@@ -1399,14 +1399,6 @@ PrefabInstance:
       propertyPath: GlobalObjectIdHash
       value: 4014219241
       objectReference: {fileID: 0}
-    - target: {fileID: 6137856269261841483, guid: 4d11e616516268c49a3530bd96c7859d, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 0.5
-      objectReference: {fileID: 0}
-    - target: {fileID: 6137856269261841483, guid: 4d11e616516268c49a3530bd96c7859d, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: -0.5
-      objectReference: {fileID: 0}
     - target: {fileID: 6804900789083310662, guid: 4d11e616516268c49a3530bd96c7859d, type: 3}
       propertyPath: m_Name
       value: CameraTestPlayer
