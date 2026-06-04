@@ -1,14 +1,12 @@
 using System.Collections.Generic;
 using Unity.Cinemachine;
+using Unity.Netcode;
 using UnityEngine;
 
-public class CameraTargetSwitcher : MonoBehaviour
+public class CameraTargetSwitcher : NetworkBehaviour
 {
     [SerializeField]
     private CinemachineCamera playerCamera;
-
-    private CinemachineBrain cinemachineBrain;
-
     private void Awake()
     {
        Initailize();
