@@ -38,7 +38,12 @@ public class Unit : NetworkBehaviour
         // 쉴드가 있으면 쉴드로 피해를 처리하고 남은 데미지 계산
         if (_health.HasShield)
         {
-            int shieldDamage = _health.CurrentShield - remainingDamage;
+            int shieldDamage = remainingDamage - _health.CurrentShield;
+            // 남은 데미지가 쉴드보다 작은 경우, 쉴드로 모든 피해를 처리하도록 shieldDamage를 조정
+            if (shieldDamage < 0)
+            {
+                shieldDamage = remainingDamage;
+            }
             _health.TakeShieldDamage(shieldDamage);
 
             UpdateNetworkShield();
@@ -162,7 +167,16 @@ public class Unit : NetworkBehaviour
     }
     #endregion
 
-    public Unit(int attackDamage, float moveSpeed, float attackSpeed, int maxHp, int defense, int maxShield)
+    /// <summary>
+    /// Unit을 상속받는 클래스에서 Unit의 기본 능력치들을 초기화하는 함수
+    /// </summary>
+    /// <param name="attackDamage">기본 공격력</param>
+    /// <param name="moveSpeed">기본 이동 속도</param>
+    /// <param name="attackSpeed">기본 공격 속도</param>
+    /// <param name="maxHp">최대 체력</param>
+    /// <param name="defense">기본 방어력</param>
+    /// <param name="maxShield">최대 쉴드</param>
+    public void Initialize(int attackDamage, float moveSpeed, float attackSpeed, int maxHp, int defense, int maxShield)
     {
         _attackDamage = attackDamage;
         _moveSpeed = moveSpeed;
