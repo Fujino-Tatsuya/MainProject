@@ -78,4 +78,7 @@ crashlytics-build.properties
 /[Aa]ssets/[Ee]ditor/
 [Aa]ssets/50.Art/
 
+# extension ignore
+*.fbx
+
 # End of https://www.toptal.com/developers/gitignore/api/unity
