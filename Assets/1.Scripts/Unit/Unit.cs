@@ -15,6 +15,15 @@ public class Unit : NetworkBehaviour
         if(!IsServer) return; // 서버에서만 공격력 변경 처리
         _attackDamage = newAttackDamage;
     }
+
+    [Rpc(SendTo.Server)]
+    public void ChangeAttackDamageValueRpc(RpcParams rpcParams = default)
+    {
+        if (rpcParams.Receive.SenderClientId != OwnerClientId)
+            return;
+
+        ChangeAttackDamageValue(AttackDamage);
+    }
     #endregion
 
     #region 체력과 방어력

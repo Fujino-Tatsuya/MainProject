@@ -103,6 +103,4 @@ public class Health
         _currentShield = 0;
         _hasShield = false;
     }
-
-
 }
