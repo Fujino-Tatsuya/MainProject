@@ -15,15 +15,6 @@ public class Unit : NetworkBehaviour
         if(!IsServer) return; // 서버에서만 공격력 변경 처리
         _attackDamage = newAttackDamage;
     }
-
-    [Rpc(SendTo.Server)]
-    public void ChangeAttackDamageValueRpc(RpcParams rpcParams = default)
-    {
-        if (rpcParams.Receive.SenderClientId != OwnerClientId)
-            return;
-
-        ChangeAttackDamageValue(AttackDamage);
-    }
     #endregion
 
     #region 체력과 방어력
@@ -173,6 +164,100 @@ public class Unit : NetworkBehaviour
     {
         if (!IsServer) return; // 서버에서만 상태 이상 변경 처리
         _statusEffectType = newStatusEffectType;
+    }
+    #endregion
+
+    #region RPC
+
+
+    [Rpc(SendTo.Server)]
+    public void ChangeAttackDamageValueRpc(int newAttackDamage, RpcParams rpcParams = default)
+    {
+        if (rpcParams.Receive.SenderClientId != OwnerClientId)
+            return;
+
+        ChangeAttackDamageValue(newAttackDamage);
+    }
+
+    [Rpc(SendTo.Server)]
+    public void TakeDamageRpc(int damage, RpcParams rpcParams = default)
+    {
+        if (rpcParams.Receive.SenderClientId != OwnerClientId)
+            return;
+
+        TakeDamage(damage);
+    }
+
+    [Rpc(SendTo.Server)]
+    public void HealHpRpc(int healAmount, RpcParams rpcParams = default)
+    {
+        if (rpcParams.Receive.SenderClientId != OwnerClientId)
+            return;
+
+        HealHp(healAmount);
+    }
+
+    [Rpc(SendTo.Server)]
+    public void IncreaseDefenseRpc(int increaseAmount, RpcParams rpcParams = default)
+    {
+        if (rpcParams.Receive.SenderClientId != OwnerClientId)
+            return;
+
+        IncreaseDefense(increaseAmount);
+    }
+
+    [Rpc(SendTo.Server)]
+    public void DecreaseDefenseRpc(int decreaseAmount, RpcParams rpcParams = default)
+    {
+        if (rpcParams.Receive.SenderClientId != OwnerClientId)
+            return;
+
+        DecreaseDefense(decreaseAmount);
+    }
+
+    [Rpc(SendTo.Server)]
+    public void IncreaseShieldRpc(int shieldAmount, RpcParams rpcParams = default)
+    {
+        if (rpcParams.Receive.SenderClientId != OwnerClientId)
+            return;
+
+        IncreaseShield(shieldAmount);
+    }
+
+    [Rpc(SendTo.Server)]
+    public void SetShieldRpc(int shieldValue, RpcParams rpcParams = default)
+    {
+        if (rpcParams.Receive.SenderClientId != OwnerClientId)
+            return;
+
+        SetShield(shieldValue);
+    }
+
+    [Rpc(SendTo.Server)]
+    public void ChangeMoveSpeedValueRpc(float newMoveSpeed, RpcParams rpcParams = default)
+    {
+        if (rpcParams.Receive.SenderClientId != OwnerClientId)
+            return;
+
+        ChangeMoveSpeedValue(newMoveSpeed);
+    }
+
+    [Rpc(SendTo.Server)]
+    public void ChangeAttackSpeedValueRpc(float newAttackSpeed, RpcParams rpcParams = default)
+    {
+        if (rpcParams.Receive.SenderClientId != OwnerClientId)
+            return;
+
+        ChangeAttackSpeedValue(newAttackSpeed);
+    }
+
+    [Rpc(SendTo.Server)]
+    public void ChangeStatusEffectTypeRpc(StatusEffectType newStatusEffectType, RpcParams rpcParams = default)
+    {
+        if (rpcParams.Receive.SenderClientId != OwnerClientId)
+            return;
+
+        ChangeStatusEffectType(newStatusEffectType);
     }
     #endregion
 
