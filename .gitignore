@@ -81,4 +81,7 @@ crashlytics-build.properties
 # extension ignore
 *.fbx
 
+# SVN folder and file
+.svn
+
 # End of https://www.toptal.com/developers/gitignore/api/unity
