@@ -4,7 +4,7 @@ using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-public class CameraTargetSwitcher : NetworkBehaviour
+public class CameraTargetSwitcher : MonoBehaviour
 {
     private const string CameraFollowTargetTag = "CameraFollowTarget";
 
