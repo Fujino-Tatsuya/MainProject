@@ -228,6 +228,8 @@ MonoBehaviour:
   m_BlackboardVariableOverridesList:
   - rid: 5035182809093243097
   - rid: 5035182901744632091
+  - rid: 5035182925311639983
+  - rid: 5035182926561018508
   m_OriginalGraph: {fileID: 0}
   m_IsInitialised: 0
   m_IsStarted: 0
@@ -251,6 +253,22 @@ MonoBehaviour:
           m_Value1: 6148736503789710872
         Name: ServerSetAnimState
         m_Value: {fileID: 52311990419430086}
+    - rid: 5035182925311639983
+      type: {class: 'BlackboardVariable`1[[TwentyThreeBasicAttackChoice, Assembly-CSharp]]', ns: Unity.Behavior, asm: Unity.Behavior}
+      data:
+        GUID:
+          m_Value0: 18137842937653405972
+          m_Value1: 15790169094875680797
+        Name: AttackChoice
+        m_Value: {fileID: 7129852271225524614}
+    - rid: 5035182926561018508
+      type: {class: 'BlackboardVariable`1[[System.Single, mscorlib]]', ns: Unity.Behavior, asm: Unity.Behavior}
+      data:
+        GUID:
+          m_Value0: 12705959001415569842
+          m_Value1: 6836732866086054585
+        Name: WalkSpeed
+        m_Value: 2
 --- !u!195 &1054250890861799072
 NavMeshAgent:
   m_ObjectHideFlags: 0
@@ -297,8 +315,9 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 3556593508814251226}
+  - component: {fileID: 7129852271225524614}
   m_Layer: 0
-  m_Name: GameObject
+  m_Name: Attacks
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -319,6 +338,28 @@ Transform:
   m_Children: []
   m_Father: {fileID: 2585134952784665517}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &7129852271225524614
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8300409248683084403}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 09473024ac015514bbaf65dd19dbf924, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TwentyThreeBasicAttackChoice
+  hookAttackDistance: 2
+  hookAttackPercentage: 30
+  upperAttackDistance: 3
+  upperAttackPercentage: 20
+  grabAttackDistance: 4
+  grabAttackPercentage: 10
+  jumpAttackDistance: 6
+  jumpAttackPercentage: 20
+  dashAttackDistance: 7
+  dashAttackPercentage: 30
 --- !u!1 &8718092995756804922
 GameObject:
   m_ObjectHideFlags: 0
