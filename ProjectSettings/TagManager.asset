@@ -5,6 +5,8 @@ TagManager:
   serializedVersion: 3
   tags:
   - CameraFollowTarget
+  - BossHomePoint
+  - BossArea
   layers:
   - Default
   - TransparentFX
