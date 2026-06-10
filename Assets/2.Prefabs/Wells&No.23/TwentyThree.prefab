@@ -102,6 +102,90 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   btAgent: {fileID: 1173616335134953240}
   navMeshAgent: {fileID: 8402773553709846297}
+--- !u!1 &5112472842191727821
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2274862431756851996}
+  - component: {fileID: 3174080452546132724}
+  - component: {fileID: 8820610430510614129}
+  - component: {fileID: 8658205103514387744}
+  m_Layer: 0
+  m_Name: UpperAttack
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2274862431756851996
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5112472842191727821}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 3556593508814251226}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &3174080452546132724
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5112472842191727821}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 2.0061078, y: 2.5931518, z: 1.2873125}
+  m_Center: {x: 0.0024816394, y: 1.2965759, z: 1.3436563}
+--- !u!114 &8820610430510614129
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5112472842191727821}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 95e4cb8fdfc80954cba9136f5e8f994a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EnableCollider
+  ShowTopMostFoldoutHeaderGroup: 1
+  _isServerAuthority: 1
+  _initValue: 0
+--- !u!114 &8658205103514387744
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5112472842191727821}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9ade2f62ff4dc90419b84d90209441d5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BaseWeapon
+  _damage: 0
+  _isGroggyAttack: 0
 --- !u!1 &5372104213593212626
 GameObject:
   m_ObjectHideFlags: 0
@@ -152,7 +236,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 739404150
+  GlobalObjectIdHash: 1745528080
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -195,12 +279,12 @@ MonoBehaviour:
   SyncPositionX: 1
   SyncPositionY: 1
   SyncPositionZ: 1
-  SyncRotAngleX: 1
+  SyncRotAngleX: 0
   SyncRotAngleY: 1
-  SyncRotAngleZ: 1
-  SyncScaleX: 1
-  SyncScaleY: 1
-  SyncScaleZ: 1
+  SyncRotAngleZ: 0
+  SyncScaleX: 0
+  SyncScaleY: 0
+  SyncScaleZ: 0
   PositionThreshold: 0.001
   RotAngleThreshold: 0.01
   ScaleThreshold: 0.01
@@ -230,6 +314,8 @@ MonoBehaviour:
   - rid: 5035182901744632091
   - rid: 5035182925311639983
   - rid: 5035182926561018508
+  - rid: 5035182941922919282
+  - rid: 5035182944123880110
   m_OriginalGraph: {fileID: 0}
   m_IsInitialised: 0
   m_IsStarted: 0
@@ -269,6 +355,22 @@ MonoBehaviour:
           m_Value1: 6836732866086054585
         Name: WalkSpeed
         m_Value: 2
+    - rid: 5035182941922919282
+      type: {class: 'BlackboardVariable`1[[UnityEngine.Animator, UnityEngine.AnimationModule]]', ns: Unity.Behavior, asm: Unity.Behavior}
+      data:
+        GUID:
+          m_Value0: 891075477305766340
+          m_Value1: 8919902273331475158
+        Name: MyAnimator
+        m_Value: {fileID: 4360647608449234546}
+    - rid: 5035182944123880110
+      type: {class: 'BlackboardVariable`1[[EnableCollider, Assembly-CSharp]]', ns: Unity.Behavior, asm: Unity.Behavior}
+      data:
+        GUID:
+          m_Value0: 13109639695138280437
+          m_Value1: 1671448159921255291
+        Name: UpperAttackCollider
+        m_Value: {fileID: 8820610430510614129}
 --- !u!195 &1054250890861799072
 NavMeshAgent:
   m_ObjectHideFlags: 0
@@ -335,7 +437,8 @@ Transform:
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 2274862431756851996}
   m_Father: {fileID: 2585134952784665517}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &7129852271225524614
@@ -405,6 +508,10 @@ PrefabInstance:
       propertyPath: m_Controller
       value: 
       objectReference: {fileID: 9100000, guid: 31d04fbded57bff4b839713ec2cca9de, type: 2}
+    - target: {fileID: 4608369919061240865, guid: 0b61d617ad0871e44acc43a49be710cf, type: 3}
+      propertyPath: m_ApplyRootMotion
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 7088600385777052897, guid: 0b61d617ad0871e44acc43a49be710cf, type: 3}
       propertyPath: m_Name
       value: Amature
