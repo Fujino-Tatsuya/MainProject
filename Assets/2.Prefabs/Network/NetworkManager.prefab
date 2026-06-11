@@ -138,7 +138,5 @@ MonoBehaviour:
   targetSceneName: Temp_inGameScene
   minimumVisibleSeconds: 5
   readyMessageSeconds: 2.5
-  progressReportInterval: 0.1
-  sceneLoadWeight: 1
   requireLobbyReadyToStart: 1
   debugLogging: 0
