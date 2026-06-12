@@ -10,5 +10,5 @@ public enum StatusEffectType
     Slowed = 1 << 2,         // µÐÈ­
     Rooted = 1 << 3,         // ¼Ó¹Ú
     Silenced = 1 << 4,       // Ä§¹¬(½ºÅ³ ºÀÀÎ)
-    Debilitated = 1 << 5     // ¾àÈ­(´ë½¬X, µÐÈ­)
+    Debilitated = 1 << 5,    // ¾àÈ­(´ë½¬X, µÐÈ­)
 }
