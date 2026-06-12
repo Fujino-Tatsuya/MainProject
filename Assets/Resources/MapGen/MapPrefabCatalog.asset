@@ -21,9 +21,9 @@ MonoBehaviour:
   - {fileID: 1957021531820338, guid: 7cca0ece1b5e5374991c1edafd5314b2, type: 3}
   - {fileID: 1249707538929122, guid: 5be022cbfecfcf8478a5658a5142f700, type: 3}
   Tier2Obstacles:
-  - {fileID: 8243285855701492715, guid: a2828531b1e34f94a8dd016b277d4cfc, type: 3}
+  - {fileID: 1402279105088362049, guid: a2828531b1e34f94a8dd016b277d4cfc, type: 3}
   Tier3Obstacles:
-  - {fileID: 3255004225863579499, guid: 78aa47cf2a4a3ed439549a76b081bbc0, type: 3}
+  - {fileID: 7446573032957620201, guid: 78aa47cf2a4a3ed439549a76b081bbc0, type: 3}
   Tier3Recovery:
   - {fileID: 1187625364453610, guid: c56b7bbe609f8bc4bb153e1e148fabcf, type: 3}
   Tier3Teleport:
@@ -36,9 +36,9 @@ MonoBehaviour:
   Tier1Rotation: {x: -90, y: 0, z: 0}
   SpawnStructureRotation: {x: -90, y: 0, z: 0}
   Tier3Scale: 2.5
-  BossAreaMarker: {fileID: 4673329821738574558, guid: 53d1d6d4ed204b449ba71955773096c0, type: 3}
-  SpawnAreaMarker: {fileID: 1983519631449714005, guid: 03055b4f319e2354695744c8240c8509, type: 3}
-  QuestAreaMarker: {fileID: 4652151505965226060, guid: 39f7e1bbdd2fe78408e6c91e7a5338e2, type: 3}
+  BossAreaMarker: {fileID: 6257232294707993470, guid: 53d1d6d4ed204b449ba71955773096c0, type: 3}
+  SpawnAreaMarker: {fileID: 4836647589428915071, guid: 03055b4f319e2354695744c8240c8509, type: 3}
+  QuestAreaMarker: {fileID: 6894159624124694603, guid: 39f7e1bbdd2fe78408e6c91e7a5338e2, type: 3}
   AreaMarkerSize: 20
   FloorTiles:
   - {fileID: 1762945973701536, guid: 27e2f0253f3de9a4baa6aba994ff3eb7, type: 3}

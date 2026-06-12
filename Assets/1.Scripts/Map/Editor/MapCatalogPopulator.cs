@@ -19,17 +19,20 @@ public static class MapCatalogPopulator
             Debug.Log("[MapCatalogPopulator] MapPrefabCatalog.asset 생성.");
         }
 
+        // 아트는 50.Art/MapGen(SVN 영역)으로 이동됨 — 여기 기준으로 로드
+        const string Art = "Assets/50.Art/MapGen";
+
         // 1티어(대형) — FBX
         catalog.Tier1Nodes = LoadAll(
-            "Assets/Resources/MapGen/Prefabs/node_factory.fbx",
-            "Assets/Resources/MapGen/Prefabs/node_hospitalroom.fbx",
-            "Assets/Resources/MapGen/Prefabs/node_operationroom.fbx");
+            $"{Art}/Nodes/node_factory.fbx",
+            $"{Art}/Nodes/node_hospitalroom.fbx",
+            $"{Art}/Nodes/node_operationroom.fbx");
 
         // 2티어(중형) — 노드 / 장애물(큐브 프리미티브, 다른 2티어급 크기)
         catalog.Tier2Props = LoadAll(
-            "Assets/Synty/PolygonConstruction/Prefabs/Props/SM_Prop_Pallet_03.prefab",
-            "Assets/Synty/PolygonConstruction/Prefabs/Buildings/SM_Bld_ConcreteFrame_Pillar_03.prefab",
-            "Assets/Synty/PolygonConstruction/Prefabs/Props/SM_Prop_Shipping_Container_01.prefab");
+            $"{Art}/Synty/PolygonConstruction/Prefabs/Props/SM_Prop_Pallet_03.prefab",
+            $"{Art}/Synty/PolygonConstruction/Prefabs/Buildings/SM_Bld_ConcreteFrame_Pillar_03.prefab",
+            $"{Art}/Synty/PolygonConstruction/Prefabs/Props/SM_Prop_Shipping_Container_01.prefab");
         catalog.Tier2Obstacles = new List<GameObject>
         {
             GetOrCreatePrimitive("Tier2_Obstacle_Cube", PrimitiveType.Cube,
@@ -43,26 +46,26 @@ public static class MapCatalogPopulator
             GetOrCreatePrimitive("Tier3_Obstacle_Circle", PrimitiveType.Sphere,
                 new Color(0.7f, 0.7f, 0.7f), new Vector3(1.5f, 1.5f, 1.5f))
         };
-        catalog.Tier3Recovery = LoadAll("Assets/Synty/PolygonConstruction/Prefabs/Props/SM_Prop_BarrelStack_01.prefab");
-        catalog.Tier3Teleport = LoadAll("Assets/Synty/PolygonConstruction/Prefabs/Props/SM_Prop_Brick_Stack_04.prefab");
-        catalog.Tier3Buff = LoadAll("Assets/Synty/PolygonConstruction/Prefabs/Props/SM_Prop_ConcreteBag_Stack_03.prefab");
+        catalog.Tier3Recovery = LoadAll($"{Art}/Synty/PolygonConstruction/Prefabs/Props/SM_Prop_BarrelStack_01.prefab");
+        catalog.Tier3Teleport = LoadAll($"{Art}/Synty/PolygonConstruction/Prefabs/Props/SM_Prop_Brick_Stack_04.prefab");
+        catalog.Tier3Buff = LoadAll($"{Art}/Synty/PolygonConstruction/Prefabs/Props/SM_Prop_ConcreteBag_Stack_03.prefab");
 
         // 플레이어 스폰 영역 구조물
         catalog.SpawnAreaStructure = AssetDatabase.LoadAssetAtPath<GameObject>(
-            "Assets/Resources/MapGen/Prefabs/node_spownpoint.fbx");
+            $"{Art}/Nodes/node_spownpoint.fbx");
         if (catalog.SpawnAreaStructure == null) Debug.LogWarning("[MapCatalogPopulator] node_spownpoint.fbx 못 찾음");
 
         // 고정 지형 — 바닥 4종 / 외벽 2종 (존별 텍스처 통일) / 통로 문 벽
         catalog.FloorTiles = LoadAll(
-            "Assets/Synty/PolygonConstruction/Prefabs/Buildings/SM_Bld_Concrete_Floor_01.prefab",
-            "Assets/Synty/PolygonConstruction/Prefabs/Buildings/SM_Bld_Concrete_Floor_02.prefab",
-            "Assets/Synty/PolygonConstruction/Prefabs/Buildings/SM_Bld_Concrete_Floor_03.prefab",
-            "Assets/Synty/PolygonConstruction/Prefabs/Buildings/SM_Bld_Concrete_Floor_04.prefab");
+            $"{Art}/Synty/PolygonConstruction/Prefabs/Buildings/SM_Bld_Concrete_Floor_01.prefab",
+            $"{Art}/Synty/PolygonConstruction/Prefabs/Buildings/SM_Bld_Concrete_Floor_02.prefab",
+            $"{Art}/Synty/PolygonConstruction/Prefabs/Buildings/SM_Bld_Concrete_Floor_03.prefab",
+            $"{Art}/Synty/PolygonConstruction/Prefabs/Buildings/SM_Bld_Concrete_Floor_04.prefab");
         catalog.WallFences = LoadAll(
-            "Assets/Synty/PolygonConstruction/Prefabs/Buildings/SM_Bld_Concrete_Wall_01.prefab",
-            "Assets/Synty/PolygonConstruction/Prefabs/Buildings/SM_Bld_Concrete_Wall_02.prefab");
+            $"{Art}/Synty/PolygonConstruction/Prefabs/Buildings/SM_Bld_Concrete_Wall_01.prefab",
+            $"{Art}/Synty/PolygonConstruction/Prefabs/Buildings/SM_Bld_Concrete_Wall_02.prefab");
         catalog.WallDoor = AssetDatabase.LoadAssetAtPath<GameObject>(
-            "Assets/Synty/PolygonConstruction/Prefabs/Buildings/SM_Bld_House_Wall_Door_03.prefab");
+            $"{Art}/Synty/PolygonConstruction/Prefabs/Buildings/SM_Bld_House_Wall_Door_03.prefab");
         if (catalog.WallDoor == null) Debug.LogWarning("[MapCatalogPopulator] SM_Bld_House_Wall_Door_03 못 찾음");
 
         // 역할 영역 마커 (Quad + 아이콘 텍스처)
@@ -116,6 +119,14 @@ public static class MapCatalogPopulator
     // 프리미티브 더미 프리팹 생성 (있으면 재사용) — 장애물 표시용
     private static GameObject GetOrCreatePrimitive(string name, PrimitiveType type, Color color, Vector3 scale)
     {
+        // 폴더가 지워졌어도 재생성 가능하도록 보장
+        if (!AssetDatabase.IsValidFolder("Assets/Resources"))
+            AssetDatabase.CreateFolder("Assets", "Resources");
+        if (!AssetDatabase.IsValidFolder("Assets/Resources/MapGen"))
+            AssetDatabase.CreateFolder("Assets/Resources", "MapGen");
+        if (!AssetDatabase.IsValidFolder("Assets/Resources/MapGen/Prefabs"))
+            AssetDatabase.CreateFolder("Assets/Resources/MapGen", "Prefabs");
+
         string prefabPath = $"Assets/Resources/MapGen/Prefabs/{name}.prefab";
         var existing = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
         if (existing != null) return existing;
