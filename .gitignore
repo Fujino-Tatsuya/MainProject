@@ -76,9 +76,42 @@ crashlytics-build.properties
 
 # Editor folder ignore
 /[Aa]ssets/[Ee]ditor/
-[Aa]ssets/50.Art/
 
-# extension ignore
-*.fbx
+# 50.Art folder - Media Asset Ignore Lists
+# (폴더 내의 .meta 파일은 자동으로 추적되며, 아래 확장자들만 제외됩니다)
+[Aa]ssets/50.Art/**/*.fbx
+[Aa]ssets/50.Art/**/*.obj
+[Aa]ssets/50.Art/**/*.max
+[Aa]ssets/50.Art/**/*.blend
+
+# Textures & Images
+[Aa]ssets/50.Art/**/*.png
+[Aa]ssets/50.Art/**/*.jpg
+[Aa]ssets/50.Art/**/*.jpeg
+[Aa]ssets/50.Art/**/*.tga
+[Aa]ssets/50.Art/**/*.psd
+[Aa]ssets/50.Art/**/*.tiff
+[Aa]ssets/50.Art/**/*.exr
+[Aa]ssets/50.Art/**/*.hdr
+
+# Video Assets
+[Aa]ssets/50.Art/**/*.mp4
+[Aa]ssets/50.Art/**/*.mov
+[Aa]ssets/50.Art/**/*.avi
+[Aa]ssets/50.Art/**/*.mkv
+[Aa]ssets/50.Art/**/*.webm
+
+# Audio Assets
+[Aa]ssets/50.Art/**/*.wav
+[Aa]ssets/50.Art/**/*.mp3
+[Aa]ssets/50.Art/**/*.ogg
+[Aa]ssets/50.Art/**/*.flac
+[Aa]ssets/50.Art/**/*.aif
+[Aa]ssets/50.Art/**/*.aiff
+
+*.zip
+
+# SVN folder and file
+.svn
 
 # End of https://www.toptal.com/developers/gitignore/api/unity
