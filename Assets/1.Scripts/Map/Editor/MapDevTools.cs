@@ -159,6 +159,47 @@ public static class MapDevTools
         Debug.Log(sb.ToString());
     }
 
+    // 네트워크 통합 배선: MapScene을 빌드 세팅에 추가 + MapNetworkSync(NetworkObject) 배치
+    // (로딩 플로우의 targetSceneName=MapScene 과 한 세트 — NGO가 MapScene 로드 시 자동 생성 시작)
+    [MenuItem("VeyTrace/Map/Wire Network Integration")]
+    public static void WireNetworkIntegration()
+    {
+        // 1) MapScene 빌드 세팅 등록 (NetworkSceneManager는 빌드 목록의 씬만 로드 가능)
+        const string mapScenePath = "Assets/0.Scenes/MapScene.unity";
+        var scenes = new System.Collections.Generic.List<EditorBuildSettingsScene>(EditorBuildSettings.scenes);
+        if (!scenes.Exists(s => s.path == mapScenePath))
+        {
+            scenes.Add(new EditorBuildSettingsScene(mapScenePath, true));
+            EditorBuildSettings.scenes = scenes.ToArray();
+            Debug.Log("[WireNet] MapScene을 빌드 세팅에 추가.");
+        }
+
+        // 2) MapScene에 MapNetworkSync + NetworkObject 배선
+        var mg = Object.FindFirstObjectByType<MapGenerator>();
+        if (mg == null)
+        {
+            Debug.LogWarning("[WireNet] MapGenerator 없음 — MapScene을 열고 실행할 것.");
+            return;
+        }
+
+        var syncGo = GameObject.Find("MapNetworkSync");
+        if (syncGo == null) syncGo = new GameObject("MapNetworkSync");
+
+        if (syncGo.GetComponent<Unity.Netcode.NetworkObject>() == null)
+            syncGo.AddComponent<Unity.Netcode.NetworkObject>();
+
+        var sync = syncGo.GetComponent<MapNetworkSync>();
+        if (sync == null) sync = syncGo.AddComponent<MapNetworkSync>();
+
+        // private [SerializeField] mapGenerator 연결
+        var so = new SerializedObject(sync);
+        so.FindProperty("mapGenerator").objectReferenceValue = mg;
+        so.ApplyModifiedProperties();
+
+        EditorSceneManager.MarkSceneDirty(syncGo.scene);
+        Debug.Log("[WireNet] MapNetworkSync 배선 완료 (NetworkObject + mapGenerator 참조). 씬 저장 필요.");
+    }
+
     // 오버뷰 맵 UI 토글 (플레이 모드 테스트용 — 게임에선 M 키)
     [MenuItem("VeyTrace/Map/Toggle Overview UI")]
     public static void ToggleOverviewUI()

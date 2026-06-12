@@ -135,7 +135,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   loadingSceneName: LoadingScene
-  targetSceneName: Temp_inGameScene
+  targetSceneName: MapScene
   minimumVisibleSeconds: 5
   readyMessageSeconds: 2.5
   requireLobbyReadyToStart: 1
