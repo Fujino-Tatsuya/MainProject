@@ -77,6 +77,7 @@ crashlytics-build.properties
 # Editor folder ignore
 /[Aa]ssets/[Ee]ditor/
 [Aa]ssets/50.Art/
+![Aa]ssets/50.Art/**/*.meta
 
 # extension ignore
 *.fbx
