@@ -5,11 +5,13 @@ using UnityEngine;
 public class NetworkSessionLauncher : MonoBehaviour
 {
     NetworkManager _networkManager;
+    NetworkLoadingFlowController _loadingFlowController;
     public GameObject ButtonGroup;
 
     private void Awake()
     {
         _networkManager = GetComponent<NetworkManager>();
+        _loadingFlowController = GetComponent<NetworkLoadingFlowController>();
 
         if(ButtonGroup == null)
         {
@@ -19,25 +21,63 @@ public class NetworkSessionLauncher : MonoBehaviour
 
     public void StartHost()
     {
-        _networkManager.StartHost();
-        ButtonGroup.SetActive(false);
+        if (_networkManager.StartHost())
+        {
+            RegisterLoadingFlowCallbacks();
+            SetButtonGroupActive(false);
+        }
     }
 
     public void StartClient()
     {
-        _networkManager.StartClient();
-        ButtonGroup.SetActive(false);
+        if (_networkManager.StartClient())
+        {
+            RegisterLoadingFlowCallbacks();
+            SetButtonGroupActive(false);
+        }
     }
 
     public void StartServer()
     {
-        _networkManager.StartServer();
-        ButtonGroup.SetActive(false);
+        if (_networkManager.StartServer())
+        {
+            RegisterLoadingFlowCallbacks();
+            SetButtonGroupActive(false);
+        }
     }
 
     public void OnSetConnectionData(string ip)
     {
         NetworkManager.Singleton.GetComponent<UnityTransport>().SetConnectionData(ip, 7777);
+    }
+
+    public void StartGameLoading()
+    {
+        RegisterLoadingFlowCallbacks();
+        _loadingFlowController?.StartGameLoading();
+    }
+
+    private void RegisterLoadingFlowCallbacks()
+    {
+        if (_loadingFlowController == null)
+        {
+            _loadingFlowController = GetComponent<NetworkLoadingFlowController>();
+        }
+
+        if (_loadingFlowController == null)
+        {
+            _loadingFlowController = gameObject.AddComponent<NetworkLoadingFlowController>();
+        }
+
+        _loadingFlowController?.RegisterNetworkCallbacks();
+    }
+
+    private void SetButtonGroupActive(bool active)
+    {
+        if (ButtonGroup != null)
+        {
+            ButtonGroup.SetActive(active);
+        }
     }
 
     private void OnApplicationQuit()

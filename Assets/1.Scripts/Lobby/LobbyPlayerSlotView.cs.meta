@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: de175a4278a3f044bb4bf8d7f464e29b
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - connectedImage: {instanceID: 0}
+  - readyImage: {instanceID: 0}
+  - connectedSprite: {fileID: 21300000, guid: bd508104de8e5844fb45c2fd40539f64, type: 3}
+  - disconnectedSprite: {fileID: 21300000, guid: bd508104de8e5844fb45c2fd40539f64, type: 3}
+  - readySprite: {fileID: 21300000, guid: f9658c2d1bdf0ea48b01bf532e851e14, type: 3}
+  - notReadySprite: {fileID: 21300000, guid: f9658c2d1bdf0ea48b01bf532e851e14, type: 3}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
