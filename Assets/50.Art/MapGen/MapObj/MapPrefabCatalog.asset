@@ -40,6 +40,9 @@ MonoBehaviour:
   SpawnAreaMarker: {fileID: 4836647589428915071, guid: 03055b4f319e2354695744c8240c8509, type: 3}
   QuestAreaMarker: {fileID: 6894159624124694603, guid: 39f7e1bbdd2fe78408e6c91e7a5338e2, type: 3}
   AreaMarkerSize: 20
+  BossIcon: {fileID: 2800000, guid: 4647253d7b3344e4e904fe50ffa0af77, type: 3}
+  SpawnIcon: {fileID: 2800000, guid: 7a324d5a4f089ea4d8fd8a6dcc524583, type: 3}
+  QuestIcon: {fileID: 2800000, guid: 991f6db95e5cec3438aea0484767d49d, type: 3}
   FloorTiles:
   - {fileID: 1762945973701536, guid: 27e2f0253f3de9a4baa6aba994ff3eb7, type: 3}
   - {fileID: 1139298442579984, guid: 69bfa6c642d9c9846baa1c4024f377f3, type: 3}

@@ -18,7 +18,7 @@ public static class MapGeometryBuilder
     [MenuItem("VeyTrace/Map/Build Map Geometry (Floors+Walls+Corridors)")]
     public static void Build()
     {
-        var catalog = AssetDatabase.LoadAssetAtPath<MapPrefabCatalogSO>("Assets/Resources/MapGen/MapPrefabCatalog.asset");
+        var catalog = AssetDatabase.LoadAssetAtPath<MapPrefabCatalogSO>(MapEditorPaths.CatalogPath);
         if (catalog == null || catalog.FloorTiles.Count == 0 || catalog.WallFences.Count == 0)
         {
             Debug.LogWarning("[MapGeometry] 카탈로그의 바닥/벽 풀이 비어있음 — 먼저 'Populate Prefab Catalog' 실행.");

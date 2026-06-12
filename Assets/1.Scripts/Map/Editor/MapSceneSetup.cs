@@ -26,15 +26,15 @@ public static class MapSceneSetup
         var overview = GetOrAdd<MapOverviewUI>(mg.gameObject);
         overview.Generator = mg;
 
-        // 에셋 로드
-        mg.Config = AssetDatabase.LoadAssetAtPath<MapGenConfigSO>("Assets/Resources/MapGen/MapGenConfig.asset");
-        mg.Catalog = AssetDatabase.LoadAssetAtPath<MapPrefabCatalogSO>("Assets/Resources/MapGen/MapPrefabCatalog.asset");
+        // 에셋 로드 (경로는 MapEditorPaths 단일 출처)
+        mg.Config = AssetDatabase.LoadAssetAtPath<MapGenConfigSO>(MapEditorPaths.ConfigPath);
+        mg.Catalog = AssetDatabase.LoadAssetAtPath<MapPrefabCatalogSO>(MapEditorPaths.CatalogPath);
 
         // ZoneDef_1~10 순서대로
         var zones = new List<ZoneDefinitionSO>();
         for (int i = 1; i <= 10; i++)
         {
-            var z = AssetDatabase.LoadAssetAtPath<ZoneDefinitionSO>($"Assets/Resources/MapGen/ZoneDef_{i}.asset");
+            var z = AssetDatabase.LoadAssetAtPath<ZoneDefinitionSO>(MapEditorPaths.ZoneDefPath(i));
             if (z != null) zones.Add(z);
             else Debug.LogWarning($"[MapSceneSetup] ZoneDef_{i} 못 찾음");
         }

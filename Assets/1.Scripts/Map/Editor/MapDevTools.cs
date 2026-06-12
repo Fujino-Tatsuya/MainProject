@@ -32,7 +32,7 @@ public static class MapDevTools
         int created = 0;
         for (int i = 1; i <= count; i++)
         {
-            var zone = AssetDatabase.LoadAssetAtPath<ZoneDefinitionSO>($"Assets/Resources/MapGen/ZoneDef_{i}.asset");
+            var zone = AssetDatabase.LoadAssetAtPath<ZoneDefinitionSO>(MapEditorPaths.ZoneDefPath(i));
             int col = (i - 1) % cols;
             int row = (i - 1) / cols;
             Vector3 pos = new Vector3(originX + col * cellW, center.y, originZ - row * cellD);
@@ -83,7 +83,7 @@ public static class MapDevTools
         int moved = 0, created = 0;
         foreach (var entry in layout)
         {
-            var zoneAsset = AssetDatabase.LoadAssetAtPath<ZoneDefinitionSO>($"Assets/Resources/MapGen/ZoneDef_{entry.zone}.asset");
+            var zoneAsset = AssetDatabase.LoadAssetAtPath<ZoneDefinitionSO>(MapEditorPaths.ZoneDefPath(entry.zone));
             if (zoneAsset == null) { Debug.LogWarning($"[ZoneLayout] ZoneDef_{entry.zone} 못 찾음"); continue; }
 
             ZoneVolume vol = null;

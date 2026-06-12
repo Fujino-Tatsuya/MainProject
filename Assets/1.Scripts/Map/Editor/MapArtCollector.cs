@@ -9,11 +9,11 @@ using System.Text;
 //  - 이동 후 남은 Assets/Synty, Assets/POLYBOX 원본 팩은 SVN에 올릴 필요 없음
 public static class MapArtCollector
 {
-    private const string DestRoot = "Assets/50.Art/MapGen";
+    private const string DestRoot = MapEditorPaths.ArtRoot;
 
     private static readonly string[] Roots =
     {
-        "Assets/Resources/MapGen/MapPrefabCatalog.asset",
+        MapEditorPaths.CatalogPath,
         "Assets/2.Prefabs/Map/Stage1.prefab",
         "Assets/0.Scenes/MapScene.unity",
     };
@@ -28,13 +28,11 @@ public static class MapArtCollector
 
         foreach (string dep in deps)
         {
+            // 외부 에셋팩만 수집 대상 (이미 50.Art로 옮긴 것은 자동 제외)
             bool isPackArt = dep.StartsWith("Assets/Synty/") || dep.StartsWith("Assets/POLYBOX/");
-            bool isNodeFbx = dep.StartsWith("Assets/Resources/MapGen/Prefabs/") && dep.EndsWith(".fbx");
-            if (!isPackArt && !isNodeFbx) { skipped++; continue; }
+            if (!isPackArt) { skipped++; continue; }
 
-            string dest = isNodeFbx
-                ? $"{DestRoot}/Nodes/{Path.GetFileName(dep)}"
-                : $"{DestRoot}/{dep.Substring("Assets/".Length)}"; // Synty/... 구조 유지
+            string dest = $"{DestRoot}/{dep.Substring("Assets/".Length)}"; // 팩 구조 유지
 
             EnsureFolder(Path.GetDirectoryName(dest).Replace('\\', '/'));
 

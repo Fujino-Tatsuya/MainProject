@@ -50,7 +50,12 @@ public class MapPrefabCatalogSO : ScriptableObject
     [Tooltip("퀘스트로 뽑힌 존 중앙 바닥 표시")]
     public GameObject QuestAreaMarker;
     [Tooltip("마커 한 변 크기")]
-    public float AreaMarkerSize = 10f;
+    public float AreaMarkerSize = 20f;
+
+    [Header("=== 오버뷰 UI 아이콘 (Resources 밖으로 이동 → 직렬화 참조, 빌드 안전) ===")]
+    public Texture2D BossIcon;
+    public Texture2D SpawnIcon;
+    public Texture2D QuestIcon;
 
     [Header("=== 고정 지형 (맵 지오메트리 빌드 툴용) ===")]
     [Tooltip("바닥 타일 — 존별 하나씩 순환 사용")]

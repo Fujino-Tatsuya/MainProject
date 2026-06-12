@@ -6,7 +6,7 @@ using System.Collections.Generic;
 // (GUID/fileID 수기 작성 대신 AssetDatabase 경로 로드로 안전하게 연결)
 public static class MapCatalogPopulator
 {
-    private const string CatalogPath = "Assets/Resources/MapGen/MapPrefabCatalog.asset";
+    private const string CatalogPath = MapEditorPaths.CatalogPath;
 
     [MenuItem("VeyTrace/Map/Populate Prefab Catalog")]
     public static void Populate()
@@ -19,8 +19,8 @@ public static class MapCatalogPopulator
             Debug.Log("[MapCatalogPopulator] MapPrefabCatalog.asset 생성.");
         }
 
-        // 아트는 50.Art/MapGen(SVN 영역)으로 이동됨 — 여기 기준으로 로드
-        const string Art = "Assets/50.Art/MapGen";
+        // 아트는 50.Art/MapGen(SVN 영역)으로 이동됨 — 경로는 MapEditorPaths 단일 출처
+        const string Art = MapEditorPaths.ArtRoot;
 
         // 1티어(대형) — FBX
         catalog.Tier1Nodes = LoadAll(
@@ -69,9 +69,15 @@ public static class MapCatalogPopulator
         if (catalog.WallDoor == null) Debug.LogWarning("[MapCatalogPopulator] SM_Bld_House_Wall_Door_03 못 찾음");
 
         // 역할 영역 마커 (Quad + 아이콘 텍스처)
-        catalog.BossAreaMarker = GetOrCreateMarkerQuad("Marker_BossArea", "Assets/Resources/MapGen/Boss.png", new Color(0.85f, 0.2f, 0.2f));
-        catalog.SpawnAreaMarker = GetOrCreateMarkerQuad("Marker_SpawnArea", "Assets/Resources/MapGen/Spawn.png", new Color(0.2f, 0.85f, 0.35f));
-        catalog.QuestAreaMarker = GetOrCreateMarkerQuad("Marker_QuestArea", "Assets/Resources/MapGen/Quest.png", new Color(0.95f, 0.8f, 0.2f));
+        catalog.BossAreaMarker = GetOrCreateMarkerQuad("Marker_BossArea", MapEditorPaths.IconPath("Boss"), new Color(0.85f, 0.2f, 0.2f));
+        catalog.SpawnAreaMarker = GetOrCreateMarkerQuad("Marker_SpawnArea", MapEditorPaths.IconPath("Spawn"), new Color(0.2f, 0.85f, 0.35f));
+        catalog.QuestAreaMarker = GetOrCreateMarkerQuad("Marker_QuestArea", MapEditorPaths.IconPath("Quest"), new Color(0.95f, 0.8f, 0.2f));
+
+        // 오버뷰 UI 아이콘 — Resources 밖이라 Resources.Load 불가 → 카탈로그 직렬화 참조(빌드 안전)
+        catalog.BossIcon = AssetDatabase.LoadAssetAtPath<Texture2D>(MapEditorPaths.IconPath("Boss"));
+        catalog.SpawnIcon = AssetDatabase.LoadAssetAtPath<Texture2D>(MapEditorPaths.IconPath("Spawn"));
+        catalog.QuestIcon = AssetDatabase.LoadAssetAtPath<Texture2D>(MapEditorPaths.IconPath("Quest"));
+        if (catalog.BossIcon == null) Debug.LogWarning("[MapCatalogPopulator] 오버뷰 아이콘 PNG 못 찾음 — " + MapEditorPaths.IconPath("Boss"));
 
         EditorUtility.SetDirty(catalog);
         AssetDatabase.SaveAssets();
@@ -85,7 +91,7 @@ public static class MapCatalogPopulator
         var prefab = GetOrCreatePrimitive(name, PrimitiveType.Quad, fallback, Vector3.one);
 
         var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath);
-        var mat = AssetDatabase.LoadAssetAtPath<Material>($"Assets/Resources/MapGen/Prefabs/{name}_Mat.mat");
+        var mat = AssetDatabase.LoadAssetAtPath<Material>($"{MapEditorPaths.PrimitivesFolder}/{name}_Mat.mat");
         if (mat == null) return prefab;
 
         // 아이콘이 라이팅 영향 없이 또렷하게 보이도록 Unlit + 알파 투명
@@ -120,14 +126,9 @@ public static class MapCatalogPopulator
     private static GameObject GetOrCreatePrimitive(string name, PrimitiveType type, Color color, Vector3 scale)
     {
         // 폴더가 지워졌어도 재생성 가능하도록 보장
-        if (!AssetDatabase.IsValidFolder("Assets/Resources"))
-            AssetDatabase.CreateFolder("Assets", "Resources");
-        if (!AssetDatabase.IsValidFolder("Assets/Resources/MapGen"))
-            AssetDatabase.CreateFolder("Assets/Resources", "MapGen");
-        if (!AssetDatabase.IsValidFolder("Assets/Resources/MapGen/Prefabs"))
-            AssetDatabase.CreateFolder("Assets/Resources/MapGen", "Prefabs");
+        EnsureFolder(MapEditorPaths.PrimitivesFolder);
 
-        string prefabPath = $"Assets/Resources/MapGen/Prefabs/{name}.prefab";
+        string prefabPath = $"{MapEditorPaths.PrimitivesFolder}/{name}.prefab";
         var existing = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
         if (existing != null) return existing;
 
@@ -135,7 +136,7 @@ public static class MapCatalogPopulator
         obj.name = name;
         obj.transform.localScale = scale;
 
-        string matPath = $"Assets/Resources/MapGen/Prefabs/{name}_Mat.mat";
+        string matPath = $"{MapEditorPaths.PrimitivesFolder}/{name}_Mat.mat";
         var mat = AssetDatabase.LoadAssetAtPath<Material>(matPath);
         if (mat == null)
         {
@@ -150,6 +151,15 @@ public static class MapCatalogPopulator
         Object.DestroyImmediate(obj);
         Debug.Log($"[MapCatalogPopulator] 프리미티브 생성: {prefabPath}");
         return prefab;
+    }
+
+    // 중첩 경로 재귀 생성
+    private static void EnsureFolder(string folder)
+    {
+        if (string.IsNullOrEmpty(folder) || AssetDatabase.IsValidFolder(folder)) return;
+        string parent = System.IO.Path.GetDirectoryName(folder).Replace('\\', '/');
+        EnsureFolder(parent);
+        AssetDatabase.CreateFolder(parent, System.IO.Path.GetFileName(folder));
     }
 
     private static List<GameObject> LoadAll(params string[] paths)

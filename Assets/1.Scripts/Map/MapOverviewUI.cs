@@ -189,23 +189,22 @@ public class MapOverviewUI : MonoBehaviour
             }
         }
 
-        // 3) 역할 아이콘 (Resources/MapGen의 Boss/Spawn/Quest 텍스처)
-        PlaceRoleIcon(volumes, ZoneRole.BossRoom, "MapGen/Boss", WorldToMap);
-        PlaceRoleIcon(volumes, ZoneRole.PlayerSpawn, "MapGen/Spawn", WorldToMap);
-        PlaceRoleIcon(volumes, ZoneRole.Quest, "MapGen/Quest", WorldToMap);
+        // 3) 역할 아이콘 — 텍스처가 Resources 밖(50.Art)으로 이동해 Resources.Load 불가
+        //    → 카탈로그 직렬화 참조 사용 (빌드에서도 동작)
+        var cat = Generator != null ? Generator.Catalog : null;
+        PlaceRoleIcon(volumes, ZoneRole.BossRoom, cat != null ? cat.BossIcon : null, WorldToMap);
+        PlaceRoleIcon(volumes, ZoneRole.PlayerSpawn, cat != null ? cat.SpawnIcon : null, WorldToMap);
+        PlaceRoleIcon(volumes, ZoneRole.Quest, cat != null ? cat.QuestIcon : null, WorldToMap);
     }
 
-    private void PlaceRoleIcon(ZoneVolume[] volumes, ZoneRole role, string resourcePath,
+    private void PlaceRoleIcon(ZoneVolume[] volumes, ZoneRole role, Texture2D tex,
         System.Func<float, float, Vector2> worldToMap)
     {
-        if (Generator == null) return;
+        if (Generator == null || tex == null) return;
 
         foreach (var v in volumes)
         {
             if (v.Zone == null || Generator.GetZoneRole(v.Zone) != role) continue;
-
-            var tex = Resources.Load<Texture2D>(resourcePath);
-            if (tex == null) return;
 
             var img = MakeImage($"Icon_{role}", Color.white);
             img.sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), Vector2.one * 0.5f);
