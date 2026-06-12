@@ -19,12 +19,14 @@ public partial class GetAnimClipPlayTimeAction : Action
     [SerializeReference] public BlackboardVariable<float> ClipStart;
     [SerializeReference] public BlackboardVariable<float> ClipEnd;
 
-    float animSpeed = 1f;
+    float animSpeed;
 
     protected override Status OnStart()
     {
         if (!CheckValid())
             return Status.Failure;
+
+        animSpeed = 1f;
 
         RuntimeAnimatorController controller = Animator.Value.runtimeAnimatorController;
 
@@ -56,13 +58,13 @@ public partial class GetAnimClipPlayTimeAction : Action
 
     bool CheckValid()
     {
-        if (AnimClip == null)
+        if (AnimClip.Value == "")
         {
             Debug.LogError("AnimClip is null");
             return false;
         }
 
-        if (Animator == null)
+        if (Animator.Value == null)
         {
             Debug.LogError("Animator is null");
             return false;

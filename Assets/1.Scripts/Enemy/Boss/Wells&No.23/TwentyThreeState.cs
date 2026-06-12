@@ -11,16 +11,18 @@ public enum TwentyThreeState
     RightHookAttack = 3,
     UpperAttack = 4,
     Grab = 5,
+    Hold = 6,
+    Throw = 7,
 
     // 원거리 공격
-    JumpAttack = 6,
-    DashAttack = 7,
+    JumpAttack = 8,
+    DashAttack = 9,
 
     // 스킬
-    Charging = 8,
-    Rage = 9,
+    Charging = 10,
+    Rage = 11,
 
-    Groggy = 10,
-    Break = 11,
-    Dead = 12
+    Groggy = 12,
+    Break = 13,
+    Dead = 14
 }
