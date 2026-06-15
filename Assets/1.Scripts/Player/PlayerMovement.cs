@@ -5,6 +5,7 @@ using UnityEngine;
 public class PlayerMovement : MonoBehaviour
 {
     private PlayerInputReader reader;
+    private Player player;
     private Rigidbody rb;
 
     [SerializeField] private Transform armature;
@@ -22,10 +23,16 @@ public class PlayerMovement : MonoBehaviour
     private void Awake()
     {
         reader = GetComponent<PlayerInputReader>();
+        player = GetComponent<Player>();
         rb = GetComponent<Rigidbody>();
 
         if (armature == null)
             armature = transform.Find("Armature");
+    }
+
+    private void Start()
+    {
+        rotate_Speed = 10f;
     }
 
     private void Update()
@@ -36,6 +43,12 @@ public class PlayerMovement : MonoBehaviour
 
     private void Move()
     {
+        if (player != null && !player.CanMove)
+        {
+            currentSpeed = 0f;
+            return;
+        }
+
         if (!reader.HasMoveInput)
         {
             currentSpeed = 0f;
@@ -74,6 +87,9 @@ public class PlayerMovement : MonoBehaviour
 
     private void Rotate()
     {
+        if (player != null && !player.CanMovementRotate)
+            return;
+
         if (armature == null)
             return;
 
@@ -102,6 +118,38 @@ public class PlayerMovement : MonoBehaviour
             armature.rotation,
             targetRotation,
             rotate_Speed * Time.deltaTime
+        );
+    }
+
+    public void RotateImmediately(Vector3 direction)
+    {
+        if (armature == null)
+            return;
+
+        direction.y = 0f;
+
+        if (direction.sqrMagnitude < 0.001f)
+            return;
+
+        armature.rotation = Quaternion.LookRotation(direction.normalized);
+        hasRotate = false;
+    }
+
+    public void RotateToward(Vector3 direction, float speed)
+    {
+        if (armature == null)
+            return;
+
+        direction.y = 0f;
+
+        if (direction.sqrMagnitude < 0.001f)
+            return;
+
+        Quaternion targetRotation = Quaternion.LookRotation(direction.normalized);
+        armature.rotation = Quaternion.Slerp(
+            armature.rotation,
+            targetRotation,
+            speed * Time.deltaTime
         );
     }
 }

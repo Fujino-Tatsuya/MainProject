@@ -9,11 +9,13 @@ public class PlayerInputReader : BaseNetworkBehaviour
     private PlayerInput playerInput;
     private PlayerMovement movement;
     private InputAction moveAction;
+    private InputAction attackAction;
     private bool inputEnabled = true;
     private bool controlEnabled = true;
 
     public Vector2 Direction { get; private set; }
     public bool HasMoveInput => Direction.sqrMagnitude > 0.01f;
+    public bool AttackPressed => inputEnabled && attackAction != null && attackAction.WasPressedThisFrame();
 
     private bool CanUseLocalControl =>
         !IsNetworkActive || IsOwner;
@@ -24,6 +26,7 @@ public class PlayerInputReader : BaseNetworkBehaviour
         movement = GetComponent<PlayerMovement>();
 
         moveAction = playerInput.actions["Move"];
+        attackAction = playerInput.actions["Attack"];
     }
 
     private void Start()
