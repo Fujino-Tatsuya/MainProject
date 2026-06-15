@@ -17,6 +17,7 @@ GameObject:
   - component: {fileID: -1605918763266026934}
   - component: {fileID: 7306616824936131376}
   - component: {fileID: 9178965677029127983}
+  - component: {fileID: 5682234352900363449}
   m_Layer: 3
   m_Name: Player
   m_TagString: Player
@@ -51,7 +52,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1028933124
+  GlobalObjectIdHash: 1305296745
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -249,5 +250,18 @@ MonoBehaviour:
   moveSpeed: 2
   attackSpeed: 1
   maxHp: 100
-  defense: 5
+  defense: 0
   maxShield: 100
+--- !u!114 &5682234352900363449
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3532302232374388767}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d174a8a90bb29b3469ed2187c9f88d24, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerGrabController
+  ShowTopMostFoldoutHeaderGroup: 1

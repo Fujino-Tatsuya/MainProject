@@ -9,7 +9,10 @@ public class Player : Unit
     [SerializeField] int maxHp;
     [SerializeField] int defense;
     [SerializeField] int maxShield;
-    void Awake()
+
+    [Header("상태 확인용")]
+    [SerializeField] int currentHp;
+    public override void OnNetworkSpawn()
     {
         if (!IsServer) return;
 
@@ -19,6 +22,6 @@ public class Player : Unit
 
     void Update()
     {
-        
+        currentHp = _currentHp.Value;
     }
 }

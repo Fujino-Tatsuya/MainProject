@@ -108,13 +108,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1688202503914477069}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: -0.5735764, w: 0.8191521}
+  m_LocalRotation: {x: 0.7071068, y: 0.7071068, z: 0, w: 0}
   m_LocalPosition: {x: 0.068, y: 0.325, z: -0.229}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 140439914847657440}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: -70}
+  m_LocalEulerAnglesHint: {x: 0, y: 180, z: 90}
 --- !u!1 &3116697827074385888
 GameObject:
   m_ObjectHideFlags: 0
@@ -352,7 +352,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1745528080
+  GlobalObjectIdHash: 739404150
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -818,6 +818,12 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 8
   bt: {fileID: 7434833580858265621}
+  grabDamage: 5
+  holdDamage: 1
+  holdAttackPeriod: 0.5
+  landingDamage: 10
+  throwDirection: {x: 0, y: 0, z: 1}
+  throwStrength: 5
 --- !u!1 &8300409248683084403
 GameObject:
   m_ObjectHideFlags: 0
@@ -982,6 +988,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 7088600385777052897, guid: 0b61d617ad0871e44acc43a49be710cf, type: 3}
       insertIndex: -1
       addedObject: {fileID: 52311990419430086}
+    - targetCorrespondingSourceObject: {fileID: 7088600385777052897, guid: 0b61d617ad0871e44acc43a49be710cf, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1396588492618051365}
   m_SourcePrefab: {fileID: 100100000, guid: 0b61d617ad0871e44acc43a49be710cf, type: 3}
 --- !u!4 &140439914847657440 stripped
 Transform:
@@ -1036,6 +1045,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ServerSetAnimState
   ShowTopMostFoldoutHeaderGroup: 1
   animator: {fileID: 4360647608449234546}
+--- !u!114 &1396588492618051365
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7003059613902337714}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 854cd2378b965774f89b4d92521510a9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TwentyThreeAnimEvents
+  ShowTopMostFoldoutHeaderGroup: 1
+  grabController: {fileID: 8939195106823421711}
 --- !u!4 &7666266973708758024 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 7571699769823753819, guid: 0b61d617ad0871e44acc43a49be710cf, type: 3}

@@ -9,9 +9,15 @@ public class TwentyThreeAnimEvents : NetworkBehaviour
 
     }
 
-    public void GrabEvent()
+    public void TryGrabEvent()
     {
         if(IsServer)
             grabController.Detect();
+    }
+
+    public void ThrowEvent()
+    {
+        if (IsServer)
+            grabController.Throw();
     }
 }

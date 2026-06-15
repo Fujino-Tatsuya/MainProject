@@ -15,8 +15,10 @@ public class Health
     public void TakeHpDamage(int damage)
     {
         //if(!isServer) return; // 서버에서만 체력 감소 처리
+
         _currentHp -= damage;
         _currentHp = Mathf.Max(_currentHp, 0); // 체력이 0 이하로 떨어지지 않도록 보장
+        Debug.Log($"피해량: {damage}   /   현재 체력: {_currentHp}");
     }
     /// <summary>
     /// healAmount만큼 체력을 회복시키는 함수
