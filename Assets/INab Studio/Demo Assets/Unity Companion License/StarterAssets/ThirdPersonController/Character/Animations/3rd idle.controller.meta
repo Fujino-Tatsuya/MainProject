@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 2726ba9d7c3cded499910f14da71b25d
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 9100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 352338
+  packageName: Character Effects
+  packageVersion: 1.0
+  assetPath: Assets/INab Studio/Demo Assets/Unity Companion License/StarterAssets/ThirdPersonController/Character/Animations/3rd
+    idle.controller
+  uploadId: 839888

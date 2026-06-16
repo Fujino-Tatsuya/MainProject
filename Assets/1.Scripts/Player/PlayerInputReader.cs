@@ -10,12 +10,15 @@ public class PlayerInputReader : BaseNetworkBehaviour
     private PlayerMovement movement;
     private InputAction moveAction;
     private InputAction attackAction;
+    private InputAction interruptAction;
     private bool inputEnabled = true;
     private bool controlEnabled = true;
 
     public Vector2 Direction { get; private set; }
     public bool HasMoveInput => Direction.sqrMagnitude > 0.01f;
     public bool AttackPressed => inputEnabled && attackAction != null && attackAction.WasPressedThisFrame();
+    public bool AttackHeld => inputEnabled && attackAction != null && attackAction.IsPressed();
+    public bool InterruptPressed => inputEnabled && interruptAction != null && interruptAction.WasPressedThisFrame();
 
     private bool CanUseLocalControl =>
         !IsNetworkActive || IsOwner;
@@ -27,6 +30,7 @@ public class PlayerInputReader : BaseNetworkBehaviour
 
         moveAction = playerInput.actions["Move"];
         attackAction = playerInput.actions["Attack"];
+        interruptAction = playerInput.actions["Interrupt"];
     }
 
     private void Start()

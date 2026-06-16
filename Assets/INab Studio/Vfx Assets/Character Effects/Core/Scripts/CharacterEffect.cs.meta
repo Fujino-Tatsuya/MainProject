@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: bed290d90ff4e5140a672625f874dcc3
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 352338
+  packageName: Character Effects
+  packageVersion: 1.0
+  assetPath: Assets/INab Studio/Vfx Assets/Character Effects/Core/Scripts/CharacterEffect.cs
+  uploadId: 839888

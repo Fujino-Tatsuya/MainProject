@@ -152,4 +152,9 @@ public class PlayerMovement : MonoBehaviour
             speed * Time.deltaTime
         );
     }
+
+    public void MoveRoot(Vector3 deltaPosition)
+    {
+        rb.MovePosition(rb.position + deltaPosition);
+    }
 }
