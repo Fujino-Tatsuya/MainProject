@@ -115,3 +115,6 @@ crashlytics-build.properties
 .svn
 
 # End of https://www.toptal.com/developers/gitignore/api/unity
+
+# Claude Code — 개인 AI 오버라이드 (공용 규칙=CLAUDE.md, 개인용은 로컬에만 / 커밋 금지)
+CLAUDE.local.md
