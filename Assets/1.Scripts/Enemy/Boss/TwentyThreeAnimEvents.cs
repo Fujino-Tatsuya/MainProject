@@ -4,6 +4,8 @@ using Unity.Netcode;
 public class TwentyThreeAnimEvents : NetworkBehaviour
 {
     [SerializeField] GrabController grabController;
+    [SerializeField] JumpController jumpController;
+
     void Start()
     {
 
@@ -19,5 +21,17 @@ public class TwentyThreeAnimEvents : NetworkBehaviour
     {
         if (IsServer)
             grabController.Throw();
+    }
+
+    public void SetTargetEvent()
+    {
+        if (IsServer)
+            jumpController.SetTarget();
+    }
+
+    public void OnLandedEvent()
+    {
+        if (IsServer)
+            jumpController.OnLanded();
     }
 }

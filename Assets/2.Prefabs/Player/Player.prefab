@@ -252,6 +252,7 @@ MonoBehaviour:
   maxHp: 100
   defense: 0
   maxShield: 100
+  currentHp: 0
 --- !u!114 &5682234352900363449
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -42,25 +42,21 @@ public class GrabController : NetworkBehaviour
         if (bt.BlackboardReference == null)
         {
             Debug.LogError("BlackboardReference is null.", this);
-            return;
         }
 
         if (!bt.BlackboardReference.GetVariable("IsGrabbed", out IsGrabbed))
         {
             Debug.LogError("Blackboard variable 'IsGrabbed' not found.", this);
-            return;
         }
 
         if (!bt.BlackboardReference.GetVariable("GrabbedPlayer", out GrabbedPlayer))
         {
             Debug.LogError("Blackboard variable 'GrabbedPlayer' not found.", this);
-            return;
         }
 
         if(!bt.BlackboardReference.GetVariable("CurrentState", out CurrentState))
         {
             Debug.LogError("Blackboard variable 'CurrentState' not found.", this);
-            return;
         }
     }
 

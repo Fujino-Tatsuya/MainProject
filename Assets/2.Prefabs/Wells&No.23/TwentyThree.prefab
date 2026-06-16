@@ -84,6 +84,179 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BaseWeapon
   _damage: 0
   _isGroggyAttack: 0
+--- !u!1 &1594302937096804332
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 3673097288058613262}
+  - component: {fileID: 2431996963261175524}
+  - component: {fileID: 1250761815717026779}
+  - component: {fileID: 747408113423012220}
+  - component: {fileID: 7906701713519702217}
+  m_Layer: 0
+  m_Name: Sign
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &3673097288058613262
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1594302937096804332}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.7071068, y: 0, z: 0, w: 0.7071068}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 3, y: 3, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 9185639174043840639}
+  m_LocalEulerAnglesHint: {x: -90, y: 0, z: 0}
+--- !u!212 &2431996963261175524
+SpriteRenderer:
+  serializedVersion: 2
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1594302937096804332}
+  m_Enabled: 1
+  m_CastShadows: 0
+  m_ReceiveShadows: 0
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 0
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: 9dfc825aed78fcd4ba02077103263b40, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 0
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_Sprite: {fileID: 55075430, guid: 23856ea02fe1c53449dad11cfc3da022, type: 3}
+  m_Color: {r: 1, g: 0, b: 0, a: 0.47058824}
+  m_FlipX: 0
+  m_FlipY: 0
+  m_DrawMode: 0
+  m_Size: {x: 2.54, y: 2.54}
+  m_AdaptiveModeThreshold: 0.5
+  m_SpriteTileMode: 0
+  m_WasSpriteAssigned: 1
+  m_SpriteSortPoint: 0
+--- !u!135 &1250761815717026779
+SphereCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1594302937096804332}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 0
+  serializedVersion: 3
+  m_Radius: 1.2700003
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &747408113423012220
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1594302937096804332}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 81c70da5a2e747148bf71f917743b5fd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ColliderInfo
+--- !u!114 &7906701713519702217
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1594302937096804332}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e96cb6065543e43c4a752faaa1468eb1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.Components.NetworkTransform
+  ShowTopMostFoldoutHeaderGroup: 1
+  NetworkTransformExpanded: 0
+  AutoOwnerAuthorityTickOffset: 1
+  PositionInterpolationType: 0
+  RotationInterpolationType: 0
+  ScaleInterpolationType: 0
+  PositionLerpSmoothing: 1
+  PositionMaxInterpolationTime: 0.1
+  RotationLerpSmoothing: 1
+  RotationMaxInterpolationTime: 0.1
+  ScaleLerpSmoothing: 1
+  ScaleMaxInterpolationTime: 0.1
+  AuthorityMode: 0
+  TickSyncChildren: 0
+  UseUnreliableDeltas: 0
+  SyncPositionX: 1
+  SyncPositionY: 1
+  SyncPositionZ: 1
+  SyncRotAngleX: 1
+  SyncRotAngleY: 1
+  SyncRotAngleZ: 1
+  SyncScaleX: 1
+  SyncScaleY: 1
+  SyncScaleZ: 1
+  PositionThreshold: 0.001
+  RotAngleThreshold: 0.01
+  ScaleThreshold: 0.01
+  UseQuaternionSynchronization: 0
+  UseQuaternionCompression: 0
+  UseHalfFloatPrecision: 0
+  InLocalSpace: 0
+  SwitchTransformSpaceWhenParented: 0
+  Interpolate: 1
+  SlerpPosition: 0
 --- !u!1 &1688202503914477069
 GameObject:
   m_ObjectHideFlags: 0
@@ -217,6 +390,60 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   btAgent: {fileID: 1173616335134953240}
   navMeshAgent: {fileID: 8402773553709846297}
+--- !u!1 &3443241134742314900
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 9185639174043840639}
+  - component: {fileID: 273769967766734601}
+  m_Layer: 0
+  m_Name: JumpAttack
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &9185639174043840639
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3443241134742314900}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 3673097288058613262}
+  m_Father: {fileID: 3556593508814251226}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &273769967766734601
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3443241134742314900}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2fcefbfdfc9b94e408620422080df651, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::JumpController
+  ShowTopMostFoldoutHeaderGroup: 1
+  bt: {fileID: 7434833580858265621}
+  colliderInfo: {fileID: 747408113423012220}
+  signObject: {fileID: 1594302937096804332}
+  followTargetTag: Player
+  playerLayer:
+    serializedVersion: 2
+    m_Bits: 8
+  damage: 3
 --- !u!1 &5112472842191727821
 GameObject:
   m_ObjectHideFlags: 0
@@ -352,7 +579,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 739404150
+  GlobalObjectIdHash: 1745528080
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -822,7 +1049,7 @@ MonoBehaviour:
   holdDamage: 1
   holdAttackPeriod: 0.5
   landingDamage: 10
-  throwDirection: {x: 0, y: 0, z: 1}
+  throwDirection: {x: 0, y: 1, z: 1}
   throwStrength: 5
 --- !u!1 &8300409248683084403
 GameObject:
@@ -858,6 +1085,7 @@ Transform:
   - {fileID: 3551397243170944304}
   - {fileID: 3801006872250370184}
   - {fileID: 998147511182444830}
+  - {fileID: 9185639174043840639}
   m_Father: {fileID: 2585134952784665517}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &7129852271225524614
@@ -872,15 +1100,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 09473024ac015514bbaf65dd19dbf924, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TwentyThreeBasicAttackChoice
-  hookAttackDistance: 2
+  hookAttackMinDistance: 0
+  hookAttackMaxDistance: 3
   hookAttackPercentage: 30
-  upperAttackDistance: 3
+  upperAttackMinDistance: 0
+  upperAttackMaxDistance: 3
   upperAttackPercentage: 20
-  grabAttackDistance: 4
+  grabAttackMinDistance: 0
+  grabAttackMaxDistance: 3
   grabAttackPercentage: 10
-  jumpAttackDistance: 6
+  jumpAttackMinDistance: 3
+  jumpAttackMaxDistance: 5
   jumpAttackPercentage: 20
-  dashAttackDistance: 7
+  dashAttackMinDistance: 3
+  dashAttackMaxDistance: 5
   dashAttackPercentage: 30
 --- !u!1 &8718092995756804922
 GameObject:
@@ -1030,6 +1263,10 @@ MonoBehaviour:
       NameHash: 1649606143
       Synchronize: 1
       ParameterType: 3
+    - name: Jump
+      NameHash: 125937960
+      Synchronize: 1
+      ParameterType: 3
   AnimatorParametersExpanded: 0
 --- !u!114 &52311990419430086
 MonoBehaviour:
@@ -1059,6 +1296,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TwentyThreeAnimEvents
   ShowTopMostFoldoutHeaderGroup: 1
   grabController: {fileID: 8939195106823421711}
+  jumpController: {fileID: 273769967766734601}
 --- !u!4 &7666266973708758024 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 7571699769823753819, guid: 0b61d617ad0871e44acc43a49be710cf, type: 3}

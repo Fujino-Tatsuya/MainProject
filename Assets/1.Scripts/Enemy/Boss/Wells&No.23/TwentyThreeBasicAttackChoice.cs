@@ -5,23 +5,28 @@ using System;
 public class TwentyThreeBasicAttackChoice : BaseAttackChoice
 {
     [Header("Hook Attack")]
-    [SerializeField] float hookAttackDistance;
+    [SerializeField] float hookAttackMinDistance;
+    [SerializeField] float hookAttackMaxDistance;
     [SerializeField] float hookAttackPercentage;
 
     [Header("Upper Attack")]
-    [SerializeField] float upperAttackDistance;
+    [SerializeField] float upperAttackMinDistance;
+    [SerializeField] float upperAttackMaxDistance;
     [SerializeField] float upperAttackPercentage;
 
     [Header("Grab Attack")]
-    [SerializeField] float grabAttackDistance;
+    [SerializeField] float grabAttackMinDistance;
+    [SerializeField] float grabAttackMaxDistance;
     [SerializeField] float grabAttackPercentage;
 
     [Header("Jump Attack")]
-    [SerializeField] float jumpAttackDistance;
+    [SerializeField] float jumpAttackMinDistance;
+    [SerializeField] float jumpAttackMaxDistance;
     [SerializeField] float jumpAttackPercentage;
 
     [Header("Dash Attack")]
-    [SerializeField] float dashAttackDistance;
+    [SerializeField] float dashAttackMinDistance;
+    [SerializeField] float dashAttackMaxDistance;
     [SerializeField] float dashAttackPercentage;
 
     List<WeightedAttack<TwentyThreeBasicAttackType>> attackChoices = new List<WeightedAttack<TwentyThreeBasicAttackType>>();
@@ -29,11 +34,11 @@ public class TwentyThreeBasicAttackChoice : BaseAttackChoice
 
     void Awake()
     {
-        attackChoices.Add(new WeightedAttack<TwentyThreeBasicAttackType>(TwentyThreeBasicAttackType.Hook, hookAttackDistance, hookAttackPercentage));
-        attackChoices.Add(new WeightedAttack<TwentyThreeBasicAttackType>(TwentyThreeBasicAttackType.Upper, upperAttackDistance, upperAttackPercentage));
-        attackChoices.Add(new WeightedAttack<TwentyThreeBasicAttackType>(TwentyThreeBasicAttackType.Grab, grabAttackDistance, grabAttackPercentage));
-        attackChoices.Add(new WeightedAttack<TwentyThreeBasicAttackType>(TwentyThreeBasicAttackType.Jump, jumpAttackDistance, jumpAttackPercentage));
-        attackChoices.Add(new WeightedAttack<TwentyThreeBasicAttackType>(TwentyThreeBasicAttackType.Dash, dashAttackDistance, dashAttackPercentage));
+        attackChoices.Add(new WeightedAttack<TwentyThreeBasicAttackType>(TwentyThreeBasicAttackType.Hook, hookAttackMinDistance, hookAttackMaxDistance, hookAttackPercentage));
+        attackChoices.Add(new WeightedAttack<TwentyThreeBasicAttackType>(TwentyThreeBasicAttackType.Upper, upperAttackMinDistance, upperAttackMaxDistance, upperAttackPercentage));
+        attackChoices.Add(new WeightedAttack<TwentyThreeBasicAttackType>(TwentyThreeBasicAttackType.Grab, grabAttackMinDistance, grabAttackMaxDistance, grabAttackPercentage));
+        attackChoices.Add(new WeightedAttack<TwentyThreeBasicAttackType>(TwentyThreeBasicAttackType.Jump, jumpAttackMinDistance, jumpAttackMaxDistance, jumpAttackPercentage));
+        attackChoices.Add(new WeightedAttack<TwentyThreeBasicAttackType>(TwentyThreeBasicAttackType.Dash, dashAttackMinDistance, dashAttackMaxDistance, dashAttackPercentage));
     }
 
     public override int GetRandomAttack(float currentDistance)
@@ -44,7 +49,7 @@ public class TwentyThreeBasicAttackChoice : BaseAttackChoice
 
         foreach (var attack in attackChoices)
         {
-            if (currentDistance <= attack.attackDistance)
+            if (currentDistance <= attack.attackMaxDistance && currentDistance >= attack.attackMinDistance)
             {
                 validAttacks.Add(attack);
             }
