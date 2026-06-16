@@ -11,8 +11,6 @@ public class PlayerAnimationEventRelay : MonoBehaviour
 
     public void EndDefaultAttack()
     {
-        Debug.Log("[AnimationEvent] EndDefaultAttack called", this);
-
         if (player == null)
             player = GetComponentInParent<Player>();
 
