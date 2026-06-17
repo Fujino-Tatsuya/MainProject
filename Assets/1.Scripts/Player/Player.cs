@@ -39,6 +39,14 @@ public class Player : Unit
 
     private void Update()
     {
+        if (Unity.Netcode.NetworkManager.Singleton != null &&
+            Unity.Netcode.NetworkManager.Singleton.IsListening &&
+            IsSpawned &&
+            !IsOwner)
+        {
+            return;
+        }
+
         if (CurrentState == PlayerState.Attack)
         {
             SetAnimatorMoving(false);

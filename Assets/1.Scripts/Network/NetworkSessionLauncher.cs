@@ -6,12 +6,14 @@ public class NetworkSessionLauncher : MonoBehaviour
 {
     NetworkManager _networkManager;
     NetworkLoadingFlowController _loadingFlowController;
+    [SerializeField] private GameObject defaultPlayerPrefab;
     public GameObject ButtonGroup;
 
     private void Awake()
     {
         _networkManager = GetComponent<NetworkManager>();
         _loadingFlowController = GetComponent<NetworkLoadingFlowController>();
+        _loadingFlowController?.SetDefaultPlayerPrefab(defaultPlayerPrefab);
 
         if(ButtonGroup == null)
         {
@@ -69,6 +71,7 @@ public class NetworkSessionLauncher : MonoBehaviour
             _loadingFlowController = gameObject.AddComponent<NetworkLoadingFlowController>();
         }
 
+        _loadingFlowController?.SetDefaultPlayerPrefab(defaultPlayerPrefab);
         _loadingFlowController?.RegisterNetworkCallbacks();
     }
 

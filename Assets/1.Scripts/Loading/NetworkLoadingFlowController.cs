@@ -18,7 +18,9 @@ public class NetworkLoadingFlowController : MonoBehaviour
     [SerializeField] private float minimumVisibleSeconds = 5f;
     [SerializeField] private float readyMessageSeconds = 2.5f;
     [SerializeField] private bool requireLobbyReadyToStart = true;
+    [SerializeField] private GameObject defaultPlayerPrefab;
     [SerializeField] private bool debugLogging;
+    [SerializeField] private Vector3 spawn_Offset = new Vector3(0, 10.0f, 0);
 
     private readonly HashSet<ulong> _trackedClients = new HashSet<ulong>();
     private readonly HashSet<ulong> _timedOutClients = new HashSet<ulong>();
@@ -34,6 +36,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
     private Coroutine _completionRoutine;
     private Coroutine _registerCallbacksRoutine;
     private bool _callbacksRegistered;
+    private bool _playersSpawnedForCurrentTargetScene;
     private uint _flowId;
     private float _averageProgress;
     private float _minimumTimerStartedAt;
@@ -167,6 +170,14 @@ public class NetworkLoadingFlowController : MonoBehaviour
     {
         _view = view;
         ApplyViewState();
+    }
+
+    public void SetDefaultPlayerPrefab(GameObject playerPrefab)
+    {
+        if (playerPrefab != null)
+        {
+            defaultPlayerPrefab = playerPrefab;
+        }
     }
 
     private void UnregisterNetworkCallbacks()
@@ -330,10 +341,131 @@ public class NetworkLoadingFlowController : MonoBehaviour
             }
         }
 
+        SpawnAllPlayersOnce();
+
         _averageProgress = CalculateAverageProgress();
         LogDebug($"Target scene load event completed. average={_averageProgress:P0}. Waiting for completion routine.");
         ApplyViewState();
         BroadcastAverageProgress();
+    }
+
+    public void SpawnAllPlayers()
+    {
+        if (!IsServerActive)
+        {
+            Debug.LogWarning("Only the server or host can spawn player objects.");
+            return;
+        }
+
+        var baseSpawnPoint = ResolveBasePlayerSpawnPoint();
+
+        var spawnIndex = 0;
+        foreach (var clientId in _networkManager.ConnectedClientsIds)
+        {
+            SpawnPlayerForClient(clientId, spawnIndex, baseSpawnPoint);
+            spawnIndex++;
+        }
+    }
+
+    private void SpawnAllPlayersOnce()
+    {
+        if (_playersSpawnedForCurrentTargetScene)
+        {
+            return;
+        }
+
+        _playersSpawnedForCurrentTargetScene = true;
+        SpawnAllPlayers();
+    }
+
+    private void SpawnPlayerForClient(ulong clientId, int spawnIndex, Transform baseSpawnPoint)
+    {
+        if (!_networkManager.ConnectedClients.TryGetValue(clientId, out var client))
+        {
+            return;
+        }
+
+        if (client.PlayerObject != null)
+        {
+            return;
+        }
+
+        var prefab = ResolvePlayerPrefabForClient(clientId);
+        if (prefab == null)
+        {
+            Debug.LogWarning($"Player prefab is not assigned. clientId={clientId}");
+            return;
+        }
+
+        if (!prefab.TryGetComponent<NetworkObject>(out _))
+        {
+            Debug.LogWarning($"Player prefab must have a {nameof(NetworkObject)} component. prefab={prefab.name}");
+            return;
+        }
+
+        var spawnPose = ResolvePlayerSpawnPose(spawnIndex, baseSpawnPoint);
+        var player = Instantiate(prefab, spawnPose.position, spawnPose.rotation);
+        var targetScene = SceneManager.GetSceneByName(targetSceneName);
+        if (targetScene.IsValid() && targetScene.isLoaded)
+        {
+            SceneManager.MoveGameObjectToScene(player, targetScene);
+        }
+
+        player.GetComponent<NetworkObject>().SpawnAsPlayerObject(clientId, true);
+
+        LogDebug($"Spawned player. clientId={clientId}, prefab={prefab.name}, position={spawnPose.position}.");
+    }
+
+    private GameObject ResolvePlayerPrefabForClient(ulong clientId)
+    {
+        // TODO: Replace this with the client character selection lookup.
+        return defaultPlayerPrefab;
+    }
+
+    private Pose ResolvePlayerSpawnPose(int spawnIndex, Transform baseSpawnPoint)
+    {
+        if (baseSpawnPoint != null)
+        {
+            var playerSpacingOffset = Vector3.right * (spawnIndex * 2f);
+            return new Pose(baseSpawnPoint.position + spawn_Offset + playerSpacingOffset, baseSpawnPoint.rotation);
+        }
+
+        var fallbackPosition = new Vector3(spawnIndex * 2f, 5.0f, 0f);
+        return new Pose(fallbackPosition, Quaternion.identity);
+    }
+
+    private Transform ResolveBasePlayerSpawnPoint()
+    {
+        var mapGenerator = FindFirstObjectByType<MapGenerator>();
+        var spawnPoints = FindObjectsByType<SpawnPoint>(FindObjectsSortMode.None);
+        System.Array.Sort(spawnPoints, (a, b) => a.PointID.CompareTo(b.PointID));
+        return ResolveBasePlayerSpawnPoint(mapGenerator, spawnPoints);
+    }
+
+    private Transform ResolveBasePlayerSpawnPoint(MapGenerator mapGenerator, SpawnPoint[] spawnPoints)
+    {
+        Transform fallback = null;
+        foreach (var spawnPoint in spawnPoints)
+        {
+            if (spawnPoint == null)
+            {
+                continue;
+            }
+
+            fallback ??= spawnPoint.transform;
+
+            if (spawnPoint.ParentZone == null)
+            {
+                continue;
+            }
+
+            if (mapGenerator == null || mapGenerator.GetZoneRole(spawnPoint.ParentZone) == ZoneRole.PlayerSpawn)
+            {
+                return spawnPoint.transform;
+            }
+        }
+
+        return fallback;
     }
 
     private IEnumerator StartTargetLoadAfterSceneEvent()
@@ -695,6 +827,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
         _trackedClients.Clear();
         _timedOutClients.Clear();
         _clientProgress.Clear();
+        _playersSpawnedForCurrentTargetScene = false;
         _averageProgress = 0f;
         _sourceSceneName = string.Empty;
 

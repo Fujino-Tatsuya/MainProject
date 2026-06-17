@@ -121,6 +121,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e79780907b68c8e4795e23dde0acb9f8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NetworkSessionLauncher
+  defaultPlayerPrefab: {fileID: 6804900789083310662, guid: 4d11e616516268c49a3530bd96c7859d, type: 3}
   ButtonGroup: {fileID: 0}
 --- !u!114 &7043847080119373261
 MonoBehaviour:
@@ -139,4 +140,5 @@ MonoBehaviour:
   minimumVisibleSeconds: 5
   readyMessageSeconds: 2.5
   requireLobbyReadyToStart: 1
-  debugLogging: 0
+  defaultPlayerPrefab: {fileID: 6804900789083310662, guid: 4d11e616516268c49a3530bd96c7859d, type: 3}
+  debugLogging: 1
