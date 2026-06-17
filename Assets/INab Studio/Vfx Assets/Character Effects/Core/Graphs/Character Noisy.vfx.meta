@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 288f3d4a312b58543b96295e4823c8ae
+VisualEffectImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 352338
+  packageName: Character Effects
+  packageVersion: 1.0
+  assetPath: Assets/INab Studio/Vfx Assets/Character Effects/Core/Graphs/Character
+    Noisy.vfx
+  uploadId: 839888

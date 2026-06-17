@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: d3af3603fa3c5fe4e966293013f961ea
+VisualEffectImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 352338
+  packageName: Character Effects
+  packageVersion: 1.0
+  assetPath: Assets/INab Studio/Vfx Assets/Character Effects/Core/Graphs/Character
+    Local Connect.vfx
+  uploadId: 839888

@@ -5,11 +5,12 @@ TagManager:
   serializedVersion: 3
   tags:
   - CameraFollowTarget
+  - CinemachineTarget
   layers:
   - Default
   - TransparentFX
   - Ignore Raycast
-  - 
+  - Ground
   - Water
   - UI
   - 
@@ -51,3 +52,4 @@ TagManager:
   - Light Layer 5
   - Light Layer 6
   - Light Layer 7
+  - Ground Layer

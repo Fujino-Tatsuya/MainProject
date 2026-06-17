@@ -1,21 +1,53 @@
+using BaseNetCode;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
 [RequireComponent(typeof(PlayerInput))]
-public class PlayerInputReader : MonoBehaviour
+[RequireComponent(typeof(PlayerMovement))]
+public class PlayerInputReader : BaseNetworkBehaviour
 {
     private PlayerInput playerInput;
+    private PlayerMovement movement;
     private InputAction moveAction;
+    private InputAction attackAction;
+    private InputAction interruptAction;
     private bool inputEnabled = true;
+    private bool controlEnabled = true;
 
     public Vector2 Direction { get; private set; }
     public bool HasMoveInput => Direction.sqrMagnitude > 0.01f;
+    public bool AttackPressed => inputEnabled && attackAction != null && attackAction.WasPressedThisFrame();
+    public bool AttackHeld => inputEnabled && attackAction != null && attackAction.IsPressed();
+    public bool InterruptPressed => inputEnabled && interruptAction != null && interruptAction.WasPressedThisFrame();
+
+    private bool CanUseLocalControl =>
+        !IsNetworkActive || IsOwner;
 
     private void Awake()
     {
         playerInput = GetComponent<PlayerInput>();
+        movement = GetComponent<PlayerMovement>();
 
         moveAction = playerInput.actions["Move"];
+        attackAction = playerInput.actions["Attack"];
+        interruptAction = playerInput.actions["Interrupt"];
+    }
+
+    private void Start()
+    {
+        RefreshControlState();
+    }
+
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+        RefreshControlState();
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        SetLocalControl(false);
+        base.OnNetworkDespawn();
     }
 
     public void SetInputEnabled(bool isEnabled)
@@ -27,6 +59,23 @@ public class PlayerInputReader : MonoBehaviour
 
         if (!inputEnabled)
             Direction = Vector2.zero;
+    }
+
+    private void RefreshControlState()
+    {
+        SetLocalControl(CanUseLocalControl);
+    }
+
+    private void SetLocalControl(bool isEnabled)
+    {
+        if (controlEnabled == isEnabled)
+            return;
+
+        controlEnabled = isEnabled;
+        SetInputEnabled(isEnabled);
+
+        if (movement != null)
+            movement.enabled = isEnabled;
     }
 
     private void Update()
