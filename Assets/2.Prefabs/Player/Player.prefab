@@ -263,6 +263,7 @@ GameObject:
   - component: {fileID: 3600963326377684433}
   - component: {fileID: 6098322879574375161}
   - component: {fileID: 4272353666037054394}
+  - component: {fileID: 8301241639383343952}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -532,6 +533,25 @@ MonoBehaviour:
   SwitchTransformSpaceWhenParented: 0
   Interpolate: 1
   SlerpPosition: 0
+--- !u!114 &8301241639383343952
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8559504096609571310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0618ea3ce6d52b241accc381256b49fe, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerColorAssigner
+  ShowTopMostFoldoutHeaderGroup: 1
+  colorsByClientId:
+  - {fileID: 2100000, guid: ab94dbd755e14629811493e577fc4fce, type: 2}
+  - {fileID: 2100000, guid: 17e5fe2e91824d55a7bfa0e7d6d8d824, type: 2}
+  - {fileID: 2100000, guid: c1cb4507129f426c839b2570c241f3dc, type: 2}
+  - {fileID: 2100000, guid: 20573b9755854bb6b73c0bf6130cd259, type: 2}
+  bodyRenderer: {fileID: 2710021930536529835}
 --- !u!1 &8896633917232358439
 GameObject:
   m_ObjectHideFlags: 0
@@ -2194,6 +2214,10 @@ PrefabInstance:
       value: -0.10450637
       objectReference: {fileID: 0}
     - target: {fileID: 5866666021909216657, guid: ea2c0cabb7e7e2b418264d07318bd8ea, type: 3}
+      propertyPath: m_Avatar
+      value: 
+      objectReference: {fileID: 9000000, guid: ea2c0cabb7e7e2b418264d07318bd8ea, type: 3}
+    - target: {fileID: 5866666021909216657, guid: ea2c0cabb7e7e2b418264d07318bd8ea, type: 3}
       propertyPath: m_Controller
       value: 
       objectReference: {fileID: 9100000, guid: 5b86aa0eb6cd85b4f9e7120c1591e103, type: 2}
@@ -2381,6 +2405,11 @@ Transform:
 --- !u!4 &1081799241535317990 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -1633487744486694252, guid: ea2c0cabb7e7e2b418264d07318bd8ea, type: 3}
+  m_PrefabInstance: {fileID: 7374641231828436338}
+  m_PrefabAsset: {fileID: 0}
+--- !u!137 &2710021930536529835 stripped
+SkinnedMeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 4885301371922852569, guid: ea2c0cabb7e7e2b418264d07318bd8ea, type: 3}
   m_PrefabInstance: {fileID: 7374641231828436338}
   m_PrefabAsset: {fileID: 0}
 --- !u!95 &3980452584406513891 stripped

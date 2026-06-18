@@ -37,6 +37,15 @@ public class Player : Unit
             animator = GetComponentInChildren<Animator>();
     }
 
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+
+        // 내가 Owner인 플레이어가 스폰되면, 카메라 매니저에게 나를 따라오라고 알린다.
+        if (IsOwner)
+            CameraTargetSwitcher.Active?.FocusOwnerPlayer();
+    }
+
     private void Update()
     {
         if (Unity.Netcode.NetworkManager.Singleton != null &&

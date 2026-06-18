@@ -4,13 +4,21 @@ using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
+// MapScene에 배치되는 카메라 매니저.
+//  - 오너 플레이어가 스폰될 때(Player.OnNetworkSpawn → FocusOwnerPlayer) 카메라 리그를 Instantiate하고,
+//  - 내가 Owner인 플레이어를 따라가게 하며,
+//  - '[' / ']' 로 팔로우 대상을 전환한다(스위칭은 MapScene 전용).
 public class CameraTargetSwitcher : MonoBehaviour
 {
+    public static CameraTargetSwitcher Active { get; private set; }
+
     private const string CameraFollowTargetTag = "CameraFollowTarget";
 
-    [SerializeField]
-    private CinemachineCamera playerCamera;
+    [SerializeField] private GameObject mainCameraPrefab;
 
+    [SerializeField] private GameObject followCameraPrefab;
+
+    private CinemachineCamera playerCamera;       // 리그 안의 vcam (런타임에 채워짐)
     private readonly List<Transform> cameraFollowTargets = new();
     private int currentTargetIndex = -1;
     private CinemachineFollow playerCameraFollow;
@@ -19,7 +27,76 @@ public class CameraTargetSwitcher : MonoBehaviour
 
     private void Awake()
     {
-        Initialize();
+        Active = this;
+    }
+
+    private void OnDestroy()
+    {
+        if (Active == this)
+            Active = null;
+    }
+
+    // 오너 플레이어가 스폰될 때 호출된다. 리그가 없으면 만들고, 오너를 초기 대상으로 잡는다.
+    public void FocusOwnerPlayer()
+    {
+        Debug.Log("[CameraTargetSwitcher] FocusOwnerPlayer() 호출됨.", this);
+        EnsureCameraRig();
+        SelectOwnerPlayerTarget();
+    }
+
+    private void EnsureCameraRig()
+    {
+        Debug.Log($"[CameraTargetSwitcher] EnsureCameraRig() 시작. playerCamera={(playerCamera != null ? playerCamera.name : "null")}", this);
+
+        if (playerCamera != null)
+        {
+            Debug.Log("[CameraTargetSwitcher] 이미 카메라 리그가 존재 → 생성 건너뜀.", this);
+            return;
+        }
+
+        Debug.Log($"[CameraTargetSwitcher] 프리팹 확인. mainCameraPrefab={(mainCameraPrefab != null ? mainCameraPrefab.name : "null")}, followCameraPrefab={(followCameraPrefab != null ? followCameraPrefab.name : "null")}", this);
+        if (mainCameraPrefab == null || followCameraPrefab == null)
+        {
+            Debug.LogWarning("[CameraTargetSwitcher] 카메라 리그 프리팹 미할당 (mainCamera/follow) → 생성 중단.", this);
+            return;
+        }
+
+        // 활성 씬(소스/로딩 씬)이 아니라, 매니저(CameraSwitcher)가 사는 씬(MapScene)에서 바로 생성한다.
+        // 부모를 this.transform으로 주면 그 씬 소속으로 태어나므로, 소스 씬 언로드에 휩쓸려 파괴되지 않는다.
+        GameObject mainInstance = Instantiate(mainCameraPrefab, transform); // 렌더링 카메라 + CinemachineBrain
+        Debug.Log($"[CameraTargetSwitcher] mainCamera 인스턴스화 완료: {mainInstance.name} (scene={mainInstance.scene.name})", mainInstance);
+
+        GameObject followInstance = Instantiate(followCameraPrefab, transform); // 팔로우 vcam
+        Debug.Log($"[CameraTargetSwitcher] followCamera 인스턴스화 완료: {followInstance.name} (scene={followInstance.scene.name})", followInstance);
+
+        playerCamera = followInstance.GetComponentInChildren<CinemachineCamera>(true);
+        if (playerCamera == null)
+        {
+            Debug.LogWarning($"[CameraTargetSwitcher] follow 프리팹에 {nameof(CinemachineCamera)}가 없음. prefab={followCameraPrefab.name} → 생성 중단.", followInstance);
+            return;
+        }
+        Debug.Log($"[CameraTargetSwitcher] vcam(CinemachineCamera) 확보: {playerCamera.name}", playerCamera);
+
+        playerCamera.Priority = 100;
+        CacheFixedCameraRotation();
+        ClearLookAtTarget();
+        Debug.Log("[CameraTargetSwitcher] 카메라 리그 준비 완료 (Priority=100, 회전 캐시/LookAt 정리).", this);
+    }
+
+    // 내가 Owner인 플레이어의 팔로우 타겟을 카메라 대상으로 설정한다.
+    private void SelectOwnerPlayerTarget()
+    {
+        RefreshFollowTargets();
+
+        for (int i = 0; i < cameraFollowTargets.Count; i++)
+        {
+            NetworkObject networkObject = cameraFollowTargets[i].GetComponentInParent<NetworkObject>();
+            if (networkObject != null && networkObject.IsOwner)
+            {
+                SetTarget(i);
+                return;
+            }
+        }
     }
 
     private void Update()
@@ -40,21 +117,6 @@ public class CameraTargetSwitcher : MonoBehaviour
         }
     }
 
-    private void Initialize()
-    {
-        FindPlayerCamera();
-
-        if (playerCamera != null)
-        {
-            playerCamera.Priority = 100;
-            CacheFixedCameraRotation();
-            ClearLookAtTarget();
-        }
-
-        CacheFollowTargets();
-        SetTarget(0);
-    }
-
     public void SwitchToNextTarget()
     {
         SwitchTarget(1);
@@ -67,6 +129,11 @@ public class CameraTargetSwitcher : MonoBehaviour
 
     private void SwitchTarget(int direction)
     {
+        if (playerCamera == null)
+        {
+            return;
+        }
+
         RefreshFollowTargets();
 
         if (cameraFollowTargets.Count == 0)
@@ -85,12 +152,6 @@ public class CameraTargetSwitcher : MonoBehaviour
     private int GetInitialTargetIndex(int direction)
     {
         return direction < 0 ? cameraFollowTargets.Count - 1 : 0;
-    }
-
-    private void CacheFollowTargets()
-    {
-        cameraFollowTargets.Clear();
-        RefreshFollowTargets();
     }
 
     private void RefreshFollowTargets()
@@ -116,11 +177,6 @@ public class CameraTargetSwitcher : MonoBehaviour
 
     private void SetTarget(int targetIndex)
     {
-        if (playerCamera == null)
-        {
-            FindPlayerCamera();
-        }
-
         if (playerCamera == null || targetIndex < 0 || targetIndex >= cameraFollowTargets.Count)
         {
             return;
@@ -156,25 +212,6 @@ public class CameraTargetSwitcher : MonoBehaviour
         }
 
         return cameraFollowTargets[currentTargetIndex];
-    }
-
-    private void FindPlayerCamera()
-    {
-        if (playerCamera != null)
-        {
-            return;
-        }
-
-        GameObject playerCameraObject = GameObject.Find("PlayerFollowCamera");
-        if (playerCameraObject != null)
-        {
-            playerCamera = playerCameraObject.GetComponent<CinemachineCamera>();
-            if (playerCamera != null)
-            {
-                CacheFixedCameraRotation();
-                ClearLookAtTarget();
-            }
-        }
     }
 
     private void CacheFixedCameraRotation()
