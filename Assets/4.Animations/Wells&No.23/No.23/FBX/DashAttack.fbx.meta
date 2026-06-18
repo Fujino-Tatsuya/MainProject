@@ -32,8 +32,8 @@ ModelImporter:
     clipAnimations:
     - serializedVersion: 16
       name: DashAttack
-      takeName: mixamo.com
-      internalID: -203655887218126122
+      takeName: root|mixamo.com
+      internalID: -3622160399380218894
       firstFrame: 0
       lastFrame: 26
       wrapMode: 0

@@ -2,49 +2,53 @@ using Unity.Netcode;
 using UnityEngine;
 using System.Collections.Generic;
 using Unity.Behavior;
+using Unity.Netcode.Components;
 
 public class JumpController : NetworkBehaviour
 {
     [SerializeField] BehaviorGraphAgent bt;
     [SerializeField] ColliderInfo colliderInfo;
-    [SerializeField] GameObject signObject;
+    [SerializeField] SpriteRenderer signObject;
     [SerializeField] string followTargetTag;
     [SerializeField] LayerMask playerLayer;
     [SerializeField] int damage;
 
-    BlackboardVariable<Vector3> LandingPoint;
+    BlackboardVariable<Vector3> ArrivePoint;
 
     GameObject _target;
     Quaternion _baseRotation = Quaternion.identity;
+    Vector3 _signPos;
+    Quaternion _signRot;
     float _offset = 0.01f;
     bool _isJumping = false;
 
     public override void OnNetworkSpawn()
     {
-        InitializeLocal();
+        Initialize();
         _baseRotation = signObject.transform.rotation;
 
         if (!IsServer) return;
-        EnableObjectClientRpc(false);
 
-        if (!bt.BlackboardReference.GetVariable<Vector3>("LandingPoint", out LandingPoint))
+        if (!bt.BlackboardReference.GetVariable<Vector3>("ArrivePoint", out ArrivePoint))
         {
-            Debug.LogError("Blackboard variable 'LandingPoint' not found.", this);
+            Debug.LogError("Blackboard variable 'ArrivePoint' not found.", this);
         }
     }
 
 
-    void Update()
+    void LateUpdate()
     {
-        if (!_isJumping || !IsServer) return;
+        if (!_isJumping) return;
 
-        Move();
+        signObject.transform.SetPositionAndRotation(_signPos, _signRot);
     }
 
 
     HashSet<GameObject> players = new HashSet<GameObject>();
     public void SetTarget()
     {
+        if (!IsServer) return;
+
         GameObject[] gameObjects = GameObject.FindGameObjectsWithTag(followTargetTag);
         float closestDistance = Mathf.Infinity;
         GameObject closestObject = null;
@@ -77,25 +81,27 @@ public class JumpController : NetworkBehaviour
             slopeRotation = Quaternion.FromToRotation(Vector3.up, hit.normal);
         }
         signObject.transform.rotation = _baseRotation * slopeRotation;
+        _signRot = signObject.transform.rotation;
 
         Vector3 landingPos = _target.transform.position;
         landingPos.y = 0f;
-        LandingPoint.Value = landingPos;
+        ArrivePoint.Value = landingPos;
 
         Move();
 
         _isJumping = true;
         players.Clear();
-        EnableObjectClientRpc(true);
+        ShowSignClientRpc(_signPos, _signRot);
     }
 
     void Move()
     {
         // 위치 이동
-        signObject.transform.position = LandingPoint.Value;
+        signObject.transform.position = ArrivePoint.Value;
         Vector3 up = signObject.transform.forward;
         Vector3 offset = up * _offset;
         signObject.transform.position += offset;
+        _signPos = signObject.transform.position;
     }
 
 
@@ -103,6 +109,8 @@ public class JumpController : NetworkBehaviour
     HashSet<Player> damagedPlayers = new HashSet<Player>();
     public void OnLanded()
     {
+        if (!IsServer) return;
+
         SphereColliderInfo sphereInfo = new SphereColliderInfo();
         colliderInfo.GetSphereColliderInfo(ref sphereInfo);
 
@@ -135,29 +143,31 @@ public class JumpController : NetworkBehaviour
             player.TakeDamage(damage);
         }
 
-        Initialize();
+        HideSignClientRpc();
     }
 
     void Initialize()
     {
-        InitializeLocal();
-
-        if (!IsServer)
-            return;
-
-        EnableObjectClientRpc(false);
-    }
-
-    void InitializeLocal()
-    {
         _isJumping = false;
         _target = null;
-        signObject.SetActive(false);
+        signObject.enabled = false;
     }
 
     [ClientRpc]
-    void EnableObjectClientRpc(bool enable)
+    void ShowSignClientRpc(Vector3 position, Quaternion rotation)
     {
-        signObject.SetActive(enable);
+        _signPos = position;
+        _signRot = rotation;
+        _isJumping = true;
+
+        signObject.transform.SetPositionAndRotation(position, rotation);
+        signObject.enabled = true;
+    }
+
+    [ClientRpc]
+    void HideSignClientRpc()
+    {
+        _isJumping = false;
+        signObject.enabled = false;
     }
 }

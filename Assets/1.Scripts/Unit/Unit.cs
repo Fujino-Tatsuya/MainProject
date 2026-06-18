@@ -207,5 +207,17 @@ public class Unit : NetworkBehaviour
         _currentHp.Value = maxHp;
 
         UpdateNetworkShield();
+
+        _knockback = GetComponent<IKnockbackable>();
     }
+
+    #region ³Ë¹é
+    IKnockbackable _knockback;
+    public void Knockback(Vector3 direction, float strength)
+    {
+        if (!IsServer) return;
+
+        _knockback?.ApplyKnockback(direction, strength);
+    }
+    #endregion
 }

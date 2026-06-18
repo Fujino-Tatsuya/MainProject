@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 3551397243170944304}
   - component: {fileID: 328986694273374958}
   - component: {fileID: 6116763131625831750}
-  - component: {fileID: 7168439928056925488}
+  - component: {fileID: 3298624546661411796}
   m_Layer: 0
   m_Name: RightHookAttack
   m_TagString: Untagged
@@ -70,7 +70,7 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   _isServerAuthority: 1
   _initValue: 0
---- !u!114 &7168439928056925488
+--- !u!114 &3298624546661411796
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -79,11 +79,15 @@ MonoBehaviour:
   m_GameObject: {fileID: 859237602223199644}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9ade2f62ff4dc90419b84d90209441d5, type: 3}
+  m_Script: {fileID: 11500000, guid: af5d9f825e50d7e4caf8eadf755ab930, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::BaseWeapon
-  _damage: 0
-  _isGroggyAttack: 0
+  m_EditorClassIdentifier: Assembly-CSharp::Attack
+  ShowTopMostFoldoutHeaderGroup: 1
+  damage: 1
+  isGroggyAttack: 0
+  layerMask:
+    serializedVersion: 2
+    m_Bits: 8
 --- !u!1 &1594302937096804332
 GameObject:
   m_ObjectHideFlags: 0
@@ -96,7 +100,6 @@ GameObject:
   - component: {fileID: 2431996963261175524}
   - component: {fileID: 1250761815717026779}
   - component: {fileID: 747408113423012220}
-  - component: {fileID: 7906701713519702217}
   m_Layer: 0
   m_Name: Sign
   m_TagString: Untagged
@@ -211,52 +214,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 81c70da5a2e747148bf71f917743b5fd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ColliderInfo
---- !u!114 &7906701713519702217
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1594302937096804332}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e96cb6065543e43c4a752faaa1468eb1, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.Components.NetworkTransform
-  ShowTopMostFoldoutHeaderGroup: 1
-  NetworkTransformExpanded: 0
-  AutoOwnerAuthorityTickOffset: 1
-  PositionInterpolationType: 0
-  RotationInterpolationType: 0
-  ScaleInterpolationType: 0
-  PositionLerpSmoothing: 1
-  PositionMaxInterpolationTime: 0.1
-  RotationLerpSmoothing: 1
-  RotationMaxInterpolationTime: 0.1
-  ScaleLerpSmoothing: 1
-  ScaleMaxInterpolationTime: 0.1
-  AuthorityMode: 0
-  TickSyncChildren: 0
-  UseUnreliableDeltas: 0
-  SyncPositionX: 1
-  SyncPositionY: 1
-  SyncPositionZ: 1
-  SyncRotAngleX: 1
-  SyncRotAngleY: 1
-  SyncRotAngleZ: 1
-  SyncScaleX: 1
-  SyncScaleY: 1
-  SyncScaleZ: 1
-  PositionThreshold: 0.001
-  RotAngleThreshold: 0.01
-  ScaleThreshold: 0.01
-  UseQuaternionSynchronization: 0
-  UseQuaternionCompression: 0
-  UseHalfFloatPrecision: 0
-  InLocalSpace: 0
-  SwitchTransformSpaceWhenParented: 0
-  Interpolate: 1
-  SlerpPosition: 0
 --- !u!1 &1688202503914477069
 GameObject:
   m_ObjectHideFlags: 0
@@ -288,6 +245,95 @@ Transform:
   m_Children: []
   m_Father: {fileID: 140439914847657440}
   m_LocalEulerAnglesHint: {x: 0, y: 180, z: 90}
+--- !u!1 &2884726549167042591
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1461158703682127806}
+  - component: {fileID: 3578002433487090739}
+  - component: {fileID: 7903687224634922449}
+  - component: {fileID: 5579044265559132990}
+  m_Layer: 0
+  m_Name: DashAttack
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1461158703682127806
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2884726549167042591}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 1.71, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 3556593508814251226}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!135 &3578002433487090739
+SphereCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2884726549167042591}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Radius: 1.25
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &7903687224634922449
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2884726549167042591}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 95e4cb8fdfc80954cba9136f5e8f994a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EnableCollider
+  ShowTopMostFoldoutHeaderGroup: 1
+  _isServerAuthority: 1
+  _initValue: 0
+--- !u!114 &5579044265559132990
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2884726549167042591}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b2e13755730c9274fbe68dff27ce63d0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ColliderKnockbackAttack
+  ShowTopMostFoldoutHeaderGroup: 1
+  damage: 6
+  isGroggyAttack: 0
+  layerMask:
+    serializedVersion: 2
+    m_Bits: 8
+  knockbackStrength: 10
 --- !u!1 &3116697827074385888
 GameObject:
   m_ObjectHideFlags: 0
@@ -438,7 +484,7 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   bt: {fileID: 7434833580858265621}
   colliderInfo: {fileID: 747408113423012220}
-  signObject: {fileID: 1594302937096804332}
+  signObject: {fileID: 2431996963261175524}
   followTargetTag: Player
   playerLayer:
     serializedVersion: 2
@@ -455,7 +501,7 @@ GameObject:
   - component: {fileID: 2274862431756851996}
   - component: {fileID: 3174080452546132724}
   - component: {fileID: 8820610430510614129}
-  - component: {fileID: 8658205103514387744}
+  - component: {fileID: 3484998061978514129}
   m_Layer: 0
   m_Name: UpperAttack
   m_TagString: Untagged
@@ -514,7 +560,7 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   _isServerAuthority: 1
   _initValue: 0
---- !u!114 &8658205103514387744
+--- !u!114 &3484998061978514129
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -523,11 +569,15 @@ MonoBehaviour:
   m_GameObject: {fileID: 5112472842191727821}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9ade2f62ff4dc90419b84d90209441d5, type: 3}
+  m_Script: {fileID: 11500000, guid: af5d9f825e50d7e4caf8eadf755ab930, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::BaseWeapon
-  _damage: 0
-  _isGroggyAttack: 0
+  m_EditorClassIdentifier: Assembly-CSharp::Attack
+  ShowTopMostFoldoutHeaderGroup: 1
+  damage: 1
+  isGroggyAttack: 0
+  layerMask:
+    serializedVersion: 2
+    m_Bits: 8
 --- !u!1 &5372104213593212626
 GameObject:
   m_ObjectHideFlags: 0
@@ -541,6 +591,7 @@ GameObject:
   - component: {fileID: 1056816215148577785}
   - component: {fileID: 7434833580858265621}
   - component: {fileID: 1054250890861799072}
+  - component: {fileID: 4934386844203442851}
   - component: {fileID: 8430385608559717113}
   - component: {fileID: 3484663710126934133}
   m_Layer: 0
@@ -579,7 +630,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1745528080
+  GlobalObjectIdHash: 739404150
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -660,6 +711,8 @@ MonoBehaviour:
   - rid: 5035182944123880110
   - rid: 5035182945995587746
   - rid: 5035182945995587747
+  - rid: 5035183107175351285
+  - rid: 5035183127801626729
   m_OriginalGraph: {fileID: 0}
   m_IsInitialised: 0
   m_IsStarted: 0
@@ -723,6 +776,22 @@ MonoBehaviour:
           m_Value1: 16299973529637426705
         Name: RightHookAttackCollider
         m_Value: {fileID: 6116763131625831750}
+    - rid: 5035183107175351285
+      type: {class: 'BlackboardVariable`1[[EnableCollider, Assembly-CSharp]]', ns: Unity.Behavior, asm: Unity.Behavior}
+      data:
+        GUID:
+          m_Value0: 3776506582560659219
+          m_Value1: 5145139585753243403
+        Name: DashAttackColldier
+        m_Value: {fileID: 7903687224634922449}
+    - rid: 5035183127801626729
+      type: {class: 'BlackboardVariable`1[[KnockbackAttack, Assembly-CSharp]]', ns: Unity.Behavior, asm: Unity.Behavior}
+      data:
+        GUID:
+          m_Value0: 13399196146552934063
+          m_Value1: 2910270055033367747
+        Name: Knockback Attack
+        m_Value: {fileID: 5579044265559132990}
 --- !u!195 &1054250890861799072
 NavMeshAgent:
   m_ObjectHideFlags: 0
@@ -745,6 +814,33 @@ NavMeshAgent:
   m_BaseOffset: 0
   m_WalkableMask: 4294967295
   m_ObstacleAvoidanceType: 4
+--- !u!54 &4934386844203442851
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5372104213593212626}
+  serializedVersion: 5
+  m_Mass: 1
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 1
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 0
 --- !u!114 &8430385608559717113
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -790,7 +886,7 @@ GameObject:
   - component: {fileID: 3801006872250370184}
   - component: {fileID: 2347615363194617035}
   - component: {fileID: 5256932725647423925}
-  - component: {fileID: 8456496730325720355}
+  - component: {fileID: 5991986677993798632}
   m_Layer: 0
   m_Name: LeftHookAttack
   m_TagString: Untagged
@@ -849,7 +945,7 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   _isServerAuthority: 1
   _initValue: 0
---- !u!114 &8456496730325720355
+--- !u!114 &5991986677993798632
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -858,11 +954,15 @@ MonoBehaviour:
   m_GameObject: {fileID: 6682516438038340514}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9ade2f62ff4dc90419b84d90209441d5, type: 3}
+  m_Script: {fileID: 11500000, guid: af5d9f825e50d7e4caf8eadf755ab930, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::BaseWeapon
-  _damage: 0
-  _isGroggyAttack: 0
+  m_EditorClassIdentifier: Assembly-CSharp::Attack
+  ShowTopMostFoldoutHeaderGroup: 1
+  damage: 1
+  isGroggyAttack: 0
+  layerMask:
+    serializedVersion: 2
+    m_Bits: 8
 --- !u!1 &6792224880344252734
 GameObject:
   m_ObjectHideFlags: 0
@@ -1086,6 +1186,7 @@ Transform:
   - {fileID: 3801006872250370184}
   - {fileID: 998147511182444830}
   - {fileID: 9185639174043840639}
+  - {fileID: 1461158703682127806}
   m_Father: {fileID: 2585134952784665517}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &7129852271225524614
@@ -1102,19 +1203,19 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TwentyThreeBasicAttackChoice
   hookAttackMinDistance: 0
   hookAttackMaxDistance: 3
-  hookAttackPercentage: 30
+  hookAttackPercentage: 1
   upperAttackMinDistance: 0
   upperAttackMaxDistance: 3
-  upperAttackPercentage: 20
+  upperAttackPercentage: 1
   grabAttackMinDistance: 0
   grabAttackMaxDistance: 3
-  grabAttackPercentage: 10
-  jumpAttackMinDistance: 3
-  jumpAttackMaxDistance: 5
-  jumpAttackPercentage: 20
-  dashAttackMinDistance: 3
-  dashAttackMaxDistance: 5
-  dashAttackPercentage: 30
+  grabAttackPercentage: 1
+  jumpAttackMinDistance: 5
+  jumpAttackMaxDistance: 10
+  jumpAttackPercentage: 1
+  dashAttackMinDistance: 5
+  dashAttackMaxDistance: 20
+  dashAttackPercentage: 100
 --- !u!1 &8718092995756804922
 GameObject:
   m_ObjectHideFlags: 0
@@ -1267,6 +1368,18 @@ MonoBehaviour:
       NameHash: 125937960
       Synchronize: 1
       ParameterType: 3
+    - name: IsGroggy
+      NameHash: 847727466
+      Synchronize: 1
+      ParameterType: 9
+    - name: IsBreak
+      NameHash: -891938696
+      Synchronize: 1
+      ParameterType: 9
+    - name: IsDead
+      NameHash: 1270110494
+      Synchronize: 1
+      ParameterType: 4
   AnimatorParametersExpanded: 0
 --- !u!114 &52311990419430086
 MonoBehaviour:

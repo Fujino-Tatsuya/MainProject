@@ -1,10 +1,13 @@
+using Unity.Netcode;
 using UnityEngine;
 
-public class BaseWeapon : MonoBehaviour
+public class BaseWeapon : NetworkBehaviour
 {
-    [SerializeField] protected int _damage = 0;
-    public int Damage { get { return _damage; } }
+    [SerializeField] protected int damage = 0;
+    public int Damage { get { return damage; } }
 
-    [SerializeField] protected bool _isGroggyAttack = false;
-    public bool IsGroggyAttack { get { return _isGroggyAttack; } }
+    [SerializeField] protected bool isGroggyAttack = false;
+    public bool IsGroggyAttack { get { return isGroggyAttack; } }
+
+    [SerializeField] protected LayerMask layerMask;
 }

@@ -18,6 +18,7 @@ GameObject:
   - component: {fileID: 7306616824936131376}
   - component: {fileID: 9178965677029127983}
   - component: {fileID: 5682234352900363449}
+  - component: {fileID: 5733293919325896430}
   m_Layer: 3
   m_Name: Player
   m_TagString: Player
@@ -214,7 +215,7 @@ Rigidbody:
   m_UseGravity: 1
   m_IsKinematic: 1
   m_Interpolate: 0
-  m_Constraints: 0
+  m_Constraints: 80
   m_CollisionDetection: 0
 --- !u!114 &7306616824936131376
 MonoBehaviour:
@@ -266,3 +267,20 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerGrabController
   ShowTopMostFoldoutHeaderGroup: 1
+--- !u!114 &5733293919325896430
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3532302232374388767}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 86dca35901565144f832eb2841a1d793, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LinearKnockback
+  ShowTopMostFoldoutHeaderGroup: 1
+  maxDistance: 2
+  minKnockbackTime: 0.15
+  maxKnockbackTime: 1.5
+  stopSpeed: 0.15
