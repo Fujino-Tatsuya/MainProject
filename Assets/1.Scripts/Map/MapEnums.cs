@@ -57,3 +57,10 @@ public enum Difficulty : byte
     Normal,
     Hard
 }
+
+public enum ZoneSize : byte
+{
+    Large,   // 대형 — 1티어 노드 포함 전투 존
+    Medium,  // 중형
+    Small    // 소형
+}

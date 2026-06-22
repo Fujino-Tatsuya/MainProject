@@ -8,6 +8,7 @@
 - [design/players.md](design/players.md) — 플레이어 가붕이/징크스 스킬·우클릭
 - [design/status-effects.md](design/status-effects.md) — 상태이상 정의/게이팅
 - [design/builds.md](design/builds.md) — 빌드(모디파이어) 시스템, R 잠금/해금
+- [design/level-system.md](design/level-system.md) — 레벨/난이도 4축, 콘텐츠 난이도, 난이도↔전투 상호작용
 
 ## 기술
 - [tech/architecture.md](tech/architecture.md) — UnitBase·컴포넌트, 스탯/상태 자료구조, FSM/페이즈
