@@ -1,34 +1,84 @@
 # 네트워크
 
-> 리슨 서버 협동(PvE). **NGO 기반 (공모전/디버깅: IPv4 직접통신, 출시: Steamworks API).** 네트워크 구현 담당은 은희한테 전적으로 맡길거임.
+> Listen server cooperative PvE (host-client). **Unity Netcode for GameObjects based (base version 2.11.2; competition/debugging: direct IPv4 connection; release: Steamworks API).**
 
 ## 권한 모델
-- **플레이어(클라/오너 권한)**: 이동·입력·스킬 발동 트리거는 로컬 오너. `NetworkTransform`(owner authority).
-- **서버(호스트 권한)**: 보스 전 로직, 데미지/체력, **상태이상**, **폭탄/장판/투사체**, 빌드 적용, **페이즈 전환**.
-- 협동 PvE라 안티치트 불필요 → 위 분리로 반응성 + 단순성 확보.
-- 예) **폭탄 상호작용**: 기본공격 적중 판정·날아가는 방향/거리·타이머 정지·**넉백(유저만)·스킬 시전 취소·hit**
-  은 전부 **서버가 권위적으로 처리**(클라는 입력/연출만).
+- **Player**: movement, input, and animation are owner-authoritative.
+- **Server/Host**: every system except player-owned movement, input, and animation is authoritative on the host.
+- Anti-cheat is unnecessary for cooperative PvE, so this split keeps player response fast while keeping the network model simple.
 
 ## 연결 흐름
-1. **Intro / Lobby / Room = Steam Lobby (출시) 또는 IP 입력 직접 접속 (공모전/디버깅)**
-   - 출시: 스팀 친구 초대 및 로비 매칭 사용.
-   - 공모전/디버깅: 호스트 IP 주소를 직접 입력하여 접속.
-   - 로비 플레이어 데이터 = 캐릭터 선택 / 빌드 선택 / Ready 상태.
-2. **방장 "게임시작"** →
-   - 출시: **SteamDatagramRelay (SDR)**를 통해 NGO Host/Client 연결 수립.
-   - 공모전/디버깅: **IPv4 직접 연결**을 통해 NGO Host/Client 연결 수립.
-3. 호스트가 **`NetworkSceneManager`** 로 **Game 씬** 로드 → 보스 연출 → 전투.
-4. **호스트 이탈 = 즉시 연결 종료 + 플레이 씬 강제 종료**(레이븐스워치 동일). 재접속/마이그레이션 없음(7월).
+1. **Title / Lobby / Loading / InGame / Result**
+2. If the Host leaves during InGame, the session ends. The remaining players transition to the Result Scene locally.
 
-## Ready / Start 조건
-- **방 슬롯 = 항상 3인 고정**, 시작은 **1 / 2 / 3인 모두 가능**.
-- **게임시작 활성화 = (방장 제외 전원 Ready) AND (방장 캐릭터+빌드 선택 유효).** (방장의 '준비'는 선택 완료로 갈음)
-- 1인: 방장 본인 선택만 유효하면 시작. **로스터/선택 변경 시 조건 재평가**(중도 입장·이탈·언레디).
+## Lobby
+- The Lobby always maintains 3 fixed player slots, including empty slots.
+- The Lobby UI always displays all 3 player slots.
+- Empty player slots are displayed as `Empty`.
+- If the Host leaves the Lobby, no scene transition occurs, and all slots except the local player's character slot become `Empty`.
+- The game can start only when all connected players are Ready.
+- Solo, duo, and trio play are all supported.
+- When entering the Lobby Scene, the `NetworkManager` instance must be inactive or in a local-only state, not running as Host.
+- The Lobby Scene is always treated as a local scene and is not loaded through `NetworkSceneManager`.
 
-## 테스트
-- **Multiplayer Play Mode(MPPM)**: 에디터 1개에서 가상 플레이어 2~3명으로 흐름·동기화 검증.
-- 점검: 방코드 입장, Ready/Start(1·2·3인), 보스 페이즈 전환, 폭탄 넉백/스킬취소, 상태이상 일관성, 호스트 이탈.
+## Lobby Ready / Start
+- The Lobby start button is bound to `Ready()` for both solo and multiplayer.
+- When all connected players are in the Ready state, the game starts after a 5-second countdown.
+- If a player becomes Unready or disconnects during the countdown, the countdown is canceled.
+- After the countdown starts because all players are Ready, if one player cancels their Ready state, only that player becomes Unready.
+- If the countdown is canceled and all players become Ready again, the countdown restarts from 5 seconds.
+- Character selection and build selection cannot be changed while the player is in the Ready state.
+- If a client disconnects before the countdown starts, all remaining players' Ready states are reset.
+- If a new client joins the Lobby, all players' Ready states are reset.
+- Clients only send a `RequestReady()` call, and the server validates whether the player can become Ready before changing the Ready state.
+- Lobby player data such as Ready state, character selection, and build selection is stored and synchronized using `NetworkVariable` or `NetworkList`.
 
-## 패키지 주의
-- NGO/Steamworks 패키지를 추가하면 **반드시 `Packages/manifest.json` + `packages-lock.json` 커밋**
-  (현재 미추적 — [../../AGENT.md](../../AGENT.md) §3).
+## Solo Flow
+- Solo flow: `Ready()` -> 5-second countdown -> `StartHost()` -> Loading Scene -> InGame Scene.
+- In Solo play, the countdown is handled by a local timer because the Host has not started yet.
+- In Solo play, if the player becomes Unready during the countdown, the countdown is canceled and the player remains in the Lobby.
+- If `StartHost()` fails after the Solo countdown finishes, the player remains in the Lobby, an error message is shown, and the Ready state is reset.
+- After `StartHost()` succeeds in Solo play, scene transitions use `NetworkSceneManager`.
+- In Solo play, both the Loading Scene and InGame Scene are loaded through `NetworkSceneManager`.
+
+## Multiplayer Flow
+- Multiplayer flow 1: connect by entering an invite code.
+- Multiplayer flow 2: connect through matchmaking.
+- Multiplayer flows will be discussed after gathering information about the Steamworks API.
+- Clients cannot join the Lobby while the countdown is in progress.
+- Clients cannot join after the game has already started.
+- The countdown is managed and synchronized by the server.
+
+## Result Scene
+- The Result Scene requires network synchronization on normal game completion.
+- On normal game completion, category-based result ratios are calculated by the Host before entering the Result Scene.
+- On normal game completion, all players see the full team result in the Result Scene.
+- On normal game completion, the Host transitions all players to the Result Scene through `NetworkSceneManager`.
+- Team contribution totals, such as total team damage, are not tracked.
+- Only individual player contribution is measured.
+- Individual contribution categories are deferred.
+- The detailed synchronization flow for normal game completion is deferred.
+
+## InGame Leave
+- This section only covers Client leave cases where the Host remains connected.
+- If a Client leaves during InGame and the Host remains connected, the session continues.
+- If a Client leaves during InGame, that Client returns to the Title Scene.
+- A manual Client leave and an unexpected Client disconnect are handled the same way, but they display different messages.
+- The Host sees different messages for a manual Client leave and an unexpected Client disconnect.
+- When a Client leaves during InGame, the remaining players are shown a `Player disconnected` notification.
+- During InGame, if a Client leaves, the remaining players briefly see that player as `Disconnected`, then the player is removed from the combat UI.
+- When a Client leaves during InGame, that Client's character is removed from the session if possible. If immediate removal is not feasible, the character is disabled.
+- When a Client's character is removed from the session, summons created by that character are killed immediately.
+- If the leaving Client's character owns a bomb or another special interaction object, it is removed with the character, or immediately dropped and transferred to server ownership if required by game rules.
+- Projectiles and area effects created by the leaving Client's character remain active and are destroyed automatically when their duration expires.
+- A disconnected Client's remaining projectiles and area effects continue to apply damage until they expire.
+- Damage caused by a disconnected Client's remaining projectiles or area effects after disconnection still affects gameplay, but is excluded from Result contribution data.
+- If a Client leaves during InGame, boss difficulty and HP scaling are not recalculated.
+- If only one player remains after a Client leaves during InGame, the session continues.
+- Rejoining is not allowed after a Client leaves during InGame.
+- Backfilling is not allowed after a Client leaves during InGame.
+- When a Client leaves during InGame, the Host finalizes that player's individual contribution snapshot at the moment of leaving.
+- If a Client leaves during InGame, that player's Result data is included up to the point of leaving.
+- For normal game completion, disconnected Clients' Result data is based only on authoritative data stored by the Host up to the point of leaving.
+- If a Client leaves during InGame, that player remains listed in the Result Scene with a `Disconnected` or `Left` status.
+- In the Result Scene
