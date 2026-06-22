@@ -124,18 +124,18 @@ public static class MapDevTools
             return;
         }
 
-        var results = mg.Generate(System.Environment.TickCount, Difficulty.Normal);
+        var results = mg.Generate(System.Environment.TickCount, 0); // 난이도 Lv0 (baseline)
 
         var byKey = new Dictionary<string, int>();
         foreach (var r in results)
         {
-            string key = $"{r.Tier}/{r.Content}";
+            string key = $"{(r.Slot != null ? r.Slot.Size.ToString() : "?")}/{r.Role}";
             byKey.TryGetValue(key, out int c);
             byKey[key] = c + 1;
         }
 
         var sb = new System.Text.StringBuilder();
-        sb.Append($"[TestGenerate] 노드 {results.Count}개 — ");
+        sb.Append($"[TestGenerate] 배치 {results.Count}개 — ");
         foreach (var kv in byKey) sb.Append($"{kv.Key}:{kv.Value}  ");
         Debug.Log(sb.ToString());
     }

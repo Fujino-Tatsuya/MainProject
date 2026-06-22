@@ -19,8 +19,7 @@ public static class MapSceneSetup
         }
 
         // 보조 컴포넌트
-        mg.NodePlacer = GetOrAdd<NodePlacer>(mg.gameObject);
-        mg.ObstaclePlacer = GetOrAdd<ObstaclePlacer>(mg.gameObject);
+        mg.LayoutPlacer = GetOrAdd<LayoutPlacer>(mg.gameObject);
         mg.Validator = GetOrAdd<MapValidator>(mg.gameObject);
         mg.ContentSpawner = GetOrAdd<MapContentSpawner>(mg.gameObject);
         var overview = GetOrAdd<MapOverviewUI>(mg.gameObject);
@@ -30,19 +29,17 @@ public static class MapSceneSetup
         mg.Config = AssetDatabase.LoadAssetAtPath<MapGenConfigSO>(MapEditorPaths.ConfigPath);
         mg.Catalog = AssetDatabase.LoadAssetAtPath<MapPrefabCatalogSO>(MapEditorPaths.CatalogPath);
 
-        // ZoneDef_1~10 순서대로
-        var zones = new List<ZoneDefinitionSO>();
-        for (int i = 1; i <= 10; i++)
-        {
-            var z = AssetDatabase.LoadAssetAtPath<ZoneDefinitionSO>(MapEditorPaths.ZoneDefPath(i));
-            if (z != null) zones.Add(z);
-            else Debug.LogWarning($"[MapSceneSetup] ZoneDef_{i} 못 찾음");
-        }
-        mg.Zones = zones;
+        // 존 레이아웃 카탈로그 (프로젝트의 첫 ZoneLayoutCatalogSO 자동 연결)
+        var catGuids = AssetDatabase.FindAssets("t:ZoneLayoutCatalogSO");
+        if (catGuids.Length > 0)
+            mg.ZoneLayoutCatalog = AssetDatabase.LoadAssetAtPath<ZoneLayoutCatalogSO>(
+                AssetDatabase.GUIDToAssetPath(catGuids[0]));
+        else
+            Debug.LogWarning("[MapSceneSetup] ZoneLayoutCatalog 에셋 없음 — 생성 후 인스펙터에서 연결하세요.");
 
         EditorUtility.SetDirty(mg);
         EditorSceneManager.MarkSceneDirty(mg.gameObject.scene);
-        Debug.Log($"[MapSceneSetup] 완료 — Config:{(mg.Config != null)} / Catalog:{(mg.Catalog != null)} / Zones:{zones.Count}. (씬 저장 필요)");
+        Debug.Log($"[MapSceneSetup] 완료 — Config:{(mg.Config != null)} / Catalog:{(mg.Catalog != null)} / ZoneLayoutCatalog:{(mg.ZoneLayoutCatalog != null)}. (씬 저장 필요)");
     }
 
     private static T GetOrAdd<T>(GameObject go) where T : Component

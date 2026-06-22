@@ -1,176 +1,125 @@
 using UnityEngine;
 using System.Collections.Generic;
 
+// 맵 생성 v2 — 사전 디자인 존 프리팹을 슬롯에 배치(위치 셔플). (Docs/design/level-system.md, map-generation.md §5.2 / PLAN)
 public class MapGenerator : MonoBehaviour
 {
     [Header("=== 설정 ===")]
-    public MapGenConfigSO Config;
-    public MapPrefabCatalogSO Catalog;
-    public List<ZoneDefinitionSO> Zones;
+    public MapGenConfigSO Config;                 // 몬스터 그룹 풀 등
+    public ZoneLayoutCatalogSO ZoneLayoutCatalog; // (Size×Difficulty) 전투 풀 + 역할 고정 디자인
+    public MapPrefabCatalogSO Catalog;            // 오버뷰 역할 아이콘용 (노드 스폰엔 미사용)
 
     [Header("=== 컴포넌트 참조 ===")]
-    public NodePlacer NodePlacer;
-    public ObstaclePlacer ObstaclePlacer;
-    public MapValidator Validator;
+    public LayoutPlacer LayoutPlacer;
+    public MapValidator Validator;                // (선택) 경로 검증 — 다리 고정이라 현재 미호출
     public MapContentSpawner ContentSpawner;
 
     [Header("=== 자동 생성 ===")]
-    [Tooltip("Start에서 자동 생성. 네트워크 세션 중이면 건너뜀 — MapNetworkSync(OnNetworkSpawn)가 서버 시드를 동기화해 호출 (클라가 제멋대로 다른 시드로 생성하는 디싱크 방지)")]
+    [Tooltip("Start에서 자동 생성. 네트워크 세션 중이면 MapNetworkSync(OnNetworkSpawn)가 서버 시드를 동기화해 호출.")]
     public bool AutoGenerateOnStart = true;
 
     [Header("=== 생성 결과 (런타임, 디버그용) ===")]
-    public List<GeneratedNodeData> Results = new List<GeneratedNodeData>();
+    public List<ZonePlacement> Placements = new List<ZonePlacement>();
 
     private bool _generated;
+    private System.Random _rng;
+    private readonly List<ZoneSlot> _slots = new List<ZoneSlot>();
+
+    // 현재 슬롯 목록 (오버뷰/스포너 — 생성 후 유효)
+    public IReadOnlyList<ZoneSlot> Slots => _slots;
 
     private void Start()
     {
         if (!AutoGenerateOnStart || _generated) return;
 
-        // 네트워크 세션이 돌고 있으면 MapNetworkSync가 시드 동기화 후 Generate를 호출한다.
+        // 네트워크 세션이 돌면 MapNetworkSync가 시드 동기화 후 Generate 호출 (클라 디싱크 방지)
         var nm = Unity.Netcode.NetworkManager.Singleton;
         if (nm != null && nm.IsListening) return;
 
-        Generate(System.Environment.TickCount, Difficulty.Normal);
+        Generate(System.Environment.TickCount, 0);
     }
 
-    private System.Random _rng;
-    // 영역 역할은 SO를 변경하지 않고 런타임 dict로만 관리 (SO는 공유 에셋이라 변경 금지)
-    private readonly Dictionary<ZoneDefinitionSO, ZoneRole> _zoneRoles = new Dictionary<ZoneDefinitionSO, ZoneRole>();
-    // 씬의 SpawnPoint를 ParentZone 별로 수집 (SO가 씬 참조를 못 들기 때문)
-    private readonly Dictionary<ZoneDefinitionSO, List<SpawnPoint>> _zonePoints = new Dictionary<ZoneDefinitionSO, List<SpawnPoint>>();
-    private static readonly List<SpawnPoint> _empty = new List<SpawnPoint>();
-
-    public List<GeneratedNodeData> Generate(int mapSeed, Difficulty selectedDifficulty)
+    // 시드 + 난이도로 존 배치 생성. 결정적(같은 시드 → 서버/클라 동일).
+    public List<ZonePlacement> Generate(int mapSeed, int difficultyLevel)
     {
-        _generated = true; // Start 자동 생성과 네트워크 호출 중복 방지
+        _generated = true;
         _rng = new System.Random(mapSeed);
-        Results.Clear();
+        Placements.Clear();
 
-        GatherSpawnPoints();                       // 씬 스캔 → ParentZone 별 그룹핑 + 초기화
-        NodePlacer.Initialize(Config, Catalog, _rng);
+        GatherSlots();       // 씬 ZoneSlot 수집 + SlotID 정렬 + 초기화
+        AssignSlotRoles();   // 후보 중 퀘스트/보스/스폰 1곳씩
 
-        // 1. 영역 역할 배정 (퀘스트/보스/스폰 각 후보 중 1곳, 나머지 전투)
-        AssignZoneRoles();
-
-        // 2. 전투 영역 분류 (A등급 = 1티어 가능). 스폰포인트 목록으로 모음.
-        var combatZonePoints = new List<List<SpawnPoint>>();
-        var combatAZonePoints = new List<List<SpawnPoint>>();
-        foreach (var zone in Zones)
+        if (LayoutPlacer == null)
         {
-            if (zone == null || _zoneRoles[zone] != ZoneRole.Combat) continue;
-            var pts = PointsOf(zone);
-            combatZonePoints.Add(pts);
-            if (zone.DefaultGrade == ZoneGrade.A_UpToTier1) combatAZonePoints.Add(pts);
+            Debug.LogWarning("[MapGenerator] LayoutPlacer 미연결 — 생성 중단.");
+            return Placements;
         }
 
-        // 3. 노드 배치 (Min/Max = 맵 전체 총량 기반)
-        NodePlacer.PlaceTier1(combatAZonePoints);
-        NodePlacer.PlaceTier2(combatZonePoints);
-        NodePlacer.PlaceTier3(combatZonePoints);
+        Placements = LayoutPlacer.SelectLayouts(_slots, ZoneLayoutCatalog, difficultyLevel, _rng);
 
-        // 4. 몬스터/보상 (현재는 데이터 골격만 — 추후)
-        AssignMonsterGroups(selectedDifficulty);
+        // 스폰: 존 비주얼(양쪽 로컬) + 몬스터(서버) — NGO 자동 복제
+        ContentSpawner?.SpawnPlacements(this, Placements);
 
-        // 5. 결과 수집 (디버그 UI / 서버 스폰이 읽어갈 목록)
-        CollectResults();
-
-        // 6. 경로 검증
-        if (Validator != null && !Validator.ValidateMapPaths())
-            Debug.LogWarning("[MapGenerator] 경로 검증 실패 — 재시도 로직 필요.");
-
-        // 7. 실제 콘텐츠 스폰 (프리팹 인스턴스화 + 네트워크 오브젝트는 서버 Spawn)
-        ContentSpawner?.SpawnGenerated(this);
-
-        Debug.Log($"[MapGenerator] 생성 완료. Seed:{mapSeed} / 전투영역 {combatZonePoints.Count} / 노드 {Results.Count}개.");
-        return Results;
+        Debug.Log($"[MapGenerator] 생성 완료. Seed:{mapSeed} / 난이도 Lv{difficultyLevel} / 슬롯 {_slots.Count} / 배치 {Placements.Count}.");
+        return Placements;
     }
 
-    public ZoneRole GetZoneRole(ZoneDefinitionSO zone)
+    // 씬의 ZoneSlot 수집 + SlotID 정렬(결정성) + 런타임 초기화
+    private void GatherSlots()
     {
-        return _zoneRoles.TryGetValue(zone, out var role) ? role : ZoneRole.Combat;
-    }
+        _slots.Clear();
+        _slots.AddRange(FindObjectsByType<ZoneSlot>(FindObjectsSortMode.None));
 
-    // 씬의 모든 SpawnPoint를 ParentZone 별로 모으고 런타임 상태 초기화
-    private void GatherSpawnPoints()
-    {
-        _zonePoints.Clear();
-        var all = FindObjectsByType<SpawnPoint>(FindObjectsSortMode.None);
-        foreach (var sp in all)
+        // 결정적 전순서(NGO 디싱크 방지): SlotID → 위치(x→z, 라운딩) 2차 키.
+        // List.Sort는 불안정 정렬이라 SlotID 동률 시 FindObjectsByType 비결정 순서에 의존하므로 2차 키 필수.
+        _slots.Sort((a, b) =>
         {
-            if (sp == null || sp.ParentZone == null) continue;
-            if (!_zonePoints.TryGetValue(sp.ParentZone, out var list))
-            {
-                list = new List<SpawnPoint>();
-                _zonePoints[sp.ParentZone] = list;
-            }
-            list.Add(sp);
-            sp.ResetRuntime();
-        }
-        // 결정적 순서를 위해 PointID로 정렬
-        foreach (var list in _zonePoints.Values)
-            list.Sort((a, b) => a.PointID.CompareTo(b.PointID));
+            int c = a.SlotID.CompareTo(b.SlotID);
+            if (c != 0) return c;
+            Vector3 pa = a.transform.position, pb = b.transform.position;
+            c = Mathf.RoundToInt(pa.x * 100f).CompareTo(Mathf.RoundToInt(pb.x * 100f));
+            if (c != 0) return c;
+            return Mathf.RoundToInt(pa.z * 100f).CompareTo(Mathf.RoundToInt(pb.z * 100f));
+        });
+
+        // 중복 SlotID 조기 노출 (침묵 디싱크 방지)
+        for (int i = 1; i < _slots.Count; i++)
+            if (_slots[i].SlotID == _slots[i - 1].SlotID)
+                Debug.LogError($"[MapGenerator] SlotID 중복 {_slots[i].SlotID}: '{_slots[i - 1].name}' vs '{_slots[i].name}' — 고유 ID 부여 필요(결정성 깨짐).");
+
+        foreach (var s in _slots) if (s != null) s.ResetRuntime();
     }
 
-    private List<SpawnPoint> PointsOf(ZoneDefinitionSO zone)
+    // 역할 후보 중 1곳씩 배정 (퀘스트 → 보스 → 스폰). 정렬 슬롯 + 단일 RNG → 결정적.
+    private void AssignSlotRoles()
     {
-        return _zonePoints.TryGetValue(zone, out var list) ? list : _empty;
+        var taken = new HashSet<ZoneSlot>();
+        AssignRole(s => s.IsQuestCandidate, ZoneRole.Quest, taken);
+        AssignRole(s => s.IsBossCandidate, ZoneRole.BossRoom, taken);
+        AssignRole(s => s.IsSpawnCandidate, ZoneRole.PlayerSpawn, taken);
     }
 
-    private void AssignZoneRoles()
+    private void AssignRole(System.Func<ZoneSlot, bool> predicate, ZoneRole role, HashSet<ZoneSlot> taken)
     {
-        // 후보 풀에서 1곳씩 선택 (이미 다른 역할로 뽑힌 곳은 제외)
-        var taken = new HashSet<ZoneDefinitionSO>();
+        var pool = new List<ZoneSlot>();
+        foreach (var s in _slots)
+            if (s != null && predicate(s) && !taken.Contains(s)) pool.Add(s);
+        if (pool.Count == 0) return;
 
-        ZoneDefinitionSO quest = PickCandidate(z => z.IsQuestZoneCandidate, taken);
-        ZoneDefinitionSO boss  = PickCandidate(z => z.IsBossGateCandidate, taken);
-        ZoneDefinitionSO spawn = PickCandidate(z => z.IsPlayerSpawnCandidate, taken);
-
-        foreach (var zone in Zones)
-        {
-            if (zone == null) continue;
-            ZoneRole role = ZoneRole.Combat;
-            if (zone == quest)      role = ZoneRole.Quest;
-            else if (zone == boss)  role = ZoneRole.BossRoom;
-            else if (zone == spawn) role = ZoneRole.PlayerSpawn;
-            _zoneRoles[zone] = role;
-        }
-
-        Debug.Log($"[MapGenerator] 역할 — 퀘스트:{NameOf(quest)} / 보스:{NameOf(boss)} / 스폰:{NameOf(spawn)}");
-    }
-
-    private ZoneDefinitionSO PickCandidate(System.Func<ZoneDefinitionSO, bool> predicate, HashSet<ZoneDefinitionSO> taken)
-    {
-        var pool = new List<ZoneDefinitionSO>();
-        foreach (var zone in Zones)
-            if (zone != null && predicate(zone) && !taken.Contains(zone)) pool.Add(zone);
-
-        if (pool.Count == 0) return null;
-        ZoneDefinitionSO chosen = pool[_rng.Next(pool.Count)];
+        var chosen = pool[_rng.Next(pool.Count)];
+        chosen.AssignedRole = role;
         taken.Add(chosen);
-        return chosen;
     }
 
-    private void AssignMonsterGroups(Difficulty diff)
+    // 역할로 뽑힌 첫 슬롯 (오버뷰/스포너용)
+    public ZoneSlot GetRoleSlot(ZoneRole role)
     {
-        // TODO: 몬스터 기획/에셋 확정 후 그룹·마릿수 배정. 현재는 데이터 골격만.
+        foreach (var s in _slots) if (s != null && s.AssignedRole == role) return s;
+        return null;
     }
-
-    private void CollectResults()
-    {
-        foreach (var list in _zonePoints.Values)
-            foreach (var sp in list)
-                if (sp != null && sp.IsAssigned) Results.Add(sp.NodeData);
-    }
-
-    private static string NameOf(ZoneDefinitionSO z) => z != null ? z.ZoneName : "(없음)";
 
 #if UNITY_EDITOR
-    // 인스펙터 우클릭 → 에디터에서 즉시 생성 테스트 (랜덤 시드, 매번 다른 결과)
     [ContextMenu("▶ Test Generate (random seed)")]
-    private void EditorTestGenerate()
-    {
-        Generate(System.Environment.TickCount, Difficulty.Normal);
-    }
+    private void EditorTestGenerate() => Generate(System.Environment.TickCount, 0);
 #endif
 }
