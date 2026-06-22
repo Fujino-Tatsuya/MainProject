@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: f568eea51d80ec14e85c93e7eebeeb0d
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 352338
+  packageName: Character Effects
+  packageVersion: 1.0
+  assetPath: Assets/INab Studio/Demo Assets/Unity Companion License/StarterAssets/ThirdPersonController/Character/Materials/M_Body.mat
+  uploadId: 839888

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 2294beb660f51a34a8f4e3af29502b18
+VisualEffectImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 352338
+  packageName: Character Effects
+  packageVersion: 1.0
+  assetPath: Assets/INab Studio/Vfx Assets/Character Effects/Core/Graphs/Character
+    Points.vfx
+  uploadId: 839888

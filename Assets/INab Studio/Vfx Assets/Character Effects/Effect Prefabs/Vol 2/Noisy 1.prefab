@@ -1,0 +1,257 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &4017169259970017970
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8378591020213969219}
+  - component: {fileID: 8000171076506649165}
+  - component: {fileID: 6120034848669053731}
+  - component: {fileID: 2466945733341167346}
+  - component: {fileID: 5936464849173993751}
+  m_Layer: 0
+  m_Name: Noisy 1
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8378591020213969219
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4017169259970017970}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!2083052967 &8000171076506649165
+VisualEffect:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4017169259970017970}
+  m_Enabled: 1
+  m_Asset: {fileID: 8926484042661614526, guid: 288f3d4a312b58543b96295e4823c8ae, type: 3}
+  m_InitialEventName: 
+  m_InitialEventNameOverriden: 0
+  m_StartSeed: 0
+  m_ResetSeedOnPlay: 1
+  m_AllowInstancing: 1
+  m_ResourceVersion: 1
+  m_PropertySheet:
+    m_Float:
+      m_Array:
+      - m_Value: 1
+        m_Name: Effect Value
+        m_Overridden: 1
+      - m_Value: 0.0151
+        m_Name: Position Random Offset Time
+        m_Overridden: 1
+      - m_Value: 3.08
+        m_Name: Strip Init Velocity Size
+        m_Overridden: 1
+      - m_Value: 250
+        m_Name: Spawn Rate
+        m_Overridden: 1
+      - m_Value: 1.22
+        m_Name: Texture Color Power
+        m_Overridden: 1
+      - m_Value: 5.64
+        m_Name: Posterize Steps
+        m_Overridden: 1
+      - m_Value: 0
+        m_Name: Size Multiplier
+        m_Overridden: 1
+      - m_Value: 0.5
+        m_Name: Lifetime Multiplier
+        m_Overridden: 1
+      - m_Value: 25
+        m_Name: Angular Velocity
+        m_Overridden: 1
+      - m_Value: 0
+        m_Name: height alive
+        m_Overridden: 1
+      - m_Value: 0
+        m_Name: Hardness
+        m_Overridden: 1
+      - m_Value: 1
+        m_Name: Multiplier
+        m_Overridden: 1
+      - m_Value: 4
+        m_Name: Alpha Multiplier
+        m_Overridden: 1
+      - m_Value: 1.15
+        m_Name: Power
+        m_Overridden: 1
+      - m_Value: 5
+        m_Name: Lifetime
+        m_Overridden: 1
+      - m_Value: 0
+        m_Name: Random Direction Strength
+        m_Overridden: 1
+      - m_Value: 0.1
+        m_Name: Random Direction Frequency
+        m_Overridden: 1
+      - m_Value: 0
+        m_Name: Random Direction Time Scale
+        m_Overridden: 1
+      - m_Value: 0.25
+        m_Name: Flame Speed
+        m_Overridden: 1
+      - m_Value: 1
+        m_Name: Size
+        m_Overridden: 1
+      - m_Value: 0.794
+        m_Name: Flame Height
+        m_Overridden: 1
+      - m_Value: 0.3
+        m_Name: Z Offset
+        m_Overridden: 0
+      - m_Value: 0
+        m_Name: Height Spawn Adjustment
+        m_Overridden: 1
+      - m_Value: -0.07
+        m_Name: Position Offset
+        m_Overridden: 1
+    m_Vector2f:
+      m_Array:
+      - m_Value: {x: 0.45, y: 1.59}
+        m_Name: Noise Scale
+        m_Overridden: 1
+    m_Vector3f:
+      m_Array:
+      - m_Value: {x: -0, y: 56.075764, z: 0}
+        m_Name: Transform_angles
+        m_Overridden: 1
+      - m_Value: {x: 1.9, y: 0, z: -4.9}
+        m_Name: Transform_position
+        m_Overridden: 1
+      - m_Value: {x: 1, y: 1, z: 1}
+        m_Name: Transform_scale
+        m_Overridden: 1
+    m_Vector4f:
+      m_Array:
+      - m_Value: {x: 5.298137, y: 6.2784996, z: 7.0641828, w: 1}
+        m_Name: Color
+        m_Overridden: 1
+    m_Uint:
+      m_Array: []
+    m_Int:
+      m_Array: []
+    m_Matrix4x4f:
+      m_Array: []
+    m_AnimationCurve:
+      m_Array: []
+    m_Gradient:
+      m_Array: []
+    m_NamedObject:
+      m_Array:
+      - m_Value: {fileID: -664032772943106202, guid: 8e758bfa6efa28e4ba889fa7ce593840, type: 3}
+        m_Name: Mesh Renderer
+        m_Overridden: 1
+      - m_Value: {fileID: 2800000, guid: 6c712a759cadbcb41853eec1bdba6ddc, type: 3}
+        m_Name: Flipbook Texture (8x8)
+        m_Overridden: 1
+      - m_Value: {fileID: 2800000, guid: fadf2db8baabd9242a1043a2fe648a16, type: 3}
+        m_Name: Texture 1
+        m_Overridden: 1
+      - m_Value: {fileID: 2800000, guid: 9092f443e11791e4b8dfe4afa55deabd, type: 3}
+        m_Name: Texture 2
+        m_Overridden: 1
+      - m_Value: {fileID: 0}
+        m_Name: Skinned Renderer
+        m_Overridden: 1
+    m_Bool:
+      m_Array:
+      - m_Value: 1
+        m_Name: Use Skinned Mesh
+        m_Overridden: 1
+      - m_Value: 0
+        m_Name: Use Posterize
+        m_Overridden: 1
+--- !u!73398921 &6120034848669053731
+VFXRenderer:
+  serializedVersion: 1
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4017169259970017970}
+  m_Enabled: 1
+  m_CastShadows: 0
+  m_ReceiveShadows: 0
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 0
+  m_LightProbeUsage: 0
+  m_ReflectionProbeUsage: 0
+  m_RayTracingMode: 0
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+--- !u!114 &2466945733341167346
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4017169259970017970}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cdafc37f32b176349b1684c4455b98e9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_ExecuteInEditor: 1
+  m_Bindings:
+  - {fileID: 5936464849173993751}
+  m_VisualEffect: {fileID: 8000171076506649165}
+--- !u!114 &5936464849173993751
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4017169259970017970}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 33749af2b80913f4a810677e249c9ba4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Property:
+    m_Name: Transform
+  Target: {fileID: 0}

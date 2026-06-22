@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 20545407f52b9a14d850f9745e1b3986
+VisualEffectImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 352338
+  packageName: Character Effects
+  packageVersion: 1.0
+  assetPath: Assets/INab Studio/Vfx Assets/Character Effects/Core/Blocks/Character
+    Mesh Spawn.vfxblock
+  uploadId: 839888

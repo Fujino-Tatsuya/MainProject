@@ -1,51 +1,54 @@
 using UnityEngine;
-using UnityEngine.EventSystems;
-using UnityEngine.InputSystem;
 
 [RequireComponent(typeof(PlayerInputReader))]
+[RequireComponent(typeof(Rigidbody))]
 public class PlayerMovement : MonoBehaviour
 {
-    PlayerInputReader reader;
-    Rigidbody rb;
+    private PlayerInputReader reader;
+    private Player player;
+    private Rigidbody rb;
 
-    private Vector2 prevDir_for_Rotate;
-    [SerializeField] private float rotate_Speed;
-    private bool hasRotate;
-
+    [SerializeField] private Transform armature;
+    [SerializeField] private float rotate_Speed = 10f;
     [SerializeField] private float maxSpeed = 5f;
     [SerializeField] private float midSpeed = 3f;
     [SerializeField] private float acceleration = 80f;
     [SerializeField] private float alignThreshold = 0.98f;
     [SerializeField] private float viewYaw = -45f;
 
+    private Vector2 prevDir_for_Rotate = new Vector2(0f, -1f);
+    private bool hasRotate = true;
     private float currentSpeed;
 
     private void Awake()
     {
         reader = GetComponent<PlayerInputReader>();
+        player = GetComponent<Player>();
         rb = GetComponent<Rigidbody>();
+
+        if (armature == null)
+            armature = transform.Find("Armature");
     }
 
     private void Start()
     {
-        rotate_Speed = 10.0f;
-        prevDir_for_Rotate = new Vector2(0,-1);
-        hasRotate = true;
+        rotate_Speed = 10f;
     }
 
-    private void FixedUpdate()
+    private void Update()
     {
         Move();
         Rotate();
     }
 
-    /// <summary>
-    /// 기존의 정면과 같은 방향으로 이동한다면 즉시 최고속도.
-    /// 정면과 다른 방향으로 이동한다면 중간 -> 최고 속도로 가속.
-    /// forward 와 input direction 을 내적하여 감별.
-    /// </summary>
-    void Move()
+    private void Move()
     {
+        if (player != null && !player.CanMove)
+        {
+            currentSpeed = 0f;
+            return;
+        }
+
         if (!reader.HasMoveInput)
         {
             currentSpeed = 0f;
@@ -58,7 +61,8 @@ public class PlayerMovement : MonoBehaviour
         Vector3 worldDir = Quaternion.Euler(0f, viewYaw, 0f) * localDir;
         worldDir.Normalize();
 
-        float dot = Vector3.Dot(worldDir, transform.forward);
+        Vector3 forward = armature != null ? armature.forward : transform.forward;
+        float dot = Vector3.Dot(worldDir, forward);
 
         if (dot >= alignThreshold)
         {
@@ -72,20 +76,23 @@ public class PlayerMovement : MonoBehaviour
             currentSpeed = Mathf.MoveTowards(
                 currentSpeed,
                 maxSpeed,
-                acceleration * Time.fixedDeltaTime
+                acceleration * Time.deltaTime
             );
         }
 
         rb.MovePosition(
-            rb.position + worldDir * currentSpeed * Time.fixedDeltaTime
+            rb.position + worldDir * currentSpeed * Time.deltaTime
         );
     }
 
-    /// <summary>
-    /// 마지막 입력 방향에 도달 할 때 까지 반복하는 회전 함수
-    /// </summary>
-    void Rotate()
+    private void Rotate()
     {
+        if (player != null && !player.CanMovementRotate)
+            return;
+
+        if (armature == null)
+            return;
+
         if (reader.HasMoveInput)
         {
             prevDir_for_Rotate = reader.Direction;
@@ -95,40 +102,59 @@ public class PlayerMovement : MonoBehaviour
         if (!hasRotate)
             return;
 
-        Vector3 dir = new Vector3(prevDir_for_Rotate.x, 0, prevDir_for_Rotate.y);
+        Vector3 dir = new Vector3(prevDir_for_Rotate.x, 0f, prevDir_for_Rotate.y);
         dir = Quaternion.Euler(0f, viewYaw, 0f) * dir;
 
         Quaternion targetRotation = Quaternion.LookRotation(dir);
 
-        if (Vector3.Dot(dir, transform.forward) > 0.999f)
+        if (Vector3.Dot(dir, armature.forward) > 0.999f)
         {
-            rb.MoveRotation(targetRotation);
+            armature.rotation = targetRotation;
             hasRotate = false;
             return;
         }
 
-        rb.MoveRotation(Quaternion.Slerp(rb.rotation, targetRotation, rotate_Speed * Time.fixedDeltaTime));
+        armature.rotation = Quaternion.Slerp(
+            armature.rotation,
+            targetRotation,
+            rotate_Speed * Time.deltaTime
+        );
     }
 
-    /// <summary>
-    /// Rotate like a robot, If you use this function, you need to increase the rotation speed.
-    /// </summary>
-    void RoatateToward()
+    public void RotateImmediately(Vector3 direction)
     {
-        if (reader.HasMoveInput)
-            prevDir_for_Rotate = reader.Direction;
-
-        Vector3 dir = new Vector3(prevDir_for_Rotate.x, 0, prevDir_for_Rotate.y);
-        dir = Quaternion.Euler(0f, viewYaw, 0f) * dir;
-
-        Quaternion targetRotation = Quaternion.LookRotation(dir);
-
-        if (Vector3.Dot(dir, transform.forward) > 0.999f)
-        {
-            rb.rotation = targetRotation;
+        if (armature == null)
             return;
-        }
 
-        rb.rotation = Quaternion.RotateTowards(rb.rotation, targetRotation, rotate_Speed * Time.deltaTime);
+        direction.y = 0f;
+
+        if (direction.sqrMagnitude < 0.001f)
+            return;
+
+        armature.rotation = Quaternion.LookRotation(direction.normalized);
+        hasRotate = false;
+    }
+
+    public void RotateToward(Vector3 direction, float speed)
+    {
+        if (armature == null)
+            return;
+
+        direction.y = 0f;
+
+        if (direction.sqrMagnitude < 0.001f)
+            return;
+
+        Quaternion targetRotation = Quaternion.LookRotation(direction.normalized);
+        armature.rotation = Quaternion.Slerp(
+            armature.rotation,
+            targetRotation,
+            speed * Time.deltaTime
+        );
+    }
+
+    public void MoveRoot(Vector3 deltaPosition)
+    {
+        rb.MovePosition(rb.position + deltaPosition);
     }
 }

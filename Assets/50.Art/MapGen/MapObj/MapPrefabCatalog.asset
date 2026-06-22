@@ -1,0 +1,54 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 993348ec57e055943bd3335749d92d69, type: 3}
+  m_Name: MapPrefabCatalog
+  m_EditorClassIdentifier: Assembly-CSharp::MapPrefabCatalogSO
+  Tier1Nodes:
+  - {fileID: 919132149155446097, guid: 9696d4bfd643f45488bac0b4c62108dd, type: 3}
+  - {fileID: 919132149155446097, guid: c40b4a8908ed189449502ee298518e1e, type: 3}
+  - {fileID: 919132149155446097, guid: fdb11c4c977e0094a8cfd5fdf3862823, type: 3}
+  Tier2Props:
+  - {fileID: 1045472623685520, guid: 41430ccb06114c04bb00c0175c01c88d, type: 3}
+  - {fileID: 1957021531820338, guid: 7cca0ece1b5e5374991c1edafd5314b2, type: 3}
+  - {fileID: 1249707538929122, guid: 5be022cbfecfcf8478a5658a5142f700, type: 3}
+  Tier2Obstacles:
+  - {fileID: 1402279105088362049, guid: a2828531b1e34f94a8dd016b277d4cfc, type: 3}
+  Tier3Obstacles:
+  - {fileID: 7446573032957620201, guid: 78aa47cf2a4a3ed439549a76b081bbc0, type: 3}
+  Tier3Recovery:
+  - {fileID: 1187625364453610, guid: c56b7bbe609f8bc4bb153e1e148fabcf, type: 3}
+  Tier3Teleport:
+  - {fileID: 1996425905810576, guid: 0c2869721262ac6429af5bbef6ebeb56, type: 3}
+  Tier3Buff:
+  - {fileID: 1690727760587702, guid: f3401d1420c933746803e19506814fc8, type: 3}
+  SpawnAreaStructure: {fileID: 919132149155446097, guid: 5156e85384a1255478aff647be127adf, type: 3}
+  Tier1Scale: 1300
+  SpawnStructureScale: 100
+  Tier1Rotation: {x: -90, y: 0, z: 0}
+  SpawnStructureRotation: {x: -90, y: 0, z: 0}
+  Tier3Scale: 2.5
+  BossAreaMarker: {fileID: 6257232294707993470, guid: 53d1d6d4ed204b449ba71955773096c0, type: 3}
+  SpawnAreaMarker: {fileID: 4836647589428915071, guid: 03055b4f319e2354695744c8240c8509, type: 3}
+  QuestAreaMarker: {fileID: 6894159624124694603, guid: 39f7e1bbdd2fe78408e6c91e7a5338e2, type: 3}
+  AreaMarkerSize: 20
+  BossIcon: {fileID: 2800000, guid: 4647253d7b3344e4e904fe50ffa0af77, type: 3}
+  SpawnIcon: {fileID: 2800000, guid: 7a324d5a4f089ea4d8fd8a6dcc524583, type: 3}
+  QuestIcon: {fileID: 2800000, guid: 991f6db95e5cec3438aea0484767d49d, type: 3}
+  FloorTiles:
+  - {fileID: 1762945973701536, guid: 27e2f0253f3de9a4baa6aba994ff3eb7, type: 3}
+  - {fileID: 1139298442579984, guid: 69bfa6c642d9c9846baa1c4024f377f3, type: 3}
+  - {fileID: 1507543799964052, guid: 56a7df5d71b7dc84ba419747c924ffc6, type: 3}
+  - {fileID: 1365389252355666, guid: c586fddde79bf5f4aba2e6a5cdf2338e, type: 3}
+  WallFences:
+  - {fileID: 1396626323766674, guid: f7572585f8e47874fa6cf0f8f60a7adb, type: 3}
+  - {fileID: 1319772559360156, guid: 70a1ed1496258cf478966b30ae12c1f1, type: 3}
+  WallDoor: {fileID: 1366956832668916, guid: 5a9a03aee9fc2da469081e7616dc19bb, type: 3}
