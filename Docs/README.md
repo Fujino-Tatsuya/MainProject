@@ -5,7 +5,11 @@
 
 ## 설계 (GDD)
 - [design/boss-wells-and-no23.md](design/boss-wells-and-no23.md) — 보스 "웰즈 & 23호" 컨셉·기믹·페이즈
-- [design/players.md](design/players.md) — 플레이어 가붕이/징크스 스킬·우클릭
+- [design/player.md](design/player.md) — Player Prefab, 입력·이동·피격 책임
+- [design/character.md](design/character.md) — Character 데이터, Prefab, UserProfile 보정
+- [design/character/character_garen.md](design/character/character_garen.md) — Garen 캐릭터 요약
+- [design/character/character_jinx.md](design/character/character_jinx.md) — Jinx 캐릭터 요약
+- [design/ability.md](design/ability.md) — Ability 슬롯, 실행 타입, 패시브 구조
 - [design/status-effects.md](design/status-effects.md) — 상태이상 정의/게이팅
 - [design/builds.md](design/builds.md) — 빌드(모디파이어) 시스템, R 잠금/해금
 - [design/level-system.md](design/level-system.md) — 레벨/난이도 4축, 콘텐츠 난이도, 난이도↔전투 상호작용
