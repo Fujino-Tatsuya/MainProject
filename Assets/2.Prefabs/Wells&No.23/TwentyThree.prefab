@@ -88,6 +88,8 @@ MonoBehaviour:
   layerMask:
     serializedVersion: 2
     m_Bits: 8
+  triggerMode: 0
+  stayTime: 0
 --- !u!1 &1594302937096804332
 GameObject:
   m_ObjectHideFlags: 0
@@ -245,6 +247,140 @@ Transform:
   m_Children: []
   m_Father: {fileID: 140439914847657440}
   m_LocalEulerAnglesHint: {x: 0, y: 180, z: 90}
+--- !u!1 &2538891665261033949
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8992115720558921880}
+  - component: {fileID: 8934441457672701464}
+  - component: {fileID: 7544648479387723351}
+  - component: {fileID: 9015786729669437829}
+  m_Layer: 0
+  m_Name: Floor
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8992115720558921880
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2538891665261033949}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.7071068, y: -0, z: -0, w: 0.7071068}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 3, y: 3, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 5472367148495070200}
+  m_LocalEulerAnglesHint: {x: -90, y: 0, z: 0}
+--- !u!212 &8934441457672701464
+SpriteRenderer:
+  serializedVersion: 2
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2538891665261033949}
+  m_Enabled: 1
+  m_CastShadows: 0
+  m_ReceiveShadows: 0
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 0
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: 9dfc825aed78fcd4ba02077103263b40, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 0
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_Sprite: {fileID: 55075430, guid: 23856ea02fe1c53449dad11cfc3da022, type: 3}
+  m_Color: {r: 1, g: 0, b: 0, a: 0.47058824}
+  m_FlipX: 0
+  m_FlipY: 0
+  m_DrawMode: 0
+  m_Size: {x: 2.54, y: 2.54}
+  m_AdaptiveModeThreshold: 0.5
+  m_SpriteTileMode: 0
+  m_WasSpriteAssigned: 1
+  m_SpriteSortPoint: 0
+--- !u!135 &7544648479387723351
+SphereCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2538891665261033949}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Radius: 1.2700003
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &9015786729669437829
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2538891665261033949}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: af5d9f825e50d7e4caf8eadf755ab930, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ColiderBasicAttack
+  ShowTopMostFoldoutHeaderGroup: 1
+  damage: 1
+  isGroggyAttack: 0
+  layerMask:
+    serializedVersion: 2
+    m_Bits: 8
+  triggerMode: 1
+  stayTime: 0
 --- !u!1 &2884726549167042591
 GameObject:
   m_ObjectHideFlags: 0
@@ -490,6 +626,110 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 8
   damage: 3
+--- !u!1 &3908396834888608453
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7285464119157252650}
+  - component: {fileID: 6555260676494401482}
+  m_Layer: 0
+  m_Name: Rage
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &7285464119157252650
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3908396834888608453}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 3556593508814251226}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &6555260676494401482
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3908396834888608453}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b2e13755730c9274fbe68dff27ce63d0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KnockbackAttack
+  ShowTopMostFoldoutHeaderGroup: 1
+  damage: 20
+  isGroggyAttack: 0
+  layerMask:
+    serializedVersion: 2
+    m_Bits: 8
+  knockbackStrength: 5
+--- !u!1 &5016341223067883996
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5472367148495070200}
+  - component: {fileID: 1982363097940907444}
+  m_Layer: 0
+  m_Name: Charging
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &5472367148495070200
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5016341223067883996}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 8992115720558921880}
+  m_Father: {fileID: 3556593508814251226}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1982363097940907444
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5016341223067883996}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4d7741cb3cc33aa4cb4e3d9035aecf14, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ChargeController
+  ShowTopMostFoldoutHeaderGroup: 1
+  maxY: 5
+  minY: 0
+  player1: 1
+  player2: 2
+  player3: 4
+  floor: {fileID: 2538891665261033949}
+  _isDefeated: 0
 --- !u!1 &5112472842191727821
 GameObject:
   m_ObjectHideFlags: 0
@@ -578,6 +818,8 @@ MonoBehaviour:
   layerMask:
     serializedVersion: 2
     m_Bits: 8
+  triggerMode: 0
+  stayTime: 0
 --- !u!1 &5372104213593212626
 GameObject:
   m_ObjectHideFlags: 0
@@ -713,6 +955,15 @@ MonoBehaviour:
   - rid: 5035182945995587747
   - rid: 5035183107175351285
   - rid: 5035183127801626729
+  - rid: 5035183130424639518
+  - rid: 5035183130424639519
+  - rid: 5035183131845722957
+  - rid: 5035183149431915327
+  - rid: 5035183149431915328
+  - rid: 5035183150490452910
+  - rid: 5035183217539285901
+  - rid: 5035183218639241401
+  - rid: 5035183218639241402
   m_OriginalGraph: {fileID: 0}
   m_IsInitialised: 0
   m_IsStarted: 0
@@ -792,6 +1043,78 @@ MonoBehaviour:
           m_Value1: 2910270055033367747
         Name: Knockback Attack
         m_Value: {fileID: 5579044265559132990}
+    - rid: 5035183130424639518
+      type: {class: 'BlackboardVariable`1[[System.Single, mscorlib]]', ns: Unity.Behavior, asm: Unity.Behavior}
+      data:
+        GUID:
+          m_Value0: 2254922149918382935
+          m_Value1: 9164977172194990837
+        Name: GroggyTime
+        m_Value: 10
+    - rid: 5035183130424639519
+      type: {class: 'BlackboardVariable`1[[System.Single, mscorlib]]', ns: Unity.Behavior, asm: Unity.Behavior}
+      data:
+        GUID:
+          m_Value0: 17205449954236613168
+          m_Value1: 2456026599336773606
+        Name: BreakTime
+        m_Value: 20
+    - rid: 5035183131845722957
+      type: {class: 'BlackboardVariable`1[[System.Single, mscorlib]]', ns: Unity.Behavior, asm: Unity.Behavior}
+      data:
+        GUID:
+          m_Value0: 5099864915279301384
+          m_Value1: 10246294715414392933
+        Name: ChargingTime
+        m_Value: 10
+    - rid: 5035183149431915327
+      type: {class: 'BlackboardVariable`1[[KnockbackAttack, Assembly-CSharp]]', ns: Unity.Behavior, asm: Unity.Behavior}
+      data:
+        GUID:
+          m_Value0: 8223242428661034045
+          m_Value1: 10854045377775622696
+        Name: Rage Attack
+        m_Value: {fileID: 6555260676494401482}
+    - rid: 5035183149431915328
+      type: {class: 'BlackboardVariable`1[[Enemy, Assembly-CSharp]]', ns: Unity.Behavior, asm: Unity.Behavior}
+      data:
+        GUID:
+          m_Value0: 4082606241079875717
+          m_Value1: 5211148615093030675
+        Name: Unit
+        m_Value: {fileID: 3484663710126934133}
+    - rid: 5035183150490452910
+      type: {class: 'BlackboardVariable`1[[System.Int32, mscorlib]]', ns: Unity.Behavior, asm: Unity.Behavior}
+      data:
+        GUID:
+          m_Value0: 6402150840621234159
+          m_Value1: 8671428947124840453
+        Name: MaxRageCount
+        m_Value: 5
+    - rid: 5035183217539285901
+      type: {class: 'BlackboardVariable`1[[ChargeController, Assembly-CSharp]]', ns: Unity.Behavior, asm: Unity.Behavior}
+      data:
+        GUID:
+          m_Value0: 16203391712790933127
+          m_Value1: 16539432465900484831
+        Name: Charge Controller
+        m_Value: {fileID: 1982363097940907444}
+    - rid: 5035183218639241401
+      type: {class: 'BlackboardVariable`1[[System.Int32, mscorlib]]', ns: Unity.Behavior, asm: Unity.Behavior}
+      data:
+        GUID:
+          m_Value0: 1592063912214193792
+          m_Value1: 1106959860664521683
+        Name: IncreaseHpAmount
+        m_Value: 1
+    - rid: 5035183218639241402
+      type: {class: 'BlackboardVariable`1[[System.Int32, mscorlib]]', ns: Unity.Behavior, asm: Unity.Behavior}
+      data:
+        GUID:
+          m_Value0: 204263104457482820
+          m_Value1: 17047565114546333891
+        Name: IncreaseShieldAmount
+        m_Value: 1
 --- !u!195 &1054250890861799072
 NavMeshAgent:
   m_ObjectHideFlags: 0
@@ -875,6 +1198,8 @@ MonoBehaviour:
   maxHp: 100
   defense: 5
   maxShield: 100
+  _groggyCount: 0
+  _maxGroggyCount: 5
 --- !u!1 &6682516438038340514
 GameObject:
   m_ObjectHideFlags: 0
@@ -963,6 +1288,8 @@ MonoBehaviour:
   layerMask:
     serializedVersion: 2
     m_Bits: 8
+  triggerMode: 0
+  stayTime: 0
 --- !u!1 &6792224880344252734
 GameObject:
   m_ObjectHideFlags: 0
@@ -1187,6 +1514,8 @@ Transform:
   - {fileID: 998147511182444830}
   - {fileID: 9185639174043840639}
   - {fileID: 1461158703682127806}
+  - {fileID: 5472367148495070200}
+  - {fileID: 7285464119157252650}
   m_Father: {fileID: 2585134952784665517}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &7129852271225524614
@@ -1212,8 +1541,8 @@ MonoBehaviour:
   grabAttackPercentage: 1
   jumpAttackMinDistance: 5
   jumpAttackMaxDistance: 10
-  jumpAttackPercentage: 1
-  dashAttackMinDistance: 5
+  jumpAttackPercentage: 100
+  dashAttackMinDistance: 10
   dashAttackMaxDistance: 20
   dashAttackPercentage: 100
 --- !u!1 &8718092995756804922
@@ -1357,7 +1686,28 @@ MonoBehaviour:
   NetworkAnimatorExpanded: 0
   AuthorityMode: 0
   m_Animator: {fileID: 4360647608449234546}
-  TransitionStateInfoList: []
+  TransitionStateInfoList:
+  - IsCrossFadeExit: 0
+    Layer: 0
+    OriginatingState: 221587152
+    DestinationState: -843218978
+    TransitionDuration: 0.25
+    TriggerNameHash: -891938696
+    TransitionIndex: 0
+  - IsCrossFadeExit: 0
+    Layer: 0
+    OriginatingState: 221587152
+    DestinationState: 2081823275
+    TransitionDuration: 0.25
+    TriggerNameHash: 1625683022
+    TransitionIndex: 1
+  - IsCrossFadeExit: 0
+    Layer: 0
+    OriginatingState: -843218978
+    DestinationState: 2081823275
+    TransitionDuration: 0.25
+    TriggerNameHash: 1625683022
+    TransitionIndex: 0
   AnimatorParameterEntries:
     ParameterEntries:
     - name: State
@@ -1379,7 +1729,15 @@ MonoBehaviour:
     - name: IsDead
       NameHash: 1270110494
       Synchronize: 1
-      ParameterType: 4
+      ParameterType: 9
+    - name: IsWalking
+      NameHash: 1282839668
+      Synchronize: 1
+      ParameterType: 9
+    - name: IsInit
+      NameHash: 1625683022
+      Synchronize: 1
+      ParameterType: 9
   AnimatorParametersExpanded: 0
 --- !u!114 &52311990419430086
 MonoBehaviour:

@@ -28,6 +28,15 @@ public class Health
     {
         _currentHp += healAmount;
         _currentHp = Mathf.Min(_currentHp, _maxHp); // 체력이 최대 체력을 초과하지 않도록 보장
+
+        Debug.Log($"체력 증가량: {healAmount}   /   현재 체력: {_currentHp}");
+    }
+    /// <summary>
+    /// 체력을 최대치로 회복시키는 함수
+    /// </summary>
+    public void Revive()
+    {
+        _currentHp = _maxHp;
     }
     #endregion
 
@@ -93,6 +102,8 @@ public class Health
         _currentShield += shieldAmount;
         _currentShield = Mathf.Min(_currentShield, _maxShield); // 쉴드가 최대 쉴드를 초과하지 않도록 보장
         _hasShield = (_currentShield > 0)? true : false;
+
+        Debug.Log($"쉴드 증가량: {shieldAmount}   /   현재 쉴드: {_currentShield}");
     }
     #endregion
 

@@ -19,8 +19,6 @@ public class LinearKnockback : NetworkBehaviour, IKnockbackable
 
     public void ApplyKnockback(Vector3 direction, float strength)
     {
-        Debug.Log("³Ë¹é!");
-
         StartKnockback();
 
         _rigidbody.AddForce(direction * strength, ForceMode.Impulse);
