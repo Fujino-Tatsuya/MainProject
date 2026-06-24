@@ -48,6 +48,7 @@ public sealed class FogManager : MonoBehaviour
     // ----- buffers -----
     private readonly Vector4[] _params0 = new Vector4[MaxVolumes];
     private readonly Vector4[] _colors = new Vector4[MaxVolumes];
+    private readonly Vector4[] _bounds = new Vector4[MaxVolumes];
     private readonly Matrix4x4[] _w2l = new Matrix4x4[MaxVolumes];
     private readonly List<FogVolume> _sortList = new List<FogVolume>(MaxVolumes * 2);
     private Vector3 _camPos;
@@ -87,6 +88,7 @@ public sealed class FogManager : MonoBehaviour
     private static readonly int ID_VolumeCount = Shader.PropertyToID("_FogVolumeCount");
     private static readonly int ID_VolParams0 = Shader.PropertyToID("_FogVolumeParams0");
     private static readonly int ID_VolColor = Shader.PropertyToID("_FogVolumeColor");
+    private static readonly int ID_VolBounds = Shader.PropertyToID("_FogVolumeBounds");
     private static readonly int ID_VolW2L = Shader.PropertyToID("_FogVolumeWorldToLocal");
 
     private void OnEnable()
@@ -194,6 +196,7 @@ public sealed class FogManager : MonoBehaviour
         Shader.SetGlobalInteger(ID_VolumeCount, count);
         Shader.SetGlobalVectorArray(ID_VolParams0, _params0);
         Shader.SetGlobalVectorArray(ID_VolColor, _colors);
+        Shader.SetGlobalVectorArray(ID_VolBounds, _bounds);
         Shader.SetGlobalMatrixArray(ID_VolW2L, _w2l);
     }
 
@@ -221,12 +224,14 @@ public sealed class FogManager : MonoBehaviour
             FogVolume v = _sortList[i];
             _params0[i] = v.GetParams0();
             _colors[i] = (Vector4)v.color;
+            _bounds[i] = v.GetBounds();
             _w2l[i] = v.GetWorldToLocal();
         }
         for (int i = count; i < MaxVolumes; i++)
         {
             _params0[i] = Vector4.zero;
             _colors[i] = Vector4.zero;
+            _bounds[i] = Vector4.zero;
             _w2l[i] = Matrix4x4.identity;
         }
         return count;

@@ -47,9 +47,10 @@ SAMPLER(sampler_FogMaskTex);
 
 // ---------------- 로컬 볼륨 ----------------
 int      _FogVolumeCount;
-float4   _FogVolumeParams0[MAX_FOG_VOLUMES];      // x:type(0 box,1 sphere) y:density z:softBorder w:hasTint
+float4   _FogVolumeParams0[MAX_FOG_VOLUMES];      // x:type(0 box,1 sphere) y:density z:softBorder(월드 m) w:hasTint
 float4   _FogVolumeColor[MAX_FOG_VOLUMES];        // rgb:tint
-float4x4 _FogVolumeWorldToLocal[MAX_FOG_VOLUMES]; // 월드->로컬(박스=[-0.5,0.5]^3, 스피어=반지름 0.5)
+float4   _FogVolumeBounds[MAX_FOG_VOLUMES];       // 박스:half-extents(xyz, 월드 m) / 스피어:반지름(x)
+float4x4 _FogVolumeWorldToLocal[MAX_FOG_VOLUMES]; // 월드->회전프레임(원점 중심, 월드 스케일 유지)
 
 // ---------------- 노이즈 헬퍼 ----------------
 float Fog_Hash21(float2 p)
@@ -114,23 +115,26 @@ float Fog_Height(float y)
 // ---------------- 로컬 볼륨 기여 ----------------
 float Fog_VolumeContribution(float3 worldPos, int i)
 {
+    // 회전 프레임(월드 스케일 유지)으로 변환 → SDF를 월드 단위(미터)로 계산.
     float3 local = mul(_FogVolumeWorldToLocal[i], float4(worldPos, 1.0)).xyz;
     float type = _FogVolumeParams0[i].x;
-    float soft = max(1e-4, _FogVolumeParams0[i].z);
+    float soft = max(1e-3, _FogVolumeParams0[i].z); // 월드 단위 페이드 폭
+    float3 b = _FogVolumeBounds[i].xyz;
 
-    float inside;
+    // 표면까지 부호거리(내부 음수, 외부 양수)
+    float dist;
     if (type < 0.5)
     {
-        // 박스 SDF (half-extent 0.5)
-        float3 q = abs(local) - 0.5;
-        float sdf = length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
-        inside = saturate(-sdf / soft);
+        float3 q = abs(local) - b;               // 박스 half-extents(월드)
+        dist = length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
     }
     else
     {
-        float d = length(local);
-        inside = saturate((0.5 - d) / soft);
+        dist = length(local) - b.x;              // 스피어 반지름(월드)
     }
+
+    // 표면(0)에서 soft 미터 안쪽까지 0→1 부드럽게(smoothstep). 방향 무관 균질.
+    float inside = smoothstep(0.0, soft, -dist);
     return inside * _FogVolumeParams0[i].y;
 }
 
