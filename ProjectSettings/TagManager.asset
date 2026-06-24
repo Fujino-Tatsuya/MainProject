@@ -6,16 +6,21 @@ TagManager:
   tags:
   - CameraFollowTarget
   - CinemachineTarget
+  - BossHomePoint
+  - BossArea
+  - Wall
+  - Ground
   layers:
   - Default
   - TransparentFX
   - Ignore Raycast
   - Ground
+  - Player
   - Water
   - UI
-  - 
-  - 
-  - 
+  - Surface
+  - Enemy
+  - HazardArea
   - 
   - 
   - 

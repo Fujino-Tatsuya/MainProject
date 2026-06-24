@@ -18,16 +18,30 @@ public class Unit : NetworkBehaviour
     #endregion
 
     #region 체력과 방어력
-    Health _health;
-    NetworkVariable<int> _currentHp = new NetworkVariable<int>();
-    NetworkVariable<int> _currentShield = new NetworkVariable<int>();
-    NetworkVariable<bool> _hasShield = new NetworkVariable<bool>();
+    protected Health _health;
+    public int CurrentHealth { get { return _health.CurrentHealth; } }
+    public int MaxHp { get { return _health.MaxHp; } }
+    protected NetworkVariable<int> _currentHp = new NetworkVariable<int>(
+    0,
+    NetworkVariableReadPermission.Everyone,
+    NetworkVariableWritePermission.Server
+);
+    protected NetworkVariable<int> _currentShield = new NetworkVariable<int>(
+    0,
+    NetworkVariableReadPermission.Everyone,
+    NetworkVariableWritePermission.Server
+);
+    protected NetworkVariable<bool> _hasShield = new NetworkVariable<bool>(
+    false,
+    NetworkVariableReadPermission.Everyone,
+    NetworkVariableWritePermission.Server
+);
 
     /// <summary>
     /// damage만큼 방어력을 반영하여 쉴드와 체력을 감소시키는 함수
     /// </summary>
     /// <param name="damage">감소시킬 피해 값</param>
-    public void TakeDamage(int damage)
+    public virtual void TakeDamage(int damage)
     {
         if (!IsServer) return; // 서버에서만 피해 처리
         int remainingDamage = damage;
@@ -68,6 +82,16 @@ public class Unit : NetworkBehaviour
     {
         if (!IsServer) return; // 서버에서만 체력 회복 처리
         _health.HealHp(healAmount);
+        _currentHp.Value = _health.CurrentHealth;
+    }
+
+    /// <summary>
+    /// 체력을 최대치로 회복시키는 함수
+    /// </summary>
+    public void Revive()
+    {
+        if (!IsServer) return; // 서버에서만 체력 회복 처리
+        _health.Revive();
         _currentHp.Value = _health.CurrentHealth;
     }
 
@@ -277,8 +301,20 @@ public class Unit : NetworkBehaviour
         _attackSpeed = attackSpeed;
 
         _health = new Health(maxHp, defense, maxShield);
-        _currentHp = new NetworkVariable<int>(maxHp);
+        _currentHp.Value = maxHp;
 
         UpdateNetworkShield();
+
+        _knockback = GetComponent<IKnockbackable>();
     }
+
+    #region 넉백
+    IKnockbackable _knockback;
+    public void Knockback(Vector3 direction, float strength)
+    {
+        if (!IsServer) return;
+
+        _knockback?.ApplyKnockback(direction, strength);
+    }
+    #endregion
 }
