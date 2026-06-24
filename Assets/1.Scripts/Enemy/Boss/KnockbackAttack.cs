@@ -28,7 +28,9 @@ public class KnockbackAttack : BaseWeapon
     {
         Vector3 direction;
 
-        direction = target.transform.position - transform.root.position;
+        Vector3 start = transform.position;
+        start.y = target.transform.position.y;
+        direction = target.transform.position - start;
 
         return direction.normalized;
     }

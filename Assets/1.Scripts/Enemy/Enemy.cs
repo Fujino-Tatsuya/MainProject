@@ -49,7 +49,7 @@ public class Enemy : Unit
         GroggyCount.Value = _groggyCount;
         MaxGroggyCount.Value = _maxGroggyCount;
 
-        TakeDamage(60);
+        TakeDamage(150);
     }
 
     public override void TakeDamage(int damage)

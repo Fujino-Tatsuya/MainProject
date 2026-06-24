@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Unity.Behavior.Authoring::Unity.Behavior.BehaviorProjectSettings
   m_GraphOwnerName: Self
   m_AutoSaveLastSaveLocation: 1
-  m_SaveFolder: 1.Scripts/BT/Actions/Return
+  m_SaveFolder: 1.Scripts/BT/Events
   m_UseSeparateSaveFolders: 0
   m_SaveFolderAction: 
   m_SaveFolderModifier: 

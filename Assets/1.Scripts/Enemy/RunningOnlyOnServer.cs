@@ -12,8 +12,10 @@ public class RunningOnlyOnServer : NetworkBehaviour
     { 
         base.OnNetworkSpawn();
 
-        btAgent.enabled = IsServer;
-        navMeshAgent.enabled = IsServer;
+        if(btAgent)
+            btAgent.enabled = IsServer;
+        if(navMeshAgent)
+            navMeshAgent.enabled = IsServer;
     }
 
     public override void OnNetworkDespawn()

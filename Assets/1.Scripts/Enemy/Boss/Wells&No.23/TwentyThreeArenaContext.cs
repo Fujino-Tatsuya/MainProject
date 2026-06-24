@@ -6,14 +6,15 @@ public class TwentyThreeArenaContext : NetworkBehaviour
 {
     [SerializeField] GameObject bossPrefab;
     [SerializeField] List<ChargingObject> ChargingObjects;
+    [SerializeField] Vector3 bossPos;
 
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
 
         if (!IsServer) return;
-
-        NetworkObject boss = Instantiate(bossPrefab).GetComponent<NetworkObject>();
+        
+        NetworkObject boss = Instantiate(bossPrefab, bossPos, Quaternion.identity).GetComponent<NetworkObject>();
         if (boss == null)
         {
             Debug.LogError("해당 프리펩에 NetworkObject 컴포넌트가 없습니다. 추가해주세요.");
