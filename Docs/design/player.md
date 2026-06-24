@@ -89,6 +89,8 @@ PlayerInput
 
 `PlayerAbilityController`는 Ability 실행만 담당한다. Character 장착, Character Prefab 생성, 스탯 초기화, Ability 목록 구성은 `PlayerCharacterController` 책임으로 분리한다.
 
+슬롯 실행 API는 `UseSlot(AbilitySlot slot)`으로 확정한다. 입력 계층은 이 public API만 호출한다. 클라이언트가 서버에 Ability 사용을 요청할 때는 `RequestUseSlotRpc(AbilitySlot slot)`을 사용하고, 서버 내부에서는 `bool TryUseSlot(AbilitySlot slot)`이 현재 장착된 Character의 해당 슬롯 Ability를 검증/실행한다.
+
 ## 현재 코드 기준
 
 현재 `Assets/1.Scripts/Player`에는 다음 컴포넌트가 있다.
@@ -107,5 +109,5 @@ PlayerInput
 | 주제 | 논의할 내용 |
 |------|-------------|
 | 런타임 Character 교체 | 대부분의 Character는 런타임 중 교체하지 않는다. 예외는 추후 별도 논의한다. |
-| Ability 입력 전달 컴포넌트 | `PlayerAbilityController`로 확정한다. 이 컴포넌트는 Ability 실행만 담당한다. 구체 API와 서버 RPC 흐름은 구현 시 결정해야 한다. |
+| Ability 입력 전달 컴포넌트 | `PlayerAbilityController`로 확정한다. 이 컴포넌트는 Ability 실행만 담당하며, public API는 `UseSlot(AbilitySlot slot)`을 사용한다. |
 | 중복 이동/회전 컴포넌트 정리 | `PlayerInputScript`, `PlayerRotation`, `PlayerRotation_RotateTowards`를 유지할지 정리할지 결정해야 한다. |

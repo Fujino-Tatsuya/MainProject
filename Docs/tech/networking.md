@@ -81,4 +81,77 @@
 - If a Client leaves during InGame, that player's Result data is included up to the point of leaving.
 - For normal game completion, disconnected Clients' Result data is based only on authoritative data stored by the Host up to the point of leaving.
 - If a Client leaves during InGame, that player remains listed in the Result Scene with a `Disconnected` or `Left` status.
-- In the Result Scene
+- In the Result Scene, a manually leaving Client is displayed as `Left`, and an unexpectedly disconnected Client is displayed as `Disconnected`.
+- `Left` and `Disconnected` Result entries are shown only to the players who remain in the session until Result Scene.
+- If the Host leaves after a Client has already left, the abnormal session end rules take priority and all Result data is treated as invalid.
+
+## Abnormal Session End
+- All Host leave cases are handled under `Abnormal Session End`.
+- If the session ends abnormally because the Host leaves, players transition to the Result Scene locally and the result is treated as invalid.
+- If the Host manually leaves or forfeits before normal game completion, the session is treated as abnormal and invalid.
+- If the Host leaves after becoming the only remaining player, the session is treated as an abnormal session end.
+- In an abnormal Result Scene, all gameplay result values are set to 0.
+- The Client only stores and displays the local play time.
+- In an abnormal Result Scene, a session invalid message is displayed, such as `Host disconnected`.
+
+## Network Time Management
+- During InGame, Host/Server time is the only authoritative network time.
+- `ServerTime` and gameplay `GameTime` are separated.
+- Clients use synchronized server time only for UI display and visual correction.
+- Gameplay decisions are not finalized by client-local time.
+- Combat starts only after all connected players finish loading the InGame Scene.
+- After all connected players finish loading, the Host sets and synchronizes `CombatStartServerTime`.
+- Combat intro, player control unlock, and the first boss pattern are driven by `CombatStartServerTime`.
+- `GameTime` starts from the player-controllable combat start point.
+- Loading Scene time and non-controllable intro time are not included in play time.
+- Result play time is calculated from `CombatGameTime`.
+- Gameplay timers use absolute `GameTime` timestamps such as `expiresAtGameTime`, `nextCastAtGameTime`, and `phaseChangeAtGameTime`.
+- Timer values are synchronized only when they are created, changed, resumed by object-specific rules, or canceled.
+- Remaining time is not synchronized every frame.
+- Skill cooldowns, status effects, bombs, area effects, projectile lifetimes, boss pattern schedules, and phase transition timings all use server-authoritative `GameTime`.
+- Client UI displays remaining gameplay time as `expiresAtGameTime - synchronizedGameTime`.
+- If a Client UI timer reaches 0 before receiving the server-confirmed gameplay event, only the UI display reaches 0.
+- Actual gameplay state changes occur only when confirmed by the server.
+- `GameTime` is not synchronized every frame. Clients calculate display-only `GameTime` from synchronized baseline values and pause/resume state.
+- Solo host-only play uses the same clock manager after `StartHost()` succeeds.
+- In Solo host-only play, opening the option panel with `Esc` pauses `GameTime`.
+- In multiplayer, pressing `Esc` opens only the local option panel and does not pause `GameTime`.
+- While a multiplayer option panel is open, that player's gameplay input is blocked, but the character remains in the world and can still be hit by server-authoritative gameplay.
+- When `GameTime` is paused, gameplay objects, Ability flow, gameplay UI timers, combat animations/VFX, cooldowns, status effects, bombs, area effects, projectiles, boss patterns, and phase timings are paused.
+- NetworkManager time, transport timeouts, connection state, menu UI input, option panel UI, loading spinners, and other non-gameplay UI continue using real time.
+- The project does not use a generic individual timer pause system.
+- Special mechanics that stop their own countdown, such as bomb fuse timing while flying, are handled as object-specific state rules instead of generic timer pause.
+- Lobby countdowns are separate from combat `GameTime`.
+- Solo Lobby countdowns use local real time because the Host has not started yet.
+- Multiplayer Lobby countdowns use server real time.
+- Matchmaking timeouts, connection timeouts, UI fades, loading spinners, and transport/heartbeat timeouts use real time.
+- NGO `NetworkConfig.TickRate` starts at 30 ticks per second and may be changed later.
+- Unity `Time.fixedDeltaTime` is matched to `1 / TickRate`.
+- Server gameplay simulation and gameplay decisions run on fixed ticks.
+- Rendering and animation presentation are interpolated separately from fixed tick simulation.
+- Ability requests received by the server are queued and processed in the server fixed tick pipeline.
+- Ability requests are judged by the server state at the time they are processed, without client input-time compensation.
+- If a Client's local display state says an Ability slot is not usable, the Client does not send `RequestUseSlotRpc`.
+- The local usability gate is only for responsiveness and traffic reduction. The server still performs final authoritative validation.
+- Ability execution is not locally predicted by the Client.
+- No gameplay animation, VFX, cooldown, damage, projectile, or area effect starts until the server approves the Ability request.
+- When the server approves an Ability request, it assigns an `abilityStartGameTime`.
+- `abilityStartGameTime` is the `GameTime` of the server fixed tick that processed and approved the request.
+- Server approval events are sent to all clients.
+- Owner and non-owner clients play Ability animation and VFX from the same server approval event.
+- Cooldown start, cast delay, damage timing, projectile spawning, and area effect spawning use `abilityStartGameTime` as their timing reference.
+- Client visual correction using `abilityStartGameTime` is deferred and may be added later if needed.
+- If the server rejects an Ability request, no failure UI is shown and the request is treated as if the skill was not used.
+- Server-side debug logs may be recorded for rejected Ability requests.
+- Input buffering is not used when the local usability gate fails.
+- If cooldown expiration and an Ability request occur on the same fixed tick, cooldown expiration is processed first and the request can be approved.
+- If status effect expiration and an Ability request occur on the same fixed tick, status expiration is processed first and the request can be approved.
+- A player cannot use another Ability while already casting an Ability.
+- If Active and Passive Ability processing requests occur on the same fixed tick, Active processing takes priority over Passive processing.
+- Multiple players' Ability requests on the same fixed tick are processed in ascending `ClientId` order.
+- If boss HP reaches 0 during a fixed tick, combat ends immediately at that point.
+- The server fixed tick pipeline should be centralized so event ordering can be changed by reordering pipeline steps.
+
+## 패키지 주의
+- NGO/Steamworks 패키지를 추가하면 **반드시 `Packages/manifest.json` + `packages-lock.json` 커밋**
+  (현재 미추적 — [../../AGENT.md](../../AGENT.md) §3).
