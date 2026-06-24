@@ -24,7 +24,8 @@ public sealed class FogVolume : MonoBehaviour
     [Tooltip("스피어 반지름(로컬). 스케일과 곱해진다.")]
     public float sphereRadius = 5f;
 
-    [Range(0f, 2f)] public float density = 1f;
+    [Tooltip("영역 포그 농도. 양수 = 추가, 음수 = 제거(자연스러운 클리어링).")]
+    [Range(-1f, 2f)] public float density = 1f;
 
     [Tooltip("경계 페이드 폭(월드 단위, 미터). 클수록 가장자리가 부드럽게 사라진다. 볼륨 크기에 맞춰 키울 것(예: 3~10).")]
     [Min(0f)] public float softBorder = 3f;

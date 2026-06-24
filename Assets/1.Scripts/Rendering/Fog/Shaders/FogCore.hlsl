@@ -72,19 +72,21 @@ float Fog_ValueNoise(float2 p)
     return lerp(lerp(a, b, u.x), lerp(c, d, u.x), u.y);
 }
 
+// 원시 노이즈 [0,1] (텍스처 있으면 R, 없으면 절차적)
+float Fog_RawNoise(float3 worldPos)
+{
+    float2 uv = worldPos.xz * _FogNoiseScale + _FogNoiseScroll.xy * _Time.y;
+    if (_FogNoiseUseTexture > 0.5)
+        return SAMPLE_TEXTURE2D_LOD(_FogNoiseTex, sampler_FogNoiseTex, uv, 0).r;
+    return Fog_ValueNoise(uv);
+}
+
+// 농도 변동 배율 [1-strength, 1+strength]
 float Fog_SampleNoise(float3 worldPos)
 {
     if (_FogNoiseEnabled < 0.5)
         return 1.0;
-
-    float2 uv = worldPos.xz * _FogNoiseScale + _FogNoiseScroll.xy * _Time.y;
-    float n;
-    if (_FogNoiseUseTexture > 0.5)
-        n = SAMPLE_TEXTURE2D_LOD(_FogNoiseTex, sampler_FogNoiseTex, uv, 0).r;
-    else
-        n = Fog_ValueNoise(uv);
-
-    return lerp(1.0 - _FogNoiseStrength, 1.0 + _FogNoiseStrength, n);
+    return lerp(1.0 - _FogNoiseStrength, 1.0 + _FogNoiseStrength, Fog_RawNoise(worldPos));
 }
 
 // ---------------- 전역 포그 항 ----------------
@@ -133,7 +135,12 @@ float Fog_VolumeContribution(float3 worldPos, int i)
         dist = length(local) - b.x;              // 스피어 반지름(월드)
     }
 
+    // 경계를 노이즈로 ±soft 만큼 도메인 워프 → 큐브/원 티가 안 나게 유기적으로 흩어짐.
+    if (_FogNoiseEnabled > 0.5)
+        dist += (Fog_RawNoise(worldPos) - 0.5) * 2.0 * soft * _FogNoiseStrength;
+
     // 표면(0)에서 soft 미터 안쪽까지 0→1 부드럽게(smoothstep). 방향 무관 균질.
+    // density 가 음수면 그 영역의 포그를 깎는다(자연스러운 클리어링).
     float inside = smoothstep(0.0, soft, -dist);
     return inside * _FogVolumeParams0[i].y;
 }
@@ -156,15 +163,15 @@ float Fog_Evaluate(float3 worldPos, float dist, float skyMask, out float3 outCol
     [loop]
     for (int i = 0; i < _FogVolumeCount; i++)
     {
-        float c = Fog_VolumeContribution(worldPos, i) * noise;
+        float c = Fog_VolumeContribution(worldPos, i) * noise; // 음수 가능(클리어링)
         fVol += c;
-        if (_FogVolumeParams0[i].w > 0.5)
+        if (_FogVolumeParams0[i].w > 0.5 && c > 0.0) // 틴트는 더하는 볼륨에만
         {
             volTint += _FogVolumeColor[i].rgb * c;
             volTintW += c;
         }
     }
-    fVol = saturate(fVol);
+    fVol = clamp(fVol, -1.0, 1.0); // 음수 = 전역 포그에서 차감
 
     // 마스크
     float maskMul = 1.0;
