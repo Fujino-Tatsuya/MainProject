@@ -437,35 +437,16 @@ public class NetworkLoadingFlowController : MonoBehaviour
     private Transform ResolveBasePlayerSpawnPoint()
     {
         var mapGenerator = FindFirstObjectByType<MapGenerator>();
-        var spawnPoints = FindObjectsByType<SpawnPoint>(FindObjectsSortMode.None);
-        System.Array.Sort(spawnPoints, (a, b) => a.PointID.CompareTo(b.PointID));
-        return ResolveBasePlayerSpawnPoint(mapGenerator, spawnPoints);
-    }
-
-    private Transform ResolveBasePlayerSpawnPoint(MapGenerator mapGenerator, SpawnPoint[] spawnPoints)
-    {
-        Transform fallback = null;
-        foreach (var spawnPoint in spawnPoints)
+        if (mapGenerator == null)
         {
-            if (spawnPoint == null)
-            {
-                continue;
-            }
-
-            fallback ??= spawnPoint.transform;
-
-            if (spawnPoint.ParentZone == null)
-            {
-                continue;
-            }
-
-            if (mapGenerator == null || mapGenerator.GetZoneRole(spawnPoint.ParentZone) == ZoneRole.PlayerSpawn)
-            {
-                return spawnPoint.transform;
-            }
+            return null; // ResolvePlayerSpawnPose가 null이면 기본 위치로 폴백
         }
 
-        return fallback;
+        // v2: 플레이어 스폰 구역 = PlayerSpawn 역할이 배정된 ZoneSlot.
+        // 슬롯 앵커 transform 위치에 스폰 존 ZoneLayout 프리팹이 배치된다.
+        // (구 SpawnPoint/ZoneDefinitionSO 절차배치 모델은 ZoneSlot/ZoneLayout으로 대체됨)
+        var spawnSlot = mapGenerator.GetRoleSlot(ZoneRole.PlayerSpawn);
+        return spawnSlot != null ? spawnSlot.transform : null;
     }
 
     private IEnumerator StartTargetLoadAfterSceneEvent()
