@@ -65,4 +65,12 @@ public sealed class FogProfile : ScriptableObject
     [Min(0f)] public float viewRange = 0f;
     [Tooltip("반경 경계 페이드 폭(m). 클수록 완만하게 어두워짐.")]
     [Min(0.0001f)] public float viewFade = 6f;
+
+    [Header("시야 차폐 (LoS — 벽/노드 뒤)")]
+    [Tooltip("차폐 영역 디밍 강도(0=영향 없음, 1=완전 디밍).")]
+    [Range(0f, 1f)] public float losDarken = 1f;
+    [Tooltip("자기 차폐 방지 여유(m). 차폐체 표면 자신이 어두워지는 것 방지.")]
+    [Min(0f)] public float losDistanceBias = 0.5f;
+    [Tooltip("차폐 경계 페이드 폭(m). 클수록 그림자 가장자리가 부드러움.")]
+    [Min(0.0001f)] public float losEdgeFade = 1f;
 }
