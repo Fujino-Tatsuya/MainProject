@@ -18,6 +18,12 @@ public sealed class FogManager : MonoBehaviour
     public bool fogEnabled = true;
     public FogProfile profile;
 
+    [Header("층 디밍 (전장의 안개)")]
+    [Tooltip("포그와 독립. 플레이어 y 기준 범위 밖 픽셀의 채도·명도를 낮춘다.")]
+    public bool dimEnabled = true;
+    [Tooltip("비우면 CameraTargetSwitcher.Active 의 현재 추적 타겟 → 'CameraFollowTarget' 태그 순으로 자동 탐색.")]
+    public Transform dimPlayerOverride;
+
     [Header("페인트 마스크 (순수 비주얼)")]
     public bool maskEnabled = false;
     public Texture2D maskTexture;
@@ -34,8 +40,9 @@ public sealed class FogManager : MonoBehaviour
     private static FogManager s_active;
     private static readonly List<FogVolume> s_volumes = new List<FogVolume>();
 
+    // 포그 또는 디밍 중 하나라도 켜져 있으면 렌더 패스를 큐잉한다(독립 토글).
     public static bool HasActiveInstance =>
-        s_active != null && s_active.isActiveAndEnabled && s_active.fogEnabled;
+        s_active != null && s_active.isActiveAndEnabled && (s_active.fogEnabled || s_active.dimEnabled);
 
     public static void Register(FogVolume v)
     {
@@ -54,6 +61,10 @@ public sealed class FogManager : MonoBehaviour
     private Vector3 _camPos;
     private FogProfile _fallback;
     private System.Comparison<FogVolume> _cmp;
+
+    // 층 디밍: 플레이어 y 추적 타겟 캐시 + 마지막 값(타겟 소실 시 유지)
+    private Transform _dimTargetCache;
+    private float _lastDimPlayerY;
 
     // ----- shader property ids -----
     private static readonly int ID_GlobalEnabled = Shader.PropertyToID("_FogGlobalEnabled");
@@ -91,6 +102,16 @@ public sealed class FogManager : MonoBehaviour
     private static readonly int ID_VolBounds = Shader.PropertyToID("_FogVolumeBounds");
     private static readonly int ID_VolW2L = Shader.PropertyToID("_FogVolumeWorldToLocal");
 
+    private static readonly int ID_DimEnabled = Shader.PropertyToID("_DimEnabled");
+    private static readonly int ID_DimPlayerY = Shader.PropertyToID("_DimPlayerY");
+    private static readonly int ID_DimRangeUp = Shader.PropertyToID("_DimRangeUp");
+    private static readonly int ID_DimRangeDown = Shader.PropertyToID("_DimRangeDown");
+    private static readonly int ID_DimFadeUp = Shader.PropertyToID("_DimFadeUp");
+    private static readonly int ID_DimFadeDown = Shader.PropertyToID("_DimFadeDown");
+    private static readonly int ID_DimSaturation = Shader.PropertyToID("_DimSaturation");
+    private static readonly int ID_DimBrightness = Shader.PropertyToID("_DimBrightness");
+    private static readonly int ID_DimAffectSky = Shader.PropertyToID("_DimAffectSky");
+
     private void OnEnable()
     {
         s_active = this;
@@ -103,6 +124,7 @@ public sealed class FogManager : MonoBehaviour
         {
             s_active = null;
             Shader.SetGlobalFloat(ID_GlobalEnabled, 0f);
+            Shader.SetGlobalFloat(ID_DimEnabled, 0f);
         }
     }
 
@@ -134,13 +156,25 @@ public sealed class FogManager : MonoBehaviour
 
     private void PushGlobals()
     {
-        if (!isActiveAndEnabled || !fogEnabled)
+        if (!isActiveAndEnabled)
         {
             Shader.SetGlobalFloat(ID_GlobalEnabled, 0f);
+            Shader.SetGlobalFloat(ID_DimEnabled, 0f);
             return;
         }
 
         FogProfile p = EffectiveProfile;
+        PushFogGlobals(p);
+        PushDimGlobals(p);
+    }
+
+    private void PushFogGlobals(FogProfile p)
+    {
+        if (!fogEnabled)
+        {
+            Shader.SetGlobalFloat(ID_GlobalEnabled, 0f);
+            return;
+        }
 
         Shader.SetGlobalFloat(ID_GlobalEnabled, 1f);
         Shader.SetGlobalVector(ID_Color, (Vector4)p.color);
@@ -198,6 +232,61 @@ public sealed class FogManager : MonoBehaviour
         Shader.SetGlobalVectorArray(ID_VolColor, _colors);
         Shader.SetGlobalVectorArray(ID_VolBounds, _bounds);
         Shader.SetGlobalMatrixArray(ID_VolW2L, _w2l);
+    }
+
+    private void PushDimGlobals(FogProfile p)
+    {
+        if (!dimEnabled)
+        {
+            Shader.SetGlobalFloat(ID_DimEnabled, 0f);
+            return;
+        }
+
+        Shader.SetGlobalFloat(ID_DimEnabled, 1f);
+        Shader.SetGlobalFloat(ID_DimPlayerY, ResolveDimPlayerY());
+        Shader.SetGlobalFloat(ID_DimRangeUp, p.dimRangeUp);
+        Shader.SetGlobalFloat(ID_DimRangeDown, p.dimRangeDown);
+        Shader.SetGlobalFloat(ID_DimFadeUp, p.dimFadeUp);
+        Shader.SetGlobalFloat(ID_DimFadeDown, p.dimFadeDown);
+        Shader.SetGlobalFloat(ID_DimSaturation, p.dimSaturation);
+        Shader.SetGlobalFloat(ID_DimBrightness, p.dimBrightness);
+        Shader.SetGlobalFloat(ID_DimAffectSky, p.dimAffectSky);
+    }
+
+    // 플레이어 y 기준선: override → 카메라 추적 타겟 → 태그 캐시 → 마지막 값 순.
+    private float ResolveDimPlayerY()
+    {
+        // 1) 인스펙터 명시 override
+        if (dimPlayerOverride != null)
+        {
+            _lastDimPlayerY = dimPlayerOverride.position.y;
+            return _lastDimPlayerY;
+        }
+
+        // 2) 카메라가 현재 따라가는 대상(= 플레이어). '[' / ']' 전환에도 자동 추적.
+        CameraTargetSwitcher cts = CameraTargetSwitcher.Active;
+        if (cts != null && cts.CurrentFollowTarget != null)
+        {
+            _dimTargetCache = cts.CurrentFollowTarget;
+            _lastDimPlayerY = _dimTargetCache.position.y;
+            return _lastDimPlayerY;
+        }
+
+        // 3) 태그 검색 캐시(매 프레임 Find 금지 — 캐시 살아있으면 재사용)
+        if (_dimTargetCache == null)
+        {
+            GameObject go = GameObject.FindGameObjectWithTag("CameraFollowTarget");
+            if (go != null)
+                _dimTargetCache = go.transform;
+        }
+        if (_dimTargetCache != null)
+        {
+            _lastDimPlayerY = _dimTargetCache.position.y;
+            return _lastDimPlayerY;
+        }
+
+        // 4) fallback: 마지막 값 유지(씬 전환/스폰 전 깜빡임 방지)
+        return _lastDimPlayerY;
     }
 
     private int CollectVolumes()

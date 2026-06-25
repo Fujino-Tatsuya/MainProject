@@ -45,6 +45,19 @@ float  _FogMaskTintStrength;
 TEXTURE2D(_FogMaskTex);
 SAMPLER(sampler_FogMaskTex);
 
+// ---------------- 층 디밍(전장의 안개) ----------------
+// 포그와 독립 토글. 픽셀 월드 y가 플레이어 y 기준 허용범위를 벗어나면
+// 채도/명도를 낮춰 "현재 층 밖"을 어둡게 만든다. 1탭(이웃 샘플 없음).
+float  _DimEnabled;
+float  _DimPlayerY;          // 추적 타겟(플레이어)의 월드 y
+float  _DimRangeUp;          // 위로 허용 범위(이 값 넘으면 페이드 시작)
+float  _DimRangeDown;        // 아래로 허용 범위
+float  _DimFadeUp;           // 위쪽 페이드 폭(smoothstep)
+float  _DimFadeDown;         // 아래쪽 페이드 폭
+float  _DimSaturation;       // 완전 디밍 시 채도 잔량(0=완전 흑백)
+float  _DimBrightness;       // 완전 디밍 시 명도 곱(0≈검정)
+float  _DimAffectSky;        // 스카이박스 적용 비율(0=하늘 제외)
+
 // ---------------- 로컬 볼륨 ----------------
 int      _FogVolumeCount;
 float4   _FogVolumeParams0[MAX_FOG_VOLUMES];      // x:type(0 box,1 sphere) y:density z:softBorder(월드 m) w:hasTint
@@ -206,6 +219,28 @@ float Fog_Evaluate(float3 worldPos, float dist, float skyMask, out float3 outCol
 
     outColor = baseCol;
     return f;
+}
+
+// ---------------- 층 디밍 평가 ----------------
+// 픽셀 world.y가 플레이어 y 기준 허용범위를 벗어난 정도 → 디밍 강도(0=정상, 1=완전 디밍).
+float Dim_Amount(float worldY, float skyMask)
+{
+    float dy = worldY - _DimPlayerY;
+    // 위/아래 비대칭: 양수(위) / 음수(아래)를 각각 다른 임계·페이드로 평가.
+    float up   = smoothstep(_DimRangeUp,   _DimRangeUp   + max(1e-4, _DimFadeUp),   dy);
+    float down = smoothstep(_DimRangeDown, _DimRangeDown + max(1e-4, _DimFadeDown), -dy);
+    float t = max(up, down);                  // 위든 아래든 벗어난 쪽 적용
+    t = lerp(t, t * _DimAffectSky, skyMask);  // 스카이박스는 보통 제외
+    return saturate(t);
+}
+
+// 색에 desaturate(luminance 기반) + darken(곱) 적용.
+float3 Dim_Apply(float3 color, float t)
+{
+    float luma = dot(color, float3(0.2126, 0.7152, 0.0722)); // Rec.709
+    float3 desat = lerp(color, luma.xxx, t * (1.0 - _DimSaturation));
+    float darkenMul = lerp(1.0, _DimBrightness, t);
+    return desat * darkenMul;
 }
 
 #endif // FOG_CORE_INCLUDED

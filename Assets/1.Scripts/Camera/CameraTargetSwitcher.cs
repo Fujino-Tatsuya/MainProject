@@ -12,6 +12,10 @@ public class CameraTargetSwitcher : MonoBehaviour
 {
     public static CameraTargetSwitcher Active { get; private set; }
 
+    // 현재 카메라가 따라가는 대상(=플레이어). 없으면 null.
+    // FogManager 의 층 디밍이 플레이어 y 기준선을 잡는 데 사용한다.
+    public Transform CurrentFollowTarget => GetCurrentTarget();
+
     private const string CameraFollowTargetTag = "CameraFollowTarget";
 
     [SerializeField] private GameObject mainCameraPrefab;

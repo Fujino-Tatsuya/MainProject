@@ -43,4 +43,20 @@ public sealed class FogProfile : ScriptableObject
     [Min(0.0001f)] public float noiseScale = 0.05f;
     [Range(0f, 1f)] public float noiseStrength = 0.35f;
     public Vector2 noiseScroll = new Vector2(0.3f, 0.15f);
+
+    [Header("층 디밍 (전장의 안개)")]
+    [Tooltip("플레이어 y 기준 위로 이 거리(m)를 넘으면 디밍 시작.")]
+    [Min(0f)] public float dimRangeUp = 5f;
+    [Tooltip("플레이어 y 기준 아래로 이 거리(m)를 넘으면 디밍 시작.")]
+    [Min(0f)] public float dimRangeDown = 5f;
+    [Tooltip("위쪽 페이드 폭(m). 임계 도달 후 완전 디밍까지의 거리.")]
+    [Min(0.0001f)] public float dimFadeUp = 3f;
+    [Tooltip("아래쪽 페이드 폭(m).")]
+    [Min(0.0001f)] public float dimFadeDown = 3f;
+    [Tooltip("완전 디밍 시 채도 잔량(0 = 완전 흑백).")]
+    [Range(0f, 1f)] public float dimSaturation = 0f;
+    [Tooltip("완전 디밍 시 명도 곱(0 ≈ 검정).")]
+    [Range(0f, 1f)] public float dimBrightness = 0.03f;
+    [Tooltip("스카이박스 픽셀에 디밍을 적용할 비율(0 = 하늘 제외).")]
+    [Range(0f, 1f)] public float dimAffectSky = 0f;
 }

@@ -31,7 +31,10 @@ Shader "Hidden/Fog/FullScreenFog"
                 float2 uv = input.texcoord;
 
                 half3 sceneColor = SAMPLE_TEXTURE2D_X(_BlitTexture, sampler_LinearClamp, uv).rgb;
-                if (_FogGlobalEnabled < 0.5)
+
+                bool fogOn = _FogGlobalEnabled >= 0.5;
+                bool dimOn = _DimEnabled >= 0.5;
+                if (!fogOn && !dimOn)
                     return half4(sceneColor, 1.0);
 
                 float depth = SampleSceneDepth(uv);
@@ -39,12 +42,25 @@ Shader "Hidden/Fog/FullScreenFog"
                 float skyMask = (depth <= 1e-6) ? 1.0 : 0.0;
 
                 float3 worldPos = ComputeWorldSpacePosition(uv, depth, UNITY_MATRIX_I_VP);
-                float dist = length(worldPos - _WorldSpaceCameraPos);
 
-                float3 fogColor;
-                float f = Fog_Evaluate(worldPos, dist, skyMask, fogColor);
+                half3 outColor = sceneColor;
 
-                half3 outColor = lerp(sceneColor, fogColor, saturate(f));
+                // 1) 포그 먼저(켜져 있으면)
+                if (fogOn)
+                {
+                    float dist = length(worldPos - _WorldSpaceCameraPos);
+                    float3 fogColor;
+                    float f = Fog_Evaluate(worldPos, dist, skyMask, fogColor);
+                    outColor = lerp(outColor, fogColor, saturate(f));
+                }
+
+                // 2) 그 위에 층 디밍(켜져 있으면) — 안개 낀 색을 다시 어둡게
+                if (dimOn)
+                {
+                    float t = Dim_Amount(worldPos.y, skyMask);
+                    outColor = Dim_Apply(outColor, t);
+                }
+
                 return half4(outColor, 1.0);
             }
             ENDHLSL
