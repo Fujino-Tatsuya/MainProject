@@ -57,6 +57,10 @@ float  _DimFadeDown;         // 아래쪽 페이드 폭
 float  _DimSaturation;       // 완전 디밍 시 채도 잔량(0=완전 흑백)
 float  _DimBrightness;       // 완전 디밍 시 명도 곱(0≈검정)
 float  _DimAffectSky;        // 스카이박스 적용 비율(0=하늘 제외)
+// 시야범위 디밍(FOW): 플레이어 xz 반경 밖을 디밍. 층 디밍과 max 합성.
+float2 _DimPlayerXZ;         // 플레이어 월드 xz
+float  _ViewRange;           // 시야 반경(0이면 끔)
+float  _ViewFade;            // 반경 경계 페이드 폭
 
 // ---------------- 로컬 볼륨 ----------------
 int      _FogVolumeCount;
@@ -221,15 +225,25 @@ float Fog_Evaluate(float3 worldPos, float dist, float skyMask, out float3 outCol
     return f;
 }
 
-// ---------------- 층 디밍 평가 ----------------
-// 픽셀 world.y가 플레이어 y 기준 허용범위를 벗어난 정도 → 디밍 강도(0=정상, 1=완전 디밍).
-float Dim_Amount(float worldY, float skyMask)
+// ---------------- 디밍 평가 (층 + 시야범위) ----------------
+// 픽셀 worldPos가 (a) 플레이어 y 기준 층 범위, (b) 플레이어 xz 시야 반경을
+// 벗어난 정도 → 디밍 강도(0=정상, 1=완전 디밍). 둘 중 큰 쪽 적용(max).
+float Dim_Amount(float3 worldPos, float skyMask)
 {
-    float dy = worldY - _DimPlayerY;
-    // 위/아래 비대칭: 양수(위) / 음수(아래)를 각각 다른 임계·페이드로 평가.
+    // (a) 층 디밍 — 위/아래 비대칭
+    float dy = worldPos.y - _DimPlayerY;
     float up   = smoothstep(_DimRangeUp,   _DimRangeUp   + max(1e-4, _DimFadeUp),   dy);
     float down = smoothstep(_DimRangeDown, _DimRangeDown + max(1e-4, _DimFadeDown), -dy);
     float t = max(up, down);                  // 위든 아래든 벗어난 쪽 적용
+
+    // (b) 시야범위 디밍 — 플레이어 xz 반경 밖 (_ViewRange>0일 때만)
+    if (_ViewRange > 0.0)
+    {
+        float distXZ = length(worldPos.xz - _DimPlayerXZ);
+        float view = smoothstep(_ViewRange, _ViewRange + max(1e-4, _ViewFade), distXZ);
+        t = max(t, view);
+    }
+
     t = lerp(t, t * _DimAffectSky, skyMask);  // 스카이박스는 보통 제외
     return saturate(t);
 }

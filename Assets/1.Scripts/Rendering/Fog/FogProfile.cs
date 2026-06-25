@@ -59,4 +59,10 @@ public sealed class FogProfile : ScriptableObject
     [Range(0f, 1f)] public float dimBrightness = 0.03f;
     [Tooltip("스카이박스 픽셀에 디밍을 적용할 비율(0 = 하늘 제외).")]
     [Range(0f, 1f)] public float dimAffectSky = 0f;
+
+    [Header("시야범위 디밍 (FOW)")]
+    [Tooltip("플레이어 중심 이 반경(m) 밖이면 디밍 시작. 0이면 시야범위 디밍 끔(층 디밍만).")]
+    [Min(0f)] public float viewRange = 0f;
+    [Tooltip("반경 경계 페이드 폭(m). 클수록 완만하게 어두워짐.")]
+    [Min(0.0001f)] public float viewFade = 6f;
 }

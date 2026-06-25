@@ -57,7 +57,7 @@ Shader "Hidden/Fog/FullScreenFog"
                 // 2) 그 위에 층 디밍(켜져 있으면) — 안개 낀 색을 다시 어둡게
                 if (dimOn)
                 {
-                    float t = Dim_Amount(worldPos.y, skyMask);
+                    float t = Dim_Amount(worldPos, skyMask);
                     outColor = Dim_Apply(outColor, t);
                 }
 

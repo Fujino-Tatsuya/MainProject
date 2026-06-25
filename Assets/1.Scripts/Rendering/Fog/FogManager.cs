@@ -62,9 +62,9 @@ public sealed class FogManager : MonoBehaviour
     private FogProfile _fallback;
     private System.Comparison<FogVolume> _cmp;
 
-    // 층 디밍: 플레이어 y 추적 타겟 캐시 + 마지막 값(타겟 소실 시 유지)
+    // 디밍: 플레이어 추적 타겟 캐시 + 마지막 위치(타겟 소실 시 유지). 층(y)+시야(xz) 공용.
     private Transform _dimTargetCache;
-    private float _lastDimPlayerY;
+    private Vector3 _lastDimPlayerPos;
 
     // ----- shader property ids -----
     private static readonly int ID_GlobalEnabled = Shader.PropertyToID("_FogGlobalEnabled");
@@ -111,6 +111,9 @@ public sealed class FogManager : MonoBehaviour
     private static readonly int ID_DimSaturation = Shader.PropertyToID("_DimSaturation");
     private static readonly int ID_DimBrightness = Shader.PropertyToID("_DimBrightness");
     private static readonly int ID_DimAffectSky = Shader.PropertyToID("_DimAffectSky");
+    private static readonly int ID_DimPlayerXZ = Shader.PropertyToID("_DimPlayerXZ");
+    private static readonly int ID_ViewRange = Shader.PropertyToID("_ViewRange");
+    private static readonly int ID_ViewFade = Shader.PropertyToID("_ViewFade");
 
     private void OnEnable()
     {
@@ -242,8 +245,12 @@ public sealed class FogManager : MonoBehaviour
             return;
         }
 
+        Vector3 playerPos = ResolveDimPlayerPos();
         Shader.SetGlobalFloat(ID_DimEnabled, 1f);
-        Shader.SetGlobalFloat(ID_DimPlayerY, ResolveDimPlayerY());
+        Shader.SetGlobalFloat(ID_DimPlayerY, playerPos.y);
+        Shader.SetGlobalVector(ID_DimPlayerXZ, new Vector4(playerPos.x, playerPos.z, 0f, 0f));
+        Shader.SetGlobalFloat(ID_ViewRange, p.viewRange);
+        Shader.SetGlobalFloat(ID_ViewFade, p.viewFade);
         Shader.SetGlobalFloat(ID_DimRangeUp, p.dimRangeUp);
         Shader.SetGlobalFloat(ID_DimRangeDown, p.dimRangeDown);
         Shader.SetGlobalFloat(ID_DimFadeUp, p.dimFadeUp);
@@ -253,14 +260,14 @@ public sealed class FogManager : MonoBehaviour
         Shader.SetGlobalFloat(ID_DimAffectSky, p.dimAffectSky);
     }
 
-    // 플레이어 y 기준선: override → 카메라 추적 타겟 → 태그 캐시 → 마지막 값 순.
-    private float ResolveDimPlayerY()
+    // 플레이어 추적 위치(y=층, xz=시야): override → 카메라 추적 타겟 → 태그 캐시 → 마지막 값 순.
+    private Vector3 ResolveDimPlayerPos()
     {
         // 1) 인스펙터 명시 override
         if (dimPlayerOverride != null)
         {
-            _lastDimPlayerY = dimPlayerOverride.position.y;
-            return _lastDimPlayerY;
+            _lastDimPlayerPos = dimPlayerOverride.position;
+            return _lastDimPlayerPos;
         }
 
         // 2) 카메라가 현재 따라가는 대상(= 플레이어). '[' / ']' 전환에도 자동 추적.
@@ -268,8 +275,8 @@ public sealed class FogManager : MonoBehaviour
         if (cts != null && cts.CurrentFollowTarget != null)
         {
             _dimTargetCache = cts.CurrentFollowTarget;
-            _lastDimPlayerY = _dimTargetCache.position.y;
-            return _lastDimPlayerY;
+            _lastDimPlayerPos = _dimTargetCache.position;
+            return _lastDimPlayerPos;
         }
 
         // 3) 태그 검색 캐시(매 프레임 Find 금지 — 캐시 살아있으면 재사용)
@@ -281,12 +288,12 @@ public sealed class FogManager : MonoBehaviour
         }
         if (_dimTargetCache != null)
         {
-            _lastDimPlayerY = _dimTargetCache.position.y;
-            return _lastDimPlayerY;
+            _lastDimPlayerPos = _dimTargetCache.position;
+            return _lastDimPlayerPos;
         }
 
         // 4) fallback: 마지막 값 유지(씬 전환/스폰 전 깜빡임 방지)
-        return _lastDimPlayerY;
+        return _lastDimPlayerPos;
     }
 
     private int CollectVolumes()
