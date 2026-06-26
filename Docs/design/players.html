@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>플레이어 캐릭터</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f8fb;
+      --surface: #ffffff;
+      --text: #202632;
+      --muted: #5e6878;
+      --border: #d9dee8;
+      --accent: #2563eb;
+      --accent-soft: #e8f0ff;
+      --code-bg: #eef2f7;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif;
+      line-height: 1.65;
+    }
+
+    main {
+      width: min(960px, calc(100% - 32px));
+      margin: 40px auto;
+      padding: 40px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+
+    h1 {
+      margin: 0 0 24px;
+      font-size: 2rem;
+    }
+
+    h2 {
+      margin: 36px 0 14px;
+      padding-top: 4px;
+      font-size: 1.35rem;
+      border-top: 1px solid var(--border);
+    }
+
+    h3 {
+      margin: 26px 0 10px;
+      font-size: 1.08rem;
+    }
+
+    h4, h5, h6 {
+      margin: 22px 0 8px;
+      font-size: 1rem;
+    }
+
+    p { margin: 0 0 16px; }
+
+    blockquote {
+      margin: 0 0 28px;
+      padding: 16px 18px;
+      background: var(--accent-soft);
+      border-left: 4px solid var(--accent);
+      border-radius: 6px;
+      color: #1f3f72;
+    }
+
+    blockquote p { margin: 0 0 8px; }
+    blockquote p:last-child { margin-bottom: 0; }
+
+    ul, ol {
+      margin: 0 0 18px;
+      padding-left: 24px;
+    }
+
+    li { margin: 6px 0; }
+    li > ul, li > ol { margin: 6px 0 0; }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    a:hover { text-decoration: underline; }
+
+    code {
+      padding: 2px 5px;
+      border-radius: 4px;
+      background: var(--code-bg);
+      font-family: "Cascadia Mono", "Consolas", monospace;
+      font-size: 0.92em;
+    }
+
+    pre {
+      overflow-x: auto;
+      margin: 12px 0 18px;
+      padding: 14px 16px;
+      border-radius: 8px;
+      background: #111827;
+      color: #f9fafb;
+    }
+
+    pre code {
+      padding: 0;
+      background: transparent;
+      color: inherit;
+      font-size: 0.9rem;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      margin: 12px 0 18px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 640px;
+    }
+
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #f0f3f8;
+      font-weight: 700;
+    }
+
+    tr:last-child td { border-bottom: 0; }
+
+    @media (max-width: 640px) {
+      main {
+        width: 100%;
+        margin: 0;
+        padding: 24px 18px;
+        border: 0;
+        border-radius: 0;
+      }
+
+      h1 { font-size: 1.65rem; }
+      h2 { font-size: 1.18rem; }
+      table { min-width: 520px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+<h1>플레이어 캐릭터</h1>
+<blockquote>
+<p>7월 스코프: <strong>근거리(가붕이) / 원거리(징크스) 1종씩</strong>. 스킬은 러프하게 구현, 쿨타임 등 수치는 참조 기준에 맞춰 튜닝.</p>
+<p><code>Q/E/R</code> 옆 코드네임은 <strong>팀 내부 참조용</strong>이며, 실제 동작·수치는 구현 시 팀이 확정한다.</p>
+</blockquote>
+<h2>공통</h2>
+<ul>
+<li><strong>좌클릭 = 평타(기본 공격).</strong> 두 캐릭터 공통. (보스의 폭탄도 이 평타로만 상호작용 — <a href="boss-wells-and-no23.html">boss 문서</a> §폭탄)
+</li>
+<li><strong>우클릭 = 캐릭터별 고유 액션</strong> (근거리 = 패링 / 원거리 = 스택 발동).
+<ul>
+<li>8월+: 이 우클릭이 <strong>인터럽트 스킬</strong>(<code>HasInterrupt</code>)로 확장 — 성공 시 패턴 취소 + 그로기/연계. <a href="level-system.html">level-system.md</a> §4.
+</li>
+</ul>
+</li>
+<li><strong>대쉬 시 무적</strong> (무적 윈도우 동안 피격 무효 — 서버가 판정).
+</li>
+</ul>
+<h2>상태이상 (피격 시 받을 수 있음)</h2>
+<ul>
+<li>공중에 뜸 / 기절 / 둔화 / 속박 / 침묵(스킬 봉인) / 허약(= 대쉬 불가 + 둔화)
+</li>
+<li>정의·게이팅 규칙: <a href="status-effects.html">status-effects.md</a>
+</li>
+</ul>
+<h2>가붕이 — 한손검, 방패 (근거리)</h2>
+<div class="table-wrap">
+<table>
+<thead>
+<tr>
+<th>슬롯</th>
+<th>내용</th>
+<th>비고</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>좌클릭</td>
+<td>평타(기본 공격)</td>
+<td>근접 타격</td>
+</tr>
+<tr>
+<td>우클릭</td>
+<td><strong>패링</strong></td>
+<td>바라보는 방향으로 오는 공격만 막음. 쿨 3~5초(작게)</td>
+</tr>
+<tr>
+<td>Q</td>
+<td>크산테w (참조)</td>
+<td>동작·수치 TBD</td>
+</tr>
+<tr>
+<td>E</td>
+<td>가붕이w (참조)</td>
+<td>동작·수치 TBD</td>
+</tr>
+<tr>
+<td>R</td>
+<td>가붕이r (참조)</td>
+<td><strong>기본 잠금</strong>, 빌드로 해금</td>
+</tr>
+</tbody>
+</table>
+</div>
+<ul>
+<li><strong>패링</strong>: 방패 기반, <strong>정면(바라보는 방향)으로 들어오는 공격만 막는다</strong>(방향 판정). 성공 시 해당 피격 무효(후속 효과 TBD).
+<br>쿨타임 3~5초로 짧게. 판정은 서버 권한.
+</li>
+</ul>
+<h2>징크스 — 대포 (원거리)</h2>
+<div class="table-wrap">
+<table>
+<thead>
+<tr>
+<th>슬롯</th>
+<th>내용</th>
+<th>비고</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>좌클릭</td>
+<td>평타(기본 공격)</td>
+<td><strong>적중 시 그 몬스터에 스택 누적</strong>(트위치류)</td>
+</tr>
+<tr>
+<td>우클릭</td>
+<td><strong>스택 발동</strong></td>
+<td>주변 범위 내 <strong>스택 쌓인 몬스터가 있을 때만 사용 가능</strong>. 쿨 3초</td>
+</tr>
+<tr>
+<td>Q</td>
+<td>징크스e (참조)</td>
+<td>동작·수치 TBD</td>
+</tr>
+<tr>
+<td>E</td>
+<td>애쉬w (참조)</td>
+<td>동작·수치 TBD</td>
+</tr>
+<tr>
+<td>R</td>
+<td>징크스r (참조)</td>
+<td><strong>기본 잠금</strong>, 빌드로 해금</td>
+</tr>
+</tbody>
+</table>
+</div>
+<ul>
+<li><strong>스택 메커니즘</strong>: 좌클릭 평타가 대상 몬스터에 <strong>스택을 쌓고</strong>, 우클릭은 <strong>주변 범위 내 스택 보유 몬스터가 있으면</strong>
+<br>활성화되어 스택을 소비/발동(쿨 3초). 스택 수치는 <strong>적(UnitBase)이 보유</strong>(서버 권한, 클라 복제).
+</li>
+</ul>
+<h2>구현 참고</h2>
+<ul>
+<li><strong>R는 기본 잠금</strong> 상태로 노출되고, 빌드(모디파이어) 선택으로 해금. (<a href="builds.html">builds.md</a>)
+</li>
+<li>입력은 <strong>Unity Input System(액션 에셋)</strong>: 좌클릭(평타)/우클릭(고유)/Q/E/R/이동/대쉬 액션 정의.
+<br>발동/판정은 클라(오너)가 트리거, <strong>데미지/CC/패링 방향판정/스택은 서버 RPC</strong>.
+</li>
+<li>각 스킬은 <code>AbilityConfig</code>(ScriptableObject)로 데이터화 → 빌드가 런타임 패치(데미지 추가/2회타격/쿨감 등).
+</li>
+<li><strong>쿨타임·범위·스택 수 등 수치는 <code>[SerializeField]</code>로 노출</strong>해 직렬화로 빼두고, 실제 플레이하며 튜닝.
+</li>
+</ul>
+  </main>
+</body>
+</html>

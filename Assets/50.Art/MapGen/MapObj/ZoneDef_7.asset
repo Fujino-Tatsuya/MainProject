@@ -17,5 +17,4 @@ MonoBehaviour:
   DefaultGrade: 1
   IsQuestZoneCandidate: 0
   IsPlayerSpawnCandidate: 0
-  IsBossGateCandidate: 1
-  SpawnPoints: []
+  IsBossGateCandidate: 0

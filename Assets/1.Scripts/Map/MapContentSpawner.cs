@@ -45,17 +45,39 @@ public class MapContentSpawner : MonoBehaviour
     private int SpawnMonstersFor(GameObject zoneGo, MapGenerator gen)
     {
         var layout = zoneGo.GetComponent<ZoneLayout>();
-        if (layout == null || layout.MonsterSpawnPoints == null || layout.MonsterSpawnPoints.Count == 0)
-            return 0;
+        if (layout == null) return 0;
 
-        GameObject monsterPrefab = ResolveMonsterPrefab(gen, layout.MonsterGroupID);
+        int n = 0;
+        int combatNodes = 0;
+        // 노드 단위 스폰 — 전투 노드(CombatNode)만 몬스터 스폰.
+        if (layout.Nodes != null && layout.Nodes.Count > 0)
+        {
+            foreach (var node in layout.Nodes)
+            {
+                if (node == null || node.ContentType != NodeContentType.CombatNode) continue;
+                combatNodes++;
+                n += SpawnGroupAt(gen, node.MonsterGroupID, node.MonsterSpawnPoints, node.Behavior);
+            }
+        }
+        // 전투 노드가 하나도 없으면 존 단위 마커로 폴백 (역할/단순 존 호환)
+        if (combatNodes == 0)
+            n += SpawnGroupAt(gen, layout.MonsterGroupID, layout.MonsterSpawnPoints, MonsterBehavior.Idle);
+        return n;
+    }
+
+    // 그룹ID의 몬스터를 주어진 마커들에 스폰 (서버 전용 호출). 몬스터 에셋 확정 전이면 0.
+    private int SpawnGroupAt(MapGenerator gen, int monsterGroupID, System.Collections.Generic.List<Transform> points, MonsterBehavior behavior)
+    {
+        if (points == null || points.Count == 0) return 0;
+        GameObject monsterPrefab = ResolveMonsterPrefab(gen, monsterGroupID);
         if (monsterPrefab == null) return 0; // 몬스터 에셋 확정 전엔 마커만 두고 스킵
 
         int n = 0;
-        foreach (var marker in layout.MonsterSpawnPoints)
+        foreach (var marker in points)
         {
             if (marker == null) continue;
             GameObject go = Instantiate(monsterPrefab, marker.position, marker.rotation);
+            // TODO: 몬스터 AI 확정 후 behavior 적용 (예: go.GetComponent<MonsterAI>()?.SetBehavior(behavior)).
             var netObj = go.GetComponent<NetworkObject>();
             if (netObj != null) { netObj.Spawn(); _spawnedNetObjs.Add(netObj); } // NGO 복제 + despawn 추적
             else go.transform.SetParent(_root, true);  // 비네트워크 몬스터 → 루트 하위로 ClearGenerated가 정리(누수 방지)

@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>맵 생성 (Map Generation) — v2: 사전 디자인 존 + 위치 셔플</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f8fb;
+      --surface: #ffffff;
+      --text: #202632;
+      --muted: #5e6878;
+      --border: #d9dee8;
+      --accent: #2563eb;
+      --accent-soft: #e8f0ff;
+      --code-bg: #eef2f7;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif;
+      line-height: 1.65;
+    }
+
+    main {
+      width: min(960px, calc(100% - 32px));
+      margin: 40px auto;
+      padding: 40px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+
+    h1 {
+      margin: 0 0 24px;
+      font-size: 2rem;
+    }
+
+    h2 {
+      margin: 36px 0 14px;
+      padding-top: 4px;
+      font-size: 1.35rem;
+      border-top: 1px solid var(--border);
+    }
+
+    h3 {
+      margin: 26px 0 10px;
+      font-size: 1.08rem;
+    }
+
+    h4, h5, h6 {
+      margin: 22px 0 8px;
+      font-size: 1rem;
+    }
+
+    p { margin: 0 0 16px; }
+
+    blockquote {
+      margin: 0 0 28px;
+      padding: 16px 18px;
+      background: var(--accent-soft);
+      border-left: 4px solid var(--accent);
+      border-radius: 6px;
+      color: #1f3f72;
+    }
+
+    blockquote p { margin: 0 0 8px; }
+    blockquote p:last-child { margin-bottom: 0; }
+
+    ul, ol {
+      margin: 0 0 18px;
+      padding-left: 24px;
+    }
+
+    li { margin: 6px 0; }
+    li > ul, li > ol { margin: 6px 0 0; }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    a:hover { text-decoration: underline; }
+
+    code {
+      padding: 2px 5px;
+      border-radius: 4px;
+      background: var(--code-bg);
+      font-family: "Cascadia Mono", "Consolas", monospace;
+      font-size: 0.92em;
+    }
+
+    pre {
+      overflow-x: auto;
+      margin: 12px 0 18px;
+      padding: 14px 16px;
+      border-radius: 8px;
+      background: #111827;
+      color: #f9fafb;
+    }
+
+    pre code {
+      padding: 0;
+      background: transparent;
+      color: inherit;
+      font-size: 0.9rem;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      margin: 12px 0 18px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 640px;
+    }
+
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #f0f3f8;
+      font-weight: 700;
+    }
+
+    tr:last-child td { border-bottom: 0; }
+
+    @media (max-width: 640px) {
+      main {
+        width: 100%;
+        margin: 0;
+        padding: 24px 18px;
+        border: 0;
+        border-radius: 0;
+      }
+
+      h1 { font-size: 1.65rem; }
+      h2 { font-size: 1.18rem; }
+      table { min-width: 520px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+<h1>맵 생성 (Map Generation) — v2: 사전 디자인 존 + 위치 셔플</h1>
+<blockquote>
+<p>담당: <strong>경석</strong>. 코드 위치: <code>Assets/1.Scripts/Map/</code>.</p>
+<p>네트워크 권한 모델 <a href="networking.html">networking.md</a>, 데이터주도 원칙 <a href="architecture.html">architecture.md</a>, 레벨/난이도 설계 <a href="../design/level-system.html">design/level-system.md</a>.</p>
+<p><strong>상태: v2 코드 완료(워크트리 — 미커밋·미컴파일), Unity 씬/프리팹 작업 대기.</strong> 구 절차생성 모델은 <strong>폐기</strong>(2026-06-19 재작성). 옛 설계는 git 이력 참조.</p>
+</blockquote>
+<h2>0. 스코프 / 결정 로그 ★ (v2)</h2>
+<ul>
+<li><strong>Stage1 = 스켈레톤.</strong> 외곽 프레임 + 존↔존 <strong>연결 다리/통로(공유·고정)</strong> + <strong>슬롯 앵커(<code>ZoneSlot</code>)</strong> 만. <strong>바닥·벽·테마는 각 존 프리팹으로 이관</strong>(테마별로 다름).
+</li>
+<li><strong>존 = 미리 레벨디자인한 프리팹(<code>ZoneLayout</code>).</strong> 바닥·벽·테마·노드(1/2/3티어)·몬스터 스폰위치·몬스터 그룹을 전부 포함한 완성 디자인.
+</li>
+<li><strong>생성 = 위치 셔플.</strong> 같은 크기(대/중/소) 전투 존끼리 디자인을 <strong>위치만 랜덤 배치</strong>(고정 세트, 풀에서 뽑는 게 아님). 역할 존(보스 / 스폰=상점 / 퀘스트)은 <strong>단일 고정 디자인</strong>.
+</li>
+<li><strong>장애물 폐기.</strong> 절차적 노드/장애물 배치 없음 — 전부 디자인에 포함.
+</li>
+<li><strong>카운트 데이터 주도.</strong> 슬롯 수·디자인 수를 코드에 안 박음(Stage1 <code>ZoneSlot</code> + 카탈로그에서 유도). 기획이 디자인에서 조절.
+</li>
+<li><strong>난이도 = 디자인 세트 선택.</strong> 서버 소유 <code>DifficultyLevel</code>(Ascension+Stage)로 (Size, Difficulty) 전투 풀을 고름. 마릿수 스케일 폐기(몬스터 디자인 내장).
+</li>
+<li><strong>NGO:</strong> 시드/난이도 <strong>NetworkVariable</strong> 복제 → 서버/클라 동일 결정 생성. 존 비주얼=양쪽 로컬(같은 시드), 몬스터=서버 <code>NetworkObject</code> Spawn→복제. 데이터 핸드오프 없음.
+</li>
+</ul>
+<h2>1. 목적</h2>
+<p>Stage1 지오메트리는 고정, 매 런마다 <strong>어떤 디자인 존이 어느 슬롯에 오는지만</strong> 셔플. &quot;위치만 달라지고 컨셉/디자인은 고정.&quot;</p>
+<h2>2. 데이터 모델 (v2)</h2>
+<div class="table-wrap">
+<table>
+<thead>
+<tr>
+<th>타입</th>
+<th>역할</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ZoneSlot</code> (MB)</td>
+<td>Stage1 슬롯 앵커 — <code>SlotID</code>·<code>Size</code>·<code>Footprint</code>·역할후보 플래그·런타임 <code>AssignedRole</code>/<code>IsFilled</code></td>
+</tr>
+<tr>
+<td><code>ZoneLayout</code> (MB)</td>
+<td>존 프리팹 루트 — <code>Size</code>/<code>Role</code>/<code>Difficulty</code> 태그 + <code>MonsterGroupID</code>·몬스터 스폰 마커·소켓</td>
+</tr>
+<tr>
+<td><code>ZoneLayoutCatalogSO</code></td>
+<td>(Size×Difficulty) 전투 풀 + 역할 고정 디자인 조회(<code>GetCombatPool</code>/<code>GetRoleLayout</code>)</td>
+</tr>
+<tr>
+<td><code>LayoutPlacer</code> (MB)</td>
+<td>역할존 고정 + 전투존 크기별 풀 셔플 1:1 → <code>ZonePlacement[]</code></td>
+</tr>
+<tr>
+<td><code>MapGenerator</code> (MB)</td>
+<td>슬롯 수집 → 역할 배정 → <code>LayoutPlacer</code> → 스폰. <code>Generate(seed, int level)</code></td>
+</tr>
+<tr>
+<td><code>MapContentSpawner</code> (MB)</td>
+<td>존 비주얼(양쪽 로컬) + 몬스터(서버 Spawn)</td>
+</tr>
+<tr>
+<td><code>MapNetworkSync</code> (NB)</td>
+<td>서버 시드/난이도 결정 → <code>NetworkVariable</code> 복제 → 양쪽 <code>Generate</code></td>
+</tr>
+<tr>
+<td><code>MapOverviewUI</code> (MB)</td>
+<td>M키 오버뷰 (슬롯 사각형 by 역할 + 아이콘)</td>
+</tr>
+<tr>
+<td><code>MapGenConfigSO</code></td>
+<td>몬스터 그룹 풀 + (구 스캐터용) 배제반경</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>유지(에디터 호환·런타임 미사용):</strong> <code>ZoneVolume</code>/<code>SpawnPoint</code>/<code>ZoneDefinitionSO</code>/<code>GeneratedNodeData</code>(구 절차모델), <code>MapPrefabCatalogSO</code>(역할 아이콘·지오메트리 빌드), <code>MapCorridors</code>/<code>MapGeometryBuilder</code>/<code>MapSpawnPointScatter</code>(Stage1 지오메트리 저작 툴). <strong>삭제:</strong> <code>NodePlacer</code>·<code>ObstaclePlacer</code>·<code>DifficultyTableSO</code>.</p>
+<h2>3. 존 모델</h2>
+<div class="table-wrap">
+<table>
+<thead>
+<tr>
+<th>크기</th>
+<th>정체</th>
+<th>역할</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>대형</td>
+<td>1티어 노드 포함</td>
+<td>전투</td>
+</tr>
+<tr>
+<td>중형</td>
+<td>2칸(가로2/세로2)</td>
+<td>퀘스트 후보 → 1 퀘스트, 나머지 전투</td>
+</tr>
+<tr>
+<td>소형</td>
+<td>—</td>
+<td>보스방 / 스폰(=상점) 후보</td>
+</tr>
+</tbody>
+</table>
+</div>
+<ul>
+<li>역할 후보 = <code>ZoneSlot</code>의 <code>IsQuestCandidate</code>/<code>IsBossCandidate</code>/<code>IsSpawnCandidate</code>. 개수는 씬 배치가 결정.
+</li>
+<li>예시 디자인(기획 조절): 중형 = 2티어 1 + 3티어 5, 소형 = 2티어 1 + 3티어 3.
+</li>
+</ul>
+<h2>4. 파이프라인 — <code>Generate(seed, level)</code></h2>
+<ol>
+<li><strong>슬롯 수집</strong>: 씬 <code>ZoneSlot</code> → <code>SlotID</code>(동률 시 위치 2차 키) 정렬 = 결정성. 중복 SlotID는 <code>LogError</code>.
+</li>
+<li><strong>역할 배정</strong>: 퀘스트 → 보스 → 스폰 (후보 중 1, 단일 RNG).
+</li>
+<li><strong>레이아웃 선택</strong>(<code>LayoutPlacer</code>): 역할존 = 고정 디자인 / 전투존 = 크기별 (Size, level) 풀 시드 셔플 → 같은 크기 슬롯에 1:1.
+</li>
+<li><strong>스폰</strong>(<code>MapContentSpawner</code>): 존 비주얼 양쪽 로컬 + 몬스터 서버 Spawn(마커 위치).
+</li>
+</ol>
+<blockquote>
+<p>결정성(NGO 디싱크 방지): 슬롯 정렬 + 크기 고정 순회(L→M→S) + 단일 주입 RNG.</p>
+</blockquote>
+<h2>5. 난이도 (<a href="../design/level-system.html">design/level-system.md</a> §3)</h2>
+<ul>
+<li><code>DifficultyLevel = Ascension + StageIndex*StageStep</code> (서버, <code>MapNetworkSync</code>에서 합성).
+</li>
+<li>catalog의 (Size, Difficulty) 전투 풀을 골라 셔플 → <strong>난이도 = 디자인 세트 선택</strong>. 마릿수 스케일·<code>DifficultyTableSO</code>는 <strong>폐기</strong>(몬스터는 디자인 내장).
+</li>
+<li>초기엔 단일 난이도(Difficulty=0) 세트로 시작, 밴드는 카탈로그에 디자인 추가로 확장.
+</li>
+</ul>
+<h2>6. 런타임 / 네트워킹</h2>
+<ol>
+<li>NGO가 MapScene 로드 → <code>MapNetworkSync.OnNetworkSpawn</code>.
+</li>
+<li><strong>서버</strong>: 시드 결정 + 난이도 합성 → <code>NetworkVariable(_seed/_difficulty/_ready)</code> 기록 + 로컬 <code>Generate</code>.
+</li>
+<li><strong>클라</strong>: <code>_ready</code> 복제 시 동일 시드로 <code>Generate</code> — <strong>동시 시작·레이트 조인 모두 대응</strong>.
+</li>
+<li>존 비주얼 = 양쪽 로컬(같은 시드 → 동일), 몬스터 <code>NetworkObject</code> = 서버 Spawn → 복제.
+</li>
+</ol>
+<blockquote>
+<p>노드/존 클리어 상태 동기화는 클리어 시스템 붙을 때(§8).</p>
+</blockquote>
+<h2>7. 오버뷰 UI (M키)</h2>
+<p>슬롯 사각형(역할별 색: 전투=회청/보스=빨강/스폰=초록/퀘스트=노랑, <code>Footprint</code> 크기) + 역할 아이콘(카탈로그). <code>MapGenerator.Slots</code>/<code>GetRoleSlot</code> 기반, 열 때 재드로우(서버/클라 동일 시드라 동일).</p>
+<h2>8. 상태 / 남은 일</h2>
+<h3>v2 코드 (완료 — 워크트리, 미커밋·미컴파일)</h3>
+<ul>
+<li>신규 <code>ZoneSlot</code>·<code>ZoneLayout</code>·<code>ZoneLayoutCatalogSO</code>·<code>LayoutPlacer</code>(+<code>ZonePlacement</code>), <code>ZoneSize</code> enum.
+</li>
+<li>재작성 <code>MapGenerator</code>·<code>MapContentSpawner</code>·<code>MapOverviewUI</code>·<code>MapNetworkSync</code>(NetworkVariable), 슬림 <code>MapGenConfigSO</code>, 수정 <code>MapSceneSetup</code>·<code>MapDevTools</code>. 삭제 <code>NodePlacer</code>·<code>ObstaclePlacer</code>·<code>DifficultyTableSO</code>.
+</li>
+<li>정적 검증(워크플로 18 에이전트) → 결함 5건 수정: <code>.cs.meta</code> 4종 GUID 핀, 몬스터 재생성 누수, SlotID 안정 정렬+중복검출, NetworkVariable 레이트조인, mapGenerator null 가드.
+</li>
+</ul>
+<h3>Unity 작업 (경석, 메인 체크아웃 — 이 브랜치 체크아웃 후)</h3>
+<ol>
+<li><strong><code>ZoneSlot</code> 배치</strong> — 보조: <code>VeyTrace/Map/v2 ① Create ZoneSlots from ZoneVolumes</code>(기존 ZoneVolume에서 자동 생성) → 각 슬롯 <strong>Size(대/중/소) 보정</strong> + 역할후보·<code>Footprint</code>·앵커 방향 + <strong>고유 <code>SlotID</code></strong> 확인. (수동: 빈 GameObject + <code>ZoneSlot</code> 컴포넌트)
+</li>
+<li><strong><code>ZoneLayout</code> 프리팹 제작</strong>: 루트에 <code>ZoneLayout</code> + 바닥/벽/테마/노드 + 몬스터 스폰 마커(<code>MonsterSpawnPoints</code>)/소켓(<code>Sockets</code>) + Size·Role·Difficulty·<code>MonsterGroupID</code> 태그. <strong>같은 크기 = 통일 풋프린트·출입구 좌표</strong>(다리 자동 정렬).
+</li>
+<li><strong><code>ZoneLayoutCatalog.asset</code></strong> — 보조: <code>VeyTrace/Map/v2 ② Build ZoneLayout Catalog from Prefabs</code>(프리팹 태그 기준 자동 등록·재실행 멱등). (수동: <code>Create → VeyTrace/Zone Layout Catalog</code> + Entries)
+</li>
+<li><code>VeyTrace/Map/Setup Scene Generator</code>(LayoutPlacer·카탈로그 배선) → <strong><code>MapGenerator</code> 우클릭 <code>▶ Test Generate</code></strong> 검증(콘솔 로그·M키 오버뷰) → 씬 저장.
+</li>
+</ol>
+<h3>미정</h3>
+<ul>
+<li>표준 소켓 규약 실좌표(기존 Stage1 다리 위치 기준), 클리어 상태 네트워크 동기화, 난이도 밴드 확장, 몬스터 에셋/그룹 실데이터.
+</li>
+</ul>
+  </main>
+</body>
+</html>

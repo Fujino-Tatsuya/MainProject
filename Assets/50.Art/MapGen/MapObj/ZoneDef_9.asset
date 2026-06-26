@@ -15,6 +15,6 @@ MonoBehaviour:
   ZoneID: 9
   ZoneName: Zone 9
   DefaultGrade: 1
-  IsQuestZoneCandidate: 0
-  IsPlayerSpawnCandidate: 1
+  IsQuestZoneCandidate: 1
+  IsPlayerSpawnCandidate: 0
   IsBossGateCandidate: 0

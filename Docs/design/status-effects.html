@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>상태이상 (Status Effects)</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f8fb;
+      --surface: #ffffff;
+      --text: #202632;
+      --muted: #5e6878;
+      --border: #d9dee8;
+      --accent: #2563eb;
+      --accent-soft: #e8f0ff;
+      --code-bg: #eef2f7;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif;
+      line-height: 1.65;
+    }
+
+    main {
+      width: min(960px, calc(100% - 32px));
+      margin: 40px auto;
+      padding: 40px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+
+    h1 {
+      margin: 0 0 24px;
+      font-size: 2rem;
+    }
+
+    h2 {
+      margin: 36px 0 14px;
+      padding-top: 4px;
+      font-size: 1.35rem;
+      border-top: 1px solid var(--border);
+    }
+
+    h3 {
+      margin: 26px 0 10px;
+      font-size: 1.08rem;
+    }
+
+    h4, h5, h6 {
+      margin: 22px 0 8px;
+      font-size: 1rem;
+    }
+
+    p { margin: 0 0 16px; }
+
+    blockquote {
+      margin: 0 0 28px;
+      padding: 16px 18px;
+      background: var(--accent-soft);
+      border-left: 4px solid var(--accent);
+      border-radius: 6px;
+      color: #1f3f72;
+    }
+
+    blockquote p { margin: 0 0 8px; }
+    blockquote p:last-child { margin-bottom: 0; }
+
+    ul, ol {
+      margin: 0 0 18px;
+      padding-left: 24px;
+    }
+
+    li { margin: 6px 0; }
+    li > ul, li > ol { margin: 6px 0 0; }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    a:hover { text-decoration: underline; }
+
+    code {
+      padding: 2px 5px;
+      border-radius: 4px;
+      background: var(--code-bg);
+      font-family: "Cascadia Mono", "Consolas", monospace;
+      font-size: 0.92em;
+    }
+
+    pre {
+      overflow-x: auto;
+      margin: 12px 0 18px;
+      padding: 14px 16px;
+      border-radius: 8px;
+      background: #111827;
+      color: #f9fafb;
+    }
+
+    pre code {
+      padding: 0;
+      background: transparent;
+      color: inherit;
+      font-size: 0.9rem;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      margin: 12px 0 18px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 640px;
+    }
+
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #f0f3f8;
+      font-weight: 700;
+    }
+
+    tr:last-child td { border-bottom: 0; }
+
+    @media (max-width: 640px) {
+      main {
+        width: 100%;
+        margin: 0;
+        padding: 24px 18px;
+        border: 0;
+        border-radius: 0;
+      }
+
+      h1 { font-size: 1.65rem; }
+      h2 { font-size: 1.18rem; }
+      table { min-width: 520px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+<h1>상태이상 (Status Effects)</h1>
+<blockquote>
+<p>플레이어·보스가 공유하는 <strong>중앙 시스템</strong>. 서버 권한으로 적용·만료, 클라에 복제(애니/VFX·입력 게이팅).</p>
+<p>자료구조 권장안은 <a href="../tech/architecture.html">../tech/architecture.md</a> §상태 참조.</p>
+</blockquote>
+<h2>목록과 게이팅 규칙</h2>
+<div class="table-wrap">
+<table>
+<thead>
+<tr>
+<th>상태</th>
+<th>효과(게이팅)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>공중에 뜸(Airborne)</strong></td>
+<td>공중 CC. 이동/행동 불가, 착지까지 무력.</td>
+</tr>
+<tr>
+<td><strong>기절(Stun)</strong></td>
+<td>모든 입력 차단(이동·스킬·평타).</td>
+</tr>
+<tr>
+<td><strong>둔화(Slow)</strong></td>
+<td>이동속도 배율 감소(행동은 가능).</td>
+</tr>
+<tr>
+<td><strong>속박(Root)</strong></td>
+<td>이동만 불가, 스킬/평타는 가능.</td>
+</tr>
+<tr>
+<td><strong>침묵(Silence)</strong></td>
+<td>스킬 봉인(이동/평타는 가능).</td>
+</tr>
+<tr>
+<td><strong>허약(Weak)</strong></td>
+<td><strong>대쉬 불가 + 둔화</strong> 의 조합 상태.</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h2>설계 메모</h2>
+<ul>
+<li><strong>동시 다중 상태 가능</strong>(예: 둔화 + 침묵). → 단일 enum이 아니라 <strong><code>[Flags]</code> 비트마스크</strong>로 표현.
+<ul>
+<li>예: <code>[Flags] StatusFlags { None, Airborne, Stun, Slow, Root, Silence, NoDash }</code>
+</li>
+<li><strong>허약 = <code>Slow | NoDash</code></strong> 조합으로 표현(별도 값 불필요).
+</li>
+</ul>
+</li>
+<li><strong>지속시간/스택/출처</strong>는 Flags로 못 담으므로, <strong>서버가 활성효과 인스턴스 리스트</strong>
+<br><code>{ type, endTime, stacks, source }</code> 를 들고 매 틱 만료 처리 → 그 결과로 <strong>Flags 요약을 재계산</strong>해 복제.
+</li>
+<li><strong>대쉬 무적</strong>은 상태이상과 별개의 무적 윈도우. 서버가 피격 시점에 판정.
+</li>
+</ul>
+<h2>적용 주체</h2>
+<ul>
+<li>보스 기믹(잡기→전기→던지기, 폭탄 그로기/밀쳐냄, 차징 근접 데미지 등)이 플레이어에게 부여.
+</li>
+<li>플레이어 스킬(예: CC 계열)이 보스에게 부여(그로기 등은 별도 보스 상태로 처리 가능).
+</li>
+</ul>
+  </main>
+</body>
+</html>

@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>로드맵 (2026-06-04 ~ 07-31)</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f8fb;
+      --surface: #ffffff;
+      --text: #202632;
+      --muted: #5e6878;
+      --border: #d9dee8;
+      --accent: #2563eb;
+      --accent-soft: #e8f0ff;
+      --code-bg: #eef2f7;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif;
+      line-height: 1.65;
+    }
+
+    main {
+      width: min(960px, calc(100% - 32px));
+      margin: 40px auto;
+      padding: 40px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+
+    h1 {
+      margin: 0 0 24px;
+      font-size: 2rem;
+    }
+
+    h2 {
+      margin: 36px 0 14px;
+      padding-top: 4px;
+      font-size: 1.35rem;
+      border-top: 1px solid var(--border);
+    }
+
+    h3 {
+      margin: 26px 0 10px;
+      font-size: 1.08rem;
+    }
+
+    h4, h5, h6 {
+      margin: 22px 0 8px;
+      font-size: 1rem;
+    }
+
+    p { margin: 0 0 16px; }
+
+    blockquote {
+      margin: 0 0 28px;
+      padding: 16px 18px;
+      background: var(--accent-soft);
+      border-left: 4px solid var(--accent);
+      border-radius: 6px;
+      color: #1f3f72;
+    }
+
+    blockquote p { margin: 0 0 8px; }
+    blockquote p:last-child { margin-bottom: 0; }
+
+    ul, ol {
+      margin: 0 0 18px;
+      padding-left: 24px;
+    }
+
+    li { margin: 6px 0; }
+    li > ul, li > ol { margin: 6px 0 0; }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    a:hover { text-decoration: underline; }
+
+    code {
+      padding: 2px 5px;
+      border-radius: 4px;
+      background: var(--code-bg);
+      font-family: "Cascadia Mono", "Consolas", monospace;
+      font-size: 0.92em;
+    }
+
+    pre {
+      overflow-x: auto;
+      margin: 12px 0 18px;
+      padding: 14px 16px;
+      border-radius: 8px;
+      background: #111827;
+      color: #f9fafb;
+    }
+
+    pre code {
+      padding: 0;
+      background: transparent;
+      color: inherit;
+      font-size: 0.9rem;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      margin: 12px 0 18px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 640px;
+    }
+
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #f0f3f8;
+      font-weight: 700;
+    }
+
+    tr:last-child td { border-bottom: 0; }
+
+    @media (max-width: 640px) {
+      main {
+        width: 100%;
+        margin: 0;
+        padding: 24px 18px;
+        border: 0;
+        border-radius: 0;
+      }
+
+      h1 { font-size: 1.65rem; }
+      h2 { font-size: 1.18rem; }
+      table { min-width: 520px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+<h1>로드맵 (2026-06-04 ~ 07-31)</h1>
+<blockquote>
+<p>목표: 7월 말 <strong>&quot;게임 시작 → 보스 연출 → 보스 전투&quot;</strong> 리슨 서버 수직 슬라이스.</p>
+</blockquote>
+<h2>마일스톤</h2>
+<ul>
+<li><strong>W0 (6/4–6/5) 셋업</strong>
+<ul>
+<li>Unity 6000.3.16f1 고정, <code>Packages/</code> 커밋 정상화, <code>.gitignore</code>/<code>.gitattributes</code>/Force Text/Smart Merge/PR 템플릿
+</li>
+<li>SVN(대용량 아트·오디오) · GitHub(코드·씬·프리팹) 경계 설정, 문서 골격(AGENT.md 포함)
+</li>
+<li>NGO·Input System 설치, IPv4 멀티 연결 셋업, MPPM 세팅, 분담 확정
+</li>
+<li><strong>폴더 컨벤션 마이그레이션 계획</strong>(번호/점 제거) — 머지 충돌 적은 시점 택일
+</li>
+</ul>
+</li>
+</ul>
+<ul>
+<li><strong>W1–2 (6/8–6/22) 코어 + 네트워크 뼈대</strong>
+<ul>
+<li><strong>은희</strong>: NGO host/client·<strong>IPv4 직접 연결</strong>·방 입장·씬전환(SceneManagement) / UnitBase·currentHP·상태이상([Flags]+인스턴스)·스탯/모디파이어 코어
+</li>
+<li><strong>은희·경석</strong>: 플레이어 클라 이동·Input·기본공격·대쉬(무적)·AbilityController 골격(R 잠금)
+</li>
+<li><strong>경석·민경</strong>: BossUnit·FSM 골격·페이즈매니저 / 근접 기본공격(훅 콤보)·어퍼컷(공중에뜸)
+</li>
+</ul>
+</li>
+</ul>
+<ul>
+<li><strong>W3–4 (6/23–7/6) 플레이어 2종 + 보스 1차</strong>
+<ul>
+<li><strong>은희·경석</strong>: 가붕이/징크스 Q/E/R+우클릭, 빌드 모디파이어 연결
+</li>
+<li><strong>은희</strong>: 빌드 선택→스폰 적용 / Ready·Start / 인트로·로비 화면 UI
+</li>
+<li><strong>경석·민경</strong>: 잡기(쿨타임, 잡기→전기→던지기) / <strong>폭탄</strong>(랜덤 살포·기본공격으로 반대방향 발사·거리=피해량·비행중 타이머정지·벽/유저/보스 충돌 폭발·유저만 넉백+스킬취소)
+</li>
+</ul>
+</li>
+</ul>
+<ul>
+<li><strong>W5–6 (7/7–7/20) 송전기 기믹 + 페이즈 전환</strong>
+<ul>
+<li><strong>경석·민경</strong>: 송전기(인원수 생성/제한시간/성공 그로기·실패 레이지)·차징(중앙 대기/전기장판 근접 즉사/실드 점증)·레이지(돌진)·<strong>66%/33% 페이즈 전환</strong>
+</li>
+<li><strong>은희</strong>: 보스 상태·데미지·장판·폭탄 동기화 검증 / 호스트 이탈 처리
+</li>
+<li><strong>은희·경석</strong>: 빌드 픽 완성·R 해금·상태이상 피격 반응 폴리시
+</li>
+</ul>
+</li>
+</ul>
+<ul>
+<li><strong>W7 (7/21–7/27) 통합 + 보스 연출</strong>: 게임시작→보스 등장 연출→전투 풀루프, 3인 안정화, 투사체/장판 디싱크 정리
+</li>
+</ul>
+<ul>
+<li><strong>W8 (7/28–7/31) 안정화</strong>: 밸런스 1차, 크래시/디싱크 픽스, 클라이언트 빌드로 2~3인 외부 테스트
+</li>
+</ul>
+<h2>남은 미정 (회의/추후 확정)</h2>
+<ol>
+<li><strong>빌드 구체안</strong>(픽 개수·풀·캐릭터별 분리·중복 규칙)
+</li>
+<li>제한시간·실드 점증/돌진 등 밸런스 수치
+</li>
+<li>페이즈별 차등 수치
+</li>
+</ol>
+  </main>
+</body>
+</html>

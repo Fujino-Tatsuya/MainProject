@@ -16,6 +16,5 @@ MonoBehaviour:
   ZoneName: Zone 6
   DefaultGrade: 1
   IsQuestZoneCandidate: 0
-  IsPlayerSpawnCandidate: 0
+  IsPlayerSpawnCandidate: 1
   IsBossGateCandidate: 1
-  SpawnPoints: []

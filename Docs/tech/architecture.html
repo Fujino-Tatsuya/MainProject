@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>아키텍처</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f8fb;
+      --surface: #ffffff;
+      --text: #202632;
+      --muted: #5e6878;
+      --border: #d9dee8;
+      --accent: #2563eb;
+      --accent-soft: #e8f0ff;
+      --code-bg: #eef2f7;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif;
+      line-height: 1.65;
+    }
+
+    main {
+      width: min(960px, calc(100% - 32px));
+      margin: 40px auto;
+      padding: 40px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+
+    h1 {
+      margin: 0 0 24px;
+      font-size: 2rem;
+    }
+
+    h2 {
+      margin: 36px 0 14px;
+      padding-top: 4px;
+      font-size: 1.35rem;
+      border-top: 1px solid var(--border);
+    }
+
+    h3 {
+      margin: 26px 0 10px;
+      font-size: 1.08rem;
+    }
+
+    h4, h5, h6 {
+      margin: 22px 0 8px;
+      font-size: 1rem;
+    }
+
+    p { margin: 0 0 16px; }
+
+    blockquote {
+      margin: 0 0 28px;
+      padding: 16px 18px;
+      background: var(--accent-soft);
+      border-left: 4px solid var(--accent);
+      border-radius: 6px;
+      color: #1f3f72;
+    }
+
+    blockquote p { margin: 0 0 8px; }
+    blockquote p:last-child { margin-bottom: 0; }
+
+    ul, ol {
+      margin: 0 0 18px;
+      padding-left: 24px;
+    }
+
+    li { margin: 6px 0; }
+    li > ul, li > ol { margin: 6px 0 0; }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    a:hover { text-decoration: underline; }
+
+    code {
+      padding: 2px 5px;
+      border-radius: 4px;
+      background: var(--code-bg);
+      font-family: "Cascadia Mono", "Consolas", monospace;
+      font-size: 0.92em;
+    }
+
+    pre {
+      overflow-x: auto;
+      margin: 12px 0 18px;
+      padding: 14px 16px;
+      border-radius: 8px;
+      background: #111827;
+      color: #f9fafb;
+    }
+
+    pre code {
+      padding: 0;
+      background: transparent;
+      color: inherit;
+      font-size: 0.9rem;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      margin: 12px 0 18px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 640px;
+    }
+
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #f0f3f8;
+      font-weight: 700;
+    }
+
+    tr:last-child td { border-bottom: 0; }
+
+    @media (max-width: 640px) {
+      main {
+        width: 100%;
+        margin: 0;
+        padding: 24px 18px;
+        border: 0;
+        border-radius: 0;
+      }
+
+      h1 { font-size: 1.65rem; }
+      h2 { font-size: 1.18rem; }
+      table { min-width: 520px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+<h1>아키텍처</h1>
+<blockquote>
+<p>원칙: <strong>상속 최소, 합성 우선.</strong> 데이터는 ScriptableObject. 네트워크 권한은 <a href="networking.html">networking.md</a> 참조.</p>
+</blockquote>
+<h2>UnitBase + 컴포넌트 조립</h2>
+<p><code>UnitBase : NetworkBehaviour</code> 는 <strong>공통(기본 상태 + 스탯)만</strong> 보유:</p>
+<ul>
+<li>현재 체력(<code>currentHP</code>, 서버 권한), <code>IDamageable.TakeDamage(...)</code>, 사망 이벤트
+</li>
+<li>팀/진영, 스탯 블록, 상태이상 리시버
+</li>
+<li><code>LevelComponent</code> <strong>자리만</strong>(7월 비활성, 8월 연결)
+</li>
+<li>파생:
+<ul>
+<li><code>PlayerUnit</code> — 오너 입력, 클라 이동, AbilityController, 빌드 적용
+</li>
+<li><code>BossUnit</code> — 서버 FSM, 페이즈, 기믹
+</li>
+</ul>
+</li>
+<li><strong>이동/어빌리티/상태이상/스탯은 각각 컴포넌트</strong>로 분리(플레이어·보스가 다른 구현 주입).
+</li>
+</ul>
+<h2>스탯 (struct, 단 3분할)</h2>
+<ul>
+<li><code>struct CombatStats { maxHP, atk, def, moveSpeed, atkSpeed }</code> — <strong>정적</strong>(빌드/후일 레벨 때만 변경).
+<br>값타입·캐시 친화, NGO <code>INetworkSerializable</code>로 <code>NetworkVariable&lt;T&gt;</code> 가능.
+</li>
+<li><strong><code>currentHP</code> 는 분리</strong>(런타임, 서버 NetworkVariable). 매 타격마다 변하므로 스탯 struct에 묶으면
+<br>피격 1회마다 struct 전체가 dirty → 스탯 전체 재전송(낭비). 분리해 트래픽·의미 분리.
+</li>
+<li><strong>Base → Current 모디파이어 레이어</strong>: base 스냅샷 위에 빌드 모디파이어(가산/배율)를 적용해 current 산출.
+</li>
+</ul>
+<h2>상태이상</h2>
+<ul>
+<li><strong><code>[Flags] StatusFlags</code></strong> 요약(복제, 입력 게이팅용) + <strong>서버측 효과 인스턴스 리스트</strong><code>{type,endTime,stacks,source}</code>.
+</li>
+<li>매 틱 만료 처리 → Flags 재계산 → 복제. 게이팅 규칙은 <a href="../design/status-effects.html">../design/status-effects.md</a>.
+</li>
+</ul>
+<h2>어빌리티</h2>
+<ul>
+<li><code>AbilityController</code>: <strong>좌클릭(평타)</strong> + <strong>우클릭(캐릭터별: 가붕이 패링 / 징크스 스택 발동)</strong> + Q/E/R 슬롯.
+<br>각 <code>AbilityConfig</code>(SO) 참조(데미지/쿨/사거리/CC).
+</li>
+<li><strong>R 잠금 플래그</strong>(빌드 해금 시 true), UI 잠금/해금 표시.
+</li>
+<li>발동/판정은 클라(오너) 트리거, <strong>데미지/CC/패링 방향판정/스택은 서버 RPC</strong>(서버 권한).
+</li>
+<li>적(UnitBase)은 <strong>스택 카운트</strong> 보유(원거리 평타 누적, 우클릭 소비). 쿨/범위/스택수는 <code>[SerializeField]</code>로 노출.
+</li>
+</ul>
+<h2>빌드(모디파이어)</h2>
+<ul>
+<li><code>BuildModifier</code>(SO) → 스폰 시 <strong>서버에서</strong> StatSet/AbilityController에 적용.
+</li>
+<li>효과 종류·연결: <a href="../design/builds.html">../design/builds.md</a>.
+</li>
+</ul>
+<h2>보스 FSM + 페이즈</h2>
+<ul>
+<li><code>BossStateMachine</code>(서버 전용, 코드 <code>TwentyThreeState</code>): <code>Idle</code>·<code>Walk</code>, <strong>근접</strong> <code>HookAttack</code>(좌/우 훅)·<code>UpperAttack</code>(어퍼컷→공중에뜸)·<code>Grab</code>, <strong>원거리</strong> <code>JumpAttack</code>·<code>DashAttack</code>, <code>Charging</code>·<code>Groggy</code>(그로기)·<code>Break</code>(그로기 강화)·<code>Dead</code>. (Hit는 색깔만 변경이라 상태 아님 / Bomb은 웰즈, Pylon/Rage/PhaseTransition은 로직 레이어)
+</li>
+<li><code>PhaseManager</code>: 체력 감시, <strong>66%/33%에서 <code>pendingPhaseTransition</code> 플래그</strong>.
+<br>각 상태는 <strong>종료 시점에 플래그 확인 → 다음 전환을 고정 패턴(송전기/차징)으로 강제</strong>.
+</li>
+<li>고정 패턴은 <code>BossPhasePattern</code>(SO)로 데이터화. 기믹 상세: <a href="../design/boss-wells-and-no23.html">../design/boss-wells-and-no23.md</a>.
+</li>
+</ul>
+<h2>에셋 로딩 — Addressables</h2>
+<ul>
+<li>프로젝트에 <strong>Addressables</strong>가 이미 도입됨. 보스/투사체/프리팹 스폰, 씬 콘텐츠 로딩에 활용.
+</li>
+<li>네트워크 스폰 프리팹은 NGO 등록 + Addressables 주소 관리 정합성 주의(주소/그룹명에 점·공백 금지 — <a href="conventions.html">conventions.md</a>).
+</li>
+</ul>
+  </main>
+</body>
+</html>

@@ -25,6 +25,10 @@ public class ZoneLayout : MonoBehaviour
     [Tooltip("같은 크기 존끼리 통일된 로컬 좌표를 따라야 함. Stage1 다리와 정렬 검증/디버그용.")]
     public List<Transform> Sockets = new List<Transform>();
 
+    [Header("=== 노드 (존 내부 2/3티어) ===")]
+    [Tooltip("이 존에 배치된 노드 마커들. MapContentSpawner가 노드별로 스폰/처리. 비면 존 단위 MonsterSpawnPoints로 폴백.")]
+    public List<NodeMarker> Nodes = new List<NodeMarker>();
+
     private void OnDrawGizmosSelected()
     {
         Gizmos.color = Color.cyan;
