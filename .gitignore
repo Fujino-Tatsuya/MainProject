@@ -121,8 +121,9 @@ CLAUDE.local.md
 
 # AI 플러그인 / 툴 산출물 (개인 환경, 커밋 금지)
 # .bkit/·.omc/ = AI 플러그인 상태, /data/ = 툴 산출물(예: data/created-pages.json)
-# /PLAN.md = 작업마다 새로 생성되는 플래닝 산출물(승인용 working doc, 레포 미보관)
+# /plans/ = 작업마다 생성되는 플래닝 산출물 모음(승인용 working doc, 레포 미보관)
 .bkit/
 .omc/
 /data/
-/PLAN.md
+/plans/
+.mcp.json

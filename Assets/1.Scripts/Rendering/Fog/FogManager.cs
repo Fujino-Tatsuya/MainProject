@@ -18,6 +18,30 @@ public sealed class FogManager : MonoBehaviour
     public bool fogEnabled = true;
     public FogProfile profile;
 
+    [Header("층 디밍 (전장의 안개)")]
+    [Tooltip("포그와 독립. 플레이어 y 기준 범위 밖 픽셀의 채도·명도를 낮춘다.")]
+    public bool dimEnabled = true;
+    [Tooltip("비우면 CameraTargetSwitcher.Active 의 현재 추적 타겟 → 'CameraFollowTarget' 태그 순으로 자동 탐색.")]
+    public Transform dimPlayerOverride;
+
+    [Header("시야 차폐 (LoS — 벽/노드 뒤)")]
+    [Tooltip("벽/노드 뒤를 가려 어둡게. dimEnabled 가 켜져 있어야 적용됨.")]
+    public bool losEnabled = false;
+    [Tooltip("벽 등 차폐체 콜라이더 레이어. 이 레이어만 raycast 로 시야를 막는다.")]
+    public LayerMask losWallMask = ~0;
+    [Tooltip("각도 해상도(빈 개수). 클수록 그림자 경계 정밀, 비용↑.")]
+    [Range(64, 720)] public int losTexels = 360;
+    [Tooltip("시야가 닿는 최대 거리(m). 이 너머는 항상 가려진 것으로 본다.")]
+    [Min(1f)] public float losMaxDist = 40f;
+    [Tooltip("raycast 시작 높이(플레이어 발끝 위 오프셋, m). 벽 중간 높이를 맞추기 위함.")]
+    public float losRayHeight = 1f;
+    [Tooltip("노드도 시야를 막을지. 노드는 콜라이더 대신 위치+Tier 원형으로 처리.")]
+    public bool losNodesBlock = true;
+    [Tooltip("이 Tier 까지만 차폐(더 작은 건 제외). Tier1_Large=0..Tier3_Small=2. 기본 전부 차폐.")]
+    public NodeTier losNodeMaxTier = NodeTier.Tier3_Small;
+    [Tooltip("노드 차폐 반경 배율(Tier 기본 반경 7.5/5/2.5m 에 곱).")]
+    [Min(0.01f)] public float losNodeRadiusScale = 1f;
+
     [Header("페인트 마스크 (순수 비주얼)")]
     public bool maskEnabled = false;
     public Texture2D maskTexture;
@@ -34,8 +58,9 @@ public sealed class FogManager : MonoBehaviour
     private static FogManager s_active;
     private static readonly List<FogVolume> s_volumes = new List<FogVolume>();
 
+    // 포그 또는 디밍 중 하나라도 켜져 있으면 렌더 패스를 큐잉한다(독립 토글).
     public static bool HasActiveInstance =>
-        s_active != null && s_active.isActiveAndEnabled && s_active.fogEnabled;
+        s_active != null && s_active.isActiveAndEnabled && (s_active.fogEnabled || s_active.dimEnabled);
 
     public static void Register(FogVolume v)
     {
@@ -54,6 +79,16 @@ public sealed class FogManager : MonoBehaviour
     private Vector3 _camPos;
     private FogProfile _fallback;
     private System.Comparison<FogVolume> _cmp;
+
+    // 디밍: 플레이어 추적 타겟 캐시 + 마지막 위치(타겟 소실 시 유지). 층(y)+시야(xz) 공용.
+    private Transform _dimTargetCache;
+    private Vector3 _lastDimPlayerPos;
+
+    // 시야 차폐: 라디얼 거리맵 + 노드 차폐 캐시(정적 맵 → 1회)
+    private Texture2D _losTex;
+    private float[] _losDist;
+    private readonly List<Vector4> _losNodes = new List<Vector4>(); // xyz=pos, w=radius
+    private bool _losNodesCached;
 
     // ----- shader property ids -----
     private static readonly int ID_GlobalEnabled = Shader.PropertyToID("_FogGlobalEnabled");
@@ -91,6 +126,26 @@ public sealed class FogManager : MonoBehaviour
     private static readonly int ID_VolBounds = Shader.PropertyToID("_FogVolumeBounds");
     private static readonly int ID_VolW2L = Shader.PropertyToID("_FogVolumeWorldToLocal");
 
+    private static readonly int ID_DimEnabled = Shader.PropertyToID("_DimEnabled");
+    private static readonly int ID_DimPlayerY = Shader.PropertyToID("_DimPlayerY");
+    private static readonly int ID_DimRangeUp = Shader.PropertyToID("_DimRangeUp");
+    private static readonly int ID_DimRangeDown = Shader.PropertyToID("_DimRangeDown");
+    private static readonly int ID_DimFadeUp = Shader.PropertyToID("_DimFadeUp");
+    private static readonly int ID_DimFadeDown = Shader.PropertyToID("_DimFadeDown");
+    private static readonly int ID_DimSaturation = Shader.PropertyToID("_DimSaturation");
+    private static readonly int ID_DimBrightness = Shader.PropertyToID("_DimBrightness");
+    private static readonly int ID_DimAffectSky = Shader.PropertyToID("_DimAffectSky");
+    private static readonly int ID_DimPlayerXZ = Shader.PropertyToID("_DimPlayerXZ");
+    private static readonly int ID_ViewRange = Shader.PropertyToID("_ViewRange");
+    private static readonly int ID_ViewFade = Shader.PropertyToID("_ViewFade");
+
+    private static readonly int ID_LosEnabled = Shader.PropertyToID("_LosEnabled");
+    private static readonly int ID_LosTex = Shader.PropertyToID("_LosTex");
+    private static readonly int ID_LosMaxDist = Shader.PropertyToID("_LosMaxDist");
+    private static readonly int ID_LosDarken = Shader.PropertyToID("_LosDarken");
+    private static readonly int ID_LosDistanceBias = Shader.PropertyToID("_LosDistanceBias");
+    private static readonly int ID_LosEdgeFade = Shader.PropertyToID("_LosEdgeFade");
+
     private void OnEnable()
     {
         s_active = this;
@@ -103,6 +158,8 @@ public sealed class FogManager : MonoBehaviour
         {
             s_active = null;
             Shader.SetGlobalFloat(ID_GlobalEnabled, 0f);
+            Shader.SetGlobalFloat(ID_DimEnabled, 0f);
+            Shader.SetGlobalFloat(ID_LosEnabled, 0f);
         }
     }
 
@@ -134,13 +191,25 @@ public sealed class FogManager : MonoBehaviour
 
     private void PushGlobals()
     {
-        if (!isActiveAndEnabled || !fogEnabled)
+        if (!isActiveAndEnabled)
         {
             Shader.SetGlobalFloat(ID_GlobalEnabled, 0f);
+            Shader.SetGlobalFloat(ID_DimEnabled, 0f);
             return;
         }
 
         FogProfile p = EffectiveProfile;
+        PushFogGlobals(p);
+        PushDimGlobals(p);
+    }
+
+    private void PushFogGlobals(FogProfile p)
+    {
+        if (!fogEnabled)
+        {
+            Shader.SetGlobalFloat(ID_GlobalEnabled, 0f);
+            return;
+        }
 
         Shader.SetGlobalFloat(ID_GlobalEnabled, 1f);
         Shader.SetGlobalVector(ID_Color, (Vector4)p.color);
@@ -198,6 +267,180 @@ public sealed class FogManager : MonoBehaviour
         Shader.SetGlobalVectorArray(ID_VolColor, _colors);
         Shader.SetGlobalVectorArray(ID_VolBounds, _bounds);
         Shader.SetGlobalMatrixArray(ID_VolW2L, _w2l);
+    }
+
+    private void PushDimGlobals(FogProfile p)
+    {
+        if (!dimEnabled)
+        {
+            Shader.SetGlobalFloat(ID_DimEnabled, 0f);
+            Shader.SetGlobalFloat(ID_LosEnabled, 0f);
+            return;
+        }
+
+        Vector3 playerPos = ResolveDimPlayerPos();
+        Shader.SetGlobalFloat(ID_DimEnabled, 1f);
+        Shader.SetGlobalFloat(ID_DimPlayerY, playerPos.y);
+        Shader.SetGlobalVector(ID_DimPlayerXZ, new Vector4(playerPos.x, playerPos.z, 0f, 0f));
+        Shader.SetGlobalFloat(ID_ViewRange, p.viewRange);
+        Shader.SetGlobalFloat(ID_ViewFade, p.viewFade);
+        Shader.SetGlobalFloat(ID_DimRangeUp, p.dimRangeUp);
+        Shader.SetGlobalFloat(ID_DimRangeDown, p.dimRangeDown);
+        Shader.SetGlobalFloat(ID_DimFadeUp, p.dimFadeUp);
+        Shader.SetGlobalFloat(ID_DimFadeDown, p.dimFadeDown);
+        Shader.SetGlobalFloat(ID_DimSaturation, p.dimSaturation);
+        Shader.SetGlobalFloat(ID_DimBrightness, p.dimBrightness);
+        Shader.SetGlobalFloat(ID_DimAffectSky, p.dimAffectSky);
+
+        PushLos(p, playerPos);
+    }
+
+    // 플레이어 추적 위치(y=층, xz=시야): override → 카메라 추적 타겟 → 태그 캐시 → 마지막 값 순.
+    private Vector3 ResolveDimPlayerPos()
+    {
+        // 1) 인스펙터 명시 override
+        if (dimPlayerOverride != null)
+        {
+            _lastDimPlayerPos = dimPlayerOverride.position;
+            return _lastDimPlayerPos;
+        }
+
+        // 2) 카메라가 현재 따라가는 대상(= 플레이어). '[' / ']' 전환에도 자동 추적.
+        CameraTargetSwitcher cts = CameraTargetSwitcher.Active;
+        if (cts != null && cts.CurrentFollowTarget != null)
+        {
+            _dimTargetCache = cts.CurrentFollowTarget;
+            _lastDimPlayerPos = _dimTargetCache.position;
+            return _lastDimPlayerPos;
+        }
+
+        // 3) 태그 검색 캐시(매 프레임 Find 금지 — 캐시 살아있으면 재사용)
+        if (_dimTargetCache == null)
+        {
+            GameObject go = GameObject.FindGameObjectWithTag("CameraFollowTarget");
+            if (go != null)
+                _dimTargetCache = go.transform;
+        }
+        if (_dimTargetCache != null)
+        {
+            _lastDimPlayerPos = _dimTargetCache.position;
+            return _lastDimPlayerPos;
+        }
+
+        // 4) fallback: 마지막 값 유지(씬 전환/스폰 전 깜빡임 방지)
+        return _lastDimPlayerPos;
+    }
+
+    // ----- 시야 차폐 (LoS) -----
+    // 벽=콜라이더 raycast, 노드=위치+Tier 원형. 라디얼 거리맵(_losTex)에 합성.
+    private void PushLos(FogProfile p, Vector3 playerPos)
+    {
+        if (!losEnabled)
+        {
+            Shader.SetGlobalFloat(ID_LosEnabled, 0f);
+            return;
+        }
+
+        BuildRadialMap(playerPos);
+
+        Shader.SetGlobalFloat(ID_LosEnabled, 1f);
+        Shader.SetGlobalTexture(ID_LosTex, _losTex);
+        Shader.SetGlobalFloat(ID_LosMaxDist, losMaxDist);
+        Shader.SetGlobalFloat(ID_LosDarken, p.losDarken);
+        Shader.SetGlobalFloat(ID_LosDistanceBias, p.losDistanceBias);
+        Shader.SetGlobalFloat(ID_LosEdgeFade, p.losEdgeFade);
+    }
+
+    // 각도별 최근접 차폐 거리 → _losTex(RFloat, n×1). 플레이어 이동 시 갱신.
+    // CPU 각도 i→ang = i/n*2PI - PI, 셰이더 u = ang/2PI + 0.5 와 일치.
+    private void BuildRadialMap(Vector3 playerPos)
+    {
+        int n = Mathf.Clamp(losTexels, 64, 720);
+        if (_losTex == null || _losTex.width != n)
+        {
+            if (_losTex != null)
+            {
+                if (Application.isPlaying) Destroy(_losTex);
+                else DestroyImmediate(_losTex);
+            }
+            _losTex = new Texture2D(n, 1, TextureFormat.RFloat, false, true)
+            {
+                wrapMode = TextureWrapMode.Repeat,
+                filterMode = FilterMode.Bilinear,
+                name = "FogLosRadialMap"
+            };
+            _losDist = new float[n];
+        }
+
+        float maxD = losMaxDist;
+        for (int i = 0; i < n; i++) _losDist[i] = maxD;
+
+        // (1) 벽 등 콜라이더 raycast (수평 레이라 바닥은 안 맞음)
+        Vector3 origin = playerPos + Vector3.up * losRayHeight;
+        for (int i = 0; i < n; i++)
+        {
+            float ang = ((float)i / n) * (2f * Mathf.PI) - Mathf.PI;
+            Vector3 dir = new Vector3(Mathf.Cos(ang), 0f, Mathf.Sin(ang));
+            if (Physics.Raycast(origin, dir, out RaycastHit hit, maxD, losWallMask, QueryTriggerInteraction.Ignore))
+                _losDist[i] = hit.distance;
+        }
+
+        // (2) 노드 원형 차폐 (콜라이더 없음 → 위치+Tier 반경)
+        if (losNodesBlock)
+        {
+            if (!_losNodesCached) CacheNodes();
+            float twoPi = 2f * Mathf.PI;
+            for (int k = 0; k < _losNodes.Count; k++)
+            {
+                Vector4 nd = _losNodes[k];
+                float dx = nd.x - playerPos.x, dz = nd.z - playerPos.z;
+                float d = Mathf.Sqrt(dx * dx + dz * dz);
+                float r = nd.w;
+                if (d <= r || d > maxD) continue;
+                float surf = d - r;                          // 원 표면까지 거리(근사)
+                float center = Mathf.Atan2(dz, dx);
+                float half = Mathf.Asin(Mathf.Clamp01(r / d));
+                int i0 = Mathf.FloorToInt(((center - half + Mathf.PI) / twoPi) * n);
+                int i1 = Mathf.CeilToInt(((center + half + Mathf.PI) / twoPi) * n);
+                for (int i = i0; i <= i1; i++)
+                {
+                    int bin = ((i % n) + n) % n;             // 각도 wrap
+                    if (surf < _losDist[bin]) _losDist[bin] = surf;
+                }
+            }
+        }
+
+        _losTex.SetPixelData(_losDist, 0);
+        _losTex.Apply(false);
+    }
+
+    // 차폐 노드 수집(정적 맵 → 1회). Tier 컷오프 적용.
+    private void CacheNodes()
+    {
+        _losNodes.Clear();
+        NodeMarker[] nodes = FindObjectsByType<NodeMarker>(FindObjectsSortMode.None);
+        for (int i = 0; i < nodes.Length; i++)
+        {
+            NodeMarker nd = nodes[i];
+            if ((int)nd.Tier > (int)losNodeMaxTier) continue;   // 더 작은 Tier 제외
+            Vector3 pos = nd.transform.position;
+            _losNodes.Add(new Vector4(pos.x, pos.y, pos.z, TierToRadius(nd.Tier) * losNodeRadiusScale));
+        }
+        _losNodesCached = true;
+    }
+
+    // 맵 재생성 시 노드 캐시 무효화(외부 호출용).
+    public void InvalidateLosNodes() => _losNodesCached = false;
+
+    private static float TierToRadius(NodeTier t)
+    {
+        switch (t)
+        {
+            case NodeTier.Tier1_Large: return 7.5f;
+            case NodeTier.Tier2_Medium: return 5f;
+            case NodeTier.Tier3_Small: return 2.5f;
+            default: return 3f;
+        }
     }
 
     private int CollectVolumes()

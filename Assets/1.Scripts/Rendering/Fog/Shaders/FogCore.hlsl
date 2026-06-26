@@ -45,6 +45,30 @@ float  _FogMaskTintStrength;
 TEXTURE2D(_FogMaskTex);
 SAMPLER(sampler_FogMaskTex);
 
+// ---------------- 층 디밍(전장의 안개) ----------------
+// 포그와 독립 토글. 픽셀 월드 y가 플레이어 y 기준 허용범위를 벗어나면
+// 채도/명도를 낮춰 "현재 층 밖"을 어둡게 만든다. 1탭(이웃 샘플 없음).
+float  _DimEnabled;
+float  _DimPlayerY;          // 추적 타겟(플레이어)의 월드 y
+float  _DimRangeUp;          // 위로 허용 범위(이 값 넘으면 페이드 시작)
+float  _DimRangeDown;        // 아래로 허용 범위
+float  _DimFadeUp;           // 위쪽 페이드 폭(smoothstep)
+float  _DimFadeDown;         // 아래쪽 페이드 폭
+float  _DimSaturation;       // 완전 디밍 시 채도 잔량(0=완전 흑백)
+float  _DimBrightness;       // 완전 디밍 시 명도 곱(0≈검정)
+float  _DimAffectSky;        // 스카이박스 적용 비율(0=하늘 제외)
+// 시야범위 디밍(FOW): 플레이어 xz 반경 밖을 디밍. 층 디밍과 max 합성.
+float2 _DimPlayerXZ;         // 플레이어 월드 xz
+float  _ViewRange;           // 시야 반경(0이면 끔)
+float  _ViewFade;            // 반경 경계 페이드 폭
+// 시야 차폐(LoS): 라디얼 시야맵(각도→최근접 차폐 거리). 벽/노드 뒤를 디밍.
+float  _LosEnabled;
+TEXTURE2D(_LosTex); SAMPLER(sampler_LosTex);
+float  _LosMaxDist;          // 라디얼맵 최대 거리
+float  _LosDarken;           // 차폐 디밍 강도
+float  _LosDistanceBias;     // 자기차폐 방지 여유(m)
+float  _LosEdgeFade;         // 차폐 경계 페이드(m)
+
 // ---------------- 로컬 볼륨 ----------------
 int      _FogVolumeCount;
 float4   _FogVolumeParams0[MAX_FOG_VOLUMES];      // x:type(0 box,1 sphere) y:density z:softBorder(월드 m) w:hasTint
@@ -206,6 +230,57 @@ float Fog_Evaluate(float3 worldPos, float dist, float skyMask, out float3 outCol
 
     outColor = baseCol;
     return f;
+}
+
+// ---------------- 시야 차폐 평가 (라디얼 시야맵) ----------------
+// 픽셀의 플레이어 기준 (각도→u)로 _LosTex 1탭 샘플 → 그 각도 최근접 차폐 표면거리.
+// 픽셀 거리가 그보다 멀면(=벽/노드 뒤) 차폐 디밍. CPU atan2(dz,dx)와 u매핑 일치 필수.
+float Los_Amount(float3 worldPos)
+{
+    if (_LosEnabled < 0.5) return 0.0;
+    float2 d = worldPos.xz - _DimPlayerXZ;
+    float distXZ = length(d);
+    if (distXZ < 1e-3) return 0.0;
+    float ang = atan2(d.y, d.x);              // -PI..PI (x=cos, z=sin)
+    float u = ang * (0.5 / PI) + 0.5;         // 0..1, _LosTex wrap=Repeat
+    float occ = SAMPLE_TEXTURE2D_LOD(_LosTex, sampler_LosTex, float2(u, 0.5), 0).r;
+    // occ = 그 각도의 최근접 차폐 표면거리. 픽셀이 그보다 멀면 뒤(가려짐).
+    return smoothstep(occ + _LosDistanceBias, occ + _LosDistanceBias + max(1e-4, _LosEdgeFade), distXZ) * _LosDarken;
+}
+
+// ---------------- 디밍 평가 (층 + 시야범위) ----------------
+// 픽셀 worldPos가 (a) 플레이어 y 기준 층 범위, (b) 플레이어 xz 시야 반경을
+// 벗어난 정도 → 디밍 강도(0=정상, 1=완전 디밍). 둘 중 큰 쪽 적용(max).
+float Dim_Amount(float3 worldPos, float skyMask)
+{
+    // (a) 층 디밍 — 위/아래 비대칭
+    float dy = worldPos.y - _DimPlayerY;
+    float up   = smoothstep(_DimRangeUp,   _DimRangeUp   + max(1e-4, _DimFadeUp),   dy);
+    float down = smoothstep(_DimRangeDown, _DimRangeDown + max(1e-4, _DimFadeDown), -dy);
+    float t = max(up, down);                  // 위든 아래든 벗어난 쪽 적용
+
+    // (b) 시야범위 디밍 — 플레이어 xz 반경 밖 (_ViewRange>0일 때만)
+    if (_ViewRange > 0.0)
+    {
+        float distXZ = length(worldPos.xz - _DimPlayerXZ);
+        float view = smoothstep(_ViewRange, _ViewRange + max(1e-4, _ViewFade), distXZ);
+        t = max(t, view);
+    }
+
+    // (c) 시야 차폐 — 벽/노드 뒤
+    t = max(t, Los_Amount(worldPos));
+
+    t = lerp(t, t * _DimAffectSky, skyMask);  // 스카이박스는 보통 제외
+    return saturate(t);
+}
+
+// 색에 desaturate(luminance 기반) + darken(곱) 적용.
+float3 Dim_Apply(float3 color, float t)
+{
+    float luma = dot(color, float3(0.2126, 0.7152, 0.0722)); // Rec.709
+    float3 desat = lerp(color, luma.xxx, t * (1.0 - _DimSaturation));
+    float darkenMul = lerp(1.0, _DimBrightness, t);
+    return desat * darkenMul;
 }
 
 #endif // FOG_CORE_INCLUDED
