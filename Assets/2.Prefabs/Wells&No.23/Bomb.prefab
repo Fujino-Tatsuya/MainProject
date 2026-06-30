@@ -370,16 +370,16 @@ MonoBehaviour:
   bombDamage: 2
   player:
     serializedVersion: 2
-    m_Bits: 8
+    m_Bits: 64
   enemy:
     serializedVersion: 2
-    m_Bits: 128
+    m_Bits: 256
   surface:
     serializedVersion: 2
-    m_Bits: 64
+    m_Bits: 128
   hazardArea:
     serializedVersion: 2
-    m_Bits: 256
+    m_Bits: 512
   wallTag: Wall
   groundTag: Ground
   bombRadius: 0.25

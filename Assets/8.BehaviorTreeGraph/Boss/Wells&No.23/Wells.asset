@@ -3079,7 +3079,7 @@ MonoBehaviour:
   - rid: 5035183235171615223
   - rid: 5035183235171615259
   - rid: 5035183258559840965
-  m_VersionTimestamp: 639178993836323961
+  m_VersionTimestamp: 639179160781052677
   m_CommandBuffer:
     m_Commands: []
   m_RuntimeBlackboardAsset: {fileID: -5491183588050324566}
@@ -3103,7 +3103,7 @@ MonoBehaviour:
           m_Value0: 4100369404515997713
           m_Value1: 14882607252173658764
         Name: CurrentState
-        IsExposed: 0
+        IsExposed: 1
         m_IsShared: 0
         m_Value: 0
     - rid: 5035183235171614924

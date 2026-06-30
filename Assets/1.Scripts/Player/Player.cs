@@ -13,6 +13,14 @@ public class Player : Unit
     [SerializeField] private float interruptDuration = 0.5f;
     [SerializeField] private float interruptForwardDistance = 0.5f;
 
+    [Header("\n초기화 값")]
+    [SerializeField] int attackDamage;
+    [SerializeField] float moveSpeed;
+    [SerializeField] float attackSpeed;
+    [SerializeField] int maxHp;
+    [SerializeField] int defense;
+    [SerializeField] int maxShield;
+
     private PlayerInputReader inputReader;
     private PlayerMovement movement;
     private PlayerAimIndicator aimIndicator;
@@ -44,6 +52,10 @@ public class Player : Unit
         // 내가 Owner인 플레이어가 스폰되면, 카메라 매니저에게 나를 따라오라고 알린다.
         if (IsOwner)
             CameraTargetSwitcher.Active?.FocusOwnerPlayer();
+
+        if (IsServer)
+            Initialize(attackDamage, moveSpeed, attackSpeed, maxHp, defense, maxShield);
+
     }
 
     private void Update()
@@ -159,6 +171,11 @@ public class Player : Unit
     {
         if (animator != null)
             animator.SetBool(IsMovingHash, isMoving);
+    }
+
+    public override void TakeDamage(int damage)
+    {
+        base.TakeDamage(damage);
     }
 }
 

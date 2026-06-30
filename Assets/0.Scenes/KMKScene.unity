@@ -692,7 +692,7 @@ Transform:
   m_GameObject: {fileID: 609884187}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 2.79, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -762,7 +762,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TwentyThreeArenaContext
   ShowTopMostFoldoutHeaderGroup: 1
-  bossPrefab: {fileID: 5372104213593212626, guid: 1100cccaacdc1fe4ca3e1eb9680f8c75, type: 3}
+  bossPrefab: {fileID: 6048960277833949737, guid: ec098039733a00145a352f70e7611fe9, type: 3}
   ChargingObjects:
   - {fileID: 1929793192}
   - {fileID: 1063592043}
@@ -1178,7 +1178,7 @@ GameObject:
   - component: {fileID: 1509206121}
   - component: {fileID: 1509206120}
   - component: {fileID: 1509206119}
-  m_Layer: 6
+  m_Layer: 3
   m_Name: Ground
   m_TagString: Ground
   m_Icon: {fileID: 0}
@@ -1344,7 +1344,7 @@ MonoBehaviour:
   NetworkConfig:
     ProtocolVersion: 0
     NetworkTransport: {fileID: 1792167253}
-    PlayerPrefab: {fileID: 3532302232374388767, guid: 5066bd0eae84f59458cc92dc3a57d718, type: 3}
+    PlayerPrefab: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
     Prefabs:
       NetworkPrefabsLists:
       - {fileID: 11400000, guid: 28ca89dc34eff6547b550c9200caee32, type: 2}

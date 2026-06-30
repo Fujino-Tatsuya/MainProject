@@ -15,6 +15,11 @@ public class ColliderBasicAttack : BaseWeapon
 
     void OnTriggerEnter(Collider other)
     {
+        OnAttackTriggerEnter(other);
+    }
+
+    public void OnAttackTriggerEnter(Collider other)
+    {
         if (!IsServer) return;
         _stayTimer = 0f;
 
@@ -25,6 +30,11 @@ public class ColliderBasicAttack : BaseWeapon
     }
 
     void OnTriggerStay(Collider other)
+    {
+        OnAttackTriggerStay(other);
+    }
+
+    public void OnAttackTriggerStay(Collider other)
     {
         if (!IsServer) return;
 
@@ -40,6 +50,11 @@ public class ColliderBasicAttack : BaseWeapon
     }
 
     private void OnTriggerExit(Collider other)
+    {
+        OnAttackTriggerExit(other);
+    }
+
+    public void OnAttackTriggerExit(Collider other)
     {
         if (!IsServer) return;
 

@@ -106,7 +106,7 @@ public class JumpController : NetworkBehaviour
 
 
     Collider[] results = new Collider[16];
-    HashSet<Player> damagedPlayers = new HashSet<Player>();
+    HashSet<Unit> damagedPlayers = new HashSet<Unit>();
     public void OnLanded()
     {
         if (!IsServer) return;
@@ -130,17 +130,17 @@ public class JumpController : NetworkBehaviour
             if (hitCollider == null)
                 continue;
 
-            Player player = hitCollider.GetComponentInParent<Player>();
-            if (player == null)
+            Unit unit = hitCollider.GetComponent<Unit>();
+            if (unit == null)
             {
-                Debug.LogError("해당 플레이어는 Player 컴포넌트를 부착하고 있지 않습니다.");
+                Debug.LogError("해당 플레이어는 Unit 컴포넌트를 부착하고 있지 않습니다.");
                 continue;
             }
 
-            if (!damagedPlayers.Add(player))
+            if (!damagedPlayers.Add(unit))
                 continue;
 
-            player.TakeDamage(damage);
+            unit.TakeDamage(damage);
         }
 
         HideSignClientRpc();

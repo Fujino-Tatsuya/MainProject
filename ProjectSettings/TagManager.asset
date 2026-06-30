@@ -15,13 +15,12 @@ TagManager:
   - TransparentFX
   - Ignore Raycast
   - Ground
-  - Player
   - Water
   - UI
+  - Player
   - Surface
   - Enemy
   - HazardArea
-  - 
   - 
   - 
   - 

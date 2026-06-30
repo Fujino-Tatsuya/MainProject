@@ -87,7 +87,7 @@ MonoBehaviour:
   isGroggyAttack: 0
   layerMask:
     serializedVersion: 2
-    m_Bits: 8
+    m_Bits: 64
   triggerMode: 0
   stayTime: 0
 --- !u!1 &1594302937096804332
@@ -468,7 +468,7 @@ MonoBehaviour:
   isGroggyAttack: 0
   layerMask:
     serializedVersion: 2
-    m_Bits: 8
+    m_Bits: 64
   knockbackStrength: 10
 --- !u!1 &3443241134742314900
 GameObject:
@@ -522,7 +522,7 @@ MonoBehaviour:
   followTargetTag: Player
   playerLayer:
     serializedVersion: 2
-    m_Bits: 8
+    m_Bits: 64
   damage: 3
 --- !u!1 &3908396834888608453
 GameObject:
@@ -573,7 +573,7 @@ MonoBehaviour:
   isGroggyAttack: 0
   layerMask:
     serializedVersion: 2
-    m_Bits: 8
+    m_Bits: 64
   knockbackStrength: 5
 --- !u!1 &5016341223067883996
 GameObject:
@@ -715,7 +715,7 @@ MonoBehaviour:
   isGroggyAttack: 0
   layerMask:
     serializedVersion: 2
-    m_Bits: 8
+    m_Bits: 64
   triggerMode: 0
   stayTime: 0
 --- !u!1 &5372104213593212626
@@ -863,6 +863,7 @@ MonoBehaviour:
   - rid: 5035183218639241401
   - rid: 5035183218639241402
   - rid: 5035183259049001731
+  - rid: 5035183289670304660
   m_OriginalGraph: {fileID: 0}
   m_IsInitialised: 0
   m_IsStarted: 0
@@ -1022,6 +1023,14 @@ MonoBehaviour:
           m_Value1: 15137502110088861269
         Name: BossStateChanged
         m_Value: {fileID: 11400000, guid: e78288d73e6e29843b07bd884f9535fa, type: 2}
+    - rid: 5035183289670304660
+      type: {class: 'BlackboardVariable`1[[Unity.Behavior.BehaviorGraph, Unity.Behavior]]', ns: Unity.Behavior, asm: Unity.Behavior}
+      data:
+        GUID:
+          m_Value0: 3547964277086351208
+          m_Value1: 14094535254966029272
+        Name: WaitingBoss
+        m_Value: {fileID: -5756971992900613783, guid: 732dccfc6d720204d9eedd9b92fbfd2f, type: 2}
 --- !u!195 &1054250890861799072
 NavMeshAgent:
   m_ObjectHideFlags: 0
@@ -1194,7 +1203,7 @@ MonoBehaviour:
   isGroggyAttack: 0
   layerMask:
     serializedVersion: 2
-    m_Bits: 8
+    m_Bits: 64
   triggerMode: 0
   stayTime: 0
 --- !u!1 &6792224880344252734
@@ -1377,7 +1386,7 @@ MonoBehaviour:
   grabColliderInfo: {fileID: 6124302813489217326}
   targetMask:
     serializedVersion: 2
-    m_Bits: 8
+    m_Bits: 64
   bt: {fileID: 7434833580858265621}
   grabDamage: 5
   holdDamage: 1

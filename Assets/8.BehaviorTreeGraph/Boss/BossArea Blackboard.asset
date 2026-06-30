@@ -1,0 +1,87 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &-1684693009561155783
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5c02bb70996b49eba31d0c206e28da24, type: 3}
+  m_Name: BossArea Blackboard
+  m_EditorClassIdentifier: Unity.Behavior::Unity.Behavior.RuntimeBlackboardAsset
+  VersionTimestamp: 639180163525083093
+  AssetID:
+    m_Value0: 2659926847979802981
+    m_Value1: 9172045664839197754
+  m_Blackboard:
+    m_Variables:
+    - rid: 5035183289726665216
+    - rid: 5035183289726665218
+  m_SharedBlackboardVariableGuids: []
+  references:
+    version: 2
+    RefIds:
+    - rid: 5035183289726665216
+      type: {class: 'BlackboardVariable`1[[System.Boolean, mscorlib]]', ns: Unity.Behavior, asm: Unity.Behavior}
+      data:
+        GUID:
+          m_Value0: 7125940558170079757
+          m_Value1: 1170387460850572217
+        Name: IsOpen
+        m_Value: 0
+    - rid: 5035183289726665218
+      type: {class: 'BlackboardVariable`1[[System.Int32, mscorlib]]', ns: Unity.Behavior, asm: Unity.Behavior}
+      data:
+        GUID:
+          m_Value0: 7018206511225267602
+          m_Value1: 16668687327822665963
+        Name: TotalPlayerNumber
+        m_Value: 0
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2dd922ae02c94c87a66e46a10a7319b9, type: 3}
+  m_Name: BossArea Blackboard
+  m_EditorClassIdentifier: Unity.Behavior.Authoring::Unity.Behavior.BehaviorBlackboardAuthoringAsset
+  AssetID:
+    m_Value0: 2659926847979802981
+    m_Value1: 9172045664839197754
+  m_Variables:
+  - rid: 5035183289726665215
+  - rid: 5035183289726665217
+  m_VersionTimestamp: 639180163525083093
+  m_CommandBuffer:
+    m_Commands: []
+  m_RuntimeBlackboardAsset: {fileID: -1684693009561155783}
+  references:
+    version: 2
+    RefIds:
+    - rid: 5035183289726665215
+      type: {class: 'TypedVariableModel`1[[System.Boolean, mscorlib]]', ns: Unity.Behavior.GraphFramework, asm: Unity.Behavior.GraphFramework}
+      data:
+        ID:
+          m_Value0: 7125940558170079757
+          m_Value1: 1170387460850572217
+        Name: IsOpen
+        IsExposed: 1
+        m_IsShared: 0
+        m_Value: 0
+    - rid: 5035183289726665217
+      type: {class: 'TypedVariableModel`1[[System.Int32, mscorlib]]', ns: Unity.Behavior.GraphFramework, asm: Unity.Behavior.GraphFramework}
+      data:
+        ID:
+          m_Value0: 7018206511225267602
+          m_Value1: 16668687327822665963
+        Name: TotalPlayerNumber
+        IsExposed: 1
+        m_IsShared: 0
+        m_Value: 0
