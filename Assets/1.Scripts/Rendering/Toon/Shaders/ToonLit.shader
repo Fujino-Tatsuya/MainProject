@@ -12,6 +12,8 @@ Shader "Project/ToonLit"
         [MainColor]   _BaseColor ("Base Color", Color) = (1,1,1,1)
 
         [Header(Cel Shading)][Space]
+        [Toggle(_FIXEDLIGHT_ON)] _FixedLightOn ("Fixed Light (라이트독립 세로음영)", Float) = 0
+        _FixedLightDir ("Fixed Light Dir (오브젝트공간)", Vector) = (0.15,1.0,0.35,0)
         _ShadeColor ("Shade Tint (그림자 채색)", Color) = (0.62,0.60,0.72,1)
         _ShadeThreshold ("Shade Threshold (half-lambert)", Range(0,1)) = 0.5
         _ShadeSmooth ("Shade Smoothness", Range(0.001,0.7)) = 0.08
@@ -28,6 +30,13 @@ Shader "Project/ToonLit"
         _RimIntensity ("Rim Intensity", Range(0,3)) = 0.5
         _RimLightAlign ("Rim Light Align (광원쪽만)", Range(0,1)) = 0.3
 
+        [Header(Hair Anisotropic (Angel Ring))][Space]
+        [Toggle(_HAIR_ON)] _HairOn ("Hair Mode", Float) = 0
+        [HDR]_HairSpecColor ("Hair Spec Color", Color) = (1,1,1,1)
+        _HairThreshold ("Hair Spec Threshold", Range(0,1)) = 0.62
+        _HairSmooth ("Hair Spec Smoothness", Range(0.001,0.5)) = 0.05
+        _HairShift ("Hair Highlight Shift", Range(-1,1)) = 0.0
+
         [Header(Metal Toggle (Mecha 23ho))][Space]
         [Toggle(_METAL_ON)] _MetalOn ("Metal Mode", Float) = 0
         [HDR]_SpecColor2 ("Spec Color", Color) = (1,1,1,1)
@@ -41,6 +50,10 @@ Shader "Project/ToonLit"
         [Header(Tone Brightness Saturation)][Space]
         _Brightness ("Brightness", Range(0.5,2)) = 1.18
         _Saturation ("Saturation", Range(0,2)) = 1.15
+
+        [Header(Outline)][Space]
+        _OutlineColor ("Outline Tint (표면색 곱계수)", Color) = (0.55,0.55,0.6,1)
+        _OutlineWidth ("Outline Width", Range(0,0.03)) = 0.008
     }
 
     SubShader
@@ -58,6 +71,8 @@ Shader "Project/ToonLit"
             #pragma fragment frag
 
             #pragma shader_feature_local _METAL_ON
+            #pragma shader_feature_local _FIXEDLIGHT_ON
+            #pragma shader_feature_local _HAIR_ON
 
             // URP 라이팅/그림자 키워드
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
@@ -96,6 +111,13 @@ Shader "Project/ToonLit"
                 half   _ReceiveShadowStrength;
                 half   _Brightness;
                 half   _Saturation;
+                float4 _FixedLightDir;
+                half4  _OutlineColor;
+                half   _OutlineWidth;
+                half4  _HairSpecColor;
+                half   _HairThreshold;
+                half   _HairSmooth;
+                half   _HairShift;
             CBUFFER_END
 
             TEXTURE2D(_BaseMap); SAMPLER(sampler_BaseMap);
@@ -104,6 +126,7 @@ Shader "Project/ToonLit"
             {
                 float4 positionOS : POSITION;
                 float3 normalOS   : NORMAL;
+                float4 tangentOS  : TANGENT;
                 float2 uv         : TEXCOORD0;
             };
 
@@ -114,17 +137,19 @@ Shader "Project/ToonLit"
                 float3 positionWS : TEXCOORD1;
                 float3 normalWS   : TEXCOORD2;
                 float  fogFactor  : TEXCOORD3;
+                float3 bitangentWS: TEXCOORD4;
             };
 
             Varyings vert (Attributes IN)
             {
                 Varyings OUT = (Varyings)0;
                 VertexPositionInputs posInputs = GetVertexPositionInputs(IN.positionOS.xyz);
-                VertexNormalInputs   nrmInputs = GetVertexNormalInputs(IN.normalOS);
+                VertexNormalInputs   nrmInputs = GetVertexNormalInputs(IN.normalOS, IN.tangentOS);
 
                 OUT.positionCS = posInputs.positionCS;
                 OUT.positionWS = posInputs.positionWS;
                 OUT.normalWS   = nrmInputs.normalWS;
+                OUT.bitangentWS= nrmInputs.bitangentWS;
                 OUT.uv         = TRANSFORM_TEX(IN.uv, _BaseMap);
                 OUT.fogFactor  = ComputeFogFactor(posInputs.positionCS.z);
                 return OUT;
@@ -152,7 +177,13 @@ Shader "Project/ToonLit"
                 // ---- 메인 라이트 ----
                 float4 shadowCoord = TransformWorldToShadowCoord(IN.positionWS);
                 Light mainLight = GetMainLight(shadowCoord);
-                float3 L = normalize(mainLight.direction);
+                #if defined(_FIXEDLIGHT_ON)
+                    // 라이트 독립: 오브젝트공간 고정 방향 → 월드. 실제 라이트가 움직이거나
+                    // 캐릭터가 돌아도 음영이 캐릭터 기준으로 일관(블아식 세로 고정 음영).
+                    float3 L = normalize(mul((float3x3)UNITY_MATRIX_M, _FixedLightDir.xyz));
+                #else
+                    float3 L = normalize(mainLight.direction);
+                #endif
                 half ndl = dot(N, L);
 
                 // 그림자 수신(셀프/캐스트) — 강도 조절(블아는 약하게)
@@ -192,6 +223,18 @@ Shader "Project/ToonLit"
                     half specRaw = pow(ndh, 64.0h);
                     half spec = smoothstep(_SpecThreshold - _SpecSmooth, _SpecThreshold + _SpecSmooth, specRaw);
                     color += _SpecColor2.rgb * spec * shadowAtten;
+                }
+                #endif
+
+                // ---- 머리 이방성 하이라이트(엔젤링, Kajiya-Kay 셀) ----
+                #if defined(_HAIR_ON)
+                {
+                    float3 Th = normalize(IN.bitangentWS + N * _HairShift);
+                    float3 Hh = normalize(L + V);
+                    half TdotH = dot(Th, Hh);
+                    half sinTH = sqrt(saturate(1.0h - TdotH * TdotH));
+                    half hairSpec = smoothstep(_HairThreshold - _HairSmooth, _HairThreshold + _HairSmooth, sinTH);
+                    color += _HairSpecColor.rgb * hairSpec * saturate(ndl + 0.3h);
                 }
                 #endif
 
@@ -258,6 +301,73 @@ Shader "Project/ToonLit"
                 Varyings o; o.positionCS = GetShadowPositionHClip(input); return o;
             }
             half4 ShadowPassFragment(Varyings input) : SV_TARGET { return 0; }
+            ENDHLSL
+        }
+
+        // ------------------------------------------------------------------
+        //  인버티드 헐 아웃라인 (백페이스 확장). 화면공간 일정 두께 근사.
+        Pass
+        {
+            Name "Outline"
+            Tags { "LightMode"="SRPDefaultUnlit" }
+            Cull Front
+            ZWrite On
+
+            HLSLPROGRAM
+            #pragma vertex vertOutline
+            #pragma fragment fragOutline
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+            CBUFFER_START(UnityPerMaterial)
+                float4 _BaseMap_ST;
+                half4  _BaseColor;
+                half4  _ShadeColor;
+                half   _ShadeThreshold;
+                half   _ShadeSmooth;
+                half   _Shade2Threshold;
+                half   _Shade2Smooth;
+                half   _ShadeStrength;
+                half   _ShadeAmbient;
+                half4  _RimColor;
+                half   _RimPower;
+                half   _RimIntensity;
+                half   _RimLightAlign;
+                half4  _SpecColor2;
+                half   _SpecThreshold;
+                half   _SpecSmooth;
+                half   _MetalBandSmooth;
+                half   _ReceiveShadowStrength;
+                half   _Brightness;
+                half   _Saturation;
+                float4 _FixedLightDir;
+                half4  _OutlineColor;
+                half   _OutlineWidth;
+                half4  _HairSpecColor;
+                half   _HairThreshold;
+                half   _HairSmooth;
+                half   _HairShift;
+            CBUFFER_END
+
+            TEXTURE2D(_BaseMap); SAMPLER(sampler_BaseMap);
+
+            struct AttributesO { float4 positionOS:POSITION; float3 normalOS:NORMAL; float2 uv:TEXCOORD0; };
+            struct VaryingsO   { float4 positionCS:SV_POSITION; float2 uv:TEXCOORD0; };
+
+            VaryingsO vertOutline (AttributesO IN)
+            {
+                VaryingsO OUT;
+                // 오브젝트 공간에서 노멀 방향으로 정점 확장(검증된 인버티드 헐 방식)
+                float3 posOS = IN.positionOS.xyz + normalize(IN.normalOS) * _OutlineWidth;
+                OUT.positionCS = TransformObjectToHClip(posOS);
+                OUT.uv = TRANSFORM_TEX(IN.uv, _BaseMap);
+                return OUT;
+            }
+            // 아웃라인 색 = 머티리얼별 근사 어두운색(_OutlineColor) 직접 출력.
+            // 검은 파트(머리/옷/스타킹)는 albedo가 0이라 곱 방식이 안 통하므로 부위별 근사색을 지정.
+            half4 fragOutline (VaryingsO IN) : SV_Target
+            {
+                return half4(_OutlineColor.rgb, 1);
+            }
             ENDHLSL
         }
 
