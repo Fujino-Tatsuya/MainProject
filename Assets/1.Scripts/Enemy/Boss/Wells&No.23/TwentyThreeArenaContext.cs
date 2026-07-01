@@ -22,12 +22,20 @@ public class TwentyThreeArenaContext : NetworkBehaviour
         }
         boss.Spawn();
 
-        //ChargeController controller = boss.GetComponentInChildren<ChargeController>();
-        //if (controller == null)
-        //{
-        //    Debug.LogError("해당 보스에 ChargeController 컴포넌트가 없습니다. 추가해주세요.");
-        //    return;
-        //}
-        //controller.SetList(ChargingObjects);
+        ChargeController controller = boss.GetComponentInChildren<ChargeController>();
+        if (controller == null)
+        {
+            Debug.LogError("해당 보스에 ChargeController 컴포넌트가 없습니다. 추가해주세요.");
+            return;
+        }
+        controller.SetList(ChargingObjects);
+
+        EnemyBTActivator btActivator = boss.GetComponent<EnemyBTActivator>();
+        if (btActivator == null)
+        {
+            Debug.LogError("해당 보스에 EnemyBTActivator 컴포넌트가 없습니다. 추가해주세요.");
+            return;
+        }
+        btActivator.OpenBT();
     }
 }

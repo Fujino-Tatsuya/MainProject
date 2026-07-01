@@ -6,7 +6,7 @@ using System;
 public class ChargeController : NetworkBehaviour
 {
     List<ChargingObject> chargeObjects;
-    [SerializeField] float maxY = 5f;
+    [SerializeField] float maxY = 1f;
     [SerializeField] float minY = 0f;
     [Header("플레이어 인원 수에 따른 오브젝트 갯수")]
     [SerializeField] int player1 = 1;
@@ -29,6 +29,10 @@ public class ChargeController : NetworkBehaviour
         floor.SetActive(false);
     }
 
+    /// <summary>
+    /// ChargeController가 부착되어 있는 오브젝트 생성 시에 해당 함수를 통해 ChargingObject 리스트를 설정해야 합니다.
+    /// </summary>
+    /// <param name="list">등록할 ChargingObject 리스트</param>
     public void SetList(List<ChargingObject> list)
     {
         if (!IsServer) return;
@@ -55,6 +59,12 @@ public class ChargeController : NetworkBehaviour
     {
         if (!IsServer) return;
 
+        if (chargeObjects == null || chargeObjects.Count == 0)
+        {
+            Debug.LogError("ChargeController에 ChargingObject 리스트가 설정되지 않았습니다." +
+                "\nChargeController가 부착되어 있는 오브젝트 생성 시에 SetList()함수를 통해 리스트를 설정해야 합니다.");
+            return;
+        }
         Init();
         SetFloorEnableClientRpc(true);
 

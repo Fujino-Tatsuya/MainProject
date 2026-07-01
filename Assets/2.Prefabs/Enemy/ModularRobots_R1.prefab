@@ -322,7 +322,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: af5d9f825e50d7e4caf8eadf755ab930, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ColliderBasicAttack
-  ShowTopMostFoldoutHeaderGroup: 1
   damage: 1
   isGroggyAttack: 0
   layerMask:
@@ -967,7 +966,8 @@ GameObject:
   - component: {fileID: 8200821695789514122}
   - component: {fileID: 5661557782957567535}
   - component: {fileID: 7020066614126957741}
-  m_Layer: 0
+  - component: {fileID: 2302287723897775423}
+  m_Layer: 8
   m_Name: ModularRobots_R1
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1290,6 +1290,21 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1, y: 1.8531716, z: 1}
   m_Center: {x: 0, y: 0.7869947, z: 0}
+--- !u!114 &2302287723897775423
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6048960277833949737}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7fac6c92ebc10514f91f94b7680acbef, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyBTActivator
+  ShowTopMostFoldoutHeaderGroup: 1
+  targetBTs: []
+  isOpenVariableName: IsOpen
 --- !u!1 &6243455780138866486
 GameObject:
   m_ObjectHideFlags: 0

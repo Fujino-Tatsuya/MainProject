@@ -82,7 +82,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: af5d9f825e50d7e4caf8eadf755ab930, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Attack
-  ShowTopMostFoldoutHeaderGroup: 1
   damage: 1
   isGroggyAttack: 0
   layerMask:
@@ -373,12 +372,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: af5d9f825e50d7e4caf8eadf755ab930, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ColiderBasicAttack
-  ShowTopMostFoldoutHeaderGroup: 1
   damage: 1
   isGroggyAttack: 0
   layerMask:
     serializedVersion: 2
-    m_Bits: 8
+    m_Bits: 64
   triggerMode: 1
   stayTime: 0
 --- !u!1 &2884726549167042591
@@ -463,7 +461,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b2e13755730c9274fbe68dff27ce63d0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ColliderKnockbackAttack
-  ShowTopMostFoldoutHeaderGroup: 1
   damage: 6
   isGroggyAttack: 0
   layerMask:
@@ -568,7 +565,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b2e13755730c9274fbe68dff27ce63d0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KnockbackAttack
-  ShowTopMostFoldoutHeaderGroup: 1
   damage: 20
   isGroggyAttack: 0
   layerMask:
@@ -621,7 +617,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ChargeController
   ShowTopMostFoldoutHeaderGroup: 1
-  maxY: 5
+  maxY: 1
   minY: 0
   player1: 1
   player2: 2
@@ -710,7 +706,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: af5d9f825e50d7e4caf8eadf755ab930, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Attack
-  ShowTopMostFoldoutHeaderGroup: 1
   damage: 1
   isGroggyAttack: 0
   layerMask:
@@ -734,7 +729,10 @@ GameObject:
   - component: {fileID: 4934386844203442851}
   - component: {fileID: 8430385608559717113}
   - component: {fileID: 3484663710126934133}
-  m_Layer: 0
+  - component: {fileID: 2934878137636970231}
+  - component: {fileID: 6839388890406243040}
+  - component: {fileID: 5760370461006381669}
+  m_Layer: 8
   m_Name: TwentyThree
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -864,6 +862,7 @@ MonoBehaviour:
   - rid: 5035183218639241402
   - rid: 5035183259049001731
   - rid: 5035183289670304660
+  - rid: 8806980410284442218
   m_OriginalGraph: {fileID: 0}
   m_IsInitialised: 0
   m_IsStarted: 0
@@ -1031,6 +1030,14 @@ MonoBehaviour:
           m_Value1: 14094535254966029272
         Name: WaitingBoss
         m_Value: {fileID: -5756971992900613783, guid: 732dccfc6d720204d9eedd9b92fbfd2f, type: 2}
+    - rid: 8806980410284442218
+      type: {class: 'BlackboardVariable`1[[SpawnPointer, Assembly-CSharp]]', ns: Unity.Behavior, asm: Unity.Behavior}
+      data:
+        GUID:
+          m_Value0: 487517564429868762
+          m_Value1: 6770229833929637791
+        Name: Spawn Pointer
+        m_Value: {fileID: 2934878137636970231}
 --- !u!195 &1054250890861799072
 NavMeshAgent:
   m_ObjectHideFlags: 0
@@ -1110,12 +1117,64 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   attackDamage: 1
   moveSpeed: 2
+  chaseSpeed: 0
   attackSpeed: 1
   maxHp: 100
   defense: 5
   maxShield: 100
   _groggyCount: 0
-  _maxGroggyCount: 5
+  _maxGroggyCount: 2
+--- !u!114 &2934878137636970231
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5372104213593212626}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b51fd4afea6c445488587a9a53911983, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SpawnPointer
+  _spawnPoint: {x: 0, y: 0, z: 0}
+--- !u!114 &6839388890406243040
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5372104213593212626}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7fac6c92ebc10514f91f94b7680acbef, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyBTActivator
+  ShowTopMostFoldoutHeaderGroup: 1
+  targetBTs:
+  - {fileID: 7434833580858265621}
+  - {fileID: 1173616335134953240}
+  isOpenVariableName: IsOpen
+--- !u!65 &5760370461006381669
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5372104213593212626}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1.3351028, y: 3.6711357, z: 1}
+  m_Center: {x: -0.02576986, y: 1.3355678, z: 0}
 --- !u!1 &6682516438038340514
 GameObject:
   m_ObjectHideFlags: 0
@@ -1198,7 +1257,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: af5d9f825e50d7e4caf8eadf755ab930, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Attack
-  ShowTopMostFoldoutHeaderGroup: 1
   damage: 1
   isGroggyAttack: 0
   layerMask:
@@ -1774,11 +1832,23 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
+    m_RemovedComponents:
+    - {fileID: -8169499400238446845, guid: 79860f5bc8d12324ba329dfa38ea3699, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 79860f5bc8d12324ba329dfa38ea3699, type: 3}
+--- !u!114 &1173616335134953240 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 187644027839116329, guid: 79860f5bc8d12324ba329dfa38ea3699, type: 3}
+  m_PrefabInstance: {fileID: 1356464099776690993}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f0038c16c34866b4f9e25c9c0dc0f7e6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Behavior::Unity.Behavior.BehaviorGraphAgent
 --- !u!4 &5386615103850727379 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 6346197552094035170, guid: 79860f5bc8d12324ba329dfa38ea3699, type: 3}

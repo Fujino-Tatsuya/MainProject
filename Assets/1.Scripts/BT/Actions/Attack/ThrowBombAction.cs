@@ -15,7 +15,7 @@ public partial class ThrowBombAction : Action
     [SerializeReference] public BlackboardVariable<float> ArcHeight;
     [SerializeReference] public BlackboardVariable<GameObject> BombInstance;
     [SerializeReference] public BlackboardVariable<GameObject> Agent;
-    [SerializeReference] public BlackboardVariable<string> Surface;
+    [SerializeReference] public BlackboardVariable<string> Ground;
 
     BombController _bombController;
     protected override Status OnStart()
@@ -29,7 +29,7 @@ public partial class ThrowBombAction : Action
         Vector3 target = agentTransform.position + throwVector;
 
         RaycastHit hit;
-        if (Physics.Raycast(target, Vector3.down, out hit, Mathf.Infinity, LayerMask.GetMask(Surface)))
+        if (Physics.Raycast(target, Vector3.down, out hit, Mathf.Infinity, LayerMask.GetMask(Ground)))
         {
             target.y = hit.point.y;
         }

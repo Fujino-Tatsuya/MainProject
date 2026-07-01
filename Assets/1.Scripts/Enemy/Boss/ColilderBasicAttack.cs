@@ -25,8 +25,8 @@ public class ColliderBasicAttack : BaseWeapon
 
         if (triggerMode != TriggerMode.OnlyEnter) return;
 
-        GameObject root = other.transform.root.gameObject;
-        TakeDamage(root);
+        GameObject collidedObject = other.gameObject;
+        TakeDamage(collidedObject);
     }
 
     void OnTriggerStay(Collider other)
@@ -43,8 +43,8 @@ public class ColliderBasicAttack : BaseWeapon
         _stayTimer += Time.deltaTime;
         if (stayTime <= _stayTimer)
         {
-            GameObject root = other.transform.root.gameObject;
-            TakeDamage(root);
+            GameObject collidedObject = other.gameObject;
+            TakeDamage(collidedObject);
             _stayTimer = 0f;
         }
     }
@@ -60,18 +60,18 @@ public class ColliderBasicAttack : BaseWeapon
 
         if (triggerMode != TriggerMode.OnlyExit) return;
 
-        GameObject root = other.transform.root.gameObject;
-        TakeDamage(root);
+        GameObject collidedObject = other.gameObject;
+        TakeDamage(collidedObject);
     }
 
-    void TakeDamage(GameObject root)
+    void TakeDamage(GameObject collidedObject)
     {
-        if ((layerMask.value & (1 << root.layer)) != 0)
+        if ((layerMask.value & (1 << collidedObject.layer)) != 0)
         {
-            Unit unit = root.GetComponent<Unit>();
+            Unit unit = collidedObject.GetComponent<Unit>();
             if (unit == null)
             {
-                Debug.LogError($"해당 오브젝트, {root.name}에 Unit 컴포넌트가 부착되어있지 않습니다.", this);
+                Debug.LogError($"해당 오브젝트, {collidedObject.name}에 Unit 컴포넌트가 부착되어있지 않습니다.", this);
                 return;
             }
 
