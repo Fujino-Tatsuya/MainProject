@@ -54,14 +54,22 @@ Shader "Hidden/Fog/FullScreenFog"
                     outColor = lerp(outColor, fogColor, saturate(f));
                 }
 
-                // 2) 그 위에 디밍 — 층/시야범위(진하게)와 시야 차폐(은은하게)를 분리 적용
+                // 2) 그 위에 디밍 — 층/시야범위 + 시야 차폐를 max 로 합쳐 단일 톤 1회 적용.
+                //    톤 통일(원형·부채꼴 경계 톤차 제거) + Dim_Apply 1회로 비용↓.
+                //    (_LosBrightness/_LosSaturation 는 이제 미사용 — 톤은 _DimBrightness/_DimSaturation 로 일원화.)
                 if (dimOn)
                 {
-                    float tBase = Dim_Amount(worldPos, skyMask);              // 층 + 시야범위
-                    outColor = Dim_Apply(outColor, tBase, _DimBrightness, _DimSaturation);
+                    float t = max(Dim_Amount(worldPos, skyMask), Los_DimAmount(worldPos, skyMask));
+                    outColor = Dim_Apply(outColor, t, _DimBrightness, _DimSaturation);
+                }
 
-                    float tLos = Los_DimAmount(worldPos, skyMask);            // 시야 차폐(별도 톤)
-                    outColor = Dim_Apply(outColor, tLos, _LosBrightness, _LosSaturation);
+                // 3) 어비스 물안개 — 디밍 위에 심연색으로 덮음(구멍 내부만, 하늘 제외).
+                //    디밍의 탈채도가 심연색을 흑백으로 날리지 않도록 마지막에 합성.
+                if (fogOn && _AbyssEnabled >= 0.5)
+                {
+                    float3 abyssCol;
+                    float a = Abyss_Evaluate(worldPos, abyssCol) * (1.0 - skyMask);
+                    outColor = lerp(outColor, abyssCol, saturate(a));
                 }
 
                 return half4(outColor, 1.0);

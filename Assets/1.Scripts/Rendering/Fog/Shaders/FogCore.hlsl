@@ -72,6 +72,18 @@ float  _LosBrightness;       // 차폐 시 명도 곱(층 디밍과 별개, 0≈
 float  _LosSaturation;       // 차폐 시 채도 잔량(0=흑백 1=원색)
 float  _LosAngleJitter;      // 차폐 경계 각도 노이즈(부채꼴 직선/삼각형 완화)
 
+// ---------------- 어비스(바닥 구멍) 물안개 ----------------
+// 구멍 안 물평면/바닥 지오메트리의 worldPos.y 가 threshold 이하로 깊어질수록
+// 심연색으로 덮고 노이즈로 일렁이게 한다. Y<0 은 구멍에서만 생기므로 자동 국한.
+float  _AbyssEnabled;
+float4 _AbyssColor;          // 심연색(어두운 청/흑)
+float  _AbyssThreshold;      // 이 Y 이하부터 어비스 시작(보통 0 또는 소량 음수)
+float  _AbyssDepthRange;     // threshold 부터 이 깊이까지 0→1 (m)
+float  _AbyssMaxOpacity;     // 최대 불투명도
+float  _AbyssNoiseStrength;  // 노이즈 일렁임 세기
+float  _AbyssNoiseScale;     // 어비스 노이즈 UV 스케일
+float4 _AbyssNoiseScroll;    // xy = 월드 x,z 스크롤 속도(느리게)
+
 // ---------------- 로컬 볼륨 ----------------
 int      _FogVolumeCount;
 float4   _FogVolumeParams0[MAX_FOG_VOLUMES];      // x:type(0 box,1 sphere) y:density z:softBorder(월드 m) w:hasTint
@@ -233,6 +245,21 @@ float Fog_Evaluate(float3 worldPos, float dist, float skyMask, out float3 outCol
 
     outColor = baseCol;
     return f;
+}
+
+// ---------------- 어비스 물안개 평가 ----------------
+// worldPos.y 가 _AbyssThreshold 이하로 깊어질수록 심연색 + 노이즈 일렁임.
+// 스카이박스 제외는 호출부에서 (1-skyMask) 곱으로 처리(뻥 뚫린 구멍이 하늘만 보일 때 오적용 방지).
+float Abyss_Evaluate(float3 worldPos, out float3 outColor)
+{
+    outColor = _AbyssColor.rgb;
+    if (_AbyssEnabled < 0.5) return 0.0;
+    float depth = saturate((_AbyssThreshold - worldPos.y) / max(1e-4, _AbyssDepthRange));
+    if (depth <= 0.0) return 0.0;
+    float2 nuv = worldPos.xz * _AbyssNoiseScale + _AbyssNoiseScroll.xy * _Time.y;
+    float n = Fog_ValueNoise(nuv);
+    float wobble = lerp(1.0 - _AbyssNoiseStrength, 1.0 + _AbyssNoiseStrength, n);
+    return saturate(depth * _AbyssMaxOpacity * wobble);
 }
 
 // ---------------- 시야 차폐 평가 (라디얼 시야맵) ----------------

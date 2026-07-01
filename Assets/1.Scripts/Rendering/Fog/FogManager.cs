@@ -151,6 +151,15 @@ public sealed class FogManager : MonoBehaviour
     private static readonly int ID_LosSaturation = Shader.PropertyToID("_LosSaturation");
     private static readonly int ID_LosAngleJitter = Shader.PropertyToID("_LosAngleJitter");
 
+    private static readonly int ID_AbyssEnabled = Shader.PropertyToID("_AbyssEnabled");
+    private static readonly int ID_AbyssColor = Shader.PropertyToID("_AbyssColor");
+    private static readonly int ID_AbyssThreshold = Shader.PropertyToID("_AbyssThreshold");
+    private static readonly int ID_AbyssDepthRange = Shader.PropertyToID("_AbyssDepthRange");
+    private static readonly int ID_AbyssMaxOpacity = Shader.PropertyToID("_AbyssMaxOpacity");
+    private static readonly int ID_AbyssNoiseStrength = Shader.PropertyToID("_AbyssNoiseStrength");
+    private static readonly int ID_AbyssNoiseScale = Shader.PropertyToID("_AbyssNoiseScale");
+    private static readonly int ID_AbyssNoiseScroll = Shader.PropertyToID("_AbyssNoiseScroll");
+
     private void OnEnable()
     {
         s_active = this;
@@ -272,6 +281,24 @@ public sealed class FogManager : MonoBehaviour
         Shader.SetGlobalVectorArray(ID_VolColor, _colors);
         Shader.SetGlobalVectorArray(ID_VolBounds, _bounds);
         Shader.SetGlobalMatrixArray(ID_VolW2L, _w2l);
+
+        // 어비스(바닥 구멍) 물안개 — 포그 게이트 안. fogEnabled=false 면 여기 도달 못하므로 자동 미적용.
+        if (p.abyssEnabled)
+        {
+            Shader.SetGlobalFloat(ID_AbyssEnabled, 1f);
+            Shader.SetGlobalVector(ID_AbyssColor, (Vector4)p.abyssColor);
+            Shader.SetGlobalFloat(ID_AbyssThreshold, p.abyssThreshold);
+            Shader.SetGlobalFloat(ID_AbyssDepthRange, Mathf.Max(1e-4f, p.abyssDepthRange));
+            Shader.SetGlobalFloat(ID_AbyssMaxOpacity, p.abyssMaxOpacity);
+            Shader.SetGlobalFloat(ID_AbyssNoiseStrength, p.abyssNoiseStrength);
+            Shader.SetGlobalFloat(ID_AbyssNoiseScale, p.abyssNoiseScale);
+            Shader.SetGlobalVector(ID_AbyssNoiseScroll,
+                new Vector4(p.abyssNoiseScroll.x, p.abyssNoiseScroll.y, 0f, 0f));
+        }
+        else
+        {
+            Shader.SetGlobalFloat(ID_AbyssEnabled, 0f);
+        }
     }
 
     private void PushDimGlobals(FogProfile p)

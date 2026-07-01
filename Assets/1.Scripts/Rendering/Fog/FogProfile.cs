@@ -79,4 +79,22 @@ public sealed class FogProfile : ScriptableObject
     [Range(0f, 1f)] public float losSaturation = 0.35f;
     [Tooltip("차폐 경계 각도 흔들기(0=직선, 클수록 유기적으로 뭉갬). 노이즈로 부채꼴 경계 직선/삼각형을 완화. 0.01~0.04 권장.")]
     [Range(0f, 0.1f)] public float losAngleJitter = 0.02f;
+
+    [Header("어비스 (바닥 구멍 물안개)")]
+    [Tooltip("구멍 안 물평면/바닥의 worldPos.y 가 임계 이하로 깊어질수록 심연색으로 덮는다.")]
+    public bool abyssEnabled = false;
+    [Tooltip("심연색(어두운 청/흑). 구멍 아래로 갈수록 이 색으로 lerp.")]
+    [ColorUsage(true, true)] public Color abyssColor = new Color(0.02f, 0.05f, 0.09f, 1f);
+    [Tooltip("이 Y 이하부터 어비스 시작. 맵 규약상 바닥=0 이므로 보통 0.")]
+    public float abyssThreshold = 0f;
+    [Tooltip("threshold 부터 이 깊이(m)까지 0→1 로 짙어짐.")]
+    [Min(0.0001f)] public float abyssDepthRange = 8f;
+    [Tooltip("어비스 최대 불투명도.")]
+    [Range(0f, 1f)] public float abyssMaxOpacity = 0.95f;
+    [Tooltip("안개 일렁임 세기(노이즈 진폭).")]
+    [Range(0f, 1f)] public float abyssNoiseStrength = 0.5f;
+    [Tooltip("어비스 노이즈 UV 스케일.")]
+    [Min(0.0001f)] public float abyssNoiseScale = 0.15f;
+    [Tooltip("어비스 노이즈 스크롤 속도(월드 x,z / 초). 느릴수록 무거운 분위기.")]
+    public Vector2 abyssNoiseScroll = new Vector2(0.05f, 0.03f);
 }

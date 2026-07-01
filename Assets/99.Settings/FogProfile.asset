@@ -18,9 +18,9 @@ MonoBehaviour:
   distanceStart: 0
   distanceEnd: 120
   maxOpacity: 0.223
-  heightStart: 0
-  heightEnd: 25
-  heightStrength: 0.697
+  heightStart: 2.62
+  heightEnd: 1.7
+  heightStrength: 1
   skyboxInfluence: 0.445
   useMainLightDirection: 1
   sunDirection: {x: 0.5, y: -0.7, z: 0.3}
@@ -32,3 +32,26 @@ MonoBehaviour:
   noiseScale: 0.05
   noiseStrength: 1
   noiseScroll: {x: 0.3, y: 0.15}
+  dimRangeUp: 5
+  dimRangeDown: 5
+  dimFadeUp: 3
+  dimFadeDown: 3
+  dimSaturation: 0.0748456
+  dimBrightness: 0.1
+  dimAffectSky: 1
+  viewRange: 13.6
+  viewFade: 9.96
+  losDarken: 1
+  losDistanceBias: 0
+  losEdgeFade: 5.71
+  losBrightness: 0.15
+  losSaturation: 0.2
+  losAngleJitter: 0.02
+  abyssEnabled: 0
+  abyssColor: {r: 0.02, g: 0.05, b: 0.09, a: 1}
+  abyssThreshold: 0
+  abyssDepthRange: 8
+  abyssMaxOpacity: 0.95
+  abyssNoiseStrength: 0.5
+  abyssNoiseScale: 0.15
+  abyssNoiseScroll: {x: 0.05, y: 0.03}
