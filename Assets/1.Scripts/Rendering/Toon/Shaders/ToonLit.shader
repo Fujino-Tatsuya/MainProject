@@ -37,6 +37,10 @@ Shader "Project/ToonLit"
 
         [Header(Shadow Receive)][Space]
         _ReceiveShadowStrength ("Receive Shadow Strength", Range(0,1)) = 0.6
+
+        [Header(Tone Brightness Saturation)][Space]
+        _Brightness ("Brightness", Range(0.5,2)) = 1.18
+        _Saturation ("Saturation", Range(0,2)) = 1.15
     }
 
     SubShader
@@ -90,6 +94,8 @@ Shader "Project/ToonLit"
                 half   _SpecSmooth;
                 half   _MetalBandSmooth;
                 half   _ReceiveShadowStrength;
+                half   _Brightness;
+                half   _Saturation;
             CBUFFER_END
 
             TEXTURE2D(_BaseMap); SAMPLER(sampler_BaseMap);
@@ -193,7 +199,13 @@ Shader "Project/ToonLit"
                 half fresnel = pow(1.0h - saturate(dot(N, V)), _RimPower);
                 half rimAlign = lerp(1.0h, saturate(ndl), _RimLightAlign);
                 half rim = fresnel * _RimIntensity * rimAlign;
-                color += _RimColor.rgb * rim;
+                // 흰 테두리 방지: 림을 표면색(albedo)으로 틴트 → 검은 스타킹은 옅은 어두운 테두리, 대비↑
+                color += _RimColor.rgb * albedo * rim;
+
+                // ---- 톤: 밝기 + 채도(블아풍 밝고 대비 있는 룩) ----
+                color *= _Brightness;
+                half luma = dot(color, half3(0.299h, 0.587h, 0.114h));
+                color = lerp(luma.xxx, color, _Saturation);
 
                 // (④단계 LoS 클리핑 자리)
                 // half occ = Los_Amount(IN.positionWS); if (occ > 0.5) clip(-1);
