@@ -71,6 +71,12 @@ public sealed class FogProfile : ScriptableObject
     [Range(0f, 1f)] public float losDarken = 1f;
     [Tooltip("자기 차폐 방지 여유(m). 차폐체 표면 자신이 어두워지는 것 방지.")]
     [Min(0f)] public float losDistanceBias = 0.5f;
-    [Tooltip("차폐 경계 페이드 폭(m). 클수록 그림자 가장자리가 부드러움.")]
-    [Min(0.0001f)] public float losEdgeFade = 1f;
+    [Tooltip("차폐 경계 페이드 폭(m). 클수록 그림자 가장자리가 부드러움. 은은하게 점점 어두워지려면 크게(5~8).")]
+    [Min(0.0001f)] public float losEdgeFade = 6f;
+    [Tooltip("차폐 시 명도 곱(0≈검정, 1=영향없음). 층 디밍과 별개 — 은은한 어둠은 0.25~0.4.")]
+    [Range(0f, 1f)] public float losBrightness = 0.32f;
+    [Tooltip("차폐 시 채도 잔량(0=흑백, 1=원색 유지). 자연스러우려면 0.3 안팎.")]
+    [Range(0f, 1f)] public float losSaturation = 0.35f;
+    [Tooltip("차폐 경계 각도 흔들기(0=직선, 클수록 유기적으로 뭉갬). 노이즈로 부채꼴 경계 직선/삼각형을 완화. 0.01~0.04 권장.")]
+    [Range(0f, 0.1f)] public float losAngleJitter = 0.02f;
 }

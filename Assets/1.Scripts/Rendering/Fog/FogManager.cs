@@ -31,6 +31,8 @@ public sealed class FogManager : MonoBehaviour
     public LayerMask losWallMask = ~0;
     [Tooltip("각도 해상도(빈 개수). 클수록 그림자 경계 정밀, 비용↑.")]
     [Range(64, 720)] public int losTexels = 360;
+    [Tooltip("각도 방향 블러 반경(빈). 벽 모서리 occ 급변을 완화해 부채꼴 경계(삼각형/직선)를 부드럽게. 0=끔, 4~8 권장.")]
+    [Range(0, 24)] public int losAngleBlur = 6;
     [Tooltip("시야가 닿는 최대 거리(m). 이 너머는 항상 가려진 것으로 본다.")]
     [Min(1f)] public float losMaxDist = 40f;
     [Tooltip("raycast 시작 높이(플레이어 발끝 위 오프셋, m). 벽 중간 높이를 맞추기 위함.")]
@@ -145,6 +147,9 @@ public sealed class FogManager : MonoBehaviour
     private static readonly int ID_LosDarken = Shader.PropertyToID("_LosDarken");
     private static readonly int ID_LosDistanceBias = Shader.PropertyToID("_LosDistanceBias");
     private static readonly int ID_LosEdgeFade = Shader.PropertyToID("_LosEdgeFade");
+    private static readonly int ID_LosBrightness = Shader.PropertyToID("_LosBrightness");
+    private static readonly int ID_LosSaturation = Shader.PropertyToID("_LosSaturation");
+    private static readonly int ID_LosAngleJitter = Shader.PropertyToID("_LosAngleJitter");
 
     private void OnEnable()
     {
@@ -349,6 +354,9 @@ public sealed class FogManager : MonoBehaviour
         Shader.SetGlobalFloat(ID_LosDarken, p.losDarken);
         Shader.SetGlobalFloat(ID_LosDistanceBias, p.losDistanceBias);
         Shader.SetGlobalFloat(ID_LosEdgeFade, p.losEdgeFade);
+        Shader.SetGlobalFloat(ID_LosBrightness, p.losBrightness);
+        Shader.SetGlobalFloat(ID_LosSaturation, p.losSaturation);
+        Shader.SetGlobalFloat(ID_LosAngleJitter, p.losAngleJitter);
     }
 
     // 각도별 최근접 차폐 거리 → _losTex(RFloat, n×1). 플레이어 이동 시 갱신.
@@ -407,6 +415,24 @@ public sealed class FogManager : MonoBehaviour
                     int bin = ((i % n) + n) % n;             // 각도 wrap
                     if (surf < _losDist[bin]) _losDist[bin] = surf;
                 }
+            }
+        }
+
+        // (3) 각도 방향 블러 — 벽 모서리에서 occ 급변을 완화해 부채꼴 경계(삼각형/직선)를 부드럽게.
+        if (losAngleBlur > 0)
+        {
+            float[] src = (float[])_losDist.Clone();
+            int r = losAngleBlur;
+            int win = 2 * r + 1;
+            for (int i = 0; i < n; i++)
+            {
+                float sum = 0f;
+                for (int k = -r; k <= r; k++)
+                {
+                    int bin = ((i + k) % n + n) % n;   // 각도 wrap
+                    sum += src[bin];
+                }
+                _losDist[i] = sum / win;
             }
         }
 

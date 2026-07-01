@@ -68,6 +68,9 @@ float  _LosMaxDist;          // 라디얼맵 최대 거리
 float  _LosDarken;           // 차폐 디밍 강도
 float  _LosDistanceBias;     // 자기차폐 방지 여유(m)
 float  _LosEdgeFade;         // 차폐 경계 페이드(m)
+float  _LosBrightness;       // 차폐 시 명도 곱(층 디밍과 별개, 0≈검정 1=영향없음)
+float  _LosSaturation;       // 차폐 시 채도 잔량(0=흑백 1=원색)
+float  _LosAngleJitter;      // 차폐 경계 각도 노이즈(부채꼴 직선/삼각형 완화)
 
 // ---------------- 로컬 볼륨 ----------------
 int      _FogVolumeCount;
@@ -243,6 +246,8 @@ float Los_Amount(float3 worldPos)
     if (distXZ < 1e-3) return 0.0;
     float ang = atan2(d.y, d.x);              // -PI..PI (x=cos, z=sin)
     float u = ang * (0.5 / PI) + 0.5;         // 0..1, _LosTex wrap=Repeat
+    // 노이즈로 각도 지터 — 부채꼴 경계(직선/삼각형)를 주변과 유기적으로 뭉갠다.
+    u += (Fog_RawNoise(worldPos) - 0.5) * _LosAngleJitter;
     float occ = SAMPLE_TEXTURE2D_LOD(_LosTex, sampler_LosTex, float2(u, 0.5), 0).r;
     // occ = 그 각도의 최근접 차폐 표면거리. 픽셀이 그보다 멀면 뒤(가려짐).
     return smoothstep(occ + _LosDistanceBias, occ + _LosDistanceBias + max(1e-4, _LosEdgeFade), distXZ) * _LosDarken;
@@ -251,6 +256,7 @@ float Los_Amount(float3 worldPos)
 // ---------------- 디밍 평가 (층 + 시야범위) ----------------
 // 픽셀 worldPos가 (a) 플레이어 y 기준 층 범위, (b) 플레이어 xz 시야 반경을
 // 벗어난 정도 → 디밍 강도(0=정상, 1=완전 디밍). 둘 중 큰 쪽 적용(max).
+// 시야 차폐(LoS)는 톤이 달라(은은) 여기 포함하지 않고 Los_DimAmount 로 분리 적용.
 float Dim_Amount(float3 worldPos, float skyMask)
 {
     // (a) 층 디밍 — 위/아래 비대칭
@@ -267,19 +273,25 @@ float Dim_Amount(float3 worldPos, float skyMask)
         t = max(t, view);
     }
 
-    // (c) 시야 차폐 — 벽/노드 뒤
-    t = max(t, Los_Amount(worldPos));
-
     t = lerp(t, t * _DimAffectSky, skyMask);  // 스카이박스는 보통 제외
     return saturate(t);
 }
 
-// 색에 desaturate(luminance 기반) + darken(곱) 적용.
-float3 Dim_Apply(float3 color, float t)
+// 시야 차폐(LoS) 디밍 강도 — 층 디밍과 별도 톤으로 적용하기 위해 분리.
+float Los_DimAmount(float3 worldPos, float skyMask)
+{
+    float t = Los_Amount(worldPos);
+    t = lerp(t, t * _DimAffectSky, skyMask);  // 스카이박스 제외(층 디밍과 동일)
+    return saturate(t);
+}
+
+// 색에 desaturate(luminance 기반) + darken(곱) 적용. 명도/채도잔량은 호출부가 지정
+// (층 디밍 vs 시야 차폐가 서로 다른 톤을 쓰도록 분리).
+float3 Dim_Apply(float3 color, float t, float brightness, float saturation)
 {
     float luma = dot(color, float3(0.2126, 0.7152, 0.0722)); // Rec.709
-    float3 desat = lerp(color, luma.xxx, t * (1.0 - _DimSaturation));
-    float darkenMul = lerp(1.0, _DimBrightness, t);
+    float3 desat = lerp(color, luma.xxx, t * (1.0 - saturation));
+    float darkenMul = lerp(1.0, brightness, t);
     return desat * darkenMul;
 }
 

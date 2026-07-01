@@ -54,11 +54,14 @@ Shader "Hidden/Fog/FullScreenFog"
                     outColor = lerp(outColor, fogColor, saturate(f));
                 }
 
-                // 2) 그 위에 층 디밍(켜져 있으면) — 안개 낀 색을 다시 어둡게
+                // 2) 그 위에 디밍 — 층/시야범위(진하게)와 시야 차폐(은은하게)를 분리 적용
                 if (dimOn)
                 {
-                    float t = Dim_Amount(worldPos, skyMask);
-                    outColor = Dim_Apply(outColor, t);
+                    float tBase = Dim_Amount(worldPos, skyMask);              // 층 + 시야범위
+                    outColor = Dim_Apply(outColor, tBase, _DimBrightness, _DimSaturation);
+
+                    float tLos = Los_DimAmount(worldPos, skyMask);            // 시야 차폐(별도 톤)
+                    outColor = Dim_Apply(outColor, tLos, _LosBrightness, _LosSaturation);
                 }
 
                 return half4(outColor, 1.0);
