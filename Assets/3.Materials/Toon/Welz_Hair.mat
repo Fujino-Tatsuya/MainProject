@@ -35,7 +35,7 @@ Material:
     - _FixedLightOn: 1
     - _HairOn: 1
     - _HairThreshold: 0.62
-    - _HairSmooth: 0.05
+    - _HairSmooth: 0.004
     - _HairShift: 0
     - _MetalBandSmooth: 0.35
     - _MetalOn: 0
@@ -56,7 +56,7 @@ Material:
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _FixedLightDir: {r: 0.15, g: 1, b: 0.35, a: 0}
-    - _HairSpecColor: {r: 1.1, g: 1.1, b: 1.2, a: 1}
+    - _HairSpecColor: {r: 0.5, g: 0.5, b: 0.6, a: 1}
     - _OutlineColor: {r: 0.25, g: 0.32, b: 0.5, a: 1}
     - _RimColor: {r: 1, g: 1, b: 1, a: 1}
     - _ShadeColor: {r: 0.38, g: 0.38, b: 0.5, a: 1}
