@@ -17,7 +17,27 @@ public class LinearKnockback : NetworkBehaviour, IKnockbackable
 
     float _knockbackStartTime;
 
+    /// <summary>
+    /// IKnockbackable의 ApplyKnockback 구현
+    /// </summary>
+    /// <param name="direction">넉백 방향</param>
+    /// <param name="strength">넉백 세기</param>
     public void ApplyKnockback(Vector3 direction, float strength)
+    {
+        if (!IsServer) return;
+
+        // 넉백을 적용할 오브젝트의 소유자에게만 RPC를 보내서 넉백을 적용
+        ClientRpcParams rpcParams = new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams
+            {
+                TargetClientIds = new ulong[] { OwnerClientId }
+            }
+        };
+        ApplyKnockbackClientRpc(direction, strength, rpcParams);
+    }
+    [ClientRpc]
+    void ApplyKnockbackClientRpc(Vector3 direction, float strength, ClientRpcParams rpcParams = default)
     {
         StartKnockback();
 
@@ -63,9 +83,10 @@ public class LinearKnockback : NetworkBehaviour, IKnockbackable
         _isKnockbacking = false;
     }
 
+
     void FixedUpdate()
     {
-        if (!_isKnockbacking || !IsServer) return;
+        if (!_isKnockbacking || !IsOwner) return;
 
         float elapsed = Time.time - _knockbackStartTime;
 

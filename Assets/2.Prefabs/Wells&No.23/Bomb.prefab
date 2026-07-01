@@ -13,7 +13,8 @@ GameObject:
   - component: {fileID: 3772882085835264051}
   - component: {fileID: 4766237143709975679}
   - component: {fileID: 106586928179634492}
-  m_Layer: 8
+  - component: {fileID: 312407702851531552}
+  m_Layer: 9
   m_Name: Circle
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -127,12 +128,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: af5d9f825e50d7e4caf8eadf755ab930, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ColliderBasicAttack
-  ShowTopMostFoldoutHeaderGroup: 1
-  damage: 1
+  damage: 11
   isGroggyAttack: 0
   layerMask:
     serializedVersion: 2
-    m_Bits: 8
+    m_Bits: 64
   triggerMode: 1
   stayTime: 0.5
 --- !u!114 &106586928179634492
@@ -151,6 +151,52 @@ MonoBehaviour:
   growAmount: 0.2
   maxScale: 2
   mergeGroup: 1
+--- !u!114 &312407702851531552
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3716740133590289348}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e96cb6065543e43c4a752faaa1468eb1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.Components.NetworkTransform
+  ShowTopMostFoldoutHeaderGroup: 1
+  NetworkTransformExpanded: 0
+  AutoOwnerAuthorityTickOffset: 1
+  PositionInterpolationType: 0
+  RotationInterpolationType: 0
+  ScaleInterpolationType: 0
+  PositionLerpSmoothing: 1
+  PositionMaxInterpolationTime: 0.1
+  RotationLerpSmoothing: 1
+  RotationMaxInterpolationTime: 0.1
+  ScaleLerpSmoothing: 1
+  ScaleMaxInterpolationTime: 0.1
+  AuthorityMode: 0
+  TickSyncChildren: 0
+  UseUnreliableDeltas: 0
+  SyncPositionX: 0
+  SyncPositionY: 0
+  SyncPositionZ: 0
+  SyncRotAngleX: 0
+  SyncRotAngleY: 0
+  SyncRotAngleZ: 0
+  SyncScaleX: 1
+  SyncScaleY: 1
+  SyncScaleZ: 1
+  PositionThreshold: 0.001
+  RotAngleThreshold: 0.01
+  ScaleThreshold: 0.01
+  UseQuaternionSynchronization: 0
+  UseQuaternionCompression: 0
+  UseHalfFloatPrecision: 0
+  InLocalSpace: 0
+  SwitchTransformSpaceWhenParented: 0
+  Interpolate: 1
+  SlerpPosition: 0
 --- !u!1 &4482847992404060272
 GameObject:
   m_ObjectHideFlags: 0
@@ -162,7 +208,7 @@ GameObject:
   - component: {fileID: 919519255675829702}
   - component: {fileID: 8725455330000229990}
   - component: {fileID: 6992523247136213386}
-  m_Layer: 8
+  m_Layer: 0
   m_Name: Sphere
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -255,7 +301,7 @@ GameObject:
   - component: {fileID: 6620790566187525332}
   - component: {fileID: 854992860938221299}
   - component: {fileID: 8199087048143662978}
-  m_Layer: 8
+  m_Layer: 10
   m_Name: Bomb
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -291,7 +337,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 2523117972
+  GlobalObjectIdHash: 2160200206
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -367,21 +413,25 @@ MonoBehaviour:
   floor: {fileID: 3716740133590289348}
   bombTime: 3
   floorTime: 10
-  bombDamage: 2
+  bombDamage: 55
   player:
     serializedVersion: 2
     m_Bits: 64
   enemy:
     serializedVersion: 2
     m_Bits: 256
-  surface:
+  ground:
+    serializedVersion: 2
+    m_Bits: 8
+  wall:
     serializedVersion: 2
     m_Bits: 128
   hazardArea:
     serializedVersion: 2
     m_Bits: 512
-  wallTag: Wall
-  groundTag: Ground
+  LeftClickAttack:
+    serializedVersion: 2
+    m_Bits: 0
   bombRadius: 0.25
   floorIncreasAmount: 0
 --- !u!54 &854992860938221299
@@ -423,10 +473,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b2e13755730c9274fbe68dff27ce63d0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KnockbackAttack
-  ShowTopMostFoldoutHeaderGroup: 1
   damage: 0
   isGroggyAttack: 0
   layerMask:
     serializedVersion: 2
-    m_Bits: 8
+    m_Bits: 64
   knockbackStrength: 5

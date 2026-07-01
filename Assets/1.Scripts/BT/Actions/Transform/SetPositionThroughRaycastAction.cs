@@ -17,16 +17,16 @@ public partial class SetPositionThroughRaycastAction : Action
         if (!CheckValid())
             return Status.Failure;
 
-        Vector3 direction = (Target.Value.transform.position - Agent.Value.transform.position).normalized;
+        //Vector3 direction = (Target.Value.transform.position - Agent.Value.transform.position).normalized;
+        
+        //if (!Physics.Raycast(Agent.Value.transform.position, direction, out RaycastHit hit, Mathf.Infinity))
+        //{
+        //    Debug.LogError("Failed to Raycast");
+        //    return Status.Failure;
+        //}
 
-        if (!Physics.Raycast(Agent.Value.transform.position, direction, out RaycastHit hit, Mathf.Infinity))
-        {
-            Debug.LogError("Failed to Raycast");
-            return Status.Failure;
-        }
-
-        Position.Value = hit.transform.position;
-        Debug.Log($"최종 목적지 좌표: {Position.Value}, 목적지 오브젝트 이름: {hit.transform.name}");
+        Position.Value = Target.Value.transform.position;
+        Debug.Log($"최종 목적지 좌표: {Position.Value}");
         return Status.Success;
     }
 

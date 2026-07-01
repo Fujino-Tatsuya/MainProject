@@ -104,12 +104,6 @@ public partial class MoveForDurationAction : Action
             return false;
         }
 
-        if (NewPosition.Value == Vector3.zero)
-        {
-            Debug.LogError("NewPosition is null");
-            return false;
-        }
-
         if (Duration.Value <= 0f)
         {
             Debug.LogError("Duration is null");

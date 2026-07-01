@@ -20,6 +20,8 @@ public class BombController : NetworkBehaviour
     [Header("폭탄 표시 오브젝트")]
     [SerializeField] GameObject bomb;
     [SerializeField] GameObject floor;
+    SpriteRenderer _floorRenderer;
+    Collider _floorCollider;
 
     [Header("\n타이머")]
     [SerializeField] float bombTime;
@@ -31,10 +33,9 @@ public class BombController : NetworkBehaviour
     [Header("\n레이어와 태그")]
     [SerializeField] LayerMask player;
     [SerializeField] LayerMask enemy;
-    [SerializeField] LayerMask surface;
+    [SerializeField] LayerMask ground;
+    [SerializeField] LayerMask wall;
     [SerializeField] LayerMask hazardArea;
-    [SerializeField] string wallTag;
-    [SerializeField] string groundTag;
 
     [Header("\n범위 설정")]
     [SerializeField] float bombRadius;
@@ -82,8 +83,11 @@ public class BombController : NetworkBehaviour
     /// </summary>
     public override void OnNetworkSpawn()
     {
+        _floorRenderer = floor.GetComponent<SpriteRenderer>();
+        _floorCollider = floor.GetComponent<Collider>();
+
         bomb.SetActive(true);
-        floor.SetActive(false);
+        SetFloorEnable(false);
 
         if (!IsServer) return;
 
@@ -141,8 +145,6 @@ public class BombController : NetworkBehaviour
 
         _rigidbody.useGravity = false;
         _rigidbody.isKinematic = true;
-        _rigidbody.linearVelocity = Vector3.zero;
-        _rigidbody.angularVelocity = Vector3.zero;
 
         transform.SetPositionAndRotation(socket.position, socket.rotation);
     }
@@ -169,14 +171,35 @@ public class BombController : NetworkBehaviour
 
         _rigidbody.useGravity = false;
         _rigidbody.isKinematic = true;
-        _rigidbody.linearVelocity = Vector3.zero;
-        _rigidbody.angularVelocity = Vector3.zero;
+    }
+    /// <summary>
+    /// 폭탄을 현재 위치에서 일정 거리만큼 직선으로 발사합니다.
+    /// </summary>
+    /// <param name="referencePoint">발사 방향 계산을 위한 위치</param>
+    /// <param name="distance">발사할 거리</param>
+    public void LinearLaunch(Vector3 referencePoint, float distance)
+    {
+        if (!IsServer) return;
+
+        _followTarget = null;
+        _bombState = BombState.Flight;
+
+        _startPos = transform.position;
+        _prevPos = _startPos;
+
+        _targetPos = _startPos + (_startPos - referencePoint).normalized * distance;
+        _duration = 1f;
+        _arcHeight = 0;
+        _elapsed = 0f;
+
+        _rigidbody.useGravity = false;
+        _rigidbody.isKinematic = true;
     }
 
     /// <summary>
     /// 장판 유지 시간을 처음부터 다시 계산하도록 타이머를 초기화합니다.
     /// </summary>
-    public void InitFloorTimer()
+    void InitFloorTimer()
     {
         _floorTimer = 0f;
     }
@@ -295,7 +318,7 @@ public class BombController : NetworkBehaviour
             dir.normalized,
             out RaycastHit hit,
             distance,
-            player | enemy | surface,
+            player | enemy | wall | ground,
             QueryTriggerInteraction.Ignore))
         {
             HandleHit(hit.collider);
@@ -315,7 +338,7 @@ public class BombController : NetworkBehaviour
 
             Explode();
             unit?.TakeDamage(bombDamage);
-            _knockbackAttack.ApplyKnockbackAttack(collider.transform.root.gameObject);
+            _knockbackAttack.ApplyKnockbackAttack(collider.gameObject);
             MakeFloor();
             Debug.Log("플레이어와 충돌!");
         }
@@ -328,18 +351,15 @@ public class BombController : NetworkBehaviour
             MakeFloor();
             Debug.Log("적과 충돌!");
         }
-        else if ((surface.value & (1 << layer)) != 0)
+        else if ((wall.value & (1 << layer)) != 0)
         {
-            if (collider.CompareTag(wallTag))
-            {
-                Explode();
-                MakeFloor();
-                Debug.Log("벽과 충돌!");
-            }
-            else if (collider.CompareTag(groundTag))
-            {
-                _bombState = BombState.BombTimer;
-            }
+            Explode();
+            MakeFloor();
+            Debug.Log("벽과 충돌!");
+        }
+        else if ((ground.value & (1 << layer)) != 0)
+        {
+            _bombState = BombState.BombTimer;
         }
     }
 
@@ -356,14 +376,14 @@ public class BombController : NetworkBehaviour
     {
         RaycastHit hit;
 
-        if (Physics.Raycast(transform.position, Vector3.down, out hit, Mathf.Infinity, surface))
+        if (Physics.Raycast(transform.position, Vector3.down, out hit, Mathf.Infinity, ground))
         {
             Quaternion slopeRot = Quaternion.FromToRotation(Vector3.up, hit.normal);
             transform.rotation = _baseRot * slopeRot;
 
             Vector3 pos = hit.point;
             pos.y += 0.01f;
-            _rigidbody.MovePosition(pos);
+            transform.position = pos;
         }
 
         BombAreaEffect bombAreaEffect = CheckDoubleExplosion();
@@ -423,10 +443,15 @@ public class BombController : NetworkBehaviour
         bomb.SetActive(enable);
     }
 
+    void SetFloorEnable(bool enable)
+    {
+        _floorRenderer.enabled = enable;
+        _floorCollider.enabled = enable;
+    }
     [ClientRpc]
     void SetFloorEnableClientRpc(bool enable)
     {
-        floor.SetActive(enable);
+        SetFloorEnable(enable);
     }
 
     [ClientRpc]
