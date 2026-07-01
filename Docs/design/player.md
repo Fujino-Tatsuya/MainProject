@@ -1,7 +1,5 @@
 # Player
 
-> 현재 브랜치: `feature/Wells&No.23`
->
 > 이 문서는 `Player`의 코드/Prefab 책임을 다룬다. `Character`와 `Ability` 상세 규칙은 각각 `character.md`, `ability.md`에서 다룬다.
 
 ## 개념 분리
