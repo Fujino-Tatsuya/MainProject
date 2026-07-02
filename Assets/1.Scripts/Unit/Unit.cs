@@ -310,7 +310,12 @@ public class Unit : NetworkBehaviour
 
     #region 넉백
     IKnockbackable _knockback;
-    public void Knockback(Vector3 direction, float strength)
+    /// <summary>
+    /// 자식 클래스에서 수정 가능한 넉백 호출 함수
+    /// </summary>
+    /// <param name="direction">넉백 방향</param>
+    /// <param name="strength">넉백 세기</param>
+    public virtual void Knockback(Vector3 direction, float strength)
     {
         if (!IsServer) return;
 

@@ -7,6 +7,7 @@ enum BombState
 {
     None,
     BombTimer,     // 폭발 대기 타이머
+    InitFlight,    // 초기 포물선 발사
     Flight,
     Floor          // 장판 유지
 }
@@ -160,7 +161,7 @@ public class BombController : NetworkBehaviour
         if (!IsServer) return;
 
         _followTarget = null;
-        _bombState = BombState.Flight;
+        _bombState = BombState.InitFlight;
 
         _startPos = transform.position;
         _prevPos = _startPos;
@@ -271,7 +272,7 @@ public class BombController : NetworkBehaviour
 
     void UpdateFlight()
     {
-        if (_bombState != BombState.Flight) return;
+        if (_bombState != BombState.InitFlight && _bombState != BombState.Flight) return;
 
         _elapsed += Time.fixedDeltaTime;
 
@@ -342,7 +343,7 @@ public class BombController : NetworkBehaviour
             MakeFloor();
             Debug.Log("플레이어와 충돌!");
         }
-        else if ((enemy.value & (1 << layer)) != 0)
+        else if ((enemy.value & (1 << layer)) != 0 && _bombState != BombState.InitFlight)
         {
             Unit unit = collider.GetComponentInParent<Unit>();
 

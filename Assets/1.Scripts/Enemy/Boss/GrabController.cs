@@ -11,12 +11,12 @@ public class GrabController : NetworkBehaviour
     [SerializeField] BehaviorGraphAgent bt;
 
     [Header("데미지, 주기, 던지기 방향")]
-    [SerializeField] int grabDamage;
-    [SerializeField] int holdDamage;
+    [SerializeField] int grabDamagePercentage;
+    [SerializeField] int holdDamagePercentage;
     [SerializeField] float holdAttackPeriod;
-    [SerializeField] int landingDamage;
-    [SerializeField] Vector3 throwDirection;
-    [SerializeField] float throwStrength;
+    [SerializeField] int landingDamagePercentage;
+    //[SerializeField] Vector3 throwDirection;
+    //[SerializeField] float throwStrength;
 
     const int _maxPlayer = 3;
     Collider[] results = new Collider[_maxPlayer];
@@ -27,7 +27,9 @@ public class GrabController : NetworkBehaviour
     BlackboardVariable<GameObject> GrabbedPlayer;
     BlackboardVariable<TwentyThreeState> CurrentState;
 
-    PlayerGrabController _playerGrabController;
+    Unit _targetUnit;
+    Rigidbody _targetRigidbody;
+    int _targetHp;
 
     float _holdTimer = 0f;
 
@@ -62,19 +64,26 @@ public class GrabController : NetworkBehaviour
 
     void Update()
     {
-        if (CurrentState.Value == TwentyThreeState.Hold)
+        if (IsOwner)
         {
-            _holdTimer += Time.deltaTime;
-            if (_holdTimer >= holdAttackPeriod)
+            if (IsGrabbed.Value && GrabbedPlayer.Value != null)
             {
-                if (_playerGrabController == null)
-                {
-                    Debug.LogError("해당 플레이어에 PlayerGrabController컴포넌트가 부착되어 있지 않습니다.");
-                    return;
-                }
+                // 플레이어를 잡고 있는 동안의 로직
+                _targetRigidbody.MovePosition(grabSocket.position);
+                _targetRigidbody.MoveRotation(grabSocket.rotation);
+            }
+        }
 
-                _playerGrabController.ApplyHoldDamage(holdDamage);
-                _holdTimer = 0f;
+        if (IsServer)
+        {
+            if (CurrentState.Value == TwentyThreeState.Hold && _targetUnit != null)
+            {
+                _holdTimer += Time.deltaTime;
+                if (_holdTimer >= holdAttackPeriod)
+                {
+                    ApplyDamage(holdDamagePercentage);
+                    _holdTimer = 0f;
+                }
             }
         }
     }
@@ -175,15 +184,26 @@ public class GrabController : NetworkBehaviour
 
         GameObject player = GrabbedPlayer.Value;
 
-        _playerGrabController = player.GetComponent<PlayerGrabController>();
-        if (_playerGrabController == null)
+        _targetUnit = player.GetComponent<Unit>();
+        if (_targetUnit == null)
         {
-            Debug.LogError("해당 플레이어에 PlayerGrabController컴포넌트가 부착되어 있지 않습니다.");
+            Debug.LogError("해당 플레이어에 Unit 컴포넌트가 부착되어 있지 않습니다.");
             Clear();
             return;
         }
 
-        _playerGrabController.BeginGrab(grabSocket, grabDamage);
+        _targetRigidbody = player.GetComponent<Rigidbody>();
+        if (_targetRigidbody == null)
+        {
+            Debug.LogError("해당 플레이어에 Rigidbody 컴포넌트가 부착되어 있지 않습니다.");
+            Clear();
+            return;
+        }
+
+        //_targetUnit.BeginGrab(grabSocket, grabDamage);
+        // 플레이어 상태 전환 함수 호출하기
+        _targetHp = _targetUnit.CurrentHealth;
+        ApplyDamage(grabDamagePercentage);
     }
 
     /// <summary>
@@ -193,14 +213,17 @@ public class GrabController : NetworkBehaviour
     {
         if (!IsServer) return;
 
-        Vector3 worldDir = grabSocket.transform.TransformDirection(throwDirection);
+        //Vector3 worldDir = grabSocket.transform.TransformDirection(throwDirection);
 
-        if (_playerGrabController == null)
-        {
-            Debug.LogError("해당 플레이어에 PlayerGrabController컴포넌트가 부착되어 있지 않습니다.");
-            return;
-        }
-        _playerGrabController.Throw(worldDir * throwStrength, landingDamage);
+        //if (_playerGrabController == null)
+        //{
+        //    Debug.LogError("해당 플레이어에 PlayerGrabController컴포넌트가 부착되어 있지 않습니다.");
+        //    return;
+        //}
+        //_playerGrabController.Throw(worldDir * throwStrength, landingDamage);
+        ApplyDamage(landingDamagePercentage);
+
+        // 플레이어 상태 전환 함수 호출하기
 
         Clear();
     }
@@ -209,7 +232,26 @@ public class GrabController : NetworkBehaviour
     {
         IsGrabbed.Value = false;
         GrabbedPlayer.Value = null;
-        _playerGrabController = null;
+        _targetUnit = null;
+        _targetRigidbody = null;
         _holdTimer = 0f;
+        _targetHp = 0;
+    }
+
+    /// <summary>
+    /// 타겟 유닛에게 percentage만큼 피해를 입히는 함수입니다.
+    /// </summary>
+    /// <param name="percentage">피해를 입힐 퍼센트</param>
+    void ApplyDamage(int percentage)
+    {
+        if (!IsServer) return;
+        if (_targetUnit == null)
+        {
+            Debug.LogError("타겟 유닛이 null입니다.");
+            return;
+        }
+
+        int damage = Mathf.RoundToInt(_targetHp * (percentage / 100f));
+        _targetUnit.TakeDamage(damage);
     }
 }
