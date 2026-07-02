@@ -9163,6 +9163,10 @@ MonoBehaviour:
   Role: 3
   Difficulty: 0
   ThemeName: Factory
+  OpenN: 1
+  OpenE: 0
+  OpenS: 0
+  OpenW: 1
   MonsterGroupID: -1
   MonsterSpawnPoints: []
   Sockets: []

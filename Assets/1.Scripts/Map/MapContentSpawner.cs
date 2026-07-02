@@ -28,9 +28,10 @@ public class MapContentSpawner : MonoBehaviour
             {
                 if (p.Slot == null || p.LayoutPrefab == null) continue;
 
-                // 존 비주얼 — 양쪽 로컬 생성 (슬롯 앵커 위치/방향)
+                // 존 비주얼 — 양쪽 로컬 생성 (슬롯 앵커 위치/방향 + 출입구 매칭 회전)
+                Quaternion rot = p.Slot.transform.rotation * Quaternion.Euler(0f, p.ExtraYawSteps * 90f, 0f);
                 GameObject zoneGo = Instantiate(p.LayoutPrefab,
-                    p.Slot.transform.position, p.Slot.transform.rotation, _root);
+                    p.Slot.transform.position, rot, _root);
                 p.Slot.IsFilled = true;
                 visuals++;
 

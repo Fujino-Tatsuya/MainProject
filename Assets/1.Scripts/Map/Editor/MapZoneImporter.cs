@@ -106,6 +106,76 @@ public static class MapZoneImporter
         return root;
     }
 
+    // 출입구 자동 감지: 4변 가장자리 밴드에서 벽(높은 조각)의 변 방향 커버리지를 재고,
+    // 4m 이상 트인 구간이 있으면 출입구로 판단. 오탐 시 프리팹 인스펙터에서 수동 보정.
+    const float EdgeBand = 2.0f;      // 변에서 안쪽 스캔 폭(m)
+    const float MinWallTopY = 1.2f;   // 이보다 낮은 조각은 바닥/트렌치로 무시
+    const float MinGap = 4.0f;        // 출입구 최소 폭(통로 폭 6m 대비 여유)
+    const float CornerMargin = 1.5f;  // 모서리 끝 빈틈 무시
+
+    static void DetectOpenings(GameObject root, ZoneLayout layout)
+    {
+        var rends = root.GetComponentsInChildren<Renderer>();
+        if (rends.Length == 0) return;
+        Bounds all = rends[0].bounds;
+        foreach (var r in rends) all.Encapsulate(r.bounds);
+
+        layout.OpenN = EdgeHasGap(rends, all, 0, out float gN);
+        layout.OpenE = EdgeHasGap(rends, all, 1, out float gE);
+        layout.OpenS = EdgeHasGap(rends, all, 2, out float gS);
+        layout.OpenW = EdgeHasGap(rends, all, 3, out float gW);
+        Debug.Log($"[ZoneImporter] {root.name} 변별 최대 빈틈(m): N={gN:F1} E={gE:F1} S={gS:F1} W={gW:F1} (기준 {MinGap})");
+    }
+
+    // 둘레 구조물(벽/코너/문 계열)만 커버리지에 포함 — Cube/Cylinder 등 내부 프롭·플랫폼 오인 방지.
+    static bool IsPerimeterPiece(Transform t)
+    {
+        for (var c = t; c != null; c = c.parent)
+        {
+            string n = c.name.ToLowerInvariant();
+            if (n.Contains("wall") || n.Contains("corner") || n.Contains("door")) return true;
+        }
+        return false;
+    }
+
+    // dir: 0=N(+Z) 1=E(+X) 2=S(-Z) 3=W(-X)
+    static bool EdgeHasGap(Renderer[] rends, Bounds all, int dir, out float maxGap)
+    {
+        bool alongX = dir == 0 || dir == 2;                 // N/S 변은 X축 커버리지
+        float lo = (alongX ? all.min.x : all.min.z) + CornerMargin;
+        float hi = (alongX ? all.max.x : all.max.z) - CornerMargin;
+        maxGap = 0f;
+        if (hi - lo < MinGap) return false;
+
+        var iv = new System.Collections.Generic.List<Vector2>();
+        foreach (var r in rends)
+        {
+            Bounds b = r.bounds;
+            if (b.max.y < MinWallTopY) continue;            // 바닥/낮은 조각 제외
+            if (!IsPerimeterPiece(r.transform)) continue;   // 내부 프롭/플랫폼 제외
+            bool inBand = dir switch
+            {
+                0 => b.max.z >= all.max.z - EdgeBand,
+                1 => b.max.x >= all.max.x - EdgeBand,
+                2 => b.min.z <= all.min.z + EdgeBand,
+                _ => b.min.x <= all.min.x + EdgeBand,
+            };
+            if (!inBand) continue;
+            iv.Add(alongX ? new Vector2(b.min.x, b.max.x) : new Vector2(b.min.z, b.max.z));
+        }
+
+        iv.Sort((a, b) => a.x.CompareTo(b.x));
+        float cursor = lo;
+        foreach (var s in iv)
+        {
+            if (s.x > cursor) maxGap = Mathf.Max(maxGap, Mathf.Min(s.x, hi) - cursor);
+            cursor = Mathf.Max(cursor, s.y);
+            if (cursor >= hi) break;
+        }
+        if (hi > cursor) maxGap = Mathf.Max(maxGap, hi - cursor);
+        return maxGap >= MinGap;
+    }
+
     [MenuItem("Tools/MapGen/Import All Zone FBX (Mesh_zone)")]
     static void ImportAll()
     {
@@ -171,6 +241,11 @@ public static class MapZoneImporter
         (layout.Size, layout.Role) = TagFromName(name);
         layout.Difficulty = 0;
         layout.ThemeName = "Factory";
+
+        // 출입구(벽 트임) 자동 감지 → 배치 회전 매칭용
+        DetectOpenings(go, layout);
+        string open = $"{(layout.OpenN ? "N" : "")}{(layout.OpenE ? "E" : "")}{(layout.OpenS ? "S" : "")}{(layout.OpenW ? "W" : "")}";
+        Debug.Log($"[ZoneImporter] {name} 출입구 감지: [{(open.Length > 0 ? open : "없음!")}]");
 
         if (!AssetDatabase.IsValidFolder(PrefabDir)) { Debug.LogError($"[ZoneImporter] 폴더 없음 {PrefabDir}"); Object.DestroyImmediate(go); return false; }
         string path = $"{PrefabDir}/{name}.prefab"; // 고정 경로(재실행 시 덮어쓰기)

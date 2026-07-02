@@ -37,6 +37,10 @@ MonoBehaviour:
     Size: 1
     Role: 0
     Difficulty: 0
+  - Prefab: {fileID: 2968610578156927165, guid: 54703100bb6e2fc4497921a550f5a001, type: 3}
+    Size: 1
+    Role: 1
+    Difficulty: 0
   - Prefab: {fileID: 1855233461408979672, guid: b0d46e5d26dc9814dba8c15632463b96, type: 3}
     Size: 2
     Role: 0

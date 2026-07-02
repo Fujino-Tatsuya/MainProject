@@ -7,6 +7,7 @@ public struct ZonePlacement
     public ZoneSlot Slot;
     public ZoneRole Role;
     public GameObject LayoutPrefab;   // 선택된 ZoneLayout 프리팹 (없으면 null)
+    public int ExtraYawSteps;         // 슬롯 회전 위에 더하는 90° 단위 회전(0~3) — 출입구↔다리 매칭
 }
 
 // 슬롯에 ZoneLayout 프리팹을 선택해 배치 결과를 만든다 (스폰은 MapContentSpawner).
@@ -55,7 +56,8 @@ public class LayoutPlacer : MonoBehaviour
                 {
                     Slot = slot,
                     Role = slot.AssignedRole,
-                    LayoutPrefab = roleLayout
+                    LayoutPrefab = roleLayout,
+                    ExtraYawSteps = PickYaw(roleLayout, slot, rng)
                 });
             }
         }
@@ -83,11 +85,41 @@ public class LayoutPlacer : MonoBehaviour
                 {
                     Slot = combatSlots[i],
                     Role = combatSlots[i].AssignedRole, // 퀘스트 슬롯(전용 디자인 없음)도 풀 셔플로 오므로 Role 보존
-                    LayoutPrefab = pool[i % pool.Count]
+                    LayoutPrefab = pool[i % pool.Count],
+                    ExtraYawSteps = PickYaw(pool[i % pool.Count], combatSlots[i], rng)
                 });
         }
 
         return placements;
+    }
+
+    // 회전 매칭: 존의 개방변(N/W, 벽 없음)이 슬롯의 다리 방향(월드)을 최대한 많이 향하는
+    // 90° 단위 회전을 고른다(스코어링). 개방변이 못 덮는 연결은 벽의 문(door)으로 통과 —
+    // 존 저작 규칙: N/W=완전 개방, S/E=벽+문(문 위치 정렬은 슬롯 좌표 보정에서).
+    //  - 정사각(대/소): 0/90/180/270 전부 후보. 직사각(중): 풋프린트 축 유지를 위해 0/180만.
+    //  - 최고 점수 후보가 여럿이면 rng로 하나(배치 다양성).
+    private static int PickYaw(GameObject prefab, ZoneSlot slot, System.Random rng)
+    {
+        if (prefab == null || slot == null) return 0;
+        var layout = prefab.GetComponent<ZoneLayout>();
+        if (layout == null || layout.OpeningCount == 0) return 0; // 출입구 정보 없음 — 매칭 불가(감지 전 프리팹)
+
+        int slotSteps = Mathf.RoundToInt(slot.transform.eulerAngles.y / 90f) & 3;
+        int[] candidates = layout.Size == ZoneSize.Medium ? new[] { 0, 2 } : new[] { 0, 1, 2, 3 };
+
+        int bestScore = -1;
+        var best = new List<int>();
+        foreach (int extra in candidates)
+        {
+            int total = (slotSteps + extra) & 3;
+            int score = 0;
+            for (int d = 0; d < 4; d++)
+                if (slot.HasConn(d) && layout.HasOpening((d - total + 4) & 3))
+                    score++;
+            if (score > bestScore) { bestScore = score; best.Clear(); }
+            if (score == bestScore) best.Add(extra);
+        }
+        return best[rng.Next(best.Count)];
     }
 
     // Fisher–Yates (결정적: 주입된 rng만 사용)
