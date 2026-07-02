@@ -171,17 +171,81 @@ public static class ZoneWiring
     const float WallThickness = 0.5f;
     const float SegLen = 4f;          // 프리미티브 세그먼트 길이(UV 반복 밀도)
 
+    // 크기별 로컬 half-extents (회전 전)
+    static Vector2 BaseHalf(ZoneSize size) => size switch
+    {
+        ZoneSize.Large  => new Vector2(20.5f, 20.5f),
+        ZoneSize.Medium => new Vector2(10.5f, 20.5f),
+        _               => new Vector2(10.5f, 10.5f),
+    };
+
     // 슬롯의 월드 half-extents (회전 반영: 90°면 x/z 스왑)
     static Vector2 HalfExtents(ZoneSlot s)
     {
-        Vector2 half = s.Size switch
-        {
-            ZoneSize.Large  => new Vector2(20.5f, 20.5f),
-            ZoneSize.Medium => new Vector2(10.5f, 20.5f),
-            _               => new Vector2(10.5f, 10.5f),
-        };
+        Vector2 half = BaseHalf(s.Size);
         int steps = Mathf.RoundToInt(s.transform.eulerAngles.y / 90f) & 3;
         return (steps & 1) == 1 ? new Vector2(half.y, half.x) : half;
+    }
+
+    // ---- 문 표준 좌표 (Report Zone Door Positions 실측, 존-로컬·피벗=중앙) ----
+    // E변(x=+hx)의 문 z좌표 / S변(z=-hz)의 문 x좌표. N/W변은 완전 개방(문 불필요).
+    static float[] DoorsE(ZoneSize s) => s == ZoneSize.Small ? new[] { 0.5f } : new[] { 10.5f, -9.5f };
+    static float[] DoorsS(ZoneSize s) => s switch
+    {
+        ZoneSize.Large => new[] { -10.5f },
+        ZoneSize.Medium => new[] { -0.5f },
+        _ => new[] { -0.5f },
+    };
+
+    // 슬롯의 최종 회전(스텝) — LayoutPlacer.PickYaw와 동일 규칙을 "표준 존(N/W 개방)" 가정으로 복제.
+    // 회전이 결정적이라 어떤 디자인이 와도 슬롯별 벽 방향은 고정 → 다리를 문에 앵커 가능.
+    static int FinalStepsFor(ZoneSlot s)
+    {
+        int slotSteps = Mathf.RoundToInt(s.transform.eulerAngles.y / 90f) & 3;
+        int[] candidates = s.Size == ZoneSize.Medium ? new[] { 0, 2 } : new[] { 0, 1, 2, 3 };
+        int bestScore = -1, best = 0;
+        foreach (int extra in candidates)
+        {
+            int total = (slotSteps + extra) & 3;
+            int score = 0;
+            for (int d = 0; d < 4; d++)
+            {
+                if (!s.HasConn(d)) continue;
+                int l = (d - total + 4) & 3;
+                if (l == 0 || l == 3) score++; // N/W 개방변
+            }
+            if (score > bestScore) { bestScore = score; best = extra; }
+        }
+        return (slotSteps + best) & 3;
+    }
+
+    // worldDir(0=N..3=W) 방향 변이 벽(E/S)이면 그 변 문들의 "진행축 수직 좌표"(월드)를 반환, 개방변이면 null.
+    static List<float> DoorAlongCoords(ZoneSlot s, int worldDir, bool corridorAlongX)
+    {
+        int total = FinalStepsFor(s);
+        int l = (worldDir - total + 4) & 3;
+        if (l == 0 || l == 3) return null; // 개방변 — 어디든 연결 가능
+
+        Vector2 half = BaseHalf(s.Size);
+        var pts = new List<Vector2>(); // 존-로컬 문 위치
+        if (l == 1) foreach (float off in DoorsE(s.Size)) pts.Add(new Vector2(half.x, off));
+        else        foreach (float off in DoorsS(s.Size)) pts.Add(new Vector2(off, -half.y));
+
+        var result = new List<float>();
+        foreach (var p in pts)
+        {
+            // yaw 스텝 회전: 1스텝(+90°) (x,z)→(z,-x)
+            Vector2 r = total switch
+            {
+                1 => new Vector2(p.y, -p.x),
+                2 => new Vector2(-p.x, -p.y),
+                3 => new Vector2(-p.y, p.x),
+                _ => p,
+            };
+            Vector3 w = s.transform.position + new Vector3(r.x, 0f, r.y);
+            result.Add(corridorAlongX ? w.z : w.x);
+        }
+        return result;
     }
 
     [MenuItem("Tools/MapGen/Build Corridors V2 (Tex_zone)")]
@@ -216,27 +280,54 @@ public static class ZoneWiring
             Vector3 d = pb - pa;
             bool alongX = Mathf.Abs(d.x) >= Mathf.Abs(d.z);
 
-            float start, end, center;
+            float start, end, ovLo, ovHi;
+            int dirA, dirB; // a→b / b→a 월드 방향(0=N 1=E 2=S 3=W)
             if (alongX)
             {
                 var (lo, hiS, loHalf, hiHalf) = d.x > 0 ? (pa, pb, ha, hb) : (pb, pa, hb, ha);
                 start = lo.x + loHalf.x; end = hiS.x - hiHalf.x;
-                float ovLo = Mathf.Max(lo.z - loHalf.y, hiS.z - hiHalf.y);
-                float ovHi = Mathf.Min(lo.z + loHalf.y, hiS.z + hiHalf.y);
-                if (ovHi - ovLo < CorridorWidth) { Debug.LogWarning($"[CorridorV2] {a.name}↔{b.name} 측면 겹침 {ovHi - ovLo:F1}m < 폭 {CorridorWidth} — 스킵(슬롯 좌표 보정 필요)"); continue; }
-                center = (ovLo + ovHi) * 0.5f;
+                ovLo = Mathf.Max(lo.z - loHalf.y, hiS.z - hiHalf.y);
+                ovHi = Mathf.Min(lo.z + loHalf.y, hiS.z + hiHalf.y);
+                dirA = d.x > 0 ? 1 : 3; dirB = d.x > 0 ? 3 : 1;
             }
             else
             {
                 var (lo, hiS, loHalf, hiHalf) = d.z > 0 ? (pa, pb, ha, hb) : (pb, pa, hb, ha);
                 start = lo.z + loHalf.y; end = hiS.z - hiHalf.y;
-                float ovLo = Mathf.Max(lo.x - loHalf.x, hiS.x - hiHalf.x);
-                float ovHi = Mathf.Min(lo.x + loHalf.x, hiS.x + hiHalf.x);
-                if (ovHi - ovLo < CorridorWidth) { Debug.LogWarning($"[CorridorV2] {a.name}↔{b.name} 측면 겹침 {ovHi - ovLo:F1}m < 폭 {CorridorWidth} — 스킵(슬롯 좌표 보정 필요)"); continue; }
-                center = (ovLo + ovHi) * 0.5f;
+                ovLo = Mathf.Max(lo.x - loHalf.x, hiS.x - hiHalf.x);
+                ovHi = Mathf.Min(lo.x + loHalf.x, hiS.x + hiHalf.x);
+                dirA = d.z > 0 ? 0 : 2; dirB = d.z > 0 ? 2 : 0;
             }
-
+            if (ovHi - ovLo < CorridorWidth) { Debug.LogWarning($"[CorridorV2] {a.name}↔{b.name} 측면 겹침 {ovHi - ovLo:F1}m < 폭 {CorridorWidth} — 스킵(슬롯 좌표 보정 필요)"); continue; }
             if (end - start < 0.5f) { Debug.LogWarning($"[CorridorV2] {a.name}↔{b.name} 간격 {end - start:F1}m — 존 겹침/근접, 스킵(슬롯 좌표 보정 필요)"); continue; }
+
+            // 다리 중심: 벽(E/S) 변으로 붙는 쪽이 있으면 그 변의 "표준 문 위치"에 앵커.
+            // 양쪽 다 벽이면 겹침 중앙에 가장 가까운 문 기준 + 상대측 문과 어긋나면 경고.
+            float center = (ovLo + ovHi) * 0.5f;
+            var doorsA = DoorAlongCoords(a, dirA, alongX);
+            var doorsB = DoorAlongCoords(b, dirB, alongX);
+            if (doorsA != null || doorsB != null)
+            {
+                var cands = new List<float>();
+                if (doorsA != null) cands.AddRange(doorsA);
+                if (doorsB != null) cands.AddRange(doorsB);
+                float mid = center, bestC = cands[0];
+                foreach (float c in cands)
+                    if (Mathf.Abs(c - mid) < Mathf.Abs(bestC - mid)) bestC = c;
+                float clamped = Mathf.Clamp(bestC, ovLo + CorridorWidth * 0.5f, ovHi - CorridorWidth * 0.5f);
+                if (Mathf.Abs(clamped - bestC) > 0.01f)
+                    Debug.LogWarning($"[CorridorV2] {a.name}↔{b.name} 문 위치 {bestC:F1}가 겹침 범위를 벗어나 {clamped:F1}로 클램프 — 슬롯 좌표 보정 권장.");
+                if (doorsA != null && doorsB != null)
+                {
+                    float bOther = doorsB[0];
+                    foreach (float c in doorsB) if (Mathf.Abs(c - bestC) < Mathf.Abs(bOther - bestC)) bOther = c;
+                    float aOther = doorsA[0];
+                    foreach (float c in doorsA) if (Mathf.Abs(c - bestC) < Mathf.Abs(aOther - bestC)) aOther = c;
+                    if (Mathf.Abs(aOther - bOther) > 1f)
+                        Debug.LogWarning($"[CorridorV2] {a.name}↔{b.name} 양측 모두 벽인데 문 위치 불일치(A {aOther:F1} vs B {bOther:F1}) — 슬롯 좌표/회전 확인.");
+                }
+                center = clamped;
+            }
 
             var group = new GameObject($"Cor_{a.SlotID}_{b.SlotID}").transform;
             group.SetParent(root, false);
@@ -270,6 +361,57 @@ public static class ZoneWiring
         }
     }
 
+    // ---------------- 문 위치 리포트 (다리↔문 정렬용 표준화 검증) ----------------
+
+    // 각 존 프리팹의 door 피스 중심을 존-로컬 좌표로 출력하고 변(N/E/S/W)을 분류.
+    // 같은 크기 존끼리 문 로컬 좌표가 표준화돼 있으면 → 다리 중심을 문 위치에 고정 가능.
+    [MenuItem("Tools/MapGen/Report Zone Door Positions")]
+    static void ReportDoors()
+    {
+        var sb = new System.Text.StringBuilder("[Doors] 존-로컬 문 중심 (변 분류, 피벗=존 중앙):\n");
+        foreach (var guid in AssetDatabase.FindAssets("t:Prefab", new[] { PrefabDir }))
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            if (prefab == null || prefab.GetComponent<ZoneLayout>() == null) continue;
+            if (!prefab.name.StartsWith("zone_")) continue;
+
+            var inst = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+            var rends = inst.GetComponentsInChildren<Renderer>();
+            if (rends.Length == 0) { Object.DestroyImmediate(inst); continue; }
+            Bounds all = rends[0].bounds;
+            foreach (var r in rends) all.Encapsulate(r.bounds);
+
+            // door 상위 노드 단위로 묶어 중심 계산 (Dupli 조각 개별 출력 방지)
+            var doorGroups = new Dictionary<Transform, Bounds>();
+            foreach (var r in rends)
+            {
+                Transform doorRoot = null;
+                for (var c = r.transform; c != null; c = c.parent)
+                    if (c.name.ToLowerInvariant().StartsWith("door")) doorRoot = c;
+                if (doorRoot == null) continue;
+                if (doorGroups.TryGetValue(doorRoot, out var b)) { b.Encapsulate(r.bounds); doorGroups[doorRoot] = b; }
+                else doorGroups[doorRoot] = r.bounds;
+            }
+
+            var items = new List<string>();
+            foreach (var kv in doorGroups)
+            {
+                Vector3 c = kv.Value.center; // 인스턴스가 원점이므로 월드=존로컬
+                float dN = all.max.z - c.z, dS = c.z - all.min.z, dE = all.max.x - c.x, dW = c.x - all.min.x;
+                float min = Mathf.Min(dN, Mathf.Min(dS, Mathf.Min(dE, dW)));
+                string edge = min == dN ? "N" : min == dS ? "S" : min == dE ? "E" : "W";
+                // 변 진행축 좌표(존 중앙 기준)로 출력 — 표준화 비교용
+                float along = (edge == "N" || edge == "S") ? c.x : c.z;
+                items.Add($"{edge}@{along:F1}");
+            }
+            items.Sort();
+            sb.AppendLine($"  {prefab.name} [{inst.GetComponent<ZoneLayout>().Size}]: {string.Join(", ", items)}");
+            Object.DestroyImmediate(inst);
+        }
+        Debug.Log(sb.ToString());
+    }
+
     // ---------------- 퀘스트 임시 존 (기본 5x10: 바닥 + 4변 벽, 변마다 6m 출입구) ----------------
 
     [MenuItem("Tools/MapGen/Build Temp Quest Zone Prefab")]
@@ -297,24 +439,32 @@ public static class ZoneWiring
                 box.GetComponent<Renderer>().sharedMaterial = floorMat;
             }
 
-        // 4변 벽 — 변 중앙 6m 출입구
-        void WallRuns(bool alongX, float cross, float lo, float hi)
+        // 표준 M 규격 준수: N/W 완전 개방, S/E 벽 + 표준 문 위치(문 폭 4m).
+        //  E변 문 z=10.5/-9.5, S변 문 x=-0.5 (Report Zone Door Positions 실측값과 동일)
+        const float doorHalf = 2f;
+        void WallWithDoors(bool alongX, float cross, float lo, float hi, float[] doors)
         {
-            float mid = (lo + hi) * 0.5f;
-            FillLine(root.transform, alongX, lo, mid - CorridorWidth * 0.5f, cross, WallHeight * 0.5f, new Vector2(WallThickness, WallHeight), wallMat, "wall");
-            FillLine(root.transform, alongX, mid + CorridorWidth * 0.5f, hi, cross, WallHeight * 0.5f, new Vector2(WallThickness, WallHeight), wallMat, "wall");
+            var sorted = new List<float>(doors); sorted.Sort();
+            float cursor = lo;
+            foreach (float m in sorted)
+            {
+                if (m - doorHalf > cursor)
+                    FillLine(root.transform, alongX, cursor, m - doorHalf, cross, WallHeight * 0.5f, new Vector2(WallThickness, WallHeight), wallMat, "wall");
+                cursor = Mathf.Max(cursor, m + doorHalf);
+            }
+            if (hi > cursor)
+                FillLine(root.transform, alongX, cursor, hi, cross, WallHeight * 0.5f, new Vector2(WallThickness, WallHeight), wallMat, "wall");
         }
-        WallRuns(true, hz - WallThickness * 0.5f, -hx, hx);   // N
-        WallRuns(true, -hz + WallThickness * 0.5f, -hx, hx);  // S
-        WallRuns(false, hx - WallThickness * 0.5f, -hz, hz);  // E
-        WallRuns(false, -hx + WallThickness * 0.5f, -hz, hz); // W
+        WallWithDoors(true, -hz + WallThickness * 0.5f, -hx, hx, DoorsS(ZoneSize.Medium));  // S
+        WallWithDoors(false, hx - WallThickness * 0.5f, -hz, hz, DoorsE(ZoneSize.Medium));  // E
 
         var layout = root.AddComponent<ZoneLayout>();
         layout.Size = ZoneSize.Medium;
         layout.Role = ZoneRole.Quest;
         layout.Difficulty = 0;
         layout.ThemeName = "Factory(temp)";
-        layout.OpenN = layout.OpenE = layout.OpenS = layout.OpenW = true;
+        layout.OpenN = layout.OpenW = true;   // 표준 존과 동일: N/W 개방
+        layout.OpenE = layout.OpenS = false;  // 벽+문(문은 다리 앵커가 맞춰줌)
 
         string path = $"{PrefabDir}/zone_M_typeQuest.prefab";
         PrefabUtility.SaveAsPrefabAsset(root, path);

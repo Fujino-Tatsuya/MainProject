@@ -57,7 +57,7 @@ public class LayoutPlacer : MonoBehaviour
                     Slot = slot,
                     Role = slot.AssignedRole,
                     LayoutPrefab = roleLayout,
-                    ExtraYawSteps = PickYaw(roleLayout, slot, rng)
+                    ExtraYawSteps = PickYaw(roleLayout, slot)
                 });
             }
         }
@@ -86,7 +86,7 @@ public class LayoutPlacer : MonoBehaviour
                     Slot = combatSlots[i],
                     Role = combatSlots[i].AssignedRole, // 퀘스트 슬롯(전용 디자인 없음)도 풀 셔플로 오므로 Role 보존
                     LayoutPrefab = pool[i % pool.Count],
-                    ExtraYawSteps = PickYaw(pool[i % pool.Count], combatSlots[i], rng)
+                    ExtraYawSteps = PickYaw(pool[i % pool.Count], combatSlots[i])
                 });
         }
 
@@ -95,10 +95,11 @@ public class LayoutPlacer : MonoBehaviour
 
     // 회전 매칭: 존의 개방변(N/W, 벽 없음)이 슬롯의 다리 방향(월드)을 최대한 많이 향하는
     // 90° 단위 회전을 고른다(스코어링). 개방변이 못 덮는 연결은 벽의 문(door)으로 통과 —
-    // 존 저작 규칙: N/W=완전 개방, S/E=벽+문(문 위치 정렬은 슬롯 좌표 보정에서).
+    // 존 저작 규칙: N/W=완전 개방, S/E=벽+문.
     //  - 정사각(대/소): 0/90/180/270 전부 후보. 직사각(중): 풋프린트 축 유지를 위해 0/180만.
-    //  - 최고 점수 후보가 여럿이면 rng로 하나(배치 다양성).
-    private static int PickYaw(GameObject prefab, ZoneSlot slot, System.Random rng)
+    //  - 동점이면 최소 회전(결정적): 슬롯별 벽 방향이 고정돼야 정적 다리를 문 위치에
+    //    맞출 수 있다. 배치 다양성은 "어떤 디자인이 오는가"(풀 셔플)로 이미 확보.
+    private static int PickYaw(GameObject prefab, ZoneSlot slot)
     {
         if (prefab == null || slot == null) return 0;
         var layout = prefab.GetComponent<ZoneLayout>();
@@ -107,8 +108,7 @@ public class LayoutPlacer : MonoBehaviour
         int slotSteps = Mathf.RoundToInt(slot.transform.eulerAngles.y / 90f) & 3;
         int[] candidates = layout.Size == ZoneSize.Medium ? new[] { 0, 2 } : new[] { 0, 1, 2, 3 };
 
-        int bestScore = -1;
-        var best = new List<int>();
+        int bestScore = -1, best = 0;
         foreach (int extra in candidates)
         {
             int total = (slotSteps + extra) & 3;
@@ -116,10 +116,9 @@ public class LayoutPlacer : MonoBehaviour
             for (int d = 0; d < 4; d++)
                 if (slot.HasConn(d) && layout.HasOpening((d - total + 4) & 3))
                     score++;
-            if (score > bestScore) { bestScore = score; best.Clear(); }
-            if (score == bestScore) best.Add(extra);
+            if (score > bestScore) { bestScore = score; best = extra; }
         }
-        return best[rng.Next(best.Count)];
+        return best;
     }
 
     // Fisher–Yates (결정적: 주입된 rng만 사용)
