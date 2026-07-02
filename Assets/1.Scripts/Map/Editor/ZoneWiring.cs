@@ -255,6 +255,28 @@ public static class ZoneWiring
 
     const string GeoPrefabPath = "Assets/50.Art/MapGen/MapObj/MapGeometryV2.prefab";
 
+    // 존 바닥 상면 Y 실측 — 바닥 머티리얼(zone_floor_*) 렌더러 top의 최빈값.
+    // 다리/둘레벽을 존 보행면 높이에 정렬(단차 방지). 실패 시 0.
+    static float MeasureFloorTopY(string prefabName)
+    {
+        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{PrefabDir}/{prefabName}.prefab");
+        if (prefab == null) return 0f;
+        var inst = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+        var counts = new Dictionary<int, int>(); // 0.05m 단위 히스토그램
+        foreach (var r in inst.GetComponentsInChildren<Renderer>())
+        {
+            var m = r.sharedMaterial;
+            if (m == null || !m.name.StartsWith("zone_floor")) continue;
+            int key = Mathf.RoundToInt(r.bounds.max.y * 20f);
+            counts[key] = counts.TryGetValue(key, out int c) ? c + 1 : 1;
+        }
+        Object.DestroyImmediate(inst);
+        int bestKey = 0, bestCount = -1;
+        foreach (var kv in counts)
+            if (kv.Value > bestCount) { bestCount = kv.Value; bestKey = kv.Key; }
+        return bestCount > 0 ? bestKey / 20f : 0f;
+    }
+
     // 정적 지오메트리 v2 통합 빌드 (2026-07 팀장 지시):
     //  ① 구 MapGeometry(v1 바닥/벽/다리) 삭제
     //  ② 슬롯 위치·결정 회전 기준으로 다리(문 앵커) + 존 개방변(N/W) 둘레벽(다리 입구만 트기) 생성
@@ -272,6 +294,10 @@ public static class ZoneWiring
         var floorMat = AssetDatabase.LoadAssetAtPath<Material>($"{TexDir}/zone_floor_basic.mat");
         var wallMat = AssetDatabase.LoadAssetAtPath<Material>($"{TexDir}/zone_wall_basic.mat");
         if (floorMat == null || wallMat == null) { Debug.LogError("[GeoV2] Tex_zone 머티리얼 없음 — 먼저 Import All 실행"); return; }
+
+        // 존 보행면 높이 실측 — 다리/벽을 존 바닥 상면에 정렬(단차 방지)
+        float floorTop = MeasureFloorTopY("zone_S_typeA");
+        Debug.Log($"[GeoV2] 존 바닥 상면 Y 실측: {floorTop:F2}m — 다리/벽 높이 기준");
 
         // ① 구 산출물 제거: v1 MapGeometry(프리팹 인스턴스면 언팩 후), 구 CorridorsV2, 기존 MapGeometryV2
         foreach (string oldName in new[] { "MapGeometry", "CorridorsV2", "MapGeometryV2" })
@@ -360,21 +386,22 @@ public static class ZoneWiring
 
             var group = new GameObject($"Cor_{a.SlotID}_{b.SlotID}").transform;
             group.SetParent(root, false);
-            // 바닥 스트립 (top y=0) + 측벽 2줄
-            FillLine(group, alongX, start, end, center, -0.2f, new Vector2(CorridorWidth, 0.4f), floorMat, "floor");
+            // 바닥 스트립 (top = 존 보행면) + 측벽 2줄 (보행면 위로 세움)
+            FillLine(group, alongX, start, end, center, floorTop - 0.2f, new Vector2(CorridorWidth, 0.4f), floorMat, "floor");
             float wallOff = CorridorWidth * 0.5f + WallThickness * 0.5f;
-            FillLine(group, alongX, start, end, center + wallOff, WallHeight * 0.5f, new Vector2(WallThickness, WallHeight), wallMat, "wall");
-            FillLine(group, alongX, start, end, center - wallOff, WallHeight * 0.5f, new Vector2(WallThickness, WallHeight), wallMat, "wall");
+            FillLine(group, alongX, start, end, center + wallOff, floorTop + WallHeight * 0.5f, new Vector2(WallThickness, WallHeight), wallMat, "wall");
+            FillLine(group, alongX, start, end, center - wallOff, floorTop + WallHeight * 0.5f, new Vector2(WallThickness, WallHeight), wallMat, "wall");
             AddMouth(a.SlotID, dirA, center);
             AddMouth(b.SlotID, dirB, center);
             built++;
         }
 
-        // ② 존 개방변(N/W 로컬) 둘레벽 — 다리 입구 위치만 트고 채움.
-        //    벽 변(E/S 로컬)은 존 자체 벽+문이 있으므로 생략.
+        // ② 존 둘레 처리 — "갈 수 있는 경우의 수" 보장:
+        //    개방변(N/W 로컬) = 다리 입구만 트고 벽으로 채움.
+        //    벽 변(E/S 로컬) = 존 자체 벽+문 — 다리가 안 붙은 문은 바깥 벽 패치로 차단(떨어지는 길 방지).
         var wallsRoot = new GameObject("ZoneEdgeWalls").transform;
         wallsRoot.SetParent(geoRoot.transform, false);
-        int wallEdges = 0;
+        int wallEdges = 0, blockedDoors = 0;
         foreach (var s in slots)
         {
             int total = FinalStepsFor(s);
@@ -386,10 +413,36 @@ public static class ZoneWiring
             for (int d = 0; d < 4; d++)
             {
                 int l = (d - total + 4) & 3;
-                if (l == 1 || l == 2) continue; // 존 자체 벽(E/S) — 생성 시 존이 가져옴
+                bool alongX = d == 0 || d == 2; // N/S 변은 X축 진행
                 mouths.TryGetValue((s.SlotID, d), out var gaps);
 
-                bool alongX = d == 0 || d == 2; // N/S 변은 X축 진행
+                if (l == 1 || l == 2)
+                {
+                    // 벽 변: 미사용 문 차단 — 다리 입구가 없는 문 위치에 바깥쪽 벽 패치
+                    var doors = DoorAlongCoords(s, d, d == 1 || d == 3);
+                    if (doors == null) continue;
+                    float crossOut = d switch
+                    {
+                        0 => pos.z + half.y + WallThickness * 0.5f,
+                        1 => pos.x + half.x + WallThickness * 0.5f,
+                        2 => pos.z - half.y - WallThickness * 0.5f,
+                        _ => pos.x - half.x - WallThickness * 0.5f,
+                    };
+                    foreach (float door in doors)
+                    {
+                        bool used = false;
+                        if (gaps != null)
+                            foreach (float g in gaps)
+                                if (Mathf.Abs(g - door) < 2f) { used = true; break; }
+                        if (used) continue;
+                        FillLine(edgeParent, alongX, door - 2.3f, door + 2.3f, crossOut,
+                                 floorTop + WallHeight * 0.5f, new Vector2(WallThickness, WallHeight), wallMat, "doorBlock");
+                        blockedDoors++;
+                    }
+                    continue;
+                }
+
+                // 개방변: 다리 입구만 트고 채움
                 float lo = alongX ? pos.x - half.x : pos.z - half.y;
                 float hi = alongX ? pos.x + half.x : pos.z + half.y;
                 float cross = d switch
@@ -399,7 +452,7 @@ public static class ZoneWiring
                     2 => pos.z - half.y + WallThickness * 0.5f,
                     _ => pos.x - half.x + WallThickness * 0.5f,
                 };
-                WallLineWithGaps(edgeParent, alongX, lo, hi, cross, gaps, CorridorWidth * 0.5f, wallMat);
+                WallLineWithGaps(edgeParent, alongX, lo, hi, cross, gaps, CorridorWidth * 0.5f, wallMat, floorTop);
                 wallEdges++;
             }
         }
@@ -407,11 +460,11 @@ public static class ZoneWiring
         // ③ 프리팹 저장 (씬 인스턴스 연결 유지 — 재빌드 시 덮어쓰기)
         PrefabUtility.SaveAsPrefabAssetAndConnect(geoRoot, GeoPrefabPath, InteractionMode.AutomatedAction);
         UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(stage1.scene);
-        Debug.Log($"[GeoV2] 다리 {built}/{SlotPairs.Length} + 개방변 벽 {wallEdges}개 변 생성 → {GeoPrefabPath} (구 MapGeometry 삭제됨)");
+        Debug.Log($"[GeoV2] 다리 {built}/{SlotPairs.Length} + 개방변 벽 {wallEdges}변 + 미사용 문 차단 {blockedDoors}개 (보행면 y={floorTop:F2}) → {GeoPrefabPath}");
     }
 
-    // 한 직선 구간을 벽으로 채우되 gaps(중심±gapHalf)만 트기. (다리 입구/문)
-    static void WallLineWithGaps(Transform parent, bool alongX, float lo, float hi, float cross, List<float> gaps, float gapHalf, Material mat)
+    // 한 직선 구간을 벽으로 채우되 gaps(중심±gapHalf)만 트기. (다리 입구/문) 벽 바닥 = baseY.
+    static void WallLineWithGaps(Transform parent, bool alongX, float lo, float hi, float cross, List<float> gaps, float gapHalf, Material mat, float baseY = 0f)
     {
         var sorted = gaps != null ? new List<float>(gaps) : new List<float>();
         sorted.Sort();
@@ -419,11 +472,11 @@ public static class ZoneWiring
         foreach (float g in sorted)
         {
             if (g - gapHalf > cursor)
-                FillLine(parent, alongX, cursor, g - gapHalf, cross, WallHeight * 0.5f, new Vector2(WallThickness, WallHeight), mat, "wall");
+                FillLine(parent, alongX, cursor, g - gapHalf, cross, baseY + WallHeight * 0.5f, new Vector2(WallThickness, WallHeight), mat, "wall");
             cursor = Mathf.Max(cursor, g + gapHalf);
         }
         if (hi > cursor)
-            FillLine(parent, alongX, cursor, hi, cross, WallHeight * 0.5f, new Vector2(WallThickness, WallHeight), mat, "wall");
+            FillLine(parent, alongX, cursor, hi, cross, baseY + WallHeight * 0.5f, new Vector2(WallThickness, WallHeight), mat, "wall");
     }
 
     // 진행축(alongX) 구간 [from,to]를 SegLen 단위 큐브로 정확히 채움. size=(가로폭, 높이).
@@ -505,9 +558,11 @@ public static class ZoneWiring
         if (floorMat == null || wallMat == null) { Debug.LogError("[QuestZone] Tex_zone 머티리얼 없음 — 먼저 Import All 실행"); return; }
 
         const float hx = 10.5f, hz = 20.5f; // 중형 21x41 half
+        // 실제 존 보행면 높이에 맞춤 (다리/벽 Y 정렬과 동일 기준)
+        float floorTop = MeasureFloorTopY("zone_M_typeA");
         var root = new GameObject("zone_M_typeQuest");
 
-        // 바닥 (top y=0)
+        // 바닥 (top = 실측 보행면)
         var floor = root.transform;
         int cols = 6, rows = 12;
         float sx = hx * 2f / cols, sz = hz * 2f / rows;
@@ -517,7 +572,7 @@ public static class ZoneWiring
                 var box = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 box.name = $"floor_{cx}_{cz}";
                 box.transform.SetParent(floor, false);
-                box.transform.position = new Vector3(-hx + sx * (cx + 0.5f), -0.2f, -hz + sz * (cz + 0.5f));
+                box.transform.position = new Vector3(-hx + sx * (cx + 0.5f), floorTop - 0.2f, -hz + sz * (cz + 0.5f));
                 box.transform.localScale = new Vector3(sx, 0.4f, sz);
                 box.GetComponent<Renderer>().sharedMaterial = floorMat;
             }
@@ -525,21 +580,10 @@ public static class ZoneWiring
         // 표준 M 규격 준수: N/W 완전 개방, S/E 벽 + 표준 문 위치(문 폭 4m).
         //  E변 문 z=10.5/-9.5, S변 문 x=-0.5 (Report Zone Door Positions 실측값과 동일)
         const float doorHalf = 2f;
-        void WallWithDoors(bool alongX, float cross, float lo, float hi, float[] doors)
-        {
-            var sorted = new List<float>(doors); sorted.Sort();
-            float cursor = lo;
-            foreach (float m in sorted)
-            {
-                if (m - doorHalf > cursor)
-                    FillLine(root.transform, alongX, cursor, m - doorHalf, cross, WallHeight * 0.5f, new Vector2(WallThickness, WallHeight), wallMat, "wall");
-                cursor = Mathf.Max(cursor, m + doorHalf);
-            }
-            if (hi > cursor)
-                FillLine(root.transform, alongX, cursor, hi, cross, WallHeight * 0.5f, new Vector2(WallThickness, WallHeight), wallMat, "wall");
-        }
-        WallWithDoors(true, -hz + WallThickness * 0.5f, -hx, hx, DoorsS(ZoneSize.Medium));  // S
-        WallWithDoors(false, hx - WallThickness * 0.5f, -hz, hz, DoorsE(ZoneSize.Medium));  // E
+        WallLineWithGaps(root.transform, true, -hx, hx, -hz + WallThickness * 0.5f,
+                         new List<float>(DoorsS(ZoneSize.Medium)), doorHalf, wallMat, floorTop);  // S
+        WallLineWithGaps(root.transform, false, -hz, hz, hx - WallThickness * 0.5f,
+                         new List<float>(DoorsE(ZoneSize.Medium)), doorHalf, wallMat, floorTop);  // E
 
         var layout = root.AddComponent<ZoneLayout>();
         layout.Size = ZoneSize.Medium;

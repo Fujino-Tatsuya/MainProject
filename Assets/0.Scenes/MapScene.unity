@@ -424,7 +424,7 @@ MonoBehaviour:
   ConnE: 0
   ConnS: 0
   ConnW: 1
-  AssignedRole: 0
+  AssignedRole: 1
   IsFilled: 1
 --- !u!1001 &314806437
 PrefabInstance:
@@ -1509,7 +1509,7 @@ MonoBehaviour:
   ConnE: 1
   ConnS: 0
   ConnW: 0
-  AssignedRole: 1
+  AssignedRole: 0
   IsFilled: 1
 --- !u!1001 &1964899879
 PrefabInstance:
@@ -1765,7 +1765,7 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 906965cfe1b31ed44b25d894e54d9133, type: 3}
---- !u!1001 &5345263986600635148
+--- !u!1001 &5393385379000297073
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
@@ -1822,10 +1822,10 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: bce8494e62133e241a1e403d5cd1acdc, type: 3}
---- !u!4 &5345263986600635149 stripped
+--- !u!4 &5393385379000297074 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 653796495814684463, guid: bce8494e62133e241a1e403d5cd1acdc, type: 3}
-  m_PrefabInstance: {fileID: 5345263986600635148}
+  m_PrefabInstance: {fileID: 5393385379000297073}
   m_PrefabAsset: {fileID: 0}
 --- !u!1001 &7707652367797161032
 PrefabInstance:
@@ -5488,7 +5488,7 @@ PrefabInstance:
       addedObject: {fileID: 1759065532}
     - targetCorrespondingSourceObject: {fileID: 7779696810356756282, guid: 752c9377d228ec54f8c1b2bdcdd8e603, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 5345263986600635149}
+      addedObject: {fileID: 5393385379000297074}
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 752c9377d228ec54f8c1b2bdcdd8e603, type: 3}
 --- !u!1660057539 &9223372036854775807
