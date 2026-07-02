@@ -57,6 +57,13 @@ public partial class SetPositionThroughRaycastAction : Action
             Debug.LogWarning($"SamplePosition failed near {wallPoint} (maxDistance={MaxDistance.Value}), using raw wall point.");
         }
 
+        if (NavMesh.Raycast(Agent.Value.transform.position, Position.Value, out NavMeshHit navMeshHit, areaMask))
+        {
+            Position.Value = navMeshHit.position;
+        }
+
+        Debug.Log($"SetPositionThroughRaycastAction: Position set to {Position.Value}");
+
         return Status.Success;
     }
 

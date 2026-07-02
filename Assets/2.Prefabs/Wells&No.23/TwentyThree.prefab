@@ -768,7 +768,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1745528080
+  GlobalObjectIdHash: 739404150
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -863,6 +863,7 @@ MonoBehaviour:
   - rid: 5035183259049001731
   - rid: 5035183289670304660
   - rid: 8806980410284442218
+  - rid: 3912067921147069364
   m_OriginalGraph: {fileID: 0}
   m_IsInitialised: 0
   m_IsStarted: 0
@@ -870,6 +871,14 @@ MonoBehaviour:
   references:
     version: 2
     RefIds:
+    - rid: 3912067921147069364
+      type: {class: 'BlackboardVariable`1[[System.Single, mscorlib]]', ns: Unity.Behavior, asm: Unity.Behavior}
+      data:
+        GUID:
+          m_Value0: 9394978460118093945
+          m_Value1: 11036599555410557666
+        Name: DashSpeed
+        m_Value: 10
     - rid: 5035182809093243097
       type: {class: 'BlackboardVariable`1[[UnityEngine.GameObject, UnityEngine.CoreModule]]', ns: Unity.Behavior, asm: Unity.Behavior}
       data:
@@ -1450,8 +1459,6 @@ MonoBehaviour:
   holdDamagePercentage: 5
   holdAttackPeriod: 0.5
   landingDamagePercentage: 30
-  throwDirection: {x: 0, y: 1, z: 1}
-  throwStrength: 5
 --- !u!1 &8300409248683084403
 GameObject:
   m_ObjectHideFlags: 0
@@ -1514,7 +1521,7 @@ MonoBehaviour:
   grabAttackMaxDistance: 3
   grabAttackPercentage: 1
   jumpAttackMinDistance: 5
-  jumpAttackMaxDistance: 10
+  jumpAttackMaxDistance: 20
   jumpAttackPercentage: 100
   dashAttackMinDistance: 10
   dashAttackMaxDistance: 20
