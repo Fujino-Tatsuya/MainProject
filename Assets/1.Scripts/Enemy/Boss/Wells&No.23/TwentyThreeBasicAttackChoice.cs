@@ -41,67 +41,6 @@ public class TwentyThreeBasicAttackChoice : BaseAttackChoice
         attackChoices.Add(new WeightedAttack<TwentyThreeBasicAttackType>(TwentyThreeBasicAttackType.Dash, dashAttackMinDistance, dashAttackMaxDistance, dashAttackPercentage));
     }
 
-
-    public override void AddType<T>(T type)
-    {
-        if (type is not TwentyThreeBasicAttackType attackType)
-        {
-            Debug.LogWarning($"{type} is not a {nameof(TwentyThreeBasicAttackType)}.");
-            return;
-        }
-
-        for (int i = 0; i < attackChoices.Count; i++)
-        {
-            if (attackChoices[i].basicAttackType == attackType)
-            {
-                Debug.LogWarning($"Attack type {type} already exists in the attack choices. Use UpdateType to modify its properties.");
-                return;
-            }
-                
-        }
-
-        switch (type)
-        {
-            case TwentyThreeBasicAttackType.Hook:
-                attackChoices.Add(new WeightedAttack<TwentyThreeBasicAttackType>(attackType, hookAttackMinDistance, hookAttackMaxDistance, hookAttackPercentage));
-                break;
-            case TwentyThreeBasicAttackType.Upper:
-                attackChoices.Add(new WeightedAttack<TwentyThreeBasicAttackType>(attackType, upperAttackMinDistance, upperAttackMaxDistance, upperAttackPercentage));
-                break;
-            case TwentyThreeBasicAttackType.Grab:
-                attackChoices.Add(new WeightedAttack<TwentyThreeBasicAttackType>(attackType, grabAttackMinDistance, grabAttackMaxDistance, grabAttackPercentage));
-                break;
-            case TwentyThreeBasicAttackType.Jump:
-                attackChoices.Add(new WeightedAttack<TwentyThreeBasicAttackType>(attackType, jumpAttackMinDistance, jumpAttackMaxDistance, jumpAttackPercentage));
-                break;
-            case TwentyThreeBasicAttackType.Dash:
-                attackChoices.Add(new WeightedAttack<TwentyThreeBasicAttackType>(attackType, dashAttackMinDistance, dashAttackMaxDistance, dashAttackPercentage));
-                break;
-            default:
-                Debug.LogWarning($"Unknown attack type {type}. Cannot add to attack choices.");
-                break;
-        }
-    }
-
-
-    public override void RemoveType<T>(T type)
-    {
-        if (type is not TwentyThreeBasicAttackType attackType)
-        {
-            Debug.LogWarning($"{type} is not a {nameof(TwentyThreeBasicAttackType)}.");
-            return;
-        }
-
-        for (int i = 0; i < attackChoices.Count; i++)
-        {
-            if (attackChoices[i].basicAttackType == attackType)
-            {
-                attackChoices.RemoveAt(i);
-                return;
-            }
-        }
-    }
-
     public override int GetRandomAttack(float currentDistance)
     {
         TwentyThreeBasicAttackType res = TwentyThreeBasicAttackType.None;

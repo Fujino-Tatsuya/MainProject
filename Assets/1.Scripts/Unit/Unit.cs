@@ -311,12 +311,7 @@ public class Unit : BaseNetworkBehaviour
 
     #region ë„‰ë°±
     IKnockbackable _knockback;
-    /// <summary>
-    /// ÀÚ½Ä Å¬·¡½º¿¡¼­ ¼öÁ¤ °¡´ÉÇÑ ³Ë¹é È£Ãâ ÇÔ¼ö
-    /// </summary>
-    /// <param name="direction">³Ë¹é ¹æÇâ</param>
-    /// <param name="strength">³Ë¹é ¼¼±â</param>
-    public virtual void Knockback(Vector3 direction, float strength)
+    public void Knockback(Vector3 direction, float strength)
     {
         if (!IsServer) return;
 
