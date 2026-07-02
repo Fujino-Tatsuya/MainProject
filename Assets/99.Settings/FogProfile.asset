@@ -36,22 +36,22 @@ MonoBehaviour:
   dimRangeDown: 5
   dimFadeUp: 3
   dimFadeDown: 3
-  dimSaturation: 0.0748456
-  dimBrightness: 0.1
-  dimAffectSky: 1
-  viewRange: 13.6
-  viewFade: 9.96
+  dimSaturation: 0.249
+  dimBrightness: 0.16
+  dimAffectSky: 0
+  viewRange: 18
+  viewFade: 4
   losDarken: 1
   losDistanceBias: 0
   losEdgeFade: 5.71
   losBrightness: 0.15
   losSaturation: 0.2
-  losAngleJitter: 0.02
+  losAngleJitter: 0.03
   abyssEnabled: 0
-  abyssColor: {r: 0.02, g: 0.05, b: 0.09, a: 1}
+  abyssColor: {r: 0.0028924812, g: 0.010691476, b: 0.02044022, a: 1}
   abyssThreshold: 0
-  abyssDepthRange: 8
-  abyssMaxOpacity: 0.95
-  abyssNoiseStrength: 0.5
+  abyssDepthRange: 50
+  abyssMaxOpacity: 0.271
+  abyssNoiseStrength: 0.243
   abyssNoiseScale: 0.15
   abyssNoiseScroll: {x: 0.05, y: 0.03}

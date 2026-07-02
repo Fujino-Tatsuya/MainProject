@@ -273,8 +273,9 @@ float Los_Amount(float3 worldPos)
     if (distXZ < 1e-3) return 0.0;
     float ang = atan2(d.y, d.x);              // -PI..PI (x=cos, z=sin)
     float u = ang * (0.5 / PI) + 0.5;         // 0..1, _LosTex wrap=Repeat
-    // 노이즈로 각도 지터 — 부채꼴 경계(직선/삼각형)를 주변과 유기적으로 뭉갠다.
-    u += (Fog_RawNoise(worldPos) - 0.5) * _LosAngleJitter;
+    // 노이즈로 각도 지터 — 부채꼴 경계(직선/삼각형)를 유기적으로 뭉갠다.
+    // 정적 노이즈(위치 기반, _Time 스크롤 없음) → FoW 경계가 흐르지 않고 고정.
+    u += (Fog_ValueNoise(worldPos.xz * _FogNoiseScale) - 0.5) * _LosAngleJitter;
     float occ = SAMPLE_TEXTURE2D_LOD(_LosTex, sampler_LosTex, float2(u, 0.5), 0).r;
     // occ = 그 각도의 최근접 차폐 표면거리. 픽셀이 그보다 멀면 뒤(가려짐).
     return smoothstep(occ + _LosDistanceBias, occ + _LosDistanceBias + max(1e-4, _LosEdgeFade), distXZ) * _LosDarken;

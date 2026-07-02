@@ -33,6 +33,8 @@ public sealed class FogManager : MonoBehaviour
     [Range(64, 720)] public int losTexels = 360;
     [Tooltip("각도 방향 블러 반경(빈). 벽 모서리 occ 급변을 완화해 부채꼴 경계(삼각형/직선)를 부드럽게. 0=끔, 4~8 권장.")]
     [Range(0, 24)] public int losAngleBlur = 6;
+    [Tooltip("시야맵 재빌드 간격(프레임). 정적 레이아웃이라 매프레임 불필요 — 2=30Hz(비용 절반), 3=20Hz, 1=매프레임. 에디트모드는 항상 재빌드.")]
+    [Min(1)] public int losRebuildInterval = 2;
     [Tooltip("시야가 닿는 최대 거리(m). 이 너머는 항상 가려진 것으로 본다.")]
     [Min(1f)] public float losMaxDist = 40f;
     [Tooltip("raycast 시작 높이(플레이어 발끝 위 오프셋, m). 벽 중간 높이를 맞추기 위함.")]
@@ -91,6 +93,7 @@ public sealed class FogManager : MonoBehaviour
     private float[] _losDist;
     private readonly List<Vector4> _losNodes = new List<Vector4>(); // xyz=pos, w=radius
     private bool _losNodesCached;
+    private int _losFrameCounter; // 재빌드 스로틀 카운터
 
     // ----- shader property ids -----
     private static readonly int ID_GlobalEnabled = Shader.PropertyToID("_FogGlobalEnabled");
@@ -373,7 +376,13 @@ public sealed class FogManager : MonoBehaviour
             return;
         }
 
-        BuildRadialMap(playerPos);
+        // 스로틀: 정적 레이아웃이라 매프레임 재빌드 불필요. N프레임마다만 재빌드(에디트모드는 항상).
+        // 스킵 시 기존 _losTex 재사용 — 글로벌은 아래에서 매프레임 갱신(저렴).
+        if (_losTex == null || !Application.isPlaying || ++_losFrameCounter >= Mathf.Max(1, losRebuildInterval))
+        {
+            BuildRadialMap(playerPos);
+            _losFrameCounter = 0;
+        }
 
         Shader.SetGlobalFloat(ID_LosEnabled, 1f);
         Shader.SetGlobalTexture(ID_LosTex, _losTex);
