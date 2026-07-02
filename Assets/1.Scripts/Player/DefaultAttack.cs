@@ -65,29 +65,30 @@ public class DefaultAttack : BaseNetworkBehaviour
             animator.gameObject.AddComponent<PlayerAnimationEventRelay>();
     }
 
-    public void TryStart()
+    public bool TryStart()
     {
         if (IsAttacking || isRequestingAttack || player == null || !CanRequestStart)
-            return;
+            return false;
 
         Vector3 requestedDirection = aimIndicator.AimDirection.normalized;
 
         if (!IsNetworkActive)
         {
             ApproveLocalAttack(requestedDirection);
-            return;
+            return true;
         }
 
         if (!IsOwner)
-            return;
+            return false;
 
         isRequestingAttack = true;
         RequestStartAttackRpc(requestedDirection);
+        return true;
     }
 
     public void BeginFromState()
     {
-        StartAttack(0, approvedAttackDirection);
+        StartAttack(0, approvedAttackDirection, true);
         hasApprovedAttackDirection = false;
         isRequestingAttack = false;
     }
@@ -198,13 +199,13 @@ public class DefaultAttack : BaseNetworkBehaviour
         };
     }
 
-    private void StartAttack(int attackIndex, Vector3 direction)
+    private void StartAttack(int attackIndex, Vector3 direction, bool forceTriggerAttack = false)
     {
         if (!HasAttackStep(attackIndex))
             return;
 
         DefaultAttackStep step = attackSteps[attackIndex];
-        bool shouldTriggerAttack = !IsAttacking;
+        bool shouldTriggerAttack = forceTriggerAttack || !IsAttacking;
 
         if (direction.sqrMagnitude < 0.001f || step.Duration <= 0f)
             return;

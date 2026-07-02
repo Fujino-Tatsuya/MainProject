@@ -234,7 +234,7 @@ public abstract class PlayerStateBase : IPlayerState
     protected bool TryConsumeActionInput()
     {
         if ((Context.Input.AttackPressed || Context.Input.AttackHeld) &&
-            Context.Controller.ChangeState(PlayerActionState.Attack))
+            Context.DefaultAttack.TryStart())
         {
             return true;
         }
