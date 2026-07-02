@@ -29,93 +29,53 @@
 
 ---
 
-## 2. Task 2 — 어비스(바닥 구멍) 물안개 [신규 구현]
-바닥이 뚫린 구멍 지형에 **짙은 심연색 + 노이즈 일렁임** 물안개.
+## 2. Task 2 — 어비스 물: 불투명 어두운 물 Plane [신규 구현, 방식 확정]
 
-### ⚠️ 먼저 결정할 것 (다음 세션 grill)
-풀스크린 포그는 **depth(그려진 픽셀) 기반**이라, 구멍 아래에 **실제 지오메트리(물 평면 등)가 있어야** 픽셀이 존재해 어비스 색을 입힐 수 있음. 방식 택1:
-- **(A) 물 평면 메시**: 구멍 아래 Y<0에 어두운 물 평면 배치 → 그 픽셀에 어비스 물안개 적용. (아트/기획 협의)
-- **(B) 영역 마스크**: 구멍 위치를 마스크(기존 `_FogMaskTex` 확장 or 볼륨)로 지정 → 해당 영역 픽셀 어비스색. 지오메트리 없어도 됨.
-- **(C) 높이 기반**: 픽셀 worldPos.y < 임계면 어비스. 단 구멍 아래 지오메트리 필요(A와 병행).
-→ **B(영역 마스크) 또는 A(물 평면)+C(높이) 조합** 권장. 다음 세션에 맵 구조 보고 확정.
+> **결정(2026-07, 팀장 확정):** 포그 기반 어비스 물안개 ❌ → **불투명 물 Plane 1장** 방식.
+> - 물은 **불투명·어두움** → 물 바닥이 안 보이고 카메라가 물 안쪽을 못 봄(목표 자동 달성)
+> - **흐르는 것만** 보이면 됨 (스크롤 노이즈 물결)
+> - **실시간 반사 없음** (Planar Reflection/실시간 Probe 금지 — 프레임 예산)
+> - 어두운 물이라 비침(스크린 왜곡/굴절)도 없음
+> - 바닥 메시를 따로 그리지 않음 (불투명이라 불필요)
 
-### C# — FogProfile.cs 추가 프로퍼티
-```csharp
-[Header("어비스 물안개 (바닥 구멍)")]
-public bool abyssEnabled = false;
-[Tooltip("이 월드 Y 이하부터 어비스 물안개 시작.")]
-public float abyssHeightThreshold = 0f;
-[Tooltip("이 깊이(m)에서 어비스 최대 강도.")]
-[Min(0.01f)] public float abyssDepthRange = 8f;
-[Tooltip("심연 색(어두운 남색/검정 계열, HDR).")]
-[ColorUsage(true, true)] public Color abyssColor = new Color(0.02f, 0.04f, 0.08f, 1f);
-[Range(0f, 1f)] public float abyssMaxOpacity = 0.95f;
-[Tooltip("물안개 일렁임 세기(기존 노이즈 재활용).")]
-[Range(0f, 3f)] public float abyssNoiseStrength = 1.5f;
-[Tooltip("물 일렁임 스크롤 속도(월드 xz).")]
-public Vector2 abyssNoiseScroll = new Vector2(0.15f, 0.1f);
-```
+### 구현 — `WaterDark.shader` (신규, Unlit 계열 1패스)
+경로 제안: `Assets/1.Scripts/Rendering/Water/WaterDark.shader` (+ 머티리얼 `Assets/3.Materials/Water/`)
+- **Opaque, ZWrite On, 라이팅 없음(Unlit)** — 쿼드 1장, 사실상 0 비용
+- 컬러 = 어두운 심연색 `_DeepColor`(예 0.02,0.04,0.08) 기반
+- **물결**: 절차 노이즈 2겹(서로 다른 scale·스크롤 속도, `FogCore.hlsl`의 `Fog_ValueNoise` 패턴 재사용) → 밝은 물결색 `_FlowColor`를 얇게 lerp
+- **fake 깊이감**: 가장자리(벽 접점) 살짝 밝고 중앙으로 갈수록 어둡게 — UV 또는 월드거리 그라데이션. 바닥 지오메트리 없이 깊어 보이게
+- (선택) depth 기반 엣지 폼(벽 접점 하얀 거품) — Fog 패스가 이미 depth 사용 중이라 추가 비용 낮음. 1차엔 생략 가능
+- 프로퍼티: `_DeepColor` `_FlowColor` `_FlowSpeed1/2` `_FlowScale1/2` `_FlowStrength` `_EdgeBrighten`
 
-### C# — FogManager.cs
-- `_ID` 추가: `_AbyssEnabled` `_AbyssThreshold` `_AbyssDepthRange` `_AbyssColor` `_AbyssMaxOpacity` `_AbyssNoiseStrength` `_AbyssNoiseScroll`
-- `PushFogGlobals(p)` 안에서 위 값 `Shader.SetGlobalXxx` push (기존 노이즈 push 패턴 참고)
+### 씬 배치
+- 구멍 지형 아래 **Y<바닥면**에 물 Plane(쿼드) 배치, 맵 구멍 전체를 덮게
+- 물 Plane엔 **콜라이더 없음** (캐릭터는 통과해 떨어짐)
+- 낙하 캐릭터는 불투명 Plane이 시각적으로 자연 차폐 (별도 렌더러 토글 불필요)
 
-### FogCore.hlsl — 어비스 평가 함수 추가
-```hlsl
-// ---------------- 어비스 물안개 ----------------
-float  _AbyssEnabled;
-float  _AbyssThreshold;
-float  _AbyssDepthRange;
-float4 _AbyssColor;
-float  _AbyssMaxOpacity;
-float  _AbyssNoiseStrength;
-float4 _AbyssNoiseScroll;
+### 낙하/복귀 연동 (기존 시스템 연결만)
+- 물 Plane 아래에 **리스폰 트리거 볼륨**(BoxCollider isTrigger) 1개 → 기존 "근처 복귀" 시스템 호출
+- 카메라는 어차피 따라가지 않음(기존 동작 유지) → 물 안쪽 노출 없음
 
-// worldPos.y가 임계 이하로 깊어질수록 심연색+일렁임. 반환=어비스 양(0~1), col=심연색
-float Abyss_Evaluate(float3 worldPos, out float3 col)
-{
-    col = _AbyssColor.rgb;
-    if (_AbyssEnabled < 0.5) return 0.0;
-    float depth = saturate((_AbyssThreshold - worldPos.y) / max(1e-4, _AbyssDepthRange));
-    if (depth <= 0.0) return 0.0;
-    // 물 일렁임: 스크롤 노이즈 강하게
-    float2 uv = worldPos.xz * _FogNoiseScale + _AbyssNoiseScroll.xy * _Time.y;
-    float n = _FogNoiseUseTexture > 0.5
-        ? SAMPLE_TEXTURE2D_LOD(_FogNoiseTex, sampler_FogNoiseTex, uv, 0).r
-        : Fog_ValueNoise(uv);
-    float wobble = lerp(1.0, n, saturate(_AbyssNoiseStrength));
-    return saturate(depth * _AbyssMaxOpacity * wobble);
-}
-```
-
-### FogCore.hlsl — 최종 합성 (Fog_Evaluate 반환 후, 또는 FullScreenFog에서)
-```hlsl
-// 기존 f(포그양)/outColor 계산 뒤:
-float3 abyssCol;
-float abyssAmt = Abyss_Evaluate(worldPos, abyssCol);
-// 어비스가 일반 포그를 덮어씀(더 짙고 어두움)
-outColor = lerp(outColor, abyssCol, abyssAmt);
-f = max(f, abyssAmt);
-```
-
-### 권장 테스트 세팅
-- 구멍 아래 Y<0 물 평면(또는 마스크 영역) 배치
-- `abyssThreshold` 0, `abyssDepthRange` 6~10, `abyssColor` (0.02,0.04,0.08), `abyssNoiseStrength` 1.5, `abyssNoiseScroll` (0.15,0.1)
-- 탑다운 카메라에서 구멍이 짙은 남색 + 안개 일렁임으로 보이면 성공
+### 성능 체크리스트
+- ✅ 쿼드 1장 + Unlit 1패스 (드로우콜 +1)
+- ✅ 텍스처 0장(절차 노이즈) 또는 노이즈 텍스처 1장
+- ❌ 금지: 실시간 반사, 투명 블렌딩(오버드로우), 스크린 굴절(grab pass), 테셀레이션/버텍스 웨이브
 
 ---
 
-## 3. 작업 순서 (다음 세션)
-1. 어비스 방식 결정(A 물평면 / B 마스크 / C 높이) — 맵 구조 확인 후 grill
-2. FogProfile.cs → FogManager.cs → FogCore.hlsl 순으로 어비스 구현
-3. losEnabled/viewRange 켜고 이터널리턴 FoW 튜닝
-4. 검증(Unity 스샷) → feature/map 커밋
+## 3. 작업 순서 (다음 세션 — 방식 확정됨, grill 불필요)
+1. `WaterDark.shader` + 머티리얼 작성 (불투명 어두운 물, 노이즈 2겹 스크롤, fake 깊이 그라데이션)
+2. 테스트 씬 구멍 아래 물 Plane 배치 → 탑다운/근접 육안 검증 (흐름 보임 + 물 안쪽 안 보임)
+3. 리스폰 트리거 볼륨 연결(기존 복귀 시스템)
+4. losEnabled/viewRange 켜고 이터널리턴 FoW 튜닝 (§1 권장값)
+5. 검증(Unity 스샷, 프레임 확인) → feature/map 커밋
 
 ## 4. 참고 — 파일 역할
 | 파일 | 역할 |
 |---|---|
 | `FogManager.cs` | 글로벌 프로퍼티 push, `_LosTex` 라디얼맵 CPU 생성(각도 블러 포함) |
 | `FogProfile.cs` | ScriptableObject 설정값 |
-| `FogCore.hlsl` | 포그/디밍/LoS/(예정)어비스 수학 |
+| `FogCore.hlsl` | 포그/디밍/LoS 수학 |
 | `FullScreenFog.shader` | 풀스크린 합성 패스 |
 | `FogRendererFeature.cs` | URP 렌더 패스 등록 |
+| (예정) `../Water/WaterDark.shader` | 불투명 어두운 물 Plane (Task 2, 신규) |
