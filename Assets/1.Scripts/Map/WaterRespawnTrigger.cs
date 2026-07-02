@@ -1,8 +1,8 @@
 using UnityEngine;
 
-// 어비스 물 아래 리스폰 트리거 — 낙하한 플레이어를 마지막 안전 지점 근처로 복귀.
+// 어비스 물 아래 리스폰 트리거 — 낙하한 플레이어를 가장 가까운 SpawnPoint로 복귀.
 // 물 Plane(콜라이더 없음) 아래에 BoxCollider(isTrigger) 볼륨으로 배치.
-// SafeGroundTracker 기록이 없으면(스폰 직후 낙하 등) 가장 가까운 SpawnPoint로 폴백.
+// TODO: "마지막 안전 지점 근처 복귀"가 필요해지면 안전지점 추적을 붙인다(SafeGroundTracker 초안은 964ba80 참고, 현재 제거됨).
 [RequireComponent(typeof(BoxCollider))]
 public class WaterRespawnTrigger : MonoBehaviour
 {
@@ -19,19 +19,8 @@ public class WaterRespawnTrigger : MonoBehaviour
         var player = other.GetComponentInParent<Player>();
         if (player == null) return;
 
-        var tracker = player.GetComponent<SafeGroundTracker>();
-        if (tracker == null)
-            tracker = player.gameObject.AddComponent<SafeGroundTracker>();
-
-        Vector3 target;
-        if (tracker.HasSafePosition)
-        {
-            target = tracker.LastSafePosition;
-        }
-        else if (!TryGetNearestSpawnPoint(player.transform.position, out target))
-        {
+        if (!TryGetNearestSpawnPoint(player.transform.position, out Vector3 target))
             target = Vector3.zero; // 최후 폴백: 맵 원점
-        }
         target += Vector3.up * RespawnHeightOffset;
 
         var rb = player.GetComponent<Rigidbody>();
