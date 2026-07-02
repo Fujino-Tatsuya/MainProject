@@ -96,20 +96,20 @@ public static class ZoneWiring
             created.Add(slot);
         }
 
-        // 연결 그래프 → 슬롯별 다리 방향(월드 지배축) 플래그
+        // 연결 그래프 → 슬롯별 다리 개수(월드 지배축 방향별)
         foreach (var p in SlotPairs)
         {
             var a = created[p.a]; var b = created[p.b];
             Vector3 d = b.transform.position - a.transform.position;
             if (Mathf.Abs(d.x) >= Mathf.Abs(d.z))
             {
-                if (d.x > 0) { a.ConnE = true; b.ConnW = true; }
-                else         { a.ConnW = true; b.ConnE = true; }
+                if (d.x > 0) { a.ConnE++; b.ConnW++; }
+                else         { a.ConnW++; b.ConnE++; }
             }
             else
             {
-                if (d.z > 0) { a.ConnN = true; b.ConnS = true; }
-                else         { a.ConnS = true; b.ConnN = true; }
+                if (d.z > 0) { a.ConnN++; b.ConnS++; }
+                else         { a.ConnS++; b.ConnN++; }
             }
         }
 
@@ -192,18 +192,8 @@ public static class ZoneWiring
         return (steps & 1) == 1 ? new Vector2(half.y, half.x) : half;
     }
 
-    // ---- 문 표준 좌표 (Report Zone Door Positions 실측, 존-로컬·피벗=중앙) ----
-    // E변(x=+hx)의 문 z좌표 / S변(z=-hz)의 문 x좌표. N/W변은 완전 개방(문 불필요).
-    static float[] DoorsE(ZoneSize s) => s == ZoneSize.Small ? new[] { 0.5f } : new[] { 10.5f, -9.5f };
-    static float[] DoorsS(ZoneSize s) => s switch
-    {
-        ZoneSize.Large => new[] { -10.5f },
-        ZoneSize.Medium => new[] { -0.5f },
-        _ => new[] { -0.5f },
-    };
-
     // 슬롯의 최종 회전(스텝) — LayoutPlacer.PickYaw와 동일 규칙을 "표준 존(N/W 개방)" 가정으로 복제.
-    // 회전이 결정적이라 어떤 디자인이 와도 슬롯별 벽 방향은 고정 → 다리를 문에 앵커 가능.
+    // 다리 "개수" 가중 최대 커버(동점=최소 회전, 결정적) — 어떤 디자인이 와도 슬롯별 벽 방향 고정.
     static int FinalStepsFor(ZoneSlot s)
     {
         int slotSteps = Mathf.RoundToInt(s.transform.eulerAngles.y / 90f) & 3;
@@ -215,42 +205,12 @@ public static class ZoneWiring
             int score = 0;
             for (int d = 0; d < 4; d++)
             {
-                if (!s.HasConn(d)) continue;
                 int l = (d - total + 4) & 3;
-                if (l == 0 || l == 3) score++; // N/W 개방변
+                if (l == 0 || l == 3) score += s.ConnCount(d); // N/W 개방변이 커버하는 다리 수
             }
             if (score > bestScore) { bestScore = score; best = extra; }
         }
         return (slotSteps + best) & 3;
-    }
-
-    // worldDir(0=N..3=W) 방향 변이 벽(E/S)이면 그 변 문들의 "진행축 수직 좌표"(월드)를 반환, 개방변이면 null.
-    static List<float> DoorAlongCoords(ZoneSlot s, int worldDir, bool corridorAlongX)
-    {
-        int total = FinalStepsFor(s);
-        int l = (worldDir - total + 4) & 3;
-        if (l == 0 || l == 3) return null; // 개방변 — 어디든 연결 가능
-
-        Vector2 half = BaseHalf(s.Size);
-        var pts = new List<Vector2>(); // 존-로컬 문 위치
-        if (l == 1) foreach (float off in DoorsE(s.Size)) pts.Add(new Vector2(half.x, off));
-        else        foreach (float off in DoorsS(s.Size)) pts.Add(new Vector2(off, -half.y));
-
-        var result = new List<float>();
-        foreach (var p in pts)
-        {
-            // yaw 스텝 회전: 1스텝(+90°) (x,z)→(z,-x)
-            Vector2 r = total switch
-            {
-                1 => new Vector2(p.y, -p.x),
-                2 => new Vector2(-p.x, -p.y),
-                3 => new Vector2(-p.y, p.x),
-                _ => p,
-            };
-            Vector3 w = s.transform.position + new Vector3(r.x, 0f, r.y);
-            result.Add(corridorAlongX ? w.z : w.x);
-        }
-        return result;
     }
 
     const string GeoPrefabPath = "Assets/50.Art/MapGen/MapObj/MapGeometryV2.prefab";
@@ -356,33 +316,18 @@ public static class ZoneWiring
             if (ovHi - ovLo < CorridorWidth) { Debug.LogWarning($"[CorridorV2] {a.name}↔{b.name} 측면 겹침 {ovHi - ovLo:F1}m < 폭 {CorridorWidth} — 스킵(슬롯 좌표 보정 필요)"); continue; }
             if (end - start < 0.5f) { Debug.LogWarning($"[CorridorV2] {a.name}↔{b.name} 간격 {end - start:F1}m — 존 겹침/근접, 스킵(슬롯 좌표 보정 필요)"); continue; }
 
-            // 다리 중심: 벽(E/S) 변으로 붙는 쪽이 있으면 그 변의 "표준 문 위치"에 앵커.
-            // 양쪽 다 벽이면 겹침 중앙에 가장 가까운 문 기준 + 상대측 문과 어긋나면 경고.
-            float center = (ovLo + ovHi) * 0.5f;
-            var doorsA = DoorAlongCoords(a, dirA, alongX);
-            var doorsB = DoorAlongCoords(b, dirB, alongX);
-            if (doorsA != null || doorsB != null)
+            // 문은 장식(통로 아님) — 다리는 반드시 "개방변"으로만 연결한다.
+            // 회전 매칭 후에도 벽 변으로 갈 수밖에 없는 다리는 미생성 + 경고
+            // (설계 그래프의 다리 수 > 존 개구부 수 — 아트 개구부 추가 or 그래프 조정 필요).
+            int lA = (dirA - FinalStepsFor(a) + 4) & 3;
+            int lB = (dirB - FinalStepsFor(b) + 4) & 3;
+            if (lA == 1 || lA == 2 || lB == 1 || lB == 2)
             {
-                var cands = new List<float>();
-                if (doorsA != null) cands.AddRange(doorsA);
-                if (doorsB != null) cands.AddRange(doorsB);
-                float mid = center, bestC = cands[0];
-                foreach (float c in cands)
-                    if (Mathf.Abs(c - mid) < Mathf.Abs(bestC - mid)) bestC = c;
-                float clamped = Mathf.Clamp(bestC, ovLo + CorridorWidth * 0.5f, ovHi - CorridorWidth * 0.5f);
-                if (Mathf.Abs(clamped - bestC) > 0.01f)
-                    Debug.LogWarning($"[CorridorV2] {a.name}↔{b.name} 문 위치 {bestC:F1}가 겹침 범위를 벗어나 {clamped:F1}로 클램프 — 슬롯 좌표 보정 권장.");
-                if (doorsA != null && doorsB != null)
-                {
-                    float bOther = doorsB[0];
-                    foreach (float c in doorsB) if (Mathf.Abs(c - bestC) < Mathf.Abs(bOther - bestC)) bOther = c;
-                    float aOther = doorsA[0];
-                    foreach (float c in doorsA) if (Mathf.Abs(c - bestC) < Mathf.Abs(aOther - bestC)) aOther = c;
-                    if (Mathf.Abs(aOther - bOther) > 1f)
-                        Debug.LogWarning($"[CorridorV2] {a.name}↔{b.name} 양측 모두 벽인데 문 위치 불일치(A {aOther:F1} vs B {bOther:F1}) — 슬롯 좌표/회전 확인.");
-                }
-                center = clamped;
+                string blocked = (lA == 1 || lA == 2) ? a.name : b.name;
+                Debug.LogWarning($"[GeoV2] ✋ {a.name}↔{b.name} 다리 미생성 — {blocked} 쪽이 벽 변(개구부 없음).");
+                continue;
             }
+            float center = (ovLo + ovHi) * 0.5f;
 
             var group = new GameObject($"Cor_{a.SlotID}_{b.SlotID}").transform;
             group.SetParent(root, false);
@@ -401,7 +346,7 @@ public static class ZoneWiring
         //    벽 변(E/S 로컬) = 존 자체 벽+문 — 다리가 안 붙은 문은 바깥 벽 패치로 차단(떨어지는 길 방지).
         var wallsRoot = new GameObject("ZoneEdgeWalls").transform;
         wallsRoot.SetParent(geoRoot.transform, false);
-        int wallEdges = 0, blockedDoors = 0;
+        int wallEdges = 0;
         foreach (var s in slots)
         {
             int total = FinalStepsFor(s);
@@ -416,31 +361,7 @@ public static class ZoneWiring
                 bool alongX = d == 0 || d == 2; // N/S 변은 X축 진행
                 mouths.TryGetValue((s.SlotID, d), out var gaps);
 
-                if (l == 1 || l == 2)
-                {
-                    // 벽 변: 미사용 문 차단 — 다리 입구가 없는 문 위치에 바깥쪽 벽 패치
-                    var doors = DoorAlongCoords(s, d, d == 1 || d == 3);
-                    if (doors == null) continue;
-                    float crossOut = d switch
-                    {
-                        0 => pos.z + half.y + WallThickness * 0.5f,
-                        1 => pos.x + half.x + WallThickness * 0.5f,
-                        2 => pos.z - half.y - WallThickness * 0.5f,
-                        _ => pos.x - half.x - WallThickness * 0.5f,
-                    };
-                    foreach (float door in doors)
-                    {
-                        bool used = false;
-                        if (gaps != null)
-                            foreach (float g in gaps)
-                                if (Mathf.Abs(g - door) < 2f) { used = true; break; }
-                        if (used) continue;
-                        FillLine(edgeParent, alongX, door - 2.3f, door + 2.3f, crossOut,
-                                 floorTop + WallHeight * 0.5f, new Vector2(WallThickness, WallHeight), wallMat, "doorBlock");
-                        blockedDoors++;
-                    }
-                    continue;
-                }
+                if (l == 1 || l == 2) continue; // 벽 변 — 존 자체 벽이 이미 막음(문은 장식일 뿐 구멍 아님)
 
                 // 개방변: 다리 입구만 트고 채움
                 float lo = alongX ? pos.x - half.x : pos.z - half.y;
@@ -460,7 +381,7 @@ public static class ZoneWiring
         // ③ 프리팹 저장 (씬 인스턴스 연결 유지 — 재빌드 시 덮어쓰기)
         PrefabUtility.SaveAsPrefabAssetAndConnect(geoRoot, GeoPrefabPath, InteractionMode.AutomatedAction);
         UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(stage1.scene);
-        Debug.Log($"[GeoV2] 다리 {built}/{SlotPairs.Length} + 개방변 벽 {wallEdges}변 + 미사용 문 차단 {blockedDoors}개 (보행면 y={floorTop:F2}) → {GeoPrefabPath}");
+        Debug.Log($"[GeoV2] 다리 {built}/{SlotPairs.Length} + 개방변 벽 {wallEdges}변 (보행면 y={floorTop:F2}) → {GeoPrefabPath}. 미생성 다리는 개구부/그래프 조정 필요(경고 참조).");
     }
 
     // 한 직선 구간을 벽으로 채우되 gaps(중심±gapHalf)만 트기. (다리 입구/문) 벽 바닥 = baseY.
@@ -579,11 +500,9 @@ public static class ZoneWiring
 
         // 표준 M 규격 준수: N/W 완전 개방, S/E 벽 + 표준 문 위치(문 폭 4m).
         //  E변 문 z=10.5/-9.5, S변 문 x=-0.5 (Report Zone Door Positions 실측값과 동일)
-        const float doorHalf = 2f;
-        WallLineWithGaps(root.transform, true, -hx, hx, -hz + WallThickness * 0.5f,
-                         new List<float>(DoorsS(ZoneSize.Medium)), doorHalf, wallMat, floorTop);  // S
-        WallLineWithGaps(root.transform, false, -hz, hz, hx - WallThickness * 0.5f,
-                         new List<float>(DoorsE(ZoneSize.Medium)), doorHalf, wallMat, floorTop);  // E
+        // S/E 벽은 통짜(문 없음) — 실제 존과 동일 규칙(문은 장식일 뿐, 통로=개방변 N/W)
+        WallLineWithGaps(root.transform, true, -hx, hx, -hz + WallThickness * 0.5f, null, 0f, wallMat, floorTop);  // S
+        WallLineWithGaps(root.transform, false, -hz, hz, hx - WallThickness * 0.5f, null, 0f, wallMat, floorTop); // E
 
         var layout = root.AddComponent<ZoneLayout>();
         layout.Size = ZoneSize.Medium;

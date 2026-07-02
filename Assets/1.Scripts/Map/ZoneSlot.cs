@@ -17,14 +17,15 @@ public class ZoneSlot : MonoBehaviour
     public bool IsSpawnCandidate;
 
     [Header("=== 다리 연결 방향 (ZoneWiring이 연결 그래프에서 채움, 월드 기준) ===")]
-    [Tooltip("이 슬롯에 다리가 붙는 월드 방향. 배치 시 존 출입구가 이 방향들을 전부 커버하도록 회전 매칭.")]
-    public bool ConnN;
-    public bool ConnE;
-    public bool ConnS;
-    public bool ConnW;
+    [Tooltip("이 슬롯에 붙는 다리 개수(월드 방향별). 회전 매칭이 개방변으로 최대한 많은 다리를 커버하도록 사용.")]
+    public int ConnN;
+    public int ConnE;
+    public int ConnS;
+    public int ConnW;
 
     // dir: 0=N(+Z) 1=E(+X) 2=S(-Z) 3=W(-X)
-    public bool HasConn(int dir) => dir switch { 0 => ConnN, 1 => ConnE, 2 => ConnS, _ => ConnW };
+    public int ConnCount(int dir) => dir switch { 0 => ConnN, 1 => ConnE, 2 => ConnS, _ => ConnW };
+    public bool HasConn(int dir) => ConnCount(dir) > 0;
 
     [Header("=== 런타임 (생성기가 채움) ===")]
     public ZoneRole AssignedRole = ZoneRole.Combat;

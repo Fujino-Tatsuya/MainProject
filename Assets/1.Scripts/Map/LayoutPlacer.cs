@@ -114,8 +114,8 @@ public class LayoutPlacer : MonoBehaviour
             int total = (slotSteps + extra) & 3;
             int score = 0;
             for (int d = 0; d < 4; d++)
-                if (slot.HasConn(d) && layout.HasOpening((d - total + 4) & 3))
-                    score++;
+                if (layout.HasOpening((d - total + 4) & 3))
+                    score += slot.ConnCount(d); // 다리 "개수" 가중 — 개방변이 최대한 많은 다리를 받도록
             if (score > bestScore) { bestScore = score; best = extra; }
         }
         return best;
