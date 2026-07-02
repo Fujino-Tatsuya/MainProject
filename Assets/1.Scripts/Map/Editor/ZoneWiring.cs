@@ -248,28 +248,52 @@ public static class ZoneWiring
         return result;
     }
 
-    [MenuItem("Tools/MapGen/Build Corridors V2 (Tex_zone)")]
-    static void BuildCorridorsV2()
+    const string GeoPrefabPath = "Assets/50.Art/MapGen/MapObj/MapGeometryV2.prefab";
+
+    // 정적 지오메트리 v2 통합 빌드 (2026-07 팀장 지시):
+    //  ① 구 MapGeometry(v1 바닥/벽/다리) 삭제
+    //  ② 슬롯 위치·결정 회전 기준으로 다리(문 앵커) + 존 개방변(N/W) 둘레벽(다리 입구만 트기) 생성
+    //  ③ Tex_zone 머티리얼 통일 → MapGeometryV2.prefab 저장(씬 인스턴스 연결 유지)
+    [MenuItem("Tools/MapGen/Build Static Geometry V2 (Corridors+Walls → Prefab)")]
+    static void BuildStaticGeometryV2()
     {
         var stage1 = GameObject.Find("Stage1");
-        if (stage1 == null) { Debug.LogError("[CorridorV2] Stage1 없음"); return; }
+        if (stage1 == null) { Debug.LogError("[GeoV2] Stage1 없음"); return; }
 
         var slots = new List<ZoneSlot>(Object.FindObjectsByType<ZoneSlot>(FindObjectsSortMode.None));
         slots.Sort((a, b) => a.SlotID.CompareTo(b.SlotID));
-        if (slots.Count == 0) { Debug.LogError("[CorridorV2] ZoneSlot 없음 — 먼저 Wire 실행"); return; }
+        if (slots.Count == 0) { Debug.LogError("[GeoV2] ZoneSlot 없음 — 먼저 Wire 실행"); return; }
 
         var floorMat = AssetDatabase.LoadAssetAtPath<Material>($"{TexDir}/zone_floor_basic.mat");
         var wallMat = AssetDatabase.LoadAssetAtPath<Material>($"{TexDir}/zone_wall_basic.mat");
-        if (floorMat == null || wallMat == null) { Debug.LogError("[CorridorV2] Tex_zone 머티리얼 없음 — 먼저 Import All 실행"); return; }
+        if (floorMat == null || wallMat == null) { Debug.LogError("[GeoV2] Tex_zone 머티리얼 없음 — 먼저 Import All 실행"); return; }
 
-        var oldV2 = stage1.transform.Find("CorridorsV2");
-        if (oldV2 != null) Object.DestroyImmediate(oldV2.gameObject);
-        var root = new GameObject("CorridorsV2").transform;
-        root.SetParent(stage1.transform, false);
+        // ① 구 산출물 제거: v1 MapGeometry(프리팹 인스턴스면 언팩 후), 구 CorridorsV2, 기존 MapGeometryV2
+        foreach (string oldName in new[] { "MapGeometry", "CorridorsV2", "MapGeometryV2" })
+        {
+            var old = stage1.transform.Find(oldName);
+            if (old == null) continue;
+            if (PrefabUtility.IsPartOfPrefabInstance(old.gameObject))
+            {
+                var outermost = PrefabUtility.GetOutermostPrefabInstanceRoot(old.gameObject);
+                if (outermost != null && outermost != stage1)
+                    PrefabUtility.UnpackPrefabInstance(outermost, PrefabUnpackMode.OutermostRoot, InteractionMode.AutomatedAction);
+            }
+            Object.DestroyImmediate(old.gameObject);
+        }
 
-        // 구 다리는 비활성 (텍스처/위치 안 맞음 — 삭제는 검증 후)
-        var oldCorr = stage1.transform.Find("MapGeometry/Corridors");
-        if (oldCorr != null) oldCorr.gameObject.SetActive(false);
+        var geoRoot = new GameObject("MapGeometryV2");
+        geoRoot.transform.SetParent(stage1.transform, false);
+        var root = new GameObject("Corridors").transform;
+        root.SetParent(geoRoot.transform, false);
+
+        // 다리 입구 수집: (SlotID, 월드방향) → 입구 중심들 (개방변 벽에 구멍 낼 위치)
+        var mouths = new Dictionary<(int slot, int dir), List<float>>();
+        void AddMouth(int slot, int dir, float c)
+        {
+            if (!mouths.TryGetValue((slot, dir), out var list)) mouths[(slot, dir)] = list = new List<float>();
+            list.Add(c);
+        }
 
         int built = 0;
         foreach (var p in SlotPairs)
@@ -336,11 +360,65 @@ public static class ZoneWiring
             float wallOff = CorridorWidth * 0.5f + WallThickness * 0.5f;
             FillLine(group, alongX, start, end, center + wallOff, WallHeight * 0.5f, new Vector2(WallThickness, WallHeight), wallMat, "wall");
             FillLine(group, alongX, start, end, center - wallOff, WallHeight * 0.5f, new Vector2(WallThickness, WallHeight), wallMat, "wall");
+            AddMouth(a.SlotID, dirA, center);
+            AddMouth(b.SlotID, dirB, center);
             built++;
         }
 
+        // ② 존 개방변(N/W 로컬) 둘레벽 — 다리 입구 위치만 트고 채움.
+        //    벽 변(E/S 로컬)은 존 자체 벽+문이 있으므로 생략.
+        var wallsRoot = new GameObject("ZoneEdgeWalls").transform;
+        wallsRoot.SetParent(geoRoot.transform, false);
+        int wallEdges = 0;
+        foreach (var s in slots)
+        {
+            int total = FinalStepsFor(s);
+            Vector2 half = HalfExtents(s);
+            Vector3 pos = s.transform.position;
+            var edgeParent = new GameObject($"Walls_{s.SlotID}_{s.name}").transform;
+            edgeParent.SetParent(wallsRoot, false);
+
+            for (int d = 0; d < 4; d++)
+            {
+                int l = (d - total + 4) & 3;
+                if (l == 1 || l == 2) continue; // 존 자체 벽(E/S) — 생성 시 존이 가져옴
+                mouths.TryGetValue((s.SlotID, d), out var gaps);
+
+                bool alongX = d == 0 || d == 2; // N/S 변은 X축 진행
+                float lo = alongX ? pos.x - half.x : pos.z - half.y;
+                float hi = alongX ? pos.x + half.x : pos.z + half.y;
+                float cross = d switch
+                {
+                    0 => pos.z + half.y - WallThickness * 0.5f,
+                    1 => pos.x + half.x - WallThickness * 0.5f,
+                    2 => pos.z - half.y + WallThickness * 0.5f,
+                    _ => pos.x - half.x + WallThickness * 0.5f,
+                };
+                WallLineWithGaps(edgeParent, alongX, lo, hi, cross, gaps, CorridorWidth * 0.5f, wallMat);
+                wallEdges++;
+            }
+        }
+
+        // ③ 프리팹 저장 (씬 인스턴스 연결 유지 — 재빌드 시 덮어쓰기)
+        PrefabUtility.SaveAsPrefabAssetAndConnect(geoRoot, GeoPrefabPath, InteractionMode.AutomatedAction);
         UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(stage1.scene);
-        Debug.Log($"[CorridorV2] 다리 {built}/{SlotPairs.Length} 생성 (Tex_zone 머티리얼, 구 Corridors 비활성). 스킵된 쌍은 슬롯 좌표 보정 후 재실행.");
+        Debug.Log($"[GeoV2] 다리 {built}/{SlotPairs.Length} + 개방변 벽 {wallEdges}개 변 생성 → {GeoPrefabPath} (구 MapGeometry 삭제됨)");
+    }
+
+    // 한 직선 구간을 벽으로 채우되 gaps(중심±gapHalf)만 트기. (다리 입구/문)
+    static void WallLineWithGaps(Transform parent, bool alongX, float lo, float hi, float cross, List<float> gaps, float gapHalf, Material mat)
+    {
+        var sorted = gaps != null ? new List<float>(gaps) : new List<float>();
+        sorted.Sort();
+        float cursor = lo;
+        foreach (float g in sorted)
+        {
+            if (g - gapHalf > cursor)
+                FillLine(parent, alongX, cursor, g - gapHalf, cross, WallHeight * 0.5f, new Vector2(WallThickness, WallHeight), mat, "wall");
+            cursor = Mathf.Max(cursor, g + gapHalf);
+        }
+        if (hi > cursor)
+            FillLine(parent, alongX, cursor, hi, cross, WallHeight * 0.5f, new Vector2(WallThickness, WallHeight), mat, "wall");
     }
 
     // 진행축(alongX) 구간 [from,to]를 SegLen 단위 큐브로 정확히 채움. size=(가로폭, 높이).
