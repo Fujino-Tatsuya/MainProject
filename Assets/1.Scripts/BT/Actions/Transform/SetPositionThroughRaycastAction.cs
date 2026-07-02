@@ -25,13 +25,8 @@ public partial class SetPositionThroughRaycastAction : Action
         //    return Status.Failure;
         //}
 
-        if (NavMesh.Raycast(Agent.Value.transform.position, Position.Value, out NavMeshHit navMeshHit, areaMask))
-        {
-            Position.Value = navMeshHit.position;
-        }
-
-        Debug.Log($"SetPositionThroughRaycastAction: Position set to {Position.Value}");
-
+        Position.Value = Target.Value.transform.position;
+        Debug.Log($"최종 목적지 좌표: {Position.Value}");
         return Status.Success;
     }
 
