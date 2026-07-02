@@ -17,6 +17,12 @@ public class MapContentSpawner : MonoBehaviour
     {
         ClearGenerated();
         _root = new GameObject(RootName).transform;
+#if UNITY_EDITOR
+        // 에디터 테스트 생성물(Test Generate 메뉴)은 씬 파일에 저장하지 않는다 —
+        // 실수로 씬 저장 시 존 수천 오브젝트가 박제되는 것 방지. 런타임 생성은 어차피 저장 안 됨.
+        if (!Application.isPlaying)
+            _root.gameObject.hideFlags = HideFlags.DontSaveInEditor;
+#endif
 
         var nm = NetworkManager.Singleton;
         bool isServer = nm != null && nm.IsServer;
