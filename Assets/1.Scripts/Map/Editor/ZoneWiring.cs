@@ -150,10 +150,15 @@ public static class ZoneWiring
         Debug.Log($"[Wire] ✔ 슬롯 {id} + 카탈로그 {cat.Entries.Count} + 참조 연결. 임시 Zone_* {hidden} 숨김. (LayoutPlacer={(lpOk ? "OK" : "없음")}, ContentSpawner={(csOk ? "OK" : "없음")})");
     }
 
-    [MenuItem("Tools/MapGen/Test Generate (shuffle, seed 12345)")]
+    // 매번 다른 배치: 대형 3 순열 / 중형 3+퀘스트(4곳 중 1) / 스폰↔보스입구(좌상·좌하 랜덤)
+    [MenuItem("Tools/MapGen/Test Generate (random seed)")]
+    static void GenRandom() => RunGen(System.Environment.TickCount);
+
+    // 고정 시드 — 재현/디버그용
+    [MenuItem("Tools/MapGen/Test Generate (seed 12345, 재현용)")]
     static void Gen12345() => RunGen(12345);
 
-    [MenuItem("Tools/MapGen/Test Generate (shuffle, seed 99)")]
+    [MenuItem("Tools/MapGen/Test Generate (seed 99, 재현용)")]
     static void Gen99() => RunGen(99);
 
     static void RunGen(int seed)
