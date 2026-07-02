@@ -239,8 +239,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1688202503914477069}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.7071068, y: 0.7071068, z: 0, w: 0}
-  m_LocalPosition: {x: 0.068, y: 0.325, z: -0.229}
+  m_LocalRotation: {x: -0.37136412, y: 0.50739163, z: 0.070222504, w: -0.77441025}
+  m_LocalPosition: {x: -0.25175714, y: -0.20234545, z: -2.2254777}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 1
   m_Children: []
@@ -910,7 +910,7 @@ MonoBehaviour:
           m_Value0: 891075477305766340
           m_Value1: 8919902273331475158
         Name: MyAnimator
-        m_Value: {fileID: 4360647608449234546}
+        m_Value: {fileID: 0}
     - rid: 5035182944123880110
       type: {class: 'BlackboardVariable`1[[EnableCollider, Assembly-CSharp]]', ns: Unity.Behavior, asm: Unity.Behavior}
       data:
@@ -1458,7 +1458,9 @@ MonoBehaviour:
   grabDamage: 5
   holdDamage: 1
   holdAttackPeriod: 0.5
-  landingDamagePercentage: 30
+  landingDamage: 0
+  throwDirection: {x: 0, y: 0, z: 0}
+  throwStrength: 0
 --- !u!1 &8300409248683084403
 GameObject:
   m_ObjectHideFlags: 0
@@ -1577,7 +1579,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7088600385777052897, guid: 0b61d617ad0871e44acc43a49be710cf, type: 3}
       propertyPath: m_Name
-      value: Amature
+      value: SKM_Golem (2)
       objectReference: {fileID: 0}
     - target: {fileID: 7571699769823753819, guid: 0b61d617ad0871e44acc43a49be710cf, type: 3}
       propertyPath: m_LocalPosition.x
@@ -1641,11 +1643,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 180962815706630067, guid: 0b61d617ad0871e44acc43a49be710cf, type: 3}
   m_PrefabInstance: {fileID: 247726442781629011}
   m_PrefabAsset: {fileID: 0}
---- !u!95 &4360647608449234546 stripped
-Animator:
-  m_CorrespondingSourceObject: {fileID: 4608369919061240865, guid: 0b61d617ad0871e44acc43a49be710cf, type: 3}
-  m_PrefabInstance: {fileID: 247726442781629011}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1 &7003059613902337714 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 7088600385777052897, guid: 0b61d617ad0871e44acc43a49be710cf, type: 3}
@@ -1666,59 +1663,10 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   NetworkAnimatorExpanded: 0
   AuthorityMode: 0
-  m_Animator: {fileID: 4360647608449234546}
-  TransitionStateInfoList:
-  - IsCrossFadeExit: 0
-    Layer: 0
-    OriginatingState: 221587152
-    DestinationState: -843218978
-    TransitionDuration: 0.25
-    TriggerNameHash: -891938696
-    TransitionIndex: 0
-  - IsCrossFadeExit: 0
-    Layer: 0
-    OriginatingState: 221587152
-    DestinationState: 2081823275
-    TransitionDuration: 0.25
-    TriggerNameHash: 1625683022
-    TransitionIndex: 1
-  - IsCrossFadeExit: 0
-    Layer: 0
-    OriginatingState: -843218978
-    DestinationState: 2081823275
-    TransitionDuration: 0.25
-    TriggerNameHash: 1625683022
-    TransitionIndex: 0
+  m_Animator: {fileID: 0}
+  TransitionStateInfoList: []
   AnimatorParameterEntries:
-    ParameterEntries:
-    - name: State
-      NameHash: 1649606143
-      Synchronize: 1
-      ParameterType: 3
-    - name: Jump
-      NameHash: 125937960
-      Synchronize: 1
-      ParameterType: 3
-    - name: IsGroggy
-      NameHash: 847727466
-      Synchronize: 1
-      ParameterType: 9
-    - name: IsBreak
-      NameHash: -891938696
-      Synchronize: 1
-      ParameterType: 9
-    - name: IsDead
-      NameHash: 1270110494
-      Synchronize: 1
-      ParameterType: 9
-    - name: IsWalking
-      NameHash: 1282839668
-      Synchronize: 1
-      ParameterType: 9
-    - name: IsInit
-      NameHash: 1625683022
-      Synchronize: 1
-      ParameterType: 9
+    ParameterEntries: []
   AnimatorParametersExpanded: 0
 --- !u!114 &52311990419430086
 MonoBehaviour:
@@ -1733,7 +1681,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ServerSetAnimState
   ShowTopMostFoldoutHeaderGroup: 1
-  animator: {fileID: 4360647608449234546}
+  animator: {fileID: 0}
 --- !u!114 &1396588492618051365
 MonoBehaviour:
   m_ObjectHideFlags: 0
