@@ -215,37 +215,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 81c70da5a2e747148bf71f917743b5fd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ColliderInfo
---- !u!1 &1688202503914477069
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 6937263478194986299}
-  m_Layer: 0
-  m_Name: GrabSocket
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &6937263478194986299
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1688202503914477069}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0.7071068, y: 0.7071068, z: 0, w: 0}
-  m_LocalPosition: {x: 0.068, y: 0.325, z: -0.229}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 1
-  m_Children: []
-  m_Father: {fileID: 140439914847657440}
-  m_LocalEulerAnglesHint: {x: 0, y: 180, z: 90}
 --- !u!1 &2538891665261033949
 GameObject:
   m_ObjectHideFlags: 0
@@ -894,7 +863,7 @@ MonoBehaviour:
           m_Value0: 7356739638323325224
           m_Value1: 6148736503789710872
         Name: ServerSetAnimState
-        m_Value: {fileID: 52311990419430086}
+        m_Value: {fileID: 7990462879863374674}
     - rid: 5035182925311639983
       type: {class: 'BlackboardVariable`1[[TwentyThreeBasicAttackChoice, Assembly-CSharp]]', ns: Unity.Behavior, asm: Unity.Behavior}
       data:
@@ -1449,7 +1418,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GrabController
   ShowTopMostFoldoutHeaderGroup: 1
-  grabSocket: {fileID: 6937263478194986299}
+  grabSocket: {fileID: 5478182228516368551}
   grabColliderInfo: {fileID: 6124302813489217326}
   targetMask:
     serializedVersion: 2
@@ -1567,14 +1536,14 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 2585134952784665517}
     m_Modifications:
-    - target: {fileID: 4608369919061240865, guid: 0b61d617ad0871e44acc43a49be710cf, type: 3}
-      propertyPath: m_Controller
+    - target: {fileID: 1946988448521182992, guid: 0b61d617ad0871e44acc43a49be710cf, type: 3}
+      propertyPath: grabController
       value: 
-      objectReference: {fileID: 9100000, guid: 31d04fbded57bff4b839713ec2cca9de, type: 2}
-    - target: {fileID: 4608369919061240865, guid: 0b61d617ad0871e44acc43a49be710cf, type: 3}
-      propertyPath: m_ApplyRootMotion
-      value: 0
-      objectReference: {fileID: 0}
+      objectReference: {fileID: 8939195106823421711}
+    - target: {fileID: 1946988448521182992, guid: 0b61d617ad0871e44acc43a49be710cf, type: 3}
+      propertyPath: jumpController
+      value: 
+      objectReference: {fileID: 273769967766734601}
     - target: {fileID: 7088600385777052897, guid: 0b61d617ad0871e44acc43a49be710cf, type: 3}
       propertyPath: m_Name
       value: Amature
@@ -1621,139 +1590,35 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
-    m_AddedGameObjects:
-    - targetCorrespondingSourceObject: {fileID: 180962815706630067, guid: 0b61d617ad0871e44acc43a49be710cf, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 6937263478194986299}
-    m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: 7088600385777052897, guid: 0b61d617ad0871e44acc43a49be710cf, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 1329105890528872702}
-    - targetCorrespondingSourceObject: {fileID: 7088600385777052897, guid: 0b61d617ad0871e44acc43a49be710cf, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 52311990419430086}
-    - targetCorrespondingSourceObject: {fileID: 7088600385777052897, guid: 0b61d617ad0871e44acc43a49be710cf, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 1396588492618051365}
+    m_AddedGameObjects: []
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 0b61d617ad0871e44acc43a49be710cf, type: 3}
---- !u!4 &140439914847657440 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 180962815706630067, guid: 0b61d617ad0871e44acc43a49be710cf, type: 3}
-  m_PrefabInstance: {fileID: 247726442781629011}
-  m_PrefabAsset: {fileID: 0}
 --- !u!95 &4360647608449234546 stripped
 Animator:
   m_CorrespondingSourceObject: {fileID: 4608369919061240865, guid: 0b61d617ad0871e44acc43a49be710cf, type: 3}
   m_PrefabInstance: {fileID: 247726442781629011}
   m_PrefabAsset: {fileID: 0}
---- !u!1 &7003059613902337714 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 7088600385777052897, guid: 0b61d617ad0871e44acc43a49be710cf, type: 3}
+--- !u!4 &5478182228516368551 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 5725887487946730228, guid: 0b61d617ad0871e44acc43a49be710cf, type: 3}
   m_PrefabInstance: {fileID: 247726442781629011}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &1329105890528872702
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7003059613902337714}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e8d0727d5ae3244e3b569694d3912374, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.Components.NetworkAnimator
-  ShowTopMostFoldoutHeaderGroup: 1
-  NetworkAnimatorExpanded: 0
-  AuthorityMode: 0
-  m_Animator: {fileID: 4360647608449234546}
-  TransitionStateInfoList:
-  - IsCrossFadeExit: 0
-    Layer: 0
-    OriginatingState: 221587152
-    DestinationState: -843218978
-    TransitionDuration: 0.25
-    TriggerNameHash: -891938696
-    TransitionIndex: 0
-  - IsCrossFadeExit: 0
-    Layer: 0
-    OriginatingState: 221587152
-    DestinationState: 2081823275
-    TransitionDuration: 0.25
-    TriggerNameHash: 1625683022
-    TransitionIndex: 1
-  - IsCrossFadeExit: 0
-    Layer: 0
-    OriginatingState: -843218978
-    DestinationState: 2081823275
-    TransitionDuration: 0.25
-    TriggerNameHash: 1625683022
-    TransitionIndex: 0
-  AnimatorParameterEntries:
-    ParameterEntries:
-    - name: State
-      NameHash: 1649606143
-      Synchronize: 1
-      ParameterType: 3
-    - name: Jump
-      NameHash: 125937960
-      Synchronize: 1
-      ParameterType: 3
-    - name: IsGroggy
-      NameHash: 847727466
-      Synchronize: 1
-      ParameterType: 9
-    - name: IsBreak
-      NameHash: -891938696
-      Synchronize: 1
-      ParameterType: 9
-    - name: IsDead
-      NameHash: 1270110494
-      Synchronize: 1
-      ParameterType: 9
-    - name: IsWalking
-      NameHash: 1282839668
-      Synchronize: 1
-      ParameterType: 9
-    - name: IsInit
-      NameHash: 1625683022
-      Synchronize: 1
-      ParameterType: 9
-  AnimatorParametersExpanded: 0
---- !u!114 &52311990419430086
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7003059613902337714}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 13e8c5b35403d6b468c8645946489777, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ServerSetAnimState
-  ShowTopMostFoldoutHeaderGroup: 1
-  animator: {fileID: 4360647608449234546}
---- !u!114 &1396588492618051365
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7003059613902337714}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 854cd2378b965774f89b4d92521510a9, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::TwentyThreeAnimEvents
-  ShowTopMostFoldoutHeaderGroup: 1
-  grabController: {fileID: 8939195106823421711}
-  jumpController: {fileID: 273769967766734601}
 --- !u!4 &7666266973708758024 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 7571699769823753819, guid: 0b61d617ad0871e44acc43a49be710cf, type: 3}
   m_PrefabInstance: {fileID: 247726442781629011}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &7990462879863374674 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 7895876967101880577, guid: 0b61d617ad0871e44acc43a49be710cf, type: 3}
+  m_PrefabInstance: {fileID: 247726442781629011}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 13e8c5b35403d6b468c8645946489777, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ServerSetAnimState
 --- !u!1001 &1356464099776690993
 PrefabInstance:
   m_ObjectHideFlags: 0
