@@ -74,7 +74,8 @@ public static class MapZoneImporter
     }
 
     // 파일명 → (Size, Role). zone_L_*=Large, zone_M_*=Medium, zone_S_*=Small,
-    // typeBoss=보스방(역할 고정), typeStart=플레이어 스폰(역할 고정), 그 외=전투 풀.
+    // typeBoss=보스맵 입구(역할 고정), typeStart=플레이어 스폰(역할 고정),
+    // typeQuest=퀘스트 전용(역할 고정, FBX 수령 시 자동 인식), 그 외=전투 풀.
     static (ZoneSize size, ZoneRole role) TagFromName(string name)
     {
         ZoneSize size = name.Contains("_L_") ? ZoneSize.Large
@@ -82,8 +83,27 @@ public static class MapZoneImporter
                       : ZoneSize.Small;
         ZoneRole role = name.Contains("typeBoss") ? ZoneRole.BossRoom
                       : name.Contains("typeStart") ? ZoneRole.PlayerSpawn
+                      : name.Contains("typeQuest") ? ZoneRole.Quest
                       : ZoneRole.Combat;
         return (size, role);
+    }
+
+    // 피벗 자동 보정: 블렌더 원점이 존 구석에 있어 슬롯 앵커 배치/회전이 어긋난다.
+    // 렌더러 합산 바운즈의 XZ 중심을 새 루트 피벗으로(Y는 저작값 유지 — 다리 높이 정렬).
+    // → 슬롯 좌표 = 존 "중앙", 90° 회전 슬롯도 중심 기준으로 안전하게 돈다.
+    static GameObject CenterPivot(GameObject go, string name)
+    {
+        var rends = go.GetComponentsInChildren<Renderer>();
+        var root = new GameObject(name);
+        if (rends.Length > 0)
+        {
+            Bounds b = rends[0].bounds;
+            for (int i = 1; i < rends.Length; i++) b.Encapsulate(rends[i].bounds);
+            go.transform.position -= new Vector3(b.center.x, 0f, b.center.z);
+            Debug.Log($"[ZoneImporter] {name} 피벗 센터링: 풋프린트 {b.size.x:F1}x{b.size.z:F1}m, 오프셋 ({-b.center.x:F1}, {-b.center.z:F1})");
+        }
+        go.transform.SetParent(root.transform, true);
+        return root;
     }
 
     [MenuItem("Tools/MapGen/Import All Zone FBX (Mesh_zone)")]
@@ -144,7 +164,8 @@ public static class MapZoneImporter
             if (mf.sharedMesh != null && mf.GetComponent<MeshCollider>() == null)
             { mf.gameObject.AddComponent<MeshCollider>(); cc++; }
 
-        // ZoneLayout — 파일명 기반 자동 태깅
+        // 피벗 센터링(모델을 새 루트 자식으로) 후 루트에 ZoneLayout — 파일명 기반 자동 태깅
+        go = CenterPivot(go, name);
         var layout = go.GetComponent<ZoneLayout>();
         if (layout == null) layout = go.AddComponent<ZoneLayout>();
         (layout.Size, layout.Role) = TagFromName(name);

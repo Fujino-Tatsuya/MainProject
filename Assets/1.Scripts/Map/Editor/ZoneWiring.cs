@@ -15,24 +15,28 @@ public static class ZoneWiring
 
     // 고정 스켈레톤 — 마스터 프레임(파란 탑다운) 기준 10존: 대형3(전투) + 중형4(전부 quest후보) + 소형3.
     // 좌표 = 이미지 정규화위치 → 월드(Wworld=210, Hworld=170, y반전) 환산. 스샷 보고 미세보정.
+    // 소형 규칙(2026-07 팀장 확정): 우상단 1곳=고정 전투(S_typeA),
+    // 나머지 2곳(좌상/좌하)=스폰 후보 겸 보스맵입구 후보 — 한쪽이 스폰이 되면 다른 쪽이 보스입구.
     static readonly Slot[] Slots =
     {
-        new Slot{ label="Spawn",  size=ZoneSize.Small,  pos=new Vector3(-48f,0f, 65f), s=true }, // 상-좌(스폰 후보)
+        new Slot{ label="S_TL",   size=ZoneSize.Small,  pos=new Vector3(-48f,0f, 65f), s=true, b=true }, // 상-좌(스폰/보스입구 후보)
         new Slot{ label="L_top",  size=ZoneSize.Large,  pos=new Vector3(  6f,0f, 63f) },         // 상-중(구조물)
-        new Slot{ label="S_TR",   size=ZoneSize.Small,  pos=new Vector3( 71f,0f, 48f) },         // 상-우(고정 소형)
+        new Slot{ label="S_TR",   size=ZoneSize.Small,  pos=new Vector3( 71f,0f, 48f) },         // 상-우(고정 소형 전투)
         new Slot{ label="L_left", size=ZoneSize.Large,  pos=new Vector3(-59f,0f, 14f) },         // 좌(분수)
         new Slot{ label="M_ctr",  size=ZoneSize.Medium, pos=new Vector3(  0f,0f,  0f), q=true }, // 중앙(quest후보)
         new Slot{ label="M_right",size=ZoneSize.Medium, pos=new Vector3( 44f,0f,  5f), rotY=90f, q=true }, // 우-중(가로)
         new Slot{ label="M_BL",   size=ZoneSize.Medium, pos=new Vector3(-71f,0f,-36f), rotY=90f, q=true }, // 하-좌(가로)
         new Slot{ label="M_BC",   size=ZoneSize.Medium, pos=new Vector3(-27f,0f,-41f), q=true }, // 하-중좌
-        new Slot{ label="S_BC",   size=ZoneSize.Small,  pos=new Vector3(  2f,0f,-65f) },         // 하-중
+        new Slot{ label="S_BL",   size=ZoneSize.Small,  pos=new Vector3(  2f,0f,-65f), s=true, b=true }, // 하-좌측(스폰/보스입구 후보)
         new Slot{ label="L_BR",   size=ZoneSize.Large,  pos=new Vector3( 46f,0f,-44f) },         // 하-우(구조물)
     };
 
-    // 카탈로그 9엔트리 — 블렌더 통짜 FBX 임포트본(Mesh_zone, 2026-07 교체).
-    // 중형: 전용 Quest 디자인 없음 → 퀘스트 슬롯도 중형 전투 풀에서 셔플(LayoutPlacer 폴백).
-    // 소형: 전투 풀 1종(S_typeA — 소형 전투 2슬롯에 재사용) + 보스방/스폰 역할 고정.
-    // 보스방(zone_S_typeBoss)은 이 10존 레이아웃에 보스 슬롯이 없어 당장은 미사용(등록만).
+    // 카탈로그 — 블렌더 통짜 FBX 임포트본(Mesh_zone, 2026-07 교체).
+    // 대형: 3디자인 ↔ 3슬롯 시드 셔플(재사용 없음).
+    // 중형: 퀘스트 슬롯(4후보 중 랜덤 1곳)=zone_M_typeQuest 전용 디자인(FBX 대기 — 수령 전엔
+    //       LayoutPlacer 폴백으로 전투 풀에서 셔플), 나머지 3슬롯=M_typeA/B/C 셔플.
+    // 소형: S_typeA=우상단 고정 전투(풀 1종↔1슬롯), typeBoss=보스맵 입구, typeStart=스폰
+    //       (좌상/좌하 후보 2곳에 스폰/보스입구가 매판 랜덤 배정).
     static readonly (string name, ZoneSize size, ZoneRole role)[] CatEntries =
     {
         ("zone_L_typeA", ZoneSize.Large, ZoneRole.Combat),
@@ -41,6 +45,7 @@ public static class ZoneWiring
         ("zone_M_typeA", ZoneSize.Medium, ZoneRole.Combat),
         ("zone_M_typeB", ZoneSize.Medium, ZoneRole.Combat),
         ("zone_M_typeC", ZoneSize.Medium, ZoneRole.Combat),
+        ("zone_M_typeQuest", ZoneSize.Medium, ZoneRole.Quest), // FBX 미수령 — 있으면 자동 등록
         ("zone_S_typeA", ZoneSize.Small, ZoneRole.Combat),
         ("zone_S_typeBoss", ZoneSize.Small, ZoneRole.BossRoom),
         ("zone_S_typeStart", ZoneSize.Small, ZoneRole.PlayerSpawn),
