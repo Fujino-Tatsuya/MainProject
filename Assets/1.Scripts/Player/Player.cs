@@ -4,9 +4,10 @@ using UnityEngine;
 [RequireComponent(typeof(PlayerMovement))]
 [RequireComponent(typeof(PlayerAimIndicator))]
 [RequireComponent(typeof(DefaultAttack))]
+[RequireComponent(typeof(PlayerStateController))]
+[RequireComponent(typeof(StatusEffectController))]
 public class Player : Unit
 {
-    private static readonly int InterruptHash = Animator.StringToHash("Interrupt");
     private static readonly int IsMovingHash = Animator.StringToHash("IsMoving");
 
     [SerializeField] private Animator animator;
@@ -21,24 +22,24 @@ public class Player : Unit
     [SerializeField] int defense;
     [SerializeField] int maxShield;
 
-    private PlayerInputReader inputReader;
-    private PlayerMovement movement;
-    private PlayerAimIndicator aimIndicator;
+    private PlayerStateController stateController;
     private DefaultAttack defaultAttack;
-    private Vector3 actionDirection;
-    private float actionEndTime;
-    private float actionMoveRemaining;
-    private float actionMoveSpeed;
 
-    public PlayerState CurrentState { get; private set; } = PlayerState.Idle;
-    public bool CanMove => CurrentState == PlayerState.Idle || CurrentState == PlayerState.Move;
-    public bool CanMovementRotate => CurrentState == PlayerState.Idle || CurrentState == PlayerState.Move;
+    public PlayerActionState CurrentState => stateController != null ? stateController.CurrentState : PlayerActionState.Idle;
+    public bool CanMove => stateController == null || stateController.CanMove;
+    public bool CanMovementRotate => stateController == null || stateController.CanMovementRotate;
+    public float InterruptDuration => interruptDuration;
+    public float InterruptForwardDistance => interruptForwardDistance;
 
     private void Awake()
     {
-        inputReader = GetComponent<PlayerInputReader>();
-        movement = GetComponent<PlayerMovement>();
-        aimIndicator = GetComponent<PlayerAimIndicator>();
+        if (GetComponent<StatusEffectController>() == null)
+            gameObject.AddComponent<StatusEffectController>();
+
+        stateController = GetComponent<PlayerStateController>();
+        if (stateController == null)
+            stateController = gameObject.AddComponent<PlayerStateController>();
+
         defaultAttack = GetComponent<DefaultAttack>();
 
         if (animator == null)
@@ -55,91 +56,17 @@ public class Player : Unit
 
         if (IsServer)
             Initialize(attackDamage, moveSpeed, attackSpeed, maxHp, defense, maxShield);
-
     }
 
     private void Update()
     {
-        if (Unity.Netcode.NetworkManager.Singleton != null &&
-            Unity.Netcode.NetworkManager.Singleton.IsListening &&
-            IsSpawned &&
-            !IsOwner)
+        if (IsNetworkActive &&
+            !stateController.ShouldTickForNetwork(IsOwner, HasStateAuthority))
         {
             return;
         }
 
-        if (CurrentState == PlayerState.Attack)
-        {
-            SetAnimatorMoving(false);
-            defaultAttack.Tick();
-            return;
-        }
-
-        if (CurrentState == PlayerState.Interrupt)
-        {
-            SetAnimatorMoving(false);
-            MoveDuringAction();
-
-            if (Time.time >= actionEndTime)
-                EndCurrentAction();
-
-            return;
-        }
-
-        UpdateLocomotionState();
-
-        if (inputReader.AttackPressed || inputReader.AttackHeld)
-            defaultAttack.TryStart();
-        else if (inputReader.InterruptPressed)
-            StartInterrupt();
-    }
-
-    private void UpdateLocomotionState()
-    {
-        bool isMoving = inputReader.HasMoveInput;
-
-        CurrentState = isMoving ? PlayerState.Move : PlayerState.Idle;
-        SetAnimatorMoving(isMoving);
-    }
-
-    private void StartInterrupt()
-    {
-        StartAction(
-            PlayerState.Interrupt,
-            InterruptHash,
-            interruptDuration,
-            interruptForwardDistance
-        );
-    }
-
-    private void StartAction(PlayerState state, int triggerHash, float duration, float forwardDistance)
-    {
-        Vector3 aimDirection = aimIndicator.AimDirection;
-
-        if (aimDirection.sqrMagnitude < 0.001f || duration <= 0f)
-            return;
-
-        actionDirection = aimDirection.normalized;
-        actionEndTime = Time.time + duration;
-        actionMoveRemaining = Mathf.Max(forwardDistance, 0f);
-        actionMoveSpeed = actionMoveRemaining / duration;
-
-        movement.RotateImmediately(actionDirection);
-        CurrentState = state;
-        SetAnimatorMoving(false);
-
-        if (animator != null)
-            animator.SetTrigger(triggerHash);
-    }
-
-    private void MoveDuringAction()
-    {
-        if (actionMoveRemaining <= 0f)
-            return;
-
-        float moveDistance = Mathf.Min(actionMoveSpeed * Time.deltaTime, actionMoveRemaining);
-        actionMoveRemaining -= moveDistance;
-        movement.MoveRoot(actionDirection * moveDistance);
+        stateController.Tick();
     }
 
     public void EndDefaultAttack()
@@ -149,22 +76,12 @@ public class Player : Unit
 
     public void EndInterrupt()
     {
-        if (CurrentState != PlayerState.Interrupt)
-            return;
-
-        EndCurrentAction();
+        stateController.EndInterrupt();
     }
 
-    private void EndCurrentAction()
+    public bool SetState(PlayerActionState state)
     {
-        actionMoveRemaining = 0f;
-        CurrentState = PlayerState.Idle;
-        SetAnimatorMoving(false);
-    }
-
-    public void SetState(PlayerState state)
-    {
-        CurrentState = state;
+        return stateController.ChangeState(state);
     }
 
     public void SetAnimatorMoving(bool isMoving)
@@ -177,15 +94,4 @@ public class Player : Unit
     {
         base.TakeDamage(damage);
     }
-}
-
-public enum PlayerState
-{
-    Idle,
-    Move,
-    Attack,
-    Interrupt,
-    Skill,
-    Stun,
-    Dead
 }

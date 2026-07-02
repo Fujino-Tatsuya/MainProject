@@ -36,7 +36,11 @@ public class DefaultAttack : MonoBehaviour
     private float moveRemaining;
     private float moveSpeed;
 
-    public bool IsAttacking => player != null && player.CurrentState == PlayerState.Attack;
+    public bool IsAttacking => player != null && player.CurrentState == PlayerActionState.Attack;
+    public bool CanStart => HasAttackSteps &&
+        aimIndicator != null &&
+        aimIndicator.AimDirection.sqrMagnitude >= 0.001f &&
+        CurrentStepDuration > 0f;
 
     private void Awake()
     {
@@ -54,9 +58,14 @@ public class DefaultAttack : MonoBehaviour
 
     public void TryStart()
     {
-        if (IsAttacking)
+        if (IsAttacking || player == null)
             return;
 
+        player.SetState(PlayerActionState.Attack);
+    }
+
+    public void BeginFromState()
+    {
         StartAttack(0);
     }
 
@@ -79,8 +88,17 @@ public class DefaultAttack : MonoBehaviour
             return;
         }
 
-        player.SetState(PlayerState.Idle);
+        player.SetState(PlayerActionState.Idle);
         player.SetAnimatorMoving(false);
+        currentAttackIndex = 0;
+
+        if (animator != null)
+            animator.CrossFadeInFixedTime(IdleHash, 0.05f);
+    }
+
+    public void CancelCurrentAttack()
+    {
+        moveRemaining = 0f;
         currentAttackIndex = 0;
 
         if (animator != null)
@@ -89,7 +107,7 @@ public class DefaultAttack : MonoBehaviour
 
     private void StartAttack(int attackIndex)
     {
-        if (!HasAttackSteps)
+        if (!HasAttackStep(attackIndex))
             return;
 
         DefaultAttackStep step = attackSteps[attackIndex];
@@ -105,7 +123,6 @@ public class DefaultAttack : MonoBehaviour
         moveSpeed = moveRemaining / step.Duration;
 
         movement.RotateImmediately(attackDirection);
-        player.SetState(PlayerState.Attack);
         player.SetAnimatorMoving(false);
 
         if (animator != null)
@@ -134,6 +151,15 @@ public class DefaultAttack : MonoBehaviour
     }
 
     private bool HasAttackSteps => attackSteps != null && attackSteps.Length > 0;
+    private bool HasAttackStep(int attackIndex)
+    {
+        return HasAttackSteps &&
+            attackIndex >= 0 &&
+            attackIndex < attackSteps.Length &&
+            attackSteps[attackIndex] != null;
+    }
+
+    private float CurrentStepDuration => HasAttackStep(0) ? attackSteps[0].Duration : 0f;
 }
 
 [Serializable]

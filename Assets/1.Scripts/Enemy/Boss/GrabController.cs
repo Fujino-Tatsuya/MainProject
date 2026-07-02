@@ -27,7 +27,7 @@ public class GrabController : NetworkBehaviour
     BlackboardVariable<GameObject> GrabbedPlayer;
     BlackboardVariable<TwentyThreeState> CurrentState;
 
-    PlayerGrabController _playerGrabController;
+    PlayerStateController _playerStateController;
 
     float _holdTimer = 0f;
 
@@ -67,13 +67,13 @@ public class GrabController : NetworkBehaviour
             _holdTimer += Time.deltaTime;
             if (_holdTimer >= holdAttackPeriod)
             {
-                if (_playerGrabController == null)
+                if (_playerStateController == null)
                 {
-                    Debug.LogError("해당 플레이어에 PlayerGrabController컴포넌트가 부착되어 있지 않습니다.");
+                    Debug.LogError("해당 플레이어에 PlayerStateController 컴포넌트가 부착되어 있지 않습니다.");
                     return;
                 }
 
-                _playerGrabController.ApplyHoldDamage(holdDamage);
+                _playerStateController.ApplyGrabHoldDamage(holdDamage);
                 _holdTimer = 0f;
             }
         }
@@ -175,15 +175,15 @@ public class GrabController : NetworkBehaviour
 
         GameObject player = GrabbedPlayer.Value;
 
-        _playerGrabController = player.GetComponent<PlayerGrabController>();
-        if (_playerGrabController == null)
+        _playerStateController = player.GetComponent<PlayerStateController>();
+        if (_playerStateController == null)
         {
-            Debug.LogError("해당 플레이어에 PlayerGrabController컴포넌트가 부착되어 있지 않습니다.");
+            Debug.LogError("해당 플레이어에 PlayerStateController 컴포넌트가 부착되어 있지 않습니다.");
             Clear();
             return;
         }
 
-        _playerGrabController.BeginGrab(grabSocket, grabDamage);
+        _playerStateController.BeginGrab(grabSocket, grabDamage);
     }
 
     /// <summary>
@@ -195,12 +195,12 @@ public class GrabController : NetworkBehaviour
 
         Vector3 worldDir = grabSocket.transform.TransformDirection(throwDirection);
 
-        if (_playerGrabController == null)
+        if (_playerStateController == null)
         {
-            Debug.LogError("해당 플레이어에 PlayerGrabController컴포넌트가 부착되어 있지 않습니다.");
+            Debug.LogError("해당 플레이어에 PlayerStateController 컴포넌트가 부착되어 있지 않습니다.");
             return;
         }
-        _playerGrabController.Throw(worldDir * throwStrength, landingDamage);
+        _playerStateController.ThrowGrabbed(worldDir * throwStrength, landingDamage);
 
         Clear();
     }
@@ -209,7 +209,7 @@ public class GrabController : NetworkBehaviour
     {
         IsGrabbed.Value = false;
         GrabbedPlayer.Value = null;
-        _playerGrabController = null;
+        _playerStateController = null;
         _holdTimer = 0f;
     }
 }

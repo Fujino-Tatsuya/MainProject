@@ -6,6 +6,7 @@ public class PlayerMovement : MonoBehaviour
 {
     private PlayerInputReader reader;
     private Player player;
+    private StatusEffectController statusEffects;
     private Rigidbody rb;
 
     [SerializeField] private Transform armature;
@@ -24,6 +25,7 @@ public class PlayerMovement : MonoBehaviour
     {
         reader = GetComponent<PlayerInputReader>();
         player = GetComponent<Player>();
+        statusEffects = GetComponent<StatusEffectController>();
         rb = GetComponent<Rigidbody>();
 
         if (armature == null)
@@ -81,7 +83,7 @@ public class PlayerMovement : MonoBehaviour
         }
 
         rb.MovePosition(
-            rb.position + worldDir * currentSpeed * Time.deltaTime
+            rb.position + worldDir * currentSpeed * MoveSpeedMultiplier * Time.deltaTime
         );
     }
 
@@ -156,5 +158,16 @@ public class PlayerMovement : MonoBehaviour
     public void MoveRoot(Vector3 deltaPosition)
     {
         rb.MovePosition(rb.position + deltaPosition);
+    }
+
+    private float MoveSpeedMultiplier
+    {
+        get
+        {
+            if (statusEffects == null)
+                statusEffects = GetComponent<StatusEffectController>();
+
+            return statusEffects != null ? statusEffects.MoveSpeedMultiplier : 1f;
+        }
     }
 }
