@@ -27,6 +27,9 @@ public class ZoneSlot : MonoBehaviour
     public int ConnCount(int dir) => dir switch { 0 => ConnN, 1 => ConnE, 2 => ConnS, _ => ConnW };
     public bool HasConn(int dir) => ConnCount(dir) > 0;
 
+    [Tooltip("벽 변으로 붙는 다리 입구(월드 xz, w=변 방향 0~3). 존 스폰 시 이 지점과 겹치는 벽 조각을 삭제해 통로를 뚫는다. ZoneWiring 다리 빌더가 채움.")]
+    public System.Collections.Generic.List<Vector4> WallCuts = new System.Collections.Generic.List<Vector4>();
+
     [Header("=== 런타임 (생성기가 채움) ===")]
     public ZoneRole AssignedRole = ZoneRole.Combat;
     public bool IsFilled;

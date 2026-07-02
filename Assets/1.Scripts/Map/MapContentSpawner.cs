@@ -27,7 +27,7 @@ public class MapContentSpawner : MonoBehaviour
         var nm = NetworkManager.Singleton;
         bool isServer = nm != null && nm.IsServer;
 
-        int visuals = 0, monsters = 0;
+        int visuals = 0, monsters = 0, wallCuts = 0;
         if (placements != null)
         {
             foreach (var p in placements)
@@ -41,12 +41,54 @@ public class MapContentSpawner : MonoBehaviour
                 p.Slot.IsFilled = true;
                 visuals++;
 
+                // 벽 변으로 붙는 다리 입구 자리의 벽 조각 삭제(통로 뚫기) —
+                // 슬롯/프리팹/회전이 결정적이라 서버·클라 동일 결과.
+                wallCuts += CutWallsForSlot(zoneGo, p.Slot);
+
                 // 몬스터 — 서버만 스폰 (NetworkObject → NGO 복제, 클라는 수신)
                 if (isServer) monsters += SpawnMonstersFor(zoneGo, gen);
             }
         }
 
-        Debug.Log($"[MapContentSpawner] 존 비주얼 {visuals} / 몬스터 {monsters} 스폰 (서버:{isServer}).");
+        Debug.Log($"[MapContentSpawner] 존 비주얼 {visuals} / 벽 컷 {wallCuts}조각 / 몬스터 {monsters} 스폰 (서버:{isServer}).");
+    }
+
+    // 벽 변으로 붙는 다리 입구(ZoneSlot.WallCuts) 자리의 벽/코너/문 조각을 비활성화해 통로를 뚫는다.
+    // 프리팹·트랜스폼·순회 순서가 결정적이라 같은 시드면 서버/클라 동일하게 잘린다.
+    private static int CutWallsForSlot(GameObject zoneGo, ZoneSlot slot)
+    {
+        if (slot.WallCuts == null || slot.WallCuts.Count == 0) return 0;
+
+        int n = 0;
+        var rends = zoneGo.GetComponentsInChildren<Renderer>();
+        foreach (var cut in slot.WallCuts)
+        {
+            int dir = Mathf.RoundToInt(cut.w);
+            bool alongX = dir == 0 || dir == 2; // N/S 변 = 변이 X축으로 진행
+            Vector3 half = alongX ? new Vector3(3.5f, 10f, 1.5f) : new Vector3(1.5f, 10f, 3.5f);
+            var box = new Bounds(new Vector3(cut.x, 2f, cut.z), half * 2f);
+
+            foreach (var r in rends)
+            {
+                if (r == null || !r.gameObject.activeSelf) continue;
+                if (r.bounds.max.y < 1.2f) continue;      // 바닥/낮은 조각 유지
+                if (!IsWallFamily(r.transform)) continue; // 벽/코너/문 계열만
+                if (!box.Intersects(r.bounds)) continue;
+                r.gameObject.SetActive(false);
+                n++;
+            }
+        }
+        return n;
+    }
+
+    private static bool IsWallFamily(Transform t)
+    {
+        for (var c = t; c != null; c = c.parent)
+        {
+            string nm = c.name.ToLowerInvariant();
+            if (nm.Contains("wall") || nm.Contains("corner") || nm.Contains("door")) return true;
+        }
+        return false;
     }
 
     private int SpawnMonstersFor(GameObject zoneGo, MapGenerator gen)

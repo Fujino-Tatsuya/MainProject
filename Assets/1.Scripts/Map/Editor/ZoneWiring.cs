@@ -286,7 +286,10 @@ public static class ZoneWiring
             list.Add(c);
         }
 
-        int built = 0;
+        // 벽 컷 지점 초기화 (다리 빌드에서 다시 채움)
+        foreach (var s in slots) { s.WallCuts.Clear(); EditorUtility.SetDirty(s); }
+
+        int built = 0, cuts = 0;
         foreach (var p in SlotPairs)
         {
             var a = slots[p.a]; var b = slots[p.b];
@@ -316,18 +319,26 @@ public static class ZoneWiring
             if (ovHi - ovLo < CorridorWidth) { Debug.LogWarning($"[CorridorV2] {a.name}↔{b.name} 측면 겹침 {ovHi - ovLo:F1}m < 폭 {CorridorWidth} — 스킵(슬롯 좌표 보정 필요)"); continue; }
             if (end - start < 0.5f) { Debug.LogWarning($"[CorridorV2] {a.name}↔{b.name} 간격 {end - start:F1}m — 존 겹침/근접, 스킵(슬롯 좌표 보정 필요)"); continue; }
 
-            // 문은 장식(통로 아님) — 다리는 반드시 "개방변"으로만 연결한다.
-            // 회전 매칭 후에도 벽 변으로 갈 수밖에 없는 다리는 미생성 + 경고
-            // (설계 그래프의 다리 수 > 존 개구부 수 — 아트 개구부 추가 or 그래프 조정 필요).
+            float center = (ovLo + ovHi) * 0.5f;
+
+            // 벽 변으로 붙는 다리는 그 자리 벽 조각을 스폰 시 삭제(WallCuts 기록) —
+            // 회전 최적화로 컷을 최소화하고, 불가피한 곳만 뚫는다(팀장 확정: 벽 밀기 방식).
             int lA = (dirA - FinalStepsFor(a) + 4) & 3;
             int lB = (dirB - FinalStepsFor(b) + 4) & 3;
-            if (lA == 1 || lA == 2 || lB == 1 || lB == 2)
+            if (lA == 1 || lA == 2)
             {
-                string blocked = (lA == 1 || lA == 2) ? a.name : b.name;
-                Debug.LogWarning($"[GeoV2] ✋ {a.name}↔{b.name} 다리 미생성 — {blocked} 쪽이 벽 변(개구부 없음).");
-                continue;
+                Vector3 mouthA = alongX ? new Vector3(dirA == 1 ? pa.x + ha.x : pa.x - ha.x, 0f, center)
+                                        : new Vector3(center, 0f, dirA == 0 ? pa.z + ha.y : pa.z - ha.y);
+                a.WallCuts.Add(new Vector4(mouthA.x, 0f, mouthA.z, dirA));
+                cuts++;
             }
-            float center = (ovLo + ovHi) * 0.5f;
+            if (lB == 1 || lB == 2)
+            {
+                Vector3 mouthB = alongX ? new Vector3(dirB == 1 ? pb.x + hb.x : pb.x - hb.x, 0f, center)
+                                        : new Vector3(center, 0f, dirB == 0 ? pb.z + hb.y : pb.z - hb.y);
+                b.WallCuts.Add(new Vector4(mouthB.x, 0f, mouthB.z, dirB));
+                cuts++;
+            }
 
             var group = new GameObject($"Cor_{a.SlotID}_{b.SlotID}").transform;
             group.SetParent(root, false);
@@ -381,7 +392,7 @@ public static class ZoneWiring
         // ③ 프리팹 저장 (씬 인스턴스 연결 유지 — 재빌드 시 덮어쓰기)
         PrefabUtility.SaveAsPrefabAssetAndConnect(geoRoot, GeoPrefabPath, InteractionMode.AutomatedAction);
         UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(stage1.scene);
-        Debug.Log($"[GeoV2] 다리 {built}/{SlotPairs.Length} + 개방변 벽 {wallEdges}변 (보행면 y={floorTop:F2}) → {GeoPrefabPath}. 미생성 다리는 개구부/그래프 조정 필요(경고 참조).");
+        Debug.Log($"[GeoV2] 다리 {built}/{SlotPairs.Length} + 개방변 벽 {wallEdges}변 + 벽 컷 지점 {cuts}개 (보행면 y={floorTop:F2}) → {GeoPrefabPath}");
     }
 
     // 한 직선 구간을 벽으로 채우되 gaps(중심±gapHalf)만 트기. (다리 입구/문) 벽 바닥 = baseY.
