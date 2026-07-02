@@ -37,7 +37,13 @@ public class LayoutPlacer : MonoBehaviour
         {
             if (slot == null) continue;
 
-            if (slot.AssignedRole == ZoneRole.Combat)
+            // 역할 전용 디자인이 있으면 고정 배치. 퀘스트는 전용 디자인이 없으면
+            // 같은 크기 전투 풀에서 셔플로 뽑는다(위치+비주얼 모두 매판 달라짐).
+            GameObject roleLayout = slot.AssignedRole == ZoneRole.Combat
+                ? null : catalog.GetRoleLayout(slot.AssignedRole, slot.Size);
+
+            if (slot.AssignedRole == ZoneRole.Combat ||
+                (slot.AssignedRole == ZoneRole.Quest && roleLayout == null))
             {
                 if (!combatBySize.TryGetValue(slot.Size, out var list))
                     combatBySize[slot.Size] = list = new List<ZoneSlot>();
@@ -49,7 +55,7 @@ public class LayoutPlacer : MonoBehaviour
                 {
                     Slot = slot,
                     Role = slot.AssignedRole,
-                    LayoutPrefab = catalog.GetRoleLayout(slot.AssignedRole, slot.Size)
+                    LayoutPrefab = roleLayout
                 });
             }
         }
@@ -64,7 +70,7 @@ public class LayoutPlacer : MonoBehaviour
             {
                 Debug.LogWarning($"[LayoutPlacer] {size}/난이도{difficulty} 전투 풀이 비어 있음 — {combatSlots.Count}곳 미배치.");
                 foreach (var s in combatSlots)
-                    placements.Add(new ZonePlacement { Slot = s, Role = ZoneRole.Combat, LayoutPrefab = null });
+                    placements.Add(new ZonePlacement { Slot = s, Role = s.AssignedRole, LayoutPrefab = null });
                 continue;
             }
 
@@ -76,7 +82,7 @@ public class LayoutPlacer : MonoBehaviour
                 placements.Add(new ZonePlacement
                 {
                     Slot = combatSlots[i],
-                    Role = ZoneRole.Combat,
+                    Role = combatSlots[i].AssignedRole, // 퀘스트 슬롯(전용 디자인 없음)도 풀 셔플로 오므로 Role 보존
                     LayoutPrefab = pool[i % pool.Count]
                 });
         }

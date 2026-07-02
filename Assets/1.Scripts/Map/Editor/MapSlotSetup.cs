@@ -8,7 +8,8 @@ using System.Collections.Generic;
 //  ② 프로젝트의 ZoneLayout 프리팹 전체 스캔 → ZoneLayoutCatalog.asset 자동 구성.
 public static class MapSlotSetup
 {
-    private const string CatalogPath = "Assets/Resources/MapGen/ZoneLayoutCatalog.asset";
+    // ZoneWiring.CatalogPath 와 동일해야 함(이중 카탈로그 방지).
+    private const string CatalogPath = "Assets/50.Art/MapGen/MapObj/ZoneLayout/ZoneLayoutCatalog.asset";
 
     [MenuItem("VeyTrace/Map/v2 ① Create ZoneSlots from ZoneVolumes")]
     public static void CreateZoneSlotsFromVolumes()

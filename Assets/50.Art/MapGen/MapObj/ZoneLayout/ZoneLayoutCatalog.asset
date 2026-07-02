@@ -13,15 +13,39 @@ MonoBehaviour:
   m_Name: ZoneLayoutCatalog
   m_EditorClassIdentifier: Assembly-CSharp::ZoneLayoutCatalogSO
   Entries:
-  - Prefab: {fileID: 0}
+  - Prefab: {fileID: 8640830364188894420, guid: 8189c54a3cbe7c74ca3b724d69b76906, type: 3}
     Size: 0
     Role: 0
     Difficulty: 0
-  - Prefab: {fileID: 0}
+  - Prefab: {fileID: 6407874156787964121, guid: 04ef50b42e9373947a23c77abbf2b426, type: 3}
     Size: 0
     Role: 0
     Difficulty: 0
-  - Prefab: {fileID: 0}
+  - Prefab: {fileID: 4353868789431516161, guid: de5389d364e42a0459cbb3668911e0d3, type: 3}
     Size: 0
     Role: 0
+    Difficulty: 0
+  - Prefab: {fileID: 600478898819790959, guid: 37e650059ed5b594eb191d9be08f16e3, type: 3}
+    Size: 1
+    Role: 0
+    Difficulty: 0
+  - Prefab: {fileID: 1797342214044660152, guid: 307f7b08a9db4654cab90d9f0c6dc6b1, type: 3}
+    Size: 1
+    Role: 0
+    Difficulty: 0
+  - Prefab: {fileID: 403535652672499933, guid: 09fb3e14013002b43a72d3c42d5ae86c, type: 3}
+    Size: 1
+    Role: 0
+    Difficulty: 0
+  - Prefab: {fileID: 1855233461408979672, guid: b0d46e5d26dc9814dba8c15632463b96, type: 3}
+    Size: 2
+    Role: 0
+    Difficulty: 0
+  - Prefab: {fileID: 2386417836648585552, guid: 7ca467a8cbd986b41bef56e0a89add49, type: 3}
+    Size: 2
+    Role: 2
+    Difficulty: 0
+  - Prefab: {fileID: 7289609885698413967, guid: ed6df612d60e6a44da2d540940557931, type: 3}
+    Size: 2
+    Role: 3
     Difficulty: 0
