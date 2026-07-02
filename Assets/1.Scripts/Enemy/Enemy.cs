@@ -30,32 +30,32 @@ public class Enemy : Unit
 
         BehaviorGraphAgent bt = GetComponent<BehaviorGraphAgent>();
         if (bt == null)
-            Debug.LogError("BehaviorGraphAgent를 얻어오는 것을 실패했습니다.");
+            Debug.LogAssertion("BehaviorGraphAgent를 얻어오는 것을 실패했습니다.");
 
         if (!bt.BlackboardReference.GetVariable<float>("WalkSpeed", out WalkSpeed))
-            Debug.LogAssertion("해당 BT의 Blackboard에서 WalkSpeed 변수를 얻어오는 것에 실패했습니다.");
+            Debug.LogWarning("해당 BT의 Blackboard에서 WalkSpeed 변수를 얻어오는 것에 실패했습니다.");
         else
             WalkSpeed.Value = moveSpeed;
 
         if (!bt.BlackboardReference.GetVariable<float>("ChaseSpeed", out ChaseSpeed))
-            Debug.LogAssertion("해당 BT의 Blackboard에서 WalkSpeed 변수를 얻어오는 것에 실패했습니다.");
+            Debug.LogWarning("해당 BT의 Blackboard에서 ChaseSpeed 변수를 얻어오는 것에 실패했습니다.");
         else
             ChaseSpeed.Value = chaseSpeed;
 
         if (_maxGroggyCount != 0)
         {
             if (!bt.BlackboardReference.GetVariable<int>("GroggyCount", out GroggyCount))
-                Debug.LogError("해당 BT의 Blackboard에서 GroggyCount 변수를 얻어오는 것에 실패했습니다.");
+                Debug.LogAssertion("해당 BT의 Blackboard에서 GroggyCount 변수를 얻어오는 것에 실패했습니다.");
             else
                 GroggyCount.Value = _groggyCount;
 
             if (!bt.BlackboardReference.GetVariable<int>("MaxGroggyCount", out MaxGroggyCount))
-                Debug.LogError("해당 BT의 Blackboard에서 MaxGroggyCount 변수를 얻어오는 것에 실패했습니다.");
+                Debug.LogAssertion("해당 BT의 Blackboard에서 MaxGroggyCount 변수를 얻어오는 것에 실패했습니다.");
             else
                 MaxGroggyCount.Value = _maxGroggyCount;
 
             if (!bt.BlackboardReference.GetVariable<bool>("IsGroggy", out IsGroggy))
-                Debug.LogError("해당 BT의 Blackboard에서 IsGroggy 변수를 얻어오는 것에 실패했습니다.");
+                Debug.LogAssertion("해당 BT의 Blackboard에서 IsGroggy 변수를 얻어오는 것에 실패했습니다.");
         }
     }
 

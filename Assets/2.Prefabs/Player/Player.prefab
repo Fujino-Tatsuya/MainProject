@@ -334,7 +334,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 2672932260
+  GlobalObjectIdHash: 1250559839
   InScenePlacedSourceGlobalObjectIdHash: 1250559839
   DeferredDespawnTick: 0
   Ownership: 8
@@ -366,7 +366,7 @@ MonoBehaviour:
   attackDamage: 0
   moveSpeed: 0
   attackSpeed: 0
-  maxHp: 0
+  maxHp: 100
   defense: 0
   maxShield: 0
 --- !u!114 &1825865676068489031
@@ -3207,7 +3207,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: af5d9f825e50d7e4caf8eadf755ab930, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ColliderBasicAttack
-  damage: 10
+  damage: 1
   isGroggyAttack: 0
   layerMask:
     serializedVersion: 2
