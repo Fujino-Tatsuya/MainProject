@@ -122,7 +122,7 @@ public class PlayerStateController : MonoBehaviour
 
         return nextState switch
         {
-            PlayerActionState.Attack => CanAttack && context.DefaultAttack.CanStart,
+            PlayerActionState.Attack => CanAttack && context.DefaultAttack.CanStartApprovedAttack,
             PlayerActionState.Interrupt => CanInterrupt && PlayerInterruptState.CanStart(context),
             PlayerActionState.Move => !context.StatusEffects.BlocksMovement,
             PlayerActionState.Idle => true,

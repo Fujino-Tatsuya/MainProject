@@ -1,11 +1,13 @@
 using System;
+using BaseNetCode;
+using Unity.Netcode;
 using UnityEngine;
 
 [RequireComponent(typeof(Player))]
 [RequireComponent(typeof(PlayerInputReader))]
 [RequireComponent(typeof(PlayerMovement))]
 [RequireComponent(typeof(PlayerAimIndicator))]
-public class DefaultAttack : MonoBehaviour
+public class DefaultAttack : BaseNetworkBehaviour
 {
     private static readonly int DefaultAttackHash = Animator.StringToHash("DefaultAttack");
     private static readonly int AttackIndexHash = Animator.StringToHash("AttackIndex");
@@ -32,14 +34,21 @@ public class DefaultAttack : MonoBehaviour
     private PlayerMovement movement;
     private PlayerAimIndicator aimIndicator;
     private Vector3 attackDirection;
+    private Vector3 approvedAttackDirection;
     private int currentAttackIndex;
     private float moveRemaining;
     private float moveSpeed;
+    private bool hasApprovedAttackDirection;
+    private bool isRequestingAttack;
 
     public bool IsAttacking => player != null && player.CurrentState == PlayerActionState.Attack;
-    public bool CanStart => HasAttackSteps &&
+    public bool CanRequestStart => HasAttackSteps &&
         aimIndicator != null &&
         aimIndicator.AimDirection.sqrMagnitude >= 0.001f &&
+        CurrentStepDuration > 0f;
+    public bool CanStartApprovedAttack => HasAttackSteps &&
+        hasApprovedAttackDirection &&
+        approvedAttackDirection.sqrMagnitude >= 0.001f &&
         CurrentStepDuration > 0f;
 
     private void Awake()
@@ -58,15 +67,29 @@ public class DefaultAttack : MonoBehaviour
 
     public void TryStart()
     {
-        if (IsAttacking || player == null)
+        if (IsAttacking || isRequestingAttack || player == null || !CanRequestStart)
             return;
 
-        player.SetState(PlayerActionState.Attack);
+        Vector3 requestedDirection = aimIndicator.AimDirection.normalized;
+
+        if (!IsNetworkActive)
+        {
+            ApproveLocalAttack(requestedDirection);
+            return;
+        }
+
+        if (!IsOwner)
+            return;
+
+        isRequestingAttack = true;
+        RequestStartAttackRpc(requestedDirection);
     }
 
     public void BeginFromState()
     {
-        StartAttack(0);
+        StartAttack(0, approvedAttackDirection);
+        hasApprovedAttackDirection = false;
+        isRequestingAttack = false;
     }
 
     public void Tick()
@@ -84,7 +107,10 @@ public class DefaultAttack : MonoBehaviour
         if (inputReader.AttackHeld && HasAttackSteps)
         {
             int nextIndex = (currentAttackIndex + 1) % attackSteps.Length;
-            StartAttack(nextIndex);
+            Vector3 nextDirection = aimIndicator.AimDirection.sqrMagnitude >= 0.001f
+                ? aimIndicator.AimDirection.normalized
+                : attackDirection;
+            StartAttack(nextIndex, nextDirection);
             return;
         }
 
@@ -100,25 +126,91 @@ public class DefaultAttack : MonoBehaviour
     {
         moveRemaining = 0f;
         currentAttackIndex = 0;
+        hasApprovedAttackDirection = false;
+        isRequestingAttack = false;
 
         if (animator != null)
             animator.CrossFadeInFixedTime(IdleHash, 0.05f);
     }
 
-    private void StartAttack(int attackIndex)
+    [Rpc(SendTo.Server)]
+    private void RequestStartAttackRpc(Vector3 requestedDirection, RpcParams rpcParams = default)
+    {
+        if (rpcParams.Receive.SenderClientId != OwnerClientId)
+            return;
+
+        if (!CanApproveServerAttack(requestedDirection))
+        {
+            RejectStartAttackClientRpc(CreateOwnerClientRpcParams());
+            return;
+        }
+
+        ApproveStartAttackClientRpc(requestedDirection.normalized, CreateOwnerClientRpcParams());
+    }
+
+    [ClientRpc]
+    private void ApproveStartAttackClientRpc(Vector3 approvedDirection, ClientRpcParams clientRpcParams = default)
+    {
+        if (!IsOwner)
+            return;
+
+        ApproveLocalAttack(approvedDirection);
+    }
+
+    [ClientRpc]
+    private void RejectStartAttackClientRpc(ClientRpcParams clientRpcParams = default)
+    {
+        if (IsOwner)
+            isRequestingAttack = false;
+    }
+
+    private void ApproveLocalAttack(Vector3 approvedDirection)
+    {
+        isRequestingAttack = false;
+        approvedAttackDirection = approvedDirection.normalized;
+        hasApprovedAttackDirection = true;
+        player.SetState(PlayerActionState.Attack);
+    }
+
+    private bool CanApproveServerAttack(Vector3 requestedDirection)
+    {
+        if (!HasAttackStep(0))
+            return false;
+
+        if (requestedDirection.sqrMagnitude < 0.001f)
+            return false;
+
+        if (player == null || player.CurrentState == PlayerActionState.Dead)
+            return false;
+
+        StatusEffectController statusEffects = GetComponent<StatusEffectController>();
+        return statusEffects == null || !statusEffects.BlocksAttack;
+    }
+
+    private ClientRpcParams CreateOwnerClientRpcParams()
+    {
+        return new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams
+            {
+                TargetClientIds = new[] { OwnerClientId }
+            }
+        };
+    }
+
+    private void StartAttack(int attackIndex, Vector3 direction)
     {
         if (!HasAttackStep(attackIndex))
             return;
 
         DefaultAttackStep step = attackSteps[attackIndex];
-        Vector3 aimDirection = aimIndicator.AimDirection;
         bool shouldTriggerAttack = !IsAttacking;
 
-        if (aimDirection.sqrMagnitude < 0.001f || step.Duration <= 0f)
+        if (direction.sqrMagnitude < 0.001f || step.Duration <= 0f)
             return;
 
         currentAttackIndex = attackIndex;
-        attackDirection = aimDirection.normalized;
+        attackDirection = direction.normalized;
         moveRemaining = Mathf.Max(step.ForwardDistance, 0f);
         moveSpeed = moveRemaining / step.Duration;
 
