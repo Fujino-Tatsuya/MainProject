@@ -1,18 +1,16 @@
-ï»¿using Unity.Netcode;
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.AI;
 
-// Unit, Rigidbody/NavMeshAgentì™€ ê°™ì€ ìµœìƒë‹¨ ì˜¤ë¸Œì íŠ¸ì— ìœ„ì¹˜í•´ ìˆì–´ì•¼ í•¨
+// Unit, Rigidbody/NavMeshAgent¿Í °°Àº ÃÖ»ó´Ü ¿ÀºêÁ§Æ®¿¡ À§Ä¡ÇØ ÀÖ¾î¾ß ÇÔ
 public class LinearKnockback : NetworkBehaviour, IKnockbackable
 {
     NavMeshAgent _navMeshAgent;
     Rigidbody _rigidbody;
-    PlayerStateController _playerState;
-    StatusEffectController _statusEffects;
     bool _isKnockbacking;
 
     [SerializeField] float maxDistance = 2f;
-    [Header("ë„‰ë°± ì¢…ë£Œ ì¡°ê±´")]
+    [Header("³Ë¹é Á¾·á Á¶°Ç")]
     [SerializeField] float minKnockbackTime = 0.15f;
     [SerializeField] float maxKnockbackTime = 1.5f;
     [SerializeField] float stopSpeed = 0.15f;
@@ -20,16 +18,15 @@ public class LinearKnockback : NetworkBehaviour, IKnockbackable
     float _knockbackStartTime;
 
     /// <summary>
-    /// IKnockbackableì˜ ApplyKnockback êµ¬í˜„
+    /// IKnockbackableÀÇ ApplyKnockback ±¸Çö
     /// </summary>
-    /// <param name="direction">ë„‰ë°± ë°©í–¥</param>
-    /// <param name="strength">ë„‰ë°± ì„¸ê¸°</param>
+    /// <param name="direction">³Ë¹é ¹æÇâ</param>
+    /// <param name="strength">³Ë¹é ¼¼±â</param>
     public void ApplyKnockback(Vector3 direction, float strength)
     {
         if (!IsServer) return;
-        if (_statusEffects != null && _statusEffects.HasSuperArmor) return;
 
-        // ë„‰ë°±ì„ ì ìš©í•  ì˜¤ë¸Œì íŠ¸ì˜ ì†Œìœ ìì—ê²Œë§Œ RPCë¥¼ ë³´ë‚´ì„œ ë„‰ë°±ì„ ì ìš©
+        // ³Ë¹éÀ» Àû¿ëÇÒ ¿ÀºêÁ§Æ®ÀÇ ¼ÒÀ¯ÀÚ¿¡°Ô¸¸ RPC¸¦ º¸³»¼­ ³Ë¹éÀ» Àû¿ë
         ClientRpcParams rpcParams = new ClientRpcParams
         {
             Send = new ClientRpcSendParams
@@ -42,20 +39,13 @@ public class LinearKnockback : NetworkBehaviour, IKnockbackable
     [ClientRpc]
     void ApplyKnockbackClientRpc(Vector3 direction, float strength, ClientRpcParams rpcParams = default)
     {
-        if (_statusEffects != null && _statusEffects.HasSuperArmor)
-            return;
-
-        if (!StartKnockback())
-            return;
+        StartKnockback();
 
         _rigidbody.AddForce(direction * strength, ForceMode.Impulse);
     }
 
-    bool StartKnockback()
+    void StartKnockback()
     {
-        if (_playerState != null && !_playerState.BeginKnockback())
-            return false;
-
         _isKnockbacking = true;
         _knockbackStartTime = Time.time;
 
@@ -68,13 +58,11 @@ public class LinearKnockback : NetworkBehaviour, IKnockbackable
         _rigidbody.isKinematic = false;
         _rigidbody.linearVelocity = Vector3.zero;
         _rigidbody.angularVelocity = Vector3.zero;
-        return true;
     }
 
     void EndKnockback()
     {
         _isKnockbacking = false;
-        _playerState?.EndKnockback();
 
         _rigidbody.linearVelocity = Vector3.zero;
         _rigidbody.angularVelocity = Vector3.zero;
@@ -92,8 +80,6 @@ public class LinearKnockback : NetworkBehaviour, IKnockbackable
     {
         _navMeshAgent = GetComponent<NavMeshAgent>();
         _rigidbody = GetComponent<Rigidbody>();
-        _playerState = GetComponent<PlayerStateController>();
-        _statusEffects = GetComponent<StatusEffectController>();
         _isKnockbacking = false;
     }
 

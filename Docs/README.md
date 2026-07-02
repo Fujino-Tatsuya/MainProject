@@ -17,7 +17,6 @@
 ## 기술
 - [tech/architecture.md](tech/architecture.md) — UnitBase·컴포넌트, 스탯/상태 자료구조, FSM/페이즈
 - [tech/networking.md](tech/networking.md) — NGO / IPv4·Steamworks, 권한 모델, 연결 흐름
-- [tech/physics.md](tech/physics.md) — Collider/LayerMask/Faction, Hitbox/Hurtbox, 물리 최적화 기준
 - [tech/conventions.md](tech/conventions.md) — 네이밍/폴더/Input/SO 규칙
 - [tech/workflow.md](tech/workflow.md) — git 브랜치·PR, Unity 협업 세팅, SVN/Git 하이브리드
 - [tech/map-generation.md](tech/map-generation.md) — 절차적 맵 생성 흐름, 영역/티어 규칙, NGO 서버권한 생성+결과복제
