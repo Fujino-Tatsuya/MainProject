@@ -21,12 +21,12 @@ public static class ZoneWiring
     {
         new Slot{ label="S_TL",   size=ZoneSize.Small,  pos=new Vector3(-48f,0f, 65f), s=true, b=true }, // 상-좌(스폰/보스입구 후보)
         new Slot{ label="L_top",  size=ZoneSize.Large,  pos=new Vector3(  6f,0f, 63f) },         // 상-중(구조물)
-        new Slot{ label="S_TR",   size=ZoneSize.Small,  pos=new Vector3( 71f,0f, 48f) },         // 상-우(고정 소형 전투)
+        new Slot{ label="S_TR",   size=ZoneSize.Small,  pos=new Vector3(64.5f,0f, 48f) },        // 상-우(고정 소형 전투, 71→64.5: M_right 문(57.5) 앵커 확보)
         new Slot{ label="L_left", size=ZoneSize.Large,  pos=new Vector3(-59f,0f, 14f) },         // 좌(분수)
         new Slot{ label="M_ctr",  size=ZoneSize.Medium, pos=new Vector3(  0f,0f,  0f), q=true }, // 중앙(quest후보)
         new Slot{ label="M_right",size=ZoneSize.Medium, pos=new Vector3( 48f,0f,  5f), rotY=90f, q=true }, // 우-중(가로, 44→48: S_TR 다리 겹침 확보)
-        new Slot{ label="M_BL",   size=ZoneSize.Medium, pos=new Vector3(-71f,0f,-36f), rotY=90f, q=true }, // 하-좌(가로)
-        new Slot{ label="M_BC",   size=ZoneSize.Medium, pos=new Vector3(-35f,0f,-41f), q=true }, // 하-중좌(-27→-35: L_left 다리 겹침 확보)
+        new Slot{ label="M_BL",   size=ZoneSize.Medium, pos=new Vector3(-77.5f,0f,-36f), rotY=90f, q=true }, // 하-좌(가로, -71→-77.5: M_BC 서진에 따른 간격 유지)
+        new Slot{ label="M_BC",   size=ZoneSize.Medium, pos=new Vector3(-41.5f,0f,-41f), q=true }, // 하-중좌(-35→-41.5: L_left 문(-48.5) 앵커 확보)
         new Slot{ label="S_BL",   size=ZoneSize.Small,  pos=new Vector3(  2f,0f,-65f), s=true, b=true }, // 하-좌측(스폰/보스입구 후보)
         new Slot{ label="L_BR",   size=ZoneSize.Large,  pos=new Vector3( 46f,0f,-44f) },         // 하-우(구조물)
     };
