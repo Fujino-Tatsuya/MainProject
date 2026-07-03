@@ -181,6 +181,11 @@ public static class ZoneWiring
         var mm = Object.FindFirstObjectByType<MinimapController>();
         if (mm == null) mm = new GameObject("Minimap").AddComponent<MinimapController>();
         mm.Generator = mg;
+        // 탐사 상태 서버 공유 — 씬 NetworkObject + Sync 컴포넌트
+        if (mm.GetComponent<Unity.Netcode.NetworkObject>() == null)
+            mm.gameObject.AddComponent<Unity.Netcode.NetworkObject>();
+        if (mm.GetComponent<MinimapNetworkSync>() == null)
+            mm.gameObject.AddComponent<MinimapNetworkSync>();
         EditorUtility.SetDirty(mm);
 
         int hidden = 0;

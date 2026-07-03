@@ -53,7 +53,7 @@ public class MinimapController : MonoBehaviour
     private Sprite _dotSprite;
 
     // 마커
-    private readonly List<RectTransform> _staticMarkers = new List<RectTransform>();
+    private readonly List<(RectTransform rt, Vector3 world)> _staticMarkers = new List<(RectTransform, Vector3)>();
     private readonly Dictionary<Component, Image> _dynMarkers = new Dictionary<Component, Image>();
     private readonly List<Component> _dynRemove = new List<Component>();
     private readonly List<Transform> _players = new List<Transform>();
@@ -73,6 +73,21 @@ public class MinimapController : MonoBehaviour
         ResetMask();
         BuildStaticMarkers(gen);
         _baked = true;
+
+        // 클라에서 씬 로드 직후 렌더 요청이 빈 결과를 줄 수 있음 — 밝기 0이면 재시도
+        if (_lastBakeLuminance < 0.01f) StartCoroutine(RetryBake());
+    }
+
+    private float _lastBakeLuminance;
+
+    private System.Collections.IEnumerator RetryBake()
+    {
+        for (int i = 0; i < 4 && _lastBakeLuminance < 0.01f; i++)
+        {
+            yield return new WaitForSeconds(0.5f);
+            Debug.LogWarning($"[Minimap] 베이크 밝기 0 — 재시도 {i + 1}/4");
+            BakeTerrain();
+        }
     }
 
     // ---------------- 베이크 ----------------
@@ -152,7 +167,8 @@ public class MinimapController : MonoBehaviour
         float lum = 0f;
         var px = t.GetPixels32();
         foreach (var c in px) lum += (c.r + c.g + c.b) / (3f * 255f);
-        Debug.Log($"[Minimap] 베이크 완료 — 중앙 샘플 평균 밝기 {lum / px.Length:F3} (0이면 렌더 실패 의심)");
+        _lastBakeLuminance = lum / px.Length;
+        Debug.Log($"[Minimap] 베이크 완료 — 중앙 샘플 평균 밝기 {_lastBakeLuminance:F3} (0이면 렌더 실패 의심)");
         Destroy(t);
     }
 
@@ -353,7 +369,7 @@ public class MinimapController : MonoBehaviour
 
     private void BuildStaticMarkers(MapGenerator gen)
     {
-        foreach (var m in _staticMarkers) if (m != null) Destroy(m.gameObject);
+        foreach (var (rt, _) in _staticMarkers) if (rt != null) Destroy(rt.gameObject);
         _staticMarkers.Clear();
 
         var cat = gen.Catalog;
@@ -372,7 +388,7 @@ public class MinimapController : MonoBehaviour
                 img.sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), Vector2.one * 0.5f);
             else { img.sprite = _dotSprite; img.color = label == "Boss" ? MonsterColor : Color.yellow; }
             img.rectTransform.anchoredPosition = WorldToMap(s.transform.position);
-            _staticMarkers.Add(img.rectTransform);
+            _staticMarkers.Add((img.rectTransform, s.transform.position));
         }
 
         // 티어 노드 — 스폰된 존 안의 NodeMarker (보상 오브젝트 시스템 확정 전 임시 소스)
@@ -386,8 +402,38 @@ public class MinimapController : MonoBehaviour
             };
             var img = MakeMarkerImage($"Node_{node.Tier}", _dotSprite, c, NodeDotSize);
             img.rectTransform.anchoredPosition = WorldToMap(node.transform.position);
-            _staticMarkers.Add(img.rectTransform);
+            _staticMarkers.Add((img.rectTransform, node.transform.position));
         }
+    }
+
+    // ---------------- 크기 조절 ([ = 축소, ] = 확대) ----------------
+
+    private static readonly float[] SizePresets = { 220f, 300f, 400f };
+
+    private void ApplyPanelSize(float size)
+    {
+        PanelSize = size;
+        if (_mapRect == null) return;
+        _mapRect.sizeDelta = Vector2.one * PanelSize;
+        foreach (var (rt, world) in _staticMarkers)
+            if (rt != null) rt.anchoredPosition = WorldToMap(world);
+        // 동적 마커는 매 프레임 재배치되므로 별도 처리 불필요
+    }
+
+    private void HandleSizeInput()
+    {
+#if ENABLE_INPUT_SYSTEM
+        var kb = UnityEngine.InputSystem.Keyboard.current;
+        if (kb == null) return;
+        int dir = kb.rightBracketKey.wasPressedThisFrame ? 1 : kb.leftBracketKey.wasPressedThisFrame ? -1 : 0;
+#else
+        int dir = Input.GetKeyDown(KeyCode.RightBracket) ? 1 : Input.GetKeyDown(KeyCode.LeftBracket) ? -1 : 0;
+#endif
+        if (dir == 0) return;
+        int cur = 0;
+        for (int i = 0; i < SizePresets.Length; i++)
+            if (Mathf.Abs(SizePresets[i] - PanelSize) < Mathf.Abs(SizePresets[cur] - PanelSize)) cur = i;
+        ApplyPanelSize(SizePresets[Mathf.Clamp(cur + dir, 0, SizePresets.Length - 1)]);
     }
 
     // ---------------- 동적 마커 (플레이어/몬스터) ----------------
@@ -395,6 +441,8 @@ public class MinimapController : MonoBehaviour
     private void Update()
     {
         if (!_baked) return;
+
+        HandleSizeInput();
 
         _playerScanTimer -= Time.deltaTime;
         if (_playerScanTimer <= 0f)
@@ -478,6 +526,31 @@ public class MinimapController : MonoBehaviour
         var no = p.GetComponentInParent<Unity.Netcode.NetworkObject>();
         if (no != null) return no.IsOwner;
         return true; // 비네트워크(에디터 단독 테스트) — 전부 내 것으로 간주
+    }
+
+    // ---------------- 탐사 상태 네트워크 공유 API (MinimapNetworkSync가 사용) ----------------
+    // 서버가 자기 탐사 그리드를 비트팩으로 뽑아 브로드캐스트 → 클라는 병합(OR).
+    // 클라 로컬 스탬프는 즉각 반응용으로 유지되고, 서버 브로드캐스트가 최종 일치를 보장한다.
+
+    public bool IsReady => _baked && _explored != null;
+
+    // 탐사 그리드를 1비트/셀로 팩킹 (임계 128). 반환 길이 = res*res/8.
+    public byte[] GetExploredBits()
+    {
+        if (_explored == null) return null;
+        var bits = new byte[_explored.Length / 8];
+        for (int i = 0; i < _explored.Length; i++)
+            if (_explored[i] >= 128) bits[i >> 3] |= (byte)(1 << (i & 7));
+        return bits;
+    }
+
+    // 서버 탐사 비트를 로컬 그리드에 병합
+    public void MergeExploredBits(byte[] bits)
+    {
+        if (_explored == null || bits == null || bits.Length != _explored.Length / 8) return;
+        for (int i = 0; i < _explored.Length; i++)
+            if ((bits[i >> 3] & (1 << (i & 7))) != 0 && _explored[i] < 255)
+                _explored[i] = 255;
     }
 
     private void OnDestroy()
