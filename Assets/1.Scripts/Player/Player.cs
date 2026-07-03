@@ -1,4 +1,5 @@
 using UnityEngine;
+using Unity.Netcode;
 
 [RequireComponent(typeof(PlayerInputReader))]
 [RequireComponent(typeof(PlayerMovement))]
@@ -84,6 +85,46 @@ public class Player : Unit
         return stateController.ChangeState(state);
     }
 
+    public bool BeginGrabbedByInstigator(GameObject instigator)
+    {
+        if (!IsServer)
+            return false;
+
+        if (!stateController.BeginGrabbed(instigator))
+            return false;
+
+        BeginGrabbedClientRpc(CreateOwnerClientRpcParams());
+        return true;
+    }
+
+    public bool EndGrabbedByInstigator()
+    {
+        if (!IsServer)
+            return false;
+
+        bool ended = stateController.EndGrabbed();
+        EndGrabbedClientRpc(CreateOwnerClientRpcParams());
+        return ended;
+    }
+
+    [ClientRpc]
+    private void BeginGrabbedClientRpc(ClientRpcParams clientRpcParams = default)
+    {
+        if (!IsOwner)
+            return;
+
+        stateController.ApplyGrabbedFromServer();
+    }
+
+    [ClientRpc]
+    private void EndGrabbedClientRpc(ClientRpcParams clientRpcParams = default)
+    {
+        if (!IsOwner)
+            return;
+
+        stateController.EndGrabbed();
+    }
+
     public void SetAnimatorMoving(bool isMoving)
     {
         if (animator != null)
@@ -93,5 +134,16 @@ public class Player : Unit
     public override void TakeDamage(int damage)
     {
         base.TakeDamage(damage);
+    }
+
+    private ClientRpcParams CreateOwnerClientRpcParams()
+    {
+        return new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams
+            {
+                TargetClientIds = new[] { OwnerClientId }
+            }
+        };
     }
 }

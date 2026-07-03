@@ -228,7 +228,7 @@ Rigidbody:
   m_UseGravity: 1
   m_IsKinematic: 0
   m_Interpolate: 0
-  m_Constraints: 80
+  m_Constraints: 112
   m_CollisionDetection: 0
 --- !u!136 &6098322879574375161
 CapsuleCollider:
@@ -361,6 +361,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 977a09efa1174d52b59919b43ccfdb21, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerStateController
+  currentStateDebug: 0
 --- !u!1 &8896633917232358439
 GameObject:
   m_ObjectHideFlags: 0

@@ -28,6 +28,7 @@ public class GrabController : NetworkBehaviour
     BlackboardVariable<TwentyThreeState> CurrentState;
 
     Unit _targetUnit;
+    Player _targetPlayer;
     Rigidbody _targetRigidbody;
     int _targetHp;
 
@@ -202,6 +203,20 @@ public class GrabController : NetworkBehaviour
 
         //_targetUnit.BeginGrab(grabSocket, grabDamage);
         // 플레이어 상태 전환 함수 호출하기
+        _targetPlayer = player.GetComponent<Player>();
+        if (_targetPlayer == null)
+        {
+            Debug.LogError("Grab target Player component is missing.", this);
+            Clear();
+            return;
+        }
+
+        if (!_targetPlayer.BeginGrabbedByInstigator(gameObject))
+        {
+            Clear();
+            return;
+        }
+
         _targetHp = _targetUnit.CurrentHealth;
         ApplyDamage(grabDamagePercentage);
     }
@@ -214,13 +229,6 @@ public class GrabController : NetworkBehaviour
         if (!IsServer) return;
 
         //Vector3 worldDir = grabSocket.transform.TransformDirection(throwDirection);
-
-        //if (_playerGrabController == null)
-        //{
-        //    Debug.LogError("해당 플레이어에 PlayerGrabController컴포넌트가 부착되어 있지 않습니다.");
-        //    return;
-        //}
-        //_playerGrabController.Throw(worldDir * throwStrength, landingDamage);
         ApplyDamage(landingDamagePercentage);
 
         // 플레이어 상태 전환 함수 호출하기
@@ -230,9 +238,13 @@ public class GrabController : NetworkBehaviour
 
     void Clear()
     {
+        if (_targetPlayer != null)
+            _targetPlayer.EndGrabbedByInstigator();
+
         IsGrabbed.Value = false;
         GrabbedPlayer.Value = null;
         _targetUnit = null;
+        _targetPlayer = null;
         _targetRigidbody = null;
         _holdTimer = 0f;
         _targetHp = 0;
