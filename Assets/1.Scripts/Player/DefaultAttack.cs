@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using BaseNetCode;
 using Unity.Netcode;
 using UnityEngine;
@@ -28,11 +29,16 @@ public class DefaultAttack : BaseNetworkBehaviour
         new DefaultAttackStep(),
         new DefaultAttackStep()
     };
+    [SerializeField] private ColliderInfo defaultHitbox;
+    [SerializeField] private LayerMask hittableLayers;
+    [SerializeField] private int maxHitResults = 16;
+    [SerializeField] private int damageOverride;
 
     private Player player;
     private PlayerInputReader inputReader;
     private PlayerMovement movement;
     private PlayerAimIndicator aimIndicator;
+    private Collider[] hitResults;
     private Vector3 attackDirection;
     private Vector3 approvedAttackDirection;
     private int currentAttackIndex;
@@ -57,6 +63,7 @@ public class DefaultAttack : BaseNetworkBehaviour
         inputReader = GetComponent<PlayerInputReader>();
         movement = GetComponent<PlayerMovement>();
         aimIndicator = GetComponent<PlayerAimIndicator>();
+        hitResults = new Collider[Mathf.Max(1, maxHitResults)];
 
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
@@ -233,6 +240,115 @@ public class DefaultAttack : BaseNetworkBehaviour
         }
     }
 
+    public void HitCurrentAttack()
+    {
+        if (!IsAttacking || !HasAttackStep(currentAttackIndex))
+            return;
+
+        if (IsNetworkActive && !IsServer)
+        {
+            if (IsOwner)
+                RequestHitCurrentAttackRpc(currentAttackIndex);
+
+            return;
+        }
+
+        DealAttackHit(currentAttackIndex);
+    }
+
+    [Rpc(SendTo.Server)]
+    private void RequestHitCurrentAttackRpc(int attackIndex, RpcParams rpcParams = default)
+    {
+        if (rpcParams.Receive.SenderClientId != OwnerClientId)
+            return;
+
+        DealAttackHit(attackIndex);
+    }
+
+    private void DealAttackHit(int attackIndex)
+    {
+        if (!HasAttackStep(attackIndex))
+            return;
+
+        ColliderInfo hitbox = attackSteps[attackIndex].Hitbox != null
+            ? attackSteps[attackIndex].Hitbox
+            : defaultHitbox;
+
+        if (hitbox == null)
+        {
+            Debug.LogWarning("DefaultAttack requires a ColliderInfo hitbox for animation-event damage.", this);
+            return;
+        }
+
+        int hitCount = OverlapHitbox(hitbox);
+        int damage = GetAttackDamage(attackIndex);
+        HashSet<Unit> damagedUnits = new HashSet<Unit>();
+
+        for (int i = 0; i < hitCount; i++)
+        {
+            Collider hit = hitResults[i];
+            if (hit == null || (hittableLayers.value & (1 << hit.gameObject.layer)) == 0)
+                continue;
+
+            Unit target = hit.GetComponentInParent<Unit>();
+            if (target == null || target == player || damagedUnits.Contains(target))
+                continue;
+
+            damagedUnits.Add(target);
+            target.TakeDamage(damage);
+        }
+    }
+
+    private int OverlapHitbox(ColliderInfo hitbox)
+    {
+        switch (hitbox.OverlapCollider)
+        {
+            case OverlapCollider.Box:
+                BoxColliderInfo boxInfo = default;
+                hitbox.GetBoxColliderInfo(ref boxInfo);
+                return Physics.OverlapBoxNonAlloc(
+                    boxInfo.center,
+                    boxInfo.halfExtents,
+                    hitResults,
+                    boxInfo.orientation,
+                    hittableLayers);
+
+            case OverlapCollider.Sphere:
+                SphereColliderInfo sphereInfo = default;
+                hitbox.GetSphereColliderInfo(ref sphereInfo);
+                return Physics.OverlapSphereNonAlloc(
+                    sphereInfo.center,
+                    sphereInfo.radius,
+                    hitResults,
+                    hittableLayers);
+
+            case OverlapCollider.Capsule:
+                CapsuleColliderInfo capsuleInfo = default;
+                hitbox.GetCapsuleColliderInfo(ref capsuleInfo);
+                return Physics.OverlapCapsuleNonAlloc(
+                    capsuleInfo.point0,
+                    capsuleInfo.point1,
+                    capsuleInfo.radius,
+                    hitResults,
+                    hittableLayers);
+
+            default:
+                return 0;
+        }
+    }
+
+    private int GetAttackDamage(int attackIndex)
+    {
+        int stepDamage = attackSteps[attackIndex].Damage;
+        if (stepDamage > 0)
+            return stepDamage;
+
+        if (damageOverride > 0)
+            return damageOverride;
+
+        return player != null ? player.AttackDamage : 0;
+    }
+
     private void MoveDuringAttack()
     {
         if (moveRemaining <= 0f)
@@ -261,10 +377,14 @@ public class DefaultAttackStep
     [SerializeField] private AnimationClip clip;
     [SerializeField] private float duration = 0.5f;
     [SerializeField] private float forwardDistance = 0.5f;
+    [SerializeField] private ColliderInfo hitbox;
+    [SerializeField] private int damage;
 
     public AnimationClip Clip => clip;
     public float Duration => duration > 0f ? duration : ClipDuration;
     public float ForwardDistance => forwardDistance;
+    public ColliderInfo Hitbox => hitbox;
+    public int Damage => damage;
 
     private float ClipDuration => clip != null ? clip.length : 0f;
 }

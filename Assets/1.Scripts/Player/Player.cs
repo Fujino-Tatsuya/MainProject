@@ -75,6 +75,11 @@ public class Player : Unit
         defaultAttack.EndCurrentAttack();
     }
 
+    public void HitDefaultAttack()
+    {
+        defaultAttack.HitCurrentAttack();
+    }
+
     public void EndInterrupt()
     {
         stateController.EndInterrupt();
@@ -90,7 +95,7 @@ public class Player : Unit
         if (!IsServer)
             return;
 
-        stateController.BeginKnockback(direction, strength);
+        //stateController.BeginKnockback(direction, strength);
         ApplyKnockbackClientRpc(direction, strength, CreateOwnerClientRpcParams());
     }
 
