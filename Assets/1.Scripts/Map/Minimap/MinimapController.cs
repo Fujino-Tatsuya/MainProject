@@ -23,7 +23,7 @@ public class MinimapController : MonoBehaviour
     [Header("=== 시야/탐사 ===")]
     [Tooltip("현재 시야 반경(m) — 팀원 전원 합산")] public float SightRadius = 15f;
     [Tooltip("탐사 마스크 해상도")] public int MaskResolution = 128;
-    [Tooltip("마스크 갱신 주기(초)")] public float MaskTick = 0.35;
+    [Tooltip("마스크 갱신 주기(초)")] public float MaskTick = 0.35f;
 
     [Header("=== 베이크 ===")]
     [Tooltip("지형 베이크 해상도")] public int BakeResolution = 1024;

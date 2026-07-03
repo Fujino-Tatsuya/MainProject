@@ -771,8 +771,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MinimapController
   Generator: {fileID: 99066894}
-  PanelSize: 600
-  Margin: {x: 16, y: 16}
+  PanelSize: 350
+  Margin: {x: 2, y: 2}
   RoleIconSize: 22
   NodeDotSize: 9
   UnitDotSize: 11

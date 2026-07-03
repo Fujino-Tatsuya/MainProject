@@ -11,7 +11,7 @@ Shader "UI/MinimapComposite"
         _MaskTex ("Mask (R=explored, G=visible)", 2D) = "black" {}
         _SilTex ("Silhouette (R=맵 모양, CPU 생성)", 2D) = "black" {}
         _SilColor ("미탐사 실루엣 색", Color) = (0.22, 0.26, 0.33, 1)
-        _DimExplored ("탐사 디밍", Range(0,1)) = 0.5
+        _DimExplored ("탐사 디밍", Range(0,1)) = 0.825
         _BgAlpha ("맵 밖 배경 알파", Range(0,1)) = 0.35
     }
     SubShader

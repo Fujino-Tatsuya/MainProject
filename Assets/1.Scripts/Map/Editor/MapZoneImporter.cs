@@ -13,7 +13,7 @@ public static class MapZoneImporter
 {
     const string FbxDir = "Assets/50.Art/mesh/Mesh_zone";
     const string TexDir = "Assets/50.Art/texture/Tex_zone";
-    const string PrefabDir = "Assets/50.Art/MapGen/MapObj/prefab";
+    const string PrefabDir = "Assets/50.Art/MapGen/MapObj/Zoneprefab"; // 2026-07-03 아트가 prefab→Zoneprefab로 폴더명 변경(GUID 유지)
 
     // (머티리얼 에셋명, 베이스컬러, 노멀[없으면 null])
     static readonly (string mat, string baseTex, string normalTex)[] MatDefs =

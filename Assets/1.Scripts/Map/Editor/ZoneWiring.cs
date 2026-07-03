@@ -9,7 +9,7 @@ using UnityEngine;
 // 배치 소스오브트루스 = ZoneVolume(씬). 볼륨을 옮기고 Wire → Build GeoV2 재실행하면 맵이 따라온다.
 public static class ZoneWiring
 {
-    const string PrefabDir = "Assets/50.Art/MapGen/MapObj/prefab";
+    const string PrefabDir = "Assets/50.Art/MapGen/MapObj/Zoneprefab"; // 2026-07-03 아트가 prefab→Zoneprefab로 폴더명 변경(GUID 유지)
     const string CatalogPath = "Assets/50.Art/MapGen/MapObj/ZoneLayout/ZoneLayoutCatalog.asset";
 
     // 배치 소스오브트루스 = 씬(Stage1)의 ZoneVolume 10개 (2026-07 리팩토링).
