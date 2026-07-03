@@ -18,23 +18,8 @@ public static class ZoneWiring
     //  - ZoneDefinitionSO 플래그 → 퀘스트/스폰/보스입구 후보
     //  - SlotID = ZoneID - 1 (1~10 필수, 결정적 순서)
     // 디자이너가 씬에서 볼륨을 옮기면 Wire 재실행만으로 배치가 따라온다.
-    // 규격 스켈레톤 초기값은 Align Zone Volumes 메뉴로 스냅.
-
-    // 규격 스켈레톤 (ZoneID → 위치, 풋프린트 XZ) — Align 메뉴 전용 초기값.
-    // 좌표는 마스터 프레임 기준 미세보정 완료본(다리 겹침/문 앵커 확보 반영).
-    static readonly (int zone, Vector3 pos, Vector2 size)[] AlignSpec =
-    {
-        (1, new Vector3(-59f, 0f, 14f),   new Vector2(40f, 40f)), // 대형-좌(분수)
-        (2, new Vector3(  6f, 0f, 63f),   new Vector2(40f, 40f)), // 대형-상중(구조물)
-        (3, new Vector3( 46f, 0f, -44f),  new Vector2(40f, 40f)), // 대형-하우(구조물)
-        (4, new Vector3(  0f, 0f,  0f),   new Vector2(20f, 40f)), // 중형-중앙(세로, quest후보)
-        (5, new Vector3(-41.5f, 0f, -41f),new Vector2(20f, 40f)), // 중형-하중좌(세로, quest후보)
-        (6, new Vector3(-48f, 0f, 65f),   new Vector2(20f, 20f)), // 소형-좌상(스폰/보스입구 후보)
-        (7, new Vector3(64.5f, 0f, 48f),  new Vector2(20f, 20f)), // 소형-우상(고정 전투)
-        (8, new Vector3(  2f, 0f, -65f),  new Vector2(20f, 20f)), // 소형-하좌(스폰/보스입구 후보)
-        (9, new Vector3(-77.5f, 0f, -36f),new Vector2(40f, 20f)), // 중형-하좌(가로=90°, quest후보)
-        (10,new Vector3( 48f, 0f,  5f),   new Vector2(40f, 20f)), // 중형-우중(가로=90°, quest후보)
-    };
+    // 존 간 간격 = 디자이너가 볼륨으로 잡은 그대로 — 다리는 존 사이 빈 간격만큼 생성되고,
+    // 존 회전(PickYaw)이 출입구를 다리 방향에 자동 매칭한다.
 
     // 카탈로그 (prefab 폴더, 2026-07 정리 완료).
     // 대형: 3디자인 ↔ 3슬롯 시드 셔플(재사용 없음).
@@ -78,28 +63,24 @@ public static class ZoneWiring
         }
     }
 
-    // 씬 ZoneVolume들을 규격 스켈레톤(AlignSpec)으로 스냅 — 최초 이관/리셋용.
-    // 이후 미세 조정은 씬에서 볼륨을 직접 옮기고 Wire 재실행.
-    [MenuItem("Tools/MapGen/Align Zone Volumes (규격 스켈레톤 정렬)")]
-    static void AlignVolumes()
+    // 씬 ZoneVolume 오버라이드를 프리팹(Stage1) 원본 값으로 되돌린다 — 디자이너 배치 복원용.
+    // (2026-07-03 규격 스켈레톤 스냅으로 볼륨이 벌어졌던 것을 원복. 이후 조정은 씬/프리팹에서 직접.)
+    [MenuItem("Tools/MapGen/Revert Zone Volumes (프리팹 원본 복원)")]
+    static void RevertVolumes()
     {
         var vols = Object.FindObjectsByType<ZoneVolume>(FindObjectsInactive.Include, FindObjectsSortMode.None)
             .Where(v => v.Zone != null).ToList();
-        if (vols.Count == 0) { Debug.LogError("[Align] ZoneVolume 없음"); return; }
+        if (vols.Count == 0) { Debug.LogError("[Revert] ZoneVolume 없음"); return; }
 
         int ok = 0;
-        foreach (var (zone, pos, size) in AlignSpec)
+        foreach (var v in vols)
         {
-            var v = vols.FirstOrDefault(x => x.Zone.ZoneID == zone);
-            if (v == null) { Debug.LogWarning($"[Align] ZoneID {zone} 볼륨 없음 — 건너뜀"); continue; }
-            Undo.RecordObjects(new Object[] { v.transform, v }, "Align Zone Volumes");
-            v.transform.position = pos;
-            v.Size = new Vector3(size.x, v.Size.y, size.y);
-            EditorUtility.SetDirty(v);
-            EditorUtility.SetDirty(v.transform);
+            if (!PrefabUtility.IsPartOfPrefabInstance(v)) { Debug.LogWarning($"[Revert] {v.name} 프리팹 인스턴스 아님 — 건너뜀"); continue; }
+            PrefabUtility.RevertObjectOverride(v.transform, InteractionMode.AutomatedAction);
+            PrefabUtility.RevertObjectOverride(v, InteractionMode.AutomatedAction);
             ok++;
         }
-        Debug.Log($"[Align] ZoneVolume {ok}/{AlignSpec.Length} 규격 정렬 완료 — 씬 저장 필요. 이후 Wire → Build GeoV2 실행.");
+        Debug.Log($"[Revert] ZoneVolume {ok}/{vols.Count} 프리팹 원본 복원 — 씬 저장 필요. 이후 Wire → Build GeoV2 실행.");
     }
 
     [MenuItem("Tools/MapGen/Wire Slots + Catalog + Refs")]
