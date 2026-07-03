@@ -292,8 +292,8 @@ MonoBehaviour:
   WallCuts:
   - {x: 12, y: 0, z: -30.3, w: 2}
   - {x: 21.5, y: 0, z: -0.8000002, w: 1}
-  AssignedRole: 0
-  IsFilled: 0
+  AssignedRole: 1
+  IsFilled: 1
 --- !u!1 &207377810
 GameObject:
   m_ObjectHideFlags: 0
@@ -350,7 +350,7 @@ MonoBehaviour:
   ConnW: 1
   WallCuts: []
   AssignedRole: 0
-  IsFilled: 0
+  IsFilled: 1
 --- !u!1001 &314806437
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -468,8 +468,8 @@ MonoBehaviour:
   ConnS: 1
   ConnW: 0
   WallCuts: []
-  AssignedRole: 0
-  IsFilled: 0
+  AssignedRole: 2
+  IsFilled: 1
 --- !u!1 &498941367
 GameObject:
   m_ObjectHideFlags: 0
@@ -771,7 +771,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MinimapController
   Generator: {fileID: 99066894}
-  PanelSize: 260
+  PanelSize: 600
   Margin: {x: 16, y: 16}
   RoleIconSize: 22
   NodeDotSize: 9
@@ -897,7 +897,7 @@ MonoBehaviour:
   ConnW: 1
   WallCuts: []
   AssignedRole: 0
-  IsFilled: 0
+  IsFilled: 1
 --- !u!1 &1029092588
 GameObject:
   m_ObjectHideFlags: 0
@@ -1086,7 +1086,7 @@ MonoBehaviour:
   WallCuts:
   - {x: -19.5, y: 0, z: 34.2, w: 0}
   AssignedRole: 0
-  IsFilled: 0
+  IsFilled: 1
 --- !u!1 &1101385521
 GameObject:
   m_ObjectHideFlags: 0
@@ -1175,8 +1175,8 @@ MonoBehaviour:
   ConnS: 0
   ConnW: 0
   WallCuts: []
-  AssignedRole: 0
-  IsFilled: 0
+  AssignedRole: 3
+  IsFilled: 1
 --- !u!1 &1572451034
 GameObject:
   m_ObjectHideFlags: 0
@@ -1234,7 +1234,7 @@ MonoBehaviour:
   WallCuts:
   - {x: 67.5, y: 0, z: 9.7, w: 0}
   AssignedRole: 0
-  IsFilled: 0
+  IsFilled: 1
 --- !u!1 &1643572544
 GameObject:
   m_ObjectHideFlags: 0
@@ -1357,7 +1357,7 @@ MonoBehaviour:
   ConnW: 1
   WallCuts: []
   AssignedRole: 0
-  IsFilled: 0
+  IsFilled: 1
 --- !u!1 &1822721338
 GameObject:
   m_ObjectHideFlags: 0
@@ -1415,7 +1415,7 @@ MonoBehaviour:
   WallCuts:
   - {x: 3.5, y: 0, z: 54.95, w: 3}
   AssignedRole: 0
-  IsFilled: 0
+  IsFilled: 1
 --- !u!1001 &1964899879
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1670,7 +1670,7 @@ MonoBehaviour:
   ConnW: 0
   WallCuts: []
   AssignedRole: 0
-  IsFilled: 0
+  IsFilled: 1
 --- !u!1001 &7341477658164184187
 PrefabInstance:
   m_ObjectHideFlags: 0

@@ -14,8 +14,8 @@ public class MinimapController : MonoBehaviour
     public MapGenerator Generator;
 
     [Header("=== UI ===")]
-    [Tooltip("미니맵 한 변 픽셀 크기")] public float PanelSize = 260f;
-    [Tooltip("화면 우하단 여백")] public Vector2 Margin = new Vector2(16f, 16f);
+    [Tooltip("미니맵 한 변 픽셀 크기")] public float PanelSize = 350f;
+    [Tooltip("화면 우하단 여백")] public Vector2 Margin = new Vector2(1f, 1f);
     public float RoleIconSize = 22f;
     public float NodeDotSize = 9f;
     public float UnitDotSize = 11f;
@@ -23,7 +23,7 @@ public class MinimapController : MonoBehaviour
     [Header("=== 시야/탐사 ===")]
     [Tooltip("현재 시야 반경(m) — 팀원 전원 합산")] public float SightRadius = 15f;
     [Tooltip("탐사 마스크 해상도")] public int MaskResolution = 128;
-    [Tooltip("마스크 갱신 주기(초)")] public float MaskTick = 0.15f;
+    [Tooltip("마스크 갱신 주기(초)")] public float MaskTick = 0.35;
 
     [Header("=== 베이크 ===")]
     [Tooltip("지형 베이크 해상도")] public int BakeResolution = 1024;
@@ -326,6 +326,11 @@ public class MinimapController : MonoBehaviour
 
         _dotSprite = MakeCircleSprite(32);
         if (_maskTex != null) _mapMat.SetTexture("_MaskTex", _maskTex);
+
+        _mapRect.sizeDelta = Vector2.one * PanelSize; // 인스펙터/기본값 반영
+        // 네트워크 세션 중이면 플레이어 스폰 전(로딩 화면)엔 숨김 — Update가 상태 갱신
+        var nm = Unity.Netcode.NetworkManager.Singleton;
+        _canvas.enabled = !(nm != null && nm.IsListening);
     }
 
     private static Sprite MakeCircleSprite(int size)
@@ -408,7 +413,7 @@ public class MinimapController : MonoBehaviour
 
     // ---------------- 크기 조절 ([ = 축소, ] = 확대) ----------------
 
-    private static readonly float[] SizePresets = { 220f, 300f, 400f };
+    private static readonly float[] SizePresets = { 300f, 400f, 520f };
 
     private void ApplyPanelSize(float size)
     {
@@ -449,6 +454,7 @@ public class MinimapController : MonoBehaviour
         {
             _playerScanTimer = 1f;
             ScanPlayers();
+            UpdateCanvasVisibility();
         }
 
         _maskTimer -= Time.deltaTime;
@@ -459,6 +465,16 @@ public class MinimapController : MonoBehaviour
         }
 
         UpdateDynamicMarkers();
+    }
+
+    // 로딩 씬 등 게임플레이 전엔 미니맵 숨김 (팀장 지시 2026-07-03) —
+    // 네트워크 세션 중엔 플레이어가 스폰된 뒤에만 표시. 오프라인(에디터 단독 테스트)은 항상 표시.
+    private void UpdateCanvasVisibility()
+    {
+        if (_canvas == null) return;
+        var nm = Unity.Netcode.NetworkManager.Singleton;
+        bool online = nm != null && nm.IsListening;
+        _canvas.enabled = !online || _players.Count > 0;
     }
 
     // 플레이어 수집 — NGO 플레이어 오브젝트(IsPlayerObject, 전 클라에서 보임) 우선,
