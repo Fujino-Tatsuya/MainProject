@@ -1,34 +1,39 @@
 #if UNITY_EDITOR
 using System.Collections.Generic;
+using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
-// 일회성 와이어링(에디터 전용): 조립된 ZoneLayout 프리팹 → 고정 ZoneSlot 스켈레톤 +
+// 와이어링(에디터 전용): 씬 ZoneVolume → ZoneSlot 스켈레톤 생성 +
 // ZoneLayoutCatalog 등록 + MapGenerator 참조 연결 + 임시 Zone_* 숨김. + 셔플 generate 메뉴.
-// 슬롯 위치는 프레임 기준(2번째 이미지) — 현재 근사치, 이후 보정.
+// 배치 소스오브트루스 = ZoneVolume(씬). 볼륨을 옮기고 Wire → Build GeoV2 재실행하면 맵이 따라온다.
 public static class ZoneWiring
 {
     const string PrefabDir = "Assets/50.Art/MapGen/MapObj/prefab";
     const string CatalogPath = "Assets/50.Art/MapGen/MapObj/ZoneLayout/ZoneLayoutCatalog.asset";
 
-    struct Slot { public string label; public ZoneSize size; public Vector3 pos; public float rotY; public bool q, s, b; }
+    // 배치 소스오브트루스 = 씬(Stage1)의 ZoneVolume 10개 (2026-07 리팩토링).
+    //  - ZoneVolume.transform.position → 슬롯 중심 (Y는 0으로 클램프)
+    //  - ZoneVolume.Size 가로세로비 → 크기/회전 (양축≥30m=대형 / 한축만≥30m=중형, X가 길면 90° / 그 외=소형)
+    //  - ZoneDefinitionSO 플래그 → 퀘스트/스폰/보스입구 후보
+    //  - SlotID = ZoneID - 1 (1~10 필수, 결정적 순서)
+    // 디자이너가 씬에서 볼륨을 옮기면 Wire 재실행만으로 배치가 따라온다.
+    // 규격 스켈레톤 초기값은 Align Zone Volumes 메뉴로 스냅.
 
-    // 고정 스켈레톤 — 마스터 프레임(파란 탑다운) 기준 10존: 대형3(전투) + 중형4(전부 quest후보) + 소형3.
-    // 좌표 = 이미지 정규화위치 → 월드(Wworld=210, Hworld=170, y반전) 환산. 스샷 보고 미세보정.
-    // 소형 규칙(2026-07 팀장 확정): 우상단 1곳=고정 전투(S_typeA),
-    // 나머지 2곳(좌상/좌하)=스폰 후보 겸 보스맵입구 후보 — 한쪽이 스폰이 되면 다른 쪽이 보스입구.
-    static readonly Slot[] Slots =
+    // 규격 스켈레톤 (ZoneID → 위치, 풋프린트 XZ) — Align 메뉴 전용 초기값.
+    // 좌표는 마스터 프레임 기준 미세보정 완료본(다리 겹침/문 앵커 확보 반영).
+    static readonly (int zone, Vector3 pos, Vector2 size)[] AlignSpec =
     {
-        new Slot{ label="S_TL",   size=ZoneSize.Small,  pos=new Vector3(-48f,0f, 65f), s=true, b=true }, // 상-좌(스폰/보스입구 후보)
-        new Slot{ label="L_top",  size=ZoneSize.Large,  pos=new Vector3(  6f,0f, 63f) },         // 상-중(구조물)
-        new Slot{ label="S_TR",   size=ZoneSize.Small,  pos=new Vector3(64.5f,0f, 48f) },        // 상-우(고정 소형 전투, 71→64.5: M_right 문(57.5) 앵커 확보)
-        new Slot{ label="L_left", size=ZoneSize.Large,  pos=new Vector3(-59f,0f, 14f) },         // 좌(분수)
-        new Slot{ label="M_ctr",  size=ZoneSize.Medium, pos=new Vector3(  0f,0f,  0f), q=true }, // 중앙(quest후보)
-        new Slot{ label="M_right",size=ZoneSize.Medium, pos=new Vector3( 48f,0f,  5f), rotY=90f, q=true }, // 우-중(가로, 44→48: S_TR 다리 겹침 확보)
-        new Slot{ label="M_BL",   size=ZoneSize.Medium, pos=new Vector3(-77.5f,0f,-36f), rotY=90f, q=true }, // 하-좌(가로, -71→-77.5: M_BC 서진에 따른 간격 유지)
-        new Slot{ label="M_BC",   size=ZoneSize.Medium, pos=new Vector3(-41.5f,0f,-41f), q=true }, // 하-중좌(-35→-41.5: L_left 문(-48.5) 앵커 확보)
-        new Slot{ label="S_BL",   size=ZoneSize.Small,  pos=new Vector3(  2f,0f,-65f), s=true, b=true }, // 하-좌측(스폰/보스입구 후보)
-        new Slot{ label="L_BR",   size=ZoneSize.Large,  pos=new Vector3( 46f,0f,-44f) },         // 하-우(구조물)
+        (1, new Vector3(-59f, 0f, 14f),   new Vector2(40f, 40f)), // 대형-좌(분수)
+        (2, new Vector3(  6f, 0f, 63f),   new Vector2(40f, 40f)), // 대형-상중(구조물)
+        (3, new Vector3( 46f, 0f, -44f),  new Vector2(40f, 40f)), // 대형-하우(구조물)
+        (4, new Vector3(  0f, 0f,  0f),   new Vector2(20f, 40f)), // 중형-중앙(세로, quest후보)
+        (5, new Vector3(-41.5f, 0f, -41f),new Vector2(20f, 40f)), // 중형-하중좌(세로, quest후보)
+        (6, new Vector3(-48f, 0f, 65f),   new Vector2(20f, 20f)), // 소형-좌상(스폰/보스입구 후보)
+        (7, new Vector3(64.5f, 0f, 48f),  new Vector2(20f, 20f)), // 소형-우상(고정 전투)
+        (8, new Vector3(  2f, 0f, -65f),  new Vector2(20f, 20f)), // 소형-하좌(스폰/보스입구 후보)
+        (9, new Vector3(-77.5f, 0f, -36f),new Vector2(40f, 20f)), // 중형-하좌(가로=90°, quest후보)
+        (10,new Vector3( 48f, 0f,  5f),   new Vector2(40f, 20f)), // 중형-우중(가로=90°, quest후보)
     };
 
     // 카탈로그 (prefab 폴더, 2026-07 정리 완료).
@@ -50,18 +55,52 @@ public static class ZoneWiring
         ("ZoneS_typeStart",    ZoneSize.Small, ZoneRole.PlayerSpawn),
     };
 
-    // 연결 그래프 (신 SlotID, 13연결) — 구 MapCorridors.Pairs(v1 존ID) 이관.
-    // 다리 방향(슬롯 Conn 플래그)과 다리 재생성 둘 다 이 표에서 파생.
-    static readonly (int a, int b)[] SlotPairs =
+    // 연결 그래프 (ZoneID 쌍, 13연결) — 다리 방향(슬롯 Conn 플래그)과 다리 재생성 둘 다 이 표에서 파생.
+    static readonly (int a, int b)[] ZonePairs =
     {
-        (0, 3), (0, 1),          // S_TL ↔ L_left / L_top
-        (1, 2), (1, 4),          // L_top ↔ S_TR / M_ctr
-        (3, 4), (3, 7), (3, 6),  // L_left ↔ M_ctr / M_BC / M_BL
-        (6, 7),                  // M_BL ↔ M_BC
-        (4, 8), (4, 5),          // M_ctr ↔ S_BL / M_right
-        (2, 5),                  // S_TR ↔ M_right
-        (5, 9), (8, 9),          // M_right ↔ L_BR / S_BL ↔ L_BR
+        (6, 1), (6, 2),          // 소형좌상 ↔ 대형좌 / 대형상중
+        (2, 7), (2, 4),          // 대형상중 ↔ 소형우상 / 중형중앙
+        (1, 4), (1, 5), (1, 9),  // 대형좌 ↔ 중형중앙 / 중형하중좌 / 중형하좌
+        (9, 5),                  // 중형하좌 ↔ 중형하중좌
+        (4, 8), (4, 10),         // 중형중앙 ↔ 소형하좌 / 중형우중
+        (7, 10),                 // 소형우상 ↔ 중형우중
+        (10, 3), (8, 3),         // 중형우중 ↔ 대형하우 / 소형하좌 ↔ 대형하우
     };
+
+    // SlotID(=ZoneID-1) 기준 쌍 — GeoV2/Conn 파생용
+    static (int a, int b)[] SlotPairs
+    {
+        get
+        {
+            var arr = new (int a, int b)[ZonePairs.Length];
+            for (int i = 0; i < ZonePairs.Length; i++) arr[i] = (ZonePairs[i].a - 1, ZonePairs[i].b - 1);
+            return arr;
+        }
+    }
+
+    // 씬 ZoneVolume들을 규격 스켈레톤(AlignSpec)으로 스냅 — 최초 이관/리셋용.
+    // 이후 미세 조정은 씬에서 볼륨을 직접 옮기고 Wire 재실행.
+    [MenuItem("Tools/MapGen/Align Zone Volumes (규격 스켈레톤 정렬)")]
+    static void AlignVolumes()
+    {
+        var vols = Object.FindObjectsByType<ZoneVolume>(FindObjectsInactive.Include, FindObjectsSortMode.None)
+            .Where(v => v.Zone != null).ToList();
+        if (vols.Count == 0) { Debug.LogError("[Align] ZoneVolume 없음"); return; }
+
+        int ok = 0;
+        foreach (var (zone, pos, size) in AlignSpec)
+        {
+            var v = vols.FirstOrDefault(x => x.Zone.ZoneID == zone);
+            if (v == null) { Debug.LogWarning($"[Align] ZoneID {zone} 볼륨 없음 — 건너뜀"); continue; }
+            Undo.RecordObjects(new Object[] { v.transform, v }, "Align Zone Volumes");
+            v.transform.position = pos;
+            v.Size = new Vector3(size.x, v.Size.y, size.y);
+            EditorUtility.SetDirty(v);
+            EditorUtility.SetDirty(v.transform);
+            ok++;
+        }
+        Debug.Log($"[Align] ZoneVolume {ok}/{AlignSpec.Length} 규격 정렬 완료 — 씬 저장 필요. 이후 Wire → Build GeoV2 실행.");
+    }
 
     [MenuItem("Tools/MapGen/Wire Slots + Catalog + Refs")]
     static void Wire()
@@ -74,24 +113,38 @@ public static class ZoneWiring
         var slotsRoot = new GameObject("Slots");
         slotsRoot.transform.SetParent(stage1.transform, false);
 
+        // 씬 ZoneVolume 수집 (비활성 포함) → ZoneID 순 정렬
+        var vols = Object.FindObjectsByType<ZoneVolume>(FindObjectsInactive.Include, FindObjectsSortMode.None)
+            .Where(v => v.Zone != null).OrderBy(v => v.Zone.ZoneID).ToList();
+        if (vols.Count == 0) { Debug.LogError("[Wire] ZoneVolume 없음 — Stage1의 ZoneVolumes 확인"); return; }
+        for (int i = 0; i < vols.Count; i++)
+            if (vols[i].Zone.ZoneID != i + 1)
+            { Debug.LogError($"[Wire] ZoneID 불연속: {vols[i].name} = {vols[i].Zone.ZoneID} (기대 {i + 1}) — ZoneDef 지정 확인"); return; }
+
         int id = 0;
         var created = new List<ZoneSlot>();
-        foreach (var s in Slots)
+        foreach (var v in vols)
         {
-            var go = new GameObject($"Slot_{id}_{s.label}");
+            bool lx = v.Size.x >= 30f, lz = v.Size.z >= 30f;
+            ZoneSize size = lx && lz ? ZoneSize.Large : (lx || lz ? ZoneSize.Medium : ZoneSize.Small);
+            float rotY = size == ZoneSize.Medium && lx ? 90f : 0f; // 가로로 긴 중형 = 90°
+
+            var go = new GameObject($"Slot_{id}_Z{v.Zone.ZoneID}_{size.ToString()[0]}");
             go.transform.SetParent(slotsRoot.transform, false);
-            go.transform.position = s.pos;
-            go.transform.rotation = Quaternion.Euler(0f, s.rotY, 0f);
+            go.transform.position = new Vector3(v.transform.position.x, 0f, v.transform.position.z);
+            go.transform.rotation = Quaternion.Euler(0f, rotY, 0f);
             var slot = go.AddComponent<ZoneSlot>();
             slot.SlotID = id++;
-            slot.Size = s.size;
-            slot.Footprint = s.size switch
+            slot.Size = size;
+            slot.Footprint = size switch
             {
                 ZoneSize.Large  => new Vector2(40f, 40f),  // 10x10 타일
                 ZoneSize.Medium => new Vector2(20f, 40f),  // 5x10 타일
                 _               => new Vector2(20f, 20f),  // 5x5 타일
             };
-            slot.IsQuestCandidate = s.q; slot.IsSpawnCandidate = s.s; slot.IsBossCandidate = s.b;
+            slot.IsQuestCandidate = v.Zone.IsQuestZoneCandidate;
+            slot.IsSpawnCandidate = v.Zone.IsPlayerSpawnCandidate;
+            slot.IsBossCandidate = v.Zone.IsBossGateCandidate;
             created.Add(slot);
         }
 
@@ -149,9 +202,9 @@ public static class ZoneWiring
             foreach (Transform c in geom)
                 if (c.name.StartsWith("Zone_")) { c.gameObject.SetActive(false); hidden++; }
 
-        // 구 절차배치 모델 잔재 비활성(ZoneSlot이 대체) — 삭제는 검증 후 별도로.
+        // ZoneVolumes = 배치 소스오브트루스 — 반드시 활성 유지(과거 Wire가 비활성화했던 것 복구)
         var volumes = stage1.transform.Find("ZoneVolumes");
-        if (volumes != null && volumes.gameObject.activeSelf) { volumes.gameObject.SetActive(false); hidden++; }
+        if (volumes != null && !volumes.gameObject.activeSelf) volumes.gameObject.SetActive(true);
 
         AssetDatabase.SaveAssets();
         bool lpOk = mg != null && mg.LayoutPlacer != null;
