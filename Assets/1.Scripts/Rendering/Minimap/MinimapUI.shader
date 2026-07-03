@@ -7,8 +7,9 @@ Shader "UI/MinimapComposite"
 {
     Properties
     {
-        _MainTex ("Bake (RGB=지형, A=맵 실루엣)", 2D) = "black" {}
+        _MainTex ("Bake (RGB=지형)", 2D) = "black" {}
         _MaskTex ("Mask (R=explored, G=visible)", 2D) = "black" {}
+        _SilTex ("Silhouette (R=맵 모양, CPU 생성)", 2D) = "black" {}
         _SilColor ("미탐사 실루엣 색", Color) = (0.22, 0.26, 0.33, 1)
         _DimExplored ("탐사 디밍", Range(0,1)) = 0.5
         _BgAlpha ("맵 밖 배경 알파", Range(0,1)) = 0.35
@@ -28,6 +29,7 @@ Shader "UI/MinimapComposite"
 
             sampler2D _MainTex;
             sampler2D _MaskTex;
+            sampler2D _SilTex;
             fixed4 _SilColor;
             float _DimExplored;
             float _BgAlpha;
@@ -48,6 +50,7 @@ Shader "UI/MinimapComposite"
             {
                 fixed4 bake = tex2D(_MainTex, i.uv);
                 fixed4 mask = tex2D(_MaskTex, i.uv);
+                float shape = tex2D(_SilTex, i.uv).r; // 맵 모양 (존+다리, CPU 생성)
                 float explored = saturate(mask.r);
                 float visible = saturate(mask.g);
 
@@ -57,10 +60,10 @@ Shader "UI/MinimapComposite"
                 // 미탐사 영역은 실루엣 색으로
                 fixed3 rgb = lerp(_SilColor.rgb, terrain, saturate(explored + visible));
 
-                // 맵 모양(bake.a) 밖은 반투명 배경
+                // 맵 모양 밖은 반투명 배경
                 fixed4 col;
-                col.rgb = lerp(fixed3(0.02, 0.02, 0.03), rgb, bake.a);
-                col.a = max(bake.a, _BgAlpha) * i.color.a;
+                col.rgb = lerp(fixed3(0.02, 0.02, 0.03), rgb, shape);
+                col.a = max(shape, _BgAlpha) * i.color.a;
                 return col;
             }
             ENDCG

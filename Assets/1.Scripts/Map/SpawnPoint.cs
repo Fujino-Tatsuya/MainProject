@@ -28,7 +28,7 @@ public class SpawnPoint : MonoBehaviour
         NodeData = default;
     }
 
-    private void OnDrawGizmos()
+/*    private void OnDrawGizmos()
     {
         // 에디터에서 식별하기 쉽도록 티어별로 색상을 다르게 그려줍니다.
         switch (AllowedTier)
@@ -39,6 +39,6 @@ public class SpawnPoint : MonoBehaviour
         }
 
         Gizmos.DrawWireSphere(transform.position, 0.5f);
-    }
+    }*/
 }
 

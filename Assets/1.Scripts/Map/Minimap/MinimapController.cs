@@ -56,8 +56,9 @@ public class MinimapController : MonoBehaviour
     private readonly List<RectTransform> _staticMarkers = new List<RectTransform>();
     private readonly Dictionary<Component, Image> _dynMarkers = new Dictionary<Component, Image>();
     private readonly List<Component> _dynRemove = new List<Component>();
-    private PlayerMovement[] _players = System.Array.Empty<PlayerMovement>();
+    private readonly List<Transform> _players = new List<Transform>();
     private float _playerScanTimer;
+    private int _lastPlayerCount = -1;
 
     private void OnEnable() => MapGenerator.OnGenerated += HandleGenerated;
     private void OnDisable() => MapGenerator.OnGenerated -= HandleGenerated;
@@ -68,6 +69,7 @@ public class MinimapController : MonoBehaviour
         ComputeWorldRect(gen);
         BakeTerrain();
         EnsureUI();
+        BuildSilhouette(gen);
         ResetMask();
         BuildStaticMarkers(gen);
         _baked = true;
@@ -125,9 +127,92 @@ public class MinimapController : MonoBehaviour
         }
         cam.cullingMask = mask;
         cam.enabled = false;
-        cam.Render();
+
+        // URP에서 Camera.Render()는 동작하지 않음 — 렌더 요청 API 사용 (Unity 6)
+        var request = new UnityEngine.Rendering.RenderPipeline.StandardRequest { destination = _bakeRT };
+        if (UnityEngine.Rendering.RenderPipeline.SupportsRenderRequest(cam, request))
+            UnityEngine.Rendering.RenderPipeline.SubmitRenderRequest(cam, request);
+        else
+            cam.Render(); // 빌트인 파이프라인 폴백
+
         cam.targetTexture = null;
         Destroy(camGo);
+        LogBakeCoverage();
+    }
+
+    // 베이크 진단 — 중앙 64px 샘플의 평균 밝기 로그 (0에 가까우면 베이크 실패 의심)
+    private void LogBakeCoverage()
+    {
+        var prev = RenderTexture.active;
+        RenderTexture.active = _bakeRT;
+        var t = new Texture2D(64, 64, TextureFormat.RGBA32, false);
+        t.ReadPixels(new Rect(_bakeRT.width / 2 - 32, _bakeRT.height / 2 - 32, 64, 64), 0, 0);
+        t.Apply(false);
+        RenderTexture.active = prev;
+        float lum = 0f;
+        var px = t.GetPixels32();
+        foreach (var c in px) lum += (c.r + c.g + c.b) / (3f * 255f);
+        Debug.Log($"[Minimap] 베이크 완료 — 중앙 샘플 평균 밝기 {lum / px.Length:F3} (0이면 렌더 실패 의심)");
+        Destroy(t);
+    }
+
+    // ---------------- 맵 실루엣 (존+다리 모양, CPU 생성) ----------------
+    // 베이크 알파는 URP 설정에 따라 불안정 → 슬롯 풋프린트 + 다리(Corridors 렌더러 AABB)로
+    // 결정적으로 그린다. 미탐사 상태에서도 "존이 어떻게 연결됐는지"가 보이는 큰 틀.
+    private Texture2D _silTex;
+
+    private void BuildSilhouette(MapGenerator gen)
+    {
+        const int res = 256;
+        if (_silTex == null)
+        {
+            _silTex = new Texture2D(res, res, TextureFormat.R8, false);
+            _silTex.name = "MinimapSilhouette";
+            _silTex.wrapMode = TextureWrapMode.Clamp;
+        }
+        var px = new byte[res * res];
+
+        void FillWorldRect(float minX, float minZ, float maxX, float maxZ)
+        {
+            int x0 = Mathf.Clamp(Mathf.FloorToInt((minX - _worldRect.xMin) / _worldRect.width * res), 0, res - 1);
+            int x1 = Mathf.Clamp(Mathf.CeilToInt((maxX - _worldRect.xMin) / _worldRect.width * res), 0, res - 1);
+            int y0 = Mathf.Clamp(Mathf.FloorToInt((minZ - _worldRect.yMin) / _worldRect.height * res), 0, res - 1);
+            int y1 = Mathf.Clamp(Mathf.CeilToInt((maxZ - _worldRect.yMin) / _worldRect.height * res), 0, res - 1);
+            for (int y = y0; y <= y1; y++)
+            for (int x = x0; x <= x1; x++)
+                px[y * res + x] = 255;
+        }
+
+        // 존 풋프린트 (회전 반영)
+        foreach (var s in gen.Slots)
+        {
+            int steps = Mathf.RoundToInt(s.transform.eulerAngles.y / 90f) & 3;
+            Vector2 half = (steps & 1) == 1
+                ? new Vector2(s.Footprint.y, s.Footprint.x) * 0.5f
+                : s.Footprint * 0.5f;
+            Vector3 p = s.transform.position;
+            FillWorldRect(p.x - half.x, p.z - half.y, p.x + half.x, p.z + half.y);
+        }
+
+        // 다리 — MapGeometryV2/Corridors 하위 각 Cor_* 그룹의 렌더러 AABB (축 정렬 통로)
+        var geo = GameObject.Find("MapGeometryV2");
+        var corridors = geo != null ? geo.transform.Find("Corridors") : null;
+        if (corridors != null)
+        {
+            foreach (Transform cor in corridors)
+            {
+                var rends = cor.GetComponentsInChildren<Renderer>();
+                if (rends.Length == 0) continue;
+                Bounds b = rends[0].bounds;
+                foreach (var r in rends) b.Encapsulate(r.bounds);
+                FillWorldRect(b.min.x, b.min.z, b.max.x, b.max.z);
+            }
+        }
+        else Debug.LogWarning("[Minimap] MapGeometryV2/Corridors 못 찾음 — 실루엣에 다리 미포함");
+
+        _silTex.SetPixelData(px, 0);
+        _silTex.Apply(false);
+        _mapMat.SetTexture("_SilTex", _silTex);
     }
 
     // ---------------- 탐사 마스크 (CPU 스탬프) ----------------
@@ -163,7 +248,7 @@ public class MinimapController : MonoBehaviour
         foreach (var p in _players)
         {
             if (p == null) continue;
-            Vector3 wp = p.transform.position;
+            Vector3 wp = p.position;
             int cx = Mathf.RoundToInt((wp.x - _worldRect.xMin) * pxPerMeter);
             int cy = Mathf.RoundToInt((wp.z - _worldRect.yMin) * pxPerMeter);
             int x0 = Mathf.Max(0, cx - rPx), x1 = Mathf.Min(res - 1, cx + rPx);
@@ -315,7 +400,7 @@ public class MinimapController : MonoBehaviour
         if (_playerScanTimer <= 0f)
         {
             _playerScanTimer = 1f;
-            _players = FindObjectsByType<PlayerMovement>(FindObjectsSortMode.None);
+            ScanPlayers();
         }
 
         _maskTimer -= Time.deltaTime;
@@ -328,6 +413,23 @@ public class MinimapController : MonoBehaviour
         UpdateDynamicMarkers();
     }
 
+    // 플레이어 수집 — NGO 플레이어 오브젝트(IsPlayerObject, 전 클라에서 보임) 우선,
+    // 없으면 PlayerMovement(에디터 단독 테스트) 폴백.
+    private void ScanPlayers()
+    {
+        _players.Clear();
+        foreach (var no in FindObjectsByType<Unity.Netcode.NetworkObject>(FindObjectsSortMode.None))
+            if (no.IsPlayerObject) _players.Add(no.transform);
+        if (_players.Count == 0)
+            foreach (var pm in FindObjectsByType<PlayerMovement>(FindObjectsSortMode.None))
+                _players.Add(pm.transform);
+        if (_players.Count != _lastPlayerCount)
+        {
+            _lastPlayerCount = _players.Count;
+            Debug.Log($"[Minimap] 플레이어 {_players.Count}명 추적 중 (시야/탐사 스탬프 대상)");
+        }
+    }
+
     private void UpdateDynamicMarkers()
     {
         // 플레이어
@@ -335,7 +437,7 @@ public class MinimapController : MonoBehaviour
         {
             if (p == null) continue;
             var img = GetOrCreateDyn(p, IsLocal(p) ? LocalPlayerColor : AllyColor, UnitDotSize);
-            img.rectTransform.anchoredPosition = WorldToMap(p.transform.position);
+            img.rectTransform.anchoredPosition = WorldToMap(p.position);
             img.enabled = true;
         }
 
@@ -348,7 +450,7 @@ public class MinimapController : MonoBehaviour
             foreach (var p in _players)
             {
                 if (p == null) continue;
-                Vector3 d = m.transform.position - p.transform.position;
+                Vector3 d = m.transform.position - p.position;
                 d.y = 0f;
                 if (d.sqrMagnitude <= SightRadius * SightRadius) { inSight = true; break; }
             }
