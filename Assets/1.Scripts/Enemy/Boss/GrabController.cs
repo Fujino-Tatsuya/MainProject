@@ -200,7 +200,7 @@ public class GrabController : NetworkBehaviour
             Clear();
             return;
         }
-        EnableTargetRigidbody(false);
+
         //_targetUnit.BeginGrab(grabSocket, grabDamage);
         // 플레이어 상태 전환 함수 호출하기
         _targetPlayer = player.GetComponent<Player>();
@@ -230,7 +230,7 @@ public class GrabController : NetworkBehaviour
 
         //Vector3 worldDir = grabSocket.transform.TransformDirection(throwDirection);
         ApplyDamage(landingDamagePercentage);
-        EnableTargetRigidbody(true);
+
         // 플레이어 상태 전환 함수 호출하기
 
         Clear();
@@ -250,14 +250,6 @@ public class GrabController : NetworkBehaviour
         _targetHp = 0;
     }
 
-    void EnableTargetRigidbody(bool enabled)
-    {
-        if(_targetRigidbody == null) return;
-
-        _targetRigidbody.isKinematic = !enabled;
-        _targetRigidbody.angularVelocity = Vector3.zero;
-        _targetRigidbody.linearVelocity = Vector3.zero;
-    }
 
     /// <summary>
     /// 타겟 유닛에게 percentage만큼 피해를 입히는 함수입니다.
