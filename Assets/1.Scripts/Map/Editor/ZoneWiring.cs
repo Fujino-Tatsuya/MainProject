@@ -177,6 +177,12 @@ public static class ZoneWiring
             EditorUtility.SetDirty(mg);
         }
 
+        // 미니맵 컨트롤러 — 없으면 생성, 참조 연결 (런타임에 MapGenerator.OnGenerated 구독)
+        var mm = Object.FindFirstObjectByType<MinimapController>();
+        if (mm == null) mm = new GameObject("Minimap").AddComponent<MinimapController>();
+        mm.Generator = mg;
+        EditorUtility.SetDirty(mm);
+
         int hidden = 0;
         var geom = stage1.transform.Find("MapGeometry");
         if (geom != null)

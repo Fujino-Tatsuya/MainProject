@@ -61,8 +61,12 @@ public class MapGenerator : MonoBehaviour
         ContentSpawner?.SpawnPlacements(this, Placements);
 
         Debug.Log($"[MapGenerator] 생성 완료. Seed:{mapSeed} / 난이도 Lv{difficultyLevel} / 슬롯 {_slots.Count} / 배치 {Placements.Count}.");
+        OnGenerated?.Invoke(this); // 미니맵 베이크 등 후처리 훅 (생성물 배치 완료 시점)
         return Placements;
     }
+
+    // 생성 완료 이벤트 — 구독자: MinimapController(지형 베이크/마커 수집)
+    public static event System.Action<MapGenerator> OnGenerated;
 
     // 씬의 ZoneSlot 수집 + SlotID 정렬(결정성) + 런타임 초기화
     private void GatherSlots()
