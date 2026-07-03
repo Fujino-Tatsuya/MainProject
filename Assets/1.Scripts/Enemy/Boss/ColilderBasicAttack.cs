@@ -66,12 +66,12 @@ public class ColliderBasicAttack : BaseWeapon
 
     void TakeDamage(GameObject collidedObject)
     {
-        if ((layerMask.value & (1 << collidedObject.layer)) != 0)
+        if ((targetLayer.value & (1 << collidedObject.layer)) != 0)
         {
             Unit unit = collidedObject.GetComponent<Unit>();
             if (unit == null)
             {
-                Debug.LogError($"ÇØ´ç ¿ÀºêÁ§Æ®, {collidedObject.name}¿¡ Unit ÄÄÆ÷³ÍÆ®°¡ ºÎÂøµÇ¾îÀÖÁö ¾Ê½À´Ï´Ù.", this);
+                Debug.LogError($"í•´ë‹¹ ì˜¤ë¸Œì íŠ¸, {collidedObject.name}ì— Unit ì»´í¬ë„ŒíŠ¸ê°€ ë¶€ì°©ë˜ì–´ìˆì§€ ì•ŠìŠµë‹ˆë‹¤.", this);
                 return;
             }
 

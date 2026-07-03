@@ -8,6 +8,8 @@ public class ChargingObject : Unit
     [SerializeField] int defense;
     [SerializeField] int maxshield;
 
+    Collider _collider;
+
     float _maxY = 5f;
     float _minY = 0f;
     float _sign = 1f;
@@ -19,19 +21,25 @@ public class ChargingObject : Unit
     public event EventHandler DestroyEvent;
     public event EventHandler ReachEvent;
 
+    void Awake()
+    {
+        _collider = GetComponent<Collider>();
+        _minY = transform.position.y;
+    }
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
+        _collider.enabled = false;
 
         if (!IsServer) return;
 
         Initialize(0, 0, 0, maxHp, defense, maxshield);
     }
 
-    public void SetMinMaxY(float min, float max)
+    public void SetMinMaxY(float max)
     {
         _maxY = max;
-        _minY = min;
     }
 
     void Update()
@@ -98,6 +106,8 @@ public class ChargingObject : Unit
         _isReached = false;
         Revive();
         _sign = 1f;
+
+        _collider.enabled = true;
     }
 
     public void EndCharge()
@@ -107,5 +117,7 @@ public class ChargingObject : Unit
         _isAlive = false;
         _isReached = false;
         _sign = -1f;
+
+        _collider.enabled = false;
     }
 }

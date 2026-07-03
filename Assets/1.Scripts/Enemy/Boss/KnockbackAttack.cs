@@ -9,12 +9,12 @@ public class KnockbackAttack : BaseWeapon
         if (!IsServer) return;
 
         GameObject root = collidedObject.transform.root.gameObject;
-        if ((layerMask.value & (1 << root.layer)) != 0)
+        if ((targetLayer.value & (1 << root.layer)) != 0)
         {
             Unit unit = root.GetComponent<Unit>();
             if (unit == null)
             {
-                Debug.LogError($"ÇØ´ç ¿ÀºêÁ§Æ®, {root.name}¿¡ Unit ÄÄÆ÷³ÍÆ®°¡ ºÎÂøµÇ¾îÀÖÁö ¾Ê½À´Ï´Ù.", this);
+                Debug.LogError($"í•´ë‹¹ ì˜¤ë¸Œì íŠ¸, {root.name}ì— Unit ì»´í¬ë„ŒíŠ¸ê°€ ë¶€ì°©ë˜ì–´ìˆì§€ ì•ŠìŠµë‹ˆë‹¤.", this);
                 return;
             }
 

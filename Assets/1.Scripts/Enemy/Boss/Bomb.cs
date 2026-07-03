@@ -1,56 +1,22 @@
 using UnityEngine;
 using System;
 
-public enum CollidedWithBomb
-{ 
-    Wall,
-    Player,
-    Enemy,
-    Ground
-}
 
-public class BombCollidedEventArgs : EventArgs
-{
-    public CollidedWithBomb _collidedWithBomb;
-    public GameObject _gameObject;
-
-    public BombCollidedEventArgs(CollidedWithBomb collidedWithBomb, GameObject gameObject = null)
-    {
-        _collidedWithBomb  = collidedWithBomb;
-        _gameObject = gameObject;
-    }
-}
     
-public class Bomb : MonoBehaviour
+public class Bomb : Unit
 {
-    [SerializeField] LayerMask Player;
-    [SerializeField] LayerMask Enemy;
-    [SerializeField] LayerMask Surface;
-    [SerializeField] string WallTag;
-    [SerializeField] string GroundTag;
+    [SerializeField] AttackType attackType;
 
-    public EventHandler<BombCollidedEventArgs> OnCollided;
+    public EventHandler<AttackEventArgs> OnTriggered;
 
-    void OnCollisionEnter(Collision collision)
+    void OnTriggerEnter(Collider other)
     {
-        int layer = collision.gameObject.layer;
+        BaseWeapon baseWeapon = other.GetComponent<BaseWeapon>();
+        if (baseWeapon == null) return;
 
-        if ((Player & 1 << layer) != 0)
+        if (baseWeapon.AttackType == attackType)
         {
-            OnCollided?.Invoke(this, new BombCollidedEventArgs(CollidedWithBomb.Player, collision.transform.root.gameObject));
-        }
-        else if ((Enemy & 1 << layer) != 0)
-        {
-            OnCollided?.Invoke(this, new BombCollidedEventArgs(CollidedWithBomb.Enemy, collision.transform.root.gameObject));
-        }
-        else if ((Surface & 1 << layer) != 0)
-        {
-            string tag = collision.gameObject.tag;
-            if(tag == WallTag)
-                OnCollided?.Invoke(this, new BombCollidedEventArgs(CollidedWithBomb.Wall));
-
-            else if (tag == GroundTag)
-                OnCollided?.Invoke(this, new BombCollidedEventArgs(CollidedWithBomb.Ground));
+            OnTriggered?.Invoke(this, new AttackEventArgs(baseWeapon));
         }
     }
 }
