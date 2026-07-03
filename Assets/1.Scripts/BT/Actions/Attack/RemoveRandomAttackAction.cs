@@ -1,13 +1,13 @@
 using System;
 using Unity.Behavior;
-using UnityEngine;
-using Action = Unity.Behavior.Action;
 using Unity.Properties;
 using Unity.VisualScripting;
+using UnityEngine;
+using Action = Unity.Behavior.Action;
 
 [Serializable, GeneratePropertyBag]
-[NodeDescription(name: "Add RandomAttack", story: "Add [BasicAttackType] to [BaseAttackChoice]", category: "Action/Attack", id: "afad3ec8c04f70f9e7e914c16688641a")]
-public partial class AddRandomAttackAction : Action
+[NodeDescription(name: "Remove RandomAttack", story: "Remove [BasicAttackType] to [BaseAttackChoice]", category: "Action/Attack", id: "5e887726eda93bbd69c256ade9e100ac")]
+public partial class RemoveRandomAttackAction : Action
 {
     [SerializeReference] public BlackboardVariable BasicAttackType;
     [SerializeReference] public BlackboardVariable<BaseAttackChoice> BaseAttackChoice;
@@ -21,7 +21,7 @@ public partial class AddRandomAttackAction : Action
         if (choice == null)
             return Status.Failure;
 
-        choice.AddType(BasicAttackType.ObjectValue.ConvertTo<System.Enum>());
+        choice.RemoveType(BasicAttackType.ObjectValue.ConvertTo<System.Enum>());
         return Status.Success;
     }
 
@@ -29,9 +29,9 @@ public partial class AddRandomAttackAction : Action
     {
         // 진단: 변수 자체가 null(바인딩 유실)인지, 값만 null(원본 미할당)인지 구분한다.
         if (BaseAttackChoice == null)
-            Debug.LogWarning("AddRandomAttack: BaseAttackChoice variable itself is null (binding lost).");
+            Debug.LogWarning("RemoveRandomAttack: BaseAttackChoice variable itself is null (binding lost).");
         else if (BaseAttackChoice.Value == null)
-            Debug.LogWarning("AddRandomAttack: BaseAttackChoice value is null (source variable not assigned).");
+            Debug.LogWarning("RemoveRandomAttack: BaseAttackChoice value is null (source variable not assigned).");
         else
             return BaseAttackChoice.Value;
 
@@ -41,7 +41,7 @@ public partial class AddRandomAttackAction : Action
             BaseAttackChoice found = Agent.Value.GetComponentInChildren<BaseAttackChoice>();
             if (found != null)
             {
-                Debug.LogWarning($"AddRandomAttack: fallback resolved BaseAttackChoice from {Agent.Value.name}.");
+                Debug.LogWarning($"RemoveRandomAttack: fallback resolved BaseAttackChoice from {Agent.Value.name}.");
                 return found;
             }
         }
