@@ -17,6 +17,9 @@ public class MapContentSpawner : MonoBehaviour
     {
         ClearGenerated();
         _root = new GameObject(RootName).transform;
+        // NGO 로딩 플로우 중엔 활성 씬이 아직 소스(로비)/로딩 씬 — new GameObject는 활성 씬에 생기므로
+        // 그대로 두면 소스 씬 언로드와 함께 생성물 전체가 파괴된다. 스포너가 있는 씬(MapScene)으로 이동.
+        UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(_root.gameObject, gameObject.scene);
 #if UNITY_EDITOR
         // 에디터 테스트 생성물(Test Generate 메뉴)은 씬 파일에 저장하지 않는다 —
         // 실수로 씬 저장 시 존 수천 오브젝트가 박제되는 것 방지. 런타임 생성은 어차피 저장 안 됨.
@@ -38,6 +41,12 @@ public class MapContentSpawner : MonoBehaviour
                 Quaternion rot = p.Slot.transform.rotation * Quaternion.Euler(0f, p.ExtraYawSteps * 90f, 0f);
                 GameObject zoneGo = Instantiate(p.LayoutPrefab,
                     p.Slot.transform.position, rot, _root);
+
+                // 피벗 보정 — 아트 존 프리팹(2026-07 신규 9종)은 코너 피벗이라 그대로 두면
+                // 존이 슬롯 중심에서 반폭만큼 밀린다(벽 컷/다리 정렬 깨짐).
+                // 바닥 렌더러 바운즈 중심(XZ)을 슬롯 위치에 맞춘다. 중앙 피벗 프리팹은 delta≈0.
+                CenterOnSlot(zoneGo, p.Slot.transform.position);
+
                 p.Slot.IsFilled = true;
                 visuals++;
 
@@ -53,6 +62,28 @@ public class MapContentSpawner : MonoBehaviour
         Debug.Log($"[MapContentSpawner] 존 비주얼 {visuals} / 벽 컷 {wallCuts}조각 / 몬스터 {monsters} 스폰 (서버:{isServer}).");
     }
 
+    // 존 비주얼의 둘레(벽 계열) 바운즈 중심(XZ)을 슬롯 위치로 이동 — 코너 피벗 프리팹 보정.
+    // 벽이 존 경계를 정의하므로 바닥 타일(자체도 코너 피벗)보다 벽 바운즈가 정확하다.
+    // 프리팹·트랜스폼이 결정적이라 같은 시드면 서버/클라 동일 결과. Y는 건드리지 않는다.
+    private static void CenterOnSlot(GameObject zoneGo, Vector3 slotPos)
+    {
+        bool hasWall = false, hasAny = false;
+        var wb = new Bounds();
+        var ab = new Bounds();
+        foreach (var r in zoneGo.GetComponentsInChildren<Renderer>())
+        {
+            if (r == null) continue;
+            if (!hasAny) { ab = r.bounds; hasAny = true; } else ab.Encapsulate(r.bounds);
+            if (!IsWallFamily(r.transform)) continue;
+            if (!hasWall) { wb = r.bounds; hasWall = true; } else wb.Encapsulate(r.bounds);
+        }
+        if (!hasAny) return;
+
+        Vector3 delta = slotPos - (hasWall ? wb.center : ab.center);
+        delta.y = 0f;
+        zoneGo.transform.position += delta;
+    }
+
     // 벽 변으로 붙는 다리 입구(ZoneSlot.WallCuts) 자리의 벽/코너/문 조각을 비활성화해 통로를 뚫는다.
     // 프리팹·트랜스폼·순회 순서가 결정적이라 같은 시드면 서버/클라 동일하게 잘린다.
     private static int CutWallsForSlot(GameObject zoneGo, ZoneSlot slot)
@@ -65,9 +96,11 @@ public class MapContentSpawner : MonoBehaviour
         {
             int dir = Mathf.RoundToInt(cut.w);
             bool alongX = dir == 0 || dir == 2; // N/S 변 = 변이 X축으로 진행
-            Vector3 half = alongX ? new Vector3(3.5f, 10f, 1.5f) : new Vector3(1.5f, 10f, 3.5f);
+            // 컷 창 = 다리 폭 4m + 여유 0.5m/변 (다리 규격화에 맞춤 — 7m 창은 4m 벽 모듈을 2개까지 잘랐음)
+            Vector3 half = alongX ? new Vector3(2.5f, 10f, 1.5f) : new Vector3(1.5f, 10f, 2.5f);
             var box = new Bounds(new Vector3(cut.x, 2f, cut.z), half * 2f);
 
+            int hit = 0;
             foreach (var r in rends)
             {
                 if (r == null || !r.gameObject.activeSelf) continue;
@@ -75,8 +108,23 @@ public class MapContentSpawner : MonoBehaviour
                 if (!IsWallFamily(r.transform)) continue; // 벽/코너/문 계열만
                 if (!box.Intersects(r.bounds)) continue;
                 r.gameObject.SetActive(false);
-                n++;
+                hit++;
             }
+            n += hit;
+#if UNITY_EDITOR
+            if (hit == 0)
+            {
+                Renderer near = null; float best = float.MaxValue;
+                foreach (var r in rends)
+                {
+                    if (r == null || !r.gameObject.activeSelf || !IsWallFamily(r.transform)) continue;
+                    float d = (r.bounds.ClosestPoint(box.center) - box.center).magnitude;
+                    if (d < best) { best = d; near = r; }
+                }
+                string info = near != null ? $"최근접벽 {near.name} c=({near.bounds.center.x:F1},{near.bounds.center.y:F1},{near.bounds.center.z:F1}) 거리={best:F1}m" : "벽 없음";
+                Debug.LogWarning($"[WallCut] {slot.name} 컷({cut.x:F1},{cut.z:F1}) dir={dir}: 0조각 — {info}");
+            }
+#endif
         }
         return n;
     }

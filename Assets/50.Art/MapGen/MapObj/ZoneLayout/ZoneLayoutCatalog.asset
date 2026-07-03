@@ -13,43 +13,39 @@ MonoBehaviour:
   m_Name: ZoneLayoutCatalog
   m_EditorClassIdentifier: Assembly-CSharp::ZoneLayoutCatalogSO
   Entries:
-  - Prefab: {fileID: 8640830364188894420, guid: 8189c54a3cbe7c74ca3b724d69b76906, type: 3}
+  - Prefab: {fileID: 285148272634331417, guid: abf0f7b102c958b488d9c99a38d4201b, type: 3}
     Size: 0
     Role: 0
     Difficulty: 0
-  - Prefab: {fileID: 6407874156787964121, guid: 04ef50b42e9373947a23c77abbf2b426, type: 3}
+  - Prefab: {fileID: 5365079267588705583, guid: 6849fda9e44544b4984a260535e5337f, type: 3}
     Size: 0
     Role: 0
     Difficulty: 0
-  - Prefab: {fileID: 4353868789431516161, guid: de5389d364e42a0459cbb3668911e0d3, type: 3}
+  - Prefab: {fileID: 5273433595464729019, guid: c377f83fd2df32745bb0a27d1bb2742d, type: 3}
     Size: 0
     Role: 0
     Difficulty: 0
-  - Prefab: {fileID: 600478898819790959, guid: 37e650059ed5b594eb191d9be08f16e3, type: 3}
+  - Prefab: {fileID: 1954291100424522954, guid: 8c16f46fd3628814ab54eae0c2dc92f6, type: 3}
     Size: 1
     Role: 0
     Difficulty: 0
-  - Prefab: {fileID: 1797342214044660152, guid: 307f7b08a9db4654cab90d9f0c6dc6b1, type: 3}
+  - Prefab: {fileID: 8841651143735104381, guid: e01fb5167d2bdc14f9ed5e56f7987ce2, type: 3}
     Size: 1
     Role: 0
     Difficulty: 0
-  - Prefab: {fileID: 403535652672499933, guid: 09fb3e14013002b43a72d3c42d5ae86c, type: 3}
+  - Prefab: {fileID: 7771318122478940750, guid: 1b6898dd9b7a38340919a7081750f0c5, type: 3}
     Size: 1
     Role: 0
     Difficulty: 0
-  - Prefab: {fileID: 2968610578156927165, guid: 54703100bb6e2fc4497921a550f5a001, type: 3}
-    Size: 1
-    Role: 1
-    Difficulty: 0
-  - Prefab: {fileID: 1855233461408979672, guid: b0d46e5d26dc9814dba8c15632463b96, type: 3}
+  - Prefab: {fileID: 7021507519627135962, guid: 691f2e3d42b9b0540800bcae1bf123dd, type: 3}
     Size: 2
     Role: 0
     Difficulty: 0
-  - Prefab: {fileID: 2386417836648585552, guid: 7ca467a8cbd986b41bef56e0a89add49, type: 3}
+  - Prefab: {fileID: 3047669436039568175, guid: 8c7389282a565a64eab74444c597f931, type: 3}
     Size: 2
     Role: 2
     Difficulty: 0
-  - Prefab: {fileID: 7289609885698413967, guid: ed6df612d60e6a44da2d540940557931, type: 3}
+  - Prefab: {fileID: 3918268803367683522, guid: b0760a67dc21daf48bf92cb785979d38, type: 3}
     Size: 2
     Role: 3
     Difficulty: 0

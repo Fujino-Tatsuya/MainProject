@@ -8,7 +8,7 @@ using UnityEngine;
 // 슬롯 위치는 프레임 기준(2번째 이미지) — 현재 근사치, 이후 보정.
 public static class ZoneWiring
 {
-    const string PrefabDir = "Assets/50.Art/MapGen/MapObj/ZoneLayout/Prefabs";
+    const string PrefabDir = "Assets/50.Art/MapGen/MapObj/prefab";
     const string CatalogPath = "Assets/50.Art/MapGen/MapObj/ZoneLayout/ZoneLayoutCatalog.asset";
 
     struct Slot { public string label; public ZoneSize size; public Vector3 pos; public float rotY; public bool q, s, b; }
@@ -31,24 +31,23 @@ public static class ZoneWiring
         new Slot{ label="L_BR",   size=ZoneSize.Large,  pos=new Vector3( 46f,0f,-44f) },         // 하-우(구조물)
     };
 
-    // 카탈로그 — 블렌더 통짜 FBX 임포트본(Mesh_zone, 2026-07 교체).
+    // 카탈로그 (prefab 폴더, 2026-07 정리 완료).
     // 대형: 3디자인 ↔ 3슬롯 시드 셔플(재사용 없음).
-    // 중형: 퀘스트 슬롯(4후보 중 랜덤 1곳)=zone_M_typeQuest 전용 디자인(FBX 대기 — 수령 전엔
-    //       LayoutPlacer 폴백으로 전투 풀에서 셔플), 나머지 3슬롯=M_typeA/B/C 셔플.
-    // 소형: S_typeA=우상단 고정 전투(풀 1종↔1슬롯), typeBoss=보스맵 입구, typeStart=스폰
+    // 중형: 퀘스트 슬롯(4후보 중 랜덤 1곳) = 전용 디자인 없음 → Combat 풀(A/B/C)에서 셔플.
+    // 소형: typeA=우상단 고정 전투, typeBossEnter=보스맵 입구, typeStart=스폰
     //       (좌상/좌하 후보 2곳에 스폰/보스입구가 매판 랜덤 배정).
     static readonly (string name, ZoneSize size, ZoneRole role)[] CatEntries =
     {
-        ("zone_L_typeA", ZoneSize.Large, ZoneRole.Combat),
-        ("zone_L_typeB", ZoneSize.Large, ZoneRole.Combat),
-        ("zone_L_typeC", ZoneSize.Large, ZoneRole.Combat),
-        ("zone_M_typeA", ZoneSize.Medium, ZoneRole.Combat),
-        ("zone_M_typeB", ZoneSize.Medium, ZoneRole.Combat),
-        ("zone_M_typeC", ZoneSize.Medium, ZoneRole.Combat),
-        ("zone_M_typeQuest", ZoneSize.Medium, ZoneRole.Quest), // FBX 미수령 — 있으면 자동 등록
-        ("zone_S_typeA", ZoneSize.Small, ZoneRole.Combat),
-        ("zone_S_typeBoss", ZoneSize.Small, ZoneRole.BossRoom),
-        ("zone_S_typeStart", ZoneSize.Small, ZoneRole.PlayerSpawn),
+        ("ZoneL_typeA", ZoneSize.Large,  ZoneRole.Combat),
+        ("ZoneL_typeB", ZoneSize.Large,  ZoneRole.Combat),
+        ("ZoneL_typeC", ZoneSize.Large,  ZoneRole.Combat),
+        ("ZoneM_typeA", ZoneSize.Medium, ZoneRole.Combat),
+        ("ZoneM_typeB", ZoneSize.Medium, ZoneRole.Combat),
+        ("ZoneM_typeC", ZoneSize.Medium, ZoneRole.Combat),
+        // Quest: 전용 디자인 없음 — LayoutPlacer가 Combat 풀에서 셔플로 배정
+        ("ZoneS_typeA",        ZoneSize.Small, ZoneRole.Combat),
+        ("ZoneS_typeBossEnter",ZoneSize.Small, ZoneRole.BossRoom),
+        ("ZoneS_typeStart",    ZoneSize.Small, ZoneRole.PlayerSpawn),
     };
 
     // 연결 그래프 (신 SlotID, 13연결) — 구 MapCorridors.Pairs(v1 존ID) 이관.
@@ -114,7 +113,17 @@ public static class ZoneWiring
         }
 
         var cat = AssetDatabase.LoadAssetAtPath<ZoneLayoutCatalogSO>(CatalogPath);
-        if (cat == null) { Debug.LogError($"[Wire] 카탈로그 없음 {CatalogPath}"); return; }
+        if (cat == null)
+        {
+            // 폴더 정리 등으로 삭제됐을 때 자동 재생성
+            string dir = System.IO.Path.GetDirectoryName(CatalogPath).Replace('\\', '/');
+            if (!AssetDatabase.IsValidFolder(dir))
+                AssetDatabase.CreateFolder(System.IO.Path.GetDirectoryName(dir).Replace('\\', '/'),
+                                           System.IO.Path.GetFileName(dir));
+            cat = ScriptableObject.CreateInstance<ZoneLayoutCatalogSO>();
+            AssetDatabase.CreateAsset(cat, CatalogPath);
+            Debug.Log($"[Wire] 카탈로그 신규 생성 → {CatalogPath}");
+        }
         cat.Entries.Clear();
         foreach (var e in CatEntries)
         {
@@ -168,13 +177,13 @@ public static class ZoneWiring
         mg.Generate(seed, 0);
     }
 
-    // ---------------- 다리 v2 (Tex_zone 머티리얼, 슬롯 기준 절차 재생성) ----------------
+    // ---------------- 다리 v2 (MapObj/material 머티리얼, 슬롯 기준 절차 재생성) ----------------
 
-    const string TexDir = "Assets/50.Art/texture/Tex_zone";
-    const float CorridorWidth = 6f;   // 통로 폭 (v1 MapCorridors.Width 승계)
+    const string MatDir = "Assets/50.Art/MapGen/MapObj/material";
+    const float CorridorWidth = 4f;   // 통로 폭 = 문 폭과 동일 (1×1×1 타일 4칸)
     const float WallHeight = 3f;
     const float WallThickness = 0.5f;
-    const float SegLen = 4f;          // 프리미티브 세그먼트 길이(UV 반복 밀도)
+    const float SegLen = 4f;          // 벽 세그먼트 길이(오브젝트 수 절약 — 바닥은 FillFloor가 1m 단위)
 
     // 크기별 로컬 half-extents (회전 전)
     static Vector2 BaseHalf(ZoneSize size) => size switch
@@ -215,7 +224,8 @@ public static class ZoneWiring
 
     const string GeoPrefabPath = "Assets/50.Art/MapGen/MapObj/MapGeometryV2.prefab";
 
-    // 존 바닥 상면 Y 실측 — 바닥 머티리얼(zone_floor_*) 렌더러 top의 최빈값.
+    // 존 바닥 상면 Y 실측 — 바닥 머티리얼 렌더러 top의 최빈값.
+    // zone_floor_* (구 규칙) 또는 MA_floor* (신 FBX 규칙) 양쪽 인식.
     // 다리/둘레벽을 존 보행면 높이에 정렬(단차 방지). 실패 시 0.
     static float MeasureFloorTopY(string prefabName)
     {
@@ -226,7 +236,9 @@ public static class ZoneWiring
         foreach (var r in inst.GetComponentsInChildren<Renderer>())
         {
             var m = r.sharedMaterial;
-            if (m == null || !m.name.StartsWith("zone_floor")) continue;
+            if (m == null) continue;
+            string mn = m.name.ToLowerInvariant();
+            if (!mn.StartsWith("zone_floor") && !mn.StartsWith("ma_floor")) continue;
             int key = Mathf.RoundToInt(r.bounds.max.y * 20f);
             counts[key] = counts.TryGetValue(key, out int c) ? c + 1 : 1;
         }
@@ -234,6 +246,8 @@ public static class ZoneWiring
         int bestKey = 0, bestCount = -1;
         foreach (var kv in counts)
             if (kv.Value > bestCount) { bestCount = kv.Value; bestKey = kv.Key; }
+        if (bestCount <= 0)
+            Debug.LogWarning($"[GeoV2] MeasureFloorTopY({prefabName}): 바닥 머티리얼(zone_floor_* 또는 MA_floor*) 없음 → 0 반환. 머티리얼 이름 확인 필요.");
         return bestCount > 0 ? bestKey / 20f : 0f;
     }
 
@@ -251,12 +265,12 @@ public static class ZoneWiring
         slots.Sort((a, b) => a.SlotID.CompareTo(b.SlotID));
         if (slots.Count == 0) { Debug.LogError("[GeoV2] ZoneSlot 없음 — 먼저 Wire 실행"); return; }
 
-        var floorMat = AssetDatabase.LoadAssetAtPath<Material>($"{TexDir}/zone_floor_basic.mat");
-        var wallMat = AssetDatabase.LoadAssetAtPath<Material>($"{TexDir}/zone_wall_basic.mat");
-        if (floorMat == null || wallMat == null) { Debug.LogError("[GeoV2] Tex_zone 머티리얼 없음 — 먼저 Import All 실행"); return; }
+        var floorMat = AssetDatabase.LoadAssetAtPath<Material>($"{MatDir}/MA_floor.mat");
+        var wallMat = AssetDatabase.LoadAssetAtPath<Material>($"{MatDir}/MA_Wall_basic.mat");
+        if (floorMat == null || wallMat == null) { Debug.LogError("[GeoV2] MapObj/material 머티리얼 없음 (MA_floor.mat / MA_Wall_basic.mat)"); return; }
 
         // 존 보행면 높이 실측 — 다리/벽을 존 바닥 상면에 정렬(단차 방지)
-        float floorTop = MeasureFloorTopY("zone_S_typeA");
+        float floorTop = MeasureFloorTopY("ZoneS_typeA");
         Debug.Log($"[GeoV2] 존 바닥 상면 Y 실측: {floorTop:F2}m — 다리/벽 높이 기준");
 
         // ① 구 산출물 제거: v1 MapGeometry(프리팹 인스턴스면 언팩 후), 구 CorridorsV2, 기존 MapGeometryV2
@@ -342,8 +356,8 @@ public static class ZoneWiring
 
             var group = new GameObject($"Cor_{a.SlotID}_{b.SlotID}").transform;
             group.SetParent(root, false);
-            // 바닥 스트립 (top = 존 보행면) + 측벽 2줄 (보행면 위로 세움)
-            FillLine(group, alongX, start, end, center, floorTop - 0.2f, new Vector2(CorridorWidth, 0.4f), floorMat, "floor");
+            // 바닥: 1×1×1 타일 그리드 (존 내부 타일 규격과 동일, top = 존 보행면)
+            FillFloor(group, alongX, start, end, center, floorTop - 0.5f, CorridorWidth, floorMat);
             float wallOff = CorridorWidth * 0.5f + WallThickness * 0.5f;
             FillLine(group, alongX, start, end, center + wallOff, floorTop + WallHeight * 0.5f, new Vector2(WallThickness, WallHeight), wallMat, "wall");
             FillLine(group, alongX, start, end, center - wallOff, floorTop + WallHeight * 0.5f, new Vector2(WallThickness, WallHeight), wallMat, "wall");
@@ -411,6 +425,27 @@ public static class ZoneWiring
             FillLine(parent, alongX, cursor, hi, cross, baseY + WallHeight * 0.5f, new Vector2(WallThickness, WallHeight), mat, "wall");
     }
 
+    // 통로 바닥을 1×1×1 타일 그리드로 채운다 (존 내부 바닥 규격과 동일, 문 폭/높이 정렬).
+    // y = 타일 중심 Y (타일 상면 = y + 0.5 = floorTop).
+    static void FillFloor(Transform parent, bool alongX, float from, float to, float center, float y, float width, Material mat)
+    {
+        int wTiles = Mathf.Max(1, Mathf.RoundToInt(width));
+        float halfW = wTiles * 0.5f;
+        int lTiles = Mathf.Max(1, Mathf.RoundToInt(to - from));
+        for (int li = 0; li < lTiles; li++)
+        for (int wi = 0; wi < wTiles; wi++)
+        {
+            float along = from + li + 0.5f;
+            float cross = center - halfW + wi + 0.5f;
+            var box = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            box.name = $"tile_{li}_{wi}";
+            box.transform.SetParent(parent, false);
+            box.transform.position = alongX ? new Vector3(along, y, cross) : new Vector3(cross, y, along);
+            box.transform.localScale = Vector3.one;
+            box.GetComponent<Renderer>().sharedMaterial = mat;
+        }
+    }
+
     // 진행축(alongX) 구간 [from,to]를 SegLen 단위 큐브로 정확히 채움. size=(가로폭, 높이).
     static void FillLine(Transform parent, bool alongX, float from, float to, float cross, float y, Vector2 size, Material mat, string label)
     {
@@ -442,7 +477,7 @@ public static class ZoneWiring
             string path = AssetDatabase.GUIDToAssetPath(guid);
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
             if (prefab == null || prefab.GetComponent<ZoneLayout>() == null) continue;
-            if (!prefab.name.StartsWith("zone_")) continue;
+            if (!prefab.name.StartsWith("Zone")) continue;
 
             var inst = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
             var rends = inst.GetComponentsInChildren<Renderer>();
@@ -485,14 +520,14 @@ public static class ZoneWiring
     [MenuItem("Tools/MapGen/Build Temp Quest Zone Prefab")]
     static void BuildTempQuestZone()
     {
-        var floorMat = AssetDatabase.LoadAssetAtPath<Material>($"{TexDir}/zone_floor_basic.mat");
-        var wallMat = AssetDatabase.LoadAssetAtPath<Material>($"{TexDir}/zone_wall_basic.mat");
-        if (floorMat == null || wallMat == null) { Debug.LogError("[QuestZone] Tex_zone 머티리얼 없음 — 먼저 Import All 실행"); return; }
+        var floorMat = AssetDatabase.LoadAssetAtPath<Material>($"{MatDir}/MA_floor.mat");
+        var wallMat = AssetDatabase.LoadAssetAtPath<Material>($"{MatDir}/MA_Wall_basic.mat");
+        if (floorMat == null || wallMat == null) { Debug.LogError("[QuestZone] MapObj/material 머티리얼 없음 (MA_floor.mat / MA_Wall_basic.mat)"); return; }
 
         const float hx = 10.5f, hz = 20.5f; // 중형 21x41 half
         // 실제 존 보행면 높이에 맞춤 (다리/벽 Y 정렬과 동일 기준)
-        float floorTop = MeasureFloorTopY("zone_M_typeA");
-        var root = new GameObject("zone_M_typeQuest");
+        float floorTop = MeasureFloorTopY("ZoneM_typeA");
+        var root = new GameObject("ZoneM_typeQuest");
 
         // 바닥 (top = 실측 보행면)
         var floor = root.transform;
@@ -523,7 +558,7 @@ public static class ZoneWiring
         layout.OpenN = layout.OpenW = true;   // 표준 존과 동일: N/W 개방
         layout.OpenE = layout.OpenS = false;  // 벽+문(문은 다리 앵커가 맞춰줌)
 
-        string path = $"{PrefabDir}/zone_M_typeQuest.prefab";
+        string path = $"{PrefabDir}/ZoneM_typeQuest.prefab";
         PrefabUtility.SaveAsPrefabAsset(root, path);
         Object.DestroyImmediate(root);
         AssetDatabase.SaveAssets();
