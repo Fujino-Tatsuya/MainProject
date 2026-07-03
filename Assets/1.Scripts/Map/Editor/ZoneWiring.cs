@@ -217,7 +217,7 @@ public static class ZoneWiring
     const float CorridorWidth = 4f;   // 통로 폭 = 문 폭과 동일 (1×1×1 타일 4칸)
     const float WallHeight = 3f;
     const float WallThickness = 0.5f;
-    const float SegLen = 4f;          // 벽 세그먼트 길이(오브젝트 수 절약 — 바닥은 FillFloor가 1m 단위)
+    const float SegLen = 4f;          // 벽 세그먼트 길이 = 존 벽 모듈 규격(4m) — 바닥도 FillFloor가 4m 정타일
 
     // 크기별 로컬 half-extents (회전 전)
     static Vector2 BaseHalf(ZoneSize size) => size switch
@@ -390,8 +390,8 @@ public static class ZoneWiring
 
             var group = new GameObject($"Cor_{a.SlotID}_{b.SlotID}").transform;
             group.SetParent(root, false);
-            // 바닥: 1×1×1 타일 그리드 (존 내부 타일 규격과 동일, top = 존 보행면)
-            FillFloor(group, alongX, start, end, center, floorTop - 0.5f, CorridorWidth, floorMat);
+            // 바닥: 존과 동일한 4m 규격 아트 타일 (top = 존 보행면)
+            FillFloor(group, alongX, start, end, center, floorTop, floorMat);
             float wallOff = CorridorWidth * 0.5f + WallThickness * 0.5f;
             FillLine(group, alongX, start, end, center + wallOff, floorTop + WallHeight * 0.5f, new Vector2(WallThickness, WallHeight), wallMat, "wall");
             FillLine(group, alongX, start, end, center - wallOff, floorTop + WallHeight * 0.5f, new Vector2(WallThickness, WallHeight), wallMat, "wall");
@@ -459,24 +459,62 @@ public static class ZoneWiring
             FillLine(parent, alongX, cursor, hi, cross, baseY + WallHeight * 0.5f, new Vector2(WallThickness, WallHeight), mat, "wall");
     }
 
-    // 통로 바닥을 1×1×1 타일 그리드로 채운다 (존 내부 바닥 규격과 동일, 문 폭/높이 정렬).
-    // y = 타일 중심 Y (타일 상면 = y + 0.5 = floorTop).
-    static void FillFloor(Transform parent, bool alongX, float from, float to, float center, float y, float width, Material mat)
+    // 통로 바닥 = 존 바닥과 동일한 4m 규격 아트 타일 (2026-07 팀장 지시: 다리 타일 크기/비율 = 존 큐브 규격).
+    // 양끝은 통타일로 존 경계에 밀착시키고, 4m로 나눠떨어지지 않는 나머지는 "중앙 1장만" 트림 —
+    // 비율 왜곡이 다리 중앙에 숨고 존 접합부는 항상 정타일이라 연결이 자연스럽다.
+    const string FloorTileFbx = "Assets/50.Art/MapGen/MapObj/mesh/floor/Env_floor_basic_typeA.fbx";
+    const float TileSize = 4f;
+
+    static void FillFloor(Transform parent, bool alongX, float from, float to, float center, float floorTop, Material mat)
     {
-        int wTiles = Mathf.Max(1, Mathf.RoundToInt(width));
-        float halfW = wTiles * 0.5f;
-        int lTiles = Mathf.Max(1, Mathf.RoundToInt(to - from));
-        for (int li = 0; li < lTiles; li++)
-        for (int wi = 0; wi < wTiles; wi++)
+        var template = AssetDatabase.LoadAssetAtPath<GameObject>(FloorTileFbx);
+        if (template == null) { Debug.LogError($"[GeoV2] 바닥 타일 FBX 없음 {FloorTileFbx}"); return; }
+
+        // 템플릿 바운즈 실측(피벗 보정용) — 피벗이 코너/센터 어디든 바운즈 기준으로 배치
+        var probe = Object.Instantiate(template);
+        probe.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+        var rends = probe.GetComponentsInChildren<Renderer>();
+        Bounds tb = rends[0].bounds;
+        foreach (var r in rends) tb.Encapsulate(r.bounds);
+        Vector3 pivotToCenter = tb.center; // 피벗(0,0,0) → 바운즈 중심
+        float topFromPivot = tb.max.y;
+        Object.DestroyImmediate(probe);
+
+        float len = to - from;
+        int whole = Mathf.FloorToInt(len / TileSize + 0.01f);
+        float rem = len - whole * TileSize;
+        if (rem < 0.05f) rem = 0f; else whole = Mathf.Min(whole, Mathf.FloorToInt(len / TileSize));
+
+        // 구간 목록: 시작쪽 통타일 절반 → (중앙 트림 1장) → 끝쪽 통타일 절반
+        var spans = new List<(float a, float b)>();
+        int headTiles = rem > 0f ? (whole + 1) / 2 : whole;
+        float cursor = from;
+        for (int i = 0; i < headTiles; i++) { spans.Add((cursor, cursor + TileSize)); cursor += TileSize; }
+        if (rem > 0f) { spans.Add((cursor, cursor + rem)); cursor += rem; }
+        for (int i = headTiles; i < whole; i++) { spans.Add((cursor, cursor + TileSize)); cursor += TileSize; }
+
+        int idx = 0;
+        foreach (var (a, b) in spans)
         {
-            float along = from + li + 0.5f;
-            float cross = center - halfW + wi + 0.5f;
-            var box = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            box.name = $"tile_{li}_{wi}";
-            box.transform.SetParent(parent, false);
-            box.transform.position = alongX ? new Vector3(along, y, cross) : new Vector3(cross, y, along);
-            box.transform.localScale = Vector3.one;
-            box.GetComponent<Renderer>().sharedMaterial = mat;
+            float s = b - a;
+            float factor = s / TileSize;
+            var tile = Object.Instantiate(template);
+            tile.name = $"tile_{idx++}";
+            tile.transform.SetParent(parent, false);
+            tile.transform.rotation = Quaternion.identity;
+            tile.transform.localScale = alongX ? new Vector3(factor, 1f, 1f) : new Vector3(1f, 1f, factor);
+
+            // 목표 바운즈 중심(월드): 진행축 = 구간 중앙, 교차축 = 통로 중심, 상면 = floorTop
+            Vector3 off = pivotToCenter;
+            if (alongX) off.x *= factor; else off.z *= factor;
+            float along = (a + b) * 0.5f;
+            Vector3 target = alongX ? new Vector3(along, 0f, center) : new Vector3(center, 0f, along);
+            tile.transform.position = new Vector3(target.x - off.x, floorTop - topFromPivot, target.z - off.z);
+
+            foreach (var r in tile.GetComponentsInChildren<Renderer>()) r.sharedMaterial = mat;
+            foreach (var mf in tile.GetComponentsInChildren<MeshFilter>())
+                if (mf.sharedMesh != null && mf.GetComponent<MeshCollider>() == null)
+                    mf.gameObject.AddComponent<MeshCollider>();
         }
     }
 

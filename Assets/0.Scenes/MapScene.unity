@@ -175,7 +175,7 @@ MonoBehaviour:
   LayoutPlacer: {fileID: 99066898}
   Validator: {fileID: 99066891}
   ContentSpawner: {fileID: 99066896}
-  AutoGenerateOnStart: 0
+  AutoGenerateOnStart: 1
 --- !u!4 &99066895
 Transform:
   m_ObjectHideFlags: 0
@@ -911,7 +911,7 @@ MonoBehaviour:
   WallCuts:
   - {x: 12, y: 0, z: -30.3, w: 2}
   - {x: 21.5, y: 0, z: -0.8000002, w: 1}
-  AssignedRole: 0
+  AssignedRole: 1
   IsFilled: 1
 --- !u!1 &1029092588
 GameObject:
@@ -1091,7 +1091,7 @@ MonoBehaviour:
   ConnS: 0
   ConnW: 1
   WallCuts: []
-  AssignedRole: 1
+  AssignedRole: 0
   IsFilled: 1
 --- !u!1 &1176456589
 GameObject:
@@ -1205,7 +1205,7 @@ MonoBehaviour:
   ConnS: 0
   ConnW: 0
   WallCuts: []
-  AssignedRole: 2
+  AssignedRole: 3
   IsFilled: 1
 --- !u!1 &1556099510
 GameObject:
@@ -1699,9 +1699,9 @@ MonoBehaviour:
   ConnS: 1
   ConnW: 0
   WallCuts: []
-  AssignedRole: 3
+  AssignedRole: 2
   IsFilled: 1
---- !u!1001 &2761203666738728931
+--- !u!1001 &521139927814405753
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
@@ -1758,10 +1758,10 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: bce8494e62133e241a1e403d5cd1acdc, type: 3}
---- !u!4 &2761203666738728932 stripped
+--- !u!4 &521139927814405754 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 2209409418697741873, guid: bce8494e62133e241a1e403d5cd1acdc, type: 3}
-  m_PrefabInstance: {fileID: 2761203666738728931}
+  m_PrefabInstance: {fileID: 521139927814405753}
   m_PrefabAsset: {fileID: 0}
 --- !u!1001 &7707652367797161032
 PrefabInstance:
@@ -5424,7 +5424,7 @@ PrefabInstance:
       addedObject: {fileID: 469299580}
     - targetCorrespondingSourceObject: {fileID: 7779696810356756282, guid: 752c9377d228ec54f8c1b2bdcdd8e603, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 2761203666738728932}
+      addedObject: {fileID: 521139927814405754}
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 752c9377d228ec54f8c1b2bdcdd8e603, type: 3}
 --- !u!1660057539 &9223372036854775807
