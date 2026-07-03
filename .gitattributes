@@ -32,6 +32,14 @@
 *.unity text
 *.vfx text
 
+# Some .asset files are ALWAYS binary, even with Force Text serialization.
+# Treating them as text corrupts them on checkout/merge (CRLF conversion,
+# 3-way text merge). These override the *.asset rule above.
+NavMesh*.asset binary
+LightingData.asset binary
+OcclusionCullingData.asset binary
+INab*.asset binary
+
 # Imported/binary assets.
 *.dll binary
 *.exe binary
