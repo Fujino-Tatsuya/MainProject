@@ -85,6 +85,15 @@ public class Player : Unit
         return stateController.ChangeState(state);
     }
 
+    public override void Knockback(Vector3 direction, float strength)
+    {
+        if (!IsServer)
+            return;
+
+        stateController.BeginKnockback(direction, strength);
+        ApplyKnockbackClientRpc(direction, strength, CreateOwnerClientRpcParams());
+    }
+
     public bool BeginGrabbedByInstigator(GameObject instigator)
     {
         if (!IsServer)
@@ -123,6 +132,15 @@ public class Player : Unit
             return;
 
         stateController.EndGrabbed();
+    }
+
+    [ClientRpc]
+    private void ApplyKnockbackClientRpc(Vector3 direction, float strength, ClientRpcParams clientRpcParams = default)
+    {
+        if (!IsOwner)
+            return;
+
+        stateController.ApplyKnockbackFromServer(direction, strength);
     }
 
     public void SetAnimatorMoving(bool isMoving)

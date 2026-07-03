@@ -9,6 +9,9 @@ using UnityEngine;
 public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
 {
     [SerializeField] private PlayerActionState currentStateDebug;
+    [SerializeField] private float minKnockbackTime = 0.15f;
+    [SerializeField] private float maxKnockbackTime = 1.5f;
+    [SerializeField] private float knockbackStopSpeed = 0.15f;
 
     private IPlayerState currentState;
     private PlayerStateContext context;
@@ -19,6 +22,9 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
     public bool CanAttack => (CurrentState == PlayerActionState.Idle || CurrentState == PlayerActionState.Move) && !context.StatusEffects.BlocksAttack;
     public bool CanInterrupt => (CurrentState == PlayerActionState.Idle || CurrentState == PlayerActionState.Move) && !context.StatusEffects.BlocksInterrupt;
     public bool HasSuperArmor => context.StatusEffects.HasSuperArmor;
+    public float MinKnockbackTime => minKnockbackTime;
+    public float MaxKnockbackTime => maxKnockbackTime;
+    public float KnockbackStopSpeed => knockbackStopSpeed;
 
     private void Awake()
     {
@@ -107,11 +113,21 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
 
     public bool BeginKnockback()
     {
+        return BeginKnockback(Vector3.zero, 0f);
+    }
+
+    public bool BeginKnockback(Vector3 direction, float strength)
+    {
         if (CurrentState == PlayerActionState.Dead || context.StatusEffects.HasSuperArmor)
             return false;
 
-        SetState(new PlayerKnockbackState(context));
+        SetState(new PlayerKnockbackState(context, direction, strength));
         return true;
+    }
+
+    public bool ApplyKnockbackFromServer(Vector3 direction, float strength)
+    {
+        return BeginKnockback(direction, strength);
     }
 
     public void EndKnockback()
@@ -153,7 +169,7 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
             PlayerActionState.Attack => new PlayerAttackState(context),
             PlayerActionState.Interrupt => new PlayerInterruptState(context),
             PlayerActionState.Grabbed => new PlayerGrabbedState(context),
-            PlayerActionState.Knockback => new PlayerKnockbackState(context),
+            PlayerActionState.Knockback => new PlayerKnockbackState(context, Vector3.zero, 0f),
             PlayerActionState.Dead => new PlayerLockedState(context, PlayerActionState.Dead),
             _ => new PlayerIdleState(context)
         };
@@ -508,12 +524,62 @@ public sealed class PlayerGrabbedState : PlayerStateBase
 
 public sealed class PlayerKnockbackState : PlayerStateBase
 {
-    public PlayerKnockbackState(PlayerStateContext context) : base(context) { }
+    private readonly Vector3 direction;
+    private readonly float strength;
+    private float startTime;
+
+    public PlayerKnockbackState(PlayerStateContext context, Vector3 direction, float strength) : base(context)
+    {
+        this.direction = direction;
+        this.strength = strength;
+    }
 
     public override PlayerActionState StateType => PlayerActionState.Knockback;
+    public override bool RequiresStateAuthorityTick => true;
 
     public override void Enter(PlayerActionState previousState)
     {
         Context.Player.SetAnimatorMoving(false);
+
+        startTime = Time.time;
+
+        if (Context.Rigidbody == null)
+            return;
+
+        Context.Rigidbody.isKinematic = false;
+        Context.Rigidbody.linearVelocity = Vector3.zero;
+        Context.Rigidbody.angularVelocity = Vector3.zero;
+
+        if (direction.sqrMagnitude > 0.001f && strength > 0f)
+            Context.Rigidbody.AddForce(direction.normalized * strength, ForceMode.Impulse);
+    }
+
+    public override void Tick()
+    {
+        if (Context.Rigidbody == null)
+        {
+            Context.Controller.EndKnockback();
+            return;
+        }
+
+        float elapsed = Time.time - startTime;
+        if (elapsed < Context.Controller.MinKnockbackTime)
+            return;
+
+        float stopSpeed = Context.Controller.KnockbackStopSpeed;
+        bool slowEnough = Context.Rigidbody.linearVelocity.sqrMagnitude <= stopSpeed * stopSpeed;
+        bool timeout = elapsed >= Context.Controller.MaxKnockbackTime;
+
+        if (slowEnough || timeout)
+            Context.Controller.EndKnockback();
+    }
+
+    public override void Exit(PlayerActionState nextState)
+    {
+        if (Context.Rigidbody == null)
+            return;
+
+        Context.Rigidbody.linearVelocity = Vector3.zero;
+        Context.Rigidbody.angularVelocity = Vector3.zero;
     }
 }

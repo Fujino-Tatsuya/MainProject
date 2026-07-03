@@ -20,7 +20,6 @@ GameObject:
   - component: {fileID: 6098322879574375161}
   - component: {fileID: 4272353666037054394}
   - component: {fileID: 8301241639383343952}
-  - component: {fileID: 6805540437326725667}
   - component: {fileID: 8345678279683584363}
   - component: {fileID: 4237082408145735710}
   m_Layer: 6
@@ -318,23 +317,6 @@ MonoBehaviour:
   - {fileID: 2100000, guid: c1cb4507129f426c839b2570c241f3dc, type: 2}
   - {fileID: 2100000, guid: 20573b9755854bb6b73c0bf6130cd259, type: 2}
   bodyRenderer: {fileID: 2710021930536529835}
---- !u!114 &6805540437326725667
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8559504096609571310}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 86dca35901565144f832eb2841a1d793, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LinearKnockback
-  ShowTopMostFoldoutHeaderGroup: 1
-  maxDistance: 2
-  minKnockbackTime: 0.15
-  maxKnockbackTime: 1.5
-  stopSpeed: 0.15
 --- !u!114 &8345678279683584363
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -362,6 +344,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerStateController
   currentStateDebug: 0
+  minKnockbackTime: 0.15
+  maxKnockbackTime: 1.5
+  knockbackStopSpeed: 0.15
 --- !u!1 &8896633917232358439
 GameObject:
   m_ObjectHideFlags: 0
