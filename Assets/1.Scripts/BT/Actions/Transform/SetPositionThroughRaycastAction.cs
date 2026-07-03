@@ -18,6 +18,8 @@ public partial class SetPositionThroughRaycastAction : Action
     // 벽 표면 점 근처에서 도달 가능한 NavMesh 지점을 찾을 때의 탐색 반경.
     [SerializeReference] public BlackboardVariable<float> MaxDistance = new BlackboardVariable<float>(3f);
 
+    [SerializeReference] public BlackboardVariable<float> diff = new BlackboardVariable<float>(1f);
+
     protected override Status OnStart()
     {
         if (!CheckValid())

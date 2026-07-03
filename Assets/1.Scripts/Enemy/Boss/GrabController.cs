@@ -199,7 +199,7 @@ public class GrabController : NetworkBehaviour
             Clear();
             return;
         }
-
+        EnableTargetRigidbody(false);
         //_targetUnit.BeginGrab(grabSocket, grabDamage);
         // 플레이어 상태 전환 함수 호출하기
         _targetHp = _targetUnit.CurrentHealth;
@@ -222,7 +222,7 @@ public class GrabController : NetworkBehaviour
         //}
         //_playerGrabController.Throw(worldDir * throwStrength, landingDamage);
         ApplyDamage(landingDamagePercentage);
-
+        EnableTargetRigidbody(true);
         // 플레이어 상태 전환 함수 호출하기
 
         Clear();
@@ -236,6 +236,15 @@ public class GrabController : NetworkBehaviour
         _targetRigidbody = null;
         _holdTimer = 0f;
         _targetHp = 0;
+    }
+
+    void EnableTargetRigidbody(bool enabled)
+    {
+        if(_targetRigidbody == null) return;
+
+        _targetRigidbody.isKinematic = !enabled;
+        _targetRigidbody.angularVelocity = Vector3.zero;
+        _targetRigidbody.linearVelocity = Vector3.zero;
     }
 
     /// <summary>

@@ -8,7 +8,7 @@ public class ChargeController : NetworkBehaviour
     List<ChargingObject> chargeObjects;
     [SerializeField] float maxY = 1f;
     [SerializeField] float minY = 0f;
-    [Header("ÇÃ·¹ÀÌ¾î ÀÎ¿ø ¼ö¿¡ µû¸¥ ¿ÀºêÁ§Æ® °¹¼ö")]
+    [Header("í”Œë ˆì´ì–´ ì¸ì› ìˆ˜ì— ë”°ë¥¸ ì˜¤ë¸Œì íŠ¸ ê°¯ìˆ˜")]
     [SerializeField] int player1 = 1;
     [SerializeField] int player2 = 2;
     [SerializeField] int player3 = 3;
@@ -17,7 +17,7 @@ public class ChargeController : NetworkBehaviour
 
     int _max = 0;
     int _destroyCount = 0;
-    // Å×½ºÆ®¸¦ À§ÇØ Àá½Ã public Ã³¸®.
+    // í…ŒìŠ¤íŠ¸ë¥¼ ìœ„í•´ ì ì‹œ public ì²˜ë¦¬.
     public bool _isDefeated = false;
     public bool IsDefeated { get { return _isDefeated; } }
     int _reachedCount = 0;
@@ -29,10 +29,23 @@ public class ChargeController : NetworkBehaviour
         floor.SetActive(false);
     }
 
+    public override void OnNetworkDespawn()
+    {
+        if (!IsServer) return;
+        if (chargeObjects != null)
+        {
+            foreach (ChargingObject obj in chargeObjects)
+            {
+                obj.DestroyEvent -= CheckDestroyedObjects;
+                obj.ReachEvent -= CheckReachedObjects;
+            }
+        }
+    }
+
     /// <summary>
-    /// ChargeController°¡ ºÎÂøµÇ¾î ÀÖ´Â ¿ÀºêÁ§Æ® »ı¼º ½Ã¿¡ ÇØ´ç ÇÔ¼ö¸¦ ÅëÇØ ChargingObject ¸®½ºÆ®¸¦ ¼³Á¤ÇØ¾ß ÇÕ´Ï´Ù.
+    /// ChargeControllerê°€ ë¶€ì°©ë˜ì–´ ìˆëŠ” ì˜¤ë¸Œì íŠ¸ ìƒì„± ì‹œì— í•´ë‹¹ í•¨ìˆ˜ë¥¼ í†µí•´ ChargingObject ë¦¬ìŠ¤íŠ¸ë¥¼ ì„¤ì •í•´ì•¼ í•©ë‹ˆë‹¤.
     /// </summary>
-    /// <param name="list">µî·ÏÇÒ ChargingObject ¸®½ºÆ®</param>
+    /// <param name="list">ë“±ë¡í•  ChargingObject ë¦¬ìŠ¤íŠ¸</param>
     public void SetList(List<ChargingObject> list)
     {
         if (!IsServer) return;
@@ -43,7 +56,7 @@ public class ChargeController : NetworkBehaviour
 
         foreach (ChargingObject obj in chargeObjects)
         {
-            obj.SetMinMaxY(minY, maxY);
+            obj.SetMinMaxY(maxY);
             obj.DestroyEvent += CheckDestroyedObjects;
             obj.ReachEvent += CheckReachedObjects;
         }
@@ -61,8 +74,8 @@ public class ChargeController : NetworkBehaviour
 
         if (chargeObjects == null || chargeObjects.Count == 0)
         {
-            Debug.LogError("ChargeController¿¡ ChargingObject ¸®½ºÆ®°¡ ¼³Á¤µÇÁö ¾Ê¾Ò½À´Ï´Ù." +
-                "\nChargeController°¡ ºÎÂøµÇ¾î ÀÖ´Â ¿ÀºêÁ§Æ® »ı¼º ½Ã¿¡ SetList()ÇÔ¼ö¸¦ ÅëÇØ ¸®½ºÆ®¸¦ ¼³Á¤ÇØ¾ß ÇÕ´Ï´Ù.");
+            Debug.LogError("ChargeControllerì— ChargingObject ë¦¬ìŠ¤íŠ¸ê°€ ì„¤ì •ë˜ì§€ ì•Šì•˜ìŠµë‹ˆë‹¤." +
+                "\nChargeControllerê°€ ë¶€ì°©ë˜ì–´ ìˆëŠ” ì˜¤ë¸Œì íŠ¸ ìƒì„± ì‹œì— SetList()í•¨ìˆ˜ë¥¼ í†µí•´ ë¦¬ìŠ¤íŠ¸ë¥¼ ì„¤ì •í•´ì•¼ í•©ë‹ˆë‹¤.");
             return;
         }
         Init();

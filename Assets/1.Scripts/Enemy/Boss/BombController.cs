@@ -28,8 +28,9 @@ public class BombController : NetworkBehaviour
     [SerializeField] float bombTime;
     [SerializeField] float floorTime;
 
-    [Header("\n데미지")]
+    [Header("\n데미지와 시간")]
     [SerializeField] int bombDamage;
+    [SerializeField] float bombFlightDuration = 0.5f;
 
     [Header("\n레이어와 태그")]
     [SerializeField] LayerMask player;
@@ -48,6 +49,7 @@ public class BombController : NetworkBehaviour
 
     KnockbackAttack _knockbackAttack;
     Rigidbody _rigidbody;
+    Bomb _bombComponent;
 
     #endregion
 
@@ -92,6 +94,16 @@ public class BombController : NetworkBehaviour
 
         if (!IsServer) return;
 
+        _bombComponent = bomb.GetComponent<Bomb>();
+        if (_bombComponent == null)
+        {
+            Debug.LogAssertion("Bomb 컴포넌트가 연결되어 있지 않습니다.");
+        }
+        else
+        {
+            _bombComponent.OnTriggered += BombHit;
+        }
+
         _knockbackAttack = GetComponent<KnockbackAttack>();
         if (_knockbackAttack == null)
         {
@@ -105,6 +117,16 @@ public class BombController : NetworkBehaviour
         }
 
         _baseRot = transform.rotation;
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        if (!IsServer) return;
+
+        if (_bombComponent != null)
+        {
+            _bombComponent.OnTriggered -= BombHit;
+        }
     }
 
     void FixedUpdate()
@@ -178,7 +200,7 @@ public class BombController : NetworkBehaviour
     /// </summary>
     /// <param name="referencePoint">발사 방향 계산을 위한 위치</param>
     /// <param name="distance">발사할 거리</param>
-    public void LinearLaunch(Vector3 referencePoint, float distance)
+    void LinearLaunch(Vector3 referencePoint, float distance)
     {
         if (!IsServer) return;
 
@@ -188,7 +210,11 @@ public class BombController : NetworkBehaviour
         _startPos = transform.position;
         _prevPos = _startPos;
 
-        _targetPos = _startPos + (_startPos - referencePoint).normalized * distance;
+        Vector3 dir = referencePoint - _startPos;
+        dir.y = 0f;
+        dir.Normalize();
+
+        _targetPos = _startPos + dir * distance;
         _duration = 1f;
         _arcHeight = 0;
         _elapsed = 0f;
@@ -299,6 +325,14 @@ public class BombController : NetworkBehaviour
         float arc = 4f * _arcHeight * t * (1 - t);
 
         return linear + Vector3.up * arc;
+    }
+
+    void BombHit(object sender, AttackEventArgs e)
+    {
+        if (_bombState != BombState.BombTimer) return;
+
+        BaseWeapon weapon = e.BaseWeapon;
+        LinearLaunch(weapon.transform.position, weapon.Damage);
     }
 
     #endregion
