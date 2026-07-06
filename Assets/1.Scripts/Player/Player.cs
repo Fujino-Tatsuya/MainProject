@@ -90,8 +90,8 @@ public class Player : Unit
             animator.SetBool(IsMovingHash, isMoving);
     }
 
-    public override void TakeDamage(int damage)
+    public override void TakeDamage(AttackInfo attackInfo)
     {
-        base.TakeDamage(damage);
+        base.TakeDamage(attackInfo);
     }
 }

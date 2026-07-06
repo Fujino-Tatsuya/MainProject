@@ -875,7 +875,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TwentyThreeArenaContext
   ShowTopMostFoldoutHeaderGroup: 1
-  bossPrefab: {fileID: 5372104213593212626, guid: 1100cccaacdc1fe4ca3e1eb9680f8c75, type: 3}
+  bossPrefab: {fileID: 6048960277833949737, guid: ec098039733a00145a352f70e7611fe9, type: 3}
   ChargingObjects:
   - {fileID: 1929793192}
   - {fileID: 1063592043}

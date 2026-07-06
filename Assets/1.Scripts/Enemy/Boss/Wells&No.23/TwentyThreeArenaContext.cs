@@ -17,23 +17,23 @@ public class TwentyThreeArenaContext : NetworkBehaviour
         NetworkObject boss = Instantiate(bossPrefab, bossPos, Quaternion.identity).GetComponent<NetworkObject>();
         if (boss == null)
         {
-            Debug.LogError("ÇØ´ç ÇÁ¸®Æé¿¡ NetworkObject ÄÄÆ÷³ÍÆ®°¡ ¾ø½À´Ï´Ù. Ãß°¡ÇØÁÖ¼¼¿ä.");
+            Debug.LogError("í•´ë‹¹ í”„ë¦¬í©ì— NetworkObject ì»´í¬ë„ŒíŠ¸ê°€ ì—†ìŠµë‹ˆë‹¤. ì¶”ê°€í•´ì£¼ì„¸ìš”.");
             return;
         }
         boss.Spawn();
 
-        ChargeController controller = boss.GetComponentInChildren<ChargeController>();
-        if (controller == null)
-        {
-            Debug.LogError("ÇØ´ç º¸½º¿¡ ChargeController ÄÄÆ÷³ÍÆ®°¡ ¾ø½À´Ï´Ù. Ãß°¡ÇØÁÖ¼¼¿ä.");
-            return;
-        }
-        controller.SetList(ChargingObjects);
+        //ChargeController controller = boss.GetComponentInChildren<ChargeController>();
+        //if (controller == null)
+        //{
+        //    Debug.LogError("í•´ë‹¹ ë³´ìŠ¤ì— ChargeController ì»´í¬ë„ŒíŠ¸ê°€ ì—†ìŠµë‹ˆë‹¤. ì¶”ê°€í•´ì£¼ì„¸ìš”.");
+        //    return;
+        //}
+        //controller.SetList(ChargingObjects);
 
         EnemyBTActivator btActivator = boss.GetComponent<EnemyBTActivator>();
         if (btActivator == null)
         {
-            Debug.LogError("ÇØ´ç º¸½º¿¡ EnemyBTActivator ÄÄÆ÷³ÍÆ®°¡ ¾ø½À´Ï´Ù. Ãß°¡ÇØÁÖ¼¼¿ä.");
+            Debug.LogError("í•´ë‹¹ ë³´ìŠ¤ì— EnemyBTActivator ì»´í¬ë„ŒíŠ¸ê°€ ì—†ìŠµë‹ˆë‹¤. ì¶”ê°€í•´ì£¼ì„¸ìš”.");
             return;
         }
         btActivator.OpenBT();

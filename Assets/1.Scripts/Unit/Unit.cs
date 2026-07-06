@@ -42,7 +42,7 @@ public class Unit : BaseNetworkBehaviour
     /// damage만큼 방어력을 반영하여 쉴드와 체력을 감소시키는 함수
     /// </summary>
     /// <param name="damage">감소시킬 피해 값</param>
-    public virtual void TakeDamage(int damage)
+    protected void TakeDamage(int damage)
     {
         if (!IsServer) return; // 서버에서만 피해 처리
         int remainingDamage = damage;
@@ -73,6 +73,11 @@ public class Unit : BaseNetworkBehaviour
         }
 
         _currentHp.Value = _health.CurrentHealth;
+    }
+
+    public virtual void TakeDamage(AttackInfo attackInfo)
+    {
+        TakeDamage(attackInfo.damage);
     }
 
     /// <summary>

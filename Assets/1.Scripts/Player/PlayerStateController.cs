@@ -70,14 +70,14 @@ public class PlayerStateController : MonoBehaviour
         if (CurrentState == PlayerActionState.Dead || grabSocket == null)
             return;
 
-        context.Player.TakeDamage(startDamage);
+        context.Player.TakeDamage(new AttackInfo(startDamage));
         SetState(new PlayerGrabbedState(context, grabSocket));
     }
 
     public void ApplyGrabHoldDamage(int damage)
     {
         if (currentState is PlayerGrabbedState)
-            context.Player.TakeDamage(damage);
+            context.Player.TakeDamage(new AttackInfo(damage));
     }
 
     public void ThrowGrabbed(Vector3 force, int landingDamage)
@@ -545,7 +545,7 @@ public sealed class PlayerThrownState : PlayerStateBase
         if (collision.gameObject.layer != groundLayer)
             return;
 
-        Context.Player.TakeDamage(landingDamage);
+        Context.Player.TakeDamage(new AttackInfo(landingDamage));
         RestoreControl();
         Context.Controller.ChangeState(PlayerActionState.Idle);
     }

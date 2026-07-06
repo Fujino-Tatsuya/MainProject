@@ -76,7 +76,7 @@ public class JumpController : NetworkBehaviour
         // 경사면을 고려한 회전 변경
         RaycastHit hit;
         Quaternion slopeRotation = Quaternion.identity;
-        if (Physics.Raycast(closestObject.transform.position, Vector3.down, out hit, Mathf.Infinity))
+        if (Physics.Raycast(closestObject.transform.position, Vector3.down, out hit, Mathf.Infinity, LayerMask.GetMask("Ground")))
         {
             slopeRotation = Quaternion.FromToRotation(Vector3.up, hit.normal);
         }
@@ -140,7 +140,7 @@ public class JumpController : NetworkBehaviour
             if (!damagedPlayers.Add(unit))
                 continue;
 
-            unit.TakeDamage(damage);
+            unit.TakeDamage(new AttackInfo(damage));
         }
 
         HideSignClientRpc();

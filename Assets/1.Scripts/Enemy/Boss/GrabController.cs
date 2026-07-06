@@ -29,6 +29,7 @@ public class GrabController : NetworkBehaviour
 
     Unit _targetUnit;
     Rigidbody _targetRigidbody;
+    PlayerStateController _targetStateController;
     int _targetHp;
 
     float _holdTimer = 0f;
@@ -199,8 +200,16 @@ public class GrabController : NetworkBehaviour
             Clear();
             return;
         }
-        EnableTargetRigidbody(false);
-        //_targetUnit.BeginGrab(grabSocket, grabDamage);
+
+        _targetStateController = player.GetComponent<PlayerStateController>();
+        if (_targetStateController == null)
+        {
+            Debug.LogError("해당 플레이어에 PlayerStateController 컴포넌트가 부착되어 있지 않습니다.");
+            Clear();
+            return;
+        }
+
+        _targetStateController.ChangeState(PlayerActionState.Grabbed);
         // 플레이어 상태 전환 함수 호출하기
         _targetHp = _targetUnit.CurrentHealth;
         ApplyDamage(grabDamagePercentage);
@@ -213,18 +222,9 @@ public class GrabController : NetworkBehaviour
     {
         if (!IsServer) return;
 
-        //Vector3 worldDir = grabSocket.transform.TransformDirection(throwDirection);
-
-        //if (_playerGrabController == null)
-        //{
-        //    Debug.LogError("해당 플레이어에 PlayerGrabController컴포넌트가 부착되어 있지 않습니다.");
-        //    return;
-        //}
-        //_playerGrabController.Throw(worldDir * throwStrength, landingDamage);
         ApplyDamage(landingDamagePercentage);
-        EnableTargetRigidbody(true);
         // 플레이어 상태 전환 함수 호출하기
-
+        _targetStateController.ChangeState(PlayerActionState.Idle);
         Clear();
     }
 
@@ -234,17 +234,9 @@ public class GrabController : NetworkBehaviour
         GrabbedPlayer.Value = null;
         _targetUnit = null;
         _targetRigidbody = null;
+        _targetStateController = null;
         _holdTimer = 0f;
         _targetHp = 0;
-    }
-
-    void EnableTargetRigidbody(bool enabled)
-    {
-        if(_targetRigidbody == null) return;
-
-        _targetRigidbody.isKinematic = !enabled;
-        _targetRigidbody.angularVelocity = Vector3.zero;
-        _targetRigidbody.linearVelocity = Vector3.zero;
     }
 
     /// <summary>
@@ -261,6 +253,6 @@ public class GrabController : NetworkBehaviour
         }
 
         int damage = Mathf.RoundToInt(_targetHp * (percentage / 100f));
-        _targetUnit.TakeDamage(damage);
+        _targetUnit.TakeDamage(new AttackInfo(damage));
     }
 }

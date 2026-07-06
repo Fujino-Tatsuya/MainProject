@@ -540,13 +540,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b2e13755730c9274fbe68dff27ce63d0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KnockbackAttack
-  damage: 20
+  damage: 10
   isGroggyAttack: 0
   targetLayer:
     serializedVersion: 2
     m_Bits: 64
   attackType: 0
-  knockbackStrength: 5
+  knockbackStrength: 10
 --- !u!135 &1551797295837025053
 SphereCollider:
   m_ObjectHideFlags: 0
@@ -643,7 +643,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ChargeController
   ShowTopMostFoldoutHeaderGroup: 1
   maxY: 1
-  minY: 0
   player1: 1
   player2: 2
   player3: 4
@@ -794,7 +793,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1745528080
+  GlobalObjectIdHash: 739404150
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -1235,8 +1234,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 1.3351028, y: 3.6711357, z: 1}
-  m_Center: {x: -0.02576986, y: 1.3355678, z: 0}
+  m_Size: {x: 2.0280366, y: 3.4828558, z: 1}
+  m_Center: {x: 0.014000893, y: 1.4297078, z: 0}
 --- !u!1 &6682516438038340514
 GameObject:
   m_ObjectHideFlags: 0
@@ -1567,12 +1566,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TwentyThreeBasicAttackChoice
   hookAttackMinDistance: 0
   hookAttackMaxDistance: 3
-  hookAttackPercentage: 1
+  hookAttackPercentage: 50
   upperAttackMinDistance: 0
   upperAttackMaxDistance: 3
-  upperAttackPercentage: 1
+  upperAttackPercentage: 50
   grabAttackMinDistance: 0
-  grabAttackMaxDistance: 3
+  grabAttackMaxDistance: 1
   grabAttackPercentage: 100
   jumpAttackMinDistance: 5
   jumpAttackMaxDistance: 10

@@ -214,8 +214,8 @@ public class BombController : NetworkBehaviour
         dir.y = 0f;
         dir.Normalize();
 
-        _targetPos = _startPos + dir * distance;
-        _duration = 1f;
+        _targetPos = _startPos - dir * distance;
+        _duration = bombFlightDuration;
         _arcHeight = 0;
         _elapsed = 0f;
 
@@ -332,7 +332,7 @@ public class BombController : NetworkBehaviour
         if (_bombState != BombState.BombTimer) return;
 
         BaseWeapon weapon = e.BaseWeapon;
-        LinearLaunch(weapon.transform.position, weapon.Damage);
+        LinearLaunch(weapon.transform.root.position, weapon.Damage);
     }
 
     #endregion
@@ -347,14 +347,18 @@ public class BombController : NetworkBehaviour
         if (distance <= 0f)
             return false;
 
+        int layerMask = player | enemy | wall;
+        if (_bombState == BombState.InitFlight)
+            layerMask = layerMask | ground;
+
         if (Physics.SphereCast(
             from,
             bombRadius,
             dir.normalized,
             out RaycastHit hit,
             distance,
-            player | enemy | wall | ground,
-            QueryTriggerInteraction.Ignore))
+            layerMask,
+            QueryTriggerInteraction.Collide))
         {
             HandleHit(hit.collider);
             return true;
@@ -372,7 +376,7 @@ public class BombController : NetworkBehaviour
             Unit unit = collider.GetComponentInParent<Unit>();
 
             Explode();
-            unit?.TakeDamage(bombDamage);
+            unit?.TakeDamage(new AttackInfo(bombDamage));
             _knockbackAttack.ApplyKnockbackAttack(collider.gameObject);
             MakeFloor();
             Debug.Log("플레이어와 충돌!");
@@ -382,7 +386,7 @@ public class BombController : NetworkBehaviour
             Unit unit = collider.GetComponentInParent<Unit>();
 
             Explode();
-            unit?.TakeDamage(bombDamage);
+            unit?.TakeDamage(new AttackInfo(bombDamage));
             MakeFloor();
             Debug.Log("적과 충돌!");
         }
@@ -392,7 +396,7 @@ public class BombController : NetworkBehaviour
             MakeFloor();
             Debug.Log("벽과 충돌!");
         }
-        else if ((ground.value & (1 << layer)) != 0)
+        else if ((ground.value & (1 << layer)) != 0 && _bombState != BombState.Flight)
         {
             _bombState = BombState.BombTimer;
         }
