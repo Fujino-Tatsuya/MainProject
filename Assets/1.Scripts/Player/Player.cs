@@ -1,4 +1,5 @@
 using UnityEngine;
+using Unity.Netcode;
 
 [RequireComponent(typeof(PlayerInputReader))]
 [RequireComponent(typeof(PlayerMovement))]
@@ -74,6 +75,11 @@ public class Player : Unit
         defaultAttack.EndCurrentAttack();
     }
 
+    public void HitDefaultAttack()
+    {
+        defaultAttack.HitCurrentAttack();
+    }
+
     public void EndInterrupt()
     {
         stateController.EndInterrupt();
@@ -82,6 +88,64 @@ public class Player : Unit
     public bool SetState(PlayerActionState state)
     {
         return stateController.ChangeState(state);
+    }
+
+    public override void Knockback(Vector3 direction, float strength)
+    {
+        if (!IsServer)
+            return;
+
+        //stateController.BeginKnockback(direction, strength);
+        ApplyKnockbackClientRpc(direction, strength, CreateOwnerClientRpcParams());
+    }
+
+    public bool BeginGrabbedByInstigator(GameObject instigator)
+    {
+        if (!IsServer)
+            return false;
+
+        if (!stateController.BeginGrabbed(instigator))
+            return false;
+
+        BeginGrabbedClientRpc(CreateOwnerClientRpcParams());
+        return true;
+    }
+
+    public bool EndGrabbedByInstigator()
+    {
+        if (!IsServer)
+            return false;
+
+        bool ended = stateController.EndGrabbed();
+        EndGrabbedClientRpc(CreateOwnerClientRpcParams());
+        return ended;
+    }
+
+    [ClientRpc]
+    private void BeginGrabbedClientRpc(ClientRpcParams clientRpcParams = default)
+    {
+        if (!IsOwner)
+            return;
+
+        stateController.ApplyGrabbedFromServer();
+    }
+
+    [ClientRpc]
+    private void EndGrabbedClientRpc(ClientRpcParams clientRpcParams = default)
+    {
+        if (!IsOwner)
+            return;
+
+        stateController.EndGrabbed();
+    }
+
+    [ClientRpc]
+    private void ApplyKnockbackClientRpc(Vector3 direction, float strength, ClientRpcParams clientRpcParams = default)
+    {
+        if (!IsOwner)
+            return;
+
+        stateController.ApplyKnockbackFromServer(direction, strength);
     }
 
     public void SetAnimatorMoving(bool isMoving)
@@ -93,5 +157,16 @@ public class Player : Unit
     public override void TakeDamage(AttackInfo attackInfo)
     {
         base.TakeDamage(attackInfo);
+    }
+
+    private ClientRpcParams CreateOwnerClientRpcParams()
+    {
+        return new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams
+            {
+                TargetClientIds = new[] { OwnerClientId }
+            }
+        };
     }
 }

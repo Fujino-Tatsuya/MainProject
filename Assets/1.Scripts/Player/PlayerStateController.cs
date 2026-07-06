@@ -6,8 +6,13 @@ using UnityEngine;
 [RequireComponent(typeof(PlayerAimIndicator))]
 [RequireComponent(typeof(DefaultAttack))]
 [RequireComponent(typeof(StatusEffectController))]
-public class PlayerStateController : MonoBehaviour
+public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
 {
+    [SerializeField] private PlayerActionState currentStateDebug;
+    [SerializeField] private float minKnockbackTime = 0.15f;
+    [SerializeField] private float maxKnockbackTime = 1.5f;
+    [SerializeField] private float knockbackStopSpeed = 0.15f;
+
     private IPlayerState currentState;
     private PlayerStateContext context;
 
@@ -17,6 +22,9 @@ public class PlayerStateController : MonoBehaviour
     public bool CanAttack => (CurrentState == PlayerActionState.Idle || CurrentState == PlayerActionState.Move) && !context.StatusEffects.BlocksAttack;
     public bool CanInterrupt => (CurrentState == PlayerActionState.Idle || CurrentState == PlayerActionState.Move) && !context.StatusEffects.BlocksInterrupt;
     public bool HasSuperArmor => context.StatusEffects.HasSuperArmor;
+    public float MinKnockbackTime => minKnockbackTime;
+    public float MaxKnockbackTime => maxKnockbackTime;
+    public float KnockbackStopSpeed => knockbackStopSpeed;
 
     private void Awake()
     {
@@ -37,6 +45,7 @@ public class PlayerStateController : MonoBehaviour
         );
 
         currentState = CreateState(PlayerActionState.Idle);
+        currentStateDebug = currentState.StateType;
         currentState.Enter(PlayerActionState.Idle);
     }
 
@@ -61,52 +70,70 @@ public class PlayerStateController : MonoBehaviour
         PlayerActionState previousState = CurrentState;
         currentState?.Exit(nextState);
         currentState = CreateState(nextState);
+        currentStateDebug = currentState.StateType;
         currentState.Enter(previousState);
         return true;
     }
 
-    public void BeginGrab(Transform grabSocket, int startDamage)
+    public bool TryReceiveGrab(GrabInteractionContext grabContext)
     {
-        if (CurrentState == PlayerActionState.Dead || grabSocket == null)
-            return;
+        if (!CanReceiveServerInteraction())
+            return false;
 
-        context.Player.TakeDamage(new AttackInfo(startDamage));
-        SetState(new PlayerGrabbedState(context, grabSocket));
+        return ApplyGrabbed(grabContext);
     }
 
-    public void ApplyGrabHoldDamage(int damage)
+    public bool ApplyGrabbedFromServer(GameObject instigator = null)
     {
-        if (currentState is PlayerGrabbedState)
-            context.Player.TakeDamage(new AttackInfo(damage));
+        return ApplyGrabbed(new GrabInteractionContext(instigator, gameObject));
     }
 
-    public void ThrowGrabbed(Vector3 force, int landingDamage)
+    private bool ApplyGrabbed(GrabInteractionContext grabContext)
     {
-        if (currentState is not PlayerGrabbedState grabbedState)
-            return;
+        if (!CanReceiveGrab(grabContext))
+            return false;
 
-        SetState(grabbedState.CreateThrownState(force, landingDamage));
+        SetState(new PlayerGrabbedState(context));
+        return true;
+    }
+
+    public bool BeginGrabbed(GameObject instigator = null)
+    {
+        return TryReceiveGrab(new GrabInteractionContext(instigator, gameObject));
+    }
+
+    public bool EndGrabbed()
+    {
+        if (CurrentState != PlayerActionState.Grabbed)
+            return false;
+
+        ChangeState(PlayerActionState.Idle);
+        return true;
     }
 
     public bool BeginKnockback()
     {
+        return BeginKnockback(Vector3.zero, 0f);
+    }
+
+    public bool BeginKnockback(Vector3 direction, float strength)
+    {
         if (CurrentState == PlayerActionState.Dead || context.StatusEffects.HasSuperArmor)
             return false;
 
-        SetState(new PlayerKnockbackState(context));
+        SetState(new PlayerKnockbackState(context, direction, strength));
         return true;
+    }
+
+    public bool ApplyKnockbackFromServer(Vector3 direction, float strength)
+    {
+        return BeginKnockback(direction, strength);
     }
 
     public void EndKnockback()
     {
         if (CurrentState == PlayerActionState.Knockback)
             ChangeState(PlayerActionState.Idle);
-    }
-
-    private void OnCollisionEnter(Collision collision)
-    {
-        if (currentState is PlayerThrownState thrownState)
-            thrownState.OnCollisionEnter(collision);
     }
 
     public void EndInterrupt()
@@ -127,7 +154,6 @@ public class PlayerStateController : MonoBehaviour
             PlayerActionState.Move => !context.StatusEffects.BlocksMovement,
             PlayerActionState.Idle => true,
             PlayerActionState.Grabbed => true,
-            PlayerActionState.Thrown => true,
             PlayerActionState.Knockback => !context.StatusEffects.HasSuperArmor,
             PlayerActionState.Dead => true,
             _ => false
@@ -142,9 +168,8 @@ public class PlayerStateController : MonoBehaviour
             PlayerActionState.Move => new PlayerMoveState(context),
             PlayerActionState.Attack => new PlayerAttackState(context),
             PlayerActionState.Interrupt => new PlayerInterruptState(context),
-            PlayerActionState.Grabbed => new PlayerLockedState(context, PlayerActionState.Grabbed),
-            PlayerActionState.Thrown => new PlayerLockedState(context, PlayerActionState.Thrown),
-            PlayerActionState.Knockback => new PlayerKnockbackState(context),
+            PlayerActionState.Grabbed => new PlayerGrabbedState(context),
+            PlayerActionState.Knockback => new PlayerKnockbackState(context, Vector3.zero, 0f),
             PlayerActionState.Dead => new PlayerLockedState(context, PlayerActionState.Dead),
             _ => new PlayerIdleState(context)
         };
@@ -155,8 +180,42 @@ public class PlayerStateController : MonoBehaviour
         PlayerActionState previousState = CurrentState;
         currentState?.Exit(nextState.StateType);
         currentState = nextState;
+        currentStateDebug = currentState.StateType;
         currentState.Enter(previousState);
     }
+
+    private bool CanReceiveGrab(GrabInteractionContext grabContext)
+    {
+        return CurrentState != PlayerActionState.Dead &&
+            CurrentState != PlayerActionState.Grabbed;
+    }
+
+    private bool CanReceiveServerInteraction()
+    {
+        if (context?.Player == null)
+            return false;
+
+        return !context.Player.IsSpawned || context.Player.IsServer;
+    }
+}
+
+public readonly struct GrabInteractionContext
+{
+    public GrabInteractionContext(GameObject instigator, GameObject receiver)
+    {
+        Instigator = instigator;
+        Receiver = receiver;
+    }
+
+    public GameObject Instigator { get; }
+    public GameObject Receiver { get; }
+}
+
+public interface IGrabInteractionReceiver
+{
+    bool TryReceiveGrab(GrabInteractionContext context);
+    bool BeginGrabbed(GameObject instigator = null);
+    bool EndGrabbed();
 }
 
 public enum PlayerActionState
@@ -166,7 +225,6 @@ public enum PlayerActionState
     Attack,
     Interrupt,
     Grabbed,
-    Thrown,
     Knockback,
     Dead
 }
@@ -405,174 +463,123 @@ public sealed class PlayerLockedState : PlayerStateBase
 
 public sealed class PlayerGrabbedState : PlayerStateBase
 {
-    private readonly Transform grabSocket;
-    private bool wasMovementEnabled;
-    private bool wasUseGravity;
     private bool wasKinematic;
+    private bool wasDetectingCollisions;
+    private bool hadRigidbody;
 
-    public PlayerGrabbedState(PlayerStateContext context, Transform grabSocket) : base(context)
-    {
-        this.grabSocket = grabSocket;
-    }
+    public PlayerGrabbedState(PlayerStateContext context) : base(context) { }
 
     public override PlayerActionState StateType => PlayerActionState.Grabbed;
+
+    public override void Enter(PlayerActionState previousState)
+    {
+        Context.Player.SetAnimatorMoving(false);
+        DelegatePhysicsAndCollisionToInstigator();
+        // TODO: Play the grabbed animation here after the Animator parameter/clip is configured.
+        // Example: Context.Animator.SetBool("IsGrabbed", true);
+    }
+
+    public override void Exit(PlayerActionState nextState)
+    {
+        RestorePlayerPhysicsAndCollision();
+        ResetRootRotation();
+        // TODO: Stop the grabbed animation here after the Animator parameter/clip is configured.
+        // Example: Context.Animator.SetBool("IsGrabbed", false);
+    }
+
+    private void DelegatePhysicsAndCollisionToInstigator()
+    {
+        if (Context.Rigidbody == null)
+            return;
+
+        hadRigidbody = true;
+        wasKinematic = Context.Rigidbody.isKinematic;
+        wasDetectingCollisions = Context.Rigidbody.detectCollisions;
+
+        Context.Rigidbody.linearVelocity = Vector3.zero;
+        Context.Rigidbody.angularVelocity = Vector3.zero;
+        Context.Rigidbody.isKinematic = true;
+        Context.Rigidbody.detectCollisions = false;
+    }
+
+    private void RestorePlayerPhysicsAndCollision()
+    {
+        if (!hadRigidbody || Context.Rigidbody == null)
+            return;
+
+        Context.Rigidbody.isKinematic = wasKinematic;
+        Context.Rigidbody.detectCollisions = wasDetectingCollisions;
+        Context.Rigidbody.linearVelocity = Vector3.zero;
+        Context.Rigidbody.angularVelocity = Vector3.zero;
+    }
+
+    private void ResetRootRotation()
+    {
+        if (Context.Rigidbody != null)
+            Context.Rigidbody.rotation = Quaternion.identity;
+
+        Context.Player.transform.rotation = Quaternion.identity;
+    }
+}
+
+public sealed class PlayerKnockbackState : PlayerStateBase
+{
+    private readonly Vector3 direction;
+    private readonly float strength;
+    private float startTime;
+
+    public PlayerKnockbackState(PlayerStateContext context, Vector3 direction, float strength) : base(context)
+    {
+        this.direction = direction;
+        this.strength = strength;
+    }
+
+    public override PlayerActionState StateType => PlayerActionState.Knockback;
     public override bool RequiresStateAuthorityTick => true;
 
     public override void Enter(PlayerActionState previousState)
     {
         Context.Player.SetAnimatorMoving(false);
 
-        if (Context.Movement != null)
-        {
-            wasMovementEnabled = Context.Movement.enabled;
-            Context.Movement.enabled = false;
-        }
+        startTime = Time.time;
 
-        if (Context.Rigidbody != null)
-        {
-            wasUseGravity = Context.Rigidbody.useGravity;
-            wasKinematic = Context.Rigidbody.isKinematic;
-            Context.Rigidbody.linearVelocity = Vector3.zero;
-            Context.Rigidbody.angularVelocity = Vector3.zero;
-            Context.Rigidbody.useGravity = false;
-            Context.Rigidbody.isKinematic = true;
-            Context.Rigidbody.position = grabSocket.position;
-            Context.Rigidbody.rotation = grabSocket.rotation;
-        }
-        else
-        {
-            Context.Player.transform.SetPositionAndRotation(grabSocket.position, grabSocket.rotation);
-        }
+        if (Context.Rigidbody == null)
+            return;
+
+        Context.Rigidbody.isKinematic = false;
+        Context.Rigidbody.linearVelocity = Vector3.zero;
+        Context.Rigidbody.angularVelocity = Vector3.zero;
+
+        if (direction.sqrMagnitude > 0.001f && strength > 0f)
+            Context.Rigidbody.AddForce(direction.normalized * strength, ForceMode.Impulse);
     }
 
     public override void Tick()
     {
-        if (grabSocket == null)
+        if (Context.Rigidbody == null)
+        {
+            Context.Controller.EndKnockback();
+            return;
+        }
+
+        float elapsed = Time.time - startTime;
+        if (elapsed < Context.Controller.MinKnockbackTime)
             return;
 
-        if (Context.Rigidbody != null)
-        {
-            Context.Rigidbody.MovePosition(grabSocket.position);
-            Context.Rigidbody.MoveRotation(grabSocket.rotation);
-        }
-        else
-        {
-            Context.Player.transform.SetPositionAndRotation(grabSocket.position, grabSocket.rotation);
-        }
+        float stopSpeed = Context.Controller.KnockbackStopSpeed;
+        bool slowEnough = Context.Rigidbody.linearVelocity.sqrMagnitude <= stopSpeed * stopSpeed;
+        bool timeout = elapsed >= Context.Controller.MaxKnockbackTime;
+
+        if (slowEnough || timeout)
+            Context.Controller.EndKnockback();
     }
 
     public override void Exit(PlayerActionState nextState)
     {
-        if (nextState == PlayerActionState.Thrown)
-            return;
-
-        RestoreControl();
-    }
-
-    public PlayerThrownState CreateThrownState(Vector3 force, int landingDamage)
-    {
-        return new PlayerThrownState(
-            Context,
-            force,
-            landingDamage,
-            wasMovementEnabled,
-            wasUseGravity,
-            wasKinematic
-        );
-    }
-
-    private void RestoreControl()
-    {
-        if (Context.Movement != null)
-            Context.Movement.enabled = wasMovementEnabled;
-
-        if (Context.Rigidbody != null)
-        {
-            Context.Rigidbody.useGravity = wasUseGravity;
-            Context.Rigidbody.isKinematic = wasKinematic;
-            Context.Rigidbody.linearVelocity = Vector3.zero;
-            Context.Rigidbody.angularVelocity = Vector3.zero;
-        }
-    }
-}
-
-public sealed class PlayerThrownState : PlayerStateBase
-{
-    private readonly Vector3 force;
-    private readonly int landingDamage;
-    private readonly bool wasMovementEnabled;
-    private readonly bool wasUseGravity;
-    private readonly bool wasKinematic;
-
-    public PlayerThrownState(
-        PlayerStateContext context,
-        Vector3 force,
-        int landingDamage,
-        bool wasMovementEnabled,
-        bool wasUseGravity,
-        bool wasKinematic) : base(context)
-    {
-        this.force = force;
-        this.landingDamage = landingDamage;
-        this.wasMovementEnabled = wasMovementEnabled;
-        this.wasUseGravity = wasUseGravity;
-        this.wasKinematic = wasKinematic;
-    }
-
-    public override PlayerActionState StateType => PlayerActionState.Thrown;
-
-    public override void Enter(PlayerActionState previousState)
-    {
-        Context.Player.SetAnimatorMoving(false);
-
         if (Context.Rigidbody == null)
-        {
-            RestoreControl();
-            Context.Controller.ChangeState(PlayerActionState.Idle);
             return;
-        }
 
-        Context.Rigidbody.isKinematic = false;
-        Context.Rigidbody.useGravity = true;
         Context.Rigidbody.linearVelocity = Vector3.zero;
         Context.Rigidbody.angularVelocity = Vector3.zero;
-        Context.Rigidbody.AddForce(force, ForceMode.VelocityChange);
-    }
-
-    public void OnCollisionEnter(Collision collision)
-    {
-        int groundLayer = LayerMask.NameToLayer("Surface");
-        if (collision.gameObject.layer != groundLayer)
-            return;
-
-        Context.Player.TakeDamage(new AttackInfo(landingDamage));
-        RestoreControl();
-        Context.Controller.ChangeState(PlayerActionState.Idle);
-    }
-
-    private void RestoreControl()
-    {
-        if (Context.Movement != null)
-            Context.Movement.enabled = wasMovementEnabled;
-
-        if (Context.Rigidbody != null)
-        {
-            Context.Rigidbody.useGravity = wasUseGravity;
-            Context.Rigidbody.isKinematic = wasKinematic;
-            Context.Rigidbody.linearVelocity = Vector3.zero;
-            Context.Rigidbody.angularVelocity = Vector3.zero;
-        }
-    }
-}
-
-public sealed class PlayerKnockbackState : PlayerStateBase
-{
-    public PlayerKnockbackState(PlayerStateContext context) : base(context) { }
-
-    public override PlayerActionState StateType => PlayerActionState.Knockback;
-
-    public override void Enter(PlayerActionState previousState)
-    {
-        Context.Player.SetAnimatorMoving(false);
     }
 }

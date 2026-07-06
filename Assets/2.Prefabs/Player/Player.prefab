@@ -20,7 +20,6 @@ GameObject:
   - component: {fileID: 6098322879574375161}
   - component: {fileID: 4272353666037054394}
   - component: {fileID: 8301241639383343952}
-  - component: {fileID: 6805540437326725667}
   - component: {fileID: 8345678279683584363}
   - component: {fileID: 4237082408145735710}
   m_Layer: 6
@@ -90,7 +89,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1250559839
+  GlobalObjectIdHash: 2672932260
   InScenePlacedSourceGlobalObjectIdHash: 1250559839
   DeferredDespawnTick: 0
   Ownership: 8
@@ -194,15 +193,29 @@ MonoBehaviour:
   - clip: {fileID: 7743820057955227385, guid: cd27b044584c25e4d8f0cf1d2d12845e, type: 3}
     duration: 0.5
     forwardDistance: 1
+    hitbox: {fileID: 0}
+    damage: 0
   - clip: {fileID: 528945471217504453, guid: 9765f5f25910f8e4787cb607e2dcfd6d, type: 3}
     duration: 0.5
     forwardDistance: 1
+    hitbox: {fileID: 0}
+    damage: 0
   - clip: {fileID: 1666602461442742344, guid: a453adc3b73dcb9409eab16ad723930c, type: 3}
     duration: 0.5
     forwardDistance: 1
+    hitbox: {fileID: 0}
+    damage: 0
   - clip: {fileID: -8397454821858528057, guid: e0e4735c9749f534da624659d5fb140b, type: 3}
     duration: 0.5
     forwardDistance: 1
+    hitbox: {fileID: 0}
+    damage: 0
+  defaultHitbox: {fileID: 0}
+  hittableLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  maxHitResults: 16
+  damageOverride: 0
 --- !u!54 &3600963326377684433
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -318,23 +331,6 @@ MonoBehaviour:
   - {fileID: 2100000, guid: c1cb4507129f426c839b2570c241f3dc, type: 2}
   - {fileID: 2100000, guid: 20573b9755854bb6b73c0bf6130cd259, type: 2}
   bodyRenderer: {fileID: 2710021930536529835}
---- !u!114 &6805540437326725667
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8559504096609571310}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 86dca35901565144f832eb2841a1d793, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LinearKnockback
-  ShowTopMostFoldoutHeaderGroup: 1
-  maxDistance: 2
-  minKnockbackTime: 0.15
-  maxKnockbackTime: 1.5
-  stopSpeed: 0.15
 --- !u!114 &8345678279683584363
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -361,6 +357,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 977a09efa1174d52b59919b43ccfdb21, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerStateController
+  currentStateDebug: 0
+  minKnockbackTime: 0.15
+  maxKnockbackTime: 1.5
+  knockbackStopSpeed: 0.15
 --- !u!1 &8896633917232358439
 GameObject:
   m_ObjectHideFlags: 0

@@ -17,6 +17,14 @@ public class PlayerAnimationEventRelay : MonoBehaviour
         player?.EndDefaultAttack();
     }
 
+    public void HitDefaultAttack()
+    {
+        if (player == null)
+            player = GetComponentInParent<Player>();
+
+        player?.HitDefaultAttack();
+    }
+
     public void EndInterrupt()
     {
         if (player == null)

@@ -28,7 +28,7 @@ PlayerPrefab
 ├── Player
 ├── PlayerMovement
 ├── PlayerInputReader
-├── PlayerGrabController
+├── PlayerStateController
 ├── PlayerCharacterController
 ├── PlayerAbilityController
 └── CharacterSlot
@@ -48,7 +48,7 @@ PlayerPrefab
 | 입력 읽기 | `PlayerInputReader` |
 | Ability 입력 전달 | `PlayerAbilityController` |
 | 이동/회전 | `PlayerMovement` 및 회전 컴포넌트 |
-| 보스 잡기 대응 | `PlayerGrabController` |
+| 보스 잡힘 상태 대응 | `PlayerStateController`의 `Grabbed` 상태 |
 | Character 장착/초기화 | `PlayerCharacterController` |
 | 캐릭터별 기본 스탯 | 장착된 `Character` 데이터 |
 | 캐릭터별 스킬/공격 | 장착된 `Character` 또는 Character Ability 컴포넌트 |
@@ -101,7 +101,7 @@ PlayerInput
 | `PlayerInputReader.cs` | Unity Input System의 `Move` 액션을 읽어 이동 입력 방향을 제공한다. |
 | `PlayerMovement.cs` | `Rigidbody` 기반 이동과 회전을 처리한다. |
 | `PlayerInputScript.cs` | `CharacterController` 기반 이동 실험/이전 구현으로 보인다. 현재 주 이동 구조와 중복될 수 있다. |
-| `PlayerGrabController.cs` | 보스 잡기 패턴에 의해 플레이어가 고정, 피해, 던지기, 착지 피해를 받는 흐름을 처리한다. |
+| `PlayerStateController.cs` | 플레이어 행동 상태를 관리한다. 보스 잡기는 `Grabbed` 상태로 입력 기반 이동, 공격, 회전, 인터럽트만 막고 위치 고정, 피해, throw/release 타이밍은 보스가 처리한다. |
 | `PlayerRotation.cs` / `PlayerRotation_RotateTowards.cs` | 회전 처리 실험/대안 구현으로 보인다. `PlayerMovement`의 회전 처리와 역할 중복 여부를 검토해야 한다. |
 
 ## 추후 논의 필요

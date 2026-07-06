@@ -316,7 +316,7 @@ public class Unit : BaseNetworkBehaviour
 
     #region 넉백
     IKnockbackable _knockback;
-    public void Knockback(Vector3 direction, float strength)
+    public virtual void Knockback(Vector3 direction, float strength)
     {
         if (!IsServer) return;
 

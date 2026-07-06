@@ -210,7 +210,7 @@ public class GrabController : NetworkBehaviour
         }
 
         _targetStateController.ChangeState(PlayerActionState.Grabbed);
-        // 플레이어 상태 전환 함수 호출하기
+
         _targetHp = _targetUnit.CurrentHealth;
         ApplyDamage(grabDamagePercentage);
     }
