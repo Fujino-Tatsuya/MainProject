@@ -295,7 +295,7 @@ public class DefaultAttack : BaseNetworkBehaviour
                 continue;
 
             damagedUnits.Add(target);
-            target.TakeDamage(damage);
+            target.TakeDamage(new AttackInfo(damage));
         }
     }
 
