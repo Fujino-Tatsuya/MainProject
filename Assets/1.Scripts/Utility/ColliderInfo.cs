@@ -30,12 +30,14 @@ public struct SphereColliderInfo
     public float radius;
 }
 
+/// <summary>
+/// collider 크기,형태 정보 전달을 위한 클래스. without layers
+/// </summary>
 public class ColliderInfo : MonoBehaviour
 {
     BoxCollider _boxCollider;
     CapsuleCollider _capsuleCollider;
     SphereCollider _sphereCollider;
-    ColliderInfo _colliderInfo;
 
     OverlapCollider _overlapCollider;
     public OverlapCollider OverlapCollider { get { return _overlapCollider; } }
@@ -45,7 +47,6 @@ public class ColliderInfo : MonoBehaviour
         _boxCollider = GetComponent<BoxCollider>();
         _capsuleCollider = GetComponent<CapsuleCollider>();
         _sphereCollider = GetComponent<SphereCollider>();
-        _colliderInfo = GetComponent<ColliderInfo>();
 
         _overlapCollider = OverlapCollider.None;
 
@@ -68,7 +69,23 @@ public class ColliderInfo : MonoBehaviour
             Debug.LogError($"ColliderInfo supports only one collider type, but found {_overlapCollider}.", this);
         }
 
-        _colliderInfo.enabled = false;
+        DisableSourceCollider();
+    }
+
+    void DisableSourceCollider()
+    {
+        switch (_overlapCollider)
+        {
+            case OverlapCollider.Box:
+                _boxCollider.enabled = false;
+                break;
+            case OverlapCollider.Capsule:
+                _capsuleCollider.enabled = false;
+                break;
+            case OverlapCollider.Sphere:
+                _sphereCollider.enabled = false;
+                break;
+        }
     }
 
     /// <summary>

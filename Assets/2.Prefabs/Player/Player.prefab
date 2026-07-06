@@ -89,7 +89,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 2672932260
+  GlobalObjectIdHash: 1250559839
   InScenePlacedSourceGlobalObjectIdHash: 1250559839
   DeferredDespawnTick: 0
   Ownership: 8
@@ -213,7 +213,7 @@ MonoBehaviour:
   defaultHitbox: {fileID: 0}
   hittableLayers:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 256
   maxHitResults: 16
   damageOverride: 0
 --- !u!54 &3600963326377684433
@@ -265,7 +265,7 @@ CapsuleCollider:
   m_Radius: 0.38
   m_Height: 1.79
   m_Direction: 1
-  m_Center: {x: 0, y: 1, z: 0}
+  m_Center: {x: 0, y: 0.88, z: 0}
 --- !u!114 &4272353666037054394
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -429,46 +429,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 1160318589990200604}
     m_Modifications:
-    - target: {fileID: 2609089805756766508, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
-      propertyPath: m_Enabled
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 2609089805756766508, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
-      propertyPath: SyncScaleX
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2609089805756766508, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
-      propertyPath: SyncPositionX
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2609089805756766508, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
-      propertyPath: SyncPositionY
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2609089805756766508, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
-      propertyPath: SyncPositionZ
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2609089805756766508, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
-      propertyPath: SyncRotAngleX
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 2609089805756766508, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
-      propertyPath: SyncRotAngleY
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 2609089805756766508, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
-      propertyPath: SyncRotAngleZ
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 4899003165152616628, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
-      propertyPath: attackType
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 4899003165152616628, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
-      propertyPath: targetLayer.m_Bits
-      value: 256
-      objectReference: {fileID: 0}
     - target: {fileID: 6129863144953294667, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
@@ -491,7 +451,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6129863144953294667, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
       propertyPath: m_LocalRotation.y
-      value: -0
+      value: 0.0002631796
       objectReference: {fileID: 0}
     - target: {fileID: 6129863144953294667, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
       propertyPath: m_LocalRotation.z

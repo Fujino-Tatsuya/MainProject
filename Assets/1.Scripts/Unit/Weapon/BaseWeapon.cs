@@ -25,4 +25,32 @@ public class BaseWeapon : MonoBehaviour
 
     protected bool IsServer =>
     NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer;
+
+    protected bool TryResolveHit(Collider hit, int? overrideDamage = null)
+    {
+        if (!IsServer || hit == null)
+            return false;
+
+        GameObject target = hit.transform.root.gameObject;
+        if ((targetLayer.value & (1 << target.layer)) == 0)
+            return false;
+
+        Unit unit = target.GetComponent<Unit>();
+        if (unit == null)
+        {
+            Debug.LogError($"해당 오브젝트, {target.name}에 Unit 컴포넌트가 부착되어있지 않습니다.", this);
+            return false;
+        }
+
+        return TryResolveHit(unit, overrideDamage);
+    }
+
+    protected bool TryResolveHit(Unit unit, int? overrideDamage = null)
+    {
+        if (!IsServer || unit == null)
+            return false;
+
+        unit.TakeDamage(overrideDamage ?? damage);
+        return true;
+    }
 }
