@@ -10,7 +10,7 @@ public enum AttackType
     R
 }
 
-public class BaseWeapon : MonoBehaviour
+public class BaseAttack : MonoBehaviour
 {
     [SerializeField] protected int damage = 0;
     public int Damage { get { return damage; } }
@@ -24,7 +24,24 @@ public class BaseWeapon : MonoBehaviour
     public AttackType AttackType { get { return attackType; } }
 
     protected bool IsServer =>
-    NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer;
+        NetworkManager.Singleton == null ||
+        !NetworkManager.Singleton.IsListening ||
+        NetworkManager.Singleton.IsServer;
+
+    public void SetDamageSnapshot(int value)
+    {
+        damage = Mathf.Max(0, value);
+    }
+
+    public void SetTargetLayer(LayerMask value)
+    {
+        targetLayer = value;
+    }
+
+    public void SetAttackType(AttackType value)
+    {
+        attackType = value;
+    }
 
     protected bool TryResolveHit(Collider hit, int? overrideDamage = null)
     {

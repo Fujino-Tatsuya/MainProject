@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class KnockbackAttack : BaseWeapon
+public class KnockbackAttack : BaseAttack
 {
     [SerializeField] float knockbackStrength = 5f;
 

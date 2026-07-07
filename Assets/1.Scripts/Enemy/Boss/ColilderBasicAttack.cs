@@ -7,7 +7,7 @@ public enum TriggerMode
     OnlyExit
 }
 
-public class ColliderBasicAttack : BaseWeapon
+public class ColliderBasicAttack : BaseAttack
 {
     [SerializeField] TriggerMode triggerMode;
     [SerializeField] float stayTime;

@@ -3,10 +3,10 @@ using UnityEngine;
 
 public class AttackEventArgs : EventArgs
 {
-    BaseWeapon _baseWeapon;
-    public BaseWeapon BaseWeapon { get { return _baseWeapon; } }
+    BaseAttack _baseWeapon;
+    public BaseAttack BaseWeapon { get { return _baseWeapon; } }
 
-    public AttackEventArgs(BaseWeapon baseWeapon)
+    public AttackEventArgs(BaseAttack baseWeapon)
     {
         _baseWeapon = baseWeapon;
     }

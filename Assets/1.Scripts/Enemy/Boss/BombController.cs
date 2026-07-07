@@ -331,7 +331,7 @@ public class BombController : NetworkBehaviour
     {
         if (_bombState != BombState.BombTimer) return;
 
-        BaseWeapon weapon = e.BaseWeapon;
+        BaseAttack weapon = e.BaseWeapon;
         LinearLaunch(weapon.transform.position, weapon.Damage);
     }
 

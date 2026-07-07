@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class OverlapAttack : BaseWeapon
+public class OverlapAttack : BaseAttack
 {
     [SerializeField] private ColliderInfo colliderInfo;
     [SerializeField] private int maxHitCount = 16;

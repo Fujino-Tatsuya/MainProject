@@ -11,7 +11,7 @@ public class Bomb : Unit
 
     void OnTriggerEnter(Collider other)
     {
-        BaseWeapon baseWeapon = other.GetComponent<BaseWeapon>();
+        BaseAttack baseWeapon = other.GetComponent<BaseAttack>();
         if (baseWeapon == null) return;
 
         if (baseWeapon.AttackType == attackType)
