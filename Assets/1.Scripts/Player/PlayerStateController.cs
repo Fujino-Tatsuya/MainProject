@@ -291,7 +291,9 @@ public abstract class PlayerStateBase : IPlayerState
 
     protected bool TryConsumeActionInput()
     {
-        if ((Context.Input.AttackPressed || Context.Input.AttackHeld) &&
+        // 공격 시작은 누른 프레임(press)에만 허용한다. 홀드 상태로는 시작되지 않으므로,
+        // Once 정책에서 체인이 끝난 뒤 계속 누르고 있어도 재시작되지 않는다(릴리즈 요구).
+        if (Context.Input.AttackPressed &&
             Context.DefaultAttack.TryStart())
         {
             return true;

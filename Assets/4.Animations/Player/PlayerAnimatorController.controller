@@ -7,7 +7,7 @@ AnimatorState:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Garen_Default_Attack1
+  m_Name: Default_Attack1
   m_Speed: 3
   m_CycleOffset: 0
   m_Transitions:
@@ -381,7 +381,7 @@ AnimatorState:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Garen_Default_Attack2
+  m_Name: Default_Attack2
   m_Speed: 3
   m_CycleOffset: 0
   m_Transitions:
@@ -486,7 +486,7 @@ AnimatorState:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Garen_Default_Attack0
+  m_Name: Default_Attack0
   m_Speed: 3
   m_CycleOffset: 0
   m_Transitions:
@@ -514,7 +514,7 @@ AnimatorStateMachine:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Garen_Default_Attack
+  m_Name: Default_Attack
   m_ChildStates:
   - serializedVersion: 1
     m_State: {fileID: 6402379192222144080}
@@ -595,7 +595,7 @@ AnimatorState:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Garen_Default_Attack3
+  m_Name: Default_Attack3
   m_Speed: 3
   m_CycleOffset: 0
   m_Transitions:

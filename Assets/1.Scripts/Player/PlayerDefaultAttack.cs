@@ -3,38 +3,42 @@ using UnityEngine;
 
 public class PlayerDefaultAttack : BaseAttack
 {
-    [SerializeField] private int maxHitResults = 16;
+    // SO(DefaultAttackData) 미할당 시 사용하는 기본 버퍼 크기.
+    private const int DefaultMaxHitResults = 16;
+
+    // 투사체 생성/레이캐스트 시작 위치. 비워두면 자기 위치를 사용.
+    [SerializeField] private Transform muzzle;
 
     private readonly HashSet<Unit> damagedUnits = new HashSet<Unit>();
-    private Collider[] hitResults;
+    private Collider[] hitResults = new Collider[DefaultMaxHitResults];
     private Player owner;
-    private ColliderInfo currentHitbox;
-    private ColliderInfo fallbackHitbox;
+    private ColliderInfo defaultHitbox;
+    private ColliderInfo hitbox;
     private DefaultAttackStep currentStep;
     private Vector3 attackDirection;
 
     private void Awake()
     {
         owner = GetComponent<Player>();
-        hitResults = new Collider[Mathf.Max(1, maxHitResults)];
         SetAttackType(AttackType.Default);
     }
 
-    public void Configure(ColliderInfo defaultHitbox, LayerMask hittableLayers, int maxResults)
+    public void Configure(ColliderInfo defaultHitbox, LayerMask hittableLayers, int maxHitResults = DefaultMaxHitResults)
     {
-        fallbackHitbox = defaultHitbox;
+        this.defaultHitbox = defaultHitbox;
+        hitbox = defaultHitbox;
         SetTargetLayer(hittableLayers);
 
-        int resultCount = Mathf.Max(1, maxResults);
-        if (hitResults == null || hitResults.Length != resultCount)
+        int resultCount = Mathf.Max(1, maxHitResults);
+        if (hitResults.Length != resultCount)
             hitResults = new Collider[resultCount];
     }
 
     public void PrepareStep(DefaultAttackStep step, int damageSnapshot, Vector3 direction)
     {
         currentStep = step;
-        currentHitbox = step != null && step.Hitbox != null ? step.Hitbox : fallbackHitbox;
         attackDirection = direction.sqrMagnitude >= 0.001f ? direction.normalized : transform.forward;
+        hitbox = step != null && step.Hitbox != null ? step.Hitbox : defaultHitbox;
         SetDamageSnapshot(damageSnapshot);
         damagedUnits.Clear();
     }
@@ -65,13 +69,13 @@ public class PlayerDefaultAttack : BaseAttack
 
     private void HitOverlap()
     {
-        if (currentHitbox == null)
+        if (hitbox == null)
         {
             Debug.LogWarning("PlayerDefaultAttack requires a ColliderInfo hitbox.", this);
             return;
         }
 
-        int hitCount = OverlapHitbox(currentHitbox);
+        int hitCount = OverlapHitbox(hitbox);
         for (int i = 0; i < hitCount; i++)
         {
             Collider hit = hitResults[i];
@@ -95,7 +99,6 @@ public class PlayerDefaultAttack : BaseAttack
             return;
         }
 
-        Transform muzzle = currentStep.Muzzle;
         Vector3 position = muzzle != null ? muzzle.position : transform.position;
         Quaternion rotation = Quaternion.LookRotation(attackDirection);
         GameObject projectileObject = Instantiate(currentStep.ProjectilePrefab, position, rotation);
@@ -108,7 +111,6 @@ public class PlayerDefaultAttack : BaseAttack
 
     private void HitRaycast()
     {
-        Transform muzzle = currentStep.Muzzle;
         Vector3 origin = muzzle != null ? muzzle.position : transform.position;
 
         if (!Physics.Raycast(origin, attackDirection, out RaycastHit hit, currentStep.RaycastRange, targetLayer, QueryTriggerInteraction.Ignore))
