@@ -64,10 +64,18 @@ Vault/
 
 ## 회의록 파이프라인
 
-- Obsidian 커뮤니티 **Whisper 플러그인**을 설치한다.
-- 본인 PC에 NVIDIA RTX GPU가 있으므로, 로컬 GPU 모델(large-v3급)로 설정해 사내 회의 내용이 외부로 나가지 않게 한다.
-- 녹음/전사 결과는 자동으로 `Meetings/` 폴더에 날짜별 파일로 저장한다.
-- 후처리(LLM 요약/액션아이템 추출)는 이번 Phase A 범위에는 포함하지 않고, 이후 필요 시 추가한다.
+로컬 GPU로 Whisper 플러그인을 돌리는 방식은 시도했으나(ctranslate2의 Windows CUDA 의존성 문제로 삽질이 길어져) 폐기하고, 아래의 더 단순한 흐름으로 대체했다.
+
+1. **녹음은 핸드폰으로** 한다.
+2. 녹음 파일을 **whisper key** 웹사이트에 올려 화자 분리 + 전사한다.
+3. 전사 결과를 그대로 복사해서 Vault의 `Meetings/_inbox.md`에 붙여넣는다.
+4. Claude Code에서 `/meeting-note` 커스텀 슬래시 커맨드(`Vault/.claude/commands/meeting-note.md`)를 실행한다.
+   - `_inbox.md`의 원본 전사를 읽어 날짜·회의명·참석자(화자)를 파악하고(근거 없으면 사용자에게 확인),
+   - `Meetings/YYYY-MM-DD 회의명.md`에 요약·주요 논의 내용·결정사항/액션아이템·원본 전사(접이식) 순으로 정리해 저장한다.
+   - 처리 후 `_inbox.md`는 다시 빈 템플릿으로 초기화된다.
+   - 원본에 없는 내용은 지어내지 않는다(Daily Todo Reminder와 동일한 evidence-only 원칙).
+
+Obsidian Whisper 플러그인 자체는 설치는 남아있지만 이 파이프라인에서는 사용하지 않는다.
 
 ## 셋업 순서 (구현 계획에서 상세화)
 
