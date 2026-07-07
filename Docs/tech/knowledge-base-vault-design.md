@@ -77,6 +77,16 @@ Vault/
 
 Obsidian Whisper 플러그인 자체는 설치는 남아있지만 이 파이프라인에서는 사용하지 않는다.
 
+### 녹음 파일 자동 전사 (`/transcribe`)
+
+수동 복붙 없이 녹음 파일에서 회의록까지 한 번에 가는 경로 (검증 완료, 2026-07-07):
+
+- `Meetings/_audio-inbox/`에 녹음 파일(mp3/m4a/wav 등)을 넣고 Claude Code에서 `/transcribe` 실행.
+- `.claude/scripts/transcribe-deepgram.ps1`이 **Deepgram API**(nova-3, 다국어, diarize+utterances)로 전사해서 `_merge-inbox/A-<이름>.json`으로 저장하고, 오디오는 `_processed/`로 이동.
+- 이어서 `/meeting-merge` 규칙으로 회의록 생성. 클로바노트 등 한국어 특화 전사(B)가 같이 있으면 교차검증 병합.
+- **API 키는 사용자 환경변수 `DEEPGRAM_API_KEY`에만 저장** — Vault 안에 절대 두지 않는다(Syncthing으로 서버·팀원 PC에 퍼짐).
+- WhisperX 로컬 설치 계획은 Deepgram이 같은 역할(단어 타임스탬프+화자분리)을 API 한 번으로 대체하므로 보류. 보안 요건이 생기거나 무료 크레딧($200) 소진 시의 보험으로만 남겨둠.
+
 ### 교차 검증 병합 (`/meeting-merge`)
 
 전사 정확도를 높이기 위해 두 개의 전사 결과를 교차 검증하는 확장 커맨드(`Vault/.claude/commands/meeting-merge.md`)도 있다.
