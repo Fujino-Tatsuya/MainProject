@@ -77,6 +77,15 @@ Vault/
 
 Obsidian Whisper 플러그인 자체는 설치는 남아있지만 이 파이프라인에서는 사용하지 않는다.
 
+### 교차 검증 병합 (`/meeting-merge`)
+
+전사 정확도를 높이기 위해 두 개의 전사 결과를 교차 검증하는 확장 커맨드(`Vault/.claude/commands/meeting-merge.md`)도 있다.
+
+- **데이터 A** (WhisperX): 단어 단위 타임스탬프 정밀, 문맥에 강함. 화자 분리·한국어 뉘앙스에 약함.
+- **데이터 B** (whisper key 등 한국어 특화): 화자 분리·한국어 고유명사에 강함.
+- `Meetings/_merge-inbox/`에 두 파일(`A-*`, `B-*`)을 넣고 `/meeting-merge` 실행 → 병합 규칙(화자=B 우선, 텍스트=B 우선+A 문맥 교정, 누락 구간=A로 보완, 타임스탬프 통합) 적용 → 이어서 회의록 노트까지 한 번에 생성. 처리된 입력은 `Meetings/_processed/`로 이동(원본 보존).
+- B(또는 파일 1개)만 있으면 병합 없이 단독 처리로 폴백한다. WhisperX 로컬 설치는 다른 팀의 "WhisperX GPU 설치 보완 (Windows 11 + RTX/CUDA)" 문서를 따라 추후 진행 예정 — WhisperX도 ctranslate2 기반이라 위에서 폐기한 로컬 서버와 같은 CUDA DLL 이슈를 만날 수 있음을 유의.
+
 ## 셋업 순서 (구현 계획에서 상세화)
 
 1. 본인 PC + 서버 PC에 Tailscale 설치·연결
