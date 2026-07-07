@@ -4,7 +4,7 @@ using UnityEngine;
 [RequireComponent(typeof(PlayerInputReader))]
 [RequireComponent(typeof(PlayerMovement))]
 [RequireComponent(typeof(PlayerAimIndicator))]
-[RequireComponent(typeof(DefaultAttack))]
+[RequireComponent(typeof(DefaultAttackController))]
 [RequireComponent(typeof(StatusEffectController))]
 public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
 {
@@ -38,7 +38,7 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
             GetComponent<PlayerInputReader>(),
             GetComponent<PlayerMovement>(),
             GetComponent<PlayerAimIndicator>(),
-            GetComponent<DefaultAttack>(),
+            GetComponent<DefaultAttackController>(),
             statusEffects,
             GetComponent<Rigidbody>(),
             GetComponentInChildren<Animator>()
@@ -237,7 +237,7 @@ public sealed class PlayerStateContext
         PlayerInputReader input,
         PlayerMovement movement,
         PlayerAimIndicator aim,
-        DefaultAttack defaultAttack,
+        DefaultAttackController defaultAttack,
         StatusEffectController statusEffects,
         Rigidbody rigidbody,
         Animator animator)
@@ -258,7 +258,7 @@ public sealed class PlayerStateContext
     public PlayerInputReader Input { get; }
     public PlayerMovement Movement { get; }
     public PlayerAimIndicator Aim { get; }
-    public DefaultAttack DefaultAttack { get; }
+    public DefaultAttackController DefaultAttack { get; }
     public StatusEffectController StatusEffects { get; }
     public Rigidbody Rigidbody { get; }
     public Animator Animator { get; }
@@ -365,6 +365,7 @@ public sealed class PlayerAttackState : PlayerStateBase
     public PlayerAttackState(PlayerStateContext context) : base(context) { }
 
     public override PlayerActionState StateType => PlayerActionState.Attack;
+    public override bool RequiresStateAuthorityTick => true;
 
     public override void Enter(PlayerActionState previousState)
     {

@@ -4,7 +4,7 @@ using Unity.Netcode;
 [RequireComponent(typeof(PlayerInputReader))]
 [RequireComponent(typeof(PlayerMovement))]
 [RequireComponent(typeof(PlayerAimIndicator))]
-[RequireComponent(typeof(DefaultAttack))]
+[RequireComponent(typeof(DefaultAttackController))]
 [RequireComponent(typeof(PlayerStateController))]
 [RequireComponent(typeof(StatusEffectController))]
 public class Player : Unit
@@ -24,7 +24,7 @@ public class Player : Unit
     [SerializeField] int maxShield;
 
     private PlayerStateController stateController;
-    private DefaultAttack defaultAttack;
+    private DefaultAttackController defaultAttack;
 
     public PlayerActionState CurrentState => stateController != null ? stateController.CurrentState : PlayerActionState.Idle;
     public bool CanMove => stateController == null || stateController.CanMove;
@@ -41,7 +41,7 @@ public class Player : Unit
         if (stateController == null)
             stateController = gameObject.AddComponent<PlayerStateController>();
 
-        defaultAttack = GetComponent<DefaultAttack>();
+        defaultAttack = GetComponent<DefaultAttackController>();
 
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
@@ -78,6 +78,11 @@ public class Player : Unit
     public void HitDefaultAttack()
     {
         defaultAttack.HitCurrentAttack();
+    }
+
+    public void HandleDefaultAttackEvent(DefaultAttackAnimationEventType eventType)
+    {
+        defaultAttack.HandleAnimationEvent(eventType);
     }
 
     public void EndInterrupt()

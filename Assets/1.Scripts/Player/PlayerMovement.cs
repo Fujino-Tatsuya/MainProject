@@ -157,4 +157,12 @@ public class PlayerMovement : MonoBehaviour
     {
         rb.MovePosition(rb.position + deltaPosition);
     }
+
+    public void SetArmature(Transform newArmature)
+    {
+        if (newArmature == null)
+            return;
+
+        armature = newArmature;
+    }
 }
