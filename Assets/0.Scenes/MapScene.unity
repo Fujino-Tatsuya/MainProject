@@ -175,7 +175,7 @@ MonoBehaviour:
   LayoutPlacer: {fileID: 99066898}
   Validator: {fileID: 99066891}
   ContentSpawner: {fileID: 99066896}
-  AutoGenerateOnStart: 0
+  AutoGenerateOnStart: 1
 --- !u!4 &99066895
 Transform:
   m_ObjectHideFlags: 0
@@ -235,122 +235,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ad4f71ce5092bbd6e8fa1c24d5e7f90b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LayoutPlacer
---- !u!1 &110137886
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 110137887}
-  - component: {fileID: 110137888}
-  m_Layer: 0
-  m_Name: Slot_3_Z4_M
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &110137887
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 110137886}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 11, y: 0, z: -9.8}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1033906589}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &110137888
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 110137886}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7a1c4e9b2d6f48a3b5c7e9f1a2b4c6d8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ZoneSlot
-  SlotID: 3
-  Size: 1
-  Footprint: {x: 20, y: 40}
-  IsQuestCandidate: 1
-  IsBossCandidate: 0
-  IsSpawnCandidate: 0
-  ConnN: 1
-  ConnE: 1
-  ConnS: 1
-  ConnW: 1
-  WallCuts:
-  - {x: 12, y: 0, z: -30.3, w: 2}
-  - {x: 21.5, y: 0, z: -0.8000002, w: 1}
-  AssignedRole: 1
-  IsFilled: 1
---- !u!1 &207377810
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 207377811}
-  - component: {fileID: 207377812}
-  m_Layer: 0
-  m_Name: Slot_6_Z7_S
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &207377811
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 207377810}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 67.5, y: 0, z: 29.2}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1033906589}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &207377812
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 207377810}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7a1c4e9b2d6f48a3b5c7e9f1a2b4c6d8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ZoneSlot
-  SlotID: 6
-  Size: 2
-  Footprint: {x: 20, y: 20}
-  IsQuestCandidate: 0
-  IsBossCandidate: 0
-  IsSpawnCandidate: 0
-  ConnN: 0
-  ConnE: 0
-  ConnS: 1
-  ConnW: 1
-  WallCuts: []
-  AssignedRole: 0
-  IsFilled: 1
 --- !u!1001 &314806437
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -408,12 +292,7 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: bc75b318f39c223498b5be6f18c5ea93, type: 3}
---- !u!4 &356815196 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 2209409418697741873, guid: bce8494e62133e241a1e403d5cd1acdc, type: 3}
-  m_PrefabInstance: {fileID: 7341477658164184187}
-  m_PrefabAsset: {fileID: 0}
---- !u!1 &476252577
+--- !u!1 &398213966
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -421,54 +300,55 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 476252578}
-  - component: {fileID: 476252579}
+  - component: {fileID: 398213967}
+  - component: {fileID: 398213968}
   m_Layer: 0
-  m_Name: Slot_5_Z6_S
+  m_Name: Slot_0_Z1_L
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &476252578
+--- !u!4 &398213967
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 476252577}
+  m_GameObject: {fileID: 398213966}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -18.5, y: 0, z: 57.2}
+  m_LocalPosition: {x: -30.5, y: 0, z: 13.7}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1033906589}
+  m_Father: {fileID: 1679616776}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &476252579
+--- !u!114 &398213968
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 476252577}
+  m_GameObject: {fileID: 398213966}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7a1c4e9b2d6f48a3b5c7e9f1a2b4c6d8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ZoneSlot
-  SlotID: 5
-  Size: 2
-  Footprint: {x: 20, y: 20}
+  SlotID: 0
+  Size: 0
+  Footprint: {x: 40, y: 40}
   IsQuestCandidate: 0
-  IsBossCandidate: 1
-  IsSpawnCandidate: 1
-  ConnN: 0
+  IsBossCandidate: 0
+  IsSpawnCandidate: 0
+  ConnN: 1
   ConnE: 1
-  ConnS: 1
+  ConnS: 2
   ConnW: 0
-  WallCuts: []
-  AssignedRole: 2
+  WallCuts:
+  - {x: -19.5, y: 0, z: 34.2, w: 0}
+  AssignedRole: 0
   IsFilled: 1
 --- !u!1 &498941367
 GameObject:
@@ -537,6 +417,63 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!1 &501998214
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 501998215}
+  - component: {fileID: 501998216}
+  m_Layer: 0
+  m_Name: Slot_4_Z5_M
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &501998215
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 501998214}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: -17.5, y: 0, z: -37.8}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1679616776}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &501998216
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 501998214}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a1c4e9b2d6f48a3b5c7e9f1a2b4c6d8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ZoneSlot
+  SlotID: 4
+  Size: 1
+  Footprint: {x: 20, y: 40}
+  IsQuestCandidate: 1
+  IsBossCandidate: 0
+  IsSpawnCandidate: 0
+  ConnN: 1
+  ConnE: 0
+  ConnS: 0
+  ConnW: 1
+  WallCuts: []
+  AssignedRole: 1
+  IsFilled: 1
 --- !u!1 &529259874
 GameObject:
   m_ObjectHideFlags: 0
@@ -664,6 +601,63 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
+--- !u!1 &597751498
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 597751499}
+  - component: {fileID: 597751500}
+  m_Layer: 0
+  m_Name: Slot_7_Z8_S
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &597751499
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 597751498}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 13, y: 0, z: -58.3}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1679616776}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &597751500
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 597751498}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a1c4e9b2d6f48a3b5c7e9f1a2b4c6d8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ZoneSlot
+  SlotID: 7
+  Size: 2
+  Footprint: {x: 20, y: 20}
+  IsQuestCandidate: 0
+  IsBossCandidate: 1
+  IsSpawnCandidate: 1
+  ConnN: 1
+  ConnE: 1
+  ConnS: 0
+  ConnW: 0
+  WallCuts: []
+  AssignedRole: 2
+  IsFilled: 1
 --- !u!1 &642347869
 GameObject:
   m_ObjectHideFlags: 0
@@ -841,7 +835,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MinimapNetworkSync
   ShowTopMostFoldoutHeaderGroup: 1
   SyncInterval: 1
---- !u!1 &891078955
+--- !u!1 &704270378
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -849,46 +843,46 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 891078956}
-  - component: {fileID: 891078957}
+  - component: {fileID: 704270379}
+  - component: {fileID: 704270380}
   m_Layer: 0
-  m_Name: Slot_4_Z5_M
+  m_Name: Slot_2_Z3_L
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &891078956
+--- !u!4 &704270379
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 891078955}
+  m_GameObject: {fileID: 704270378}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -17.5, y: 0, z: -37.8}
+  m_LocalPosition: {x: 56, y: 0, z: -38.3}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1033906589}
+  m_Father: {fileID: 1679616776}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &891078957
+--- !u!114 &704270380
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 891078955}
+  m_GameObject: {fileID: 704270378}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7a1c4e9b2d6f48a3b5c7e9f1a2b4c6d8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ZoneSlot
-  SlotID: 4
-  Size: 1
-  Footprint: {x: 20, y: 40}
-  IsQuestCandidate: 1
+  SlotID: 2
+  Size: 0
+  Footprint: {x: 40, y: 40}
+  IsQuestCandidate: 0
   IsBossCandidate: 0
   IsSpawnCandidate: 0
   ConnN: 1
@@ -896,6 +890,65 @@ MonoBehaviour:
   ConnS: 0
   ConnW: 1
   WallCuts: []
+  AssignedRole: 0
+  IsFilled: 1
+--- !u!1 &970543447
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 970543448}
+  - component: {fileID: 970543449}
+  m_Layer: 0
+  m_Name: Slot_3_Z4_M
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &970543448
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 970543447}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 11, y: 0, z: -9.8}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1679616776}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &970543449
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 970543447}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a1c4e9b2d6f48a3b5c7e9f1a2b4c6d8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ZoneSlot
+  SlotID: 3
+  Size: 1
+  Footprint: {x: 20, y: 40}
+  IsQuestCandidate: 1
+  IsBossCandidate: 0
+  IsSpawnCandidate: 0
+  ConnN: 1
+  ConnE: 1
+  ConnS: 1
+  ConnW: 1
+  WallCuts:
+  - {x: 12, y: 0, z: -30.3, w: 2}
+  - {x: 21.5, y: 0, z: -0.8000002, w: 1}
   AssignedRole: 0
   IsFilled: 1
 --- !u!1 &1029092588
@@ -988,7 +1041,7 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1029092588}
   m_Mesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
---- !u!1 &1033906588
+--- !u!1 &1083398835
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -996,95 +1049,53 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1033906589}
+  - component: {fileID: 1083398836}
+  - component: {fileID: 1083398837}
   m_Layer: 0
-  m_Name: Slots
+  m_Name: Slot_8_Z9_M
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &1033906589
+--- !u!4 &1083398836
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1033906588}
+  m_GameObject: {fileID: 1083398835}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children:
-  - {fileID: 1067600917}
-  - {fileID: 1822721339}
-  - {fileID: 1745794972}
-  - {fileID: 110137887}
-  - {fileID: 891078956}
-  - {fileID: 476252578}
-  - {fileID: 207377811}
-  - {fileID: 1429000805}
-  - {fileID: 2109382020}
-  - {fileID: 1572451035}
-  m_Father: {fileID: 27948497}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1067600916
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1067600917}
-  - component: {fileID: 1067600918}
-  m_Layer: 0
-  m_Name: Slot_0_Z1_L
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1067600917
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1067600916}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -30.5, y: 0, z: 13.7}
+  m_LocalRotation: {x: -0, y: 0.7071068, z: -0, w: 0.7071068}
+  m_LocalPosition: {x: -58.5, y: 0, z: -32.3}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1033906589}
+  m_Father: {fileID: 1679616776}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1067600918
+--- !u!114 &1083398837
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1067600916}
+  m_GameObject: {fileID: 1083398835}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7a1c4e9b2d6f48a3b5c7e9f1a2b4c6d8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ZoneSlot
-  SlotID: 0
-  Size: 0
-  Footprint: {x: 40, y: 40}
-  IsQuestCandidate: 0
+  SlotID: 8
+  Size: 1
+  Footprint: {x: 20, y: 40}
+  IsQuestCandidate: 1
   IsBossCandidate: 0
   IsSpawnCandidate: 0
   ConnN: 1
   ConnE: 1
-  ConnS: 2
+  ConnS: 0
   ConnW: 0
-  WallCuts:
-  - {x: -19.5, y: 0, z: 34.2, w: 0}
+  WallCuts: []
   AssignedRole: 0
   IsFilled: 1
 --- !u!1 &1101385521
@@ -1120,7 +1131,7 @@ Transform:
   - {fileID: 498941368}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1429000804
+--- !u!1 &1199013401
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -1128,56 +1139,56 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1429000805}
-  - component: {fileID: 1429000806}
+  - component: {fileID: 1199013402}
+  - component: {fileID: 1199013403}
   m_Layer: 0
-  m_Name: Slot_7_Z8_S
+  m_Name: Slot_5_Z6_S
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &1429000805
+--- !u!4 &1199013402
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1429000804}
+  m_GameObject: {fileID: 1199013401}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 13, y: 0, z: -58.3}
+  m_LocalPosition: {x: -18.5, y: 0, z: 57.2}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1033906589}
+  m_Father: {fileID: 1679616776}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1429000806
+--- !u!114 &1199013403
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1429000804}
+  m_GameObject: {fileID: 1199013401}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7a1c4e9b2d6f48a3b5c7e9f1a2b4c6d8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ZoneSlot
-  SlotID: 7
+  SlotID: 5
   Size: 2
   Footprint: {x: 20, y: 20}
   IsQuestCandidate: 0
   IsBossCandidate: 1
   IsSpawnCandidate: 1
-  ConnN: 1
+  ConnN: 0
   ConnE: 1
-  ConnS: 0
+  ConnS: 1
   ConnW: 0
   WallCuts: []
   AssignedRole: 3
   IsFilled: 1
---- !u!1 &1572451034
+--- !u!1 &1426158778
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -1185,54 +1196,54 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1572451035}
-  - component: {fileID: 1572451036}
+  - component: {fileID: 1426158779}
+  - component: {fileID: 1426158780}
   m_Layer: 0
-  m_Name: Slot_9_Z10_M
+  m_Name: Slot_1_Z2_L
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &1572451035
+--- !u!4 &1426158779
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1572451034}
+  m_GameObject: {fileID: 1426158778}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: 0.7071068, z: -0, w: 0.7071068}
-  m_LocalPosition: {x: 57.5, y: 0, z: -0.8}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 24, y: 0, z: 42.7}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1033906589}
+  m_Father: {fileID: 1679616776}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1572451036
+--- !u!114 &1426158780
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1572451034}
+  m_GameObject: {fileID: 1426158778}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7a1c4e9b2d6f48a3b5c7e9f1a2b4c6d8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ZoneSlot
-  SlotID: 9
-  Size: 1
-  Footprint: {x: 20, y: 40}
-  IsQuestCandidate: 1
+  SlotID: 1
+  Size: 0
+  Footprint: {x: 40, y: 40}
+  IsQuestCandidate: 0
   IsBossCandidate: 0
   IsSpawnCandidate: 0
-  ConnN: 1
-  ConnE: 0
+  ConnN: 0
+  ConnE: 1
   ConnS: 1
   ConnW: 1
   WallCuts:
-  - {x: 67.5, y: 0, z: 9.7, w: 0}
+  - {x: 3.5, y: 0, z: 54.95, w: 3}
   AssignedRole: 0
   IsFilled: 1
 --- !u!1 &1643572544
@@ -1301,7 +1312,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1745794971
+--- !u!1 &1679616775
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -1309,56 +1320,40 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1745794972}
-  - component: {fileID: 1745794973}
+  - component: {fileID: 1679616776}
   m_Layer: 0
-  m_Name: Slot_2_Z3_L
+  m_Name: Slots
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &1745794972
+--- !u!4 &1679616776
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1745794971}
+  m_GameObject: {fileID: 1679616775}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 56, y: 0, z: -38.3}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1033906589}
+  m_Children:
+  - {fileID: 398213967}
+  - {fileID: 1426158779}
+  - {fileID: 704270379}
+  - {fileID: 970543448}
+  - {fileID: 501998215}
+  - {fileID: 1199013402}
+  - {fileID: 1910255092}
+  - {fileID: 597751499}
+  - {fileID: 1083398836}
+  - {fileID: 2019149970}
+  m_Father: {fileID: 27948497}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1745794973
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1745794971}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7a1c4e9b2d6f48a3b5c7e9f1a2b4c6d8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ZoneSlot
-  SlotID: 2
-  Size: 0
-  Footprint: {x: 40, y: 40}
-  IsQuestCandidate: 0
-  IsBossCandidate: 0
-  IsSpawnCandidate: 0
-  ConnN: 1
-  ConnE: 0
-  ConnS: 0
-  ConnW: 1
-  WallCuts: []
-  AssignedRole: 0
-  IsFilled: 1
---- !u!1 &1822721338
+--- !u!1 &1910255091
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -1366,54 +1361,53 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1822721339}
-  - component: {fileID: 1822721340}
+  - component: {fileID: 1910255092}
+  - component: {fileID: 1910255093}
   m_Layer: 0
-  m_Name: Slot_1_Z2_L
+  m_Name: Slot_6_Z7_S
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &1822721339
+--- !u!4 &1910255092
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1822721338}
+  m_GameObject: {fileID: 1910255091}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 24, y: 0, z: 42.7}
+  m_LocalPosition: {x: 67.5, y: 0, z: 29.2}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1033906589}
+  m_Father: {fileID: 1679616776}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1822721340
+--- !u!114 &1910255093
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1822721338}
+  m_GameObject: {fileID: 1910255091}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7a1c4e9b2d6f48a3b5c7e9f1a2b4c6d8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ZoneSlot
-  SlotID: 1
-  Size: 0
-  Footprint: {x: 40, y: 40}
+  SlotID: 6
+  Size: 2
+  Footprint: {x: 20, y: 20}
   IsQuestCandidate: 0
   IsBossCandidate: 0
   IsSpawnCandidate: 0
   ConnN: 0
-  ConnE: 1
+  ConnE: 0
   ConnS: 1
   ConnW: 1
-  WallCuts:
-  - {x: 3.5, y: 0, z: 54.95, w: 3}
+  WallCuts: []
   AssignedRole: 0
   IsFilled: 1
 --- !u!1001 &1964899879
@@ -1557,6 +1551,64 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 116710c329a761d4a92a7dd6b86a01ed, type: 3}
+--- !u!1 &2019149969
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2019149970}
+  - component: {fileID: 2019149971}
+  m_Layer: 0
+  m_Name: Slot_9_Z10_M
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2019149970
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2019149969}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: 0.7071068, z: -0, w: 0.7071068}
+  m_LocalPosition: {x: 57.5, y: 0, z: -0.8}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1679616776}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2019149971
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2019149969}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a1c4e9b2d6f48a3b5c7e9f1a2b4c6d8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ZoneSlot
+  SlotID: 9
+  Size: 1
+  Footprint: {x: 20, y: 40}
+  IsQuestCandidate: 1
+  IsBossCandidate: 0
+  IsSpawnCandidate: 0
+  ConnN: 1
+  ConnE: 0
+  ConnS: 1
+  ConnW: 1
+  WallCuts:
+  - {x: 67.5, y: 0, z: 9.7, w: 0}
+  AssignedRole: 0
+  IsFilled: 1
 --- !u!1001 &2088372457
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1614,64 +1666,7 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 906965cfe1b31ed44b25d894e54d9133, type: 3}
---- !u!1 &2109382019
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 2109382020}
-  - component: {fileID: 2109382021}
-  m_Layer: 0
-  m_Name: Slot_8_Z9_M
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &2109382020
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2109382019}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0, y: 0.7071068, z: -0, w: 0.7071068}
-  m_LocalPosition: {x: -58.5, y: 0, z: -32.3}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1033906589}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &2109382021
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2109382019}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7a1c4e9b2d6f48a3b5c7e9f1a2b4c6d8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ZoneSlot
-  SlotID: 8
-  Size: 1
-  Footprint: {x: 20, y: 40}
-  IsQuestCandidate: 1
-  IsBossCandidate: 0
-  IsSpawnCandidate: 0
-  ConnN: 1
-  ConnE: 1
-  ConnS: 0
-  ConnW: 0
-  WallCuts: []
-  AssignedRole: 0
-  IsFilled: 1
---- !u!1001 &7341477658164184187
+--- !u!1001 &4891539121135420269
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
@@ -1728,6 +1723,11 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: bce8494e62133e241a1e403d5cd1acdc, type: 3}
+--- !u!4 &4891539121135420270 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 2209409418697741873, guid: bce8494e62133e241a1e403d5cd1acdc, type: 3}
+  m_PrefabInstance: {fileID: 4891539121135420269}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &7707652367797161032
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -5386,10 +5386,10 @@ PrefabInstance:
     m_AddedGameObjects:
     - targetCorrespondingSourceObject: {fileID: 7779696810356756282, guid: 752c9377d228ec54f8c1b2bdcdd8e603, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 1033906589}
+      addedObject: {fileID: 1679616776}
     - targetCorrespondingSourceObject: {fileID: 7779696810356756282, guid: 752c9377d228ec54f8c1b2bdcdd8e603, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 356815196}
+      addedObject: {fileID: 4891539121135420270}
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 752c9377d228ec54f8c1b2bdcdd8e603, type: 3}
 --- !u!1660057539 &9223372036854775807

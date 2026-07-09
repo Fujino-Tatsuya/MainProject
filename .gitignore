@@ -124,6 +124,17 @@ CLAUDE.local.md
 # /plans/ = 작업마다 생성되는 플래닝 산출물 모음(승인용 working doc, 레포 미보관)
 .bkit/
 .omc/
+.omx/
 /data/
 /plans/
 .mcp.json
+*.bak
+
+# Syncthing 동기화 메타(Docs/ 폴더가 개인 Syncthing으로 관리되는 경우) + 로컬 백업/생성물
+.stfolder/
+.stignore
+.stversions/
+Docs/MainProjectDocsBackup/
+Docs/MainProjectValutBackup/
+Docs/MainProjectVault/
+/Generated/
