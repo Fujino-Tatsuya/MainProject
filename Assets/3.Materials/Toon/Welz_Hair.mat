@@ -21,7 +21,7 @@ Material:
   m_CustomRenderQueue: -1
   stringTagMap: {}
   disabledShaderPasses: []
-  m_LockedProperties:
+  m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
@@ -34,12 +34,12 @@ Material:
     - _Brightness: 1.15
     - _FixedLightOn: 1
     - _HairOn: 1
-    - _HairThreshold: 0.62
-    - _HairSmooth: 0.004
     - _HairShift: 0
+    - _HairSmooth: 0.004
+    - _HairThreshold: 0.62
     - _MetalBandSmooth: 0.35
     - _MetalOn: 0
-    - _OutlineWidth: 0.005
+    - _OutlineWidth: 0.003
     - _ReceiveShadowStrength: 0.6
     - _RimIntensity: 1
     - _RimLightAlign: 0.3

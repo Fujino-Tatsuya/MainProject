@@ -25,18 +25,23 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _DepthDarken: 0.35
-    - _DepthNoiseScale: 0.02
+    - _DepthDarken: 0.475
+    - _DepthNoiseScale: 0.002
+    - _DepthOctaveFalloff: 0.541
+    - _DepthOctaveScale: 2.1
     - _EdgeBrighten: 0
     - _EdgeWidth: 0.08
     - _FlowScale1: 0.15
     - _FlowScale2: 0.33
-    - _FlowSharp: 3
-    - _FlowStrength: 0.4
+    - _FlowSharp: 2.21
+    - _FlowStrength: 0.637
     m_Colors:
     - _DeepColor: {r: 0.02, g: 0.04, b: 0.079999976, a: 1}
+    - _DepthDrift1: {r: 0.03, g: 0.015, b: 0, a: 0}
+    - _DepthDrift2: {r: -0.02, g: 0.025, b: 0, a: 0}
+    - _DepthDrift3: {r: 0.015, g: -0.02, b: 0, a: 0}
     - _FlowColor: {r: 0.09999997, g: 0.17999998, b: 0.25999996, a: 1}
-    - _FlowSpeed1: {r: 0.6, g: 0.25, b: 0, a: 0}
+    - _FlowSpeed1: {r: 0.6, g: 1, b: 0, a: 0}
     - _FlowSpeed2: {r: -0.4, g: 0.5, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
