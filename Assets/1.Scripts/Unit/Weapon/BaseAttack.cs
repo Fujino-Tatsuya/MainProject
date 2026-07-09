@@ -10,6 +10,20 @@ public enum AttackType
     R
 }
 
+public struct AttackInfo
+{
+    public int damage;
+    public AttackType attackType;
+    public bool isGroggyAttack;
+
+    public AttackInfo(int damage, AttackType attackType = AttackType.None, bool isGroggyAttack = false)
+    {
+        this.damage = Mathf.Max(0, damage);
+        this.attackType = attackType;
+        this.isGroggyAttack = isGroggyAttack;
+    }
+}
+
 public class BaseAttack : MonoBehaviour
 {
     [SerializeField] protected int damage = 0;
@@ -23,14 +37,22 @@ public class BaseAttack : MonoBehaviour
     [SerializeField] protected AttackType attackType = AttackType.None;
     public AttackType AttackType { get { return attackType; } }
 
+    protected AttackInfo _attackInfo;
+
     protected bool IsServer =>
         NetworkManager.Singleton == null ||
         !NetworkManager.Singleton.IsListening ||
         NetworkManager.Singleton.IsServer;
 
+    protected void InitializeAttackInfo()
+    {
+        _attackInfo = new AttackInfo(damage, attackType, isGroggyAttack);
+    }
+
     public void SetDamageSnapshot(int value)
     {
         damage = Mathf.Max(0, value);
+        InitializeAttackInfo();
     }
 
     public void SetTargetLayer(LayerMask value)
@@ -41,6 +63,7 @@ public class BaseAttack : MonoBehaviour
     public void SetAttackType(AttackType value)
     {
         attackType = value;
+        InitializeAttackInfo();
     }
 
     protected bool TryResolveHit(Collider hit, int? overrideDamage = null)
@@ -67,7 +90,11 @@ public class BaseAttack : MonoBehaviour
         if (!IsServer || unit == null)
             return false;
 
-        unit.TakeDamage(overrideDamage ?? damage);
+        AttackInfo attackInfo = overrideDamage.HasValue
+            ? new AttackInfo(overrideDamage.Value, attackType, isGroggyAttack)
+            : _attackInfo;
+
+        unit.TakeDamage(attackInfo);
         return true;
     }
 }

@@ -9,6 +9,7 @@ public class OverlapAttack : BaseAttack
 
     private void Awake()
     {
+        InitializeAttackInfo();
         results = new Collider[Mathf.Max(1, maxHitCount)];
     }
 

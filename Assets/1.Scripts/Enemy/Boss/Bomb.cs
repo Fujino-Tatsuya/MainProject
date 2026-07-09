@@ -11,12 +11,12 @@ public class Bomb : MonoBehaviour
 
     void OnTriggerEnter(Collider other)
     {
-        BaseAttack baseWeapon = other.GetComponent<BaseAttack>();
-        if (baseWeapon == null) return;
+        BaseAttack baseAttack = other.GetComponent<BaseAttack>();
+        if (baseAttack == null) return;
 
-        if (baseWeapon.AttackType == attackType)
+        if (baseAttack.AttackType == attackType)
         {
-            OnTriggered?.Invoke(this, new AttackEventArgs(baseWeapon));
+            OnTriggered?.Invoke(this, new AttackEventArgs(baseAttack));
         }
     }
 }
