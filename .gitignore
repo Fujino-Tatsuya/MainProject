@@ -138,3 +138,6 @@ Docs/MainProjectDocsBackup/
 Docs/MainProjectValutBackup/
 Docs/MainProjectVault/
 /Generated/
+
+# 세션 스크래치 노트(작업 중 임시 분석 메모, 완료되면 Docs/design·tech로 옮겨서 커밋)
+Docs/temp/
