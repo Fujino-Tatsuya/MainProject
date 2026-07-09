@@ -49,11 +49,11 @@ public class ChargingObject : Unit
         CheckMoving();
         CheckHp();
     }
-    public override void TakeDamage(int damage)
+    public override void TakeDamage(AttackInfo attackInfo)
     { 
         if (!IsServer || !_isReached) return;
 
-        base.TakeDamage(damage);
+        base.TakeDamage(attackInfo);
     }
 
     void CheckHp()

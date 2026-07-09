@@ -503,6 +503,30 @@ PrefabInstance:
       propertyPath: m_Name
       value: Armature
       objectReference: {fileID: 0}
+    - target: {fileID: 6834237226984651676, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: m_Size.x
+      value: 1.19
+      objectReference: {fileID: 0}
+    - target: {fileID: 6834237226984651676, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: m_Size.y
+      value: 1.5185375
+      objectReference: {fileID: 0}
+    - target: {fileID: 6834237226984651676, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: m_Size.z
+      value: 1.8886403
+      objectReference: {fileID: 0}
+    - target: {fileID: 6834237226984651676, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: m_Center.x
+      value: -0.0000031931802
+      objectReference: {fileID: 0}
+    - target: {fileID: 6834237226984651676, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: m_Center.y
+      value: 0.5907402
+      objectReference: {fileID: 0}
+    - target: {fileID: 6834237226984651676, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: m_Center.z
+      value: -0.16600186
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

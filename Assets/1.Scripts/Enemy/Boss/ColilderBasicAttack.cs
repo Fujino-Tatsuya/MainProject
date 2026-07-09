@@ -13,6 +13,11 @@ public class ColliderBasicAttack : BaseAttack
     [SerializeField] float stayTime;
     float _stayTimer = 0f;
 
+    void Awake()
+    {
+        InitializeAttackInfo();
+    }
+
     void OnTriggerEnter(Collider other)
     {
         OnAttackTriggerEnter(other);
@@ -75,7 +80,7 @@ public class ColliderBasicAttack : BaseAttack
                 return;
             }
 
-            unit.TakeDamage(damage);
+            unit.TakeDamage(_attackInfo);
         }
     }
 }

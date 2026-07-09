@@ -28,8 +28,8 @@ public class GrabController : NetworkBehaviour
     BlackboardVariable<TwentyThreeState> CurrentState;
 
     Unit _targetUnit;
-    Player _targetPlayer;
     Rigidbody _targetRigidbody;
+    PlayerStateController _targetStateController;
     int _targetHp;
 
     float _holdTimer = 0f;
@@ -201,21 +201,15 @@ public class GrabController : NetworkBehaviour
             return;
         }
 
-        //_targetUnit.BeginGrab(grabSocket, grabDamage);
-        // 플레이어 상태 전환 함수 호출하기
-        _targetPlayer = player.GetComponent<Player>();
-        if (_targetPlayer == null)
+        _targetStateController = player.GetComponent<PlayerStateController>();
+        if (_targetStateController == null)
         {
-            Debug.LogError("Grab target Player component is missing.", this);
+            Debug.LogError("해당 플레이어에 PlayerStateController 컴포넌트가 부착되어 있지 않습니다.");
             Clear();
             return;
         }
 
-        if (!_targetPlayer.BeginGrabbedByInstigator(gameObject))
-        {
-            Clear();
-            return;
-        }
+        _targetStateController.ChangeState(PlayerActionState.Grabbed);
 
         _targetHp = _targetUnit.CurrentHealth;
         ApplyDamage(grabDamagePercentage);
@@ -228,28 +222,22 @@ public class GrabController : NetworkBehaviour
     {
         if (!IsServer) return;
 
-        //Vector3 worldDir = grabSocket.transform.TransformDirection(throwDirection);
         ApplyDamage(landingDamagePercentage);
-
         // 플레이어 상태 전환 함수 호출하기
-
+        _targetStateController.ChangeState(PlayerActionState.Idle);
         Clear();
     }
 
     void Clear()
     {
-        if (_targetPlayer != null)
-            _targetPlayer.EndGrabbedByInstigator();
-
         IsGrabbed.Value = false;
         GrabbedPlayer.Value = null;
         _targetUnit = null;
-        _targetPlayer = null;
         _targetRigidbody = null;
+        _targetStateController = null;
         _holdTimer = 0f;
         _targetHp = 0;
     }
-
 
     /// <summary>
     /// 타겟 유닛에게 percentage만큼 피해를 입히는 함수입니다.
@@ -265,6 +253,6 @@ public class GrabController : NetworkBehaviour
         }
 
         int damage = Mathf.RoundToInt(_targetHp * (percentage / 100f));
-        _targetUnit.TakeDamage(damage);
+        _targetUnit.TakeDamage(new AttackInfo(damage));
     }
 }

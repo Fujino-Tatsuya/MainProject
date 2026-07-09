@@ -288,6 +288,8 @@ GameObject:
   m_Component:
   - component: {fileID: 7322158407290278549}
   - component: {fileID: 1413397347602629547}
+  - component: {fileID: 18253178153069437}
+  - component: {fileID: 5606819332925398687}
   m_Layer: 0
   m_Name: Attack
   m_TagString: Untagged
@@ -324,11 +326,48 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ColliderBasicAttack
   damage: 1
   isGroggyAttack: 0
-  layerMask:
+  targetLayer:
     serializedVersion: 2
     m_Bits: 64
+  attackType: 0
   triggerMode: 0
   stayTime: 0
+--- !u!65 &18253178153069437
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2712610884434696670}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 1, z: 0.5}
+--- !u!114 &5606819332925398687
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2712610884434696670}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 95e4cb8fdfc80954cba9136f5e8f994a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EnableCollider
+  ShowTopMostFoldoutHeaderGroup: 1
+  _isServerAuthority: 1
+  _initValue: 0
 --- !u!1 &3023851990575758465
 GameObject:
   m_ObjectHideFlags: 0
@@ -814,74 +853,6 @@ Transform:
   - {fileID: 8407155563381702794}
   m_Father: {fileID: 3447475238173643711}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &4744031106272483572
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 7617838738321354719}
-  - component: {fileID: 5086193802937287329}
-  - component: {fileID: 1769385603133792811}
-  m_Layer: 0
-  m_Name: AttackCollider
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &7617838738321354719
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4744031106272483572}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0.16750053, y: 0.00000006855172, z: 0.00000007861446, w: 0.985872}
-  m_LocalPosition: {x: 0.001, y: 0.207, z: 0.012}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1060440656687913551}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &5086193802937287329
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4744031106272483572}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 1
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 0.2, y: 0.5, z: 0.29}
-  m_Center: {x: 0, y: 0, z: 0}
---- !u!114 &1769385603133792811
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4744031106272483572}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f0be684ca80dd734485c466d80acc3e6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::AttackTriggerRelay
-  ShowTopMostFoldoutHeaderGroup: 1
-  colliderBasicAttack: {fileID: 1413397347602629547}
 --- !u!1 &4805671829883139251
 GameObject:
   m_ObjectHideFlags: 0
@@ -1153,8 +1124,7 @@ MonoBehaviour:
   - rid: 5035183372550275517
   - rid: 5035183372550275518
   - rid: 5035183373361086525
-  - rid: 5035183378223596293
-  - rid: 5035183378260820480
+  - rid: 3912068012685656400
   - rid: 5035183378461622441
   - rid: 5035183378461622442
   m_OriginalGraph: {fileID: -6913670341886614013, guid: 791caac66e274714c9c63465c1ebbaa7, type: 2}
@@ -1164,6 +1134,14 @@ MonoBehaviour:
   references:
     version: 2
     RefIds:
+    - rid: 3912068012685656400
+      type: {class: 'BlackboardVariable`1[[EnableCollider, Assembly-CSharp]]', ns: Unity.Behavior, asm: Unity.Behavior}
+      data:
+        GUID:
+          m_Value0: 8938126352352136845
+          m_Value1: 15102472101333612613
+        Name: Attack Collider
+        m_Value: {fileID: 5606819332925398687}
     - rid: 5035183372550275517
       type: {class: 'BlackboardVariable`1[[UnityEngine.GameObject, UnityEngine.CoreModule]]', ns: Unity.Behavior, asm: Unity.Behavior}
       data:
@@ -1188,22 +1166,6 @@ MonoBehaviour:
           m_Value1: 12745702985315443572
         Name: Spawn Pointer
         m_Value: {fileID: 5661557782957567535}
-    - rid: 5035183378223596293
-      type: {class: 'BlackboardVariable`1[[UnityEngine.BoxCollider, UnityEngine.PhysicsModule]]', ns: Unity.Behavior, asm: Unity.Behavior}
-      data:
-        GUID:
-          m_Value0: 1300975177905921874
-          m_Value1: 572109624478674389
-        Name: AttackCollider
-        m_Value: {fileID: 5086193802937287329}
-    - rid: 5035183378260820480
-      type: {class: 'BlackboardVariable`1[[System.String, mscorlib]]', ns: Unity.Behavior, asm: Unity.Behavior}
-      data:
-        GUID:
-          m_Value0: 2655362144622966801
-          m_Value1: 12043352121738227021
-        Name: AreaName
-        m_Value: BossArea
     - rid: 5035183378461622441
       type: {class: 'BlackboardVariable`1[[System.Single, mscorlib]]', ns: Unity.Behavior, asm: Unity.Behavior}
       data:
@@ -1304,7 +1266,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemyBTActivator
   ShowTopMostFoldoutHeaderGroup: 1
-  targetBTs: []
+  targetBTs:
+  - {fileID: 6180967711162896175}
   isOpenVariableName: IsOpen
 --- !u!54 &8420402705270843187
 Rigidbody:
@@ -1568,8 +1531,7 @@ Transform:
   m_LocalPosition: {x: -0.036763526, y: 0.22238792, z: 0.000000026226044}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children:
-  - {fileID: 7617838738321354719}
+  m_Children: []
   m_Father: {fileID: 4045612941811374038}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &7597645273965016694

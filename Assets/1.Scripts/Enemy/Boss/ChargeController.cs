@@ -7,7 +7,6 @@ public class ChargeController : NetworkBehaviour
 {
     List<ChargingObject> chargeObjects;
     [SerializeField] float maxY = 1f;
-    [SerializeField] float minY = 0f;
     [Header("플레이어 인원 수에 따른 오브젝트 갯수")]
     [SerializeField] int player1 = 1;
     [SerializeField] int player2 = 2;

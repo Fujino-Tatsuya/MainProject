@@ -3,7 +3,7 @@ using Unity.Behavior;
 
 public class Enemy : Unit
 {
-    [Header("ÃÊ±âÈ­ °ª")]
+    [Header("ì´ˆê¸°í™” ê°’")]
     [SerializeField] int attackDamage;
     [SerializeField] float moveSpeed;
     [SerializeField] float chaseSpeed;
@@ -12,7 +12,7 @@ public class Enemy : Unit
     [SerializeField] int defense;
     [SerializeField] int maxShield;
 
-    [Header("\nEnemy Àü¿ë »óÅÂ")]
+    [Header("\nEnemy ì „ìš© ìƒíƒœ")]
     [SerializeField] int _groggyCount;
     [SerializeField] int _maxGroggyCount;
 
@@ -30,39 +30,39 @@ public class Enemy : Unit
 
         BehaviorGraphAgent bt = GetComponent<BehaviorGraphAgent>();
         if (bt == null)
-            Debug.LogAssertion("BehaviorGraphAgent¸¦ ¾ò¾î¿À´Â °ÍÀ» ½ÇÆĞÇß½À´Ï´Ù.");
+            Debug.LogAssertion("BehaviorGraphAgentë¥¼ ì–»ì–´ì˜¤ëŠ” ê²ƒì„ ì‹¤íŒ¨í–ˆìŠµë‹ˆë‹¤.");
 
         if (!bt.BlackboardReference.GetVariable<float>("WalkSpeed", out WalkSpeed))
-            Debug.LogWarning("ÇØ´ç BTÀÇ Blackboard¿¡¼­ WalkSpeed º¯¼ö¸¦ ¾ò¾î¿À´Â °Í¿¡ ½ÇÆĞÇß½À´Ï´Ù.");
+            Debug.LogWarning("í•´ë‹¹ BTì˜ Blackboardì—ì„œ WalkSpeed ë³€ìˆ˜ë¥¼ ì–»ì–´ì˜¤ëŠ” ê²ƒì— ì‹¤íŒ¨í–ˆìŠµë‹ˆë‹¤.");
         else
             WalkSpeed.Value = moveSpeed;
 
         if (!bt.BlackboardReference.GetVariable<float>("ChaseSpeed", out ChaseSpeed))
-            Debug.LogWarning("ÇØ´ç BTÀÇ Blackboard¿¡¼­ ChaseSpeed º¯¼ö¸¦ ¾ò¾î¿À´Â °Í¿¡ ½ÇÆĞÇß½À´Ï´Ù.");
+            Debug.LogWarning("í•´ë‹¹ BTì˜ Blackboardì—ì„œ ChaseSpeed ë³€ìˆ˜ë¥¼ ì–»ì–´ì˜¤ëŠ” ê²ƒì— ì‹¤íŒ¨í–ˆìŠµë‹ˆë‹¤.");
         else
             ChaseSpeed.Value = chaseSpeed;
 
         if (_maxGroggyCount != 0)
         {
             if (!bt.BlackboardReference.GetVariable<int>("GroggyCount", out GroggyCount))
-                Debug.LogAssertion("ÇØ´ç BTÀÇ Blackboard¿¡¼­ GroggyCount º¯¼ö¸¦ ¾ò¾î¿À´Â °Í¿¡ ½ÇÆĞÇß½À´Ï´Ù.");
+                Debug.LogAssertion("í•´ë‹¹ BTì˜ Blackboardì—ì„œ GroggyCount ë³€ìˆ˜ë¥¼ ì–»ì–´ì˜¤ëŠ” ê²ƒì— ì‹¤íŒ¨í–ˆìŠµë‹ˆë‹¤.");
             else
                 GroggyCount.Value = _groggyCount;
 
             if (!bt.BlackboardReference.GetVariable<int>("MaxGroggyCount", out MaxGroggyCount))
-                Debug.LogAssertion("ÇØ´ç BTÀÇ Blackboard¿¡¼­ MaxGroggyCount º¯¼ö¸¦ ¾ò¾î¿À´Â °Í¿¡ ½ÇÆĞÇß½À´Ï´Ù.");
+                Debug.LogAssertion("í•´ë‹¹ BTì˜ Blackboardì—ì„œ MaxGroggyCount ë³€ìˆ˜ë¥¼ ì–»ì–´ì˜¤ëŠ” ê²ƒì— ì‹¤íŒ¨í–ˆìŠµë‹ˆë‹¤.");
             else
                 MaxGroggyCount.Value = _maxGroggyCount;
 
             if (!bt.BlackboardReference.GetVariable<bool>("IsGroggy", out IsGroggy))
-                Debug.LogAssertion("ÇØ´ç BTÀÇ Blackboard¿¡¼­ IsGroggy º¯¼ö¸¦ ¾ò¾î¿À´Â °Í¿¡ ½ÇÆĞÇß½À´Ï´Ù.");
+                Debug.LogAssertion("í•´ë‹¹ BTì˜ Blackboardì—ì„œ IsGroggy ë³€ìˆ˜ë¥¼ ì–»ì–´ì˜¤ëŠ” ê²ƒì— ì‹¤íŒ¨í–ˆìŠµë‹ˆë‹¤.");
         }
     }
 
-    public override void TakeDamage(int damage)
+    public override void TakeDamage(AttackInfo attackInfo)
     {
-        base.TakeDamage(damage);
+        base.TakeDamage(attackInfo);
 
-        // ±×·Î±â Ã¼Å©..
+        // ê·¸ë¡œê¸° ì²´í¬..
     }
 }

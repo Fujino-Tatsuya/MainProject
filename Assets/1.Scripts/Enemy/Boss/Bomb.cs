@@ -3,7 +3,7 @@ using System;
 
 
     
-public class Bomb : Unit
+public class Bomb : MonoBehaviour
 {
     [SerializeField] AttackType attackType;
 

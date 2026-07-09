@@ -4,6 +4,11 @@ public class KnockbackAttack : BaseAttack
 {
     [SerializeField] float knockbackStrength = 5f;
 
+    void Awake()
+    {
+        InitializeAttackInfo();
+    }
+
     public void ApplyKnockbackAttack(GameObject collidedObject)
     {
         if (!IsServer) return;
@@ -18,7 +23,7 @@ public class KnockbackAttack : BaseAttack
                 return;
             }
 
-            unit.TakeDamage(damage);
+            unit.TakeDamage(_attackInfo);
             Vector3 dir = GetDirection(root);
             unit.Knockback(dir, knockbackStrength);
         }

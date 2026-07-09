@@ -10,4 +10,9 @@ public class AttackEventArgs : EventArgs
     {
         _baseWeapon = baseWeapon;
     }
+
+    public AttackEventArgs(int damage)
+    {
+        _damage = damage;
+    }
 }
