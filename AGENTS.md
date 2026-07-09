@@ -37,7 +37,7 @@
 ## 6. 문서 인덱스
 - 설계(GDD): [Docs/design/](Docs/design/) — 보스 / 플레이어 / 상태이상 / 빌드
 - 기술: [Docs/tech/](Docs/tech/) — 아키텍처 / 네트워크 / 컨벤션 / 워크플로우
-- 일정: [Docs/tasks/roadmap.md](Docs/tasks/roadmap.md)
+- 일정: `Project_MT 일정.xlsx` (담당: 이지원) — 팀 지식베이스 Vault `Core/project-schedule-2026.md` 스냅샷 참조
 
 ## 7. AI 협업 규칙 / 공유 이해도 문서
 작업 전 기본적으로 이 문서를 먼저 읽고, 작업 성격에 따라 아래 문서도 함께 읽는다.

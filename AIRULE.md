@@ -53,7 +53,7 @@ Use these files consistently:
 - `AIRULE.md`: AI development process and collaboration rules.
 - `CONTEXT.md`: project vocabulary, domain terms, and shared language.
 - `PLAN.md`: locked plan for the current substantial task.
-- `Docs/`: detailed design, tech, workflow, and roadmap documents.
+- `Docs/`: detailed design, tech, and workflow documents.
 - `docs/adr/` or `Docs/adr/`: architecture decision records when a decision is hard to reverse.
 
 ## Reference-Based Implementation
