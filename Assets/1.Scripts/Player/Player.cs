@@ -121,10 +121,23 @@ public class Player : Unit
         if (!IsServer)
             return false;
 
+        NetworkObject instigatorNetworkObject =
+            instigator != null ? instigator.GetComponentInParent<NetworkObject>() : null;
+        if (instigatorNetworkObject == null)
+        {
+            Debug.LogError("Grab instigator must belong to a spawned NetworkObject.", this);
+            return false;
+        }
+
         if (!stateController.BeginGrabbed(instigator))
             return false;
 
-        BeginGrabbedClientRpc(CreateOwnerClientRpcParams());
+        BeforeMergeTestLog.Info(
+            "GRAB",
+            "BEGIN_SERVER",
+            $"ownerClientId={OwnerClientId}, instigatorNetworkObjectId={instigatorNetworkObject.NetworkObjectId}, state={CurrentState}",
+            this);
+        BeginGrabbedClientRpc(new NetworkObjectReference(instigatorNetworkObject), CreateOwnerClientRpcParams());
         return true;
     }
 
@@ -134,17 +147,35 @@ public class Player : Unit
             return false;
 
         bool ended = stateController.EndGrabbed();
+        BeforeMergeTestLog.Info(
+            "GRAB",
+            "END_SERVER",
+            $"ownerClientId={OwnerClientId}, ended={ended}, state={CurrentState}",
+            this);
         EndGrabbedClientRpc(CreateOwnerClientRpcParams());
         return ended;
     }
 
     [ClientRpc]
-    private void BeginGrabbedClientRpc(ClientRpcParams clientRpcParams = default)
+    private void BeginGrabbedClientRpc(
+        NetworkObjectReference instigatorReference,
+        ClientRpcParams clientRpcParams = default)
     {
         if (!IsOwner)
             return;
 
-        stateController.ApplyGrabbedFromServer();
+        if (!instigatorReference.TryGet(out NetworkObject instigatorNetworkObject))
+        {
+            Debug.LogError("Grab instigator NetworkObject could not be resolved on the owner.", this);
+            return;
+        }
+
+        bool applied = stateController.ApplyGrabbedFromServer(instigatorNetworkObject.gameObject);
+        BeforeMergeTestLog.Info(
+            "GRAB",
+            "BEGIN_RX_OWNER",
+            $"ownerClientId={OwnerClientId}, applied={applied}, instigatorNetworkObjectId={instigatorNetworkObject.NetworkObjectId}, state={CurrentState}",
+            this);
     }
 
     [ClientRpc]
@@ -153,7 +184,12 @@ public class Player : Unit
         if (!IsOwner)
             return;
 
-        stateController.EndGrabbed();
+        bool ended = stateController.EndGrabbed();
+        BeforeMergeTestLog.Info(
+            "GRAB",
+            "END_RX_OWNER",
+            $"ownerClientId={OwnerClientId}, ended={ended}, state={CurrentState}",
+            this);
     }
 
     [ClientRpc]

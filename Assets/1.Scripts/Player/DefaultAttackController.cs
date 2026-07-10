@@ -253,10 +253,14 @@ public class DefaultAttackController : BaseNetworkBehaviour
 
     public void CancelCurrentAttack()
     {
+        bool hadActiveAttack = IsAttacking || hasStartedAttack || isRequestingAttack;
         ResetAttackRuntime();
 
-        if (animator != null)
+        if (hadActiveAttack && animator != null)
             animator.CrossFadeInFixedTime(IdleHash, 0.05f);
+
+        if (hadActiveAttack && IsNetworkActive && IsServer)
+            EndDefaultAttackClientRpc();
     }
 
     public void HandleAnimationEvent(DefaultAttackAnimationEventType eventType)
@@ -269,6 +273,16 @@ public class DefaultAttackController : BaseNetworkBehaviour
 
         if (IsNetworkActive && !IsServer)
             return;
+
+        if (!IsAttacking)
+        {
+            BeforeMergeTestLog.Info(
+                "ATTACK",
+                "ANIM_EVENT_IGNORED",
+                $"event={eventType}, state={(player == null ? "null" : player.CurrentState.ToString())}",
+                this);
+            return;
+        }
 
         switch (eventType)
         {
@@ -377,10 +391,21 @@ public class DefaultAttackController : BaseNetworkBehaviour
             $"index={attackIndex}, stateBefore={(player == null ? "null" : player.CurrentState.ToString())}, trigger={triggerAttack}, IsOwner={IsOwner}",
             this);
         isRequestingAttack = false;
-        StartAttackPresentation(attackIndex, direction, triggerAttack);
 
-        if (player != null && player.CurrentState != PlayerActionState.Attack)
-            player.SetState(PlayerActionState.Attack);
+        if (player != null &&
+            player.CurrentState != PlayerActionState.Attack &&
+            !player.SetState(PlayerActionState.Attack))
+        {
+            BeforeMergeTestLog.Info(
+                "ATTACK",
+                "PLAY_IGNORED_OWNER",
+                $"index={attackIndex}, state={player.CurrentState}, reason=state-rejected",
+                this);
+            ResetAttackRuntime();
+            return;
+        }
+
+        StartAttackPresentation(attackIndex, direction, triggerAttack);
     }
 
     [ClientRpc]

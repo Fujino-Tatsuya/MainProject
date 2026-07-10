@@ -214,7 +214,7 @@ MonoBehaviour:
   animator: {fileID: 3980452584406513891}
   interruptDuration: 0.5
   interruptForwardDistance: 0
-  attackDamage: 0
+  attackDamage: 5
   moveSpeed: 0
   attackSpeed: 0
   maxHp: 0

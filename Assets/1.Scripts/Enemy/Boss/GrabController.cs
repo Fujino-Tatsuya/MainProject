@@ -28,8 +28,7 @@ public class GrabController : NetworkBehaviour
     BlackboardVariable<TwentyThreeState> CurrentState;
 
     Unit _targetUnit;
-    Rigidbody _targetRigidbody;
-    PlayerStateController _targetStateController;
+    Player _targetPlayer;
     int _targetHp;
 
     float _holdTimer = 0f;
@@ -65,16 +64,6 @@ public class GrabController : NetworkBehaviour
 
     void Update()
     {
-        if (IsOwner)
-        {
-            if (IsGrabbed.Value && GrabbedPlayer.Value != null)
-            {
-                // 플레이어를 잡고 있는 동안의 로직
-                _targetRigidbody.MovePosition(grabSocket.position);
-                _targetRigidbody.MoveRotation(grabSocket.rotation);
-            }
-        }
-
         if (IsServer)
         {
             if (CurrentState.Value == TwentyThreeState.Hold && _targetUnit != null)
@@ -94,6 +83,9 @@ public class GrabController : NetworkBehaviour
     /// </summary>
     public void Detect()
     {
+        if (!IsServer)
+            return;
+
         _resultCount = 0;
         if (grabColliderInfo == null)
         {
@@ -165,9 +157,20 @@ public class GrabController : NetworkBehaviour
             return;
         }
 
-        bool isGrabbed = _resultCount > 0;
+        GameObject grabbedPlayer = null;
+        for (int i = 0; i < _resultCount; i++)
+        {
+            Player player = results[i] != null ? results[i].GetComponentInParent<Player>() : null;
+            if (player == null)
+                continue;
+
+            grabbedPlayer = player.gameObject;
+            break;
+        }
+
+        bool isGrabbed = grabbedPlayer != null;
         IsGrabbed.Value = isGrabbed;
-        GrabbedPlayer.Value = isGrabbed ? results[0].gameObject : null;
+        GrabbedPlayer.Value = grabbedPlayer;
 
         if (isGrabbed)
         {
@@ -183,33 +186,21 @@ public class GrabController : NetworkBehaviour
     {
         if (IsGrabbed.Value == false || GrabbedPlayer.Value == null) return;
 
-        GameObject player = GrabbedPlayer.Value;
-
-        _targetUnit = player.GetComponent<Unit>();
-        if (_targetUnit == null)
+        _targetPlayer = GrabbedPlayer.Value.GetComponent<Player>();
+        if (_targetPlayer == null)
         {
-            Debug.LogError("해당 플레이어에 Unit 컴포넌트가 부착되어 있지 않습니다.");
+            Debug.LogError("해당 대상에 Player 컴포넌트가 부착되어 있지 않습니다.", this);
             Clear();
             return;
         }
 
-        _targetRigidbody = player.GetComponent<Rigidbody>();
-        if (_targetRigidbody == null)
+        _targetUnit = _targetPlayer;
+        if (!_targetPlayer.BeginGrabbedByInstigator(gameObject))
         {
-            Debug.LogError("해당 플레이어에 Rigidbody 컴포넌트가 부착되어 있지 않습니다.");
+            Debug.LogWarning("서버가 플레이어의 Grabbed 상태 진입을 거부했습니다.", this);
             Clear();
             return;
         }
-
-        _targetStateController = player.GetComponent<PlayerStateController>();
-        if (_targetStateController == null)
-        {
-            Debug.LogError("해당 플레이어에 PlayerStateController 컴포넌트가 부착되어 있지 않습니다.");
-            Clear();
-            return;
-        }
-
-        _targetStateController.ChangeState(PlayerActionState.Grabbed);
 
         _targetHp = _targetUnit.CurrentHealth;
         ApplyDamage(grabDamagePercentage);
@@ -223,18 +214,19 @@ public class GrabController : NetworkBehaviour
         if (!IsServer) return;
 
         ApplyDamage(landingDamagePercentage);
-        // 플레이어 상태 전환 함수 호출하기
-        _targetStateController.ChangeState(PlayerActionState.Idle);
+        if (_targetPlayer != null)
+            _targetPlayer.EndGrabbedByInstigator();
         Clear();
     }
+
+    public Transform GrabSocket => grabSocket;
 
     void Clear()
     {
         IsGrabbed.Value = false;
         GrabbedPlayer.Value = null;
         _targetUnit = null;
-        _targetRigidbody = null;
-        _targetStateController = null;
+        _targetPlayer = null;
         _holdTimer = 0f;
         _targetHp = 0;
     }

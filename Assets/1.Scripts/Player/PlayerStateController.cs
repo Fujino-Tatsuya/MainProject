@@ -95,7 +95,7 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
         if (!CanReceiveGrab(grabContext))
             return false;
 
-        SetState(new PlayerGrabbedState(context));
+        SetState(new PlayerGrabbedState(context, grabContext.Instigator));
         return true;
     }
 
@@ -481,17 +481,33 @@ public sealed class PlayerLockedState : PlayerStateBase
 
 public sealed class PlayerGrabbedState : PlayerStateBase
 {
+    private readonly GameObject instigator;
     private bool wasKinematic;
     private bool wasDetectingCollisions;
     private bool hadRigidbody;
+    private Transform followTarget;
 
-    public PlayerGrabbedState(PlayerStateContext context) : base(context) { }
+    public PlayerGrabbedState(PlayerStateContext context, GameObject instigator = null) : base(context)
+    {
+        this.instigator = instigator;
+    }
 
     public override PlayerActionState StateType => PlayerActionState.Grabbed;
+    public override bool RequiresStateAuthorityTick => true;
 
     public override void Enter(PlayerActionState previousState)
     {
+        Context.DefaultAttack.CancelCurrentAttack();
         Context.Player.SetAnimatorMoving(false);
+        GrabController grabController = instigator != null
+            ? instigator.GetComponentInChildren<GrabController>()
+            : null;
+        followTarget = grabController != null ? grabController.GrabSocket : null;
+        BeforeMergeTestLog.Info(
+            "GRAB",
+            "STATE_ENTER",
+            $"movementAuthority={Context.Player.IsMovementAuthority}, prev={previousState}, hasFollowTarget={followTarget != null}",
+            Context.Player);
         DelegatePhysicsAndCollisionToInstigator();
         // TODO: Play the grabbed animation here after the Animator parameter/clip is configured.
         // Example: Context.Animator.SetBool("IsGrabbed", true);
@@ -499,15 +515,35 @@ public sealed class PlayerGrabbedState : PlayerStateBase
 
     public override void Exit(PlayerActionState nextState)
     {
+        BeforeMergeTestLog.Info(
+            "GRAB",
+            "STATE_EXIT",
+            $"movementAuthority={Context.Player.IsMovementAuthority}, next={nextState}",
+            Context.Player);
         RestorePlayerPhysicsAndCollision();
         ResetRootRotation();
         // TODO: Stop the grabbed animation here after the Animator parameter/clip is configured.
         // Example: Context.Animator.SetBool("IsGrabbed", false);
     }
 
+    public override void Tick()
+    {
+        if (!Context.Player.IsMovementAuthority || followTarget == null)
+            return;
+
+        if (Context.Rigidbody != null)
+        {
+            Context.Rigidbody.MovePosition(followTarget.position);
+            Context.Rigidbody.MoveRotation(followTarget.rotation);
+            return;
+        }
+
+        Context.Player.transform.SetPositionAndRotation(followTarget.position, followTarget.rotation);
+    }
+
     private void DelegatePhysicsAndCollisionToInstigator()
     {
-        if (Context.Rigidbody == null)
+        if (!Context.Player.IsMovementAuthority || Context.Rigidbody == null)
             return;
 
         hadRigidbody = true;
@@ -557,6 +593,7 @@ public sealed class PlayerKnockbackState : PlayerStateBase
 
     public override void Enter(PlayerActionState previousState)
     {
+        Context.DefaultAttack.CancelCurrentAttack();
         BeforeMergeTestLog.Info(
             "KNOCKBACK",
             "STATE_ENTER",

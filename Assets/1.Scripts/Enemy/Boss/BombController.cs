@@ -331,6 +331,11 @@ public class BombController : NetworkBehaviour
     {
         if (_bombState != BombState.BombTimer) return;
 
+        BeforeMergeTestLog.Info(
+            "BOMB",
+            "HIT_LAUNCH",
+            $"attackDamage={attackInfo.damage}, launchDistance={attackInfo.damage}, source={hitContext.sourcePosition}",
+            this);
         LinearLaunch(hitContext.sourcePosition, attackInfo.damage);
     }
 
