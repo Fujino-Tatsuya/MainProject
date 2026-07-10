@@ -43,7 +43,7 @@ public class OverlapAttack : BaseAttack
                     results,
                     info.orientation,
                     targetLayer,
-                    QueryTriggerInteraction.Ignore);
+                    QueryTriggerInteraction.Collide);
             }
 
             case OverlapCollider.Sphere:
@@ -55,7 +55,7 @@ public class OverlapAttack : BaseAttack
                     info.radius,
                     results,
                     targetLayer,
-                    QueryTriggerInteraction.Ignore);
+                    QueryTriggerInteraction.Collide);
             }
 
             case OverlapCollider.Capsule:
@@ -68,7 +68,7 @@ public class OverlapAttack : BaseAttack
                     info.radius,
                     results,
                     targetLayer,
-                    QueryTriggerInteraction.Ignore);
+                    QueryTriggerInteraction.Collide);
             }
 
             default:

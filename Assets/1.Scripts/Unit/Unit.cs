@@ -2,7 +2,7 @@ using BaseNetCode;
 using Unity.Netcode;
 using UnityEngine;
 
-public class Unit : BaseNetworkBehaviour
+public class Unit : BaseNetworkBehaviour, IAttackReceiver
 {
     #region 공격력
     int _attackDamage;
@@ -78,6 +78,12 @@ public class Unit : BaseNetworkBehaviour
     public virtual void TakeDamage(AttackInfo attackInfo)
     {
         TakeDamage(attackInfo.damage);
+    }
+
+    public virtual bool ReceiveAttack(AttackInfo attackInfo, AttackHitContext hitContext)
+    {
+        TakeDamage(attackInfo);
+        return true;
     }
 
     /// <summary>
@@ -322,5 +328,6 @@ public class Unit : BaseNetworkBehaviour
 
         _knockback?.ApplyKnockback(direction, strength);
     }
+
     #endregion
 }

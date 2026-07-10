@@ -10,6 +10,7 @@ public class PlayerDefaultAttack : BaseAttack
     [SerializeField] private Transform muzzle;
 
     private readonly HashSet<Unit> damagedUnits = new HashSet<Unit>();
+    private readonly HashSet<Hurtbox> damagedHurtboxes = new HashSet<Hurtbox>();
     private Collider[] hitResults = new Collider[DefaultMaxHitResults];
     private Player owner;
     private ColliderInfo defaultHitbox;
@@ -41,6 +42,7 @@ public class PlayerDefaultAttack : BaseAttack
         hitbox = step != null && step.Hitbox != null ? step.Hitbox : defaultHitbox;
         SetDamageSnapshot(damageSnapshot);
         damagedUnits.Clear();
+        damagedHurtboxes.Clear();
     }
 
     public void HitCurrentStep()
@@ -82,6 +84,25 @@ public class PlayerDefaultAttack : BaseAttack
             if (hit == null)
                 continue;
 
+            if (TryGetHurtbox(hit, out Hurtbox hurtbox))
+            {
+                hurtbox.TryGetOwner(out Unit ownerUnit);
+                if (ownerUnit == owner || damagedHurtboxes.Contains(hurtbox))
+                    continue;
+
+                if (ownerUnit != null && damagedUnits.Contains(ownerUnit))
+                    continue;
+
+                if (TryResolveHit(hurtbox, hit))
+                {
+                    damagedHurtboxes.Add(hurtbox);
+                    if (ownerUnit != null)
+                        damagedUnits.Add(ownerUnit);
+                }
+
+                continue;
+            }
+
             Unit target = hit.GetComponentInParent<Unit>();
             if (target == null || target == owner || damagedUnits.Contains(target))
                 continue;
@@ -113,8 +134,17 @@ public class PlayerDefaultAttack : BaseAttack
     {
         Vector3 origin = muzzle != null ? muzzle.position : transform.position;
 
-        if (!Physics.Raycast(origin, attackDirection, out RaycastHit hit, currentStep.RaycastRange, targetLayer, QueryTriggerInteraction.Ignore))
+        if (!Physics.Raycast(origin, attackDirection, out RaycastHit hit, currentStep.RaycastRange, targetLayer, QueryTriggerInteraction.Collide))
             return;
+
+        if (TryGetHurtbox(hit.collider, out Hurtbox hurtbox))
+        {
+            hurtbox.TryGetOwner(out Unit ownerUnit);
+            if (ownerUnit != owner)
+                TryResolveHit(hurtbox, hit.collider);
+
+            return;
+        }
 
         Unit target = hit.collider.GetComponentInParent<Unit>();
         if (target == null || target == owner)
@@ -136,7 +166,7 @@ public class PlayerDefaultAttack : BaseAttack
                     hitResults,
                     boxInfo.orientation,
                     targetLayer,
-                    QueryTriggerInteraction.Ignore);
+                    QueryTriggerInteraction.Collide);
 
             case OverlapCollider.Sphere:
                 SphereColliderInfo sphereInfo = default;
@@ -146,7 +176,7 @@ public class PlayerDefaultAttack : BaseAttack
                     sphereInfo.radius,
                     hitResults,
                     targetLayer,
-                    QueryTriggerInteraction.Ignore);
+                    QueryTriggerInteraction.Collide);
 
             case OverlapCollider.Capsule:
                 CapsuleColliderInfo capsuleInfo = default;
@@ -157,10 +187,11 @@ public class PlayerDefaultAttack : BaseAttack
                     capsuleInfo.radius,
                     hitResults,
                     targetLayer,
-                    QueryTriggerInteraction.Ignore);
+                    QueryTriggerInteraction.Collide);
 
             default:
                 return 0;
         }
     }
+
 }

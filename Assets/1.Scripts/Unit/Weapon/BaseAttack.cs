@@ -24,6 +24,20 @@ public struct AttackInfo
     }
 }
 
+public struct AttackHitContext
+{
+    public Vector3 sourcePosition;
+    public Transform sourceTransform;
+    public Collider hitCollider;
+
+    public AttackHitContext(Vector3 sourcePosition, Transform sourceTransform = null, Collider hitCollider = null)
+    {
+        this.sourcePosition = sourcePosition;
+        this.sourceTransform = sourceTransform;
+        this.hitCollider = hitCollider;
+    }
+}
+
 public class BaseAttack : MonoBehaviour
 {
     [SerializeField] protected int damage = 0;
@@ -71,11 +85,15 @@ public class BaseAttack : MonoBehaviour
         if (!IsServer || hit == null)
             return false;
 
-        GameObject target = hit.transform.root.gameObject;
-        if ((targetLayer.value & (1 << target.layer)) == 0)
+        if (!IsInTargetLayer(hit))
             return false;
 
-        Unit unit = target.GetComponent<Unit>();
+        Hurtbox hurtbox = hit.GetComponentInParent<Hurtbox>();
+        if (hurtbox != null)
+            return TryResolveHit(hurtbox, hit, overrideDamage);
+
+        GameObject target = hit.transform.root.gameObject;
+        Unit unit = hit.GetComponentInParent<Unit>();
         if (unit == null)
         {
             Debug.LogError($"해당 오브젝트, {target.name}에 Unit 컴포넌트가 부착되어있지 않습니다.", this);
@@ -90,11 +108,64 @@ public class BaseAttack : MonoBehaviour
         if (!IsServer || unit == null)
             return false;
 
-        AttackInfo attackInfo = overrideDamage.HasValue
+        AttackInfo attackInfo = CreateAttackInfo(overrideDamage);
+
+        return unit.ReceiveAttack(attackInfo, CreateHitContext(null));
+    }
+
+    protected bool TryResolveHit(Hurtbox hurtbox, int? overrideDamage = null)
+    {
+        if (!IsServer || hurtbox == null)
+            return false;
+
+        AttackInfo attackInfo = CreateAttackInfo(overrideDamage);
+        return hurtbox.ReceiveAttack(attackInfo, CreateHitContext(null));
+    }
+
+    protected bool TryResolveHit(Hurtbox hurtbox, Collider hit, int? overrideDamage = null)
+    {
+        if (!IsServer || hurtbox == null)
+            return false;
+
+        AttackInfo attackInfo = CreateAttackInfo(overrideDamage);
+        return hurtbox.ReceiveAttack(attackInfo, CreateHitContext(hit));
+    }
+
+    protected bool TryGetHurtbox(Collider hit, out Hurtbox hurtbox)
+    {
+        hurtbox = null;
+        if (hit == null || !IsInTargetLayer(hit))
+            return false;
+
+        hurtbox = hit.GetComponentInParent<Hurtbox>();
+        return hurtbox != null;
+    }
+
+    protected bool IsInTargetLayer(int layer)
+    {
+        return (targetLayer.value & (1 << layer)) != 0;
+    }
+
+    protected bool IsInTargetLayer(Collider hit)
+    {
+        if (hit == null)
+            return false;
+
+        if (IsInTargetLayer(hit.gameObject.layer))
+            return true;
+
+        return IsInTargetLayer(hit.transform.root.gameObject.layer);
+    }
+
+    private AttackInfo CreateAttackInfo(int? overrideDamage)
+    {
+        return overrideDamage.HasValue
             ? new AttackInfo(overrideDamage.Value, attackType, isGroggyAttack)
             : _attackInfo;
+    }
 
-        unit.TakeDamage(attackInfo);
-        return true;
+    private AttackHitContext CreateHitContext(Collider hit)
+    {
+        return new AttackHitContext(transform.position, transform, hit);
     }
 }

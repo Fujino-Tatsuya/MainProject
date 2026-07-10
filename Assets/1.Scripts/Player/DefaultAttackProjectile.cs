@@ -40,6 +40,18 @@ public class DefaultAttackProjectile : BaseAttack
         if (!launched || !IsServer)
             return;
 
+        if (TryGetHurtbox(other, out Hurtbox hurtbox))
+        {
+            hurtbox.TryGetOwner(out Unit ownerUnit);
+            if (ownerUnit == owner)
+                return;
+
+            if (TryResolveHit(hurtbox, other))
+                Destroy(gameObject);
+
+            return;
+        }
+
         Unit target = other.GetComponentInParent<Unit>();
         if (target == null || target == owner)
             return;

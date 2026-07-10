@@ -327,12 +327,11 @@ public class BombController : NetworkBehaviour
         return linear + Vector3.up * arc;
     }
 
-    void BombHit(object sender, AttackEventArgs e)
+    void BombHit(AttackInfo attackInfo, AttackHitContext hitContext)
     {
         if (_bombState != BombState.BombTimer) return;
 
-        BaseAttack baseAttack = e.BaseAttack;
-        LinearLaunch(baseAttack.transform.position, baseAttack.Damage);
+        LinearLaunch(hitContext.sourcePosition, attackInfo.damage);
     }
 
     #endregion
