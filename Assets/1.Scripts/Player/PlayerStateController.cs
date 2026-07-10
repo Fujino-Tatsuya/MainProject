@@ -546,7 +546,8 @@ public sealed class PlayerKnockbackState : PlayerStateBase
 
         startTime = Time.time;
 
-        if (Context.Rigidbody == null)
+        // 물리 적용은 이동 권위(오너/오프라인)만 — 서버(비오너) 사본은 상태 장부만 기록
+        if (!Context.Player.IsMovementAuthority || Context.Rigidbody == null)
             return;
 
         Context.Rigidbody.isKinematic = false;
@@ -559,9 +560,17 @@ public sealed class PlayerKnockbackState : PlayerStateBase
 
     public override void Tick()
     {
+        if (!Context.Player.IsMovementAuthority)
+        {
+            // 서버(비오너) 사본: 오너의 종료 보고가 1차 경로, 타임아웃은 보고 유실 대비 안전망
+            if (Time.time - startTime >= Context.Controller.MaxKnockbackTime)
+                Context.Controller.EndKnockback();
+            return;
+        }
+
         if (Context.Rigidbody == null)
         {
-            Context.Controller.EndKnockback();
+            EndAndNotifyServer();
             return;
         }
 
@@ -574,15 +583,21 @@ public sealed class PlayerKnockbackState : PlayerStateBase
         bool timeout = elapsed >= Context.Controller.MaxKnockbackTime;
 
         if (slowEnough || timeout)
-            Context.Controller.EndKnockback();
+            EndAndNotifyServer();
     }
 
     public override void Exit(PlayerActionState nextState)
     {
-        if (Context.Rigidbody == null)
+        if (!Context.Player.IsMovementAuthority || Context.Rigidbody == null)
             return;
 
         Context.Rigidbody.linearVelocity = Vector3.zero;
         Context.Rigidbody.angularVelocity = Vector3.zero;
+    }
+
+    private void EndAndNotifyServer()
+    {
+        Context.Controller.EndKnockback();
+        Context.Player.NotifyKnockbackEnded();
     }
 }

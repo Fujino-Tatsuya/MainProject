@@ -97,7 +97,10 @@ public class Player : Unit
 
     protected override void OnKnockback(Vector3 direction, float strength)
     {
-        //stateController.BeginKnockback(direction, strength);
+        // 서버가 거부(사망/슈퍼아머)하면 오너에게도 전파하지 않는다
+        if (!stateController.BeginKnockback(direction, strength))
+            return;
+
         ApplyKnockbackClientRpc(direction, strength, CreateOwnerClientRpcParams());
     }
 
@@ -144,10 +147,28 @@ public class Player : Unit
     [ClientRpc]
     private void ApplyKnockbackClientRpc(Vector3 direction, float strength, ClientRpcParams clientRpcParams = default)
     {
-        if (!IsOwner)
+        // 호스트는 서버 경로의 BeginKnockback으로 이미 상태 진입 — 재진입 시 임펄스가 이중 적용됨
+        if (!IsOwner || IsServer)
             return;
 
         stateController.ApplyKnockbackFromServer(direction, strength);
+    }
+
+    /// <summary>이동은 오너 권위(networking.md) — 넉백 물리를 시뮬레이션할 피어인지 여부.</summary>
+    public bool IsMovementAuthority => !IsNetworkActive || IsOwner;
+
+    public void NotifyKnockbackEnded()
+    {
+        if (!IsNetworkActive || IsServer)
+            return;
+
+        NotifyKnockbackEndedServerRpc();
+    }
+
+    [ServerRpc] // RequireOwnership 기본값 true — 오너만 호출 가능
+    private void NotifyKnockbackEndedServerRpc()
+    {
+        stateController.EndKnockback();
     }
 
     public void SetAnimatorMoving(bool isMoving)
