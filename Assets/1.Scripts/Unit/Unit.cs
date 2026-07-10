@@ -322,11 +322,27 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
 
     #region 넉백
     IKnockbackable _knockback;
-    public virtual void Knockback(Vector3 direction, float strength)
+
+    /// <summary>
+    /// 넉백 진입점. 서버 가드 등 공통 규칙은 여기서만 처리한다.
+    /// 기본 동작은 IKnockbackable 컴포넌트 위임, 예외는 OnKnockback을 override.
+    /// </summary>
+    public void Knockback(Vector3 direction, float strength)
     {
         if (!IsServer) return;
 
-        _knockback?.ApplyKnockback(direction, strength);
+        OnKnockback(direction, strength);
+    }
+
+    protected virtual void OnKnockback(Vector3 direction, float strength)
+    {
+        if (_knockback == null)
+        {
+            Debug.LogError($"{name}: IKnockbackable 컴포넌트가 없어 넉백이 무시됩니다.", this);
+            return;
+        }
+
+        _knockback.ApplyKnockback(direction, strength);
     }
 
     #endregion

@@ -95,11 +95,8 @@ public class Player : Unit
         return stateController.ChangeState(state);
     }
 
-    public override void Knockback(Vector3 direction, float strength)
+    protected override void OnKnockback(Vector3 direction, float strength)
     {
-        if (!IsServer)
-            return;
-
         //stateController.BeginKnockback(direction, strength);
         ApplyKnockbackClientRpc(direction, strength, CreateOwnerClientRpcParams());
     }
