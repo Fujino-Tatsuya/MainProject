@@ -11,6 +11,7 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
     [SerializeField] private PlayerActionState currentStateDebug;
     [SerializeField] private float minKnockbackTime = 0.15f;
     [SerializeField] private float maxKnockbackTime = 1.5f;
+    [SerializeField, Min(0f)] private float serverKnockbackReportGraceTime = 0.25f;
     [SerializeField] private float knockbackStopSpeed = 0.15f;
 
     private IPlayerState currentState;
@@ -24,6 +25,7 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
     public bool HasSuperArmor => context.StatusEffects.HasSuperArmor;
     public float MinKnockbackTime => minKnockbackTime;
     public float MaxKnockbackTime => maxKnockbackTime;
+    public float ServerKnockbackReportGraceTime => serverKnockbackReportGraceTime;
     public float KnockbackStopSpeed => knockbackStopSpeed;
 
     private void Awake()
@@ -118,7 +120,15 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
 
     public bool BeginKnockback(Vector3 direction, float strength)
     {
-        if (CurrentState == PlayerActionState.Dead || context.StatusEffects.HasSuperArmor)
+        bool isDead = CurrentState == PlayerActionState.Dead;
+        bool hasSuperArmor = context.StatusEffects.HasSuperArmor;
+        BeforeMergeTestLog.Info(
+            "KNOCKBACK",
+            "BEGIN_ATTEMPT",
+            $"state={CurrentState}, isDead={isDead}, hasSuperArmor={hasSuperArmor}, movementAuthority={context.Player.IsMovementAuthority}, strength={strength}",
+            context.Player);
+
+        if (isDead || hasSuperArmor)
             return false;
 
         SetState(new PlayerKnockbackState(context, direction, strength));
@@ -132,6 +142,11 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
 
     public void EndKnockback()
     {
+        BeforeMergeTestLog.Info(
+            "KNOCKBACK",
+            "END_ATTEMPT",
+            $"stateBefore={CurrentState}, willChange={CurrentState == PlayerActionState.Knockback}, movementAuthority={context.Player.IsMovementAuthority}",
+            context.Player);
         if (CurrentState == PlayerActionState.Knockback)
             ChangeState(PlayerActionState.Idle);
     }
@@ -542,6 +557,12 @@ public sealed class PlayerKnockbackState : PlayerStateBase
 
     public override void Enter(PlayerActionState previousState)
     {
+        BeforeMergeTestLog.Info(
+            "KNOCKBACK",
+            "STATE_ENTER",
+            $"movementAuthority={Context.Player.IsMovementAuthority}, prev={previousState}, strength={strength}, maxDuration={Context.Controller.MaxKnockbackTime}",
+            Context.Player);
+
         Context.Player.SetAnimatorMoving(false);
 
         startTime = Time.time;
@@ -563,14 +584,23 @@ public sealed class PlayerKnockbackState : PlayerStateBase
         if (!Context.Player.IsMovementAuthority)
         {
             // 서버(비오너) 사본: 오너의 종료 보고가 1차 경로, 타임아웃은 보고 유실 대비 안전망
-            if (Time.time - startTime >= Context.Controller.MaxKnockbackTime)
+            float serverFallbackTimeout = Context.Controller.MaxKnockbackTime +
+                                          Context.Controller.ServerKnockbackReportGraceTime;
+            if (Time.time - startTime >= serverFallbackTimeout)
+            {
+                BeforeMergeTestLog.Warning(
+                    "KNOCKBACK",
+                    "SERVER_FALLBACK_TIMEOUT",
+                    $"elapsed={Time.time - startTime:F3}, ownerMaxDuration={Context.Controller.MaxKnockbackTime:F3}, reportGrace={Context.Controller.ServerKnockbackReportGraceTime:F3}, serverTimeout={serverFallbackTimeout:F3} — 오너 보고가 안 왔음",
+                    Context.Player);
                 Context.Controller.EndKnockback();
+            }
             return;
         }
 
         if (Context.Rigidbody == null)
         {
-            EndAndNotifyServer();
+            EndAndNotifyServer("rigidbody-null", Time.time - startTime, -1f);
             return;
         }
 
@@ -583,7 +613,10 @@ public sealed class PlayerKnockbackState : PlayerStateBase
         bool timeout = elapsed >= Context.Controller.MaxKnockbackTime;
 
         if (slowEnough || timeout)
-            EndAndNotifyServer();
+        {
+            string reason = slowEnough ? "slow-enough" : "owner-timeout";
+            EndAndNotifyServer(reason, elapsed, Context.Rigidbody.linearVelocity.magnitude);
+        }
     }
 
     public override void Exit(PlayerActionState nextState)
@@ -595,8 +628,13 @@ public sealed class PlayerKnockbackState : PlayerStateBase
         Context.Rigidbody.angularVelocity = Vector3.zero;
     }
 
-    private void EndAndNotifyServer()
+    private void EndAndNotifyServer(string reason, float elapsed, float speed)
     {
+        BeforeMergeTestLog.Info(
+            "KNOCKBACK",
+            "OWNER_END",
+            $"reason={reason}, elapsed={elapsed:F3}, speed={speed:F3}, maxDuration={Context.Controller.MaxKnockbackTime:F3} → 서버 보고 시도",
+            Context.Player);
         Context.Controller.EndKnockback();
         Context.Player.NotifyKnockbackEnded();
     }

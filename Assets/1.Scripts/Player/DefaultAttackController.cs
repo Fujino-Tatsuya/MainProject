@@ -77,6 +77,7 @@ public class DefaultAttackController : BaseNetworkBehaviour
     [SerializeField] private float endFallbackPadding = 0.1f;
 
     private Player player;
+    private PlayerStateController stateController;
     private PlayerInputReader inputReader;
     private PlayerMovement movement;
     private PlayerAimIndicator aimIndicator;
@@ -99,6 +100,7 @@ public class DefaultAttackController : BaseNetworkBehaviour
     private void Awake()
     {
         player = GetComponent<Player>();
+        stateController = GetComponent<PlayerStateController>();
         inputReader = GetComponent<PlayerInputReader>();
         movement = GetComponent<PlayerMovement>();
         aimIndicator = GetComponent<PlayerAimIndicator>();
@@ -170,7 +172,14 @@ public class DefaultAttackController : BaseNetworkBehaviour
     public bool TryStart()
     {
         if (IsAttacking || isRequestingAttack || player == null || !CanRequestStart)
+        {
+            BeforeMergeTestLog.Info(
+                "ATTACK",
+                "REQUEST_BLOCKED_OWNER",
+                $"state={(player == null ? "null" : player.CurrentState.ToString())}, isAttacking={IsAttacking}, isRequesting={isRequestingAttack}, hasPlayer={player != null}, canRequest={CanRequestStart}, IsOwner={IsOwner}, IsServer={IsServer}",
+                this);
             return false;
+        }
 
         Vector3 requestedDirection = GetCurrentAimDirection();
 
@@ -184,6 +193,11 @@ public class DefaultAttackController : BaseNetworkBehaviour
             return false;
 
         isRequestingAttack = true;
+        BeforeMergeTestLog.Info(
+            "ATTACK",
+            "REQUEST_TX_OWNER",
+            $"state={player.CurrentState}, ownerClientId={OwnerClientId}, direction={requestedDirection}, isRequesting={isRequestingAttack}",
+            this);
         RequestStartAttackRpc(requestedDirection);
         return true;
     }
@@ -247,6 +261,12 @@ public class DefaultAttackController : BaseNetworkBehaviour
 
     public void HandleAnimationEvent(DefaultAttackAnimationEventType eventType)
     {
+        BeforeMergeTestLog.Info(
+            "ATTACK",
+            "ANIM_EVENT",
+            $"event={eventType}, IsServer={IsServer}, 처리={!(IsNetworkActive && !IsServer)}, state={(player == null ? "null" : player.CurrentState.ToString())}",
+            this);
+
         if (IsNetworkActive && !IsServer)
             return;
 
@@ -316,7 +336,14 @@ public class DefaultAttackController : BaseNetworkBehaviour
         if (rpcParams.Receive.SenderClientId != OwnerClientId)
             return;
 
-        if (!CanApproveServerAttack())
+        bool canApprove = CanApproveServerAttack();
+        BeforeMergeTestLog.Info(
+            "ATTACK",
+            "REQUEST_RX_SERVER",
+            $"sender={rpcParams.Receive.SenderClientId}, ownerClientId={OwnerClientId}, state={(player == null ? "null" : player.CurrentState.ToString())}, canApprove={canApprove}",
+            this);
+
+        if (!canApprove)
         {
             RejectStartAttackClientRpc(CreateOwnerClientRpcParams());
             return;
@@ -344,6 +371,11 @@ public class DefaultAttackController : BaseNetworkBehaviour
         if (IsServer)
             return;
 
+        BeforeMergeTestLog.Info(
+            "ATTACK",
+            "PLAY_RX_OWNER",
+            $"index={attackIndex}, stateBefore={(player == null ? "null" : player.CurrentState.ToString())}, trigger={triggerAttack}, IsOwner={IsOwner}",
+            this);
         isRequestingAttack = false;
         StartAttackPresentation(attackIndex, direction, triggerAttack);
 
@@ -369,6 +401,11 @@ public class DefaultAttackController : BaseNetworkBehaviour
     [ClientRpc]
     private void RejectStartAttackClientRpc(ClientRpcParams clientRpcParams = default)
     {
+        BeforeMergeTestLog.Info(
+            "ATTACK",
+            "REJECT_RX_OWNER",
+            $"IsOwner={IsOwner}, state={(player == null ? "null" : player.CurrentState.ToString())}, isRequestingBefore={isRequestingAttack}",
+            this);
         if (IsOwner)
             isRequestingAttack = false;
     }
@@ -376,11 +413,25 @@ public class DefaultAttackController : BaseNetworkBehaviour
     private void StartAttackServer(int attackIndex, Vector3 direction, bool triggerAttack)
     {
         if (!HasAttackStep(attackIndex))
+        {
+            BeforeMergeTestLog.Warning(
+                "ATTACK",
+                "START_ABORT_SERVER",
+                $"reason=missingStep, index={attackIndex}, state={(player == null ? "null" : player.CurrentState.ToString())} — 오너 래치 고착 경로",
+                this);
             return;
+        }
 
         DefaultAttackStep step = attackSteps[attackIndex];
         if (step.MotionDuration <= 0f)
+        {
+            BeforeMergeTestLog.Warning(
+                "ATTACK",
+                "START_ABORT_SERVER",
+                $"reason=invalidMotionDuration, index={attackIndex}, duration={step.MotionDuration}, state={(player == null ? "null" : player.CurrentState.ToString())} — 오너 래치 고착 경로",
+                this);
             return;
+        }
 
         isRequestingAttack = false;
         hasStartedAttack = true;
@@ -392,10 +443,23 @@ public class DefaultAttackController : BaseNetworkBehaviour
         attackEndFallbackTime = Time.time + step.MotionDuration + Mathf.Max(0f, endFallbackPadding);
 
         int damageSnapshot = CalculateDamageSnapshot(step);
+        BeforeMergeTestLog.Info(
+            "ATTACK",
+            "START_APPROVED_SERVER",
+            $"index={attackIndex}, stateBefore={(player == null ? "null" : player.CurrentState.ToString())}, damageSnapshot={damageSnapshot}, hitType={step.HitType}",
+            this);
         playerDefaultAttack.PrepareStep(step, damageSnapshot, attackDirection);
 
         if (player != null && player.CurrentState != PlayerActionState.Attack)
-            player.SetState(PlayerActionState.Attack);
+        {
+            PlayerActionState stateBefore = player.CurrentState;
+            bool stateChanged = player.SetState(PlayerActionState.Attack);
+            BeforeMergeTestLog.Info(
+                "ATTACK",
+                "STATE_SET_SERVER",
+                $"requested=Attack, stateBefore={stateBefore}, changed={stateChanged}, stateAfter={player.CurrentState}",
+                this);
+        }
 
         StartAttackPresentation(attackIndex, attackDirection, triggerAttack);
 
@@ -539,11 +603,10 @@ public class DefaultAttackController : BaseNetworkBehaviour
         if (!HasAttackStep(0))
             return false;
 
-        if (player == null || player.CurrentState == PlayerActionState.Dead)
+        if (player == null || stateController == null || !stateController.CanAttack)
             return false;
 
-        StatusEffectController statusEffects = GetComponent<StatusEffectController>();
-        return statusEffects == null || !statusEffects.BlocksAttack;
+        return true;
     }
 
     private int CalculateDamageSnapshot(DefaultAttackStep step)

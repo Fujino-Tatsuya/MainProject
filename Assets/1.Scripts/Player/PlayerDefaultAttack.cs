@@ -47,6 +47,12 @@ public class PlayerDefaultAttack : BaseAttack
 
     public void HitCurrentStep()
     {
+        BeforeMergeTestLog.Info(
+            "HIT",
+            "STEP_BEGIN",
+            $"IsServer={IsServer}, step={(currentStep == null ? "null" : currentStep.HitType.ToString())}, mask={targetLayer.value}",
+            this);
+
         if (!IsServer)
             return;
 
@@ -78,6 +84,7 @@ public class PlayerDefaultAttack : BaseAttack
         }
 
         int hitCount = OverlapHitbox(hitbox);
+        BeforeMergeTestLog.Info("HIT", "OVERLAP_RESULT", $"hitCount={hitCount}", this);
         for (int i = 0; i < hitCount; i++)
         {
             Collider hit = hitResults[i];
@@ -93,7 +100,13 @@ public class PlayerDefaultAttack : BaseAttack
                 if (ownerUnit != null && damagedUnits.Contains(ownerUnit))
                     continue;
 
-                if (TryResolveHit(hurtbox, hit))
+                bool resolved = TryResolveHit(hurtbox, hit);
+                BeforeMergeTestLog.Info(
+                    "HIT",
+                    "HURTBOX_RESOLVE",
+                    $"hit[{i}]={hit.name}, layer={hit.gameObject.layer}, resolved={resolved}",
+                    hit);
+                if (resolved)
                 {
                     damagedHurtboxes.Add(hurtbox);
                     if (ownerUnit != null)
@@ -104,6 +117,11 @@ public class PlayerDefaultAttack : BaseAttack
             }
 
             Unit target = hit.GetComponentInParent<Unit>();
+            BeforeMergeTestLog.Info(
+                "HIT",
+                "UNIT_FALLBACK",
+                $"hit[{i}]={hit.name}, layer={hit.gameObject.layer}, target={(target == null ? "Unit 없음" : target.name)}{(target == owner ? " (자기 자신, 스킵)" : "")}",
+                hit);
             if (target == null || target == owner || damagedUnits.Contains(target))
                 continue;
 
@@ -135,7 +153,16 @@ public class PlayerDefaultAttack : BaseAttack
         Vector3 origin = muzzle != null ? muzzle.position : transform.position;
 
         if (!Physics.Raycast(origin, attackDirection, out RaycastHit hit, currentStep.RaycastRange, targetLayer, QueryTriggerInteraction.Collide))
+        {
+            BeforeMergeTestLog.Info("HIT", "RAYCAST_MISS", $"range={currentStep.RaycastRange}", this);
             return;
+        }
+
+        BeforeMergeTestLog.Info(
+            "HIT",
+            "RAYCAST_HIT",
+            $"collider={hit.collider.name}, layer={hit.collider.gameObject.layer}",
+            hit.collider);
 
         if (TryGetHurtbox(hit.collider, out Hurtbox hurtbox))
         {

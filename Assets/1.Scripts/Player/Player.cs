@@ -98,9 +98,21 @@ public class Player : Unit
     protected override void OnKnockback(Vector3 direction, float strength)
     {
         // 서버가 거부(사망/슈퍼아머)하면 오너에게도 전파하지 않는다
-        if (!stateController.BeginKnockback(direction, strength))
+        PlayerActionState stateBefore = CurrentState;
+        bool accepted = stateController.BeginKnockback(direction, strength);
+        BeforeMergeTestLog.Info(
+            "KNOCKBACK",
+            "BEGIN_RESULT_SERVER",
+            $"ownerClientId={OwnerClientId}, stateBefore={stateBefore}, BeginKnockback={accepted}, stateAfter={CurrentState}, strength={strength}",
+            this);
+        if (!accepted)
             return;
 
+        BeforeMergeTestLog.Info(
+            "KNOCKBACK",
+            "APPLY_RPC_TX_SERVER",
+            $"targetOwnerClientId={OwnerClientId}, state={CurrentState}, strength={strength}",
+            this);
         ApplyKnockbackClientRpc(direction, strength, CreateOwnerClientRpcParams());
     }
 
@@ -147,6 +159,12 @@ public class Player : Unit
     [ClientRpc]
     private void ApplyKnockbackClientRpc(Vector3 direction, float strength, ClientRpcParams clientRpcParams = default)
     {
+        BeforeMergeTestLog.Info(
+            "KNOCKBACK",
+            "APPLY_RPC_RX_OWNER",
+            $"ownerClientId={OwnerClientId}, IsOwner={IsOwner}, IsServer={IsServer}, stateBefore={CurrentState}, 스킵={!IsOwner || IsServer}, strength={strength}",
+            this);
+
         // 호스트는 서버 경로의 BeginKnockback으로 이미 상태 진입 — 재진입 시 임펄스가 이중 적용됨
         if (!IsOwner || IsServer)
             return;
@@ -159,6 +177,11 @@ public class Player : Unit
 
     public void NotifyKnockbackEnded()
     {
+        BeforeMergeTestLog.Info(
+            "KNOCKBACK",
+            "END_REPORT_TX_OWNER",
+            $"ownerClientId={OwnerClientId}, IsServer={IsServer}, state={CurrentState}, 보고전송={!(!IsNetworkActive || IsServer)}",
+            this);
         if (!IsNetworkActive || IsServer)
             return;
 
@@ -168,6 +191,11 @@ public class Player : Unit
     [ServerRpc] // RequireOwnership 기본값 true — 오너만 호출 가능
     private void NotifyKnockbackEndedServerRpc()
     {
+        BeforeMergeTestLog.Info(
+            "KNOCKBACK",
+            "END_REPORT_RX_SERVER",
+            $"ownerClientId={OwnerClientId}, stateBefore={CurrentState} → EndKnockback",
+            this);
         stateController.EndKnockback();
     }
 
