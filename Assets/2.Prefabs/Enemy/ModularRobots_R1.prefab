@@ -105,7 +105,7 @@ SkinnedMeshRenderer:
   m_RootBone: {fileID: 6891435679083297743}
   m_AABB:
     m_Center: {x: -0.4083256, y: -0.04445854, z: 0.86121017}
-    m_Extent: {x: 0.12711017, y: 0.17335916, z: 0.40242487}
+    m_Extent: {x: 0.762661, y: 1.7335916, z: 2.4145494}
   m_DirtyAABB: 0
 --- !u!1 &574499539586517616
 GameObject:
@@ -276,7 +276,7 @@ SkinnedMeshRenderer:
   m_RootBone: {fileID: 6891435679083297743}
   m_AABB:
     m_Center: {x: -0.20040002, y: -0.0649063, z: 0.37059802}
-    m_Extent: {x: 0.1392571, y: 0.21050516, z: 0.4645968}
+    m_Extent: {x: 0.8355426, y: 2.1050515, z: 2.787581}
   m_DirtyAABB: 0
 --- !u!1 &2712610884434696670
 GameObject:
@@ -474,7 +474,7 @@ SkinnedMeshRenderer:
   m_RootBone: {fileID: 6891435679083297743}
   m_AABB:
     m_Center: {x: -0.00000023841858, y: -0.013851911, z: 1.4690866}
-    m_Extent: {x: 0.2863958, y: 0.21308643, z: 0.20473814}
+    m_Extent: {x: 1.7183747, y: 2.1308641, z: 1.2284288}
   m_DirtyAABB: 0
 --- !u!1 &3236041008047448047
 GameObject:
@@ -680,7 +680,7 @@ SkinnedMeshRenderer:
   m_RootBone: {fileID: 6891435679083297743}
   m_AABB:
     m_Center: {x: 0.2004, y: -0.06490633, z: 0.37059802}
-    m_Extent: {x: 0.1392572, y: 0.21050513, z: 0.4645967}
+    m_Extent: {x: 0.83554316, y: 2.1050513, z: 2.78758}
   m_DirtyAABB: 0
 --- !u!1 &4250415844617869301
 GameObject:
@@ -819,7 +819,7 @@ SkinnedMeshRenderer:
   m_RootBone: {fileID: 6891435679083297743}
   m_AABB:
     m_Center: {x: -0.00000020861626, y: -0.0022762567, z: 0.9984596}
-    m_Extent: {x: 0.32752815, y: 0.1946862, z: 0.37052202}
+    m_Extent: {x: 1.965169, y: 1.946862, z: 2.2231321}
   m_DirtyAABB: 0
 --- !u!1 &4671997702162033352
 GameObject:
@@ -1438,7 +1438,7 @@ SkinnedMeshRenderer:
   m_RootBone: {fileID: 6891435679083297743}
   m_AABB:
     m_Center: {x: 0.40832537, y: -0.044458553, z: 0.8612102}
-    m_Extent: {x: 0.1271103, y: 0.17335917, z: 0.4024249}
+    m_Extent: {x: 0.7626618, y: 1.7335917, z: 2.4145494}
   m_DirtyAABB: 0
 --- !u!1 &6985073322208332107
 GameObject:
