@@ -27,7 +27,7 @@ public class LayoutPlacer : MonoBehaviour
         if (slots == null || slots.Count == 0) return placements;
         if (catalog == null)
         {
-            Debug.LogWarning("[LayoutPlacer] ZoneLayoutCatalog 미연결 — 배치 생략.");
+            Edit.LogWarning("[LayoutPlacer] ZoneLayoutCatalog 미연결 — 배치 생략.");
             return placements;
         }
 
@@ -62,7 +62,7 @@ public class LayoutPlacer : MonoBehaviour
             var pool = catalog.GetCombatPool(size, difficulty);
             if (pool.Count == 0)
             {
-                Debug.LogWarning($"[LayoutPlacer] {size}/난이도{difficulty} 전투 풀이 비어 있음 — {combatSlots.Count}곳 미배치.");
+                Edit.LogWarning($"[LayoutPlacer] {size}/난이도{difficulty} 전투 풀이 비어 있음 — {combatSlots.Count}곳 미배치.");
                 foreach (var s in combatSlots)
                     placements.Add(new ZonePlacement { Slot = s, Role = ZoneRole.Combat, LayoutPrefab = null });
                 continue;
@@ -70,7 +70,7 @@ public class LayoutPlacer : MonoBehaviour
 
             Shuffle(pool, rng);   // 위치만 달라지게 풀을 셔플
             if (pool.Count < combatSlots.Count)
-                Debug.LogWarning($"[LayoutPlacer] {size}/난이도{difficulty} 디자인 {pool.Count}개 < 슬롯 {combatSlots.Count}개 — 일부 재사용됨.");
+                Edit.LogWarning($"[LayoutPlacer] {size}/난이도{difficulty} 디자인 {pool.Count}개 < 슬롯 {combatSlots.Count}개 — 일부 재사용됨.");
 
             for (int i = 0; i < combatSlots.Count; i++)
                 placements.Add(new ZonePlacement

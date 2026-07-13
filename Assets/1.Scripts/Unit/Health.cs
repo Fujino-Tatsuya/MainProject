@@ -3,36 +3,36 @@ using UnityEngine;
 
 public class Health
 {
-    #region ÇÇ Ã¼·Â
+    #region ï¿½ï¿½ Ã¼ï¿½ï¿½
     int _currentHp;
     public int CurrentHealth { get { return _currentHp; } }
     int _maxHp;
     public int MaxHp { get { return _maxHp; } }
     /// <summary>
-    /// damage¸¸Å­ Ã¼·ÂÀ» °¨¼Ò½ÃÅ°´Â ÇÔ¼ö
+    /// damageï¿½ï¿½Å­ Ã¼ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ò½ï¿½Å°ï¿½ï¿½ ï¿½Ô¼ï¿½
     /// </summary>
-    /// <param name="damage">°¨¼Ò½ÃÅ³ Ã¼·Â °ª</param>
+    /// <param name="damage">ï¿½ï¿½ï¿½Ò½ï¿½Å³ Ã¼ï¿½ï¿½ ï¿½ï¿½</param>
     public void TakeHpDamage(int damage)
     {
-        //if(!isServer) return; // ¼­¹ö¿¡¼­¸¸ Ã¼·Â °¨¼Ò Ã³¸®
+        //if(!isServer) return; // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Ã¼ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ Ã³ï¿½ï¿½
 
         _currentHp -= damage;
-        _currentHp = Mathf.Max(_currentHp, 0); // Ã¼·ÂÀÌ 0 ÀÌÇÏ·Î ¶³¾îÁöÁö ¾Êµµ·Ï º¸Àå
-        Debug.Log($"ÇÇÇØ·®: {damage}   /   ÇöÀç Ã¼·Â: {_currentHp}");
+        _currentHp = Mathf.Max(_currentHp, 0); // Ã¼ï¿½ï¿½ï¿½ï¿½ 0 ï¿½ï¿½ï¿½Ï·ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Êµï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+        Edit.Log($"ï¿½ï¿½ï¿½Ø·ï¿½: {damage}   /   ï¿½ï¿½ï¿½ï¿½ Ã¼ï¿½ï¿½: {_currentHp}");
     }
     /// <summary>
-    /// healAmount¸¸Å­ Ã¼·ÂÀ» È¸º¹½ÃÅ°´Â ÇÔ¼ö
+    /// healAmountï¿½ï¿½Å­ Ã¼ï¿½ï¿½ï¿½ï¿½ È¸ï¿½ï¿½ï¿½ï¿½Å°ï¿½ï¿½ ï¿½Ô¼ï¿½
     /// </summary>
-    /// <param name="healAmount">È¸º¹½ÃÅ³ Ã¼·Â °ª</param>
+    /// <param name="healAmount">È¸ï¿½ï¿½ï¿½ï¿½Å³ Ã¼ï¿½ï¿½ ï¿½ï¿½</param>
     public void HealHp(int healAmount)
     {
         _currentHp += healAmount;
-        _currentHp = Mathf.Min(_currentHp, _maxHp); // Ã¼·ÂÀÌ ÃÖ´ë Ã¼·ÂÀ» ÃÊ°úÇÏÁö ¾Êµµ·Ï º¸Àå
+        _currentHp = Mathf.Min(_currentHp, _maxHp); // Ã¼ï¿½ï¿½ï¿½ï¿½ ï¿½Ö´ï¿½ Ã¼ï¿½ï¿½ï¿½ï¿½ ï¿½Ê°ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Êµï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 
-        Debug.Log($"Ã¼·Â Áõ°¡·®: {healAmount}   /   ÇöÀç Ã¼·Â: {_currentHp}");
+        Edit.Log($"Ã¼ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½: {healAmount}   /   ï¿½ï¿½ï¿½ï¿½ Ã¼ï¿½ï¿½: {_currentHp}");
     }
     /// <summary>
-    /// Ã¼·ÂÀ» ÃÖ´ëÄ¡·Î È¸º¹½ÃÅ°´Â ÇÔ¼ö
+    /// Ã¼ï¿½ï¿½ï¿½ï¿½ ï¿½Ö´ï¿½Ä¡ï¿½ï¿½ È¸ï¿½ï¿½ï¿½ï¿½Å°ï¿½ï¿½ ï¿½Ô¼ï¿½
     /// </summary>
     public void Revive()
     {
@@ -40,31 +40,31 @@ public class Health
     }
     #endregion
 
-    #region ¹æ¾î·Â
+    #region ï¿½ï¿½ï¿½ï¿½
     int _currentDefense;
     public int CurrentDefense { get { return _currentDefense; } }
 
     /// <summary>
-    /// decreaseAmount¸¸Å­ ¹æ¾î·ÂÀ» °¨¼Ò½ÃÅ°´Â ÇÔ¼ö
+    /// decreaseAmountï¿½ï¿½Å­ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ò½ï¿½Å°ï¿½ï¿½ ï¿½Ô¼ï¿½
     /// </summary>
-    /// <param name="decreaseAmount">°¨¼Ò½ÃÅ³ Ã¼·Â °ª</param>
+    /// <param name="decreaseAmount">ï¿½ï¿½ï¿½Ò½ï¿½Å³ Ã¼ï¿½ï¿½ ï¿½ï¿½</param>
     public void DecreaseDefense(int decreaseAmount)
     {
         _currentDefense -= decreaseAmount;
-        _currentDefense = Mathf.Max(_currentDefense, 0); // ¹æ¾î·ÂÀÌ 0 ÀÌÇÏ·Î ¶³¾îÁöÁö ¾Êµµ·Ï º¸Àå
+        _currentDefense = Mathf.Max(_currentDefense, 0); // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 0 ï¿½ï¿½ï¿½Ï·ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Êµï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     }
 
     /// <summary>
-    /// defenseAmount¸¸Å­ ¹æ¾î·ÂÀ» Áõ°¡½ÃÅ°´Â ÇÔ¼ö
+    /// defenseAmountï¿½ï¿½Å­ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Å°ï¿½ï¿½ ï¿½Ô¼ï¿½
     /// </summary>
-    /// <param name="increaseAmount">Áõ°¡½ÃÅ³ ¹æ¾î·Â °ª</param>
+    /// <param name="increaseAmount">ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Å³ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½</param>
     public void IncreaseDefense(int increaseAmount)
     {
         _currentDefense += increaseAmount;
     }
     #endregion
 
-    #region ½¯µå
+    #region ï¿½ï¿½ï¿½ï¿½
     int _currentShield;
     public int CurrentShield { get { return _currentShield; } }
     int _maxShield;
@@ -73,20 +73,20 @@ public class Health
     public bool HasShield { get { return _hasShield; } }
 
     /// <summary>
-    /// damage¸¸Å­ ½¯µå¸¦ °¨¼Ò½ÃÅ°°í ½¯µå°¡ 0 ÀÌÇÏ·Î ¶³¾îÁöÁö ¾Êµµ·Ï º¸ÀåÇÏ´Â ÇÔ¼ö
+    /// damageï¿½ï¿½Å­ ï¿½ï¿½ï¿½å¸¦ ï¿½ï¿½ï¿½Ò½ï¿½Å°ï¿½ï¿½ ï¿½ï¿½ï¿½å°¡ 0 ï¿½ï¿½ï¿½Ï·ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Êµï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï´ï¿½ ï¿½Ô¼ï¿½
     /// </summary>
-    /// <param name="damage">°¨¼Ò½ÃÅ³ ½¯µå °ª</param>
+    /// <param name="damage">ï¿½ï¿½ï¿½Ò½ï¿½Å³ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½</param>
     public void TakeShieldDamage(int damage)
     {
         _currentShield -= damage;
-        _currentShield = Mathf.Max(_currentShield, 0); // ½¯µå°¡ 0 ÀÌÇÏ·Î ¶³¾îÁöÁö ¾Êµµ·Ï º¸Àå
+        _currentShield = Mathf.Max(_currentShield, 0); // ï¿½ï¿½ï¿½å°¡ 0 ï¿½ï¿½ï¿½Ï·ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Êµï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         _hasShield = (_currentShield > 0)? true : false;
     }
 
     /// <summary>
-    /// shieldValue·Î ½¯µå °ªÀ» ¼³Á¤ÇÏ°í ½¯µå °ªÀÌ 0º¸´Ù Å©¸é hasShield¸¦ true·Î, ±×·¸Áö ¾ÊÀ¸¸é false·Î ¼³Á¤ÇÏ´Â ÇÔ¼ö
+    /// shieldValueï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï°ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ 0ï¿½ï¿½ï¿½ï¿½ Å©ï¿½ï¿½ hasShieldï¿½ï¿½ trueï¿½ï¿½, ï¿½×·ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ falseï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï´ï¿½ ï¿½Ô¼ï¿½
     /// </summary>
-    /// <param name="shieldValue">¼³Á¤ÇÒ ½¯µå °ª</param>
+    /// <param name="shieldValue">ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½</param>
     public void SetShield(int shieldValue)
     {
         _currentShield = shieldValue;
@@ -94,16 +94,16 @@ public class Health
     }
 
     /// <summary>
-    /// shieldAmount¸¸Å­ ½¯µå °ªÀ» Áõ°¡½ÃÅ°°í ½¯µå °ªÀÌ 0º¸´Ù Å©¸é hasShield¸¦ true·Î, ±×·¸Áö ¾ÊÀ¸¸é false·Î ¼³Á¤ÇÏ´Â ÇÔ¼ö
+    /// shieldAmountï¿½ï¿½Å­ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Å°ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ 0ï¿½ï¿½ï¿½ï¿½ Å©ï¿½ï¿½ hasShieldï¿½ï¿½ trueï¿½ï¿½, ï¿½×·ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ falseï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï´ï¿½ ï¿½Ô¼ï¿½
     /// </summary>
-    /// <param name="shieldAmount">Áõ°¡½ÃÅ³ ½¯µå °ª</param>
+    /// <param name="shieldAmount">ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Å³ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½</param>
     public void IncreaseShield(int shieldAmount)
     {
         _currentShield += shieldAmount;
-        _currentShield = Mathf.Min(_currentShield, _maxShield); // ½¯µå°¡ ÃÖ´ë ½¯µå¸¦ ÃÊ°úÇÏÁö ¾Êµµ·Ï º¸Àå
+        _currentShield = Mathf.Min(_currentShield, _maxShield); // ï¿½ï¿½ï¿½å°¡ ï¿½Ö´ï¿½ ï¿½ï¿½ï¿½å¸¦ ï¿½Ê°ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Êµï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         _hasShield = (_currentShield > 0)? true : false;
 
-        Debug.Log($"½¯µå Áõ°¡·®: {shieldAmount}   /   ÇöÀç ½¯µå: {_currentShield}");
+        Edit.Log($"ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½: {shieldAmount}   /   ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½: {_currentShield}");
     }
     #endregion
 

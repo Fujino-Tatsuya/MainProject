@@ -15,7 +15,7 @@ public class KeySystem : MonoBehaviour
         if (Random.value <= chance)
         {
             AddKey();
-            Debug.Log("[KeySystem] 열쇠를 획득했습니다! 현재 열쇠: " + currentKeys);
+            Edit.Log("[KeySystem] 열쇠를 획득했습니다! 현재 열쇠: " + currentKeys);
         }
     }
 
@@ -29,7 +29,7 @@ public class KeySystem : MonoBehaviour
         if (currentKeys > 0)
         {
             currentKeys--;
-            Debug.Log("[KeySystem] 열쇠를 사용했습니다. 남은 열쇠: " + currentKeys);
+            Edit.Log("[KeySystem] 열쇠를 사용했습니다. 남은 열쇠: " + currentKeys);
             return true;
         }
         return false;

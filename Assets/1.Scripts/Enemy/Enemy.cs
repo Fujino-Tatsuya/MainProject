@@ -33,12 +33,12 @@ public class Enemy : Unit
             Debug.LogAssertion("BehaviorGraphAgent를 얻어오는 것을 실패했습니다.");
 
         if (!bt.BlackboardReference.GetVariable<float>("WalkSpeed", out WalkSpeed))
-            Debug.LogWarning("해당 BT의 Blackboard에서 WalkSpeed 변수를 얻어오는 것에 실패했습니다.");
+            Edit.LogWarning("해당 BT의 Blackboard에서 WalkSpeed 변수를 얻어오는 것에 실패했습니다.");
         else
             WalkSpeed.Value = moveSpeed;
 
         if (!bt.BlackboardReference.GetVariable<float>("ChaseSpeed", out ChaseSpeed))
-            Debug.LogWarning("해당 BT의 Blackboard에서 ChaseSpeed 변수를 얻어오는 것에 실패했습니다.");
+            Edit.LogWarning("해당 BT의 Blackboard에서 ChaseSpeed 변수를 얻어오는 것에 실패했습니다.");
         else
             ChaseSpeed.Value = chaseSpeed;
 

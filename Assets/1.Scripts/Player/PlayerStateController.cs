@@ -122,11 +122,6 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
     {
         bool isDead = CurrentState == PlayerActionState.Dead;
         bool hasSuperArmor = context.StatusEffects.HasSuperArmor;
-        BeforeMergeTestLog.Info(
-            "KNOCKBACK",
-            "BEGIN_ATTEMPT",
-            $"state={CurrentState}, isDead={isDead}, hasSuperArmor={hasSuperArmor}, movementAuthority={context.Player.IsMovementAuthority}, strength={strength}",
-            context.Player);
 
         if (isDead || hasSuperArmor)
             return false;
@@ -142,11 +137,6 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
 
     public void EndKnockback()
     {
-        BeforeMergeTestLog.Info(
-            "KNOCKBACK",
-            "END_ATTEMPT",
-            $"stateBefore={CurrentState}, willChange={CurrentState == PlayerActionState.Knockback}, movementAuthority={context.Player.IsMovementAuthority}",
-            context.Player);
         if (CurrentState == PlayerActionState.Knockback)
             ChangeState(PlayerActionState.Idle);
     }
@@ -503,11 +493,6 @@ public sealed class PlayerGrabbedState : PlayerStateBase
             ? instigator.GetComponentInChildren<GrabController>()
             : null;
         followTarget = grabController != null ? grabController.GrabSocket : null;
-        BeforeMergeTestLog.Info(
-            "GRAB",
-            "STATE_ENTER",
-            $"movementAuthority={Context.Player.IsMovementAuthority}, prev={previousState}, hasFollowTarget={followTarget != null}",
-            Context.Player);
         DelegatePhysicsAndCollisionToInstigator();
         // TODO: Play the grabbed animation here after the Animator parameter/clip is configured.
         // Example: Context.Animator.SetBool("IsGrabbed", true);
@@ -515,11 +500,6 @@ public sealed class PlayerGrabbedState : PlayerStateBase
 
     public override void Exit(PlayerActionState nextState)
     {
-        BeforeMergeTestLog.Info(
-            "GRAB",
-            "STATE_EXIT",
-            $"movementAuthority={Context.Player.IsMovementAuthority}, next={nextState}",
-            Context.Player);
         RestorePlayerPhysicsAndCollision();
         ResetRootRotation();
         // TODO: Stop the grabbed animation here after the Animator parameter/clip is configured.
@@ -594,11 +574,6 @@ public sealed class PlayerKnockbackState : PlayerStateBase
     public override void Enter(PlayerActionState previousState)
     {
         Context.DefaultAttack.CancelCurrentAttack();
-        BeforeMergeTestLog.Info(
-            "KNOCKBACK",
-            "STATE_ENTER",
-            $"movementAuthority={Context.Player.IsMovementAuthority}, prev={previousState}, strength={strength}, maxDuration={Context.Controller.MaxKnockbackTime}",
-            Context.Player);
 
         Context.Player.SetAnimatorMoving(false);
 
@@ -625,11 +600,6 @@ public sealed class PlayerKnockbackState : PlayerStateBase
                                           Context.Controller.ServerKnockbackReportGraceTime;
             if (Time.time - startTime >= serverFallbackTimeout)
             {
-                BeforeMergeTestLog.Warning(
-                    "KNOCKBACK",
-                    "SERVER_FALLBACK_TIMEOUT",
-                    $"elapsed={Time.time - startTime:F3}, ownerMaxDuration={Context.Controller.MaxKnockbackTime:F3}, reportGrace={Context.Controller.ServerKnockbackReportGraceTime:F3}, serverTimeout={serverFallbackTimeout:F3} — 오너 보고가 안 왔음",
-                    Context.Player);
                 Context.Controller.EndKnockback();
             }
             return;
@@ -667,11 +637,6 @@ public sealed class PlayerKnockbackState : PlayerStateBase
 
     private void EndAndNotifyServer(string reason, float elapsed, float speed)
     {
-        BeforeMergeTestLog.Info(
-            "KNOCKBACK",
-            "OWNER_END",
-            $"reason={reason}, elapsed={elapsed:F3}, speed={speed:F3}, maxDuration={Context.Controller.MaxKnockbackTime:F3} → 서버 보고 시도",
-            Context.Player);
         Context.Controller.EndKnockback();
         Context.Player.NotifyKnockbackEnded();
     }

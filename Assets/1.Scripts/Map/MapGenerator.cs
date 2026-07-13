@@ -51,7 +51,7 @@ public class MapGenerator : MonoBehaviour
 
         if (LayoutPlacer == null)
         {
-            Debug.LogWarning("[MapGenerator] LayoutPlacer 미연결 — 생성 중단.");
+            Edit.LogWarning("[MapGenerator] LayoutPlacer 미연결 — 생성 중단.");
             return Placements;
         }
 
@@ -60,7 +60,7 @@ public class MapGenerator : MonoBehaviour
         // 스폰: 존 비주얼(양쪽 로컬) + 몬스터(서버) — NGO 자동 복제
         ContentSpawner?.SpawnPlacements(this, Placements);
 
-        Debug.Log($"[MapGenerator] 생성 완료. Seed:{mapSeed} / 난이도 Lv{difficultyLevel} / 슬롯 {_slots.Count} / 배치 {Placements.Count}.");
+        Edit.Log($"[MapGenerator] 생성 완료. Seed:{mapSeed} / 난이도 Lv{difficultyLevel} / 슬롯 {_slots.Count} / 배치 {Placements.Count}.");
         return Placements;
     }
 

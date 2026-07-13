@@ -174,11 +174,11 @@ public class GrabController : NetworkBehaviour
 
         if (isGrabbed)
         {
-            Debug.Log("그랩 성공!");
+            Edit.Log("그랩 성공!");
         }
         else 
         {
-            Debug.Log("그랩 실패!");
+            Edit.Log("그랩 실패!");
         }
     }
 
@@ -197,7 +197,7 @@ public class GrabController : NetworkBehaviour
         _targetUnit = _targetPlayer;
         if (!_targetPlayer.BeginGrabbedByInstigator(gameObject))
         {
-            Debug.LogWarning("서버가 플레이어의 Grabbed 상태 진입을 거부했습니다.", this);
+            Edit.LogWarning("서버가 플레이어의 Grabbed 상태 진입을 거부했습니다.", this);
             Clear();
             return;
         }

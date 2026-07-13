@@ -331,11 +331,6 @@ public class BombController : NetworkBehaviour
     {
         if (_bombState != BombState.BombTimer) return;
 
-        BeforeMergeTestLog.Info(
-            "BOMB",
-            "HIT_LAUNCH",
-            $"attackDamage={attackInfo.damage}, launchDistance={attackInfo.damage}, source={hitContext.sourcePosition}",
-            this);
         LinearLaunch(hitContext.sourcePosition, attackInfo.damage);
     }
 
@@ -383,7 +378,7 @@ public class BombController : NetworkBehaviour
             unit?.TakeDamage(new AttackInfo(bombDamage));
             _knockbackAttack.ApplyKnockbackAttack(collider.gameObject);
             MakeFloor();
-            Debug.Log("플레이어와 충돌!");
+            Edit.Log("플레이어와 충돌!");
         }
         else if ((enemy.value & (1 << layer)) != 0 && _bombState != BombState.InitFlight)
         {
@@ -392,13 +387,13 @@ public class BombController : NetworkBehaviour
             Explode();
             unit?.TakeDamage(new AttackInfo(bombDamage));
             MakeFloor();
-            Debug.Log("적과 충돌!");
+            Edit.Log("적과 충돌!");
         }
         else if ((wall.value & (1 << layer)) != 0)
         {
             Explode();
             MakeFloor();
-            Debug.Log("벽과 충돌!");
+            Edit.Log("벽과 충돌!");
         }
         else if ((ground.value & (1 << layer)) != 0 && _bombState != BombState.Flight)
         {

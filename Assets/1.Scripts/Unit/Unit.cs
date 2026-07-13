@@ -82,17 +82,7 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
 
     public virtual bool ReceiveAttack(AttackInfo attackInfo, AttackHitContext hitContext)
     {
-        BeforeMergeTestLog.Info(
-            "DAMAGE",
-            "RECEIVE_BEGIN",
-            $"unit={name}, damage={attackInfo.damage}, hpBefore={(_health != null ? _health.CurrentHealth : -1)}",
-            this);
         TakeDamage(attackInfo);
-        BeforeMergeTestLog.Info(
-            "DAMAGE",
-            "RECEIVE_END",
-            $"unit={name}, hpAfter={(_health != null ? _health.CurrentHealth : -1)}",
-            this);
         return true;
     }
 
@@ -339,11 +329,6 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     /// </summary>
     public void Knockback(Vector3 direction, float strength)
     {
-        BeforeMergeTestLog.Info(
-            "KNOCKBACK",
-            "ENTRY",
-            $"unit={name}, IsServer={IsServer}, strength={strength}, direction={direction}",
-            this);
         if (!IsServer) return;
 
         OnKnockback(direction, strength);
@@ -357,11 +342,6 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
             return;
         }
 
-        BeforeMergeTestLog.Info(
-            "KNOCKBACK",
-            "BASE_DELEGATE",
-            $"unit={name}, implementation={_knockback.GetType().Name}, strength={strength}",
-            this);
         _knockback.ApplyKnockback(direction, strength);
     }
 

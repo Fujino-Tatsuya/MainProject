@@ -56,7 +56,7 @@ public partial class SetPositionThroughRaycastAction : Action
             // Failure를 반환하면 상위 Sequence가 즉시 종료돼 Idle 정리 블록이 스킵되고
             // Dead로 전파되므로, 여기서는 Success를 유지한다.
             Position.Value = wallPoint;
-            Debug.LogWarning($"SamplePosition failed near {wallPoint} (maxDistance={MaxDistance.Value}), using raw wall point.");
+            Edit.LogWarning($"SamplePosition failed near {wallPoint} (maxDistance={MaxDistance.Value}), using raw wall point.");
         }
 
         if (NavMesh.Raycast(Agent.Value.transform.position, Position.Value, out NavMeshHit navMeshHit, areaMask))
@@ -64,7 +64,7 @@ public partial class SetPositionThroughRaycastAction : Action
             Position.Value = navMeshHit.position;
         }
 
-        Debug.Log($"SetPositionThroughRaycastAction: Position set to {Position.Value}");
+        Edit.Log($"SetPositionThroughRaycastAction: Position set to {Position.Value}");
 
         return Status.Success;
     }
