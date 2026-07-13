@@ -650,15 +650,15 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 1713885100698644901, guid: bc75b318f39c223498b5be6f18c5ea93, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 4.17389
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1713885100698644901, guid: bc75b318f39c223498b5be6f18c5ea93, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -0
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1713885100698644901, guid: bc75b318f39c223498b5be6f18c5ea93, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -0.56745
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1713885100698644901, guid: bc75b318f39c223498b5be6f18c5ea93, type: 3}
       propertyPath: m_LocalRotation.w
@@ -795,14 +795,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TwentyThreeArenaContext
   ShowTopMostFoldoutHeaderGroup: 1
-  bossPrefab: {fileID: 6048960277833949737, guid: ec098039733a00145a352f70e7611fe9, type: 3}
+  bossPrefab: {fileID: 5372104213593212626, guid: 1100cccaacdc1fe4ca3e1eb9680f8c75, type: 3}
   ChargingObjects:
   - {fileID: 1929793192}
   - {fileID: 1063592043}
   - {fileID: 299937201}
   - {fileID: 30393467}
   bossPos: {x: 10, y: 0, z: 10}
-  spawnCnt: 100
 --- !u!1 &1063592036
 GameObject:
   m_ObjectHideFlags: 0

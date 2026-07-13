@@ -139,7 +139,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 2282465424
+  GlobalObjectIdHash: 1250559839
   InScenePlacedSourceGlobalObjectIdHash: 1250559839
   DeferredDespawnTick: 0
   Ownership: 8
@@ -306,56 +306,8 @@ MonoBehaviour:
   animator: {fileID: 3980452584406513891}
   attackData: {fileID: 11400000, guid: 8d6735b7ed4fc9e49b360d6bbcb907a5, type: 2}
   playerDefaultAttack: {fileID: 4525831256458907740}
-  comboInputType: 1
-  attackSteps:
-  - clip: {fileID: 7743820057955227385, guid: cd27b044584c25e4d8f0cf1d2d12845e, type: 3}
-    motionDuration: 0.5
-    movementType: 2
-    forwardDistance: 1
-    rotationType: 1
-    trackRotationSpeed: 12
-    hitType: 0
-    projectilePrefab: {fileID: 0}
-    projectileSpeed: 12
-    raycastRange: 20
-    attackDamageMultiplier: 1
-    flatDamageBonus: 0
-  - clip: {fileID: 528945471217504453, guid: 9765f5f25910f8e4787cb607e2dcfd6d, type: 3}
-    motionDuration: 0.5
-    movementType: 2
-    forwardDistance: 1
-    rotationType: 1
-    trackRotationSpeed: 12
-    hitType: 0
-    projectilePrefab: {fileID: 0}
-    projectileSpeed: 12
-    raycastRange: 20
-    attackDamageMultiplier: 1
-    flatDamageBonus: 0
-  - clip: {fileID: 1666602461442742344, guid: a453adc3b73dcb9409eab16ad723930c, type: 3}
-    motionDuration: 0.5
-    movementType: 2
-    forwardDistance: 1
-    rotationType: 1
-    trackRotationSpeed: 12
-    hitType: 0
-    projectilePrefab: {fileID: 0}
-    projectileSpeed: 12
-    raycastRange: 20
-    attackDamageMultiplier: 1
-    flatDamageBonus: 0
-  - clip: {fileID: -8397454821858528057, guid: e0e4735c9749f534da624659d5fb140b, type: 3}
-    motionDuration: 0.5
-    movementType: 2
-    forwardDistance: 1
-    rotationType: 1
-    trackRotationSpeed: 12
-    hitType: 0
-    projectilePrefab: {fileID: 0}
-    projectileSpeed: 12
-    raycastRange: 20
-    attackDamageMultiplier: 1
-    flatDamageBonus: 0
+  chainPolicy: 0
+  attackSteps: []
   defaultHitbox: {fileID: 4124164167168416360}
   hittableLayers:
     serializedVersion: 2
@@ -390,6 +342,7 @@ MonoBehaviour:
   currentStateDebug: 0
   minKnockbackTime: 0.15
   maxKnockbackTime: 1.5
+  serverKnockbackReportGraceTime: 0.25
   knockbackStopSpeed: 0.15
 --- !u!1 &8896633917232358439
 GameObject:
@@ -503,37 +456,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Armature
       objectReference: {fileID: 0}
-    - target: {fileID: 6834237226984651676, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
-      propertyPath: m_Size.x
-      value: 1.19
-      objectReference: {fileID: 0}
-    - target: {fileID: 6834237226984651676, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
-      propertyPath: m_Size.y
-      value: 1.5185375
-      objectReference: {fileID: 0}
-    - target: {fileID: 6834237226984651676, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
-      propertyPath: m_Size.z
-      value: 1.8886403
-      objectReference: {fileID: 0}
-    - target: {fileID: 6834237226984651676, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
-      propertyPath: m_Center.x
-      value: -0.0000031931802
-      objectReference: {fileID: 0}
-    - target: {fileID: 6834237226984651676, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
-      propertyPath: m_Center.y
-      value: 0.5907402
-      objectReference: {fileID: 0}
-    - target: {fileID: 6834237226984651676, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
-      propertyPath: m_Center.z
-      value: -0.16600186
-      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: 6798877021700322801, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 5171625135088924833}
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
 --- !u!95 &3980452584406513891 stripped
 Animator:
@@ -556,23 +482,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 6129863144953294667, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
   m_PrefabInstance: {fileID: 3804664619706551762}
   m_PrefabAsset: {fileID: 0}
---- !u!1 &7680489978896873507 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 6798877021700322801, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
-  m_PrefabInstance: {fileID: 3804664619706551762}
-  m_PrefabAsset: {fileID: 0}
---- !u!114 &5171625135088924833
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7680489978896873507}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b2a4a9e0b93645a4eb7f6b13adf3a2d3, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PlayerRootMotionRelay
 --- !u!1001 &6267298663107183514
 PrefabInstance:
   m_ObjectHideFlags: 0
