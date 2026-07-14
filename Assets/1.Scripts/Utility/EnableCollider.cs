@@ -1,4 +1,4 @@
-using UnityEngine;
+ï»¿using UnityEngine;
 using Unity.Netcode;
 
 public class EnableCollider : NetworkBehaviour
@@ -28,7 +28,7 @@ public class EnableCollider : NetworkBehaviour
         _hasSphere = (_sphereCollider) ? true : false;
         _hasMesh = (_meshCollider) ? true : false;
 
-        // ÃÊ±âÈ­ °ª
+        // ì´ˆê¸°í™” ê°’
         ApplyColliderEnabled(_initValue);
     }
 
@@ -36,7 +36,7 @@ public class EnableCollider : NetworkBehaviour
     {
         base.OnNetworkSpawn();
 
-        // ¼­¹ö±ÇÀ§ÀÎµ¥ ¼­¹ö°¡ ¾Æ´Ò °æ¿ì
+        // ì„œë²„ê¶Œìœ„ì¸ë° ì„œë²„ê°€ ì•„ë‹ ê²½ìš°
         if (_isServerAuthority && !IsServer)
         {
             ApplyColliderEnabled(false);
@@ -44,9 +44,9 @@ public class EnableCollider : NetworkBehaviour
     }
 
     /// <summary>
-    /// ÇØ´ç ÄÄÆ÷³ÍÆ®°¡ ºÎÂøµÇ¾î ÀÖ´Â ¿ÀºêÁ§Æ®ÀÇ Äİ¶óÀÌ´õ È°¼ºÈ­ ¿©ºÎ¸¦ ¼ÂÆÃÇÏ´Â ÇÔ¼ö
+    /// í•´ë‹¹ ì»´í¬ë„ŒíŠ¸ê°€ ë¶€ì°©ë˜ì–´ ìˆëŠ” ì˜¤ë¸Œì íŠ¸ì˜ ì½œë¼ì´ë” í™œì„±í™” ì—¬ë¶€ë¥¼ ì…‹íŒ…í•˜ëŠ” í•¨ìˆ˜
     /// </summary>
-    /// <param name="enable">true : È°¼ºÈ­, false : ºñÈ°¼ºÈ­ </param>
+    /// <param name="enable">true : í™œì„±í™”, false : ë¹„í™œì„±í™” </param>
     public void SetEnableCollider(bool enable)
     {
         if (_isServerAuthority && !IsServer)

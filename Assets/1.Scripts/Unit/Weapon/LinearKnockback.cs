@@ -1,8 +1,8 @@
-using Unity.Netcode;
+ï»¿using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.AI;
 
-// Unit, Rigidbody/NavMeshAgent¿Í °°Àº ÃÖ»ó´Ü ¿ÀºêÁ§Æ®¿¡ À§Ä¡ÇØ ÀÖ¾î¾ß ÇÔ
+// Unit, Rigidbody/NavMeshAgentì™€ ê°™ì€ ìµœìƒë‹¨ ì˜¤ë¸Œì íŠ¸ì— ìœ„ì¹˜í•´ ìˆì–´ì•¼ í•¨
 public class LinearKnockback : NetworkBehaviour, IKnockbackable
 {
     NavMeshAgent _navMeshAgent;
@@ -10,7 +10,7 @@ public class LinearKnockback : NetworkBehaviour, IKnockbackable
     bool _isKnockbacking;
 
     [SerializeField] float maxDistance = 2f;
-    [Header("³Ë¹é Á¾·á Á¶°Ç")]
+    [Header("ë„‰ë°± ì¢…ë£Œ ì¡°ê±´")]
     [SerializeField] float minKnockbackTime = 0.15f;
     [SerializeField] float maxKnockbackTime = 1.5f;
     [SerializeField] float stopSpeed = 0.15f;
@@ -18,15 +18,15 @@ public class LinearKnockback : NetworkBehaviour, IKnockbackable
     float _knockbackStartTime;
 
     /// <summary>
-    /// IKnockbackableÀÇ ApplyKnockback ±¸Çö
+    /// IKnockbackableì˜ ApplyKnockback êµ¬í˜„
     /// </summary>
-    /// <param name="direction">³Ë¹é ¹æÇâ</param>
-    /// <param name="strength">³Ë¹é ¼¼±â</param>
+    /// <param name="direction">ë„‰ë°± ë°©í–¥</param>
+    /// <param name="strength">ë„‰ë°± ì„¸ê¸°</param>
     public void ApplyKnockback(Vector3 direction, float strength)
     {
         if (!IsServer) return;
 
-        // ³Ë¹éÀ» Àû¿ëÇÒ ¿ÀºêÁ§Æ®ÀÇ ¼ÒÀ¯ÀÚ¿¡°Ô¸¸ RPC¸¦ º¸³»¼­ ³Ë¹éÀ» Àû¿ë
+        // ë„‰ë°±ì„ ì ìš©í•  ì˜¤ë¸Œì íŠ¸ì˜ ì†Œìœ ìì—ê²Œë§Œ RPCë¥¼ ë³´ë‚´ì„œ ë„‰ë°±ì„ ì ìš©
         ClientRpcParams rpcParams = new ClientRpcParams
         {
             Send = new ClientRpcSendParams

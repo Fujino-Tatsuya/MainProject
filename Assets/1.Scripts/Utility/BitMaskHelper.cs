@@ -1,13 +1,13 @@
-using System.Collections.Generic;
+ï»¿using System.Collections.Generic;
 
 public class BitMaskHelper <T> where T : System.Enum
 {
     /// <summary>
-    /// ¿øº» enum °ª¿¡ »õ·Î¿î enum °ªÀ» Ãß°¡ÇÏ´Â ÇÔ¼ö
+    /// ì›ë³¸ enum ê°’ì— ìƒˆë¡œìš´ enum ê°’ì„ ì¶”ê°€í•˜ëŠ” í•¨ìˆ˜
     /// </summary>
-    /// <param name="original">º¯°æÇÒ ¿øº» enum °ª</param>
-    /// <param name="newState">Ãß°¡ÇÒ »õ·Î¿î enum °ª</param>
-    /// <returns>¿øº» enum °ª¿¡ »õ·Î¿î enum °ªÀÌ Ãß°¡µÈ °á°ú</returns>
+    /// <param name="original">ë³€ê²½í•  ì›ë³¸ enum ê°’</param>
+    /// <param name="newState">ì¶”ê°€í•  ìƒˆë¡œìš´ enum ê°’</param>
+    /// <returns>ì›ë³¸ enum ê°’ì— ìƒˆë¡œìš´ enum ê°’ì´ ì¶”ê°€ëœ ê²°ê³¼</returns>
     public static T Add(T original, T newState)
     {
         int originalValue = System.Convert.ToInt32(original);
@@ -17,11 +17,11 @@ public class BitMaskHelper <T> where T : System.Enum
     }
 
     /// <summary>
-    /// »õ·Î¿î enum °ªÀ» ¿øº» enum °ª¿¡¼­ Á¦°ÅÇÏ´Â ÇÔ¼ö
+    /// ìƒˆë¡œìš´ enum ê°’ì„ ì›ë³¸ enum ê°’ì—ì„œ ì œê±°í•˜ëŠ” í•¨ìˆ˜
     /// </summary>
-    /// <param name="original">º¯°æÇÒ ¿øº» enum °ª</param>
-    /// <param name="newState">Á¦°ÅÇÒ »õ·Î¿î enum °ª</param>
-    /// <returns>¿øº» enum °ª¿¡¼­ »õ·Î¿î enum°ªÀÌ Á¦°ÅµÈ °á°ú</returns>
+    /// <param name="original">ë³€ê²½í•  ì›ë³¸ enum ê°’</param>
+    /// <param name="newState">ì œê±°í•  ìƒˆë¡œìš´ enum ê°’</param>
+    /// <returns>ì›ë³¸ enum ê°’ì—ì„œ ìƒˆë¡œìš´ enumê°’ì´ ì œê±°ëœ ê²°ê³¼</returns>
     public static T Remove(T original, T newState)
     {
         long originalValue = System.Convert.ToInt64(original);
@@ -31,22 +31,22 @@ public class BitMaskHelper <T> where T : System.Enum
     }
     
     /// <summary>
-    /// µÎ enum °ªÀÌ µ¿ÀÏÇÑÁö È®ÀÎÇÏ´Â ÇÔ¼ö
+    /// ë‘ enum ê°’ì´ ë™ì¼í•œì§€ í™•ì¸í•˜ëŠ” í•¨ìˆ˜
     /// </summary>
-    /// <param name="original">ºñ±³ÇÒ ¿øº» enum °ª</param>
-    /// <param name="newState">ºñ±³ÇÒ »õ·Î¿î enum °ª</param>
-    /// <returns>µÎ enum °ªÀÌ µ¿ÀÏÇÏ¸é true, ±×·¸Áö ¾ÊÀ¸¸é false</returns>
+    /// <param name="original">ë¹„êµí•  ì›ë³¸ enum ê°’</param>
+    /// <param name="newState">ë¹„êµí•  ìƒˆë¡œìš´ enum ê°’</param>
+    /// <returns>ë‘ enum ê°’ì´ ë™ì¼í•˜ë©´ true, ê·¸ë ‡ì§€ ì•Šìœ¼ë©´ false</returns>
     public static bool CheckEquals(T original, T newState)
     {
         return EqualityComparer<T>.Default.Equals(original, newState);
     }
 
     /// <summary>
-    /// »õ·Î¿î enum °ªÀÌ ¿øº» enum °ª¿¡ Æ÷ÇÔµÇ¾î ÀÖ´ÂÁö È®ÀÎÇÏ´Â ÇÔ¼ö
+    /// ìƒˆë¡œìš´ enum ê°’ì´ ì›ë³¸ enum ê°’ì— í¬í•¨ë˜ì–´ ìˆëŠ”ì§€ í™•ì¸í•˜ëŠ” í•¨ìˆ˜
     /// </summary>
-    /// <param name="original">ºñ±³ÇÒ ¿øº» enum °ª</param>
-    /// <param name="newState">ºñ±³ÇÒ »õ·Î¿î enum °ª</param>
-    /// <returns>»õ·Î¿î enum °ªÀÌ ¿øº» enum °ª¿¡ Æ÷ÇÔµÇ¾î ÀÖÀ¸¸é true, ±×·¸Áö ¾ÊÀ¸¸é false</returns>
+    /// <param name="original">ë¹„êµí•  ì›ë³¸ enum ê°’</param>
+    /// <param name="newState">ë¹„êµí•  ìƒˆë¡œìš´ enum ê°’</param>
+    /// <returns>ìƒˆë¡œìš´ enum ê°’ì´ ì›ë³¸ enum ê°’ì— í¬í•¨ë˜ì–´ ìˆìœ¼ë©´ true, ê·¸ë ‡ì§€ ì•Šìœ¼ë©´ false</returns>
     public static bool CheckContains(T original, T newState)
     {
         long originalValue = System.Convert.ToInt64(original);
