@@ -288,7 +288,7 @@ MonoBehaviour:
   moveSpeed: 10
   attackSpeed: 0
   maxHp: 300
-  defense: 5
+  defense: 25
   maxShield: 10
 --- !u!114 &1825865676068489031
 MonoBehaviour:

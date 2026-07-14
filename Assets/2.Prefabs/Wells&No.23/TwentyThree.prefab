@@ -1182,7 +1182,7 @@ MonoBehaviour:
   chaseSpeed: 0
   attackSpeed: 1
   maxHp: 100
-  defense: 5
+  defense: 25
   maxShield: 100
   _groggyCount: 0
   _maxGroggyCount: 2
