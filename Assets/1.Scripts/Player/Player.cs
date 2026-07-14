@@ -90,9 +90,17 @@ public class Player : Unit
         stateController.EndInterrupt();
     }
 
-    public bool SetState(PlayerActionState state)
+    public bool BeginAttackState()
     {
-        return stateController.ChangeState(state);
+        return stateController.ChangeState(PlayerActionState.Attack);
+    }
+
+    public bool EndAttackState()
+    {
+        if (stateController.CurrentState != PlayerActionState.Attack)
+            return false;
+
+        return stateController.ChangeState(PlayerActionState.Idle);
     }
 
     protected override void OnKnockback(Vector3 direction, float strength)

@@ -113,11 +113,6 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
         return true;
     }
 
-    public bool BeginKnockback()
-    {
-        return BeginKnockback(Vector3.zero, 0f);
-    }
-
     public bool BeginKnockback(Vector3 direction, float strength)
     {
         bool isDead = CurrentState == PlayerActionState.Dead;
@@ -159,7 +154,7 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
             PlayerActionState.Move => !context.StatusEffects.BlocksMovement,
             PlayerActionState.Idle => true,
             PlayerActionState.Grabbed => true,
-            PlayerActionState.Knockback => !context.StatusEffects.HasSuperArmor,
+            PlayerActionState.Knockback => false, // 방향·세기가 필수라 BeginKnockback(direction, strength)으로만 진입
             PlayerActionState.Dead => true,
             _ => false
         };
@@ -174,7 +169,6 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
             PlayerActionState.Attack => new PlayerAttackState(context),
             PlayerActionState.Interrupt => new PlayerInterruptState(context),
             PlayerActionState.Grabbed => new PlayerGrabbedState(context),
-            PlayerActionState.Knockback => new PlayerKnockbackState(context, Vector3.zero, 0f),
             PlayerActionState.Dead => new PlayerLockedState(context, PlayerActionState.Dead),
             _ => new PlayerIdleState(context)
         };

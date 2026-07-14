@@ -20,9 +20,15 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
 
     #region 체력과 방어력
     protected Health _health;
-    public int CurrentHealth { get { return _health.CurrentHealth; } }
-    public int MaxHp { get { return _health.MaxHp; } }
+    // _health는 서버에서만 생성됨(Initialize) — 클라이언트는 복제된 NetworkVariable을 읽는다
+    public int CurrentHealth { get { return _health != null ? _health.CurrentHealth : _currentHp.Value; } }
+    public int MaxHp { get { return _health != null ? _health.MaxHp : _maxHp.Value; } }
     protected NetworkVariable<int> _currentHp = new NetworkVariable<int>(
+    0,
+    NetworkVariableReadPermission.Everyone,
+    NetworkVariableWritePermission.Server
+);
+    protected NetworkVariable<int> _maxHp = new NetworkVariable<int>(
     0,
     NetworkVariableReadPermission.Everyone,
     NetworkVariableWritePermission.Server
@@ -216,15 +222,6 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     }
 
     [Rpc(SendTo.Server)]
-    public void TakeDamageRpc(int damage, RpcParams rpcParams = default)
-    {
-        if (rpcParams.Receive.SenderClientId != OwnerClientId)
-            return;
-
-        TakeDamage(damage);
-    }
-
-    [Rpc(SendTo.Server)]
     public void HealHpRpc(int healAmount, RpcParams rpcParams = default)
     {
         if (rpcParams.Receive.SenderClientId != OwnerClientId)
@@ -314,6 +311,7 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
 
         _health = new Health(maxHp, defense, maxShield);
         _currentHp.Value = maxHp;
+        _maxHp.Value = maxHp;
 
         UpdateNetworkShield();
 

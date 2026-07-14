@@ -360,9 +360,7 @@ public class DefaultAttackController : BaseNetworkBehaviour
 
         isRequestingAttack = false;
 
-        if (player != null &&
-            player.CurrentState != PlayerActionState.Attack &&
-            !player.SetState(PlayerActionState.Attack))
+        if (player != null && !player.BeginAttackState())
         {
             ResetAttackRuntime();
             return;
@@ -379,8 +377,7 @@ public class DefaultAttackController : BaseNetworkBehaviour
 
         ResetAttackRuntime();
 
-        if (player != null && player.CurrentState == PlayerActionState.Attack)
-            player.SetState(PlayerActionState.Idle);
+        player?.EndAttackState();
 
         if (animator != null)
             animator.CrossFadeInFixedTime(IdleHash, 0.05f);
@@ -418,9 +415,9 @@ public class DefaultAttackController : BaseNetworkBehaviour
         int damageSnapshot = CalculateDamageSnapshot(step);
         playerDefaultAttack.PrepareStep(step, damageSnapshot, attackDirection);
 
-        if (player != null && player.CurrentState != PlayerActionState.Attack)
+        if (player != null)
         {
-            player.SetState(PlayerActionState.Attack);
+            player.BeginAttackState();
         }
 
         StartAttackPresentation(attackIndex, attackDirection, triggerAttack);
@@ -504,8 +501,7 @@ public class DefaultAttackController : BaseNetworkBehaviour
     {
         ResetAttackRuntime();
 
-        if (player != null && player.CurrentState == PlayerActionState.Attack)
-            player.SetState(PlayerActionState.Idle);
+        player?.EndAttackState();
 
         if (animator != null)
             animator.CrossFadeInFixedTime(IdleHash, 0.05f);
