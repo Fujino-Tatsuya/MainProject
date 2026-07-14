@@ -328,7 +328,7 @@ MonoBehaviour:
   isGroggyAttack: 0
   targetLayer:
     serializedVersion: 2
-    m_Bits: 64
+    m_Bits: 8192
   attackType: 0
   triggerMode: 0
   stayTime: 0
@@ -939,6 +939,7 @@ GameObject:
   - component: {fileID: 7020066614126957741}
   - component: {fileID: 2302287723897775423}
   - component: {fileID: 8420402705270843187}
+  - component: {fileID: 8734512906874521134}
   m_Layer: 8
   m_Name: ModularRobots_R1
   m_TagString: Untagged
@@ -1628,3 +1629,16 @@ Transform:
   - {fileID: 8187141956482287634}
   m_Father: {fileID: 569754481335400209}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &8734512906874521134
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6048960277833949737}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4ff6f17a7ad346d48ad09109dd1ef5d3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Hurtbox
+  ownerUnit: {fileID: 8805211339034511167}
