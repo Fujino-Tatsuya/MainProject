@@ -132,7 +132,7 @@ MonoBehaviour:
   isGroggyAttack: 0
   targetLayer:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 8192
   attackType: 0
   triggerMode: 1
   stayTime: 0.5
@@ -527,6 +527,6 @@ MonoBehaviour:
   isGroggyAttack: 0
   targetLayer:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 64
   attackType: 0
   knockbackStrength: 5
