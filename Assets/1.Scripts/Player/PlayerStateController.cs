@@ -494,6 +494,7 @@ public sealed class PlayerGrabbedState : PlayerStateBase
             : null;
         followTarget = grabController != null ? grabController.GrabSocket : null;
         DelegatePhysicsAndCollisionToInstigator();
+        FaceInstigator();
         // TODO: Play the grabbed animation here after the Animator parameter/clip is configured.
         // Example: Context.Animator.SetBool("IsGrabbed", true);
     }
@@ -501,7 +502,7 @@ public sealed class PlayerGrabbedState : PlayerStateBase
     public override void Exit(PlayerActionState nextState)
     {
         RestorePlayerPhysicsAndCollision();
-        ResetRootRotation();
+        FaceInstigator();
         // TODO: Stop the grabbed animation here after the Animator parameter/clip is configured.
         // Example: Context.Animator.SetBool("IsGrabbed", false);
     }
@@ -547,12 +548,24 @@ public sealed class PlayerGrabbedState : PlayerStateBase
         Context.Rigidbody.angularVelocity = Vector3.zero;
     }
 
-    private void ResetRootRotation()
+    // 잡기 소켓에 슬레이브되며 생긴 기울어짐을 정리하고 보스 방향(yaw만)으로 세운다.
+    // instigator가 없으면 현재 바라보던 방향을 유지한 채 똑바로만 세운다.
+    private void FaceInstigator()
     {
-        if (Context.Rigidbody != null)
-            Context.Rigidbody.rotation = Quaternion.identity;
+        Vector3 lookDirection = instigator != null
+            ? instigator.transform.position - Context.Player.transform.position
+            : Context.Player.transform.forward;
+        lookDirection.y = 0f;
 
-        Context.Player.transform.rotation = Quaternion.identity;
+        if (lookDirection.sqrMagnitude < 0.0001f)
+            return;
+
+        Quaternion rotation = Quaternion.LookRotation(lookDirection.normalized);
+
+        if (Context.Rigidbody != null)
+            Context.Rigidbody.rotation = rotation;
+
+        Context.Player.transform.rotation = rotation;
     }
 }
 
