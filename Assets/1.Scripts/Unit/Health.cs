@@ -81,6 +81,7 @@ public class Health
         _currentShield -= damage;
         _currentShield = Mathf.Max(_currentShield, 0); // 쉴드가 0 이하로 떨어지지 않도록 보장
         _hasShield = (_currentShield > 0)? true : false;
+        Edit.Log($"[Unit] 쉴드 피해량: {damage}   /   현재 쉴드: {_currentShield}");
     }
 
     /// <summary>

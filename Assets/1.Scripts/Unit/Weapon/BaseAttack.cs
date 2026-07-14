@@ -110,7 +110,9 @@ public class BaseAttack : MonoBehaviour
 
         AttackInfo attackInfo = CreateAttackInfo(overrideDamage);
 
-        return unit.ReceiveAttack(attackInfo, CreateHitContext(null));
+        bool resolved = unit.ReceiveAttack(attackInfo, CreateHitContext(null));
+        LogHit(resolved, unit.name, attackInfo);
+        return resolved;
     }
 
     protected bool TryResolveHit(Hurtbox hurtbox, int? overrideDamage = null)
@@ -119,7 +121,9 @@ public class BaseAttack : MonoBehaviour
             return false;
 
         AttackInfo attackInfo = CreateAttackInfo(overrideDamage);
-        return hurtbox.ReceiveAttack(attackInfo, CreateHitContext(null));
+        bool resolved = hurtbox.ReceiveAttack(attackInfo, CreateHitContext(null));
+        LogHit(resolved, GetTargetName(hurtbox), attackInfo);
+        return resolved;
     }
 
     protected bool TryResolveHit(Hurtbox hurtbox, Collider hit, int? overrideDamage = null)
@@ -128,7 +132,22 @@ public class BaseAttack : MonoBehaviour
             return false;
 
         AttackInfo attackInfo = CreateAttackInfo(overrideDamage);
-        return hurtbox.ReceiveAttack(attackInfo, CreateHitContext(hit));
+        bool resolved = hurtbox.ReceiveAttack(attackInfo, CreateHitContext(hit));
+        LogHit(resolved, GetTargetName(hurtbox), attackInfo);
+        return resolved;
+    }
+
+    void LogHit(bool resolved, string targetName, AttackInfo attackInfo)
+    {
+        if (!resolved)
+            return;
+
+        Edit.Log($"[Attack] {name} -> {targetName} 적중 (피해 {attackInfo.damage}, {attackInfo.attackType})", this);
+    }
+
+    static string GetTargetName(Hurtbox hurtbox)
+    {
+        return hurtbox.TryGetOwner(out Unit owner) ? owner.name : hurtbox.name;
     }
 
     protected bool TryGetHurtbox(Collider hit, out Hurtbox hurtbox)
