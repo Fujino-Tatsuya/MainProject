@@ -26,20 +26,20 @@ public partial class HoldBombAction : Action
     {
         if (BombInstance.Value == null)
         {
-            Debug.LogError("BombInstance is null");
+            Debug.LogError("[BT] BombInstance is null");
             return false;
         }
 
         if (BombSocket.Value == null)
         {
-            Debug.LogError("BombSocket is null");
+            Debug.LogError("[BT] BombSocket is null");
             return false;
         }
 
         bombController = BombInstance.Value.GetComponent<BombController>();
         if (bombController == null)
         {
-            Debug.LogError("bombController is null");
+            Debug.LogError("[BT] bombController is null");
             return false;
         }
 

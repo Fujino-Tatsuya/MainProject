@@ -127,13 +127,13 @@ public class NetworkLoadingFlowController : MonoBehaviour
 
         if (!IsServerActive)
         {
-            Edit.LogWarning("Only the server or host can start the loading flow.");
+            Edit.LogWarning("[Loading] Only the server or host can start the loading flow.");
             return;
         }
 
         if (requireLobbyReadyToStart && !CanStartFromLobby())
         {
-            Edit.LogWarning("Cannot start game loading until all connected clients are ready.");
+            Edit.LogWarning("[Loading] Cannot start game loading until all connected clients are ready.");
             return;
         }
 
@@ -151,7 +151,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
         LogDebug($"Requested loading scene load. status={status}.");
         if (status != SceneEventProgressStatus.Started)
         {
-            Edit.LogWarning($"Failed to load {loadingSceneName} with {nameof(SceneEventProgressStatus)}.{status}.");
+            Edit.LogWarning($"[Loading] Failed to load {loadingSceneName} with {nameof(SceneEventProgressStatus)}.{status}.");
         }
     }
 
@@ -353,7 +353,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
     {
         if (!IsServerActive)
         {
-            Edit.LogWarning("Only the server or host can spawn player objects.");
+            Edit.LogWarning("[Loading] Only the server or host can spawn player objects.");
             return;
         }
 
@@ -393,13 +393,13 @@ public class NetworkLoadingFlowController : MonoBehaviour
         var prefab = ResolvePlayerPrefabForClient(clientId);
         if (prefab == null)
         {
-            Edit.LogWarning($"Player prefab is not assigned. clientId={clientId}");
+            Edit.LogWarning($"[Loading] Player prefab is not assigned. clientId={clientId}");
             return;
         }
 
         if (!prefab.TryGetComponent<NetworkObject>(out _))
         {
-            Edit.LogWarning($"Player prefab must have a {nameof(NetworkObject)} component. prefab={prefab.name}");
+            Edit.LogWarning($"[Loading] Player prefab must have a {nameof(NetworkObject)} component. prefab={prefab.name}");
             return;
         }
 
@@ -472,7 +472,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
 
         if (status != SceneEventProgressStatus.Started)
         {
-            Edit.LogWarning($"Failed to load {targetSceneName} with {nameof(SceneEventProgressStatus)}.{status}.");
+            Edit.LogWarning($"[Loading] Failed to load {targetSceneName} with {nameof(SceneEventProgressStatus)}.{status}.");
         }
 
         _targetLoadRoutine = null;
@@ -862,7 +862,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
         LogDebug($"Requested scene unload. scene={sceneName}, status={status}.");
         if (status != SceneEventProgressStatus.Started)
         {
-            Edit.LogWarning($"Failed to unload {sceneName} with {nameof(SceneEventProgressStatus)}.{status}.");
+            Edit.LogWarning($"[Loading] Failed to unload {sceneName} with {nameof(SceneEventProgressStatus)}.{status}.");
             yield break;
         }
 

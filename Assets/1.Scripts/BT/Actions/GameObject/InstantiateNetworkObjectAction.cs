@@ -25,14 +25,14 @@ public partial class InstantiateNetworkObjectAction : Action
     {
         if (Object.Value == null)
         {
-            Debug.LogError("Object is null");
+            Debug.LogError("[BT] Object is null");
             return false;
         }
 
         _networkObject = Object.Value.GetComponent<NetworkObject>();
         if (_networkObject == null)
         {
-            Debug.LogError("The Object doesn't include 'NetworkObject' component!");
+            Debug.LogError("[BT] The Object doesn't include 'NetworkObject' component!");
             return false;
         }
 

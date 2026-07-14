@@ -25,13 +25,13 @@ public partial class SetPositionToTargetAction : Action
     {
         if (Position.Value == null)
         {
-            Debug.LogError("Position is null");
+            Debug.LogError("[BT] Position is null");
             return false;
         }
 
         if (Target.Value == null)
         {
-            Debug.LogError("Target is null");
+            Debug.LogError("[BT] Target is null");
             return false;
         }
 

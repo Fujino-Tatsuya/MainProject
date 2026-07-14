@@ -1,28 +1,28 @@
-using System;
+ï»¿using System;
 using System.Collections.Generic;
 using UnityEngine;
 
 public abstract class BaseAttackChoice : MonoBehaviour
 {
     /// <summary>
-    /// °Å¸®¿Í È®·ü¿¡ µû¶ó ·£´ıÀ¸·Î enumÀÇ »óÅÂ¸¦ int·Î ¹İÈ¯
+    /// ê±°ë¦¬ì™€ í™•ë¥ ì— ë”°ë¼ ëœë¤ìœ¼ë¡œ enumì˜ ìƒíƒœë¥¼ intë¡œ ë°˜í™˜
     /// </summary>
-    /// <param name="currentDistance">enemy¿Í player °£ÀÇ °Å¸®</param>
-    /// <returns>Æ¯Á¤ enumÀÇ ·£´ı »óÅÂ¸¦ int·Î ¹İÈ¯</returns>
+    /// <param name="currentDistance">enemyì™€ player ê°„ì˜ ê±°ë¦¬</param>
+    /// <returns>íŠ¹ì • enumì˜ ëœë¤ ìƒíƒœë¥¼ intë¡œ ë°˜í™˜</returns>
     public abstract int GetRandomAttack(float currentDistance);
 
     /// <summary>
-    /// Æ¯Á¤ °ø°İ Å¸ÀÔÀ» Ãß°¡ÇÕ´Ï´Ù. ÀÌ¹Ì Á¸ÀçÇÏ´Â °ø°İ Å¸ÀÔÀ» Ãß°¡ÇÏ·Á°í ÇÏ¸é °æ°í ¸Ş½ÃÁö¸¦ Ãâ·ÂÇÏ°í ¾Æ¹« ÀÛ¾÷µµ ¼öÇàÇÏÁö ¾Ê½À´Ï´Ù.
+    /// íŠ¹ì • ê³µê²© íƒ€ì…ì„ ì¶”ê°€í•©ë‹ˆë‹¤. ì´ë¯¸ ì¡´ì¬í•˜ëŠ” ê³µê²© íƒ€ì…ì„ ì¶”ê°€í•˜ë ¤ê³  í•˜ë©´ ê²½ê³  ë©”ì‹œì§€ë¥¼ ì¶œë ¥í•˜ê³  ì•„ë¬´ ì‘ì—…ë„ ìˆ˜í–‰í•˜ì§€ ì•ŠìŠµë‹ˆë‹¤.
     /// </summary>
-    /// <param name="type">Ãß°¡ÇÒ °ø°İ Å¸ÀÔ</param>
-    /// <param name="minDistance">°ø°İÀÇ ÃÖ¼Ò °Å¸®</param>
-    /// <param name="maxDistance">°ø°İÀÇ ÃÖ´ë °Å¸®</param>
-    /// <param name="percentage">°ø°İÀÇ È®·ü</param>
+    /// <param name="type">ì¶”ê°€í•  ê³µê²© íƒ€ì…</param>
+    /// <param name="minDistance">ê³µê²©ì˜ ìµœì†Œ ê±°ë¦¬</param>
+    /// <param name="maxDistance">ê³µê²©ì˜ ìµœëŒ€ ê±°ë¦¬</param>
+    /// <param name="percentage">ê³µê²©ì˜ í™•ë¥ </param>
     public abstract void AddType<T>(T type) where T : Enum;
 
     /// <summary>
-    /// Æ¯Á¤ °ø°İ Å¸ÀÔÀ» Á¦°ÅÇÕ´Ï´Ù. Á¦°ÅÇÒ °ø°İ Å¸ÀÔÀÌ Á¸ÀçÇÏÁö ¾ÊÀ¸¸é ¾Æ¹« ÀÛ¾÷µµ ¼öÇàÇÏÁö ¾Ê½À´Ï´Ù.
+    /// íŠ¹ì • ê³µê²© íƒ€ì…ì„ ì œê±°í•©ë‹ˆë‹¤. ì œê±°í•  ê³µê²© íƒ€ì…ì´ ì¡´ì¬í•˜ì§€ ì•Šìœ¼ë©´ ì•„ë¬´ ì‘ì—…ë„ ìˆ˜í–‰í•˜ì§€ ì•ŠìŠµë‹ˆë‹¤.
     /// </summary>
-    /// <param name="type">Á¦°ÅÇÒ °ø°İ Å¸ÀÔ</param>
+    /// <param name="type">ì œê±°í•  ê³µê²© íƒ€ì…</param>
     public abstract void RemoveType<T>(T type) where T : Enum;
 }

@@ -1,4 +1,4 @@
-using System;
+ï»¿using System;
 using Unity.Behavior;
 using UnityEngine;
 using Action = Unity.Behavior.Action;
@@ -12,10 +12,10 @@ public partial class GetAnimClipPlayTimeAction : Action
     [SerializeReference] public BlackboardVariable<Animator> Animator;
     [SerializeReference] public BlackboardVariable<float> PlayTime;
 
-    // ¾Ö´Ï¸ŞÀÌ¼Ç ¹è¼Ó ÆÄ¶ó¹ÌÅÍ
+    // ì• ë‹ˆë©”ì´ì…˜ ë°°ì† íŒŒë¼ë¯¸í„°
     [SerializeReference] public BlackboardVariable<string> Multiplier;
 
-    // State¿¡¼­ Àß¶ó³½ normalized ±¸°£ (¿¹: 0 ~ 100)
+    // Stateì—ì„œ ì˜ë¼ë‚¸ normalized êµ¬ê°„ (ì˜ˆ: 0 ~ 100)
     [SerializeReference] public BlackboardVariable<float> ClipStart;
     [SerializeReference] public BlackboardVariable<float> ClipEnd;
 
@@ -43,12 +43,12 @@ public partial class GetAnimClipPlayTimeAction : Action
         if (targetClip == null)
             return Status.Failure;
 
-        float baseLength = targetClip.length;   // ¾Ö´Ï¸ŞÀÌ¼Ç Å¬¸³ÀÇ ±âº» Àç»ı ±æÀÌ
+        float baseLength = targetClip.length;   // ì• ë‹ˆë©”ì´ì…˜ í´ë¦½ì˜ ê¸°ë³¸ ì¬ìƒ ê¸¸ì´
 
-        // Àß¶ó³½ ±¸°£ÀÇ ±æÀÌ
+        // ì˜ë¼ë‚¸ êµ¬ê°„ì˜ ê¸¸ì´
         float trimmedLength = baseLength * (ClipEnd.Value - ClipStart.Value) / 100f;
 
-        // speed¸¦ °í·ÁÇÑ ½ÇÁ¦ Àç»ı ½Ã°£
+        // speedë¥¼ ê³ ë ¤í•œ ì‹¤ì œ ì¬ìƒ ì‹œê°„
         float realPlayTime = trimmedLength / animSpeed;
 
         PlayTime.Value = realPlayTime;
@@ -60,19 +60,19 @@ public partial class GetAnimClipPlayTimeAction : Action
     {
         if (AnimClip.Value == "")
         {
-            Debug.LogError("AnimClip is null");
+            Debug.LogError("[BT] AnimClip is null");
             return false;
         }
 
         if (Animator.Value == null)
         {
-            Debug.LogError("Animator is null");
+            Debug.LogError("[BT] Animator is null");
             return false;
         }
 
         if (PlayTime == null)
         {
-            Debug.LogError("PlayTime is null");
+            Debug.LogError("[BT] PlayTime is null");
             return false;
         }
 

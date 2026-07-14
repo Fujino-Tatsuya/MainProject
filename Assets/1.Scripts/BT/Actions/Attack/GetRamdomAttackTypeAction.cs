@@ -30,13 +30,13 @@ public partial class GetRamdomAttackTypeAction : Action
         Type attackType = AttackType.ObjectValue.GetType();
         if (!attackType.IsEnum)
         {
-            Debug.LogError("AttackType is not Enum.");
+            Debug.LogError("[BT] AttackType is not Enum.");
             return false;
         }
 
         if (BaseAttackChoice == null)
         {
-            Debug.LogError("BaseAttackChoice is null");
+            Debug.LogError("[BT] BaseAttackChoice is null");
             return false;
         }
 

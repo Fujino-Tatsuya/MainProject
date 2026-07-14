@@ -18,7 +18,7 @@ public class Health
 
         _currentHp -= damage;
         _currentHp = Mathf.Max(_currentHp, 0); // 체력이 0 이하로 떨어지지 않도록 보장
-        Edit.Log($"피해량: {damage}   /   현재 체력: {_currentHp}");
+        Edit.Log($"[Unit] 피해량: {damage}   /   현재 체력: {_currentHp}");
     }
     /// <summary>
     /// healAmount만큼 체력을 회복시키는 함수
@@ -29,7 +29,7 @@ public class Health
         _currentHp += healAmount;
         _currentHp = Mathf.Min(_currentHp, _maxHp); // 체력이 최대 체력을 초과하지 않도록 보장
 
-        Edit.Log($"체력 증가량: {healAmount}   /   현재 체력: {_currentHp}");
+        Edit.Log($"[Unit] 체력 증가량: {healAmount}   /   현재 체력: {_currentHp}");
     }
     /// <summary>
     /// 체력을 최대치로 회복시키는 함수
@@ -103,7 +103,7 @@ public class Health
         _currentShield = Mathf.Min(_currentShield, _maxShield); // 쉴드가 최대 쉴드를 초과하지 않도록 보장
         _hasShield = (_currentShield > 0)? true : false;
 
-        Edit.Log($"쉴드 증가량: {shieldAmount}   /   현재 쉴드: {_currentShield}");
+        Edit.Log($"[Unit] 쉴드 증가량: {shieldAmount}   /   현재 쉴드: {_currentShield}");
     }
     #endregion
 

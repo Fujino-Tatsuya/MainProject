@@ -25,13 +25,13 @@ public partial class ServerSetTriggerIntAction : Action
     {
         if (Server == null)
         {
-            Debug.LogError("ServerSetAnimState is not assigned.");
+            Debug.LogError("[BT] ServerSetAnimState is not assigned.");
             return false;
         }
 
         if (State == null)
         {
-            Debug.LogError("State variable is not assigned.");
+            Debug.LogError("[BT] State variable is not assigned.");
             return false;
         }
 

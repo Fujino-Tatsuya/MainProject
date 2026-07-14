@@ -99,7 +99,7 @@ public static class BossAreaSubgraphExampleBuilder
         AssetDatabase.ImportAsset(GraphPath, ImportAssetOptions.ForceUpdate);
         Selection.activeObject = graph;
 
-        Debug.Log($"Created Behavior Graph example: {GraphPath}", graph);
+        Debug.Log($"[Utility] Created Behavior Graph example: {GraphPath}", graph);
     }
 
     private static void DeleteExistingAsset()

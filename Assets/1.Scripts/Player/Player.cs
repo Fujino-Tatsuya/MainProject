@@ -114,7 +114,7 @@ public class Player : Unit
             instigator != null ? instigator.GetComponentInParent<NetworkObject>() : null;
         if (instigatorNetworkObject == null)
         {
-            Debug.LogError("Grab instigator must belong to a spawned NetworkObject.", this);
+            Debug.LogError("[Player] Grab instigator must belong to a spawned NetworkObject.", this);
             return false;
         }
 
@@ -145,7 +145,7 @@ public class Player : Unit
 
         if (!instigatorReference.TryGet(out NetworkObject instigatorNetworkObject))
         {
-            Debug.LogError("Grab instigator NetworkObject could not be resolved on the owner.", this);
+            Debug.LogError("[Player] Grab instigator NetworkObject could not be resolved on the owner.", this);
             return;
         }
 

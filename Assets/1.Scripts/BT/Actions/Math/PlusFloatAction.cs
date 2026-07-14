@@ -1,4 +1,4 @@
-using System;
+ï»¿using System;
 using Unity.Behavior;
 using UnityEngine;
 using Action = Unity.Behavior.Action;
@@ -25,7 +25,7 @@ public partial class PlusFloatAction : Action
     {
         if (C == null)
         {
-            Debug.LogError("°è»ê °á°ú°ªÀ» ÀúÀåÇÒ º¯¼ö°¡ ¾ø½À´Ï´Ù.");
+            Debug.LogError("[BT] ê³„ì‚° ê²°ê³¼ê°’ì„ ì €ì¥í•  ë³€ìˆ˜ê°€ ì—†ìŠµë‹ˆë‹¤.");
             return false;
         }
         return true;

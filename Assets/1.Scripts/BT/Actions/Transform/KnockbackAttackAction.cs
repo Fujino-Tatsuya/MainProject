@@ -24,13 +24,13 @@ public partial class KnockbackAttackAction : Action
     {
         if (Target.Value == null)
         {
-            Debug.LogError("Target is null");
+            Debug.LogError("[BT] Target is null");
             return false;
         }
 
         if (KnobackAttack.Value == null)
         {
-            Debug.LogError("KnobackAttack script is null");
+            Debug.LogError("[BT] KnobackAttack script is null");
             return false;
         }
 

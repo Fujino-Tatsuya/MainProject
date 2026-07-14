@@ -73,7 +73,7 @@ public class PlayerDefaultAttack : BaseAttack
     {
         if (hitbox == null)
         {
-            Edit.LogWarning("PlayerDefaultAttack requires a ColliderInfo hitbox.", this);
+            Edit.LogWarning("[Player] PlayerDefaultAttack requires a ColliderInfo hitbox.", this);
             return;
         }
 
@@ -117,7 +117,7 @@ public class PlayerDefaultAttack : BaseAttack
     {
         if (currentStep.ProjectilePrefab == null)
         {
-            Edit.LogWarning("Projectile default attack requires a projectile prefab.", this);
+            Edit.LogWarning("[Player] Projectile default attack requires a projectile prefab.", this);
             return;
         }
 

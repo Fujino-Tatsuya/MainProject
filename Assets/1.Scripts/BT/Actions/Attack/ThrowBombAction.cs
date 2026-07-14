@@ -44,44 +44,44 @@ public partial class ThrowBombAction : Action
     {
         if (BombInstance.Value == null)
         {
-            Debug.LogError("BombInstance is null");
+            Debug.LogError("[BT] BombInstance is null");
             return false;
         }
 
         _bombController = BombInstance.Value.GetComponent<BombController>();
         if (_bombController == null)
         {
-            Debug.LogError("BombInstance doesn't include BombController component");
+            Debug.LogError("[BT] BombInstance doesn't include BombController component");
             return false;
         }
 
         if (Agent.Value == null)
         {
-            Debug.LogError("Agent is null");
+            Debug.LogError("[BT] Agent is null");
             return false;
         }
 
         if (ThrowDistance.Value <= 0)
         {
-            Debug.LogError("ThrowDistance is under than 0");
+            Debug.LogError("[BT] ThrowDistance is under than 0");
             return false;
         }
 
         if (FlyingDuration.Value <= 0)
         {
-            Debug.LogError("FlyingDuration is under than 0");
+            Debug.LogError("[BT] FlyingDuration is under than 0");
             return false;
         }
 
         if (ArcHeight.Value <= 0)
         {
-            Debug.LogError("ArcHeight is under than 0");
+            Debug.LogError("[BT] ArcHeight is under than 0");
             return false;
         }
 
         if (ThrowLocalDirection.Value == Vector3.zero)
         {
-            Debug.LogError("ThrowLocalDirection is 0");
+            Debug.LogError("[BT] ThrowLocalDirection is 0");
             return false;
         }
         return true;

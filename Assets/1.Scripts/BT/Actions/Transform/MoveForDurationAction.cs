@@ -100,13 +100,13 @@ public partial class MoveForDurationAction : Action
     {
         if (Agent.Value == null)
         {
-            Debug.LogError("Agent is null");
+            Debug.LogError("[BT] Agent is null");
             return false;
         }
 
         if (Duration.Value <= 0f)
         {
-            Debug.LogError("Duration is null");
+            Debug.LogError("[BT] Duration is null");
             return false;
         }
 

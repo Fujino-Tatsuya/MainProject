@@ -140,7 +140,7 @@ public class DefaultAttackController : BaseNetworkBehaviour
             if (!animator.HasState(0, GetAttackStateHash(i)))
             {
                 Debug.LogError(
-                    $"Animator Controller '{animator.runtimeAnimatorController.name}'에 'Default_Attack{i}' 상태가 없습니다. " +
+                    $"[Player] Animator Controller '{animator.runtimeAnimatorController.name}'에 'Default_Attack{i}' 상태가 없습니다. " +
                     $"공격 데이터는 {attackSteps.Length}타 콤보를 요구합니다.",
                     this);
             }
@@ -149,7 +149,7 @@ public class DefaultAttackController : BaseNetworkBehaviour
             if (stepClip != null && !HasComboWindowOpenEvent(stepClip))
             {
                 Edit.LogWarning(
-                    $"클립 '{stepClip.name}'에 ComboWindowOpen 이벤트" +
+                    $"[Player] 클립 '{stepClip.name}'에 ComboWindowOpen 이벤트" +
                     $"(HandleDefaultAttackEvent, int={(int)DefaultAttackAnimationEventType.ComboWindowOpen})가 없습니다. " +
                     "윈도우가 열리지 않으면 이 스텝에서 다음 타를 예약할 수 없습니다.",
                     this);

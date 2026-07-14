@@ -24,13 +24,13 @@ public partial class IncreaseUnitHpAction : Action
     {
         if (Amount.Value == 0)
         {
-            Debug.LogError("Increasing Amount is 0.");
+            Debug.LogError("[BT] Increasing Amount is 0.");
             return false;
         }
 
         if (Unit.Value == null)
         {
-            Debug.LogError("Unit script is null.");
+            Debug.LogError("[BT] Unit script is null.");
             return false;
         }
 

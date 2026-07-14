@@ -60,13 +60,13 @@ public class ColliderInfo : MonoBehaviour
         int overlapColliderValue = (int)_overlapCollider;
         if (overlapColliderValue == 0)
         {
-            Debug.LogError("ColliderInfo requires one BoxCollider, CapsuleCollider, or SphereCollider.", this);
+            Debug.LogError("[Utility] ColliderInfo requires one BoxCollider, CapsuleCollider, or SphereCollider.", this);
         }
         else if (overlapColliderValue != (int)OverlapCollider.Box &&
                  overlapColliderValue != (int)OverlapCollider.Capsule &&
                  overlapColliderValue != (int)OverlapCollider.Sphere)
         {
-            Debug.LogError($"ColliderInfo supports only one collider type, but found {_overlapCollider}.", this);
+            Debug.LogError($"[Utility] ColliderInfo supports only one collider type, but found {_overlapCollider}.", this);
         }
 
         DisableSourceCollider();

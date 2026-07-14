@@ -31,7 +31,7 @@ public class JumpController : NetworkBehaviour
 
         if (!bt.BlackboardReference.GetVariable<Vector3>("ArrivePoint", out ArrivePoint))
         {
-            Debug.LogError("Blackboard variable 'ArrivePoint' not found.", this);
+            Edit.LogError("[No.23] Blackboard variable 'ArrivePoint' not found.", this);
         }
     }
 
@@ -67,7 +67,7 @@ public class JumpController : NetworkBehaviour
 
         if (closestObject == null)
         {
-            Debug.LogError($"{followTargetTag} 태그를 가진 오브젝트가 존재하지 않습니다.");
+            Edit.LogError($"[No.23] {followTargetTag} 태그를 가진 오브젝트가 존재하지 않습니다.");
             Initialize();
             return;
         }
@@ -133,7 +133,7 @@ public class JumpController : NetworkBehaviour
             Unit unit = hitCollider.GetComponent<Unit>();
             if (unit == null)
             {
-                Debug.LogError("해당 플레이어는 Unit 컴포넌트를 부착하고 있지 않습니다.");
+                Edit.LogError("[No.23] 해당 플레이어는 Unit 컴포넌트를 부착하고 있지 않습니다.");
                 continue;
             }
 

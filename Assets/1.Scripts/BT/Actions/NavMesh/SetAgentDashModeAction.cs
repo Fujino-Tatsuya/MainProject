@@ -50,7 +50,7 @@ public partial class SetAgentDashModeAction : Action
     {
         if (NavMeshAgent.Value == null)
         {
-            Debug.LogError("NavMeshAgent is null.");
+            Debug.LogError("[BT] NavMeshAgent is null.");
             return false;
         }
         return true;

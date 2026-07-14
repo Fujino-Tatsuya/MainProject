@@ -29,9 +29,9 @@ public partial class AddRandomAttackAction : Action
     {
         // 진단: 변수 자체가 null(바인딩 유실)인지, 값만 null(원본 미할당)인지 구분한다.
         if (BaseAttackChoice == null)
-            Edit.LogWarning("AddRandomAttack: BaseAttackChoice variable itself is null (binding lost).");
+            Edit.LogWarning("[BT] AddRandomAttack: BaseAttackChoice variable itself is null (binding lost).");
         else if (BaseAttackChoice.Value == null)
-            Edit.LogWarning("AddRandomAttack: BaseAttackChoice value is null (source variable not assigned).");
+            Edit.LogWarning("[BT] AddRandomAttack: BaseAttackChoice value is null (source variable not assigned).");
         else
             return BaseAttackChoice.Value;
 
@@ -41,12 +41,12 @@ public partial class AddRandomAttackAction : Action
             BaseAttackChoice found = Agent.Value.GetComponentInChildren<BaseAttackChoice>();
             if (found != null)
             {
-                Edit.LogWarning($"AddRandomAttack: fallback resolved BaseAttackChoice from {Agent.Value.name}.");
+                Edit.LogWarning($"[BT] AddRandomAttack: fallback resolved BaseAttackChoice from {Agent.Value.name}.");
                 return found;
             }
         }
 
-        Debug.LogError("BasicAttackChoice is null. Please assign a valid BaseAttackChoice.");
+        Debug.LogError("[BT] BasicAttackChoice is null. Please assign a valid BaseAttackChoice.");
         return null;
     }
 }

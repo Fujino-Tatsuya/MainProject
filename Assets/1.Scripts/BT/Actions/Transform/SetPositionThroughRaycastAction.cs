@@ -31,7 +31,7 @@ public partial class SetPositionThroughRaycastAction : Action
 
         if (!Physics.Raycast(Agent.Value.transform.position, direction, out RaycastHit hit, Mathf.Infinity, LayerMask.GetMask(CollisionLayer.Value.ToArray())))
         {
-            Debug.LogError("Failed to Raycast");
+            Debug.LogError("[BT] Failed to Raycast");
             return Status.Failure;
         }
 
@@ -56,7 +56,7 @@ public partial class SetPositionThroughRaycastAction : Action
             // Failure를 반환하면 상위 Sequence가 즉시 종료돼 Idle 정리 블록이 스킵되고
             // Dead로 전파되므로, 여기서는 Success를 유지한다.
             Position.Value = wallPoint;
-            Edit.LogWarning($"SamplePosition failed near {wallPoint} (maxDistance={MaxDistance.Value}), using raw wall point.");
+            Edit.LogWarning($"[BT] SamplePosition failed near {wallPoint} (maxDistance={MaxDistance.Value}), using raw wall point.");
         }
 
         if (NavMesh.Raycast(Agent.Value.transform.position, Position.Value, out NavMeshHit navMeshHit, areaMask))
@@ -64,7 +64,7 @@ public partial class SetPositionThroughRaycastAction : Action
             Position.Value = navMeshHit.position;
         }
 
-        Edit.Log($"SetPositionThroughRaycastAction: Position set to {Position.Value}");
+        Edit.Log($"[BT] SetPositionThroughRaycastAction: Position set to {Position.Value}");
 
         return Status.Success;
     }
@@ -73,13 +73,13 @@ public partial class SetPositionThroughRaycastAction : Action
     {
         if (Agent.Value == null)
         {
-            Debug.LogError("Agent is null");
+            Debug.LogError("[BT] Agent is null");
             return false;
         }
 
         if (Target.Value == null)
         {
-            Debug.LogError("Target is null");
+            Debug.LogError("[BT] Target is null");
             return false;
         }
 

@@ -24,7 +24,7 @@ public partial class MoveTowardDirectionAction : Action
         navMeshAgent = Agent.Value.GetComponent<NavMeshAgent>();
         if (navMeshAgent == null)
         {
-            Debug.LogError("Agent does not include NavMeshAgent component");
+            Debug.LogError("[BT] Agent does not include NavMeshAgent component");
             return Status.Failure;
         }
 
@@ -37,13 +37,13 @@ public partial class MoveTowardDirectionAction : Action
     {
         if (Agent.Value == null)
         {
-            Debug.LogError("Agent is null");
+            Debug.LogError("[BT] Agent is null");
             return false;
         }
 
         if (Direction.Value == null)
         {
-            Debug.LogError("Direction is null");
+            Debug.LogError("[BT] Direction is null");
             return false;
         }
 

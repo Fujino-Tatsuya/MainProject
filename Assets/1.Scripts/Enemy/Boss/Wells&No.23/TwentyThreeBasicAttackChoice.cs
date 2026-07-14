@@ -46,7 +46,7 @@ public class TwentyThreeBasicAttackChoice : BaseAttackChoice
     {
         if (type is not TwentyThreeBasicAttackType attackType)
         {
-            Edit.LogWarning($"{type} is not a {nameof(TwentyThreeBasicAttackType)}.");
+            Edit.LogWarning($"[No.23] {type} is not a {nameof(TwentyThreeBasicAttackType)}.");
             return;
         }
 
@@ -54,7 +54,7 @@ public class TwentyThreeBasicAttackChoice : BaseAttackChoice
         {
             if (attackChoices[i].basicAttackType == attackType)
             {
-                Edit.LogWarning($"Attack type {type} already exists in the attack choices. Use UpdateType to modify its properties.");
+                Edit.LogWarning($"[No.23] Attack type {type} already exists in the attack choices. Use UpdateType to modify its properties.");
                 return;
             }
                 
@@ -78,7 +78,7 @@ public class TwentyThreeBasicAttackChoice : BaseAttackChoice
                 attackChoices.Add(new WeightedAttack<TwentyThreeBasicAttackType>(attackType, dashAttackMinDistance, dashAttackMaxDistance, dashAttackPercentage));
                 break;
             default:
-                Edit.LogWarning($"Unknown attack type {type}. Cannot add to attack choices.");
+                Edit.LogWarning($"[No.23] Unknown attack type {type}. Cannot add to attack choices.");
                 break;
         }
     }
@@ -88,7 +88,7 @@ public class TwentyThreeBasicAttackChoice : BaseAttackChoice
     {
         if (type is not TwentyThreeBasicAttackType attackType)
         {
-            Edit.LogWarning($"{type} is not a {nameof(TwentyThreeBasicAttackType)}.");
+            Edit.LogWarning($"[No.23] {type} is not a {nameof(TwentyThreeBasicAttackType)}.");
             return;
         }
 

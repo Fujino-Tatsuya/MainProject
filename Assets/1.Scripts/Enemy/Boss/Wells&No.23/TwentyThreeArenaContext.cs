@@ -19,7 +19,7 @@ public class TwentyThreeArenaContext : NetworkBehaviour
        NetworkObject boss = Instantiate(bossPrefab, bossPos, Quaternion.identity).GetComponent<NetworkObject>();
        if (boss == null)
        {
-           Debug.LogError("해당 프리펩에 NetworkObject 컴포넌트가 없습니다. 추가해주세요.");
+           Edit.LogError("[No.23] 해당 프리펩에 NetworkObject 컴포넌트가 없습니다. 추가해주세요.");
            return;
        }
        boss.Spawn();
@@ -28,7 +28,7 @@ public class TwentyThreeArenaContext : NetworkBehaviour
         //ChargeController controller = boss.GetComponentInChildren<ChargeController>();
         //if (controller == null)
         //{
-        //    Debug.LogError("해당 보스에 ChargeController 컴포넌트가 없습니다. 추가해주세요.");
+        //    Edit.LogError("[No.23] 해당 보스에 ChargeController 컴포넌트가 없습니다. 추가해주세요.");
         //    return;
         //}
         //controller.SetList(ChargingObjects);
@@ -36,7 +36,7 @@ public class TwentyThreeArenaContext : NetworkBehaviour
       EnemyBTActivator btActivator = boss.GetComponent<EnemyBTActivator>();
       if (btActivator == null)
       {
-          Debug.LogError("해당 보스에 EnemyBTActivator 컴포넌트가 없습니다. 추가해주세요.");
+          Edit.LogError("[No.23] 해당 보스에 EnemyBTActivator 컴포넌트가 없습니다. 추가해주세요.");
           return;
       }
       btActivator.OpenBT();

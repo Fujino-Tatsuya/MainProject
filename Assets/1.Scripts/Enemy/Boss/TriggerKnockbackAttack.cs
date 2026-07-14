@@ -8,7 +8,7 @@ public class TriggerKnockbackAttack : MonoBehaviour
     {
         if (knockbackAttack == null)
         {
-            Debug.LogError("KnockbackAttack 컴포넌트가 할당되지 않았습니다.", this);
+            Edit.LogError("[No.23] KnockbackAttack 컴포넌트가 할당되지 않았습니다.", this);
         }
     }
     private void OnTriggerEnter(Collider other)

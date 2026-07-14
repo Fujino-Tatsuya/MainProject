@@ -52,7 +52,7 @@ public class CameraTargetSwitcher : MonoBehaviour
 
         if (mainCameraPrefab == null || followCameraPrefab == null)
         {
-            Edit.LogWarning("Camera rig prefabs are not assigned (mainCamera/follow).");
+            Edit.LogWarning("[Camera] Camera rig prefabs are not assigned (mainCamera/follow).");
             return;
         }
 
@@ -64,7 +64,7 @@ public class CameraTargetSwitcher : MonoBehaviour
         playerCamera = followInstance.GetComponentInChildren<CinemachineCamera>(true);
         if (playerCamera == null)
         {
-            Edit.LogWarning($"Follow camera prefab has no {nameof(CinemachineCamera)}. prefab={followCameraPrefab.name}");
+            Edit.LogWarning($"[Camera] Follow camera prefab has no {nameof(CinemachineCamera)}. prefab={followCameraPrefab.name}");
             return;
         }
 

@@ -19,7 +19,7 @@ public class KnockbackAttack : BaseAttack
             Unit unit = root.GetComponent<Unit>();
             if (unit == null)
             {
-                Debug.LogError($"해당 오브젝트, {root.name}에 Unit 컴포넌트가 부착되어있지 않습니다.", this);
+                Edit.LogError($"[No.23] 해당 오브젝트, {root.name}에 Unit 컴포넌트가 부착되어있지 않습니다.", this);
                 return;
             }
 

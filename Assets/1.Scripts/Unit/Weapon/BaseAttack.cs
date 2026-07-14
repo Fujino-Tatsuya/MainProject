@@ -96,7 +96,7 @@ public class BaseAttack : MonoBehaviour
         Unit unit = hit.GetComponentInParent<Unit>();
         if (unit == null)
         {
-            Debug.LogError($"해당 오브젝트, {target.name}에 Unit 컴포넌트가 부착되어있지 않습니다.", this);
+            Debug.LogError($"[Unit] 해당 오브젝트, {target.name}에 Unit 컴포넌트가 부착되어있지 않습니다.", this);
             return false;
         }
 

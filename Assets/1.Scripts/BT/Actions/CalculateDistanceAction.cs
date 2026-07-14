@@ -27,7 +27,7 @@ public partial class CalculateDistanceAction : Action
     {
         if (Distance == null || A == null || B == null)
         {
-            Debug.LogError("CalculateDistanceAction: One or more variables are not assigned.");
+            Debug.LogError("[BT] CalculateDistanceAction: One or more variables are not assigned.");
             return false;
         }
 

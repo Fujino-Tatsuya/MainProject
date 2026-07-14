@@ -1,4 +1,4 @@
-using Unity.Netcode;
+ï»¿using Unity.Netcode;
 using UnityEngine;
 using System.Collections.Generic;
 
@@ -13,7 +13,7 @@ public class KMKScene : NetworkBehaviour
         NetworkObject boss = Instantiate(bossPrefab).GetComponent<NetworkObject>();
         if (boss == null)
         {
-            Debug.LogError("ÇØ´ç ÇÁ¸®Æé¿¡ NetworkObject ÄÄÆ÷³ÍÆ®°¡ ¾ø½À´Ï´Ù. Ãß°¡ÇØÁÖ¼¼¿ä.");
+            Debug.LogError("[Scene] í•´ë‹¹ í”„ë¦¬í©ì— NetworkObject ì»´í¬ë„ŒíŠ¸ê°€ ì—†ìŠµë‹ˆë‹¤. ì¶”ê°€í•´ì£¼ì„¸ìš”.");
             return;
         }
         boss.Spawn();

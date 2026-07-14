@@ -20,7 +20,7 @@ public class OverlapAttack : BaseAttack
 
         if (colliderInfo == null)
         {
-            Debug.LogError("OverlapAttack requires ColliderInfo.", this);
+            Debug.LogError("[Unit] OverlapAttack requires ColliderInfo.", this);
             return;
         }
 

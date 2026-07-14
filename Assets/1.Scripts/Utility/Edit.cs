@@ -30,4 +30,11 @@ public static class Edit
     {
         Debug.LogError(message, context);
     }
+
+    [HideInCallstack]
+    [Conditional("UNITY_EDITOR")]
+    public static void LogAssertion(object message, Object context = null)
+    {
+        Debug.LogAssertion(message, context);
+    }
 }
