@@ -1,5 +1,14 @@
 # 코딩 / 프로젝트 컨벤션
 
+## 파일 인코딩 — **UTF-8(BOM) 표준** (2026-07-14 확립)
+- 모든 `.cs` 파일은 **UTF-8 with BOM**으로 저장한다.
+- 배경: CP949로 저장된 파일이 UTF-8 환경(에디터/AI 도구/diff)에서 한글 주석·로그가 깨져 보이고,
+  모르고 UTF-8로 재저장하면 한글이 영구 파괴된다 (Health.cs 사고, EnemyBTActivator 사례).
+- BOM을 붙이는 이유: 인코딩 자동 감지 실패 방지 (BOM 없으면 일부 도구가 CP949/ANSI로 오판).
+- IDE 설정: Visual Studio는 `고급 저장 옵션 → UTF-8(BOM)`, Rider/VS Code는 `"files.encoding": "utf8bom"`.
+- 기존 CP949 파일 발견 시: **CP949로 읽어 한글이 온전한지 확인 후** UTF-8(BOM)로 재저장할 것.
+  (7개 파일 변환 완료: 2026-07-13~14)
+
 ## 네이밍 (C#)
 - 클래스/메서드/프로퍼티/enum: **PascalCase**
 - 지역변수/파라미터: **camelCase**
