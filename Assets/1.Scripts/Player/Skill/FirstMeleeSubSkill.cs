@@ -30,6 +30,7 @@ public class FirstMeleeSubSkill : PlayerInstantSkill
 
         // 재사용 시 교체: 남은 수치와 무관하게 새 값으로 덮어쓰고 지속시간도 새로 시작
         owner.SetShield(data.ShieldAmount);
+        Edit.Log($"[Skill] 수호자의 의지 — 보호막 {data.ShieldAmount} 부여 (지속 {data.ShieldDuration}s)", this);
 
         if (expiryRoutine != null)
             StopCoroutine(expiryRoutine);

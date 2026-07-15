@@ -170,6 +170,8 @@ public class PlayerSkillController : BaseNetworkBehaviour
         activeSkill = null;
         activeEndFallbackTime = 0f;
 
+        Edit.Log($"[Skill] {skill.Slot} 종료 ({reason})", this);
+
         skill.OnEnd(reason);
 
         if (stateController != null && stateController.CurrentState == PlayerActionState.Skill)
@@ -216,6 +218,8 @@ public class PlayerSkillController : BaseNetworkBehaviour
             Mathf.RoundToInt(player.FinalAttackDamage * skill.Data.AttackDamageMultiplier) + skill.Data.FlatDamageBonus);
         skill.SetDamageSnapshot(damageSnapshot);
 
+        Edit.Log($"[Skill] {slot} 시작 — 피해 스냅샷 {damageSnapshot}, 쿨타임 {skill.Data.CooldownTime}s", this);
+
         skill.OnServerStart(direction, target);
         PlaySkillPresentation(skill, direction);
 
@@ -232,22 +236,44 @@ public class PlayerSkillController : BaseNetworkBehaviour
         isDead = stateController != null && stateController.CurrentState == PlayerActionState.Dead;
 
         if (skill == null || skill.Data == null || stateController == null)
+        {
+            Edit.Log($"[Skill] {slot} 거부 — 스킬/데이터 미배정", this);
             return false;
+        }
 
-        if (IsSkillActive || !IsCooldownReady(slot))
+        if (IsSkillActive)
+        {
+            Edit.Log($"[Skill] {slot} 거부 — {activeSkill.Slot} 실행 중", this);
             return false;
+        }
+
+        if (!IsCooldownReady(slot))
+        {
+            Edit.Log($"[Skill] {slot} 거부 — 쿨타임 {GetCooldownRemaining(slot):F1}s 남음", this);
+            return false;
+        }
 
         if (isDead)
         {
             if (!skill.Data.UsableWhileDead)
+            {
+                Edit.Log($"[Skill] {slot} 거부 — 사망 상태", this);
                 return false;
+            }
         }
         else if (!stateController.CanUseSkill)
         {
+            Edit.Log($"[Skill] {slot} 거부 — 상태 {stateController.CurrentState} 또는 차단 효과", this);
             return false;
         }
 
-        return skill.CanUse(direction, target);
+        if (!skill.CanUse(direction, target))
+        {
+            Edit.Log($"[Skill] {slot} 거부 — 스킬 자체 조건(CanUse) 불충족", this);
+            return false;
+        }
+
+        return true;
     }
 
     private void TickServer()
