@@ -6,9 +6,6 @@ public class SpawnPoint : MonoBehaviour
     [Header("=== 스폰 포인트 정보 ===")]
     public int PointID;
 
-    [Tooltip("이 스폰 포인트가 속한 구역")]
-    public ZoneDefinitionSO ParentZone;
-
     [Tooltip("이 포인트에서 생성 가능한 노드 티어 (1티어 전용, 2티어 전용 등)")]
     public NodeTier AllowedTier;
 

@@ -48,55 +48,13 @@ public static class ZoneWiring
         var stage1 = GameObject.Find("Stage1");
         if (stage1 == null) { Debug.LogError("[Wire] Stage1 없음"); return; }
 
-        // v11: 슬롯은 저작 데이터(위치·회전·FixedPrefab·QuestPrefab·플래그)의 소스오브트루스.
-        // 이미 있으면 절대 재생성하지 않는다(재생성 = 저작 전부 소실). 없을 때만 볼륨에서 최초 생성.
+        // v11: 슬롯이 배치의 소스오브트루스(위치·회전·FixedPrefab·QuestPrefab·후보플래그). ZoneVolume/ZoneDefinitionSO는 폐기됨.
+        // 슬롯은 씬에 손배치·저작된 상태로 존재하며, Wire는 재생성하지 않고 카탈로그·참조만 갱신한다.
         var slotsRoot = stage1.transform.Find("Slots");
-        int slotCount;
-        if (slotsRoot != null && slotsRoot.GetComponentsInChildren<ZoneSlot>(true).Length > 0)
-        {
-            slotCount = slotsRoot.GetComponentsInChildren<ZoneSlot>(true).Length;
-            Debug.Log($"[Wire] 기존 Slots {slotCount}개 보존(저작 데이터 유지) — 슬롯 재생성 건너뜀, 카탈로그·참조만 갱신.");
-        }
-        else
-        {
-            if (slotsRoot != null) Object.DestroyImmediate(slotsRoot.gameObject);
-            var newRoot = new GameObject("Slots");
-            newRoot.transform.SetParent(stage1.transform, false);
-
-            // 씬 ZoneVolume 수집 (비활성 포함) → ZoneID 순 정렬. (최초 셋업에서만 사용)
-            var vols = Object.FindObjectsByType<ZoneVolume>(FindObjectsInactive.Include, FindObjectsSortMode.None)
-                .Where(v => v.Zone != null).OrderBy(v => v.Zone.ZoneID).ToList();
-            if (vols.Count == 0) { Debug.LogError("[Wire] ZoneVolume 없음 — Stage1의 ZoneVolumes 확인"); return; }
-            for (int i = 0; i < vols.Count; i++)
-                if (vols[i].Zone.ZoneID != i + 1)
-                { Debug.LogError($"[Wire] ZoneID 불연속: {vols[i].name} = {vols[i].Zone.ZoneID} (기대 {i + 1}) — ZoneDef 지정 확인"); return; }
-
-            int id = 0;
-            foreach (var v in vols)
-            {
-                bool lx = v.Size.x >= 30f, lz = v.Size.z >= 30f;
-                ZoneSize size = lx && lz ? ZoneSize.Large : (lx || lz ? ZoneSize.Medium : ZoneSize.Small);
-                float rotY = Mathf.Round(v.transform.eulerAngles.y / 90f) * 90f;
-
-                var go = new GameObject($"Slot_{id}_Z{v.Zone.ZoneID}_{size.ToString()[0]}");
-                go.transform.SetParent(newRoot.transform, false);
-                go.transform.position = v.transform.position;
-                go.transform.rotation = Quaternion.Euler(0f, rotY, 0f);
-                var slot = go.AddComponent<ZoneSlot>();
-                slot.SlotID = id++;
-                slot.Size = size;
-                slot.Footprint = size switch
-                {
-                    ZoneSize.Large  => new Vector2(40f, 40f),
-                    ZoneSize.Medium => new Vector2(20f, 40f),
-                    _               => new Vector2(20f, 20f),
-                };
-                slot.IsQuestCandidate = v.Zone.IsQuestZoneCandidate;
-                slot.IsSpawnCandidate = v.Zone.IsPlayerSpawnCandidate;
-                slot.IsBossCandidate = v.Zone.IsBossGateCandidate;
-            }
-            slotCount = id;
-        }
+        if (slotsRoot == null || slotsRoot.GetComponentsInChildren<ZoneSlot>(true).Length == 0)
+        { Debug.LogError("[Wire] Slots 없음 — v11은 슬롯이 소스오브트루스. 씬에 ZoneSlot(Stage1/Slots)이 있어야 함."); return; }
+        int slotCount = slotsRoot.GetComponentsInChildren<ZoneSlot>(true).Length;
+        Debug.Log($"[Wire] 기존 Slots {slotCount}개 사용 — 카탈로그·참조만 갱신.");
 
         var cat = AssetDatabase.LoadAssetAtPath<ZoneLayoutCatalogSO>(CatalogPath);
         if (cat == null)
@@ -145,10 +103,6 @@ public static class ZoneWiring
         if (geom != null)
             foreach (Transform c in geom)
                 if (c.name.StartsWith("Zone_")) { c.gameObject.SetActive(false); hidden++; }
-
-        // ZoneVolumes = 배치 소스오브트루스 — 반드시 활성 유지(과거 Wire가 비활성화했던 것 복구)
-        var volumes = stage1.transform.Find("ZoneVolumes");
-        if (volumes != null && !volumes.gameObject.activeSelf) volumes.gameObject.SetActive(true);
 
         AssetDatabase.SaveAssets();
         bool lpOk = mg != null && mg.LayoutPlacer != null;

@@ -38,7 +38,7 @@ MonoBehaviour:
   dimFadeDown: 3
   dimSaturation: 0.249
   dimBrightness: 0.16
-  dimAffectSky: 0.473
+  dimAffectSky: 0.714
   viewRange: 18
   viewFade: 4
   losDarken: 1
