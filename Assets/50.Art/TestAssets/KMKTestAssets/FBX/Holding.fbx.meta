@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: 4f02d409fb2a2ba4e8f14a71a51c73fe
+guid: 74ab184be8d99ce4caf264f74c0f3415
 ModelImporter:
   serializedVersion: 24200
   internalIDToNameTable: []
@@ -31,11 +31,11 @@ ModelImporter:
     extraUserProperties: []
     clipAnimations:
     - serializedVersion: 16
-      name: Charging
+      name: Holding
       takeName: mixamo.com
       internalID: -203655887218126122
       firstFrame: 0
-      lastFrame: 102
+      lastFrame: 189
       wrapMode: 0
       orientationOffsetY: 0
       level: 0
