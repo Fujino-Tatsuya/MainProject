@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using BaseNetCode;
 using Unity.Netcode;
 using UnityEngine;
@@ -569,7 +569,8 @@ public class DefaultAttackController : BaseNetworkBehaviour
 
     private int CalculateDamageSnapshot(DefaultAttackStep step)
     {
-        int baseDamage = player != null ? player.AttackDamage : 0;
+        // 상태이상 modifier가 반영된 최종 공격력 기준
+        int baseDamage = player != null ? player.FinalAttackDamage : 0;
         int calculatedDamage = Mathf.RoundToInt(baseDamage * step.AttackDamageMultiplier) + step.FlatDamageBonus;
 
         return Mathf.Max(0, calculatedDamage);

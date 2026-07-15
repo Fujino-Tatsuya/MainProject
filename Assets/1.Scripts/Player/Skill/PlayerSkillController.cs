@@ -211,8 +211,9 @@ public class PlayerSkillController : BaseNetworkBehaviour
         // 쿨타임은 승인 즉시 시작, 환불 없음
         nextReadyTime[(int)slot] = Time.time + skill.Data.CooldownTime;
 
+        // 상태이상 modifier가 반영된 최종 공격력으로 스냅샷 (그릴 합의: SO 계수 × 최종 스탯)
         int damageSnapshot = Mathf.Max(0,
-            Mathf.RoundToInt(player.AttackDamage * skill.Data.AttackDamageMultiplier) + skill.Data.FlatDamageBonus);
+            Mathf.RoundToInt(player.FinalAttackDamage * skill.Data.AttackDamageMultiplier) + skill.Data.FlatDamageBonus);
         skill.SetDamageSnapshot(damageSnapshot);
 
         skill.OnServerStart(direction, target);

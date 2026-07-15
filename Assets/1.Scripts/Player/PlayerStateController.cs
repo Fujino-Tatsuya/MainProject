@@ -35,9 +35,10 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
 
     private void Awake()
     {
+        // StatusEffectController는 NetworkBehaviour라 런타임 추가가 불가 — 프리팹에 미리 부착돼 있어야 한다
         StatusEffectController statusEffects = GetComponent<StatusEffectController>();
         if (statusEffects == null)
-            statusEffects = gameObject.AddComponent<StatusEffectController>();
+            Debug.LogError("[Player] StatusEffectController가 프리팹에 부착되어 있지 않습니다.", this);
 
         context = new PlayerStateContext(
             this,

@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 [RequireComponent(typeof(PlayerInputReader))]
 [RequireComponent(typeof(Rigidbody))]
@@ -80,8 +80,13 @@ public class PlayerMovement : MonoBehaviour
             );
         }
 
+        // 상태이상 이속 modifier 반영 (버프 > 1, 둔화 < 1)
+        float statusMultiplier = player != null && player.StatusEffects != null
+            ? player.StatusEffects.GetStatMultiplier(StatusEffectType.MoveSpeedModifier)
+            : 1f;
+
         rb.MovePosition(
-            rb.position + worldDir * currentSpeed * Time.deltaTime
+            rb.position + worldDir * currentSpeed * statusMultiplier * Time.deltaTime
         );
     }
 

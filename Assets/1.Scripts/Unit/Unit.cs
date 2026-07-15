@@ -1,4 +1,4 @@
-using BaseNetCode;
+﻿using BaseNetCode;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -194,19 +194,36 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     }
     #endregion
 
-    #region 상태 이상
-    StatusEffectType _statusEffectType = StatusEffectType.None;
-    public StatusEffectType StatusEffectType { get { return _statusEffectType; } }
-    /// <summary>
-    /// statusEffectType 값을 변경하는 함수
-    /// BitMaskHelper를 사용하여 나온 값을 newStatusEffectType으로 전달하여 상태 이상 효과를 변경할 수 있도록 함
-    /// </summary>
-    /// <param name="newStatusEffectType">변경할 새로운 상태 이상 타입 값</param>
-    public void ChangeStatusEffectType(StatusEffectType newStatusEffectType)
+    #region 상태이상 / 최종 스탯
+    StatusEffectController _statusEffects;
+    bool _statusEffectsCached;
+    // 상태이상 장부의 유일한 창구. 미부착 유닛은 null (상태이상 없음으로 동작)
+    public StatusEffectController StatusEffects
     {
-        if (!IsServer) return; // 서버에서만 상태 이상 변경 처리
-        _statusEffectType = newStatusEffectType;
+        get
+        {
+            if (!_statusEffectsCached)
+            {
+                _statusEffects = GetComponent<StatusEffectController>();
+                _statusEffectsCached = true;
+            }
+            return _statusEffects;
+        }
     }
+
+    float GetStatMultiplier(StatusEffectType statType)
+    {
+        return StatusEffects != null ? StatusEffects.GetStatMultiplier(statType) : 1f;
+    }
+
+    // 최종 스탯 = base(불변) × 활성 modifier 배율의 곱. 소비처는 base 대신 이 값을 읽는다
+    public int FinalAttackDamage => Mathf.Max(0, Mathf.RoundToInt(_attackDamage * GetStatMultiplier(StatusEffectType.AttackDamageModifier)));
+    public float FinalMoveSpeed => Mathf.Max(0f, _moveSpeed * GetStatMultiplier(StatusEffectType.MoveSpeedModifier));
+    public float FinalAttackSpeed => Mathf.Max(0f, _attackSpeed * GetStatMultiplier(StatusEffectType.AttackSpeedModifier));
+    // 방어력/최대쉴드는 _health가 서버에서만 생성되므로 서버에서만 유효
+    public int FinalDefense => Mathf.Max(0, Mathf.RoundToInt((_health != null ? _health.CurrentDefense : 0) * GetStatMultiplier(StatusEffectType.DefenseModifier)));
+    public int FinalMaxHp => Mathf.Max(0, Mathf.RoundToInt(MaxHp * GetStatMultiplier(StatusEffectType.MaxHpModifier)));
+    public int FinalMaxShield => Mathf.Max(0, Mathf.RoundToInt((_health != null ? _health.MaxShield : 0) * GetStatMultiplier(StatusEffectType.MaxShieldModifier)));
     #endregion
 
     #region RPC
@@ -284,14 +301,6 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         ChangeAttackSpeedValue(newAttackSpeed);
     }
 
-    [Rpc(SendTo.Server)]
-    public void ChangeStatusEffectTypeRpc(StatusEffectType newStatusEffectType, RpcParams rpcParams = default)
-    {
-        if (rpcParams.Receive.SenderClientId != OwnerClientId)
-            return;
-
-        ChangeStatusEffectType(newStatusEffectType);
-    }
     #endregion
 
     /// <summary>

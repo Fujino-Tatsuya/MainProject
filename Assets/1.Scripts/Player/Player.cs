@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using Unity.Netcode;
 
 [RequireComponent(typeof(PlayerInputReader))]
@@ -34,8 +34,9 @@ public class Player : Unit
 
     private void Awake()
     {
+        // StatusEffectController는 NetworkBehaviour라 런타임 추가가 불가 — 프리팹에 미리 부착돼 있어야 한다
         if (GetComponent<StatusEffectController>() == null)
-            gameObject.AddComponent<StatusEffectController>();
+            Debug.LogError("[Player] StatusEffectController가 프리팹에 부착되어 있지 않습니다.", this);
 
         stateController = GetComponent<PlayerStateController>();
         if (stateController == null)
