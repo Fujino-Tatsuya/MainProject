@@ -364,6 +364,11 @@ public class PlayerSkillController : BaseNetworkBehaviour
         if (skill == null)
             return;
 
+        // 표시용 쿨타임 미러 — 이 RPC 수신 = 서버 승인이므로 오너도 장부를 기록한다.
+        // 서버 시점과의 오차(전송 지연)는 HUD 표시용으로 허용, 검증은 여전히 서버 장부가 담당 (그릴 합의)
+        if (IsOwner && skill.Data != null)
+            nextReadyTime[(int)slot] = Time.time + skill.Data.CooldownTime;
+
         if (stateController != null &&
             stateController.CurrentState != PlayerActionState.Skill &&
             !stateController.BeginSkill(skill))

@@ -11,6 +11,19 @@ public class Player : Unit
 {
     private static readonly int IsMovingHash = Animator.StringToHash("IsMoving");
 
+    /// <summary>이 클라이언트가 조작하는 플레이어. HUD 등 로컬 UI 바인딩용.</summary>
+    public static Player LocalPlayer { get; private set; }
+    public static event System.Action<Player> LocalPlayerChanged;
+
+    private static void SetLocalPlayer(Player player)
+    {
+        if (LocalPlayer == player)
+            return;
+
+        LocalPlayer = player;
+        LocalPlayerChanged?.Invoke(player);
+    }
+
     [SerializeField] private Animator animator;
     [SerializeField] private float interruptDuration = 0.5f;
     [SerializeField] private float interruptForwardDistance = 0.5f;
@@ -54,10 +67,37 @@ public class Player : Unit
 
         // 내가 Owner인 플레이어가 스폰되면, 카메라 매니저에게 나를 따라오라고 알린다.
         if (IsOwner)
+        {
             CameraTargetSwitcher.Active?.FocusOwnerPlayer();
+            SetLocalPlayer(this);
+        }
 
         if (IsServer)
             Initialize(attackDamage, moveSpeed, attackSpeed, maxHp, defense, maxShield);
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        if (LocalPlayer == this)
+            SetLocalPlayer(null);
+
+        base.OnNetworkDespawn();
+    }
+
+    private void Start()
+    {
+        // 오프라인(비네트워크) 실행은 OnNetworkSpawn이 불리지 않는다 — 테스트 씬 HUD 바인딩 폴백
+        if (!IsNetworkActive)
+            SetLocalPlayer(this);
+    }
+
+    public override void OnDestroy()
+    {
+        // NGO NetworkBehaviour의 OnDestroy가 내부 정리를 수행하므로 반드시 base 호출
+        if (LocalPlayer == this)
+            SetLocalPlayer(null);
+
+        base.OnDestroy();
     }
 
     private void Update()

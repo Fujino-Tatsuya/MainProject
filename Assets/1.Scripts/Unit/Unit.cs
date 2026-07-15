@@ -23,6 +23,7 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     // _health는 서버에서만 생성됨(Initialize) — 클라이언트는 복제된 NetworkVariable을 읽는다
     public int CurrentHealth { get { return _health != null ? _health.CurrentHealth : _currentHp.Value; } }
     public int MaxHp { get { return _health != null ? _health.MaxHp : _maxHp.Value; } }
+    public int CurrentShield { get { return _health != null ? _health.CurrentShield : _currentShield.Value; } }
     protected NetworkVariable<int> _currentHp = new NetworkVariable<int>(
     0,
     NetworkVariableReadPermission.Everyone,
