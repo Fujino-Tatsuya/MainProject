@@ -13,6 +13,7 @@ public struct StatusEffectInstance : INetworkSerializable, IEquatable<StatusEffe
     public float duration;          // 0 이하 = 수동 해제 전까지 유지
     public double appliedServerTime; // ServerTime 기준 (피어 간 시계 차이 대응)
     public ulong sourceId;          // 출처 (거는 쪽 NetworkObjectId 등)
+    public int stackCount;          // 같은 출처 재적용으로 쌓인 스택 (1~maxStacks), 배율은 magnitude^stackCount
 
     public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
     {
@@ -21,6 +22,7 @@ public struct StatusEffectInstance : INetworkSerializable, IEquatable<StatusEffe
         serializer.SerializeValue(ref duration);
         serializer.SerializeValue(ref appliedServerTime);
         serializer.SerializeValue(ref sourceId);
+        serializer.SerializeValue(ref stackCount);
     }
 
     public bool Equals(StatusEffectInstance other)
@@ -29,7 +31,8 @@ public struct StatusEffectInstance : INetworkSerializable, IEquatable<StatusEffe
             magnitude == other.magnitude &&
             duration == other.duration &&
             appliedServerTime == other.appliedServerTime &&
-            sourceId == other.sourceId;
+            sourceId == other.sourceId &&
+            stackCount == other.stackCount;
     }
 }
 
@@ -78,17 +81,28 @@ public class StatusEffectController : BaseNetworkBehaviour
     public bool BlocksSkill => Has(SkillBlockers);
     public bool HasSuperArmor => Has(StatusEffectType.SuperArmor);
 
-    /// <summary>활성 인스턴스 중 statType에 해당하는 배율의 곱. 없으면 1.</summary>
+    /// <summary>활성 인스턴스 중 statType에 해당하는 배율의 곱. 스택은 magnitude^stackCount로 누적. 없으면 1.</summary>
     public float GetStatMultiplier(StatusEffectType statType)
     {
         float multiplier = 1f;
         for (int i = 0; i < effects.Count; i++)
         {
-            if ((effects[i].type & statType) != 0)
-                multiplier *= Mathf.Max(0f, effects[i].magnitude);
+            if ((effects[i].type & statType) == 0)
+                continue;
+
+            float magnitude = Mathf.Max(0f, effects[i].magnitude);
+            int stacks = Mathf.Max(1, effects[i].stackCount);
+            multiplier *= stacks == 1 ? magnitude : Mathf.Pow(magnitude, stacks);
         }
 
         return multiplier;
+    }
+
+    /// <summary>특정 출처가 건 특정 타입의 현재 스택 수. 없으면 0.</summary>
+    public int GetStackCount(StatusEffectType type, ulong sourceId)
+    {
+        int index = IndexOf(type, sourceId);
+        return index >= 0 ? Mathf.Max(1, effects[index].stackCount) : 0;
     }
 
     /// <summary>차단류 등 수치 없는 효과 적용 (배율 1).</summary>
@@ -97,11 +111,20 @@ public class StatusEffectController : BaseNetworkBehaviour
         Apply(type, 1f, duration, sourceId);
     }
 
-    /// <summary>서버 전용. 같은 (type, sourceId)가 있으면 시간·수치를 갱신하고, 없으면 병존 추가한다.</summary>
-    public void Apply(StatusEffectType type, float magnitude, float duration, ulong sourceId)
+    /// <summary>
+    /// 서버 전용. 같은 (type, sourceId)가 없으면 병존 추가.
+    /// 있으면 maxStacks 1(기본) = 갱신(시간·수치 리셋, 스택 1), maxStacks 2+ = 스택 +1(상한까지) + 시간 갱신.
+    /// </summary>
+    public void Apply(StatusEffectType type, float magnitude, float duration, ulong sourceId, int maxStacks = 1)
     {
         if (!CanWrite || type == StatusEffectType.None)
             return;
+
+        int index = IndexOf(type, sourceId);
+
+        int stackCount = 1;
+        if (index >= 0 && maxStacks > 1)
+            stackCount = Mathf.Min(Mathf.Max(1, effects[index].stackCount) + 1, maxStacks);
 
         StatusEffectInstance instance = new StatusEffectInstance
         {
@@ -109,10 +132,10 @@ public class StatusEffectController : BaseNetworkBehaviour
             magnitude = magnitude,
             duration = duration,
             appliedServerTime = NetworkManager.ServerTime.Time,
-            sourceId = sourceId
+            sourceId = sourceId,
+            stackCount = stackCount
         };
 
-        int index = IndexOf(type, sourceId);
         if (index >= 0)
             effects[index] = instance;
         else
