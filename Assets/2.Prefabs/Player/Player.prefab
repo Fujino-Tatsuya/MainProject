@@ -445,7 +445,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fbf6f9bb63ea49bd8590d12feb70624b, type: 3}
   m_Name:
-  m_EditorClassIdentifier: Assembly-CSharp::PlayerGuardianWillSkill
+  m_EditorClassIdentifier: Assembly-CSharp::FirstMeleeSubSkill
   data: {fileID: 11400000, guid: 40499745b22c405fb0781629e282229c, type: 2}
   hitboxAnchor: {fileID: 0}
 --- !u!1 &8896633917232358439
