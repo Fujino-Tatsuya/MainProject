@@ -44,4 +44,20 @@ public class ZoneLayoutCatalogSO : ScriptableObject
                 return e.Prefab;
         return null;
     }
+
+    // 역할 디자인 후보 전체(Quest 등 2종 이상 등록 시 랜덤 선택용): (Role, Size) 매칭, 없으면 Size 무관 fallback.
+    public List<GameObject> GetRolePool(ZoneRole role, ZoneSize size)
+    {
+        var pool = new List<GameObject>();
+        if (Entries == null) return pool;
+        foreach (var e in Entries)
+            if (e.Prefab != null && e.Role == role && e.Size == size)
+                pool.Add(e.Prefab);
+        if (pool.Count > 0) return pool;
+
+        foreach (var e in Entries)
+            if (e.Prefab != null && e.Role == role)
+                pool.Add(e.Prefab);
+        return pool;
+    }
 }

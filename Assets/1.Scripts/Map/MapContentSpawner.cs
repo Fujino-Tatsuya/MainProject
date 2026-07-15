@@ -30,113 +30,35 @@ public class MapContentSpawner : MonoBehaviour
         var nm = NetworkManager.Singleton;
         bool isServer = nm != null && nm.IsServer;
 
-        int visuals = 0, monsters = 0, wallCuts = 0;
+        int visuals = 0, monsters = 0;
         if (placements != null)
         {
             foreach (var p in placements)
             {
                 if (p.Slot == null || p.LayoutPrefab == null) continue;
 
-                // 존 비주얼 — 양쪽 로컬 생성 (슬롯 앵커 위치/방향 + 출입구 매칭 회전)
-                Quaternion rot = p.Slot.transform.rotation * Quaternion.Euler(0f, p.ExtraYawSteps * 90f, 0f);
-                GameObject zoneGo = Instantiate(p.LayoutPrefab,
-                    p.Slot.transform.position, rot, _root);
+                // v11: 회전 = 슬롯에 저작된 프리팹별 YawSteps(90° 4택). 위치 = 조합별 저장 위치(있으면), 없으면 슬롯 baseline.
+                // 미저작이면 임시 0°+baseline으로 배치하되 경고 — 조용한 실패 없음(저작 창으로 채워야 통로에 붙음).
+                if (!p.Slot.TryGetYaw(p.LayoutPrefab, out int yawSteps))
+                    Debug.LogWarning($"[MapContentSpawner] 회전 미저작 (Slot {p.Slot.SlotID} × {p.LayoutPrefab.name}) — 임시 0°. Zone Rotation Authoring 필요.");
+                Vector3 pos = p.Slot.TryGetPosition(p.LayoutPrefab, out var savedPos) ? savedPos : p.Slot.transform.position;
+                Quaternion rot = Quaternion.Euler(0f, yawSteps * 90f, 0f);
+                GameObject zoneGo = Instantiate(p.LayoutPrefab, pos, rot, _root);
 
-                // 피벗 보정 — 아트 존 프리팹(2026-07 신규 9종)은 코너 피벗이라 그대로 두면
-                // 존이 슬롯 중심에서 반폭만큼 밀린다(벽 컷/다리 정렬 깨짐).
-                // 바닥 렌더러 바운즈 중심(XZ)을 슬롯 위치에 맞춘다. 중앙 피벗 프리팹은 delta≈0.
-                CenterOnSlot(zoneGo, p.Slot.transform.position);
+                // 저작 툴(Save Placements)이 되받을 수 있게 (SlotID, 원본 프리팹) 식별자 부착.
+                var idc = zoneGo.AddComponent<GeneratedZoneIdentity>();
+                idc.SlotID = p.Slot.SlotID;
+                idc.SourcePrefab = p.LayoutPrefab;
 
                 p.Slot.IsFilled = true;
                 visuals++;
-
-                // 벽 변으로 붙는 다리 입구 자리의 벽 조각 삭제(통로 뚫기) —
-                // 슬롯/프리팹/회전이 결정적이라 서버·클라 동일 결과.
-                wallCuts += CutWallsForSlot(zoneGo, p.Slot);
 
                 // 몬스터 — 서버만 스폰 (NetworkObject → NGO 복제, 클라는 수신)
                 if (isServer) monsters += SpawnMonstersFor(zoneGo, gen);
             }
         }
 
-        Debug.Log($"[MapContentSpawner] 존 비주얼 {visuals} / 벽 컷 {wallCuts}조각 / 몬스터 {monsters} 스폰 (서버:{isServer}).");
-    }
-
-    // 존 비주얼의 둘레(벽 계열) 바운즈 중심(XZ)을 슬롯 위치로 이동 — 코너 피벗 프리팹 보정.
-    // 벽이 존 경계를 정의하므로 바닥 타일(자체도 코너 피벗)보다 벽 바운즈가 정확하다.
-    // 프리팹·트랜스폼이 결정적이라 같은 시드면 서버/클라 동일 결과. Y는 건드리지 않는다.
-    private static void CenterOnSlot(GameObject zoneGo, Vector3 slotPos)
-    {
-        bool hasWall = false, hasAny = false;
-        var wb = new Bounds();
-        var ab = new Bounds();
-        foreach (var r in zoneGo.GetComponentsInChildren<Renderer>())
-        {
-            if (r == null) continue;
-            if (!hasAny) { ab = r.bounds; hasAny = true; } else ab.Encapsulate(r.bounds);
-            if (!IsWallFamily(r.transform)) continue;
-            if (!hasWall) { wb = r.bounds; hasWall = true; } else wb.Encapsulate(r.bounds);
-        }
-        if (!hasAny) return;
-
-        Vector3 delta = slotPos - (hasWall ? wb.center : ab.center);
-        delta.y = 0f;
-        zoneGo.transform.position += delta;
-    }
-
-    // 벽 변으로 붙는 다리 입구(ZoneSlot.WallCuts) 자리의 벽/코너/문 조각을 비활성화해 통로를 뚫는다.
-    // 프리팹·트랜스폼·순회 순서가 결정적이라 같은 시드면 서버/클라 동일하게 잘린다.
-    private static int CutWallsForSlot(GameObject zoneGo, ZoneSlot slot)
-    {
-        if (slot.WallCuts == null || slot.WallCuts.Count == 0) return 0;
-
-        int n = 0;
-        var rends = zoneGo.GetComponentsInChildren<Renderer>();
-        foreach (var cut in slot.WallCuts)
-        {
-            int dir = Mathf.RoundToInt(cut.w);
-            bool alongX = dir == 0 || dir == 2; // N/S 변 = 변이 X축으로 진행
-            // 컷 창 = 다리 폭 4m + 여유 0.5m/변 (다리 규격화에 맞춤 — 7m 창은 4m 벽 모듈을 2개까지 잘랐음)
-            Vector3 half = alongX ? new Vector3(2.5f, 10f, 1.5f) : new Vector3(1.5f, 10f, 2.5f);
-            var box = new Bounds(new Vector3(cut.x, 2f, cut.z), half * 2f);
-
-            int hit = 0;
-            foreach (var r in rends)
-            {
-                if (r == null || !r.gameObject.activeSelf) continue;
-                if (r.bounds.max.y < 1.2f) continue;      // 바닥/낮은 조각 유지
-                if (!IsWallFamily(r.transform)) continue; // 벽/코너/문 계열만
-                if (!box.Intersects(r.bounds)) continue;
-                r.gameObject.SetActive(false);
-                hit++;
-            }
-            n += hit;
-#if UNITY_EDITOR
-            if (hit == 0)
-            {
-                Renderer near = null; float best = float.MaxValue;
-                foreach (var r in rends)
-                {
-                    if (r == null || !r.gameObject.activeSelf || !IsWallFamily(r.transform)) continue;
-                    float d = (r.bounds.ClosestPoint(box.center) - box.center).magnitude;
-                    if (d < best) { best = d; near = r; }
-                }
-                string info = near != null ? $"최근접벽 {near.name} c=({near.bounds.center.x:F1},{near.bounds.center.y:F1},{near.bounds.center.z:F1}) 거리={best:F1}m" : "벽 없음";
-                Debug.LogWarning($"[WallCut] {slot.name} 컷({cut.x:F1},{cut.z:F1}) dir={dir}: 0조각 — {info}");
-            }
-#endif
-        }
-        return n;
-    }
-
-    private static bool IsWallFamily(Transform t)
-    {
-        for (var c = t; c != null; c = c.parent)
-        {
-            string nm = c.name.ToLowerInvariant();
-            if (nm.Contains("wall") || nm.Contains("corner") || nm.Contains("door")) return true;
-        }
-        return false;
+        Debug.Log($"[MapContentSpawner] 존 비주얼 {visuals} / 몬스터 {monsters} 스폰 (서버:{isServer}).");
     }
 
     private int SpawnMonstersFor(GameObject zoneGo, MapGenerator gen)

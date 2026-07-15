@@ -6,8 +6,7 @@ public struct ZonePlacement
 {
     public ZoneSlot Slot;
     public ZoneRole Role;
-    public GameObject LayoutPrefab;   // 선택된 ZoneLayout 프리팹 (없으면 null)
-    public int ExtraYawSteps;         // 슬롯 회전 위에 더하는 90° 단위 회전(0~3) — 출입구↔다리 매칭
+    public GameObject LayoutPrefab;   // 선택된 ZoneLayout 프리팹 (없으면 null). 회전은 슬롯이 프리팹별로 들고 있음(ZoneSlot.Rotations).
 }
 
 // 슬롯에 ZoneLayout 프리팹을 선택해 배치 결과를 만든다 (스폰은 MapContentSpawner).
@@ -32,16 +31,48 @@ public class LayoutPlacer : MonoBehaviour
             return placements;
         }
 
-        // 1) 역할 존 = 고정 디자인 / 전투 존 = 크기별로 모음
+        // 슬롯에 FixedPrefab이 지정돼 있으면 셔플·역할과 무관하게 그 프리팹으로 고정 배치.
+        // 고정 프리팹은 전투 셔플 풀에서도 제외한다(다른 슬롯에 중복 등장 방지).
+        var pinned = new HashSet<GameObject>();
+        foreach (var s in slots)
+            if (s != null && s.FixedPrefab != null) pinned.Add(s.FixedPrefab);
+
+        // 1) 고정/역할 존 = 지정 디자인 / 전투 존 = 크기별로 모음
         var combatBySize = new Dictionary<ZoneSize, List<ZoneSlot>>();
         foreach (var slot in slots)
         {
             if (slot == null) continue;
 
-            // 역할 전용 디자인이 있으면 고정 배치. 퀘스트는 전용 디자인이 없으면
-            // 같은 크기 전투 풀에서 셔플로 뽑는다(위치+비주얼 모두 매판 달라짐).
-            GameObject roleLayout = slot.AssignedRole == ZoneRole.Combat
-                ? null : catalog.GetRoleLayout(slot.AssignedRole, slot.Size);
+            // 고정 프리팹 슬롯: 역할 무관 즉시 배치.
+            if (slot.FixedPrefab != null)
+            {
+                placements.Add(new ZonePlacement { Slot = slot, Role = slot.AssignedRole, LayoutPrefab = slot.FixedPrefab });
+                continue;
+            }
+
+            // 역할 전용 디자인이 있으면 고정 배치. 퀘스트는 슬롯에 QuestPrefab이 지정돼 있으면 그걸(고정 페어링),
+            // 없으면 전용 디자인 풀 중 rng 랜덤 1개, 그것도 없으면 같은 크기 전투 풀에서 셔플로 뽑는다.
+            GameObject roleLayout;
+            if (slot.AssignedRole == ZoneRole.Combat)
+            {
+                roleLayout = null;
+            }
+            else if (slot.AssignedRole == ZoneRole.Quest)
+            {
+                if (slot.QuestPrefab != null)
+                {
+                    roleLayout = slot.QuestPrefab;
+                }
+                else
+                {
+                    var questPool = catalog.GetRolePool(slot.AssignedRole, slot.Size);
+                    roleLayout = questPool.Count > 0 ? questPool[rng.Next(questPool.Count)] : null;
+                }
+            }
+            else
+            {
+                roleLayout = catalog.GetRoleLayout(slot.AssignedRole, slot.Size);
+            }
 
             if (slot.AssignedRole == ZoneRole.Combat ||
                 (slot.AssignedRole == ZoneRole.Quest && roleLayout == null))
@@ -56,8 +87,7 @@ public class LayoutPlacer : MonoBehaviour
                 {
                     Slot = slot,
                     Role = slot.AssignedRole,
-                    LayoutPrefab = roleLayout,
-                    ExtraYawSteps = PickYaw(roleLayout, slot)
+                    LayoutPrefab = roleLayout
                 });
             }
         }
@@ -68,6 +98,7 @@ public class LayoutPlacer : MonoBehaviour
             if (!combatBySize.TryGetValue(size, out var combatSlots)) continue;
 
             var pool = catalog.GetCombatPool(size, difficulty);
+            if (pinned.Count > 0) pool.RemoveAll(p => pinned.Contains(p)); // 고정 프리팹은 전투 셔플에서 제외
             if (pool.Count == 0)
             {
                 Debug.LogWarning($"[LayoutPlacer] {size}/난이도{difficulty} 전투 풀이 비어 있음 — {combatSlots.Count}곳 미배치.");
@@ -85,40 +116,11 @@ public class LayoutPlacer : MonoBehaviour
                 {
                     Slot = combatSlots[i],
                     Role = combatSlots[i].AssignedRole, // 퀘스트 슬롯(전용 디자인 없음)도 풀 셔플로 오므로 Role 보존
-                    LayoutPrefab = pool[i % pool.Count],
-                    ExtraYawSteps = PickYaw(pool[i % pool.Count], combatSlots[i])
+                    LayoutPrefab = pool[i % pool.Count]
                 });
         }
 
         return placements;
-    }
-
-    // 회전 매칭: 존의 개방변(N/W, 벽 없음)이 슬롯의 다리 방향(월드)을 최대한 많이 향하는
-    // 90° 단위 회전을 고른다(스코어링). 개방변이 못 덮는 연결은 벽의 문(door)으로 통과 —
-    // 존 저작 규칙: N/W=완전 개방, S/E=벽+문.
-    //  - 정사각(대/소): 0/90/180/270 전부 후보. 직사각(중): 풋프린트 축 유지를 위해 0/180만.
-    //  - 동점이면 최소 회전(결정적): 슬롯별 벽 방향이 고정돼야 정적 다리를 문 위치에
-    //    맞출 수 있다. 배치 다양성은 "어떤 디자인이 오는가"(풀 셔플)로 이미 확보.
-    private static int PickYaw(GameObject prefab, ZoneSlot slot)
-    {
-        if (prefab == null || slot == null) return 0;
-        var layout = prefab.GetComponent<ZoneLayout>();
-        if (layout == null || layout.OpeningCount == 0) return 0; // 출입구 정보 없음 — 매칭 불가(감지 전 프리팹)
-
-        int slotSteps = Mathf.RoundToInt(slot.transform.eulerAngles.y / 90f) & 3;
-        int[] candidates = layout.Size == ZoneSize.Medium ? new[] { 0, 2 } : new[] { 0, 1, 2, 3 };
-
-        int bestScore = -1, best = 0;
-        foreach (int extra in candidates)
-        {
-            int total = (slotSteps + extra) & 3;
-            int score = 0;
-            for (int d = 0; d < 4; d++)
-                if (layout.HasOpening((d - total + 4) & 3))
-                    score += slot.ConnCount(d); // 다리 "개수" 가중 — 개방변이 최대한 많은 다리를 받도록
-            if (score > bestScore) { bestScore = score; best = extra; }
-        }
-        return best;
     }
 
     // Fisher–Yates (결정적: 주입된 rng만 사용)

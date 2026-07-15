@@ -11,7 +11,6 @@ public class MapGenerator : MonoBehaviour
 
     [Header("=== 컴포넌트 참조 ===")]
     public LayoutPlacer LayoutPlacer;
-    public MapValidator Validator;                // (선택) 경로 검증 — 다리 고정이라 현재 미호출
     public MapContentSpawner ContentSpawner;
 
     [Header("=== 자동 생성 ===")]
@@ -43,19 +42,7 @@ public class MapGenerator : MonoBehaviour
     public List<ZonePlacement> Generate(int mapSeed, int difficultyLevel)
     {
         _generated = true;
-        _rng = new System.Random(mapSeed);
-        Placements.Clear();
-
-        GatherSlots();       // 씬 ZoneSlot 수집 + SlotID 정렬 + 초기화
-        AssignSlotRoles();   // 후보 중 퀘스트/보스/스폰 1곳씩
-
-        if (LayoutPlacer == null)
-        {
-            Debug.LogWarning("[MapGenerator] LayoutPlacer 미연결 — 생성 중단.");
-            return Placements;
-        }
-
-        Placements = LayoutPlacer.SelectLayouts(_slots, ZoneLayoutCatalog, difficultyLevel, _rng);
+        Placements = ComputePlacements(mapSeed, difficultyLevel);
 
         // 스폰: 존 비주얼(양쪽 로컬) + 몬스터(서버) — NGO 자동 복제
         ContentSpawner?.SpawnPlacements(this, Placements);
@@ -63,6 +50,20 @@ public class MapGenerator : MonoBehaviour
         Debug.Log($"[MapGenerator] 생성 완료. Seed:{mapSeed} / 난이도 Lv{difficultyLevel} / 슬롯 {_slots.Count} / 배치 {Placements.Count}.");
         OnGenerated?.Invoke(this); // 미니맵 베이크 등 후처리 훅 (생성물 배치 완료 시점)
         return Placements;
+    }
+
+    // 스폰 없이 배치만 계산 (Generate 공용 + 회전 저작 창의 조합 시뮬용). 결정적(같은 시드 → 서버/클라 동일).
+    public List<ZonePlacement> ComputePlacements(int mapSeed, int difficultyLevel)
+    {
+        _rng = new System.Random(mapSeed);
+        GatherSlots();       // 씬 ZoneSlot 수집 + SlotID 정렬 + 초기화
+        AssignSlotRoles();   // 후보 중 퀘스트/보스/스폰 1곳씩
+        if (LayoutPlacer == null)
+        {
+            Debug.LogWarning("[MapGenerator] LayoutPlacer 미연결 — 배치 계산 불가.");
+            return new List<ZonePlacement>();
+        }
+        return LayoutPlacer.SelectLayouts(_slots, ZoneLayoutCatalog, difficultyLevel, _rng);
     }
 
     // 생성 완료 이벤트 — 구독자: MinimapController(지형 베이크/마커 수집)
