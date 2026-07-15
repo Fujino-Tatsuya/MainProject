@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 [RequireComponent(typeof(Player))]
 [RequireComponent(typeof(PlayerInputReader))]
@@ -18,10 +18,15 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
     private PlayerStateContext context;
 
     public PlayerActionState CurrentState => currentState?.StateType ?? PlayerActionState.Idle;
-    public bool CanMove => (CurrentState == PlayerActionState.Idle || CurrentState == PlayerActionState.Move) && !context.StatusEffects.BlocksMovement;
-    public bool CanMovementRotate => (CurrentState == PlayerActionState.Idle || CurrentState == PlayerActionState.Move) && !context.StatusEffects.BlocksMovement;
+    public bool CanMove => (CurrentState == PlayerActionState.Idle || CurrentState == PlayerActionState.Move || AllowsSkillMovement) && !context.StatusEffects.BlocksMovement;
+    public bool CanMovementRotate => (CurrentState == PlayerActionState.Idle || CurrentState == PlayerActionState.Move || AllowsSkillMovementRotate) && !context.StatusEffects.BlocksMovement;
     public bool CanAttack => (CurrentState == PlayerActionState.Idle || CurrentState == PlayerActionState.Move) && !context.StatusEffects.BlocksAttack;
     public bool CanInterrupt => (CurrentState == PlayerActionState.Idle || CurrentState == PlayerActionState.Move) && !context.StatusEffects.BlocksInterrupt;
+    public bool CanUseSkill => (CurrentState == PlayerActionState.Idle || CurrentState == PlayerActionState.Move) && !context.StatusEffects.BlocksSkill;
+
+    // 스킬 실행 중 이동/회전 허용 여부는 스킬 정의에 위임 (단일 Skill 상태)
+    private bool AllowsSkillMovement => currentState is PlayerSkillState skillState && skillState.AllowsMovement;
+    private bool AllowsSkillMovementRotate => currentState is PlayerSkillState skillState && skillState.AllowsMovementRotate;
     public bool HasSuperArmor => context.StatusEffects.HasSuperArmor;
     public float MinKnockbackTime => minKnockbackTime;
     public float MaxKnockbackTime => maxKnockbackTime;
@@ -43,7 +48,8 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
             GetComponent<DefaultAttackController>(),
             statusEffects,
             GetComponent<Rigidbody>(),
-            GetComponentInChildren<Animator>()
+            GetComponentInChildren<Animator>(),
+            GetComponent<PlayerSkillController>()
         );
 
         currentState = CreateState(PlayerActionState.Idle);
@@ -142,6 +148,22 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
             ChangeState(PlayerActionState.Idle);
     }
 
+    // Skill 상태는 실행할 스킬 인스턴스가 필요해 BeginKnockback처럼 인스턴스 주입 경로로만 진입한다.
+    public bool BeginSkill(PlayerSkillBase skill)
+    {
+        if (skill == null || !CanUseSkill)
+            return false;
+
+        SetState(new PlayerSkillState(context, skill));
+        return true;
+    }
+
+    public void EndSkill()
+    {
+        if (CurrentState == PlayerActionState.Skill)
+            ChangeState(PlayerActionState.Idle);
+    }
+
     private bool CanEnter(PlayerActionState nextState)
     {
         if (CurrentState == PlayerActionState.Dead)
@@ -151,6 +173,7 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
         {
             PlayerActionState.Attack => CanAttack && context.DefaultAttack.CanStartApprovedAttack,
             PlayerActionState.Interrupt => CanInterrupt && PlayerInterruptState.CanStart(context),
+            PlayerActionState.Skill => false, // 스킬 인스턴스가 필수라 BeginSkill(skill)으로만 진입
             PlayerActionState.Move => !context.StatusEffects.BlocksMovement,
             PlayerActionState.Idle => true,
             PlayerActionState.Grabbed => true,
@@ -225,7 +248,8 @@ public enum PlayerActionState
     Interrupt,
     Grabbed,
     Knockback,
-    Dead
+    Dead,
+    Skill
 }
 
 public sealed class PlayerStateContext
@@ -239,7 +263,8 @@ public sealed class PlayerStateContext
         DefaultAttackController defaultAttack,
         StatusEffectController statusEffects,
         Rigidbody rigidbody,
-        Animator animator)
+        Animator animator,
+        PlayerSkillController skills)
     {
         Controller = controller;
         Player = player;
@@ -250,6 +275,7 @@ public sealed class PlayerStateContext
         StatusEffects = statusEffects;
         Rigidbody = rigidbody;
         Animator = animator;
+        Skills = skills;
     }
 
     public PlayerStateController Controller { get; }
@@ -261,6 +287,8 @@ public sealed class PlayerStateContext
     public StatusEffectController StatusEffects { get; }
     public Rigidbody Rigidbody { get; }
     public Animator Animator { get; }
+    // 스킬 시스템 미장착 프리팹에서는 null — 사용처는 전부 null 허용으로 다룬다
+    public PlayerSkillController Skills { get; }
 }
 
 public interface IPlayerState
@@ -298,6 +326,9 @@ public abstract class PlayerStateBase : IPlayerState
             return true;
         }
 
+        if (TryStartSkillInput())
+            return true;
+
         if (Context.Input.InterruptPressed &&
             Context.Controller.ChangeState(PlayerActionState.Interrupt))
         {
@@ -305,6 +336,20 @@ public abstract class PlayerStateBase : IPlayerState
         }
 
         return false;
+    }
+
+    private bool TryStartSkillInput()
+    {
+        PlayerSkillController skills = Context.Skills;
+        if (skills == null)
+            return false;
+
+        // Interrupt 슬롯에 스킬(단죄의 방패)이 배정되면 여기서 소비되어
+        // 아래 기존 Interrupt 상태 경로를 자연히 대체한다. 미배정이면 TryUse가 false라 기존 경로 유지.
+        return (Context.Input.GetSkillPressed(PlayerSkillSlot.Main) && skills.TryUse(PlayerSkillSlot.Main)) ||
+            (Context.Input.GetSkillPressed(PlayerSkillSlot.Sub) && skills.TryUse(PlayerSkillSlot.Sub)) ||
+            (Context.Input.GetSkillPressed(PlayerSkillSlot.Interrupt) && skills.TryUse(PlayerSkillSlot.Interrupt)) ||
+            (Context.Input.GetSkillPressed(PlayerSkillSlot.Ultimate) && skills.TryUse(PlayerSkillSlot.Ultimate));
     }
 }
 

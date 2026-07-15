@@ -1,4 +1,4 @@
-using BaseNetCode;
+﻿using BaseNetCode;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -11,6 +11,9 @@ public class PlayerInputReader : BaseNetworkBehaviour
     private InputAction moveAction;
     private InputAction attackAction;
     private InputAction interruptAction;
+    private InputAction skillMainAction;
+    private InputAction skillSubAction;
+    private InputAction skillUltimateAction;
     private bool inputEnabled = true;
     private bool controlEnabled = true;
 
@@ -31,6 +34,41 @@ public class PlayerInputReader : BaseNetworkBehaviour
         moveAction = playerInput.actions["Move"];
         attackAction = playerInput.actions["Attack"];
         interruptAction = playerInput.actions["Interrupt"];
+
+        // 스킬 액션은 에셋에 없을 수 있어 FindAction(null 허용)으로 조회한다 (인덱서는 예외 발생)
+        skillMainAction = playerInput.actions.FindAction("SkillMain");
+        skillSubAction = playerInput.actions.FindAction("SkillSub");
+        skillUltimateAction = playerInput.actions.FindAction("SkillUltimate");
+    }
+
+    public bool GetSkillPressed(PlayerSkillSlot slot)
+    {
+        if (!inputEnabled)
+            return false;
+
+        InputAction action = GetSkillAction(slot);
+        return action != null && action.WasPressedThisFrame();
+    }
+
+    public bool GetSkillHeld(PlayerSkillSlot slot)
+    {
+        if (!inputEnabled)
+            return false;
+
+        InputAction action = GetSkillAction(slot);
+        return action != null && action.IsPressed();
+    }
+
+    private InputAction GetSkillAction(PlayerSkillSlot slot)
+    {
+        return slot switch
+        {
+            PlayerSkillSlot.Main => skillMainAction,
+            PlayerSkillSlot.Sub => skillSubAction,
+            PlayerSkillSlot.Interrupt => interruptAction, // 우클릭 — 기존 Interrupt 액션 재사용
+            PlayerSkillSlot.Ultimate => skillUltimateAction,
+            _ => null
+        };
     }
 
     private void Start()
