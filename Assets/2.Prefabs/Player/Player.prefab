@@ -91,6 +91,8 @@ GameObject:
   - component: {fileID: 5274188098871446382}
   - component: {fileID: 8345678279683584363}
   - component: {fileID: 4237082408145735710}
+  - component: {fileID: 4711829301158223401}
+  - component: {fileID: 5233118834099021557}
   m_Layer: 6
   m_Name: Player
   m_TagString: Player
@@ -414,6 +416,38 @@ MonoBehaviour:
   maxKnockbackTime: 1.5
   serverKnockbackReportGraceTime: 0.25
   knockbackStopSpeed: 0.15
+--- !u!114 &4711829301158223401
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8559504096609571310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 51e4f741faf94c6d803b8171aa328964, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerSkillController
+  animator: {fileID: 3980452584406513891}
+  mainSkill: {fileID: 0}
+  subSkill: {fileID: 5233118834099021557}
+  interruptSkill: {fileID: 0}
+  ultimateSkill: {fileID: 0}
+  endFallbackPadding: 0.1
+--- !u!114 &5233118834099021557
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8559504096609571310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fbf6f9bb63ea49bd8590d12feb70624b, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerGuardianWillSkill
+  data: {fileID: 11400000, guid: 40499745b22c405fb0781629e282229c, type: 2}
+  hitboxAnchor: {fileID: 0}
 --- !u!1 &8896633917232358439
 GameObject:
   m_ObjectHideFlags: 0
