@@ -1,0 +1,59 @@
+# Default text handling. Keep repository text files normalized by Git while
+# binary Unity/imported assets stay untouched by the binary rules below.
+* text=auto
+
+# Source and project text files are UTF-8 by policy.
+*.asmdef text
+*.cginc text
+*.cs text
+*.css text
+*.html text
+*.inputactions text
+*.json text
+*.md text
+*.shader text
+*.shadergraph text
+*.shadersubgraph text
+*.tss text
+*.txt text
+*.uxml text
+*.uss text
+*.yaml text
+*.yml text
+
+# Unity YAML assets are text, but avoid forcing line endings here to reduce
+# scene/prefab churn across Windows editors.
+*.anim text
+*.asset text
+*.controller text
+*.mat text
+*.meta text
+*.prefab text
+*.unity text
+*.vfx text
+
+# Some .asset files are ALWAYS binary, even with Force Text serialization.
+# Treating them as text corrupts them on checkout/merge (CRLF conversion,
+# 3-way text merge). These override the *.asset rule above.
+NavMesh*.asset binary
+LightingData.asset binary
+OcclusionCullingData.asset binary
+INab*.asset binary
+
+# Imported/binary assets.
+*.dll binary
+*.exe binary
+*.fbx binary
+*.jpg binary
+*.jpeg binary
+*.mp3 binary
+*.mp4 binary
+*.ogg binary
+*.pdf binary
+*.png binary
+*.psd binary
+*.tga binary
+*.ttf binary
+*.unitypackage binary
+*.wav binary
+*.zip binary

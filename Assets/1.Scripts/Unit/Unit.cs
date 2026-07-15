@@ -1,45 +1,60 @@
-using UnityEngine;
+using BaseNetCode;
 using Unity.Netcode;
+using UnityEngine;
 
-public class Unit : NetworkBehaviour
+public class Unit : BaseNetworkBehaviour, IAttackReceiver
 {
-    #region °ø°İ·Â
+    #region ê³µê²©ë ¥
     int _attackDamage;
     public int AttackDamage { get { return _attackDamage; } }
     /// <summary>
-    /// attackDamage °ªÀ» º¯°æÇÏ´Â ÇÔ¼ö
+    /// attackDamage ê°’ì„ ë³€ê²½í•˜ëŠ” í•¨ìˆ˜
     /// </summary>
-    /// <param name="newAttackDamage">º¯°æÇÒ »õ·Î¿î °ø°İ·Â °ª</param>
+    /// <param name="newAttackDamage">ë³€ê²½í•  ìƒˆë¡œìš´ ê³µê²©ë ¥ ê°’</param>
     public void ChangeAttackDamageValue(int newAttackDamage)
     {
-        if(!IsServer) return; // ¼­¹ö¿¡¼­¸¸ °ø°İ·Â º¯°æ Ã³¸®
+        if(!IsServer) return; // ì„œë²„ì—ì„œë§Œ ê³µê²©ë ¥ ë³€ê²½ ì²˜ë¦¬
         _attackDamage = newAttackDamage;
     }
     #endregion
 
-    #region Ã¼·Â°ú ¹æ¾î·Â
-    Health _health;
-    NetworkVariable<int> _currentHp = new NetworkVariable<int>();
-    NetworkVariable<int> _currentShield = new NetworkVariable<int>();
-    NetworkVariable<bool> _hasShield = new NetworkVariable<bool>();
+    #region ì²´ë ¥ê³¼ ë°©ì–´ë ¥
+    protected Health _health;
+    public int CurrentHealth { get { return _health.CurrentHealth; } }
+    public int MaxHp { get { return _health.MaxHp; } }
+    protected NetworkVariable<int> _currentHp = new NetworkVariable<int>(
+    0,
+    NetworkVariableReadPermission.Everyone,
+    NetworkVariableWritePermission.Server
+);
+    protected NetworkVariable<int> _currentShield = new NetworkVariable<int>(
+    0,
+    NetworkVariableReadPermission.Everyone,
+    NetworkVariableWritePermission.Server
+);
+    protected NetworkVariable<bool> _hasShield = new NetworkVariable<bool>(
+    false,
+    NetworkVariableReadPermission.Everyone,
+    NetworkVariableWritePermission.Server
+);
 
     /// <summary>
-    /// damage¸¸Å­ ¹æ¾î·ÂÀ» ¹İ¿µÇÏ¿© ½¯µå¿Í Ã¼·ÂÀ» °¨¼Ò½ÃÅ°´Â ÇÔ¼ö
+    /// damageë§Œí¼ ë°©ì–´ë ¥ì„ ë°˜ì˜í•˜ì—¬ ì‰´ë“œì™€ ì²´ë ¥ì„ ê°ì†Œì‹œí‚¤ëŠ” í•¨ìˆ˜
     /// </summary>
-    /// <param name="damage">°¨¼Ò½ÃÅ³ ÇÇÇØ °ª</param>
-    public void TakeDamage(int damage)
+    /// <param name="damage">ê°ì†Œì‹œí‚¬ í”¼í•´ ê°’</param>
+    protected void TakeDamage(int damage)
     {
-        if (!IsServer) return; // ¼­¹ö¿¡¼­¸¸ ÇÇÇØ Ã³¸®
+        if (!IsServer) return; // ì„œë²„ì—ì„œë§Œ í”¼í•´ ì²˜ë¦¬
         int remainingDamage = damage;
 
-        // ¹æ¾î·ÂÀ¸·Î ÇÇÇØ¸¦ ¸ÕÀú Ã³¸®ÇÏ°í ³²Àº µ¥¹ÌÁö °è»ê
+        // ë°©ì–´ë ¥ìœ¼ë¡œ í”¼í•´ë¥¼ ë¨¼ì € ì²˜ë¦¬í•˜ê³  ë‚¨ì€ ë°ë¯¸ì§€ ê³„ì‚°
         remainingDamage = Mathf.Max(remainingDamage - _health.CurrentDefense, 0);
 
-        // ½¯µå°¡ ÀÖÀ¸¸é ½¯µå·Î ÇÇÇØ¸¦ Ã³¸®ÇÏ°í ³²Àº µ¥¹ÌÁö °è»ê
+        // ì‰´ë“œê°€ ìˆìœ¼ë©´ ì‰´ë“œë¡œ í”¼í•´ë¥¼ ì²˜ë¦¬í•˜ê³  ë‚¨ì€ ë°ë¯¸ì§€ ê³„ì‚°
         if (_health.HasShield)
         {
             int shieldDamage = remainingDamage - _health.CurrentShield;
-            // ³²Àº µ¥¹ÌÁö°¡ ½¯µåº¸´Ù ÀÛÀº °æ¿ì, ½¯µå·Î ¸ğµç ÇÇÇØ¸¦ Ã³¸®ÇÏµµ·Ï shieldDamage¸¦ Á¶Á¤
+            // ë‚¨ì€ ë°ë¯¸ì§€ê°€ ì‰´ë“œë³´ë‹¤ ì‘ì€ ê²½ìš°, ì‰´ë“œë¡œ ëª¨ë“  í”¼í•´ë¥¼ ì²˜ë¦¬í•˜ë„ë¡ shieldDamageë¥¼ ì¡°ì •
             if (shieldDamage < 0)
             {
                 shieldDamage = remainingDamage;
@@ -51,7 +66,7 @@ public class Unit : NetworkBehaviour
             remainingDamage -= shieldDamage;
         }
 
-        // ³²Àº ÇÇÇØ´Â Ã¼·ÂÀ¸·Î Ã³¸®
+        // ë‚¨ì€ í”¼í•´ëŠ” ì²´ë ¥ìœ¼ë¡œ ì²˜ë¦¬
         if (remainingDamage > 0)
         {
             _health.TakeHpDamage(remainingDamage);
@@ -60,61 +75,92 @@ public class Unit : NetworkBehaviour
         _currentHp.Value = _health.CurrentHealth;
     }
 
+    public virtual void TakeDamage(AttackInfo attackInfo)
+    {
+        TakeDamage(attackInfo.damage);
+    }
+
+    public virtual bool ReceiveAttack(AttackInfo attackInfo, AttackHitContext hitContext)
+    {
+        BeforeMergeTestLog.Info(
+            "DAMAGE",
+            "RECEIVE_BEGIN",
+            $"unit={name}, damage={attackInfo.damage}, hpBefore={(_health != null ? _health.CurrentHealth : -1)}",
+            this);
+        TakeDamage(attackInfo);
+        BeforeMergeTestLog.Info(
+            "DAMAGE",
+            "RECEIVE_END",
+            $"unit={name}, hpAfter={(_health != null ? _health.CurrentHealth : -1)}",
+            this);
+        return true;
+    }
+
     /// <summary>
-    /// healAmount¸¸Å­ Ã¼·ÂÀ» È¸º¹½ÃÅ°´Â ÇÔ¼ö
+    /// healAmountë§Œí¼ ì²´ë ¥ì„ íšŒë³µì‹œí‚¤ëŠ” í•¨ìˆ˜
     /// </summary>
-    /// <param name="healAmount">È¸º¹½ÃÅ³ Ã¼·Â ¾ç</param>
+    /// <param name="healAmount">íšŒë³µì‹œí‚¬ ì²´ë ¥ ì–‘</param>
     public void HealHp(int healAmount)
     {
-        if (!IsServer) return; // ¼­¹ö¿¡¼­¸¸ Ã¼·Â È¸º¹ Ã³¸®
+        if (!IsServer) return; // ì„œë²„ì—ì„œë§Œ ì²´ë ¥ íšŒë³µ ì²˜ë¦¬
         _health.HealHp(healAmount);
         _currentHp.Value = _health.CurrentHealth;
     }
 
     /// <summary>
-    /// increaseAmount¸¸Å­ ¹æ¾î·ÂÀ» Áõ°¡½ÃÅ°´Â ÇÔ¼ö
+    /// ì²´ë ¥ì„ ìµœëŒ€ì¹˜ë¡œ íšŒë³µì‹œí‚¤ëŠ” í•¨ìˆ˜
     /// </summary>
-    /// <param name="increaseAmount">Áõ°¡½ÃÅ³ ¹æ¾î·Â ¾ç</param>
+    public void Revive()
+    {
+        if (!IsServer) return; // ì„œë²„ì—ì„œë§Œ ì²´ë ¥ íšŒë³µ ì²˜ë¦¬
+        _health.Revive();
+        _currentHp.Value = _health.CurrentHealth;
+    }
+
+    /// <summary>
+    /// increaseAmountë§Œí¼ ë°©ì–´ë ¥ì„ ì¦ê°€ì‹œí‚¤ëŠ” í•¨ìˆ˜
+    /// </summary>
+    /// <param name="increaseAmount">ì¦ê°€ì‹œí‚¬ ë°©ì–´ë ¥ ì–‘</param>
     public void IncreaseDefense(int increaseAmount)
     {
-        if (!IsServer) return; // ¼­¹ö¿¡¼­¸¸ ¹æ¾î·Â È¸º¹ Ã³¸®
+        if (!IsServer) return; // ì„œë²„ì—ì„œë§Œ ë°©ì–´ë ¥ íšŒë³µ ì²˜ë¦¬
         _health.IncreaseDefense(increaseAmount);
     }
 
     /// <summary>
-    /// decreaseAmount¸¸Å­ ¹æ¾î·ÂÀ» °¨¼Ò½ÃÅ°´Â ÇÔ¼ö
+    /// decreaseAmountë§Œí¼ ë°©ì–´ë ¥ì„ ê°ì†Œì‹œí‚¤ëŠ” í•¨ìˆ˜
     /// </summary>
-    /// <param name="decreaseAmount">°¨¼Ò½ÃÅ³ ¹æ¾î·Â ¾ç</param>
+    /// <param name="decreaseAmount">ê°ì†Œì‹œí‚¬ ë°©ì–´ë ¥ ì–‘</param>
     public void DecreaseDefense(int decreaseAmount)
     {
-        if (!IsServer) return; // ¼­¹ö¿¡¼­¸¸ ¹æ¾î·Â °¨¼Ò Ã³¸®
+        if (!IsServer) return; // ì„œë²„ì—ì„œë§Œ ë°©ì–´ë ¥ ê°ì†Œ ì²˜ë¦¬
         _health.DecreaseDefense(decreaseAmount);
     }
 
     /// <summary>
-    /// shieldAmount¸¸Å­ ½¯µå¸¦ È¸º¹½ÃÅ°´Â ÇÔ¼ö
+    /// shieldAmountë§Œí¼ ì‰´ë“œë¥¼ íšŒë³µì‹œí‚¤ëŠ” í•¨ìˆ˜
     /// </summary>
-    /// <param name="shieldAmount">È¸º¹½ÃÅ³ ½¯µå ¾ç</param>
+    /// <param name="shieldAmount">íšŒë³µì‹œí‚¬ ì‰´ë“œ ì–‘</param>
     public void IncreaseShield(int shieldAmount)
     {
-        if (!IsServer) return; // ¼­¹ö¿¡¼­¸¸ ½¯µå È¸º¹ Ã³¸®
+        if (!IsServer) return; // ì„œë²„ì—ì„œë§Œ ì‰´ë“œ íšŒë³µ ì²˜ë¦¬
         _health.IncreaseShield(shieldAmount);
         UpdateNetworkShield();
     }
 
     /// <summary>
-    /// shieldValue¸¸Å­ ½¯µå¸¦ ¼³Á¤ÇÏ´Â ÇÔ¼ö
+    /// shieldValueë§Œí¼ ì‰´ë“œë¥¼ ì„¤ì •í•˜ëŠ” í•¨ìˆ˜
     /// </summary>
-    /// <param name="shieldValue">¼³Á¤ÇÒ ½¯µå °ª</param>
+    /// <param name="shieldValue">ì„¤ì •í•  ì‰´ë“œ ê°’</param>
     public void SetShield(int shieldValue)
     {
-        if (!IsServer) return; // ¼­¹ö¿¡¼­¸¸ ½¯µå ¼³Á¤ Ã³¸®
+        if (!IsServer) return; // ì„œë²„ì—ì„œë§Œ ì‰´ë“œ ì„¤ì • ì²˜ë¦¬
         _health.SetShield(shieldValue);
         UpdateNetworkShield();
     }
 
     /// <summary>
-    /// ½¯µå »óÅÂ °»½Å ÇÔ¼ö
+    /// ì‰´ë“œ ìƒíƒœ ê°±ì‹  í•¨ìˆ˜
     /// </summary>
     void UpdateNetworkShield()
     {
@@ -124,45 +170,45 @@ public class Unit : NetworkBehaviour
     }
     #endregion
 
-    #region ¼Óµµ
-    // ÀÌµ¿ ¼Óµµ
+    #region ì†ë„
+    // ì´ë™ ì†ë„
     float _moveSpeed;
     public float MoveSpeed { get { return _moveSpeed; } }
     /// <summary>
-    /// moveSpeed °ªÀ» º¯°æÇÏ´Â ÇÔ¼ö
+    /// moveSpeed ê°’ì„ ë³€ê²½í•˜ëŠ” í•¨ìˆ˜
     /// </summary>
-    /// <param name="newMoveSpeed">º¯°æÇÒ »õ·Î¿î ÀÌµ¿ ¼Óµµ °ª</param>
+    /// <param name="newMoveSpeed">ë³€ê²½í•  ìƒˆë¡œìš´ ì´ë™ ì†ë„ ê°’</param>
     public void ChangeMoveSpeedValue(float newMoveSpeed)
     {
-        if (!IsServer) return; // ¼­¹ö¿¡¼­¸¸ ÀÌµ¿ ¼Óµµ º¯°æ Ã³¸®
+        if (!IsServer) return; // ì„œë²„ì—ì„œë§Œ ì´ë™ ì†ë„ ë³€ê²½ ì²˜ë¦¬
         _moveSpeed = newMoveSpeed;
     }
 
-    // °ø°İ ¼Óµµ
+    // ê³µê²© ì†ë„
     float _attackSpeed;
     public float AttackSpeed { get { return _attackSpeed; } }
     /// <summary>
-    /// attackSpeed °ªÀ» º¯°æÇÏ´Â ÇÔ¼ö
+    /// attackSpeed ê°’ì„ ë³€ê²½í•˜ëŠ” í•¨ìˆ˜
     /// </summary>
-    /// <param name="newAttackSpeed">º¯°æÇÒ »õ·Î¿î °ø°İ ¼Óµµ °ª</param>
+    /// <param name="newAttackSpeed">ë³€ê²½í•  ìƒˆë¡œìš´ ê³µê²© ì†ë„ ê°’</param>
     public void ChangeAttackSpeedValue(float newAttackSpeed)
     {
-        if (!IsServer) return; // ¼­¹ö¿¡¼­¸¸ °ø°İ ¼Óµµ º¯°æ Ã³¸®
+        if (!IsServer) return; // ì„œë²„ì—ì„œë§Œ ê³µê²© ì†ë„ ë³€ê²½ ì²˜ë¦¬
         _attackSpeed = newAttackSpeed;
     }
     #endregion
 
-    #region »óÅÂ ÀÌ»ó
+    #region ìƒíƒœ ì´ìƒ
     StatusEffectType _statusEffectType = StatusEffectType.None;
     public StatusEffectType StatusEffectType { get { return _statusEffectType; } }
     /// <summary>
-    /// statusEffectType °ªÀ» º¯°æÇÏ´Â ÇÔ¼ö
-    /// BitMaskHelper¸¦ »ç¿ëÇÏ¿© ³ª¿Â °ªÀ» newStatusEffectTypeÀ¸·Î Àü´ŞÇÏ¿© »óÅÂ ÀÌ»ó È¿°ú¸¦ º¯°æÇÒ ¼ö ÀÖµµ·Ï ÇÔ
+    /// statusEffectType ê°’ì„ ë³€ê²½í•˜ëŠ” í•¨ìˆ˜
+    /// BitMaskHelperë¥¼ ì‚¬ìš©í•˜ì—¬ ë‚˜ì˜¨ ê°’ì„ newStatusEffectTypeìœ¼ë¡œ ì „ë‹¬í•˜ì—¬ ìƒíƒœ ì´ìƒ íš¨ê³¼ë¥¼ ë³€ê²½í•  ìˆ˜ ìˆë„ë¡ í•¨
     /// </summary>
-    /// <param name="newStatusEffectType">º¯°æÇÒ »õ·Î¿î »óÅÂ ÀÌ»ó Å¸ÀÔ °ª</param>
+    /// <param name="newStatusEffectType">ë³€ê²½í•  ìƒˆë¡œìš´ ìƒíƒœ ì´ìƒ íƒ€ì… ê°’</param>
     public void ChangeStatusEffectType(StatusEffectType newStatusEffectType)
     {
-        if (!IsServer) return; // ¼­¹ö¿¡¼­¸¸ »óÅÂ ÀÌ»ó º¯°æ Ã³¸®
+        if (!IsServer) return; // ì„œë²„ì—ì„œë§Œ ìƒíƒœ ì´ìƒ ë³€ê²½ ì²˜ë¦¬
         _statusEffectType = newStatusEffectType;
     }
     #endregion
@@ -262,14 +308,14 @@ public class Unit : NetworkBehaviour
     #endregion
 
     /// <summary>
-    /// UnitÀ» »ó¼Ó¹Ş´Â Å¬·¡½º¿¡¼­ UnitÀÇ ±âº» ´É·ÂÄ¡µéÀ» ÃÊ±âÈ­ÇÏ´Â ÇÔ¼ö
+    /// Unitì„ ìƒì†ë°›ëŠ” í´ë˜ìŠ¤ì—ì„œ Unitì˜ ê¸°ë³¸ ëŠ¥ë ¥ì¹˜ë“¤ì„ ì´ˆê¸°í™”í•˜ëŠ” í•¨ìˆ˜
     /// </summary>
-    /// <param name="attackDamage">±âº» °ø°İ·Â</param>
-    /// <param name="moveSpeed">±âº» ÀÌµ¿ ¼Óµµ</param>
-    /// <param name="attackSpeed">±âº» °ø°İ ¼Óµµ</param>
-    /// <param name="maxHp">ÃÖ´ë Ã¼·Â</param>
-    /// <param name="defense">±âº» ¹æ¾î·Â</param>
-    /// <param name="maxShield">ÃÖ´ë ½¯µå</param>
+    /// <param name="attackDamage">ê¸°ë³¸ ê³µê²©ë ¥</param>
+    /// <param name="moveSpeed">ê¸°ë³¸ ì´ë™ ì†ë„</param>
+    /// <param name="attackSpeed">ê¸°ë³¸ ê³µê²© ì†ë„</param>
+    /// <param name="maxHp">ìµœëŒ€ ì²´ë ¥</param>
+    /// <param name="defense">ê¸°ë³¸ ë°©ì–´ë ¥</param>
+    /// <param name="maxShield">ìµœëŒ€ ì‰´ë“œ</param>
     public void Initialize(int attackDamage, float moveSpeed, float attackSpeed, int maxHp, int defense, int maxShield)
     {
         _attackDamage = attackDamage;
@@ -277,8 +323,47 @@ public class Unit : NetworkBehaviour
         _attackSpeed = attackSpeed;
 
         _health = new Health(maxHp, defense, maxShield);
-        _currentHp = new NetworkVariable<int>(maxHp);
+        _currentHp.Value = maxHp;
 
         UpdateNetworkShield();
+
+        _knockback = GetComponent<IKnockbackable>();
     }
+
+    #region ë„‰ë°±
+    IKnockbackable _knockback;
+
+    /// <summary>
+    /// ë„‰ë°± ì§„ì…ì . ì„œë²„ ê°€ë“œ ë“± ê³µí†µ ê·œì¹™ì€ ì—¬ê¸°ì„œë§Œ ì²˜ë¦¬í•œë‹¤.
+    /// ê¸°ë³¸ ë™ì‘ì€ IKnockbackable ì»´í¬ë„ŒíŠ¸ ìœ„ì„, ì˜ˆì™¸ëŠ” OnKnockbackì„ override.
+    /// </summary>
+    public void Knockback(Vector3 direction, float strength)
+    {
+        BeforeMergeTestLog.Info(
+            "KNOCKBACK",
+            "ENTRY",
+            $"unit={name}, IsServer={IsServer}, strength={strength}, direction={direction}",
+            this);
+        if (!IsServer) return;
+
+        OnKnockback(direction, strength);
+    }
+
+    protected virtual void OnKnockback(Vector3 direction, float strength)
+    {
+        if (_knockback == null)
+        {
+            Debug.LogError($"{name}: IKnockbackable ì»´í¬ë„ŒíŠ¸ê°€ ì—†ì–´ ë„‰ë°±ì´ ë¬´ì‹œë©ë‹ˆë‹¤.", this);
+            return;
+        }
+
+        BeforeMergeTestLog.Info(
+            "KNOCKBACK",
+            "BASE_DELEGATE",
+            $"unit={name}, implementation={_knockback.GetType().Name}, strength={strength}",
+            this);
+        _knockback.ApplyKnockback(direction, strength);
+    }
+
+    #endregion
 }

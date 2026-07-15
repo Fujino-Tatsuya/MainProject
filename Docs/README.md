@@ -7,6 +7,7 @@
 
 - [design/boss-wells-and-no23.md](design/boss-wells-and-no23.md) — 보스 "웰즈 & 23호" 컨셉·기믹·페이즈
 - [design/player.md](design/player.md) — Player Prefab, 입력·이동·피격 책임
+- [design/interaction-policy.md](design/interaction-policy.md) — Instigator/Receiver/Target 상호작용 책임 정책
 - [design/character.md](design/character.md) — Character 데이터, Prefab, UserProfile 보정
 - [design/character/character_garen.md](design/character/character_garen.md) — Garen 캐릭터 요약
 - [design/character/character_jinx.md](design/character/character_jinx.md) — Jinx 캐릭터 요약
