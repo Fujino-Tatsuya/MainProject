@@ -7,6 +7,8 @@
 public class CombatHUD : MonoBehaviour
 {
     [SerializeField] private SkillCooldownHUD skillCooldownHUD;
+    [SerializeField] private PlayerHealthHUD playerHealthHUD;
+    [SerializeField] private StatusEffectHUD statusEffectHUD;
 
     private void OnEnable()
     {
@@ -23,5 +25,11 @@ public class CombatHUD : MonoBehaviour
     {
         if (skillCooldownHUD != null)
             skillCooldownHUD.Bind(player);
+
+        if (playerHealthHUD != null)
+            playerHealthHUD.Bind(player);
+
+        if (statusEffectHUD != null)
+            statusEffectHUD.Bind(player);
     }
 }

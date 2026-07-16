@@ -105,6 +105,26 @@ public class StatusEffectController : BaseNetworkBehaviour
         return index >= 0 ? Mathf.Max(1, effects[index].stackCount) : 0;
     }
 
+    // ── UI 조회용 (전 피어 읽기 가능 — NetworkList는 복제됨) ──
+
+    public int ActiveCount => effects.Count;
+
+    public StatusEffectInstance GetActive(int index)
+    {
+        return effects[index];
+    }
+
+    /// <summary>index 인스턴스의 남은 시간(초). 수동 해제형(duration 0 이하)은 -1.</summary>
+    public float GetRemainingTime(int index)
+    {
+        StatusEffectInstance instance = effects[index];
+        if (instance.duration <= 0f)
+            return -1f;
+
+        double now = NetworkManager != null ? NetworkManager.ServerTime.Time : 0.0;
+        return Mathf.Max(0f, (float)(instance.appliedServerTime + instance.duration - now));
+    }
+
     /// <summary>차단류 등 수치 없는 효과 적용 (배율 1).</summary>
     public void Apply(StatusEffectType type, float duration, ulong sourceId)
     {
