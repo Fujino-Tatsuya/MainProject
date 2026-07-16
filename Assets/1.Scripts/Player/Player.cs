@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using UnityEngine.InputSystem;
 using Unity.Netcode;
 
 [RequireComponent(typeof(PlayerInputReader))]
@@ -69,6 +70,7 @@ public class Player : Unit
         {
             CameraTargetSwitcher.Active?.FocusOwnerPlayer();
             SetLocalPlayer(this);
+            EnableLocalInput();
         }
         else
         {
@@ -76,6 +78,11 @@ public class Player : Unit
             CombatHUD childHud = GetComponentInChildren<CombatHUD>(true);
             if (childHud != null)
                 childHud.gameObject.SetActive(false);
+
+            // AudioListener는 씬에 하나만 활성이어야 한다 — 원격 플레이어 것은 끈다
+            AudioListener audioListener = GetComponentInChildren<AudioListener>(true);
+            if (audioListener != null)
+                audioListener.enabled = false;
         }
 
         if (IsServer)
@@ -92,9 +99,23 @@ public class Player : Unit
 
     private void Start()
     {
-        // 오프라인(비네트워크) 실행은 OnNetworkSpawn이 불리지 않는다 — 테스트 씬 HUD 바인딩 폴백
+        // 오프라인(비네트워크) 실행은 OnNetworkSpawn이 불리지 않는다 — 테스트 씬 HUD 바인딩/입력 활성 폴백
         if (!IsNetworkActive)
+        {
             SetLocalPlayer(this);
+            EnableLocalInput();
+        }
+    }
+
+    /// <summary>
+    /// PlayerInput은 프리팹에서 기본 비활성 — 원격 플레이어 클론이 스폰 시 디바이스 페어링을 시도하며
+    /// "Cannot find matching control scheme" 경고를 내는 것을 막기 위해 로컬(오너/오프라인)만 켠다.
+    /// </summary>
+    private void EnableLocalInput()
+    {
+        PlayerInput playerInput = GetComponent<PlayerInput>();
+        if (playerInput != null && !playerInput.enabled)
+            playerInput.enabled = true;
     }
 
     public override void OnDestroy()
