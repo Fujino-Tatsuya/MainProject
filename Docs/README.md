@@ -16,6 +16,8 @@
 - [design/level-system.md](design/level-system.md) — 레벨/난이도 4축, 콘텐츠 난이도, 난이도↔전투 상호작용
 
 ## 기술
+- [tech/game-structure-uml.md](tech/game-structure-uml.md) — C# 189개와 씬·프리팹·SO·Behavior Graph를 교차검증한 현재 게임 구조 UML
+- [tech/script-inventory.md](tech/script-inventory.md) — 전체 C# 189개 파일별 역할·상속·실제 연결/미연결 상태 전수 목록
 - [tech/architecture.md](tech/architecture.md) — UnitBase·컴포넌트, 스탯/상태 자료구조, FSM/페이즈
 - [tech/networking.md](tech/networking.md) — NGO / IPv4·Steamworks, 권한 모델, 연결 흐름
 - [tech/conventions.md](tech/conventions.md) — 네이밍/폴더/Input/SO 규칙
