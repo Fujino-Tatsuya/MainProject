@@ -758,6 +758,7 @@ GameObject:
   - component: {fileID: 6839388890406243040}
   - component: {fileID: 5760370461006381669}
   - component: {fileID: 8734512906874521133}
+  - component: {fileID: 9114957203948571100}
   m_Layer: 8
   m_Name: TwentyThree
   m_TagString: Untagged
@@ -1824,3 +1825,15 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 6346197552094035170, guid: 79860f5bc8d12324ba329dfa38ea3699, type: 3}
   m_PrefabInstance: {fileID: 1356464099776690993}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &9114957203948571100
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5372104213593212626}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0ee932d817fa4e58ac747ef1da75f242, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::BossHudTarget
