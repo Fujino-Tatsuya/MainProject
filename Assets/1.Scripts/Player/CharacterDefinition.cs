@@ -14,7 +14,6 @@ public class CharacterDefinition : ScriptableObject
     [SerializeField] private float attackSpeed;
     [SerializeField] private int maxHp;
     [SerializeField] private int defense;
-    [SerializeField] private int maxShield;
 
     public string CharacterId => characterId;
     public GameObject VisualPrefab => visualPrefab;
@@ -25,5 +24,4 @@ public class CharacterDefinition : ScriptableObject
     public float AttackSpeed => attackSpeed;
     public int MaxHp => maxHp;
     public int Defense => defense;
-    public int MaxShield => maxShield;
 }

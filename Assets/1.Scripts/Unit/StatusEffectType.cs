@@ -22,5 +22,4 @@ public enum StatusEffectType
     AttackSpeedModifier = 1 << 9,
     DefenseModifier = 1 << 10,
     MaxHpModifier = 1 << 11,
-    MaxShieldModifier = 1 << 12,
 }

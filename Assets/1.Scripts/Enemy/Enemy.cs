@@ -10,7 +10,6 @@ public class Enemy : Unit
     [SerializeField] float attackSpeed;
     [SerializeField] int maxHp;
     [SerializeField] int defense;
-    [SerializeField] int maxShield;
 
     [Header("\nEnemy 전용 상태")]
     [SerializeField] int _groggyCount;
@@ -26,7 +25,7 @@ public class Enemy : Unit
     public override void OnNetworkSpawn()
     {
         if (!IsServer) return;
-        Initialize(attackDamage, moveSpeed, attackSpeed, maxHp, defense, maxShield);
+        Initialize(attackDamage, moveSpeed, attackSpeed, maxHp, defense);
 
         BehaviorGraphAgent bt = GetComponent<BehaviorGraphAgent>();
         if (bt == null)

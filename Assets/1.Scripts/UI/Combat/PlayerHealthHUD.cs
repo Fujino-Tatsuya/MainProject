@@ -3,14 +3,17 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// 로컬 플레이어의 HP/실드 바. Unit의 복제 스탯(CurrentHealth/FinalMaxHp/CurrentShield)을 매 프레임 폴링한다.
-/// MaxShield는 서버 전용(_health)이라 클라이언트에서 읽을 수 없어, 실드 바는 최대 HP와 같은 스케일로 표시한다.
+/// 로컬 플레이어의 HP 바 + 실드 바(별도 바). Unit의 복제 스탯을 매 프레임 폴링한다.
+/// 실드는 상한(MaxShield) 개념이 없으므로 바 비율은 최대 HP 대비로 그리고, 수치는 절대량을 표시한다.
+/// 실드가 0이면 실드 바 전체를 숨긴다.
 /// </summary>
 public class PlayerHealthHUD : MonoBehaviour
 {
     [SerializeField] private Image hpFill;
-    [SerializeField] private Image shieldFill;
     [SerializeField] private TMP_Text hpText;
+    [SerializeField] private GameObject shieldBar;
+    [SerializeField] private Image shieldFill;
+    [SerializeField] private TMP_Text shieldText;
 
     private Player player;
 
@@ -41,14 +44,20 @@ public class PlayerHealthHUD : MonoBehaviour
         if (hpFill != null)
             hpFill.fillAmount = maxHp > 0 ? Mathf.Clamp01((float)hp / maxHp) : 0f;
 
+        if (hpText != null)
+            hpText.text = maxHp > 0 ? $"{hp}/{maxHp}" : string.Empty;
+
+        bool hasShield = shield > 0;
+        if (shieldBar != null && shieldBar.activeSelf != hasShield)
+            shieldBar.SetActive(hasShield);
+
+        if (!hasShield)
+            return;
+
         if (shieldFill != null)
             shieldFill.fillAmount = maxHp > 0 ? Mathf.Clamp01((float)shield / maxHp) : 0f;
 
-        if (hpText != null)
-        {
-            hpText.text = maxHp <= 0
-                ? string.Empty
-                : shield > 0 ? $"{hp}/{maxHp} (+{shield})" : $"{hp}/{maxHp}";
-        }
+        if (shieldText != null)
+            shieldText.text = shield.ToString();
     }
 }

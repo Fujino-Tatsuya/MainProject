@@ -221,10 +221,9 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     public int FinalAttackDamage => Mathf.Max(0, Mathf.RoundToInt(_attackDamage * GetStatMultiplier(StatusEffectType.AttackDamageModifier)));
     public float FinalMoveSpeed => Mathf.Max(0f, _moveSpeed * GetStatMultiplier(StatusEffectType.MoveSpeedModifier));
     public float FinalAttackSpeed => Mathf.Max(0f, _attackSpeed * GetStatMultiplier(StatusEffectType.AttackSpeedModifier));
-    // 방어력/최대쉴드는 _health가 서버에서만 생성되므로 서버에서만 유효
+    // 방어력은 _health가 서버에서만 생성되므로 서버에서만 유효
     public int FinalDefense => Mathf.Max(0, Mathf.RoundToInt((_health != null ? _health.CurrentDefense : 0) * GetStatMultiplier(StatusEffectType.DefenseModifier)));
     public int FinalMaxHp => Mathf.Max(0, Mathf.RoundToInt(MaxHp * GetStatMultiplier(StatusEffectType.MaxHpModifier)));
-    public int FinalMaxShield => Mathf.Max(0, Mathf.RoundToInt((_health != null ? _health.MaxShield : 0) * GetStatMultiplier(StatusEffectType.MaxShieldModifier)));
     #endregion
 
     #region RPC
@@ -312,14 +311,13 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     /// <param name="attackSpeed">기본 공격 속도</param>
     /// <param name="maxHp">최대 체력</param>
     /// <param name="defense">기본 방어력</param>
-    /// <param name="maxShield">최대 쉴드</param>
-    public void Initialize(int attackDamage, float moveSpeed, float attackSpeed, int maxHp, int defense, int maxShield)
+    public void Initialize(int attackDamage, float moveSpeed, float attackSpeed, int maxHp, int defense)
     {
         _attackDamage = attackDamage;
         _moveSpeed = moveSpeed;
         _attackSpeed = attackSpeed;
 
-        _health = new Health(maxHp, defense, maxShield);
+        _health = new Health(maxHp, defense);
         _currentHp.Value = maxHp;
         _maxHp.Value = maxHp;
 

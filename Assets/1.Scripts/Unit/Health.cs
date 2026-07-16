@@ -67,8 +67,6 @@ public class Health
     #region 쉴드
     int _currentShield;
     public int CurrentShield { get { return _currentShield; } }
-    int _maxShield;
-    public int MaxShield { get { return _maxShield; } }
     bool _hasShield = false;
     public bool HasShield { get { return _hasShield; } }
 
@@ -101,19 +99,17 @@ public class Health
     public void IncreaseShield(int shieldAmount)
     {
         _currentShield += shieldAmount;
-        _currentShield = Mathf.Min(_currentShield, _maxShield); // 쉴드가 최대 쉴드를 초과하지 않도록 보장
         _hasShield = (_currentShield > 0)? true : false;
 
         Edit.Log($"[Unit] 쉴드 증가량: {shieldAmount}   /   현재 쉴드: {_currentShield}");
     }
     #endregion
 
-    public Health(int maxHp, int defense, int maxShield)
+    public Health(int maxHp, int defense)
     {
         _maxHp = maxHp;
         _currentHp = maxHp;
         _currentDefense = defense;
-        _maxShield = maxShield;
         _currentShield = 0;
         _hasShield = false;
     }

@@ -34,7 +34,6 @@ public class Player : Unit
     [SerializeField] float attackSpeed;
     [SerializeField] int maxHp;
     [SerializeField] int defense;
-    [SerializeField] int maxShield;
 
     private PlayerStateController stateController;
     private DefaultAttackController defaultAttack;
@@ -73,7 +72,7 @@ public class Player : Unit
         }
 
         if (IsServer)
-            Initialize(attackDamage, moveSpeed, attackSpeed, maxHp, defense, maxShield);
+            Initialize(attackDamage, moveSpeed, attackSpeed, maxHp, defense);
     }
 
     public override void OnNetworkDespawn()
