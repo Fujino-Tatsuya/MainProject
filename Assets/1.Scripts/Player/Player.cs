@@ -70,6 +70,13 @@ public class Player : Unit
             CameraTargetSwitcher.Active?.FocusOwnerPlayer();
             SetLocalPlayer(this);
         }
+        else
+        {
+            // HUD는 Player 프리팹 자식으로 스폰되므로, 원격 플레이어의 HUD 캔버스가 겹치지 않게 끈다
+            CombatHUD childHud = GetComponentInChildren<CombatHUD>(true);
+            if (childHud != null)
+                childHud.gameObject.SetActive(false);
+        }
 
         if (IsServer)
             Initialize(attackDamage, moveSpeed, attackSpeed, maxHp, defense);
