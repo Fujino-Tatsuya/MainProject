@@ -100,3 +100,15 @@ CLAUDE.local.md
 .omc/
 /data/
 /PLAN.md
+
+# Claude/Codex local agent bridge runtime and dependencies
+/.agent-bridge/
+/Tools/AgentBridge/node_modules/
+
+# 로컬 AI 에이전트 협업 파일 (개인 환경, 커밋 금지)
+# 도구가 루트 고정 경로에서 읽는 파일들이라 폴더로 이동 불가 → 경로별 ignore
+/.codex/
+/.mcp.json
+/AGENTS.md
+/CONTEXT.md
+/Tools/
