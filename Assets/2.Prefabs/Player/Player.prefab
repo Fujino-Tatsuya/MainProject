@@ -123,14 +123,6 @@ Transform:
   - {fileID: 6114957203948570910}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!81 &7345129804561237845
-AudioListener:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8559504096609571310}
-  m_Enabled: 1
 --- !u!136 &6098322879574375161
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -191,7 +183,7 @@ MonoBehaviour:
   m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 62899f850307741f2a39c98a8b639597, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Unity.InputSystem::UnityEngine.InputSystem.PlayerInput
   m_Actions: {fileID: -944628639613478452, guid: 009d7ad6ad2d76847b25fd96c90990a0, type: 3}
   m_NotificationBehavior: 0
@@ -469,10 +461,18 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a19090957c0daae4bbf5ee81759f8d5a, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FirstMeleeMainSkill
   data: {fileID: 11400000, guid: 3f8c2b71d94a4e5f8b6a1c0d2e947a31, type: 2}
-  hitboxAnchor: {fileID: 0}
+  hitboxAnchor: {fileID: 6669628826641242712}
+--- !u!81 &7345129804561237845
+AudioListener:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8559504096609571310}
+  m_Enabled: 1
 --- !u!1 &8896633917232358439
 GameObject:
   m_ObjectHideFlags: 0
@@ -541,6 +541,29 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 1160318589990200604}
     m_Modifications:
+    - target: {fileID: 284160916278146353, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: m_WarningMessage
+      value: "\nBinding warning: Some generic clip(s) animate transforms that are
+        already bound by a Humanoid avatar. These transforms can only be changed
+        by Humanoid clips.\n\tTransform 'Right_ThumbIntermediate'\n\tTransform 'Left_LowerArm'\n\tTransform
+        'Chest'\n\tTransform 'Right_ThumbDistal'\n\tTransform 'Spine'\n\tTransform
+        'Right_Foot'\n\tTransform 'Right_Toes'\n\tTransform 'Right_LowerLeg'\n\tTransform
+        'UpperChest'\n\tTransform 'Left_Toes'\n\tand more ...\n\tFrom animation clip
+        'Stand_Idle_A_1'\n\tFrom animation clip 'Walk_A_F'\n\tFrom animation clip
+        '1Hand_Base_Shield_Block_Parry_2'"
+      objectReference: {fileID: 0}
+    - target: {fileID: 1926395644936646202, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1926395644936646202, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1926395644936646202, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 6129863144953294667, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
@@ -588,7 +611,13 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 8408518544339265324, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 5851354062470704141}
+    - targetCorrespondingSourceObject: {fileID: 8408518544339265324, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 6669628826641242712}
   m_SourcePrefab: {fileID: 100100000, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
 --- !u!95 &3980452584406513891 stripped
 Animator:
@@ -601,6 +630,44 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 3804664619706551762}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 81c70da5a2e747148bf71f917743b5fd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ColliderInfo
+--- !u!1 &4647131252094888702 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 8408518544339265324, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+  m_PrefabInstance: {fileID: 3804664619706551762}
+  m_PrefabAsset: {fileID: 0}
+--- !u!65 &5851354062470704141
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4647131252094888702}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 2, y: 1, z: 2}
+  m_Center: {x: 0, y: 0, z: 0.8}
+--- !u!114 &6669628826641242712
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4647131252094888702}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 81c70da5a2e747148bf71f917743b5fd, type: 3}
