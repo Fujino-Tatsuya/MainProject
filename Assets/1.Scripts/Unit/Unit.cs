@@ -330,6 +330,42 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         _knockback = GetComponent<IKnockbackable>();
     }
 
+    #region 클라이언트 피격 알림 (복제 기반 — 피격 플래시/HUD 등 로컬 연출용)
+    /// <summary>
+    /// 모든 피어에서 HP 또는 쉴드가 "감소"했을 때 발생(NetworkVariable 복제 기반 → RPC 불필요).
+    /// 피격 플래시(HitFlash) 등 판정과 무관한 로컬 연출이 구독한다.
+    /// </summary>
+    public event System.Action ClientDamaged;
+
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+        _currentHp.OnValueChanged += OnHpReplicated;
+        _currentShield.OnValueChanged += OnShieldReplicated;
+
+        // 피격 플래시 자동 부착 — Unit 계열 전체 공통(프리팹에 미리 붙어 있으면 그대로 사용).
+        if (GetComponent<HitFlash>() == null)
+            gameObject.AddComponent<HitFlash>();
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        _currentHp.OnValueChanged -= OnHpReplicated;
+        _currentShield.OnValueChanged -= OnShieldReplicated;
+        base.OnNetworkDespawn();
+    }
+
+    void OnHpReplicated(int previous, int next)
+    {
+        if (next < previous) ClientDamaged?.Invoke();
+    }
+
+    void OnShieldReplicated(int previous, int next)
+    {
+        if (next < previous) ClientDamaged?.Invoke();
+    }
+    #endregion
+
     #region 넉백
     IKnockbackable _knockback;
 
