@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Netcode;
@@ -11,6 +11,8 @@ public class LobbyUIController : MonoBehaviour
     private const string StateMessageName = "Lobby.State";
 
     public static LobbyUIController Active { get; private set; }
+
+    public event System.Action StateChanged;
 
     [SerializeField] private LobbyPlayerSlotView[] slots;
     [SerializeField] private Image startButtonImage;
@@ -166,7 +168,7 @@ public class LobbyUIController : MonoBehaviour
 
         if (!_readyStates.ContainsKey(clientId))
         {
-            _readyStates.Add(clientId, false);
+            _readyStates.Add(clientId, IsHostClient(clientId));
         }
 
         BroadcastState();
@@ -290,7 +292,7 @@ public class LobbyUIController : MonoBehaviour
             _orderedClients.Add(clientId);
             if (!_readyStates.ContainsKey(clientId))
             {
-                _readyStates.Add(clientId, false);
+                _readyStates.Add(clientId, IsHostClient(clientId));
             }
         }
 
@@ -339,6 +341,7 @@ public class LobbyUIController : MonoBehaviour
         }
 
         ApplyStartButtonState();
+        StateChanged?.Invoke();
     }
 
     private void BuildOrderedClientList()
@@ -361,6 +364,12 @@ public class LobbyUIController : MonoBehaviour
         }
 
         startButtonImage.color = AreAllConnectedClientsReady ? startAvailableColor : startBlockedColor;
+    }
+
+    // Host는 Ready 버튼 없이 항상 준비 상태로 취급한다. GameStart 활성 조건은 "Host 제외 전원 Ready"가 된다.
+    private bool IsHostClient(ulong clientId)
+    {
+        return _networkManager != null && _networkManager.IsHost && clientId == NetworkManager.ServerClientId;
     }
 
     private bool HasConnectedClients()

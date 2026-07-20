@@ -47,6 +47,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
     private void Awake()
     {
         _networkManager = GetComponent<NetworkManager>();
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.Awake hasNetworkManager={_networkManager != null}");
     }
 
     private void OnDestroy()
@@ -62,6 +63,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
 
     public void RegisterNetworkCallbacks()
     {
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.RegisterNetworkCallbacks requested registered={_callbacksRegistered} canRegister={CanRegisterNetworkCallbacks()}");
         if (_callbacksRegistered)
         {
             return;
@@ -88,6 +90,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
         _networkManager.OnClientConnectedCallback += HandleClientConnected;
         _callbacksRegistered = true;
 
+        Debug.Log("[SceneFlow] NetworkLoadingFlowController.RegisterNetworkCallbacks registered");
         LogDebug("Network callbacks registered.");
     }
 
@@ -123,16 +126,22 @@ public class NetworkLoadingFlowController : MonoBehaviour
 
     public void StartGameLoading()
     {
+        Debug.Log(
+            $"[SceneFlow] NetworkLoadingFlowController.StartGameLoading begin phase={_phase} " +
+            $"listening={_networkManager != null && _networkManager.IsListening} server={IsServerActive}");
+        LogLoadedScenes("StartGameLoading.begin");
         RegisterNetworkCallbacks();
 
         if (!IsServerActive)
         {
+            Debug.Log("[SceneFlow] NetworkLoadingFlowController.StartGameLoading blocked not server");
             Edit.LogWarning("[Loading] Only the server or host can start the loading flow.");
             return;
         }
 
         if (requireLobbyReadyToStart && !CanStartFromLobby())
         {
+            Debug.Log("[SceneFlow] NetworkLoadingFlowController.StartGameLoading blocked lobby not ready");
             Edit.LogWarning("[Loading] Cannot start game loading until all connected clients are ready.");
             return;
         }
@@ -143,11 +152,15 @@ public class NetworkLoadingFlowController : MonoBehaviour
         _minimumTimerStartedAt = Time.unscaledTime;
         _sourceSceneName = SceneManager.GetActiveScene().name;
 
+        Debug.Log(
+            $"[SceneFlow] NetworkLoadingFlowController.StartGameLoading loadingScene={loadingSceneName} " +
+            $"targetScene={targetSceneName} sourceScene={_sourceSceneName} flowId={_flowId}");
         LogDebug($"StartGameLoading flowId={_flowId}, loadingScene={loadingSceneName}, targetScene={targetSceneName}.");
         ApplyViewState();
         BroadcastState();
 
         var status = _networkManager.SceneManager.LoadScene(loadingSceneName, LoadSceneMode.Additive);
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.StartGameLoading LoadScene loading status={status}");
         LogDebug($"Requested loading scene load. status={status}.");
         if (status != SceneEventProgressStatus.Started)
         {
@@ -182,6 +195,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
 
     private void UnregisterNetworkCallbacks()
     {
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.UnregisterNetworkCallbacks registered={_callbacksRegistered}");
         if (!_callbacksRegistered || _networkManager == null)
         {
             return;
@@ -206,6 +220,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
 
     private void HandleClientConnected(ulong clientId)
     {
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.HandleClientConnected clientId={clientId} phase={_phase}");
         LogDebug($"Client connected. clientId={clientId}, phase={_phase}.");
 
         if (!IsServerActive || _phase == NetworkLoadingPhase.Idle || _phase == NetworkLoadingPhase.Completed)
@@ -219,6 +234,11 @@ public class NetworkLoadingFlowController : MonoBehaviour
     private void HandleSceneEvent(SceneEvent sceneEvent)
     {
         RegisterNetworkCallbacks();
+        CaptureSourceSceneIfNeeded(sceneEvent);
+        Debug.Log(
+            $"[SceneFlow] NetworkLoadingFlowController.HandleSceneEvent type={sceneEvent.SceneEventType} " +
+            $"scene={sceneEvent.SceneName} clientId={sceneEvent.ClientId} phase={_phase} flowId={_flowId}");
+        LogLoadedScenes($"SceneEvent.{sceneEvent.SceneEventType}.{sceneEvent.SceneName}");
         LogDebug(
             $"SceneEvent type={sceneEvent.SceneEventType}, scene={sceneEvent.SceneName}, clientId={sceneEvent.ClientId}, " +
             $"phase={_phase}, flowId={_flowId}.");
@@ -243,6 +263,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
     private void HandleUnloadEventCompleted(SceneEvent sceneEvent)
     {
         _completedUnloads.Add(sceneEvent.SceneName);
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.HandleUnloadEventCompleted scene={sceneEvent.SceneName}");
         LogDebug($"UnloadEventCompleted. scene={sceneEvent.SceneName}.");
     }
 
@@ -256,6 +277,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
         _phase = NetworkLoadingPhase.LoadingGame;
         _localLoadOperation = sceneEvent.AsyncOperation;
 
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.HandleLoadStarted target scene={sceneEvent.SceneName} clientId={sceneEvent.ClientId}");
         LogDebug($"Target load started. clientId={sceneEvent.ClientId}, asyncOperation={_localLoadOperation != null}.");
         _minimumTimerStartedAt = Time.unscaledTime;
 
@@ -276,6 +298,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
             return;
         }
 
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.HandleLoadComplete target scene={sceneEvent.SceneName} clientId={sceneEvent.ClientId}");
         if (sceneEvent.ClientId == _networkManager.LocalClientId)
         {
             LogDebug("Local target scene load complete. Submitting 100% progress.");
@@ -296,6 +319,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
     {
         if (sceneEvent.SceneName == loadingSceneName)
         {
+            Debug.Log($"[SceneFlow] NetworkLoadingFlowController.HandleLoadEventCompleted loading scene={sceneEvent.SceneName} isServer={IsServerActive} hasTargetRoutine={_targetLoadRoutine != null}");
             if (IsServerActive && _targetLoadRoutine == null)
             {
                 _targetLoadRoutine = StartCoroutine(StartTargetLoadAfterSceneEvent());
@@ -309,6 +333,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
             return;
         }
 
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.HandleLoadEventCompleted target scene={sceneEvent.SceneName} completed={sceneEvent.ClientsThatCompleted.Count} timedOut={sceneEvent.ClientsThatTimedOut.Count}");
         StopLocalProgressReporting();
         _localLoadOperation = null;
 
@@ -451,7 +476,11 @@ public class NetworkLoadingFlowController : MonoBehaviour
 
     private IEnumerator StartTargetLoadAfterSceneEvent()
     {
+        Debug.Log("[SceneFlow] NetworkLoadingFlowController.StartTargetLoadAfterSceneEvent begin");
+        LogLoadedScenes("StartTargetLoadAfterSceneEvent.beforeSourceUnload");
         yield return null;
+        yield return UnloadSourceSceneIfNeeded();
+        LogLoadedScenes("StartTargetLoadAfterSceneEvent.afterSourceUnload");
 
         _phase = NetworkLoadingPhase.LoadingGame;
         CaptureTrackedClients();
@@ -460,6 +489,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
         BroadcastState();
 
         var status = _networkManager.SceneManager.LoadScene(targetSceneName, LoadSceneMode.Additive);
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.StartTargetLoadAfterSceneEvent LoadScene target={targetSceneName} status={status}");
         LogDebug($"Requested target scene load. status={status}.");
         var retries = 0;
         while (status == SceneEventProgressStatus.SceneEventInProgress && retries < 30)
@@ -467,6 +497,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
             retries++;
             yield return null;
             status = _networkManager.SceneManager.LoadScene(targetSceneName, LoadSceneMode.Additive);
+            Debug.Log($"[SceneFlow] NetworkLoadingFlowController.StartTargetLoadAfterSceneEvent retry={retries} status={status}");
             LogDebug($"Retry target scene load. retry={retries}, status={status}.");
         }
 
@@ -476,11 +507,14 @@ public class NetworkLoadingFlowController : MonoBehaviour
         }
 
         _targetLoadRoutine = null;
+        Debug.Log("[SceneFlow] NetworkLoadingFlowController.StartTargetLoadAfterSceneEvent end");
     }
 
     private IEnumerator CompleteAfterMinimumVisibleTime()
     {
         _phase = NetworkLoadingPhase.WaitingForPlayers;
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.CompleteAfterMinimumVisibleTime begin phase={_phase} average={_averageProgress}");
+        LogLoadedScenes("CompleteAfterMinimumVisibleTime.begin");
         LogDebug("All tracked clients reached 100%. Waiting for minimum visible time.");
         ApplyViewState();
         BroadcastState();
@@ -493,6 +527,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
         }
 
         _phase = NetworkLoadingPhase.Ready;
+        Debug.Log("[SceneFlow] NetworkLoadingFlowController.CompleteAfterMinimumVisibleTime phase=Ready");
         LogDebug("Minimum visible time satisfied. Showing ready message.");
         ApplyViewState();
         BroadcastState();
@@ -500,18 +535,19 @@ public class NetworkLoadingFlowController : MonoBehaviour
         yield return new WaitForSecondsRealtime(Mathf.Max(0f, readyMessageSeconds));
 
         _phase = NetworkLoadingPhase.Activating;
+        Debug.Log("[SceneFlow] NetworkLoadingFlowController.CompleteAfterMinimumVisibleTime phase=Activating");
         LogDebug("Ready message finished. Completing loading flow.");
         ApplyViewState();
         BroadcastState();
 
-        yield return UnloadSourceSceneIfNeeded();
-
         _phase = NetworkLoadingPhase.Completed;
         _averageProgress = 1f;
+        Debug.Log("[SceneFlow] NetworkLoadingFlowController.CompleteAfterMinimumVisibleTime phase=Completed");
         ApplyViewState();
         BroadcastState();
 
         yield return UnloadLoadingScene();
+        LogLoadedScenes("CompleteAfterMinimumVisibleTime.afterLoadingUnload");
         ResetFlow();
     }
 
@@ -641,6 +677,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
         }
 
         _averageProgress = CalculateAverageProgress();
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.BroadcastAverageProgress phase={_phase} average={_averageProgress} tracked={_trackedClients.Count} completionRoutine={_completionRoutine != null}");
         LogDebug($"Average progress updated. average={_averageProgress:P0}, trackedClients={_trackedClients.Count}.");
         ApplyViewState();
         BroadcastState();
@@ -790,6 +827,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
 
     private void ResetFlow()
     {
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.ResetFlow phaseBefore={_phase} flowId={_flowId}");
         StopLocalProgressReporting();
 
         if (_targetLoadRoutine != null)
@@ -816,6 +854,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
         {
             _phase = NetworkLoadingPhase.Idle;
         }
+        LogLoadedScenes("ResetFlow.after");
     }
 
     public void SetEditorDefaults(string loadingScene, string targetScene, float minimumSeconds, float readySeconds)
@@ -828,6 +867,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
 
     private IEnumerator UnloadSourceSceneIfNeeded()
     {
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.UnloadSourceSceneIfNeeded source={_sourceSceneName} loading={loadingSceneName} target={targetSceneName}");
         if (string.IsNullOrEmpty(_sourceSceneName) ||
             _sourceSceneName == loadingSceneName ||
             _sourceSceneName == targetSceneName)
@@ -835,16 +875,18 @@ public class NetworkLoadingFlowController : MonoBehaviour
             yield break;
         }
 
-        yield return UnloadNetworkScene(_sourceSceneName);
+        yield return UnloadLocalScene(_sourceSceneName);
     }
 
     private IEnumerator UnloadLoadingScene()
     {
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.UnloadLoadingScene loading={loadingSceneName}");
         yield return UnloadNetworkScene(loadingSceneName);
     }
 
     private IEnumerator UnloadNetworkScene(string sceneName)
     {
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.UnloadNetworkScene begin scene={sceneName} isServer={IsServerActive}");
         if (!IsServerActive)
         {
             yield break;
@@ -853,12 +895,14 @@ public class NetworkLoadingFlowController : MonoBehaviour
         var scene = SceneManager.GetSceneByName(sceneName);
         if (!scene.IsValid() || !scene.isLoaded)
         {
+            Debug.Log($"[SceneFlow] NetworkLoadingFlowController.UnloadNetworkScene skipped not loaded scene={sceneName}");
             LogDebug($"Scene is not loaded. scene={sceneName}.");
             yield break;
         }
 
         _completedUnloads.Remove(sceneName);
         var status = _networkManager.SceneManager.UnloadScene(scene);
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.UnloadNetworkScene requested scene={sceneName} status={status}");
         LogDebug($"Requested scene unload. scene={sceneName}, status={status}.");
         if (status != SceneEventProgressStatus.Started)
         {
@@ -870,5 +914,90 @@ public class NetworkLoadingFlowController : MonoBehaviour
         {
             yield return null;
         }
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.UnloadNetworkScene completed scene={sceneName}");
+        LogLoadedScenes($"UnloadNetworkScene.completed.{sceneName}");
+    }
+
+    private IEnumerator UnloadLocalScene(string sceneName)
+    {
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.UnloadLocalScene begin scene={sceneName}");
+
+        var scene = SceneManager.GetSceneByName(sceneName);
+        if (!scene.IsValid() || !scene.isLoaded)
+        {
+            Debug.Log($"[SceneFlow] NetworkLoadingFlowController.UnloadLocalScene skipped not loaded scene={sceneName}");
+            yield break;
+        }
+
+        MoveActiveSceneBeforeLocalUnload(scene);
+
+        var operation = SceneManager.UnloadSceneAsync(scene);
+        if (operation == null)
+        {
+            Debug.LogWarning($"Failed to locally unload scene {sceneName}.");
+            yield break;
+        }
+
+        while (!operation.isDone)
+        {
+            yield return null;
+        }
+
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.UnloadLocalScene completed scene={sceneName}");
+        LogLoadedScenes($"UnloadLocalScene.completed.{sceneName}");
+    }
+
+    private void MoveActiveSceneBeforeLocalUnload(Scene sceneToUnload)
+    {
+        if (SceneManager.GetActiveScene() != sceneToUnload)
+        {
+            return;
+        }
+
+        var loadingScene = SceneManager.GetSceneByName(loadingSceneName);
+        if (loadingScene.IsValid() && loadingScene.isLoaded)
+        {
+            SceneManager.SetActiveScene(loadingScene);
+            Debug.Log($"[SceneFlow] NetworkLoadingFlowController.MoveActiveSceneBeforeLocalUnload active={loadingScene.name}");
+            return;
+        }
+
+        var targetScene = SceneManager.GetSceneByName(targetSceneName);
+        if (targetScene.IsValid() && targetScene.isLoaded)
+        {
+            SceneManager.SetActiveScene(targetScene);
+            Debug.Log($"[SceneFlow] NetworkLoadingFlowController.MoveActiveSceneBeforeLocalUnload active={targetScene.name}");
+        }
+    }
+
+    private void CaptureSourceSceneIfNeeded(SceneEvent sceneEvent)
+    {
+        if (!string.IsNullOrEmpty(_sourceSceneName) || sceneEvent.SceneName != loadingSceneName)
+        {
+            return;
+        }
+
+        var activeScene = SceneManager.GetActiveScene();
+        if (!activeScene.IsValid() ||
+            activeScene.name == loadingSceneName ||
+            activeScene.name == targetSceneName)
+        {
+            return;
+        }
+
+        _sourceSceneName = activeScene.name;
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.CaptureSourceSceneIfNeeded source={_sourceSceneName}");
+    }
+
+    private void LogLoadedScenes(string context)
+    {
+        var sceneNames = new List<string>();
+        for (var i = 0; i < SceneManager.sceneCount; i++)
+        {
+            var scene = SceneManager.GetSceneAt(i);
+            sceneNames.Add($"{scene.name}(loaded={scene.isLoaded}, active={scene == SceneManager.GetActiveScene()})");
+        }
+
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.LoadedScenes context={context} scenes={string.Join(", ", sceneNames)}");
     }
 }
