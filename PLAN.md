@@ -1,31 +1,190 @@
-# PLAN — 맵 콜라이더 + Paladin 스폰 + E2E (feature/map-player-merge, 2026-07-15)
+# PLAN — 몬스터 FSM 프레임워크 + 일반몹 5 + 중간보스 3 (2026-07-16)
 
-목표: lobby 접속 → 맵 생성 → 3플레이어 전부 **Paladin**으로 스폰 → **이동까지 문제없음**.
+> 직전 PLAN(맵 콜라이더+Paladin 스폰, 커밋 bd10c98/01ceb71)은 완료. E2E 검증만 미완(git+메모리 보존).
+> 보스(웰즈&23호) 재작성은 **다음 스펙** — 의도는 메모리 `project-boss-bt-intent-analysis`에 확정.
 
-## 확정된 사실 (조사 완료)
-- 맵 = **시드 기반 결정론적 로컬 생성**(서버·클라 각자 동일 `Instantiate`, NGO 복제 아님, `MapContentSpawner.cs:46`). 존 프리팹에 NetworkObject 없음 → **콜라이더는 프리팹/메시에 baked면 모든 피어 자동 적용**(서버 전용 분기만 피하면 됨).
-- 스폰 = `NetworkLoadingFlowController.SpawnPlayerForClient` → `SpawnAsPlayerObject`. 프리팹 = `NetworkManager.prefab`의 `defaultPlayerPrefab` 2곳(NetworkSessionLauncher@124 + NetworkLoadingFlowController@143).
-- Paladin.prefab = 완전한 독립 플레이어 루트(NetworkObject+Player.cs+이동/입력/공격). **단 `PlayerDefaultAttack`(3c80e0a7) 누락**(Player.prefab엔 있음).
+## 목표
+`Unit`(=UnitBase) 상속 · **코드 FSM(BT 미사용)** · 데이터 주도(ScriptableObject) 몬스터 프레임워크를 만들고,
+SRG 로봇으로 **일반몹 5종 + 중간보스 3종**을 찍어내 MonsterScene에서 서버권한 협동 전투를 검증한다.
 
-## 작업 항목
+## 스코프
+- **In**: FSM 프레임워크 · 일반몹 5(ChompBot·HumanoidBot·PeekABot·TeslaBot·MortarBot) · 중간보스 3(GauntletBot·SpinnerBot·WallBot) · 스포너 · 상태복제 · 그로기/슈퍼아머 · 상태적용 파사드 · 사망(Death애니+디졸브) · 드롭 훅 · MonsterScene 검증.
+- **Out(다음 스펙)**: 보스(웰즈&23) 재작성 · 맵생성 연동(함수 호출만 후속) · 성장/드롭 실제 값(훅만) · 풀 상태이상 시스템 · 밸런싱.
+- **불변식**: 팀원 BT 자산(`Enemy.cs`·`Assets/1.Scripts/Enemy/Boss/*`·`8.BehaviorTreeGraph/*`)은 **손대지 않음**. 신규 코드는 별도 폴더/네임스페이스로 완전 분리(제안: `Assets/1.Scripts/Monster/`).
 
-### 1. Paladin 스폰 직결 — ✅ 완료 (커밋 대기)
-- `NetworkManager.prefab` `defaultPlayerPrefab` 2곳: CameraTestPlayer(stale) → **Paladin**(`af4a760f…`, fileID 8559504096609571310) 교체 완료. 검증: Paladin참조 2 / CameraTestPlayer 0.
+## 현재 이해 (조사 완료)
+- `Unit`: 서버권한 스탯/체력/쉴드/방어/`StatusEffectType`(enum·저장만) + `IKnockbackable`. 지속시간·만료·CC적용 로직은 없음.
+- `AttackInfo`: "기본/스킬 공격 여부 + 그로기 여부"만 담음 → **데미지와 상태이상은 별도 경로**로 처리해야 함.
+- 기존 몹 골격은 전부 BT 기반(`BehaviorGraphAgent`) — 재사용 안 함. 이동은 `NavMeshAgent` 서버전용(`RunningOnlyOnServer` 패턴만 개념 차용).
+- SRG 8종 전부 **Humanoid 릭** → Mixamo 리타게팅 호환. Death 애니는 GauntletBot(Defeat)만 존재.
+- 전용 몹 스포너 없음. 투사체 프리팹 없음.
 
-### 2. 바닥/벽 콜라이더 — 방법 재검토 (규모: 존당 floor/wall 메시 ~41개 × 12존 = ~480)
-- **(강력 권장) fbx-import baked**: floor(28)+wall(14) fbx `.meta`의 `addColliders: 0→1` + 재임포트. 한 번에 모든 메시에 MeshCollider baked → 전 존 인스턴스·전 피어 자동. non-readable 메시도 import 시 baked라 안전. **자동화 가능(.meta 편집).** fbx=SVN(50.Art)라 SVN 커밋 필요.
-- (사용자 최초 선택) 존/벽 프리팹 자식에 직접 MeshCollider: ~480개 수작업, MCP 다운으로 자동화 불안정. 비권장.
-- 타입: 정적 맵 = non-convex MeshCollider OK. 플레이어(Rigidbody+CapsuleCollider)가 딛음.
+## 접근
+### 1) FSM 프레임워크 (`MonsterBase : Unit`)
+- 상태 = `MonsterState` enum + 상태별 Enter/Tick/Exit를 **한 클래스에서** 처리(BT↔Animator desync 제거).
+- 상태 진입 시 **직접 Animator 재생**. 공격 판정은 **애니이벤트 프레임**에 훅.
+- **상태 복제(척추)**: `NetworkVariable<MonsterState>`(Server write) → 클라 `OnValueChanged`에서 상태→애니 매핑으로 Animator 재생. 판정은 서버만.
+- 이동: `NavMeshAgent` **서버 전용**(클라는 NetworkTransform 복제).
 
-### 3. Paladin PlayerDefaultAttack 누락 — 이동 테스트엔 선택
-- Player.prefab의 `PlayerDefaultAttack` 복사 + `DefaultAttackController.playerDefaultAttack` 배선. **공격에 필요, 이동엔 불필요.** ⚠️단 DefaultAttackController가 Awake/Start에서 null 접근하면 NRE로 플레이어 전체 깨질 수 있음 → 스폰 후 콘솔 확인 필수. 필요시 은희와 처리.
+### 2) 아키타입 3종 (공유 로직 + SO 데이터)
+- **Melee**(Chomp·Humanoid, +중간보스 3): 추격→사거리→애니이벤트 Overlap 히트박스.
+- **RangedTurret**(PeekABot·TeslaBot): 정지, Alert→Reveal→Shoot, 발사 프레임에 서버 투사체 스폰.
+- **RangedMobile**(MortarBot): 재배치 후 포격.
+- `MonsterDataSO`: 스탯·AnimatorController·공격파라미터·탐지/리쉬 거리·그로기/슈퍼아머 설정·아키타입.
 
-### 4. E2E 검증 — MPPM 3클라
-- lobby(Temp_LobbyScene) → StartHost + 클라 ready → LoadingScene → MapScene → 3 Paladin 스폰 → 이동. 콘솔 0 에러.
-- 지원: curl로 컴파일 상태·플레이 콘솔 로그 확인(MCP node 클라 죽어 curl 경유).
+### 3) 타게팅/어그로/전투 루프 (일반 게임식 어그로 관리)
+- 모든 몹은 **스폰 포인트 저장**. 인지범위 내 **Player 태그/레이어 발견 → target**.
+- 공격범위 내 → 공격, 아니면 추격. 범위 안에 계속 있으면 **계속 공격 반복**.
+- **공격 시도 중 피격 → 공격 취소 + Hit 처리**(일반 몹).
+- **리쉬**: 몹마다 개별 리쉬 범위. 플레이어가 그 밖으로 벗어나면 **스폰포인트 복귀 + 상태 초기화**(버프/디버프 전부 제거 + 체력 최대 회복).
+- 플레이어 상호작용 로직 참고처: **git `feature/playerskill` 브랜치**(스킬/공격이 Unit에 어떻게 데미지·상태를 적용하는지).
 
-## 순서
-2(콜라이더) → 1·2 커밋 → 3(선택) → 4(검증). 통과 후 development 푸시 → feature/map 정리 → 새 브랜치.
+### 4) 중간보스 차별 (= Melee + config)
+- **강화** 스탯. **그로기**: `GroggyCount/MaxGroggyCount` 누적 피격→Groggy(취약·지속) — 애니는 GauntletBot `Defeat` 공용(SpinnerBot은 Dizzy).
+- **슈퍼아머**: 특정 공격 windup~active 동안 들어오는 CC/넉백/행동취소 무시. 표현 = **노란 외곽선**(슈퍼아머 상태 인지) + 피격 시 **빨강 틴트 잠깐**(데미지는 들어갔음을 표시, 단 행동취소 아님). 임시 틴트로 시작, 전용 VFX는 추후.
+- **CC/버프/디버프**: 상태적용 **파사드**(`IStatusEffectFacade` 등) 경유 — 본체는 은희가 나중에 정의(지금은 스텁). 슈퍼아머는 이 파사드 위에서 "무시" 판정.
 
-## 미결 결정
-- 콜라이더 방법: **fbx-import(권장, 내가 자동화)** vs 프리팹 수작업(사용자 Unity). ← 이거 정하면 2 착수.
+### 5) 공격 판정
+- 멜리: 애니이벤트 프레임 서버 `OverlapBox/Sphere` → 데미지+상태(파사드).
+- 원거리: 발사 프레임 **서버 투사체 프리팹**(임시 제작, 추후 교체) + INab VFX 재사용.
+
+### 6) 사망 / 드롭
+- HP 0 → 서버가 **Death 애니 재생 → 디졸브 소멸 → 디스폰**(맨 디졸브 금지). Death 없는 7종은 **Mixamo Death** 취득.
+- 드롭은 `virtual OnDeath(killerContext)` **확장 훅만** 노출(은희 성장시스템이 값/호출 연결). 사망 지점 단일화.
+
+### 7) 애니 취득 매핑(Humanoid 공용)
+- **Hit** = WallBot Hit 공용(자기 Hit 있으면 자기 것). **Groggy** = GauntletBot Defeat 공용(중간보스 3). **Death** = Mixamo(전 로봇). 어색한 놈만 개별 Mixamo 교체(추후).
+
+### 8) 스폰
+- Spawner 컴포넌트 + 씬 배치 스폰지점 → 서버 NGO 스폰 후 복제. 이후 맵생성 연동은 **동일 스폰 함수 호출**만.
+
+## 전투 계약 통합 (feature/PlayerSkill 분석 확정 — 계약은 현재 브랜치에도 존재)
+- `AttackInfo{damage, attackType(None/Default/Q/E/R), isGroggyAttack}` — 데미지·상태 분리. 방향/위치=`AttackHitContext`.
+- **몹 피격**: `Enemy:Unit`(Unit이 IAttackReceiver 구현) + Collider + `Hurtbox`(ownerUnit 지정). `OnNetworkSpawn` 서버에서 `Initialize(...)` 필수(안 하면 _health null NRE). 그로기 = `TakeDamage(AttackInfo)` override에서 `isGroggyAttack` 처리.
+- **몹 공격**: `BaseAttack` 계열 재사용 — 근접 `ColliderBasicAttack`+`AttackTriggerRelay`, 스윕 `OverlapAttack`(애니이벤트 `Hit()`), 원거리 `DefaultAttackProjectile.Launch`. `targetLayer`=플레이어. `InitializeAttackInfo()` 보장.
+- **넉백**: 루트에 `Rigidbody`+`NavMeshAgent`+`LinearKnockback` → `Unit.Knockback(dir,strength)`(AttackInfo 무관).
+- **시간제 상태이상 = 어디에도 없음** → 신규 최소 서버권한 컴포넌트(`MonsterStatusEffect`: NetworkVariable 플래그 + 타이머 + FSM 차단조회) + 상태적용 파사드 신설. `StatusEffectController`(플레이어 전용·무타이머 조회)는 몹에 미사용.
+- **금지**: 오너→서버 직접 데미지 RPC(`TakeDamageRpc`) 의존(PlayerSkill 제거됨). 데미지는 `BaseAttack→ReceiveAttack` 서버 경로만. 밸런스는 경감률 `dmg×100/(100+def)` 기준.
+
+## 네트워크 권한 가정
+- 스폰·FSM·이동목표·데미지·상태·사망·드롭 = **전부 서버(호스트) 권한**. 클라 = 상태/트랜스폼 복제로 애니만 재생.
+
+## 리스크 / 의존성
+- MonsterScene에 **NavMesh Bake 선행 필요**(맵 콜라이더/네브메시 미비 — 사용자 처리).
+- **투사체 프리팹 임시 제작 필요**(추후 교체).
+- **디졸브 셰이더/머티리얼 필요**(없으면 임시 페이드 폴백).
+- **SRG 팩(224파일) = SVN 처리**(git 금지, 사용자). `.meta` 동반.
+- Mixamo Death/Hit/Groggy 클립 취득(사용자) — 없으면 임시 폴백으로 배선만 완성.
+- 파사드 스텁 상태에선 CC 실제 효과(이동/입력차단)는 은희 구현 전까지 no-op.
+
+## 미결 / 확인 필요
+- 신규 폴더/네임스페이스 = `Assets/1.Scripts/Monster/` 로 확정?
+- 슈퍼아머 텔레그래프 표현(머티리얼 틴트 vs 전용 VFX) — 아트 의존, 임시 틴트로 시작?
+
+## 완료 조건 (Acceptance)
+- 스포너가 서버에서 몹 스폰 → 전 클라 복제(위치·애니 동기).
+- 일반몹 5종: 탐지→추격→공격(서버판정)→피격(Hit)→사망(Death+디졸브)→`OnDeath` 훅 발화.
+- 중간보스 3종: 위 + 그로기(누적피격 발동, 취약) + 슈퍼아머(텔레그래프 표시 + CC/넉백 무시).
+- 원거리 3종: 서버 투사체 발사·명중 판정 복제.
+- 플레이어 CC가 파사드로 라우팅(스텁이라도 호출 확인), 슈퍼아머 중 무시.
+- 콘솔 0 에러(서버·클라).
+
+## 검증 계획 (MPPM host+client)
+MonsterScene(NavMesh baked) → host+1클라 → 스폰 → 각 아키타입 1종씩 교전 → 중간보스 그로기·슈퍼아머 → 사망 연출·훅 로그 확인. 서버판정/클라애니 동기 육안 + 콘솔 확인.
+
+---
+
+# PLAN 추가 — 공격 이동잠금 + 지속넉백/경직(Q 스킬 대응) + HumanoidBot (2026-07-20)
+
+> 위 프레임워크(2026-07-16)는 가동 중. 이번 작업은 그 위에 **버그 2건 + 코어 전투 확장 1건**.
+> 팀장 그릴 확정 사항: ①넉백=지속밀림 ②구조=지속넉백 먼저→끝나면 Stunned 경직(~0.2s, 0.1~1s 조절) ③공격종료=attackDuration 튜닝(지금)+애니 End 이벤트(이후).
+
+## A. 공격 중 이동/슬라이드 근본 해결
+- **완료**: `StopAgent()`에 `agent.velocity=Vector3.zero` — 공격 진입 시 감속 글라이딩 제거(MonsterBase/BossBase).
+- **잔여 원인**: `attackDuration`(예: Humanoid 0.9s)이 실제 공격 클립보다 짧아 FSM이 클립 끝나기 전에 Attack을 빠져나가 재추격 → 클립 꼬리에 재이동("공격 끝나기 전 이동").
+- **지금**: 각 몹 데이터 `attackDuration`을 실제 공격 클립 길이에 맞게 튜닝(클립 길이 조회 후 반영).
+- **이후(견고)**: MonsterBase에 애니 이벤트 수신 훅(`OnAttackAnimEnd`) + 릴레이 → 클립 End 이벤트가 있으면 그걸로 Attack 종료, 없으면 attackDuration 타이머 폴백. (플레이어 DefaultAttack 방식과 동형.)
+
+## B. HumanoidBot 안 걸음
+- 확인됨: `Controller_HumanoidBot` 파라미터 Attack/Hit/RunBlend = 데이터와 일치(배선 정상).
+- 원인 후보: 컨트롤러 내부 **RunBlend 블렌드트리에 걷기/달리기 클립 미연결**(유력) 또는 물리적 미이동. → 컨트롤러 열어 블렌드트리 확인 후 걷기 클립 배선(에셋 작업). 다른 몹이 걸으면 전자 확정.
+
+## C. 지속넉백 + 경직 (플레이어 Q 근접스킬 대응) — 코어 전투 확장
+**목표**: 어떤 공격이든(특히 Q) 맞은 몹을 **지속적으로 밀어내고(넉백) → 끝나면 짧게 경직(Stunned)** 시킬 수 있게, 값 **조절 가능**하게. 스킬 본체는 스킬 담당에게 **넘길 수 있도록 인프라 + 수신측**을 제공.
+
+### C-1. 전송: `AttackInfo` 확장(하위호환)
+- 필드 추가: `float knockbackStrength`(0=넉백없음), `float knockbackDuration`(지속밀림 초), `float staggerDuration`(넉백 종료 후 Stunned 초).
+- 생성자에 **옵션 파라미터(기본 0)** 추가 → 기존 `new AttackInfo(dmg,type,groggy)` 호출부 전부 무영향.
+
+### C-2. 수신: MonsterBase 반응 시퀀스
+- `ReceiveAttack(info, hitContext)` override로 **넉백 방향 확보**(dir = 몹 - attacker, 수평). 데미지는 기존 경로 유지.
+- `knockbackStrength>0`이면: **MonsterState.Knockback 신설** 진입 → agent off, 서버가 knockbackDuration 동안 **매 틱 dir로 지속 밀기**(NetworkTransform 복제) → 종료 시 `MonsterStatusEffect.ApplyStatus(Stunned, staggerDuration)` → 경직 유지 후 `DecideNextAfterAction`.
+- **슈퍼아머(BlocksInterrupt) 중이면 넉백·경직 무시**(기존 CC 무시 규칙 일관). 사망/그로기/복귀 중 진입 가드.
+- 지속밀림 구현은 `LinearKnockback` 확장(sustained 모드) 또는 MonsterBase 서버틱 직접 이동 중 택1 — 물리 vs NetworkTransform 충돌 최소인 쪽으로(구현 시 결정, 기본안=서버틱 직접 이동 + agent off).
+
+### C-3. 조절 가능 + 핸드오프 + 검증
+- 값은 **공격(스킬) 측 AttackInfo가 지정** → Q 스킬은 자기 SO/SerializeField로 세팅만 하면 됨(핸드오프 지점).
+- 검증: `MonsterTestBootstrap.DoDebugAttack`에 knockback/stagger 파라미터 추가 → 좌클릭으로 몹에 지속넉백→경직 재현.
+
+## 스코프 경계
+- **In**: A(튜닝+이벤트훅), B(진단+걷기배선), C(AttackInfo 확장·MonsterBase 수신·지속넉백·경직·디버그검증).
+- **Out/하드오프**: 플레이어 **Q 스킬 본체**(입력→히트박스→AttackInfo 세팅)는 스킬 담당. 나는 그쪽이 값만 채우면 되도록 인프라+수신만.
+- **불변식**: BT 자산·`Enemy/*` 미변경. AttackInfo 확장은 하위호환(기존 호출부 무수정).
+
+## 리스크
+- 지속넉백이 NavMeshAgent/NetworkTransform와 충돌 가능 → agent off + 서버 권한 이동으로 격리.
+- attackDuration 튜닝엔 실제 클립 길이 필요(조회 후 반영).
+- B는 애니메이터 에셋 작업 — 걷기 클립 자체가 없으면 취득 필요(사용자).
+
+## 완료 조건
+- 공격 중 몹이 제자리 고정(진입 글라이딩 0 + 클립 끝까지 재이동 없음).
+- 디버그 공격으로 몹이 지속적으로 밀린 뒤 ~0.2s 경직 → 이후 정상 복귀. 값 조절 반영됨.
+- 콘솔 0 에러. 기존 몹/보스/플레이어 공격 계약 회귀 없음(AttackInfo 하위호환).
+
+---
+
+# PLAN 추가 — 중간보스 3종 완성 (2026-07-20)
+
+> grill 확정. 페이즈 없음(**그로기만**). 고유 기믹까지 구현. C(넉백/경직)는 은희 인터페이스 대기(병렬).
+> 애니 상태 존재 확인 완료. 데미지=애니이벤트(OnAttackHit)+windup 타이머 폴백(A②로 이미 구축).
+
+## 공통 신규 시스템
+### (S1) AoE 텔레그래프 (신규 — 기존 시스템 없음)
+- 바닥에 **빨간 장판**(임시 데칼/평면 + 반투명 빨강 머티리얼)을 windup 동안 표시 → 히트 시 사라짐.
+- 서버 권한 표시 + 전 피어 복제(NetworkVariable 또는 ClientRpc). 크기/지속=파라미터.
+- 재사용형 컴포넌트(`AoeTelegraph`)로 — 이후 보스 장판에도 재사용.
+
+### (S2) 코드 주도 공격 선택 + CrossFade
+- 진입은 단일 `Attack`(FSM). 서버가 **가중치 랜덤으로 1종 선택** → 선택값 ClientRpc 브로드캐스트 → 전 피어가 해당 상태로 **CrossFade**(orphan 상태여도 CrossFade 가능 → 진입전이 배선 불필요). 종료 시 ResetToLocomotion(구축됨)로 이동 복귀.
+
+## GauntletBot (콤보 스크립트 → 7종 가중치 선택기로 재작성)
+- **7 공격**: `Smash` + `Gauntlet_Punch01_L/R`, `02_L/R`, `03_L/R`. (상태 존재 확인)
+- **선택 가중치**: 01/02 高, **03(어퍼컷) 最低**. `Smash`는 **범위 내 player 수(1/2/3+)에 따라 확률 상향**(1명 싱글도 동작). 매 cadence(1/attackSpeed)마다 선택.
+- **Smash**: windup 동안 (S1) 빨간 장판 표시 → 히트 프레임에 **AoE 오버랩 데미지**(반경=장판). 강력.
+- **어퍼컷(03)**: **데미지만 지금**. player airborne CC = **연기(훅만)** — C/상태이상 인터페이스 이후.
+- **01/02**: 일반 단타 데미지.
+- L/R = 시각 다양성(번갈아/랜덤). 데미지는 OnAttackHit 이벤트(없으면 windup 폴백).
+- 기존 콤보(exit-time/RPC 콤보) 로직 제거.
+
+## SpinnerBot (신규 스크립트 `SpinnerBot : MonsterBase`)
+- **기본 = Whip 근접**(`Attack Whip L/R`), **특수 = 스핀 대시**. 평소 Whip, 조건/확률로 스핀 대시(B안 확정).
+- **스핀 대시**: `Spin Attack Start`(제자리 회전 windup, **최소 1초 회피시간 보장**) → `Spin Attack Loop` 유지하며 **직선 질주**(**공격 시작 시 방향 고정**, windup 중 재조준 X → 옆으로 회피 가능) → 경로상 적 **1틱** 데미지(hit-once). **windup시간/거리/속도/지속 전부 인스펙터 노출**(플레이테스트로 튜닝).
+- **낙하 안전(★)**: 대시는 **NavMeshAgent + `NavMesh.Raycast`로 navmesh 경계 클램프** → 낭떠러지(navmesh 밖) 절대 안 감, 가장자리에서 정지. raw transform 이동 금지.
+- **스핀 종료 → Dizzy**: 그로기/취약 창 진입(SpinnerBot 그로기 애니 = Dizzy). 스핀 후 자기 유발 빈틈. 종료 후 로코모션 복귀.
+
+## WallBot (방어형 — 이미 단발, HP만 상향)
+- `attackFinishTrigger`(AttackEnd)는 **다단 히트가 아니라 단일 스윙의 2단 애니(Start→Strike) 진행용**. MonsterBase는 히트 1회 + 이 트리거로 애니만 진행 → **이미 단발 공격**. 그대로 유지(제거하면 애니가 안 끝남).
+- **매우 높은 HP로 상향**(350→600, 튜닝). 역할=탱커. 커스텀 스크립트 불필요.
+
+## 리스크 / 의존성
+- (S1) 텔레그래프 = 신규 에셋(데칼/머티리얼) 제작 필요.
+- OnAttackHit 애니이벤트를 각 공격 클립에 삽입해야 정밀 타이밍(미삽입 시 windup 폴백 동작).
+- GauntletBot 각 공격의 Anticipation→본동작 전이 확인(없으면 본동작으로 직접 CrossFade).
+- 어퍼컷 airborne = 상태이상 인터페이스(은희) 이후.
+- SpinnerBot 스핀대시 vs NavMesh/NetworkTransform — 서버 권한 이동으로 격리.
+
+## 완료 조건 (중간보스)
+- GauntletBot: 7종 가중치 선택 발동, Smash 장판→AoE 데미지, 어퍼컷 데미지(airborne 훅), 그로기, 사망.
+- SpinnerBot: 스핀대시 발동·경로 1틱 데미지, 그로기, 사망.
+- WallBot: 단발 멜리 + 고HP 탱킹, 그로기, 사망.
+- MonsterScene E2E(스폰→교전→고유공격→그로기→사망) + 콘솔 0 에러.
