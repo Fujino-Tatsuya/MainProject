@@ -73,6 +73,18 @@ public class PlayerSkillController : BaseNetworkBehaviour
         skill.Initialize(player, this);
     }
 
+    // 쿨타임 장부(nextReadyTime)가 만료되면 스킬 내부 State도 Cooldown → Ready로 복귀시킨다.
+    // 시전 검증은 장부가 담당하므로 State는 표시/조회용 — ResetToReady가 Cooldown일 때만 동작한다.
+    private void Update()
+    {
+        for (int i = 0; i < SlotCount; i++)
+        {
+            PlayerSkillBase skill = GetSkill((PlayerSkillSlot)i);
+            if (skill != null && skill != activeSkill && Time.time >= nextReadyTime[i])
+                skill.ResetToReady();
+        }
+    }
+
     public PlayerSkillBase GetSkill(PlayerSkillSlot slot)
     {
         return slot switch
