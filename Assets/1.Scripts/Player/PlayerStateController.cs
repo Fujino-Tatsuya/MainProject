@@ -27,7 +27,6 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
     // 스킬 실행 중 이동/회전 허용 여부는 스킬 정의에 위임 (단일 Skill 상태)
     private bool AllowsSkillMovement => currentState is PlayerSkillState skillState && skillState.AllowsMovement;
     private bool AllowsSkillMovementRotate => currentState is PlayerSkillState skillState && skillState.AllowsMovementRotate;
-    public bool HasSuperArmor => context.StatusEffects.HasSuperArmor;
     public float MinKnockbackTime => minKnockbackTime;
     public float MaxKnockbackTime => maxKnockbackTime;
     public float ServerKnockbackReportGraceTime => serverKnockbackReportGraceTime;
@@ -120,12 +119,10 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
         return true;
     }
 
+    // 슈퍼아머 거부는 Unit.Knockback 공통 진입점에서 처리 — 여기서는 사망만 거부한다
     public bool BeginKnockback(Vector3 direction, float strength)
     {
-        bool isDead = CurrentState == PlayerActionState.Dead;
-        bool hasSuperArmor = context.StatusEffects.HasSuperArmor;
-
-        if (isDead || hasSuperArmor)
+        if (CurrentState == PlayerActionState.Dead)
             return false;
 
         SetState(new PlayerKnockbackState(context, direction, strength));

@@ -217,6 +217,9 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         return StatusEffects != null ? StatusEffects.GetStatMultiplier(statType) : 1f;
     }
 
+    // 미부착 유닛은 슈퍼아머 없음으로 동작
+    public bool HasSuperArmor => StatusEffects != null && StatusEffects.HasSuperArmor;
+
     // 최종 스탯 = base(불변) × 활성 modifier 배율의 곱. 소비처는 base 대신 이 값을 읽는다
     public int FinalAttackDamage => Mathf.Max(0, Mathf.RoundToInt(_attackDamage * GetStatMultiplier(StatusEffectType.AttackDamageModifier)));
     public float FinalMoveSpeed => Mathf.Max(0f, _moveSpeed * GetStatMultiplier(StatusEffectType.MoveSpeedModifier));
@@ -330,12 +333,13 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     IKnockbackable _knockback;
 
     /// <summary>
-    /// 넉백 진입점. 서버 가드 등 공통 규칙은 여기서만 처리한다.
+    /// 넉백 진입점. 서버 가드·슈퍼아머 등 공통 규칙은 여기서만 처리한다.
     /// 기본 동작은 IKnockbackable 컴포넌트 위임, 예외는 OnKnockback을 override.
     /// </summary>
     public void Knockback(Vector3 direction, float strength)
     {
         if (!IsServer) return;
+        if (HasSuperArmor) return;
 
         OnKnockback(direction, strength);
     }

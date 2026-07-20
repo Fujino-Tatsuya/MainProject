@@ -173,7 +173,7 @@ public class Player : Unit
 
     protected override void OnKnockback(Vector3 direction, float strength)
     {
-        // 서버가 거부(사망/슈퍼아머)하면 오너에게도 전파하지 않는다
+        // 서버가 거부(사망 — 슈퍼아머는 Unit.Knockback에서 선차단)하면 오너에게도 전파하지 않는다
         bool accepted = stateController.BeginKnockback(direction, strength);
         if (!accepted)
             return;
