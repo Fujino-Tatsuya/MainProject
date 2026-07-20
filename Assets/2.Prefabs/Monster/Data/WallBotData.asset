@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 576305eb4d78f0c4eb97b90edc8cae21, type: 3}
+  m_Name: WallBotData
+  m_EditorClassIdentifier:
+  archetype: 0
+  attackDamage: 16
+  moveSpeed: 2
+  chaseSpeed: 3
+  attackSpeed: 0.5
+  maxHp: 600
+  defense: 8
+  maxShield: 0
+  detectionRadius: 9
+  attackRange: 3.5
+  leashRadius: 18
+  returnSpeedMultiplier: 5
+  attackDuration: 1.6
+  attackWindup: 0.5
+  maxGroggyCount: 4
+  groggyDuration: 3
+  startsWithSuperArmor: 0
+  hasSuperArmorWhileAttacking: 1
+  hitStunDuration: 0.4
+  despawnDelay: 2
+  isMidBoss: 1
+  animSpeedParam: RunBlend
+  attackTrigger: Attack
+  attackFinishTrigger: AttackEnd
+  hitTrigger: Hit
+  groggyBool: Groggy
+  deathTrigger: Death
