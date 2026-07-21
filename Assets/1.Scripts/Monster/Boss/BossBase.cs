@@ -115,8 +115,8 @@ public class BossBase : Unit
             return;
         }
 
-        // Unit 스탯 주입(파라미터 순서 = Unit.Initialize 계약).
-        Initialize(data.attackDamage, data.moveSpeed, data.attackSpeed, data.maxHp, data.defense, data.maxShield);
+        // Unit 스탯 주입(파라미터 순서 = Unit.Initialize 계약. MaxShield는 PlayerSkill 머지에서 개념 제거됨).
+        Initialize(data.attackDamage, data.moveSpeed, data.attackSpeed, data.maxHp, data.defense);
         _maxHp = Mathf.Max(1, data.maxHp); // 페이즈 임계 계산용 자체 보관.
 
         // 근접 공격기에 데미지/타깃레이어 스냅샷 반영.

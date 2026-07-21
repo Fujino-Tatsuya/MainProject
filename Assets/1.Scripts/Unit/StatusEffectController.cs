@@ -41,7 +41,7 @@ public struct StatusEffectInstance : INetworkSerializable, IEquatable<StatusEffe
 /// 서버만 리스트를 쓰고(Apply/Remove/만료 스윕) NetworkList가 전 피어에 동기화되며,
 /// 집계(차단 = OR, 스탯 배율 = 곱)는 각 피어가 로컬에서 계산한다.
 /// </summary>
-public class StatusEffectController : BaseNetworkBehaviour
+public class StatusEffectController : BaseNetworkBehaviour, IStatusEffectFacade
 {
     // 타입 → 차단 매핑 테이블. 차단 규칙 변경은 여기 한 곳만 고친다.
     private const StatusEffectType MovementBlockers =

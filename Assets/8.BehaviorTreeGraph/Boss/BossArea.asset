@@ -117,7 +117,7 @@ MonoBehaviour:
   - rid: 5035183290210058336
   - rid: 5035183290210058337
   - rid: 5035183290210058338
-  m_VersionTimestamp: 639183393943463209
+  m_VersionTimestamp: 639197388846976781
   m_SerializedVersion: 3
   m_DebugInfo: {fileID: 3804736121904330390}
   m_RuntimeGraph: {fileID: 1526940904156870345}
@@ -170,7 +170,7 @@ MonoBehaviour:
       m_Value1: 2972652634563073417
     Variables: []
     NamedChildren: []
-    IsPlaceholder: 0
+    IsPlaceholder: 1
   - Name: Plus_int
     Story: 'Set [A] Plus [B] To [C]'
     RuntimeTypeString: PlusIntAction, Assembly-CSharp, Version=0.0.0.0, Culture=neutral,
@@ -195,7 +195,7 @@ MonoBehaviour:
           PublicKeyToken=b77a5c561934e089
       Tooltip: 
     NamedChildren: []
-    IsPlaceholder: 0
+    IsPlaceholder: 1
   - Name: Sequence
     Story: 
     RuntimeTypeString: Unity.Behavior.SequenceComposite, Unity.Behavior, Version=0.0.0.0,
@@ -275,14 +275,14 @@ MonoBehaviour:
           PublicKeyToken=b77a5c561934e089
       Tooltip: 
     NamedChildren: []
-    IsPlaceholder: 0
+    IsPlaceholder: 1
   m_Blackboards: []
   m_MainBlackboardAuthoringAsset: {fileID: -9037834783360390643}
   m_CommandBuffer:
     m_Commands: []
   m_SubgraphsInfo: []
   m_BlackboardMissingManagedRef: 0
-  m_GraphMissingManagedRef: 0
+  m_GraphMissingManagedRef: 1
   m_HasMissingTypeInManagedRef: 0
   m_EnumDependencyCache:
     Entries:

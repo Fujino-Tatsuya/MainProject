@@ -392,7 +392,7 @@ MonoBehaviour:
   - rid: 5035183371583488727
   - rid: 5035183374473888494
   - rid: 5035183375061877447
-  m_VersionTimestamp: 639183400944826444
+  m_VersionTimestamp: 639197388847164388
   m_SerializedVersion: 3
   m_DebugInfo: {fileID: 8122592051631973958}
   m_RuntimeGraph: {fileID: -4490973281338094014}
@@ -435,7 +435,7 @@ MonoBehaviour:
       m_Value1: 2972652634563073417
     Variables: []
     NamedChildren: []
-    IsPlaceholder: 0
+    IsPlaceholder: 1
   - Name: Sequence
     Story: 
     RuntimeTypeString: Unity.Behavior.SequenceComposite, Unity.Behavior, Version=0.0.0.0,
@@ -515,7 +515,7 @@ MonoBehaviour:
           PublicKeyToken=b77a5c561934e089
       Tooltip: 
     NamedChildren: []
-    IsPlaceholder: 0
+    IsPlaceholder: 1
   - Name: Find With Tag
     Story: 'Find [Object] with tag: [Tag]'
     RuntimeTypeString: Unity.Behavior.FindObjectWithTagAction, Unity.Behavior, Version=0.0.0.0,
@@ -562,7 +562,7 @@ MonoBehaviour:
     m_Commands: []
   m_SubgraphsInfo: []
   m_BlackboardMissingManagedRef: 0
-  m_GraphMissingManagedRef: 0
+  m_GraphMissingManagedRef: 1
   m_HasMissingTypeInManagedRef: 0
   m_EnumDependencyCache:
     Entries:

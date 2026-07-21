@@ -119,8 +119,8 @@ public class MonsterBase : Unit
             return;
         }
 
-        // Unit 스탯 주입(파라미터 순서 = Unit.Initialize 계약).
-        Initialize(data.attackDamage, data.moveSpeed, data.attackSpeed, data.maxHp, data.defense, data.maxShield);
+        // Unit 스탯 주입(파라미터 순서 = Unit.Initialize 계약. MaxShield는 PlayerSkill 머지에서 개념 제거됨).
+        Initialize(data.attackDamage, data.moveSpeed, data.attackSpeed, data.maxHp, data.defense);
 
         // 근접 공격 컴포넌트에 데미지/타깃레이어 스냅샷 반영.
         if (meleeAttack != null)

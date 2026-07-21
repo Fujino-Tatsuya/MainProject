@@ -130,7 +130,7 @@ MonoBehaviour:
   - rid: 3912067943982957073
   - rid: 3912067943982957472
   - rid: 3912067943995015870
-  m_VersionTimestamp: 639186921967924583
+  m_VersionTimestamp: 639197388847174410
   m_SerializedVersion: 3
   m_DebugInfo: {fileID: -7697823700966553886}
   m_RuntimeGraph: {fileID: 900680763059361209}
@@ -196,7 +196,7 @@ MonoBehaviour:
           Culture=neutral, PublicKeyToken=null
       Tooltip: 
     NamedChildren: []
-    IsPlaceholder: 0
+    IsPlaceholder: 1
   - Name: AddDeltaTime
     Story: 'Add DeltaTime to [Var]'
     RuntimeTypeString: AddDeltaTimeAction, Assembly-CSharp, Version=0.0.0.0, Culture=neutral,
@@ -211,7 +211,7 @@ MonoBehaviour:
           PublicKeyToken=b77a5c561934e089
       Tooltip: 
     NamedChildren: []
-    IsPlaceholder: 0
+    IsPlaceholder: 1
   - Name: Conditional Guard (Modifier)
     Story: 
     RuntimeTypeString: Unity.Behavior.ConditionalGuardModifier, Unity.Behavior, Version=0.0.0.0,
@@ -293,7 +293,7 @@ MonoBehaviour:
     m_Commands: []
   m_SubgraphsInfo: []
   m_BlackboardMissingManagedRef: 0
-  m_GraphMissingManagedRef: 0
+  m_GraphMissingManagedRef: 1
   m_HasMissingTypeInManagedRef: 0
   m_EnumDependencyCache:
     Entries:

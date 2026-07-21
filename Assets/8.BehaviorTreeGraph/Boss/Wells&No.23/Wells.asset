@@ -211,7 +211,7 @@ MonoBehaviour:
   - rid: 5035183259109032352
   - rid: 5035183399642334148
   - rid: 5035183399642334168
-  m_VersionTimestamp: 639184955421876194
+  m_VersionTimestamp: 639197388847017656
   m_SerializedVersion: 3
   m_DebugInfo: {fileID: -801970679742516528}
   m_RuntimeGraph: {fileID: 6688886481996931209}
@@ -352,7 +352,7 @@ MonoBehaviour:
           PublicKeyToken=b77a5c561934e089
       Tooltip: 
     NamedChildren: []
-    IsPlaceholder: 0
+    IsPlaceholder: 1
   - Name: Instantiate Network Object
     Story: 'Instantiate Network [Object]'
     RuntimeTypeString: InstantiateNetworkObjectAction, Assembly-CSharp, Version=0.0.0.0,
@@ -367,7 +367,7 @@ MonoBehaviour:
           Culture=neutral, PublicKeyToken=null
       Tooltip: 
     NamedChildren: []
-    IsPlaceholder: 0
+    IsPlaceholder: 1
   - Name: HoldBomb
     Story: '[BombInstance] Follow [BombSocket]'
     RuntimeTypeString: HoldBombAction, Assembly-CSharp, Version=0.0.0.0, Culture=neutral,
@@ -387,7 +387,7 @@ MonoBehaviour:
           Culture=neutral, PublicKeyToken=null
       Tooltip: 
     NamedChildren: []
-    IsPlaceholder: 0
+    IsPlaceholder: 1
   - Name: Set Variable Value
     Story: 'Set [Variable] value to [Value]'
     RuntimeTypeString: Unity.Behavior.SetVariableValueAction, Unity.Behavior, Version=0.0.0.0,
@@ -439,7 +439,7 @@ MonoBehaviour:
     m_Commands: []
   m_SubgraphsInfo: []
   m_BlackboardMissingManagedRef: 0
-  m_GraphMissingManagedRef: 0
+  m_GraphMissingManagedRef: 1
   m_HasMissingTypeInManagedRef: 0
   m_EnumDependencyCache:
     Entries:

@@ -212,13 +212,31 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         }
     }
 
+    // 읽기 파사드 — 플레이어(StatusEffectController)와 몹(MonsterStatusEffect)을 공통으로 잡는다.
+    // Unit이 소비하는 표면(HasSuperArmor/GetStatMultiplier)은 이 파사드 경유 → 몹 슈퍼아머도 Knockback 가드에 걸림.
+    // (StatusEffects 공개 프로퍼티는 플레이어 전용 쓰기 API(Apply/Remove) 호출부가 있어 구체 타입 유지.)
+    IStatusEffectFacade _statusFacade;
+    bool _statusFacadeCached;
+    IStatusEffectFacade StatusFacade
+    {
+        get
+        {
+            if (!_statusFacadeCached)
+            {
+                _statusFacade = GetComponent<IStatusEffectFacade>();
+                _statusFacadeCached = true;
+            }
+            return _statusFacade;
+        }
+    }
+
     float GetStatMultiplier(StatusEffectType statType)
     {
-        return StatusEffects != null ? StatusEffects.GetStatMultiplier(statType) : 1f;
+        return StatusFacade != null ? StatusFacade.GetStatMultiplier(statType) : 1f;
     }
 
     // 미부착 유닛은 슈퍼아머 없음으로 동작
-    public bool HasSuperArmor => StatusEffects != null && StatusEffects.HasSuperArmor;
+    public bool HasSuperArmor => StatusFacade != null && StatusFacade.HasSuperArmor;
 
     // 최종 스탯 = base(불변) × 활성 modifier 배율의 곱. 소비처는 base 대신 이 값을 읽는다
     public int FinalAttackDamage => Mathf.Max(0, Mathf.RoundToInt(_attackDamage * GetStatMultiplier(StatusEffectType.AttackDamageModifier)));
