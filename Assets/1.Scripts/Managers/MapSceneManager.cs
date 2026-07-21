@@ -1,6 +1,7 @@
 ﻿using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 public class MapSceneManager : NemoSceneManager
@@ -10,6 +11,10 @@ public class MapSceneManager : NemoSceneManager
 
     [Header("Buttons")]
     [SerializeField] private Button resultButton; // ExitButton — 호스트/오프라인만 GoToResult 개시
+    [SerializeField] private Button optionButton; // Option_Button — 옵션 패널 열기
+
+    [Header("Option")]
+    [SerializeField] private GameObject optionPanel;
 
     [Header("Client Exit Warning")]
     [SerializeField] private GameObject warningPanel;     // WarningMessage_Panel — 클라 전용 경고창
@@ -27,8 +32,17 @@ public class MapSceneManager : NemoSceneManager
         _gameManager = GetGameManager();
         _networkManager = NetworkManager.Singleton;
         ResolveSceneReferences();
+        SetOptionPanel(false);
         BindButtons();
         RegisterGoToResultHandler();
+    }
+
+    private void Update()
+    {
+        if (Keyboard.current?.escapeKey.wasPressedThisFrame == true)
+        {
+            OpenOptionPanel();
+        }
     }
 
     private void Start()
@@ -78,6 +92,11 @@ public class MapSceneManager : NemoSceneManager
         SetWarningPanel(false);
     }
 
+    public void OpenOptionPanel()
+    {
+        SetOptionPanel(true);
+    }
+
     private void QuitApplication()
     {
 #if UNITY_EDITOR
@@ -104,6 +123,14 @@ public class MapSceneManager : NemoSceneManager
         if (warningPanel != null)
         {
             warningPanel.SetActive(active);
+        }
+    }
+
+    private void SetOptionPanel(bool active)
+    {
+        if (optionPanel != null)
+        {
+            optionPanel.SetActive(active);
         }
     }
 
@@ -178,8 +205,14 @@ public class MapSceneManager : NemoSceneManager
     private void ResolveSceneReferences()
     {
         resultButton ??= FindButton("ExitButton");
+        optionButton ??= FindButton("Option_Button");
         warningConfirmButton ??= FindButton("ConfirmButton");
         warningCancelButton ??= FindButton("CancelButton");
+        if (optionPanel == null)
+        {
+            optionPanel = FindInActiveScene("OptionPanel");
+        }
+
         if (warningPanel == null)
         {
             warningPanel = FindInActiveScene("WarningMessage_Panel");
@@ -188,6 +221,16 @@ public class MapSceneManager : NemoSceneManager
         if (resultButton == null)
         {
             WarnMissingReference(nameof(resultButton));
+        }
+
+        if (optionButton == null)
+        {
+            WarnMissingReference(nameof(optionButton));
+        }
+
+        if (optionPanel == null)
+        {
+            WarnMissingReference(nameof(optionPanel));
         }
 
         if (warningPanel == null)
@@ -210,6 +253,12 @@ public class MapSceneManager : NemoSceneManager
     {
         // resultButton(ExitButton)은 씬에서 GameManager.GoToResultButton 퍼시스턴트 이벤트로 이미 연결됨 —
         // 코드 리스너를 추가하면 이중 호출되므로 여기서는 바인딩하지 않는다. (interactable 제어용으로만 참조 보유)
+        if (optionButton != null)
+        {
+            optionButton.onClick.RemoveListener(OpenOptionPanel);
+            optionButton.onClick.AddListener(OpenOptionPanel);
+        }
+
         if (warningConfirmButton != null)
         {
             warningConfirmButton.onClick.RemoveListener(ConfirmClientExit);
