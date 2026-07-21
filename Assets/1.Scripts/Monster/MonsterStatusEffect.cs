@@ -11,7 +11,7 @@ using UnityEngine;
 //  - 슈퍼아머(SuperArmor) 활성 중에는 들어오는 CC(SuperArmor 외 전부)를 무시한다.
 //  - duration <= 0 이면 무한 지속(수동 해제 전까지). 그 외엔 서버 Tick으로 만료.
 [DisallowMultipleComponent]
-public class MonsterStatusEffect : NetworkBehaviour, IMonsterStatusFacade
+public class MonsterStatusEffect : NetworkBehaviour, IMonsterStatusFacade, IStatusEffectFacade
 {
     // 개별 상태 플래그(단일 비트) 목록. 조합값(Flags) 순회/해제에 사용.
     static readonly StatusEffectType[] SingleFlags =
@@ -49,6 +49,11 @@ public class MonsterStatusEffect : NetworkBehaviour, IMonsterStatusFacade
     public bool BlocksInterrupt => HasSuperArmor;
 
     public bool HasSuperArmor => Has(StatusEffectType.SuperArmor);
+
+    // IStatusEffectFacade — Unit의 Final* 스탯 계산용 배율.
+    // 몹은 아직 스탯 modifier(버프/디버프 배율) 시스템이 없어 항상 1f(무효과).
+    // 몹 버프/디버프 도입 시 여기서 실제 배율을 계산한다(플레이어 StatusEffectController.GetStatMultiplier 참고).
+    public float GetStatMultiplier(StatusEffectType statType) => 1f;
 
     bool Has(StatusEffectType flag) => (_active.Value & flag) != 0;
     #endregion

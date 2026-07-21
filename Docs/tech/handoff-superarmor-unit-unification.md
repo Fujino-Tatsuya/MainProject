@@ -32,5 +32,22 @@ public bool HasSuperArmor => StatusEffects != null && StatusEffects.HasSuperArmo
   - feature/map-player-merge: `Assets/1.Scripts/Player/StatusEffectController.cs`
   → 폴더 이동 충돌 + 머지 후 `StatusEffectController`(플레이어)·`MonsterStatusEffect`(몹) 공존 정리 필요.
 
+## ★ 경석 측 준비 완료 (2026-07-21 — 몹 쪽 인터페이스 구현 끝)
+map-player-merge 브랜치에 아래가 이미 들어가 있음:
+- **`Assets/1.Scripts/Unit/IStatusEffectFacade.cs`** 신설 — Unit이 소비하는 표면 그대로:
+  ```csharp
+  public interface IStatusEffectFacade
+  {
+      bool HasSuperArmor { get; }
+      float GetStatMultiplier(StatusEffectType statType);
+  }
+  ```
+- **`MonsterStatusEffect : ..., IStatusEffectFacade`** 구현 완료 — HasSuperArmor(기존), GetStatMultiplier=1f(몹 스탯 modifier 도입 전 무효과).
+
+**은희 쪽 남은 작업 2줄** (PlayerSkill 계약 실측 기준 — Unit은 StatusEffects에서 위 2멤버만 소비):
+1. `StatusEffectController`에 `: IStatusEffectFacade` 선언 추가 (멤버 시그니처 이미 일치 — 본문 변경 불필요).
+2. `Unit.StatusEffects` 캐시 타입을 `IStatusEffectFacade`로 + `GetComponent<IStatusEffectFacade>()` 탐색 (Unity GetComponent는 인터페이스 지원).
+→ 이것만 되면 몹 슈퍼아머가 `Unit.Knockback` 가드에 걸리고, 몹 Final* 스탯도 안전(1f).
+
 ## 경석 측 대기 상태
 - C(Q 지속넉백 → 넉백 종료 후 ~0.2s Stunned 경직)는 위 통합 완료 후 `Unit.Knockback` 공통 진입점 + 통합 슈퍼아머 위에 얹어 재개.
