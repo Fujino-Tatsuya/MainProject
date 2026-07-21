@@ -128,3 +128,10 @@ Docs/temp/
 /AGENTS.md
 /CONTEXT.md
 /Tools/
+
+# 개인 작업 노트 + Unity 자동생성물(커밋 금지)
+/IMPLEMENTATION_NOTES.md
+/PLAN-mcp.md
+/[Aa]ssets/Unity.VisualScripting.Generated/
+/[Aa]ssets/Unity.VisualScripting.Generated.meta
+*.sync-conflict-*
