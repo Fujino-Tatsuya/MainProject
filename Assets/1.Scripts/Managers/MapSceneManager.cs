@@ -9,7 +9,12 @@ public class MapSceneManager : NemoSceneManager
     private const string GoToResultMessageName = "MapScene.GoToResult";
 
     [Header("Buttons")]
-    [SerializeField] private Button resultButton;
+    [SerializeField] private Button resultButton; // ExitButton — 호스트/오프라인만 GoToResult 개시
+
+    [Header("Client Exit Warning")]
+    [SerializeField] private GameObject warningPanel;     // WarningMessage_Panel — 클라 전용 경고창
+    [SerializeField] private Button warningConfirmButton; // ConfirmButton(Yes) — 게임 종료
+    [SerializeField] private Button warningCancelButton;  // CancelButton — 경고창 닫기
 
     private GameManager _gameManager;
     private NetworkManager _networkManager;
@@ -23,13 +28,13 @@ public class MapSceneManager : NemoSceneManager
         _networkManager = NetworkManager.Singleton;
         ResolveSceneReferences();
         BindButtons();
-        ApplyEndButtonVisibility();
         RegisterGoToResultHandler();
     }
 
     private void Start()
     {
         Debug.Log("[SceneFlow] MapSceneManager.Start");
+        SetWarningPanel(false); // 경고창은 기본 숨김 — 클라가 Exit를 누를 때만 표시
         PlayEnterFade();
     }
 
@@ -38,24 +43,48 @@ public class MapSceneManager : NemoSceneManager
         UnregisterGoToResultHandler();
     }
 
-    // 호스트 버튼 진입점. TempGameManager.GoToResultButton 브리지와 버튼 리스너가 호출한다.
+    // ExitButton 진입점. TempGameManager.GoToResultButton 브리지가 호출한다.
+    // 호스트/오프라인: 전 클라 ResultScene 전환. 클라: 경고창 표시.
     public void GoToResult()
     {
-        Debug.Log($"[SceneFlow] MapSceneManager.GoToResult transitioning={IsTransitioning} hasGameManager={_gameManager != null}");
+        Debug.Log($"[SceneFlow] MapSceneManager.GoToResult transitioning={IsTransitioning} client={IsNetworkClientOnly()}");
         if (IsTransitioning || _gameManager == null)
         {
             return;
         }
 
-        // 전환 개시는 오프라인/호스트만. 클라 버튼은 숨겨져 있으나 이중 방어.
         if (IsNetworkClientOnly())
         {
-            Debug.Log("[SceneFlow] MapSceneManager.GoToResult ignored on client");
+            SetWarningPanel(true);
             return;
         }
 
         BroadcastGoToResultToClients();
         PerformGoToResult();
+    }
+
+    // 클라 경고창 Yes — 게임 종료.
+    public void ConfirmClientExit()
+    {
+        Debug.Log("[SceneFlow] MapSceneManager.ConfirmClientExit quit");
+        SetButtonsInteractable(false, warningConfirmButton, warningCancelButton);
+        QuitApplication();
+    }
+
+    // 클라 경고창 Cancel — 경고창 닫기.
+    public void CancelClientExit()
+    {
+        Debug.Log("[SceneFlow] MapSceneManager.CancelClientExit close warning");
+        SetWarningPanel(false);
+    }
+
+    private void QuitApplication()
+    {
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
+        Application.Quit();
+#endif
     }
 
     // 실제 로컬 전환. GameManager.GoToResult가 ResultScene을 단일 모드로 로드 → MapScene 자동 언로드.
@@ -70,17 +99,12 @@ public class MapSceneManager : NemoSceneManager
         StartCoroutine(FadeThenInvoke(_gameManager.GoToResult));
     }
 
-    // 세션에 접속한 순수 클라이언트에게는 End 버튼을 숨긴다. 오프라인/호스트/서버는 표시.
-    private void ApplyEndButtonVisibility()
+    private void SetWarningPanel(bool active)
     {
-        if (resultButton == null)
+        if (warningPanel != null)
         {
-            return;
+            warningPanel.SetActive(active);
         }
-
-        bool hide = IsNetworkClientOnly();
-        resultButton.gameObject.SetActive(!hide);
-        Debug.Log($"[SceneFlow] MapSceneManager.ApplyEndButtonVisibility hideForClient={hide}");
     }
 
     private bool IsNetworkClientOnly()
@@ -153,20 +177,49 @@ public class MapSceneManager : NemoSceneManager
 
     private void ResolveSceneReferences()
     {
-        resultButton ??= FindButton("Button_GotoResult");
+        resultButton ??= FindButton("ExitButton");
+        warningConfirmButton ??= FindButton("ConfirmButton");
+        warningCancelButton ??= FindButton("CancelButton");
+        if (warningPanel == null)
+        {
+            warningPanel = FindInActiveScene("WarningMessage_Panel");
+        }
 
         if (resultButton == null)
         {
             WarnMissingReference(nameof(resultButton));
         }
+
+        if (warningPanel == null)
+        {
+            WarnMissingReference(nameof(warningPanel));
+        }
+
+        if (warningConfirmButton == null)
+        {
+            WarnMissingReference(nameof(warningConfirmButton));
+        }
+
+        if (warningCancelButton == null)
+        {
+            WarnMissingReference(nameof(warningCancelButton));
+        }
     }
 
     private void BindButtons()
     {
-        if (resultButton != null)
+        // resultButton(ExitButton)은 씬에서 GameManager.GoToResultButton 퍼시스턴트 이벤트로 이미 연결됨 —
+        // 코드 리스너를 추가하면 이중 호출되므로 여기서는 바인딩하지 않는다. (interactable 제어용으로만 참조 보유)
+        if (warningConfirmButton != null)
         {
-            resultButton.onClick.RemoveListener(GoToResult);
-            resultButton.onClick.AddListener(GoToResult);
+            warningConfirmButton.onClick.RemoveListener(ConfirmClientExit);
+            warningConfirmButton.onClick.AddListener(ConfirmClientExit);
+        }
+
+        if (warningCancelButton != null)
+        {
+            warningCancelButton.onClick.RemoveListener(CancelClientExit);
+            warningCancelButton.onClick.AddListener(CancelClientExit);
         }
     }
 }
