@@ -38,7 +38,7 @@ public class Hurtbox : MonoBehaviour
     {
         if (!TryGetReceiver(out IAttackReceiver receiver))
         {
-            Debug.LogError($"Hurtbox '{name}' has no attack receiver.", this);
+            Debug.LogError($"[Unit] Hurtbox '{name}' has no attack receiver.", this);
             return false;
         }
 

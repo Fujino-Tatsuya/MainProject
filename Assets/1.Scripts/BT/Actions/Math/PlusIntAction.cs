@@ -28,7 +28,7 @@ public partial class PlusIntAction : Action
     {
         if (A == null || B == null || C == null)
         {
-            Debug.LogError("PlusIntAction: A, B, and C must not be null.");
+            Debug.LogError("[BT] PlusIntAction: A, B, and C must not be null.");
             return false;
         }
         return true;

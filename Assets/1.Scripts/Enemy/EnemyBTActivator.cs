@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+ï»¿using System.Collections.Generic;
 using Unity.Behavior;
 using Unity.Netcode;
 using UnityEngine;
@@ -32,7 +32,7 @@ public class EnemyBTActivator : NetworkBehaviour
             }
             else
             {
-                Debug.LogError($"{bt.name} BT¿¡¼­ {isOpenVariableName} º¯¼ö¸¦ Ã£Áö ¸øÇß½À´Ï´Ù.", bt);
+                Debug.LogError($"[Enemy] {bt.name} BTì—ì„œ {isOpenVariableName} ë³€ìˆ˜ë¥¼ ì°¾ì§€ ëª»í–ˆìŠµë‹ˆë‹¤.", bt);
             }
         }
     }

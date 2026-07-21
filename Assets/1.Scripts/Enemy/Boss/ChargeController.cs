@@ -73,7 +73,7 @@ public class ChargeController : NetworkBehaviour
 
         if (chargeObjects == null || chargeObjects.Count == 0)
         {
-            Debug.LogError("ChargeController에 ChargingObject 리스트가 설정되지 않았습니다." +
+            Edit.LogError("[No.23] ChargeController에 ChargingObject 리스트가 설정되지 않았습니다." +
                 "\nChargeController가 부착되어 있는 오브젝트 생성 시에 SetList()함수를 통해 리스트를 설정해야 합니다.");
             return;
         }

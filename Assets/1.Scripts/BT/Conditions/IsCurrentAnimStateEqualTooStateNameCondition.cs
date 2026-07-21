@@ -32,13 +32,13 @@ public partial class IsCurrentAnimStateEqualTooStateNameCondition : Condition
     {
         if (StateName.Value == "")
         {
-            Debug.LogError("Please Fill in StateName");
+            Debug.LogError("[BT] Please Fill in StateName");
             return false;
         }
 
         if (Animator.Value == null)
         {
-            Debug.LogError("Animator is null");
+            Debug.LogError("[BT] Animator is null");
             return false;
         }
 

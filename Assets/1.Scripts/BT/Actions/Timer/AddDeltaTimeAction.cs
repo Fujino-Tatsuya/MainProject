@@ -14,7 +14,7 @@ public partial class AddDeltaTimeAction : Action
     {
         if (Var == null)
         {
-            Debug.LogError("Var is null");
+            Debug.LogError("[BT] Var is null");
             return Status.Failure;
         }
 

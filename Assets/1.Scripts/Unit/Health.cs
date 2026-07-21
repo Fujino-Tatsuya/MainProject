@@ -1,38 +1,38 @@
-using Unity.Netcode;
+ï»¿using Unity.Netcode;
 using UnityEngine;
 
 public class Health
 {
-    #region ÇÇ Ã¼·Â
+    #region í”¼ ì²´ë ¥
     int _currentHp;
     public int CurrentHealth { get { return _currentHp; } }
     int _maxHp;
     public int MaxHp { get { return _maxHp; } }
     /// <summary>
-    /// damage¸¸Å­ Ã¼·ÂÀ» °¨¼Ò½ÃÅ°´Â ÇÔ¼ö
+    /// damageë§Œí¼ ì²´ë ¥ì„ ê°ì†Œì‹œí‚¤ëŠ” í•¨ìˆ˜
     /// </summary>
-    /// <param name="damage">°¨¼Ò½ÃÅ³ Ã¼·Â °ª</param>
+    /// <param name="damage">ê°ì†Œì‹œí‚¬ ì²´ë ¥ ê°’</param>
     public void TakeHpDamage(int damage)
     {
-        //if(!isServer) return; // ¼­¹ö¿¡¼­¸¸ Ã¼·Â °¨¼Ò Ã³¸®
+        //if(!isServer) return; // ì„œë²„ì—ì„œë§Œ ì²´ë ¥ ê°ì†Œ ì²˜ë¦¬
 
         _currentHp -= damage;
-        _currentHp = Mathf.Max(_currentHp, 0); // Ã¼·ÂÀÌ 0 ÀÌÇÏ·Î ¶³¾îÁöÁö ¾Êµµ·Ï º¸Àå
-        Debug.Log($"ÇÇÇØ·®: {damage}   /   ÇöÀç Ã¼·Â: {_currentHp}");
+        _currentHp = Mathf.Max(_currentHp, 0); // ì²´ë ¥ì´ 0 ì´í•˜ë¡œ ë–¨ì–´ì§€ì§€ ì•Šë„ë¡ ë³´ì¥
+        Edit.Log($"[Unit] í”¼í•´ëŸ‰: {damage}   /   í˜„ì¬ ì²´ë ¥: {_currentHp}");
     }
     /// <summary>
-    /// healAmount¸¸Å­ Ã¼·ÂÀ» È¸º¹½ÃÅ°´Â ÇÔ¼ö
+    /// healAmountë§Œí¼ ì²´ë ¥ì„ íšŒë³µì‹œí‚¤ëŠ” í•¨ìˆ˜
     /// </summary>
-    /// <param name="healAmount">È¸º¹½ÃÅ³ Ã¼·Â °ª</param>
+    /// <param name="healAmount">íšŒë³µì‹œí‚¬ ì²´ë ¥ ê°’</param>
     public void HealHp(int healAmount)
     {
         _currentHp += healAmount;
-        _currentHp = Mathf.Min(_currentHp, _maxHp); // Ã¼·ÂÀÌ ÃÖ´ë Ã¼·ÂÀ» ÃÊ°úÇÏÁö ¾Êµµ·Ï º¸Àå
+        _currentHp = Mathf.Min(_currentHp, _maxHp); // ì²´ë ¥ì´ ìµœëŒ€ ì²´ë ¥ì„ ì´ˆê³¼í•˜ì§€ ì•Šë„ë¡ ë³´ì¥
 
-        Debug.Log($"Ã¼·Â Áõ°¡·®: {healAmount}   /   ÇöÀç Ã¼·Â: {_currentHp}");
+        Edit.Log($"[Unit] ì²´ë ¥ ì¦ê°€ëŸ‰: {healAmount}   /   í˜„ì¬ ì²´ë ¥: {_currentHp}");
     }
     /// <summary>
-    /// Ã¼·ÂÀ» ÃÖ´ëÄ¡·Î È¸º¹½ÃÅ°´Â ÇÔ¼ö
+    /// ì²´ë ¥ì„ ìµœëŒ€ì¹˜ë¡œ íšŒë³µì‹œí‚¤ëŠ” í•¨ìˆ˜
     /// </summary>
     public void Revive()
     {
@@ -40,53 +40,52 @@ public class Health
     }
     #endregion
 
-    #region ¹æ¾î·Â
+    #region ë°©ì–´ë ¥
     int _currentDefense;
     public int CurrentDefense { get { return _currentDefense; } }
 
     /// <summary>
-    /// decreaseAmount¸¸Å­ ¹æ¾î·ÂÀ» °¨¼Ò½ÃÅ°´Â ÇÔ¼ö
+    /// decreaseAmountë§Œí¼ ë°©ì–´ë ¥ì„ ê°ì†Œì‹œí‚¤ëŠ” í•¨ìˆ˜
     /// </summary>
-    /// <param name="decreaseAmount">°¨¼Ò½ÃÅ³ Ã¼·Â °ª</param>
+    /// <param name="decreaseAmount">ê°ì†Œì‹œí‚¬ ì²´ë ¥ ê°’</param>
     public void DecreaseDefense(int decreaseAmount)
     {
         _currentDefense -= decreaseAmount;
-        _currentDefense = Mathf.Max(_currentDefense, 0); // ¹æ¾î·ÂÀÌ 0 ÀÌÇÏ·Î ¶³¾îÁöÁö ¾Êµµ·Ï º¸Àå
+        _currentDefense = Mathf.Max(_currentDefense, 0); // ë°©ì–´ë ¥ì´ 0 ì´í•˜ë¡œ ë–¨ì–´ì§€ì§€ ì•Šë„ë¡ ë³´ì¥
     }
 
     /// <summary>
-    /// defenseAmount¸¸Å­ ¹æ¾î·ÂÀ» Áõ°¡½ÃÅ°´Â ÇÔ¼ö
+    /// defenseAmountë§Œí¼ ë°©ì–´ë ¥ì„ ì¦ê°€ì‹œí‚¤ëŠ” í•¨ìˆ˜
     /// </summary>
-    /// <param name="increaseAmount">Áõ°¡½ÃÅ³ ¹æ¾î·Â °ª</param>
+    /// <param name="increaseAmount">ì¦ê°€ì‹œí‚¬ ë°©ì–´ë ¥ ê°’</param>
     public void IncreaseDefense(int increaseAmount)
     {
         _currentDefense += increaseAmount;
     }
     #endregion
 
-    #region ½¯µå
+    #region ì‰´ë“œ
     int _currentShield;
     public int CurrentShield { get { return _currentShield; } }
-    int _maxShield;
-    public int MaxShield { get { return _maxShield; } }
     bool _hasShield = false;
     public bool HasShield { get { return _hasShield; } }
 
     /// <summary>
-    /// damage¸¸Å­ ½¯µå¸¦ °¨¼Ò½ÃÅ°°í ½¯µå°¡ 0 ÀÌÇÏ·Î ¶³¾îÁöÁö ¾Êµµ·Ï º¸ÀåÇÏ´Â ÇÔ¼ö
+    /// damageë§Œí¼ ì‰´ë“œë¥¼ ê°ì†Œì‹œí‚¤ê³  ì‰´ë“œê°€ 0 ì´í•˜ë¡œ ë–¨ì–´ì§€ì§€ ì•Šë„ë¡ ë³´ì¥í•˜ëŠ” í•¨ìˆ˜
     /// </summary>
-    /// <param name="damage">°¨¼Ò½ÃÅ³ ½¯µå °ª</param>
+    /// <param name="damage">ê°ì†Œì‹œí‚¬ ì‰´ë“œ ê°’</param>
     public void TakeShieldDamage(int damage)
     {
         _currentShield -= damage;
-        _currentShield = Mathf.Max(_currentShield, 0); // ½¯µå°¡ 0 ÀÌÇÏ·Î ¶³¾îÁöÁö ¾Êµµ·Ï º¸Àå
+        _currentShield = Mathf.Max(_currentShield, 0); // ì‰´ë“œê°€ 0 ì´í•˜ë¡œ ë–¨ì–´ì§€ì§€ ì•Šë„ë¡ ë³´ì¥
         _hasShield = (_currentShield > 0)? true : false;
+        Edit.Log($"[Unit] ì‰´ë“œ í”¼í•´ëŸ‰: {damage}   /   í˜„ì¬ ì‰´ë“œ: {_currentShield}");
     }
 
     /// <summary>
-    /// shieldValue·Î ½¯µå °ªÀ» ¼³Á¤ÇÏ°í ½¯µå °ªÀÌ 0º¸´Ù Å©¸é hasShield¸¦ true·Î, ±×·¸Áö ¾ÊÀ¸¸é false·Î ¼³Á¤ÇÏ´Â ÇÔ¼ö
+    /// shieldValueë¡œ ì‰´ë“œ ê°’ì„ ì„¤ì •í•˜ê³  ì‰´ë“œ ê°’ì´ 0ë³´ë‹¤ í¬ë©´ hasShieldë¥¼ trueë¡œ, ê·¸ë ‡ì§€ ì•Šìœ¼ë©´ falseë¡œ ì„¤ì •í•˜ëŠ” í•¨ìˆ˜
     /// </summary>
-    /// <param name="shieldValue">¼³Á¤ÇÒ ½¯µå °ª</param>
+    /// <param name="shieldValue">ì„¤ì •í•  ì‰´ë“œ ê°’</param>
     public void SetShield(int shieldValue)
     {
         _currentShield = shieldValue;
@@ -94,25 +93,23 @@ public class Health
     }
 
     /// <summary>
-    /// shieldAmount¸¸Å­ ½¯µå °ªÀ» Áõ°¡½ÃÅ°°í ½¯µå °ªÀÌ 0º¸´Ù Å©¸é hasShield¸¦ true·Î, ±×·¸Áö ¾ÊÀ¸¸é false·Î ¼³Á¤ÇÏ´Â ÇÔ¼ö
+    /// shieldAmountë§Œí¼ ì‰´ë“œ ê°’ì„ ì¦ê°€ì‹œí‚¤ê³  ì‰´ë“œ ê°’ì´ 0ë³´ë‹¤ í¬ë©´ hasShieldë¥¼ trueë¡œ, ê·¸ë ‡ì§€ ì•Šìœ¼ë©´ falseë¡œ ì„¤ì •í•˜ëŠ” í•¨ìˆ˜
     /// </summary>
-    /// <param name="shieldAmount">Áõ°¡½ÃÅ³ ½¯µå °ª</param>
+    /// <param name="shieldAmount">ì¦ê°€ì‹œí‚¬ ì‰´ë“œ ê°’</param>
     public void IncreaseShield(int shieldAmount)
     {
         _currentShield += shieldAmount;
-        _currentShield = Mathf.Min(_currentShield, _maxShield); // ½¯µå°¡ ÃÖ´ë ½¯µå¸¦ ÃÊ°úÇÏÁö ¾Êµµ·Ï º¸Àå
         _hasShield = (_currentShield > 0)? true : false;
 
-        Debug.Log($"½¯µå Áõ°¡·®: {shieldAmount}   /   ÇöÀç ½¯µå: {_currentShield}");
+        Edit.Log($"[Unit] ì‰´ë“œ ì¦ê°€ëŸ‰: {shieldAmount}   /   í˜„ì¬ ì‰´ë“œ: {_currentShield}");
     }
     #endregion
 
-    public Health(int maxHp, int defense, int maxShield)
+    public Health(int maxHp, int defense)
     {
         _maxHp = maxHp;
         _currentHp = maxHp;
         _currentDefense = defense;
-        _maxShield = maxShield;
         _currentShield = 0;
         _hasShield = false;
     }

@@ -1,4 +1,4 @@
-using Unity.Netcode;
+ï»¿using Unity.Netcode;
 using UnityEngine;
 
 public class ServerSetAnimState : NetworkBehaviour
@@ -7,9 +7,9 @@ public class ServerSetAnimState : NetworkBehaviour
 
     #region Integer Parameter Setters
     /// <summary>
-    /// ¼­¹ö°¡ ¾Ö´Ï¸ŞÀÌÅÍÀÇ Integer ÆÄ¶ó¹ÌÅÍ¸¦ ¼³Á¤ÇÏ´Â ÇÔ¼öÀÔ´Ï´Ù.
-    /// <param name="parameterName">¼³Á¤ÇÒ ÆÄ¶ó¹ÌÅÍÀÇ ÀÌ¸§</param>
-    /// <param name="value">¼³Á¤ÇÒ °ª</param>
+    /// ì„œë²„ê°€ ì• ë‹ˆë©”ì´í„°ì˜ Integer íŒŒë¼ë¯¸í„°ë¥¼ ì„¤ì •í•˜ëŠ” í•¨ìˆ˜ì…ë‹ˆë‹¤.
+    /// <param name="parameterName">ì„¤ì •í•  íŒŒë¼ë¯¸í„°ì˜ ì´ë¦„</param>
+    /// <param name="value">ì„¤ì •í•  ê°’</param>
     /// </summary>
     public void ServerSetInteger(string parameterName, int value)
     { 
@@ -18,11 +18,11 @@ public class ServerSetAnimState : NetworkBehaviour
     }
 
     /// <summary>
-    /// ¼­¹ö°¡ ¾Ö´Ï¸ŞÀÌÅÍÀÇ Integer ÆÄ¶ó¹ÌÅÍ¸¦ ¼³Á¤ÇÏ´Â ÇÔ¼öÀÔ´Ï´Ù.
+    /// ì„œë²„ê°€ ì• ë‹ˆë©”ì´í„°ì˜ Integer íŒŒë¼ë¯¸í„°ë¥¼ ì„¤ì •í•˜ëŠ” í•¨ìˆ˜ì…ë‹ˆë‹¤.
     /// </summary>
-    /// <typeparam name="T"> ÆÄ¶ó¹ÌÅÍÀÇ °ªÀÌ µÉ Enum Å¸ÀÔ</typeparam>
-    /// <param name="parameterName">¼³Á¤ÇÒ ÆÄ¶ó¹ÌÅÍÀÇ ÀÌ¸§</param>
-    /// <param name="enumValue">¼³Á¤ÇÒ Enum °ª</param>
+    /// <typeparam name="T"> íŒŒë¼ë¯¸í„°ì˜ ê°’ì´ ë  Enum íƒ€ì…</typeparam>
+    /// <param name="parameterName">ì„¤ì •í•  íŒŒë¼ë¯¸í„°ì˜ ì´ë¦„</param>
+    /// <param name="enumValue">ì„¤ì •í•  Enum ê°’</param>
     public void ServerSetInteger<T>(string parameterName, T enumValue) where T : System.Enum
     {
         if (!IsServer) return;
@@ -31,10 +31,10 @@ public class ServerSetAnimState : NetworkBehaviour
     }
 
     /// <summary>
-    /// ¼­¹ö°¡ ¾Ö´Ï¸ŞÀÌÅÍÀÇ Integer ÆÄ¶ó¹ÌÅÍ¸¦ ¼³Á¤ÇÏ´Â ÇÔ¼öÀÔ´Ï´Ù.
+    /// ì„œë²„ê°€ ì• ë‹ˆë©”ì´í„°ì˜ Integer íŒŒë¼ë¯¸í„°ë¥¼ ì„¤ì •í•˜ëŠ” í•¨ìˆ˜ì…ë‹ˆë‹¤.
     /// </summary>
-    /// <param name="id">¼³Á¤ÇÒ ÆÄ¶ó¹ÌÅÍÀÇ ID</param>
-    /// <param name="value">¼³Á¤ÇÒ °ª</param>
+    /// <param name="id">ì„¤ì •í•  íŒŒë¼ë¯¸í„°ì˜ ID</param>
+    /// <param name="value">ì„¤ì •í•  ê°’</param>
     public void ServerSetInteger(int id, int value)
     {
         if (!IsServer) return;
@@ -42,11 +42,11 @@ public class ServerSetAnimState : NetworkBehaviour
     }
 
     /// <summary>
-    /// ¼­¹ö°¡ ¾Ö´Ï¸ŞÀÌÅÍÀÇ Integer ÆÄ¶ó¹ÌÅÍ¸¦ ¼³Á¤ÇÏ´Â ÇÔ¼öÀÔ´Ï´Ù.
+    /// ì„œë²„ê°€ ì• ë‹ˆë©”ì´í„°ì˜ Integer íŒŒë¼ë¯¸í„°ë¥¼ ì„¤ì •í•˜ëŠ” í•¨ìˆ˜ì…ë‹ˆë‹¤.
     /// </summary>
-    /// <typeparam name="T"> ÆÄ¶ó¹ÌÅÍÀÇ °ªÀÌ µÉ Enum Å¸ÀÔ</typeparam>
-    /// <param name="id">¼³Á¤ÇÒ ÆÄ¶ó¹ÌÅÍÀÇ ID</param>
-    /// <param name="enumValue">¼³Á¤ÇÒ Enum °ª</param>
+    /// <typeparam name="T"> íŒŒë¼ë¯¸í„°ì˜ ê°’ì´ ë  Enum íƒ€ì…</typeparam>
+    /// <param name="id">ì„¤ì •í•  íŒŒë¼ë¯¸í„°ì˜ ID</param>
+    /// <param name="enumValue">ì„¤ì •í•  Enum ê°’</param>
     public void ServerSetInteger<T>(int id, T enumValue) where T : System.Enum
     {
         if (!IsServer) return;
@@ -57,9 +57,9 @@ public class ServerSetAnimState : NetworkBehaviour
 
     #region Trigger Parameter Setters and Resetters
     /// <summary>
-    /// ¼­¹ö°¡ ¾Ö´Ï¸ŞÀÌÅÍÀÇ Trigger ÆÄ¶ó¹ÌÅÍ¸¦ ¼³Á¤ÇÏ´Â ÇÔ¼öÀÔ´Ï´Ù.
+    /// ì„œë²„ê°€ ì• ë‹ˆë©”ì´í„°ì˜ Trigger íŒŒë¼ë¯¸í„°ë¥¼ ì„¤ì •í•˜ëŠ” í•¨ìˆ˜ì…ë‹ˆë‹¤.
     /// </summary>
-    /// <param name="parameterName">¼³Á¤ÇÒ ÆÄ¶ó¹ÌÅÍÀÇ ÀÌ¸§</param>
+    /// <param name="parameterName">ì„¤ì •í•  íŒŒë¼ë¯¸í„°ì˜ ì´ë¦„</param>
     public void ServerSetTrigger(string parameterName)
     {
         if (!IsServer) return;
@@ -67,9 +67,9 @@ public class ServerSetAnimState : NetworkBehaviour
     }
 
     /// <summary>
-    /// ¼­¹ö°¡ ¾Ö´Ï¸ŞÀÌÅÍÀÇ Trigger ÆÄ¶ó¹ÌÅÍ¸¦ ¼³Á¤ÇÏ´Â ÇÔ¼öÀÔ´Ï´Ù.
+    /// ì„œë²„ê°€ ì• ë‹ˆë©”ì´í„°ì˜ Trigger íŒŒë¼ë¯¸í„°ë¥¼ ì„¤ì •í•˜ëŠ” í•¨ìˆ˜ì…ë‹ˆë‹¤.
     /// </summary>
-    /// <param name="id">¼³Á¤ÇÒ ÆÄ¶ó¹ÌÅÍÀÇ ID</param>
+    /// <param name="id">ì„¤ì •í•  íŒŒë¼ë¯¸í„°ì˜ ID</param>
     public void ServerSetTrigger(int id)
     {
         if (!IsServer) return;
@@ -77,9 +77,9 @@ public class ServerSetAnimState : NetworkBehaviour
     }
 
     /// <summary>
-    /// ¼­¹ö°¡ ¾Ö´Ï¸ŞÀÌÅÍÀÇ Trigger ÆÄ¶ó¹ÌÅÍ¸¦ ¸®¼ÂÇÏ´Â ÇÔ¼öÀÔ´Ï´Ù.
+    /// ì„œë²„ê°€ ì• ë‹ˆë©”ì´í„°ì˜ Trigger íŒŒë¼ë¯¸í„°ë¥¼ ë¦¬ì…‹í•˜ëŠ” í•¨ìˆ˜ì…ë‹ˆë‹¤.
     /// </summary>
-    /// <param name="parameterName">¸®¼ÂÇÒ ÆÄ¶ó¹ÌÅÍÀÇ ÀÌ¸§</param>
+    /// <param name="parameterName">ë¦¬ì…‹í•  íŒŒë¼ë¯¸í„°ì˜ ì´ë¦„</param>
     public void ServerResetTrigger(string parameterName)
     {
         if (!IsServer) return;
@@ -87,9 +87,9 @@ public class ServerSetAnimState : NetworkBehaviour
     }
 
     /// <summary>
-    /// ¼­¹ö°¡ ¾Ö´Ï¸ŞÀÌÅÍÀÇ Trigger ÆÄ¶ó¹ÌÅÍ¸¦ ¸®¼ÂÇÏ´Â ÇÔ¼öÀÔ´Ï´Ù.
+    /// ì„œë²„ê°€ ì• ë‹ˆë©”ì´í„°ì˜ Trigger íŒŒë¼ë¯¸í„°ë¥¼ ë¦¬ì…‹í•˜ëŠ” í•¨ìˆ˜ì…ë‹ˆë‹¤.
     /// </summary>
-    /// <param name="id">¸®¼ÂÇÒ ÆÄ¶ó¹ÌÅÍÀÇ ID</param>
+    /// <param name="id">ë¦¬ì…‹í•  íŒŒë¼ë¯¸í„°ì˜ ID</param>
     public void ServerResetTrigger(int id)
     {
         if (!IsServer) return;
@@ -99,10 +99,10 @@ public class ServerSetAnimState : NetworkBehaviour
     
     #region Float Parameter Setters
     /// <summary>
-    /// ¼­¹ö°¡ ¾Ö´Ï¸ŞÀÌÅÍÀÇ Float ÆÄ¶ó¹ÌÅÍ¸¦ ¼³Á¤ÇÏ´Â ÇÔ¼öÀÔ´Ï´Ù.
+    /// ì„œë²„ê°€ ì• ë‹ˆë©”ì´í„°ì˜ Float íŒŒë¼ë¯¸í„°ë¥¼ ì„¤ì •í•˜ëŠ” í•¨ìˆ˜ì…ë‹ˆë‹¤.
     /// </summary>
-    /// <param name="parameterName">¼³Á¤ÇÒ ÆÄ¶ó¹ÌÅÍÀÇ ÀÌ¸§</param>
-    /// <param name="value">¼³Á¤ÇÒ °ª</param>
+    /// <param name="parameterName">ì„¤ì •í•  íŒŒë¼ë¯¸í„°ì˜ ì´ë¦„</param>
+    /// <param name="value">ì„¤ì •í•  ê°’</param>
     public void ServerSetFloat(string parameterName, float value)
     {
         if (!IsServer) return;
@@ -110,10 +110,10 @@ public class ServerSetAnimState : NetworkBehaviour
     }
 
     /// <summary>
-    /// ¼­¹ö°¡ ¾Ö´Ï¸ŞÀÌÅÍÀÇ Float ÆÄ¶ó¹ÌÅÍ¸¦ ¼³Á¤ÇÏ´Â ÇÔ¼öÀÔ´Ï´Ù.      
+    /// ì„œë²„ê°€ ì• ë‹ˆë©”ì´í„°ì˜ Float íŒŒë¼ë¯¸í„°ë¥¼ ì„¤ì •í•˜ëŠ” í•¨ìˆ˜ì…ë‹ˆë‹¤.      
     /// </summary>
-    /// <param name="id">¼³Á¤ÇÒ ÆÄ¶ó¹ÌÅÍÀÇ ID</param>
-    /// <param name="value">¼³Á¤ÇÒ °ª</param>
+    /// <param name="id">ì„¤ì •í•  íŒŒë¼ë¯¸í„°ì˜ ID</param>
+    /// <param name="value">ì„¤ì •í•  ê°’</param>
     public void ServerSetFloat(int id, float value)
     {
         if (!IsServer) return;
@@ -123,10 +123,10 @@ public class ServerSetAnimState : NetworkBehaviour
 
     #region Bool Parameter Setters
     /// <summary>
-    /// ¼­¹ö°¡ ¾Ö´Ï¸ŞÀÌÅÍÀÇ Bool ÆÄ¶ó¹ÌÅÍ¸¦ ¼³Á¤ÇÏ´Â ÇÔ¼öÀÔ´Ï´Ù.
+    /// ì„œë²„ê°€ ì• ë‹ˆë©”ì´í„°ì˜ Bool íŒŒë¼ë¯¸í„°ë¥¼ ì„¤ì •í•˜ëŠ” í•¨ìˆ˜ì…ë‹ˆë‹¤.
     /// </summary>
-    /// <param name="parameterName">¼³Á¤ÇÒ ÆÄ¶ó¹ÌÅÍÀÇ ÀÌ¸§</param>
-    /// <param name="value">¼³Á¤ÇÒ °ª</param>
+    /// <param name="parameterName">ì„¤ì •í•  íŒŒë¼ë¯¸í„°ì˜ ì´ë¦„</param>
+    /// <param name="value">ì„¤ì •í•  ê°’</param>
     public void ServerSetBool(string parameterName, bool value)
     {
         if (!IsServer) return;
@@ -134,10 +134,10 @@ public class ServerSetAnimState : NetworkBehaviour
     }
 
     /// <summary>
-    /// ¼­¹ö°¡ ¾Ö´Ï¸ŞÀÌÅÍÀÇ Bool ÆÄ¶ó¹ÌÅÍ¸¦ ¼³Á¤ÇÏ´Â ÇÔ¼öÀÔ´Ï´Ù.
+    /// ì„œë²„ê°€ ì• ë‹ˆë©”ì´í„°ì˜ Bool íŒŒë¼ë¯¸í„°ë¥¼ ì„¤ì •í•˜ëŠ” í•¨ìˆ˜ì…ë‹ˆë‹¤.
     /// </summary>
-    /// <param name="id">¼³Á¤ÇÒ ÆÄ¶ó¹ÌÅÍÀÇ ID</param>
-    /// <param name="value">¼³Á¤ÇÒ °ª</param>
+    /// <param name="id">ì„¤ì •í•  íŒŒë¼ë¯¸í„°ì˜ ID</param>
+    /// <param name="value">ì„¤ì •í•  ê°’</param>
     public void ServerSetBool(int id, bool value)
     {
         if (!IsServer) return;

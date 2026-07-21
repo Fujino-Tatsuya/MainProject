@@ -25,7 +25,7 @@ public partial class CheckArrivalInChargeControllerCondition : Condition
     {
         if (ChargeController.Value == null)
         {
-            Debug.LogError("ChargeController script is null.");
+            Debug.LogError("[BT] ChargeController script is null.");
             return false;
         }
 

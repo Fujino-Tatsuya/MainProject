@@ -28,12 +28,12 @@ public partial class SetNumberWithTagAction : Action
     {
         if (TotalNumber == null)
         {
-            Debug.LogError("TotalNumber is null");
+            Debug.LogError("[BT] TotalNumber is null");
             return false;
         }
         if (Tag == null)
         {
-            Debug.LogError("Tag is null");
+            Debug.LogError("[BT] Tag is null");
             return false;
         }
         return true;

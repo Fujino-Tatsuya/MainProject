@@ -15,14 +15,14 @@ public partial class SetEnableBoxColliderAction : Action
     {
         if (gameObject == null || gameObject.Value == null)
         {
-            Debug.LogError("GameObject is null.");
+            Debug.LogError("[BT] GameObject is null.");
             return Status.Failure;
         }
 
         var boxCollider = gameObject.Value.GetComponent<BoxCollider>();
         if (boxCollider == null)
         {
-            Debug.LogError("BoxCollider component not found on the GameObject.");
+            Debug.LogError("[BT] BoxCollider component not found on the GameObject.");
             return Status.Failure;
         }
 

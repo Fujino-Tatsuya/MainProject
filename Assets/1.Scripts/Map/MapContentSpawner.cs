@@ -58,7 +58,7 @@ public class MapContentSpawner : MonoBehaviour
             }
         }
 
-        Debug.Log($"[MapContentSpawner] 존 비주얼 {visuals} / 몬스터 {monsters} 스폰 (서버:{isServer}).");
+        Edit.Log($"[MapContentSpawner] 존 비주얼 {visuals} / 몬스터 {monsters} 스폰 (서버:{isServer}).");
     }
 
     private int SpawnMonstersFor(GameObject zoneGo, MapGenerator gen)

@@ -1,15 +1,15 @@
-using UnityEngine;
+ï»¿using UnityEngine;
 
 public class SpawnPointer : MonoBehaviour
 {
-    // µğ¹ö±ëÀ» À§ÇØ ÀÓ½Ã·Î SerializeField Ã³¸®
+    // ë””ë²„ê¹…ì„ ìœ„í•´ ì„ì‹œë¡œ SerializeField ì²˜ë¦¬
     [SerializeField] Vector3 _spawnPoint;
     public Vector3 SpawnPoint { get { return _spawnPoint; } }
 
     /// <summary>
-    /// ½ºÆù Æ÷ÀÎÆ®¸¦ ¼³Á¤ÇÏ´Â ÇÔ¼ö
+    /// ìŠ¤í° í¬ì¸íŠ¸ë¥¼ ì„¤ì •í•˜ëŠ” í•¨ìˆ˜
     /// </summary>
-    /// <param name="point">»õ·Î¿î ½ºÆù Æ÷ÀÎÆ®</param>
+    /// <param name="point">ìƒˆë¡œìš´ ìŠ¤í° í¬ì¸íŠ¸</param>
     public void SetSpawnPoint(Vector3 point)
     {
         _spawnPoint = point;

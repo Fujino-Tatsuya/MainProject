@@ -14,7 +14,7 @@ public partial class EnableColldierAction : Action
     {
         if (Script == null)
         {
-            Debug.LogError("Script is null");
+            Debug.LogError("[BT] Script is null");
             return Status.Failure;
         }
 

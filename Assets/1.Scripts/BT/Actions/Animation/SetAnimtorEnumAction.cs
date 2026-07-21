@@ -27,26 +27,26 @@ public partial class SetAnimtorEnumAction : Action
     {
         if (Parameter == null)
         {
-            Debug.LogError("Parameter is null");
+            Debug.LogError("[BT] Parameter is null");
             return false;
         }
 
         if (Animator == null)
         {
-            Debug.LogError("Animator is null");
+            Debug.LogError("[BT] Animator is null");
             return false;
         }
 
         if (Value == null)
         {
-            Debug.LogError("Value is null");
+            Debug.LogError("[BT] Value is null");
             return false;
         }
 
         Type type = Value.ObjectValue.GetType();
         if (!type.IsEnum)
         {
-            Debug.LogError("Value Type is not Enum");
+            Debug.LogError("[BT] Value Type is not Enum");
             return false;
         }
 

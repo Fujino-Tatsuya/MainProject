@@ -29,13 +29,13 @@ public partial class SetChargingStateAction : Action
     {
         if (Script.Value == null)
         {
-            Debug.LogError("Script is null");
+            Debug.LogError("[BT] Script is null");
             return false;
         }
 
         if (PlayerCount.Value <= 0)
         {
-            Debug.LogError("PlayerCount should be more than zero");
+            Debug.LogError("[BT] PlayerCount should be more than zero");
             return false;
         }
 

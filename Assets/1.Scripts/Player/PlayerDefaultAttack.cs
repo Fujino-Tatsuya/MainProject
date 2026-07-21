@@ -47,12 +47,6 @@ public class PlayerDefaultAttack : BaseAttack
 
     public void HitCurrentStep()
     {
-        BeforeMergeTestLog.Info(
-            "HIT",
-            "STEP_BEGIN",
-            $"IsServer={IsServer}, step={(currentStep == null ? "null" : currentStep.HitType.ToString())}, mask={targetLayer.value}",
-            this);
-
         if (!IsServer)
             return;
 
@@ -79,12 +73,11 @@ public class PlayerDefaultAttack : BaseAttack
     {
         if (hitbox == null)
         {
-            Debug.LogWarning("PlayerDefaultAttack requires a ColliderInfo hitbox.", this);
+            Edit.LogWarning("[Player] PlayerDefaultAttack requires a ColliderInfo hitbox.", this);
             return;
         }
 
         int hitCount = OverlapHitbox(hitbox);
-        BeforeMergeTestLog.Info("HIT", "OVERLAP_RESULT", $"hitCount={hitCount}", this);
         for (int i = 0; i < hitCount; i++)
         {
             Collider hit = hitResults[i];
@@ -101,11 +94,6 @@ public class PlayerDefaultAttack : BaseAttack
                     continue;
 
                 bool resolved = TryResolveHit(hurtbox, hit);
-                BeforeMergeTestLog.Info(
-                    "HIT",
-                    "HURTBOX_RESOLVE",
-                    $"hit[{i}]={hit.name}, layer={hit.gameObject.layer}, resolved={resolved}",
-                    hit);
                 if (resolved)
                 {
                     damagedHurtboxes.Add(hurtbox);
@@ -117,11 +105,6 @@ public class PlayerDefaultAttack : BaseAttack
             }
 
             Unit target = hit.GetComponentInParent<Unit>();
-            BeforeMergeTestLog.Info(
-                "HIT",
-                "UNIT_FALLBACK",
-                $"hit[{i}]={hit.name}, layer={hit.gameObject.layer}, target={(target == null ? "Unit 없음" : target.name)}{(target == owner ? " (자기 자신, 스킵)" : "")}",
-                hit);
             if (target == null || target == owner || damagedUnits.Contains(target))
                 continue;
 
@@ -134,7 +117,7 @@ public class PlayerDefaultAttack : BaseAttack
     {
         if (currentStep.ProjectilePrefab == null)
         {
-            Debug.LogWarning("Projectile default attack requires a projectile prefab.", this);
+            Edit.LogWarning("[Player] Projectile default attack requires a projectile prefab.", this);
             return;
         }
 
@@ -154,15 +137,8 @@ public class PlayerDefaultAttack : BaseAttack
 
         if (!Physics.Raycast(origin, attackDirection, out RaycastHit hit, currentStep.RaycastRange, targetLayer, QueryTriggerInteraction.Collide))
         {
-            BeforeMergeTestLog.Info("HIT", "RAYCAST_MISS", $"range={currentStep.RaycastRange}", this);
             return;
         }
-
-        BeforeMergeTestLog.Info(
-            "HIT",
-            "RAYCAST_HIT",
-            $"collider={hit.collider.name}, layer={hit.collider.gameObject.layer}",
-            hit.collider);
 
         if (TryGetHurtbox(hit.collider, out Hurtbox hurtbox))
         {

@@ -24,7 +24,7 @@ public partial class GetSpawnPointAction : Action
     {
         if (SpawnPointer.Value == null)
         {
-            Debug.LogError("SpawnPoiner is null");
+            Debug.LogError("[BT] SpawnPoiner is null");
             return false;
         }
         return true;

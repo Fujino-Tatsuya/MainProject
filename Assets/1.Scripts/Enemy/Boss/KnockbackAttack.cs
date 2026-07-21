@@ -19,13 +19,14 @@ public class KnockbackAttack : BaseAttack
             Unit unit = root.GetComponent<Unit>();
             if (unit == null)
             {
-                Debug.LogError($"해당 오브젝트, {root.name}에 Unit 컴포넌트가 부착되어있지 않습니다.", this);
+                Edit.LogError($"[No.23] 해당 오브젝트, {root.name}에 Unit 컴포넌트가 부착되어있지 않습니다.", this);
                 return;
             }
 
             unit.TakeDamage(_attackInfo);
             Vector3 dir = GetDirection(root);
             unit.Knockback(dir, knockbackStrength);
+            Edit.Log($"[No.23] {name} 넉백 공격 적중: {unit.name} (피해 {_attackInfo.damage})", this);
         }
     }
 

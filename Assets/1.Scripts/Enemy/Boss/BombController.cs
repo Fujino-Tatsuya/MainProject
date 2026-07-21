@@ -97,7 +97,7 @@ public class BombController : NetworkBehaviour
         _bombComponent = bomb.GetComponent<Bomb>();
         if (_bombComponent == null)
         {
-            Debug.LogAssertion("Bomb 컴포넌트가 연결되어 있지 않습니다.");
+            Edit.LogAssertion("[No.23] Bomb 컴포넌트가 연결되어 있지 않습니다.");
         }
         else
         {
@@ -107,13 +107,13 @@ public class BombController : NetworkBehaviour
         _knockbackAttack = GetComponent<KnockbackAttack>();
         if (_knockbackAttack == null)
         {
-            Debug.LogAssertion("KnockbackAttack 컴포넌트가 연결되어 있지 않습니다.");
+            Edit.LogAssertion("[No.23] KnockbackAttack 컴포넌트가 연결되어 있지 않습니다.");
         }
 
         _rigidbody = GetComponent<Rigidbody>();
         if (_rigidbody == null)
         {
-            Debug.LogAssertion("Rigidbody 컴포넌트가 연결되어 있지 않습니다.");
+            Edit.LogAssertion("[No.23] Rigidbody 컴포넌트가 연결되어 있지 않습니다.");
         }
 
         _baseRot = transform.rotation;
@@ -331,11 +331,6 @@ public class BombController : NetworkBehaviour
     {
         if (_bombState != BombState.BombTimer) return;
 
-        BeforeMergeTestLog.Info(
-            "BOMB",
-            "HIT_LAUNCH",
-            $"attackDamage={attackInfo.damage}, launchDistance={attackInfo.damage}, source={hitContext.sourcePosition}",
-            this);
         LinearLaunch(hitContext.sourcePosition, attackInfo.damage);
     }
 
@@ -383,7 +378,7 @@ public class BombController : NetworkBehaviour
             unit?.TakeDamage(new AttackInfo(bombDamage));
             _knockbackAttack.ApplyKnockbackAttack(collider.gameObject);
             MakeFloor();
-            Debug.Log("플레이어와 충돌!");
+            Edit.Log("[No.23] 플레이어와 충돌!");
         }
         else if ((enemy.value & (1 << layer)) != 0 && _bombState != BombState.InitFlight)
         {
@@ -392,13 +387,13 @@ public class BombController : NetworkBehaviour
             Explode();
             unit?.TakeDamage(new AttackInfo(bombDamage));
             MakeFloor();
-            Debug.Log("적과 충돌!");
+            Edit.Log("[No.23] 적과 충돌!");
         }
         else if ((wall.value & (1 << layer)) != 0)
         {
             Explode();
             MakeFloor();
-            Debug.Log("벽과 충돌!");
+            Edit.Log("[No.23] 벽과 충돌!");
         }
         else if ((ground.value & (1 << layer)) != 0 && _bombState != BombState.Flight)
         {
@@ -437,7 +432,7 @@ public class BombController : NetworkBehaviour
             BombController bombController = bombAreaEffect.GetComponentInParent<BombController>();
             if (bombController == null)
             {
-                Debug.LogError("BombController 컴포넌트가 연결되어 있지 않아 장판 타이머를 초기화하지 못했습니다.");
+                Edit.LogError("[No.23] BombController 컴포넌트가 연결되어 있지 않아 장판 타이머를 초기화하지 못했습니다.");
                 DespawnBomb();
                 return;
             }

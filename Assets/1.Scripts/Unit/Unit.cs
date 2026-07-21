@@ -1,4 +1,4 @@
-using BaseNetCode;
+﻿using BaseNetCode;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -20,9 +20,16 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
 
     #region 체력과 방어력
     protected Health _health;
-    public int CurrentHealth { get { return _health.CurrentHealth; } }
-    public int MaxHp { get { return _health.MaxHp; } }
+    // _health는 서버에서만 생성됨(Initialize) — 클라이언트는 복제된 NetworkVariable을 읽는다
+    public int CurrentHealth { get { return _health != null ? _health.CurrentHealth : _currentHp.Value; } }
+    public int MaxHp { get { return _health != null ? _health.MaxHp : _maxHp.Value; } }
+    public int CurrentShield { get { return _health != null ? _health.CurrentShield : _currentShield.Value; } }
     protected NetworkVariable<int> _currentHp = new NetworkVariable<int>(
+    0,
+    NetworkVariableReadPermission.Everyone,
+    NetworkVariableWritePermission.Server
+);
+    protected NetworkVariable<int> _maxHp = new NetworkVariable<int>(
     0,
     NetworkVariableReadPermission.Everyone,
     NetworkVariableWritePermission.Server
@@ -47,8 +54,8 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         if (!IsServer) return; // 서버에서만 피해 처리
         int remainingDamage = damage;
 
-        // 방어력으로 피해를 먼저 처리하고 남은 데미지 계산
-        remainingDamage = Mathf.Max(remainingDamage - _health.CurrentDefense, 0);
+        // 방어력 경감률 적용: 최종 피해 = 피해 x 100 / (100 + 방어력), 방어력 100당 50% 경감
+        remainingDamage = Mathf.RoundToInt(remainingDamage * 100f / (100f + _health.CurrentDefense));
 
         // 쉴드가 있으면 쉴드로 피해를 처리하고 남은 데미지 계산
         if (_health.HasShield)
@@ -82,17 +89,7 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
 
     public virtual bool ReceiveAttack(AttackInfo attackInfo, AttackHitContext hitContext)
     {
-        BeforeMergeTestLog.Info(
-            "DAMAGE",
-            "RECEIVE_BEGIN",
-            $"unit={name}, damage={attackInfo.damage}, hpBefore={(_health != null ? _health.CurrentHealth : -1)}",
-            this);
         TakeDamage(attackInfo);
-        BeforeMergeTestLog.Info(
-            "DAMAGE",
-            "RECEIVE_END",
-            $"unit={name}, hpAfter={(_health != null ? _health.CurrentHealth : -1)}",
-            this);
         return true;
     }
 
@@ -198,19 +195,38 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     }
     #endregion
 
-    #region 상태 이상
-    StatusEffectType _statusEffectType = StatusEffectType.None;
-    public StatusEffectType StatusEffectType { get { return _statusEffectType; } }
-    /// <summary>
-    /// statusEffectType 값을 변경하는 함수
-    /// BitMaskHelper를 사용하여 나온 값을 newStatusEffectType으로 전달하여 상태 이상 효과를 변경할 수 있도록 함
-    /// </summary>
-    /// <param name="newStatusEffectType">변경할 새로운 상태 이상 타입 값</param>
-    public void ChangeStatusEffectType(StatusEffectType newStatusEffectType)
+    #region 상태이상 / 최종 스탯
+    StatusEffectController _statusEffects;
+    bool _statusEffectsCached;
+    // 상태이상 장부의 유일한 창구. 미부착 유닛은 null (상태이상 없음으로 동작)
+    public StatusEffectController StatusEffects
     {
-        if (!IsServer) return; // 서버에서만 상태 이상 변경 처리
-        _statusEffectType = newStatusEffectType;
+        get
+        {
+            if (!_statusEffectsCached)
+            {
+                _statusEffects = GetComponent<StatusEffectController>();
+                _statusEffectsCached = true;
+            }
+            return _statusEffects;
+        }
     }
+
+    float GetStatMultiplier(StatusEffectType statType)
+    {
+        return StatusEffects != null ? StatusEffects.GetStatMultiplier(statType) : 1f;
+    }
+
+    // 미부착 유닛은 슈퍼아머 없음으로 동작
+    public bool HasSuperArmor => StatusEffects != null && StatusEffects.HasSuperArmor;
+
+    // 최종 스탯 = base(불변) × 활성 modifier 배율의 곱. 소비처는 base 대신 이 값을 읽는다
+    public int FinalAttackDamage => Mathf.Max(0, Mathf.RoundToInt(_attackDamage * GetStatMultiplier(StatusEffectType.AttackDamageModifier)));
+    public float FinalMoveSpeed => Mathf.Max(0f, _moveSpeed * GetStatMultiplier(StatusEffectType.MoveSpeedModifier));
+    public float FinalAttackSpeed => Mathf.Max(0f, _attackSpeed * GetStatMultiplier(StatusEffectType.AttackSpeedModifier));
+    // 방어력은 _health가 서버에서만 생성되므로 서버에서만 유효
+    public int FinalDefense => Mathf.Max(0, Mathf.RoundToInt((_health != null ? _health.CurrentDefense : 0) * GetStatMultiplier(StatusEffectType.DefenseModifier)));
+    public int FinalMaxHp => Mathf.Max(0, Mathf.RoundToInt(MaxHp * GetStatMultiplier(StatusEffectType.MaxHpModifier)));
     #endregion
 
     #region RPC
@@ -223,15 +239,6 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
             return;
 
         ChangeAttackDamageValue(newAttackDamage);
-    }
-
-    [Rpc(SendTo.Server)]
-    public void TakeDamageRpc(int damage, RpcParams rpcParams = default)
-    {
-        if (rpcParams.Receive.SenderClientId != OwnerClientId)
-            return;
-
-        TakeDamage(damage);
     }
 
     [Rpc(SendTo.Server)]
@@ -297,14 +304,6 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         ChangeAttackSpeedValue(newAttackSpeed);
     }
 
-    [Rpc(SendTo.Server)]
-    public void ChangeStatusEffectTypeRpc(StatusEffectType newStatusEffectType, RpcParams rpcParams = default)
-    {
-        if (rpcParams.Receive.SenderClientId != OwnerClientId)
-            return;
-
-        ChangeStatusEffectType(newStatusEffectType);
-    }
     #endregion
 
     /// <summary>
@@ -315,15 +314,15 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     /// <param name="attackSpeed">기본 공격 속도</param>
     /// <param name="maxHp">최대 체력</param>
     /// <param name="defense">기본 방어력</param>
-    /// <param name="maxShield">최대 쉴드</param>
-    public void Initialize(int attackDamage, float moveSpeed, float attackSpeed, int maxHp, int defense, int maxShield)
+    public void Initialize(int attackDamage, float moveSpeed, float attackSpeed, int maxHp, int defense)
     {
         _attackDamage = attackDamage;
         _moveSpeed = moveSpeed;
         _attackSpeed = attackSpeed;
 
-        _health = new Health(maxHp, defense, maxShield);
+        _health = new Health(maxHp, defense);
         _currentHp.Value = maxHp;
+        _maxHp.Value = maxHp;
 
         UpdateNetworkShield();
 
@@ -370,17 +369,13 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     IKnockbackable _knockback;
 
     /// <summary>
-    /// 넉백 진입점. 서버 가드 등 공통 규칙은 여기서만 처리한다.
+    /// 넉백 진입점. 서버 가드·슈퍼아머 등 공통 규칙은 여기서만 처리한다.
     /// 기본 동작은 IKnockbackable 컴포넌트 위임, 예외는 OnKnockback을 override.
     /// </summary>
     public void Knockback(Vector3 direction, float strength)
     {
-        BeforeMergeTestLog.Info(
-            "KNOCKBACK",
-            "ENTRY",
-            $"unit={name}, IsServer={IsServer}, strength={strength}, direction={direction}",
-            this);
         if (!IsServer) return;
+        if (HasSuperArmor) return;
 
         OnKnockback(direction, strength);
     }
@@ -389,15 +384,10 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     {
         if (_knockback == null)
         {
-            Debug.LogError($"{name}: IKnockbackable 컴포넌트가 없어 넉백이 무시됩니다.", this);
+            Debug.LogError($"[Unit] {name}: IKnockbackable 컴포넌트가 없어 넉백이 무시됩니다.", this);
             return;
         }
 
-        BeforeMergeTestLog.Info(
-            "KNOCKBACK",
-            "BASE_DELEGATE",
-            $"unit={name}, implementation={_knockback.GetType().Name}, strength={strength}",
-            this);
         _knockback.ApplyKnockback(direction, strength);
     }
 

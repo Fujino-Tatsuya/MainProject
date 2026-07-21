@@ -28,7 +28,7 @@ public partial class CheckHealthPercentCondition : Condition
     {
         if (Unit.Value == null)
         {
-            Debug.LogError("Unit script is not assigned");
+            Debug.LogError("[BT] Unit script is not assigned");
             return false;
         }
 

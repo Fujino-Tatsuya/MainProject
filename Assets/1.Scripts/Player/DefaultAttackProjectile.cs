@@ -40,6 +40,10 @@ public class DefaultAttackProjectile : BaseAttack
         if (!launched || !IsServer)
             return;
 
+        // targetLayer 밖의 콜라이더(아군 Hurtbox 등)가 Unit 폴백으로 피해를 입지 않도록 차단
+        if (!IsInTargetLayer(other))
+            return;
+
         if (TryGetHurtbox(other, out Hurtbox hurtbox))
         {
             hurtbox.TryGetOwner(out Unit ownerUnit);

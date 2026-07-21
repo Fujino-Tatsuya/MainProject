@@ -1,4 +1,5 @@
-using UnityEngine;
+﻿using UnityEngine;
+using UnityEngine.InputSystem;
 using Unity.Netcode;
 
 [RequireComponent(typeof(PlayerInputReader))]
@@ -11,6 +12,19 @@ public class Player : Unit
 {
     private static readonly int IsMovingHash = Animator.StringToHash("IsMoving");
 
+    /// <summary>이 클라이언트가 조작하는 플레이어. HUD 등 로컬 UI 바인딩용.</summary>
+    public static Player LocalPlayer { get; private set; }
+    public static event System.Action<Player> LocalPlayerChanged;
+
+    private static void SetLocalPlayer(Player player)
+    {
+        if (LocalPlayer == player)
+            return;
+
+        LocalPlayer = player;
+        LocalPlayerChanged?.Invoke(player);
+    }
+
     [SerializeField] private Animator animator;
     [SerializeField] private float interruptDuration = 0.5f;
     [SerializeField] private float interruptForwardDistance = 0.5f;
@@ -21,7 +35,6 @@ public class Player : Unit
     [SerializeField] float attackSpeed;
     [SerializeField] int maxHp;
     [SerializeField] int defense;
-    [SerializeField] int maxShield;
 
     private PlayerStateController stateController;
     private DefaultAttackController defaultAttack;
@@ -34,8 +47,9 @@ public class Player : Unit
 
     private void Awake()
     {
+        // StatusEffectController는 NetworkBehaviour라 런타임 추가가 불가 — 프리팹에 미리 부착돼 있어야 한다
         if (GetComponent<StatusEffectController>() == null)
-            gameObject.AddComponent<StatusEffectController>();
+            Debug.LogError("[Player] StatusEffectController가 프리팹에 부착되어 있지 않습니다.", this);
 
         stateController = GetComponent<PlayerStateController>();
         if (stateController == null)
@@ -53,10 +67,64 @@ public class Player : Unit
 
         // 내가 Owner인 플레이어가 스폰되면, 카메라 매니저에게 나를 따라오라고 알린다.
         if (IsOwner)
+        {
             CameraTargetSwitcher.Active?.FocusOwnerPlayer();
+            SetLocalPlayer(this);
+            EnableLocalInput();
+        }
+        else
+        {
+            // HUD는 Player 프리팹 자식으로 스폰되므로, 원격 플레이어의 HUD 캔버스가 겹치지 않게 끈다
+            CombatHUD childHud = GetComponentInChildren<CombatHUD>(true);
+            if (childHud != null)
+                childHud.gameObject.SetActive(false);
+
+            // AudioListener는 씬에 하나만 활성이어야 한다 — 원격 플레이어 것은 끈다
+            AudioListener audioListener = GetComponentInChildren<AudioListener>(true);
+            if (audioListener != null)
+                audioListener.enabled = false;
+        }
 
         if (IsServer)
-            Initialize(attackDamage, moveSpeed, attackSpeed, maxHp, defense, maxShield);
+            Initialize(attackDamage, moveSpeed, attackSpeed, maxHp, defense);
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        if (LocalPlayer == this)
+            SetLocalPlayer(null);
+
+        base.OnNetworkDespawn();
+    }
+
+    private void Start()
+    {
+        // 오프라인(비네트워크) 실행은 OnNetworkSpawn이 불리지 않는다 — 테스트 씬 HUD 바인딩/입력 활성 폴백
+        if (!IsNetworkActive)
+        {
+            SetLocalPlayer(this);
+            EnableLocalInput();
+        }
+    }
+
+    /// <summary>
+    /// PlayerInput은 프리팹에서 기본 비활성 — 원격 플레이어 클론이 스폰 시 디바이스 페어링을 시도하며
+    /// "Cannot find matching control scheme" 경고를 내는 것을 막기 위해 로컬(오너/오프라인)만 켠다.
+    /// </summary>
+    private void EnableLocalInput()
+    {
+        PlayerInput playerInput = GetComponent<PlayerInput>();
+        if (playerInput != null && !playerInput.enabled)
+            playerInput.enabled = true;
+    }
+
+    public override void OnDestroy()
+    {
+        // NGO NetworkBehaviour의 OnDestroy가 내부 정리를 수행하므로 반드시 base 호출
+        if (LocalPlayer == this)
+            SetLocalPlayer(null);
+
+        base.OnDestroy();
     }
 
     private void Update()
@@ -90,29 +158,26 @@ public class Player : Unit
         stateController.EndInterrupt();
     }
 
-    public bool SetState(PlayerActionState state)
+    public bool BeginAttackState()
     {
-        return stateController.ChangeState(state);
+        return stateController.ChangeState(PlayerActionState.Attack);
+    }
+
+    public bool EndAttackState()
+    {
+        if (stateController.CurrentState != PlayerActionState.Attack)
+            return false;
+
+        return stateController.ChangeState(PlayerActionState.Idle);
     }
 
     protected override void OnKnockback(Vector3 direction, float strength)
     {
-        // 서버가 거부(사망/슈퍼아머)하면 오너에게도 전파하지 않는다
-        PlayerActionState stateBefore = CurrentState;
+        // 서버가 거부(사망 — 슈퍼아머는 Unit.Knockback에서 선차단)하면 오너에게도 전파하지 않는다
         bool accepted = stateController.BeginKnockback(direction, strength);
-        BeforeMergeTestLog.Info(
-            "KNOCKBACK",
-            "BEGIN_RESULT_SERVER",
-            $"ownerClientId={OwnerClientId}, stateBefore={stateBefore}, BeginKnockback={accepted}, stateAfter={CurrentState}, strength={strength}",
-            this);
         if (!accepted)
             return;
 
-        BeforeMergeTestLog.Info(
-            "KNOCKBACK",
-            "APPLY_RPC_TX_SERVER",
-            $"targetOwnerClientId={OwnerClientId}, state={CurrentState}, strength={strength}",
-            this);
         ApplyKnockbackClientRpc(direction, strength, CreateOwnerClientRpcParams());
     }
 
@@ -125,18 +190,13 @@ public class Player : Unit
             instigator != null ? instigator.GetComponentInParent<NetworkObject>() : null;
         if (instigatorNetworkObject == null)
         {
-            Debug.LogError("Grab instigator must belong to a spawned NetworkObject.", this);
+            Debug.LogError("[Player] Grab instigator must belong to a spawned NetworkObject.", this);
             return false;
         }
 
         if (!stateController.BeginGrabbed(instigator))
             return false;
 
-        BeforeMergeTestLog.Info(
-            "GRAB",
-            "BEGIN_SERVER",
-            $"ownerClientId={OwnerClientId}, instigatorNetworkObjectId={instigatorNetworkObject.NetworkObjectId}, state={CurrentState}",
-            this);
         BeginGrabbedClientRpc(new NetworkObjectReference(instigatorNetworkObject), CreateOwnerClientRpcParams());
         return true;
     }
@@ -147,11 +207,6 @@ public class Player : Unit
             return false;
 
         bool ended = stateController.EndGrabbed();
-        BeforeMergeTestLog.Info(
-            "GRAB",
-            "END_SERVER",
-            $"ownerClientId={OwnerClientId}, ended={ended}, state={CurrentState}",
-            this);
         EndGrabbedClientRpc(CreateOwnerClientRpcParams());
         return ended;
     }
@@ -166,16 +221,11 @@ public class Player : Unit
 
         if (!instigatorReference.TryGet(out NetworkObject instigatorNetworkObject))
         {
-            Debug.LogError("Grab instigator NetworkObject could not be resolved on the owner.", this);
+            Debug.LogError("[Player] Grab instigator NetworkObject could not be resolved on the owner.", this);
             return;
         }
 
-        bool applied = stateController.ApplyGrabbedFromServer(instigatorNetworkObject.gameObject);
-        BeforeMergeTestLog.Info(
-            "GRAB",
-            "BEGIN_RX_OWNER",
-            $"ownerClientId={OwnerClientId}, applied={applied}, instigatorNetworkObjectId={instigatorNetworkObject.NetworkObjectId}, state={CurrentState}",
-            this);
+        stateController.ApplyGrabbedFromServer(instigatorNetworkObject.gameObject);
     }
 
     [ClientRpc]
@@ -184,23 +234,12 @@ public class Player : Unit
         if (!IsOwner)
             return;
 
-        bool ended = stateController.EndGrabbed();
-        BeforeMergeTestLog.Info(
-            "GRAB",
-            "END_RX_OWNER",
-            $"ownerClientId={OwnerClientId}, ended={ended}, state={CurrentState}",
-            this);
+        stateController.EndGrabbed();
     }
 
     [ClientRpc]
     private void ApplyKnockbackClientRpc(Vector3 direction, float strength, ClientRpcParams clientRpcParams = default)
     {
-        BeforeMergeTestLog.Info(
-            "KNOCKBACK",
-            "APPLY_RPC_RX_OWNER",
-            $"ownerClientId={OwnerClientId}, IsOwner={IsOwner}, IsServer={IsServer}, stateBefore={CurrentState}, 스킵={!IsOwner || IsServer}, strength={strength}",
-            this);
-
         // 호스트는 서버 경로의 BeginKnockback으로 이미 상태 진입 — 재진입 시 임펄스가 이중 적용됨
         if (!IsOwner || IsServer)
             return;
@@ -213,11 +252,6 @@ public class Player : Unit
 
     public void NotifyKnockbackEnded()
     {
-        BeforeMergeTestLog.Info(
-            "KNOCKBACK",
-            "END_REPORT_TX_OWNER",
-            $"ownerClientId={OwnerClientId}, IsServer={IsServer}, state={CurrentState}, 보고전송={!(!IsNetworkActive || IsServer)}",
-            this);
         if (!IsNetworkActive || IsServer)
             return;
 
@@ -227,11 +261,6 @@ public class Player : Unit
     [ServerRpc] // RequireOwnership 기본값 true — 오너만 호출 가능
     private void NotifyKnockbackEndedServerRpc()
     {
-        BeforeMergeTestLog.Info(
-            "KNOCKBACK",
-            "END_REPORT_RX_SERVER",
-            $"ownerClientId={OwnerClientId}, stateBefore={CurrentState} → EndKnockback",
-            this);
         stateController.EndKnockback();
     }
 

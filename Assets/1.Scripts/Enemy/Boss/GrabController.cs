@@ -37,28 +37,28 @@ public class GrabController : NetworkBehaviour
     {
         if (bt == null)
         {
-            Debug.LogError("BehaviorTree is null.", this);
+            Edit.LogError("[No.23] BehaviorTree is null.", this);
             return;
         }
 
         if (bt.BlackboardReference == null)
         {
-            Debug.LogError("BlackboardReference is null.", this);
+            Edit.LogError("[No.23] BlackboardReference is null.", this);
         }
 
         if (!bt.BlackboardReference.GetVariable("IsGrabbed", out IsGrabbed))
         {
-            Debug.LogError("Blackboard variable 'IsGrabbed' not found.", this);
+            Edit.LogError("[No.23] Blackboard variable 'IsGrabbed' not found.", this);
         }
 
         if (!bt.BlackboardReference.GetVariable("GrabbedPlayer", out GrabbedPlayer))
         {
-            Debug.LogError("Blackboard variable 'GrabbedPlayer' not found.", this);
+            Edit.LogError("[No.23] Blackboard variable 'GrabbedPlayer' not found.", this);
         }
 
         if(!bt.BlackboardReference.GetVariable("CurrentState", out CurrentState))
         {
-            Debug.LogError("Blackboard variable 'CurrentState' not found.", this);
+            Edit.LogError("[No.23] Blackboard variable 'CurrentState' not found.", this);
         }
     }
 
@@ -89,7 +89,7 @@ public class GrabController : NetworkBehaviour
         _resultCount = 0;
         if (grabColliderInfo == null)
         {
-            Debug.LogError("Grab ColliderInfo is null.", this);
+            Edit.LogError("[No.23] Grab ColliderInfo is null.", this);
             return;
         }
 
@@ -153,7 +153,7 @@ public class GrabController : NetworkBehaviour
     {
         if (IsGrabbed == null || GrabbedPlayer == null)
         {
-            Debug.LogError("Grab blackboard variables are not initialized.", this);
+            Edit.LogError("[No.23] Grab blackboard variables are not initialized.", this);
             return;
         }
 
@@ -174,11 +174,11 @@ public class GrabController : NetworkBehaviour
 
         if (isGrabbed)
         {
-            Debug.Log("그랩 성공!");
+            Edit.Log("[No.23] 그랩 성공!");
         }
         else 
         {
-            Debug.Log("그랩 실패!");
+            Edit.Log("[No.23] 그랩 실패!");
         }
     }
 
@@ -189,7 +189,7 @@ public class GrabController : NetworkBehaviour
         _targetPlayer = GrabbedPlayer.Value.GetComponent<Player>();
         if (_targetPlayer == null)
         {
-            Debug.LogError("해당 대상에 Player 컴포넌트가 부착되어 있지 않습니다.", this);
+            Edit.LogError("[No.23] 해당 대상에 Player 컴포넌트가 부착되어 있지 않습니다.", this);
             Clear();
             return;
         }
@@ -197,7 +197,7 @@ public class GrabController : NetworkBehaviour
         _targetUnit = _targetPlayer;
         if (!_targetPlayer.BeginGrabbedByInstigator(gameObject))
         {
-            Debug.LogWarning("서버가 플레이어의 Grabbed 상태 진입을 거부했습니다.", this);
+            Edit.LogWarning("[No.23] 서버가 플레이어의 Grabbed 상태 진입을 거부했습니다.", this);
             Clear();
             return;
         }
@@ -240,7 +240,7 @@ public class GrabController : NetworkBehaviour
         if (!IsServer) return;
         if (_targetUnit == null)
         {
-            Debug.LogError("타겟 유닛이 null입니다.");
+            Edit.LogError("[No.23] 타겟 유닛이 null입니다.");
             return;
         }
 

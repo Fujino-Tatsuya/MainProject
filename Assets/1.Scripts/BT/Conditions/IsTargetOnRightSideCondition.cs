@@ -13,10 +13,10 @@ public partial class IsTargetOnRightSideCondition : Condition
     public override bool IsTrue()
     {
         if (Target == null)
-            Debug.LogError("Target is null");
+            Debug.LogError("[BT] Target is null");
 
         if (Agent == null)
-            Debug.LogError("Agent is null");
+            Debug.LogError("[BT] Agent is null");
 
         Vector3 agentRightVector = Agent.Value.transform.right;
         Vector3 targetVector = Vector3.Normalize(Target.Value.position - Agent.Value.position);

@@ -6,7 +6,6 @@ public class ChargingObject : Unit
 {
     [SerializeField] int maxHp;
     [SerializeField] int defense;
-    [SerializeField] int maxshield;
 
     Collider _collider;
 
@@ -34,7 +33,7 @@ public class ChargingObject : Unit
 
         if (!IsServer) return;
 
-        Initialize(0, 0, 0, maxHp, defense, maxshield);
+        Initialize(0, 0, 0, maxHp, defense);
     }
 
     public void SetMinMaxY(float max)

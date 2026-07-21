@@ -24,7 +24,7 @@ public partial class ResetPathAction : Action
     {
         if (NavMeshAgent.Value == null)
         {
-            Debug.LogError("NavMeshAgent is null.");
+            Debug.LogError("[BT] NavMeshAgent is null.");
             return false;
         }
         return true;

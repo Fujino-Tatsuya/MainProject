@@ -1,4 +1,4 @@
-using Unity.Behavior;
+ï»¿using Unity.Behavior;
 
 [BlackboardEnum]
 public enum TwentyThreeState
@@ -6,7 +6,7 @@ public enum TwentyThreeState
     Idle = 0,
     Walk = 1,
 
-    // ±Ù°Å¸® °ø°İ
+    // ê·¼ê±°ë¦¬ ê³µê²©
     LeftHookAttack = 2,
     RightHookAttack = 3,
     UpperAttack = 4,
@@ -14,11 +14,11 @@ public enum TwentyThreeState
     Hold = 6,
     Throw = 7,
 
-    // ¿ø°Å¸® °ø°İ
+    // ì›ê±°ë¦¬ ê³µê²©
     JumpAttack = 8,
     DashAttack = 9,
 
-    // ½ºÅ³
+    // ìŠ¤í‚¬
     Charging = 10,
     Rage = 11,
 

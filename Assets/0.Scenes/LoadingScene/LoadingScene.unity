@@ -392,11 +392,11 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 0}
-  m_Type: 0
+  m_Sprite: {fileID: 21300000, guid: efff9d08056fd8a4ba37e0abf5b72223, type: 3}
+  m_Type: 3
   m_PreserveAspect: 0
   m_FillCenter: 1
-  m_FillMethod: 4
+  m_FillMethod: 0
   m_FillAmount: 1
   m_FillClockwise: 1
   m_FillOrigin: 0
@@ -611,11 +611,11 @@ MonoBehaviour:
   statusText: {fileID: 1610552923}
   percentText: {fileID: 949715956}
   tooltipTable:
-  - "\uB3FC\uC9C0\uACBD\uC11D...."
-  - "\u3139\u3147\u314B\u314B...."
-  - "\uBC14\uBCF4\uBBFC\uACBD...."
   - "\uBC25 \uBB50 \uBA39\uC9C0...."
   - "\uB85C\uB529 \uC5B8\uC81C \uB05D\uB098\uB0D0...."
+  - "\uBE44\uBC84\uB77D\uC2A4 \uD654\uC774\uD305..."
+  - "\uC878\uB9AC\uB2E4..."
+  - "\uC9D1 \uAC00\uACE0\uC2F6\uB2E4..."
   imageTable: []
   readyMessages:
   - Enter...

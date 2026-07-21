@@ -25,19 +25,19 @@ public partial class ServerSetAnimIntegerStringEnumAction : Action
     {
         if (Server == null)
         {
-            Debug.LogError("ServerSetAnimState is not assigned.");
+            Debug.LogError("[BT] ServerSetAnimState is not assigned.");
             return false;
         }
 
         if (State == null)
         {
-            Debug.LogError("State variable is not assigned.");
+            Debug.LogError("[BT] State variable is not assigned.");
             return false;
         }
 
         if (Value == null)
         {
-            Debug.LogError("Value variable is not assigned.");
+            Debug.LogError("[BT] Value variable is not assigned.");
             return false;
         }
 
@@ -45,7 +45,7 @@ public partial class ServerSetAnimIntegerStringEnumAction : Action
 
         if (!valueType.IsEnum)
         {
-            Debug.LogError($"Value must be an enum type, but got {valueType}");
+            Debug.LogError($"[BT] Value must be an enum type, but got {valueType}");
             return false;
         }
 
