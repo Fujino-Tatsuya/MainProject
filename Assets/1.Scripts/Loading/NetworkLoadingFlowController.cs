@@ -324,6 +324,13 @@ public class NetworkLoadingFlowController : MonoBehaviour
             {
                 _targetLoadRoutine = StartCoroutine(StartTargetLoadAfterSceneEvent());
             }
+            else if (!IsServerActive)
+            {
+                // Lobby/Result는 로컬 UI 씬이라 NGO가 언로드하지 않는다.
+                // 서버는 StartTargetLoadAfterSceneEvent에서 로컬 소스 씬을 언로드하므로
+                // 클라이언트도 대칭적으로 자기 로컬 소스(Lobby) 씬을 여기서 언로드한다.
+                StartCoroutine(UnloadSourceSceneIfNeeded());
+            }
 
             return;
         }
