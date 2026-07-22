@@ -143,6 +143,45 @@ MonsterScene(NavMesh baked) → host+1클라 → 스폰 → 각 아키타입 1�
 
 ---
 
+# PLAN 추가 — MapScene 몬스터 통합 (2026-07-21)
+
+> 전제: C(지속넉백+Stunned 경직) 구현 완료(AttackInfo 확장·MonsterState.Knockback·Q 배선, 컴파일 0).
+> 팀장 확정: ①존 스폰 = **전존 정석 저작**(ZoneLayout+마커) ②바닥 = **fbx addColliders 지금 확정**(구 미결 해결책 A).
+
+## 목표
+MapScene(생성맵)에서 몬스터 실스폰 + FSM 사이클(탐지→추격→공격→피격/넉백→사망/리쉬복귀) E2E 검증. 완료 후 git push.
+
+## 작업
+1. **fbx 콜라이더**: `50.Art/MapGen/MapObj/mesh/{floor,wall}` 임포터 콜라이더 활성(.meta) → 재임포트 → 바닥/벽 MeshCollider 생성. ⚠️ 아트 .meta=SVN 관할 — 로컬 적용 후 **팀장 TortoiseSVN 커밋** 필요. (meta에 addCollider 키 부재 확인됨 — 임포터 버전별 키 확인 후 적용)
+2. **ZoneLayout 전존 저작**: 에디터 일회성 스크립트(`1.Scripts/Map/Editor/`)로 존 프리팹 12개에 ZoneLayout 부착. Size/Role/Difficulty = ZoneLayoutCatalog Entries와 일치. Combat존 MonsterGroupID 배정 + 렌더 바운즈 기반 스폰 마커 자식 자동 생성(L=4/M=3/S=2, Start·BossEnter·bossroom=0). 위치는 러프 — 테스트 후 프리팹에서 수동 조정.
+3. **MonsterGroups 등록**: `MapGenConfig.asset`(50.Art=SVN)에 그룹 풀 등록 — 1=ChompBot 2=HumanoidBot 3=TeslaBot 4=MortarBot 5=GauntletBot(중간보스 존용).
+4. **NavMesh 런타임 베이크**: `MapNavMeshBaker` 신설 — MapGenerator.OnGenerated 구독 → NavMeshSurface.BuildNavMesh() → 이미 스폰된 몹 agent 재부착(SamplePosition+Warp, 스폰이 베이크보다 먼저라 필수). MapScene에 NavMeshSurface 배치.
+5. **테스트 하네스**: NetworkManager+MonsterTestBootstrap(Player 스폰, 디버그공격 off)을 **MapScene에 직접 추가**(팀장 확정). ⚠️ MapScene은 빌드 플로우(index 3) 소속 — **push 전 하네스 오브젝트 제거 필수**(잔존 시 정식 로딩 플로우 NetworkManager 중복).
+
+## 리스크
+- 몬스터 스폰(SpawnPlacements 내부) < 베이크(OnGenerated) 순서 → 4의 재부착으로 해소.
+- 마커 자동 위치가 소품 위/통행불가 지점에 떨어질 수 있음(테스트에서 조정).
+- 50.Art 에셋 변경분(meta·Config)은 git에 안 잡힘 — SVN 커밋 별도 안내.
+
+## 완료 조건
+호스트 Play → 맵 생성 → 존별 몬스터 스폰 → NavMesh 이동/전투/넉백/리쉬 사이클 정상 → 콘솔 0 에러 → git push + SVN 커밋 목록 안내.
+
+## 진행 상태 (2026-07-21 세션 마감)
+- ✅ §1~5 구현·1차 검증 완료(컴파일 0): 콜라이더/NavMesh 런타임 베이크, 전존 ZoneLayout+MonsterGroups 저작, 하네스, CC(넉백/경직)+Q, 플레이어 버그 2건(벽관통·조준폴백).
+- ✅ §6 보스 입장: 패드 표시+진입 색전환+이탈 취소+생존자 전원 텔레포트+페이드, 튜닝값 인스펙터화까지 완료.
+- ⏳ 남은 작업·조사·멀티검증·커밋가이드 = **Docs/tech/map-monster-boss-handoff.md**로 이관(Codex 인수). 핵심: 패드 y 가림 / MPPM 텔레포트 검증 / 터렛 스폰 재확인 / MortarBot 복귀후 Idle 회귀 조사 / push 전 하네스 제거.
+- ⛔ 캐릭터 누워있는 이슈 = 타 팀원 확인 중, 건드리지 말 것.
+
+## 추가 §6 — 보스 Enter 카운트다운+전원 텔레포트 (2026-07-21 팀장 확정)
+스펙(2026-07-21 2차 개정 — 로아식): 생존 플레이어 **1명이라도** BossEnter 존 진입 → 서버가 3·2·1 카운트다운(전 피어 표시) → 만료 시 **생존자 전원**을 보스룸으로 이동. **카운트다운 중 존이 비면(전원 이탈/전멸) 취소·리셋**(재진입 시 재시작). 존 범위는 바닥 테두리 라인으로 상시 표시 — 대기 시안/진입·카운트다운 초록(BossEnterZoneVisual, 전 피어 로컬). 몹 스폰은 마커→바닥 레이캐스트 스냅(허공 마커는 존 중심 폴백+경고 — 터렛 부유 방지). 보스룸 = bossroom.prefab을 **맵 밖 고정 좌표(x≈+500)에 씬 배치**. 보스 스폰/전투 시작은 스코프 외.
+
+구현:
+- `BossEnterTrigger`(일반 MonoBehaviour): 서버 전용 판정, 생존 Player 진입 1회 감지 → 매니저 호출. 존 프리팹은 비네트워크 규약이므로 **MapContentSpawner가 BossRoom 역할 존 스폰 시 서버에서 동적 부착**(트리거 박스 = 존 바운즈).
+- `BossTeleportManager`(씬 상주 NetworkObject): `NetworkVariable<double>`(서버시간 만료각)로 카운트다운 복제 → 전 피어 OnGUI 임시 표시(UI 담당 교체 전제). 만료 시 서버가 ConnectedClients 중 CurrentHealth>0만 산개 텔레포트 — 서버권한 NT는 `NetworkTransform.Teleport`, 오너권한 대비 대상 오너에게 ClientRpc 로컬 이동 병행. **매니저 GO 위치 = 텔레포트 지점**(참조 배선 없음).
+- 주의: FoW/미니맵이 보스룸(맵 밖 좌표)을 어떻게 다루는지는 후속 확인.
+
+---
+
 # PLAN 추가 — 중간보스 3종 완성 (2026-07-20)
 
 > grill 확정. 페이즈 없음(**그로기만**). 고유 기믹까지 구현. C(넉백/경직)는 은희 인터페이스 대기(병렬).
