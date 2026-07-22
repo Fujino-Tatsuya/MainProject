@@ -62,6 +62,9 @@ public class MonsterBase : Unit
     float _combatMoveSpeed;        // 커밋 이동 속도(후퇴=chaseSpeed, 재배치=MoveSpeed)
     bool _combatMoveRepick;        // 도착 시 다음 지점 재선택 여부(재배치=true, 후퇴=false)
     int _groggyCount;
+    Vector3 _knockbackDir;         // 지속넉백 방향(수평 정규화)
+    float _knockbackSpeed;         // 지속넉백 속도(m/s) = AttackInfo.knockbackStrength
+    float _staggerAfterKnockback;  // 넉백 종료 후 Stunned 경직 시간(초)
     bool _isDead;
     bool _initialized;
     Coroutine _deathFxRoutine;              // 임시 사망 표시 코루틴(모든 피어)
@@ -200,6 +203,9 @@ public class MonsterBase : Unit
                 break;
             case MonsterState.Return:
                 HandleReturn();
+                break;
+            case MonsterState.Knockback:
+                HandleKnockback(dt);
                 break;
             case MonsterState.Dead:
                 break;
@@ -632,6 +638,124 @@ public class MonsterBase : Unit
     }
     #endregion
 
+    #region 지속넉백 (PLAN C — AttackInfo 확장 수신측)
+    // 공격 수신 단일 진입점 override — 데미지는 base(TakeDamage) 경로 그대로, 넉백 지시만 여기서 추가 해석한다.
+    // 방향: 공격이 명시(knockbackDirection)하면 그대로(방향성 공격 — Q 전진 견인 등),
+    // 아니면 방사형(몹 - 공격자, 수평) 폴백(장판/폭발형). 방사형은 시전자가 이동하며 대상을
+    // 따라잡으면 옆/뒤로 뒤집히므로 이동형 공격에는 쓰지 않는다.
+    public override bool ReceiveAttack(AttackInfo attackInfo, AttackHitContext hitContext)
+    {
+        bool resolved = base.ReceiveAttack(attackInfo, hitContext);
+
+        if (IsServer && resolved && attackInfo.knockbackStrength > 0f && attackInfo.knockbackDuration > 0f)
+        {
+            Vector3 dir = attackInfo.knockbackDirection;
+            dir.y = 0f;
+            if (dir.sqrMagnitude < 0.0001f)
+            {
+                dir = transform.position - hitContext.sourcePosition;
+                dir.y = 0f;
+            }
+            if (dir.sqrMagnitude < 0.0001f)
+            {
+                // 공격자와 겹침 — 공격자의 전방(있으면)으로 밀어낸다.
+                dir = hitContext.sourceTransform != null ? hitContext.sourceTransform.forward : -transform.forward;
+                dir.y = 0f;
+            }
+            TryEnterKnockback(dir.normalized, attackInfo);
+        }
+
+        return resolved;
+    }
+
+    // 넉백 진입/갱신. 슈퍼아머·사망·그로기·복귀 중에는 무시(기존 CC 무시 규칙 일관).
+    // 이미 넉백 중이면 방향·속도·시간을 갱신한다(Q 홀드처럼 매 틱 재적용되는 지속 견인 대응).
+    void TryEnterKnockback(Vector3 dir, AttackInfo attackInfo)
+    {
+        if (_isDead) return;
+        if (status != null && status.BlocksInterrupt) return; // 슈퍼아머
+        MonsterState s = _state.Value;
+        if (s == MonsterState.Groggy || s == MonsterState.Return || s == MonsterState.Dead) return;
+
+        // 고정 포탑(RangedTurret)은 자리를 지킨다 — 밀림 무효, 경직(Stunned)만 적용(팀장 확정).
+        // 매 히트 갱신 = 지속 타격 중 스턴락 허용(일반 피격경직 hitStun도 갱신형이라 일관).
+        if (data != null && data.archetype == MonsterArchetype.RangedTurret)
+        {
+            if (attackInfo.staggerDuration > 0f)
+            {
+                status?.ApplyStatus(StatusEffectType.Stunned, attackInfo.staggerDuration);
+                if (s == MonsterState.Hit)
+                {
+                    // TakeDamage의 피격경직(hitStun)이 이미 진행 중이면 더 긴 쪽만 유지.
+                    _stateTimer = Mathf.Max(_stateTimer, attackInfo.staggerDuration);
+                }
+                else
+                {
+                    _stateTimer = attackInfo.staggerDuration;
+                    StopAgent();
+                    SetState(MonsterState.Hit);
+                }
+            }
+            return;
+        }
+
+        _knockbackDir = dir;
+        _knockbackSpeed = attackInfo.knockbackStrength;
+        _staggerAfterKnockback = attackInfo.staggerDuration;
+        _stateTimer = attackInfo.knockbackDuration;
+
+        if (s == MonsterState.Knockback)
+            return; // 갱신만 — 이미 agent off + 상태 진입 완료
+
+        // 서버틱 직접 이동과 충돌하지 않게 에이전트를 완전히 내려놓는다(off). 종료 시 재획득.
+        ClearReposition();
+        StopAgent();
+        if (agent != null) agent.enabled = false;
+        SetState(MonsterState.Knockback);
+    }
+
+    // 서버틱 지속 밀기. NavMesh 경계 클램프 — 메시 밖(낭떠러지/벽 뒤)으로는 절대 밀리지 않는다.
+    // (넉백으로 오프메시에 떨어지면 에이전트 재획득이 실패해 FSM 전체가 동결되는 것을 원천 차단.)
+    void HandleKnockback(float dt)
+    {
+        _stateTimer -= dt;
+
+        Vector3 next = transform.position + _knockbackDir * (_knockbackSpeed * dt);
+        if (NavMesh.SamplePosition(next, out NavMeshHit navHit, 0.5f, NavMesh.AllAreas))
+        {
+            // 수평 밀기만 반영(y는 유지) — 종료 시 Warp가 메시 높이에 정착시킨다.
+            transform.position = new Vector3(navHit.position.x, transform.position.y, navHit.position.z);
+        }
+        // 샘플 실패 = 경계 도달 → 이번 틱 이동 생략(그 자리에서 밀림 종료 대기)
+
+        if (_stateTimer <= 0f)
+            ExitKnockback();
+    }
+
+    // 넉백 종료: 에이전트 재획득(on-mesh 보장) → Stunned 경직(staggerDuration) → 기존 Hit 타이머 경로로 재개.
+    void ExitKnockback()
+    {
+        if (agent != null)
+        {
+            agent.enabled = true;
+            if (!agent.isOnNavMesh &&
+                NavMesh.SamplePosition(transform.position, out NavMeshHit navHit, 2f, NavMesh.AllAreas))
+                agent.Warp(navHit.position);
+        }
+
+        if (_staggerAfterKnockback > 0f)
+        {
+            status?.ApplyStatus(StatusEffectType.Stunned, _staggerAfterKnockback);
+            _stateTimer = _staggerAfterKnockback;
+            SetState(MonsterState.Hit); // HandleTimedResume이 만료 후 DecideNextAfterAction 호출
+        }
+        else
+        {
+            DecideNextAfterAction();
+        }
+    }
+    #endregion
+
     #region 피격 / 사망 (서버 경로)
     public override void TakeDamage(AttackInfo attackInfo)
     {
@@ -660,8 +784,10 @@ public class MonsterBase : Unit
         }
 
         // 피격 경직: 공격 중 피격 시 공격 취소 + Hit. 단 슈퍼아머면 취소하지 않고 데미지만.
+        // 지속넉백 중에는 Hit로 덮지 않는다(밀림 유지 — 데미지만 누적, ReceiveAttack이 넉백을 갱신).
         bool superArmor = status != null && status.BlocksInterrupt;
-        if (!superArmor && _state.Value != MonsterState.Groggy && _state.Value != MonsterState.Return)
+        if (!superArmor && _state.Value != MonsterState.Groggy && _state.Value != MonsterState.Return
+            && _state.Value != MonsterState.Knockback)
             EnterHit();
     }
 
@@ -813,7 +939,8 @@ public class MonsterBase : Unit
     }
 
     static bool IsActionAnimState(MonsterState s) =>
-        s == MonsterState.Attack || s == MonsterState.Hit || s == MonsterState.Groggy;
+        s == MonsterState.Attack || s == MonsterState.Hit || s == MonsterState.Groggy
+        || s == MonsterState.Knockback;
 
     static bool IsLocomotionAnimState(MonsterState s) =>
         s == MonsterState.Idle || s == MonsterState.Chase || s == MonsterState.Return;
@@ -855,6 +982,9 @@ public class MonsterBase : Unit
                 break;
             case MonsterState.Hit:
                 SafeSetTrigger(data.hitTrigger);
+                break;
+            case MonsterState.Knockback:
+                SafeSetTrigger(data.hitTrigger); // 밀리는 동안 피격 리액션 재생(전용 클립 없음 — Hit 공용)
                 break;
             case MonsterState.Dead:
                 SafeSetTrigger(data.deathTrigger);

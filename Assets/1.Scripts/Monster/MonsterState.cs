@@ -10,4 +10,5 @@ public enum MonsterState
     Groggy,  // 그로기(그로기 공격 누적 임계 도달)
     Return,  // 리쉬 이탈 후 스폰 지점 복귀
     Dead,    // 사망(디스폰 대기)
+    Knockback, // 지속넉백(서버틱 직접 밀기, agent off — 종료 시 Stunned 경직 후 재개)
 }

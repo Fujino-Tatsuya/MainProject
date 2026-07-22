@@ -27,6 +27,11 @@ public class MonsterTestBootstrap : MonoBehaviour
     [SerializeField] private Vector3 debugAttackBoxHalfExtents = new Vector3(1f, 1f, 1.25f);
     [SerializeField] private float debugAttackForwardOffset = 1.25f;
 
+    [Header("디버그 넉백/경직 (지속넉백→Stunned 시퀀스 검증 — 0이면 데미지만)")]
+    [SerializeField, Min(0f)] private float debugKnockbackStrength = 3f;   // 지속 밀기 속도(m/s)
+    [SerializeField, Min(0f)] private float debugKnockbackDuration = 0.3f; // 지속 밀기 시간(초)
+    [SerializeField, Min(0f)] private float debugStaggerDuration = 0.2f;   // 종료 후 Stunned 경직(초)
+
     private Transform _hostPlayer;
     private readonly Collider[] _debugHits = new Collider[16];
 
@@ -122,7 +127,11 @@ public class MonsterTestBootstrap : MonoBehaviour
             center, debugAttackBoxHalfExtents, _debugHits,
             _hostPlayer.rotation, mask, QueryTriggerInteraction.Collide);
 
-        AttackInfo info = new AttackInfo(debugAttackDamage, AttackType.Default, false);
+        // 방향 = 플레이어 전방 명시(수평) — 방향성 밀기 검증용(방사형 폴백 검증은 zero로 바꿔서).
+        Vector3 knockDir = _hostPlayer.forward;
+        knockDir.y = 0f;
+        AttackInfo info = new AttackInfo(debugAttackDamage, AttackType.Default, false,
+            debugKnockbackStrength, debugKnockbackDuration, debugStaggerDuration, knockDir);
         int applied = 0;
         for (int i = 0; i < n; i++)
         {
