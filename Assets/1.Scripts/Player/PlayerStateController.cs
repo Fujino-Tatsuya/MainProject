@@ -316,6 +316,11 @@ public abstract class PlayerStateBase : IPlayerState
 
     protected bool TryConsumeActionInput()
     {
+        // 조준 모드 중에는 일반 액션 입력(공격/다른 스킬/인터럽트)을 억제한다.
+        // 좌클릭 확정·Esc/재입력 취소는 PlayerSkillTargeting이 직접 처리한다.
+        if (Context.Skills != null && Context.Skills.IsChoosingTarget)
+            return false;
+
         // 공격 시작은 누른 프레임(press)에만 허용한다. 홀드 상태로는 시작되지 않으므로,
         // Once 정책에서 체인이 끝난 뒤 계속 누르고 있어도 재시작되지 않는다(릴리즈 요구).
         if (Context.Input.AttackPressed &&

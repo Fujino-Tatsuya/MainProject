@@ -95,6 +95,9 @@ GameObject:
   - component: {fileID: 5233118834099021557}
   - component: {fileID: 7482913650248105327}
   - component: {fileID: 7345129804561237845}
+  - component: {fileID: 1111000000000000001}
+  - component: {fileID: 1111000000000000002}
+  - component: {fileID: 1111000000000000003}
   m_Layer: 6
   m_Name: Player
   m_TagString: Player
@@ -118,6 +121,7 @@ Transform:
   - {fileID: 7051867761104396953}
   - {fileID: 2333762669771461899}
   - {fileID: 908875682933095156}
+  - {fileID: 2030860255433127375}
   - {fileID: 7233913257752374772}
   - {fileID: 6114957203948570908}
   - {fileID: 6114957203948570910}
@@ -215,7 +219,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1250559839
+  GlobalObjectIdHash: 2672932260
   InScenePlacedSourceGlobalObjectIdHash: 1250559839
   DeferredDespawnTick: 0
   Ownership: 8
@@ -435,7 +439,7 @@ MonoBehaviour:
   mainSkill: {fileID: 7482913650248105327}
   subSkill: {fileID: 5233118834099021557}
   interruptSkill: {fileID: 0}
-  ultimateSkill: {fileID: 0}
+  ultimateSkill: {fileID: 1111000000000000001}
   endFallbackPadding: 0.1
 --- !u!114 &5233118834099021557
 MonoBehaviour:
@@ -464,7 +468,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FirstMeleeMainSkill
   data: {fileID: 11400000, guid: 3f8c2b71d94a4e5f8b6a1c0d2e947a31, type: 2}
-  hitboxAnchor: {fileID: 6669628826641242712}
+  hitboxAnchor: {fileID: 8532915693143272332}
 --- !u!81 &7345129804561237845
 AudioListener:
   m_ObjectHideFlags: 0
@@ -473,6 +477,61 @@ AudioListener:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 8559504096609571310}
   m_Enabled: 1
+--- !u!114 &1111000000000000001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8559504096609571310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5e57d99d539a13d4f9032c69b8d43bf0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FirstMeleeUltimateSkill
+  data: {fileID: 11400000, guid: 3c9e1f7a2b8d4e6c9a0f5d1b7e2c4a68, type: 2}
+  hitboxAnchor: {fileID: 0}
+--- !u!114 &1111000000000000002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8559504096609571310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1d57eddf5eb448e47bce29f9715da62f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerSkillTargeting
+  rangeIndicator: {fileID: 1111000000000000004}
+  cursorView: {fileID: 1111000000000000003}
+--- !u!114 &1111000000000000003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8559504096609571310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 911a1dbb20ea23f4da1183a213e03f3a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SkillCursorView
+  defaultIcon:
+    texture: {fileID: 2800000, guid: cb56f15f319089f4f976b55bb0689ef0, type: 3}
+    hotspot: {x: 0, y: 0}
+  targetingIcon:
+    texture: {fileID: 2800000, guid: 44fd9e22ab204704ab51e8ac64e2bac9, type: 3}
+    hotspot: {x: 0, y: 0}
+  validTargetIcon:
+    texture: {fileID: 0}
+    hotspot: {x: 0, y: 0}
+  invalidTargetIcon:
+    texture: {fileID: 0}
+    hotspot: {x: 0, y: 0}
+  outOfRangeIcon:
+    texture: {fileID: 0}
+    hotspot: {x: 0, y: 0}
 --- !u!1 &8896633917232358439
 GameObject:
   m_ObjectHideFlags: 0
@@ -484,7 +543,7 @@ GameObject:
   - component: {fileID: 908875682933095156}
   - component: {fileID: 7530996341332987822}
   m_Layer: 0
-  m_Name: Projector
+  m_Name: AimIndicator
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -533,6 +592,82 @@ MonoBehaviour:
   m_FadeFactor: 1
   version: 1
   m_DecalLayerMask: 1
+--- !u!1 &9014512876417585360
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2030860255433127375}
+  - component: {fileID: 4898328899726629905}
+  - component: {fileID: 1111000000000000004}
+  m_Layer: 0
+  m_Name: SkillRangeIndicator
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!4 &2030860255433127375
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9014512876417585360}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1160318589990200604}
+  m_LocalEulerAnglesHint: {x: 90, y: 0, z: 0}
+--- !u!114 &4898328899726629905
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9014512876417585360}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0777d029ed3dffa4692f417d4aba19ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.DecalProjector
+  m_Material: {fileID: 2100000, guid: 62f58cdc33eed9d4ba9fa1ab34a29f3e, type: 2}
+  m_DrawDistance: 1000
+  m_FadeScale: 0.9
+  m_StartAngleFade: 180
+  m_EndAngleFade: 180
+  m_UVScale: {x: 1, y: 1}
+  m_UVBias: {x: 0, y: 0}
+  m_RenderingLayerMask:
+    serializedVersion: 0
+    m_Bits: 256
+  m_ScaleMode: 0
+  m_Offset: {x: 0, y: 0, z: 0}
+  m_Size: {x: 2, y: 2, z: 5}
+  m_FadeFactor: 1
+  version: 1
+  m_DecalLayerMask: 1
+--- !u!114 &1111000000000000004
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9014512876417585360}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 21094ed5e8a34ba40b66bbb2cfcd8fd6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SkillRangeIndicator
+  rangeDecal: {fileID: 4898328899726629905}
+  groundMarkerDecal: {fileID: 0}
+  decalDepth: 5
 --- !u!1001 &3804664619706551762
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -541,29 +676,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 1160318589990200604}
     m_Modifications:
-    - target: {fileID: 284160916278146353, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
-      propertyPath: m_WarningMessage
-      value: "\nBinding warning: Some generic clip(s) animate transforms that are
-        already bound by a Humanoid avatar. These transforms can only be changed
-        by Humanoid clips.\n\tTransform 'Right_ThumbIntermediate'\n\tTransform 'Left_LowerArm'\n\tTransform
-        'Chest'\n\tTransform 'Right_ThumbDistal'\n\tTransform 'Spine'\n\tTransform
-        'Right_Foot'\n\tTransform 'Right_Toes'\n\tTransform 'Right_LowerLeg'\n\tTransform
-        'UpperChest'\n\tTransform 'Left_Toes'\n\tand more ...\n\tFrom animation clip
-        'Stand_Idle_A_1'\n\tFrom animation clip 'Walk_A_F'\n\tFrom animation clip
-        '1Hand_Base_Shield_Block_Parry_2'"
-      objectReference: {fileID: 0}
-    - target: {fileID: 1926395644936646202, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1926395644936646202, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1926395644936646202, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 6129863144953294667, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
@@ -611,13 +723,7 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: 8408518544339265324, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 5851354062470704141}
-    - targetCorrespondingSourceObject: {fileID: 8408518544339265324, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 6669628826641242712}
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
 --- !u!95 &3980452584406513891 stripped
 Animator:
@@ -635,49 +741,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 81c70da5a2e747148bf71f917743b5fd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ColliderInfo
---- !u!1 &4647131252094888702 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 8408518544339265324, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
-  m_PrefabInstance: {fileID: 3804664619706551762}
-  m_PrefabAsset: {fileID: 0}
---- !u!65 &5851354062470704141
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4647131252094888702}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 2, y: 1, z: 2}
-  m_Center: {x: 0, y: 0, z: 0.8}
---- !u!114 &6669628826641242712
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4647131252094888702}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 81c70da5a2e747148bf71f917743b5fd, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ColliderInfo
 --- !u!4 &7051867761104396953 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 6129863144953294667, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
   m_PrefabInstance: {fileID: 3804664619706551762}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &8532915693143272332 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 4803057998818846302, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+  m_PrefabInstance: {fileID: 3804664619706551762}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 81c70da5a2e747148bf71f917743b5fd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ColliderInfo
 --- !u!1001 &6114957203948571001
 PrefabInstance:
   m_ObjectHideFlags: 0

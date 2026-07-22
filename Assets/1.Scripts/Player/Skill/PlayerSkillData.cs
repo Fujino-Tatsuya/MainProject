@@ -32,6 +32,16 @@ public class PlayerSkillData : ScriptableObject
     [SerializeField] private bool usableWhileDead = false;
     [SerializeField] private LayerMask hittableLayers;
 
+    [Header("타겟팅")]
+    // None이면 키 입력 즉시 시전(기존 동작). SingleTarget/GroundPoint면 조준 모드로 진입한다.
+    [SerializeField] private SkillTargetingMode targetingMode = SkillTargetingMode.None;
+    // 조준 모드 확정 방식. 현재 ClickToConfirm만 구현.
+    [SerializeField] private SkillConfirmMode confirmMode = SkillConfirmMode.ClickToConfirm;
+    // 사거리(m). 사거리 링 반경이자 시전자 중심 대상/지점 유효 거리. targetingMode != None일 때만 의미.
+    [SerializeField, Min(0f)] private float castRange = 8f;
+    // SingleTarget에서 레이캐스트로 맞출 대상 레이어(기본 Enemy). GroundPoint는 groundMask를 쓴다.
+    [SerializeField] private LayerMask targetableLayers;
+
     [Header("연출")]
     // 캐릭터 Animator Controller의 스킬 상태 이름 (CrossFade 대상). 비우면 애니메이션 전환 없음
     [SerializeField] private string animatorStateName = "";
@@ -45,6 +55,10 @@ public class PlayerSkillData : ScriptableObject
     public float TickInterval => tickInterval;
     public bool UsableWhileDead => usableWhileDead;
     public LayerMask HittableLayers => hittableLayers;
+    public SkillTargetingMode TargetingMode => targetingMode;
+    public SkillConfirmMode ConfirmMode => confirmMode;
+    public float CastRange => castRange;
+    public LayerMask TargetableLayers => targetableLayers;
     public string AnimatorStateName => animatorStateName;
     public bool SnapRotationOnStart => snapRotationOnStart;
 }

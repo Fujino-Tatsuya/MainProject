@@ -163,6 +163,34 @@ public class PlayerMovement : MonoBehaviour
         rb.MovePosition(rb.position + deltaPosition);
     }
 
+    /// <summary>
+    /// 오너 자동 이동(스킬 사거리 확보용). worldTarget 방향으로 최대 이속(상태이상 배율 반영)으로 이동하며
+    /// armature를 진행 방향으로 회전시킨다. CanMove가 막히면(CC 등) 그 프레임은 정지한다.
+    /// 수동 입력이 없을 때만 호출되므로 Move()의 입력 이동과 충돌하지 않는다.
+    /// </summary>
+    public void MoveTowardsPoint(Vector3 worldTarget)
+    {
+        if (rb == null)
+            return;
+
+        if (player != null && !player.CanMove)
+            return;
+
+        Vector3 dir = worldTarget - rb.position;
+        dir.y = 0f;
+        if (dir.sqrMagnitude < 0.0001f)
+            return;
+
+        dir.Normalize();
+
+        float statusMultiplier = player != null && player.StatusEffects != null
+            ? player.StatusEffects.GetStatMultiplier(StatusEffectType.MoveSpeedModifier)
+            : 1f;
+
+        rb.MovePosition(rb.position + dir * (maxSpeed * statusMultiplier * Time.deltaTime));
+        RotateToward(dir, rotate_Speed);
+    }
+
     public void SetArmature(Transform newArmature)
     {
         if (newArmature == null)
