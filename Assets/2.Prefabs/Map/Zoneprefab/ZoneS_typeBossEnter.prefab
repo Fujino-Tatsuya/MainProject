@@ -1139,6 +1139,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 8234122746114646554}
+  - component: {fileID: 6964055113801828697}
   m_Layer: 0
   m_Name: ZoneS_typeBossEnter
   m_TagString: Untagged
@@ -1196,6 +1197,25 @@ Transform:
   - {fileID: 5032563637390847396}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &6964055113801828697
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2400110006461124550}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8b2d5fac3e7059b4c6d8fa02b3c5d7e9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ZoneLayout
+  Size: 2
+  Role: 2
+  Difficulty: 0
+  ThemeName: 
+  MonsterGroupID: -1
+  MonsterSpawnPoints: []
+  Nodes: []
 --- !u!1 &2402429945712679560
 GameObject:
   m_ObjectHideFlags: 0

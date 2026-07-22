@@ -12,19 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8eb111e69b44628478c73b2839c2f39d, type: 3}
   m_Name: MapGenConfig
   m_EditorClassIdentifier: Assembly-CSharp::MapGenConfigSO
-  TotalSpawnPoints: 30
-  Tier1NodeCount: 3
-  Tier2Obstacle_Min: 4
-  Tier2Obstacle_Max: 12
-  Recovery_Min: 5
-  Recovery_Max: 10
-  Teleport_Min: 3
-  Teleport_Max: 7
-  Buff_Min: 3
-  Buff_Max: 7
-  MonstersPerNode_Easy: {x: 2, y: 4}
-  MonstersPerNode_Normal: {x: 4, y: 6}
-  MonstersPerNode_Hard: {x: 6, y: 9}
   Tier1ExclusionRadius: 30
   Tier2ExclusionRadius: 10
   Tier3ExclusionRadius: 5
@@ -37,9 +24,37 @@ MonoBehaviour:
     DefaultBehavior: 0
     BaseSpawnWeight: 3
   - GroupID: 1
-    GroupName: RobbetMonsterGroup
+    GroupName: Chomp Pack
     TargetTier: 1
-    TargetDifficulty: 0
-    MonsterPrefab: {fileID: 0}
-    DefaultBehavior: 1
-    BaseSpawnWeight: 5
+    TargetDifficulty: 1
+    MonsterPrefab: {fileID: 5083357185944259280, guid: 7a0deecc1539ff543aa747158bacf514, type: 3}
+    DefaultBehavior: 0
+    BaseSpawnWeight: 1
+  - GroupID: 2
+    GroupName: Humanoid Duo
+    TargetTier: 1
+    TargetDifficulty: 1
+    MonsterPrefab: {fileID: 2289540308195322763, guid: 959abbfa6214e0c42a0b997163c969f9, type: 3}
+    DefaultBehavior: 0
+    BaseSpawnWeight: 1
+  - GroupID: 3
+    GroupName: Tesla Turret
+    TargetTier: 1
+    TargetDifficulty: 1
+    MonsterPrefab: {fileID: 1485102947224704385, guid: a6380ac222b5ef440b1a21ca01db6329, type: 3}
+    DefaultBehavior: 0
+    BaseSpawnWeight: 1
+  - GroupID: 4
+    GroupName: Mortar Squad
+    TargetTier: 1
+    TargetDifficulty: 1
+    MonsterPrefab: {fileID: 6303057502177232290, guid: 1f13e06cd8ea3c14eb063c61e7298d62, type: 3}
+    DefaultBehavior: 0
+    BaseSpawnWeight: 1
+  - GroupID: 5
+    GroupName: Gauntlet Elite
+    TargetTier: 1
+    TargetDifficulty: 1
+    MonsterPrefab: {fileID: 7309020434041632752, guid: da3f41ab1370eae4e8899078b1d264c0, type: 3}
+    DefaultBehavior: 0
+    BaseSpawnWeight: 1

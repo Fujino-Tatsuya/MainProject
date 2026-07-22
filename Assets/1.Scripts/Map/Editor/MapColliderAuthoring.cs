@@ -1,0 +1,74 @@
+using UnityEditor;
+using UnityEngine;
+
+// 일회성 저작 도구 — 맵 프리팹의 바닥/벽 메시에 MeshCollider 부착 (PLAN 2026-07-21 §1).
+//
+// 배경: 기존 맵 프리팹(Stage1/WallPrefabs/Zoneprefab)의 바닥·벽은 fbx 모델 인스턴스가 아니라
+// "언팩된 사본"(MeshFilter+MeshRenderer만)이라, fbx 임포터 addColliders를 켜도 전파되지 않는다.
+// 그래서 프리팹을 직접 순회하며 이름이 floor/wall/hallway 계열인 메시에 MeshCollider를 붙인다.
+// (소품/장식은 이름 필터로 제외 — 통행 방해 방지. fbx addColliders는 신규 배치용으로 별도 유지.)
+public static class MapColliderAuthoring
+{
+    const string TargetFolder = "Assets/2.Prefabs/Map";
+    static readonly string[] NameKeywords = { "floor", "wall", "hallway" };
+
+    [MenuItem("Tools/Map/Authoring/Add Floor+Wall MeshColliders")]
+    public static void AddFloorWallColliders()
+    {
+        string[] guids = AssetDatabase.FindAssets("t:Prefab", new[] { TargetFolder });
+        int prefabsChanged = 0, collidersAdded = 0;
+
+        foreach (string guid in guids)
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            GameObject root = PrefabUtility.LoadPrefabContents(path);
+            int added = 0;
+
+            try
+            {
+                foreach (MeshFilter mf in root.GetComponentsInChildren<MeshFilter>(true))
+                {
+                    // 중첩 프리팹 인스턴스 내부는 건너뜀 — 원본 프리팹이 이 스캔에 포함되므로
+                    // 원본에서 1회만 부착(인스턴스 오버라이드 오염 방지).
+                    if (PrefabUtility.IsPartOfPrefabInstance(mf.gameObject))
+                        continue;
+
+                    if (!IsFloorOrWall(mf))
+                        continue;
+
+                    // 이미 어떤 콜라이더든 있으면 유지(수동 저작 존중).
+                    if (mf.GetComponent<Collider>() != null)
+                        continue;
+
+                    mf.gameObject.AddComponent<MeshCollider>(); // sharedMesh는 MeshFilter에서 자동 참조
+                    added++;
+                }
+
+                if (added > 0)
+                {
+                    PrefabUtility.SaveAsPrefabAsset(root, path);
+                    prefabsChanged++;
+                    collidersAdded += added;
+                    Debug.Log($"[MapColliderAuthoring] {path} — MeshCollider {added}개 부착.");
+                }
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(root);
+            }
+        }
+
+        Debug.Log($"[MapColliderAuthoring] 완료 — 프리팹 {prefabsChanged}개 수정, 콜라이더 총 {collidersAdded}개 부착.");
+    }
+
+    // 오브젝트명 또는 메시명에 floor/wall/hallway 포함 여부(대소문자 무시).
+    static bool IsFloorOrWall(MeshFilter mf)
+    {
+        string goName = mf.gameObject.name.ToLowerInvariant();
+        string meshName = mf.sharedMesh != null ? mf.sharedMesh.name.ToLowerInvariant() : string.Empty;
+        foreach (string k in NameKeywords)
+            if (goName.Contains(k) || meshName.Contains(k))
+                return true;
+        return false;
+    }
+}
