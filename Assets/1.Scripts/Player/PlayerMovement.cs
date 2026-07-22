@@ -7,6 +7,8 @@ public class PlayerMovement : MonoBehaviour
     private PlayerInputReader reader;
     private Player player;
     private Rigidbody rb;
+    private CapsuleCollider capsule;
+    private LayerMask rootMoveBlockingMask;
 
     [SerializeField] private Transform armature;
     [SerializeField] private float rotate_Speed = 10f;
@@ -25,6 +27,11 @@ public class PlayerMovement : MonoBehaviour
         reader = GetComponent<PlayerInputReader>();
         player = GetComponent<Player>();
         rb = GetComponent<Rigidbody>();
+        capsule = GetComponent<CapsuleCollider>();
+
+        // MoveRoot(평타 러시 스텝/스킬 전진) 관통 방지 스윕 대상 — 정적 지오메트리만.
+        // 유닛(Enemy/Player)은 제외해 러시가 몹 사이를 지나는 기존 감각을 유지한다.
+        rootMoveBlockingMask = LayerMask.GetMask("Default", "Ground", "Wall", "Env");
 
         if (armature == null)
             armature = transform.Find("Armature");
@@ -160,7 +167,29 @@ public class PlayerMovement : MonoBehaviour
 
     public void MoveRoot(Vector3 deltaPosition)
     {
-        rb.MovePosition(rb.position + deltaPosition);
+        rb.MovePosition(rb.position + ClampByStaticGeometry(deltaPosition));
+    }
+
+    // MovePosition은 스윕 없이 목표 지점으로 이동해, 평타 러시 스텝처럼 한 프레임 대이동이
+    // 논컨벡스 벽 MeshCollider를 그대로 관통한다 — 벽에 막히면 그 앞까지로 이동량을 클램프.
+    private Vector3 ClampByStaticGeometry(Vector3 delta)
+    {
+        float dist = delta.magnitude;
+        if (dist < 0.0001f || capsule == null)
+            return delta;
+
+        Vector3 dir = delta / dist;
+        Vector3 center = rb.position + capsule.center;
+        float half = Mathf.Max(0f, capsule.height * 0.5f - capsule.radius);
+        // 반경/정지거리에 스킨 여유 — 바닥 등 기존 접촉면 스침으로 제자리 클램프되는 것 방지.
+        float radius = Mathf.Max(0.01f, capsule.radius - 0.02f);
+
+        if (Physics.CapsuleCast(
+                center + Vector3.up * half, center - Vector3.up * half, radius,
+                dir, out RaycastHit hit, dist, rootMoveBlockingMask, QueryTriggerInteraction.Ignore))
+            return dir * Mathf.Max(0f, hit.distance - 0.02f);
+
+        return delta;
     }
 
     public void SetArmature(Transform newArmature)
