@@ -55,10 +55,56 @@ public class MapContentSpawner : MonoBehaviour
 
                 // 몬스터 — 서버만 스폰 (NetworkObject → NGO 복제, 클라는 수신)
                 if (isServer) monsters += SpawnMonstersFor(zoneGo, gen);
+
+                // BossRoom 역할 존: 진입 트리거(서버 판정) + 범위 표시(전 피어) 부착 — PLAN §6.
+                // 존 프리팹은 비네트워크 규약이라 프리팹에 미리 넣지 않고 스폰 시 동적 부착한다.
+                if (p.Slot.AssignedRole == ZoneRole.BossRoom)
+                    AttachBossEnterZone(zoneGo, isServer);
             }
         }
 
         Edit.Log($"[MapContentSpawner] 존 비주얼 {visuals} / 몬스터 {monsters} 스폰 (서버:{isServer}).");
+    }
+
+    // BossRoom 존에 진입 판정(서버)과 범위 표시(전 피어)를 부착.
+    private static void AttachBossEnterZone(GameObject zoneGo, bool isServer)
+    {
+        Bounds bounds = new Bounds(zoneGo.transform.position, Vector3.one * 4f);
+        Renderer[] renderers = zoneGo.GetComponentsInChildren<Renderer>(true);
+        if (renderers.Length > 0)
+        {
+            bounds = renderers[0].bounds;
+            for (int i = 1; i < renderers.Length; i++) bounds.Encapsulate(renderers[i].bounds);
+        }
+
+        // 패드 크기 = BossTeleportManager 인스펙터 값(존 전체가 아니라 존 중앙의 작은 진입 패드 — 팀장 확정).
+        Vector2 pad = BossTeleportManager.Instance != null
+            ? BossTeleportManager.Instance.EnterPadSize
+            : new Vector2(6f, 6f);
+
+        // y는 바닥(로컬 0) 기준 고정 — 렌더 바운즈 중심을 쓰면 램프/기둥 등 높은 구조물이
+        // 중심을 끌어올려 박스 바닥이 플레이어 키 위로 떠 진입 판정이 조용히 빠질 수 있다.
+        Vector3 centerLocal = zoneGo.transform.InverseTransformPoint(bounds.center);
+        centerLocal.y = 2f;
+        Vector3 size = new Vector3(
+            Mathf.Max(1f, pad.x),
+            4f, // 바닥 0~4m 커버
+            Mathf.Max(1f, pad.y));
+
+        // 범위 표시(모든 피어 로컬 연출) — 대기 시안/진입 초록.
+        var ringGo = new GameObject("BossEnterRing");
+        ringGo.transform.SetParent(zoneGo.transform, false);
+        ringGo.AddComponent<BossEnterZoneVisual>().Setup(centerLocal, new Vector2(size.x, size.z));
+
+        if (!isServer) return;
+
+        // 진입 판정(서버 권한).
+        BoxCollider box = zoneGo.AddComponent<BoxCollider>();
+        box.isTrigger = true;
+        box.center = centerLocal;
+        box.size = size;
+        zoneGo.AddComponent<BossEnterTrigger>();
+        Edit.Log($"[MapContentSpawner] BossEnter 트리거 부착 — {zoneGo.name} @ {zoneGo.transform.position} (박스 {box.size})", zoneGo);
     }
 
     private int SpawnMonstersFor(GameObject zoneGo, MapGenerator gen)
@@ -75,17 +121,17 @@ public class MapContentSpawner : MonoBehaviour
             {
                 if (node == null || node.ContentType != NodeContentType.CombatNode) continue;
                 combatNodes++;
-                n += SpawnGroupAt(gen, node.MonsterGroupID, node.MonsterSpawnPoints, node.Behavior);
+                n += SpawnGroupAt(gen, zoneGo, node.MonsterGroupID, node.MonsterSpawnPoints, node.Behavior);
             }
         }
         // 전투 노드가 하나도 없으면 존 단위 마커로 폴백 (역할/단순 존 호환)
         if (combatNodes == 0)
-            n += SpawnGroupAt(gen, layout.MonsterGroupID, layout.MonsterSpawnPoints, MonsterBehavior.Idle);
+            n += SpawnGroupAt(gen, zoneGo, layout.MonsterGroupID, layout.MonsterSpawnPoints, MonsterBehavior.Idle);
         return n;
     }
 
     // 그룹ID의 몬스터를 주어진 마커들에 스폰 (서버 전용 호출). 몬스터 에셋 확정 전이면 0.
-    private int SpawnGroupAt(MapGenerator gen, int monsterGroupID, System.Collections.Generic.List<Transform> points, MonsterBehavior behavior)
+    private int SpawnGroupAt(MapGenerator gen, GameObject zoneGo, int monsterGroupID, System.Collections.Generic.List<Transform> points, MonsterBehavior behavior)
     {
         if (points == null || points.Count == 0) return 0;
         GameObject monsterPrefab = ResolveMonsterPrefab(gen, monsterGroupID);
@@ -95,7 +141,7 @@ public class MapContentSpawner : MonoBehaviour
         foreach (var marker in points)
         {
             if (marker == null) continue;
-            GameObject go = Instantiate(monsterPrefab, marker.position, marker.rotation);
+            GameObject go = Instantiate(monsterPrefab, SnapToFloor(marker.position, zoneGo), marker.rotation);
             // TODO: 몬스터 AI 확정 후 behavior 적용 (예: go.GetComponent<MonsterAI>()?.SetBehavior(behavior)).
             var netObj = go.GetComponent<NetworkObject>();
             if (netObj != null) { netObj.Spawn(); _spawnedNetObjs.Add(netObj); } // NGO 복제 + despawn 추적
@@ -103,6 +149,25 @@ public class MapContentSpawner : MonoBehaviour
             n++;
         }
         return n;
+    }
+
+    // 스폰 마커를 바닥으로 스냅. 자동 저작 마커가 구덩이/허공 위에 찍히면 몹이 공중에 떠서
+    // 방치된다(터렛은 이동이 없어 영구 부유) — 실패 시 존 중심 바닥으로 폴백하고 경고를 남긴다.
+    private static Vector3 SnapToFloor(Vector3 position, GameObject zoneGo)
+    {
+        int mask = LayerMask.GetMask("Default");
+        if (Physics.Raycast(position + Vector3.up * 5f, Vector3.down, out RaycastHit hit, 30f, mask, QueryTriggerInteraction.Ignore))
+            return hit.point + Vector3.up * 0.05f;
+
+        Vector3 center = zoneGo != null ? zoneGo.transform.position : position;
+        if (Physics.Raycast(center + Vector3.up * 5f, Vector3.down, out hit, 30f, mask, QueryTriggerInteraction.Ignore))
+        {
+            Edit.LogWarning($"[MapContentSpawner] 스폰 마커가 허공({position}) — {zoneGo?.name} 중심 바닥으로 대체. 마커 위치 조정 필요.");
+            return hit.point + Vector3.up * 0.05f;
+        }
+
+        Edit.LogWarning($"[MapContentSpawner] 스폰 마커·존 중심 모두 바닥 없음({position}) — 원위치 스폰. {zoneGo?.name} 확인 필요.");
+        return position;
     }
 
     // MonsterGroupID → 프리팹 (Config.MonsterGroups). 실제 몬스터 에셋은 추후.
