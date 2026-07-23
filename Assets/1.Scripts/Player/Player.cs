@@ -36,9 +36,16 @@ public class Player : Unit
     [SerializeField] int maxHp;
     [SerializeField] int defense;
 
+    [Header("\n이동 플랫폼 캐리")]
+    [Tooltip("발밑 플랫폼 라이더 콜라이더 검사 레이어. 기본 전체.")]
+    [SerializeField] private LayerMask platformRiderMask = ~0;
+    [Tooltip("발밑 검사 거리(m).")]
+    [SerializeField] private float platformGroundCheckDistance = 0.6f;
+
     private PlayerStateController stateController;
     private DefaultAttackController defaultAttack;
     private FirstMeleePassive passive;
+    private PlayerMovement movement;
 
     public PlayerActionState CurrentState => stateController != null ? stateController.CurrentState : PlayerActionState.Idle;
     public bool CanMove => stateController == null || stateController.CanMove;
@@ -58,6 +65,7 @@ public class Player : Unit
 
         defaultAttack = GetComponent<DefaultAttackController>();
         passive = GetComponent<FirstMeleePassive>();
+        movement = GetComponent<PlayerMovement>();
 
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
@@ -131,6 +139,13 @@ public class Player : Unit
 
     private void Update()
     {
+        // 이동 플랫폼 캐리는 이동 권한 피어(오너/오프라인)에서만 적용한다.
+        // 비오너는 루트 NetworkTransform으로 이미 동기되므로 여기서 적용하면 이중 적용된다.
+        if (IsMovementAuthority)
+        {
+            ApplyPlatformCarry();
+        }
+
         if (IsNetworkActive &&
             !stateController.ShouldTickForNetwork(IsOwner, HasStateAuthority))
         {
@@ -138,6 +153,34 @@ public class Player : Unit
         }
 
         stateController.Tick();
+    }
+
+    /// <summary>발밑에 이동 플랫폼이 있으면 그 이동량을 플레이어 이동에 가산한다(락스텝 캐리).</summary>
+    private void ApplyPlatformCarry()
+    {
+        if (movement == null)
+        {
+            return;
+        }
+
+        // RaycastAll: 자기 콜라이더가 먼저 맞아 플랫폼 검출을 막지 않도록 전체 히트에서 MovingPlatform을 찾는다.
+        Vector3 origin = transform.position + Vector3.up * 0.1f;
+        RaycastHit[] hits = Physics.RaycastAll(
+            origin,
+            Vector3.down,
+            platformGroundCheckDistance,
+            platformRiderMask,
+            QueryTriggerInteraction.Collide);
+
+        for (int i = 0; i < hits.Length; i++)
+        {
+            MovingPlatform platform = hits[i].collider.GetComponentInParent<MovingPlatform>();
+            if (platform != null)
+            {
+                movement.AddCarryDelta(platform.CurrentDelta);
+                break;
+            }
+        }
     }
 
     public void EndDefaultAttack()

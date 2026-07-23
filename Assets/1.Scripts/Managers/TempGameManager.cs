@@ -6,10 +6,25 @@ public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
 
+    /// <summary>클라이언트 로컬 게임 상태(현재 씬 단계). 서버 SessionPhase와는 별개.</summary>
+    public enum GameState
+    {
+        Title,
+        Lobby,
+        Loading,
+        MainGame,
+        Result,
+    }
+
     [SerializeField] private string titleSceneName = "TitleScene";
     [SerializeField] private string lobbySceneName = "Temp_LobbyScene";
     [SerializeField] private string resultSceneName = "ResultScene";
+    [SerializeField] private string loadingSceneName = "2.LoadingScene";
+    [SerializeField] private string mainGameSceneName = "4.MapScene";
     [SerializeField] private string sessionConnectPanelName = "Pannel_SessionConnect";
+
+    /// <summary>현재 게임 상태. 씬 전환 시점에 갱신된다.</summary>
+    public GameState CurrentState { get; private set; } = GameState.Title;
 
     private bool _hideSessionConnectPanelOnLobbyLoad;
 
@@ -31,7 +46,19 @@ public class GameManager : MonoBehaviour
     private void Start()
     {
         Debug.Log($"[SceneFlow] GameManager.Start LoadScene titleSceneName={titleSceneName}");
+        SetState(GameState.Title);
         SceneManager.LoadScene(titleSceneName);
+    }
+
+    private void SetState(GameState next)
+    {
+        if (CurrentState == next)
+        {
+            return;
+        }
+
+        Debug.Log($"[SceneFlow] GameManager.SetState {CurrentState} -> {next}");
+        CurrentState = next;
     }
 
     private void OnDestroy()
@@ -47,6 +74,7 @@ public class GameManager : MonoBehaviour
     {
         _hideSessionConnectPanelOnLobbyLoad = IsInNetworkSession();
         Debug.Log($"[SceneFlow] GameManager.GoToLobby LoadScene lobbySceneName={lobbySceneName} hideSessionPanel={_hideSessionConnectPanelOnLobbyLoad}");
+        SetState(GameState.Lobby);
         SceneManager.LoadScene(lobbySceneName);
     }
 
@@ -72,6 +100,7 @@ public class GameManager : MonoBehaviour
     public void GoToResult()
     {
         Debug.Log($"[SceneFlow] GameManager.GoToResult LoadScene resultSceneName={resultSceneName}");
+        SetState(GameState.Result);
         SceneManager.LoadScene(resultSceneName);
     }
 
@@ -97,6 +126,22 @@ public class GameManager : MonoBehaviour
     private void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
     {
         Debug.Log($"[SceneFlow] GameManager.HandleSceneLoaded scene={scene.name} mode={mode} activeScene={SceneManager.GetActiveScene().name}");
+
+        // NGO 추가 로드도 sceneLoaded를 발생시키므로 Loading/MainGame 진입을 여기서 감지한다.
+        if (scene.name == loadingSceneName)
+        {
+            SetState(GameState.Loading);
+        }
+        else if (scene.name == mainGameSceneName)
+        {
+            SetState(GameState.MainGame);
+            // 공유 시계에 MainGame 시작을 스탬프(서버만 실제 반영, 클라 호출은 무시됨).
+            if (NetworkClock.Instance != null)
+            {
+                NetworkClock.Instance.MarkMainGameStart();
+            }
+        }
+
         if (scene.name != lobbySceneName)
         {
             return;
