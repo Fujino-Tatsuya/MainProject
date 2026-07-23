@@ -94,6 +94,7 @@ GameObject:
   - component: {fileID: 4711829301158223401}
   - component: {fileID: 5233118834099021557}
   - component: {fileID: 7345129804561237845}
+  - component: {fileID: -101483256447534319}
   m_Layer: 6
   m_Name: Player
   m_TagString: Player
@@ -122,14 +123,6 @@ Transform:
   - {fileID: 6114957203948570910}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!81 &7345129804561237845
-AudioListener:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8559504096609571310}
-  m_Enabled: 1
 --- !u!136 &6098322879574375161
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -190,7 +183,7 @@ MonoBehaviour:
   m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 62899f850307741f2a39c98a8b639597, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Unity.InputSystem::UnityEngine.InputSystem.PlayerInput
   m_Actions: {fileID: -944628639613478452, guid: 009d7ad6ad2d76847b25fd96c90990a0, type: 3}
   m_NotificationBehavior: 0
@@ -369,7 +362,7 @@ MonoBehaviour:
   isGroggyAttack: 0
   targetLayer:
     serializedVersion: 2
-    m_Bits: 256
+    m_Bits: 16384
   attackType: 1
   muzzle: {fileID: 0}
 --- !u!114 &5274188098871446382
@@ -393,7 +386,7 @@ MonoBehaviour:
   defaultHitbox: {fileID: 4124164167168416360}
   hittableLayers:
     serializedVersion: 2
-    m_Bits: 256
+    m_Bits: 16384
   endFallbackPadding: 0.1
 --- !u!114 &8345678279683584363
 MonoBehaviour:
@@ -458,6 +451,28 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FirstMeleeSubSkill
   data: {fileID: 11400000, guid: 40499745b22c405fb0781629e282229c, type: 2}
   hitboxAnchor: {fileID: 0}
+--- !u!81 &7345129804561237845
+AudioListener:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8559504096609571310}
+  m_Enabled: 1
+--- !u!114 &-101483256447534319
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8559504096609571310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 86c6556701af9e04380698b89f691b6e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: FMODUnity::FMODUnity.StudioListener
+  nonRigidbodyVelocity: 0
+  attenuationObject: {fileID: 0}
 --- !u!1 &8896633917232358439
 GameObject:
   m_ObjectHideFlags: 0

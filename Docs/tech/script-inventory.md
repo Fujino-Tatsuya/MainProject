@@ -90,7 +90,7 @@
 
 | 파일 | 선언/역할 | 상태와 핵심 연결 |
 | --- | --- | --- |
-| `Assets/1.Scripts/Enemy/BombAreaEffect.cs` | 바닥 폭탄 영역의 merge 방식, 성장·겹침·표현을 관리 | **연결됨**. Bomb prefab의 floor 상태 효과 |
+| `Assets/1.Scripts/Enemy/FloorAreaEffect.cs` | 바닥 폭탄 영역의 merge 방식, 성장·겹침·표현을 관리 | **연결됨**. Bomb prefab의 floor 상태 효과 |
 | `Assets/1.Scripts/Enemy/Boss/BaseAttackChoice.cs` | 거리/상태에 따른 보스 공격 선택기의 추상 기반 | **지원 코드**. TwentyThreeBasicAttackChoice 부모 |
 | `Assets/1.Scripts/Enemy/Boss/Bomb.cs` | `IAttackReceiver`로 평타를 받아 BombController에 반사/재발사를 지시 | **연결됨**. Bomb prefab과 Hurtbox 부모 receiver |
 | `Assets/1.Scripts/Enemy/Boss/BombController.cs` | Hold→Timer→Flight→Floor 서버 FSM, spherecast, ClientRpc 프레젠테이션 | **연결됨**. Wells Graph가 생성·보유·투척 |

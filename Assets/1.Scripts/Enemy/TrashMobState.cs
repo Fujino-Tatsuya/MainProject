@@ -4,8 +4,9 @@ using Unity.Behavior;
 public enum TrashMobState
 {
     Idle = 0,
-    Return,
-    Chase,
-    Attack,
-    Death
+    Return = 1,
+    Chase = 2,
+    Attack = 3,
+    Death = 4,
+    Stiff = 5
 }

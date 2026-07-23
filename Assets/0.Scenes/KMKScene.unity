@@ -134,7 +134,7 @@ GameObject:
   - component: {fileID: 30393463}
   - component: {fileID: 30393462}
   - component: {fileID: 30393467}
-  m_Layer: 8
+  m_Layer: 14
   m_Name: Cylinder4
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -322,7 +322,38 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   maxHp: 5
   defense: 0
-  maxshield: 0
+--- !u!1 &48827683
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 48827684}
+  m_Layer: 0
+  m_Name: Sound
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &48827684
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 48827683}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1434745727}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &119557554
 GameObject:
   m_ObjectHideFlags: 0
@@ -451,7 +482,7 @@ GameObject:
   - component: {fileID: 299937197}
   - component: {fileID: 299937196}
   - component: {fileID: 299937201}
-  m_Layer: 8
+  m_Layer: 14
   m_Name: Cylinder3
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -639,7 +670,6 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   maxHp: 5
   defense: 0
-  maxshield: 0
 --- !u!1 &367464626
 GameObject:
   m_ObjectHideFlags: 0
@@ -650,7 +680,6 @@ GameObject:
   m_Component:
   - component: {fileID: 367464629}
   - component: {fileID: 367464628}
-  - component: {fileID: 367464627}
   - component: {fileID: 367464630}
   m_Layer: 0
   m_Name: Main Camera
@@ -659,14 +688,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!81 &367464627
-AudioListener:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 367464626}
-  m_Enabled: 1
 --- !u!20 &367464628
 Camera:
   m_ObjectHideFlags: 0
@@ -875,13 +896,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TwentyThreeArenaContext
   ShowTopMostFoldoutHeaderGroup: 1
-  bossPrefab: {fileID: 6048960277833949737, guid: ec098039733a00145a352f70e7611fe9, type: 3}
+  bossPrefab: {fileID: 5372104213593212626, guid: 1100cccaacdc1fe4ca3e1eb9680f8c75, type: 3}
   ChargingObjects:
   - {fileID: 1929793192}
   - {fileID: 1063592043}
   - {fileID: 299937201}
   - {fileID: 30393467}
-  bossPos: {x: 10, y: 0, z: 10}
+  bossPos: {x: 0, y: 0, z: 0}
 --- !u!1 &1063592036
 GameObject:
   m_ObjectHideFlags: 0
@@ -897,7 +918,7 @@ GameObject:
   - component: {fileID: 1063592039}
   - component: {fileID: 1063592038}
   - component: {fileID: 1063592043}
-  m_Layer: 8
+  m_Layer: 14
   m_Name: Cylinder2
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1085,7 +1106,6 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   maxHp: 5
   defense: 0
-  maxshield: 0
 --- !u!1 &1337346165
 GameObject:
   m_ObjectHideFlags: 0
@@ -1326,6 +1346,69 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1388258016}
   m_Mesh: {fileID: 10209, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1434745726
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1434745727}
+  - component: {fileID: 1434745728}
+  m_Layer: 0
+  m_Name: BGM
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1434745727
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1434745726}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 48827684}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1434745728
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1434745726}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9a6610d2e704f1648819acc8d7460285, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: FMODUnity::FMODUnity.StudioEventEmitter
+  CollisionTag: 
+  EventReference:
+    Guid:
+      Data1: -750402196
+      Data2: 1272640217
+      Data3: -1569645665
+      Data4: 153077687
+    Path: event:/Test
+  Event: 
+  EventPlayTrigger: 1
+  EventStopTrigger: 0
+  AllowFadeout: 1
+  TriggerOnce: 0
+  Preload: 0
+  NonRigidbodyVelocity: 0
+  Params: []
+  OverrideAttenuation: 0
+  OverrideMinDistance: 1
+  OverrideMaxDistance: 20
 --- !u!1 &1460582718
 GameObject:
   m_ObjectHideFlags: 0
@@ -1857,7 +1940,7 @@ GameObject:
   - component: {fileID: 1929793188}
   - component: {fileID: 1929793187}
   - component: {fileID: 1929793192}
-  m_Layer: 8
+  m_Layer: 14
   m_Name: Cylinder1
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -2045,7 +2128,6 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   maxHp: 5
   defense: 0
-  maxshield: 0
 --- !u!1 &2002621902
 GameObject:
   m_ObjectHideFlags: 0
@@ -2166,3 +2248,4 @@ SceneRoots:
   - {fileID: 1337346167}
   - {fileID: 1460582719}
   - {fileID: 1792167255}
+  - {fileID: 48827684}

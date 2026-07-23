@@ -29,6 +29,12 @@ public class TwentyThreeAnimEvents : NetworkBehaviour
             jumpController.SetTarget();
     }
 
+    public void FallEvent()
+    {
+        if (IsServer)
+            jumpController.ShowMyMeshClientRpc(true);
+    }
+
     public void OnLandedEvent()
     {
         if (IsServer)
