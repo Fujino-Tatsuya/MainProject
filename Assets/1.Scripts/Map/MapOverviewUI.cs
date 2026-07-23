@@ -24,6 +24,13 @@ public class MapOverviewUI : MonoBehaviour
 
     private Canvas _canvas;
     private RectTransform _mapArea;
+    private Transform _corridorsRoot;
+
+    private void Awake()
+    {
+        var stage = GameObject.Find("Stage1");
+        if (stage != null) _corridorsRoot = stage.transform.Find("Level_wall_hallway");
+    }
 
     private void Update()
     {
@@ -70,16 +77,49 @@ public class MapOverviewUI : MonoBehaviour
         {
             if (s == null) continue;
             Vector3 p = s.transform.position;
-            float hx = s.Footprint.x * 0.5f, hz = s.Footprint.y * 0.5f;
-            minX = Mathf.Min(minX, p.x - hx); maxX = Mathf.Max(maxX, p.x + hx);
-            minZ = Mathf.Min(minZ, p.z - hz); maxZ = Mathf.Max(maxZ, p.z + hz);
+
+            // 회전(90°) 시 풋프린트 스왑 반영
+            int steps = Mathf.RoundToInt(s.transform.eulerAngles.y / 90f) & 3;
+            Vector2 half = (steps & 1) == 1
+                ? new Vector2(s.Footprint.y, s.Footprint.x) * 0.5f
+                : s.Footprint * 0.5f;
+
+            minX = Mathf.Min(minX, p.x - half.x); maxX = Mathf.Max(maxX, p.x + half.x);
+            minZ = Mathf.Min(minZ, p.z - half.y); maxZ = Mathf.Max(maxZ, p.z + half.y);
         }
+        // 다리(Corridors) 바운즈 계산 추가 (Awake에서 캐싱)
+        var corridors = _corridorsRoot;
+        var corridorBounds = new System.Collections.Generic.List<Bounds>();
+
+        if (corridors != null)
+        {
+            foreach (Transform cor in corridors)
+            {
+                var rends = cor.GetComponentsInChildren<Renderer>();
+                if (rends.Length == 0) continue;
+                Bounds b = rends[0].bounds;
+                foreach (var r in rends) b.Encapsulate(r.bounds);
+                corridorBounds.Add(b);
+
+                minX = Mathf.Min(minX, b.min.x); maxX = Mathf.Max(maxX, b.max.x);
+                minZ = Mathf.Min(minZ, b.min.z); maxZ = Mathf.Max(maxZ, b.max.z);
+            }
+        }
+
         if (maxX <= minX || maxZ <= minZ) return;
 
         Rect panel = _mapArea.rect;
         float scale = Mathf.Min(panel.width / (maxX - minX), panel.height / (maxZ - minZ));
         Vector2 WorldToMap(float wx, float wz) =>
             new Vector2((wx - (minX + maxX) * 0.5f) * scale, (wz - (minZ + maxZ) * 0.5f) * scale);
+
+        // 다리 그리기
+        foreach (var b in corridorBounds)
+        {
+            var img = MakeImage("Corridor", CombatZoneColor); // 전투 구역과 같은 색 사용
+            img.rectTransform.anchoredPosition = WorldToMap(b.center.x, b.center.z);
+            img.rectTransform.sizeDelta = new Vector2(b.size.x * scale, b.size.z * scale);
+        }
 
         // 존 슬롯 사각형 (역할별 색)
         foreach (var s in slots)
@@ -96,6 +136,7 @@ public class MapOverviewUI : MonoBehaviour
             Vector3 p = s.transform.position;
             img.rectTransform.anchoredPosition = WorldToMap(p.x, p.z);
             img.rectTransform.sizeDelta = new Vector2(s.Footprint.x * scale, s.Footprint.y * scale);
+            img.rectTransform.localEulerAngles = new Vector3(0, 0, -s.transform.eulerAngles.y);
         }
 
         // 역할 아이콘 (카탈로그 직렬화 참조 — 빌드에서도 동작)

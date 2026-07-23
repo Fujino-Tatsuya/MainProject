@@ -1313,6 +1313,22 @@ PrefabInstance:
       propertyPath: Rotations.Array.data[2].Position.z
       value: -9.901578
       objectReference: {fileID: 0}
+    - target: {fileID: 5554032220252057955, guid: 752c9377d228ec54f8c1b2bdcdd8e603, type: 3}
+      propertyPath: IsFilled
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5554032220252057955, guid: 752c9377d228ec54f8c1b2bdcdd8e603, type: 3}
+      propertyPath: Rotations.Array.data[2].Position.x
+      value: -36.276722
+      objectReference: {fileID: 0}
+    - target: {fileID: 5554032220252057955, guid: 752c9377d228ec54f8c1b2bdcdd8e603, type: 3}
+      propertyPath: Rotations.Array.data[2].Position.y
+      value: 0.00000011920929
+      objectReference: {fileID: 0}
+    - target: {fileID: 5554032220252057955, guid: 752c9377d228ec54f8c1b2bdcdd8e603, type: 3}
+      propertyPath: Rotations.Array.data[2].Position.z
+      value: 10.314606
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

@@ -14,7 +14,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
     private const int StateMessageSize = sizeof(uint) + sizeof(byte) + sizeof(float);
 
     [SerializeField] private string loadingSceneName = "LoadingScene";
-    [SerializeField] private string targetSceneName = "Temp_inGameScene";
+    [SerializeField] private string targetSceneName = "MapScene"; // Temp_inGameScene에서 변경.
     [SerializeField] private float minimumVisibleSeconds = 5f;
     [SerializeField] private float readyMessageSeconds = 2.5f;
     [SerializeField] private bool requireLobbyReadyToStart = true;
@@ -444,7 +444,6 @@ public class NetworkLoadingFlowController : MonoBehaviour
 
         // v2: 플레이어 스폰 구역 = PlayerSpawn 역할이 배정된 ZoneSlot.
         // 슬롯 앵커 transform 위치에 스폰 존 ZoneLayout 프리팹이 배치된다.
-        // (구 SpawnPoint/ZoneDefinitionSO 절차배치 모델은 ZoneSlot/ZoneLayout으로 대체됨)
         var spawnSlot = mapGenerator.GetRoleSlot(ZoneRole.PlayerSpawn);
         return spawnSlot != null ? spawnSlot.transform : null;
     }

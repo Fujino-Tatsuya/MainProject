@@ -56,9 +56,19 @@ public class MinimapController : MonoBehaviour
     private readonly List<(RectTransform rt, Vector3 world)> _staticMarkers = new List<(RectTransform, Vector3)>();
     private readonly Dictionary<Component, Image> _dynMarkers = new Dictionary<Component, Image>();
     private readonly List<Component> _dynRemove = new List<Component>();
-    private readonly List<Transform> _players = new List<Transform>();
+    private readonly List<Transform> _players = new List<Transform>(); // TODO: NetworkManager.ConnectedClients 기반으로 주기적 캐싱 구현 필요
     private float _playerScanTimer;
     private int _lastPlayerCount = -1;
+    private Transform _corridorsRoot;
+
+    private void Awake()
+    {
+        // 맵 구조물(복도/다리 등)을 미리 캐싱하여 매 업데이트마다 찾는 비용 방지
+        var mapGeom = GameObject.Find("Stage1/Level_wall_hallway");
+        if (mapGeom != null) _corridorsRoot = mapGeom.transform;
+
+        _explored = new byte[MaskResolution * MaskResolution];
+    }
 
     private void OnEnable() => MapGenerator.OnGenerated += HandleGenerated;
     private void OnDisable() => MapGenerator.OnGenerated -= HandleGenerated;
@@ -210,9 +220,8 @@ public class MinimapController : MonoBehaviour
             FillWorldRect(p.x - half.x, p.z - half.y, p.x + half.x, p.z + half.y);
         }
 
-        // 다리 — MapGeometryV2/Corridors 하위 각 Cor_* 그룹의 렌더러 AABB (축 정렬 통로)
-        var geo = GameObject.Find("MapGeometryV2");
-        var corridors = geo != null ? geo.transform.Find("Corridors") : null;
+        // 5) 복도/방 연결부 (보통 얇고 긴 메쉬)
+        Transform corridors = _corridorsRoot;
         if (corridors != null)
         {
             foreach (Transform cor in corridors)
@@ -477,8 +486,10 @@ public class MinimapController : MonoBehaviour
         _canvas.enabled = !online || _players.Count > 0;
     }
 
-    // 플레이어 수집 — NGO 플레이어 오브젝트(IsPlayerObject, 전 클라에서 보임) 우선,
-    // 없으면 PlayerMovement(에디터 단독 테스트) 폴백.
+    // [TODO] 플레이어 캐싱 최적화 및 영혼(Ghost) 부활 시스템 대응 예정
+    // - 내일 플레이어 머지 이후, Player.cs 측에 정적 리스트(AllPlayers)를 두어 스폰 시 자동 캐싱하도록 설계.
+    // - 이후 본 메서드의 FindObjectsByType 주기적 폴링을 제거하고, 그 리스트를 직접 순회하도록 수정.
+    // - 기획된 다중 목숨 시스템에 따라, 영혼 상태일 때의 마커 처리(색상 변경 등) 로직을 통합.
     private void ScanPlayers()
     {
         _players.Clear();

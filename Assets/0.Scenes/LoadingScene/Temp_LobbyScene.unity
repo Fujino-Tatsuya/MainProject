@@ -3027,7 +3027,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7043847080119373261, guid: d78501012a484a84287af3ca22ef5e90, type: 3}
       propertyPath: targetSceneName
-      value: PlayerScene
+      value: MapScene
       objectReference: {fileID: 0}
     - target: {fileID: 7043847080119373261, guid: d78501012a484a84287af3ca22ef5e90, type: 3}
       propertyPath: defaultPlayerPrefab

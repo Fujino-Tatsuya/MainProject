@@ -121,7 +121,9 @@ public class BossTeleportManager : NetworkBehaviour
 
             Vector3 destination = GetScatterPosition(index++);
 
-            if (playerObject.TryGetComponent(out NetworkTransform netTransform))
+            // 서버가 오너가 아닌(클라이언트 소유) NetworkTransform에 Teleport를 호출하면 예외가 발생하여 루프가 중단됨.
+            // 따라서 서버(호스트) 본인 것만 여기서 처리하고, 클라이언트는 아래 RPC 내부에서 각자 처리하도록 변경.
+            if (playerObject.IsOwner && playerObject.TryGetComponent(out NetworkTransform netTransform))
                 netTransform.Teleport(destination, playerObject.transform.rotation, playerObject.transform.localScale);
 
             TeleportOwnerClientRpc(destination, new ClientRpcParams
@@ -147,6 +149,12 @@ public class BossTeleportManager : NetworkBehaviour
             rb.position = destination;
         }
         playerObject.transform.position = destination;
+
+        // 클라이언트 본인(오너) 권한으로 NetworkTransform 순간이동 처리
+        if (playerObject.TryGetComponent(out NetworkTransform netTransform))
+        {
+            netTransform.Teleport(destination, playerObject.transform.rotation, playerObject.transform.localScale);
+        }
 
         _fadeAlpha = 1f;
         _fadingIn = true;
