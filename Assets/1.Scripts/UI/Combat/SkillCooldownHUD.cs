@@ -60,9 +60,10 @@ public class SkillCooldownHUD : MonoBehaviour
 
             if (widget.remainingText != null)
             {
+                // 1초 미만은 소수점(0.1초 단위), 1초 이상은 정수(올림), 0이면 숨김
                 widget.remainingText.text = remaining <= 0f
                     ? string.Empty
-                    : remaining < 10f ? remaining.ToString("F1") : Mathf.CeilToInt(remaining).ToString();
+                    : remaining < 1f ? remaining.ToString("F1") : Mathf.CeilToInt(remaining).ToString();
             }
         }
     }

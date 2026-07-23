@@ -92,12 +92,12 @@ GameObject:
   - component: {fileID: 8345678279683584363}
   - component: {fileID: 4237082408145735710}
   - component: {fileID: 4711829301158223401}
-  - component: {fileID: 5233118834099021557}
-  - component: {fileID: 7482913650248105327}
-  - component: {fileID: 7345129804561237845}
-  - component: {fileID: 1111000000000000001}
   - component: {fileID: 1111000000000000002}
   - component: {fileID: 1111000000000000003}
+  - component: {fileID: -8376725212529185166}
+  - component: {fileID: 7482913650248105327}
+  - component: {fileID: 5233118834099021557}
+  - component: {fileID: 1111000000000000001}
   m_Layer: 6
   m_Name: Player
   m_TagString: Player
@@ -219,7 +219,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 2672932260
+  GlobalObjectIdHash: 1250559839
   InScenePlacedSourceGlobalObjectIdHash: 1250559839
   DeferredDespawnTick: 0
   Ownership: 8
@@ -441,56 +441,6 @@ MonoBehaviour:
   interruptSkill: {fileID: 0}
   ultimateSkill: {fileID: 1111000000000000001}
   endFallbackPadding: 0.1
---- !u!114 &5233118834099021557
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8559504096609571310}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: fbf6f9bb63ea49bd8590d12feb70624b, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::FirstMeleeSubSkill
-  data: {fileID: 11400000, guid: 40499745b22c405fb0781629e282229c, type: 2}
-  hitboxAnchor: {fileID: 0}
---- !u!114 &7482913650248105327
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8559504096609571310}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a19090957c0daae4bbf5ee81759f8d5a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::FirstMeleeMainSkill
-  data: {fileID: 11400000, guid: 3f8c2b71d94a4e5f8b6a1c0d2e947a31, type: 2}
-  hitboxAnchor: {fileID: 8532915693143272332}
---- !u!81 &7345129804561237845
-AudioListener:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8559504096609571310}
-  m_Enabled: 1
---- !u!114 &1111000000000000001
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8559504096609571310}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5e57d99d539a13d4f9032c69b8d43bf0, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::FirstMeleeUltimateSkill
-  data: {fileID: 11400000, guid: 3c9e1f7a2b8d4e6c9a0f5d1b7e2c4a68, type: 2}
-  hitboxAnchor: {fileID: 0}
 --- !u!114 &1111000000000000002
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -532,6 +482,68 @@ MonoBehaviour:
   outOfRangeIcon:
     texture: {fileID: 0}
     hotspot: {x: 0, y: 0}
+--- !u!114 &-8376725212529185166
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8559504096609571310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5e4ef262716bb9b448ce04641fb8509d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FirstMeleePassive
+  ShowTopMostFoldoutHeaderGroup: 1
+  cooldownTime: 5
+  hitCooldownReduction: 2
+  bonusDamageMultiplier: 1
+  bonusFlatDamage: 0
+  minTargetThreshold: 5
+  minHealPercent: 5
+  perTargetHealPercent: 1
+--- !u!114 &7482913650248105327
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8559504096609571310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a19090957c0daae4bbf5ee81759f8d5a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FirstMeleeMainSkill
+  data: {fileID: 11400000, guid: 3f8c2b71d94a4e5f8b6a1c0d2e947a31, type: 2}
+  hitboxAnchor: {fileID: 8532915693143272332}
+--- !u!114 &5233118834099021557
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8559504096609571310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fbf6f9bb63ea49bd8590d12feb70624b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FirstMeleeSubSkill
+  data: {fileID: 11400000, guid: 40499745b22c405fb0781629e282229c, type: 2}
+  hitboxAnchor: {fileID: 0}
+--- !u!114 &1111000000000000001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8559504096609571310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5e57d99d539a13d4f9032c69b8d43bf0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FirstMeleeUltimateSkill
+  data: {fileID: 11400000, guid: 3c9e1f7a2b8d4e6c9a0f5d1b7e2c4a68, type: 2}
+  hitboxAnchor: {fileID: 0}
 --- !u!1 &8896633917232358439
 GameObject:
   m_ObjectHideFlags: 0

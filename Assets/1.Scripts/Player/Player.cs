@@ -38,6 +38,7 @@ public class Player : Unit
 
     private PlayerStateController stateController;
     private DefaultAttackController defaultAttack;
+    private FirstMeleePassive passive;
 
     public PlayerActionState CurrentState => stateController != null ? stateController.CurrentState : PlayerActionState.Idle;
     public bool CanMove => stateController == null || stateController.CanMove;
@@ -56,6 +57,7 @@ public class Player : Unit
             stateController = gameObject.AddComponent<PlayerStateController>();
 
         defaultAttack = GetComponent<DefaultAttackController>();
+        passive = GetComponent<FirstMeleePassive>();
 
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
@@ -273,6 +275,14 @@ public class Player : Unit
     public override void TakeDamage(AttackInfo attackInfo)
     {
         base.TakeDamage(attackInfo);
+    }
+
+    // 피격당하면(데미지량 무관) 패시브(불굴의 의지) 쿨다운을 감소시킨다. 서버 권위에서만 유효.
+    public override bool ReceiveAttack(AttackInfo attackInfo, AttackHitContext hitContext)
+    {
+        bool result = base.ReceiveAttack(attackInfo, hitContext);
+        passive?.NotifyOwnerHit();
+        return result;
     }
 
     private ClientRpcParams CreateOwnerClientRpcParams()
