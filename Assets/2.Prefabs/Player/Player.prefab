@@ -299,6 +299,10 @@ MonoBehaviour:
   attackSpeed: 0
   maxHp: 300
   defense: 25
+  platformRiderMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  platformGroundCheckDistance: 0.6
 --- !u!114 &1825865676068489031
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -859,6 +863,10 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 101, guid: 34df118ba6f24cd2945c523d7569cb92, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1476124164519952759, guid: 34df118ba6f24cd2945c523d7569cb92, type: 3}
+      propertyPath: m_FillAmount
       value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
