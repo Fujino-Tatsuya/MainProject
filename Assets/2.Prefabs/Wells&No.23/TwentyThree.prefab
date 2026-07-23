@@ -927,7 +927,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1745528080
+  GlobalObjectIdHash: 739404150
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -1765,9 +1765,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 09473024ac015514bbaf65dd19dbf924, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TwentyThreeBasicAttackChoice
-  page0: {fileID: 11400000, guid: e8cd87b61eab8e8478ce3a1a5b893e77, type: 2}
-  page1: {fileID: 11400000, guid: 81de92bb67433024aba9db7555d32287, type: 2}
-  page2: {fileID: 11400000, guid: 1981baa49b6e5cc4a8c12112485378af, type: 2}
+  pages:
+  - {fileID: 11400000, guid: e8cd87b61eab8e8478ce3a1a5b893e77, type: 2}
+  - {fileID: 11400000, guid: 81de92bb67433024aba9db7555d32287, type: 2}
+  - {fileID: 11400000, guid: 1981baa49b6e5cc4a8c12112485378af, type: 2}
 --- !u!1 &8718092995756804922
 GameObject:
   m_ObjectHideFlags: 0
