@@ -1,4 +1,4 @@
-﻿using BaseNetCode;
+using BaseNetCode;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -54,7 +54,7 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         if (!IsServer) return; // 서버에서만 피해 처리
         int remainingDamage = damage;
 
-        // 방어력 경감률 적용: 최종 피해 = 피해 x 100 / (100 + 방어력), 방어력 100당 50% 경감
+        //// 방어력 경감률 적용: 최종 피해 = 피해 x 100 / (100 + 방어력), 방어력 100당 50% 경감
         remainingDamage = Mathf.RoundToInt(remainingDamage * 100f / (100f + _health.CurrentDefense));
 
         // 쉴드가 있으면 쉴드로 피해를 처리하고 남은 데미지 계산

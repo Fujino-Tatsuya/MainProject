@@ -927,7 +927,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 739404150
+  GlobalObjectIdHash: 1745528080
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -1002,7 +1002,6 @@ MonoBehaviour:
   m_Graph: {fileID: -1017828834710968504, guid: 132421a8efb8fe94ca46d618644f2d18, type: 2}
   m_BlackboardVariableOverridesList:
   - rid: 5035182809093243097
-  - rid: 5035182901744632091
   - rid: 5035182925311639983
   - rid: 5035182941922919282
   - rid: 5035182944123880110
@@ -1073,14 +1072,6 @@ MonoBehaviour:
           m_Value1: 0
         Name: Self
         m_Value: {fileID: 5372104213593212626}
-    - rid: 5035182901744632091
-      type: {class: 'BlackboardVariable`1[[ServerSetAnimState, Assembly-CSharp]]', ns: Unity.Behavior, asm: Unity.Behavior}
-      data:
-        GUID:
-          m_Value0: 7356739638323325224
-          m_Value1: 6148736503789710872
-        Name: ServerSetAnimState
-        m_Value: {fileID: 0}
     - rid: 5035182925311639983
       type: {class: 'BlackboardVariable`1[[TwentyThreeBasicAttackChoice, Assembly-CSharp]]', ns: Unity.Behavior, asm: Unity.Behavior}
       data:
@@ -1583,7 +1574,7 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 0
   serializedVersion: 3
-  m_Size: {x: 3, y: 3, z: 3}
+  m_Size: {x: 1.2, y: 3, z: 1}
   m_Center: {x: 0, y: 1.5, z: 0.5}
 --- !u!114 &6124302813489217326
 MonoBehaviour:
@@ -1774,21 +1765,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 09473024ac015514bbaf65dd19dbf924, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TwentyThreeBasicAttackChoice
-  hookAttackMinDistance: 0
-  hookAttackMaxDistance: 3
-  hookAttackPercentage: 50
-  upperAttackMinDistance: 0
-  upperAttackMaxDistance: 3
-  upperAttackPercentage: 50
-  grabAttackMinDistance: 0
-  grabAttackMaxDistance: 1
-  grabAttackPercentage: 100
-  jumpAttackMinDistance: 5
-  jumpAttackMaxDistance: 10
-  jumpAttackPercentage: 100
-  dashAttackMinDistance: 10
-  dashAttackMaxDistance: 20
-  dashAttackPercentage: 100
+  page0: {fileID: 11400000, guid: e8cd87b61eab8e8478ce3a1a5b893e77, type: 2}
+  page1: {fileID: 11400000, guid: 81de92bb67433024aba9db7555d32287, type: 2}
+  page2: {fileID: 11400000, guid: 1981baa49b6e5cc4a8c12112485378af, type: 2}
 --- !u!1 &8718092995756804922
 GameObject:
   m_ObjectHideFlags: 0
