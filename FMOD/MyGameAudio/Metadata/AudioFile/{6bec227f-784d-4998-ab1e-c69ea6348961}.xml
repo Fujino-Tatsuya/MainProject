@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<objects serializationModel="Studio.02.03.00">
+	<object class="AudioFile" id="{6bec227f-784d-4998-ab1e-c69ea6348961}">
+		<property name="assetPath">
+			<value>eastside.mp3</value>
+		</property>
+		<property name="isStreaming">
+			<value>true</value>
+		</property>
+		<property name="frequencyInKHz">
+			<value>44.0999985</value>
+		</property>
+		<property name="channelCount">
+			<value>2</value>
+		</property>
+		<property name="length">
+			<value>174.68081632653062</value>
+		</property>
+		<relationship name="masterAssetFolder">
+			<destination>{b560101f-338c-48b4-9bc7-688f6927f644}</destination>
+		</relationship>
+	</object>
+</objects>
