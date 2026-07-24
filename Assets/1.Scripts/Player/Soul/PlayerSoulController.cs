@@ -1,0 +1,291 @@
+using UnityEngine;
+
+[DisallowMultipleComponent]
+[RequireComponent(typeof(PlayerLifeCycleController))]
+public sealed class PlayerSoulController : MonoBehaviour
+{
+    private const string SoulLayerName = "Soul";
+
+    [Header("Life State")]
+    [SerializeField] private PlayerLifeCycleController lifeCycle;
+    [SerializeField] private PlayerGroundingSensor groundingSensor;
+
+    [Header("Visual")]
+    [SerializeField] private PlayableCharacterVisual characterVisual;
+    [SerializeField] private CharacterDefinition characterDefinition;
+    [Tooltip("생존 외형 루트. 비어 있으면 PlayableCharacterVisual 또는 Armature에서 찾습니다.")]
+    [SerializeField] private GameObject aliveVisual;
+    [Tooltip("Soul 외형의 부모. 비어 있으면 Player Root를 사용합니다.")]
+    [SerializeField] private Transform soulVisualRoot;
+
+    [Header("Combat Target")]
+    [Tooltip("비어 있으면 Player Root 아래의 모든 Hurtbox Collider를 찾습니다.")]
+    [SerializeField] private Collider[] hurtboxColliders;
+
+    private GameObject soulVisual;
+    private bool[] initialHurtboxEnabled;
+    private int aliveLayer;
+    private int soulLayer = -1;
+    private bool warnedMissingSoulLayer;
+    private bool warnedMissingSoulVisual;
+    private bool warnedMissingAliveVisual;
+
+    public GameObject SoulVisual => soulVisual;
+    public bool IsSoulVisualReady => soulVisual != null;
+
+    private void Awake()
+    {
+        ResolveReferences();
+        aliveLayer = gameObject.layer;
+        soulLayer = LayerMask.NameToLayer(SoulLayerName);
+        CacheHurtboxDefaults();
+        EnsureSoulVisual();
+    }
+
+    private void OnEnable()
+    {
+        ResolveReferences();
+
+        if (lifeCycle != null)
+            lifeCycle.LifeStateChanged += HandleLifeStateChanged;
+
+        if (characterVisual != null)
+            characterVisual.CharacterApplied += HandleCharacterApplied;
+    }
+
+    private void Start()
+    {
+        if (lifeCycle == null)
+        {
+            Debug.LogError("[SoulAlert] PlayerLifeCycleController is missing.", this);
+            return;
+        }
+
+        ApplyLifeState(lifeCycle.State);
+    }
+
+    private void OnDisable()
+    {
+        if (lifeCycle != null)
+            lifeCycle.LifeStateChanged -= HandleLifeStateChanged;
+
+        if (characterVisual != null)
+            characterVisual.CharacterApplied -= HandleCharacterApplied;
+    }
+
+    public void ApplyLifeState(PlayerLifeState state)
+    {
+        bool isAlive = state == PlayerLifeState.Alive;
+        bool isSoul = state == PlayerLifeState.Soul;
+
+        EnsureSoulVisual();
+        SetVisualState(isAlive, isSoul);
+        SetRootLayer(isSoul);
+        SetGroundingMode(isSoul);
+        SetHurtboxesEnabled(isAlive);
+    }
+
+    public void SetCharacterDefinition(CharacterDefinition definition)
+    {
+        if (characterDefinition == definition)
+            return;
+
+        characterDefinition = definition;
+        RecreateSoulVisual();
+
+        if (lifeCycle != null)
+            ApplyLifeState(lifeCycle.State);
+    }
+
+    private void HandleLifeStateChanged(
+        PlayerLifeState previousState,
+        PlayerLifeState currentState)
+    {
+        ApplyLifeState(currentState);
+    }
+
+    private void HandleCharacterApplied(CharacterDefinition definition)
+    {
+        SetCharacterDefinition(definition);
+    }
+
+    private void ResolveReferences()
+    {
+        if (lifeCycle == null)
+            lifeCycle = GetComponent<PlayerLifeCycleController>();
+
+        if (groundingSensor == null)
+            groundingSensor = GetComponent<PlayerGroundingSensor>();
+
+        if (characterVisual == null)
+            characterVisual = GetComponent<PlayableCharacterVisual>();
+
+        if (characterDefinition == null && characterVisual != null)
+            characterDefinition = characterVisual.Definition;
+
+        if (aliveVisual == null && characterVisual != null)
+        {
+            aliveVisual = characterVisual.CurrentVisual;
+            if (aliveVisual == null &&
+                characterVisual.VisualRoot != null &&
+                characterVisual.VisualRoot != transform)
+            {
+                aliveVisual = characterVisual.VisualRoot.gameObject;
+            }
+        }
+
+        if (aliveVisual == null)
+        {
+            Transform armature = transform.Find("Armature");
+            if (armature != null)
+                aliveVisual = armature.gameObject;
+        }
+
+        if (soulVisualRoot == null)
+            soulVisualRoot = transform;
+    }
+
+    private void EnsureSoulVisual()
+    {
+        if (soulVisual != null)
+            return;
+
+        ResolveReferences();
+        GameObject prefab = characterDefinition != null
+            ? characterDefinition.SoulVisualPrefab
+            : null;
+
+        if (prefab == null)
+        {
+            WarnMissingSoulVisual();
+            return;
+        }
+
+        if (prefab.GetComponentInChildren<Unity.Netcode.NetworkObject>(true) != null)
+        {
+            Debug.LogWarning(
+                "[SoulAlert] SoulVisualPrefab must not contain a NetworkObject. " +
+                "Soul state will continue without a Soul visual.",
+                prefab);
+            return;
+        }
+
+        soulVisual = Instantiate(prefab, soulVisualRoot);
+        soulVisual.name = $"{prefab.name} (Soul Visual)";
+        soulVisual.transform.localPosition = Vector3.zero;
+        soulVisual.transform.localRotation = Quaternion.identity;
+        soulVisual.transform.localScale = Vector3.one;
+        soulVisual.SetActive(false);
+    }
+
+    private void RecreateSoulVisual()
+    {
+        if (soulVisual != null)
+            Destroy(soulVisual);
+
+        soulVisual = null;
+        warnedMissingSoulVisual = false;
+        EnsureSoulVisual();
+    }
+
+    private void SetVisualState(bool isAlive, bool isSoul)
+    {
+        ResolveReferences();
+
+        if (aliveVisual != null)
+        {
+            aliveVisual.SetActive(isAlive);
+        }
+        else if (!warnedMissingAliveVisual)
+        {
+            warnedMissingAliveVisual = true;
+            Debug.LogWarning(
+                "[SoulAlert] Alive visual reference is missing. " +
+                "Life state, layer, grounding, and Hurtbox transitions will continue.",
+                this);
+        }
+
+        if (soulVisual != null)
+            soulVisual.SetActive(isSoul);
+    }
+
+    private void SetRootLayer(bool isSoul)
+    {
+        if (!isSoul)
+        {
+            gameObject.layer = aliveLayer;
+            return;
+        }
+
+        if (soulLayer < 0)
+        {
+            if (!warnedMissingSoulLayer)
+            {
+                warnedMissingSoulLayer = true;
+                Debug.LogWarning(
+                    "[SoulAlert] Layer 'Soul' is not defined. " +
+                    "Life state and other Soul transitions will continue.",
+                    this);
+            }
+
+            return;
+        }
+
+        gameObject.layer = soulLayer;
+    }
+
+    private void SetGroundingMode(bool isSoul)
+    {
+        if (groundingSensor == null)
+            return;
+
+        groundingSensor.SetGroundingMode(
+            isSoul
+                ? PlayerGroundingSensor.GroundingMode.Soul
+                : PlayerGroundingSensor.GroundingMode.Alive);
+    }
+
+    private void CacheHurtboxDefaults()
+    {
+        if (hurtboxColliders == null || hurtboxColliders.Length == 0)
+        {
+            Hurtbox[] hurtboxes = GetComponentsInChildren<Hurtbox>(true);
+            hurtboxColliders = new Collider[hurtboxes.Length];
+
+            for (int i = 0; i < hurtboxes.Length; i++)
+                hurtboxColliders[i] = hurtboxes[i].GetComponent<Collider>();
+        }
+
+        initialHurtboxEnabled = new bool[hurtboxColliders.Length];
+        for (int i = 0; i < hurtboxColliders.Length; i++)
+        {
+            Collider hurtbox = hurtboxColliders[i];
+            initialHurtboxEnabled[i] = hurtbox != null && hurtbox.enabled;
+        }
+    }
+
+    private void SetHurtboxesEnabled(bool isAlive)
+    {
+        if (hurtboxColliders == null || initialHurtboxEnabled == null)
+            return;
+
+        for (int i = 0; i < hurtboxColliders.Length; i++)
+        {
+            Collider hurtbox = hurtboxColliders[i];
+            if (hurtbox != null)
+                hurtbox.enabled = isAlive && initialHurtboxEnabled[i];
+        }
+    }
+
+    private void WarnMissingSoulVisual()
+    {
+        if (warnedMissingSoulVisual)
+            return;
+
+        warnedMissingSoulVisual = true;
+        Debug.LogWarning(
+            "[SoulAlert] CharacterDefinition.SoulVisualPrefab is missing. " +
+            "Life state, layer, grounding, and Hurtbox transitions will continue.",
+            this);
+    }
+}

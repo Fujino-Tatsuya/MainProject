@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 [RequireComponent(typeof(PlayerMovement))]
@@ -11,6 +12,14 @@ public class PlayableCharacterVisual : MonoBehaviour
     private GameObject currentVisual;
     private PlayerMovement movement;
     private DefaultAttackController defaultAttack;
+
+    public CharacterDefinition CurrentDefinition { get; private set; }
+    public CharacterDefinition Definition =>
+        CurrentDefinition != null ? CurrentDefinition : initialCharacter;
+    public GameObject CurrentVisual => currentVisual;
+    public Transform VisualRoot => visualRoot;
+
+    public event Action<CharacterDefinition> CharacterApplied;
 
     private void Awake()
     {
@@ -31,6 +40,8 @@ public class PlayableCharacterVisual : MonoBehaviour
         if (definition == null)
             return;
 
+        CurrentDefinition = definition;
+
         if (definition.VisualPrefab != null)
             ReplaceVisual(definition.VisualPrefab);
 
@@ -42,6 +53,8 @@ public class PlayableCharacterVisual : MonoBehaviour
 
         if (definition.DefaultAttackData != null)
             defaultAttack.ApplyData(definition.DefaultAttackData);
+
+        CharacterApplied?.Invoke(definition);
     }
 
     public void ReplaceVisual(GameObject visualPrefab)

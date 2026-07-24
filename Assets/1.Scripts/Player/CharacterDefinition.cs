@@ -5,6 +5,7 @@ public class CharacterDefinition : ScriptableObject
 {
     [SerializeField] private string characterId;
     [SerializeField] private GameObject visualPrefab;
+    [SerializeField] private GameObject soulVisualPrefab;
     [SerializeField] private RuntimeAnimatorController animatorController;
     [SerializeField] private DefaultAttackData defaultAttackData;
 
@@ -17,6 +18,7 @@ public class CharacterDefinition : ScriptableObject
 
     public string CharacterId => characterId;
     public GameObject VisualPrefab => visualPrefab;
+    public GameObject SoulVisualPrefab => soulVisualPrefab;
     public RuntimeAnimatorController AnimatorController => animatorController;
     public DefaultAttackData DefaultAttackData => defaultAttackData;
     public int AttackDamage => attackDamage;
