@@ -46,6 +46,9 @@ public class Player : Unit
     private DefaultAttackController defaultAttack;
     private FirstMeleePassive passive;
     private PlayerMovement movement;
+    private Rigidbody playerRigidbody;
+    private bool initialRigidbodyIsKinematic;
+    private bool initialRigidbodyDetectCollisions;
 
     public PlayerActionState CurrentState => stateController != null ? stateController.CurrentState : PlayerActionState.Idle;
     public bool CanMove => stateController == null || stateController.CanMove;
@@ -66,6 +69,12 @@ public class Player : Unit
         defaultAttack = GetComponent<DefaultAttackController>();
         passive = GetComponent<FirstMeleePassive>();
         movement = GetComponent<PlayerMovement>();
+        playerRigidbody = GetComponent<Rigidbody>();
+        if (playerRigidbody != null)
+        {
+            initialRigidbodyIsKinematic = playerRigidbody.isKinematic;
+            initialRigidbodyDetectCollisions = playerRigidbody.detectCollisions;
+        }
 
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
@@ -97,6 +106,8 @@ public class Player : Unit
 
         if (IsServer)
             Initialize(attackDamage, moveSpeed, attackSpeed, maxHp, defense);
+
+        ConfigureMovementPhysicsAuthority();
     }
 
     public override void OnNetworkDespawn()
@@ -104,7 +115,20 @@ public class Player : Unit
         if (LocalPlayer == this)
             SetLocalPlayer(null);
 
+        RestoreRigidbodyDefaults();
         base.OnNetworkDespawn();
+    }
+
+    public override void OnGainedOwnership()
+    {
+        base.OnGainedOwnership();
+        ConfigureMovementPhysicsAuthority();
+    }
+
+    public override void OnLostOwnership()
+    {
+        base.OnLostOwnership();
+        ConfigureMovementPhysicsAuthority();
     }
 
     private void Start()
@@ -294,6 +318,41 @@ public class Player : Unit
 
     /// <summary>이동은 오너 권위(networking.md) — 넉백 물리를 시뮬레이션할 피어인지 여부.</summary>
     public bool IsMovementAuthority => !IsNetworkActive || IsOwner;
+
+    /// <summary>
+    /// Player 위치는 owner-authority NetworkTransform이 복제한다.
+    /// 비권한 피어의 Rigidbody는 kinematic으로 두어 중력·충돌 반응이 복제 위치와 경쟁하지 않게 한다.
+    /// 콜라이더 감지는 유지하므로 서버의 공격 판정과 Overlap 쿼리에는 계속 참여한다.
+    /// </summary>
+    private void ConfigureMovementPhysicsAuthority()
+    {
+        if (playerRigidbody == null)
+            return;
+
+        playerRigidbody.linearVelocity = Vector3.zero;
+        playerRigidbody.angularVelocity = Vector3.zero;
+
+        if (IsMovementAuthority)
+        {
+            playerRigidbody.detectCollisions = initialRigidbodyDetectCollisions;
+            playerRigidbody.isKinematic = initialRigidbodyIsKinematic;
+            return;
+        }
+
+        playerRigidbody.detectCollisions = initialRigidbodyDetectCollisions;
+        playerRigidbody.isKinematic = true;
+    }
+
+    private void RestoreRigidbodyDefaults()
+    {
+        if (playerRigidbody == null)
+            return;
+
+        playerRigidbody.linearVelocity = Vector3.zero;
+        playerRigidbody.angularVelocity = Vector3.zero;
+        playerRigidbody.detectCollisions = initialRigidbodyDetectCollisions;
+        playerRigidbody.isKinematic = initialRigidbodyIsKinematic;
+    }
 
     public void NotifyKnockbackEnded()
     {
