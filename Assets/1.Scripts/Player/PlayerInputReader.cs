@@ -23,6 +23,12 @@ public class PlayerInputReader : BaseNetworkBehaviour
     public bool AttackHeld => inputEnabled && attackAction != null && attackAction.IsPressed();
     public bool InterruptPressed => inputEnabled && interruptAction != null && interruptAction.WasPressedThisFrame();
 
+    // v1 대시 입력은 키보드 Shift 직접 판정(입력 에셋에 Dash 액션이 없어도 동작). (PLAN §7)
+    public bool DashPressed =>
+        inputEnabled &&
+        Keyboard.current != null &&
+        Keyboard.current.leftShiftKey.wasPressedThisFrame;
+
     private bool CanUseLocalControl =>
         !IsNetworkActive || IsOwner;
 

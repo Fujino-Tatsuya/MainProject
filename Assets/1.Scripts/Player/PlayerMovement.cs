@@ -180,6 +180,32 @@ public class PlayerMovement : MonoBehaviour
     }
 
     /// <summary>
+    /// 현재 이동 입력을 뷰(viewYaw) 기준 월드 평면 방향으로 변환한다. 입력이 없으면 zero.
+    /// 대시 등 외부 소비자가 이동과 동일한 입력→월드 매핑을 공유하기 위한 진입점.
+    /// </summary>
+    public Vector3 GetInputWorldDirection()
+    {
+        if (reader == null || !reader.HasMoveInput)
+            return Vector3.zero;
+
+        Vector2 input = reader.Direction;
+        Vector3 worldDir = Quaternion.Euler(0f, viewYaw, 0f) * new Vector3(input.x, 0f, input.y);
+        worldDir.y = 0f;
+        return worldDir.sqrMagnitude > 0.0001f ? worldDir.normalized : Vector3.zero;
+    }
+
+    /// <summary>현재 캐릭터(armature)가 바라보는 평면 정면. 대시 무입력 시 기본 방향.</summary>
+    public Vector3 CurrentFacing
+    {
+        get
+        {
+            Vector3 forward = armature != null ? armature.forward : transform.forward;
+            forward.y = 0f;
+            return forward.sqrMagnitude > 0.0001f ? forward.normalized : Vector3.forward;
+        }
+    }
+
+    /// <summary>
     /// 오너 자동 이동(스킬 사거리 확보용). worldTarget 방향으로 최대 이속(상태이상 배율 반영)으로 이동하며
     /// armature를 진행 방향으로 회전시킨다. CanMove가 막히면(CC 등) 그 프레임은 정지한다.
     /// 수동 입력이 없을 때만 호출되므로 Move()의 입력 이동과 충돌하지 않는다.
