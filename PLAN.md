@@ -1,3 +1,13 @@
+# CURRENT PLAN — 보스룸 진입·No.23 등장·전투 전환 (2026-07-24)
+
+> 상태: 설계 승인, 구현 대기
+> 설계: [Docs/superpowers/specs/2026-07-24-boss-encounter-intro-design.md](Docs/superpowers/specs/2026-07-24-boss-encounter-intro-design.md)
+> 구현 계획: [Docs/superpowers/plans/2026-07-24-boss-encounter-intro.md](Docs/superpowers/plans/2026-07-24-boss-encounter-intro.md)
+
+`BossEncounterDirector`가 서버 권한으로 텔레포트 완료 ACK, 플레이어 상태 초기화·입력 잠금, No.23 낙하/착지 연출, 페이지 대사, 만장일치 ESC 스킵, 동시 전투 시작을 조율한다. 충전기 4개 재사용, 보스룸 투명 경계와 NavMesh 포함까지 같은 수직 슬라이스에서 MPPM 1·2·3인으로 검증한다.
+
+---
+
 # PLAN — 몬스터 FSM 프레임워크 + 일반몹 5 + 중간보스 3 (2026-07-16)
 
 > 직전 PLAN(맵 콜라이더+Paladin 스폰, 커밋 bd10c98/01ceb71)은 완료. E2E 검증만 미완(git+메모리 보존).
