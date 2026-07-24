@@ -50,7 +50,8 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
             GetComponent<Rigidbody>(),
             GetComponentInChildren<Animator>(),
             GetComponent<PlayerSkillController>(),
-            GetComponent<PlayerDashController>()
+            GetComponent<PlayerDashController>(),
+            GetComponent<PlayerGroundingSensor>()
         );
 
         currentState = CreateState(PlayerActionState.Idle);
@@ -282,7 +283,8 @@ public sealed class PlayerStateContext
         Rigidbody rigidbody,
         Animator animator,
         PlayerSkillController skills,
-        PlayerDashController dash)
+        PlayerDashController dash,
+        PlayerGroundingSensor groundingSensor)
     {
         Controller = controller;
         Player = player;
@@ -295,6 +297,7 @@ public sealed class PlayerStateContext
         Animator = animator;
         Skills = skills;
         Dash = dash;
+        GroundingSensor = groundingSensor;
     }
 
     public PlayerStateController Controller { get; }
@@ -310,6 +313,8 @@ public sealed class PlayerStateContext
     public PlayerSkillController Skills { get; }
     // 대시 컨트롤러 미장착 프리팹에서는 null — 사용처는 null 허용으로 다룬다
     public PlayerDashController Dash { get; }
+    // 접지 센서 미장착 프리팹에서는 null — 사용처는 null 허용으로 다룬다
+    public PlayerGroundingSensor GroundingSensor { get; }
 }
 
 public interface IPlayerState
@@ -761,9 +766,27 @@ public sealed class PlayerDashState : PlayerStateBase
     {
         // 정면 벽/이동 0이어도 대시 상태는 원래 종료시각까지 유지한다. (불변식: 상태·무적 유지)
         if (speed > 0f)
-            Context.Movement.MoveRoot(direction * speed * Time.deltaTime);
+        {
+            Vector3 moveDir = ResolvePlanarSlopeDirection();
+            Context.Movement.MoveRoot(moveDir * speed * Time.deltaTime);
+        }
 
         if (Time.time >= endTime)
             Context.Controller.ChangeState(PlayerActionState.Idle);
+    }
+
+    // 지면이 있으면 대시 방향을 지면 평면에 투영해 오르막/내리막을 따라간다. (PLAN §8 / W3a)
+    // 평지에서는 그대로, 급경사(벽) 판정과 절벽/공중 처리는 W3b/W3c에서 확장한다.
+    private Vector3 ResolvePlanarSlopeDirection()
+    {
+        PlayerGroundingSensor sensor = Context.GroundingSensor;
+        if (sensor != null && sensor.IsGrounded)
+        {
+            Vector3 projected = Vector3.ProjectOnPlane(direction, sensor.GroundNormal);
+            if (projected.sqrMagnitude > 0.0001f)
+                return projected.normalized;
+        }
+
+        return direction;
     }
 }
