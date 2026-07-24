@@ -1,7 +1,7 @@
 namespace BeaverLobby.Player.Dash
 {
     /// <summary>서버가 대시 요청을 거부한 사유. (PLAN §9 검증 순서)</summary>
-    internal enum DashRejectReason
+    public enum DashRejectReason
     {
         None = 0,
 

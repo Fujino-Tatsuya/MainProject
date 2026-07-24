@@ -17,10 +17,10 @@ namespace BeaverLobby.Player.Dash
     ///
     /// 멱등/RequestId 중복 처리는 상위(캐시/컨트롤러) 책임이며 이 정책은 다루지 않는다.
     /// </summary>
-    internal static class DashValidationPolicy
+    public static class DashValidationPolicy
     {
         /// <summary>Owner가 보낸 최소 요청 파라미터(평면 정규화 전 방향 포함).</summary>
-        internal readonly struct Request
+        public readonly struct Request
         {
             public readonly double ClientNetworkLocalTime;
             public readonly double DirectionX;
@@ -35,7 +35,7 @@ namespace BeaverLobby.Player.Dash
         }
 
         /// <summary>요청 도착 시점(현재)의 서버 권한 상태. 과거 승인 후 재검사에 쓰인다.</summary>
-        internal readonly struct CurrentState
+        public readonly struct CurrentState
         {
             public readonly bool Dead;
             public readonly bool Soul;

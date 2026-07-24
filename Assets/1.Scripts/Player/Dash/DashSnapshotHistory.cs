@@ -9,7 +9,7 @@ namespace BeaverLobby.Player.Dash
     /// - <see cref="TrySelectAtOrBefore"/>는 요청시각 이전(이하)의 가장 가까운 스냅샷을 선택한다.
     /// - 선택된 스냅샷이 요청시각과 freshness 허용값보다 멀면 Receive-time fallback 없이 거부한다.
     /// </summary>
-    internal sealed class DashSnapshotHistory
+    public sealed class DashSnapshotHistory
     {
         private readonly DashStateSnapshot[] _buffer;
         private int _count;   // 유효 항목 수 (<= Capacity)

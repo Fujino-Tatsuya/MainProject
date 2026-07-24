@@ -9,7 +9,7 @@ namespace BeaverLobby.Player.Dash
     ///
     /// 이동/추락/공중 물리 등 나머지 튜닝 값은 해당 Workstream(W3/W10)에서 필드를 추가한다.
     /// </summary>
-    internal readonly struct DashRuntimeConfig
+    public readonly struct DashRuntimeConfig
     {
         public readonly bool DashEnabled;
         public readonly double DashSpeed;

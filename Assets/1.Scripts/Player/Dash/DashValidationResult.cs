@@ -9,7 +9,7 @@ namespace BeaverLobby.Player.Dash
     /// - 요청 도착 시 이미 대시가 끝났으면 remaining = 0 (충전·회복 장부만 반영).
     /// - 과거엔 유효했으나 현재 CC/사망이면 interrupted = true (현재 상태 우선, Owner 대시 중단).
     /// </summary>
-    internal readonly struct DashValidationResult
+    public readonly struct DashValidationResult
     {
         public readonly bool IsApproved;
         public readonly DashRejectReason Reason;

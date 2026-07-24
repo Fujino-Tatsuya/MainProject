@@ -15,7 +15,7 @@ namespace BeaverLobby.Player.Dash
     ///
     /// 항상 <c>Count &lt; MaxCharge</c>인 동안에는 유효한 회복 타이머(<see cref="NextReadyTime"/>)가 존재한다.
     /// </summary>
-    internal sealed class DashChargeLedger
+    public sealed class DashChargeLedger
     {
         private readonly int _maxCharge;
         private readonly double _rechargeDuration;

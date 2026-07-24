@@ -32,7 +32,7 @@ namespace BeaverLobby.Player.Dash
         public float SnapshotFreshnessTolerance => snapshotFreshnessTolerance;
 
         /// <summary>검증된 불변 런타임 설정을 만든다. 값이 비정상이면 DashEnabled=false로 반환한다.</summary>
-        internal DashRuntimeConfig CreateValidatedConfig()
+        public DashRuntimeConfig CreateValidatedConfig()
         {
             return DashRuntimeConfig.Create(
                 dashSpeed,
