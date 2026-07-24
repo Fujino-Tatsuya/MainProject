@@ -22,6 +22,10 @@ public sealed class PlayerSoulController : MonoBehaviour
     [Tooltip("비어 있으면 Player Root 아래의 모든 Hurtbox Collider를 찾습니다.")]
     [SerializeField] private Collider[] hurtboxColliders;
 
+    [Header("Movement")]
+    [Tooltip("Soul 상태의 고정 이동속도. 향후 PlayerGameRuleData.soulSpeed 공급으로 교체합니다.")]
+    [SerializeField, Min(0f)] private float soulMoveSpeed = 5f;
+
     private GameObject soulVisual;
     private bool[] initialHurtboxEnabled;
     private int aliveLayer;
@@ -32,6 +36,7 @@ public sealed class PlayerSoulController : MonoBehaviour
 
     public GameObject SoulVisual => soulVisual;
     public bool IsSoulVisualReady => soulVisual != null;
+    public float SoulMoveSpeed => Mathf.Max(0f, soulMoveSpeed);
 
     private void Awake()
     {
@@ -95,6 +100,21 @@ public sealed class PlayerSoulController : MonoBehaviour
 
         if (lifeCycle != null)
             ApplyLifeState(lifeCycle.State);
+    }
+
+    /// <summary>
+    /// 서버가 복제한 LifeState가 Soul일 때만 상태이상과 무관한 고정 이동속도를 제공한다.
+    /// 실제 이동 적용은 기존 오너 이동 경로가 담당한다.
+    /// </summary>
+    public bool TryGetFixedMoveSpeed(out float moveSpeed)
+    {
+        if (lifeCycle == null)
+            ResolveReferences();
+
+        bool isSoul = lifeCycle != null &&
+                      lifeCycle.State == PlayerLifeState.Soul;
+        moveSpeed = isSoul ? SoulMoveSpeed : 0f;
+        return isSoul;
     }
 
     private void HandleLifeStateChanged(
@@ -287,5 +307,10 @@ public sealed class PlayerSoulController : MonoBehaviour
             "[SoulAlert] CharacterDefinition.SoulVisualPrefab is missing. " +
             "Life state, layer, grounding, and Hurtbox transitions will continue.",
             this);
+    }
+
+    private void OnValidate()
+    {
+        soulMoveSpeed = Mathf.Max(0f, soulMoveSpeed);
     }
 }
