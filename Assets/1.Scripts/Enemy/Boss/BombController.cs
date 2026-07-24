@@ -424,10 +424,10 @@ public class BombController : NetworkBehaviour
             transform.position = pos;
         }
 
-        BombAreaEffect bombAreaEffect = CheckDoubleExplosion();
+        FloorAreaEffect bombAreaEffect = CheckDoubleExplosion();
         if (bombAreaEffect != null)
         {
-            bombAreaEffect.Grow();
+            bombAreaEffect.OverlapGrow();
 
             BombController bombController = bombAreaEffect.GetComponentInParent<BombController>();
             if (bombController == null)
@@ -442,29 +442,31 @@ public class BombController : NetworkBehaviour
             return;
         }
 
+        transform.rotation = Quaternion.identity;
+
         SetFloorEnableClientRpc(true);
         _bombState = BombState.Floor;
     }
 
-    BombAreaEffect CheckDoubleExplosion()
+    FloorAreaEffect CheckDoubleExplosion()
     {
-        BombAreaEffect bombAreaEffect = null;
+        FloorAreaEffect bombAreaEffect = null;
         Collider[] hits = Physics.OverlapSphere(transform.position, bombRadius, hazardArea);
 
         foreach (Collider collider in hits)
         {
-            BombAreaEffect currentBombAreaEffect = collider.GetComponent<BombAreaEffect>();
+            FloorAreaEffect currentFloorAreaEffect = collider.GetComponent<FloorAreaEffect>();
 
-            if (currentBombAreaEffect == null)
+            if (currentFloorAreaEffect == null)
                 continue;
 
-            if (currentBombAreaEffect.CanGrowOnOverlap == false)
+            if (currentFloorAreaEffect.CanGrowOnOverlap == false)
                 continue;
 
-            if (currentBombAreaEffect.MergeGroup != AreaMergeType.GrowOnOverlap)
+            if (currentFloorAreaEffect.FloorType != AreaType.GrowOnOverlap)
                 continue;
 
-            bombAreaEffect = currentBombAreaEffect;
+            bombAreaEffect = currentFloorAreaEffect;
             break;
         }
 

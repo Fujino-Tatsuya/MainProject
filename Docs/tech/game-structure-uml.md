@@ -692,7 +692,7 @@ classDiagram
     class Bomb {
         +ReceiveAttack(AttackInfo, AttackHitContext)
     }
-    class BombAreaEffect
+    class FloorAreaEffect
 
     Unit <|-- Enemy
     TwentyThreeArenaContext --> Enemy : server spawn
@@ -707,7 +707,7 @@ classDiagram
     Enemy o-- KnockbackAttack
     Enemy o-- BombController : nested Wells
     BombController --> Bomb
-    Bomb --> BombAreaEffect
+    Bomb --> FloorAreaEffect
     Bomb ..|> IAttackReceiver
 ```
 
@@ -818,7 +818,7 @@ stateDiagram-v2
     InitFlight --> Flight: 속도·방향 초기화
     Flight --> Flight: 서버 SphereCast 이동
     Flight --> Floor: 바닥 충돌
-    Floor --> Floor: BombAreaEffect 병합·성장
+    Floor --> Floor: FloorAreaEffect 병합·성장
     Floor --> [*]: 수명 종료/제거
 ```
 
@@ -842,7 +842,7 @@ sequenceDiagram
     BC-->>FX: 바닥 효과·병합 표현
 ```
 
-Bomb의 Hurtbox는 `ownerUnit`이 비어 있지만 부모의 `IAttackReceiver`인 `Bomb`을 찾아 정상 위임한다. Bomb은 현재 `AttackType.Default`에만 반응한다. 플레이어가 반사한 폭탄은 source position과 damage로 방향·세기를 계산하고, 바닥에서는 `BombAreaEffect`가 영역 병합과 성장을 처리한다.
+Bomb의 Hurtbox는 `ownerUnit`이 비어 있지만 부모의 `IAttackReceiver`인 `Bomb`을 찾아 정상 위임한다. Bomb은 현재 `AttackType.Default`에만 반응한다. 플레이어가 반사한 폭탄은 source position과 damage로 방향·세기를 계산하고, 바닥에서는 `FloorAreaEffect`가 영역 병합과 성장을 처리한다.
 
 현재 prefab 수치는 fuse 20초, 바닥 지속 30초, 직접 충돌 피해 55와 넉백 5, 장판 피해 11/0.5초다. 다른 HazardArea와 합쳐지면 기존 장판이 0.2씩 최대 2배까지 커지고 타이머가 초기화된다. 비행 중 fuse는 멈춘다. fuse 만료는 반경 폭발을 만들지 않고 mesh를 숨긴 뒤 장판으로 전환할 뿐이다.
 

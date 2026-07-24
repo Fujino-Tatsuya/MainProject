@@ -25,7 +25,7 @@ TagManager:
   - Env
   - Weapon
   - PlayerHurtbox
-  - 
+  - EnemyHurtBox
   - 
   - 
   - 
