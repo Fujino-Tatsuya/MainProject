@@ -98,6 +98,13 @@ GameObject:
   - component: {fileID: 7482913650248105327}
   - component: {fileID: 5233118834099021557}
   - component: {fileID: 1111000000000000001}
+  - component: {fileID: 8829839017192280447}
+  - component: {fileID: 3406906192496269592}
+  - component: {fileID: 1111000000000000010}
+  - component: {fileID: 1111000000000000011}
+  - component: {fileID: 1111000000000000012}
+  - component: {fileID: 1111000000000000013}
+  - component: {fileID: 1111000000000000014}
   m_Layer: 6
   m_Name: Player
   m_TagString: Player
@@ -548,6 +555,144 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FirstMeleeUltimateSkill
   data: {fileID: 11400000, guid: 3c9e1f7a2b8d4e6c9a0f5d1b7e2c4a68, type: 2}
   hitboxAnchor: {fileID: 0}
+--- !u!114 &8829839017192280447
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8559504096609571310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9e4297a08dc44ac1984f91b432931730, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerDashController
+  ShowTopMostFoldoutHeaderGroup: 1
+  dashData: {fileID: 11400000, guid: f2e9be4143ad74d4fb3f49788c28f857, type: 2}
+  gameRule: {fileID: 11400000, guid: 5a71cc8f5b32f47428af514e196e5a8c, type: 2}
+  groundingSensor: {fileID: 3406906192496269592}
+--- !u!114 &3406906192496269592
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8559504096609571310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5d7a1fbb9bc21a6ac3bd674cbaffa06e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerGroundingSensor
+  ShowTopMostFoldoutHeaderGroup: 1
+  probeDistance: 0.1
+  aliveGroundMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  soulGroundMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  gameRule: {fileID: 11400000, guid: 5a71cc8f5b32f47428af514e196e5a8c, type: 2}
+--- !u!114 &1111000000000000010
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8559504096609571310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ef8da10829b5441a82677bf80664364d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerInvulnerability
+  ShowTopMostFoldoutHeaderGroup: 1
+  hurtbox: {fileID: 1042392932136475753}
+  hurtboxCollider: {fileID: 2821089013405294523}
+--- !u!114 &1111000000000000011
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8559504096609571310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 88a3d6e479134c59ba61ba8eb50bc94c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerLandingProtection
+  ShowTopMostFoldoutHeaderGroup: 1
+  invulnerability: {fileID: 1111000000000000010}
+  statusEffects: {fileID: 8345678279683584363}
+  grounding: {fileID: 3406906192496269592}
+  landingProtectionDuration: 1
+  airborneFailsafeSeconds: 3
+  blinkVisualRoot: {fileID: 7680489978896873507}
+  blinkInterval: 0.1
+--- !u!114 &1111000000000000012
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8559504096609571310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7bd7fc027b5588e4c80aa6168028c9a4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerFallController
+  ShowTopMostFoldoutHeaderGroup: 1
+--- !u!114 &1111000000000000013
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8559504096609571310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3fcbbdfc94a84334b831e0b491a12d50, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerSafePointTracker
+  ShowTopMostFoldoutHeaderGroup: 1
+  grounding: {fileID: 3406906192496269592}
+  stateController: {fileID: 4237082408145735710}
+  stableSeconds: 0.5
+  maxFlatAngle: 5
+  ringRadii:
+  - 1
+  - 2
+  - 3
+  returnYTolerance: 0.5
+  groundMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  occupancyRadius: 0.4
+  probeUpDistance: 1.5
+  probeDownDistance: 3
+--- !u!114 &1111000000000000014
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8559504096609571310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0f1f8dc5ef1e4c15b60814a3ff44ab06, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerFallRecovery
+  ShowTopMostFoldoutHeaderGroup: 1
+  fallController: {fileID: 1111000000000000012}
+  safePointTracker: {fileID: 1111000000000000013}
+  protection: {fileID: 1111000000000000011}
+  dashController: {fileID: 8829839017192280447}
+  movement: {fileID: 4342448094249856294}
+  input: {fileID: 1825865676068489031}
+  body: {fileID: 3600963326377684433}
+  grounding: {fileID: 3406906192496269592}
+  fallReturnDelay: 0.75
+  landedFollowCameraDelay: 1
+  fallReturnInputLock: 0.5
+  fallReturnInvulnerability: 1.5
 --- !u!1 &8896633917232358439
 GameObject:
   m_ObjectHideFlags: 0
@@ -760,6 +905,11 @@ MonoBehaviour:
 --- !u!4 &7051867761104396953 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 6129863144953294667, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+  m_PrefabInstance: {fileID: 3804664619706551762}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &7680489978896873507 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 6798877021700322801, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
   m_PrefabInstance: {fileID: 3804664619706551762}
   m_PrefabAsset: {fileID: 0}
 --- !u!114 &8532915693143272332 stripped
