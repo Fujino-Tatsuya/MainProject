@@ -60,12 +60,7 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         // 쉴드가 있으면 쉴드로 피해를 처리하고 남은 데미지 계산
         if (_health.HasShield)
         {
-            int shieldDamage = remainingDamage - _health.CurrentShield;
-            // 남은 데미지가 쉴드보다 작은 경우, 쉴드로 모든 피해를 처리하도록 shieldDamage를 조정
-            if (shieldDamage < 0)
-            {
-                shieldDamage = remainingDamage;
-            }
+            int shieldDamage = Mathf.Min(remainingDamage, _health.CurrentShield);
             _health.TakeShieldDamage(shieldDamage);
 
             UpdateNetworkShield();
