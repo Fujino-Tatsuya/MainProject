@@ -39,6 +39,13 @@ public class NetworkClock : MonoBehaviour
     /// <summary>일시정지 시간을 제외한 게임시간.</summary>
     public double GameNow => ServerNow - CurrentPausedAccum();
 
+    /// <summary>이 클라이언트의 NGO LocalTime(서버보다 편도지연만큼 앞섬). 대시 RTT 보정 요청에 사용. (PLAN §9)</summary>
+    public double LocalNow =>
+        _networkManager != null && _networkManager.IsListening ? _networkManager.LocalTime.Time : 0.0;
+
+    /// <summary>일시정지를 제외한 클라이언트 로컬 게임시간.</summary>
+    public double GameLocalNow => LocalNow - CurrentPausedAccum();
+
     public bool HasSessionFormed => !double.IsNaN(_sessionFormedAt);
     public bool HasMainGameStarted => !double.IsNaN(_mainGameStartedAt);
 
