@@ -28,8 +28,10 @@ public class CameraTargetSwitcher : MonoBehaviour
     private CinemachineFollow playerCameraFollow;
     private Quaternion fixedCameraRotation;
     private bool hasFixedCameraRotation;
+    private PlayerLifeCycleController ownerLifeCycle;
 
     public bool IsInFallView { get; private set; }
+    public bool IsSpectatorMode { get; private set; }
 
     private void Awake()
     {
@@ -38,6 +40,8 @@ public class CameraTargetSwitcher : MonoBehaviour
 
     private void OnDestroy()
     {
+        UnbindOwnerLifeCycle();
+
         if (Active == this)
         {
             Active = null;
@@ -49,6 +53,7 @@ public class CameraTargetSwitcher : MonoBehaviour
     {
         EnsureCameraRig();
         SelectOwnerPlayerTarget();
+        BindOwnerLifeCycleFromCurrentTarget();
     }
 
     // Freezes the proxy at the selected target's current world Y and starts
@@ -163,6 +168,13 @@ public class CameraTargetSwitcher : MonoBehaviour
 
     private void Update()
     {
+        if (!IsSpectatorMode)
+        {
+            return;
+        }
+
+        EnsureValidSpectatorTarget();
+
         if (Keyboard.current == null)
         {
             return;
@@ -187,6 +199,40 @@ public class CameraTargetSwitcher : MonoBehaviour
     public void SwitchToPreviousTarget()
     {
         SwitchTarget(-1);
+    }
+
+    /// <summary>
+    /// 로컬 Player가 PermanentDead일 때만 호출되는 관전 진입점.
+    /// 서버 상태를 변경하지 않고 이 클라이언트의 Camera Follow 대상만 전환한다.
+    /// </summary>
+    public void SetSpectatorMode(bool enabled)
+    {
+        if (IsSpectatorMode == enabled)
+        {
+            return;
+        }
+
+        IsSpectatorMode = enabled;
+        EnsureCameraRig();
+        Transform lastFollowTarget = GetCurrentTarget();
+
+        if (!enabled)
+        {
+            SelectOwnerPlayerTarget();
+            ReturnToPlayerView();
+            return;
+        }
+
+        RefreshFollowTargets();
+        if (cameraFollowTargets.Count == 0)
+        {
+            FreezeAtLastFollowPosition(lastFollowTarget);
+            return;
+        }
+
+        // PermanentDead인 기존 오너는 후보 필터에서 제거되므로 첫 유효 대상을 자동 선택한다.
+        SwitchTarget(1);
+        ReturnToPlayerView();
     }
 
     private void SwitchTarget(int direction)
@@ -219,13 +265,14 @@ public class CameraTargetSwitcher : MonoBehaviour
     private void RefreshFollowTargets()
     {
         Transform currentTarget = GetCurrentTarget();
-        RemoveMissingTargets();
+        RemoveInvalidTargets();
 
         GameObject[] followTargetObjects = GameObject.FindGameObjectsWithTag(CameraFollowTargetTag);
         foreach (GameObject followTargetObject in followTargetObjects)
         {
             Transform followTarget = followTargetObject.transform;
-            if (!cameraFollowTargets.Contains(followTarget))
+            if (IsValidFollowTarget(followTarget) &&
+                !cameraFollowTargets.Contains(followTarget))
             {
                 cameraFollowTargets.Add(followTarget);
             }
@@ -252,11 +299,11 @@ public class CameraTargetSwitcher : MonoBehaviour
         RestoreFixedCameraRotation();
     }
 
-    private void RemoveMissingTargets()
+    private void RemoveInvalidTargets()
     {
         for (int i = cameraFollowTargets.Count - 1; i >= 0; i--)
         {
-            if (cameraFollowTargets[i] == null)
+            if (!IsValidFollowTarget(cameraFollowTargets[i]))
             {
                 cameraFollowTargets.RemoveAt(i);
             }
@@ -266,6 +313,113 @@ public class CameraTargetSwitcher : MonoBehaviour
         {
             currentTargetIndex = cameraFollowTargets.Count - 1;
         }
+    }
+
+    private bool IsValidFollowTarget(Transform followTarget)
+    {
+        if (followTarget == null || !followTarget.gameObject.activeInHierarchy)
+        {
+            return false;
+        }
+
+        if (!IsSpectatorMode)
+        {
+            return true;
+        }
+
+        PlayerLifeCycleController lifeCycle =
+            followTarget.GetComponentInParent<PlayerLifeCycleController>();
+        return lifeCycle != null && IsSpectatorCandidate(lifeCycle.State);
+    }
+
+    private void BindOwnerLifeCycleFromCurrentTarget()
+    {
+        Transform target = GetCurrentTarget();
+        BindOwnerLifeCycle(
+            target != null
+                ? target.GetComponentInParent<PlayerLifeCycleController>()
+                : null);
+    }
+
+    private void BindOwnerLifeCycle(PlayerLifeCycleController lifeCycle)
+    {
+        if (ownerLifeCycle == lifeCycle)
+        {
+            return;
+        }
+
+        UnbindOwnerLifeCycle();
+        ownerLifeCycle = lifeCycle;
+
+        if (ownerLifeCycle != null)
+        {
+            ownerLifeCycle.LifeStateChanged += HandleOwnerLifeStateChanged;
+            SetSpectatorMode(ownerLifeCycle.State == PlayerLifeState.PermanentDead);
+        }
+        else
+        {
+            SetSpectatorMode(false);
+        }
+    }
+
+    private void UnbindOwnerLifeCycle()
+    {
+        if (ownerLifeCycle == null)
+            return;
+
+        ownerLifeCycle.LifeStateChanged -= HandleOwnerLifeStateChanged;
+        ownerLifeCycle = null;
+    }
+
+    private static bool IsSpectatorCandidate(PlayerLifeState state)
+    {
+        return state == PlayerLifeState.Alive ||
+            state == PlayerLifeState.Soul;
+    }
+
+    private void HandleOwnerLifeStateChanged(
+        PlayerLifeState previousState,
+        PlayerLifeState currentState)
+    {
+        SetSpectatorMode(currentState == PlayerLifeState.PermanentDead);
+    }
+
+    private void EnsureValidSpectatorTarget()
+    {
+        Transform lastFollowTarget = GetCurrentTarget();
+        if (IsValidFollowTarget(lastFollowTarget))
+        {
+            return;
+        }
+
+        RefreshFollowTargets();
+        if (cameraFollowTargets.Count == 0)
+        {
+            FreezeAtLastFollowPosition(lastFollowTarget);
+            return;
+        }
+
+        SetTarget(0);
+        ReturnToPlayerView();
+    }
+
+    private void FreezeAtLastFollowPosition(Transform lastFollowTarget)
+    {
+        if (playerCamera == null || floatCamera == null || floatFollowTarget == null)
+        {
+            return;
+        }
+
+        // 추락 사망으로 이미 Float View라면 proxy의 마지막 안전 높이/위치를 그대로 보존한다.
+        if (!IsInFallView && lastFollowTarget != null)
+        {
+            floatFollowTarget.transform.position = lastFollowTarget.position;
+        }
+
+        floatFollowTarget.SetSource(null);
+        playerCamera.Priority = InactiveCameraPriority;
+        floatCamera.Priority = ActiveCameraPriority;
+        IsInFallView = true;
     }
 
     private Transform GetCurrentTarget()

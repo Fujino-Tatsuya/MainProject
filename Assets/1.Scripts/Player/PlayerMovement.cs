@@ -6,6 +6,7 @@ public class PlayerMovement : MonoBehaviour
 {
     private PlayerInputReader reader;
     private Player player;
+    private PlayerSoulController soulController;
     private Rigidbody rb;
 
     [SerializeField] private Transform armature;
@@ -33,6 +34,7 @@ public class PlayerMovement : MonoBehaviour
     {
         reader = GetComponent<PlayerInputReader>();
         player = GetComponent<Player>();
+        soulController = GetComponent<PlayerSoulController>();
         rb = GetComponent<Rigidbody>();
 
         if (armature == null)
@@ -82,12 +84,7 @@ public class PlayerMovement : MonoBehaviour
                 );
             }
 
-            // 상태이상 이속 modifier 반영 (버프 > 1, 둔화 < 1)
-            float statusMultiplier = player != null && player.StatusEffects != null
-                ? player.StatusEffects.GetStatMultiplier(StatusEffectType.MoveSpeedModifier)
-                : 1f;
-
-            inputMove = worldDir * currentSpeed * statusMultiplier * Time.deltaTime;
+            inputMove = worldDir * ResolveMoveSpeed(currentSpeed) * Time.deltaTime;
         }
         else
         {
@@ -225,12 +222,24 @@ public class PlayerMovement : MonoBehaviour
 
         dir.Normalize();
 
+        rb.MovePosition(
+            rb.position + dir * (ResolveMoveSpeed(maxSpeed) * Time.deltaTime));
+        RotateToward(dir, rotate_Speed);
+    }
+
+    private float ResolveMoveSpeed(float baseSpeed)
+    {
+        if (soulController != null &&
+            soulController.TryGetFixedMoveSpeed(out float soulMoveSpeed))
+        {
+            return soulMoveSpeed;
+        }
+
         float statusMultiplier = player != null && player.StatusEffects != null
             ? player.StatusEffects.GetStatMultiplier(StatusEffectType.MoveSpeedModifier)
             : 1f;
 
-        rb.MovePosition(rb.position + dir * (maxSpeed * statusMultiplier * Time.deltaTime));
-        RotateToward(dir, rotate_Speed);
+        return baseSpeed * statusMultiplier;
     }
 
     public void SetArmature(Transform newArmature)
