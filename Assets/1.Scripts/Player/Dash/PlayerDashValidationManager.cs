@@ -106,6 +106,15 @@ namespace BeaverLobby.Player.Dash
             _players.Remove(networkObjectId);
         }
 
+        /// <summary>생존 복귀/부활 시 서버 권한 충전을 강제 초기화한다(Epoch 증가). (PLAN §10)</summary>
+        public void ForceReset(ulong networkObjectId, int count, double now)
+        {
+            if (_players.TryGetValue(networkObjectId, out PlayerEntry entry))
+            {
+                entry.Ledger.ForceReset(count, now);
+            }
+        }
+
         /// <summary>서버 tick마다 충전 장부를 진행시키고 현재 상태 스냅샷을 저장한다.</summary>
         public void CaptureSnapshot(
             ulong networkObjectId, double serverTime,

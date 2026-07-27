@@ -23,8 +23,8 @@ public sealed class PlayerFallController : NetworkBehaviour
     /// <summary>서버 전용. 추락 피해로 사망한 순간 발행. Soul/LifeCount 작업이 소비.</summary>
     public event Action<FallDeathContext> ServerFallDeath;
 
-    /// <summary>서버 전용. 추락 피해를 입었지만 생존한 순간 발행. W11 안전지점 복귀가 소비.</summary>
-    public event Action ServerFallSurvived;
+    /// <summary>서버 전용. 추락 피해를 입었지만 생존한 순간 발행(fallPoint 전달). W11 안전지점 복귀가 소비.</summary>
+    public event Action<Vector3> ServerFallSurvived;
 
     private void Awake()
     {
@@ -84,7 +84,7 @@ public sealed class PlayerFallController : NetworkBehaviour
         }
         else
         {
-            ServerFallSurvived?.Invoke();
+            ServerFallSurvived?.Invoke(fallPoint);
         }
     }
 }

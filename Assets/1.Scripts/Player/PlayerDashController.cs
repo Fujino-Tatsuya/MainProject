@@ -293,6 +293,20 @@ public class PlayerDashController : NetworkBehaviour
         return rttSeconds;
     }
 
+    /// <summary>서버 권한 충전을 1개로 강제 초기화(생존 복귀/부활 시). (PLAN §10)</summary>
+    public void ServerResetChargeToOne()
+    {
+        if (IsServer && PlayerDashValidationManager.Instance != null)
+            PlayerDashValidationManager.Instance.ForceReset(NetworkObjectId, 1, ServerNow());
+    }
+
+    /// <summary>오너 예측 충전을 1개로 강제 초기화. 다음 충전 진행도는 0부터.</summary>
+    public void OwnerResetChargeToOne()
+    {
+        if (player != null && player.IsMovementAuthority && predictedLedger != null)
+            predictedLedger.ForceReset(1, OwnerNow());
+    }
+
     private DashMotionSettings BuildMotionSettings()
     {
         float walkableAngle = gameRule != null ? gameRule.MaxWalkableSlopeAngle : DefaultMaxWalkableSlopeAngle;
