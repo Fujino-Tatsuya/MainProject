@@ -149,12 +149,12 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
     }
 
     // Dash는 방향·속도·지속시간이 필수라 인스턴스 주입 경로로만 진입한다. (예측 게이트는 PlayerDashController가 확인)
-    public bool BeginDash(Vector3 planarDirection, float speed, float duration)
+    public bool BeginDash(Vector3 planarDirection, float speed, float duration, DashMotionSettings motion)
     {
         if (CurrentState == PlayerActionState.Dead)
             return false;
 
-        SetState(new PlayerDashState(context, planarDirection, speed, duration));
+        SetState(new PlayerDashState(context, planarDirection, speed, duration, motion));
         return true;
     }
 
@@ -738,11 +738,16 @@ public sealed class PlayerKnockbackState : PlayerStateBase
 // W2는 평지 단순 이동만 담당한다. 경사·벽·절벽·공중 관성은 W3에서 대체·확장한다.
 public sealed class PlayerDashState : PlayerStateBase
 {
-    private readonly Vector3 direction; // 평면 정규화 방향
+    private const int CastBufferSize = 8;
+
+    private readonly Vector3 direction; // 평면 정규화 방향(시작 순간 확정)
     private readonly float speed;
     private readonly float endTime;
+    private readonly DashMotionSettings motion;
+    private readonly CapsuleCollider capsule;
+    private readonly RaycastHit[] castBuffer = new RaycastHit[CastBufferSize];
 
-    public PlayerDashState(PlayerStateContext context, Vector3 planarDirection, float speed, float duration)
+    public PlayerDashState(PlayerStateContext context, Vector3 planarDirection, float speed, float duration, DashMotionSettings motion)
         : base(context)
     {
         Vector3 planar = planarDirection;
@@ -751,7 +756,9 @@ public sealed class PlayerDashState : PlayerStateBase
             ? planar.normalized
             : Context.Movement.CurrentFacing;
         this.speed = Mathf.Max(0f, speed);
+        this.motion = motion;
         endTime = Time.time + Mathf.Max(0f, duration);
+        capsule = Context.Player != null ? Context.Player.GetComponent<CapsuleCollider>() : null;
     }
 
     public override PlayerActionState StateType => PlayerActionState.Dash;
@@ -764,29 +771,125 @@ public sealed class PlayerDashState : PlayerStateBase
 
     public override void Tick()
     {
-        // 정면 벽/이동 0이어도 대시 상태는 원래 종료시각까지 유지한다. (불변식: 상태·무적 유지)
+        // 정면 벽으로 이동이 0이 되어도 대시 상태는 원래 종료시각까지 유지한다. (불변식: 상태·무적 유지)
         if (speed > 0f)
         {
             Vector3 moveDir = ResolvePlanarSlopeDirection();
-            Context.Movement.MoveRoot(moveDir * speed * Time.deltaTime);
+            MoveWithSweep(moveDir * speed * Time.deltaTime);
         }
 
         if (Time.time >= endTime)
             Context.Controller.ChangeState(PlayerActionState.Idle);
     }
 
-    // 지면이 있으면 대시 방향을 지면 평면에 투영해 오르막/내리막을 따라간다. (PLAN §8 / W3a)
-    // 평지에서는 그대로, 급경사(벽) 판정과 절벽/공중 처리는 W3b/W3c에서 확장한다.
+    // 지면이 걷기 가능 경사면 지면 평면에 투영해 오르막/내리막을 따라가고,
+    // maxWalkableSlopeAngle 초과 급경사는 벽으로 취급해 투영하지 않는다(스윕이 클램프). (PLAN §8 / W3a·W3b)
     private Vector3 ResolvePlanarSlopeDirection()
     {
         PlayerGroundingSensor sensor = Context.GroundingSensor;
         if (sensor != null && sensor.IsGrounded)
         {
-            Vector3 projected = Vector3.ProjectOnPlane(direction, sensor.GroundNormal);
-            if (projected.sqrMagnitude > 0.0001f)
-                return projected.normalized;
+            float angle = Vector3.Angle(sensor.GroundNormal, Vector3.up);
+            if (angle <= motion.MaxWalkableSlopeAngle)
+            {
+                Vector3 projected = Vector3.ProjectOnPlane(direction, sensor.GroundNormal);
+                if (projected.sqrMagnitude > 0.0001f)
+                    return projected.normalized;
+            }
         }
 
         return direction;
+    }
+
+    // 실제 CapsuleCollider 형상으로 Sweep해 벽/지형 관통을 막고, 비스듬한 충돌은 접선으로 미끄러진다.
+    // MovePosition이 지연 적용되므로 한 Tick의 모든 캐스트는 누적 오프셋으로 근사하고, MoveRoot는 마지막에 1회만 호출한다.
+    private void MoveWithSweep(Vector3 delta)
+    {
+        if (capsule == null)
+        {
+            if (delta.sqrMagnitude > 0f)
+                Context.Movement.MoveRoot(delta);
+            return;
+        }
+
+        Vector3 accumulated = Vector3.zero;
+        Vector3 remaining = delta;
+        float skin = motion.CollisionSkin;
+        int iterations = Mathf.Max(1, motion.MaxSweepIterations);
+
+        for (int i = 0; i < iterations; i++)
+        {
+            float dist = remaining.magnitude;
+            if (dist <= 1e-5f)
+                break;
+
+            Vector3 dir = remaining / dist;
+
+            if (TryCapsuleCast(accumulated, dir, dist + skin, out RaycastHit hit))
+            {
+                float allowed = Mathf.Max(0f, hit.distance - skin);
+                accumulated += dir * allowed;
+                Vector3 leftover = dir * (dist - allowed);
+                remaining = Vector3.ProjectOnPlane(leftover, hit.normal);
+            }
+            else
+            {
+                accumulated += remaining;
+                break;
+            }
+        }
+
+        if (accumulated.sqrMagnitude > 1e-10f)
+            Context.Movement.MoveRoot(accumulated);
+    }
+
+    private bool TryCapsuleCast(Vector3 originOffset, Vector3 dir, float maxDistance, out RaycastHit best)
+    {
+        best = default;
+        ComputeWorldCapsule(originOffset, out Vector3 p1, out Vector3 p2, out float radius);
+
+        int count = Physics.CapsuleCastNonAlloc(
+            p1, p2, radius, dir, castBuffer, maxDistance, motion.ObstacleMask, QueryTriggerInteraction.Ignore);
+
+        float nearest = float.PositiveInfinity;
+        bool found = false;
+        for (int i = 0; i < count; i++)
+        {
+            RaycastHit hit = castBuffer[i];
+            if (hit.collider == null || IsSelfCollider(hit.collider))
+                continue;
+            if (hit.distance < nearest)
+            {
+                nearest = hit.distance;
+                best = hit;
+                found = true;
+            }
+        }
+
+        return found;
+    }
+
+    // 캡슐 방향은 Y축(direction==1) 가정. 대부분의 Player 캡슐과 일치한다.
+    private void ComputeWorldCapsule(Vector3 originOffset, out Vector3 p1, out Vector3 p2, out float radius)
+    {
+        Transform t = capsule.transform;
+        Vector3 lossy = t.lossyScale;
+        float radiusScale = Mathf.Max(Mathf.Abs(lossy.x), Mathf.Abs(lossy.z));
+        float heightScale = Mathf.Abs(lossy.y);
+
+        radius = capsule.radius * radiusScale;
+        float height = Mathf.Max(capsule.height * heightScale, radius * 2f);
+        float half = Mathf.Max(0f, height * 0.5f - radius);
+
+        Vector3 center = t.TransformPoint(capsule.center) + originOffset;
+        Vector3 up = t.up;
+        p1 = center + up * half;
+        p2 = center - up * half;
+    }
+
+    private bool IsSelfCollider(Collider other)
+    {
+        Transform playerTransform = Context.Player.transform;
+        return other.transform == playerTransform || other.transform.IsChildOf(playerTransform);
     }
 }

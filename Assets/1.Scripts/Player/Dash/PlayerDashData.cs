@@ -24,12 +24,24 @@ namespace BeaverLobby.Player.Dash
         [SerializeField, Min(1)] private int snapshotCapacity = 32;                // 서버 과거 상태 Ring Buffer
         [SerializeField, Min(0f)] private float snapshotFreshnessTolerance = 0.1f; // 요청시각과 Snapshot 최대 간격(초)
 
+        [Header("충돌/경사 (W3)")]
+        [SerializeField, Min(0f)] private float collisionSkin = 0.02f;             // Capsule Sweep 여유
+        [SerializeField, Min(1)] private int maxSweepIterations = 3;               // 물리 Tick당 최대 충돌 해결 반복
+        [SerializeField, Range(1f, 89f)] private float maxWalkableSlopeAngle = 50f;// 초과 경사는 벽으로 취급
+        [Tooltip("대시 Capsule Sweep이 충돌로 취급할 레이어. 자기(Player/Hurtbox) 콜라이더는 코드에서 제외한다.")]
+        [SerializeField] private LayerMask dashObstacleMask = ~0;
+
         public float DashSpeed => dashSpeed;
         public float DashDuration => dashDuration;
         public int MaxCharge => maxCharge;
         public float RechargeDuration => rechargeDuration;
         public int SnapshotCapacity => snapshotCapacity;
         public float SnapshotFreshnessTolerance => snapshotFreshnessTolerance;
+
+        public float CollisionSkin => collisionSkin;
+        public int MaxSweepIterations => maxSweepIterations;
+        public float MaxWalkableSlopeAngle => maxWalkableSlopeAngle;
+        public LayerMask DashObstacleMask => dashObstacleMask;
 
         /// <summary>검증된 불변 런타임 설정을 만든다. 값이 비정상이면 DashEnabled=false로 반환한다.</summary>
         public DashRuntimeConfig CreateValidatedConfig()

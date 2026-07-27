@@ -1,6 +1,23 @@
 using UnityEngine;
 using BeaverLobby.Player.Dash;
 
+/// <summary>대시 상태가 이동 중 충돌 해결에 쓰는 튜닝값 묶음. (W3)</summary>
+public readonly struct DashMotionSettings
+{
+    public readonly float CollisionSkin;
+    public readonly int MaxSweepIterations;
+    public readonly float MaxWalkableSlopeAngle;
+    public readonly LayerMask ObstacleMask;
+
+    public DashMotionSettings(float collisionSkin, int maxSweepIterations, float maxWalkableSlopeAngle, LayerMask obstacleMask)
+    {
+        CollisionSkin = Mathf.Max(0f, collisionSkin);
+        MaxSweepIterations = Mathf.Max(1, maxSweepIterations);
+        MaxWalkableSlopeAngle = Mathf.Clamp(maxWalkableSlopeAngle, 1f, 89f);
+        ObstacleMask = obstacleMask;
+    }
+}
+
 /// <summary>
 /// 대시 입력·오너 예측·상태 진입을 담당한다. (PLAN §6, §7 / W2)
 ///
@@ -97,7 +114,17 @@ public class PlayerDashController : MonoBehaviour
             return false;
 
         Vector3 direction = ResolveDashDirection();
-        return stateController.BeginDash(direction, (float)config.DashSpeed, (float)config.DashDuration);
+        return stateController.BeginDash(direction, (float)config.DashSpeed, (float)config.DashDuration, BuildMotionSettings());
+    }
+
+    private DashMotionSettings BuildMotionSettings()
+    {
+        // dashData는 DashEnabled 게이트를 통과한 시점에서 non-null이 보장된다.
+        return new DashMotionSettings(
+            dashData.CollisionSkin,
+            dashData.MaxSweepIterations,
+            dashData.MaxWalkableSlopeAngle,
+            dashData.DashObstacleMask);
     }
 
     // 이동 입력이 있으면 입력 방향, 없으면 현재 정면. (PLAN §7)
