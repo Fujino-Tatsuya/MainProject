@@ -389,14 +389,40 @@ public class Player : Unit
         return result;
     }
 
-    // 무적(대시 등) 동안 일반 피해를 차단한다. 서버 권한 무적 상태를 참조. (PLAN §11 / W5)
-    // 추락 판정의 무적 우회는 W10에서 서버 전용 Bypass Context로 추가한다.
+    // 추락 피해는 방어력·쉴드·일반 무적을 무시한다(서버 전용 Bypass Context). (PLAN §11, §13 / W10)
+    private bool _fallDamageBypass;
+
+    // 무적(대시 등) 동안 일반 피해를 차단한다. 단 추락 Bypass 중에는 통과시킨다. (PLAN §11 / W5·W10)
     protected override bool CanApplyHealthDamage(int damage)
     {
+        if (_fallDamageBypass)
+            return true;
+
         if (invulnerability != null && invulnerability.IsServerInvulnerable)
             return false;
 
         return base.CanApplyHealthDamage(damage);
+    }
+
+    /// <summary>
+    /// 서버 전용. 추락 피해를 적용한다: BreakShield → ceil(FinalMaxHp * ratio) 직접 피해(무적 우회).
+    /// 공격 Passive/Hit 반응을 발생시키지 않는다. (PLAN §13)
+    /// </summary>
+    public void ApplyFallDamage(float ratio)
+    {
+        if (!IsServer)
+            return;
+
+        _fallDamageBypass = true;
+        try
+        {
+            BreakShield();
+            ApplyDirectHealthDamage(Mathf.CeilToInt(FinalMaxHp * Mathf.Max(0f, ratio)));
+        }
+        finally
+        {
+            _fallDamageBypass = false;
+        }
     }
 
     private ClientRpcParams CreateOwnerClientRpcParams()
