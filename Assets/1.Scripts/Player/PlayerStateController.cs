@@ -749,8 +749,6 @@ public sealed class PlayerDashState : PlayerStateBase
     private readonly RaycastHit[] castBuffer = new RaycastHit[CastBufferSize];
 
     private float airborneVerticalSpeed; // 절벽 낙하 중 누적 하강 속도(공중 구간에서만)
-    private float startTime;
-    private Vector3 startPos;
 
     public PlayerDashState(PlayerStateContext context, Vector3 planarDirection, float speed, float duration, DashMotionSettings motion)
         : base(context)
@@ -772,16 +770,6 @@ public sealed class PlayerDashState : PlayerStateBase
     {
         Context.Player.SetAnimatorMoving(false);
         Context.Movement.RotateImmediately(direction);
-        startTime = Time.time;
-        startPos = Context.Player.transform.position;
-        Edit.Log($"[Dash][State] Enter dir=({direction.x:F2},{direction.z:F2}) speed={speed} dur={(endTime - startTime):F3} from={previousState}", Context.Player);
-    }
-
-    public override void Exit(PlayerActionState nextState)
-    {
-        float elapsed = Time.time - startTime;
-        float moved = Vector3.Distance(startPos, Context.Player.transform.position);
-        Edit.Log($"[Dash][State] Exit → {nextState} elapsed={elapsed:F3}s moved={moved:F2}m", Context.Player);
     }
 
     public override void Tick()

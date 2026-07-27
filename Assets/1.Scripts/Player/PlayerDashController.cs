@@ -160,34 +160,23 @@ public class PlayerDashController : NetworkBehaviour
     /// <summary>Idle/Move 액션 입력에서 대시 우선으로 호출된다. 게이트 통과 시 예측 소비 + 대시 진입(+온라인이면 서버 요청).</summary>
     public bool TryBeginPredictedDash()
     {
-        bool grounded = groundingSensor == null || groundingSensor.IsGrounded;
-        bool moveAuth = player != null && player.IsMovementAuthority;
-        bool canMove = player != null && player.CanMove;
-        Edit.Log($"[Dash][Owner] try: enabled={DashEnabled} moveAuth={moveAuth} canMove={canMove} grounded={grounded} charge={PredictedCharge}/{MaxCharge} spawned={IsSpawned} owner={IsOwner}", this);
-
         if (!DashEnabled)
             return false;
-        if (!moveAuth)
+        if (player == null || !player.IsMovementAuthority)
             return false;
-        if (!canMove)
+        if (!player.CanMove)
             return false;
         if (groundingSensor != null && !groundingSensor.IsGrounded)
             return false;
 
         double now = OwnerNow();
         if (!predictedLedger.TryConsume(now))
-        {
-            Edit.Log("[Dash][Owner] blocked: no predicted charge", this);
             return false;
-        }
 
         Vector3 direction = ResolveDashDirection();
         bool started = stateController.BeginDash(direction, (float)config.DashSpeed, (float)config.DashDuration, BuildMotionSettings());
         if (!started)
-        {
-            Edit.Log("[Dash][Owner] BeginDash returned false", this);
             return false;
-        }
 
         // 온라인이면 서버 승인을 요청한다. 오프라인(테스트)에서는 예측만.
         if (IsSpawned && IsOwner)
@@ -195,12 +184,7 @@ public class PlayerDashController : NetworkBehaviour
             uint requestId = _nextRequestId++;
             _pendingRequestId = requestId;
             _hasPending = true;
-            Edit.Log($"[Dash][Owner] started req={requestId} dir=({direction.x:F2},{direction.z:F2}) localT={LocalTimeForRequest():F3} predCharge={PredictedCharge}", this);
             SubmitDashRequestServerRpc(requestId, LocalTimeForRequest(), direction.x, direction.z, predictedLedger.Revision);
-        }
-        else
-        {
-            Edit.Log("[Dash][Owner] started OFFLINE (예측만, RPC 없음)", this);
         }
 
         return true;
@@ -218,8 +202,6 @@ public class PlayerDashController : NetworkBehaviour
         ulong senderClientId = rpcParams.Receive.SenderClientId;
         double rttSeconds = GetSenderRttSeconds(senderClientId, out bool rttAvailable);
 
-        Edit.Log($"[Dash][Server] recv req={requestId} sender={senderClientId} localT={clientLocalTime:F3} serverNow={ServerNow():F3} rtt={rttSeconds:F4}s rttAvail={rttAvailable} dir=({directionX:F2},{directionZ:F2})", this);
-
         DashServerResponse response = PlayerDashValidationManager.Instance.ValidateRequest(
             NetworkObjectId, senderClientId, requestId,
             clientLocalTime, directionX, directionZ,
@@ -227,8 +209,6 @@ public class PlayerDashController : NetworkBehaviour
             currentDead: false,
             currentSoul: false,
             currentCrowdControlled: statusEffects != null && statusEffects.BlocksMovement);
-
-        Edit.Log($"[Dash][Server] result req={requestId} approved={response.IsApproved} reason={response.Reason} remaining={response.RemainingServerDuration:F3} interrupted={response.WasInterruptedByServerState} charge={response.AuthoritativeChargeCount}", this);
 
         RespondDashClientRpc(
             requestId, response.IsApproved, (int)response.Reason, response.RemainingServerDuration,
@@ -245,20 +225,16 @@ public class PlayerDashController : NetworkBehaviour
         if (!IsOwner || predictedLedger == null)
             return;
 
-        bool isPendingMatch = _hasPending && requestId == _pendingRequestId;
-        Edit.Log($"[Dash][Owner] resp req={requestId} approved={approved} reason={(DashRejectReason)reason} remaining={remainingServerDuration:F3} interrupted={interrupted} charge={authoritativeChargeCount} pendingMatch={isPendingMatch}", this);
-
         // 권한 충전으로 예측 정합(더 최신 Epoch/Revision만 채택).
         predictedLedger.SyncToAuthoritative(authoritativeChargeCount, chargeEpoch, chargeRevision, OwnerNow());
 
-        if (isPendingMatch)
+        if (_hasPending && requestId == _pendingRequestId)
         {
             _hasPending = false;
 
             // 거부/중단/이미 종료면 진행 중인 예측 대시를 멈춘다(위치 롤백은 v1 없음).
             if (!approved || interrupted || remainingServerDuration <= 0.0)
             {
-                Edit.Log($"[Dash][Owner] EndDash by response req={requestId} (approved={approved} interrupted={interrupted} remaining={remainingServerDuration:F3})", this);
                 stateController.EndDash();
             }
         }
