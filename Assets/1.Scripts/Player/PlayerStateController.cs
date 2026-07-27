@@ -801,8 +801,7 @@ public sealed class PlayerDashState : PlayerStateBase
         return direction;
     }
 
-    // 실제 CapsuleCollider 형상으로 Sweep해 벽/지형 관통을 막고, 비스듬한 충돌은 접선으로 미끄러진다.
-    // MovePosition이 지연 적용되므로 한 Tick의 모든 캐스트는 누적 오프셋으로 근사하고, MoveRoot는 마지막에 1회만 호출한다.
+    // 대시·일반 이동이 공유하는 스윕으로 벽/급경사 관통을 막고 접선으로 미끄러진다. (PlayerMotionSweep 단일 소스)
     private void MoveWithSweep(Vector3 delta)
     {
         if (capsule == null)
@@ -812,90 +811,11 @@ public sealed class PlayerDashState : PlayerStateBase
             return;
         }
 
-        Vector3 accumulated = Vector3.zero;
-        Vector3 remaining = delta;
-        float skin = motion.CollisionSkin;
-        int iterations = Mathf.Max(1, motion.MaxSweepIterations);
+        Vector3 resolved = PlayerMotionSweep.Resolve(
+            capsule, delta, motion.MaxWalkableSlopeAngle, motion.ObstacleMask,
+            motion.CollisionSkin, motion.MaxSweepIterations, castBuffer);
 
-        for (int i = 0; i < iterations; i++)
-        {
-            float dist = remaining.magnitude;
-            if (dist <= 1e-5f)
-                break;
-
-            Vector3 dir = remaining / dist;
-
-            if (TryCapsuleCast(accumulated, dir, dist + skin, out RaycastHit hit))
-            {
-                float allowed = Mathf.Max(0f, hit.distance - skin);
-                accumulated += dir * allowed;
-                Vector3 leftover = dir * (dist - allowed);
-                remaining = Vector3.ProjectOnPlane(leftover, hit.normal);
-            }
-            else
-            {
-                accumulated += remaining;
-                break;
-            }
-        }
-
-        if (accumulated.sqrMagnitude > 1e-10f)
-            Context.Movement.MoveRoot(accumulated);
-    }
-
-    private bool TryCapsuleCast(Vector3 originOffset, Vector3 dir, float maxDistance, out RaycastHit best)
-    {
-        best = default;
-        ComputeWorldCapsule(originOffset, out Vector3 p1, out Vector3 p2, out float radius);
-
-        int count = Physics.CapsuleCastNonAlloc(
-            p1, p2, radius, dir, castBuffer, maxDistance, motion.ObstacleMask, QueryTriggerInteraction.Ignore);
-
-        float nearest = float.PositiveInfinity;
-        bool found = false;
-        for (int i = 0; i < count; i++)
-        {
-            RaycastHit hit = castBuffer[i];
-            if (hit.collider == null || IsSelfCollider(hit.collider))
-                continue;
-
-            // 걸을 수 있는 경사(지면)는 막지 않는다 — 경사 투영으로 타고 오른다.
-            // 급경사/벽/천장(법선이 위에서 크게 벗어남)만 차단한다. 초기 겹침(normal≈0)도 여기서 무시된다.
-            if (Vector3.Angle(hit.normal, Vector3.up) <= motion.MaxWalkableSlopeAngle)
-                continue;
-
-            if (hit.distance < nearest)
-            {
-                nearest = hit.distance;
-                best = hit;
-                found = true;
-            }
-        }
-
-        return found;
-    }
-
-    // 캡슐 방향은 Y축(direction==1) 가정. 대부분의 Player 캡슐과 일치한다.
-    private void ComputeWorldCapsule(Vector3 originOffset, out Vector3 p1, out Vector3 p2, out float radius)
-    {
-        Transform t = capsule.transform;
-        Vector3 lossy = t.lossyScale;
-        float radiusScale = Mathf.Max(Mathf.Abs(lossy.x), Mathf.Abs(lossy.z));
-        float heightScale = Mathf.Abs(lossy.y);
-
-        radius = capsule.radius * radiusScale;
-        float height = Mathf.Max(capsule.height * heightScale, radius * 2f);
-        float half = Mathf.Max(0f, height * 0.5f - radius);
-
-        Vector3 center = t.TransformPoint(capsule.center) + originOffset;
-        Vector3 up = t.up;
-        p1 = center + up * half;
-        p2 = center - up * half;
-    }
-
-    private bool IsSelfCollider(Collider other)
-    {
-        Transform playerTransform = Context.Player.transform;
-        return other.transform == playerTransform || other.transform.IsChildOf(playerTransform);
+        if (resolved.sqrMagnitude > 1e-10f)
+            Context.Movement.MoveRoot(resolved);
     }
 }
