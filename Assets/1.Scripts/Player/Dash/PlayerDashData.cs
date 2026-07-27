@@ -27,7 +27,9 @@ namespace BeaverLobby.Player.Dash
         [Header("충돌/경사 (W3)")]
         [SerializeField, Min(0f)] private float collisionSkin = 0.02f;             // Capsule Sweep 여유
         [SerializeField, Min(1)] private int maxSweepIterations = 3;               // 물리 Tick당 최대 충돌 해결 반복
-        [SerializeField, Range(1f, 89f)] private float maxWalkableSlopeAngle = 50f;// 초과 경사는 벽으로 취급
+        // 초과 경사는 벽으로 취급. PlayerGroundingSensor의 지면 인정 한계(약 60°)와 맞춰
+        // 걸어 올라갈 수 있는 경사를 대시도 동일하게 따라가게 한다. (PLAN §5 "등판각은 일반 이동 규칙 공유")
+        [SerializeField, Range(1f, 89f)] private float maxWalkableSlopeAngle = 60f;
         [Tooltip("대시 Capsule Sweep이 충돌로 취급할 레이어. 자기(Player/Hurtbox) 콜라이더는 코드에서 제외한다.")]
         [SerializeField] private LayerMask dashObstacleMask = ~0;
 
