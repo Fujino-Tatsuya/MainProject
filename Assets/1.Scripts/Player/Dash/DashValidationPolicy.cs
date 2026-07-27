@@ -84,8 +84,11 @@ namespace BeaverLobby.Player.Dash
                 return DashValidationResult.Reject(DashRejectReason.RttUnavailable);
             }
 
+            // 요청은 서버 수신 시점(serverNow) 기준 약 oneWay 전에 보내졌다.
+            // 클라이언트 절대 시계에 의존하면 피어 간 시계 오프셋으로 스냅샷 매칭이 어긋나므로(관측: ~1s),
+            // 서버 도메인에서 estimatedServerStart = serverNow - oneWay로 추정한다. (RTT 보정 취지 유지)
             double oneWayDelay = serverRtt * 0.5;
-            double estimatedServerStart = request.ClientNetworkLocalTime - oneWayDelay;
+            double estimatedServerStart = serverNow - oneWayDelay;
 
             if (history == null ||
                 !history.TrySelectAtOrBefore(estimatedServerStart, snapshotFreshnessTolerance, out DashStateSnapshot snapshot))
