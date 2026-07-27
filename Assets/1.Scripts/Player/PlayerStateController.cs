@@ -739,6 +739,7 @@ public sealed class PlayerKnockbackState : PlayerStateBase
 public sealed class PlayerDashState : PlayerStateBase
 {
     private const int CastBufferSize = 8;
+    private const float MaxFallSpeed = 30f; // 대시 공중 낙하 속도 상한 (PLAN §5)
 
     private readonly Vector3 direction; // 평면 정규화 방향(시작 순간 확정)
     private readonly float speed;
@@ -746,6 +747,8 @@ public sealed class PlayerDashState : PlayerStateBase
     private readonly DashMotionSettings motion;
     private readonly CapsuleCollider capsule;
     private readonly RaycastHit[] castBuffer = new RaycastHit[CastBufferSize];
+
+    private float airborneVerticalSpeed; // 절벽 낙하 중 누적 하강 속도(공중 구간에서만)
 
     public PlayerDashState(PlayerStateContext context, Vector3 planarDirection, float speed, float duration, DashMotionSettings motion)
         : base(context)
@@ -772,11 +775,29 @@ public sealed class PlayerDashState : PlayerStateBase
     public override void Tick()
     {
         // 정면 벽으로 이동이 0이 되어도 대시 상태는 원래 종료시각까지 유지한다. (불변식: 상태·무적 유지)
+        Vector3 delta = Vector3.zero;
         if (speed > 0f)
         {
-            Vector3 moveDir = ResolvePlanarSlopeDirection();
-            MoveWithSweep(moveDir * speed * Time.deltaTime);
+            Vector3 moveDir = ResolvePlanarSlopeDirection(); // 접지면 경사 투영, 공중이면 flat 수평
+            delta = moveDir * speed * Time.deltaTime;
         }
+
+        // 절벽: Grounded를 잃으면 남은 대시 동안 방향 조작·Drag 없이 대시 수평속도 + 중력을 적용한다. (PLAN §8 / W3c)
+        PlayerGroundingSensor sensor = Context.GroundingSensor;
+        bool grounded = sensor != null && sensor.IsGrounded;
+        if (!grounded)
+        {
+            airborneVerticalSpeed += Physics.gravity.y * Time.deltaTime; // gravity.y < 0
+            airborneVerticalSpeed = Mathf.Max(airborneVerticalSpeed, -MaxFallSpeed);
+            delta.y += airborneVerticalSpeed * Time.deltaTime;
+        }
+        else
+        {
+            airborneVerticalSpeed = 0f;
+        }
+
+        if (delta.sqrMagnitude > 0f)
+            MoveWithSweep(delta);
 
         if (Time.time >= endTime)
             Context.Controller.ChangeState(PlayerActionState.Idle);
