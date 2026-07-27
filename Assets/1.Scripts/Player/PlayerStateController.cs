@@ -858,6 +858,12 @@ public sealed class PlayerDashState : PlayerStateBase
             RaycastHit hit = castBuffer[i];
             if (hit.collider == null || IsSelfCollider(hit.collider))
                 continue;
+
+            // 걸을 수 있는 경사(지면)는 막지 않는다 — 경사 투영으로 타고 오른다.
+            // 급경사/벽/천장(법선이 위에서 크게 벗어남)만 차단한다. 초기 겹침(normal≈0)도 여기서 무시된다.
+            if (Vector3.Angle(hit.normal, Vector3.up) <= motion.MaxWalkableSlopeAngle)
+                continue;
+
             if (hit.distance < nearest)
             {
                 nearest = hit.distance;
