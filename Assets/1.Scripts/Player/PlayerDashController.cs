@@ -46,6 +46,7 @@ public class PlayerDashController : NetworkBehaviour
     private PlayerStateController stateController;
     private PlayerMovement movement;
     private StatusEffectController statusEffects;
+    private PlayerInvulnerability invulnerability;
 
     private DashRuntimeConfig config;
     private DashChargeLedger predictedLedger;
@@ -71,6 +72,7 @@ public class PlayerDashController : NetworkBehaviour
         stateController = GetComponent<PlayerStateController>();
         movement = GetComponent<PlayerMovement>();
         statusEffects = GetComponent<StatusEffectController>();
+        invulnerability = GetComponent<PlayerInvulnerability>();
         if (groundingSensor == null)
             groundingSensor = GetComponent<PlayerGroundingSensor>();
 
@@ -136,9 +138,16 @@ public class PlayerDashController : NetworkBehaviour
 
     private void Update()
     {
+        if (player == null || !player.IsMovementAuthority)
+            return;
+
         // 오너 예측 충전 회복.
-        if (ready && predictedLedger != null && player != null && player.IsMovementAuthority)
+        if (ready && predictedLedger != null)
             predictedLedger.Advance(OwnerNow());
+
+        // 예측 무적을 대시 상태에 맞춘다(오너 로컬 Hurtbox 즉시 반영). 서버 무적은 승인 토큰이 확정.
+        if (invulnerability != null && stateController != null)
+            invulnerability.SetOwnerPredicted(stateController.CurrentState == PlayerActionState.Dash);
     }
 
     private void FixedUpdate()
@@ -209,6 +218,15 @@ public class PlayerDashController : NetworkBehaviour
             currentDead: false,
             currentSoul: false,
             currentCrowdControlled: statusEffects != null && statusEffects.BlocksMovement);
+
+        // 승인되고 실제 대시가 진행될 때만 서버 권한 무적을 남은 대시 시간만큼 부여한다. (PLAN §11)
+        if (invulnerability != null &&
+            response.IsApproved &&
+            !response.WasInterruptedByServerState &&
+            response.RemainingServerDuration > 0.0)
+        {
+            invulnerability.AddServerToken(InvulnerabilityCause.Dash, response.RemainingServerDuration);
+        }
 
         RespondDashClientRpc(
             requestId, response.IsApproved, (int)response.Reason, response.RemainingServerDuration,

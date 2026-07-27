@@ -46,6 +46,7 @@ public class Player : Unit
     private DefaultAttackController defaultAttack;
     private FirstMeleePassive passive;
     private PlayerMovement movement;
+    private PlayerInvulnerability invulnerability;
     private Rigidbody playerRigidbody;
     private bool initialRigidbodyIsKinematic;
     private bool initialRigidbodyDetectCollisions;
@@ -69,6 +70,7 @@ public class Player : Unit
         defaultAttack = GetComponent<DefaultAttackController>();
         passive = GetComponent<FirstMeleePassive>();
         movement = GetComponent<PlayerMovement>();
+        invulnerability = GetComponent<PlayerInvulnerability>();
         playerRigidbody = GetComponent<Rigidbody>();
         if (playerRigidbody != null)
         {
@@ -385,6 +387,16 @@ public class Player : Unit
         bool result = base.ReceiveAttack(attackInfo, hitContext);
         passive?.NotifyOwnerHit();
         return result;
+    }
+
+    // 무적(대시 등) 동안 일반 피해를 차단한다. 서버 권한 무적 상태를 참조. (PLAN §11 / W5)
+    // 추락 판정의 무적 우회는 W10에서 서버 전용 Bypass Context로 추가한다.
+    protected override bool CanApplyHealthDamage(int damage)
+    {
+        if (invulnerability != null && invulnerability.IsServerInvulnerable)
+            return false;
+
+        return base.CanApplyHealthDamage(damage);
     }
 
     private ClientRpcParams CreateOwnerClientRpcParams()
