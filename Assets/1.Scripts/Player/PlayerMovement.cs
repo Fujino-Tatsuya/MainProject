@@ -16,25 +16,9 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private float alignThreshold = 0.98f;
     [SerializeField] private float viewYaw = -45f;
 
-    [Header("경사/충돌 (W3)")]
-    [Tooltip("공용 이동 규칙(등판각). 미할당 시 60도 폴백. 걷기·대시가 이 값을 공유한다.")]
-    [SerializeField] private PlayerGameRuleData gameRule;
-    [Tooltip("걷기 Capsule Sweep이 충돌로 취급할 레이어. 자기 콜라이더는 코드에서 제외.")]
-    [SerializeField] private LayerMask walkObstacleMask = ~0;
-
-    private const float SweepSkin = 0.02f;
-    private const int SweepIterations = 3;
-    private const float DefaultMaxWalkableSlopeAngle = 60f;
-
-    private CapsuleCollider capsule;
-    private readonly RaycastHit[] sweepBuffer = new RaycastHit[8];
-
     private Vector2 prevDir_for_Rotate = new Vector2(0f, -1f);
     private bool hasRotate = true;
     private float currentSpeed;
-
-    private float WalkableSlopeAngle()
-        => gameRule != null ? gameRule.MaxWalkableSlopeAngle : DefaultMaxWalkableSlopeAngle;
 
     // 이동 플랫폼 캐리: 이번 프레임 외부 이동량(플랫폼). Move()에서 입력 이동과 합산 후 리셋.
     private Vector3 _carryDelta;
@@ -50,7 +34,6 @@ public class PlayerMovement : MonoBehaviour
         reader = GetComponent<PlayerInputReader>();
         player = GetComponent<Player>();
         rb = GetComponent<Rigidbody>();
-        capsule = GetComponent<CapsuleCollider>();
 
         if (armature == null)
             armature = transform.Find("Armature");
@@ -105,11 +88,6 @@ public class PlayerMovement : MonoBehaviour
                 : 1f;
 
             inputMove = worldDir * currentSpeed * statusMultiplier * Time.deltaTime;
-
-            // 급경사/벽은 공용 스윕으로 막고 걸을 수 있는 경사는 통과시킨다.
-            // '걸을 수 없는 각도 = 대시도 못 오르는 각도'를 위해 대시와 동일한 규칙/로직을 공유한다. (PlayerMotionSweep)
-            inputMove = PlayerMotionSweep.Resolve(
-                capsule, inputMove, WalkableSlopeAngle(), walkObstacleMask, SweepSkin, SweepIterations, sweepBuffer);
         }
         else
         {
