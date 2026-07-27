@@ -267,8 +267,12 @@ public class PlayerDashController : NetworkBehaviour
             return 0.0;
         }
 
+        // localhost/MPPM에서는 원격 RTT도 0으로 보고될 수 있다. 0은 "지연 0"으로 유효 처리하고,
+        // Transport가 있으면 사용 가능으로 본다(음수만 0으로 보정). 이전엔 0을 거부해 클라 대시가 전부 중단됐다.
         double rttSeconds = transport.GetCurrentRtt(senderClientId) / 1000.0;
-        rttAvailable = rttSeconds > 0.0;
+        if (rttSeconds < 0.0)
+            rttSeconds = 0.0;
+        rttAvailable = true;
         return rttSeconds;
     }
 
