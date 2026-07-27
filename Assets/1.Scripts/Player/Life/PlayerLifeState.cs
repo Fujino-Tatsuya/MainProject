@@ -11,6 +11,16 @@ public enum PlayerLifeState
 }
 
 /// <summary>
+/// 사망 연출 진입 원인.
+/// FallDeathContext가 확정되기 전까지 Fall 쪽이 사용할 최소 placeholder 계약이다.
+/// </summary>
+public enum PlayerDeathCause
+{
+    Combat,
+    Fall
+}
+
+/// <summary>
 /// 각 입력/피격 시스템이 생명주기 상태를 소비할 때 사용하는 공용 게이트 값.
 /// 실제 입력 컴포넌트와 Hurtbox 배선은 후속 통합에서 수행한다.
 /// </summary>

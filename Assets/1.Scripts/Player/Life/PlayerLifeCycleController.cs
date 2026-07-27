@@ -24,6 +24,8 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
             NetworkVariableWritePermission.Server);
 
     public PlayerLifeState State => lifeState.Value;
+    public PlayerDeathCause LastDeathCause { get; private set; } =
+        PlayerDeathCause.Combat;
     public PlayerLifeGameplayAccess GameplayAccess =>
         PlayerLifeGameplayAccess.FromState(lifeState.Value);
 
@@ -54,7 +56,24 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
     /// <summary>Alive 사망을 DeadPresentation으로 진입시킨다. 서버에서만 성공한다.</summary>
     public bool TryBeginDeathPresentation()
     {
-        return TryTransition(PlayerLifeState.DeadPresentation);
+        return TryBeginDeathPresentation(PlayerDeathCause.Combat);
+    }
+
+    /// <summary>
+    /// Alive 사망 원인을 기록하고 DeadPresentation으로 진입시킨다.
+    /// FallDeathContext가 확정되면 Fall 경로가 Fall 원인으로 이 overload를 호출한다.
+    /// </summary>
+    public bool TryBeginDeathPresentation(PlayerDeathCause deathCause)
+    {
+        if (!CanWriteLifeState ||
+            !IsValidTransition(lifeState.Value, PlayerLifeState.DeadPresentation))
+        {
+            return false;
+        }
+
+        LastDeathCause = deathCause;
+        lifeState.Value = PlayerLifeState.DeadPresentation;
+        return true;
     }
 
     /// <summary>DeadPresentation 종료 후 Soul로 전환한다. 서버에서만 성공한다.</summary>
