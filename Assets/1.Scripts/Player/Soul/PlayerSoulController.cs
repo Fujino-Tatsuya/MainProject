@@ -17,6 +17,8 @@ public sealed class PlayerSoulController : MonoBehaviour
     [SerializeField] private GameObject aliveVisual;
     [Tooltip("Soul 외형의 부모. 비어 있으면 Player Root를 사용합니다.")]
     [SerializeField] private Transform soulVisualRoot;
+    [Tooltip("SoulVisualPrefab이 없을 때 생존 외형에 임시로 적용할 머티리얼.")]
+    [SerializeField] private Material fallbackSoulMaterial;
 
     [Header("Combat Target")]
     [Tooltip("비어 있으면 Player Root 아래의 모든 Hurtbox Collider를 찾습니다.")]
@@ -27,6 +29,9 @@ public sealed class PlayerSoulController : MonoBehaviour
     [SerializeField, Min(0f)] private float soulMoveSpeed = 5f;
 
     private GameObject soulVisual;
+    private Renderer[] aliveRenderers;
+    private Material[][] originalAliveMaterials;
+    private GameObject cachedMaterialVisual;
     private bool[] initialHurtboxEnabled;
     private int aliveLayer;
     private int soulLayer = -1;
@@ -126,6 +131,7 @@ public sealed class PlayerSoulController : MonoBehaviour
 
     private void HandleCharacterApplied(CharacterDefinition definition)
     {
+        InvalidateAliveMaterialCache();
         SetCharacterDefinition(definition);
     }
 
@@ -211,10 +217,12 @@ public sealed class PlayerSoulController : MonoBehaviour
     private void SetVisualState(bool isAlive, bool isSoul)
     {
         ResolveReferences();
+        bool useFallbackAliveVisual = isSoul && soulVisual == null;
+        SetFallbackSoulMaterial(useFallbackAliveVisual);
 
         if (aliveVisual != null)
         {
-            aliveVisual.SetActive(isAlive);
+            aliveVisual.SetActive(isAlive || useFallbackAliveVisual);
         }
         else if (!warnedMissingAliveVisual)
         {
@@ -227,6 +235,72 @@ public sealed class PlayerSoulController : MonoBehaviour
 
         if (soulVisual != null)
             soulVisual.SetActive(isSoul);
+    }
+
+    private void SetFallbackSoulMaterial(bool shouldUseFallback)
+    {
+        CacheAliveVisualMaterials();
+
+        if (aliveRenderers == null || originalAliveMaterials == null)
+            return;
+
+        if (shouldUseFallback && fallbackSoulMaterial == null)
+        {
+            Debug.LogWarning(
+                "[SoulAlert] SoulVisualPrefab과 임시 Soul Material이 모두 없습니다. " +
+                "Alive 외형을 유지하지만 초록 표시를 적용할 수 없습니다.",
+                this);
+            return;
+        }
+
+        for (int i = 0; i < aliveRenderers.Length; i++)
+        {
+            Renderer aliveRenderer = aliveRenderers[i];
+            if (aliveRenderer == null)
+                continue;
+
+            Material[] originalMaterials = originalAliveMaterials[i];
+            if (!shouldUseFallback)
+            {
+                aliveRenderer.sharedMaterials = originalMaterials;
+                continue;
+            }
+
+            Material[] fallbackMaterials = new Material[originalMaterials.Length];
+            for (int materialIndex = 0;
+                 materialIndex < fallbackMaterials.Length;
+                 materialIndex++)
+            {
+                fallbackMaterials[materialIndex] = fallbackSoulMaterial;
+            }
+
+            aliveRenderer.sharedMaterials = fallbackMaterials;
+        }
+    }
+
+    private void CacheAliveVisualMaterials()
+    {
+        if (aliveVisual == null ||
+            (cachedMaterialVisual == aliveVisual &&
+             aliveRenderers != null &&
+             originalAliveMaterials != null))
+        {
+            return;
+        }
+
+        cachedMaterialVisual = aliveVisual;
+        aliveRenderers = aliveVisual.GetComponentsInChildren<Renderer>(true);
+        originalAliveMaterials = new Material[aliveRenderers.Length][];
+
+        for (int i = 0; i < aliveRenderers.Length; i++)
+            originalAliveMaterials[i] = aliveRenderers[i].sharedMaterials;
+    }
+
+    private void InvalidateAliveMaterialCache()
+    {
+        cachedMaterialVisual = null;
+        aliveRenderers = null;
+        originalAliveMaterials = null;
     }
 
     private void SetRootLayer(bool isSoul)
