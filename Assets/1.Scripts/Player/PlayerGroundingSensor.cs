@@ -19,7 +19,7 @@ public sealed class PlayerGroundingSensor : NetworkBehaviour
     }
 
     private const float ProbeRadiusScale = 0.95f;
-    private const float MinimumGroundUpDot = 0.5f;
+    private const float DefaultMinimumGroundUpDot = 0.5f; // 규칙 미할당 시 폴백(60도)
     private const float VerticalVelocityEpsilon = 0.01f;
     private const int MaxProbeHits = 8;
 
@@ -27,6 +27,8 @@ public sealed class PlayerGroundingSensor : NetworkBehaviour
     [SerializeField, Min(0f)] private float probeDistance = 0.1f;
     [SerializeField] private LayerMask aliveGroundMask = ~0;
     [SerializeField] private LayerMask soulGroundMask = ~0;
+    [Tooltip("걸을 수 있는 최대 경사각 등 공용 규칙. 미할당 시 기본 60도(dot 0.5)로 폴백한다.")]
+    [SerializeField] private PlayerGameRuleData gameRule;
 
     private readonly RaycastHit[] probeHits = new RaycastHit[MaxProbeHits];
 
@@ -141,6 +143,9 @@ public sealed class PlayerGroundingSensor : NetworkBehaviour
             ? soulGroundMask
             : aliveGroundMask;
 
+        // 걸을 수 있는 경사 한계는 공용 규칙에서 온다(대시 등판각과 단일 소스). 미할당 시 60도 폴백.
+        float minGroundUpDot = gameRule != null ? gameRule.WalkableGroundUpDot : DefaultMinimumGroundUpDot;
+
         int hitCount = Physics.SphereCastNonAlloc(
             bottomSphereCenter,
             probeRadius,
@@ -157,7 +162,7 @@ public sealed class PlayerGroundingSensor : NetworkBehaviour
             if (hit.collider == null || IsOwnCollider(hit.collider))
                 continue;
 
-            if (Vector3.Dot(hit.normal, Vector3.up) < MinimumGroundUpDot)
+            if (Vector3.Dot(hit.normal, Vector3.up) < minGroundUpDot)
                 continue;
 
             if (hit.distance >= nearestDistance)

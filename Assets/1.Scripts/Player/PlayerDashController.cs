@@ -32,8 +32,12 @@ public class PlayerDashController : MonoBehaviour
 {
     [Tooltip("대시 튜닝 원본(ScriptableObject). 없으면 대시가 비활성화된다.")]
     [SerializeField] private PlayerDashData dashData;
+    [Tooltip("공용 이동 규칙(등판각 등). 미할당 시 60도 폴백.")]
+    [SerializeField] private PlayerGameRuleData gameRule;
     [Tooltip("지면 판정 센서. 없으면 지면 게이트를 건너뛴다(W2 한정).")]
     [SerializeField] private PlayerGroundingSensor groundingSensor;
+
+    private const float DefaultMaxWalkableSlopeAngle = 60f;
 
     private Player player;
     private PlayerInputReader input;
@@ -120,10 +124,12 @@ public class PlayerDashController : MonoBehaviour
     private DashMotionSettings BuildMotionSettings()
     {
         // dashData는 DashEnabled 게이트를 통과한 시점에서 non-null이 보장된다.
+        // 등판각은 공용 규칙(GroundingSensor와 단일 소스)에서 읽는다. 미할당 시 폴백.
+        float walkableAngle = gameRule != null ? gameRule.MaxWalkableSlopeAngle : DefaultMaxWalkableSlopeAngle;
         return new DashMotionSettings(
             dashData.CollisionSkin,
             dashData.MaxSweepIterations,
-            dashData.MaxWalkableSlopeAngle,
+            walkableAngle,
             dashData.DashObstacleMask);
     }
 
