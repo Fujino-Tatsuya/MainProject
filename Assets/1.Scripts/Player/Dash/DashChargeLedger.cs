@@ -124,6 +124,31 @@ namespace BeaverLobby.Player.Dash
             _revision = 0u;
         }
 
+        /// <summary>
+        /// 서버 권한 충전 스냅샷으로 정합한다(오너 예측 → 권한 동기화). (PLAN §10)
+        /// 과거 Epoch/Revision 스냅샷은 최신 장부를 덮지 않는다. 채택 시 지역 회복 타이머를 now 기준으로 다시 시작한다.
+        /// </summary>
+        public void SyncToAuthoritative(int count, uint epoch, uint revision, double now)
+        {
+            if (epoch < _epoch)
+            {
+                return; // 더 최신 강제 초기화 장부를 과거 스냅샷으로 덮지 않는다.
+            }
+
+            if (epoch == _epoch && SequenceLess(revision, _revision))
+            {
+                return; // 같은 Epoch 안에서 더 오래된 Revision은 무시.
+            }
+
+            _epoch = epoch;
+            _revision = revision;
+            _count = Clamp(count, 0, _maxCharge);
+            _nextReadyTime = _count >= _maxCharge ? double.PositiveInfinity : now + _rechargeDuration;
+        }
+
+        private static bool SequenceLess(uint a, uint b)
+            => unchecked((int)(a - b)) < 0;
+
         private static int Clamp(int value, int min, int max)
             => value < min ? min : (value > max ? max : value);
     }
