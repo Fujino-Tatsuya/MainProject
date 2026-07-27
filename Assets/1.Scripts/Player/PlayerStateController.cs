@@ -164,6 +164,16 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
             ChangeState(PlayerActionState.Idle);
     }
 
+    // 대시가 공중에서 끝났을 때 수평 관성을 유지한 채 공중 상태로 넘긴다. 착지 시 Idle로 복귀.
+    public bool BeginAirborne(Vector3 horizontalVelocity, float verticalSpeed, float maxWalkableSlopeAngle, LayerMask obstacleMask)
+    {
+        if (CurrentState == PlayerActionState.Dead)
+            return false;
+
+        SetState(new PlayerAirborneState(context, horizontalVelocity, verticalSpeed, maxWalkableSlopeAngle, obstacleMask));
+        return true;
+    }
+
     // Skill 상태는 실행할 스킬 인스턴스가 필요해 BeginKnockback처럼 인스턴스 주입 경로로만 진입한다.
     public bool BeginSkill(PlayerSkillBase skill)
     {
@@ -195,6 +205,7 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
             PlayerActionState.Grabbed => true,
             PlayerActionState.Knockback => false, // 방향·세기가 필수라 BeginKnockback(direction, strength)으로만 진입
             PlayerActionState.Dash => false, // 방향·속도·지속이 필수라 BeginDash(...)로만 진입
+            PlayerActionState.Airborne => false, // 초기 속도가 필수라 BeginAirborne(...)로만 진입
             PlayerActionState.Dead => true,
             _ => false
         };
@@ -267,7 +278,8 @@ public enum PlayerActionState
     Knockback,
     Dead,
     Skill,
-    Dash
+    Dash,
+    Airborne
 }
 
 public sealed class PlayerStateContext
@@ -800,7 +812,14 @@ public sealed class PlayerDashState : PlayerStateBase
             MoveWithSweep(delta);
 
         if (Time.time >= endTime)
-            Context.Controller.ChangeState(PlayerActionState.Idle);
+        {
+            // 지면에서 끝나면 대시 속도만 제거하고 Idle. 공중에서 끝나면 수평 관성을 공중 상태로 넘긴다. (PLAN §8)
+            if (grounded)
+                Context.Controller.ChangeState(PlayerActionState.Idle);
+            else
+                Context.Controller.BeginAirborne(
+                    direction * speed, airborneVerticalSpeed, motion.MaxWalkableSlopeAngle, motion.ObstacleMask);
+        }
     }
 
     // 지면이 걷기 가능 경사면 지면 평면에 투영해 오르막/내리막을 따라가고,
@@ -838,5 +857,79 @@ public sealed class PlayerDashState : PlayerStateBase
 
         if (resolved.sqrMagnitude > 1e-10f)
             Context.Movement.MoveRoot(resolved);
+    }
+}
+
+// 대시가 공중에서 끝난 뒤의 관성 낙하 상태. 수평 관성을 Drag로 감쇠하며 제한된 공중 조작을 허용하고,
+// 중력으로 낙하하다 착지하면 Idle로 복귀한다. (PLAN §8 / W3c-b)
+// v1 튜닝값은 상수(§5 기본값). 추후 PlayerGameRuleData로 이관 가능.
+public sealed class PlayerAirborneState : PlayerStateBase
+{
+    private const float AirMaxControlSpeed = 5f;      // 공중 입력이 만들 수 있는 수평 속도 상한
+    private const float AirControlAcceleration = 12f; // 공중 입력 가속
+    private const float AirHorizontalDrag = 1.5f;     // 수평 관성 감쇠
+    private const float MaxFallSpeed = 30f;
+    private const float CollisionSkin = 0.02f;
+    private const int MaxSweepIterations = 3;
+    private const int CastBufferSize = 8;
+
+    private Vector3 horizontalVelocity; // y=0
+    private float verticalSpeed;
+    private readonly float walkableAngle;
+    private readonly LayerMask obstacleMask;
+    private readonly CapsuleCollider capsule;
+    private readonly RaycastHit[] castBuffer = new RaycastHit[CastBufferSize];
+
+    public PlayerAirborneState(
+        PlayerStateContext context, Vector3 initialHorizontalVelocity, float initialVerticalSpeed,
+        float walkableAngle, LayerMask obstacleMask) : base(context)
+    {
+        horizontalVelocity = new Vector3(initialHorizontalVelocity.x, 0f, initialHorizontalVelocity.z);
+        verticalSpeed = initialVerticalSpeed;
+        this.walkableAngle = walkableAngle;
+        this.obstacleMask = obstacleMask;
+        capsule = Context.Player != null ? Context.Player.GetComponent<CapsuleCollider>() : null;
+    }
+
+    public override PlayerActionState StateType => PlayerActionState.Airborne;
+
+    public override void Enter(PlayerActionState previousState)
+    {
+        Context.Player.SetAnimatorMoving(false);
+    }
+
+    public override void Tick()
+    {
+        float dt = Time.deltaTime;
+
+        // 수평 관성 Drag 감쇠.
+        horizontalVelocity = Vector3.MoveTowards(horizontalVelocity, Vector3.zero, AirHorizontalDrag * dt);
+
+        // 제한된 공중 조작: 입력 방향으로 가속하되 현재 속도 또는 airMaxControlSpeed 중 큰 값까지만 허용
+        // (대시 관성이 상한보다 크면 입력으로 더 키우지 않고 방향만 살짝 조정, 관성은 Drag로 감쇠).
+        Vector3 inputDir = Context.Movement != null ? Context.Movement.GetInputWorldDirection() : Vector3.zero;
+        if (inputDir.sqrMagnitude > 0.0001f)
+        {
+            float cap = Mathf.Max(horizontalVelocity.magnitude, AirMaxControlSpeed);
+            horizontalVelocity += inputDir.normalized * AirControlAcceleration * dt;
+            if (horizontalVelocity.magnitude > cap)
+                horizontalVelocity = horizontalVelocity.normalized * cap;
+        }
+
+        // 중력.
+        verticalSpeed += Physics.gravity.y * dt;
+        verticalSpeed = Mathf.Max(verticalSpeed, -MaxFallSpeed);
+
+        Vector3 delta = (horizontalVelocity + Vector3.up * verticalSpeed) * dt;
+        if (capsule != null)
+            delta = PlayerMotionSweep.Resolve(capsule, delta, walkableAngle, obstacleMask, CollisionSkin, MaxSweepIterations, castBuffer);
+
+        if (delta.sqrMagnitude > 0f)
+            Context.Movement.MoveRoot(delta);
+
+        // 하강 중 착지하면 Idle로 복귀.
+        PlayerGroundingSensor sensor = Context.GroundingSensor;
+        if (sensor != null && sensor.IsGrounded && verticalSpeed <= 0f)
+            Context.Controller.ChangeState(PlayerActionState.Idle);
     }
 }
