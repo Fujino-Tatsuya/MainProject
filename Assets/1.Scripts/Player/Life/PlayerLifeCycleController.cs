@@ -133,7 +133,26 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
     /// <summary>Soul의 실제 부활 성공을 Alive로 확정한다. 서버에서만 성공한다.</summary>
     public bool TryCompleteRevive()
     {
-        return TryTransition(PlayerLifeState.Alive);
+        if (!CanWriteLifeState ||
+            !IsValidTransition(lifeState.Value, PlayerLifeState.Alive))
+        {
+            return false;
+        }
+
+        ResolveReferences();
+        if (deathSource == null)
+        {
+            Debug.LogError(
+                "[SoulAlert] 부활할 Unit deathSource가 없어 Alive 전환을 중단합니다.",
+                this);
+            return false;
+        }
+
+        // HP와 Unit.Died 재발행 잠금을 먼저 복구한 뒤 Hurtbox/입력 소비자가
+        // Alive 복제 상태에 반응하도록 한다.
+        deathSource.Revive();
+        lifeState.Value = PlayerLifeState.Alive;
+        return true;
     }
 
     /// <summary>DeadPresentation 종료 후 최종 사망을 확정한다. 서버에서만 성공한다.</summary>
