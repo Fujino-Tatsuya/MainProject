@@ -60,20 +60,23 @@ public sealed class PlayerLifeInputPolicy : MonoBehaviour
             return;
 
         if (!access.AllowsCombatInput)
-        {
-            skillTargeting?.Cancel();
-
-            if (stateController != null &&
-                stateController.CurrentState != PlayerActionState.Idle)
-            {
-                stateController.ChangeState(PlayerActionState.Idle);
-            }
-        }
+            CancelCombatActions();
 
         // DeadPresentation/PermanentDead는 PlayerInput 자체를 끄고 Direction을 즉시 0으로 만든다.
         // Soul은 PlayerInput을 유지하되 아래 전투 게이트만 닫아 이동 입력을 보존한다.
         inputReader.SetInputEnabled(access.AllowsMovement);
         inputReader.SetCombatInputEnabled(access.AllowsCombatInput);
+    }
+
+    private void CancelCombatActions()
+    {
+        skillTargeting?.Cancel();
+
+        if (stateController != null &&
+            stateController.CurrentState != PlayerActionState.Idle)
+        {
+            stateController.ChangeState(PlayerActionState.Idle);
+        }
     }
 
     private void ResolveReferences()

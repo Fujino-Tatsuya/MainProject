@@ -40,11 +40,7 @@ public class CameraTargetSwitcher : MonoBehaviour
 
     private void OnDestroy()
     {
-        if (ownerLifeCycle != null)
-        {
-            ownerLifeCycle.LifeStateChanged -= HandleOwnerLifeStateChanged;
-            ownerLifeCycle = null;
-        }
+        UnbindOwnerLifeCycle();
 
         if (Active == this)
         {
@@ -333,9 +329,7 @@ public class CameraTargetSwitcher : MonoBehaviour
 
         PlayerLifeCycleController lifeCycle =
             followTarget.GetComponentInParent<PlayerLifeCycleController>();
-        return lifeCycle != null &&
-            (lifeCycle.State == PlayerLifeState.Alive ||
-             lifeCycle.State == PlayerLifeState.Soul);
+        return lifeCycle != null && IsSpectatorCandidate(lifeCycle.State);
     }
 
     private void BindOwnerLifeCycleFromCurrentTarget()
@@ -354,11 +348,7 @@ public class CameraTargetSwitcher : MonoBehaviour
             return;
         }
 
-        if (ownerLifeCycle != null)
-        {
-            ownerLifeCycle.LifeStateChanged -= HandleOwnerLifeStateChanged;
-        }
-
+        UnbindOwnerLifeCycle();
         ownerLifeCycle = lifeCycle;
 
         if (ownerLifeCycle != null)
@@ -370,6 +360,21 @@ public class CameraTargetSwitcher : MonoBehaviour
         {
             SetSpectatorMode(false);
         }
+    }
+
+    private void UnbindOwnerLifeCycle()
+    {
+        if (ownerLifeCycle == null)
+            return;
+
+        ownerLifeCycle.LifeStateChanged -= HandleOwnerLifeStateChanged;
+        ownerLifeCycle = null;
+    }
+
+    private static bool IsSpectatorCandidate(PlayerLifeState state)
+    {
+        return state == PlayerLifeState.Alive ||
+            state == PlayerLifeState.Soul;
     }
 
     private void HandleOwnerLifeStateChanged(

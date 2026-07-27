@@ -44,11 +44,12 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
 
     private bool CanWriteLifeState => IsSpawned && IsServer;
     private bool deathResolutionPending;
-    private double deathResolutionServerTime;
+    private double deathResolutionDeadlineServerTime;
 
     private void Awake()
     {
-        ResolveReferences();
+        ResolveLocalReferences();
+        ResolveGameRuleReference();
     }
 
     public override void OnNetworkSpawn()
@@ -58,28 +59,20 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
 
         if (IsServer)
         {
-            ResolveReferences();
-
-            if (deathSource != null)
-                deathSource.Died += HandleUnitDied;
-            else
-                Debug.LogError(
-                    "[SoulAlert] Unit 사망 신호를 연결할 deathSource가 없습니다.",
-                    this);
-
+            ResolveLocalReferences();
+            ResolveGameRuleReference();
+            SubscribeToDeathSource();
             if (gameRule != null)
                 gameRule.TryRegisterClient(OwnerClientId);
         }
 
         // 초기 복제값도 후속 Visual/Input/Hurtbox 소비자가 한 번 적용할 수 있게 알린다.
-        ApplyStateHooks(lifeState.Value, lifeState.Value);
+        NotifyStateObservers(lifeState.Value, lifeState.Value);
     }
 
     public override void OnNetworkDespawn()
     {
-        if (deathSource != null)
-            deathSource.Died -= HandleUnitDied;
-
+        UnsubscribeFromDeathSource();
         deathResolutionPending = false;
         lifeState.OnValueChanged -= HandleLifeStateChanged;
         base.OnNetworkDespawn();
@@ -96,7 +89,7 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
             return;
         }
 
-        if (NetworkManager.ServerTime.Time >= deathResolutionServerTime)
+        if (NetworkManager.ServerTime.Time >= deathResolutionDeadlineServerTime)
             ResolveDeathPresentation();
     }
 
@@ -139,7 +132,7 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
             return false;
         }
 
-        ResolveReferences();
+        ResolveLocalReferences();
         if (deathSource == null)
         {
             Debug.LogError(
@@ -185,7 +178,7 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
     private void ScheduleDeathResolution()
     {
         deathResolutionPending = true;
-        deathResolutionServerTime =
+        deathResolutionDeadlineServerTime =
             NetworkManager.ServerTime.Time + Mathf.Max(0f, deathPresentationDuration);
 
         if (deathPresentationDuration <= 0f)
@@ -202,28 +195,8 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
         }
 
         deathResolutionPending = false;
-        PlayerLifeState destinationState = PlayerLifeState.Soul;
-
-        ResolveGameRuleReference();
-        bool resolvedByRule =
-            gameRule != null &&
-            gameRule.TryRegisterClient(OwnerClientId) &&
-            gameRule.TryResolveDeathState(OwnerClientId, out destinationState);
-
-        if (!resolvedByRule)
-        {
-            // 임시 Rule 누락이 Player를 영구 사망시키지 않도록 부활 가능한 Soul로 폴백한다.
-            destinationState = PlayerLifeState.Soul;
-            Debug.LogWarning(
-                "[SoulAlert] Temp_MultiGameRule/LifeCount를 확인할 수 없어 " +
-                $"{OwnerClientId}번 Player를 Soul로 전환합니다. " +
-                "씬에 Spawn된 Temp_MultiGameRule을 배치하세요.",
-                this);
-        }
-
-        bool transitioned = destinationState == PlayerLifeState.PermanentDead
-            ? TryEnterPermanentDead()
-            : TryEnterSoul();
+        PlayerLifeState destinationState = ResolveDeathDestination();
+        bool transitioned = TryEnterResolvedDeathState(destinationState);
 
         if (!transitioned)
         {
@@ -234,12 +207,55 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
         }
     }
 
-    private void ResolveReferences()
+    private PlayerLifeState ResolveDeathDestination()
+    {
+        ResolveGameRuleReference();
+        if (gameRule != null &&
+            gameRule.TryRegisterClient(OwnerClientId) &&
+            gameRule.TryResolveDeathState(OwnerClientId, out PlayerLifeState destinationState))
+        {
+            return destinationState;
+        }
+
+        // 임시 Rule 누락이 Player를 영구 사망시키지 않도록 부활 가능한 Soul로 폴백한다.
+        Debug.LogWarning(
+            "[SoulAlert] Temp_MultiGameRule/LifeCount를 확인할 수 없어 " +
+            $"{OwnerClientId}번 Player를 Soul로 전환합니다. " +
+            "씬에 Spawn된 Temp_MultiGameRule을 배치하세요.",
+            this);
+        return PlayerLifeState.Soul;
+    }
+
+    private bool TryEnterResolvedDeathState(PlayerLifeState destinationState)
+    {
+        return destinationState == PlayerLifeState.PermanentDead
+            ? TryEnterPermanentDead()
+            : TryEnterSoul();
+    }
+
+    private void SubscribeToDeathSource()
+    {
+        if (deathSource != null)
+        {
+            deathSource.Died += HandleUnitDied;
+            return;
+        }
+
+        Debug.LogError(
+            "[SoulAlert] Unit 사망 신호를 연결할 deathSource가 없습니다.",
+            this);
+    }
+
+    private void UnsubscribeFromDeathSource()
+    {
+        if (deathSource != null)
+            deathSource.Died -= HandleUnitDied;
+    }
+
+    private void ResolveLocalReferences()
     {
         if (deathSource == null)
             deathSource = GetComponent<Unit>();
-
-        ResolveGameRuleReference();
     }
 
     private void ResolveGameRuleReference()
@@ -272,10 +288,10 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
         PlayerLifeState previousState,
         PlayerLifeState currentState)
     {
-        ApplyStateHooks(previousState, currentState);
+        NotifyStateObservers(previousState, currentState);
     }
 
-    private void ApplyStateHooks(
+    private void NotifyStateObservers(
         PlayerLifeState previousState,
         PlayerLifeState currentState)
     {

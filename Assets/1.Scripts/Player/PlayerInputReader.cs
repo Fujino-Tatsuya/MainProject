@@ -20,12 +20,14 @@ public class PlayerInputReader : BaseNetworkBehaviour
 
     public Vector2 Direction { get; private set; }
     public bool HasMoveInput => Direction.sqrMagnitude > 0.01f;
-    public bool AttackPressed => inputEnabled && combatInputEnabled && attackAction != null && attackAction.WasPressedThisFrame();
-    public bool AttackHeld => inputEnabled && combatInputEnabled && attackAction != null && attackAction.IsPressed();
-    public bool InterruptPressed => inputEnabled && combatInputEnabled && interruptAction != null && interruptAction.WasPressedThisFrame();
+    public bool AttackPressed => CanReadCombatInput && attackAction != null && attackAction.WasPressedThisFrame();
+    public bool AttackHeld => CanReadCombatInput && attackAction != null && attackAction.IsPressed();
+    public bool InterruptPressed => CanReadCombatInput && interruptAction != null && interruptAction.WasPressedThisFrame();
 
     private bool CanUseLocalControl =>
         !IsNetworkActive || IsOwner;
+    private bool CanReadCombatInput =>
+        inputEnabled && combatInputEnabled;
 
     private void Awake()
     {
@@ -44,7 +46,7 @@ public class PlayerInputReader : BaseNetworkBehaviour
 
     public bool GetSkillPressed(PlayerSkillSlot slot)
     {
-        if (!inputEnabled || !combatInputEnabled)
+        if (!CanReadCombatInput)
             return false;
 
         InputAction action = GetSkillAction(slot);
@@ -53,7 +55,7 @@ public class PlayerInputReader : BaseNetworkBehaviour
 
     public bool GetSkillHeld(PlayerSkillSlot slot)
     {
-        if (!inputEnabled || !combatInputEnabled)
+        if (!CanReadCombatInput)
             return false;
 
         InputAction action = GetSkillAction(slot);

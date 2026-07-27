@@ -65,16 +65,12 @@ public class PlayerCombatUiLifecyclePolicy : MonoBehaviour
     {
         UnbindLifeCycle();
 
-        lifeCycle = player != null
-            ? player.GetComponent<PlayerLifeCycleController>()
-            : null;
+        lifeCycle = ResolveLifeCycle(player);
 
         if (lifeCycle != null)
             lifeCycle.LifeStateChanged += HandleLifeStateChanged;
 
-        ApplyState(player != null
-            ? lifeCycle != null ? lifeCycle.State : PlayerLifeState.Alive
-            : PlayerLifeState.PermanentDead);
+        ApplyState(ResolveDisplayState(player));
     }
 
     private void UnbindLifeCycle()
@@ -90,6 +86,23 @@ public class PlayerCombatUiLifecyclePolicy : MonoBehaviour
         PlayerLifeState currentState)
     {
         ApplyState(currentState);
+    }
+
+    private static PlayerLifeCycleController ResolveLifeCycle(Player player)
+    {
+        return player != null
+            ? player.GetComponent<PlayerLifeCycleController>()
+            : null;
+    }
+
+    private PlayerLifeState ResolveDisplayState(Player player)
+    {
+        if (player == null)
+            return PlayerLifeState.PermanentDead;
+
+        return lifeCycle != null
+            ? lifeCycle.State
+            : PlayerLifeState.Alive;
     }
 
     private void ApplyState(PlayerLifeState state)

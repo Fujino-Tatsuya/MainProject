@@ -21,7 +21,7 @@ public sealed class PlayerSoulController : MonoBehaviour
     [SerializeField] private Material fallbackSoulMaterial;
 
     [Header("Combat Target")]
-    [Tooltip("비어 있으면 Player Root 아래의 모든 Hurtbox Collider를 찾습니다.")]
+    [Tooltip("비어 있으면 Player Root 아래의 Hurtbox 컴포넌트에 연결된 Collider를 찾습니다.")]
     [SerializeField] private Collider[] hurtboxColliders;
 
     [Header("Movement")]
@@ -87,12 +87,14 @@ public sealed class PlayerSoulController : MonoBehaviour
     {
         bool isAlive = state == PlayerLifeState.Alive;
         bool isSoul = state == PlayerLifeState.Soul;
+        PlayerLifeGameplayAccess gameplayAccess =
+            PlayerLifeGameplayAccess.FromState(state);
 
         EnsureSoulVisual();
         SetVisualState(isAlive, isSoul);
         SetRootLayer(isSoul);
         SetGroundingMode(isSoul);
-        SetHurtboxesEnabled(isAlive);
+        SetHurtboxesEnabled(gameplayAccess.ShouldEnableHurtbox);
     }
 
     public void SetCharacterDefinition(CharacterDefinition definition)
@@ -358,7 +360,7 @@ public sealed class PlayerSoulController : MonoBehaviour
         }
     }
 
-    private void SetHurtboxesEnabled(bool isAlive)
+    private void SetHurtboxesEnabled(bool shouldEnable)
     {
         if (hurtboxColliders == null || initialHurtboxEnabled == null)
             return;
@@ -367,7 +369,7 @@ public sealed class PlayerSoulController : MonoBehaviour
         {
             Collider hurtbox = hurtboxColliders[i];
             if (hurtbox != null)
-                hurtbox.enabled = isAlive && initialHurtboxEnabled[i];
+                hurtbox.enabled = shouldEnable && initialHurtboxEnabled[i];
         }
     }
 

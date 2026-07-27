@@ -14,6 +14,8 @@ public sealed class PlayerReviveController : NetworkBehaviour
     [Header("Revive")]
     [SerializeField] private PlayerLifeCycleController lifeCycle;
     [SerializeField] private Temp_MultiGameRule gameRule;
+    [Tooltip("실제 부활 조건으로 교체하기 전까지 사용하는 로컬 오너 디버그 입력입니다.")]
+    [SerializeField] private Key debugReviveKey = Key.F10;
 
     /// <summary>
     /// 서버에서 Alive 전환과 LifeCount 차감이 모두 끝난 뒤 발생한다.
@@ -23,7 +25,8 @@ public sealed class PlayerReviveController : NetworkBehaviour
 
     private void Awake()
     {
-        ResolveReferences();
+        ResolveLocalReferences();
+        ResolveGameRuleReference();
     }
 
     public override void OnNetworkSpawn()
@@ -31,19 +34,16 @@ public sealed class PlayerReviveController : NetworkBehaviour
         base.OnNetworkSpawn();
 
         if (IsServer)
-            ResolveReferences();
+        {
+            ResolveLocalReferences();
+            ResolveGameRuleReference();
+        }
     }
 
     private void Update()
     {
-        if (!IsSpawned ||
-            !IsOwner ||
-            lifeCycle == null ||
-            lifeCycle.State != PlayerLifeState.Soul ||
-            Keyboard.current?.f10Key.wasPressedThisFrame != true)
-        {
+        if (!CanRequestDebugRevive() || !WasDebugRevivePressed())
             return;
-        }
 
         RequestDebugReviveRpc();
     }
@@ -57,7 +57,8 @@ public sealed class PlayerReviveController : NetworkBehaviour
         if (!IsSpawned || !IsServer)
             return false;
 
-        ResolveReferences();
+        ResolveLocalReferences();
+        ResolveGameRuleReference();
         if (lifeCycle == null || lifeCycle.State != PlayerLifeState.Soul)
             return false;
 
@@ -97,12 +98,29 @@ public sealed class PlayerReviveController : NetworkBehaviour
         TryCompleteReviveOnServer();
     }
 
-    private void ResolveReferences()
+    private void ResolveLocalReferences()
     {
         if (lifeCycle == null)
             lifeCycle = GetComponent<PlayerLifeCycleController>();
+    }
 
+    private void ResolveGameRuleReference()
+    {
         if (gameRule == null)
             gameRule = FindFirstObjectByType<Temp_MultiGameRule>();
+    }
+
+    private bool CanRequestDebugRevive()
+    {
+        return IsSpawned &&
+            IsOwner &&
+            lifeCycle != null &&
+            lifeCycle.State == PlayerLifeState.Soul;
+    }
+
+    private bool WasDebugRevivePressed()
+    {
+        return Keyboard.current != null &&
+            Keyboard.current[debugReviveKey].wasPressedThisFrame;
     }
 }

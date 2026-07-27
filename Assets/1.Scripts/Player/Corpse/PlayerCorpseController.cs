@@ -9,6 +9,7 @@ using UnityEngine;
 public sealed class PlayerCorpseController : NetworkBehaviour
 {
     private const string CorpseLayerName = "Corpse";
+    private const float PlatformProbeOriginOffset = 0.05f;
 
     [Header("Life State")]
     [SerializeField] private PlayerLifeCycleController lifeCycle;
@@ -241,7 +242,8 @@ public sealed class PlayerCorpseController : NetworkBehaviour
             return;
 
         Bounds bounds = corpseCollider.bounds;
-        Vector3 origin = bounds.center + Vector3.up * 0.05f;
+        Vector3 origin =
+            bounds.center + Vector3.up * PlatformProbeOriginOffset;
         float distance = bounds.extents.y + platformProbeDistance;
         RaycastHit[] hits = Physics.RaycastAll(
             origin,

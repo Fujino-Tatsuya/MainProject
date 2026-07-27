@@ -22,10 +22,28 @@ public enum PlayerDeathCause
 
 /// <summary>
 /// 각 입력/피격 시스템이 생명주기 상태를 소비할 때 사용하는 공용 게이트 값.
-/// 실제 입력 컴포넌트와 Hurtbox 배선은 후속 통합에서 수행한다.
+/// 로컬 입력과 Hurtbox 정책은 이 값을 소비해 상태별 허용 여부를 적용한다.
 /// </summary>
 public readonly struct PlayerLifeGameplayAccess
 {
+    private static readonly PlayerLifeGameplayAccess AliveAccess =
+        new PlayerLifeGameplayAccess(
+            allowsMovement: true,
+            allowsCombatInput: true,
+            shouldEnableHurtbox: true);
+
+    private static readonly PlayerLifeGameplayAccess SoulAccess =
+        new PlayerLifeGameplayAccess(
+            allowsMovement: true,
+            allowsCombatInput: false,
+            shouldEnableHurtbox: false);
+
+    private static readonly PlayerLifeGameplayAccess BlockedAccess =
+        new PlayerLifeGameplayAccess(
+            allowsMovement: false,
+            allowsCombatInput: false,
+            shouldEnableHurtbox: false);
+
     public bool AllowsMovement { get; }
     public bool AllowsCombatInput { get; }
     public bool ShouldEnableHurtbox { get; }
@@ -45,24 +63,15 @@ public readonly struct PlayerLifeGameplayAccess
         switch (state)
         {
             case PlayerLifeState.Alive:
-                return new PlayerLifeGameplayAccess(
-                    allowsMovement: true,
-                    allowsCombatInput: true,
-                    shouldEnableHurtbox: true);
+                return AliveAccess;
 
             case PlayerLifeState.Soul:
-                return new PlayerLifeGameplayAccess(
-                    allowsMovement: true,
-                    allowsCombatInput: false,
-                    shouldEnableHurtbox: false);
+                return SoulAccess;
 
             case PlayerLifeState.DeadPresentation:
             case PlayerLifeState.PermanentDead:
             default:
-                return new PlayerLifeGameplayAccess(
-                    allowsMovement: false,
-                    allowsCombatInput: false,
-                    shouldEnableHurtbox: false);
+                return BlockedAccess;
         }
     }
 }
