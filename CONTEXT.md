@@ -60,16 +60,35 @@ Update this file when a term becomes important enough that future agents or team
 - `GameManager.prefab`의 씬 이름이 리네임 전 값이었다(BootStrap 인스턴스는 이미 정상이라
   정식 플로우는 무영향, MapScene 직접 Play만 실패). 프리팹 최신화.
 
-### 다음 작업
+### 이어서 완료 — 보스룸 경계 + 도착 ACK (`3b626a1`·`93f65b8`·`a3d284e`)
 
-1. **남은 도구 2개 실행** — `[1회용] 사망→Result→로비 사이클 배선`(SessionStatsTracker 추가분),
-   `[1회용] Result 결과 표시 UI 생성`. 실행 후 결과 화면 위치·서체 조정 필요.
-2. **보스** — 승인된 계획 `Docs/superpowers/plans/2026-07-24-boss-encounter-intro.md` 착수.
-   투명 경계·NavMesh·추락 방지가 §8에 포함. 보스 격파 시
-   `SessionStatsTracker.Active.Capture(cleared: true)` 연결로 클리어 판정이 붙는다.
-3. **미구현으로 확인된 것**: dash HUD 위젯(충전 개수·재충전 게이지), 로딩바 보간,
-   RMB 스킬(`FirstMeleeInterruptSkill` 구현체 자체가 없음), Result 결과 UI 서체·배치.
-4. push 안 된 상태. 롤백 지점 = `backup/pre-dash-soul-merge`(`caaef90`).
+승인 계획의 **A단계(투명벽) + Task 1**까지. 계획 사본 = `C:\Users\user\.claude\plans\synchronous-pondering-coral.md`
+
+- `BossRoomAuthoring` 저작 도구로 `bossroom.prefab`에 생성(재실행 가능, 렌더러 바운즈 실측):
+  `BossFloorCollider`(21×1×21, Default, 상단 Y 0.61) · `InvisibleBoundaries` 4면(Wall, 높이 8,
+  트리거·렌더러 없음) · `PlayerArrivalPoints/Player1..3`(2m 삼각, 착지점 응시) · `BossLandingPoint`
+- `BossTeleportManager`: 황금각 산개 → 도착 지점 배열 + ACK 계약. `encounterSequence` +
+  대기 집합, sender·sequence 일치만 수락(중복 무시), 전원 ACK → `AlivePlayersArrived` 1회,
+  5초 타임아웃 → `ArrivalAborted`, disconnect 처리, `IsEncounterBusy`로 재진입 차단
+- ⚠️ 함정: `renderer.bounds`는 월드 좌표이고 `LoadPrefabContents`는 프리팹을 원점이 아닌 프리뷰
+  씬에 올린다. 로컬인 `BoxCollider.center`에 그대로 넣으면 전체가 밀린다(1차 실행에서 Z≈109).
+
+### ▶ 다음 세션 시작점
+
+**증상: 보스룸으로 이동은 되는데 보스가 안 나온다 — 정상이다.** MapScene에는 보스를 스폰하는
+주체가 없다. 보스를 스폰하는 `TwentyThreeArenaContext`(`OnNetworkSpawn`에서 `boss.Spawn()`)는
+`KMKScene`·`PlayerBossTest`에만 배치돼 있고, **MapScene의 `TwentyThree.prefab` 참조는 0건**이다.
+그게 **Task 3 `BossEncounterDirector`**의 일이고 이번 범위는 "도착까지"였다.
+
+1. **승인 계획서에 "달라진 전제" 반영** — 착수 첫 단계. 씬 경로(`MainFlow/4.MapScene`),
+   플레이어 프리팹 1개, 연출 잠금 대상 확대(dash·fall·revive·soul), `PartyWipeWatcher` 오발 억제,
+   카메라 우선순위(Float 뷰), 클리어 판정 연결, 담당 경계, DynamicsManager 재수정 불필요.
+2. **Task 2~8** 순서대로. Task 3에서 보스 스폰 소유자를 Director 하나로 정리한다
+   (`TwentyThreeArenaContext`는 민경 님 영역 — 중복 스폰이 실제로 생기면 그때 수정, 팀장 승인 받음).
+3. 보스 격파 시 `SessionStatsTracker.Active.Capture(cleared: true)` 연결 → 결과 클리어 판정 완성.
+4. **미구현 확인분**: dash HUD 위젯(충전 개수·재충전 게이지), 로딩바 보간,
+   RMB 스킬(`FirstMeleeInterruptSkill` 구현체 자체가 없음), Result UI 서체·배치.
+5. push 안 된 상태. 롤백 지점 = `backup/pre-dash-soul-merge`(`caaef90`).
 
 ### 확인만 하고 넘긴 것
 
