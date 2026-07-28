@@ -1,3 +1,5 @@
+using Unity.Netcode;
+using Unity.Netcode.Components;
 using UnityEditor;
 using UnityEngine;
 
@@ -64,6 +66,135 @@ public static class BossRoomAuthoring
         {
             PrefabUtility.UnloadPrefabContents(root);
         }
+    }
+
+    // ── 충전 기둥 (승인 계획 Task 6) ──────────────────────────────────────
+
+    const string ChargePillarName = "Env_Mv_bosscharger_upper";
+    const int ExpectedPillarCount = 4;
+
+    // ⚠️ 레이어는 KMKScene(EnemyHurtBox=14)과 다르게 Enemy(8)를 쓴다.
+    // 현재 플레이어 공격의 targetLayer/hittableLayers는 m_Bits=256(Enemy)뿐이라 14에 두면
+    // 기둥을 때릴 수 없다. 실제로 동작하는 ChompBot의 Hurtbox도 Enemy(8)에 있다.
+    // 팀이 나중에 플레이어 마스크에 EnemyHurtBox를 추가하면 여기도 함께 옮긴다.
+    const string PillarLayerName = "Enemy";
+
+    // 체력·방어는 KMKScene 기둥 설정과 동일(체력 5 · 방어 0).
+    const int PillarMaxHp = 5;
+    const int PillarDefense = 0;
+
+    /// <summary>
+    /// 보스룸의 충전 기둥 4개를 서버 권한 피격 대상으로 구성한다.
+    ///
+    /// 아트 오브젝트에 컴포넌트를 <b>덧붙이는</b> 방식이다 — 부모 프리팹(SVN 아트)은 건드리지 않고
+    /// bossroom.prefab에 override로만 남는다. 재실행해도 중복 부착하지 않는다.
+    /// </summary>
+    [MenuItem("Tools/Map/Authoring/Setup Boss Charge Pillars")]
+    public static void SetupBossChargePillars()
+    {
+        int pillarLayer = LayerMask.NameToLayer(PillarLayerName);
+        if (pillarLayer < 0)
+        {
+            Debug.LogError($"[BossRoomAuthoring] '{PillarLayerName}' 레이어가 없다.");
+            return;
+        }
+
+        GameObject root = PrefabUtility.LoadPrefabContents(BossRoomPath);
+
+        try
+        {
+            var pillars = new System.Collections.Generic.List<Transform>();
+            foreach (Transform child in root.GetComponentsInChildren<Transform>(true))
+            {
+                if (child.name == ChargePillarName)
+                    pillars.Add(child);
+            }
+
+            if (pillars.Count != ExpectedPillarCount)
+            {
+                Debug.LogWarning(
+                    $"[BossRoomAuthoring] '{ChargePillarName}' 오브젝트가 {pillars.Count}개다(기대 {ExpectedPillarCount}). " +
+                    "아트 구성이 바뀌었는지 확인 필요.");
+            }
+
+            if (pillars.Count == 0)
+            {
+                Debug.LogError($"[BossRoomAuthoring] '{ChargePillarName}'를 찾지 못해 중단한다.");
+                return;
+            }
+
+            // 이름이 모두 같아 인덱스 순서가 흔들리지 않도록 위치로 정렬한다(결정적 활성 순서).
+            pillars.Sort((a, b) =>
+            {
+                Vector3 pa = a.position;
+                Vector3 pb = b.position;
+                int compareZ = pa.z.CompareTo(pb.z);
+                return compareZ != 0 ? compareZ : pa.x.CompareTo(pb.x);
+            });
+
+            for (int i = 0; i < pillars.Count; i++)
+                SetupPillar(pillars[i], i, pillarLayer);
+
+            PrefabUtility.SaveAsPrefabAsset(root, BossRoomPath);
+            Debug.Log($"[BossRoomAuthoring] 충전 기둥 {pillars.Count}개 구성 완료 후 저장.");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    static void SetupPillar(Transform pillar, int index, int pillarLayer)
+    {
+        GameObject go = pillar.gameObject;
+        go.layer = pillarLayer;
+
+        // Unit(NetworkBehaviour) 요구사항 — NetworkObject가 먼저 있어야 한다.
+        if (go.GetComponent<NetworkObject>() == null)
+            go.AddComponent<NetworkObject>();
+
+        if (go.GetComponent<NetworkTransform>() == null)
+        {
+            var networkTransform = go.AddComponent<NetworkTransform>();
+            // 부모(보스룸)가 고정이라 로컬 공간 복제로 두면 좌표계 혼선이 없다.
+            networkTransform.InLocalSpace = true;
+        }
+
+        // 피격 판정용 콜라이더. 렌더러 실측으로 맞추고, 활성 여부는 ChargingObject가 제어한다.
+        BoxCollider box = go.GetComponent<BoxCollider>();
+        if (box == null)
+            box = go.AddComponent<BoxCollider>();
+
+        Renderer renderer = go.GetComponent<Renderer>();
+        if (renderer != null)
+        {
+            Bounds local = ToRootLocalBounds(pillar, renderer.bounds);
+            box.center = local.center;
+            box.size = local.size;
+        }
+        else
+        {
+            Debug.LogWarning($"[BossRoomAuthoring] {go.name}[{index}]에 Renderer가 없어 콜라이더 크기를 실측하지 못했다.", go);
+        }
+
+        box.isTrigger = false;
+        box.enabled = false; // 평상시 통행 방해 금지 — 상승 완료 시 ChargingObject가 켠다
+
+        ChargingObject charging = go.GetComponent<ChargingObject>();
+        if (charging == null)
+            charging = go.AddComponent<ChargingObject>();
+
+        // 인스펙터 값이 이미 튜닝돼 있으면 덮지 않는다(재실행 안전).
+        SerializedObject serialized = new SerializedObject(charging);
+        SerializedProperty maxHp = serialized.FindProperty("maxHp");
+        SerializedProperty defense = serialized.FindProperty("defense");
+        if (maxHp != null && maxHp.intValue <= 0) maxHp.intValue = PillarMaxHp;
+        if (defense != null && defense.intValue < 0) defense.intValue = PillarDefense;
+        serialized.ApplyModifiedPropertiesWithoutUndo();
+
+        Debug.Log(
+            $"[BossRoomAuthoring] 기둥 {index} 구성 — {go.name} @ local {pillar.localPosition}, " +
+            $"레이어 {LayerMask.LayerToName(pillarLayer)}, 콜라이더 {box.size}");
     }
 
     /// <summary>

@@ -35,6 +35,19 @@ public class JumpController : NetworkBehaviour
     Quaternion _floorRootRot;
     float _jumpDiff;    // 장판 시간 계산으로 위해 총 정지 시간에서 더할 보정값
     bool _isJumping = false;
+    bool _isCinematicLanding = false;
+
+    /// <summary>
+    /// 등장 연출 착지 모드. BossEncounterDirector가 하강 전에 켜고 전투 전환 시 끈다.
+    /// 켜져 있는 동안 장판 표시와 착지 피해를 만들지 않는다 — 연출 착지는 공격이 아니다.
+    /// (승인 계획 Task 4)
+    /// </summary>
+    public void SetCinematicLandingMode(bool enabled)
+    {
+        if (!IsServer && IsSpawned) return;
+
+        _isCinematicLanding = enabled;
+    }
 
     public override void OnNetworkSpawn()
     {
@@ -75,6 +88,9 @@ public class JumpController : NetworkBehaviour
     public void SetTarget()
     {
         if (!IsServer) return;
+
+        // 연출 착지는 대상 선정·장판·메시 숨김을 하지 않는다.
+        if (_isCinematicLanding) return;
 
         GameObject target = FindTargetByDistance(true);
 
@@ -147,6 +163,9 @@ public class JumpController : NetworkBehaviour
     public void OnLanded()
     {
         if (!IsServer) return;
+
+        // 연출 착지는 피해를 주지 않는다. 장판도 켜지지 않았으므로 숨김 처리도 불필요.
+        if (_isCinematicLanding) return;
 
         // 데미지 범위는 장판1(floorBase)의 실제 시각 크기 기준
         Vector3 center = floorBase.bounds.center;
