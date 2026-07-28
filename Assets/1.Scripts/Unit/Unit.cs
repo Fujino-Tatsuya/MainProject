@@ -1,4 +1,5 @@
 ﻿using BaseNetCode;
+using System;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -44,6 +45,13 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     NetworkVariableReadPermission.Everyone,
     NetworkVariableWritePermission.Server
 );
+    bool _deathNotified;
+
+    /// <summary>
+    /// 서버에서 생존 상태의 체력이 0으로 전환될 때 한 번 발생한다.
+    /// Revive 호출 전까지 같은 사망에 대해 다시 발생하지 않는다.
+    /// </summary>
+    public event Action Died;
 
     /// <summary>
     /// damage만큼 방어력을 반영하여 쉴드와 체력을 감소시키는 함수
@@ -51,7 +59,40 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     /// <param name="damage">감소시킬 피해 값</param>
     protected void TakeDamage(int damage)
     {
-        if (!IsServer) return; // 서버에서만 피해 처리
+        ApplyHealthDamage(damage, false);
+    }
+
+    /// <summary>
+    /// 피해 적용 전에 파생 Unit이 무적 등 공통 차단 규칙을 검사하는 지점.
+    /// </summary>
+    /// <param name="damage">방어력 적용 전 피해량</param>
+    protected virtual bool CanApplyHealthDamage(int damage)
+    {
+        return true;
+    }
+
+    void ApplyHealthDamage(int damage, bool ignoreDefenseAndShield)
+    {
+        if (!IsServer || _health == null || damage <= 0) return;
+        if (!CanApplyHealthDamage(damage)) return;
+
+        int previousHealth = _health.CurrentHealth;
+
+        if (ignoreDefenseAndShield)
+        {
+            _health.TakeHpDamage(damage);
+        }
+        else
+        {
+            ApplyMitigatedHealthDamage(damage);
+        }
+
+        _currentHp.Value = _health.CurrentHealth;
+        NotifyDeathTransition(previousHealth);
+    }
+
+    void ApplyMitigatedHealthDamage(int damage)
+    {
         int remainingDamage = damage;
 
         // 방어력 경감률 적용: 최종 피해 = 피해 x 100 / (100 + 방어력), 방어력 100당 50% 경감
@@ -78,8 +119,15 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         {
             _health.TakeHpDamage(remainingDamage);
         }
+    }
 
-        _currentHp.Value = _health.CurrentHealth;
+    void NotifyDeathTransition(int previousHealth)
+    {
+        if (_deathNotified || previousHealth <= 0 || _health.CurrentHealth > 0)
+            return;
+
+        _deathNotified = true;
+        Died?.Invoke();
     }
 
     public virtual void TakeDamage(AttackInfo attackInfo)
@@ -91,6 +139,43 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     {
         TakeDamage(attackInfo);
         return true;
+    }
+
+    /// <summary>
+    /// 방어력과 쉴드를 무시하고 HP에 직접 피해를 적용한다.
+    /// </summary>
+    public void ApplyDirectHealthDamage(int damage)
+    {
+        ApplyHealthDamage(damage, true);
+    }
+
+    /// <summary>
+    /// 최종 최대 체력 비율만큼 계산한 피해를 일반 방어력/쉴드 경로로 적용한다.
+    /// </summary>
+    public void ApplyMaxHealthPercentDamage(float ratio)
+    {
+        int damage = Mathf.CeilToInt(FinalMaxHp * Mathf.Max(0f, ratio));
+        ApplyHealthDamage(damage, false);
+    }
+
+    /// <summary>
+    /// 현재 체력 비율만큼 계산한 피해를 일반 방어력/쉴드 경로로 적용한다.
+    /// </summary>
+    public void ApplyCurrentHealthPercentDamage(float ratio)
+    {
+        int damage = Mathf.CeilToInt(CurrentHealth * Mathf.Max(0f, ratio));
+        ApplyHealthDamage(damage, false);
+    }
+
+    /// <summary>
+    /// 현재 쉴드를 모두 제거한다.
+    /// </summary>
+    public void BreakShield()
+    {
+        if (!IsServer || _health == null) return;
+
+        _health.SetShield(0);
+        UpdateNetworkShield();
     }
 
     /// <summary>
@@ -112,6 +197,7 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         if (!IsServer) return; // 서버에서만 체력 회복 처리
         _health.Revive();
         _currentHp.Value = _health.CurrentHealth;
+        _deathNotified = false;
     }
 
     /// <summary>
@@ -341,6 +427,7 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         _health = new Health(maxHp, defense);
         _currentHp.Value = maxHp;
         _maxHp.Value = maxHp;
+        _deathNotified = false;
 
         UpdateNetworkShield();
 

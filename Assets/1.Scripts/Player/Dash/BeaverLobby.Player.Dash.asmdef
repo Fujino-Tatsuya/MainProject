@@ -1,0 +1,14 @@
+{
+    "name": "BeaverLobby.Player.Dash",
+    "rootNamespace": "BeaverLobby.Player.Dash",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

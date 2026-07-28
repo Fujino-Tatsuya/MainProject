@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public class PlayerDefaultAttack : BaseAttack
@@ -9,8 +9,13 @@ public class PlayerDefaultAttack : BaseAttack
     // 투사체 생성/레이캐스트 시작 위치. 비워두면 자기 위치를 사용.
     [SerializeField] private Transform muzzle;
 
+    // 서버: 한 스윙(HitCurrentStep 1회)에서 명중시킨 적 목록을 통지한다. 패시브(불굴의 의지) 등이 구독한다.
+    // 구독자가 없으면 무영향 — PlayerDefaultAttack은 구독자를 몰라도 된다.
+    public event System.Action<IReadOnlyList<Unit>> ServerHitEnemiesResolved;
+
     private readonly HashSet<Unit> damagedUnits = new HashSet<Unit>();
     private readonly HashSet<Hurtbox> damagedHurtboxes = new HashSet<Hurtbox>();
+    private readonly List<Unit> swingHitBuffer = new List<Unit>();
     private Collider[] hitResults = new Collider[DefaultMaxHitResults];
     private Player owner;
     private ColliderInfo defaultHitbox;
@@ -77,6 +82,8 @@ public class PlayerDefaultAttack : BaseAttack
             return;
         }
 
+        swingHitBuffer.Clear();
+
         int hitCount = OverlapHitbox(hitbox);
         for (int i = 0; i < hitCount; i++)
         {
@@ -98,7 +105,10 @@ public class PlayerDefaultAttack : BaseAttack
                 {
                     damagedHurtboxes.Add(hurtbox);
                     if (ownerUnit != null)
+                    {
                         damagedUnits.Add(ownerUnit);
+                        swingHitBuffer.Add(ownerUnit);
+                    }
                 }
 
                 continue;
@@ -109,8 +119,15 @@ public class PlayerDefaultAttack : BaseAttack
                 continue;
 
             if (TryResolveHit(target))
+            {
                 damagedUnits.Add(target);
+                swingHitBuffer.Add(target);
+            }
         }
+
+        // 이번 스윙에 명중시킨 적이 있으면 통지 (패시브 발동 트리거). 허공 스윙은 통지하지 않는다.
+        if (swingHitBuffer.Count > 0)
+            ServerHitEnemiesResolved?.Invoke(swingHitBuffer);
     }
 
     private void SpawnProjectile()

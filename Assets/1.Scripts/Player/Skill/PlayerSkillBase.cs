@@ -47,6 +47,11 @@ public abstract class PlayerSkillBase : MonoBehaviour
     public ColliderInfo HitboxAnchor => hitboxAnchor;
     public SkillState State { get; protected set; } = SkillState.Ready;
 
+    // GroundPoint 조준으로 확정된 지면 지점 (월드). 컨트롤러가 OnServerStart/OnClientPlay 직전에 세팅한다.
+    // SingleTarget/None 스킬은 무시. HasAimPoint로 유효성 판별.
+    public Vector3 AimPoint { get; private set; }
+    public bool HasAimPoint { get; private set; }
+
     public abstract PlayerSkillSlot Slot { get; }
 
     // FSM(PlayerSkillState) 위임 질의 — E는 이동 자유, R은 완전 잠금 등 스킬이 결정한다.
@@ -68,6 +73,12 @@ public abstract class PlayerSkillBase : MonoBehaviour
     public void SetDamageSnapshot(int value)
     {
         damageSnapshot = Mathf.Max(0, value);
+    }
+
+    public void SetAimPoint(Vector3 point, bool hasPoint)
+    {
+        AimPoint = point;
+        HasAimPoint = hasPoint;
     }
 
     public void ResetToReady()

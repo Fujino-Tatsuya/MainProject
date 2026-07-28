@@ -237,7 +237,9 @@ public class DefaultAttackController : BaseNetworkBehaviour
         if (HasGameplayAuthority && IsAttacking)
             TickServerFallbacks();
 
-        if (!IsNetworkActive || IsServer || IsOwner)
+        // 전진·회전 변위는 owner-authority NetworkTransform의 쓰기 주체만 수행한다.
+        // 서버는 승인·판정·종료 장부만 관리하고 오너가 복제한 위치를 사용한다.
+        if (!IsNetworkActive || IsOwner)
             TickMovementAndRotation();
     }
 
@@ -305,7 +307,8 @@ public class DefaultAttackController : BaseNetworkBehaviour
         if (!HasAttackStep(currentAttackIndex))
             return;
 
-        if (IsNetworkActive && !IsServer && !IsOwner)
+        // 루트모션 변위도 일반 scripted 이동과 동일하게 오너만 적용한다.
+        if (IsNetworkActive && !IsOwner)
             return;
 
         DefaultAttackStep step = attackSteps[currentAttackIndex];

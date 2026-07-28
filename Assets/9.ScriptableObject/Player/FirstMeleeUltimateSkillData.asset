@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 35ae1fdc1e61a894988a21563d47ab80, type: 3}
+  m_Name: FirstMeleeUltimateSkillData
+  m_EditorClassIdentifier:
+  inputType: 0
+  cooldownTime: 60
+  attackDamageMultiplier: 3
+  flatDamageBonus: 0
+  maxActiveDuration: 1.5
+  tickInterval: 0
+  usableWhileDead: 0
+  hittableLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  targetingMode: 1
+  confirmMode: 0
+  castRange: 8
+  targetableLayers:
+    serializedVersion: 2
+    m_Bits: 256
+  animatorStateName:
+  snapRotationOnStart: 1

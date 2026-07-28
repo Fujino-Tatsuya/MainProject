@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 /// <summary>
 /// 전투 HUD 루트. 로컬 플레이어 스폰/교체(Player.LocalPlayerChanged)를 구독해
@@ -6,9 +6,11 @@
 /// </summary>
 public class CombatHUD : MonoBehaviour
 {
-    [SerializeField] private SkillCooldownHUD skillCooldownHUD;
     [SerializeField] private PlayerHealthHUD playerHealthHUD;
     [SerializeField] private StatusEffectHUD statusEffectHUD;
+    [SerializeField] private PassiveHUD passiveHUD;
+    [SerializeField] private SkillCooldownHUD skillCooldownHUD;
+
 
     private void OnEnable()
     {
@@ -31,5 +33,8 @@ public class CombatHUD : MonoBehaviour
 
         if (statusEffectHUD != null)
             statusEffectHUD.Bind(player);
+
+        if (passiveHUD != null)
+            passiveHUD.Bind(player);
     }
 }

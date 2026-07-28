@@ -49,7 +49,9 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
             statusEffects,
             GetComponent<Rigidbody>(),
             GetComponentInChildren<Animator>(),
-            GetComponent<PlayerSkillController>()
+            GetComponent<PlayerSkillController>(),
+            GetComponent<PlayerDashController>(),
+            GetComponent<PlayerGroundingSensor>()
         );
 
         currentState = CreateState(PlayerActionState.Idle);
@@ -146,6 +148,22 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
             ChangeState(PlayerActionState.Idle);
     }
 
+    // Dash는 방향·속도·지속시간이 필수라 인스턴스 주입 경로로만 진입한다. (예측 게이트는 PlayerDashController가 확인)
+    public bool BeginDash(Vector3 planarDirection, float speed, float duration, DashMotionSettings motion)
+    {
+        if (CurrentState == PlayerActionState.Dead)
+            return false;
+
+        SetState(new PlayerDashState(context, planarDirection, speed, duration, motion));
+        return true;
+    }
+
+    public void EndDash()
+    {
+        if (CurrentState == PlayerActionState.Dash)
+            ChangeState(PlayerActionState.Idle);
+    }
+
     // Skill 상태는 실행할 스킬 인스턴스가 필요해 BeginKnockback처럼 인스턴스 주입 경로로만 진입한다.
     public bool BeginSkill(PlayerSkillBase skill)
     {
@@ -176,6 +194,7 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
             PlayerActionState.Idle => true,
             PlayerActionState.Grabbed => true,
             PlayerActionState.Knockback => false, // 방향·세기가 필수라 BeginKnockback(direction, strength)으로만 진입
+            PlayerActionState.Dash => false, // 방향·속도·지속이 필수라 BeginDash(...)로만 진입
             PlayerActionState.Dead => true,
             _ => false
         };
@@ -247,7 +266,8 @@ public enum PlayerActionState
     Grabbed,
     Knockback,
     Dead,
-    Skill
+    Skill,
+    Dash
 }
 
 public sealed class PlayerStateContext
@@ -262,7 +282,9 @@ public sealed class PlayerStateContext
         StatusEffectController statusEffects,
         Rigidbody rigidbody,
         Animator animator,
-        PlayerSkillController skills)
+        PlayerSkillController skills,
+        PlayerDashController dash,
+        PlayerGroundingSensor groundingSensor)
     {
         Controller = controller;
         Player = player;
@@ -274,6 +296,8 @@ public sealed class PlayerStateContext
         Rigidbody = rigidbody;
         Animator = animator;
         Skills = skills;
+        Dash = dash;
+        GroundingSensor = groundingSensor;
     }
 
     public PlayerStateController Controller { get; }
@@ -287,6 +311,10 @@ public sealed class PlayerStateContext
     public Animator Animator { get; }
     // 스킬 시스템 미장착 프리팹에서는 null — 사용처는 전부 null 허용으로 다룬다
     public PlayerSkillController Skills { get; }
+    // 대시 컨트롤러 미장착 프리팹에서는 null — 사용처는 null 허용으로 다룬다
+    public PlayerDashController Dash { get; }
+    // 접지 센서 미장착 프리팹에서는 null — 사용처는 null 허용으로 다룬다
+    public PlayerGroundingSensor GroundingSensor { get; }
 }
 
 public interface IPlayerState
@@ -316,6 +344,20 @@ public abstract class PlayerStateBase : IPlayerState
 
     protected bool TryConsumeActionInput()
     {
+        // 조준 모드 중에는 일반 액션 입력(공격/다른 스킬/인터럽트)을 억제한다.
+        // 좌클릭 확정·Esc/재입력 취소는 PlayerSkillTargeting이 직접 처리한다.
+        if (Context.Skills != null && Context.Skills.IsChoosingTarget)
+            return false;
+
+        // 대시 우선: Idle/Move에서 대시와 공격·스킬이 같은 프레임이면 대시가 이긴다. (PLAN §7)
+        // 사용 불가능한 대시 입력은 여기서 소비되지 않아 아래 공격·스킬 경로가 보존된다.
+        if (Context.Dash != null &&
+            Context.Input.DashPressed &&
+            Context.Dash.TryBeginPredictedDash())
+        {
+            return true;
+        }
+
         // 공격 시작은 누른 프레임(press)에만 허용한다. 홀드 상태로는 시작되지 않으므로,
         // Once 정책에서 체인이 끝난 뒤 계속 누르고 있어도 재시작되지 않는다(릴리즈 요구).
         if (Context.Input.AttackPressed &&
@@ -689,5 +731,112 @@ public sealed class PlayerKnockbackState : PlayerStateBase
     {
         Context.Controller.EndKnockback();
         Context.Player.NotifyKnockbackEnded();
+    }
+}
+
+// 오너 예측 대시. 방향·Root Yaw를 시작 순간 확정하고 지속시간 동안 바꾸지 않는다. (PLAN §7, 불변식 6)
+// W2는 평지 단순 이동만 담당한다. 경사·벽·절벽·공중 관성은 W3에서 대체·확장한다.
+public sealed class PlayerDashState : PlayerStateBase
+{
+    private const int CastBufferSize = 8;
+    private const float MaxFallSpeed = 30f; // 대시 공중 낙하 속도 상한 (PLAN §5)
+
+    private readonly Vector3 direction; // 평면 정규화 방향(시작 순간 확정)
+    private readonly float speed;
+    private readonly float endTime;
+    private readonly DashMotionSettings motion;
+    private readonly CapsuleCollider capsule;
+    private readonly RaycastHit[] castBuffer = new RaycastHit[CastBufferSize];
+
+    private float airborneVerticalSpeed; // 절벽 낙하 중 누적 하강 속도(공중 구간에서만)
+
+    public PlayerDashState(PlayerStateContext context, Vector3 planarDirection, float speed, float duration, DashMotionSettings motion)
+        : base(context)
+    {
+        Vector3 planar = planarDirection;
+        planar.y = 0f;
+        direction = planar.sqrMagnitude > 0.0001f
+            ? planar.normalized
+            : Context.Movement.CurrentFacing;
+        this.speed = Mathf.Max(0f, speed);
+        this.motion = motion;
+        endTime = Time.time + Mathf.Max(0f, duration);
+        capsule = Context.Player != null ? Context.Player.GetComponent<CapsuleCollider>() : null;
+    }
+
+    public override PlayerActionState StateType => PlayerActionState.Dash;
+
+    public override void Enter(PlayerActionState previousState)
+    {
+        Context.Player.SetAnimatorMoving(false);
+        Context.Movement.RotateImmediately(direction);
+    }
+
+    public override void Tick()
+    {
+        // 정면 벽으로 이동이 0이 되어도 대시 상태는 원래 종료시각까지 유지한다. (불변식: 상태·무적 유지)
+        Vector3 delta = Vector3.zero;
+        if (speed > 0f)
+        {
+            Vector3 moveDir = ResolvePlanarSlopeDirection(); // 접지면 경사 투영, 공중이면 flat 수평
+            delta = moveDir * speed * Time.deltaTime;
+        }
+
+        // 절벽: Grounded를 잃으면 남은 대시 동안 방향 조작·Drag 없이 대시 수평속도 + 중력을 적용한다. (PLAN §8 / W3c)
+        PlayerGroundingSensor sensor = Context.GroundingSensor;
+        bool grounded = sensor != null && sensor.IsGrounded;
+        if (!grounded)
+        {
+            airborneVerticalSpeed += Physics.gravity.y * Time.deltaTime; // gravity.y < 0
+            airborneVerticalSpeed = Mathf.Max(airborneVerticalSpeed, -MaxFallSpeed);
+            delta.y += airborneVerticalSpeed * Time.deltaTime;
+        }
+        else
+        {
+            airborneVerticalSpeed = 0f;
+        }
+
+        if (delta.sqrMagnitude > 0f)
+            MoveWithSweep(delta);
+
+        if (Time.time >= endTime)
+            Context.Controller.ChangeState(PlayerActionState.Idle);
+    }
+
+    // 지면이 걷기 가능 경사면 지면 평면에 투영해 오르막/내리막을 따라가고,
+    // maxWalkableSlopeAngle 초과 급경사는 벽으로 취급해 투영하지 않는다(스윕이 클램프). (PLAN §8 / W3a·W3b)
+    private Vector3 ResolvePlanarSlopeDirection()
+    {
+        PlayerGroundingSensor sensor = Context.GroundingSensor;
+        if (sensor != null && sensor.IsGrounded)
+        {
+            float angle = Vector3.Angle(sensor.GroundNormal, Vector3.up);
+            if (angle <= motion.MaxWalkableSlopeAngle)
+            {
+                Vector3 projected = Vector3.ProjectOnPlane(direction, sensor.GroundNormal);
+                if (projected.sqrMagnitude > 0.0001f)
+                    return projected.normalized;
+            }
+        }
+
+        return direction;
+    }
+
+    // 대시·일반 이동이 공유하는 스윕으로 벽/급경사 관통을 막고 접선으로 미끄러진다. (PlayerMotionSweep 단일 소스)
+    private void MoveWithSweep(Vector3 delta)
+    {
+        if (capsule == null)
+        {
+            if (delta.sqrMagnitude > 0f)
+                Context.Movement.MoveRoot(delta);
+            return;
+        }
+
+        Vector3 resolved = PlayerMotionSweep.Resolve(
+            capsule, delta, motion.MaxWalkableSlopeAngle, motion.ObstacleMask,
+            motion.CollisionSkin, motion.MaxSweepIterations, castBuffer);
+
+        if (resolved.sqrMagnitude > 1e-10f)
+            Context.Movement.MoveRoot(resolved);
     }
 }
