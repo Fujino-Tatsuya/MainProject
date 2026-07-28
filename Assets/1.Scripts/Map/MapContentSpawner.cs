@@ -50,7 +50,14 @@ public class MapContentSpawner : MonoBehaviour
                 // 미저작이면 임시 0°+baseline으로 배치하되 경고 — 조용한 실패 없음(저작 창으로 채워야 통로에 붙음).
                 if (!p.Slot.TryGetYaw(p.LayoutPrefab, out int yawSteps))
                     Debug.LogWarning($"[MapContentSpawner] 회전 미저작 (Slot {p.Slot.SlotID} × {p.LayoutPrefab.name}) — 임시 0°. Zone Rotation Authoring 필요.");
-                Vector3 pos = p.Slot.TryGetPosition(p.LayoutPrefab, out var savedPos) ? savedPos : p.Slot.transform.position;
+
+                // 위치 미저작도 조용히 넘기지 않는다 — baseline으로 떨어지면 문이 통로와 어긋나
+                // 바닥이 벌어진 것처럼 보이고 그 틈으로 떨어진다(시드에 따라만 나타난다).
+                bool hasSavedPos = p.Slot.TryGetPosition(p.LayoutPrefab, out var savedPos);
+                if (!hasSavedPos)
+                    Debug.LogWarning($"[MapContentSpawner] 위치 미저작 (Slot {p.Slot.SlotID} × {p.LayoutPrefab.name}) — 슬롯 baseline 사용. Save Placements 필요.");
+
+                Vector3 pos = hasSavedPos ? savedPos : p.Slot.transform.position;
                 Quaternion rot = Quaternion.Euler(0f, yawSteps * 90f, 0f);
                 GameObject zoneGo = Instantiate(p.LayoutPrefab, pos, rot, _root);
 
@@ -69,10 +76,6 @@ public class MapContentSpawner : MonoBehaviour
                 // 존 프리팹은 비네트워크 규약이라 프리팹에 미리 넣지 않고 스폰 시 동적 부착한다.
                 if (p.Slot.AssignedRole == ZoneRole.BossRoom)
                     AttachBossEnterZone(zoneGo, isServer);
-
-                // Quest 역할 존: 콘텐츠가 미구현이라 물리적으로 진입을 막는다(전 피어 동일 결과).
-                if (p.Slot.AssignedRole == ZoneRole.Quest)
-                    AttachQuestBlockade(zoneGo);
             }
         }
 
@@ -118,76 +121,6 @@ public class MapContentSpawner : MonoBehaviour
         box.size = size;
         zoneGo.AddComponent<BossEnterTrigger>();
         Edit.Log($"[MapContentSpawner] BossEnter 트리거 부착 — {zoneGo.name} @ {zoneGo.transform.position} (박스 {box.size})", zoneGo);
-    }
-
-    /// <summary>
-    /// Quest 존 진입 차단(모든 피어에서 동일하게 부착 — 물리는 각 피어 로컬 판정이다).
-    ///
-    /// 레이저 프리팹에 벽을 심는 방식은 통로 전역(Stage1 26곳)을 막아 <b>보스 진입로까지 봉쇄</b>했다.
-    /// 어느 슬롯이 Quest가 되는지는 시드마다 달라지므로 정적 배치로는 맞출 수 없다 — 역할이 정해지는
-    /// 이 시점에 해당 존만 감싼다. Quest 콘텐츠가 구현되면 이 호출만 제거하면 된다.
-    /// </summary>
-    private static void AttachQuestBlockade(GameObject zoneGo)
-    {
-        int wallLayer = LayerMask.NameToLayer("Wall");
-        if (wallLayer < 0)
-        {
-            Edit.LogWarning("[MapContentSpawner] 'Wall' 레이어가 없어 Quest 차단벽을 만들지 못했다.");
-            return;
-        }
-
-        Renderer[] renderers = zoneGo.GetComponentsInChildren<Renderer>(true);
-        if (renderers.Length == 0)
-        {
-            Edit.LogWarning($"[MapContentSpawner] {zoneGo.name}에 렌더러가 없어 Quest 차단 범위를 실측하지 못했다.");
-            return;
-        }
-
-        Bounds bounds = renderers[0].bounds;
-        for (int i = 1; i < renderers.Length; i++) bounds.Encapsulate(renderers[i].bounds);
-
-        Vector3 centerLocal = zoneGo.transform.InverseTransformPoint(bounds.center);
-        Vector3 size = bounds.size;
-
-        var root = new GameObject("QuestBlockade");
-        root.transform.SetParent(zoneGo.transform, false);
-        root.layer = wallLayer;
-
-        // 네 변을 막는다. 두께는 통과 방지용으로 넉넉히, 높이는 대시·넉백으로 넘지 못할 만큼.
-        float halfX = size.x * 0.5f;
-        float halfZ = size.z * 0.5f;
-        float centerY = QuestWallHeight * 0.5f;
-
-        AddQuestWall(root, wallLayer, "Block_XMin",
-            new Vector3(centerLocal.x - halfX, centerY, centerLocal.z),
-            new Vector3(QuestWallThickness, QuestWallHeight, size.z + QuestWallThickness * 2f));
-        AddQuestWall(root, wallLayer, "Block_XMax",
-            new Vector3(centerLocal.x + halfX, centerY, centerLocal.z),
-            new Vector3(QuestWallThickness, QuestWallHeight, size.z + QuestWallThickness * 2f));
-        AddQuestWall(root, wallLayer, "Block_ZMin",
-            new Vector3(centerLocal.x, centerY, centerLocal.z - halfZ),
-            new Vector3(size.x, QuestWallHeight, QuestWallThickness));
-        AddQuestWall(root, wallLayer, "Block_ZMax",
-            new Vector3(centerLocal.x, centerY, centerLocal.z + halfZ),
-            new Vector3(size.x, QuestWallHeight, QuestWallThickness));
-
-        Edit.Log(
-            $"[MapContentSpawner] Quest 존 차단벽 부착 — {zoneGo.name} @ {zoneGo.transform.position} " +
-            $"(범위 {size.x:F1}×{size.z:F1})", zoneGo);
-    }
-
-    private const float QuestWallHeight = 8f;
-    private const float QuestWallThickness = 1f;
-
-    private static void AddQuestWall(GameObject parent, int layer, string name, Vector3 center, Vector3 size)
-    {
-        var go = new GameObject(name);
-        go.transform.SetParent(parent.transform, false);
-        go.layer = layer;
-
-        var box = go.AddComponent<BoxCollider>();
-        box.center = center;
-        box.size = size;
     }
 
     private int SpawnMonstersFor(GameObject zoneGo, MapGenerator gen)
