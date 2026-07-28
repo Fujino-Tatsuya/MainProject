@@ -25,6 +25,38 @@ public static class QuestLaserBlockerAuthoring
     // 레이저가 바닥에서 떠 있어도 발밑까지 막도록 아래로 더 뻗는 양.
     const float DownExtension = 2f;
 
+    /// <summary>
+    /// 레이저 프리팹에 심은 차단벽을 제거한다.
+    ///
+    /// ⚠️ 이 방식은 폐기됐다: layprefab은 Stage1 통로 26곳에 들어 있어 <b>보스 진입로까지 봉쇄</b>했고,
+    /// 어느 슬롯이 Quest가 되는지는 시드마다 달라 정적 배치로 맞출 수 없다. 현재 Quest 차단은
+    /// MapContentSpawner가 역할 확정 시점에 해당 존만 감싸는 방식(AttachQuestBlockade)으로 처리한다.
+    /// 특정 통로를 영구히 막아야 할 때만 아래 Setup을 쓰고, 그 경우도 대상 인스턴스를 좁혀야 한다.
+    /// </summary>
+    [MenuItem("Tools/Map/Authoring/Remove Quest Laser Blockers")]
+    public static void RemoveLaserBlockers()
+    {
+        GameObject root = PrefabUtility.LoadPrefabContents(LaserPrefabPath);
+
+        try
+        {
+            Transform existing = root.transform.Find(BlockerName);
+            if (existing == null)
+            {
+                Debug.Log($"[QuestLaserBlocker] {BlockerName}이 없다 — 제거할 것 없음.");
+                return;
+            }
+
+            Object.DestroyImmediate(existing.gameObject);
+            PrefabUtility.SaveAsPrefabAsset(root, LaserPrefabPath);
+            Debug.Log($"[QuestLaserBlocker] {BlockerName} 제거 후 저장 — 레이저 통로 통행이 복구된다.");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
     [MenuItem("Tools/Map/Authoring/Setup Quest Laser Blockers")]
     public static void SetupLaserBlockers()
     {

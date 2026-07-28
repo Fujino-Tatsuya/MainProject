@@ -63,11 +63,13 @@ public static class MapMonsterAuthoring
                 layout.Difficulty = entry.Difficulty;
                 layout.MonsterGroupID = PickGroupID(entry.Size, entry.Role, idx);
 
-                int markerTarget = MarkerCount(entry.Size, entry.Role);
+                int markerTarget = MarkerCount(entry.Size, entry.Role, layout.MonsterGroupID);
                 // 기존 마커가 있으면 유지(수동 저작 존중), 없을 때만 자동 생성.
                 layout.MonsterSpawnPoints.RemoveAll(t => t == null);
                 if (markerTarget > 0 && layout.MonsterSpawnPoints.Count == 0)
                     CreateMarkers(root, layout, markerTarget);
+                else if (layout.MonsterSpawnPoints.Count > markerTarget)
+                    TrimMarkers(layout, markerTarget);
 
                 PrefabUtility.SaveAsPrefabAsset(root, path);
                 changed++;
@@ -141,8 +143,14 @@ public static class MapMonsterAuthoring
         }
     }
 
-    static int MarkerCount(ZoneSize size, ZoneRole role)
+    // 중간보스(GauntletBot) 그룹은 마커 수 = 스폰 수이므로 대형 존 기준 4마리가 되어 과했다.
+    // 엘리트는 1마리만 세운다(팀장 피드백 2026-07-29).
+    const int EliteGroupID = 5;
+    const int EliteMarkerCount = 1;
+
+    static int MarkerCount(ZoneSize size, ZoneRole role, int monsterGroupID)
     {
+        if (monsterGroupID == EliteGroupID) return EliteMarkerCount;
         if (role == ZoneRole.Quest) return 2;
         if (role != ZoneRole.Combat) return 0;
         switch (size)
@@ -150,6 +158,18 @@ public static class MapMonsterAuthoring
             case ZoneSize.Large: return 4;
             case ZoneSize.Medium: return 3;
             default: return 2;
+        }
+    }
+
+    // 목표보다 많은 마커는 뒤에서부터 제거한다(수동 조정한 앞쪽 위치를 보존).
+    static void TrimMarkers(ZoneLayout layout, int target)
+    {
+        for (int i = layout.MonsterSpawnPoints.Count - 1; i >= target; i--)
+        {
+            Transform marker = layout.MonsterSpawnPoints[i];
+            layout.MonsterSpawnPoints.RemoveAt(i);
+            if (marker != null)
+                Object.DestroyImmediate(marker.gameObject);
         }
     }
 
