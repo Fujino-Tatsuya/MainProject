@@ -4,7 +4,17 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## 현재 인수인계 (2026-07-21 → Codex)
+## 현재 인수인계 (2026-07-28)
+
+작업 세션: **경석(Claude)** — 벽 투명화(Wall Occlusion)를 per-pixel 월드공간 페이드로 전면 재설계. 자동 검증 완료, **사용자 Play Mode 검증 대기**.
+
+- 설계·검증 상태·남은 과제 = [Docs/tech/wall-occlusion-implementation.md](Docs/tech/wall-occlusion-implementation.md), 계획 잠금 = `PLAN.md` 최상단 섹션.
+- 수정 파일(동시수정 주의): `1.Scripts/Rendering/{WallOcclusionDriver.cs, Occlusion/*, Editor/WallOcclusionAuthoring.cs}`, `3.Materials/Level1_Materials/Occlusion/*`, `99.Settings/WallOcclusionSettings.asset`, `MapScene.unity`, `Assets/Tests/EditMode/Occlusion/*`.
+- 삭제됨: `WallOcclusionUnit/Proxy/Manager/VisibilityContributor/Core/RuntimeBinder/ProjectBridge`. 폐기 문서 2종(`wall-occlusion-plan.md`, `wall-occlusion-runtime-bounds.md`)도 삭제.
+- **⚠️ 맵 콜라이더 전멸**: 2026-07-28 아트 교체로 맵 프리팹 12개 콜라이더 0개(렌더러 1,823). 벽 투명화는 콜라이더를 안 쓰므로 무관하지만 플레이어 충돌·NavMesh·낙하 방지에 필요 — `Tools > Map > Authoring > Add Floor+Wall MeshColliders` 미실행 상태.
+- 아직 커밋 안 됨.
+
+## 이전 인수인계 (2026-07-21 → Codex)
 
 작업 세션: **경석(Claude)** — MapScene 몬스터/보스입장 통합 완료(컴파일 0, 1차 플레이 검증). 다음 작업자 = Codex.
 

@@ -1,0 +1,22 @@
+{
+  "name": "VeyTrace.Rendering.Occlusion.EditModeTests",
+  "rootNamespace": "VeyTrace.Rendering.Occlusion.Tests",
+  "references": [
+    "VeyTrace.Rendering.Occlusion"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [
+    "nunit.framework.dll"
+  ],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

@@ -1,3 +1,58 @@
+# CURRENT PLAN — Wall Occlusion per-pixel 재설계 (2026-07-28)
+
+> 상태: 구현 + 자동 검증 완료, **사용자 Play Mode 검증 대기**
+> 자동 검증: C# 컴파일 0 에러 / 0 경고, 셰이더 컴파일 정상, EditMode 15 passed / 0 failed,
+> Apply All 매핑 5쌍, Validate errors=0
+> 설계 문서: [Docs/tech/wall-occlusion-implementation.md](Docs/tech/wall-occlusion-implementation.md)
+
+## 왜 재설계했나
+
+이전 구조는 벽 오브젝트당 스칼라 불투명도 하나를 CPU가 계산해 MPB로 밀어 넣었다.
+그래서 벽은 통째로 사라지거나 통째로 남거나 둘 중 하나였고, 사용자가 요구한
+**벽 표면 위의 그라데이션**(ㅡ자 벽에서 시선축 쪽 끝은 투명, 반대쪽 끝은 불투명)이
+원천적으로 불가능했다.
+
+추가로 이전 구조의 "정밀 판정"은 실제로는 동작하지 않았다. `Collider.ClosestPoint`가
+non-convex MeshCollider를 지원하지 않아 AABB로 폴백하는데, 맵의 벽 콜라이더는 전부
+non-convex였다. 즉 제거했다던 코너 오판이 그대로 남아 있었고, EditMode 테스트는
+BoxCollider로만 검증해서 초록이었다.
+
+## 무엇으로 바꿨나
+
+불투명도를 프래그먼트의 월드 좌표로 셰이더가 직접 계산한다. C#은 전역 유니폼
+네 개만 갱신한다.
+
+- 물리 쿼리 0회, MaterialPropertyBlock 0회 (SRP Batcher 복귀)
+- `WallOcclusionUnit` / `Proxy` / `Manager` / `VisibilityContributor` 삭제
+- 페이드 타이밍·히스테리시스 삭제 — 공간 그라데이션에는 on/off 이벤트가 없다
+- 렌더러 이름 문자열 필터 삭제 — 벽/바닥은 셰이더가 노멀(`1-|normalWS.y|`)로 가른다
+- 정적 스테이지(`Stage1`)도 `OnEnable`에서 바인딩 (이전엔 영원히 누락됐다)
+
+## 완료 조건
+
+- [x] 셰이더 4개 패스 전부 per-pixel 클립 + Forward+ 키워드(`_CLUSTER_LIGHT_LOOP`) 추가
+- [x] `WallOcclusionDriver`가 명시 카메라/타깃으로 전역 유니폼 갱신 (`Camera.main` 금지 유지)
+- [x] 머티리얼 바인더 멱등화, 미매핑 머티리얼 리포트
+- [x] 저작툴에서 Shader Graph 프로퍼티 이름 하드코딩 제거 (아트 재저장에 안 깨지도록)
+- [x] MapScene 컴포넌트를 Driver 하나로 교체
+- [x] 구 아키텍처 삭제 + 테스트 교체
+- [ ] **사용자 Play Mode 검증** — 그라데이션 형태, 바닥 미페이드, 그림자 잔상, 카메라 전환, MPPM
+
+## 남은 과제
+
+- 스킬 장판(Telegraph) 채널 미구현 — 전역 벡터 배열로 복원 가능
+- 변종 머티리얼은 원본 Shader Graph의 근사치. 룩을 정확히 보존하려면 원본 그래프에
+  Custom Function + Dither 노드를 넣어야 하나 SVN 아트 수정 합의 필요
+- 다른 커스텀 셰이더(ToonLit, WaterDark)의 Forward+ 키워드 누락 점검
+
+## 별개 이슈 — 맵 콜라이더 전멸
+
+2026-07-28 아트 교체로 맵 프리팹 12개의 콜라이더가 전부 사라졌다(렌더러 1,823 / 콜라이더 0).
+재설계 후 벽 투명화는 콜라이더를 쓰지 않아 이 기능을 막지는 않지만, 플레이어 충돌·
+NavMesh·낙하 방지에 필요하다. `Tools > Map > Authoring > Add Floor+Wall MeshColliders`로 복구.
+
+---
+
 # CURRENT PLAN — 보스룸 진입·No.23 등장·전투 전환 (2026-07-24)
 
 > 상태: 설계 승인, 구현 대기

@@ -3,6 +3,7 @@ using Unity.Cinemachine;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using VeyTrace.RuntimeSafety;
 
 // MapScene에 배치되는 카메라 매니저.
 //  - 오너 플레이어가 스폰될 때(Player.OnNetworkSpawn → FocusOwnerPlayer) 카메라 리그를 Instantiate하고,
@@ -15,6 +16,7 @@ public class CameraTargetSwitcher : MonoBehaviour
     // 현재 카메라가 따라가는 대상(=플레이어). 없으면 null.
     // FogManager 의 층 디밍이 플레이어 y 기준선을 잡는 데 사용한다.
     public Transform CurrentFollowTarget => GetCurrentTarget();
+    public Camera GameplayCamera => gameplayCamera;
 
     private const string CameraFollowTargetTag = "CameraFollowTarget";
 
@@ -22,6 +24,9 @@ public class CameraTargetSwitcher : MonoBehaviour
 
     [SerializeField] private GameObject followCameraPrefab;
 
+    private GameObject mainCameraInstance;
+    private GameObject followCameraInstance;
+    private Camera gameplayCamera;
     private CinemachineCamera playerCamera;       // 리그 안의 vcam (런타임에 채워짐)
     private readonly List<Transform> cameraFollowTargets = new();
     private int currentTargetIndex = -1;
@@ -45,11 +50,12 @@ public class CameraTargetSwitcher : MonoBehaviour
     {
         EnsureCameraRig();
         SelectOwnerPlayerTarget();
+        RuntimeSceneServiceCoordinator.Reconcile();
     }
 
     private void EnsureCameraRig()
     {
-        if (playerCamera != null)
+        if (playerCamera != null && gameplayCamera != null)
         {
             return;
         }
@@ -60,12 +66,24 @@ public class CameraTargetSwitcher : MonoBehaviour
             return;
         }
 
-        // 활성 씬(소스/로딩 씬)이 아니라, 매니저(CameraSwitcher)가 사는 씬(MapScene)에서 바로 생성한다.
-        // 부모를 this.transform으로 주면 그 씬 소속으로 태어나므로, 소스 씬 언로드에 휩쓸려 파괴되지 않는다.
-        Instantiate(mainCameraPrefab, transform); // 렌더링 카메라 + CinemachineBrain
-        GameObject followInstance = Instantiate(followCameraPrefab, transform); // 팔로우 vcam
+        // 부모를 this.transform으로 주면 MapScene 소속으로 생성되어 소스/로딩 씬 언로드에
+        // 휩쓸리지 않는다. 생성한 인스턴스에서 직접 찾고 Camera.main은 사용하지 않는다.
+        if (mainCameraInstance == null)
+            mainCameraInstance = Instantiate(mainCameraPrefab, transform);
+        if (followCameraInstance == null)
+            followCameraInstance = Instantiate(followCameraPrefab, transform);
 
-        playerCamera = followInstance.GetComponentInChildren<CinemachineCamera>(true);
+        gameplayCamera =
+            mainCameraInstance.GetComponentInChildren<Camera>(true);
+        if (gameplayCamera == null)
+        {
+            Edit.LogWarning(
+                $"[Camera] Main camera prefab has no {nameof(Camera)}. " +
+                $"prefab={mainCameraPrefab.name}");
+        }
+
+        playerCamera =
+            followCameraInstance.GetComponentInChildren<CinemachineCamera>(true);
         if (playerCamera == null)
         {
             Edit.LogWarning($"[Camera] Follow camera prefab has no {nameof(CinemachineCamera)}. prefab={followCameraPrefab.name}");

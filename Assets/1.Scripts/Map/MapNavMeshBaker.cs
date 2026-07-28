@@ -1,6 +1,7 @@
 using Unity.AI.Navigation;
 using UnityEngine;
 using UnityEngine.AI;
+using VeyTrace.RuntimeSafety;
 
 // 생성맵 NavMesh 런타임 베이커 (PLAN 2026-07-21 §4).
 //
@@ -37,7 +38,19 @@ public class MapNavMeshBaker : MonoBehaviour
         if (nm != null && nm.IsListening && !nm.IsServer) return;
 
         if (surface == null) return;
-        surface.BuildNavMesh();
+        using (UnreadableMeshColliderBakeScope fallback =
+               UnreadableMeshColliderBakeScope.BeginLoadedScenes())
+        {
+            if (fallback.ProxyCount > 0)
+            {
+                Debug.Log(
+                    $"[MapNavMeshBaker] Replaced {fallback.ProxyCount} unreadable " +
+                    "MeshCollider(s) with temporary BoxCollider bake proxies.",
+                    this);
+            }
+
+            surface.BuildNavMesh();
+        }
 
         ReattachAgents();
         Debug.Log("[MapNavMeshBaker] NavMesh 베이크 완료 + 에이전트 재부착.");

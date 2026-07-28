@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e3e0022985474d70b14dad59ecb3969a, type: 3}
+  m_Name: WallOcclusionSettings
+  m_EditorClassIdentifier: VeyTrace.Rendering.Occlusion::VeyTrace.Rendering.Occlusion.WallOcclusionSettings
+  innerRadius: 1.2
+  outerRadius: 4.5
+  minimumOpacity: 0.15
+  behindFalloff: 1.5
+  floorNormalThreshold: 0.35
+  floorGuardDepth: 0.5
+  sourceMaterials:
+  - {fileID: 2100000, guid: b59ab9d552f599444b0f308c3b68d32e, type: 2}
+  - {fileID: 2100000, guid: 03db29b8a7bbae64f98a2010b35ccd8a, type: 2}
+  - {fileID: 2100000, guid: 97b8d1ae93dcb0840ad31fcd65139ab4, type: 2}
+  - {fileID: 2100000, guid: faf6786bc924f1548a9151ebdfa38ded, type: 2}
+  - {fileID: 2100000, guid: e2d4ad45394708b4ea06dfe511639ecf, type: 2}
+  occlusionMaterials:
+  - {fileID: 2100000, guid: 87fff8d9d1b84a3b94281973d42e24a6, type: 2}
+  - {fileID: 2100000, guid: f098193652f04e92ba647f0492cef963, type: 2}
+  - {fileID: 2100000, guid: a400a02352dce2846bb6050e8f9f3e1c, type: 2}
+  - {fileID: 2100000, guid: d3b69cdf7e8f4dafaf671eead1027010, type: 2}
+  - {fileID: 2100000, guid: 19a95c9cfa2444eab6b6354ee7e7d346, type: 2}

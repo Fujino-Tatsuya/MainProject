@@ -1,0 +1,14 @@
+{
+  "name": "VeyTrace.Rendering.Occlusion",
+  "rootNamespace": "VeyTrace.Rendering.Occlusion",
+  "references": [],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
