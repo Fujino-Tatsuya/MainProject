@@ -1,4 +1,4 @@
-using Unity.Netcode;
+﻿using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
 using UnityEngine;
 
@@ -7,54 +7,71 @@ public class NetworkSessionLauncher : MonoBehaviour
     NetworkManager _networkManager;
     NetworkLoadingFlowController _loadingFlowController;
     [SerializeField] private GameObject defaultPlayerPrefab;
-    public GameObject ButtonGroup;
 
     private void Awake()
     {
         _networkManager = GetComponent<NetworkManager>();
         _loadingFlowController = GetComponent<NetworkLoadingFlowController>();
         _loadingFlowController?.SetDefaultPlayerPrefab(defaultPlayerPrefab);
-
-        if(ButtonGroup == null)
-        {
-            ButtonGroup = GameObject.Find("TempButtonGroup");
-        }
+        Debug.Log($"[SceneFlow] NetworkSessionLauncher.Awake hasNetworkManager={_networkManager != null} hasLoadingFlow={_loadingFlowController != null}");
     }
 
-    public void StartHost()
+    public bool StartHost()
     {
+        Debug.Log($"[SceneFlow] NetworkSessionLauncher.StartHost before listening={_networkManager.IsListening}");
         if (_networkManager.StartHost())
         {
             RegisterLoadingFlowCallbacks();
-            SetButtonGroupActive(false);
+            Debug.Log($"[SceneFlow] NetworkSessionLauncher.StartHost success localClientId={_networkManager.LocalClientId}");
+            return true;
         }
+
+        Debug.Log("[SceneFlow] NetworkSessionLauncher.StartHost failed");
+        return false;
     }
 
-    public void StartClient()
+    public bool StartClient()
     {
+        Debug.Log($"[SceneFlow] NetworkSessionLauncher.StartClient before listening={_networkManager.IsListening}");
         if (_networkManager.StartClient())
         {
             RegisterLoadingFlowCallbacks();
-            SetButtonGroupActive(false);
+            Debug.Log($"[SceneFlow] NetworkSessionLauncher.StartClient success localClientId={_networkManager.LocalClientId}");
+            return true;
         }
+
+        Debug.Log("[SceneFlow] NetworkSessionLauncher.StartClient failed");
+        return false;
     }
 
-    public void StartServer()
+    public bool StartServer()
     {
+        Debug.Log($"[SceneFlow] NetworkSessionLauncher.StartServer before listening={_networkManager.IsListening}");
         if (_networkManager.StartServer())
         {
             RegisterLoadingFlowCallbacks();
-            SetButtonGroupActive(false);
+            Debug.Log("[SceneFlow] NetworkSessionLauncher.StartServer success");
+            return true;
         }
+
+        Debug.Log("[SceneFlow] NetworkSessionLauncher.StartServer failed");
+        return false;
     }
 
     public void OnSetConnectionData(string ip)
     {
-        NetworkManager.Singleton.GetComponent<UnityTransport>().SetConnectionData(ip, 7777);
+        OnSetConnectionData(ip, 7777);
+    }
+
+    public void OnSetConnectionData(string ip, ushort port)
+    {
+        Debug.Log($"[SceneFlow] NetworkSessionLauncher.OnSetConnectionData ip={ip} port={port}");
+        NetworkManager.Singleton.GetComponent<UnityTransport>().SetConnectionData(ip, port);
     }
 
     public void StartGameLoading()
     {
+        Debug.Log($"[SceneFlow] NetworkSessionLauncher.StartGameLoading hasFlow={_loadingFlowController != null}");
         RegisterLoadingFlowCallbacks();
         _loadingFlowController?.StartGameLoading();
     }
@@ -69,22 +86,17 @@ public class NetworkSessionLauncher : MonoBehaviour
         if (_loadingFlowController == null)
         {
             _loadingFlowController = gameObject.AddComponent<NetworkLoadingFlowController>();
+            Debug.Log("[SceneFlow] NetworkSessionLauncher.RegisterLoadingFlowCallbacks added NetworkLoadingFlowController");
         }
 
         _loadingFlowController?.SetDefaultPlayerPrefab(defaultPlayerPrefab);
         _loadingFlowController?.RegisterNetworkCallbacks();
-    }
-
-    private void SetButtonGroupActive(bool active)
-    {
-        if (ButtonGroup != null)
-        {
-            ButtonGroup.SetActive(active);
-        }
+        Debug.Log($"[SceneFlow] NetworkSessionLauncher.RegisterLoadingFlowCallbacks done hasFlow={_loadingFlowController != null}");
     }
 
     private void OnApplicationQuit()
     {
+        Debug.Log("[SceneFlow] NetworkSessionLauncher.OnApplicationQuit");
         if (NetworkManager.Singleton != null)
         {
             NetworkManager.Singleton.Shutdown();

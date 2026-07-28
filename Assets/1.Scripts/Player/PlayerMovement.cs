@@ -6,6 +6,7 @@ public class PlayerMovement : MonoBehaviour
 {
     private PlayerInputReader reader;
     private Player player;
+    private PlayerSoulController soulController;
     private Rigidbody rb;
 
     [SerializeField] private Transform armature;
@@ -20,10 +21,20 @@ public class PlayerMovement : MonoBehaviour
     private bool hasRotate = true;
     private float currentSpeed;
 
+    // 이동 플랫폼 캐리: 이번 프레임 외부 이동량(플랫폼). Move()에서 입력 이동과 합산 후 리셋.
+    private Vector3 _carryDelta;
+
+    /// <summary>이동 플랫폼 등 외부 이동량을 이번 프레임 이동에 가산한다(소유자측에서 호출).</summary>
+    public void AddCarryDelta(Vector3 delta)
+    {
+        _carryDelta += delta;
+    }
+
     private void Awake()
     {
         reader = GetComponent<PlayerInputReader>();
         player = GetComponent<Player>();
+        soulController = GetComponent<PlayerSoulController>();
         rb = GetComponent<Rigidbody>();
 
         if (armature == null)
@@ -43,51 +54,53 @@ public class PlayerMovement : MonoBehaviour
 
     private void Move()
     {
-        if (player != null && !player.CanMove)
+        Vector3 inputMove = Vector3.zero;
+
+        bool canMove = player == null || player.CanMove;
+        if (canMove && reader.HasMoveInput)
         {
-            currentSpeed = 0f;
-            return;
-        }
+            Vector2 input = reader.Direction;
 
-        if (!reader.HasMoveInput)
-        {
-            currentSpeed = 0f;
-            return;
-        }
+            Vector3 localDir = new Vector3(input.x, 0f, input.y);
+            Vector3 worldDir = Quaternion.Euler(0f, viewYaw, 0f) * localDir;
+            worldDir.Normalize();
 
-        Vector2 input = reader.Direction;
+            Vector3 forward = armature != null ? armature.forward : transform.forward;
+            float dot = Vector3.Dot(worldDir, forward);
 
-        Vector3 localDir = new Vector3(input.x, 0f, input.y);
-        Vector3 worldDir = Quaternion.Euler(0f, viewYaw, 0f) * localDir;
-        worldDir.Normalize();
+            if (dot >= alignThreshold)
+            {
+                currentSpeed = maxSpeed;
+            }
+            else
+            {
+                if (currentSpeed > midSpeed)
+                    currentSpeed = midSpeed;
 
-        Vector3 forward = armature != null ? armature.forward : transform.forward;
-        float dot = Vector3.Dot(worldDir, forward);
+                currentSpeed = Mathf.MoveTowards(
+                    currentSpeed,
+                    maxSpeed,
+                    acceleration * Time.deltaTime
+                );
+            }
 
-        if (dot >= alignThreshold)
-        {
-            currentSpeed = maxSpeed;
+            inputMove = worldDir * ResolveMoveSpeed(currentSpeed) * Time.deltaTime;
         }
         else
         {
-            if (currentSpeed > midSpeed)
-                currentSpeed = midSpeed;
-
-            currentSpeed = Mathf.MoveTowards(
-                currentSpeed,
-                maxSpeed,
-                acceleration * Time.deltaTime
-            );
+            currentSpeed = 0f;
         }
 
-        // 상태이상 이속 modifier 반영 (버프 > 1, 둔화 < 1)
-        float statusMultiplier = player != null && player.StatusEffects != null
-            ? player.StatusEffects.GetStatMultiplier(StatusEffectType.MoveSpeedModifier)
-            : 1f;
+        // 입력 이동 + 플랫폼 캐리를 단일 MovePosition으로 적용.
+        // (MovePosition을 프레임당 두 번 호출하면 뒤엣것이 덮어쓰므로 반드시 합산.)
+        // 캐리는 CanMove/입력과 무관하게 적용 → 스턴/사망 중에도 플랫폼에 실려 이동(시체 잔류).
+        Vector3 total = inputMove + _carryDelta;
+        _carryDelta = Vector3.zero;
 
-        rb.MovePosition(
-            rb.position + worldDir * currentSpeed * statusMultiplier * Time.deltaTime
-        );
+        if (total.sqrMagnitude > 0f)
+        {
+            rb.MovePosition(rb.position + total);
+        }
     }
 
     private void Rotate()
@@ -161,6 +174,72 @@ public class PlayerMovement : MonoBehaviour
     public void MoveRoot(Vector3 deltaPosition)
     {
         rb.MovePosition(rb.position + deltaPosition);
+    }
+
+    /// <summary>
+    /// 현재 이동 입력을 뷰(viewYaw) 기준 월드 평면 방향으로 변환한다. 입력이 없으면 zero.
+    /// 대시 등 외부 소비자가 이동과 동일한 입력→월드 매핑을 공유하기 위한 진입점.
+    /// </summary>
+    public Vector3 GetInputWorldDirection()
+    {
+        if (reader == null || !reader.HasMoveInput)
+            return Vector3.zero;
+
+        Vector2 input = reader.Direction;
+        Vector3 worldDir = Quaternion.Euler(0f, viewYaw, 0f) * new Vector3(input.x, 0f, input.y);
+        worldDir.y = 0f;
+        return worldDir.sqrMagnitude > 0.0001f ? worldDir.normalized : Vector3.zero;
+    }
+
+    /// <summary>현재 캐릭터(armature)가 바라보는 평면 정면. 대시 무입력 시 기본 방향.</summary>
+    public Vector3 CurrentFacing
+    {
+        get
+        {
+            Vector3 forward = armature != null ? armature.forward : transform.forward;
+            forward.y = 0f;
+            return forward.sqrMagnitude > 0.0001f ? forward.normalized : Vector3.forward;
+        }
+    }
+
+    /// <summary>
+    /// 오너 자동 이동(스킬 사거리 확보용). worldTarget 방향으로 최대 이속(상태이상 배율 반영)으로 이동하며
+    /// armature를 진행 방향으로 회전시킨다. CanMove가 막히면(CC 등) 그 프레임은 정지한다.
+    /// 수동 입력이 없을 때만 호출되므로 Move()의 입력 이동과 충돌하지 않는다.
+    /// </summary>
+    public void MoveTowardsPoint(Vector3 worldTarget)
+    {
+        if (rb == null)
+            return;
+
+        if (player != null && !player.CanMove)
+            return;
+
+        Vector3 dir = worldTarget - rb.position;
+        dir.y = 0f;
+        if (dir.sqrMagnitude < 0.0001f)
+            return;
+
+        dir.Normalize();
+
+        rb.MovePosition(
+            rb.position + dir * (ResolveMoveSpeed(maxSpeed) * Time.deltaTime));
+        RotateToward(dir, rotate_Speed);
+    }
+
+    private float ResolveMoveSpeed(float baseSpeed)
+    {
+        if (soulController != null &&
+            soulController.TryGetFixedMoveSpeed(out float soulMoveSpeed))
+        {
+            return soulMoveSpeed;
+        }
+
+        float statusMultiplier = player != null && player.StatusEffects != null
+            ? player.StatusEffects.GetStatMultiplier(StatusEffectType.MoveSpeedModifier)
+            : 1f;
+
+        return baseSpeed * statusMultiplier;
     }
 
     public void SetArmature(Transform newArmature)

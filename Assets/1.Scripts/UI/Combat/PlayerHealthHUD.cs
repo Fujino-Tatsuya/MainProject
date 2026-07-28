@@ -16,10 +16,21 @@ public class PlayerHealthHUD : MonoBehaviour
     [SerializeField] private TMP_Text shieldText;
 
     private Player player;
+    private bool displayOverrideZero;
 
     public void Bind(Player boundPlayer)
     {
         player = boundPlayer;
+        Refresh();
+    }
+
+    /// <summary>
+    /// HP/Shield의 실제 복제값을 변경하지 않고 HUD 표시만 0으로 덮는다.
+    /// Soul 표현 정책에서 사용한다.
+    /// </summary>
+    public void SetDisplayOverrideZero(bool shouldOverride)
+    {
+        displayOverrideZero = shouldOverride;
         Refresh();
     }
 
@@ -41,13 +52,20 @@ public class PlayerHealthHUD : MonoBehaviour
             shield = player.CurrentShield;
         }
 
+        if (displayOverrideZero)
+        {
+            hp = 0;
+            shield = 0;
+        }
+
         if (hpFill != null)
             hpFill.fillAmount = maxHp > 0 ? Mathf.Clamp01((float)hp / maxHp) : 0f;
 
         if (hpText != null)
             hpText.text = maxHp > 0 ? $"{hp}/{maxHp}" : string.Empty;
 
-        bool hasShield = shield > 0;
+        // Soul에서는 실제 Shield가 없어도 0 표기를 유지한다.
+        bool hasShield = displayOverrideZero || shield > 0;
         if (shieldBar != null && shieldBar.activeSelf != hasShield)
             shieldBar.SetActive(hasShield);
 

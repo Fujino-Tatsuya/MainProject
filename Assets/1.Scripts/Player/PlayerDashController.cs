@@ -1,0 +1,334 @@
+using UnityEngine;
+using Unity.Netcode;
+using BeaverLobby.Player.Dash;
+
+/// <summary>대시 상태가 이동 중 충돌 해결에 쓰는 튜닝값 묶음. (W3)</summary>
+public readonly struct DashMotionSettings
+{
+    public readonly float CollisionSkin;
+    public readonly int MaxSweepIterations;
+    public readonly float MaxWalkableSlopeAngle;
+    public readonly LayerMask ObstacleMask;
+
+    public DashMotionSettings(float collisionSkin, int maxSweepIterations, float maxWalkableSlopeAngle, LayerMask obstacleMask)
+    {
+        CollisionSkin = Mathf.Max(0f, collisionSkin);
+        MaxSweepIterations = Mathf.Max(1, maxSweepIterations);
+        MaxWalkableSlopeAngle = Mathf.Clamp(maxWalkableSlopeAngle, 1f, 89f);
+        ObstacleMask = obstacleMask;
+    }
+}
+
+/// <summary>
+/// 대시 입력·오너 예측·서버 승인·충전 정합을 담당한다. (PLAN §6, §7, §9, §10 / W2·W4)
+///
+/// - 오너: Shift 입력 → 게이트 → 예측 충전 소비 → 대시 상태 진입 → 서버로 요청 RPC.
+/// - 서버: 매 물리 tick 스냅샷 저장, 요청을 DashValidationPolicy로 검증(멱등)하고 권한 충전 소비 후 응답.
+/// - 오너: 응답으로 예측 충전을 권한값에 정합. 거부/중단/이미종료면 대시를 멈춘다(위치 롤백은 v1 없음).
+/// 오프라인(비네트워크)에서는 예측만 수행한다.
+/// </summary>
+[RequireComponent(typeof(Player))]
+[RequireComponent(typeof(PlayerInputReader))]
+[RequireComponent(typeof(PlayerStateController))]
+public class PlayerDashController : NetworkBehaviour
+{
+    [Tooltip("대시 튜닝 원본(ScriptableObject). 없으면 대시가 비활성화된다.")]
+    [SerializeField] private PlayerDashData dashData;
+    [Tooltip("공용 이동 규칙(등판각 등). 미할당 시 60도 폴백.")]
+    [SerializeField] private PlayerGameRuleData gameRule;
+    [Tooltip("지면 판정 센서. 없으면 지면 게이트를 건너뛴다.")]
+    [SerializeField] private PlayerGroundingSensor groundingSensor;
+
+    private const float DefaultMaxWalkableSlopeAngle = 60f;
+
+    private Player player;
+    private PlayerInputReader input;
+    private PlayerStateController stateController;
+    private PlayerMovement movement;
+    private StatusEffectController statusEffects;
+    private PlayerInvulnerability invulnerability;
+
+    private DashRuntimeConfig config;
+    private DashChargeLedger predictedLedger;
+    private bool ready;
+
+    // 오너 요청/멱등 상태.
+    private uint _nextRequestId = 1u;
+    private uint _pendingRequestId;
+    private bool _hasPending;
+    private bool _serverSnapshotWarned;
+
+    public bool DashEnabled => ready && config.DashEnabled;
+
+    // HUD(W8)·디버그용 예측 충전 상태.
+    public int PredictedCharge => predictedLedger != null ? predictedLedger.Count : 0;
+    public int MaxCharge => predictedLedger != null ? predictedLedger.MaxCharge : 0;
+    public double PredictedNextReadyTime => predictedLedger != null ? predictedLedger.NextReadyTime : 0.0;
+
+    private void Awake()
+    {
+        player = GetComponent<Player>();
+        input = GetComponent<PlayerInputReader>();
+        stateController = GetComponent<PlayerStateController>();
+        movement = GetComponent<PlayerMovement>();
+        statusEffects = GetComponent<StatusEffectController>();
+        invulnerability = GetComponent<PlayerInvulnerability>();
+        if (groundingSensor == null)
+            groundingSensor = GetComponent<PlayerGroundingSensor>();
+
+        BuildRuntime();
+    }
+
+    private void BuildRuntime()
+    {
+        if (dashData == null)
+        {
+            config = DashRuntimeConfig.Create(0.0, 0.0, 1, 0.0, 1, 0.0); // DashEnabled=false
+            predictedLedger = new DashChargeLedger(1, 0.0, 0, OwnerNow());
+            ready = true;
+            Debug.LogWarning("[DashAlert] PlayerDashData가 할당되지 않아 대시를 비활성화합니다.", this);
+            return;
+        }
+
+        config = dashData.CreateValidatedConfig();
+        predictedLedger = new DashChargeLedger(config.MaxCharge, config.RechargeDuration, config.MaxCharge, OwnerNow());
+        ready = true;
+
+        if (!config.DashEnabled)
+            Debug.LogWarning("[DashAlert] PlayerDashData 값이 비정상이라 대시를 비활성화합니다.", this);
+    }
+
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+
+        if (IsServer)
+        {
+            if (PlayerDashValidationManager.Instance != null)
+            {
+                PlayerDashValidationManager.Instance.RegisterPlayer(NetworkObjectId, OwnerClientId, config, ServerNow());
+            }
+            else if (!_serverSnapshotWarned)
+            {
+                _serverSnapshotWarned = true;
+                Debug.LogWarning("[DashAlert] PlayerDashValidationManager가 씬에 없어 대시 서버 검증이 비활성화됩니다.", this);
+            }
+        }
+
+        if (IsOwner)
+        {
+            // 예측 장부를 네트워크 시간 기준으로 재시작(만충).
+            predictedLedger = new DashChargeLedger(config.MaxCharge, config.RechargeDuration, config.MaxCharge, OwnerNow());
+        }
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        if (IsServer && PlayerDashValidationManager.Instance != null)
+        {
+            PlayerDashValidationManager.Instance.DeregisterPlayer(NetworkObjectId);
+        }
+
+        base.OnNetworkDespawn();
+    }
+
+    private double OwnerNow() => NetworkClock.Instance != null ? NetworkClock.Instance.GameLocalNow : Time.timeAsDouble;
+    private double ServerNow() => NetworkClock.Instance != null ? NetworkClock.Instance.GameNow : Time.timeAsDouble;
+    private double LocalTimeForRequest() => NetworkClock.Instance != null ? NetworkClock.Instance.LocalNow : Time.timeAsDouble;
+
+    private void Update()
+    {
+        if (player == null || !player.IsMovementAuthority)
+            return;
+
+        // 오너 예측 충전 회복.
+        if (ready && predictedLedger != null)
+            predictedLedger.Advance(OwnerNow());
+
+        // 예측 무적을 대시 상태에 맞춘다(오너 로컬 Hurtbox 즉시 반영). 서버 무적은 승인 토큰이 확정.
+        if (invulnerability != null && stateController != null)
+            invulnerability.SetOwnerPredicted(stateController.CurrentState == PlayerActionState.Dash);
+    }
+
+    private void FixedUpdate()
+    {
+        // 서버는 매 물리 tick Player 상태 스냅샷을 저장한다.
+        if (!IsSpawned || !IsServer || PlayerDashValidationManager.Instance == null)
+            return;
+
+        PlayerDashValidationManager.Instance.CaptureSnapshot(
+            NetworkObjectId,
+            ServerNow(),
+            grounded: groundingSensor == null || groundingSensor.IsGrounded,
+            dead: false,           // TODO: PlayerLifeCycle(soul 병합)·Unit 사망 신호 배선
+            soul: false,           // TODO: soul 병합 후
+            crowdControlled: statusEffects != null && statusEffects.BlocksMovement,
+            landingProtected: false); // TODO: W5 착지 보호
+    }
+
+    /// <summary>Idle/Move 액션 입력에서 대시 우선으로 호출된다. 게이트 통과 시 예측 소비 + 대시 진입(+온라인이면 서버 요청).</summary>
+    public bool TryBeginPredictedDash()
+    {
+        if (!DashEnabled)
+            return false;
+        if (player == null || !player.IsMovementAuthority)
+            return false;
+        if (!player.CanMove)
+            return false;
+        if (groundingSensor != null && !groundingSensor.IsGrounded)
+            return false;
+
+        double now = OwnerNow();
+        if (!predictedLedger.TryConsume(now))
+            return false;
+
+        Vector3 direction = ResolveDashDirection();
+        bool started = stateController.BeginDash(direction, (float)config.DashSpeed, (float)config.DashDuration, BuildMotionSettings());
+        if (!started)
+            return false;
+
+        // 온라인이면 서버 승인을 요청한다. 오프라인(테스트)에서는 예측만.
+        if (IsSpawned && IsOwner)
+        {
+            uint requestId = _nextRequestId++;
+            _pendingRequestId = requestId;
+            _hasPending = true;
+            SubmitDashRequestServerRpc(requestId, LocalTimeForRequest(), direction.x, direction.z, predictedLedger.Revision);
+        }
+
+        return true;
+    }
+
+    [ServerRpc]
+    private void SubmitDashRequestServerRpc(uint requestId, double clientLocalTime, float directionX, float directionZ, uint knownChargeRevision, ServerRpcParams rpcParams = default)
+    {
+        if (PlayerDashValidationManager.Instance == null)
+        {
+            RespondDashClientRpc(requestId, false, (int)DashRejectReason.ConfigDisabled, 0.0, false, 0, 0.0, 0u, 0u, OwnerClientRpcParams());
+            return;
+        }
+
+        ulong senderClientId = rpcParams.Receive.SenderClientId;
+        double rttSeconds = GetSenderRttSeconds(senderClientId, out bool rttAvailable);
+
+        DashServerResponse response = PlayerDashValidationManager.Instance.ValidateRequest(
+            NetworkObjectId, senderClientId, requestId,
+            clientLocalTime, directionX, directionZ,
+            ServerNow(), rttSeconds, rttAvailable,
+            currentDead: false,
+            currentSoul: false,
+            currentCrowdControlled: statusEffects != null && statusEffects.BlocksMovement);
+
+        // 승인되고 실제 대시가 진행될 때만 서버 권한 무적을 남은 대시 시간만큼 부여한다. (PLAN §11)
+        if (invulnerability != null &&
+            response.IsApproved &&
+            !response.WasInterruptedByServerState &&
+            response.RemainingServerDuration > 0.0)
+        {
+            invulnerability.AddServerToken(InvulnerabilityCause.Dash, response.RemainingServerDuration);
+        }
+
+        RespondDashClientRpc(
+            requestId, response.IsApproved, (int)response.Reason, response.RemainingServerDuration,
+            response.WasInterruptedByServerState, response.AuthoritativeChargeCount, response.NextChargeReadyServerTime,
+            response.ChargeEpoch, response.ChargeRevision, OwnerClientRpcParams());
+    }
+
+    [ClientRpc]
+    private void RespondDashClientRpc(
+        uint requestId, bool approved, int reason, double remainingServerDuration, bool interrupted,
+        int authoritativeChargeCount, double nextChargeReadyServerTime, uint chargeEpoch, uint chargeRevision,
+        ClientRpcParams rpcParams = default)
+    {
+        if (!IsOwner || predictedLedger == null)
+            return;
+
+        // 권한 충전으로 예측 정합(더 최신 Epoch/Revision만 채택).
+        predictedLedger.SyncToAuthoritative(authoritativeChargeCount, chargeEpoch, chargeRevision, OwnerNow());
+
+        if (_hasPending && requestId == _pendingRequestId)
+        {
+            _hasPending = false;
+
+            // 거부/중단/이미 종료면 진행 중인 예측 대시를 멈춘다(위치 롤백은 v1 없음).
+            if (!approved || interrupted || remainingServerDuration <= 0.0)
+            {
+                stateController.EndDash();
+            }
+        }
+    }
+
+    private ClientRpcParams OwnerClientRpcParams()
+    {
+        return new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams { TargetClientIds = new[] { OwnerClientId } }
+        };
+    }
+
+    // 원격 Client는 Transport RTT(ms) 사용. Host 자신(로컬)은 0이 정상. 원격 RTT가 0/비정상이면 안전 거부. (PLAN §9)
+    private double GetSenderRttSeconds(ulong senderClientId, out bool rttAvailable)
+    {
+        if (senderClientId == NetworkManager.ServerClientId || senderClientId == NetworkManager.LocalClientId)
+        {
+            rttAvailable = true;
+            return 0.0;
+        }
+
+        var transport = NetworkManager != null && NetworkManager.NetworkConfig != null
+            ? NetworkManager.NetworkConfig.NetworkTransport
+            : null;
+        if (transport == null)
+        {
+            rttAvailable = false;
+            return 0.0;
+        }
+
+        // localhost/MPPM에서는 원격 RTT도 0으로 보고될 수 있다. 0은 "지연 0"으로 유효 처리하고,
+        // Transport가 있으면 사용 가능으로 본다(음수만 0으로 보정). 이전엔 0을 거부해 클라 대시가 전부 중단됐다.
+        double rttSeconds = transport.GetCurrentRtt(senderClientId) / 1000.0;
+        if (rttSeconds < 0.0)
+            rttSeconds = 0.0;
+        rttAvailable = true;
+        return rttSeconds;
+    }
+
+    /// <summary>서버 권한 충전을 1개로 강제 초기화(생존 복귀/부활 시). (PLAN §10)</summary>
+    public void ServerResetChargeToOne()
+    {
+        if (IsServer && PlayerDashValidationManager.Instance != null)
+            PlayerDashValidationManager.Instance.ForceReset(NetworkObjectId, 1, ServerNow());
+    }
+
+    /// <summary>오너 예측 충전을 1개로 강제 초기화. 다음 충전 진행도는 0부터.</summary>
+    public void OwnerResetChargeToOne()
+    {
+        if (player != null && player.IsMovementAuthority && predictedLedger != null)
+            predictedLedger.ForceReset(1, OwnerNow());
+    }
+
+    private DashMotionSettings BuildMotionSettings()
+    {
+        float walkableAngle = gameRule != null ? gameRule.MaxWalkableSlopeAngle : DefaultMaxWalkableSlopeAngle;
+        return new DashMotionSettings(
+            dashData.CollisionSkin,
+            dashData.MaxSweepIterations,
+            walkableAngle,
+            dashData.DashObstacleMask);
+    }
+
+    private Vector3 ResolveDashDirection()
+    {
+        if (movement != null)
+        {
+            Vector3 inputDir = movement.GetInputWorldDirection();
+            if (inputDir.sqrMagnitude > 0.0001f)
+                return inputDir;
+            return movement.CurrentFacing;
+        }
+
+        Vector3 forward = transform.forward;
+        forward.y = 0f;
+        return forward.sqrMagnitude > 0.0001f ? forward.normalized : Vector3.forward;
+    }
+}

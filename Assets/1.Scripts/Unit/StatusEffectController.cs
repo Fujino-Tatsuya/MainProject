@@ -121,8 +121,7 @@ public class StatusEffectController : BaseNetworkBehaviour
         if (instance.duration <= 0f)
             return -1f;
 
-        double now = NetworkManager != null ? NetworkManager.ServerTime.Time : 0.0;
-        return Mathf.Max(0f, (float)(instance.appliedServerTime + instance.duration - now));
+        return Mathf.Max(0f, (float)(instance.appliedServerTime + instance.duration - Now()));
     }
 
     /// <summary>차단류 등 수치 없는 효과 적용 (배율 1).</summary>
@@ -151,7 +150,7 @@ public class StatusEffectController : BaseNetworkBehaviour
             type = type,
             magnitude = magnitude,
             duration = duration,
-            appliedServerTime = NetworkManager.ServerTime.Time,
+            appliedServerTime = Now(),
             sourceId = sourceId,
             stackCount = stackCount
         };
@@ -206,12 +205,19 @@ public class StatusEffectController : BaseNetworkBehaviour
         return -1;
     }
 
+    // 만료 시간 기준을 Pause-aware NetworkClock.GameNow로 사용한다(멀티에선 ServerTime과 동일, 솔로 host Pause만 반영). (PLAN §12)
+    // NetworkClock이 없으면(구성 누락) raw ServerTime으로 폴백한다. appliedServerTime 필드도 같은 도메인으로 기록된다.
+    private double Now()
+        => NetworkClock.Instance != null
+            ? NetworkClock.Instance.GameNow
+            : (NetworkManager != null ? NetworkManager.ServerTime.Time : 0.0);
+
     private void Update()
     {
         if (!CanWrite)
             return;
 
-        double now = NetworkManager.ServerTime.Time;
+        double now = Now();
         for (int i = effects.Count - 1; i >= 0; i--)
         {
             StatusEffectInstance instance = effects[i];

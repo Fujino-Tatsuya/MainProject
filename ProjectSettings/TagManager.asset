@@ -10,6 +10,7 @@ TagManager:
   - BossArea
   - Wall
   - Ground
+  - SystemUI
   layers:
   - Default
   - TransparentFX
@@ -25,7 +26,7 @@ TagManager:
   - Env
   - Weapon
   - PlayerHurtbox
-  - 
+  - Corpse
   - 
   - 
   - 
