@@ -24,6 +24,11 @@ public class Enemy : Unit
 
     public override void OnNetworkSpawn()
     {
+        // ⚠️ base 호출이 빠져 있었다. Unit.OnNetworkSpawn이 HP/쉴드 복제 구독과 HitFlash(피격 빨간
+        // 틴트) 자동 부착을 담당하므로, 이게 없으면 **보스만** 피격 표시가 안 나온다.
+        // 전 피어에서 실행돼야 하는 로컬 연출이라 IsServer 게이트보다 먼저 호출한다.
+        base.OnNetworkSpawn();
+
         if (!IsServer) return;
         Initialize(attackDamage, moveSpeed, attackSpeed, maxHp, defense);
 
