@@ -9,6 +9,7 @@ public class PlayerMovement : MonoBehaviour
     private PlayerSoulController soulController;
     private Rigidbody rb;
     private CapsuleCollider capsule;
+    private PlayerGroundingSensor grounding;
     private LayerMask rootMoveBlockingMask;
 
     [SerializeField] private Transform armature;
@@ -39,6 +40,7 @@ public class PlayerMovement : MonoBehaviour
         soulController = GetComponent<PlayerSoulController>();
         rb = GetComponent<Rigidbody>();
         capsule = GetComponent<CapsuleCollider>();
+        grounding = GetComponent<PlayerGroundingSensor>();
 
         // MoveRoot(평타 러시 스텝/스킬 전진) 관통 방지 스윕 대상 — 정적 지오메트리만.
         // 유닛(Enemy/Player)은 제외해 러시가 몹 사이를 지나는 기존 감각을 유지한다.
@@ -101,13 +103,39 @@ public class PlayerMovement : MonoBehaviour
         // 입력 이동 + 플랫폼 캐리를 단일 MovePosition으로 적용.
         // (MovePosition을 프레임당 두 번 호출하면 뒤엣것이 덮어쓰므로 반드시 합산.)
         // 캐리는 CanMove/입력과 무관하게 적용 → 스턴/사망 중에도 플랫폼에 실려 이동(시체 잔류).
-        Vector3 total = inputMove + _carryDelta;
+        Vector3 total = ProjectOntoGround(inputMove) + _carryDelta;
         _carryDelta = Vector3.zero;
 
         if (total.sqrMagnitude > 0f)
         {
             rb.MovePosition(rb.position + total);
         }
+    }
+
+    /// <summary>
+    /// 접지 중이면 수평 이동을 지면 평면에 투영한다.
+    /// MovePosition은 CharacterController와 달리 경사 보정을 해 주지 않아서, 수평 벡터를 그대로
+    /// 밀면 경사면에 파고들며 막힌다(계단·경사로를 못 올라가던 원인). 지면 노멀에 투영하면
+    /// 같은 거리를 경사면을 따라 이동하므로 등판이 된다. 평지에서는 결과가 동일하다.
+    /// </summary>
+    private Vector3 ProjectOntoGround(Vector3 horizontalMove)
+    {
+        if (grounding == null || !grounding.IsGrounded)
+            return horizontalMove;
+
+        float distance = horizontalMove.magnitude;
+        if (distance <= Mathf.Epsilon)
+            return horizontalMove;
+
+        Vector3 normal = grounding.GroundNormal;
+        if (normal.y >= 0.999f) // 평지
+            return horizontalMove;
+
+        Vector3 projected = Vector3.ProjectOnPlane(horizontalMove, normal);
+        if (projected.sqrMagnitude <= 1e-6f)
+            return horizontalMove;
+
+        return projected.normalized * distance;
     }
 
     private void Rotate()

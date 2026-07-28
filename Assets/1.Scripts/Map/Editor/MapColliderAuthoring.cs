@@ -40,11 +40,30 @@ public static class MapColliderAuthoring
                     if (!IsFloorOrWall(mf))
                         continue;
 
-                    // 이미 어떤 콜라이더든 있으면 유지(수동 저작 존중).
-                    if (mf.GetComponent<Collider>() != null)
-                        continue;
+                    bool isStair = IsStair(mf);
+                    Collider existing = mf.GetComponent<Collider>();
 
-                    mf.gameObject.AddComponent<MeshCollider>(); // sharedMesh는 MeshFilter에서 자동 참조
+                    if (existing != null)
+                    {
+                        // 기존 콜라이더는 유지(수동 저작 존중)하되, 계단만 예외로 볼록 승격한다.
+                        if (isStair && existing is MeshCollider existingMesh && !existingMesh.convex)
+                        {
+                            existingMesh.convex = true;
+                            added++;
+                            Debug.Log($"[MapColliderAuthoring] 계단 볼록 승격: {mf.gameObject.name}");
+                        }
+                        continue;
+                    }
+
+                    var collider = mf.gameObject.AddComponent<MeshCollider>(); // sharedMesh는 MeshFilter에서 자동 참조
+
+                    // 계단을 실제 메시(턱 있는 형상)로 두면 Rigidbody 캡슐이 턱에 막혀 못 올라간다.
+                    // 플레이어 이동은 MovePosition 기반이라 CharacterController의 stepOffset 같은
+                    // 계단 오르기 보정이 없다. 볼록 껍질을 씌우면 계단 위를 잇는 램프가 되어
+                    // 걸어 올라갈 수 있고 NavMesh 베이크에도 유리하다.
+                    if (isStair)
+                        collider.convex = true;
+
                     added++;
                 }
 
@@ -85,6 +104,14 @@ public static class MapColliderAuthoring
         }
 
         return false;
+    }
+
+    // 계단 판정 — 볼록 승격 대상. 경사로(slope)는 이미 램프라 원본 메시 그대로 둔다.
+    static bool IsStair(MeshFilter mf)
+    {
+        if (mf.gameObject.name.ToLowerInvariant().Contains("stair"))
+            return true;
+        return mf.sharedMesh != null && mf.sharedMesh.name.ToLowerInvariant().Contains("stair");
     }
 
     static bool MatchesKeyword(string name)
