@@ -4,11 +4,34 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## 현재 인수인계 (2026-07-28 · git push 완료)
+## 현재 인수인계 (2026-07-28 · SVN r235 커밋 완료)
 
-작업 세션: **경석(Claude)**. 브랜치 `feature/map-player-merge`, **origin과 동일 (`0314d4c`)**.
+작업 세션: **경석(Claude)**. 브랜치 `feature/map-player-merge` (`30cf1df`, origin보다 1 앞).
 
-### 완료
+### 이번 세션 완료 — SVN 최신화
+
+**커밋 r235** (225 → 235). 신규 242 / 수정 104.
+
+- 신규: `MapObj/mesh/level`(131) · `material`(48) · `texture`(32) · `mesh/object`(28)
+- **⚠️ r234 GUID 사고 처리** — 팀원이 "누락된 meta 커밋"으로 MapObj meta 87개의 GUID를 새로
+  발급해 올렸다. 그대로 update 했으면 git 쪽 41개 파일(존 프리팹 12·벽 10·머티리얼 17·씬 1)이
+  전부 미싱 레퍼런스가 된다. `svn merge -c -234`로 GUID 재발급분만 역머지해 원본 유지.
+  경위·재발 방지 = `Docs/_local/lessons.md` #14
+- **콜라이더 플래그 복구** — floor/wall/urethane fbx meta 39개가 7/28 아트 교체로 `addColliders`·
+  `isReadable` 0으로 리셋돼 있던 것을 r225 값(1/1)으로 되돌림.
+- 검증: 컴파일 0에러/0경고, GUID 80/80 원본 일치, 이번 작업발 미싱 레퍼런스 0.
+  (기존 미싱 5건 — MapScene FoW `maskTexture`(미사용) · `MA_Wall_basic.mat` 1 · `Stage1.prefab` 3 — 은 별개)
+- git 정리 커밋 `30cf1df`: Tree/TutorialInfo 템플릿 잔재 + `all_mesh.unity` 제거
+  (빌드 세팅 미등록·코드 참조 0 확인).
+
+### 다음 작업
+
+1. **MapScene Play 검증** — 맵 생성 → 이동/충돌 → 콘솔 0에러. 39개 FBX가 임포터 콜라이더를
+   다시 달았으므로 이 확인 후 머지.
+2. **머지** — `feature/map-player-merge`는 origin/development보다 **209 커밋 앞, 0 뒤짐**
+   (fast-forward 가능). PR 여부는 검증 후 결정.
+
+### 이전 세션 완료
 
 1. **벽 투명화 per-pixel 재설계** — 오브젝트당 스칼라 불투명도(MPB) → 프래그먼트 월드좌표 기반
    셰이더 계산. 물리 쿼리 0, MPB 0, 약 1,600줄 → 473줄. Play 검증 통과.

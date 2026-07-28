@@ -1,6 +1,7 @@
 # CURRENT PLAN — Wall Occlusion per-pixel 재설계 (2026-07-28)
 
-> 상태: **완료·push됨 (`0314d4c`)**. Play Mode 검증 통과. 다음은 SVN 최신화 → 머지.
+> 상태: **완료·push됨 (`0314d4c`)**. Play Mode 검증 통과. SVN 최신화 완료(r235).
+> 다음은 MapScene Play 검증 → 머지.
 > 자동 검증: C# 컴파일 0 에러 / 0 경고, 셰이더 컴파일 정상, EditMode 15 passed / 0 failed,
 > Apply All 매핑 5쌍, Validate errors=0
 > 설계 문서: [Docs/tech/wall-occlusion-implementation.md](Docs/tech/wall-occlusion-implementation.md)
@@ -38,8 +39,10 @@ BoxCollider로만 검증해서 초록이었다.
 - [x] 구 아키텍처 삭제 + 테스트 교체
 - [x] **사용자 Play Mode 검증** — 그라데이션·자주색 해소 확인
 - [x] `Assets/level` 아트팩 145개 재배치 (GUID 145/145 보존) + 오클루전 매핑 5쌍 → 14쌍
-- [ ] **SVN 최신화** — `50.Art/MapGen/MapObj` 신규분 add/commit (git 미추적 영역)
-- [ ] SVN 정리 후 **머지**
+- [x] **SVN 최신화** — r235 커밋(신규 242·수정 104). r234의 GUID 재발급 역머지 + 콜라이더
+      플래그 39개 복구 포함. 경위 = `Docs/_local/lessons.md` #14
+- [ ] MapScene **Play 검증** (임포터 콜라이더 재부착 확인)
+- [ ] 검증 후 **머지** — origin/development 기준 209 커밋 앞, fast-forward 가능
 
 ## 남은 과제
 
