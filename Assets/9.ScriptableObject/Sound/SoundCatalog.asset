@@ -16,11 +16,15 @@ MonoBehaviour:
     _entity: {fileID: 0}
     ID: 0
     <DebugObject>k__BackingField: {fileID: 0}
+  <TitleBGM>k__BackingField:
+    _entity: {fileID: 11400000, guid: e751d13d9430cdc4da2250b09770e4ac, type: 2}
+    ID: 0
+    <DebugObject>k__BackingField: {fileID: 0}
   <LobbyBGM>k__BackingField:
-    _entity: {fileID: 0}
+    _entity: {fileID: 11400000, guid: a50cbb408056b6c479e783e0dfe0e653, type: 2}
     ID: 0
     <DebugObject>k__BackingField: {fileID: 0}
   <InGameBGM>k__BackingField:
-    _entity: {fileID: 11400000, guid: 77f357ec097acfe469b016d79f9053fa, type: 2}
+    _entity: {fileID: 11400000, guid: 14c673f85161ec243afda024dec1335a, type: 2}
     ID: 0
     <DebugObject>k__BackingField: {fileID: 0}

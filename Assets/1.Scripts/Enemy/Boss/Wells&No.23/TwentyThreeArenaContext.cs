@@ -33,12 +33,14 @@ public class TwentyThreeArenaContext : NetworkBehaviour
         //}
         //controller.SetList(ChargingObjects);
 
-      EnemyBTActivator btActivator = boss.GetComponent<EnemyBTActivator>();
-      if (btActivator == null)
-      {
-          Edit.LogError("[No.23] 해당 보스에 EnemyBTActivator 컴포넌트가 없습니다. 추가해주세요.");
-          return;
-      }
-      btActivator.OpenBT();
+        EnemyBTActivator btActivator = boss.GetComponent<EnemyBTActivator>();
+        if (btActivator == null)
+        {
+            Edit.LogError("[No.23] 해당 보스에 EnemyBTActivator 컴포넌트가 없습니다. 추가해주세요.");
+            return;
+        }
+        btActivator.OpenBT();
+
+        AudioManager.Instance.PlayBGM(AudioManager.Instance.Catalog.InGameBGM);
     }
 }

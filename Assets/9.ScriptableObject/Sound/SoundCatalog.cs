@@ -17,6 +17,7 @@ public class SoundCatalog : ScriptableObject
     [field: SerializeField] public SoundID UIClick { get; private set; }
 
     [Header("BGM")]
+    [field: SerializeField] public SoundID TitleBGM { get; private set; }
     [field: SerializeField] public SoundID LobbyBGM { get; private set; }
     [field: SerializeField] public SoundID InGameBGM { get; private set; }
 
