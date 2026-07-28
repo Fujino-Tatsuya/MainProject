@@ -27,6 +27,6 @@ MonoBehaviour:
   castRange: 8
   targetableLayers:
     serializedVersion: 2
-    m_Bits: 256
+    m_Bits: 16640
   animatorStateName:
   snapRotationOnStart: 1

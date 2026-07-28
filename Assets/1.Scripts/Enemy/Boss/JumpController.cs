@@ -8,6 +8,8 @@ public class JumpController : NetworkBehaviour
     [SerializeField] BehaviorGraphAgent bt;
     [SerializeField] string followTargetTag;
     [SerializeField] LayerMask playerLayer;
+    [Tooltip("착지 지점을 찾을 바닥 레이어. 생성맵 바닥은 Ground가 아니라 Default다 — 둘 다 포함해야 한다.")]
+    [SerializeField] LayerMask groundMask = 0;
     [SerializeField] int damage;
     [SerializeField] float jumpingTime = 0.5f; // 허공에 정지해있는 시간 (= 장판2 성장 시간)
     [SerializeField] List<GameObject> meshRenderer;
@@ -47,6 +49,22 @@ public class JumpController : NetworkBehaviour
         if (!IsServer && IsSpawned) return;
 
         _isCinematicLanding = enabled;
+    }
+
+    // 바닥 탐색 파라미터. 대상 머리 위에서 아래로 쏘아 발밑 바닥을 잡는다.
+    const float GroundProbeUp = 2f;
+    const float GroundProbeDistance = 50f;
+
+    /// <summary>
+    /// 인스펙터 groundMask가 비어 있으면 Default+Ground로 폴백한다.
+    /// 프리팹 값이 비어 있어도 생성맵에서 동작하게 하는 안전망이다.
+    /// </summary>
+    LayerMask ResolveGroundMask()
+    {
+        if (groundMask.value != 0)
+            return groundMask;
+
+        return LayerMask.GetMask("Default", "Ground");
     }
 
     public override void OnNetworkSpawn()
@@ -102,17 +120,32 @@ public class JumpController : NetworkBehaviour
         }
         _target = target;
 
-        // 경사면을 고려한 회전 변경
-        RaycastHit hit;
+        // 경사면을 고려한 회전 변경 + 착지 높이 확정.
+        // ⚠️ 예전엔 바닥 레이어를 "Ground"로 하드코딩하고 착지 Y를 0으로 고정했다. 생성맵 보스룸
+        // 바닥은 Default 레이어에 Y≈0.61이라 장판이 바닥 아래로 들어가고 보스와 어긋났다.
+        Vector3 landingPos = _target.transform.position;
         Quaternion slopeRotation = Quaternion.identity;
-        if (Physics.Raycast(target.transform.position, Vector3.down, out hit, Mathf.Infinity, LayerMask.GetMask("Ground")))
+
+        if (Physics.Raycast(
+                landingPos + Vector3.up * GroundProbeUp,
+                Vector3.down,
+                out RaycastHit hit,
+                GroundProbeDistance,
+                ResolveGroundMask(),
+                QueryTriggerInteraction.Ignore))
         {
             slopeRotation = Quaternion.FromToRotation(Vector3.up, hit.normal);
+            landingPos.y = hit.point.y;
         }
+        else
+        {
+            Edit.LogWarning(
+                $"[No.23] 착지 지점 아래에서 바닥을 찾지 못했습니다({landingPos}) — 대상 높이를 그대로 사용합니다. " +
+                "JumpController.groundMask에 실제 바닥 레이어가 포함됐는지 확인하세요.", this);
+        }
+
         _floorRootRot = _baseRotation * slopeRotation;
 
-        Vector3 landingPos = _target.transform.position;
-        landingPos.y = 0f;
         ArrivePoint.Value = landingPos;
         _floorRootPos = landingPos;
 

@@ -474,7 +474,7 @@ MonoBehaviour:
     m_Bits: 16640
   ground:
     serializedVersion: 2
-    m_Bits: 8
+    m_Bits: 9
   wall:
     serializedVersion: 2
     m_Bits: 128
