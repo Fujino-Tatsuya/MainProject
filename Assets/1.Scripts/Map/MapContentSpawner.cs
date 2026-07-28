@@ -157,7 +157,12 @@ public class MapContentSpawner : MonoBehaviour
         foreach (var marker in points)
         {
             if (marker == null) continue;
-            GameObject go = Instantiate(monsterPrefab, SnapToFloor(marker.position, zoneGo), marker.rotation);
+
+            // 바닥을 못 찾으면 스폰하지 않는다 — 공중에 스폰된 몹은 중력으로 어비스로 떨어진다.
+            if (!TryResolveSpawnPoint(marker.position, zoneGo, out Vector3 spawnPoint))
+                continue;
+
+            GameObject go = Instantiate(monsterPrefab, spawnPoint, marker.rotation);
             // TODO: 몬스터 AI 확정 후 behavior 적용 (예: go.GetComponent<MonsterAI>()?.SetBehavior(behavior)).
             var netObj = go.GetComponent<NetworkObject>();
             if (netObj != null) { netObj.Spawn(); _spawnedNetObjs.Add(netObj); } // NGO 복제 + despawn 추적
@@ -167,23 +172,54 @@ public class MapContentSpawner : MonoBehaviour
         return n;
     }
 
-    // 스폰 마커를 바닥으로 스냅. 자동 저작 마커가 구덩이/허공 위에 찍히면 몹이 공중에 떠서
-    // 방치된다(터렛은 이동이 없어 영구 부유) — 실패 시 존 중심 바닥으로 폴백하고 경고를 남긴다.
-    private static Vector3 SnapToFloor(Vector3 position, GameObject zoneGo)
+    // 스폰 마커를 바닥으로 스냅한다. 자동 저작 마커가 구덩이/허공 위에 찍히거나, 존이 통로와
+    // 어긋난 위치에 배치되면(슬롯×프리팹 위치 미저작) 마커 아래에 바닥이 없다.
+    //
+    // ⚠️ 이전에는 마커 → 존 transform 원점 순으로 찾고, 둘 다 실패하면 **원위치에 그냥 스폰**했다.
+    // 그러면 몹이 공중에서 중력으로 어비스로 떨어진다(실제 Play 로그: Zone_typeQuest02 마커 2개).
+    // 존 transform 원점은 회전·어긋난 배치에서 바닥 위가 아닐 수 있으므로, 폴백은 **존 렌더러
+    // 바운즈 위**에서 쏜다 — 존 자신의 바닥은 언제나 자기 바운즈 안에 있다.
+    private static bool TryResolveSpawnPoint(Vector3 markerPosition, GameObject zoneGo, out Vector3 result)
     {
         int mask = LayerMask.GetMask("Default");
-        if (Physics.Raycast(position + Vector3.up * 5f, Vector3.down, out RaycastHit hit, 30f, mask, QueryTriggerInteraction.Ignore))
-            return hit.point + Vector3.up * 0.05f;
 
-        Vector3 center = zoneGo != null ? zoneGo.transform.position : position;
-        if (Physics.Raycast(center + Vector3.up * 5f, Vector3.down, out hit, 30f, mask, QueryTriggerInteraction.Ignore))
+        if (Physics.Raycast(markerPosition + Vector3.up * 5f, Vector3.down, out RaycastHit hit, 30f, mask, QueryTriggerInteraction.Ignore))
         {
-            Edit.LogWarning($"[MapContentSpawner] 스폰 마커가 허공({position}) — {zoneGo?.name} 중심 바닥으로 대체. 마커 위치 조정 필요.");
-            return hit.point + Vector3.up * 0.05f;
+            result = hit.point + Vector3.up * 0.05f;
+            return true;
         }
 
-        Edit.LogWarning($"[MapContentSpawner] 스폰 마커·존 중심 모두 바닥 없음({position}) — 원위치 스폰. {zoneGo?.name} 확인 필요.");
-        return position;
+        if (TryGetZoneBounds(zoneGo, out Bounds zoneBounds))
+        {
+            Vector3 origin = new Vector3(zoneBounds.center.x, zoneBounds.max.y + 2f, zoneBounds.center.z);
+            float distance = zoneBounds.size.y + 12f;
+            if (Physics.Raycast(origin, Vector3.down, out hit, distance, mask, QueryTriggerInteraction.Ignore))
+            {
+                Edit.LogWarning(
+                    $"[MapContentSpawner] 스폰 마커가 허공({markerPosition}) — {zoneGo?.name} 바닥 중앙으로 대체. 마커 위치 조정 필요.");
+                result = hit.point + Vector3.up * 0.05f;
+                return true;
+            }
+        }
+
+        Edit.LogError(
+            $"[MapContentSpawner] {zoneGo?.name}에서 바닥을 찾지 못해 몬스터를 스폰하지 않습니다({markerPosition}) — " +
+            "존이 통로와 어긋난 위치에 배치됐을 가능성이 큽니다(Validate Slot Authoring 확인).");
+        result = markerPosition;
+        return false;
+    }
+
+    private static bool TryGetZoneBounds(GameObject zoneGo, out Bounds bounds)
+    {
+        bounds = default;
+        if (zoneGo == null) return false;
+
+        Renderer[] renderers = zoneGo.GetComponentsInChildren<Renderer>(true);
+        if (renderers.Length == 0) return false;
+
+        bounds = renderers[0].bounds;
+        for (int i = 1; i < renderers.Length; i++) bounds.Encapsulate(renderers[i].bounds);
+        return true;
     }
 
     // MonsterGroupID → 프리팹 (Config.MonsterGroups). 실제 몬스터 에셋은 추후.

@@ -278,6 +278,7 @@ MonoBehaviour:
   SpawnZoneColor: {r: 0.25, g: 0.7, b: 0.35, a: 0.9}
   QuestZoneColor: {r: 0.85, g: 0.75, b: 0.25, a: 0.9}
   RoleIconSize: 48
+  CorridorMaxSpan: 60
 --- !u!114 &99066898
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -834,7 +835,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ChargingObject
 --- !u!4 &317701358 stripped
 Transform:
-  m_CorrespondingSourceObject: {fileID: 2230953390173365377, guid: 09f37616c8805a244ae999c00477d2ab, type: 3}
+  m_CorrespondingSourceObject: {fileID: 6127362525628137612, guid: 09f37616c8805a244ae999c00477d2ab, type: 3}
   m_PrefabInstance: {fileID: 317701353}
   m_PrefabAsset: {fileID: 0}
 --- !u!1 &327227631
@@ -1912,6 +1913,9 @@ MonoBehaviour:
   MaskTick: 0.15
   BakeResolution: 1024
   BoundsMargin: 8
+  BakeCameraHeight: 120
+  BakeMinWorldY: -5
+  CorridorMaxSpan: 60
   LocalPlayerColor: {r: 1, g: 1, b: 1, a: 1}
   AllyColor: {r: 0.3, g: 0.85, b: 1, a: 1}
   MonsterColor: {r: 1, g: 0.25, b: 0.2, a: 1}

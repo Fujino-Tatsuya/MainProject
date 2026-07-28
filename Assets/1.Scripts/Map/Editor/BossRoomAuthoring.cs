@@ -58,6 +58,7 @@ public static class BossRoomAuthoring
             BuildFloorNet(root, roomBounds, floorTopY);
             BuildBoundaries(root, roomBounds, floorTopY, wallLayer);
             BuildReferencePoints(root, roomBounds, floorTopY);
+            BuildBossArea(root, roomBounds, floorTopY);
 
             PrefabUtility.SaveAsPrefabAsset(root, BossRoomPath);
             Debug.Log("[BossRoomAuthoring] 완료 — 경계·바닥 안전망·기준점 재생성 후 저장.");
@@ -66,6 +67,47 @@ public static class BossRoomAuthoring
         {
             PrefabUtility.UnloadPrefabContents(root);
         }
+    }
+
+    // ── 보스 아레나 기준 오브젝트 ─────────────────────────────────────────
+
+    const string BossAreaName = "BossArea";
+    const string BossAreaTag = "BossArea";
+
+    // KMKScene 기준값: BoxCollider size (10, 2, 10) / center (0, 1, 0) / isTrigger.
+    const float BossAreaHeight = 2f;
+
+    /// <summary>
+    /// No.23 BT가 태그로 찾아 쓰는 아레나 기준 오브젝트.
+    ///
+    /// KMKScene에는 tag `BossArea`인 트리거 박스가 아레나 중앙에 있고 BT가 그것을 켜고 끈다.
+    /// MapScene에는 그게 없어서(전수 검색 0건) 보스·Wells 쪽 처리가 방 중앙을 기준으로 잡히지 않았다.
+    /// 보스룸 프리팹 안에 만들어 두면 방을 어디로 옮기든 항상 중앙을 따라간다.
+    ///
+    /// ⚠️ KMK 쪽 BossArea에는 <c>TwentyThreeArenaContext</c>(보스 스포너)가 함께 붙어 있다. 여기엔
+    /// 붙이지 않는다 — MapScene의 스폰 소유자는 <c>BossEncounterDirector</c> 하나이고, 붙이면 보스가
+    /// 두 번 스폰된다.
+    /// </summary>
+    static void BuildBossArea(GameObject root, Bounds roomBounds, float floorTopY)
+    {
+        Transform stale = root.transform.Find(BossAreaName);
+        if (stale != null)
+            Object.DestroyImmediate(stale.gameObject);
+
+        var go = new GameObject(BossAreaName);
+        go.transform.SetParent(root.transform, false);
+        go.transform.localPosition = new Vector3(roomBounds.center.x, floorTopY, roomBounds.center.z);
+        go.tag = BossAreaTag;
+
+        var box = go.AddComponent<BoxCollider>();
+        box.isTrigger = true;
+        box.center = new Vector3(0f, BossAreaHeight * 0.5f, 0f);
+        // 방 전체를 덮는다 — KMK의 10×10은 그쪽 아레나 크기 기준이라 이 방(실측)에 맞춰 넓힌다.
+        box.size = new Vector3(roomBounds.size.x, BossAreaHeight, roomBounds.size.z);
+
+        Debug.Log(
+            $"[BossRoomAuthoring] {BossAreaName} — tag {BossAreaTag}, 중앙 {go.transform.localPosition}, " +
+            $"박스 {box.size} (트리거). ArenaContext는 붙이지 않음(스폰 소유자는 Director).");
     }
 
     // ── 충전 기둥 (승인 계획 Task 6) ──────────────────────────────────────

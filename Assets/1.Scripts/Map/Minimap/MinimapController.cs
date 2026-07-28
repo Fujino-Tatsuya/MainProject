@@ -33,6 +33,9 @@ public class MinimapController : MonoBehaviour
     [Tooltip("베이크에 포함할 최저 월드 Y. 이보다 아래 지오메트리는 잘라낸다 — " +
              "어비스 물 Plane(y≈-19, 3300m)이 미니맵을 통째로 덮는 것을 막는다.")]
     public float BakeMinWorldY = -5f;
+    [Tooltip("실루엣에 통로로 그릴 최대 한 변(m). 이보다 큰 렌더러 묶음은 통로가 아니라 " +
+             "배경/전체 메시로 보고 제외한다 — 실루엣이 통짜 사각형으로 채워지는 것을 막는다.")]
+    public float CorridorMaxSpan = 60f;
 
     [Header("=== 색 ===")]
     public Color LocalPlayerColor = Color.white;
@@ -238,6 +241,13 @@ public class MinimapController : MonoBehaviour
                 if (rends.Length == 0) continue;
                 Bounds b = rends[0].bounds;
                 foreach (var r in rends) b.Encapsulate(r.bounds);
+
+                // ⚠️ 이 루트의 자식이 항상 "통로 한 조각"은 아니다. 맵 전체를 덮는 묶음이 하나라도
+                // 있으면 실루엣이 통째로 채워져 미탐사 색(_SilColor)이 미니맵 전체를 덮는다 —
+                // 실제로 그래서 미니맵이 거대한 파란 사각형으로 보였다. (M키 지도도 같은 원인)
+                if (b.size.x > CorridorMaxSpan || b.size.z > CorridorMaxSpan)
+                    continue;
+
                 FillWorldRect(b.min.x, b.min.z, b.max.x, b.max.z);
             }
         }
