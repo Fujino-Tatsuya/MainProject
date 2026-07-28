@@ -1,16 +1,20 @@
 using UnityEditor;
 using UnityEngine;
 
-// 일회성 저작 도구 — 맵 프리팹의 바닥/벽 메시에 MeshCollider 부착 (PLAN 2026-07-21 §1).
+// 일회성 저작 도구 — 맵 프리팹의 바닥/벽/경사로 메시에 MeshCollider 부착 (PLAN 2026-07-21 §1).
 //
 // 배경: 기존 맵 프리팹(Stage1/WallPrefabs/Zoneprefab)의 바닥·벽은 fbx 모델 인스턴스가 아니라
 // "언팩된 사본"(MeshFilter+MeshRenderer만)이라, fbx 임포터 addColliders를 켜도 전파되지 않는다.
 // 그래서 프리팹을 직접 순회하며 이름이 floor/wall/hallway 계열인 메시에 MeshCollider를 붙인다.
 // (소품/장식은 이름 필터로 제외 — 통행 방해 방지. fbx addColliders는 신규 배치용으로 별도 유지.)
+//
+// 2026-07-28: slope/stairs 추가. Play 검증에서 경사로를 밟으면 아래로 떨어지는 것이 확인됐다.
+// 경사로·계단도 바닥과 같은 "밟고 지나가는" 지오메트리인데 이름 필터에서 빠져 있었다.
+// 대상 17개(slope 12 · stairs 5) — ZoneL_typeA/B · ZoneM_typeA/B · Zone_typeQuest01/02.
 public static class MapColliderAuthoring
 {
     const string TargetFolder = "Assets/2.Prefabs/Map";
-    static readonly string[] NameKeywords = { "floor", "wall", "hallway" };
+    static readonly string[] NameKeywords = { "floor", "wall", "hallway", "slope", "stair" };
 
     [MenuItem("Tools/Map/Authoring/Add Floor+Wall MeshColliders")]
     public static void AddFloorWallColliders()

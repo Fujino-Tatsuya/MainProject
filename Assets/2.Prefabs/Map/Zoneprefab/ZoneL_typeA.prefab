@@ -13313,6 +13313,7 @@ GameObject:
   - component: {fileID: 489396535146439590}
   - component: {fileID: 2558225142963961341}
   - component: {fileID: 8517292152776287653}
+  - component: {fileID: 1763300721997084513}
   m_Layer: 0
   m_Name: Env_slope_1by3fbx (2)
   m_TagString: Untagged
@@ -13392,6 +13393,28 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!64 &1763300721997084513
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8260409274857504054}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 5
+  m_Convex: 0
+  m_CookingOptions: 30
+  m_Mesh: {fileID: 3603701992865572903, guid: 1aaa4f1d726ada54897b96cf64e31d32, type: 3}
 --- !u!1 &8327267420580143326
 GameObject:
   m_ObjectHideFlags: 0

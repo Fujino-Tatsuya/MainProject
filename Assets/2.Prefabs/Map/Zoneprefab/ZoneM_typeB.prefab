@@ -2002,6 +2002,7 @@ GameObject:
   - component: {fileID: 53559478894051740}
   - component: {fileID: 1245638441969989900}
   - component: {fileID: 5061467318504853967}
+  - component: {fileID: 1148898263531585038}
   m_Layer: 0
   m_Name: Env_slope_1by1fbx (6)
   m_TagString: Untagged
@@ -2081,6 +2082,28 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!64 &1148898263531585038
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2220211327815951142}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 5
+  m_Convex: 0
+  m_CookingOptions: 30
+  m_Mesh: {fileID: -5457014858600919925, guid: 15daf5b9a018f314f9d01451866a5216, type: 3}
 --- !u!1 &2247563428040521190
 GameObject:
   m_ObjectHideFlags: 0
@@ -4886,6 +4909,7 @@ GameObject:
   - component: {fileID: 959240390492957949}
   - component: {fileID: 8189073379723973500}
   - component: {fileID: 2086153098862439319}
+  - component: {fileID: 7729082656358241700}
   m_Layer: 0
   m_Name: Env_slope_1by1fbx (5)
   m_TagString: Untagged
@@ -4965,6 +4989,28 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!64 &7729082656358241700
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4915551524694714182}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 5
+  m_Convex: 0
+  m_CookingOptions: 30
+  m_Mesh: {fileID: -5457014858600919925, guid: 15daf5b9a018f314f9d01451866a5216, type: 3}
 --- !u!1 &5077935789848093660
 GameObject:
   m_ObjectHideFlags: 0
@@ -7380,6 +7426,7 @@ GameObject:
   - component: {fileID: 2763780379394199954}
   - component: {fileID: 228307562240466615}
   - component: {fileID: 6563933218316450893}
+  - component: {fileID: 8189996116689555931}
   m_Layer: 0
   m_Name: Env_slope_1by3fbx (1)
   m_TagString: Untagged
@@ -7459,6 +7506,28 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!64 &8189996116689555931
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7505736284139225190}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 5
+  m_Convex: 0
+  m_CookingOptions: 30
+  m_Mesh: {fileID: 3603701992865572903, guid: 1aaa4f1d726ada54897b96cf64e31d32, type: 3}
 --- !u!1 &7754383147866613851
 GameObject:
   m_ObjectHideFlags: 0
