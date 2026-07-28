@@ -72,6 +72,7 @@ Update this file when a term becomes important enough that future agents or team
   5초 타임아웃 → `ArrivalAborted`, disconnect 처리, `IsEncounterBusy`로 재진입 차단
 - ⚠️ 함정: `renderer.bounds`는 월드 좌표이고 `LoadPrefabContents`는 프리팹을 원점이 아닌 프리뷰
   씬에 올린다. 로컬인 `BoxCollider.center`에 그대로 넣으면 전체가 밀린다(1차 실행에서 Z≈109).
+  (로컬 로그 `Docs/_local/lessons.md` #18 — 팀 공유 대상 아님)
 
 ### ▶ 다음 세션 시작점
 
