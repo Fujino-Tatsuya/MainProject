@@ -4,15 +4,40 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## 현재 인수인계 (2026-07-28)
+## 현재 인수인계 (2026-07-28 · git push 완료)
 
-작업 세션: **경석(Claude)** — 벽 투명화(Wall Occlusion)를 per-pixel 월드공간 페이드로 전면 재설계. 자동 검증 완료, **사용자 Play Mode 검증 대기**.
+작업 세션: **경석(Claude)**. 브랜치 `feature/map-player-merge`, **origin과 동일 (`0314d4c`)**.
 
-- 설계·검증 상태·남은 과제 = [Docs/tech/wall-occlusion-implementation.md](Docs/tech/wall-occlusion-implementation.md), 계획 잠금 = `PLAN.md` 최상단 섹션.
-- 수정 파일(동시수정 주의): `1.Scripts/Rendering/{WallOcclusionDriver.cs, Occlusion/*, Editor/WallOcclusionAuthoring.cs}`, `3.Materials/Level1_Materials/Occlusion/*`, `99.Settings/WallOcclusionSettings.asset`, `MapScene.unity`, `Assets/Tests/EditMode/Occlusion/*`.
-- 삭제됨: `WallOcclusionUnit/Proxy/Manager/VisibilityContributor/Core/RuntimeBinder/ProjectBridge`. 폐기 문서 2종(`wall-occlusion-plan.md`, `wall-occlusion-runtime-bounds.md`)도 삭제.
-- **⚠️ 맵 콜라이더 전멸**: 2026-07-28 아트 교체로 맵 프리팹 12개 콜라이더 0개(렌더러 1,823). 벽 투명화는 콜라이더를 안 쓰므로 무관하지만 플레이어 충돌·NavMesh·낙하 방지에 필요 — `Tools > Map > Authoring > Add Floor+Wall MeshColliders` 미실행 상태.
-- 아직 커밋 안 됨.
+### 완료
+
+1. **벽 투명화 per-pixel 재설계** — 오브젝트당 스칼라 불투명도(MPB) → 프래그먼트 월드좌표 기반
+   셰이더 계산. 물리 쿼리 0, MPB 0, 약 1,600줄 → 473줄. Play 검증 통과.
+   설계·검증·한계 = [Docs/tech/wall-occlusion-implementation.md](Docs/tech/wall-occlusion-implementation.md)
+   - 삭제된 타입: `WallOcclusionUnit/Proxy/Manager/VisibilityContributor/Core/RuntimeBinder/ProjectBridge`
+   - 현행 타입: `WallOcclusionDriver`(Assembly-CSharp) + `Globals`/`MaterialBinder`/`Settings`(Occlusion asmdef)
+2. **맵 프리팹 콜라이더 복구** — 아트 교체로 12개 프리팹 콜라이더 0개였던 것 복구.
+3. **`Assets/level` 아트팩 145개 재배치** — GUID 참조 그래프로 사용/미사용 판정 후 이전.
+   `AssetDatabase.MoveAsset`만 사용, **GUID 145/145 보존, 미싱 레퍼런스 0**.
+   - `50.Art/MapGen/MapObj/{mesh/level, material, texture}` ← FBX·머티리얼·셰이더그래프·텍스처 (**SVN**)
+   - `2.Prefabs/Map/Props` ← 프롭 프리팹 38개 (git)
+   - `99.Settings` ← `PP.asset`, `PP_Renderer.asset` (미참조 URP 파이프라인, 위치만 잡아둠)
+   - 이름 충돌 3건은 `_level` 접미사로 개명 (`MA_prop03_level` 등 — 기존 50.Art와 이름만 같고 별개 에셋)
+4. **오클루전 머티리얼 매핑 5쌍 → 14쌍** — level 폴더 머티리얼 9종이 매핑에서 빠져 프롭들이
+   디더 셰이더를 못 달고 있던 문제 수정.
+
+### 다음 작업 (이어서)
+
+1. **SVN 최신화** — `50.Art/MapGen/MapObj` 아래 신규 파일들을 SVN에 add/commit. git에는 안 보인다
+   (`.gitignore:83`이 `50.Art/` 제외, `Assets/50.Art.meta` 1개만 추적).
+2. **머지** — SVN 상태 맞춘 뒤 진행.
+
+### 주의
+
+- **`8.BehaviorTreeGraph/**` 는 다른 담당자 작업물이다. 수정·커밋하지 말 것.** (현재 워킹트리에
+  수정 상태로 있으나 의도적으로 커밋에서 제외했다.)
+- 미커밋으로 남긴 것: `TitleScene`·`ProjectSettings`(줄바꿈만 변경, 내용 0), `all_mesh.unity`,
+  `FogProfile.asset`, BT 에셋 2종.
+- 아트(FBX·텍스처·머티리얼)는 SVN, 코드·씬·프리팹은 git. 이 경계를 넘기지 말 것.
 
 ## 이전 인수인계 (2026-07-21 → Codex)
 

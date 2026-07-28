@@ -1,6 +1,6 @@
 # CURRENT PLAN — Wall Occlusion per-pixel 재설계 (2026-07-28)
 
-> 상태: 구현 + 자동 검증 완료, **사용자 Play Mode 검증 대기**
+> 상태: **완료·push됨 (`0314d4c`)**. Play Mode 검증 통과. 다음은 SVN 최신화 → 머지.
 > 자동 검증: C# 컴파일 0 에러 / 0 경고, 셰이더 컴파일 정상, EditMode 15 passed / 0 failed,
 > Apply All 매핑 5쌍, Validate errors=0
 > 설계 문서: [Docs/tech/wall-occlusion-implementation.md](Docs/tech/wall-occlusion-implementation.md)
@@ -36,7 +36,10 @@ BoxCollider로만 검증해서 초록이었다.
 - [x] 저작툴에서 Shader Graph 프로퍼티 이름 하드코딩 제거 (아트 재저장에 안 깨지도록)
 - [x] MapScene 컴포넌트를 Driver 하나로 교체
 - [x] 구 아키텍처 삭제 + 테스트 교체
-- [ ] **사용자 Play Mode 검증** — 그라데이션 형태, 바닥 미페이드, 그림자 잔상, 카메라 전환, MPPM
+- [x] **사용자 Play Mode 검증** — 그라데이션·자주색 해소 확인
+- [x] `Assets/level` 아트팩 145개 재배치 (GUID 145/145 보존) + 오클루전 매핑 5쌍 → 14쌍
+- [ ] **SVN 최신화** — `50.Art/MapGen/MapObj` 신규분 add/commit (git 미추적 영역)
+- [ ] SVN 정리 후 **머지**
 
 ## 남은 과제
 
