@@ -65,13 +65,36 @@ public static class MapColliderAuthoring
         Debug.Log($"[MapColliderAuthoring] 완료 — 프리팹 {prefabsChanged}개 수정, 콜라이더 총 {collidersAdded}개 부착.");
     }
 
-    // 오브젝트명 또는 메시명에 floor/wall/hallway 포함 여부(대소문자 무시).
+    // 오브젝트명 · 메시명 · 머티리얼명 중 하나라도 키워드를 포함하면 대상.
     static bool IsFloorOrWall(MeshFilter mf)
     {
-        string goName = mf.gameObject.name.ToLowerInvariant();
-        string meshName = mf.sharedMesh != null ? mf.sharedMesh.name.ToLowerInvariant() : string.Empty;
+        if (MatchesKeyword(mf.gameObject.name))
+            return true;
+        if (mf.sharedMesh != null && MatchesKeyword(mf.sharedMesh.name))
+            return true;
+
+        // 아트가 바닥 메시를 Cube.209 처럼 무의미한 이름으로 내보내는 경우가 있어
+        // 이름만으로는 바닥과 소품을 가르지 못한다. 머티리얼로 한 번 더 판정한다.
+        // (MA_floor_urethane → 바닥으로 잡히고, MA_prop01 환풍구류는 그대로 제외된다.)
+        MeshRenderer renderer = mf.GetComponent<MeshRenderer>();
+        if (renderer != null)
+        {
+            foreach (Material mat in renderer.sharedMaterials)
+                if (mat != null && MatchesKeyword(mat.name))
+                    return true;
+        }
+
+        return false;
+    }
+
+    static bool MatchesKeyword(string name)
+    {
+        if (string.IsNullOrEmpty(name))
+            return false;
+
+        string lower = name.ToLowerInvariant();
         foreach (string k in NameKeywords)
-            if (goName.Contains(k) || meshName.Contains(k))
+            if (lower.Contains(k))
                 return true;
         return false;
     }
