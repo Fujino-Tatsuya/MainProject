@@ -74,8 +74,20 @@ public class LayoutPlacer : MonoBehaviour
                 roleLayout = catalog.GetRoleLayout(slot.AssignedRole, slot.Size);
             }
 
-            if (slot.AssignedRole == ZoneRole.Combat ||
-                (slot.AssignedRole == ZoneRole.Quest && roleLayout == null))
+            // ⚠️ 역할 디자인이 그 크기로 저작돼 있지 않으면(예: BossRoom/PlayerSpawn 후보가 Medium 슬롯에
+            // 뽑힘) 이전엔 LayoutPrefab=null 배치가 그대로 나가고 스포너가 조용히 건너뛰어 **바닥에
+            // 구멍**이 생겼다. 시드에 따라만 나타나서 Test Generate에서는 안 보였다.
+            // 구멍보다 "역할 존이 전투 디자인으로 대체"가 낫다 — 전투 풀로 폴백시킨다.
+            if (slot.AssignedRole != ZoneRole.Combat &&
+                slot.AssignedRole != ZoneRole.Quest &&
+                roleLayout == null)
+            {
+                Edit.LogWarning(
+                    $"[LayoutPlacer] {slot.AssignedRole} 역할 디자인이 {slot.Size} 크기로 없습니다 " +
+                    $"(Slot {slot.SlotID}) — 전투 풀 디자인으로 대체합니다. 해당 크기의 역할 존 저작 필요.");
+            }
+
+            if (roleLayout == null)
             {
                 if (!combatBySize.TryGetValue(slot.Size, out var list))
                     combatBySize[slot.Size] = list = new List<ZoneSlot>();
