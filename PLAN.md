@@ -41,8 +41,12 @@ BoxCollider로만 검증해서 초록이었다.
 - [x] `Assets/level` 아트팩 145개 재배치 (GUID 145/145 보존) + 오클루전 매핑 5쌍 → 14쌍
 - [x] **SVN 최신화** — r235 커밋(신규 242·수정 104). r234의 GUID 재발급 역머지 + 콜라이더
       플래그 39개 복구 포함. 경위 = `Docs/_local/lessons.md` #14
-- [ ] MapScene **Play 검증** (임포터 콜라이더 재부착 확인)
-- [ ] 검증 후 **머지** — origin/development 기준 209 커밋 앞, fast-forward 가능
+- [x] MapScene **Play 검증** — 경사로 낙하 발견 → 경사로·계단 17개 MeshCollider 부착
+      (`caaef90`). `MapColliderAuthoring` 이름 필터에 slope/stair 추가.
+- [x] **`feature/dash-soul` 머지** (`7a5db51`, 59커밋) — 씬 구조 재편 충돌 9건 해소.
+      MapScene은 UnityYAMLMerge 3-way로 충돌 0. 컴파일 error CS 0.
+- [ ] 머지본 **Play 검증** (맵 생성·경사로·dash/soul) → push
+- [ ] 이후 `development` 머지 — 기준 209 커밋 앞, fast-forward 가능
 
 ## 남은 과제
 

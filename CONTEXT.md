@@ -24,12 +24,31 @@ Update this file when a term becomes important enough that future agents or team
 - git 정리 커밋 `30cf1df`: Tree/TutorialInfo 템플릿 잔재 + `all_mesh.unity` 제거
   (빌드 세팅 미등록·코드 참조 0 확인).
 
+### 이어서 완료 — 경사로 콜라이더 + dash-soul 머지
+
+- **`caaef90`** 경사로·계단 17개 MeshCollider 부착. Play에서 slope를 밟으면 낙하하던 문제.
+  프리팹 안 언팩 사본이라 fbx `addColliders`가 전파되지 않는데 `MapColliderAuthoring`
+  이름 필터에 slope/stair가 없었다. 키워드 추가로 해결(소품 88개는 통행 방해 우려로 제외).
+- **`7a5db51`** `feature/dash-soul` 머지(59커밋). 씬이 `0.Scenes/MainFlow/`로 재편돼
+  rename+양쪽수정 충돌 9건 발생, 전부 해소. 상세 = 머지 커밋 메시지.
+  - MapScene은 **UnityYAMLMerge 3-way로 충돌 0** — 우리(맵 시스템 7)와 그쪽(옵션 UI 11)이
+    겹치지 않았다. 병합 후 18개 오브젝트·참조·스크립트 전수 확인.
+  - 자동 해소에 맡겼으면 조용히 깨졌을 3건을 수동 처리: **BossHudTarget 유실**(보스 체력바
+    미표시), **레이어 슬롯 14 이중 점유**(EnemyHurtBox↔Corpse), **HasAimGroundPoint 게이트**
+    (생성맵에서 지면 스킬 전면 차단).
+- 검증: Unity 배치모드 컴파일 **error CS 0**, MapScene 댕글링 참조 0 / 미싱 스크립트 0.
+
 ### 다음 작업
 
-1. **MapScene Play 검증** — 맵 생성 → 이동/충돌 → 콘솔 0에러. 39개 FBX가 임포터 콜라이더를
-   다시 달았으므로 이 확인 후 머지.
-2. **머지** — `feature/map-player-merge`는 origin/development보다 **209 커밋 앞, 0 뒤짐**
-   (fast-forward 가능). PR 여부는 검증 후 결정.
+1. **MapScene Play 검증** — 맵 생성 → 이동/충돌(경사로 포함) → dash/soul 동작 → 콘솔 확인.
+2. 이상 없으면 push. 롤백 지점 = `backup/pre-dash-soul-merge`(`caaef90`).
+3. 이후 soul 상태 관련 후속 작업(못 가는 구역 처리 등)을 이 브랜치에서 이어간다.
+
+### 주의 — SVN meta
+
+`50.Art/Char/Boss/bomb.fbx.meta`가 로컬 미버전 상태다. r233에서 fbx만 meta 없이 올라와
+우리 Unity가 GUID를 새로 발급한 것 — **커밋하지 말 것**(r234와 같은 사고가 된다).
+boss 담당(민경)이 자기 프로젝트에서 커밋해야 한다.
 
 ### 이전 세션 완료
 
