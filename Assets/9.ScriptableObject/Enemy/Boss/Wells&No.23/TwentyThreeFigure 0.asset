@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 16067418779ddc3438941815fd0fe88e, type: 3}
+  m_Name: TwentyThreeFigure 0
+  m_EditorClassIdentifier: Assembly-CSharp::TwentyThreeFigure
+  maxRageCount: 2
+  increaseHpAmount: 2
+  increaseShieldAmount: 2
+  maxGroggyCount: 2
+  dashSpeed: 10
+  grabCoolTime: 5
+  chargingTime: 10
+  groggyTime: 5
+  breakTime: 10
+  jumpingTime: 0.5
+  hookDamage: 2
+  upperDamage: 3
+  chargingFloorDamage: 1
+  dashDamage: 5
+  rageDamage: 10
+  jumpDamage: 8
+  grabDamagePercentage: 10
+  holdDamagePercentage: 5
+  landingDamagePercentage: 20
+  holdAttackPeriod: 0.5
+  throwLocalDirection: {x: 0, y: 0, z: 1}
+  throwDistance: 5
+  flyingDuration: 2
+  arcHeight: 3
+  spreadAngle: 30

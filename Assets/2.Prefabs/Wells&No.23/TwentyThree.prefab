@@ -565,6 +565,70 @@ MonoBehaviour:
     m_Bits: 64
   attackType: 0
   knockbackStrength: 10
+--- !u!1 &3178699018579886661
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 178548833760689029}
+  - component: {fileID: 3919172422678745266}
+  m_Layer: 0
+  m_Name: Initializer
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &178548833760689029
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3178699018579886661}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 6916739971123564487}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &3919172422678745266
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3178699018579886661}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0c245cd4b0c7634384fbffd1d7634f5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TwentyThreeInitializer
+  ShowTopMostFoldoutHeaderGroup: 1
+  figure: {fileID: 11400000, guid: 107f78c06f7d0684ca8f644d66d93880, type: 2}
+  bt: {fileID: 7434833580858265621}
+  damageEntries:
+  - target: {fileID: 3298624546661411796}
+    type: 0
+  - target: {fileID: 5991986677993798632}
+    type: 0
+  - target: {fileID: 3484998061978514129}
+    type: 1
+  - target: {fileID: 1982363097940907444}
+    type: 2
+  - target: {fileID: 5579044265559132990}
+    type: 3
+  - target: {fileID: 6555260676494401482}
+    type: 4
+  - target: {fileID: 273769967766734601}
+    type: 5
+  grabController: {fileID: 8939195106823421711}
+  bombLauncher: {fileID: 3123776171035693610}
 --- !u!1 &3443241134742314900
 GameObject:
   m_ObjectHideFlags: 0
@@ -575,6 +639,7 @@ GameObject:
   m_Component:
   - component: {fileID: 9185639174043840639}
   - component: {fileID: 273769967766734601}
+  - component: {fileID: 7789291556692004003}
   m_Layer: 0
   m_Name: JumpAttack
   m_TagString: Untagged
@@ -616,8 +681,6 @@ MonoBehaviour:
   playerLayer:
     serializedVersion: 2
     m_Bits: 64
-  damage: 3
-  jumpingTime: 0.5
   meshRenderer:
   - {fileID: 1048921974906316339}
   - {fileID: 3386235969700265050}
@@ -629,6 +692,25 @@ MonoBehaviour:
   multiplier: 
   clipStart: 7.1
   clipEnd: 25.8
+--- !u!114 &7789291556692004003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3443241134742314900}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b2e13755730c9274fbe68dff27ce63d0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KnockbackAttack
+  damage: 0
+  isGroggyAttack: 0
+  targetLayer:
+    serializedVersion: 2
+    m_Bits: 8256
+  attackType: 0
+  knockbackStrength: 8
 --- !u!1 &3908396834888608453
 GameObject:
   m_ObjectHideFlags: 0
@@ -743,7 +825,7 @@ GameObject:
   - component: {fileID: 5472367148495070200}
   - component: {fileID: 1982363097940907444}
   m_Layer: 0
-  m_Name: Charging
+  m_Name: ChargeAttack
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -913,6 +995,7 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 2585134952784665517}
+  - {fileID: 178548833760689029}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &5825734050860780127
@@ -927,7 +1010,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 739404150
+  GlobalObjectIdHash: 1745528080
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -1022,7 +1105,6 @@ MonoBehaviour:
   - rid: 5035183289670304660
   - rid: 8806980410284442218
   - rid: 3912067921147069364
-  - rid: 3912067923411731077
   - rid: 3912067923411731078
   - rid: 3912067945809575982
   m_OriginalGraph: {fileID: 0}
@@ -1040,14 +1122,6 @@ MonoBehaviour:
           m_Value1: 11036599555410557666
         Name: DashSpeed
         m_Value: 10
-    - rid: 3912067923411731077
-      type: {class: 'BlackboardVariable`1[[System.Single, mscorlib]]', ns: Unity.Behavior, asm: Unity.Behavior}
-      data:
-        GUID:
-          m_Value0: 7859883530159267686
-          m_Value1: 12859901698643088057
-        Name: DashCoolTime
-        m_Value: 5
     - rid: 3912067923411731078
       type: {class: 'BlackboardVariable`1[[System.Single, mscorlib]]', ns: Unity.Behavior, asm: Unity.Behavior}
       data:
@@ -1307,8 +1381,6 @@ MonoBehaviour:
   attackSpeed: 1
   maxHp: 100
   defense: 5
-  _groggyCount: 0
-  _maxGroggyCount: 2
 --- !u!114 &2934878137636970231
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1429,68 +1501,6 @@ MonoBehaviour:
   attackType: 0
   triggerMode: 0
   stayTime: 0
---- !u!1 &6792224880344252734
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 2256331854799873209}
-  m_Layer: 0
-  m_Name: Hold
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &2256331854799873209
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6792224880344252734}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 998147511182444830}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &6802184529552565561
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 839400050952676414}
-  m_Layer: 0
-  m_Name: Throw
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &839400050952676414
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6802184529552565561}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 998147511182444830}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &6887850482435865838
 GameObject:
   m_ObjectHideFlags: 0
@@ -1686,8 +1696,6 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 3777127995163679798}
-  - {fileID: 2256331854799873209}
-  - {fileID: 839400050952676414}
   m_Father: {fileID: 3556593508814251226}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &8939195106823421711
@@ -1709,10 +1717,6 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 64
   bt: {fileID: 7434833580858265621}
-  grabDamagePercentage: 10
-  holdDamagePercentage: 5
-  holdAttackPeriod: 0.5
-  landingDamagePercentage: 30
 --- !u!1 &8300409248683084403
 GameObject:
   m_ObjectHideFlags: 0
@@ -1871,6 +1875,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f0038c16c34866b4f9e25c9c0dc0f7e6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Behavior::Unity.Behavior.BehaviorGraphAgent
+--- !u!114 &3123776171035693610 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 4146338655535622427, guid: 79860f5bc8d12324ba329dfa38ea3699, type: 3}
+  m_PrefabInstance: {fileID: 1356464099776690993}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 519f0d5762034604f82a979c406a4fc6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BombLauncher
 --- !u!1 &3386235969700265050 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 4336248756725876587, guid: 79860f5bc8d12324ba329dfa38ea3699, type: 3}

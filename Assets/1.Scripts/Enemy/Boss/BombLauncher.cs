@@ -22,6 +22,22 @@ public class BombLauncher : MonoBehaviour
 
     #endregion
 
+    #region Config Injection
+
+    /// <summary>
+    /// 투척 관련 수치를 외부에서 주입한다. (SO 종속 없이 값만 받음)
+    /// </summary>
+    public void SetThrowFigures(Vector3 localDirection, float distance, float duration, float arc, float spread)
+    {
+        throwLocalDirection = localDirection;
+        throwDistance = distance;
+        flyingDuration = duration;
+        arcHeight = arc;
+        spreadAngle = spread;
+    }
+
+    #endregion
+
     #region State Variables
 
     GameObject _bombInstance;

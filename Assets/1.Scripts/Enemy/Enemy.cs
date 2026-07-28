@@ -11,15 +11,8 @@ public class Enemy : Unit
     [SerializeField] int maxHp;
     [SerializeField] int defense;
 
-    [Header("\nEnemy 전용 상태")]
-    [SerializeField] int _groggyCount;
-    [SerializeField] int _maxGroggyCount;
-
     BlackboardVariable<float> WalkSpeed;
     BlackboardVariable<float> ChaseSpeed;
-    BlackboardVariable<bool> IsGroggy;
-    BlackboardVariable<int> GroggyCount;
-    BlackboardVariable<int> MaxGroggyCount;
 
 
     public override void OnNetworkSpawn()
@@ -40,22 +33,6 @@ public class Enemy : Unit
             Edit.LogWarning("[Enemy] 해당 BT의 Blackboard에서 ChaseSpeed 변수를 얻어오는 것에 실패했습니다.");
         else
             ChaseSpeed.Value = chaseSpeed;
-
-        if (_maxGroggyCount != 0)
-        {
-            if (!bt.BlackboardReference.GetVariable<int>("GroggyCount", out GroggyCount))
-                Edit.LogAssertion("[Enemy] 해당 BT의 Blackboard에서 GroggyCount 변수를 얻어오는 것에 실패했습니다.");
-            else
-                GroggyCount.Value = _groggyCount;
-
-            if (!bt.BlackboardReference.GetVariable<int>("MaxGroggyCount", out MaxGroggyCount))
-                Edit.LogAssertion("[Enemy] 해당 BT의 Blackboard에서 MaxGroggyCount 변수를 얻어오는 것에 실패했습니다.");
-            else
-                MaxGroggyCount.Value = _maxGroggyCount;
-
-            if (!bt.BlackboardReference.GetVariable<bool>("IsGroggy", out IsGroggy))
-                Edit.LogAssertion("[Enemy] 해당 BT의 Blackboard에서 IsGroggy 변수를 얻어오는 것에 실패했습니다.");
-        }
     }
 
     public override void TakeDamage(AttackInfo attackInfo)

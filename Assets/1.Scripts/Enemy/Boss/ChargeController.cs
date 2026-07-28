@@ -1,9 +1,10 @@
-using UnityEngine;
+using System;
 using System.Collections.Generic;
 using Unity.Netcode;
-using System;
+using Unity.VisualScripting;
+using UnityEngine;
 
-public class ChargeController : NetworkBehaviour
+public class ChargeController : NetworkBehaviour, IDamageSettable
 {
     List<ChargingObject> chargeObjects;
     [SerializeField] float maxY = 1f;
@@ -13,6 +14,7 @@ public class ChargeController : NetworkBehaviour
     [SerializeField] int player3 = 3;
 
     [SerializeField] GameObject floor;
+    ColliderBasicAttack _floorColliderAttack;
 
     int _max = 0;
     int _destroyCount = 0;
@@ -26,6 +28,9 @@ public class ChargeController : NetworkBehaviour
     public override void OnNetworkSpawn()
     {
         floor.SetActive(false);
+
+        if (!IsServer) return;
+        _floorColliderAttack = floor.GetComponent<ColliderBasicAttack>();
     }
 
     public override void OnNetworkDespawn()
@@ -39,6 +44,11 @@ public class ChargeController : NetworkBehaviour
                 obj.ReachEvent -= CheckReachedObjects;
             }
         }
+    }
+
+    public void SetDamage(int value)
+    {
+        _floorColliderAttack.SetDamage(value);
     }
 
     /// <summary>

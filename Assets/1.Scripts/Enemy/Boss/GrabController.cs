@@ -10,13 +10,23 @@ public class GrabController : NetworkBehaviour
     [SerializeField] LayerMask targetMask;
     [SerializeField] BehaviorGraphAgent bt;
 
-    [Header("데미지, 주기, 던지기 방향")]
-    [SerializeField] int grabDamagePercentage;
-    [SerializeField] int holdDamagePercentage;
-    [SerializeField] float holdAttackPeriod;
-    [SerializeField] int landingDamagePercentage;
+    int grabDamagePercentage;
+    int holdDamagePercentage;
+    float holdAttackPeriod;
+    int landingDamagePercentage;
     //[SerializeField] Vector3 throwDirection;
     //[SerializeField] float throwStrength;
+
+    /// <summary>
+    /// Grab 데미지 퍼센티지들과 홀드 주기를 외부에서 주입한다. (SO 종속 없이 값만 받음)
+    /// </summary>
+    public void SetGrabFigures(int grabPercentage, int holdPercentage, int landingPercentage, float attackPeriod)
+    {
+        grabDamagePercentage = Mathf.Max(0, grabPercentage);
+        holdDamagePercentage = Mathf.Max(0, holdPercentage);
+        landingDamagePercentage = Mathf.Max(0, landingPercentage);
+        holdAttackPeriod = Mathf.Max(0f, attackPeriod);
+    }
 
     const int _maxPlayer = 3;
     Collider[] results = new Collider[_maxPlayer];

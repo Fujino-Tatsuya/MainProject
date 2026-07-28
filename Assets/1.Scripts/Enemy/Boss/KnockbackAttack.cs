@@ -23,10 +23,10 @@ public class KnockbackAttack : BaseAttack
                 return;
             }
 
-            unit.TakeDamage(_attackInfo);
+            unit.TakeDamage(new AttackInfo(damage, attackType, isGroggyAttack));
             Vector3 dir = GetDirection(root);
             unit.Knockback(dir, knockbackStrength);
-            Edit.Log($"[No.23] {name} 넉백 공격 적중: {unit.name} (피해 {_attackInfo.damage})", this);
+            Edit.Log($"[No.23] {name} 넉백 공격 적중: {unit.name} (피해 {damage})", this);
         }
     }
 
@@ -37,6 +37,11 @@ public class KnockbackAttack : BaseAttack
         Vector3 start = transform.position;
         start.y = target.transform.position.y;
         direction = target.transform.position - start;
+
+        if (direction.sqrMagnitude <= Mathf.Epsilon)
+        {
+            return target.transform.TransformDirection(Vector3.back);
+        }
 
         return direction.normalized;
     }
