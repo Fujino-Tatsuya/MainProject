@@ -27,6 +27,9 @@ public class TitleSceneManager : NemoSceneManager
         Debug.Log("[SceneFlow] TitleSceneManager.Start");
         SetOptionPanel(false);
         PlayEnterFade();
+
+        // BGM 재생
+        AudioManager.Instance.PlayBGM(AudioManager.Instance.Catalog.TitleBGM);
     }
 
     public void StartGame()

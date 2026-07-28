@@ -26,7 +26,7 @@ public class VolumeSlider : MonoBehaviour
 
     private Slider _slider;
 
-    private string PrefsKey => isMaster ? "vol_master" : $"vol_{audioType}";
+    //private string PrefsKey => isMaster ? "vol_master" : $"vol_{audioType}";
 
     private void Awake()
     {
@@ -37,12 +37,14 @@ public class VolumeSlider : MonoBehaviour
     {
         _slider.onValueChanged.AddListener(Apply);
 
-        if (persist && PlayerPrefs.HasKey(PrefsKey))
-        {
-            // 저장값을 슬라이더에 반영 → onValueChanged가 발생해 Apply까지 이어짐
-            _slider.value = PlayerPrefs.GetFloat(PrefsKey);
-        }
-        else if (applyOnEnable)
+        _slider.value = AudioManager.Instance.GetVolume(audioType);
+
+        //if (persist && PlayerPrefs.HasKey(PrefsKey))
+        //{
+        //    // 저장값을 슬라이더에 반영 → onValueChanged가 발생해 Apply까지 이어짐
+        //    _slider.value = PlayerPrefs.GetFloat(PrefsKey);
+        //}
+        if (applyOnEnable)
         {
             Apply(_slider.value);
         }
@@ -71,9 +73,9 @@ public class VolumeSlider : MonoBehaviour
             AudioManager.Instance.SetVolume(audioType, value);
         }
 
-        if (persist)
-        {
-            PlayerPrefs.SetFloat(PrefsKey, value);
-        }
+        //if (persist)
+        //{
+        //    PlayerPrefs.SetFloat(PrefsKey, value);
+        //}
     }
 }

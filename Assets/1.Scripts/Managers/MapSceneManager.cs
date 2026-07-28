@@ -1,4 +1,4 @@
-﻿using Unity.Collections;
+using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -50,6 +50,9 @@ public class MapSceneManager : NemoSceneManager
         Debug.Log("[SceneFlow] MapSceneManager.Start");
         SetWarningPanel(false); // 경고창은 기본 숨김 — 클라가 Exit를 누를 때만 표시
         PlayEnterFade();
+
+        // BGM 재생
+        AudioManager.Instance.PlayBGM(AudioManager.Instance.Catalog.InGameBGM);
     }
 
     private void OnDestroy()

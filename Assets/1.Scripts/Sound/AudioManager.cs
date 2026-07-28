@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using Ami.BroAudio;
 
@@ -25,6 +26,9 @@ public class AudioManager : MonoBehaviour
     /// <summary>중앙 사운드 카탈로그. 예: AudioManager.Instance.Catalog.UIClick</summary>
     public SoundCatalog Catalog => catalog;
 
+    // BroAudioType별 현재 볼륨(0~10, 1=원음). 게임 시작 시 전부 1f로 초기화. PlayerPrefs 미사용.
+    private readonly Dictionary<BroAudioType, float> _volumes = new Dictionary<BroAudioType, float>();
+
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -36,6 +40,8 @@ public class AudioManager : MonoBehaviour
 
         Instance = this;
         DontDestroyOnLoad(gameObject);
+
+        InitVolumes();
 
         if (catalog == null)
         {
@@ -106,16 +112,33 @@ public class AudioManager : MonoBehaviour
 
     #region 볼륨 / 카테고리 제어 (기존 VCA/Bus 대체)
 
+    /// <summary>BroAudioType별 볼륨 딕셔너리를 전부 1f(원음)로 초기화한다.</summary>
+    private void InitVolumes()
+    {
+        foreach (BroAudioType type in System.Enum.GetValues(typeof(BroAudioType)))
+        {
+            _volumes[type] = 1f;
+        }
+    }
+
     /// <summary>카테고리별 볼륨을 설정한다. (기존 VCA 대체) vol 0~10, 1 = 원음</summary>
     public void SetVolume(BroAudioType audioType, float volume, float fadeTime = 0f)
     {
+        _volumes[audioType] = volume;
         BroAudio.SetVolume(audioType, volume, fadeTime);
     }
 
-    /// <summary>마스터 볼륨을 설정한다. vol 0~10, 1 = 원음</summary>
+    /// <summary>마스터 볼륨을 설정한다. (BroAudioType.All) vol 0~10, 1 = 원음</summary>
     public void SetMasterVolume(float volume, float fadeTime = 0f)
     {
+        _volumes[BroAudioType.All] = volume;
         BroAudio.SetVolume(volume, fadeTime);
+    }
+
+    /// <summary>지정한 BroAudioType의 현재 볼륨을 반환한다. (딕셔너리에 없으면 1f)</summary>
+    public float GetVolume(BroAudioType audioType)
+    {
+        return _volumes.TryGetValue(audioType, out float volume) ? volume : 1f;
     }
 
     /// <summary>카테고리 전체를 일시정지한다. (기존 Bus pause 대체)</summary>
