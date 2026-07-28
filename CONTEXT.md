@@ -165,7 +165,53 @@ PlayerDashController, Skill/PlayerSkillController, Fall/PlayerFallController,
 Life/PlayerLifeCycleController, Life/PlayerLifeInputPolicy}`, `1.Scripts/Unit/StatusEffectController.cs`,
 `2.Prefabs/Player/Player.prefab`. ⚠️ 플레이어 계통은 은희 담당 영역 — 동시 수정 주의.
 
-### ▶ 다음 세션 시작점
+### ▶▶ 다음 세션 시작점 (2026-07-29 마감 · 팀장 지시 = **분석 먼저, 수정 나중**)
+
+팀장 지시 원문 취지: "지금 너무 수정만 하는데 달라지는 게 아니니 **분석부터 제대로** 해야 한다.
+다음 세션에서 작업하자." → 다음 세션은 **코드를 고치기 전에 아래 4건의 분석을 먼저 끝내고
+결과를 보고한 뒤** 지시를 받는다. 상세 경위·교훈은 `Docs/_local/lessons.md` #20~#26 +
+「⏳ 미해결」 절.
+
+**분석 1 — `Env_Wall_doorframe` 콜라이더 부재 (확인됨, 원인 미확정)**
+- 사실: 문틀은 `MeshFilter`+`MeshRenderer`만 있고 콜라이더가 없다(인스펙터 확인). 그래서 통과된다.
+- 벽 투명화와 무관함은 확정: `WallOcclusionDriver`에 `Collider`/`Physics`/`SetActive`/`enabled` 참조 **0건**
+  (셰이더 전용). 투명해 보이는 것과 콜라이더 부재는 별개 사건이다.
+- 분석할 것: `MapColliderAuthoring`의 이름 필터에 doorframe 계열이 포함되는지, 문틀 26개(+`Env_laser`)의
+  콜라이더 유무 전수, 문틀이 통행을 막아야 하는지(문이므로 열려 있어야 할 수도) — **디자인 의도 확인 필요**.
+
+**분석 2 — M키 지도 ↔ 우측하단 미니맵 탐사 동기화 (미구현)**
+- 사실: 미니맵은 `_MaskTex`(R=explored, G=visible)로 점점 밝아진다. M키 지도(`MapOverviewUI`)는
+  슬롯 사각형만 그리고 탐사 개념이 없다.
+- 요구: 미니맵에서 밝아진 영역이 M키 지도에도 같이 그려져야 한다.
+- 분석할 것: `MinimapController.GetExploredBits()`(이미 존재) + `_worldRect` 좌표계를 `MapOverviewUI`가
+  어떻게 소비할지. 존 사각형 위에 탐사 마스크를 덮는 방식 vs 베이크 텍스처를 그대로 확대 표시하는 방식 —
+  둘 중 어느 쪽이 지금 UI 구조에 맞는지 먼저 결정.
+
+**분석 3 — `BossArea`가 실제로 쓰이는지 (내가 만들었지만 검증 안 됨)**
+- 사실: KMKScene·PlayerBossTest에만 있었고 MapScene엔 0건이었다 → `bossroom.prefab`에 tag `BossArea`
+  트리거 박스(20.98×2×20.98, 중앙 (0.49, 0.61, 0.49))를 만들어 넣었다. `TwentyThreeArenaContext`는
+  **일부러 안 붙였다**(붙이면 보스 이중 스폰).
+- 분석할 것: No.23 BT가 BossArea를 **태그 검색으로 찾는지, 블랙보드 GameObject 참조로 받는지**.
+  블랙보드 참조라면 프리팹에서 스폰된 보스는 씬 오브젝트를 못 잡으므로 **Director가 주입**해야 한다.
+  BT 그래프(`8.BehaviorTreeGraph/Boss/Wells&No.23/No.23.asset`)는 **읽기만** 하고 수정하지 말 것(민경 님 영역).
+
+**분석 4 — 어긋난 존 배치 = 구멍·몹 낙하의 근본 (재저작 대기, 코드로는 못 고침)**
+- 사실: `Validate Slot Authoring` 결과 **미저작 9건 / 참조 잃은 저작 항목 9건**(개수 일치).
+  대상 = `ZoneM_typeA`, `Zone_typeQuest01`, `Zone_typeQuest02` × Slot 4·8·9.
+  원인 = 그 프리팹들이 재생성돼 GUID가 바뀌면서 저작 데이터가 고아가 됐다.
+- 해결은 코드가 아니라 **재-fitting + Save Placements**(팀장 작업). 그전까지 그 존들은 baseline에 떨어져
+  통로와 어긋난다 → 몹은 이제 스폰되지 않고 에러 로그만 남는다(낙하는 막았다).
+- 분석할 것: 재저작 없이 임시로 버티려면 어떤 대체가 가능한지(예: 미저작 조합을 셔플 풀에서 제외).
+
+**참고 — 이번 세션에 실제로 검증된 것**
+- 보스 등장 흐름 정상: 로그 `SpawnPoint를 방 중앙 (500.49, 0.61, 0.49)으로 설정` → 하강 → `전투 시작 — BT 개방`.
+  스크린샷의 보스 좌표 `(13.33, 0.08, -4.83)`은 그 수정 **이전** Play다.
+- 미니맵 베이크 자체는 정상(`중앙 샘플 평균 밝기 0.308`). 남았던 원인은 실루엣 마스크였다.
+- 레이저 통로 차단(26곳)은 **의도된 것**이며 유지한다. 내 판단으로 제거했다가 원복했다(`5dee39d`).
+- ⚠️ 보스룸 저작 도구(`Rebuild Boss Room Bounds`)는 `PlayerArrivalPoints`·`BossLandingPoint`를 **재생성**한다
+  → 실행 후 `Wire Boss Encounter (MapScene)`를 반드시 재실행(참조 끊김). 손으로 옮긴 지점도 초기화된다.
+
+### ▶ 이전 세션 시작점(참고용)
 
 **증상: 보스룸으로 이동은 되는데 보스가 안 나온다 — 정상이다.** MapScene에는 보스를 스폰하는
 주체가 없다. 보스를 스폰하는 `TwentyThreeArenaContext`(`OnNetworkSpawn`에서 `boss.Spawn()`)는
