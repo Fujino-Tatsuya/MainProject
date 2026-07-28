@@ -15,7 +15,7 @@ EditorBuildSettings:
     path: Assets/0.Scenes/PlayerScene.unity
     guid: c4beb9550bd2eb44896475389e20263a
   - enabled: 1
-    path: Assets/0.Scenes/KMKScene.unity
+    path: Assets/0.Scenes/BossScene.unity
     guid: 4df41e85c6a1dba4d9f41195a1ab45c8
   m_configObjects:
     com.unity.addressableassets: {fileID: 11400000, guid: 7b59ffdbd78cddf4589a8be5b4a153c8, type: 2}

@@ -25,8 +25,19 @@ public class TwentyThreeWells_Initializer : NetworkBehaviour
     [Header("블랙보드")]
     [SerializeField] BehaviorGraphAgent bt;
 
+    [Serializable]
+    struct KnockbackEntry
+    {
+        [Tooltip("넉백 세기를 주입할 대상 컴포넌트 (IKnockbackSettable 구현). 컴포넌트 헤더를 직접 드래그해 지정")]
+        public MonoBehaviour target;
+        public TwentyThreeDamageType type;
+    }
+
     [Header("평타 damage 주입 대상")]
     [SerializeField] DamageEntry[] damageEntries;
+
+    [Header("넉백 세기 주입 대상")]
+    [SerializeField] KnockbackEntry[] knockbackEntries;
 
     [Header("Grab (퍼센티지 3개 + 주기)")]
     [SerializeField] GrabController grabController;
@@ -46,6 +57,7 @@ public class TwentyThreeWells_Initializer : NetworkBehaviour
 
         ApplyBlackboard();
         ApplyDamages();
+        ApplyKnockbacks();
         ApplyGrab();
         ApplyBomb();
     }
@@ -89,6 +101,26 @@ public class TwentyThreeWells_Initializer : NetworkBehaviour
             }
 
             settable.SetDamage(figure.GetDamage(entry.type));
+        }
+    }
+
+    void ApplyKnockbacks()
+    {
+        foreach (KnockbackEntry entry in knockbackEntries)
+        {
+            if (entry.target == null)
+            {
+                Edit.LogError("[No.23] knockbackEntries의 target이 비어 있습니다.", this);
+                continue;
+            }
+
+            if (entry.target is not IKnockbackSettable settable)
+            {
+                Edit.LogError($"[No.23] {entry.target.name}은 IKnockbackSettable을 구현하지 않습니다.", this);
+                continue;
+            }
+
+            settable.SetKnockbackStrength(figure.GetKnockbackStrength(entry.type));
         }
     }
 

@@ -50,6 +50,12 @@ public class TwentyThreeWells_Figure : ScriptableObject
     public int rageDamage;
     public int jumpDamage;
 
+    [Header("넉백 세기 (float)")]
+    public float dashKnockback;
+    public float rageKnockback;
+    public float chargingFloorKnockback;
+    public float jumpKnockback;
+
     [Header("Grab (대상 체력 대비 %)")]
     public int grabDamagePercentage;
     public int holdDamagePercentage;
@@ -77,6 +83,19 @@ public class TwentyThreeWells_Figure : ScriptableObject
             case TwentyThreeDamageType.Rage: return rageDamage;
             case TwentyThreeDamageType.Jump: return jumpDamage;
             default: return 0;
+        }
+    }
+
+    /// <summary>슬롯 타입에 해당하는 넉백 세기를 반환한다. (넉백 없는 타입은 0)</summary>
+    public float GetKnockbackStrength(TwentyThreeDamageType type)
+    {
+        switch (type)
+        {
+            case TwentyThreeDamageType.Dash: return dashKnockback;
+            case TwentyThreeDamageType.Rage: return rageKnockback;
+            case TwentyThreeDamageType.ChargingFloor: return chargingFloorKnockback;
+            case TwentyThreeDamageType.Jump: return jumpKnockback;
+            default: return 0f;
         }
     }
 }

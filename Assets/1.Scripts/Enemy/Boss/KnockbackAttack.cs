@@ -1,12 +1,20 @@
 using UnityEngine;
 
-public class KnockbackAttack : BaseAttack
+public class KnockbackAttack : BaseAttack, IKnockbackSettable
 {
     [SerializeField] float knockbackStrength = 5f;
 
     void Awake()
     {
         InitializeAttackInfo();
+    }
+
+    /// <summary>
+    /// 넉백 세기 값만 설정한다.
+    /// </summary>
+    public void SetKnockbackStrength(float value)
+    {
+        knockbackStrength = Mathf.Max(0f, value);
     }
 
     public void ApplyKnockbackAttack(GameObject collidedObject)

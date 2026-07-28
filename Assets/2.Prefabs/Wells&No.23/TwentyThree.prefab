@@ -367,7 +367,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 8256
   attackType: 0
-  knockbackStrength: 5
+  knockbackStrength: 0
 --- !u!1 &2878115523209849289
 GameObject:
   m_ObjectHideFlags: 0
@@ -564,7 +564,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 64
   attackType: 0
-  knockbackStrength: 10
+  knockbackStrength: 0
 --- !u!1 &3178699018579886661
 GameObject:
   m_ObjectHideFlags: 0
@@ -627,6 +627,13 @@ MonoBehaviour:
     type: 4
   - target: {fileID: 273769967766734601}
     type: 5
+  knockbackEntries:
+  - target: {fileID: 7789291556692004003}
+    type: 5
+  - target: {fileID: 4435137659627741301}
+    type: 2
+  - target: {fileID: 6555260676494401482}
+    type: 4
   grabController: {fileID: 8939195106823421711}
   bombLauncher: {fileID: 3123776171035693610}
 --- !u!1 &3443241134742314900
@@ -710,7 +717,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 8256
   attackType: 0
-  knockbackStrength: 8
+  knockbackStrength: 0
 --- !u!1 &3908396834888608453
 GameObject:
   m_ObjectHideFlags: 0
@@ -764,7 +771,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 64
   attackType: 0
-  knockbackStrength: 10
+  knockbackStrength: 0
 --- !u!135 &1551797295837025053
 SphereCollider:
   m_ObjectHideFlags: 0
@@ -1010,7 +1017,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1745528080
+  GlobalObjectIdHash: 739404150
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1

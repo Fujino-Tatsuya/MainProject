@@ -28,6 +28,10 @@ MonoBehaviour:
   dashDamage: 5
   rageDamage: 10
   jumpDamage: 8
+  dashKnockback: 5
+  rageKnockback: 5
+  chargingFloorKnockback: 2
+  jumpKnockback: 8
   grabDamagePercentage: 10
   holdDamagePercentage: 5
   landingDamagePercentage: 20
