@@ -28,6 +28,11 @@ public class MinimapController : MonoBehaviour
     [Header("=== 베이크 ===")]
     [Tooltip("지형 베이크 해상도")] public int BakeResolution = 1024;
     [Tooltip("맵 경계 여유(m)")] public float BoundsMargin = 8f;
+    [Tooltip("베이크 카메라 높이(m). 이 높이에서 아래를 내려다본다.")]
+    public float BakeCameraHeight = 120f;
+    [Tooltip("베이크에 포함할 최저 월드 Y. 이보다 아래 지오메트리는 잘라낸다 — " +
+             "어비스 물 Plane(y≈-19, 3300m)이 미니맵을 통째로 덮는 것을 막는다.")]
+    public float BakeMinWorldY = -5f;
 
     [Header("=== 색 ===")]
     public Color LocalPlayerColor = Color.white;
@@ -136,16 +141,19 @@ public class MinimapController : MonoBehaviour
         var cam = camGo.AddComponent<Camera>();
         cam.orthographic = true;
         cam.orthographicSize = _worldRect.width * 0.5f;
-        cam.transform.position = new Vector3(_worldRect.center.x, 120f, _worldRect.center.y);
+        cam.transform.position = new Vector3(_worldRect.center.x, BakeCameraHeight, _worldRect.center.y);
         cam.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
         cam.nearClipPlane = 1f;
-        cam.farClipPlane = 300f;
+        // ⚠️ far를 300으로 두면 y=-19의 어비스 물 Plane(스케일 330 = 3300m)까지 구워져
+        // 미니맵 전체가 큰 사각형으로 채워진다(배경 알파 0 실루엣이 무의미해짐).
+        // 지형이 있는 높이까지만 본다.
+        cam.farClipPlane = Mathf.Max(10f, BakeCameraHeight - BakeMinWorldY);
         cam.clearFlags = CameraClearFlags.SolidColor;
         cam.backgroundColor = new Color(0f, 0f, 0f, 0f); // 알파 0 = 맵 실루엣 마스크
         cam.targetTexture = _bakeRT;
         // 유닛/UI 제외 — 지형만 굽는다 (레이어가 없으면 무시됨)
         int mask = ~0;
-        foreach (string ln in new[] { "UI", "Player", "Monster", "Unit" })
+        foreach (string ln in new[] { "UI", "Player", "Monster", "Unit", "Water", "Soul", "Corpse", "Projectile" })
         {
             int l = LayerMask.NameToLayer(ln);
             if (l >= 0) mask &= ~(1 << l);
