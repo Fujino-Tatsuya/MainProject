@@ -1,4 +1,6 @@
+using System;
 using System.Collections;
+using System.Collections.Generic;
 using Unity.Netcode;
 using Unity.Netcode.Components;
 using UnityEngine;
@@ -20,7 +22,18 @@ public class BossTeleportManager : NetworkBehaviour
 {
     [Header("카운트다운/산개")]
     [SerializeField, Min(0.5f)] private float countdownSeconds = 3f;
+    [Tooltip("도착 지점을 못 찾았을 때만 쓰는 폴백 산개 반경.")]
     [SerializeField, Min(0f)] private float scatterRadius = 2f;
+
+    [Header("도착 지점 (bossroom/PlayerArrivalPoints)")]
+    [Tooltip("비어 있으면 씬에서 'PlayerArrivalPoints' 이름으로 찾는다.")]
+    [SerializeField] private Transform arrivalPointsRoot;
+    [Tooltip("비어 있으면 위 루트의 자식으로 채운다. ClientId 오름차순으로 이 순서에 배정된다.")]
+    [SerializeField] private Transform[] arrivalPoints;
+
+    [Header("도착 ACK")]
+    [Tooltip("이 시간 안에 전원 ACK가 오지 않으면 전투를 강행하지 않고 실패로 복구한다.")]
+    [SerializeField, Min(0.5f)] private float arrivalAckTimeoutSeconds = 5f;
 
     [Header("진입 패드 (존 중앙 트리거+테두리 크기, m)")]
     [SerializeField] private Vector2 enterPadSize = new Vector2(6f, 6f);
@@ -49,7 +62,22 @@ public class BossTeleportManager : NetworkBehaviour
     private float _fadeAlpha;
     private bool _fadingIn;
 
+    // 도착 ACK 상태(서버 전용).
+    private uint _encounterSequence;
+    private readonly HashSet<ulong> _awaitingArrival = new HashSet<ulong>();
+    private readonly List<ulong> _arrivedClientIds = new List<ulong>();
+    private Coroutine _ackTimeout;
+
+    /// <summary>서버 전용. 유효 참가자 전원이 도착을 적용했을 때 한 번 발화한다.</summary>
+    public event Action<IReadOnlyList<ulong>> AlivePlayersArrived;
+
+    /// <summary>서버 전용. ACK 타임아웃 또는 참가자 전멸로 도착이 무효화됐을 때 발화한다.</summary>
+    public event Action ArrivalAborted;
+
     public static BossTeleportManager Instance { get; private set; }
+
+    /// <summary>카운트다운 또는 도착 대기가 진행 중인지 — 재진입 카운트다운을 막는 데 쓴다.</summary>
+    public bool IsEncounterBusy => _pending != null || _awaitingArrival.Count > 0;
 
     /// <summary>존 안에 생존 플레이어가 있는지 (모든 피어에서 유효 — 범위 표시가 읽는다).</summary>
     public bool IsOccupied => _occupied.Value;
@@ -66,10 +94,58 @@ public class BossTeleportManager : NetworkBehaviour
         Instance = this;
     }
 
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+
+        if (!IsServer)
+            return;
+
+        ResolveArrivalPoints();
+        NetworkManager.OnClientDisconnectCallback += HandleClientDisconnected;
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        if (IsServer && NetworkManager != null)
+            NetworkManager.OnClientDisconnectCallback -= HandleClientDisconnected;
+
+        base.OnNetworkDespawn();
+    }
+
     public override void OnDestroy()
     {
         if (Instance == this) Instance = null;
         base.OnDestroy();
+    }
+
+    /// <summary>도착 지점은 bossroom 프리팹 인스턴스 안에 있으므로 씬에서 이름으로 회수한다.</summary>
+    private void ResolveArrivalPoints()
+    {
+        if (arrivalPoints != null && arrivalPoints.Length > 0)
+            return;
+
+        if (arrivalPointsRoot == null)
+        {
+            GameObject found = GameObject.Find("PlayerArrivalPoints");
+            if (found != null)
+                arrivalPointsRoot = found.transform;
+        }
+
+        if (arrivalPointsRoot == null)
+        {
+            Edit.LogWarning(
+                "[BossTeleport] PlayerArrivalPoints를 찾지 못해 폴백 산개로 이동한다. " +
+                "bossroom 프리팹에 도착 지점을 배치하고 인스펙터에 연결할 것.", this);
+            return;
+        }
+
+        var points = new List<Transform>(arrivalPointsRoot.childCount);
+        for (int i = 0; i < arrivalPointsRoot.childCount; i++)
+            points.Add(arrivalPointsRoot.GetChild(i));
+
+        arrivalPoints = points.ToArray();
+        Edit.Log($"[BossTeleport] 도착 지점 {arrivalPoints.Length}개 회수.", this);
     }
 
     /// <summary>
@@ -83,7 +159,8 @@ public class BossTeleportManager : NetworkBehaviour
 
         if (occupied)
         {
-            if (_pending != null) return;
+            // 연출/도착 대기 중에는 재진입 카운트다운을 만들지 않는다.
+            if (IsEncounterBusy) return;
             _teleportAt.Value = NetworkManager.ServerTime.Time + countdownSeconds;
             _pending = StartCoroutine(TeleportAfter(countdownSeconds));
             Edit.Log($"[BossTeleport] 카운트다운 시작 — {countdownSeconds:0}초 후 생존자 전원 보스룸 이동.", this);
@@ -109,7 +186,8 @@ public class BossTeleportManager : NetworkBehaviour
     {
         if (!IsServer) return;
 
-        int index = 0;
+        // ClientId 오름차순 정렬 — 슬롯 배정이 결정적이어야 재현·디버깅이 가능하다.
+        var alive = new List<ulong>();
         foreach (NetworkClient client in NetworkManager.ConnectedClientsList)
         {
             NetworkObject playerObject = client.PlayerObject;
@@ -119,26 +197,66 @@ public class BossTeleportManager : NetworkBehaviour
             Unit unit = playerObject.GetComponent<Unit>();
             if (unit == null || unit.CurrentHealth <= 0) continue;
 
-            Vector3 destination = GetScatterPosition(index++);
+            alive.Add(client.ClientId);
+        }
+
+        alive.Sort();
+
+        if (alive.Count == 0)
+        {
+            Edit.LogWarning("[BossTeleport] 생존자가 없어 이동을 취소한다.", this);
+            AbortArrival();
+            return;
+        }
+
+        _encounterSequence++;
+        _awaitingArrival.Clear();
+        _arrivedClientIds.Clear();
+
+        for (int slot = 0; slot < alive.Count; slot++)
+        {
+            ulong clientId = alive[slot];
+            NetworkObject playerObject = NetworkManager.ConnectedClients[clientId].PlayerObject;
+            GetArrivalPose(slot, out Vector3 destination, out Quaternion rotation);
+
+            _awaitingArrival.Add(clientId);
 
             // 서버가 오너가 아닌(클라이언트 소유) NetworkTransform에 Teleport를 호출하면 예외가 발생하여 루프가 중단됨.
             // 따라서 서버(호스트) 본인 것만 여기서 처리하고, 클라이언트는 아래 RPC 내부에서 각자 처리하도록 변경.
             if (playerObject.IsOwner && playerObject.TryGetComponent(out NetworkTransform netTransform))
-                netTransform.Teleport(destination, playerObject.transform.rotation, playerObject.transform.localScale);
+                netTransform.Teleport(destination, rotation, playerObject.transform.localScale);
 
-            TeleportOwnerClientRpc(destination, new ClientRpcParams
+            TeleportOwnerClientRpc(destination, rotation, _encounterSequence, new ClientRpcParams
             {
-                Send = new ClientRpcSendParams { TargetClientIds = new[] { client.ClientId } }
+                Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } }
             });
+
+            Edit.Log($"[BossTeleport] 슬롯 {slot} 배정 — clientId={clientId}, seq={_encounterSequence}", this);
         }
 
-        Edit.Log($"[BossTeleport] 생존자 {index}명 보스룸 이동 완료 @ {transform.position}", this);
+        if (_ackTimeout != null) StopCoroutine(_ackTimeout);
+        _ackTimeout = StartCoroutine(AwaitArrivalAck(_encounterSequence));
+    }
+
+    /// <summary>전원 ACK가 오지 않으면 전투를 강행하지 않고 복구한다.</summary>
+    private IEnumerator AwaitArrivalAck(uint sequence)
+    {
+        yield return new WaitForSeconds(arrivalAckTimeoutSeconds);
+        _ackTimeout = null;
+
+        if (sequence != _encounterSequence || _awaitingArrival.Count == 0)
+            yield break;
+
+        Edit.LogWarning(
+            $"[BossTeleport] 도착 ACK 타임아웃 — {_awaitingArrival.Count}명 미응답. 전투를 시작하지 않는다.", this);
+        AbortArrival();
     }
 
     // 오너 로컬에서도 위치를 강제 — 오너 권한 이동 구성에서 서버 텔레포트가 되돌려지는 것 방지.
     // 도착 직후 페이드인 시작(이동 직전 암전은 로컬에서 만료 시각 기준 선제 진행).
     [ClientRpc]
-    private void TeleportOwnerClientRpc(Vector3 destination, ClientRpcParams rpcParams = default)
+    private void TeleportOwnerClientRpc(
+        Vector3 destination, Quaternion rotation, uint sequence, ClientRpcParams rpcParams = default)
     {
         NetworkObject playerObject = NetworkManager.LocalClient?.PlayerObject;
         if (playerObject == null) return;
@@ -146,27 +264,108 @@ public class BossTeleportManager : NetworkBehaviour
         if (playerObject.TryGetComponent(out Rigidbody rb))
         {
             rb.linearVelocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
             rb.position = destination;
+            rb.rotation = rotation;
         }
-        playerObject.transform.position = destination;
+        playerObject.transform.SetPositionAndRotation(destination, rotation);
 
         // 클라이언트 본인(오너) 권한으로 NetworkTransform 순간이동 처리
         if (playerObject.TryGetComponent(out NetworkTransform netTransform))
         {
-            netTransform.Teleport(destination, playerObject.transform.rotation, playerObject.transform.localScale);
+            netTransform.Teleport(destination, rotation, playerObject.transform.localScale);
         }
 
         _fadeAlpha = 1f;
         _fadingIn = true;
+
+        // 적용 완료를 서버에 통보 — 서버는 전원 ACK 이후에만 다음 단계로 넘어간다.
+        ArrivalAppliedServerRpc(sequence);
     }
 
-    private Vector3 GetScatterPosition(int index)
+    /// <summary>도착 적용 ACK. sender가 대기 집합에 있고 sequence가 일치할 때만 수락한다(중복 무시).</summary>
+    [ServerRpc(RequireOwnership = false)]
+    private void ArrivalAppliedServerRpc(uint sequence, ServerRpcParams rpcParams = default)
     {
-        if (index == 0 || scatterRadius <= 0f)
-            return transform.position;
+        ulong sender = rpcParams.Receive.SenderClientId;
 
-        float angle = index * 137f * Mathf.Deg2Rad; // 황금각 산개 — 인원수 몰라도 겹침 최소
-        return transform.position + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * scatterRadius;
+        if (sequence != _encounterSequence || !_awaitingArrival.Remove(sender))
+            return;
+
+        _arrivedClientIds.Add(sender);
+        Edit.Log($"[BossTeleport] 도착 ACK — clientId={sender}, 남은 {_awaitingArrival.Count}명", this);
+
+        if (_awaitingArrival.Count > 0)
+            return;
+
+        CompleteArrival();
+    }
+
+    private void CompleteArrival()
+    {
+        if (_ackTimeout != null)
+        {
+            StopCoroutine(_ackTimeout);
+            _ackTimeout = null;
+        }
+
+        _arrivedClientIds.Sort();
+        Edit.Log($"[BossTeleport] 참가자 {_arrivedClientIds.Count}명 도착 완료 @ {transform.position}", this);
+        AlivePlayersArrived?.Invoke(_arrivedClientIds);
+    }
+
+    private void AbortArrival()
+    {
+        if (_ackTimeout != null)
+        {
+            StopCoroutine(_ackTimeout);
+            _ackTimeout = null;
+        }
+
+        _awaitingArrival.Clear();
+        _arrivedClientIds.Clear();
+        _teleportAt.Value = 0d;
+        ArrivalAborted?.Invoke();
+    }
+
+    /// <summary>대기 중 이탈 처리. 남은 대기자가 0이면 도착한 사람으로 진행하고, 아무도 없으면 취소한다.</summary>
+    private void HandleClientDisconnected(ulong clientId)
+    {
+        if (!IsServer || !_awaitingArrival.Remove(clientId))
+            return;
+
+        Edit.Log($"[BossTeleport] 대기 중 이탈 — clientId={clientId}, 남은 {_awaitingArrival.Count}명", this);
+
+        if (_awaitingArrival.Count > 0)
+            return;
+
+        if (_arrivedClientIds.Count > 0)
+            CompleteArrival();
+        else
+            AbortArrival();
+    }
+
+    private void GetArrivalPose(int slot, out Vector3 position, out Quaternion rotation)
+    {
+        if (arrivalPoints != null && slot < arrivalPoints.Length && arrivalPoints[slot] != null)
+        {
+            Transform point = arrivalPoints[slot];
+            position = point.position;
+            rotation = point.rotation;
+            return;
+        }
+
+        // 폴백 — 지점이 없거나 인원이 지점보다 많을 때만. 황금각 산개로 겹침을 줄인다.
+        rotation = transform.rotation;
+
+        if (slot == 0 || scatterRadius <= 0f)
+        {
+            position = transform.position;
+            return;
+        }
+
+        float angle = slot * 137f * Mathf.Deg2Rad;
+        position = transform.position + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * scatterRadius;
     }
 
     // 로컬 페이드 진행 — 이동 대상(생존한 본인)만 만료 직전 암전, 취소 시 복구.
