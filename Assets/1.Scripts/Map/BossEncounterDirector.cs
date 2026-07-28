@@ -93,6 +93,7 @@ public sealed class BossEncounterDirector : NetworkBehaviour
     private ChargeController _chargeController;
     private JumpController _jumpController;
     private NavMeshAgent _bossAgent;
+    private SpawnPointer _bossSpawnPointer;
 
     private Vector3 _descendFrom;
     private Vector3 _descendTo;
@@ -325,6 +326,21 @@ public sealed class BossEncounterDirector : NetworkBehaviour
         // 연출 착지가 전투 판정·장판을 만들지 않게 한다.
         _jumpController?.SetCinematicLandingMode(true);
 
+        // ⚠️ BT가 "복귀/중앙 위치"로 쓰는 SpawnPoint는 프리팹 기본값 (0,0,0)이고 아무도 채우지 않는다.
+        // KMKScene은 아레나가 원점이라 우연히 맞았지만, 보스룸은 맵 밖 좌표(x≈500)라 그대로 두면
+        // 충전 페이즈에서 보스가 월드 원점으로 이동해 맵 밖으로 사라진다. 착지점(=방 중앙)으로 채운다.
+        if (_bossSpawnPointer != null)
+        {
+            _bossSpawnPointer.SetSpawnPoint(landing);
+            Edit.Log($"[BossEncounter] 보스 SpawnPoint를 방 중앙 {landing}으로 설정.", this);
+        }
+        else
+        {
+            Edit.LogWarning(
+                "[BossEncounter] 보스에 SpawnPointer가 없습니다 — BT의 복귀 위치가 (0,0,0)으로 남아 " +
+                "충전 페이즈에서 맵 밖으로 이동할 수 있습니다.", this);
+        }
+
         // 충전 기둥은 스폰 이후에 주입해야 ChargeController의 서버 게이트를 통과한다.
         InjectChargingObjects();
         SubscribeBossDeath();
@@ -345,6 +361,7 @@ public sealed class BossEncounterDirector : NetworkBehaviour
         _chargeController = bossInstance.GetComponentInChildren<ChargeController>(true);
         _jumpController = bossInstance.GetComponentInChildren<JumpController>(true);
         _bossAgent = bossInstance.GetComponent<NavMeshAgent>();
+        _bossSpawnPointer = bossInstance.GetComponentInChildren<SpawnPointer>(true);
 
         if (_bossUnit == null)
             Edit.LogError("[BossEncounter] 보스에 Unit이 없어 사망(클리어) 판정을 연결할 수 없습니다.", this);
@@ -534,6 +551,7 @@ public sealed class BossEncounterDirector : NetworkBehaviour
         _chargeController = null;
         _jumpController = null;
         _bossAgent = null;
+        _bossSpawnPointer = null;
     }
 
     private void PruneEligible()
