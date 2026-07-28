@@ -411,6 +411,9 @@ public class BossBase : Unit
 
         OnDeath(); // 드롭/보상/처치연출 확장 훅(단일 지점).
 
+        // 세션 통계(처치 수)용 통보. 구독자가 없으면 아무 일도 하지 않는다.
+        MonsterDeathEvents.RaiseServerMonsterDied(this);
+
         // 디졸브 연출이 있으면 재생 후 디스폰, 없으면 지연 후 디스폰.
         IDeathEffect fx = GetComponent<IDeathEffect>();
         if (fx != null)

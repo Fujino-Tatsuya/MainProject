@@ -40,30 +40,17 @@ public static class MapColliderAuthoring
                     if (!IsFloorOrWall(mf))
                         continue;
 
-                    bool isStair = IsStair(mf);
-                    Collider existing = mf.GetComponent<Collider>();
-
-                    if (existing != null)
-                    {
-                        // 기존 콜라이더는 유지(수동 저작 존중)하되, 계단만 예외로 볼록 승격한다.
-                        if (isStair && existing is MeshCollider existingMesh && !existingMesh.convex)
-                        {
-                            existingMesh.convex = true;
-                            added++;
-                            Debug.Log($"[MapColliderAuthoring] 계단 볼록 승격: {mf.gameObject.name}");
-                        }
+                    // 계단은 이 패스에서 제외한다 — 별도 메뉴(Rebuild Stair Ramp Colliders)가
+                    // 경사면 BoxCollider로 대체한다. 여기서 MeshCollider를 붙이면 램프와 겹쳐
+                    // 턱이 되살아난다.
+                    if (IsStair(mf))
                         continue;
-                    }
 
-                    var collider = mf.gameObject.AddComponent<MeshCollider>(); // sharedMesh는 MeshFilter에서 자동 참조
+                    // 이미 어떤 콜라이더든 있으면 유지(수동 저작 존중).
+                    if (mf.GetComponent<Collider>() != null)
+                        continue;
 
-                    // 계단을 실제 메시(턱 있는 형상)로 두면 Rigidbody 캡슐이 턱에 막혀 못 올라간다.
-                    // 플레이어 이동은 MovePosition 기반이라 CharacterController의 stepOffset 같은
-                    // 계단 오르기 보정이 없다. 볼록 껍질을 씌우면 계단 위를 잇는 램프가 되어
-                    // 걸어 올라갈 수 있고 NavMesh 베이크에도 유리하다.
-                    if (isStair)
-                        collider.convex = true;
-
+                    mf.gameObject.AddComponent<MeshCollider>(); // sharedMesh는 MeshFilter에서 자동 참조
                     added++;
                 }
 
@@ -106,7 +93,126 @@ public static class MapColliderAuthoring
         return false;
     }
 
-    // 계단 판정 — 볼록 승격 대상. 경사로(slope)는 이미 램프라 원본 메시 그대로 둔다.
+    const string RampChildName = "__StairRampCollider";
+
+    // 계단은 콜라이더를 계단 형상에 맞추지 않고 경사면(램프) 하나로 대체한다.
+    // 보이는 건 계단 그대로지만 물리적으로는 slope와 동일해져서, stepOffset 보정이 없는
+    // Rigidbody 이동으로도 걸어 올라갈 수 있다. 볼록 승격만으로는 부족했다(계단 밑단
+    // 수직면이 남아 캡슐이 걸린다).
+    [MenuItem("Tools/Map/Authoring/Rebuild Stair Ramp Colliders")]
+    public static void RebuildStairRamps()
+    {
+        string[] guids = AssetDatabase.FindAssets("t:Prefab", new[] { TargetFolder });
+        int prefabsChanged = 0, rampsBuilt = 0;
+
+        foreach (string guid in guids)
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            GameObject root = PrefabUtility.LoadPrefabContents(path);
+            int built = 0;
+
+            try
+            {
+                foreach (MeshFilter mf in root.GetComponentsInChildren<MeshFilter>(true))
+                {
+                    if (PrefabUtility.IsPartOfPrefabInstance(mf.gameObject))
+                        continue;
+                    if (!IsStair(mf) || mf.sharedMesh == null)
+                        continue;
+                    if (BuildRamp(mf))
+                        built++;
+                }
+
+                if (built > 0)
+                {
+                    PrefabUtility.SaveAsPrefabAsset(root, path);
+                    prefabsChanged++;
+                    rampsBuilt += built;
+                    Debug.Log($"[MapColliderAuthoring] {path} — 계단 램프 {built}개 생성.");
+                }
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(root);
+            }
+        }
+
+        Debug.Log($"[MapColliderAuthoring] 계단 램프 완료 — 프리팹 {prefabsChanged}개, 램프 {rampsBuilt}개.");
+    }
+
+    static bool BuildRamp(MeshFilter mf)
+    {
+        Bounds bounds = mf.sharedMesh.bounds;
+
+        // 오르는 방향 찾기 — 각 수평축으로 반씩 나눠 위쪽 절반의 최고 높이를 비교한다.
+        MeasureAscent(mf.sharedMesh, bounds, out bool alongX, out float sign);
+
+        float run = alongX ? bounds.size.x : bounds.size.z;
+        float width = alongX ? bounds.size.z : bounds.size.x;
+        float rise = bounds.size.y;
+        if (run <= Mathf.Epsilon || rise <= Mathf.Epsilon)
+            return false;
+
+        float angle = Mathf.Atan2(rise, run) * Mathf.Rad2Deg;
+        const float thickness = 0.5f;
+        float length = Mathf.Sqrt(run * run + rise * rise);
+
+        // 계단 원본 콜라이더는 제거 — 램프와 동시에 존재하면 턱이 그대로 남는다.
+        foreach (Collider stale in mf.GetComponents<Collider>())
+            Object.DestroyImmediate(stale);
+
+        Transform existing = mf.transform.Find(RampChildName);
+        if (existing != null)
+            Object.DestroyImmediate(existing.gameObject);
+
+        var rampGo = new GameObject(RampChildName);
+        rampGo.transform.SetParent(mf.transform, false);
+
+        // 램프 표면이 저점 바닥에서 고점 상단까지 이어지도록 중앙에 놓고 기울인다.
+        Vector3 center = bounds.center;
+        center.y = bounds.min.y + rise * 0.5f;
+        rampGo.transform.localPosition = center;
+        rampGo.transform.localRotation = alongX
+            ? Quaternion.Euler(0f, 0f, angle * sign)
+            : Quaternion.Euler(-angle * sign, 0f, 0f);
+
+        var box = rampGo.AddComponent<BoxCollider>();
+        box.size = alongX
+            ? new Vector3(length, thickness, width)
+            : new Vector3(width, thickness, length);
+        box.center = new Vector3(0f, -thickness * 0.5f, 0f); // 상단면이 램프면
+
+        Debug.Log($"[MapColliderAuthoring] 램프 {mf.gameObject.name} — " +
+                  $"{(alongX ? "X" : "Z")}축 {(sign > 0 ? "+" : "-")}, {angle:F1}도, 길이 {length:F2}");
+        return true;
+    }
+
+    // 위쪽 절반과 아래쪽 절반의 최고 정점 높이를 비교해 오르는 축·방향을 판정한다.
+    static void MeasureAscent(Mesh mesh, Bounds bounds, out bool alongX, out float sign)
+    {
+        Vector3[] vertices = mesh.vertices;
+        float xLow = float.NegativeInfinity, xHigh = float.NegativeInfinity;
+        float zLow = float.NegativeInfinity, zHigh = float.NegativeInfinity;
+
+        foreach (Vector3 v in vertices)
+        {
+            if (v.x < bounds.center.x) xLow = Mathf.Max(xLow, v.y);
+            else xHigh = Mathf.Max(xHigh, v.y);
+
+            if (v.z < bounds.center.z) zLow = Mathf.Max(zLow, v.y);
+            else zHigh = Mathf.Max(zHigh, v.y);
+        }
+
+        float xDelta = xHigh - xLow;
+        float zDelta = zHigh - zLow;
+
+        alongX = Mathf.Abs(xDelta) > Mathf.Abs(zDelta);
+        sign = Mathf.Sign(alongX ? xDelta : zDelta);
+        if (sign == 0f)
+            sign = 1f;
+    }
+
+    // 계단 판정 — 램프 대체 대상. 경사로(slope)는 이미 램프라 원본 메시 그대로 둔다.
     static bool IsStair(MeshFilter mf)
     {
         if (mf.gameObject.name.ToLowerInvariant().Contains("stair"))

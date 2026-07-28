@@ -220,7 +220,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 10303, guid: 0000000000000000f000000000000000, type: 0}
+  - {fileID: 2100000, guid: 90e3d4838edeec849922152c6957442f, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -841,6 +841,10 @@ MonoBehaviour:
   fallbackSoulMaterial: {fileID: 2100000, guid: 17e5fe2e91824d55a7bfa0e7d6d8d824, type: 2}
   hurtboxColliders: []
   soulMoveSpeed: 5
+  hoverProbeDistance: 6
+  hoverGroundMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
 --- !u!114 &800000000000000022
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -870,8 +874,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d42e8f7c6a1b4d3e9f205718ac64be90, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerReviveController
+  ShowTopMostFoldoutHeaderGroup: 1
   lifeCycle: {fileID: 800000000000000020}
   gameRule: {fileID: 0}
+  debugReviveKey: 103
 --- !u!114 &8829839017192280447
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1156,14 +1162,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 284160916278146353, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
       propertyPath: m_WarningMessage
-      value: "\nBinding warning: Some generic clip(s) animate transforms that are
-        already bound by a Humanoid avatar. These transforms can only be changed by
-        Humanoid clips.\n\tTransform 'Right_ThumbIntermediate'\n\tTransform 'Left_LowerArm'\n\tTransform
-        'Chest'\n\tTransform 'Right_ThumbDistal'\n\tTransform 'Spine'\n\tTransform
-        'Right_Foot'\n\tTransform 'Right_Toes'\n\tTransform 'Right_LowerLeg'\n\tTransform
-        'UpperChest'\n\tTransform 'Left_Toes'\n\tand more ...\n\tFrom animation clip
-        'Stand_Idle_A_1'\n\tFrom animation clip 'Walk_A_F'\n\tFrom animation clip
-        '1Hand_Base_Shield_Block_Parry_2'"
+      value: 
       objectReference: {fileID: 0}
     - target: {fileID: 6129863144953294667, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
       propertyPath: m_LocalPosition.x

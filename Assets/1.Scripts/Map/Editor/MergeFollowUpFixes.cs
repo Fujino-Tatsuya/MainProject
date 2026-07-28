@@ -75,6 +75,233 @@ public static class MergeFollowUpFixes
                   $"충돌 유지 레이어: {string.Join(", ", SolidLayers)} / 나머지 전부 무시.");
     }
 
+    const string GameManagerPrefabPath = "Assets/2.Prefabs/Managers/GameManager.prefab";
+
+    // 씬 재편(MainFlow) 이후 GameManager가 들고 있던 씬 이름이 낡아 LoadScene이 실패한다.
+    // GoToResult / GoToLobby / 타이틀 복귀가 전부 이 값으로 SceneManager.LoadScene을 호출한다.
+    static readonly (string field, string value)[] SceneNameFixes =
+    {
+        ("titleSceneName", "1.TitleScene"),
+        ("lobbySceneName", "3.BeaverLobby"),
+        ("resultSceneName", "5.ResultScene"),
+    };
+
+    [MenuItem("Tools/Map/Authoring/[1회용] 사망→Result→로비 사이클 배선")]
+    public static void WireResultCycle()
+    {
+        if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+            return;
+
+        FixGameManagerSceneNames();
+        AddWipeWatcherToMapScene();
+    }
+
+    static void FixGameManagerSceneNames()
+    {
+        GameObject root = PrefabUtility.LoadPrefabContents(GameManagerPrefabPath);
+        try
+        {
+            var manager = root.GetComponentInChildren<GameManager>(true);
+            if (manager == null)
+            {
+                Debug.LogError("[MergeFollowUp] GameManager 컴포넌트를 찾지 못했다.");
+                return;
+            }
+
+            var so = new SerializedObject(manager);
+            int changed = 0;
+            foreach ((string field, string value) in SceneNameFixes)
+            {
+                SerializedProperty prop = so.FindProperty(field);
+                if (prop == null)
+                {
+                    Debug.LogWarning($"[MergeFollowUp] 필드 '{field}'를 찾지 못했다.");
+                    continue;
+                }
+
+                if (prop.stringValue == value)
+                    continue;
+
+                Debug.Log($"[MergeFollowUp] {field}: '{prop.stringValue}' -> '{value}'");
+                prop.stringValue = value;
+                changed++;
+            }
+
+            if (changed > 0)
+            {
+                so.ApplyModifiedPropertiesWithoutUndo();
+                PrefabUtility.SaveAsPrefabAsset(root, GameManagerPrefabPath);
+                Debug.Log($"[MergeFollowUp] GameManager 씬 이름 {changed}건 수정.");
+            }
+            else
+            {
+                Debug.Log("[MergeFollowUp] GameManager 씬 이름은 이미 최신.");
+            }
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    static void AddWipeWatcherToMapScene()
+    {
+        Scene scene = EditorSceneManager.OpenScene(MapScenePath, OpenSceneMode.Single);
+        int added = 0;
+
+        if (Object.FindFirstObjectByType<PartyWipeWatcher>(FindObjectsInactive.Include) == null)
+        {
+            new GameObject(nameof(PartyWipeWatcher)).AddComponent<PartyWipeWatcher>();
+            added++;
+            Debug.Log("[MergeFollowUp] PartyWipeWatcher 배치 — 전원 PermanentDead면 Result로 전환.");
+        }
+
+        if (Object.FindFirstObjectByType<SessionStatsTracker>(FindObjectsInactive.Include) == null)
+        {
+            new GameObject(nameof(SessionStatsTracker)).AddComponent<SessionStatsTracker>();
+            added++;
+            Debug.Log("[MergeFollowUp] SessionStatsTracker 배치 — 생존 시간·처치 수 집계.");
+        }
+
+        if (added == 0)
+        {
+            Debug.Log("[MergeFollowUp] MapScene 통계·전멸 감시자는 이미 배치됨.");
+            return;
+        }
+
+        EditorSceneManager.MarkSceneDirty(scene);
+        EditorSceneManager.SaveScene(scene);
+    }
+
+    const string ResultScenePath = "Assets/0.Scenes/MainFlow/5.ResultScene.unity";
+
+    // ResultScene에는 GotoLobby 버튼만 있고 결과 표시가 없었다.
+    // 클리어 여부 / 생존 시간 / 처치 수 세 줄을 만들고 ResultStatsView를 붙인다.
+    [MenuItem("Tools/Map/Authoring/[1회용] Result 결과 표시 UI 생성")]
+    public static void BuildResultStatsUI()
+    {
+        if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+            return;
+
+        Scene scene = EditorSceneManager.OpenScene(ResultScenePath, OpenSceneMode.Single);
+
+        if (Object.FindFirstObjectByType<ResultStatsView>(FindObjectsInactive.Include) != null)
+        {
+            Debug.Log("[MergeFollowUp] ResultStatsView 이미 존재.");
+            return;
+        }
+
+        Canvas canvas = null;
+        foreach (Canvas candidate in Object.FindObjectsByType<Canvas>(
+                     FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            if (candidate.transform.parent == null)
+            {
+                canvas = candidate;
+                break;
+            }
+        }
+
+        if (canvas == null)
+        {
+            Debug.LogError("[MergeFollowUp] ResultScene에서 루트 Canvas를 찾지 못했다.");
+            return;
+        }
+
+        var container = new GameObject("ResultStats", typeof(RectTransform));
+        container.transform.SetParent(canvas.transform, false);
+        var containerRect = (RectTransform)container.transform;
+        containerRect.anchorMin = new Vector2(0.5f, 0.5f);
+        containerRect.anchorMax = new Vector2(0.5f, 0.5f);
+        containerRect.anchoredPosition = new Vector2(0f, 120f);
+        containerRect.sizeDelta = new Vector2(600f, 260f);
+
+        CreateStatText(containerRect, "Text_Outcome", 64f, 80f);
+        CreateStatText(containerRect, "Text_Survival", 34f, 0f);
+        CreateStatText(containerRect, "Text_Kills", 34f, -50f);
+
+        container.AddComponent<ResultStatsView>();
+
+        EditorSceneManager.MarkSceneDirty(scene);
+        EditorSceneManager.SaveScene(scene);
+        Debug.Log("[MergeFollowUp] Result 결과 표시 UI 생성 — 위치·서체는 인스펙터에서 조정할 것.");
+    }
+
+    static void CreateStatText(RectTransform parent, string name, float fontSize, float y)
+    {
+        var go = new GameObject(name, typeof(RectTransform));
+        go.transform.SetParent(parent, false);
+
+        var rect = (RectTransform)go.transform;
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = new Vector2(0f, y);
+        rect.sizeDelta = new Vector2(600f, fontSize * 1.6f);
+
+        var text = go.AddComponent<TMPro.TextMeshProUGUI>();
+        text.fontSize = fontSize;
+        text.alignment = TMPro.TextAlignmentOptions.Center;
+        text.text = name;
+    }
+
+    const string PlayerPrefabPath = "Assets/2.Prefabs/Player/Player.prefab";
+    const string CorpseMaterialPath = "Assets/3.Materials/Player/MA_CorpsePlaceholder.mat";
+
+    // 시체 플레이스홀더가 자홍색으로 보이던 문제.
+    // 빌트인 Default-Material(guid 0000..f000..)을 쓰고 있었는데, 그 셰이더는 URP에서
+    // 지원되지 않아 자홍색 폴백으로 렌더된다. URP Lit 머티리얼로 교체한다.
+    [MenuItem("Tools/Map/Authoring/[1회용] 시체 플레이스홀더 머티리얼 (URP)")]
+    public static void FixCorpsePlaceholderMaterial()
+    {
+        Material material = AssetDatabase.LoadAssetAtPath<Material>(CorpseMaterialPath);
+        if (material == null)
+        {
+            Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+            if (shader == null)
+            {
+                Debug.LogError("[MergeFollowUp] URP Lit 셰이더를 찾을 수 없어 중단한다.");
+                return;
+            }
+
+            string folder = System.IO.Path.GetDirectoryName(CorpseMaterialPath).Replace('\\', '/');
+            if (!AssetDatabase.IsValidFolder(folder))
+                AssetDatabase.CreateFolder("Assets/3.Materials", "Player");
+
+            material = new Material(shader);
+            material.color = new Color(0.35f, 0.32f, 0.30f); // 임시 시체 색
+            AssetDatabase.CreateAsset(material, CorpseMaterialPath);
+            Debug.Log($"[MergeFollowUp] 머티리얼 생성: {CorpseMaterialPath}");
+        }
+
+        GameObject root = PrefabUtility.LoadPrefabContents(PlayerPrefabPath);
+        try
+        {
+            int changed = 0;
+            foreach (MeshRenderer renderer in root.GetComponentsInChildren<MeshRenderer>(true))
+            {
+                if (renderer.gameObject.name != "CorpseVisualPlaceholder")
+                    continue;
+
+                renderer.sharedMaterial = material;
+                changed++;
+            }
+
+            if (changed > 0)
+            {
+                PrefabUtility.SaveAsPrefabAsset(root, PlayerPrefabPath);
+                Debug.Log($"[MergeFollowUp] CorpseVisualPlaceholder 머티리얼 교체 {changed}건.");
+            }
+            else
+            {
+                Debug.LogWarning("[MergeFollowUp] CorpseVisualPlaceholder를 찾지 못했다.");
+            }
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
     static int EnsureLayer(string layerName)
     {
         int existing = LayerMask.NameToLayer(layerName);
