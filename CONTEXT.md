@@ -38,11 +38,46 @@ Update this file when a term becomes important enough that future agents or team
     (생성맵에서 지면 스킬 전면 차단).
 - 검증: Unity 배치모드 컴파일 **error CS 0**, MapScene 댕글링 참조 0 / 미싱 스크립트 0.
 
+### 이어서 완료 — Play 검증 피드백 반영 (`dec1eb3`·`f990c73`·`35aa703`)
+
+**★ 이번 세션 최대 교훈: dash-soul 시스템들은 "씬마다 하나씩 배치"를 전제하고, 없으면
+예외 없이 조용히 비활성화된다.** 증상만 보면 기능 버그로 보인다. MapScene에 배치한 것:
+`FallBoundarySettings`(추락 감지) · `PlayerDashValidationManager`(대시 서버 검증) ·
+`Temp_MultiGameRule`(부활 규칙) · `PartyWipeWatcher` · `SessionStatsTracker`.
+
+- **콜라이더**: 바닥 82개(머티리얼 이름 판정 추가 — 아트가 `Cube.209` 식으로 내보내 이름
+  필터로 안 잡혔다). **계단은 경사면 BoxCollider로 대체** — 계단 형상 콜라이더는 Rigidbody
+  캡슐이 턱에 걸린다(`stepOffset` 보정 없음). 보이는 건 계단 그대로.
+- **경사 등판**: `PlayerMovement`가 수평 벡터를 그대로 `MovePosition`에 넣어 경사면에 파고들었다.
+  접지 중이면 지면 노멀 평면에 투영하도록 수정.
+- **Soul**: `Soul` 레이어 신설(16) + `Soul`/`Corpse` 충돌을 `Default`/`Ground`/`Wall`/`Env`로
+  제한. 어비스 위에서는 `useGravity`를 꺼 부유(속도만 0으로는 중력이 재가속시킨다).
+- **낙사**: `ServerFallDeath` 구독자가 0이어서 사망 시 몸이 추락 지점에 남았다 → 안전지점 복귀.
+- **사이클**: 전멸(=전원 `PermanentDead`) → Result → 로비. 결과 = `SessionResult` +
+  `SessionStatsTracker`(생존 시간·처치 수) + `ResultStatsView`. 처치 수는
+  `MonsterBase`/`BossBase` 사망 지점의 `MonsterDeathEvents`로 집계.
+- **시체 자홍색**: 빌트인 `Default-Material`은 URP 미지원 → URP Lit로 교체.
+- `GameManager.prefab`의 씬 이름이 리네임 전 값이었다(BootStrap 인스턴스는 이미 정상이라
+  정식 플로우는 무영향, MapScene 직접 Play만 실패). 프리팹 최신화.
+
 ### 다음 작업
 
-1. **MapScene Play 검증** — 맵 생성 → 이동/충돌(경사로 포함) → dash/soul 동작 → 콘솔 확인.
-2. 이상 없으면 push. 롤백 지점 = `backup/pre-dash-soul-merge`(`caaef90`).
-3. 이후 soul 상태 관련 후속 작업(못 가는 구역 처리 등)을 이 브랜치에서 이어간다.
+1. **남은 도구 2개 실행** — `[1회용] 사망→Result→로비 사이클 배선`(SessionStatsTracker 추가분),
+   `[1회용] Result 결과 표시 UI 생성`. 실행 후 결과 화면 위치·서체 조정 필요.
+2. **보스** — 승인된 계획 `Docs/superpowers/plans/2026-07-24-boss-encounter-intro.md` 착수.
+   투명 경계·NavMesh·추락 방지가 §8에 포함. 보스 격파 시
+   `SessionStatsTracker.Active.Capture(cleared: true)` 연결로 클리어 판정이 붙는다.
+3. **미구현으로 확인된 것**: dash HUD 위젯(충전 개수·재충전 게이지), 로딩바 보간,
+   RMB 스킬(`FirstMeleeInterruptSkill` 구현체 자체가 없음), Result 결과 UI 서체·배치.
+4. push 안 된 상태. 롤백 지점 = `backup/pre-dash-soul-merge`(`caaef90`).
+
+### 확인만 하고 넘긴 것
+
+- **로비 Ready**: 호스트는 자동 Ready + GameStart 버튼, 클라이언트만 Ready — **의도된 설계**.
+- `ProjectSettings/DynamicsManager.asset`이 serializedVersion 13 → 23으로 포맷 마이그레이션됨
+  (Unity가 저장 시 재작성). 신규 필드는 전부 기본값이지만 팀원 pull 시 통째로 바뀐 diff를 본다.
+- 몬스터 루트 레이어가 제각각(ChompBot=19 이름없는 레이어, SpinnerBot·WallBot=0). 콜라이더는
+  전부 Enemy(8)라 현재 증상은 없으나 레이어 마스크 로직에서 물릴 수 있다.
 
 ### 주의 — SVN meta
 
