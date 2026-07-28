@@ -74,6 +74,19 @@ Update this file when a term becomes important enough that future agents or team
   씬에 올린다. 로컬인 `BoxCollider.center`에 그대로 넣으면 전체가 밀린다(1차 실행에서 Z≈109).
   (로컬 로그 `Docs/_local/lessons.md` #18 — 팀 공유 대상 아님)
 
+### 진행 중 (2026-07-28 이어서) — 승인 계획서 전제 갱신 완료
+
+`Docs/superpowers/plans/2026-07-24-boss-encounter-intro.md`에 **Revised Premises 9항** 추가.
+Task 1·Task 7(경계 부분) 완료 표시, 씬 경로(`MainFlow/4.MapScene`) 전면 수정, Task 2를
+"기존 `GameplayAccess` 게이트 확장 + dash/fall/life 차단"으로 재작성, Task 3에 클리어 판정
+(`Unit.Died` → `Capture(cleared: true)`)과 `PartyWipeWatcher` 경합 항목 추가.
+
+**다음 = Task 2**(플레이어 연출 잠금). 수정 예정 파일 = `1.Scripts/Player/{PlayerEncounterLock.cs(신규),
+PlayerInputReader, PlayerStateController, PlayerMovement, DefaultAttackController, Player,
+PlayerDashController, Skill/PlayerSkillController, Fall/PlayerFallController,
+Life/PlayerLifeCycleController, Life/PlayerLifeInputPolicy}`, `1.Scripts/Unit/StatusEffectController.cs`,
+`2.Prefabs/Player/Player.prefab`. ⚠️ 플레이어 계통은 은희 담당 영역 — 동시 수정 주의.
+
 ### ▶ 다음 세션 시작점
 
 **증상: 보스룸으로 이동은 되는데 보스가 안 나온다 — 정상이다.** MapScene에는 보스를 스폰하는

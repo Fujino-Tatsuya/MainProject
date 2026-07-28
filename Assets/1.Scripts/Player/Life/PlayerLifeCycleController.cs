@@ -42,12 +42,21 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
     public event Action<PlayerLifeState, PlayerLifeState> LifeStateChanged;
     public event Action<PlayerLifeGameplayAccess> GameplayAccessChanged;
 
-    private bool CanWriteLifeState => IsSpawned && IsServer;
+    private bool CanWriteLifeState => IsSpawned && IsServer && !IsCinematicLocked;
     private bool deathResolutionPending;
     private double deathResolutionDeadlineServerTime;
+    private PlayerEncounterLock encounterLock;
+    private bool deferredDeathWhileLocked;
+
+    /// <summary>
+    /// 연출 잠금 중에는 생명주기 전이를 동결한다. 피해는 무적 토큰이 이미 막지만,
+    /// 추락·부활 타이머 같은 다른 경로가 연출 도중 상태를 바꾸면 참가자 집합이 깨진다.
+    /// </summary>
+    private bool IsCinematicLocked => encounterLock != null && encounterLock.IsCinematicLocked;
 
     private void Awake()
     {
+        encounterLock = GetComponent<PlayerEncounterLock>();
         ResolveLocalReferences();
         ResolveGameRuleReference();
     }
@@ -64,6 +73,9 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
             SubscribeToDeathSource();
             if (gameRule != null)
                 gameRule.TryRegisterClient(OwnerClientId);
+
+            if (encounterLock != null)
+                encounterLock.CinematicLockChanged += HandleCinematicLockChanged;
         }
 
         // 초기 복제값도 후속 Visual/Input/Hurtbox 소비자가 한 번 적용할 수 있게 알린다.
@@ -73,7 +85,12 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
     public override void OnNetworkDespawn()
     {
         UnsubscribeFromDeathSource();
+
+        if (encounterLock != null)
+            encounterLock.CinematicLockChanged -= HandleCinematicLockChanged;
+
         deathResolutionPending = false;
+        deferredDeathWhileLocked = false;
         lifeState.OnValueChanged -= HandleLifeStateChanged;
         base.OnNetworkDespawn();
     }
@@ -169,10 +186,33 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
 
     private void HandleUnitDied()
     {
-        if (!CanWriteLifeState)
+        if (!IsSpawned || !IsServer)
             return;
 
+        // Unit.Died는 _deathNotified로 래치되어 재발행되지 않는다. 연출 중 들어온 사망 신호를
+        // 그냥 버리면 HP 0인데 Alive로 남는 좀비가 되므로 잠금 해제 시점까지 보류한다.
+        if (IsCinematicLocked)
+        {
+            deferredDeathWhileLocked = true;
+            return;
+        }
+
         TryBeginDeathPresentation(PlayerDeathCause.Combat);
+    }
+
+    private void HandleCinematicLockChanged(bool isLocked)
+    {
+        if (isLocked || !deferredDeathWhileLocked || !IsSpawned || !IsServer)
+            return;
+
+        deferredDeathWhileLocked = false;
+
+        if (!TryBeginDeathPresentation(PlayerDeathCause.Combat))
+        {
+            Debug.LogError(
+                "[SoulAlert] 연출 중 보류한 사망을 해제 후에도 처리하지 못했습니다.",
+                this);
+        }
     }
 
     private void ScheduleDeathResolution()

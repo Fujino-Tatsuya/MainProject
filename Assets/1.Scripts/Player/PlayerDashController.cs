@@ -47,6 +47,7 @@ public class PlayerDashController : NetworkBehaviour
     private PlayerMovement movement;
     private StatusEffectController statusEffects;
     private PlayerInvulnerability invulnerability;
+    private PlayerEncounterLock encounterLock;
 
     private DashRuntimeConfig config;
     private DashChargeLedger predictedLedger;
@@ -73,6 +74,7 @@ public class PlayerDashController : NetworkBehaviour
         movement = GetComponent<PlayerMovement>();
         statusEffects = GetComponent<StatusEffectController>();
         invulnerability = GetComponent<PlayerInvulnerability>();
+        encounterLock = GetComponent<PlayerEncounterLock>();
         if (groundingSensor == null)
             groundingSensor = GetComponent<PlayerGroundingSensor>();
 
@@ -156,13 +158,17 @@ public class PlayerDashController : NetworkBehaviour
         if (!IsSpawned || !IsServer || PlayerDashValidationManager.Instance == null)
             return;
 
+        // 연출 잠금은 "행동 불가"로 스냅샷에 남긴다 — 요청 시점 스냅샷으로 검증하는 구조라
+        // 잠금 구간에 찍힌 요청은 뒤늦게 도착해도 CrowdControlled로 거부된다.
+        bool cinematicLocked = encounterLock != null && encounterLock.IsCinematicLocked;
+
         PlayerDashValidationManager.Instance.CaptureSnapshot(
             NetworkObjectId,
             ServerNow(),
             grounded: groundingSensor == null || groundingSensor.IsGrounded,
             dead: false,           // TODO: PlayerLifeCycle(soul 병합)·Unit 사망 신호 배선
             soul: false,           // TODO: soul 병합 후
-            crowdControlled: statusEffects != null && statusEffects.BlocksMovement,
+            crowdControlled: cinematicLocked || (statusEffects != null && statusEffects.BlocksMovement),
             landingProtected: false); // TODO: W5 착지 보호
     }
 
@@ -217,7 +223,9 @@ public class PlayerDashController : NetworkBehaviour
             ServerNow(), rttSeconds, rttAvailable,
             currentDead: false,
             currentSoul: false,
-            currentCrowdControlled: statusEffects != null && statusEffects.BlocksMovement);
+            currentCrowdControlled:
+                (encounterLock != null && encounterLock.IsCinematicLocked) ||
+                (statusEffects != null && statusEffects.BlocksMovement));
 
         // 승인되고 실제 대시가 진행될 때만 서버 권한 무적을 남은 대시 시간만큼 부여한다. (PLAN §11)
         if (invulnerability != null &&

@@ -17,6 +17,9 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
     private IPlayerState currentState;
     private PlayerStateContext context;
 
+    // 연출 잠금(Cinematic) 중에는 상태 전이 자체를 막는다. SetState 경로(대시/넉백/그랩)도 함께 차단한다.
+    private bool cinematicLocked;
+
     public PlayerActionState CurrentState => currentState?.StateType ?? PlayerActionState.Idle;
     public bool CanMove => (CurrentState == PlayerActionState.Idle || CurrentState == PlayerActionState.Move || AllowsSkillMovement) && !context.StatusEffects.BlocksMovement;
     public bool CanMovementRotate => (CurrentState == PlayerActionState.Idle || CurrentState == PlayerActionState.Move || AllowsSkillMovementRotate) && !context.StatusEffects.BlocksMovement;
@@ -121,10 +124,10 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
         return true;
     }
 
-    // 슈퍼아머 거부는 Unit.Knockback 공통 진입점에서 처리 — 여기서는 사망만 거부한다
+    // 슈퍼아머 거부는 Unit.Knockback 공통 진입점에서 처리 — 여기서는 사망·연출 잠금만 거부한다
     public bool BeginKnockback(Vector3 direction, float strength)
     {
-        if (CurrentState == PlayerActionState.Dead)
+        if (CurrentState == PlayerActionState.Dead || cinematicLocked)
             return false;
 
         SetState(new PlayerKnockbackState(context, direction, strength));
@@ -148,10 +151,45 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
             ChangeState(PlayerActionState.Idle);
     }
 
+    /// <summary>
+    /// 연출 잠금 진입. <see cref="PlayerEncounterLock"/>이 전 피어에서 호출한다(복제된 잠금 값 기준).
+    /// 진행 중이던 상태의 Exit 정리는 그대로 돌고, 이후 모든 전이는 <see cref="EndCinematic"/>까지 막힌다.
+    /// 사망 상태는 잠금보다 우선한다 — 연출 참가자는 생존자만이라 정상 경로에서는 발생하지 않는다.
+    /// </summary>
+    public bool BeginCinematic()
+    {
+        if (CurrentState == PlayerActionState.Dead)
+            return false;
+
+        if (cinematicLocked)
+            return true;
+
+        cinematicLocked = true;
+        SetState(CreateState(PlayerActionState.Cinematic));
+        return true;
+    }
+
+    /// <summary>연출 잠금 해제 후 Idle 복귀. 잠금이 없으면 아무것도 하지 않는다.</summary>
+    public bool EndCinematic()
+    {
+        if (!cinematicLocked)
+            return false;
+
+        cinematicLocked = false;
+
+        if (CurrentState == PlayerActionState.Cinematic)
+            ChangeState(PlayerActionState.Idle);
+
+        return true;
+    }
+
+    /// <summary>연출 잠금 여부(로컬 FSM 기준). 권위 값은 <see cref="PlayerEncounterLock"/>가 갖는다.</summary>
+    public bool IsCinematicLocked => cinematicLocked;
+
     // Dash는 방향·속도·지속시간이 필수라 인스턴스 주입 경로로만 진입한다. (예측 게이트는 PlayerDashController가 확인)
     public bool BeginDash(Vector3 planarDirection, float speed, float duration, DashMotionSettings motion)
     {
-        if (CurrentState == PlayerActionState.Dead)
+        if (CurrentState == PlayerActionState.Dead || cinematicLocked)
             return false;
 
         SetState(new PlayerDashState(context, planarDirection, speed, duration, motion));
@@ -185,6 +223,10 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
         if (CurrentState == PlayerActionState.Dead)
             return false;
 
+        // 연출 잠금 중에는 어떤 상태로도 나가지 못한다. 해제는 EndCinematic만 할 수 있다.
+        if (cinematicLocked)
+            return false;
+
         return nextState switch
         {
             PlayerActionState.Attack => CanAttack && context.DefaultAttack.CanStartApprovedAttack,
@@ -210,6 +252,7 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
             PlayerActionState.Interrupt => new PlayerInterruptState(context),
             PlayerActionState.Grabbed => new PlayerGrabbedState(context),
             PlayerActionState.Dead => new PlayerLockedState(context, PlayerActionState.Dead),
+            PlayerActionState.Cinematic => new PlayerLockedState(context, PlayerActionState.Cinematic),
             _ => new PlayerIdleState(context)
         };
     }
@@ -226,7 +269,8 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
     private bool CanReceiveGrab(GrabInteractionContext grabContext)
     {
         return CurrentState != PlayerActionState.Dead &&
-            CurrentState != PlayerActionState.Grabbed;
+            CurrentState != PlayerActionState.Grabbed &&
+            !cinematicLocked;
     }
 
     private bool CanReceiveServerInteraction()
@@ -267,7 +311,10 @@ public enum PlayerActionState
     Knockback,
     Dead,
     Skill,
-    Dash
+    Dash,
+
+    /// <summary>보스 등장 등 연출 잠금. 서버가 PlayerEncounterLock으로 진입·해제한다.</summary>
+    Cinematic
 }
 
 public sealed class PlayerStateContext
