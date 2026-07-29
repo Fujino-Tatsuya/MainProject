@@ -397,6 +397,9 @@ Life/PlayerLifeCycleController, Life/PlayerLifeInputPolicy}`, `1.Scripts/Unit/St
   충전 장부 epoch/revision 불일치.
 - **거부가 로그 0줄이었다**(조용한 실패). 경고를 추가했다 → 다음 Play에서
   `[Dash] 서버가 대시를 취소했습니다 — approved=… / reason=… / 남은시간=… / 권한충전=…` 한 줄로 확정된다.
+- ⏩ **후속 결론은 아래 「3. 대시 — 쿨타임 결함 3건 수정 완료」 참조.** 여기 적힌 후보 중
+  `NoFreshSnapshot`은 확정되지 않았고, 실제로 잡힌 것은 "거부 시 충전 미환불 + 스냅샷 기준 충전 판정 +
+  오프라인 멈춘 시계" 3건이다.
 
 ### ▶ 부수 발견 (미처리, 보고만)
 
@@ -415,19 +418,87 @@ Life/PlayerLifeCycleController, Life/PlayerLifeInputPolicy}`, `1.Scripts/Unit/St
   카브(`ZoneBridgeGate` 의 `BridgeGapCarve`)가 안 먹으면 다리가 물러난 구간이 walkable로 남는다.
   Play에서 그 오브젝트가 생성되는지, 크기가 다리 구간을 덮는지 먼저 확인할 것.
 
-**2. 민경 팀원 커밋 3개 받기 (`origin/feature/Boss`)**
-- `89bc9e1`(페이즈별 Page SO) · `e61999d`(SO 리스트 통합) · `9a2cad0`(넉백 SO + BossScene 리네임).
-- 팀장이 민경에게 **커밋 추가 요청**해둘 예정 → 받은 뒤 머지. 상세 분석·리스크는 이 문서 위쪽
-  「⚠️⚠️ 위 권고는 무효」 절 참조.
+**2. 민경 팀원 커밋 받기 (`origin/feature/Boss`) — 커밋 추가 도착, 총 13개 ahead**
+- 기존 3개(`89bc9e1` 페이즈별 Page SO · `e61999d` SO 리스트 통합 · `9a2cad0` 넉백 SO + BossScene 리네임)에
+  더해 `465a934`(몬스터 시간 제어 HitStop/SlowMotion + `WaitForAnimState` BT 노드) ·
+  `01fd648`(`SetNumberWithTag` onlyCountRoot) · `677ffc4`(No.23 BT 그래프) · `63242b2`(maxRageCount 2→5).
+- 팀장 방침(2026-07-29): **feature/Boss 쪽을 권위로 받고 내 로컬 수정본은 폐기**한다.
+- 상세 분석·리스크는 이 문서 위쪽 「⚠️⚠️ 위 권고는 무효」 절 참조.
+
+**2-a. 🔴 머지로 유실되는 내 작업 — 머지 후 다시 해야 함 (팀장 지시로 기록)**
+
+프리팹 YAML은 수동 머지하지 않는다(GUID/fileID 깨짐 위험). Boss 쪽을 통째로 받고 아래를 재작업한다.
+
+| 대상 | 유실되는 내 작업 | 근거 커밋 |
+|---|---|---|
+| `Bomb.prefab` | 폭탄 비주얼을 아트 모델로 교체 | `1b13d6e` |
+| `TwentyThree.prefab` | **생성맵에서 보스 피격 가능 + 지면 인식** (맞으면 빨갛게 되는 처리 포함) | `60f3862` |
+| `TwentyThree.prefab` | 미사용 `maxShield` 직렬화 제거(재저장) | `1271b85` |
+| `Wells.prefab` | 루트에 `NetworkObject` 추가 (dirty, 커밋 안 됨) | — |
+
+- Boss 쪽도 같은 파일을 만졌다: `18befc0`·`89bc9e1`·`e61999d`·`9dbdf8c`·`9a2cad0`·`465a934`.
+  → `Bomb.prefab`/`TwentyThree.prefab`은 **양쪽 커밋 충돌**이므로 "theirs" 채택 시 위 3건이 사라진다.
+- `Wells.prefab`의 `NetworkObject`는 **HEAD에도 Boss에도 없다.** 그런데 Wells는 오래전부터
+  `DefaultNetworkPrefabs.asset`에 등록돼 있다(`6e2c783`) → 지금 레포는 "네트워크 프리팹으로 등록됐지만
+  `NetworkObject`가 없는" 무효 상태다(`TwentyThree.prefab`은 갖고 있다). 머지 후 인스펙터로 재부착하고
+  별도 커밋할 것. 민경과 담당 경계 확인 필요.
+- `CommonMeleeRobot.asset` dirty(내 로컬 1032줄)는 BT 리세이브 churn → `git checkout --`으로 폐기하고
+  Boss 쪽 1828줄을 받는다. `0.BootStrapScene.unity` dirty는 **내용 차이 0**(개행 변환뿐), 팀장 지시로 보존.
 - 🔴 **머지 전 필수**: `git status`로 `Assets/8.BehaviorTreeGraph/*` dirty 확인 → dirty면 `git checkout --`으로
   폐기. Unity가 리컴파일마다 재직렬화하므로 계속 되살아난다. 커밋하면 민경의 11k줄을 덮어쓴다.
 - 🔴 **`git add -A` 금지** — 위 BT 에셋이 섞여 들어간다(이번 세션에 실제로 한 번 섞여 amend로 제거).
 
-**3. 대시 — 다음 Play 1회로 확정 (로그 심어둠)**
-- `TryBeginPredictedDash`의 게이트 5개에 사유 로그를 넣었다. Shift 한 번이면 반드시 한 줄 나온다.
-- 유력: `[Dash] 시작 불가: 충전 없음 0/1, 다음 충전까지 N초` → `maxCharge 1 / rechargeDuration 2`는
-  `feature/dash-soul` 원본값이고 머지 유실 아님. 그러면 **버그가 아니라 밸런스 결정**(maxCharge 상향 여부).
-- 서버 거부 로그(`서버가 대시를 취소했습니다`)가 안 뜬 것이 단서였다 — 거부 경로가 아니라 시작 자체가 안 됨.
+**3. 대시 — 쿨타임 결함 3건 수정 완료 (2026-07-29 후속, Play 검증 대기)**
+
+팀장 판단("1회 제한이 아니라 쿨타임이 안 돈다")이 맞았다. `DashChargeLedger`의 회복 계산 자체는
+정상이고(별도 콘솔 하네스로 실행 검증), 문제는 **쿨타임이 리셋/동결되는 경로**였다.
+
+- **(1) 거부 시 예측 충전이 환불되지 않았다** — 오너는 입력 순간 소비로 `Revision`을 올리고, 거부한
+  서버는 소비를 안 해 `Revision`이 더 낮다. 그래서 응답의 권한 충전값이 `SyncToAuthoritative`의
+  과거-리비전 가드에 걸려 **조용히 버려졌다**. 결과: 거부 1회 = 대시 안 나가고 재충전 2초는 통째 손실.
+  → `DashChargeLedger.ForceAdoptAuthoritative`(리비전 무시 채택) 추가, 거부 경로에서만 사용.
+  잔여시간은 응답의 `nextChargeReadyServerTime`을 오너 도메인으로 환산해 이식한다.
+- **(2) 충전 유무를 과거 스냅샷으로 판정했다** — `snapshot.ChargeCount`는 마지막 물리 tick 값이라
+  회복 경계 직후에는 아직 0이다. 충전은 서버만 바꾸는 자원이라 지연보정할 이유가 없다(오탐만 생긴다).
+  → `DashValidationPolicy.Validate`에 `authoritativeChargeCount` 파라미터 추가, 현재 서버 장부로 판정.
+- **(3) 오프라인 Play에서 시계가 멈춰 충전이 영구히 회복되지 않았다** — `NetworkClock`은 세션이 안 돌면
+  `LocalNow`/`ServerNow`를 **상수 0**으로 돌려준다. 그런데 `OwnerNow()`는 `Instance != null`만 보고
+  폴백을 결정했다 → 프리팹은 씬에 있고 세션은 안 켠 상태(예: `PlayerDashTest` 단독 Play)에서
+  `Advance(0.0)`만 반복 → **대시 딱 1회**. → `NetworkClock.IsRunning` 추가하고 그걸로 폴백 판단.
+- 부수: 서버 충전 소비 시각을 RPC 도착시각 → **추정 입력시각**으로 옮겼다(오너/서버 회복 시점 정렬).
+
+⚠️ **반증된 가설 (기록용)**: "원격 클라는 오너가 서버보다 먼저 회복해서 경계 입력이 구조적으로
+NoCharge 거부된다"— 12초 시뮬레이션으로 반증됐다. 승인 응답의 `SyncToAuthoritative`가 오너 타이머를
+**응답 도착 시점**으로 재시작하기 때문에 오너는 항상 서버보다 RTT만큼 **늦다**. 부작용으로 오너
+체감 쿨타임 = `rechargeDuration + RTT`(100ms RTT면 2.1초)다. 지금은 안전한 방향이라 그대로 뒀다.
+
+- 남은 검증: Play 1회. 성공 경로에도 로그를 넣었으므로
+  `[Dash] 시작 — 남은충전 n/1, 재충전 2.00s, now=…, 시계=NetworkClock|Time.timeAsDouble` 한 줄이 뜬다.
+  **`시계=Time.timeAsDouble`로 찍히면 (3)의 상황**이고, 간격이 2초보다 훨씬 길면 아직 다른 원인이 있다.
+- EditMode 테스트: 정책 2건·장부 3건 추가(`DashValidationPolicyTests`·`DashChargeLedgerTests`).
+  에디터가 열려 있어 Test Runner 배치 실행은 못 했고, 대신 순수 로직 파일을 `dotnet`으로 떼어
+  같은 단정을 실제 실행해 전부 통과 확인했다. **Test Runner 실행은 아직 안 했다.**
+
+**3-a. 보스룸 진입 경사(`Env_object_bossroomenter`) 콜라이더 — 완료 (2026-07-29)**
+
+- 증상: 보스룸 진입 4방향 경사를 못 올라간다. 콜라이더가 없었다(lessons #29 재발).
+- 원인 = **두 저작 경로가 모두 놓치는 사각지대**. 이 오브젝트는 존 프리팹 안의 **fbx 모델 프리팹
+  인스턴스**다. ① fbx 임포터 `addColliders: 0`이라 모델 쪽에서 안 붙고, ② `MapColliderAuthoring`의
+  `AddFloorWallColliders`는 `IsPartOfPrefabInstance`면 건너뛴다(원본 프리팹에서 1회 붙이는 전제인데,
+  여기서 원본은 fbx라 컴포넌트를 붙일 수 없다). 이름 필터(`floor/wall/hallway/slope/stair`)에도
+  `Env_object_*`는 소품으로 분류돼 안 걸린다.
+- 조치: 새 메뉴 `Tools/Map/Authoring/Add MeshColliders to Walkable Model Instances`.
+  허용목록(`bossroomenter`) − 제외목록(`_mv_`)으로만 동작한다. **엘리베이터
+  `Env_object_MV_bossroomenter`는 이동 플랫폼이라 의도적으로 제외**(팀장 확인).
+  fbx `.meta`는 SVN 관리라 임포터 설정을 못 건드리므로 git 쪽(존 프리팹)에 인스턴스 오버라이드로 붙였다.
+- 형상 실측(면적 가중, 삼각형 법선): 위쪽 면이 **0~10도 7% / 20~30도 84% / 30~40도 8% → 전부 60도 이하.**
+  완경사라 MeshCollider(비볼록)로 충분하고 계단식 램프 박스 대체는 불필요하다.
+  ⚠️ bounds(rise/run)로 각도를 추정하면 헛값이 나온다(첫 시도 65.8도 — 중앙 구조물 높이를 경사로 착각).
+  도구가 이제 각도 분포를 로그로 남긴다.
+- ⚠️ **부수효과 주의**: 이 계열 도구는 `Assets/2.Prefabs/Map` 전체를 `LoadPrefabContents`로 순회하는데,
+  그 과정에서 **중첩 프리팹 에셋의 루트 위치가 0으로 정규화**되는 일이 있다(이번에 `bossroom.prefab`의
+  루트가 `(6.199, 0, 108.774)` → `(0,0,0)`으로 바뀌어 되돌렸다). MapScene 인스턴스는 위치 오버라이드를
+  3축 다 갖고 있어 영향은 없었지만, **도구 실행 후 `git status`로 의도 외 프리팹 변경을 확인할 것.**
 
 **4. 미착수 (오후 목표 잔여)**
 - 벤트에서 증기 나옴

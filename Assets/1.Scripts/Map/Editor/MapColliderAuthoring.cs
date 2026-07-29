@@ -232,6 +232,164 @@ public static class MapColliderAuthoring
         return false;
     }
 
+    // 2026-07-29 추가: fbx 모델 프리팹 인스턴스로 배치된 "밟고 올라가는" 지오메트리에 MeshCollider 부착.
+    //
+    // 배경 — 이건 위 두 패스가 모두 놓치는 사각지대다:
+    //  (a) fbx 임포터 addColliders=0 → 모델 쪽에서 안 붙는다.
+    //  (b) AddFloorWallColliders는 IsPartOfPrefabInstance면 건너뛴다(원본 프리팹에서 1회 붙이는
+    //      전제). 그런데 여기서 원본은 **fbx 모델 프리팹**이라 컴포넌트를 붙일 수 없다.
+    // 실제 증상: Env_object_bossroomenter(보스룸 진입 4방향 경사)를 못 올라간다. 콜라이더가
+    // 없으면 NavMesh에도 안 올라간다 — "보인다"는 "지오메트리가 있다"가 아니다.
+    //
+    // fbx .meta는 SVN 관리라 임포터 설정 변경은 팀장 SVN 커밋을 기다려야 한다. 그래서 git 쪽인
+    // 존 프리팹에 인스턴스 오버라이드(컴포넌트 추가)로 붙인다.
+    //
+    // 허용목록 방식만 쓴다 — 이름에 걸리는 것만 붙인다. 엘리베이터(Env_object_MV_bossroomenter)는
+    // 타고 올라가는 게 아니라 이동 플랫폼이므로 반드시 제외한다.
+    static readonly string[] WalkableModelInstanceNames = { "bossroomenter" };
+    static readonly string[] ModelInstanceExclusions = { "_mv_" };
+
+    [MenuItem("Tools/Map/Authoring/Add MeshColliders to Walkable Model Instances")]
+    public static void AddWalkableModelInstanceColliders()
+    {
+        string[] guids = AssetDatabase.FindAssets("t:Prefab", new[] { TargetFolder });
+        int prefabsChanged = 0, collidersAdded = 0, skippedExcluded = 0;
+
+        foreach (string guid in guids)
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            GameObject root = PrefabUtility.LoadPrefabContents(path);
+            int added = 0;
+
+            try
+            {
+                foreach (MeshFilter mf in root.GetComponentsInChildren<MeshFilter>(true))
+                {
+                    string lower = mf.gameObject.name.ToLowerInvariant();
+
+                    if (!ContainsAny(lower, WalkableModelInstanceNames))
+                        continue;
+
+                    if (ContainsAny(lower, ModelInstanceExclusions))
+                    {
+                        skippedExcluded++;
+                        continue;
+                    }
+
+                    // 진단은 멱등하게 항상 돌린다 — 이미 콜라이더가 붙은 뒤에도 기울기를 다시 확인할 수 있어야 한다.
+                    LogUpwardFaceAngles(mf);
+
+                    if (mf.GetComponent<Collider>() != null)
+                        continue; // 이미 있으면 수동 저작 존중
+
+                    var mc = mf.gameObject.AddComponent<MeshCollider>();
+                    mc.sharedMesh = mf.sharedMesh; // 인스턴스에선 자동 참조가 비는 경우가 있어 명시
+                    added++;
+                }
+
+                if (added > 0)
+                {
+                    PrefabUtility.SaveAsPrefabAsset(root, path);
+                    prefabsChanged++;
+                    collidersAdded += added;
+                    Debug.Log($"[MapColliderAuthoring] {path} — 모델 인스턴스 MeshCollider {added}개 부착.");
+                }
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(root);
+            }
+        }
+
+        Debug.Log($"[MapColliderAuthoring] 모델 인스턴스 완료 — 프리팹 {prefabsChanged}개, " +
+                  $"콜라이더 {collidersAdded}개 부착, 제외(엘리베이터 등) {skippedExcluded}개.");
+    }
+
+    // 위를 향한 면들의 실제 기울기 분포를 면적 가중으로 집계해 남긴다.
+    //
+    // ⚠️ bounds(rise/run)로 각도를 추정하면 안 된다 — 이 메시처럼 중앙 구조물이 높고 주변에 낮은
+    // 램프가 붙은 형상에서는 전혀 다른 값이 나온다(실제로 첫 시도에서 65.8도라는 헛값이 나왔다).
+    // 등판각(PlayerGameRuleData.MaxWalkableSlopeAngle, 기본 60도) 초과 면만 있으면 콜라이더를
+    // 붙여도 못 올라가므로, 램프 박스 대체가 필요한지 여기서 판단한다.
+    static void LogUpwardFaceAngles(MeshFilter mf)
+    {
+        Mesh mesh = mf.sharedMesh;
+        if (mesh == null)
+        {
+            Debug.LogWarning($"[MapColliderAuthoring] {mf.gameObject.name} — sharedMesh가 없어 각도 측정 생략.", mf);
+            return;
+        }
+
+        if (!mesh.isReadable)
+        {
+            Debug.LogWarning($"[MapColliderAuthoring] {mf.gameObject.name} — 메시가 isReadable=false라 " +
+                             "각도 측정 불가(임포터에서 Read/Write 활성 필요). 콜라이더는 붙었다.", mf);
+            return;
+        }
+
+        Vector3 scale = mf.transform.lossyScale;
+        Vector3[] v = mesh.vertices;
+        int[] tris = mesh.triangles;
+
+        // 10도 버킷(0~90). 값은 그 버킷에 속한 위쪽 면의 총 면적.
+        var areaByBucket = new float[10];
+        float upwardArea = 0f;
+
+        for (int i = 0; i < tris.Length; i += 3)
+        {
+            Vector3 a = Vector3.Scale(v[tris[i]], scale);
+            Vector3 b = Vector3.Scale(v[tris[i + 1]], scale);
+            Vector3 c = Vector3.Scale(v[tris[i + 2]], scale);
+
+            Vector3 cross = Vector3.Cross(b - a, c - a);
+            float area = cross.magnitude * 0.5f;
+            if (area <= 1e-6f)
+                continue;
+
+            Vector3 normal = cross / (area * 2f);
+            if (normal.y <= 0.01f)
+                continue; // 위를 향하지 않는 면(벽·아랫면)은 밟는 대상이 아니다
+
+            float angle = Mathf.Acos(Mathf.Clamp01(normal.y)) * Mathf.Rad2Deg;
+            int bucket = Mathf.Clamp((int)(angle / 10f), 0, 9);
+            areaByBucket[bucket] += area;
+            upwardArea += area;
+        }
+
+        if (upwardArea <= 0f)
+        {
+            Debug.LogWarning($"[MapColliderAuthoring] {mf.gameObject.name} — 위를 향한 면이 없다. " +
+                             "밟을 수 있는 지오메트리가 아닐 수 있다.", mf);
+            return;
+        }
+
+        var report = new System.Text.StringBuilder();
+        float walkableArea = 0f;
+        for (int i = 0; i < areaByBucket.Length; i++)
+        {
+            if (areaByBucket[i] <= 0f)
+                continue;
+
+            report.Append($"{i * 10}~{i * 10 + 10}도:{areaByBucket[i] / upwardArea * 100f:F0}% ");
+            if (i * 10 + 10 <= 60)
+                walkableArea += areaByBucket[i];
+        }
+
+        Debug.Log($"[MapColliderAuthoring] {mf.gameObject.name} — 위쪽 면 기울기 분포(면적비): {report}" +
+                  $"→ 60도 이하 = {walkableArea / upwardArea * 100f:F0}%. " +
+                  (walkableArea / upwardArea > 0.2f
+                      ? "걸어 올라갈 면이 충분하다 → MeshCollider로 처리 가능."
+                      : "⚠️ 완경사 면이 거의 없다 → 램프 박스 대체 검토 필요."), mf);
+    }
+
+    static bool ContainsAny(string lowerName, string[] keywords)
+    {
+        foreach (string k in keywords)
+            if (lowerName.Contains(k))
+                return true;
+        return false;
+    }
+
     // 2026-07-29 추가: 현재 열려있는 씬의 Level_wall_hallway 자식들에게 MeshCollider 부착
     [MenuItem("Tools/Map/Authoring/Add MeshColliders to Active Scene (Level_wall_hallway)")]
     public static void AddMeshCollidersToActiveSceneHallway()
