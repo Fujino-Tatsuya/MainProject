@@ -162,6 +162,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 5795541321776209706}
+  - component: {fileID: 8099867436302166808}
   m_Layer: 0
   m_Name: bossroom
   m_TagString: Untagged
@@ -253,6 +254,29 @@ Transform:
   - {fileID: 7214256352383163521}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &8099867436302166808
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3404462435022388304}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a6979139d4fb4c3429f28088a51b3728, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BossArenaContext
+  bossLandingPoint: {fileID: 6127362525628137612}
+  bossArea: {fileID: 3840767119752862971}
+  playerArrivalPoints:
+  - {fileID: 8570872663885675172}
+  - {fileID: 3914392976097328152}
+  - {fileID: 6603621056323436876}
+  chargingPillars:
+  - {fileID: 3221511134861534754}
+  - {fileID: 6562377548359998151}
+  - {fileID: 5085897276421390087}
+  - {fileID: 7190623343084418001}
 --- !u!1 &4439133027132039482
 GameObject:
   m_ObjectHideFlags: 0

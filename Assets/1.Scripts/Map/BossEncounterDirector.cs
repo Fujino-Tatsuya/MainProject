@@ -18,7 +18,7 @@ using UnityEngine.AI;
 /// </list>
 ///
 /// 씬에 하나만 배치한다(MapScene 상주 NetworkObject). MapScene에는 보스를 스폰하는 다른 주체가
-/// 없어야 한다 — <c>TwentyThreeArenaContext</c>는 KMKScene·PlayerBossTest 전용이다.
+/// 없어야 한다 — <c>TwentyThreeArenaContext</c>는 BossScene·PlayerBossTest 전용이다.
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class BossEncounterDirector : NetworkBehaviour
@@ -44,8 +44,11 @@ public sealed class BossEncounterDirector : NetworkBehaviour
     [Tooltip("착지 후 전투 시작까지 정지 시간(초).")]
     [SerializeField, Min(0f)] private float impactHoldSeconds = 0.9f;
 
-    [Header("충전 기둥 (bossroom)")]
-    [Tooltip("보스룸 충전 기둥. 정확히 4개를 넣는다. 보스 스폰 직후 ChargeController에 주입한다.")]
+    [Header("아레나 (bossroom)")]
+    [Tooltip("보스룸이 자기 부품을 들고 있는 컴포넌트. 비우면 씬에서 찾는다(정상 = 1개).")]
+    [SerializeField] private BossArenaContext arena;
+
+    [Tooltip("보스룸 충전 기둥. 비우면 arena에서 가져온다. 보스 스폰 직후 ChargeController에 주입한다.")]
     [SerializeField] private List<ChargingObject> chargingObjects = new List<ChargingObject>();
 
     [Header("클리어 판정")]
@@ -166,8 +169,22 @@ public sealed class BossEncounterDirector : NetworkBehaviour
         if (mapSceneManager == null)
             mapSceneManager = FindFirstObjectByType<MapSceneManager>();
 
+        // 아레나 부품(착지점·BossArea·충전 기둥)은 bossroom 프리팹이 스스로 들고 있다.
+        // 그래서 씬 배선이 비어 있어도 여기서 채워진다 — 저작 도구가 기준점을 재생성해 참조가
+        // 끊기거나, bossroom을 다른 씬에 인스턴스화해도 동작한다.
+        if (arena == null)
+            arena = BossArenaContext.FindInScene(this);
+
+        if (bossLandingPoint == null && arena != null)
+            bossLandingPoint = arena.BossLandingPoint;
+
+        // 이름 전역검색은 최후 폴백으로만 남긴다 — 씬에 동명 오브젝트가 둘이면 어느 것을 잡을지
+        // 보장이 없다(아레나 좌표가 맵 밖 x≈500이라 잘못 잡으면 보스가 엉뚱한 곳으로 내려온다).
         if (bossLandingPoint == null)
             bossLandingPoint = FindLandingPointByName();
+
+        if (chargingObjects.Count == 0 && arena != null)
+            chargingObjects.AddRange(arena.ChargingPillars);
     }
 
     private static Transform FindLandingPointByName()
@@ -187,15 +204,74 @@ public sealed class BossEncounterDirector : NetworkBehaviour
             Edit.LogError("[BossEncounter] 착지점(BossLandingPoint)을 찾지 못했습니다.", this);
 
         chargingObjects.RemoveAll(o => o == null);
-        if (chargingObjects.Count != ChargePillarCount)
+
+        if (arena != null)
         {
-            Edit.LogWarning(
-                $"[BossEncounter] 충전 기둥이 {chargingObjects.Count}개입니다(기대 {ChargePillarCount}). " +
-                "충전 패턴이 인원수만큼 활성되지 않을 수 있습니다.", this);
+            // 기둥 개수·콜라이더·NetworkObject·BossArea 태그는 아레나가 자기 부품에 대해 검사한다
+            // (부품의 소유자가 검사도 소유한다 — 두 곳에서 검사하면 메시지가 갈라진다).
+            arena.Validate();
         }
+        else
+        {
+            if (chargingObjects.Count != ChargePillarCount)
+                Edit.LogWarning(
+                    $"[BossEncounter] 충전 기둥이 {chargingObjects.Count}개입니다(기대 {ChargePillarCount}). " +
+                    "충전 패턴이 인원수만큼 활성되지 않을 수 있습니다.", this);
+
+            // 기둥은 활성 상태에서만 콜라이더를 켜서 피격을 받는다(ChargingObject.SetColliderEnabled).
+            // 콜라이더가 아예 없으면 예외 없이 조용히 무적이 되어 충전 패턴을 깰 수 없다.
+            foreach (ChargingObject pillar in chargingObjects)
+                if (pillar.GetComponent<Collider>() == null)
+                    Edit.LogError(
+                        $"[BossEncounter] 충전 기둥 '{pillar.name}'에 Collider가 없습니다 — 피격되지 않아 " +
+                        "충전 패턴을 깰 수 없습니다.", pillar);
+        }
+
+        // 씬 전역 중복은 아레나가 아니라 여기서 본다 — BT의 FindObjectWithTag는 씬 전체를 훑는다.
+        ValidateBossAreaTag();
     }
 
     private const int ChargePillarCount = 4;
+    private const string BossAreaTag = "BossArea";
+
+    /// <summary>
+    /// No.23 BT는 <c>BossArea</c>를 블랙보드로 주입받지 않는다 — <c>FindObjectWithTagAction</c>으로
+    /// 태그 <c>BossArea</c>를 씬에서 직접 찾아 <c>SetEnableBoxColliderAction</c>으로 켠다
+    /// (<c>8.BehaviorTreeGraph/Boss/Wells&amp;No.23/No.23.asset</c>). 그래서 Director가 주입할 것은 없다.
+    ///
+    /// 다만 태그가 0개면 BT가 null을 잡고, 2개 이상이면 <b>어느 것을 잡을지 보장이 없다</b>
+    /// (씬 순회 순서에 의존). 두 경우 모두 증상은 "보스 패턴이 이상하다"로만 나타나 원인 추적이
+    /// 오래 걸리므로 여기서 소리내어 잡는다. BossScene의 BossArea를 MapScene으로 복사해 오면
+    /// 정확히 이 2개 상태가 된다.
+    /// </summary>
+    private void ValidateBossAreaTag()
+    {
+        GameObject[] areas;
+        try
+        {
+            areas = GameObject.FindGameObjectsWithTag(BossAreaTag);
+        }
+        catch (UnityException)
+        {
+            Edit.LogError($"[BossEncounter] 태그 '{BossAreaTag}'가 프로젝트에 정의돼 있지 않습니다.", this);
+            return;
+        }
+
+        if (areas.Length == 1) return;
+
+        if (areas.Length == 0)
+        {
+            Edit.LogError(
+                $"[BossEncounter] 태그 '{BossAreaTag}' 오브젝트가 씬에 없습니다 — No.23 BT가 아레나 " +
+                "콜라이더를 못 찾습니다. bossroom 인스턴스가 씬에 있는지 확인하세요.", this);
+            return;
+        }
+
+        Edit.LogError(
+            $"[BossEncounter] 태그 '{BossAreaTag}' 오브젝트가 {areas.Length}개입니다 " +
+            $"({string.Join(", ", System.Array.ConvertAll(areas, a => a.name))}) — BT가 어느 것을 잡을지 " +
+            "보장되지 않습니다. 씬에 정확히 1개만 두세요(정본 = bossroom 프리팹의 BossArea).", this);
+    }
 
     // ── 연출 진입 ──────────────────────────────────────────────────────────
 
@@ -327,7 +403,7 @@ public sealed class BossEncounterDirector : NetworkBehaviour
         _jumpController?.SetCinematicLandingMode(true);
 
         // ⚠️ BT가 "복귀/중앙 위치"로 쓰는 SpawnPoint는 프리팹 기본값 (0,0,0)이고 아무도 채우지 않는다.
-        // KMKScene은 아레나가 원점이라 우연히 맞았지만, 보스룸은 맵 밖 좌표(x≈500)라 그대로 두면
+        // BossScene은 아레나가 원점이라 우연히 맞았지만, 보스룸은 맵 밖 좌표(x≈500)라 그대로 두면
         // 충전 페이즈에서 보스가 월드 원점으로 이동해 맵 밖으로 사라진다. 착지점(=방 중앙)으로 채운다.
         if (_bossSpawnPointer != null)
         {
@@ -340,6 +416,8 @@ public sealed class BossEncounterDirector : NetworkBehaviour
                 "[BossEncounter] 보스에 SpawnPointer가 없습니다 — BT의 복귀 위치가 (0,0,0)으로 남아 " +
                 "충전 페이즈에서 맵 밖으로 이동할 수 있습니다.", this);
         }
+
+        SeedArenaPositionBlackboard(landing);
 
         // 충전 기둥은 스폰 이후에 주입해야 ChargeController의 서버 게이트를 통과한다.
         InjectChargingObjects();
@@ -498,6 +576,60 @@ public sealed class BossEncounterDirector : NetworkBehaviour
         SetPhase(BossEncounterPhase.FailedSafe);
     }
 
+    /// <summary>
+    /// No.23 BT의 <b>절대 위치 블랙보드 변수를 아레나 중앙으로 미리 채운다</b>(서버, 보스 스폰 직후).
+    ///
+    /// 왜 필요한가 — BT 루트가 <c>ParallelAllComposite</c>이고 8개 <c>Start</c> 브랜치가 동시에 돈다.
+    /// 그 중
+    /// <list type="bullet">
+    /// <item>브랜치[1]에 <c>NavigateToLocationAction(Location = "Spawn Point")</c> — <b>읽는</b> 쪽</item>
+    /// <item>브랜치[4]에 <c>GetSpawnPointAction</c> — <b>쓰는</b> 쪽</item>
+    /// </list>
+    /// 이 있다. 병렬이라 쓰기가 먼저라는 보장이 없고, 인덱스 순 틱이면 읽기가 먼저다 →
+    /// 첫 프레임에 <c>Spawn Point</c>의 초기값 <c>(0,0,0)</c>을 읽어 <b>보스가 월드 원점으로 향한다</b>.
+    ///
+    /// <c>ArrivePoint</c>도 같은 함정이다. 원래 <see cref="JumpController.SetTarget"/>이 채우는데,
+    /// 연출 착지 중에는 <c>_isCinematicLanding</c>으로 조기 반환해 <b>한 번도 채워지지 않는다</b>.
+    /// 그 상태로 BT가 열리면 <c>SetPositionThroughRaycastAction</c>/<c>MoveForDurationAction</c>이
+    /// <c>(0,0,0)</c>을 목표로 삼아 위치를 직접 쓴다 — 아레나가 x≈500이라 원점으로 순간이동한다.
+    ///
+    /// 그래프를 고치는 게 정석이지만 BT는 보스 담당 영역이라, 여기서 <b>초기값을 안전한 값(방 중앙)으로
+    /// 덮어</b> 경합의 최악값을 없앤다. 이후 BT가 정상적으로 다시 채우면 그 값이 이긴다.
+    /// </summary>
+    private void SeedArenaPositionBlackboard(Vector3 arenaCenter)
+    {
+        var agent = _bossNetworkObject != null
+            ? _bossNetworkObject.GetComponentInChildren<Unity.Behavior.BehaviorGraphAgent>(true)
+            : null;
+
+        if (agent == null || agent.BlackboardReference == null)
+        {
+            Edit.LogWarning(
+                "[BossEncounter] 보스에 BehaviorGraphAgent가 없어 위치 블랙보드를 초기화하지 못했습니다 — " +
+                "BT가 (0,0,0)을 목표로 삼을 수 있습니다.", this);
+            return;
+        }
+
+        foreach (string variableName in ArenaPositionVariables)
+        {
+            if (agent.BlackboardReference.GetVariable<Vector3>(variableName, out var variable))
+            {
+                variable.Value = arenaCenter;
+                continue;
+            }
+
+            Edit.LogWarning(
+                $"[BossEncounter] BT 블랙보드에 Vector3 '{variableName}'이 없습니다 — 이름이 바뀐 것인지 " +
+                "확인하세요(초기화를 건너뜁니다).", this);
+        }
+
+        Edit.Log($"[BossEncounter] BT 위치 블랙보드 초기화 — {string.Join(", ", ArenaPositionVariables)} = {arenaCenter}", this);
+    }
+
+    // BT가 절대 위치로 소비하는 Vector3 블랙보드 변수 이름. 그래프에서 확인한 실제 이름이다
+    // ('Spawn Point'는 공백 포함 — 'Spawn Pointer'(컴포넌트 참조)와 다른 변수다).
+    private static readonly string[] ArenaPositionVariables = { "Spawn Point", "ArrivePoint" };
+
     private void SnapBossToNavMesh()
     {
         if (_bossNetworkObject == null)
@@ -508,18 +640,38 @@ public sealed class BossEncounterDirector : NetworkBehaviour
         if (_bossAgent == null)
             return;
 
-        _bossAgent.enabled = true;
-
-        if (NavMesh.SamplePosition(_descendTo, out NavMeshHit hit, 5f, NavMesh.AllAreas))
+        // ⚠️ 순서 주의: 샘플링을 **먼저** 한다. NavMesh 밖에서 에이전트를 켜면 Unity가 내부 위치를
+        // 가장 가까운 메시에 맞추는데, 아레나(x≈500)에 메시가 없으면 그 "가장 가까운 곳"이
+        // 맵 본체(원점 근처)다 → 보스가 착지 직후 원점으로 끌려간다. 그래서 붙일 곳을 확인한 뒤에만 켠다.
+        if (!NavMesh.SamplePosition(_descendTo, out NavMeshHit hit, NavSampleRadius, NavMesh.AllAreas))
         {
-            _bossAgent.Warp(hit.position);
+            Edit.LogError(
+                $"[BossEncounter] 착지점 {_descendTo} 주변 {NavSampleRadius}m에 NavMesh가 없습니다 — " +
+                "에이전트를 켜지 않습니다(켜면 맵 본체로 끌려갑니다). 보스룸 바닥 콜라이더가 " +
+                "Default 레이어이고 MapNavMeshBaker 베이크에 포함되는지 확인하세요.", this);
             return;
         }
 
-        Edit.LogError(
-            $"[BossEncounter] 착지점 {_descendTo} 주변 5m에 NavMesh가 없습니다 — " +
-            "보스가 이동하지 못합니다(보스룸 바닥이 베이크에 포함됐는지 확인).", this);
+        // 붙은 곳이 착지점에서 멀면 아레나 자체 메시가 아니라 남의 메시를 잡은 것이다.
+        // 이 경우가 바로 "landing 직후 원점으로 이동"의 물리적 경로다 — 조용히 넘기지 않는다.
+        float drift = Vector3.Distance(_descendTo, hit.position);
+        if (drift > NavSampleRadius * 0.5f)
+        {
+            Edit.LogError(
+                $"[BossEncounter] 착지점 {_descendTo}에서 {drift:F1}m 떨어진 NavMesh({hit.position})에 " +
+                "붙었습니다 — 아레나 바닥이 베이크에서 빠져 다른 지형의 메시를 잡은 것입니다. " +
+                "에이전트를 켜지 않습니다.", this);
+            return;
+        }
+
+        _bossAgent.enabled = true;
+        _bossAgent.Warp(hit.position);
+        Edit.Log($"[BossEncounter] 보스 NavMesh 부착 완료 — {hit.position} (착지점 오차 {drift:F2}m)", this);
     }
+
+    // 착지점에서 NavMesh를 찾는 반경. 아레나 바닥은 착지점 바로 아래라 넉넉할 필요가 없다 —
+    // 크게 잡으면 남의 지형 메시를 잡아 원점으로 끌려가는 사고가 오히려 커진다.
+    private const float NavSampleRadius = 5f;
 
     private void UnlockAllParticipants()
     {
