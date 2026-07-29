@@ -27,7 +27,7 @@ EditorBuildSettings:
     path: Assets/0.Scenes/PlayerDashTest.unity
     guid: eb00076fd4b55fb44be3166ca583662d
   - enabled: 1
-    path: Assets/0.Scenes/KMKScene.unity
+    path: Assets/0.Scenes/BossScene.unity
     guid: 4df41e85c6a1dba4d9f41195a1ab45c8
   - enabled: 1
     path: Assets/0.Scenes/CamaraScene.unity
