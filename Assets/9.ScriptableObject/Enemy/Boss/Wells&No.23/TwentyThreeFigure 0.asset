@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 16067418779ddc3438941815fd0fe88e, type: 3}
   m_Name: TwentyThreeFigure 0
   m_EditorClassIdentifier: Assembly-CSharp::TwentyThreeFigure
-  maxRageCount: 2
+  maxRageCount: 5
   increaseHpAmount: 2
   increaseShieldAmount: 2
   maxGroggyCount: 2
