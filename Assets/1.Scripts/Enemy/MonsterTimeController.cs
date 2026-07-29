@@ -31,6 +31,11 @@ public class MonsterTimeController : MonoBehaviour
     Coroutine hitStopRoutine;
     Coroutine slowMotionRoutine;
 
+    // HitStop이 끝난 뒤 되돌릴 배율. HitStop 진행 중(=0배)에 재진입할 때 currentScale(0)을
+    // 기억해버리는 것을 막기 위해 별도로 들고 있는다. (아래 HitStop 주석 참고)
+    float hitStopRestoreScale = 1f;
+    bool hitStopActive;
+
     void Awake()
     {
         if (agent != null)
@@ -67,8 +72,23 @@ public class MonsterTimeController : MonoBehaviour
     /// duration(초) 동안 0배로 완전 정지한 뒤 "직전 배율"로 복원한다. (타격감용)
     /// 슬로우모션 중 피격되면 HitStop 후 다시 그 슬로우모션 배율로 돌아간다.
     /// </summary>
+    /// <remarks>
+    /// ⚠️ 재진입 주의 — 예전에는 코루틴 안에서 <c>currentScale</c>을 복원값으로 기억했다.
+    /// 그러면 HitStop 진행 중(배율 0)에 또 맞았을 때 두 번째 코루틴이 <b>0을 복원값으로 기억</b>해
+    /// 0.25초 뒤 배율을 0으로 "복원"했다 → Animator·NavMeshAgent가 <b>영구 정지</b>.
+    /// <see cref="Enemy.TakeDamage"/>가 피격마다 이걸 부르므로 0.25초 안에 2연타면 바로 재현된다.
+    /// 증상은 "보스가 멈추고 애니메이션이 아무것도 안 보인다" — 게다가 BT의
+    /// <c>WaitForAnimStateAction</c>은 normalizedTime을 보므로 애니메이터가 멈추면 <b>BT도 영원히
+    /// 대기</b>한다(장판·데미지는 시간 기반이라 계속 돌아 원인이 더 가려진다).
+    /// 그래서 복원값은 <b>최초 진입에서만</b> 기록한다.
+    /// </remarks>
     public void HitStop(float duration)
     {
+        if (!hitStopActive)
+            hitStopRestoreScale = currentScale;   // 최초 진입에서만 직전 배율(슬로우모션 중이면 그 값) 기억
+
+        hitStopActive = true;
+
         if (hitStopRoutine != null)
             StopCoroutine(hitStopRoutine);
         hitStopRoutine = StartCoroutine(HitStopRoutine(duration));
@@ -76,14 +96,27 @@ public class MonsterTimeController : MonoBehaviour
 
     IEnumerator HitStopRoutine(float duration)
     {
-        float restoreScale = currentScale;   // 직전 배율 기억 (슬로우모션 중이면 그 값)
         SetTimeScale(0f);
 
         // Scaled 기준: WaitForSeconds는 전역 Time.timeScale에 종속되어, 게임 정지 시 함께 멈춘다.
         yield return new WaitForSeconds(duration);
 
-        SetTimeScale(restoreScale);
+        SetTimeScale(hitStopRestoreScale);
+        hitStopActive = false;
         hitStopRoutine = null;
+    }
+
+    /// <summary>
+    /// 비활성화되면 코루틴이 죽어 배율이 0인 채로 남는다 — 다시 켜졌을 때 굳어 있지 않게 되돌린다.
+    /// (사망 연출·풀링으로 껐다 켜는 몬스터에서 "부활했는데 안 움직인다"가 되는 것을 막는다.)
+    /// </summary>
+    void OnDisable()
+    {
+        hitStopRoutine = null;
+        slowMotionRoutine = null;
+        hitStopActive = false;
+        hitStopRestoreScale = 1f;
+        SetTimeScale(1f);
     }
 
     /// <summary>
