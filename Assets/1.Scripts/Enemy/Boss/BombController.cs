@@ -414,13 +414,8 @@ public class BombController : NetworkBehaviour
     {
         RaycastHit hit;
 
-        // 원점을 살짝 띄운다 — 폭탄이 바닥면과 같은 높이거나 미세하게 아래면 표면에서 시작한 광선이
-        // MeshCollider 윗면을 놓친다(뒷면은 안 맞는다). 그러면 아래 스냅이 통째로 건너뛰어져
-        // 폭탄이 공중에 그대로 남는다.
-        const float floorProbeUp = 2f;
-
-        if (Physics.Raycast(transform.position + Vector3.up * floorProbeUp, Vector3.down, out hit,
-                            Mathf.Infinity, ground, QueryTriggerInteraction.Ignore))
+        // 바닥 판정은 GroundProbe로 통일한다. 여기서 실패하면 "폭탄이 공중에 뜬 채로 장판만 깔림"이 된다.
+        if (GroundProbe.TryFindGround(transform.position, ground.value, out hit, out string report))
         {
             Quaternion slopeRot = Quaternion.FromToRotation(Vector3.up, hit.normal);
             transform.rotation = _baseRot * slopeRot;
@@ -431,12 +426,8 @@ public class BombController : NetworkBehaviour
         }
         else
         {
-            // 조용히 넘기면 "폭탄이 공중에 뜬 채로 장판만 깔림"이 된다 — 어느 레이캐스트가 실패했는지
-            // 이 로그로 갈린다(투척 시점 실패는 BombLauncher/ThrowBombAction 쪽 경고로 따로 뜬다).
             Edit.LogWarning(
-                $"[No.23] 폭탄 아래에서 바닥을 찾지 못해 착지 스냅을 건너뜁니다 — 위치 {transform.position}, " +
-                $"ground 마스크 {ground.value}. 그 지점에 바닥 콜라이더가 있는지, 마스크에 해당 레이어가 " +
-                "포함됐는지 확인하세요(생성맵 바닥은 Default).", this);
+                $"[No.23] 폭탄 착지 스냅을 건너뜁니다 — 위치 {transform.position}, {report}", this);
         }
 
         FloorAreaEffect bombAreaEffect = CheckDoubleExplosion();

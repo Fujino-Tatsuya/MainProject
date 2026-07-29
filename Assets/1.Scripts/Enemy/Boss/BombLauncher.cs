@@ -138,25 +138,16 @@ public class BombLauncher : MonoBehaviour
         Vector3 throwVector = dir * throwDistance;
         Vector3 target = transform.position + throwVector;
 
-        // ThrowBombAction과 같은 판정을 쓴다 — 인스펙터 마스크에 Default가 빠져도 동작하게 보강하고,
-        // 원점을 살짝 띄워 바닥면과 같은 높이에서 광선이 MeshCollider를 놓치는 것을 막는다.
-        int resolvedGroundMask = groundMask.value | LayerMask.GetMask("Default", "Ground");
-        const float probeUp = 2f;
-        const float probeDistance = 200f;
-
-        RaycastHit hit;
-        if (Physics.Raycast(target + Vector3.up * probeUp, Vector3.down, out hit,
-                            probeDistance, resolvedGroundMask, QueryTriggerInteraction.Ignore))
+        // 바닥 판정은 GroundProbe로 통일한다(레이어·원점·유닛 콜라이더 제외를 한 곳에서 처리).
+        // 빗나가면 target.y가 투척 높이로 남아 폭탄이 공중에 착지한다 — 그래서 성공/실패 둘 다 로그를 남긴다.
+        if (GroundProbe.TryFindGround(target, groundMask.value, out RaycastHit hit, out string report))
         {
             target.y = hit.point.y;
+            Edit.Log($"[No.23] 폭탄 투척 착지 지점 확정 — {report}", this);
         }
         else
         {
-            // ⚠️ 조용히 넘기면 target.y가 투척 높이로 남아 폭탄이 공중에 착지한다("바닥으로 안 떨어짐").
-            // 실제로 groundMask가 Ground(3) 단독이라 생성맵 바닥(Default, 0)을 못 맞혀서 이 증상이 났다.
-            Edit.LogWarning(
-                $"[No.23] 폭탄 착지 지점 아래에서 바닥을 찾지 못했습니다({target}) — 투척 높이를 그대로 씁니다. " +
-                "BombLauncher.groundMask에 실제 바닥 레이어가 포함됐는지 확인하세요(생성맵 바닥은 Default).", this);
+            Edit.LogWarning($"[No.23] 폭탄 투척 착지 지점을 못 찾아 투척 높이를 그대로 씁니다({target}) — {report}", this);
         }
 
         _bombController.Launch(target, flyingDuration, arcHeight);

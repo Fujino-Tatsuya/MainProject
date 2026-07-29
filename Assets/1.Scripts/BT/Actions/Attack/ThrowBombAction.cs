@@ -28,27 +28,15 @@ public partial class ThrowBombAction : Action
         Vector3 throwVector = dir * ThrowDistance.Value;
         Vector3 target = agentTransform.position + throwVector;
 
-        // ⚠️ 생성맵 바닥은 "Ground"가 아니라 **Default** 레이어다(존 프리팹 전수 확인: 바닥·벽 전부 layer 0).
-        // BT 블랙보드에 적힌 Ground 이름만 쓰면 레이캐스트가 빗나가고, 빗나가면 target.y가 투척 높이로
-        // 남아 **폭탄이 공중에 착지**한다(Launch는 중력 없이 _targetPos로 보간해 그 지점에서 멈춘다).
-        // 같은 원인으로 JumpController·BombLauncher에서 이미 두 번 터졌다 → 여기서도 Default를 함께 포함한다.
-        //
-        // 원점을 살짝 띄우는 이유: target.y가 바닥면과 같거나 미세하게 아래면 표면에서 시작한 광선이
-        // MeshCollider를 놓친다. 위에서 아래로 훑어야 안정적으로 맞는다.
-        int groundMask = LayerMask.GetMask(Ground) | LayerMask.GetMask("Default", "Ground");
-        const float probeUp = 2f;
-        const float probeDistance = 200f;
-
-        if (Physics.Raycast(target + Vector3.up * probeUp, Vector3.down, out RaycastHit hit,
-                            probeDistance, groundMask, QueryTriggerInteraction.Ignore))
+        // 바닥 판정은 GroundProbe로 통일한다 — BT 블랙보드의 Ground 이름만 쓰면 생성맵 바닥(Default)을
+        // 구조적으로 못 맞히고, 보스 자기 히트박스(Default 레이어)를 바닥으로 오인하는 문제도 있다.
+        if (GroundProbe.TryFindGround(target, LayerMask.GetMask(Ground), out RaycastHit hit, out string report))
         {
             target.y = hit.point.y;
         }
         else
         {
-            Edit.LogWarning(
-                $"[BT] 폭탄 착지 지점 아래에서 바닥을 찾지 못했습니다({target}) — 투척 높이를 그대로 씁니다. " +
-                "폭탄이 공중에 착지하면 이 로그를 먼저 확인할 것.");
+            Edit.LogWarning($"[BT] 폭탄 착지 지점을 못 찾아 투척 높이를 그대로 씁니다({target}) — {report}");
         }
 
         //BombInstance.Value.GetComponent<NetworkObject>().TryRemoveParent(true);

@@ -54,21 +54,10 @@ public class JumpController : NetworkBehaviour, IDamageSettable
         _isCinematicLanding = enabled;
     }
 
-    // 바닥 탐색 파라미터. 대상 머리 위에서 아래로 쏘아 발밑 바닥을 잡는다.
-    const float GroundProbeUp = 2f;
-    const float GroundProbeDistance = 50f;
-
-    /// <summary>
-    /// 인스펙터 groundMask가 비어 있으면 Default+Ground로 폴백한다.
-    /// 프리팹 값이 비어 있어도 생성맵에서 동작하게 하는 안전망이다.
-    /// </summary>
-    LayerMask ResolveGroundMask()
-    {
-        if (groundMask.value != 0)
-            return groundMask;
-
-        return LayerMask.GetMask("Default", "Ground");
-    }
+    // 바닥 탐색은 GroundProbe로 통일했다(레이어 폴백·원점 띄우기·유닛 콜라이더 제외).
+    // ⚠️ 특히 유닛 제외가 중요하다 — 이 보스는 플레이어 위치로 착지하므로 자기 공격 히트박스
+    // (Rage·DashAttack·Floor 등 Default 레이어 7개)가 반드시 근처에 있고, 그게 "바닥"으로 잡히면
+    // 착지 높이와 장판이 몸통 높이에 걸린다(폭탄이 y≈1.8에 뜬 것과 같은 원인).
 
     public override void OnNetworkSpawn()
     {
@@ -125,13 +114,7 @@ public class JumpController : NetworkBehaviour, IDamageSettable
         Vector3 landingPos = _target.transform.position;
         Quaternion slopeRotation = Quaternion.identity;
 
-        if (Physics.Raycast(
-                landingPos + Vector3.up * GroundProbeUp,
-                Vector3.down,
-                out RaycastHit hit,
-                GroundProbeDistance,
-                ResolveGroundMask(),
-                QueryTriggerInteraction.Ignore))
+        if (GroundProbe.TryFindGround(landingPos, groundMask.value, out RaycastHit hit, out string report))
         {
             slopeRotation = Quaternion.FromToRotation(Vector3.up, hit.normal);
             landingPos.y = hit.point.y;
@@ -139,8 +122,7 @@ public class JumpController : NetworkBehaviour, IDamageSettable
         else
         {
             Edit.LogWarning(
-                $"[No.23] 착지 지점 아래에서 바닥을 찾지 못했습니다({landingPos}) — 대상 높이를 그대로 사용합니다. " +
-                "JumpController.groundMask에 실제 바닥 레이어가 포함됐는지 확인하세요.", this);
+                $"[No.23] 착지 지점 아래에서 바닥을 찾지 못해 대상 높이를 그대로 사용합니다({landingPos}) — {report}", this);
         }
         _floorRootRot = _baseRotation * slopeRotation;
 
