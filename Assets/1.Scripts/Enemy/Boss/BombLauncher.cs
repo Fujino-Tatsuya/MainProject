@@ -143,6 +143,14 @@ public class BombLauncher : MonoBehaviour
         {
             target.y = hit.point.y;
         }
+        else
+        {
+            // ⚠️ 조용히 넘기면 target.y가 투척 높이로 남아 폭탄이 공중에 착지한다("바닥으로 안 떨어짐").
+            // 실제로 groundMask가 Ground(3) 단독이라 생성맵 바닥(Default, 0)을 못 맞혀서 이 증상이 났다.
+            Edit.LogWarning(
+                $"[No.23] 폭탄 착지 지점 아래에서 바닥을 찾지 못했습니다({target}) — 투척 높이를 그대로 씁니다. " +
+                "BombLauncher.groundMask에 실제 바닥 레이어가 포함됐는지 확인하세요(생성맵 바닥은 Default).", this);
+        }
 
         _bombController.Launch(target, flyingDuration, arcHeight);
 

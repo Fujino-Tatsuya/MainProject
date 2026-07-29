@@ -444,6 +444,29 @@ Life/PlayerLifeCycleController, Life/PlayerLifeInputPolicy}`, `1.Scripts/Unit/St
   커밋하면 민경 저작 바이트를 덮어쓴다.
 - 후속 커밋 `c273ad8`: `EditorBuildSettings` 경로를 BossScene으로 갱신.
 
+**2-c. 머지 후 Play 검증에서 나온 회귀 3건 — 수정 완료 (2026-07-29)**
+
+- **보스가 멈추고 애니메이션이 아무것도 안 보인다(사망 연출 포함)** = `MonsterTimeController.HitStop` 재진입 결함.
+  코루틴이 복원값으로 `currentScale`을 기억했는데, HitStop 진행 중(배율 0)에 또 맞으면 두 번째
+  코루틴이 **0을 복원값으로 기억** → 0.25초 뒤 배율을 0으로 "복원" → `animator.speed`·`agent.speed`
+  **영구 0**. `Enemy.TakeDamage`가 피격마다 부르므로 0.25초 내 2연타면 재현된다.
+  게다가 BT의 `WaitForAnimStateAction`은 `normalizedTime`을 보므로 애니메이터가 멈추면 **BT도 로그
+  없이 영원히 대기**한다(장판·데미지는 시간 기반이라 계속 돌아 원인이 가려진다).
+  → 복원값을 최초 진입에서만 기록 + `OnDisable`에서 배율 1 복구.
+  ⚠️ 부수 발견: `Enemy.OnNetworkSpawn`이 `IsServer` 게이트 **뒤에서** `_monsterTimeController`를
+  잡으므로 HitStop은 서버에서만 돈다 — 클라는 타격감 연출을 못 받고, 이 정지도 호스트 화면 한정이었다.
+- **보스 HP bar가 다시 안 보인다** = `BossHudTarget`이 TwentyThree.prefab에서 **머지로 유실**됐다
+  (theirs 채택). 원본 블록(fileID `9114957203948571100`, 루트 `TwentyThree`에 부착, 직렬화 필드 없음)을
+  그대로 복원했다.
+  ★**다음 머지 때 쓸 검사법**: 커밋 로그로 유실을 추정하면 틀린다. 프리팹별로
+  `grep -o "Assembly-CSharp::[A-Za-z_0-9]*" | sort -u`를 머지 전/후로 `comm`하면 사라진 컴포넌트가
+  바로 나온다(이번엔 TwentyThree에서 `BossHudTarget` 1건, Wells는 0건으로 확정됐다).
+- **폭탄이 바닥으로 떨어지지 않는다** = `BombLauncher.groundMask`가 Wells.prefab에서 **Ground(3) 단독**
+  이었다. 생성맵 바닥은 **Default(0)** 이라 레이캐스트가 빗나가고, 빗나가면 `target.y`를 그대로 둬서
+  폭탄이 공중 지점에 착지한다. → `m_Bits: 8` → `9`(Default+Ground). 같은 계열인
+  `BombController.ground`는 이미 9였다(런처만 저작 누락). 빗나갈 때 경고 로그도 추가했다.
+  TwentyThree는 중첩 Wells 인스턴스의 컴포넌트를 참조(stripped)하고 오버라이드가 없어 이 값이 그대로 적용된다.
+
 **2-a. 🔴 머지로 유실된 내 작업 — 다시 해야 함 (팀장 지시로 기록)**
 
 프리팹 YAML은 수동 머지하지 않는다(GUID/fileID 깨짐 위험). Boss 쪽을 통째로 받고 아래를 재작업한다.
