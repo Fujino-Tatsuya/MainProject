@@ -425,7 +425,26 @@ Life/PlayerLifeCycleController, Life/PlayerLifeInputPolicy}`, `1.Scripts/Unit/St
 - 팀장 방침(2026-07-29): **feature/Boss 쪽을 권위로 받고 내 로컬 수정본은 폐기**한다.
 - 상세 분석·리스크는 이 문서 위쪽 「⚠️⚠️ 위 권고는 무효」 절 참조.
 
-**2-a. 🔴 머지로 유실되는 내 작업 — 머지 후 다시 해야 함 (팀장 지시로 기록)**
+**2-b. ✅ 머지 완료 (2026-07-29 · `3ef3cab`, 컴파일 0에러 0경고 / Play 검증 대기)**
+
+- 충돌 10건 해결: 보스 소유 에셋(BossScene·TwentyThree·Wells·No.23) = theirs / TagManager·Unit.cs =
+  ours / BombLauncher = theirs / ChargeController·JumpController = 수동 병합 / Player.prefab = 충돌
+  블록만 ours.
+- ⚠️ **Player.prefab에서 살린 저쪽 clean hunk**: `PlayerDefaultAttack.targetLayer` ·
+  `DefaultAttack.hittableLayers` 가 **Enemy(8) → EnemyHurtBox(14)** 로 전환됐다. 보스와 일반몹
+  (`ModularRobots_R1`) 모두 레이어 14 노드가 있어 정합. `--ours`로 파일 전체를 되돌리면 256으로
+  회귀해 **보스를 못 때리게 된다** — 다음에 이 파일 충돌 시 주의.
+- 머지 후 컴파일 수정 1건: `BossBasicAttackChoice.PageEvent(int)` 구현 추가(`BaseAttackChoice`에
+  추상 멤버 신설). 코드 FSM 보스는 Page SO 체계가 없어 의도적 no-op.
+- **의도적으로 안 받은 것**: Player.prefab의 `AudioListener` + `FMODUnity.StudioListener`.
+  이 머지는 FMOD 파일·참조 코드를 하나도 안 가져오고(`51adcf1`에서 사운드 분리) 이 워킹카피에 FMOD가
+  미설치라 받으면 Missing Script가 된다. AudioListener를 Player 프리팹에 두면 멀티에서 리스너가
+  여러 개가 되는 문제도 있다 → `feature/Sound` 머지 때 함께 검토.
+- 머지 직후 Unity가 BT 에셋 3개(`No.23` +4598/-5033 등)를 재직렬화했다 → 규칙대로 폐기했다.
+  커밋하면 민경 저작 바이트를 덮어쓴다.
+- 후속 커밋 `c273ad8`: `EditorBuildSettings` 경로를 BossScene으로 갱신.
+
+**2-a. 🔴 머지로 유실된 내 작업 — 다시 해야 함 (팀장 지시로 기록)**
 
 프리팹 YAML은 수동 머지하지 않는다(GUID/fileID 깨짐 위험). Boss 쪽을 통째로 받고 아래를 재작업한다.
 
@@ -435,6 +454,8 @@ Life/PlayerLifeCycleController, Life/PlayerLifeInputPolicy}`, `1.Scripts/Unit/St
 | `TwentyThree.prefab` | **생성맵에서 보스 피격 가능 + 지면 인식** (맞으면 빨갛게 되는 처리 포함) | `60f3862` |
 | `TwentyThree.prefab` | 미사용 `maxShield` 직렬화 제거(재저장) | `1271b85` |
 | `Wells.prefab` | 루트에 `NetworkObject` 추가 (dirty, 커밋 안 됨) | — |
+| `BossScene.unity` | 보스 테스트 씬 작업분 (리네임 전 `KMKScene`) | `8e0215b` |
+| `Player.prefab` | — (유실 아님) 오디오 2개는 `feature/Sound` 머지 때 재검토 | 위 2-b 참조 |
 
 - Boss 쪽도 같은 파일을 만졌다: `18befc0`·`89bc9e1`·`e61999d`·`9dbdf8c`·`9a2cad0`·`465a934`.
   → `Bomb.prefab`/`TwentyThree.prefab`은 **양쪽 커밋 충돌**이므로 "theirs" 채택 시 위 3건이 사라진다.
