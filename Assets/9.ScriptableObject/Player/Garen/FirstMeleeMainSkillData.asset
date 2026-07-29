@@ -9,24 +9,28 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 35ae1fdc1e61a894988a21563d47ab80, type: 3}
-  m_Name: FirstMeleeUltimateSkillData
-  m_EditorClassIdentifier:
-  inputType: 0
-  cooldownTime: 60
-  attackDamageMultiplier: 3
+  m_Script: {fileID: 11500000, guid: a336cb8a15e6f024caef82ee480e4c84, type: 3}
+  m_Name: FirstMeleeMainSkillData
+  m_EditorClassIdentifier: 
+  inputType: 1
+  cooldownTime: 10
+  attackDamageMultiplier: 0.3
   flatDamageBonus: 0
-  maxActiveDuration: 1.5
-  tickInterval: 0
+  maxActiveDuration: 3
+  tickInterval: 0.25
   usableWhileDead: 0
   hittableLayers:
     serializedVersion: 2
-    m_Bits: 0
-  targetingMode: 1
+    m_Bits: 1280
+  targetingMode: 0
   confirmMode: 0
   castRange: 8
   targetableLayers:
     serializedVersion: 2
-    m_Bits: 256
-  animatorStateName:
+    m_Bits: 0
+  animatorStateName: Garen_Main_Skill
   snapRotationOnStart: 1
+  advanceSpeed: 6
+  steerAnglePerTick: 5
+  knockbackStrength: 3
+  maxHitResults: 16
