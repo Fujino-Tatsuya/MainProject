@@ -4,15 +4,39 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 현재 인수인계 (2026-07-29 세션 종료 · feature/Boss 머지 완료)
+## ▶▶ 현재 인수인계 (2026-07-29 · 폭탄 투척 경로 복구, 커밋 `93b4e02`)
 
-작업 세션: **경석(Claude)**. 브랜치 `feature/map-player-merge`, 마지막 커밋 `cc22c3b`.
-워킹트리: `0.BootStrapScene.unity`(팀장 지시로 보존) 외 clean — BT 에셋 churn은 폐기함.
+작업 세션: **경석(Claude)**. 브랜치 `feature/map-player-merge`, 마지막 커밋 `93b4e02`.
+워킹트리: 씬 2개(`0.BootStrapScene`·`4.MapScene`)와 `Bomb.prefab`·머티리얼·BT 에셋 등은
+**의도적으로 미커밋 보류** — 다른 담당자 작업(대시 등)과 겹치므로 이번 커밋에 넣지 않았다.
 
-### 다음 세션 시작점 — 폭탄 아트 수정본 받기
+### 다음 시작점 — 폭탄이 손 높이에서 정지하는 문제
 
-**팀장이 폭탄 아트 fbx를 직접 수정한 뒤, 그 수정본으로 Play해서 재판단한다.** 다음 세션은 그
-결과를 받는 것으로 시작한다(이상하면 팀장이 알려줌). 코드 측은 이미 다 닫혀 있다:
+**아트 fbx는 무죄이고 `GroundProbe`도 정상이다.** Play 로그가
+`바닥=Env_floor_basic_typeA (7)(layer 0) y=0.50 → 착지 y=0.55`로 매번 맞게 나온다.
+그런데 폭탄 오브젝트는 `y≈2.79~2.86`(= 보스 손 높이)에 남는다. 목표에 도달했다면
+`MovePosition(_targetPos)`로 Y가 정확히 0.55여야 하므로, **비행 중 `CheckHitBetween`에
+막혀 위치가 갱신되지 않는 것**이다(`29cc999`에서 잡았던 증상이 다른 원인으로 재발).
+
+`93b4e02`에 진단 로그를 넣어 뒀다 — 다음 Play에서 콘솔을 `정지`로 필터하면
+`[No.23] 폭탄이 바닥 판정에 걸려 정지 — <콜라이더>(layer N), 현재 위치 …, 목표 …`가
+범인을 그대로 지목한다. 유력 후보는 **`Env_Mv_bosscharger_upper`**(송전기, Default 레이어,
+보스 계층 밖이라 `Unit` 제외에 안 걸린다). ground 마스크가 Default를 포함하는 한
+`Unit` 제외만으로는 부족하다는 뜻이 된다.
+
+⚠️ **MCP 브릿지로 Play 로그를 읽을 수 없다.** `totalBuffered`가 에디터 기동 시점 값에서
+멈추고 Play 로그가 들어오지 않는다(도메인 리로드 후 로그 콜백 미재등록 의심). 이전 규칙
+"Play 로그는 Play 중에만 읽힌다"는 무효 — **콘솔 스크린샷으로 받아야 한다.**
+
+### 이번에 닫은 것
+
+| 닫은 것 | 커밋 |
+|---|---|
+| Wells 루트에 `NetworkObject` 부착 — `WellsAnimEvents`가 `NetworkBehaviour`라 서버 판정을 못 받아 투척 애니 이벤트가 무시됐다(`BombHold`는 전역 `IsServer`를 봐서 영향 없음 → "손에 들고만 있음") | `4a84fe9` |
+| `BombThrow`의 조용한 실패 복원(주석 처리돼 있던 로그) + `_bombController` 수명 일치 + `BombAction.Mode` 활성화 | `4a84fe9` |
+| 폭탄 스케일 손 `0.5` → 착지 `1.0` 시간 보간 + `HandleHit` ground 분기 진단 로그 | `93b4e02` |
+
+### 이전 세션에 닫은 것
 
 | 닫은 것 | 커밋 |
 |---|---|
@@ -35,8 +59,11 @@ Update this file when a term becomes important enough that future agents or team
      `comm` 비교(이번에 `BossHudTarget`을 놓쳤던 방식의 재발 방지)
    - **Player.prefab 레이어 마스크 함정**: `EnemyHurtBox`(14) 유지 — `--ours`로 통째 되돌리면 보스를 못 때린다
    - FMOD/AudioListener는 그 브랜치에 붙은 상태로 받기로 결정
-3. **미결 1건**: `Wells.prefab`이 `NetworkObject` 없이 `DefaultNetworkPrefabs`에 등록된 무효 상태 →
-   부착이냐 등록 제거냐 **민경 확인 필요**.
+3. ~~**미결 1건**: `Wells.prefab`이 `NetworkObject` 없이 `DefaultNetworkPrefabs`에 등록된 무효 상태~~
+   → **`4a84fe9`에서 부착으로 해소.** 없으면 `WellsAnimEvents`가 서버 판정을 못 받아 폭탄 투척이
+   조용히 막힌다는 것이 실증됐다. Wells는 `TwentyThree.prefab` 안 중첩 자식으로만 쓰이므로
+   (단독 스폰처 0건) **중첩 `NetworkObject` 상태**다 — 현재 정상 동작하지만 NGO 중첩 지원에
+   의존하는 구조라 민경과 한 번 확인해 두는 게 좋다.
 
 ### 이 세션에 확립된 재사용 규칙
 
@@ -45,7 +72,9 @@ Update this file when a term becomes important enough that future agents or team
 - **바닥에 눕는 것은 `GroundProbe.SurfaceY(hit)`** (= 찾은 바닥 + 0.05). 절대 Y 상수 금지.
 - **보스룸 보행면 = Y 0.50** (`BossFloorCollider` 상단·`BossLandingPoint`·`BossArea` 전부 0.50).
   이전 문서·주석의 "0.61"은 솟은 발판을 잘못 측정한 값이었다.
-- **Play 로그는 Play 중에만 MCP로 읽힌다** — Play를 나가면 도메인 리로드로 버퍼가 리셋된다.
+- ~~**Play 로그는 Play 중에만 MCP로 읽힌다**~~ → **⚠️ 정정(2026-07-29): Play 중에도 못 읽는다.**
+  `unity_get_console_logs`의 `totalBuffered`가 에디터 기동 시점 값에서 멈춘다. Play 로그는
+  **콘솔 스크린샷으로 받는다**고 전제하고 진단 계획을 세울 것.
 - 로컬 교훈 로그(`Docs/_local/lessons.md`) #32~#37에 이번 세션 6건을 적었다.
 
 ---
