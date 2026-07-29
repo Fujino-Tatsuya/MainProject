@@ -123,21 +123,21 @@ public class GameManager : MonoBehaviour
 
     /// <summary>
     /// Instance null 방어까지 포함한 정적 구독 파사드. 구독자는 GameManager 참조 없이 호출 가능.
-    /// 예) GameManager.SubscribeReady(OnReady); / 해제: GameManager.UnsubscribeReady(OnReady);
+    /// 예) GameManager.SubscribeMainGameStart(OnReady); / 해제: GameManager.UnsubscribeMainGameStart(OnReady);
     /// </summary>
-    public static void SubscribeReady(Action callback)
+    public static void SubscribeMainGameStart(Action callback)
     {
         if (Instance == null)
         {
-            Debug.LogWarning("[GameManager] Instance가 아직 없어 MainGameReady 구독 실패. BootStrap 이후 호출할 것.");
+            Debug.LogWarning("[GameManager] Instance가 아직 없어 MainGame 시작 구독 실패. BootStrap 이후 호출할 것.");
             return;
         }
 
         Instance.SubscribeMainGameReady(callback);
     }
 
-    /// <summary><see cref="SubscribeReady"/>로 등록한 콜백을 해제한다.</summary>
-    public static void UnsubscribeReady(Action callback)
+    /// <summary><see cref="SubscribeMainGameStart"/>로 등록한 콜백을 해제한다.</summary>
+    public static void UnsubscribeMainGameStart(Action callback)
     {
         Instance?.UnsubscribeMainGameReady(callback);
     }
