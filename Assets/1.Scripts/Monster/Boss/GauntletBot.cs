@@ -184,6 +184,8 @@ public class GauntletBot : MonsterBase
         {
             Collider c = _nearbyBuffer[i];
             if (c == null) continue;
+            // 유령은 인원수에 넣지 않는다 — 넣으면 스매시 단계가 실제 교전 인원보다 높게 잡힌다.
+            if (!MonsterTargeting.IsAttackable(c)) continue;
             _nearbyRoots.Add(c.transform.root);
         }
         return _nearbyRoots.Count;

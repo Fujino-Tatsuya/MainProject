@@ -471,7 +471,8 @@ public class BossBase : Unit
     // 공격 간격 = 1 / 공격속도(Unit.AttackSpeed, 초당 공격 횟수).
     bool CooldownReady() => Time.time - _lastAttackTime >= 1f / Mathf.Max(0.01f, AttackSpeed);
 
-    bool IsTargetValid(Transform t) => t != null && t.gameObject.activeInHierarchy;
+    // Soul(유령)은 활성으로 남아 null·active 검사를 통과한다 — 생명주기까지 본다(MonsterTargeting).
+    bool IsTargetValid(Transform t) => MonsterTargeting.IsAttackable(t);
 
     // 인지 반경 내 최근접 플레이어 Transform 탐색(서버 전용). MonsterBase.FindNearestTarget 그대로.
     Transform FindNearestTarget()
@@ -487,6 +488,7 @@ public class BossBase : Unit
         {
             Collider c = _detectBuffer[i];
             if (c == null) continue;
+            if (!MonsterTargeting.IsAttackable(c)) continue;   // 유령은 인지 대상 제외
 
             Transform root = c.transform.root;
             float sqr = (root.position - transform.position).sqrMagnitude;

@@ -477,10 +477,9 @@ public class MonsterBase : Unit
     #endregion
 
     // 타겟 유효성: 존재 + 활성. (리쉬는 몹-스폰 거리로 별도 판정하므로 여기선 거리 제한 없음.)
-    bool IsTargetValid(Transform t)
-    {
-        return t != null && t.gameObject.activeInHierarchy;
-    }
+    // Soul(유령) 플레이어는 활성 상태로 남으므로 null·active 검사만으로는 걸러지지 않는다.
+    // 생명주기까지 봐야 사망 직전에 잡힌 타겟이 즉시 풀린다(MonsterTargeting).
+    bool IsTargetValid(Transform t) => MonsterTargeting.IsAttackable(t);
 
     protected virtual void StartAttack()
     {
@@ -877,6 +876,10 @@ public class MonsterBase : Unit
         {
             Collider c = _detectBuffer[i];
             if (c == null) continue;
+
+            // 유령은 인지 대상이 아니다 — 레이어 마스크만으로는 못 막는다(Soul 전환은 루트 레이어만
+            // 바꾸고 자식 콜라이더는 그대로 남는다).
+            if (!MonsterTargeting.IsAttackable(c)) continue;
 
             // 루트 오브젝트 기준 거리(콜라이더가 자식일 수 있음).
             Transform root = c.transform.root;
