@@ -27,7 +27,22 @@ public partial class BombAction : Action
             return Status.Failure;
         }
 
-        BombLauncher.Value.BombHold();
+        // ⚠️ Mode가 선언만 되고 읽히지 않아, 투척용으로 놓은 노드까지 Hold로 동작했다. 그래서 투척은
+        // 애니메이션 이벤트에만 의존했고, BT 주기가 끊기면 조용히 안 나갔다.
+        // Wells.asset의 두 노드는 현재 둘 다 Hold이므로 이 변경만으로 동작은 달라지지 않는다.
+        // 투척 노드를 Mode: Throw로 바꾸면 BT가 투척을 주도한다(그래프 수정은 담당자 몫).
+        BombActionMode mode = Mode != null ? Mode.Value : BombActionMode.Hold;
+
+        switch (mode)
+        {
+            case BombActionMode.Hold:
+                BombLauncher.Value.BombHold();
+                break;
+
+            case BombActionMode.Throw:
+                BombLauncher.Value.BombThrow();
+                break;
+        }
 
         return Status.Success;
     }

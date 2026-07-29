@@ -99,9 +99,15 @@ public class BombLauncher : MonoBehaviour
     {
         if (!IsServer()) return;
 
+        // ⚠️ 여기가 조용히 return하면 "투척 애니메이션은 나오는데 폭탄만 안 나간다"는 증상만 남고
+        // 아무 흔적이 없다. BT(Hold)와 Animator(투척 이벤트)는 서로의 상태를 모르기 때문에,
+        // 보스가 Groggy·Break로 끊기거나 폭탄이 먼저 파괴되면 실제로 이 상태가 된다.
+        // 투척 이벤트 1회당 한 줄이므로 스팸이 아니다 — 다시 주석 처리하지 말 것.
         if (_bombController == null)
         {
-            //Edit.LogError("[Wells] BombThrow 호출 전에 BombHold가 성공하지 않았습니다.");
+            Edit.LogWarning(
+                "[Wells] 투척 이벤트가 왔지만 들고 있는 폭탄이 없습니다 — BombHold가 오지 않았거나 " +
+                "폭탄이 먼저 파괴됐습니다(BT 주기와 애니메이션 주기가 어긋난 경우).", this);
             return;
         }
 
@@ -153,7 +159,10 @@ public class BombLauncher : MonoBehaviour
 
         _bombController.Launch(target, flyingDuration, arcHeight);
 
+        // 던진 뒤에는 "들고 있는 폭탄 없음"이 참이어야 한다. _bombController를 남겨 두면 이미 날아간
+        // (또는 폭발해 despawn된) 컨트롤러를 들고 다음 투척 이벤트에 들어가, 위의 조용한 경로로 빠진다.
         _bombInstance = null;
+        _bombController = null;
     }
 
     /// <summary>
@@ -169,6 +178,9 @@ public class BombLauncher : MonoBehaviour
             network.Despawn(true);
             _bombInstance = null;
         }
+
+        // 인스턴스가 이미 사라진 경로에서도 컨트롤러 참조만 남을 수 있다 — 항상 함께 비운다.
+        _bombController = null;
     }
 
     #endregion
