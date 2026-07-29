@@ -1,3 +1,4 @@
+﻿using System;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -25,6 +26,14 @@ public class GameManager : MonoBehaviour
 
     /// <summary>현재 게임 상태. 씬 전환 시점에 갱신된다.</summary>
     public GameState CurrentState { get; private set; } = GameState.Title;
+
+    /// <summary>
+    /// Additive 로딩과 플레이어 준비가 모두 끝나 MainGame을 시작할 수 있을 때 발행된다.
+    /// 늦게 활성화되는 소비자는 구독 전에 <see cref="IsMainGameReady"/>를 먼저 확인해야 한다.
+    /// </summary>
+    public event Action OnMainGameReady;
+
+    public bool IsMainGameReady { get; private set; }
 
     private bool _hideSessionConnectPanelOnLobbyLoad;
 
@@ -57,8 +66,27 @@ public class GameManager : MonoBehaviour
             return;
         }
 
+        if (next != GameState.MainGame)
+        {
+            IsMainGameReady = false;
+        }
+
         Debug.Log($"[SceneFlow] GameManager.SetState {CurrentState} -> {next}");
         CurrentState = next;
+    }
+
+    /// <summary>
+    /// 현재 피어의 MainGame 로딩 완료를 알린다. 같은 세션에서는 한 번만 발행된다.
+    /// </summary>
+    public void NotifyMainGameReady()
+    {
+        if (IsMainGameReady)
+        {
+            return;
+        }
+
+        IsMainGameReady = true;
+        OnMainGameReady?.Invoke();
     }
 
     private void OnDestroy()
