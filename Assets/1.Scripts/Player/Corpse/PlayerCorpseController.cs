@@ -254,12 +254,13 @@ public sealed class PlayerCorpseController : NetworkBehaviour
 
         for (int i = 0; i < hits.Length; i++)
         {
-            MovingPlatform platform =
-                hits[i].collider.GetComponentInParent<MovingPlatform>();
-            if (platform == null)
+            ISurfaceCarrier carrier =
+                hits[i].collider.GetComponentInParent<ISurfaceCarrier>();
+            if (carrier == null)
                 continue;
 
-            corpseRigidbody.position += platform.CurrentDelta;
+            corpseRigidbody.position +=
+                carrier.GetCarryDelta(corpseRigidbody.position, Time.deltaTime);
             return;
         }
     }
