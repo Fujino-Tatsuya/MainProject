@@ -1,9 +1,10 @@
-using UnityEngine;
+using System;
 using System.Collections.Generic;
 using Unity.Netcode;
-using System;
+using Unity.VisualScripting;
+using UnityEngine;
 
-public class ChargeController : NetworkBehaviour
+public class ChargeController : NetworkBehaviour, IDamageSettable
 {
     List<ChargingObject> chargeObjects;
     [SerializeField] float maxY = 1f;
@@ -13,6 +14,7 @@ public class ChargeController : NetworkBehaviour
     [SerializeField] int player3 = 3;
 
     [SerializeField] GameObject floor;
+    ColliderBasicAttack _floorColliderAttack;
 
     int _max = 0;
     int _destroyCount = 0;
@@ -27,6 +29,13 @@ public class ChargeController : NetworkBehaviour
     {
         base.OnNetworkSpawn();
         SetFloorActive(false);
+
+        if (!IsServer) return;
+
+        // 머지(2026-07-29): floor 장판 공격 참조 취득은 feature/Boss 쪽 신규 로직.
+        // floor가 비어 있는 프리팹이 있어 SetFloorActive와 같은 이유로 가드한다.
+        if (floor != null)
+            _floorColliderAttack = floor.GetComponent<ColliderBasicAttack>();
     }
 
     // floor 미배정 프리팹에서 NRE로 스폰이 중단되지 않게 한 곳에서만 만진다.
@@ -48,6 +57,11 @@ public class ChargeController : NetworkBehaviour
             UnsubscribeAll();
 
         base.OnNetworkDespawn();
+    }
+
+    public void SetDamage(int value)
+    {
+        _floorColliderAttack.SetDamage(value);
     }
 
     /// <summary>

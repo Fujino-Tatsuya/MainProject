@@ -88,6 +88,15 @@ public class BossBasicAttackChoice : BaseAttackChoice
         }
     }
 
+    // 머지(2026-07-29, feature/Boss): BaseAttackChoice에 PageEvent(int)가 추상 멤버로 추가됐다.
+    // 페이즈별 수치 주입은 No.23 전용 Page SO 체계이고, 코드 FSM 보스는 인스펙터 직렬화 값을 쓰며
+    // 페이즈에 따라 수치를 갈아끼우지 않는다 → 의도적으로 아무것도 하지 않는다.
+    // 페이즈별 수치가 필요해지면 TwentyThreeBasicAttackChoice.PageEvent처럼 Page SO를 받아
+    // attackChoices를 일괄 재설정하는 방식으로 구현할 것.
+    public override void PageEvent(int page)
+    {
+    }
+
     // 거리창 필터 + 가중치 룰렛. 유효 후보 없음/확률 0 → None(0).
     public override int GetRandomAttack(float currentDistance)
     {

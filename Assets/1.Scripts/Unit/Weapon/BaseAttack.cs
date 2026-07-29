@@ -54,7 +54,7 @@ public struct AttackHitContext
     }
 }
 
-public class BaseAttack : MonoBehaviour
+public class BaseAttack : MonoBehaviour, IDamageSettable
 {
     [SerializeField] protected int damage = 0;
     public int Damage { get { return damage; } }
@@ -83,6 +83,14 @@ public class BaseAttack : MonoBehaviour
     {
         damage = Mathf.Max(0, value);
         InitializeAttackInfo();
+    }
+
+    /// <summary>
+    /// damage int 값만 설정한다. (_attackInfo 스냅샷은 갱신하지 않음)
+    /// </summary>
+    public void SetDamage(int value)
+    {
+        damage = Mathf.Max(0, value);
     }
 
     public void SetTargetLayer(LayerMask value)

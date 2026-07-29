@@ -627,7 +627,7 @@ MonoBehaviour:
   isGroggyAttack: 0
   targetLayer:
     serializedVersion: 2
-    m_Bits: 256
+    m_Bits: 16384
   attackType: 1
   muzzle: {fileID: 0}
 --- !u!114 &5274188098871446382
@@ -651,7 +651,7 @@ MonoBehaviour:
   defaultHitbox: {fileID: 4124164167168416360}
   hittableLayers:
     serializedVersion: 2
-    m_Bits: 256
+    m_Bits: 16384
   endFallbackPadding: 0.1
 --- !u!114 &8345678279683584363
 MonoBehaviour:

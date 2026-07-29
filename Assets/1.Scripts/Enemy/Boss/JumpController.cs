@@ -3,15 +3,15 @@ using UnityEngine;
 using System.Collections.Generic;
 using Unity.Behavior;
 
-public class JumpController : NetworkBehaviour
+public class JumpController : NetworkBehaviour, IDamageSettable
 {
     [SerializeField] BehaviorGraphAgent bt;
     [SerializeField] string followTargetTag;
     [SerializeField] LayerMask playerLayer;
     [Tooltip("착지 지점을 찾을 바닥 레이어. 생성맵 바닥은 Ground가 아니라 Default다 — 둘 다 포함해야 한다.")]
     [SerializeField] LayerMask groundMask = 0;
-    [SerializeField] int damage;
-    [SerializeField] float jumpingTime = 0.5f; // 허공에 정지해있는 시간 (= 장판2 성장 시간)
+    // 머지(2026-07-29): 직렬화 damage / jumpingTime 필드는 feature/Boss에서 제거됐다.
+    // 착지 피해는 SetDamage(_damage), 정지 시간은 Blackboard JumpingTime(SO 주입)이 정본이다.
     [SerializeField] List<GameObject> meshRenderer;
 
     [Header("장판")]
@@ -31,6 +31,9 @@ public class JumpController : NetworkBehaviour
 
     SpriteRenderer _floorGrowRenderer;
 
+    KnockbackAttack _knockbackAttack;
+
+    int _damage;
     GameObject _target;
     Quaternion _baseRotation = Quaternion.identity;
     Vector3 _floorRootPos;
@@ -75,24 +78,20 @@ public class JumpController : NetworkBehaviour
 
         if (!IsServer) return;
 
-        if (jumpingTime <= 0)
-        {
-            Edit.LogError("[No.23] 'jumpingTime' is below than 0.", this);
-        }
-
         if (!bt.BlackboardReference.GetVariable<Vector3>("ArrivePoint", out ArrivePoint))
         {
             Edit.LogError("[No.23] Blackboard variable 'ArrivePoint' not found.", this);
         }
 
+        // JumpingTime 값은 TwentyThreeBlackboardInitializer가 SO에서 주입한다. 여기선 읽기 위해 참조만 확보.
         if (!bt.BlackboardReference.GetVariable<float>("JumpingTime", out JumpingTime))
         {
             Edit.LogError("[No.23] Blackboard variable 'JumpingTime' not found.", this);
         }
 
-        JumpingTime.Value = jumpingTime;
-
         _jumpDiff = AnimClipUtility.GetPlayTime(animator, animClip, multiplier, clipStart, clipEnd);
+
+        _knockbackAttack = GetComponent<KnockbackAttack>();
     }
 
 
@@ -143,14 +142,16 @@ public class JumpController : NetworkBehaviour
                 $"[No.23] 착지 지점 아래에서 바닥을 찾지 못했습니다({landingPos}) — 대상 높이를 그대로 사용합니다. " +
                 "JumpController.groundMask에 실제 바닥 레이어가 포함됐는지 확인하세요.", this);
         }
-
         _floorRootRot = _baseRotation * slopeRotation;
 
         ArrivePoint.Value = landingPos;
         _floorRootPos = landingPos;
 
+        // 서버가 최종 장판 성장시간을 계산해 모든 클라이언트에 동일하게 전달
+        float growDuration = JumpingTime.Value + _jumpDiff;
+
         _isJumping = true;
-        ShowFloorsClientRpc(_floorRootPos, _floorRootRot);
+        ShowFloorsClientRpc(_floorRootPos, _floorRootRot, growDuration);
         ShowMyMeshClientRpc(false);
     }
 
@@ -230,10 +231,19 @@ public class JumpController : NetworkBehaviour
             if (!damagedPlayers.Add(unit))
                 continue;
 
-            unit.TakeDamage(new AttackInfo(damage));
+            unit.TakeDamage(new AttackInfo(_damage));
+            _knockbackAttack.ApplyKnockbackAttack(unit.gameObject);
         }
 
         HideFloorsClientRpc();
+    }
+
+    /// <summary>
+    /// 착지 데미지(damage) 값만 설정한다.
+    /// </summary>
+    public void SetDamage(int value)
+    {
+        _damage = Mathf.Max(0, value);
     }
 
     void EnableMeshRenderers(bool enable)
@@ -264,7 +274,7 @@ public class JumpController : NetworkBehaviour
     }
 
     [ClientRpc]
-    void ShowFloorsClientRpc(Vector3 position, Quaternion rotation)
+    void ShowFloorsClientRpc(Vector3 position, Quaternion rotation, float growDuration)
     {
         _floorRootPos = position;
         _floorRootRot = rotation;
@@ -273,8 +283,8 @@ public class JumpController : NetworkBehaviour
         floorRoot.SetPositionAndRotation(position, rotation);
         SetFloorsEnable(true);
 
-        // 장판2: 0.1(prefab 시작 크기) → 장판1 크기까지 jumpingTime 동안 성장
-        floorGrow.StartOverTimeGrow(jumpingTime + _jumpDiff, floorBase.transform.localScale);
+        // 장판2: 0.1(prefab 시작 크기) → 장판1 크기까지 growDuration(서버 계산) 동안 성장
+        floorGrow.StartOverTimeGrow(growDuration, floorBase.transform.localScale);
     }
 
     [ClientRpc]

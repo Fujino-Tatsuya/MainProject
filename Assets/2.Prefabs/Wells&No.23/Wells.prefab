@@ -289,7 +289,7 @@ MonoBehaviour:
   spreadAngle: 30
   groundMask:
     serializedVersion: 2
-    m_Bits: 9
+    m_Bits: 8
 --- !u!1001 &6085385266305458409
 PrefabInstance:
   m_ObjectHideFlags: 0
