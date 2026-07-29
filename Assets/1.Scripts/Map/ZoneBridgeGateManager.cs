@@ -43,8 +43,11 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
     [SerializeField] private Key interactKey = Key.F;
 
     [Header("NavMesh")]
-    [Tooltip("개통 완료 시 NavMesh를 다시 굽는다. 다리가 걸어갈 수 있게 되는 시점.")]
-    [SerializeField] private bool rebakeNavMeshOnOpen = true;
+    [Tooltip("개통 완료 시 NavMesh 전체를 다시 굽는다. 기본은 끔 — 이 서피스는 맵 전체를 덮어 " +
+             "재베이크가 수백 ms 멈추고, 그 멈춤을 서버에서 전원이 겪는다. 정상 경로는 " +
+             "'열린 상태로 미리 굽고 평상시엔 카브로 막기'(ZoneBridgeGate)이므로 재베이크가 필요 없다. " +
+             "카브 방식이 안 먹는 지형에서만 임시로 켠다.")]
+    [SerializeField] private bool rebakeNavMeshOnOpen = false;
 
     private readonly NetworkList<GateState> gates = new NetworkList<GateState>(
         default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
@@ -54,6 +57,7 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
     // SlotID → 이 피어에 로컬로 생성된 존 게이트
     private readonly Dictionary<int, ZoneBridgeGate> _localGates = new Dictionary<int, ZoneBridgeGate>();
     private readonly HashSet<int> _navRebakeDone = new HashSet<int>();
+    private bool _warnedNoKeyboard;
 
     private void Awake() => Instance = this;
 
@@ -67,6 +71,16 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
     {
         base.OnNetworkSpawn();
         gates.OnListChanged += HandleGatesChanged;
+
+        // ⚠️ 순서 함정: 존 스폰(=RegisterGate)이 이 OnNetworkSpawn보다 먼저 올 수 있다. 씬 상주
+        // NetworkObject들 사이의 스폰 순서는 보장되지 않고, 맵 생성은 MapNetworkSync의
+        // OnNetworkSpawn에서 시작된다. 그때 NetworkList에 쓰면 조용히 버려져 상태 항목이 없는
+        // 채로 남고, 서버 RPC가 FindIndex에서 -1을 받아 아무 일도 일어나지 않는다.
+        // → 스폰 시점에 이미 등록된 게이트의 항목을 여기서 만든다.
+        foreach (int slotID in _localGates.Keys)
+            EnsureStateEntry(slotID);
+
+        Edit.Log($"[BridgeGate] 매니저 스폰 (서버:{IsServer}) — 등록된 게이트 {_localGates.Count}개 / 상태 항목 {gates.Count}개.", this);
         ApplyAllStates();
     }
 
@@ -102,12 +116,21 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
                 "그 조각은 움직이지 않습니다. 'Tools/Map/Authoring/Record Bridge Open Positions'로 저장하세요.", gate);
         }
 
-        if (IsServer && FindIndex(gate.SlotID) < 0)
-        {
-            gates.Add(new GateState { SlotID = gate.SlotID, ActivatedMask = 0, OpenStartServerTime = -1d });
-        }
-
+        EnsureStateEntry(gate.SlotID);
         ApplyState(gate);
+
+        Edit.Log(
+            $"[BridgeGate] 게이트 등록 — Slot {gate.SlotID}, 패널 {gate.PanelCount}개, 다리 {gate.SegmentCount}조각 " +
+            $"(반경 {gate.InteractRadius}m). 스폰됨:{IsSpawned} 서버:{IsServer} 상태항목:{gates.Count}", gate);
+    }
+
+    /// <summary>서버·스폰 완료 상태에서만 상태 항목을 만든다. 스폰 전 쓰기는 조용히 버려진다.</summary>
+    private void EnsureStateEntry(int slotID)
+    {
+        if (!IsServer || !IsSpawned) return;
+        if (FindIndex(slotID) >= 0) return;
+
+        gates.Add(new GateState { SlotID = slotID, ActivatedMask = 0, OpenStartServerTime = -1d });
     }
 
     public void UnregisterGate(ZoneBridgeGate gate)
@@ -121,9 +144,28 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
     {
         TickOpening();
 
-        if (!IsSpawned) return;
-        if (Keyboard.current == null) return;
+        if (Keyboard.current == null)
+        {
+            // 마지막 남은 조용한 경로 — Active Input Handling이 Input System을 포함하지 않으면 여기서 끝난다.
+            if (!_warnedNoKeyboard)
+            {
+                _warnedNoKeyboard = true;
+                Edit.LogError("[BridgeGate] Keyboard.current가 null입니다 — Input System 키보드를 읽을 수 없어 " +
+                              "F 상호작용이 동작하지 않습니다(Project Settings > Player > Active Input Handling 확인).", this);
+            }
+            return;
+        }
+
         if (!Keyboard.current[interactKey].wasPressedThisFrame) return;
+
+        // ⚠️ 키를 눌렀는데 아무 일도 안 일어나는 상태를 조용히 두지 않는다. 조기 반환이 6가지라
+        // 로그가 없으면 어디서 막혔는지 알 방법이 없다(F가 안 먹는다는 보고의 원인).
+        if (!IsSpawned)
+        {
+            Edit.LogWarning("[BridgeGate] F: 매니저가 아직 네트워크 스폰되지 않았습니다 — " +
+                            "MapScene에 배치한 뒤 씬을 저장했는지, NetworkObject가 붙어 있는지 확인하세요.", this);
+            return;
+        }
 
         TrySendInteract();
     }
@@ -134,23 +176,54 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
     /// </summary>
     private void TrySendInteract()
     {
-        if (!TryGetLocalPlayer(out Transform player, out PlayerLifeCycleController life, out PlayerEncounterLock lockState))
+        if (_localGates.Count == 0)
+        {
+            Edit.LogWarning("[BridgeGate] F: 등록된 게이트가 0개입니다 — ZoneL_typeB가 이번 시드에 배치되지 않았거나, " +
+                            "존 프리팹에 ZoneBridgeGate가 없습니다('Wire Zone Bridge Gate' 확인).", this);
             return;
+        }
+
+        if (!TryGetLocalPlayer(out Transform player, out PlayerLifeCycleController life, out PlayerEncounterLock lockState))
+        {
+            Edit.LogWarning("[BridgeGate] F: 로컬 플레이어(PlayerObject)를 찾지 못했습니다 — 아직 스폰 전이거나 " +
+                            "이 피어에 플레이어가 없습니다.", this);
+            return;
+        }
 
         // 유령·사망·연출 잠금 중에는 상호작용하지 않는다.
-        if (life != null && life.State != PlayerLifeState.Alive) return;
-        if (lockState != null && lockState.IsCinematicLocked) return;
+        if (life != null && life.State != PlayerLifeState.Alive)
+        {
+            Edit.Log($"[BridgeGate] F 무시: 플레이어 상태가 {life.State}입니다(Alive만 가능).", this);
+            return;
+        }
 
-        if (!TryFindNearestPanel(player.position, out int slotID, out int panelIndex)) return;
+        if (lockState != null && lockState.IsCinematicLocked)
+        {
+            Edit.Log("[BridgeGate] F 무시: 연출 잠금 중입니다.", this);
+            return;
+        }
 
+        if (!TryFindNearestPanel(player.position, out int slotID, out int panelIndex, out float nearestDistance, out int skippedActive))
+        {
+            Edit.Log(
+                $"[BridgeGate] F 무시: 반경 안에 미활성 패널이 없습니다. 가장 가까운 미활성 패널 " +
+                $"{(nearestDistance < float.MaxValue ? $"{nearestDistance:F2}m" : "없음")} / " +
+                $"이미 활성 {skippedActive}개 / 플레이어 {player.position}", this);
+            return;
+        }
+
+        Edit.Log($"[BridgeGate] F: Slot {slotID} 패널 {panelIndex} 요청 (거리 {nearestDistance:F2}m).", this);
         RequestInteractServerRpc(slotID, panelIndex);
     }
 
-    private bool TryFindNearestPanel(Vector3 from, out int slotID, out int panelIndex)
+    private bool TryFindNearestPanel(Vector3 from, out int slotID, out int panelIndex,
+                                     out float nearestDistance, out int skippedActive)
     {
         slotID = -1;
         panelIndex = -1;
+        skippedActive = 0;
         float best = float.MaxValue;
+        float nearestAny = float.MaxValue;   // 반경 밖이라도 가장 가까운 미활성 패널 거리(진단용)
 
         foreach (KeyValuePair<int, ZoneBridgeGate> kv in _localGates)
         {
@@ -163,10 +236,12 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
 
             for (int i = 0; i < gate.PanelCount; i++)
             {
-                if ((mask & (1 << i)) != 0) continue;                     // 이미 활성
+                if ((mask & (1 << i)) != 0) { skippedActive++; continue; }   // 이미 활성
                 if (!gate.TryGetPanelPosition(i, out Vector3 p)) continue;
 
                 float sqr = (p - from).sqrMagnitude;
+                if (sqr < nearestAny) nearestAny = sqr;
+
                 if (sqr > radiusSqr || sqr >= best) continue;
 
                 best = sqr;
@@ -175,6 +250,7 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
             }
         }
 
+        nearestDistance = nearestAny < float.MaxValue ? Mathf.Sqrt(nearestAny) : float.MaxValue;
         return slotID >= 0;
     }
 
@@ -182,23 +258,42 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
     private void RequestInteractServerRpc(int slotID, int panelIndex, ServerRpcParams p = default)
     {
         int index = FindIndex(slotID);
-        if (index < 0) return;
+        if (index < 0)
+        {
+            Edit.LogWarning($"[BridgeGate] 서버 거부: Slot {slotID}의 상태 항목이 없습니다 — " +
+                            "게이트 등록이 매니저 스폰보다 먼저였을 수 있습니다.", this);
+            return;
+        }
 
         GateState state = gates[index];
         if (panelIndex < 0 || panelIndex >= 32) return;
         if ((state.ActivatedMask & (1 << panelIndex)) != 0) return;       // 멱등 — 중복 요청 무시
 
-        if (!_localGates.TryGetValue(slotID, out ZoneBridgeGate gate) || gate == null) return;
+        if (!_localGates.TryGetValue(slotID, out ZoneBridgeGate gate) || gate == null)
+        {
+            Edit.LogWarning($"[BridgeGate] 서버 거부: Slot {slotID}의 존이 서버에 없습니다.", this);
+            return;
+        }
         if (!gate.TryGetPanelPosition(panelIndex, out Vector3 panelPos)) return;
 
         // 서버 재검증: 보낸 클라의 플레이어가 실제로 그 패널 근처에 살아 있는지.
         // 클라 검사만 믿으면 어디서든 개통할 수 있게 된다.
         if (!TryGetPlayerOf(p.Receive.SenderClientId, out Transform sender, out PlayerLifeCycleController life))
+        {
+            Edit.LogWarning($"[BridgeGate] 서버 거부: client {p.Receive.SenderClientId}의 PlayerObject를 찾지 못했습니다.", this);
             return;
+        }
         if (life != null && life.State != PlayerLifeState.Alive) return;
 
         float radius = gate.InteractRadius;
-        if ((sender.position - panelPos).sqrMagnitude > radius * radius) return;
+        float distance = Vector3.Distance(sender.position, panelPos);
+        if (distance > radius)
+        {
+            Edit.LogWarning($"[BridgeGate] 서버 거부: 거리 {distance:F2}m > 반경 {radius}m " +
+                            $"(서버가 본 플레이어 {sender.position} / 패널 {panelPos}). " +
+                            "클라와 서버의 플레이어 위치가 어긋나면 이 값이 벌어진다.", this);
+            return;
+        }
 
         state.ActivatedMask |= 1 << panelIndex;
 
@@ -300,7 +395,8 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
         life = null;
         lockState = null;
 
-        NetworkObject po = NetworkManager != null ? NetworkManager.LocalClient.PlayerObject : null;
+        // LocalClient는 null일 수 있다 — 프로젝트의 다른 소비처(BossTeleportManager)와 같이 ?. 를 쓴다.
+        NetworkObject po = NetworkManager != null ? NetworkManager.LocalClient?.PlayerObject : null;
         if (po == null) return false;
 
         player = po.transform;

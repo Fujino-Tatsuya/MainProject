@@ -48,6 +48,12 @@ public class MapNavMeshBaker : MonoBehaviour
         if (nm != null && nm.IsListening && !nm.IsServer) return;
 
         if (surface == null) return;
+
+        // 다리처럼 "나중에 연결되는 지오메트리"는 **베이크 시점에 연결돼 있어야** NavMesh가 이어진다.
+        // 런타임 재베이크는 이 서피스가 맵 전체(원점~x≈500)를 덮어 수백 ms 멈추므로 답이 아니다 —
+        // 열린 상태로 한 번 굽고, 평상시에는 NavMeshObstacle 카브로 막는다(ZoneBridgeGate).
+        // 스코프가 이 함수 안에서 왕복을 끝내므로 순서가 보장된다.
+        using (ZoneBridgeGate.BakeOpenScope bridges = ZoneBridgeGate.BakeOpenScope.Begin())
         using (UnreadableMeshColliderBakeScope fallback =
                UnreadableMeshColliderBakeScope.BeginLoadedScenes())
         {
@@ -59,6 +65,9 @@ public class MapNavMeshBaker : MonoBehaviour
                     this);
             }
 
+            if (bridges.GateCount > 0)
+                Debug.Log($"[MapNavMeshBaker] 다리 게이트 {bridges.GateCount}개를 연결 상태로 두고 굽습니다.", this);
+
             surface.BuildNavMesh();
         }
 
@@ -66,16 +75,41 @@ public class MapNavMeshBaker : MonoBehaviour
         Debug.Log($"[MapNavMeshBaker] NavMesh 베이크 완료 + 에이전트 재부착 (사유: {reason}).");
     }
 
+    // 재부착 허용 거리. 이보다 멀리 옮기지 않는다 — 넓게 잡으면 틈을 건너뛴다.
+    private const float ReattachRadius = 5f;
+    private const float ReattachMaxDrift = 1.5f;
+
     // 베이크 이전에 스폰된 몬스터 에이전트를 새 메시에 재부착(Warp).
+    //
+    // ⚠️ 예전엔 5m 안에서 찾은 아무 지점으로나 Warp했다. 이 맵은 플랫폼 사이가 어두운 틈으로
+    // 갈라져 있어서, 자기 발밑에 메시가 없는 몹이 **틈 건너 옆 플랫폼으로 순간이동**했다.
+    // 그러면 "갈 수 없는 곳에 몬스터가 있다"가 되고, 거기서부터는 정상 경로가 없다.
+    // → 부착은 제자리 보정(1.5m) 수준만 허용하고, 그보다 멀면 옮기지 않고 에러로 알린다.
+    //   제자리에 굳은 몹은 눈에 보이고 고칠 수 있다. 엉뚱한 섬으로 간 몹은 원인 추적이 어렵다.
     private static void ReattachAgents()
     {
         foreach (NavMeshAgent agent in Object.FindObjectsByType<NavMeshAgent>(FindObjectsSortMode.None))
         {
             if (agent == null || !agent.enabled || agent.isOnNavMesh) continue;
-            if (NavMesh.SamplePosition(agent.transform.position, out NavMeshHit hit, 5f, NavMesh.AllAreas))
-                agent.Warp(hit.position);
-            else
-                Debug.LogWarning($"[MapNavMeshBaker] '{agent.name}' 주변 5m에 NavMesh 없음 — 재부착 실패(스폰 마커 위치 확인 필요).", agent);
+
+            if (!NavMesh.SamplePosition(agent.transform.position, out NavMeshHit hit, ReattachRadius, NavMesh.AllAreas))
+            {
+                Debug.LogWarning($"[MapNavMeshBaker] '{agent.name}' 주변 {ReattachRadius}m에 NavMesh 없음 — " +
+                                 "재부착 실패(스폰 마커 위치 확인 필요).", agent);
+                continue;
+            }
+
+            float drift = Vector3.Distance(agent.transform.position, hit.position);
+            if (drift > ReattachMaxDrift)
+            {
+                Debug.LogError(
+                    $"[MapNavMeshBaker] '{agent.name}' 재부착을 건너뜁니다 — 가장 가까운 NavMesh가 {drift:F2}m " +
+                    $"떨어져 있어(허용 {ReattachMaxDrift}m) 옮기면 틈을 건너 다른 플랫폼으로 순간이동합니다. " +
+                    "이 몹의 스폰 마커가 NavMesh 밖입니다(존 저작 확인).", agent);
+                continue;
+            }
+
+            agent.Warp(hit.position);
         }
     }
 }

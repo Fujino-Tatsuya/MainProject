@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.AI;
 
 /// <summary>
 /// 존 프리팹이 <b>스스로 들고 다니는</b> 다리 개통 장치 저작 데이터.
@@ -50,11 +51,22 @@ public sealed class ZoneBridgeGate : MonoBehaviour
     [Tooltip("상호작용 가능 거리(m). 플레이어가 패널에서 이 안에 있어야 F가 먹는다.")]
     [SerializeField, Min(0.5f)] private float interactRadius = 2.5f;
 
-    [Tooltip("활성 표시 링의 반지름(m). 스크린샷의 청록 링.")]
+    [Header("활성 표시 링")]
+    [Tooltip("링 반지름(m).")]
     [SerializeField, Min(0.2f)] private float ringRadius = 1.2f;
 
-    [Tooltip("활성 표시 링 색.")]
+    [Tooltip("링 색.")]
     [SerializeField] private Color ringColor = new Color(0.45f, 0.9f, 1f, 1f);
+
+    [Tooltip("링 선 굵기(m).")]
+    [SerializeField, Min(0.01f)] private float ringWidth = 0.12f;
+
+    [Tooltip("바닥에서 띄우는 높이(m). 너무 작으면 바닥과 Z-fighting으로 지글거린다.")]
+    [SerializeField, Min(0f)] private float ringGroundLift = 0.05f;
+
+    [Tooltip("비우면 절차 생성 원(LineRenderer)을 쓴다. 채우면 이 프리팹을 대신 쓴다 — " +
+             "전용 아트로 갈아끼우는 경로. 이 경우 위 반지름·색·굵기는 무시되고 프리팹이 스스로 정한다.")]
+    [SerializeField] private GameObject ringPrefabOverride;
 
     public IReadOnlyList<Transform> Panels => panels;
     public int PanelCount => panels != null ? panels.Count : 0;
@@ -77,7 +89,123 @@ public sealed class ZoneBridgeGate : MonoBehaviour
     void Awake()
     {
         BuildRings();
+        BuildGapObstacle();
         ApplyOpenProgress(0f);
+    }
+
+    // ── NavMesh: 미리 굽고 카브로 막는다 ──────────────────────────────────
+    //
+    // 런타임에 서피스를 다시 굽는 건 답이 아니다 — 이 프로젝트의 NavMeshSurface는 맵 전체
+    // (원점~x≈500)를 덮어서 재베이크가 수백 ms 단위로 멈춘다. 서버에서 그 멈춤은 전원이 겪는다.
+    //
+    // 그래서 반대로 한다: **베이크 시점에 다리를 연결된 상태로 두고 굽고**(BakeOpenScope),
+    // 평상시에는 그 위를 NavMeshObstacle로 **카브해 막는다**. 개통되면 카브를 끄면 끝 —
+    // 카브 갱신은 부분 갱신이라 값이 싸고, 재베이크가 0회다.
+    //
+    // 카브가 필요한 이유: 열린 상태로 구워두면 다리가 물러나 있는 동안에도 NavMesh는 "걸을 수 있다"고
+    // 말한다. 플레이어는 물리라 떨어지지만 NavMeshAgent(몬스터)는 허공을 건너간다.
+
+    const float CarveVerticalPadding = 2f;
+
+    NavMeshObstacle _gapObstacle;
+
+    void BuildGapObstacle()
+    {
+        if (_gapObstacle != null || segments == null || segments.Count == 0) return;
+        if (!TryGetOpenSpanBounds(out Bounds localBounds)) return;
+
+        var go = new GameObject("BridgeGapCarve");
+        go.transform.SetParent(transform, false);
+        go.transform.localPosition = localBounds.center;
+        go.transform.localRotation = Quaternion.identity;
+
+        _gapObstacle = go.AddComponent<NavMeshObstacle>();
+        _gapObstacle.shape = NavMeshObstacleShape.Box;
+
+        // 데크가 얇아 바운즈 그대로 쓰면 카브 박스가 NavMesh 표면을 스치지 못하고 빗나간다.
+        // 위아래로 넉넉히 부풀려 확실히 파낸다(가로·세로는 다리 폭 그대로 — 넓히면 옆 바닥을 깎는다).
+        Vector3 size = localBounds.size;
+        size.y = Mathf.Max(size.y, 1f) + CarveVerticalPadding;
+        _gapObstacle.size = size;
+        _gapObstacle.carving = true;
+        _gapObstacle.carveOnlyStationary = false;   // 켜고 끄는 순간 바로 반영돼야 한다
+    }
+
+    /// <summary>다리가 열렸을 때 걸을 수 있게 되는 구간의 로컬 바운즈. 카브 박스 크기의 근거.</summary>
+    bool TryGetOpenSpanBounds(out Bounds localBounds)
+    {
+        localBounds = default;
+        bool any = false;
+
+        foreach (Segment s in segments)
+        {
+            if (s.Target == null || !s.HasOpenPosition) continue;
+
+            Renderer[] renderers = s.Target.GetComponentsInChildren<Renderer>(true);
+            if (renderers.Length == 0) continue;
+
+            // 조각을 열림 위치로 옮겨 놓고 바운즈를 읽은 뒤 되돌린다 — 열림 상태의 실제 점유 공간이
+            // 필요하므로 닫힘 위치의 바운즈를 평행이동하는 것으로는 회전·스케일을 못 맞춘다.
+            Vector3 saved = s.Target.localPosition;
+            s.Target.localPosition = s.OpenLocalPosition;
+
+            foreach (Renderer r in renderers)
+            {
+                Bounds w = r.bounds;
+                Vector3 c = transform.InverseTransformPoint(w.center);
+                Vector3 e = transform.InverseTransformVector(w.extents);
+                var lb = new Bounds(c, new Vector3(Mathf.Abs(e.x), Mathf.Abs(e.y), Mathf.Abs(e.z)) * 2f);
+
+                if (!any) { localBounds = lb; any = true; }
+                else localBounds.Encapsulate(lb);
+            }
+
+            s.Target.localPosition = saved;
+        }
+
+        return any;
+    }
+
+    /// <summary>
+    /// NavMesh를 굽는 동안만 다리를 연결 상태로 만드는 스코프. <see cref="MapNavMeshBaker"/>가 쓴다.
+    /// 이 함수 안에서 왕복이 끝나므로 "굽기 전에 열고 굽고 나서 닫는" 순서가 보장된다
+    /// (OnGenerated 구독자 사이의 호출 순서에 의존하지 않는다).
+    /// </summary>
+    public sealed class BakeOpenScope : System.IDisposable
+    {
+        readonly List<(ZoneBridgeGate gate, float progress)> _saved = new List<(ZoneBridgeGate, float)>();
+
+        public static BakeOpenScope Begin()
+        {
+            var scope = new BakeOpenScope();
+
+            foreach (ZoneBridgeGate gate in FindObjectsByType<ZoneBridgeGate>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                if (gate == null) continue;
+
+                scope._saved.Add((gate, gate.OpenProgress));
+                gate.ApplyOpenProgress(1f);           // 연결된 상태로 굽는다
+                gate.SetGapCarveEnabled(false);       // 카브가 켜져 있으면 구운 결과가 다시 파인다
+            }
+
+            return scope;
+        }
+
+        public int GateCount => _saved.Count;
+
+        public void Dispose()
+        {
+            foreach ((ZoneBridgeGate gate, float progress) in _saved)
+            {
+                if (gate == null) continue;
+                gate.ApplyOpenProgress(progress);     // 원래(대개 끊긴) 상태로 되돌린다
+            }
+        }
+    }
+
+    void SetGapCarveEnabled(bool enabled)
+    {
+        if (_gapObstacle != null) _gapObstacle.enabled = enabled;
     }
 
     /// <summary>
@@ -98,7 +226,8 @@ public sealed class ZoneBridgeGate : MonoBehaviour
                 continue;
             }
 
-            _rings.Add(ZoneInteractRing.Create(panel, ringRadius, ringColor));
+            _rings.Add(ZoneInteractRing.Create(panel, ringRadius, ringColor, ringWidth,
+                                               ringGroundLift, ringPrefabOverride));
         }
     }
 
@@ -147,6 +276,9 @@ public sealed class ZoneBridgeGate : MonoBehaviour
 
             s.Target.localPosition = Vector3.Lerp(s.ClosedLocalPosition, s.OpenLocalPosition, _openProgress);
         }
+
+        // 완전히 열렸을 때만 카브를 뺀다. 이동 중에 미리 빼면 다리가 도착하기 전에 몬스터가 허공으로 들어간다.
+        SetGapCarveEnabled(_openProgress < 1f);
     }
 
     /// <summary>저작이 빠진 조각 수. 스폰 시 매니저가 경고에 쓴다.</summary>

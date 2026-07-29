@@ -403,6 +403,42 @@ Life/PlayerLifeCycleController, Life/PlayerLifeInputPolicy}`, `1.Scripts/Unit/St
 - `[No.23] Floor 넉백 공격 적중: Player(Clone) (피해 0)`이 **19회 이상 연속**으로 찍힌다.
   장판 넉백이 매 프레임 재적중하면서 데미지는 0 — 중복 방지 누락과 데미지 값 둘 다 의심된다.
 
+### ▶▶ 다음 세션 시작점 (2026-07-29 마감 · 팀장 지시)
+
+**1. 몬스터가 NavMesh 없는 공중을 걸어서 건너온다 (확정 — 원인 미규명)**
+- 팀장 확인: 몹이 순간이동한 게 아니라 **걸어서** 고립 플랫폼으로 건너왔다. 즉 NavMesh가 **틈 위 공중에
+  깔려 있다.** `ReattachAgents` Warp는 원인이 아니다(그 건은 별개로 1.5m 제한으로 수정 완료 — lessons #31).
+- 조사할 것: `NavMeshSurface` 설정(`agentClimb`/`agentRadius`/voxel size). 낮은 단차를 이어붙이는
+  `agentClimb`가 크면 플랫폼 사이 틈이 walkable로 연결된다. `MapNavMeshBaker.Awake`가 강제하는 값은
+  `useGeometry`·`collectObjects`·`layerMask`뿐이고 **에이전트 파라미터는 씬 세팅 그대로**다 — 거기부터 본다.
+- ⚠️ 이번 세션에 내가 바꾼 것도 용의자다: NavMesh를 **다리가 열린 상태로** 굽게 했다(`BakeOpenScope`).
+  카브(`ZoneBridgeGate` 의 `BridgeGapCarve`)가 안 먹으면 다리가 물러난 구간이 walkable로 남는다.
+  Play에서 그 오브젝트가 생성되는지, 크기가 다리 구간을 덮는지 먼저 확인할 것.
+
+**2. 민경 팀원 커밋 3개 받기 (`origin/feature/Boss`)**
+- `89bc9e1`(페이즈별 Page SO) · `e61999d`(SO 리스트 통합) · `9a2cad0`(넉백 SO + BossScene 리네임).
+- 팀장이 민경에게 **커밋 추가 요청**해둘 예정 → 받은 뒤 머지. 상세 분석·리스크는 이 문서 위쪽
+  「⚠️⚠️ 위 권고는 무효」 절 참조.
+- 🔴 **머지 전 필수**: `git status`로 `Assets/8.BehaviorTreeGraph/*` dirty 확인 → dirty면 `git checkout --`으로
+  폐기. Unity가 리컴파일마다 재직렬화하므로 계속 되살아난다. 커밋하면 민경의 11k줄을 덮어쓴다.
+- 🔴 **`git add -A` 금지** — 위 BT 에셋이 섞여 들어간다(이번 세션에 실제로 한 번 섞여 amend로 제거).
+
+**3. 대시 — 다음 Play 1회로 확정 (로그 심어둠)**
+- `TryBeginPredictedDash`의 게이트 5개에 사유 로그를 넣었다. Shift 한 번이면 반드시 한 줄 나온다.
+- 유력: `[Dash] 시작 불가: 충전 없음 0/1, 다음 충전까지 N초` → `maxCharge 1 / rechargeDuration 2`는
+  `feature/dash-soul` 원본값이고 머지 유실 아님. 그러면 **버그가 아니라 밸런스 결정**(maxCharge 상향 여부).
+- 서버 거부 로그(`서버가 대시를 취소했습니다`)가 안 뜬 것이 단서였다 — 거부 경로가 아니라 시작 자체가 안 됨.
+
+**4. 미착수 (오후 목표 잔여)**
+- 벤트에서 증기 나옴
+- 이동 플랫폼 바닥 `Env_MV_floor_typeA` 컨베이어 — 은희와 협의 후 추가
+
+**완료된 것 (이번 세션 후반)**
+- 다리 개통 F 상호작용 **동작 확인**(패널 4개 → 링 4개 → 다리 lerp 이동). 링 각도 버그 수정
+  (원을 로컬 XZ에 그리고 또 90° 돌려 벽면이 됐던 것 → 로컬 XY로 그림).
+- 다리 조각에 MeshCollider 자동 부착(없으면 NavMesh에 안 올라간다 — lessons #29).
+- 열림 위치 저작 완료(팀장 확인: 의도 맞음). `Record Bridge CLOSED/OPEN Positions` 도구 2개.
+
 ### ▶ 이전 세션 시작점(참고용)
 
 **증상: 보스룸으로 이동은 되는데 보스가 안 나온다 — 정상이다.** MapScene에는 보스를 스폰하는

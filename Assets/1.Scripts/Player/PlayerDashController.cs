@@ -175,18 +175,43 @@ public class PlayerDashController : NetworkBehaviour
     /// <summary>Idle/Move 액션 입력에서 대시 우선으로 호출된다. 게이트 통과 시 예측 소비 + 대시 진입(+온라인이면 서버 요청).</summary>
     public bool TryBeginPredictedDash()
     {
+        // ⚠️ 아래 5개 게이트는 전부 조용히 false를 돌려줬다. 그래서 "대시가 안 되는데 로그도 없다"가
+        // 됐고, 원인을 서버 거부 쪽에서 찾다가 시간을 썼다. 실제로는 대시가 **시작조차 안 되는**
+        // 경우가 여기 숨는다. 입력 1회당 한 줄이므로 스팸이 되지 않는다.
         if (!DashEnabled)
+        {
+            Edit.LogWarning($"[Dash] 시작 불가: 대시가 비활성입니다(dashData 미할당 또는 값 비정상). " +
+                            $"ready={ready} config.DashEnabled={config.DashEnabled}", this);
             return false;
+        }
+
         if (player == null || !player.IsMovementAuthority)
+        {
+            Edit.LogWarning("[Dash] 시작 불가: 이동 권한이 없습니다(오너가 아님).", this);
             return false;
+        }
+
         if (!player.CanMove)
+        {
+            Edit.LogWarning($"[Dash] 시작 불가: CanMove=false (상태 {stateController?.CurrentState}). " +
+                            "연출 잠금·CC·사망 게이트를 확인하세요.", this);
             return false;
+        }
+
         if (groundingSensor != null && !groundingSensor.IsGrounded)
+        {
+            Edit.LogWarning("[Dash] 시작 불가: 접지 상태가 아닙니다(공중). PlayerGroundingSensor 판정 확인.", this);
             return false;
+        }
 
         double now = OwnerNow();
         if (!predictedLedger.TryConsume(now))
+        {
+            // 가장 흔한 정상 거절 — 충전 1개/재충전 2초 설계라 연속 입력은 여기서 막힌다.
+            Edit.Log($"[Dash] 시작 불가: 충전 없음 {predictedLedger.Count}/{predictedLedger.MaxCharge}, " +
+                     $"다음 충전까지 {Mathf.Max(0f, (float)(predictedLedger.NextReadyTime - now)):F2}초.", this);
             return false;
+        }
 
         Vector3 direction = ResolveDashDirection();
         bool started = stateController.BeginDash(direction, (float)config.DashSpeed, (float)config.DashDuration, BuildMotionSettings());

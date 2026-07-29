@@ -61,6 +61,12 @@ public static class ZoneBridgeGateWiring
             so.ApplyModifiedPropertiesWithoutUndo();
 
             log.AppendLine($"  다리 {bridges.Count}조각: {Names(bridges)}");
+
+            // ⚠️ 콜라이더가 없으면 NavMesh에 안 올라간다. MapNavMeshBaker는
+            // useGeometry = PhysicsColliders 이므로 렌더러만 있는 다리는 베이크에서 통째로 빠지고,
+            // 개통해도 그 위를 걸을 수 없다(실제로 그렇게 났다). 여기서 보장한다.
+            int collidersAdded = EnsureMeshColliders(bridges, log);
+            log.AppendLine($"  MeshCollider 신규 부착 {collidersAdded}개");
             log.AppendLine($"  닫힘 위치 = 현재 위치로 기록 / 열림 위치 보존 {kept}건 · 미저작 {bridges.Count - kept}건");
 
             if (panels.Count == 0)
@@ -159,23 +165,37 @@ public static class ZoneBridgeGateWiring
         }
     }
 
-    [MenuItem("Tools/Map/Authoring/Record Bridge Open Positions (prefab stage)")]
-    public static void RecordOpenPositions()
+    [MenuItem("Tools/Map/Authoring/Record Bridge CLOSED Positions (prefab stage)")]
+    public static void RecordClosedPositions()
     {
-        PrefabStage stage = PrefabStageUtility.GetCurrentPrefabStage();
-        if (stage == null || stage.assetPath != ZonePath)
+        if (!TryGetStageGate(out ZoneBridgeGate gate, out PrefabStage stage)) return;
+
+        var so = new SerializedObject(gate);
+        SerializedProperty segs = so.FindProperty("segments");
+        var log = new StringBuilder("[BridgeGate] 현재 위치를 '닫힘(평상시)'으로 저장합니다:\n");
+        int n = 0;
+
+        for (int i = 0; i < segs.arraySize; i++)
         {
-            Debug.LogError($"[BridgeGate] {ZonePath}를 **프리팹 모드로 열고** 다리를 연결 위치로 옮긴 뒤 실행하세요. " +
-                           "(Project 창에서 프리팹 더블클릭)");
-            return;
+            SerializedProperty e = segs.GetArrayElementAtIndex(i);
+            var t = e.FindPropertyRelative("Target").objectReferenceValue as Transform;
+            if (t == null) continue;
+
+            e.FindPropertyRelative("ClosedLocalPosition").vector3Value = t.localPosition;
+            log.AppendLine($"  {t.name}: 닫힘 {t.localPosition}");
+            n++;
         }
 
-        var gate = stage.prefabContentsRoot.GetComponent<ZoneBridgeGate>();
-        if (gate == null)
-        {
-            Debug.LogError("[BridgeGate] 먼저 'Wire Zone Bridge Gate'를 실행하세요.");
-            return;
-        }
+        so.ApplyModifiedProperties();
+        EditorSceneManager.MarkSceneDirty(stage.scene);
+        log.AppendLine($"완료: {n}조각. 이제 다리를 **연결된 위치**로 옮기고 'Record Bridge OPEN Positions'를 실행하세요.");
+        Debug.Log(log.ToString());
+    }
+
+    [MenuItem("Tools/Map/Authoring/Record Bridge OPEN Positions (prefab stage)")]
+    public static void RecordOpenPositions()
+    {
+        if (!TryGetStageGate(out ZoneBridgeGate gate, out PrefabStage stage)) return;
 
         var so = new SerializedObject(gate);
         SerializedProperty segs = so.FindProperty("segments");
@@ -207,6 +227,61 @@ public static class ZoneBridgeGateWiring
 
         log.AppendLine($"완료: {n}조각 저장. **프리팹 저장 필요**(Ctrl+S).");
         Debug.Log(log.ToString());
+    }
+
+    /// <summary>
+    /// 프리팹 모드로 열려 있는 ZoneL_typeB의 게이트를 가져온다.
+    /// 프리팹 스테이지에서 작업하는 이유: 저작은 눈으로 위치를 맞추는 일이고, 스테이지 밖에서
+    /// <c>LoadPrefabContents</c>로 열면 같은 프리팹을 두 곳에서 편집해 나중 저장이 앞선 것을 덮는다.
+    /// </summary>
+    static bool TryGetStageGate(out ZoneBridgeGate gate, out PrefabStage stage)
+    {
+        gate = null;
+        stage = PrefabStageUtility.GetCurrentPrefabStage();
+
+        if (stage == null || stage.assetPath != ZonePath)
+        {
+            Debug.LogError($"[BridgeGate] {ZonePath}를 **프리팹 모드로 열고** 실행하세요 " +
+                           "(Project 창에서 프리팹 더블클릭).");
+            return false;
+        }
+
+        gate = stage.prefabContentsRoot.GetComponent<ZoneBridgeGate>();
+        if (gate == null)
+        {
+            Debug.LogError("[BridgeGate] 프리팹에 ZoneBridgeGate가 없습니다 — 먼저 'Wire Zone Bridge Gate'를 실행하세요.");
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// 다리 조각(과 그 자식)에서 MeshFilter가 있는데 Collider가 없는 곳에 MeshCollider를 붙인다.
+    /// 이미 있으면 건드리지 않으므로 재실행 안전하다(손으로 붙인 것도 보존).
+    ///
+    /// convex는 켜지 않는다 — 다리 데크는 오목한 형상일 수 있고, Rigidbody가 없는 정적 콜라이더라
+    /// 비볼록도 그대로 쓸 수 있다. 개통 때 한 번 움직이는 비용은 무시 가능하다.
+    /// </summary>
+    static int EnsureMeshColliders(List<Transform> bridges, StringBuilder log)
+    {
+        int added = 0;
+
+        foreach (Transform bridge in bridges)
+        {
+            foreach (MeshFilter mf in bridge.GetComponentsInChildren<MeshFilter>(true))
+            {
+                if (mf.sharedMesh == null) continue;
+                if (mf.GetComponent<Collider>() != null) continue;
+
+                var mc = mf.gameObject.AddComponent<MeshCollider>();
+                mc.convex = false;
+                added++;
+                log.AppendLine($"    + MeshCollider: {bridge.name}/{mf.name} (mesh {mf.sharedMesh.name})");
+            }
+        }
+
+        return added;
     }
 
     static List<Transform> Collect(GameObject root, string prefix)
