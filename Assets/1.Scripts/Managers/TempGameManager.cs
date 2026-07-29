@@ -89,6 +89,59 @@ public class GameManager : MonoBehaviour
         OnMainGameReady?.Invoke();
     }
 
+    /// <summary>
+    /// OnMainGameReady 구독 파사드. 이벤트를 몰라도 이 한 줄로 안전하게 구독한다.
+    /// - 이미 준비된 상태면 콜백을 <b>즉시 1회</b> 실행한다(늦게 붙은 구독자 보호).
+    /// - 아직이면 준비되는 순간 자동 호출되도록 등록한다.
+    /// - 같은 세션에서 중복 실행되지 않는다(발행이 멱등).
+    /// 반드시 짝이 되는 <see cref="UnsubscribeMainGameReady"/>로 해제할 것(GameManager는 계속 살아있음).
+    /// </summary>
+    public void SubscribeMainGameReady(Action callback)
+    {
+        if (callback == null)
+        {
+            return;
+        }
+
+        OnMainGameReady += callback;   // 이후(다음 세션 재진입 포함) 발행 대비
+        if (IsMainGameReady)
+        {
+            callback();                // 이미 지나갔으면 지금 1회
+        }
+    }
+
+    /// <summary><see cref="SubscribeMainGameReady"/>로 등록한 콜백을 해제한다.</summary>
+    public void UnsubscribeMainGameReady(Action callback)
+    {
+        if (callback == null)
+        {
+            return;
+        }
+
+        OnMainGameReady -= callback;
+    }
+
+    /// <summary>
+    /// Instance null 방어까지 포함한 정적 구독 파사드. 구독자는 GameManager 참조 없이 호출 가능.
+    /// 예) GameManager.SubscribeReady(OnReady); / 해제: GameManager.UnsubscribeReady(OnReady);
+    /// </summary>
+    public static void SubscribeReady(Action callback)
+    {
+        if (Instance == null)
+        {
+            Debug.LogWarning("[GameManager] Instance가 아직 없어 MainGameReady 구독 실패. BootStrap 이후 호출할 것.");
+            return;
+        }
+
+        Instance.SubscribeMainGameReady(callback);
+    }
+
+    /// <summary><see cref="SubscribeReady"/>로 등록한 콜백을 해제한다.</summary>
+    public static void UnsubscribeReady(Action callback)
+    {
+        Instance?.UnsubscribeMainGameReady(callback);
+    }
+
     private void OnDestroy()
     {
         if (Instance == this)
