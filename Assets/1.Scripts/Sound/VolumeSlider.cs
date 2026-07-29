@@ -37,7 +37,7 @@ public class VolumeSlider : MonoBehaviour
     {
         _slider.onValueChanged.AddListener(Apply);
 
-        _slider.value = AudioManager.Instance.GetVolume(audioType);
+        _slider.value = AudioManager.Instance.GetVolume(isMaster? BroAudioType.All : audioType);
 
         //if (persist && PlayerPrefs.HasKey(PrefsKey))
         //{

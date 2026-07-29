@@ -51,12 +51,29 @@ public class MapSceneManager : NemoSceneManager
         SetWarningPanel(false); // 경고창은 기본 숨김 — 클라가 Exit를 누를 때만 표시
         PlayEnterFade();
 
-        // BGM 재생
-        AudioManager.Instance.PlayBGM(AudioManager.Instance.Catalog.InGameBGM);
+        // 인게임 BGM: 씬 로드 시점이 아니라 "본게임 준비 완료(로딩+플레이어 스폰 동기화)" 시점에 재생.
+        // 이미 준비된 뒤 구독하면 즉시 1회 실행되고, 아직이면 준비되는 순간 호출된다.
+        if (_gameManager != null)
+        {
+            _gameManager.SubscribeMainGameReady(PlayInGameBgm);
+        }
+    }
+
+    // 본게임 준비 완료 시 호출되는 콜백. 인게임 BGM을 재생한다.
+    private void PlayInGameBgm()
+    {
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlayBGM(AudioManager.Instance.Catalog.InGameBGM);
+        }
     }
 
     private void OnDestroy()
     {
+        if (_gameManager != null)
+        {
+            _gameManager.UnsubscribeMainGameReady(PlayInGameBgm);
+        }
         UnregisterGoToResultHandler();
     }
 
