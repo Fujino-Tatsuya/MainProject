@@ -134,9 +134,14 @@ public class PlayerDashController : NetworkBehaviour
         base.OnNetworkDespawn();
     }
 
-    private double OwnerNow() => NetworkClock.Instance != null ? NetworkClock.Instance.GameLocalNow : Time.timeAsDouble;
-    private double ServerNow() => NetworkClock.Instance != null ? NetworkClock.Instance.GameNow : Time.timeAsDouble;
-    private double LocalTimeForRequest() => NetworkClock.Instance != null ? NetworkClock.Instance.LocalNow : Time.timeAsDouble;
+    // ⚠️ Instance 유무가 아니라 IsRunning(세션 가동)으로 폴백을 판단한다.
+    // NetworkClock은 세션이 안 돌면 0을 돌려주므로, 예전처럼 Instance만 보면 오프라인 Play에서
+    // "멈춘 시계"로 Advance()가 돌아 충전이 영구히 회복되지 않았다(대시 1회만 되는 증상).
+    private static bool ClockRunning => NetworkClock.Instance != null && NetworkClock.Instance.IsRunning;
+
+    private double OwnerNow() => ClockRunning ? NetworkClock.Instance.GameLocalNow : Time.timeAsDouble;
+    private double ServerNow() => ClockRunning ? NetworkClock.Instance.GameNow : Time.timeAsDouble;
+    private double LocalTimeForRequest() => ClockRunning ? NetworkClock.Instance.LocalNow : Time.timeAsDouble;
 
     private void Update()
     {
@@ -218,6 +223,12 @@ public class PlayerDashController : NetworkBehaviour
         if (!started)
             return false;
 
+        // 성공 경로도 한 줄 남긴다 — 거부 로그만 있으면 "쿨타임이 안 돈다"를 진단할 때
+        // 실제 간격과 시계 출처를 알 수 없어 원인을 거꾸로 짚게 된다. 입력 1회당 한 줄.
+        Edit.Log($"[Dash] 시작 — 남은충전 {predictedLedger.Count}/{predictedLedger.MaxCharge}, " +
+                 $"재충전 {config.RechargeDuration:F2}s, now={now:F3}, " +
+                 $"시계={(ClockRunning ? "NetworkClock" : "Time.timeAsDouble")}", this);
+
         // 온라인이면 서버 승인을 요청한다. 오프라인(테스트)에서는 예측만.
         if (IsSpawned && IsOwner)
         {
@@ -276,10 +287,24 @@ public class PlayerDashController : NetworkBehaviour
         if (!IsOwner || predictedLedger == null)
             return;
 
-        // 권한 충전으로 예측 정합(더 최신 Epoch/Revision만 채택).
-        predictedLedger.SyncToAuthoritative(authoritativeChargeCount, chargeEpoch, chargeRevision, OwnerNow());
+        bool isPendingResponse = _hasPending && requestId == _pendingRequestId;
 
-        if (_hasPending && requestId == _pendingRequestId)
+        if (isPendingResponse && !approved)
+        {
+            // 거부 = 우리 예측 소비가 무효였다는 뜻. Revision 가드를 우회해 권한값으로 되돌린다.
+            // ⚠️ SyncToAuthoritative로는 이 경로가 항상 무시된다(오너 Revision이 더 높음) →
+            // 오너만 충전 1개와 재충전 시간을 잃어 "쿨타임이 안 도는" 것처럼 보였다.
+            predictedLedger.ForceAdoptAuthoritative(
+                authoritativeChargeCount, chargeEpoch, chargeRevision, OwnerNow(),
+                RemainingToReadyInOwnerDomain(nextChargeReadyServerTime));
+        }
+        else
+        {
+            // 권한 충전으로 예측 정합(더 최신 Epoch/Revision만 채택).
+            predictedLedger.SyncToAuthoritative(authoritativeChargeCount, chargeEpoch, chargeRevision, OwnerNow());
+        }
+
+        if (isPendingResponse)
         {
             _hasPending = false;
 
@@ -293,11 +318,25 @@ public class PlayerDashController : NetworkBehaviour
                 Edit.LogWarning(
                     $"[Dash] 서버가 대시를 취소했습니다 — approved={approved} / " +
                     $"reason={(DashRejectReason)reason} / interrupted={interrupted} / " +
-                    $"남은시간={remainingServerDuration:F3}s / 권한충전={authoritativeChargeCount}", this);
+                    $"남은시간={remainingServerDuration:F3}s / 권한충전={authoritativeChargeCount} / " +
+                    $"환불후 예측충전={predictedLedger.Count}/{predictedLedger.MaxCharge}", this);
 
                 stateController.EndDash();
             }
         }
+    }
+
+    /// <summary>
+    /// 서버 도메인 "다음 충전 완료시각"을 오너 도메인 잔여시간으로 환산한다.
+    /// 두 시계(GameNow / GameLocalNow)는 도메인만 다르고 진행 속도는 같으므로 차이만 옮긴다.
+    /// 만충(+Inf)/비정상 값은 0.
+    /// </summary>
+    private double RemainingToReadyInOwnerDomain(double nextChargeReadyServerTime)
+    {
+        if (double.IsNaN(nextChargeReadyServerTime) || double.IsInfinity(nextChargeReadyServerTime))
+            return 0.0;
+
+        return System.Math.Max(0.0, nextChargeReadyServerTime - ServerNow());
     }
 
     private ClientRpcParams OwnerClientRpcParams()

@@ -40,10 +40,11 @@ namespace BeaverLobby.Player.Dash.EditModeTests
             bool rttAvailable = true,
             bool dashEnabled = true,
             DashValidationPolicy.Request? req = null,
-            DashValidationPolicy.CurrentState current = default)
+            DashValidationPolicy.CurrentState current = default,
+            int authoritativeCharge = 1)
             => DashValidationPolicy.Validate(
                 dashEnabled, DashDuration, Freshness, serverNow, serverRtt, rttAvailable,
-                req ?? Req(), history, current);
+                authoritativeCharge, req ?? Req(), history, current);
 
         [Test]
         public void ConfigDisabled_Rejected()
@@ -124,9 +125,26 @@ namespace BeaverLobby.Player.Dash.EditModeTests
         }
 
         [Test]
-        public void NoChargeAtSnapshot_Rejected()
+        public void NoAuthoritativeCharge_Rejected()
         {
-            var r = Validate(History(Snap(9.95, charge: 0)), serverNow: 10.0);
+            var r = Validate(History(Snap(9.95, charge: 0)), serverNow: 10.0, authoritativeCharge: 0);
+            Assert.AreEqual(DashRejectReason.NoCharge, r.Reason);
+        }
+
+        [Test]
+        public void SnapshotChargeZero_ButAuthoritativeHasCharge_Approved()
+        {
+            // 회귀: 회복 경계 직후 입력. 마지막 물리 tick 스냅샷은 아직 0이지만 서버 장부는 이미 1.
+            // 예전엔 여기서 NoCharge로 거부되고 오너 예측 충전까지 날아가 쿨타임이 두 배로 보였다.
+            var r = Validate(History(Snap(9.95, charge: 0)), serverNow: 10.0, authoritativeCharge: 1);
+            Assert.IsTrue(r.IsApproved, "충전은 스냅샷이 아니라 현재 서버 장부로 판정한다");
+        }
+
+        [Test]
+        public void AuthoritativeChargeZero_ButSnapshotHadCharge_Rejected()
+        {
+            // 반대 방향: 스냅샷엔 있었지만 지금 서버 장부가 비었으면 승인하지 않는다(이중 소비 방지).
+            var r = Validate(History(Snap(9.95, charge: 1)), serverNow: 10.0, authoritativeCharge: 0);
             Assert.AreEqual(DashRejectReason.NoCharge, r.Reason);
         }
 

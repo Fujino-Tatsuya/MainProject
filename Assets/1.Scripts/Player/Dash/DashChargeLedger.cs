@@ -146,6 +146,42 @@ namespace BeaverLobby.Player.Dash
             _nextReadyTime = _count >= _maxCharge ? double.PositiveInfinity : now + _rechargeDuration;
         }
 
+        /// <summary>
+        /// 서버가 요청을 <b>거부</b>했을 때 오너의 예측 소비를 되돌린다. Revision 비교를 하지 않는다.
+        ///
+        /// ⚠️ <see cref="SyncToAuthoritative"/>로는 이 경우가 항상 무시된다 — 오너는 입력 순간
+        /// 예측 소비로 Revision을 이미 올렸고, 거부한 서버는 소비를 안 해 Revision이 더 낮다.
+        /// 그래서 "과거 스냅샷" 가드에 걸려 권한 충전값이 버려지고, 오너만 충전 1개와
+        /// 재충전 2초를 잃었다(대시는 안 나가고 쿨타임만 두 배가 되는 증상의 실제 원인).
+        ///
+        /// <paramref name="remainingToReady"/>는 오너 도메인으로 환산한 다음 충전까지 남은 시간.
+        /// 비정상/범위 밖 값은 [0, rechargeDuration]으로 보정한다.
+        /// </summary>
+        public void ForceAdoptAuthoritative(int count, uint epoch, uint revision, double now, double remainingToReady)
+        {
+            _epoch = epoch;
+            _revision = revision;
+            _count = Clamp(count, 0, _maxCharge);
+
+            if (_count >= _maxCharge)
+            {
+                _nextReadyTime = double.PositiveInfinity;
+                return;
+            }
+
+            double remaining = remainingToReady;
+            if (double.IsNaN(remaining) || remaining < 0.0)
+            {
+                remaining = 0.0;
+            }
+            else if (remaining > _rechargeDuration)
+            {
+                remaining = _rechargeDuration;
+            }
+
+            _nextReadyTime = now + remaining;
+        }
+
         private static bool SequenceLess(uint a, uint b)
             => unchecked((int)(a - b)) < 0;
 
