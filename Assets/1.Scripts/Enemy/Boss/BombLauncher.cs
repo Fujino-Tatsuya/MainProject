@@ -138,8 +138,15 @@ public class BombLauncher : MonoBehaviour
         Vector3 throwVector = dir * throwDistance;
         Vector3 target = transform.position + throwVector;
 
+        // ThrowBombAction과 같은 판정을 쓴다 — 인스펙터 마스크에 Default가 빠져도 동작하게 보강하고,
+        // 원점을 살짝 띄워 바닥면과 같은 높이에서 광선이 MeshCollider를 놓치는 것을 막는다.
+        int resolvedGroundMask = groundMask.value | LayerMask.GetMask("Default", "Ground");
+        const float probeUp = 2f;
+        const float probeDistance = 200f;
+
         RaycastHit hit;
-        if (Physics.Raycast(target, Vector3.down, out hit, Mathf.Infinity, groundMask))
+        if (Physics.Raycast(target + Vector3.up * probeUp, Vector3.down, out hit,
+                            probeDistance, resolvedGroundMask, QueryTriggerInteraction.Ignore))
         {
             target.y = hit.point.y;
         }
