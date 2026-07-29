@@ -31,7 +31,17 @@ public class MapNavMeshBaker : MonoBehaviour
     private void OnEnable() { MapGenerator.OnGenerated += HandleGenerated; }
     private void OnDisable() { MapGenerator.OnGenerated -= HandleGenerated; }
 
-    private void HandleGenerated(MapGenerator gen)
+    private void HandleGenerated(MapGenerator gen) => Bake("맵 생성");
+
+    /// <summary>
+    /// 런타임에 지형이 바뀐 뒤 다시 굽는다(다리 개통 등). 서버/오프라인만.
+    ///
+    /// 전체 서피스를 다시 굽기 때문에 한순간 히칭이 있다. 개통은 실행당 1회성 이벤트라
+    /// 지금은 수용하지만, 런타임 변형이 늘어나면 부분 갱신(NavMeshObstacle carve 등)으로 옮겨야 한다.
+    /// </summary>
+    public void RebakeNow(string reason) => Bake(reason);
+
+    private void Bake(string reason)
     {
         // 순수 클라는 이동 권한이 없어(에이전트 비활성) 베이크 불필요 — 서버/호스트/오프라인만.
         var nm = Unity.Netcode.NetworkManager.Singleton;
@@ -53,7 +63,7 @@ public class MapNavMeshBaker : MonoBehaviour
         }
 
         ReattachAgents();
-        Debug.Log("[MapNavMeshBaker] NavMesh 베이크 완료 + 에이전트 재부착.");
+        Debug.Log($"[MapNavMeshBaker] NavMesh 베이크 완료 + 에이전트 재부착 (사유: {reason}).");
     }
 
     // 베이크 이전에 스폰된 몬스터 에이전트를 새 메시에 재부착(Warp).

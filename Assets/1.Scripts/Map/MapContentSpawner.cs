@@ -76,10 +76,35 @@ public class MapContentSpawner : MonoBehaviour
                 // 존 프리팹은 비네트워크 규약이라 프리팹에 미리 넣지 않고 스폰 시 동적 부착한다.
                 if (p.Slot.AssignedRole == ZoneRole.BossRoom)
                     AttachBossEnterZone(zoneGo, isServer);
+
+                // 다리 개통 장치(ZoneL_typeB 등): 존 프리팹이 저작 데이터·로컬 연출을 들고 있고,
+                // 상태 복제·판정은 씬 상주 ZoneBridgeGateManager가 (SlotID, 패널 인덱스) 키로 맡는다.
+                // 존이 비네트워크라 패널·다리에 NetworkBehaviour를 붙일 수 없기 때문이다.
+                RegisterBridgeGate(zoneGo, p.Slot.SlotID);
             }
         }
 
         Edit.Log($"[MapContentSpawner] 존 비주얼 {visuals} / 몬스터 {monsters} 스폰 (서버:{isServer}).");
+    }
+
+    // 존 프리팹이 다리 개통 장치를 들고 있으면 씬 매니저에 등록한다(전 피어 — 링 표시·다리 보간은
+    // 양쪽 로컬이고 판정만 서버다). 매니저가 없으면 조용히 꺼지지 않게 경고한다.
+    private static void RegisterBridgeGate(GameObject zoneGo, int slotID)
+    {
+        var gate = zoneGo.GetComponent<ZoneBridgeGate>();
+        if (gate == null) return;
+
+        gate.SetSlotID(slotID);
+
+        if (ZoneBridgeGateManager.Instance != null)
+        {
+            ZoneBridgeGateManager.Instance.RegisterGate(gate);
+            return;
+        }
+
+        Edit.LogError(
+            $"[MapContentSpawner] Slot {slotID}에 다리 개통 장치가 있는데 씬에 ZoneBridgeGateManager가 " +
+            "없습니다 — F 상호작용과 다리가 동작하지 않습니다. MapScene에 매니저를 배치하세요.", gate);
     }
 
     // BossRoom 존에 진입 판정(서버)과 범위 표시(전 피어)를 부착.

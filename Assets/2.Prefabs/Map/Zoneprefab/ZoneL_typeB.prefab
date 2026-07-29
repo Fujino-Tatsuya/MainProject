@@ -237,6 +237,7 @@ GameObject:
   m_Component:
   - component: {fileID: 5484054633064661158}
   - component: {fileID: 4427764332978332936}
+  - component: {fileID: 4651166640668175613}
   m_Layer: 0
   m_Name: ZoneL_typeB
   m_TagString: Untagged
@@ -405,6 +406,44 @@ MonoBehaviour:
   - {fileID: 3770815874031333545}
   - {fileID: 1033087256312751609}
   Nodes: []
+--- !u!114 &4651166640668175613
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 411843160232409271}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ead6a18a9cec45e4e842bfdc6caace92, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ZoneBridgeGate
+  panels:
+  - {fileID: 987965845978149371}
+  - {fileID: 3690060630681536262}
+  - {fileID: 5364890894112033271}
+  - {fileID: 4007547566777560182}
+  segments:
+  - Target: {fileID: 6316292418549258961}
+    ClosedLocalPosition: {x: 13.22, y: 2.56, z: 0.2950592}
+    OpenLocalPosition: {x: 2.4079657, y: 2.56, z: 0.2950592}
+    HasOpenPosition: 1
+  - Target: {fileID: 314353605433172930}
+    ClosedLocalPosition: {x: -13.107, y: 2.56, z: 0.2950592}
+    OpenLocalPosition: {x: -2.4079666, y: 2.56, z: 0.2950592}
+    HasOpenPosition: 1
+  - Target: {fileID: 5152180367809072457}
+    ClosedLocalPosition: {x: 12.1241455, y: 2.56, z: 0.2950592}
+    OpenLocalPosition: {x: 1.3121109, y: 2.56, z: 0.2950592}
+    HasOpenPosition: 1
+  - Target: {fileID: 5016843805129617717}
+    ClosedLocalPosition: {x: -12.015855, y: 2.56, z: 0.2950592}
+    OpenLocalPosition: {x: -1.3168211, y: 2.56, z: 0.2950592}
+    HasOpenPosition: 1
+  openDuration: 1.5
+  interactRadius: 2.5
+  ringRadius: 1.2
+  ringColor: {r: 0.45, g: 0.9, b: 1, a: 1}
 --- !u!1 &412572219791136095
 GameObject:
   m_ObjectHideFlags: 0
