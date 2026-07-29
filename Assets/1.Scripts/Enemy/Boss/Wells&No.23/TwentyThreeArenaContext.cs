@@ -39,6 +39,6 @@ public class TwentyThreeArenaContext : NetworkBehaviour
             Edit.LogError("[No.23] 해당 보스에 EnemyBTActivator 컴포넌트가 없습니다. 추가해주세요.");
             return;
         }
-        btActivator.OpenBT();
+        //btActivator.OpenBT();
     }
 }
