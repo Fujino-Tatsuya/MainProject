@@ -231,4 +231,36 @@ public static class MapColliderAuthoring
                 return true;
         return false;
     }
+
+    // 2026-07-29 추가: 현재 열려있는 씬의 Level_wall_hallway 자식들에게 MeshCollider 부착
+    [MenuItem("Tools/Map/Authoring/Add MeshColliders to Active Scene (Level_wall_hallway)")]
+    public static void AddMeshCollidersToActiveSceneHallway()
+    {
+        var root = GameObject.Find("Level_wall_hallway");
+        if (root == null)
+        {
+            Debug.LogError("[MapColliderAuthoring] 현재 씬에서 'Level_wall_hallway' 오브젝트를 찾을 수 없습니다.");
+            return;
+        }
+
+        int addedCount = 0;
+        var meshFilters = root.GetComponentsInChildren<MeshFilter>(true);
+        
+        Undo.SetCurrentGroupName("Add Mesh Colliders (Scene)");
+        int group = Undo.GetCurrentGroup();
+
+        foreach (var mf in meshFilters)
+        {
+            var go = mf.gameObject;
+            if (go.GetComponent<Collider>() == null)
+            {
+                var meshCollider = Undo.AddComponent<MeshCollider>(go);
+                meshCollider.sharedMesh = mf.sharedMesh;
+                addedCount++;
+            }
+        }
+
+        Undo.CollapseUndoOperations(group);
+        Debug.Log($"[MapColliderAuthoring] 씬 내 'Level_wall_hallway' 하위 오브젝트에 {addedCount}개의 MeshCollider를 부착했습니다.");
+    }
 }

@@ -7,7 +7,7 @@ using UnityEngine.SceneManagement;
 
 // 보스 등장 오케스트레이터(BossEncounterDirector) 씬 배선 도구. (승인 계획 Task 3)
 //
-// MapScene에는 보스를 스폰하는 주체가 없었다 — TwentyThreeArenaContext는 KMKScene·PlayerBossTest
+// MapScene에는 보스를 스폰하는 주체가 없었다 — TwentyThreeArenaContext는 BossScene·PlayerBossTest
 // 전용이라 정식 플로우에서는 보스가 등장하지 않았다. 이 도구가 Director를 씬 상주 NetworkObject로
 // 배치하고, 보스 프리팹·착지점·충전 기둥 4개·씬 매니저 참조를 채운다.
 //

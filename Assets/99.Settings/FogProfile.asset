@@ -32,8 +32,8 @@ MonoBehaviour:
   noiseScale: 0.05
   noiseStrength: 1
   noiseScroll: {x: 0.3, y: 0.15}
-  dimRangeUp: 5
-  dimRangeDown: 5
+  dimRangeUp: 0
+  dimRangeDown: 0
   dimFadeUp: 3
   dimFadeDown: 3
   dimSaturation: 0.249

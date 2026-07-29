@@ -74,13 +74,13 @@ public static class BossRoomAuthoring
     const string BossAreaName = "BossArea";
     const string BossAreaTag = "BossArea";
 
-    // KMKScene 기준값: BoxCollider size (10, 2, 10) / center (0, 1, 0) / isTrigger.
+    // BossScene 기준값: BoxCollider size (10, 2, 10) / center (0, 1, 0) / isTrigger.
     const float BossAreaHeight = 2f;
 
     /// <summary>
     /// No.23 BT가 태그로 찾아 쓰는 아레나 기준 오브젝트.
     ///
-    /// KMKScene에는 tag `BossArea`인 트리거 박스가 아레나 중앙에 있고 BT가 그것을 켜고 끈다.
+    /// BossScene에는 tag `BossArea`인 트리거 박스가 아레나 중앙에 있고 BT가 그것을 켜고 끈다.
     /// MapScene에는 그게 없어서(전수 검색 0건) 보스·Wells 쪽 처리가 방 중앙을 기준으로 잡히지 않았다.
     /// 보스룸 프리팹 안에 만들어 두면 방을 어디로 옮기든 항상 중앙을 따라간다.
     ///
@@ -115,13 +115,13 @@ public static class BossRoomAuthoring
     const string ChargePillarName = "Env_Mv_bosscharger_upper";
     const int ExpectedPillarCount = 4;
 
-    // ⚠️ 레이어는 KMKScene(EnemyHurtBox=14)과 다르게 Enemy(8)를 쓴다.
+    // ⚠️ 레이어는 BossScene(EnemyHurtBox=14)과 다르게 Enemy(8)를 쓴다.
     // 현재 플레이어 공격의 targetLayer/hittableLayers는 m_Bits=256(Enemy)뿐이라 14에 두면
     // 기둥을 때릴 수 없다. 실제로 동작하는 ChompBot의 Hurtbox도 Enemy(8)에 있다.
     // 팀이 나중에 플레이어 마스크에 EnemyHurtBox를 추가하면 여기도 함께 옮긴다.
     const string PillarLayerName = "Enemy";
 
-    // 체력·방어는 KMKScene 기둥 설정과 동일(체력 5 · 방어 0).
+    // 체력·방어는 BossScene 기둥 설정과 동일(체력 5 · 방어 0).
     const int PillarMaxHp = 5;
     const int PillarDefense = 0;
 

@@ -102,7 +102,7 @@ dash-soul 계통(대시 예측+서버 스냅샷 / 추락 감지 / 생명주기 �
   으로 시작했다. `Unit.OnNetworkSpawn`의 HP 복제 구독 + `HitFlash` 자동 부착이 통째로 건너뛰어졌다.
   Unit 파생 5종 중 Enemy만 누락. **★파생 클래스에서 base 누락은 "그 타입만" 조용히 기능이 빠진다.**
 - **충전 중 보스가 맵 밖으로** — BT가 복귀 위치로 읽는 `SpawnPointer.SpawnPoint`가 프리팹 기본값
-  `(0,0,0)`이고 코드에서 아무도 채우지 않는다. KMKScene은 아레나가 원점이라 우연히 맞았다.
+  `(0,0,0)`이고 코드에서 아무도 채우지 않는다. BossScene은 아레나가 원점이라 우연히 맞았다.
   → Director가 스폰 직후 착지점(방 중앙)으로 채운다.
 - **보스 진입로가 막혔다(직전 세션 회귀)** — 레이저 프리팹에 심은 차단벽이 Stage1 통로 26곳을
   전부 막았다. 어느 슬롯이 Quest가 되는지는 시드마다 달라 정적 배치로는 불가.
@@ -112,7 +112,7 @@ dash-soul 계통(대시 예측+서버 스냅샷 / 추락 감지 / 생명주기 �
 
 ### 이어서 완료 — Play 피드백 4건 (`60f3862`·`66ac555`)
 
-**★ 교훈: 민경 님 보스 코드는 아레나 바닥이 `Ground` 레이어에 Y=0이라고 가정한다(KMKScene 기준).
+**★ 교훈: 민경 님 보스 코드는 아레나 바닥이 `Ground` 레이어에 Y=0이라고 가정한다(BossScene 기준).
 생성맵 보스룸 바닥은 `Default` 레이어에 Y≈0.61이라 바닥을 찾는 모든 레이캐스트가 조용히 빗나간다.**
 증상은 제각각으로 보이지만 뿌리가 하나였다.
 
@@ -140,7 +140,7 @@ NetworkObject)가 등장·전투 전환의 단일 소유자다: 도착 ACK → �
 - **충전 기둥 4개**: `bossroom`의 `Env_Mv_bosscharger_upper`에 NetworkObject·NetworkTransform·
   BoxCollider·`ChargingObject`를 저작 도구로 부착(`Tools/Map/Authoring/Setup Boss Charge Pillars`).
   Director가 스폰 직후 `ChargeController.SetList`로 주입 → BT의 `SetChargingStateAction`이 그대로 동작.
-- ⚠️ **기둥 레이어는 `Enemy(8)`** — KMKScene은 `EnemyHurtBox(14)`지만 플레이어 공격 마스크가
+- ⚠️ **기둥 레이어는 `Enemy(8)`** — BossScene은 `EnemyHurtBox(14)`지만 플레이어 공격 마스크가
   `m_Bits=256`(Enemy)뿐이라 14에 두면 기둥을 때릴 수 없다. **민경 님과 정리 필요**(마스크를
   넓힐지, 기둥을 8에 둘지).
 - `ChargingObject` 절대 Y → 로컬 숨김/활성 위치 + Hidden/Rising/Active/Lowering 상태로 재작성.
@@ -187,21 +187,38 @@ Life/PlayerLifeCycleController, Life/PlayerLifeInputPolicy}`, `1.Scripts/Unit/St
   어떻게 소비할지. 존 사각형 위에 탐사 마스크를 덮는 방식 vs 베이크 텍스처를 그대로 확대 표시하는 방식 —
   둘 중 어느 쪽이 지금 UI 구조에 맞는지 먼저 결정.
 
-**분석 3 — `BossArea`가 실제로 쓰이는지 (내가 만들었지만 검증 안 됨)**
-- 사실: KMKScene·PlayerBossTest에만 있었고 MapScene엔 0건이었다 → `bossroom.prefab`에 tag `BossArea`
-  트리거 박스(20.98×2×20.98, 중앙 (0.49, 0.61, 0.49))를 만들어 넣었다. `TwentyThreeArenaContext`는
-  **일부러 안 붙였다**(붙이면 보스 이중 스폰).
-- 분석할 것: No.23 BT가 BossArea를 **태그 검색으로 찾는지, 블랙보드 GameObject 참조로 받는지**.
-  블랙보드 참조라면 프리팹에서 스폰된 보스는 씬 오브젝트를 못 잡으므로 **Director가 주입**해야 한다.
-  BT 그래프(`8.BehaviorTreeGraph/Boss/Wells&No.23/No.23.asset`)는 **읽기만** 하고 수정하지 말 것(민경 님 영역).
+**분석 3 — `BossArea` ✅ 해결(2026-07-29): BT가 태그로 스스로 찾는다, 주입 불필요**
+- No.23 BT는 `FindObjectWithTagAction`(Tag=문자열 `"BossArea"`)으로 씬에서 직접 찾아 `BossArea`
+  GameObject 블랙보드 변수를 채우고, 같은 부모 아래 `SetEnableBoxColliderAction(Enable=true)`로 켠다
+  (`No.23.asset` rid 1567581773390152037·038 — 읽기만 함). **Director 주입 불필요.**
+- MapScene 현황은 이미 완비: `bossroom.prefab`에 tag `BossArea` 트리거(20.98×2×20.98, center y=1),
+  충전 기둥 4개 = `Env_Mv_bosscharger_upper` + BoxCollider + ChargingObject + NetworkObject +
+  NetworkTransform(maxHp 5·defense 0·riseHeight 1·moveSpeed 1 = KMK와 동일),
+  `BossEncounterDirector.chargingObjects`에 4개 전부 연결.
+- ⚠️ **BossScene의 BossArea를 MapScene으로 복사해 오면 안 된다** — 태그 2개가 되어 `FindObjectWithTag`가
+  어느 것을 잡을지 보장되지 않고, 기둥 8개 중 4개만 동작하며, `TwentyThreeArenaContext`가 함께 오면
+  보스 이중 스폰이 된다. `BossEncounterDirector.ValidateBossAreaTag()`가 태그 0개/2개 이상을 에러로 잡는다.
+- 부수 확인: `HomePoint`는 코드·No.23 BT 어디서도 참조 0건(미사용 마커). `8.BehaviorTreeGraph/Boss/
+  BossArea.asset` 그래프는 어느 씬·프리팹도 참조하지 않는 고아(예제 빌더 산출물).
 
-**분석 4 — 어긋난 존 배치 = 구멍·몹 낙하의 근본 (재저작 대기, 코드로는 못 고침)**
-- 사실: `Validate Slot Authoring` 결과 **미저작 9건 / 참조 잃은 저작 항목 9건**(개수 일치).
-  대상 = `ZoneM_typeA`, `Zone_typeQuest01`, `Zone_typeQuest02` × Slot 4·8·9.
-  원인 = 그 프리팹들이 재생성돼 GUID가 바뀌면서 저작 데이터가 고아가 됐다.
-- 해결은 코드가 아니라 **재-fitting + Save Placements**(팀장 작업). 그전까지 그 존들은 baseline에 떨어져
-  통로와 어긋난다 → 몹은 이제 스폰되지 않고 에러 로그만 남는다(낙하는 막았다).
-- 분석할 것: 재저작 없이 임시로 버티려면 어떤 대체가 가능한지(예: 미저작 조합을 셔플 풀에서 제외).
+**분석 4 — ✅ 해결(2026-07-29): 존 저작은 이미 맞았고, 검증 도구가 잘못된 대상을 읽었다**
+- **거짓 경보였다.** `Save Placements`는 **씬의 Stage1 인스턴스**에 쓰고 씬을 dirty 처리한다(프리팹에
+  Apply하지 않음). 그런데 `Validate Slot Authoring`은 `Stage1.prefab` **에셋**을 읽어 씬 오버라이드를
+  못 봤다 → 재저작을 마친 뒤에도 "미저작 9건"을 계속 보고했다.
+- 프리팹+씬 오버라이드(슬롯 대상 61건)를 병합한 실제 상태 = **실질 미저작 0건**. 도구가 세던 3건은
+  전부 도달 불가 조합이었다: Slot 5·7 × `ZoneS_typeA`(둘 다 Boss/Spawn 후보 2곳뿐 → 절대 Combat 안 됨),
+  Slot 8 × `Quest01`(`QuestPrefab=Quest02` 지정 시 카탈로그 Quest 풀 미조회).
+- Quest는 의도대로 고정됨: Slot 4 `IsQuestCandidate` 0으로 내리고, Slot 8만 후보 + `QuestPrefab=Quest02`
+  → 시드 무관 항상 Slot 8 / Quest02. 부작용으로 카탈로그 Quest 풀 2종은 사실상 미사용.
+- 셔플은 카탈로그대로 돈다: Large 0·1·2 ↔ A/B/C 1:1 순열 / Medium은 Slot 3 `FixedPrefab=ZoneM_typeC`가
+  pinned 제외되어 남은 풀 {A,B} 2개 ↔ Slot 4·9 2곳 1:1 / Small 전투는 Slot 6 하나 ↔ `ZoneS_typeA`.
+  총 조합 = 6 × 2 × (Boss/Spawn 스왑 2) = 24가지. **Medium은 여유 0** — Medium 슬롯을 늘리거나 Slot 4를
+  Quest 후보로 되살리면 즉시 풀 부족(재사용)으로 넘어간다.
+- 남은 잔재: 옛 GUID 참조 9건(Slot 3:3, 4:3, 8:2, 9:1) + 끊긴 `QuestPrefab` 2건. 런타임 무해(null은
+  프리팹 비교에 안 걸림), 리포트만 오염. 청소 도구 = `Tools/Map/Authoring/Cleanup Slot Authoring (dead refs)`.
+- ⚠️ **구조적 취약점**: 저작 정본이 씬 오버라이드에만 있다 → Stage1 인스턴스에서 Revert 한 번이면
+  61건이 날아간다(복구선 = 커밋된 MapScene). Stage1을 다른 씬에 인스턴스화하면 저작 0 상태로 떨어진다.
+  근본 해소는 씬 오버라이드를 Stage1.prefab에 Apply해 정본을 프리팹으로 옮기는 것(씬 수술 리스크, 미착수).
 
 **참고 — 이번 세션에 실제로 검증된 것**
 - 보스 등장 흐름 정상: 로그 `SpawnPoint를 방 중앙 (500.49, 0.61, 0.49)으로 설정` → 하강 → `전투 시작 — BT 개방`.
@@ -211,11 +228,186 @@ Life/PlayerLifeCycleController, Life/PlayerLifeInputPolicy}`, `1.Scripts/Unit/St
 - ⚠️ 보스룸 저작 도구(`Rebuild Boss Room Bounds`)는 `PlayerArrivalPoints`·`BossLandingPoint`를 **재생성**한다
   → 실행 후 `Wire Boss Encounter (MapScene)`를 반드시 재실행(참조 끊김). 손으로 옮긴 지점도 초기화된다.
 
+### 이번 세션 완료 (2026-07-29 · 아레나 자립화 + 유령 타겟팅)
+
+- **`BossArenaContext` 신설 + bossroom.prefab에 부착·저장** — 아레나가 자기 부품(착지점·BossArea·
+  충전 기둥 4개·도착 지점 3개)을 프리팹 내부 참조로 들고 있다. 참조가 전부 프리팹 내부 fileID라
+  **절대좌표가 개입하지 않는다**. `BossEncounterDirector`는 `arena` 하나만 물어보고, 씬 배선이
+  비어 있으면 여기서 채운다 → 다른 씬에 인스턴스화해도 동작. 저작 도구가 기준점을 재생성해
+  참조가 끊기는 사고도 사라진다. 부착 도구 = `Tools/Map/Authoring/Wire Boss Arena Context (bossroom)`.
+  - **위치 검증 결과: 착지점 localPos (0.49, 0.61, 0.49) == BossArea localPos, 간격 0.000m.**
+    즉 "아레나 중앙으로 안 간다"의 원인은 절대좌표 하드코딩이 아니다(코드 전수 검색에서도 0건).
+    `Spawn Point`·`ArrivePoint` 블랙보드 Vector3는 둘 다 런타임에 채워진다
+    (Director→`SpawnPointer`→`GetSpawnPointAction` / `JumpController.SetTarget`). 남은 유일한 위험은
+    `GameObject.Find("BossLandingPoint")` 이름 폴백 → 이제 arena를 먼저 보므로 최후 폴백으로만 남았다.
+- **유령(Soul) 상태에서 몬스터가 더 이상 반응하지 않는다** — `MonsterTargeting.IsAttackable`(신설)이
+  단일 기준. 기존 `IsTargetValid`가 `null`+`activeInHierarchy`만 봐서 Soul이 통과했고, 사망 직전에
+  잡힌 타겟이 유지되어 몬스터가 유령을 쫓고 공격 모션까지 냈다(데미지는 Soul에서 hurtbox가 꺼져
+  안 들어갔으므로 **행동만 남은 상태**였다). 적용: `MonsterBase.IsTargetValid`·`FindNearestTarget`,
+  `BossBase` 동일 2곳, `GauntletBot.CountNearbyPlayers`(유령이 스매시 단계 인원수에 잡히던 것).
+  - 판정 기준은 `ShouldEnableHurtbox`가 아니라 `PlayerLifeState.Alive`다 — 무적 프레임(대시 회피)이
+    hurtbox를 끌 때 "맞지 않는다"를 "노리지 않는다"로 해석하면 대시 한 번에 타겟이 풀린다.
+  - ⚠️ **No.23 보스는 미적용**: 타겟 선정이 BT 노드(`FindClosestWithTagAction` 등, 민경 님 영역)라
+    코드에서 못 막는다. 같은 증상이 보스전에서 재현되면 BT 쪽 조건 추가가 필요하다.
+
+### ▶ 진행 중 — "23호가 landing 직후 (0,0,0) 근처로 이동" (2026-07-29, 원인 2개 후보 모두 차단·검증 대기)
+
+증상: 하강·착지까지 정상, **착지 직후** `TwentyThree(Clone)` position이 x≈1.9(맵 중앙)로 이동.
+아레나는 x≈500이므로 500m 순간이동이다. 절대좌표 하드코딩은 코드 전수 검색 **0건**이었고,
+착지점·BossArea localPos는 간격 **0.000m**로 정합했다. 그래서 원인은 다음 둘 중 하나다.
+
+**후보 A — NavMeshAgent를 메시 밖에서 켰다 (착지 시점에 정확히 실행됨 = 가장 유력)**
+- `SnapBossToNavMesh`가 `_bossAgent.enabled = true`를 **샘플링보다 먼저** 했다. NavMesh 밖에서
+  에이전트를 켜면 Unity가 내부 위치를 가장 가까운 메시에 맞추는데, 아레나에 메시가 없으면
+  그 "가장 가까운 곳"이 맵 본체(원점 근처)다 → 보스가 끌려간다.
+- 수정: **샘플 먼저 → 실패하거나 착지점에서 2.5m 이상 떨어진 메시를 잡으면 에이전트를 켜지 않고
+  에러 로그**. 아레나 안에서 못 움직이는 게 원점으로 날아가는 것보다 낫다(lessons #26 원칙).
+- ⚠️ 이 경우 보스가 아레나에서 이동하지 못한다 = **NavMesh 베이크를 고쳐야 하는 진짜 문제**가 드러난다.
+  `MapNavMeshBaker`는 `useGeometry=PhysicsColliders` + `layerMask=Default만` + `collectObjects=All`이고,
+  bossroom의 `BossFloorCollider`(BoxCollider)는 layer 0(Default)이라 **수집 대상은 맞다**. 경계 5개는
+  layer 7(Wall)로 올바르게 벽 취급. 즉 배선상 bossroom이 특별 취급되는 곳은 없다 — 남은 의심은
+  아트 바닥 콜라이더 유실/unreadable mesh다(베이커에 `UnreadableMeshColliderBakeScope` 폴백이 있는 이유).
+
+**후보 B — BT 절대 위치 블랙보드가 (0,0,0)으로 시작한다 (구조는 확인, 발동 여부 미확인)**
+- No.23 루트가 `ParallelAllComposite` + `Start` 8브랜치 **병렬**이다. 브랜치[1]에
+  `NavigateToLocationAction(Location="Spawn Point")`가, 브랜치[4]에 그 값을 **쓰는**
+  `GetSpawnPointAction`이 있다 → 쓰기가 먼저라는 보장이 없다.
+- `ArrivePoint`도 같다. `JumpController.SetTarget`이 채우는데 연출 착지 중엔 `_isCinematicLanding`으로
+  **조기 반환해 한 번도 안 채워진다**. 그 값을 `SetPositionThroughRaycastAction`·`MoveForDurationAction`이
+  **위치에 직접 쓴다**(파인딩 아님) → (0,0,0) 순간이동. 단 이들은 `SwitchComposite`(상태 스위치) 아래라
+  첫 틱 무조건 실행은 아니다 — 그래서 "구조는 확실, 발동은 미확인"이다.
+- 수정: `BossEncounterDirector.SeedArenaPositionBlackboard`가 스폰 직후 `Spawn Point`·`ArrivePoint`를
+  **방 중앙으로 미리 덮는다**. BT 그래프는 보스 담당 영역이라 손대지 않고 최악값만 없앴다.
+
+**✅ 판별 완료 (Play 1회, Editor.log 확인)** — 원점 이동 **해결**됨:
+- `[BossEncounter] 보스 NavMesh 부착 완료 — (500.49, 0.67, 0.49) (착지점 오차 0.06m)`
+  → **아레나에 NavMesh 정상 존재. 후보 A 기각.** bossroom 베이크는 문제없다.
+- `[BossEncounter] BT 위치 블랙보드 초기화 — Spawn Point, ArrivePoint = (500.49, 0.61, 0.49)` → 시딩 동작.
+- 즉 실제로 들었던 원인은 **후보 B(블랙보드 (0,0,0))** 쪽이다.
+
+### ▶ 후속 — "보스가 공격만 하고 걷지 않는다" = 이동 배선이 아니라 **거리창** 문제 (2026-07-29 분석 완료)
+
+- **로그 증거: 전체 런에 `Walk`/추격 상태 전환 0건.** Idle→Upper/LeftHook/RightHook/Grab/Jump→Idle 반복,
+  마지막에 Charging→Groggy→Dead. 걷는 상태에 들어간 적이 없다.
+- 원인 = `TwentyThreeBasicAttackChoice` 거리창이 거의 전 구간을 덮는다(프리팹 값):
+  hook 0~3 / upper 0~3 / grab 0~1 / jump 5~10 / dash 10~20, 가중치 50/50/100/100/100.
+  **빈 구간은 3~5m와 20m 초과뿐**이고 `GetRandomAttack`은 그때만 `None`을 반환한다 → BT가 Walk로 가는 건
+  그 두 구간에서만이다. 플레이어가 붙어 있으면 항상 공격이 뽑히므로 **걷지 않는 게 설계상 정상**이다.
+  → **팀장 확인(2026-07-29): 3~5m Walk 밴드 하나는 의도된 설계다.** 그 안쪽은 hook/upper/grab이 처리한다.
+  남은 쟁점은 수치를 bossroom 크기에 맞추는 것뿐이다(아래).
+
+**아레나 스케일 실측 — 튜닝 전제가 바뀌었다 (2026-07-29)**
+
+| | 벽 안쪽 전투 구역 | 최대 거리(대각선) | BossArea 트리거 |
+|---|---|---|---|
+| BossScene(튜닝 환경) | Ground scale 5 → 약 48×48m, 벽 ±24m | ~68m | 10×10, 중심에서 **x+2.79 어긋남** |
+| bossroom(실전) | **21.0×21.0m** | **29.67m** | 20.98×20.98, 방 전체·정중앙 |
+
+- bossroom이 KMK 테스트장보다 **약 2.3배 작다.** 현재 거리창은 48m 방 기준으로 잡힌 값이다.
+- ⚠️ **사각지대**: dash가 20에서 끊기는데 bossroom 최대 거리는 29.67m → **20~29.67m 구간(코너 대각)**에서
+  `GetRandomAttack`이 `None`을 반환해 Walk로 간다. WalkSpeed 2로는 10m를 5초 걸어온다.
+- 원칙: **공격 리치는 아레나 크기와 무관, 이동 공격과 사각지대만 아레나에 의존한다.**
+  hook/upper/grab(0~3, 0~3, 0~1)은 애니메이션 리치이므로 스케일하면 안 된다(팔이 안 닿는 거리에서 때린다).
+  그리고 **가장 먼 공격의 max는 항상 아레나 대각선 이상**이어야 한다.
+- 권고 2안 (프리팹 값이라 팀장/민경 승인 후 변경, 아직 미적용):
+  - **안 1(최소 변경, 권장)**: dash max **20 → 30**. 나머지 그대로 → 사각지대 0.
+  - **안 2(방 크기에 맞춤)**: jump 5~9 / dash 9~30. 대시를 더 일찍 쓰게 하고 사각지대 0.
+  - 별건: **WalkSpeed 2 → 3.5 이상** 검토(NavMeshAgent 기본값보다 낮아 걸어도 티가 안 난다).
+- 참고: KMK의 BossArea는 10×10에 x+2.79 어긋난 반면 bossroom은 방 전체·정중앙이다. BT가 켜고 끄는
+  그 콜라이더의 범위가 두 환경에서 크게 달라, KMK에서 "구역 밖"이던 거리가 bossroom에선 전부 "구역 안"이다.
+
+**⚠️⚠️ 위 권고는 무효 — `origin/feature/Boss` 3커밋(민경, 미머지)이 거리창을 SO로 옮기고 값을 바꿨다 (2026-07-29 확인)**
+
+`89bc9e1`(페이즈별 Page SO) → `e61999d`(SO 리스트 통합) → `9a2cad0`(넉백 SO + 씬 리네임).
+거리창은 이제 프리팹 필드가 아니라 `9.ScriptableObject/Enemy/Boss/Wells&No.23/TwentyThreePage {0,1,2}.asset`이고,
+`PageEventAction` BT 노드가 페이즈 전환 시 `PageEvent(page)`로 교체한다. 실측값:
+
+| Page | hook | upper | grab | jump | dash |
+|---|---|---|---|---|---|
+| 0 | 0~4 (50) | 0~4 (35) | 0~4 (15) | 5~10 (60) | **5~10** (40) |
+| 1 | 0~4 (40) | 0~4 (40) | 0~4 (20) | 5~10 (45) | **5~10** (55) |
+| 2 | 0~4 (35) | 0~4 (40) | 0~4 (25) | 5~10 (25) | **5~10** (75) |
+
+- **세 페이지 모두 0~4와 5~10만 덮는다. 10m 초과를 덮는 밴드가 하나도 없다.** bossroom 최대 거리는
+  대각선 **29.67m** → **10~29.67m 전체가 Walk 구간**(가능 거리의 약 2/3). 이전(dash 10~20)과 성격이 반대다:
+  "사각지대가 좁아 안 걷는다" → **"멀면 거의 항상 걷는다"**.
+- 따라서 **`WalkSpeed`(=`Enemy.moveSpeed`)가 2인 것이 이제 치명적이다.** 20m를 10초 걸어온다.
+  이전엔 코너 케이스였지만 지금은 상시 경로다. → **최우선 조정 대상은 dash max가 아니라 WalkSpeed.**
+  권고: `moveSpeed` 2 → **5~7**(NavMeshAgent 기본 3.5보다도 낮은 현재값은 21m 방에 안 맞는다).
+  대안(더 침습적): dash max를 대각선까지(예: 5~30). 단 페이즈별 jump/dash 비중 설계(40→55→75)를 깨뜨린다.
+- ⚠️ **팀장이 확정한 "3~5m Walk 밴드"가 이미 4~5m로 절반이 됐다** — hook/upper/grab max가 3→4로 올랐다.
+  의도 재확인 필요(민경과).
+- 새 구조 자체는 개선이다: `GetRandomAttack`의 `None`→Walk 로직은 그대로이고, 수치만 SO로 빠졌다.
+
+**⚠️ 머지 리스크 (가장 큰 이슈) — 분기점 `0aba7b3`(7/20), 미머지**
+
+- 🔴 **`No.23.asset`이 양쪽에서 변경.** 민경 쪽 11,191줄(+6041/−5546). 그런데 **내 워킹트리도 이미 dirty
+  (+3373/−3951)** — 이 세션 전부터 그랬고 내가 만든 변경이 아니다. 내용은 rid 재번호 + `Name: Self` 같은
+  블랙보드 변수 삭제 = **Unity 재직렬화 churn**이다. `CommonMeleeRobot.asset`도 같은 성격(+516/−516).
+  → **이 churn을 커밋하면 민경의 11k줄 작업을 덮어쓴다.** 머지 전에 반드시 `git checkout --`으로 폐기해야 한다
+  (메모리 규칙 "8.BehaviorTreeGraph 수정금지"와도 일치). 거대 생성 YAML은 3-way 머지가 사실상 불가능하다.
+- 🟡 `ProjectSettings/EditorBuildSettings.asset` 양쪽 변경(내 쪽 dirty + 민경 씬 리네임). union 성격이라 수동 병합 가능.
+- 🟢 **소스 파일 충돌 0.** 민경이 건드린 것 = `BaseAttackChoice`, `TwentyThreeBasicAttackChoice`, `Unit.cs`,
+  `KnockbackAttack`, `TwentyThreeWells_*`, `TwentyThree.prefab`, `PageEventAction`(신규), `IKnockbackSettable`(신규).
+  내가 건드린 것과 **겹치는 파일이 없다.** 특히 `Enemy.cs`는 민경이 안 건드려 내 `ApplyOptionalSpeed`가 그대로 산다.
+
+**씬 리네임 파급 — `KMKScene.unity` → `BossScene.unity`**
+
+- `.meta`를 유지해 **GUID 보존 → 에셋 참조는 안 깨진다** ✅. `TwentyThreeArenaContext`·BossArea·Cylinder1~4·
+  HomePoint 모두 BossScene에 잔존 → MapScene과 분리 유지, 이중 스폰 위험 없음(내 `ValidateBossAreaTag` 가드도 유효).
+- 하지만 **이름 문자열 참조는 깨진다.** 갱신 대상: `Map/BossArenaContext.cs`, `Map/BossEncounterDirector.cs`,
+  `Map/Editor/BossEncounterWiring.cs`, `Map/Editor/BossRoomAuthoring.cs`(주석), `CONTEXT.md`,
+  `Docs/tech/game-structure-uml.md`, `Docs/tech/script-inventory.md`, `Docs/_local/lessons.md`.
+  그리고 **`Assets/1.Scripts/Scene/BossScene.cs`는 스크립트 이름이 그대로다** — 씬만 리네임됐다.
+- 그 커밋에서 FMOD `Sound`/`BGM` 오브젝트가 **제거**됐다(164줄 삭제). 보스 테스트 씬에서 BGM이 사라진 것 —
+  사운드 담당(민경) 의도인지 확인 필요.
+
+**부수 — `Unit.cs`의 `////`**
+
+`// 방어력 경감률 적용` → `//// 방어력 경감률 적용`으로 바뀌었는데 **바로 아래 계산 코드는 그대로 살아 있다.**
+경감률을 끄려던 시도였다면 실패했다(여전히 적용 중). 커밋 메시지는 "주석 정리"라 의도일 수도 있으나
+데미지 밸런스에 직결되므로 확인 필요.
+
+**부수 — 넉백**
+
+`KnockbackAttack`에 `SetKnockbackStrength`(+`IKnockbackSettable`)가 생겨 세기를 SO로 주입하게 됐지만,
+내가 보고한 **"Floor 넉백 매 프레임 재적중 + 피해 0"은 해결되지 않았다** — 중복 방지 로직은 없다.
+이제 "세기 0"과 "피해 0"을 구분해서 봐야 한다.
+
+**✅ `ChaseSpeed` 경고 정리 완료** — `Enemy.ApplyOptionalSpeed`로 교체했다. 부재는 **조용히 통과**(그래프마다
+선택적으로 쓰는 변수이므로 정상), 반대로 **그래프가 쓰는데 넣을 값이 0**이면 그때 경고한다. 이유:
+값 0인 프리팹에 이름만 맞추는 잘못된 수정을 경고가 유도하고 있었다.
+- **이동 배선 자체는 정상**: NavMesh 부착 OK / 추격 노드 `NavigateToTargetAction(Speed→WalkSpeed)` /
+  `Enemy`가 `WalkSpeed = moveSpeed = 2` 기록 성공(루트 `BehaviorGraphAgent`는 1개뿐 — 프리팹에 보이는
+  두 번째 항목은 `m_GameObject: 0`인 고아 직렬화라 `GetComponent`가 올바른 쪽을 잡는다).
+  단 **WalkSpeed 2는 보스치고 매우 느리다**(NavMeshAgent 기본 3.5보다 낮음) — 걸어도 티가 안 난다.
+- ⚠️ **함정: `ChaseSpeed` 죽은 배선.** `[Enemy] ChaseSpeed 변수를 얻어오는 것에 실패` 경고가 뜨는데,
+  No.23 그래프에 `ChaseSpeed`가 **없다**(가진 그래프는 `Enemy/CommonMeleeRobot.asset`뿐). 게다가
+  `TwentyThree.prefab`의 `chaseSpeed = 0`이다. 지금은 무해하지만 다음 사람이 경고를 보고 이름을 맞추면
+  **추격 속도 0이 되어 보스가 진짜로 안 움직인다.** 이름을 손대기 전에 값을 먼저 넣어야 한다.
+
+### ▶ 후속 — 대시 2회차부터 이동 없음 = **서버 거부 후 즉시 EndDash** (원인 사슬 확정, 사유는 로그 대기)
+
+- `PlayerDashController.RespondDashClientRpc`가 거부/중단 시 곧바로 `stateController.EndDash()`를 호출한다.
+  호스트에서는 ServerRpc→ClientRpc 왕복이 사실상 같은 프레임이라 **`PlayerDashState.Tick`이 변위를 한 번도
+  적용하기 전에 상태가 끝난다.** `PlayerDashState.Enter`가 `SetAnimatorMoving(false)`를 호출하므로 증상이
+  "가만히 있는 애니메이션만 순간 출력 + 이동 0"으로 정확히 나타난다.
+- 왜 1회차만 통과하는지는 서버 `PlayerDashValidationManager.ValidateRequest`의 거부 사유에 달렸다.
+  유력 후보 = `NoFreshSnapshot`(clientLocalTime↔serverNow 시계 도메인 + `SnapshotFreshnessTolerance`) 또는
+  충전 장부 epoch/revision 불일치.
+- **거부가 로그 0줄이었다**(조용한 실패). 경고를 추가했다 → 다음 Play에서
+  `[Dash] 서버가 대시를 취소했습니다 — approved=… / reason=… / 남은시간=… / 권한충전=…` 한 줄로 확정된다.
+
+### ▶ 부수 발견 (미처리, 보고만)
+
+- `[No.23] Floor 넉백 공격 적중: Player(Clone) (피해 0)`이 **19회 이상 연속**으로 찍힌다.
+  장판 넉백이 매 프레임 재적중하면서 데미지는 0 — 중복 방지 누락과 데미지 값 둘 다 의심된다.
+
 ### ▶ 이전 세션 시작점(참고용)
 
 **증상: 보스룸으로 이동은 되는데 보스가 안 나온다 — 정상이다.** MapScene에는 보스를 스폰하는
 주체가 없다. 보스를 스폰하는 `TwentyThreeArenaContext`(`OnNetworkSpawn`에서 `boss.Spawn()`)는
-`KMKScene`·`PlayerBossTest`에만 배치돼 있고, **MapScene의 `TwentyThree.prefab` 참조는 0건**이다.
+`BossScene`·`PlayerBossTest`에만 배치돼 있고, **MapScene의 `TwentyThree.prefab` 참조는 0건**이다.
 그게 **Task 3 `BossEncounterDirector`**의 일이고 이번 범위는 "도착까지"였다.
 
 1. **승인 계획서에 "달라진 전제" 반영** — 착수 첫 단계. 씬 경로(`MainFlow/4.MapScene`),

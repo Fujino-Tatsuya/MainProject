@@ -261,6 +261,15 @@ public class PlayerDashController : NetworkBehaviour
             // 거부/중단/이미 종료면 진행 중인 예측 대시를 멈춘다(위치 롤백은 v1 없음).
             if (!approved || interrupted || remainingServerDuration <= 0.0)
             {
+                // ⚠️ 조용히 끝내면 안 된다. 호스트에서는 ServerRpc→ClientRpc 왕복이 사실상 같은 프레임이라
+                // PlayerDashState.Tick이 변위를 한 번도 적용하기 전에 상태가 끝난다. 증상은
+                // "대시 애니메이션은 뜨는데 이동이 없다"로만 나타나고, 로그가 없으면 거부 사유를
+                // 추적할 방법이 없다(첫 대시만 되고 이후 안 되는 현상의 원인이 여기 숨는다).
+                Edit.LogWarning(
+                    $"[Dash] 서버가 대시를 취소했습니다 — approved={approved} / " +
+                    $"reason={(DashRejectReason)reason} / interrupted={interrupted} / " +
+                    $"남은시간={remainingServerDuration:F3}s / 권한충전={authoritativeChargeCount}", this);
+
                 stateController.EndDash();
             }
         }
