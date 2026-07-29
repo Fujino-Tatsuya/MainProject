@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Netcode;
@@ -551,6 +551,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
         _averageProgress = 1f;
         Debug.Log("[SceneFlow] NetworkLoadingFlowController.CompleteAfterMinimumVisibleTime phase=Completed");
         ApplyViewState();
+        GameManager.Instance?.NotifyMainGameReady();
         BroadcastState();
 
         yield return UnloadLoadingScene();
@@ -784,6 +785,10 @@ public class NetworkLoadingFlowController : MonoBehaviour
         LogDebug($"Received state. sender={senderClientId}, phase={_phase}, average={_averageProgress:P0}, flowId={_flowId}.");
 
         ApplyViewState();
+        if (_phase == NetworkLoadingPhase.Completed)
+        {
+            GameManager.Instance?.NotifyMainGameReady();
+        }
     }
 
     private void ApplyViewState()
