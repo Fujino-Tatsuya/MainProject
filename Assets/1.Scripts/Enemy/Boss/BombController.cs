@@ -43,6 +43,10 @@ public class BombController : NetworkBehaviour
     [SerializeField] float bombRadius;
     [SerializeField] float floorIncreasAmount;
 
+    [Header("\n스케일 (손 → 착지)")]
+    [SerializeField] float heldScale = 0.5f;
+    [SerializeField] float landedScale = 1f;
+
     #endregion
 
     #region Component Variables
@@ -170,6 +174,7 @@ public class BombController : NetworkBehaviour
         _rigidbody.isKinematic = true;
 
         transform.SetPositionAndRotation(socket.position, socket.rotation);
+        ApplyUniformScale(heldScale);
     }
 
     /// <summary>
@@ -238,6 +243,7 @@ public class BombController : NetworkBehaviour
     void Init()
     {
         transform.rotation = _baseRot;
+        ApplyUniformScale(landedScale);
         _bombState = BombState.None;
         _bombTimer = 0f;
         _floorTimer = 0f;
@@ -303,6 +309,12 @@ public class BombController : NetworkBehaviour
         _elapsed += Time.fixedDeltaTime;
 
         float t = Mathf.Clamp01(_elapsed / _duration);
+
+        // 손에서 작게 들고 있다가 날아가는 동안 원래 크기로 돌아온다(착지 순간 = landedScale).
+        // 되쳐낸 Flight는 이미 원래 크기이므로 보간하지 않는다.
+        if (_bombState == BombState.InitFlight)
+            ApplyUniformScale(Mathf.Lerp(heldScale, landedScale, t));
+
         Vector3 nextPos = EvaluatePosition(t);
 
         if (CheckHitBetween(_prevPos, nextPos))
@@ -314,6 +326,7 @@ public class BombController : NetworkBehaviour
         if (t >= 1f)
         {
             _rigidbody.MovePosition(_targetPos);
+            ApplyUniformScale(landedScale);
             _bombState = BombState.BombTimer;
             _elapsed = 0f;
         }
@@ -411,7 +424,7 @@ public class BombController : NetworkBehaviour
             unit?.TakeDamage(new AttackInfo(bombDamage));
             _knockbackAttack.ApplyKnockbackAttack(collider.gameObject);
             MakeFloor();
-            Edit.Log("[No.23] 플레이어와 충돌!");
+            Edit.Log($"[No.23] 플레이어와 충돌! — {collider.name}(layer {layer})");
         }
         else if ((enemy.value & (1 << layer)) != 0 && _bombState != BombState.InitFlight)
         {
@@ -420,18 +433,47 @@ public class BombController : NetworkBehaviour
             Explode();
             unit?.TakeDamage(new AttackInfo(bombDamage));
             MakeFloor();
-            Edit.Log("[No.23] 적과 충돌!");
+            Edit.Log($"[No.23] 적과 충돌! — {collider.name}(layer {layer})");
         }
         else if ((wall.value & (1 << layer)) != 0)
         {
             Explode();
             MakeFloor();
-            Edit.Log("[No.23] 벽과 충돌!");
+            Edit.Log($"[No.23] 벽과 충돌! — {collider.name}(layer {layer})");
         }
         else if ((ground.value & (1 << layer)) != 0 && _bombState != BombState.Flight)
         {
+            // ⚠️ 이 분기에 들어오면 비행이 그 자리에서 끝난다. 무엇을 "바닥"으로 봤는지 남기지 않으면
+            // "폭탄이 공중에 멈춘다"는 증상만 보이고 원인을 못 짚는다(같은 증상으로 두 번 헤맸다).
+            // ground 마스크는 Default를 포함하고 Default는 "미분류 전부"라, 보스 밑이 아닌 환경
+            // 오브젝트(예: 송전기)까지 후보가 된다 — 이름과 레이어를 반드시 함께 찍는다.
+            Edit.Log(
+                $"[No.23] 폭탄이 바닥 판정에 걸려 정지 — {collider.name}(layer {layer}), " +
+                $"현재 위치 {transform.position}, 목표 {_targetPos}", this);
+
+            // 목표 지점보다 먼저 바닥에 닿은 경우 — 보간이 끝나기 전이므로 여기서 원래 크기로 맞춘다.
+            ApplyUniformScale(landedScale);
             _bombState = BombState.BombTimer;
         }
+    }
+
+    #endregion
+
+    #region Scale Methods
+
+    /// <summary>
+    /// 폭탄 루트 스케일을 균일하게 맞춘다. 손에 있을 때는 <see cref="heldScale"/>, 바닥에 놓이면
+    /// <see cref="landedScale"/>이고 비행 중에는 진행도에 따라 보간하므로 착지 순간 원래 크기가 된다.
+    ///
+    /// ⚠️ 루트를 스케일하면 장판(<c>floor</c>)과 히트박스도 같이 커진다. 착지·폭발 경로는 모두
+    /// <see cref="landedScale"/>로 수렴시켜 두었으니 장판 크기는 종전과 같다. 다만
+    /// <see cref="bombRadius"/>(스윕·중첩 판정 반경)는 스케일을 타지 않는 별개 값이므로,
+    /// 스케일만 키우면 판정은 그대로라는 점을 기억할 것.
+    /// 서버에서만 호출한다 — 복제는 루트 <c>NetworkTransform</c>(SyncScale)이 담당한다.
+    /// </summary>
+    void ApplyUniformScale(float scale)
+    {
+        transform.localScale = Vector3.one * scale;
     }
 
     #endregion
@@ -445,6 +487,9 @@ public class BombController : NetworkBehaviour
 
     void MakeFloor()
     {
+        // 공중에서 플레이어·벽에 맞아 터진 경로는 보간이 끝나지 않았을 수 있다 — 장판은 항상 원래 크기로 깐다.
+        ApplyUniformScale(landedScale);
+
         RaycastHit hit;
 
         // 바닥 판정은 GroundProbe로 통일한다. 여기서 실패하면 "폭탄이 공중에 뜬 채로 장판만 깔림"이 된다.
