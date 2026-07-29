@@ -9,122 +9,84 @@ using UnityEngine;
 // 런타임에 baseline 위치 + 0°로 떨어져 **문이 어긋나고 바닥이 벌어진 것처럼** 보인다. 어느 조합이
 // 뽑히는지는 시드마다 달라서 Test Generate 한두 번으로는 드러나지 않는다.
 //
-// 이 도구는 카탈로그가 각 슬롯에 넣을 수 있는 프리팹을 모두 나열해 저작 여부를 표로 보여준다.
-// 프리팹이 재생성돼 GUID가 바뀌면 기존 저작 항목은 참조를 잃고(null) 남는데, 그것도 함께 보고한다.
+// ⚠️ 2026-07-29 수정 — 이 도구는 예전에 Stage1.prefab **에셋**을 읽었다. 그런데 저작을 쓰는
+// Save Placements는 **씬의 Stage1 인스턴스**에 쓰고 프리팹에 Apply하지 않는다. 그래서 재저작을
+// 다 마친 뒤에도 "미저작 9건 / 참조 잃은 항목 9건"을 계속 보고했고, 그걸 믿고 이미 끝난 재저작을
+// 다시 하려 드는 사고가 났다. 지금은 열린 씬을 읽는다(= 런타임이 실제로 쓰는 값).
+//
+// 후보 계산도 넓게 잡지 않는다. 역할 후보가 역할 수와 딱 맞아 절대 Combat이 안 되는 슬롯,
+// QuestPrefab이 지정돼 카탈로그 Quest 풀을 안 보는 슬롯, FixedPrefab으로 셔플에서 빠진 프리팹은
+// 애초에 도달하지 않는 조합이므로 미저작으로 세지 않는다. (계산은 SlotAuthoringModel)
 public static class SlotAuthoringValidator
 {
-    const string CatalogPath = "Assets/50.Art/MapGen/MapObj/ZoneLayout/ZoneLayoutCatalog.asset";
-    const string StagePath = "Assets/2.Prefabs/Map/Stage1.prefab";
-
     [MenuItem("Tools/Map/Authoring/Validate Slot Authoring")]
     public static void Validate()
     {
-        var catalog = AssetDatabase.LoadAssetAtPath<ZoneLayoutCatalogSO>(CatalogPath);
-        if (catalog == null || catalog.Entries == null)
+        ZoneLayoutCatalogSO catalog = SlotAuthoringModel.LoadCatalog();
+        if (catalog == null) return;
+
+        List<ZoneSlot> slots = SlotAuthoringModel.GatherSceneSlots();
+        if (slots.Count == 0)
         {
-            Debug.LogError($"[SlotAuthoring] 카탈로그 로드 실패: {CatalogPath}");
+            Debug.LogError(
+                "[SlotAuthoring] 열린 씬에 ZoneSlot이 없습니다. 저작의 정본은 씬의 Stage1 인스턴스이므로 " +
+                "4.MapScene을 열고 다시 실행하세요.");
             return;
         }
 
-        GameObject stage = PrefabUtility.LoadPrefabContents(StagePath);
+        List<SlotAuthoringModel.SlotPlan> plans = SlotAuthoringModel.BuildPlans(slots, catalog);
 
-        try
+        var report = new StringBuilder();
+        int missingTotal = 0;
+        int deadTotal = 0;
+        int strayTotal = 0;
+
+        foreach (SlotAuthoringModel.SlotPlan plan in plans)
         {
-            ZoneSlot[] slots = stage.GetComponentsInChildren<ZoneSlot>(true);
-            if (slots.Length == 0)
+            ZoneSlot slot = plan.Slot;
+
+            var missing = new List<string>();
+            foreach (GameObject candidate in plan.Reachable)
             {
-                Debug.LogError($"[SlotAuthoring] {StagePath}에 ZoneSlot이 없다.");
-                return;
+                bool hasYaw = slot.TryGetYaw(candidate, out _);
+                bool hasPos = slot.TryGetPosition(candidate, out _);
+                if (hasYaw && hasPos) continue;
+
+                missing.Add($"{candidate.name}({(hasYaw ? "" : "회전")}{(!hasYaw && !hasPos ? "+" : "")}{(hasPos ? "" : "위치")} 없음)");
             }
 
-            var report = new StringBuilder();
-            int missingTotal = 0;
-            int danglingTotal = 0;
+            int dead = SlotAuthoringModel.CountDeadEntries(slot);
 
-            foreach (ZoneSlot slot in slots)
-            {
-                List<GameObject> candidates = CollectCandidates(catalog, slot);
+            // 도달 불가 조합에 남아 있는 저작 = 무해하지만 리포트를 흐리고 인스펙터를 부풀린다.
+            var stray = new List<string>();
+            if (slot.Rotations != null)
+                foreach (ZoneSlot.RotationEntry entry in slot.Rotations)
+                    if (entry.Prefab != null && !plan.Reachable.Contains(entry.Prefab))
+                        stray.Add(entry.Prefab.name);
 
-                var missing = new List<string>();
-                foreach (GameObject candidate in candidates)
-                {
-                    bool hasYaw = slot.TryGetYaw(candidate, out _);
-                    bool hasPos = slot.TryGetPosition(candidate, out _);
-                    if (hasYaw && hasPos) continue;
+            missingTotal += missing.Count;
+            deadTotal += dead;
+            strayTotal += stray.Count;
 
-                    missing.Add($"{candidate.name}({(hasYaw ? "" : "회전")}{(!hasYaw && !hasPos ? "+" : "")}{(hasPos ? "" : "위치")} 없음)");
-                }
-
-                int dangling = 0;
-                if (slot.Rotations != null)
-                    foreach (ZoneSlot.RotationEntry entry in slot.Rotations)
-                        if (entry.Prefab == null) dangling++;
-
-                missingTotal += missing.Count;
-                danglingTotal += dangling;
-
-                report.AppendLine(
-                    $"Slot {slot.SlotID} [{slot.Size}] 후보 {candidates.Count}개 / 미저작 {missing.Count}개" +
-                    (dangling > 0 ? $" / 참조 잃은 항목 {dangling}개" : "") +
-                    (missing.Count > 0 ? "\n    → " + string.Join(", ", missing) : ""));
-            }
-
-            string summary =
-                $"[SlotAuthoring] 슬롯 {slots.Length}개 검증 — 미저작 조합 {missingTotal}개 / " +
-                $"참조 잃은 저작 항목 {danglingTotal}개\n{report}";
-
-            if (missingTotal > 0 || danglingTotal > 0)
-            {
-                Debug.LogWarning(
-                    summary +
-                    "\n미저작 조합은 해당 프리팹을 슬롯에 맞춘 뒤 Save Placements로 저장해야 한다. " +
-                    "참조 잃은 항목은 프리팹이 재생성돼 GUID가 바뀐 잔재다(무해하지만 정리 권장).");
-            }
-            else
-            {
-                Debug.Log(summary + "\n모든 조합이 저작됨.");
-            }
-        }
-        finally
-        {
-            PrefabUtility.UnloadPrefabContents(stage);
-        }
-    }
-
-    /// <summary>
-    /// 이 슬롯에 실제로 들어올 수 있는 프리팹 전부.
-    /// 역할 후보 플래그가 켜져 있으면 그 역할 디자인도 후보다(런타임 RNG가 역할을 배정한다).
-    /// </summary>
-    static List<GameObject> CollectCandidates(ZoneLayoutCatalogSO catalog, ZoneSlot slot)
-    {
-        var result = new List<GameObject>();
-
-        if (slot.FixedPrefab != null)
-        {
-            result.Add(slot.FixedPrefab);
-            return result; // 고정 슬롯은 셔플·역할과 무관하다
+            string roles = string.Join("/", plan.PossibleRoles);
+            report.AppendLine(
+                $"Slot {slot.SlotID} [{slot.Size}] 가능역할 {roles} / 도달가능 {plan.Reachable.Count}개 / 미저작 {missing.Count}개" +
+                (dead > 0 ? $" / 참조 잃은 항목 {dead}개" : "") +
+                (stray.Count > 0 ? $" / 불필요 저작 {stray.Count}개" : "") +
+                (missing.Count > 0 ? "\n    → 미저작: " + string.Join(", ", missing) : "") +
+                (stray.Count > 0 ? "\n    → 불필요: " + string.Join(", ", stray) : ""));
         }
 
-        void AddUnique(GameObject prefab)
-        {
-            if (prefab != null && !result.Contains(prefab)) result.Add(prefab);
-        }
+        string summary =
+            $"[SlotAuthoring] 씬 '{slots[0].gameObject.scene.name}' 슬롯 {slots.Count}개 검증 — " +
+            $"미저작 {missingTotal}개 / 참조 잃은 항목 {deadTotal}개 / 불필요 저작 {strayTotal}개\n{report}";
 
-        // 전투 셔플 풀 — 난이도 0 기준(생성기 기본값).
-        foreach (GameObject prefab in catalog.GetCombatPool(slot.Size, 0)) AddUnique(prefab);
-
-        if (slot.IsQuestCandidate)
-        {
-            if (slot.QuestPrefab != null) AddUnique(slot.QuestPrefab);
-            foreach (GameObject prefab in catalog.GetRolePool(ZoneRole.Quest, slot.Size)) AddUnique(prefab);
-        }
-
-        if (slot.IsBossCandidate)
-            AddUnique(catalog.GetRoleLayout(ZoneRole.BossRoom, slot.Size));
-
-        if (slot.IsSpawnCandidate)
-            AddUnique(catalog.GetRoleLayout(ZoneRole.PlayerSpawn, slot.Size));
-
-        return result;
+        if (missingTotal > 0)
+            Debug.LogWarning(summary + "\n미저작 조합은 해당 프리팹을 슬롯에 맞춘 뒤 Save Placements로 저장해야 한다.");
+        else if (deadTotal > 0 || strayTotal > 0)
+            Debug.LogWarning(summary +
+                "\n도달 가능한 조합은 모두 저작됨. 남은 항목은 'Tools/Map/Authoring/Cleanup Slot Authoring'으로 정리한다.");
+        else
+            Debug.Log(summary + "\n모든 조합이 저작됨. 잔재 없음.");
     }
 }
