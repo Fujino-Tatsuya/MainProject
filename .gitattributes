@@ -57,3 +57,6 @@ INab*.asset binary
 *.unitypackage binary
 *.wav binary
 *.zip binary
+
+Assets/Plugins/FMOD/**/*.bundle text eol=lf
+Assets/Plugins/FMOD/**/Info.plist text eol=lf

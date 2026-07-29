@@ -36,8 +36,20 @@ public class Player : Unit
     [SerializeField] int maxHp;
     [SerializeField] int defense;
 
+    [Header("\n이동 플랫폼 캐리")]
+    [Tooltip("발밑 플랫폼 라이더 콜라이더 검사 레이어. 기본 전체.")]
+    [SerializeField] private LayerMask platformRiderMask = ~0;
+    [Tooltip("발밑 검사 거리(m).")]
+    [SerializeField] private float platformGroundCheckDistance = 0.6f;
+
     private PlayerStateController stateController;
     private DefaultAttackController defaultAttack;
+    private FirstMeleePassive passive;
+    private PlayerMovement movement;
+    private PlayerInvulnerability invulnerability;
+    private Rigidbody playerRigidbody;
+    private bool initialRigidbodyIsKinematic;
+    private bool initialRigidbodyDetectCollisions;
 
     public PlayerActionState CurrentState => stateController != null ? stateController.CurrentState : PlayerActionState.Idle;
     public bool CanMove => stateController == null || stateController.CanMove;
@@ -56,6 +68,15 @@ public class Player : Unit
             stateController = gameObject.AddComponent<PlayerStateController>();
 
         defaultAttack = GetComponent<DefaultAttackController>();
+        passive = GetComponent<FirstMeleePassive>();
+        movement = GetComponent<PlayerMovement>();
+        invulnerability = GetComponent<PlayerInvulnerability>();
+        playerRigidbody = GetComponent<Rigidbody>();
+        if (playerRigidbody != null)
+        {
+            initialRigidbodyIsKinematic = playerRigidbody.isKinematic;
+            initialRigidbodyDetectCollisions = playerRigidbody.detectCollisions;
+        }
 
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
@@ -87,6 +108,8 @@ public class Player : Unit
 
         if (IsServer)
             Initialize(attackDamage, moveSpeed, attackSpeed, maxHp, defense);
+
+        ConfigureMovementPhysicsAuthority();
     }
 
     public override void OnNetworkDespawn()
@@ -94,7 +117,20 @@ public class Player : Unit
         if (LocalPlayer == this)
             SetLocalPlayer(null);
 
+        RestoreRigidbodyDefaults();
         base.OnNetworkDespawn();
+    }
+
+    public override void OnGainedOwnership()
+    {
+        base.OnGainedOwnership();
+        ConfigureMovementPhysicsAuthority();
+    }
+
+    public override void OnLostOwnership()
+    {
+        base.OnLostOwnership();
+        ConfigureMovementPhysicsAuthority();
     }
 
     private void Start()
@@ -129,6 +165,13 @@ public class Player : Unit
 
     private void Update()
     {
+        // 이동 플랫폼 캐리는 이동 권한 피어(오너/오프라인)에서만 적용한다.
+        // 비오너는 루트 NetworkTransform으로 이미 동기되므로 여기서 적용하면 이중 적용된다.
+        if (IsMovementAuthority)
+        {
+            ApplyPlatformCarry();
+        }
+
         if (IsNetworkActive &&
             !stateController.ShouldTickForNetwork(IsOwner, HasStateAuthority))
         {
@@ -136,6 +179,34 @@ public class Player : Unit
         }
 
         stateController.Tick();
+    }
+
+    /// <summary>발밑에 이동 플랫폼이 있으면 그 이동량을 플레이어 이동에 가산한다(락스텝 캐리).</summary>
+    private void ApplyPlatformCarry()
+    {
+        if (movement == null)
+        {
+            return;
+        }
+
+        // RaycastAll: 자기 콜라이더가 먼저 맞아 플랫폼 검출을 막지 않도록 전체 히트에서 MovingPlatform을 찾는다.
+        Vector3 origin = transform.position + Vector3.up * 0.1f;
+        RaycastHit[] hits = Physics.RaycastAll(
+            origin,
+            Vector3.down,
+            platformGroundCheckDistance,
+            platformRiderMask,
+            QueryTriggerInteraction.Collide);
+
+        for (int i = 0; i < hits.Length; i++)
+        {
+            MovingPlatform platform = hits[i].collider.GetComponentInParent<MovingPlatform>();
+            if (platform != null)
+            {
+                movement.AddCarryDelta(platform.CurrentDelta);
+                break;
+            }
+        }
     }
 
     public void EndDefaultAttack()
@@ -173,7 +244,7 @@ public class Player : Unit
 
     protected override void OnKnockback(Vector3 direction, float strength)
     {
-        // 서버가 거부(사망/슈퍼아머)하면 오너에게도 전파하지 않는다
+        // 서버가 거부(사망 — 슈퍼아머는 Unit.Knockback에서 선차단)하면 오너에게도 전파하지 않는다
         bool accepted = stateController.BeginKnockback(direction, strength);
         if (!accepted)
             return;
@@ -250,6 +321,41 @@ public class Player : Unit
     /// <summary>이동은 오너 권위(networking.md) — 넉백 물리를 시뮬레이션할 피어인지 여부.</summary>
     public bool IsMovementAuthority => !IsNetworkActive || IsOwner;
 
+    /// <summary>
+    /// Player 위치는 owner-authority NetworkTransform이 복제한다.
+    /// 비권한 피어의 Rigidbody는 kinematic으로 두어 중력·충돌 반응이 복제 위치와 경쟁하지 않게 한다.
+    /// 콜라이더 감지는 유지하므로 서버의 공격 판정과 Overlap 쿼리에는 계속 참여한다.
+    /// </summary>
+    private void ConfigureMovementPhysicsAuthority()
+    {
+        if (playerRigidbody == null)
+            return;
+
+        playerRigidbody.linearVelocity = Vector3.zero;
+        playerRigidbody.angularVelocity = Vector3.zero;
+
+        if (IsMovementAuthority)
+        {
+            playerRigidbody.detectCollisions = initialRigidbodyDetectCollisions;
+            playerRigidbody.isKinematic = initialRigidbodyIsKinematic;
+            return;
+        }
+
+        playerRigidbody.detectCollisions = initialRigidbodyDetectCollisions;
+        playerRigidbody.isKinematic = true;
+    }
+
+    private void RestoreRigidbodyDefaults()
+    {
+        if (playerRigidbody == null)
+            return;
+
+        playerRigidbody.linearVelocity = Vector3.zero;
+        playerRigidbody.angularVelocity = Vector3.zero;
+        playerRigidbody.detectCollisions = initialRigidbodyDetectCollisions;
+        playerRigidbody.isKinematic = initialRigidbodyIsKinematic;
+    }
+
     public void NotifyKnockbackEnded()
     {
         if (!IsNetworkActive || IsServer)
@@ -273,6 +379,50 @@ public class Player : Unit
     public override void TakeDamage(AttackInfo attackInfo)
     {
         base.TakeDamage(attackInfo);
+    }
+
+    // 피격당하면(데미지량 무관) 패시브(불굴의 의지) 쿨다운을 감소시킨다. 서버 권위에서만 유효.
+    public override bool ReceiveAttack(AttackInfo attackInfo, AttackHitContext hitContext)
+    {
+        bool result = base.ReceiveAttack(attackInfo, hitContext);
+        passive?.NotifyOwnerHit();
+        return result;
+    }
+
+    // 추락 피해는 방어력·쉴드·일반 무적을 무시한다(서버 전용 Bypass Context). (PLAN §11, §13 / W10)
+    private bool _fallDamageBypass;
+
+    // 무적(대시 등) 동안 일반 피해를 차단한다. 단 추락 Bypass 중에는 통과시킨다. (PLAN §11 / W5·W10)
+    protected override bool CanApplyHealthDamage(int damage)
+    {
+        if (_fallDamageBypass)
+            return true;
+
+        if (invulnerability != null && invulnerability.IsServerInvulnerable)
+            return false;
+
+        return base.CanApplyHealthDamage(damage);
+    }
+
+    /// <summary>
+    /// 서버 전용. 추락 피해를 적용한다: BreakShield → ceil(FinalMaxHp * ratio) 직접 피해(무적 우회).
+    /// 공격 Passive/Hit 반응을 발생시키지 않는다. (PLAN §13)
+    /// </summary>
+    public void ApplyFallDamage(float ratio)
+    {
+        if (!IsServer)
+            return;
+
+        _fallDamageBypass = true;
+        try
+        {
+            BreakShield();
+            ApplyDirectHealthDamage(Mathf.CeilToInt(FinalMaxHp * Mathf.Max(0f, ratio)));
+        }
+        finally
+        {
+            _fallDamageBypass = false;
+        }
     }
 
     private ClientRpcParams CreateOwnerClientRpcParams()

@@ -15,16 +15,28 @@ public class PlayerInputReader : BaseNetworkBehaviour
     private InputAction skillSubAction;
     private InputAction skillUltimateAction;
     private bool inputEnabled = true;
+    private bool uiInputSuppressed;
+    private bool combatInputEnabled = true;
     private bool controlEnabled = true;
 
     public Vector2 Direction { get; private set; }
     public bool HasMoveInput => Direction.sqrMagnitude > 0.01f;
-    public bool AttackPressed => inputEnabled && attackAction != null && attackAction.WasPressedThisFrame();
-    public bool AttackHeld => inputEnabled && attackAction != null && attackAction.IsPressed();
-    public bool InterruptPressed => inputEnabled && interruptAction != null && interruptAction.WasPressedThisFrame();
+    public bool AttackPressed => CanReadCombatInput && attackAction != null && attackAction.WasPressedThisFrame();
+    public bool AttackHeld => CanReadCombatInput && attackAction != null && attackAction.IsPressed();
+    public bool InterruptPressed => CanReadCombatInput && interruptAction != null && interruptAction.WasPressedThisFrame();
+
+    // v1 대시 입력은 키보드 Shift 직접 판정(입력 에셋에 Dash 액션이 없어도 동작). (PLAN §7)
+    public bool DashPressed =>
+        EffectiveInputEnabled &&
+        Keyboard.current != null &&
+        Keyboard.current.leftShiftKey.wasPressedThisFrame;
 
     private bool CanUseLocalControl =>
         !IsNetworkActive || IsOwner;
+    private bool CanReadCombatInput =>
+        EffectiveInputEnabled && combatInputEnabled;
+    private bool EffectiveInputEnabled =>
+        inputEnabled && !uiInputSuppressed;
 
     private void Awake()
     {
@@ -43,7 +55,7 @@ public class PlayerInputReader : BaseNetworkBehaviour
 
     public bool GetSkillPressed(PlayerSkillSlot slot)
     {
-        if (!inputEnabled)
+        if (!CanReadCombatInput)
             return false;
 
         InputAction action = GetSkillAction(slot);
@@ -52,7 +64,7 @@ public class PlayerInputReader : BaseNetworkBehaviour
 
     public bool GetSkillHeld(PlayerSkillSlot slot)
     {
-        if (!inputEnabled)
+        if (!CanReadCombatInput)
             return false;
 
         InputAction action = GetSkillAction(slot);
@@ -91,12 +103,22 @@ public class PlayerInputReader : BaseNetworkBehaviour
     public void SetInputEnabled(bool isEnabled)
     {
         inputEnabled = isEnabled;
+        ApplyInputState();
+    }
 
-        if (playerInput != null)
-            playerInput.enabled = isEnabled;
+    public void SetUiInputSuppressed(bool suppressed)
+    {
+        uiInputSuppressed = suppressed;
+        ApplyInputState();
+    }
 
-        if (!inputEnabled)
-            Direction = Vector2.zero;
+    /// <summary>
+    /// 이동 입력은 유지하면서 공격/인터럽트/스킬 입력만 허용하거나 차단한다.
+    /// Soul 생명주기 정책이 로컬 오너 입력에만 적용한다.
+    /// </summary>
+    public void SetCombatInputEnabled(bool isEnabled)
+    {
+        combatInputEnabled = isEnabled;
     }
 
     private void RefreshControlState()
@@ -116,9 +138,18 @@ public class PlayerInputReader : BaseNetworkBehaviour
             movement.enabled = isEnabled;
     }
 
+    private void ApplyInputState()
+    {
+        if (playerInput != null)
+            playerInput.enabled = EffectiveInputEnabled;
+
+        if (!EffectiveInputEnabled)
+            Direction = Vector2.zero;
+    }
+
     private void Update()
     {
-        if (!inputEnabled)
+        if (!EffectiveInputEnabled)
         {
             Direction = Vector2.zero;
             return;

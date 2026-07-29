@@ -28,6 +28,7 @@ public class PlayerSkillController : BaseNetworkBehaviour
     private PlayerInputReader inputReader;
     private PlayerMovement movement;
     private PlayerAimIndicator aimIndicator;
+    private PlayerSkillTargeting targeting;
 
     // 서버 권위 쿨타임 장부. 승인 즉시 기록하며 환불하지 않는다 (사망 포함).
     private readonly float[] nextReadyTime = new float[SlotCount];
@@ -39,6 +40,8 @@ public class PlayerSkillController : BaseNetworkBehaviour
 
     public PlayerSkillBase ActiveSkill => activeSkill;
     public bool IsSkillActive => activeSkill != null;
+    // 조준/자동이동/확정 직후 프레임 — FSM이 일반 액션 입력(공격/다른 스킬)을 억제하는 데 쓴다.
+    public bool IsChoosingTarget => targeting != null && targeting.IsInterceptingInput;
     private bool HasGameplayAuthority => !IsNetworkActive || IsServer;
 
     private void Awake()
@@ -48,6 +51,7 @@ public class PlayerSkillController : BaseNetworkBehaviour
         inputReader = GetComponent<PlayerInputReader>();
         movement = GetComponent<PlayerMovement>();
         aimIndicator = GetComponent<PlayerAimIndicator>();
+        targeting = GetComponent<PlayerSkillTargeting>();
 
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
@@ -71,6 +75,18 @@ public class PlayerSkillController : BaseNetworkBehaviour
         }
 
         skill.Initialize(player, this);
+    }
+
+    // 쿨타임 장부(nextReadyTime)가 만료되면 스킬 내부 State도 Cooldown → Ready로 복귀시킨다.
+    // 시전 검증은 장부가 담당하므로 State는 표시/조회용 — ResetToReady가 Cooldown일 때만 동작한다.
+    private void Update()
+    {
+        for (int i = 0; i < SlotCount; i++)
+        {
+            PlayerSkillBase skill = GetSkill((PlayerSkillSlot)i);
+            if (skill != null && skill != activeSkill && Time.time >= nextReadyTime[i])
+                skill.ResetToReady();
+        }
     }
 
     public PlayerSkillBase GetSkill(PlayerSkillSlot slot)
@@ -97,12 +113,51 @@ public class PlayerSkillController : BaseNetworkBehaviour
 
     // ── 오너 입력 진입점 ──
 
+    // 입력 진입점. 타겟팅 스킬은 즉시 시전 대신 조준 모드로 진입하고, 아니면 바로 시전한다.
     public bool TryUse(PlayerSkillSlot slot)
     {
-        return TryUse(slot, null);
+        PlayerSkillBase skill = GetSkill(slot);
+        if (skill == null || skill.Data == null)
+            return false;
+
+        if (skill.Data.TargetingMode != SkillTargetingMode.None && CanBeginTargeting())
+        {
+            // 조준 진입 게이트: 실행 중/요청 중/쿨타임 미완이면 진입 안 함 (서버가 최종 검증하지만 UX상 조기 차단)
+            if (IsSkillActive || isRequestingSkill || !IsCooldownReady(slot))
+                return false;
+
+            return targeting.Begin(slot);
+        }
+
+        return Cast(slot, null, Vector3.zero, false);
     }
 
+    // 명시적 대상 지정 시전 (기존 시그니처 유지 — 조준 모드를 건너뛰고 바로 시전).
     public bool TryUse(PlayerSkillSlot slot, Unit target)
+    {
+        return Cast(slot, target, Vector3.zero, false);
+    }
+
+    // 조준 확정 경로 — PlayerSkillTargeting이 좌클릭 확정 시 호출. 조준 재진입 없이 실제 시전한다.
+    public bool ExecuteTargetedSkill(PlayerSkillSlot slot, Unit target, Vector3 aimPoint, bool hasAimPoint)
+    {
+        return Cast(slot, target, aimPoint, hasAimPoint);
+    }
+
+    // 조준 모드는 로컬 조작자(오너/오프라인)에서만, 타겟팅 컴포넌트가 있을 때만 시작할 수 있다.
+    private bool CanBeginTargeting()
+    {
+        return targeting != null && (!IsNetworkActive || IsOwner);
+    }
+
+    // 같은 스킬키 재입력 여부 — 조준 취소 판별용(PlayerSkillTargeting에서 조회).
+    public bool WasSkillRePressed(PlayerSkillSlot slot)
+    {
+        return inputReader != null && inputReader.GetSkillPressed(slot);
+    }
+
+    // 실제 시전 공통 경로. aimPoint는 GroundPoint 확정 지점(hasAimPoint일 때만 유효).
+    private bool Cast(PlayerSkillSlot slot, Unit target, Vector3 aimPoint, bool hasAimPoint)
     {
         if (IsSkillActive || isRequestingSkill)
             return false;
@@ -111,10 +166,12 @@ public class PlayerSkillController : BaseNetworkBehaviour
         if (skill == null || skill.Data == null)
             return false;
 
-        Vector3 direction = GetCurrentAimDirection();
+        Vector3 direction = hasAimPoint
+            ? ResolveDirection(aimPoint - transform.position)
+            : GetCurrentAimDirection();
 
         if (!IsNetworkActive)
-            return StartSkillServer(slot, direction, target);
+            return StartSkillServer(slot, direction, target, aimPoint, hasAimPoint);
 
         if (!IsOwner)
             return false;
@@ -124,7 +181,7 @@ public class PlayerSkillController : BaseNetworkBehaviour
             targetRef = target.NetworkObject;
 
         isRequestingSkill = true;
-        RequestUseSkillRpc(slot, direction, targetRef);
+        RequestUseSkillRpc(slot, direction, targetRef, aimPoint, hasAimPoint);
         return true;
     }
 
@@ -195,7 +252,8 @@ public class PlayerSkillController : BaseNetworkBehaviour
 
     // ── 서버 처리 ──
 
-    private bool StartSkillServer(PlayerSkillSlot slot, Vector3 direction, Unit target)
+    private bool StartSkillServer(
+        PlayerSkillSlot slot, Vector3 direction, Unit target, Vector3 aimPoint, bool hasAimPoint)
     {
         if (!CanApproveSkill(slot, direction, target, out PlayerSkillBase skill, out bool isDead))
             return false;
@@ -217,6 +275,7 @@ public class PlayerSkillController : BaseNetworkBehaviour
         int damageSnapshot = Mathf.Max(0,
             Mathf.RoundToInt(player.FinalAttackDamage * skill.Data.AttackDamageMultiplier) + skill.Data.FlatDamageBonus);
         skill.SetDamageSnapshot(damageSnapshot);
+        skill.SetAimPoint(aimPoint, hasAimPoint);
 
         Edit.Log($"[Skill] {slot} 시작 — 피해 스냅샷 {damageSnapshot}, 쿨타임 {skill.Data.CooldownTime}s", this);
 
@@ -224,7 +283,7 @@ public class PlayerSkillController : BaseNetworkBehaviour
         PlaySkillPresentation(skill, direction);
 
         if (IsNetworkActive)
-            PlaySkillClientRpc(slot, direction);
+            PlaySkillClientRpc(slot, direction, aimPoint, hasAimPoint);
 
         return true;
     }
@@ -322,13 +381,14 @@ public class PlayerSkillController : BaseNetworkBehaviour
 
     [Rpc(SendTo.Server)]
     private void RequestUseSkillRpc(
-        PlayerSkillSlot slot, Vector3 direction, NetworkObjectReference targetRef, RpcParams rpcParams = default)
+        PlayerSkillSlot slot, Vector3 direction, NetworkObjectReference targetRef,
+        Vector3 aimPoint, bool hasAimPoint, RpcParams rpcParams = default)
     {
         if (rpcParams.Receive.SenderClientId != OwnerClientId)
             return;
 
         Unit target = ResolveTarget(targetRef);
-        if (!StartSkillServer(slot, direction, target))
+        if (!StartSkillServer(slot, direction, target, aimPoint, hasAimPoint))
             RejectSkillClientRpc(CreateOwnerClientRpcParams());
     }
 
@@ -353,7 +413,7 @@ public class PlayerSkillController : BaseNetworkBehaviour
     // ── RPC (서버 → 클라) ──
 
     [ClientRpc]
-    private void PlaySkillClientRpc(PlayerSkillSlot slot, Vector3 direction)
+    private void PlaySkillClientRpc(PlayerSkillSlot slot, Vector3 direction, Vector3 aimPoint, bool hasAimPoint)
     {
         if (IsServer)
             return;
@@ -363,6 +423,8 @@ public class PlayerSkillController : BaseNetworkBehaviour
         PlayerSkillBase skill = GetSkill(slot);
         if (skill == null)
             return;
+
+        skill.SetAimPoint(aimPoint, hasAimPoint);
 
         // 표시용 쿨타임 미러 — 이 RPC 수신 = 서버 승인이므로 오너도 장부를 기록한다.
         // 서버 시점과의 오차(전송 지연)는 HUD 표시용으로 허용, 검증은 여전히 서버 장부가 담당 (그릴 합의)

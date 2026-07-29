@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.InputSystem;
 using Unity.Netcode;
 
@@ -10,6 +10,16 @@ public class PlayerAimIndicator : NetworkBehaviour
     [SerializeField] private LayerMask groundMask;
 
     public Vector3 AimDirection { get; private set; }
+
+    // 마우스 아래 지면 히트 지점(월드). 타겟팅 컨트롤러가 GroundPoint 조준·사거리 판정에 재사용한다.
+    public Vector3 AimGroundPoint { get; private set; }
+    public bool HasAimGroundPoint { get; private set; }
+
+    // 조준에 쓰는 게임플레이 카메라. 소멸/미존재 시 지연 재해석되므로 매번 프로퍼티로 조회할 것.
+    public Camera TargetCamera => targetCamera;
+
+    // groundMask 공유 — 타겟팅 컨트롤러가 별도 마스크를 들지 않도록 노출한다.
+    public LayerMask GroundMask => groundMask;
 
     private void Awake()
     {
@@ -50,7 +60,13 @@ public class PlayerAimIndicator : NetworkBehaviour
         Ray ray = targetCamera.ScreenPointToRay(mousePosition);
 
         if (!Physics.Raycast(ray, out RaycastHit hit, 100f, groundMask))
+        {
+            HasAimGroundPoint = false;
             return;
+        }
+
+        AimGroundPoint = hit.point;
+        HasAimGroundPoint = true;
 
         Vector3 direction = hit.point - transform.position;
         direction.y = 0f;

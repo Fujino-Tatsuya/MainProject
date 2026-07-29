@@ -111,3 +111,12 @@ PlayerInput
 | 런타임 Character 교체 | 대부분의 Character는 런타임 중 교체하지 않는다. 예외는 추후 별도 논의한다. |
 | Ability 입력 전달 컴포넌트 | `PlayerAbilityController`로 확정한다. 이 컴포넌트는 Ability 실행만 담당하며, public API는 `UseSlot(AbilitySlot slot)`을 사용한다. |
 | 중복 이동/회전 컴포넌트 정리 | `PlayerInputScript`, `PlayerRotation`, `PlayerRotation_RotateTowards`를 유지할지 정리할지 결정해야 한다. |
+
+### 최하위 우선순위 아이디어 — 최종 사망 시체 래그돌
+
+- `remainingRevives == 0`인 Player의 최종 사망 시체에만 래그돌을 적용하는 아이디어다.
+- 현재 Dash/추락/사망/Soul 구현 범위에서는 제외하고, 래그돌 없는 시각 전용 시체로 진행한다.
+- 추후 적용한다면 뼈별 네트워크 동기화는 하지 않고 각 피어의 로컬 시각 연출로만 실행한다.
+- 래그돌 Collider는 전투·Player·Enemy 판정에서 제외하며, 자체 충돌을 최소화한다.
+- Player는 최대 3명이므로 최종 시체 수도 최대 3개로 제한된다.
+- 일정 시간(예: 5초) 후 뼈 Rigidbody를 kinematic으로 전환해 물리 비용을 멈춘다.
