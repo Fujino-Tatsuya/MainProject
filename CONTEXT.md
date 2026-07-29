@@ -4,7 +4,53 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## 현재 인수인계 (2026-07-28 · SVN r235 커밋 완료)
+## ▶▶ 현재 인수인계 (2026-07-29 세션 종료 · feature/Boss 머지 완료)
+
+작업 세션: **경석(Claude)**. 브랜치 `feature/map-player-merge`, 마지막 커밋 `cc22c3b`.
+워킹트리: `0.BootStrapScene.unity`(팀장 지시로 보존) 외 clean — BT 에셋 churn은 폐기함.
+
+### 다음 세션 시작점 — 폭탄 아트 수정본 받기
+
+**팀장이 폭탄 아트 fbx를 직접 수정한 뒤, 그 수정본으로 Play해서 재판단한다.** 다음 세션은 그
+결과를 받는 것으로 시작한다(이상하면 팀장이 알려줌). 코드 측은 이미 다 닫혀 있다:
+
+| 닫은 것 | 커밋 |
+|---|---|
+| 폭탄이 보스 히트박스를 바닥으로 오인 → `GroundProbe`로 바닥 판정 통일(레이어 폴백·원점 띄우기·**Unit 계층 제외**) | `2b4226c` |
+| 바닥 위 표준 간격 `0.05` 도입(절대 Y 고정은 불가 — 보스룸 보행면은 0.50, BossScene은 0) + 바닥 상단 측정을 Max→**최빈값** | `88da3c6` |
+| 보스룸 안전망·기준점을 실제 보행면 **Y 0.50**에 맞춰 재생성(도구 재실행) | `95f3d61` |
+| 폭탄이 보스 손 높이에서 영구 정지 — **무시할 히트를 스윕 마스크에서 제외** | `29cc999` |
+| 아트 오프셋 실측 도구 + Bomb 비주얼 정합 확인(center (0,0,0) → 프리팹은 정상) | `cc22c3b` |
+
+⚠️ **아트를 고치면 `Cube.422/423` 로컬 값이 바뀌고, 그러면 `BombVisual`의 상쇄값
+`(28.0, -1.23, -6.94)`도 함께 무효가 된다.** 눈대중으로 맞추지 말고
+`Tools/Map/Authoring/Measure Bomb Visual Offset`으로 재측정할 것(center가 0에 오면 정합).
+
+### 그 다음 예정 (팀장 지시 순서)
+
+1. **git 최신화 → SVN 업데이트**
+2. **은희 `feature/PlayerSkillAnimation` 머지** — 사운드(`feature/Sound`)는 그 브랜치에 붙인 상태로 받는다.
+   준비물은 §2-b/§2-c에 정리돼 있다:
+   - **프리팹 컴포넌트 유실 검사법**: `grep -o "Assembly-CSharp::[A-Za-z_0-9]*" | sort -u`를 머지 전/후
+     `comm` 비교(이번에 `BossHudTarget`을 놓쳤던 방식의 재발 방지)
+   - **Player.prefab 레이어 마스크 함정**: `EnemyHurtBox`(14) 유지 — `--ours`로 통째 되돌리면 보스를 못 때린다
+   - FMOD/AudioListener는 그 브랜치에 붙은 상태로 받기로 결정
+3. **미결 1건**: `Wells.prefab`이 `NetworkObject` 없이 `DefaultNetworkPrefabs`에 등록된 무효 상태 →
+   부착이냐 등록 제거냐 **민경 확인 필요**.
+
+### 이 세션에 확립된 재사용 규칙
+
+- **바닥 판정은 `GroundProbe.TryFindGround` 하나만 쓴다.** 직접 `Physics.Raycast(..., "Ground")`를 쓰지 말 것.
+  네 군데에서 같은 원인으로 터졌다(점프 착지·폭탄 투척·MakeFloor·비행 스윕).
+- **바닥에 눕는 것은 `GroundProbe.SurfaceY(hit)`** (= 찾은 바닥 + 0.05). 절대 Y 상수 금지.
+- **보스룸 보행면 = Y 0.50** (`BossFloorCollider` 상단·`BossLandingPoint`·`BossArea` 전부 0.50).
+  이전 문서·주석의 "0.61"은 솟은 발판을 잘못 측정한 값이었다.
+- **Play 로그는 Play 중에만 MCP로 읽힌다** — Play를 나가면 도메인 리로드로 버퍼가 리셋된다.
+- 로컬 교훈 로그(`Docs/_local/lessons.md`) #32~#37에 이번 세션 6건을 적었다.
+
+---
+
+## 이전 인수인계 (2026-07-28 · SVN r235 커밋 완료)
 
 작업 세션: **경석(Claude)**. 브랜치 `feature/map-player-merge` (`30cf1df`, origin보다 1 앞).
 
