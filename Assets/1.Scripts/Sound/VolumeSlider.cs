@@ -21,8 +21,8 @@ public class VolumeSlider : MonoBehaviour
     [Header("동작")]
     [Tooltip("활성화 시 슬라이더 현재 값을 볼륨에 즉시 반영(패널 열 때 동기화)")]
     [SerializeField] private bool applyOnEnable = true;
-    [Tooltip("PlayerPrefs로 볼륨을 저장/복원(옵션 메뉴 표준). 필요 없으면 해제")]
-    [SerializeField] private bool persist = true;
+    //[Tooltip("PlayerPrefs로 볼륨을 저장/복원(옵션 메뉴 표준). 필요 없으면 해제")]
+    //[SerializeField] private bool persist = true;
 
     private Slider _slider;
 

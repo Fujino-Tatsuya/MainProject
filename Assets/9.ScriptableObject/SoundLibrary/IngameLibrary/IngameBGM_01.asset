@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ad670d1adcf8be84f891f82b894c08a5, type: 3}
-  m_Name: New Sound
+  m_Name: IngameBGM_01
   m_EditorClassIdentifier: BroAudio::Ami.BroAudio.Data.AudioEntity
   UseAddressables: 0
   <ID>k__BackingField: 0

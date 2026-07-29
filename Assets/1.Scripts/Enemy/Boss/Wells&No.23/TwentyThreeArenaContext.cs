@@ -40,7 +40,5 @@ public class TwentyThreeArenaContext : NetworkBehaviour
             return;
         }
         btActivator.OpenBT();
-
-        AudioManager.Instance.PlayBGM(AudioManager.Instance.Catalog.InGameBGM);
     }
 }

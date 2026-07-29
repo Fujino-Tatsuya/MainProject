@@ -38,7 +38,7 @@ public static class VolumeUIBuilder
         scaler.referenceResolution = new Vector2(1920f, 1080f);
 
         // 2) EventSystem (Input System 패키지 사용 프로젝트 → 해당 모듈 우선, 없으면 레거시)
-        if (Object.FindObjectOfType<EventSystem>() == null)
+        if (Object.FindFirstObjectByType<EventSystem>() == null)
         {
             var esGO = new GameObject("EventSystem", typeof(EventSystem));
             var moduleType = System.Type.GetType("UnityEngine.InputSystem.UI.InputSystemUIInputModule, Unity.InputSystem");
