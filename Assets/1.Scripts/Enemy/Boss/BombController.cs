@@ -338,6 +338,24 @@ public class BombController : NetworkBehaviour
 
     #region Collision Methods
 
+    static readonly RaycastHit[] HitBuffer = new RaycastHit[16];
+
+    /// <summary>
+    /// 비행 구간(from→to)에 막히는 것이 있으면 처리하고 true. true면 <see cref="UpdateFlight"/>가
+    /// 위치를 갱신하지 않으므로, <b>무시할 히트는 애초에 잡지 않아야 한다.</b>
+    ///
+    /// ⚠️ 여기서 폭탄이 보스 손 높이에 영구히 멈추는 버그가 났다. 두 가지가 겹쳤다:
+    /// <list type="number">
+    /// <item><see cref="HandleHit"/>의 enemy 분기는 <c>InitFlight</c>(=보스가 던진 직후)를 제외해
+    ///   던진 보스 몸을 무시하는데, 예전 코드는 그 히트에도 true를 돌려줬다. 폭탄은 보스
+    ///   <c>HurtBox</c>(EnemyHurtBox) 안에서 출발하므로 매 프레임 "막혔다"가 되어 한 발도 못 나갔고,
+    ///   상태도 안 바뀌어 폭발 타이머조차 돌지 않았다. → InitFlight에는 enemy를 마스크에서 뺀다
+    ///   (반대로 플레이어가 되쳐낸 <c>Flight</c>에서는 몹을 때려야 하므로 넣는다).</item>
+    /// <item>유닛의 <b>공격 히트박스</b>는 몸도 바닥도 벽도 아니다. No.23은 Rage·DashAttack 등
+    ///   공격 콜라이더가 Default(=ground 마스크)에 있어, 그대로 두면 폭탄이 던진 보스 몸통을
+    ///   "바닥"으로 인식해 손 높이에서 폭발했다. → 몸 레이어가 아닌 유닛 콜라이더는 통과시킨다.</item>
+    /// </list>
+    /// </summary>
     bool CheckHitBetween(Vector3 from, Vector3 to)
     {
         Vector3 dir = to - from;
@@ -346,24 +364,39 @@ public class BombController : NetworkBehaviour
         if (distance <= 0f)
             return false;
 
-        int layerMask = player | enemy | wall;
-        if (_bombState == BombState.InitFlight)
-            layerMask = layerMask | ground;
+        int layerMask = player | wall;
+        layerMask |= _bombState == BombState.InitFlight ? ground.value : enemy.value;
 
-        if (Physics.SphereCast(
-            from,
-            bombRadius,
-            dir.normalized,
-            out RaycastHit hit,
-            distance,
-            layerMask,
-            QueryTriggerInteraction.Collide))
+        int count = Physics.SphereCastNonAlloc(
+            from, bombRadius, dir.normalized, HitBuffer, distance,
+            layerMask, QueryTriggerInteraction.Collide);
+
+        Collider nearest = null;
+        float nearestDistance = float.PositiveInfinity;
+        int bodyLayers = player.value | enemy.value;
+
+        for (int i = 0; i < count; i++)
         {
-            HandleHit(hit.collider);
-            return true;
+            Collider candidate = HitBuffer[i].collider;
+            if (candidate == null)
+                continue;
+
+            bool isBodyLayer = (bodyLayers & (1 << candidate.gameObject.layer)) != 0;
+            if (!isBodyLayer && candidate.GetComponentInParent<Unit>() != null)
+                continue;   // 유닛의 공격 히트박스 — 폭탄은 그냥 통과한다
+
+            if (HitBuffer[i].distance < nearestDistance)
+            {
+                nearestDistance = HitBuffer[i].distance;
+                nearest = candidate;
+            }
         }
 
-        return false;
+        if (nearest == null)
+            return false;
+
+        HandleHit(nearest);
+        return true;
     }
 
     void HandleHit(Collider collider)
