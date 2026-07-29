@@ -142,8 +142,9 @@ public class BombLauncher : MonoBehaviour
         // 빗나가면 target.y가 투척 높이로 남아 폭탄이 공중에 착지한다 — 그래서 성공/실패 둘 다 로그를 남긴다.
         if (GroundProbe.TryFindGround(target, groundMask.value, out RaycastHit hit, out string report))
         {
-            target.y = hit.point.y;
-            Edit.Log($"[No.23] 폭탄 투척 착지 지점 확정 — {report}", this);
+            // 바닥면과 정확히 같은 높이로 두면 폭탄·장판이 바닥과 z-fighting 한다 → 표준 간격만큼 띄운다.
+            target.y = GroundProbe.SurfaceY(hit);
+            Edit.Log($"[No.23] 폭탄 투척 착지 지점 확정 — {report} → 착지 y={target.y:F2}", this);
         }
         else
         {

@@ -117,7 +117,8 @@ public class JumpController : NetworkBehaviour, IDamageSettable
         if (GroundProbe.TryFindGround(landingPos, groundMask.value, out RaycastHit hit, out string report))
         {
             slopeRotation = Quaternion.FromToRotation(Vector3.up, hit.normal);
-            landingPos.y = hit.point.y;
+            // 장판이 바닥면과 같은 높이면 z-fighting 한다 → 폭탄과 같은 표준 간격으로 띄운다.
+            landingPos.y = GroundProbe.SurfaceY(hit);
         }
         else
         {

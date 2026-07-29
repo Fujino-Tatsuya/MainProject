@@ -420,8 +420,9 @@ public class BombController : NetworkBehaviour
             Quaternion slopeRot = Quaternion.FromToRotation(Vector3.up, hit.normal);
             transform.rotation = _baseRot * slopeRot;
 
+            // 0.01은 z-fighting이 나는 간격이었다 — 장판/폭탄 공통 표준 간격으로 띄운다.
             Vector3 pos = hit.point;
-            pos.y += 0.01f;
+            pos.y = GroundProbe.SurfaceY(hit);
             transform.position = pos;
         }
         else

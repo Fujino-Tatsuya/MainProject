@@ -21,6 +21,17 @@ public static class GroundProbe
     public const float ProbeUp = 2f;
     public const float ProbeDistance = 200f;
 
+    /// <summary>
+    /// 바닥면 위로 띄우는 표준 간격. 장판·폭탄처럼 바닥에 눕는 것들이 표면과 **정확히 같은 높이**면
+    /// z-fighting이 난다. 반대로 절대 Y를 상수로 고정하면 안 된다 — 생성맵 보스룸 슬래브 윗면은
+    /// 0.50이고 BossScene은 0이라, 상수로 박으면 한쪽에서 바닥 아래로 묻힌다.
+    /// 항상 "찾은 바닥 + 이 간격"으로 쓴다.
+    /// </summary>
+    public const float SurfaceOffset = 0.05f;
+
+    /// <summary>찾은 바닥 위에 눕힐 Y. <see cref="SurfaceOffset"/>만큼 띄운다.</summary>
+    public static float SurfaceY(in RaycastHit ground) => ground.point.y + SurfaceOffset;
+
     static readonly RaycastHit[] Buffer = new RaycastHit[16];
 
     /// <summary>

@@ -32,7 +32,7 @@ public partial class ThrowBombAction : Action
         // 구조적으로 못 맞히고, 보스 자기 히트박스(Default 레이어)를 바닥으로 오인하는 문제도 있다.
         if (GroundProbe.TryFindGround(target, LayerMask.GetMask(Ground), out RaycastHit hit, out string report))
         {
-            target.y = hit.point.y;
+            target.y = GroundProbe.SurfaceY(hit);
         }
         else
         {

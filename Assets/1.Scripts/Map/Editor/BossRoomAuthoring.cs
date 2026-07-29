@@ -251,7 +251,15 @@ public static class BossRoomAuthoring
 
         bool hasAny = false;
         bool hasFloor = false;
-        float floorMax = float.NegativeInfinity;
+
+        // 바닥 상단 Y는 "가장 높은 바닥"이 아니라 **가장 넓게 깔린 바닥**이다.
+        //
+        // ⚠️ 예전에는 Mathf.Max를 썼다. 보스룸에는 이름에 "Floor"가 들어가는 솟은 발판
+        // (Env_Floor_bosscharger)이 있어서 그 상단(0.611)이 잡혔고, 실제 보행 슬래브
+        // (Env_floor_basic_typeA, 0.50)보다 0.11 높은 안전망이 만들어졌다. 그 결과 이 안전망을
+        // 바닥으로 잡는 모든 것(폭탄·장판·착지점)이 타일보다 0.11 떠 있었다.
+        // 슬래브는 수십 장이고 발판은 몇 개뿐이므로, 높이를 1cm 단위로 묶어 표를 세면 보행면이 이긴다.
+        var floorTopVotes = new System.Collections.Generic.Dictionary<int, int>();
 
         foreach (Renderer renderer in root.GetComponentsInChildren<Renderer>(true))
         {
@@ -274,13 +282,38 @@ public static class BossRoomAuthoring
                 continue;
 
             hasFloor = true;
-            floorMax = Mathf.Max(floorMax, bounds.max.y);
+
+            int bucket = Mathf.RoundToInt(bounds.max.y * 100f);   // 1cm 단위
+            floorTopVotes.TryGetValue(bucket, out int votes);
+            floorTopVotes[bucket] = votes + 1;
         }
 
         if (!hasAny)
             return false;
 
-        floorTopY = hasFloor ? floorMax : roomBounds.min.y;
+        if (!hasFloor)
+        {
+            floorTopY = roomBounds.min.y;
+            return true;
+        }
+
+        int bestBucket = 0, bestVotes = -1;
+        var distribution = new System.Text.StringBuilder();
+        foreach (var pair in floorTopVotes)
+        {
+            distribution.Append($"y{pair.Key / 100f:F2}×{pair.Value} ");
+
+            // 표가 같으면 낮은 쪽을 택한다 — 솟은 발판보다 보행면을 기준으로 두는 게 안전하다.
+            if (pair.Value > bestVotes || (pair.Value == bestVotes && pair.Key < bestBucket))
+            {
+                bestVotes = pair.Value;
+                bestBucket = pair.Key;
+            }
+        }
+
+        floorTopY = bestBucket / 100f;
+        Debug.Log($"[BossRoomAuthoring] 바닥 상단 Y 후보 분포 — {distribution}→ 채택 {floorTopY:F2} " +
+                  $"(최빈값. 솟은 발판이 최댓값을 끌어올리는 것을 막는다)");
         return true;
     }
 
