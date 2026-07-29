@@ -634,6 +634,8 @@ MonoBehaviour:
     type: 2
   - target: {fileID: 6555260676494401482}
     type: 4
+  - target: {fileID: 5579044265559132990}
+    type: 3
   grabController: {fileID: 8939195106823421711}
   bombLauncher: {fileID: 3123776171035693610}
 --- !u!1 &3443241134742314900
@@ -981,6 +983,7 @@ GameObject:
   - component: {fileID: 3484663710126934133}
   - component: {fileID: 2934878137636970231}
   - component: {fileID: 6839388890406243040}
+  - component: {fileID: 6491938153281997714}
   m_Layer: 8
   m_Name: TwentyThree
   m_TagString: Untagged
@@ -1017,7 +1020,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 739404150
+  GlobalObjectIdHash: 1745528080
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -1418,6 +1421,20 @@ MonoBehaviour:
   - {fileID: 7434833580858265621}
   - {fileID: 1173616335134953240}
   isOpenVariableName: IsOpen
+--- !u!114 &6491938153281997714
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5372104213593212626}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9e2f1802081602c4f9d3d5afc2a7c96d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MonsterTimeController
+  animator: {fileID: 7460696466104070403}
+  agent: {fileID: 1054250890861799072}
 --- !u!1 &6682516438038340514
 GameObject:
   m_ObjectHideFlags: 0
