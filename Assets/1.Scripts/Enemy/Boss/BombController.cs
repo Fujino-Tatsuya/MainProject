@@ -414,7 +414,13 @@ public class BombController : NetworkBehaviour
     {
         RaycastHit hit;
 
-        if (Physics.Raycast(transform.position, Vector3.down, out hit, Mathf.Infinity, ground))
+        // 원점을 살짝 띄운다 — 폭탄이 바닥면과 같은 높이거나 미세하게 아래면 표면에서 시작한 광선이
+        // MeshCollider 윗면을 놓친다(뒷면은 안 맞는다). 그러면 아래 스냅이 통째로 건너뛰어져
+        // 폭탄이 공중에 그대로 남는다.
+        const float floorProbeUp = 2f;
+
+        if (Physics.Raycast(transform.position + Vector3.up * floorProbeUp, Vector3.down, out hit,
+                            Mathf.Infinity, ground, QueryTriggerInteraction.Ignore))
         {
             Quaternion slopeRot = Quaternion.FromToRotation(Vector3.up, hit.normal);
             transform.rotation = _baseRot * slopeRot;
@@ -422,6 +428,15 @@ public class BombController : NetworkBehaviour
             Vector3 pos = hit.point;
             pos.y += 0.01f;
             transform.position = pos;
+        }
+        else
+        {
+            // 조용히 넘기면 "폭탄이 공중에 뜬 채로 장판만 깔림"이 된다 — 어느 레이캐스트가 실패했는지
+            // 이 로그로 갈린다(투척 시점 실패는 BombLauncher/ThrowBombAction 쪽 경고로 따로 뜬다).
+            Edit.LogWarning(
+                $"[No.23] 폭탄 아래에서 바닥을 찾지 못해 착지 스냅을 건너뜁니다 — 위치 {transform.position}, " +
+                $"ground 마스크 {ground.value}. 그 지점에 바닥 콜라이더가 있는지, 마스크에 해당 레이어가 " +
+                "포함됐는지 확인하세요(생성맵 바닥은 Default).", this);
         }
 
         FloorAreaEffect bombAreaEffect = CheckDoubleExplosion();
@@ -480,7 +495,32 @@ public class BombController : NetworkBehaviour
     [ClientRpc]
     void SetBombEnableClientRpc(bool enable)
     {
-        bomb.SetActive(enable);
+        SetBombEnable(enable);
+    }
+
+    /// <summary>
+    /// 폭탄 본체의 표시/판정을 켜고 끈다(폭발 시 false).
+    ///
+    /// ⚠️ <c>bomb.SetActive</c>만으로는 부족하다 — 폭탄 비주얼을 아트 모델(fbx)로 교체하면서
+    /// 그 인스턴스(<c>BombVisual</c>)가 <c>bomb</c>(Sphere)의 <b>형제</b>로 붙었다. 그래서 폭발해서
+    /// 장판이 깔린 뒤에도 아트 모델만 그대로 남아 떠 있었다.
+    /// 장판(<c>floor</c>) 계층은 유지해야 하므로 그쪽만 제외하고 남은 렌더러를 함께 토글한다
+    /// (앞으로 비주얼을 더 붙여도 자동으로 따라온다).
+    /// </summary>
+    void SetBombEnable(bool enable)
+    {
+        if (bomb != null)
+            bomb.SetActive(enable);
+
+        foreach (Renderer renderer in GetComponentsInChildren<Renderer>(true))
+        {
+            if (floor != null && renderer.transform.IsChildOf(floor.transform))
+                continue;   // 장판은 폭발 후에 오히려 보여야 한다
+            if (bomb != null && renderer.transform.IsChildOf(bomb.transform))
+                continue;   // 위 SetActive가 이미 처리
+
+            renderer.enabled = enable;
+        }
     }
 
     void SetFloorEnable(bool enable)
