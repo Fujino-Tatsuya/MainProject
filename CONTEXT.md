@@ -448,14 +448,19 @@ Life/PlayerLifeCycleController, Life/PlayerLifeInputPolicy}`, `1.Scripts/Unit/St
 
 프리팹 YAML은 수동 머지하지 않는다(GUID/fileID 깨짐 위험). Boss 쪽을 통째로 받고 아래를 재작업한다.
 
-| 대상 | 유실되는 내 작업 | 근거 커밋 |
+⚠️ **머지 후 실측하니 이 표의 예상이 대부분 틀렸다.** 아래가 검증된 결과다(2026-07-29).
+
+| 대상 | 실제 결과 | 근거 |
 |---|---|---|
-| `Bomb.prefab` | 폭탄 비주얼을 아트 모델로 교체 | `1b13d6e` |
-| `TwentyThree.prefab` | **생성맵에서 보스 피격 가능 + 지면 인식** (맞으면 빨갛게 되는 처리 포함) | `60f3862` |
-| `TwentyThree.prefab` | 미사용 `maxShield` 직렬화 제거(재저장) | `1271b85` |
-| `Wells.prefab` | 루트에 `NetworkObject` 추가 (dirty, 커밋 안 됨) | — |
-| `BossScene.unity` | 보스 테스트 씬 작업분 (리네임 전 `KMKScene`) | `8e0215b` |
-| `Player.prefab` | — (유실 아님) 오디오 2개는 `feature/Sound` 머지 때 재검토 | 위 2-b 참조 |
+| `Bomb.prefab` 아트 모델 교체 | ✅ **온전함 — 재작업 불필요.** 충돌 없이 auto-merge되어 양쪽이 합쳐졌다. 플레이스홀더 `Sphere`의 MeshRenderer는 비활성(`m_Enabled: 0`) 유지, 아트 인스턴스 `BombVisual`(scale 0.684) 존재. 부모 오프셋(28.0, −1.23, −6.94)이 fbx 내부 오프셋(−40.96, 1.80, 10.16)×0.684와 상쇄되어 폭탄 원점(≈0.15, 0, −0.03)에 놓인다 | `1b13d6e` |
+| "TwentyThree 피격 가능+지면 인식" | ❌ **애초에 프리팹 작업이 아니었다.** `60f3862`의 TwentyThree.prefab diff는 **비어 있다** — 코드 작업(JumpController `groundMask`/`GroundProbe`)이고 그 코드는 병합에서 우리 것으로 살렸다. 현재 theirs 프리팹도 레이어14(EnemyHurtBox) 노드 + Hurtbox를 갖고 있다 | `60f3862` |
+| `maxShield` 직렬화 제거 | 무해. 코드에 이미 없는 필드의 잔여 직렬화값이라 다음 재저장 때 사라진다 | `1271b85` |
+| `BossScene.unity` | 재작업 아님 — 보스 테스트 씬은 민경 소유로 인계(팀장 확인). 우리 `8e0215b`(102줄 추가)는 버린다 | `8e0215b` |
+| `Player.prefab` 오디오 2개 | 유실 아님(의도적 미채택) — `feature/Sound` 머지 때. 팀장 방침: 사운드 브랜치를 **은희 `feature/PlayerSkillAnimation`에 붙인 상태로** 받는다 | 위 2-b |
+
+**🔴 남은 실제 후속 1건 — `Wells.prefab`**
+- 머지 후에도 `NetworkObject`가 **없는데** `DefaultNetworkPrefabs.asset`에는 **등록돼 있다**(`6e2c783`, 민경 작업). 즉 "네트워크 프리팹으로 등록됐지만 NetworkObject가 없는" 무효 상태가 그대로다.
+- 선택지 두 개이고 **민경 확인이 필요하다**: ① Wells를 네트워크 스폰할 것이면 루트에 `NetworkObject` 부착, ② 스폰 주체가 없으면(현재 `BossEncounterWiring`의 보스 프리팹은 `TwentyThree.prefab`이다) 등록을 제거. 둘 중 뭐든 하기 전에는 무효 항목 경고가 남는다.
 
 - Boss 쪽도 같은 파일을 만졌다: `18befc0`·`89bc9e1`·`e61999d`·`9dbdf8c`·`9a2cad0`·`465a934`.
   → `Bomb.prefab`/`TwentyThree.prefab`은 **양쪽 커밋 충돌**이므로 "theirs" 채택 시 위 3건이 사라진다.
