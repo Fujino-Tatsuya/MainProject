@@ -17,7 +17,11 @@ public static class QAReportWriter
     {
         try
         {
-            string runDir = Path.Combine(RunsRoot(), Timestamp());
+            string baseDir = Path.Combine(RunsRoot(), Timestamp());
+            string runDir = baseDir;
+            int suffix = 2;
+            while (Directory.Exists(runDir))     // 같은 초에 여러 사이클이 끝나도 폴더 충돌 방지
+                runDir = baseDir + "_" + suffix++;
             Directory.CreateDirectory(runDir);
 
             File.WriteAllText(Path.Combine(runDir, "report.md"),
