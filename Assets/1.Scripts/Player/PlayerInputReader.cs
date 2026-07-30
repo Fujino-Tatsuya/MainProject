@@ -15,6 +15,7 @@ public class PlayerInputReader : BaseNetworkBehaviour
     private InputAction skillSubAction;
     private InputAction skillUltimateAction;
     private bool inputEnabled = true;
+    private bool uiInputSuppressed;
     private bool combatInputEnabled = true;
     private bool controlEnabled = true;
 
@@ -26,14 +27,16 @@ public class PlayerInputReader : BaseNetworkBehaviour
 
     // v1 대시 입력은 키보드 Shift 직접 판정(입력 에셋에 Dash 액션이 없어도 동작). (PLAN §7)
     public bool DashPressed =>
-        inputEnabled &&
+        EffectiveInputEnabled &&
         Keyboard.current != null &&
         Keyboard.current.leftShiftKey.wasPressedThisFrame;
 
     private bool CanUseLocalControl =>
         !IsNetworkActive || IsOwner;
     private bool CanReadCombatInput =>
-        inputEnabled && combatInputEnabled;
+        EffectiveInputEnabled && combatInputEnabled;
+    private bool EffectiveInputEnabled =>
+        inputEnabled && !uiInputSuppressed;
 
     private void Awake()
     {
@@ -100,12 +103,13 @@ public class PlayerInputReader : BaseNetworkBehaviour
     public void SetInputEnabled(bool isEnabled)
     {
         inputEnabled = isEnabled;
+        ApplyInputState();
+    }
 
-        if (playerInput != null)
-            playerInput.enabled = isEnabled;
-
-        if (!inputEnabled)
-            Direction = Vector2.zero;
+    public void SetUiInputSuppressed(bool suppressed)
+    {
+        uiInputSuppressed = suppressed;
+        ApplyInputState();
     }
 
     /// <summary>
@@ -134,9 +138,18 @@ public class PlayerInputReader : BaseNetworkBehaviour
             movement.enabled = isEnabled;
     }
 
+    private void ApplyInputState()
+    {
+        if (playerInput != null)
+            playerInput.enabled = EffectiveInputEnabled;
+
+        if (!EffectiveInputEnabled)
+            Direction = Vector2.zero;
+    }
+
     private void Update()
     {
-        if (!inputEnabled)
+        if (!EffectiveInputEnabled)
         {
             Direction = Vector2.zero;
             return;

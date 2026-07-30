@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a336cb8a15e6f024caef82ee480e4c84, type: 3}
   m_Name: FirstMeleeMainSkillData
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   inputType: 1
   cooldownTime: 10
   attackDamageMultiplier: 0.3
@@ -21,8 +21,14 @@ MonoBehaviour:
   usableWhileDead: 0
   hittableLayers:
     serializedVersion: 2
-    m_Bits: 17664
-  animatorStateName:
+    m_Bits: 1280
+  targetingMode: 0
+  confirmMode: 0
+  castRange: 8
+  targetableLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  animatorStateName: Garen_Main_Skill
   snapRotationOnStart: 1
   advanceSpeed: 6
   steerAnglePerTick: 5

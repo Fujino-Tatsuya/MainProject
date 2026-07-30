@@ -9,20 +9,24 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6cd9883059c546e68f5aeeda0b842aa8, type: 3}
-  m_Name: FirstMeleeSubSkillData
-  m_EditorClassIdentifier:
+  m_Script: {fileID: 11500000, guid: 35ae1fdc1e61a894988a21563d47ab80, type: 3}
+  m_Name: FirstMeleeUltimateSkillData
+  m_EditorClassIdentifier: 
   inputType: 0
-  cooldownTime: 14
-  attackDamageMultiplier: 0
+  cooldownTime: 60
+  attackDamageMultiplier: 3
   flatDamageBonus: 0
-  maxActiveDuration: 0.5
+  maxActiveDuration: 1.5
   tickInterval: 0
   usableWhileDead: 0
   hittableLayers:
     serializedVersion: 2
     m_Bits: 0
-  animatorStateName:
-  snapRotationOnStart: 0
-  shieldAmount: 10
-  shieldDuration: 5
+  targetingMode: 1
+  confirmMode: 0
+  castRange: 8
+  targetableLayers:
+    serializedVersion: 2
+    m_Bits: 256
+  animatorStateName: Garen_Ultimate_Skill
+  snapRotationOnStart: 1

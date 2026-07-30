@@ -181,7 +181,7 @@ public class Player : Unit
         stateController.Tick();
     }
 
-    /// <summary>발밑에 이동 플랫폼이 있으면 그 이동량을 플레이어 이동에 가산한다(락스텝 캐리).</summary>
+    /// <summary>발밑에 캐리 표면이 있으면 그 이동량을 플레이어 이동에 가산한다.</summary>
     private void ApplyPlatformCarry()
     {
         if (movement == null)
@@ -189,7 +189,7 @@ public class Player : Unit
             return;
         }
 
-        // RaycastAll: 자기 콜라이더가 먼저 맞아 플랫폼 검출을 막지 않도록 전체 히트에서 MovingPlatform을 찾는다.
+        // RaycastAll: 자기 콜라이더가 먼저 맞아 캐리 표면 검출을 막지 않도록 전체 히트를 확인한다.
         Vector3 origin = transform.position + Vector3.up * 0.1f;
         RaycastHit[] hits = Physics.RaycastAll(
             origin,
@@ -200,10 +200,12 @@ public class Player : Unit
 
         for (int i = 0; i < hits.Length; i++)
         {
-            MovingPlatform platform = hits[i].collider.GetComponentInParent<MovingPlatform>();
-            if (platform != null)
+            ISurfaceCarrier carrier =
+                hits[i].collider.GetComponentInParent<ISurfaceCarrier>();
+            if (carrier != null)
             {
-                movement.AddCarryDelta(platform.CurrentDelta);
+                movement.AddCarryDelta(
+                    carrier.GetCarryDelta(transform.position, Time.deltaTime));
                 break;
             }
         }

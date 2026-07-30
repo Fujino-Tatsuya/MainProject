@@ -19,6 +19,8 @@ public sealed class PlayerSoulController : MonoBehaviour
     [SerializeField] private Transform soulVisualRoot;
     [Tooltip("SoulVisualPrefab이 없을 때 생존 외형에 임시로 적용할 머티리얼.")]
     [SerializeField] private Material fallbackSoulMaterial;
+    [Tooltip("Soul 상태에서만 숨길 장비(무기·방패 등). Soul 진입 시 SetActive(false), 그 외 상태는 SetActive(true).")]
+    [SerializeField] private GameObject[] soulHiddenEquipment;
 
     [Header("Combat Target")]
     [Tooltip("비어 있으면 Player Root 아래의 Hurtbox 컴포넌트에 연결된 Collider를 찾습니다.")]
@@ -107,6 +109,7 @@ public sealed class PlayerSoulController : MonoBehaviour
 
         EnsureSoulVisual();
         SetVisualState(isAlive, isSoul);
+        SetEquipmentActive(!isSoul);
         SetRootLayer(isSoul);
         SetGroundingMode(isSoul);
         SetHurtboxesEnabled(gameplayAccess.ShouldEnableHurtbox);
@@ -324,6 +327,19 @@ public sealed class PlayerSoulController : MonoBehaviour
 
         if (soulVisual != null)
             soulVisual.SetActive(isSoul);
+    }
+
+    private void SetEquipmentActive(bool active)
+    {
+        if (soulHiddenEquipment == null)
+            return;
+
+        for (int i = 0; i < soulHiddenEquipment.Length; i++)
+        {
+            GameObject equipment = soulHiddenEquipment[i];
+            if (equipment != null && equipment.activeSelf != active)
+                equipment.SetActive(active);
+        }
     }
 
     private void SetFallbackSoulMaterial(bool shouldUseFallback)
