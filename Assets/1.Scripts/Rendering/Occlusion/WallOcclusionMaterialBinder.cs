@@ -10,19 +10,24 @@ namespace VeyTrace.Rendering.Occlusion
             int swappedRenderers,
             int swappedSlots,
             int alreadyBoundSlots,
-            IReadOnlyCollection<string> unmappedMaterialNames)
+            IReadOnlyCollection<string> unmappedMaterialNames,
+            int excludedRenderers = 0)
         {
             InspectedRenderers = inspectedRenderers;
             SwappedRenderers = swappedRenderers;
             SwappedSlots = swappedSlots;
             AlreadyBoundSlots = alreadyBoundSlots;
             UnmappedMaterialNames = unmappedMaterialNames ?? System.Array.Empty<string>();
+            ExcludedRenderers = excludedRenderers;
         }
 
         public int InspectedRenderers { get; }
         public int SwappedRenderers { get; }
         public int SwappedSlots { get; }
         public int AlreadyBoundSlots { get; }
+
+        // 이름 규칙으로 불투명하게 남긴 렌더러 수(밟는 면 등).
+        public int ExcludedRenderers { get; }
 
         // 매핑이 없어 페이드되지 않는 머티리얼. 아트 교체 후 누락을 잡는 용도다.
         public IReadOnlyCollection<string> UnmappedMaterialNames { get; }
@@ -49,6 +54,7 @@ namespace VeyTrace.Rendering.Occlusion
             int swappedRenderers = 0;
             int swappedSlots = 0;
             int alreadyBound = 0;
+            int excluded = 0;
             var visitedRoots = new HashSet<Transform>();
 
             foreach (Transform root in roots)
@@ -64,6 +70,15 @@ namespace VeyTrace.Rendering.Occlusion
                         continue;
 
                     inspected++;
+
+                    // 밟고 다니는 면(참호 덮개·경사면)은 벽과 머티리얼을 공유하므로 매핑으로는
+                    // 걸러낼 수 없다. 이름 규칙으로 교체 자체를 건너뛰어 불투명하게 남긴다.
+                    if (IsExcludedByName(renderer.transform, root, settings))
+                    {
+                        excluded++;
+                        continue;
+                    }
+
                     if (TrySwapRenderer(
                             renderer,
                             settings,
@@ -79,7 +94,28 @@ namespace VeyTrace.Rendering.Occlusion
                 swappedRenderers,
                 swappedSlots,
                 alreadyBound,
-                unmapped);
+                unmapped,
+                excluded);
+        }
+
+        // 이름 판정은 렌더러 자신부터 바인딩 루트까지 올라가며 본다. 아트가 fbx를 그대로
+        // 인스턴스화하므로 이름이 붙은 쪽이 렌더러가 아니라 모델 루트인 경우가 많다
+        // (예: 루트 'Env_floor_Trenchcover' 밑의 메시 자식 이름은 'default').
+        private static bool IsExcludedByName(
+            Transform renderer,
+            Transform root,
+            WallOcclusionSettings settings)
+        {
+            for (Transform current = renderer; current != null; current = current.parent)
+            {
+                if (settings.IsExcludedByName(current.name))
+                    return true;
+
+                if (current == root)
+                    break;
+            }
+
+            return false;
         }
 
         private static bool TrySwapRenderer(

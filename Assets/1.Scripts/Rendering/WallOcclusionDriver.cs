@@ -112,6 +112,7 @@ public sealed class WallOcclusionDriver : MonoBehaviour
             $"[WallOcclusion] 바인딩 완료 — roots={roots.Count}, " +
             $"renderers={report.InspectedRenderers}, " +
             $"boundSlots={report.BoundSlots} (신규 {report.SwappedSlots} / 기존 {report.AlreadyBoundSlots}), " +
+            $"불투명 유지(이름 제외)={report.ExcludedRenderers}, " +
             $"unmappedMaterials={report.UnmappedMaterialNames.Count} " +
             $"[{WallOcclusionMaterialBinder.DescribeUnmapped(report.UnmappedMaterialNames)}]",
             this);

@@ -31,6 +31,42 @@ namespace VeyTrace.Rendering.Occlusion
                  "이 장치가 없으면 벽 윗면·선반·창틀 윗면까지 보호돼서 벽 윤곽만 남는다.")]
         [Min(0.01f)] public float floorGuardDepth = 0.5f;
 
+        [Header("Opaque Objects")]
+        [Tooltip("이 이름 조각을 포함한 오브젝트(또는 그 부모)는 머티리얼을 교체하지 않아 항상 불투명하다. " +
+                 "밟고 다니는 면이 대상이다.")]
+        [SerializeField]
+        private string[] excludedNameFragments = { "trenchcover", "slope" };
+
+        /// <summary>
+        /// 이름으로 투명화 대상에서 제외할지 판단한다.
+        ///
+        /// ⚠️ 왜 머티리얼이 아니라 이름으로 빼는가 — 참호 덮개·경사면은 벽과 <b>같은 머티리얼</b>
+        /// (MA_lay·Generic_01_A·MA_prop* 등)을 공유한다. 저작 단계의 머티리얼 이름 제외
+        /// (일반 바닥이 쓰는 방식)로 빼면 같은 머티리얼을 쓰는 실제 벽까지 불투명해진다.
+        ///
+        /// ⚠️ 왜 셰이더 Floor Guard로 안 되는가 — 그쪽은 노멀이 위를 향하는 면 중
+        /// <see cref="floorGuardDepth"/>만큼 플레이어보다 아래에 있는 것만 보호한다.
+        /// 밟고 다니는 면은 플레이어 발밑 높이라 그 조건에서 탈락한다. 임계값을 낮추면
+        /// 벽 윗면·창틀까지 보호돼 벽 윤곽만 남는다(과거에 실제로 그랬다).
+        /// </summary>
+        public bool IsExcludedByName(string objectName)
+        {
+            if (string.IsNullOrEmpty(objectName) || excludedNameFragments == null)
+                return false;
+
+            for (int i = 0; i < excludedNameFragments.Length; i++)
+            {
+                string fragment = excludedNameFragments[i];
+                if (string.IsNullOrEmpty(fragment))
+                    continue;
+
+                if (objectName.IndexOf(fragment, StringComparison.OrdinalIgnoreCase) >= 0)
+                    return true;
+            }
+
+            return false;
+        }
+
         [Header("Runtime Materials")]
         [SerializeField] private Material[] sourceMaterials = Array.Empty<Material>();
         [SerializeField] private Material[] occlusionMaterials = Array.Empty<Material>();

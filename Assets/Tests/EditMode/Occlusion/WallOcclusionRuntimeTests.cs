@@ -221,6 +221,45 @@ namespace VeyTrace.Rendering.Occlusion.Tests
             Assert.That(renderer.sharedMaterial, Is.SameAs(variant));
         }
 
+        [Test]
+        public void Bind_SkipsRenderersExcludedByName()
+        {
+            // 경사면·참호 덮개는 벽과 같은 머티리얼을 쓰므로 매핑으로는 구분되지 않는다.
+            WallOcclusionSettings settings = CreateSettingsWithMapping(
+                out Material source,
+                out Material variant);
+
+            GameObject root = CreateObject("GeneratedMap");
+            MeshRenderer wall = CreateRenderer(root.transform, "Env_Wall_basic", source);
+            MeshRenderer slope = CreateRenderer(root.transform, "Env_slope_1by2fbx", source);
+
+            WallOcclusionBindReport report =
+                WallOcclusionMaterialBinder.Bind(settings, new[] { root.transform });
+
+            Assert.That(wall.sharedMaterial, Is.SameAs(variant));
+            Assert.That(slope.sharedMaterial, Is.SameAs(source));
+            Assert.That(report.ExcludedRenderers, Is.EqualTo(1));
+            Assert.That(report.SwappedSlots, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void Bind_ExcludesRenderersUnderNamedModelRoot()
+        {
+            // fbx를 그대로 인스턴스화하면 이름은 모델 루트에 있고 렌더러는 그 자식이다.
+            WallOcclusionSettings settings = CreateSettingsWithMapping(out Material source, out _);
+
+            GameObject root = CreateObject("GeneratedMap");
+            GameObject model = CreateObject("Env_floor_Trenchcover");
+            model.transform.SetParent(root.transform, false);
+            MeshRenderer mesh = CreateRenderer(model.transform, "default", source);
+
+            WallOcclusionBindReport report =
+                WallOcclusionMaterialBinder.Bind(settings, new[] { root.transform });
+
+            Assert.That(mesh.sharedMaterial, Is.SameAs(source));
+            Assert.That(report.ExcludedRenderers, Is.EqualTo(1));
+        }
+
         private GameObject CreateObject(string name)
         {
             var gameObject = new GameObject(name);
