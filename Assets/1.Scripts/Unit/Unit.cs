@@ -1,4 +1,4 @@
-﻿using BaseNetCode;
+using BaseNetCode;
 using System;
 using Unity.Netcode;
 using UnityEngine;

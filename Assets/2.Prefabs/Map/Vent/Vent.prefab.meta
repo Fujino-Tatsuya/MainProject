@@ -1,11 +1,6 @@
 fileFormatVersion: 2
-<<<<<<<< HEAD:Assets/1.Scripts/Rendering/Fog/FOG_NEXT_PLAN.md.meta
-guid: b1de5f8d9df2bd34cb4b92a43cb82159
-TextScriptImporter:
-========
 guid: 407dffc28a409494d9173e24a4cfdd5c
 PrefabImporter:
->>>>>>>> feature/Platforms:Assets/2.Prefabs/Map/Vent/Vent.prefab.meta
   externalObjects: {}
   userData: 
   assetBundleName: 

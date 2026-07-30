@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using TMPro;
 using Unity.Netcode;
 using UnityEngine;
@@ -59,6 +59,9 @@ public class BeaverLobbySceneManager : NemoSceneManager
         SetErrorMessage(string.Empty);
         RegisterLobbyUiEvents();
         ApplyRoleUi();
+
+        // BGM 재생
+        AudioManager.Instance.PlayBGM(AudioManager.Instance.Catalog.LobbyBGM);
     }
 
     private void OnDestroy()

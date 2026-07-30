@@ -21,6 +21,7 @@ public class ResultSceneManager : NemoSceneManager
     {
         Debug.Log("[SceneFlow] ResultSceneManager.Start");
         PlayEnterFade();
+        AudioManager.Instance.StopBGM();
     }
 
     public void GoToLobby()

@@ -721,6 +721,8 @@ GameObject:
   - component: {fileID: 1111000000000000013}
   - component: {fileID: 1111000000000000014}
   - component: {fileID: 800000000000000030}
+  - component: {fileID: 1017407548875731560}
+  - component: {fileID: 133388133837901378}
   m_Layer: 6
   m_Name: Player
   m_TagString: Player
@@ -1425,6 +1427,27 @@ MonoBehaviour:
   landedFollowCameraDelay: 1
   fallReturnInputLock: 0.5
   fallReturnInvulnerability: 1.5
+--- !u!81 &1017407548875731560
+AudioListener:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8559504096609571310}
+  m_Enabled: 1
+--- !u!114 &133388133837901378
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8559504096609571310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 600743207dcdea7459d72b9ff80c9038, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerAudioListenerActivator
+  ShowTopMostFoldoutHeaderGroup: 1
 --- !u!1 &8838956553020289695
 GameObject:
   m_ObjectHideFlags: 0
@@ -1712,6 +1735,246 @@ PrefabInstance:
       propertyPath: weaponMountTransform
       value: 
       objectReference: {fileID: 508707659756833582}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.size
+      value: 17
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: animationClipList.Array.size
+      value: 9
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: animationClipsNames.Array.size
+      value: 9
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'animationClipList.Array.data[0]'
+      value: 
+      objectReference: {fileID: 7400000, guid: 4b3edd597aa2c1f4983e96943c145bc7, type: 2}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'animationClipList.Array.data[1]'
+      value: 
+      objectReference: {fileID: 7400000, guid: eb421784d811c5346ad349c86a62bb97, type: 2}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'animationClipList.Array.data[2]'
+      value: 
+      objectReference: {fileID: 7400000, guid: ba61124d14cc59e479ebb7ec68861dbf, type: 2}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'animationClipList.Array.data[3]'
+      value: 
+      objectReference: {fileID: 7400000, guid: 81923af8fbd673b43bbdab1759bdd607, type: 2}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'animationClipList.Array.data[4]'
+      value: 
+      objectReference: {fileID: 7400000, guid: b52dbc15e07861d478ecfe269cfa9112, type: 2}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'animationClipList.Array.data[5]'
+      value: 
+      objectReference: {fileID: 7400000, guid: 39d36e6d9f0eb8c44b900cdf070eebfe, type: 2}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'animationClipList.Array.data[6]'
+      value: 
+      objectReference: {fileID: 7400000, guid: 12312a1688de53a45ad3c5dfe98321e4, type: 2}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'animationClipList.Array.data[7]'
+      value: 
+      objectReference: {fileID: 7400000, guid: 56128d2b850943d4e82bfc7eaeedc12d, type: 2}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'animationClipList.Array.data[8]'
+      value: 
+      objectReference: {fileID: 7400000, guid: 1c32f02fd71b2e24db9075ea68dc1aed, type: 2}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[11].clip
+      value: 
+      objectReference: {fileID: 7400000, guid: 4b3edd597aa2c1f4983e96943c145bc7, type: 2}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[12].clip
+      value: 
+      objectReference: {fileID: 7400000, guid: eb421784d811c5346ad349c86a62bb97, type: 2}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[13].clip
+      value: 
+      objectReference: {fileID: 7400000, guid: ba61124d14cc59e479ebb7ec68861dbf, type: 2}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[14].clip
+      value: 
+      objectReference: {fileID: 7400000, guid: 07b6d9d69bbe9d141b21013910f47688, type: 2}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[15].clip
+      value: 
+      objectReference: {fileID: 7400000, guid: b52dbc15e07861d478ecfe269cfa9112, type: 2}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[16].clip
+      value: 
+      objectReference: {fileID: 7400000, guid: 81923af8fbd673b43bbdab1759bdd607, type: 2}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'animationClipsNames.Array.data[0]'
+      value: Player_Idle
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'animationClipsNames.Array.data[1]'
+      value: Player_Walk
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'animationClipsNames.Array.data[2]'
+      value: Garen_Parry
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'animationClipsNames.Array.data[3]'
+      value: Garen_Main_Skill
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'animationClipsNames.Array.data[4]'
+      value: Garen_Ultimate_Skill
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'animationClipsNames.Array.data[5]'
+      value: Garen_Default_Attack_1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'animationClipsNames.Array.data[6]'
+      value: Garen_Default_Attack_2
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'animationClipsNames.Array.data[7]'
+      value: Garen_Default_Attack_3
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'animationClipsNames.Array.data[8]'
+      value: Garen_Default_Attack_4
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[11].preset.endTime
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[12].preset.endTime
+      value: 1.0666667
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[13].preset.endTime
+      value: 1.1666667
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[14].preset.endTime
+      value: 1.6666667
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[15].preset.endTime
+      value: 5.666667
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[16].preset.endTime
+      value: 0.6666667
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[11].preset.clipAsset
+      value: 
+      objectReference: {fileID: 7400000, guid: 4b3edd597aa2c1f4983e96943c145bc7, type: 2}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[12].preset.clipAsset
+      value: 
+      objectReference: {fileID: 7400000, guid: eb421784d811c5346ad349c86a62bb97, type: 2}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[13].preset.clipAsset
+      value: 
+      objectReference: {fileID: 7400000, guid: ba61124d14cc59e479ebb7ec68861dbf, type: 2}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[14].preset.clipAsset
+      value: 
+      objectReference: {fileID: 7400000, guid: 07b6d9d69bbe9d141b21013910f47688, type: 2}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[15].preset.clipAsset
+      value: 
+      objectReference: {fileID: 7400000, guid: b52dbc15e07861d478ecfe269cfa9112, type: 2}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[16].preset.clipAsset
+      value: 
+      objectReference: {fileID: 7400000, guid: 81923af8fbd673b43bbdab1759bdd607, type: 2}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[11].preset.fadeOutDuration
+      value: 0.05
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[12].preset.fadeOutDuration
+      value: 0.05
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[13].preset.fadeOutDuration
+      value: 0.05
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[14].preset.fadeOutDuration
+      value: 0.05
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[15].preset.fadeOutDuration
+      value: 0.05
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[16].preset.fadeOutDuration
+      value: 0.05
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[11].preset.trailLengthLifetime
+      value: 0.35
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[12].preset.trailLengthLifetime
+      value: 0.35
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[13].preset.trailLengthLifetime
+      value: 0.35
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[14].preset.trailLengthLifetime
+      value: 0.35
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[15].preset.trailLengthLifetime
+      value: 0.35
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[16].preset.trailLengthLifetime
+      value: 0.35
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[11].preset.fadeInDuration_slider
+      value: 0.2
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[12].preset.fadeInDuration_slider
+      value: 0.2
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[13].preset.fadeInDuration_slider
+      value: 0.2
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[14].preset.fadeInDuration_slider
+      value: 0.2
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[15].preset.fadeInDuration_slider
+      value: 0.2
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[16].preset.fadeInDuration_slider
+      value: 0.2
+      objectReference: {fileID: 0}
+    - target: {fileID: 5798075419419700096, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0.000012575824
+      objectReference: {fileID: 0}
+    - target: {fileID: 5798075419419700096, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: -0.00010245141
+      objectReference: {fileID: 0}
+    - target: {fileID: 5798075419419700096, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0.000028373266
+      objectReference: {fileID: 0}
     - target: {fileID: 6129863144953294667, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
@@ -1772,6 +2035,246 @@ PrefabInstance:
       propertyPath: weaponMountTransform
       value: 
       objectReference: {fileID: 8154761916280388380}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.size
+      value: 17
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: animationClipList.Array.size
+      value: 9
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: animationClipsNames.Array.size
+      value: 9
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'animationClipList.Array.data[0]'
+      value: 
+      objectReference: {fileID: 7400000, guid: 4b3edd597aa2c1f4983e96943c145bc7, type: 2}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'animationClipList.Array.data[1]'
+      value: 
+      objectReference: {fileID: 7400000, guid: eb421784d811c5346ad349c86a62bb97, type: 2}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'animationClipList.Array.data[2]'
+      value: 
+      objectReference: {fileID: 7400000, guid: ba61124d14cc59e479ebb7ec68861dbf, type: 2}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'animationClipList.Array.data[3]'
+      value: 
+      objectReference: {fileID: 7400000, guid: 81923af8fbd673b43bbdab1759bdd607, type: 2}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'animationClipList.Array.data[4]'
+      value: 
+      objectReference: {fileID: 7400000, guid: b52dbc15e07861d478ecfe269cfa9112, type: 2}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'animationClipList.Array.data[5]'
+      value: 
+      objectReference: {fileID: 7400000, guid: 39d36e6d9f0eb8c44b900cdf070eebfe, type: 2}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'animationClipList.Array.data[6]'
+      value: 
+      objectReference: {fileID: 7400000, guid: 12312a1688de53a45ad3c5dfe98321e4, type: 2}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'animationClipList.Array.data[7]'
+      value: 
+      objectReference: {fileID: 7400000, guid: 56128d2b850943d4e82bfc7eaeedc12d, type: 2}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'animationClipList.Array.data[8]'
+      value: 
+      objectReference: {fileID: 7400000, guid: 1c32f02fd71b2e24db9075ea68dc1aed, type: 2}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[11].clip
+      value: 
+      objectReference: {fileID: 7400000, guid: 4b3edd597aa2c1f4983e96943c145bc7, type: 2}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[12].clip
+      value: 
+      objectReference: {fileID: 7400000, guid: eb421784d811c5346ad349c86a62bb97, type: 2}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[13].clip
+      value: 
+      objectReference: {fileID: 7400000, guid: ba61124d14cc59e479ebb7ec68861dbf, type: 2}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[14].clip
+      value: 
+      objectReference: {fileID: 7400000, guid: 07b6d9d69bbe9d141b21013910f47688, type: 2}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[15].clip
+      value: 
+      objectReference: {fileID: 7400000, guid: b52dbc15e07861d478ecfe269cfa9112, type: 2}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[16].clip
+      value: 
+      objectReference: {fileID: 7400000, guid: 81923af8fbd673b43bbdab1759bdd607, type: 2}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'animationClipsNames.Array.data[0]'
+      value: Player_Idle
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'animationClipsNames.Array.data[1]'
+      value: Player_Walk
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'animationClipsNames.Array.data[2]'
+      value: Garen_Parry
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'animationClipsNames.Array.data[3]'
+      value: Garen_Main_Skill
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'animationClipsNames.Array.data[4]'
+      value: Garen_Ultimate_Skill
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'animationClipsNames.Array.data[5]'
+      value: Garen_Default_Attack_1
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'animationClipsNames.Array.data[6]'
+      value: Garen_Default_Attack_2
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'animationClipsNames.Array.data[7]'
+      value: Garen_Default_Attack_3
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'animationClipsNames.Array.data[8]'
+      value: Garen_Default_Attack_4
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[11].preset.endTime
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[12].preset.endTime
+      value: 1.0666667
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[13].preset.endTime
+      value: 1.1666667
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[14].preset.endTime
+      value: 1.6666667
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[15].preset.endTime
+      value: 5.666667
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[16].preset.endTime
+      value: 0.6666667
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[11].preset.clipAsset
+      value: 
+      objectReference: {fileID: 7400000, guid: 4b3edd597aa2c1f4983e96943c145bc7, type: 2}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[12].preset.clipAsset
+      value: 
+      objectReference: {fileID: 7400000, guid: eb421784d811c5346ad349c86a62bb97, type: 2}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[13].preset.clipAsset
+      value: 
+      objectReference: {fileID: 7400000, guid: ba61124d14cc59e479ebb7ec68861dbf, type: 2}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[14].preset.clipAsset
+      value: 
+      objectReference: {fileID: 7400000, guid: 07b6d9d69bbe9d141b21013910f47688, type: 2}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[15].preset.clipAsset
+      value: 
+      objectReference: {fileID: 7400000, guid: b52dbc15e07861d478ecfe269cfa9112, type: 2}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[16].preset.clipAsset
+      value: 
+      objectReference: {fileID: 7400000, guid: 81923af8fbd673b43bbdab1759bdd607, type: 2}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[11].preset.fadeOutDuration
+      value: 0.05
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[12].preset.fadeOutDuration
+      value: 0.05
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[13].preset.fadeOutDuration
+      value: 0.05
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[14].preset.fadeOutDuration
+      value: 0.05
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[15].preset.fadeOutDuration
+      value: 0.05
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[16].preset.fadeOutDuration
+      value: 0.05
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[11].preset.trailLengthLifetime
+      value: 0.35
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[12].preset.trailLengthLifetime
+      value: 0.35
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[13].preset.trailLengthLifetime
+      value: 0.35
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[14].preset.trailLengthLifetime
+      value: 0.35
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[15].preset.trailLengthLifetime
+      value: 0.35
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[16].preset.trailLengthLifetime
+      value: 0.35
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[11].preset.fadeInDuration_slider
+      value: 0.2
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[12].preset.fadeInDuration_slider
+      value: 0.2
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[13].preset.fadeInDuration_slider
+      value: 0.2
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[14].preset.fadeInDuration_slider
+      value: 0.2
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[15].preset.fadeInDuration_slider
+      value: 0.2
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[16].preset.fadeInDuration_slider
+      value: 0.2
+      objectReference: {fileID: 0}
+    - target: {fileID: 8819879468311463950, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0.00003374271
+      objectReference: {fileID: 0}
+    - target: {fileID: 8819879468311463950, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0.000020629965
+      objectReference: {fileID: 0}
+    - target: {fileID: 8819879468311463950, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0.000028066454
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

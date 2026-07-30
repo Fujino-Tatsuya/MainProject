@@ -1392,6 +1392,7 @@ MonoBehaviour:
   attackSpeed: 1
   maxHp: 100
   defense: 5
+  _monsterTimeController: {fileID: 0}
 --- !u!114 &2934878137636970231
 MonoBehaviour:
   m_ObjectHideFlags: 0
