@@ -72,10 +72,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 6346197552094035170}
-  - component: {fileID: 657607111497605440}
-  - component: {fileID: 4756578540380568215}
   - component: {fileID: 187644027839116329}
-  - component: {fileID: 3640142762517420555}
   m_Layer: 0
   m_Name: Wells
   m_TagString: Untagged
@@ -100,77 +97,6 @@ Transform:
   - {fileID: 5745502121310879258}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &657607111497605440
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4148832031641590993}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 2215638323
-  InScenePlacedSourceGlobalObjectIdHash: 0
-  DeferredDespawnTick: 0
-  Ownership: 1
-  AlwaysReplicateAsRoot: 0
-  SynchronizeTransform: 1
-  ActiveSceneSynchronization: 0
-  SceneMigrationSynchronization: 1
-  SpawnWithObservers: 1
-  DontDestroyWithOwner: 0
-  AutoObjectParentSync: 1
-  SyncOwnerTransformWhenParented: 1
-  AllowOwnerToParent: 0
---- !u!114 &4756578540380568215
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4148832031641590993}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e96cb6065543e43c4a752faaa1468eb1, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.Components.NetworkTransform
-  ShowTopMostFoldoutHeaderGroup: 1
-  NetworkTransformExpanded: 0
-  AutoOwnerAuthorityTickOffset: 1
-  PositionInterpolationType: 0
-  RotationInterpolationType: 0
-  ScaleInterpolationType: 0
-  PositionLerpSmoothing: 1
-  PositionMaxInterpolationTime: 0.1
-  RotationLerpSmoothing: 1
-  RotationMaxInterpolationTime: 0.1
-  ScaleLerpSmoothing: 1
-  ScaleMaxInterpolationTime: 0.1
-  AuthorityMode: 0
-  TickSyncChildren: 0
-  UseUnreliableDeltas: 0
-  SyncPositionX: 1
-  SyncPositionY: 1
-  SyncPositionZ: 1
-  SyncRotAngleX: 1
-  SyncRotAngleY: 1
-  SyncRotAngleZ: 1
-  SyncScaleX: 1
-  SyncScaleY: 1
-  SyncScaleZ: 1
-  PositionThreshold: 0.001
-  RotAngleThreshold: 0.01
-  ScaleThreshold: 0.01
-  UseQuaternionSynchronization: 0
-  UseQuaternionCompression: 0
-  UseHalfFloatPrecision: 0
-  InLocalSpace: 0
-  SwitchTransformSpaceWhenParented: 0
-  Interpolate: 1
-  SlerpPosition: 0
 --- !u!114 &187644027839116329
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -247,21 +173,6 @@ MonoBehaviour:
           m_Value1: 8161177305878392679
         Name: BossStateChanged
         m_Value: {fileID: 11400000, guid: e78288d73e6e29843b07bd884f9535fa, type: 2}
---- !u!114 &3640142762517420555
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4148832031641590993}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3af2115b0dbf10740a42d57da0917118, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::RunningOnlyOnServer
-  ShowTopMostFoldoutHeaderGroup: 1
-  btAgent: {fileID: 187644027839116329}
-  navMeshAgent: {fileID: 0}
 --- !u!1 &6195463117839181549
 GameObject:
   m_ObjectHideFlags: 0
@@ -400,9 +311,6 @@ PrefabInstance:
       addedObject: {fileID: 2145321535539746380}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 9fed67314ef11ca4cb85a6d61bfa1c0e, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 6718347726688941657}
-    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 9fed67314ef11ca4cb85a6d61bfa1c0e, type: 3}
-      insertIndex: -1
       addedObject: {fileID: 5515748389101313656}
   m_SourcePrefab: {fileID: 100100000, guid: 9fed67314ef11ca4cb85a6d61bfa1c0e, type: 3}
 --- !u!4 &1533896975880492512 stripped
@@ -442,85 +350,6 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
---- !u!114 &6718347726688941657
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6391391245549526456}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e8d0727d5ae3244e3b569694d3912374, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.Components.NetworkAnimator
-  ShowTopMostFoldoutHeaderGroup: 1
-  NetworkAnimatorExpanded: 0
-  AuthorityMode: 0
-  m_Animator: {fileID: 2145321535539746380}
-  TransitionStateInfoList:
-  - IsCrossFadeExit: 0
-    Layer: 0
-    OriginatingState: 221587152
-    DestinationState: 2081823275
-    TransitionDuration: 0.25
-    TriggerNameHash: 1625683022
-    TransitionIndex: 0
-  - IsCrossFadeExit: 0
-    Layer: 0
-    OriginatingState: 2081823275
-    DestinationState: -1907200461
-    TransitionDuration: 0.25
-    TriggerNameHash: -1992750699
-    TransitionIndex: 0
-  - IsCrossFadeExit: 0
-    Layer: 0
-    OriginatingState: 2081823275
-    DestinationState: 125937960
-    TransitionDuration: 0.25
-    TriggerNameHash: 19011116
-    TransitionIndex: 1
-  - IsCrossFadeExit: 0
-    Layer: 0
-    OriginatingState: 125937960
-    DestinationState: -1907200461
-    TransitionDuration: 0.25
-    TriggerNameHash: -1992750699
-    TransitionIndex: 1
-  - IsCrossFadeExit: 0
-    Layer: 0
-    OriginatingState: -1907200461
-    DestinationState: 125937960
-    TransitionDuration: 0.25
-    TriggerNameHash: 19011116
-    TransitionIndex: 1
-  AnimatorParameterEntries:
-    ParameterEntries:
-    - name: State
-      NameHash: 1649606143
-      Synchronize: 1
-      ParameterType: 3
-    - name: IsGroggy
-      NameHash: 847727466
-      Synchronize: 1
-      ParameterType: 9
-    - name: IsInit
-      NameHash: 1625683022
-      Synchronize: 1
-      ParameterType: 9
-    - name: IsDead
-      NameHash: 1270110494
-      Synchronize: 1
-      ParameterType: 9
-    - name: IsThrow
-      NameHash: -1992750699
-      Synchronize: 1
-      ParameterType: 9
-    - name: IsJump
-      NameHash: 19011116
-      Synchronize: 1
-      ParameterType: 9
-  AnimatorParametersExpanded: 0
 --- !u!114 &5515748389101313656
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -533,5 +362,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 430566ed93b960443a4d8510881c4378, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WellsAnimEvents
-  ShowTopMostFoldoutHeaderGroup: 1
   bombLauncher: {fileID: 4146338655535622427}
