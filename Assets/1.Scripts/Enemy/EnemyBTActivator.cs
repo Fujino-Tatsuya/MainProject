@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Unity.Behavior;
 using Unity.Netcode;
 using UnityEngine;
@@ -7,6 +7,7 @@ public class EnemyBTActivator : NetworkBehaviour
 {
     [SerializeField] BehaviorGraphAgent[] targetBTs;
     [SerializeField] string isOpenVariableName = "IsOpen";
+    [SerializeField] private ReStart restartChannel;
 
     readonly List<BlackboardVariable<bool>> isOpenVariables = new();
 
@@ -51,5 +52,13 @@ public class EnemyBTActivator : NetworkBehaviour
 
         foreach (var isOpen in isOpenVariables)
             isOpen.Value = false;
+    }
+
+
+    public void RaiseRestart()
+    {
+        // 이 채널을 구독(On Start 등)하는 모든 BehaviorGraph의 노드가 트리거됨
+        restartChannel.SendEventMessage();
+        OpenBT();
     }
 }

@@ -465,7 +465,7 @@ MonoBehaviour:
   floor: {fileID: 3716740133590289348}
   bombTime: 20
   floorTime: 30
-  bombDamage: 55
+  bombDamage: 5
   bombFlightDuration: 1
   player:
     serializedVersion: 2
