@@ -540,6 +540,8 @@ GameObject:
   - component: {fileID: 1111000000000000012}
   - component: {fileID: 1111000000000000013}
   - component: {fileID: 1111000000000000014}
+  - component: {fileID: 1017407548875731560}
+  - component: {fileID: 133388133837901378}
   m_Layer: 6
   m_Name: Player
   m_TagString: Player
@@ -1030,6 +1032,10 @@ MonoBehaviour:
   soulHiddenEquipment: []
   hurtboxColliders: []
   soulMoveSpeed: 5
+  hoverProbeDistance: 6
+  hoverGroundMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
 --- !u!114 &800000000000000022
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1047,6 +1053,7 @@ MonoBehaviour:
   inputReader: {fileID: 1825865676068489031}
   stateController: {fileID: 4237082408145735710}
   skillTargeting: {fileID: 1111000000000000002}
+  encounterLock: {fileID: 0}
 --- !u!114 &800000000000000024
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1215,6 +1222,27 @@ MonoBehaviour:
   landedFollowCameraDelay: 1
   fallReturnInputLock: 0.5
   fallReturnInvulnerability: 1.5
+--- !u!81 &1017407548875731560
+AudioListener:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8559504096609571310}
+  m_Enabled: 1
+--- !u!114 &133388133837901378
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8559504096609571310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 600743207dcdea7459d72b9ff80c9038, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerAudioListenerActivator
+  ShowTopMostFoldoutHeaderGroup: 1
 --- !u!1 &8838956553020289695
 GameObject:
   m_ObjectHideFlags: 0
@@ -1786,7 +1814,7 @@ PrefabInstance:
       objectReference: {fileID: 508707659756833582}
     - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
       propertyPath: clipPresets.Array.size
-      value: 16
+      value: 17
       objectReference: {fileID: 0}
     - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
       propertyPath: animationClipList.Array.size
@@ -1811,7 +1839,7 @@ PrefabInstance:
     - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
       propertyPath: 'animationClipList.Array.data[3]'
       value: 
-      objectReference: {fileID: 7400000, guid: 07b6d9d69bbe9d141b21013910f47688, type: 2}
+      objectReference: {fileID: 7400000, guid: 81923af8fbd673b43bbdab1759bdd607, type: 2}
     - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
       propertyPath: 'animationClipList.Array.data[4]'
       value: 
@@ -1852,6 +1880,10 @@ PrefabInstance:
       propertyPath: clipPresets.Array.data[15].clip
       value: 
       objectReference: {fileID: 7400000, guid: b52dbc15e07861d478ecfe269cfa9112, type: 2}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[16].clip
+      value: 
+      objectReference: {fileID: 7400000, guid: 81923af8fbd673b43bbdab1759bdd607, type: 2}
     - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
       propertyPath: 'animationClipsNames.Array.data[0]'
       value: Player_Idle
@@ -1909,6 +1941,10 @@ PrefabInstance:
       value: 5.666667
       objectReference: {fileID: 0}
     - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[16].preset.endTime
+      value: 0.6666667
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
       propertyPath: clipPresets.Array.data[11].preset.clipAsset
       value: 
       objectReference: {fileID: 7400000, guid: 4b3edd597aa2c1f4983e96943c145bc7, type: 2}
@@ -1929,6 +1965,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 7400000, guid: b52dbc15e07861d478ecfe269cfa9112, type: 2}
     - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[16].preset.clipAsset
+      value: 
+      objectReference: {fileID: 7400000, guid: 81923af8fbd673b43bbdab1759bdd607, type: 2}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
       propertyPath: clipPresets.Array.data[11].preset.fadeOutDuration
       value: 0.05
       objectReference: {fileID: 0}
@@ -1946,6 +1986,10 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
       propertyPath: clipPresets.Array.data[15].preset.fadeOutDuration
+      value: 0.05
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[16].preset.fadeOutDuration
       value: 0.05
       objectReference: {fileID: 0}
     - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
@@ -1969,6 +2013,10 @@ PrefabInstance:
       value: 0.35
       objectReference: {fileID: 0}
     - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[16].preset.trailLengthLifetime
+      value: 0.35
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
       propertyPath: clipPresets.Array.data[11].preset.fadeInDuration_slider
       value: 0.2
       objectReference: {fileID: 0}
@@ -1986,6 +2034,10 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
       propertyPath: clipPresets.Array.data[15].preset.fadeInDuration_slider
+      value: 0.2
+      objectReference: {fileID: 0}
+    - target: {fileID: 5354202808707024626, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[16].preset.fadeInDuration_slider
       value: 0.2
       objectReference: {fileID: 0}
     - target: {fileID: 5798075419419700096, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
@@ -2118,7 +2170,7 @@ PrefabInstance:
       objectReference: {fileID: 8154761916280388380}
     - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
       propertyPath: clipPresets.Array.size
-      value: 16
+      value: 17
       objectReference: {fileID: 0}
     - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
       propertyPath: animationClipList.Array.size
@@ -2143,7 +2195,7 @@ PrefabInstance:
     - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
       propertyPath: 'animationClipList.Array.data[3]'
       value: 
-      objectReference: {fileID: 7400000, guid: 07b6d9d69bbe9d141b21013910f47688, type: 2}
+      objectReference: {fileID: 7400000, guid: 81923af8fbd673b43bbdab1759bdd607, type: 2}
     - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
       propertyPath: 'animationClipList.Array.data[4]'
       value: 
@@ -2184,6 +2236,10 @@ PrefabInstance:
       propertyPath: clipPresets.Array.data[15].clip
       value: 
       objectReference: {fileID: 7400000, guid: b52dbc15e07861d478ecfe269cfa9112, type: 2}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[16].clip
+      value: 
+      objectReference: {fileID: 7400000, guid: 81923af8fbd673b43bbdab1759bdd607, type: 2}
     - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
       propertyPath: 'animationClipsNames.Array.data[0]'
       value: Player_Idle
@@ -2241,6 +2297,10 @@ PrefabInstance:
       value: 5.666667
       objectReference: {fileID: 0}
     - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[16].preset.endTime
+      value: 0.6666667
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
       propertyPath: clipPresets.Array.data[11].preset.clipAsset
       value: 
       objectReference: {fileID: 7400000, guid: 4b3edd597aa2c1f4983e96943c145bc7, type: 2}
@@ -2261,6 +2321,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 7400000, guid: b52dbc15e07861d478ecfe269cfa9112, type: 2}
     - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[16].preset.clipAsset
+      value: 
+      objectReference: {fileID: 7400000, guid: 81923af8fbd673b43bbdab1759bdd607, type: 2}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
       propertyPath: clipPresets.Array.data[11].preset.fadeOutDuration
       value: 0.05
       objectReference: {fileID: 0}
@@ -2278,6 +2342,10 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
       propertyPath: clipPresets.Array.data[15].preset.fadeOutDuration
+      value: 0.05
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[16].preset.fadeOutDuration
       value: 0.05
       objectReference: {fileID: 0}
     - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
@@ -2301,6 +2369,10 @@ PrefabInstance:
       value: 0.35
       objectReference: {fileID: 0}
     - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[16].preset.trailLengthLifetime
+      value: 0.35
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
       propertyPath: clipPresets.Array.data[11].preset.fadeInDuration_slider
       value: 0.2
       objectReference: {fileID: 0}
@@ -2318,6 +2390,10 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
       propertyPath: clipPresets.Array.data[15].preset.fadeInDuration_slider
+      value: 0.2
+      objectReference: {fileID: 0}
+    - target: {fileID: 8354529293896315969, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: clipPresets.Array.data[16].preset.fadeInDuration_slider
       value: 0.2
       objectReference: {fileID: 0}
     - target: {fileID: 8819879468311463950, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}

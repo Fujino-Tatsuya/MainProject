@@ -858,6 +858,10 @@ PrefabInstance:
       propertyPath: SceneMigrationSynchronization
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 5221272126269502752, guid: 09f37616c8805a244ae999c00477d2ab, type: 3}
+      propertyPath: m_Layer
+      value: 3
+      objectReference: {fileID: 0}
     - target: {fileID: 5427120997204487538, guid: 09f37616c8805a244ae999c00477d2ab, type: 3}
       propertyPath: m_LocalPosition.y
       value: 0
