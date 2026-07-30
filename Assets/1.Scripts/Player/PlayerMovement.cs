@@ -108,6 +108,15 @@ public class PlayerMovement : MonoBehaviour
 
         if (total.sqrMagnitude > 0f)
         {
+            // 대시 중에는 CanMove=false라 입력 이동이 0이므로, 여기 남는 건 플랫폼 캐리뿐이다.
+            // MovePosition을 한 프레임에 두 번 호출하면 나중 것이 이기므로 대시 변위가 사라질 수 있다.
+            if (player != null && player.CurrentState == PlayerActionState.Dash)
+            {
+                Edit.LogWarning(
+                    $"[Dash] 같은 프레임에 PlayerMovement.Move가 MovePosition을 호출합니다(캐리 {total.magnitude:F3}m) — " +
+                    "실행 순서에 따라 대시 변위가 덮어써질 수 있습니다(이동 플랫폼 위에서 대시한 경우).", this);
+            }
+
             rb.MovePosition(rb.position + total);
         }
     }
@@ -228,7 +237,23 @@ public class PlayerMovement : MonoBehaviour
         if (Physics.CapsuleCast(
                 center + Vector3.up * half, center - Vector3.up * half, radius,
                 dir, out RaycastHit hit, dist, rootMoveBlockingMask, QueryTriggerInteraction.Ignore))
-            return dir * Mathf.Max(0f, hit.distance - 0.02f);
+        {
+            float allowed = Mathf.Max(0f, hit.distance - 0.02f);
+
+            // ⚠️ 대시는 PlayerMotionSweep으로 이미 충돌을 해결한 뒤 여기로 온다. 이 클램프는 마스크
+            // (Default/Ground/Wall/Env)와 등판각 판정이 달라, 대시 스윕이 통과시킨 경사·지면을
+            // 여기서 다시 막을 수 있다 — "대시가 시작은 됐는데 안 나간다"의 마지막 후보다.
+            if (player != null && player.CurrentState == PlayerActionState.Dash && allowed < dist * 0.9f)
+            {
+                Edit.LogWarning(
+                    $"[Dash] MoveRoot 클램프: 요청 {dist:F3}m → 허용 {allowed:F3}m, " +
+                    $"막은 콜라이더='{hit.collider.name}' (레이어 {LayerMask.LayerToName(hit.collider.gameObject.layer)}), " +
+                    $"법선각={Vector3.Angle(hit.normal, Vector3.up):F0}°. " +
+                    "대시 스윕(PlayerMotionSweep)과 마스크·등판각 판정이 다른 2차 클램프입니다.", this);
+            }
+
+            return dir * allowed;
+        }
 
         return delta;
     }

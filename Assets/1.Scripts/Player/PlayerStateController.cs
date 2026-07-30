@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System.Runtime.CompilerServices;
+using UnityEngine;
 
 [RequireComponent(typeof(Player))]
 [RequireComponent(typeof(PlayerInputReader))]
@@ -62,8 +63,29 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
         currentState.Enter(PlayerActionState.Idle);
     }
 
+    /// <summary>
+    /// 대시 진단용. 마지막 상태 전이를 요청한 호출 지점(파일:줄 + 멤버명).
+    /// 대시가 중단됐을 때 "누가 상태를 바꿨는가"를 <see cref="PlayerDashState.Exit"/>가 로그에 남긴다.
+    /// </summary>
+    public string LastTransitionCause { get; private set; } = "(없음)";
+
+    // Idle/Move만 PlayerStateBase.TryConsumeActionInput을 호출한다 —
+    // 그 외 상태(공격·스킬·인터럽트·넉백·그랩·연출·대시·사망)에서는 Shift가 조용히 버려진다.
+    private bool CurrentStateReadsActionInput =>
+        CurrentState == PlayerActionState.Idle || CurrentState == PlayerActionState.Move;
+
     public void Tick()
     {
+        // ⚠️ "대시가 됐다 말았다"의 가장 흔한 무증상 경로: 대시 입력이 상태 때문에 아예 읽히지 않는 경우.
+        // 공격·스킬 모션 중 Shift를 누르면 TryBeginPredictedDash가 호출조차 되지 않아
+        // 시작 로그도, 거부 로그도 남지 않는다(입력 1회당 한 줄이므로 스팸이 아니다).
+        if (context.Input != null && context.Input.DashPressed && !CurrentStateReadsActionInput)
+        {
+            Edit.LogWarning(
+                $"[Dash] 입력 무시: 현재 상태 {CurrentState}는 액션 입력을 읽지 않습니다(Idle/Move에서만 대시 입력 처리). " +
+                "이 프레임의 Shift는 버퍼되지 않고 버려집니다.", this);
+        }
+
         currentState?.Tick();
     }
 
@@ -72,13 +94,30 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
         return isOwner || (hasStateAuthority && currentState.RequiresStateAuthorityTick);
     }
 
-    public bool ChangeState(PlayerActionState nextState)
+    // 진단용 Caller 인자는 전부 컴파일 타임에 채워지는 선택 인자다 — 기존 호출부는 그대로 동작한다.
+    public bool ChangeState(
+        PlayerActionState nextState,
+        [CallerMemberName] string callerMember = null,
+        [CallerFilePath] string callerFile = null,
+        [CallerLineNumber] int callerLine = 0)
     {
         if (CurrentState == nextState)
             return true;
 
         if (!CanEnter(nextState))
+        {
+            // 대시 중 전이 거부는 "대시가 안 끝난다"로 나타난다 — 사망/연출 잠금뿐이지만 남겨 둔다.
+            if (CurrentState == PlayerActionState.Dash)
+            {
+                Edit.LogWarning(
+                    $"[Dash] 상태 전이 거부: Dash→{nextState} 실패(연출잠금={cinematicLocked}) " +
+                    $"요청={DescribeCaller(callerMember, callerFile, callerLine)}", this);
+            }
+
             return false;
+        }
+
+        LastTransitionCause = DescribeCaller(callerMember, callerFile, callerLine);
 
         PlayerActionState previousState = CurrentState;
         currentState?.Exit(nextState);
@@ -86,6 +125,15 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
         currentStateDebug = currentState.StateType;
         currentState.Enter(previousState);
         return true;
+    }
+
+    /// <summary>전이 요청 지점을 "멤버() @ 파일:줄" 형태로 표기한다(대시 중단 원인 추적용).</summary>
+    private static string DescribeCaller(string callerMember, string callerFile, int callerLine)
+    {
+        string fileName = string.IsNullOrEmpty(callerFile)
+            ? "?"
+            : System.IO.Path.GetFileName(callerFile);
+        return $"{callerMember}() @ {fileName}:{callerLine}";
     }
 
     public bool TryReceiveGrab(GrabInteractionContext grabContext)
@@ -190,7 +238,18 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
     public bool BeginDash(Vector3 planarDirection, float speed, float duration, DashMotionSettings motion)
     {
         if (CurrentState == PlayerActionState.Dead || cinematicLocked)
+        {
+            Edit.LogWarning(
+                $"[Dash] 상태 진입 거부: {(CurrentState == PlayerActionState.Dead ? "사망 상태" : "연출 잠금(Cinematic) 중")}입니다. " +
+                $"현재상태={CurrentState}", this);
             return false;
+        }
+
+        // 대시 진입은 CanEnter를 거치지 않는 강제 전이라 진행 중인 상태를 덮는다 — 무엇을 덮었는지 남긴다.
+        if (CurrentState != PlayerActionState.Idle && CurrentState != PlayerActionState.Move)
+        {
+            Edit.LogWarning($"[Dash] 상태 진입: {CurrentState} 상태를 덮어쓰고 대시로 전이합니다.", this);
+        }
 
         SetState(new PlayerDashState(context, planarDirection, speed, duration, motion));
         return true;
@@ -199,7 +258,13 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
     public void EndDash()
     {
         if (CurrentState == PlayerActionState.Dash)
+        {
             ChangeState(PlayerActionState.Idle);
+            return;
+        }
+
+        // 서버 취소가 대시 종료 후에 도착한 경우 — 대시는 이미 끝나 있어 아무 일도 일어나지 않는다.
+        Edit.Log($"[Dash] EndDash 무효: 현재 상태가 Dash가 아닙니다(={CurrentState}).", this);
     }
 
     // Skill 상태는 실행할 스킬 인스턴스가 필요해 BeginKnockback처럼 인스턴스 주입 경로로만 진입한다.
@@ -257,8 +322,16 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
         };
     }
 
-    private void SetState(IPlayerState nextState)
+    // SetState는 CanEnter를 거치지 않는 강제 전이 경로다(넉백·그랩·연출·대시). 대시를 끊는 주범이라
+    // 요청 지점을 반드시 기록한다 — 기록된 값은 PlayerDashState.Exit 로그에 그대로 실린다.
+    private void SetState(
+        IPlayerState nextState,
+        [CallerMemberName] string callerMember = null,
+        [CallerFilePath] string callerFile = null,
+        [CallerLineNumber] int callerLine = 0)
     {
+        LastTransitionCause = DescribeCaller(callerMember, callerFile, callerLine);
+
         PlayerActionState previousState = CurrentState;
         currentState?.Exit(nextState.StateType);
         currentState = nextState;
@@ -394,7 +467,16 @@ public abstract class PlayerStateBase : IPlayerState
         // 조준 모드 중에는 일반 액션 입력(공격/다른 스킬/인터럽트)을 억제한다.
         // 좌클릭 확정·Esc/재입력 취소는 PlayerSkillTargeting이 직접 처리한다.
         if (Context.Skills != null && Context.Skills.IsChoosingTarget)
+        {
+            if (Context.Input.DashPressed)
+            {
+                Edit.LogWarning(
+                    "[Dash] 입력 무시: 스킬 조준(타겟 선택) 중에는 액션 입력이 억제됩니다. " +
+                    "조준을 확정/취소한 뒤 대시가 가능합니다.", Context.Player);
+            }
+
             return false;
+        }
 
         // 대시 우선: Idle/Move에서 대시와 공격·스킬이 같은 프레임이면 대시가 이긴다. (PLAN §7)
         // 사용 불가능한 대시 입력은 여기서 소비되지 않아 아래 공격·스킬 경로가 보존된다.
@@ -790,12 +872,23 @@ public sealed class PlayerDashState : PlayerStateBase
 
     private readonly Vector3 direction; // 평면 정규화 방향(시작 순간 확정)
     private readonly float speed;
+    private readonly float duration;    // 요청된 지속시간(진단 로그용 원본)
+    private readonly float startTime;   // 상태 생성 시각(진단용)
     private readonly float endTime;
     private readonly DashMotionSettings motion;
     private readonly CapsuleCollider capsule;
     private readonly RaycastHit[] castBuffer = new RaycastHit[CastBufferSize];
 
     private float airborneVerticalSpeed; // 절벽 낙하 중 누적 하강 속도(공중 구간에서만)
+
+    // ── 진단 상태(로그 전용) ──
+    private int tickCount;
+    private Vector3 startPosition;
+    private float requestedDistance;    // 스윕 전 요청 이동량 누적
+    private float appliedDistance;      // 스윕 후 실제 적용 이동량 누적
+    private int blockedTickCount;       // 스윕이 요청 이동량을 대부분 깎은 tick 수
+    private bool lostGroundingDuringDash;
+    private bool wasGrounded;
 
     public PlayerDashState(PlayerStateContext context, Vector3 planarDirection, float speed, float duration, DashMotionSettings motion)
         : base(context)
@@ -806,21 +899,57 @@ public sealed class PlayerDashState : PlayerStateBase
             ? planar.normalized
             : Context.Movement.CurrentFacing;
         this.speed = Mathf.Max(0f, speed);
+        this.duration = Mathf.Max(0f, duration);
         this.motion = motion;
+        startTime = Time.time;
         endTime = Time.time + Mathf.Max(0f, duration);
         capsule = Context.Player != null ? Context.Player.GetComponent<CapsuleCollider>() : null;
     }
 
     public override PlayerActionState StateType => PlayerActionState.Dash;
 
+    /// <summary>대시 이동량 계산에 쓰는 현재 위치(Rigidbody 우선 — MoveRoot가 rb.position 기준이다).</summary>
+    private Vector3 CurrentPosition =>
+        Context.Rigidbody != null ? Context.Rigidbody.position : Context.Player.transform.position;
+
     public override void Enter(PlayerActionState previousState)
     {
         Context.Player.SetAnimatorMoving(false);
         Context.Movement.RotateImmediately(direction);
+
+        startPosition = CurrentPosition;
+        PlayerGroundingSensor sensor = Context.GroundingSensor;
+        wasGrounded = sensor != null && sensor.IsGrounded;
+
+        Edit.Log(
+            $"[Dash] 상태 진입 — 이전상태={previousState} 방향=({direction.x:F2}, {direction.z:F2}) " +
+            $"속도={speed:F1} 지속={duration:F3}s 종료예정={endTime:F3} 접지={wasGrounded} " +
+            $"이동권한={Context.Player.IsMovementAuthority} 시작위치={startPosition} | " +
+            // 충돌 튜닝은 PlayerDashData 에셋이 W3 필드 추가 이전에 저장돼 YAML에 키가 없다 —
+            // 런타임 실제값(마스크 0이면 스윕 무력화)을 여기서 확인한다.
+            $"장애물마스크={motion.ObstacleMask.value} 스킨={motion.CollisionSkin:F3} " +
+            $"스윕반복={motion.MaxSweepIterations} 등판각={motion.MaxWalkableSlopeAngle:F1}°", Context.Player);
+
+        // 아래 두 경우는 대시가 "시작은 되는데 제대로 안 나가는" 조용한 원인이다.
+        if (capsule == null)
+        {
+            Edit.LogWarning(
+                "[Dash] CapsuleCollider가 없어 충돌 스윕(PlayerMotionSweep)을 건너뜁니다 — 벽 관통/막힘이 클램프 없이 발생합니다.",
+                Context.Player);
+        }
+
+        if (sensor == null)
+        {
+            Edit.LogWarning(
+                "[Dash] PlayerGroundingSensor가 없어 대시 내내 '공중'으로 취급됩니다 — 매 tick 중력이 누적됩니다.",
+                Context.Player);
+        }
     }
 
     public override void Tick()
     {
+        tickCount++;
+
         // 정면 벽으로 이동이 0이 되어도 대시 상태는 원래 종료시각까지 유지한다. (불변식: 상태·무적 유지)
         Vector3 delta = Vector3.zero;
         if (speed > 0f)
@@ -828,12 +957,28 @@ public sealed class PlayerDashState : PlayerStateBase
             Vector3 moveDir = ResolvePlanarSlopeDirection(); // 접지면 경사 투영, 공중이면 flat 수평
             delta = moveDir * speed * Time.deltaTime;
         }
+        else if (tickCount == 1) // 매 tick 반복될 값이라 첫 tick에만 남긴다
+        {
+            Edit.LogWarning("[Dash] 속도가 0이라 대시 내내 이동량이 없습니다(PlayerDashData.dashSpeed 확인).", Context.Player);
+        }
 
         // 절벽: Grounded를 잃으면 남은 대시 동안 방향 조작·Drag 없이 대시 수평속도 + 중력을 적용한다. (PLAN §8 / W3c)
         PlayerGroundingSensor sensor = Context.GroundingSensor;
         bool grounded = sensor != null && sensor.IsGrounded;
+
+        // 대시 중 접지 상실은 서버 스냅샷에서 NotGrounded 거부로 이어지고(다음 입력), 낙하도 시작된다.
+        if (grounded != wasGrounded)
+        {
+            Edit.Log(
+                $"[Dash] tick #{tickCount}: 접지 {wasGrounded}→{grounded} " +
+                $"(경과 {(Time.time - startTime):F3}s, 지면법선={(sensor != null ? sensor.GroundNormal.ToString("F2") : "센서없음")})",
+                Context.Player);
+            wasGrounded = grounded;
+        }
+
         if (!grounded)
         {
+            lostGroundingDuringDash = true;
             airborneVerticalSpeed += Physics.gravity.y * Time.deltaTime; // gravity.y < 0
             airborneVerticalSpeed = Mathf.Max(airborneVerticalSpeed, -MaxFallSpeed);
             delta.y += airborneVerticalSpeed * Time.deltaTime;
@@ -848,6 +993,80 @@ public sealed class PlayerDashState : PlayerStateBase
 
         if (Time.time >= endTime)
             Context.Controller.ChangeState(PlayerActionState.Idle);
+    }
+
+    /// <summary>
+    /// 대시가 끝난 이유를 한 줄로 확정한다 — 요청한 이동량 대비 실제로 얼마나 갔는지까지 포함한다.
+    /// 지속시간 만료(정상)와 외부 전이(조기 중단)를 시간으로 구분하고, 중단이면 누가 상태를 바꿨는지
+    /// (PlayerStateController.LastTransitionCause) 함께 남긴다.
+    /// </summary>
+    public override void Exit(PlayerActionState nextState)
+    {
+        float elapsed = Time.time - startTime;
+        bool expired = Time.time >= endTime;
+        Vector3 total = CurrentPosition - startPosition;
+        float actualPlanarDistance = new Vector3(total.x, 0f, total.z).magnitude;
+        string cause = Context.Controller.LastTransitionCause;
+
+        string verdict = expired
+            ? "정상 종료(지속시간 만료)"
+            : $"조기 중단 — 남은시간 {Mathf.Max(0f, endTime - Time.time):F3}s / 진행률 {(duration > 0f ? elapsed / duration * 100f : 100f):F0}%";
+
+        string interruptedBy = expired ? string.Empty : $" 중단 원인={ClassifyInterruption(nextState)} 요청지점={cause}";
+
+        string body =
+            $"[Dash] 종료: {verdict}{interruptedBy} | 다음상태={nextState} " +
+            $"경과={elapsed:F3}s/{duration:F3}s tick={tickCount}회 " +
+            $"요청이동={requestedDistance:F2}m 적용이동={appliedDistance:F2}m 실제이동={actualPlanarDistance:F2}m " +
+            $"막힌tick={blockedTickCount} 접지상실={lostGroundingDuringDash}";
+
+        if (expired)
+            Edit.Log(body, Context.Player);
+        else
+            Edit.LogWarning(body, Context.Player);
+
+        // 아래 세 경고는 "상태는 정상인데 몸이 안 움직였다"를 각각 다른 원인으로 분리해 준다.
+        if (tickCount == 0)
+        {
+            Edit.LogWarning(
+                "[Dash] 이동 없음: Tick이 한 번도 돌지 않았습니다 — 진입한 프레임에 바로 종료됐습니다. " +
+                "호스트에서는 ServerRpc→ClientRpc 왕복이 같은 프레임이라 서버 취소가 여기 해당합니다. " +
+                "(Player.Update의 ShouldTickForNetwork 게이트로 Tick 자체가 막힌 경우도 확인)", Context.Player);
+        }
+        else if (requestedDistance > 0.01f && appliedDistance < requestedDistance * 0.5f)
+        {
+            Edit.LogWarning(
+                $"[Dash] 이동 손실(스윕): 요청 {requestedDistance:F2}m 중 {appliedDistance:F2}m만 적용됐습니다 — " +
+                $"벽/급경사(등판각 {motion.MaxWalkableSlopeAngle:F0}° 초과)에 막혔습니다. " +
+                $"장애물 마스크={motion.ObstacleMask.value}, 막힌tick={blockedTickCount}", Context.Player);
+        }
+        else if (appliedDistance > 0.01f && actualPlanarDistance < appliedDistance * 0.5f)
+        {
+            Edit.LogWarning(
+                $"[Dash] 이동 손실(적용 후): 스윕은 {appliedDistance:F2}m를 적용했지만 실제 위치는 {actualPlanarDistance:F2}m만 움직였습니다 — " +
+                "PlayerMovement.MoveRoot의 정적 지오메트리 클램프, 같은 프레임의 다른 MovePosition 호출, " +
+                "또는 비권한 피어 위치 복제(NetworkTransform)와 경쟁하는 경우입니다.", Context.Player);
+        }
+    }
+
+    /// <summary>다음 상태로 대시 중단 원인을 분류한다(전이 요청 지점과 함께 읽는다).</summary>
+    private static string ClassifyInterruption(PlayerActionState nextState)
+    {
+        switch (nextState)
+        {
+            case PlayerActionState.Knockback:
+                return "피격 넉백(Unit.Knockback → BeginKnockback)";
+            case PlayerActionState.Grabbed:
+                return "보스 잡기(Grab)";
+            case PlayerActionState.Cinematic:
+                return "연출 잠금(PlayerEncounterLock)";
+            case PlayerActionState.Dead:
+                return "사망";
+            case PlayerActionState.Idle:
+                return "Idle 전이(서버 취소 EndDash 또는 외부 전이)";
+            default:
+                return $"{nextState} 전이";
+        }
     }
 
     // 지면이 걷기 가능 경사면 지면 평면에 투영해 오르막/내리막을 따라가고,
@@ -872,10 +1091,17 @@ public sealed class PlayerDashState : PlayerStateBase
     // 대시·일반 이동이 공유하는 스윕으로 벽/급경사 관통을 막고 접선으로 미끄러진다. (PlayerMotionSweep 단일 소스)
     private void MoveWithSweep(Vector3 delta)
     {
+        // 진단: 요청/적용 이동량은 수평 성분만 비교한다(공중 낙하 y는 대시 거리와 무관).
+        float requested = new Vector3(delta.x, 0f, delta.z).magnitude;
+        requestedDistance += requested;
+
         if (capsule == null)
         {
             if (delta.sqrMagnitude > 0f)
+            {
+                appliedDistance += requested;
                 Context.Movement.MoveRoot(delta);
+            }
             return;
         }
 
@@ -883,7 +1109,26 @@ public sealed class PlayerDashState : PlayerStateBase
             capsule, delta, motion.MaxWalkableSlopeAngle, motion.ObstacleMask,
             motion.CollisionSkin, motion.MaxSweepIterations, castBuffer);
 
+        float applied = new Vector3(resolved.x, 0f, resolved.z).magnitude;
+        appliedDistance += applied;
+
+        // 요청량의 10% 미만만 남았으면 사실상 벽에 막힌 tick으로 센다.
+        if (requested > 0.0001f && applied < requested * 0.1f)
+        {
+            blockedTickCount++;
+            Edit.LogWarning(
+                $"[Dash] tick #{tickCount}: 스윕이 이동을 차단 — 요청 {requested:F3}m → 적용 {applied:F3}m " +
+                $"(등판각 {motion.MaxWalkableSlopeAngle:F0}° 초과 경사/벽). 대시 상태와 무적은 종료시각까지 유지됩니다.",
+                Context.Player);
+        }
+
         if (resolved.sqrMagnitude > 1e-10f)
+        {
             Context.Movement.MoveRoot(resolved);
+        }
+        else if (requested > 0.0001f)
+        {
+            Edit.LogWarning($"[Dash] tick #{tickCount}: 적용 이동량이 0이라 MoveRoot를 호출하지 않았습니다.", Context.Player);
+        }
     }
 }
