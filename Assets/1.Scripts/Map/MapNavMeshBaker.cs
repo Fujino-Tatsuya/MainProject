@@ -22,10 +22,14 @@ public class MapNavMeshBaker : MonoBehaviour
         // 베이크 설정은 코드로 강제 — 씬 세팅 실수 원천 차단.
         //  - PhysicsColliders: 콜라이더 기반 수집. 물 플레인(콜라이더 없음)엔 메시가 안 깔리고,
         //    벽 콜라이더가 통행을 정확히 차단한다. (fbx addColliders + 저작 도구로 콜라이더 확보됨)
-        //  - Default 레이어만: 몬스터(Enemy)/플레이어(Player)가 베이크 전에 존재해도 지오메트리에 안 섞임.
+        //  - Default + Ground 만: 몬스터(Enemy)/플레이어(Player)가 베이크 전에 존재해도 지오메트리에 안 섞임.
+        //    ⚠️ Ground 를 빼면 안 된다. c5826a3 이 보행면 833건을 Default → Ground 로 옮겼고,
+        //    맵의 벽은 Wall(7)이 아니라 Default(0)에 있다. Default 만 수집하면 남는 건 벽과 소품뿐이라
+        //    바닥이 하나도 안 들어가고 NavMesh 가 빈 채로 구워진다(몬스터·보스가 전혀 못 움직인다).
+        //    Default ∪ Ground = 이관 이전의 Default 와 같은 집합이다.
         surface.useGeometry = NavMeshCollectGeometry.PhysicsColliders;
         surface.collectObjects = CollectObjects.All;
-        surface.layerMask = LayerMask.GetMask("Default");
+        surface.layerMask = LayerMask.GetMask("Default", "Ground");
     }
 
     private void OnEnable() { MapGenerator.OnGenerated += HandleGenerated; }
