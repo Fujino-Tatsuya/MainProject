@@ -6795,6 +6795,7 @@ GameObject:
   - component: {fileID: 227894669654775974}
   - component: {fileID: 1311512696789152797}
   - component: {fileID: 1461530121226363041}
+  - component: {fileID: 3420145443151374840}
   m_Layer: 6
   m_Name: Paladin
   m_TagString: Player
@@ -7306,7 +7307,7 @@ MonoBehaviour:
   inputReader: {fileID: 3136856600094551148}
   stateController: {fileID: 1123356785223043744}
   skillTargeting: {fileID: 87698441936007240}
-  encounterLock: {fileID: 0}
+  encounterLock: {fileID: 3420145443151374840}
 --- !u!114 &5407395958139638515
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -7475,6 +7476,26 @@ MonoBehaviour:
   landedFollowCameraDelay: 1
   fallReturnInputLock: 0.5
   fallReturnInvulnerability: 1.5
+--- !u!114 &3420145443151374840
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6077492126708577103}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2d86d153e71c08841859b8dc02d8e923, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerEncounterLock
+  ShowTopMostFoldoutHeaderGroup: 1
+  player: {fileID: 4633887174277109591}
+  stateController: {fileID: 1123356785223043744}
+  invulnerability: {fileID: 7549880373700647455}
+  statusEffects: {fileID: 6169844953318847693}
+  defaultAttack: {fileID: 4683411582078572617}
+  skillController: {fileID: 8323634410014447556}
+  body: {fileID: 786699605289514005}
 --- !u!1 &6097337715216137025
 GameObject:
   m_ObjectHideFlags: 0
