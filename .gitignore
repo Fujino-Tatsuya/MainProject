@@ -93,6 +93,9 @@ crashlytics-build.properties
 # Claude Code — 개인 AI 오버라이드 (공용 규칙=CLAUDE.md, 개인용은 로컬에만 / 커밋 금지)
 CLAUDE.local.md
 
+# ML-Agents QA 자동화 리포트 산출물 (실행마다 생성, 커밋 금지)
+/Docs/temp/qa-runs/
+
 # AI 플러그인 / 툴 산출물 (개인 환경, 커밋 금지)
 # .bkit/·.omc/ = AI 플러그인 상태, /data/ = 툴 산출물(예: data/created-pages.json)
 # /PLAN.md = 작업마다 새로 생성되는 플래닝 산출물(승인용 working doc, 레포 미보관)
