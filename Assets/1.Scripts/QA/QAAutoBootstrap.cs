@@ -51,10 +51,10 @@ public static class QAAutoBootstrap
         dr.TakeActionsBetweenDecisions = false; // 이동 지속은 QAInputController.FixedUpdate가 담당
 
         var session = go.AddComponent<QASessionController>();
-        session.Configure(QASettings.Duration, QASettings.RepeatCount);
+        session.Configure(QASettings.Duration, QASettings.RepeatCount, QASettings.PlayerCount);
 
         go.SetActive(true);
-        Debug.Log($"[QA] Harness 생성 완료 — 사이클당 {QASettings.Duration:F0}초, " +
+        Debug.Log($"[QA] Harness 생성 완료 — {QASettings.PlayerCount}인, 사이클당 {QASettings.Duration:F0}초, " +
                   $"{(QASettings.RepeatCount <= 0 ? "무한" : QASettings.RepeatCount + "회")} 반복.");
     }
 }

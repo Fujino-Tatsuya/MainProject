@@ -31,19 +31,30 @@ public sealed class QASessionController : MonoBehaviour
     [Tooltip("스폰(로딩 포함) 대기 타임아웃(초).")]
     [SerializeField] private float spawnTimeout = 90f;
 
+    [Header("멀티플레이(MPPM)")]
+    [Tooltip("인원 수(호스트 포함). 3=호스트1+클라2(가상 플레이어). 1=호스트 단독.")]
+    [SerializeField] private int expectedPlayers = 3;
+    [Tooltip("멀티플레이 접속·ready·스폰 대기 타임아웃(초).")]
+    [SerializeField] private float multiplayerTimeout = 120f;
+
+    private const string ConnectIp = "127.0.0.1";
+    private const ushort ConnectPort = 7777;
+
     private readonly List<IQADetector> _detectors = new List<IQADetector>();
     private QARecorder _recorder;
     private QAInputController _input;
     private bool _running;
     private bool _timedOut;
+    private bool _cycleFailed;
     private int _iteration;
     private string _cycleSummary = "중단";
 
     /// <summary>부트스트랩이 활성화 전에 EditorPrefs 값으로 주입한다.</summary>
-    public void Configure(float sessionDurationSeconds, int repeats)
+    public void Configure(float sessionDurationSeconds, int repeats, int playerCount)
     {
         sessionDuration = Mathf.Max(5f, sessionDurationSeconds);
         repeatCount = repeats;
+        expectedPlayers = Mathf.Max(1, playerCount);
     }
 
     private void Start()
@@ -60,7 +71,8 @@ public sealed class QASessionController : MonoBehaviour
         Player.LocalPlayerChanged += OnLocalPlayerChanged;
 
         string plan = repeatCount <= 0 ? "무한 반복" : $"{repeatCount}회 반복";
-        Debug.Log($"[QA] 세션 시작 — 사이클당 {sessionDuration:F0}초, {plan}. 부팅부터 자동 진행합니다.");
+        string role = IsHostRole() ? "호스트" : "클라이언트(가상 플레이어)";
+        Debug.Log($"[QA] 세션 시작 — 역할={role}, {expectedPlayers}인, 사이클당 {sessionDuration:F0}초, {plan}. 부팅부터 자동 진행합니다.");
         StartCoroutine(RunAll());
     }
 
@@ -108,6 +120,7 @@ public sealed class QASessionController : MonoBehaviour
     private IEnumerator RunCycle(bool first)
     {
         _cycleSummary = "중단";
+        _cycleFailed = false;
 
         // 1) 첫 사이클만 부팅 완료 대기(GameManager 준비 + 타이틀 씬 로드).
         if (first)
@@ -127,23 +140,17 @@ public sealed class QASessionController : MonoBehaviour
             phaseTimeout);
         if (AbortCycle("로비 씬 진입")) yield break;
 
-        // 3) 호스트 단독 세션 시작.
+        // 3) 역할 분기: 메인 에디터 = 호스트, MPPM 가상 플레이어 = 클라이언트.
         NetworkSessionLauncher launcher = GetLauncher();
-        Debug.Log("[QA] → StartHost");
-        launcher.StartHost();
-        yield return WaitOrTimeout(
-            () => NetworkManager.Singleton != null &&
-                  NetworkManager.Singleton.IsListening &&
-                  NetworkManager.Singleton.IsHost,
-            phaseTimeout);
-        if (AbortCycle("호스트 시작")) yield break;
+        if (IsHostRole())
+            yield return RunHostLobby(launcher);
+        else
+            yield return RunClientLobby(launcher);
+        if (_cycleFailed) yield break;
 
-        yield return new WaitForSeconds(0.5f);
-
-        // 4) 게임 로딩(→ 4.MapScene) + 플레이어 스폰.
-        Debug.Log("[QA] → StartGameLoading");
-        launcher.StartGameLoading();
-        yield return WaitOrTimeout(() => Player.LocalPlayer != null, spawnTimeout);
+        // 4) 플레이어 스폰 대기(호스트가 맵 로딩 후 서버가 스폰).
+        float spawnWait = expectedPlayers > 1 ? multiplayerTimeout : spawnTimeout;
+        yield return WaitOrTimeout(() => Player.LocalPlayer != null, spawnWait);
         if (AbortCycle("맵 로딩·플레이어 스폰")) yield break;
 
         // 5) 플레이 세션.
@@ -160,9 +167,92 @@ public sealed class QASessionController : MonoBehaviour
         if (!_timedOut)
             return false;
 
+        _cycleFailed = true;
         _recorder.Add(QASeverity.Critical, "Flow",
-            $"진행 단계 '{phase}'에서 {phaseTimeout:F0}s 내 진척 없음(부트 흐름 소프트락 의심)");
+            $"진행 단계 '{phase}'에서 진척 없음(부트/네트워크 흐름 소프트락 의심)");
         _cycleSummary = $"흐름 타임아웃: {phase}";
+        return true;
+    }
+
+    /// <summary>호스트 역할: StartHost → 클라 접속·ready 대기(멀티) → StartGameLoading.</summary>
+    private IEnumerator RunHostLobby(NetworkSessionLauncher launcher)
+    {
+        Debug.Log("[QA][Host] → StartHost");
+        launcher.StartHost();
+        yield return WaitOrTimeout(
+            () => NetworkManager.Singleton != null &&
+                  NetworkManager.Singleton.IsListening &&
+                  NetworkManager.Singleton.IsHost,
+            phaseTimeout);
+        if (AbortCycle("호스트 시작")) yield break;
+
+        if (expectedPlayers > 1)
+        {
+            Debug.Log($"[QA][Host] 클라이언트 {expectedPlayers - 1}명 접속·ready 대기");
+            yield return WaitOrTimeout(HostReadyToStart, multiplayerTimeout);
+            if (AbortCycle($"클라이언트 접속·ready(기대 {expectedPlayers}인)")) yield break;
+        }
+
+        yield return new WaitForSeconds(0.5f);
+        Debug.Log("[QA][Host] → StartGameLoading");
+        launcher.StartGameLoading();
+    }
+
+    /// <summary>모든 인원 접속 + 전원 ready(호스트는 자동 ready)일 때만 게임 시작 가능.</summary>
+    private bool HostReadyToStart()
+    {
+        NetworkManager nm = NetworkManager.Singleton;
+        if (nm == null || !nm.IsServer)
+            return false;
+        if (nm.ConnectedClientsList.Count < expectedPlayers)
+            return false;
+        LobbyUIController lobby = LobbyUIController.Active;
+        return lobby == null || lobby.CanStartGame;
+    }
+
+    /// <summary>클라이언트 역할(MPPM 가상 플레이어): 호스트에 접속 → ready. 스폰은 공통 단계에서 대기.</summary>
+    private IEnumerator RunClientLobby(NetworkSessionLauncher launcher)
+    {
+        launcher.OnSetConnectionData(ConnectIp, ConnectPort);
+
+        // 호스트가 아직 안 떴을 수 있어 접속을 재시도한다.
+        float deadline = Time.time + multiplayerTimeout;
+        while (Time.time < deadline &&
+               !(NetworkManager.Singleton != null && NetworkManager.Singleton.IsConnectedClient))
+        {
+            NetworkManager nm = NetworkManager.Singleton;
+            bool attemptInFlight = nm != null && (nm.IsClient || nm.IsListening);
+            if (!attemptInFlight)
+            {
+                Debug.Log($"[QA][Client] → StartClient ({ConnectIp}:{ConnectPort})");
+                launcher.StartClient();
+            }
+            yield return new WaitForSeconds(2f);
+        }
+
+        if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsConnectedClient)
+        {
+            _timedOut = true;
+            if (AbortCycle("클라이언트 접속")) yield break;
+        }
+
+        Debug.Log("[QA][Client] 접속 완료 → ready");
+        yield return WaitOrTimeout(() => LobbyUIController.Active != null, phaseTimeout);
+        if (AbortCycle("로비 UI 대기")) yield break;
+
+        LobbyUIController.Active.SetLocalReady(true);
+        // 호스트가 StartGameLoading하면 서버가 스폰 → 공통 4)에서 Player.LocalPlayer 대기.
+    }
+
+    /// <summary>MPPM 가상 플레이어(클론)는 --virtual-project-clone 인자를 갖는다. 메인 에디터=호스트.</summary>
+    private static bool IsHostRole()
+    {
+        string[] args = Environment.GetCommandLineArgs();
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i] == "--virtual-project-clone" || args[i] == "com.unity.mppm.clone")
+                return false;
+        }
         return true;
     }
 

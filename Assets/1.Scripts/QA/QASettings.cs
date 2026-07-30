@@ -14,6 +14,7 @@ public static class QASettings
     public const string AutoRunKey = "QA.AutoRunFromBootstrap";
     public const string DurationKey = "QA.SessionDuration";
     public const string RepeatKey = "QA.RepeatCount";
+    public const string PlayerCountKey = "QA.PlayerCount";
 
     /// <summary>0.BootStrapScene에서 Play 시 QA 하네스를 자동 생성할지.</summary>
     public static bool AutoRun
@@ -34,6 +35,13 @@ public static class QASettings
     {
         get => EditorPrefs.GetInt(RepeatKey, 1);
         set => EditorPrefs.SetInt(RepeatKey, value);
+    }
+
+    /// <summary>멀티플레이 인원 수(호스트 포함). 3=호스트1+MPPM 가상 플레이어2. 1=단독.</summary>
+    public static int PlayerCount
+    {
+        get => EditorPrefs.GetInt(PlayerCountKey, 3);
+        set => EditorPrefs.SetInt(PlayerCountKey, value);
     }
 }
 #endif

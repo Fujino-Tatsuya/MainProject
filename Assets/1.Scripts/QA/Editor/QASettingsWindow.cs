@@ -35,11 +35,20 @@ public sealed class QASettingsWindow : EditorWindow
             QASettings.RepeatCount);
         QASettings.RepeatCount = Mathf.Max(0, repeat);
 
+        int players = EditorGUILayout.IntField(
+            new GUIContent("인원 수 (호스트 포함)", "3=호스트1+MPPM 가상 플레이어2. 1=호스트 단독. MPPM 창에서 (인원-1)개 가상 플레이어를 활성화해야 함."),
+            QASettings.PlayerCount);
+        QASettings.PlayerCount = Mathf.Max(1, players);
+
         EditorGUILayout.Space(8);
         string repeatText = QASettings.RepeatCount <= 0 ? "무한" : $"{QASettings.RepeatCount}회";
+        string mpText = QASettings.PlayerCount <= 1
+            ? "호스트 단독"
+            : $"{QASettings.PlayerCount}인(호스트1+가상 플레이어{QASettings.PlayerCount - 1})";
         EditorGUILayout.HelpBox(
-            $"현재 설정: 사이클당 {QASettings.Duration:F0}초 × {repeatText}\n" +
-            "반복 시 매 회 부팅부터 재시작한다(네트워크 종료 → 로비→호스트→맵 재구동, 사이클마다 리포트 1개).\n" +
+            $"현재 설정: {mpText} · 사이클당 {QASettings.Duration:F0}초 × {repeatText}\n" +
+            "반복 시 매 회 부팅부터 재시작(네트워크 종료 → 로비→호스트/클라→맵 재구동, 사이클마다 리포트 1개).\n" +
+            "MPPM: Window ▸ Multiplayer Play Mode에서 가상 플레이어를 (인원-1)개 활성화. 각 인스턴스가 자기 관점 리포트를 남김.\n" +
             "리포트: Docs/temp/qa-runs/",
             MessageType.Info);
     }
