@@ -14,10 +14,22 @@ public class EnemyBTActivator : NetworkBehaviour
     // 부활로 전투를 이어갈 때는 이 플래그도 함께 내려야 한다.
     [SerializeField] string isOverVariableName = "IsOver";
 
+    // 부활 시 플레이어 명부를 다시 세우기 위한 변수들.
+    // 그래프의 On Start 분기는 FindGroupsByTag → GetPlayerCount 로 이 둘을 채우는데,
+    // 그 분기는 **시작할 때 한 번만** 돈다. 그래서 도중에 죽었다 살아나면 TargetGroup 에
+    // 파괴된(또는 낡은) 참조가 남고 TotalPlayerNumber 도 옛 값 그대로다.
+    // 재시작 이벤트를 받는 분기를 그래프에 따로 만드는 대신, 같은 효과를 여기서 낸다
+    // (그래프를 건드리면 런타임 그래프 RID 가 통째로 재직렬화돼 diff 가 수천 줄이 된다).
+    [SerializeField] string targetGroupVariableName = "TargetGroup";
+    [SerializeField] string totalPlayerNumberVariableName = "TotalPlayerNumber";
+    [SerializeField] string playerTag = "Player";
+
     [SerializeField] private ReStart restartChannel;
 
     readonly List<BlackboardVariable<bool>> isOpenVariables = new();
     readonly List<BlackboardVariable<bool>> isOverVariables = new();
+    readonly List<BlackboardVariable<List<GameObject>>> targetGroupVariables = new();
+    readonly List<BlackboardVariable<int>> totalPlayerNumberVariables = new();
 
     public override void OnNetworkSpawn()
     {
@@ -30,6 +42,8 @@ public class EnemyBTActivator : NetworkBehaviour
     {
         isOpenVariables.Clear();
         isOverVariables.Clear();
+        targetGroupVariables.Clear();
+        totalPlayerNumberVariables.Clear();
 
         foreach (BehaviorGraphAgent bt in targetBTs)
         {
@@ -48,6 +62,13 @@ public class EnemyBTActivator : NetworkBehaviour
             // IsOver 는 그래프마다 없을 수 있다(Wells 등) — 없으면 조용히 건너뛴다.
             if (bt.BlackboardReference.GetVariable<bool>(isOverVariableName, out var isOver))
                 isOverVariables.Add(isOver);
+
+            // 플레이어 명부도 그래프마다 없을 수 있다 — 같은 규칙으로 조용히 건너뛴다.
+            if (bt.BlackboardReference.GetVariable<List<GameObject>>(targetGroupVariableName, out var group))
+                targetGroupVariables.Add(group);
+
+            if (bt.BlackboardReference.GetVariable<int>(totalPlayerNumberVariableName, out var total))
+                totalPlayerNumberVariables.Add(total);
         }
 
         // 외부 변경 감시 기준값 — 초기화하지 않으면 첫 Update가 허위 변화를 보고한다.
@@ -93,8 +114,61 @@ public class EnemyBTActivator : NetworkBehaviour
         // 실행하고, 그래프에는 IsOver 를 false 로 쓰는 노드가 없기 때문이다(쓰기 1곳, 값 true 뿐).
         // 그래서 전투를 이어가려면 IsOver 를 여기서 내려 줘야 한다. OpenBT 보다 먼저 내린다 —
         // 순서가 뒤바뀌면 같은 프레임에 다시 닫힐 수 있다.
+        // 플레이어 명부를 먼저 다시 세운다. IsOver 를 내려 전투를 재개시켜도 TargetGroup 이
+        // 파괴된 참조를 들고 있으면 추격 대상이 없어 그 자리에 서 있게 된다.
+        RefreshPlayerGroup();
         ClearIsOver();
         OpenBT();
+    }
+
+    /// <summary>
+    /// TargetGroup / TotalPlayerNumber 를 현재 살아 있는 플레이어로 다시 채운다.
+    /// 그래프의 FindGroupsByTag + GetPlayerCount 조합과 같은 일을 한다
+    /// (FindGroupsByTag 의 onlyCountRoot=true 경로와 동일하게 root 기준으로 중복 제거).
+    /// </summary>
+    void RefreshPlayerGroup()
+    {
+        if (targetGroupVariables.Count == 0 && totalPlayerNumberVariables.Count == 0)
+        {
+            Debug.LogWarning(
+                $"[Enemy] BT에 {targetGroupVariableName}/{totalPlayerNumberVariableName} 이 없어 " +
+                "플레이어 명부를 갱신하지 못했습니다 — 부활해도 추격 대상이 비어 있을 수 있습니다.", this);
+            return;
+        }
+
+        GameObject[] tagged = GameObject.FindGameObjectsWithTag(playerTag);
+
+        // 태그가 자식에 붙는 프리팹도 있으므로 root 로 접어 중복을 제거한다.
+        var roots = new List<GameObject>();
+        for (int i = 0; i < tagged.Length; i++)
+        {
+            GameObject root = tagged[i].transform.root.gameObject;
+            if (!roots.Contains(root))
+                roots.Add(root);
+        }
+
+        for (int i = 0; i < targetGroupVariables.Count; i++)
+        {
+            // 리스트 인스턴스를 통째로 바꾸지 않고 내용만 교체한다 —
+            // 그래프의 다른 노드가 같은 리스트 참조를 들고 있을 수 있다.
+            List<GameObject> list = targetGroupVariables[i].Value;
+            if (list == null)
+            {
+                list = new List<GameObject>();
+                targetGroupVariables[i].Value = list;
+            }
+
+            list.Clear();
+            list.AddRange(roots);
+        }
+
+        for (int i = 0; i < totalPlayerNumberVariables.Count; i++)
+        {
+            int before = totalPlayerNumberVariables[i].Value;
+            totalPlayerNumberVariables[i].Value = roots.Count;
+            Debug.Log(
+                $"[Enemy/진단] {totalPlayerNumberVariableName}[{i}] {before} → {roots.Count} (명부 갱신)", this);
+        }
     }
 
     void ClearIsOver()
