@@ -194,7 +194,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 2750038226
+  GlobalObjectIdHash: 2103065721
   InScenePlacedSourceGlobalObjectIdHash: 1085786765
   DeferredDespawnTick: 0
   Ownership: 1
@@ -357,7 +357,7 @@ GameObject:
   - component: {fileID: 1007765668087241035}
   - component: {fileID: 138876035767613204}
   - component: {fileID: 2612575897913690349}
-  m_Layer: 8
+  m_Layer: 14
   m_Name: Hurtbox
   m_TagString: Untagged
   m_Icon: {fileID: 0}

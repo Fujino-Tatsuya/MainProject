@@ -674,6 +674,7 @@ MonoBehaviour:
   animator: {fileID: 4411660867951341482}
   status: {fileID: 60898105745225537}
   meleeAttack: {fileID: 275297665414947253}
+  rangedAttack: {fileID: 0}
   playerMask:
     serializedVersion: 2
     m_Bits: 64
@@ -827,7 +828,7 @@ GameObject:
   - component: {fileID: 3981137833716717794}
   - component: {fileID: 3650362197745556948}
   - component: {fileID: 6623433459106963636}
-  m_Layer: 8
+  m_Layer: 14
   m_Name: Hurtbox
   m_TagString: Untagged
   m_Icon: {fileID: 0}
