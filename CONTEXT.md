@@ -4,7 +4,49 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 현재 인수인계 (2026-07-29 · 폭탄 투척 경로 복구, 커밋 `93b4e02`)
+## ▶▶ 현재 인수인계 (2026-07-31 · 보스 이슈 정리 + 툰셰이딩, `7c6ec58` push 완료)
+
+작업 세션: **경석(Claude)**. 브랜치 `feature/map-player-merge`, origin 과 동기화됨.
+워킹트리에 남은 것은 **내용 변경 0 인 줄바꿈 노이즈 3개**뿐이다
+(`0.BootStrapScene` · `EditorBuildSettings` · `MultiplayerManager` — 커밋하지 말 것).
+
+### 이번에 닫은 것
+
+| 닫은 것 | 커밋 |
+|---|---|
+| 툰셰이더 — 캐릭터 조명 독립 / 아웃라인 화면공간 px 고정 / 고정광 월드공간화, Wells·검·방패 툰 적용 | `e5cc012` |
+| 보스 HUD 복구 — Paladin 의 CombatHUD 에 `BossHealthHUD` 재부착 + RectTransform 스케일 0 수정 | `ebbbf71` · `7e9c78c` |
+| **Wells 폭탄 투척 복구 — 중첩 NetworkObject 제거** (아래 §정정 참고) | `58278e9` |
+| `BombLauncher` 무증상 실패 제거 + `_bombController` 수명 대칭 | `88c4772` |
+| Q 스킬 도중 사망 시 애니메이터 초기화(`Rebind`+`Update(0)`) | `bae2e98` |
+| 부활 시 BT 플레이어 명부(`TargetGroup`/`TotalPlayerNumber`) 갱신 | `7c6ec58` |
+| 은희 컨베이어벨트(`6150ee5`) rebase 병합 · SVN r258→r259 | — |
+
+### 다음 시작점 — 몬스터 배치
+
+스포너 기계는 이미 있다: `MapContentSpawner`(마커별 그룹 스폰 구현됨) · `SpawnPoint`
+(`AllowedTier` + `MonsterSpawnPoints`) · `MonsterGroupData`(티어/난이도/프리팹/가중치).
+남은 것은 **저작·구성** 쪽이다.
+
+### 이 세션에 확립된 것
+
+- 🔴 **Wells 는 자체 `NetworkObject` 를 가지면 안 된다** — NGO 는 프리팹의 중첩
+  NetworkObject 를 스폰하지 않는다. 서버 판정이 필요하면 `NetworkManager.Singleton.IsServer`
+  를 쓴다(`BombLauncher`·`WellsAnimEvents` 패턴).
+- ⚠️ **`Assets/8.BehaviorTreeGraph` 는 열기만 해도 런타임 그래프 RID 가 통째로 재직렬화된다**
+  (No.23 = 4,675줄). 의도한 편집이 아니면 `git checkout` 으로 버릴 것. 그래프에 노드를 넣는
+  대신 C# 에서 블랙보드를 쓰는 쪽이 diff·머지 비용이 훨씬 싸다.
+- ⚠️ **`MonsterArea.asset` 은 고아라 삭제했다**(`58278e9`). Unity 가 BT 그래프를 열 때 다시
+  지우려 들 수 있다 — `git status` 에 뜨면 정상이다.
+- ✅ **Play 로그는 MCP 콘솔이 아니라 `%LOCALAPPDATA%\Unity\Editor\Editor.log` 로 읽힌다.**
+  (2026-07-29 의 "스크린샷으로만 받는다"는 전제는 과했다. 한글은 깨지지만 ASCII 마커로
+  검색하면 충분하다 — 이번 폭탄·BT 진단을 전부 이 방법으로 끝냈다.)
+- 남은 이슈: Wells `BehaviorGraphAgent` 가 모든 피어에서 돎(멀티 검증 전 서버 게이트 필요) /
+  `WeaponTrailEffect` NRE 다수(로그 오염) / SVN `MapGenConfig.asset` 미커밋.
+
+---
+
+## 이전 인수인계 (2026-07-29 · 폭탄 투척 경로 복구, 커밋 `93b4e02`)
 
 작업 세션: **경석(Claude)**. 브랜치 `feature/map-player-merge`, 마지막 커밋 `93b4e02`.
 워킹트리: 씬 2개(`0.BootStrapScene`·`4.MapScene`)와 `Bomb.prefab`·머티리얼·BT 에셋 등은
@@ -60,10 +102,15 @@ Update this file when a term becomes important enough that future agents or team
    - **Player.prefab 레이어 마스크 함정**: `EnemyHurtBox`(14) 유지 — `--ours`로 통째 되돌리면 보스를 못 때린다
    - FMOD/AudioListener는 그 브랜치에 붙은 상태로 받기로 결정
 3. ~~**미결 1건**: `Wells.prefab`이 `NetworkObject` 없이 `DefaultNetworkPrefabs`에 등록된 무효 상태~~
-   → **`4a84fe9`에서 부착으로 해소.** 없으면 `WellsAnimEvents`가 서버 판정을 못 받아 폭탄 투척이
-   조용히 막힌다는 것이 실증됐다. Wells는 `TwentyThree.prefab` 안 중첩 자식으로만 쓰이므로
-   (단독 스폰처 0건) **중첩 `NetworkObject` 상태**다 — 현재 정상 동작하지만 NGO 중첩 지원에
-   의존하는 구조라 민경과 한 번 확인해 두는 게 좋다.
+   ~~→ **`4a84fe9`에서 부착으로 해소.**~~ ~~현재 정상 동작하지만 NGO 중첩 지원에 의존하는 구조~~
+
+   ⚠️ **정정 (2026-07-31, `58278e9`): 부착은 해결책이 아니었고 그 뒤에도 폭탄은 안 나갔다.**
+   진단("서버 판정을 못 받는다")은 맞았지만 처방이 반대였다. **NGO 는 프리팹의 중첩
+   NetworkObject 를 스폰하지 않는다**(씬 오브젝트만 지원) — 붙여도 스폰되지 않으므로
+   `IsServer` 는 계속 false 다. 런타임 로그로 실증:
+   `ThrowBombEvent 진입 — IsServer=False, IsSpawned=False`.
+   해결은 **NetworkObject 제거 + `WellsAnimEvents` 를 MonoBehaviour 로 전환**이었다.
+   🔴 **다시 붙이지 말 것.** 상세는 `58278e9` 커밋 메시지와 `WellsAnimEvents` 클래스 주석.
 
 ### 이 세션에 확립된 재사용 규칙
 
