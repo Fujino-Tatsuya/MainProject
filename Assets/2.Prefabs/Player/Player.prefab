@@ -540,6 +540,7 @@ GameObject:
   - component: {fileID: 1111000000000000012}
   - component: {fileID: 1111000000000000013}
   - component: {fileID: 1111000000000000014}
+  - component: {fileID: 800000000000000030}
   m_Layer: 6
   m_Name: Player
   m_TagString: Player
@@ -1042,6 +1043,31 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5b26151e1b4e4f1c965ef85e1900d68c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerLifeInputPolicy
+  player: {fileID: 7612441094946270182}
+  lifeCycle: {fileID: 800000000000000020}
+  inputReader: {fileID: 1825865676068489031}
+  stateController: {fileID: 4237082408145735710}
+  skillTargeting: {fileID: 1111000000000000002}
+  encounterLock: {fileID: 800000000000000030}
+--- !u!114 &800000000000000030
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8559504096609571310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2d86d153e71c08841859b8dc02d8e923, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerEncounterLock
+  player: {fileID: 7612441094946270182}
+  stateController: {fileID: 4237082408145735710}
+  invulnerability: {fileID: 1111000000000000010}
+  statusEffects: {fileID: 8345678279683584363}
+  defaultAttack: {fileID: 5274188098871446382}
+  skillController: {fileID: 4711829301158223401}
+  body: {fileID: 3600963326377684433}
   player: {fileID: 7612441094946270182}
   lifeCycle: {fileID: 800000000000000020}
   inputReader: {fileID: 1825865676068489031}
