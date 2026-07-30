@@ -1803,7 +1803,7 @@ Transform:
   m_GameObject: {fileID: 842101051510495039}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 11, y: 0.1, z: -16}
+  m_LocalPosition: {x: -16, y: 0.1, z: -6}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -8470,6 +8470,37 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: -3764680694359950872, guid: 335a891f76499ae408d9c45c13ed9954, type: 3}
+--- !u!1 &5210806627089533267
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5706051639449884261}
+  m_Layer: 0
+  m_Name: Spawn_5
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &5706051639449884261
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5210806627089533267}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 12, y: 0.1, z: -11}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 5248829919776621801}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &5250627220166532043
 GameObject:
   m_ObjectHideFlags: 0
@@ -8950,7 +8981,7 @@ Transform:
   m_GameObject: {fileID: 5625910928470562875}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -15, y: 0.1, z: -4}
+  m_LocalPosition: {x: -16, y: 0.1, z: -2}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -13110,9 +13141,20 @@ MonoBehaviour:
   - {fileID: 1720094728896743314}
   - {fileID: 3998222768414543366}
   - {fileID: 3874025069116932658}
+  - {fileID: 5706051639449884261}
   MonsterSpawnEntries:
-  - Marker: {fileID: 0}
+  - Marker: {fileID: 774493334140230951}
+    MonsterGroupID: 7
+  - Marker: {fileID: 8295391338655822361}
     MonsterGroupID: 0
+  - Marker: {fileID: 1720094728896743314}
+    MonsterGroupID: 2
+  - Marker: {fileID: 3998222768414543366}
+    MonsterGroupID: 3
+  - Marker: {fileID: 3874025069116932658}
+    MonsterGroupID: 1
+  - Marker: {fileID: 5706051639449884261}
+    MonsterGroupID: 4
   Nodes: []
 --- !u!1 &8462609902352467278
 GameObject:
@@ -14543,6 +14585,7 @@ Transform:
   - {fileID: 1720094728896743314}
   - {fileID: 3998222768414543366}
   - {fileID: 3874025069116932658}
+  - {fileID: 5706051639449884261}
   m_Father: {fileID: 3735471301859160650}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &9001133204864569584
