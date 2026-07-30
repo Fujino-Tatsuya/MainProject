@@ -1,10 +1,11 @@
 {
   "dependencies": {
     "com.community.unity-mcp": {
-      "version": "file:com.community.unity-mcp",
+      "version": "https://github.com/usmanbutt-dev/unity-mcp.git",
       "depth": 0,
-      "source": "embedded",
-      "dependencies": {}
+      "source": "git",
+      "dependencies": {},
+      "hash": "19486cf5696bbd87ae315eada2ff989e00a691f4"
     },
     "com.unity.2d.sprite": {
       "version": "1.0.0",
