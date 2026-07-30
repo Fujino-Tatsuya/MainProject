@@ -8,6 +8,10 @@ public class JumpController : NetworkBehaviour, IDamageSettable
     [SerializeField] BehaviorGraphAgent bt;
     [SerializeField] string followTargetTag;
     [SerializeField] LayerMask playerLayer;
+    [Tooltip("착지 지점을 찾을 바닥 레이어. 생성맵 바닥은 Ground가 아니라 Default다 — 둘 다 포함해야 한다.")]
+    [SerializeField] LayerMask groundMask = 0;
+    // 머지(2026-07-29): 직렬화 damage / jumpingTime 필드는 feature/Boss에서 제거됐다.
+    // 착지 피해는 SetDamage(_damage), 정지 시간은 Blackboard JumpingTime(SO 주입)이 정본이다.
     [SerializeField] List<GameObject> meshRenderer;
 
     [Header("장판")]
@@ -36,6 +40,24 @@ public class JumpController : NetworkBehaviour, IDamageSettable
     Quaternion _floorRootRot;
     float _jumpDiff;    // 장판 시간 계산으로 위해 총 정지 시간에서 더할 보정값
     bool _isJumping = false;
+    bool _isCinematicLanding = false;
+
+    /// <summary>
+    /// 등장 연출 착지 모드. BossEncounterDirector가 하강 전에 켜고 전투 전환 시 끈다.
+    /// 켜져 있는 동안 장판 표시와 착지 피해를 만들지 않는다 — 연출 착지는 공격이 아니다.
+    /// (승인 계획 Task 4)
+    /// </summary>
+    public void SetCinematicLandingMode(bool enabled)
+    {
+        if (!IsServer && IsSpawned) return;
+
+        _isCinematicLanding = enabled;
+    }
+
+    // 바닥 탐색은 GroundProbe로 통일했다(레이어 폴백·원점 띄우기·유닛 콜라이더 제외).
+    // ⚠️ 특히 유닛 제외가 중요하다 — 이 보스는 플레이어 위치로 착지하므로 자기 공격 히트박스
+    // (Rage·DashAttack·Floor 등 Default 레이어 7개)가 반드시 근처에 있고, 그게 "바닥"으로 잡히면
+    // 착지 높이와 장판이 몸통 높이에 걸린다(폭탄이 y≈1.8에 뜬 것과 같은 원인).
 
     public override void OnNetworkSpawn()
     {
@@ -73,6 +95,9 @@ public class JumpController : NetworkBehaviour, IDamageSettable
     {
         if (!IsServer) return;
 
+        // 연출 착지는 대상 선정·장판·메시 숨김을 하지 않는다.
+        if (_isCinematicLanding) return;
+
         GameObject target = FindTargetByDistance(true);
 
         if (target == null)
@@ -83,17 +108,25 @@ public class JumpController : NetworkBehaviour, IDamageSettable
         }
         _target = target;
 
-        // 경사면을 고려한 회전 변경
-        RaycastHit hit;
+        // 경사면을 고려한 회전 변경 + 착지 높이 확정.
+        // ⚠️ 예전엔 바닥 레이어를 "Ground"로 하드코딩하고 착지 Y를 0으로 고정했다. 생성맵 보스룸
+        // 바닥은 Default 레이어에 Y≈0.61이라 장판이 바닥 아래로 들어가고 보스와 어긋났다.
+        Vector3 landingPos = _target.transform.position;
         Quaternion slopeRotation = Quaternion.identity;
-        if (Physics.Raycast(target.transform.position, Vector3.down, out hit, Mathf.Infinity, LayerMask.GetMask("Ground")))
+
+        if (GroundProbe.TryFindGround(landingPos, groundMask.value, out RaycastHit hit, out string report))
         {
             slopeRotation = Quaternion.FromToRotation(Vector3.up, hit.normal);
+            // 장판이 바닥면과 같은 높이면 z-fighting 한다 → 폭탄과 같은 표준 간격으로 띄운다.
+            landingPos.y = GroundProbe.SurfaceY(hit);
+        }
+        else
+        {
+            Edit.LogWarning(
+                $"[No.23] 착지 지점 아래에서 바닥을 찾지 못해 대상 높이를 그대로 사용합니다({landingPos}) — {report}", this);
         }
         _floorRootRot = _baseRotation * slopeRotation;
 
-        Vector3 landingPos = _target.transform.position;
-        landingPos.y = 0f;
         ArrivePoint.Value = landingPos;
         _floorRootPos = landingPos;
 
@@ -147,6 +180,9 @@ public class JumpController : NetworkBehaviour, IDamageSettable
     public void OnLanded()
     {
         if (!IsServer) return;
+
+        // 연출 착지는 피해를 주지 않는다. 장판도 켜지지 않았으므로 숨김 처리도 불필요.
+        if (_isCinematicLanding) return;
 
         // 데미지 범위는 장판1(floorBase)의 실제 시각 크기 기준
         Vector3 center = floorBase.bounds.center;

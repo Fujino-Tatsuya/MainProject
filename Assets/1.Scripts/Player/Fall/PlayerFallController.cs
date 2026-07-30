@@ -17,6 +17,7 @@ using UnityEngine;
 public sealed class PlayerFallController : NetworkBehaviour
 {
     private Player player;
+    private PlayerEncounterLock encounterLock;
     private bool _fallHandled;
     private bool _warnedMissingBoundary;
 
@@ -29,11 +30,17 @@ public sealed class PlayerFallController : NetworkBehaviour
     private void Awake()
     {
         player = GetComponent<Player>();
+        encounterLock = GetComponent<PlayerEncounterLock>();
     }
 
     private void FixedUpdate()
     {
         if (!IsSpawned || !IsServer || player == null)
+            return;
+
+        // 연출 잠금(보스룸 이동·등장) 중에는 추락 판정을 멈춘다. 보스룸은 생성맵 밖 좌표라
+        // 이동 중 경계 아래로 스쳐도 추락 피해·안전지점 복귀가 걸리면 도착 계약이 깨진다.
+        if (encounterLock != null && encounterLock.IsCinematicLocked)
             return;
 
         FallBoundarySettings boundary = FallBoundarySettings.Instance;

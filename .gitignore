@@ -95,10 +95,27 @@ CLAUDE.local.md
 
 # AI 플러그인 / 툴 산출물 (개인 환경, 커밋 금지)
 # .bkit/·.omc/ = AI 플러그인 상태, /data/ = 툴 산출물(예: data/created-pages.json)
-# /PLAN.md = 작업마다 새로 생성되는 플래닝 산출물(승인용 working doc, 레포 미보관)
+# /plans/ = 작업마다 생성되는 플래닝 산출물 모음(승인용 working doc, 레포 미보관)
 .bkit/
 .omc/
+.omx/
 /data/
+/plans/
+.mcp.json
+*.bak
+
+# Syncthing 동기화 메타(Docs/ 폴더가 개인 Syncthing으로 관리되는 경우) + 로컬 백업/생성물
+.stfolder/
+.stignore
+.stversions/
+Docs/MainProjectDocsBackup/
+Docs/MainProjectValutBackup/
+Docs/MainProjectVault/
+/Docs_Old/
+/Generated/
+
+# 세션 스크래치 노트(작업 중 임시 분석 메모, 완료되면 Docs/design·tech로 옮겨서 커밋)
+Docs/temp/
 /PLAN.md
 
 # Claude/Codex local agent bridge runtime and dependencies
@@ -112,3 +129,10 @@ CLAUDE.local.md
 /AGENTS.md
 /CONTEXT.md
 /Tools/
+
+# 개인 작업 노트 + Unity 자동생성물(커밋 금지)
+/IMPLEMENTATION_NOTES.md
+/PLAN-mcp.md
+/[Aa]ssets/Unity.VisualScripting.Generated/
+/[Aa]ssets/Unity.VisualScripting.Generated.meta
+*.sync-conflict-*

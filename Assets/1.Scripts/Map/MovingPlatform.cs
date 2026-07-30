@@ -11,7 +11,7 @@ using UnityEngine;
 /// 동기 모델: NetworkObject/NetworkTransform 없음. 위치 = f(<see cref="NetworkClock.MainGameElapsed"/>)
 /// 순수함수라 모든 클라가 동일 계산으로 일치한다. dt 적분 금지(FP 드리프트 방지).
 /// </summary>
-public class MovingPlatform : MonoBehaviour
+public class MovingPlatform : MonoBehaviour, ISurfaceCarrier
 {
     /// <summary>
     /// 경로 형태만 결정한다(정지 여부는 각 노드의 <see cref="WaypointNode"/>가 담당).
@@ -39,6 +39,11 @@ public class MovingPlatform : MonoBehaviour
 
     /// <summary>이번 프레임 이동량(월드). 소유자측 플레이어 캐리가 읽는다.</summary>
     public Vector3 CurrentDelta { get; private set; }
+
+    public Vector3 GetCarryDelta(Vector3 riderWorldPos, float dt)
+    {
+        return CurrentDelta;
+    }
 
     private struct Segment
     {

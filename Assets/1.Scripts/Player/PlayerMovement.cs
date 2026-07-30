@@ -8,6 +8,9 @@ public class PlayerMovement : MonoBehaviour
     private Player player;
     private PlayerSoulController soulController;
     private Rigidbody rb;
+    private CapsuleCollider capsule;
+    private PlayerGroundingSensor grounding;
+    private LayerMask rootMoveBlockingMask;
 
     [SerializeField] private Transform armature;
     [SerializeField] private float rotate_Speed = 10f;
@@ -36,6 +39,12 @@ public class PlayerMovement : MonoBehaviour
         player = GetComponent<Player>();
         soulController = GetComponent<PlayerSoulController>();
         rb = GetComponent<Rigidbody>();
+        capsule = GetComponent<CapsuleCollider>();
+        grounding = GetComponent<PlayerGroundingSensor>();
+
+        // MoveRoot(평타 러시 스텝/스킬 전진) 관통 방지 스윕 대상 — 정적 지오메트리만.
+        // 유닛(Enemy/Player)은 제외해 러시가 몹 사이를 지나는 기존 감각을 유지한다.
+        rootMoveBlockingMask = LayerMask.GetMask("Default", "Ground", "Wall", "Env");
 
         if (armature == null)
             armature = transform.Find("Armature");
@@ -94,13 +103,39 @@ public class PlayerMovement : MonoBehaviour
         // 입력 이동 + 플랫폼 캐리를 단일 MovePosition으로 적용.
         // (MovePosition을 프레임당 두 번 호출하면 뒤엣것이 덮어쓰므로 반드시 합산.)
         // 캐리는 CanMove/입력과 무관하게 적용 → 스턴/사망 중에도 플랫폼에 실려 이동(시체 잔류).
-        Vector3 total = inputMove + _carryDelta;
+        Vector3 total = ProjectOntoGround(inputMove) + _carryDelta;
         _carryDelta = Vector3.zero;
 
         if (total.sqrMagnitude > 0f)
         {
             rb.MovePosition(rb.position + total);
         }
+    }
+
+    /// <summary>
+    /// 접지 중이면 수평 이동을 지면 평면에 투영한다.
+    /// MovePosition은 CharacterController와 달리 경사 보정을 해 주지 않아서, 수평 벡터를 그대로
+    /// 밀면 경사면에 파고들며 막힌다(계단·경사로를 못 올라가던 원인). 지면 노멀에 투영하면
+    /// 같은 거리를 경사면을 따라 이동하므로 등판이 된다. 평지에서는 결과가 동일하다.
+    /// </summary>
+    private Vector3 ProjectOntoGround(Vector3 horizontalMove)
+    {
+        if (grounding == null || !grounding.IsGrounded)
+            return horizontalMove;
+
+        float distance = horizontalMove.magnitude;
+        if (distance <= Mathf.Epsilon)
+            return horizontalMove;
+
+        Vector3 normal = grounding.GroundNormal;
+        if (normal.y >= 0.999f) // 평지
+            return horizontalMove;
+
+        Vector3 projected = Vector3.ProjectOnPlane(horizontalMove, normal);
+        if (projected.sqrMagnitude <= 1e-6f)
+            return horizontalMove;
+
+        return projected.normalized * distance;
     }
 
     private void Rotate()
@@ -173,7 +208,29 @@ public class PlayerMovement : MonoBehaviour
 
     public void MoveRoot(Vector3 deltaPosition)
     {
-        rb.MovePosition(rb.position + deltaPosition);
+        rb.MovePosition(rb.position + ClampByStaticGeometry(deltaPosition));
+    }
+
+    // MovePosition은 스윕 없이 목표 지점으로 이동해, 평타 러시 스텝처럼 한 프레임 대이동이
+    // 논컨벡스 벽 MeshCollider를 그대로 관통한다 — 벽에 막히면 그 앞까지로 이동량을 클램프.
+    private Vector3 ClampByStaticGeometry(Vector3 delta)
+    {
+        float dist = delta.magnitude;
+        if (dist < 0.0001f || capsule == null)
+            return delta;
+
+        Vector3 dir = delta / dist;
+        Vector3 center = rb.position + capsule.center;
+        float half = Mathf.Max(0f, capsule.height * 0.5f - capsule.radius);
+        // 반경/정지거리에 스킨 여유 — 바닥 등 기존 접촉면 스침으로 제자리 클램프되는 것 방지.
+        float radius = Mathf.Max(0.01f, capsule.radius - 0.02f);
+
+        if (Physics.CapsuleCast(
+                center + Vector3.up * half, center - Vector3.up * half, radius,
+                dir, out RaycastHit hit, dist, rootMoveBlockingMask, QueryTriggerInteraction.Ignore))
+            return dir * Mathf.Max(0f, hit.distance - 0.02f);
+
+        return delta;
     }
 
     /// <summary>

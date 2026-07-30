@@ -63,6 +63,16 @@ public class ForProfile : MonoBehaviour
 
     private void HandleServerStarted()
     {
+        // 디버그 호스트 시작 경로: 정식 4.MapScene 로딩(GameManager가 MarkMainGameStart 호출)을
+        // 거치지 않는 테스트 씬에서도 MainGame 시계를 켜준다. 이게 있어야 NetworkClock.MainGameElapsed가
+        // 흐르고, 그에 의존하는 결정론 모션(MovingPlatform, Vent 등)이 실제로 동작한다.
+        // 이미 시작된 시계는 재스탬프하지 않아 정식 흐름에 영향 없음.
+        var clock = NetworkClock.Instance;
+        if (clock != null && !clock.HasMainGameStarted)
+        {
+            clock.MarkMainGameStart();
+        }
+
         var gameManager = GameManager.Instance;
         if (gameManager == null)
         {

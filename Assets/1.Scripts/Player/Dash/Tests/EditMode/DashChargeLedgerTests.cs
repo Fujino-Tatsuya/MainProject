@@ -87,6 +87,51 @@ namespace BeaverLobby.Player.Dash.EditModeTests
         }
 
         [Test]
+        public void SyncToAuthoritative_IsIgnored_WhenOwnerRevisionIsAhead()
+        {
+            // 거부 시나리오의 전제 확인: 오너는 예측 소비로 Revision을 올렸고 서버는 소비하지 않았다.
+            var ledger = new DashChargeLedger(1, 2.0, 1, 0.0);
+            Assert.IsTrue(ledger.TryConsume(0.0)); // Revision 0 -> 1, Count 1 -> 0
+
+            ledger.SyncToAuthoritative(count: 1, epoch: 0u, revision: 0u, now: 0.0);
+
+            Assert.AreEqual(0, ledger.Count, "과거 Revision 스냅샷은 채택되지 않는다(설계대로)");
+        }
+
+        [Test]
+        public void ForceAdoptAuthoritative_RefundsPredictedConsume_IgnoringRevision()
+        {
+            // 회귀: 서버 거부 시 예측 소비를 되돌려야 한다. Revision이 앞서 있어도 덮어쓴다.
+            var ledger = new DashChargeLedger(1, 2.0, 1, 0.0);
+            Assert.IsTrue(ledger.TryConsume(0.0));
+
+            ledger.ForceAdoptAuthoritative(count: 1, epoch: 0u, revision: 0u, now: 0.0, remainingToReady: 0.0);
+
+            Assert.AreEqual(1, ledger.Count, "거부는 예측 소비가 없었던 일 → 즉시 재시도 가능");
+            Assert.IsTrue(ledger.IsFull);
+            Assert.AreEqual(double.PositiveInfinity, ledger.NextReadyTime);
+        }
+
+        [Test]
+        public void ForceAdoptAuthoritative_TransplantsRemainingTime_AndClampsOutOfRange()
+        {
+            var ledger = new DashChargeLedger(1, 2.0, 1, 0.0);
+            ledger.TryConsume(0.0);
+
+            // 서버 장부도 비어 있고 0.5초 남았다 → 오너 도메인 now(10.0) + 0.5
+            ledger.ForceAdoptAuthoritative(0, 0u, 0u, now: 10.0, remainingToReady: 0.5);
+            Assert.AreEqual(0, ledger.Count);
+            Assert.AreEqual(10.5, ledger.NextReadyTime, 1e-9);
+
+            // 범위 밖 값 보정: 음수 -> 0, rechargeDuration 초과 -> rechargeDuration
+            ledger.ForceAdoptAuthoritative(0, 0u, 0u, now: 20.0, remainingToReady: -5.0);
+            Assert.AreEqual(20.0, ledger.NextReadyTime, 1e-9);
+
+            ledger.ForceAdoptAuthoritative(0, 0u, 0u, now: 30.0, remainingToReady: 99.0);
+            Assert.AreEqual(32.0, ledger.NextReadyTime, 1e-9);
+        }
+
+        [Test]
         public void MaxChargeOne_IsFullWhenOne_AndRechargesAfterConsume()
         {
             var ledger = new DashChargeLedger(1, 2.0, 1, 0.0);

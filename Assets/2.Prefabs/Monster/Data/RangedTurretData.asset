@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 576305eb4d78f0c4eb97b90edc8cae21, type: 3}
+  m_Name: RangedTurretData
+  m_EditorClassIdentifier:
+  archetype: 1
+  attackDamage: 8
+  moveSpeed: 1
+  chaseSpeed: 1
+  attackSpeed: 0.8
+  maxHp: 60
+  defense: 0
+  maxShield: 0
+  detectionRadius: 12
+  attackRange: 10
+  leashRadius: 15
+  returnSpeedMultiplier: 5
+  projectilePrefab: {fileID: 8845096525963102658, guid: 54c0baf85e460bc478f1db5826ccde56, type: 3}
+  projectileSpeed: 14
+  projectileLifetime: 4
+  minStandoff: 4
+  attackDuration: 0.7
+  attackWindup: 0.3
+  maxGroggyCount: 0
+  groggyDuration: 3
+  startsWithSuperArmor: 0
+  hasSuperArmorWhileAttacking: 0
+  hitStunDuration: 0.4
+  despawnDelay: 2
+  isMidBoss: 0
+  animSpeedParam: RunBlend
+  attackTrigger: Attack
+  hitTrigger: Hit
+  groggyBool: Groggy
+  deathTrigger: Death

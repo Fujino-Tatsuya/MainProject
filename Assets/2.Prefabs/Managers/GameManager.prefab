@@ -44,6 +44,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fe744fd291fe45a59d87072fcd2a110e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TempGameManager
-  lobbySceneName: Temp_LobbyScene
-  resultSceneName: ResultScene
+  titleSceneName: 1.TitleScene
+  lobbySceneName: 3.BeaverLobby
+  resultSceneName: 5.ResultScene
+  loadingSceneName: 2.LoadingScene
+  mainGameSceneName: 4.MapScene
   sessionConnectPanelName: Pannel_SessionConnect

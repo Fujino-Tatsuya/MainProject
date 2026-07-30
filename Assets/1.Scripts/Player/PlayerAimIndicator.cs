@@ -59,16 +59,32 @@ public class PlayerAimIndicator : NetworkBehaviour
         Vector2 mousePosition = Mouse.current.position.ReadValue();
         Ray ray = targetCamera.ScreenPointToRay(mousePosition);
 
-        if (!Physics.Raycast(ray, out RaycastHit hit, 100f, groundMask))
+        Vector3 aimPoint;
+        if (Physics.Raycast(ray, out RaycastHit hit, 100f, groundMask))
         {
-            HasAimGroundPoint = false;
-            return;
+            aimPoint = hit.point;
+        }
+        else
+        {
+            // 바닥이 Ground 레이어가 아닌 씬(생성맵 등)에서는 레이가 영원히 미스 →
+            // 조준이 마지막 값으로 고정된다. 플레이어 높이 수평면과 교차시켜 폴백 —
+            // 씬 레이어 구성과 무관하게 조준을 유지한다.
+            Plane aimPlane = new Plane(Vector3.up, transform.position);
+            if (!aimPlane.Raycast(ray, out float enter))
+            {
+                HasAimGroundPoint = false;
+                return;
+            }
+            aimPoint = ray.GetPoint(enter);
         }
 
-        AimGroundPoint = hit.point;
+        // 지면 타게팅 스킬(PlayerSkillTargeting)이 이 값으로 시전 지점을 잡는다.
+        // 폴백으로 구한 점도 유효 조준점으로 취급한다 — 생성맵처럼 Ground 레이어가
+        // 없는 씬에서 지면 스킬이 통째로 막히면 안 되기 때문.
+        AimGroundPoint = aimPoint;
         HasAimGroundPoint = true;
 
-        Vector3 direction = hit.point - transform.position;
+        Vector3 direction = aimPoint - transform.position;
         direction.y = 0f;
 
         if (direction.sqrMagnitude < 0.001f)

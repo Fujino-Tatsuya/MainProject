@@ -1937,7 +1937,7 @@ GameObject:
   - component: {fileID: 1913174487}
   - component: {fileID: 1913174486}
   - component: {fileID: 1913174485}
-  m_Layer: 14
+  m_Layer: 15
   m_Name: Corpse
   m_TagString: Ground
   m_Icon: {fileID: 0}

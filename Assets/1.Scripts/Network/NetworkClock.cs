@@ -46,6 +46,16 @@ public class NetworkClock : MonoBehaviour
     /// <summary>일시정지를 제외한 클라이언트 로컬 게임시간.</summary>
     public double GameLocalNow => LocalNow - CurrentPausedAccum();
 
+    /// <summary>
+    /// 세션이 실제로 돌고 있는지. false면 <see cref="ServerNow"/>/<see cref="LocalNow"/>는
+    /// 진행하지 않고 <b>상수 0</b>이다.
+    ///
+    /// ⚠️ 소비자는 <c>Instance != null</c>만 보고 폴백을 결정하면 안 된다 — 프리팹은 씬에 있는데
+    /// 세션은 안 켠 상태(오프라인 Play)에서 "멈춘 시계"를 정상 시각으로 받아 쓰게 된다.
+    /// 시간차로 회복/만료를 계산하는 쪽은 이 값이 false면 Time.timeAsDouble로 폴백할 것.
+    /// </summary>
+    public bool IsRunning => _networkManager != null && _networkManager.IsListening;
+
     public bool HasSessionFormed => !double.IsNaN(_sessionFormedAt);
     public bool HasMainGameStarted => !double.IsNaN(_mainGameStartedAt);
 

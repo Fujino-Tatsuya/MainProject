@@ -21,10 +21,12 @@ public class PlayerColorAssigner : NetworkBehaviour
         if (bodyRenderer == null || colorsByClientId == null)
             return;
 
-        if (OwnerClientId < (ulong)colorsByClientId.Length &&
-            colorsByClientId[OwnerClientId] != null)
-        {
-            bodyRenderer.sharedMaterial = colorsByClientId[OwnerClientId];
-        }
+        // [임시 주석처리 2026-07-15] 플레이어 색 구분이 Paladin 텍스처를 단색으로 덮어써 빨갛게 보임 → 비활성화.
+        // 텍스처 유지하며 색 구분하려면 sharedMaterial 통째 교체 대신 MaterialPropertyBlock으로 _BaseColor 틴트 방식으로 재작업 필요.
+        // if (OwnerClientId < (ulong)colorsByClientId.Length &&
+        //     colorsByClientId[OwnerClientId] != null)
+        // {
+        //     bodyRenderer.sharedMaterial = colorsByClientId[OwnerClientId];
+        // }
     }
 }

@@ -28,10 +28,15 @@ public partial class ThrowBombAction : Action
         Vector3 throwVector = dir * ThrowDistance.Value;
         Vector3 target = agentTransform.position + throwVector;
 
-        RaycastHit hit;
-        if (Physics.Raycast(target, Vector3.down, out hit, Mathf.Infinity, LayerMask.GetMask(Ground)))
+        // 바닥 판정은 GroundProbe로 통일한다 — BT 블랙보드의 Ground 이름만 쓰면 생성맵 바닥(Default)을
+        // 구조적으로 못 맞히고, 보스 자기 히트박스(Default 레이어)를 바닥으로 오인하는 문제도 있다.
+        if (GroundProbe.TryFindGround(target, LayerMask.GetMask(Ground), out RaycastHit hit, out string report))
         {
-            target.y = hit.point.y;
+            target.y = GroundProbe.SurfaceY(hit);
+        }
+        else
+        {
+            Edit.LogWarning($"[BT] 폭탄 착지 지점을 못 찾아 투척 높이를 그대로 씁니다({target}) — {report}");
         }
 
         //BombInstance.Value.GetComponent<NetworkObject>().TryRemoveParent(true);

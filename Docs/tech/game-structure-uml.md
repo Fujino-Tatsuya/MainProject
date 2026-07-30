@@ -3,6 +3,7 @@
 > 감사 기준: 2026-07-15, Unity `6000.3.16f1`, Git `feature/CombatUI` / `54603b0`
 > 범위: `Assets` 아래 C# 189개 전수, `Assets/1.Scripts` 159개 + 프로젝트 Editor 도구 3개 + 외부·데모 27개, 주요 씬·프리팹·ScriptableObject·Behavior Graph·Build Settings·Network Prefab 목록
 > 상세 파일별 목록: [script-inventory.md](script-inventory.md)
+> PlayerSkill 부분 갱신: 2026-07-23, `feature/PlayerSkill` / `558ab43`. Q/E/R, 타겟팅, Player 프리팹 배선에 관한 절만 최신화했으며 나머지 감사 내용은 기존 기준을 유지한다.
 
 이 문서는 설계 의도만 옮긴 그림이 아니라 **현재 저장소에서 실제로 확인되는 구조**를 기록한다. 코드 선언, 호출자, Unity YAML 직렬화 참조, Behavior Graph의 커스텀 노드 타입 참조를 서로 대조했다. 따라서 아래 표기 상태를 구분해서 읽어야 한다.
 
@@ -159,7 +160,7 @@ flowchart TB
     Wells --> WellsGraph["Wells Behavior Graph"]
 
     PlayerP --> AttackSO["DefaultAttackData.asset"]
-    PlayerP --> SkillSO["FirstMeleeSubSkillData.asset"]
+    PlayerP --> SkillSO["Q/E/R SkillData assets"]
     PlayerP --> InputActions["InputSystem_Actions.inputactions"]
     PlayerP --> Armature["TempPlayer_Armature"]
     PlayerP --> Follow["CameraFollowTarget"]
@@ -410,7 +411,8 @@ flowchart TB
     Root --> Move["PlayerMovement"]
     Root --> Aim["PlayerAimIndicator"]
     Root --> Attack["DefaultAttackController\n+ PlayerDefaultAttack"]
-    Root --> Skill["PlayerSkillController\n+ FirstMeleeSubSkill"]
+    Root --> Skill["PlayerSkillController\n+ Q / E / R"]
+    Root --> Targeting["PlayerSkillTargeting\n+ SkillCursorView"]
     Root --> Status["StatusEffectController"]
     Root --> Rigid["Rigidbody + CapsuleCollider"]
 
@@ -418,13 +420,16 @@ flowchart TB
     HurtChild --> Hurtbox["Hurtbox → Player"]
     Root --> Visual["TempPlayer_Armature\nAnimator event relays"]
     Root --> CameraTarget["CameraFollowTarget"]
-    Root --> Decal["Projector 조준 데칼"]
+    Root --> Decal["SkillRangeIndicator\nDecalProjector"]
 
     Attack --> AttackData["DefaultAttackData\n4단 overlap 콤보"]
-    Skill --> EData["FirstMeleeSubSkillData\nE, cooldown 14s, shield 10/5s"]
+    Skill --> QData["FirstMeleeMainSkillData\nQ, advance + knockback"]
+    Skill --> EData["FirstMeleeSubSkillData\nE, shield 10/5s"]
+    Skill --> RData["FirstMeleeUltimateSkillData\nR, SingleTarget + channel"]
+    Targeting --> Decal
 ```
 
-현재 `Player.prefab`에는 E/Sub 스킬만 배선되어 있다. Q/Main, RMB/Interrupt, R/Ultimate 슬롯은 비어 있다. 입력 에셋에는 `Attack=LMB`, `Interrupt=RMB`, `SkillMain=Q`, `SkillSub=E`, `SkillUltimate=R`가 모두 정의되어 있고 `Interact=E`도 중복 정의되지만 현재 상호작용 소비 코드는 없다.
+현재 `Player.prefab`에는 Q/Main, E/Sub, R/Ultimate가 배선되어 있다. R은 `PlayerSkillTargeting`, `SkillCursorView`, DecalProjector 기반 `SkillRangeIndicator`와 연결되며 사거리 밖 대상을 확정하면 자동 이동 후 시전한다. RMB/Interrupt 슬롯은 비어 있다. 입력 에셋에는 `Attack=LMB`, `Interrupt=RMB`, `SkillMain=Q`, `SkillSub=E`, `SkillUltimate=R`가 모두 정의되어 있고 `Interact=E`도 중복 정의되지만 현재 상호작용 소비 코드는 없다.
 
 `Paladin.prefab`은 `Player`, 입력, 이동, 상태, 평타, 색상 컴포넌트까지만 있고 Hurtbox와 `PlayerSkillController`가 없다. 네트워크 프리팹 목록에는 남아 있으므로 플레이어 기준 프리팹을 하나로 수렴시키는 것이 안전하다.
 
@@ -463,9 +468,9 @@ classDiagram
         +ExecuteHit(step, damageSnapshot)
     }
     class PlayerSkillController {
-        +RequestUseSkill(slot)
-        +RequestReleaseSkill(slot)
-        +TryGetCooldown(slot)
+        +TryUse(slot)
+        +ExecuteTargetedSkill(slot, target, aimPoint)
+        +GetCooldownRemaining(slot)
     }
     class PlayerSkillBase {
         <<abstract>>
@@ -478,7 +483,10 @@ classDiagram
     class PlayerInstantSkill
     class PlayerHoldSkill
     class PlayerChannelingSkill
+    class FirstMeleeMainSkill
     class FirstMeleeSubSkill
+    class FirstMeleeUltimateSkill
+    class PlayerSkillTargeting
 
     Player --> PlayerInputReader
     Player --> PlayerMovement
@@ -490,7 +498,10 @@ classDiagram
     PlayerSkillBase <|-- PlayerInstantSkill
     PlayerSkillBase <|-- PlayerHoldSkill
     PlayerSkillBase <|-- PlayerChannelingSkill
+    PlayerSkillBase <|-- FirstMeleeMainSkill
     PlayerInstantSkill <|-- FirstMeleeSubSkill
+    PlayerChannelingSkill <|-- FirstMeleeUltimateSkill
+    PlayerSkillController --> PlayerSkillTargeting
 ```
 
 ### 6.3 Player FSM
@@ -586,7 +597,12 @@ sequenceDiagram
 
     Owner->>Input: Q / E / R / RMB
     Input->>FSM: slot 입력 소비
-    FSM->>PSC: RequestUseSkill(slot, aim)
+    FSM->>PSC: TryUse(slot)
+    opt 타겟팅 스킬
+        PSC->>PSC: PlayerSkillTargeting.Begin(slot)
+        Owner->>PSC: 대상 확정 또는 취소
+        PSC->>PSC: ExecuteTargetedSkill(slot, target, aimPoint)
+    end
     PSC->>PSC: ServerRpc
     PSC->>PSC: 슬롯·cooldown·blocker·FSM 검증
     PSC->>Unit: 최종 공격력 snapshot
@@ -607,7 +623,7 @@ sequenceDiagram
     PSC-->>Clients: EndPresentation ClientRpc
 ```
 
-실제 연결된 `FirstMeleeSubSkill`은 Instant 스킬이다. 서버가 10 실드를 적용하고 5초 후 회수하며 cooldown은 14초다. 만료 coroutine은 출처를 식별하지 않고 `SetShield(0)`을 호출하므로 그 사이 다른 효과가 준 실드까지 지울 수 있다. 스킬·평타 시간 추적과 E 실드 coroutine은 현재 `Time.time`을 사용한다. 네트워크 설계 문서가 목표로 제시한 서버 공통 `GameTime` 추상화는 아직 없다.
+실제 연결된 스킬은 Q `FirstMeleeMainSkill`, E `FirstMeleeSubSkill`, R `FirstMeleeUltimateSkill`이다. Q는 전진·조향하며 서버 overlap으로 피해와 넉백을 적용하고 실행 중 SuperArmor를 부여한다. E는 서버가 10 실드를 적용하고 5초 후 회수하며 cooldown은 14초다. R은 SingleTarget 조준과 사거리 밖 자동 이동을 거쳐 1.5초 채널 완주 시 단일 피해를 적용하는 최소 구현이며 수치와 연출은 placeholder다. RMB/Interrupt는 아직 비어 있다. 스킬 시간 추적과 E 실드 coroutine은 현재 `Time.time`을 사용하며 서버 공통 `GameTime` 추상화는 아직 없다.
 
 ### 6.6 로컬 표현과 UI 결합
 
@@ -1128,9 +1144,9 @@ flowchart LR
 | Attack | Left Mouse | 평타 콤보 |
 | Interrupt | Right Mouse | 스킬 슬롯이 없을 때 레거시 Interrupt |
 | Interact | E | 현재 소비 없음 |
-| SkillMain | Q | 슬롯 정의, 프리팹 스킬 없음 |
+| SkillMain | Q | `FirstMeleeMainSkill` 연결됨 |
 | SkillSub | E | `FirstMeleeSubSkill` 연결됨 |
-| SkillUltimate | R | 슬롯 정의, 프리팹 스킬 없음 |
+| SkillUltimate | R | `FirstMeleeUltimateSkill` + SingleTarget 타겟팅 연결됨 |
 | Crouch, Jump, Previous, Next, Sprint | 표준 Starter Assets 계열 | 현재 Player 핵심 FSM에서 미사용 |
 
 E가 `Interact`와 `SkillSub` 양쪽에 중복 배치돼 있다. 상호작용을 구현할 때 입력 소비 우선순위나 context map 분리가 필요하다.
@@ -1270,7 +1286,7 @@ flowchart TB
     FSM --> Attack["DefaultAttackController"]
     FSM --> Skill["PlayerSkillController"]
     Attack --> AttackExec["PlayerDefaultAttack"]
-    Skill --> SkillExec["FirstMeleeSubSkill"]
+    Skill --> SkillExec["FirstMeleeMainSkill / SubSkill / UltimateSkill"]
     AttackExec --> Hurtbox
     SkillExec --> Unit["Player : Unit"]
     Hurtbox --> Receiver["IAttackReceiver"]

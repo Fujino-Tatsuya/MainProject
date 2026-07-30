@@ -40,15 +40,57 @@ public sealed class PlayerFallRecovery : NetworkBehaviour
         {
             ResolveReferences();
             if (fallController != null)
+            {
                 fallController.ServerFallSurvived += HandleServerFallSurvived;
+                fallController.ServerFallDeath += HandleServerFallDeath;
+            }
         }
     }
 
     public override void OnNetworkDespawn()
     {
         if (fallController != null)
+        {
             fallController.ServerFallSurvived -= HandleServerFallSurvived;
+            fallController.ServerFallDeath -= HandleServerFallDeath;
+        }
         base.OnNetworkDespawn();
+    }
+
+    /// <summary>
+    /// 서버: 추락으로 사망한 경우에도 몸을 안전지점으로 되돌린다.
+    /// 되돌리지 않으면 Soul이 추락 지점(경계 아래)에 그대로 남는데, 추락 복귀는 Alive 전용이라
+    /// 스스로 올라올 수단이 없다. 생존 복귀와 달리 무적·충전 리셋·낙하 연출은 걸지 않는다
+    /// — 이미 사망 처리가 진행 중이고 Soul 전환 연출과 겹치면 안 되기 때문.
+    /// </summary>
+    private void HandleServerFallDeath(FallDeathContext context)
+    {
+        Vector3 returnPoint = safePointTracker != null
+            ? safePointTracker.ResolveReturnPoint(context.FallPoint)
+            : transform.position;
+
+        ReturnAfterFallDeathRpc(returnPoint);
+    }
+
+    [Rpc(SendTo.Owner)]
+    private void ReturnAfterFallDeathRpc(Vector3 returnPoint)
+    {
+        StopAllCoroutines(); // 생존 복귀 연출이 돌고 있었다면 중단
+
+        if (body != null)
+        {
+            body.position = returnPoint;
+            body.linearVelocity = Vector3.zero;
+            body.angularVelocity = Vector3.zero;
+        }
+        else
+        {
+            transform.position = returnPoint;
+        }
+
+        // 낙하 뷰로 전환돼 있을 수 있으므로 일반 추적 카메라로 되돌린다.
+        // 입력 잠금은 건드리지 않는다 — 사망/Soul 전환은 PlayerLifeInputPolicy가 소유한다.
+        CameraTargetSwitcher.Active?.ReturnToPlayerView();
     }
 
     // 서버: 복귀 지점·무적·충전 리셋 확정 후 오너에게 연출 지시.

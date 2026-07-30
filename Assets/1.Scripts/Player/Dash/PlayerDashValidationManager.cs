@@ -173,6 +173,10 @@ namespace BeaverLobby.Player.Dash
 
             e.Ledger.Advance(serverNow);
 
+            // 추정 입력시각(서버 도메인). DashValidationPolicy와 같은 식을 쓴다.
+            double oneWayDelay = rttAvailable && serverRtt > 0.0 ? serverRtt * 0.5 : 0.0;
+            double estimatedStart = serverNow - oneWayDelay;
+
             DashValidationResult result = DashValidationPolicy.Validate(
                 e.Config.DashEnabled,
                 e.Config.DashDuration,
@@ -180,14 +184,19 @@ namespace BeaverLobby.Player.Dash
                 serverNow,
                 serverRtt,
                 rttAvailable,
+                e.Ledger.Count,
                 new DashValidationPolicy.Request(clientLocalTime, directionX, directionZ),
                 e.History,
                 new DashValidationPolicy.CurrentState(currentDead, currentSoul, currentCrowdControlled));
 
             // 승인은 충전 소비를 인정한다(중단/이미 종료라도). 현재 장부에 충전이 있으면 소비.
+            //
+            // ⚠️ 소비 시각은 RPC 도착시각(serverNow)이 아니라 추정 입력시각이다. 도착시각으로 잡으면
+            // 서버 회복 완료가 오너보다 항상 편도지연만큼 늦어진다 → 오너가 "이제 찼다"고 믿고 누른
+            // 입력이 서버에선 아직 0인 구간이 매 주기 생기고, 그 입력이 거부된다(원격 클라에서 심함).
             if (result.IsApproved && e.Ledger.HasCharge)
             {
-                e.Ledger.TryConsume(serverNow);
+                e.Ledger.TryConsume(estimatedStart);
             }
 
             DashServerResponse response = new DashServerResponse(
