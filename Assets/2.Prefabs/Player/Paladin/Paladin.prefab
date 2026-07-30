@@ -7152,6 +7152,7 @@ MonoBehaviour:
   deathSource: {fileID: 0}
   gameRule: {fileID: 0}
   deathPresentationDuration: 1.5
+  lifeAnimator: {fileID: 0}
 --- !u!114 &6188505159852038187
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -10234,19 +10235,19 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 6333140226819068526, guid: 3caed5297caa7c04a9d7e3ffc0a521a4, type: 3}
       propertyPath: m_Pivot.x
-      value: 0
+      value: 0.5
       objectReference: {fileID: 0}
     - target: {fileID: 6333140226819068526, guid: 3caed5297caa7c04a9d7e3ffc0a521a4, type: 3}
       propertyPath: m_Pivot.y
-      value: 0
+      value: 0.5
       objectReference: {fileID: 0}
     - target: {fileID: 6333140226819068526, guid: 3caed5297caa7c04a9d7e3ffc0a521a4, type: 3}
       propertyPath: m_AnchorMax.x
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 6333140226819068526, guid: 3caed5297caa7c04a9d7e3ffc0a521a4, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 6333140226819068526, guid: 3caed5297caa7c04a9d7e3ffc0a521a4, type: 3}
       propertyPath: m_AnchorMin.x
@@ -10263,6 +10264,18 @@ PrefabInstance:
     - target: {fileID: 6333140226819068526, guid: 3caed5297caa7c04a9d7e3ffc0a521a4, type: 3}
       propertyPath: m_SizeDelta.y
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6333140226819068526, guid: 3caed5297caa7c04a9d7e3ffc0a521a4, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 6333140226819068526, guid: 3caed5297caa7c04a9d7e3ffc0a521a4, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 6333140226819068526, guid: 3caed5297caa7c04a9d7e3ffc0a521a4, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 6333140226819068526, guid: 3caed5297caa7c04a9d7e3ffc0a521a4, type: 3}
       propertyPath: m_LocalPosition.x
