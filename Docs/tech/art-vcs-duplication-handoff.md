@@ -168,16 +168,66 @@ SVN에서 텍스처가 아직 안 왔거나, 경로 이동으로 `.meta`가 갈�
 
 ---
 
-## 5. `.meta` GUID 중복 — 같이 볼 패턴
+## 5. 🔴 GUID 가 반복해서 뒤집히는 진짜 원인 — `.meta` 에 커밋된 충돌 마커
 
-`Vent.prefab.meta`의 GUID가 `FOG_NEXT_PLAN.md.meta`와 **중복**(`45b6fe3f…`)이어서
-에디터가 Vent 쪽에 새 GUID(`b1de5f8d…`)를 발급했다. 커밋 `fd1bf2c`로 반영했다.
+**이것이 이 문서에 적힌 GUID 분기 현상 전체의 근본 원인이다.** 2026-07-30 `feature/Sound-Boss`
+머지 중에 발견했다.
 
-`Vent.prefab`을 GUID로 참조하는 에셋이 없어 참조 파괴는 없었다. **커밋하지 않으면
-프로젝트를 열 때마다 새 GUID가 재발급되어 같은 diff가 무한 반복된다.**
+과거 머지에서 **미해결 충돌 마커가 그대로 커밋된 `.meta` 파일이 3건** 있었다:
 
-`.meta` 복사나 잘못된 머지로 GUID가 복제되면 이 형태가 된다. art 폴더에서 같은 패턴을
-더 찾을 수 있다.
+```
+Assets/2.Prefabs/Map/Vent/Vent.prefab.meta            ← fe75533 (Merge feature/Platforms)
+Assets/1.Scripts/Rendering/Fog/FOG_NEXT_PLAN.md.meta  ← 같은 커밋
+Assets/0.Scenes/MonsterScene.unity.meta               ← e43d733 (Merge feature/PlayerSkill)
+```
+
+내용이 거의 같은 `.meta` 들을 git 이 **rename/copy 관계로 오인**해 서로의 내용을 섞어 넣었다.
+그 결과 한 파일 안에 `guid:` 가 두 개, 임포터가 두 개 들어갔다 — `Vent`(프리팹)가
+`TextScriptImporter` 를, `FOG`(마크다운)가 `PrefabImporter` 를 갖는 상태였다:
+
+```
+fileFormatVersion: 2
+<<<<<<<< HEAD:Assets/1.Scripts/Rendering/Fog/FOG_NEXT_PLAN.md.meta
+guid: 45b6fe3ffe0fe1d418111431b9583ab1
+TextScriptImporter:
+========
+guid: 407dffc28a409494d9173e24a4cfdd5c
+PrefabImporter:
+>>>>>>>> feature/Platforms:Assets/2.Prefabs/Map/Vent/Vent.prefab.meta
+  externalObjects: {}
+```
+
+**Unity 는 이런 `.meta` 를 파싱하지 못해 GUID 를 새로 발급한다.** 그것이 커밋될 때마다
+참조가 갈리고, 다른 사람이 받으면 또 재발급된다. 하루에 세 번 뒤집힌 이유가 이것이다.
+`convayorbelt.shadergraph.meta` 의 SVN r249 GUID 교체도 같은 계열로 의심된다.
+
+복구한 정본 (임포터 종류가 파일 확장자와 맞는지가 판별 기준이다):
+
+| 파일 | GUID | 임포터 |
+|---|---|---|
+| `Vent.prefab.meta` | `407dffc28a409494d9173e24a4cfdd5c` | `PrefabImporter` |
+| `FOG_NEXT_PLAN.md.meta` | `45b6fe3ffe0fe1d418111431b9583ab1` | `TextScriptImporter` |
+| `MonsterScene.unity.meta` | `8066623a2cd82c946bb900abdefd5f04` | `DefaultImporter` |
+
+`MonsterScene` 의 GUID 는 `ProjectSettings/EditorBuildSettings.asset` 이 참조하므로 유지가 맞다.
+`Vent` 는 `cce1ff2`(Vent 추가 커밋)의 원본 값으로 되돌렸다.
+
+> ⚠️ **정정**: 초판에서는 이 현상을 "Vent 와 FOG 가 같은 GUID 를 공유하는 중복"으로 적고
+> `fd1bf2c` 에서 Vent 에 새 GUID 를 발급해 "중복 해소"했다고 기록했다. **오진이었다.**
+> 실제로는 두 파일이 같은 마커 블록을 품고 있어서 같은 `guid:` 줄이 양쪽에 보인 것이고,
+> `fd1bf2c` 는 그 마커 블록 **안쪽의 한 줄**을 고친 것이었다. diff 에 나온 `guid:` 한 줄만
+> 보고 판단해 파일 전체를 열어보지 않았다.
+
+### 재발 점검 명령
+
+머지 직후, 특히 `.meta` 가 걸린 머지 뒤에는 반드시 돌린다.
+
+```bash
+grep -rlE "^<{7} |^<{8} |^={7}$|^>{7} " Assets/ ProjectSettings/ Packages/ | grep -v "\.svn/"
+```
+
+출력이 있으면 그 파일은 **커밋된 손상**이다. 임포터 종류를 확장자와 맞춰 한쪽을 고르고,
+GUID 는 그 에셋을 추가한 원본 커밋에서 가져온다.
 
 ---
 
