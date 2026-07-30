@@ -54,7 +54,7 @@ VisualEffect:
   m_PropertySheet:
     m_Float:
       m_Array:
-      - m_Value: 1
+      - m_Value: 0
         m_Name: Effect Value
         m_Overridden: 1
       - m_Value: 0.36
@@ -307,22 +307,22 @@ VisualEffect:
       - m_Value: {x: -0.0004906533, y: 0.95762604, z: 0.2880142}
         m_Name: up
         m_Overridden: 1
-      - m_Value: {x: 276.2799, y: 76.45455, z: 0.00009366135}
+      - m_Value: {x: 296.00977, y: 85.69382, z: -0.000011681539}
         m_Name: Line Tip_angles
         m_Overridden: 1
-      - m_Value: {x: -0.7675466, y: 3.7083027, z: -0.19142209}
+      - m_Value: {x: -2.7298791, y: 2.0959718, z: 0.23143342}
         m_Name: Line Tip_position
         m_Overridden: 1
-      - m_Value: {x: 1.0000004, y: 1.0000005, z: 1.0000002}
+      - m_Value: {x: 1.0000001, y: 1, z: 1}
         m_Name: Line Tip_scale
         m_Overridden: 1
-      - m_Value: {x: 276.2799, y: 76.45455, z: 0.00009366135}
+      - m_Value: {x: 296.00977, y: 85.69382, z: -0.000011681539}
         m_Name: Line Bottom_angles
         m_Overridden: 1
-      - m_Value: {x: -0.88141435, y: 2.643972, z: -0.21885465}
+      - m_Value: {x: -3.684467, y: 0.13408642, z: 0.1595538}
         m_Name: Line Bottom_position
         m_Overridden: 1
-      - m_Value: {x: 1.0000004, y: 1.0000005, z: 1.0000002}
+      - m_Value: {x: 1.0000001, y: 1, z: 1}
         m_Name: Line Bottom_scale
         m_Overridden: 1
     m_Vector4f:
@@ -362,7 +362,7 @@ VisualEffect:
         m_Overridden: 1
     m_Bool:
       m_Array:
-      - m_Value: 1
+      - m_Value: 0
         m_Name: Effect Active
         m_Overridden: 1
       - m_Value: 1
