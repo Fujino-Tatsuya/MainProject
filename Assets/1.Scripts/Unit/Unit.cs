@@ -74,7 +74,17 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     void ApplyHealthDamage(int damage, bool ignoreDefenseAndShield)
     {
         if (!IsServer || _health == null || damage <= 0) return;
-        if (!CanApplyHealthDamage(damage)) return;
+
+        // 진단 — 여기서 조용히 버려지는 피해가 "때려도 안 맞는다"로 보인다(2026-07-30).
+        // ReceiveAttack 은 무조건 true 를 반환하므로 공격 측은 [Attack] … 적중 을 찍고,
+        // 피해만 사라져서 로그상 성공처럼 보인다. 누가 무엇을 거부했는지 남긴다.
+        if (!CanApplyHealthDamage(damage))
+        {
+            Edit.LogWarning(
+                $"[Unit/진단] {name} 이 피해 {damage} 를 거부했다 — CanApplyHealthDamage=false " +
+                $"(현재 체력 {_health.CurrentHealth}/{FinalMaxHp})", this);
+            return;
+        }
 
         int previousHealth = _health.CurrentHealth;
 
@@ -88,6 +98,13 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         }
 
         _currentHp.Value = _health.CurrentHealth;
+
+        // 진단 — Health 의 기존 로그는 대상 이름이 없어서 누구의 체력이 줄었는지 알 수 없었다.
+        // 요청값과 실제 감소량을 함께 남긴다(경감으로 1까지 깎이는 경우를 가른다).
+        Edit.Log(
+            $"[Unit/진단] {name} 피해 적용 — 요청 {damage}, 실제 감소 {previousHealth - _health.CurrentHealth}, " +
+            $"체력 {previousHealth} → {_health.CurrentHealth}/{FinalMaxHp}", this);
+
         NotifyDeathTransition(previousHealth);
     }
 

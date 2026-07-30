@@ -128,6 +128,42 @@ public class PlayerDefaultAttack : BaseAttack
         // 이번 스윙에 명중시킨 적이 있으면 통지 (패시브 발동 트리거). 허공 스윙은 통지하지 않는다.
         if (swingHitBuffer.Count > 0)
             ServerHitEnemiesResolved?.Invoke(swingHitBuffer);
+        else
+            LogEmptySwing(hitCount);
+    }
+
+    // 진단 — "때려도 안 맞는다"의 원인을 로그로 가른다(2026-07-30).
+    // 적중 로그([Attack] …)는 성공 시에만 찍히므로, 실패한 스윙은 아무 흔적이 없어
+    // ① 스윙 자체가 없었는지 ② 후보가 0인지 ③ 후보는 있는데 전부 걸러졌는지 구분할 수 없었다.
+    // 유효 마스크도 함께 찍는다 — 프리팹은 256(Enemy)이고 SO(17664)가 런타임에 덮는 구조라,
+    // ApplyData 가 안 돌면 EnemyHurtBox(14)가 마스크에서 빠져 보스를 못 때린다.
+    private void LogEmptySwing(int hitCount)
+    {
+        if (hitCount == 0)
+        {
+            Edit.LogWarning(
+                $"[Attack/진단] {name} 스윙 무효 — 히트박스 안 후보 0개, 유효 마스크={targetLayer.value}", this);
+            return;
+        }
+
+        var sb = new System.Text.StringBuilder();
+        for (int i = 0; i < hitCount; i++)
+        {
+            Collider hit = hitResults[i];
+            if (hit == null)
+                continue;
+
+            if (sb.Length > 0)
+                sb.Append(", ");
+
+            sb.Append(hit.name).Append("(layer ").Append(hit.gameObject.layer);
+            sb.Append(hit.GetComponentInParent<Hurtbox>() != null ? ", hurtbox" : ", hurtbox없음");
+            sb.Append(hit.GetComponentInParent<Unit>() != null ? ", unit)" : ", unit없음)");
+        }
+
+        Edit.LogWarning(
+            $"[Attack/진단] {name} 스윙이 후보 {hitCount}개를 찾았지만 전부 걸러졌다 — " +
+            $"유효 마스크={targetLayer.value} / 후보: {sb}", this);
     }
 
     private void SpawnProjectile()
