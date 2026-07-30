@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FogProfile
   color: {r: 0.6, g: 0.65, b: 0.72, a: 1}
   distanceMode: 1
-  density: 0.02
+  density: 0.005
   distanceStart: 0
   distanceEnd: 120
   maxOpacity: 0.223
@@ -36,16 +36,16 @@ MonoBehaviour:
   dimRangeDown: 0
   dimFadeUp: 3
   dimFadeDown: 3
-  dimSaturation: 0.249
-  dimBrightness: 0.16
+  dimSaturation: 0.17
+  dimBrightness: 0.116
   dimAffectSky: 0.714
   viewRange: 18
   viewFade: 4
   losDarken: 1
   losDistanceBias: 0
   losEdgeFade: 5.71
-  losBrightness: 0.15
-  losSaturation: 0.2
+  losBrightness: 1
+  losSaturation: 0.566
   losAngleJitter: 0.03
   abyssEnabled: 1
   abyssColor: {r: 0.0028924812, g: 0.010691476, b: 0.02044022, a: 1}
