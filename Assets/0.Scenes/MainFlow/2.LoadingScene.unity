@@ -611,11 +611,9 @@ MonoBehaviour:
   statusText: {fileID: 1610552923}
   percentText: {fileID: 949715956}
   tooltipTable:
+  - "\uC73C\uC544\u314F\u314F\u314F\u314F"
+  - "\uCEE4\uD53C\u3163\u3163\u3163\u3163"
   - "\uBC25 \uBB50 \uBA39\uC9C0...."
-  - "\uB85C\uB529 \uC5B8\uC81C \uB05D\uB098\uB0D0...."
-  - "\uBE44\uBC84\uB77D\uC2A4 \uD654\uC774\uD305..."
-  - "\uC878\uB9AC\uB2E4..."
-  - "\uC9D1 \uAC00\uACE0\uC2F6\uB2E4..."
   imageTable: []
   readyMessages:
   - Enter...
