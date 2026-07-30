@@ -167,8 +167,57 @@ public class MapContentSpawner : MonoBehaviour
         }
         // 전투 노드가 하나도 없으면 존 단위 마커로 폴백 (역할/단순 존 호환)
         if (combatNodes == 0)
-            n += SpawnGroupAt(gen, zoneGo, layout.MonsterGroupID, layout.MonsterSpawnPoints, MonsterBehavior.Idle);
+            n += SpawnEntriesAt(gen, zoneGo, layout, MonsterBehavior.Idle);
         return n;
+    }
+
+    /// <summary>
+    /// 마커별 그룹 ID로 스폰한다. 예전 <see cref="SpawnGroupAt"/>는 그룹 하나를 한 번만 해석해
+    /// <b>모든 마커에 같은 몬스터</b>를 세웠다 — 마커마다 다른 몬스터를 섞으려면 마커 단위로 해석해야 한다.
+    /// </summary>
+    private int SpawnEntriesAt(MapGenerator gen, GameObject zoneGo, ZoneLayout layout, MonsterBehavior behavior)
+    {
+        int n = 0;
+        int index = -1;
+
+        foreach (MonsterSpawnEntry entry in layout.ResolveSpawnEntries())
+        {
+            index++;
+
+            if (entry.Marker == null)
+                continue;
+
+            int groupId = entry.MonsterGroupID >= 0 ? entry.MonsterGroupID : layout.MonsterGroupID;
+
+            GameObject monsterPrefab = ResolveMonsterPrefab(gen, groupId);
+            if (monsterPrefab == null)
+            {
+                // 예전에는 여기서 조용히 return 0 이었다 — 마커는 있는데 몹이 없는 상태가 로그 없이 만들어졌다.
+                // (MonsterGroupID 0 은 MapGenConfig 에서 MonsterPrefab 이 비어 있고, 기본값은 -1이다.)
+                Edit.LogWarning(
+                    $"[MapContentSpawner] {zoneGo?.name} 마커 {index}({entry.Marker.name})의 몬스터 그룹 " +
+                    $"{groupId} 을 해석하지 못해 스폰하지 않습니다 — MapGenConfig.MonsterGroups 확인 필요.");
+                continue;
+            }
+
+            if (!TryResolveSpawnPoint(entry.Marker.position, zoneGo, out Vector3 spawnPoint))
+                continue;
+
+            SpawnMonsterInstance(monsterPrefab, spawnPoint, entry.Marker.rotation);
+            n++;
+        }
+
+        return n;
+    }
+
+    // 스폰 인스턴스화 + 네트워크 등록/정리 추적. 두 스폰 경로가 공유한다.
+    private void SpawnMonsterInstance(GameObject monsterPrefab, Vector3 spawnPoint, Quaternion rotation)
+    {
+        GameObject go = Instantiate(monsterPrefab, spawnPoint, rotation);
+
+        var netObj = go.GetComponent<NetworkObject>();
+        if (netObj != null) { netObj.Spawn(); _spawnedNetObjs.Add(netObj); } // NGO 복제 + despawn 추적
+        else go.transform.SetParent(_root, true);  // 비네트워크 몬스터 → 루트 하위로 ClearGenerated가 정리(누수 방지)
     }
 
     // 그룹ID의 몬스터를 주어진 마커들에 스폰 (서버 전용 호출). 몬스터 에셋 확정 전이면 0.
@@ -187,11 +236,8 @@ public class MapContentSpawner : MonoBehaviour
             if (!TryResolveSpawnPoint(marker.position, zoneGo, out Vector3 spawnPoint))
                 continue;
 
-            GameObject go = Instantiate(monsterPrefab, spawnPoint, marker.rotation);
             // TODO: 몬스터 AI 확정 후 behavior 적용 (예: go.GetComponent<MonsterAI>()?.SetBehavior(behavior)).
-            var netObj = go.GetComponent<NetworkObject>();
-            if (netObj != null) { netObj.Spawn(); _spawnedNetObjs.Add(netObj); } // NGO 복제 + despawn 추적
-            else go.transform.SetParent(_root, true);  // 비네트워크 몬스터 → 루트 하위로 ClearGenerated가 정리(누수 방지)
+            SpawnMonsterInstance(monsterPrefab, spawnPoint, marker.rotation);
             n++;
         }
         return n;
@@ -206,7 +252,12 @@ public class MapContentSpawner : MonoBehaviour
     // 바운즈 위**에서 쏜다 — 존 자신의 바닥은 언제나 자기 바운즈 안에 있다.
     private static bool TryResolveSpawnPoint(Vector3 markerPosition, GameObject zoneGo, out Vector3 result)
     {
-        int mask = LayerMask.GetMask("Default");
+        // ⚠️ Default 단독이면 안 된다. c5826a3 이 보행면 833건을 Default → Ground 로 옮겼기 때문에
+        // Default 만 쏘면 두 레이캐스트가 모두 빗나가고, 호출부가 `continue` 하므로 **몬스터가 한 마리도
+        // 스폰되지 않는다.** Default ∪ Ground = 이관 이전의 Default 와 같은 집합이다.
+        // (본래 규칙은 GroundProbe.TryFindGround 로 통일하는 것 — 여기는 Unit 제외·최빈값 판정이
+        //  스폰 스냅에 필요한지 확인이 안 됐으므로 마스크만 맞춰 두고 후속으로 남긴다.)
+        int mask = LayerMask.GetMask("Default", "Ground");
 
         if (Physics.Raycast(markerPosition + Vector3.up * 5f, Vector3.down, out RaycastHit hit, 30f, mask, QueryTriggerInteraction.Ignore))
         {
