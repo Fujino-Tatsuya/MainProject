@@ -287,7 +287,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2096050942251110251}
   - component: {fileID: 7019431461189215873}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: BossFloorCollider
   m_TagString: Untagged
   m_Icon: {fileID: 0}
