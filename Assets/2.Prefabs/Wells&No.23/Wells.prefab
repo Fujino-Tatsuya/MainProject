@@ -1,5 +1,68 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!1 &3963499940899954680
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1290984645392595337}
+  m_Layer: 0
+  m_Name: BombSocket
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1290984645392595337
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3963499940899954680}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.16769385, y: -0.17575476, z: -0.16448659, w: -0.95599854}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 0.0100000035, y: 0.01, z: 0.010000002}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1533896975880492512}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &4034334083653381287
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5745502121310879258}
+  m_Layer: 0
+  m_Name: Attack
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &5745502121310879258
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4034334083653381287}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 6537007972140660606}
+  m_Father: {fileID: 6346197552094035170}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &4148832031641590993
 GameObject:
   m_ObjectHideFlags: 0
@@ -9,7 +72,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 6346197552094035170}
-  - component: {fileID: -8169499400238446845}
+  - component: {fileID: 1127366446119794313}
   - component: {fileID: 4756578540380568215}
   - component: {fileID: 187644027839116329}
   - component: {fileID: 3640142762517420555}
@@ -28,15 +91,16 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4148832031641590993}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 0.01, y: 0.010000002, z: 0.010000002}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 2769573029811135408}
+  - {fileID: 6050894877744760578}
+  - {fileID: 5745502121310879258}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &-8169499400238446845
+--- !u!114 &1127366446119794313
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -48,7 +112,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 4152966653
+  GlobalObjectIdHash: 3317109442
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -123,14 +187,11 @@ MonoBehaviour:
   m_Graph: {fileID: 6688886481996931209, guid: 851f806a29c9a9c479733e5cdf7363ca, type: 2}
   m_BlackboardVariableOverridesList:
   - rid: 5035182809093243098
-  - rid: 5035183235171614995
-  - rid: 5035183235171615438
-  - rid: 5035183235171615439
   - rid: 5035183235171615440
-  - rid: 5035183235171615441
-  - rid: 5035183235171615442
-  - rid: 5035183235171615443
-  - rid: 5035183235171615444
+  - rid: 3912068385032372419
+  - rid: 5035183259049001732
+  - rid: 3912068368438133255
+  - rid: 3912068384511755164
   m_OriginalGraph: {fileID: 0}
   m_IsInitialised: 0
   m_IsStarted: 0
@@ -138,6 +199,30 @@ MonoBehaviour:
   references:
     version: 2
     RefIds:
+    - rid: 3912068368438133255
+      type: {class: 'BlackboardVariable`1[[UnityEngine.Animator, UnityEngine.AnimationModule]]', ns: Unity.Behavior, asm: Unity.Behavior}
+      data:
+        GUID:
+          m_Value0: 7976202814567923132
+          m_Value1: 5060643867561147528
+        Name: MyAnimator
+        m_Value: {fileID: 2145321535539746380}
+    - rid: 3912068384511755164
+      type: {class: 'BlackboardVariable`1[[BombLauncher, Assembly-CSharp]]', ns: Unity.Behavior, asm: Unity.Behavior}
+      data:
+        GUID:
+          m_Value0: 4987383725004072673
+          m_Value1: 13584133098615525834
+        Name: Bomb Launcher
+        m_Value: {fileID: 4146338655535622427}
+    - rid: 3912068385032372419
+      type: {class: 'BlackboardVariable`1[[System.Single, mscorlib]]', ns: Unity.Behavior, asm: Unity.Behavior}
+      data:
+        GUID:
+          m_Value0: 7505599484840529057
+          m_Value1: 14473010834411372248
+        Name: ThrowTime
+        m_Value: 2
     - rid: 5035182809093243098
       type: {class: 'BlackboardVariable`1[[UnityEngine.GameObject, UnityEngine.CoreModule]]', ns: Unity.Behavior, asm: Unity.Behavior}
       data:
@@ -146,30 +231,6 @@ MonoBehaviour:
           m_Value1: 0
         Name: Self
         m_Value: {fileID: 4148832031641590993}
-    - rid: 5035183235171614995
-      type: {class: 'BlackboardVariable`1[[UnityEngine.GameObject, UnityEngine.CoreModule]]', ns: Unity.Behavior, asm: Unity.Behavior}
-      data:
-        GUID:
-          m_Value0: 12726604389213858763
-          m_Value1: 7483485815841342934
-        Name: BombSocket
-        m_Value: {fileID: 5901421584256387174}
-    - rid: 5035183235171615438
-      type: {class: 'BlackboardVariable`1[[UnityEngine.GameObject, UnityEngine.CoreModule]]', ns: Unity.Behavior, asm: Unity.Behavior}
-      data:
-        GUID:
-          m_Value0: 8047941047710395419
-          m_Value1: 12927950889837745891
-        Name: BombPrefab
-        m_Value: {fileID: 5615323045015015025, guid: 33b7a29152ec8b147a9418461ad7dae6, type: 3}
-    - rid: 5035183235171615439
-      type: {class: 'BlackboardVariable`1[[System.Single, mscorlib]]', ns: Unity.Behavior, asm: Unity.Behavior}
-      data:
-        GUID:
-          m_Value0: 7505599484840529057
-          m_Value1: 14473010834411372248
-        Name: ThrowTime
-        m_Value: 3
     - rid: 5035183235171615440
       type: {class: 'BlackboardVariable`1[[System.Single, mscorlib]]', ns: Unity.Behavior, asm: Unity.Behavior}
       data:
@@ -178,38 +239,14 @@ MonoBehaviour:
           m_Value1: 3336986784668203907
         Name: GrabTime
         m_Value: 1
-    - rid: 5035183235171615441
-      type: {class: 'BlackboardVariable`1[[System.Single, mscorlib]]', ns: Unity.Behavior, asm: Unity.Behavior}
+    - rid: 5035183259049001732
+      type: {class: 'BlackboardVariable`1[[BossStateChanged, Assembly-CSharp]]', ns: Unity.Behavior, asm: Unity.Behavior}
       data:
         GUID:
-          m_Value0: 13333599408801677743
-          m_Value1: 18063395709991778212
-        Name: FlyingDuration
-        m_Value: 2
-    - rid: 5035183235171615442
-      type: {class: 'BlackboardVariable`1[[System.Single, mscorlib]]', ns: Unity.Behavior, asm: Unity.Behavior}
-      data:
-        GUID:
-          m_Value0: 3863537201921229086
-          m_Value1: 10049033518994740283
-        Name: ArcHeight
-        m_Value: 3
-    - rid: 5035183235171615443
-      type: {class: 'BlackboardVariable`1[[UnityEngine.Vector3, UnityEngine.CoreModule]]', ns: Unity.Behavior, asm: Unity.Behavior}
-      data:
-        GUID:
-          m_Value0: 16449072155048358271
-          m_Value1: 6269893813650213484
-        Name: ThrowLocalDirection
-        m_Value: {x: 0, y: 0, z: 1}
-    - rid: 5035183235171615444
-      type: {class: 'BlackboardVariable`1[[System.Single, mscorlib]]', ns: Unity.Behavior, asm: Unity.Behavior}
-      data:
-        GUID:
-          m_Value0: 10282426874977236332
-          m_Value1: 13492302267896101814
-        Name: ThrowDistance
-        m_Value: 8
+          m_Value0: 8178423087468841569
+          m_Value1: 8161177305878392679
+        Name: BossStateChanged
+        m_Value: {fileID: 11400000, guid: e78288d73e6e29843b07bd884f9535fa, type: 2}
 --- !u!114 &3640142762517420555
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -225,7 +262,7 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   btAgent: {fileID: 187644027839116329}
   navMeshAgent: {fileID: 0}
---- !u!1 &5648779661265750741
+--- !u!1 &6195463117839181549
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -233,117 +270,248 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 2769573029811135408}
-  - component: {fileID: 2944031780415565602}
-  - component: {fileID: 7647845401662782920}
+  - component: {fileID: 6537007972140660606}
+  - component: {fileID: 4146338655535622427}
   m_Layer: 0
-  m_Name: Amature
+  m_Name: BombAttack
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &2769573029811135408
+--- !u!4 &6537007972140660606
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5648779661265750741}
+  m_GameObject: {fileID: 6195463117839181549}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children:
-  - {fileID: 8743723931027436183}
-  m_Father: {fileID: 6346197552094035170}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!33 &2944031780415565602
-MeshFilter:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5648779661265750741}
-  m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
---- !u!23 &7647845401662782920
-MeshRenderer:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5648779661265750741}
-  m_Enabled: 1
-  m_CastShadows: 1
-  m_ReceiveShadows: 1
-  m_DynamicOccludee: 1
-  m_StaticShadowCaster: 0
-  m_MotionVectors: 1
-  m_LightProbeUsage: 1
-  m_ReflectionProbeUsage: 1
-  m_RayTracingMode: 2
-  m_RayTraceProcedural: 0
-  m_RayTracingAccelStructBuildFlagsOverride: 0
-  m_RayTracingAccelStructBuildFlags: 1
-  m_SmallMeshCulling: 1
-  m_ForceMeshLod: -1
-  m_MeshLodSelectionBias: 0
-  m_RenderingLayerMask: 1
-  m_RendererPriority: 0
-  m_Materials:
-  - {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
-  m_StaticBatchInfo:
-    firstSubMesh: 0
-    subMeshCount: 0
-  m_StaticBatchRoot: {fileID: 0}
-  m_ProbeAnchor: {fileID: 0}
-  m_LightProbeVolumeOverride: {fileID: 0}
-  m_ScaleInLightmap: 1
-  m_ReceiveGI: 1
-  m_PreserveUVs: 0
-  m_IgnoreNormalsForChartDetection: 0
-  m_ImportantGI: 0
-  m_StitchLightmapSeams: 1
-  m_SelectedEditorRenderState: 3
-  m_MinimumChartSize: 4
-  m_AutoUVMaxDistance: 0.5
-  m_AutoUVMaxAngle: 89
-  m_LightmapParameters: {fileID: 0}
-  m_GlobalIlluminationMeshLod: 0
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
-  m_SortingOrder: 0
-  m_MaskInteraction: 0
-  m_AdditionalVertexStreams: {fileID: 0}
---- !u!1 &5901421584256387174
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 8743723931027436183}
-  m_Layer: 0
-  m_Name: BombSocket
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &8743723931027436183
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5901421584256387174}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0.685}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 2769573029811135408}
+  m_Father: {fileID: 5745502121310879258}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &4146338655535622427
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6195463117839181549}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 519f0d5762034604f82a979c406a4fc6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BombLauncher
+  bombPrefab: {fileID: 5615323045015015025, guid: 33b7a29152ec8b147a9418461ad7dae6, type: 3}
+  bombSocket: {fileID: 1290984645392595337}
+  throwLocalDirection: {x: 0, y: 0, z: 1}
+  throwDistance: 5
+  flyingDuration: 3
+  arcHeight: 8
+  spreadAngle: 30
+  groundMask:
+    serializedVersion: 2
+    m_Bits: 9
+--- !u!1001 &6085385266305458409
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 6346197552094035170}
+    m_Modifications:
+    - target: {fileID: -8679921383154817045, guid: 9fed67314ef11ca4cb85a6d61bfa1c0e, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 9fed67314ef11ca4cb85a6d61bfa1c0e, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 9fed67314ef11ca4cb85a6d61bfa1c0e, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 9fed67314ef11ca4cb85a6d61bfa1c0e, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 9fed67314ef11ca4cb85a6d61bfa1c0e, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 9fed67314ef11ca4cb85a6d61bfa1c0e, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 9fed67314ef11ca4cb85a6d61bfa1c0e, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 9fed67314ef11ca4cb85a6d61bfa1c0e, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 9fed67314ef11ca4cb85a6d61bfa1c0e, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 9fed67314ef11ca4cb85a6d61bfa1c0e, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 9fed67314ef11ca4cb85a6d61bfa1c0e, type: 3}
+      propertyPath: m_Name
+      value: Amature
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects:
+    - targetCorrespondingSourceObject: {fileID: 4700313821224334601, guid: 9fed67314ef11ca4cb85a6d61bfa1c0e, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1290984645392595337}
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 9fed67314ef11ca4cb85a6d61bfa1c0e, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2145321535539746380}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 9fed67314ef11ca4cb85a6d61bfa1c0e, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 6718347726688941657}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 9fed67314ef11ca4cb85a6d61bfa1c0e, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 5515748389101313656}
+  m_SourcePrefab: {fileID: 100100000, guid: 9fed67314ef11ca4cb85a6d61bfa1c0e, type: 3}
+--- !u!4 &1533896975880492512 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 4700313821224334601, guid: 9fed67314ef11ca4cb85a6d61bfa1c0e, type: 3}
+  m_PrefabInstance: {fileID: 6085385266305458409}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &6050894877744760578 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 9fed67314ef11ca4cb85a6d61bfa1c0e, type: 3}
+  m_PrefabInstance: {fileID: 6085385266305458409}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &6391391245549526456 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 9fed67314ef11ca4cb85a6d61bfa1c0e, type: 3}
+  m_PrefabInstance: {fileID: 6085385266305458409}
+  m_PrefabAsset: {fileID: 0}
+--- !u!95 &2145321535539746380
+Animator:
+  serializedVersion: 7
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6391391245549526456}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 9100000, guid: 6d95354ad645ca84f8124d86311d6999, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_AnimatePhysics: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
+--- !u!114 &6718347726688941657
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6391391245549526456}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e8d0727d5ae3244e3b569694d3912374, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.Components.NetworkAnimator
+  ShowTopMostFoldoutHeaderGroup: 1
+  NetworkAnimatorExpanded: 0
+  AuthorityMode: 0
+  m_Animator: {fileID: 2145321535539746380}
+  TransitionStateInfoList:
+  - IsCrossFadeExit: 0
+    Layer: 0
+    OriginatingState: 221587152
+    DestinationState: 2081823275
+    TransitionDuration: 0.25
+    TriggerNameHash: 1625683022
+    TransitionIndex: 0
+  - IsCrossFadeExit: 0
+    Layer: 0
+    OriginatingState: 2081823275
+    DestinationState: -1907200461
+    TransitionDuration: 0.25
+    TriggerNameHash: -1992750699
+    TransitionIndex: 0
+  - IsCrossFadeExit: 0
+    Layer: 0
+    OriginatingState: 2081823275
+    DestinationState: 125937960
+    TransitionDuration: 0.25
+    TriggerNameHash: 19011116
+    TransitionIndex: 1
+  - IsCrossFadeExit: 0
+    Layer: 0
+    OriginatingState: 125937960
+    DestinationState: -1907200461
+    TransitionDuration: 0.25
+    TriggerNameHash: -1992750699
+    TransitionIndex: 1
+  - IsCrossFadeExit: 0
+    Layer: 0
+    OriginatingState: -1907200461
+    DestinationState: 125937960
+    TransitionDuration: 0.25
+    TriggerNameHash: 19011116
+    TransitionIndex: 1
+  AnimatorParameterEntries:
+    ParameterEntries:
+    - name: State
+      NameHash: 1649606143
+      Synchronize: 1
+      ParameterType: 3
+    - name: IsGroggy
+      NameHash: 847727466
+      Synchronize: 1
+      ParameterType: 9
+    - name: IsInit
+      NameHash: 1625683022
+      Synchronize: 1
+      ParameterType: 9
+    - name: IsDead
+      NameHash: 1270110494
+      Synchronize: 1
+      ParameterType: 9
+    - name: IsThrow
+      NameHash: -1992750699
+      Synchronize: 1
+      ParameterType: 9
+    - name: IsJump
+      NameHash: 19011116
+      Synchronize: 1
+      ParameterType: 9
+  AnimatorParametersExpanded: 0
+--- !u!114 &5515748389101313656
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6391391245549526456}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 430566ed93b960443a4d8510881c4378, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::WellsAnimEvents
+  ShowTopMostFoldoutHeaderGroup: 1
+  bombLauncher: {fileID: 4146338655535622427}

@@ -2,6 +2,7 @@
 
 > 기준: 2026-07-15. `Assets` 아래 `*.cs` 189개를 파일 시스템 기준으로 전수 집계했다. Git/ignore 여부와 관계없이 실제 파일을 포함한다.
 > 구조 UML과 교차 시스템 설명: [game-structure-uml.md](game-structure-uml.md)
+> 부분 갱신: 2026-07-23, `feature/PlayerSkill` / `558ab43`. 아래 Player Skill 절만 최신 구현과 프리팹 배선을 반영했으며 상위 전체 파일 수 집계는 2026-07-15 감사 기준을 유지한다.
 
 ## 범위와 판정법
 
@@ -40,20 +41,30 @@
 | `Assets/1.Scripts/Player/PlayerRootMotionRelay.cs` | Animator root motion delta를 Player 이동/공격 흐름에 전달 | **연결됨**. armature의 root motion 중계 |
 | `Assets/1.Scripts/Player/PlayerStateController.cs` | Player FSM 전체와 상태 context, Idle/Move/Attack/Interrupt/Grabbed/Knockback 구현 | **연결됨**. Player 행동의 중앙 상태 관리자; Dead enum은 구현 전 |
 
-### Player Skill — 10개
+### Player Skill — 20개 (PlayerSkill 부분 갱신)
 
 | 파일 | 선언/역할 | 상태와 핵심 연결 |
 | --- | --- | --- |
-| `Assets/1.Scripts/Player/Skill/FirstMeleeSubSkill.cs` | Instant E 스킬; 서버에서 실드를 부여하고 지속시간 후 회수 | **연결됨**. Player prefab의 유일한 실제 스킬 |
+| `Assets/1.Scripts/Player/Skill/FirstMeleeMainSkill.cs` | Q 진격의 방패; 오너 전진·조향, 서버 overlap 피해·넉백, 시전 중 SuperArmor | **연결됨**. Player prefab Main/Q 슬롯 |
+| `Assets/1.Scripts/Player/Skill/FirstMeleeMainSkillData.cs` | Q 전진 속도·조향각·넉백·판정 수를 추가한 `PlayerSkillData` | **연결됨**. cooldown 10초, 피해계수 0.3 자산 |
+| `Assets/1.Scripts/Player/Skill/FirstMeleeSubSkill.cs` | Instant E 스킬; 서버에서 실드를 부여하고 지속시간 후 회수 | **연결됨**. Player prefab Sub/E 슬롯 |
 | `Assets/1.Scripts/Player/Skill/FirstMeleeSubSkillData.cs` | 실드량·지속시간을 추가한 `PlayerSkillData` | **연결됨**. cooldown 14초, 실드 10/5초 자산 |
-| `Assets/1.Scripts/Player/Skill/PlayerChannelingSkill.cs` | 누르고 있는 동안 tick되는 channeling 스킬 추상 베이스 | **지원 코드/현재 구체 스킬 없음** |
+| `Assets/1.Scripts/Player/Skill/FirstMeleeUltimateSkill.cs` | R 최후의 심판; SingleTarget 지정 후 채널 완주 시 단일 피해 | **연결됨**. Player prefab Ultimate/R 슬롯; 연출·상세 메커니즘은 후속 |
+| `Assets/1.Scripts/Player/Skill/FirstMeleeUltimateSkillData.cs` | R 타겟팅·사거리·채널·피해 설정을 추가한 `PlayerSkillData` | **연결됨**. 사거리 8, 채널 1.5초, 피해계수 3, cooldown 60초 placeholder 자산 |
+| `Assets/1.Scripts/Player/Skill/PlayerChannelingSkill.cs` | 채널 시간을 서버에서 추적하고 완료/취소를 관리하는 추상 베이스 | **지원 코드/연결됨**. FirstMeleeUltimateSkill의 부모 |
 | `Assets/1.Scripts/Player/Skill/PlayerHoldSkill.cs` | press/update/release 수명주기를 갖는 hold 스킬 추상 베이스 | **지원 코드/현재 구체 스킬 없음** |
 | `Assets/1.Scripts/Player/Skill/PlayerInstantSkill.cs` | 시작 후 짧은 active window로 끝나는 instant 스킬 베이스 | **지원 코드**. FirstMeleeSubSkill의 부모 |
 | `Assets/1.Scripts/Player/Skill/PlayerSkillBase.cs` | 스킬 서버 수명주기·프레젠테이션·aim·movement/rotation 정책의 최상위 추상 클래스 | **지원 코드**. Controller가 모든 슬롯을 이 타입으로 다룸 |
-| `Assets/1.Scripts/Player/Skill/PlayerSkillController.cs` | Q/E/R/RMB 슬롯, cooldown, 서버 검증, aim/release RPC, 활성 스킬 tick의 단일 오케스트레이터 | **연결됨**. Player prefab에는 E만 배선 |
-| `Assets/1.Scripts/Player/Skill/PlayerSkillData.cs` | 이름·slot·입력 형태·cooldown·active time·애니메이션 등 공통 SO 데이터 | **지원 코드/연결됨**. E 데이터의 부모 |
+| `Assets/1.Scripts/Player/Skill/PlayerSkillController.cs` | Q/E/R/RMB 슬롯, cooldown, 서버 검증, aim/release RPC, 활성 스킬 tick의 단일 오케스트레이터 | **연결됨**. Player prefab에 Q/E/R 배선; RMB/Interrupt는 미배정 |
+| `Assets/1.Scripts/Player/Skill/PlayerSkillData.cs` | 공통 스킬 수치와 targeting mode·confirm mode·cast range·target layer를 보관하는 SO 베이스 | **지원 코드/연결됨**. Q/E/R 데이터의 부모 |
 | `Assets/1.Scripts/Player/Skill/PlayerSkillSlot.cs` | Main/Sub/Ultimate/Interrupt 슬롯 enum | **지원 코드**. InputReader, Controller, HUD 공통 계약 |
 | `Assets/1.Scripts/Player/Skill/PlayerSkillState.cs` | 활성 스킬에 이동·회전·종료를 위임하는 Player FSM 상태 | **연결됨**. 스킬 승인 시 StateController가 진입 |
+| `Assets/1.Scripts/Player/Skill/Targeting/PlayerSkillTargeting.cs` | 조준 진입·확정·취소, SingleTarget 탐색, 사거리 밖 자동 이동 후 시전을 중계 | **연결됨**. Player prefab의 Controller·AimIndicator·표시 컴포넌트와 연결 |
+| `Assets/1.Scripts/Player/Skill/Targeting/SkillConfirmMode.cs` | 조준 확정 입력 방식을 정의하는 enum | **지원 코드**. PlayerSkillData와 타겟팅 흐름의 계약 |
+| `Assets/1.Scripts/Player/Skill/Targeting/SkillCursorState.cs` | 기본·조준·유효·무효 커서 상태 enum | **지원 코드**. SkillCursorView의 표시 계약 |
+| `Assets/1.Scripts/Player/Skill/Targeting/SkillCursorView.cs` | 조준 상태에 따라 시스템 커서 텍스처를 교체 | **연결됨**. Player prefab에 기본·타겟팅 커서 배선 |
+| `Assets/1.Scripts/Player/Skill/Targeting/SkillRangeIndicator.cs` | DecalProjector 기반 시전 사거리와 지면 마커 표시 | **연결됨**. Player prefab의 SkillRangeIndicator 오브젝트와 range decal 연결 |
+| `Assets/1.Scripts/Player/Skill/Targeting/SkillTargetingMode.cs` | None·SingleTarget·GroundPoint 타겟팅 방식 enum | **지원 코드**. PlayerSkillData와 PlayerSkillTargeting 공통 계약 |
 
 ### Unit와 Weapon — 12개
 
@@ -90,7 +101,7 @@
 
 | 파일 | 선언/역할 | 상태와 핵심 연결 |
 | --- | --- | --- |
-| `Assets/1.Scripts/Enemy/BombAreaEffect.cs` | 바닥 폭탄 영역의 merge 방식, 성장·겹침·표현을 관리 | **연결됨**. Bomb prefab의 floor 상태 효과 |
+| `Assets/1.Scripts/Enemy/FloorAreaEffect.cs` | 바닥 폭탄 영역의 merge 방식, 성장·겹침·표현을 관리 | **연결됨**. Bomb prefab의 floor 상태 효과 |
 | `Assets/1.Scripts/Enemy/Boss/BaseAttackChoice.cs` | 거리/상태에 따른 보스 공격 선택기의 추상 기반 | **지원 코드**. TwentyThreeBasicAttackChoice 부모 |
 | `Assets/1.Scripts/Enemy/Boss/Bomb.cs` | `IAttackReceiver`로 평타를 받아 BombController에 반사/재발사를 지시 | **연결됨**. Bomb prefab과 Hurtbox 부모 receiver |
 | `Assets/1.Scripts/Enemy/Boss/BombController.cs` | Hold→Timer→Flight→Floor 서버 FSM, spherecast, ClientRpc 프레젠테이션 | **연결됨**. Wells Graph가 생성·보유·투척 |

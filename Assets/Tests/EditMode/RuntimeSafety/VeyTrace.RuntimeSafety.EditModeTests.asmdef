@@ -1,0 +1,22 @@
+{
+  "name": "VeyTrace.RuntimeSafety.EditModeTests",
+  "rootNamespace": "VeyTrace.RuntimeSafety.Tests",
+  "references": [
+    "VeyTrace.RuntimeSafety"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [
+    "nunit.framework.dll"
+  ],
+  "autoReferenced": false,
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

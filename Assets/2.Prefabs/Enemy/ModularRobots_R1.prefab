@@ -171,6 +171,73 @@ Transform:
   - {fileID: 4624903222535579269}
   m_Father: {fileID: 3512791794625281449}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1490096631927981247
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1512838292421371129}
+  - component: {fileID: 7205590118644834387}
+  - component: {fileID: 5932119234035770936}
+  m_Layer: 14
+  m_Name: HurtBox
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1512838292421371129
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1490096631927981247}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 3512791794625281449}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &7205590118644834387
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1490096631927981247}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1.8531716, z: 1}
+  m_Center: {x: 0, y: 0.7869947, z: 0}
+--- !u!114 &5932119234035770936
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1490096631927981247}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4ff6f17a7ad346d48ad09109dd1ef5d3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Hurtbox
+  ownerUnit: {fileID: 8805211339034511167}
 --- !u!1 &2621216123981704936
 GameObject:
   m_ObjectHideFlags: 0
@@ -936,10 +1003,8 @@ GameObject:
   - component: {fileID: 7823689755345464978}
   - component: {fileID: 8200821695789514122}
   - component: {fileID: 5661557782957567535}
-  - component: {fileID: 7020066614126957741}
   - component: {fileID: 2302287723897775423}
   - component: {fileID: 8420402705270843187}
-  - component: {fileID: 8734512906874521134}
   m_Layer: 8
   m_Name: ModularRobots_R1
   m_TagString: Untagged
@@ -962,6 +1027,7 @@ Transform:
   m_Children:
   - {fileID: 2505925837623607853}
   - {fileID: 7322158407290278549}
+  - {fileID: 1512838292421371129}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &738327132853705960
@@ -976,7 +1042,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 3535513482
+  GlobalObjectIdHash: 1426892597
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -1104,7 +1170,6 @@ MonoBehaviour:
   attackSpeed: 0
   maxHp: 100
   defense: 0
-  maxShield: 0
   _groggyCount: 0
   _maxGroggyCount: 0
 --- !u!114 &6180967711162896175
@@ -1233,27 +1298,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SpawnPointer
   _spawnPoint: {x: 1, y: 0, z: 1}
---- !u!65 &7020066614126957741
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6048960277833949737}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 1, y: 1.8531716, z: 1}
-  m_Center: {x: 0, y: 0.7869947, z: 0}
 --- !u!114 &2302287723897775423
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1629,16 +1673,3 @@ Transform:
   - {fileID: 8187141956482287634}
   m_Father: {fileID: 569754481335400209}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &8734512906874521134
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6048960277833949737}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4ff6f17a7ad346d48ad09109dd1ef5d3, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Hurtbox
-  ownerUnit: {fileID: 8805211339034511167}

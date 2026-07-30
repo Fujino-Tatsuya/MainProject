@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -25,4 +25,11 @@ public abstract class BaseAttackChoice : MonoBehaviour
     /// </summary>
     /// <param name="type">제거할 공격 타입</param>
     public abstract void RemoveType<T>(T type) where T : Enum;
+
+    /// <summary>
+    /// 페이즈가 증가할 때마다 호출되는 함수.
+    /// </summary>
+    /// <param name="page">페이즈 넘버</param>
+    /// <returns></returns>
+    public abstract void PageEvent(int page);
 }

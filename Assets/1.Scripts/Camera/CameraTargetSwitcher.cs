@@ -3,12 +3,18 @@ using Unity.Cinemachine;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using VeyTrace.RuntimeSafety;
 
 // MapScene camera manager. It creates one render camera and two identical
 // Cinemachine cameras, then switches their priorities for normal/fall views.
 public class CameraTargetSwitcher : MonoBehaviour
 {
     public static CameraTargetSwitcher Active { get; private set; }
+
+    // 현재 카메라가 따라가는 대상(=플레이어). 없으면 null.
+    // FogManager 의 층 디밍이 플레이어 y 기준선을 잡는 데 사용한다.
+    public Transform CurrentFollowTarget => GetCurrentTarget();
+    public Camera GameplayCamera => gameplayCamera;
 
     private const string CameraFollowTargetTag = "CameraFollowTarget";
     private const int ActiveCameraPriority = 100;
@@ -19,8 +25,13 @@ public class CameraTargetSwitcher : MonoBehaviour
     [SerializeField, Min(0f)] private float toFloatBlendDuration = 0.2f;
     [SerializeField, Min(0f)] private float toFollowBlendDuration = 0.35f;
 
+    // 생성한 리그 인스턴스를 들고 있어야 EnsureCameraRig가 멱등해진다(중복 생성 방지).
+    private GameObject mainCameraInstance;
+    private GameObject followCameraInstance;
+    private GameObject floatCameraInstance;
+    private Camera gameplayCamera;
     private CinemachineBrain cameraBrain;
-    private CinemachineCamera playerCamera;
+    private CinemachineCamera playerCamera;       // 리그 안의 vcam (런타임에 채워짐)
     private CinemachineCamera floatCamera;
     private FloatFollowTarget floatFollowTarget;
     private readonly List<Transform> cameraFollowTargets = new();
@@ -54,6 +65,7 @@ public class CameraTargetSwitcher : MonoBehaviour
         EnsureCameraRig();
         SelectOwnerPlayerTarget();
         BindOwnerLifeCycleFromCurrentTarget();
+        RuntimeSceneServiceCoordinator.Reconcile();
     }
 
     // Freezes the proxy at the selected target's current world Y and starts
@@ -102,7 +114,7 @@ public class CameraTargetSwitcher : MonoBehaviour
 
     private void EnsureCameraRig()
     {
-        if (playerCamera != null && floatCamera != null)
+        if (playerCamera != null && floatCamera != null && gameplayCamera != null)
         {
             return;
         }
@@ -113,16 +125,35 @@ public class CameraTargetSwitcher : MonoBehaviour
             return;
         }
 
-        GameObject mainCameraInstance = Instantiate(mainCameraPrefab, transform);
+        // 부모를 this.transform으로 주면 MapScene 소속으로 생성되어 소스/로딩 씬 언로드에
+        // 휩쓸리지 않는다. 생성한 인스턴스에서 직접 찾고 Camera.main은 사용하지 않는다.
+        // 인스턴스를 필드로 들고 재사용해야 재호출 시 리그가 중복 생성되지 않는다.
+        if (mainCameraInstance == null)
+            mainCameraInstance = Instantiate(mainCameraPrefab, transform);
+        if (followCameraInstance == null)
+        {
+            followCameraInstance = Instantiate(followCameraPrefab, transform);
+            followCameraInstance.name = "PlayerFollowCamera";
+        }
+        if (floatCameraInstance == null)
+        {
+            floatCameraInstance = Instantiate(followCameraPrefab, transform);
+            floatCameraInstance.name = "PlayerFollowFloatCamera";
+        }
+
+        gameplayCamera =
+            mainCameraInstance.GetComponentInChildren<Camera>(true);
+        if (gameplayCamera == null)
+        {
+            Edit.LogWarning(
+                $"[Camera] Main camera prefab has no {nameof(Camera)}. " +
+                $"prefab={mainCameraPrefab.name}");
+        }
+
         cameraBrain = mainCameraInstance.GetComponentInChildren<CinemachineBrain>(true);
 
-        GameObject followInstance = Instantiate(followCameraPrefab, transform);
-        followInstance.name = "PlayerFollowCamera";
-        playerCamera = followInstance.GetComponentInChildren<CinemachineCamera>(true);
-
-        GameObject floatInstance = Instantiate(followCameraPrefab, transform);
-        floatInstance.name = "PlayerFollowFloatCamera";
-        floatCamera = floatInstance.GetComponentInChildren<CinemachineCamera>(true);
+        playerCamera = followCameraInstance.GetComponentInChildren<CinemachineCamera>(true);
+        floatCamera = floatCameraInstance.GetComponentInChildren<CinemachineCamera>(true);
 
         if (playerCamera == null || floatCamera == null)
         {
@@ -137,10 +168,14 @@ public class CameraTargetSwitcher : MonoBehaviour
                 $"[Camera] Main camera prefab has no {nameof(CinemachineBrain)}. prefab={mainCameraPrefab.name}");
         }
 
-        GameObject proxyObject = new("FloatFollowTarget");
-        proxyObject.transform.SetParent(transform, false);
-        floatFollowTarget = proxyObject.AddComponent<FloatFollowTarget>();
-        floatCamera.Follow = proxyObject.transform;
+        // 리그 생성이 멱등해야 하므로 프록시도 한 번만 만든다.
+        if (floatFollowTarget == null)
+        {
+            GameObject proxyObject = new("FloatFollowTarget");
+            proxyObject.transform.SetParent(transform, false);
+            floatFollowTarget = proxyObject.AddComponent<FloatFollowTarget>();
+        }
+        floatCamera.Follow = floatFollowTarget.transform;
 
         playerCamera.Priority = ActiveCameraPriority;
         floatCamera.Priority = InactiveCameraPriority;

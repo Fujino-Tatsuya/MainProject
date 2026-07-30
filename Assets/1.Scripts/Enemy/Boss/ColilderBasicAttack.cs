@@ -4,7 +4,8 @@ public enum TriggerMode
 {
     OnlyEnter,
     OnlyStay,
-    OnlyExit
+    OnlyExit,
+    OnlyStayAndKnockBack
 }
 
 public class ColliderBasicAttack : BaseAttack
@@ -12,11 +13,13 @@ public class ColliderBasicAttack : BaseAttack
     [SerializeField] private TriggerMode triggerMode;
     [SerializeField] private float stayTime;
 
+    KnockbackAttack _knockbackAttack;
     private float _stayTimer = 0f;
 
     private void Awake()
     {
         InitializeAttackInfo();
+        _knockbackAttack = GetComponent<KnockbackAttack>();
     }
 
     private void OnTriggerEnter(Collider other)
@@ -47,7 +50,7 @@ public class ColliderBasicAttack : BaseAttack
         if (!IsServer)
             return;
 
-        if (triggerMode != TriggerMode.OnlyStay)
+        if (triggerMode != TriggerMode.OnlyStay && triggerMode != TriggerMode.OnlyStayAndKnockBack)
             return;
 
         _stayTimer += Time.deltaTime;
@@ -55,6 +58,9 @@ public class ColliderBasicAttack : BaseAttack
             return;
 
         TryResolveHit(other);
+        if (triggerMode == TriggerMode.OnlyStayAndKnockBack)
+            _knockbackAttack?.ApplyKnockbackAttack(other.gameObject);
+
         _stayTimer = 0f;
     }
 

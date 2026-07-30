@@ -95,18 +95,13 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     {
         int remainingDamage = damage;
 
-        // 방어력 경감률 적용: 최종 피해 = 피해 x 100 / (100 + 방어력), 방어력 100당 50% 경감
+        //// 방어력 경감률 적용: 최종 피해 = 피해 x 100 / (100 + 방어력), 방어력 100당 50% 경감
         remainingDamage = Mathf.RoundToInt(remainingDamage * 100f / (100f + _health.CurrentDefense));
 
         // 쉴드가 있으면 쉴드로 피해를 처리하고 남은 데미지 계산
         if (_health.HasShield)
         {
-            int shieldDamage = remainingDamage - _health.CurrentShield;
-            // 남은 데미지가 쉴드보다 작은 경우, 쉴드로 모든 피해를 처리하도록 shieldDamage를 조정
-            if (shieldDamage < 0)
-            {
-                shieldDamage = remainingDamage;
-            }
+            int shieldDamage = Mathf.Min(remainingDamage, _health.CurrentShield);
             _health.TakeShieldDamage(shieldDamage);
 
             UpdateNetworkShield();
@@ -298,13 +293,31 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         }
     }
 
+    // 읽기 파사드 — 플레이어(StatusEffectController)와 몹(MonsterStatusEffect)을 공통으로 잡는다.
+    // Unit이 소비하는 표면(HasSuperArmor/GetStatMultiplier)은 이 파사드 경유 → 몹 슈퍼아머도 Knockback 가드에 걸림.
+    // (StatusEffects 공개 프로퍼티는 플레이어 전용 쓰기 API(Apply/Remove) 호출부가 있어 구체 타입 유지.)
+    IStatusEffectFacade _statusFacade;
+    bool _statusFacadeCached;
+    IStatusEffectFacade StatusFacade
+    {
+        get
+        {
+            if (!_statusFacadeCached)
+            {
+                _statusFacade = GetComponent<IStatusEffectFacade>();
+                _statusFacadeCached = true;
+            }
+            return _statusFacade;
+        }
+    }
+
     float GetStatMultiplier(StatusEffectType statType)
     {
-        return StatusEffects != null ? StatusEffects.GetStatMultiplier(statType) : 1f;
+        return StatusFacade != null ? StatusFacade.GetStatMultiplier(statType) : 1f;
     }
 
     // 미부착 유닛은 슈퍼아머 없음으로 동작
-    public bool HasSuperArmor => StatusEffects != null && StatusEffects.HasSuperArmor;
+    public bool HasSuperArmor => StatusFacade != null && StatusFacade.HasSuperArmor;
 
     // 최종 스탯 = base(불변) × 활성 modifier 배율의 곱. 소비처는 base 대신 이 값을 읽는다
     public int FinalAttackDamage => Mathf.Max(0, Mathf.RoundToInt(_attackDamage * GetStatMultiplier(StatusEffectType.AttackDamageModifier)));
@@ -415,6 +428,42 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
 
         _knockback = GetComponent<IKnockbackable>();
     }
+
+    #region 클라이언트 피격 알림 (복제 기반 — 피격 플래시/HUD 등 로컬 연출용)
+    /// <summary>
+    /// 모든 피어에서 HP 또는 쉴드가 "감소"했을 때 발생(NetworkVariable 복제 기반 → RPC 불필요).
+    /// 피격 플래시(HitFlash) 등 판정과 무관한 로컬 연출이 구독한다.
+    /// </summary>
+    public event System.Action ClientDamaged;
+
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+        _currentHp.OnValueChanged += OnHpReplicated;
+        _currentShield.OnValueChanged += OnShieldReplicated;
+
+        // 피격 플래시 자동 부착 — Unit 계열 전체 공통(프리팹에 미리 붙어 있으면 그대로 사용).
+        if (GetComponent<HitFlash>() == null)
+            gameObject.AddComponent<HitFlash>();
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        _currentHp.OnValueChanged -= OnHpReplicated;
+        _currentShield.OnValueChanged -= OnShieldReplicated;
+        base.OnNetworkDespawn();
+    }
+
+    void OnHpReplicated(int previous, int next)
+    {
+        if (next < previous) ClientDamaged?.Invoke();
+    }
+
+    void OnShieldReplicated(int previous, int next)
+    {
+        if (next < previous) ClientDamaged?.Invoke();
+    }
+    #endregion
 
     #region 넉백
     IKnockbackable _knockback;

@@ -19,6 +19,8 @@ public sealed class PlayerSoulController : MonoBehaviour
     [SerializeField] private Transform soulVisualRoot;
     [Tooltip("SoulVisualPrefab이 없을 때 생존 외형에 임시로 적용할 머티리얼.")]
     [SerializeField] private Material fallbackSoulMaterial;
+    [Tooltip("Soul 상태에서만 숨길 장비(무기·방패 등). Soul 진입 시 SetActive(false), 그 외 상태는 SetActive(true).")]
+    [SerializeField] private GameObject[] soulHiddenEquipment;
 
     [Header("Combat Target")]
     [Tooltip("비어 있으면 Player Root 아래의 Hurtbox 컴포넌트에 연결된 Collider를 찾습니다.")]
@@ -28,6 +30,19 @@ public sealed class PlayerSoulController : MonoBehaviour
     [Tooltip("Soul 상태의 고정 이동속도. 향후 PlayerGameRuleData.soulSpeed 공급으로 교체합니다.")]
     [SerializeField, Min(0f)] private float soulMoveSpeed = 5f;
 
+    [Header("Abyss Hover")]
+    [Tooltip("이 거리 안에 지면이 없으면 낙하를 멈추고 그 자리에 떠 있습니다. 지형 위에서는 평소대로 걷습니다.")]
+    [SerializeField, Min(0f)] private float hoverProbeDistance = 6f;
+    [Tooltip("부유 판정에 쓰는 지면 레이어.")]
+    [SerializeField] private LayerMask hoverGroundMask = ~0;
+
+    private const float HoverProbeOriginOffset = 0.1f;
+    private const int MaxHoverProbeHits = 4;
+
+    private readonly RaycastHit[] hoverProbeHits = new RaycastHit[MaxHoverProbeHits];
+    private Rigidbody soulBody;
+    private bool isHovering;
+    private bool gravityBeforeHover = true;
     private GameObject soulVisual;
     private Renderer[] aliveRenderers;
     private Material[][] originalAliveMaterials;
@@ -76,6 +91,8 @@ public sealed class PlayerSoulController : MonoBehaviour
 
     private void OnDisable()
     {
+        RestoreGravity(); // 부유 중 비활성화되면 중력이 꺼진 채 남는다
+
         if (lifeCycle != null)
             lifeCycle.LifeStateChanged -= HandleLifeStateChanged;
 
@@ -92,6 +109,7 @@ public sealed class PlayerSoulController : MonoBehaviour
 
         EnsureSoulVisual();
         SetVisualState(isAlive, isSoul);
+        SetEquipmentActive(!isSoul);
         SetRootLayer(isSoul);
         SetGroundingMode(isSoul);
         SetHurtboxesEnabled(gameplayAccess.ShouldEnableHurtbox);
@@ -135,6 +153,78 @@ public sealed class PlayerSoulController : MonoBehaviour
     {
         InvalidateAliveMaterialCache();
         SetCharacterDefinition(definition);
+    }
+
+    /// <summary>
+    /// Soul은 어비스로 떨어지면 안 된다. 추락 복귀(PlayerFallController)는 Alive 전용이라
+    /// HP 0인 Soul은 피해도 복귀도 못 받고 무한히 떨어진다. 그래서 발밑에 지형이 없을 때만
+    /// 하강을 멈춰 그 자리에 떠 있게 한다. 지형 위에서는 개입하지 않으므로 걷고 오르내리는
+    /// 동작은 Alive와 동일하다.
+    /// </summary>
+    private void FixedUpdate()
+    {
+        if (soulBody == null)
+            soulBody = GetComponent<Rigidbody>();
+
+        if (soulBody == null || soulBody.isKinematic)
+            return;
+
+        bool isSoul = lifeCycle != null && lifeCycle.State == PlayerLifeState.Soul;
+        bool shouldHover = isSoul && !HasGroundBelow();
+
+        if (shouldHover)
+        {
+            // 속도만 0으로 눌러서는 안 된다 — 다음 물리 스텝에서 중력이 다시 가속시켜
+            // 스텝마다 조금씩 내려간다. 중력 자체를 꺼야 그 자리에 멈춘다.
+            if (!isHovering)
+            {
+                isHovering = true;
+                gravityBeforeHover = soulBody.useGravity;
+            }
+
+            soulBody.useGravity = false;
+
+            Vector3 velocity = soulBody.linearVelocity;
+            if (velocity.y != 0f)
+            {
+                velocity.y = 0f; // 수평 이동은 유지
+                soulBody.linearVelocity = velocity;
+            }
+        }
+        else if (isHovering)
+        {
+            RestoreGravity();
+        }
+    }
+
+    private void RestoreGravity()
+    {
+        isHovering = false;
+        if (soulBody != null)
+            soulBody.useGravity = gravityBeforeHover;
+    }
+
+    private bool HasGroundBelow()
+    {
+        Vector3 origin = transform.position + Vector3.up * HoverProbeOriginOffset;
+        int hitCount = Physics.RaycastNonAlloc(
+            origin,
+            Vector3.down,
+            hoverProbeHits,
+            hoverProbeDistance + HoverProbeOriginOffset,
+            hoverGroundMask,
+            QueryTriggerInteraction.Ignore);
+
+        for (int i = 0; i < hitCount; i++)
+        {
+            Collider hit = hoverProbeHits[i].collider;
+            if (hit == null || hit.transform.IsChildOf(transform))
+                continue; // 자기 콜라이더는 무시(레이캐스트는 충돌 매트릭스를 보지 않는다)
+
+            return true;
+        }
+
+        return false;
     }
 
     private void ResolveReferences()
@@ -237,6 +327,19 @@ public sealed class PlayerSoulController : MonoBehaviour
 
         if (soulVisual != null)
             soulVisual.SetActive(isSoul);
+    }
+
+    private void SetEquipmentActive(bool active)
+    {
+        if (soulHiddenEquipment == null)
+            return;
+
+        for (int i = 0; i < soulHiddenEquipment.Length; i++)
+        {
+            GameObject equipment = soulHiddenEquipment[i];
+            if (equipment != null && equipment.activeSelf != active)
+                equipment.SetActive(active);
+        }
     }
 
     private void SetFallbackSoulMaterial(bool shouldUseFallback)

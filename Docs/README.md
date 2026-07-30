@@ -4,6 +4,7 @@
 작업 추적(태스크)은 가능하면 GitHub Issues/Projects를 쓰고, 이 문서들은 "정의/규칙"을 담는다.
 
 ## 설계 (GDD)
+
 - [design/boss-wells-and-no23.md](design/boss-wells-and-no23.md) — 보스 "웰즈 & 23호" 컨셉·기믹·페이즈
 - [design/player.md](design/player.md) — Player Prefab, 입력·이동·피격 책임
 - [design/interaction-policy.md](design/interaction-policy.md) — Instigator/Receiver/Target 상호작용 책임 정책
@@ -25,7 +26,5 @@
 - [tech/map-generation.md](tech/map-generation.md) — 절차적 맵 생성 흐름, 영역/티어 규칙, NGO 서버권한 생성+결과복제
 
 ## 일정
-- [tasks/roadmap.md](tasks/roadmap.md) — 마일스톤(6~7월)
 
----
-> 루트 [AGENT.md](../AGENT.md) 를 먼저 읽을 것. (온보딩 + 지금 당장 고칠 것)
+- 일정은 `Project_MT 일정.xlsx`(담당: 이지원)로 관리 — 팀 Vault `Core/project-schedule-2026.md`에 스냅샷. (구 `tasks/roadmap.md`는 폐기)

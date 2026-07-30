@@ -16,11 +16,27 @@ public struct AttackInfo
     public AttackType attackType;
     public bool isGroggyAttack;
 
-    public AttackInfo(int damage, AttackType attackType = AttackType.None, bool isGroggyAttack = false)
+    // 지속넉백/경직(CC) — 값은 공격(스킬) 측이 지정한다(PLAN C-1). 0 = 해당 효과 없음.
+    // 수신측 반응 시퀀스(MonsterState.Knockback → Stunned)는 MonsterBase가 처리한다.
+    public float knockbackStrength;   // 지속 밀기 속도(m/s). 0이면 넉백 없음.
+    public float knockbackDuration;   // 지속 밀기 시간(초).
+    public float staggerDuration;     // 넉백 종료 후 Stunned 경직 시간(초).
+    // 밀기 방향(월드, 수평). zero면 수신측이 방사형(몹-공격자)으로 계산한다.
+    // 방향성 공격(Q 전진 견인 등)은 반드시 명시할 것 — 이동하는 시전자의 방사형 계산은
+    // 시전자가 대상을 따라잡는 순간 옆/뒤로 뒤집힌다.
+    public Vector3 knockbackDirection;
+
+    public AttackInfo(int damage, AttackType attackType = AttackType.None, bool isGroggyAttack = false,
+        float knockbackStrength = 0f, float knockbackDuration = 0f, float staggerDuration = 0f,
+        Vector3 knockbackDirection = default)
     {
         this.damage = Mathf.Max(0, damage);
         this.attackType = attackType;
         this.isGroggyAttack = isGroggyAttack;
+        this.knockbackStrength = Mathf.Max(0f, knockbackStrength);
+        this.knockbackDuration = Mathf.Max(0f, knockbackDuration);
+        this.staggerDuration = Mathf.Max(0f, staggerDuration);
+        this.knockbackDirection = knockbackDirection;
     }
 }
 
@@ -38,7 +54,7 @@ public struct AttackHitContext
     }
 }
 
-public class BaseAttack : MonoBehaviour
+public class BaseAttack : MonoBehaviour, IDamageSettable
 {
     [SerializeField] protected int damage = 0;
     public int Damage { get { return damage; } }
@@ -67,6 +83,14 @@ public class BaseAttack : MonoBehaviour
     {
         damage = Mathf.Max(0, value);
         InitializeAttackInfo();
+    }
+
+    /// <summary>
+    /// damage int 값만 설정한다. (_attackInfo 스냅샷은 갱신하지 않음)
+    /// </summary>
+    public void SetDamage(int value)
+    {
+        damage = Mathf.Max(0, value);
     }
 
     public void SetTargetLayer(LayerMask value)

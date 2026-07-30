@@ -41,7 +41,7 @@ public struct StatusEffectInstance : INetworkSerializable, IEquatable<StatusEffe
 /// 서버만 리스트를 쓰고(Apply/Remove/만료 스윕) NetworkList가 전 피어에 동기화되며,
 /// 집계(차단 = OR, 스탯 배율 = 곱)는 각 피어가 로컬에서 계산한다.
 /// </summary>
-public class StatusEffectController : BaseNetworkBehaviour
+public class StatusEffectController : BaseNetworkBehaviour, IStatusEffectFacade
 {
     // 타입 → 차단 매핑 테이블. 차단 규칙 변경은 여기 한 곳만 고친다.
     private const StatusEffectType MovementBlockers =
@@ -54,6 +54,14 @@ public class StatusEffectController : BaseNetworkBehaviour
         StatusEffectType.Stunned | StatusEffectType.Silenced | StatusEffectType.Airborne;
 
     private readonly NetworkList<StatusEffectInstance> effects = new NetworkList<StatusEffectInstance>();
+
+    // Player 전용 — 연출 잠금 중 신규 상태이상 거부에만 사용한다. 몬스터에는 부착되지 않으므로 null이 정상.
+    private PlayerEncounterLock encounterLock;
+
+    private void Awake()
+    {
+        encounterLock = GetComponent<PlayerEncounterLock>();
+    }
 
     // NetworkList 쓰기는 스폰된 서버에서만 유효 (오프라인 실행에서는 상태이상이 걸리지 않는다 — Unit 스탯 계열과 동일)
     private bool CanWrite => IsSpawned && IsServer;
@@ -139,6 +147,11 @@ public class StatusEffectController : BaseNetworkBehaviour
         if (!CanWrite || type == StatusEffectType.None)
             return;
 
+        // 연출 잠금(보스 등장) 중인 Player에게는 새 상태이상을 걸지 않는다. 연출 해제 직후
+        // 남은 디버프가 전투 시작 상태를 오염시키는 것을 막는다. (Player 외 Unit은 encounterLock이 없다)
+        if (encounterLock != null && encounterLock.IsCinematicLocked)
+            return;
+
         int index = IndexOf(type, sourceId);
 
         int stackCount = 1;
@@ -190,6 +203,22 @@ public class StatusEffectController : BaseNetworkBehaviour
                 removed++;
             }
         }
+
+        return removed;
+    }
+
+    /// <summary>
+    /// 서버 전용. 활성 상태이상을 전부 해제한다(무기한 버프·디버프 포함).
+    /// 연출 진입처럼 전투 상태를 초기화해야 하는 경로가 사용한다. 해제한 개수를 반환한다.
+    /// </summary>
+    public int ClearAllServer()
+    {
+        if (!CanWrite)
+            return 0;
+
+        int removed = effects.Count;
+        for (int i = effects.Count - 1; i >= 0; i--)
+            effects.RemoveAt(i);
 
         return removed;
     }

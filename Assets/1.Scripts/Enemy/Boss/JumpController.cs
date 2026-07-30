@@ -2,30 +2,68 @@ using Unity.Netcode;
 using UnityEngine;
 using System.Collections.Generic;
 using Unity.Behavior;
-using Unity.Netcode.Components;
 
-public class JumpController : NetworkBehaviour
+public class JumpController : NetworkBehaviour, IDamageSettable
 {
     [SerializeField] BehaviorGraphAgent bt;
-    [SerializeField] ColliderInfo colliderInfo;
-    [SerializeField] SpriteRenderer signObject;
     [SerializeField] string followTargetTag;
     [SerializeField] LayerMask playerLayer;
-    [SerializeField] int damage;
+    [Tooltip("착지 지점을 찾을 바닥 레이어. 생성맵 바닥은 Ground가 아니라 Default다 — 둘 다 포함해야 한다.")]
+    [SerializeField] LayerMask groundMask = 0;
+    // 머지(2026-07-29): 직렬화 damage / jumpingTime 필드는 feature/Boss에서 제거됐다.
+    // 착지 피해는 SetDamage(_damage), 정지 시간은 Blackboard JumpingTime(SO 주입)이 정본이다.
+    [SerializeField] List<GameObject> meshRenderer;
+
+    [Header("장판")]
+    [SerializeField] Transform floorRoot;      // 두 장판을 담는 위치 기준 컨테이너
+    [SerializeField] SpriteRenderer floorBase;  // 장판1: 크기 고정 기준 + 데미지 범위 기준
+    [SerializeField] FloorAreaEffect floorGrow; // 장판2: 0.1 → 장판1 크기로 시간 점증
+
+    [Header("장판 시간 보정을 위한 변수")]
+    [SerializeField] Animator animator;
+    [SerializeField] string animClip;
+    [SerializeField] string multiplier;
+    [SerializeField] float clipStart = 0f;
+    [SerializeField] float clipEnd = 100f;
 
     BlackboardVariable<Vector3> ArrivePoint;
+    BlackboardVariable<float> JumpingTime;
 
+    SpriteRenderer _floorGrowRenderer;
+
+    KnockbackAttack _knockbackAttack;
+
+    int _damage;
     GameObject _target;
     Quaternion _baseRotation = Quaternion.identity;
-    Vector3 _signPos;
-    Quaternion _signRot;
-    float _offset = 0.01f;
+    Vector3 _floorRootPos;
+    Quaternion _floorRootRot;
+    float _jumpDiff;    // 장판 시간 계산으로 위해 총 정지 시간에서 더할 보정값
     bool _isJumping = false;
+    bool _isCinematicLanding = false;
+
+    /// <summary>
+    /// 등장 연출 착지 모드. BossEncounterDirector가 하강 전에 켜고 전투 전환 시 끈다.
+    /// 켜져 있는 동안 장판 표시와 착지 피해를 만들지 않는다 — 연출 착지는 공격이 아니다.
+    /// (승인 계획 Task 4)
+    /// </summary>
+    public void SetCinematicLandingMode(bool enabled)
+    {
+        if (!IsServer && IsSpawned) return;
+
+        _isCinematicLanding = enabled;
+    }
+
+    // 바닥 탐색은 GroundProbe로 통일했다(레이어 폴백·원점 띄우기·유닛 콜라이더 제외).
+    // ⚠️ 특히 유닛 제외가 중요하다 — 이 보스는 플레이어 위치로 착지하므로 자기 공격 히트박스
+    // (Rage·DashAttack·Floor 등 Default 레이어 7개)가 반드시 근처에 있고, 그게 "바닥"으로 잡히면
+    // 착지 높이와 장판이 몸통 높이에 걸린다(폭탄이 y≈1.8에 뜬 것과 같은 원인).
 
     public override void OnNetworkSpawn()
     {
+        _baseRotation = floorRoot.rotation;
+        _floorGrowRenderer = floorGrow.GetComponent<SpriteRenderer>();
         Initialize();
-        _baseRotation = signObject.transform.rotation;
 
         if (!IsServer) return;
 
@@ -33,75 +71,107 @@ public class JumpController : NetworkBehaviour
         {
             Edit.LogError("[No.23] Blackboard variable 'ArrivePoint' not found.", this);
         }
+
+        // JumpingTime 값은 TwentyThreeBlackboardInitializer가 SO에서 주입한다. 여기선 읽기 위해 참조만 확보.
+        if (!bt.BlackboardReference.GetVariable<float>("JumpingTime", out JumpingTime))
+        {
+            Edit.LogError("[No.23] Blackboard variable 'JumpingTime' not found.", this);
+        }
+
+        _jumpDiff = AnimClipUtility.GetPlayTime(animator, animClip, multiplier, clipStart, clipEnd);
+
+        _knockbackAttack = GetComponent<KnockbackAttack>();
     }
 
 
     void LateUpdate()
     {
         if (!_isJumping) return;
-
-        signObject.transform.SetPositionAndRotation(_signPos, _signRot);
+        // 보스 이동으로 인한 장판 위치 보정
+        floorRoot.SetPositionAndRotation(_floorRootPos, _floorRootRot);
     }
 
-
-    HashSet<GameObject> players = new HashSet<GameObject>();
     public void SetTarget()
     {
         if (!IsServer) return;
 
-        GameObject[] gameObjects = GameObject.FindGameObjectsWithTag(followTargetTag);
-        float closestDistance = Mathf.Infinity;
-        GameObject closestObject = null;
+        // 연출 착지는 대상 선정·장판·메시 숨김을 하지 않는다.
+        if (_isCinematicLanding) return;
 
-        foreach (GameObject gameObject in gameObjects)
-        {
-            if (!players.Add(gameObject.transform.root.gameObject)) continue;
+        GameObject target = FindTargetByDistance(true);
 
-            float distanceSq = Vector3.SqrMagnitude(gameObject.transform.root.position - transform.position);
-            if (closestDistance > distanceSq || closestObject == null)
-            {
-                closestDistance = distanceSq;
-                closestObject = gameObject.transform.root.gameObject;
-            }
-        }
-
-        if (closestObject == null)
+        if (target == null)
         {
             Edit.LogError($"[No.23] {followTargetTag} 태그를 가진 오브젝트가 존재하지 않습니다.");
             Initialize();
             return;
         }
-        _target = closestObject;
+        _target = target;
 
-        // 경사면을 고려한 회전 변경
-        RaycastHit hit;
+        // 경사면을 고려한 회전 변경 + 착지 높이 확정.
+        // ⚠️ 예전엔 바닥 레이어를 "Ground"로 하드코딩하고 착지 Y를 0으로 고정했다. 생성맵 보스룸
+        // 바닥은 Default 레이어에 Y≈0.61이라 장판이 바닥 아래로 들어가고 보스와 어긋났다.
+        Vector3 landingPos = _target.transform.position;
         Quaternion slopeRotation = Quaternion.identity;
-        if (Physics.Raycast(closestObject.transform.position, Vector3.down, out hit, Mathf.Infinity, LayerMask.GetMask("Ground")))
+
+        if (GroundProbe.TryFindGround(landingPos, groundMask.value, out RaycastHit hit, out string report))
         {
             slopeRotation = Quaternion.FromToRotation(Vector3.up, hit.normal);
+            // 장판이 바닥면과 같은 높이면 z-fighting 한다 → 폭탄과 같은 표준 간격으로 띄운다.
+            landingPos.y = GroundProbe.SurfaceY(hit);
         }
-        signObject.transform.rotation = _baseRotation * slopeRotation;
-        _signRot = signObject.transform.rotation;
+        else
+        {
+            Edit.LogWarning(
+                $"[No.23] 착지 지점 아래에서 바닥을 찾지 못해 대상 높이를 그대로 사용합니다({landingPos}) — {report}", this);
+        }
+        _floorRootRot = _baseRotation * slopeRotation;
 
-        Vector3 landingPos = _target.transform.position;
-        landingPos.y = 0f;
         ArrivePoint.Value = landingPos;
+        _floorRootPos = landingPos;
 
-        Move();
+        // 서버가 최종 장판 성장시간을 계산해 모든 클라이언트에 동일하게 전달
+        float growDuration = JumpingTime.Value + _jumpDiff;
 
         _isJumping = true;
-        players.Clear();
-        ShowSignClientRpc(_signPos, _signRot);
+        ShowFloorsClientRpc(_floorRootPos, _floorRootRot, growDuration);
+        ShowMyMeshClientRpc(false);
     }
 
-    void Move()
+
+    HashSet<GameObject> players = new HashSet<GameObject>();
+    /// <summary>
+    /// 후보 오브젝트 중 자신과의 거리가 가장 먼(또는 가장 가까운) 오브젝트를 반환한다.
+    /// </summary>
+    /// <param name="findFarthest">true면 가장 먼 대상, false면 가장 가까운 대상 반환</param>
+    GameObject FindTargetByDistance(bool findFarthest)
     {
-        // 위치 이동
-        signObject.transform.position = ArrivePoint.Value;
-        Vector3 up = signObject.transform.forward;
-        Vector3 offset = up * _offset;
-        signObject.transform.position += offset;
-        _signPos = signObject.transform.position;
+        GameObject[] gameObjects = GameObject.FindGameObjectsWithTag(followTargetTag);
+
+        // 중복 제거: 같은 루트 오브젝트를 한 번만 후보로 등록
+        players.Clear();
+        foreach (GameObject gameObject in gameObjects)
+        {
+            players.Add(gameObject.transform.root.gameObject);
+        }
+
+        float bestDistanceSq = findFarthest ? -1f : Mathf.Infinity;
+        GameObject bestObject = null;
+
+        foreach (GameObject player in players)
+        {
+            if (player == null) continue;
+
+            float distanceSq = Vector3.SqrMagnitude(player.transform.position - transform.position);
+            bool isBetter = findFarthest ? distanceSq > bestDistanceSq : distanceSq < bestDistanceSq;
+            if (bestObject == null || isBetter)
+            {
+                bestDistanceSq = distanceSq;
+                bestObject = player;
+            }
+        }
+
+        return bestObject;
     }
 
 
@@ -111,12 +181,16 @@ public class JumpController : NetworkBehaviour
     {
         if (!IsServer) return;
 
-        SphereColliderInfo sphereInfo = new SphereColliderInfo();
-        colliderInfo.GetSphereColliderInfo(ref sphereInfo);
+        // 연출 착지는 피해를 주지 않는다. 장판도 켜지지 않았으므로 숨김 처리도 불필요.
+        if (_isCinematicLanding) return;
+
+        // 데미지 범위는 장판1(floorBase)의 실제 시각 크기 기준
+        Vector3 center = floorBase.bounds.center;
+        float radius = Mathf.Max(floorBase.bounds.extents.x, floorBase.bounds.extents.z);
 
         int hitCount = Physics.OverlapSphereNonAlloc(
-            sphereInfo.center,
-            sphereInfo.radius,
+            center,
+            radius,
             results,
             playerLayer,
             QueryTriggerInteraction.Ignore
@@ -140,34 +214,66 @@ public class JumpController : NetworkBehaviour
             if (!damagedPlayers.Add(unit))
                 continue;
 
-            unit.TakeDamage(new AttackInfo(damage));
+            unit.TakeDamage(new AttackInfo(_damage));
+            _knockbackAttack.ApplyKnockbackAttack(unit.gameObject);
         }
 
-        HideSignClientRpc();
+        HideFloorsClientRpc();
+    }
+
+    /// <summary>
+    /// 착지 데미지(damage) 값만 설정한다.
+    /// </summary>
+    public void SetDamage(int value)
+    {
+        _damage = Mathf.Max(0, value);
+    }
+
+    void EnableMeshRenderers(bool enable)
+    {
+        foreach (GameObject mesh in meshRenderer)
+        {
+            mesh.SetActive(enable);
+        }
+    }
+
+    void SetFloorsEnable(bool enable)
+    {
+        floorBase.enabled = enable;
+        _floorGrowRenderer.enabled = enable;
     }
 
     void Initialize()
     {
         _isJumping = false;
         _target = null;
-        signObject.enabled = false;
+        SetFloorsEnable(false);
     }
 
     [ClientRpc]
-    void ShowSignClientRpc(Vector3 position, Quaternion rotation)
+    public void ShowMyMeshClientRpc(bool enable)
     {
-        _signPos = position;
-        _signRot = rotation;
+        EnableMeshRenderers(enable);
+    }
+
+    [ClientRpc]
+    void ShowFloorsClientRpc(Vector3 position, Quaternion rotation, float growDuration)
+    {
+        _floorRootPos = position;
+        _floorRootRot = rotation;
         _isJumping = true;
 
-        signObject.transform.SetPositionAndRotation(position, rotation);
-        signObject.enabled = true;
+        floorRoot.SetPositionAndRotation(position, rotation);
+        SetFloorsEnable(true);
+
+        // 장판2: 0.1(prefab 시작 크기) → 장판1 크기까지 growDuration(서버 계산) 동안 성장
+        floorGrow.StartOverTimeGrow(growDuration, floorBase.transform.localScale);
     }
 
     [ClientRpc]
-    void HideSignClientRpc()
+    void HideFloorsClientRpc()
     {
         _isJumping = false;
-        signObject.enabled = false;
+        SetFloorsEnable(false);
     }
 }

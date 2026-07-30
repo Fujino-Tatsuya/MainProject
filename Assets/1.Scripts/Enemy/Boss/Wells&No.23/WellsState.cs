@@ -3,7 +3,9 @@ using Unity.Behavior;
 [BlackboardEnum]
 public enum WellsState
 {
-    Normal,
-    Throw,
-    Dead
+    Idle = 0,
+    Throw = 1,
+    Jump = 2,
+    Groggy = 3,
+    Dead = 4
 }

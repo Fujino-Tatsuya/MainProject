@@ -26,9 +26,9 @@ TagManager:
   - Env
   - Weapon
   - PlayerHurtbox
+  - EnemyHurtBox
   - Corpse
-  - 
-  - 
+  - Soul
   - 
   - 
   - 

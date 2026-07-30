@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Unity.Behavior;
 using UnityEngine;
 using Action = Unity.Behavior.Action;
@@ -18,7 +18,7 @@ public partial class PlusFloatAction : Action
             return Status.Failure;
 
         C.Value = A.Value + B.Value;
-        return Status.Running;
+        return Status.Success;
     }
 
     bool CheckValid()

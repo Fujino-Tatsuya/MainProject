@@ -12,8 +12,11 @@ namespace BeaverLobby.Player.Dash
     ///   remainingServerState = max(0, estimatedServerEnd - serverNow)
     ///
     /// 검증 순서(요약): Config → Payload/방향 → RTT 유효 → Snapshot(at-or-before) →
-    /// 당시 Dead/Soul → 당시 CC → 당시 LandingProtection → 당시 Grounded → 당시 충전 →
+    /// 당시 Dead/Soul → 당시 CC → 당시 LandingProtection → 당시 Grounded → **현재** 서버 충전 →
     /// 과거 승인 → 현재 CC/사망 재검사(ApprovedButInterrupted).
+    ///
+    /// 충전만 "당시"가 아니라 "현재"로 보는 이유는 <see cref="Validate"/>의
+    /// <c>authoritativeChargeCount</c> 주석에 있다.
     ///
     /// 멱등/RequestId 중복 처리는 상위(캐시/컨트롤러) 책임이며 이 정책은 다루지 않는다.
     /// </summary>
@@ -49,6 +52,12 @@ namespace BeaverLobby.Player.Dash
             }
         }
 
+        /// <param name="authoritativeChargeCount">
+        /// 검증 시점의 <b>현재</b> 서버 장부 충전 수. Snapshot의 ChargeCount를 쓰지 않는다 —
+        /// 충전은 서버만 바꾸는 자원이라 클라가 위조할 수 없어 지연보정할 이유가 없고,
+        /// Snapshot 값은 마지막 물리 tick 시점이라 회복 경계 직후에는 아직 0으로 남아 있다.
+        /// 그걸로 거부하면 "쿨타임 끝나자마자 누른 입력"만 골라 오탐 거부가 난다.
+        /// </param>
         public static DashValidationResult Validate(
             bool dashEnabled,
             double dashDuration,
@@ -56,6 +65,7 @@ namespace BeaverLobby.Player.Dash
             double serverNow,
             double serverRtt,
             bool rttAvailable,
+            int authoritativeChargeCount,
             in Request request,
             DashSnapshotHistory history,
             in CurrentState current)
@@ -117,7 +127,10 @@ namespace BeaverLobby.Player.Dash
                 return DashValidationResult.Reject(DashRejectReason.NotGrounded);
             }
 
-            if (snapshot.ChargeCount <= 0)
+            // ⚠️ Snapshot.ChargeCount가 아니라 현재 서버 장부로 판정한다(param 주석 참고).
+            // Snapshot 기준으로 거부하던 동안, 오너는 회복 직후 입력이 NoCharge로 튕기면서
+            // 예측 소비분까지 잃어 쿨타임이 두 배로 늘어난 것처럼 보였다.
+            if (authoritativeChargeCount <= 0)
             {
                 return DashValidationResult.Reject(DashRejectReason.NoCharge);
             }

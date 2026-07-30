@@ -6,7 +6,7 @@ public struct ZonePlacement
 {
     public ZoneSlot Slot;
     public ZoneRole Role;
-    public GameObject LayoutPrefab;   // 선택된 ZoneLayout 프리팹 (없으면 null)
+    public GameObject LayoutPrefab;   // 선택된 ZoneLayout 프리팹 (없으면 null). 회전은 슬롯이 프리팹별로 들고 있음(ZoneSlot.Rotations).
 }
 
 // 슬롯에 ZoneLayout 프리팹을 선택해 배치 결과를 만든다 (스폰은 MapContentSpawner).
@@ -31,13 +31,63 @@ public class LayoutPlacer : MonoBehaviour
             return placements;
         }
 
-        // 1) 역할 존 = 고정 디자인 / 전투 존 = 크기별로 모음
+        // 슬롯에 FixedPrefab이 지정돼 있으면 셔플·역할과 무관하게 그 프리팹으로 고정 배치.
+        // 고정 프리팹은 전투 셔플 풀에서도 제외한다(다른 슬롯에 중복 등장 방지).
+        var pinned = new HashSet<GameObject>();
+        foreach (var s in slots)
+            if (s != null && s.FixedPrefab != null) pinned.Add(s.FixedPrefab);
+
+        // 1) 고정/역할 존 = 지정 디자인 / 전투 존 = 크기별로 모음
         var combatBySize = new Dictionary<ZoneSize, List<ZoneSlot>>();
         foreach (var slot in slots)
         {
             if (slot == null) continue;
 
+            // 고정 프리팹 슬롯: 역할 무관 즉시 배치.
+            if (slot.FixedPrefab != null)
+            {
+                placements.Add(new ZonePlacement { Slot = slot, Role = slot.AssignedRole, LayoutPrefab = slot.FixedPrefab });
+                continue;
+            }
+
+            // 역할 전용 디자인이 있으면 고정 배치. 퀘스트는 슬롯에 QuestPrefab이 지정돼 있으면 그걸(고정 페어링),
+            // 없으면 전용 디자인 풀 중 rng 랜덤 1개, 그것도 없으면 같은 크기 전투 풀에서 셔플로 뽑는다.
+            GameObject roleLayout;
             if (slot.AssignedRole == ZoneRole.Combat)
+            {
+                roleLayout = null;
+            }
+            else if (slot.AssignedRole == ZoneRole.Quest)
+            {
+                if (slot.QuestPrefab != null)
+                {
+                    roleLayout = slot.QuestPrefab;
+                }
+                else
+                {
+                    var questPool = catalog.GetRolePool(slot.AssignedRole, slot.Size);
+                    roleLayout = questPool.Count > 0 ? questPool[rng.Next(questPool.Count)] : null;
+                }
+            }
+            else
+            {
+                roleLayout = catalog.GetRoleLayout(slot.AssignedRole, slot.Size);
+            }
+
+            // ⚠️ 역할 디자인이 그 크기로 저작돼 있지 않으면(예: BossRoom/PlayerSpawn 후보가 Medium 슬롯에
+            // 뽑힘) 이전엔 LayoutPrefab=null 배치가 그대로 나가고 스포너가 조용히 건너뛰어 **바닥에
+            // 구멍**이 생겼다. 시드에 따라만 나타나서 Test Generate에서는 안 보였다.
+            // 구멍보다 "역할 존이 전투 디자인으로 대체"가 낫다 — 전투 풀로 폴백시킨다.
+            if (slot.AssignedRole != ZoneRole.Combat &&
+                slot.AssignedRole != ZoneRole.Quest &&
+                roleLayout == null)
+            {
+                Edit.LogWarning(
+                    $"[LayoutPlacer] {slot.AssignedRole} 역할 디자인이 {slot.Size} 크기로 없습니다 " +
+                    $"(Slot {slot.SlotID}) — 전투 풀 디자인으로 대체합니다. 해당 크기의 역할 존 저작 필요.");
+            }
+
+            if (roleLayout == null)
             {
                 if (!combatBySize.TryGetValue(slot.Size, out var list))
                     combatBySize[slot.Size] = list = new List<ZoneSlot>();
@@ -49,7 +99,7 @@ public class LayoutPlacer : MonoBehaviour
                 {
                     Slot = slot,
                     Role = slot.AssignedRole,
-                    LayoutPrefab = catalog.GetRoleLayout(slot.AssignedRole, slot.Size)
+                    LayoutPrefab = roleLayout
                 });
             }
         }
@@ -60,11 +110,12 @@ public class LayoutPlacer : MonoBehaviour
             if (!combatBySize.TryGetValue(size, out var combatSlots)) continue;
 
             var pool = catalog.GetCombatPool(size, difficulty);
+            if (pinned.Count > 0) pool.RemoveAll(p => pinned.Contains(p)); // 고정 프리팹은 전투 셔플에서 제외
             if (pool.Count == 0)
             {
                 Edit.LogWarning($"[LayoutPlacer] {size}/난이도{difficulty} 전투 풀이 비어 있음 — {combatSlots.Count}곳 미배치.");
                 foreach (var s in combatSlots)
-                    placements.Add(new ZonePlacement { Slot = s, Role = ZoneRole.Combat, LayoutPrefab = null });
+                    placements.Add(new ZonePlacement { Slot = s, Role = s.AssignedRole, LayoutPrefab = null });
                 continue;
             }
 
@@ -76,7 +127,7 @@ public class LayoutPlacer : MonoBehaviour
                 placements.Add(new ZonePlacement
                 {
                     Slot = combatSlots[i],
-                    Role = ZoneRole.Combat,
+                    Role = combatSlots[i].AssignedRole, // 퀘스트 슬롯(전용 디자인 없음)도 풀 셔플로 오므로 Role 보존
                     LayoutPrefab = pool[i % pool.Count]
                 });
         }

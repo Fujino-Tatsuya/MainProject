@@ -105,7 +105,17 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
             if (unit == null || unit == owner || !tickTargets.Add(unit))
                 continue;
 
-            AttackInfo attackInfo = new AttackInfo(damageSnapshot, AttackType.Q);
+            // 견인: 넉백/경직 값을 AttackInfo에 실어 전달 — 수신측(MonsterBase)이 지속넉백(Knockback 상태,
+            // NavMesh 경계 클램프) → 종료 후 Stunned 경직 시퀀스를 처리한다. 슈퍼아머도 수신측이 거른다.
+            // 방향 = heading(진행 방향) 명시 — 전 대상을 균일하게 앞으로 견인(다음 틱에도 범위 유지).
+            // 방사형 폴백에 맡기면 전진(6m/s)이 넉백(3m/s)을 따라잡는 순간 옆/뒤로 뒤집힌다.
+            // 견인 속도 하한 = 전진 속도: 넉백이 전진보다 느리면 플레이어가 몹을 추월해 히트박스에서
+            // 놓친다("한두 번 밀리고 끝"). 하한을 코드로 보장해 돌진 끝까지 방패 앞에 붙어 밀려가게 한다.
+            AttackInfo attackInfo = new AttackInfo(damageSnapshot, AttackType.Q,
+                knockbackStrength: Mathf.Max(data.KnockbackStrength, data.AdvanceSpeed),
+                knockbackDuration: data.KnockbackDuration,
+                staggerDuration: data.StaggerDuration,
+                knockbackDirection: heading);
             AttackHitContext hitContext = new AttackHitContext(owner.transform.position, owner.transform, hit);
 
             bool resolved = hurtbox != null
@@ -116,10 +126,6 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
                 continue;
 
             Edit.Log($"[Skill] 진격의 방패 틱 — {unit.name} 피해 {attackInfo.damage} + 견인", this);
-
-            // 견인: 전 대상을 진행 방향으로 동일하게 넉백 — 다음 틱에도 범위에 들어오도록.
-            // 슈퍼아머(보스 예정)·IKnockbackable 미부착은 Unit.Knockback이 거른다.
-            unit.Knockback(heading, data.KnockbackStrength);
         }
     }
 
