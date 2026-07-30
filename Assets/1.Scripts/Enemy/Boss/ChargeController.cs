@@ -170,6 +170,20 @@ public class ChargeController : NetworkBehaviour, IDamageSettable
         {
             _isDefeated = true;
         }
+
+        // 진단 (2026-07-30) — 판정이 `==` 라서 카운트가 _max 를 지나치면 두 플래그 모두
+        // 영원히 false 로 남고, BT는 IsDefeated/IsReached 를 기다리며 Idle 에 park 된다.
+        // 파괴와 도달이 섞이는 경우(_destroyCount + _reachedCount == _max)도 같은 교착이다.
+        Edit.Log(
+            $"[No.23/진단] 기둥 파괴 — 파괴 {_destroyCount}/{_max}, 도달 {_reachedCount}/{_max}, " +
+            $"IsDefeated={_isDefeated}, IsReached={_isReached}", this);
+
+        if (_destroyCount > _max)
+        {
+            Edit.LogError(
+                $"[No.23/진단] 파괴 카운트가 _max({_max})를 넘었다({_destroyCount}) — " +
+                "`==` 판정이라 IsDefeated 가 절대 true 가 되지 않는다(BT 교착).", this);
+        }
     }
 
     void CheckReachedObjects(object sender, EventArgs eventArgs)
@@ -179,10 +193,31 @@ public class ChargeController : NetworkBehaviour, IDamageSettable
         {
             _isReached = true;
         }
+
+        Edit.Log(
+            $"[No.23/진단] 기둥 도달 — 도달 {_reachedCount}/{_max}, 파괴 {_destroyCount}/{_max}, " +
+            $"IsDefeated={_isDefeated}, IsReached={_isReached}", this);
+
+        // 파괴 + 도달이 _max 를 채웠는데 어느 플래그도 안 섰다면 그게 바로 교착이다.
+        if (!_isDefeated && !_isReached && _destroyCount + _reachedCount >= _max)
+        {
+            Edit.LogError(
+                $"[No.23/진단] 교착 — 파괴 {_destroyCount} + 도달 {_reachedCount} 가 _max({_max}) 를 채웠지만 " +
+                "`==` 판정이라 IsDefeated/IsReached 둘 다 false 다. BT가 차징에서 빠져나오지 못한다.", this);
+        }
     }
 
     void Init()
     {
+        // 진단 — 중단된 차징이 남긴 카운트를 여기서 지운다. 무엇을 지웠는지 보이면
+        // "부활 후 차징이 재시작됐는지 / 이전 상태를 물고 있는지"를 가를 수 있다.
+        if (_destroyCount != 0 || _reachedCount != 0 || _isDefeated || _isReached)
+        {
+            Edit.Log(
+                $"[No.23/진단] 차징 카운터 초기화 — 이전 상태 파괴 {_destroyCount}, 도달 {_reachedCount}, " +
+                $"IsDefeated={_isDefeated}, IsReached={_isReached} (_max={_max})", this);
+        }
+
         _isDefeated = false;
         _destroyCount = 0;
 
