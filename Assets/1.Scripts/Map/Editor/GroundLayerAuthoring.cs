@@ -53,6 +53,87 @@ public static class GroundLayerAuthoring
     [MenuItem("Tools/Map/Authoring/Ground Layer - 적용 (프리팹 + 열린 씬)")]
     public static void Apply() => Execute(true);
 
+    // ── 플레이어 접지 마스크 ────────────────────────────────────────────────────
+    //
+    // 보행면이 Ground 로 정리된 뒤에야 의미가 생기는 후속 작업이다.
+    // PlayerGroundingSensor.aliveGroundMask 가 Everything(~0) 이면 다음이 모두 "바닥"이 된다:
+    //   · 보스 공격 히트박스 (No.23 은 Default 레이어 콜라이더가 7개)
+    //   · 다른 플레이어의 캡슐 (Player 레이어)
+    //   · 시체·적·소품
+    // PlayerGroundingSensor 는 GroundProbe 와 달리 Unit 콜라이더를 제외하지 않는다
+    // (IsOwnCollider 가 자기 자신/자식만 제외). 경사각 필터만 통과하면 바닥으로 인정되므로,
+    // 주변에 무엇이 있느냐에 따라 접지가 달라진다 — dash 의 "되다 말다"가 이 형태다.
+    // 누락은 항상 실패를, 과다 포함은 간헐적 실패를 만든다.
+    //
+    // Ground 전용으로 좁히면 위 후보가 전부 빠지고, 움직이는 발판(PlatformBody)도 Ground 라 유지된다.
+    // 검증: 모든 테스트 씬의 실제 바닥이 이미 Ground 다 (PlayerDashTest=Plane, BossScene/
+    // PlayerBossTest=Ground, PlayerScene=Ground, MapScene=맵 프리팹 상속).
+    // Default 로 남는 것은 dash 장애물용 Cube 와 BossArea 마커뿐이다.
+    //
+    // soulGroundMask 는 건드리지 않는다 — 유령 상태는 통과 규칙이 다를 수 있어 별도 판단이다.
+    const string PlayerPrefabFolder = "Assets/2.Prefabs/Player";
+
+    [MenuItem("Tools/Map/Authoring/Ground Layer - 플레이어 접지 마스크를 Ground 전용으로")]
+    public static void NarrowPlayerGroundMask()
+    {
+        int groundLayer = LayerMask.NameToLayer(GroundLayerName);
+        if (groundLayer < 0)
+        {
+            Debug.LogError($"[GroundLayer] '{GroundLayerName}' 레이어가 없다.");
+            return;
+        }
+
+        int target = 1 << groundLayer;
+        var sb = new StringBuilder("[GroundLayer] 플레이어 접지 마스크\n");
+        int changed = 0;
+
+        foreach (string guid in AssetDatabase.FindAssets("t:Prefab", new[] { PlayerPrefabFolder }))
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            GameObject root = PrefabUtility.LoadPrefabContents(path);
+
+            try
+            {
+                var sensor = root.GetComponentInChildren<PlayerGroundingSensor>(true);
+                if (sensor == null)
+                    continue;
+
+                var so = new SerializedObject(sensor);
+                SerializedProperty alive = so.FindProperty("aliveGroundMask");
+                SerializedProperty soul = so.FindProperty("soulGroundMask");
+
+                if (alive == null)
+                {
+                    sb.AppendLine($"  ⚠️ aliveGroundMask 필드 없음: {path}");
+                    continue;
+                }
+
+                int before = alive.intValue;
+                string soulNote = soul != null ? $" / soulGroundMask={soul.intValue}(유지)" : "";
+
+                if (before == target)
+                {
+                    sb.AppendLine($"  정상  {path}  alive={before}{soulNote}");
+                    continue;
+                }
+
+                alive.intValue = target;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                PrefabUtility.SaveAsPrefabAsset(root, path);
+                changed++;
+
+                sb.AppendLine($"  수정  {path}  alive={before} → {target}{soulNote}");
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(root);
+            }
+        }
+
+        sb.AppendLine($"  → 프리팹 {changed}개 수정 (Ground 전용 = {target})");
+        Debug.Log(sb.ToString());
+    }
+
     struct Stat
     {
         public int Changed;
