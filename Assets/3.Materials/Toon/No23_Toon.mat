@@ -1,0 +1,80 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: No23_Toon
+  m_Shader: {fileID: 4800000, guid: 5470b58cb4c8a4c41b31ff395ed6dcd8, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords:
+  - _FIXEDLIGHT_ON
+  - _OUTLINE_SCREEN_ON
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties:
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _BaseMap:
+        m_Texture: {fileID: 2800000, guid: bb97635d9d632d044aa9937ba55086e4, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _Brightness: 1.08
+    - _CharAmbient: 0.32
+    - _CharKeyIntensity: 1.2
+    - _CharLightBlend: 1
+    - _FaceBrightness: 1.12
+    - _FaceFlatten: 1
+    - _FaceLiftAmbient: 0.9
+    - _FaceLiftHeight: 1.15
+    - _FaceLiftOn: 0
+    - _FaceLiftSmooth: 0.12
+    - _FixedLightOn: 1
+    - _HairOn: 0
+    - _HairShift: 0
+    - _HairSmooth: 0.05
+    - _HairThreshold: 0.62
+    - _MetalBandSmooth: 0.4
+    - _MetalOn: 0
+    - _OutlineDarken: 0.22
+    - _OutlineMinLum: 0.15
+    - _OutlinePixels: 5.4
+    - _OutlineScreenOn: 1
+    - _OutlineWidth: 0.006
+    - _ReceiveShadowStrength: 0.35
+    - _RimIntensity: 0.45
+    - _RimLightAlign: 0.35
+    - _RimPower: 5
+    - _Saturation: 1.02
+    - _Shade2Level: 0.32
+    - _Shade2Smooth: 0.035
+    - _Shade2Threshold: 0.33
+    - _ShadeAmbient: 0.24
+    - _ShadeSmooth: 0.03
+    - _ShadeStrength: 1
+    - _ShadeThreshold: 0.5
+    - _SpecSmooth: 0.05
+    - _SpecThreshold: 0.62
+    m_Colors:
+    - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
+    - _CharKeyColor: {r: 0.98, g: 0.98, b: 1, a: 1}
+    - _FixedLightDir: {r: 0.5, g: 0.55, b: 0.4, a: 0}
+    - _HairSpecColor: {r: 0.5, g: 0.5, b: 0.6, a: 1}
+    - _OutlineColor: {r: 1, g: 1, b: 1, a: 1}
+    - _RimColor: {r: 0.9, g: 0.92, b: 0.96, a: 1}
+    - _ShadeColor: {r: 0.46, g: 0.45, b: 0.5, a: 1}
+    - _SpecColor2: {r: 0.9, g: 0.94, b: 1, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1

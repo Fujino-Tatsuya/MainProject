@@ -1024,7 +1024,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1745528080
+  GlobalObjectIdHash: 739404150
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -1435,6 +1435,7 @@ MonoBehaviour:
   - {fileID: 7434833580858265621}
   - {fileID: 1173616335134953240}
   isOpenVariableName: IsOpen
+  isOverVariableName: IsOver
   restartChannel: {fileID: 11400000, guid: 86eb215c73ccef542a7511e8f09d6cda, type: 2}
 --- !u!114 &6491938153281997714
 MonoBehaviour:
@@ -1867,6 +1868,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 290302554425236768}
     m_Modifications:
+    - target: {fileID: 657607111497605440, guid: 79860f5bc8d12324ba329dfa38ea3699, type: 3}
+      propertyPath: GlobalObjectIdHash
+      value: 2959889982
+      objectReference: {fileID: 0}
     - target: {fileID: 4148832031641590993, guid: 79860f5bc8d12324ba329dfa38ea3699, type: 3}
       propertyPath: m_Name
       value: Wells
@@ -2007,7 +2012,7 @@ PrefabInstance:
     - target: {fileID: -6290459818519570926, guid: 471c30ff001a0254e8af63991ec73cf2, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 2100000, guid: 70f00129a6f8bbb46ac0e6a96dfddbce, type: 2}
+      objectReference: {fileID: 2100000, guid: 05140c2772297ca40b1428aeb4ed1c81, type: 2}
     - target: {fileID: -6290459818519570926, guid: 471c30ff001a0254e8af63991ec73cf2, type: 3}
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
