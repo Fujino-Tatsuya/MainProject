@@ -28,7 +28,9 @@ public static class WallOcclusionAuthoring
         "Assets/3.Materials/Level1_Materials/Occlusion";
     private const string SourceMaterialDirectory =
         "Assets/50.Art/MapGen/MapObj/material";
-    private const string MapScenePath = "Assets/0.Scenes/MapScene.unity";
+    // dash-soul 머지에서 씬이 0.Scenes/MainFlow/ 아래로 재편됐다(구 경로 "0.Scenes/MapScene.unity"는
+    // 더 이상 존재하지 않아 이 도구가 씬을 못 찾고 있었다).
+    private const string MapScenePath = "Assets/0.Scenes/MainFlow/4.MapScene.unity";
 
     // 바닥/천장은 셰이더의 wallness 판정으로 이미 제외되므로 변종을 만들지 않는다.
     // 만들어봐야 룩만 근사치로 바뀌고 얻는 게 없다.
