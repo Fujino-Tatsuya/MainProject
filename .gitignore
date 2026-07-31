@@ -80,6 +80,7 @@ crashlytics-build.properties
 
 # SVN-owned Unity asset trees.
 # Keep each asset file and its .meta file in the same VCS.
+# (AGENTS.md §3 — .meta 는 에셋과 같은 VCS 로 관리. 아트 .meta 는 SVN 소유)
 /[Aa]ssets/50.Art/
 /[Aa]ssets/51.Audio/
 
