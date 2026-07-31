@@ -41,7 +41,7 @@ public class MapSceneManager : NemoSceneManager
     {
         if (Keyboard.current?.escapeKey.wasPressedThisFrame == true)
         {
-            OpenOptionPanel();
+            ToggleOptionPanel();
         }
     }
 
@@ -115,6 +115,17 @@ public class MapSceneManager : NemoSceneManager
     public void OpenOptionPanel()
     {
         SetOptionPanel(true);
+    }
+
+    public void CloseOptionPanel()
+    {
+        SetOptionPanel(false);
+    }
+
+    // ESC / 톱니 토글 — 열려 있으면 닫고, 닫혀 있으면 연다.
+    public void ToggleOptionPanel()
+    {
+        SetOptionPanel(optionPanel == null || !optionPanel.activeSelf);
     }
 
     private void QuitApplication()
