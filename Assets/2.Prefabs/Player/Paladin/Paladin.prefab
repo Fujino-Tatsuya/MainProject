@@ -6807,7 +6807,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 4160073818
+  GlobalObjectIdHash: 582794665
   InScenePlacedSourceGlobalObjectIdHash: 582794665
   DeferredDespawnTick: 0
   Ownership: 8
@@ -6882,10 +6882,10 @@ MonoBehaviour:
   animator: {fileID: 0}
   interruptDuration: 0.5
   interruptForwardDistance: 0
-  attackDamage: 5
+  attackDamage: 33
   moveSpeed: 10
   attackSpeed: 0
-  maxHp: 50
+  maxHp: 9999
   defense: 25
   platformRiderMask:
     serializedVersion: 2

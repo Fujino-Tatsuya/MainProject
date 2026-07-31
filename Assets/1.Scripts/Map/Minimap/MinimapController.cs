@@ -69,6 +69,8 @@ public class MinimapController : MonoBehaviour
     private int _lastPlayerCount = -1;
     private Transform _corridorsRoot;
 
+    [SerializeField] private Material MinimapComsite;
+
     private void Awake()
     {
         // 맵 구조물(복도/다리 등)을 미리 캐싱하여 매 업데이트마다 찾는 비용 방지
@@ -328,6 +330,11 @@ public class MinimapController : MonoBehaviour
             return;
         }
 
+        if (MinimapComsite == null)
+        {
+            return;
+        }
+
         var canvasGo = new GameObject("MinimapCanvas");
         canvasGo.transform.SetParent(transform, false);
         _canvas = canvasGo.AddComponent<Canvas>();
@@ -339,8 +346,11 @@ public class MinimapController : MonoBehaviour
         var mapGo = new GameObject("Minimap", typeof(RawImage));
         mapGo.transform.SetParent(canvasGo.transform, false);
         var raw = mapGo.GetComponent<RawImage>();
-        var shader = Shader.Find("UI/MinimapComposite");
-        _mapMat = new Material(shader);
+        //var shader = Shader.Find("UI/MinimapComposite");
+        //_mapMat = new Material(shader);
+
+        _mapMat = new Material(MinimapComsite); //##경슥아 이거 수정했음 26.7.31
+
         _mapMat.SetTexture("_MainTex", _bakeRT);
         raw.texture = _bakeRT;
         raw.material = _mapMat;

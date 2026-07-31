@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: FirstMeleeUltimateSkillData
   m_EditorClassIdentifier: 
   inputType: 0
-  cooldownTime: 60
+  cooldownTime: 20
   attackDamageMultiplier: 3
   flatDamageBonus: 0
   maxActiveDuration: 1.5
@@ -21,12 +21,12 @@ MonoBehaviour:
   usableWhileDead: 0
   hittableLayers:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 16640
   targetingMode: 1
   confirmMode: 0
-  castRange: 8
+  castRange: 6
   targetableLayers:
     serializedVersion: 2
-    m_Bits: 256
+    m_Bits: 16640
   animatorStateName: Garen_Ultimate_Skill
   snapRotationOnStart: 1
