@@ -4,11 +4,12 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 현재 인수인계 (2026-07-31 · 보스 이슈 정리 + 툰셰이딩, `7c6ec58` push 완료)
+## ▶▶ 현재 인수인계 (2026-07-31 · 보스 이슈 정리 + 툰셰이딩 + Windows 빌드, `93716e0` 미push)
 
-작업 세션: **경석(Claude)**. 브랜치 `feature/map-player-merge`, origin 과 동기화됨.
-워킹트리에 남은 것은 **내용 변경 0 인 줄바꿈 노이즈 3개**뿐이다
-(`0.BootStrapScene` · `EditorBuildSettings` · `MultiplayerManager` — 커밋하지 말 것).
+작업 세션: **경석(Claude)**. 브랜치 `feature/map-player-merge`, origin 대비 **ahead 1**.
+워킹트리에 남은 것은 **내용 변경 0 인 줄바꿈 노이즈 4개**뿐이다
+(`0.BootStrapScene` · `GraphicsSettings` · `MultiplayerManager` ·
+`UniversalRenderPipelineGlobalSettings` — 커밋하지 말 것. `git diff` 가 0줄이면 이 부류다).
 
 ### 이번에 닫은 것
 
@@ -21,6 +22,7 @@ Update this file when a term becomes important enough that future agents or team
 | Q 스킬 도중 사망 시 애니메이터 초기화(`Rebind`+`Update(0)`) | `bae2e98` |
 | 부활 시 BT 플레이어 명부(`TargetGroup`/`TotalPlayerNumber`) 갱신 | `7c6ec58` |
 | 은희 컨베이어벨트(`6150ee5`) rebase 병합 · SVN r258→r259 | — |
+| **Windows 빌드 파이프라인** — `BuildWindowsPlayer` + 빌드 씬 목록 정리 + `productName` 복구 | `93716e0` |
 
 ### 다음 시작점 — 몬스터 배치
 
@@ -41,8 +43,34 @@ Update this file when a term becomes important enough that future agents or team
 - ✅ **Play 로그는 MCP 콘솔이 아니라 `%LOCALAPPDATA%\Unity\Editor\Editor.log` 로 읽힌다.**
   (2026-07-29 의 "스크린샷으로만 받는다"는 전제는 과했다. 한글은 깨지지만 ASCII 마커로
   검색하면 충분하다 — 이번 폭탄·BT 진단을 전부 이 방법으로 끝냈다.)
+- ✅ **Windows 빌드는 `BuildWindowsPlayer` 로 뽑는다.** 에디터를 닫은 뒤 CLI 배치모드:
+  `Unity.exe -batchmode -quit -projectPath <proj> -buildTarget Win64
+  -executeMethod BuildWindowsPlayer.BuildWindows64 -buildOutput <exe> -logFile <log>`
+  (또는 에디터 메뉴 `Build > Windows64 Player (MainFlow)`). 출력은 레포 밖에 둔다 —
+  `.gitignore` 에 `/Build/` 규칙이 없다. 첫 빌드 기준 4m41s / 369MB.
+- ⚠️ **`Unity.exe` 는 자기를 자식 프로세스로 재실행해서 셸에 exit 0 을 즉시 돌려준다.**
+  종료코드로 빌드 성공을 판단하면 안 된다. 판정은 로그의 `[Build] result=` 줄과
+  exe 존재로 한다(`MainProject_Data/level*` 개수 = 포함 씬 수).
+- ⚠️ **`Assets/Editor/` 는 `.gitignore:79` 로 무시된다.** 팀 공유용 에디터 스크립트는
+  `Assets/1.Scripts/Editor/` 에 둘 것(같은 `Assembly-CSharp-Editor` 로 컴파일된다).
+- 빌드가 부수적으로 만드는 것: `Assets/99.Settings/PC_RPAsset.asset` 의 `m_Prefilter*` 값과
+  `Assets/AddressableAssetsData/link.xml`. 둘 다 재생성물이라 커밋하지 않는다.
+- 🔴 **런타임 `Shader.Find` 는 빌드에서 null 이 된다** — 어떤 머티리얼/씬/프리팹도 참조하지 않는
+  셰이더는 빌드에서 스트립되기 때문. "에디터는 되는데 빌드만 안 됨"의 대표 원인이다.
+  미니맵(`UI/MinimapComposite`)이 이걸로 빌드에서 안 보였다. 프로젝트 자체 셰이더 5개 중
+  참조 0 이던 건 미니맵 하나뿐이고 나머지(ToonLit·ToonGlass·WaterDark·FullScreenFog)는 안전하다.
+  **커스텀 셰이더는 반드시 머티리얼 에셋 → 인스펙터 참조 체인으로 물릴 것.**
+  검증법: 빌드 로그에 `Compiling shader "<이름>"` 이 찍히는지 본다.
+- `#if` 전수조사 완료(자체 코드 36건) — M키·미니맵 미표시와 무관했다. 실제로 빌드에서 빠지는 건
+  `ProfilerHUD`(`UNITY_EDITOR || DEVELOPMENT_BUILD`) 하나뿐이고 어느 씬에도 안 붙어 있어 무해하다.
+  플레이어 어셈블리 define 확인법: `Library/Bee/artifacts/*P.dag/Assembly-CSharp.rsp`.
+- ⚠️ **TeslaBot 은 메쉬가 분리된 채 전투한다 — 미해결.** 조사만 했고 담당자 배정 대기다:
+  [Docs/tech/teslabot-mesh-separation-handoff.md](Docs/tech/teslabot-mesh-separation-handoff.md).
+  임시 조치로 `MapGenConfig` GroupID 3 을 TeslaBot → PeekABot 으로 대체해 뒀다(GroupName 에 "임시대체" 표기).
+  🔴 `MapGenConfig.asset` 은 `50.Art` = **SVN** 이라 git 커밋으로는 안 넘어간다 — TortoiseSVN 으로 커밋할 것.
 - 남은 이슈: Wells `BehaviorGraphAgent` 가 모든 피어에서 돎(멀티 검증 전 서버 게이트 필요) /
-  `WeaponTrailEffect` NRE 다수(로그 오염) / SVN `MapGenConfig.asset` 미커밋.
+  `WeaponTrailEffect` NRE 다수(로그 오염) / SVN `MapGenConfig.asset` 미커밋 /
+  빌드 exe 실플레이(타이틀→로비→맵→결과) 미검증.
 
 ---
 
