@@ -2536,6 +2536,7 @@ MonoBehaviour:
   NodeT1Color: {r: 1, g: 0.45, b: 0.15, a: 1}
   NodeT2Color: {r: 1, g: 0.85, b: 0.25, a: 1}
   NodeT3Color: {r: 0.4, g: 0.95, b: 0.4, a: 1}
+  MinimapComsite: {fileID: 2100000, guid: 41d1e8d3715472c44905bdbd6dd1ea3e, type: 2}
 --- !u!4 &683071051
 Transform:
   m_ObjectHideFlags: 0
