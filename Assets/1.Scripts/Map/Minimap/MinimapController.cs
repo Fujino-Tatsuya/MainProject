@@ -332,6 +332,11 @@ public class MinimapController : MonoBehaviour
 
         if (MinimapComsite == null)
         {
+            // 미배정이면 미니맵 UI 자체가 안 만들어진다 — 조용히 사라지면 원인 추적이 오래 걸리므로 알린다.
+            // 인스펙터 참조가 정본인 이유: 이 참조가 없으면 UI/MinimapComposite 셰이더를 아무 에셋도
+            // 참조하지 않게 되어 빌드에서 스트립된다(Shader.Find 로는 빌드에서 못 찾는다).
+            Debug.LogError("[Minimap] MinimapComsite 머티리얼 미할당 — 미니맵을 생성하지 않는다. " +
+                           "4.MapScene 의 Minimap 오브젝트에 3.Materials/MinimapComposite/MinimapComposite.mat 을 배정할 것.");
             return;
         }
 
