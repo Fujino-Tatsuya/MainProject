@@ -1,6 +1,6 @@
 # PLAN — 플로팅 데미지 (feature/FloatingDamage)
 
-> 상태: **구현 완료 · Unity/MPPM 검증 대기**. Codex(`fd` 레인) 구현 및 정적 컴파일 통과.
+> 상태: **구현 완료 · Unity/MPPM 검증 통과**(2026-08-05). 남은 것은 후속 작업(유닛별 앵커)뿐.
 > 설계 근거: [Docs/tech/floating-damage-design.md](../tech/floating-damage-design.md)
 > 워크트리 `C:\UnityProject\MainProject-WorkTree` / 브랜치 `feature/FloatingDamage` (base `Convayor-V2` c256a5d21)
 > 레포 루트의 `PLAN.md`는 별건(개발 진입점 단일화, 승인 대기)이라 건드리지 않는다.
@@ -79,5 +79,23 @@
   추가했다. 이는 판정에 사용하지 않고 표시 필터에서만 읽는다.
 - Unity 6000.3.16f1 컴파일 응답 파일과 현재 패키지 참조로 전체 런타임 C#을 컴파일해
   **0 errors**를 확인했다.
-- 이 환경의 Unity Licensing Client IPC 실패로 에디터 임포트 및 MPPM 검증은 수행하지 못했다.
-  Unity 에디터에서 프리팹/씬 직렬화 확인 후 완료조건의 MPPM 2인 시나리오를 실행해야 한다.
+- Codex 환경의 Unity Licensing Client IPC 실패로 에디터 검증은 Codex가 수행하지 못했다.
+
+## 검증 결과 (2026-08-05, Unity 에디터 + MPPM)
+
+**통과** — 완료조건 1~6 전부. 호스트 단독 3상태 동작(고정·합산·이탈·페이드), MPPM 2인 상호 표시,
+자기 피격 미표시, 필터 3값(`AllDamage`/`OwnDealtOnly`/`AllWithOwnEmphasis`) 동작, HitFlash·기존 HUD 회귀 없음.
+
+- 완료조건 4(기본 필터 RPC 0)는 코드 리뷰로만 확인했다(Network Profiler 계측은 생략).
+  게이트가 `FloatingDamageSpawner.RequiresAttributedDamageRpc` 정적 조건 하나다.
+- Vent 별도 검증은 불필요로 판정했다. `ApplyDirectHealthDamage`의 유일한 호출처는
+  `Player.cs`의 추락 피해(로컬 플레이어 자기 피해 → 표시 규칙상 미표시)이고, Vent는 데미지
+  콜라이더 = 일반 `ReceiveAttack` 경로다.
+- MPPM 클론이 브랜치 전환 이후 스테일해져 `BroAudio.asmdef`를 못 읽고 죽는 문제가 있었다.
+  `Library/VP/mppm*` 클론 폴더를 지우고 재생성해 해소했다(코드 문제 아님).
+
+## 후속 작업 — 유닛별 앵커
+
+`overheadWorldOffset`이 전 유닛 공통 고정값이라 몹과 보스의 체력바 위치가 어긋난다.
+신규 컴포넌트 `FloatingDamageAnchor`를 유닛 프리팹에 붙여 **체류(Active) 위치를 자식 Transform으로
+저작**하고, 앵커가 없으면 현재 오프셋으로 폴백한다. 프리팹별 앵커 배치는 에디터 작업.
