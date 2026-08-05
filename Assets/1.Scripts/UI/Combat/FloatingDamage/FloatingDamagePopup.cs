@@ -16,6 +16,7 @@ public sealed class FloatingDamagePopup : MonoBehaviour
 
     FloatingDamageSettings _settings;
     FloatingPopupRequest _request;
+    FloatingDamageAnchor _anchor;
     Action<FloatingDamagePopup> _release;
     PopupState _state;
     int _amount;
@@ -44,6 +45,7 @@ public sealed class FloatingDamagePopup : MonoBehaviour
     {
         _request = request;
         _settings = settings;
+        _anchor = request.target != null ? request.target.GetComponent<FloatingDamageAnchor>() : null;
         _release = release;
         _amount = Mathf.Max(0, request.amount);
         _state = PopupState.Active;
@@ -189,6 +191,12 @@ public sealed class FloatingDamagePopup : MonoBehaviour
 
     void SnapToTarget()
     {
+        if (_anchor != null)
+        {
+            transform.position = _anchor.WorldPosition;
+            return;
+        }
+
         if (_request.target != null)
             transform.position = _request.target.transform.position + _settings.OverheadWorldOffset;
     }

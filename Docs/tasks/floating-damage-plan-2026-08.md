@@ -1,6 +1,6 @@
 # PLAN — 플로팅 데미지 (feature/FloatingDamage)
 
-> 상태: **구현 완료 · Unity/MPPM 검증 통과**(2026-08-05). 남은 것은 후속 작업(유닛별 앵커)뿐.
+> 상태: **구현 완료 · Unity/MPPM 검증 통과 · 유닛별 앵커 코드 완료**(2026-08-05).
 > 설계 근거: [Docs/tech/floating-damage-design.md](../tech/floating-damage-design.md)
 > 워크트리 `C:\UnityProject\MainProject-WorkTree` / 브랜치 `feature/FloatingDamage` (base `Convayor-V2` c256a5d21)
 > 레포 루트의 `PLAN.md`는 별건(개발 진입점 단일화, 승인 대기)이라 건드리지 않는다.
@@ -99,3 +99,11 @@
 `overheadWorldOffset`이 전 유닛 공통 고정값이라 몹과 보스의 체력바 위치가 어긋난다.
 신규 컴포넌트 `FloatingDamageAnchor`를 유닛 프리팹에 붙여 **체류(Active) 위치를 자식 Transform으로
 저작**하고, 앵커가 없으면 현재 오프셋으로 폴백한다. 프리팹별 앵커 배치는 에디터 작업.
+
+### 구현 완료 (2026-08-05)
+
+- `FloatingDamageAnchor`는 지정된 자식 Transform의 월드 위치를 우선 사용하고, 지정하지 않으면
+  컴포넌트가 붙은 유닛 루트 기준 `localOffset`을 사용한다.
+- `FloatingDamagePopup`은 `Initialize`에서 대상의 앵커를 한 번만 조회해 캐시한다. Active 상태의
+  위치 추종은 캐시된 앵커를 사용하며, 앵커 미부착 유닛은 기존 `overheadWorldOffset` 경로를 그대로 쓴다.
+- 프리팹별 앵커 자식 오브젝트 생성·위치 조절은 Unity 에디터 저작 작업으로 남긴다.
