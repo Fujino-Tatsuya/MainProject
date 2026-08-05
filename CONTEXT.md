@@ -4,7 +4,98 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 현재 인수인계 (2026-07-31 · 보스 이슈 정리 + 툰셰이딩 + Windows 빌드, `93716e0` 미push)
+## ▶▶ 현재 작업 세션 (2026-08-05 · 렌더링 — 브랜치 `feature/maprendering`)
+
+작업 세션: **경석(Claude)**. 브랜치 `feature/maprendering`
+(= `development` `cbb51b1` 기준으로 분기, 원격 push 완료).
+
+**수정 예정 영역 — 렌더링/조명/포스트프로세싱.** Codex·팀원 동시 수정 주의 대상:
+`Assets/99.Settings/*`(URP 애셋·볼륨 프로파일) · 툰 셰이더/머티리얼 ·
+`4.MapScene`·`bossroom` 의 조명·볼륨 오브젝트. 세부 파일은 범위 확정 후 여기 추가한다.
+
+### 목표 — "레퍼런스 이미지 수준의 플레이 화면"
+
+팀장이 AI 생성 레퍼런스 이미지를 **목표 룩**으로 제시했다(2026-08-05, 채팅 첨부).
+탑다운 쿼터뷰 고정 / 셀셰이딩 캐릭터 + 회화풍 배경 / 부드러운 접지 그림자 +
+따뜻한 국소 조명(가로등·창) / 물·금속 반사 / 원경 디포커스 / 채도 높은 소품.
+이미지에는 HUD 배치안(특성·강화·스탯 육각 슬롯, 하단 스킬 슬롯, HP/MP 바, 남은 시간,
+우상단 미니맵)도 손으로 얹혀 있으나 **HUD 는 이 세션 범위와 별개 트랙**이다.
+
+🔴 **레퍼런스 이미지는 아직 채팅에만 있다 — `Docs/design/` 에 저장할 것.**
+
+- **카메라 조절은 완료** — FOV 52→34 / Priority 100 (`0522731`, development 에 포함).
+  이번 세션은 카메라가 아니라 **셰이딩·조명·포스트프로세싱**이다.
+- 세부 범위는 착수 전 확정한다(grill → `PLAN.md` 승인 후 구현).
+- 선행 참고: 툰셰이더 현황(`e5cc012`) · 벽 차폐/투명화 · `Docs/tech/fog-system.md`.
+
+### 브랜치 정리 (세션 시작 시)
+
+- `feature/map-player-merge` 삭제(`8e5a2ae`) — `origin/development` 에 전부 포함된 것을
+  확인한 뒤. `ahead 2` 는 **자기 원격 ref 가 낡아서 생긴 착시**였다.
+- 로컬 `development` 를 `origin/development`(`cbb51b1`) 로 갱신 후 거기서 분기.
+  `fix/AlphaAlert` 에는 development 에만 있는 커밋 12개가 빠져 있었다(ConveyorBelt 정리,
+  진입점 단일화, 미니맵 머티리얼 배선, 루프백 바인딩 수정, 50.Art gitignore 통일 등).
+- 🔴 **git↔SVN 하이브리드 함정 — "git 추적 해제" 커밋을 가로지르는 체크아웃은 SVN 소유
+  파일을 디스크에서 지운다.** development 의 `5cd384f`(SVN 소유 아트 `.meta` 140건 추적 해제)를
+  넘어오면서 git 이 `TestAssets/Temp_Images` 아래 `.meta` 5개를 **삭제**했다. 그대로 Unity 를
+  켰으면 GUID 재발급으로 참조가 깨졌을 것이다. SVN 이 `!`(missing) 로 잡고 있어 `svn revert`
+  로 복구, GUID 가 git 원본과 일치하는 것까지 확인했다.
+  **브랜치를 갈아탄 뒤 Unity 를 켜기 전에 아래를 볼 것:**
+  `svn status Assets/50.Art | Select-String "^!"`
+
+---
+
+## 이전 인수인계 (2026-08-05 · MCP 무한대기 해소 + 네트워크 권한 결함 2건, **PR #10 머지 완료** `cbb51b1`)
+
+작업 세션: **경석(Claude)**. `fix/AlphaAlert` → `development` 머지 완료, 원격 동기화됨.
+워킹트리에 남은 것은 **줄바꿈 노이즈 1개**(`MultiplayerManager`)뿐이다 — 아래 07-31 항목의
+"내용 변경 0" 부류와 같다. 커밋하지 말 것.
+
+### 이번에 닫은 것
+
+| 닫은 것 | 커밋 |
+|---|---|
+| **결과 씬 전환 메시지에 송신자 검증** — 클라가 named message 로 호스트를 결과 화면으로 끌고 갈 수 있었다 | `6d34ea1` |
+| **대시 서버 검증에 사망/영혼 배선** — 판정 입력이 `false` 하드코딩이라 죽은 플레이어 대시를 못 막았다 | `66d99af` |
+| **Unity MCP 무한대기 해소 + 브릿지 런처** (핀 `cf61cc5`→`2ea969e`) | `58f3c19` · `effdf12` |
+| 툰 룩 동결값 — 카메라 FOV 52→34 / Priority 100 / Paladin 툰 4값 | `0522731` |
+
+두 결함은 Codex·Claude 교차 코드리뷰에서 나왔다. 리뷰 원문·39건 목록은 개인 보관.
+
+### 다음 시작점 — 렌더링 수정 (**새 브랜치에서 작업**)
+
+팀장 지시: 다음 작업은 렌더링 수정이며 **브랜치를 새로 파서** 진행한다. 구체 범위는 다음 세션에
+확정. 관련 기존 문서를 먼저 확인할 것 — 툰셰이더 현황(위 07-31 §이번에 닫은 것 `e5cc012`),
+벽 차폐/투명화, `Docs/tech/fog-system.md`.
+
+### 이 세션에 확립된 것
+
+- 🔴 **Claude Code 는 프로젝트 `.mcp.json` 이 아니라 `~/.claude.json` 의 user 스코프
+  `mcpServers` 를 우선한다.** 둘 다 `unity` 가 있으면 프로젝트 쪽은 무시된다.
+  MCP 가 "고쳤는데 그대로"면 **실행 중인 프로세스의 커맨드라인부터 본다**:
+  `Get-CimInstance Win32_Process -Filter "name='node.exe'" | Select CommandLine`.
+- 🔴 **브릿지 사본을 홈(`~/.unity-mcp/`)에 두지 말 것.** 사본은 패키지가 갱신돼도 조용히 낡고,
+  낡았다는 신호가 어디에도 안 뜬다. 경로가 흔들리는 문제는 사본이 아니라 **런처로** 푼다 —
+  `.mcp-bridge-launcher.js`(레포 루트, 커밋됨)가 `PackageCache` 를 실행 시점에 탐색하므로
+  **앞으로 패키지 핀을 갱신해도 개인 설정을 고칠 필요가 없다.**
+- ⚠️ **MCP 무한대기의 원인은 타임아웃 부재가 아니라 응답 id 유실이었다.** 서버가 합성 에러에
+  id 를 안 실으면(`id:null`) HTTP 200 으로 나가고, 브릿지는 "정상 응답"으로 처리해
+  **자체 타임아웃·재시도가 아예 발동하지 않는다.** 요청-응답 프로토콜에서 무한대기를 만나면
+  "응답이 오는가"보다 **"응답의 상관키가 맞는가"** 를 먼저 본다.
+- ✅ **MCP 패키지 수정 절차**: `C:\Users\user\unity-mcp-fork` 의 **`optimized` 브랜치**에서
+  수정 → push → `Packages/manifest.json` 핀 갱신 → Unity 재시작. `main` 은 이 프로젝트가
+  쓰는 계보가 아니다. lock(`packages-lock.json`)도 같이 커밋해야 팀원이 새 버전을 받는다.
+- ⚠️ **`MapSceneManager` 만 송신자 검증이 빠져 있었다** — `LobbyUIController:259`,
+  `NetworkLoadingFlowController:766`, `NetworkClock:264` 는 이미 하고 있었다. NGO custom
+  named message 핸들러를 새로 추가할 때는 이 가드를 기본으로 넣을 것.
+- ⚠️ **`PlayerDashController` 는 `PlayerLifeCycleController` 가 없으면 "살아있음"으로 폴백한다**
+  (대시 전용 테스트 씬 대응). 프로덕션 프리팹에서 이 컴포넌트가 누락되면 사망 검증이 조용히
+  빠지므로, 서버 스폰 경고(`[DashAlert] PlayerLifeCycleController가 없어…`)를 무시하지 말 것.
+- 팀원 조치 안내는 볼트 `Core/MCP패키지_포크전환_안내.md`(2026-08-05 최신화)에 정리했다.
+
+---
+
+## 이전 인수인계 (2026-07-31 · 보스 이슈 정리 + 툰셰이딩 + Windows 빌드, `93716e0` — PR #10 로 머지됨)
 
 작업 세션: **경석(Claude)**. 브랜치 `feature/map-player-merge`, origin 대비 **ahead 1**.
 워킹트리에 남은 것은 **내용 변경 0 인 줄바꿈 노이즈 4개**뿐이다
