@@ -222,6 +222,24 @@ public static class RenderingLookAuthoring
             "⚠️ Bokeh 는 Gaussian 보다 비싸다 — AA 성능 비교 시 이 비용을 함께 볼 것.");
     }
 
+    // 마스크 블러와 DoF 는 같은 일(배경 디포커스)을 서로 다른 기준으로 하므로 겹친다.
+    // 둘 다 켜면 이중 블러가 되고 Bokeh 는 비싸다 — 하나만 쓰는 게 맞다.
+    [MenuItem("Tools/Rendering/Look/DoF — Off")]
+    public static void DisableDof()
+    {
+        var profile = AssetDatabase.LoadAssetAtPath<VolumeProfile>(MapVolumeProfilePath);
+        if (profile == null || !profile.TryGet(out DepthOfField dof))
+        {
+            Debug.LogWarning("[RenderingLook] 볼륨 프로파일에 DepthOfField 가 없다.");
+            return;
+        }
+
+        Override(dof.mode, DepthOfFieldMode.Off);
+        EditorUtility.SetDirty(profile);
+        AssetDatabase.SaveAssets();
+        Debug.Log("[RenderingLook] DoF = Off. 되살리려면 Apply DoF 메뉴를 쓴다.");
+    }
+
     // ---- 안티에일리어싱 A/B ----
     //
     // 게임플레이 카메라는 씬에 없다 — CameraTargetSwitcher 가 MainCamera.prefab 을 런타임에
