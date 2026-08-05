@@ -174,6 +174,61 @@ public static class RenderingLookAuthoring
         Toggle<FogManager>("포그 매니저(디밍·시야)");
     }
 
+    // ---- 안티에일리어싱 A/B ----
+    //
+    // 게임플레이 카메라는 씬에 없다 — CameraTargetSwitcher 가 MainCamera.prefab 을 런타임에
+    // Instantiate 한다. 그래서 인스펙터로 찾아 들어가려면 프리팹을 직접 열어야 하는데,
+    // 그 사실 자체가 안 알려져 있어서 "카메라 설정을 바꿨는데 안 먹는다"가 반복된다.
+    // 여기서 프리팹을 직접 고쳐 그 함정을 우회한다.
+    //
+    // 무엇을 비교하는가:
+    //   None — 기준선. 계단현상 그대로, 디더는 날것.
+    //   SMAA — 계단현상만 잡는다. 시간축 누적이 없어 고스팅이 없고 프레임 비용도 예측 가능하다.
+    //          ⚠️ 이걸 쓸 때는 WallOcclusionSettings.animateDither 를 반드시 끈다.
+    //   TAA  — 계단현상 + 디더를 함께 녹일 수 있지만, 분산 클램프가 디더를 기각하면
+    //          뿌연 얼룩이 되고 빠른 이동에서 고스팅이 생긴다.
+    private const string MainCameraPrefabPath = "Assets/2.Prefabs/Camera/MainCamera.prefab";
+
+    [MenuItem("Tools/Rendering/Look/AA — None")]
+    public static void SetAaNone() => SetAntialiasing(AntialiasingMode.None);
+
+    [MenuItem("Tools/Rendering/Look/AA — SMAA")]
+    public static void SetAaSmaa() =>
+        SetAntialiasing(AntialiasingMode.SubpixelMorphologicalAntiAliasing);
+
+    [MenuItem("Tools/Rendering/Look/AA — TAA")]
+    public static void SetAaTaa() =>
+        SetAntialiasing(AntialiasingMode.TemporalAntiAliasing);
+
+    private static void SetAntialiasing(AntialiasingMode mode)
+    {
+        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(MainCameraPrefabPath);
+        if (prefab == null)
+        {
+            Debug.LogError($"[RenderingLook] 카메라 프리팹을 찾지 못했다: {MainCameraPrefabPath}");
+            return;
+        }
+
+        var data = prefab.GetComponentInChildren<UniversalAdditionalCameraData>(true);
+        if (data == null)
+        {
+            Debug.LogError(
+                "[RenderingLook] UniversalAdditionalCameraData 가 없다 — " +
+                $"{MainCameraPrefabPath} 구조를 확인할 것.");
+            return;
+        }
+
+        data.antialiasing = mode;
+        EditorUtility.SetDirty(data);
+        PrefabUtility.SavePrefabAsset(prefab);
+
+        string note = mode == AntialiasingMode.TemporalAntiAliasing
+            ? "animateDither 를 켜도 되는 유일한 모드다."
+            : "WallOcclusionSettings.animateDither 는 꺼 둘 것(지글거림).";
+
+        Debug.Log($"[RenderingLook] 안티에일리어싱 = {mode}. {note}");
+    }
+
     private static void Toggle<T>(string label) where T : MonoBehaviour
     {
         var target = Object.FindFirstObjectByType<T>(FindObjectsInactive.Include);

@@ -23,6 +23,14 @@ namespace VeyTrace.Rendering.Occlusion
         [Tooltip("플레이어보다 뒤로 이 거리만큼 지나면 원래 불투명도로 되돌아온다.")]
         [Min(0.01f)] public float behindFalloff = 1.5f;
 
+        [Header("Dither")]
+        [Tooltip("디더 패턴을 프레임마다 흔든다. TAA 전용 옵션이다.\n\n" +
+                 "TAA 를 쓸 때만 켠다 — TAA 가 프레임을 누적해 매끈한 반투명으로 녹여준다.\n" +
+                 "SMAA/None 에서 켜면 녹여줄 주체가 없어 화면이 지글거리기만 한다.\n" +
+                 "TAA 에서도 분산 클램프(VarianceClampScale)가 디더 변동을 히스토리에서 " +
+                 "기각하면 뿌연 얼룩으로 뭉갤 수 있으므로, 켠 뒤 반드시 눈으로 확인할 것.")]
+        public bool animateDither = false;
+
         [Header("Floor Guard")]
         [Tooltip("노멀이 이만큼 위를 향하면 바닥 후보로 본다. 낮출수록 경사면까지 바닥으로 취급한다.")]
         [Range(0f, 0.95f)] public float floorNormalThreshold = 0.35f;

@@ -68,12 +68,18 @@ namespace VeyTrace.Rendering.Occlusion
                 new Vector4(cameraPosition.x, cameraPosition.y, cameraPosition.z, 0f));
             Shader.SetGlobalVector(RangePropertyId, BuildRange(settings, true));
             Shader.SetGlobalVector(ShapePropertyId, BuildShape(settings));
-            Shader.SetGlobalVector(DitherPropertyId, BuildDither(Time.frameCount));
+            Shader.SetGlobalVector(
+                DitherPropertyId,
+                BuildDither(Time.frameCount, settings.animateDither));
         }
 
         // x = 이번 프레임의 디더 오프셋. 셰이더가 픽셀 좌표에 더해서 쓴다.
-        public static Vector4 BuildDither(int frameCount)
+        // animate 가 false 면 0 을 넣어 기존의 고정 패턴으로 되돌아간다.
+        public static Vector4 BuildDither(int frameCount, bool animate)
         {
+            if (!animate)
+                return Vector4.zero;
+
             float offset = (frameCount % DitherFrameCycle) * DitherFrameStride;
             return new Vector4(offset, 0f, 0f, 0f);
         }
