@@ -99,8 +99,7 @@ public sealed class WallOcclusionDriver : MonoBehaviour
         if (roots.Count == 0)
         {
             Debug.LogWarning(
-                $"[WallOcclusion] 바인딩 루트를 찾지 못했다. " +
-                $"('{MapContentSpawner.RootName}', '{StaticStageRootName}')",
+                $"[WallOcclusion] 바인딩 루트를 찾지 못했다. ('{StaticStageRootName}')",
                 this);
             return;
         }
@@ -126,10 +125,16 @@ public sealed class WallOcclusionDriver : MonoBehaviour
         }
     }
 
+    // 투명화 대상은 Stage1(정적 스테이지) 안의 벽 계열뿐이다.
+    //
+    // 왜 GeneratedMap 을 제외하는가 (2026-08-05 팀장 판단):
+    // 존 프리팹 안에 배치된 것들은 통행을 가로막는 벽이 아니라 존 내부의 구조물·소품이다.
+    // 이것들까지 투명화하면 존 안에서 화면이 통째로 듬성듬성해지고, 무엇보다 기계류가 쓰는
+    // 멀티텍스처 머티리얼은 변종으로 재현이 안 돼 원본과 다른 톤으로 튄다.
+    // 시야를 실제로 가리는 것은 Stage1 의 통로 벽이므로 대상을 거기로 좁힌다.
     private List<Transform> CollectRoots()
     {
-        var roots = new List<Transform>(2);
-        AddRoot(roots, MapContentSpawner.RootName);
+        var roots = new List<Transform>(1);
         AddRoot(roots, StaticStageRootName);
         return roots;
     }
