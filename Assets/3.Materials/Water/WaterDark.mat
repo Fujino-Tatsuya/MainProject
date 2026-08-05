@@ -36,11 +36,11 @@ Material:
     - _FlowSharp: 2.21
     - _FlowStrength: 0.646
     m_Colors:
-    - _DeepColor: {r: 0.35154855, g: 0.39122057, b: 0.4716981, a: 1}
+    - _DeepColor: {r: 0.068, g: 0.273, b: 0.263, a: 1}
     - _DepthDrift1: {r: -0.35, g: 2.3, b: 1.06, a: 0.68}
     - _DepthDrift2: {r: 1, g: 0.25, b: 0.32, a: 0}
     - _DepthDrift3: {r: 0.015, g: -0.02, b: 0, a: 0}
-    - _FlowColor: {r: 0.6363474, g: 0.7327519, b: 0.735849, a: 1}
+    - _FlowColor: {r: 0.147, g: 0.395, b: 0.367, a: 1}
     - _FlowSpeed1: {r: 0.6, g: 1, b: 0, a: 0}
     - _FlowSpeed2: {r: -0.4, g: 0.5, b: 0, a: 0}
   m_BuildTextureStacks: []
