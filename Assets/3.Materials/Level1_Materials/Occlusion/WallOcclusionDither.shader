@@ -50,6 +50,7 @@ Shader "Project/Environment/Wall Occlusion Dither"
         float4 _WallOccCameraWS;   // xyz = 게임플레이 카메라 월드 위치
         float4 _WallOccRange;      // x=innerRadius, y=outerRadius, z=minOpacity, w=enable
         float4 _WallOccShape;      // x=floorNormalThreshold, y=behindFalloff, z=floorGuardDepth
+        float4 _WallOccDither;     // x=프레임별 디더 오프셋(TAA 가 녹일 수 있게 흔든다)
 
         TEXTURE2D(_BaseMap);
         SAMPLER(sampler_BaseMap);
@@ -104,16 +105,37 @@ Shader "Project/Environment/Wall Occlusion Dither"
             return lerp(opacity, 1.0, floorProtect);
         }
 
-        void ClipWallOcclusion(float4 positionCS, float3 positionWS, half3 normalWS)
+        // interleaved gradient noise — 화면 공간 디더로 반투명을 흉내낸다.
+        // ditherOffset 을 프레임마다 바꾸면 살아남는 픽셀이 매번 달라진다.
+        void ClipWallOcclusionWithOffset(
+            float4 positionCS, float3 positionWS, half3 normalWS, float ditherOffset)
         {
             float opacity =
                 WallOcclusionFactor(positionWS, normalWS) * _WallOcclusionOpacity;
 
-            // interleaved gradient noise — 화면 공간 디더로 반투명을 흉내낸다.
-            float2 pixel = floor(positionCS.xy);
+            float2 pixel = floor(positionCS.xy) + ditherOffset;
             float threshold =
                 frac(52.9829189 * frac(dot(pixel, float2(0.06711056, 0.00583715))));
             clip(opacity - threshold);
+        }
+
+        // 색 패스용. 디더를 시간축으로 흔들어 TAA 가 매끈한 반투명으로 누적하게 한다.
+        // ⚠️ TAA 가 꺼져 있으면 녹여줄 주체가 없어 화면이 지글거리기만 한다 — 둘은 세트다.
+        void ClipWallOcclusion(float4 positionCS, float3 positionWS, half3 normalWS)
+        {
+            ClipWallOcclusionWithOffset(
+                positionCS, positionWS, normalWS, _WallOccDither.x);
+        }
+
+        // 깊이·그림자 패스용. 여기서는 고정 패턴을 쓴다.
+        //
+        // 왜 나눴는가: 이 패스들의 결과는 _CameraDepthTexture 로 나가 SSAO·DoF 가 샘플하고,
+        // TAA 자신도 리프로젝션 기준으로 깊이를 본다. 깊이 구멍이 프레임마다 움직이면
+        // 그 효과들이 통째로 깜빡이고, TAA 는 이웃 클램프가 샘플을 계속 기각해 오히려
+        // 누적이 안 된다. 흔들어야 하는 것은 눈에 보이는 색뿐이다.
+        void ClipWallOcclusionStable(float4 positionCS, float3 positionWS, half3 normalWS)
+        {
+            ClipWallOcclusionWithOffset(positionCS, positionWS, normalWS, 0.0);
         }
         ENDHLSL
 
@@ -283,7 +305,7 @@ Shader "Project/Environment/Wall Occlusion Dither"
             {
                 UNITY_SETUP_INSTANCE_ID(input);
                 // 사라진 벽이 그림자만 남기지 않도록 그림자 패스도 같은 기준으로 클립한다.
-                ClipWallOcclusion(input.positionCS, input.positionWS, input.normalWS);
+                ClipWallOcclusionStable(input.positionCS, input.positionWS, input.normalWS);
                 return 0;
             }
             ENDHLSL
@@ -332,7 +354,7 @@ Shader "Project/Environment/Wall Occlusion Dither"
             {
                 UNITY_SETUP_INSTANCE_ID(input);
                 // Depth 기반 효과(포그·SSAO 등)에 사라진 벽이 남지 않게 동일 기준으로 클립한다.
-                ClipWallOcclusion(input.positionCS, input.positionWS, input.normalWS);
+                ClipWallOcclusionStable(input.positionCS, input.positionWS, input.normalWS);
                 return 0;
             }
             ENDHLSL
@@ -379,7 +401,7 @@ Shader "Project/Environment/Wall Occlusion Dither"
             half4 DepthNormalsFrag(Varyings input) : SV_Target
             {
                 UNITY_SETUP_INSTANCE_ID(input);
-                ClipWallOcclusion(input.positionCS, input.positionWS, input.normalWS);
+                ClipWallOcclusionStable(input.positionCS, input.positionWS, input.normalWS);
                 return half4(normalize(input.normalWS) * 0.5h + 0.5h, 0);
             }
             ENDHLSL
