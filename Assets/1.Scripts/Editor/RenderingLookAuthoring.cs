@@ -152,27 +152,45 @@ public static class RenderingLookAuthoring
         return component;
     }
 
-    // 벽 투명화(디밍 차폐) 껐다 켜기.
-    // 끄면 머티리얼 교체 자체가 일어나지 않아 벽이 원본 아트 머티리얼로 렌더된다
-    // (셰이더 전역 _WallOccRange.w 도 0 이라 디더 경로를 통째로 건너뛴다).
+    // 벽 투명화(플레이어를 가리는 벽을 비운다) 껐다 켜기.
+    // ⚠️ 이 기능은 켜 두는 것이 기본이다 — 끄면 벽 뒤 플레이어가 그냥 안 보인다.
+    //    화면에 보이는 디더(스크린도어) 무늬는 품질 문제가 아니라 의도된 비용 절충이다:
+    //    반투명 블렌딩 대신 clip() 으로 처리해 불투명 큐 한 패스로 끝낸다.
+    //    A/B 비교할 때만 잠깐 끄고, 끝나면 반드시 되돌릴 것.
     [MenuItem("Tools/Rendering/Look/Toggle Wall Occlusion (open scene)")]
     public static void ToggleWallOcclusion()
     {
-        var driver = Object.FindFirstObjectByType<WallOcclusionDriver>(FindObjectsInactive.Include);
-        if (driver == null)
+        Toggle<WallOcclusionDriver>("벽 투명화");
+    }
+
+    // 포그 매니저 껐다 켜기.
+    // ⚠️ 이름은 "포그"지만 실제로 화면을 어둡게 만드는 건 디밍(dimEnabled)과 시야 제한(losEnabled)이다.
+    //    프로파일의 fogEnabled 는 이미 0 이라 포그 자체는 안 그려진다.
+    //    FogRendererFeature 는 FogManager.HasActiveInstance 로 조기 반환하므로
+    //    컴포넌트만 끄면 풀스크린 패스가 통째로 빠지고, OnDisable 이 셰이더 전역도 0 으로 되돌린다.
+    [MenuItem("Tools/Rendering/Look/Toggle Fog Manager (open scene)")]
+    public static void ToggleFogManager()
+    {
+        Toggle<FogManager>("포그 매니저(디밍·시야)");
+    }
+
+    private static void Toggle<T>(string label) where T : MonoBehaviour
+    {
+        var target = Object.FindFirstObjectByType<T>(FindObjectsInactive.Include);
+        if (target == null)
         {
             Debug.LogWarning(
-                "[RenderingLook] 열린 씬에서 WallOcclusionDriver 를 찾지 못했다. " +
+                $"[RenderingLook] 열린 씬에서 {typeof(T).Name} 을(를) 찾지 못했다. " +
                 "4.MapScene 을 연 뒤 다시 실행할 것.");
             return;
         }
 
-        driver.enabled = !driver.enabled;
-        EditorUtility.SetDirty(driver);
-        EditorSceneManager.MarkSceneDirty(driver.gameObject.scene);
+        target.enabled = !target.enabled;
+        EditorUtility.SetDirty(target);
+        EditorSceneManager.MarkSceneDirty(target.gameObject.scene);
 
         Debug.Log(
-            $"[RenderingLook] 벽 투명화 = {(driver.enabled ? "ON" : "OFF")} " +
-            $"(씬 '{driver.gameObject.scene.name}'). 씬 저장 필요.");
+            $"[RenderingLook] {label} = {(target.enabled ? "ON" : "OFF")} " +
+            $"(씬 '{target.gameObject.scene.name}'). 씬 저장 필요.");
     }
 }
