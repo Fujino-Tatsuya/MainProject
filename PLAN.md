@@ -1,3 +1,139 @@
+# CURRENT PLAN — 지연 체력바(잔상 바) — 플레이어/보스 HUD (2026-08-05)
+
+> 상태: **승인 대기**. 브랜치 `feature/DelayedHealthBar` (base `Convayor-V2`), 레인 `dash`.
+> 구현 위임: Codex(코드만) / 프리팹 배선: 은희(Unity 에디터).
+> grill 완료 — 아래는 확정된 결정만 담는다.
+
+## 목표
+
+피격 시 **앞쪽 HP 바는 즉시 줄고, 뒤쪽 잔상 바가 옛 HP에 잠시 머문 뒤 따라 내려온다**.
+잃은 양을 눈으로 읽히게 하는 순수 로컬 표현(길티기어/LoL 방식).
+
+## 스코프
+
+- **In**: 로컬 플레이어 HUD(`PlayerHealthHUD`), 보스 HUD(`BossHealthHUD`).
+- **Out**: 원격 플레이어 머리 위 바(`UnitOverheadHealthBar`) — 월드스페이스 소형 바라 효과 낮고
+  `Player.prefab` 수정이 필요. 로직은 재사용 가능한 형태로 두어 나중에 붙일 수 있게 한다.
+- **Out**: 실드 바 — 실드는 상한(MaxShield) 개념이 없어(현재도 MaxHp 대비로 그림) 잔상 의미가 모호.
+- **Out**: 지연 *피해* 게이지(예약 피해 후 적용)류 게임플레이 변경 — UI 작업이 아님.
+
+## 알고리즘 (확정)
+
+```
+state: Queue<int> held      // 아직 잔상으로 붙잡고 있는 피해 조각
+       float displayed      // 잔상 바가 그리는 값 (비율 아님, HP 절대값)
+       float holdTimer
+
+이벤트 Unit.ClientHpChanged(prev, next):
+  if next < prev:
+      held.Enqueue(prev - next)
+      holdTimer 시작  // resetHoldOnDamage=true면 매번 갱신, false면 held가 비어있었을 때만
+      if held.Count > maxHeldHits: held.Dequeue()   // 가장 먼저 들어온 조각부터 놓아줌
+  else:
+      held.Clear(); displayed = next                // 회복 → 즉시 스냅
+  if next <= 0: held.Clear(); displayed = 0         // 사망 → 0 스냅
+
+매 프레임(Tick):
+  if holdTimer 만료: held.Clear()
+  target    = hp + held.Sum()
+  displayed = MoveTowards(displayed, target, maxHp * drainRatePerSecond * dt)
+  delayedFill.fillAmount = maxHp > 0 ? clamp01(displayed / maxHp) : 0
+```
+
+### 파라미터 (전부 `SerializeField`, 인스펙터 튜닝)
+
+| 필드 | 기본값 | 의미 |
+|---|---|---|
+| `holdSeconds` | 0.4 | 피격 후 잔상이 멈춰 있는 시간 |
+| `drainRatePerSecond` | 0.8 | 초당 감소량 = 최대HP의 80% (**고정 속도** → 큰 피해는 오래, 작은 피해는 짧게 흐름) |
+| `maxHeldHits` | 5 | 홀드로 붙잡을 최대 피격 횟수. 초과하면 가장 오래된 조각을 pop |
+| `resetHoldOnDamage` | 플레이어 `true` / 보스 `false` | 피격마다 홀드 타이머를 갱신할지 |
+
+**왜 큐인가**: 보스 HUD는 3인이 거의 매 프레임 때리고, 플레이어도 Vent 장판/도트를 맞는다.
+"피격마다 홀드 리셋"만 있으면 리셋이 무한 갱신돼 **잔상이 전투 시작 HP에 영구 고착**한다.
+큐 상한(`maxHeldHits`)이 그 고착을 끊고, 보스는 리셋 자체를 끈다.
+
+**왜 고정 속도인가**: 고정 시간은 피해 크기 정보를 지우고, `Lerp` 감쇠는 끝이 안 닿아 잔상이
+미세하게 남고 프레임레이트에 의존한다.
+
+**pop = 즉시 차감이 아니다** — `target`을 낮출 뿐이고 실제 감소는 위 고정 속도로 흐른다.
+
+### 즉시 리셋(스냅) 케이스 — 이 4개만
+
+1. 대상 교체 (`Bind` 재호출 / 보스 참조 변경)
+2. 회복 (HP 증가)
+3. 사망 (HP 0)
+4. `PlayerHealthHUD.SetDisplayOverrideZero(true)` (Soul 표현 — HUD를 0으로 덮을 때 잔상도 0)
+
+`FinalMaxHp` 변동은 리셋 불필요 — `displayed`를 HP 절대값으로 보관하므로 비율이 자동으로 맞는다.
+
+## 피해 감지 — 기존 복제 이벤트 확장
+
+[Unit.cs:474](Assets/1.Scripts/Unit/Unit.cs:474)의 `OnHpReplicated(prev, next)`가 이미 있고
+`next < prev`만 걸러 `ClientDamaged`(파라미터 없음)를 쏜다. 여기에 **증감 전부를 흘리는 이벤트를
+2줄 추가**한다. 데미지 파이프라인·서버 권한 경로는 건드리지 않는다.
+
+```csharp
+public event System.Action<int, int> ClientHpChanged;   // (previous, next)
+
+void OnHpReplicated(int previous, int next)
+{
+    ClientHpChanged?.Invoke(previous, next);            // 추가
+    if (next < previous) ClientDamaged?.Invoke();       // 기존 유지 (HitFlash 구독)
+}
+```
+
+- `NetworkVariable` 복제 기반이라 RPC 불필요, 모든 피어에서 발동.
+- 회복도 쏘는 이유: 회복 시 잔상 스냅 신호가 필요하고, 소스가 이벤트 하나로 단일화된다.
+- 기존 `ClientDamaged`와 `HitFlash`는 **무수정**(실드 감소도 쏘므로 HP 델타 의미가 오염됨 → 통합 안 함).
+- 한계: 리모트 클라는 네트워크 틱에서 여러 피격이 합산될 수 있어 큐 카운트가 근사치다.
+  호스트에서는 1건당 1회 보장. 잔상 연출에는 무해.
+
+## 구독 수명주기
+
+| 지점 | 처리 |
+|---|---|
+| `PlayerHealthHUD.Bind(player)` | 이전 대상 구독 해제 → 새 대상 구독, `displayed = CurrentHealth` 스냅. `OnDisable`에서 해제 |
+| `BossHealthHUD` | 매 프레임 `FindBoss()` 결과가 이전 참조와 다르면 구독 교체 + 잔상 리셋 (보스1→보스2 잔상 누출 방지) |
+| 늦은 바인딩 | 구독 직후 현재 HP로 스냅. 놓친 구간은 잔상 없이 시작 |
+
+## 변경 파일 (정확히 4개)
+
+| 파일 | 변경 |
+|---|---|
+| `Assets/1.Scripts/UI/Combat/DelayedHealthBar.cs` | **신규** — `[Serializable]` 순수 C# 클래스. `Image delayedFill` + 파라미터 + `Queue<int>`. API: `Bind(int hp)` / `OnHpChanged(int prev, int next)` / `Tick(float dt, int hp, int maxHp)` |
+| `Assets/1.Scripts/Unit/Unit.cs` | `ClientHpChanged` 이벤트 + `Invoke` (2줄) |
+| `Assets/1.Scripts/UI/Combat/PlayerHealthHUD.cs` | `[SerializeField] DelayedHealthBar delayed;` + 구독/Tick + `SetDisplayOverrideZero` 연동 |
+| `Assets/1.Scripts/UI/Combat/BossHealthHUD.cs` | 동일 + 대상 교체 감지 |
+
+기존 `hpFill` / `hpText` / 실드 / `displayOverrideZero`의 **매 프레임 폴링은 그대로 유지**한다
+(이벤트로 옮기면 리팩터 범위가 커진다). 잔상만 이벤트 기반.
+
+## 프리팹 배선 (사용자 몫 — Codex 범위 밖)
+
+Codex는 `.cs` 4개만 건드리고 **프리팹/씬/`.meta`는 수정하지 않는다**. 이후 은희가 Unity에서:
+
+1. [CombatHUD.prefab](Assets/2.Prefabs/UI/CombatHUD.prefab) — HP 바에 Image 추가, `hpFill`과 동일한
+   RectTransform/`fillMethod`, **형제 순서를 `hpFill`보다 앞**(= 뒤에 그려짐) → `delayed.delayedFill`에 연결
+2. [BossHealthHUD.prefab](Assets/2.Prefabs/UI/BossHealthHUD.prefab) — 동일
+3. 색/투명도는 프리팹에서 결정(코드는 `fillAmount`만 건드림), `resetHoldOnDamage`는 보스만 해제
+
+## 완료 조건
+
+1. 변경 파일 정확히 4개. **프리팹/씬/`.meta` 무수정**
+2. 신규 `.cs`는 **UTF-8(BOM)** — 레포 인코딩 규칙
+3. 기존 폴링 동작(HP 텍스트·앞바·실드·`displayOverrideZero`) 회귀 없음
+4. 단일 커밋 + `work_completed`에 커밋 해시 + 인스펙터 배선 안내
+5. (사용자) Unity 컴파일 0 에러 → 프리팹 배선 → MapScene Play에서 피격 시 잔상 확인
+
+## 리스크
+
+- 컴파일 검증을 Codex가 못 한다(Unity 미실행) → 에러 시 `/CoopAgent_Reload` 후 Claude가 수정.
+- 리모트 클라의 큐 카운트는 네트워크 틱 합산으로 근사(위 참조).
+- `Unit.cs`는 코어(은희 담당 영역)지만 이벤트 추가만이라 기존 경로 무영향.
+
+---
+
 # CURRENT PLAN — 개발 진입점 단일화 + 맵 단독 Play 부팅 (2026-08-03)
 
 > 상태: **승인 대기**. 구현 착수 전.

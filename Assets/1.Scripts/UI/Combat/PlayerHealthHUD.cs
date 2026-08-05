@@ -14,13 +14,22 @@ public class PlayerHealthHUD : MonoBehaviour
     [SerializeField] private GameObject shieldBar;
     [SerializeField] private Image shieldFill;
     [SerializeField] private TMP_Text shieldText;
+    [SerializeField] private DelayedHealthBar delayed = new DelayedHealthBar();
 
     private Player player;
     private bool displayOverrideZero;
 
     public void Bind(Player boundPlayer)
     {
+        if (player != null)
+            player.ClientHpChanged -= delayed.OnHpChanged;
+
         player = boundPlayer;
+
+        if (player != null)
+            player.ClientHpChanged += delayed.OnHpChanged;
+
+        delayed.Bind(player != null ? player.CurrentHealth : 0);
         Refresh();
     }
 
@@ -31,12 +40,40 @@ public class PlayerHealthHUD : MonoBehaviour
     public void SetDisplayOverrideZero(bool shouldOverride)
     {
         displayOverrideZero = shouldOverride;
+        if (shouldOverride)
+            delayed.Bind(0);
         Refresh();
     }
 
     private void Update()
     {
         Refresh();
+
+        int hp = player != null && !displayOverrideZero ? player.CurrentHealth : 0;
+        int maxHp = player != null ? player.FinalMaxHp : 0;
+        delayed.Tick(Time.deltaTime, hp, maxHp);
+    }
+
+    /// <summary>
+    /// OnDisable에서 끊은 구독을 되살린다. 이 HUD의 GameObject만 껐다 켜는 경우
+    /// Bind가 다시 불리지 않아 잔상이 조용히 죽기 때문에 필요하다.
+    /// (CombatHUD 루트 토글은 CombatHUD.OnEnable → Bind로 이미 복구된다.)
+    /// </summary>
+    private void OnEnable()
+    {
+        if (player == null)
+            return;
+
+        // 이미 구독된 상태에서 재진입해도 중복되지 않게 한 번 떼고 붙인다.
+        player.ClientHpChanged -= delayed.OnHpChanged;
+        player.ClientHpChanged += delayed.OnHpChanged;
+        delayed.Bind(player.CurrentHealth);
+    }
+
+    private void OnDisable()
+    {
+        if (player != null)
+            player.ClientHpChanged -= delayed.OnHpChanged;
     }
 
     private void Refresh()

@@ -149,8 +149,32 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
 
     public virtual bool ReceiveAttack(AttackInfo attackInfo, AttackHitContext hitContext)
     {
+        int previousHp = CurrentHealth;
+        int previousShield = CurrentShield;
+
         TakeDamage(attackInfo);
+
+        int hpDamage = Mathf.Max(0, previousHp - CurrentHealth);
+        int shieldDamage = Mathf.Max(0, previousShield - CurrentShield);
+        if (IsServer && IsSpawned && (hpDamage > 0 || shieldDamage > 0) &&
+            FloatingDamageSpawner.RequiresAttributedDamageRpc)
+        {
+            ulong attackerClientId = ResolveAttackerClientId(hitContext);
+            ClientDamagedAttributedClientRpc(hpDamage, shieldDamage, attackerClientId);
+        }
+
         return true;
+    }
+
+    static ulong ResolveAttackerClientId(AttackHitContext hitContext)
+    {
+        Player sourcePlayer = hitContext.sourceUnit as Player;
+        if (sourcePlayer == null && hitContext.sourceTransform != null)
+            sourcePlayer = hitContext.sourceTransform.GetComponentInParent<Player>();
+
+        return sourcePlayer != null && sourcePlayer.IsSpawned
+            ? sourcePlayer.OwnerClientId
+            : ulong.MaxValue;
     }
 
     /// <summary>
@@ -453,6 +477,23 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     /// </summary>
     public event System.Action ClientDamaged;
 
+    /// <summary>
+    /// 모든 피어에서 HP 복제값이 바뀔 때 발생(감소·증가 전부). 인자는 (previous, next).
+    /// 지연 체력바처럼 피해량과 회복 시점을 모두 알아야 하는 로컬 연출이 구독한다.
+    /// 실드 감소는 여기서 나오지 않는다(ClientDamaged 참조).
+    /// </summary>
+    public event System.Action<int, int> ClientHpChanged;
+    /// 모든 피어에서 복제된 실제 감소량과 채널을 전달한다. 기본 AllDamage 표시에 사용하며
+    /// 기존 ClientDamaged 이벤트와 판정 경로는 변경하지 않는다.
+    /// </summary>
+    public event Action<int, DamageChannel> ClientDamagedAmount;
+
+    /// <summary>
+    /// 공격자 구분 필터가 켜졌을 때만 서버가 보내는 실제 감소량이다.
+    /// attackerClientId가 ulong.MaxValue면 플레이어 공격자가 아닌 피해다.
+    /// </summary>
+    public event Action<int, DamageChannel, ulong> ClientDamagedAttributed;
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
@@ -462,6 +503,10 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         // 피격 플래시 자동 부착 — Unit 계열 전체 공통(프리팹에 미리 붙어 있으면 그대로 사용).
         if (GetComponent<HitFlash>() == null)
             gameObject.AddComponent<HitFlash>();
+
+        // 플로팅 데미지 역시 Unit 계열 전체에 붙는 순수 로컬 연출 소비자다.
+        if (GetComponent<FloatingDamagePresenter>() == null)
+            gameObject.AddComponent<FloatingDamagePresenter>();
     }
 
     public override void OnNetworkDespawn()
@@ -471,14 +516,36 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         base.OnNetworkDespawn();
     }
 
+    //충돌난거 임시 해결함 추후 수정 해야됨.
     void OnHpReplicated(int previous, int next)
     {
+        ClientHpChanged?.Invoke(previous, next);
         if (next < previous) ClientDamaged?.Invoke();
+
+        if (next >= previous)
+            return;
+
+        ClientDamaged?.Invoke();
+        ClientDamagedAmount?.Invoke(previous - next, DamageChannel.Hp);
     }
 
     void OnShieldReplicated(int previous, int next)
     {
-        if (next < previous) ClientDamaged?.Invoke();
+        if (next >= previous)
+            return;
+
+        ClientDamaged?.Invoke();
+        ClientDamagedAmount?.Invoke(previous - next, DamageChannel.Shield);
+    }
+
+    [ClientRpc]
+    void ClientDamagedAttributedClientRpc(int hpDamage, int shieldDamage, ulong attackerClientId)
+    {
+        if (shieldDamage > 0)
+            ClientDamagedAttributed?.Invoke(shieldDamage, DamageChannel.Shield, attackerClientId);
+
+        if (hpDamage > 0)
+            ClientDamagedAttributed?.Invoke(hpDamage, DamageChannel.Hp, attackerClientId);
     }
     #endregion
 
