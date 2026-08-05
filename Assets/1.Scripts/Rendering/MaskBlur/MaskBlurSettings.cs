@@ -16,11 +16,14 @@ public sealed class MaskBlurSettings : ScriptableObject
     [Tooltip("중심(화면 UV). (0.5, 0.5) = 화면 정중앙.")]
     public Vector2 center = new Vector2(0.5f, 0.5f);
 
-    [Tooltip("반경(화면 UV). x=가로, y=세로. 0.5 면 화면 절반까지 선명하다.")]
-    public Vector2 size = new Vector2(0.30f, 0.34f);
+    [Tooltip("선명 영역 반경. x=가로, y=세로.\n\n" +
+             "matchAspect 가 켜져 있으면 화면 높이 기준 단위로 해석된다 — x 와 y 가 같으면 정원이고, " +
+             "x 를 키우면 가로로 넓어진다(좌우를 넓히려면 여기 x 를 올린다).\n" +
+             "꺼져 있으면 화면 UV 그대로다(16:9 에서 x=y 면 가로로 늘어난 타원이 된다).")]
+    public Vector2 size = new Vector2(0.55f, 0.34f);
 
-    [Tooltip("켜면 size.x 를 화면 종횡비로부터 y 기준으로 유도한다 — 화면에서 정원(正圓)으로 보인다.\n" +
-             "가로로 넓은 타원·사각형을 원하면 끄고 x 를 직접 준다.")]
+    [Tooltip("size 를 화면 높이 기준 단위로 해석해 종횡비를 보정한다.\n" +
+             "끄면 size 가 화면 UV 그대로가 되어 해상도·종횡비가 바뀌면 모양이 변한다.")]
     public bool matchAspect = true;
 
     [Tooltip("초타원 지수. 2 = 타원, 커질수록 사각형에 수렴한다(4~6 이 둥근 사각).")]
@@ -64,6 +67,10 @@ public sealed class MaskBlurSettings : ScriptableObject
         if (!matchAspect || pixelWidth <= 0f || pixelHeight <= 0f)
             return size;
 
-        return new Vector2(size.y * (pixelHeight / pixelWidth), size.y);
+        // ⚠️ 처음에는 x 를 y 에서 유도해(size.y * 종횡비) 정원을 보장했는데, 그러면 인스펙터의
+        //    size.x 가 조용히 무시된다. "값을 올렸는데 화면이 그대로"가 되는 대표적인 형태다.
+        //    x 도 그대로 반영하고 종횡비 보정만 적용한다 — x == y 면 여전히 정원이고,
+        //    x 를 키우면 가로로 넓어진다.
+        return new Vector2(size.x * (pixelHeight / pixelWidth), size.y);
     }
 }
