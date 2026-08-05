@@ -4,7 +4,30 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 현재 인수인계 (2026-07-31 · 보스 이슈 정리 + 툰셰이딩 + Windows 빌드, `93716e0` 미push)
+## ▶▶ 현재 인수인계 (2026-08-05 · 지연 체력바 — Claude → Codex 위임)
+
+작업 세션: **은희(Claude → Codex 위임)**. 레인 `dash` = `C:\UnityProject\MainProject`,
+브랜치 `feature/DelayedHealthBar` (base `Convayor-V2`).
+
+**Codex가 수정 예정 (Claude·타 작업자 동시 편집 금지)**:
+`Assets/1.Scripts/UI/Combat/DelayedHealthBar.cs`(신규) ·
+`Assets/1.Scripts/Unit/Unit.cs`(이벤트 2줄) ·
+`Assets/1.Scripts/UI/Combat/PlayerHealthHUD.cs` · `Assets/1.Scripts/UI/Combat/BossHealthHUD.cs`
+
+설계·완료조건은 [PLAN.md](PLAN.md) 최상단 참조(중복 기재하지 않음). 요지만:
+피격 시 잔상 바가 옛 HP에 0.4초 머문 뒤 고정 속도로 따라 내려온다. 피해 조각을 `Queue`로
+붙잡고 `maxHeldHits=5` 초과 시 오래된 것부터 놓아준다(보스는 홀드 리셋 off) — 지속 피해에
+잔상이 영구 고착하는 것을 막는 장치다.
+
+프리팹 배선(`CombatHUD.prefab` · `BossHealthHUD.prefab`에 잔상 Image 추가·연결)은 **은희가
+Unity에서 직접** 한다. Codex는 `.cs` 4개만 건드리고 프리팹·씬·`.meta`는 손대지 않는다.
+
+⚠️ `CLAUDE.local.md`의 레인 표는 낡았다 — `soul`/`MainProject-BeaverLobby` 워크트리는 없고,
+현재 살아있는 워처는 `dash`(MainProject)와 `fd`(MainProject-WorkTree, `feature/FloatingDamage`) 둘이다.
+
+---
+
+## 이전 인수인계 (2026-07-31 · 보스 이슈 정리 + 툰셰이딩 + Windows 빌드, `93716e0` 미push)
 
 작업 세션: **경석(Claude)**. 브랜치 `feature/map-player-merge`, origin 대비 **ahead 1**.
 워킹트리에 남은 것은 **내용 변경 0 인 줄바꿈 노이즈 4개**뿐이다
