@@ -48,6 +48,7 @@ public class PlayerDashController : NetworkBehaviour
     private StatusEffectController statusEffects;
     private PlayerInvulnerability invulnerability;
     private PlayerEncounterLock encounterLock;
+    private PlayerLifeCycleController lifeCycle;
 
     private DashRuntimeConfig config;
     private DashChargeLedger predictedLedger;
@@ -75,6 +76,7 @@ public class PlayerDashController : NetworkBehaviour
         statusEffects = GetComponent<StatusEffectController>();
         invulnerability = GetComponent<PlayerInvulnerability>();
         encounterLock = GetComponent<PlayerEncounterLock>();
+        lifeCycle = GetComponent<PlayerLifeCycleController>();
         if (groundingSensor == null)
             groundingSensor = GetComponent<PlayerGroundingSensor>();
 
@@ -115,6 +117,13 @@ public class PlayerDashController : NetworkBehaviour
                 _serverSnapshotWarned = true;
                 Debug.LogWarning("[DashAlert] PlayerDashValidationManager가 씬에 없어 대시 서버 검증이 비활성화됩니다.", this);
             }
+
+            // 사망/영혼 게이트는 이 컴포넌트에서만 읽는다. 없으면 죽은 플레이어의 대시를 서버가 막지 못한다.
+            if (lifeCycle == null)
+            {
+                Debug.LogWarning("[DashAlert] PlayerLifeCycleController가 없어 사망/영혼 상태를 대시 서버 검증에 " +
+                                 "반영하지 못합니다(항상 살아있음으로 간주). Player 프리팹 배선을 확인하세요.", this);
+            }
         }
 
         if (IsOwner)
@@ -149,6 +158,18 @@ public class PlayerDashController : NetworkBehaviour
     private double ServerNow() => ClockRunning ? NetworkClock.Instance.GameNow : Time.timeAsDouble;
     private double LocalTimeForRequest() => ClockRunning ? NetworkClock.Instance.LocalNow : Time.timeAsDouble;
 
+    // 생명주기 상태를 대시 검증 입력(dead/soul)으로 변환한다. 서버에서만 읽는다.
+    // ⚠️ player.CanMove로 대체할 수 없다 — Soul은 "이동은 되지만 대시는 금지"이기 때문이다.
+    //    (PlayerLifeGameplayAccess.SoulAccess는 AllowsMovement=true,
+    //     DashValidationPolicy는 Dead||Soul을 DeadOrSoul로 거부한다.)
+    // lifeCycle이 없으면(대시 전용 테스트 씬 등) 살아있는 것으로 간주해 기존 동작을 유지한다.
+    private bool IsDeadForDash =>
+        lifeCycle != null &&
+        (lifeCycle.State == PlayerLifeState.DeadPresentation ||
+         lifeCycle.State == PlayerLifeState.PermanentDead);
+
+    private bool IsSoulForDash => lifeCycle != null && lifeCycle.State == PlayerLifeState.Soul;
+
     private void Update()
     {
         if (player == null || !player.IsMovementAuthority)
@@ -177,8 +198,8 @@ public class PlayerDashController : NetworkBehaviour
             NetworkObjectId,
             ServerNow(),
             grounded: groundingSensor == null || groundingSensor.IsGrounded,
-            dead: false,           // TODO: PlayerLifeCycle(soul 병합)·Unit 사망 신호 배선
-            soul: false,           // TODO: soul 병합 후
+            dead: IsDeadForDash,
+            soul: IsSoulForDash,
             crowdControlled: cinematicLocked || (statusEffects != null && statusEffects.BlocksMovement),
             landingProtected: false); // TODO: W5 착지 보호
     }
@@ -301,8 +322,8 @@ public class PlayerDashController : NetworkBehaviour
             NetworkObjectId, senderClientId, requestId,
             clientLocalTime, directionX, directionZ,
             ServerNow(), rttSeconds, rttAvailable,
-            currentDead: false,
-            currentSoul: false,
+            currentDead: IsDeadForDash,
+            currentSoul: IsSoulForDash,
             currentCrowdControlled:
                 (encounterLock != null && encounterLock.IsCinematicLocked) ||
                 (statusEffects != null && statusEffects.BlocksMovement));

@@ -226,9 +226,27 @@ public class MapSceneManager : NemoSceneManager
         Debug.Log($"[SceneFlow] MapSceneManager.BroadcastGoToResultToClients clients={_networkManager.ConnectedClientsIds.Count}");
     }
 
-    // 클라 수신: 서버만 이 메시지를 보내므로 신뢰하고 즉시 로컬 전환. 재전송/호스트가드 없음.
+    // 클라 수신: 서버가 보낸 것만 신뢰하고 로컬 전환한다.
+    // ⚠️ 이 핸들러는 Awake에서 호스트/클라 구분 없이 등록된다(RegisterGoToResultHandler). 송신자 검증이
+    //    없으면 클라가 서버로 같은 이름의 메시지를 보내 호스트를 결과 화면으로 끌고 갈 수 있었다.
+    //    LobbyUIController·NetworkLoadingFlowController·NetworkClock이 쓰는 것과 동일한 가드다.
     private void HandleGoToResultMessage(ulong senderClientId, FastBufferReader reader)
     {
+        // 서버는 BroadcastGoToResultToClients에서 자신을 제외하고 로컬에서 직접 전환한다.
+        // 따라서 서버가 이 메시지를 받았다면 송신자는 클라이언트다 — 처리하지 않는다.
+        if (_networkManager != null && _networkManager.IsServer)
+        {
+            Debug.LogWarning($"[SceneFlow] GoToResult 메시지를 서버가 수신해 무시합니다. sender={senderClientId} " +
+                             "(서버는 로컬에서 직접 전환하므로 이 경로로 들어올 이유가 없습니다.)");
+            return;
+        }
+
+        if (senderClientId != NetworkManager.ServerClientId)
+        {
+            Debug.LogWarning($"[SceneFlow] GoToResult 메시지의 송신자가 서버가 아니라 무시합니다. sender={senderClientId}");
+            return;
+        }
+
         Debug.Log($"[SceneFlow] MapSceneManager.HandleGoToResultMessage sender={senderClientId}");
         PerformGoToResult();
     }
