@@ -25,6 +25,9 @@ public static class RenderingLookAuthoring
     private const float DofStart = 26f;
     private const float DofEnd = 50f;
 
+    // ⚠️ 이 메뉴는 손으로 튜닝한 값을 덮어쓴다(비네트 강도·채도·대비 등).
+    //    스크린샷 비교로 값을 잡아 둔 뒤에는 다시 실행하지 말 것.
+    //    DoF 만 다시 잡고 싶으면 아래 Apply DoF 메뉴를 쓴다.
     [MenuItem("Tools/Rendering/Look/Apply Baseline (HDR Grading + Post)")]
     public static void ApplyBaseline()
     {
@@ -172,6 +175,51 @@ public static class RenderingLookAuthoring
     public static void ToggleFogManager()
     {
         Toggle<FogManager>("포그 매니저(디밍·시야)");
+    }
+
+    // ---- DoF: 플레이어 초점 (사진식 얕은 심도) ----
+    //
+    // Gaussian → Bokeh 로 바꾸는 이유:
+    // Gaussian 은 gaussianStart 바깥만 흐리게 하는 "원거리 전용"이다. 카메라보다 가까운 쪽,
+    // 즉 화면 아래쪽 바닥은 절대 흐려지지 않는다. 목표한 레퍼런스(f/16 사진)는 초점면 앞뒤가
+    // 모두 흐려지는 그림이므로 물리 기반 Bokeh 가 맞다.
+    //
+    // 🔴 DoF 로 "화면 외곽"을 흐리게 할 수는 없다. DoF 는 화면 위치가 아니라 깊이로 판단한다.
+    //    탑다운에서 좌우 외곽은 중앙과 깊이가 거의 같아 흐려지지 않고, 흐려지는 곳은
+    //    가까운 아래쪽과 먼 위쪽뿐이다. 진짜 방사형 외곽 블러가 필요하면 풀스크린 패스를
+    //    따로 만들어야 한다(FogRendererFeature 와 같은 계통).
+    //
+    // 값 근거 — FollowOffset (7,17,-7) → 카메라~플레이어 약 19.7m.
+    // focalLength 80mm / aperture f4 에서 과초점거리 ≈ 53m 이므로 선명 구간은 약 14~31m 다.
+    // 화면 대부분은 선명하고 가장 가까운 아래쪽과 먼 위쪽만 살짝 흐려진다("살짝"에 해당).
+    // 더 강하게 하려면 aperture 를 낮추거나(f2.8) focalLength 를 올린다(100~150mm).
+    private const float PlayerFocusDistance = 19.7f;
+
+    [MenuItem("Tools/Rendering/Look/Apply DoF — Bokeh (player focus)")]
+    public static void ApplyPlayerFocusDof()
+    {
+        var profile = AssetDatabase.LoadAssetAtPath<VolumeProfile>(MapVolumeProfilePath);
+        if (profile == null)
+        {
+            Debug.LogError($"[RenderingLook] 볼륨 프로파일을 찾지 못했다: {MapVolumeProfilePath}");
+            return;
+        }
+
+        var dof = GetOrAdd<DepthOfField>(profile);
+        Override(dof.mode, DepthOfFieldMode.Bokeh);
+        Override(dof.focusDistance, PlayerFocusDistance);
+        Override(dof.focalLength, 80f);
+        Override(dof.aperture, 4f);
+        Override(dof.bladeCount, 5);
+        Override(dof.bladeCurvature, 1f);
+
+        EditorUtility.SetDirty(profile);
+        AssetDatabase.SaveAssets();
+
+        Debug.Log(
+            $"[RenderingLook] DoF = Bokeh, 초점 {PlayerFocusDistance}m " +
+            "(80mm f4 → 선명 구간 약 14~31m). " +
+            "⚠️ Bokeh 는 Gaussian 보다 비싸다 — AA 성능 비교 시 이 비용을 함께 볼 것.");
     }
 
     // ---- 안티에일리어싱 A/B ----
