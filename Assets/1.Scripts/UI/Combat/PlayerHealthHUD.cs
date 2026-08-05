@@ -14,13 +14,22 @@ public class PlayerHealthHUD : MonoBehaviour
     [SerializeField] private GameObject shieldBar;
     [SerializeField] private Image shieldFill;
     [SerializeField] private TMP_Text shieldText;
+    [SerializeField] private DelayedHealthBar delayed = new DelayedHealthBar();
 
     private Player player;
     private bool displayOverrideZero;
 
     public void Bind(Player boundPlayer)
     {
+        if (player != null)
+            player.ClientHpChanged -= delayed.OnHpChanged;
+
         player = boundPlayer;
+
+        if (player != null)
+            player.ClientHpChanged += delayed.OnHpChanged;
+
+        delayed.Bind(player != null ? player.CurrentHealth : 0);
         Refresh();
     }
 
@@ -31,12 +40,24 @@ public class PlayerHealthHUD : MonoBehaviour
     public void SetDisplayOverrideZero(bool shouldOverride)
     {
         displayOverrideZero = shouldOverride;
+        if (shouldOverride)
+            delayed.Bind(0);
         Refresh();
     }
 
     private void Update()
     {
         Refresh();
+
+        int hp = player != null && !displayOverrideZero ? player.CurrentHealth : 0;
+        int maxHp = player != null ? player.FinalMaxHp : 0;
+        delayed.Tick(Time.deltaTime, hp, maxHp);
+    }
+
+    private void OnDisable()
+    {
+        if (player != null)
+            player.ClientHpChanged -= delayed.OnHpChanged;
     }
 
     private void Refresh()

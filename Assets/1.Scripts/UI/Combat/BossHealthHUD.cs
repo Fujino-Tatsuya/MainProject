@@ -10,20 +10,46 @@ public class BossHealthHUD : MonoBehaviour
 {
     [SerializeField] private GameObject barRoot;
     [SerializeField] private Image hpFill;
+    [SerializeField] private DelayedHealthBar delayed = new DelayedHealthBar();
+
+    private Unit boundBoss;
 
     private void Update()
     {
         Unit boss = FindBoss();
+        if (boss != boundBoss)
+            BindBoss(boss);
 
         bool shouldShow = boss != null && boss.CurrentHealth > 0;
         if (barRoot != null && barRoot.activeSelf != shouldShow)
             barRoot.SetActive(shouldShow);
 
-        if (!shouldShow || hpFill == null)
+        if (!shouldShow)
             return;
 
         int maxHp = boss.FinalMaxHp;
-        hpFill.fillAmount = maxHp > 0 ? Mathf.Clamp01((float)boss.CurrentHealth / maxHp) : 0f;
+        if (hpFill != null)
+            hpFill.fillAmount = maxHp > 0 ? Mathf.Clamp01((float)boss.CurrentHealth / maxHp) : 0f;
+
+        delayed.Tick(Time.deltaTime, boss.CurrentHealth, maxHp);
+    }
+
+    private void OnDisable()
+    {
+        BindBoss(null);
+    }
+
+    private void BindBoss(Unit boss)
+    {
+        if (boundBoss != null)
+            boundBoss.ClientHpChanged -= delayed.OnHpChanged;
+
+        boundBoss = boss;
+
+        if (boundBoss != null)
+            boundBoss.ClientHpChanged += delayed.OnHpChanged;
+
+        delayed.Bind(boundBoss != null ? boundBoss.CurrentHealth : 0);
     }
 
     private static Unit FindBoss()

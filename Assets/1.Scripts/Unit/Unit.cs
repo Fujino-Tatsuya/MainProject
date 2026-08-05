@@ -453,6 +453,13 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     /// </summary>
     public event System.Action ClientDamaged;
 
+    /// <summary>
+    /// 모든 피어에서 HP 복제값이 바뀔 때 발생(감소·증가 전부). 인자는 (previous, next).
+    /// 지연 체력바처럼 피해량과 회복 시점을 모두 알아야 하는 로컬 연출이 구독한다.
+    /// 실드 감소는 여기서 나오지 않는다(ClientDamaged 참조).
+    /// </summary>
+    public event System.Action<int, int> ClientHpChanged;
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
@@ -473,6 +480,7 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
 
     void OnHpReplicated(int previous, int next)
     {
+        ClientHpChanged?.Invoke(previous, next);
         if (next < previous) ClientDamaged?.Invoke();
     }
 
