@@ -5717,16 +5717,16 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1643572544}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b59817cf8551205429df556d35c7eb92, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FogManager
   fogEnabled: 0
   profile: {fileID: 11400000, guid: 9183e1848aa2d5f478208fafdaa8425f, type: 2}
-  dimEnabled: 1
+  dimEnabled: 0
   dimPlayerOverride: {fileID: 0}
-  losEnabled: 1
+  losEnabled: 0
   losWallMask:
     serializedVersion: 2
     m_Bits: 4294967295

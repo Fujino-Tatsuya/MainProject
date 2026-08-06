@@ -76,7 +76,6 @@ public sealed class LookToggle : MonoBehaviour
     // 원복용 스냅샷. Play 중 변경은 어차피 폐기되지만, 토글을 Play 중에 끄는 경우까지
     // 정합을 지키려면 명시적으로 되돌리는 편이 안전하다.
     private bool _snapTaken;
-    private bool _snapFogComponentEnabled;
     private bool _snapFogEnabled;
     private bool _snapDimEnabled;
     private bool _snapLosEnabled;
@@ -155,21 +154,16 @@ public sealed class LookToggle : MonoBehaviour
         if (fogManager == null)
             return;
 
-        if (on)
-        {
-            // 포그는 원래도 꺼져 있었다(씬 값 fogEnabled: 0). 어둡게 만든 것은 dim 이다.
-            fogManager.fogEnabled = false;
-            fogManager.dimEnabled = true;
+        // 포그는 두 룩 모두 꺼져 있다(씬 값 fogEnabled: 0). 어둡게 만드는 것은 dim 이다.
+        fogManager.fogEnabled = false;
 
-            // 차폐까지 켠다 — 플레이어 주변을 뺀 나머지가 매우 어두워지는 것이 룩 B 다.
-            // ⚠️ PushLos 는 dimEnabled 안에서만 불린다. dim 을 끄면 차폐도 함께 죽는다.
-            fogManager.losEnabled = true;
-        }
+        fogManager.dimEnabled = on;
 
-        // 컴포넌트 on/off 가 실제 게이트다. FogRendererFeature 가
-        // FogManager.HasActiveInstance 를 보고 패스를 큐잉하므로, 끄면 비용이 0 이고
-        // OnDisable 이 _DimEnabled·_LosEnabled 전역을 0 으로 되돌려 잔상도 안 남는다.
-        fogManager.enabled = on;
+        // 차폐도 함께 — 플레이어 주변을 뺀 나머지가 매우 어두워지는 것이 룩 B 다.
+        // ⚠️ PushLos 는 dimEnabled 안에서만 불린다. dim 을 끄면 차폐도 같이 죽으므로
+        //    losEnabled 를 남겨 둬도 룩 A 에서 게임플레이로 새지 않는다. 그래도 값 자체를
+        //    맞춰 두는 편이 인스펙터를 봤을 때 오해가 없다.
+        fogManager.losEnabled = on;
     }
 
     private void ApplyVolumeProfile(bool on)
@@ -207,7 +201,6 @@ public sealed class LookToggle : MonoBehaviour
 
         if (fogManager != null)
         {
-            _snapFogComponentEnabled = fogManager.enabled;
             _snapFogEnabled = fogManager.fogEnabled;
             _snapDimEnabled = fogManager.dimEnabled;
             _snapLosEnabled = fogManager.losEnabled;
@@ -226,10 +219,11 @@ public sealed class LookToggle : MonoBehaviour
 
         if (fogManager != null)
         {
+            // 🔴 컴포넌트의 enabled 는 건드리지 않는다. 어비스 물안개가 이 매니저에
+            //    얹혀 있어서, 끄면 룩과 무관한 기능이 함께 죽는다(2026-08-06).
             fogManager.fogEnabled = _snapFogEnabled;
             fogManager.dimEnabled = _snapDimEnabled;
             fogManager.losEnabled = _snapLosEnabled;
-            fogManager.enabled = _snapFogComponentEnabled;
         }
 
         if (globalVolume != null && _snapProfile != null)

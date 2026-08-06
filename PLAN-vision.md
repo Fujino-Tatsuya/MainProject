@@ -518,3 +518,45 @@ F9 토글·토스트·디밍은 정상 작동 확인. 두 가지를 고쳤다.
 `pixelBlockSize` 를 4→16 으로 올릴 때 `MaskBlurSettings.asset` 에는 `4` 가 이미 적혀 있어
 **코드만 고쳤으면 화면은 그대로였다.** 필드를 추가한 뒤 기본값을 바꿀 때는 애셋의 실제 값을
 열어 확인할 것. (2026-08-05 의 "적용했는데 화면이 그대로" 3건과 같은 뿌리)
+
+### 8.13 어비스 물안개 복구 (2026-08-06) — 포그 게이트에서 분리
+
+룩 A/B 작업 중 발견. `FogProfile.abyssEnabled: 1` 인데 **물안개가 렌더되지 않고 있었다.**
+물 평면은 메시라 계속 보였기 때문에 "물은 있는데 심연이 안 덮인다"로만 나타나
+증상만으로는 원인에 도달하기 어려운 형태였다.
+
+**원인이 세 군데였다 — 전부 "어비스가 포그에 종속"이라는 같은 뿌리.**
+
+| # | 위치 | 문제 |
+|---|---|---|
+| 1 | `FogManager.PushFogGlobals` | 어비스 푸시가 이 안에 있어 `fogEnabled: 0` 이면 도달 못 함 |
+| 2 | `FullScreenFog.shader` | 조기 반환 `if (!fogOn && !dimOn) return;` + 분기 `if (fogOn && _AbyssEnabled...)` 둘 다 포그에 묶임 |
+| 3 | `FogManager.HasActiveInstance` | `fogEnabled \|\| dimEnabled` 만 봐서 **패스가 큐잉조차 안 됨** |
+
+**수정**
+
+- `PushAbyssGlobals(p)` 로 분리해 `PushGlobals` 에서 무조건 호출. 게이트는 `abyssEnabled` 뿐.
+- 셰이더에 `abyssOn` 독립 조건 추가 — 조기 반환과 분기 양쪽.
+- `HasActiveInstance` 에 `profile.abyssEnabled` 포함.
+- `OnDisable` / `PushGlobals` 조기 반환에서 `_AbyssEnabled` 도 0 으로 내린다 —
+  전역은 도메인이 살아 있는 동안 남으므로 안 내리면 마지막 값이 다음 씬까지 따라간다.
+- 씬 `FogManager` 컴포넌트를 **켰다**(`m_Enabled: 0→1`), 대신 룩 A 상태를 값으로 표현
+  (`dimEnabled: 0` / `losEnabled: 0`). 씬 diff 3줄.
+- 🔴 **`LookToggle` 이 컴포넌트 `enabled` 를 토글하지 않게 바꿨다.** 컴포넌트를 끄면
+  룩과 무관한 어비스가 함께 죽는다. 이제 `dimEnabled`·`losEnabled` **필드만** 오간다.
+
+**검증**
+
+- 컴파일 0에러/0경고. `FullScreenFog`·`MaskBlur` 셰이더 강제 재임포트 후 씬 뷰 렌더 정상,
+  콘솔 에러 0건. Play 후 애셋 오염 0(값 3개 대조).
+- 적용 강도 계산: `AbyssWater` 가 y = **-19** →
+  `depth = (0-(-19))/50 = 0.38` × `abyssMaxOpacity 0.356` × 일렁임 = **약 8~19% tint**.
+  설계상 은은해서 원거리 스크린샷으로는 구분이 어렵다 — **구멍 근처 육안 확인이 남았다.**
+
+**⚠️ 비용 변화**: 어비스 때문에 룩 A 에서도 포그 패스가 매 프레임 돈다(예전엔 0).
+풀스크린 패스 1개. `ProfilerHUD` 마커에 `FullScreenFog` 를 넣으면 측정된다.
+
+**🔴 여기서 얻은 일반 규칙: 한 계통을 다른 계통의 게이트 안에 두지 말 것.**
+"포그를 껐다"는 결정이 무관한 기능을 조용히 함께 껐다. 매니저 컴포넌트의 `enabled` 로
+한 기능만 토글하는 것도 같은 실수다 — 그 매니저에 얹힌 다른 기능이 같이 죽는다.
+`FogManager` 는 이름이 "Fog" 지만 실제로는 **포그·디밍·차폐·어비스 4계통의 호스트**다.
