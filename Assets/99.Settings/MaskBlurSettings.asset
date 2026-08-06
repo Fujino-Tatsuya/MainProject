@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MaskBlurSettings
   enabled: 1
   center: {x: 0.5, y: 0.5}
-  size: {x: 0.55, y: 0.34}
+  size: {x: 0.65, y: 0.34}
   matchAspect: 1
   roundness: 4
   feather: 0.35
@@ -23,3 +23,7 @@ MonoBehaviour:
   downsampleShift: 1
   desaturate: 0
   darken: 0
+  pixelateEnabled: 1
+  pixelBlockSize: 8
+  pixelateMode: 0
+  pixelateRegionScale: 1.242
