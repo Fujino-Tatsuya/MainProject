@@ -67,6 +67,34 @@ public class PlayerDashController : NetworkBehaviour
     public int MaxCharge => predictedLedger != null ? predictedLedger.MaxCharge : 0;
     public double PredictedNextReadyTime => predictedLedger != null ? predictedLedger.NextReadyTime : 0.0;
 
+    /// <summary>재충전 1회에 걸리는 시간(초). HUD 진행도의 분모.</summary>
+    public float RechargeDuration => (float)config.RechargeDuration;
+
+    /// <summary>충전이 1개 이상 남아 있는지(예측 기준). 다른 게이트(접지·CC·사망)는 보지 않는다.</summary>
+    public bool IsReady => PredictedCharge > 0;
+
+    /// <summary>
+    /// 다음 충전 완료까지 남은 시간(초). 만충이면 0.
+    ///
+    /// ⚠️ HUD가 <see cref="PredictedNextReadyTime"/>에서 직접 빼면 안 되기 때문에 존재한다 —
+    /// 그 값은 절대시각이고, 시간 원점이 NetworkClock인지 <see cref="Time.timeAsDouble"/>인지는
+    /// <see cref="OwnerNow"/>만 안다. 도메인을 밖에서 다시 고르면 두 시계가 어긋나 남은 시간이 엉킨다.
+    /// </summary>
+    public float RemainingRecharge
+    {
+        get
+        {
+            if (predictedLedger == null)
+                return 0f;
+
+            double next = predictedLedger.NextReadyTime;
+            if (double.IsInfinity(next))
+                return 0f; // 만충 — 회복 타이머가 없다.
+
+            return Mathf.Max(0f, (float)(next - OwnerNow()));
+        }
+    }
+
     private void Awake()
     {
         player = GetComponent<Player>();
