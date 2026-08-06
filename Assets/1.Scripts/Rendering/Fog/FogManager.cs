@@ -63,8 +63,22 @@ public sealed class FogManager : MonoBehaviour
     private static readonly List<FogVolume> s_volumes = new List<FogVolume>();
 
     // 포그 또는 디밍 중 하나라도 켜져 있으면 렌더 패스를 큐잉한다(독립 토글).
-    public static bool HasActiveInstance =>
-        s_active != null && s_active.isActiveAndEnabled && (s_active.fogEnabled || s_active.dimEnabled);
+    // 패스를 큐잉할 이유가 하나라도 있는지. 셋은 서로 독립이다 —
+    // 어비스를 빼먹으면 "abyssEnabled 가 켜져 있는데 물안개가 없다"가 된다(2026-08-06).
+    public static bool HasActiveInstance
+    {
+        get
+        {
+            if (s_active == null || !s_active.isActiveAndEnabled)
+                return false;
+
+            if (s_active.fogEnabled || s_active.dimEnabled)
+                return true;
+
+            FogProfile p = s_active.EffectiveProfile;
+            return p != null && p.abyssEnabled;
+        }
+    }
 
     public static void Register(FogVolume v)
     {
@@ -177,6 +191,10 @@ public sealed class FogManager : MonoBehaviour
             Shader.SetGlobalFloat(ID_GlobalEnabled, 0f);
             Shader.SetGlobalFloat(ID_DimEnabled, 0f);
             Shader.SetGlobalFloat(ID_LosEnabled, 0f);
+
+            // 어비스도 반드시 내린다. 전역은 도메인이 살아 있는 동안 남으므로,
+            // 안 내리면 매니저를 끈 뒤에도 마지막 값이 다음 씬까지 따라간다.
+            Shader.SetGlobalFloat(ID_AbyssEnabled, 0f);
         }
     }
 
@@ -212,12 +230,14 @@ public sealed class FogManager : MonoBehaviour
         {
             Shader.SetGlobalFloat(ID_GlobalEnabled, 0f);
             Shader.SetGlobalFloat(ID_DimEnabled, 0f);
+            Shader.SetGlobalFloat(ID_AbyssEnabled, 0f);
             return;
         }
 
         FogProfile p = EffectiveProfile;
         PushFogGlobals(p);
         PushDimGlobals(p);
+        PushAbyssGlobals(p);
     }
 
     private void PushFogGlobals(FogProfile p)
@@ -285,23 +305,33 @@ public sealed class FogManager : MonoBehaviour
         Shader.SetGlobalVectorArray(ID_VolBounds, _bounds);
         Shader.SetGlobalMatrixArray(ID_VolW2L, _w2l);
 
-        // 어비스(바닥 구멍) 물안개 — 포그 게이트 안. fogEnabled=false 면 여기 도달 못하므로 자동 미적용.
-        if (p.abyssEnabled)
-        {
-            Shader.SetGlobalFloat(ID_AbyssEnabled, 1f);
-            Shader.SetGlobalVector(ID_AbyssColor, (Vector4)p.abyssColor);
-            Shader.SetGlobalFloat(ID_AbyssThreshold, p.abyssThreshold);
-            Shader.SetGlobalFloat(ID_AbyssDepthRange, Mathf.Max(1e-4f, p.abyssDepthRange));
-            Shader.SetGlobalFloat(ID_AbyssMaxOpacity, p.abyssMaxOpacity);
-            Shader.SetGlobalFloat(ID_AbyssNoiseStrength, p.abyssNoiseStrength);
-            Shader.SetGlobalFloat(ID_AbyssNoiseScale, p.abyssNoiseScale);
-            Shader.SetGlobalVector(ID_AbyssNoiseScroll,
-                new Vector4(p.abyssNoiseScroll.x, p.abyssNoiseScroll.y, 0f, 0f));
-        }
-        else
+    }
+
+    // 어비스(바닥 구멍) 물안개.
+    //
+    // 🔴 예전에는 이 블록이 PushFogGlobals 안에 있었다. 그래서 fogEnabled=false 면
+    //    도달하지 못해, abyssEnabled 가 켜져 있어도 물안개가 조용히 사라졌다.
+    //    물 평면은 메시라 계속 보이기 때문에 "물은 있는데 심연이 안 덮인다"로만 나타나
+    //    원인을 찾기 어려웠다(2026-08-06 분리).
+    //
+    //    포그·디밍·어비스는 서로 독립이다 — 한 계통을 다른 계통의 게이트 안에 두지 말 것.
+    private void PushAbyssGlobals(FogProfile p)
+    {
+        if (!p.abyssEnabled)
         {
             Shader.SetGlobalFloat(ID_AbyssEnabled, 0f);
+            return;
         }
+
+        Shader.SetGlobalFloat(ID_AbyssEnabled, 1f);
+        Shader.SetGlobalVector(ID_AbyssColor, (Vector4)p.abyssColor);
+        Shader.SetGlobalFloat(ID_AbyssThreshold, p.abyssThreshold);
+        Shader.SetGlobalFloat(ID_AbyssDepthRange, Mathf.Max(1e-4f, p.abyssDepthRange));
+        Shader.SetGlobalFloat(ID_AbyssMaxOpacity, p.abyssMaxOpacity);
+        Shader.SetGlobalFloat(ID_AbyssNoiseStrength, p.abyssNoiseStrength);
+        Shader.SetGlobalFloat(ID_AbyssNoiseScale, p.abyssNoiseScale);
+        Shader.SetGlobalVector(ID_AbyssNoiseScroll,
+            new Vector4(p.abyssNoiseScroll.x, p.abyssNoiseScroll.y, 0f, 0f));
     }
 
     private void PushDimGlobals(FogProfile p)

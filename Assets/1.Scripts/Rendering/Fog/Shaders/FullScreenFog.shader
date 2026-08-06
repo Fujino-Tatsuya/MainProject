@@ -34,7 +34,13 @@ Shader "Hidden/Fog/FullScreenFog"
 
                 bool fogOn = _FogGlobalEnabled >= 0.5;
                 bool dimOn = _DimEnabled >= 0.5;
-                if (!fogOn && !dimOn)
+
+                // 어비스는 포그·디밍과 독립이다. 예전에는 이 조기 반환과 아래 3) 이 둘 다
+                // 포그에 묶여 있어서, 포그를 끄면 abyssEnabled 가 켜져 있어도 물안개가
+                // 조용히 사라졌다(2026-08-06 수정).
+                bool abyssOn = _AbyssEnabled >= 0.5;
+
+                if (!fogOn && !dimOn && !abyssOn)
                     return half4(sceneColor, 1.0);
 
                 float depth = SampleSceneDepth(uv);
@@ -65,7 +71,7 @@ Shader "Hidden/Fog/FullScreenFog"
 
                 // 3) 어비스 물안개 — 디밍 위에 심연색으로 덮음(구멍 내부만, 하늘 제외).
                 //    디밍의 탈채도가 심연색을 흑백으로 날리지 않도록 마지막에 합성.
-                if (fogOn && _AbyssEnabled >= 0.5)
+                if (abyssOn)
                 {
                     float3 abyssCol;
                     float a = Abyss_Evaluate(worldPos, abyssCol) * (1.0 - skyMask);
