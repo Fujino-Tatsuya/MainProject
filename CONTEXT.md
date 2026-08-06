@@ -4,7 +4,29 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 현재 인수인계 (2026-07-31 · 보스 이슈 정리 + 툰셰이딩 + Windows 빌드, `93716e0` 미push)
+## ▶▶ 현재 인수인계 (2026-08-06 · Effect System v1, 브랜치 `feature/VFX`)
+
+작업 세션: **민경(Claude)**. 설계 원본은 레포 밖 `D:\김민경\유니티\VFX-Learning\design\effect-system-v1.md`.
+
+**용어**: 이펙트 재생 시스템의 코드 이름은 `VFX*`가 아니라 **`Effect*`** 다
+(`UnityEngine.VFX.VFXManager`가 엔진에 실존해 S6에서 이름이 충돌한다). 에셋 폴더는 `5.VFX/` 유지.
+
+- 코드: `Assets/1.Scripts/Effects/` — `EffectManager`(싱글톤 파사드) · `IEffectSystem`(파트 드라이버) ·
+  `ShurikenEffectSystem`(v1 유일 구현) · `EffectEntry`/`EffectPart`/`EffectCatalog`(데이터) ·
+  `EffectPool`(`UnityEngine.Pool` 래퍼) · `EffectHandle`(세대 카운터 있는 루프 핸들).
+- 데이터: `9.ScriptableObject/Effects/EffectCatalog.asset`, `5.VFX/Common/FX_*_Entry.asset`,
+  `5.VFX/EffectManager.prefab`(카탈로그 연결됨 — 씬에 드래그해서 쓴다).
+- 🔴 **수명은 데이터가 진실이다.** 프리팹에서 종료를 추론하지 않고 `EffectEntry.duration` 타이머로
+  회수한다. `duration`은 감으로 적지 말고 `EffectDurationProbe`로 실측한다.
+- 🔴 **히트스톱은 파티클에 자동 적용되지 않는다.** 이 프로젝트는 `Time.timeScale`을 한 번도 쓰지 않고
+  `MonsterTimeController`가 몬스터별로만 감속한다. `EffectManager.SetPlayRateForTarget`을
+  거기서 불러주지 않으면 몬스터만 얼고 이펙트는 계속 돈다. **그 배선은 팀 합의 대기(v1 밖)다.**
+- ⚠️ **풀링 전제 프리팹 규칙**: `Stop Action ≠ Destroy` / `TrailRenderer.AutoDestruct` OFF /
+  프리팹 하나에 단일 기술만. 앞의 둘은 `EffectPrefabRules`가 런타임에 경고+교정한다.
+- ✅ 검증: `Tools/Effects/스모크 테스트 (Play Mode)` → 23/23 통과(배관만).
+  연출의 자연스러움은 `EffectSceneTester`로 VFXScene에서 눈으로 본다.
+
+### 이전 인수인계 (2026-07-31 · 보스 이슈 정리 + 툰셰이딩 + Windows 빌드, `93716e0` 미push)
 
 작업 세션: **경석(Claude)**. 브랜치 `feature/map-player-merge`, origin 대비 **ahead 1**.
 워킹트리에 남은 것은 **내용 변경 0 인 줄바꿈 노이즈 4개**뿐이다
