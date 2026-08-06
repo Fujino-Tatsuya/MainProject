@@ -1,0 +1,476 @@
+# 보스 FSM 구현 스펙 — 23호 & 웰즈
+
+> 작성 2026-08-06 · 경석 · **구현 직전 스펙**. 주말 구현용.
+> [boss-fsm-design.md](boss-fsm-design.md) = *무엇을·왜* / **이 문서 = *어떻게*** (클래스·파라미터·이벤트·전이 전수).
+> 계획서 [PLAN-boss-fsm.md](../../PLAN-boss-fsm.md) · 플레이어 요청 [handoff-player-carry-socket.md](handoff-player-carry-socket.md)
+>
+> **§12 에 미확정 질문 10건**을 모아 뒀다. 그 10건 외에는 코드를 바로 칠 수 있는 수준으로 적었다.
+
+---
+
+## 1. 애니메이터 계약 ✅ 검증됨
+
+`Assets/4.Animations/Wells&No.23/No.23/Controller/TwentyThreeController.controller` 를
+Unity 에서 직접 읽어 확인했다. **애니메이터는 고칠 필요가 없다** — 기존 BT 가 쓰던 계약을 그대로 쓴다.
+
+### 1.1 파라미터 8개
+
+| 파라미터 | 타입 | 용도 |
+|---|---|---|
+| `State` | **Int** | **`(int)TwentyThreeState` 를 그대로 넣는다.** 통상 전이 전부 |
+| `Jump` | Int | JumpAttack 내부 단계. `Leap` 진입 조건이 `State==8 && Jump==0` |
+| `Groggy` | Int | 그로기 내부 단계. `1` = Start→Loop, `2` = Loop→End |
+| `IsGroggy` | Trigger | **AnyState → GroggyStart** |
+| `IsBreak` | Trigger | **AnyState → Break** |
+| `IsDead` | Trigger | **AnyState → Dead** |
+| `IsInit` | Trigger | `Break → Idle`, `GroggyEnd → Idle` (복귀) |
+| `IsWalking` | Trigger | ⚠️ 전이에서 쓰이는 곳을 못 찾았다 → §12 Q2 |
+
+### 1.2 🔴 가장 중요한 함정
+
+**`Groggy`·`Break`·`Dead` 는 `State` 로 진입하지 않는다. AnyState 트리거다.**
+
+```
+State = 12 (Groggy)  →  아무 일도 안 일어난다.   ❌
+IsGroggy 트리거      →  AnyState → GroggyStart   ✅
+```
+
+`TwentyThreeState` 에 `Groggy=12 / Break=13 / Dead=14` 가 있어서 "State 에 넣으면 되겠지" 로
+가기 쉽다. **FSM 내부 상태값과 애니메이터 구동 방식이 다른 구간이다.**
+→ `SetState()` 단일 지점에서 갈라 처리한다 (§4.1).
+
+### 1.3 상태 ↔ 클립
+
+클립은 전부 **`Assets/50.Art/Char/Boss/SK/SK_23.fbx` 의 내장 서브에셋**이다(21개). `.anim` 파일은 없다.
+
+| State | enum 값 | 애니 스테이트 | 클립 (프레임) |
+|---|---|---|---|
+| Idle | 0 | `Idle` | `Boss_23_idle` (0~163) |
+| Walk | 1 | `Walking` | `Boss_23_walk` (0~169) |
+| LeftHookAttack | 2 | `LeftHook` | `Boss_23_hookL` (0~56) |
+| RightHookAttack | 3 | `RightHook` | `Boss_23_hookR` (0~56) |
+| UpperAttack | 4 | **`Uppercut`** | `Boss_23_uppercut` (0~56) |
+| Grab | 5 | `Grab` | `Boss_23_grab` (0~187) |
+| Hold | 6 | `Holding` | `Boss_23_grabshock` (0~68) |
+| Throw | 7 | `Throw` | `Boss_23_grabdump` (0~39) |
+| JumpAttack | 8 | **`Leap`** (+`Jump` Int) | `Boss_23_jump`(44~158) → `Boss_23_jumping`(0~1) → `Boss_23_landingattack`(8~123) |
+| DashAttack | 9 | `DashAttack` | `Boss_23_dash` (17~102) |
+| Charging | 10 | `Charging` | `Boss_23_charging` (0~158) |
+| Rage | 11 | `Rage` | 🔴 **없음** → §12 Q3 |
+| Groggy | 12 | `GroggyStart`→`Groggy`→`GroggyEnd` | `Boss_23_.groggy_enter`(0~89) → `_ing`(88~105) → `_end`(105~158) |
+| Break | 13 | `Break` | 🔴 애니메이터는 `Break` 모션을 참조하는데 FBX 에 없다 → §12 Q3 |
+| Dead | 14 | `Dead` | `Boss_23_.die` (0~155) |
+
+- **enum 이름 ≠ 애니 스테이트 이름 2개**: `UpperAttack`→`Uppercut`, `JumpAttack`→`Leap`.
+- **미사용 클립**: `Boss_23_getowned01/02`(0~29, 피격 리액션 추정 — Hit 은 상태가 아니므로 안 씀),
+  `Boss_23_.groggy`(0~90, `_enter/_ing/_end` 3분할로 대체됨), `Boss_23_grabend`(0~82).
+- `Arrive` 스테이트가 따로 있다(등장 연출, `State==0 && Jump==0` 으로 탈출). **범위 밖 — 안 건드린다.**
+
+### 1.4 검증된 전이 (발췌)
+
+```
+AnyState  → Dead        [IsDead]
+AnyState  → Break       [IsBreak]
+AnyState  → GroggyStart [IsGroggy]
+GroggyStart → Groggy    [Groggy == 1]
+Groggy      → GroggyEnd [Groggy == 2]
+Groggy      → Break     [IsBreak]  (exitTime 있음)
+GroggyEnd   → Idle      [IsInit]   (exitTime 있음)
+Break       → Idle      [IsInit]
+Idle/Walking → 각 공격  [State == n]
+공격 전부   → Idle/Walking [State == 0 / 1]
+```
+
+**공격 스테이트는 `hasExitTime: false`** 다 — 즉 **클립이 끝나도 스스로 안 빠져나온다.**
+FSM 이 `State` 를 0 또는 1 로 되돌려야 복귀한다. 안 되돌리면 **공격 자세로 얼어붙는다.**
+
+### 1.5 🔴 애니 이벤트는 **SVN** 이다
+
+`Assets/50.Art` 는 **`.gitignore:84` 로 git 제외**이고 **SVN 워킹카피**(`Assets/50.Art/.svn`)다.
+애니 이벤트는 `SK_23.fbx.meta` 의 `clipAnimations` 에 저장되므로:
+
+- **§6 의 이벤트 추가는 전부 SVN 커밋**이다. git 에 안 올라간다.
+- git 만 받는 팀원에게는 **C# 은 가는데 이벤트는 안 간다** → 히트가 안 나고 카운터 창이 안 열린다.
+  **에러는 안 난다.** 조용히 아무 일도 안 일어난다.
+- → 그래서 **코드 타이머 폴백을 반드시 남긴다**(§6.3). 이벤트가 없어도 보스가 얼지는 않게.
+
+---
+
+## 2. 컴포넌트 구성
+
+| 컴포넌트 | 상태 | 책임 | 권한 |
+|---|---|---|---|
+| `TwentyThreeBoss : BossBase` | **신규** | FSM 본체 — 상태·전이·선택기·페이즈 | 서버 |
+| `WellsBoss` | **신규** | Wells 4상태 FSM + 폭탄 주기 | 서버 |
+| `BossAttackTableSO` | **신규** | 공격별 쿨·거리창·가중치·데미지·캐리 수치 | 데이터 |
+| `DashCarryController` | **신규** | 돌진 이동 + 캐리 소켓 + 벽 판정 | 서버 |
+| `IBossTelegraph` / `TintTelegraph` | **신규** | 카운터 창 표현 | 클라 |
+| `GrabController` | **개조** | BT 블랙보드 3개 이탈 (§3) | 서버 |
+| `JumpController` | **개조** | BT 블랙보드 2개 이탈 (§3) | 서버 |
+| `TwentyThreeAnimEvents` | **확장** | 이벤트 5개 → 11개 (§6) | 서버 |
+| `ChargeController` | **그대로** | BT 결합 없음 ✅ (`Clamp` 버그만 수정) | 서버 |
+| `BombLauncher` · `BombController` · `Bomb` | **그대로** | BT 결합 없음 ✅ | 서버 |
+| `ChargingObject` | **그대로** | 송전탑 개체 | 서버 |
+
+**삭제 대상** (전환 검증 후 별도 커밋): `Assets/8.BehaviorTreeGraph/Boss/**`,
+`Assets/1.Scripts/BT/Actions/Attack/*`(보스용), `BossStateChanged`(EventChannel),
+`EnemyBTActivator` 의 보스 경로, 프리팹의 `BehaviorGraphAgent` 3개.
+
+### 2.1 `BossBase` 를 어떻게 둘 것인가
+
+`BossBase`·`BossState` 는 **외부 참조가 0건**이다(전수 확인). 자유롭게 바꿔도 된다.
+
+**채택: `BossBase` 는 상태를 `NetworkVariable<int>` 로 들고, 파생이 enum 으로 해석한다.**
+
+```csharp
+protected readonly NetworkVariable<int> _stateRaw = new(0, Read.Everyone, Write.Server);
+protected abstract void OnStateChangedClient(int raw);   // 파생이 (TwentyThreeState)raw 로 캐스팅
+```
+
+- 제네릭 `BossBase<TState>` 도 되지만, NGO `NetworkVariable` + 인스펙터 + 프리팹 참조가 같이
+  까다로워진다. 보스가 하나뿐이니 **int 가 싸다.**
+- 기존 `BossState` enum 은 **삭제**한다 (§1.1 의 단일 enum 결정).
+
+---
+
+## 3. BT 이탈 작업 (구체)
+
+BT 를 끄면 아래 두 컨트롤러가 **NullReference 로 죽는다.** 먼저 처리해야 한다.
+
+### 3.1 `GrabController` — 블랙보드 3개
+
+| 현재 | 바꿀 것 |
+|---|---|
+| `BlackboardVariable<bool> IsGrabbed` | `public bool IsGrabbed { get; private set; }` (FSM 이 읽음) |
+| `BlackboardVariable<GameObject> GrabbedPlayer` | `public Player GrabbedPlayer { get; private set; }` |
+| `BlackboardVariable<TwentyThreeState> CurrentState` — `Update()` 가 `== Hold` 를 읽어 홀드 데미지 주기 구동 (`:79`) | **`Update()` 의 자체 판단을 없애고** FSM 이 `Hold` 상태 Stay 에서 `TickHold(dt)` 를 호출 |
+
+- `Start()` 의 블랙보드 조회 4블록(`:46~73`) 전부 삭제 → `bt` 필드 제거.
+- `Detect()` / `Throw()` 는 애니 이벤트 진입점이므로 **시그니처 유지**.
+- ⚠️ `UpdateBlackboard()` 가 잡기 성공/실패를 결정하므로, 반환값을 `bool` 로 바꿔
+  **FSM 이 `Grab`→`Hold` / `Grab`→재판단 을 가를 수 있게** 한다. (지금은 BT 가 블랙보드를 폴링)
+
+### 3.2 `JumpController` — 블랙보드 2개
+
+| 현재 | 바꿀 것 |
+|---|---|
+| `BlackboardVariable<Vector3> ArrivePoint` (쓰기) | `public Vector3 ArrivePoint { get; private set; }` |
+| `BlackboardVariable<float> JumpingTime` (읽기) | `BossAttackTableSO.jumpHoverTime` 주입 |
+
+`SetTarget()` / `ShowMyMeshClientRpc()` / `OnLanded()` 는 애니 이벤트 진입점 — 유지.
+
+### 3.3 순서
+
+**BT 이탈(3.1·3.2) → FSM 골격(S1) → 프리팹에서 `BehaviorGraphAgent` off** 순으로 간다.
+BT 와 FSM 이 **동시에 사는 구간을 만들지 않는다** (둘 다 `State` 를 쓰면 애니가 튄다).
+
+---
+
+## 4. 상태 전이 전수표 (23호)
+
+`dt` = 서버 틱. 모든 항목 **서버 전용**. 클라는 `_stateRaw` 복제만 받는다.
+
+### 4.1 `SetState(TwentyThreeState s)` — 단일 진입점
+
+```
+_stateRaw.Value = (int)s
+switch (s):
+  Groggy : animator.SetTrigger("IsGroggy");  animator.SetInteger("Groggy", 1)
+  Break  : animator.SetTrigger("IsBreak")
+  Dead   : animator.SetTrigger("IsDead")
+  default: animator.SetInteger("State", (int)s)
+```
+
+**애니 구동을 여기 한 곳에만 둔다.** 상태마다 흩어지면 §1.2 함정을 반드시 밟는다.
+
+### 4.2 전수표
+
+| 상태 | Enter | Stay(매 틱) | Exit / 전이 조건 |
+|---|---|---|---|
+| **Idle** | `StopAgent()` · `State=0` · 타겟 해제 | 타겟 탐색(Soul 제외) | 타겟 有 → `Walk` |
+| **Walk** | `State=1` | 타겟 추적 · `FaceTarget` · **선택기 실행**(§5) | 공격 선택됨 → 해당 공격 / 타겟 無 → `Idle` |
+| **LeftHook / RightHook / Upper** | `StopAgent` · `FaceTarget` · `State=2/3/4` · 쿨 시작 · `RemoveType` | `FaceTarget` **금지**(선딜 후 방향 고정) | 클립 `End` 이벤트 → 재판단 |
+| **Grab** | `StopAgent` · `FaceTarget` · `State=5` · 쿨 시작 · **카운터 창 Open** | — | `TryGrabEvent` 에서 잡기 성공 → `Hold` / 실패 → 재판단 / **카운터 성공 → `Groggy`** |
+| **Hold** | `State=6` | `grab.TickHold(dt)` (주기 데미지) | `holdDuration` 종료 → `Throw` |
+| **Throw** | `State=7` | — | `ThrowEvent` → 클립 `End` → 재판단 |
+| **JumpAttack** | `StopAgent` · `State=8` · **`Jump=0`** · 쿨 시작 | `JumpController` 시퀀스(§7) | `OnLandedEvent` → 재판단 |
+| **DashAttack** | `FaceTarget` · `State=9` · 쿨 시작 · **카운터 창 Open** · `dashCarry.Begin()` | 돌진 이동 · 캐리 갱신 | 벽/맵끝/최대거리 → 스턴 부여 후 재판단 / **카운터 성공 → `Groggy`(캐리 해제, 스턴 없음)** |
+| **Charging** | `State=10` · 실드 점증 시작 · 전기 장판 on · `charge.StartCharge(playerCount)` | 근접자 데미지+밀치기 · 제한시간 카운트 | 송전탑 전멸 → `Groggy` / 시간 초과 → `Rage` |
+| **Rage** | `State=11` · 전기 이펙트 on | 돌진 3회 순차 (**카운터 창 없음**) | 3회 종료 → 재판단 |
+| **Groggy** | `IsGroggy` 트리거 · `Groggy=1` · `StopAgent` · **진행 중 전부 취소** · `GroggyCount+=1` | 타이머 2초 | 종료 → `Groggy=2` → `GroggyEnd` → `IsInit` → 재판단 |
+| **Break** | `IsBreak` 트리거 · `StopAgent` · **`GroggyCount=0`** | 타이머 5초 | 종료 → `IsInit` → 재판단 |
+| **Dead** | `IsDead` 트리거 · agent/콜라이더 off · `OnDeath()` | — | 디스폰 |
+
+### 4.3 "재판단" = `DecideNextAfterAction()`
+
+```
+if (_pendingCharging) → Charging            # 페이즈 임계 통과 대기분을 여기서 소비
+else if (타겟 無)      → Idle
+else                  → Walk                # Walk 의 Stay 가 다음 틱에 선택기를 돌린다
+```
+
+**공격 상태에서 곧바로 다음 공격으로 가지 않는다.** 반드시 `Walk` 를 한 번 거친다 —
+그래야 `State` 가 0/1 로 내려가 애니 전이가 성립하고(§1.4), 거리 재평가도 한 번 들어간다.
+
+---
+
+## 5. 공격 선택기
+
+`Walk` 의 Stay 에서만 호출. 행동 중에는 호출하지 않는다.
+
+```
+SelectAttack(dist, now):
+    후보 = []
+    for a in table.attacks:
+        if now - a.lastUsed < a.cooldown:      continue   # ① 쿨
+        if !(a.minDist <= dist <= a.maxDist):  continue   # ② 거리창 (Jump 는 창 무시)
+        if !a.AllowedIn(currentPhase):         continue   # ③ 페이즈 개방
+        w = a.weight
+        if a.type == _lastAttack: w *= table.repeatPenalty   # ④ 연속 감쇠 (제외 아님)
+        후보.add(a, w)
+
+    if 후보.empty:  return None        # → 폴백: Walk 유지 (제자리 정지 금지)
+    return 가중치룰렛(후보)
+```
+
+- **④ 는 제외가 아니라 감쇠**다. 제외하면 후보가 1개일 때 아무것도 못 한다.
+  `repeatPenalty` 기본값 **0.3** 제안.
+- `None` 이 폴백으로 흡수되는 것이 이 설계의 핵심이다. 현행 `BossBase` 는 여기서
+  **제자리에 선다** — 보스가 멍청해 보이는 원인 1위.
+- 쿨 재등록: `RemoveType(type)` 은 Enter 에서, `AddType(type)` 은 **쿨 만료 시**.
+  → 위 의사코드처럼 `lastUsed` 타임스탬프로 하면 `Add/Remove` 자체가 불필요하다.
+  **둘 중 하나만 쓴다** (섞으면 이중 관리가 된다). → §12 Q4
+
+### 5.1 공격표 초기값
+
+| 공격 | 쿨 | 거리창 | 가중치 | 카운터 창 | 타겟 |
+|---|---|---|---|---|---|
+| LeftHook | 2.5s | 0 ~ 근접 | 25 | ✗ | 현재 타겟 |
+| RightHook | 2.5s | 0 ~ 근접 | 25 | ✗ | 현재 타겟 |
+| Uppercut | 3.0s | 0 ~ 근접 | 20 | ✗ | 현재 타겟 |
+| Grab | **10s** | 0 ~ 근접 | 15 | **✓** | 현재 타겟 |
+| DashAttack | **5s** | 원거리만 | 10 | **✓** | 현재 타겟 |
+| JumpAttack | **10s** | **무시** | 5 | ✗ | **최원거리 플레이어** |
+
+가중치는 전부 SO 노출. 거리 임계값은 §11 TBD.
+
+---
+
+## 6. 애니메이션 이벤트
+
+독트린(몬스터 FSM 에서 확립): **히트·종료·커밋은 클립 이벤트**, `End` 는 `exitTime` **앞**에 둔다.
+코드 타이머는 **이벤트 누락 대비 폴백**으로만 남긴다.
+
+### 6.1 기존 5개 (유지) — FBX meta 에서 확인됨
+
+| 이벤트 | 클립 | 하는 일 |
+|---|---|---|
+| `SetTargetEvent` | `Boss_23_jump` | `jumpController.SetTarget()` — 타겟 확정 + 장판 생성 + **메시 off** |
+| `FallEvent` | `Boss_23_landingattack` | 메시 on |
+| `OnLandedEvent` | `Boss_23_landingattack` | `jumpController.OnLanded()` — 착지 데미지 |
+| `TryGrabEvent` | `Boss_23_grab` | `grabController.Detect()` |
+| `ThrowEvent` | `Boss_23_grabdump` | `grabController.Throw()` |
+
+> 메시 off 는 별도 이벤트가 아니라 `JumpController.SetTarget()` 안(`:138`)에 있다. **추가 불필요.**
+
+### 6.2 추가할 이벤트 — **현재 근접 3종·돌진에는 이벤트가 0개다**
+
+`hookL` · `hookR` · `uppercut` · `dash` · `charging` 클립에는 **이벤트가 하나도 없다.**
+지금 근접 공격에 히트 판정 자체가 없다는 뜻이다.
+
+| 이벤트 | 클립 (프레임 범위) | 놓을 위치 | 하는 일 |
+|---|---|---|---|
+| `OnAttackHit` | `hookL`·`hookR`·`uppercut` (0~56) | 팔이 내려가는 프레임 (≈30~38 추정, **육안 확인 필요**) | `meleeAttack.Hit()` |
+| `OnAttackEnd` | `hookL`·`hookR`·`uppercut` (0~56) | **56 보다 앞** (≈52) | 재판단 |
+| `OnAttackEnd` | `grabdump` (0~39) | ≈36 | 재판단 |
+| `OnCounterWindowOpen` | `grab` (0~187) | 0 | `SetCounterWindow(true)` |
+| `OnCounterWindowClose` | `grab` (0~187) | **`TryGrabEvent` 직전 프레임** | `SetCounterWindow(false)` |
+| `OnCounterWindowOpen` | `dash` (17~102) | 17 | `SetCounterWindow(true)` |
+| `OnCounterWindowClose` | `dash` (17~102) | 돌진 종료 프레임 | `SetCounterWindow(false)` |
+| `OnDashHitboxOn` / `Off` | `dash` (17~102) | 돌진 구간 앞뒤 | 캐리 판정 on/off |
+| `OnAttackEnd` | `dash` (17~102) | 102 보다 앞 (≈98) | 재판단 |
+
+🔴 **`OnCounterWindowClose` 는 `TryGrabEvent` 보다 반드시 앞 프레임**에 둔다. 같은 프레임이면
+호출 순서가 클립 등록 순서에 좌우돼 **"잡히면서 동시에 카운터 성공"** 이 난다.
+
+### 6.3 폴백 (이벤트가 없어도 얼지 않게)
+
+§1.5 때문에 **이벤트가 없는 환경이 실제로 생긴다**(git 만 받은 팀원, SVN 미갱신).
+
+- `OnAttackEnd` 가 안 오면 → `attackDuration` 코드 타이머로 재판단. **필수.**
+- `OnAttackHit` 가 안 오면 → 히트 없음(데미지 0). 폴백을 넣으면 이벤트 추가 후 **두 번 맞는다** →
+  히트는 폴백을 **넣지 않고**, 대신 서버 경고 로그 1회를 남긴다.
+- `OnCounterWindowOpen/Close` 가 안 오면 → 창이 안 열림(카운터 불가). 이것도 폴백 대신 로그.
+
+**"종료"만 폴백, "판정"은 폴백 금지.** 판정을 폴백하면 이중 적용이 조용히 생긴다.
+
+---
+
+## 7. JumpAttack 시퀀스
+
+**클립 3개로 쪼개져 있고 `Jump` Int 가 그 사이를 넘긴다.**
+
+```
+Enter:  State=8, Jump=0                → Leap = Boss_23_jump (44~158)
+  ↓ 수직 도약 (수평 이동 없음)
+SetTargetEvent  (최상단, 클립 내장)     → 최원거리 플레이어 확정 → ArrivePoint
+                                        → 장판1(바닥+0.01, 고정 크기)
+                                        → 장판2(바닥+0.02, 0.1 → 장판1 크기로 점증)
+                                        → ShowMyMeshClientRpc(false)  = 메시 off (:138)
+  ↓ FSM: Jump=1                        → Boss_23_jumping (0~1) = 1프레임 체공 루프
+  ↓ jumpHoverTime 체공 (장판 점증 시간)
+  ↓ FSM: Jump=2                        → Boss_23_landingattack (8~123)
+FallEvent       (낙하 시작, 클립 내장)  → 메시 on
+OnLandedEvent   (착지, 클립 내장)       → 장판 내 플레이어 데미지 → 장판 제거
+  ↓ FSM: Jump=0, State=1               → 재판단
+```
+
+- `Boss_23_jumping` 이 **1프레임짜리 클립**인 것이 체공 루프의 증거다.
+- ⚠️ `Jump` 전이 조건에서 확인한 것은 **0 과 2** 뿐이다. **1 = 체공은 추정**이다 → §12 Q1.
+- 🔴 **`Jump` 를 0 으로 되돌리지 않으면 다음 JumpAttack 이 영원히 안 나온다** —
+  `Leap` 진입 조건이 `State==8 && Jump==0` 이다. 종료 시 반드시 리셋.
+
+---
+
+## 8. 카운터 창
+
+### 8.1 타임라인
+
+```
+Grab:   [클립 시작]───창 열림───[TryGrabEvent 직전 창 닫힘]──[잡기 판정]──Hold──Throw
+Dash:   [돌진 시작]────────────창 열림────────────[돌진 종료 창 닫힘]
+```
+
+### 8.2 판정 (서버)
+
+```
+OnTakeDamage(attackInfo, attacker):
+    base 처리(데미지·실드·HP)        # 카운터든 아니든 데미지는 항상 들어간다
+    if !_counterWindow.Value:        return
+    if !attackInfo.IsInterruptSkill: return      # ← 은희 요청 A
+    if !IsInFront(attacker):         return      # ← 헤드어택 오면 교체될 지점
+    OnCounterSuccess()
+
+OnCounterSuccess():
+    CancelCurrentAction()            # Grab: 히트박스 해제, Hold/Throw 로 안 감
+                                     # Dash: 돌진 정지 + 캐리 해제(벽 스턴 없음)
+    SetCounterWindow(false)
+    GroggyCount += 1
+    SetState(GroggyCount >= maxGroggyCount ? Break : Groggy)
+```
+
+- `IsInFront` 는 **별도 메서드로 분리**한다. 헤드어택 도입 시 이 한 곳만 바꾼다.
+- `_counterWindow` = `NetworkVariable<bool>`(Server write) → `OnValueChanged` 로
+  클라 `IBossTelegraph.OnCounterWindow(bool)`.
+
+### 8.3 표현
+
+```
+IBossTelegraph { void OnCounterWindow(bool on); }
+  └ TintTelegraph : 노란색 베이스 틴트   ← 지금
+  └ VfxTelegraph  : 이펙트               ← 나중 (프리팹에서 컴포넌트 스왑)
+```
+
+🔴 `HitFlash` 가 `_originalColors` 를 초기화 시점 색으로 캐시하고 MPB 로 복원한다
+([HitFlash.cs](../../Assets/1.Scripts/Unit/HitFlash.cs)). 같은 경로로 칠하면 **피격 한 번에
+노란색이 날아간다.** → `HitFlash` 에 베이스 틴트 오버라이드 진입점을 추가하고,
+카운터가 베이스를 밀고 피격 플래시는 그 위에서 Lerp 하게 한다.
+
+---
+
+## 9. 페이즈 · 송전기
+
+```
+TakeDamage → EvaluatePhase():
+    hp% <= 0.33 → 목표 2 / <= 0.66 → 1 / else 0
+    하향 통과 시에만: _phaseIndex 갱신, _pendingCharging = true, OnPhaseChanged(idx)
+```
+
+`_pendingCharging` 은 **현재 행동이 끝난 뒤**(§4.3) 소비한다 — 행동 도중 강제 중단하지 않는다.
+
+### 9.1 송전기 시퀀스
+
+1. `Charging` 진입 — 중앙 이동 후 대기
+2. 전기 장판 on — 근접 시 데미지 + 뒤로 밀치기
+3. 실드 HP 점증 시작
+4. `charge.StartCharge(playerCount)` — **1인 1 / 2인 2 / 3인 4**
+5. 전멸 → `Groggy` / 제한시간 초과 → `Rage`
+
+🔴 `ChargeController.StartCharge` 의 `Mathf.Clamp(playerCount, 1, 3)` 은 **버그**다.
+`player3` 인스펙터 기본값이 3 이라 3인에 3개만 활성된다. `player3 = 4` 로 바꾸고
+`Clamp` 상한은 유지(인원 인덱스 클램프이지 개수 클램프가 아니다). → 프리팹 값도 함께 확인.
+
+---
+
+## 10. Wells FSM
+
+| 상태 | Enter | 전이 |
+|---|---|---|
+| `Idle` | 대기 | 폭탄 쿨 만료 → `Throw` |
+| `Throw` | `BombHold()` → 애니 → `BombThrow()` | 클립 종료 → `Idle` |
+| `Groggy` | 폭탄 주기 정지 | 23호가 그로기/브레이크 해제 → `Idle` |
+| `Dead` | — | (없음) |
+
+- **`Jump` 상태 삭제** (기존 `WellsState` 5 → 4).
+- Wells 는 **피격 대상이 아니다** (hurtbox 없음, HP 는 23호 것만).
+- 23호 → Wells 동기화는 **23호가 Wells 를 밀어주는 단방향**으로 한다
+  (Wells 가 23호를 폴링하면 순서 의존이 생긴다).
+- 그 외에는 23호 상태와 **무관하게** 자기 주기로 살포한다.
+
+---
+
+## 11. 데이터 스키마 — `BossAttackTableSO`
+
+```
+[공격 엔트리 × 6]
+  type, cooldown, minDistance, maxDistance, ignoreDistance(Jump 용),
+  weight, damage, allowedFromPhase
+[전역]
+  repeatPenalty (0.3), meleeRange, rangedThreshold
+[Grab]  holdDuration, holdDamagePercent, holdPeriod, throwDamagePercent
+[Dash]  dashSpeed, carryPushSpeed, wallStunDuration, dashDamage, maxDashDistance
+[Jump]  jumpHoverTime, floorGrowTime, landingDamage, aoeRadius
+[Charge] timeLimit, shieldGainPerSec, zoneDamage, zonePushForce, pylonCount(1/2/4)
+[Rage]  dashCount(3), dashDamage, interval
+[그로기] maxGroggyCount(5), groggyDuration(2), breakDuration(5)
+```
+
+값이 비어 있는 것은 §12 이후 팀장이 플레이하며 조절. **인스펙터 노출까지만 이번 범위.**
+
+---
+
+## 12. 미확정 — 질문 10건
+
+구현 전에 답이 필요하거나, 제가 임의로 정하면 안 되는 것들입니다.
+
+> 조사로 닫힌 것 3건은 아래에서 뺐습니다 — 클립 이름(§1.3 전부 확인), 메시 off 시점
+> (`SetTarget()` 내부, 추가 이벤트 불필요), `Jump` 단계 구조(클립 3분할 확인).
+
+| # | 질문 | 제 임시안 |
+|---|---|---|
+| **Q1** | **`Jump==1` 이 체공이 맞나요?** 클립 3분할(`jump`→`jumping`(1프레임)→`landingattack`)은 확인했는데, 애니메이터 전이 조건에서는 `Jump==0` 과 `Jump==2` 만 찾았습니다. 체공 전환을 뭐가 하나요 | 0=도약 / **1=체공** / 2=낙하. 아니면 `jumping` 을 안 쓰고 `jump` 클립 끝에서 멈추는 구조일 수도 |
+| **Q2** | **`IsWalking` 트리거가 쓰이는 곳**을 못 찾았습니다. 죽은 파라미터인가요? | 미사용으로 보고 안 건드림 |
+| **Q3** | 🔴 **`Rage` 와 `Break` 클립이 FBX 에 없습니다.** 애니메이터엔 스테이트가 있고 `Break` 는 `Break` 라는 모션을 참조하는데 `SK_23.fbx` 내장 21개에 없습니다. 아트 대기인가요, 다른 클립 재사용인가요? | Rage = `Boss_23_dash` 재사용 / Break = `Boss_23_.groggy_ing` 느리게 — **임시** |
+| **Q4** | 쿨다운을 **`lastUsed` 타임스탬프**로 할까요, 기존 **`AddType`/`RemoveType` 재등록**으로 할까요? 둘 다 쓰면 이중 관리가 됩니다 | **타임스탬프.** 코드가 절반이고 디버깅이 쉽다 |
+| **Q5** | 근접 3종 클립이 **전부 0~56 프레임으로 같습니다.** 히트 프레임도 같게 봐도 되나요? (어퍼는 뜨는 판정이라 다를 것 같은데) | 훅 2종 동일, 어퍼만 별도. **육안 확인 후 확정** |
+| **Q6** | **차징 중 페이즈 임계를 또 넘으면**? (33% 를 차징 중에 통과) | 무시하고 현재 시퀀스 끝까지 → 끝나고 즉시 다음 차징 |
+| **Q7** | **Break 중에 HP 0** 이 되면? Break 애니가 끝까지 가나요, 즉시 Dead 인가요? | 즉시 `Dead` (AnyState 트리거라 자연스러움) |
+| **Q8** | **근접 사거리 / 원거리 임계 거리** 초기값은? Dash 의 `minDistance` 가 여기서 나옵니다 | 근접 3.0 / 원거리 6.0 이상 |
+| **Q9** | Grab 이 **빗나갔을 때 쿨**은 그대로 10초인가요, 짧게 주나요? | 그대로 10초 (창을 연 대가) |
+| **Q10** | 🔴 **애니 이벤트 추가는 SVN 커밋**입니다(§1.5). 주말 구현 중에 SVN 커밋이 가능한가요? 못 하면 이벤트 없는 상태로 테스트하게 됩니다 | 근접 히트만이라도 먼저 SVN 에 넣고 시작 |
+
+### 구현 순서 제안
+
+```
+0) BT 이탈 (§3)              — 이거 안 하면 아무것도 안 돈다
+1) BossBase int 상태 + SetState 단일 지점 (§4.1)
+2) Idle/Walk/근접 3종 + 선택기 + 폴백 (§4·§5)     ← 여기까지가 "멍청하지 않은 보스"
+3) Grab 체인 (§4.2)
+4) JumpAttack (§7)
+5) 카운터 창 + 텔레그래프 (§8)   ← 은희 A 수령 후 마지막 한 줄
+6) Dash + 캐리 (§4.2)            ← 은희 B 수령 후
+7) 페이즈/송전기/차징/레이지 (§9)
+8) Wells (§10)
+```
+
+2번까지 되면 **BT 를 끄고 플레이가 가능**하다. 거기서부터는 증분이다.
