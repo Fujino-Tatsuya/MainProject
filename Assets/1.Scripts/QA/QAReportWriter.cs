@@ -5,7 +5,8 @@ using UnityEngine;
 
 /// <summary>
 /// QA 세션 결과를 로컬 리포트 파일로 남긴다.
-/// 경로: &lt;repo&gt;/Docs/temp/qa-runs/&lt;timestamp&gt;/  (git 비추적, .gitignore 등록됨)
+/// 기본 경로: &lt;repo&gt;/Docs/temp/qa-runs/&lt;timestamp&gt;/  (git 비추적, .gitignore 등록됨)
+/// Tools ▸ QA ▸ Settings에서 시스템 절대 경로를 지정하면 그 폴더 아래에 쌓는다.
 ///   - report.md   : 심각도별 요약 + 발견 타임라인
 ///   - errors.log  : 스택트레이스 포함 원문
 /// 에디터 PlayMode 전제. 빌드에서는 persistentDataPath로 폴백한다.
@@ -42,6 +43,17 @@ public static class QAReportWriter
     public static string RunsRoot()
     {
 #if UNITY_EDITOR
+        string configured = QASettings.ReportRoot;
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            configured = configured.Trim();
+            // 절대 경로만 허용 — 상대 경로는 에디터의 작업 디렉터리 기준이라 엉뚱한 곳에 쌓인다.
+            if (Path.IsPathRooted(configured))
+                return configured;
+
+            Debug.LogWarning($"[QA] 리포트 경로가 절대 경로가 아니라 무시하고 기본 경로를 씁니다: {configured}");
+        }
+
         // <project>/Assets 의 상위 = repo 루트.
         string repoRoot = Directory.GetParent(Application.dataPath).FullName;
         return Path.Combine(repoRoot, "Docs", "temp", "qa-runs");

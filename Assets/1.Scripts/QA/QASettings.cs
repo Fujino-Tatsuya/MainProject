@@ -15,6 +15,7 @@ public static class QASettings
     public const string DurationKey = "QA.SessionDuration";
     public const string RepeatKey = "QA.RepeatCount";
     public const string PlayerCountKey = "QA.PlayerCount";
+    public const string ReportRootKey = "QA.ReportRoot";
 
     /// <summary>0.BootStrapScene에서 Play 시 QA 하네스를 자동 생성할지.</summary>
     public static bool AutoRun
@@ -42,6 +43,17 @@ public static class QASettings
     {
         get => EditorPrefs.GetInt(PlayerCountKey, 3);
         set => EditorPrefs.SetInt(PlayerCountKey, value);
+    }
+
+    /// <summary>
+    /// 리포트를 저장할 시스템 절대 경로(예: D:/QALogs). 프로젝트 밖도 가능.
+    /// 비어 있거나 절대 경로가 아니면 기본 경로(&lt;repo&gt;/Docs/temp/qa-runs)로 폴백한다.
+    /// 실제 해석은 QAReportWriter.RunsRoot()가 담당.
+    /// </summary>
+    public static string ReportRoot
+    {
+        get => EditorPrefs.GetString(ReportRootKey, string.Empty);
+        set => EditorPrefs.SetString(ReportRootKey, value ?? string.Empty);
     }
 }
 #endif
