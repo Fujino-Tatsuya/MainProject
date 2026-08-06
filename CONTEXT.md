@@ -25,8 +25,91 @@ Update this file when a term becomes important enough that future agents or team
 
 - **카메라 조절은 완료** — FOV 52→34 / Priority 100 (`0522731`, development 에 포함).
   이번 세션은 카메라가 아니라 **셰이딩·조명·포스트프로세싱**이다.
-- 세부 범위는 착수 전 확정한다(grill → `PLAN.md` 승인 후 구현).
+- 승인된 계획서는 `PLAN.md` 가 아니라 **`PLAN-vision.md` §7** 이다(§4 단계 2~3 재개).
 - 선행 참고: 툰셰이더 현황(`e5cc012`) · 벽 차폐/투명화 · `Docs/tech/fog-system.md`.
+
+### ▶▶ 다음 세션 시작점 — Play 테스트부터 (2026-08-05 마감, `317a2a1`, **미push ahead 10**)
+
+**코드 작업은 일단락됐고 남은 것은 육안 검증이다.** 컴파일 0에러/0경고, 콘솔 에러 0건,
+`svn status Assets/50.Art` missing 0건, 배선 14개 항목 전수 확인 완료.
+
+**이번 세션에 닫은 것**
+
+| 닫은 것 | 커밋 |
+|---|---|
+| 그레이딩 LDR→HDR + 톤매핑·화이트밸런스·컬러조정·비네트 도입 | `77e6063` |
+| 벽 투명화 복원 + **포그 매니저 OFF** | `3b2d07f` |
+| **카메라 포스트프로세싱 활성** + TAA | `0dfec30` |
+| 벽 투명화 대상을 Stage1 로 한정 + AA·디더 토글 분리 | `82b079b` |
+| ProfilerHUD 배치 + DoF Bokeh | `421b844` |
+| **화면공간 마스크 블러** 신설(셰이더·피처·컨트롤러·설정) | `e07d2ac` |
+| 마스크 블러 `size.x` 무시 수정 + 성능 실측 기록 | `959b8c2` |
+| HUD 마커를 마스크 블러 4패스로 교체 | `317a2a1` |
+
+**다음에 할 것 (순서대로)**
+
+1. **Play 육안 검증** — 마스크 블러 외곽이 실제로 흐려지는지, `feather`(0.35)·
+   `blurStrength`(1)·`roundness`(4) 가 맞는지. 전부 추정값이고 화면으로 확인한 적 없다.
+2. **AA A/B** — 현재 TAA. `Tools/Rendering/Look/AA — SMAA` 로 바꿔 F8 수치·룩 비교.
+   🔴 SMAA 로 갈 때 `WallOcclusionSettings.animateDither` 는 반드시 OFF(기본값 OFF).
+3. **저사양 성능 재측정** — 팀장 PC 는 GPU 2.89ms 로 여유롭지만 고사양 기준이다.
+   비싸면 `downsampleShift` 1→2 → `blurStrength` 하향 → 패스 축소 순.
+4. 남은 격차 = **국소 조명**(가로등·창). 라이트맵 방향이 정해져야 착수 가능(아래 미해결).
+
+**🔴 미해결 / 결정 대기**
+
+- **라이트맵 베이크가 현재 맵 구조와 충돌한다.** `MapContentSpawner.cs:62` 가 존 레이아웃
+  프리팹(바닥·벽 포함)을 런타임 `Instantiate` 하는데, 라이트맵 데이터는 씬 렌더러에
+  직렬화되므로 런타임 생성물은 받지 못한다. 씬의 static 플래그도 0개다. 게다가 슬롯
+  위치가 시드마다 셔플된다. 선택지 = 프리팹 라이트맵 베이크 / 라이트 프로브·APV /
+  Stage1 만 굽고 생성물은 실시간. **조명 단계 전에 방향 결정 필요.**
+- **퓨즈박스가 어둡다 — 미해결.** `Level_wall_hallway.prefab`(Stage1 에 13개)이 쓰는
+  `MA_prop03` 은 `prop03_basecolor` + `pipe_basecolor` 두 장인데 오클루전 변종은 한 장만
+  가져간다. 변종 14개 중 4개가 3~5장 → 1장으로 붕괴하고, **13개는 노멀맵을 잃었다**
+  (노멀 텍스처 5개가 `textureType: 0`=Default 로 임포트돼 `IsNormalMap()` 이 false 를
+  반환하기 때문 — 팀장이 재임포트 예정). 근본 해결은 변종 머티리얼을 없애고 원본
+  ShaderGraph 에 디더를 심는 것. `50.Art` = SVN 이라 단일 담당 필요.
+- ⚠️ **`ProfilerHUD` 는 제출 빌드 전에 MapScene 에서 제거할 것.** 클래스가
+  `#if UNITY_EDITOR || DEVELOPMENT_BUILD` 로 감싸져 있어 릴리스 빌드에서 missing script 가 된다.
+- 🔴 **`Paladin.prefab` 의 `PlayerInput` 이 `m_Enabled: 0 → 1` 로 켜져 있다(미커밋).**
+  `Player.cs:146` 주석대로 **프리팹 기본값은 비활성이 맞고**, `EnableLocalInput()` 이
+  로컬(오너/오프라인)만 켠다 — 원격 클론이 디바이스 페어링을 시도해
+  "Cannot find matching control scheme" 경고를 내는 것을 막기 위한 설계다.
+  `Player.prefab` 은 여전히 `0` 이라 Paladin 만 어긋났다. **커밋하지 말고 되돌릴 것:**
+  `git checkout -- Assets/2.Prefabs/Player/Paladin/Paladin.prefab`
+
+**미커밋으로 남긴 것** — 전부 팀장이 인스펙터에서 튜닝 중인 값이라 손대지 않았다:
+`Global Volume Profile`(비네트 색 warm→진회색, 강도 0.606 / 대비 -3.7 / 채도 -11.6 —
+내가 넣었던 +12·+18 이 과해서 되돌린 것) · `MaskBlurSettings`(`size.x` 0.65) ·
+`Paladin.prefab`(위 항목, 되돌릴 것) · 줄바꿈 노이즈 2건.
+
+**이 세션에 확립된 것**
+
+- 🔴 **"적용했는데 화면이 그대로"가 세 번 나왔고 원인이 매번 달랐다.**
+  ① `VolumeProfile.Add<T>()` 는 서브에셋 등록을 안 해 저장 시 `{fileID: 0}` 널이 된다
+  (게다가 널이 되기 전 메모리 인스턴스를 `TryGet` 이 찾아 "이미 있음"으로 오판한다 —
+  판단 기준은 존재 여부가 아니라 `AssetDatabase.Contains`).
+  ② **카메라 포스트프로세싱이 꺼져 있었다**(`m_RenderPostProcessing: 0`).
+  ③ `MaskBlurSettings.ResolveSize` 가 `size.x` 를 y 에서 유도해 인스펙터 값을 버렸다.
+  **공통 교훈: 도구가 "성공" 로그를 찍어도 산출물 파일을 직접 열어 확인할 것.**
+- 🔴 **게임플레이 카메라는 씬에 없다.** `4.MapScene` 의 Camera 는 0개이고
+  `CameraTargetSwitcher.cs:132` 가 `CameraSwitcher.prefab` → `MainCamera.prefab` 을 런타임
+  `Instantiate` 한다. 그 프리팹은 `CamaraScene`·`PlayerScene`(테스트 씬)에서만 직접 쓰이므로
+  **씬만 훑으면 실제 카메라 설정에 도달하지 못한다.**
+- ⚠️ **`FogManager` 는 이름과 달리 포그가 범인이 아니다.** 씬 값이 `fogEnabled: 0` 이라
+  포그는 안 그려지고 있었고, 화면을 어둡게 만든 것은 `dimEnabled: 1` + `losEnabled: 1`
+  (`losMaxDist: 4`)이다. 지금 OFF 라 **먼 거리 적이 전부 보인다** — 게임플레이 영향 있음.
+- ⚠️ **탑다운에서 DoF 로 화면 외곽을 흐리게 할 수 없다.** DoF 는 깊이로 판단하는데
+  좌우 외곽은 중앙과 깊이가 같다. 그래서 화면공간 마스크 블러를 새로 만들었다.
+- ⚠️ **벽 투명화의 디더 무늬는 품질 결함이 아니라 의도된 비용 절충**이다(반투명 블렌딩
+  대신 `clip()` 으로 불투명 큐 한 패스). 보기 싫다고 끄지 말 것 — 끄면 벽 뒤 플레이어가
+  그냥 안 보인다. 디더+TAA 로 녹이는 시도는 **실패했다**(TAA 분산 클램프가 디더 변동을
+  기각해 뿌연 얼룩이 된다). 2안 = MSAA + `AlphaToMask`.
+- ✅ **렌더러 피처를 코드로 추가할 때는 `AddObjectToAsset` + `m_RendererFeatureMap` 정합
+  확인이 필수다.** 맵은 features 개수와 길이가 맞아야 한다(long 1개 = hex 16자).
+  URP 의 `ValidateRendererFeatures()` 가 재계산하지만 `internal` 이라 리플렉션으로 깨웠다.
+- ✅ 셰이더는 반드시 **직렬화 참조**로 물릴 것(`MaskBlurFeature._shader`). `Shader.Find`
+  만으로는 빌드에서 스트립된다(미니맵 전례).
 
 ### 브랜치 정리 (세션 시작 시)
 
