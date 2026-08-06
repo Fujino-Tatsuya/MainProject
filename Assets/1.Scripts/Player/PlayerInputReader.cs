@@ -14,6 +14,7 @@ public class PlayerInputReader : BaseNetworkBehaviour
     private InputAction skillMainAction;
     private InputAction skillSubAction;
     private InputAction skillUltimateAction;
+    private InputAction dashAction;
     private bool inputEnabled = true;
     private bool uiInputSuppressed;
     private bool combatInputEnabled = true;
@@ -25,11 +26,12 @@ public class PlayerInputReader : BaseNetworkBehaviour
     public bool AttackHeld => CanReadCombatInput && attackAction != null && attackAction.IsPressed();
     public bool InterruptPressed => CanReadCombatInput && interruptAction != null && interruptAction.WasPressedThisFrame();
 
-    // v1 대시 입력은 키보드 Shift 직접 판정(입력 에셋에 Dash 액션이 없어도 동작). (PLAN §7)
+    // 대시 입력은 입력 에셋의 "Dash" 액션에서 읽는다(바인딩 = Space · Gamepad South · XR).
+    // 키는 에셋에서만 바꾼다 — 예전처럼 코드에 키를 박으면 리바인딩이 불가능해진다.
+    // ⚠️ combatInputEnabled 게이트를 타지 않는 것은 의도다 — Soul 차단은 서버
+    //    DashValidationPolicy(Dead||Soul)와 TryBeginPredictedDash의 CanMove가 담당한다.
     public bool DashPressed =>
-        EffectiveInputEnabled &&
-        Keyboard.current != null &&
-        Keyboard.current.leftShiftKey.wasPressedThisFrame;
+        EffectiveInputEnabled && dashAction != null && dashAction.WasPressedThisFrame();
 
     private bool CanUseLocalControl =>
         !IsNetworkActive || IsOwner;
@@ -51,6 +53,11 @@ public class PlayerInputReader : BaseNetworkBehaviour
         skillMainAction = playerInput.actions.FindAction("SkillMain");
         skillSubAction = playerInput.actions.FindAction("SkillSub");
         skillUltimateAction = playerInput.actions.FindAction("SkillUltimate");
+        dashAction = playerInput.actions.FindAction("Dash");
+
+        // 액션이 없으면 대시 입력이 조용히 사라진다(예전 Shift 직접 판정과 달리 폴백이 없다).
+        if (dashAction == null)
+            Debug.LogWarning("[DashAlert] 입력 에셋에 \"Dash\" 액션이 없어 대시 입력을 읽을 수 없습니다.", this);
     }
 
     public bool GetSkillPressed(PlayerSkillSlot slot)
