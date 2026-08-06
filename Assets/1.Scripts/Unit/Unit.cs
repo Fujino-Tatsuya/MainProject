@@ -156,8 +156,9 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
 
         int hpDamage = Mathf.Max(0, previousHp - CurrentHealth);
         int shieldDamage = Mathf.Max(0, previousShield - CurrentShield);
+        // 타격 쉐이크도 공격자 귀속값을 소비하므로 카메라 리그가 있으면 기존 RPC를 재사용한다.
         if (IsServer && IsSpawned && (hpDamage > 0 || shieldDamage > 0) &&
-            FloatingDamageSpawner.RequiresAttributedDamageRpc)
+            (FloatingDamageSpawner.RequiresAttributedDamageRpc || CameraFeedback.RequiresAttributedDamageRpc))
         {
             ulong attackerClientId = ResolveAttackerClientId(hitContext);
             ClientDamagedAttributedClientRpc(hpDamage, shieldDamage, attackerClientId);
@@ -507,6 +508,9 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         // 플로팅 데미지 역시 Unit 계열 전체에 붙는 순수 로컬 연출 소비자다.
         if (GetComponent<FloatingDamagePresenter>() == null)
             gameObject.AddComponent<FloatingDamagePresenter>();
+
+        if (GetComponent<UnitCameraFeedbackReporter>() == null)
+            gameObject.AddComponent<UnitCameraFeedbackReporter>();
     }
 
     public override void OnNetworkDespawn()

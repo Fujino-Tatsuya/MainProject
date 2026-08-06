@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 6257019220733146828}
   - component: {fileID: 5855979776105512679}
   - component: {fileID: 5439277089092647679}
+  - component: {fileID: 8814470022951103552}
   m_Layer: 0
   m_Name: MainCamera
   m_TagString: MainCamera
@@ -161,3 +162,25 @@ MonoBehaviour:
       m_PostInfinity: 2
       m_RotationOrder: 4
   CustomBlends: {fileID: 0}
+--- !u!114 &8814470022951103552
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2081724482138444043}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 97b87fc7ed9d4e58a9c6c16fcccf2fbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CameraFeedback
+  receivedHitAmplitude: 0.35
+  receivedHitDuration: 0.2
+  receivedHitMinInterval: 0.08
+  dealtDamageAmplitude: 0.12
+  dealtDamageDuration: 0.08
+  dealtDamageMinInterval: 0.05
+  intensityAtFullHp: 0
+  intensityAtZeroHp: 0.32
+  vignetteSmoothingPerSecond: 0.8
+  volumePriority: 100

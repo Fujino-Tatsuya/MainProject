@@ -51,6 +51,10 @@
 - 리그가 런타임 생성이라 씬 배선으로는 못 잡는다. 프리팹에 있으면 리그와 함께 생성된다.
 - 튜닝값을 `SerializeField`로 프리팹에서 조절할 수 있다(런타임 `AddComponent`면 불가능).
 - ⚠️ **Impulse 리스너는 vcam이 아니라 Brain 쪽에 둔다.** vcam에 붙이면 추락·관전 전환 때 끊긴다.
+  타입은 **`CinemachineExternalImpulseListener`**(순수 `MonoBehaviour`)다.
+  🔴 **정정**: 이 계획의 초안에 적었던 `CinemachineIndependentImpulseListener`는 3.1.6에 **존재하지 않는다**.
+  `CinemachineImpulseListener`는 `CinemachineExtension`이라 vcam 전용이므로 Brain에 못 쓴다.
+  (파일명 `Runtime/Impulse/CinemachinExternalImpulseListener.cs`에 오타가 있지만 클래스명은 정상이다.)
 
 `Volume`과 `CinemachineIndependentImpulseListener`는 **이 컴포넌트가 런타임에 `AddComponent`로 만든다**
 → 프리팹 작업은 "컴포넌트 1개 부착"뿐이고 참조 배선이 없다.
@@ -121,6 +125,20 @@
 | `Assets/1.Scripts/Camera/Feedback/UnitCameraFeedbackReporter.cs` | **신규** — Unit 피해 이벤트 → 로컬 판정 → `CameraFeedback` 호출 |
 | `Assets/1.Scripts/Unit/Unit.cs` | 자동 부착 2줄 (`FloatingDamagePresenter` 블록 바로 아래) |
 | `Assets/1.Scripts/Camera/CameraTargetSwitcher.cs` | **필요할 때만** — Brain 카메라를 리포터가 못 찾으면 접근자 1개 추가. 불필요하면 손대지 말 것 |
+
+## 구현 중 드러난 전제 (2026-08-06 Codex 보고 → 전부 실측 확인)
+
+1. 🔴 **`MainCamera.prefab`의 `m_RenderPostProcessing: 0`** — post-processing이 꺼져 있어 비네트가
+   아무것도 그리지 않는다. **코드로 켜지 않는다** — 켜면 그 카메라 범위의 Volume 오버라이드가 전부
+   살아나서(씬 `Global Volume`·`FogProfile` 등) 게임 전체 룩이 바뀌고 툰셰이딩 작업과 충돌한다.
+   컴포넌트는 경고 1회만 남기고, **켜는 것은 렌더링 전역 결정으로 팀장 확인 후 프리팹에서** 한다.
+2. 🔴 **`FloatingDamageSettings.asset`의 `displayFilter: 0`(=AllDamage)** 이면
+   `FloatingDamageSpawner.RequiresAttributedDamageRpc`가 false여서 `ClientDamagedAttributedClientRpc`가
+   아예 나가지 않는다 → **타격 쉐이크가 영구히 안 뜬다.** 그 게이트는 "소비자가 없으면 RPC를 아끼는"
+   장치이므로 두 번째 소비자를 OR로 더한다. `Unit`이 카메라 구현을 모르도록
+   `CameraFeedback.RequiresAttributedDamageRpc` 정적 프로퍼티를 경유한다.
+3. ✅ 카메라의 `m_VolumeLayerMask`가 Default(bit 1)이고 `MainCamera`가 layer 0이라 런타임 Volume이
+   마스크에 잡힌다. (안 맞으면 비네트가 조용히 안 나온다.)
 
 ## 완료 조건
 
