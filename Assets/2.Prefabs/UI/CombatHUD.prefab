@@ -124,6 +124,7 @@ MonoBehaviour:
   statusEffectHUD: {fileID: 802}
   passiveHUD: {fileID: 373025847395609761}
   skillCooldownHUD: {fileID: 202}
+  dashCooldownHUD: {fileID: 203}
 --- !u!114 &106
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -147,6 +148,7 @@ GameObject:
   - component: {fileID: 201}
   - component: {fileID: 202}
   - component: {fileID: 373025847395609761}
+  - component: {fileID: 203}
   m_Layer: 5
   m_Name: SkillBar
   m_TagString: Untagged
@@ -204,6 +206,21 @@ MonoBehaviour:
   - slot: 3
     cooldownFill: {fileID: 623}
     remainingText: {fileID: 633}
+  blockedColor: {r: 0.35, g: 0.35, b: 0.35, a: 0.75}
+--- !u!114 &203
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 200}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f33637e932a54892b0d6d764064ab094, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DashCooldownHUD
+  cooldownFill: {fileID: 1476124164519952759}
+  remainingText: {fileID: 6839221787935398516}
   blockedColor: {r: 0.35, g: 0.35, b: 0.35, a: 0.75}
 --- !u!114 &373025847395609761
 MonoBehaviour:
