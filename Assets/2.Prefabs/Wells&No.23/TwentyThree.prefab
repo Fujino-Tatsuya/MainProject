@@ -690,6 +690,9 @@ MonoBehaviour:
   playerLayer:
     serializedVersion: 2
     m_Bits: 64
+  groundMask:
+    serializedVersion: 2
+    m_Bits: 0
   meshRenderer:
   - {fileID: 1048921974906316339}
   - {fileID: 3386235969700265050}
@@ -985,6 +988,7 @@ GameObject:
   - component: {fileID: 6839388890406243040}
   - component: {fileID: 6491938153281997714}
   - component: {fileID: 9114957203948571100}
+  - component: {fileID: 3492608744245104837}
   m_Layer: 8
   m_Name: TwentyThree
   m_TagString: Untagged
@@ -1007,6 +1011,7 @@ Transform:
   m_Children:
   - {fileID: 2585134952784665517}
   - {fileID: 178548833760689029}
+  - {fileID: 5727676292926268320}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &5825734050860780127
@@ -1021,7 +1026,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1745528080
+  GlobalObjectIdHash: 739404150
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -1118,6 +1123,7 @@ MonoBehaviour:
   - rid: 3912067921147069364
   - rid: 3912067923411731078
   - rid: 3912067945809575982
+  - rid: 3912068559286830064
   m_OriginalGraph: {fileID: 0}
   m_IsInitialised: 0
   m_IsStarted: 0
@@ -1149,6 +1155,14 @@ MonoBehaviour:
           m_Value1: 10641492134374864108
         Name: RageAttackCollider
         m_Value: {fileID: 2956919693736392804}
+    - rid: 3912068559286830064
+      type: {class: 'BlackboardVariable`1[[ReStart, Assembly-CSharp]]', ns: Unity.Behavior, asm: Unity.Behavior}
+      data:
+        GUID:
+          m_Value0: 17144912353383193492
+          m_Value1: 10151673525453670001
+        Name: ReStart
+        m_Value: {fileID: 11400000, guid: 86eb215c73ccef542a7511e8f09d6cda, type: 2}
     - rid: 5035182809093243097
       type: {class: 'BlackboardVariable`1[[UnityEngine.GameObject, UnityEngine.CoreModule]]', ns: Unity.Behavior, asm: Unity.Behavior}
       data:
@@ -1390,8 +1404,9 @@ MonoBehaviour:
   moveSpeed: 2
   chaseSpeed: 0
   attackSpeed: 1
-  maxHp: 100
-  defense: 5
+  maxHp: 1000
+  defense: 10
+  _monsterTimeController: {fileID: 0}
 --- !u!114 &2934878137636970231
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1422,6 +1437,11 @@ MonoBehaviour:
   - {fileID: 7434833580858265621}
   - {fileID: 1173616335134953240}
   isOpenVariableName: IsOpen
+  isOverVariableName: IsOver
+  targetGroupVariableName: TargetGroup
+  totalPlayerNumberVariableName: TotalPlayerNumber
+  playerTag: Player
+  restartChannel: {fileID: 11400000, guid: 86eb215c73ccef542a7511e8f09d6cda, type: 2}
 --- !u!114 &6491938153281997714
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1436,6 +1456,64 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MonsterTimeController
   animator: {fileID: 7460696466104070403}
   agent: {fileID: 1054250890861799072}
+--- !u!114 &9114957203948571100
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5372104213593212626}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0ee932d817fa4e58ac747ef1da75f242, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BossHudTarget
+  ShowTopMostFoldoutHeaderGroup: 1
+--- !u!114 &3492608744245104837
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5372104213593212626}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f2e447cc70314d499ac79242b297f571, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FloatingDamageAnchor
+  anchorTransform: {fileID: 5727676292926268320}
+  localOffset: {x: 0, y: 0, z: 0}
+--- !u!1 &5983189518809354529
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5727676292926268320}
+  m_Layer: 8
+  m_Name: FD_Anchor
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &5727676292926268320
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5983189518809354529}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 3.5, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 6916739971123564487}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &6682516438038340514
 GameObject:
   m_ObjectHideFlags: 0
@@ -1840,6 +1918,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 290302554425236768}
     m_Modifications:
+    - target: {fileID: 657607111497605440, guid: 79860f5bc8d12324ba329dfa38ea3699, type: 3}
+      propertyPath: GlobalObjectIdHash
+      value: 2959889982
+      objectReference: {fileID: 0}
     - target: {fileID: 4148832031641590993, guid: 79860f5bc8d12324ba329dfa38ea3699, type: 3}
       propertyPath: m_Name
       value: Wells
@@ -1980,7 +2062,7 @@ PrefabInstance:
     - target: {fileID: -6290459818519570926, guid: 471c30ff001a0254e8af63991ec73cf2, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 2100000, guid: 70f00129a6f8bbb46ac0e6a96dfddbce, type: 2}
+      objectReference: {fileID: 2100000, guid: 05140c2772297ca40b1428aeb4ed1c81, type: 2}
     - target: {fileID: -6290459818519570926, guid: 471c30ff001a0254e8af63991ec73cf2, type: 3}
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
@@ -2161,16 +2243,3 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 6996169128672416064, guid: 471c30ff001a0254e8af63991ec73cf2, type: 3}
   m_PrefabInstance: {fileID: 3231270175939980973}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &9114957203948571100
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5372104213593212626}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0ee932d817fa4e58ac747ef1da75f242, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::BossHudTarget
-  ShowTopMostFoldoutHeaderGroup: 1

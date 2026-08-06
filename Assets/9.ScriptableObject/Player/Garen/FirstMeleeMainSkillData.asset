@@ -21,7 +21,7 @@ MonoBehaviour:
   usableWhileDead: 0
   hittableLayers:
     serializedVersion: 2
-    m_Bits: 1280
+    m_Bits: 17664
   targetingMode: 0
   confirmMode: 0
   castRange: 8

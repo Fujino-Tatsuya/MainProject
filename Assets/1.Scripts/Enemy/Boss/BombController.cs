@@ -121,6 +121,9 @@ public class BombController : NetworkBehaviour
         }
 
         _baseRot = transform.rotation;
+
+        // [임시 진단] ground 마스크 실제 런타임 값 확인 (Ground만이면 8, Ground+Default면 9)
+        Edit.Log($"[진단][No.23] ground.value = {ground.value} (Ground만=8, +Default=9)");
     }
 
     public override void OnNetworkDespawn()

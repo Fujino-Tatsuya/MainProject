@@ -14,7 +14,8 @@ public class Enemy : Unit
     BlackboardVariable<float> WalkSpeed;
     BlackboardVariable<float> ChaseSpeed;
 
-    MonsterTimeController _monsterTimeController;
+    [Header("시간제어 컴포넌트")]
+    [SerializeField] MonsterTimeController _monsterTimeController;
 
     public override void OnNetworkSpawn()
     {
@@ -32,8 +33,6 @@ public class Enemy : Unit
 
         ApplyOptionalSpeed(bt, "WalkSpeed", moveSpeed, out WalkSpeed);
         ApplyOptionalSpeed(bt, "ChaseSpeed", chaseSpeed, out ChaseSpeed);
-
-        _monsterTimeController = GetComponent<MonsterTimeController>();
     }
 
     /// <summary>
@@ -65,7 +64,7 @@ public class Enemy : Unit
     public override void TakeDamage(AttackInfo attackInfo)
     {
         base.TakeDamage(attackInfo);
-        _monsterTimeController?.HitStop(0.25f);
+
         // 그로기 체크..
     }
 }

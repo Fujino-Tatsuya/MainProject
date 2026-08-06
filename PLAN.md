@@ -1,3 +1,260 @@
+# CURRENT PLAN — 지연 체력바(잔상 바) — 플레이어/보스 HUD (2026-08-05)
+
+> 상태: **승인 대기**. 브랜치 `feature/DelayedHealthBar` (base `Convayor-V2`), 레인 `dash`.
+> 구현 위임: Codex(코드만) / 프리팹 배선: 은희(Unity 에디터).
+> grill 완료 — 아래는 확정된 결정만 담는다.
+
+## 목표
+
+피격 시 **앞쪽 HP 바는 즉시 줄고, 뒤쪽 잔상 바가 옛 HP에 잠시 머문 뒤 따라 내려온다**.
+잃은 양을 눈으로 읽히게 하는 순수 로컬 표현(길티기어/LoL 방식).
+
+## 스코프
+
+- **In**: 로컬 플레이어 HUD(`PlayerHealthHUD`), 보스 HUD(`BossHealthHUD`).
+- **Out**: 원격 플레이어 머리 위 바(`UnitOverheadHealthBar`) — 월드스페이스 소형 바라 효과 낮고
+  `Player.prefab` 수정이 필요. 로직은 재사용 가능한 형태로 두어 나중에 붙일 수 있게 한다.
+- **Out**: 실드 바 — 실드는 상한(MaxShield) 개념이 없어(현재도 MaxHp 대비로 그림) 잔상 의미가 모호.
+- **Out**: 지연 *피해* 게이지(예약 피해 후 적용)류 게임플레이 변경 — UI 작업이 아님.
+
+## 알고리즘 (확정)
+
+```
+state: Queue<int> held      // 아직 잔상으로 붙잡고 있는 피해 조각
+       float displayed      // 잔상 바가 그리는 값 (비율 아님, HP 절대값)
+       float holdTimer
+
+이벤트 Unit.ClientHpChanged(prev, next):
+  if next < prev:
+      held.Enqueue(prev - next)
+      holdTimer 시작  // resetHoldOnDamage=true면 매번 갱신, false면 held가 비어있었을 때만
+      if held.Count > maxHeldHits: held.Dequeue()   // 가장 먼저 들어온 조각부터 놓아줌
+  else:
+      held.Clear(); displayed = next                // 회복 → 즉시 스냅
+  if next <= 0: held.Clear(); displayed = 0         // 사망 → 0 스냅
+
+매 프레임(Tick):
+  if holdTimer 만료: held.Clear()
+  target    = hp + held.Sum()
+  displayed = MoveTowards(displayed, target, maxHp * drainRatePerSecond * dt)
+  delayedFill.fillAmount = maxHp > 0 ? clamp01(displayed / maxHp) : 0
+```
+
+### 파라미터 (전부 `SerializeField`, 인스펙터 튜닝)
+
+| 필드 | 기본값 | 의미 |
+|---|---|---|
+| `holdSeconds` | 0.4 | 피격 후 잔상이 멈춰 있는 시간 |
+| `drainRatePerSecond` | 0.8 | 초당 감소량 = 최대HP의 80% (**고정 속도** → 큰 피해는 오래, 작은 피해는 짧게 흐름) |
+| `maxHeldHits` | 5 | 홀드로 붙잡을 최대 피격 횟수. 초과하면 가장 오래된 조각을 pop |
+| `resetHoldOnDamage` | 플레이어 `true` / 보스 `false` | 피격마다 홀드 타이머를 갱신할지 |
+
+**왜 큐인가**: 보스 HUD는 3인이 거의 매 프레임 때리고, 플레이어도 Vent 장판/도트를 맞는다.
+"피격마다 홀드 리셋"만 있으면 리셋이 무한 갱신돼 **잔상이 전투 시작 HP에 영구 고착**한다.
+큐 상한(`maxHeldHits`)이 그 고착을 끊고, 보스는 리셋 자체를 끈다.
+
+**왜 고정 속도인가**: 고정 시간은 피해 크기 정보를 지우고, `Lerp` 감쇠는 끝이 안 닿아 잔상이
+미세하게 남고 프레임레이트에 의존한다.
+
+**pop = 즉시 차감이 아니다** — `target`을 낮출 뿐이고 실제 감소는 위 고정 속도로 흐른다.
+
+### 즉시 리셋(스냅) 케이스 — 이 4개만
+
+1. 대상 교체 (`Bind` 재호출 / 보스 참조 변경)
+2. 회복 (HP 증가)
+3. 사망 (HP 0)
+4. `PlayerHealthHUD.SetDisplayOverrideZero(true)` (Soul 표현 — HUD를 0으로 덮을 때 잔상도 0)
+
+`FinalMaxHp` 변동은 리셋 불필요 — `displayed`를 HP 절대값으로 보관하므로 비율이 자동으로 맞는다.
+
+## 피해 감지 — 기존 복제 이벤트 확장
+
+[Unit.cs:474](Assets/1.Scripts/Unit/Unit.cs:474)의 `OnHpReplicated(prev, next)`가 이미 있고
+`next < prev`만 걸러 `ClientDamaged`(파라미터 없음)를 쏜다. 여기에 **증감 전부를 흘리는 이벤트를
+2줄 추가**한다. 데미지 파이프라인·서버 권한 경로는 건드리지 않는다.
+
+```csharp
+public event System.Action<int, int> ClientHpChanged;   // (previous, next)
+
+void OnHpReplicated(int previous, int next)
+{
+    ClientHpChanged?.Invoke(previous, next);            // 추가
+    if (next < previous) ClientDamaged?.Invoke();       // 기존 유지 (HitFlash 구독)
+}
+```
+
+- `NetworkVariable` 복제 기반이라 RPC 불필요, 모든 피어에서 발동.
+- 회복도 쏘는 이유: 회복 시 잔상 스냅 신호가 필요하고, 소스가 이벤트 하나로 단일화된다.
+- 기존 `ClientDamaged`와 `HitFlash`는 **무수정**(실드 감소도 쏘므로 HP 델타 의미가 오염됨 → 통합 안 함).
+- 한계: 리모트 클라는 네트워크 틱에서 여러 피격이 합산될 수 있어 큐 카운트가 근사치다.
+  호스트에서는 1건당 1회 보장. 잔상 연출에는 무해.
+
+## 구독 수명주기
+
+| 지점 | 처리 |
+|---|---|
+| `PlayerHealthHUD.Bind(player)` | 이전 대상 구독 해제 → 새 대상 구독, `displayed = CurrentHealth` 스냅. `OnDisable`에서 해제 |
+| `BossHealthHUD` | 매 프레임 `FindBoss()` 결과가 이전 참조와 다르면 구독 교체 + 잔상 리셋 (보스1→보스2 잔상 누출 방지) |
+| 늦은 바인딩 | 구독 직후 현재 HP로 스냅. 놓친 구간은 잔상 없이 시작 |
+
+## 변경 파일 (정확히 4개)
+
+| 파일 | 변경 |
+|---|---|
+| `Assets/1.Scripts/UI/Combat/DelayedHealthBar.cs` | **신규** — `[Serializable]` 순수 C# 클래스. `Image delayedFill` + 파라미터 + `Queue<int>`. API: `Bind(int hp)` / `OnHpChanged(int prev, int next)` / `Tick(float dt, int hp, int maxHp)` |
+| `Assets/1.Scripts/Unit/Unit.cs` | `ClientHpChanged` 이벤트 + `Invoke` (2줄) |
+| `Assets/1.Scripts/UI/Combat/PlayerHealthHUD.cs` | `[SerializeField] DelayedHealthBar delayed;` + 구독/Tick + `SetDisplayOverrideZero` 연동 |
+| `Assets/1.Scripts/UI/Combat/BossHealthHUD.cs` | 동일 + 대상 교체 감지 |
+
+기존 `hpFill` / `hpText` / 실드 / `displayOverrideZero`의 **매 프레임 폴링은 그대로 유지**한다
+(이벤트로 옮기면 리팩터 범위가 커진다). 잔상만 이벤트 기반.
+
+## 프리팹 배선 (사용자 몫 — Codex 범위 밖)
+
+Codex는 `.cs` 4개만 건드리고 **프리팹/씬/`.meta`는 수정하지 않는다**. 이후 은희가 Unity에서:
+
+1. [CombatHUD.prefab](Assets/2.Prefabs/UI/CombatHUD.prefab) — HP 바에 Image 추가, `hpFill`과 동일한
+   RectTransform/`fillMethod`, **형제 순서를 `hpFill`보다 앞**(= 뒤에 그려짐) → `delayed.delayedFill`에 연결
+2. [BossHealthHUD.prefab](Assets/2.Prefabs/UI/BossHealthHUD.prefab) — 동일
+3. 색/투명도는 프리팹에서 결정(코드는 `fillAmount`만 건드림), `resetHoldOnDamage`는 보스만 해제
+
+## 완료 조건
+
+1. 변경 파일 정확히 4개. **프리팹/씬/`.meta` 무수정**
+2. 신규 `.cs`는 **UTF-8(BOM)** — 레포 인코딩 규칙
+3. 기존 폴링 동작(HP 텍스트·앞바·실드·`displayOverrideZero`) 회귀 없음
+4. 단일 커밋 + `work_completed`에 커밋 해시 + 인스펙터 배선 안내
+5. (사용자) Unity 컴파일 0 에러 → 프리팹 배선 → MapScene Play에서 피격 시 잔상 확인
+
+## 리스크
+
+- 컴파일 검증을 Codex가 못 한다(Unity 미실행) → 에러 시 `/CoopAgent_Reload` 후 Claude가 수정.
+- 리모트 클라의 큐 카운트는 네트워크 틱 합산으로 근사(위 참조).
+- `Unit.cs`는 코어(은희 담당 영역)지만 이벤트 추가만이라 기존 경로 무영향.
+
+---
+
+# CURRENT PLAN — 개발 진입점 단일화 + 맵 단독 Play 부팅 (2026-08-03)
+
+> 상태: **승인 대기**. 구현 착수 전.
+> 요청자: 은희 (Network 관할). 담당 코드 중 `GameManager.cs`는 팀장(경석) 담당 영역 —
+> 부팅 흐름을 건드리므로 머지 전 합의 필요.
+
+## 목표
+
+1. **맵을 단독으로 Play해도 게임이 돈다.** `ForProfile`의 `Start Host` GUI 버튼으로 호스트를 띄우면
+   `NetworkClock`과 `GameManager`가 정상 구동해야 한다. 현재는 셋 다 성립하지 않는다.
+2. **로비 진입점을 하나로 줄인다.** 개발 기간 동안 로비가 둘(`3.LobbyScene`, `3.BeaverLobby`)이라
+   어디가 진짜인지 매번 헷갈린다. Steamworks 로비가 들어오면 어차피 교체될 영역이므로
+   지금은 "하나만 남긴다"까지만 한다.
+
+## 현재 이해 (조사 완료)
+
+| 사실 | 근거 |
+|---|---|
+| `4.MapScene`에 `NetworkManager`·`ForProfile`이 **없다** | 씬 GUID 스캔. `ForProfile`은 `PlayerBossTest`/`PlayerDashTest`에만 존재 |
+| `4.MapScene`의 GameManager 참조 1건은 인스턴스가 아니라 **버튼 OnClick이 프리팹 에셋을 직접 가리키는 것** | `4.MapScene.unity:2057` |
+| 매니저는 `0.BootStrapScene`에만 있다 | GameManager.prefab(15참조) + NetworkManager.prefab(13참조) |
+| `NetworkClock`·`NetworkSessionLauncher`·`NetworkLoadingFlowController`는 `NetworkManager.prefab`의 컴포넌트 | 프리팹 GUID 스캔 |
+| **강제 이동의 정체는 BootStrap이 아니라 `GameManager.Start()`** | `GameManager.cs:59` — 조건 없이 `LoadScene(titleSceneName)` |
+| 그 결과 `CurrentState`가 `Title`로 남아 `NotifyMainGameReady()`도 안 나간다 | `ForProfile.cs:86`이 `CurrentState == MainGame`을 요구 |
+| 정식 MapScene 로딩은 `NetworkManager.SceneManager.LoadScene(..., Additive)` → `SetActiveScene` | `NetworkLoadingFlowController.cs:497,979` |
+| `3.LobbyScene`은 빌드 목록에 **없다**. MPPM PlayMode 설정 2개가 초기 씬으로 참조 | `EditorBuildSettings`, `LobbySceneTest.asset:25`, `PlayerTest.asset:25` |
+| `3.LobbyScene`은 팀원 IP 하드코딩 버튼 5개(`172.33.1.x`), `3.BeaverLobby`는 IP/Port 입력 필드 | 씬 GameObject diff, 두 매니저 클래스 |
+
+## 접근
+
+### A. 개발용 부팅 씬을 분리한다 (목표 1)
+
+새 씬 **`Assets/0.Scenes/Dev/Dev_MapScene.unity`** 를 만든다. 구성:
+
+- `NetworkManager.prefab` 인스턴스 (→ `NetworkClock`·`NetworkSessionLauncher`·`NetworkLoadingFlowController` 동반)
+- `GameManager.prefab` 인스턴스
+- `ForProfile`을 든 GameObject 하나 (`Start Host` OnGUI 버튼)
+- `DevSceneBooter`(신규, 소형): `Start()`에서 `SceneManager.LoadScene("4.MapScene", Additive)` 후 `SetActiveScene`
+
+**`4.MapScene`은 수정하지 않는다.** 이게 "씬 파일 분리"의 핵심 이득이다:
+
+- 정식 흐름(`BootStrap → … → MapScene`)에서 `NetworkManager`가 중복되지 않는다.
+  NGO `NetworkManager`는 싱글톤이라 중복 인스턴스가 세션을 깨뜨릴 수 있다.
+- `4.MapScene.unity`를 건드리지 않으므로 맵 저작과 **씬 머지 충돌이 발생하지 않는다**.
+- Dev 씬은 `EditorBuildSettings`에 넣지 않는다 → 빌드 산출물에 영향 0.
+  (`4.MapScene`은 이미 목록에 있으므로 에디터 Play에서 이름으로 additive 로드가 된다.)
+
+정식 흐름과 동일하게 additive + `SetActiveScene` 형태를 유지해, Dev 경로에서만 성립하는
+씬 구성 차이를 최소화한다.
+
+### B. `GameManager`를 부팅 씬 인식형으로 바꾼다 (목표 1의 실제 차단 지점)
+
+`GameManager.cs`:
+
+1. 직렬화 필드 `bootstrapSceneName = "0.BootStrapScene"` 추가.
+2. `Start()`에서 활성 씬이 `bootstrapSceneName`일 때만 `LoadScene(titleSceneName)`.
+   그 외(Dev 씬 등)에서는 **자동 진행을 생략**한다.
+3. 자동 진행을 생략한 경우, 이미 로드된 씬을 1회 스캔해 `mainGameSceneName`이 있으면
+   `SetState(GameState.MainGame)`.
+   - additive 로드는 `HandleSceneLoaded`가 잡지만, GameManager가 먼저 깨어 있으면
+     그 경로로도 들어온다. Start 스캔은 순서가 뒤집힐 때의 보험.
+
+이 변경으로 `CurrentState == MainGame`이 성립하고, `ForProfile.HandleServerStarted`의
+`NotifyMainGameReady()`가 나간다 → `MapSceneManager`의 인게임 BGM 등 `OnMainGameReady`
+구독자가 정상 동작한다.
+
+`NetworkClock`은 **기존 코드로 이미 해결된다** — `ForProfile.HandleServerStarted`가
+`HasMainGameStarted`가 false면 `MarkMainGameStart()`를 호출한다(`ForProfile.cs:70-74`).
+새로 만들 것 없음.
+
+> ⚠️ `GameManager.cs`는 팀장 담당 영역(부팅 씬)이다. 변경은 기본값 유지·기존 경로 무영향
+> 이 되도록 설계했으나, PR 전에 팀장 확인을 받는다.
+
+### C. 로비를 하나로 줄인다 (목표 2)
+
+`3.BeaverLobby`를 남기고 구 로비를 제거한다. 이름은 그대로 둔다 —
+Steamworks 로비로 교체될 영역에 rename 비용을 쓰지 않는다.
+
+**삭제**
+- `Assets/0.Scenes/MainFlow/3.LobbyScene.unity` (+`.meta`)
+- `Assets/1.Scripts/Managers/LobbySceneManager.cs` (+`.meta`)
+- `Assets/2.Prefabs/Managers/LobbySceneManager.prefab` (+`.meta`)
+- `NetworkSessionLauncher.OnSetConnectionData(string ip)` 1인자 오버로드
+  — 유일 호출자가 `LobbySceneManager`. 포트를 조용히 7777로 고정하는 오버로드라
+  남겨두면 나중에 함정이 된다.
+
+**재지정**
+- `Assets/Settings/PlayMode/LobbySceneTest.asset` → 초기 씬 `3.BeaverLobby`
+- `Assets/Settings/PlayMode/PlayerTest.asset` → 초기 씬 `3.BeaverLobby`
+
+빌드 목록엔 없던 씬이므로 빌드 영향 0.
+
+## 완료 조건
+
+1. `Dev_MapScene`을 열고 Play → 좌상단 `Start Host` → 아래가 모두 성립:
+   - `[NetworkClock] MainGame 시작 스탬프 = …` 로그 1회
+   - `NetworkClock.MainGameElapsed`가 증가 (`IsRunning == true`)
+   - `MainGameElapsed`에 의존하는 결정론 모션(MovingPlatform, Vent)이 실제로 움직인다
+   - 인게임 BGM 재생 (= `NotifyMainGameReady()` 발행 확인)
+2. **정식 흐름 회귀 없음**: `0.BootStrap → 1.Title → 3.BeaverLobby → 2.Loading → 4.MapScene`
+   `[SceneFlow]` 로그 시퀀스가 변경 전과 동일.
+3. C# 컴파일 0 에러 / 0 경고. `3.LobbyScene`·`LobbySceneManager` 잔존 참조 0건 (GUID 스캔).
+4. MPPM 2인 검증(BeaverLobby 경유 정식 흐름) 정상.
+
+## 리스크 / 한계
+
+- **Dev 씬은 솔로 전용이다.** 일반 `SceneManager`로 MapScene을 먼저 얹고 나중에 호스트를
+  시작하는 순서라, 클라이언트 씬 동기화 경로가 정식과 다르다. 호스트 시작 시점에 이미
+  로드된 씬의 `NetworkObject`는 서버가 스폰하므로 솔로는 성립하지만, **Dev 씬에서 2인
+  접속은 보장하지 않는다.** 멀티 검증은 정식 흐름/MPPM으로 한다. 이 제약은 씬 안 텍스트와
+  `DevSceneBooter` 주석에 남긴다.
+- `ForProfile`은 `#if UNITY_EDITOR`가 아니다. Dev 씬을 빌드 목록에 넣지 않으므로 실무상
+  무해하나, 누군가 목록에 추가하면 릴리즈에 GUI 버튼이 남는다.
+- `GameManager.cs` 변경이 팀장 담당 영역과 겹친다(위 B 참고).
+
+## 미확정 (승인 시 함께 확정)
+
+- Dev 씬 이름/경로: `Assets/0.Scenes/Dev/Dev_MapScene.unity` 로 제안
+- MPPM 초기 씬을 `3.BeaverLobby`로 제안 (대안: `0.BootStrapScene` = 정식 흐름 전체 검증)
+- 커밋 분할: (A+B 부팅) / (C 로비 정리) 2개로 제안
+
 # CURRENT PLAN — Wall Occlusion per-pixel 재설계 (2026-07-28)
 
 > 상태: **완료·push됨 (`0314d4c`)**. Play Mode 검증 통과. SVN 최신화 완료(r235).

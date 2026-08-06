@@ -92,6 +92,16 @@ public sealed class PlayerSafePointTracker : NetworkBehaviour
     {
         Vector3 basePoint = _hasSafePoint ? _safePoint : _spawnPoint;
 
+        // 진단 — "마지막 위치가 아니라 스폰포인트로 돌아온다"의 원인을 가른다(2026-07-30).
+        // ① 기록이 아예 안 된 것(_hasSafePoint=false)인지 ② 기록은 됐는데 IsFreeStanding 이 거부해
+        // Ring 탐색/스폰 폴백으로 넘어간 것인지가 육안으로는 똑같이 보인다.
+        // 기록 조건은 접지 + 평지 + 이동플랫폼 아님 + 상태가 Idle/Move + stableSeconds 유지다 —
+        // 전투 중엔 Attack/Dash 로 계속 끊기므로 한 번도 못 기록할 수 있다.
+        Edit.Log(
+            $"[Fall/진단] 복귀 지점 산출 — 안전지점 기록됨={_hasSafePoint}, " +
+            $"기준점={(_hasSafePoint ? "안전지점" : "스폰포인트")} {basePoint}, " +
+            $"낙하지점={fallPoint}, 기준점이 설 수 있는가={IsFreeStanding(basePoint)}", this);
+
         if (IsFreeStanding(basePoint))
             return basePoint;
 

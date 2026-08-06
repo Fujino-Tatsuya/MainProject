@@ -50,6 +50,7 @@ public class LobbySceneManager : NemoSceneManager
     {
         Debug.Log("[SceneFlow] LobbySceneManager.Start");
         PlayEnterFade();
+
     }
 
     public void StartHost()

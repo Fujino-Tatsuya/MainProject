@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 4403097926049145552}
   - component: {fileID: 6447413059843656341}
   - component: {fileID: 8210463039446112679}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_curb (5)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -125,7 +125,7 @@ GameObject:
   - component: {fileID: 2046335163705694924}
   - component: {fileID: 4370403719243632941}
   - component: {fileID: 374481694625150837}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Cube.227
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -238,7 +238,7 @@ GameObject:
   - component: {fileID: 4554928438082595009}
   - component: {fileID: 4993563938694538178}
   - component: {fileID: 5312058315030460}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Cube.222
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -351,7 +351,7 @@ GameObject:
   - component: {fileID: 3236646020678668858}
   - component: {fileID: 637716949517771313}
   - component: {fileID: 919522414184810056}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Cube.225
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -495,7 +495,7 @@ GameObject:
   - component: {fileID: 5951405505269833170}
   - component: {fileID: 2147029891218342159}
   - component: {fileID: 2210624812494290217}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_basic_typeA (149)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -596,6 +596,37 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: 2363565981455421637, guid: 1d97786342e594f44b614a0ad80a2e3a, type: 3}
+--- !u!1 &686800098008466758
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2635431105857776809}
+  m_Layer: 0
+  m_Name: Spawn_8
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2635431105857776809
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 686800098008466758}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -15, y: 0.1, z: -8}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1538382604900928293}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &962784221349940739
 GameObject:
   m_ObjectHideFlags: 0
@@ -621,7 +652,7 @@ Transform:
   m_GameObject: {fileID: 962784221349940739}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -1.4164834, y: 0.1, z: 2.0037982}
+  m_LocalPosition: {x: 10, y: 0.1, z: -4}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -639,7 +670,7 @@ GameObject:
   - component: {fileID: 5481199107379164524}
   - component: {fileID: 3407297835236787149}
   - component: {fileID: 3105994824465036731}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_basic_typeA (165)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -854,6 +885,37 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: -130419551602238211, guid: 3feb4a06bfb1377459b531e5c55fd713, type: 3}
+--- !u!1 &1247725430870537365
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8785543250254528908}
+  m_Layer: 0
+  m_Name: Spawn_5
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8785543250254528908
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1247725430870537365}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -1, y: 0.1, z: -1}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1538382604900928293}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1274131065584731908
 GameObject:
   m_ObjectHideFlags: 0
@@ -866,7 +928,7 @@ GameObject:
   - component: {fileID: 4879662430005803956}
   - component: {fileID: 1923559057645455756}
   - component: {fileID: 9110572399609529551}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_slope_1by2fbx (1)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1092,7 +1154,7 @@ GameObject:
   - component: {fileID: 1199103773522018318}
   - component: {fileID: 3355328577119858626}
   - component: {fileID: 2272868166692010665}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_basic_typeA (160)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1350,7 +1412,7 @@ GameObject:
   - component: {fileID: 331571055743720694}
   - component: {fileID: 1696333744703425173}
   - component: {fileID: 8531227890981097260}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_basic_typeA (132)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1463,7 +1525,7 @@ GameObject:
   - component: {fileID: 2087778795420329009}
   - component: {fileID: 4471377093572785549}
   - component: {fileID: 1501059313560588488}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_Trenchcover (3)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1727,6 +1789,31 @@ MonoBehaviour:
   - {fileID: 3621812391053458912}
   - {fileID: 6672216452106693005}
   - {fileID: 8171906893504522212}
+  - {fileID: 1096891352740711203}
+  - {fileID: 6677453500545615066}
+  - {fileID: 8785543250254528908}
+  - {fileID: 8897448264047830028}
+  - {fileID: 1003659186267951844}
+  - {fileID: 2635431105857776809}
+  MonsterSpawnEntries:
+  - Marker: {fileID: 3621812391053458912}
+    MonsterGroupID: 0
+  - Marker: {fileID: 6672216452106693005}
+    MonsterGroupID: 0
+  - Marker: {fileID: 8171906893504522212}
+    MonsterGroupID: 0
+  - Marker: {fileID: 1096891352740711203}
+    MonsterGroupID: 2
+  - Marker: {fileID: 6677453500545615066}
+    MonsterGroupID: 2
+  - Marker: {fileID: 8785543250254528908}
+    MonsterGroupID: 1
+  - Marker: {fileID: 8897448264047830028}
+    MonsterGroupID: 1
+  - Marker: {fileID: 1003659186267951844}
+    MonsterGroupID: 1
+  - Marker: {fileID: 2635431105857776809}
+    MonsterGroupID: 0
   Nodes: []
 --- !u!1 &2523061432995721138
 GameObject:
@@ -1753,7 +1840,7 @@ Transform:
   m_GameObject: {fileID: 2523061432995721138}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 3.44352, y: 0.1, z: -0.80212593}
+  m_LocalPosition: {x: 10, y: 0.1, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1771,7 +1858,7 @@ GameObject:
   - component: {fileID: 1421022511808958953}
   - component: {fileID: 1856523618023013301}
   - component: {fileID: 3007217318467480667}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_Trenchcover (2)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1884,7 +1971,7 @@ GameObject:
   - component: {fileID: 7684044424517476875}
   - component: {fileID: 4172577493389072371}
   - component: {fileID: 1212821400415079813}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_basic_typeA (150)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -2110,7 +2197,7 @@ GameObject:
   - component: {fileID: 2025366918116695583}
   - component: {fileID: 3574870780328784392}
   - component: {fileID: 7579498885656878827}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Cube.226
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -2272,7 +2359,7 @@ GameObject:
   - component: {fileID: 6746231292359787748}
   - component: {fileID: 4173588236755030407}
   - component: {fileID: 1354299013918451354}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_Trenchcover (1)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -2385,7 +2472,7 @@ GameObject:
   - component: {fileID: 7075951655720582094}
   - component: {fileID: 4476582837374190035}
   - component: {fileID: 1800776238341228371}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_basic_typeB (4)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -2499,7 +2586,7 @@ GameObject:
   - component: {fileID: 2095457145117877046}
   - component: {fileID: 3861876029700357694}
   - component: {fileID: 1187512284387294782}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_basic_typeA (168)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -2600,6 +2687,37 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: 2363565981455421637, guid: 1d97786342e594f44b614a0ad80a2e3a, type: 3}
+--- !u!1 &3395010121918185289
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1003659186267951844}
+  m_Layer: 0
+  m_Name: Spawn_7
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1003659186267951844
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3395010121918185289}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 1, y: 0.1, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1538382604900928293}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &3497322398638899969
 GameObject:
   m_ObjectHideFlags: 0
@@ -2612,7 +2730,7 @@ GameObject:
   - component: {fileID: 825942752585987946}
   - component: {fileID: 5296359225376916789}
   - component: {fileID: 6862873389650520825}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_slope_1by1fbx (2)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -2725,7 +2843,7 @@ GameObject:
   - component: {fileID: 4658065774849958197}
   - component: {fileID: 6990671489990793280}
   - component: {fileID: 1165775460299419667}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_curb (4)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -2838,7 +2956,7 @@ GameObject:
   - component: {fileID: 8192377210765358006}
   - component: {fileID: 4476368022017926445}
   - component: {fileID: 2241400600153355946}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_curb (2)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -2951,7 +3069,7 @@ GameObject:
   - component: {fileID: 3995887267752999450}
   - component: {fileID: 6999764323140501157}
   - component: {fileID: 6888492128324431321}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_basic_typeA (154)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -3292,7 +3410,7 @@ GameObject:
   - component: {fileID: 5273978607429036591}
   - component: {fileID: 8932233884145307555}
   - component: {fileID: 4114448381654846047}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_basic_typeA (125)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -3633,7 +3751,7 @@ GameObject:
   - component: {fileID: 6902573082997068761}
   - component: {fileID: 6262622950324436349}
   - component: {fileID: 3050973012497207324}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_basic_typeA (145)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -3759,7 +3877,7 @@ Transform:
   m_GameObject: {fileID: 5340670428583250467}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -1.4164829, y: 0.1, z: -3.6080503}
+  m_LocalPosition: {x: 13, y: 0.1, z: 4}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -3777,7 +3895,7 @@ GameObject:
   - component: {fileID: 6000659298271376962}
   - component: {fileID: 3792861688703265013}
   - component: {fileID: 3104883627871324949}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_curb (3)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -3890,7 +4008,7 @@ GameObject:
   - component: {fileID: 6262929656168778338}
   - component: {fileID: 4417724021384131916}
   - component: {fileID: 487358129081866757}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Cube.220
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -4003,7 +4121,7 @@ GameObject:
   - component: {fileID: 4071900721132999549}
   - component: {fileID: 1275883826554874738}
   - component: {fileID: 7058085252332423533}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_curb (1)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -4229,7 +4347,7 @@ GameObject:
   - component: {fileID: 5166740497802247666}
   - component: {fileID: 8631338532580820516}
   - component: {fileID: 3367587455645441977}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_urethane_MzoneA02 (1)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -4683,7 +4801,7 @@ GameObject:
   - component: {fileID: 4856660147839668448}
   - component: {fileID: 706144849382211215}
   - component: {fileID: 1634421936151899993}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_basic_typeA (156)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -4898,6 +5016,37 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: -3310824846634532694, guid: 2c4755ed7b080824897a52af10cbff53, type: 3}
+--- !u!1 &6447503719195149086
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8897448264047830028}
+  m_Layer: 0
+  m_Name: Spawn_6
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8897448264047830028
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6447503719195149086}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -5, y: 0.1, z: -3}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1538382604900928293}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &6588264734692845170
 GameObject:
   m_ObjectHideFlags: 0
@@ -5024,7 +5173,7 @@ GameObject:
   - component: {fileID: 638195454265770380}
   - component: {fileID: 5769024891031008911}
   - component: {fileID: 2933256087659495159}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_basic_typeA (137)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -5137,7 +5286,7 @@ GameObject:
   - component: {fileID: 4105355918897181380}
   - component: {fileID: 8168093705587155914}
   - component: {fileID: 7884684986358457445}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_basic_typeA (163)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -5270,6 +5419,12 @@ Transform:
   - {fileID: 3621812391053458912}
   - {fileID: 6672216452106693005}
   - {fileID: 8171906893504522212}
+  - {fileID: 1096891352740711203}
+  - {fileID: 6677453500545615066}
+  - {fileID: 8785543250254528908}
+  - {fileID: 8897448264047830028}
+  - {fileID: 1003659186267951844}
+  - {fileID: 2635431105857776809}
   m_Father: {fileID: 4982696156970294461}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &6822179036647043797
@@ -5284,7 +5439,7 @@ GameObject:
   - component: {fileID: 7592655840540258214}
   - component: {fileID: 3404930939439598184}
   - component: {fileID: 7604196643758274689}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_basic_typeA (151)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -5511,7 +5666,7 @@ GameObject:
   - component: {fileID: 3241923147323709748}
   - component: {fileID: 8103083389518271347}
   - component: {fileID: 5349497172382193814}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_basic_typeB (2)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -5625,7 +5780,7 @@ GameObject:
   - component: {fileID: 7964114595345167070}
   - component: {fileID: 7869831011615774852}
   - component: {fileID: 6081828632037390181}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_basic_typeA (126)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -5738,7 +5893,7 @@ GameObject:
   - component: {fileID: 3339652870970163164}
   - component: {fileID: 8134203818689908363}
   - component: {fileID: 6097767231168035521}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_Trenchcover (4)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -5839,6 +5994,37 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: -1742469267645209985, guid: f2df244252d42fc4e8eddbee1824f71b, type: 3}
+--- !u!1 &7092434641237270866
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6677453500545615066}
+  m_Layer: 0
+  m_Name: Spawn_4
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &6677453500545615066
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7092434641237270866}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -1, y: 0.1, z: -9}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1538382604900928293}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &7399951998646227899
 GameObject:
   m_ObjectHideFlags: 0
@@ -5851,7 +6037,7 @@ GameObject:
   - component: {fileID: 100498106648501282}
   - component: {fileID: 871524347411552416}
   - component: {fileID: 4208483553293970507}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_basic_typeA (139)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -5964,7 +6150,7 @@ GameObject:
   - component: {fileID: 1861488830139782244}
   - component: {fileID: 5869667777699300657}
   - component: {fileID: 1513006903163220786}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Cube.221
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -6077,7 +6263,7 @@ GameObject:
   - component: {fileID: 5683622711370324980}
   - component: {fileID: 1358294360237076847}
   - component: {fileID: 1016159643886461239}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_basic_typeA (140)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -6190,7 +6376,7 @@ GameObject:
   - component: {fileID: 355742998695777224}
   - component: {fileID: 6239777812399064615}
   - component: {fileID: 8507244816004405203}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_basic_typeB (3)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -6418,7 +6604,7 @@ GameObject:
   - component: {fileID: 2161273581470009263}
   - component: {fileID: 3470624849370565984}
   - component: {fileID: 5737994849278821560}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_basic_typeA (128)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -6531,7 +6717,7 @@ GameObject:
   - component: {fileID: 3006990507313759372}
   - component: {fileID: 4785423050413295364}
   - component: {fileID: 2197608711557954646}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Cube.224
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -6872,7 +7058,7 @@ GameObject:
   - component: {fileID: 6075383768240542078}
   - component: {fileID: 5084406328537627493}
   - component: {fileID: 5689617876587511470}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_basic_typeA (146)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -6985,7 +7171,7 @@ GameObject:
   - component: {fileID: 4378700040545111254}
   - component: {fileID: 6035893924492054177}
   - component: {fileID: 5368303659516695482}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_basic_typeA (142)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -7098,7 +7284,7 @@ GameObject:
   - component: {fileID: 4597630345732154998}
   - component: {fileID: 8287060095678814502}
   - component: {fileID: 6598828189317809178}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_basic_typeA (138)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -7211,7 +7397,7 @@ GameObject:
   - component: {fileID: 5287945485234402459}
   - component: {fileID: 9030867180406487091}
   - component: {fileID: 49559140367171292}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_curb (6)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -7324,7 +7510,7 @@ GameObject:
   - component: {fileID: 5011523925009178840}
   - component: {fileID: 2109207418001552292}
   - component: {fileID: 2458337270302145397}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_basic_typeA (134)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -7551,7 +7737,7 @@ GameObject:
   - component: {fileID: 3294329380933704077}
   - component: {fileID: 4442331561954712821}
   - component: {fileID: 1638171494314989679}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_slope_1by1fbx (1)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -7664,7 +7850,7 @@ GameObject:
   - component: {fileID: 4048998930899229878}
   - component: {fileID: 513581663731796560}
   - component: {fileID: 1930706942087464884}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Cube.223
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -7777,7 +7963,7 @@ GameObject:
   - component: {fileID: 1023020189662427171}
   - component: {fileID: 3639202281952929056}
   - component: {fileID: 726379423705099872}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_basic_typeA (170)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -7890,7 +8076,7 @@ GameObject:
   - component: {fileID: 7676518652699616476}
   - component: {fileID: 4687353621930691406}
   - component: {fileID: 2814278075841812542}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_basic_typeA (144)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -7991,6 +8177,37 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: 2363565981455421637, guid: 1d97786342e594f44b614a0ad80a2e3a, type: 3}
+--- !u!1 &8512826368795366775
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1096891352740711203}
+  m_Layer: 0
+  m_Name: Spawn_3
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1096891352740711203
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8512826368795366775}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -5, y: 0.1, z: -9}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1538382604900928293}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &8607009532723957569
 GameObject:
   m_ObjectHideFlags: 0
@@ -8003,7 +8220,7 @@ GameObject:
   - component: {fileID: 7664487525493388102}
   - component: {fileID: 8496287682717945919}
   - component: {fileID: 4440811231483348692}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_basic_typeA (158)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -8116,7 +8333,7 @@ GameObject:
   - component: {fileID: 6626224011921699688}
   - component: {fileID: 6848774289359830544}
   - component: {fileID: 8383435659814725722}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_slope_1by1fbx (3)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -8229,7 +8446,7 @@ GameObject:
   - component: {fileID: 4868462791097849056}
   - component: {fileID: 7829126682249592078}
   - component: {fileID: 4765477630907267840}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_basic_typeA (143)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -8342,7 +8559,7 @@ GameObject:
   - component: {fileID: 4583520998717643489}
   - component: {fileID: 8614064251577731807}
   - component: {fileID: 3379158251968578966}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_urethane_MzoneA02 (2)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -8455,7 +8672,7 @@ GameObject:
   - component: {fileID: 7823463156079202736}
   - component: {fileID: 6794166023249494967}
   - component: {fileID: 9027970328964593480}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_slope_1by1fbx (4)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -8568,7 +8785,7 @@ GameObject:
   - component: {fileID: 2113503576040177158}
   - component: {fileID: 1556874952579556008}
   - component: {fileID: 379371087866780298}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_slope_1by2fbx (2)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -8681,7 +8898,7 @@ GameObject:
   - component: {fileID: 2186140974251057789}
   - component: {fileID: 504937981752288791}
   - component: {fileID: 7933335381395389688}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Env_floor_basic_typeB (1)
   m_TagString: Untagged
   m_Icon: {fileID: 0}

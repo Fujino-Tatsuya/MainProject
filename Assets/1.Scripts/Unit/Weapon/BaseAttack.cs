@@ -45,12 +45,18 @@ public struct AttackHitContext
     public Vector3 sourcePosition;
     public Transform sourceTransform;
     public Collider hitCollider;
+    public Unit sourceUnit;
 
-    public AttackHitContext(Vector3 sourcePosition, Transform sourceTransform = null, Collider hitCollider = null)
+    public AttackHitContext(
+        Vector3 sourcePosition,
+        Transform sourceTransform = null,
+        Collider hitCollider = null,
+        Unit sourceUnit = null)
     {
         this.sourcePosition = sourcePosition;
         this.sourceTransform = sourceTransform;
         this.hitCollider = hitCollider;
+        this.sourceUnit = sourceUnit;
     }
 }
 
@@ -68,6 +74,12 @@ public class BaseAttack : MonoBehaviour, IDamageSettable
     public AttackType AttackType { get { return attackType; } }
 
     protected AttackInfo _attackInfo;
+
+    /// <summary>
+    /// 공격자 식별용 메타데이터. 플레이어 계층에서 분리되는 투사체는 owner로 재정의한다.
+    /// 피해 판정에는 사용하지 않는다.
+    /// </summary>
+    protected virtual Unit AttackSourceUnit => GetComponentInParent<Unit>();
 
     protected bool IsServer =>
         NetworkManager.Singleton == null ||
@@ -209,6 +221,6 @@ public class BaseAttack : MonoBehaviour, IDamageSettable
 
     private AttackHitContext CreateHitContext(Collider hit)
     {
-        return new AttackHitContext(transform.position, transform, hit);
+        return new AttackHitContext(transform.position, transform, hit, AttackSourceUnit);
     }
 }

@@ -89,6 +89,11 @@ public sealed class BossEncounterDirector : NetworkBehaviour
 
     private readonly List<ulong> _eligibleClientIds = new List<ulong>();
 
+    // 부활 감시 대상. 전투 시작 시 참가자별로 구독하고, 종료 경로에서 반드시 해제한다
+    // (씬 전환 후 남은 콜백이 사라진 Director를 만지는 사고를 막는다).
+    private readonly List<PlayerLifeCycleController> _revivalWatchers =
+        new List<PlayerLifeCycleController>();
+
     private BossTeleportManager _teleportManager;
     private NetworkObject _bossNetworkObject;
     private Unit _bossUnit;
@@ -147,6 +152,7 @@ public sealed class BossEncounterDirector : NetworkBehaviour
             NetworkManager.OnClientDisconnectCallback -= HandleClientDisconnect;
 
         UnsubscribeBossDeath();
+        UnsubscribeParticipantRevivals();
 
         base.OnNetworkDespawn();
     }
@@ -554,6 +560,9 @@ public sealed class BossEncounterDirector : NetworkBehaviour
 
         _btActivator?.OpenBT();
 
+        // 1인 플레이에서 사망으로 BT가 닫힌 뒤 부활하면 다시 열어 준다.
+        SubscribeParticipantRevivals();
+
         SetPhase(BossEncounterPhase.Combat);
         Edit.Log($"[BossEncounter] 전투 시작 — 참가자 {_eligibleClientIds.Count}명, BT 개방.", this);
     }
@@ -567,6 +576,7 @@ public sealed class BossEncounterDirector : NetworkBehaviour
         Edit.LogWarning($"[BossEncounter] 연출 중단 — {reason}", this);
 
         UnlockAllParticipants();
+        UnsubscribeParticipantRevivals();
         DespawnBoss();
 
         _eligibleClientIds.Clear();
@@ -741,12 +751,91 @@ public sealed class BossEncounterDirector : NetworkBehaviour
             _bossUnit.Died -= HandleBossDefeated;
     }
 
+    // ── 부활 시 전투 재개 ──────────────────────────────────────────────────
+    //
+    // No.23 BT는 생존 인원이 없어지면 스스로 `IsOpen`을 false로 내린다
+    // (그래프 안 SetVariableValueAction 2곳, 이를 읽는 조건 6곳). 1인 플레이에서는
+    // 그 플레이어가 죽는 순간 BT가 멈추는데, 목숨이 남아 부활할 수 있으므로
+    // 부활 시점에 `IsOpen`을 다시 올려 전투를 이어 줘야 한다.
+    //
+    // BT 그래프는 보스 담당 영역이라 손대지 않는다 — 레버는 기존 EnemyBTActivator 하나뿐이고,
+    // `IsOpen = true` 대입이라 여러 번 불려도 안전(멱등)하다. 2~3인에서는 한 명 사망으로
+    // BT가 닫히지 않으므로 이 재호출은 사실상 no-op이 된다.
+    private void SubscribeParticipantRevivals()
+    {
+        UnsubscribeParticipantRevivals();
+
+        for (int i = 0; i < _eligibleClientIds.Count; i++)
+        {
+            PlayerLifeCycleController lifeCycle = GetLifeCycle(_eligibleClientIds[i]);
+            if (lifeCycle == null)
+                continue;
+
+            lifeCycle.LifeStateChanged += HandleParticipantLifeStateChanged;
+            _revivalWatchers.Add(lifeCycle);
+        }
+    }
+
+    private void UnsubscribeParticipantRevivals()
+    {
+        for (int i = 0; i < _revivalWatchers.Count; i++)
+        {
+            if (_revivalWatchers[i] != null)
+                _revivalWatchers[i].LifeStateChanged -= HandleParticipantLifeStateChanged;
+        }
+
+        _revivalWatchers.Clear();
+    }
+
+    private PlayerLifeCycleController GetLifeCycle(ulong clientId)
+    {
+        if (NetworkManager == null || !NetworkManager.ConnectedClients.ContainsKey(clientId))
+            return null;
+
+        NetworkObject playerObject = NetworkManager.ConnectedClients[clientId].PlayerObject;
+        return playerObject != null ? playerObject.GetComponent<PlayerLifeCycleController>() : null;
+    }
+
+    private void HandleParticipantLifeStateChanged(PlayerLifeState previous, PlayerLifeState current)
+    {
+        if (!IsServer)
+            return;
+
+        // Alive로 "들어오는" 전이만 본다. 같은 상태 재발행이나 Soul/PermanentDead 전이는 무시.
+        if (current != PlayerLifeState.Alive || previous == PlayerLifeState.Alive)
+            return;
+
+        // ⚠️ 전투 중이고 보스가 살아 있을 때만. 이 가드가 없으면 격파 후 부활에 시체의 BT가 되살아난다.
+        if (!_combatStarted || _defeatHandled)
+            return;
+
+        if (_bossUnit == null || _bossUnit.CurrentHealth <= 0)
+            return;
+
+        // 차징 도중에 죽었다면 ChargeController 의 카운터가 중간값으로 남아 있을 수 있다.
+        // 그 상태를 함께 남긴다 — 재개방이 "무시되는" 것처럼 보이는 원인을 여기서 가른다.
+        string chargeState = _chargeController != null
+            ? $"IsDefeated={_chargeController.IsDefeated}, IsReached={_chargeController.IsReached}"
+            : "ChargeController 없음";
+
+        // OpenBT 만으로는 부족했다 — IsOpen 을 되돌려도 BT가 파킹된 서브트리에서 빠져나오지 못했다.
+        // 민경 님이 추가한 RaiseRestart 는 ReStart 이벤트 채널을 발행해 그래프의 On Start 구독 노드를
+        // 트리거하고 OpenBT 까지 함께 수행한다(c7f7b1c). 재개는 이 경로 하나로 통일한다.
+        _btActivator?.RaiseRestart();
+        Edit.Log(
+            $"[BossEncounter] 참가자 부활({previous} → {current}) — BT 재시작 요청(RaiseRestart). " +
+            $"보스 체력={_bossUnit.CurrentHealth}, 차징 {chargeState}", this);
+    }
+
     private void HandleBossDefeated()
     {
         if (!IsServer || _defeatHandled)
             return;
 
         _defeatHandled = true;
+
+        // 격파 후 부활로 BT가 되살아나지 않게 감시를 먼저 끊는다.
+        UnsubscribeParticipantRevivals();
 
         // 결과 화면이 읽을 값을 씬 전환 전에 확정한다(전멸 경로는 PartyWipeWatcher가 false로 확정).
         SessionStatsTracker.Active?.Capture(cleared: true);

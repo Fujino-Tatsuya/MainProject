@@ -1,9 +1,5 @@
 fileFormatVersion: 2
-<<<<<<<< HEAD:Assets/ML-Agents/Timers/4.MapScene_timers.json.meta
-guid: 43b2c3f6c59208441b3950b50268c4ac
-========
 guid: 4dea5b4892aca8141a68f981492a9a35
->>>>>>>> feature/map-player-merge:Assets/1.Scripts/Rendering/Fog/THIRD_PARTY_NOTICES.md.meta
 TextScriptImporter:
   externalObjects: {}
   userData: 

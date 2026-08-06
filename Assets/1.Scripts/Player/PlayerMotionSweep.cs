@@ -38,9 +38,10 @@ public static class PlayerMotionSweep
 
             Vector3 dir = remaining / dist;
 
-            if (TryCast(capsule, owner, accumulated, dir, dist + skin, maxWalkableAngle, obstacleMask, buffer, out RaycastHit hit))
+            if (TryCast(capsule, owner, accumulated, dir, dist + skin, maxWalkableAngle, obstacleMask, skin, buffer,
+                    out RaycastHit hit, out float hitDistance))
             {
-                float allowed = Mathf.Max(0f, hit.distance - skin);
+                float allowed = Mathf.Max(0f, hitDistance - skin);
                 accumulated += dir * allowed;
                 Vector3 leftover = dir * (dist - allowed);
                 remaining = Vector3.ProjectOnPlane(leftover, hit.normal);
@@ -55,6 +56,16 @@ public static class PlayerMotionSweep
         return accumulated;
     }
 
+    /// <param name="skin">
+    /// 캐스트 반경을 줄이는 여유 두께.
+    ///
+    /// ⚠️ 캡슐 반경을 그대로 쏘면 <b>이미 닿아 있는 면</b>이 distance 0으로 히트한다. 특히 캡슐
+    /// 하단이 지면에 1~2cm 파묻힌 상태(스폰 Y가 낮을 때)에서는 수평 스윕이 바닥 메시의 측면
+    /// 삼각형(법선 수평 → 벽 판정)을 매 tick 때려 이동 전량이 클램프된다 — 대시가 제자리에서
+    /// 끝나는 원인이었다. 반경을 skin만큼 줄여 접촉면을 떼고, 그만큼 늘어난 히트 거리는
+    /// <paramref name="hitDistance"/>에서 되돌린다. (MoveRoot·PlayerGroundingSensor와 같은 패턴)
+    /// </param>
+    /// <param name="hitDistance">인셋 보정을 되돌린 히트 거리(원래 반경 기준). 호출부는 이 값을 쓴다.</param>
     private static bool TryCast(
         CapsuleCollider capsule,
         Transform owner,
@@ -63,24 +74,34 @@ public static class PlayerMotionSweep
         float maxDistance,
         float maxWalkableAngle,
         LayerMask obstacleMask,
+        float skin,
         RaycastHit[] buffer,
-        out RaycastHit best)
+        out RaycastHit best,
+        out float hitDistance)
     {
         best = default;
+        hitDistance = 0f;
 
         Vector3 lossy = owner.lossyScale;
         float radiusScale = Mathf.Max(Mathf.Abs(lossy.x), Mathf.Abs(lossy.z));
         float heightScale = Mathf.Abs(lossy.y);
-        float radius = capsule.radius * radiusScale;
-        float height = Mathf.Max(capsule.height * heightScale, radius * 2f);
-        float half = Mathf.Max(0f, height * 0.5f - radius);
+        float fullRadius = capsule.radius * radiusScale;
+
+        // 캡슐 끝점(p1/p2)은 원래 지오메트리 그대로 두고 반경만 줄인다 → 스윕 볼륨이 전 방향으로
+        // skin만큼 축소돼 접촉면에서 떨어진다(캡슐이 길어지지 않는다).
+        float radius = Mathf.Max(0.01f, fullRadius - skin);
+        float inset = Mathf.Max(0f, fullRadius - radius);
+
+        float height = Mathf.Max(capsule.height * heightScale, fullRadius * 2f);
+        float half = Mathf.Max(0f, height * 0.5f - fullRadius);
         Vector3 center = owner.TransformPoint(capsule.center) + originOffset;
         Vector3 up = owner.up;
         Vector3 p1 = center + up * half;
         Vector3 p2 = center - up * half;
 
+        // 반경을 줄인 만큼 같은 벽을 inset 늦게 만난다 — 검사 거리도 그만큼 늘려야 사거리가 보존된다.
         int count = Physics.CapsuleCastNonAlloc(
-            p1, p2, radius, dir, buffer, maxDistance, obstacleMask, QueryTriggerInteraction.Ignore);
+            p1, p2, radius, dir, buffer, maxDistance + inset, obstacleMask, QueryTriggerInteraction.Ignore);
 
         float nearest = float.PositiveInfinity;
         bool found = false;
@@ -102,6 +123,8 @@ public static class PlayerMotionSweep
             }
         }
 
+        // 인셋 보정을 되돌려 원래 반경 기준 거리로 환산한다 → 호출부의 정지 지점(hit - skin)이 종전과 같다.
+        hitDistance = found ? Mathf.Max(0f, best.distance - inset) : 0f;
         return found;
     }
 }

@@ -22,6 +22,9 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
     [SerializeField] private Temp_MultiGameRule gameRule;
     [SerializeField, Min(0f)] private float deathPresentationDuration = 1.5f;
 
+    // 사망 시 되돌릴 애니메이터. 비워 두면 Awake 에서 자식에서 찾는다(프리팹 배선 불필요).
+    [SerializeField] private Animator lifeAnimator;
+
     private readonly NetworkVariable<PlayerLifeState> lifeState =
         new NetworkVariable<PlayerLifeState>(
             PlayerLifeState.Alive,
@@ -59,6 +62,9 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
         encounterLock = GetComponent<PlayerEncounterLock>();
         ResolveLocalReferences();
         ResolveGameRuleReference();
+
+        if (lifeAnimator == null)
+            lifeAnimator = GetComponentInChildren<Animator>(true);
     }
 
     public override void OnNetworkSpawn()
@@ -328,7 +334,39 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
         PlayerLifeState previousState,
         PlayerLifeState currentState)
     {
+        // ⚠️ 관찰자 통지보다 **먼저** 되돌린다. 사망 연출을 구독하는 쪽이 애니메이터를 세팅한 뒤에
+        //    리셋하면 그 연출까지 같이 지워진다.
+        if (currentState == PlayerLifeState.DeadPresentation &&
+            previousState != PlayerLifeState.DeadPresentation)
+        {
+            ResetAnimatorForDeath();
+        }
+
         NotifyStateObservers(previousState, currentState);
+    }
+
+    /// <summary>
+    /// 사망 순간 애니메이터를 초기 상태로 되돌린다.
+    ///
+    /// 왜 필요한가: Q(FirstMeleeMainSkill) 같은 스킬 도중 죽으면 애니메이터가 그 상태와 트리거를
+    /// 그대로 들고 있다. 프로젝트 전체에 플레이어 애니메이션을 되돌리는 경로가 아예 없어
+    /// (Rebind/WriteDefaultValues 0건, 스킬 취소 경로 0건, ResetTrigger 는 몬스터 전용)
+    /// 부활해도 남은 상태가 그대로 이어진다.
+    ///
+    /// ⚠️ Unity 6000.3.16f1 에는 "상태만 초기화"하는 전용 API 가 없다.
+    ///    ResetAllStates / ResetParameters 는 존재하지 않음을 어셈블리에서 확인했다.
+    ///    문서화된 방법은 Rebind() + Update(0) 뿐이다 — Rebind 는 파라미터까지 되돌리므로
+    ///    이후 사망 연출은 이 호출 **뒤에** 세팅돼야 한다(호출 위치가 통지보다 앞인 이유).
+    ///
+    /// 모든 피어에서 같은 복제 전이에 대해 호출되므로 호스트/클라이언트가 어긋나지 않는다.
+    /// </summary>
+    private void ResetAnimatorForDeath()
+    {
+        if (lifeAnimator == null || !lifeAnimator.isActiveAndEnabled)
+            return;
+
+        lifeAnimator.Rebind();
+        lifeAnimator.Update(0f);
     }
 
     private void NotifyStateObservers(

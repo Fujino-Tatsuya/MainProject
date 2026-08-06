@@ -69,6 +69,8 @@ public class MinimapController : MonoBehaviour
     private int _lastPlayerCount = -1;
     private Transform _corridorsRoot;
 
+    [SerializeField] private Material MinimapComsite;
+
     private void Awake()
     {
         // 맵 구조물(복도/다리 등)을 미리 캐싱하여 매 업데이트마다 찾는 비용 방지
@@ -328,6 +330,16 @@ public class MinimapController : MonoBehaviour
             return;
         }
 
+        if (MinimapComsite == null)
+        {
+            // 미배정이면 미니맵 UI 자체가 안 만들어진다 — 조용히 사라지면 원인 추적이 오래 걸리므로 알린다.
+            // 인스펙터 참조가 정본인 이유: 이 참조가 없으면 UI/MinimapComposite 셰이더를 아무 에셋도
+            // 참조하지 않게 되어 빌드에서 스트립된다(Shader.Find 로는 빌드에서 못 찾는다).
+            Debug.LogError("[Minimap] MinimapComsite 머티리얼 미할당 — 미니맵을 생성하지 않는다. " +
+                           "4.MapScene 의 Minimap 오브젝트에 3.Materials/MinimapComposite/MinimapComposite.mat 을 배정할 것.");
+            return;
+        }
+
         var canvasGo = new GameObject("MinimapCanvas");
         canvasGo.transform.SetParent(transform, false);
         _canvas = canvasGo.AddComponent<Canvas>();
@@ -339,8 +351,11 @@ public class MinimapController : MonoBehaviour
         var mapGo = new GameObject("Minimap", typeof(RawImage));
         mapGo.transform.SetParent(canvasGo.transform, false);
         var raw = mapGo.GetComponent<RawImage>();
-        var shader = Shader.Find("UI/MinimapComposite");
-        _mapMat = new Material(shader);
+        //var shader = Shader.Find("UI/MinimapComposite");
+        //_mapMat = new Material(shader);
+
+        _mapMat = new Material(MinimapComsite); //##경슥아 이거 수정했음 26.7.31
+
         _mapMat.SetTexture("_MainTex", _bakeRT);
         raw.texture = _bakeRT;
         raw.material = _mapMat;

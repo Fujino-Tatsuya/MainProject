@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using TMPro;
 using Unity.Netcode;
 using UnityEngine;
@@ -59,6 +59,9 @@ public class BeaverLobbySceneManager : NemoSceneManager
         SetErrorMessage(string.Empty);
         RegisterLobbyUiEvents();
         ApplyRoleUi();
+
+        // BGM 재생
+        AudioManager.Instance.PlayBGM(AudioManager.Instance.Catalog.LobbyBGM);
     }
 
     private void OnDestroy()
@@ -266,7 +269,7 @@ public class BeaverLobbySceneManager : NemoSceneManager
             return;
         }
 
-        Debug.Log($"[SceneFlow] BeaverLobbySceneManager.HandleClientDisconnected clientId={clientId} isServer={_networkManager.IsServer}");
+        Debug.Log($"[SceneFlow] BeaverLobbySceneManager.HandleClientDisconnected clientId={clientId} isServer={_networkManager.IsServer} reason='{_networkManager.DisconnectReason}'");
         if (_networkManager.IsServer)
         {
             if (clientId != _networkManager.LocalClientId)
@@ -293,7 +296,7 @@ public class BeaverLobbySceneManager : NemoSceneManager
 
     private void HandleTransportFailure()
     {
-        Debug.Log("[SceneFlow] BeaverLobbySceneManager.HandleTransportFailure");
+        Debug.LogError("[SceneFlow] BeaverLobbySceneManager.HandleTransportFailure");
         SetErrorMessage("네트워크 전송 오류가 발생했습니다.");
         _clientConnectPending = false;
         SetSessionConnectPanel(true);

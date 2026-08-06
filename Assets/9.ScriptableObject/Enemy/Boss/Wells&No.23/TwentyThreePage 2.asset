@@ -13,13 +13,13 @@ MonoBehaviour:
   m_Name: TwentyThreePage 2
   m_EditorClassIdentifier: Assembly-CSharp::TwentyThreeBasicAttackFigure
   hookAttackMinDistance: 0
-  hookAttackMaxDistance: 4
+  hookAttackMaxDistance: 2
   hookAttackPercentage: 35
   upperAttackMinDistance: 0
-  upperAttackMaxDistance: 4
+  upperAttackMaxDistance: 2
   upperAttackPercentage: 40
   grabAttackMinDistance: 0
-  grabAttackMaxDistance: 4
+  grabAttackMaxDistance: 2
   grabAttackPercentage: 25
   jumpAttackMinDistance: 5
   jumpAttackMaxDistance: 10

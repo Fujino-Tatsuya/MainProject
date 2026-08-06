@@ -465,7 +465,7 @@ MonoBehaviour:
   floor: {fileID: 3716740133590289348}
   bombTime: 20
   floorTime: 30
-  bombDamage: 55
+  bombDamage: 5
   bombFlightDuration: 1
   player:
     serializedVersion: 2
@@ -475,7 +475,7 @@ MonoBehaviour:
     m_Bits: 16640
   ground:
     serializedVersion: 2
-    m_Bits: 9
+    m_Bits: 8
   wall:
     serializedVersion: 2
     m_Bits: 128
@@ -484,6 +484,8 @@ MonoBehaviour:
     m_Bits: 512
   bombRadius: 0.25
   floorIncreasAmount: 0.2
+  heldScale: 0.5
+  landedScale: 1
 --- !u!54 &854992860938221299
 Rigidbody:
   m_ObjectHideFlags: 0

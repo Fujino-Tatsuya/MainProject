@@ -1,4 +1,4 @@
-﻿using Unity.Collections;
+using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -41,7 +41,7 @@ public class MapSceneManager : NemoSceneManager
     {
         if (Keyboard.current?.escapeKey.wasPressedThisFrame == true)
         {
-            OpenOptionPanel();
+            ToggleOptionPanel();
         }
     }
 
@@ -50,10 +50,30 @@ public class MapSceneManager : NemoSceneManager
         Debug.Log("[SceneFlow] MapSceneManager.Start");
         SetWarningPanel(false); // 경고창은 기본 숨김 — 클라가 Exit를 누를 때만 표시
         PlayEnterFade();
+
+        // 인게임 BGM: 씬 로드 시점이 아니라 "본게임 준비 완료(로딩+플레이어 스폰 동기화)" 시점에 재생.
+        // 이미 준비된 뒤 구독하면 즉시 1회 실행되고, 아직이면 준비되는 순간 호출된다.
+        if (_gameManager != null)
+        {
+            _gameManager.SubscribeMainGameReady(PlayInGameBgm);
+        }
+    }
+
+    // 본게임 준비 완료 시 호출되는 콜백. 인게임 BGM을 재생한다.
+    private void PlayInGameBgm()
+    {
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlayBGM(AudioManager.Instance.Catalog.InGameBGM);
+        }
     }
 
     private void OnDestroy()
     {
+        if (_gameManager != null)
+        {
+            _gameManager.UnsubscribeMainGameReady(PlayInGameBgm);
+        }
         UnregisterGoToResultHandler();
     }
 
@@ -95,6 +115,17 @@ public class MapSceneManager : NemoSceneManager
     public void OpenOptionPanel()
     {
         SetOptionPanel(true);
+    }
+
+    public void CloseOptionPanel()
+    {
+        SetOptionPanel(false);
+    }
+
+    // ESC / 톱니 토글 — 열려 있으면 닫고, 닫혀 있으면 연다.
+    public void ToggleOptionPanel()
+    {
+        SetOptionPanel(optionPanel == null || !optionPanel.activeSelf);
     }
 
     private void QuitApplication()
@@ -195,9 +226,27 @@ public class MapSceneManager : NemoSceneManager
         Debug.Log($"[SceneFlow] MapSceneManager.BroadcastGoToResultToClients clients={_networkManager.ConnectedClientsIds.Count}");
     }
 
-    // 클라 수신: 서버만 이 메시지를 보내므로 신뢰하고 즉시 로컬 전환. 재전송/호스트가드 없음.
+    // 클라 수신: 서버가 보낸 것만 신뢰하고 로컬 전환한다.
+    // ⚠️ 이 핸들러는 Awake에서 호스트/클라 구분 없이 등록된다(RegisterGoToResultHandler). 송신자 검증이
+    //    없으면 클라가 서버로 같은 이름의 메시지를 보내 호스트를 결과 화면으로 끌고 갈 수 있었다.
+    //    LobbyUIController·NetworkLoadingFlowController·NetworkClock이 쓰는 것과 동일한 가드다.
     private void HandleGoToResultMessage(ulong senderClientId, FastBufferReader reader)
     {
+        // 서버는 BroadcastGoToResultToClients에서 자신을 제외하고 로컬에서 직접 전환한다.
+        // 따라서 서버가 이 메시지를 받았다면 송신자는 클라이언트다 — 처리하지 않는다.
+        if (_networkManager != null && _networkManager.IsServer)
+        {
+            Debug.LogWarning($"[SceneFlow] GoToResult 메시지를 서버가 수신해 무시합니다. sender={senderClientId} " +
+                             "(서버는 로컬에서 직접 전환하므로 이 경로로 들어올 이유가 없습니다.)");
+            return;
+        }
+
+        if (senderClientId != NetworkManager.ServerClientId)
+        {
+            Debug.LogWarning($"[SceneFlow] GoToResult 메시지의 송신자가 서버가 아니라 무시합니다. sender={senderClientId}");
+            return;
+        }
+
         Debug.Log($"[SceneFlow] MapSceneManager.HandleGoToResultMessage sender={senderClientId}");
         PerformGoToResult();
     }

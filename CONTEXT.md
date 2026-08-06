@@ -4,7 +4,100 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 현재 인수인계 (2026-07-29 · 폭탄 투척 경로 복구, 커밋 `93b4e02`)
+## ▶▶ 현재 인수인계 (2026-08-05 · 지연 체력바 — Claude → Codex 위임)
+
+작업 세션: **은희(Claude → Codex 위임)**. 레인 `dash` = `C:\UnityProject\MainProject`,
+브랜치 `feature/DelayedHealthBar` (base `Convayor-V2`).
+
+**Codex가 수정 예정 (Claude·타 작업자 동시 편집 금지)**:
+`Assets/1.Scripts/UI/Combat/DelayedHealthBar.cs`(신규) ·
+`Assets/1.Scripts/Unit/Unit.cs`(이벤트 2줄) ·
+`Assets/1.Scripts/UI/Combat/PlayerHealthHUD.cs` · `Assets/1.Scripts/UI/Combat/BossHealthHUD.cs`
+
+설계·완료조건은 [PLAN.md](PLAN.md) 최상단 참조(중복 기재하지 않음). 요지만:
+피격 시 잔상 바가 옛 HP에 0.4초 머문 뒤 고정 속도로 따라 내려온다. 피해 조각을 `Queue`로
+붙잡고 `maxHeldHits=5` 초과 시 오래된 것부터 놓아준다(보스는 홀드 리셋 off) — 지속 피해에
+잔상이 영구 고착하는 것을 막는 장치다.
+
+프리팹 배선(`CombatHUD.prefab` · `BossHealthHUD.prefab`에 잔상 Image 추가·연결)은 **은희가
+Unity에서 직접** 한다. Codex는 `.cs` 4개만 건드리고 프리팹·씬·`.meta`는 손대지 않는다.
+
+⚠️ `CLAUDE.local.md`의 레인 표는 낡았다 — `soul`/`MainProject-BeaverLobby` 워크트리는 없고,
+현재 살아있는 워처는 `dash`(MainProject)와 `fd`(MainProject-WorkTree, `feature/FloatingDamage`) 둘이다.
+
+---
+
+## 이전 인수인계 (2026-07-31 · 보스 이슈 정리 + 툰셰이딩 + Windows 빌드, `93716e0` 미push)
+
+작업 세션: **경석(Claude)**. 브랜치 `feature/map-player-merge`, origin 대비 **ahead 1**.
+워킹트리에 남은 것은 **내용 변경 0 인 줄바꿈 노이즈 4개**뿐이다
+(`0.BootStrapScene` · `GraphicsSettings` · `MultiplayerManager` ·
+`UniversalRenderPipelineGlobalSettings` — 커밋하지 말 것. `git diff` 가 0줄이면 이 부류다).
+
+### 이번에 닫은 것
+
+| 닫은 것 | 커밋 |
+|---|---|
+| 툰셰이더 — 캐릭터 조명 독립 / 아웃라인 화면공간 px 고정 / 고정광 월드공간화, Wells·검·방패 툰 적용 | `e5cc012` |
+| 보스 HUD 복구 — Paladin 의 CombatHUD 에 `BossHealthHUD` 재부착 + RectTransform 스케일 0 수정 | `ebbbf71` · `7e9c78c` |
+| **Wells 폭탄 투척 복구 — 중첩 NetworkObject 제거** (아래 §정정 참고) | `58278e9` |
+| `BombLauncher` 무증상 실패 제거 + `_bombController` 수명 대칭 | `88c4772` |
+| Q 스킬 도중 사망 시 애니메이터 초기화(`Rebind`+`Update(0)`) | `bae2e98` |
+| 부활 시 BT 플레이어 명부(`TargetGroup`/`TotalPlayerNumber`) 갱신 | `7c6ec58` |
+| 은희 컨베이어벨트(`6150ee5`) rebase 병합 · SVN r258→r259 | — |
+| **Windows 빌드 파이프라인** — `BuildWindowsPlayer` + 빌드 씬 목록 정리 + `productName` 복구 | `93716e0` |
+
+### 다음 시작점 — 몬스터 배치
+
+스포너 기계는 이미 있다: `MapContentSpawner`(마커별 그룹 스폰 구현됨) · `SpawnPoint`
+(`AllowedTier` + `MonsterSpawnPoints`) · `MonsterGroupData`(티어/난이도/프리팹/가중치).
+남은 것은 **저작·구성** 쪽이다.
+
+### 이 세션에 확립된 것
+
+- 🔴 **Wells 는 자체 `NetworkObject` 를 가지면 안 된다** — NGO 는 프리팹의 중첩
+  NetworkObject 를 스폰하지 않는다. 서버 판정이 필요하면 `NetworkManager.Singleton.IsServer`
+  를 쓴다(`BombLauncher`·`WellsAnimEvents` 패턴).
+- ⚠️ **`Assets/8.BehaviorTreeGraph` 는 열기만 해도 런타임 그래프 RID 가 통째로 재직렬화된다**
+  (No.23 = 4,675줄). 의도한 편집이 아니면 `git checkout` 으로 버릴 것. 그래프에 노드를 넣는
+  대신 C# 에서 블랙보드를 쓰는 쪽이 diff·머지 비용이 훨씬 싸다.
+- ⚠️ **`MonsterArea.asset` 은 고아라 삭제했다**(`58278e9`). Unity 가 BT 그래프를 열 때 다시
+  지우려 들 수 있다 — `git status` 에 뜨면 정상이다.
+- ✅ **Play 로그는 MCP 콘솔이 아니라 `%LOCALAPPDATA%\Unity\Editor\Editor.log` 로 읽힌다.**
+  (2026-07-29 의 "스크린샷으로만 받는다"는 전제는 과했다. 한글은 깨지지만 ASCII 마커로
+  검색하면 충분하다 — 이번 폭탄·BT 진단을 전부 이 방법으로 끝냈다.)
+- ✅ **Windows 빌드는 `BuildWindowsPlayer` 로 뽑는다.** 에디터를 닫은 뒤 CLI 배치모드:
+  `Unity.exe -batchmode -quit -projectPath <proj> -buildTarget Win64
+  -executeMethod BuildWindowsPlayer.BuildWindows64 -buildOutput <exe> -logFile <log>`
+  (또는 에디터 메뉴 `Build > Windows64 Player (MainFlow)`). 출력은 레포 밖에 둔다 —
+  `.gitignore` 에 `/Build/` 규칙이 없다. 첫 빌드 기준 4m41s / 369MB.
+- ⚠️ **`Unity.exe` 는 자기를 자식 프로세스로 재실행해서 셸에 exit 0 을 즉시 돌려준다.**
+  종료코드로 빌드 성공을 판단하면 안 된다. 판정은 로그의 `[Build] result=` 줄과
+  exe 존재로 한다(`MainProject_Data/level*` 개수 = 포함 씬 수).
+- ⚠️ **`Assets/Editor/` 는 `.gitignore:79` 로 무시된다.** 팀 공유용 에디터 스크립트는
+  `Assets/1.Scripts/Editor/` 에 둘 것(같은 `Assembly-CSharp-Editor` 로 컴파일된다).
+- 빌드가 부수적으로 만드는 것: `Assets/99.Settings/PC_RPAsset.asset` 의 `m_Prefilter*` 값과
+  `Assets/AddressableAssetsData/link.xml`. 둘 다 재생성물이라 커밋하지 않는다.
+- 🔴 **런타임 `Shader.Find` 는 빌드에서 null 이 된다** — 어떤 머티리얼/씬/프리팹도 참조하지 않는
+  셰이더는 빌드에서 스트립되기 때문. "에디터는 되는데 빌드만 안 됨"의 대표 원인이다.
+  미니맵(`UI/MinimapComposite`)이 이걸로 빌드에서 안 보였다. 프로젝트 자체 셰이더 5개 중
+  참조 0 이던 건 미니맵 하나뿐이고 나머지(ToonLit·ToonGlass·WaterDark·FullScreenFog)는 안전하다.
+  **커스텀 셰이더는 반드시 머티리얼 에셋 → 인스펙터 참조 체인으로 물릴 것.**
+  검증법: 빌드 로그에 `Compiling shader "<이름>"` 이 찍히는지 본다.
+- `#if` 전수조사 완료(자체 코드 36건) — M키·미니맵 미표시와 무관했다. 실제로 빌드에서 빠지는 건
+  `ProfilerHUD`(`UNITY_EDITOR || DEVELOPMENT_BUILD`) 하나뿐이고 어느 씬에도 안 붙어 있어 무해하다.
+  플레이어 어셈블리 define 확인법: `Library/Bee/artifacts/*P.dag/Assembly-CSharp.rsp`.
+- ⚠️ **TeslaBot 은 메쉬가 분리된 채 전투한다 — 미해결.** 조사만 했고 담당자 배정 대기다:
+  [Docs/tech/teslabot-mesh-separation-handoff.md](Docs/tech/teslabot-mesh-separation-handoff.md).
+  임시 조치로 `MapGenConfig` GroupID 3 을 TeslaBot → PeekABot 으로 대체해 뒀다(GroupName 에 "임시대체" 표기).
+  🔴 `MapGenConfig.asset` 은 `50.Art` = **SVN** 이라 git 커밋으로는 안 넘어간다 — TortoiseSVN 으로 커밋할 것.
+- 남은 이슈: Wells `BehaviorGraphAgent` 가 모든 피어에서 돎(멀티 검증 전 서버 게이트 필요) /
+  `WeaponTrailEffect` NRE 다수(로그 오염) / SVN `MapGenConfig.asset` 미커밋 /
+  빌드 exe 실플레이(타이틀→로비→맵→결과) 미검증.
+
+---
+
+## 이전 인수인계 (2026-07-29 · 폭탄 투척 경로 복구, 커밋 `93b4e02`)
 
 작업 세션: **경석(Claude)**. 브랜치 `feature/map-player-merge`, 마지막 커밋 `93b4e02`.
 워킹트리: 씬 2개(`0.BootStrapScene`·`4.MapScene`)와 `Bomb.prefab`·머티리얼·BT 에셋 등은
@@ -60,10 +153,15 @@ Update this file when a term becomes important enough that future agents or team
    - **Player.prefab 레이어 마스크 함정**: `EnemyHurtBox`(14) 유지 — `--ours`로 통째 되돌리면 보스를 못 때린다
    - FMOD/AudioListener는 그 브랜치에 붙은 상태로 받기로 결정
 3. ~~**미결 1건**: `Wells.prefab`이 `NetworkObject` 없이 `DefaultNetworkPrefabs`에 등록된 무효 상태~~
-   → **`4a84fe9`에서 부착으로 해소.** 없으면 `WellsAnimEvents`가 서버 판정을 못 받아 폭탄 투척이
-   조용히 막힌다는 것이 실증됐다. Wells는 `TwentyThree.prefab` 안 중첩 자식으로만 쓰이므로
-   (단독 스폰처 0건) **중첩 `NetworkObject` 상태**다 — 현재 정상 동작하지만 NGO 중첩 지원에
-   의존하는 구조라 민경과 한 번 확인해 두는 게 좋다.
+   ~~→ **`4a84fe9`에서 부착으로 해소.**~~ ~~현재 정상 동작하지만 NGO 중첩 지원에 의존하는 구조~~
+
+   ⚠️ **정정 (2026-07-31, `58278e9`): 부착은 해결책이 아니었고 그 뒤에도 폭탄은 안 나갔다.**
+   진단("서버 판정을 못 받는다")은 맞았지만 처방이 반대였다. **NGO 는 프리팹의 중첩
+   NetworkObject 를 스폰하지 않는다**(씬 오브젝트만 지원) — 붙여도 스폰되지 않으므로
+   `IsServer` 는 계속 false 다. 런타임 로그로 실증:
+   `ThrowBombEvent 진입 — IsServer=False, IsSpawned=False`.
+   해결은 **NetworkObject 제거 + `WellsAnimEvents` 를 MonoBehaviour 로 전환**이었다.
+   🔴 **다시 붙이지 말 것.** 상세는 `58278e9` 커밋 메시지와 `WellsAnimEvents` 클래스 주석.
 
 ### 이 세션에 확립된 재사용 규칙
 

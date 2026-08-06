@@ -11,6 +11,8 @@ public class DefaultAttackProjectile : BaseAttack
     private float despawnTime;
     private bool launched;
 
+    protected override Unit AttackSourceUnit => owner;
+
     public void Launch(Unit owner, Vector3 direction, float speed, int damage, LayerMask targetLayer)
     {
         this.owner = owner;

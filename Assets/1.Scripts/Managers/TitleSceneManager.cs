@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 public class TitleSceneManager : NemoSceneManager
@@ -27,6 +28,18 @@ public class TitleSceneManager : NemoSceneManager
         Debug.Log("[SceneFlow] TitleSceneManager.Start");
         SetOptionPanel(false);
         PlayEnterFade();
+
+        // BGM 재생
+        AudioManager.Instance.PlayBGM(AudioManager.Instance.Catalog.TitleBGM);
+    }
+
+    private void Update()
+    {
+        // ESC로 옵션창 토글 (열려있으면 닫고, 닫혀있으면 연다)
+        if (Keyboard.current?.escapeKey.wasPressedThisFrame == true && !IsTransitioning)
+        {
+            ToggleOption();
+        }
     }
 
     public void StartGame()

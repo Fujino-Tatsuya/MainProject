@@ -89,6 +89,10 @@ public class BombLauncher : MonoBehaviour
         }
 
         _bombController.Hold(bombSocket);
+
+        // [진단] 생성은 되는데 투척이 0회인 상태를 가르기 위한 기준점.
+        // 이 로그만 반복되고 아래 BombThrow 로그가 없으면 = 던지기 경로가 아예 안 불린다.
+        Edit.Log("[진단][Wells] BombHold 성공 — 폭탄 생성·소켓 장착");
     }
 
     /// <summary>
@@ -99,17 +103,22 @@ public class BombLauncher : MonoBehaviour
     {
         if (!IsServer()) return;
 
-        // ⚠️ 여기가 조용히 return하면 "투척 애니메이션은 나오는데 폭탄만 안 나간다"는 증상만 남고
-        // 아무 흔적이 없다. BT(Hold)와 Animator(투척 이벤트)는 서로의 상태를 모르기 때문에,
-        // 보스가 Groggy·Break로 끊기거나 폭탄이 먼저 파괴되면 실제로 이 상태가 된다.
-        // 투척 이벤트 1회당 한 줄이므로 스팸이 아니다 — 다시 주석 처리하지 말 것.
+        // [진단] BombThrow 가 **불리기는 했다**는 사실 자체가 핵심 신호다.
+        // 이 로그가 보이면  → 던지기 경로는 도는데 그 시점에 폭탄이 이미 없다
+        //                     (jump/die/groggy 의 time-0 BombDestroyEvent 가 먼저 먹었다는 뜻)
+        // 이 로그가 없으면  → ThrowBombEvent 자체가 발화하지 않았다
+        //                     (throwing 클립이 51% 지점에 도달 못 함 / 상태 진입 실패)
+        //
+        // ⚠️ 예전엔 이 로그가 주석 처리돼 있어, 폭탄이 안 나가는데 콘솔은 완전히 조용했다.
+        //    실제로 이번 증상(생성 4회 / 투척 0회 / 에러 0건)이 정확히 이 경로였고,
+        //    무증상이라 원인을 좁히지 못한 채 시간을 썼다. 다시 주석 처리하지 말 것.
         if (_bombController == null)
         {
-            Edit.LogWarning(
-                "[Wells] 투척 이벤트가 왔지만 들고 있는 폭탄이 없습니다 — BombHold가 오지 않았거나 " +
-                "폭탄이 먼저 파괴됐습니다(BT 주기와 애니메이션 주기가 어긋난 경우).", this);
+            Edit.Log("[진단][Wells] BombThrow 호출됨 — 그러나 들고 있는 폭탄이 없다(투척 전 파괴됨)");
             return;
         }
+
+        Edit.Log("[진단][Wells] BombThrow 호출됨 — 폭탄 보유 확인, 투척 진행");
 
         if (throwDistance <= 0f)
         {
@@ -144,23 +153,17 @@ public class BombLauncher : MonoBehaviour
         Vector3 throwVector = dir * throwDistance;
         Vector3 target = transform.position + throwVector;
 
-        // 바닥 판정은 GroundProbe로 통일한다(레이어·원점·유닛 콜라이더 제외를 한 곳에서 처리).
-        // 빗나가면 target.y가 투척 높이로 남아 폭탄이 공중에 착지한다 — 그래서 성공/실패 둘 다 로그를 남긴다.
-        if (GroundProbe.TryFindGround(target, groundMask.value, out RaycastHit hit, out string report))
+        // [임시 진단] groundMask 실제 런타임 값 확인 (Ground만이면 8, Ground+Default면 9)
+        Edit.Log($"[진단][Wells] groundMask.value = {groundMask.value} (Ground만=8, +Default=9)");
+
+        RaycastHit hit;
+        if (Physics.Raycast(target, Vector3.down, out hit, Mathf.Infinity, groundMask))
         {
-            // 바닥면과 정확히 같은 높이로 두면 폭탄·장판이 바닥과 z-fighting 한다 → 표준 간격만큼 띄운다.
-            target.y = GroundProbe.SurfaceY(hit);
-            Edit.Log($"[No.23] 폭탄 투척 착지 지점 확정 — {report} → 착지 y={target.y:F2}", this);
-        }
-        else
-        {
-            Edit.LogWarning($"[No.23] 폭탄 투척 착지 지점을 못 찾아 투척 높이를 그대로 씁니다({target}) — {report}", this);
+            target.y = hit.point.y;
         }
 
         _bombController.Launch(target, flyingDuration, arcHeight);
 
-        // 던진 뒤에는 "들고 있는 폭탄 없음"이 참이어야 한다. _bombController를 남겨 두면 이미 날아간
-        // (또는 폭발해 despawn된) 컨트롤러를 들고 다음 투척 이벤트에 들어가, 위의 조용한 경로로 빠진다.
         _bombInstance = null;
         _bombController = null;
     }
@@ -172,15 +175,27 @@ public class BombLauncher : MonoBehaviour
     {
         if (!IsServer()) return;
 
-        if (_bombInstance != null)
+        if (_bombInstance == null)
         {
-            NetworkObject network = _bombInstance.GetComponent<NetworkObject>();
-            network.Despawn(true);
-            _bombInstance = null;
+            // 들고 있는 폭탄이 없는 정상 경로. 다만 낡은 컨트롤러 참조가 남아 있으면
+            // 다음 BombThrow 가 조용히 실패하므로 여기서 함께 끊는다.
+            _bombController = null;
+            return;
         }
 
-        // 인스턴스가 이미 사라진 경로에서도 컨트롤러 참조만 남을 수 있다 — 항상 함께 비운다.
+        NetworkObject network = _bombInstance.GetComponent<NetworkObject>();
+        if (network != null && network.IsSpawned)
+            network.Despawn(true);
+
+        _bombInstance = null;
+
+        // ⚠️ 예전에는 _bombInstance 만 지우고 _bombController 는 남겨 뒀다.
+        //    BombThrow 는 _bombController 로 판단하므로, 파괴된 폭탄의 참조가 남으면
+        //    "Hold 는 새로 되는데 Throw 는 조용히 실패"하는 비대칭 상태가 만들어진다.
+        //    BombThrow 가 둘 다 지우는 것과 대칭을 맞춘다.
         _bombController = null;
+
+        Edit.Log("[진단][Wells] BombDestroy — 들고 있던 폭탄을 파괴(jump/die/groggy 의 time-0 이벤트)");
     }
 
     #endregion

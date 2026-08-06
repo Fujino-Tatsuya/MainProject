@@ -106,7 +106,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1100360743
+  GlobalObjectIdHash: 2496641408
   InScenePlacedSourceGlobalObjectIdHash: 1085786765
   DeferredDespawnTick: 0
   Ownership: 1
@@ -268,8 +268,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 726436c34c5fb69479762ad46e46752f, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   damage: 0
   isGroggyAttack: 0
   targetLayer:
@@ -380,7 +380,7 @@ GameObject:
   - component: {fileID: 7112906337474501026}
   - component: {fileID: 7921955671834298660}
   - component: {fileID: 4612344457778335923}
-  m_Layer: 8
+  m_Layer: 14
   m_Name: Hurtbox
   m_TagString: Untagged
   m_Icon: {fileID: 0}
