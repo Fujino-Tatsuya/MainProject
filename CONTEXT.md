@@ -4,7 +4,92 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 현재 작업 세션 (2026-08-05 · 렌더링 — 브랜치 `feature/maprendering`)
+## ▶▶ 다음 세션 시작점 — 보스 FSM 재설계 (2026-08-06 인계)
+
+**목표: 예전에 분석해 둔 보스 FSM 분석을 확장 재분석하고, 기획 추가 내용을 반영해 다시 만든다.**
+(팀장 지시, 2026-08-06)
+
+### 착수 전 읽을 것 — 이미 있는 것부터
+
+| 문서 | 무엇이 들어 있나 |
+|---|---|
+| [Docs/tech/boss-fsm-design.md](Docs/tech/boss-fsm-design.md) (132줄) | **§7 원본 BT 의도 6항목**(재작성 시 보존 대상) · **§8 GAP 8항목**(미결) · §9 네트워크 계약 |
+| [Docs/design/boss-wells-and-no23.md](Docs/design/boss-wells-and-no23.md) (85줄) | 3페이즈(66%/33%) · 송전기·차징 시퀀스 5단 · `TwentyThreeState` 11개 · **§미정 3항목** |
+| 볼트 `GameDesign/콘텐츠/프로토타입/보스_(프로토타입).xlsx` | **기획 수치 출처 후보** — §미정 값들이 여기 있을 가능성 |
+| 볼트 `Worklog/경석/2026-07-24 보스룸 No.23 등장 연출 *` (3건) | 등장 연출 설계·구현 계획 |
+
+🔴 **"분석 확장"의 출발점은 새로 읽는 게 아니라 §8 GAP 8항목이다.** 이미 리버스
+엔지니어링된 의도(§7)와 미결 목록(§8)이 있으므로, 중복 분석하지 말고 **미결을 기획으로 닫는
+방향**으로 확장한다.
+
+### 살아 있는 미결 (§8 그대로 — 기획 확정이 필요한 것 ★)
+
+- ★ **송전탑 개수** — 원본 3 vs 4 미확정
+- ★ **페이즈 임계값** — `0.66 / 0.33` 은 임시값, 원본 미확인
+- ★ **차징 중 근접 판정** 존재 여부 미발견
+- ★ **근접↔원거리 전환 거리**, JumpAttack/DashAttack 쿨·데미지·AoE, 제한시간,
+  실드 점증 속도, 돌진 횟수/데미지, 페이즈별 차등 수치 (GDD §미정)
+- **쿨다운 재등록 배선** 미완 (선택기엔 구현, `BossBase` 배선 없음)
+- **넉백/CC/슈퍼아머 Unit 통합** — 보스가 아직 `MonsterStatusEffect`(몹용)를 참조
+- **Wells(2호기) vs 23호 역할 분리** — 현재 스켈레톤은 23호 기준
+- **공격 타이밍 애니이벤트화** — 몬스터 FSM 에서 확립된 독트린을 그대로 적용
+  (히트/종료/커밋 = 클립 이벤트, `End` 는 `exitTime` 앞)
+
+### 착수 전 알아 둘 것
+
+- ⚠️ **담당 경계**: `AGENTS.md` 기준 **경석 = 보스 전반 / 민경 = 보스 기믹**(잡기·폭탄·송전기·
+  차징·레이지) **+ 보스 프리팹**. 동시 수정 충돌 지점이므로 시작 시 이 문서 작업 세션에 적을 것.
+- 🔴 **`Assets/8.BehaviorTreeGraph` 는 수정 금지.** 기존 BT 는 의도 추출용 참고 자료다.
+- 보스는 **서버(호스트) 권한** — FSM·판정·이동·페이즈·사망 전부. 데미지 유입은
+  `BaseAttack → ReceiveAttack` 서버 경로만(오너→서버 직접 데미지 RPC 금지).
+- ⚠️ 보스 `IsOver` 는 **쓰기 전용 플래그**다(읽어서 분기하면 안 됨).
+- 큰 작업이므로 `AIRULE.md` 의 grill → `PLAN.md` → 승인 → 구현 순서를 따른다.
+  ⚠️ `PLAN.md` 는 지금 **은희의 승인 대기 계획서**(2026-08-03 개발 진입점 단일화)가 점유 중이다.
+  덮어쓰지 말고 별도 파일이나 섹션 추가로 갈 것.
+
+---
+
+## 이전 인수인계 (2026-08-06 · 렌더링 룩 A/B + 픽셀레이트 + 어비스 복구 — `37a338f` **push 완료**)
+
+브랜치 `feature/maprendering` 원격 동기화 완료(ahead 0). 커밋 5개:
+`88f43cb` 픽셀레이트 · `3f7c43d` 룩 A/B 토글(F9) · `062308a` DoF 비활성 ·
+`a239923` 아트 가이드+계획서 · `37a338f` 어비스 복구.
+
+**닫은 것**
+
+- **픽셀레이트** — 합성 패스 UV 양자화로 구현(패스 추가 0, 각 0.01ms). 블러와 **독립 반경**
+  (`pixelateRegionScale`)이라 픽셀 범위만 좁힐 수 있다. 룩 A·B **공통**.
+- **룩 A/B 토글(F9)** — A = 채도 살림 / B = 디밍 + 저채도 + **시야 차폐**.
+  토글은 `dimEnabled`·`losEnabled` **필드만** 오간다(컴포넌트를 끄면 어비스가 함께 죽는다).
+- **DoF 비활성** — 배경 흐림은 마스크 블러 단독. 삭제 아니라 `active: 0`(튜닝값 보존).
+- **어비스 물안개 복구** — 포그 게이트에 묶여 **렌더되지 않고 있었다**(원인 3곳).
+
+**문서**: [Docs/design/look-ab-tuning.md](Docs/design/look-ab-tuning.md)(아트용) ·
+`PLAN-vision.md` §8.11~8.13 · 볼트 `Programming/Setting/렌더링 설정 종합 정리` ·
+볼트 `Art-Planning/Setting 사용법/룩 A-B 비교와 설정 조절`.
+
+**남은 육안 검증 2건** — ① 픽셀 영역 배율(`pixelateRegionScale` 1.242) 적정성
+② **어비스 tint 는 8~19% 로 은은해 구멍 근처에서만 보인다** — 확인 필요.
+
+**미커밋으로 남은 것** = `0.BootStrapScene` · `Paladin.prefab` · `TwentyThree.prefab` ·
+`MultiplayerManager.asset` 4개인데 **전부 내용 변경 0(줄바꿈 노이즈)** 이다.
+(이전 인계에 있던 "Paladin PlayerInput 되돌릴 것" 항목은 현재 diff 0 이라 **해소됨**.)
+
+**🔴 이 세션의 반복 패턴 3건 — 다음에 의심할 것**
+
+1. **C# 기본값을 바꿔도 이미 직렬화된 애셋은 안 바뀐다.** `pixelBlockSize` 4→16 을 코드에서만
+   올려 화면이 그대로였다. 필드 기본값을 바꿀 때는 **애셋 파일의 실제 값을 열어 확인**할 것.
+2. **한 계통을 다른 계통의 게이트 안에 두지 말 것.** 어비스가 포그 안에 있어서 "포그를 껐다"가
+   무관한 기능을 조용히 껐다. 매니저 컴포넌트의 `enabled` 로 한 기능만 토글하는 것도 같은 실수.
+3. **로그의 실패 기록이 현재 상태가 아닐 수 있다.** 셰이더 에러가 중간 편집 상태의 기록이었다 —
+   로그를 믿지 말고 **현재 파일과 강제 재임포트로 재판정**할 것.
+
+**⚠️ 신 Input System 은 에디터에서 Game View 포커스를 따른다.** 포커스 없으면 F9 가 안 먹는다.
+그래서 `LookToggle` 은 콘솔에도 로그를 남긴다(입력 도달 여부와 적용 결과를 갈라내기 위함).
+
+---
+
+## 이전 인수인계 (2026-08-05 · 렌더링 조명·포스트프로세싱 — 브랜치 `feature/maprendering`)
 
 작업 세션: **경석(Claude)**. 브랜치 `feature/maprendering`
 (= `development` `cbb51b1` 기준으로 분기, 원격 push 완료).
@@ -28,7 +113,7 @@ Update this file when a term becomes important enough that future agents or team
 - 승인된 계획서는 `PLAN.md` 가 아니라 **`PLAN-vision.md` §7** 이다(§4 단계 2~3 재개).
 - 선행 참고: 툰셰이더 현황(`e5cc012`) · 벽 차폐/투명화 · `Docs/tech/fog-system.md`.
 
-### ▶▶ 다음 세션 시작점 — Play 테스트부터 (2026-08-05 마감, `317a2a1`, **미push ahead 10**)
+### 2026-08-05 마감 시점 기록 (`317a2a1`) — ✅ 이후 전부 push 됨
 
 **코드 작업은 일단락됐고 남은 것은 육안 검증이다.** 컴파일 0에러/0경고, 콘솔 에러 0건,
 `svn status Assets/50.Art` missing 0건, 배선 14개 항목 전수 확인 완료.
@@ -51,7 +136,7 @@ Update this file when a term becomes important enough that future agents or team
 VFX 로 따로 넣는다** — 그래야 통제가 된다. `m_Antialiasing: 2` 적용됨.
 🔴 SMAA 에서는 `WallOcclusionSettings.animateDither` 를 켜면 안 된다(기본값 OFF, 유지).
 
-**다음 세션 목표 — 두 룩을 키 하나로 비교 (팀장 지시, 2026-08-05)**
+**두 룩을 키 하나로 비교 (팀장 지시, 2026-08-05) — ✅ 2026-08-06 완료(위 인수인계 참조)**
 
 지금은 채도를 살리는 방향으로 왔지만, 원래는 **어둡고 디밍이 들어간 상태**였다.
 그쪽에 **픽셀레이트 + 블러**까지 얹은 것과 지금 화면을 **키 입력 한 번으로 전환**해
@@ -102,12 +187,14 @@ VFX 로 따로 넣는다** — 그래야 통제가 된다. `m_Antialiasing: 2` �
   ShaderGraph 에 디더를 심는 것. `50.Art` = SVN 이라 단일 담당 필요.
 - ⚠️ **`ProfilerHUD` 는 제출 빌드 전에 MapScene 에서 제거할 것.** 클래스가
   `#if UNITY_EDITOR || DEVELOPMENT_BUILD` 로 감싸져 있어 릴리스 빌드에서 missing script 가 된다.
-- 🔴 **`Paladin.prefab` 의 `PlayerInput` 이 `m_Enabled: 0 → 1` 로 켜져 있다(미커밋).**
-  `Player.cs:146` 주석대로 **프리팹 기본값은 비활성이 맞고**, `EnableLocalInput()` 이
-  로컬(오너/오프라인)만 켠다 — 원격 클론이 디바이스 페어링을 시도해
+- ✅ **해소됨 (2026-08-06 확인) — 아래 되돌리기 명령은 실행하지 말 것.**
+  `Paladin.prefab` 의 `git diff` 는 현재 **내용 변경 0**(줄바꿈 노이즈만)이다. 아래는
+  당시 기록으로만 남긴다.
+  <br>~~`PlayerInput` 이 `m_Enabled: 0 → 1` 로 켜져 있다(미커밋).~~
+  단, **규칙 자체는 유효하다**: `Player.cs:146` 주석대로 프리팹 기본값은 비활성이 맞고,
+  `EnableLocalInput()` 이 로컬(오너/오프라인)만 켠다 — 원격 클론이 디바이스 페어링을 시도해
   "Cannot find matching control scheme" 경고를 내는 것을 막기 위한 설계다.
-  `Player.prefab` 은 여전히 `0` 이라 Paladin 만 어긋났다. **커밋하지 말고 되돌릴 것:**
-  `git checkout -- Assets/2.Prefabs/Player/Paladin/Paladin.prefab`
+  **`PlayerInput` 을 프리팹에서 켜 두면 안 된다.**
 
 **미커밋으로 남긴 것** — 전부 팀장이 인스펙터에서 튜닝 중인 값이라 손대지 않았다:
 `Global Volume Profile`(비네트 색 warm→진회색, 강도 0.606 / 대비 -3.7 / 채도 -11.6 —
