@@ -33,7 +33,9 @@ public class EffectManager : MonoBehaviour
     private readonly List<IEffectSystem> _drivers = new List<IEffectSystem>();
     private readonly List<ActiveEffect> _slots = new List<ActiveEffect>();
     private readonly Stack<int> _freeSlots = new Stack<int>();
-    private readonly HashSet<Object> _warned = new HashSet<Object>();   // 경고는 대상당 1회 (콘솔 마비 방지)
+    // 경고는 (대상 × 종류)당 1회. 콘솔 마비는 막되, 먼저 뜬 경고가 나중 경고를 영원히 덮지 않게 한다
+    // — 특히 누수 경고(maxActiveWarn)가 튜닝 경고에 묻히면 상한을 둔 이유가 사라진다.
+    private readonly HashSet<(int id, string kind)> _warned = new HashSet<(int, string)>();
 
     private EffectPool _pool;
     private Transform _poolRoot;
@@ -134,12 +136,12 @@ public class EffectManager : MonoBehaviour
 
         if (entry.duration <= 0f)
         {
-            WarnOnce(entry, $"[EffectManager] '{entry.name}'의 duration이 0이라 재생 즉시 반납된다. " +
+            WarnOnce(entry, "duration", $"[EffectManager] '{entry.name}'의 duration이 0이라 재생 즉시 반납된다. " +
                             "EffectDurationProbe로 실측해 채울 것.");
         }
         else if (entry.duration < entry.LongestPartDelay)
         {
-            WarnOnce(entry, $"[EffectManager] '{entry.name}'의 duration({entry.duration:F2}s)이 " +
+            WarnOnce(entry, "duration", $"[EffectManager] '{entry.name}'의 duration({entry.duration:F2}s)이 " +
                             $"가장 늦은 파트의 delay({entry.LongestPartDelay:F2}s)보다 짧다. " +
                             "그 파트는 발화되기 전에 반납된다.");
         }
@@ -238,7 +240,7 @@ public class EffectManager : MonoBehaviour
 
         if (active.entry.outroDuration < active.entry.LongestOutroDelay)
         {
-            WarnOnce(active.entry, $"[EffectManager] '{active.entry.name}'의 outroDuration" +
+            WarnOnce(active.entry, "outroDuration", $"[EffectManager] '{active.entry.name}'의 outroDuration" +
                                    $"({active.entry.outroDuration:F2}s)이 가장 늦은 outro 파트의 " +
                                    $"delay({active.entry.LongestOutroDelay:F2}s)보다 짧다. 그 파트는 발화되지 않는다.");
         }
@@ -534,14 +536,14 @@ public class EffectManager : MonoBehaviour
         if (count <= entry.maxActiveWarn) return;
 
         // 상한을 넘겨도 재생은 계속한다. 상한의 목적은 성능이 아니라 반납 누락(누수)을 그날 잡는 것이다.
-        WarnOnce(entry, $"[EffectManager] '{entry.name}'의 동시 활성 수가 {count}개로 " +
+        WarnOnce(entry, "maxActive", $"[EffectManager] '{entry.name}'의 동시 활성 수가 {count}개로 " +
                         $"maxActiveWarn({entry.maxActiveWarn})를 넘었다. " +
                         "루프 이펙트의 Release() 누락일 가능성이 높다. (재생은 계속한다)");
     }
 
-    private void WarnOnce(Object context, string message)
+    private void WarnOnce(Object context, string kind, string message)
     {
-        if (context != null && !_warned.Add(context)) return;
+        if (context != null && !_warned.Add((context.GetInstanceID(), kind))) return;
         Edit.LogWarning(message, context);
     }
 
