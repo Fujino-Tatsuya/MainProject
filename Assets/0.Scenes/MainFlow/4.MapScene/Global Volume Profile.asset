@@ -34,16 +34,16 @@ MonoBehaviour:
   active: 1
   color:
     m_OverrideState: 1
-    m_Value: {r: 0.6981132, g: 0.6227754, b: 0.43686953, a: 1}
+    m_Value: {r: 0.16981131, g: 0.16981131, b: 0.16981131, a: 1}
   center:
     m_OverrideState: 0
     m_Value: {x: 0.5, y: 0.5}
   intensity:
     m_OverrideState: 1
-    m_Value: 0.473
+    m_Value: 0.606
   smoothness:
     m_OverrideState: 1
-    m_Value: 0.4
+    m_Value: 0.421
   rounded:
     m_OverrideState: 0
     m_Value: 0
@@ -65,7 +65,7 @@ MonoBehaviour:
     m_Value: 0.2
   contrast:
     m_OverrideState: 1
-    m_Value: 12
+    m_Value: -3.7
   colorFilter:
     m_OverrideState: 1
     m_Value: {r: 1, g: 0.98, b: 0.94, a: 1}
@@ -74,7 +74,7 @@ MonoBehaviour:
     m_Value: 0
   saturation:
     m_OverrideState: 1
-    m_Value: 18
+    m_Value: -11.6
 --- !u!114 &-3357656296340945011
 MonoBehaviour:
   m_ObjectHideFlags: 1
@@ -87,7 +87,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c01700fd266d6914ababb731e09af2eb, type: 3}
   m_Name: DepthOfField
   m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.DepthOfField
-  active: 1
+  active: 0
   mode:
     m_OverrideState: 1
     m_Value: 0
@@ -170,7 +170,7 @@ MonoBehaviour:
     m_Value: 65472
   tint:
     m_OverrideState: 1
-    m_Value: {r: 0.9245283, g: 0.82277197, b: 0.82277197, a: 1}
+    m_Value: {r: 1, g: 1, b: 1, a: 1}
   highQualityFiltering:
     m_OverrideState: 0
     m_Value: 0
