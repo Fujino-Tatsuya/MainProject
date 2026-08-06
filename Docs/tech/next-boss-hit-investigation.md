@@ -1,4 +1,15 @@
-# 다음 세션 착수용 — 보스 피격 / 차징 기둥 / 플레이어 공격력
+# ⛔ 폐기 — 보스 피격 / 차징 기둥 / 플레이어 공격력 (조사 완료)
+
+> **2026-08-06 폐기.** 증상 3건 모두 해결됐다(팀장 확인). 게다가 보스는 BT 를 버리고
+> 코드 FSM 으로 재작성하기로 확정되어([PLAN-boss-fsm.md](../../PLAN-boss-fsm.md)),
+> 아래 BT 기준 진입점들은 더 이상 유효한 조사 경로가 아니다.
+>
+> **남겨 두는 이유**: ①`Enter`/`Exit` 비대칭을 의심하는 진단 순서 ②`ChargeController` 의
+> `Clamp(playerCount, 1, 3)` 단서(→ 3인 4기둥 버그로 확정, 재설계 §5.2 에 반영됨)
+> ③"이미 배제된 것" 목록은 재발 시 다시 유효하다.
+
+<details>
+<summary>이하 원문 (2026-07-30 작성)</summary>
 
 > 작성 2026-07-30 세션 종료 시점 · 브랜치 `feature/map-player-merge` (`5726074`, 전부 push됨)
 > **조사는 아직 안 했다.** 진입점과 가설만 모아 둔 문서다. "작업 시작"만 있으면 바로 착수할 수 있다.
@@ -102,3 +113,5 @@ git log --oneline -8 -- Assets/9.ScriptableObject/Player/
 5. BT 에셋 churn(`BossArea`·`CommonMeleeRobot`) 폐기 — 에디터 끌 때 한 번
 
 관련: [art-vcs-duplication-handoff.md](art-vcs-duplication-handoff.md) · [map-monster-boss-handoff.md](map-monster-boss-handoff.md)
+
+</details>

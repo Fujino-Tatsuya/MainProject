@@ -1,132 +1,390 @@
-# 보스 FSM 설계 문서 (BossBase — 웰즈 & 23호)
+# 보스 FSM 설계 — 웰즈 & 23호
 
-> 목적: `BossBase` 코드 FSM 스켈레톤의 설계를 문서화한다. 팀장 검토 + Codex 작업 지시용.
-> 대상 파일: `Assets/1.Scripts/Monster/Boss/BossBase.cs` (+ `BossState`, `BossBasicAttackType`, `BossBasicAttackChoice`).
-> 작성 2026-07-20. **"현재 구현" / "합의된 목표 방향" / "연기된 훅" / "원본 BT 의도" / "GAP·오픈이슈"** 로 구분.
+> **전면 재작성 2026-08-06** (초판 2026-07-20). BT → 순수 코드 FSM 전환 설계.
+> 계획서·승인 이력은 [PLAN-boss-fsm.md](../../PLAN-boss-fsm.md). 기획 원본은
+> [Docs/design/boss-wells-and-no23.md](../design/boss-wells-and-no23.md).
+>
+> 초판과 달라진 점: **카운터(인터럽트) 시스템이 1급 개념으로 들어왔다.** 초판의 §8 GAP 8항목 중
+> 6항목이 닫혔고(§14), 더미 공격(Slam/Sweep)은 실제 공격 6종으로 대체됐다.
 
 ---
 
 ## 0. 한눈에
 
-- **모델**: `MonsterBase`와 동일한 *순수 코드 FSM + 서버 상태소유 + 클라 애니재생*. BT(`BehaviorGraphAgent`) 미사용.
-- **상속**: `BossBase : Unit` (Enemy/MonsterBase 상속 금지). 데미지 유입 = `ReceiveAttack → TakeDamage(AttackInfo)` 서버 경로.
-- **권한**: 스폰·FSM·이동목표·데미지·페이즈·사망 = **전부 서버(호스트)**. 클라 = `_state` NetworkVariable 복제받아 애니만 재생.
-- **이 스켈레톤 범위**: FSM + 거리창·가중치 공격선택 + 페이즈 골격 + 근접공격 2종(Slam/Sweep). **잡기/폭탄/송전탑/차징전체/Dash/Jump는 virtual 훅만** 남기고 연기.
+- **모델**: `MonsterBase` 와 동형 — *순수 코드 FSM + 서버 상태소유 + 클라 애니재생*. BT 미사용.
+- **상속**: `BossBase : Unit`. 데미지 유입 = `ReceiveAttack → TakeDamage(AttackInfo)` 서버 경로.
+- **권한**: FSM·판정·이동·페이즈·사망·**카운터 창 판정** = 전부 서버(호스트).
+- **두 주체**: **23호**(본체·근접/접근 공격) 와 **웰즈**(탑승·폭탄 살포) 는 **각각 독립 FSM**.
+- **핵심 루프**: 상황 판단 → 공격 선택 → 실행 → 종료 시 재판단. 공격 도중 재판단하지 않는다.
+- **핵심 신규 개념**: **카운터 창** — 특정 패턴 중에만 열리고, 플레이어 인터럽트 스킬(우클릭)로만
+  소비되며, 성공 시 보스를 즉시 그로기로 보낸다.
 
 ---
 
-## 1. 상태 (`BossState`)
+## 1. 상태
+
+### 1.1 상태 enum 을 하나로 통일한다
+
+**결정: 23호는 `TwentyThreeState` 단일 enum(15개)을 쓴다.** 초판의 일반 `BossState`(7개)는 쓰지 않는다.
+
+| 안 | 장점 | 단점 |
+|---|---|---|
+| **A. 단일 enum (채택)** | 상태 ↔ 애니 클립 1:1 → 디버깅이 로그 한 줄로 끝난다. 이중 상태기계가 없다 | 보스마다 enum 이 생긴다 |
+| B. `BossState` 라이프사이클 + 공격 타입 | 보스 간 재사용 | Grab→Hold→Throw 같은 **체인이 서브 상태기계**를 요구 → 상태가 두 겹이 된다 |
+
+7월 스코프의 적은 보스 하나뿐이다. 일반화는 **두 번째 보스가 생길 때** 한다.
+
+### 1.2 23호 상태 (`TwentyThreeState`)
 
 | 상태 | 의미 | 진입 | 탈출 |
 |---|---|---|---|
-| `Idle` | 비교전 대기 | 초기화, 행동 종료 후 | 타겟 감지 → Chase |
-| `Chase` | 추격/교전 접근 | 사거리 밖 | 사거리 내 & 쿨 준비 → Attack |
-| `Attack` | 기본 공격 수행(windup→hit→duration) | 공격 선택됨 | duration 종료 → DecideNext |
-| `Charging` | 페이즈 전환 강제 진입(쉴드/버프+브로드캐스트) 골격 | HP 임계 하향 통과 | chargingDuration 종료 → Idle |
-| `Groggy` | 그로기(다운) 골격 | 그로기 누적 임계 | groggyDuration 종료 → DecideNext |
-| `Break` | 파츠 파괴/무력화 골격(연기 메커닉 진입점) | `EnterBreak(duration)` 호출 시 | duration 종료 → DecideNext |
+| `Idle` | 비교전 대기 | 초기화 / 타겟 소실 | 타겟 감지 → `Walk` |
+| `Walk` | 추격 · 사거리 조정 · **폴백 행동** | 사거리 밖, 또는 모든 공격이 쿨 | 공격 선택됨 → 해당 공격 |
+| `LeftHookAttack` | 좌측 훅 (단타) | 선택기 | 클립 종료 → 재판단 |
+| `RightHookAttack` | 우측 훅 (단타) | 선택기 | 클립 종료 → 재판단 |
+| `UpperAttack` | 어퍼컷 — 적중 시 **Airborne** | 선택기 | 클립 종료 → 재판단 |
+| `Grab` | 잡기 시도 — **카운터 창 有** | 선택기 | 성공 → `Hold` / 카운터 → `Groggy` / 빗나감 → 재판단 |
+| `Hold` | 잡은 상태 유지 + 전기 | `Grab` 성공 | 지속 종료 → `Throw` |
+| `Throw` | 던지기 | `Hold` 종료 | 클립 종료 → 재판단 |
+| `JumpAttack` | 수직 도약 → 장판 → 낙하 내려찍기 | 선택기 (거리 무관) | 착지 판정 후 → 재판단 |
+| `DashAttack` | 직선 돌진 + **캐리-푸시** — **카운터 창 有** | 선택기 (원거리만) | 벽/맵끝 도달 or 종료 → 재판단 |
+| `Charging` | 송전기 페이즈 차징 | 페이즈 임계 통과 | 송전탑 전멸 → `Groggy` / 제한시간 초과 → `Rage` |
+| `Rage` | 레이지 — 전기 두르고 **돌진 3회** | 송전기 제한시간 초과 | 돌진 3회 종료 → 재판단 |
+| `Groggy` | 그로기 (2초) | 카운터 성공 / 송전탑 전멸 | 지속 종료 → 재판단 |
+| `Break` | 그로기 강화 (5초) | `GroggyCount == max` 에서 카운터 성공 | 지속 종료 → 재판단 |
 | `Dead` | 사망 → 디스폰 | HP 0 | (없음) |
 
-- 상태 복제: `NetworkVariable<BossState>`(Server write / Everyone read). `OnValueChanged` → `PlayStateAnimation`(클라 애니).
-- 이동 블렌드용 `_animSpeed`(NetworkVariable<float>)도 서버가 agent 속도로 갱신 → 클라 Animator `animSpeedParam` 구동.
+- **`Hit`(피격 경직)은 상태가 아니다.** 기획대로 색 변경만 (`HitFlash`). 보스는 일반 공격에 경직되지 않는다.
+- **`Return`(리쉬)은 만들지 않는다.** 보스룸은 닫힌 방이라 이탈이 불가능하다.
+  전원 Soul → 타겟 없음 → `Idle`. **체력 회복 없음.** 그로기 카운트·송전기·폭탄·페이즈 플래그는 유지한다.
 
-### 서버 틱 루프 (`TickServer`)
-1. `status.BlocksMovement`면 `StopAgent()`.
-2. 상태 스위치: Idle/Chase→`HandleSeekAndCombat`, Attack→`HandleAttack`, Charging/Groggy/Break→각 핸들러, Dead→no-op.
+### 1.3 Wells 상태 (`WellsState`) — 4개
 
-### 교전 루프 (`HandleSeekAndCombat`)
-1. `_pendingCharging`(페이즈 통과 대기)면 즉시 `EnterCharging`.
-2. 타겟 락온(유효하면 유지, 없을 때만 재탐색) → 없으면 Idle.
-3. `FaceTarget`.
-4. `!BlocksAttack && CooldownReady()`면 `attackChoice.GetRandomAttack(dist)` → None 아니면 `StartAttack(type)`.
-5. 공격 미선택: 사거리 밖 → Chase+`MoveAgentTo`, 안 → 정지 대기.
+`Idle` · `Throw` · `Groggy` · `Dead`. **기존 `Jump` 는 삭제**한다.
 
----
-
-## 2. 공격 선택 (거리창 + 가중치 + 쿨다운 재등록)
-
-`BossBasicAttackChoice : BaseAttackChoice` — 기존 `TwentyThreeBasicAttackChoice` BT 패턴을 코드로 미러링.
-
-- **거리창 필터**: 각 공격이 `[minDistance, maxDistance]`를 가지며, 현재 거리가 창 안일 때만 후보.
-  - Slam: `[0, 3]`, 가중치 60. / Sweep: `[0, 4]`, 가중치 40. (인스펙터 조절)
-- **가중치 룰렛**: 유효 후보들의 percentage 합 기준 랜덤 선택. 후보 없음/합 0 → `None(0)` → 공격 스킵.
-- **쿨다운 재등록**: `RemoveType(type)`로 방금 쓴 공격을 후보에서 빼고, 잠시 뒤 `AddType(type)`로 복구 = "이 공격 지금 쿨다운" 표현. (현재 BossBase는 `AddType/RemoveType`를 아직 호출하지 않음 — **배선 필요**, GAP 참조.)
-- 반환은 `(int)BossBasicAttackType`.
+- Wells 는 **피격 대상이 아니다** (hurtbox 없음). HP 는 23호 것만 존재한다.
+- 23호가 `Groggy`/`Break` 로 가면 **Wells 도 `Groggy`** 로 동기화한다 (폭탄 살포 중단).
+- 23호가 `Dead` 면 Wells 도 `Dead`.
+- 그 외에는 **23호 상태와 무관하게** 자기 주기로 폭탄을 살포한다. 이것이 별도 FSM 으로 두는 이유다 —
+  23호 상태에 얹으면 폭탄 주기가 23호 공격에 끌려다닌다.
 
 ---
 
-## 3. 공격 실행 (`StartAttack` → `HandleAttack`)
+## 2. 카운터 (인터럽트) 시스템 — 신규
 
-**현재 구현 (코드 타이머 구동):**
-- `StartAttack(type)`: 타입별 `GetAttackTiming`으로 windup/duration 확정 → `_lastAttackTime` 기록, `_stateTimer=duration`, `StopAgent`, `FaceTarget`, (옵션)슈퍼아머, `ExecuteSpecialAttack(type)`(연기 no-op), `SetState(Attack)`.
-- `HandleAttack(dt)`: `_stateTimer` 감소, `FaceTarget`, `elapsed >= windup`이면 `meleeAttack.Hit()` 1회, `_stateTimer<=0`이면 `DecideNextAfterAction`.
-- 타이밍: Slam `windup 0.45 / dur 1.1`, Sweep `windup 0.35 / dur 1.0` (인스펙터).
+> 참조 모델: 로스트아크의 카운터. **보스가 특정 패턴에 들어갔을 때만** 열리는 창을,
+> 플레이어가 **전용 스킬로 정면에서** 쳐서 다운시킨다.
 
-> **⚠️ 합의된 목표 방향 (2026-07-20): 공격 타이밍을 애니메이션 이벤트로 전환.**
-> 플레이어 `DefaultAttackController`와 동형으로, 보스/몹 공격도 **애니 이벤트(Hit/End)** 로 히트·종료를 구동한다.
-> `attackWindup`/`attackDuration` 코드 타이머는 **이벤트 누락 대비 폴백**으로만 남긴다.
-> → BossBase에 애니이벤트 수신 함수(예: `OnAttackHitEvent`, `OnAttackEndEvent`) + 릴레이 추가 필요.
+### 2.1 카운터 창
 
----
+**창이 열리는 패턴은 2개뿐이다.**
 
-## 4. 페이즈 시스템
+| 패턴 | 창 범위 | 못 끊으면 |
+|---|---|---|
+| `Grab` | 시작 ~ **잡기 판정 직전** | 잡힌다 → `Hold` → `Throw` |
+| `DashAttack` | **돌진 전 구간** | 캐리-푸시 → 벽까지 → 스턴 |
 
-- `EvaluatePhase()`(TakeDamage 내부): `hpPercent = CurrentHealth / maxHp`.
-  - `<= phase3HpPercent(0.33)` → 목표 페이즈 2, `<= phase2HpPercent(0.66)` → 1, 그 외 0.
-  - **하향으로만** 증가(`target > _phaseIndex`). 처음 통과 시: `_phaseIndex` 갱신 + `_pendingCharging=true` + `OnPhaseChanged(idx)`.
-- `_pendingCharging`은 **현재 행동 종료 후**(DecideNext) 또는 다음 seek 틱에 `EnterCharging`으로 소비 → 행동 도중 강제 중단 안 함(연출 완결 보장).
-- `EnterCharging`: `chargingDuration`(1.5s) 동안 SuperArmor 부여(슬라이스1은 쉴드/버프 대체) + `BroadcastBossState(Charging)` → Idle 복귀.
+**창이 열리지 않는 것**: 훅·어퍼(단타라 상시 자원이 된다) / `Charging`(차징 중엔 다른 애니가 나오지
+않는다) / `Rage` 돌진 3회(**송전기 실패의 벌칙이 카운터로 쉽게 풀리면 실패에 의미가 없다**).
 
----
+창의 개폐는 **애니메이션 클립 이벤트**로 한다 — `OnCounterWindowOpen` / `OnCounterWindowClose`.
+`Grab` 의 닫기 이벤트는 잡기 히트 이벤트 **바로 앞**에 둔다. 코드 타이머는 이벤트 누락 대비 폴백으로만.
 
-## 5. 피격 / 그로기 / 사망
+### 2.2 성공 조건 (서버 판정)
 
-- `TakeDamage(AttackInfo)`: base(방어/쉴드/체력/복제) → 서버 가드 → HP 0이면 `EnterDead` → `EvaluatePhase` → `isGroggyAttack`면 그로기 누적, `maxGroggyCount` 도달 시 `EnterGroggy`.
-  - **주의(현재)**: MonsterBase와 달리 BossBase는 일반 피격 시 `Hit`(경직) 상태가 **없다**(보스는 아무 공격에나 경직되면 안 되므로 의도적). 그로기만 별도.
-- `EnterDead`: agent/콜라이더 off → `Dead` → `OnDeath()` 훅 → `IDeathEffect` 있으면 재생 후 디스폰, 없으면 `despawnDelay` 후 디스폰. 임시 사망연출(디졸브/스케일+틴트) 포함.
+```
+성공 =  창이 열려 있음
+     ∧ 들어온 공격이 인터럽트 스킬 (PlayerSkillSlot.Interrupt)
+     ∧ 보스 정면 각도 안        ← 헤드어택 구현 시 이 항목만 교체
+```
 
----
+- **판정은 서버에서만** 한다. 클라 예측 없음 — 오판정하면 그로기가 클라마다 갈린다.
+- **정면 판정은 교체 가능한 지점으로 분리한다.** 은희 님의 헤드어택이 들어오면
+  "정면 각도" → "헤드 히트박스 적중"으로 바꿔 끼운다. 판정식을 FSM 본문에 인라인하지 말 것.
+- **일반 공격은 창을 소비하지 않는다.** 창 중에 평타가 들어와도 데미지만 처리한다.
+  그로기는 **인터럽트 스킬로만** 발생한다.
 
-## 6. 연기된 메커닉용 virtual 훅 (이후 슬라이스/Codex에서 override)
+### 2.3 결과
 
-| 훅 | 호출 시점 | 기본 | 채울 내용 |
-|---|---|---|---|
-| `OnPhaseChanged(int page)` | 페이즈 하향 통과 | no-op | 페이즈별 패턴 강화/신규 공격 개방 |
-| `ExecuteSpecialAttack(BossBasicAttackType)` | StartAttack 내 | no-op | 잡기/폭탄/송전탑/차징전체/Dash/Jump 실행 |
-| `BroadcastBossState(BossState)` | EnterCharging 등 | no-op | BT/Events/`BossStateChanged` 채널로 상태 방송(연출 트리거) |
-| `OnDeath()` | EnterDead 단일 지점 | no-op | 드롭/보상/처치연출/다음 페이즈 전환 |
-| `EnterBreak(duration)` | (미호출) | 상태 진입 | 파츠 파괴/무력화 진입점 배선 |
+| 결과 | 처리 |
+|---|---|
+| **성공** | 진행 중 패턴 **즉시 취소** → `GroggyCount += 1` → `Groggy`(2s). 단 `GroggyCount == max(5)` 이면 `Break`(5s) |
+| **실패** (창 밖 / 후방 / 일반 공격) | 아무 일도 없음. 스킬은 정상 시전되고 쿨만 소모. 패턴은 계속 진행 |
 
----
+**취소 시 정리할 것** — 취소 경로에도 반드시 Exit 를 지나게 한다(초판 조사에서 나온 실패 패턴이다):
 
-## 7. 원본 BT 의도 (리버스 엔지니어링 — 재작성 시 보존)
+- `Grab` 취소 → `Hold`/`Throw` 로 가지 않는다. 잡기 히트박스 해제.
+- `DashAttack` 취소 → 돌진 정지. **캐리 중인 플레이어를 해제**한다 (벽 스턴 없음).
 
-> 출처: 기존 웰즈&23호 BT 5그래프 + 컨트롤러. FSM 재작성 전 보존해야 할 핵심 의도.
+### 2.4 `AttackInfo.isGroggyAttack` 의 의미 변경
 
-1. **거리창 + 가중치 공격 선택** — §2에 반영 완료.
-2. **쿨다운 재등록**(Remove→나중에 Add) — 선택기엔 구현, **BossBase 배선 미완**(GAP).
-3. **잡기 체인** — 잡기 성공 → 끌기 → 내려찍기/던지기 상태 기계. (`ExecuteSpecialAttack`+전용 상태로 이식 예정.)
-4. **폭탄 상태 기계** — 폭탄 생성/부착/카운트다운/폭발 단계. (별도 컴포넌트 + 보스 상태 연동.)
-5. **`BossStateChanged` 채널** — 보스 상태 변화를 연출/UI/BT에 방송. → `BroadcastBossState` 훅으로 대체 배선.
-6. **송전탑(Pylon) 기믹** — 페이즈 중 송전탑 소환/파괴 루프.
+현재 이 필드는 *공격에 붙은 플래그*라 **"언제 맞았는가(창)"를 표현할 수 없다.**
+→ 그로기 판정을 **보스의 창 상태**로 옮기고, 이 필드는 "이 공격이 인터럽트 스킬인가"로 의미를 좁힌다.
 
----
-
-## 8. GAP · 오픈 이슈 (팀장 결정 / Codex 작업 대상)
-
-- [ ] **공격 타이밍 애니이벤트화** (§3 목표 방향) — Hit/End 이벤트 함수 + 릴레이. 클립에 이벤트 삽입(에셋).
-- [ ] **넉백/CC/슈퍼아머 = Unit 통합** — 현재 보스는 `MonsterStatusEffect`(몹용) 참조. 합의된 방향은 슈퍼아머·CC를 **Unit 레벨로 통합**(플레이어와 정합). 넉백은 `Unit.Knockback` 공통 진입점(LinearKnockback 컴포넌트 or IKnockbackable override).
-- [ ] **쿨다운 재등록 배선** — StartAttack 후 `RemoveType`, 타이머 뒤 `AddType` 호출 루프.
-- [ ] **송전탑 개수** — 원본 3 vs 4 미확정.
-- [ ] **페이즈 임계값** — `0.66 / 0.33`은 임시. 원본 임계 미확인.
-- [ ] **차징 근접 데미지** — 원본에서 차징 중 근접 판정 존재 여부 미발견.
-- [ ] **일반 피격 경직 정책** — 보스는 Hit 경직 없음(그로기만). 특정 약점/타이밍에만 경직 줄지 결정.
-- [ ] **Wells(2호기) vs 23호 역할 분리** — 현재 스켈레톤은 23호 기준. Wells 별도 브레인/파츠 관계 정의 필요.
+⚠️ **`MonsterBase` 가 같은 필드를 쓴다.** 몹 그로기 정책은 **현행 유지**한다. 보스만 새 판정을 타게 하고,
+분리가 더 안전하면 구현 시 필드를 나눈다.
 
 ---
 
-## 9. 네트워크 계약 요약
+## 3. 공격 선택 — 조건 게이트 → 가중치 → 연속 방지
 
-- 서버: `_state`/`_animSpeed`/HP/상태이상 = NetworkVariable(Server write). FSM·판정·이동·페이즈·사망 전부 서버.
-- 클라: NetworkTransform로 위치, `OnValueChanged`로 상태→애니. 판정 관여 없음.
-- 데미지 유입: 오너→서버 직접 데미지 RPC 금지. `BaseAttack → ReceiveAttack` 서버 경로만.
+초판의 "거리창 + 가중치" 에 **쿨다운·연속방지·폴백**을 더한다. 이 셋이 없으면 보스가 멍청해 보인다.
+
+```
+1) 하드 게이트   쿨다운 준비됨 ∧ 거리창 안 ∧ 상태 허용 ∧ 타겟 유효
+2) 가중치 룰렛   남은 후보의 percentage 합 기준 랜덤
+3) 연속 방지     직전에 쓴 공격은 가중치를 감쇠시켜 넣는다 (제외가 아니라 감쇠)
+4) 폴백          후보가 하나도 없으면 → Walk (사거리 유지하며 접근)
+```
+
+- **(1) 쿨다운이 선택기 안에 있어야 한다.** 초판 GAP 이었다. 쿨이 10/5/10/2~3초로 제각각이라
+  선택기 밖에 두면 "쿨 도는 기술을 고르려다 `None` 반환 → 그 프레임에 아무것도 안 함"이 반복된다.
+  구현은 기존 `RemoveType`(사용 시) / `AddType`(쿨 종료 시) 재등록을 **`BossBase` 에서 실제로 호출**하는 것.
+- **(3) 연속 방지**는 제외가 아니라 **감쇠**다. 제외하면 후보가 1개일 때 아무것도 못 한다.
+- **(4) 폴백이 가장 중요하다.** 현재 코드는 `None` → 공격 스킵 → **제자리에 서 있음**이다.
+  보스가 멍청해 보이는 순간 1위이므로, 후보 없음은 반드시 `Walk` 로 흡수한다.
+- **재판단 시점은 행동 종료 시 1회.** 매 틱 재판단하면 공격 직전에 마음이 바뀐다.
+
+### 3.1 공격표
+
+| 공격 | 쿨다운 | 거리 조건 | 타겟 | 카운터 창 |
+|---|---|---|---|---|
+| `LeftHookAttack` | 2~3s | 근접 | 현재 타겟 | ✗ |
+| `RightHookAttack` | 2~3s | 근접 | 현재 타겟 | ✗ |
+| `UpperAttack` | 2~3s | 근접 | 현재 타겟 | ✗ |
+| `Grab` | **10s** | 근접 | 현재 타겟 | **✓** |
+| `DashAttack` | **5s** | **원거리만** | 현재 타겟 | **✓** |
+| `JumpAttack` | **10s** | **거리 무관** | **가장 멀리 있는 플레이어** | ✗ |
+
+**`JumpAttack` 이 거리 무관이면 게이트가 쿨 하나뿐**이라 10초마다 기계적으로 나와 읽힌다.
+기획서의 **"타겟 = 가장 멀리 있는 플레이어"** 규칙을 살리면 "도망친 놈을 잡으러 간다"는 의도가 생겨
+같은 쿨이어도 덜 기계적이다. 가중치는 낮게 둔다.
+
+---
+
+## 4. 공격별 상세
+
+### 4.1 근접 3종
+
+- `LeftHookAttack` / `RightHookAttack` — **콤보가 아니라 각각 독립된 단타**. 좌/우는 선택기가 따로 고른다.
+- `UpperAttack` — 적중 시 **Airborne** 부여 (`StatusEffectType.Airborne`).
+- 히트/종료는 **애니 이벤트**로 구동한다 (몬스터 FSM 독트린): 히트 = 클립 이벤트,
+  `End` 는 `exitTime` **앞**에 둔다. 코드 타이머는 폴백.
+
+### 4.2 `Grab` 체인
+
+```
+Grab (카운터 창 열림)
+  ├─ 카운터 성공  → 즉시 취소 → Groggy / Break
+  ├─ 잡기 적중    → Hold (전기) → Throw
+  └─ 빗나감       → 재판단
+```
+
+플레이어 구속은 **기존 `PlayerGrabbedState` 를 그대로 쓴다** — 이동 권한 회수·물리 위임·복원이
+이미 구현돼 있고, `GrabController.GrabSocket` 을 따라가는 구조다.
+
+### 4.3 `DashAttack` — 캐리-푸시
+
+```
+돌진 시작 (카운터 창 열림)
+  └─ 경로상 플레이어 적중
+       → 플레이어를 보스 앞에 붙여 계속 민다 (캐리)
+       → 벽 또는 맵 끝 도달
+            → 플레이어 스턴 + 데미지
+            → 보스는 패턴으로 복귀
+```
+
+**이것은 기존 잡기와 같은 문제다.** 서버가 몇 초간 플레이어 위치를 강제해야 하는데 플레이어 이동은
+오너 권한이다. `PlayerGrabbedState` 가 물리 위임(`:733`) · 소켓 슬레이브(`:718`) · 원상복구(`:748`) ·
+서버→오너 RPC 왕복(`Player.cs:257~311`) 을 이미 다 풀어놨으므로 **재사용한다.**
+보스 쪽에 같은 것을 한 벌 더 만들지 않는다 — 두 구현은 반드시 어긋난다.
+
+### 막고 있는 지점과 해결안
+
+[PlayerStateController.cs:700](../../Assets/1.Scripts/Player/PlayerStateController.cs:700) 이
+따라갈 소켓을 `GetComponentInChildren<GrabController>()` → `GrabSocket` 으로 **구체 타입 조회**한다.
+
+⚠️ **인터페이스로 바꾸는 것만으로는 부족하다.** 보스에 잡기 소켓과 돌진 소켓이 **둘 다** 붙으므로
+`GetComponentInChildren<ICarrySocketProvider>()` 는 **먼저 걸리는 쪽을 집는다.**
+→ **소켓 종류(`CarrySocketKind { Grab, Dash }`)를 인자로 전파**한다. `Transform` 은 네트워크로 못
+보내므로 **byte 하나를 RPC 에 태우는 것**이 최소 형태다.
+요청서: [handoff-player-carry-socket.md](handoff-player-carry-socket.md) (은희, 기한 8/7 17:00).
+
+### 구현 제약 (보스 쪽 책임)
+
+1. 🔴 **캐리 중 플레이어는 벽을 통과한다.** `DelegatePhysicsAndCollisionToInstigator` 가
+   `detectCollisions = false` 로 만든다(`:745`). 따라서 **벽 판정은 보스가 한다** — 보스 자신의
+   충돌로 돌진을 멈추고, 그 시점에 스턴을 준다. 소켓 오프셋이 보스 앞으로 너무 멀면
+   **플레이어가 벽에 박힌 채 풀리므로**, 오프셋은 보스 콜라이더가 벽에 닿았을 때
+   플레이어가 벽 안쪽에 남지 않는 거리로 잡는다.
+2. 🔴 **소켓을 따라가는 주체는 오너 클라다** — `IsMovementAuthority => !IsNetworkActive || IsOwner`
+   ([Player.cs:324](../../Assets/1.Scripts/Player/Player.cs:324)). 소켓의 **월드 위치가 클라에서도
+   맞아야** 하므로, **돌진 소켓은 애니메이션으로 움직이지 않는 보스의 고정 자식**으로 둔다.
+   (보스 본체는 `NetworkTransform` 으로 복제되므로 고정 자식이면 클라에서 자동으로 맞는다.)
+3. ⚠️ `CarrySocketKind` 를 enum 으로 두면 **값 추가는 끝에만** — §11 의 `AttackType` 과 같은 이유.
+
+### 그 외
+
+- 캐리 중 **다른 플레이어가 카운터 성공** → 돌진 취소 + 캐리 해제. **벽 스턴은 발생하지 않는다.**
+- 밀기 속도 · 스턴 시간 · 데미지는 **SO 로 노출**한다 (팀장이 플레이하며 조절).
+
+### 4.4 `JumpAttack`
+
+기획서 그대로. 요약:
+
+1. 수직 도약 (수평 이동 없음). 최상단 도달 시 **메시 off** → 순간이동 느낌.
+2. 최상단에서 **가장 멀리 있는 플레이어**를 타겟으로 확정 → 그 위치에 **장판 2개** 생성.
+   - 장판1: 바닥 +0.01. 최종 크기 기준선. 알파 낮음.
+   - 장판2: 바닥 +0.02. Scale 0.1 에서 시작해 지정 시간 동안 장판1 크기까지 확장.
+3. `JumpTime` 만큼 체공.
+4. 장판 소멸 → 낙하 애니 → **메시 on** → 착지 이벤트 시점에 장판 범위 내 플레이어에게 데미지.
+
+바닥 위 오브젝트의 **표준 간격은 +0.05** 규칙이 있으나, 장판은 기획서가 0.01/0.02 를 명시하므로
+그대로 둔다(두 장판의 z-fighting 회피가 목적).
+
+---
+
+## 5. 페이즈 · 송전기 · 차징 · 레이지
+
+### 5.1 페이즈 전환
+
+- 임계: **HP 66% / 33%** — **확정** (더 이상 임시값 아님).
+- **하향 통과 시에만** 1회 발동. 통과 순간 다음 패턴 선택을 무시하고 **고정 시퀀스**로 진입한다.
+- **현재 행동은 끝까지 수행한 뒤** 전환한다 (연출 완결 보장). `_pendingCharging` 플래그 소비 방식.
+
+### 5.2 고정 시퀀스 (양 임계 공통, 수치만 차등 가능)
+
+1. 보스가 **중앙에서 차징하며 대기** (`Charging`).
+2. 보스 주변 **강력한 전기 장판** — 근접 시 데미지 + 뒤로 밀치기. 3초 내 즉사 수준.
+   → 사실상 **원거리만 보스를 때릴 수 있는 구간**.
+3. 차징 중 **보스 실드 HP 점증**.
+4. **사이드 4개 지점 중 인원수만큼 송전탑 생성** — **1인 1 / 2인 2 / 3인 4**.
+5. 제한시간 내 전부 파괴 → **`Groggy`** / 실패 → **`Rage`**.
+
+🔴 **현 `ChargeController.StartCharge` 의 `Clamp(playerCount, 1, 3)` 은 버그다.**
+3인일 때 4개가 나와야 하는데 이 로직으로는 4번째가 절대 활성되지 않는다.
+
+### 5.3 `Rage`
+
+전기를 두르고 **돌진 3회**. **카운터 창 없음** — 송전기 실패의 벌칙이므로 쉽게 풀려선 안 된다.
+3회 종료 후 일반 패턴으로 복귀한다.
+
+---
+
+## 6. 그로기 / Break
+
+| 항목 | 값 | 비고 |
+|---|---|---|
+| `maxGroggyCount` | **5** | 인스펙터 |
+| `Groggy` 지속 | **2초** | 인스펙터 |
+| `Break` 지속 | **5초** | 인스펙터 |
+
+**카운트를 올리는 것 2가지:**
+
+1. **카운터 성공** → `GroggyCount += 1` → `Groggy`. `GroggyCount == max` 면 **`Break`**.
+2. **송전탑 전멸** → `GroggyCount += 1` → `Groggy`. **Break 로 승격하지 않는다.**
+
+> 송전기 그로기가 Break 를 유발하면, 페이즈 전환 직후에 5초 무력화가 겹쳐 페이즈 연출이 죽는다.
+> 카운트는 공유하되 승격 권한은 카운터에만 준다.
+
+`Break` 진입 시 `GroggyCount` 를 0으로 초기화한다. **전원 Soul → `Idle` 로 갈 때는 초기화하지 않는다.**
+
+---
+
+## 7. 표현 계층 — `IBossTelegraph`
+
+카운터 창을 플레이어에게 알리는 표현. **지금은 노란색 틴트, 나중에 VFX** 로 갈아끼운다.
+
+```
+BossBase (서버)  :  _counterWindow  NetworkVariable<bool>   ← 서버만 쓴다
+      ↓ OnValueChanged (클라)
+IBossTelegraph.OnCounterWindow(bool on)                      ← 교체 지점
+      ├─ TintTelegraph  : 지금.  노란색 베이스 틴트
+      └─ VfxTelegraph   : 나중.  이펙트
+```
+
+- **FSM 코드는 바뀌지 않는다.** 교체 = 프리팹에서 컴포넌트 스왑.
+- 함수 하나로 두는 것보다 인터페이스가 나은 이유: 나중에 창의 **진행도(남은 시간)** 를 표현하고
+  싶어지면 인터페이스만 넓히면 된다.
+
+🔴 **`HitFlash` 와 충돌한다.** [HitFlash.cs](../../Assets/1.Scripts/Unit/HitFlash.cs) 는
+`_originalColors` 를 **초기화 시점의 sharedMaterial 색으로 캐시**해두고 MaterialPropertyBlock 으로
+복원한다. 카운터 노란색을 같은 경로로 칠하면 **피격 한 번에 원래 색으로 복원되어 노란색이 날아간다.**
+→ `HitFlash` 에 **베이스 틴트 오버라이드 진입점**을 추가한다 (카운터가 베이스를 노란색으로 밀고,
+피격 플래시는 그 위에서 Lerp). VFX 로 전환하면 이 진입점은 자동으로 안 쓰인다.
+
+---
+
+## 8. 네트워크 계약
+
+- **서버**: FSM·이동·모든 판정·페이즈·사망·**카운터 창 개폐와 성공 판정**.
+  `_state` · `_animSpeed` · `_counterWindow` · HP · 상태이상 = `NetworkVariable`(Server write).
+- **클라**: `NetworkTransform` 으로 위치. `OnValueChanged` 로 상태 → 애니, 창 → `IBossTelegraph`.
+  **판정에 관여하지 않는다.**
+- **데미지 유입**: `BaseAttack → ReceiveAttack` 서버 경로만. 오너 → 서버 직접 데미지 RPC 금지.
+- **카운터**: 인터럽트 스킬 히트가 서버에 도달한 시점에 서버가 창 상태 + 정면을 본다. **클라 예측 없음.**
+- **캐리-푸시**: 플레이어가 `PlayerGrabbedState` 로 들어가며 이동 권한이 서버에 위임된다 (기존 잡기와 동일).
+
+---
+
+## 9. 데이터 소유
+
+| 데이터 | 위치 | 이유 |
+|---|---|---|
+| 공격별 쿨·거리창·가중치·데미지 | **SO** (`BossAttackTableSO`) | 팀장이 플레이하며 조절 |
+| 돌진 밀기 속도·스턴 시간 | **SO** | 위와 같음 |
+| 그로기/Break 지속·`maxGroggyCount` | 인스펙터 | 보스 1체 고유값 |
+| 페이즈 임계 (66/33) | 인스펙터 | 고정값이지만 노출 |
+| 송전탑 인원별 개수 | 인스펙터 (`ChargeController`) | 1/2/4 |
+| 현재 상태·HP·창 | **런타임 NetworkVariable** | 서버 소유 |
+
+기존 `BossBase` 는 `slamWindup` 같은 개별 필드가 흩어져 있다. **공격 파라미터는 SO 하나로 모은다.**
+
+---
+
+## 10. 원본 BT 의도 — 보존 확인표
+
+초판 §7 에서 추출한 6항목이 재설계에 어떻게 반영됐는지.
+
+| # | 원본 의도 | 재설계에서 |
+|---|---|---|
+| 1 | 거리창 + 가중치 공격 선택 | §3 — 하드 게이트에 흡수 + 쿨/연속방지 추가 |
+| 2 | 쿨다운 재등록 (Remove → 나중에 Add) | §3 — **배선 완료 예정** (초판 GAP 해소) |
+| 3 | 잡기 체인 (잡기 → 전기 → 던지기) | §4.2 — `Grab`→`Hold`→`Throw` 상태로 승격 + 카운터 취소 경로 |
+| 4 | 폭탄 상태 기계 | §1.3 — Wells 독립 FSM 으로 분리 |
+| 5 | `BossStateChanged` 채널 | §8 — `_state` NetworkVariable + `IBossTelegraph` 로 대체 |
+| 6 | 송전탑(Pylon) 기믹 | §5.2 — 페이즈 고정 시퀀스에 편입 |
+
+---
+
+## 11. 남은 오픈 이슈
+
+### 플레이어 쪽 의존 2건 — **요청 완료, 기한 2026-08-07(금) 17:00**
+
+인계 문서: [handoff-player-carry-socket.md](handoff-player-carry-socket.md) (받는 사람: 은희)
+
+- **A. 인터럽트 식별자** — 단죄의 방패 자체는 **이미 있다.** 문제는 `AttackType` enum
+  (`None/Default/Q/E/R`) 에 **우클릭 슬롯에 해당하는 값이 없어** 보스가 서버에서
+  "이 히트 = 인터럽트 스킬"을 판별할 수 없다는 것. → 값 추가 요청.
+  ⚠️ enum 은 **끝에만** 추가해야 한다 (프리팹에 정수로 직렬화돼 있어 중간 삽입 시 조용히 밀린다).
+- **B. 캐리 소켓 지정** — §4.3. `PlayerGrabbedState.Enter` 가 소켓을 `GrabController` 구체 타입으로
+  찾는다. 보스에 잡기·돌진 소켓이 **둘 다** 붙으므로 타입 조회만으로는 먼저 걸리는 쪽이 이긴다
+  → **종류(`CarrySocketKind`)를 RPC 로 전파**하는 방식으로 요청했다.
+
+**이 둘에 막히지 않는 부분은 먼저 확정한다** — 상태 전이표 · 선택기 4단 · 쿨다운 재등록 ·
+애니 이벤트 배치 · Grab 체인 · JumpAttack · 페이즈/송전기/차징/레이지 · Wells FSM · `IBossTelegraph`.
+
+### 그 외
+
+- **징크스(원거리) 스킬 SO 가 없다.** "전 캐릭터 카운터 가능"은 **슬롯 기반**으로 설계해
+  징크스 구현 시 자동 충족되게 한다 (캐릭터별 분기 금지).
+- **`isGroggyAttack` 을 몹과 공유**한다 (§2.4). 몹은 현행 유지.
+- **BT 자산 폐기 시점** — `Assets/8.BehaviorTreeGraph` 는 전환 검증 완료까지 **수정 금지**,
+  삭제는 별도 커밋.
+
+## 12. 값이 비어 있는 파라미터 (노출만)
+
+근접↔원거리 전환 거리 · 각 공격 거리창 · `JumpTime`/장판 확장 시간/착지 데미지/AoE ·
+돌진 속도/밀기 속도/스턴 시간/데미지 · `Hold` 지속/전기 데미지/`Throw` 거리 ·
+훅·어퍼 데미지/Airborne 높이·지속 · 송전기 제한시간/기둥 HP·방어력/실드 점증 속도 ·
+레이지 돌진 3회 데미지·간격 · 페이즈별 차등 배수.

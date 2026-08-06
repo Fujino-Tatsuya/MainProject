@@ -4,48 +4,68 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 다음 세션 시작점 — 보스 FSM 재설계 (2026-08-06 인계)
+## ▶▶ 다음 세션 시작점 — 보스 FSM 재설계 (2026-08-06 · **그릴 완료, 계획서 승인 대기**)
 
-**목표: 예전에 분석해 둔 보스 FSM 분석을 확장 재분석하고, 기획 추가 내용을 반영해 다시 만든다.**
-(팀장 지시, 2026-08-06)
+**작업 세션**: 경석(Claude). **수정 예정 파일 = 문서만** —
+[PLAN-boss-fsm.md](PLAN-boss-fsm.md) · [Docs/tech/boss-fsm-design.md](Docs/tech/boss-fsm-design.md).
+코드·프리팹·BT 에셋은 이번 세션 범위 밖이다.
 
-### 착수 전 읽을 것 — 이미 있는 것부터
+### 지금 상태
 
-| 문서 | 무엇이 들어 있나 |
+`AIRULE.md` 의 grill 이 끝났고 **설계 문서 2건이 나왔다.** 다음 단계는 **팀장 승인**이다.
+
+| 문서 | 역할 |
 |---|---|
-| [Docs/tech/boss-fsm-design.md](Docs/tech/boss-fsm-design.md) (132줄) | **§7 원본 BT 의도 6항목**(재작성 시 보존 대상) · **§8 GAP 8항목**(미결) · §9 네트워크 계약 |
-| [Docs/design/boss-wells-and-no23.md](Docs/design/boss-wells-and-no23.md) (85줄) | 3페이즈(66%/33%) · 송전기·차징 시퀀스 5단 · `TwentyThreeState` 11개 · **§미정 3항목** |
-| 볼트 `GameDesign/콘텐츠/프로토타입/보스_(프로토타입).xlsx` | **기획 수치 출처 후보** — §미정 값들이 여기 있을 가능성 |
-| 볼트 `Worklog/경석/2026-07-24 보스룸 No.23 등장 연출 *` (3건) | 등장 연출 설계·구현 계획 |
+| [PLAN-boss-fsm.md](PLAN-boss-fsm.md) | 승인용 계획서 — 목표·슬라이스 S0~S8·확정 결정표·리스크·수용기준 |
+| [Docs/tech/boss-fsm-design.md](Docs/tech/boss-fsm-design.md) | **전면 재작성됨.** 확정 설계 본문 |
 
-🔴 **"분석 확장"의 출발점은 새로 읽는 게 아니라 §8 GAP 8항목이다.** 이미 리버스
-엔지니어링된 의도(§7)와 미결 목록(§8)이 있으므로, 중복 분석하지 말고 **미결을 기획으로 닫는
-방향**으로 확장한다.
+⚠️ `PLAN.md` 는 은희의 승인 대기 계획서(2026-08-03 개발 진입점 단일화)가 점유 중이라 건드리지 않았다.
 
-### 살아 있는 미결 (§8 그대로 — 기획 확정이 필요한 것 ★)
+### 그릴에서 확정된 것 (2026-08-06 팀장)
 
-- ★ **송전탑 개수** — 원본 3 vs 4 미확정
-- ★ **페이즈 임계값** — `0.66 / 0.33` 은 임시값, 원본 미확인
-- ★ **차징 중 근접 판정** 존재 여부 미발견
-- ★ **근접↔원거리 전환 거리**, JumpAttack/DashAttack 쿨·데미지·AoE, 제한시간,
-  실드 점증 속도, 돌진 횟수/데미지, 페이즈별 차등 수치 (GDD §미정)
-- **쿨다운 재등록 배선** 미완 (선택기엔 구현, `BossBase` 배선 없음)
-- **넉백/CC/슈퍼아머 Unit 통합** — 보스가 아직 `MonsterStatusEffect`(몹용)를 참조
-- **Wells(2호기) vs 23호 역할 분리** — 현재 스켈레톤은 23호 기준
-- **공격 타이밍 애니이벤트화** — 몬스터 FSM 에서 확립된 독트린을 그대로 적용
-  (히트/종료/커밋 = 클립 이벤트, `End` 는 `exitTime` 앞)
+- 🔴 **BT 를 버리고 코드 FSM 으로 간다.** 살아 있는 보스는 아직 BT(`TwentyThree.prefab` 에
+  `BehaviorGraphAgent`)이고, `Monster/Boss/BossBase.cs` 는 23호에 붙어 있지 않은 더미 스켈레톤이다.
+- 🔴 **민경은 보스 작업에서 빠졌다.** 보스 전체가 경석 단독 소유 → `AGENTS.md` §5 담당 분배 갱신 대상.
+- 🔴 **7/30 보스 피격 조사 3건은 해결됐다.** `Docs/tech/next-boss-hit-investigation.md` 는 폐기 대상.
+- **카운터(인터럽트) 시스템 신규** — 우클릭(`PlayerSkillSlot.Interrupt`, 로스트아크식).
+  창은 `Grab`·`DashAttack` 2개만. 성공 = 즉시 그로기. **그로기는 인터럽트 스킬로만** 난다.
+- 페이즈 **66/33 확정** · 송전탑 **1인1 / 2인2 / 3인4** · Groggy 5회/2초, Break 5초 ·
+  쿨 Jump 10s·Dash 5s·Grab 10s·훅어퍼 2~3s · Dash 는 **캐리-푸시 → 벽 → 스턴** ·
+  Jump 는 **거리 무관 + 최원거리 타겟** · **Return 없음, 체력 회복 금지** ·
+  Wells 는 별도 FSM 4상태(`Jump` 삭제).
+
+### 플레이어 쪽 의존 2건 — 은희에게 **요청 완료** (기한 2026-08-07 금 17:00)
+
+인계 문서: [Docs/tech/handoff-player-carry-socket.md](Docs/tech/handoff-player-carry-socket.md)
+
+1. **인터럽트 식별자** — 단죄의 방패는 **이미 있고 식별 정보만 없다.**
+   `AttackType`(`None/Default/Q/E/R`)에 **우클릭 슬롯 값이 없어** 보스가 판별 불가.
+   ⚠️ enum 은 **끝에만** 추가 (프리팹에 정수로 직렬화됨).
+2. **캐리 소켓 지정** — `PlayerGrabbedState.Enter` 가 `GrabController` 구체 타입으로 소켓을 찾는다.
+   보스에 잡기·돌진 소켓이 둘 다 붙어 타입 조회로는 먼저 걸리는 쪽이 이김
+   → `CarrySocketKind` 를 RPC 로 전파하는 방식으로 요청.
+
+**임시 테스트 스킬은 만들지 않는다(기다린다). 보스 쪽 별도 캐리도 만들지 않는다.**
+
+### 일정
+
+| 시점 | 내용 |
+|---|---|
+| ~8/7(금) 17:00 | **FSM 상세 구성 확정** — 위 2건에 의존 안 하는 전부 |
+| 8/7 17:00 | 은희 산출물 수령 → S3(카운터)·S5(Dash 캐리) 마지막 배선 |
+| 주말 | **전 슬라이스 구현 + 테스트** |
 
 ### 착수 전 알아 둘 것
 
-- ⚠️ **담당 경계**: `AGENTS.md` 기준 **경석 = 보스 전반 / 민경 = 보스 기믹**(잡기·폭탄·송전기·
-  차징·레이지) **+ 보스 프리팹**. 동시 수정 충돌 지점이므로 시작 시 이 문서 작업 세션에 적을 것.
-- 🔴 **`Assets/8.BehaviorTreeGraph` 는 수정 금지.** 기존 BT 는 의도 추출용 참고 자료다.
+- 🔴 **`Assets/8.BehaviorTreeGraph` 는 전환 검증 완료까지 수정 금지.** 의도 추출용 참고 자료다.
+- 볼트 `보스_(프로토타입).xlsx` 는 **웰즈&23호 문서가 아니다** — `Demon` 모델을 쓰는 별개 프로토 보스다.
+  현재 코드의 Groggy/Break/확률 구조가 여기서 왔다. **인터럽트→Groggy→Break 만 계승**하고
+  `Dodge_Back`/`Dodge_Front`/`Return` 은 채택하지 않기로 했다.
 - 보스는 **서버(호스트) 권한** — FSM·판정·이동·페이즈·사망 전부. 데미지 유입은
   `BaseAttack → ReceiveAttack` 서버 경로만(오너→서버 직접 데미지 RPC 금지).
 - ⚠️ 보스 `IsOver` 는 **쓰기 전용 플래그**다(읽어서 분기하면 안 됨).
-- 큰 작업이므로 `AIRULE.md` 의 grill → `PLAN.md` → 승인 → 구현 순서를 따른다.
-  ⚠️ `PLAN.md` 는 지금 **은희의 승인 대기 계획서**(2026-08-03 개발 진입점 단일화)가 점유 중이다.
-  덮어쓰지 말고 별도 파일이나 섹션 추가로 갈 것.
+- ⚠️ **`HitFlash` 가 카운터 틴트를 덮어쓴다** — `_originalColors` 를 초기화 시점 색으로 캐시하고
+  MPB 로 복원하므로, 같은 경로로 칠한 노란색은 피격 한 번에 날아간다.
 
 ---
 
