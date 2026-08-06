@@ -5158,11 +5158,17 @@ MonoBehaviour:
   refreshInterval: 0.2
   targetFps: 120
   customMarkers:
-  - label: Fog
-    markerName: FullScreenFog
+  - label: Blur DownH
+    markerName: MaskBlur DownH
     budgetMs: 0
-  - label: Fog Copy
-    markerName: FullScreenFog CopyBack
+  - label: Blur V
+    markerName: MaskBlur V
+    budgetMs: 0
+  - label: Blur Comp
+    markerName: MaskBlur Composite
+    budgetMs: 0
+  - label: Blur Copy
+    markerName: MaskBlur CopyBack
     budgetMs: 0
 --- !u!4 &1493541740
 Transform:

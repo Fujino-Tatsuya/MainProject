@@ -31,6 +31,48 @@ public static class MaskBlurAuthoring
             "셋 다 OK 여야 동작한다.");
     }
 
+    // ProfilerHUD 의 customMarkers 를 마스크 블러 패스로 교체한다.
+    //
+    // 마커 이름은 MaskBlurFeature.PassNames 에서 가져온다 — 손으로 적으면 오타가 나도
+    // HUD 가 에러 없이 0.00 ms 를 찍어 "이 패스는 공짜"라는 거짓 신호가 된다.
+    [MenuItem("Tools/Rendering/Look/Wire ProfilerHUD Markers (MaskBlur)")]
+    public static void WireProfilerMarkers()
+    {
+        var hud = Object.FindFirstObjectByType<ProfilerHUD>(FindObjectsInactive.Include);
+        if (hud == null)
+        {
+            Debug.LogWarning(
+                "[MaskBlur] 열린 씬에서 ProfilerHUD 를 찾지 못했다. " +
+                "4.MapScene 을 연 뒤 다시 실행할 것.");
+            return;
+        }
+
+        hud.customMarkers.Clear();
+        AddMarker(hud, "Blur DownH", MaskBlurFeature.PassNames.DownH);
+        AddMarker(hud, "Blur V", MaskBlurFeature.PassNames.Vertical);
+        AddMarker(hud, "Blur Comp", MaskBlurFeature.PassNames.Composite);
+        AddMarker(hud, "Blur Copy", MaskBlurFeature.PassNames.CopyBack);
+
+        EditorUtility.SetDirty(hud);
+        var scene = hud.gameObject.scene;
+        EditorSceneManager.MarkSceneDirty(scene);
+        EditorSceneManager.SaveScene(scene);
+
+        Debug.Log(
+            $"[MaskBlur] ProfilerHUD 마커를 마스크 블러 4패스로 교체했다(씬 '{scene.name}'). " +
+            "F8 로 확인할 것 — 0.00 ms 로만 찍히면 패스 이름이 어긋난 것이다.");
+    }
+
+    private static void AddMarker(ProfilerHUD hud, string label, string markerName)
+    {
+        hud.customMarkers.Add(new ProfilerHUD.MarkerSpec
+        {
+            label = label,
+            markerName = markerName,
+            budgetMs = 0f
+        });
+    }
+
     private static MaskBlurSettings EnsureSettings()
     {
         var existing = AssetDatabase.LoadAssetAtPath<MaskBlurSettings>(SettingsPath);

@@ -16,6 +16,19 @@ using UnityEngine.Rendering.Universal;
 
 public sealed class MaskBlurFeature : ScriptableRendererFeature
 {
+    // RenderGraph 패스 이름. ProfilerHUD 의 customMarkers 가 이 문자열로 패스를 찾는다.
+    //
+    // 왜 상수로 묶는가: 마커 이름이 실제 패스 이름과 어긋나면 HUD 는 에러 없이 0.00 ms 를
+    // 찍는다. "이 패스는 공짜"로 읽히는 거짓 신호이고, 성능을 판단하는 자리라 특히 위험하다.
+    // 패스 이름을 바꿀 일이 생기면 여기 한 곳만 고치면 HUD 배선 도구까지 함께 따라온다.
+    public static class PassNames
+    {
+        public const string DownH = "MaskBlur DownH";
+        public const string Vertical = "MaskBlur V";
+        public const string Composite = "MaskBlur Composite";
+        public const string CopyBack = "MaskBlur CopyBack";
+    }
+
     // 🔴 셰이더를 직렬화 참조로 들고 있어야 한다.
     //    런타임 Shader.Find 만 쓰면 어떤 머티리얼·씬·프리팹도 참조하지 않는 셰이더가 되어
     //    빌드에서 스트립된다("에디터는 되는데 빌드만 안 됨"의 대표 원인. 미니맵이 이걸로 안 보였다).
@@ -137,15 +150,15 @@ public sealed class MaskBlurFeature : ScriptableRendererFeature
                 renderGraph, fullDesc, "_MaskBlurComposed", false, FilterMode.Bilinear);
 
             // 1) 다운샘플 + 가로 블러
-            AddBlit(renderGraph, "MaskBlur DownH", source, blurA, PassDownH, null, 0);
+            AddBlit(renderGraph, PassNames.DownH, source, blurA, PassDownH, null, 0);
 
             // 2) 세로 블러 → 결과를 전역 _MaskBlurTex 로 노출한다.
             //    RenderGraph 에서는 raster 패스 안에서 TextureHandle 을 머티리얼에 직접 못 꽂으므로,
             //    생산하는 패스가 SetGlobalTextureAfterPass 로 넘기고 소비하는 패스가 전역으로 읽는다.
-            AddBlit(renderGraph, "MaskBlur V", blurA, blurB, PassV, null, IdBlurTex);
+            AddBlit(renderGraph, PassNames.Vertical, blurA, blurB, PassV, null, IdBlurTex);
 
             // 3) 원본과 블러를 마스크로 합성
-            AddBlit(renderGraph, "MaskBlur Composite", source, composed, PassComposite, blurB, 0);
+            AddBlit(renderGraph, PassNames.Composite, source, composed, PassComposite, blurB, 0);
 
             // 4) 카메라 컬러로 복사
             AddCopyBack(renderGraph, composed, source);
@@ -226,7 +239,7 @@ public sealed class MaskBlurFeature : ScriptableRendererFeature
             TextureHandle dst)
         {
             using var builder =
-                renderGraph.AddRasterRenderPass<PassData>("MaskBlur CopyBack", out PassData data);
+                renderGraph.AddRasterRenderPass<PassData>(PassNames.CopyBack, out PassData data);
 
             data.source = src;
             builder.UseTexture(src, AccessFlags.Read);
