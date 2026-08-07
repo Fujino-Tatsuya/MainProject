@@ -31,7 +31,7 @@ public class KnockbackAttack : BaseAttack, IKnockbackSettable
                 return;
             }
 
-            unit.TakeDamage(new AttackInfo(damage, attackType, isGroggyAttack));
+            unit.TakeDamage(new AttackInfo(damage, attackType));
             Vector3 dir = GetDirection(root);
             unit.Knockback(dir, knockbackStrength);
             Edit.Log($"[No.23] {name} 넉백 공격 적중: {unit.name} (피해 {damage})", this);

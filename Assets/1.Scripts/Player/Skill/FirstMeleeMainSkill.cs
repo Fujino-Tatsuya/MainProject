@@ -92,7 +92,7 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
         if (data == null || HitboxAnchor == null || owner == null)
             return;
 
-        int hitCount = OverlapAnchor();
+        int hitCount = OverlapHitboxAnchor(hitResults);
         tickTargets.Clear();
 
         for (int i = 0; i < hitCount; i++)
@@ -101,7 +101,7 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
             if (hit == null)
                 continue;
 
-            Unit unit = ResolveUnit(hit, out Hurtbox hurtbox);
+            Unit unit = ResolveHitUnit(hit, out Hurtbox hurtbox);
             if (unit == null || unit == owner || !tickTargets.Add(unit))
                 continue;
 
@@ -111,7 +111,7 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
             // 방사형 폴백에 맡기면 전진(6m/s)이 넉백(3m/s)을 따라잡는 순간 옆/뒤로 뒤집힌다.
             // 견인 속도 하한 = 전진 속도: 넉백이 전진보다 느리면 플레이어가 몹을 추월해 히트박스에서
             // 놓친다("한두 번 밀리고 끝"). 하한을 코드로 보장해 돌진 끝까지 방패 앞에 붙어 밀려가게 한다.
-            AttackInfo attackInfo = new AttackInfo(damageSnapshot, AttackType.Q,
+            AttackInfo attackInfo = new AttackInfo(damageSnapshot, AttackType.Skill,
                 knockbackStrength: Mathf.Max(data.KnockbackStrength, data.AdvanceSpeed),
                 knockbackDuration: data.KnockbackDuration,
                 staggerDuration: data.StaggerDuration,
@@ -173,45 +173,6 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
             degreesPerSecond * Mathf.Deg2Rad * deltaTime,
             0f).normalized;
         heading.y = 0f;
-    }
-
-    private int OverlapAnchor()
-    {
-        switch (HitboxAnchor.OverlapCollider)
-        {
-            case OverlapCollider.Box:
-                BoxColliderInfo boxInfo = default;
-                HitboxAnchor.GetBoxColliderInfo(ref boxInfo);
-                return Physics.OverlapBoxNonAlloc(
-                    boxInfo.center, boxInfo.halfExtents, hitResults, boxInfo.orientation,
-                    Data.HittableLayers, QueryTriggerInteraction.Collide);
-
-            case OverlapCollider.Sphere:
-                SphereColliderInfo sphereInfo = default;
-                HitboxAnchor.GetSphereColliderInfo(ref sphereInfo);
-                return Physics.OverlapSphereNonAlloc(
-                    sphereInfo.center, sphereInfo.radius, hitResults,
-                    Data.HittableLayers, QueryTriggerInteraction.Collide);
-
-            case OverlapCollider.Capsule:
-                CapsuleColliderInfo capsuleInfo = default;
-                HitboxAnchor.GetCapsuleColliderInfo(ref capsuleInfo);
-                return Physics.OverlapCapsuleNonAlloc(
-                    capsuleInfo.point0, capsuleInfo.point1, capsuleInfo.radius, hitResults,
-                    Data.HittableLayers, QueryTriggerInteraction.Collide);
-
-            default:
-                return 0;
-        }
-    }
-
-    private static Unit ResolveUnit(Collider hit, out Hurtbox hurtbox)
-    {
-        hurtbox = hit.GetComponentInParent<Hurtbox>();
-        if (hurtbox != null && hurtbox.TryGetOwner(out Unit hurtboxOwner))
-            return hurtboxOwner;
-
-        return hit.GetComponentInParent<Unit>();
     }
 
     private Vector3 Flatten(Vector3 direction)

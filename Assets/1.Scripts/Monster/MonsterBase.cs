@@ -771,8 +771,9 @@ public class MonsterBase : Unit
             return;
         }
 
-        // 그로기 누적.
-        if (attackInfo.isGroggyAttack && data != null && data.maxGroggyCount > 0)
+        // 인터럽트 누적 → 그로기. "인터럽트를 어떻게 소비할지"는 수신측 결정이고, 이 계통은 누적식이다
+        // (보스 No.23은 같은 플래그를 카운터 창 판정으로 소비한다).
+        if (attackInfo.isInterruptAttack && data != null && data.maxGroggyCount > 0)
         {
             _groggyCount++;
             if (_groggyCount >= data.maxGroggyCount)
