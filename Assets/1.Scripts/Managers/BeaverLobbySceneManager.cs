@@ -582,7 +582,8 @@ public class BeaverLobbySceneManager : NemoSceneManager
         WarnIfMissing(directPanel, nameof(directPanel));
         WarnIfMissing(relayHostButton, nameof(relayHostButton));
         WarnIfMissing(relayJoinButton, nameof(relayJoinButton));
-        WarnIfMissing(modeToggleButton, nameof(modeToggleButton));
+        // modeToggleButton 은 선택 사항이라 경고하지 않는다 — 없으면 두 패널을 함께 보여준다
+        // (SetConnectionModePanels 주석 참조).
         WarnIfMissing(joinCodeInputField, nameof(joinCodeInputField));
         WarnIfMissing(joinCodeDisplayText, nameof(joinCodeDisplayText));
 
@@ -649,8 +650,21 @@ public class BeaverLobbySceneManager : NemoSceneManager
         }
     }
 
+    /// <summary>
+    /// 전환 버튼이 씬에 있을 때만 패널을 배타적으로 토글한다.
+    ///
+    /// ⚠️ 버튼이 없는데 토글하면 한쪽 패널이 숨겨진 뒤 되살릴 방법이 없어 그 통로가 통째로
+    /// 막힌다. 전환 버튼은 기능상 필수가 아니다 — IPv4 버튼은 동기 레거시 경로라 Mode 와
+    /// 무관하고, Relay 버튼은 TryBeginRelayStart 가 Mode 를 직접 UnityRelay 로 세팅한다.
+    /// 그래서 버튼이 없으면 두 패널을 저작된 그대로 함께 보여주는 것이 맞다.
+    /// </summary>
     private void SetConnectionModePanels(bool relaySelected)
     {
+        if (modeToggleButton == null)
+        {
+            return;
+        }
+
         if (relayPanel != null)
         {
             relayPanel.SetActive(relaySelected);
