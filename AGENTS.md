@@ -30,9 +30,12 @@
 - 상세: [Docs/tech/architecture.md](Docs/tech/architecture.md), [Docs/tech/networking.md](Docs/tech/networking.md)
 
 ## 5. 작업 분담
-- **은희**: 코어(UnitBase·상태이상·스탯/모디파이어) + 네트워크(NGO / IPv4 / SteamDatagramRelay / SceneManagement) + Player 제작.
-- **경석(팀장)**: 부팅 씬 + Player2 + 보스(전반). PR 리뷰/머지.
-- **민경**: 보스 기믹(잡기/폭탄/송전기/차징/레이지) + 보스 프리팹. (경석 페어링)
+> 아래는 **2026-08-07 팀장 확정** 기준이다. 이전 판(민경=보스 기믹/일반몹, 은희=성장시스템 등)은 폐기.
+
+- **은희**: 코어(UnitBase·상태이상·스탯/모디파이어) + 네트워크(NGO / IPv4 / SteamDatagramRelay / SceneManagement) + Player 제작. **사운드는 추후 은희**.
+- **경석(팀장)**: 부팅 씬 + Player2 + **몬스터 전체 단독** — 일반 몬스터·중간보스·보스의 FSM·기믹·프리팹·데이터. PR 리뷰/머지.
+  - 진행: **일반 몬스터 ✅ / 중간보스 ✅ / 보스 = 남은 것**(재작성 중 — [PLAN-boss-fsm.md](PLAN-boss-fsm.md)).
+- **민경**: **이펙트(VFX)**.
 
 ## 6. 문서 인덱스
 - 설계(GDD): [Docs/design/](Docs/design/) — 보스 / 플레이어 / 상태이상 / 빌드

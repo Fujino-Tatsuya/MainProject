@@ -4,114 +4,164 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 다음 세션 시작점 — 보스 전면 재작성 (2026-08-07)
+## ▶▶ 다음 세션 시작점 — 보스 재작성 (2026-08-07 종료)
 
-🔴 **브랜치: `feature/Boss23`** (2026-08-07 신설, `feature/maprendering` `2e14b18` 에서 분기).
-보스 작업은 전부 여기서 한다 — 렌더링 브랜치에 더 얹지 말 것.
+🔴 **브랜치 `feature/Boss23`** · **컴파일 0에러 0경고** · **전부 미커밋**
 
-**같은 날 정리한 원격 브랜치 3개** (팀장 지시):
+**한 줄 상태: 코드·애니메이터·데이터가 끝났고, 남은 것은 프리팹 조립뿐이다.**
+보스가 아직 한 번도 스폰된 적이 없다 — 그래서 `ValidateContract` 조차 돌지 않았다.
 
-| 삭제된 브랜치 | tip | 상태 |
-|---|---|---|
-| `feature/map-player-merge` | `8c7850c` | development 대비 **미머지 0** — 손실 없음 |
-| `feature/boss`(소문자) | `7350af8` | 당일 잘못 만든 것. 대문자 `feature/Boss` 와 **Windows 에서 ref 충돌**해서 제거 |
-| `feature/Boss`(대문자) | `d39e5ae` | ⚠️ **미머지 3커밋 포함**(SimJangBounce, 7/31~8/3) — 팀장 판단으로 폐기 |
-
-💾 **복구 수단**: 로컬 아카이브 태그가 있다(push 안 함).
-`archive/feature-Boss-20260807` → `d39e5ae` / `archive/map-player-merge-20260807` → `8c7850c`
-되살리려면 `git push origin archive/feature-Boss-20260807:refs/heads/<이름>`.
-
-폐기 3커밋은 **확인 불필요**로 확정됐다(팀장 판단). 태그는 만약을 위한 보험일 뿐이다.
-
-**작업 세션**: 경석(Claude). base 선행 작업(쿨다운 슬롯·archetype)까지 코드로 들어갔고,
-그 위의 보스 본체(`BossDataSO`·서브클래스)는 아직 시작 전이다.
+> **2026-08-07 밤 갱신** — 아래 **1·2단계는 완료**됐다. 컨트롤러를 고치는 게 아니라 **전면 재작성**으로
+> 갔다(팀장 확정). 저작 도구 = `Assets/1.Scripts/Monster/Editor/TwentyThreeBossAuthoring.cs`
+> (`Tools > Boss > 23호 — 컨트롤러 전면 재작성 + 데이터 저작`, 멱등).
+>
+> · `No23Controller` **신규** — 18상태 / 파라미터 `Speed`(Float)·`Groggy`(Bool)·`Death`(Trigger) /
+>   전이 **5개뿐**(AnyState⇒Dead, AnyState⇒GroggyStart⇒Groggy⇒GroggyEnd⇒Locomotion). 나머지는 CrossFade.
+> · `WellsBossController` **신규** — 4상태 / 트리거 4. 레거시 컨트롤러 2개는 **삭제**했다.
+> · 로코모션은 `Speed` BlendTree(idle@0 / walk@2.5) — `_animSpeed` 는 `agent.velocity.magnitude` **원값(m/s)**.
+> · 그로기·사망을 **파라미터 + AnyState** 로 받아 base 경로가 살아난다 → **코드·SO 스키마 수정 0줄.**
+> · `No23.asset` 저작 완료(`archetype: Boss`, 공격 8행 상태명 전량, 애니 계약 필드 전량).
+>
+> 🔴 **`attackDuration` 은 올리지 않았다** — 아래 2단계 표의 "상향"은 오독이다. 보스가
+> `_stateTimer = 체인길이 + attackDuration` 으로 이미 더한다(`TwentyThreeBoss.cs:456`).
+> 🔴 **착지 상태는 원래 있었다** — `Arrive` 가 `landingattack` 을 쓰고 있었다. 다만 입장 연출
+> (`BossEncounterDirector`)은 애니메이터를 **한 줄도 안 건드리므로** 고아였다. 새 컨트롤러엔
+> `JumpLanding` 으로 다시 뒀다.
+> 🔴 **fbx 후속(SVN)**: `Boss_23_idle`·`Boss_23_charging` 의 **Loop Time 이 꺼져 있다** — 오래
+> 유지되는 상태인데 한 바퀴 뒤 마지막 프레임에서 굳는다. 애니 이벤트 저작과 같이 처리.
+> 상세·이탈 근거 = [IMPLEMENTATION_NOTES.md](IMPLEMENTATION_NOTES.md) 최하단.
 
 ### 정본 문서 (읽는 순서)
 
 | # | 문서 | 무엇 |
 |---|---|---|
-| 1 | [Docs/tech/boss-rebuild-standard.md](Docs/tech/boss-rebuild-standard.md) | 🔴 **보스 구현 정본.** 3층 구조·훅 4개·규약·상태표·SO 설계(§10) |
-| 2 | [Docs/tech/layer-standard.md](Docs/tech/layer-standard.md) | 레이어 표준 + **이관 완료 기록**(§4.5) |
-| 3 | [Docs/tech/boss-current-problems-audit.md](Docs/tech/boss-current-problems-audit.md) | 재작성 근거(왜 버리는가) |
-| 4 | [Docs/tech/boss-fsm-detailed-spec.md](Docs/tech/boss-fsm-detailed-spec.md) | 폭탄·장판·카운터 창·애니메이터 계약 세부. **§1.1·§4 는 폐기**(1번이 대체) |
-| 5 | [PLAN-boss-fsm.md](PLAN-boss-fsm.md) | 슬라이스 S0~S9 |
+| 1 | [PLAN-boss-fsm.md](PLAN-boss-fsm.md) | 🔴 **구현 정본.** §5.1~5.11 에 슬라이스별 결정·근거·함정이 전부 있다 |
+| 2 | [Docs/tech/boss-rebuild-standard.md](Docs/tech/boss-rebuild-standard.md) | 3층 구조·훅·규약·SO 설계(§10). §10.3.1 에 스키마 변경 이력 |
+| 3 | [Docs/tech/boss-fsm-detailed-spec.md](Docs/tech/boss-fsm-detailed-spec.md) | 애니 계약(§1) · 점프(§7) · 폭탄/장판(§10.5) · 송전기(§9). **§1.1·§4 는 폐기** |
+| 4 | [Docs/tech/handoff-boss-reply-interrupt-restrained.md](Docs/tech/handoff-boss-reply-interrupt-restrained.md) | 은희 회신(개정 1판) — 인터럽트·`Restrained` |
+| 5 | [Docs/tech/layer-standard.md](Docs/tech/layer-standard.md) | 레이어 표준 + 이관 완료 기록 |
 
-### 🔴 이번에 뒤집힌 전제 2개
+### ✅ 완료 — 슬라이스 9개 중 8개 (코드)
 
-1. **"기존 기믹 컨트롤러 재사용" → 전면 재작성.** 권위 상태 부재가 공통 뿌리라 부분 보수가
-   회귀를 계속 만든다(감사 문서 참조).
-2. **"15상태 단일 enum" → `BossState` 6개 + `AttackId` + `AttackPhase` 3층.**
-   중간보스 `WallBot` 이 **C# 0줄**로 만들어져 있다 — "찍어내듯"은 이미 존재하는 실증이고
-   초판이 규약 위반이었다.
+| S1 | S2 | S3 | S4 | S5 | S6-0 | S6 | S7 | S8 | S9 |
+|---|---|---|---|---|---|---|---|---|---|
+| ✅ | ✅* | ✅ | ✅* | ⏸ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
-### 확정된 것
+`*` 부분 보류 — S2 어퍼 에어본(팀장 판단 보류. **단 G1 정정으로 지금 구현 가능**) / S4 Throw 변위(변위 경로 없음)
+`⏸` S5 Dash 캐리 — 은희 `Restrained.Push` 머지 대기
 
-- **상태**: `Idle/Walk/Attack/Hit/Groggy/Dead`. `Hit` 은 **카운터 성공에서만** 진입.
-- **확장 표면은 훅 4개** — `StartAttack`/`HandleAttack`/`PerformAttackHit`/`PlayStateAnimation`.
-  중간보스 3종 중 **아무도 `MonsterState` 에 값을 추가하지 않았다.**
-- **SO**: `BossDataSO : MonsterDataSO` 파생 / `MonsterArchetype.Boss` **끝에 추가** /
-  공격별 쿨다운을 **`MonsterBase` 로 승격**(`CooldownReady(int attackId = 0)` — 하위호환).
-- **폭탄 = 수평 당구.** y 고정·무회전·폭탄끼리 밀림. 2단계(투척 포물선 → 착지 후 당구).
-  상태기계 `Thrown/Resting/Sliding/Exploded`. 벽은 **1쿠션**(SO 조절).
-- **장판 = 타입 있는 `AreaZone`**(화염/늪/독/번개). 같은 타입끼리만 중첩 성장.
-- **카운터**: 창은 `Grab`·`Dash` 만. 성공 = 취소 → hit 애니 → `Groggy`. 그로기는 인터럽트 스킬로만.
+**신규 파일 15개** (`Assets/1.Scripts/`)
 
-### ✅ 레이어 이관 완료 (`f7fba05`)
+| 위치 | 파일 |
+|---|---|
+| `Monster/` | `AreaZone.cs` · `AreaZoneType.cs` |
+| `Monster/Boss/` | `TwentyThreeBoss.cs` · `BossDataSO.cs` · `BossAttackId.cs` · `BossAttackPhase.cs` · `IBossTelegraph.cs` · `BossCounterTelegraph.cs` · `BossDirectionIndicator.cs` · `BossBomb.cs` · `BossBombState.cs` · `BossWells.cs` · `BossWellsState.cs` · `IBossChargeSequence.cs` · `BossChargeSequence.cs` · `BossChargingPylon.cs` |
 
-공격 앵커 `Default(0)` → **`Weapon(12)`**(14개) / ChompBot 미명명 19·21 → `Default`(17개) /
-`P_MonsterProjectile` → `Projectile(10)` / **`CombatTarget(17)` 신설**.
+**폐기 4파일 삭제 완료** (`BossBase`·`BossState`·`BossBasicAttackType`·`BossBasicAttackChoice`) — 어셈블리에서 사라진 것까지 확인.
 
-- 🟢 부수 효과: 투사체 상쇄가 살아났다(그동안 레이어 때문에 죽어 있었음).
-- 미이관: 차징 기둥·부술 props → `CombatTarget`(각 기능 작업 때) / 23호 `Floor` 계열 →
-  `HazardArea`(AreaZone 작업 때) / 플레이어 앵커 → `Weapon`(보스 검증 후).
+### 🔴 base(공유 자산) 변경 4건 — 전부 additive, 기존 11종 기본값 유지
 
-### ✅ base 선행 작업은 끝났다 (`4dbfc0d`, 컴파일 0에러 0경고)
+| 파일 | 추가 | 왜 |
+|---|---|---|
+| `MonsterBase` | `ChaseSpeedMultiplier` | 페이즈 이동속도. **`SeekBoss` 분기에서만** 곱해진다 |
+| `MonsterBase` | `AutoHitReactions`(보스만 false) | base 의 자동 피격 반응 **3종**(Hit·그로기누적·Knockback)을 끈다 |
+| `MonsterBase` | `ForceHitReaction(duration, groggyAfter)` | `SetState`·`EnterHit` 이 private 이라 **보스가 `Hit` 에 들어갈 방법이 없었다** |
+| `MonsterMeleeAttack` | `SetColliderInfo`/`ColliderInfo` | 공격별 히트박스 앵커 스왑 |
+| `HitFlash` | `SetBaseTint`/`ClearBaseTint` | 카운터 색이 피격 플래시에 안 지워지게 |
+| `AoeTelegraph` | `ShowGrowing` | 점프 착지 예고(시간 성장) |
 
-`MonsterBase` 에 이미 들어가 있는 표면 — **다음 세션은 이걸 쓰기만 하면 된다**:
+### ▶ 다음 세션 착수 순서
 
-```csharp
-protected const int DefaultAttackSlot = 0;
-protected const int NoAttack = -1;
-protected int  CurrentAttackSlot { get; set; }          // StartAttack 이 이 슬롯에 쿨 기록
-protected bool CooldownReady(int attackSlot = 0)
-protected void ConfigureAttackSlots(int count)          // 파생이 스폰 시 1회
-protected void SetAttackCooldown(int slot, float sec)   // 0 이하면 1/AttackSpeed 폴백
-protected virtual int SelectAttackSlot(float dist)      // -1 = 지금 쓸 게 없다 → 접근
+**1단계 — 애니메이터 상태 3건 (팀장 확정, 이번 세션 미착수)**
+
+| # | 할 일 | 근거 |
+|---|---|---|
+| ① | `No23.asset` 의 `locomotionState` **`Movement` → `Idle`** | 🔴 그 상태가 컨트롤러에 **없다.** 공격 상태가 `hasExitTime: false` 라 복귀 CrossFade 가 실패하면 **보스가 첫 공격 후 굳는다** |
+| ② | 컨트롤러에 **`getowned` 상태 추가** | 클립(`Boss_23_getowned01/02`)은 있는데 상태가 없다. 카운터 리액션이 재생될 곳이 없다 |
+| ③ | 컨트롤러에 **점프 체공·착지 상태 추가** | `Leap` 하나뿐이고 BlendTree 0개다. 클립은 `Boss_23_jumping`·`Boss_23_landingattack` |
+
+실측한 실제 상태 이름 — **문서에서 베끼지 말고 이 목록을 쓸 것**(교훈 #63):
+
+```
+23호 (18):  Arrive Break Charging DashAttack Dead Grab Groggy GroggyEnd GroggyStart
+            Holding Idle Leap LeftHook Rage RightHook Throw Uppercut Walking
+Wells (5):  Die Groggy Idle Jump Throw
 ```
 
-- `MonsterArchetype.Boss` 추가됨(끝에). `SeekBoss()` 가 dispatch 에 물려 있다.
-- **폴백 확정**: 쓸 공격 없음 + 사거리 밖 → 걸어서 접근 / 사거리 안 → 자세 잡고 짧게 대기.
-  먼 거리에서 돌진·점프가 전부 쿨이어도 접근하면 근접 거리창이 열려 자연히 풀린다.
-- 기본 `SelectAttackSlot` 은 일반 몹과 동일한 단일 공격이라 **archetype 만 Boss 로 바꿔도 안전**하다.
+**2단계 — `No23.asset` 저작.** 아래 표대로 채우면 `ValidateContract` 가 통과한다.
 
-### ▶ 다음 세션 착수 지점 — 여기서 시작
+| 필드 | 현재 | 고칠 값 | 안 고치면 |
+|---|---|---|---|
+| `archetype` | 0 (Melee) | **Boss** | 🔴 선택기가 **아예 안 돈다**(`LogError`) |
+| `locomotionState` | `Movement` | **`Idle`** | 🔴 첫 공격 후 **굳는다** |
+| `attackTrigger` | `Attack` | **비움** | `LogWarning`(보스는 CrossFade 경로) |
+| `maxGroggyCount` | 3 | **5** | 카운터 3회에 Break |
+| `groggyDuration` | 3 | **2** | 확정 스펙과 불일치 |
+| `attackDuration` | 0.9 | **상향** | 데드락 타임아웃이라 Jump 체인에 부족 |
+| `animatorStateName` ×6 | 전부 빈값 | `LeftHook`/`RightHook`/**`Uppercut`**/`Grab`/**`Leap`**/`DashAttack` | 🔴 애니 0 (`LogError` ×6). ⚠️ enum 이름 ≠ 상태 이름 2개 |
+| **행 2개 추가** | 없음 | `ChargeSequence`·`RageDash` (**weight 0**) | 🔴 페이즈 통과 시점에 `LogError` |
+| `grabHoldState`/`grabThrowState` | 빈값 | `Holding`/`Throw` | Hold·Throw 애니 없음 |
+| `jumpHoverState`/`jumpLandingState` | 빈값 | 1단계 ③에서 만든 상태명 | 체공·착지 애니 없음 |
+| `hitReactionState` | `getowned` | 1단계 ②에서 만든 상태명 | 카운터 리액션 없음 |
 
-1. **`BossDataSO : MonsterDataSO`** 신규 — 스키마는
-   [boss-rebuild-standard.md](Docs/tech/boss-rebuild-standard.md) **§10.3** 그대로.
-   공격 테이블 6행(LeftHook/RightHook/Upper/Grab/Jump/Dash).
-2. **보스 서브클래스** — 훅 4개만 override (`StartAttack`/`HandleAttack`/
-   `PerformAttackHit`/`PlayStateAnimation`) + `SelectAttackSlot` 을 거리창+가중치+연속감쇠로.
-   `ConfigureAttackSlots(6)` + `SetAttackCooldown` 으로 Jump 10s·Dash 5s·Grab 10s·훅어퍼 2~3s.
-3. **폐기 4파일** — `Monster/Boss/BossBase.cs` · `BossState.cs` · `BossBasicAttackType.cs` ·
-   `BossBasicAttackChoice.cs`. 전부 미사용(프리팹·씬 부착 0)이고 `BossBasicAttackChoice` 는
-   버릴 `Enemy/Boss` 의 `BaseAttackChoice`·`WeightedAttack<T>` 를 상속한다.
-   ⚠️ `BossBase` 는 `: Unit` 이라 자기만의 `_lastAttackTime`/`CooldownReady` 를 갖는 **별개 클래스**다
-   — 이번 `MonsterBase` 변경과 충돌하지 않으니 안심하고 지워도 된다.
-4. 그 다음 프리팹 조립 → 애니 이벤트(**SVN**) → 카운터 → 폭탄/장판.
+⚠️ **코드 기본값은 새 애셋에만 적용된다**(교훈 #22/#55) — 기존 `No23.asset` 은 인스펙터에서 직접 고쳐야 한다.
+⚠️ **행 순서 = 쿨다운 슬롯 번호다.** 중간 삽입 금지, 끝에만 추가.
 
-### 은희 의존 2건 — 기한 2026-08-07(금) 17:00
+**3단계 — 프리팹 조립** (정본 §8 체크리스트)
 
-[Docs/tech/handoff-player-carry-socket.md](Docs/tech/handoff-player-carry-socket.md) —
-① `AttackType` 에 인터럽트 식별자 추가(**enum 끝에만**) ② 캐리 소켓 종류(`CarrySocketKind`) RPC 전파.
+| 대상 | 준비물 |
+|---|---|
+| **보스** | 루트 `Enemy(8)` / **`Hurtbox` 자식 `EnemyHurtBox(14)`**(없으면 안 맞는다) / 공격 앵커 `Weapon(12)` / **`NetworkAnimator` 제거** / `BossDirectionIndicator` + **투명 URP Unlit 머티리얼 1개** / `BossCounterTelegraph`(선택) / `BossChargeSequence` / `BossWells`(+손 소켓) / ⚠️ Relay·HitFlash 는 **붙이지 말 것**(런타임 자동 부착) / **여기서 `BehaviorGraphAgent` OFF**(R5) |
+| **폭탄** | `NetworkObject`+`NetworkRigidbody`+`Rigidbody`(**useGravity on**/`FreezeRotation`/`ContinuousDynamic`) + solid Collider + `Hurtbox`(**ownerUnit 비움** → `IAttackReceiver` 폴백) + `BossBomb` + NetworkPrefabs 등록. ⚠️ **정지해도 논키네마틱 유지**(재우면 당구가 안 된다) |
+| **장판** | `NetworkObject` + `AreaZone` + 비주얼 자식(로컬 XY 지름 1) + 레이어 **`HazardArea(9)`** + NetworkPrefabs 등록 |
+| **송전탑** | `bossroom.prefab` 의 `Env_Mv_bosscharger_upper` **4개**를 레거시 `ChargingObject` → **`BossChargingPylon`** 으로 교체 |
+| **프로젝트 설정** | 🔴 충돌 매트릭스에서 **폭탄 레이어 ↔ 유닛 레이어 물리 응답을 끊을 것**(유닛 감지는 트리거로 하므로 폭발은 산다) |
+| **애니 이벤트** | `OnAttackHit`/`OnAttackEnd`(exitTime 0.05~0.1 앞) — 🔴 **SVN 커밋**(`SK_23.fbx.meta`) |
 
-### ⚠️ 알아 둘 것
+⚠️ Wells 클립 이벤트 이름은 **fbx 에 이미 박혀 있다** — `ThrowBombEvent`/`BombDestroyEvent`. 바꾸면 조용히 무시된다.
 
-- 🔴 **`git status` 가 `Docs/` 변경을 숨긴다** — `core.fsmonitor=true` + `Docs` 가 정션이라
-  `add` 까지 조용히 무시된다. **`git -c core.fsmonitor=false` 로 커밋할 것.**
-- **애니 이벤트는 SVN** — `SK_23.fbx.meta`. git 만 받은 팀원에겐 조용히 안 간다.
-- **Codex 결과는 결론만 채택하고 숫자·경로는 재확인.** 이번에만 3건 틀렸다.
-- 애니 접근이 graceful 이라 **이름 오타가 조용히 무시된다** — 죽은 설정값이 이미 9건.
-  → `Awake` 계약 검증 필수.
+**4단계 이후** — S5 Dash(은희 머지 후 호출 3줄) → S2 어퍼 에어본(가능해짐) → **어색한 것들 수정**(팀장 목록 대기) → MPPM 검증 → 레거시 `Enemy/Boss`·`8.BehaviorTreeGraph` 삭제
+
+### 은희 의존 — ✅ **R1·R2 둘 다 종결. `development` 에 머지 완료**(`a75398c`, 2026-08-07)
+
+브랜치 `feature/InterruptSkill-CarrySocket` — `feature/maprendering` 이 아니라 **공통 조상 `cbb51b1`**
+(PR #10 머지 지점)에서 갈라졌다. 회신 문서 = `Docs/tech/player-interrupt-restrained-handoff.md`.
+**합의한 계약대로 왔다 — 수정 요청할 것 없음.** 코드에서 대조한 결과:
+
+| 계약 | 실물 |
+|---|---|
+| R1 인터럽트 식별자 | `AttackInfo.isInterruptAttack` (bool 플래그, enum 아님) |
+| R2 `Restrained` | `RestraintMode { Carry = 0, Push = 1 }` |
+| Push 만 슈퍼아머 거부 + `bool` 반환 | `PlayerStateController.cs:149` |
+| **S4 Grab 무수정 보장** | `BeginGrabbedByInstigator`/`EndGrabbedByInstigator` **래퍼 유지** |
+
+**내가 할 일 2건**
+- `TwentyThreeBoss.IsInterruptAttack` 의 `isGroggyAttack` → **`isInterruptAttack`** (한 단어).
+- **S5 Dash 착수 가능** — `BeginRestrainedByInstigator(gameObject, RestraintMode.Push, frontOffset)`.
+
+🔴 **머지 충돌은 `MonsterBase.cs` 딱 1파일**(양쪽이 동시에 건드린 유일한 파일). 해소 = 둘 다 살리기
+(이름은 은희 쪽, `if (!AutoHitReactions) return;` 는 보스 쪽, **조기 반환이 먼저**).
+추가로 내가 삭제한 `BossBase.cs` 를 은희가 리네임 때문에 건드려서 **delete/modify 충돌**이 뜬다 →
+**삭제를 채택.** `AttackType` 축소(`None/Default/Skill`)는 내 코드에 무영향(`Default` 만 쓴다).
+- 🔴 **머지 충돌 1곳**: `MonsterBase.TakeDamage` 의 `isGroggyAttack` 줄. 해소 = **둘 다 살리기**
+  (이름은 은희 쪽, `if (!AutoHitReactions) return;` 는 보스 쪽, **조기 반환이 먼저**).
+  순서는 은희 → `development` → 보스가 받는 방향(충돌 면적이 작다).
+
+### ⚠️ 이 세션에 확정·정정된 것 (상세는 PLAN 링크)
+
+- **뒤집힌 것 3건**: ① "돌진 = 매 틱 넉백 재적용" → **`Restrained.Push`**(`Unit.Knockback` 은 duration 없는 임펄스 1회라 누적되면 플레이어가 튀어나간다) ② **슈퍼아머로 돌진 버티기 = 의도**(기획 회의) → `Push` 에 슈퍼아머 검사 + `bool` 반환 요청. 슈퍼아머면 **밀림✕/기절✕/데미지○** ③ **"플레이어 CC 경로 없음"은 절반 틀렸다** — 상태이상은 `Unit.StatusEffects.Apply` 로 **오늘 가능**, 막힌 건 **변위뿐** (→ PLAN §5.1 G1 정정)
+- **"도달"은 송전기 실패 조건이 아니다** — `ReachEvent` 는 "상승 완료"라 모든 기둥이 반드시 도달한다. 실패는 **제한시간 초과 단독** (→ PLAN §5.11)
+- **JumpAttack 의 빨간 장판은 예고 표시(`AoeTelegraph`)이지 `AreaZone` 이 아니다** — 섞지 말 것
+
+### 🔴 알아 둘 것 (함정)
+
+- **`git status` 가 `Docs/` 변경을 숨긴다** — `core.fsmonitor` + `Docs` 정션. **`git -c core.fsmonitor=false` 로 커밋할 것**
+- **컴파일 판정은 MCP 응답이 아니라 산출물로** — `Assembly-CSharp.dll` mtime > 최종 소스 + **dll 안에 새 타입 실존**(`grep -a`). MCP 의 `success:true` 는 접수 확인일 뿐이고, `Editor.log` 엔 직전 실패의 에러가 남는다(교훈 #61)
+- **보스 검증은 MPPM 2인 이상에서만** — 오프라인/미스폰이면 `CanWrite = IsSpawned && IsServer` 라 **상태이상이 안 걸린다.** 단독 Play 로 "기절이 안 된다"를 버그로 오진하지 말 것
+- **파생에 `Update()` 를 선언하면 `MonsterBase.Update` 를 가려 FSM 이 통째로 멈춘다**
+- **enum 값 추가는 끝에만** — `MonsterArchetype`·`BossAttackId`·`AreaZoneType` 전부 SO 에 정수 직렬화
+- **애니·앵커 접근이 graceful 이라 이름 오타가 무증상** — 죽은 설정값 9건 실재(교훈 #59). `ValidateContract` 가 스폰 시 잡는다
+- **Codex 는 숫자·경로를 지어낸다** — 결론만 채택하고 재확인
 
 ---
 

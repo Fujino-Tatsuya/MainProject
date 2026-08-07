@@ -97,7 +97,11 @@ AttackPhase = Windup, Acquire, Hold, Throw, Recovery       ← 다단계 공격 
 - **상태→애니 매핑은 `PlayStateAnimation` 한 곳에만.**
 - **접근은 전부 graceful** — `HasParameter` / `HasState` 확인 후에만 세팅한다.
   🔴 **그래서 이름이 틀려도 조용히 무시된다.** 실제로 죽은 설정값이 여럿 있다(§6).
-  → **`Awake` 에서 애니메이터 계약을 검증해 `LogError` 를 남겨라.**
+  → **애니메이터 계약을 검증해 `LogError` 를 남겨라.**
+  ⚠️ **정정(2026-08-07): `Awake` 가 아니라 `OnNetworkSpawn` 이다.** 초판은 `Awake` 라고 적었으나
+  그 시점엔 `animator` 참조가 아직 없다 — `MonsterBase` 가 `OnNetworkSpawn` 에서
+  `GetComponentInChildren<Animator>()` 로 채운다. `Awake` 에 넣으면 검증이 통째로 무효가 된다.
+  구현: `TwentyThreeBoss.ValidateContract()`.
 - 액션→로코모션 전이 시 `ResetToLocomotion()` 으로 액션 트리거를 `ResetTrigger` 하고 CrossFade.
 
 ### 3.3 애니메이션 이벤트 — 이름 3개 고정
@@ -260,7 +264,8 @@ OnAttackHit 누락  → 히트 없음.  폴백을 넣으면 이벤트 추가 후
 | 8 | `RangedMobileData.asset` / `RangedTurretData.asset` — 참조 0 |
 | 9 | **`LinearKnockback` 이 전 몹 프리팹에 붙어 있으나 `m_Enabled: 0`** — 몹의 실제 넉백은 서버 틱 경로. **두 넉백 시스템이 공존** |
 
-→ **보스는 `Awake` 애니메이터 계약 검증을 반드시 넣는다.** 이 목록이 그 필요성의 증거다.
+→ **보스는 애니메이터 계약 검증을 반드시 넣는다** (`OnNetworkSpawn` — §3.2 정정 참조).
+이 목록이 그 필요성의 증거다.
 
 ---
 
@@ -289,13 +294,16 @@ OnAttackHit 누락  → 히트 없음.  폴백을 넣으면 이벤트 추가 후
 - [ ] `MeleeHitbox` 자식 + `ColliderInfo` + `MonsterMeleeAttack`
 - [ ] **`MonsterAnimationEventRelay` 를 붙이지 말 것** — 런타임 자동 부착
 - [ ] **`HitFlash` 도 붙이지 말 것** — `Unit.OnNetworkSpawn` 자동 부착
+- [ ] 🔴 **`BossCounterTelegraph` 는 붙일 것** (또는 `IBossTelegraph` 를 구현한 VFX 컴포넌트).
+      없으면 카운터 창이 화면에 **전혀 표시되지 않는다** — 플레이어가 끊을 타이밍을 볼 수 없다.
+      스폰 시 `LogWarning` 으로 잡히지만 경고는 놓치기 쉽다
 - [ ] `NetworkAnimator` **제거** (몬스터 규약은 상태 복제 + 로컬 재생)
 - [ ] 인스펙터 수기 입력은 `data`(SO) + 마스크뿐. 나머지 참조는 비우면 자동 탐색
 - [ ] SO: 스탯 5종 / detectionRadius·attackRange / **`attackDuration` = 데드락 타임아웃(넉넉히)** /
       애니 파라미터명 7개 / `maxGroggyCount` / `hasSuperArmorWhileAttacking`
 - [ ] 애니 클립: `OnAttackHit`(타격 프레임) + `OnAttackEnd`(**exitTime 0.05~0.1 앞**)
 - [ ] 액션 상태 복귀 전이에 **exitTime 을 반드시 걸 것**
-- [ ] `Awake` 애니메이터 계약 검증 → `LogError`
+- [ ] **`OnNetworkSpawn`** 애니메이터 계약 검증 → `LogError` (`Awake` 는 참조가 아직 없어 무효 — §3.2)
 - [ ] `NetworkManager` NetworkPrefabs 등록
 
 **베낄 가치가 있는 플레이어 규약 2개**
@@ -405,7 +413,7 @@ BossDataSO : MonsterDataSO
     superArmor           bool
     hitboxAnchorName     string         ← ColliderInfo 앵커 이름
 
-[선택기]        repeatPenalty(0.3) · meleeRange · rangedThreshold
+[선택기]        repeatPenalty(0.3) · repeatBlockAfter(2)
 
 [페이즈]        BossPhaseEntry[] phases
     hpThreshold          float          (0.66 / 0.33)
@@ -420,8 +428,18 @@ BossDataSO : MonsterDataSO
 ```
 
 ⚠️ **`hitboxAnchorName` 은 문자열이다** — 애니 파라미터명과 같은 규약(SO 문자열 + graceful).
-그래서 **오타가 조용히 무시된다.** §3.2 대로 **`Awake` 에서 앵커 실존을 검증해 `LogError`** 를 남긴다.
+그래서 **오타가 조용히 무시된다.** §3.2 대로 **`OnNetworkSpawn` 에서 앵커 실존을 검증해 `LogError`** 를 남긴다.
 이 프로젝트에 이미 죽은 설정값이 9건 있다(§6) — 같은 함정을 또 파지 않는다.
+
+### 10.3.1 초판 스키마에서 바뀐 것 (2026-08-07 구현 시 확정)
+
+| 항목 | 초판 | 확정 | 이유 |
+|---|---|---|---|
+| `meleeRange` · `rangedThreshold` | 넣는다 | 🔴 **넣지 않는다** | 공격별 `minDistance`/`maxDistance` 거리창 + base 의 `attackRange`(접근·정지 기준)가 역할을 전부 덮는다. 읽는 곳 없는 필드를 만드는 것이 §6 이 경고하는 실패 모드다 |
+| 연속 방지 | `repeatPenalty` 만 | **`repeatBlockAfter`(2) 추가** | 확률 감쇠는 "연속 N회 금지"를 **보장하지 못한다**. 하드 제외가 따로 필요하다. 단 후보가 그 공격 하나뿐이면 제외하지 않는다 — 보스가 멈춰 서는 쪽이 더 나쁜 버그다 |
+| 데미지·앵커 적용 시점 | (미규정) | **히트 직전**(`PerformAttackHit`) | `MonsterMeleeAttack` 하나를 공격 6종이 돌려 쓴다. `StartAttack` 에서 세팅하면 애니 이벤트가 늦게 올 때 `_currentEntry` 와 어긋날 수 있다 |
+| 앵커 전환 방식 | (미규정) | **`MonsterMeleeAttack.SetColliderInfo()` 로 스왑** (컴포넌트 N개 아님) | 6공격이 앵커 2~3개를 공유한다. 기존 `SetDamageSnapshot`/`SetTargetLayer` 와 같은 setter 계약이라 기존 몹 무영향 |
+| `CurrentPhase` 복제 | (미규정) | **복제하지 않는다** | `BossHealthHUD` 는 페이즈를 쓰지 않는다(체력만 폴링하고 체력은 이미 복제된다). 페이즈는 체력비율의 파생값이고 보스전은 회복 금지라 클라가 계산해도 갈리지 않는다. 페이즈 **연출**이 필요해지는 S7 에서 재검토 |
 
 ### 10.4 서브클래스가 채우는 것 — 훅 4개
 
@@ -445,7 +463,7 @@ BossDataSO : MonsterDataSO
 | Dash / Jump 이동형 | `HandleAttack` 안 (SpinnerBot 돌진 선례) |
 | 상태 브로드캐스트 | 별도 채널 불필요 — `_state` `OnValueChanged` 로 충분 |
 
-### 10.6 폐기 대상
+### 10.6 폐기 대상 — ✅ **삭제 완료 (2026-08-07)**
 
 ```
 Assets/1.Scripts/Monster/Boss/BossBase.cs
@@ -468,4 +486,4 @@ Assets/1.Scripts/Monster/Boss/BossBasicAttackChoice.cs
 3. `archetype = Boss`, 공격 테이블 6행 작성
 4. 애니 클립에 `OnAttackHit` / `OnAttackEnd`(exitTime 0.05~0.1 앞) — **SVN 커밋**
 5. 서브클래스는 훅 4개만 override
-6. `Awake` 계약 검증(애니 파라미터 + 앵커 이름) → `LogError`
+6. **`OnNetworkSpawn`** 계약 검증(애니 파라미터 + 상태명 + 앵커 이름) → `LogError`
