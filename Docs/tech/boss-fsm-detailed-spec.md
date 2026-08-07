@@ -4,7 +4,7 @@
 > [boss-fsm-design.md](boss-fsm-design.md) = *무엇을·왜* / **이 문서 = *어떻게*** (클래스·파라미터·이벤트·전이 전수).
 > 계획서 [PLAN-boss-fsm.md](../../PLAN-boss-fsm.md) · 플레이어 요청 [handoff-player-carry-socket.md](handoff-player-carry-socket.md)
 >
-> **§12 에 미확정 질문 10건**을 모아 뒀다. 그 10건 외에는 코드를 바로 칠 수 있는 수준으로 적었다.
+> **§12 에 미확정 질문 6건**을 모아 뒀다(4건은 팀장 답변으로 닫힘). 그 6건 외에는 코드를 바로 칠 수 있는 수준으로 적었다.
 
 ---
 
@@ -56,9 +56,9 @@ IsGroggy 트리거      →  AnyState → GroggyStart   ✅
 | JumpAttack | 8 | **`Leap`** (+`Jump` Int) | `Boss_23_jump`(44~158) → `Boss_23_jumping`(0~1) → `Boss_23_landingattack`(8~123) |
 | DashAttack | 9 | `DashAttack` | `Boss_23_dash` (17~102) |
 | Charging | 10 | `Charging` | `Boss_23_charging` (0~158) |
-| Rage | 11 | `Rage` | 🔴 **없음** → §12 Q3 |
+| Rage | 11 | `Rage` | **전용 클립 없음 — 정상.** Rage 는 "전기 두르고 돌진 반복"이라 **상태일 뿐**이고 애니는 기존 돌진을 쓴다 (팀장 확인 2026-08-06) |
 | Groggy | 12 | `GroggyStart`→`Groggy`→`GroggyEnd` | `Boss_23_.groggy_enter`(0~89) → `_ing`(88~105) → `_end`(105~158) |
-| Break | 13 | `Break` | 🔴 애니메이터는 `Break` 모션을 참조하는데 FBX 에 없다 → §12 Q3 |
+| Break | 13 | `Break` | **Groggy 와 같은 애니. 지속시간만 다르다**(2초 vs 5초, 팀장 확인). 별도 클립 불필요 |
 | Dead | 14 | `Dead` | `Boss_23_.die` (0~155) |
 
 - **enum 이름 ≠ 애니 스테이트 이름 2개**: `UpperAttack`→`Uppercut`, `JumpAttack`→`Leap`.
@@ -105,12 +105,18 @@ FSM 이 `State` 를 0 또는 1 로 되돌려야 복귀한다. 안 되돌리면 *
 | `BossAttackTableSO` | **신규** | 공격별 쿨·거리창·가중치·데미지·캐리 수치 | 데이터 |
 | `DashCarryController` | **신규** | 돌진 이동 + 캐리 소켓 + 벽 판정 | 서버 |
 | `IBossTelegraph` / `TintTelegraph` | **신규** | 카운터 창 표현 | 클라 |
-| `GrabController` | **개조** | BT 블랙보드 3개 이탈 (§3) | 서버 |
-| `JumpController` | **개조** | BT 블랙보드 2개 이탈 (§3) | 서버 |
-| `TwentyThreeAnimEvents` | **확장** | 이벤트 5개 → 11개 (§6) | 서버 |
-| `ChargeController` | **그대로** | BT 결합 없음 ✅ (`Clamp` 버그만 수정) | 서버 |
-| `BombLauncher` · `BombController` · `Bomb` | **그대로** | BT 결합 없음 ✅ | 서버 |
-| `ChargingObject` | **그대로** | 송전탑 개체 | 서버 |
+| `GrabController` | **재작성** | BT 블랙보드 3개 제거 (§3). 판정 로직은 참고 | 서버 |
+| `JumpController` | **재작성** | BT 블랙보드 2개 제거 (§3). 장판 2단 로직은 참고 | 서버 |
+| `TwentyThreeAnimEvents` | **재작성** | 이벤트 5개 → 11개 (§6) | 서버 |
+| `ChargeController` | **재작성** | BT 결합은 없으나 🔴 **`==` 교착 버그**가 있다 → `>=` + 파괴·도달 합산. `Clamp(1,3)` 도 함께 | 서버 |
+| 폭탄 계열 (`BombLauncher`·`BombController`·`Bomb`) | 🔴 **재작성 + 분리** | **투사체와 장판을 별도 오브젝트·수명으로 쪼갠다.** 되쳐내기 비례계수 노출 | 서버 |
+| `FireZone` (화염 장판) | **신규** | 폭탄에서 분리된 지속 장판. 자기 타이머로 소멸, 중첩 성장 | 서버 |
+| `ChargingObject` | **재작성** | 송전탑 개체 | 서버 |
+
+> **전면 재작성이다** — 기존 컨트롤러를 고쳐 쓰지 않는다(2026-08-06 팀장 판단).
+> 근거는 [boss-current-problems-audit.md](boss-current-problems-audit.md).
+> 기존 코드는 **로직 참고용**으로만 읽는다: 잡기 판정 모양, 장판 2단 점증, 폭탄 궤적 공식,
+> `GroundProbe` 사용법은 이미 검증된 것이라 그대로 옮길 값이 있다.
 
 **삭제 대상** (전환 검증 후 별도 커밋): `Assets/8.BehaviorTreeGraph/Boss/**`,
 `Assets/1.Scripts/BT/Actions/Attack/*`(보스용), `BossStateChanged`(EventChannel),
@@ -133,9 +139,11 @@ protected abstract void OnStateChangedClient(int raw);   // 파생이 (TwentyThr
 
 ---
 
-## 3. BT 이탈 작업 (구체)
+## 3. BT 결합 지점 — 새 코드가 대체해야 하는 것
 
-BT 를 끄면 아래 두 컨트롤러가 **NullReference 로 죽는다.** 먼저 처리해야 한다.
+전면 재작성이지만 **BT 가 무엇을 대신해 주고 있었는지**는 알아야 새 코드가 그 구멍을 메운다.
+아래는 "고칠 목록"이 아니라 **"새로 짤 때 반드시 제공해야 하는 기능 목록"** 이다.
+(BT 를 끄기만 하고 옛 컨트롤러를 그대로 두면 여기서 `NullReference` 로 죽는다.)
 
 ### 3.1 `GrabController` — 블랙보드 3개
 
@@ -317,16 +325,15 @@ SetTargetEvent  (최상단, 클립 내장)     → 최원거리 플레이어 확
                                         → 장판1(바닥+0.01, 고정 크기)
                                         → 장판2(바닥+0.02, 0.1 → 장판1 크기로 점증)
                                         → ShowMyMeshClientRpc(false)  = 메시 off (:138)
-  ↓ FSM: Jump=1                        → Boss_23_jumping (0~1) = 1프레임 체공 루프
-  ↓ jumpHoverTime 체공 (장판 점증 시간)
+  ↓ jumpHoverTime 체공 (장판 점증 시간) — Boss_23_jumping(0~1) 1프레임 포즈 유지
   ↓ FSM: Jump=2                        → Boss_23_landingattack (8~123)
 FallEvent       (낙하 시작, 클립 내장)  → 메시 on
 OnLandedEvent   (착지, 클립 내장)       → 장판 내 플레이어 데미지 → 장판 제거
   ↓ FSM: Jump=0, State=1               → 재판단
 ```
 
-- `Boss_23_jumping` 이 **1프레임짜리 클립**인 것이 체공 루프의 증거다.
-- ⚠️ `Jump` 전이 조건에서 확인한 것은 **0 과 2** 뿐이다. **1 = 체공은 추정**이다 → §12 Q1.
+- ✅ **`Jump` 는 2단계다 — `0` = 하늘로 올라감 / `2` = 땅으로 떨어짐** (팀장 확인 2026-08-06).
+  별도의 "체공" 값은 없다. `Boss_23_jumping`(1프레임)은 체공 **포즈 유지**용이지 전환 단계가 아니다.
 - 🔴 **`Jump` 를 0 으로 되돌리지 않으면 다음 JumpAttack 이 영원히 안 나온다** —
   `Leap` 진입 조건이 `State==8 && Jump==0` 이다. 종료 시 반드시 리셋.
 
@@ -396,9 +403,21 @@ TakeDamage → EvaluatePhase():
 4. `charge.StartCharge(playerCount)` — **1인 1 / 2인 2 / 3인 4**
 5. 전멸 → `Groggy` / 제한시간 초과 → `Rage`
 
-🔴 `ChargeController.StartCharge` 의 `Mathf.Clamp(playerCount, 1, 3)` 은 **버그**다.
-`player3` 인스펙터 기본값이 3 이라 3인에 3개만 활성된다. `player3 = 4` 로 바꾸고
-`Clamp` 상한은 유지(인원 인덱스 클램프이지 개수 클램프가 아니다). → 프리팹 값도 함께 확인.
+🔴 **현 `ChargeController` 에 버그가 2개 있다. 둘 다 재작성에서 닫는다.**
+
+1. **`Mathf.Clamp(playerCount, 1, 3)` + `player3` 기본값 3** → 3인에 3개만 활성된다.
+   `player3 = 4` 로 하고 `Clamp` 상한은 유지한다(인원 **인덱스** 클램프이지 개수 클램프가 아니다).
+   프리팹 인스펙터 값도 함께 확인.
+2. 🔴 **종료 판정이 `==` 라 교착한다.**
+   ```csharp
+   if (_destroyCount == _max) _isDefeated = true;   // :168
+   if (_reachedCount == _max) _isReached  = true;   // :192
+   ```
+   **파괴와 도달이 섞이면 두 플래그 모두 영원히 false** 가 되어 차징에서 못 나온다.
+   코드에 2026-07-30자 진단 주석·에러 로그가 이미 이 교착을 정확히 기술하고 있다
+   (`:173~186`, `:200~206`). 알려져 있었고 아직 안 고쳐졌다.
+   → **완료 판정을 `_destroyCount + _reachedCount >= _max` 합산**으로 바꾼다.
+   결과는 이분법이다 — **전부 파괴 → `Groggy` / 하나라도 도달 → `Rage`.**
 
 ---
 
@@ -411,11 +430,86 @@ TakeDamage → EvaluatePhase():
 | `Groggy` | 폭탄 주기 정지 | 23호가 그로기/브레이크 해제 → `Idle` |
 | `Dead` | — | (없음) |
 
-- **`Jump` 상태 삭제** (기존 `WellsState` 5 → 4).
+- **`Jump` 상태 삭제** (기존 `WellsState` 5 → 4). 애니메이터의 `Jump` 스테이트는 미사용이 된다.
 - Wells 는 **피격 대상이 아니다** (hurtbox 없음, HP 는 23호 것만).
 - 23호 → Wells 동기화는 **23호가 Wells 를 밀어주는 단방향**으로 한다
   (Wells 가 23호를 폴링하면 순서 의존이 생긴다).
 - 그 외에는 23호 상태와 **무관하게** 자기 주기로 살포한다.
+
+### 10.1 🔴 Wells 는 **스폰되지 않는** 중첩 NetworkObject다
+
+`WellsAnimEvents.cs:7~23` 에 사고 기록이 있다 — NGO 는 프리팹의 중첩 NetworkObject 를
+스폰하지 않는다(씬 오브젝트만 지원). `NetworkBehaviour.IsServer` 는 스폰 시 대입되는
+**필드**라 미스폰이면 영원히 false → 그 클래스가 `NetworkBehaviour` 였을 때
+**모든 애니메이션 이벤트를 조용히 삼켰다.**
+
+**따라서 Wells 는 자기 `NetworkVariable` 을 가질 수 없다.**
+
+```
+23호 NetworkObject (서버)
+  ├ _stateRaw        NetworkVariable<int>   ← 23호 상태
+  └ _wellsStateRaw   NetworkVariable<int>   ← Wells 상태도 여기 싣는다
+        ↓ OnValueChanged (각 클라)
+     로컬 Wells Animator 를 구동
+```
+
+- Wells 관련 서버 판정은 `NetworkManager.Singleton.IsServer` 로 한다 (`NetworkBehaviour.IsServer` 금지).
+- Wells 를 **최상위 NetworkObject 로 분리하는 대안**도 있으나, 위치가 23호에 종속(탑승)이라
+  NetworkTransform 하나가 더 늘고 부모 추종을 따로 짜야 한다. **23호에 싣는 쪽이 싸다.**
+
+### 10.2 Wells 애니메이터 계약 (23호와 규약이 다르다 ⚠️)
+
+| 파라미터 | 타입 | 용도 |
+|---|---|---|
+| `IsThrow` | Trigger | Idle → Throw |
+| `IsJump` | Trigger | Idle → Jump (**미사용 예정**) |
+| `IsGroggy` | Trigger | **AnyState → Groggy** |
+| `IsDead` | Trigger | **AnyState → Die** |
+| `IsInit` | Trigger | Groggy → Idle (복귀) |
+| `State` | Int | 🔴 **죽은 파라미터** — 전이 조건에 안 쓰인다 |
+
+**23호는 `State` Int 로 구동하는데 Wells 는 전부 트리거다.** 같은 방식일 거라고 가정하지 말 것.
+클립: `Boss_welz_idle` / `_throwing` / `_jump` / `_groggy` / `_die`.
+`Throw`·`Jump` 는 `hasExitTime: true` 라 클립이 끝나면 스스로 Idle 로 돌아온다(23호와 반대).
+
+---
+
+## 10.5 폭탄 / 화염 장판 분리 🔴 신규 범위
+
+**지금**: `BombController` 하나가 투사체와 장판을 겸한다. 폭발하면 **같은 NetworkObject 가
+장판으로 변신**하고(`_bombState = Floor`) 장판 수명이 끝나야 despawn 한다.
+
+**바꿀 것**: 두 개의 독립 오브젝트로 쪼갠다.
+
+```
+Bomb (투사체 NetworkObject)
+  Wells 손 소켓 추종 → 발사 → 비행 → 충돌/착지 → 폭발
+  폭발 시 FireZone 을 스폰하고 자기는 즉시 despawn
+
+FireZone (장판 NetworkObject)  ← 신규
+  자기 타이머로 소멸. 중첩되면 기존 FireZone 을 성장시키고 새로 스폰하지 않는다
+```
+
+**왜** (감사 §1.4)
+
+- 폭탄 수명이 장판 수명에 묶여 있다 — 장판이 남아 있는 동안 그 폭탄 슬롯이 점유된다.
+- `ApplyUniformScale()` 이 **루트를 스케일**해서 장판과 히트박스가 같이 커진다.
+- 중첩 폭발 시 **두 번째 폭탄이 자기를 despawn** 해버려 그 폭탄의 장판은 아예 안 생긴다.
+
+**옮길 때 반드시 챙길 것** (기존 구현에서 이미 검증됐거나, 이미 버그인 것)
+
+| 항목 | 내용 |
+|---|---|
+| 되쳐내기 거리 | 🔴 지금은 `distance = attackInfo.damage` **계수 없이 그대로**다. **비례계수를 SO 로 노출** |
+| 폭발 타이머 | 비행 중에는 **정지**하고 정지 후 재개 (기획). 현 구현도 그렇다 — 유지 |
+| 폭발 조건 | 벽 / 다른 플레이어 / 보스에 부딪히면 폭발 |
+| 상호작용 | **기본 공격(좌클릭)으로만.** 비행 중 추가 타격은 무시(재연산 안 함) |
+| 넉백 | 보스는 안 밀리고 유저만. 밀린 유저는 스킬 시전 취소 + hit 판정 |
+| 경사면 정렬 | 🔴 현 `MakeFloor()` 는 경사 회전을 계산하고 **`Quaternion.identity` 로 덮어쓴다**(`:533`). 옮길 때 이 버그를 같이 옮기지 말 것 |
+| 바닥 판정 | `GroundProbe.TryFindGround` 사용 — 이건 검증된 것이라 그대로 |
+| 진단 로그 | 🔴 `[진단]` 로그 4곳 제거 (폭탄마다 콘솔을 덮는다) |
+
+**물리 채택 여부는 §12 A1 질문.** 현 구현은 물리를 안 쓰고 수동 보간 + SphereCast 다.
 
 ---
 
@@ -439,25 +533,31 @@ TakeDamage → EvaluatePhase():
 
 ---
 
-## 12. 미확정 — 질문 10건
+## 12. 미확정 — 질문 6건
 
 구현 전에 답이 필요하거나, 제가 임의로 정하면 안 되는 것들입니다.
 
-> 조사로 닫힌 것 3건은 아래에서 뺐습니다 — 클립 이름(§1.3 전부 확인), 메시 off 시점
-> (`SetTarget()` 내부, 추가 이벤트 불필요), `Jump` 단계 구조(클립 3분할 확인).
+**2026-08-06 팀장 답변으로 4건이 닫혔습니다.** 남은 건 6건이고, 전부 제 기본값으로 진행 가능합니다.
 
-| # | 질문 | 제 임시안 |
+**닫힌 것**
+
+- ✅ **Rage** — 전용 클립이 없는 게 정상. Rage 는 "전기 두르고 돌진 반복"이라 **상태일 뿐**이다.
+- ✅ **Break** — Groggy 와 **같은 애니, 지속시간만 다르다**(2초 vs 5초). 별도 클립 불필요.
+- ✅ **`Jump` Int** — **0 = 하늘로 올라감 / 2 = 땅으로 떨어짐**. 체공 전용 값은 없다.
+- ✅ **SVN 커밋** — 주말 중 가능. 애니 이벤트 추가에 제약 없음.
+- (앞서 조사로 닫힘) 클립 이름 전수 · 메시 off 시점(`SetTarget()` 내부)
+
+**남은 것 — 답 없으면 기본값으로 갑니다**
+
+| # | 질문 | 기본값 |
 |---|---|---|
-| **Q1** | **`Jump==1` 이 체공이 맞나요?** 클립 3분할(`jump`→`jumping`(1프레임)→`landingattack`)은 확인했는데, 애니메이터 전이 조건에서는 `Jump==0` 과 `Jump==2` 만 찾았습니다. 체공 전환을 뭐가 하나요 | 0=도약 / **1=체공** / 2=낙하. 아니면 `jumping` 을 안 쓰고 `jump` 클립 끝에서 멈추는 구조일 수도 |
-| **Q2** | **`IsWalking` 트리거가 쓰이는 곳**을 못 찾았습니다. 죽은 파라미터인가요? | 미사용으로 보고 안 건드림 |
-| **Q3** | 🔴 **`Rage` 와 `Break` 클립이 FBX 에 없습니다.** 애니메이터엔 스테이트가 있고 `Break` 는 `Break` 라는 모션을 참조하는데 `SK_23.fbx` 내장 21개에 없습니다. 아트 대기인가요, 다른 클립 재사용인가요? | Rage = `Boss_23_dash` 재사용 / Break = `Boss_23_.groggy_ing` 느리게 — **임시** |
-| **Q4** | 쿨다운을 **`lastUsed` 타임스탬프**로 할까요, 기존 **`AddType`/`RemoveType` 재등록**으로 할까요? 둘 다 쓰면 이중 관리가 됩니다 | **타임스탬프.** 코드가 절반이고 디버깅이 쉽다 |
-| **Q5** | 근접 3종 클립이 **전부 0~56 프레임으로 같습니다.** 히트 프레임도 같게 봐도 되나요? (어퍼는 뜨는 판정이라 다를 것 같은데) | 훅 2종 동일, 어퍼만 별도. **육안 확인 후 확정** |
-| **Q6** | **차징 중 페이즈 임계를 또 넘으면**? (33% 를 차징 중에 통과) | 무시하고 현재 시퀀스 끝까지 → 끝나고 즉시 다음 차징 |
-| **Q7** | **Break 중에 HP 0** 이 되면? Break 애니가 끝까지 가나요, 즉시 Dead 인가요? | 즉시 `Dead` (AnyState 트리거라 자연스러움) |
-| **Q8** | **근접 사거리 / 원거리 임계 거리** 초기값은? Dash 의 `minDistance` 가 여기서 나옵니다 | 근접 3.0 / 원거리 6.0 이상 |
-| **Q9** | Grab 이 **빗나갔을 때 쿨**은 그대로 10초인가요, 짧게 주나요? | 그대로 10초 (창을 연 대가) |
-| **Q10** | 🔴 **애니 이벤트 추가는 SVN 커밋**입니다(§1.5). 주말 구현 중에 SVN 커밋이 가능한가요? 못 하면 이벤트 없는 상태로 테스트하게 됩니다 | 근접 히트만이라도 먼저 SVN 에 넣고 시작 |
+| **Q2** | `IsWalking` 트리거가 쓰이는 곳을 못 찾았습니다. 죽은 파라미터인가요? | 미사용으로 보고 안 건드림 |
+| **Q4** | 쿨다운을 **`lastUsed` 타임스탬프**로 할까요, **`AddType`/`RemoveType` 재등록**으로 할까요? | **타임스탬프.** 코드 절반, 디버깅 쉬움 |
+| **Q5** | 근접 3종 클립이 전부 0~56 프레임입니다. 히트 프레임을 같게 봐도 되나요? | 훅 2종 동일, 어퍼만 별도 (육안 확인) |
+| **Q6** | 차징 중 페이즈 임계를 또 넘으면? (33% 를 차징 중 통과) | 시퀀스 완주 → 끝나고 즉시 다음 차징 |
+| **Q7** | Break 중 HP 0 이면? | 즉시 `Dead` |
+| **Q8** | 근접 사거리 / 원거리 임계 거리 초기값은? | 근접 3.0 / 원거리 6.0 |
+| **Q9** | Grab 이 빗나갔을 때 쿨은? | 그대로 10초 (창을 연 대가) |
 
 ### 구현 순서 제안
 
