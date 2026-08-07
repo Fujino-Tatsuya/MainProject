@@ -1,3 +1,151 @@
+# CURRENT PLAN — 보스 FSM 지원 2건: 인터럽트 식별자 + 캐리 소켓 일반화 (2026-08-07)
+
+> 상태: **구현 진행 중**(사용자 지시 = PLAN 작성 후 바로 착수).
+> 브랜치 `feature/InterruptSkill-CarrySocket` (base `MainProject/development` `6dbc1c34a`).
+> 요청 출처: 경석 → 은희 인계문 `C:\Users\user\Desktop\handoff-player-carry-socket.md` (기한 8/7 17:00).
+> 담당: 은희(플레이어 계통). 보스 쪽 소비 코드는 경석이 작성한다.
+
+## 목표
+
+보스 FSM 재작성이 플레이어 쪽에 요구하는 두 계약을 **기존 동작 회귀 없이** 제공한다.
+
+- **A.** 보스가 서버에서 "이 히트 = 인터럽트 스킬"을 판별할 수 있다. ✅ 구현·컴파일 검증 완료
+- **B'.** 서버가 플레이어를 잠시 구속할 수 있다 — 잡기(소켓 종속)와 돌진 밀기(정면 추종)를
+  `Restrained` 한 상태의 두 모드로. ✅ 구현·컴파일 검증 완료
+  (원 요청 B "캐리 소켓 일반화"는 폐기. 경위는 §접근 B 참고)
+
+## 현재 이해 (코드 확인 완료)
+
+| 사실 | 근거 |
+|---|---|
+| `AttackType`에 우클릭 슬롯 값이 없다 | [BaseAttack.cs:4](Assets/1.Scripts/Unit/Weapon/BaseAttack.cs:4) |
+| 🔴 **플레이어 스킬은 `BaseAttack`을 타지 않는다** — `AttackInfo`를 직접 만들어 `ReceiveAttack` 호출 | [FirstMeleeMainSkill.cs:114](Assets/1.Scripts/Player/Skill/FirstMeleeMainSkill.cs:114), [FirstMeleeUltimateSkill.cs:58](Assets/1.Scripts/Player/Skill/FirstMeleeUltimateSkill.cs:58) |
+| 🔴 **단죄의 방패가 미구현** — `interruptSkill` 슬롯이 비어 있다 | [PlayerSkillController.cs:22](Assets/1.Scripts/Player/Skill/PlayerSkillController.cs:22) |
+| `InterruptAttack` 앵커 노드는 컴포넌트 0개의 맨 Transform | [Paladin.prefab:5806](Assets/2.Prefabs/Player/Paladin/Paladin.prefab:5806) |
+| 현재 우클릭 = `PlayerInterruptState`(전방 돌진 + Animator 트리거), **데미지 0** | [PlayerStateController.cs:604](Assets/1.Scripts/Player/PlayerStateController.cs:604) |
+| 슬롯에 스킬이 배정되면 위 상태 경로는 자연 대체된다 | [PlayerStateController.cs:516-520](Assets/1.Scripts/Player/PlayerStateController.cs:516) |
+| `AttackType`은 **2곳**에서 직렬화된다 → 값은 반드시 끝에 추가 | [BaseAttack.cs:73](Assets/1.Scripts/Unit/Weapon/BaseAttack.cs:73), [Bomb.cs:6](Assets/1.Scripts/Enemy/Boss/Bomb.cs:6) (`Bomb.cs:12`에서 값 비교) |
+| `PlayerGrabbedState`가 `GrabController` 구체 타입으로 소켓을 찾는다 | [PlayerStateController.cs:700-703](Assets/1.Scripts/Player/PlayerStateController.cs:700) |
+| `BeginGrabbedByInstigator` 호출부는 1곳뿐 | [GrabController.cs:208](Assets/1.Scripts/Enemy/Boss/GrabController.cs:208) |
+| 🟡 잡기와 캐리가 **상태 하나(`Grabbed`)를 공유**한다 — `CanReceiveGrab`이 이미 Grabbed면 거부하고, `EndGrabbed()`는 시작 주체를 안 본다 | [PlayerStateController.cs:344-346](Assets/1.Scripts/Player/PlayerStateController.cs:344), [:166](Assets/1.Scripts/Player/PlayerStateController.cs:166) |
+| 스킬 애니 이벤트 릴레이는 존재하나 **Hit 이벤트를 쓰는 스킬이 아직 없다**(Q=홀드틱, E=판정없음, R=채널) | [PlayerAnimationEventRelay.cs:43](Assets/1.Scripts/Player/PlayerAnimationEventRelay.cs:43) |
+| Garen Animator에 `Interrupt` 상태가 존재 | `Assets/4.Animations/Player/Garen/PlayerAnimatorController.controller` |
+
+## 명시적 가정 (설계 문서 부재 — 확정되면 SO 수치만 조정)
+
+단죄의 방패의 거동 스펙은 `Docs/design/`에 없다(`character_garen.md`는 전부 TBD, 인계문이 참조한
+`boss-fsm-design.md`는 존재하지 않음). 아래를 가정하고 진행한다.
+
+1. **단죄의 방패 = 짧은 전방 방패 강타.** 데미지 1회 + `AttackType.Interrupt` 태그. 카운터 창·정면 각도·
+   그로기 전이는 **전부 보스 쪽 책임**(인계문 §A 명시)이므로 플레이어는 태그만 싣는다.
+   - `Docs/design/level-system.md:64-65`의 "가붕이 = 패링" 해석은 채택하지 않는다 — 방어 창 기반 패링은
+     "히트를 보스에 보낸다"는 인계문 계약과 어긋나고 범위가 훨씬 크다. 기획 확정 시 재논의.
+2. **애니메이션 클립을 수정하지 않는다.** 판정 타이밍은 SO의 `hitDelay` 타이머로 잡고,
+   `Hit` 애니 이벤트가 나중에 심어지면 그쪽이 우선하도록 **둘 다 받되 1회만 발동**한다.
+   (클립은 아트/SVN 관할이고, 현재 어떤 스킬도 Hit 이벤트를 안 쓴다 = 미검증 경로.)
+3. 수치는 전부 임시값. `attackDamageMultiplier`·쿨타임은 기획 확정 전 placeholder.
+
+## 접근
+
+### A. 인터럽트 식별자 + 단죄의 방패
+
+1. **인터럽트는 `AttackType`이 아니라 `AttackInfo.isInterruptAttack`(기존 `isGroggyAttack` 개명)이 싣는다.**
+   - 이유: `AttackType`은 "어느 출처가 쐈나"이고 인터럽트는 그와 **직교한 능력**이다. enum 값으로 넣으면
+     "Q 슬롯인데 인터럽트인 스킬"을 표현할 수 없고, 같은 사실을 두 곳에서 말하게 된다.
+   - **플래그는 하나만 둔다.** `AttackInfo`는 공격자가 아는 사실("인터럽트다")만 싣고,
+     **소비 방식은 수신측이 정한다** — 몬스터/중간보스는 `maxGroggyCount`까지 누적→그로기
+     ([MonsterBase.cs:775](Assets/1.Scripts/Monster/MonsterBase.cs:775) · [BossBase.cs:375](Assets/1.Scripts/Monster/Boss/BossBase.cs:375)),
+     보스 No.23은 카운터 창·정면 각도 판정(경석). `Docs/design/level-system.md:70`의 분담과 일치한다.
+   - 곁들여 **`AttackType`을 `{None, Default, Skill}`로 축소** — Q/E/R을 구분해 읽는 코드가 없었다.
+     정수값 `None=0`·`Default=1`은 **고정**(기존 에셋 25곳과 `Bomb.attackType=1`이 여기 걸려 있다).
+   - **`BaseAttack`의 저작 토글은 삭제.** 인터럽트를 켜는 주체는 스킬뿐이고 스킬은 `BaseAttack`을 안 탄다 —
+     켤 수 없는 체크박스는 거짓 약속이다.
+2. `FirstMeleeInterruptSkillData : PlayerSkillData` 신설 — `hitDelay`, `skillDuration`, `maxHitResults`.
+3. `FirstMeleeInterruptSkill : PlayerInstantSkill` 신설 — `Slot => Interrupt`.
+   서버가 `hitDelay` 경과(또는 `Hit` 애니 이벤트) 시 `HitboxAnchor` 기준 Overlap →
+   `new AttackInfo(damageSnapshot, AttackType.Interrupt)` → `ReceiveAttack`. `skillDuration`에 자체 종료.
+   판정은 **1회만**(`hasResolvedHit` 래치).
+4. SO 에셋 `Assets/9.ScriptableObject/Player/Garen/FirstMeleeInterruptSkillData.asset`.
+5. `Paladin.prefab` 배선: `InterruptAttack` 노드에 `BoxCollider`+`ColliderInfo`,
+   루트에 `FirstMeleeInterruptSkill`, `PlayerSkillController.interruptSkill` 연결.
+
+### B. ~~캐리 소켓 일반화~~ → **폐기.** 돌진이 넉백+기절 방식으로 바뀌며 불필요해졌다 (2026-08-07)
+
+`ICarrySocketProvider` 코드는 원복했다. 소켓 제공자가 `GrabController` 하나뿐이라 `Kind` 탐색 자체가 무의미했다.
+
+### B'. `Restrained` — 서버 구속의 단일 상태 (경석 개정 1판 승인)
+
+넉백+기절만으로는 "밀고 가기"가 안 된다(§리스크 C-1 — `Unit.Knockback`은 임펄스 1회, duration 개념이 없다).
+그래서 잡기와 밀기를 **한 상태의 두 모드**로 묶는다.
+
+6. `PlayerActionState.Grabbed` → **`Restrained`** 개명(정수값 유지). `PlayerGrabbedState` → `PlayerRestrainedState`.
+   `GrabInteractionContext` → `RestraintContext`, `IGrabInteractionReceiver` → `IRestraintReceiver`.
+7. `enum RestraintMode : byte { Carry = 0, Push = 1 }` — `Tick()`의 목표 자세만 갈린다:
+
+   | 모드 | 추종 대상 |
+   |---|---|
+   | `Carry` | `GrabController.GrabSocket` (**기존과 동일**) |
+   | `Push` | `instigator.position + instigator.forward × frontOffset` |
+
+   **Push는 소켓도 방향/속도 동기화도 안 쓴다.** 시전자 루트가 `NetworkTransform`으로 복제되므로 오너
+   클라에서 월드 위치가 저절로 맞는다 — "돌진 소켓은 애니메이션으로 안 움직이는 고정 자식이어야 한다"는
+   제약이 사라진다. Y는 **진입 시점 값으로 고정**한다(캐리 중 `isKinematic`이라 중력이 없고,
+   시전자 Y를 그대로 쓰면 피벗 높이 차이로 플레이어가 조용히 뜨거나 잠긴다).
+8. **`Push`만 슈퍼아머를 거부한다** — `Unit.Knockback`과 같은 규칙(슈퍼아머면 안 밀린다)을
+   플레이어 쪽 한 곳에 둔다. `Carry`는 원래 슈퍼아머와 무관하게 걸렸고 바꾸면 보스 Grab 체인이 회귀한다.
+   판정은 **서버 진입(`TryReceiveRestraint`)에서만** 한다 — 오너가 다시 판정하면 복제 지연 시 상태가 갈린다.
+9. **`BeginRestrainedByInstigator`가 `bool`을 반환한다.** 시전자는 이 값으로 후처리를 가른다
+   (돌진이 벽에 닿았을 때 **실제로 밀린 대상만** 기절). 데미지는 이 값과 무관한 별도 경로.
+10. `BeginGrabbedByInstigator`/`EndGrabbedByInstigator`는 **`Carry` 호환 래퍼로 유지** —
+    [GrabController.cs:208](Assets/1.Scripts/Enemy/Boss/GrabController.cs:208)·[:228](Assets/1.Scripts/Enemy/Boss/GrabController.cs:228)은 무수정이다.
+11. 🔴 **`followTarget == null` 널 허용을 유지한다** — 위치 추종만 건너뛰고 물리 위임·입력 차단은 그대로 간다.
+    보스에 잡기 소켓이 아직 없는 동안 "제자리에 붙잡힘"이 이 성질로 성립 중이다(경석 요청).
+
+## 네트워크 권한 가정
+
+- 단죄의 방패: 오너 입력 → 서버 승인(`PlayerSkillController`) → 서버만 판정. 기존 스킬 계약과 동일.
+- `Restrained`: **상태 전이·해제·슈퍼아머 판정 = 서버**, **위치 추종 실행 = 오너**(`IsMovementAuthority`).
+  서버가 위치를 직접 쓰지 않으므로 "플레이어 이동은 오너 권한"(networking.md) 원칙이 유지된다.
+  `Transform`은 복제 불가이므로 RPC엔 **모드(byte) + offset(float)만** 싣는다.
+  입력 차단은 별도 계통이 아니라 **상태 진입만으로** 성립한다(`CanMove`/`CanUseSkill`이 `Idle|Move` 한정).
+
+## 리스크 / 한계
+
+- 🟡 **잡기와 돌진 밀기가 `PlayerActionState.Restrained`를 공유한다.** 구속 중 재진입은 조용히 거부되고
+  (`CanReceiveRestraint`), `End`는 시작 주체를 구분하지 않는다. 보스 1기 기준 무해 — **계약으로 명시**한다.
+- 🔴 **C-1: `Unit.Knockback`은 임펄스 1회다.** `AttackInfo`의 `knockbackDuration`·`staggerDuration`은
+  `MonsterBase`만 소비하고 플레이어 수신 경로는 무시한다. 이 사실 때문에 보스 돌진이 넉백이 아니라
+  `Restrained.Push`로 간다(경석 확인·설계 변경 완료).
+- 🟡 구속 중 `detectCollisions = false`라 플레이어가 벽을 통과한다.
+  **벽 판정은 보스 책임** — 캐리 중이면 벽에서 떨어진 지점에서 돌진을 정지한다(경석 수용).
+- 🟡 단죄의 방패 판정 타이밍이 애니 클립과 어긋날 수 있다(타이머 기반). SO 수치로 맞추고,
+  정밀 타이밍이 필요하면 클립에 `HandleSkillEvent(0)` 이벤트를 심는다.
+- 🔴 프리팹 배선은 Unity 재임포트가 필요하다 — 인스펙터에서 컴포넌트가 보이는지 육안 확인 필수.
+
+## 범위 밖
+
+- 보스 쪽 카운터 창·정면 각도·그로기/Break 전이·시각 피드백 (경석).
+- 돌진 소켓 자체의 생성/배치 (경석).
+- 패링 해석의 방어 창/반사 메커니즘 (기획 확정 후 별건).
+- `PlayerInterruptState` 제거 — 스킬 미배정 시의 폴백으로 남긴다.
+
+## 완료 조건
+
+1. C# 컴파일 0 에러. ✅ (경고는 전부 기존 파일)
+2. 직렬화된 `attackType` 값이 변하지 않는다 — `0`×22 / `1`×3 유지, 특히 `Bomb.attackType=1`(평타 반응). ✅
+3. 우클릭 → 단죄의 방패 발동 → 적중 시 수신측이 `attackInfo.isInterruptAttack == true`를 본다. ⏳ Play 필요
+4. 중간보스(GauntletBot·SpinnerBot·WallBot)가 인터럽트 누적으로 그로기에 들어간다
+   (`maxGroggyCount` 3/3/4 — **이전엔 켜는 주체가 없어 사실상 죽은 경로였다**). ⏳ Play 필요
+5. 기존 잡기(Grab → Hold → Throw) 회귀 없음 — `GrabController` 무수정, `Carry` 래퍼 경유. ⏳ Play 필요
+5-1. `BeginRestrainedByInstigator(boss, Push, offset)` → 플레이어가 보스 정면을 따라간다. ⏳ Play 필요
+5-2. 슈퍼아머(Q 홀드) 중이면 `Push`가 **false를 반환**하고 밀리지 않는다. `Carry`는 그대로 걸린다. ⏳ Play 필요
+6. MPPM 2인(호스트/클라) 검증. ⏳
+
+> ⚠️ 프리팹·SO에 `isGroggyAttack` YAML 키 24개가 고아로 남는다(전부 값 0). Unity가 해당 에셋을
+> 재직렬화할 때 자연 소멸한다 — 의미 손실은 없고 diff 노이즈로만 나타난다.
+
+---
+
 # CURRENT PLAN — 지연 체력바(잔상 바) — 플레이어/보스 HUD (2026-08-05)
 
 > 상태: **승인 대기**. 브랜치 `feature/DelayedHealthBar` (base `Convayor-V2`), 레인 `dash`.

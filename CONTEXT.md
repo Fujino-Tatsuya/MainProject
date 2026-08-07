@@ -4,7 +4,57 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 현재 인수인계 (2026-08-05 · 지연 체력바 — Claude → Codex 위임)
+## ▶▶ 현재 인수인계 (2026-08-07 · 보스 FSM 지원 2건 — 인터럽트 식별자 + 캐리 소켓)
+
+작업 세션: **은희(Claude)**. 워크트리 `C:\UnityProject\MainProject-WorkTree`,
+브랜치 `feature/InterruptSkill-CarrySocket` (base `MainProject/development` `6dbc1c34a`).
+요청 출처: 경석 인계문 `Desktop\handoff-player-carry-socket.md` (기한 8/7 17:00).
+
+**수정 중 (동시 편집 금지)**: `Assets/1.Scripts/Unit/Weapon/BaseAttack.cs`(enum 1줄) ·
+`Assets/1.Scripts/Unit/ICarrySocketProvider.cs`(신규) · `Assets/1.Scripts/Enemy/Boss/GrabController.cs`(인터페이스 구현) ·
+`Assets/1.Scripts/Player/{Player.cs, PlayerStateController.cs}` ·
+`Assets/1.Scripts/Player/Skill/{PlayerSkillBase.cs, FirstMeleeMainSkill.cs, FirstMeleeInterruptSkill*.cs(신규)}` ·
+`Assets/2.Prefabs/Player/Paladin/Paladin.prefab`
+
+설계·완료조건은 [PLAN.md](PLAN.md) 최상단 참조. 이번에 확립된 계약만 적는다:
+
+- 🔴 **인터럽트는 `AttackInfo.isInterruptAttack`이 싣는다**(기존 `isGroggyAttack` 개명).
+  `AttackType`은 "어느 출처가 쐈나"라 인터럽트와 **직교**한다 — enum 값으로 넣으면 안 된다.
+  **플래그는 하나뿐이고, 소비 방식은 수신측이 정한다**: 몬스터/중간보스 = `maxGroggyCount` 누적→그로기,
+  보스 No.23 = 카운터 창·정면 각도(경석). `Docs/design/level-system.md:70`의 분담과 같다.
+- 🔴 **`AttackType` = `{None=0, Default=1, Skill=2}`로 축소됐다**(Q/E/R 제거 — 구분해 읽는 코드가 없었다).
+  `BaseAttack.attackType`·`Bomb.attackType`이 `[SerializeField]`라 **정수값 0·1은 고정**이다.
+  특히 **`Bomb.attackType=1`(Default) = 폭탄은 평타에만 반응한다** — 값이 밀리면 이 기믹이 조용히 뒤집힌다.
+  **값은 끝에만 추가할 것.**
+- **`BaseAttack`엔 인터럽트 저작 토글이 없다.** 켜는 주체는 스킬뿐이고 스킬은 `BaseAttack`을 안 탄다.
+  적 공격도 인터럽트를 걸어야 하면 그때 `[SerializeField] bool` + 생성자 인자를 되살린다(3줄).
+- 🔴 **플레이어 스킬은 `BaseAttack`을 타지 않는다.** `AttackInfo`를 직접 만들어 `Hurtbox/Unit.ReceiveAttack`을
+  부른다(서버 전용 경로). 인계문의 "BaseAttack.attackType을 지정" 전제는 이 코드베이스에 없는 경로였다.
+- 🔴 **`PlayerActionState.Grabbed` → `Restrained`.** 서버가 플레이어 위치·입력을 잠시 통제하는 상태를
+  **한 곳으로 묶었다**: `RestraintMode{Carry=잡기(소켓 종속), Push=돌진 밀기(시전자 정면 추종)}`.
+  `PlayerGrabbedState`→`PlayerRestrainedState`, `GrabInteractionContext`→`RestraintContext`,
+  `IGrabInteractionReceiver`→`IRestraintReceiver`. (원 요청이던 캐리 소켓 일반화 `ICarrySocketProvider`는 **폐기**.)
+  - **`Push`는 소켓이 필요 없다** — 시전자 루트가 `NetworkTransform`으로 복제되므로 `position + forward × offset`이
+    오너 클라에서도 성립한다. Y는 진입 시점 값으로 고정(피벗 높이 차이로 뜨거나 잠기는 것 방지).
+  - **`Push`만 슈퍼아머를 거부**하고 `Carry`는 안 한다(넣으면 보스 Grab 체인 회귀). 판정은 **서버 진입에서만** —
+    오너가 다시 판정하면 복제 지연 시 상태가 갈린다.
+  - **`BeginRestrainedByInstigator`의 `bool` 반환이 계약이다** — 시전자는 이 값으로 후처리를 가른다
+    (실제로 밀린 대상만 기절). `BeginGrabbedByInstigator`는 `Carry` 래퍼로 유지 → `GrabController` 무수정.
+  - 🔴 **`followTarget == null` 널 허용을 깨지 말 것** — 위치 추종만 건너뛰고 물리 위임·입력 차단은 유지된다.
+    보스에 잡기 소켓이 아직 없어서 "제자리에 붙잡힘"이 이 성질로 성립 중이다.
+- 🔴 **`Unit.Knockback`은 임펄스 1회다** — duration 개념이 없다. `AttackInfo`의 `knockbackDuration`·
+  `staggerDuration`은 `MonsterBase`만 소비하고 **플레이어 수신 경로는 무시**한다. 보스 돌진이 넉백 대신
+  `Restrained.Push`로 간 이유다.
+- 🟡 **잡기와 돌진 캐리는 `PlayerActionState.Grabbed` 하나를 공유한다.** 캐리 중 재진입은 조용히 거부되고
+  (`CanReceiveGrab`), `EndGrabbedByInstigator()`는 시작 주체를 구분하지 않는다. 보스 1기 기준 무해.
+- 🟡 **단죄의 방패는 이번에 처음 구현됐다** — 그 전까지 우클릭은 `PlayerInterruptState`(전방 돌진, **데미지 0**)였다.
+  거동 스펙이 `Docs/design/`에 없어 "짧은 전방 강타 + Interrupt 태그"로 가정했다(PLAN 「명시적 가정」).
+  판정 타이밍은 **애니 클립 수정 없이** SO 타이머(`hitDelay`)로 잡고, Hit 애니 이벤트가 나중에 심어지면
+  그쪽이 우선하되 **1회만** 발동한다.
+
+---
+
+## 이전 인수인계 (2026-08-05 · 지연 체력바 — Claude → Codex 위임)
 
 작업 세션: **은희(Claude → Codex 위임)**. 레인 `dash` = `C:\UnityProject\MainProject`,
 브랜치 `feature/DelayedHealthBar` (base `Convayor-V2`).
