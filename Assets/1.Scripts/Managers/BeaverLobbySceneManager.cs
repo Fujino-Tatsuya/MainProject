@@ -543,6 +543,27 @@ public class BeaverLobbySceneManager : NemoSceneManager
             sessionConnectPanel = FindInActiveScene("Pannel_SessionConnect");
         }
 
+        // Relay 통로도 같은 규약을 따른다 — 이 씬은 인스펙터 배선을 쓰지 않고 이름으로 찾는다
+        // (프리팹의 참조가 전부 fileID 0 인 이유). FindInActiveScene 은 트랜스폼 계층을 순회하므로
+        // 모드 전환으로 꺼져 있는 패널도 찾는다.
+        relayPanel ??= FindInActiveScene("Panel_Relay");
+        directPanel ??= FindInActiveScene("Panel_Direct");
+        relayHostButton ??= FindButton("Button_RelayHost");
+        relayJoinButton ??= FindButton("Button_RelayJoin");
+        modeToggleButton ??= FindButton("Button_ModeToggle");
+
+        if (joinCodeInputField == null)
+        {
+            var target = FindInActiveScene("InputField_JoinCode");
+            joinCodeInputField = target != null ? target.GetComponent<TMP_InputField>() : null;
+        }
+
+        if (joinCodeDisplayText == null)
+        {
+            var target = FindInActiveScene("Text_JoinCode");
+            joinCodeDisplayText = target != null ? target.GetComponent<TMP_Text>() : null;
+        }
+
         _lobbyUIController ??= FindFirstObjectByType<LobbyUIController>();
 
         WarnIfMissing(startHostButton, nameof(startHostButton));
