@@ -45,7 +45,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TempGameManager
   titleSceneName: 1.TitleScene
-  lobbySceneName: 3.BeaverLobby
+  lobbySceneName: 3.LobbyScene
   resultSceneName: 5.ResultScene
   loadingSceneName: 2.LoadingScene
   mainGameSceneName: 4.MapScene

@@ -44,7 +44,7 @@ namespace VeyTrace.RuntimeSafety.Tests
             int gameplay =
                 RuntimeSceneServiceCoordinator.GetScenePriority("MapScene");
             int lobby =
-                RuntimeSceneServiceCoordinator.GetScenePriority("Temp_LobbyScene");
+                RuntimeSceneServiceCoordinator.GetScenePriority("3.LobbyScene");
             int loading =
                 RuntimeSceneServiceCoordinator.GetScenePriority("LoadingScene");
 

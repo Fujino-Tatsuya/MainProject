@@ -41,23 +41,19 @@ MonoBehaviour:
   m_GameObject: {fileID: 7822028015903069819}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 34f2a0eac2d742aca1b1e9b3a884c876, type: 3}
+  m_Script: {fileID: 11500000, guid: b7a2f4c91e8d4b6aa5c3d0e9f1a2b3c4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   blackImage: {fileID: 0}
   fadeDuration: 0.8
+  ipInputField: {fileID: 0}
+  portInputField: {fileID: 0}
+  setConnectionDataButton: {fileID: 0}
   startHostButton: {fileID: 0}
   startClientButton: {fileID: 0}
-  jgsButton: {fileID: 0}
-  ljwButton: {fileID: 0}
-  lehButton: {fileID: 0}
-  kthButton: {fileID: 0}
-  kmkButton: {fileID: 0}
   gameStartButton: {fileID: 0}
   readyButton: {fileID: 0}
   sessionConnectPanel: {fileID: 0}
-  jgsIp: 172.33.1.8
-  ljwIp: 172.33.1.2
-  lehIp: 172.33.1.22
-  kthIp: 172.33.1.9
-  kmkIp: 172.33.1.19
+  errorText: {fileID: 0}
+  defaultIp: 127.0.0.1
+  defaultPort: 7777

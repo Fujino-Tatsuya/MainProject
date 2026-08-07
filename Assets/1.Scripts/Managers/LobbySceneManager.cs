@@ -1,33 +1,49 @@
+﻿using System.Net;
+using TMPro;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class LobbySceneManager : NemoSceneManager
 {
+    [Header("Connection Inputs")]
+    [SerializeField] private TMP_InputField ipInputField;
+    [SerializeField] private TMP_InputField portInputField;
+    [SerializeField] private Button setConnectionDataButton;
+
     [Header("Buttons")]
     [SerializeField] private Button startHostButton;
     [SerializeField] private Button startClientButton;
-    [SerializeField] private Button jgsButton;
-    [SerializeField] private Button ljwButton;
-    [SerializeField] private Button lehButton;
-    [SerializeField] private Button kthButton;
-    [SerializeField] private Button kmkButton;
     [SerializeField] private Button gameStartButton;
     [SerializeField] private Button readyButton;
 
     [Header("Panels")]
     [SerializeField] private GameObject sessionConnectPanel;
 
-    [Header("Connection Data")]
-    [SerializeField] private string jgsIp = "172.33.1.8";
-    [SerializeField] private string ljwIp = "172.33.1.2";
-    [SerializeField] private string lehIp = "172.33.1.22";
-    [SerializeField] private string kthIp = "172.33.1.9";
-    [SerializeField] private string kmkIp = "172.33.1.19";
+    [Header("Messages")]
+    [SerializeField] private TMP_Text errorText;
+
+    [Header("Connection Defaults")]
+    [SerializeField] private string defaultIp = "127.0.0.1";
+    [SerializeField] private ushort defaultPort = 7777;
+
+    [Header("Relay Connection")]
+    [SerializeField] private GameObject relayPanel;
+    [SerializeField] private GameObject directPanel;
+    [SerializeField] private TMP_InputField joinCodeInputField;
+    [SerializeField] private TMP_Text joinCodeDisplayText;
+    [SerializeField] private Button relayHostButton;
+    [SerializeField] private Button relayJoinButton;
+    [SerializeField] private Button modeToggleButton;
 
     private NetworkManager _networkManager;
     private NetworkSessionLauncher _sessionLauncher;
     private LobbyUIController _lobbyUIController;
+    private bool _connectionDataApplied;
+    private bool _clientConnectPending;
+    private bool _networkCallbacksRegistered;
+    private bool _relayStartPending;
+    private bool _relayHostPending;
 
     protected override void Awake()
     {
@@ -35,7 +51,6 @@ public class LobbySceneManager : NemoSceneManager
         Debug.Log("[SceneFlow] LobbySceneManager.Awake");
         _networkManager = GetNetworkManager();
         _sessionLauncher = _networkManager != null ? _networkManager.GetComponent<NetworkSessionLauncher>() : null;
-        _lobbyUIController = LobbyUIController.Active;
 
         if (_sessionLauncher == null)
         {
@@ -44,13 +59,34 @@ public class LobbySceneManager : NemoSceneManager
 
         ResolveSceneReferences();
         BindButtons();
+        RegisterNetworkCallbacks();
+        RegisterSessionLauncherEvents();
     }
 
     private void Start()
     {
         Debug.Log("[SceneFlow] LobbySceneManager.Start");
         PlayEnterFade();
+        ApplyDefaultInputValues();
+        SetErrorMessage(string.Empty);
+        RegisterLobbyUiEvents();
+        SelectDirectMode();
+        ApplyRoleUi();
 
+        // BGM 재생
+        AudioManager.Instance.PlayBGM(AudioManager.Instance.Catalog.LobbyBGM);
+    }
+
+    private void OnDestroy()
+    {
+        UnregisterNetworkCallbacks();
+        UnregisterSessionLauncherEvents();
+        UnregisterLobbyUiEvents();
+    }
+
+    public void ApplyConnectionData()
+    {
+        TryApplyConnectionData();
     }
 
     public void StartHost()
@@ -59,49 +95,27 @@ public class LobbySceneManager : NemoSceneManager
         if (_sessionLauncher == null)
         {
             WarnMissingReference(nameof(NetworkSessionLauncher));
+            SetErrorMessage("네트워크 세션 런처를 찾을 수 없습니다.");
+            return;
+        }
+
+        if (!EnsureConnectionData())
+        {
             return;
         }
 
         if (_sessionLauncher.StartHost())
         {
-            Debug.Log("[SceneFlow] LobbySceneManager.StartHost succeeded, hiding sessionConnectPanel");
+            Debug.Log("[SceneFlow] LobbySceneManager.StartHost succeeded");
+            SetErrorMessage(string.Empty);
             SetSessionConnectPanel(false);
-            SetLobbyButtonsInteractable(false);
+            ApplyRoleUi();
         }
         else
         {
             Debug.Log("[SceneFlow] LobbySceneManager.StartHost failed");
+            SetErrorMessage("Host 시작에 실패했습니다. 포트가 이미 사용 중인지 확인하세요.");
         }
-    }
-
-    public void StartGameLoading()
-    {
-        Debug.Log($"[SceneFlow] LobbySceneManager.StartGameLoading hasSessionLauncher={_sessionLauncher != null}");
-        if (_sessionLauncher == null)
-        {
-            WarnMissingReference(nameof(NetworkSessionLauncher));
-            return;
-        }
-
-        SetButtonsInteractable(false, gameStartButton);
-        _sessionLauncher.StartGameLoading();
-    }
-
-    public void ToggleReady()
-    {
-        Debug.Log($"[SceneFlow] LobbySceneManager.ToggleReady hasLobbyUIController={_lobbyUIController != null}");
-        if (_lobbyUIController == null)
-        {
-            _lobbyUIController = LobbyUIController.Active;
-        }
-
-        if (_lobbyUIController == null)
-        {
-            WarnMissingReference(nameof(LobbyUIController));
-            return;
-        }
-
-        _lobbyUIController.ToggleLocalReady();
     }
 
     public void StartClient()
@@ -110,128 +124,494 @@ public class LobbySceneManager : NemoSceneManager
         if (_sessionLauncher == null)
         {
             WarnMissingReference(nameof(NetworkSessionLauncher));
+            SetErrorMessage("네트워크 세션 런처를 찾을 수 없습니다.");
+            return;
+        }
+
+        if (!EnsureConnectionData())
+        {
             return;
         }
 
         if (_sessionLauncher.StartClient())
         {
-            Debug.Log("[SceneFlow] LobbySceneManager.StartClient succeeded, hiding sessionConnectPanel");
-            SetSessionConnectPanel(false);
-            SetLobbyButtonsInteractable(false);
+            Debug.Log("[SceneFlow] LobbySceneManager.StartClient connecting");
+            _clientConnectPending = true;
+            SetErrorMessage("서버 접속 시도 중...");
+            SetConnectControlsInteractable(false);
         }
         else
         {
             Debug.Log("[SceneFlow] LobbySceneManager.StartClient failed");
+            SetErrorMessage("Client 시작에 실패했습니다.");
         }
     }
 
-    public void SetJgsConnectionData()
+    public void SelectDirectMode()
     {
-        SetConnectionData(jgsIp);
+        if (_sessionLauncher != null)
+        {
+            _sessionLauncher.Mode = SessionConnectionMode.DirectIPv4;
+        }
+
+        SetConnectionModePanels(false);
+        SetErrorMessage(string.Empty);
     }
 
-    public void SetLjwConnectionData()
+    public void SelectRelayMode()
     {
-        SetConnectionData(ljwIp);
+        if (_sessionLauncher != null)
+        {
+            _sessionLauncher.Mode = SessionConnectionMode.UnityRelay;
+        }
+
+        SetConnectionModePanels(true);
+        SetErrorMessage(string.Empty);
     }
 
-    public void SetLehConnectionData()
+    public void StartRelayHost()
     {
-        SetConnectionData(lehIp);
+        if (!TryBeginRelayStart(true))
+        {
+            return;
+        }
+
+        if (joinCodeDisplayText != null)
+        {
+            joinCodeDisplayText.text = string.Empty;
+        }
+
+        SetErrorMessage("Relay 방 생성 중...");
+        _sessionLauncher.BeginHost();
     }
 
-    public void SetKthConnectionData()
+    public void StartRelayJoin()
     {
-        SetConnectionData(kthIp);
+        var joinCode = joinCodeInputField != null ? joinCodeInputField.text : string.Empty;
+        if (string.IsNullOrWhiteSpace(joinCode))
+        {
+            SetErrorMessage("Relay 조인코드를 입력하세요.");
+            return;
+        }
+
+        if (!TryBeginRelayStart(false))
+        {
+            return;
+        }
+
+        SetErrorMessage("Relay 방 참가 준비 중...");
+        _sessionLauncher.BeginClient(joinCode);
     }
 
-    public void SetKmkConnectionData()
+    public void ToggleReady()
     {
-        SetConnectionData(kmkIp);
+        var controller = ResolveLobbyUIController();
+        Debug.Log($"[SceneFlow] LobbySceneManager.ToggleReady hasLobbyUIController={controller != null}");
+        if (controller == null)
+        {
+            WarnMissingReference(nameof(LobbyUIController));
+            SetErrorMessage("로비 UI 컨트롤러를 찾을 수 없습니다.");
+            return;
+        }
+
+        controller.ToggleLocalReady();
     }
 
-    private void SetConnectionData(string ip)
+    public void StartGameLoading()
     {
-        Debug.Log($"[SceneFlow] LobbySceneManager.SetConnectionData ip={ip} hasSessionLauncher={_sessionLauncher != null}");
+        Debug.Log($"[SceneFlow] LobbySceneManager.StartGameLoading hasSessionLauncher={_sessionLauncher != null}");
         if (_sessionLauncher == null)
         {
             WarnMissingReference(nameof(NetworkSessionLauncher));
+            SetErrorMessage("네트워크 세션 런처를 찾을 수 없습니다.");
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(ip))
+        var controller = ResolveLobbyUIController();
+        if (controller != null && !controller.CanStartGame)
         {
-            Debug.LogWarning($"{nameof(LobbySceneManager)} connection ip is empty.");
+            SetErrorMessage("모든 플레이어가 준비되지 않았습니다.");
             return;
         }
 
-        _sessionLauncher.OnSetConnectionData(ip);
+        SetErrorMessage(string.Empty);
+        SetButtonsInteractable(false, gameStartButton);
+        _sessionLauncher.StartGameLoading();
+    }
+
+    private bool EnsureConnectionData()
+    {
+        if (_connectionDataApplied)
+        {
+            return true;
+        }
+
+        return TryApplyConnectionData();
+    }
+
+    private bool TryApplyConnectionData()
+    {
+        var ipText = ipInputField != null ? ipInputField.text.Trim() : defaultIp;
+        var portText = portInputField != null ? portInputField.text.Trim() : defaultPort.ToString();
+
+        if (string.IsNullOrEmpty(ipText))
+        {
+            SetErrorMessage("IP를 입력하세요.");
+            return false;
+        }
+
+        if (!IPAddress.TryParse(ipText, out _))
+        {
+            SetErrorMessage($"IP 형식이 올바르지 않습니다: {ipText}");
+            return false;
+        }
+
+        if (!ushort.TryParse(portText, out var port) || port == 0)
+        {
+            SetErrorMessage($"Port는 1~65535 범위의 숫자여야 합니다: {portText}");
+            return false;
+        }
+
+        if (_sessionLauncher == null)
+        {
+            WarnMissingReference(nameof(NetworkSessionLauncher));
+            SetErrorMessage("네트워크 세션 런처를 찾을 수 없습니다.");
+            return false;
+        }
+
+        _sessionLauncher.OnSetConnectionData(ipText, port);
+        _connectionDataApplied = true;
+        SetErrorMessage($"연결 대상 설정: {ipText}:{port}");
+        return true;
+    }
+
+    private void ApplyDefaultInputValues()
+    {
+        if (ipInputField != null && string.IsNullOrWhiteSpace(ipInputField.text))
+        {
+            ipInputField.text = defaultIp;
+        }
+
+        if (portInputField != null && string.IsNullOrWhiteSpace(portInputField.text))
+        {
+            portInputField.text = defaultPort.ToString();
+        }
+    }
+
+    // Host는 GameStart만, Client는 Ready만 노출한다. 네트워크 시작 전에는 패널이 화면을 덮는다.
+    private void ApplyRoleUi()
+    {
+        var listening = _networkManager != null && _networkManager.IsListening;
+        var isHost = listening && _networkManager.IsHost;
+        var controller = ResolveLobbyUIController();
+
+        if (gameStartButton != null)
+        {
+            gameStartButton.gameObject.SetActive(!listening || isHost);
+            gameStartButton.interactable = isHost && controller != null && controller.CanStartGame;
+        }
+
+        if (readyButton != null)
+        {
+            readyButton.gameObject.SetActive(!listening || !isHost);
+        }
+    }
+
+    private void HandleClientConnected(ulong clientId)
+    {
+        if (_networkManager == null || clientId != _networkManager.LocalClientId)
+        {
+            return;
+        }
+
+        Debug.Log($"[SceneFlow] LobbySceneManager.HandleClientConnected localClientId={clientId}");
+        _clientConnectPending = false;
+        SetErrorMessage(string.Empty);
+        SetSessionConnectPanel(false);
+        SetConnectControlsInteractable(true);
+        SetRelayControlsInteractable(true);
+        ApplyRoleUi();
+    }
+
+    private void HandleClientDisconnected(ulong clientId)
+    {
+        if (_networkManager == null)
+        {
+            return;
+        }
+
+        Debug.Log($"[SceneFlow] LobbySceneManager.HandleClientDisconnected clientId={clientId} isServer={_networkManager.IsServer} reason='{_networkManager.DisconnectReason}'");
+        if (_networkManager.IsServer)
+        {
+            if (clientId != _networkManager.LocalClientId)
+            {
+                SetErrorMessage($"플레이어(ClientId={clientId})의 연결이 끊어졌습니다.");
+            }
+
+            return;
+        }
+
+        if (clientId != _networkManager.LocalClientId)
+        {
+            return;
+        }
+
+        SetErrorMessage(_clientConnectPending
+            ? "서버 접속에 실패했습니다. IP/Port와 Host 상태를 확인하세요."
+            : "서버와의 연결이 끊어졌습니다.");
+        _clientConnectPending = false;
+        SetSessionConnectPanel(true);
+        SetConnectControlsInteractable(true);
+        SetRelayControlsInteractable(true);
+        ApplyRoleUi();
+    }
+
+    private void HandleTransportFailure()
+    {
+        Debug.LogError("[SceneFlow] LobbySceneManager.HandleTransportFailure");
+        SetErrorMessage("네트워크 전송 오류가 발생했습니다.");
+        _clientConnectPending = false;
+        SetSessionConnectPanel(true);
+        SetConnectControlsInteractable(true);
+        SetRelayControlsInteractable(true);
+        ApplyRoleUi();
+    }
+
+    private bool TryBeginRelayStart(bool hosting)
+    {
+        if (_sessionLauncher == null)
+        {
+            WarnMissingReference(nameof(NetworkSessionLauncher));
+            SetErrorMessage("네트워크 세션 런처를 찾을 수 없습니다.");
+            return false;
+        }
+
+        if (_relayStartPending)
+        {
+            return false;
+        }
+
+        _sessionLauncher.Mode = SessionConnectionMode.UnityRelay;
+        _relayStartPending = true;
+        _relayHostPending = hosting;
+        SetConnectControlsInteractable(false);
+        SetRelayControlsInteractable(false);
+        return true;
+    }
+
+    private void HandleSessionStartCompleted(SessionStartResult result)
+    {
+        if (!_relayStartPending)
+        {
+            return;
+        }
+
+        var wasHosting = _relayHostPending;
+        _relayStartPending = false;
+        _relayHostPending = false;
+
+        if (!result.Success)
+        {
+            SetErrorMessage(result.FailureReason);
+            SetConnectControlsInteractable(true);
+            SetRelayControlsInteractable(true);
+            return;
+        }
+
+        if (wasHosting)
+        {
+            if (joinCodeDisplayText != null)
+            {
+                joinCodeDisplayText.text = result.ShareCode;
+            }
+
+            SetErrorMessage(string.IsNullOrEmpty(result.ShareCode)
+                ? "Relay Host가 시작되었습니다."
+                : $"Relay 조인코드: {result.ShareCode}");
+            SetConnectControlsInteractable(false);
+            SetRelayControlsInteractable(false);
+            ApplyRoleUi();
+            return;
+        }
+
+        _clientConnectPending = true;
+        SetErrorMessage("서버 접속 시도 중...");
+    }
+
+    private void RegisterSessionLauncherEvents()
+    {
+        if (_sessionLauncher != null)
+        {
+            _sessionLauncher.SessionStartCompleted += HandleSessionStartCompleted;
+        }
+    }
+
+    private void UnregisterSessionLauncherEvents()
+    {
+        if (_sessionLauncher != null)
+        {
+            _sessionLauncher.SessionStartCompleted -= HandleSessionStartCompleted;
+        }
+    }
+
+    private void HandleLobbyStateChanged()
+    {
+        ApplyRoleUi();
+    }
+
+    private void RegisterNetworkCallbacks()
+    {
+        if (_networkManager == null || _networkCallbacksRegistered)
+        {
+            return;
+        }
+
+        _networkManager.OnClientConnectedCallback += HandleClientConnected;
+        _networkManager.OnClientDisconnectCallback += HandleClientDisconnected;
+        _networkManager.OnTransportFailure += HandleTransportFailure;
+        _networkCallbacksRegistered = true;
+    }
+
+    private void UnregisterNetworkCallbacks()
+    {
+        if (_networkManager == null || !_networkCallbacksRegistered)
+        {
+            return;
+        }
+
+        _networkManager.OnClientConnectedCallback -= HandleClientConnected;
+        _networkManager.OnClientDisconnectCallback -= HandleClientDisconnected;
+        _networkManager.OnTransportFailure -= HandleTransportFailure;
+        _networkCallbacksRegistered = false;
+    }
+
+    private void RegisterLobbyUiEvents()
+    {
+        var controller = ResolveLobbyUIController();
+        if (controller != null)
+        {
+            controller.StateChanged += HandleLobbyStateChanged;
+        }
+    }
+
+    private void UnregisterLobbyUiEvents()
+    {
+        if (_lobbyUIController != null)
+        {
+            _lobbyUIController.StateChanged -= HandleLobbyStateChanged;
+        }
+    }
+
+    private LobbyUIController ResolveLobbyUIController()
+    {
+        if (_lobbyUIController == null)
+        {
+            _lobbyUIController = LobbyUIController.Active;
+        }
+
+        return _lobbyUIController;
     }
 
     private void ResolveSceneReferences()
     {
         startHostButton ??= FindButton("StartHost");
         startClientButton ??= FindButton("StartClient");
-        jgsButton ??= FindButton("JGS");
-        ljwButton ??= FindButton("LJW");
-        lehButton ??= FindButton("LEH");
-        kthButton ??= FindButton("KTH");
-        kmkButton ??= FindButton("KMK");
+        setConnectionDataButton ??= FindButton("SetConnectionData");
         gameStartButton ??= FindButton("GameStart");
         readyButton ??= FindButton("Ready");
+
+        if (ipInputField == null)
+        {
+            var target = FindInActiveScene("InputField_IP");
+            ipInputField = target != null ? target.GetComponent<TMP_InputField>() : null;
+        }
+
+        if (portInputField == null)
+        {
+            var target = FindInActiveScene("InputField_Port");
+            portInputField = target != null ? target.GetComponent<TMP_InputField>() : null;
+        }
+
+        if (errorText == null)
+        {
+            var target = FindInActiveScene("Text_ErrorMessage");
+            errorText = target != null ? target.GetComponent<TMP_Text>() : null;
+        }
 
         if (sessionConnectPanel == null)
         {
             sessionConnectPanel = FindInActiveScene("Pannel_SessionConnect");
         }
 
+        // Relay 통로도 같은 규약을 따른다 — 이 씬은 인스펙터 배선을 쓰지 않고 이름으로 찾는다
+        // (프리팹의 참조가 전부 fileID 0 인 이유). FindInActiveScene 은 트랜스폼 계층을 순회하므로
+        // 모드 전환으로 꺼져 있는 패널도 찾는다.
+        relayPanel ??= FindInActiveScene("Panel_Relay");
+        directPanel ??= FindInActiveScene("Panel_Direct");
+        relayHostButton ??= FindButton("Button_RelayHost");
+        relayJoinButton ??= FindButton("Button_RelayJoin");
+        modeToggleButton ??= FindButton("Button_ModeToggle");
+
+        if (joinCodeInputField == null)
+        {
+            var target = FindInActiveScene("InputField_JoinCode");
+            joinCodeInputField = target != null ? target.GetComponent<TMP_InputField>() : null;
+        }
+
+        if (joinCodeDisplayText == null)
+        {
+            var target = FindInActiveScene("Text_JoinCode");
+            joinCodeDisplayText = target != null ? target.GetComponent<TMP_Text>() : null;
+        }
+
         _lobbyUIController ??= FindFirstObjectByType<LobbyUIController>();
 
-        WarnMissingButton(startHostButton, nameof(startHostButton));
-        WarnMissingButton(startClientButton, nameof(startClientButton));
-        WarnMissingButton(jgsButton, nameof(jgsButton));
-        WarnMissingButton(ljwButton, nameof(ljwButton));
-        WarnMissingButton(lehButton, nameof(lehButton));
-        WarnMissingButton(kthButton, nameof(kthButton));
-        WarnMissingButton(kmkButton, nameof(kmkButton));
-        WarnMissingButton(gameStartButton, nameof(gameStartButton));
-        WarnMissingButton(readyButton, nameof(readyButton));
+        WarnIfMissing(startHostButton, nameof(startHostButton));
+        WarnIfMissing(startClientButton, nameof(startClientButton));
+        WarnIfMissing(setConnectionDataButton, nameof(setConnectionDataButton));
+        WarnIfMissing(gameStartButton, nameof(gameStartButton));
+        WarnIfMissing(readyButton, nameof(readyButton));
+        WarnIfMissing(ipInputField, nameof(ipInputField));
+        WarnIfMissing(portInputField, nameof(portInputField));
+        WarnIfMissing(errorText, nameof(errorText));
+        WarnIfMissing(sessionConnectPanel, nameof(sessionConnectPanel));
 
-        if (sessionConnectPanel == null)
-        {
-            WarnMissingReference(nameof(sessionConnectPanel));
-        }
+        // 이름 기반 해석이라 오브젝트 이름이 바뀌면 조용히 null 이 된다 —
+        // 그러면 모드 전환이 안 되거나 조인코드를 못 읽는데 로그가 0줄이다. 반드시 짚고 넘어간다.
+        WarnIfMissing(relayPanel, nameof(relayPanel));
+        WarnIfMissing(directPanel, nameof(directPanel));
+        WarnIfMissing(relayHostButton, nameof(relayHostButton));
+        WarnIfMissing(relayJoinButton, nameof(relayJoinButton));
+        // modeToggleButton 은 선택 사항이라 경고하지 않는다 — 없으면 두 패널을 함께 보여준다
+        // (SetConnectionModePanels 주석 참조).
+        WarnIfMissing(joinCodeInputField, nameof(joinCodeInputField));
+        WarnIfMissing(joinCodeDisplayText, nameof(joinCodeDisplayText));
 
-        if (_lobbyUIController == null)
-        {
-            WarnMissingReference(nameof(LobbyUIController));
-        }
+        WarnIfMissing(_lobbyUIController, nameof(LobbyUIController));
     }
 
     private void BindButtons()
     {
         BindButton(startHostButton, StartHost);
         BindButton(startClientButton, StartClient);
-        BindButton(jgsButton, SetJgsConnectionData);
-        BindButton(ljwButton, SetLjwConnectionData);
-        BindButton(lehButton, SetLehConnectionData);
-        BindButton(kthButton, SetKthConnectionData);
-        BindButton(kmkButton, SetKmkConnectionData);
+        BindButton(setConnectionDataButton, ApplyConnectionData);
         BindButton(gameStartButton, StartGameLoading);
         BindButton(readyButton, ToggleReady);
+        BindButton(relayHostButton, StartRelayHost);
+        BindButton(relayJoinButton, StartRelayJoin);
+        BindButton(modeToggleButton, ToggleConnectionMode);
     }
 
-    private void SetLobbyButtonsInteractable(bool interactable)
+    private void ToggleConnectionMode()
     {
-        SetButtonsInteractable(
-            interactable,
-            startHostButton,
-            startClientButton,
-            jgsButton,
-            ljwButton,
-            lehButton,
-            kthButton,
-            kmkButton);
+        if (_sessionLauncher != null && _sessionLauncher.Mode == SessionConnectionMode.UnityRelay)
+        {
+            SelectDirectMode();
+        }
+        else
+        {
+            SelectRelayMode();
+        }
     }
 
     private void BindButton(Button button, UnityEngine.Events.UnityAction action)
@@ -245,18 +625,83 @@ public class LobbySceneManager : NemoSceneManager
         button.onClick.AddListener(action);
     }
 
+    private void SetConnectControlsInteractable(bool interactable)
+    {
+        SetButtonsInteractable(interactable, startHostButton, startClientButton, setConnectionDataButton);
+
+        if (ipInputField != null)
+        {
+            ipInputField.interactable = interactable;
+        }
+
+        if (portInputField != null)
+        {
+            portInputField.interactable = interactable;
+        }
+    }
+
+    private void SetRelayControlsInteractable(bool interactable)
+    {
+        SetButtonsInteractable(interactable, relayHostButton, relayJoinButton, modeToggleButton);
+
+        if (joinCodeInputField != null)
+        {
+            joinCodeInputField.interactable = interactable;
+        }
+    }
+
+    /// <summary>
+    /// 전환 버튼이 씬에 있을 때만 패널을 배타적으로 토글한다.
+    ///
+    /// ⚠️ 버튼이 없는데 토글하면 한쪽 패널이 숨겨진 뒤 되살릴 방법이 없어 그 통로가 통째로
+    /// 막힌다. 전환 버튼은 기능상 필수가 아니다 — IPv4 버튼은 동기 레거시 경로라 Mode 와
+    /// 무관하고, Relay 버튼은 TryBeginRelayStart 가 Mode 를 직접 UnityRelay 로 세팅한다.
+    /// 그래서 버튼이 없으면 두 패널을 저작된 그대로 함께 보여주는 것이 맞다.
+    /// </summary>
+    private void SetConnectionModePanels(bool relaySelected)
+    {
+        if (modeToggleButton == null)
+        {
+            return;
+        }
+
+        if (relayPanel != null)
+        {
+            relayPanel.SetActive(relaySelected);
+        }
+
+        if (directPanel != null)
+        {
+            directPanel.SetActive(!relaySelected);
+        }
+    }
+
     private void SetSessionConnectPanel(bool active)
     {
         if (sessionConnectPanel != null)
         {
             sessionConnectPanel.SetActive(active);
         }
+
         Debug.Log($"[SceneFlow] LobbySceneManager.SetSessionConnectPanel active={active} hasPanel={sessionConnectPanel != null}");
     }
 
-    private void WarnMissingButton(Button button, string referenceName)
+    private void SetErrorMessage(string message)
     {
-        if (button == null)
+        if (errorText != null)
+        {
+            errorText.text = message;
+        }
+
+        if (!string.IsNullOrEmpty(message))
+        {
+            Debug.Log($"[SceneFlow] LobbySceneManager.SetErrorMessage message={message}");
+        }
+    }
+
+    private void WarnIfMissing(Object reference, string referenceName)
+    {
+        if (reference == null)
         {
             WarnMissingReference(referenceName);
         }

@@ -234,7 +234,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8468152987463888396, guid: 8a54a70264d851a4db24001989d8afa1, type: 3}
       propertyPath: lobbySceneName
-      value: 3.BeaverLobby
+      value: 3.LobbyScene
       objectReference: {fileID: 0}
     - target: {fileID: 8468152987463888396, guid: 8a54a70264d851a4db24001989d8afa1, type: 3}
       propertyPath: titleSceneName
