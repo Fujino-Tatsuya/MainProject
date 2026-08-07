@@ -319,3 +319,132 @@ OnAttackHit 누락  → 히트 없음.  폴백을 넣으면 이벤트 추가 후
 **모델 정확도 소감**: `gpt-5.6-sol` 이 `gpt-5.5` 보다 내용 정확도가 높았으나(마스크 계산 정확),
 **둘 다 파일 경로를 지어내는 경향**이 있었다. Claude 레인 2개는 경로가 정확했다.
 → **Codex 결과는 결론을 채택하되 경로·줄번호는 재확인**하는 것이 맞다.
+
+
+---
+
+## 10. 보스 SO 설계 (확정 2026-08-07)
+
+**방향**: 보스를 밀어버리고 몬스터 체계에 편입한다. 데이터 주도로 간다.
+팀장 확정 3건 — ① `BossDataSO : MonsterDataSO` **파생** ② `MonsterArchetype` 에 **`Boss` 추가**
+③ 공격별 개별 쿨다운을 **`MonsterBase` 로 승격**.
+
+### 10.1 `MonsterArchetype` 에 `Boss` 추가
+
+```csharp
+public enum MonsterArchetype { Melee = 0, RangedTurret = 1, RangedMobile = 2, Boss = 3 }
+```
+
+🔴 **끝에만 추가한다** — SO 에 정수로 직렬화돼 있어 중간 삽입 시 기존 몹의 아키타입이 밀린다.
+
+`MonsterBase` 의 Seek 분기에 한 줄이 는다:
+
+```
+case MonsterArchetype.Boss: SeekBoss(dist); break;
+```
+
+`SeekBoss` 는 거리창 + 가중치 + 연속 감쇠 + 폴백(§3 선택기)을 돌린다.
+
+### 10.2 공격별 쿨다운을 base 로 승격
+
+**지금**: `CooldownReady() => Time.time - _lastAttackTime >= 1f / AttackSpeed` — 단일 쿨.
+공격이 여러 종류여도 하나의 쿨을 공유한다.
+
+**바꿀 것**:
+
+```csharp
+float[] _lastUsedByAttack;                       // 크기 = 공격 종류 수 (없으면 1)
+protected bool CooldownReady(int attackId = 0)   // 기본값 0 → 기존 몹은 동작 동일
+```
+
+- **하위호환이 핵심이다.** 일반 몹 5종·중간보스 3종은 `attackId` 를 안 넘기므로 인덱스 0 하나만
+  쓰고 지금과 똑같이 동작한다. 회귀 위험을 여기서 끊는다.
+- 엔트리별 `cooldown` 이 `0` 이면 base 의 `1f / AttackSpeed` 로 폴백한다.
+
+### 10.3 `BossDataSO : MonsterDataSO`
+
+일반몹 SO 를 오염시키지 않으려고 파생으로 간다. 이미 `attackWindup`·`maxShield` 같은
+**죽은 필드가 있는 프로젝트**라 더 늘리지 않는다.
+
+```
+BossDataSO : MonsterDataSO
+─────────────────────────────────────────────────────────────
+[공격 테이블]   BossAttackEntry[] attacks
+    attackId             BossAttackId   (LeftHook/RightHook/Upper/Grab/Jump/Dash)
+    animatorStateName    string         ← ClientRpc CrossFade 대상
+    cooldown             float          ← 0 이면 base attackSpeed 폴백
+    minDistance          float
+    maxDistance          float
+    ignoreDistanceWindow bool           ← JumpAttack 전용(거리 무관)
+    targetRule           enum { CurrentTarget, FarthestPlayer }
+    weight               float
+    allowedFromPhase     int
+    damage               int
+    opensCounterWindow   bool           ← Grab·Dash 만 true
+    superArmor           bool
+    hitboxAnchorName     string         ← ColliderInfo 앵커 이름
+
+[선택기]        repeatPenalty(0.3) · meleeRange · rangedThreshold
+
+[페이즈]        BossPhaseEntry[] phases
+    hpThreshold          float          (0.66 / 0.33)
+    sequence             enum { None, ChargeSequence }
+    damageMultiplier · speedMultiplier
+
+[카운터/그로기]  counterFrontAngle(±60) · hitReactionState(getowned) · breakDuration(5)
+                ※ maxGroggyCount(5) · groggyDuration(2) 는 base 에 이미 있다 — 재사용
+
+[Wells]         bombThrowInterval · bombPrefab · throwImpulse · spreadAngle
+[폭탄/장판]      §boss-fsm-detailed-spec.md §11 스키마 참조
+```
+
+⚠️ **`hitboxAnchorName` 은 문자열이다** — 애니 파라미터명과 같은 규약(SO 문자열 + graceful).
+그래서 **오타가 조용히 무시된다.** §3.2 대로 **`Awake` 에서 앵커 실존을 검증해 `LogError`** 를 남긴다.
+이 프로젝트에 이미 죽은 설정값이 9건 있다(§6) — 같은 함정을 또 파지 않는다.
+
+### 10.4 서브클래스가 채우는 것 — 훅 4개
+
+| 훅 | 보스가 하는 일 |
+|---|---|
+| `StartAttack()` | 선택기로 `AttackId` 확정 → `base.StartAttack()` → ClientRpc CrossFade |
+| `HandleAttack(dt)` | Grab 체인(`AttackPhase`) · Dash 캐리 · Jump 시퀀스 |
+| `PerformAttackHit()` | `AttackId` 별 히트(단타 / AoE / 캐리 시작) |
+| `PlayStateAnimation(s)` | `if (s == Attack) return;` — 나머지는 base |
+
+**§2.1 관용구 3개를 그대로 따른다.** 특히 선택 결과는 `base.StartAttack()` **전에** 확정할 것.
+
+### 10.5 §7 의 6가지를 어디에 두는가
+
+| 필요 | 위치 |
+|---|---|
+| 페이즈 / HP 임계 전환 | 보스 서브클래스 + `BossDataSO.phases` |
+| **공격별 개별 쿨다운** | 🔴 **`MonsterBase` 로 승격**(§10.2) |
+| 거리창 + 가중치 선택기 | 보스 서브클래스 `SeekBoss()`. **기존 `BossBasicAttackChoice` 는 폐기** |
+| 카운터 창 + 정면 판정 | 보스 서브클래스 + `Hit` 상태 |
+| Dash / Jump 이동형 | `HandleAttack` 안 (SpinnerBot 돌진 선례) |
+| 상태 브로드캐스트 | 별도 채널 불필요 — `_state` `OnValueChanged` 로 충분 |
+
+### 10.6 폐기 대상
+
+```
+Assets/1.Scripts/Monster/Boss/BossBase.cs
+Assets/1.Scripts/Monster/Boss/BossState.cs
+Assets/1.Scripts/Monster/Boss/BossBasicAttackType.cs
+Assets/1.Scripts/Monster/Boss/BossBasicAttackChoice.cs
+```
+
+**전부 미사용**(프리팹·씬 부착 0건)이고, `BossBasicAttackChoice` 는 **버리기로 한
+`Enemy/Boss` 디렉터리의 `BaseAttackChoice`·`WeightedAttack<T>` 를 상속**한다.
+재사용이 불가능하므로 선택기는 새로 짠다.
+
+`Assets/1.Scripts/Enemy/Boss/**` 와 `Assets/8.BehaviorTreeGraph/Boss/**` 는 전환 검증 후 삭제.
+
+### 10.7 새 보스를 만드는 절차 (WallBot 경로 적용)
+
+1. `Create > Monster > Boss Data` 로 `BossDataSO` 1개
+2. 프리팹 조립 — §8 체크리스트 (루트 `Enemy(8)` / `Hurtbox` 자식 `EnemyHurtBox(14)` /
+   공격 앵커 **`Weapon(12)`** ← 레이어 이관 완료)
+3. `archetype = Boss`, 공격 테이블 6행 작성
+4. 애니 클립에 `OnAttackHit` / `OnAttackEnd`(exitTime 0.05~0.1 앞) — **SVN 커밋**
+5. 서브클래스는 훅 4개만 override
+6. `Awake` 계약 검증(애니 파라미터 + 앵커 이름) → `LogError`
