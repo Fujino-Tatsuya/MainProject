@@ -12,7 +12,7 @@ EditorBuildSettings:
     path: Assets/0.Scenes/MainFlow/1.TitleScene.unity
     guid: 3f77ead2a88390a419ff19b8eeab378f
   - enabled: 1
-    path: Assets/0.Scenes/MainFlow/3.BeaverLobby.unity
+    path: Assets/0.Scenes/MainFlow/3.LobbyScene.unity
     guid: d9c4f6e13a0f4d8cc7e5f2a1b3c4d5e6
   - enabled: 1
     path: Assets/0.Scenes/MainFlow/2.LoadingScene.unity

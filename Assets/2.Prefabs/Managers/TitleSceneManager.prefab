@@ -44,7 +44,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 94c7fd07fc274f24b9b391ef24fb7db6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  lobbySceneName: Temp_LobbyScene
+  lobbySceneName: 3.LobbyScene
   blackImage: {fileID: 0}
   fadeDuration: 1.5
   startButton: {fileID: 0}

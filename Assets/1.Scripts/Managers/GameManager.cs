@@ -18,7 +18,7 @@ public class GameManager : MonoBehaviour
     }
 
     [SerializeField] private string titleSceneName = "TitleScene";
-    [SerializeField] private string lobbySceneName = "Temp_LobbyScene";
+    [SerializeField] private string lobbySceneName = "3.LobbyScene";
     [SerializeField] private string resultSceneName = "ResultScene";
     [SerializeField] private string loadingSceneName = "2.LoadingScene";
     [SerializeField] private string mainGameSceneName = "4.MapScene";
