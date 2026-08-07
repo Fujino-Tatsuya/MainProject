@@ -21,10 +21,7 @@ Update this file when a term becomes important enough that future agents or team
 `archive/feature-Boss-20260807` → `d39e5ae` / `archive/map-player-merge-20260807` → `8c7850c`
 되살리려면 `git push origin archive/feature-Boss-20260807:refs/heads/<이름>`.
 
-⚠️ **폐기된 `d39e5ae` 는 우리 계획과 겹친다** — 커밋 제목이 "보스(23호&웰즈) 폭탄·장판 수치
-SO 이관 + Wells 블랙보드 분리"다. 우리가 §10.5(폭탄/장판 SO)와 §3(Wells BT 이탈)에서 하려는
-바로 그 작업이다. **새로 짜기 전에 위 태그의 diff 를 한 번 열어볼 가치가 있다** — 쓸 게 있으면
-가져오고, 없으면 확인했다는 사실만 남기면 된다.
+폐기 3커밋은 **확인 불필요**로 확정됐다(팀장 판단). 태그는 만약을 위한 보험일 뿐이다.
 
 **작업 세션**: 경석(Claude). base 선행 작업(쿨다운 슬롯·archetype)까지 코드로 들어갔고,
 그 위의 보스 본체(`BossDataSO`·서브클래스)는 아직 시작 전이다.
