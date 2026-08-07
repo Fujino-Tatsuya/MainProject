@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using TMPro;
 using Unity.Netcode;
 using UnityEngine;
@@ -27,12 +27,23 @@ public class BeaverLobbySceneManager : NemoSceneManager
     [SerializeField] private string defaultIp = "127.0.0.1";
     [SerializeField] private ushort defaultPort = 7777;
 
+    [Header("Relay Connection")]
+    [SerializeField] private GameObject relayPanel;
+    [SerializeField] private GameObject directPanel;
+    [SerializeField] private TMP_InputField joinCodeInputField;
+    [SerializeField] private TMP_Text joinCodeDisplayText;
+    [SerializeField] private Button relayHostButton;
+    [SerializeField] private Button relayJoinButton;
+    [SerializeField] private Button modeToggleButton;
+
     private NetworkManager _networkManager;
     private NetworkSessionLauncher _sessionLauncher;
     private LobbyUIController _lobbyUIController;
     private bool _connectionDataApplied;
     private bool _clientConnectPending;
     private bool _networkCallbacksRegistered;
+    private bool _relayStartPending;
+    private bool _relayHostPending;
 
     protected override void Awake()
     {
@@ -49,6 +60,7 @@ public class BeaverLobbySceneManager : NemoSceneManager
         ResolveSceneReferences();
         BindButtons();
         RegisterNetworkCallbacks();
+        RegisterSessionLauncherEvents();
     }
 
     private void Start()
@@ -58,6 +70,7 @@ public class BeaverLobbySceneManager : NemoSceneManager
         ApplyDefaultInputValues();
         SetErrorMessage(string.Empty);
         RegisterLobbyUiEvents();
+        SelectDirectMode();
         ApplyRoleUi();
 
         // BGM 재생
@@ -67,6 +80,7 @@ public class BeaverLobbySceneManager : NemoSceneManager
     private void OnDestroy()
     {
         UnregisterNetworkCallbacks();
+        UnregisterSessionLauncherEvents();
         UnregisterLobbyUiEvents();
     }
 
@@ -131,6 +145,62 @@ public class BeaverLobbySceneManager : NemoSceneManager
             Debug.Log("[SceneFlow] BeaverLobbySceneManager.StartClient failed");
             SetErrorMessage("Client 시작에 실패했습니다.");
         }
+    }
+
+    public void SelectDirectMode()
+    {
+        if (_sessionLauncher != null)
+        {
+            _sessionLauncher.Mode = SessionConnectionMode.DirectIPv4;
+        }
+
+        SetConnectionModePanels(false);
+        SetErrorMessage(string.Empty);
+    }
+
+    public void SelectRelayMode()
+    {
+        if (_sessionLauncher != null)
+        {
+            _sessionLauncher.Mode = SessionConnectionMode.UnityRelay;
+        }
+
+        SetConnectionModePanels(true);
+        SetErrorMessage(string.Empty);
+    }
+
+    public void StartRelayHost()
+    {
+        if (!TryBeginRelayStart(true))
+        {
+            return;
+        }
+
+        if (joinCodeDisplayText != null)
+        {
+            joinCodeDisplayText.text = string.Empty;
+        }
+
+        SetErrorMessage("Relay 방 생성 중...");
+        _sessionLauncher.BeginHost();
+    }
+
+    public void StartRelayJoin()
+    {
+        var joinCode = joinCodeInputField != null ? joinCodeInputField.text : string.Empty;
+        if (string.IsNullOrWhiteSpace(joinCode))
+        {
+            SetErrorMessage("Relay 조인코드를 입력하세요.");
+            return;
+        }
+
+        if (!TryBeginRelayStart(false))
+        {
+            return;
+        }
+
+        SetErrorMessage("Relay 방 참가 준비 중...");
+        _sessionLauncher.BeginClient(joinCode);
     }
 
     public void ToggleReady()
@@ -259,6 +329,7 @@ public class BeaverLobbySceneManager : NemoSceneManager
         SetErrorMessage(string.Empty);
         SetSessionConnectPanel(false);
         SetConnectControlsInteractable(true);
+        SetRelayControlsInteractable(true);
         ApplyRoleUi();
     }
 
@@ -291,6 +362,7 @@ public class BeaverLobbySceneManager : NemoSceneManager
         _clientConnectPending = false;
         SetSessionConnectPanel(true);
         SetConnectControlsInteractable(true);
+        SetRelayControlsInteractable(true);
         ApplyRoleUi();
     }
 
@@ -301,7 +373,85 @@ public class BeaverLobbySceneManager : NemoSceneManager
         _clientConnectPending = false;
         SetSessionConnectPanel(true);
         SetConnectControlsInteractable(true);
+        SetRelayControlsInteractable(true);
         ApplyRoleUi();
+    }
+
+    private bool TryBeginRelayStart(bool hosting)
+    {
+        if (_sessionLauncher == null)
+        {
+            WarnMissingReference(nameof(NetworkSessionLauncher));
+            SetErrorMessage("네트워크 세션 런처를 찾을 수 없습니다.");
+            return false;
+        }
+
+        if (_relayStartPending)
+        {
+            return false;
+        }
+
+        _sessionLauncher.Mode = SessionConnectionMode.UnityRelay;
+        _relayStartPending = true;
+        _relayHostPending = hosting;
+        SetConnectControlsInteractable(false);
+        SetRelayControlsInteractable(false);
+        return true;
+    }
+
+    private void HandleSessionStartCompleted(SessionStartResult result)
+    {
+        if (!_relayStartPending)
+        {
+            return;
+        }
+
+        var wasHosting = _relayHostPending;
+        _relayStartPending = false;
+        _relayHostPending = false;
+
+        if (!result.Success)
+        {
+            SetErrorMessage(result.FailureReason);
+            SetConnectControlsInteractable(true);
+            SetRelayControlsInteractable(true);
+            return;
+        }
+
+        if (wasHosting)
+        {
+            if (joinCodeDisplayText != null)
+            {
+                joinCodeDisplayText.text = result.ShareCode;
+            }
+
+            SetErrorMessage(string.IsNullOrEmpty(result.ShareCode)
+                ? "Relay Host가 시작되었습니다."
+                : $"Relay 조인코드: {result.ShareCode}");
+            SetConnectControlsInteractable(false);
+            SetRelayControlsInteractable(false);
+            ApplyRoleUi();
+            return;
+        }
+
+        _clientConnectPending = true;
+        SetErrorMessage("서버 접속 시도 중...");
+    }
+
+    private void RegisterSessionLauncherEvents()
+    {
+        if (_sessionLauncher != null)
+        {
+            _sessionLauncher.SessionStartCompleted += HandleSessionStartCompleted;
+        }
+    }
+
+    private void UnregisterSessionLauncherEvents()
+    {
+        if (_sessionLauncher != null)
+        {
+            _sessionLauncher.SessionStartCompleted -= HandleSessionStartCompleted;
+        }
     }
 
     private void HandleLobbyStateChanged()
@@ -414,6 +564,21 @@ public class BeaverLobbySceneManager : NemoSceneManager
         BindButton(setConnectionDataButton, ApplyConnectionData);
         BindButton(gameStartButton, StartGameLoading);
         BindButton(readyButton, ToggleReady);
+        BindButton(relayHostButton, StartRelayHost);
+        BindButton(relayJoinButton, StartRelayJoin);
+        BindButton(modeToggleButton, ToggleConnectionMode);
+    }
+
+    private void ToggleConnectionMode()
+    {
+        if (_sessionLauncher != null && _sessionLauncher.Mode == SessionConnectionMode.UnityRelay)
+        {
+            SelectDirectMode();
+        }
+        else
+        {
+            SelectRelayMode();
+        }
     }
 
     private void BindButton(Button button, UnityEngine.Events.UnityAction action)
@@ -439,6 +604,29 @@ public class BeaverLobbySceneManager : NemoSceneManager
         if (portInputField != null)
         {
             portInputField.interactable = interactable;
+        }
+    }
+
+    private void SetRelayControlsInteractable(bool interactable)
+    {
+        SetButtonsInteractable(interactable, relayHostButton, relayJoinButton, modeToggleButton);
+
+        if (joinCodeInputField != null)
+        {
+            joinCodeInputField.interactable = interactable;
+        }
+    }
+
+    private void SetConnectionModePanels(bool relaySelected)
+    {
+        if (relayPanel != null)
+        {
+            relayPanel.SetActive(relaySelected);
+        }
+
+        if (directPanel != null)
+        {
+            directPanel.SetActive(!relaySelected);
         }
     }
 

@@ -10,6 +10,7 @@ public class NetworkSessionLauncher : MonoBehaviour
     NetworkManager _networkManager;
     NetworkLoadingFlowController _loadingFlowController;
     DirectIPv4ConnectionProvider _directIPv4Provider;
+    RelayConnectionProvider _relayProvider;
     [SerializeField] private GameObject defaultPlayerPrefab;
 
     public SessionConnectionMode Mode { get; set; } = SessionConnectionMode.DirectIPv4;
@@ -24,6 +25,7 @@ public class NetworkSessionLauncher : MonoBehaviour
         if (unityTransport != null)
         {
             _directIPv4Provider = new DirectIPv4ConnectionProvider(unityTransport);
+            _relayProvider = new RelayConnectionProvider(unityTransport);
         }
 
         _loadingFlowController?.SetDefaultPlayerPrefab(defaultPlayerPrefab);
@@ -166,7 +168,12 @@ public class NetworkSessionLauncher : MonoBehaviour
         out ISessionConnectionProvider provider,
         out SessionStartResult failureResult)
     {
-        provider = Mode == SessionConnectionMode.DirectIPv4 ? _directIPv4Provider : null;
+        provider = Mode switch
+        {
+            SessionConnectionMode.DirectIPv4 => _directIPv4Provider,
+            SessionConnectionMode.UnityRelay => _relayProvider,
+            _ => null
+        };
         if (provider == null)
         {
             failureResult = SessionStartResult.Failed(
