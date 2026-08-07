@@ -31,6 +31,10 @@ public class EffectSceneTester : MonoBehaviour
     [SerializeField, Min(1)] private int burstCount = 20;
     [SerializeField, Min(0f)] private float burstInterval = 0.05f;
 
+    [Header("케이스 7 — 타격점 계산")]
+    [Tooltip("타격을 받을 콜라이더. 비우면 followTarget에서 찾는다")]
+    [SerializeField] private Collider hitTarget;
+
     private EffectHandle _loopHandle;
 
     private Vector3 SpawnPosition => spawnPoint != null ? spawnPoint.position : transform.position;
@@ -167,6 +171,70 @@ public class EffectSceneTester : MonoBehaviour
                     $"(대출 {EffectManager.Instance.PoolCountActive(prefab)}개) ";
         }
         return line;
+    }
+
+    #endregion
+
+    #region 케이스 7 — 타격점 계산 (EffectHitPoint)
+
+    /// <summary>
+    /// spawnPoint를 "공격자", hitTarget을 "피격자"로 삼아 <see cref="EffectHitPoint"/>가 계산한
+    /// 자리에 이펙트를 띄운다. spawnPoint를 캡슐 주위로 옮겨가며 눌러보면
+    /// 점이 표면을 따라 미끄러지고 방향이 늘 공격자 쪽을 향하는지 확인할 수 있다.
+    /// </summary>
+    [ContextMenu("케이스 7 — 타격점에 재생")]
+    public void Case7HitPoint()
+    {
+        if (!Ready(oneShot, "oneShot")) return;
+        if (!TryBuildHitContext(out AttackHitContext context)) return;
+
+        Pose pose = EffectHitPoint.Resolve(context, followTarget);
+        EffectManager.Instance.Play(oneShot, pose.position, pose.rotation);
+    }
+
+    private bool TryBuildHitContext(out AttackHitContext context)
+    {
+        context = default;
+
+        Collider target = ResolveHitTarget();
+        if (target == null)
+        {
+            Debug.LogWarning("[EffectSceneTester] hitTarget이 비어 있고 followTarget에서도 콜라이더를 찾지 못했다.", this);
+            return false;
+        }
+
+        Transform source = spawnPoint != null ? spawnPoint : transform;
+        context = new AttackHitContext(source.position, source, target);
+        return true;
+    }
+
+    private Collider ResolveHitTarget()
+    {
+        if (hitTarget != null) return hitTarget;
+        return followTarget != null ? followTarget.GetComponentInChildren<Collider>() : null;
+    }
+
+    /// <summary>
+    /// 플레이 모드 없이도 계산 결과를 눈으로 본다.
+    /// 노랑 = 공격자(spawnPoint) · 하늘 = 계산된 타격점 · 초록 = 이펙트가 바라볼 방향(+Z).
+    /// </summary>
+    private void OnDrawGizmosSelected()
+    {
+        Collider target = ResolveHitTarget();
+        if (target == null) return;
+
+        Transform source = spawnPoint != null ? spawnPoint : transform;
+        Pose pose = EffectHitPoint.Resolve(new AttackHitContext(source.position, source, target), followTarget);
+
+        Gizmos.color = Color.yellow;
+        Gizmos.DrawWireSphere(source.position, 0.08f);
+        Gizmos.DrawLine(source.position, pose.position);
+
+        Gizmos.color = Color.cyan;
+        Gizmos.DrawSphere(pose.position, 0.06f);
+
+        Gizmos.color = Color.green;
+        Gizmos.DrawRay(pose.position, pose.rotation * Vector3.forward * 0.5f);
     }
 
     #endregion

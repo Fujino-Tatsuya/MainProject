@@ -50,6 +50,13 @@ public class EffectSceneTesterEditor : Editor
             if (GUILayout.Button("대상 재개 (rate 1)")) tester.Case6ResumeTarget();
         }
 
+        Section("7 · 타격점 계산 — 표면에 붙고 공격자 쪽을 바라보는가");
+        if (GUILayout.Button("타격점에 재생")) tester.Case7HitPoint();
+        EditorGUILayout.HelpBox(
+            "이 컴포넌트를 선택하면 씬 뷰에 계산 결과가 보인다 — " +
+            "노랑=공격자 / 하늘=타격점 / 초록=이펙트가 바라볼 +Z. spawnPoint를 옮겨가며 확인할 것.",
+            MessageType.None);
+
         EditorGUILayout.Space();
         if (GUILayout.Button("풀 통계 출력")) tester.LogPoolStats();
     }
