@@ -254,7 +254,19 @@ public class Player : Unit
         ApplyKnockbackClientRpc(direction, strength, CreateOwnerClientRpcParams());
     }
 
-    public bool BeginGrabbedByInstigator(GameObject instigator)
+    /// <summary>
+    /// 서버가 플레이어를 instigator에 구속한다(잡기 = <see cref="RestraintMode.Carry"/> /
+    /// 돌진 밀기 = <see cref="RestraintMode.Push"/>).
+    ///
+    /// 반환값이 곧 계약이다 — <b>false면 구속되지 않았다</b>. 시전자는 이 값으로 후처리를 갈라야 한다
+    /// (예: 돌진이 벽에 닿았을 때 <b>실제로 밀린 대상만</b> 기절시킨다). 데미지는 이 값과 무관하게 별도 경로다.
+    ///
+    /// Push는 시전자가 슈퍼아머 대상을 밀지 못한다(<see cref="Unit.Knockback"/>과 같은 규칙).
+    /// Carry는 슈퍼아머와 무관하게 걸린다 — 기존 보스 Grab 체인의 동작이다.
+    /// </summary>
+    /// <param name="frontOffset">Push 전용. 시전자 정면으로 이만큼 앞에 붙는다.</param>
+    public bool BeginRestrainedByInstigator(
+        GameObject instigator, RestraintMode mode = RestraintMode.Carry, float frontOffset = 0f)
     {
         if (!IsServer)
             return false;
@@ -263,30 +275,47 @@ public class Player : Unit
             instigator != null ? instigator.GetComponentInParent<NetworkObject>() : null;
         if (instigatorNetworkObject == null)
         {
-            Debug.LogError("[Player] Grab instigator must belong to a spawned NetworkObject.", this);
+            Debug.LogError("[Player] Restraint instigator must belong to a spawned NetworkObject.", this);
             return false;
         }
 
-        if (!stateController.BeginGrabbed(instigator))
+        if (!stateController.BeginRestrained(instigator, mode, frontOffset))
             return false;
 
-        BeginGrabbedClientRpc(new NetworkObjectReference(instigatorNetworkObject), CreateOwnerClientRpcParams());
+        // Transform은 복제할 수 없으므로 종류(byte)와 offset만 싣는다 — 오너가 같은 규칙으로 목표를 계산한다.
+        BeginRestrainedClientRpc(
+            new NetworkObjectReference(instigatorNetworkObject), (byte)mode, frontOffset,
+            CreateOwnerClientRpcParams());
         return true;
     }
 
-    public bool EndGrabbedByInstigator()
+    public bool EndRestrainedByInstigator()
     {
         if (!IsServer)
             return false;
 
-        bool ended = stateController.EndGrabbed();
-        EndGrabbedClientRpc(CreateOwnerClientRpcParams());
+        bool ended = stateController.EndRestrained();
+        EndRestrainedClientRpc(CreateOwnerClientRpcParams());
         return ended;
     }
 
+    /// <summary>기존 잡기 호출부 호환 래퍼. 보스 Grab 체인이 이 시그니처로 동작 중이라 유지한다.</summary>
+    public bool BeginGrabbedByInstigator(GameObject instigator)
+    {
+        return BeginRestrainedByInstigator(instigator, RestraintMode.Carry);
+    }
+
+    /// <summary>기존 잡기 호출부 호환 래퍼.</summary>
+    public bool EndGrabbedByInstigator()
+    {
+        return EndRestrainedByInstigator();
+    }
+
     [ClientRpc]
-    private void BeginGrabbedClientRpc(
+    private void BeginRestrainedClientRpc(
         NetworkObjectReference instigatorReference,
+        byte restraintMode,
+        float frontOffset,
         ClientRpcParams clientRpcParams = default)
     {
         if (!IsOwner)
@@ -294,20 +323,22 @@ public class Player : Unit
 
         if (!instigatorReference.TryGet(out NetworkObject instigatorNetworkObject))
         {
-            Debug.LogError("[Player] Grab instigator NetworkObject could not be resolved on the owner.", this);
+            Debug.LogError("[Player] Restraint instigator NetworkObject could not be resolved on the owner.", this);
             return;
         }
 
-        stateController.ApplyGrabbedFromServer(instigatorNetworkObject.gameObject);
+        // 서버가 이미 승인한 전이다 — 오너는 슈퍼아머를 다시 판정하지 않는다(복제 지연 시 상태가 갈린다).
+        stateController.ApplyRestrainedFromServer(
+            instigatorNetworkObject.gameObject, (RestraintMode)restraintMode, frontOffset);
     }
 
     [ClientRpc]
-    private void EndGrabbedClientRpc(ClientRpcParams clientRpcParams = default)
+    private void EndRestrainedClientRpc(ClientRpcParams clientRpcParams = default)
     {
         if (!IsOwner)
             return;
 
-        stateController.EndGrabbed();
+        stateController.EndRestrained();
     }
 
     [ClientRpc]

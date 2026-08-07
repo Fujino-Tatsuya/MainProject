@@ -7,7 +7,7 @@ using UnityEngine;
 [RequireComponent(typeof(PlayerAimIndicator))]
 [RequireComponent(typeof(DefaultAttackController))]
 [RequireComponent(typeof(StatusEffectController))]
-public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
+public class PlayerStateController : MonoBehaviour, IRestraintReceiver
 {
     [SerializeField] private PlayerActionState currentStateDebug;
     [SerializeField] private float minKnockbackTime = 0.15f;
@@ -136,36 +136,47 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
         return $"{callerMember}() @ {fileName}:{callerLine}";
     }
 
-    public bool TryReceiveGrab(GrabInteractionContext grabContext)
+    public bool TryReceiveRestraint(RestraintContext restraintContext)
     {
         if (!CanReceiveServerInteraction())
             return false;
 
-        return ApplyGrabbed(grabContext);
-    }
-
-    public bool ApplyGrabbedFromServer(GameObject instigator = null)
-    {
-        return ApplyGrabbed(new GrabInteractionContext(instigator, gameObject));
-    }
-
-    private bool ApplyGrabbed(GrabInteractionContext grabContext)
-    {
-        if (!CanReceiveGrab(grabContext))
+        // 슈퍼아머 거부는 서버 진입에서만 판정한다. 오너는 서버 결정(ApplyRestrainedFromServer)을
+        // 그대로 따라야 하며, 복제 지연으로 상태이상 목록이 어긋난 순간에 각자 판단하면 상태가 갈린다.
+        //
+        // Push만 거부하는 이유: Unit.Knockback과 같은 규칙(슈퍼아머면 안 밀린다)을 플레이어 쪽 한 곳에 둔다.
+        // Carry(잡기)는 원래 슈퍼아머와 무관하게 걸렸다 — 여기에 검사를 넣으면 보스 Grab 체인이 회귀한다.
+        if (restraintContext.Mode == RestraintMode.Push && context.Player.HasSuperArmor)
             return false;
 
-        SetState(new PlayerGrabbedState(context, grabContext.Instigator));
+        return ApplyRestrained(restraintContext);
+    }
+
+    public bool ApplyRestrainedFromServer(
+        GameObject instigator = null, RestraintMode mode = RestraintMode.Carry, float frontOffset = 0f)
+    {
+        return ApplyRestrained(new RestraintContext(instigator, gameObject, mode, frontOffset));
+    }
+
+    private bool ApplyRestrained(RestraintContext restraintContext)
+    {
+        if (!CanReceiveRestraint(restraintContext))
+            return false;
+
+        SetState(new PlayerRestrainedState(
+            context, restraintContext.Instigator, restraintContext.Mode, restraintContext.FrontOffset));
         return true;
     }
 
-    public bool BeginGrabbed(GameObject instigator = null)
+    public bool BeginRestrained(
+        GameObject instigator = null, RestraintMode mode = RestraintMode.Carry, float frontOffset = 0f)
     {
-        return TryReceiveGrab(new GrabInteractionContext(instigator, gameObject));
+        return TryReceiveRestraint(new RestraintContext(instigator, gameObject, mode, frontOffset));
     }
 
-    public bool EndGrabbed()
+    public bool EndRestrained()
     {
-        if (CurrentState != PlayerActionState.Grabbed)
+        if (CurrentState != PlayerActionState.Restrained)
             return false;
 
         ChangeState(PlayerActionState.Idle);
@@ -299,7 +310,7 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
             PlayerActionState.Skill => false, // 스킬 인스턴스가 필수라 BeginSkill(skill)으로만 진입
             PlayerActionState.Move => !context.StatusEffects.BlocksMovement,
             PlayerActionState.Idle => true,
-            PlayerActionState.Grabbed => true,
+            PlayerActionState.Restrained => true,
             PlayerActionState.Knockback => false, // 방향·세기가 필수라 BeginKnockback(direction, strength)으로만 진입
             PlayerActionState.Dash => false, // 방향·속도·지속이 필수라 BeginDash(...)로만 진입
             PlayerActionState.Dead => true,
@@ -315,7 +326,7 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
             PlayerActionState.Move => new PlayerMoveState(context),
             PlayerActionState.Attack => new PlayerAttackState(context),
             PlayerActionState.Interrupt => new PlayerInterruptState(context),
-            PlayerActionState.Grabbed => new PlayerGrabbedState(context),
+            PlayerActionState.Restrained => new PlayerRestrainedState(context),
             PlayerActionState.Dead => new PlayerLockedState(context, PlayerActionState.Dead),
             PlayerActionState.Cinematic => new PlayerLockedState(context, PlayerActionState.Cinematic),
             _ => new PlayerIdleState(context)
@@ -339,10 +350,11 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
         currentState.Enter(previousState);
     }
 
-    private bool CanReceiveGrab(GrabInteractionContext grabContext)
+    // 서버·오너 양쪽에서 도는 공통 가드. 슈퍼아머 판정은 여기 두지 않는다(TryReceiveRestraint 주석 참고).
+    private bool CanReceiveRestraint(RestraintContext restraintContext)
     {
         return CurrentState != PlayerActionState.Dead &&
-            CurrentState != PlayerActionState.Grabbed &&
+            CurrentState != PlayerActionState.Restrained &&
             !cinematicLocked;
     }
 
@@ -355,23 +367,45 @@ public class PlayerStateController : MonoBehaviour, IGrabInteractionReceiver
     }
 }
 
-public readonly struct GrabInteractionContext
+/// <summary>
+/// 서버가 플레이어의 위치·입력을 잠시 통제하는 방식.
+/// ⚠️ 값은 반드시 끝에만 추가할 것 — RPC로 byte 전송된다.
+/// </summary>
+public enum RestraintMode : byte
 {
-    public GrabInteractionContext(GameObject instigator, GameObject receiver)
+    /// <summary>잡기 — 시전자의 <see cref="GrabController.GrabSocket"/>에 종속된다.</summary>
+    Carry = 0,
+
+    /// <summary>돌진 밀기 — 시전자 정면 offset 지점을 따라간다. 소켓이 필요 없다.</summary>
+    Push = 1
+}
+
+public readonly struct RestraintContext
+{
+    public RestraintContext(
+        GameObject instigator, GameObject receiver,
+        RestraintMode mode = RestraintMode.Carry, float frontOffset = 0f)
     {
         Instigator = instigator;
         Receiver = receiver;
+        Mode = mode;
+        FrontOffset = frontOffset;
     }
 
     public GameObject Instigator { get; }
     public GameObject Receiver { get; }
+    public RestraintMode Mode { get; }
+
+    /// <summary>Push 전용 — 시전자 정면으로 이 거리만큼 앞에 붙는다. Carry는 무시.</summary>
+    public float FrontOffset { get; }
 }
 
-public interface IGrabInteractionReceiver
+public interface IRestraintReceiver
 {
-    bool TryReceiveGrab(GrabInteractionContext context);
-    bool BeginGrabbed(GameObject instigator = null);
-    bool EndGrabbed();
+    bool TryReceiveRestraint(RestraintContext context);
+    bool BeginRestrained(
+        GameObject instigator = null, RestraintMode mode = RestraintMode.Carry, float frontOffset = 0f);
+    bool EndRestrained();
 }
 
 public enum PlayerActionState
@@ -380,7 +414,9 @@ public enum PlayerActionState
     Move,
     Attack,
     Interrupt,
-    Grabbed,
+
+    /// <summary>서버가 위치·입력을 통제하는 구속 상태(잡기 = Carry / 돌진 밀기 = Push).</summary>
+    Restrained,
     Knockback,
     Dead,
     Skill,
@@ -677,33 +713,61 @@ public sealed class PlayerLockedState : PlayerStateBase
     }
 }
 
-public sealed class PlayerGrabbedState : PlayerStateBase
+/// <summary>
+/// 서버가 플레이어의 위치·입력을 잠시 통제하는 상태. 두 모드를 한 상태로 묶는다:
+/// <see cref="RestraintMode.Carry"/>(잡기 — 소켓 종속) / <see cref="RestraintMode.Push"/>(돌진 밀기 — 시전자 정면 추종).
+///
+/// 권위 분담(networking.md 유지): 상태 진입·해제 결정은 <b>서버</b>, 위치를 실제로 옮기는 것은 <b>오너</b>다.
+/// 서버가 위치를 직접 쓰지 않으므로 "플레이어 이동은 오너 권한" 원칙이 깨지지 않는다.
+/// 입력 차단은 상태 진입만으로 성립한다 — CanMove/CanUseSkill/CanAttack이 Idle|Move에서만 참이다.
+/// </summary>
+public sealed class PlayerRestrainedState : PlayerStateBase
 {
     private readonly GameObject instigator;
+    private readonly RestraintMode mode;
+    private readonly float frontOffset;
     private bool wasKinematic;
     private bool wasDetectingCollisions;
     private bool hadRigidbody;
+
+    // Carry 전용. null이면 위치 추종만 건너뛰고 물리 위임·입력 차단은 그대로 간다
+    // (보스에 잡기 소켓이 아직 없는 동안 "제자리에 붙잡힘"이 이 성질로 성립한다 — 유지할 것).
     private Transform followTarget;
 
-    public PlayerGrabbedState(PlayerStateContext context, GameObject instigator = null) : base(context)
+    // Push 전용. 캐리 중 isKinematic이라 중력이 없으므로 Y는 진입 시점 값으로 고정한다.
+    // 시전자 Y를 그대로 쓰면 피벗 높이가 다를 때 플레이어가 조용히 뜨거나 잠긴다.
+    private float pushHeight;
+
+    public PlayerRestrainedState(
+        PlayerStateContext context, GameObject instigator = null,
+        RestraintMode mode = RestraintMode.Carry, float frontOffset = 0f) : base(context)
     {
         this.instigator = instigator;
+        this.mode = mode;
+        this.frontOffset = frontOffset;
     }
 
-    public override PlayerActionState StateType => PlayerActionState.Grabbed;
+    public override PlayerActionState StateType => PlayerActionState.Restrained;
     public override bool RequiresStateAuthorityTick => true;
 
     public override void Enter(PlayerActionState previousState)
     {
         Context.DefaultAttack.CancelCurrentAttack();
         Context.Player.SetAnimatorMoving(false);
-        GrabController grabController = instigator != null
-            ? instigator.GetComponentInChildren<GrabController>()
-            : null;
-        followTarget = grabController != null ? grabController.GrabSocket : null;
+
+        if (mode == RestraintMode.Carry)
+        {
+            GrabController grabController = instigator != null
+                ? instigator.GetComponentInChildren<GrabController>()
+                : null;
+            followTarget = grabController != null ? grabController.GrabSocket : null;
+        }
+
+        pushHeight = Context.Player.transform.position.y;
+
         DelegatePhysicsAndCollisionToInstigator();
         FaceInstigator();
-        // TODO: Play the grabbed animation here after the Animator parameter/clip is configured.
+        // TODO: Play the restrained animation here after the Animator parameter/clip is configured.
         // Example: Context.Animator.SetBool("IsGrabbed", true);
     }
 
@@ -711,23 +775,62 @@ public sealed class PlayerGrabbedState : PlayerStateBase
     {
         RestorePlayerPhysicsAndCollision();
         FaceInstigator();
-        // TODO: Stop the grabbed animation here after the Animator parameter/clip is configured.
+        // TODO: Stop the restrained animation here after the Animator parameter/clip is configured.
         // Example: Context.Animator.SetBool("IsGrabbed", false);
     }
 
     public override void Tick()
     {
-        if (!Context.Player.IsMovementAuthority || followTarget == null)
+        if (!Context.Player.IsMovementAuthority)
+            return;
+
+        if (!TryGetTargetPose(out Vector3 position, out Quaternion rotation))
             return;
 
         if (Context.Rigidbody != null)
         {
-            Context.Rigidbody.MovePosition(followTarget.position);
-            Context.Rigidbody.MoveRotation(followTarget.rotation);
+            Context.Rigidbody.MovePosition(position);
+            Context.Rigidbody.MoveRotation(rotation);
             return;
         }
 
-        Context.Player.transform.SetPositionAndRotation(followTarget.position, followTarget.rotation);
+        Context.Player.transform.SetPositionAndRotation(position, rotation);
+    }
+
+    /// <summary>추종할 목표 위치·회전. 대상이 사라졌거나 소켓이 없으면 false — 이때 위치만 놓아준다.</summary>
+    private bool TryGetTargetPose(out Vector3 position, out Quaternion rotation)
+    {
+        position = default;
+        rotation = default;
+
+        if (mode == RestraintMode.Carry)
+        {
+            if (followTarget == null)
+                return false;
+
+            position = followTarget.position;
+            rotation = followTarget.rotation;
+            return true;
+        }
+
+        // Push: 시전자 정면 offset 지점. 시전자 루트는 NetworkTransform으로 복제되므로
+        // 오너 클라에서도 월드 위치가 성립한다 — 별도 소켓 오브젝트가 필요 없다.
+        if (instigator == null)
+            return false;
+
+        Transform source = instigator.transform;
+        Vector3 forward = source.forward;
+        forward.y = 0f;
+        if (forward.sqrMagnitude < 0.0001f)
+            forward = Vector3.forward;
+        forward.Normalize();
+
+        position = source.position + forward * frontOffset;
+        position.y = pushHeight;
+
+        // 밀리는 동안 보스를 마주본다(잡기와 같은 시맨틱)
+        rotation = Quaternion.LookRotation(-forward);
+        return true;
     }
 
     private void DelegatePhysicsAndCollisionToInstigator()
@@ -756,7 +859,7 @@ public sealed class PlayerGrabbedState : PlayerStateBase
         Context.Rigidbody.angularVelocity = Vector3.zero;
     }
 
-    // 잡기 소켓에 슬레이브되며 생긴 기울어짐을 정리하고 보스 방향(yaw만)으로 세운다.
+    // 소켓/정면 추종 중 생긴 기울어짐을 정리하고 시전자 방향(yaw만)으로 세운다.
     // instigator가 없으면 현재 바라보던 방향을 유지한 채 똑바로만 세운다.
     private void FaceInstigator()
     {
@@ -1056,8 +1159,8 @@ public sealed class PlayerDashState : PlayerStateBase
         {
             case PlayerActionState.Knockback:
                 return "피격 넉백(Unit.Knockback → BeginKnockback)";
-            case PlayerActionState.Grabbed:
-                return "보스 잡기(Grab)";
+            case PlayerActionState.Restrained:
+                return "보스 구속(잡기 또는 돌진 밀기)";
             case PlayerActionState.Cinematic:
                 return "연출 잠금(PlayerEncounterLock)";
             case PlayerActionState.Dead:
