@@ -5327,6 +5327,7 @@ MonoBehaviour:
   statusEffectHUD: {fileID: 1025526318762844072}
   passiveHUD: {fileID: 2109840354742284367}
   skillCooldownHUD: {fileID: 9042323416097842816}
+  dashCooldownHUD: {fileID: 0}
 --- !u!114 &8434246506387944202
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5802,6 +5803,8 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 8207985060897067919}
+  - component: {fileID: 3347576998068231626}
+  - component: {fileID: 2360924950670046369}
   m_Layer: 6
   m_Name: InterruptAttack
   m_TagString: Untagged
@@ -5824,6 +5827,39 @@ Transform:
   m_Children: []
   m_Father: {fileID: 2120077009040376810}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &3347576998068231626
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5593719765829104883}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 0
+  serializedVersion: 3
+  m_Size: {x: 1.6, y: 1, z: 1.6}
+  m_Center: {x: 0, y: 0, z: 0.9}
+--- !u!114 &2360924950670046369
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5593719765829104883}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 81c70da5a2e747148bf71f917743b5fd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ColliderInfo
 --- !u!1 &5672675386071563159
 GameObject:
   m_ObjectHideFlags: 0
@@ -6684,6 +6720,7 @@ GameObject:
   - component: {fileID: 1311512696789152797}
   - component: {fileID: 1461530121226363041}
   - component: {fileID: 3420145443151374840}
+  - component: {fileID: 6118376412819370303}
   m_Layer: 6
   m_Name: Paladin
   m_TagString: Player
@@ -7030,7 +7067,7 @@ MonoBehaviour:
   animator: {fileID: 0}
   mainSkill: {fileID: 2590523662464605774}
   subSkill: {fileID: 2188207255195787144}
-  interruptSkill: {fileID: 0}
+  interruptSkill: {fileID: 6118376412819370303}
   ultimateSkill: {fileID: 1492765860989694546}
   endFallbackPadding: 0.1
 --- !u!114 &87698441936007240
@@ -7385,6 +7422,20 @@ MonoBehaviour:
   defaultAttack: {fileID: 4683411582078572617}
   skillController: {fileID: 8323634410014447556}
   body: {fileID: 786699605289514005}
+--- !u!114 &6118376412819370303
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6077492126708577103}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c87d05552788d9b46863221df469a7bd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FirstMeleeInterruptSkill
+  data: {fileID: 11400000, guid: 617280762f0032c4096fd2b1967e3bf1, type: 2}
+  hitboxAnchor: {fileID: 2360924950670046369}
 --- !u!1 &6097337715216137025
 GameObject:
   m_ObjectHideFlags: 0
@@ -8350,6 +8401,12 @@ MonoBehaviour:
   shieldBar: {fileID: 779114812263548466}
   shieldFill: {fileID: 9173888068502858459}
   shieldText: {fileID: 9183493968907098578}
+  delayed:
+    delayedFill: {fileID: 0}
+    holdSeconds: 0.4
+    drainRatePerSecond: 0.8
+    maxHeldHits: 5
+    resetHoldOnDamage: 1
 --- !u!1 &6844804725867415102
 GameObject:
   m_ObjectHideFlags: 0
