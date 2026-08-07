@@ -1,6 +1,115 @@
-# CURRENT PLAN — 세션 연결 방식 추상화 (Phase 1) (2026-08-07)
+# CURRENT PLAN — Relay 로비 신설 (Phase 2) (2026-08-07)
 
-> 상태: **승인 대기**. 브랜치 미생성. base `development`.
+> 상태: **승인 대기**. 브랜치 `feature/SessionTransport` 이어서 사용(Phase 1 이 base).
+> grill 완료 — 확정된 결정만 담는다.
+
+## 목표
+
+**기존 IPv4 로비를 그대로 두고**, 같은 씬 안에 **Relay 연결 통로를 신설**한다.
+호스트는 조인코드를 발급받아 화면에 표시하고, 참가자는 그 코드로 들어온다.
+
+## 확정된 결정 (grill)
+
+| 항목 | 결정 |
+|---|---|
+통로 | **기존 `3.BeaverLobby` 안에 Relay 패널 신설.** 새 씬을 만들지 않는다 |
+IPv4 | **그대로 유지**(교체 아님). 출시 전 제거 예정 |
+라우팅 | `GameManager.lobbySceneName` · 빌드 목록 **무수정** — 로비 슬롯이 하나라 새 씬을 만들면 팀장 담당 영역(부팅 라우팅)을 건드려야 한다 |
+Steam | 나중에 **토글 하나 더** 추가하는 형태로 확장 (Phase 3) |
+
+## 현재 이해 (조사 완료)
+
+| 사실 | 근거 |
+|---|---|
+Relay API 가 패키지에 **이미 있다** | `com.unity.services.multiplayer@…/Runtime/Relay/SDK/IRelayService.cs` (`CreateAllocationAsync`·`JoinAllocationAsync`) |
+`UnityTransport.SetRelayServerData(RelayServerData)` 오버로드 존재 | `UnityTransport.cs:815` |
+UGS 프로젝트 연결 완료 | `cloudProjectId c5d06f51-…` / `organizationId rangspam` |
+Phase 1 추상화가 이미 있다 | `ISessionConnectionProvider` · `BeginHost/BeginClient` · `SessionStartCompleted` |
+로비 매니저의 사용자 피드백 창구는 `SetErrorMessage` 하나 | `BeaverLobbySceneManager` 전역에서 사용 |
+로비 버튼은 OnClick → `ApplyConnectionData`/`StartHost`/`StartClient`/`ToggleReady`/`StartGameLoading` | `SerializeField` Button 5개 |
+
+## 접근
+
+### A. 고전 Relay API 를 쓴다 (Sessions API 아님)
+
+패키지에 상위 **Sessions API**(`MultiplayerService.CreateSessionAsync`)도 있지만 **쓰지 않는다**.
+그쪽은 로비·Relay·NGO 시작을 한꺼번에 소유하려 들어서, 이미 있는
+`NetworkSessionLauncher` + `NetworkLoadingFlowController` 계약과 충돌한다.
+
+고전 API 는 Phase 1 프로바이더 모양과 정확히 맞는다 — **Prepare 단계에서 연결 데이터만 채우고,
+`NetworkManager.StartHost()` 호출은 런처가 계속 소유**한다.
+
+```
+호스트: CreateAllocationAsync(maxConnections: 2)     // 3인 협동 = 호스트 + 2
+        → GetJoinCodeAsync(allocation.AllocationId)
+        → SetRelayServerData(new RelayServerData(allocation, "dtls"))
+        → ShareCode = 조인코드
+참가:   JoinAllocationAsync(joinCode)
+        → SetRelayServerData(new RelayServerData(joinAllocation, "dtls"))
+```
+
+### B. UGS 초기화·로그인 부트스트랩 (신규)
+
+Relay 호출 전에 `UnityServices.InitializeAsync()` + **익명 로그인**이 끝나 있어야 한다.
+`UnityServicesBootstrap`(신규)이 **멱등**하게 처리하고, 상태를 프로바이더가 읽는다.
+
+- `RelayConnectionProvider.IsAvailable(out reason)` 이 미초기화·미로그인·`cloudProjectId` 부재를
+  **각각 다른 사유 문자열**로 반환한다. "접속 실패"로 뭉개지 않는다.
+- 🔴 **MPPM 프로필 분리**: 익명 로그인은 자격증명을 프로젝트 단위로 캐시한다. MPPM 클론들이
+  같은 것을 물면 **같은 플레이어로 취급돼 충돌**한다. 로그인 전에
+  `AuthenticationService.Instance.SwitchProfile(<클론별 고유값>)` 을 호출한다.
+
+### C. 로비 UI — 패널 추가, 기존 것은 무수정
+
+`BeaverLobbySceneManager` 에 Relay 전용 필드·메서드를 **추가**한다. 기존 IPv4 필드·메서드는 손대지 않는다.
+
+- 추가 `SerializeField`: `relayPanel` · `directPanel` · `joinCodeInputField` ·
+  `joinCodeDisplayText` · `relayHostButton` · `relayJoinButton` · `modeToggleButton`
+- 추가 public 메서드(OnClick 대상, 전부 `void`): `SelectDirectMode()` · `SelectRelayMode()` ·
+  `StartRelayHost()` · `StartRelayJoin()`
+- **비동기 결과는 `SessionStartCompleted` 구독으로 받는다** — Phase 1 이 만든 경로다.
+  성공 시 `joinCodeDisplayText` 에 `ShareCode` 를 띄우고, 실패 시 `FailureReason` 을
+  `SetErrorMessage` 로 흘린다.
+- 연결 중에는 버튼을 잠근다(중복 클릭이 Allocation 을 두 번 만든다).
+
+⚠️ 프리팹·씬 배선(패널·입력칸·버튼 생성 및 참조 연결)은 **은희가 Unity 에서** 한다.
+코드는 참조가 비어 있어도 예외 없이 동작해야 한다(전부 null 안전).
+
+## 변경 파일
+
+| 파일 | 변경 |
+|---|---|
+`Assets/1.Scripts/Network/Session/RelayConnectionProvider.cs` | **신규** |
+`Assets/1.Scripts/Network/UnityServicesBootstrap.cs` | **신규** — 멱등 초기화 + 익명 로그인 + MPPM 프로필 분리 |
+`Assets/1.Scripts/Network/NetworkSessionLauncher.cs` | Relay 프로바이더 등록(`TryGetProvider` 분기 확장) |
+`Assets/1.Scripts/Managers/BeaverLobbySceneManager.cs` | Relay 필드·메서드 **추가**(기존 무수정) |
+
+씬·프리팹·`.meta` 무수정(코드만). `GameManager` 무수정.
+
+## 완료 조건
+
+1. **IPv4 경로 회귀 0** — 기존 IP/Port 접속이 이전과 동일.
+2. Relay 호스트 → 조인코드 화면 표시 → 다른 인스턴스가 그 코드로 참가 → 게임 진행.
+3. 실패 경로가 **사유와 함께** 표시된다: UGS 미초기화 / 로그인 실패 / 잘못된 조인코드 /
+   방 정원 초과. 조용한 실패 0.
+4. 카메라 리그·프로바이더·패널 참조가 없어도 예외 0.
+5. 컴파일 0 에러 / 0 경고. 신규 `.cs` UTF-8(BOM).
+6. MPPM 2~3인에서 Relay 경로 정상(프로필 분리 확인).
+
+## 리스크
+
+- ❓ **대시보드에서 Relay 서비스가 활성화됐는지 미확인.** 안 돼 있으면 코드는 돌아도
+  Allocation 생성이 실패한다. Phase 2 검증 전 확인 필요.
+- Relay 는 **과금·할당량**이 있는 서비스다. 무료 티어 한도를 넘기면 개발 중에도 막힌다.
+- `"dtls"` 연결 타입이 플랫폼·버전에 따라 `"udp"`/`"wss"` 로 달라질 수 있다. 실패 시 사유 로그로 판별한다.
+- MPPM 프로필 분리 값을 어떻게 얻을지는 구현 중 확정한다(클론 식별자 API 또는 경로 해시).
+
+---
+
+# PLAN (완료) — 세션 연결 방식 추상화 (Phase 1) (2026-08-07)
+
+> 상태: **완료·검증됨.** 커밋 `3c6be4fc0`, 브랜치 `feature/SessionTransport` 푸시.
+> Unity 컴파일 + MPPM 검증 통과(IPv4 동작 무변경 확인).
 > 이 문서는 **Phase 1(추상화 + 기존 IPv4 이식)** 만 다룬다. Relay·Steam 구현은 Phase 2·3.
 > grill 완료 — 확정된 결정만 담는다.
 
