@@ -26,6 +26,8 @@ public class HitFlash : MonoBehaviour
     Unit _unit;
     Renderer[] _renderers;
     Color[] _originalColors; // 렌더러별 원래 베이스 색(sharedMaterial 기준)
+    bool _hasBaseTint;       // 베이스 틴트 오버라이드 여부(보스 카운터 창 등)
+    Color _baseTint;
     int[] _propIds;          // 렌더러별 사용할 색 프로퍼티(_BaseColor 우선, 없으면 _Color, 없으면 0)
     MaterialPropertyBlock _mpb;
     Coroutine _routine;
@@ -48,6 +50,43 @@ public class HitFlash : MonoBehaviour
         if (_routine != null) { StopCoroutine(_routine); _routine = null; }
         ClearTint();
     }
+
+    /// <summary>
+    /// "원색" 자리를 이 색으로 덮는다(보스 카운터 창의 노란 틴트 등). <see cref="ClearBaseTint"/> 로 해제.
+    ///
+    /// 🔴 이 진입점이 필요한 이유: 카운터 색을 피격 플래시와 같은 경로(MPB)로 칠하면
+    /// <b>피격 한 번에 날아간다</b> — 플래시가 끝날 때 MPB 를 머티리얼 원색으로 되돌리기 때문이다.
+    /// 여기로 넣으면 플래시가 이 색 <b>위에서</b> Lerp 하고, 끝나도 이 색으로 돌아온다.
+    /// VFX 컴포넌트로 전환하면 이 진입점은 자동으로 안 쓰인다.
+    /// </summary>
+    public void SetBaseTint(Color color)
+    {
+        _baseTint = color;
+        _hasBaseTint = true;
+        ApplyBaseTint();
+    }
+
+    /// <summary>베이스 틴트 오버라이드를 해제하고 머티리얼 원색으로 되돌린다.</summary>
+    public void ClearBaseTint()
+    {
+        _hasBaseTint = false;
+        ApplyBaseTint();
+    }
+
+    // 플래시가 도는 중이면 손대지 않는다 — FlashRoutine 이 다음 프레임에 새 베이스로 Lerp 한다.
+    void ApplyBaseTint()
+    {
+        if (!isActiveAndEnabled) return;
+        if (_renderers == null) CacheRenderers();
+        if (_routine != null) return;
+
+        if (!_hasBaseTint) { ClearTint(); return; }
+        for (int i = 0; i < _renderers.Length; i++)
+            ApplyTint(i, _baseTint);
+    }
+
+    // 플래시가 되돌아갈 색 = 베이스 틴트가 있으면 그것, 없으면 머티리얼 원색.
+    Color BaseColorOf(int index) => _hasBaseTint ? _baseTint : _originalColors[index];
 
     void OnDamaged()
     {
@@ -86,13 +125,13 @@ public class HitFlash : MonoBehaviour
         while (t < flashDuration)
         {
             t += Time.deltaTime;
-            float k = 1f - Mathf.Clamp01(t / flashDuration); // 1→0: 최대 틴트에서 원색으로
+            float k = 1f - Mathf.Clamp01(t / flashDuration); // 1→0: 최대 틴트에서 베이스로
             for (int i = 0; i < _renderers.Length; i++)
-                ApplyTint(i, Color.Lerp(_originalColors[i], flashColor, k));
+                ApplyTint(i, Color.Lerp(BaseColorOf(i), flashColor, k));
             yield return null;
         }
-        ClearTint();
         _routine = null;
+        ApplyBaseTint(); // 베이스 틴트가 있으면 그 색으로, 없으면 MPB 해제(머티리얼 원색)
     }
 
     void ApplyTint(int index, Color c)

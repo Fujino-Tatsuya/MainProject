@@ -47,6 +47,47 @@ public class AoeTelegraph : MonoBehaviour
         _hideRoutine = StartCoroutine(HideAfter(duration));
     }
 
+    // 반경을 fromRadius → toRadius로 growTime초 동안 점증시키고, 그 뒤 holdAfter초 유지 후 숨긴다.
+    //
+    // 정본(boss-fsm-detailed-spec.md §10.5.2)이 말하는 **"시간 성장 인디케이터"** 가 이것이다 —
+    // JumpAttack 의 빨간 장판2가 이 경로다. ⚠️ 이건 예고 표시이지 지속 영역(AreaZone)이 아니다.
+    // 두 축을 섞지 말 것: 여기는 "언제 떨어지는가"를 보여 주고, AreaZone 은 실제 피해를 준다.
+    public void ShowGrowing(float fromRadius, float toRadius, float growTime, float holdAfter)
+    {
+        ApplyShape();
+        gameObject.SetActive(true);
+
+        if (_hideRoutine != null)
+            StopCoroutine(_hideRoutine);
+        _hideRoutine = StartCoroutine(GrowRoutine(fromRadius, toRadius, growTime, holdAfter));
+    }
+
+    IEnumerator GrowRoutine(float fromRadius, float toRadius, float growTime, float holdAfter)
+    {
+        float from = Mathf.Max(0.01f, fromRadius);
+        float to = Mathf.Max(from, toRadius);
+        float dur = Mathf.Max(0.01f, growTime);
+
+        float t = 0f;
+        while (t < dur)
+        {
+            t += Time.deltaTime;
+            float r = Mathf.Lerp(from, to, Mathf.Clamp01(t / dur));
+            float d = r * 2f;
+            transform.localScale = new Vector3(d, d, 1f);
+            yield return null;
+        }
+
+        float full = to * 2f;
+        transform.localScale = new Vector3(full, full, 1f);
+
+        if (holdAfter > 0f)
+            yield return new WaitForSeconds(holdAfter);
+
+        _hideRoutine = null;
+        gameObject.SetActive(false);
+    }
+
     // 선택된 모양의 메시를 MeshFilter에 반영(지연 초기화 — 오브젝트가 비활성 시작이라 Awake 의존 금지).
     void ApplyShape()
     {

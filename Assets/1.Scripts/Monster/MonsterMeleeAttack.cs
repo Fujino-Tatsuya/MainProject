@@ -27,6 +27,19 @@ public class MonsterMeleeAttack : BaseAttack
     public void BeginHitWindow() { _hitWindowOpen = true; _windowHits.Clear(); }
     public void EndHitWindow() { _hitWindowOpen = false; _windowHits.Clear(); }
 
+    /// <summary>프리팹에 배선된 판정 형상. 파생이 앵커를 교체하기 전에 원본을 보관하는 데 쓴다.</summary>
+    public ColliderInfo ColliderInfo { get { return colliderInfo; } }
+
+    /// <summary>
+    /// 판정 형상(앵커)을 교체한다. 공격 종류마다 히트박스가 다른 보스가 히트 직전에 갈아끼운다.
+    /// 기존 몬스터는 호출하지 않으므로 인스펙터 배선 그대로 동작한다(SetDamageSnapshot 과 같은 계약).
+    /// </summary>
+    public void SetColliderInfo(ColliderInfo value)
+    {
+        if (value != null)
+            colliderInfo = value;
+    }
+
     private void Awake()
     {
         InitializeAttackInfo();

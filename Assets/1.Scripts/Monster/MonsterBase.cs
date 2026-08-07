@@ -73,6 +73,7 @@ public class MonsterBase : Unit
     float _combatMoveSpeed;        // 커밋 이동 속도(후퇴=chaseSpeed, 재배치=MoveSpeed)
     bool _combatMoveRepick;        // 도착 시 다음 지점 재선택 여부(재배치=true, 후퇴=false)
     int _groggyCount;
+    float _groggyAfterHit;         // Hit 종료 후 이어붙일 Groggy 길이(0 = 평소대로 Idle 재평가). ForceHitReaction 이 세팅.
     Vector3 _knockbackDir;         // 지속넉백 방향(수평 정규화)
     float _knockbackSpeed;         // 지속넉백 속도(m/s) = AttackInfo.knockbackStrength
     float _staggerAfterKnockback;  // 넉백 종료 후 Stunned 경직 시간(초)
@@ -290,7 +291,7 @@ public class MonsterBase : Unit
         {
             SetState(MonsterState.Chase);
             if (!movementBlocked)
-                MoveAgentTo(_target.position, data.chaseSpeed);
+                MoveAgentTo(_target.position, data.chaseSpeed * ChaseSpeedMultiplier);
         }
         else
         {
@@ -301,6 +302,14 @@ public class MonsterBase : Unit
 
         FaceTarget();
     }
+
+    /// <summary>
+    /// 추격 이동속도 배수(보스 페이즈용). 기본 1 = 변화 없음.
+    /// 🔴 <see cref="SeekBoss"/> 분기에서만 곱해진다 — 일반 몬스터 경로(SeekMelee/SeekMobile/SeekTurret)는
+    /// 이 값을 거치지 않으므로 기존 8종에 회귀 위험이 없다.
+    /// (MoveAgentTo 가 매 틱 agent.speed 를 덮어쓰기 때문에 파생이 agent 를 직접 만져서는 유지되지 않는다.)
+    /// </summary>
+    protected virtual float ChaseSpeedMultiplier => 1f;
 
     /// <summary>
     /// 이 거리에서 쓸 공격 슬롯을 고른다. <see cref="NoAttack"/>(-1)이면 "지금 쓸 게 없다"(→ 접근).
@@ -648,8 +657,18 @@ public class MonsterBase : Unit
     void HandleTimedResume(float dt)
     {
         _stateTimer -= dt;
-        if (_stateTimer <= 0f)
-            DecideNextAfterAction();
+        if (_stateTimer > 0f) return;
+
+        // ForceHitReaction 이 이어붙인 그로기가 있으면 Idle 대신 그쪽으로 간다(보스 카운터: Hit → Groggy/Break).
+        if (_groggyAfterHit > 0f)
+        {
+            float groggy = _groggyAfterHit;
+            _groggyAfterHit = 0f;
+            ForceGroggy(groggy);
+            return;
+        }
+
+        DecideNextAfterAction();
     }
 
     void HandleGroggy(float dt)
@@ -710,7 +729,8 @@ public class MonsterBase : Unit
     {
         bool resolved = base.ReceiveAttack(attackInfo, hitContext);
 
-        if (IsServer && resolved && attackInfo.knockbackStrength > 0f && attackInfo.knockbackDuration > 0f)
+        if (IsServer && resolved && AutoHitReactions
+            && attackInfo.knockbackStrength > 0f && attackInfo.knockbackDuration > 0f)
         {
             Vector3 dir = attackInfo.knockbackDirection;
             dir.y = 0f;
@@ -835,6 +855,10 @@ public class MonsterBase : Unit
             return;
         }
 
+        // 자동 피격 반응을 쓰지 않는 파생(보스)은 여기서 끝 — 데미지·사망 판정만 받는다.
+        if (!AutoHitReactions)
+            return;
+
         // 그로기 누적.
         if (attackInfo.isGroggyAttack && data != null && data.maxGroggyCount > 0)
         {
@@ -857,6 +881,7 @@ public class MonsterBase : Unit
     void EnterHit()
     {
         _stateTimer = data != null ? data.hitStunDuration : 0.4f;
+        _groggyAfterHit = 0f; // 일반 피격 경직은 그로기로 이어지지 않는다(ForceHitReaction 전용 경로와 분리).
         StopAgent();
         SetState(MonsterState.Hit);
     }
@@ -867,6 +892,31 @@ public class MonsterBase : Unit
         _stateTimer = data != null ? data.groggyDuration : 3f;
         StopAgent();
         SetState(MonsterState.Groggy);
+    }
+
+    /// <summary>
+    /// 일반 피격이 자동으로 반응을 유발하는가. 기본 true — 기존 몬스터 8종·중간보스 3종은 그대로다.
+    ///
+    /// 🔴 보스는 false 다. 정본(boss-rebuild-standard.md §1.1 · §4)이 셋 다 부정하기 때문이다:
+    ///   ① <c>Hit</c> 는 **카운터 성공 전용** — 일반 피격은 색 변경만(HitFlash)
+    ///   ② 그로기는 **인터럽트 스킬·송전기만** 유발 — <c>isGroggyAttack</c> 누적을 쓰지 않는다
+    ///   ③ **보스는 안 밀린다** — Knockback 상태를 만들지 않는다
+    /// 데미지·사망 판정은 이 값과 무관하게 항상 돈다.
+    /// </summary>
+    protected virtual bool AutoHitReactions => true;
+
+    /// <summary>
+    /// 피격 리액션(<c>Hit</c>)을 강제 진입시킨다 — 진행 중 공격이 취소된다. <see cref="ForceGroggy"/> 의 형제.
+    /// <paramref name="groggyAfter"/> 가 0보다 크면 타이머 종료 후 <c>Idle</c> 이 아니라 그 길이만큼
+    /// <c>Groggy</c> 로 넘어간다(보스 카운터: Hit → Groggy/Break 가 확정 스펙).
+    /// </summary>
+    protected void ForceHitReaction(float duration, float groggyAfter = 0f)
+    {
+        if (!IsServer || _isDead) return;
+        _stateTimer = Mathf.Max(0.05f, duration);
+        _groggyAfterHit = Mathf.Max(0f, groggyAfter);
+        StopAgent();
+        SetState(MonsterState.Hit);
     }
 
     // 서브클래스가 특정 행동 뒤 스스로 그로기(취약)에 빠지게 하는 훅. 예: SpinnerBot 스핀 종료 → Dizzy.
