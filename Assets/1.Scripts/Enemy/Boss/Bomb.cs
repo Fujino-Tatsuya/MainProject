@@ -24,7 +24,7 @@ public class Bomb : MonoBehaviour, IAttackReceiver
     //
     //     if (baseAttack.AttackType == attackType)
     //     {
-    //         AttackInfo attackInfo = new AttackInfo(baseAttack.Damage, baseAttack.AttackType, baseAttack.IsGroggyAttack);
+    //         AttackInfo attackInfo = new AttackInfo(baseAttack.Damage, baseAttack.AttackType);
     //         AttackHitContext hitContext = new AttackHitContext(baseAttack.transform.position, baseAttack.transform, other);
     //         OnTriggered?.Invoke(attackInfo, hitContext);
     //     }

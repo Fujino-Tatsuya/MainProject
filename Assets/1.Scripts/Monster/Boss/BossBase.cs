@@ -371,8 +371,8 @@ public class BossBase : Unit
         // 페이즈 임계 하향 통과 판정(처음 통과 시에만 pending 설정).
         EvaluatePhase();
 
-        // 그로기 누적(옵션).
-        if (attackInfo.isGroggyAttack && data != null && data.maxGroggyCount > 0)
+        // 인터럽트 누적 → 그로기(옵션). 소비 방식은 수신측 결정 — 이 계통은 누적식이다.
+        if (attackInfo.isInterruptAttack && data != null && data.maxGroggyCount > 0)
         {
             _groggyCount++;
             if (_groggyCount >= data.maxGroggyCount)
