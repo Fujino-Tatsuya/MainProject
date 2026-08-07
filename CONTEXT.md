@@ -4,68 +4,70 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 다음 세션 시작점 — 보스 FSM 재설계 (2026-08-06 · **그릴 완료, 계획서 승인 대기**)
+## ▶▶ 다음 세션 시작점 — 보스 전면 재작성 (2026-08-07)
 
-**작업 세션**: 경석(Claude). **수정 예정 파일 = 문서만** —
-[PLAN-boss-fsm.md](PLAN-boss-fsm.md) · [Docs/tech/boss-fsm-design.md](Docs/tech/boss-fsm-design.md).
-코드·프리팹·BT 에셋은 이번 세션 범위 밖이다.
+**작업 세션**: 경석(Claude). 여기까지는 **문서 + 레이어 이관**만 했다. 보스 코드는 아직 안 건드렸다.
 
-### 지금 상태
+### 정본 문서 (읽는 순서)
 
-`AIRULE.md` 의 grill 이 끝났고 **설계 문서 2건이 나왔다.** 다음 단계는 **팀장 승인**이다.
+| # | 문서 | 무엇 |
+|---|---|---|
+| 1 | [Docs/tech/boss-rebuild-standard.md](Docs/tech/boss-rebuild-standard.md) | 🔴 **보스 구현 정본.** 3층 구조·훅 4개·규약·상태표·SO 설계(§10) |
+| 2 | [Docs/tech/layer-standard.md](Docs/tech/layer-standard.md) | 레이어 표준 + **이관 완료 기록**(§4.5) |
+| 3 | [Docs/tech/boss-current-problems-audit.md](Docs/tech/boss-current-problems-audit.md) | 재작성 근거(왜 버리는가) |
+| 4 | [Docs/tech/boss-fsm-detailed-spec.md](Docs/tech/boss-fsm-detailed-spec.md) | 폭탄·장판·카운터 창·애니메이터 계약 세부. **§1.1·§4 는 폐기**(1번이 대체) |
+| 5 | [PLAN-boss-fsm.md](PLAN-boss-fsm.md) | 슬라이스 S0~S9 |
 
-| 문서 | 역할 |
-|---|---|
-| [PLAN-boss-fsm.md](PLAN-boss-fsm.md) | 승인용 계획서 — 목표·슬라이스 S0~S8·확정 결정표·리스크·수용기준 |
-| [Docs/tech/boss-fsm-design.md](Docs/tech/boss-fsm-design.md) | **전면 재작성됨.** 확정 설계 본문 |
+### 🔴 이번에 뒤집힌 전제 2개
 
-⚠️ `PLAN.md` 는 은희의 승인 대기 계획서(2026-08-03 개발 진입점 단일화)가 점유 중이라 건드리지 않았다.
+1. **"기존 기믹 컨트롤러 재사용" → 전면 재작성.** 권위 상태 부재가 공통 뿌리라 부분 보수가
+   회귀를 계속 만든다(감사 문서 참조).
+2. **"15상태 단일 enum" → `BossState` 6개 + `AttackId` + `AttackPhase` 3층.**
+   중간보스 `WallBot` 이 **C# 0줄**로 만들어져 있다 — "찍어내듯"은 이미 존재하는 실증이고
+   초판이 규약 위반이었다.
 
-### 그릴에서 확정된 것 (2026-08-06 팀장)
+### 확정된 것
 
-- 🔴 **BT 를 버리고 코드 FSM 으로 간다.** 살아 있는 보스는 아직 BT(`TwentyThree.prefab` 에
-  `BehaviorGraphAgent`)이고, `Monster/Boss/BossBase.cs` 는 23호에 붙어 있지 않은 더미 스켈레톤이다.
-- 🔴 **민경은 보스 작업에서 빠졌다.** 보스 전체가 경석 단독 소유 → `AGENTS.md` §5 담당 분배 갱신 대상.
-- 🔴 **7/30 보스 피격 조사 3건은 해결됐다.** `Docs/tech/next-boss-hit-investigation.md` 는 폐기 대상.
-- **카운터(인터럽트) 시스템 신규** — 우클릭(`PlayerSkillSlot.Interrupt`, 로스트아크식).
-  창은 `Grab`·`DashAttack` 2개만. 성공 = 즉시 그로기. **그로기는 인터럽트 스킬로만** 난다.
-- 페이즈 **66/33 확정** · 송전탑 **1인1 / 2인2 / 3인4** · Groggy 5회/2초, Break 5초 ·
-  쿨 Jump 10s·Dash 5s·Grab 10s·훅어퍼 2~3s · Dash 는 **캐리-푸시 → 벽 → 스턴** ·
-  Jump 는 **거리 무관 + 최원거리 타겟** · **Return 없음, 체력 회복 금지** ·
-  Wells 는 별도 FSM 4상태(`Jump` 삭제).
+- **상태**: `Idle/Walk/Attack/Hit/Groggy/Dead`. `Hit` 은 **카운터 성공에서만** 진입.
+- **확장 표면은 훅 4개** — `StartAttack`/`HandleAttack`/`PerformAttackHit`/`PlayStateAnimation`.
+  중간보스 3종 중 **아무도 `MonsterState` 에 값을 추가하지 않았다.**
+- **SO**: `BossDataSO : MonsterDataSO` 파생 / `MonsterArchetype.Boss` **끝에 추가** /
+  공격별 쿨다운을 **`MonsterBase` 로 승격**(`CooldownReady(int attackId = 0)` — 하위호환).
+- **폭탄 = 수평 당구.** y 고정·무회전·폭탄끼리 밀림. 2단계(투척 포물선 → 착지 후 당구).
+  상태기계 `Thrown/Resting/Sliding/Exploded`. 벽은 **1쿠션**(SO 조절).
+- **장판 = 타입 있는 `AreaZone`**(화염/늪/독/번개). 같은 타입끼리만 중첩 성장.
+- **카운터**: 창은 `Grab`·`Dash` 만. 성공 = 취소 → hit 애니 → `Groggy`. 그로기는 인터럽트 스킬로만.
 
-### 플레이어 쪽 의존 2건 — 은희에게 **요청 완료** (기한 2026-08-07 금 17:00)
+### ✅ 레이어 이관 완료 (`f7fba05`)
 
-인계 문서: [Docs/tech/handoff-player-carry-socket.md](Docs/tech/handoff-player-carry-socket.md)
+공격 앵커 `Default(0)` → **`Weapon(12)`**(14개) / ChompBot 미명명 19·21 → `Default`(17개) /
+`P_MonsterProjectile` → `Projectile(10)` / **`CombatTarget(17)` 신설**.
 
-1. **인터럽트 식별자** — 단죄의 방패는 **이미 있고 식별 정보만 없다.**
-   `AttackType`(`None/Default/Q/E/R`)에 **우클릭 슬롯 값이 없어** 보스가 판별 불가.
-   ⚠️ enum 은 **끝에만** 추가 (프리팹에 정수로 직렬화됨).
-2. **캐리 소켓 지정** — `PlayerGrabbedState.Enter` 가 `GrabController` 구체 타입으로 소켓을 찾는다.
-   보스에 잡기·돌진 소켓이 둘 다 붙어 타입 조회로는 먼저 걸리는 쪽이 이김
-   → `CarrySocketKind` 를 RPC 로 전파하는 방식으로 요청.
+- 🟢 부수 효과: 투사체 상쇄가 살아났다(그동안 레이어 때문에 죽어 있었음).
+- 미이관: 차징 기둥·부술 props → `CombatTarget`(각 기능 작업 때) / 23호 `Floor` 계열 →
+  `HazardArea`(AreaZone 작업 때) / 플레이어 앵커 → `Weapon`(보스 검증 후).
 
-**임시 테스트 스킬은 만들지 않는다(기다린다). 보스 쪽 별도 캐리도 만들지 않는다.**
+### 착수 시 첫 할 일
 
-### 일정
+1. **`MonsterBase` 쿨다운 승격** — 하위호환(기존 몹 8종 무영향)이 최우선 검증 대상.
+2. `MonsterArchetype.Boss` + `SeekBoss()` 선택기.
+3. `BossDataSO` + 공격 테이블 6행.
+4. 폐기: `Monster/Boss/BossBase·BossState·BossBasicAttackType·BossBasicAttackChoice`
+   (전부 미사용 + 버릴 `Enemy/Boss` 디렉터리 상속).
 
-| 시점 | 내용 |
-|---|---|
-| ~8/7(금) 17:00 | **FSM 상세 구성 확정** — 위 2건에 의존 안 하는 전부 |
-| 8/7 17:00 | 은희 산출물 수령 → S3(카운터)·S5(Dash 캐리) 마지막 배선 |
-| 주말 | **전 슬라이스 구현 + 테스트** |
+### 은희 의존 2건 — 기한 2026-08-07(금) 17:00
 
-### 착수 전 알아 둘 것
+[Docs/tech/handoff-player-carry-socket.md](Docs/tech/handoff-player-carry-socket.md) —
+① `AttackType` 에 인터럽트 식별자 추가(**enum 끝에만**) ② 캐리 소켓 종류(`CarrySocketKind`) RPC 전파.
 
-- 🔴 **`Assets/8.BehaviorTreeGraph` 는 전환 검증 완료까지 수정 금지.** 의도 추출용 참고 자료다.
-- 볼트 `보스_(프로토타입).xlsx` 는 **웰즈&23호 문서가 아니다** — `Demon` 모델을 쓰는 별개 프로토 보스다.
-  현재 코드의 Groggy/Break/확률 구조가 여기서 왔다. **인터럽트→Groggy→Break 만 계승**하고
-  `Dodge_Back`/`Dodge_Front`/`Return` 은 채택하지 않기로 했다.
-- 보스는 **서버(호스트) 권한** — FSM·판정·이동·페이즈·사망 전부. 데미지 유입은
-  `BaseAttack → ReceiveAttack` 서버 경로만(오너→서버 직접 데미지 RPC 금지).
-- ⚠️ 보스 `IsOver` 는 **쓰기 전용 플래그**다(읽어서 분기하면 안 됨).
-- ⚠️ **`HitFlash` 가 카운터 틴트를 덮어쓴다** — `_originalColors` 를 초기화 시점 색으로 캐시하고
-  MPB 로 복원하므로, 같은 경로로 칠한 노란색은 피격 한 번에 날아간다.
+### ⚠️ 알아 둘 것
+
+- 🔴 **`git status` 가 `Docs/` 변경을 숨긴다** — `core.fsmonitor=true` + `Docs` 가 정션이라
+  `add` 까지 조용히 무시된다. **`git -c core.fsmonitor=false` 로 커밋할 것.**
+- **애니 이벤트는 SVN** — `SK_23.fbx.meta`. git 만 받은 팀원에겐 조용히 안 간다.
+- **Codex 결과는 결론만 채택하고 숫자·경로는 재확인.** 이번에만 3건 틀렸다.
+- 애니 접근이 graceful 이라 **이름 오타가 조용히 무시된다** — 죽은 설정값이 이미 9건.
+  → `Awake` 계약 검증 필수.
 
 ---
 
