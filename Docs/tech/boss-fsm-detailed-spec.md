@@ -560,9 +560,74 @@ rb.AddForce(dir * damage * knockCoef, ForceMode.Impulse)
   즉시 폭발이라 충돌 응답이 필요 없다. **폭탄끼리만 충돌 응답을 받는다**(레이어 매트릭스로 가름).
 - 🔴 **레이어 충돌 매트릭스를 정리해야 한다** — §10.5.4.
 
-**⚠️ 미확정** — Wells 가 **처음 던질 때**도 포물선 없이 수평 직선인가?
-"맵에 랜덤 살포"라 손 높이에서 바닥으로 내려오는 구간이 필요해 보인다.
-→ §12 A4. 현재 가정: **투척 직후 바닥 높이로 내려온 뒤 그때부터 수평 당구.**
+### 폭탄은 **2단계 모델**이다 (팀장 확정 2026-08-06)
+
+Wells 에 **던지는 애니메이션이 있으므로** 손 위치에서 대각선으로 `AddForce` 한다.
+그러면 자연스럽게 포물선을 그리며 떨어지고, **바닥에 닿은 뒤부터 수평 당구**다.
+
+| | 단계 1 — 투척 | 단계 2 — 당구 |
+|---|---|---|
+| 시작 | Wells 손 소켓에서 `AddForce(대각선, Impulse)` | 바닥 최초 접촉 |
+| 중력 | **켬** (`useGravity = true`) | **끔** |
+| Y 축 | 자유 (포물선) | **고정** (`FreezePositionY`) |
+| 회전 | 무회전(`FreezeRotation`) | 무회전 |
+| 궤적 | 포물선 | 방향벡터 일직선 |
+
+**전이 시점**: 바닥 최초 접촉에서 `useGravity = false` · `FreezePositionY` 를 걸고
+**y 속도를 0 으로 만든 뒤** 바닥 높이에 스냅한다. 이 세 가지를 같이 하지 않으면
+남은 y 속도가 constraint 와 싸워 떨린다.
+
+🔴 **투척 중 기존 폭탄 위에 떨어지면 폭발한다.**
+Wells 는 랜덤 살포라 이전에 던진 폭탄 자리에 떨어질 수 있다. 이 경우는 **당구가 아니라
+충돌로 판정해 터지고 장판이 생긴다.** 즉 폭탄끼리의 반응이 **단계에 따라 다르다**:
+
+| 상황 | 결과 |
+|---|---|
+| **투척 중**(단계 1) 폭탄이 기존 폭탄과 만남 | **폭발 → 장판** |
+| **당구 중**(단계 2, 되쳐낸 폭탄) 폭탄이 기존 폭탄과 만남 | **서로 밀림** (폭발 아님) |
+
+→ 충돌 처리에서 **자기 단계를 보고 갈라야 한다.** 같은 콜라이더 쌍인데 결과가 다르다.
+
+### 10.5.1.1 폭탄 상태 기계 (팀장 확정 2026-08-06)
+
+위 결정들을 합치면 **폭탄 자체가 작은 상태 기계**가 된다. 폭발 타이머와 되쳐내기 가능 여부가
+상태에 묶이므로, 이걸 명시적으로 두지 않으면 반드시 엉킨다.
+
+| 상태 | 물리 | 폭발 타이머 | 되쳐내기 | 폭탄끼리 충돌 시 |
+|---|---|---|---|---|
+| **`Thrown`** (단계 1) | 중력 on, Y 자유, 포물선 | 정지 | 불가 | 🔴 **둘 다 폭발** |
+| **`Resting`** (정지) | Y 고정, 정지 | **진행** | **가능** | — |
+| **`Sliding`** (당구 이동) | Y 고정, 수평 직선 | 정지 | **불가** | **서로 밀림** (둘 다 `Sliding`) |
+| **`Exploded`** | — | — | — | `AreaZone` 스폰 후 despawn |
+
+**전이**
+
+```
+Thrown  --바닥 최초 접촉-->            Resting   (중력 off, FreezePositionY, y속도 0, 바닥 스냅)
+Thrown  --기존 폭탄과 충돌-->          Exploded  (🔴 상대 폭탄도 Exploded)
+Resting --기본공격 적중-->             Sliding   (AddForce Impulse)
+Sliding --정지 판정(velocity<ε 유지)--> Resting   (타이머 재개)
+Sliding --정지한 폭탄과 충돌-->        둘 다 Sliding  (당구, 폭발 아님)
+Sliding --벽 충돌-->                   §아래 쿠션 규칙
+Sliding/Resting --플레이어·보스 접촉--> Exploded
+Resting --타이머 만료-->               Exploded
+```
+
+**확정된 규칙 4가지**
+
+1. 🔴 **투척 중 기존 폭탄 위에 떨어지면 둘 다 터진다.**
+   → 같은 자리에 장판 2개가 생기는 셈인데, **같은 타입이므로 하나가 성장**하는 것으로 처리한다
+   (§10.5.2 의 중첩 성장 규칙과 동일 경로). 장판이 두 개 겹쳐 스폰되지 않게 할 것.
+2. 🔴 **벽은 1쿠션이다.** 벽에 **1번 튕기고**, 그 다음 벽 충돌에서 폭발한다.
+   → `wallBounceLimit` 을 **SO/인스펙터로 노출**한다(기본 1). 폭탄마다 남은 튕김 횟수를 센다.
+   ⚠️ 기획서의 "벽에 부딪히면 터짐"은 **이 규칙으로 대체된다.**
+3. **밀려난 폭탄도 비행 취급** — 타이머가 같이 멈추고, 멈춰야 다시 흐른다.
+   즉 `Sliding` 은 되쳐낸 쪽·맞은 쪽을 구분하지 않는다.
+4. **`Sliding` 중에는 못 친다** — 기획서의 "비행 중 추가 기본공격 무시"를 유지.
+   되쳐내기는 **`Resting` 에서만** 받는다.
+
+> 구현 메모: 되쳐내기 가능 여부를 "속도가 0인가"로 판단하지 말 것. 밀리다가 순간적으로
+> 느려지는 프레임에 맞으면 예외가 생긴다. **상태로 판단**한다.
 
 ### 10.5.2 장판을 **타입 있는 일반 지속 영역**으로
 
@@ -615,6 +680,11 @@ GrowOverTime }` 은 **성장 방식**이지 원소 타입이 아니다.
 [Jump]  jumpHoverTime, floorGrowTime, landingDamage, aoeRadius
 [Charge] timeLimit, shieldGainPerSec, zoneDamage, zonePushForce, pylonCount(1/2/4)
 [Rage]  dashCount(3), dashDamage, interval
+[폭탄]  throwImpulse, throwSpreadAngle, throwInterval,
+        knockCoef(되쳐내기 거리 = damage × 이 값), wallBounceLimit(1),
+        restVelocityEpsilon, restHoldTime(정지 판정 유지 시간),
+        bombTimer(폭발까지), bombDamage, bombRadius
+[장판]  zoneType, lifetime, growPerOverlap, maxScale, tickDamage, tickInterval
 [그로기] maxGroggyCount(5), groggyDuration(2), breakDuration(5)
 ```
 
