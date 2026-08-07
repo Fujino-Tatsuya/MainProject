@@ -9,7 +9,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 245365416286222978}
-  m_Layer: 19
+  m_Layer: 0
   m_Name: Foot_R
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -40,7 +40,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 468762135610459077}
-  m_Layer: 19
+  m_Layer: 0
   m_Name: Leg_R
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -72,7 +72,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 2283321170323235124}
-  m_Layer: 19
+  m_Layer: 0
   m_Name: Leg_L
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -107,7 +107,7 @@ GameObject:
   - component: {fileID: 5250427641914083849}
   - component: {fileID: 7991457659650660422}
   - component: {fileID: 275297665414947253}
-  m_Layer: 0
+  m_Layer: 12
   m_Name: MeleeHitbox
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -193,7 +193,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 7599367980818021646}
-  m_Layer: 19
+  m_Layer: 0
   m_Name: Foot_L
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -224,7 +224,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 3689241307049000671}
-  m_Layer: 19
+  m_Layer: 0
   m_Name: Armature
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -256,7 +256,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1786670288771053011}
-  m_Layer: 19
+  m_Layer: 0
   m_Name: ForeLeg_L
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -288,7 +288,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 7999292454765025595}
-  m_Layer: 19
+  m_Layer: 0
   m_Name: Root
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -324,7 +324,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 8337383468949604239}
-  m_Layer: 19
+  m_Layer: 0
   m_Name: Head
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -355,7 +355,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 175077971607170442}
-  m_Layer: 19
+  m_Layer: 0
   m_Name: LowerJaw
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -386,7 +386,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 3889572681923849057}
-  m_Layer: 19
+  m_Layer: 0
   m_Name: ForeLeg_R
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -418,7 +418,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 5422868752590224343}
-  m_Layer: 19
+  m_Layer: 0
   m_Name: UpperJaw
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -707,7 +707,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2515709775261251744}
   - component: {fileID: 4411660867951341482}
-  m_Layer: 21
+  m_Layer: 0
   m_Name: R_Chompbot_01
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -762,7 +762,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4998502004633112037}
-  m_Layer: 19
+  m_Layer: 0
   m_Name: Master
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -794,7 +794,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 3796325343604789818}
-  m_Layer: 19
+  m_Layer: 0
   m_Name: Hip_R
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -895,7 +895,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 137279843195931009}
-  m_Layer: 19
+  m_Layer: 0
   m_Name: Hip_L
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -928,7 +928,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1999539712903484837}
   - component: {fileID: 6110713930098645201}
-  m_Layer: 21
+  m_Layer: 0
   m_Name: ChumpBot
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1032,7 +1032,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 6807899614205721584}
-  m_Layer: 21
+  m_Layer: 0
   m_Name: Model
   m_TagString: Untagged
   m_Icon: {fileID: 0}

@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 1987972827632041984}
   - component: {fileID: 8311129628035199906}
   - component: {fileID: 7452772327312371484}
-  m_Layer: 0
+  m_Layer: 12
   m_Name: MeleeHitbox
   m_TagString: Untagged
   m_Icon: {fileID: 0}

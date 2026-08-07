@@ -103,7 +103,7 @@ GameObject:
   - component: {fileID: 328986694273374958}
   - component: {fileID: 6116763131625831750}
   - component: {fileID: 3298624546661411796}
-  m_Layer: 0
+  m_Layer: 12
   m_Name: RightHookAttack
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -488,7 +488,7 @@ GameObject:
   - component: {fileID: 3578002433487090739}
   - component: {fileID: 7903687224634922449}
   - component: {fileID: 5579044265559132990}
-  m_Layer: 0
+  m_Layer: 12
   m_Name: DashAttack
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -736,7 +736,7 @@ GameObject:
   - component: {fileID: 1551797295837025053}
   - component: {fileID: 2956919693736392804}
   - component: {fileID: 578455959188562136}
-  m_Layer: 0
+  m_Layer: 12
   m_Name: Rage
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -890,7 +890,7 @@ GameObject:
   - component: {fileID: 3174080452546132724}
   - component: {fileID: 8820610430510614129}
   - component: {fileID: 3484998061978514129}
-  m_Layer: 0
+  m_Layer: 12
   m_Name: UpperAttack
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1479,7 +1479,7 @@ GameObject:
   - component: {fileID: 2347615363194617035}
   - component: {fileID: 5256932725647423925}
   - component: {fileID: 5991986677993798632}
-  m_Layer: 0
+  m_Layer: 12
   m_Name: LeftHookAttack
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1599,7 +1599,7 @@ GameObject:
   - component: {fileID: 3777127995163679798}
   - component: {fileID: 3896305855947299196}
   - component: {fileID: 6124302813489217326}
-  m_Layer: 0
+  m_Layer: 12
   m_Name: Grab
   m_TagString: Untagged
   m_Icon: {fileID: 0}
