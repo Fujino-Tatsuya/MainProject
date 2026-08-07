@@ -50,7 +50,18 @@ public class MonsterBase : Unit
     Quaternion _spawnRotation;
     Transform _target;
     Collider[] _detectBuffer;
-    float _lastAttackTime = -999f;
+
+    // 공격 슬롯별 쿨다운.
+    // 일반 몬스터는 공격이 1종이라 슬롯 0 하나만 쓰고, 그 경우 동작은 단일 쿨다운 시절과 완전히 같다.
+    // 보스처럼 공격이 여러 종류면 ConfigureAttackSlots(n)으로 슬롯을 늘리고 슬롯마다 쿨을 따로 돌린다.
+    float[] _lastUsedByAttack = { -999f };
+    float[] _cooldownByAttack = { 0f };   // 0 이하면 base 쿨(1/AttackSpeed)로 폴백
+
+    protected const int DefaultAttackSlot = 0;
+    protected const int NoAttack = -1;     // SelectAttackSlot 반환값: "지금 쓸 공격이 없다"
+
+    /// <summary>StartAttack 이 쿨을 기록할 슬롯. 파생이 공격을 고른 뒤 세팅한다(기본 0).</summary>
+    protected int CurrentAttackSlot { get; set; } = DefaultAttackSlot;
     protected float _stateTimer;   // 서브클래스(콤보 보스 등)가 공격 커밋 길이를 덮어쓸 수 있게 protected.
     bool _attackFired;
     bool _commitFired;             // attackFinishTrigger 1회 발동 가드(커밋 이벤트/히트 중 먼저 온 쪽만)
@@ -246,10 +257,59 @@ public class MonsterBase : Unit
             case MonsterArchetype.RangedMobile:
                 SeekMobile(dist, movementBlocked, attackBlocked);
                 break;
+            case MonsterArchetype.Boss:
+                SeekBoss(dist, movementBlocked, attackBlocked);
+                break;
             default:
                 SeekMelee(dist, movementBlocked, attackBlocked);
                 break;
         }
+    }
+
+    // 보스: 공격이 여러 종류다. 어떤 공격을 쓸지는 SelectAttackSlot(파생이 override)이 정하고,
+    // 여기서는 "고를 게 있으면 친다 / 없으면 접근한다"는 이동 정책만 담당한다.
+    //
+    // 🔴 고를 게 없을 때 제자리에 서 있지 않는 것이 핵심이다.
+    //    먼 거리에서 돌진·점프가 전부 쿨이면 걸어서 접근하고, 가까워지면 근접 공격의 거리창이
+    //    열리므로 "전부 쿨"이 자연히 풀린다. (사거리 안에서 전부 쿨인 구간은 짧게 지나간다.)
+    void SeekBoss(float dist, bool movementBlocked, bool attackBlocked)
+    {
+        int slot = attackBlocked ? NoAttack : SelectAttackSlot(dist);
+
+        if (slot != NoAttack)
+        {
+            StopAgent();
+            FaceTarget();
+            CurrentAttackSlot = slot;
+            StartAttack();
+            return;
+        }
+
+        // 쓸 공격이 없다 — 사거리 밖이면 접근, 안이면 자세만 잡고 쿨을 기다린다.
+        if (dist > data.attackRange)
+        {
+            SetState(MonsterState.Chase);
+            if (!movementBlocked)
+                MoveAgentTo(_target.position, data.chaseSpeed);
+        }
+        else
+        {
+            StopAgent();
+            if (_state.Value != MonsterState.Chase)
+                SetState(MonsterState.Chase);
+        }
+
+        FaceTarget();
+    }
+
+    /// <summary>
+    /// 이 거리에서 쓸 공격 슬롯을 고른다. <see cref="NoAttack"/>(-1)이면 "지금 쓸 게 없다"(→ 접근).
+    /// 기본 구현은 일반 몬스터와 같은 단일 공격이고, 보스 파생이 거리창+가중치로 override 한다.
+    /// </summary>
+    protected virtual int SelectAttackSlot(float dist)
+    {
+        if (dist > data.attackRange) return NoAttack;
+        return CooldownReady(DefaultAttackSlot) ? DefaultAttackSlot : NoAttack;
     }
 
     // 근접: 사거리 안이면 멈춰서 쿨마다 공격, 밖이면 추격.
@@ -483,7 +543,11 @@ public class MonsterBase : Unit
 
     protected virtual void StartAttack()
     {
-        _lastAttackTime = Time.time;
+        // 쿨은 "지금 쓰는 슬롯"에 기록한다. 파생이 CurrentAttackSlot 을 안 건드리면 항상 0 —
+        // 즉 공격이 1종인 몬스터는 단일 쿨다운 시절과 동작이 같다.
+        int slot = Mathf.Clamp(CurrentAttackSlot, 0, _lastUsedByAttack.Length - 1);
+        _lastUsedByAttack[slot] = Time.time;
+
         _stateTimer = data.attackDuration;
         _attackFired = false;
         _commitFired = false;
@@ -859,8 +923,43 @@ public class MonsterBase : Unit
     #endregion
 
     #region 유틸
-    // 공격 간격 = 1 / 공격속도(Unit.AttackSpeed, 초당 공격 횟수). 예: 0.5 → 2초당 1회.
-    bool CooldownReady() => Time.time - _lastAttackTime >= 1f / Mathf.Max(0.01f, AttackSpeed);
+    // 공격 슬롯의 쿨다운이 돌았는가.
+    // 슬롯 쿨(_cooldownByAttack)이 0 이하면 base 간격 = 1 / 공격속도로 폴백한다.
+    // (AttackSpeed = 초당 공격 횟수. 0.5 → 2초당 1회.)
+    // 인자를 안 주면 슬롯 0 — 공격이 1종인 일반 몬스터는 이 경로만 탄다.
+    protected bool CooldownReady(int attackSlot = DefaultAttackSlot)
+    {
+        if (attackSlot < 0 || attackSlot >= _lastUsedByAttack.Length)
+            attackSlot = DefaultAttackSlot;
+
+        float cooldown = _cooldownByAttack[attackSlot];
+        if (cooldown <= 0f)
+            cooldown = 1f / Mathf.Max(0.01f, AttackSpeed);
+
+        return Time.time - _lastUsedByAttack[attackSlot] >= cooldown;
+    }
+
+    /// <summary>
+    /// 공격 슬롯 수를 확보한다. 보스처럼 공격이 여러 종류인 파생이 스폰 시 1회 호출한다.
+    /// 호출하지 않으면 슬롯 1개(=단일 공격)로 남고 기존 동작과 동일하다.
+    /// </summary>
+    protected void ConfigureAttackSlots(int count)
+    {
+        count = Mathf.Max(1, count);
+        if (_lastUsedByAttack.Length == count) return;
+
+        _lastUsedByAttack = new float[count];
+        _cooldownByAttack = new float[count];
+        for (int i = 0; i < count; i++)
+            _lastUsedByAttack[i] = -999f;   // 스폰 직후 첫 공격이 쿨에 걸리지 않게
+    }
+
+    /// <summary>슬롯별 쿨 길이(초)를 설정한다. 0 이하면 base 간격(1/AttackSpeed)을 쓴다.</summary>
+    protected void SetAttackCooldown(int attackSlot, float seconds)
+    {
+        if (attackSlot < 0 || attackSlot >= _cooldownByAttack.Length) return;
+        _cooldownByAttack[attackSlot] = Mathf.Max(0f, seconds);
+    }
 
     // 인지 반경 내 최근접 플레이어 Transform 탐색(서버 전용).
     Transform FindNearestTarget()

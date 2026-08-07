@@ -345,7 +345,28 @@ case MonsterArchetype.Boss: SeekBoss(dist); break;
 
 `SeekBoss` 는 거리창 + 가중치 + 연속 감쇠 + 폴백(§3 선택기)을 돌린다.
 
-### 10.2 공격별 쿨다운을 base 로 승격
+### 10.2 공격별 쿨다운을 base 로 승격 — ✅ **구현 완료 (2026-08-07)**
+
+실제로 들어간 표면 (`MonsterBase`):
+
+```csharp
+protected const int DefaultAttackSlot = 0;
+protected const int NoAttack = -1;
+protected int  CurrentAttackSlot { get; set; }          // StartAttack 이 이 슬롯에 쿨 기록
+protected bool CooldownReady(int attackSlot = 0)
+protected void ConfigureAttackSlots(int count)          // 파생이 스폰 시 1회
+protected void SetAttackCooldown(int slot, float sec)   // 0 이하면 1/AttackSpeed 폴백
+protected virtual int SelectAttackSlot(float dist)      // -1 = 지금 쓸 게 없다
+```
+
+**하위호환 근거** — 기존 몬스터 8종의 동작이 바뀌지 않는 이유:
+
+- 기존 `CooldownReady()` 호출 5곳이 전부 **무인자** → 슬롯 0
+- `CurrentAttackSlot` 기본 0이고 **기존 파생(Gauntlet·Spinner)은 이 프로퍼티를 모른다**
+- `_cooldownByAttack[0] = 0` → `1f / AttackSpeed` 로 폴백 = **옛 공식 그대로**
+- `_lastUsedByAttack[0] = -999f` 초기값 = 옛 `_lastAttackTime` 과 동일
+
+
 
 **지금**: `CooldownReady() => Time.time - _lastAttackTime >= 1f / AttackSpeed` — 단일 쿨.
 공격이 여러 종류여도 하나의 쿨을 공유한다.
