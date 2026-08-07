@@ -47,13 +47,39 @@ Update this file when a term becomes important enough that future agents or team
 - 미이관: 차징 기둥·부술 props → `CombatTarget`(각 기능 작업 때) / 23호 `Floor` 계열 →
   `HazardArea`(AreaZone 작업 때) / 플레이어 앵커 → `Weapon`(보스 검증 후).
 
-### 착수 시 첫 할 일
+### ✅ base 선행 작업은 끝났다 (`4dbfc0d`, 컴파일 0에러 0경고)
 
-1. **`MonsterBase` 쿨다운 승격** — 하위호환(기존 몹 8종 무영향)이 최우선 검증 대상.
-2. `MonsterArchetype.Boss` + `SeekBoss()` 선택기.
-3. `BossDataSO` + 공격 테이블 6행.
-4. 폐기: `Monster/Boss/BossBase·BossState·BossBasicAttackType·BossBasicAttackChoice`
-   (전부 미사용 + 버릴 `Enemy/Boss` 디렉터리 상속).
+`MonsterBase` 에 이미 들어가 있는 표면 — **다음 세션은 이걸 쓰기만 하면 된다**:
+
+```csharp
+protected const int DefaultAttackSlot = 0;
+protected const int NoAttack = -1;
+protected int  CurrentAttackSlot { get; set; }          // StartAttack 이 이 슬롯에 쿨 기록
+protected bool CooldownReady(int attackSlot = 0)
+protected void ConfigureAttackSlots(int count)          // 파생이 스폰 시 1회
+protected void SetAttackCooldown(int slot, float sec)   // 0 이하면 1/AttackSpeed 폴백
+protected virtual int SelectAttackSlot(float dist)      // -1 = 지금 쓸 게 없다 → 접근
+```
+
+- `MonsterArchetype.Boss` 추가됨(끝에). `SeekBoss()` 가 dispatch 에 물려 있다.
+- **폴백 확정**: 쓸 공격 없음 + 사거리 밖 → 걸어서 접근 / 사거리 안 → 자세 잡고 짧게 대기.
+  먼 거리에서 돌진·점프가 전부 쿨이어도 접근하면 근접 거리창이 열려 자연히 풀린다.
+- 기본 `SelectAttackSlot` 은 일반 몹과 동일한 단일 공격이라 **archetype 만 Boss 로 바꿔도 안전**하다.
+
+### ▶ 다음 세션 착수 지점 — 여기서 시작
+
+1. **`BossDataSO : MonsterDataSO`** 신규 — 스키마는
+   [boss-rebuild-standard.md](Docs/tech/boss-rebuild-standard.md) **§10.3** 그대로.
+   공격 테이블 6행(LeftHook/RightHook/Upper/Grab/Jump/Dash).
+2. **보스 서브클래스** — 훅 4개만 override (`StartAttack`/`HandleAttack`/
+   `PerformAttackHit`/`PlayStateAnimation`) + `SelectAttackSlot` 을 거리창+가중치+연속감쇠로.
+   `ConfigureAttackSlots(6)` + `SetAttackCooldown` 으로 Jump 10s·Dash 5s·Grab 10s·훅어퍼 2~3s.
+3. **폐기 4파일** — `Monster/Boss/BossBase.cs` · `BossState.cs` · `BossBasicAttackType.cs` ·
+   `BossBasicAttackChoice.cs`. 전부 미사용(프리팹·씬 부착 0)이고 `BossBasicAttackChoice` 는
+   버릴 `Enemy/Boss` 의 `BaseAttackChoice`·`WeightedAttack<T>` 를 상속한다.
+   ⚠️ `BossBase` 는 `: Unit` 이라 자기만의 `_lastAttackTime`/`CooldownReady` 를 갖는 **별개 클래스**다
+   — 이번 `MonsterBase` 변경과 충돌하지 않으니 안심하고 지워도 된다.
+4. 그 다음 프리팹 조립 → 애니 이벤트(**SVN**) → 카운터 → 폭탄/장판.
 
 ### 은희 의존 2건 — 기한 2026-08-07(금) 17:00
 
