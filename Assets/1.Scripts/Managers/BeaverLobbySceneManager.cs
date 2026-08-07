@@ -575,6 +575,17 @@ public class BeaverLobbySceneManager : NemoSceneManager
         WarnIfMissing(portInputField, nameof(portInputField));
         WarnIfMissing(errorText, nameof(errorText));
         WarnIfMissing(sessionConnectPanel, nameof(sessionConnectPanel));
+
+        // 이름 기반 해석이라 오브젝트 이름이 바뀌면 조용히 null 이 된다 —
+        // 그러면 모드 전환이 안 되거나 조인코드를 못 읽는데 로그가 0줄이다. 반드시 짚고 넘어간다.
+        WarnIfMissing(relayPanel, nameof(relayPanel));
+        WarnIfMissing(directPanel, nameof(directPanel));
+        WarnIfMissing(relayHostButton, nameof(relayHostButton));
+        WarnIfMissing(relayJoinButton, nameof(relayJoinButton));
+        WarnIfMissing(modeToggleButton, nameof(modeToggleButton));
+        WarnIfMissing(joinCodeInputField, nameof(joinCodeInputField));
+        WarnIfMissing(joinCodeDisplayText, nameof(joinCodeDisplayText));
+
         WarnIfMissing(_lobbyUIController, nameof(LobbyUIController));
     }
 
