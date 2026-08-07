@@ -1,0 +1,210 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d46c5d28b6dbaeb4ca1be5ca83b290c6, type: 3}
+  m_Name: No23
+  m_EditorClassIdentifier: Assembly-CSharp::BossDataSO
+  archetype: 3
+  attackDamage: 10
+  moveSpeed: 2.5
+  chaseSpeed: 4
+  attackSpeed: 1
+  maxHp: 100
+  defense: 0
+  maxShield: 0
+  detectionRadius: 8
+  attackRange: 2
+  leashRadius: 15
+  returnSpeedMultiplier: 5
+  avoidanceRadius: 0.3
+  obstacleAvoidance: 2
+  projectilePrefab: {fileID: 0}
+  projectileSpeed: 12
+  projectileLifetime: 4
+  minStandoff: 4
+  projectileArcHeight: 0
+  projectileSplashRadius: 0
+  repositionBetweenAttacks: 0
+  retreatMinDuration: 1.2
+  repositionMinDuration: 1.2
+  attackDuration: 0.9
+  attackWindup: 0.35
+  cancelWindupIfTargetLeavesRange: 0
+  maxGroggyCount: 5
+  groggyDuration: 2
+  startsWithSuperArmor: 0
+  hasSuperArmorWhileAttacking: 0
+  hitStunDuration: 0.4
+  despawnDelay: 2
+  isMidBoss: 0
+  animSpeedParam: Speed
+  attackTrigger: 
+  attackFinishTrigger: 
+  hitTrigger: 
+  groggyBool: Groggy
+  deathTrigger: Death
+  locomotionState: Locomotion
+  attacks:
+  - attackId: 0
+    animatorStateName: LeftHook
+    cooldown: 2.5
+    minDistance: 0
+    maxDistance: 3
+    ignoreDistanceWindow: 0
+    targetRule: 0
+    weight: 30
+    allowedFromPhase: 0
+    damage: 0
+    opensCounterWindow: 0
+    superArmor: 1
+    hitboxAnchorName: 
+  - attackId: 1
+    animatorStateName: RightHook
+    cooldown: 2.5
+    minDistance: 0
+    maxDistance: 3
+    ignoreDistanceWindow: 0
+    targetRule: 0
+    weight: 30
+    allowedFromPhase: 0
+    damage: 0
+    opensCounterWindow: 0
+    superArmor: 1
+    hitboxAnchorName: 
+  - attackId: 2
+    animatorStateName: Uppercut
+    cooldown: 3
+    minDistance: 0
+    maxDistance: 2.5
+    ignoreDistanceWindow: 0
+    targetRule: 0
+    weight: 12
+    allowedFromPhase: 0
+    damage: 0
+    opensCounterWindow: 0
+    superArmor: 1
+    hitboxAnchorName: 
+  - attackId: 3
+    animatorStateName: Grab
+    cooldown: 10
+    minDistance: 0
+    maxDistance: 3.5
+    ignoreDistanceWindow: 0
+    targetRule: 0
+    weight: 15
+    allowedFromPhase: 0
+    damage: 0
+    opensCounterWindow: 1
+    superArmor: 1
+    hitboxAnchorName: 
+  - attackId: 4
+    animatorStateName: Leap
+    cooldown: 10
+    minDistance: 0
+    maxDistance: 3
+    ignoreDistanceWindow: 1
+    targetRule: 1
+    weight: 15
+    allowedFromPhase: 0
+    damage: 0
+    opensCounterWindow: 0
+    superArmor: 1
+    hitboxAnchorName: 
+  - attackId: 5
+    animatorStateName: DashAttack
+    cooldown: 5
+    minDistance: 5
+    maxDistance: 20
+    ignoreDistanceWindow: 0
+    targetRule: 0
+    weight: 20
+    allowedFromPhase: 0
+    damage: 0
+    opensCounterWindow: 1
+    superArmor: 1
+    hitboxAnchorName: 
+  - attackId: 6
+    animatorStateName: Charging
+    cooldown: 0
+    minDistance: 0
+    maxDistance: 3
+    ignoreDistanceWindow: 1
+    targetRule: 0
+    weight: 0
+    allowedFromPhase: 0
+    damage: 0
+    opensCounterWindow: 0
+    superArmor: 1
+    hitboxAnchorName: 
+  - attackId: 7
+    animatorStateName: Rage
+    cooldown: 0
+    minDistance: 0
+    maxDistance: 3
+    ignoreDistanceWindow: 1
+    targetRule: 0
+    weight: 0
+    allowedFromPhase: 0
+    damage: 0
+    opensCounterWindow: 0
+    superArmor: 1
+    hitboxAnchorName: 
+  repeatPenalty: 0.3
+  repeatBlockAfter: 2
+  phases:
+  - hpThreshold: 0.66
+    sequence: 1
+    damageMultiplier: 1
+    speedMultiplier: 1
+  - hpThreshold: 0.33
+    sequence: 1
+    damageMultiplier: 1
+    speedMultiplier: 1
+  counterFrontAngle: 60
+  backAttackAngle: 60
+  hitReactionState: getowned
+  breakDuration: 5
+  grabRadius: 2.2
+  grabHoldDuration: 2
+  grabTickInterval: 0.5
+  grabTickDamage: 5
+  grabThrowDuration: 0.6
+  grabThrowDistance: 6
+  grabThrowDamage: 20
+  grabRecoveryDuration: 0.8
+  grabHoldState: Holding
+  grabThrowState: Throw
+  jumpSearchRadius: 30
+  jumpHoverTime: 1.2
+  jumpLandingDuration: 1
+  jumpRecoveryDuration: 0.4
+  jumpAoeRadius: 3.5
+  jumpLandingDamage: 0
+  jumpHoverState: JumpHover
+  jumpLandingState: JumpLanding
+  jumpTelegraphPrefab: {fileID: 0}
+  chargeTimeLimit: 20
+  chargeShieldGainPerSec: 0
+  chargeZonePrefab: {fileID: 0}
+  chargePylonsSolo: 1
+  chargePylonsDuo: 2
+  chargePylonsTrioPlus: 4
+  rageDashCount: 3
+  rageDashInterval: 0.5
+  rageDashDuration: 0.7
+  rageDashSpeedMultiplier: 8
+  rageDashMaxDistance: 16
+  rageDashDamage: 0
+  bombThrowInterval: 6
+  bombPrefab: {fileID: 0}
+  throwImpulse: 8
+  spreadAngle: 15
+  bombThrowPitch: 35

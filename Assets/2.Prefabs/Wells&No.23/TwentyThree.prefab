@@ -2072,7 +2072,7 @@ Animator:
   m_GameObject: {fileID: 2312227645707408380}
   m_Enabled: 1
   m_Avatar: {fileID: 9000000, guid: 8d8b03aefc41c854fab32d78fb6c6386, type: 3}
-  m_Controller: {fileID: 9100000, guid: 31d04fbded57bff4b839713ec2cca9de, type: 2}
+  m_Controller: {fileID: 9100000, guid: fb9d73588311f264296352a1009a0b75, type: 2}
   m_CullingMode: 1
   m_UpdateMode: 0
   m_ApplyRootMotion: 0
@@ -2100,62 +2100,21 @@ MonoBehaviour:
   NetworkAnimatorExpanded: 0
   AuthorityMode: 0
   m_Animator: {fileID: 7460696466104070403}
-  TransitionStateInfoList:
-  - IsCrossFadeExit: 0
-    Layer: 0
-    OriginatingState: -843218978
-    DestinationState: 2081823275
-    TransitionDuration: 0.25
-    TriggerNameHash: 1625683022
-    TransitionIndex: 0
-  - IsCrossFadeExit: 0
-    Layer: 0
-    OriginatingState: 542443371
-    DestinationState: 2081823275
-    TransitionDuration: 0.25
-    TriggerNameHash: 1625683022
-    TransitionIndex: 0
-  - IsCrossFadeExit: 0
-    Layer: 0
-    OriginatingState: 221587152
-    DestinationState: -843218978
-    TransitionDuration: 0.25
-    TriggerNameHash: -891938696
-    TransitionIndex: 1
+  TransitionStateInfoList: []
   AnimatorParameterEntries:
     ParameterEntries:
-    - name: State
-      NameHash: 1649606143
-      Synchronize: 1
-      ParameterType: 3
-    - name: Jump
-      NameHash: 125937960
-      Synchronize: 1
-      ParameterType: 3
-    - name: IsGroggy
-      NameHash: 847727466
-      Synchronize: 1
-      ParameterType: 9
-    - name: IsBreak
-      NameHash: -891938696
-      Synchronize: 1
-      ParameterType: 9
-    - name: IsDead
-      NameHash: 1270110494
-      Synchronize: 1
-      ParameterType: 9
-    - name: IsWalking
-      NameHash: 1282839668
-      Synchronize: 1
-      ParameterType: 9
-    - name: IsInit
-      NameHash: 1625683022
-      Synchronize: 1
-      ParameterType: 9
     - name: Groggy
       NameHash: 221587152
       Synchronize: 1
-      ParameterType: 3
+      ParameterType: 4
+    - name: Speed
+      NameHash: -823668238
+      Synchronize: 1
+      ParameterType: 1
+    - name: Death
+      NameHash: 646380074
+      Synchronize: 1
+      ParameterType: 9
   AnimatorParametersExpanded: 0
 --- !u!114 &8851936077573526357
 MonoBehaviour:
