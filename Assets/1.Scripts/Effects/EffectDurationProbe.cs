@@ -53,7 +53,7 @@ public class EffectDurationProbe : MonoBehaviour
         // 루프가 섞여 있으면 parts는 영원히 안 죽는다 → 측정 대상은 outroParts가 된다.
         bool looping = ContainsLoopingSystem(entry.parts);
         EffectPart[] targets = looping ? entry.outroParts : entry.parts;
-        float registered = looping ? entry.outroDuration : entry.duration;
+        float registered = looping ? entry.ResolvedOutroDuration : entry.ResolvedDuration;
         string label = looping ? "outroDuration" : "duration";
 
         if (targets == null || targets.Length == 0)

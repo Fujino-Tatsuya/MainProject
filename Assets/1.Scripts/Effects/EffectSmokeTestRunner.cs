@@ -1,4 +1,4 @@
-#if UNITY_EDITOR
+﻿#if UNITY_EDITOR
 using System.Collections;
 using System.Text;
 using UnityEngine;
@@ -53,7 +53,7 @@ public class EffectSmokeTestRunner : MonoBehaviour
         yield return null;
         Check("원샷 재생 직후 인스턴스가 대출된다", manager.PoolCountActive(sparkPrefab) == 1);
 
-        yield return new WaitForSeconds(spark.duration + 0.3f);
+        yield return new WaitForSeconds(spark.ResolvedDuration + 0.3f);
         Check("duration 후 자동 반납된다", manager.PoolCountActive(sparkPrefab) == 0);
         Check("반납 후 활성 이펙트가 0이다", manager.ActiveEffectCount == 0);
 
@@ -67,21 +67,21 @@ public class EffectSmokeTestRunner : MonoBehaviour
         yield return new WaitForSeconds(composite.parts[1].delay + 0.15f);
         Check("delay 경과 후 두 번째 파트가 발화한다", manager.PoolCountActive(sparkPrefab) == sparkBefore + 1);
 
-        yield return new WaitForSeconds(composite.duration + 0.3f);
+        yield return new WaitForSeconds(composite.ResolvedDuration + 0.3f);
         Check("컴포지트 전체가 한 번에 반납된다", manager.ActiveEffectCount == 0);
 
         // ── 3. 루프 핸들: Release 전에는 안 죽고, Release 후 outroDuration에 반납 ──
         EffectHandle handle = manager.PlayLooping(spark, Vector3.zero, Quaternion.identity);
         Check("PlayLooping이 핸들을 발급한다", handle.IsSet);
 
-        yield return new WaitForSeconds(spark.duration + 0.3f);
+        yield return new WaitForSeconds(spark.ResolvedDuration + 0.3f);
         Check("루프는 duration이 지나도 살아 있다", manager.ActiveEffectCount == 1);
 
         manager.Release(handle);
         yield return null;
         Check("Release() 직후에는 아직 반납되지 않는다 (2단계 해제)", manager.ActiveEffectCount == 1);
 
-        yield return new WaitForSeconds(spark.outroDuration + 0.3f);
+        yield return new WaitForSeconds(spark.ResolvedOutroDuration + 0.3f);
         Check("outroDuration 후 반납된다", manager.ActiveEffectCount == 0);
 
         // ── 4. stale 핸들 방어 ──
@@ -115,7 +115,7 @@ public class EffectSmokeTestRunner : MonoBehaviour
         }
         int peak = manager.PoolCountAll(sparkPrefab);
 
-        yield return new WaitForSeconds(spark.duration + 0.5f);
+        yield return new WaitForSeconds(spark.ResolvedDuration + 0.5f);
         Check("연속 발화 후 전부 반납된다", manager.PoolCountActive(sparkPrefab) == 0);
 
         for (int i = 0; i < 20; i++)
@@ -126,7 +126,7 @@ public class EffectSmokeTestRunner : MonoBehaviour
         Check($"2회차 발화는 새 인스턴스를 만들지 않는다 (1회차 {before}→{peak}, 2회차 {manager.PoolCountAll(sparkPrefab)})",
             manager.PoolCountAll(sparkPrefab) <= peak);
 
-        yield return new WaitForSeconds(spark.duration + 0.5f);
+        yield return new WaitForSeconds(spark.ResolvedDuration + 0.5f);
 
         // ── 7. 히트스톱: 대상에 붙은 이펙트만 감속 ──
         var freezeTarget = new GameObject("[SmokeFreezeTarget]");

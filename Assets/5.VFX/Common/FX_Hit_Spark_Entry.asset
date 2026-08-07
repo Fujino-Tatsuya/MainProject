@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e443b5b6c03f82547af5577ea94f34d0, type: 3}
   m_Name: FX_Hit_Spark_Entry
   m_EditorClassIdentifier: Assembly-CSharp::EffectEntry
-  duration: 2
+  duration: 0
   outroDuration: 1
   prewarmCount: 8
   maxActiveWarn: 32
@@ -25,3 +25,5 @@ MonoBehaviour:
     offset: {x: 0, y: 0, z: 0}
     delay: 0
   outroParts: []
+  computedDuration: 2.4
+  computedOutroDuration: 0

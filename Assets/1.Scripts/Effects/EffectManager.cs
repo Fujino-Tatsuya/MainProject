@@ -131,17 +131,18 @@ public class EffectManager : MonoBehaviour
         active.position = position;
         active.rotation = rotation;
         active.offset = Vector3.zero;
-        active.life = entry.duration;
+        float life = entry.ResolvedDuration;
+        active.life = life;
         active.lifeCounting = true;
 
-        if (entry.duration <= 0f)
+        if (life <= 0f)
         {
             WarnOnce(entry, "duration", $"[EffectManager] '{entry.name}'의 duration이 0이라 재생 즉시 반납된다. " +
-                            "EffectDurationProbe로 실측해 채울 것.");
+                            "파티클 파트가 없어 자동 계산이 안 되는 엔트리라면 직접 값을 적을 것.");
         }
-        else if (entry.duration < entry.LongestPartDelay)
+        else if (life < entry.LongestPartDelay)
         {
-            WarnOnce(entry, "duration", $"[EffectManager] '{entry.name}'의 duration({entry.duration:F2}s)이 " +
+            WarnOnce(entry, "duration", $"[EffectManager] '{entry.name}'의 duration({life:F2}s)이 " +
                             $"가장 늦은 파트의 delay({entry.LongestPartDelay:F2}s)보다 짧다. " +
                             "그 파트는 발화되기 전에 반납된다.");
         }
@@ -238,14 +239,16 @@ public class EffectManager : MonoBehaviour
             DriverOf(instance)?.Stop(instance, false);
         }
 
-        if (active.entry.outroDuration < active.entry.LongestOutroDelay)
+        float life = active.entry.ResolvedOutroDuration;
+
+        if (life < active.entry.LongestOutroDelay)
         {
             WarnOnce(active.entry, "outroDuration", $"[EffectManager] '{active.entry.name}'의 outroDuration" +
-                                   $"({active.entry.outroDuration:F2}s)이 가장 늦은 outro 파트의 " +
+                                   $"({life:F2}s)이 가장 늦은 outro 파트의 " +
                                    $"delay({active.entry.LongestOutroDelay:F2}s)보다 짧다. 그 파트는 발화되지 않는다.");
         }
 
-        active.life = active.entry.outroDuration;
+        active.life = life;
         active.lifeCounting = true;
     }
 

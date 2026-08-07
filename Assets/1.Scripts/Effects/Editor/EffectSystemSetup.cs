@@ -32,7 +32,7 @@ public static class EffectSystemSetup
 
         EffectEntry spark = CreateEntry(EntryFolder + "/FX_Hit_Spark_Entry.asset", entry =>
         {
-            entry.duration = 2f;
+            entry.duration = 0f;   // 0 = 프리팹에서 자동 계산
             entry.prewarmCount = 8;
             entry.maxActiveWarn = 32;
             entry.parts = new[] { Part(sparkPrefab, Vector3.zero, 0f) };
@@ -41,7 +41,7 @@ public static class EffectSystemSetup
 
         EffectEntry blunt = CreateEntry(EntryFolder + "/FX_Hit_Blunt_Entry.asset", entry =>
         {
-            entry.duration = 2f;
+            entry.duration = 0f;   // 0 = 프리팹에서 자동 계산
             entry.prewarmCount = 4;
             entry.maxActiveWarn = 32;
             // 한 호출로 두 파트가 delay 간격을 두고 순차 발화한다 (컴포지트 3막 검증용).
@@ -72,6 +72,30 @@ public static class EffectSystemSetup
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
         Debug.Log("[EffectSystemSetup] 완료.");
+    }
+
+    [MenuItem("Tools/Effects/모든 엔트리 수명 재계산")]
+    public static void RecomputeAll()
+    {
+        string[] guids = AssetDatabase.FindAssets("t:EffectEntry");
+
+        for (int i = 0; i < guids.Length; i++)
+        {
+            var entry = AssetDatabase.LoadAssetAtPath<EffectEntry>(AssetDatabase.GUIDToAssetPath(guids[i]));
+            if (entry == null) continue;
+
+            entry.RecomputeLifetimes();
+
+            // 값이 안 바뀌었어도 항상 dirty로 둔다. OnValidate가 임포트 중에 이미 계산해 둔 값은
+            // 메모리에만 있고 에셋 파일에는 없을 수 있는데, 그러면 빌드가 0을 들고 나간다.
+            EditorUtility.SetDirty(entry);
+
+            Debug.Log($"[Effect] '{entry.name}' → duration {entry.ResolvedDuration:F2}s " +
+                      $"(계산 {entry.ComputedDuration:F2}s / 오버라이드 {entry.duration:F2}s)", entry);
+        }
+
+        AssetDatabase.SaveAssets();
+        Debug.Log($"[Effect] 엔트리 {guids.Length}개 갱신·저장.");
     }
 
     [MenuItem("Tools/Effects/스모크 테스트 (Play Mode)")]
