@@ -6,7 +6,28 @@ Update this file when a term becomes important enough that future agents or team
 
 ## ▶▶ 다음 세션 시작점 — 보스 전면 재작성 (2026-08-07)
 
-**작업 세션**: 경석(Claude). 여기까지는 **문서 + 레이어 이관**만 했다. 보스 코드는 아직 안 건드렸다.
+🔴 **브랜치: `feature/Boss23`** (2026-08-07 신설, `feature/maprendering` `2e14b18` 에서 분기).
+보스 작업은 전부 여기서 한다 — 렌더링 브랜치에 더 얹지 말 것.
+
+**같은 날 정리한 원격 브랜치 3개** (팀장 지시):
+
+| 삭제된 브랜치 | tip | 상태 |
+|---|---|---|
+| `feature/map-player-merge` | `8c7850c` | development 대비 **미머지 0** — 손실 없음 |
+| `feature/boss`(소문자) | `7350af8` | 당일 잘못 만든 것. 대문자 `feature/Boss` 와 **Windows 에서 ref 충돌**해서 제거 |
+| `feature/Boss`(대문자) | `d39e5ae` | ⚠️ **미머지 3커밋 포함**(SimJangBounce, 7/31~8/3) — 팀장 판단으로 폐기 |
+
+💾 **복구 수단**: 로컬 아카이브 태그가 있다(push 안 함).
+`archive/feature-Boss-20260807` → `d39e5ae` / `archive/map-player-merge-20260807` → `8c7850c`
+되살리려면 `git push origin archive/feature-Boss-20260807:refs/heads/<이름>`.
+
+⚠️ **폐기된 `d39e5ae` 는 우리 계획과 겹친다** — 커밋 제목이 "보스(23호&웰즈) 폭탄·장판 수치
+SO 이관 + Wells 블랙보드 분리"다. 우리가 §10.5(폭탄/장판 SO)와 §3(Wells BT 이탈)에서 하려는
+바로 그 작업이다. **새로 짜기 전에 위 태그의 diff 를 한 번 열어볼 가치가 있다** — 쓸 게 있으면
+가져오고, 없으면 확인했다는 사실만 남기면 된다.
+
+**작업 세션**: 경석(Claude). base 선행 작업(쿨다운 슬롯·archetype)까지 코드로 들어갔고,
+그 위의 보스 본체(`BossDataSO`·서브클래스)는 아직 시작 전이다.
 
 ### 정본 문서 (읽는 순서)
 
