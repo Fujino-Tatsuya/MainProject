@@ -1,378 +1,609 @@
+#if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using UnityEditor;
-using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering;
-using UnityEngine.SceneManagement;
 using VeyTrace.Rendering.Occlusion;
 
-// 벽 투명화 저작 도구.
-//
-// 소스 머티리얼(SVN 관리, 개별 Shader Graph)을 건드리지 않고, 같은 룩을 흉내내는
-// 디더 셰이더 변종을 Git 쪽에 만들어 설정에 매핑한다. 런타임에는 WallOcclusionDriver가
-// 이 매핑으로 머티리얼만 바꿔 끼운다.
-//
-// 주의: 변종은 원본 Shader Graph의 근사치다. 원본이 쓰는 이미시브·디테일맵 등은 재현되지
-// 않는다. 룩을 정확히 보존하려면 원본 그래프에 Custom Function + Dither 노드를 넣는 편이
-// 낫지만 그건 SVN 관리 아트 파일 수정이라 별도 합의가 필요하다.
-// (Docs/tech/wall-occlusion-implementation.md 참고)
 public static class WallOcclusionAuthoring
 {
     private const string ShaderName = "Project/Environment/Wall Occlusion Dither";
-    private const string SettingsPath =
-        "Assets/99.Settings/WallOcclusionSettings.asset";
-    private const string MaterialDirectory =
-        "Assets/3.Materials/Level1_Materials/Occlusion";
-    private const string SourceMaterialDirectory =
-        "Assets/50.Art/MapGen/MapObj/material";
-    // dash-soul 머지에서 씬이 0.Scenes/MainFlow/ 아래로 재편됐다(구 경로 "0.Scenes/MapScene.unity"는
-    // 더 이상 존재하지 않아 이 도구가 씬을 못 찾고 있었다).
-    private const string MapScenePath = "Assets/0.Scenes/MainFlow/4.MapScene.unity";
+    private const string SettingsPath = "Assets/99.Settings/WallOcclusionSettings.asset";
+    private const string GeneratedMaterialDirectory =
+        "Assets/3.Materials/Level1_Materials/Occlusion/Generated";
 
-    // 바닥/천장은 셰이더의 wallness 판정으로 이미 제외되므로 변종을 만들지 않는다.
-    // 만들어봐야 룩만 근사치로 바뀌고 얻는 게 없다.
-    private static readonly string[] ExcludedNameFragments = { "floor", "convayor", "conveyor" };
+    private static readonly Regex StackName = new("^ElevationStack_[0-9]{2}$");
+    private static readonly Regex LevelName = new("^Level_(B|L)[0-9]{2}$");
+    private static readonly Regex PropName = new("^PF_Prop_[A-Za-z0-9_]+$");
+    private static readonly Regex StageOrZoneName = new("^PF_(Stage|Zone)_[A-Za-z0-9_]+$");
+    private static readonly Regex StandaloneSectionName =
+        new("^PF_(Prop|Wall|Hallway)_[A-Za-z0-9_]+$");
+    private static readonly Regex SafeHierarchyName = new("^[A-Za-z0-9_]+$");
 
-    private static readonly string[] PrefabSearchFolders =
+    [MenuItem("Tools/Rendering/Wall Occlusion/Register-Wire Selected Prefabs")]
+    public static void RegisterWireSelected()
     {
-        "Assets/2.Prefabs/Map/WallPrefabs",
-        "Assets/2.Prefabs/Map/Zoneprefab"
-    };
+        string[] paths = GetSelectedPrefabPaths();
+        if (paths.Length == 0)
+        {
+            Debug.LogError("[WallOcclusion] Select at least one prefab asset or prefab instance.");
+            return;
+        }
 
-    [MenuItem("Tools/Rendering/Wall Occlusion/Apply All")]
-    public static void ApplyAll()
-    {
-        Dictionary<Material, Material> materialMap = EnsureMaterials();
-        WallOcclusionSettings settings = EnsureSettings(materialMap);
-        int restored = RestorePrefabMaterials(materialMap);
-        InstallMapScene(settings);
+        WallOcclusionSettings settings = EnsureSettings();
+        int totalErrors = 0;
+        foreach (string path in paths)
+        {
+            GameObject root = PrefabUtility.LoadPrefabContents(path);
+            try
+            {
+                var report = new ValidationReport(path);
+                WirePrefab(root, report);
+                EnsureMaterialVariants(root, settings, report);
+                ValidatePrefab(root, settings, report);
+                PrefabUtility.SaveAsPrefabAsset(root, path);
+                totalErrors += report.ErrorCount;
+                report.LogSummary("Register/Wire");
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(root);
+            }
+        }
+
+        EditorUtility.SetDirty(settings);
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
-
         Debug.Log(
-            $"[WallOcclusion] Apply 완료 — 매핑 {materialMap.Count}쌍, " +
-            $"프리팹에서 되돌린 슬롯 {restored}개. " +
-            $"매핑: {string.Join(", ", materialMap.Keys.Select(m => m.name))}");
+            $"[WallOcclusion] Register/Wire finished: prefabs={paths.Length}, errors={totalErrors}.");
     }
 
-    // ShaderHasError는 "마지막 임포트 시점"의 상태만 본다. 실제 메시지와 변종별
-    // 컴파일 결과를 봐야 자주색(에러 셰이더) 원인을 특정할 수 있다.
+    [MenuItem("Tools/Rendering/Wall Occlusion/Validate Selected Prefabs")]
+    public static void ValidateSelected()
+    {
+        string[] paths = GetSelectedPrefabPaths();
+        if (paths.Length == 0)
+        {
+            Debug.LogError("[WallOcclusion] Select at least one prefab asset or prefab instance.");
+            return;
+        }
+
+        WallOcclusionSettings settings = AssetDatabase.LoadAssetAtPath<WallOcclusionSettings>(SettingsPath);
+        int totalErrors = 0;
+        foreach (string path in paths)
+        {
+            GameObject root = PrefabUtility.LoadPrefabContents(path);
+            try
+            {
+                var report = new ValidationReport(path);
+                ValidatePrefab(root, settings, report);
+                totalErrors += report.ErrorCount;
+                report.LogSummary("Validate");
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(root);
+            }
+        }
+
+        Debug.Log(
+            $"[WallOcclusion] Validation finished: prefabs={paths.Length}, errors={totalErrors}. " +
+            "Validation errors do not block builds.");
+    }
+
     [MenuItem("Tools/Rendering/Wall Occlusion/Dump Shader Messages")]
     public static void DumpShaderMessages()
     {
         Shader shader = Shader.Find(ShaderName);
         if (shader == null)
         {
-            Debug.LogError($"[WallOcclusion] 셰이더를 찾을 수 없다: {ShaderName}");
+            Debug.LogError($"[WallOcclusion] Shader not found: {ShaderName}");
             return;
         }
 
-        string shaderPath = AssetDatabase.GetAssetPath(shader);
-        Debug.Log(
-            $"[WallOcclusion] shader='{shader.name}', path='{shaderPath}', " +
-            $"hasError={ShaderUtil.ShaderHasError(shader)}, " +
-            $"passCount={shader.passCount}, " +
-            $"subshaderCount={shader.subshaderCount}, " +
-            $"renderQueue={shader.renderQueue}, isSupported={shader.isSupported}",
-            shader);
-
         ShaderMessage[] messages = ShaderUtil.GetShaderMessages(shader);
-        if (messages == null || messages.Length == 0)
+        if (messages.Length == 0)
         {
-            Debug.Log("[WallOcclusion] 셰이더 메시지 없음.");
-        }
-        else
-        {
-            foreach (ShaderMessage message in messages)
-            {
-                string text =
-                    $"[WallOcclusion] {message.severity} " +
-                    $"({message.platform}) {message.file}:{message.line} — {message.message}";
-                if (message.severity ==
-                    UnityEditor.Rendering.ShaderCompilerMessageSeverity.Error)
-                    Debug.LogError(text, shader);
-                else
-                    Debug.LogWarning(text, shader);
-            }
+            Debug.Log($"[WallOcclusion] Shader has no compiler messages: {ShaderName}");
+            return;
         }
 
-        // 변종 머티리얼이 실제로 이 셰이더를 들고 있는지, 렌더 가능한지 확인한다.
-        foreach (string path in EnumerateVariantPaths())
+        for (int i = 0; i < messages.Length; i++)
         {
-            var variant = AssetDatabase.LoadAssetAtPath<Material>(path);
-            if (variant == null)
-                continue;
-
-            Debug.Log(
-                $"[WallOcclusion] variant='{variant.name}', " +
-                $"shader='{(variant.shader != null ? variant.shader.name : "<null>")}', " +
-                $"isSupported={(variant.shader != null && variant.shader.isSupported)}, " +
-                $"passCount={variant.passCount}, " +
-                $"baseMap={(variant.GetTexture("_BaseMap") != null)}",
-                variant);
-        }
-    }
-
-    [MenuItem("Tools/Rendering/Wall Occlusion/Validate")]
-    public static void ValidateAll()
-    {
-        int errors = 0;
-
-        WallOcclusionSettings settings =
-            AssetDatabase.LoadAssetAtPath<WallOcclusionSettings>(SettingsPath);
-        if (settings == null || !settings.HasValidMaterialMappings)
-        {
-            Debug.LogError("[WallOcclusion] 설정의 머티리얼 매핑이 없거나 짝이 맞지 않는다.");
-            errors++;
-        }
-
-        Shader shader = Shader.Find(ShaderName);
-        if (shader == null)
-        {
-            Debug.LogError($"[WallOcclusion] 셰이더를 찾을 수 없다: {ShaderName}");
-            errors++;
-        }
-        else if (ShaderUtil.ShaderHasError(shader))
-        {
-            // Shader.Find는 컴파일이 깨진 셰이더도 non-null로 돌려준다.
+            ShaderMessage message = messages[i];
             Debug.LogError(
-                $"[WallOcclusion] 셰이더 컴파일 오류: {ShaderName}. " +
-                "Dump Shader Messages로 상세 메시지를 볼 것.",
+                $"[WallOcclusion] {message.severity}: {message.message} " +
+                $"({message.platform}, line {message.line})",
                 shader);
-            errors++;
         }
-        else
-        {
-            // ⚠️ 이 결과를 "셰이더 정상"으로 읽으면 안 된다. 셰이더 변종은 필요할 때
-            // 지연 컴파일되므로, 아직 렌더된 적 없는 변종(예: Forward+ 클러스터)의
-            // 오류는 여기 잡히지 않는다. 실제로 2026-07-28에 이 검사가 통과한 뒤
-            // Play에서 _CLUSTER_LIGHT_LOOP 변종이 깨져 벽이 전부 자주색이 됐다.
-            // 결정적 확인은 대상 머티리얼이 실제로 렌더되는 상태에서 하는 것뿐이다.
-            Debug.Log(
-                $"[WallOcclusion] 컴파일된 변종에 오류 없음: {ShaderName} " +
-                "(미컴파일 변종은 포함하지 않음 — 실제 렌더 후 재확인할 것)");
-        }
-
-        // 변종 머티리얼에 텍스처가 비어 있으면 흰 벽이 된다 — 가장 흔한 회귀다.
-        foreach (string path in EnumerateVariantPaths())
-        {
-            var variant = AssetDatabase.LoadAssetAtPath<Material>(path);
-            if (variant == null)
-                continue;
-
-            if (variant.GetTexture("_BaseMap") == null)
-            {
-                Debug.LogError(
-                    $"[WallOcclusion] 변종 머티리얼의 _BaseMap이 비었다: {path}. " +
-                    "원본 Shader Graph의 텍스처 프로퍼티를 찾지 못했다.",
-                    variant);
-                errors++;
-            }
-        }
-
-        // 프리팹에 오클루전 머티리얼이 구워져 있으면 안 된다(런타임 스왑만 사용).
-        int persisted = CountPersistedOcclusionSlots();
-        if (persisted > 0)
-        {
-            Debug.LogError(
-                $"[WallOcclusion] 맵 프리팹에 오클루전 머티리얼 슬롯 {persisted}개가 " +
-                "직렬화돼 있다. Apply All로 되돌릴 것.");
-            errors++;
-        }
-
-        if (errors == 0)
-            Debug.Log("[WallOcclusion] 검증 통과 — errors=0, persistedOcclusionSlots=0.");
-        else
-            Debug.LogError($"[WallOcclusion] 검증 실패 — errors={errors}.");
     }
 
-    // 소스 폴더를 스캔해 변종을 만든다. 경로 하드코딩을 없앴으므로 아트 교체로
-    // 머티리얼이 추가/개명돼도 다음 Apply All에서 자동으로 따라간다.
-    public static Dictionary<Material, Material> EnsureMaterials()
+    private static void WirePrefab(GameObject root, ValidationReport report)
     {
-        EnsureAssetDirectory(MaterialDirectory);
-        Shader shader = Shader.Find(ShaderName);
-        if (shader == null)
-            throw new InvalidOperationException($"셰이더를 찾을 수 없다: {ShaderName}");
-
-        var result = new Dictionary<Material, Material>();
-        string[] guids = AssetDatabase.FindAssets(
-            "t:Material",
-            new[] { SourceMaterialDirectory });
-
-        foreach (string guid in guids)
+        if (IsStandaloneSectionPrefab(root))
         {
-            string sourcePath = AssetDatabase.GUIDToAssetPath(guid);
-
-            // FindAssets("t:Material")은 같은 폴더의 .shadergraph에 내장된 기본 머티리얼
-            // 서브에셋까지 돌려준다. 실제 .mat 파일만 대상으로 삼는다.
-            if (!sourcePath.EndsWith(".mat", StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            string fileName = Path.GetFileNameWithoutExtension(sourcePath);
-            if (IsExcluded(fileName))
-                continue;
-
-            var source = AssetDatabase.LoadAssetAtPath<Material>(sourcePath);
-            if (source == null)
-                continue;
-
-            string outputPath = $"{MaterialDirectory}/{fileName}_Occlusion.mat";
-            var variant = AssetDatabase.LoadAssetAtPath<Material>(outputPath);
-            if (variant == null)
-            {
-                variant = new Material(shader) { name = $"{fileName}_Occlusion" };
-                AssetDatabase.CreateAsset(variant, outputPath);
-            }
-            else if (variant.shader != shader)
-            {
-                variant.shader = shader;
-            }
-
-            CopyVisualProperties(source, variant);
-            EditorUtility.SetDirty(variant);
-            result[source] = variant;
+            OcclusionSection section = root.GetComponent<OcclusionSection>();
+            if (section == null)
+                section = root.AddComponent<OcclusionSection>();
+            WireSection(section);
+            return;
         }
 
-        return result;
+        Transform occlusion = FindDirectChild(root.transform, "Occlusion");
+        if (occlusion == null)
+        {
+            report.Error(root.transform, "Missing required direct child 'Occlusion'.");
+            return;
+        }
+
+        for (int i = 0; i < occlusion.childCount; i++)
+        {
+            Transform stackTransform = occlusion.GetChild(i);
+            ElevationStack stack = stackTransform.GetComponent<ElevationStack>();
+            if (stack == null)
+                stack = stackTransform.gameObject.AddComponent<ElevationStack>();
+
+            for (int levelIndex = 0; levelIndex < stackTransform.childCount; levelIndex++)
+            {
+                Transform levelTransform = stackTransform.GetChild(levelIndex);
+                ElevationLevel level = levelTransform.GetComponent<ElevationLevel>();
+                if (level == null)
+                    level = levelTransform.gameObject.AddComponent<ElevationLevel>();
+
+                Transform content = FindDirectChild(levelTransform, "Content");
+                if (content == null)
+                {
+                    report.Error(levelTransform, "Missing required direct child 'Content'.");
+                    continue;
+                }
+
+                Transform occludableProps = FindDirectChild(content, "OccludableProps");
+                if (occludableProps != null)
+                {
+                    for (int propIndex = 0; propIndex < occludableProps.childCount; propIndex++)
+                        EnsureSectionOnAuthoringRoot(occludableProps.GetChild(propIndex), root, report);
+                }
+
+                AddNamedLocalSections(content, root, report);
+                level.ConfigureAuthoring(
+                    content,
+                    content.GetComponentsInChildren<Renderer>(true),
+                    content.GetComponentsInChildren<Collider>(true));
+            }
+        }
+
+        OcclusionSection[] sections = root.GetComponentsInChildren<OcclusionSection>(true);
+        for (int i = 0; i < sections.Length; i++)
+        {
+            if (!IsInsideNestedPrefab(sections[i].gameObject, root))
+                WireSection(sections[i]);
+        }
     }
 
-    public static WallOcclusionSettings EnsureSettings(
-        Dictionary<Material, Material> materialMap)
+    private static void AddNamedLocalSections(
+        Transform current,
+        GameObject loadedRoot,
+        ValidationReport report)
     {
-        var settings = AssetDatabase.LoadAssetAtPath<WallOcclusionSettings>(SettingsPath);
+        for (int i = 0; i < current.childCount; i++)
+        {
+            Transform child = current.GetChild(i);
+            if (child.name == "OccludableProps" || child.name == "LevelOnlyProps")
+                continue;
+
+            if (IsSectionName(child.name))
+            {
+                EnsureSectionOnAuthoringRoot(child, loadedRoot, report);
+                continue;
+            }
+
+            AddNamedLocalSections(child, loadedRoot, report);
+        }
+    }
+
+    private static void EnsureSectionOnAuthoringRoot(
+        Transform target,
+        GameObject loadedRoot,
+        ValidationReport report)
+    {
+        OcclusionSection section = target.GetComponent<OcclusionSection>();
+        if (section == null && IsInsideNestedPrefab(target.gameObject, loadedRoot))
+        {
+            report.Error(
+                target,
+                "Nested prefab root has no OcclusionSection. Select and register its source prefab first.");
+            return;
+        }
+
+        if (section == null)
+            section = target.gameObject.AddComponent<OcclusionSection>();
+    }
+
+    private static void WireSection(OcclusionSection section)
+    {
+        var renderers = new List<Renderer>();
+        var colliders = new List<Collider>();
+        CollectSectionOwnedComponents(section.transform, section.transform, renderers, colliders);
+        section.ConfigureAuthoring(renderers.ToArray(), colliders.ToArray());
+    }
+
+    private static void CollectSectionOwnedComponents(
+        Transform sectionRoot,
+        Transform current,
+        List<Renderer> renderers,
+        List<Collider> colliders)
+    {
+        if (current != sectionRoot && current.GetComponent<OcclusionSection>() != null)
+            return;
+
+        renderers.AddRange(current.GetComponents<Renderer>());
+        colliders.AddRange(current.GetComponents<Collider>());
+        for (int i = 0; i < current.childCount; i++)
+            CollectSectionOwnedComponents(sectionRoot, current.GetChild(i), renderers, colliders);
+    }
+
+    private static void ValidatePrefab(
+        GameObject root,
+        WallOcclusionSettings settings,
+        ValidationReport report)
+    {
+        ValidateSafeName(root.transform, report);
+        if (IsStandaloneSectionPrefab(root))
+        {
+            if (!StandaloneSectionName.IsMatch(root.name))
+                report.Error(root.transform, "Standalone root must match PF_Prop_*, PF_Wall_*, or PF_Hallway_*.");
+            ValidateStandaloneSection(root, settings, report);
+            return;
+        }
+
+        if (!StageOrZoneName.IsMatch(root.name))
+            report.Error(root.transform, "Root must match PF_Stage_* or PF_Zone_*.");
+
+        Transform occlusion = FindDirectChild(root.transform, "Occlusion");
+        if (occlusion == null)
+        {
+            report.Error(root.transform, "Missing required direct child 'Occlusion'.");
+            return;
+        }
+
+        ValidateSafeNameRecursive(occlusion, report);
+        int occlusionNameCount = CountDirectChildren(root.transform, "Occlusion");
+        if (occlusionNameCount != 1)
+            report.Error(root.transform, $"Expected exactly one direct 'Occlusion' child, found {occlusionNameCount}.");
+
+        if (occlusion.childCount == 0)
+            report.Error(occlusion, "Occlusion must contain at least one ElevationStack.");
+
+        var sectionColliderOwners = new Dictionary<Collider, OcclusionSection>();
+        var levelColliderOwners = new Dictionary<Collider, ElevationLevel>();
+        for (int i = 0; i < occlusion.childCount; i++)
+        {
+            Transform stackTransform = occlusion.GetChild(i);
+            if (!StackName.IsMatch(stackTransform.name))
+                report.Error(stackTransform, "Stack name must match ElevationStack_00.");
+
+            ElevationStack stack = stackTransform.GetComponent<ElevationStack>();
+            if (stack == null)
+            {
+                report.Error(stackTransform, "ElevationStack component is missing.");
+                continue;
+            }
+
+            if (!stack.HasValidTransform(out string transformReason))
+                report.Error(stackTransform, transformReason);
+            ValidateStack(stack, settings, report, sectionColliderOwners, levelColliderOwners);
+        }
+    }
+
+    private static void ValidateStack(
+        ElevationStack stack,
+        WallOcclusionSettings settings,
+        ValidationReport report,
+        Dictionary<Collider, OcclusionSection> sectionColliderOwners,
+        Dictionary<Collider, ElevationLevel> levelColliderOwners)
+    {
+        if (stack.transform.childCount == 0)
+            report.Error(stack.transform, "ElevationStack must contain at least one direct Level.");
+
+        var heights = new List<float>();
+        for (int i = 0; i < stack.transform.childCount; i++)
+        {
+            Transform levelTransform = stack.transform.GetChild(i);
+            if (!LevelName.IsMatch(levelTransform.name))
+                report.Error(levelTransform, "Level name must match Level_B00 or Level_L00.");
+
+            ElevationLevel level = levelTransform.GetComponent<ElevationLevel>();
+            if (level == null)
+            {
+                report.Error(levelTransform, "ElevationLevel component is missing.");
+                continue;
+            }
+
+            for (int h = 0; h < heights.Count; h++)
+            {
+                if (Mathf.Abs(heights[h] - level.ReferenceWorldY) < 0.001f)
+                    report.Error(levelTransform, "Another Level in this Stack has the same reference Y.");
+            }
+            heights.Add(level.ReferenceWorldY);
+
+            ValidateLevel(level, settings, report, sectionColliderOwners, levelColliderOwners);
+        }
+    }
+
+    private static void ValidateLevel(
+        ElevationLevel level,
+        WallOcclusionSettings settings,
+        ValidationReport report,
+        Dictionary<Collider, OcclusionSection> sectionColliderOwners,
+        Dictionary<Collider, ElevationLevel> levelColliderOwners)
+    {
+        if (!level.IsRuntimeValid(out string reason))
+            report.Error(level.transform, reason);
+
+        Transform content = FindDirectChild(level.transform, "Content");
+        if (content == null)
+            return;
+
+        int contentCount = CountDirectChildren(level.transform, "Content");
+        if (contentCount != 1)
+            report.Error(level.transform, $"Expected exactly one direct Content child, found {contentCount}.");
+
+        Transform occludable = FindDirectChild(content, "OccludableProps");
+        Transform levelOnly = FindDirectChild(content, "LevelOnlyProps");
+        if (occludable == null || CountDirectChildren(content, "OccludableProps") != 1)
+            report.Error(content, "Exactly one direct OccludableProps child is required, even when empty.");
+        if (levelOnly == null || CountDirectChildren(content, "LevelOnlyProps") != 1)
+            report.Error(content, "Exactly one direct LevelOnlyProps child is required, even when empty.");
+
+        if (occludable != null)
+            ValidatePropContainer(occludable, true, report);
+        if (levelOnly != null)
+            ValidatePropContainer(levelOnly, false, report);
+
+        IReadOnlyList<Collider> levelColliders = level.ContentColliders;
+        for (int i = 0; i < levelColliders.Count; i++)
+        {
+            Collider collider = levelColliders[i];
+            if (collider == null)
+                continue;
+            if (levelColliderOwners.TryGetValue(collider, out ElevationLevel existing) && existing != level)
+                report.Error(collider.transform, $"Collider also belongs to Level '{existing.name}'.");
+            else
+                levelColliderOwners[collider] = level;
+        }
+
+        OcclusionSection[] sections = content.GetComponentsInChildren<OcclusionSection>(true);
+        for (int i = 0; i < sections.Length; i++)
+            ValidateSection(sections[i], level, settings, report, sectionColliderOwners);
+
+        report.Info(
+            level.transform,
+            $"counts: renderers={level.ContentRenderers.Count}, colliders={level.ContentColliders.Count}, " +
+            $"xzAreas={level.XZAreas.Count}, sections={sections.Length}");
+    }
+
+    private static void ValidatePropContainer(
+        Transform container,
+        bool shouldBeOccludable,
+        ValidationReport report)
+    {
+        if (container.GetComponent<OcclusionSection>() != null)
+            report.Error(container, "Prop category container must not have OcclusionSection.");
+
+        for (int i = 0; i < container.childCount; i++)
+        {
+            Transform prop = container.GetChild(i);
+            if (!PropName.IsMatch(prop.name))
+                report.Error(prop, "Direct prop root name must match PF_Prop_*.");
+
+            OcclusionSection rootSection = prop.GetComponent<OcclusionSection>();
+            OcclusionSection[] allSections = prop.GetComponentsInChildren<OcclusionSection>(true);
+            if (shouldBeOccludable)
+            {
+                if (rootSection == null || allSections.Length != 1)
+                    report.Error(prop, "OccludableProps child needs exactly one OcclusionSection on its root.");
+            }
+            else if (allSections.Length > 0)
+            {
+                report.Error(prop, "LevelOnlyProps child and descendants must not have OcclusionSection.");
+            }
+
+            Transform[] descendants = prop.GetComponentsInChildren<Transform>(true);
+            for (int d = 1; d < descendants.Length; d++)
+            {
+                if (PropName.IsMatch(descendants[d].name))
+                    report.Error(descendants[d], "Nested PF_Prop_* is forbidden; use sibling prop roots.");
+            }
+        }
+    }
+
+    private static void ValidateSection(
+        OcclusionSection section,
+        ElevationLevel expectedLevel,
+        WallOcclusionSettings settings,
+        ValidationReport report,
+        Dictionary<Collider, OcclusionSection> colliderOwners)
+    {
+        if (!section.IsRuntimeValid(out string reason))
+            report.Error(section.transform, reason);
+        if (section.Level != expectedLevel)
+            report.Error(section.transform, "OcclusionSection resolves to a different ElevationLevel.");
+
+        for (int i = 0; i < section.Colliders.Count; i++)
+        {
+            Collider collider = section.Colliders[i];
+            if (collider == null)
+                continue;
+            if (colliderOwners.TryGetValue(collider, out OcclusionSection existing) && existing != section)
+                report.Error(collider.transform, $"Collider also belongs to Section '{existing.name}'.");
+            else
+                colliderOwners[collider] = section;
+        }
+
+        ValidateMaterials(section.Renderers, settings, section.transform, report);
+    }
+
+    private static void ValidateStandaloneSection(
+        GameObject root,
+        WallOcclusionSettings settings,
+        ValidationReport report)
+    {
+        OcclusionSection section = root.GetComponent<OcclusionSection>();
+        if (section == null)
+        {
+            report.Error(root.transform, "Standalone wall/hallway/prop prefab needs OcclusionSection on root.");
+            return;
+        }
+
+        if (section.Renderers.Count == 0)
+            report.Error(root.transform, "OcclusionSection has no wired Renderer.");
+        if (section.Colliders.Count == 0)
+            report.Error(root.transform, "OcclusionSection has no wired Collider.");
+        ValidateMaterials(section.Renderers, settings, root.transform, report);
+    }
+
+    private static void ValidateMaterials(
+        IReadOnlyList<Renderer> renderers,
+        WallOcclusionSettings settings,
+        Transform context,
+        ValidationReport report)
+    {
         if (settings == null)
         {
-            settings = ScriptableObject.CreateInstance<WallOcclusionSettings>();
-            AssetDatabase.CreateAsset(settings, SettingsPath);
+            report.Error(context, $"Settings asset is missing: {SettingsPath}");
+            return;
         }
 
-        settings.ConfigureMaterialMappings(
-            materialMap.Keys.ToArray(),
-            materialMap.Values.ToArray());
-        EditorUtility.SetDirty(settings);
-        return settings;
-    }
-
-    // 과거 저작이 프리팹에 구워 넣은 오클루전 머티리얼을 원본으로 되돌린다.
-    private static int RestorePrefabMaterials(Dictionary<Material, Material> materialMap)
-    {
-        var reverse = new Dictionary<Material, Material>();
-        foreach (KeyValuePair<Material, Material> pair in materialMap)
-            reverse[pair.Value] = pair.Key;
-
-        int restored = 0;
-        foreach (string guid in AssetDatabase.FindAssets("t:Prefab", PrefabSearchFolders))
+        for (int i = 0; i < renderers.Count; i++)
         {
-            string path = AssetDatabase.GUIDToAssetPath(guid);
-            GameObject root = PrefabUtility.LoadPrefabContents(path);
-            bool changed = false;
-            try
+            Renderer renderer = renderers[i];
+            if (renderer == null)
+                continue;
+            Material[] materials = renderer.sharedMaterials;
+            for (int m = 0; m < materials.Length; m++)
             {
-                foreach (Renderer renderer in root.GetComponentsInChildren<Renderer>(true))
+                if (!settings.TryResolvePair(materials[m], out _, out _))
                 {
-                    if (PrefabUtility.IsPartOfPrefabInstance(renderer.gameObject))
-                        continue;
-
-                    Material[] materials = renderer.sharedMaterials;
-                    bool rendererChanged = false;
-                    for (int i = 0; i < materials.Length; i++)
-                    {
-                        if (materials[i] == null ||
-                            !reverse.TryGetValue(materials[i], out Material source))
-                            continue;
-
-                        materials[i] = source;
-                        rendererChanged = true;
-                        changed = true;
-                        restored++;
-                    }
-
-                    if (rendererChanged)
-                        renderer.sharedMaterials = materials;
-                }
-
-                if (changed)
-                    PrefabUtility.SaveAsPrefabAsset(root, path);
-            }
-            finally
-            {
-                PrefabUtility.UnloadPrefabContents(root);
-            }
-        }
-
-        return restored;
-    }
-
-    private static int CountPersistedOcclusionSlots()
-    {
-        int count = 0;
-        foreach (string guid in AssetDatabase.FindAssets("t:Prefab", PrefabSearchFolders))
-        {
-            string path = AssetDatabase.GUIDToAssetPath(guid);
-            GameObject root = PrefabUtility.LoadPrefabContents(path);
-            try
-            {
-                foreach (Renderer renderer in root.GetComponentsInChildren<Renderer>(true))
-                foreach (Material material in renderer.sharedMaterials)
-                {
-                    if (material != null &&
-                        material.shader != null &&
-                        material.shader.name == ShaderName)
-                        count++;
+                    string name = materials[m] != null ? materials[m].name : "<null>";
+                    report.Error(renderer.transform, $"Material has no registered dither variant: {name}.");
                 }
             }
-            finally
-            {
-                PrefabUtility.UnloadPrefabContents(root);
-            }
         }
-
-        return count;
     }
 
-    private static void InstallMapScene(WallOcclusionSettings settings)
+    private static void EnsureMaterialVariants(
+        GameObject root,
+        WallOcclusionSettings settings,
+        ValidationReport report)
     {
-        Scene scene = SceneManager.GetSceneByPath(MapScenePath);
-        bool openedForAuthoring = !scene.IsValid() || !scene.isLoaded;
-        if (openedForAuthoring)
-            scene = EditorSceneManager.OpenScene(MapScenePath, OpenSceneMode.Additive);
-
-        try
+        Shader ditherShader = Shader.Find(ShaderName);
+        if (ditherShader == null)
         {
-            MapGenerator mapGenerator = null;
-            foreach (GameObject root in scene.GetRootGameObjects())
-            {
-                mapGenerator = root.GetComponentInChildren<MapGenerator>(true);
-                if (mapGenerator != null)
-                    break;
-            }
-
-            if (mapGenerator == null)
-                throw new InvalidOperationException("MapScene에 MapGenerator가 없다.");
-
-            GameObject host = mapGenerator.gameObject;
-            WallOcclusionDriver driver = host.GetComponent<WallOcclusionDriver>();
-            if (driver == null)
-                driver = host.AddComponent<WallOcclusionDriver>();
-
-            driver.SetSettings(settings);
-            EditorUtility.SetDirty(driver);
-            EditorSceneManager.MarkSceneDirty(scene);
-            EditorSceneManager.SaveScene(scene);
+            report.Error(root.transform, $"Shader not found: {ShaderName}");
+            return;
         }
-        finally
+
+        EnsureAssetDirectory(GeneratedMaterialDirectory);
+        var sources = new List<Material>(settings.SourceMaterials ?? Array.Empty<Material>());
+        var variants = new List<Material>(settings.OcclusionMaterials ?? Array.Empty<Material>());
+        Transform materialScope = IsStandaloneSectionPrefab(root)
+            ? root.transform
+            : FindDirectChild(root.transform, "Occlusion");
+        if (materialScope == null)
         {
-            if (openedForAuthoring && scene.IsValid() && scene.isLoaded)
-                EditorSceneManager.CloseScene(scene, true);
+            report.Error(root.transform, "Cannot generate material variants without the required 'Occlusion' child.");
+            return;
+        }
+
+        Renderer[] renderers = materialScope.GetComponentsInChildren<Renderer>(true);
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Material[] materials = renderers[i].sharedMaterials;
+            for (int m = 0; m < materials.Length; m++)
+            {
+                Material source = materials[m];
+                if (source == null || settings.TryResolvePair(source, out _, out _))
+                    continue;
+
+                if (!CanGenerateVariant(source, out string unsupportedReason))
+                {
+                    report.Error(
+                        renderers[i].transform,
+                        $"Unsupported material '{source.name}': {unsupportedReason}. " +
+                        "Create and register an artist-authored dither variant.");
+                    continue;
+                }
+
+                string sourcePath = AssetDatabase.GetAssetPath(source);
+                string guid = AssetDatabase.AssetPathToGUID(sourcePath);
+                string safeName = Regex.Replace(source.name, "[^A-Za-z0-9_]", "_");
+                string suffix = string.IsNullOrEmpty(guid) ? "local" : guid.Substring(0, 8);
+                string variantPath =
+                    $"{GeneratedMaterialDirectory}/{safeName}_{suffix}_Occlusion.mat";
+                Material variant = AssetDatabase.LoadAssetAtPath<Material>(variantPath);
+                if (variant == null)
+                {
+                    variant = new Material(ditherShader) { name = $"{safeName}_{suffix}_Occlusion" };
+                    CopyVisualProperties(source, variant);
+                    AssetDatabase.CreateAsset(variant, variantPath);
+                }
+                else
+                {
+                    variant.shader = ditherShader;
+                    CopyVisualProperties(source, variant);
+                    EditorUtility.SetDirty(variant);
+                }
+
+                sources.Add(source);
+                variants.Add(variant);
+                settings.ConfigureMaterialMappings(sources.ToArray(), variants.ToArray());
+            }
         }
     }
 
-    // 원본이 Shader Graph라 프로퍼티 이름이 자동 생성 GUID를 포함한다.
-    // 이름을 하드코딩하지 않고 셰이더의 텍스처 프로퍼티를 훑어서 albedo/normal을 고른다.
+    private static bool CanGenerateVariant(Material source, out string reason)
+    {
+        if (source.shader == null)
+        {
+            reason = "source shader is missing";
+            return false;
+        }
+
+        if (source.renderQueue >= (int)RenderQueue.Transparent)
+        {
+            reason = "transparent materials are not supported automatically";
+            return false;
+        }
+
+        Shader shader = source.shader;
+        for (int i = 0; i < shader.GetPropertyCount(); i++)
+        {
+            string propertyName = shader.GetPropertyName(i);
+            if (propertyName.IndexOf("Emission", StringComparison.OrdinalIgnoreCase) < 0)
+                continue;
+
+            ShaderPropertyType type = shader.GetPropertyType(i);
+            if (type == ShaderPropertyType.Texture && source.GetTexture(propertyName) != null)
+            {
+                reason = "active emission texture";
+                return false;
+            }
+
+            if (type == ShaderPropertyType.Color && source.GetColor(propertyName).maxColorComponent > 0.001f)
+            {
+                reason = "active emission color";
+                return false;
+            }
+        }
+
+        reason = string.Empty;
+        return true;
+    }
+
     private static void CopyVisualProperties(Material source, Material destination)
     {
         destination.SetColor(
@@ -387,90 +618,121 @@ public static class WallOcclusionAuthoring
         destination.SetFloat(
             "_BumpScale",
             source.HasProperty("_BumpScale") ? source.GetFloat("_BumpScale") : 1f);
-        destination.SetFloat("_WallOcclusionOpacity", 1f);
+        destination.SetFloat("_WallOcclusionStrength", 1f);
         destination.SetFloat("_WallOccAffected", 1f);
 
         ResolveTextures(source, out Texture albedo, out Texture normal);
         destination.SetTexture("_BaseMap", albedo);
         destination.SetTexture("_BumpMap", normal);
-        destination.SetTextureScale("_BaseMap", Vector2.one);
-        destination.SetTextureOffset("_BaseMap", Vector2.zero);
-
-        if (albedo == null)
-        {
-            Debug.LogWarning(
-                $"[WallOcclusion] '{source.name}'에서 albedo 텍스처를 찾지 못했다. " +
-                $"변종이 흰색으로 보인다.",
-                source);
-        }
     }
 
-    private static void ResolveTextures(
-        Material source,
-        out Texture albedo,
-        out Texture normal)
+    private static void ResolveTextures(Material source, out Texture albedo, out Texture normal)
     {
         albedo = null;
         normal = null;
-
         Shader shader = source.shader;
-        if (shader == null)
-            return;
-
-        int propertyCount = shader.GetPropertyCount();
-        for (int i = 0; i < propertyCount; i++)
+        for (int i = 0; i < shader.GetPropertyCount(); i++)
         {
             if (shader.GetPropertyType(i) != ShaderPropertyType.Texture)
                 continue;
-
             Texture texture = source.GetTexture(shader.GetPropertyNameId(i));
             if (texture == null)
                 continue;
-
-            // 임포터 설정이 normal map 여부의 유일하게 신뢰할 수 있는 근거다.
             if (IsNormalMap(texture))
                 normal ??= texture;
             else
                 albedo ??= texture;
-
-            if (albedo != null && normal != null)
-                return;
         }
     }
 
     private static bool IsNormalMap(Texture texture)
     {
         string path = AssetDatabase.GetAssetPath(texture);
-        if (string.IsNullOrEmpty(path))
+        return !string.IsNullOrEmpty(path) &&
+            AssetImporter.GetAtPath(path) is TextureImporter importer &&
+            importer.textureType == TextureImporterType.NormalMap;
+    }
+
+    private static WallOcclusionSettings EnsureSettings()
+    {
+        WallOcclusionSettings settings = AssetDatabase.LoadAssetAtPath<WallOcclusionSettings>(SettingsPath);
+        if (settings != null)
+            return settings;
+
+        settings = ScriptableObject.CreateInstance<WallOcclusionSettings>();
+        AssetDatabase.CreateAsset(settings, SettingsPath);
+        return settings;
+    }
+
+    private static bool IsStandaloneSectionPrefab(GameObject root)
+    {
+        return root.name.StartsWith("PF_Prop_", StringComparison.Ordinal) ||
+            root.name.StartsWith("PF_Wall_", StringComparison.Ordinal) ||
+            root.name.StartsWith("PF_Hallway_", StringComparison.Ordinal);
+    }
+
+    private static bool IsSectionName(string name)
+    {
+        return name.StartsWith("Section_", StringComparison.Ordinal) ||
+            name.StartsWith("WallSection_", StringComparison.Ordinal) ||
+            name.StartsWith("HallwaySection_", StringComparison.Ordinal);
+    }
+
+    private static bool IsInsideNestedPrefab(GameObject target, GameObject loadedRoot)
+    {
+        if (target == loadedRoot || !PrefabUtility.IsPartOfPrefabInstance(target))
             return false;
-
-        return AssetImporter.GetAtPath(path) is TextureImporter importer &&
-               importer.textureType == TextureImporterType.NormalMap;
+        GameObject nearestRoot = PrefabUtility.GetNearestPrefabInstanceRoot(target);
+        return nearestRoot != null && nearestRoot != loadedRoot;
     }
 
-    private static IEnumerable<string> EnumerateVariantPaths()
+    private static Transform FindDirectChild(Transform parent, string name)
     {
-        if (!AssetDatabase.IsValidFolder(MaterialDirectory))
-            yield break;
-
-        foreach (string guid in AssetDatabase.FindAssets(
-                     "t:Material",
-                     new[] { MaterialDirectory }))
+        for (int i = 0; i < parent.childCount; i++)
         {
-            yield return AssetDatabase.GUIDToAssetPath(guid);
+            Transform child = parent.GetChild(i);
+            if (child.name == name)
+                return child;
         }
+        return null;
     }
 
-    private static bool IsExcluded(string materialName)
+    private static int CountDirectChildren(Transform parent, string name)
     {
-        string lower = materialName.ToLowerInvariant();
-        foreach (string fragment in ExcludedNameFragments)
+        int count = 0;
+        for (int i = 0; i < parent.childCount; i++)
         {
-            if (lower.Contains(fragment))
-                return true;
+            if (parent.GetChild(i).name == name)
+                count++;
         }
+        return count;
+    }
 
-        return false;
+    private static void ValidateSafeNameRecursive(Transform root, ValidationReport report)
+    {
+        Transform[] transforms = root.GetComponentsInChildren<Transform>(true);
+        for (int i = 0; i < transforms.Length; i++)
+            ValidateSafeName(transforms[i], report);
+    }
+
+    private static void ValidateSafeName(Transform target, ValidationReport report)
+    {
+        if (!SafeHierarchyName.IsMatch(target.name))
+            report.Error(target, "Name must use exact case-sensitive English ASCII letters, digits, and underscores.");
+    }
+
+    private static string[] GetSelectedPrefabPaths()
+    {
+        var paths = new HashSet<string>(StringComparer.Ordinal);
+        foreach (UnityEngine.Object selected in Selection.objects)
+        {
+            string path = AssetDatabase.GetAssetPath(selected);
+            if (selected is GameObject gameObject && string.IsNullOrEmpty(path))
+                path = PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(gameObject);
+            if (!string.IsNullOrEmpty(path) && path.EndsWith(".prefab", StringComparison.OrdinalIgnoreCase))
+                paths.Add(path);
+        }
+        return paths.OrderBy(path => path, StringComparer.Ordinal).ToArray();
     }
 
     private static void EnsureAssetDirectory(string path)
@@ -485,4 +747,58 @@ public static class WallOcclusionAuthoring
             current = next;
         }
     }
+
+    private sealed class ValidationReport
+    {
+        private readonly string prefabPath;
+        public int ErrorCount { get; private set; }
+        public int InfoCount { get; private set; }
+
+        public ValidationReport(string prefabPath)
+        {
+            this.prefabPath = prefabPath;
+        }
+
+        public void Error(Transform target, string message)
+        {
+            ErrorCount++;
+            Debug.LogError(
+                $"[WallOcclusion] prefab='{prefabPath}', object='{GetHierarchyPath(target)}': " +
+                $"{message}",
+                target);
+        }
+
+        public void Info(Transform target, string message)
+        {
+            InfoCount++;
+            Debug.Log(
+                $"[WallOcclusion] prefab='{prefabPath}', object='{GetHierarchyPath(target)}': {message}",
+                target);
+        }
+
+        public void LogSummary(string operation)
+        {
+            if (ErrorCount == 0)
+                Debug.Log($"[WallOcclusion] {operation} passed: prefab='{prefabPath}', errors=0, info={InfoCount}.");
+            else
+                Debug.LogError(
+                    $"[WallOcclusion] {operation} finished with errors: " +
+                    $"prefab='{prefabPath}', errors={ErrorCount}, info={InfoCount}. Build is not blocked.");
+        }
+
+        private static string GetHierarchyPath(Transform target)
+        {
+            if (target == null)
+                return "<null>";
+            var names = new Stack<string>();
+            Transform current = target;
+            while (current != null)
+            {
+                names.Push(current.name);
+                current = current.parent;
+            }
+            return string.Join("/", names);
+        }
+    }
 }
+#endif

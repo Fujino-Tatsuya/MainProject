@@ -2,172 +2,422 @@ using System.Collections.Generic;
 using UnityEngine;
 using VeyTrace.Rendering.Occlusion;
 
-// 벽 투명화 진입점. 하는 일은 두 가지뿐이다.
-//   1) 맵이 생성되면 벽 머티리얼을 오클루전 변종으로 한 번 교체한다.
-//   2) 매 LateUpdate에 카메라/플레이어 월드 위치를 셰이더 전역 유니폼으로 넘긴다.
-//
-// 불투명도 계산, 벽 선별, 페이드 타이밍은 전부 셰이더가 프래그먼트 단위로 한다.
-// 물리 쿼리와 MaterialPropertyBlock은 쓰지 않는다.
-//
-// Assembly-CSharp에 두는 이유는 CameraTargetSwitcher를 참조하기 때문이다.
-// (VeyTrace.Rendering.Occlusion 어셈블리는 프로젝트 타입을 참조하지 않는다.)
 [DisallowMultipleComponent]
-[DefaultExecutionOrder(100)] // CinemachineBrain(기본 0) 이후에 확정된 카메라 위치를 읽는다.
+[DefaultExecutionOrder(100)]
 public sealed class WallOcclusionDriver : MonoBehaviour
 {
-    private const string StaticStageRootName = "Stage1";
-
     [SerializeField] private WallOcclusionSettings settings;
 
-    private bool isActive;
-    private bool loggedInactiveReason;
+    private readonly Dictionary<ElevationStack, ElevationStackState> stackStates = new();
+    private readonly HashSet<ElevationLevel> hitLevels = new();
+    private readonly HashSet<OcclusionSection> hitSections = new();
+    private readonly List<ElevationStack> staleStacks = new();
+    private readonly List<Vector3> debugHitPoints = new();
+
+    private WallOcclusionRendererController rendererController;
+    private RaycastHit[] castHits;
+    private Transform activeTargetRoot;
+    private float previousFootY;
+    private bool hasPreviousFootY;
+    private bool warnedCastBufferFull;
+    private Vector3 debugCastOrigin;
+    private Vector3 debugCastCenter;
+    private float debugCastRadius;
 
     public WallOcclusionSettings Settings => settings;
 
     public void SetSettings(WallOcclusionSettings newSettings)
     {
+        if (settings == newSettings)
+            return;
+
+        rendererController?.RestoreAllImmediate();
         settings = newSettings;
+        CreateRuntimeBuffers();
     }
 
     private void OnEnable()
     {
-        MapGenerator.OnGenerated += HandleMapGenerated;
-
-        // 절차 생성 없이 이미 배치된 정적 스테이지(Stage1 등)도 여기서 잡힌다.
-        // 예전 구조는 OnGenerated에서만 바인딩해서 정적 씬이 영원히 누락됐다.
-        Rebind();
+        CreateRuntimeBuffers();
+        WallOcclusionGlobals.Disable();
     }
 
     private void OnDisable()
     {
-        MapGenerator.OnGenerated -= HandleMapGenerated;
+        rendererController?.RestoreAllImmediate();
         WallOcclusionGlobals.Disable();
-        isActive = false;
-        loggedInactiveReason = false;
+        stackStates.Clear();
+        activeTargetRoot = null;
+        hasPreviousFootY = false;
     }
 
     private void LateUpdate()
     {
+        EnsureRuntimeBuffers();
+        rendererController.BeginFrame();
+        debugHitPoints.Clear();
+
         CameraTargetSwitcher switcher = CameraTargetSwitcher.Active;
         Camera gameplayCamera = switcher != null ? switcher.GameplayCamera : null;
         Transform followTarget = switcher != null ? switcher.CurrentFollowTarget : null;
 
-        if (settings == null ||
-            gameplayCamera == null ||
-            !gameplayCamera.isActiveAndEnabled ||
-            followTarget == null)
+        if (settings == null || gameplayCamera == null || !gameplayCamera.isActiveAndEnabled ||
+            followTarget == null || !TryResolveTarget(followTarget, out TargetSample target))
         {
-            Deactivate(gameplayCamera, followTarget);
+            DeactivateFrame();
             return;
         }
 
-        WallOcclusionGlobals.Apply(
-            settings,
-            gameplayCamera.transform.position,
-            followTarget.position);
-        Activate(gameplayCamera, followTarget);
+        if (activeTargetRoot != target.Root)
+        {
+            activeTargetRoot = target.Root;
+            stackStates.Clear();
+            hasPreviousFootY = false;
+        }
+
+        OcclusionVerticalMotion motion = ResolveVerticalMotion(target);
+        UpdateElevationStates(target, motion);
+        ApplyScreenMask(gameplayCamera, target);
+        CollectOcclusionHits(gameplayCamera, target);
+
+        foreach (ElevationLevel level in hitLevels)
+            rendererController.AddLevel(level);
+        foreach (OcclusionSection section in hitSections)
+            rendererController.AddSection(section);
+
+        rendererController.EndFrame(Time.deltaTime);
+        previousFootY = target.FootWorldY;
+        hasPreviousFootY = true;
     }
 
-    private void HandleMapGenerated(MapGenerator _)
+    private void CreateRuntimeBuffers()
     {
-        // OnGenerated는 생성물 배치가 끝난 뒤에 발생하므로 렌더러가 이미 존재한다.
-        // 물리 동기화를 기다릴 이유가 없어졌으므로 다음 프레임까지 미루지 않는다.
-        Rebind();
+        rendererController = settings != null
+            ? new WallOcclusionRendererController(settings)
+            : null;
+        castHits = new RaycastHit[Mathf.Max(8, settings != null ? settings.maxCastHits : 8)];
+        warnedCastBufferFull = false;
     }
 
-    // 머티리얼 교체를 다시 수행한다. 멱등이므로 몇 번 불러도 안전하다.
-    public void Rebind()
+    private void EnsureRuntimeBuffers()
     {
-        if (settings == null)
+        if (rendererController == null && settings != null)
+            rendererController = new WallOcclusionRendererController(settings);
+
+        int required = Mathf.Max(8, settings != null ? settings.maxCastHits : 8);
+        if (castHits == null || castHits.Length != required)
         {
-            Debug.LogWarning(
-                "[WallOcclusion] Settings asset이 비어 있어 머티리얼 바인딩을 건너뛴다.",
-                this);
-            return;
-        }
-
-        if (!settings.HasValidMaterialMappings)
-        {
-            Debug.LogWarning(
-                "[WallOcclusion] 머티리얼 매핑이 비었다. " +
-                "Tools > Rendering > Wall Occlusion > Apply All 을 먼저 실행할 것.",
-                this);
-            return;
-        }
-
-        List<Transform> roots = CollectRoots();
-        if (roots.Count == 0)
-        {
-            Debug.LogWarning(
-                $"[WallOcclusion] 바인딩 루트를 찾지 못했다. " +
-                $"('{MapContentSpawner.RootName}', '{StaticStageRootName}')",
-                this);
-            return;
-        }
-
-        WallOcclusionBindReport report =
-            WallOcclusionMaterialBinder.Bind(settings, roots);
-
-        Debug.Log(
-            $"[WallOcclusion] 바인딩 완료 — roots={roots.Count}, " +
-            $"renderers={report.InspectedRenderers}, " +
-            $"boundSlots={report.BoundSlots} (신규 {report.SwappedSlots} / 기존 {report.AlreadyBoundSlots}), " +
-            $"불투명 유지(이름 제외)={report.ExcludedRenderers}, " +
-            $"unmappedMaterials={report.UnmappedMaterialNames.Count} " +
-            $"[{WallOcclusionMaterialBinder.DescribeUnmapped(report.UnmappedMaterialNames)}]",
-            this);
-
-        if (report.BoundSlots == 0)
-        {
-            Debug.LogWarning(
-                "[WallOcclusion] 교체된 머티리얼 슬롯이 하나도 없다. " +
-                "설정의 sourceMaterials가 실제 맵 머티리얼과 일치하는지 확인할 것.",
-                this);
+            castHits = new RaycastHit[required];
+            warnedCastBufferFull = false;
         }
     }
 
-    private List<Transform> CollectRoots()
-    {
-        var roots = new List<Transform>(2);
-        AddRoot(roots, MapContentSpawner.RootName);
-        AddRoot(roots, StaticStageRootName);
-        return roots;
-    }
-
-    private static void AddRoot(List<Transform> roots, string rootName)
-    {
-        GameObject root = GameObject.Find(rootName);
-        if (root != null)
-            roots.Add(root.transform);
-    }
-
-    private void Activate(Camera gameplayCamera, Transform followTarget)
-    {
-        if (isActive)
-            return;
-
-        isActive = true;
-        loggedInactiveReason = false;
-        Debug.Log(
-            $"[WallOcclusion] 활성 — camera='{gameplayCamera.name}' " +
-            $"scene='{gameplayCamera.gameObject.scene.name}', " +
-            $"target='{followTarget.name}'.",
-            this);
-    }
-
-    private void Deactivate(Camera gameplayCamera, Transform followTarget)
+    private void DeactivateFrame()
     {
         WallOcclusionGlobals.Disable();
-        isActive = false;
+        rendererController?.EndFrame(Time.deltaTime);
+        activeTargetRoot = null;
+        stackStates.Clear();
+        hasPreviousFootY = false;
+    }
 
-        if (loggedInactiveReason)
+    private void UpdateElevationStates(TargetSample target, OcclusionVerticalMotion motion)
+    {
+        staleStacks.Clear();
+        foreach (ElevationStack existing in stackStates.Keys)
+            staleStacks.Add(existing);
+
+        foreach (KeyValuePair<ElevationStack, List<ElevationLevel>> entry in
+                 WallOcclusionRegistry.EnumerateStacks())
+        {
+            ElevationStack stack = entry.Key;
+            if (stack == null || !stack.isActiveAndEnabled)
+                continue;
+
+            if (!stackStates.TryGetValue(stack, out ElevationStackState state))
+            {
+                state = new ElevationStackState(stack);
+                stackStates.Add(stack, state);
+            }
+
+            state.Update(
+                target.Center,
+                target.FootWorldY,
+                motion,
+                target.IsGrounded,
+                target.HasGroundSensor,
+                ResolveGroundedLevel(target, stack),
+                settings.risingProgress,
+                settings.fallingProgress);
+            staleStacks.Remove(stack);
+        }
+
+        for (int i = 0; i < staleStacks.Count; i++)
+            stackStates.Remove(staleStacks[i]);
+    }
+
+    private static ElevationLevel ResolveGroundedLevel(TargetSample target, ElevationStack stack)
+    {
+        if (!target.IsGrounded || target.GroundCollider == null ||
+            !WallOcclusionRegistry.TryGetLevel(target.GroundCollider, out ElevationLevel level))
+        {
+            return null;
+        }
+
+        return level.Stack == stack ? level : null;
+    }
+
+    private void CollectOcclusionHits(Camera camera, TargetSample target)
+    {
+        hitLevels.Clear();
+        hitSections.Clear();
+
+        Vector3 origin = camera.transform.position;
+        Vector3 toTarget = target.Center - origin;
+        float distance = toTarget.magnitude;
+        if (distance <= 0.001f)
             return;
 
-        loggedInactiveReason = true;
-        Debug.Log(
-            $"[WallOcclusion] 대기 — settings={(settings != null)}, " +
-            $"camera={(gameplayCamera != null)}, target={(followTarget != null)}. " +
-            "카메라와 오너 플레이어가 준비되면 자동으로 켜진다.",
-            this);
+        Vector3 direction = toTarget / distance;
+        float axisFacing = Mathf.Abs(Vector3.Dot(target.Axis, direction));
+        float projectedHalfCylinder = target.HalfCylinderLength *
+            Mathf.Sqrt(Mathf.Max(0f, 1f - axisFacing * axisFacing));
+        float castRadius = target.Radius + projectedHalfCylinder + settings.castPadding;
+
+        debugCastOrigin = origin;
+        debugCastCenter = target.Center;
+        debugCastRadius = castRadius;
+
+        int hitCount = Physics.SphereCastNonAlloc(
+            origin,
+            castRadius,
+            direction,
+            castHits,
+            distance,
+            settings.castMask,
+            QueryTriggerInteraction.Ignore);
+
+        if (hitCount >= castHits.Length && !warnedCastBufferFull)
+        {
+            warnedCastBufferFull = true;
+            Debug.LogWarning(
+                $"[WallOcclusion] SphereCast buffer is full ({castHits.Length}). " +
+                "Increase maxCastHits in WallOcclusionSettings.",
+                this);
+        }
+
+        for (int i = 0; i < hitCount; i++)
+        {
+            RaycastHit hit = castHits[i];
+            Collider collider = hit.collider;
+            if (collider == null || IsTargetCollider(collider, target.Root))
+                continue;
+
+            if (settings.drawRuntimeGizmos)
+                debugHitPoints.Add(hit.point);
+
+            if (WallOcclusionRegistry.TryGetLevel(collider, out ElevationLevel level) &&
+                IsLevelAbove(level))
+            {
+                hitLevels.Add(level);
+            }
+
+            if (WallOcclusionRegistry.TryGetSection(collider, out OcclusionSection section))
+                hitSections.Add(section);
+        }
+    }
+
+    private bool IsLevelAbove(ElevationLevel level)
+    {
+        if (level == null || level.Stack == null)
+            return false;
+        return stackStates.TryGetValue(level.Stack, out ElevationStackState state) &&
+            state.IsAboveActiveLevel(level);
+    }
+
+    private void ApplyScreenMask(Camera camera, TargetSample target)
+    {
+        Vector3 screenA = camera.WorldToScreenPoint(target.EndpointA);
+        Vector3 screenB = camera.WorldToScreenPoint(target.EndpointB);
+        if (screenA.z <= 0f || screenB.z <= 0f)
+        {
+            WallOcclusionGlobals.Disable();
+            return;
+        }
+
+        float projectedRadius = CalculateProjectedRadiusPixels(camera, target);
+        float targetDepth = Vector3.Dot(
+            target.Center - camera.transform.position,
+            camera.transform.forward);
+        WallOcclusionGlobals.ApplyScreenCapsule(
+            new Vector2(screenA.x, screenA.y),
+            new Vector2(screenB.x, screenB.y),
+            projectedRadius + settings.holePaddingPixels,
+            settings.featherPixels,
+            camera,
+            targetDepth,
+            settings.behindFalloff);
+    }
+
+    private static float CalculateProjectedRadiusPixels(Camera camera, TargetSample target)
+    {
+        Vector3[] centers = { target.EndpointA, target.Center, target.EndpointB };
+        float maxRadius = 1f;
+        for (int i = 0; i < centers.Length; i++)
+        {
+            Vector3 centerScreen = camera.WorldToScreenPoint(centers[i]);
+            Vector3 rightScreen = camera.WorldToScreenPoint(
+                centers[i] + camera.transform.right * target.Radius);
+            Vector3 upScreen = camera.WorldToScreenPoint(
+                centers[i] + camera.transform.up * target.Radius);
+            maxRadius = Mathf.Max(
+                maxRadius,
+                Vector2.Distance(centerScreen, rightScreen),
+                Vector2.Distance(centerScreen, upScreen));
+        }
+
+        return maxRadius;
+    }
+
+    private OcclusionVerticalMotion ResolveVerticalMotion(TargetSample target)
+    {
+        if (target.GroundSensor != null)
+        {
+            return target.GroundSensor.VerticalState switch
+            {
+                PlayerGroundingSensor.VerticalMotionState.Rising => OcclusionVerticalMotion.Rising,
+                PlayerGroundingSensor.VerticalMotionState.Falling => OcclusionVerticalMotion.Falling,
+                _ => OcclusionVerticalMotion.Stable
+            };
+        }
+
+        if (!hasPreviousFootY)
+            return OcclusionVerticalMotion.Stable;
+
+        float delta = target.FootWorldY - previousFootY;
+        if (delta > 0.001f)
+            return OcclusionVerticalMotion.Rising;
+        if (delta < -0.001f)
+            return OcclusionVerticalMotion.Falling;
+        return OcclusionVerticalMotion.Stable;
+    }
+
+    private static bool TryResolveTarget(Transform followTarget, out TargetSample sample)
+    {
+        sample = default;
+        PlayerGroundingSensor grounding = followTarget.GetComponentInParent<PlayerGroundingSensor>();
+        CapsuleCollider capsule = grounding != null
+            ? grounding.GetComponent<CapsuleCollider>()
+            : FindBaseCapsule(followTarget);
+        if (capsule == null || !capsule.enabled || capsule.isTrigger)
+            return false;
+
+        GetWorldCapsule(
+            capsule,
+            out Vector3 center,
+            out Vector3 axis,
+            out float radius,
+            out float halfCylinderLength,
+            out Vector3 endpointA,
+            out Vector3 endpointB);
+
+        bool sensorUsable = grounding != null &&
+            (!grounding.IsSpawned || grounding.IsOwner || grounding.IsServer);
+        sample = new TargetSample
+        {
+            Root = capsule.transform,
+            Center = center,
+            Axis = axis,
+            Radius = radius,
+            HalfCylinderLength = halfCylinderLength,
+            EndpointA = endpointA,
+            EndpointB = endpointB,
+            FootWorldY = Mathf.Min(endpointA.y, endpointB.y) - radius,
+            GroundSensor = sensorUsable ? grounding : null,
+            HasGroundSensor = sensorUsable,
+            IsGrounded = sensorUsable && grounding.IsGrounded,
+            GroundCollider = sensorUsable ? grounding.GroundCollider : null
+        };
+        return true;
+    }
+
+    private static CapsuleCollider FindBaseCapsule(Transform followTarget)
+    {
+        CapsuleCollider[] candidates = followTarget.GetComponentsInParent<CapsuleCollider>(true);
+        for (int i = 0; i < candidates.Length; i++)
+        {
+            if (candidates[i] != null && candidates[i].enabled && !candidates[i].isTrigger)
+                return candidates[i];
+        }
+
+        return null;
+    }
+
+    private static void GetWorldCapsule(
+        CapsuleCollider capsule,
+        out Vector3 center,
+        out Vector3 axis,
+        out float radius,
+        out float halfCylinderLength,
+        out Vector3 endpointA,
+        out Vector3 endpointB)
+    {
+        Vector3 localAxis = capsule.direction switch
+        {
+            0 => Vector3.right,
+            2 => Vector3.forward,
+            _ => Vector3.up
+        };
+        Vector3 localPerpendicularA = capsule.direction == 0 ? Vector3.up : Vector3.right;
+        Vector3 localPerpendicularB = capsule.direction == 2 ? Vector3.up : Vector3.forward;
+
+        Vector3 worldAxisVector = capsule.transform.TransformVector(localAxis);
+        axis = worldAxisVector.sqrMagnitude > 0f ? worldAxisVector.normalized : Vector3.up;
+        float axisScale = worldAxisVector.magnitude;
+        float radiusScale = Mathf.Max(
+            capsule.transform.TransformVector(localPerpendicularA).magnitude,
+            capsule.transform.TransformVector(localPerpendicularB).magnitude);
+        radius = capsule.radius * radiusScale;
+        float height = Mathf.Max(capsule.height * axisScale, radius * 2f);
+        halfCylinderLength = Mathf.Max(0f, height * 0.5f - radius);
+        center = capsule.transform.TransformPoint(capsule.center);
+        endpointA = center + axis * halfCylinderLength;
+        endpointB = center - axis * halfCylinderLength;
+    }
+
+    private static bool IsTargetCollider(Collider collider, Transform targetRoot)
+    {
+        Transform candidate = collider.transform;
+        return candidate == targetRoot || candidate.IsChildOf(targetRoot) || targetRoot.IsChildOf(candidate);
+    }
+
+    private void OnDrawGizmos()
+    {
+        if (settings == null || !settings.drawRuntimeGizmos)
+            return;
+
+        Gizmos.color = Color.cyan;
+        Gizmos.DrawLine(debugCastOrigin, debugCastCenter);
+        Gizmos.DrawWireSphere(debugCastOrigin, debugCastRadius);
+        Gizmos.DrawWireSphere(debugCastCenter, debugCastRadius);
+        Gizmos.color = Color.yellow;
+        for (int i = 0; i < debugHitPoints.Count; i++)
+            Gizmos.DrawSphere(debugHitPoints[i], 0.08f);
+    }
+
+    private struct TargetSample
+    {
+        public Transform Root;
+        public Vector3 Center;
+        public Vector3 Axis;
+        public float Radius;
+        public float HalfCylinderLength;
+        public Vector3 EndpointA;
+        public Vector3 EndpointB;
+        public float FootWorldY;
+        public PlayerGroundingSensor GroundSensor;
+        public Collider GroundCollider;
+        public bool HasGroundSensor;
+        public bool IsGrounded;
     }
 }

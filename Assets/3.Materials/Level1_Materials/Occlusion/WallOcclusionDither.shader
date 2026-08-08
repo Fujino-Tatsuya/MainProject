@@ -4,8 +4,8 @@
 // 사라지는 대신 카메라-플레이어 시선축에 가까운 픽셀부터 투명해지므로, ㅡ자 벽이라면
 // 시선축에 가까운 쪽 끝은 완전히 비고 반대쪽 끝으로 갈수록 원래 불투명도로 되돌아온다.
 //
-// C# 쪽은 WallOcclusionDriver가 전역 유니폼 네 개만 갱신한다. 물리 쿼리도,
-// MaterialPropertyBlock도, 벽별 상태도 없다.
+// C# 쪽은 WallOcclusionDriver가 등록된 대상만 SphereCast로 선택하고, 화면 공간 캡슐과
+// 카메라 데이터를 전역 유니폼으로 전달한다. 전환 강도만 MaterialPropertyBlock으로 갱신한다.
 Shader "Project/Environment/Wall Occlusion Dither"
 {
     Properties
@@ -19,7 +19,7 @@ Shader "Project/Environment/Wall Occlusion Dither"
 
         [Header(Wall Occlusion)]
         [ToggleUI] _WallOccAffected ("Affected By Occlusion", Float) = 1
-        _WallOcclusionOpacity ("Opacity Master Multiplier", Range(0,1)) = 1
+        _WallOcclusionStrength ("Occlusion Strength", Range(0,1)) = 1
     }
 
     SubShader
@@ -41,76 +41,70 @@ Shader "Project/Environment/Wall Occlusion Dither"
             half _Metallic;
             half _Smoothness;
             half _WallOccAffected;
-            half _WallOcclusionOpacity;
+            half _WallOcclusionStrength;
         CBUFFER_END
 
-        // 전역 유니폼 — WallOcclusionDriver가 매 프레임 설정한다.
-        // UnityPerMaterial 밖에 두어야 SRP Batcher 호환이 유지된다.
-        float4 _WallOccPlayerWS;   // xyz = 플레이어 월드 위치
-        float4 _WallOccCameraWS;   // xyz = 게임플레이 카메라 월드 위치
-        float4 _WallOccRange;      // x=innerRadius, y=outerRadius, z=minOpacity, w=enable
-        float4 _WallOccShape;      // x=floorNormalThreshold, y=behindFalloff, z=floorGuardDepth
+        // 게임플레이 카메라 기준 전역값. Shadow/Depth 패스도 같은 화면 좌표를 재구성한다.
+        float4 _WallOccCapsuleA;       // xy = screen pixel endpoint
+        float4 _WallOccCapsuleB;       // xy = screen pixel endpoint
+        float4 _WallOccMask;           // x=core radius, y=feather, z=enable
+        float4 _WallOccCameraWS;
+        float4 _WallOccCameraForwardWS;
+        float4 _WallOccDepth;          // x=target view depth, y=behind falloff
+        float4x4 _WallOccViewProjection;
+        float4 _WallOccScreenRect;     // xy=offset, zw=size in pixels
 
         TEXTURE2D(_BaseMap);
         SAMPLER(sampler_BaseMap);
         TEXTURE2D(_BumpMap);
         SAMPLER(sampler_BumpMap);
 
-        // 프래그먼트 월드 위치에서 불투명도를 구한다. 1 = 원래대로, 0 = 완전히 비어 보임.
-        float WallOcclusionFactor(float3 positionWS, half3 normalWS)
+        float DistanceToSegment(float2 samplePoint, float2 a, float2 b)
         {
-            if (_WallOccRange.w < 0.5 || _WallOccAffected < 0.5h)
+            float2 segment = b - a;
+            float denominator = max(dot(segment, segment), 1e-4);
+            float t = saturate(dot(samplePoint - a, segment) / denominator);
+            return distance(samplePoint, a + segment * t);
+        }
+
+        float WallOcclusionFactor(float3 positionWS, out float2 gameplayPixel)
+        {
+            gameplayPixel = 0.0;
+            if (_WallOccMask.z < 0.5 || _WallOccAffected < 0.5h ||
+                _WallOcclusionStrength <= 0.0001h)
                 return 1.0;
 
-            // 바닥만 보호한다.
-            //
-            // 노멀만으로 가르면 벽 윗면·선반·창틀 윗면 같은 수평 디테일까지 보호되는데,
-            // 탑다운 카메라에서는 그게 가장 크게 보이는 면이라 벽 몸통만 지워지고
-            // 윤곽이 통째로 남는다. 그래서 "위를 향한 면"이면서 동시에 "플레이어보다
-            // 아래"일 때만 보호한다. 플레이어 위에 있는 수평면은 실제로 시야를 가리므로
-            // 지우는 게 맞다.
-            float upness = saturate(
-                (abs(normalWS.y) - _WallOccShape.x) / max(1.0 - _WallOccShape.x, 1e-4));
-            float below = saturate(
-                (_WallOccPlayerWS.y - positionWS.y) / max(_WallOccShape.z, 1e-4));
-            float floorProtect = upness * below;
-            if (floorProtect >= 1.0)
+            float4 gameplayClip = mul(_WallOccViewProjection, float4(positionWS, 1.0));
+            if (gameplayClip.w <= 1e-4)
                 return 1.0;
 
-            float3 toPlayer = _WallOccPlayerWS.xyz - _WallOccCameraWS.xyz;
-            float sightLength = length(toPlayer);
-            if (sightLength < 1e-4)
-                return 1.0;
+            float2 viewport = gameplayClip.xy / gameplayClip.w * 0.5 + 0.5;
+            gameplayPixel = _WallOccScreenRect.xy + viewport * _WallOccScreenRect.zw;
+            float distancePixels = DistanceToSegment(
+                gameplayPixel,
+                _WallOccCapsuleA.xy,
+                _WallOccCapsuleB.xy);
+            float opacity = smoothstep(
+                _WallOccMask.x,
+                _WallOccMask.x + max(_WallOccMask.y, 1.0),
+                distancePixels);
 
-            // 카메라-플레이어 선분까지의 수직 거리. 선분 밖은 끝점으로 clamp되므로
-            // 플레이어 뒤쪽에서도 값이 이어진다(경계 이음새 방지).
-            float3 sightDir = toPlayer / sightLength;
-            float along = dot(positionWS - _WallOccCameraWS.xyz, sightDir);
-            float3 onSight =
-                _WallOccCameraWS.xyz + sightDir * clamp(along, 0.0, sightLength);
-            float radial = distance(positionWS, onSight);
-
-            float k = saturate(
-                (radial - _WallOccRange.x) /
-                max(_WallOccRange.y - _WallOccRange.x, 1e-4));
-            k = k * k * (3.0 - 2.0 * k);
-            float opacity = lerp(_WallOccRange.z, 1.0, k);
-
-            // 플레이어보다 뒤에 있는 면은 시야를 가리지 않으므로 원래 불투명도로 되돌린다.
+            float viewDepth = dot(
+                positionWS - _WallOccCameraWS.xyz,
+                _WallOccCameraForwardWS.xyz);
             float behind = saturate(
-                (along - sightLength) / max(_WallOccShape.y, 1e-4));
+                (viewDepth - _WallOccDepth.x) / max(_WallOccDepth.y, 1e-4));
             opacity = lerp(opacity, 1.0, behind);
-
-            return lerp(opacity, 1.0, floorProtect);
+            return lerp(1.0, opacity, saturate(_WallOcclusionStrength));
         }
 
         void ClipWallOcclusion(float4 positionCS, float3 positionWS, half3 normalWS)
         {
-            float opacity =
-                WallOcclusionFactor(positionWS, normalWS) * _WallOcclusionOpacity;
+            float2 gameplayPixel;
+            float opacity = WallOcclusionFactor(positionWS, gameplayPixel);
 
             // interleaved gradient noise — 화면 공간 디더로 반투명을 흉내낸다.
-            float2 pixel = floor(positionCS.xy);
+            float2 pixel = floor(gameplayPixel);
             float threshold =
                 frac(52.9829189 * frac(dot(pixel, float2(0.06711056, 0.00583715))));
             clip(opacity - threshold);

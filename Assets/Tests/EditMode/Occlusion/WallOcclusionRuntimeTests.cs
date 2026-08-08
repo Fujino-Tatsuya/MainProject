@@ -1,20 +1,39 @@
+using System;
 using System.Collections.Generic;
+using System.IO;
 using NUnit.Framework;
+using UnityEditor;
 using UnityEngine;
+using Object = UnityEngine.Object;
 
 namespace VeyTrace.Rendering.Occlusion.Tests
 {
-    // 재설계 후 C# 쪽에 남은 표면은 두 가지뿐이다.
-    //   1) 설정값 -> 셰이더 전역 벡터 변환 (WallOcclusionGlobals)
-    //   2) 머티리얼 스왑 (WallOcclusionMaterialBinder)
-    // 불투명도 곡선과 벽/바닥 판정은 셰이더에 있으므로 여기서 검증하지 않는다.
     public sealed class WallOcclusionRuntimeTests
     {
+        private const string SerializationPrefabPath =
+            "Assets/Tests/EditMode/Occlusion/__Temp_ComponentSerialization.prefab";
+        private const string RegisterWirePrefabPath =
+            "Assets/Tests/EditMode/Occlusion/PF_Prop_RegisterWireProbe.prefab";
+        private const string RegisteredSourceMaterialPath =
+            "Assets/50.Art/MapGen/MapObj/material/Generic_01_A.mat";
+        private const string GeneratedMaterialDirectory =
+            "Assets/3.Materials/Level1_Materials/Occlusion/Generated";
+
         private readonly List<Object> objectsToDestroy = new();
+        private bool generatedMaterialDirectoryWasPresent;
+
+        [SetUp]
+        public void SetUp()
+        {
+            WallOcclusionRegistry.ClearForTests();
+            generatedMaterialDirectoryWasPresent = AssetDatabase.IsValidFolder(GeneratedMaterialDirectory);
+            DeleteTemporaryAssets();
+        }
 
         [TearDown]
         public void TearDown()
         {
+            WallOcclusionRegistry.ClearForTests();
             for (int i = objectsToDestroy.Count - 1; i >= 0; i--)
             {
                 if (objectsToDestroy[i] != null)
@@ -22,242 +41,352 @@ namespace VeyTrace.Rendering.Occlusion.Tests
             }
 
             objectsToDestroy.Clear();
+            Selection.objects = Array.Empty<Object>();
+            DeleteTemporaryAssets();
+            if (!generatedMaterialDirectoryWasPresent)
+                AssetDatabase.DeleteAsset(GeneratedMaterialDirectory);
         }
 
         [Test]
-        public void BuildRange_PacksRadiiAndEnableFlag()
+        public void LocalXZArea_ContainsRotatedPoint()
         {
-            WallOcclusionSettings settings = CreateSettings();
-            settings.innerRadius = 1.5f;
-            settings.outerRadius = 5f;
-            settings.minimumOpacity = 0.2f;
+            GameObject root = CreateObject("Level_L01");
+            var area = new LocalXZArea("Entry", Vector2.zero, new Vector2(2f, 6f), 90f);
 
-            Vector4 range = WallOcclusionGlobals.BuildRange(settings, true);
-
-            Assert.That(range.x, Is.EqualTo(1.5f).Within(1e-4f));
-            Assert.That(range.y, Is.EqualTo(5f).Within(1e-4f));
-            Assert.That(range.z, Is.EqualTo(0.2f).Within(1e-4f));
-            Assert.That(range.w, Is.EqualTo(1f).Within(1e-4f));
+            Assert.That(area.Contains(root.transform, new Vector3(2f, 0f, 0f)), Is.True);
+            Assert.That(area.Contains(root.transform, new Vector3(0f, 0f, 2f)), Is.False);
         }
 
         [Test]
-        public void BuildRange_ForcesOuterRadiusAboveInner()
+        public void Registry_AllowsLevelMembershipAndSectionOwnershipOnSameCollider()
         {
-            WallOcclusionSettings settings = CreateSettings();
-            settings.innerRadius = 4f;
-            settings.outerRadius = 2f; // 잘못 설정해도 셰이더에서 0으로 나누지 않아야 한다.
+            TestHierarchy hierarchy = CreateHierarchy(0f);
+            OcclusionSection section = hierarchy.SectionRoot.AddComponent<OcclusionSection>();
+            section.ConfigureAuthoring(
+                new Renderer[] { hierarchy.Renderer },
+                new Collider[] { hierarchy.Collider });
 
-            Vector4 range = WallOcclusionGlobals.BuildRange(settings, true);
+            hierarchy.Root.SetActive(true);
+            WallOcclusionRegistry.Register(hierarchy.Level);
+            WallOcclusionRegistry.Register(section);
 
-            Assert.That(range.y, Is.GreaterThan(range.x));
+            Assert.That(
+                WallOcclusionRegistry.TryGetLevel(hierarchy.Collider, out ElevationLevel level),
+                Is.True);
+            Assert.That(level, Is.SameAs(hierarchy.Level));
+            Assert.That(
+                WallOcclusionRegistry.TryGetSection(hierarchy.Collider, out OcclusionSection resolved),
+                Is.True);
+            Assert.That(resolved, Is.SameAs(section));
         }
 
         [Test]
-        public void BuildRange_DisabledFlagIsZero()
+        public void ElevationState_InitializesAtRisingTwentyPercent()
         {
-            WallOcclusionSettings settings = CreateSettings();
+            StackFixture fixture = CreateTwoLevelStack();
+            var state = new ElevationStackState(fixture.Stack);
 
-            Vector4 range = WallOcclusionGlobals.BuildRange(settings, false);
+            state.Update(
+                Vector3.zero,
+                2.1f,
+                OcclusionVerticalMotion.Stable,
+                true,
+                true,
+                null,
+                0.2f,
+                0.6f);
 
-            Assert.That(range.w, Is.EqualTo(0f).Within(1e-4f));
+            Assert.That(state.ActiveLevel, Is.SameAs(fixture.Upper));
+            Assert.That(state.IsAboveActiveLevel(fixture.Upper), Is.False);
         }
 
         [Test]
-        public void BuildRange_NullSettingsDisablesFade()
+        public void ElevationState_GroundedRiseSwitchesAtTwentyPercent()
         {
-            Vector4 range = WallOcclusionGlobals.BuildRange(null, true);
+            StackFixture fixture = CreateTwoLevelStack();
+            var state = new ElevationStackState(fixture.Stack);
+            Update(state, 0f, OcclusionVerticalMotion.Stable, true);
 
-            Assert.That(range.w, Is.EqualTo(0f).Within(1e-4f));
+            Update(state, 1.9f, OcclusionVerticalMotion.Rising, true);
+            Assert.That(state.ActiveLevel, Is.SameAs(fixture.Lower));
+
+            Update(state, 2f, OcclusionVerticalMotion.Rising, true);
+            Assert.That(state.ActiveLevel, Is.SameAs(fixture.Upper));
         }
 
         [Test]
-        public void BuildShape_ClampsThresholdAndFalloffs()
+        public void ElevationState_RegisteredGroundLevelOverridesHeightFallback()
         {
-            WallOcclusionSettings settings = CreateSettings();
-            settings.floorNormalThreshold = 5f; // 1 이상이면 셰이더에서 0 나눗셈이 된다.
-            settings.behindFalloff = 0f;
-            settings.floorGuardDepth = 0f;
+            StackFixture fixture = CreateTwoLevelStack();
+            var state = new ElevationStackState(fixture.Stack);
 
-            Vector4 shape = WallOcclusionGlobals.BuildShape(settings);
+            state.Update(
+                Vector3.zero,
+                9f,
+                OcclusionVerticalMotion.Stable,
+                true,
+                true,
+                fixture.Lower,
+                0.2f,
+                0.6f);
 
-            Assert.That(shape.x, Is.LessThanOrEqualTo(0.95f));
-            Assert.That(shape.y, Is.GreaterThan(0f));
-            Assert.That(shape.z, Is.GreaterThan(0f));
+            Assert.That(state.ActiveLevel, Is.SameAs(fixture.Lower));
         }
 
         [Test]
-        public void BuildShape_PacksFloorGuardDepth()
+        public void ElevationState_AirborneRiseDoesNotChangeLevel()
         {
-            WallOcclusionSettings settings = CreateSettings();
-            settings.floorNormalThreshold = 0.4f;
-            settings.behindFalloff = 2f;
-            settings.floorGuardDepth = 0.8f;
+            StackFixture fixture = CreateTwoLevelStack();
+            var state = new ElevationStackState(fixture.Stack);
+            Update(state, 0f, OcclusionVerticalMotion.Stable, true);
 
-            Vector4 shape = WallOcclusionGlobals.BuildShape(settings);
+            Update(state, 8f, OcclusionVerticalMotion.Rising, false);
 
-            Assert.That(shape.x, Is.EqualTo(0.4f).Within(1e-4f));
-            Assert.That(shape.y, Is.EqualTo(2f).Within(1e-4f));
-            Assert.That(shape.z, Is.EqualTo(0.8f).Within(1e-4f));
+            Assert.That(state.ActiveLevel, Is.SameAs(fixture.Lower));
+            Assert.That(state.IsAboveActiveLevel(fixture.Upper), Is.True);
         }
 
         [Test]
-        public void Bind_SwapsMappedMaterialAndLeavesOthersAlone()
+        public void ElevationState_FallSwitchesAfterSixtyPercentDescent()
         {
-            WallOcclusionSettings settings = CreateSettingsWithMapping(
-                out Material source,
-                out Material variant);
-            Material unrelated = CreateMaterial("Unrelated");
+            StackFixture fixture = CreateTwoLevelStack();
+            var state = new ElevationStackState(fixture.Stack);
+            Update(state, 10f, OcclusionVerticalMotion.Stable, true);
 
-            GameObject root = CreateObject("GeneratedMap");
-            MeshRenderer mapped = CreateRenderer(root.transform, "Env_Wall_basic", source);
-            MeshRenderer untouched = CreateRenderer(root.transform, "Env_floor", unrelated);
+            Update(state, 4.1f, OcclusionVerticalMotion.Falling, false);
+            Assert.That(state.ActiveLevel, Is.SameAs(fixture.Upper));
 
-            WallOcclusionBindReport report =
-                WallOcclusionMaterialBinder.Bind(settings, new[] { root.transform });
-
-            Assert.That(mapped.sharedMaterial, Is.SameAs(variant));
-            Assert.That(untouched.sharedMaterial, Is.SameAs(unrelated));
-            Assert.That(report.SwappedSlots, Is.EqualTo(1));
-            Assert.That(report.SwappedRenderers, Is.EqualTo(1));
-            Assert.That(report.InspectedRenderers, Is.EqualTo(2));
+            Update(state, 4f, OcclusionVerticalMotion.Falling, false);
+            Assert.That(state.ActiveLevel, Is.SameAs(fixture.Lower));
         }
 
         [Test]
-        public void Bind_IsIdempotent()
+        public void ElevationState_OutsideAreasTreatsEveryLevelAsAboveCandidate()
         {
-            WallOcclusionSettings settings = CreateSettingsWithMapping(
-                out Material source,
-                out Material variant);
-            GameObject root = CreateObject("GeneratedMap");
-            MeshRenderer renderer = CreateRenderer(root.transform, "wall", source);
+            StackFixture fixture = CreateTwoLevelStack();
+            var state = new ElevationStackState(fixture.Stack);
 
-            WallOcclusionMaterialBinder.Bind(settings, new[] { root.transform });
-            WallOcclusionBindReport second =
-                WallOcclusionMaterialBinder.Bind(settings, new[] { root.transform });
+            state.Update(
+                new Vector3(100f, 0f, 100f),
+                0f,
+                OcclusionVerticalMotion.Stable,
+                true,
+                true,
+                null,
+                0.2f,
+                0.6f);
 
-            Assert.That(renderer.sharedMaterial, Is.SameAs(variant));
-            Assert.That(second.SwappedSlots, Is.Zero);
-            Assert.That(second.AlreadyBoundSlots, Is.EqualTo(1));
-            Assert.That(second.BoundSlots, Is.EqualTo(1));
+            Assert.That(state.IsInside, Is.False);
+            Assert.That(state.IsAboveActiveLevel(fixture.Lower), Is.True);
+            Assert.That(state.IsAboveActiveLevel(fixture.Upper), Is.True);
         }
 
         [Test]
-        public void Bind_ReportsUnmappedMaterialsByName()
-        {
-            WallOcclusionSettings settings = CreateSettingsWithMapping(out _, out _);
-            Material unmapped = CreateMaterial("MA_prop03");
-
-            GameObject root = CreateObject("GeneratedMap");
-            CreateRenderer(root.transform, "Env_Wall_odd", unmapped);
-
-            WallOcclusionBindReport report =
-                WallOcclusionMaterialBinder.Bind(settings, new[] { root.transform });
-
-            Assert.That(report.UnmappedMaterialNames, Does.Contain("MA_prop03"));
-            Assert.That(report.BoundSlots, Is.Zero);
-        }
-
-        [Test]
-        public void Bind_SwapsEveryMappedSlotOnMultiMaterialRenderer()
-        {
-            WallOcclusionSettings settings = CreateSettingsWithMapping(
-                out Material source,
-                out Material variant);
-            Material unrelated = CreateMaterial("Unrelated");
-
-            GameObject root = CreateObject("GeneratedMap");
-            MeshRenderer renderer = CreateRenderer(root.transform, "wall", source);
-            renderer.sharedMaterials = new[] { source, unrelated, source };
-
-            WallOcclusionMaterialBinder.Bind(settings, new[] { root.transform });
-
-            Material[] result = renderer.sharedMaterials;
-            Assert.That(result[0], Is.SameAs(variant));
-            Assert.That(result[1], Is.SameAs(unrelated));
-            Assert.That(result[2], Is.SameAs(variant));
-        }
-
-        [Test]
-        public void Bind_DeduplicatesRepeatedRoots()
-        {
-            WallOcclusionSettings settings = CreateSettingsWithMapping(out Material source, out _);
-            GameObject root = CreateObject("GeneratedMap");
-            CreateRenderer(root.transform, "wall", source);
-
-            WallOcclusionBindReport report = WallOcclusionMaterialBinder.Bind(
-                settings,
-                new[] { root.transform, root.transform });
-
-            Assert.That(report.InspectedRenderers, Is.EqualTo(1));
-        }
-
-        [Test]
-        public void Bind_WithoutMappingsDoesNothing()
-        {
-            WallOcclusionSettings settings = CreateSettings();
-            Material material = CreateMaterial("Any");
-            GameObject root = CreateObject("GeneratedMap");
-            MeshRenderer renderer = CreateRenderer(root.transform, "wall", material);
-
-            WallOcclusionBindReport report =
-                WallOcclusionMaterialBinder.Bind(settings, new[] { root.transform });
-
-            Assert.That(renderer.sharedMaterial, Is.SameAs(material));
-            Assert.That(report.InspectedRenderers, Is.Zero);
-        }
-
-        [Test]
-        public void Bind_FindsRenderersOnInactiveChildren()
+        public void RendererController_SwapsAndRestoresMaterials()
         {
             WallOcclusionSettings settings = CreateSettingsWithMapping(
                 out Material source,
                 out Material variant);
-            GameObject root = CreateObject("GeneratedMap");
-            MeshRenderer renderer = CreateRenderer(root.transform, "wall", source);
-            renderer.gameObject.SetActive(false);
+            TestHierarchy hierarchy = CreateHierarchy(0f, source);
+            hierarchy.Root.SetActive(true);
+            var controller = new WallOcclusionRendererController(settings);
 
-            WallOcclusionMaterialBinder.Bind(settings, new[] { root.transform });
+            controller.BeginFrame();
+            Assert.That(controller.AddLevel(hierarchy.Level), Is.True);
+            controller.EndFrame(settings.fadeInDuration);
+            Assert.That(hierarchy.Renderer.sharedMaterial, Is.SameAs(variant));
 
-            Assert.That(renderer.sharedMaterial, Is.SameAs(variant));
+            controller.BeginFrame();
+            controller.EndFrame(settings.releaseGraceDuration + settings.restoreDuration);
+            controller.BeginFrame();
+            controller.EndFrame(settings.restoreDuration);
+
+            Assert.That(hierarchy.Renderer.sharedMaterial, Is.SameAs(source));
+            Assert.That(controller.ActiveRendererCount, Is.Zero);
         }
 
         [Test]
-        public void Bind_SkipsRenderersExcludedByName()
+        public void BuildMask_DisabledFlagIsZeroAndValuesAreClamped()
         {
-            // 경사면·참호 덮개는 벽과 같은 머티리얼을 쓰므로 매핑으로는 구분되지 않는다.
-            WallOcclusionSettings settings = CreateSettingsWithMapping(
-                out Material source,
-                out Material variant);
+            Vector4 mask = WallOcclusionGlobals.BuildMask(-1f, 0f, false);
 
-            GameObject root = CreateObject("GeneratedMap");
-            MeshRenderer wall = CreateRenderer(root.transform, "Env_Wall_basic", source);
-            MeshRenderer slope = CreateRenderer(root.transform, "Env_slope_1by2fbx", source);
-
-            WallOcclusionBindReport report =
-                WallOcclusionMaterialBinder.Bind(settings, new[] { root.transform });
-
-            Assert.That(wall.sharedMaterial, Is.SameAs(variant));
-            Assert.That(slope.sharedMaterial, Is.SameAs(source));
-            Assert.That(report.ExcludedRenderers, Is.EqualTo(1));
-            Assert.That(report.SwappedSlots, Is.EqualTo(1));
+            Assert.That(mask.x, Is.Zero);
+            Assert.That(mask.y, Is.GreaterThanOrEqualTo(1f));
+            Assert.That(mask.z, Is.Zero);
         }
 
         [Test]
-        public void Bind_ExcludesRenderersUnderNamedModelRoot()
+        public void AuthoringComponents_HaveDistinctScriptsAndSurvivePrefabRoundTrip()
         {
-            // fbx를 그대로 인스턴스화하면 이름은 모델 루트에 있고 렌더러는 그 자식이다.
-            WallOcclusionSettings settings = CreateSettingsWithMapping(out Material source, out _);
+            GameObject root = CreateObject("PF_Zone_ComponentSerialization");
+            root.SetActive(false);
+            GameObject stackObject = CreateChild(root.transform, "ElevationStack_01");
+            ElevationStack stack = stackObject.AddComponent<ElevationStack>();
+            GameObject levelObject = CreateChild(stackObject.transform, "Level_L01");
+            ElevationLevel level = levelObject.AddComponent<ElevationLevel>();
+            GameObject content = CreateChild(levelObject.transform, "Content");
+            CreateChild(content.transform, "OccludableProps");
+            CreateChild(content.transform, "LevelOnlyProps");
+            GameObject sectionObject = CreateChild(content.transform, "WallSection_01");
+            MeshRenderer renderer = sectionObject.AddComponent<MeshRenderer>();
+            BoxCollider collider = sectionObject.AddComponent<BoxCollider>();
+            OcclusionSection section = sectionObject.AddComponent<OcclusionSection>();
+            level.ConfigureAuthoring(
+                content.transform,
+                new Renderer[] { renderer },
+                new Collider[] { collider },
+                new[] { new LocalXZArea("Level", Vector2.zero, new Vector2(10f, 10f)) });
+            section.ConfigureAuthoring(
+                new Renderer[] { renderer },
+                new Collider[] { collider });
 
-            GameObject root = CreateObject("GeneratedMap");
-            GameObject model = CreateObject("Env_floor_Trenchcover");
-            model.transform.SetParent(root.transform, false);
-            MeshRenderer mesh = CreateRenderer(model.transform, "default", source);
+            GameObject saved = PrefabUtility.SaveAsPrefabAsset(root, SerializationPrefabPath, out bool success);
+            Assert.That(success, Is.True);
+            Assert.That(saved, Is.Not.Null);
+            Object.DestroyImmediate(root);
+            AssetDatabase.ImportAsset(SerializationPrefabPath, ImportAssetOptions.ForceSynchronousImport);
 
-            WallOcclusionBindReport report =
-                WallOcclusionMaterialBinder.Bind(settings, new[] { root.transform });
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(SerializationPrefabPath);
+            Assert.That(prefab, Is.Not.Null);
+            ElevationStack savedStack = prefab.GetComponentInChildren<ElevationStack>(true);
+            ElevationLevel savedLevel = prefab.GetComponentInChildren<ElevationLevel>(true);
+            OcclusionSection savedSection = prefab.GetComponentInChildren<OcclusionSection>(true);
+            Assert.That(savedStack, Is.Not.Null);
+            Assert.That(savedLevel, Is.Not.Null);
+            Assert.That(savedSection, Is.Not.Null);
 
-            Assert.That(mesh.sharedMaterial, Is.SameAs(source));
-            Assert.That(report.ExcludedRenderers, Is.EqualTo(1));
+            string stackGuid = AssertScriptBinding(savedStack, "ElevationStack.cs");
+            string levelGuid = AssertScriptBinding(savedLevel, "ElevationLevel.cs");
+            string sectionGuid = AssertScriptBinding(savedSection, "OcclusionSection.cs");
+            Assert.That(new HashSet<string> { stackGuid, levelGuid, sectionGuid }.Count, Is.EqualTo(3));
+
+            string yaml = File.ReadAllText(SerializationPrefabPath);
+            Assert.That(yaml, Does.Not.Contain("m_Script: {fileID: 0}"));
+            Assert.That(yaml, Does.Contain($"guid: {stackGuid}"));
+            Assert.That(yaml, Does.Contain($"guid: {levelGuid}"));
+            Assert.That(yaml, Does.Contain($"guid: {sectionGuid}"));
+        }
+
+        [Test]
+        public void RegisterWireSelected_SavesStandaloneSectionWithValidScriptReference()
+        {
+            Material sourceMaterial = AssetDatabase.LoadAssetAtPath<Material>(RegisteredSourceMaterialPath);
+            Assert.That(sourceMaterial, Is.Not.Null);
+
+            GameObject root = CreateObject("PF_Prop_RegisterWireProbe");
+            MeshRenderer renderer = root.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = sourceMaterial;
+            root.AddComponent<BoxCollider>();
+            GameObject saved = PrefabUtility.SaveAsPrefabAsset(root, RegisterWirePrefabPath, out bool success);
+            Assert.That(success, Is.True);
+            Assert.That(saved, Is.Not.Null);
+            Object.DestroyImmediate(root);
+
+            Selection.activeObject = AssetDatabase.LoadAssetAtPath<GameObject>(RegisterWirePrefabPath);
+            Assert.That(
+                EditorApplication.ExecuteMenuItem(
+                    "Tools/Rendering/Wall Occlusion/Register-Wire Selected Prefabs"),
+                Is.True);
+            AssetDatabase.ImportAsset(RegisterWirePrefabPath, ImportAssetOptions.ForceSynchronousImport);
+
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(RegisterWirePrefabPath);
+            Assert.That(prefab, Is.Not.Null);
+            OcclusionSection section = prefab.GetComponent<OcclusionSection>();
+            Assert.That(section, Is.Not.Null);
+            Assert.That(section.Renderers.Count, Is.EqualTo(1));
+            Assert.That(section.Colliders.Count, Is.EqualTo(1));
+
+            string sectionGuid = AssertScriptBinding(section, "OcclusionSection.cs");
+            string yaml = File.ReadAllText(RegisterWirePrefabPath);
+            Assert.That(yaml, Does.Not.Contain("m_Script: {fileID: 0}"));
+            Assert.That(yaml, Does.Contain($"m_Script: {{fileID: 11500000, guid: {sectionGuid}, type: 3}}"));
+        }
+
+        private void Update(
+            ElevationStackState state,
+            float footY,
+            OcclusionVerticalMotion motion,
+            bool grounded)
+        {
+            state.Update(
+                Vector3.zero,
+                footY,
+                motion,
+                grounded,
+                true,
+                null,
+                0.2f,
+                0.6f);
+        }
+
+        private StackFixture CreateTwoLevelStack()
+        {
+            GameObject root = CreateObject("PF_Zone_Test");
+            root.SetActive(false);
+            GameObject stackObject = CreateChild(root.transform, "ElevationStack_01");
+            ElevationStack stack = stackObject.AddComponent<ElevationStack>();
+            ElevationLevel lower = CreateLevel(stackObject.transform, "Level_L01", 0f);
+            ElevationLevel upper = CreateLevel(stackObject.transform, "Level_L02", 10f);
+            root.SetActive(true);
+            WallOcclusionRegistry.Register(lower);
+            WallOcclusionRegistry.Register(upper);
+            return new StackFixture(stack, lower, upper);
+        }
+
+        private TestHierarchy CreateHierarchy(float levelY, Material material = null)
+        {
+            GameObject root = CreateObject("PF_Zone_Test");
+            root.SetActive(false);
+            GameObject stackObject = CreateChild(root.transform, "ElevationStack_01");
+            stackObject.AddComponent<ElevationStack>();
+            GameObject levelObject = CreateChild(stackObject.transform, "Level_L01");
+            levelObject.transform.localPosition = new Vector3(0f, levelY, 0f);
+            ElevationLevel level = levelObject.AddComponent<ElevationLevel>();
+            GameObject content = CreateChild(levelObject.transform, "Content");
+            CreateChild(content.transform, "OccludableProps");
+            CreateChild(content.transform, "LevelOnlyProps");
+            GameObject sectionRoot = CreateChild(content.transform, "WallSection_01");
+            MeshRenderer renderer = sectionRoot.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = material ?? CreateMaterial("Source");
+            BoxCollider collider = sectionRoot.AddComponent<BoxCollider>();
+            level.ConfigureAuthoring(
+                content.transform,
+                new Renderer[] { renderer },
+                new Collider[] { collider },
+                new[] { new LocalXZArea("Level", Vector2.zero, new Vector2(20f, 20f)) });
+            return new TestHierarchy(root, level, sectionRoot, renderer, collider);
+        }
+
+        private ElevationLevel CreateLevel(Transform stack, string name, float y)
+        {
+            GameObject levelObject = CreateChild(stack, name);
+            levelObject.transform.localPosition = new Vector3(0f, y, 0f);
+            ElevationLevel level = levelObject.AddComponent<ElevationLevel>();
+            GameObject content = CreateChild(levelObject.transform, "Content");
+            CreateChild(content.transform, "OccludableProps");
+            CreateChild(content.transform, "LevelOnlyProps");
+            GameObject geometry = CreateChild(content.transform, "FloorMesh");
+            MeshRenderer renderer = geometry.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = CreateMaterial($"{name}_Material");
+            BoxCollider collider = geometry.AddComponent<BoxCollider>();
+            level.ConfigureAuthoring(
+                content.transform,
+                new Renderer[] { renderer },
+                new Collider[] { collider },
+                new[] { new LocalXZArea(name, Vector2.zero, new Vector2(20f, 20f)) });
+            return level;
+        }
+
+        private WallOcclusionSettings CreateSettingsWithMapping(
+            out Material source,
+            out Material variant)
+        {
+            var settings = ScriptableObject.CreateInstance<WallOcclusionSettings>();
+            objectsToDestroy.Add(settings);
+            source = CreateMaterial("Source");
+            variant = CreateMaterial("Variant");
+            settings.ConfigureMaterialMappings(new[] { source }, new[] { variant });
+            return settings;
         }
 
         private GameObject CreateObject(string name)
@@ -265,6 +394,13 @@ namespace VeyTrace.Rendering.Occlusion.Tests
             var gameObject = new GameObject(name);
             objectsToDestroy.Add(gameObject);
             return gameObject;
+        }
+
+        private GameObject CreateChild(Transform parent, string name)
+        {
+            GameObject child = CreateObject(name);
+            child.transform.SetParent(parent, false);
+            return child;
         }
 
         private Material CreateMaterial(string name)
@@ -276,33 +412,58 @@ namespace VeyTrace.Rendering.Occlusion.Tests
             return material;
         }
 
-        private MeshRenderer CreateRenderer(Transform parent, string name, Material material)
+        private static string AssertScriptBinding(MonoBehaviour component, string expectedFileName)
         {
-            GameObject child = CreateObject(name);
-            child.transform.SetParent(parent, false);
-            MeshRenderer renderer = child.AddComponent<MeshRenderer>();
-            renderer.sharedMaterial = material;
-            return renderer;
+            MonoScript script = MonoScript.FromMonoBehaviour(component);
+            Assert.That(script, Is.Not.Null);
+            string path = AssetDatabase.GetAssetPath(script);
+            Assert.That(Path.GetFileName(path), Is.EqualTo(expectedFileName));
+            string guid = AssetDatabase.AssetPathToGUID(path);
+            Assert.That(guid, Is.Not.Empty);
+            return guid;
         }
 
-        private WallOcclusionSettings CreateSettings()
+        private static void DeleteTemporaryAssets()
         {
-            var settings = ScriptableObject.CreateInstance<WallOcclusionSettings>();
-            objectsToDestroy.Add(settings);
-            return settings;
+            AssetDatabase.DeleteAsset(SerializationPrefabPath);
+            AssetDatabase.DeleteAsset(RegisterWirePrefabPath);
         }
 
-        private WallOcclusionSettings CreateSettingsWithMapping(
-            out Material source,
-            out Material variant)
+        private readonly struct StackFixture
         {
-            WallOcclusionSettings settings = CreateSettings();
-            source = CreateMaterial("MA_Wall_basic");
-            variant = CreateMaterial("MA_Wall_basic_Occlusion");
-            settings.ConfigureMaterialMappings(
-                new[] { source },
-                new[] { variant });
-            return settings;
+            public readonly ElevationStack Stack;
+            public readonly ElevationLevel Lower;
+            public readonly ElevationLevel Upper;
+
+            public StackFixture(ElevationStack stack, ElevationLevel lower, ElevationLevel upper)
+            {
+                Stack = stack;
+                Lower = lower;
+                Upper = upper;
+            }
+        }
+
+        private readonly struct TestHierarchy
+        {
+            public readonly GameObject Root;
+            public readonly ElevationLevel Level;
+            public readonly GameObject SectionRoot;
+            public readonly MeshRenderer Renderer;
+            public readonly BoxCollider Collider;
+
+            public TestHierarchy(
+                GameObject root,
+                ElevationLevel level,
+                GameObject sectionRoot,
+                MeshRenderer renderer,
+                BoxCollider collider)
+            {
+                Root = root;
+                Level = level;
+                SectionRoot = sectionRoot;
+                Renderer = renderer;
+                Collider = collider;
+            }
         }
     }
 }

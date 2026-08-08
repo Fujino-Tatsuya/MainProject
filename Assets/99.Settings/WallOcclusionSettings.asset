@@ -12,12 +12,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e3e0022985474d70b14dad59ecb3969a, type: 3}
   m_Name: WallOcclusionSettings
   m_EditorClassIdentifier: VeyTrace.Rendering.Occlusion::VeyTrace.Rendering.Occlusion.WallOcclusionSettings
-  innerRadius: 1.2
-  outerRadius: 4.5
-  minimumOpacity: 0.15
+  castMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  maxCastHits: 256
+  castPadding: 0.08
+  holePaddingPixels: 8
+  featherPixels: 42
   behindFalloff: 1.5
-  floorNormalThreshold: 0.35
-  floorGuardDepth: 0.5
+  fadeInDuration: 0.1
+  releaseGraceDuration: 0.1
+  restoreDuration: 0.2
+  risingProgress: 0.2
+  fallingProgress: 0.6
+  drawRuntimeGizmos: 0
   sourceMaterials:
   - {fileID: 2100000, guid: 2a95f9ff80948c643a57b9e94a98eb3f, type: 2}
   - {fileID: 2100000, guid: a07b26988983d7c48895d52badde9df1, type: 2}

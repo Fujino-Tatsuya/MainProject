@@ -1,3 +1,198 @@
+# CURRENT PLAN — 선택형 화면 공간 캡슐 오클루전 재설계 (2026-08-06)
+
+> 상태: **구현 및 자동 검증 완료 / 사용자 프리팹 적용 후 Play 검증 대기**
+> 범위: 런타임 시스템, 선택 프리팹 등록·검증 도구, 자동 테스트, 문서 2개 및 기존 기술 문서 갱신.
+> 제외: 기존 Stage1·복도·Zone·프랍 아트 프리팹의 하이어라키 변환. 사용자가 새 구조로 변환한 뒤 실제 맵 Play 검증을 별도로 수행한다.
+
+## 목표
+
+현재처럼 재질이 매핑된 Stage1·Zone 전체를 대상으로 카메라–플레이어 선분 주변을 일괄 디더 처리하지 않는다.
+로컬 카메라에서 플레이어의 기본 충돌 캡슐을 향해 실제 물리 가림 후보를 선택하고, 명시적으로 등록된 구조물 중
+실제로 가리는 섹션만 플레이어의 **화면 공간 캡슐 실루엣 주변**에서 디더 컷아웃한다.
+
+## 잠긴 설계 결정
+
+### 1. 로컬 가림 선택
+
+- 각 클라이언트가 자기 게임플레이 카메라와 현재 카메라 추적 대상을 기준으로 독립 계산한다. 네트워크 동기화하지 않는다.
+- `LateUpdate`마다 `Physics.SphereCastNonAlloc`을 1회 실행한다. 재사용 버퍼를 사용해 프레임별 GC를 만들지 않는다.
+- 캐스트 대상은 카메라 추적 대상의 **기본 non-trigger CapsuleCollider** 중심이다. 무기·망토·VFX·애니메이션 Renderer bounds는 사용하지 않는다.
+- 캐스트 반경은 카메라 방향에 투영된 기본 캡슐 실루엣과 전역 패딩으로 동적 계산한다.
+- 카메라와 캡슐 사이에서 맞은 등록 대상은 가장 가까운 하나가 아니라 모두 처리한다. 트리거, 플레이어 자신, 구간 뒤쪽, 미등록 대상은 제외한다.
+- `Collider.ClosestPoint`와 기존 전 맵 렌더러/재질 스캔은 사용하지 않는다.
+- 추락 중 캐릭터와 Soul도 실제 기본 캡슐을 사용한다. 관전 시 현재 관전 대상을 사용하며, 유효 대상이 없으면 판정을 멈추고 활성 대상을 복원한다.
+
+### 2. 투명화 표현
+
+- 표현 방식은 URP 불투명 큐의 **디더 컷아웃**을 유지한다. 일반 알파 블렌딩으로 바꾸지 않는다.
+- 기존 월드 공간 카메라–플레이어 원통 마스크를 제거한다.
+- 기본 캡슐의 위·아래와 반지름을 카메라 화면에 투영한 화면 공간 캡슐 마스크를 사용한다.
+- 캡슐 중심부는 완전히 비우고, 외곽 링에서만 디더 그라데이션을 적용한다.
+- 색상, DepthOnly, DepthNormals, ShadowCaster가 동일한 카메라 화면 마스크를 사용한다. 잘려 보이지 않는 부분은 깊이·SSAO·그림자도 함께 제거한다.
+- 구멍 크기·외곽 폭은 전역 설정 하나를 사용한다. 섹션별 크기 오버라이드는 이번 범위에 넣지 않는다.
+- 같은 섹션에서 한 콜라이더가 맞으면 그 섹션의 등록 렌더러 전체를 활성화하되 실제 픽셀 제거는 화면 공간 캡슐 주변에만 일어난다.
+- 선택 진입 약 0.1초, 해제 유예 약 0.1초, 불투명 복원 약 0.2초의 부드러운 전환을 유지한다.
+- 전환 중인 소수 렌더러에만 MPB 전환값을 사용하고, 안정 상태에서는 공유 원본/디더 변형 재질과 빈 MPB로 복귀시켜 SRP Batcher 손실을 제한한다.
+- 노멀과 플레이어 높이로 바닥을 추측하던 `Floor Guard`와 관련 설정·테스트·문서는 제거한다. 같은 그룹에서 플레이어 뒤쪽 픽셀을 보호하는 깊이 제한은 유지한다.
+
+### 3. 명시적 런타임 등록
+
+- 런타임은 이름이나 재질명을 판정 근거로 사용하지 않는다. 컴포넌트에 직렬화된 Renderer·Collider·역할 참조만 사용한다.
+- `OcclusionSection`은 평면 복도 한 인스턴스, 연속 외벽 한 구간, 또는 등록된 프랍 한 개의 기본 소유 단위다.
+- `ElevationStack`은 같은 위치에 수직으로 쌓인 여러 `ElevationLevel`의 현재 층 상태를 독립적으로 관리한다. 별도 런타임 층 번호 필드는 두지 않고 Level 루트의 월드 Y로 정렬한다.
+- 컴포넌트는 활성화/비활성화 시 레지스트리에 스스로 등록·해제한다. 맵 전체를 매 프레임 탐색하지 않는다.
+- 하나의 Renderer 또는 Collider는 `OcclusionSection` 소유자를 최대 하나만 갖는다. 중첩 섹션의 중복 소유는 검증 오류다.
+- `OcclusionSection`은 `Occlusion` 아래 어느 깊이에나 둘 수 있다. 가장 가까운 자기 컴포넌트가 하위를 소유하며 다른 `OcclusionSection` 경계에서 부모 자동 수집을 멈춘다.
+- Level의 `Content` 소속과 `OcclusionSection` 소유는 의도적으로 함께 가질 수 있다. Level 소속은 상위 층 전체 처리를, Section 소유는 현재 층 개별 처리를 담당하며 최종 활성 조건은 OR로 결합한다.
+- 하나의 대상이 둘 이상의 `ElevationLevel/Content`에 소속되는 것은 허용하지 않는다.
+- 역할이 다른 벽·바닥·난간·프랍을 하나의 메시, Renderer 또는 Collider에 합치는 것은 허용하지 않는다.
+- 잘못 등록된 대상은 불투명 상태로 제외하고 원인 경고를 한 번만 출력한다. 정상 섹션은 계속 동작한다.
+- 각 `ElevationLevel/Content` 전체에는 상위 층 그룹 hit 판정용 Collider가 최소 하나 필요하고, 각 `OcclusionSection`에는 현재 층 개별 hit 판정용 Collider가 최소 하나 필요하다. 개별 Renderer나 `LevelOnlyProps` 프랍별 Collider는 강제하지 않는다.
+- 구형 재질 기반 자동 바인딩 호환 모드는 제거한다. 새 컴포넌트가 없는 레거시 프리팹은 불투명하게 유지한다.
+
+### 4. Stage·Zone 공통 하이어라키
+
+#### 4-A. 공통 필수 구조
+
+```text
+PF_Stage_01 또는 PF_Zone_*
+├─ (기존 아트·게임플레이 하이어라키: 자유, 항상 불투명)
+└─ Occlusion                                      ← 유일한 공통 투명화 작업 범위
+   └─ ElevationStack_01 [ElevationStack]
+      ├─ Level_B01 [ElevationLevel: 루트 Y + XZ Areas]
+      │  └─ Content
+      │     ├─ FloorMesh
+      │     ├─ WallSection_01 [OcclusionSection]
+      │     ├─ OccludableProps                    ← 비어 있어도 필수
+      │     │  └─ PF_Prop_Container_A [OcclusionSection]
+      │     └─ LevelOnlyProps                     ← 비어 있어도 필수
+      ├─ Level_L01 [ElevationLevel: 루트 Y + XZ Areas]
+      │  └─ Content
+      │     ├─ FloorMesh
+      │     ├─ HallwaySection_01 [OcclusionSection]
+      │     ├─ OccludableProps
+      │     └─ LevelOnlyProps
+      └─ Level_L02 [ElevationLevel: 루트 Y + XZ Areas]
+         └─ Content
+            ├─ FloorMesh
+            ├─ WallSection_01 [OcclusionSection]
+            ├─ OccludableProps
+            │  └─ PF_Prop_Machine_A [OcclusionSection]
+            └─ LevelOnlyProps
+               ├─ PF_Prop_Railing_A
+               └─ PF_Prop_Box_Small_A
+```
+
+- `Occlusion` 아래에는 `ElevationStack`만 허용한다. 독립 `OcclusionSection`을 직접 두는 것은 검증 오류다.
+- 단층 Stage·Zone도 `ElevationStack` 하나와 `ElevationLevel` 하나를 둔다. 모든 투명화 대상은 반드시 하나의 `Level/Content`에 속한다.
+- `Occlusion`, 각 Level의 `Content`, `OccludableProps`, `LevelOnlyProps`는 비어 있어도 항상 존재하는 필수 역할 노드다.
+- 바닥과 벽을 위한 별도 고정 컨테이너는 추가하지 않는다. 바닥은 `Content` 바로 아래에 두고, 현재 층에서도 개별 처리할 벽·복도는 `OcclusionSection`으로 표시한다.
+- `OccludableProps`와 `LevelOnlyProps` 컨테이너 자체에는 컴포넌트를 붙이지 않는다. `OccludableProps` 아래 각 프랍 프리팹 루트가 자기 `OcclusionSection`을 소유한다.
+- 두 프랍 컨테이너 아래에는 프랍 프리팹 루트만 직속 자식으로 배치한다. 중간 분류 노드는 허용하지 않으며 각 프랍 내부의 메시·Collider 하이어라키는 자유다.
+- `OccludableProps` 직속 `PF_Prop_*` 루트에는 `OcclusionSection`이 정확히 하나 있어야 한다. `LevelOnlyProps` 직속 프랍의 자신과 하위에는 `OcclusionSection`이 없어야 하며, 컴포넌트를 프랍 루트가 아닌 자식 메시 등에 붙이는 것도 검증 오류다.
+- `OcclusionSection` 아래에 `Occluders`·`NeverOccluders`를 두지 않는다. 컴포넌트가 자기 하위를 직접 소유한다.
+- `LevelOnlyProps`의 프랍은 현재 층에서 개별 처리하지 않지만, 그 Level이 플레이어보다 위에 있으면 다른 `Content`와 함께 처리된다.
+- `OccludableProps`의 프랍과 Level 안의 벽·복도 섹션은 상위 층 전체 처리에도 포함되고, 현재 층에서는 자기 SphereCast hit에 따라 독립 처리된다.
+
+#### 4-B. Stage·Zone 소유 예시
+
+- Stage와 Zone은 완전히 같은 등록 규칙을 사용한다. 런타임과 등록 도구는 프리팹 종류를 구분하지 않는다.
+- Stage1 외벽·공용 복도도 Stage의 알맞은 `ElevationLevel/Content` 안에 넣는다.
+- Stage의 특정 층에 속한 바닥·벽·프랍은 Stage의 해당 `ElevationLevel/Content`가 소유한다.
+- Zone의 특정 층에 속한 바닥·벽·프랍은 Zone의 해당 `ElevationLevel/Content`가 소유한다.
+- 외벽은 코너·복도 접합부를 경계로 한 연속 구간별 `OcclusionSection`으로 나누고, 복도 프리팹 인스턴스는 자기 섹션을 소유한다.
+- 투명화 시스템은 `Slots`, `Runtime`, `StaticGeometry`, `Hallways`, `OuterWalls` 같은 외부 이름을 예외 규칙으로 알지 않는다. `Occlusion` 밖은 이름과 관계없이 수집하지 않는다.
+
+### 5. 최소 고도 스택 규칙
+
+고도 시스템의 런타임 규칙은 아래 여섯 단계만 둔다.
+
+1. 기존 `PlayerGroundingSensor`에서 접지 여부와 상승·하강 상태를 읽고 기본 CapsuleCollider의 발 Y를 사용한다. 별도 지면 캐스트나 GroundCollider→Level 매핑은 만들지 않는다.
+2. 각 `ElevationLevel`은 루트 Transform Y 하나와 컴포넌트 내부의 데이터 전용 로컬 `XZ Areas` 목록만 가진다. 물리 `BoxCollider`, `ActivationVolumes`, 별도 층 번호 데이터는 두지 않는다.
+3. 플레이어가 들어 있는 XZ Area를 가진 Level들을 Y로 정렬해 Stack의 현재 층을 정한다. 상태가 없을 때는 인접 높이 구간의 상승 20% 기준으로 초기화한다.
+4. 접지 상승은 다음 높은 Level까지 20%에서 전환하고, 공중 상승은 점프·넉백으로 보고 현재 층을 유지한다. 진입로 및 공중 낙하는 다음 낮은 Level까지 60%에서 전환한다. 한 프레임에 여러 경계를 넘으면 연속 평가한다.
+5. 현재 층보다 높은 Level만 상위 층 전체 처리 후보로 허용한다. 상위 Level의 `Content` 안 Collider 중 하나라도 카메라→기본 캡슐 SphereCast에 맞으면 그 `Content`의 모든 Renderer를 함께 활성화한다. 아무 Collider도 맞지 않으면 활성화하지 않는다.
+6. 현재 층과 아래층의 Level 전체 처리는 끈다. 다만 `Content` 안의 벽·복도·`OccludableProps` 섹션은 자기 Collider가 실제로 맞으면 독립 활성화한다. 최종 조건은 `LevelAboveAndGroupHit || SectionHit`이며 실제 픽셀 제거는 화면 공간 캡슐 주변에서만 일어난다.
+
+- `StableSurfaces`, `TransitionSurfaces`, `AlwaysOccluders`, `NeverOccluders`, `LowerHeight`, `UpperHeight`, `HeightMarker`와 층 간 연결 데이터는 사용하지 않는다.
+- Stack과 Level 루트는 위치 이동과 Y축 회전만 허용하고 스케일은 `(1,1,1)`로 고정한다. X/Z 기울기 회전은 검증 오류다.
+- XZ Area는 `ElevationLevel` 인스펙터 목록에서 Center·Size·Y Rotation으로 만들고 Scene 핸들로 편집한다. 제작 방법을 프리팹 매뉴얼에 명시한다.
+- Stack의 모든 XZ Area 밖이면 활성 층이 없으므로 Level `Content`는 SphereCast hit 시 전체 처리할 수 있다. 겹친 Stack은 각각 독립 판정한다.
+- 하나의 Stack 안에서 사실상 같은 기준 Y를 가진 Level은 허용하지 않는다. 같은 높이의 분리 구간은 한 Level의 여러 XZ Area로 합치고, 독립 판정이 필요하면 Stack을 나눈다. 중복 높이는 검증 오류다.
+- 한 Stack의 여러 XZ Area는 하나의 이어진 고도 구조의 형태를 표현할 때만 사용한다. 서로 멀리 떨어진 건물·발판·독립 구조는 각각 별도 Stack으로 나누며, 하나의 Level Content Collider hit가 관계없는 구조 전체를 활성화하지 않게 한다.
+- 계단·경사로·진입 다리는 별도 역할이나 컴포넌트를 만들지 않고 도착하는 높은 층의 `Content`에 넣는다. 상승 20%·하강 60% 전환으로 현재 층 보호와 상위 층 전체 처리를 전환한다.
+
+### 6. 선택 프리팹 등록·검증 도구
+
+- 선택한 프리팹만 대상으로 `Register/Wire Selected`와 `Validate Selected`를 제공한다.
+- 고정 `Occlusion`, `Content`, `OccludableProps`, `LevelOnlyProps` 역할 노드와 등록 컴포넌트를 읽어 Renderer·Collider 참조와 Level 소속을 직렬화한다. XZ Area는 `ElevationLevel` 컴포넌트 내부 목록을 편집한다.
+- 하이어라키를 임의로 이동하거나 재구성하지 않으며, 중첩 프리팹 원본을 몰래 수정하지 않는다.
+- 지원되는 일반 재질은 선택 프리팹에서 실제 사용한 것만 공유 디더 변형을 결정적 경로와 이름으로 생성·재사용한다. 원본 아트 재질은 수정하지 않는다.
+- 에미션·특수 Shader Graph 등 지원하지 않는 재질은 외형을 추측하지 않고 아트가 제공한 변형을 요구한다.
+- 이름, 필수 역할 노드, 프랍 직속 자식 규칙, 중첩 `PF_Prop_*`, 프랍 분류와 Section 컴포넌트 불일치, `Occlusion` 직속 섹션, Level 미소속 대상, 역할 혼합, 콜라이더/렌더러 누락, XZ Area, Level Y 정렬·중복 높이, 루트 transform, 중복 Section 소유, 다중 Level 소속, 미지원 재질을 검사한다.
+- Content 또는 Section의 Collider 최소치가 충족되지 않으면 선택 프리팹 검증에서 프리팹·오브젝트 경로·수정 방법을 오류 로그로 출력하되 빌드는 막지 않는다. 런타임에서는 해당 대상만 불투명 상태로 제외하고 원인 경고를 한 번만 출력한다.
+- 자동으로 구조의 공간적 독립성을 단정하지 않는다. 검증 결과에 Stack·Level별 Renderer·Collider·XZ Area 수를 표시해 잘못 크게 묶인 그룹을 사람이 확인할 수 있게 한다.
+- 검증 오류는 빌드를 막지 않는다. 프리팹 경로·오브젝트·수정 방법과 전체 오류 수를 로그로 알린다.
+- 등록 컴포넌트가 없는 레거시 프리팹은 프로젝트 전체 오류로 취급하지 않는다.
+- Scene/Play 기즈모로 Level 루트 높이, XZ Area, 상승 20%, 하강 60%, 캐스트 경로, hit 섹션과 현재 층을 표시한다. 일반 빌드에서는 기본 비활성화한다.
+
+### 7. 작명 규칙
+
+- 새로 만들거나 이번 구조로 전환한 프리팹부터 엄격 적용한다. 기존 레거시 파일은 이름 변경하지 않는다.
+- 역할 노드는 영문 ASCII 고정 이름이며 대소문자까지 일치해야 한다. 한글, 공백, `(1)` 형태 자동 복제 접미사를 금지한다.
+- 새 프리팹 파일은 종류별 접두사와 `_` 구분을 사용한다.
+  - `PF_Zone_L_Combat_A`
+  - `PF_Hallway_Straight_A`
+  - `PF_Prop_Machine_Generator_A`
+  - `PF_Wall_Outer_Straight_A`
+- 프랍 등록 단위는 `OccludableProps` 또는 `LevelOnlyProps`의 직속 자식이면서 이름이 `PF_Prop_*` 규칙을 만족해야 한다. `PF_Prop_*` 안에 다른 `PF_Prop_*`을 중첩하면 검증 오류다. Stage·Zone 프리팹이 프랍 프리팹을 소유하는 정상 중첩은 허용한다.
+- 메시·콜라이더·섹션·고도 스택·Level의 세부 접두사, 필수/선택 노드, 정규식, 올바른/잘못된 예시를 별도 문서에 고정한다.
+
+## 구현 순서
+
+1. 기존 오클루전 테스트를 새 계약 기준으로 갱신하고 등록/선택/상태 전이 순수 로직 테스트를 먼저 추가한다.
+2. `OcclusionSection`, `ElevationStack`, `ElevationLevel`, 컴포넌트 내부 XZ Area 목록과 런타임 레지스트리를 구현한다.
+3. `WallOcclusionDriver`를 로컬 카메라·기본 캡슐·매 프레임 NonAlloc SphereCast 기반으로 교체한다.
+4. 화면 공간 캡슐 마스크와 전환 강도를 셰이더의 Forward/Depth/Shadow 패스에 동일 적용한다. Floor Guard를 제거한다.
+5. 공유 재질 변형 캐시와 전환 중에만 MPB를 사용하는 상태 머신을 구현한다.
+6. 선택 프리팹 등록·검증 메뉴와 Scene/Play 기즈모를 구현한다.
+7. 아래 두 신규 문서를 작성하고 기존 `Docs/tech/wall-occlusion-implementation.md`를 새 구조로 갱신한다.
+   - `Docs/tech/occlusion-prefab-authoring-manual.md` — 아트 작업자용 하이어라키·XZ Area·프랍 분류·검증 메뉴얼
+   - `Docs/tech/occlusion-prefab-naming-rules.md`
+8. 작명 규칙 문서에 AI용 프리팹 변환 작업 지시 템플릿과 완료 보고 형식을 포함한다.
+
+## 검증
+
+### 이번 구현에서 수행
+
+- EditMode: 모든 SphereCast hit 수집·중복 제거·미등록 제외·잘못된 대상 fail-opaque·경고 1회.
+- EditMode: 상위 Level의 Content Collider 하나 hit 시 Content 전체 활성, 현재 층 Section 개별 활성, `LevelAboveAndGroupHit || SectionHit`, LevelOnlyProps 현재 층 보호, 중첩 섹션 소유권, 겹친 Stack 독립 판정, Level Y 자동 정렬.
+- EditMode: 기존 접지 센서 재사용, 초기 20%, 접지 상승 20%, 공중 상승 무시, 진입로/낙하 하강 60%, XZ 이탈, 다층 연속 통과.
+- EditMode: 소스/디더 재질 전환, 해제 유예와 복원, 비활성화/씬 해제 시 원상 복구.
+- Editor: 선택 프리팹 자동 등록의 멱등성, 필수 Content/프랍 노드, 모든 대상의 Level 소속, 금지된 Occlusion 직속 Section, 중복/누락/미지원 재질 검증.
+- Shader: Forward/DepthOnly/DepthNormals/ShadowCaster 컴파일과 Floor Guard 잔존 참조 0건.
+- C# 컴파일 및 기존 관련 EditMode 테스트 회귀.
+
+### 사용자 프리팹 반영 후 후속 검증
+
+- Stage1 복도와 연속 외벽의 Level 소속, 1층/2층 `OccludableProps`와 `LevelOnlyProps` 분류.
+- 1층에서 2층 Content가 실제로 가릴 때 바닥·벽·두 프랍 그룹이 함께 화면 공간 캡슐 주변에서 처리되어 떠 보이는 오브젝트가 없는지 확인.
+- 2층에서는 벽·OccludableProps만 개별 처리되고 LevelOnlyProps는 불투명하게 유지되는지 확인.
+- 진입로 상승 20%, 하강 60%, 2층에서 직접 낙하, 점프·넉백 오인 방지.
+- 여러 겹 벽 전부 처리, 카메라 전환, Soul, 추락, 관전.
+- MPPM host+client에서 각 카메라별 독립 결과 및 콘솔 오류 없음.
+
+## 리스크와 대응
+
+- **아트 전환 전에는 투명화가 없음:** 구형 호환 모드를 의도적으로 제거한다. 사용자 프리팹 등록 후 실제 맵 검증을 진행한다.
+- **대형 Level Content 비용:** Stage1 전체를 Level 하나로 뭉치지 않고 실제 고도와 지역 소유 범위로 Stack/Level을 나눈다. Level별 Renderer·Collider 수를 검증 로그에 표시하고 상태 변경은 hit/전환 대상에만 제한한다.
+- **SphereCast 버퍼 포화:** 고정 재사용 버퍼 포화를 감지해 한 번 경고하고 설정 가능한 상한을 둔다. 누락 여부를 테스트/기즈모로 확인한다.
+- **특수 재질 외형 손실:** 자동 추측을 금지하고 지원 재질만 생성하며 나머지는 명시 변형을 요구한다.
+- **카메라/그림자 좌표 불일치:** 게임플레이 카메라의 화면 변환 데이터를 모든 셰이더 패스에 명시적으로 전달하고 테스트한다.
+- **사용자 작업 보호:** 기존 아트 프리팹과 현재 워크트리의 관련 없는 변경은 건드리지 않는다.
+
+---
+
 # CURRENT PLAN — 지연 체력바(잔상 바) — 플레이어/보스 HUD (2026-08-05)
 
 > 상태: **승인 대기**. 브랜치 `feature/DelayedHealthBar` (base `Convayor-V2`), 레인 `dash`.
