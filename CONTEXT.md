@@ -41,14 +41,24 @@ Update this file when a term becomes important enough that future agents or team
 | 4 | [Docs/tech/handoff-boss-reply-interrupt-restrained.md](Docs/tech/handoff-boss-reply-interrupt-restrained.md) | 은희 회신(개정 1판) — 인터럽트·`Restrained` |
 | 5 | [Docs/tech/layer-standard.md](Docs/tech/layer-standard.md) | 레이어 표준 + 이관 완료 기록 |
 
-### ✅ 완료 — 슬라이스 9개 중 8개 (코드)
+### ✅ 완료 — 슬라이스 **9개 전부** (코드)
 
 | S1 | S2 | S3 | S4 | S5 | S6-0 | S6 | S7 | S8 | S9 |
 |---|---|---|---|---|---|---|---|---|---|
-| ✅ | ✅* | ✅ | ✅* | ⏸ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| ✅ | ✅* | ✅ | ✅* | **✅** | ✅ | ✅ | ✅ | ✅ | ✅ |
 
-`*` 부분 보류 — S2 어퍼 에어본(팀장 판단 보류. **단 G1 정정으로 지금 구현 가능**) / S4 Throw 변위(변위 경로 없음)
-`⏸` S5 Dash 캐리 — 은희 `Restrained.Push` 머지 대기
+`*` 부분 보류 2건만 남았다 — 둘 다 **지금은 막혀 있지 않다**:
+- **S2 어퍼 에어본** — 팀장 판단 보류. G1 정정으로 구현 자체는 가능하다.
+- **S4 Throw 변위** — "변위 경로가 없다"고 적혀 있었으나 은희 머지로 전제가 바뀌었다.
+  `Unit.Knockback` 이 임펄스 1회라 **던지기에는 오히려 맞는 모양**이다(지속 밀기가 아니라서
+  돌진이 `Restrained.Push` 로 간 것이지, 던지기는 임펄스가 맞다). 재검토 가치 있음 — 미확인.
+
+**S5 돌진 = 캐리-푸시** (2026-08-08 완료). 참조 설계 = 오버워치 라인하르트 돌진:
+① 끌고 가는 대상은 **첫 1명뿐**(나머지는 스침 데미지) ② **벽에 처박혔을 때만** 데미지 —
+거리 소진이면 기절도 데미지도 없다 ③ 슈퍼아머는 안 밀린다(`BeginRestrainedByInstigator` 의 bool).
+🔴 벽 정지는 **콜라이더가 아니라 NavMesh 클램프 앞당기기**로 했다 — 낭떠러지까지 함께 막히고
+고속 이동의 트리거 터널링이 없다. 근거·되돌리는 법 = IMPLEMENTATION_NOTES.md.
+SO 에 `dash*` 6필드 + `BossAttackPhase.Dash` 추가(끝에). **숫자는 전부 placeholder**(GDD가 TBD).
 
 **신규 파일 15개** (`Assets/1.Scripts/`)
 

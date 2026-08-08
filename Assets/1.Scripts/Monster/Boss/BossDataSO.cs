@@ -250,6 +250,35 @@ public class BossDataSO : MonsterDataSO
     [Tooltip("돌진 1회 데미지. 0 이면 공격 행의 damage(그것도 0 이면 attackDamage).")]
     [Min(0)] public int rageDashDamage = 0;
 
+    // ── 돌진(Dash) — S5 ───────────────────────────────────────────────────
+    // 🔴 레이지와 값을 **따로** 둔다. 레이지는 송전기 실패 벌칙이라 강화판이어야 하는데,
+    //    같은 필드를 쓰면 평상시 돌진이 벌칙과 동일해져 페이즈 연출의 의미가 사라진다.
+    //
+    // 참조 설계 = 오버워치 라인하르트 돌진. 확인한 규칙 3가지를 그대로 가져왔다:
+    //   ① 끌고 가는 대상은 **첫 1명뿐**. 나머지는 스침 데미지만(히트 윈도우가 유닛당 1회 보장).
+    //   ② **벽에 처박혔을 때만** 큰 데미지. 거리를 소진하고 멈추면 데미지 없이 기절만.
+    //   ③ 슈퍼아머 대상은 밀리지 않는다 — `BeginRestrainedByInstigator` 의 bool 반환이 그 계약이다.
+    [Header("돌진(Dash) — [S5]")]
+    [Tooltip("돌진 지속(초).")]
+    [Min(0.1f)] public float dashDuration = 0.7f;
+
+    [Tooltip("돌진 속도 배수. 이동 속도 = MoveSpeed × 이 값. 레이지(8)보다 낮게 둔다.")]
+    [Min(1f)] public float dashSpeedMultiplier = 6f;
+
+    [Tooltip("돌진 최대 거리(m). NavMesh 경계에서 잘린다(낭떠러지 진입 불가).")]
+    [Min(1f)] public float dashMaxDistance = 16f;
+
+    [Tooltip("벽 충돌 데미지. 0 이면 공격 행의 damage(그것도 0 이면 attackDamage). " +
+             "🔴 거리를 소진하고 멈추면 이 데미지는 나가지 않는다 — 벽에 처박는 것이 처벌이다.")]
+    [Min(0)] public int dashDamage = 0;
+
+    [Tooltip("끌고 가는 플레이어가 보스 정면에서 유지하는 거리(m). " +
+             "🔴 목적지를 이 값 + 여유만큼 **앞당겨** 잡으므로, 이 값이 커질수록 보스가 벽에서 멀리 멈춘다.")]
+    [Min(0f)] public float dashCarryFrontOffset = 1.8f;
+
+    [Tooltip("벽 충돌 시 끌려온 대상에게 거는 기절(초). 슈퍼아머라 밀리지 않은 대상에겐 걸지 않는다.")]
+    [Min(0f)] public float dashStunDuration = 1f;
+
     [Header("Wells (23호에 종속) — [S8]")]
     [Tooltip("[S8] 폭탄 투척 주기(초). Wells 는 23호 NetworkObject 에 상태를 싣는다 — " +
              "스폰되지 않는 중첩 NetworkObject 라 자기 NetworkVariable 을 가질 수 없다.")]

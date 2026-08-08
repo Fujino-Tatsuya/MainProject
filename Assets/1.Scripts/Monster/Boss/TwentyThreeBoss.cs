@@ -48,7 +48,7 @@ public class TwentyThreeBoss : MonsterBase
     /// <summary>보스 데이터(읽기 전용). 방향 표시기가 각도를 판정과 **같은 출처**에서 읽기 위해 노출한다.</summary>
     public BossDataSO Data => _boss;
 
-    // 🔴 base 의 자동 피격 반응 3종을 전부 끈다: Hit 경직 · isGroggyAttack 그로기 누적 · Knockback.
+    // 🔴 base 의 자동 피격 반응 3종을 전부 끈다: Hit 경직 · isInterruptAttack 그로기 누적 · Knockback.
     //    정본 §1.1 · §4 — Hit 은 카운터 성공 전용이고, 그로기는 인터럽트 스킬·송전기만 유발하며,
     //    보스는 밀리지 않는다. 데미지·사망 판정과 HitFlash(피격 색)는 그대로 돈다.
     protected override bool AutoHitReactions => false;
@@ -82,6 +82,19 @@ public class TwentyThreeBoss : MonsterBase
     int _rageRemaining;
     Vector3 _rageDashDir;
     bool _rageDashing;                              // RageDash phase 안의 구간 구분(돌진 중 / 간격 대기)
+
+    // ─── 돌진(S5) ─────────────────────────────────────────────────────
+    // 🔴 끌고 가는 대상은 **1명뿐**이다(라인하르트 핀과 같은 규칙). 여러 명을 끌면 각자의
+    //    followTarget 이 같은 지점을 가리켜 겹쳐 쌓이고, 해제 누락 위험도 인원수만큼 늘어난다.
+    Player _dashCarried;
+    Vector3 _dashDir;
+    bool _dashBlockedAhead;                         // 목적지가 보행면 끝에서 잘렸나(= 벽에 처박는다)
+    Vector3 _dashDestination;                       // 클램프된 목적지. 도착 판정의 기준
+    float _dashPrevStopDistance = -1f;              // 돌진 전 stoppingDistance(복원용). -1 = 저장 안 됨
+
+    const float DashCarryProbeRadius = 1.2f;        // 캐리 판정 구 반경(보스 정면 offset 지점 기준)
+    const float DashCarryWallMargin = 0.6f;         // 벽 앞 추가 여유 — 플레이어 캡슐 반경분
+    const float DashArriveEpsilon = 0.35f;          // 목적지 도착으로 볼 수평 거리
 
     // ─── Wells (23호에 탑승) ──────────────────────────────────────────
     // 🔴 Wells 는 **스폰되지 않는 중첩 NetworkObject** 라 자기 NetworkVariable 을 가질 수 없다.
@@ -461,6 +474,10 @@ public class TwentyThreeBoss : MonsterBase
                 case BossAttackId.RageDash:
                     _stateTimer = RageTotalTime + data.attackDuration;
                     break;
+                case BossAttackId.Dash:
+                    // 돌진 본체 + 복귀(= attackDuration). 슈퍼아머 길이이자 데드락 안전망이다.
+                    _stateTimer = DashDuration + data.attackDuration;
+                    break;
             }
         }
 
@@ -528,8 +545,12 @@ public class TwentyThreeBoss : MonsterBase
                     ApplyJumpLandingDamage(e);
                 break;
 
+            case BossAttackId.Dash:
+                // 돌진 시작. 여기가 카운터 창이 닫히는 순간이기도 하다(위에서 이미 닫았다).
+                BeginDash();
+                break;
+
             default:
-                // Dash(S5) — 애니는 나가지만 판정이 아직 없다(캐리 변위가 막혀 있어 보류).
                 WarnUnimplementedOnce(e.attackId);
                 break;
         }
@@ -661,6 +682,11 @@ public class TwentyThreeBoss : MonsterBase
                 TickRage(dt);
                 break;
 
+            // ── 돌진(S5) ──────────────────────────────────────────────
+            case BossAttackPhase.Dash:
+                TickDash();
+                break;
+
             case BossAttackPhase.Recovery:
                 if (_attackPhaseTimer <= 0f) FinishChain();
                 break;
@@ -787,12 +813,17 @@ public class TwentyThreeBoss : MonsterBase
     void AbortAttackChain()
     {
         if (!IsServer) return;
-        if (_attackPhase == BossAttackPhase.None && _grabbed == null) return;
+        if (_attackPhase == BossAttackPhase.None && _grabbed == null && _dashCarried == null) return;
 
         // Grab: 잡은 대상을 놓는다.
         if (IsGrabbedValid())
             _grabbed.EndGrabbedByInstigator();
         _grabbed = null;
+
+        // 🔴 Dash: 끌고 가던 대상도 반드시 놓는다. Grab 과 **정확히 같은 이유** —
+        //    카운터·사망으로 돌진이 끊기면 플레이어가 이동 권한을 잃은 채 영구히 갇힌다.
+        //    (해제 없이 보스가 죽으면 아무도 풀어 줄 수 없다.)
+        ReleaseDashCarry(applyImpact: false);
 
         // 🔴 Jump: 체공 중 끊기면(카운터·사망) **메시가 꺼진 채로 남아 보스가 투명해진다.**
         //    예고 장판도 바닥에 영구히 남는다. 둘 다 여기서 되돌린다.
@@ -1319,8 +1350,7 @@ public class TwentyThreeBoss : MonsterBase
     {
         _rageDashing = false;
         meleeAttack?.EndHitWindow();
-        if (agent != null && agent.enabled) agent.speed = MoveSpeed;
-        StopAgentHard();
+        EndDashMove();
     }
 
     void ApplyRageDamageSnapshot()
@@ -1334,20 +1364,180 @@ public class TwentyThreeBoss : MonsterBase
         meleeAttack.SetDamageSnapshot(Mathf.Max(0, Mathf.RoundToInt(dmg * PhaseDamageMultiplier)));
     }
 
-    // NavMesh 경계까지 클램프한 목표로 돌진(SpinnerBot 선례 — 낭떠러지 진입 불가, 가장자리에서 정지).
-    void StartDashMove(Vector3 dir, float speedMultiplier, float maxDistance)
+    #region 돌진 (S5 — 캐리-푸시)
+    // 설계 참조 = 오버워치 라인하르트 돌진. 가져온 규칙 3가지는 BossDataSO 의 Dash 헤더에 적어 뒀다.
+    //
+    // 🔴 **왜 콜라이더가 아니라 NavMesh 클램프인가** (팀 논의에서 콜라이더 안이 먼저 나왔다):
+    //    `Restrained.Push` 는 서버가 매 틱 "보스위치 + forward × offset" 으로 플레이어 **위치를 강제**한다.
+    //    즉 끌려가는 플레이어의 콜라이더는 벽을 막아 주지 못하고, 보스 콜라이더가 벽에 닿을 때면
+    //    플레이어는 이미 벽 **안**이다. 그래서 목적지를 offset + 여유만큼 앞당겨 보스가 먼저 멈추게 한다.
+    //    벽 콜라이더 대신 NavMesh 를 기준으로 삼은 이유:
+    //      · 기준이 "보행 가능 영역의 끝"이라 **낭떠러지로 밀어넣는 사고까지 함께 막힌다**(이 맵엔 낙하 구역이 있다)
+    //      · 속도배수 6짜리 고속 이동에서 트리거 콜라이더는 프레임 사이를 건너뛴다(터널링). 레이캐스트는 안 놓친다
+    //      · 프리팹에 콜라이더·레이어·충돌 매트릭스를 더 얹지 않아도 된다
+    void BeginDash()
     {
-        if (agent == null || !agent.enabled || !agent.isOnNavMesh) return;
+        FaceTarget();
+        _dashDir = transform.forward;
+        _dashDir.y = 0f;
+        if (_dashDir.sqrMagnitude < 0.0001f) _dashDir = Vector3.forward;
+        _dashDir.Normalize();
+
+        _dashCarried = null;
+        meleeAttack?.BeginHitWindow();   // 경로상 유닛당 1회 보장 — 스침 데미지가 중복되지 않는다
+        ApplyDashDamageSnapshot();
+
+        // 아직 아무도 안 끌고 있으니 여유 0. 캐리가 성립하는 순간 다시 잡는다.
+        _dashBlockedAhead = StartDashMove(_dashDir, DashSpeedMul, DashMaxDistance);
+
+        EnterPhase(BossAttackPhase.Dash, DashDuration);
+    }
+
+    void TickDash()
+    {
+        meleeAttack?.Hit();              // 경로상 스침 데미지(히트 윈도우가 중복을 막는다)
+
+        if (_dashCarried == null)
+            TryCarryDashTarget();
+
+        bool arrived = DashDestinationReached();
+        if (_attackPhaseTimer > 0f && !arrived) return;
+
+        // 목적지에 **닿아서** 멈췄고 그 목적지가 보행면 끝이었으면 벽 충돌이다.
+        // 시간이 먼저 끝났으면 거리를 소진한 것이라 데미지가 없다(라인하르트 규칙 ②).
+        StopDash(hitWall: _dashBlockedAhead && arrived);
+        EnterPhase(BossAttackPhase.Recovery, data != null ? data.attackDuration : 0.9f);
+    }
+
+    // 라인하르트 규칙 ① — 직접 충돌한 **첫 1명**만 끌고 간다. 나머지는 스침 데미지만 받는다.
+    void TryCarryDashTarget()
+    {
+        if (_grabBuffer == null) _grabBuffer = new Collider[8];
+
+        Vector3 probe = transform.position + _dashDir * DashCarryFrontOffset;
+        int count = Physics.OverlapSphereNonAlloc(
+            probe, DashCarryProbeRadius, _grabBuffer, playerMask, QueryTriggerInteraction.Collide);
+
+        for (int i = 0; i < count; i++)
+        {
+            Player p = _grabBuffer[i] != null ? _grabBuffer[i].GetComponentInParent<Player>() : null;
+            if (p == null) continue;
+
+            // 🔴 bool 반환이 계약이다 — 슈퍼아머면 **밀리지 않는다**(확정 스펙: 밀림✕ 기절✕ 데미지○).
+            //    데미지는 히트 윈도우가 따로 처리하므로, 여기서 거부돼도 그 대상은 맞긴 맞는다.
+            if (!p.BeginRestrainedByInstigator(gameObject, RestraintMode.Push, DashCarryFrontOffset))
+                continue;
+
+            _dashCarried = p;
+
+            // 이제 끌고 가므로 목적지를 앞당겨 다시 잡는다 — 안 하면 대상이 벽 안에 낀다.
+            _dashBlockedAhead = StartDashMove(
+                _dashDir, DashSpeedMul, DashMaxDistance, DashCarryFrontOffset + DashCarryWallMargin);
+            return;
+        }
+    }
+
+    void StopDash(bool hitWall)
+    {
+        meleeAttack?.EndHitWindow();
+        EndDashMove();
+        ReleaseDashCarry(applyImpact: hitWall);
+    }
+
+    // 라인하르트 규칙 ② — **벽에 처박혔을 때만** 충돌 데미지와 기절을 준다.
+    // 거리를 소진하고 멈추면 놓아주기만 한다(위치 선정에 보상을 주는 설계).
+    void ReleaseDashCarry(bool applyImpact)
+    {
+        if (_dashCarried == null) return;
+
+        Player carried = _dashCarried;
+        _dashCarried = null;
+
+        if (carried == null || !carried.gameObject.activeInHierarchy) return;
+
+        carried.EndRestrainedByInstigator();
+        if (!applyImpact) return;
+
+        int dmg = _boss != null && _boss.dashDamage > 0
+            ? _boss.dashDamage
+            : (_currentEntry != null && _currentEntry.damage > 0 ? _currentEntry.damage : AttackDamage);
+        dmg = Mathf.Max(0, Mathf.RoundToInt(dmg * PhaseDamageMultiplier));
+
+        if (dmg > 0)
+        {
+            var info = new AttackInfo(dmg, AttackType.Default);
+            var ctx = new AttackHitContext(transform.position, transform);
+            Hurtbox hurtbox = carried.GetComponentInChildren<Hurtbox>();
+            if (hurtbox != null) hurtbox.ReceiveAttack(info, ctx);
+            else carried.ReceiveAttack(info, ctx);
+        }
+
+        // 실제로 밀린 대상만 기절한다 — 슈퍼아머로 캐리를 거부한 대상은 여기 오지 않는다.
+        if (DashStunDuration > 0f && carried.StatusEffects != null)
+            carried.StatusEffects.Apply(StatusEffectType.Stunned, DashStunDuration, NetworkObjectId);
+    }
+
+    void ApplyDashDamageSnapshot()
+    {
+        if (meleeAttack == null) return;
+
+        // 경로 스침 데미지. 벽 충돌 데미지(ReleaseDashCarry)와 달리 공격 행 값을 그대로 쓴다.
+        BossAttackEntry e = _currentEntry;
+        int dmg = e != null && e.damage > 0 ? e.damage : AttackDamage;
+        meleeAttack.SetDamageSnapshot(Mathf.Max(0, Mathf.RoundToInt(dmg * PhaseDamageMultiplier)));
+    }
+
+    bool DashDestinationReached()
+    {
+        Vector3 a = transform.position; a.y = 0f;
+        Vector3 b = _dashDestination;   b.y = 0f;
+        return (a - b).sqrMagnitude <= DashArriveEpsilon * DashArriveEpsilon;
+    }
+    #endregion
+
+    // NavMesh 경계까지 클램프한 목표로 돌진(SpinnerBot 선례 — 낭떠러지 진입 불가, 가장자리에서 정지).
+    // 반환값 = **목적지가 경계에서 잘렸나**(true 면 그 끝이 벽/낭떠러지다). 돌진이 벽 충돌을 판정하는 근거다.
+    // clearance > 0 이면 그 지점에서 그만큼 **앞당겨** 멈춘다(캐리 대상이 벽에 끼지 않게).
+    bool StartDashMove(Vector3 dir, float speedMultiplier, float maxDistance, float clearance = 0f)
+    {
+        _dashDestination = transform.position;
+        if (agent == null || !agent.enabled || !agent.isOnNavMesh) return false;
 
         Vector3 origin = transform.position;
         Vector3 desired = origin + dir * maxDistance;
-        if (UnityEngine.AI.NavMesh.Raycast(origin, desired, out UnityEngine.AI.NavMeshHit hit,
-                                           UnityEngine.AI.NavMesh.AllAreas))
-            desired = hit.position;
+        bool blocked = UnityEngine.AI.NavMesh.Raycast(origin, desired, out UnityEngine.AI.NavMeshHit hit,
+                                                      UnityEngine.AI.NavMesh.AllAreas);
+        if (blocked) desired = hit.position;
 
+        if (clearance > 0f)
+        {
+            Vector3 pulled = desired - dir * clearance;
+            // 앞당긴 지점이 출발점보다 뒤면 이미 벽에 붙어 있는 것 — 제자리에 선다(뒷걸음질 금지).
+            desired = Vector3.Dot(pulled - origin, dir) > 0f ? pulled : origin;
+        }
+
+        // 🔴 stoppingDistance 를 0 으로 내린다. base 기본값(attackRange × 0.8 ≈ 1.6m)이면
+        //    목적지에서 그만큼 앞에 멈춰 "도착"이 영원히 성립하지 않는다 → 벽 충돌 판정이 죽는다.
+        if (_dashPrevStopDistance < 0f) _dashPrevStopDistance = agent.stoppingDistance;
+        agent.stoppingDistance = 0f;
         agent.isStopped = false;
         agent.speed = Mathf.Max(0.1f, MoveSpeed * speedMultiplier);
         agent.SetDestination(desired);
+        _dashDestination = desired;
+        return blocked;
+    }
+
+    // 돌진 종료 공통 — 속도·정지거리를 되돌리고 멈춘다. 되돌리지 않으면 이후 **모든 이동이 초고속**이 되고
+    // 정지거리가 0 인 채로 남아 추격이 대상에 파고든다.
+    void EndDashMove()
+    {
+        if (agent != null && agent.enabled)
+        {
+            agent.speed = MoveSpeed;
+            if (_dashPrevStopDistance >= 0f) agent.stoppingDistance = _dashPrevStopDistance;
+        }
+        _dashPrevStopDistance = -1f;
+        StopAgentHard();
     }
 
     // base 의 StopAgent 는 private 이라 파생이 못 부른다 — 같은 일을 하는 최소 구현.
@@ -1414,6 +1604,12 @@ public class TwentyThreeBoss : MonsterBase
     float RageDashDuration => _boss != null ? Mathf.Max(0.1f, _boss.rageDashDuration) : 0.7f;
     float RageDashInterval => _boss != null ? Mathf.Max(0f, _boss.rageDashInterval) : 0.5f;
     float RageDashSpeedMul => _boss != null ? Mathf.Max(1f, _boss.rageDashSpeedMultiplier) : 8f;
+
+    float DashDuration => _boss != null ? Mathf.Max(0.1f, _boss.dashDuration) : 0.7f;
+    float DashSpeedMul => _boss != null ? Mathf.Max(1f, _boss.dashSpeedMultiplier) : 6f;
+    float DashMaxDistance => _boss != null ? Mathf.Max(1f, _boss.dashMaxDistance) : 16f;
+    float DashCarryFrontOffset => _boss != null ? Mathf.Max(0f, _boss.dashCarryFrontOffset) : 1.8f;
+    float DashStunDuration => _boss != null ? Mathf.Max(0f, _boss.dashStunDuration) : 1f;
     float RageDashMaxDistance => _boss != null ? Mathf.Max(1f, _boss.rageDashMaxDistance) : 16f;
     float RageTotalTime =>
         (_boss != null ? Mathf.Max(1, _boss.rageDashCount) : 3) * (RageDashDuration + RageDashInterval);
@@ -1444,12 +1640,15 @@ public class TwentyThreeBoss : MonsterBase
     /// <summary>
     /// 이 히트가 인터럽트 스킬인가.
     ///
-    /// 🔴 <c>AttackType</c>(None/Default/Q/E/R)에는 우클릭 슬롯 값이 아직 없다(PLAN §7 R1, 은희 의존).
-    /// 그래서 지금은 <c>isGroggyAttack</c> 으로 판별한다 — PLAN §5-1 이 이 플래그의 의미를
-    /// "이 스킬이 인터럽트 스킬인가"로 좁히기로 확정했기 때문이다.
-    /// 인터럽트 식별자를 수령하면 <c>|| attackInfo.attackType == &lt;인터럽트&gt;</c> 한 줄만 추가하면 된다.
+    /// ✅ R1 수령 완료(은희, `a75398c`) — 식별자는 <c>AttackType</c> enum 값이 아니라
+    /// <c>AttackInfo.isInterruptAttack</c> **플래그**로 왔다. <c>AttackType</c> 은 "어느 출처가 쐈나"라
+    /// 인터럽트와 직교하기 때문이다(Q 슬롯이면서 인터럽트인 스킬을 표현할 수 없게 된다).
+    ///
+    /// **플래그는 하나뿐이고 소비 방식은 수신측이 정한다** — 일반몹·중간보스는
+    /// <c>maxGroggyCount</c> 누적으로 소비하고, 23호는 여기서 **카운터 창 + 정면 각도**로 소비한다.
+    /// virtual 로 둔 것은 파생 보스가 판별을 좁힐 수 있게 하기 위해서다.
     /// </summary>
-    protected virtual bool IsInterruptAttack(AttackInfo attackInfo) => attackInfo.isGroggyAttack;
+    protected virtual bool IsInterruptAttack(AttackInfo attackInfo) => attackInfo.isInterruptAttack;
 
     /// <summary>
     /// 보스 정면에서 들어온 히트인가(<c>counterFrontAngle</c> = 전방 기준 ±각도).
