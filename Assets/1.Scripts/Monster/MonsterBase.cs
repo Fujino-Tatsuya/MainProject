@@ -901,7 +901,7 @@ public class MonsterBase : Unit
     ///
     /// 🔴 보스는 false 다. 정본(boss-rebuild-standard.md §1.1 · §4)이 셋 다 부정하기 때문이다:
     ///   ① <c>Hit</c> 는 **카운터 성공 전용** — 일반 피격은 색 변경만(HitFlash)
-    ///   ② 그로기는 **인터럽트 스킬·송전기만** 유발 — <c>isGroggyAttack</c> 누적을 쓰지 않는다
+    ///   ② 그로기는 **인터럽트 스킬·송전기만** 유발 — <c>isInterruptAttack</c> 누적을 쓰지 않는다
     ///   ③ **보스는 안 밀린다** — Knockback 상태를 만들지 않는다
     /// 데미지·사망 판정은 이 값과 무관하게 항상 돈다.
     /// </summary>
