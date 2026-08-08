@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8130f0c7b75804c4bbca2a9da664696e, type: 3}
+  m_Name: FirstMeleeInterruptSkillData
+  m_EditorClassIdentifier: Assembly-CSharp::FirstMeleeInterruptSkillData
+  inputType: 0
+  cooldownTime: 8
+  attackDamageMultiplier: 0.5
+  flatDamageBonus: 0
+  maxActiveDuration: 2
+  tickInterval: 0
+  usableWhileDead: 0
+  hittableLayers:
+    serializedVersion: 2
+    m_Bits: 17664
+  targetingMode: 0
+  confirmMode: 0
+  castRange: 8
+  targetableLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  animatorStateName: Interrupt
+  snapRotationOnStart: 1
+  hitDelay: 0.15
+  skillDuration: 0.6
+  maxHitResults: 8

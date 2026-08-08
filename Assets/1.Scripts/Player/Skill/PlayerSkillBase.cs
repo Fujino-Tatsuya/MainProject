@@ -119,4 +119,56 @@ public abstract class PlayerSkillBase : MonoBehaviour
         if (controller != null)
             controller.EndActiveSkillServer(reason);
     }
+
+    // ── 판정 공용 유틸 (서버 전용 경로에서만 호출할 것) ──
+
+    /// <summary>
+    /// 판정 앵커(<see cref="HitboxAnchor"/>)의 콜라이더 형태로 Overlap 질의한다.
+    /// 앵커는 아마추어 하위 노드이므로 회전이 반영된 방향성 판정이 된다.
+    /// </summary>
+    /// <returns>results에 채워진 개수. 앵커/데이터가 없으면 0.</returns>
+    protected int OverlapHitboxAnchor(Collider[] results)
+    {
+        if (hitboxAnchor == null || data == null || results == null)
+            return 0;
+
+        switch (hitboxAnchor.OverlapCollider)
+        {
+            case OverlapCollider.Box:
+                BoxColliderInfo boxInfo = default;
+                hitboxAnchor.GetBoxColliderInfo(ref boxInfo);
+                return Physics.OverlapBoxNonAlloc(
+                    boxInfo.center, boxInfo.halfExtents, results, boxInfo.orientation,
+                    data.HittableLayers, QueryTriggerInteraction.Collide);
+
+            case OverlapCollider.Sphere:
+                SphereColliderInfo sphereInfo = default;
+                hitboxAnchor.GetSphereColliderInfo(ref sphereInfo);
+                return Physics.OverlapSphereNonAlloc(
+                    sphereInfo.center, sphereInfo.radius, results,
+                    data.HittableLayers, QueryTriggerInteraction.Collide);
+
+            case OverlapCollider.Capsule:
+                CapsuleColliderInfo capsuleInfo = default;
+                hitboxAnchor.GetCapsuleColliderInfo(ref capsuleInfo);
+                return Physics.OverlapCapsuleNonAlloc(
+                    capsuleInfo.point0, capsuleInfo.point1, capsuleInfo.radius, results,
+                    data.HittableLayers, QueryTriggerInteraction.Collide);
+
+            default:
+                return 0;
+        }
+    }
+
+    /// <summary>
+    /// 히트 콜라이더에서 피해 수신자를 해석한다. Hurtbox가 있으면 그쪽이 우선(소유 Unit 반환).
+    /// </summary>
+    protected static Unit ResolveHitUnit(Collider hit, out Hurtbox hurtbox)
+    {
+        hurtbox = hit.GetComponentInParent<Hurtbox>();
+        if (hurtbox != null && hurtbox.TryGetOwner(out Unit hurtboxOwner))
+            return hurtboxOwner;
+
+        return hit.GetComponentInParent<Unit>();
+    }
 }

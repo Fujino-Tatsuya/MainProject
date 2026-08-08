@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using TMPro;
 using Unity.Netcode;
 using UnityEngine;
@@ -27,12 +27,23 @@ public class BeaverLobbySceneManager : NemoSceneManager
     [SerializeField] private string defaultIp = "127.0.0.1";
     [SerializeField] private ushort defaultPort = 7777;
 
+    [Header("Relay Connection")]
+    [SerializeField] private GameObject relayPanel;
+    [SerializeField] private GameObject directPanel;
+    [SerializeField] private TMP_InputField joinCodeInputField;
+    [SerializeField] private TMP_Text joinCodeDisplayText;
+    [SerializeField] private Button relayHostButton;
+    [SerializeField] private Button relayJoinButton;
+    [SerializeField] private Button modeToggleButton;
+
     private NetworkManager _networkManager;
     private NetworkSessionLauncher _sessionLauncher;
     private LobbyUIController _lobbyUIController;
     private bool _connectionDataApplied;
     private bool _clientConnectPending;
     private bool _networkCallbacksRegistered;
+    private bool _relayStartPending;
+    private bool _relayHostPending;
 
     protected override void Awake()
     {
@@ -49,6 +60,7 @@ public class BeaverLobbySceneManager : NemoSceneManager
         ResolveSceneReferences();
         BindButtons();
         RegisterNetworkCallbacks();
+        RegisterSessionLauncherEvents();
     }
 
     private void Start()
@@ -58,6 +70,7 @@ public class BeaverLobbySceneManager : NemoSceneManager
         ApplyDefaultInputValues();
         SetErrorMessage(string.Empty);
         RegisterLobbyUiEvents();
+        SelectDirectMode();
         ApplyRoleUi();
 
         // BGM 재생
@@ -67,6 +80,7 @@ public class BeaverLobbySceneManager : NemoSceneManager
     private void OnDestroy()
     {
         UnregisterNetworkCallbacks();
+        UnregisterSessionLauncherEvents();
         UnregisterLobbyUiEvents();
     }
 
@@ -131,6 +145,62 @@ public class BeaverLobbySceneManager : NemoSceneManager
             Debug.Log("[SceneFlow] BeaverLobbySceneManager.StartClient failed");
             SetErrorMessage("Client 시작에 실패했습니다.");
         }
+    }
+
+    public void SelectDirectMode()
+    {
+        if (_sessionLauncher != null)
+        {
+            _sessionLauncher.Mode = SessionConnectionMode.DirectIPv4;
+        }
+
+        SetConnectionModePanels(false);
+        SetErrorMessage(string.Empty);
+    }
+
+    public void SelectRelayMode()
+    {
+        if (_sessionLauncher != null)
+        {
+            _sessionLauncher.Mode = SessionConnectionMode.UnityRelay;
+        }
+
+        SetConnectionModePanels(true);
+        SetErrorMessage(string.Empty);
+    }
+
+    public void StartRelayHost()
+    {
+        if (!TryBeginRelayStart(true))
+        {
+            return;
+        }
+
+        if (joinCodeDisplayText != null)
+        {
+            joinCodeDisplayText.text = string.Empty;
+        }
+
+        SetErrorMessage("Relay 방 생성 중...");
+        _sessionLauncher.BeginHost();
+    }
+
+    public void StartRelayJoin()
+    {
+        var joinCode = joinCodeInputField != null ? joinCodeInputField.text : string.Empty;
+        if (string.IsNullOrWhiteSpace(joinCode))
+        {
+            SetErrorMessage("Relay 조인코드를 입력하세요.");
+            return;
+        }
+
+        if (!TryBeginRelayStart(false))
+        {
+            return;
+        }
+
+        SetErrorMessage("Relay 방 참가 준비 중...");
+        _sessionLauncher.BeginClient(joinCode);
     }
 
     public void ToggleReady()
@@ -259,6 +329,7 @@ public class BeaverLobbySceneManager : NemoSceneManager
         SetErrorMessage(string.Empty);
         SetSessionConnectPanel(false);
         SetConnectControlsInteractable(true);
+        SetRelayControlsInteractable(true);
         ApplyRoleUi();
     }
 
@@ -291,6 +362,7 @@ public class BeaverLobbySceneManager : NemoSceneManager
         _clientConnectPending = false;
         SetSessionConnectPanel(true);
         SetConnectControlsInteractable(true);
+        SetRelayControlsInteractable(true);
         ApplyRoleUi();
     }
 
@@ -301,7 +373,85 @@ public class BeaverLobbySceneManager : NemoSceneManager
         _clientConnectPending = false;
         SetSessionConnectPanel(true);
         SetConnectControlsInteractable(true);
+        SetRelayControlsInteractable(true);
         ApplyRoleUi();
+    }
+
+    private bool TryBeginRelayStart(bool hosting)
+    {
+        if (_sessionLauncher == null)
+        {
+            WarnMissingReference(nameof(NetworkSessionLauncher));
+            SetErrorMessage("네트워크 세션 런처를 찾을 수 없습니다.");
+            return false;
+        }
+
+        if (_relayStartPending)
+        {
+            return false;
+        }
+
+        _sessionLauncher.Mode = SessionConnectionMode.UnityRelay;
+        _relayStartPending = true;
+        _relayHostPending = hosting;
+        SetConnectControlsInteractable(false);
+        SetRelayControlsInteractable(false);
+        return true;
+    }
+
+    private void HandleSessionStartCompleted(SessionStartResult result)
+    {
+        if (!_relayStartPending)
+        {
+            return;
+        }
+
+        var wasHosting = _relayHostPending;
+        _relayStartPending = false;
+        _relayHostPending = false;
+
+        if (!result.Success)
+        {
+            SetErrorMessage(result.FailureReason);
+            SetConnectControlsInteractable(true);
+            SetRelayControlsInteractable(true);
+            return;
+        }
+
+        if (wasHosting)
+        {
+            if (joinCodeDisplayText != null)
+            {
+                joinCodeDisplayText.text = result.ShareCode;
+            }
+
+            SetErrorMessage(string.IsNullOrEmpty(result.ShareCode)
+                ? "Relay Host가 시작되었습니다."
+                : $"Relay 조인코드: {result.ShareCode}");
+            SetConnectControlsInteractable(false);
+            SetRelayControlsInteractable(false);
+            ApplyRoleUi();
+            return;
+        }
+
+        _clientConnectPending = true;
+        SetErrorMessage("서버 접속 시도 중...");
+    }
+
+    private void RegisterSessionLauncherEvents()
+    {
+        if (_sessionLauncher != null)
+        {
+            _sessionLauncher.SessionStartCompleted += HandleSessionStartCompleted;
+        }
+    }
+
+    private void UnregisterSessionLauncherEvents()
+    {
+        if (_sessionLauncher != null)
+        {
+            _sessionLauncher.SessionStartCompleted -= HandleSessionStartCompleted;
+        }
     }
 
     private void HandleLobbyStateChanged()
@@ -393,6 +543,27 @@ public class BeaverLobbySceneManager : NemoSceneManager
             sessionConnectPanel = FindInActiveScene("Pannel_SessionConnect");
         }
 
+        // Relay 통로도 같은 규약을 따른다 — 이 씬은 인스펙터 배선을 쓰지 않고 이름으로 찾는다
+        // (프리팹의 참조가 전부 fileID 0 인 이유). FindInActiveScene 은 트랜스폼 계층을 순회하므로
+        // 모드 전환으로 꺼져 있는 패널도 찾는다.
+        relayPanel ??= FindInActiveScene("Panel_Relay");
+        directPanel ??= FindInActiveScene("Panel_Direct");
+        relayHostButton ??= FindButton("Button_RelayHost");
+        relayJoinButton ??= FindButton("Button_RelayJoin");
+        modeToggleButton ??= FindButton("Button_ModeToggle");
+
+        if (joinCodeInputField == null)
+        {
+            var target = FindInActiveScene("InputField_JoinCode");
+            joinCodeInputField = target != null ? target.GetComponent<TMP_InputField>() : null;
+        }
+
+        if (joinCodeDisplayText == null)
+        {
+            var target = FindInActiveScene("Text_JoinCode");
+            joinCodeDisplayText = target != null ? target.GetComponent<TMP_Text>() : null;
+        }
+
         _lobbyUIController ??= FindFirstObjectByType<LobbyUIController>();
 
         WarnIfMissing(startHostButton, nameof(startHostButton));
@@ -404,6 +575,18 @@ public class BeaverLobbySceneManager : NemoSceneManager
         WarnIfMissing(portInputField, nameof(portInputField));
         WarnIfMissing(errorText, nameof(errorText));
         WarnIfMissing(sessionConnectPanel, nameof(sessionConnectPanel));
+
+        // 이름 기반 해석이라 오브젝트 이름이 바뀌면 조용히 null 이 된다 —
+        // 그러면 모드 전환이 안 되거나 조인코드를 못 읽는데 로그가 0줄이다. 반드시 짚고 넘어간다.
+        WarnIfMissing(relayPanel, nameof(relayPanel));
+        WarnIfMissing(directPanel, nameof(directPanel));
+        WarnIfMissing(relayHostButton, nameof(relayHostButton));
+        WarnIfMissing(relayJoinButton, nameof(relayJoinButton));
+        // modeToggleButton 은 선택 사항이라 경고하지 않는다 — 없으면 두 패널을 함께 보여준다
+        // (SetConnectionModePanels 주석 참조).
+        WarnIfMissing(joinCodeInputField, nameof(joinCodeInputField));
+        WarnIfMissing(joinCodeDisplayText, nameof(joinCodeDisplayText));
+
         WarnIfMissing(_lobbyUIController, nameof(LobbyUIController));
     }
 
@@ -414,6 +597,21 @@ public class BeaverLobbySceneManager : NemoSceneManager
         BindButton(setConnectionDataButton, ApplyConnectionData);
         BindButton(gameStartButton, StartGameLoading);
         BindButton(readyButton, ToggleReady);
+        BindButton(relayHostButton, StartRelayHost);
+        BindButton(relayJoinButton, StartRelayJoin);
+        BindButton(modeToggleButton, ToggleConnectionMode);
+    }
+
+    private void ToggleConnectionMode()
+    {
+        if (_sessionLauncher != null && _sessionLauncher.Mode == SessionConnectionMode.UnityRelay)
+        {
+            SelectDirectMode();
+        }
+        else
+        {
+            SelectRelayMode();
+        }
     }
 
     private void BindButton(Button button, UnityEngine.Events.UnityAction action)
@@ -439,6 +637,42 @@ public class BeaverLobbySceneManager : NemoSceneManager
         if (portInputField != null)
         {
             portInputField.interactable = interactable;
+        }
+    }
+
+    private void SetRelayControlsInteractable(bool interactable)
+    {
+        SetButtonsInteractable(interactable, relayHostButton, relayJoinButton, modeToggleButton);
+
+        if (joinCodeInputField != null)
+        {
+            joinCodeInputField.interactable = interactable;
+        }
+    }
+
+    /// <summary>
+    /// 전환 버튼이 씬에 있을 때만 패널을 배타적으로 토글한다.
+    ///
+    /// ⚠️ 버튼이 없는데 토글하면 한쪽 패널이 숨겨진 뒤 되살릴 방법이 없어 그 통로가 통째로
+    /// 막힌다. 전환 버튼은 기능상 필수가 아니다 — IPv4 버튼은 동기 레거시 경로라 Mode 와
+    /// 무관하고, Relay 버튼은 TryBeginRelayStart 가 Mode 를 직접 UnityRelay 로 세팅한다.
+    /// 그래서 버튼이 없으면 두 패널을 저작된 그대로 함께 보여주는 것이 맞다.
+    /// </summary>
+    private void SetConnectionModePanels(bool relaySelected)
+    {
+        if (modeToggleButton == null)
+        {
+            return;
+        }
+
+        if (relayPanel != null)
+        {
+            relayPanel.SetActive(relaySelected);
+        }
+
+        if (directPanel != null)
+        {
+            directPanel.SetActive(!relaySelected);
         }
     }
 

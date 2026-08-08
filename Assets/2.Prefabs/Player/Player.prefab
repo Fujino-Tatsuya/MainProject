@@ -723,6 +723,7 @@ GameObject:
   - component: {fileID: 800000000000000030}
   - component: {fileID: 1017407548875731560}
   - component: {fileID: 133388133837901378}
+  - component: {fileID: 7616504884391308831}
   m_Layer: 6
   m_Name: Player
   m_TagString: Player
@@ -1069,7 +1070,7 @@ MonoBehaviour:
   animator: {fileID: 3980452584406513891}
   mainSkill: {fileID: 7482913650248105327}
   subSkill: {fileID: 5233118834099021557}
-  interruptSkill: {fileID: 0}
+  interruptSkill: {fileID: 7616504884391308831}
   ultimateSkill: {fileID: 1111000000000000001}
   endFallbackPadding: 0.1
 --- !u!114 &1111000000000000002
@@ -1191,6 +1192,7 @@ MonoBehaviour:
   deathSource: {fileID: 0}
   gameRule: {fileID: 0}
   deathPresentationDuration: 1.5
+  lifeAnimator: {fileID: 0}
 --- !u!114 &800000000000000021
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1235,30 +1237,6 @@ MonoBehaviour:
   stateController: {fileID: 4237082408145735710}
   skillTargeting: {fileID: 1111000000000000002}
   encounterLock: {fileID: 800000000000000030}
---- !u!114 &800000000000000030
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8559504096609571310}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2d86d153e71c08841859b8dc02d8e923, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PlayerEncounterLock
-  player: {fileID: 7612441094946270182}
-  stateController: {fileID: 4237082408145735710}
-  invulnerability: {fileID: 1111000000000000010}
-  statusEffects: {fileID: 8345678279683584363}
-  defaultAttack: {fileID: 5274188098871446382}
-  skillController: {fileID: 4711829301158223401}
-  body: {fileID: 3600963326377684433}
-  player: {fileID: 7612441094946270182}
-  lifeCycle: {fileID: 800000000000000020}
-  inputReader: {fileID: 1825865676068489031}
-  stateController: {fileID: 4237082408145735710}
-  skillTargeting: {fileID: 1111000000000000002}
 --- !u!114 &800000000000000024
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1427,6 +1405,26 @@ MonoBehaviour:
   landedFollowCameraDelay: 1
   fallReturnInputLock: 0.5
   fallReturnInvulnerability: 1.5
+--- !u!114 &800000000000000030
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8559504096609571310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2d86d153e71c08841859b8dc02d8e923, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerEncounterLock
+  ShowTopMostFoldoutHeaderGroup: 1
+  player: {fileID: 7612441094946270182}
+  stateController: {fileID: 4237082408145735710}
+  invulnerability: {fileID: 1111000000000000010}
+  statusEffects: {fileID: 8345678279683584363}
+  defaultAttack: {fileID: 5274188098871446382}
+  skillController: {fileID: 4711829301158223401}
+  body: {fileID: 3600963326377684433}
 --- !u!81 &1017407548875731560
 AudioListener:
   m_ObjectHideFlags: 0
@@ -1448,6 +1446,20 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerAudioListenerActivator
   ShowTopMostFoldoutHeaderGroup: 1
+--- !u!114 &7616504884391308831
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8559504096609571310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c87d05552788d9b46863221df469a7bd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FirstMeleeInterruptSkill
+  data: {fileID: 11400000, guid: 617280762f0032c4096fd2b1967e3bf1, type: 2}
+  hitboxAnchor: {fileID: 1961035993563742540}
 --- !u!1 &8838956553020289695
 GameObject:
   m_ObjectHideFlags: 0
@@ -2280,6 +2292,17 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+--- !u!114 &1961035993563742540 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 3457108137520417950, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+  m_PrefabInstance: {fileID: 3804664619706551762}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 81c70da5a2e747148bf71f917743b5fd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ColliderInfo
 --- !u!4 &3871228745878193684 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 105197256369687494, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}

@@ -856,11 +856,13 @@ public class MonsterBase : Unit
         }
 
         // 자동 피격 반응을 쓰지 않는 파생(보스)은 여기서 끝 — 데미지·사망 판정만 받는다.
+        // 🔴 조기 반환이 **먼저**다. 아래 누적을 지나면 보스가 base 그로기까지 이중으로 받는다.
         if (!AutoHitReactions)
             return;
 
-        // 그로기 누적.
-        if (attackInfo.isGroggyAttack && data != null && data.maxGroggyCount > 0)
+        // 인터럽트 누적 → 그로기. "인터럽트를 어떻게 소비할지"는 수신측 결정이고, 이 계통은 누적식이다
+        // (보스 No.23은 같은 플래그를 카운터 창 판정으로 소비한다).
+        if (attackInfo.isInterruptAttack && data != null && data.maxGroggyCount > 0)
         {
             _groggyCount++;
             if (_groggyCount >= data.maxGroggyCount)
