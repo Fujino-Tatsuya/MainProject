@@ -8,8 +8,6 @@ namespace VeyTrace.Rendering.Occlusion
         private sealed class RendererState
         {
             public Renderer Renderer;
-            public Material[] SourceMaterials;
-            public Material[] VariantMaterials;
             public MaterialPropertyBlock OriginalBlock;
             public MaterialPropertyBlock WorkingBlock;
             public float Strength;
@@ -75,15 +73,13 @@ namespace VeyTrace.Rendering.Occlusion
                         1f,
                         deltaTime / Mathf.Max(0.01f, settings.fadeInDuration));
                     ApplyStrength(state, state.Strength);
-                    if (state.Strength >= 1f)
-                        RestoreOriginalBlock(state);
                     continue;
                 }
 
                 state.ReleaseTime += deltaTime;
                 if (state.ReleaseTime <= settings.releaseGraceDuration)
                 {
-                    RestoreOriginalBlock(state);
+                    ApplyStrength(state, state.Strength);
                     continue;
                 }
 
@@ -136,12 +132,15 @@ namespace VeyTrace.Rendering.Occlusion
 
                 for (int slot = 0; slot < materials.Length; slot++)
                 {
-                    if (!settings.TryResolvePair(materials[slot], out _, out _))
+                    Material material = materials[slot];
+                    if (material == null ||
+                        !material.HasProperty(WallOcclusionGlobals.StrengthPropertyId))
                     {
-                        string materialName = materials[slot] != null ? materials[slot].name : "<null>";
+                        string materialName = material != null ? material.name : "<null>";
                         WarnOwnerOnce(
                             owner,
-                            $"Renderer '{renderer.name}' uses unregistered material '{materialName}'");
+                            $"Renderer '{renderer.name}' uses material '{materialName}' without " +
+                            "_WallOcclusionStrength support");
                         return false;
                     }
                 }
@@ -160,28 +159,16 @@ namespace VeyTrace.Rendering.Occlusion
         private bool TryCreateState(Renderer renderer, out RendererState state)
         {
             state = null;
-            Material[] current = renderer.sharedMaterials;
-            var sources = new Material[current.Length];
-            var variants = new Material[current.Length];
-            for (int i = 0; i < current.Length; i++)
-            {
-                if (!settings.TryResolvePair(current[i], out sources[i], out variants[i]))
-                    return false;
-            }
-
             var originalBlock = new MaterialPropertyBlock();
             renderer.GetPropertyBlock(originalBlock);
             state = new RendererState
             {
                 Renderer = renderer,
-                SourceMaterials = sources,
-                VariantMaterials = variants,
                 OriginalBlock = originalBlock,
                 WorkingBlock = new MaterialPropertyBlock(),
                 Strength = 0f,
                 ReleaseTime = 0f
             };
-            renderer.sharedMaterials = variants;
             ApplyStrength(state, 0f);
             return true;
         }
@@ -200,7 +187,6 @@ namespace VeyTrace.Rendering.Occlusion
 
         private static void RestoreRenderer(RendererState state)
         {
-            state.Renderer.sharedMaterials = state.SourceMaterials;
             RestoreOriginalBlock(state);
         }
 

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using VeyTrace.Rendering.Occlusion;
 
 // 우측 하단 미니맵 (라벤스워치 룩 + 스타크래프트식 탐사) — PLAN 2026-07-03.
 //  - 지형: 맵 생성 완료(MapGenerator.OnGenerated) 시 오버헤드 카메라로 1회 베이크(높낮이 음영 포함).
@@ -33,10 +34,6 @@ public class MinimapController : MonoBehaviour
     [Tooltip("베이크에 포함할 최저 월드 Y. 이보다 아래 지오메트리는 잘라낸다 — " +
              "어비스 물 Plane(y≈-19, 3300m)이 미니맵을 통째로 덮는 것을 막는다.")]
     public float BakeMinWorldY = -5f;
-    [Tooltip("실루엣에 통로로 그릴 최대 한 변(m). 이보다 큰 렌더러 묶음은 통로가 아니라 " +
-             "배경/전체 메시로 보고 제외한다 — 실루엣이 통짜 사각형으로 채워지는 것을 막는다.")]
-    public float CorridorMaxSpan = 60f;
-
     [Header("=== 색 ===")]
     public Color LocalPlayerColor = Color.white;
     public Color AllyColor = new Color(0.3f, 0.85f, 1f);
@@ -67,16 +64,13 @@ public class MinimapController : MonoBehaviour
     private readonly List<Transform> _players = new List<Transform>(); // TODO: NetworkManager.ConnectedClients 기반으로 주기적 캐싱 구현 필요
     private float _playerScanTimer;
     private int _lastPlayerCount = -1;
-    private Transform _corridorsRoot;
+    private readonly List<Renderer> _v3MapRenderers = new List<Renderer>();
+    private readonly Dictionary<int, Vector3> _v3ZoneCenters = new Dictionary<int, Vector3>();
 
     [SerializeField] private Material MinimapComsite;
 
     private void Awake()
     {
-        // 맵 구조물(복도/다리 등)을 미리 캐싱하여 매 업데이트마다 찾는 비용 방지
-        var mapGeom = GameObject.Find("Stage1/Level_wall_hallway");
-        if (mapGeom != null) _corridorsRoot = mapGeom.transform;
-
         _explored = new byte[MaskResolution * MaskResolution];
     }
 
@@ -86,10 +80,17 @@ public class MinimapController : MonoBehaviour
     private void HandleGenerated(MapGenerator gen)
     {
         Generator = gen;
-        ComputeWorldRect(gen);
+        if (!CollectV3MapGeometry())
+        {
+            _baked = false;
+            if (_canvas != null) _canvas.enabled = false;
+            return;
+        }
+
+        ComputeWorldRect();
         BakeTerrain();
         EnsureUI();
-        BuildSilhouette(gen);
+        BuildSilhouette();
         ResetMask();
         BuildStaticMarkers(gen);
         _baked = true;
@@ -112,21 +113,109 @@ public class MinimapController : MonoBehaviour
 
     // ---------------- 베이크 ----------------
 
-    private void ComputeWorldRect(MapGenerator gen)
+    private bool CollectV3MapGeometry()
     {
-        float minX = float.MaxValue, maxX = float.MinValue, minZ = float.MaxValue, maxZ = float.MinValue;
-        foreach (var s in gen.Slots)
+        _v3MapRenderers.Clear();
+        _v3ZoneCenters.Clear();
+
+        int cullingMask = BuildTerrainCullingMask();
+        var seen = new HashSet<Renderer>();
+        var zoneBounds = new Dictionary<int, Bounds>();
+        int levelCount = 0;
+
+        foreach (ElevationLevel level in FindObjectsByType<ElevationLevel>(
+                     FindObjectsInactive.Include, FindObjectsSortMode.None))
         {
-            // 회전(90°) 시 풋프린트 스왑
-            int steps = Mathf.RoundToInt(s.transform.eulerAngles.y / 90f) & 3;
-            Vector2 half = (steps & 1) == 1
-                ? new Vector2(s.Footprint.y, s.Footprint.x) * 0.5f
-                : s.Footprint * 0.5f;
-            Vector3 p = s.transform.position;
-            minX = Mathf.Min(minX, p.x - half.x); maxX = Mathf.Max(maxX, p.x + half.x);
-            minZ = Mathf.Min(minZ, p.z - half.y); maxZ = Mathf.Max(maxZ, p.z + half.y);
+            if (level == null || !level.isActiveAndEnabled || !level.gameObject.activeInHierarchy)
+                continue;
+
+            levelCount++;
+            GeneratedZoneIdentity zone = level.GetComponentInParent<GeneratedZoneIdentity>();
+            IReadOnlyList<Renderer> renderers = level.ContentRenderers;
+            for (int i = 0; i < renderers.Count; i++)
+            {
+                Renderer renderer = renderers[i];
+                if (!IsV3MapRenderer(renderer, cullingMask))
+                    continue;
+
+                if (seen.Add(renderer))
+                    _v3MapRenderers.Add(renderer);
+
+                if (zone == null)
+                    continue;
+
+                Bounds bounds = renderer.bounds;
+                if (zoneBounds.TryGetValue(zone.SlotID, out Bounds existing))
+                {
+                    existing.Encapsulate(bounds);
+                    zoneBounds[zone.SlotID] = existing;
+                }
+                else
+                {
+                    zoneBounds.Add(zone.SlotID, bounds);
+                }
+            }
         }
-        minX -= BoundsMargin; maxX += BoundsMargin; minZ -= BoundsMargin; maxZ += BoundsMargin;
+
+        foreach (KeyValuePair<int, Bounds> pair in zoneBounds)
+            _v3ZoneCenters[pair.Key] = pair.Value.center;
+
+        if (_v3MapRenderers.Count == 0)
+        {
+            Debug.LogError(
+                "[Minimap] V3 지형 Renderer가 없습니다 — Legacy Footprint로 폴백하지 않습니다. " +
+                "생성된 Stage/Zone의 ElevationLevel Content 등록을 확인하세요.");
+            return false;
+        }
+
+        Debug.Log(
+            $"[Minimap] V3 지형 수집 완료 — ElevationLevel {levelCount}, " +
+            $"Renderer {_v3MapRenderers.Count}, Zone 중심 {_v3ZoneCenters.Count}.");
+        return true;
+    }
+
+    private static bool IsV3MapRenderer(Renderer renderer, int cullingMask)
+    {
+        if (renderer == null || !renderer.enabled || !renderer.gameObject.activeInHierarchy)
+            return false;
+        if ((cullingMask & (1 << renderer.gameObject.layer)) == 0)
+            return false;
+
+        Bounds bounds = renderer.bounds;
+        Vector3 size = bounds.size;
+        return IsFinite(bounds.center) && IsFinite(size) && size.x > 0.001f && size.z > 0.001f;
+    }
+
+    private static bool IsFinite(Vector3 value) =>
+        !float.IsNaN(value.x) && !float.IsInfinity(value.x) &&
+        !float.IsNaN(value.y) && !float.IsInfinity(value.y) &&
+        !float.IsNaN(value.z) && !float.IsInfinity(value.z);
+
+    private static int BuildTerrainCullingMask()
+    {
+        int mask = ~0;
+        foreach (string layerName in new[]
+                 {
+                     "UI", "Player", "Monster", "Unit", "Water", "Soul", "Corpse", "Projectile"
+                 })
+        {
+            int layer = LayerMask.NameToLayer(layerName);
+            if (layer >= 0) mask &= ~(1 << layer);
+        }
+
+        return mask;
+    }
+
+    private void ComputeWorldRect()
+    {
+        Bounds mapBounds = _v3MapRenderers[0].bounds;
+        for (int i = 1; i < _v3MapRenderers.Count; i++)
+            mapBounds.Encapsulate(_v3MapRenderers[i].bounds);
+
+        float minX = mapBounds.min.x - BoundsMargin;
+        float maxX = mapBounds.max.x + BoundsMargin;
+        float minZ = mapBounds.min.z - BoundsMargin;
+        float maxZ = mapBounds.max.z + BoundsMargin;
         // 정사각 유지(미니맵 비율 왜곡 방지) — 짧은 축을 중앙 기준으로 확장
         float w = maxX - minX, h = maxZ - minZ, side = Mathf.Max(w, h);
         float cx = (minX + maxX) * 0.5f, cz = (minZ + maxZ) * 0.5f;
@@ -157,13 +246,7 @@ public class MinimapController : MonoBehaviour
         cam.backgroundColor = new Color(0f, 0f, 0f, 0f); // 알파 0 = 맵 실루엣 마스크
         cam.targetTexture = _bakeRT;
         // 유닛/UI 제외 — 지형만 굽는다 (레이어가 없으면 무시됨)
-        int mask = ~0;
-        foreach (string ln in new[] { "UI", "Player", "Monster", "Unit", "Water", "Soul", "Corpse", "Projectile" })
-        {
-            int l = LayerMask.NameToLayer(ln);
-            if (l >= 0) mask &= ~(1 << l);
-        }
-        cam.cullingMask = mask;
+        cam.cullingMask = BuildTerrainCullingMask();
         cam.enabled = false;
 
         // URP에서 Camera.Render()는 동작하지 않음 — 렌더 요청 API 사용 (Unity 6)
@@ -195,12 +278,12 @@ public class MinimapController : MonoBehaviour
         Destroy(t);
     }
 
-    // ---------------- 맵 실루엣 (존+다리 모양, CPU 생성) ----------------
-    // 베이크 알파는 URP 설정에 따라 불안정 → 슬롯 풋프린트 + 다리(Corridors 렌더러 AABB)로
-    // 결정적으로 그린다. 미탐사 상태에서도 "존이 어떻게 연결됐는지"가 보이는 큰 틀.
+    // ---------------- 맵 실루엣 (V3 등록 Renderer XZ 합집합, CPU 생성) ----------------
+    // 베이크 알파는 URP 설정에 따라 불안정하므로, V3 ElevationLevel에 등록된 실제 Renderer Bounds를
+    // 같은 월드 좌표계에 합성한다. Legacy Slot Footprint나 Stage1 경로는 사용하지 않는다.
     private Texture2D _silTex;
 
-    private void BuildSilhouette(MapGenerator gen)
+    private void BuildSilhouette()
     {
         const int res = 256;
         if (_silTex == null)
@@ -222,38 +305,12 @@ public class MinimapController : MonoBehaviour
                 px[y * res + x] = 255;
         }
 
-        // 존 풋프린트 (회전 반영)
-        foreach (var s in gen.Slots)
+        // Stage와 생성 Zone의 모든 고도를 XZ 합집합으로 표시한다.
+        for (int i = 0; i < _v3MapRenderers.Count; i++)
         {
-            int steps = Mathf.RoundToInt(s.transform.eulerAngles.y / 90f) & 3;
-            Vector2 half = (steps & 1) == 1
-                ? new Vector2(s.Footprint.y, s.Footprint.x) * 0.5f
-                : s.Footprint * 0.5f;
-            Vector3 p = s.transform.position;
-            FillWorldRect(p.x - half.x, p.z - half.y, p.x + half.x, p.z + half.y);
+            Bounds bounds = _v3MapRenderers[i].bounds;
+            FillWorldRect(bounds.min.x, bounds.min.z, bounds.max.x, bounds.max.z);
         }
-
-        // 5) 복도/방 연결부 (보통 얇고 긴 메쉬)
-        Transform corridors = _corridorsRoot;
-        if (corridors != null)
-        {
-            foreach (Transform cor in corridors)
-            {
-                var rends = cor.GetComponentsInChildren<Renderer>();
-                if (rends.Length == 0) continue;
-                Bounds b = rends[0].bounds;
-                foreach (var r in rends) b.Encapsulate(r.bounds);
-
-                // ⚠️ 이 루트의 자식이 항상 "통로 한 조각"은 아니다. 맵 전체를 덮는 묶음이 하나라도
-                // 있으면 실루엣이 통째로 채워져 미탐사 색(_SilColor)이 미니맵 전체를 덮는다 —
-                // 실제로 그래서 미니맵이 거대한 파란 사각형으로 보였다. (M키 지도도 같은 원인)
-                if (b.size.x > CorridorMaxSpan || b.size.z > CorridorMaxSpan)
-                    continue;
-
-                FillWorldRect(b.min.x, b.min.z, b.max.x, b.max.z);
-            }
-        }
-        else Debug.LogWarning("[Minimap] MapGeometryV2/Corridors 못 찾음 — 실루엣에 다리 미포함");
 
         _silTex.SetPixelData(px, 0);
         _silTex.Apply(false);
@@ -434,8 +491,17 @@ public class MinimapController : MonoBehaviour
             if (tex != null)
                 img.sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), Vector2.one * 0.5f);
             else { img.sprite = _dotSprite; img.color = label == "Boss" ? MonsterColor : Color.yellow; }
-            img.rectTransform.anchoredPosition = WorldToMap(s.transform.position);
-            _staticMarkers.Add((img.rectTransform, s.transform.position));
+            if (!_v3ZoneCenters.TryGetValue(s.SlotID, out Vector3 markerWorld))
+            {
+                Debug.LogWarning(
+                    $"[Minimap] Slot {s.SlotID} 역할 마커의 V3 Zone Renderer 중심을 찾지 못해 " +
+                    $"{label} 아이콘을 생략합니다.");
+                Destroy(img.gameObject);
+                continue;
+            }
+
+            img.rectTransform.anchoredPosition = WorldToMap(markerWorld);
+            _staticMarkers.Add((img.rectTransform, markerWorld));
         }
 
         // 티어 노드 — 스폰된 존 안의 NodeMarker (보상 오브젝트 시스템 확정 전 임시 소스)

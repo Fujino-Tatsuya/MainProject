@@ -15,9 +15,16 @@ public class MapNavMeshBaker : MonoBehaviour
 {
     [SerializeField] private NavMeshSurface surface;
 
-    private void Awake()
+    private void Awake() => EnsureSurfaceConfigured();
+
+    private bool EnsureSurfaceConfigured()
     {
         if (surface == null) surface = GetComponent<NavMeshSurface>();
+        if (surface == null)
+        {
+            Debug.LogError("[MapNavMeshBaker] NavMeshSurface is missing.", this);
+            return false;
+        }
 
         // 베이크 설정은 코드로 강제 — 씬 세팅 실수 원천 차단.
         //  - PhysicsColliders: 콜라이더 기반 수집. 물 플레인(콜라이더 없음)엔 메시가 안 깔리고,
@@ -30,6 +37,7 @@ public class MapNavMeshBaker : MonoBehaviour
         surface.useGeometry = NavMeshCollectGeometry.PhysicsColliders;
         surface.collectObjects = CollectObjects.All;
         surface.layerMask = LayerMask.GetMask("Default", "Ground");
+        return true;
     }
 
     private void OnEnable() { MapGenerator.OnGenerated += HandleGenerated; }
@@ -51,7 +59,9 @@ public class MapNavMeshBaker : MonoBehaviour
         var nm = Unity.Netcode.NetworkManager.Singleton;
         if (nm != null && nm.IsListening && !nm.IsServer) return;
 
-        if (surface == null) return;
+        // Editor validation invokes RebakeNow without entering Play Mode, so Awake has not run.
+        // Configure the same surface here to keep validation and runtime bake identical.
+        if (!EnsureSurfaceConfigured()) return;
 
         // 다리처럼 "나중에 연결되는 지오메트리"는 **베이크 시점에 연결돼 있어야** NavMesh가 이어진다.
         // 런타임 재베이크는 이 서피스가 맵 전체(원점~x≈500)를 덮어 수백 ms 멈추므로 답이 아니다 —

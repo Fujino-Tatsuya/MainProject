@@ -81,7 +81,8 @@ PF_Stage_01 또는 PF_Zone_*
 - 각 `OcclusionSection`에는 Renderer가 최소 1개, Collider가 최소 1개 필요하다.
 - 모든 Renderer마다 Collider를 요구하지는 않는다.
 - `LevelOnlyProps`의 개별 프랍마다 Collider를 강제하지 않는다.
-- 자동 변형은 불투명하고 비발광인 지원 머티리얼에만 사용한다. Transparent 또는 활성 Emission 머티리얼은 아티스트가 별도 디더 변형을 준비해 등록해야 한다.
+- 투명화 대상 Renderer의 모든 원본 머티리얼은 `_WallOcclusionStrength` 속성을 지원해야 한다. 현재 V3 표준 지원 그래프는 `Generic_Standard`, `Generic_Basic`, `ConvayorBelt_Graph`, `ConvayorBelt_Corner_Graph`다.
+- 도구는 별도 `_Occlusion` 변형 머티리얼을 만들지 않는다. 다른 Shader Graph가 필요하면 그 원본 그래프에 공통 `WallOcclusionClip.hlsl`을 통합한 뒤 사용한다.
 - 잘못 등록된 대상은 런타임에서 안전하게 불투명으로 남고 경고는 한 번만 출력된다.
 
 ## 6. 등록·검증 순서
@@ -106,4 +107,3 @@ Project 창에서 프리팹 에셋 또는 Scene의 프리팹 인스턴스를 선
 - Level 루트 Y와 XZ Areas가 실제 플레이 공간을 덮는가?
 - Scale이 `(1,1,1)`이고 X/Z 회전이 없는가?
 - 등록 후 Validate 결과가 오류 0개인가?
-

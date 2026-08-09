@@ -1,4 +1,3 @@
-using System;
 using UnityEngine;
 
 namespace VeyTrace.Rendering.Occlusion
@@ -16,8 +15,11 @@ namespace VeyTrace.Rendering.Occlusion
         [Min(0f)] public float castPadding = 0.08f;
 
         [Header("Screen Capsule")]
-        [Min(0f)] public float holePaddingPixels = 8f;
-        [Min(1f)] public float featherPixels = 42f;
+        [Range(0.1f, 1f)] public float screenCapsuleRadiusScale = 0.8f;
+        [Min(0f)] public float holePaddingPixels = 2f;
+        [Range(0f, 3f)] public float featherRadiusScale = 0.5f;
+        [Min(1f)] public float minFeatherPixels = 32f;
+        [Min(1f)] public float maxFeatherPixels = 192f;
         [Min(0.01f)] public float behindFalloff = 1.5f;
 
         [Header("Fade Timing")]
@@ -32,56 +34,25 @@ namespace VeyTrace.Rendering.Occlusion
         [Header("Debug")]
         public bool drawRuntimeGizmos;
 
-        [Header("Registered Material Variants")]
-        [SerializeField] private Material[] sourceMaterials = Array.Empty<Material>();
-        [SerializeField] private Material[] occlusionMaterials = Array.Empty<Material>();
-
-        public Material[] SourceMaterials => sourceMaterials;
-        public Material[] OcclusionMaterials => occlusionMaterials;
-
-        public bool HasValidMaterialMappings =>
-            sourceMaterials != null &&
-            occlusionMaterials != null &&
-            sourceMaterials.Length > 0 &&
-            sourceMaterials.Length == occlusionMaterials.Length;
-
-        public bool TryResolvePair(Material current, out Material source, out Material variant)
+        public float CalculateFeatherPixels(float projectedRadiusPixels)
         {
-            source = null;
-            variant = null;
-            if (current == null || !HasValidMaterialMappings)
-                return false;
-
-            for (int i = 0; i < sourceMaterials.Length; i++)
-            {
-                if (current != sourceMaterials[i] && current != occlusionMaterials[i])
-                    continue;
-
-                source = sourceMaterials[i];
-                variant = occlusionMaterials[i];
-                return source != null && variant != null;
-            }
-
-            return false;
-        }
-
-        public bool TryResolveOcclusionMaterial(Material current, out Material variant)
-        {
-            return TryResolvePair(current, out _, out variant);
-        }
-
-        public void ConfigureMaterialMappings(Material[] sources, Material[] variants)
-        {
-            sourceMaterials = sources ?? Array.Empty<Material>();
-            occlusionMaterials = variants ?? Array.Empty<Material>();
+            float minimum = Mathf.Max(1f, minFeatherPixels);
+            float maximum = Mathf.Max(minimum, maxFeatherPixels);
+            return Mathf.Clamp(
+                Mathf.Max(0f, projectedRadiusPixels) * Mathf.Clamp(featherRadiusScale, 0f, 3f),
+                minimum,
+                maximum);
         }
 
         private void OnValidate()
         {
             maxCastHits = Mathf.Clamp(maxCastHits, 8, 2048);
             castPadding = Mathf.Max(0f, castPadding);
+            screenCapsuleRadiusScale = Mathf.Clamp(screenCapsuleRadiusScale, 0.1f, 1f);
             holePaddingPixels = Mathf.Max(0f, holePaddingPixels);
-            featherPixels = Mathf.Max(1f, featherPixels);
+            featherRadiusScale = Mathf.Clamp(featherRadiusScale, 0f, 3f);
+            minFeatherPixels = Mathf.Max(1f, minFeatherPixels);
+            maxFeatherPixels = Mathf.Max(minFeatherPixels, maxFeatherPixels);
             behindFalloff = Mathf.Max(0.01f, behindFalloff);
             fadeInDuration = Mathf.Max(0.01f, fadeInDuration);
             releaseGraceDuration = Mathf.Max(0f, releaseGraceDuration);

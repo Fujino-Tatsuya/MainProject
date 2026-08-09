@@ -10,7 +10,7 @@ using UnityEngine;
 // 2026-07 리팩토링: 통로는 Stage1/Level_wall_hallway 손배치로 고정 — 절차생성/연결그래프/벽컷/개방변 매칭은 폐기.
 public static class ZoneWiring
 {
-    const string PrefabDir = "Assets/50.Art/MapGen/MapObj/Zoneprefab"; // 2026-07-03 아트가 prefab→Zoneprefab로 폴더명 변경(GUID 유지)
+    const string PrefabDir = "Assets/2.Prefabs/Map/LevelDeliveryV3/Zones";
     const string CatalogPath = "Assets/50.Art/MapGen/MapObj/ZoneLayout/ZoneLayoutCatalog.asset";
 
     // 배치 소스오브트루스 = 씬(Stage1)의 ZoneVolume 10개 (2026-07 리팩토링).
@@ -27,26 +27,26 @@ public static class ZoneWiring
     //       (좌상/좌하 후보 2곳에 스폰/보스입구가 매판 랜덤 배정).
     static readonly (string name, ZoneSize size, ZoneRole role)[] CatEntries =
     {
-        ("ZoneL_typeA", ZoneSize.Large,  ZoneRole.Combat),
-        ("ZoneL_typeB", ZoneSize.Large,  ZoneRole.Combat),
-        ("ZoneL_typeC", ZoneSize.Large,  ZoneRole.Combat),
-        ("ZoneM_typeA", ZoneSize.Medium, ZoneRole.Combat),
-        ("ZoneM_typeB", ZoneSize.Medium, ZoneRole.Combat),
-        ("ZoneM_typeC", ZoneSize.Medium, ZoneRole.Combat),
+        ("PF_Zone_L_Type_A_V3", ZoneSize.Large,  ZoneRole.Combat),
+        ("PF_Zone_L_Type_B_V3", ZoneSize.Large,  ZoneRole.Combat),
+        ("PF_Zone_L_Type_C_V3", ZoneSize.Large,  ZoneRole.Combat),
+        ("PF_Zone_M_Type_A_V3", ZoneSize.Medium, ZoneRole.Combat),
+        ("PF_Zone_M_Type_B_V3", ZoneSize.Medium, ZoneRole.Combat),
+        ("PF_Zone_M_Type_C_V3", ZoneSize.Medium, ZoneRole.Combat),
         // Quest: 전용 디자인 2종(Medium) — LayoutPlacer가 이 중 랜덤 1개로 배정.
         // 2026-07-14 아트 재임포트로 파일명 ZoneM_typeQuest0x → Zone_typeQuest0x 로 변경(GUID도 신규).
-        ("Zone_typeQuest01", ZoneSize.Medium, ZoneRole.Quest),
-        ("Zone_typeQuest02", ZoneSize.Medium, ZoneRole.Quest),
-        ("ZoneS_typeA",        ZoneSize.Small, ZoneRole.Combat),
-        ("ZoneS_typeBossEnter",ZoneSize.Small, ZoneRole.BossRoom),
-        ("ZoneS_typeStart",    ZoneSize.Small, ZoneRole.PlayerSpawn),
+        ("PF_Zone_Quest_01_V3",          ZoneSize.Medium, ZoneRole.Quest),
+        ("PF_Zone_Quest_02_V3",          ZoneSize.Medium, ZoneRole.Quest),
+        ("PF_Zone_S_Type_A_V3",          ZoneSize.Small,  ZoneRole.Combat),
+        ("PF_Zone_S_Type_Boss_Enter_V3", ZoneSize.Small,  ZoneRole.BossRoom),
+        ("PF_Zone_S_Type_Start_V3",      ZoneSize.Small,  ZoneRole.PlayerSpawn),
     };
 
     [MenuItem("Tools/MapGen/Wire Slots + Catalog + Refs")]
     static void Wire()
     {
-        var stage1 = GameObject.Find("Stage1");
-        if (stage1 == null) { Debug.LogError("[Wire] Stage1 없음"); return; }
+        var stage1 = GameObject.Find("PF_Stage_01_V3");
+        if (stage1 == null) { Debug.LogError("[Wire] PF_Stage_01_V3 없음"); return; }
 
         // v11: 슬롯이 배치의 소스오브트루스(위치·회전·FixedPrefab·QuestPrefab·후보플래그). ZoneVolume/ZoneDefinitionSO는 폐기됨.
         // 슬롯은 씬에 손배치·저작된 상태로 존재하며, Wire는 재생성하지 않고 카탈로그·참조만 갱신한다.

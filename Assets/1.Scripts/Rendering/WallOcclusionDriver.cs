@@ -16,6 +16,8 @@ public sealed class WallOcclusionDriver : MonoBehaviour
 
     private WallOcclusionRendererController rendererController;
     private RaycastHit[] castHits;
+    private Ray[] sightlineRays;
+    private float[] sightlineDistances;
     private Transform activeTargetRoot;
     private float previousFootY;
     private bool hasPreviousFootY;
@@ -77,8 +79,9 @@ public sealed class WallOcclusionDriver : MonoBehaviour
 
         OcclusionVerticalMotion motion = ResolveVerticalMotion(target);
         UpdateElevationStates(target, motion);
-        ApplyScreenMask(gameplayCamera, target);
-        CollectOcclusionHits(gameplayCamera, target);
+        float projectedRadius = CalculateProjectedRadiusPixels(gameplayCamera, target);
+        ApplyScreenMask(gameplayCamera, target, projectedRadius);
+        CollectOcclusionHits(gameplayCamera, target, projectedRadius);
 
         foreach (ElevationLevel level in hitLevels)
             rendererController.AddLevel(level);
@@ -96,6 +99,8 @@ public sealed class WallOcclusionDriver : MonoBehaviour
             ? new WallOcclusionRendererController(settings)
             : null;
         castHits = new RaycastHit[Mathf.Max(8, settings != null ? settings.maxCastHits : 8)];
+        sightlineRays = new Ray[WallOcclusionSightlineFilter.RequiredSampleCapacity];
+        sightlineDistances = new float[WallOcclusionSightlineFilter.RequiredSampleCapacity];
         warnedCastBufferFull = false;
     }
 
@@ -109,6 +114,13 @@ public sealed class WallOcclusionDriver : MonoBehaviour
         {
             castHits = new RaycastHit[required];
             warnedCastBufferFull = false;
+        }
+
+        if (sightlineRays == null ||
+            sightlineRays.Length != WallOcclusionSightlineFilter.RequiredSampleCapacity)
+        {
+            sightlineRays = new Ray[WallOcclusionSightlineFilter.RequiredSampleCapacity];
+            sightlineDistances = new float[WallOcclusionSightlineFilter.RequiredSampleCapacity];
         }
     }
 
@@ -167,7 +179,10 @@ public sealed class WallOcclusionDriver : MonoBehaviour
         return level.Stack == stack ? level : null;
     }
 
-    private void CollectOcclusionHits(Camera camera, TargetSample target)
+    private void CollectOcclusionHits(
+        Camera camera,
+        TargetSample target,
+        float projectedRadius)
     {
         hitLevels.Clear();
         hitSections.Clear();
@@ -187,6 +202,16 @@ public sealed class WallOcclusionDriver : MonoBehaviour
         debugCastOrigin = origin;
         debugCastCenter = target.Center;
         debugCastRadius = castRadius;
+
+        int sightlineCount = WallOcclusionSightlineFilter.BuildSamples(
+            camera,
+            target.EndpointA,
+            target.EndpointB,
+            projectedRadius * settings.screenCapsuleRadiusScale,
+            sightlineRays,
+            sightlineDistances);
+        if (sightlineCount == 0)
+            return;
 
         int hitCount = Physics.SphereCastNonAlloc(
             origin,
@@ -213,6 +238,15 @@ public sealed class WallOcclusionDriver : MonoBehaviour
             if (collider == null || IsTargetCollider(collider, target.Root))
                 continue;
 
+            if (!WallOcclusionSightlineFilter.BlocksAnySample(
+                    collider,
+                    sightlineRays,
+                    sightlineDistances,
+                    sightlineCount))
+            {
+                continue;
+            }
+
             if (settings.drawRuntimeGizmos)
                 debugHitPoints.Add(hit.point);
 
@@ -235,7 +269,10 @@ public sealed class WallOcclusionDriver : MonoBehaviour
             state.IsAboveActiveLevel(level);
     }
 
-    private void ApplyScreenMask(Camera camera, TargetSample target)
+    private void ApplyScreenMask(
+        Camera camera,
+        TargetSample target,
+        float projectedRadius)
     {
         Vector3 screenA = camera.WorldToScreenPoint(target.EndpointA);
         Vector3 screenB = camera.WorldToScreenPoint(target.EndpointB);
@@ -245,15 +282,14 @@ public sealed class WallOcclusionDriver : MonoBehaviour
             return;
         }
 
-        float projectedRadius = CalculateProjectedRadiusPixels(camera, target);
         float targetDepth = Vector3.Dot(
             target.Center - camera.transform.position,
             camera.transform.forward);
         WallOcclusionGlobals.ApplyScreenCapsule(
             new Vector2(screenA.x, screenA.y),
             new Vector2(screenB.x, screenB.y),
-            projectedRadius + settings.holePaddingPixels,
-            settings.featherPixels,
+            projectedRadius * settings.screenCapsuleRadiusScale + settings.holePaddingPixels,
+            settings.CalculateFeatherPixels(projectedRadius),
             camera,
             targetDepth,
             settings.behindFalloff);

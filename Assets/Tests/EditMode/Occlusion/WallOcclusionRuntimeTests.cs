@@ -4,6 +4,7 @@ using System.IO;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.TestTools;
 using Object = UnityEngine.Object;
 
 namespace VeyTrace.Rendering.Occlusion.Tests
@@ -15,18 +16,14 @@ namespace VeyTrace.Rendering.Occlusion.Tests
         private const string RegisterWirePrefabPath =
             "Assets/Tests/EditMode/Occlusion/PF_Prop_RegisterWireProbe.prefab";
         private const string RegisteredSourceMaterialPath =
-            "Assets/50.Art/MapGen/MapObj/material/Generic_01_A.mat";
-        private const string GeneratedMaterialDirectory =
-            "Assets/3.Materials/Level1_Materials/Occlusion/Generated";
+            "Assets/50.Art/MapGen/MapObj/LevelDeliveryV3/Materials/Generic_01_A_V3.mat";
 
         private readonly List<Object> objectsToDestroy = new();
-        private bool generatedMaterialDirectoryWasPresent;
 
         [SetUp]
         public void SetUp()
         {
             WallOcclusionRegistry.ClearForTests();
-            generatedMaterialDirectoryWasPresent = AssetDatabase.IsValidFolder(GeneratedMaterialDirectory);
             DeleteTemporaryAssets();
         }
 
@@ -43,8 +40,6 @@ namespace VeyTrace.Rendering.Occlusion.Tests
             objectsToDestroy.Clear();
             Selection.objects = Array.Empty<Object>();
             DeleteTemporaryAssets();
-            if (!generatedMaterialDirectoryWasPresent)
-                AssetDatabase.DeleteAsset(GeneratedMaterialDirectory);
         }
 
         [Test]
@@ -182,26 +177,60 @@ namespace VeyTrace.Rendering.Occlusion.Tests
         }
 
         [Test]
-        public void RendererController_SwapsAndRestoresMaterials()
+        public void RendererController_KeepsOriginalMaterialAndRestoresOriginalPropertyBlock()
         {
-            WallOcclusionSettings settings = CreateSettingsWithMapping(
-                out Material source,
-                out Material variant);
+            WallOcclusionSettings settings = CreateSettings();
+            Material source = AssetDatabase.LoadAssetAtPath<Material>(RegisteredSourceMaterialPath);
+            Assert.That(source, Is.Not.Null);
+            Assert.That(
+                source.HasProperty(WallOcclusionGlobals.StrengthPropertyId),
+                Is.True,
+                "The registered V3 source material must expose _WallOcclusionStrength.");
             TestHierarchy hierarchy = CreateHierarchy(0f, source);
             hierarchy.Root.SetActive(true);
+            var originalBlock = new MaterialPropertyBlock();
+            originalBlock.SetFloat(WallOcclusionGlobals.StrengthPropertyId, 0.37f);
+            hierarchy.Renderer.SetPropertyBlock(originalBlock);
             var controller = new WallOcclusionRendererController(settings);
 
             controller.BeginFrame();
             Assert.That(controller.AddLevel(hierarchy.Level), Is.True);
             controller.EndFrame(settings.fadeInDuration);
-            Assert.That(hierarchy.Renderer.sharedMaterial, Is.SameAs(variant));
+            Assert.That(hierarchy.Renderer.sharedMaterial, Is.SameAs(source));
+            AssertStrength(hierarchy.Renderer, 1f);
 
             controller.BeginFrame();
-            controller.EndFrame(settings.releaseGraceDuration + settings.restoreDuration);
+            controller.EndFrame(settings.releaseGraceDuration);
+            Assert.That(hierarchy.Renderer.sharedMaterial, Is.SameAs(source));
+            AssertStrength(hierarchy.Renderer, 1f);
+
             controller.BeginFrame();
-            controller.EndFrame(settings.restoreDuration);
+            controller.EndFrame(settings.restoreDuration + 0.001f);
 
             Assert.That(hierarchy.Renderer.sharedMaterial, Is.SameAs(source));
+            AssertStrength(hierarchy.Renderer, 0.37f);
+            Assert.That(controller.ActiveRendererCount, Is.Zero);
+        }
+
+        [Test]
+        public void RendererController_UnsupportedMaterialStaysOpaqueAndWarnsOwnerOnce()
+        {
+            WallOcclusionSettings settings = CreateSettings();
+            Material unsupported = CreateMaterial("Unsupported");
+            TestHierarchy hierarchy = CreateHierarchy(0f, unsupported);
+            hierarchy.Root.SetActive(true);
+            var controller = new WallOcclusionRendererController(settings);
+            string warning =
+                "[WallOcclusion] 'Level_L01' is kept opaque: Renderer 'WallSection_01' " +
+                "uses material 'Unsupported' without _WallOcclusionStrength support.";
+
+            LogAssert.Expect(LogType.Warning, warning);
+            controller.BeginFrame();
+            Assert.That(controller.AddLevel(hierarchy.Level), Is.False);
+            Assert.That(controller.AddLevel(hierarchy.Level), Is.False);
+            controller.EndFrame(settings.fadeInDuration);
+
+            Assert.That(hierarchy.Renderer.sharedMaterial, Is.SameAs(unsupported));
             Assert.That(controller.ActiveRendererCount, Is.Zero);
         }
 
@@ -213,6 +242,58 @@ namespace VeyTrace.Rendering.Occlusion.Tests
             Assert.That(mask.x, Is.Zero);
             Assert.That(mask.y, Is.GreaterThanOrEqualTo(1f));
             Assert.That(mask.z, Is.Zero);
+        }
+
+        [TestCase(20f, 32f)]
+        [TestCase(100f, 150f)]
+        [TestCase(400f, 192f)]
+        public void FeatherWidth_ScalesWithProjectedRadiusAndClamps(
+            float projectedRadiusPixels,
+            float expectedPixels)
+        {
+            var settings = ScriptableObject.CreateInstance<WallOcclusionSettings>();
+            objectsToDestroy.Add(settings);
+            settings.featherRadiusScale = 1.5f;
+            settings.minFeatherPixels = 32f;
+            settings.maxFeatherPixels = 192f;
+
+            Assert.That(
+                settings.CalculateFeatherPixels(projectedRadiusPixels),
+                Is.EqualTo(expectedPixels).Within(0.001f));
+        }
+
+        [Test]
+        public void SightlineFilter_AcceptsColliderThatActuallyCoversCapsuleSamples()
+        {
+            Camera camera = CreateSightlineCamera();
+            GameObject blocker = CreateObject("BlockingWall");
+            blocker.transform.position = new Vector3(0f, 0f, -2f);
+            BoxCollider collider = blocker.AddComponent<BoxCollider>();
+            collider.size = new Vector3(1.5f, 3f, 0.5f);
+            Physics.SyncTransforms();
+
+            CreateSightlineSamples(camera, out Ray[] rays, out float[] distances, out int count);
+
+            Assert.That(
+                WallOcclusionSightlineFilter.BlocksAnySample(collider, rays, distances, count),
+                Is.True);
+        }
+
+        [Test]
+        public void SightlineFilter_RejectsAdjacentColliderThatDoesNotCoverCapsuleSamples()
+        {
+            Camera camera = CreateSightlineCamera();
+            GameObject adjacent = CreateObject("AdjacentProp");
+            adjacent.transform.position = new Vector3(2.5f, 0f, -2f);
+            BoxCollider collider = adjacent.AddComponent<BoxCollider>();
+            collider.size = new Vector3(1f, 2f, 0.5f);
+            Physics.SyncTransforms();
+
+            CreateSightlineSamples(camera, out Ray[] rays, out float[] distances, out int count);
+
+            Assert.That(
+                WallOcclusionSightlineFilter.BlocksAnySample(collider, rays, distances, count),
+                Is.False);
         }
 
         [Test]
@@ -377,16 +458,48 @@ namespace VeyTrace.Rendering.Occlusion.Tests
             return level;
         }
 
-        private WallOcclusionSettings CreateSettingsWithMapping(
-            out Material source,
-            out Material variant)
+        private WallOcclusionSettings CreateSettings()
         {
             var settings = ScriptableObject.CreateInstance<WallOcclusionSettings>();
             objectsToDestroy.Add(settings);
-            source = CreateMaterial("Source");
-            variant = CreateMaterial("Variant");
-            settings.ConfigureMaterialMappings(new[] { source }, new[] { variant });
             return settings;
+        }
+
+        private static void AssertStrength(Renderer renderer, float expected)
+        {
+            var block = new MaterialPropertyBlock();
+            renderer.GetPropertyBlock(block);
+            Assert.That(
+                block.GetFloat(WallOcclusionGlobals.StrengthPropertyId),
+                Is.EqualTo(expected).Within(0.001f));
+        }
+
+        private Camera CreateSightlineCamera()
+        {
+            GameObject cameraObject = CreateObject("SightlineCamera");
+            cameraObject.transform.position = new Vector3(0f, 0f, -10f);
+            Camera camera = cameraObject.AddComponent<Camera>();
+            camera.fieldOfView = 60f;
+            camera.aspect = 16f / 9f;
+            camera.pixelRect = new Rect(0f, 0f, 1920f, 1080f);
+            return camera;
+        }
+
+        private static void CreateSightlineSamples(
+            Camera camera,
+            out Ray[] rays,
+            out float[] distances,
+            out int count)
+        {
+            rays = new Ray[WallOcclusionSightlineFilter.RequiredSampleCapacity];
+            distances = new float[WallOcclusionSightlineFilter.RequiredSampleCapacity];
+            count = WallOcclusionSightlineFilter.BuildSamples(
+                camera,
+                new Vector3(0f, 1f, 0f),
+                new Vector3(0f, -1f, 0f),
+                60f,
+                rays,
+                distances);
         }
 
         private GameObject CreateObject(string name)

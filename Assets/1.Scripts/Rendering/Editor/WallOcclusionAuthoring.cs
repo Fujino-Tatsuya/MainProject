@@ -1,7 +1,6 @@
 #if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using UnityEditor;
@@ -11,10 +10,14 @@ using VeyTrace.Rendering.Occlusion;
 
 public static class WallOcclusionAuthoring
 {
-    private const string ShaderName = "Project/Environment/Wall Occlusion Dither";
     private const string SettingsPath = "Assets/99.Settings/WallOcclusionSettings.asset";
-    private const string GeneratedMaterialDirectory =
-        "Assets/3.Materials/Level1_Materials/Occlusion/Generated";
+    private static readonly string[] SupportedShaderGraphPaths =
+    {
+        "Assets/50.Art/MapGen/MapObj/material/Generic_Standard.shadergraph",
+        "Assets/50.Art/MapGen/MapObj/material/Generic_Basic.shadergraph",
+        "Assets/3.Materials/ConvayorBelt/ConvayorBelt_Graph.shadergraph",
+        "Assets/3.Materials/ConvayorBelt/ConvayorBelt_Corner_Graph.shadergraph"
+    };
 
     private static readonly Regex StackName = new("^ElevationStack_[0-9]{2}$");
     private static readonly Regex LevelName = new("^Level_(B|L)[0-9]{2}$");
@@ -43,7 +46,6 @@ public static class WallOcclusionAuthoring
             {
                 var report = new ValidationReport(path);
                 WirePrefab(root, report);
-                EnsureMaterialVariants(root, settings, report);
                 ValidatePrefab(root, settings, report);
                 PrefabUtility.SaveAsPrefabAsset(root, path);
                 totalErrors += report.ErrorCount;
@@ -98,28 +100,38 @@ public static class WallOcclusionAuthoring
     [MenuItem("Tools/Rendering/Wall Occlusion/Dump Shader Messages")]
     public static void DumpShaderMessages()
     {
-        Shader shader = Shader.Find(ShaderName);
-        if (shader == null)
+        int errorCount = 0;
+        for (int shaderIndex = 0; shaderIndex < SupportedShaderGraphPaths.Length; shaderIndex++)
         {
-            Debug.LogError($"[WallOcclusion] Shader not found: {ShaderName}");
-            return;
+            string path = SupportedShaderGraphPaths[shaderIndex];
+            Shader shader = AssetDatabase.LoadAssetAtPath<Shader>(path);
+            if (shader == null)
+            {
+                Debug.LogError($"[WallOcclusion] Shader Graph not found: {path}");
+                errorCount++;
+                continue;
+            }
+
+            ShaderMessage[] messages = ShaderUtil.GetShaderMessages(shader);
+            for (int i = 0; i < messages.Length; i++)
+            {
+                ShaderMessage message = messages[i];
+                if (string.Equals(
+                    message.severity.ToString(),
+                    "Error",
+                    StringComparison.OrdinalIgnoreCase))
+                    errorCount++;
+                Debug.Log(
+                    $"[WallOcclusion] {message.severity}: {message.message} " +
+                    $"({path}, {message.platform}, line {message.line})",
+                    shader);
+            }
+
+            if (messages.Length == 0)
+                Debug.Log($"[WallOcclusion] Shader has no compiler messages: {path}", shader);
         }
 
-        ShaderMessage[] messages = ShaderUtil.GetShaderMessages(shader);
-        if (messages.Length == 0)
-        {
-            Debug.Log($"[WallOcclusion] Shader has no compiler messages: {ShaderName}");
-            return;
-        }
-
-        for (int i = 0; i < messages.Length; i++)
-        {
-            ShaderMessage message = messages[i];
-            Debug.LogError(
-                $"[WallOcclusion] {message.severity}: {message.message} " +
-                $"({message.platform}, line {message.line})",
-                shader);
-        }
+        Debug.Log($"[WallOcclusion] Shader message scan finished: errors={errorCount}.");
     }
 
     private static void WirePrefab(GameObject root, ValidationReport report)
@@ -486,171 +498,17 @@ public static class WallOcclusionAuthoring
             Material[] materials = renderer.sharedMaterials;
             for (int m = 0; m < materials.Length; m++)
             {
-                if (!settings.TryResolvePair(materials[m], out _, out _))
+                Material material = materials[m];
+                if (material == null ||
+                    !material.HasProperty(WallOcclusionGlobals.StrengthPropertyId))
                 {
-                    string name = materials[m] != null ? materials[m].name : "<null>";
-                    report.Error(renderer.transform, $"Material has no registered dither variant: {name}.");
-                }
-            }
-        }
-    }
-
-    private static void EnsureMaterialVariants(
-        GameObject root,
-        WallOcclusionSettings settings,
-        ValidationReport report)
-    {
-        Shader ditherShader = Shader.Find(ShaderName);
-        if (ditherShader == null)
-        {
-            report.Error(root.transform, $"Shader not found: {ShaderName}");
-            return;
-        }
-
-        EnsureAssetDirectory(GeneratedMaterialDirectory);
-        var sources = new List<Material>(settings.SourceMaterials ?? Array.Empty<Material>());
-        var variants = new List<Material>(settings.OcclusionMaterials ?? Array.Empty<Material>());
-        Transform materialScope = IsStandaloneSectionPrefab(root)
-            ? root.transform
-            : FindDirectChild(root.transform, "Occlusion");
-        if (materialScope == null)
-        {
-            report.Error(root.transform, "Cannot generate material variants without the required 'Occlusion' child.");
-            return;
-        }
-
-        Renderer[] renderers = materialScope.GetComponentsInChildren<Renderer>(true);
-        for (int i = 0; i < renderers.Length; i++)
-        {
-            Material[] materials = renderers[i].sharedMaterials;
-            for (int m = 0; m < materials.Length; m++)
-            {
-                Material source = materials[m];
-                if (source == null || settings.TryResolvePair(source, out _, out _))
-                    continue;
-
-                if (!CanGenerateVariant(source, out string unsupportedReason))
-                {
+                    string name = material != null ? material.name : "<null>";
                     report.Error(
-                        renderers[i].transform,
-                        $"Unsupported material '{source.name}': {unsupportedReason}. " +
-                        "Create and register an artist-authored dither variant.");
-                    continue;
+                        renderer.transform,
+                        $"Material does not support _WallOcclusionStrength: {name}.");
                 }
-
-                string sourcePath = AssetDatabase.GetAssetPath(source);
-                string guid = AssetDatabase.AssetPathToGUID(sourcePath);
-                string safeName = Regex.Replace(source.name, "[^A-Za-z0-9_]", "_");
-                string suffix = string.IsNullOrEmpty(guid) ? "local" : guid.Substring(0, 8);
-                string variantPath =
-                    $"{GeneratedMaterialDirectory}/{safeName}_{suffix}_Occlusion.mat";
-                Material variant = AssetDatabase.LoadAssetAtPath<Material>(variantPath);
-                if (variant == null)
-                {
-                    variant = new Material(ditherShader) { name = $"{safeName}_{suffix}_Occlusion" };
-                    CopyVisualProperties(source, variant);
-                    AssetDatabase.CreateAsset(variant, variantPath);
-                }
-                else
-                {
-                    variant.shader = ditherShader;
-                    CopyVisualProperties(source, variant);
-                    EditorUtility.SetDirty(variant);
-                }
-
-                sources.Add(source);
-                variants.Add(variant);
-                settings.ConfigureMaterialMappings(sources.ToArray(), variants.ToArray());
             }
         }
-    }
-
-    private static bool CanGenerateVariant(Material source, out string reason)
-    {
-        if (source.shader == null)
-        {
-            reason = "source shader is missing";
-            return false;
-        }
-
-        if (source.renderQueue >= (int)RenderQueue.Transparent)
-        {
-            reason = "transparent materials are not supported automatically";
-            return false;
-        }
-
-        Shader shader = source.shader;
-        for (int i = 0; i < shader.GetPropertyCount(); i++)
-        {
-            string propertyName = shader.GetPropertyName(i);
-            if (propertyName.IndexOf("Emission", StringComparison.OrdinalIgnoreCase) < 0)
-                continue;
-
-            ShaderPropertyType type = shader.GetPropertyType(i);
-            if (type == ShaderPropertyType.Texture && source.GetTexture(propertyName) != null)
-            {
-                reason = "active emission texture";
-                return false;
-            }
-
-            if (type == ShaderPropertyType.Color && source.GetColor(propertyName).maxColorComponent > 0.001f)
-            {
-                reason = "active emission color";
-                return false;
-            }
-        }
-
-        reason = string.Empty;
-        return true;
-    }
-
-    private static void CopyVisualProperties(Material source, Material destination)
-    {
-        destination.SetColor(
-            "_BaseColor",
-            source.HasProperty("_BaseColor") ? source.GetColor("_BaseColor") : Color.white);
-        destination.SetFloat(
-            "_Metallic",
-            source.HasProperty("_Metallic") ? source.GetFloat("_Metallic") : 0f);
-        destination.SetFloat(
-            "_Smoothness",
-            source.HasProperty("_Smoothness") ? source.GetFloat("_Smoothness") : 0.5f);
-        destination.SetFloat(
-            "_BumpScale",
-            source.HasProperty("_BumpScale") ? source.GetFloat("_BumpScale") : 1f);
-        destination.SetFloat("_WallOcclusionStrength", 1f);
-        destination.SetFloat("_WallOccAffected", 1f);
-
-        ResolveTextures(source, out Texture albedo, out Texture normal);
-        destination.SetTexture("_BaseMap", albedo);
-        destination.SetTexture("_BumpMap", normal);
-    }
-
-    private static void ResolveTextures(Material source, out Texture albedo, out Texture normal)
-    {
-        albedo = null;
-        normal = null;
-        Shader shader = source.shader;
-        for (int i = 0; i < shader.GetPropertyCount(); i++)
-        {
-            if (shader.GetPropertyType(i) != ShaderPropertyType.Texture)
-                continue;
-            Texture texture = source.GetTexture(shader.GetPropertyNameId(i));
-            if (texture == null)
-                continue;
-            if (IsNormalMap(texture))
-                normal ??= texture;
-            else
-                albedo ??= texture;
-        }
-    }
-
-    private static bool IsNormalMap(Texture texture)
-    {
-        string path = AssetDatabase.GetAssetPath(texture);
-        return !string.IsNullOrEmpty(path) &&
-            AssetImporter.GetAtPath(path) is TextureImporter importer &&
-            importer.textureType == TextureImporterType.NormalMap;
     }
 
     private static WallOcclusionSettings EnsureSettings()
@@ -733,19 +591,6 @@ public static class WallOcclusionAuthoring
                 paths.Add(path);
         }
         return paths.OrderBy(path => path, StringComparer.Ordinal).ToArray();
-    }
-
-    private static void EnsureAssetDirectory(string path)
-    {
-        string[] parts = path.Split('/');
-        string current = parts[0];
-        for (int i = 1; i < parts.Length; i++)
-        {
-            string next = $"{current}/{parts[i]}";
-            if (!AssetDatabase.IsValidFolder(next))
-                AssetDatabase.CreateFolder(current, parts[i]);
-            current = next;
-        }
     }
 
     private sealed class ValidationReport

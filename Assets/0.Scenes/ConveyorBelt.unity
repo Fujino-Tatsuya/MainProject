@@ -673,7 +673,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 7337419264410648074, guid: 2b5bf107142c05542b995a1841802d0a, type: 3}
+  - {fileID: 2100000, guid: dcdaff601baa7ac479a85ef163e4fbc9, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -928,7 +928,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: de3ead61b8b5d1249898d6f39c72e028, type: 2}
+  - {fileID: 2100000, guid: dcdaff601baa7ac479a85ef163e4fbc9, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -1018,7 +1018,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 7337419264410648074, guid: 2b5bf107142c05542b995a1841802d0a, type: 3}
+  - {fileID: 2100000, guid: dcdaff601baa7ac479a85ef163e4fbc9, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -1090,7 +1090,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 7337419264410648074, guid: 2b5bf107142c05542b995a1841802d0a, type: 3}
+  - {fileID: 2100000, guid: dcdaff601baa7ac479a85ef163e4fbc9, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -1452,7 +1452,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: de3ead61b8b5d1249898d6f39c72e028, type: 2}
+  - {fileID: 2100000, guid: dcdaff601baa7ac479a85ef163e4fbc9, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -1542,7 +1542,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: de3ead61b8b5d1249898d6f39c72e028, type: 2}
+  - {fileID: 2100000, guid: dcdaff601baa7ac479a85ef163e4fbc9, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -1895,6 +1895,18 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 3174298269038461634, guid: e4ab0fd45f6540bbb0a7919aadadcfb9, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 4.77
+      objectReference: {fileID: 0}
+    - target: {fileID: 6876992779246040533, guid: e4ab0fd45f6540bbb0a7919aadadcfb9, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 4.7699976
+      objectReference: {fileID: 0}
+    - target: {fileID: 7954123053641278594, guid: e4ab0fd45f6540bbb0a7919aadadcfb9, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: dcdaff601baa7ac479a85ef163e4fbc9, type: 2}
     - target: {fileID: 9117473837255834812, guid: e4ab0fd45f6540bbb0a7919aadadcfb9, type: 3}
       propertyPath: m_Name
       value: ConveyorTileCorner
@@ -1916,6 +1928,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: ConvayorTileStraight (2)
       objectReference: {fileID: 0}
+    - target: {fileID: 3553087416410369997, guid: 71278eef8d78225479aef9fdd13afba4, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: dcdaff601baa7ac479a85ef163e4fbc9, type: 2}
     - target: {fileID: 5905494587539623919, guid: 71278eef8d78225479aef9fdd13afba4, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0.0000004172325

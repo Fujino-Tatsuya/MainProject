@@ -1,4 +1,165 @@
-# CURRENT PLAN — 선택형 화면 공간 캡슐 오클루전 재설계 (2026-08-06)
+# CURRENT PLAN — V3 Zone 몬스터 스폰·NavMesh·메인 플로우 연결 (2026-08-09)
+
+## 추가 계획 — 원본 셰이더 직접 Wall Occlusion 통합 (2026-08-09, 구현 및 자동 검증 완료 / Play 색감 확인 대기)
+
+> 자동 검증 결과: 스크립트 컴파일 오류 0건, 대상 Shader Graph 4종 컴파일 메시지 0건, Wall Occlusion EditMode 21/21 통과. 구형 `_Occlusion` 에셋은 제거했고 추적 대상 구형 GUID 15개의 Assets 참조는 0건이다. V3 몬스터 마커 11/11, Stage Slot 10/10, 메인 플로우 Catalog 11/11·Stage 1/1·Slot 10/10·Legacy 참조 0도 통과했다. `Validate ZoneLayout Classification`은 이미 복제된 몬스터 저작 목록도 비어 있어야 한다는 이전 이관 단계 조건 때문에 9개 Zone을 오류로 보고하므로 현재 최종 상태 검증으로는 사용하지 않는다.
+
+### 목표
+
+- 투명화 시작 시 원본 머티리얼을 `_Occlusion` 변형으로 교체해 색감이 달라지는 문제를 제거한다.
+- 원본 Shader Graph의 색상·노멀·Emission·PBR 계산은 그대로 유지하고 최종 Alpha Clip 조건에 화면 공간 캡슐 디더만 결합한다.
+- 현행 V3 Stage·Zone의 실제 유효 머티리얼만 지원하고 레거시·미사용 등록 쌍은 제거한다.
+
+### 잠긴 범위와 자산
+
+- 실제 유효 머티리얼은 `Generic_01_A_V3`, `PolygonConstruction_01_A`, `ConvayorBelt_Mat`, `ConvayorBelt_Corner_Mat` 네 종류로 통일한다.
+- 텔레포터 FBX 내부 `generic_01`은 유지하지 않고, 공용 의존 프리팹에서 `Generic_01_A_V3`로 한 번 교체해 모든 V3 Zone 인스턴스가 재사용하게 한다.
+- 직접 수정할 Shader Graph:
+  - SVN: `Generic_Standard.shadergraph`, `Generic_Basic.shadergraph`
+  - Git: `ConvayorBelt_Graph.shadergraph`, `ConvayorBelt_Corner_Graph.shadergraph`
+- Shader Graph와 `.meta` GUID는 유지한다. 머티리얼·텍스처·프리팹 원본 GUID를 재생성하지 않는다.
+
+### 셰이더 구조
+
+- 프로젝트 소유 공통 HLSL 함수 하나가 기존 `WallOcclusionGlobals`의 화면 캡슐, 깊이 보호, 디더 임계값과 per-renderer `_WallOcclusionStrength`를 계산한다.
+- `Generic_Standard`·`Generic_Basic`은 기존 `baseAlpha - baseThreshold`와 새 `occlusionOpacity - ditherThreshold` 중 작은 값을 최종 clip margin으로 사용해 원래 Alpha Clip을 보존한다.
+- 컨베이어 그래프 두 개는 Alpha Clip을 활성화하고 base alpha 1을 같은 공통 함수에 입력한다.
+- `_WallOcclusionStrength`의 머티리얼 기본값은 0으로 두어 미등록 Renderer와 비활성 상태는 항상 원본 그대로 불투명하게 유지한다.
+- Forward·ShadowCaster·DepthOnly·DepthNormals가 Shader Graph에서 생성하는 동일 Alpha Clip 조건을 사용한다.
+
+### 런타임과 제작 도구
+
+- `WallOcclusionRendererController`는 `sharedMaterials`를 교체하지 않는다. 원래 MaterialPropertyBlock을 보존한 뒤 활성 Renderer에 강도만 기록한다.
+- 강도 1 상태에서도 MPB를 유지하고, hit 해제 유예 중에도 1을 유지한다. 복원이 0에 도달한 시점에만 원래 MPB를 되돌리고 상태를 제거한다.
+- 지원 판정은 원본↔변형 배열이 아니라 모든 머티리얼 슬롯이 `_WallOcclusionStrength`를 지원하는지로 검사한다. 미지원 대상은 기존 규칙대로 불투명 제외하고 소유자 기준 한 번 경고한다.
+- Register/Wire는 변형 머티리얼을 생성하지 않고 구조 등록과 원본 셰이더 지원 검증만 수행한다.
+- `WallOcclusionSettings`의 source/occlusion material 배열과 자동 복사 로직을 제거한다. 이름 기반 런타임 판정이나 호환 모드는 추가하지 않는다.
+
+### 정리와 VCS
+
+- 새 방식 검증 후 기존 `_Occlusion.mat`, `Generated` 변형 폴더, `WallOcclusionDither.shader`와 각 `.meta`를 전체 참조 0건 확인 뒤 삭제한다.
+- 레거시 원본 머티리얼 자체는 삭제하지 않는다. 제거 대상은 투명화 전용 변형 자산과 미사용 등록 정보뿐이다.
+- `Assets/50.Art`의 두 Shader Graph 변경은 SVN 변경분, 런타임·도구·테스트·문서·컨베이어 그래프·투명화 전용 자산 삭제는 Git 변경분으로 구분해 보고한다.
+
+### 네트워크와 제외 범위
+
+- Wall Occlusion은 각 로컬 gameplay camera의 시각 효과이므로 NGO 동기화와 권한 변경은 없다.
+- SphereCast, 실제 표본 시선 차단 확인, ElevationStack/Level 판정, 화면 캡슐 크기·feather 설정, 시간 전환 값은 변경하지 않는다.
+- V3 아트 하이어라키·NavMesh·몬스터·미니맵·Zone 배치 데이터는 수정하지 않는다.
+
+### 검증
+
+- EditMode: 활성·유예·복원 전 구간에서 `sharedMaterials` 참조가 한 번도 바뀌지 않고, MPB 강도만 0→1→0으로 변하는지 검증한다.
+- EditMode/Editor: 네 유효 머티리얼이 지원되고 미지원 머티리얼은 fail-opaque 경고가 한 번만 발생하는지 검증한다.
+- Shader: 네 Shader Graph의 Forward·ShadowCaster·DepthOnly·DepthNormals 컴파일 메시지 0건을 확인한다.
+- 자산: V3 프리팹의 투명화 대상 머티리얼 집합이 네 종류인지, 텔레포터 `generic_01` 참조가 0인지, 삭제 대상 변형 자산의 외부 참조가 0인지 확인한다.
+- Play: 동일 카메라·조명에서 투명화 직전과 활성 중 남아 있는 픽셀의 색감·노멀·반사·Emission이 동일한지 확인한다.
+- 회귀: Wall Occlusion EditMode 전체, V3 프리팹 검증, 메인 플로우 V3 연결 검증을 실행한다.
+
+### 완료 조건
+
+- 투명화 중에도 Renderer의 원본 머티리얼과 셰이더가 유지되고, 남아 있는 픽셀의 색감이 바뀌지 않는다.
+- 실제 차폐가 확인된 등록 대상만 기존 화면 캡슐 디더로 잘리며 해제 후 원래 MPB까지 완전히 복원된다.
+- 전역 설정과 프로젝트에 구형 변형 매핑·투명화 전용 머티리얼·구형 디더 셰이더 참조가 남지 않는다.
+
+## 추가 변경 — 투명화 공간 그라데이션 비례 폭 (2026-08-09, 구현·자동 검증 완료 / Play 확인 대기)
+
+- 목표: 화면 공간 캡슐의 중심 완전 컷아웃은 유지하고 바깥 디더 그라데이션을 해상도·카메라 거리에 덜 민감하게 만든다.
+- 구현: 고정 16px feather를 제거하고 투영 캡슐 반경에 인스펙터 Scale을 곱한다. Scale은 0~3, Min/Max Feather Pixels는 독립 조절하며 코드 기본 최대 폭은 192px로 둔다.
+- 보존: SphereCast/실제 차폐 확인, 고도 판정, 등록 구조, 시간 전환 값, 디더 컷아웃 렌더링은 변경하지 않는다.
+- 검증: 최소값·비례값·최대값 계산을 포함한 Wall Occlusion EditMode 테스트 20/20 통과, 셰이더 컴파일 메시지 0건. 실제 플레이 화면 확인은 사용자 프리팹 적용 후 진행한다.
+
+## 추가 계획 — V3 맵 월드 원점 기준 180도 회전 (2026-08-09, 구현 완료 / Play 검증 대기)
+
+- 목표: 카메라·이동 입력·미니맵 방향은 변경하지 않고, `4.MapScene`의 V3 Stage와 런타임 생성 Zone 전체를 월드 원점 `(0,0,0)` 기준으로 Y축 180도 회전해 V3의 `-Z Front`를 프로젝트의 `+Z Front` 관례에 맞춘다.
+- 대상: V3 Stage GUID `9e5ec8ccf89822c42b0e42c35867ba40`를 사용하는 `Assets/0.Scenes/MainFlow/4.MapScene.unity` 한 곳. V3 Zone·Stage 프리팹 에셋 자체는 수정하지 않는다.
+- 일회성 변환:
+  1. 씬의 `PF_Stage_01_V3` 루트를 월드 원점에서 Y축 180도로 회전한다. 자식인 Slot Transform과 Stage 구조물은 함께 회전한다.
+  2. 모든 `ZoneSlot.Rotations` 중 `HasPosition=true`인 저장 위치를 `(x,y,z) -> (-x,y,-z)`로 변환한다.
+  3. 모든 저장 회전을 `YawSteps -> (YawSteps + 2) % 4`로 변환한다.
+  4. 변환된 데이터가 Zone Rotation Authoring과 런타임 생성 양쪽에서 그대로 보이게 하며, 런타임 숨은 방향 보정은 추가하지 않는다.
+- 저작 도구 정합성: `V3SlotPlacementAlignment`의 고정 Bay 좌표도 같은 180도 결과로 교정하여, 이후 정렬 도구 실행이 회전 전 좌표를 복원하지 않게 한다.
+- 안전장치: 전용 Editor 메뉴는 Stage가 정확히 하나이고, 위치가 원점·스케일 `(1,1,1)`·Y 회전 0도이며, 수집한 Slot이 모두 해당 Stage의 자식일 때만 실행한다. 이미 180도인 Stage 또는 조건 불일치는 오류로 중단한다. Undo와 Scene dirty를 지원하며 자동 저장하지 않는다.
+- 보존: 플레이어/Cinemachine 카메라, `PlayerMovement.viewYaw`, 미니맵 카메라·좌표 변환, V3 프리팹 GUID, NavMesh·보행면, Zone 내부 몬스터/보스/퀘스트 마커, 네트워크 seed·권한 규약.
+- 검증: 변환 전후 모든 저장 위치의 Y와 원점 거리 보존, X/Z 부호 반전, Yaw 180도 증가, Slot 10개 및 V3 참조 11개 유지, 여러 seed 생성 배치·미니맵·플레이어 스폰·NavMesh 육안 확인, 컴파일 오류 0.
+- 구현 결과: Stage 1개, Slot 10개, 저장 위치 27개, 저장 Yaw 27개를 변환하고 씬에 저장했다. 중복 실행 차단, V3 메인 플로우 연결 및 랜덤 seed Zone 10개 생성을 확인했다.
+- 후속 확인: 고정 seed NavMesh는 정상 생성되지만 기존 스폰 마커 16개가 1.5m 이내 NavMesh를 찾지 못했다. 강체 180도 회전 전후의 상대 위치는 동일하므로 이번 회전 로직과 분리된 기존 마커 저작 문제로 보고하며, 본 작업에서는 마커나 보행면을 이동하지 않는다.
+- 제외: 다른 씬, Legacy Stage/Zone, 카메라 방향 전환, 프리팹 내부 구조 수정.
+
+## 추가 계획 — V3 미니맵 데이터 교정 (2026-08-09, 구현 완료 / Play 검증 대기)
+
+- 문제: `MinimapController`의 실제 지형 베이크는 생성된 V3 오브젝트를 촬영하지만, 미탐사 실루엣과 월드 범위는 Legacy에서 복사된 `ZoneSlot.Footprint`를 사용한다. 복도 탐색도 존재하지 않는 `Stage1/Level_wall_hallway` 경로에 고정되어 V3 지형과 서로 다른 도형이 겹친다.
+- 정본: 활성 V3 Stage와 생성된 V3 Zone의 `ElevationLevel.ContentRenderers`. 이름이나 Legacy 프리팹 경로를 사용하지 않는다.
+- 구현:
+  1. 생성 완료 시 등록된 V3 Renderer를 중복 없이 수집하고, 유효한 월드 XZ Bounds로 미니맵 좌표계를 계산한다.
+  2. `ZoneSlot.Footprint` 사각형과 Legacy 복도 경로 기반 실루엣을 제거하고, 수집한 V3 Renderer의 XZ 범위를 CPU 실루엣에 합성한다.
+  3. 보스·스폰·퀘스트 아이콘은 Slot baseline이 아니라 해당 `GeneratedZoneIdentity`의 V3 Renderer Bounds 중심에 둔다.
+  4. V3 Renderer가 하나도 없을 때만 오류를 출력하고 미니맵 생성을 중단하여 Legacy 정보로 조용히 폴백하지 않는다.
+- 다층 규칙: 미니맵은 현재처럼 전체 맵 개요이므로 모든 V3 고도의 XZ 합집합을 표시한다. 플레이어 현재 층별 전환은 이번 범위에 넣지 않는다.
+- 네트워크: 지형은 같은 seed로 각 피어가 로컬 생성·베이크하며, 기존 탐사 비트 동기화 규약은 변경하지 않는다.
+- 제외: V3 아트 프리팹, Zone 배치값, NavMesh, `MapOverviewUI` 전체화면 지도 디자인 변경.
+- 완료 조건: 미탐사 실루엣과 탐사된 베이크가 같은 V3 위치에 겹치고, Legacy Stage 경로·Footprint가 미니맵 지형 생성에 사용되지 않으며, 역할 아이콘이 실제 생성 Zone 중심을 따른다.
+- 검증: Unity 컴파일 오류 0, V3 Renderer/Zone 수집 진단 로그, 여러 seed에서 미니맵 경계·실루엣·역할 아이콘 육안 확인.
+
+## 추가 잠금 — V3 Stage 슬롯 좌표 재정렬 (2026-08-09, 승인됨)
+
+- 목표: `Zone Rotation Authoring`으로 맞춘 V3 Zone의 위치·회전 값을 보존하면서, 10개 `SlotID`가 서로 다른 V3 Stage 물리 구역을 소유하도록 재정렬한다.
+- 정본: 열린 `4.MapScene`의 `PF_Stage_01_V3/Slots` 씬 오버라이드. 런타임은 기존처럼 `(SlotID × ZonePrefab)` 저장 위치를 사용한다.
+- 구현: 현재 조합/좌표 군집 보고 → Slot별 기준 구역 확정 → 같은 Slot의 도달 가능 Zone을 해당 구역으로 재배정 → Slot Transform도 대표 기준점에 동기화한다.
+- 보존: 프리팹별 피벗 미세 보정과 90도 회전 저작값. V3 Zone·Stage 아트, NavMesh, 몬스터 마커는 수정하지 않는다.
+- 검증: 도달 가능 조합 누락 0, 10개 Slot 기준 구역 중복 0, 여러 시드 전체 생성 시 Slot 간 대형 겹침 0, Legacy Zone 참조 0.
+- 안전: 자동 판단이 불가능한 구역 대응은 임의 저장하지 않고 오류로 중단한다. 모든 변경은 Undo 및 씬 dirty 처리 후 사용자가 씬 저장한다.
+
+> 상태: **범위·1차 이관 원칙 승인 / 단계별 구현 및 검증 진행**
+> 대상: `Assets/2.Prefabs/Map/LevelDeliveryV3/Zones/PF_Zone_*_V3.prefab` 11종
+> 제외: `PF_Zone_L_Type_B_V3`의 다리·조작 패널 복원 및 리팩터링. 별도 후속 작업으로 진행한다.
+
+## 목표
+
+V3 Zone을 기존 랜덤 맵 생성 흐름에 안전하게 연결하고, 전투·퀘스트 Zone의 새 지형과 고저차에 맞춰
+몬스터 스폰 마커를 다시 저작한다. 생성된 몬스터가 서버 권한으로 스폰되고 NavMesh 위에서 정상적으로
+이동하며, 클라이언트에는 NGO로 동일하게 복제되어야 한다.
+
+## 잠긴 결정
+
+- 대응하는 Legacy Zone의 `Size`, `Role`, `Difficulty`, 기본 `MonsterGroupID`를 V3 Zone에 그대로 이관한다.
+- V3가 Legacy의 보행면·NavMesh 형상을 수정 없이 유지하므로, Legacy 마커의 Zone 루트 기준 로컬 좌표·회전과 하이어라키를 그대로 복제한다.
+- Legacy Transform 참조 자체를 공유하지 않는다. V3 프리팹 내부에 새 Transform을 만들고 V3 `ZoneLayout` 목록에 연결한다.
+- Legacy의 Zone별 마커 개수와 마커별 `MonsterGroupID` 순서는 그대로 유지한다. V3 전환과 전투 구성 변경을 섞지 않는다.
+- 복제된 V3 마커 아래에 기존과 같은 보행면이 있고 NavMesh에 유효하게 붙는지 검증한다. 검증 실패 위치만 별도 수정 대상으로 보고한다.
+- `PlayerSpawn`과 `BossRoom` 역할 Zone에는 일반 몬스터 마커를 만들지 않는다.
+- 다리·조작 패널 기능은 이번 작업에서 건드리지 않는다.
+- `.meta` GUID를 보존하며 YAML의 GUID/fileID를 수동 편집하지 않는다.
+
+## 단계
+
+1. V3 11종과 Legacy 11종의 대응표 및 이관 데이터 검증.
+2. V3 루트에 `ZoneLayout`을 등록하고 분류·기본 몬스터 데이터를 이관.
+3. 전투·퀘스트 V3 Zone에 빈 마커 컨테이너를 만들고 `MonsterSpawnEntries` 등록 구조를 준비.
+4. 각 마커를 V3 보행면·고도에 맞춰 수동 배치하고 몬스터 그룹을 확정.
+5. `ZoneLayoutCatalog`의 Legacy 참조를 대응 V3 GUID로 교체.
+6. 기존 슬롯별 회전·저장 위치 데이터를 V3 프리팹 기준으로 다시 저작.
+7. 생성 후 NavMesh 베이크·마커 바닥 스냅·NavMeshAgent 재부착을 검증.
+8. 호스트 스폰, 클라이언트 복제, 재생성 정리 및 콘솔 오류를 MPPM에서 검증.
+
+## VCS 경계
+
+- V3 Zone 프리팹과 `.meta`: Git 대상.
+- `Assets/50.Art/MapGen/MapObj/ZoneLayout/ZoneLayoutCatalog.asset`: SVN 대상. 카탈로그 전환 시 별도 SVN 커밋이 필요하다.
+- 사용자의 기존 씬·컨베이어·무빙 플랫폼·Behavior Graph 변경은 보존하고 이번 작업에 포함하지 않는다.
+
+## 완료 조건
+
+- V3 11종 모두 올바른 `ZoneLayout` 분류를 갖고, Start/Boss를 제외한 대상 Zone에서 등록 마커가 유효하다.
+- 메인 생성 흐름이 Legacy가 아닌 V3 Zone을 배치한다.
+- 마커가 허공·소품 위·NavMesh 밖에 있지 않으며 여러 고도에서도 의도한 층에 스폰된다.
+- 서버에서만 몬스터를 생성하고 모든 클라이언트가 같은 몬스터를 확인한다.
+- 생성 직후 몬스터가 NavMesh에 정상 부착되어 이동하고, 맵 재생성 시 이전 몬스터가 정리된다.
+- 다리·조작 패널에는 변경이 없다.
+
+---
+
+# PREVIOUS PLAN — 선택형 화면 공간 캡슐 오클루전 재설계 (2026-08-06)
 
 > 상태: **구현 및 자동 검증 완료 / 사용자 프리팹 적용 후 Play 검증 대기**
 > 범위: 런타임 시스템, 선택 프리팹 등록·검증 도구, 자동 테스트, 문서 2개 및 기존 기술 문서 갱신.
@@ -32,7 +193,7 @@
 - 구멍 크기·외곽 폭은 전역 설정 하나를 사용한다. 섹션별 크기 오버라이드는 이번 범위에 넣지 않는다.
 - 같은 섹션에서 한 콜라이더가 맞으면 그 섹션의 등록 렌더러 전체를 활성화하되 실제 픽셀 제거는 화면 공간 캡슐 주변에만 일어난다.
 - 선택 진입 약 0.1초, 해제 유예 약 0.1초, 불투명 복원 약 0.2초의 부드러운 전환을 유지한다.
-- 전환 중인 소수 렌더러에만 MPB 전환값을 사용하고, 안정 상태에서는 공유 원본/디더 변형 재질과 빈 MPB로 복귀시켜 SRP Batcher 손실을 제한한다.
+- 선택된 렌더러는 원본 `sharedMaterials`를 항상 유지하고 MPB 강도만 사용한다. 완전 활성·해제 유예 중에도 강도 1을 유지하며, 복원 강도가 0에 도달할 때 기존 MPB로 복귀한다.
 - 노멀과 플레이어 높이로 바닥을 추측하던 `Floor Guard`와 관련 설정·테스트·문서는 제거한다. 같은 그룹에서 플레이어 뒤쪽 픽셀을 보호하는 깊이 제한은 유지한다.
 
 ### 3. 명시적 런타임 등록
@@ -111,8 +272,8 @@ PF_Stage_01 또는 PF_Zone_*
 2. 각 `ElevationLevel`은 루트 Transform Y 하나와 컴포넌트 내부의 데이터 전용 로컬 `XZ Areas` 목록만 가진다. 물리 `BoxCollider`, `ActivationVolumes`, 별도 층 번호 데이터는 두지 않는다.
 3. 플레이어가 들어 있는 XZ Area를 가진 Level들을 Y로 정렬해 Stack의 현재 층을 정한다. 상태가 없을 때는 인접 높이 구간의 상승 20% 기준으로 초기화한다.
 4. 접지 상승은 다음 높은 Level까지 20%에서 전환하고, 공중 상승은 점프·넉백으로 보고 현재 층을 유지한다. 진입로 및 공중 낙하는 다음 낮은 Level까지 60%에서 전환한다. 한 프레임에 여러 경계를 넘으면 연속 평가한다.
-5. 현재 층보다 높은 Level만 상위 층 전체 처리 후보로 허용한다. 상위 Level의 `Content` 안 Collider 중 하나라도 카메라→기본 캡슐 SphereCast에 맞으면 그 `Content`의 모든 Renderer를 함께 활성화한다. 아무 Collider도 맞지 않으면 활성화하지 않는다.
-6. 현재 층과 아래층의 Level 전체 처리는 끈다. 다만 `Content` 안의 벽·복도·`OccludableProps` 섹션은 자기 Collider가 실제로 맞으면 독립 활성화한다. 최종 조건은 `LevelAboveAndGroupHit || SectionHit`이며 실제 픽셀 제거는 화면 공간 캡슐 주변에서만 일어난다.
+5. 현재 층보다 높은 Level만 상위 층 전체 처리 후보로 허용한다. 카메라→기본 캡슐 SphereCast는 1차 후보 수집에만 사용하고, 후보 Collider가 화면 캡슐 내부의 표본 시선 중 하나를 캐릭터보다 앞에서 실제로 차단할 때만 그 `Content`의 모든 Renderer를 함께 활성화한다.
+6. 현재 층과 아래층의 Level 전체 처리는 끈다. 다만 `Content` 안의 벽·복도·`OccludableProps` 섹션은 자기 Collider가 SphereCast 후보이면서 표본 시선을 실제로 차단할 때만 독립 활성화한다. 최종 조건은 `LevelAboveAndConfirmedBlock || ConfirmedSectionBlock`이며 실제 픽셀 제거는 축소된 화면 공간 캡슐 주변에서만 일어난다.
 
 - `StableSurfaces`, `TransitionSurfaces`, `AlwaysOccluders`, `NeverOccluders`, `LowerHeight`, `UpperHeight`, `HeightMarker`와 층 간 연결 데이터는 사용하지 않는다.
 - Stack과 Level 루트는 위치 이동과 Y축 회전만 허용하고 스케일은 `(1,1,1)`로 고정한다. X/Z 기울기 회전은 검증 오류다.
@@ -127,8 +288,8 @@ PF_Stage_01 또는 PF_Zone_*
 - 선택한 프리팹만 대상으로 `Register/Wire Selected`와 `Validate Selected`를 제공한다.
 - 고정 `Occlusion`, `Content`, `OccludableProps`, `LevelOnlyProps` 역할 노드와 등록 컴포넌트를 읽어 Renderer·Collider 참조와 Level 소속을 직렬화한다. XZ Area는 `ElevationLevel` 컴포넌트 내부 목록을 편집한다.
 - 하이어라키를 임의로 이동하거나 재구성하지 않으며, 중첩 프리팹 원본을 몰래 수정하지 않는다.
-- 지원되는 일반 재질은 선택 프리팹에서 실제 사용한 것만 공유 디더 변형을 결정적 경로와 이름으로 생성·재사용한다. 원본 아트 재질은 수정하지 않는다.
-- 에미션·특수 Shader Graph 등 지원하지 않는 재질은 외형을 추측하지 않고 아트가 제공한 변형을 요구한다.
+- 등록 도구는 변형 재질을 생성하지 않는다. 선택 프리팹의 원본 재질이 `_WallOcclusionStrength`와 원본 그래프 직접 디더를 지원하는지만 검사한다.
+- 현재 V3 실사용 그래프 네 개만 직접 지원한다. 다른 Shader Graph는 외형을 추측해 변형하지 않고 원본 그래프에 공통 디더 함수를 통합한 뒤 사용한다.
 - 이름, 필수 역할 노드, 프랍 직속 자식 규칙, 중첩 `PF_Prop_*`, 프랍 분류와 Section 컴포넌트 불일치, `Occlusion` 직속 섹션, Level 미소속 대상, 역할 혼합, 콜라이더/렌더러 누락, XZ Area, Level Y 정렬·중복 높이, 루트 transform, 중복 Section 소유, 다중 Level 소속, 미지원 재질을 검사한다.
 - Content 또는 Section의 Collider 최소치가 충족되지 않으면 선택 프리팹 검증에서 프리팹·오브젝트 경로·수정 방법을 오류 로그로 출력하되 빌드는 막지 않는다. 런타임에서는 해당 대상만 불투명 상태로 제외하고 원인 경고를 한 번만 출력한다.
 - 자동으로 구조의 공간적 독립성을 단정하지 않는다. 검증 결과에 Stack·Level별 Renderer·Collider·XZ Area 수를 표시해 잘못 크게 묶인 그룹을 사람이 확인할 수 있게 한다.
