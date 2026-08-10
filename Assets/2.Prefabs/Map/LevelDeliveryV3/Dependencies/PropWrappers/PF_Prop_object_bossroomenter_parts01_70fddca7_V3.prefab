@@ -1,0 +1,123 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &2322693870058664953
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7500065722107184694}
+  - component: {fileID: 8674916696810522376}
+  m_Layer: 0
+  m_Name: PF_Prop_object_bossroomenter_parts01_70fddca7_V3
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &7500065722107184694
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2322693870058664953}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 992439699726667677}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &8674916696810522376
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2322693870058664953}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 010b78ca8837feb48bc4bc32f6ff5804, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: VeyTrace.Rendering.Occlusion::VeyTrace.Rendering.Occlusion.OcclusionSection
+  renderers:
+  - {fileID: 2408858798124869755}
+  colliders:
+  - {fileID: 7231844930240156583}
+--- !u!1001 &2995113773320729956
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 7500065722107184694}
+    m_Modifications:
+    - target: {fileID: 2618019364491590393, guid: 5d6cd502ce6026946873e9bd9817d527, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2618019364491590393, guid: 5d6cd502ce6026946873e9bd9817d527, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2618019364491590393, guid: 5d6cd502ce6026946873e9bd9817d527, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2618019364491590393, guid: 5d6cd502ce6026946873e9bd9817d527, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 2618019364491590393, guid: 5d6cd502ce6026946873e9bd9817d527, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2618019364491590393, guid: 5d6cd502ce6026946873e9bd9817d527, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2618019364491590393, guid: 5d6cd502ce6026946873e9bd9817d527, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2618019364491590393, guid: 5d6cd502ce6026946873e9bd9817d527, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2618019364491590393, guid: 5d6cd502ce6026946873e9bd9817d527, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2618019364491590393, guid: 5d6cd502ce6026946873e9bd9817d527, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4519671338299859048, guid: 5d6cd502ce6026946873e9bd9817d527, type: 3}
+      propertyPath: m_Name
+      value: LegacyContent_object_bossroomenter_parts01_70fddca7_V3
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 5d6cd502ce6026946873e9bd9817d527, type: 3}
+--- !u!4 &992439699726667677 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 2618019364491590393, guid: 5d6cd502ce6026946873e9bd9817d527, type: 3}
+  m_PrefabInstance: {fileID: 2995113773320729956}
+  m_PrefabAsset: {fileID: 0}
+--- !u!23 &2408858798124869755 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 647731421777485087, guid: 5d6cd502ce6026946873e9bd9817d527, type: 3}
+  m_PrefabInstance: {fileID: 2995113773320729956}
+  m_PrefabAsset: {fileID: 0}
+--- !u!64 &7231844930240156583 stripped
+MeshCollider:
+  m_CorrespondingSourceObject: {fileID: 5605966404466894531, guid: 5d6cd502ce6026946873e9bd9817d527, type: 3}
+  m_PrefabInstance: {fileID: 2995113773320729956}
+  m_PrefabAsset: {fileID: 0}
