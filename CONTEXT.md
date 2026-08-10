@@ -104,6 +104,58 @@ SO 에 `dash*` 6필드 + `BossAttackPhase.Dash` 추가(끝에). **숫자는 전�
   **상태이상(기절·그로기)은 MPPM 2인에서만** 걸린다(`CanWrite = IsSpawned && IsServer`).
   단독 Play 로 "기절이 안 된다"를 버그로 오진하지 말 것.
 
+#### 🔴 히트박스 전면 재설계 — 팀장 확정 (2026-08-08). **Play 보다 먼저 판단할 것**
+
+**현재 프리팹의 히트박스는 레거시 승계분이고 새 설계와 맞지 않는다.** in-place 교체를 하면서
+리그·앵커·콜라이더를 그대로 물려받았는데, 값이 애니메이션에 맞춰 튜닝된 것이 아니라
+대충 놓은 라운드 값(`2×3×2` / center ±1)이었다. **승계 사실을 검증 없이 "재사용 이점"으로 넘긴 것이 실수다.**
+
+실측값:
+
+| 앵커 | 콜라이더 | 문제 |
+|---|---|---|
+| `LeftHookAttack` | Box 2×3×2 center(-1, 1.5, 1) | 우훅·어퍼와 볼륨이 거의 겹친다 |
+| `RightHookAttack` | Box 2×3×2 center(+1, 1.5, 1) | 〃 |
+| `UpperAttack` | Box 2×3×2 center(0, 1.5, 1) | **두 훅 안에 완전히 포함**된다 |
+| `Grab` | Box 1.2×3×1 center(0, 1.5, 0.5) | 유일하게 `enabled=0`(형상 전용) — **이게 정답 형태** |
+| `DashAttack` | Sphere r=1.25 center(0, 1.71, 0) | **보스 자기 중심**. 앞으로 안 뻗어 캐리-푸시와 안 맞는다 |
+| `Rage` | Sphere r=1.25 center(0, 1.71, 0) | **DashAttack 과 완전 동일**(강화판이어야 하는데) |
+
+앵커가 전부 `pos(0,0,0)` 이라 **본에 안 붙어 있고 보스 루트 기준 고정 볼륨**이다. 주먹을 안 따라간다.
+게다가 레거시는 공격마다 검출 방식이 달랐는데(`ColliderBasicAttack` / `KnockbackAttack` / **트리거**
+`TriggerKnockbackAttack`) 지금은 전부 `MonsterMeleeAttack` 오버랩 하나로 바뀌었다 —
+**모양은 그대로인데 의미가 바뀌었다.**
+
+**확정된 새 설계:**
+- **훅·어퍼·잡기 → 손 본에 붙인다.** 넷 다 손에서 처리되므로 고정 볼륨 4개는 중복이다.
+  좌손/우손 앵커 2개로 줄이고, 어퍼·잡기가 어느 손인지는 클립을 보고 정한다.
+- **돌진 → 몸통에 콜라이더를 따로** 둔다.
+- **점프 → 바닥 원.** 이미 코드가 `jumpAoeRadius` OverlapSphere 로 처리한다 → **앵커 불필요**.
+- 그에 맞춰 `No23.asset` 의 `hitboxAnchorName` 매핑도 다시 잡는다(현재는 레거시 앵커 6개를 가리킨다).
+
+**함께 지울 레거시 서브트리** — 전부 새 코드가 대체했다:
+`JumpAttack/FloorRoot/FloorBase`·`FloorGrow`(예고 장판 스프라이트 → `AoeTelegraph` 가 대체) ·
+`ChargeAttack/Floor`(차징 장판 + 공격 2종 → `AreaZone` 이 대체) · `ColliderBasicAttack` ×4 ·
+`KnockbackAttack` ×4 · `TriggerKnockbackAttack` · 컴포넌트 제거 후 남은 빈 껍데기 `Initializer`
+
+🔴 **본에 붙일 때 함정**: `rig` 의 **스케일이 100배**, 회전이 (270.02, 0, 0) 이다.
+본 아래에 콜라이더를 넣으면 그 스케일을 상속하므로 **크기를 1/100 로 넣어야** 의도한 월드 크기가 나온다.
+
+리그는 Auto-Rig Pro 계열(`c_` 접두사 · `.x`/`.l`/`.r` 접미사)이고 경로는
+`Components/Amature/rig/c_pos/c_traj/c_root_master.x/…` 다(`c_root_master.x` 의 자식 3개 중 하나가
+중첩 `Wells`). ⚠️ **정확한 손 본 이름은 Hierarchy 창에서 눈으로 확인할 것** —
+MCP 의 `unity_get_hierarchy` 는 **3단계까지만** 열거해서 본이 안 보인다.
+
+#### 나머지 승계분 — 아직 미검증 (같이 점검할 것)
+
+| 대상 | 현재 | 상태 |
+|---|---|---|
+| `HurtBox` | Box 2.03×3.48×1 center(0.014, 1.43, 0) | 보스 몸 크기와 맞는지 **미검증** |
+| `NavMeshAgent` | — | ✅ 무관 — `ServerInitialize` 가 `speed`/`radius`/`stoppingDistance` 를 SO 값으로 덮어쓴다 |
+| `Rigidbody` | — | **미검증** |
+| 웰즈 손 소켓 | — | 아직 없음(웰즈 조립 때) |
+| `FD_Anchor` | y=3.5 | 은희 것 — 그대로 둔다 |
+
 #### 씬별 상태
 
 | 씬 | 상태 |
