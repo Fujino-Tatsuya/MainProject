@@ -6,7 +6,8 @@ Update this file when a term becomes important enough that future agents or team
 
 ## ▶▶ 다음 세션 시작점 — MonsterScene 한 사이클 (2026-08-10 종료)
 
-🔴 **브랜치 `feature/Boss23`** · **컴파일 0에러 0경고** · **전부 미커밋** (아래 「미커밋 목록」)
+**브랜치 `feature/Boss23`** · **컴파일 0에러 0경고** · **P0~P6 커밋·푸시 완료** (`66d3741`, ahead 0)
+— 아래 「커밋 상태」의 잔여 3건만 작업 트리에 남아 있다.
 
 **한 줄 상태: 프리팹 4종을 새로 만들었고 레거시 정리까지 끝났다. 다음은 `MonsterScene` 을 꾸미는 것(P7)이다.**
 
@@ -95,13 +96,29 @@ svn commit "Assets/50.Art/Char/Boss/SK/SK_23.fbx.meta" -m "feat(boss): 23호 클
 
 ⚠️ 나머지 14건(노멀맵 7 · 슬로프/계단 fbx 4 등)은 **이전부터 밀려 있던 팀장 작업분**이라 그대로 뒀다.
 
-### 미커밋 목록
+### 커밋 상태 (2026-08-10 갱신)
 
-신규 = `2.Prefabs/Monster/Boss/`(4) · `MA_AreaZone_Fire.mat` · 에디터 도구 2 · 요청문서 1
-수정 = `BossEncounterDirector.cs` · `TwentyThreeBoss.cs` · `MonsterBase.cs` · `MonsterMeleeAttack.cs` ·
-`MonsterAnimationEventRelay.cs` · `No23.asset` · `bossroom.prefab` · `DefaultNetworkPrefabs.asset` · 씬 3개
-삭제 = `BossArenaContext.cs` · `BossArenaWiring.cs`
-SVN = `SK_23.fbx.meta`
+**P0~P6 전량 커밋·푸시됨** — 7커밋 `26c70b4`~`66d3741`. 이전에 밀려 있던 50커밋도 함께 올라가
+`origin/feature/Boss23` 과 완전히 동기화됐다(ahead 0). 커밋 분할은 주석규약 / 앵커재매핑 /
+프리팹4종 / 레거시삭제·송전탑 / 에디터도구 / 문서 / 포그(별건) 순.
+
+🔴 **작업 트리에 의도적으로 남긴 3건 — P7 착수 전에 처리할 것**
+
+| 파일 | 무엇 | 판단 |
+|---|---|---|
+| `0.Scenes/MonsterScene.unity` | 디스크에 **`FireFloor`·`Bomb` 인스턴스 2개**(+140줄)가 들어 있는데 **Unity 메모리에는 없다.** P1·P2 스크린샷 검증용으로 놓고 저장됐다가 지운 뒤 저장을 안 한 것으로 보인다 | P7 이 이 씬을 재구성하므로 그때 정리한다. **Ctrl+S 하면 +140줄이 사라지고, 저장 없이 커밋하면 잔재가 들어간다** |
+| `0.Scenes/MainFlow/4.MapScene.unity` | `FloatingDamageSpawner` 가 **같은 설정으로 fileID 만 새로 발급**됐다(46+/46−). 기능 변화 0 | 공용 씬에 무의미한 충돌을 만들 뿐이라 커밋하지 않았다. 되돌리는 게 맞다 |
+| `ProjectSettings/MultiplayerManager.asset` | `--ignore-all-space` 로 diff 0 = **줄끝만 다시 써짐** | 실질 변경 없음 |
+
+미추적으로 남긴 것: `Docs/superpowers/**`(아트 피치 세션 산출물) · `tmp/` · 레포 루트의
+**`작성`(0바이트, 8/7 실수 생성)**.
+
+⚠️ **에디터 밖 YAML 쓰기가 UTF-8 BOM 을 심는다** — `No23.asset`·`bossroom.prefab`·
+`TwentyThree.prefab` 3건에 들어가 있었다. Unity 는 **예외 없이 그냥 읽어서** 알아채기 어렵다.
+커밋 전에 제거했고(`tail -c +4`), 제거 후 `Assets/Refresh` → 프리팹 정상 해석·컴파일 0/0 확인.
+같은 뿌리 = 교훈 #15(인코딩 확인 없이 경계 넘김).
+
+SVN = `SK_23.fbx.meta` **미커밋(팀장 액션, 위 참조)**. git 은 `50.Art` 를 무시한다.
 
 ---
 
