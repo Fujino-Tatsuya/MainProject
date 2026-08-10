@@ -36,6 +36,17 @@ public class GameManager : MonoBehaviour
     public bool IsMainGameReady { get; private set; }
 
     private bool _hideSessionConnectPanelOnLobbyLoad;
+    private bool _suppressStartupSceneLoad;
+
+    /// <summary>
+    /// <see cref="Start"/>의 타이틀 씬 자동 로드를 막는다. 개발용 단독 부팅(<c>DevSceneBooter</c>)이
+    /// 원하는 씬으로 직행할 때만 쓴다. 호출하지 않으면 종전과 동일하게 타이틀로 진입한다.
+    /// <b>반드시 Awake에서 호출할 것</b> — Start보다 앞서야 효과가 있다.
+    /// </summary>
+    public void SuppressStartupSceneLoad()
+    {
+        _suppressStartupSceneLoad = true;
+    }
 
     private void Awake()
     {
@@ -54,6 +65,12 @@ public class GameManager : MonoBehaviour
 
     private void Start()
     {
+        if (_suppressStartupSceneLoad)
+        {
+            Debug.Log("[SceneFlow] GameManager.Start 타이틀 자동 로드 억제됨(개발용 단독 부팅)");
+            return;
+        }
+
         Debug.Log($"[SceneFlow] GameManager.Start LoadScene titleSceneName={titleSceneName}");
         SetState(GameState.Title);
         SceneManager.LoadScene(titleSceneName);
