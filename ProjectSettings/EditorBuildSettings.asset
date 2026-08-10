@@ -23,24 +23,27 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/0.Scenes/MainFlow/5.ResultScene.unity
     guid: c64d229fc24da074ebc3669348c9163a
-  - enabled: 0
+  - enabled: 1
     path: Assets/0.Scenes/PlayerDashTest.unity
     guid: eb00076fd4b55fb44be3166ca583662d
-  - enabled: 0
+  - enabled: 1
     path: Assets/0.Scenes/CamaraScene.unity
     guid: 9f46cafcc53f0dd4da36d6aa538b25c4
-  - enabled: 0
+  - enabled: 1
     path: Assets/0.Scenes/PlayerBossTest.unity
     guid: 4924ae34750061c41a39b0b73f3a7438
-  - enabled: 0
+  - enabled: 1
     path: Assets/0.Scenes/MonsterScene.unity
     guid: 8066623a2cd82c946bb900abdefd5f04
-  - enabled: 0
+  - enabled: 1
     path: Assets/0.Scenes/PlayerScene.unity
     guid: c4beb9550bd2eb44896475389e20263a
-  - enabled: 0
+  - enabled: 1
     path: Assets/0.Scenes/BossScene.unity
     guid: 4df41e85c6a1dba4d9f41195a1ab45c8
+  - enabled: 1
+    path: Assets/0.Scenes/Dev/Dev_Boot.unity
+    guid: 180a2dd6e0939fed247ab6908eb0ec7d
   m_configObjects:
     com.unity.addressableassets: {fileID: 11400000, guid: 7b59ffdbd78cddf4589a8be5b4a153c8, type: 2}
     com.unity.dt.app-ui: {fileID: 11400000, guid: 99f9c9493070a9d4c979a8fec7c5a8d3, type: 2}
