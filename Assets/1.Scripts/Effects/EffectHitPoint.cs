@@ -31,42 +31,75 @@ public static class EffectHitPoint
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetWarnings() => Warned.Clear();
 
+    public enum HitPointMode
+    {
+        CameraDir,
+        Specific_Position,
+        ColliderHit
+    }
+    public struct HitPointInfo
+    {
+        public AttackHitContext ctx;
+        public Collider effectCollider;
+        public Transform fallbackAnchor;
+        public Vector3 facingHint;
+
+        public HitPointInfo(AttackHitContext _ctx, Collider _collider, Transform _anchor)
+        {
+            ctx = _ctx;
+            effectCollider = _collider;
+            fallbackAnchor = _anchor;
+            facingHint = default;
+        }
+    };
+
     /// <summary>
     /// 타격 지점과 회전을 구한다.
     /// </summary>
     /// <param name="ctx">공격이 넘겨준 기하 정보</param>
+    /// <param name="effectCollider">
+    /// 피격자의 hurtbox 콜라이더 대신 전용 effect 콜라이더에서 이펙트를 재생하고 싶을 때 쓴다.
+    /// </param>
     /// <param name="fallbackAnchor">
     /// 피격자의 기준점(가슴 높이 등). <c>hitCollider</c>가 없을 때 쓴다. null이면 <c>sourcePosition</c>으로 퇴화한다
     /// </param>
     /// <param name="facingHint">
     /// 방향을 직접 아는 호출자용(예: 투사체 진행 방향의 반대). 0이면 무시하고 아래 순서로 추론한다
     /// </param>
-    public static Pose Resolve(AttackHitContext ctx, Transform fallbackAnchor = null, Vector3 facingHint = default)
+    public static Pose Resolve(HitPointMode mode, HitPointInfo hitInfo)
     {
-        Vector3 origin = ctx.sourcePosition;
-        Collider collider = ctx.hitCollider;
+        Vector3 origin = hitInfo.ctx.sourcePosition;
+        Collider collider = (hitInfo.effectCollider == null) ? hitInfo.ctx.hitCollider : hitInfo.effectCollider;
 
-        Vector3 point;
-        Vector3 center;
+        Vector3 point = origin;
+        Vector3 center = origin;
 
-        if (collider != null)
+        switch (mode)
         {
-            Bounds bounds = collider.bounds;
-            center = bounds.center;
-            point = SurfacePoint(collider, bounds, origin);
-        }
-        else if (fallbackAnchor != null)
-        {
-            point = fallbackAnchor.position;
-            center = point;
-        }
-        else
-        {
-            point = origin;
-            center = origin;
+            case HitPointMode.CameraDir:
+            {
+                Bounds bounds = collider.bounds;
+                center = bounds.center;
+                point = SurfacePoint(collider, bounds, Camera.main.transform.position);
+                hitInfo.facingHint = Vector3.Normalize(collider.transform.position - Camera.main.transform.position);
+                break;
+            }
+            case HitPointMode.Specific_Position:
+            {
+                point = hitInfo.fallbackAnchor.position;
+                center = point;
+                break;
+            }
+            case HitPointMode.ColliderHit:
+            {
+                Bounds bounds = collider.bounds;
+                center = bounds.center;
+                point = SurfacePoint(collider, bounds, origin);
+                break;
+            }
         }
 
-        return new Pose(point, Facing(origin, point, center, ctx.sourceTransform, facingHint));
+        return new Pose(point, Facing(origin, point, center, hitInfo.ctx.sourceTransform, hitInfo.facingHint));
     }
 
     /// <summary>콜라이더 표면에서 <paramref name="origin"/>에 가장 가까운 점.</summary>

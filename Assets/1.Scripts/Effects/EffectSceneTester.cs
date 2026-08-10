@@ -188,8 +188,8 @@ public class EffectSceneTester : MonoBehaviour
         if (!Ready(oneShot, "oneShot")) return;
         if (!TryBuildHitContext(out AttackHitContext context)) return;
 
-        Pose pose = EffectHitPoint.Resolve(context, followTarget);
-        EffectManager.Instance.Play(oneShot, pose.position, pose.rotation);
+        //Pose pose = EffectHitPoint.Resolve(context, followTarget);
+        //EffectManager.Instance.Play(oneShot, pose.position, pose.rotation);
     }
 
     private bool TryBuildHitContext(out AttackHitContext context)
@@ -224,17 +224,17 @@ public class EffectSceneTester : MonoBehaviour
         if (target == null) return;
 
         Transform source = spawnPoint != null ? spawnPoint : transform;
-        Pose pose = EffectHitPoint.Resolve(new AttackHitContext(source.position, source, target), followTarget);
+        //Pose pose = EffectHitPoint.Resolve(new AttackHitContext(source.position, source, target), followTarget);
 
         Gizmos.color = Color.yellow;
         Gizmos.DrawWireSphere(source.position, 0.08f);
-        Gizmos.DrawLine(source.position, pose.position);
+        //Gizmos.DrawLine(source.position, pose.position);
 
         Gizmos.color = Color.cyan;
-        Gizmos.DrawSphere(pose.position, 0.06f);
+        //Gizmos.DrawSphere(pose.position, 0.06f);
 
         Gizmos.color = Color.green;
-        Gizmos.DrawRay(pose.position, pose.rotation * Vector3.forward * 0.5f);
+        //Gizmos.DrawRay(pose.position, pose.rotation * Vector3.forward * 0.5f);
     }
 
     #endregion

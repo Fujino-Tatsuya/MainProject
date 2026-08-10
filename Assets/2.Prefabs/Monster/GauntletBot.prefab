@@ -504,6 +504,9 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 64
   maxDetectionResults: 16
+  hitVFXCollider: {fileID: 2139675850464708597}
+  hitPointMode: 2
+  hitVFXType: 1
   bodyCollider: {fileID: 8347798712471976537}
   punch01Weight: 35
   punch02Weight: 35

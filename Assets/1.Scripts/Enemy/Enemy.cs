@@ -1,5 +1,7 @@
-using UnityEngine;
 using Unity.Behavior;
+using UnityEngine;
+using static EffectCatalog;
+using static EffectHitPoint;
 
 public class Enemy : Unit
 {
@@ -17,6 +19,12 @@ public class Enemy : Unit
     [Header("시간제어 컴포넌트")]
     [SerializeField] MonsterTimeController _monsterTimeController;
 
+    [Header("피격 이펙트 제어")]
+    [SerializeField] Collider hitVFXCollider;
+    [SerializeField] HitPointMode hitPointMode;
+    [SerializeField] HitVFXType hitVFXType;
+    EffectEntry _slashFX;
+
     public override void OnNetworkSpawn()
     {
         // ⚠️ base 호출이 빠져 있었다. Unit.OnNetworkSpawn이 HP/쉴드 복제 구독과 HitFlash(피격 빨간
@@ -33,6 +41,8 @@ public class Enemy : Unit
 
         ApplyOptionalSpeed(bt, "WalkSpeed", moveSpeed, out WalkSpeed);
         ApplyOptionalSpeed(bt, "ChaseSpeed", chaseSpeed, out ChaseSpeed);
+
+
     }
 
     /// <summary>
@@ -61,10 +71,16 @@ public class Enemy : Unit
         cached.Value = value;
     }
 
-    public override void TakeDamage(AttackInfo attackInfo)
+    public override bool ReceiveAttack(AttackInfo attackInfo, AttackHitContext hitContext)
     {
-        base.TakeDamage(attackInfo);
+        _slashFX = EffectManager.Instance.Catalog.GetHitEffect(hitVFXType);
 
-        // 그로기 체크..
+        TakeDamage(attackInfo);
+
+        HitPointInfo hitPointInfo = new HitPointInfo(hitContext, hitVFXCollider, hitVFXCollider.transform);
+        Pose pose = EffectHitPoint.Resolve(hitPointMode, hitPointInfo);
+        EffectManager.Instance.Play(_slashFX, pose.position, pose.rotation);
+
+        return true;
     }
 }

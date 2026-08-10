@@ -2,6 +2,8 @@ using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.AI;
+using static EffectCatalog;
+using static EffectHitPoint;
 
 // 몬스터 코드 FSM 두뇌. 서버 권한.
 //
@@ -28,6 +30,12 @@ public class MonsterBase : Unit
     [Header("타게팅")]
     [SerializeField] protected LayerMask playerMask;         // 인지 대상(플레이어) 레이어
     [SerializeField] protected int maxDetectionResults = 16;
+
+    [Header("피격 이펙트 제어")]
+    [SerializeField] Collider hitVFXCollider;
+    [SerializeField] HitPointMode hitPointMode;
+    [SerializeField] HitVFXType hitVFXType;
+    EffectEntry _slashFX;
 
     [Header("사망 시 비활성화할 콜라이더(선택)")]
     [SerializeField] protected Collider bodyCollider;
@@ -663,6 +671,13 @@ public class MonsterBase : Unit
             }
             TryEnterKnockback(dir.normalized, attackInfo);
         }
+
+        // 몬스터 피격 이펙트
+        _slashFX = EffectManager.Instance.Catalog.GetHitEffect(hitVFXType);
+
+        HitPointInfo hitPointInfo = new HitPointInfo(hitContext, hitVFXCollider, hitVFXCollider.transform);
+        Pose pose = EffectHitPoint.Resolve(hitPointMode, hitPointInfo);
+        EffectManager.Instance.Play(_slashFX, pose.position, pose.rotation);
 
         return resolved;
     }

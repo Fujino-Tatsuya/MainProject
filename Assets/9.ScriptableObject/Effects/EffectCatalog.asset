@@ -12,6 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 149db318c12b3c94d90e7d954fbed852, type: 3}
   m_Name: EffectCatalog
   m_EditorClassIdentifier: Assembly-CSharp::EffectCatalog
-  <HitSpark>k__BackingField: {fileID: 11400000, guid: 0de3ddd163483824ea840dc6deeb02ef, type: 2}
-  <HitBlunt>k__BackingField: {fileID: 11400000, guid: 0b8cf01c89d2ce747828ffec8c104ac3, type: 2}
+  <HitEffect1>k__BackingField: {fileID: 11400000, guid: 8d4dad2a5db0220479cb21b1f3bec7cd, type: 2}
+  <HitEffect2>k__BackingField: {fileID: 11400000, guid: 294044cde06b4314895367caef081a6c, type: 2}
+  <HitEffect3>k__BackingField: {fileID: 11400000, guid: 95bc2f495f06df446a3400d6d765c175, type: 2}
+  <HitEffect4>k__BackingField: {fileID: 11400000, guid: 0aec711001a248348ae18f18058b84ed, type: 2}
+  <HitEffect5>k__BackingField: {fileID: 11400000, guid: 5b297260b68709f4eba95575765449e4, type: 2}
   <BossRage>k__BackingField: {fileID: 0}

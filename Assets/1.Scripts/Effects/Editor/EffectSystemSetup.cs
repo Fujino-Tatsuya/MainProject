@@ -118,7 +118,7 @@ public static class EffectSystemSetup
             Object.Instantiate(prefab);
         }
 
-        EffectSmokeTestRunner.Launch();
+        //EffectSmokeTestRunner.Launch();
     }
 
     private static void CreateManagerPrefab(EffectCatalog catalog)
