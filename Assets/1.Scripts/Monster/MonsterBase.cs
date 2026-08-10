@@ -99,7 +99,9 @@ public class MonsterBase : Unit
         if (rangedAttack == null) rangedAttack = GetComponentInChildren<MonsterRangedAttack>();
 
         // 공격 애니 이벤트 릴레이 자동 부착(Animator 오브젝트에 — 이벤트는 같은 GO의 메서드만 호출 가능).
-        // 클립에 OnAttackHit/OnAttackEnd 이벤트가 없으면 HandleAttack 타이머가 폴백이므로 무해.
+        // 🔴 부착이 곧 동작은 아니다. OnAttackHit 은 **폴백이 없어서**, 클립에 그 이벤트가 없으면
+        //    그 공격은 데미지를 내지 못한다(OnAttackEnd 만 attackDuration 타이머가 폴백한다).
+        //    비대칭인 이유는 HandleAttack 주석 참조.
         if (animator != null && !animator.TryGetComponent(out MonsterAnimationEventRelay _))
             animator.gameObject.AddComponent<MonsterAnimationEventRelay>();
 

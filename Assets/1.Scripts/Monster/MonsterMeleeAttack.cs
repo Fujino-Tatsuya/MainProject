@@ -5,8 +5,11 @@ using UnityEngine;
 // OverlapAttack과 동일한 ColliderInfo 오버랩 패턴을 따르되, 넉백까지 책임진다는 점이 다르다.
 //
 // 히트 판정 진입점 Hit():
-//  - 서버 애니메이션 이벤트 프레임에서 호출하거나(권장, Animator 확정 후),
-//  - Animator/이벤트가 아직 없으면 MonsterBase가 선딜(attackWindup) 후 코드로 직접 호출한다.
+//  - 애니메이션 이벤트 OnAttackHit → MonsterBase.NotifyAttackHit → PerformAttackHit 경로가 기본이다.
+//    🔴 **타이머 폴백은 없다** — 클립에 이벤트가 없으면 이 공격은 데미지를 내지 못한다
+//    (attackWindup 은 더 이상 base 가 소비하지 않는다. MonsterBase.HandleAttack 참조).
+//  - 그 외에 파생 클래스가 자기 틱에서 직접 부르는 경로가 있다(지속 판정용 —
+//    SpinnerBot 스핀, 23호 Dash/RageDash. BeginHitWindow 로 유닛당 1회를 보장한다).
 // 두 경로 모두 서버에서만 실효(BaseAttack.IsServer 가드 + TryResolveHit 내부 가드).
 public class MonsterMeleeAttack : BaseAttack
 {

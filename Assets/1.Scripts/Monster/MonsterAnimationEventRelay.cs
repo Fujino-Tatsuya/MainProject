@@ -8,8 +8,16 @@ using UnityEngine;
 // (MonsterBase.OnNetworkSpawn에서 자동 부착 — 모든 피어. 실효 처리는 서버에서만.)
 //
 // 클립에 삽입할 이벤트 함수명:
-//   - OnAttackHit : 타격 프레임(히트 판정). 없으면 MonsterBase가 attackWindup 타이머로 폴백.
-//   - OnAttackEnd : 공격 종료 프레임(상태 이탈). 없으면 attackDuration 타이머로 폴백.
+//   - OnAttackHit : 타격 프레임(히트 판정). 🔴 **폴백이 없다** — 이 이벤트가 클립에 없으면
+//                   그 공격은 데미지를 내지 못한다(플레이어 DefaultAttackController와 같은 규약).
+//   - OnAttackEnd : 공격 종료 프레임(상태 이탈). 없으면 attackDuration 타이머가 폴백한다.
+//
+// 🔴 히트와 종료의 폴백 정책이 **비대칭**인 이유: 히트에 타이머 폴백을 두면 나중에 클립에
+//    이벤트를 심는 순간 같은 공격이 두 번 맞는다. 종료는 폴백이 없으면 Attack 상태에 영구
+//    고착되므로 안전망이 필요하다. (MonsterBase.HandleAttack 참조)
+//
+// ⚠️ 이름이 틀린 이벤트는 예외 없이 조용히 무시된다(수신자 없음 경고만 뜬다).
+//    23호 보스의 fbx 클립이 아직 구 이름(TryGrabEvent 등)을 쓰고 있는 것이 그 예다.
 [DisallowMultipleComponent]
 public class MonsterAnimationEventRelay : MonoBehaviour
 {
