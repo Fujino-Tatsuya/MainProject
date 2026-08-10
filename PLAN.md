@@ -1,424 +1,200 @@
-# CURRENT PLAN — 보스 FSM 지원 2건: 인터럽트 식별자 + 캐리 소켓 일반화 (2026-08-07)
+# CURRENT PLAN — DevSceneBooter: 씬 이름 한 줄로 원하는 씬 부팅 (2026-08-10)
 
-> 상태: **구현 진행 중**(사용자 지시 = PLAN 작성 후 바로 착수).
-> 브랜치 `feature/InterruptSkill-CarrySocket` (base `MainProject/development` `6dbc1c34a`).
-> 요청 출처: 경석 → 은희 인계문 `C:\Users\user\Desktop\handoff-player-carry-socket.md` (기한 8/7 17:00).
-> 담당: 은희(플레이어 계통). 보스 쪽 소비 코드는 경석이 작성한다.
+> 상태: **승인 대기**. 구현 착수 전.
+> 요청자·담당: 은희. `GameManager.cs` 수정 포함 — 2026-08-03 계획서는 이 파일을 팀장 영역이라 봤으나,
+> 은희 판단으로 진행한다(추가 4줄·기존 경로 무영향).
+> 브랜치 예정: `feature/DevSceneBooter` (base `development`), 레인 `dash`.
+> 전신 계획: `git show c98710024:PLAN.md` — "개발 진입점 단일화 + 맵 단독 Play 부팅"(목표 2만 이행됨).
 
 ## 목표
 
-보스 FSM 재작성이 플레이어 쪽에 요구하는 두 계약을 **기존 동작 회귀 없이** 제공한다.
+**`DevSceneBooter`의 `Scene` 필드에 씬 이름을 적고 Dev_Boot 씬을 Play하면, 그 씬이 정식 흐름과
+동일한 상태로 부팅된다** — 호스트 기동, 플레이어 스폰, MainGameReady 발행, 액티브 씬 지정까지.
 
-- **A.** 보스가 서버에서 "이 히트 = 인터럽트 스킬"을 판별할 수 있다. ✅ 구현·컴파일 검증 완료
-- **B'.** 서버가 플레이어를 잠시 구속할 수 있다 — 잡기(소켓 종속)와 돌진 밀기(정면 추종)를
-  `Restrained` 한 상태의 두 모드로. ✅ 구현·컴파일 검증 완료
-  (원 요청 B "캐리 소켓 일반화"는 폐기. 경위는 §접근 B 참고)
+기존 정식 흐름(BootStrap→Title→Lobby→Loading→MapScene)은 **한 줄도 바뀌지 않는다.**
 
-## 현재 이해 (코드 확인 완료)
+## 현재 이해 (코드 실측 완료)
 
 | 사실 | 근거 |
 |---|---|
-| `AttackType`에 우클릭 슬롯 값이 없다 | [BaseAttack.cs:4](Assets/1.Scripts/Unit/Weapon/BaseAttack.cs:4) |
-| 🔴 **플레이어 스킬은 `BaseAttack`을 타지 않는다** — `AttackInfo`를 직접 만들어 `ReceiveAttack` 호출 | [FirstMeleeMainSkill.cs:114](Assets/1.Scripts/Player/Skill/FirstMeleeMainSkill.cs:114), [FirstMeleeUltimateSkill.cs:58](Assets/1.Scripts/Player/Skill/FirstMeleeUltimateSkill.cs:58) |
-| 🔴 **단죄의 방패가 미구현** — `interruptSkill` 슬롯이 비어 있다 | [PlayerSkillController.cs:22](Assets/1.Scripts/Player/Skill/PlayerSkillController.cs:22) |
-| `InterruptAttack` 앵커 노드는 컴포넌트 0개의 맨 Transform | [Paladin.prefab:5806](Assets/2.Prefabs/Player/Paladin/Paladin.prefab:5806) |
-| 현재 우클릭 = `PlayerInterruptState`(전방 돌진 + Animator 트리거), **데미지 0** | [PlayerStateController.cs:604](Assets/1.Scripts/Player/PlayerStateController.cs:604) |
-| 슬롯에 스킬이 배정되면 위 상태 경로는 자연 대체된다 | [PlayerStateController.cs:516-520](Assets/1.Scripts/Player/PlayerStateController.cs:516) |
-| `AttackType`은 **2곳**에서 직렬화된다 → 값은 반드시 끝에 추가 | [BaseAttack.cs:73](Assets/1.Scripts/Unit/Weapon/BaseAttack.cs:73), [Bomb.cs:6](Assets/1.Scripts/Enemy/Boss/Bomb.cs:6) (`Bomb.cs:12`에서 값 비교) |
-| `PlayerGrabbedState`가 `GrabController` 구체 타입으로 소켓을 찾는다 | [PlayerStateController.cs:700-703](Assets/1.Scripts/Player/PlayerStateController.cs:700) |
-| `BeginGrabbedByInstigator` 호출부는 1곳뿐 | [GrabController.cs:208](Assets/1.Scripts/Enemy/Boss/GrabController.cs:208) |
-| 🟡 잡기와 캐리가 **상태 하나(`Grabbed`)를 공유**한다 — `CanReceiveGrab`이 이미 Grabbed면 거부하고, `EndGrabbed()`는 시작 주체를 안 본다 | [PlayerStateController.cs:344-346](Assets/1.Scripts/Player/PlayerStateController.cs:344), [:166](Assets/1.Scripts/Player/PlayerStateController.cs:166) |
-| 스킬 애니 이벤트 릴레이는 존재하나 **Hit 이벤트를 쓰는 스킬이 아직 없다**(Q=홀드틱, E=판정없음, R=채널) | [PlayerAnimationEventRelay.cs:43](Assets/1.Scripts/Player/PlayerAnimationEventRelay.cs:43) |
-| Garen Animator에 `Interrupt` 상태가 존재 | `Assets/4.Animations/Player/Garen/PlayerAnimatorController.controller` |
-
-## 명시적 가정 (설계 문서 부재 — 확정되면 SO 수치만 조정)
-
-단죄의 방패의 거동 스펙은 `Docs/design/`에 없다(`character_garen.md`는 전부 TBD, 인계문이 참조한
-`boss-fsm-design.md`는 존재하지 않음). 아래를 가정하고 진행한다.
-
-1. **단죄의 방패 = 짧은 전방 방패 강타.** 데미지 1회 + `AttackType.Interrupt` 태그. 카운터 창·정면 각도·
-   그로기 전이는 **전부 보스 쪽 책임**(인계문 §A 명시)이므로 플레이어는 태그만 싣는다.
-   - `Docs/design/level-system.md:64-65`의 "가붕이 = 패링" 해석은 채택하지 않는다 — 방어 창 기반 패링은
-     "히트를 보스에 보낸다"는 인계문 계약과 어긋나고 범위가 훨씬 크다. 기획 확정 시 재논의.
-2. **애니메이션 클립을 수정하지 않는다.** 판정 타이밍은 SO의 `hitDelay` 타이머로 잡고,
-   `Hit` 애니 이벤트가 나중에 심어지면 그쪽이 우선하도록 **둘 다 받되 1회만 발동**한다.
-   (클립은 아트/SVN 관할이고, 현재 어떤 스킬도 Hit 이벤트를 안 쓴다 = 미검증 경로.)
-3. 수치는 전부 임시값. `attackDamageMultiplier`·쿨타임은 기획 확정 전 placeholder.
+| 매니저 4종은 `0.BootStrapScene`에만 있다 | NetworkManager·GameManager·AudioManager·EventSystem 프리팹 인스턴스 |
+| `4.MapScene`에 NetworkManager·ForProfile 인스턴스 **0개** (GameManager 참조 1건은 버튼 OnClick이 프리팹 에셋을 가리키는 것) | 씬 GUID 스캔 |
+| **강제 타이틀 이동의 정체** = 조건 없는 `LoadScene(titleSceneName)` | [GameManager.cs:59](Assets/1.Scripts/Managers/GameManager.cs:59) |
+| ⭐ **로딩 컨트롤러는 `loadingSceneName`이 아니라 `targetSceneName` 기준으로 반응한다** → 로딩씬을 생략해도 스폰·완료 체인이 그대로 돈다 | [:272](Assets/1.Scripts/Loading/NetworkLoadingFlowController.cs:272), [:296](Assets/1.Scripts/Loading/NetworkLoadingFlowController.cs:296), [:338](Assets/1.Scripts/Loading/NetworkLoadingFlowController.cs:338) |
+| 타겟 씬 로드 완료 → `SpawnAllPlayersOnce()` → `BroadcastAverageProgress()` → `_phase==LoadingGame && avg>=1` 이면 완료 코루틴 → `NotifyMainGameReady()` | [:376](Assets/1.Scripts/Loading/NetworkLoadingFlowController.cs:376), [:692](Assets/1.Scripts/Loading/NetworkLoadingFlowController.cs:692), [:553](Assets/1.Scripts/Loading/NetworkLoadingFlowController.cs:553) |
+| 로비가 씬에 없으면 `CanStartFromLobby()`는 그냥 통과 | [:171](Assets/1.Scripts/Loading/NetworkLoadingFlowController.cs:171) |
+| `SpawnAllPlayers`는 public이고 `PlayerObject != null`이면 스킵 → **중복 호출 안전** | [:384](Assets/1.Scripts/Loading/NetworkLoadingFlowController.cs:384), [:420](Assets/1.Scripts/Loading/NetworkLoadingFlowController.cs:420) |
+| `NotifyMainGameReady`는 멱등 | [GameManager.cs:81](Assets/1.Scripts/Managers/GameManager.cs:81) |
+| 🔴 `MarkMainGameStart()`는 **멱등이 아니다** — 부를 때마다 재스탬프 | [NetworkClock.cs:125](Assets/1.Scripts/Network/NetworkClock.cs:125) |
+| `GameManager`는 `4.MapScene`일 때만 자동으로 `MarkMainGameStart` | [GameManager.cs:216](Assets/1.Scripts/Managers/GameManager.cs:216) |
+| MainGameReady 실소비자 = 플레이어 **AudioListener 활성화**, InGame BGM | [PlayerAudioListenerActivator.cs:32](Assets/1.Scripts/Player/PlayerAudioListenerActivator.cs:32), [MapSceneManager.cs:58](Assets/1.Scripts/Managers/MapSceneManager.cs:58) |
+| 컨트롤러는 **소스 씬 언로드 중에만** `SetActiveScene`을 한다 → 로딩씬 생략 시 `_sourceSceneName`이 비어 액티브 씬이 Dev_Boot에 남는다 | [:961](Assets/1.Scripts/Loading/NetworkLoadingFlowController.cs:961), [:984](Assets/1.Scripts/Loading/NetworkLoadingFlowController.cs:984) |
+| 🔴 테스트 씬 6종이 빌드 목록 `enabled: 0` → 런타임 `LoadScene` 불가 | `ProjectSettings/EditorBuildSettings.asset` |
+| 🔴 빌드 스크립트는 **EditorBuildSettings의 enabled 씬 전부**를 플레이어에 넣는다 | [BuildWindowsPlayer.cs:48](Assets/1.Scripts/Editor/BuildWindowsPlayer.cs:48) |
 
 ## 접근
 
-### A. 인터럽트 식별자 + 단죄의 방패
+### 1. 새 씬 `Assets/0.Scenes/Dev/Dev_Boot.unity` (빌드 목록에 넣지 않는다)
 
-1. **인터럽트는 `AttackType`이 아니라 `AttackInfo.isInterruptAttack`(기존 `isGroggyAttack` 개명)이 싣는다.**
-   - 이유: `AttackType`은 "어느 출처가 쐈나"이고 인터럽트는 그와 **직교한 능력**이다. enum 값으로 넣으면
-     "Q 슬롯인데 인터럽트인 스킬"을 표현할 수 없고, 같은 사실을 두 곳에서 말하게 된다.
-   - **플래그는 하나만 둔다.** `AttackInfo`는 공격자가 아는 사실("인터럽트다")만 싣고,
-     **소비 방식은 수신측이 정한다** — 몬스터/중간보스는 `maxGroggyCount`까지 누적→그로기
-     ([MonsterBase.cs:775](Assets/1.Scripts/Monster/MonsterBase.cs:775) · [BossBase.cs:375](Assets/1.Scripts/Monster/Boss/BossBase.cs:375)),
-     보스 No.23은 카운터 창·정면 각도 판정(경석). `Docs/design/level-system.md:70`의 분담과 일치한다.
-   - 곁들여 **`AttackType`을 `{None, Default, Skill}`로 축소** — Q/E/R을 구분해 읽는 코드가 없었다.
-     정수값 `None=0`·`Default=1`은 **고정**(기존 에셋 25곳과 `Bomb.attackType=1`이 여기 걸려 있다).
-   - **`BaseAttack`의 저작 토글은 삭제.** 인터럽트를 켜는 주체는 스킬뿐이고 스킬은 `BaseAttack`을 안 탄다 —
-     켤 수 없는 체크박스는 거짓 약속이다.
-2. `FirstMeleeInterruptSkillData : PlayerSkillData` 신설 — `hitDelay`, `skillDuration`, `maxHitResults`.
-3. `FirstMeleeInterruptSkill : PlayerInstantSkill` 신설 — `Slot => Interrupt`.
-   서버가 `hitDelay` 경과(또는 `Hit` 애니 이벤트) 시 `HitboxAnchor` 기준 Overlap →
-   `new AttackInfo(damageSnapshot, AttackType.Interrupt)` → `ReceiveAttack`. `skillDuration`에 자체 종료.
-   판정은 **1회만**(`hasResolvedHit` 래치).
-4. SO 에셋 `Assets/9.ScriptableObject/Player/Garen/FirstMeleeInterruptSkillData.asset`.
-5. `Paladin.prefab` 배선: `InterruptAttack` 노드에 `BoxCollider`+`ColliderInfo`,
-   루트에 `FirstMeleeInterruptSkill`, `PlayerSkillController.interruptSkill` 연결.
+**`0.BootStrapScene`을 그대로 복제**하고 `DevSceneBooter` 오브젝트 하나만 추가한다.
+BootStrap은 매니저 프리팹 인스턴스 4개가 루트에 있는 373줄짜리 단순 씬이라 복제가 깔끔하다
+(NetworkManager / GameManager / AudioManager / EventSystem — AudioManager·EventSystem을 빼면
+BGM·UI 입력이 죽는다. `c0d4457d3`에서 부팅 씬 단일 소유로 옮겨졌다).
 
-### B. ~~캐리 소켓 일반화~~ → **폐기.** 돌진이 넉백+기절 방식으로 바뀌며 불필요해졌다 (2026-08-07)
+복제이므로 매니저 구성이 BootStrap과 자동으로 일치한다 — 초안에서 우려했던 "5번째 매니저 추가 시
+드리프트"는 최초 구성이 동일해지므로 위험이 줄지만, **향후 BootStrap에 매니저가 추가되면 Dev_Boot에도
+수동 반영해야 한다**는 점은 남는다.
 
-`ICarrySocketProvider` 코드는 원복했다. 소켓 제공자가 `GrabController` 하나뿐이라 `Kind` 탐색 자체가 무의미했다.
+### 2. `DevSceneBooter.cs` (신규, `Assets/1.Scripts/Dev/`)
 
-### B'. `Restrained` — 서버 구속의 단일 상태 (경석 개정 1판 승인)
+```
+[SerializeField] string scene = "4.MapScene";   // ← 여기만 바꾼다
+[SerializeField] bool  autoBootOnPlay = true;
+[SerializeField] GameObject playerPrefabOverride;   // 비우면 NetworkManager 프리팹 기본값
+```
 
-넉백+기절만으로는 "밀고 가기"가 안 된다(§리스크 C-1 — `Unit.Knockback`은 임펄스 1회, duration 개념이 없다).
-그래서 잡기와 밀기를 **한 상태의 두 모드**로 묶는다.
+`Awake()`: `FindFirstObjectByType<GameManager>()?.SuppressStartupSceneLoad()`
+→ `Instance`가 아니라 `Find`를 쓰는 이유 = 두 Awake의 실행 순서는 보장되지 않지만, 오브젝트 존재는
+씬 로드 시점에 보장된다. `Start()`는 모든 `Awake` 뒤라 억제가 반드시 선행된다.
 
-6. `PlayerActionState.Grabbed` → **`Restrained`** 개명(정수값 유지). `PlayerGrabbedState` → `PlayerRestrainedState`.
-   `GrabInteractionContext` → `RestraintContext`, `IGrabInteractionReceiver` → `IRestraintReceiver`.
-7. `enum RestraintMode : byte { Carry = 0, Push = 1 }` — `Tick()`의 목표 자세만 갈린다:
+`Start()` → 코루틴:
+1. `scene`이 빌드 목록에 있고 enabled인지 `SceneUtility`로 검사 → 아니면 **조치 가능한 에러 로그** 후 중단
+2. `flow.SetEditorDefaults("2.LoadingScene", scene, 0f, 0f)`
+3. `launcher.StartHost()` → 실패 시 에러 후 중단
+4. `IsListening && IsServer && SceneManager != null` 까지 대기
+5. `nm.SceneManager.LoadScene(scene, Additive)` — `SceneEventInProgress`면 정식 경로와 동일하게 재시도
+6. 씬 `isLoaded` 까지 대기 → **`SceneManager.SetActiveScene(scene)`** (컨트롤러가 안 해주는 유일한 일)
+7. 한 프레임 뒤 안전망: 호스트에 `PlayerObject`가 없으면 `flow.SpawnAllPlayers()`,
+   `NetworkClock.HasMainGameStarted`가 false면 `MarkMainGameStart()` (재스탬프 방지),
+   `GameManager.Instance.NotifyMainGameReady()` (멱등)
+   → 6·7은 이벤트 순서에 의존하지 않게 만들기 위한 것이고, 전부 중복 호출 안전이 확인된 API다.
 
-   | 모드 | 추종 대상 |
-   |---|---|
-   | `Carry` | `GrabController.GrabSocket` (**기존과 동일**) |
-   | `Push` | `instigator.position + instigator.forward × frontOffset` |
+8. **Dev_Boot 씬을 로컬 언로드한다** (정식 흐름이 소스=로비 씬을 언로드하는 것과 대칭).
+   반드시 7단계의 `SetActiveScene` **뒤에** 해야 한다(액티브 씬을 먼저 옮기지 않으면 언로드 불가).
+   Dev_Boot은 NGO가 아니라 로컬 로드된 씬이므로 `SceneManager.UnloadSceneAsync`를 쓴다
+   (컨트롤러의 [UnloadLocalScene](Assets/1.Scripts/Loading/NetworkLoadingFlowController.cs:932) 과 동일한 방식).
 
-   **Push는 소켓도 방향/속도 동기화도 안 쓴다.** 시전자 루트가 `NetworkTransform`으로 복제되므로 오너
-   클라에서 월드 위치가 저절로 맞는다 — "돌진 소켓은 애니메이션으로 안 움직이는 고정 자식이어야 한다"는
-   제약이 사라진다. Y는 **진입 시점 값으로 고정**한다(캐리 중 `isKinematic`이라 중력이 없고,
-   시전자 Y를 그대로 쓰면 피벗 높이 차이로 플레이어가 조용히 뜨거나 잠긴다).
-8. **`Push`만 슈퍼아머를 거부한다** — `Unit.Knockback`과 같은 규칙(슈퍼아머면 안 밀린다)을
-   플레이어 쪽 한 곳에 둔다. `Carry`는 원래 슈퍼아머와 무관하게 걸렸고 바꾸면 보스 Grab 체인이 회귀한다.
-   판정은 **서버 진입(`TryReceiveRestraint`)에서만** 한다 — 오너가 다시 판정하면 복제 지연 시 상태가 갈린다.
-9. **`BeginRestrainedByInstigator`가 `bool`을 반환한다.** 시전자는 이 값으로 후처리를 가른다
-   (돌진이 벽에 닿았을 때 **실제로 밀린 대상만** 기절). 데미지는 이 값과 무관한 별도 경로.
-10. `BeginGrabbedByInstigator`/`EndGrabbedByInstigator`는 **`Carry` 호환 래퍼로 유지** —
-    [GrabController.cs:208](Assets/1.Scripts/Enemy/Boss/GrabController.cs:208)·[:228](Assets/1.Scripts/Enemy/Boss/GrabController.cs:228)은 무수정이다.
-11. 🔴 **`followTarget == null` 널 허용을 유지한다** — 위치 추종만 건너뛰고 물리 위임·입력 차단은 그대로 간다.
-    보스에 잡기 소켓이 아직 없는 동안 "제자리에 붙잡힘"이 이 성질로 성립 중이다(경석 요청).
+   **매니저 생존 실측 완료** — 언로드해도 4종 전부 살아남는다:
+   NetworkManager = NGO가 `OnEnable`에서 `DontDestroyOnLoad`(부모 없을 때. `Library/PackageCache/
+   com.unity.netcode.gameobjects@aaabf07f/Runtime/Core/NetworkManager.cs:1087`) /
+   [GameManager.cs:51](Assets/1.Scripts/Managers/GameManager.cs:51) /
+   [AudioManager.cs:42](Assets/1.Scripts/Sound/AudioManager.cs:42) /
+   [PersistentEventSystem.cs:28](Assets/1.Scripts/UI/PersistentEventSystem.cs:28).
+   → **전제: Dev_Boot에서 매니저 4종은 반드시 루트 오브젝트로 둔다**(NetworkManager는 부모가 있으면
+   `DontDestroyOnLoad`가 걸리지 않는다).
 
-## 네트워크 권한 가정
+### 3. 기존 파일 수정 1건 (**호출되지 않으면 완전히 무영향**)
 
-- 단죄의 방패: 오너 입력 → 서버 승인(`PlayerSkillController`) → 서버만 판정. 기존 스킬 계약과 동일.
-- `Restrained`: **상태 전이·해제·슈퍼아머 판정 = 서버**, **위치 추종 실행 = 오너**(`IsMovementAuthority`).
-  서버가 위치를 직접 쓰지 않으므로 "플레이어 이동은 오너 권한"(networking.md) 원칙이 유지된다.
-  `Transform`은 복제 불가이므로 RPC엔 **모드(byte) + offset(float)만** 싣는다.
-  입력 차단은 별도 계통이 아니라 **상태 진입만으로** 성립한다(`CanMove`/`CanUseSkill`이 `Idle|Move` 한정).
+- `GameManager.cs` — `SuppressStartupSceneLoad()` + `Start()`의 early-return. 4줄.
+- `NetworkLoadingFlowController.cs`는 수정하지 않고 기존 `SetEditorDefaults(...)`를 재사용한다.
+  Dev 경로는 `StartGameLoading()`을 호출하지 않으므로 로비 준비 게이트는 사용되지 않는다.
 
-## 리스크 / 한계
+### 4. 빌드 씬 목록 — 테스트 씬 6종 `enabled: 1`
 
-- 🟡 **잡기와 돌진 밀기가 `PlayerActionState.Restrained`를 공유한다.** 구속 중 재진입은 조용히 거부되고
-  (`CanReceiveRestraint`), `End`는 시작 주체를 구분하지 않는다. 보스 1기 기준 무해 — **계약으로 명시**한다.
-- 🔴 **C-1: `Unit.Knockback`은 임펄스 1회다.** `AttackInfo`의 `knockbackDuration`·`staggerDuration`은
-  `MonsterBase`만 소비하고 플레이어 수신 경로는 무시한다. 이 사실 때문에 보스 돌진이 넉백이 아니라
-  `Restrained.Push`로 간다(경석 확인·설계 변경 완료).
-- 🟡 구속 중 `detectCollisions = false`라 플레이어가 벽을 통과한다.
-  **벽 판정은 보스 책임** — 캐리 중이면 벽에서 떨어진 지점에서 돌진을 정지한다(경석 수용).
-- 🟡 단죄의 방패 판정 타이밍이 애니 클립과 어긋날 수 있다(타이머 기반). SO 수치로 맞추고,
-  정밀 타이밍이 필요하면 클립에 `HandleSkillEvent(0)` 이벤트를 심는다.
-- 🔴 프리팹 배선은 Unity 재임포트가 필요하다 — 인스펙터에서 컴포넌트가 보이는지 육안 확인 필수.
+`BossScene`·`MonsterScene`·`PlayerScene`·`PlayerBossTest`·`PlayerDashTest`·`CamaraScene`.
+런타임 로드의 전제 조건이라 피할 수 없다.
+
+⚠️ **인수인계 사항 — 빌드 스크립트는 은희가 직접 수정한다(2026-08-10 결정).**
+[BuildWindowsPlayer.cs:48](Assets/1.Scripts/Editor/BuildWindowsPlayer.cs:48)이 `EditorBuildSettings`의
+enabled 씬 전부를 플레이어에 담으므로, **그 수정 전까지는 테스트 씬 6종이 빌드에 실려 나간다.**
+이 계획은 `BuildWindowsPlayer.cs`를 건드리지 않는다.
+
+## 리스크
+
+| 리스크 | 대응 |
+|---|---|
+| 테스트 씬은 NetworkObject 저작·레이어 표준(`f7fba054c`)이 정식 씬과 달라 전투가 깨져 있을 수 있다 | **전투 정상 동작이 완료조건에 포함됨(2026-08-10 결정).** 씬을 NGO `SceneManager.LoadScene`으로 싣기 때문에 씬 배치 NetworkObject는 자동 스폰된다 — 그게 전제 조건은 충족시킨다. 씬별로 실제 타격까지 Play 검증하고, 저작 누락은 고친다. 씬 콘텐츠 자체를 재설계해야 하는 건이 나오면 별건으로 보고한다 |
+| MapScene은 `MapGenerator` 스폰 슬롯이 필요 — 없으면 폴백 위치(0,5,0) | 정식 흐름과 동일 동작이라 회귀 아님 |
+| 테스트 씬에 인라인 AudioListener/EventSystem이 있으면 중복 | `RuntimeSceneServiceCoordinator`·`PersistentEventSystem`이 이미 정리함 |
+| Dev_Boot이 액티브 씬으로 남는 사고 | 6단계 `SetActiveScene`이 유일한 방어선 → 검증 항목에 포함 |
+
+## 검증 방법
+
+1. 컴파일 0 에러.
+2. `Dev_Boot` Play + `Scene = 4.MapScene` → 플레이어 스폰·이동, BGM 재생, 액티브 씬이 `4.MapScene`,
+   Dev_Boot 언로드됨, `[NetworkClock] MainGame 시작 스탬프` 로그 **1회만**.
+3. **전투 검증 (완료조건)** — 대상 씬마다: 좌클릭 기본공격이 몹에 **데미지 적용**(체력 감소·히트플래시·
+   플로팅 데미지), 몹이 사망까지 가고, 몹의 반격도 플레이어 체력을 깎는다.
+   대상: `4.MapScene` / `BossScene` / `MonsterScene` / `PlayerScene` / `PlayerBossTest` / `PlayerDashTest`.
+   씬별 결과를 표로 기록하고, 깨진 건 원인(레이어·Hurtbox·NetworkObject 저작)까지 규명한다.
+4. `Scene = 없는이름` → 빌드 목록 안내 에러 후 조용히 중단(예외 없음).
+5. **회귀**: `0.BootStrapScene` Play → 타이틀→로비→로딩→맵이 종전과 동일. 로딩화면 대기시간도 5s/2.5s 유지.
+6. MPPM 2인으로 Dev_Boot 호스트 + 클라 접속 1회 확인(정식 경로 재사용이라 되어야 정상).
+
+## 진행 상황 (2026-08-10)
+
+**구현 완료 · 컴파일 0에러 0경고**
+
+| 항목 | 상태 |
+|---|---|
+| `Assets/1.Scripts/Dev/DevSceneBooter.cs` | ✅ 신규 |
+| `Assets/1.Scripts/Dev/Editor/DevBuildSceneList.cs` | ✅ 신규 — 빌드 씬 목록 등록을 Unity가 하게 하는 메뉴. Unity가 열려 있을 때 `EditorBuildSettings.asset`을 파일로 고치면 메모리 값에 덮여 조용히 되돌아가므로 필요했다 |
+| `GameManager.SuppressStartupSceneLoad()` + `Start()` 가드 | ✅ |
+| `NetworkLoadingFlowController.SetEditorDefaults()` 재사용 | ✅ |
+| `Assets/0.Scenes/Dev/Dev_Boot.unity` | ✅ BootStrap 복제 + DevSceneBooter (구조 검증: 프리팹 4개·루트 5개·스크립트 guid 일치) |
+| 빌드 씬 목록 테스트 씬 6종 활성화 | ✅ 메뉴로 적용, 디스크 반영 확인(12씬 전부 enabled) |
+### Play 검증 결과 (`4.MapScene` · `MonsterScene`)
+
+| 확인 항목 | 결과 |
+|---|---|
+| 호스트 기동 + NGO 씬 로드 | ✅ `4.MapScene`·`MonsterScene` 모두 로드 |
+| 액티브 씬 전환 | ✅ `isActive: true`로 타겟 씬이 잡힘 |
+| 플레이어 스폰 | ✅ `Paladin(Clone)` **정확히 1개**. PlayerInput·NetworkObject·NetworkTransform·PlayerDefaultAttack·스킬 4종·HitFlash·FloatingDamagePresenter까지 완비 |
+| 씬 배치 NetworkObject 스폰 | ✅ MonsterScene 봇 9종이 `Enemy` 레이어 + Hurtbox + MonsterBase로 살아있음 |
+| 게임 화면 | ✅ 톱다운 카메라·팔라딘 렌더링 정상(스크린샷 확인) |
+| **몹 → 플레이어 전투** | ✅ **작동.** 근접(`MonsterMeleeAttack.Hit`)·투사체(`MonsterProjectile.OnTriggerEnter`)·폭발(`Detonate`) 3경로 모두 피해 적용, 방어력 경감까지(요청 10 → 실제 8, defense 25). 체력 9881 → 9805 연속 감소 |
+| **플레이어 → 몹 전투** | ⏸ 합성 입력으로 발동 실패. 아래 참고 |
+| 에러·경고 | 관측 구간에서 0건 |
+
+**플레이어 공격을 자동 검증하지 못한 이유(정직하게)**: MCP 합성 마우스 입력으로 좌클릭 공격을 발동시키지
+못했다. 격리 시도에서 플레이어를 (40, 40)으로 텔레포트했는데 그곳이 MonsterScene 바닥 밖이라 낙하 상태가 됐고,
+낙하 중엔 공격이 거부된다 — 내 테스트가 스스로를 무효화했다. 헛스윙은 로그를 남기지 않아 "발동 안 됨"과
+"빗맞음"도 구분되지 않았다.
+`attackSpeed: 0`은 조사 결과 **무혐의**다 — 그 값은 `Unit.AttackSpeed`로 들어가 몹·보스 쿨다운
+(`MonsterBase.CooldownReady`)에만 쓰이고, 플레이어 공격 주기는 `DevaultAttackController.attackSteps`가 정한다.
+**중요**: 플레이어는 정식 흐름과 **동일한 프리팹·동일한 스폰 코드**(`NetworkLoadingFlowController.SpawnAllPlayers`)로
+생성된다. 따라서 플레이어 공격 거동이 개발 부팅과 정식 부팅에서 달라질 수 있는 경로가 없다.
+→ 사람이 좌클릭 한 번 하는 것으로 5초 만에 확정된다. 은희님 확인 요청.
+
+### 실측으로 부정된 가설 — 씬 배치 플레이어 중복
+
+정적 분석에서는 테스트 씬들에 활성 `Player.prefab` 인스턴스가 있어 Paladin과 **플레이어 2명**이 될 것으로
+봤다. Play 실측 결과 `Player` 컴포넌트는 **1개**뿐이었다(`Paladin(Clone)`). 중복이 발생하지 않으므로
+대응 코드는 넣지 않았다.
+
+### 🔴 발견된 결함 2건 — 둘 다 수정 완료
+
+**1. 부팅 씬을 `UnloadSceneAsync`로 언로드하면 에디터가 Play 모드를 종료한다.**
+대조 실험으로 확정했다 — 언로드 ON이면 Play가 2~3초 만에 죽고, OFF면 계속 유지된다.
+정식 흐름이 로비 씬을 언로드해도 괜찮은 것은, 그전에 타이틀 씬을 **Single 로드로 교체**해서
+Play 원본 씬이 이미 바뀌어 있기 때문이다.
+→ **수정**: 명시 언로드를 버리고 타겟 씬을 **`LoadSceneMode.Single`로 실어 부팅 씬을 대체**한다
+(`replaceBootScene`, 기본 켜짐). 결과는 요청하신 대로 부팅 씬이 하이어라키에서 사라지는 것이고,
+Play 모드는 유지된다. Single 로드는 이 오브젝트도 파괴하므로 `DontDestroyOnLoad`로 빼두었다가
+부팅이 끝나면 스스로 `Destroy`한다.
+
+**2. Play 진입 시 `Dev_Boot`이 빌드 씬 목록에 잡혔다**(`buildIndex: 12`).
+단, `ProjectSettings/EditorBuildSettings.asset` **디스크에는 기록되지 않았다** — 에디터가 Play를 위해
+임시로 잡은 인메모리 상태였고 영속되지 않는다. 즉 현재 빌드 유출 위험은 없다.
+→ 그래도 안전판으로 `Dev/빌드 씬 목록/Dev 부팅 씬을 목록에서 제거` 메뉴를 추가했다.
+
+### 남은 확인 (Unity 재컴파일 대기 중)
+
+- 수정된 Single 로드 경로로 `4.MapScene` 재검증 + Dev_Boot 씬 필드 재저장(`replaceBootScene` 키로 갱신)
+- 정식 흐름 회귀(`0.BootStrapScene` Play → 타이틀→로비→로딩→맵)
+- MPPM 2인
+- 나머지 테스트 씬 4종(`BossScene`·`PlayerScene`·`PlayerBossTest`·`PlayerDashTest`) 부팅
+
+### ⚠️ 별건 — 게임에 AudioListener가 없다 (내 작업과 무관, 기존 결함)
+
+`Paladin.prefab`에는 `AudioListener`도 `PlayerAudioListenerActivator`도 **없다**(`Player.prefab`에는 둘 다 있다).
+MainFlow 전체에서 AudioListener를 가진 것은 `2.LoadingScene` 하나뿐이라, **로딩 씬이 언로드되는 순간
+게임에 리스너가 0개가 된다** → 소리가 안 나고 Unity가 매 프레임 경고를 뿜는다(콘솔 버퍼를 도배해서
+디버깅도 방해한다).
+기본 플레이어를 Player → Paladin으로 바꾼 `0bca7a01c`에서 두 컴포넌트가 함께 넘어오지 않은 것으로 보인다.
+**정식 흐름에도 그대로 있는 결함이다.** 이 계획의 범위 밖이라 손대지 않았다 — 별건으로 처리할지 은희님 판단.
 
 ## 범위 밖
 
-- 보스 쪽 카운터 창·정면 각도·그로기/Break 전이·시각 피드백 (경석).
-- 돌진 소켓 자체의 생성/배치 (경석).
-- 패링 해석의 방어 창/반사 메커니즘 (기획 확정 후 별건).
-- `PlayerInterruptState` 제거 — 스킬 미배정 시의 폴백으로 남긴다.
-
-## 완료 조건
-
-1. C# 컴파일 0 에러. ✅ (경고는 전부 기존 파일)
-2. 직렬화된 `attackType` 값이 변하지 않는다 — `0`×22 / `1`×3 유지, 특히 `Bomb.attackType=1`(평타 반응). ✅
-3. 우클릭 → 단죄의 방패 발동 → 적중 시 수신측이 `attackInfo.isInterruptAttack == true`를 본다. ⏳ Play 필요
-4. 중간보스(GauntletBot·SpinnerBot·WallBot)가 인터럽트 누적으로 그로기에 들어간다
-   (`maxGroggyCount` 3/3/4 — **이전엔 켜는 주체가 없어 사실상 죽은 경로였다**). ⏳ Play 필요
-5. 기존 잡기(Grab → Hold → Throw) 회귀 없음 — `GrabController` 무수정, `Carry` 래퍼 경유. ⏳ Play 필요
-5-1. `BeginRestrainedByInstigator(boss, Push, offset)` → 플레이어가 보스 정면을 따라간다. ⏳ Play 필요
-5-2. 슈퍼아머(Q 홀드) 중이면 `Push`가 **false를 반환**하고 밀리지 않는다. `Carry`는 그대로 걸린다. ⏳ Play 필요
-6. MPPM 2인(호스트/클라) 검증. ⏳
-
-> ⚠️ 프리팹·SO에 `isGroggyAttack` YAML 키 24개가 고아로 남는다(전부 값 0). Unity가 해당 에셋을
-> 재직렬화할 때 자연 소멸한다 — 의미 손실은 없고 diff 노이즈로만 나타난다.
-
----
-
-# CURRENT PLAN — 카메라 쉐이크 + HP 비네트 (2026-08-06)
-
----
-
-# CURRENT PLAN — Relay 로비 신설 (Phase 2) (2026-08-07)
-
-> 상태: **승인 대기**. 브랜치 `feature/SessionTransport` 이어서 사용(Phase 1 이 base).
-> grill 완료 — 확정된 결정만 담는다.
-
-## 목표
-
-**기존 IPv4 로비를 그대로 두고**, 같은 씬 안에 **Relay 연결 통로를 신설**한다.
-호스트는 조인코드를 발급받아 화면에 표시하고, 참가자는 그 코드로 들어온다.
-
-## 확정된 결정 (grill)
-
-| 항목 | 결정 |
-|---|---|
-통로 | **기존 `3.BeaverLobby` 안에 Relay 패널 신설.** 새 씬을 만들지 않는다 |
-IPv4 | **그대로 유지**(교체 아님). 출시 전 제거 예정 |
-라우팅 | `GameManager.lobbySceneName` · 빌드 목록 **무수정** — 로비 슬롯이 하나라 새 씬을 만들면 팀장 담당 영역(부팅 라우팅)을 건드려야 한다 |
-Steam | 나중에 **토글 하나 더** 추가하는 형태로 확장 (Phase 3) |
-
-## 현재 이해 (조사 완료)
-
-| 사실 | 근거 |
-|---|---|
-Relay API 가 패키지에 **이미 있다** | `com.unity.services.multiplayer@…/Runtime/Relay/SDK/IRelayService.cs` (`CreateAllocationAsync`·`JoinAllocationAsync`) |
-`UnityTransport.SetRelayServerData(RelayServerData)` 오버로드 존재 | `UnityTransport.cs:815` |
-UGS 프로젝트 연결 완료 | `cloudProjectId c5d06f51-…` / `organizationId rangspam` |
-Phase 1 추상화가 이미 있다 | `ISessionConnectionProvider` · `BeginHost/BeginClient` · `SessionStartCompleted` |
-로비 매니저의 사용자 피드백 창구는 `SetErrorMessage` 하나 | `BeaverLobbySceneManager` 전역에서 사용 |
-로비 버튼은 OnClick → `ApplyConnectionData`/`StartHost`/`StartClient`/`ToggleReady`/`StartGameLoading` | `SerializeField` Button 5개 |
-
-## 접근
-
-### A. 고전 Relay API 를 쓴다 (Sessions API 아님)
-
-패키지에 상위 **Sessions API**(`MultiplayerService.CreateSessionAsync`)도 있지만 **쓰지 않는다**.
-그쪽은 로비·Relay·NGO 시작을 한꺼번에 소유하려 들어서, 이미 있는
-`NetworkSessionLauncher` + `NetworkLoadingFlowController` 계약과 충돌한다.
-
-고전 API 는 Phase 1 프로바이더 모양과 정확히 맞는다 — **Prepare 단계에서 연결 데이터만 채우고,
-`NetworkManager.StartHost()` 호출은 런처가 계속 소유**한다.
-
-```
-호스트: CreateAllocationAsync(maxConnections: 2)     // 3인 협동 = 호스트 + 2
-        → GetJoinCodeAsync(allocation.AllocationId)
-        → SetRelayServerData(new RelayServerData(allocation, "dtls"))
-        → ShareCode = 조인코드
-참가:   JoinAllocationAsync(joinCode)
-        → SetRelayServerData(new RelayServerData(joinAllocation, "dtls"))
-```
-
-### B. UGS 초기화·로그인 부트스트랩 (신규)
-
-Relay 호출 전에 `UnityServices.InitializeAsync()` + **익명 로그인**이 끝나 있어야 한다.
-`UnityServicesBootstrap`(신규)이 **멱등**하게 처리하고, 상태를 프로바이더가 읽는다.
-
-- `RelayConnectionProvider.IsAvailable(out reason)` 이 미초기화·미로그인·`cloudProjectId` 부재를
-  **각각 다른 사유 문자열**로 반환한다. "접속 실패"로 뭉개지 않는다.
-- 🔴 **MPPM 프로필 분리**: 익명 로그인은 자격증명을 프로젝트 단위로 캐시한다. MPPM 클론들이
-  같은 것을 물면 **같은 플레이어로 취급돼 충돌**한다. 로그인 전에
-  `AuthenticationService.Instance.SwitchProfile(<클론별 고유값>)` 을 호출한다.
-
-### C. 로비 UI — 패널 추가, 기존 것은 무수정
-
-`BeaverLobbySceneManager` 에 Relay 전용 필드·메서드를 **추가**한다. 기존 IPv4 필드·메서드는 손대지 않는다.
-
-- 추가 `SerializeField`: `relayPanel` · `directPanel` · `joinCodeInputField` ·
-  `joinCodeDisplayText` · `relayHostButton` · `relayJoinButton` · `modeToggleButton`
-- 추가 public 메서드(OnClick 대상, 전부 `void`): `SelectDirectMode()` · `SelectRelayMode()` ·
-  `StartRelayHost()` · `StartRelayJoin()`
-- **비동기 결과는 `SessionStartCompleted` 구독으로 받는다** — Phase 1 이 만든 경로다.
-  성공 시 `joinCodeDisplayText` 에 `ShareCode` 를 띄우고, 실패 시 `FailureReason` 을
-  `SetErrorMessage` 로 흘린다.
-- 연결 중에는 버튼을 잠근다(중복 클릭이 Allocation 을 두 번 만든다).
-
-⚠️ 프리팹·씬 배선(패널·입력칸·버튼 생성 및 참조 연결)은 **은희가 Unity 에서** 한다.
-코드는 참조가 비어 있어도 예외 없이 동작해야 한다(전부 null 안전).
-
-## 변경 파일
-
-| 파일 | 변경 |
-|---|---|
-`Assets/1.Scripts/Network/Session/RelayConnectionProvider.cs` | **신규** |
-`Assets/1.Scripts/Network/UnityServicesBootstrap.cs` | **신규** — 멱등 초기화 + 익명 로그인 + MPPM 프로필 분리 |
-`Assets/1.Scripts/Network/NetworkSessionLauncher.cs` | Relay 프로바이더 등록(`TryGetProvider` 분기 확장) |
-`Assets/1.Scripts/Managers/BeaverLobbySceneManager.cs` | Relay 필드·메서드 **추가**(기존 무수정) |
-
-씬·프리팹·`.meta` 무수정(코드만). `GameManager` 무수정.
-
-## 완료 조건
-
-1. **IPv4 경로 회귀 0** — 기존 IP/Port 접속이 이전과 동일.
-2. Relay 호스트 → 조인코드 화면 표시 → 다른 인스턴스가 그 코드로 참가 → 게임 진행.
-3. 실패 경로가 **사유와 함께** 표시된다: UGS 미초기화 / 로그인 실패 / 잘못된 조인코드 /
-   방 정원 초과. 조용한 실패 0.
-4. 카메라 리그·프로바이더·패널 참조가 없어도 예외 0.
-5. 컴파일 0 에러 / 0 경고. 신규 `.cs` UTF-8(BOM).
-6. MPPM 2~3인에서 Relay 경로 정상(프로필 분리 확인).
-
-## 리스크
-
-- ❓ **대시보드에서 Relay 서비스가 활성화됐는지 미확인.** 안 돼 있으면 코드는 돌아도
-  Allocation 생성이 실패한다. Phase 2 검증 전 확인 필요.
-- Relay 는 **과금·할당량**이 있는 서비스다. 무료 티어 한도를 넘기면 개발 중에도 막힌다.
-- `"dtls"` 연결 타입이 플랫폼·버전에 따라 `"udp"`/`"wss"` 로 달라질 수 있다. 실패 시 사유 로그로 판별한다.
-- MPPM 프로필 분리 값을 어떻게 얻을지는 구현 중 확정한다(클론 식별자 API 또는 경로 해시).
-
----
-
-# PLAN (완료) — 세션 연결 방식 추상화 (Phase 1) (2026-08-07)
-
-> 상태: **완료·검증됨.** 커밋 `3c6be4fc0`, 브랜치 `feature/SessionTransport` 푸시.
-> Unity 컴파일 + MPPM 검증 통과(IPv4 동작 무변경 확인).
-> 이 문서는 **Phase 1(추상화 + 기존 IPv4 이식)** 만 다룬다. Relay·Steam 구현은 Phase 2·3.
-> grill 완료 — 확정된 결정만 담는다.
-
-## 목표
-
-세션 연결 방식을 **세 가지(직접 IPv4 / Unity Relay / Steam)** 로 갈아끼울 수 있게 만든다.
-Phase 1의 산출물은 **추상화 계층 + 기존 IPv4 구현을 그 위로 이식**하는 것까지다.
-**IPv4 동작은 1바이트도 바뀌지 않는다** — 이게 Phase 1의 합격 기준이다.
-
-## 확정된 결정 (grill)
-
-| 항목 | 결정 |
-|---|---|
-진행 순서 | **추상화 먼저**, Relay·Steam은 그 위에 건씩 얹는다 |
-IPv4 직접연결 | **잠정 유지, 출시 전 제거.** 개발 중 디버깅·랜 환경에서 제일 빠르다 |
-비-Steam 로비 | Unity **Relay** (기존 IPv4 직접통신 방침을 대체) |
-Steam SDK | 미확정 — Notion 문서(`SteamSDK`)가 인증 걸려 읽지 못했다. Phase 3에서 확정 |
-
-## 현재 이해 (조사 완료)
-
-| 사실 | 근거 |
-|---|---|
-연결 설정이 **한 곳으로 모여 있다** | `NetworkSessionLauncher.OnSetConnectionData` → `UnityTransport.SetConnectionData` |
-`NetworkSessionLauncher`는 `NetworkManager.prefab`의 컴포넌트 | `NetworkClock`·`NetworkLoadingFlowController`와 동거 |
-호출자는 로비 매니저 2개 | `BeaverLobbySceneManager`(ip+port) · `LobbySceneManager`(ip only, 1인자 오버로드) |
-`CamaraScene.unity`도 이 컴포넌트를 참조 | GUID 스캔 |
-**Relay는 트랜스포트를 바꾸지 않는다** | `UnityTransport`가 `SetRelayServerData`로 처리 |
-Relay SDK는 **이미 설치돼 있다** | `com.unity.services.multiplayer 2.2.3` + `authentication`·`core`·`qos`·`wire` 해석 완료 |
-🔴 **UGS 프로젝트 미연결** | `ProjectSettings.asset`의 `cloudProjectId`·`organizationId`·`projectName` 전부 빈 값 |
-
-## 🔴 핵심 구조 문제 — 동기 API로는 Relay를 표현할 수 없다
-
-현재 계약은 **동기 `bool`** 이다:
-
-```csharp
-public bool StartHost()     // 즉시 성공/실패
-public bool StartClient()
-public void OnSetConnectionData(string ip, ushort port)
-```
-
-Relay는 호스트가 **Allocation 생성 → 조인코드 발급**, 클라가 **조인코드로 Allocation 조회** 를 해야 하고
-둘 다 **await 가 필요한 원격 호출**이다. Steam도 로비 생성/입장이 콜백 기반이다.
-그래서 Phase 1의 본질은 **계약을 비동기로 바꾸고 "연결 중" 상태를 만드는 것**이다.
-
-## 접근
-
-### A. 연결 방식을 인터페이스로 분리
-
-```csharp
-public enum SessionConnectionMode { DirectIPv4, UnityRelay, Steam }
-
-/// 사용자에게 보여줄 결과. 실패 사유를 문자열로 들고 온다 —
-/// 조용한 실패를 만들지 않는다(이 레포에서 반복해 당한 부류).
-public readonly struct SessionStartResult
-{
-    public readonly bool Success;
-    public readonly string FailureReason;
-    public readonly string ShareCode;   // 호스트가 남에게 알려줄 값
-                                        // IPv4="192.168.0.5:7777" / Relay=조인코드 / Steam=lobbyId
-}
-
-public interface ISessionConnectionProvider
-{
-    SessionConnectionMode Mode { get; }
-
-    /// 쓸 수 있는 상태인지 미리 검사한다. UGS 미연결·Steam 미실행을
-    /// "접속 실패"로 뭉개지 말고 이유를 반환한다.
-    bool IsAvailable(out string unavailableReason);
-
-    /// 호스트: 트랜스포트에 연결 데이터를 채우고 공유용 코드를 만든다.
-    Task<SessionStartResult> PrepareHostAsync(CancellationToken ct);
-
-    /// 클라이언트: 사용자 입력(IP·조인코드·lobbyId)을 해석해 연결 데이터를 채운다.
-    Task<SessionStartResult> PrepareClientAsync(string joinInput, CancellationToken ct);
-}
-```
-
-`Prepare*Async` 는 **트랜스포트 설정까지만** 한다. `NetworkManager.StartHost()` 호출은
-`NetworkSessionLauncher` 가 그대로 소유한다 — 시작 순서와 로딩 흐름 콜백 등록을 한 곳에 남긴다.
-
-### B. Phase 1 구현체는 하나뿐 — `DirectIPv4ConnectionProvider`
-
-지금 `OnSetConnectionData` 가 하는 일을 **그대로** 옮긴다. 특히 이 주석의 함정을 보존한다:
-
-> `SetConnectionData` 를 2인자로 부르면 `ServerListenAddress = ip` 가 되어 호스트가 입력값에
-> 바인딩된다. 기본값 `127.0.0.1` 이면 루프백만 듣고 다른 PC 가 접속 못 한다.
-> → 바인딩은 항상 `0.0.0.0` 고정.
-
-`IsAvailable` 은 항상 true(로컬 전용이라 외부 의존이 없다).
-`PrepareClientAsync` 는 `IPAddress.TryParse` 검증을 여기로 **가져온다** — 지금은 로비 매니저에
-있는데, 입력 형식 해석은 방식별로 다르므로(조인코드는 IP 가 아니다) 프로바이더 책임이다.
-
-### C. `NetworkSessionLauncher` — 비동기 계약 + 기존 호출자 보호
-
-```csharp
-public SessionConnectionMode Mode { get; set; }   // 기본 DirectIPv4
-public Task<SessionStartResult> StartHostAsync(CancellationToken ct)
-public Task<SessionStartResult> StartClientAsync(string joinInput, CancellationToken ct)
-```
-
-- 내부 순서: 프로바이더 `IsAvailable` → `Prepare*Async` → `NetworkManager.Start*()` →
-  `RegisterLoadingFlowCallbacks()`. 기존 `Register...` 호출 시점을 바꾸지 않는다.
-- **기존 동기 메서드는 남긴다.** `StartHost()`/`StartClient()`/`StartServer()`/`OnSetConnectionData()` 는
-  `[Obsolete]` 표시 + 내부에서 DirectIPv4 경로를 동기로 수행하는 얇은 래퍼로 유지한다.
-  이유: **UnityEvent OnClick 은 `Task` 반환 메서드를 바인딩하지 못한다.** 씬·프리팹 배선
-  (`CamaraScene`, `NetworkManager.prefab`)이 조용히 끊기는 것을 막는다.
-- 로비 매니저용으로 `void` 진입점(`BeginHost()` / `BeginClient(string)`)을 추가한다 —
-  내부에서 async 를 시작하고 결과를 이벤트로 흘린다:
-  `event Action<SessionStartResult> SessionStartCompleted`.
-
-### D. 로비 UI는 Phase 1에서 건드리지 않는다
-
-`BeaverLobbySceneManager` 의 IP/Port 입력 필드는 그대로 둔다. 조인코드 UI 는 **Relay 가 실제로
-붙는 Phase 2** 에 함께 바꾼다. Phase 1 은 배관 교체이므로 화면 변화가 0 이어야 검증이 쉽다.
-
-단, `_sessionLauncher.StartHost()` 의 즉시 `bool` 분기는 **"연결 중" 상태를 표현할 수 없다**.
-Phase 1 에서는 기존 동기 래퍼를 계속 쓰게 두고, Phase 2 에서 이벤트 기반으로 바꾼다.
-(지금 바꾸면 IPv4 동작 무변경을 보장하기 어려워진다.)
-
-## 변경 파일 (Phase 1)
-
-| 파일 | 변경 |
-|---|---|
-`Assets/1.Scripts/Network/Session/SessionConnectionMode.cs` | **신규** — enum |
-`Assets/1.Scripts/Network/Session/SessionStartResult.cs` | **신규** — 결과 struct |
-`Assets/1.Scripts/Network/Session/ISessionConnectionProvider.cs` | **신규** — 인터페이스 |
-`Assets/1.Scripts/Network/Session/DirectIPv4ConnectionProvider.cs` | **신규** — 기존 동작 이식 |
-`Assets/1.Scripts/Network/NetworkSessionLauncher.cs` | 프로바이더 경유 + 비동기 API 추가. **기존 메서드 시그니처 유지** |
-
-프리팹·씬·`.meta` 무수정. 로비 매니저 무수정.
-
-## 스코프 밖 (Phase 2·3)
-
-- **Phase 2 — Relay**: UGS 연결(대시보드·계정 작업, 사용자 몫) → `UnityServices.InitializeAsync` +
-  익명 인증 → `RelayConnectionProvider` → 로비 UI 를 조인코드로 교체 → MPPM 프로필 분리.
-- **Phase 3 — Steam**: SDK·트랜스포트 확정 → `NetworkConfig.NetworkTransport` 교체 스위처 →
-  `SteamConnectionProvider`. **MPPM 으로 검증 불가**(프로세스당 1회 초기화) → 빌드 2개·계정 2개.
-- AGENTS.md 의 "공모전 제출 = IPv4" 문구 갱신 — Phase 2 확정 후.
-- `LobbySceneManager` 삭제(구 로비 정리) — 별건. `PLAN.md` 2026-08-03 계획에 있다.
-
-## 완료 조건
-
-1. **IPv4 동작 무변경.** `3.BeaverLobby` 에서 IP·Port 입력 → Host/Client 접속이 변경 전과 동일.
-   MPPM 2인 정상. `[SceneFlow]` 로그 시퀀스 동일.
-2. 씬·프리팹의 `NetworkSessionLauncher` 배선이 유지된다(OnClick 끊김 0).
-3. C# 컴파일 0 에러 / 0 경고 (`[Obsolete]` 래퍼를 내부에서 호출하면 경고가 나므로
-   호출 지점에 `#pragma warning disable` 대신 **내부 구현을 공유 private 메서드로 분리**한다).
-4. `DirectIPv4ConnectionProvider` 가 바인딩을 `0.0.0.0` 으로 고정한다(회귀 시 다른 PC 접속 불가).
-5. 신규 `.cs` 는 UTF-8(BOM).
-
-## 리스크
-
-- 🔴 **UGS 미연결이 Phase 2 의 하드 블로커다.** Phase 1 은 영향 없지만, Relay 검증을 시작하려면
-  대시보드 작업이 선행돼야 한다. Relay 는 과금·할당량이 있는 서비스다.
-- ⚠️ **Steam 은 MPPM 으로 검증할 수 없다.** 지금까지의 검증 습관이 Phase 3 에서 통하지 않는다.
-- NGO 는 활성 트랜스포트가 하나다(`NetworkConfig.NetworkTransport` 단일 참조) → Phase 3 에서
-  런타임 교체 스위처가 필요하다. Phase 1 인터페이스는 프로바이더가 "어느 트랜스포트를 쓸지"를
-  소유할 수 있게 열어 둔다.
-- 비동기 도입으로 **취소·중복 클릭** 경로가 생긴다. `CancellationToken` 을 계약에 넣어두고,
-  진행 중 재요청은 Phase 2 UI 에서 막는다(Phase 1 은 동기 래퍼만 쓰므로 노출되지 않는다).
+- 테스트 씬 내부 콘텐츠 수리, `ForProfile` 정리, 로비 진입점 추가 변경
+- `4.MapScene` 및 정식 MainFlow 씬 수정 (일절 건드리지 않는다)
