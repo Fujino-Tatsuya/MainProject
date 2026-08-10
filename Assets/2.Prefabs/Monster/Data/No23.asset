@@ -65,7 +65,7 @@ MonoBehaviour:
     damage: 0
     opensCounterWindow: 0
     superArmor: 1
-    hitboxAnchorName: 
+    hitboxAnchorName: LeftHookAttack
   - attackId: 1
     animatorStateName: RightHook
     cooldown: 2.5
@@ -78,7 +78,7 @@ MonoBehaviour:
     damage: 0
     opensCounterWindow: 0
     superArmor: 1
-    hitboxAnchorName: 
+    hitboxAnchorName: RightHookAttack
   - attackId: 2
     animatorStateName: Uppercut
     cooldown: 3
@@ -91,7 +91,7 @@ MonoBehaviour:
     damage: 0
     opensCounterWindow: 0
     superArmor: 1
-    hitboxAnchorName: 
+    hitboxAnchorName: UpperAttack
   - attackId: 3
     animatorStateName: Grab
     cooldown: 10
@@ -104,7 +104,7 @@ MonoBehaviour:
     damage: 0
     opensCounterWindow: 1
     superArmor: 1
-    hitboxAnchorName: 
+    hitboxAnchorName: Grab
   - attackId: 4
     animatorStateName: Leap
     cooldown: 10
@@ -130,7 +130,7 @@ MonoBehaviour:
     damage: 0
     opensCounterWindow: 1
     superArmor: 1
-    hitboxAnchorName: 
+    hitboxAnchorName: DashAttack
   - attackId: 6
     animatorStateName: Charging
     cooldown: 0
@@ -156,7 +156,7 @@ MonoBehaviour:
     damage: 0
     opensCounterWindow: 0
     superArmor: 1
-    hitboxAnchorName: 
+    hitboxAnchorName: Rage
   repeatPenalty: 0.3
   repeatBlockAfter: 2
   phases:
@@ -203,6 +203,12 @@ MonoBehaviour:
   rageDashSpeedMultiplier: 8
   rageDashMaxDistance: 16
   rageDashDamage: 0
+  dashDuration: 0.7
+  dashSpeedMultiplier: 6
+  dashMaxDistance: 16
+  dashDamage: 0
+  dashCarryFrontOffset: 1.8
+  dashStunDuration: 1
   bombThrowInterval: 6
   bombPrefab: {fileID: 0}
   throwImpulse: 8

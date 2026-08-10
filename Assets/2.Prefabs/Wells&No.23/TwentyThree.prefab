@@ -101,8 +101,8 @@ GameObject:
   m_Component:
   - component: {fileID: 3551397243170944304}
   - component: {fileID: 328986694273374958}
-  - component: {fileID: 6116763131625831750}
   - component: {fileID: 3298624546661411796}
+  - component: {fileID: 8013745560377596005}
   m_Layer: 12
   m_Name: RightHookAttack
   m_TagString: Untagged
@@ -146,21 +146,6 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 2, y: 3, z: 2}
   m_Center: {x: 1, y: 1.5, z: 1}
---- !u!114 &6116763131625831750
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 859237602223199644}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 95e4cb8fdfc80954cba9136f5e8f994a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::EnableCollider
-  ShowTopMostFoldoutHeaderGroup: 1
-  _isServerAuthority: 1
-  _initValue: 0
 --- !u!114 &3298624546661411796
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -174,13 +159,24 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Attack
   damage: 1
-  isGroggyAttack: 0
   targetLayer:
     serializedVersion: 2
     m_Bits: 64
   attackType: 0
   triggerMode: 0
   stayTime: 0
+--- !u!114 &8013745560377596005
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 859237602223199644}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 81c70da5a2e747148bf71f917743b5fd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ColliderInfo
 --- !u!1 &898394340034172007
 GameObject:
   m_ObjectHideFlags: 0
@@ -342,7 +338,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ColiderBasicAttack
   damage: 1
-  isGroggyAttack: 0
   targetLayer:
     serializedVersion: 2
     m_Bits: 8256
@@ -362,7 +357,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KnockbackAttack
   damage: 0
-  isGroggyAttack: 0
   targetLayer:
     serializedVersion: 2
     m_Bits: 8256
@@ -378,7 +372,6 @@ GameObject:
   m_Component:
   - component: {fileID: 8175960208072207764}
   - component: {fileID: 1510935311031755614}
-  - component: {fileID: 792808704151781208}
   m_Layer: 0
   m_Name: FloorGrow
   m_TagString: Untagged
@@ -460,22 +453,6 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
---- !u!114 &792808704151781208
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2878115523209849289}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2954250f3b228e7449bf502b6a0c38b3, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::FloorAreaEffect
-  canGrowOnOverlap: 0
-  growAmount: 0
-  maxScale: {x: 0, y: 0, z: 0}
-  floorType: 2
 --- !u!1 &2884726549167042591
 GameObject:
   m_ObjectHideFlags: 0
@@ -486,8 +463,8 @@ GameObject:
   m_Component:
   - component: {fileID: 1461158703682127806}
   - component: {fileID: 3578002433487090739}
-  - component: {fileID: 7903687224634922449}
   - component: {fileID: 5579044265559132990}
+  - component: {fileID: 4721605016116548187}
   m_Layer: 12
   m_Name: DashAttack
   m_TagString: Untagged
@@ -531,21 +508,6 @@ SphereCollider:
   serializedVersion: 3
   m_Radius: 1.25
   m_Center: {x: 0, y: 1.71, z: 0}
---- !u!114 &7903687224634922449
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2884726549167042591}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 95e4cb8fdfc80954cba9136f5e8f994a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::EnableCollider
-  ShowTopMostFoldoutHeaderGroup: 1
-  _isServerAuthority: 1
-  _initValue: 0
 --- !u!114 &5579044265559132990
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -559,12 +521,23 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ColliderKnockbackAttack
   damage: 6
-  isGroggyAttack: 0
   targetLayer:
     serializedVersion: 2
     m_Bits: 64
   attackType: 0
   knockbackStrength: 0
+--- !u!114 &4721605016116548187
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2884726549167042591}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 81c70da5a2e747148bf71f917743b5fd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ColliderInfo
 --- !u!1 &3178699018579886661
 GameObject:
   m_ObjectHideFlags: 0
@@ -574,7 +547,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 178548833760689029}
-  - component: {fileID: 3919172422678745266}
   m_Layer: 0
   m_Name: Initializer
   m_TagString: Untagged
@@ -597,47 +569,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 6916739971123564487}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &3919172422678745266
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3178699018579886661}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d0c245cd4b0c7634384fbffd1d7634f5, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::TwentyThreeInitializer
-  ShowTopMostFoldoutHeaderGroup: 1
-  figure: {fileID: 11400000, guid: 107f78c06f7d0684ca8f644d66d93880, type: 2}
-  bt: {fileID: 7434833580858265621}
-  damageEntries:
-  - target: {fileID: 3298624546661411796}
-    type: 0
-  - target: {fileID: 5991986677993798632}
-    type: 0
-  - target: {fileID: 3484998061978514129}
-    type: 1
-  - target: {fileID: 1982363097940907444}
-    type: 2
-  - target: {fileID: 5579044265559132990}
-    type: 3
-  - target: {fileID: 6555260676494401482}
-    type: 4
-  - target: {fileID: 273769967766734601}
-    type: 5
-  knockbackEntries:
-  - target: {fileID: 7789291556692004003}
-    type: 5
-  - target: {fileID: 4435137659627741301}
-    type: 2
-  - target: {fileID: 6555260676494401482}
-    type: 4
-  - target: {fileID: 5579044265559132990}
-    type: 3
-  grabController: {fileID: 8939195106823421711}
-  bombLauncher: {fileID: 3123776171035693610}
 --- !u!1 &3443241134742314900
 GameObject:
   m_ObjectHideFlags: 0
@@ -647,7 +578,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 9185639174043840639}
-  - component: {fileID: 273769967766734601}
   - component: {fileID: 7789291556692004003}
   m_Layer: 0
   m_Name: JumpAttack
@@ -672,38 +602,6 @@ Transform:
   - {fileID: 5342640723786321571}
   m_Father: {fileID: 3556593508814251226}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &273769967766734601
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3443241134742314900}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2fcefbfdfc9b94e408620422080df651, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::JumpController
-  ShowTopMostFoldoutHeaderGroup: 1
-  bt: {fileID: 7434833580858265621}
-  followTargetTag: Player
-  playerLayer:
-    serializedVersion: 2
-    m_Bits: 64
-  groundMask:
-    serializedVersion: 2
-    m_Bits: 0
-  meshRenderer:
-  - {fileID: 1048921974906316339}
-  - {fileID: 3386235969700265050}
-  floorRoot: {fileID: 5342640723786321571}
-  floorBase: {fileID: 5740799221572613189}
-  floorGrow: {fileID: 792808704151781208}
-  animator: {fileID: 7460696466104070403}
-  animClip: Boss_23_landingattack
-  multiplier: 
-  clipStart: 7.1
-  clipEnd: 25.8
 --- !u!114 &7789291556692004003
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -717,7 +615,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KnockbackAttack
   damage: 0
-  isGroggyAttack: 0
   targetLayer:
     serializedVersion: 2
     m_Bits: 8256
@@ -734,8 +631,8 @@ GameObject:
   - component: {fileID: 7285464119157252650}
   - component: {fileID: 6555260676494401482}
   - component: {fileID: 1551797295837025053}
-  - component: {fileID: 2956919693736392804}
   - component: {fileID: 578455959188562136}
+  - component: {fileID: 8173334583911935852}
   m_Layer: 12
   m_Name: Rage
   m_TagString: Untagged
@@ -771,7 +668,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KnockbackAttack
   damage: 10
-  isGroggyAttack: 0
   targetLayer:
     serializedVersion: 2
     m_Bits: 64
@@ -798,21 +694,6 @@ SphereCollider:
   serializedVersion: 3
   m_Radius: 1.25
   m_Center: {x: 0, y: 1.71, z: 0}
---- !u!114 &2956919693736392804
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3908396834888608453}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 95e4cb8fdfc80954cba9136f5e8f994a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::EnableCollider
-  ShowTopMostFoldoutHeaderGroup: 1
-  _isServerAuthority: 1
-  _initValue: 0
 --- !u!114 &578455959188562136
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -826,6 +707,18 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TriggerKnockbackAttack
   knockbackAttack: {fileID: 6555260676494401482}
+--- !u!114 &8173334583911935852
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3908396834888608453}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 81c70da5a2e747148bf71f917743b5fd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ColliderInfo
 --- !u!1 &5016341223067883996
 GameObject:
   m_ObjectHideFlags: 0
@@ -835,7 +728,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 5472367148495070200}
-  - component: {fileID: 1982363097940907444}
   m_Layer: 0
   m_Name: ChargeAttack
   m_TagString: Untagged
@@ -859,25 +751,6 @@ Transform:
   - {fileID: 8992115720558921880}
   m_Father: {fileID: 3556593508814251226}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1982363097940907444
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5016341223067883996}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4d7741cb3cc33aa4cb4e3d9035aecf14, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ChargeController
-  ShowTopMostFoldoutHeaderGroup: 1
-  maxY: 1
-  player1: 1
-  player2: 2
-  player3: 4
-  floor: {fileID: 2538891665261033949}
-  _isDefeated: 0
 --- !u!1 &5112472842191727821
 GameObject:
   m_ObjectHideFlags: 0
@@ -888,8 +761,8 @@ GameObject:
   m_Component:
   - component: {fileID: 2274862431756851996}
   - component: {fileID: 3174080452546132724}
-  - component: {fileID: 8820610430510614129}
   - component: {fileID: 3484998061978514129}
+  - component: {fileID: 4582594494222234113}
   m_Layer: 12
   m_Name: UpperAttack
   m_TagString: Untagged
@@ -933,21 +806,6 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 2, y: 3, z: 2}
   m_Center: {x: 0, y: 1.5, z: 1}
---- !u!114 &8820610430510614129
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5112472842191727821}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 95e4cb8fdfc80954cba9136f5e8f994a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::EnableCollider
-  ShowTopMostFoldoutHeaderGroup: 1
-  _isServerAuthority: 1
-  _initValue: 0
 --- !u!114 &3484998061978514129
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -961,13 +819,24 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Attack
   damage: 1
-  isGroggyAttack: 0
   targetLayer:
     serializedVersion: 2
     m_Bits: 64
   attackType: 0
   triggerMode: 0
   stayTime: 0
+--- !u!114 &4582594494222234113
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5112472842191727821}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 81c70da5a2e747148bf71f917743b5fd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ColliderInfo
 --- !u!1 &5372104213593212626
 GameObject:
   m_ObjectHideFlags: 0
@@ -982,13 +851,14 @@ GameObject:
   - component: {fileID: 7434833580858265621}
   - component: {fileID: 1054250890861799072}
   - component: {fileID: 4934386844203442851}
-  - component: {fileID: 8430385608559717113}
-  - component: {fileID: 3484663710126934133}
-  - component: {fileID: 2934878137636970231}
-  - component: {fileID: 6839388890406243040}
   - component: {fileID: 6491938153281997714}
   - component: {fileID: 9114957203948571100}
   - component: {fileID: 3492608744245104837}
+  - component: {fileID: 8869577404840030253}
+  - component: {fileID: 4758820817683330561}
+  - component: {fileID: 4676563317458726630}
+  - component: {fileID: 6768934193557782472}
+  - component: {fileID: 5834611377083627525}
   m_Layer: 8
   m_Name: TwentyThree
   m_TagString: Untagged
@@ -1092,7 +962,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 5372104213593212626}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f0038c16c34866b4f9e25c9c0dc0f7e6, type: 3}
   m_Name: 
@@ -1154,7 +1024,7 @@ MonoBehaviour:
           m_Value0: 5514728468355562846
           m_Value1: 10641492134374864108
         Name: RageAttackCollider
-        m_Value: {fileID: 2956919693736392804}
+        m_Value: {fileID: 0}
     - rid: 3912068559286830064
       type: {class: 'BlackboardVariable`1[[ReStart, Assembly-CSharp]]', ns: Unity.Behavior, asm: Unity.Behavior}
       data:
@@ -1178,7 +1048,7 @@ MonoBehaviour:
           m_Value0: 18137842937653405972
           m_Value1: 15790169094875680797
         Name: AttackChoice
-        m_Value: {fileID: 7129852271225524614}
+        m_Value: {fileID: 0}
     - rid: 5035182941922919282
       type: {class: 'BlackboardVariable`1[[UnityEngine.Animator, UnityEngine.AnimationModule]]', ns: Unity.Behavior, asm: Unity.Behavior}
       data:
@@ -1194,7 +1064,7 @@ MonoBehaviour:
           m_Value0: 13109639695138280437
           m_Value1: 1671448159921255291
         Name: UpperAttackCollider
-        m_Value: {fileID: 8820610430510614129}
+        m_Value: {fileID: 0}
     - rid: 5035182945995587746
       type: {class: 'BlackboardVariable`1[[EnableCollider, Assembly-CSharp]]', ns: Unity.Behavior, asm: Unity.Behavior}
       data:
@@ -1202,7 +1072,7 @@ MonoBehaviour:
           m_Value0: 7559842344521484122
           m_Value1: 2098732962536698439
         Name: LeftHookAttackCollider
-        m_Value: {fileID: 5256932725647423925}
+        m_Value: {fileID: 0}
     - rid: 5035182945995587747
       type: {class: 'BlackboardVariable`1[[EnableCollider, Assembly-CSharp]]', ns: Unity.Behavior, asm: Unity.Behavior}
       data:
@@ -1210,7 +1080,7 @@ MonoBehaviour:
           m_Value0: 13904293979871715130
           m_Value1: 16299973529637426705
         Name: RightHookAttackCollider
-        m_Value: {fileID: 6116763131625831750}
+        m_Value: {fileID: 0}
     - rid: 5035183107175351285
       type: {class: 'BlackboardVariable`1[[EnableCollider, Assembly-CSharp]]', ns: Unity.Behavior, asm: Unity.Behavior}
       data:
@@ -1218,7 +1088,7 @@ MonoBehaviour:
           m_Value0: 3776506582560659219
           m_Value1: 5145139585753243403
         Name: DashAttackColldier
-        m_Value: {fileID: 7903687224634922449}
+        m_Value: {fileID: 0}
     - rid: 5035183127801626729
       type: {class: 'BlackboardVariable`1[[KnockbackAttack, Assembly-CSharp]]', ns: Unity.Behavior, asm: Unity.Behavior}
       data:
@@ -1266,7 +1136,7 @@ MonoBehaviour:
           m_Value0: 4082606241079875717
           m_Value1: 5211148615093030675
         Name: Unit
-        m_Value: {fileID: 3484663710126934133}
+        m_Value: {fileID: 0}
     - rid: 5035183150490452910
       type: {class: 'BlackboardVariable`1[[System.Int32, mscorlib]]', ns: Unity.Behavior, asm: Unity.Behavior}
       data:
@@ -1282,7 +1152,7 @@ MonoBehaviour:
           m_Value0: 16203391712790933127
           m_Value1: 16539432465900484831
         Name: Charge Controller
-        m_Value: {fileID: 1982363097940907444}
+        m_Value: {fileID: 0}
     - rid: 5035183218639241401
       type: {class: 'BlackboardVariable`1[[System.Int32, mscorlib]]', ns: Unity.Behavior, asm: Unity.Behavior}
       data:
@@ -1322,7 +1192,7 @@ MonoBehaviour:
           m_Value0: 487517564429868762
           m_Value1: 6770229833929637791
         Name: Spawn Pointer
-        m_Value: {fileID: 2934878137636970231}
+        m_Value: {fileID: 0}
 --- !u!195 &1054250890861799072
 NavMeshAgent:
   m_ObjectHideFlags: 0
@@ -1372,76 +1242,6 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 126
   m_CollisionDetection: 0
---- !u!114 &8430385608559717113
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5372104213593212626}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3af2115b0dbf10740a42d57da0917118, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::RunningOnlyOnServer
-  ShowTopMostFoldoutHeaderGroup: 1
-  btAgent: {fileID: 7434833580858265621}
-  navMeshAgent: {fileID: 1054250890861799072}
---- !u!114 &3484663710126934133
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5372104213593212626}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: eb74b85c4fb051d4d971126b89c6c51d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Enemy
-  ShowTopMostFoldoutHeaderGroup: 1
-  attackDamage: 1
-  moveSpeed: 2
-  chaseSpeed: 0
-  attackSpeed: 1
-  maxHp: 1000
-  defense: 10
-  _monsterTimeController: {fileID: 0}
---- !u!114 &2934878137636970231
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5372104213593212626}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b51fd4afea6c445488587a9a53911983, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SpawnPointer
-  _spawnPoint: {x: 0, y: 0, z: 0}
---- !u!114 &6839388890406243040
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5372104213593212626}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7fac6c92ebc10514f91f94b7680acbef, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::EnemyBTActivator
-  ShowTopMostFoldoutHeaderGroup: 1
-  targetBTs:
-  - {fileID: 7434833580858265621}
-  - {fileID: 1173616335134953240}
-  isOpenVariableName: IsOpen
-  isOverVariableName: IsOver
-  targetGroupVariableName: TargetGroup
-  totalPlayerNumberVariableName: TotalPlayerNumber
-  playerTag: Player
-  restartChannel: {fileID: 11400000, guid: 86eb215c73ccef542a7511e8f09d6cda, type: 2}
 --- !u!114 &6491938153281997714
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1483,6 +1283,102 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FloatingDamageAnchor
   anchorTransform: {fileID: 5727676292926268320}
   localOffset: {x: 0, y: 0, z: 0}
+--- !u!114 &8869577404840030253
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5372104213593212626}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 24fb152dfbff0f446b0d150a011d63e9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MonsterStatusEffect
+  ShowTopMostFoldoutHeaderGroup: 1
+--- !u!114 &4758820817683330561
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5372104213593212626}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b6aa86c59a817bb49be19a9f99559079, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MonsterMeleeAttack
+  damage: 0
+  targetLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  attackType: 0
+  colliderInfo: {fileID: 2045437098100680003}
+  maxHitCount: 16
+  applyKnockback: 0
+  knockbackStrength: 5
+--- !u!114 &4676563317458726630
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5372104213593212626}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 751e09c95b91dfa41b3df99e28850aa7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TwentyThreeBoss
+  ShowTopMostFoldoutHeaderGroup: 1
+  data: {fileID: 11400000, guid: 5df9704c5a3ee96428a7116594284d22, type: 2}
+  agent: {fileID: 0}
+  animator: {fileID: 0}
+  status: {fileID: 0}
+  meleeAttack: {fileID: 0}
+  rangedAttack: {fileID: 0}
+  playerMask:
+    serializedVersion: 2
+    m_Bits: 64
+  maxDetectionResults: 16
+  bodyCollider: {fileID: 0}
+--- !u!114 &6768934193557782472
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5372104213593212626}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cc8734fc08e048d47904f2f03419c69d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BossChargeSequence
+  riseGrace: 1.5
+  pickNearest: 1
+--- !u!114 &5834611377083627525
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5372104213593212626}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe0051b99c590994ba5574366d1615ea, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BossDirectionIndicator
+  arcMaterial: {fileID: 0}
+  innerRadius: 1.6
+  outerRadius: 2.6
+  segmentsPerArc: 24
+  frontColor: {r: 1, g: 0.35, b: 0.25, a: 0.45}
+  counterReadyColor: {r: 1, g: 0.9, b: 0.2, a: 0.8}
+  backColor: {r: 0.3, g: 0.7, b: 1, a: 0.45}
+  heightOffset: 0.04
+  airborneHideHeight: 0.6
+  extraGroundMask:
+    serializedVersion: 2
+    m_Bits: 0
 --- !u!1 &5983189518809354529
 GameObject:
   m_ObjectHideFlags: 0
@@ -1524,8 +1420,8 @@ GameObject:
   m_Component:
   - component: {fileID: 3801006872250370184}
   - component: {fileID: 2347615363194617035}
-  - component: {fileID: 5256932725647423925}
   - component: {fileID: 5991986677993798632}
+  - component: {fileID: 2045437098100680003}
   m_Layer: 12
   m_Name: LeftHookAttack
   m_TagString: Untagged
@@ -1569,21 +1465,6 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 2, y: 3, z: 2}
   m_Center: {x: -1, y: 1.5, z: 1}
---- !u!114 &5256932725647423925
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6682516438038340514}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 95e4cb8fdfc80954cba9136f5e8f994a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::EnableCollider
-  ShowTopMostFoldoutHeaderGroup: 1
-  _isServerAuthority: 1
-  _initValue: 0
 --- !u!114 &5991986677993798632
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1597,13 +1478,24 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Attack
   damage: 1
-  isGroggyAttack: 0
   targetLayer:
     serializedVersion: 2
     m_Bits: 64
   attackType: 0
   triggerMode: 0
   stayTime: 0
+--- !u!114 &2045437098100680003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6682516438038340514}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 81c70da5a2e747148bf71f917743b5fd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ColliderInfo
 --- !u!1 &6887850482435865838
 GameObject:
   m_ObjectHideFlags: 0
@@ -1767,7 +1659,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4ff6f17a7ad346d48ad09109dd1ef5d3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Hurtbox
-  ownerUnit: {fileID: 3484663710126934133}
+  ownerUnit: {fileID: 4676563317458726630}
 --- !u!1 &8280084748297922842
 GameObject:
   m_ObjectHideFlags: 0
@@ -1777,7 +1669,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 998147511182444830}
-  - component: {fileID: 8939195106823421711}
   m_Layer: 0
   m_Name: GrabAttack
   m_TagString: Untagged
@@ -1801,25 +1692,6 @@ Transform:
   - {fileID: 3777127995163679798}
   m_Father: {fileID: 3556593508814251226}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &8939195106823421711
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8280084748297922842}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 585d3d41612fde4429b4febba3277f45, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::GrabController
-  ShowTopMostFoldoutHeaderGroup: 1
-  grabSocket: {fileID: 7284501969139049306}
-  grabColliderInfo: {fileID: 6124302813489217326}
-  targetMask:
-    serializedVersion: 2
-    m_Bits: 64
-  bt: {fileID: 7434833580858265621}
 --- !u!1 &8300409248683084403
 GameObject:
   m_ObjectHideFlags: 0
@@ -1829,7 +1701,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 3556593508814251226}
-  - component: {fileID: 7129852271225524614}
   m_Layer: 0
   m_Name: Attacks
   m_TagString: Untagged
@@ -1860,22 +1731,6 @@ Transform:
   - {fileID: 7285464119157252650}
   m_Father: {fileID: 2585134952784665517}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &7129852271225524614
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8300409248683084403}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 09473024ac015514bbaf65dd19dbf924, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::TwentyThreeBasicAttackChoice
-  pages:
-  - {fileID: 11400000, guid: e8cd87b61eab8e8478ce3a1a5b893e77, type: 2}
-  - {fileID: 11400000, guid: 81de92bb67433024aba9db7555d32287, type: 2}
-  - {fileID: 11400000, guid: 1981baa49b6e5cc4a8c12112485378af, type: 2}
 --- !u!1 &8718092995756804922
 GameObject:
   m_ObjectHideFlags: 0
@@ -1921,6 +1776,10 @@ PrefabInstance:
     - target: {fileID: 657607111497605440, guid: 79860f5bc8d12324ba329dfa38ea3699, type: 3}
       propertyPath: GlobalObjectIdHash
       value: 2959889982
+      objectReference: {fileID: 0}
+    - target: {fileID: 2145321535539746380, guid: 79860f5bc8d12324ba329dfa38ea3699, type: 3}
+      propertyPath: m_Controller
+      value: 
       objectReference: {fileID: 0}
     - target: {fileID: 4148832031641590993, guid: 79860f5bc8d12324ba329dfa38ea3699, type: 3}
       propertyPath: m_Name
@@ -1971,33 +1830,6 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 79860f5bc8d12324ba329dfa38ea3699, type: 3}
---- !u!114 &1173616335134953240 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 187644027839116329, guid: 79860f5bc8d12324ba329dfa38ea3699, type: 3}
-  m_PrefabInstance: {fileID: 1356464099776690993}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f0038c16c34866b4f9e25c9c0dc0f7e6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.Behavior::Unity.Behavior.BehaviorGraphAgent
---- !u!114 &3123776171035693610 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 4146338655535622427, guid: 79860f5bc8d12324ba329dfa38ea3699, type: 3}
-  m_PrefabInstance: {fileID: 1356464099776690993}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 519f0d5762034604f82a979c406a4fc6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::BombLauncher
---- !u!1 &3386235969700265050 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 4336248756725876587, guid: 79860f5bc8d12324ba329dfa38ea3699, type: 3}
-  m_PrefabInstance: {fileID: 1356464099776690993}
-  m_PrefabAsset: {fileID: 0}
 --- !u!4 &5386615103850727379 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 6346197552094035170, guid: 79860f5bc8d12324ba329dfa38ea3699, type: 3}
@@ -2084,24 +1916,10 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 471c30ff001a0254e8af63991ec73cf2, type: 3}
       insertIndex: -1
       addedObject: {fileID: 7460696466104070403}
-    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 471c30ff001a0254e8af63991ec73cf2, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 640842503747542656}
-    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 471c30ff001a0254e8af63991ec73cf2, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 8851936077573526357}
-    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 471c30ff001a0254e8af63991ec73cf2, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 7345859516481314333}
   m_SourcePrefab: {fileID: 100100000, guid: 471c30ff001a0254e8af63991ec73cf2, type: 3}
 --- !u!4 &290302554425236768 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -6282350263528262771, guid: 471c30ff001a0254e8af63991ec73cf2, type: 3}
-  m_PrefabInstance: {fileID: 3231270175939980973}
-  m_PrefabAsset: {fileID: 0}
---- !u!1 &1048921974906316339 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: -6748287935452084066, guid: 471c30ff001a0254e8af63991ec73cf2, type: 3}
   m_PrefabInstance: {fileID: 3231270175939980973}
   m_PrefabAsset: {fileID: 0}
 --- !u!1 &2312227645707408380 stripped
@@ -2131,67 +1949,6 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
---- !u!114 &640842503747542656
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2312227645707408380}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e8d0727d5ae3244e3b569694d3912374, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.Components.NetworkAnimator
-  ShowTopMostFoldoutHeaderGroup: 1
-  NetworkAnimatorExpanded: 0
-  AuthorityMode: 0
-  m_Animator: {fileID: 7460696466104070403}
-  TransitionStateInfoList: []
-  AnimatorParameterEntries:
-    ParameterEntries:
-    - name: Groggy
-      NameHash: 221587152
-      Synchronize: 1
-      ParameterType: 4
-    - name: Speed
-      NameHash: -823668238
-      Synchronize: 1
-      ParameterType: 1
-    - name: Death
-      NameHash: 646380074
-      Synchronize: 1
-      ParameterType: 9
-  AnimatorParametersExpanded: 0
---- !u!114 &8851936077573526357
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2312227645707408380}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 13e8c5b35403d6b468c8645946489777, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ServerSetAnimState
-  ShowTopMostFoldoutHeaderGroup: 1
-  animator: {fileID: 7460696466104070403}
---- !u!114 &7345859516481314333
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2312227645707408380}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 854cd2378b965774f89b4d92521510a9, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::TwentyThreeAnimEvents
-  ShowTopMostFoldoutHeaderGroup: 1
-  grabController: {fileID: 8939195106823421711}
-  jumpController: {fileID: 273769967766734601}
 --- !u!4 &3124792699938015558 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 471c30ff001a0254e8af63991ec73cf2, type: 3}

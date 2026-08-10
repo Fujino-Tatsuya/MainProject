@@ -95,18 +95,22 @@ public static class TwentyThreeBossAuthoring
         ("Dead",        "Boss_23_.die"         ),
     };
 
-    // 공격 행 → 상태명. ⚠️ enum 이름과 상태 이름이 다른 것이 4건.
+    // 공격 행 → (상태명, 히트박스 앵커명). ⚠️ enum 이름과 상태 이름이 다른 것이 4건.
     // 🔴 배열이다 — 없는 행을 **이 순서 그대로** 뒤에 붙인다(행 순서 = 쿨다운 슬롯 번호).
-    static readonly (BossAttackId Id, string State)[] AttackStates =
+    //
+    // 앵커는 프리팹의 Weapon(12) 자식 이름이다 — 6개 전부 실재를 확인했고 각각 ColliderInfo 가 붙어 있다.
+    // 빈 값 = 근접 판정기를 안 쓰는 공격(Jump 는 OverlapSphere AoE, ChargeSequence 는 판정 자체가 없다).
+    // 빈 값이면 ApplyAttackProfile 이 프리팹 기본 앵커로 되돌린다 — 직전 공격의 형상이 남지 않게.
+    static readonly (BossAttackId Id, string State, string Anchor)[] AttackStates =
     {
-        (BossAttackId.LeftHook,       "LeftHook"  ),
-        (BossAttackId.RightHook,      "RightHook" ),
-        (BossAttackId.Upper,          "Uppercut"  ), // ⚠️ Upper ≠ Uppercut
-        (BossAttackId.Grab,           "Grab"      ),
-        (BossAttackId.Jump,           "Leap"      ), // ⚠️ Jump ≠ Leap
-        (BossAttackId.Dash,           "DashAttack"), // ⚠️ Dash ≠ DashAttack
-        (BossAttackId.ChargeSequence, "Charging"  ),
-        (BossAttackId.RageDash,       "Rage"      ),
+        (BossAttackId.LeftHook,       "LeftHook",   "LeftHookAttack" ),
+        (BossAttackId.RightHook,      "RightHook",  "RightHookAttack"),
+        (BossAttackId.Upper,          "Uppercut",   "UpperAttack"    ), // ⚠️ Upper ≠ Uppercut
+        (BossAttackId.Grab,           "Grab",       "Grab"           ),
+        (BossAttackId.Jump,           "Leap",       ""               ), // ⚠️ Jump ≠ Leap · AoE 라 앵커 없음
+        (BossAttackId.Dash,           "DashAttack", "DashAttack"     ), // ⚠️ Dash ≠ DashAttack
+        (BossAttackId.ChargeSequence, "Charging",   ""               ),
+        (BossAttackId.RageDash,       "Rage",       "Rage"           ),
     };
 
     // ── 웰즈 ──────────────────────────────────────────────────────────────
@@ -385,6 +389,11 @@ public static class TwentyThreeBossAuthoring
 
         // 🔴 호출이 성공했다는 것과 파일이 바뀌었다는 것은 별개다(교훈 #61).
         //    디스크에서 되읽어 실제 참조를 확인한다.
+        //
+        // ⚠️ 단, **되읽기 전에 강제 임포트**해야 한다. 이걸 빠뜨렸다가 캐시에 남은 옛 버전을 읽고
+        //    "Wells.prefab 가 WellsBossController 를 가리키지 않는다"는 **거짓 경보**를 냈다
+        //    (파일은 멀쩡했다). 검증기가 틀린 신호를 주면 진짜 실패와 구별할 수 없어진다.
+        AssetDatabase.ImportAsset(prefabPath, ImportAssetOptions.ForceUpdate);
         var saved = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
         Animator[] check = saved != null ? saved.GetComponentsInChildren<Animator>(true) : System.Array.Empty<Animator>();
         if (!check.Any(a => a.runtimeAnimatorController == controller))
@@ -446,7 +455,7 @@ public static class TwentyThreeBossAuthoring
         List<BossAttackEntry> rows = (so.attacks ?? System.Array.Empty<BossAttackEntry>()).ToList();
         bool ok = true;
 
-        foreach ((BossAttackId id, string stateName) in AttackStates)
+        foreach ((BossAttackId id, string stateName, string anchor) in AttackStates)
         {
             BossAttackEntry row = rows.FirstOrDefault(r => r != null && r.attackId == id);
             if (row == null)
@@ -457,6 +466,7 @@ public static class TwentyThreeBossAuthoring
                 {
                     attackId             = id,
                     animatorStateName    = stateName,
+                    hitboxAnchorName     = anchor,
                     cooldown             = 0f,
                     ignoreDistanceWindow = true,
                     weight               = 0f,
@@ -466,14 +476,23 @@ public static class TwentyThreeBossAuthoring
             }
 
             int slot = rows.IndexOf(row);
-            if (row.animatorStateName == stateName)
+
+            if (row.animatorStateName != stateName)
+            {
+                log.AppendLine($"  ~ [{slot}] {id} 상태 — {Show(row.animatorStateName)} → \"{stateName}\"");
+                row.animatorStateName = stateName;
+            }
+            else
             {
                 log.AppendLine($"  = [{slot}] {id} — 이미 {stateName}");
-                continue;
             }
 
-            log.AppendLine($"  ~ [{slot}] {id} — {Show(row.animatorStateName)} → \"{stateName}\"");
-            row.animatorStateName = stateName;
+            // 앵커는 상태명과 **따로** 판정한다 — 상태명이 이미 맞아도 앵커는 비어 있을 수 있다.
+            if (row.hitboxAnchorName != anchor)
+            {
+                log.AppendLine($"  ~ [{slot}] {id} 앵커 — {Show(row.hitboxAnchorName)} → {Show(anchor)}");
+                row.hitboxAnchorName = anchor;
+            }
         }
 
         so.attacks = rows.ToArray();

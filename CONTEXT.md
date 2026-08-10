@@ -4,12 +4,13 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 다음 세션 시작점 — 보스 재작성 (2026-08-07 종료)
+## ▶▶ 다음 세션 시작점 — 보스 재작성 (2026-08-08 종료)
 
-🔴 **브랜치 `feature/Boss23`** · **컴파일 0에러 0경고** · **전부 미커밋**
+🔴 **브랜치 `feature/Boss23`** · **컴파일 0에러 0경고** · **`development` 머지 완료(behind 0)** · **전부 커밋됨**
 
-**한 줄 상태: 코드·애니메이터·데이터가 끝났고, 남은 것은 프리팹 조립뿐이다.**
-보스가 아직 한 번도 스폰된 적이 없다 — 그래서 `ValidateContract` 조차 돌지 않았다.
+**한 줄 상태: 코드·애니메이터·데이터·보스 프리팹까지 끝났다. 다음은 `PlayerBossTest` 에서 Play 하는 것이다.**
+보스가 **아직 한 번도 스폰된 적이 없다** — `ValidateContract` 가 아직 한 번도 안 돌았다.
+그래서 다음 세션의 0번 할 일은 **구현이 아니라 Play 하고 로그를 읽는 것**이다(아래 착수 순서 §0).
 
 > **2026-08-07 밤 갱신** — 아래 **1·2단계는 완료**됐다. 컨트롤러를 고치는 게 아니라 **전면 재작성**으로
 > 갔다(팀장 확정). 저작 도구 = `Assets/1.Scripts/Monster/Editor/TwentyThreeBossAuthoring.cs`
@@ -80,57 +81,84 @@ SO 에 `dash*` 6필드 + `BossAttackPhase.Dash` 추가(끝에). **숫자는 전�
 | `HitFlash` | `SetBaseTint`/`ClearBaseTint` | 카운터 색이 피격 플래시에 안 지워지게 |
 | `AoeTelegraph` | `ShowGrowing` | 점프 착지 예고(시간 성장) |
 
-### ▶ 다음 세션 착수 순서
+### ▶ 다음 세션 착수 순서 — **Play 검증부터**
 
-**1단계 — 애니메이터 상태 3건 (팀장 확정, 이번 세션 미착수)**
+🔴 **씬: `Assets/0.Scenes/PlayerBossTest.unity`** — 배선을 여기까지 끝내 뒀다. 열고 **Play** 하면 된다.
 
-| # | 할 일 | 근거 |
-|---|---|---|
-| ① | `No23.asset` 의 `locomotionState` **`Movement` → `Idle`** | 🔴 그 상태가 컨트롤러에 **없다.** 공격 상태가 `hasExitTime: false` 라 복귀 CrossFade 가 실패하면 **보스가 첫 공격 후 굳는다** |
-| ② | 컨트롤러에 **`getowned` 상태 추가** | 클립(`Boss_23_getowned01/02`)은 있는데 상태가 없다. 카운터 리액션이 재생될 곳이 없다 |
-| ③ | 컨트롤러에 **점프 체공·착지 상태 추가** | `Leap` 하나뿐이고 BlendTree 0개다. 클립은 `Boss_23_jumping`·`Boss_23_landingattack` |
+**1·2단계(애니메이터·데이터) ✅ 완료 · 3단계(프리팹 조립) = 보스 본체만 완료**
 
-실측한 실제 상태 이름 — **문서에서 베끼지 말고 이 목록을 쓸 것**(교훈 #63):
+#### 0. 첫 관문 — `ValidateContract` 로그 읽기
 
-```
-23호 (18):  Arrive Break Charging DashAttack Dead Grab Groggy GroggyEnd GroggyStart
-            Holding Idle Leap LeftHook Rage RightHook Throw Uppercut Walking
-Wells (5):  Die Groggy Idle Jump Throw
-```
+보스가 **아직 한 번도 스폰된 적이 없다.** Play 하면 처음으로 `ValidateContract` 가 돈다.
+그 로그가 남은 작업의 지도다 — 그래서 이게 0번이다.
 
-**2단계 — `No23.asset` 저작.** 아래 표대로 채우면 `ValidateContract` 가 통과한다.
+- 🔴 `LogError` = **남은 배선 목록**. 상태명·파라미터·앵커 중 뭐가 비었는지 이름으로 알려 준다.
+- ⚠️ **정상인 경고 3건** — 다음 단계 작업이라 지금 뜨는 게 맞다:
+  · `BossWells 자식이 없어 폭탄 살포가 돌지 않는다`
+  · 방향 표시기 안 그려짐(호 머티리얼 미저작)
+  · 폭탄·장판 안 나옴(SO 의 `bombPrefab`·`chargeZonePrefab` 이 비어 있다)
+- 🔴 **의심할 것 = NavMesh.** 이 씬의 `NavMeshSurface` 가 **다른 씬(KMKScene)의 베이크 데이터**를
+  참조한다. `not close enough to the NavMesh` 가 뜨면 스폰 위치 `(10,0,10)` 가 NavMesh 밖이라는
+  뜻이고, 그러면 보스가 서 있기만 한다.
+- 단독 Play 로 볼 수 있는 것 = **스폰 · 계약 · 이동 · 공격 선택**까지.
+  **상태이상(기절·그로기)은 MPPM 2인에서만** 걸린다(`CanWrite = IsSpawned && IsServer`).
+  단독 Play 로 "기절이 안 된다"를 버그로 오진하지 말 것.
 
-| 필드 | 현재 | 고칠 값 | 안 고치면 |
-|---|---|---|---|
-| `archetype` | 0 (Melee) | **Boss** | 🔴 선택기가 **아예 안 돈다**(`LogError`) |
-| `locomotionState` | `Movement` | **`Idle`** | 🔴 첫 공격 후 **굳는다** |
-| `attackTrigger` | `Attack` | **비움** | `LogWarning`(보스는 CrossFade 경로) |
-| `maxGroggyCount` | 3 | **5** | 카운터 3회에 Break |
-| `groggyDuration` | 3 | **2** | 확정 스펙과 불일치 |
-| `attackDuration` | 0.9 | **상향** | 데드락 타임아웃이라 Jump 체인에 부족 |
-| `animatorStateName` ×6 | 전부 빈값 | `LeftHook`/`RightHook`/**`Uppercut`**/`Grab`/**`Leap`**/`DashAttack` | 🔴 애니 0 (`LogError` ×6). ⚠️ enum 이름 ≠ 상태 이름 2개 |
-| **행 2개 추가** | 없음 | `ChargeSequence`·`RageDash` (**weight 0**) | 🔴 페이즈 통과 시점에 `LogError` |
-| `grabHoldState`/`grabThrowState` | 빈값 | `Holding`/`Throw` | Hold·Throw 애니 없음 |
-| `jumpHoverState`/`jumpLandingState` | 빈값 | 1단계 ③에서 만든 상태명 | 체공·착지 애니 없음 |
-| `hitReactionState` | `getowned` | 1단계 ②에서 만든 상태명 | 카운터 리액션 없음 |
+#### 씬별 상태
 
-⚠️ **코드 기본값은 새 애셋에만 적용된다**(교훈 #22/#55) — 기존 `No23.asset` 은 인스펙터에서 직접 고쳐야 한다.
-⚠️ **행 순서 = 쿨다운 슬롯 번호다.** 중간 삽입 금지, 끝에만 추가.
-
-**3단계 — 프리팹 조립** (정본 §8 체크리스트)
-
-| 대상 | 준비물 |
+| 씬 | 상태 |
 |---|---|
-| **보스** | 루트 `Enemy(8)` / **`Hurtbox` 자식 `EnemyHurtBox(14)`**(없으면 안 맞는다) / 공격 앵커 `Weapon(12)` / **`NetworkAnimator` 제거** / `BossDirectionIndicator` + **투명 URP Unlit 머티리얼 1개** / `BossCounterTelegraph`(선택) / `BossChargeSequence` / `BossWells`(+손 소켓) / ⚠️ Relay·HitFlash 는 **붙이지 말 것**(런타임 자동 부착) / **여기서 `BehaviorGraphAgent` OFF**(R5) |
-| **폭탄** | `NetworkObject`+`NetworkRigidbody`+`Rigidbody`(**useGravity on**/`FreezeRotation`/`ContinuousDynamic`) + solid Collider + `Hurtbox`(**ownerUnit 비움** → `IAttackReceiver` 폴백) + `BossBomb` + NetworkPrefabs 등록. ⚠️ **정지해도 논키네마틱 유지**(재우면 당구가 안 된다) |
-| **장판** | `NetworkObject` + `AreaZone` + 비주얼 자식(로컬 XY 지름 1) + 레이어 **`HazardArea(9)`** + NetworkPrefabs 등록 |
-| **송전탑** | `bossroom.prefab` 의 `Env_Mv_bosscharger_upper` **4개**를 레거시 `ChargingObject` → **`BossChargingPylon`** 으로 교체 |
+| `PlayerBossTest.unity` | ✅ **배선 완료** — 기둥 4개 교체 + 스폰 주체 정리. **여기서 시작한다** |
+| `BossScene.unity` | ❓ 미확인. 같은 기둥 교체가 필요할 수 있다 |
+| `4.MapScene.unity` | 실제 맵. `bossroom.prefab` 의 `Env_Mv_bosscharger_upper` **4개**를 교체해야 한다 |
+
+#### 남은 조립 4건
+
+| 대상 | 할 일 |
+|---|---|
+| **웰즈** | `Wells.prefab` 이 아직 레거시(`BombLauncher`·`WellsAnimEvents`) → **`BossWells`** 로 교체 + 손 소켓 |
+| **폭탄** | `Bomb.prefab` 이 아직 레거시(`Bomb`·`BombController`·`BombAreaEffect`) → **`BossBomb`**. `Rigidbody`(useGravity on / FreezeRotation / ContinuousDynamic) + `Hurtbox`(**ownerUnit 비움** → `IAttackReceiver` 폴백) + NetworkPrefabs 등록. ⚠️ **정지해도 논키네마틱 유지**(재우면 당구가 안 된다) |
+| **장판** | 프리팹이 **아예 없다** — 신규 생성: `NetworkObject` + `AreaZone` + 비주얼 자식(로컬 XY 지름 1) + 레이어 **`HazardArea(9)`** + NetworkPrefabs 등록 |
+| **송전탑** | `bossroom.prefab` 의 4개 교체(위 씬 표 참조) |
 | **프로젝트 설정** | 🔴 충돌 매트릭스에서 **폭탄 레이어 ↔ 유닛 레이어 물리 응답을 끊을 것**(유닛 감지는 트리거로 하므로 폭발은 산다) |
-| **애니 이벤트** | `OnAttackHit`/`OnAttackEnd`(exitTime 0.05~0.1 앞) — 🔴 **SVN 커밋**(`SK_23.fbx.meta`) |
 
-⚠️ Wells 클립 이벤트 이름은 **fbx 에 이미 박혀 있다** — `ThrowBombEvent`/`BombDestroyEvent`. 바꾸면 조용히 무시된다.
+#### 🔴 저작 도구 3개 — **수명에 주의**
 
-**4단계 이후** — S5 Dash(은희 머지 후 호출 3줄) → S2 어퍼 에어본(가능해짐) → **어색한 것들 수정**(팀장 목록 대기) → MPPM 검증 → 레거시 `Enemy/Boss`·`8.BehaviorTreeGraph` 삭제
+전부 `Assets/1.Scripts/Monster/Editor/` 에 있다. 파괴적이라 **언제 그만 써야 하는지**가 중요하다.
+
+| 도구 | 성격 | 언제 그만 쓰나 |
+|---|---|---|
+| `TwentyThreeBossAuthoring` | 컨트롤러 2개를 **매번 지우고 새로 만든다**(GUID 도 매번 바뀐다) + `No23.asset` 저작 | 🔴 **애니메이터를 손으로 튜닝하기 시작하면 다시 돌리면 안 된다** — 손댄 것이 전부 사라진다. 그 시점에 컨트롤러 생성부를 지우고 **SO 저작만 남길 것** |
+| `BossPrefabAuthoring` | 보스 프리팹 컴포넌트 교체. **사실상 1회용** — 이미 끝났다 | 프리팹이 깨졌을 때 복구용으로만 남긴다. 4단계 레거시 정리 때 함께 삭제 |
+
+두 도구 모두 **검증 전용 메뉴**가 따로 있다(`… — 검증만`). 파괴적 메뉴를 누르기 전에 그걸로 먼저 읽을 것.
+멱등하게 짜여 있어 여러 번 눌러도 결과는 같다(`= 이미 …` 로 지나간다).
+
+#### 조절해서 처리하는 값 — 코드 수정 불필요
+
+전부 인스펙터에서 만진다. **GDD 가 TBD 로 비워 둔 구간이라 현재 값은 거의 placeholder 다.**
+
+- **`No23.asset`** — `dash*` 6필드(S5 신규) · `jump*` · `grab*` · `charge*` · `rageDash*` ·
+  `bombThrowInterval`/`throwImpulse`/`spreadAngle`/`bombThrowPitch` · 공격 행별 `cooldown`·`weight`·거리창·`damage`
+- **프리팹** — `BossChargingPylon.maxHp`(200)·`defense` · `BossDirectionIndicator` 반지름/색/세그먼트 ·
+  `BossChargeSequence` 여유시간·선택 기준
+- **코드 상수 2개**(눈으로 보고 맞춰야 하는 값) — `DashCarryProbeRadius`(1.2) · `DashCarryWallMargin`(0.6)
+
+#### 🔴 SVN 후속 (git 아님 — 팀장이 "추후"로 확정)
+
+- `Boss_23_idle`·`Boss_23_charging` 의 **Loop Time 이 꺼져 있다** — 로코모션과 차징(최대 20초)이
+  한 바퀴 뒤 마지막 프레임에서 굳는다. 저작 도구가 실행할 때마다 경고로 다시 알린다.
+- 애니 이벤트 `OnAttackHit`/`OnAttackEnd` 저작 — 없으면 공격이 `attackDuration` 타임아웃으로만 끝난다.
+  ⚠️ Wells 클립 이벤트 이름은 **fbx 에 이미 박혀 있다**(`ThrowBombEvent`/`BombDestroyEvent`). 바꾸면 조용히 무시된다.
+
+#### 4단계 이후
+
+S2 어퍼 에어본(팀장 판단 대기) → S4 Throw 변위 재검토(`Unit.Knockback` 임펄스가 던지기엔 오히려
+맞는 모양이다 — **미확인**) → **어색한 것들 수정**(팀장 목록 대기) → MPPM 2인 검증 →
+레거시 `Enemy/Boss`·`8.BehaviorTreeGraph` 삭제.
+
+⚠️ 그때 `TwentyThreeArenaContext` 는 **삭제가 아니라 `Monster/Boss/` 로 이동**해야 한다 —
+씬 3개가 이 컴포넌트를 참조한다. 파일을 옮기면 `.meta` 가 따라가 GUID 가 유지되므로 참조는 안 깨진다.
 
 ### 은희 의존 — ✅ **R1·R2 둘 다 종결. `development` 에 머지 완료**(`a75398c`, 2026-08-07)
 
