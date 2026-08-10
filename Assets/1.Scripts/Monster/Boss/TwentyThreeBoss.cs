@@ -550,6 +550,14 @@ public class TwentyThreeBoss : MonsterBase
                 BeginDash();
                 break;
 
+            // 🔴 이 둘은 히트 이벤트로 시작하지 않는다 — StartAttack 이 이미 BeginRage/BeginCharge 를 했다.
+            //    그런데 **Rage 는 DashAttack 과 같은 클립(Boss_23_dash)을 쓴다.** 그 클립에 심은
+            //    OnAttackHit 이 레이지 중에도 여기로 들어오므로, 명시적으로 받아 두지 않으면
+            //    "미구현" 경고가 뜬다(경고는 신호를 덮는다 — 교훈 #8).
+            case BossAttackId.RageDash:
+            case BossAttackId.ChargeSequence:
+                break;
+
             default:
                 WarnUnimplementedOnce(e.attackId);
                 break;

@@ -65,7 +65,7 @@ MonoBehaviour:
     damage: 0
     opensCounterWindow: 0
     superArmor: 1
-    hitboxAnchorName: LeftHookAttack
+    hitboxAnchorName: Hand_L
   - attackId: 1
     animatorStateName: RightHook
     cooldown: 2.5
@@ -78,7 +78,7 @@ MonoBehaviour:
     damage: 0
     opensCounterWindow: 0
     superArmor: 1
-    hitboxAnchorName: RightHookAttack
+    hitboxAnchorName: Hand_R
   - attackId: 2
     animatorStateName: Uppercut
     cooldown: 3
@@ -91,7 +91,7 @@ MonoBehaviour:
     damage: 0
     opensCounterWindow: 0
     superArmor: 1
-    hitboxAnchorName: UpperAttack
+    hitboxAnchorName: Hand_R
   - attackId: 3
     animatorStateName: Grab
     cooldown: 10
@@ -104,7 +104,7 @@ MonoBehaviour:
     damage: 0
     opensCounterWindow: 1
     superArmor: 1
-    hitboxAnchorName: Grab
+    hitboxAnchorName: Hand_R
   - attackId: 4
     animatorStateName: Leap
     cooldown: 10
@@ -130,7 +130,7 @@ MonoBehaviour:
     damage: 0
     opensCounterWindow: 1
     superArmor: 1
-    hitboxAnchorName: DashAttack
+    hitboxAnchorName: DashBody
   - attackId: 6
     animatorStateName: Charging
     cooldown: 0
@@ -156,7 +156,7 @@ MonoBehaviour:
     damage: 0
     opensCounterWindow: 0
     superArmor: 1
-    hitboxAnchorName: Rage
+    hitboxAnchorName: DashBody
   repeatPenalty: 0.3
   repeatBlockAfter: 2
   phases:
