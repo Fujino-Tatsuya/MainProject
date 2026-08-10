@@ -1,3 +1,75 @@
+# CURRENT PLAN — 보스 전투 한 사이클: MonsterScene 재구성 + 프리팹 4종 신규 제작 (2026-08-10)
+
+> 상태: **P0~P6 완료 · P7부터 남음** (2026-08-10 갱신). 브랜치 `feature/Boss23`. 담당: 경석(Claude).
+>
+> | P0 | P1 | P2 | P3 | P4 | P5 | P6 | P7 | P8 | P9 |
+> |---|---|---|---|---|---|---|---|---|---|
+> | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ▶ | — | — |
+>
+> P6 은 팀장 지시로 **범위가 늘었다** — 디렉터를 신형 타입으로 "개조"하는 대신, 죽은 레거시를
+> 전수 실측해 **삭제**했다(`BossArenaContext` 176줄 · `BossArenaWiring` 136줄 ·
+> `BossEncounterDirector` 889→624줄). 연출(하강·임팩트)은 그대로 유지. 상세 = CONTEXT.md 최상단.
+> 지시(팀장): 기존 `Assets/2.Prefabs/Wells&No.23/` 3개(`Bomb`·`TwentyThree`·`Wells`)는 **쓰지 않는다.**
+> 레거시 승계 없이 **새로 만든다.** 테스트 환경은 `MonsterScene`.
+> 확정 2건(2026-08-10 문답): ① **애니 이벤트를 이번에 같이 저작한다** ② **히트박스는 확정된 새 설계로 다시 잡는다.**
+
+## 목표
+
+**`MonsterScene` 에서 Paladin 이 `bossroom` 안에서 → 보스 입장 연출 → 전투 → 처치까지 한 사이클**이 돈다.
+
+## 확정된 사실 (전부 실물에서 확인 — 문서 인용 아님)
+
+| 사실 | 근거 |
+|---|---|
+| 손 본 이름 = **`hand.l` / `hand.r`** (디폼). 몸통 = `spine_01.x`·`spine_02.x`, 루트 = `root.x` | `SK_23.fbx` 바이너리 노드명 추출(116개). ⚠️ `c_` 접두사는 **컨트롤러**라 붙이면 안 된다 |
+| 보스 프리팹은 **`SK_23.fbx` + `Wells.prefab` 2개를 중첩**한다 | `TwentyThree.prefab` 의 `m_SourcePrefab` 2건 |
+| `bossroom.prefab` = `Assets/2.Prefabs/Map/Zoneprefab/bossroom.prefab` (6081줄, **git**) | 레거시 `BossArenaContext` ×1 + `ChargingObject` ×4 |
+| 🔴 연출 주체가 **레거시 타입에 묶여 있다** — `arena: BossArenaContext`, `chargingObjects: List<ChargingObject>` | [BossEncounterDirector.cs:49](Assets/1.Scripts/Map/BossEncounterDirector.cs:49) |
+| 🔴 fbx 클립 이벤트 5개가 **전부 구 이름** — `OnAttackHit` 0개 | `SK_23.fbx.meta` (`TryGrabEvent`·`OnLandedEvent`·`ThrowEvent`·`SetTargetEvent`·`FallEvent`) |
+| 🔴 히트는 **이벤트 전용, 타이머 폴백 없음** | [MonsterBase.cs:591](Assets/1.Scripts/Monster/MonsterBase.cs:591) |
+| `MonsterScene` 현재 = `MonsterSpawner` + `MonsterSpawnPoint` ×9 + `MonsterTestBootstrap` + Env(Ground·Wall1~4) | 씬 YAML |
+| `MonsterScene` 의 `PlayerPrefab` = Paladin 으로 **이미 설정됨**. 단 **`ForProfile`(Start Host) 이 없다** | 씬 YAML |
+| `AreaZone` 은 `[RequireComponent(NetworkObject)]` | [AreaZone.cs:29](Assets/1.Scripts/Monster/AreaZone.cs:29) |
+| `DefaultNetworkPrefabs.asset` 에 30개 등록됨 | 등록 필요 대상 = 새 `TwentyThree`·`Bomb`·`FireFloor`. **Wells 는 중첩이라 제외** |
+| `rig` 스케일 **100배**, 회전 (270.02, 0, 0) | 본 아래 콜라이더는 **1/100** 로 넣어야 의도한 월드 크기 |
+
+## 접근 — 슬라이스 9개
+
+| # | 슬라이스 | 내용 |
+|---|---|---|
+| **P0** | **애니 이벤트 저작** | `SK_23.fbx.meta` — `TryGrabEvent`→`OnAttackHit`(grab, t=0.354) · `OnLandedEvent`→`OnAttackHit`(landingattack, t=0.206) · 훅L/훅R/어퍼/대시에 `OnAttackHit` 신규 + 각 클립 `OnAttackEnd`. `Boss_23_idle`·`Boss_23_charging` **Loop Time on**. 🔴 SVN 이라 **커밋은 팀장님** |
+| **P1** | `FireFloor.prefab` **신규** | `NetworkObject` + `AreaZone` + 비주얼 자식(로컬 XY 지름 1) + 레이어 **`HazardArea(9)`** |
+| **P2** | `Bomb.prefab` **신규** | `NetworkObject`+`NetworkTransform` + `BossBomb` + `Rigidbody`(useGravity on / FreezeRotation / **ContinuousDynamic**) + `Hurtbox`(**ownerUnit 비움**). ⚠️ 정지해도 **논키네마틱 유지**(재우면 당구가 안 된다) |
+| **P3** | `Wells.prefab` **신규** | `BossWells` + Animator(`WellsBossController`) + **손 소켓**(`BombSocket`). 레거시 `BombLauncher`·`WellsAnimEvents`·`BehaviorGraphAgent` 없음 |
+| **P4** | `TwentyThree.prefab` **신규** | `SK_23.fbx` 중첩 + P3 중첩 + 신형 스택만. **히트박스 새 설계**: `hand.l`/`hand.r` 아래 앵커 2개(훅·어퍼·잡기 공용) + `spine_02.x` 아래 돌진용 1개. 점프는 앵커 없음(코드가 `jumpAoeRadius` 로 처리). `No23.asset` 의 `hitboxAnchorName` 재매핑 |
+| **P5** | `bossroom` 송전탑 교체 | `ChargingObject` ×4 → `BossChargingPylon` ×4 |
+| **P6** | `BossEncounterDirector` 개조 | `arena`·`chargingObjects` 를 신형 타입으로. 연출 자체(강하·임팩트 홀드)는 유지 |
+| **P7** | `MonsterScene` 재구성 | 기존 몹 세팅은 **삭제 대신 비활성 보존** · `bossroom` 배치 · `ForProfile` 추가 · **NavMesh 재베이크** |
+| **P8** | NetworkPrefabs 등록 | `DefaultNetworkPrefabs.asset` 에 3종 추가 |
+| **P9** | Play 한 사이클 검증 | Start Host → Paladin 스폰 → 입장 연출 → 공격 8종 → 카운터 → 페이즈 → 처치 |
+
+## 리스크 / 한계
+
+- 🔴 **새 프리팹은 GUID 가 새로 발급된다** — `PlayerBossTest`·`BossScene`·`4.MapScene` 은 여전히 **구 프리팹을 가리킨다.** 셋 다 재배선하거나, 구 프리팹을 지우는 시점을 따로 정해야 한다. (이번 범위는 `MonsterScene` 우선)
+- 🔴 `TwentyThreeBossAuthoring` 은 컨트롤러를 **매번 지우고 새로 만든다.** 애니를 손으로 튜닝하기 시작하면 다시 돌리면 안 된다.
+- 🔴 `50.Art` = **SVN**. P0 의 `.fbx.meta` 편집은 내가 하되 **커밋은 팀장님**이 하셔야 한다.
+- **상태이상(기절·그로기) 검증은 MPPM 2인**에서만 된다(`CanWrite = IsSpawned && IsServer`). 단독 Play 로 "기절이 안 된다"를 버그로 오진하지 말 것.
+- NavMesh 를 안 구우면 보스가 제자리에 선다(`not close enough to the NavMesh`).
+
+## 범위 밖
+
+플레이어 CC 수신 경로(`OnGrabThrowRelease` 변위) · 어퍼 에어본 · 레거시 `Enemy/Boss`·`8.BehaviorTreeGraph` 삭제 · 사운드 · VFX.
+
+## 완료 조건
+
+1. `MonsterScene` Play → Start Host → **`ValidateContract` LogError 0건**
+2. 보스가 입장 연출을 마치고 Paladin 을 추격·공격하며, **실제로 데미지가 들어간다**
+3. 카운터 창 표시가 화면에 보이고(방향 표시기 머티리얼 배선), 인터럽트로 그로기가 걸린다
+4. 페이즈 전환 → 송전기 시퀀스 → 실패 시 레이지 돌진이 돈다
+5. 보스 처치까지 도달, 콘솔 에러 0건
+
+---
+
 # CURRENT PLAN — 보스 FSM 지원 2건: 인터럽트 식별자 + 캐리 소켓 일반화 (2026-08-07)
 
 > 상태: **구현 진행 중**(사용자 지시 = PLAN 작성 후 바로 착수).

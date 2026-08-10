@@ -4,7 +4,108 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 다음 세션 시작점 — 보스 재작성 (2026-08-08 종료)
+## ▶▶ 다음 세션 시작점 — MonsterScene 한 사이클 (2026-08-10 종료)
+
+🔴 **브랜치 `feature/Boss23`** · **컴파일 0에러 0경고** · **전부 미커밋** (아래 「미커밋 목록」)
+
+**한 줄 상태: 프리팹 4종을 새로 만들었고 레거시 정리까지 끝났다. 다음은 `MonsterScene` 을 꾸미는 것(P7)이다.**
+
+> 팀장 지시(2026-08-10): 기존 `2.Prefabs/Wells&No.23/` 3개는 **쓰지 않는다.** MonsterScene 에
+> bossroom 을 깔고 **Paladin 이 보스 연출부터 전투까지 한 사이클**을 도는 테스트 환경을 만든다.
+> 계획서 = [PLAN.md](PLAN.md) 최상단(슬라이스 P0~P9).
+
+### ✅ 이번 세션 완료 — P0~P6
+
+| # | 한 것 | 검증 |
+|---|---|---|
+| **P0** | **애니 이벤트 저작** — 저작 도구 `No23ClipEventAuthoring` 신규. `OnAttackHit` 6 + `OnAttackEnd` 4, 구 이름 0건. `idle`·`charging` Loop Time on | `.fbx.meta` 직접 확인 |
+| **P1** | `FireFloor.prefab` 신규 (`AreaZone`, layer 9, 콜라이더 0, Quad+Circle 알파로 **원형**) | 씬 뷰 스크린샷 |
+| **P2** | `Bomb.prefab` 신규 (`BossBomb`, layer 10, **논키네마틱**+ContinuousDynamic, `bomb.fbx` 비주얼, `zonePrefab`→FireFloor) | 스크린샷 + YAML |
+| **P3** | `Wells.prefab` 신규 (`BossWells`, `WellsBossController`, `hand.r/Bone/BombSocket`, **NetworkObject 없음**) | `unity_get_animator_info` 로 바인딩 확인 |
+| **P4** | `TwentyThree.prefab` 신규 — **히트박스 새 설계**(`Hand_L`/`Hand_R` = 손 본 / `DashBody` = 루트 자식) | Unity 가 참조를 해석하는지 되읽어 확인 |
+| **P5** | `bossroom.prefab` 송전탑 `ChargingObject`×4 → **`BossChargingPylon`×4**, `maxHp` 5→200 | 인스턴스화 후 컴포넌트 조회 |
+| **P6** | **레거시 정리** — `BossArenaContext`·`BossArenaWiring` 삭제, `BossEncounterDirector` **889→624줄** | 컴파일 0/0, dll 에서 타입 소멸 확인 |
+
+### ▶ 다음 = P7 `MonsterScene` 재구성
+
+1. 기존 몹 세팅(`MonsterSpawner` + `MonsterSpawnPoint`×9 + `TestBootStrap`)은 **삭제 말고 비활성 보존**
+2. `bossroom.prefab` 배치
+3. **`ForProfile` 추가** — 🔴 MonsterScene 에 없다. 이게 없으면 "Start Host" 버튼이 안 떠서 **아무것도 스폰되지 않는다**(이번 세션에 PlayerBossTest 에서 30분 날린 지점). `PlayerPrefab` 은 이미 Paladin 으로 설정돼 있다
+4. `TwentyThreeArenaContext` 로 보스 스폰 (씬 3곳에서 이미 쓰는 신형 스포너). `bossPos` 가 **절대좌표**라 bossroom 위치에 맞춰야 한다
+5. **NavMesh 재베이크** — 안 하면 보스가 제자리에 선다
+6. 그 다음 P8(충돌 매트릭스) → P9(Play 한 사이클)
+
+### 🔴 새로 만든 것 — 경로
+
+| | |
+|---|---|
+| 프리팹 4종 | `Assets/2.Prefabs/Monster/Boss/` — `TwentyThree` · `Wells` · `Bomb` · `FireFloor` |
+| 머티리얼 | `Assets/3.Materials/MA_AreaZone_Fire.mat` (주황 — 예고 장판 빨강과 구분) |
+| 저작 도구 | `Monster/Editor/No23ClipEventAuthoring.cs` (클립 이벤트, **멱등·재실행 가능**) |
+| 조사 도구 | `Monster/Editor/BonePathDump.cs` (본 경로 + **lossyScale** 덤프, 읽기 전용) |
+| 요청 문서 | `Docs/tech/request-player-grabsocket-decoupling.md` (은희 님께 팀장이 전달) |
+
+**NetworkPrefabs 18개** — `TwentyThree`·`Bomb`·`FireFloor` 등록됨. Wells 는 중첩이라 대상 아님.
+
+### 🔴 팀장 액션 2건
+
+1. **SVN 커밋** — `svn commit "Assets/50.Art/Char/Boss/SK/SK_23.fbx.meta"`. git 은 `50.Art` 를 무시한다(`.gitignore:84`)
+2. **은희 님께 요청 전달** — 위 요청 문서. `PlayerStateController.cs:760` 이 `GrabController` 를 구체 타입으로 잡아 레거시 폴더 삭제가 막혀 있다. **4줄 변경, 동작 변경 0**
+
+### ⚠️ 이번 세션에 확정된 것
+
+- **리그 스케일 100배 실측 확정** — `hand.l`/`hand.r` 의 `lossyScale (100,100,100)`. 앵커의 **localScale 을 0.01** 로 둬서 `lossyScale = 1` 을 만들었다 → **콜라이더 크기를 미터 그대로 읽고 튜닝**할 수 있다(1/100 값을 안 봐도 된다)
+- **보스 리그 경로**: `rig/c_pos/c_traj/forearm.{l,r}/hand.{l,r}` · `…/c_spine_01.x/c_spine_02.x/spine_02.x`
+- **앵커 콜라이더는 전부 `enabled: 0`** — `ColliderInfo` 가 형상 데이터로만 읽는다
+- **돌진 앵커만 본이 아니라 루트 자식** — 본에 붙이면 박스가 본 회전을 따라가는데 돌진은 보스 정면으로 뻗어야 한다
+- **Animator 를 보스 루트에 두면 안 된다** — 점프 체공 중 `animator.transform` 하위 렌더러를 전부 끄므로 방향 표시기까지 사라진다
+- 🔴 **레거시 보스의 Avatar 는 `SKM_Golem.fbx`(다른 테스트 모델) 것이었다** — 승계하지 않았다. 새 프리팹은 `m_Avatar: 0`(Wells 와 동일)
+
+### ⚠️ 미확인 — Play 에서 판단할 것
+
+- **애니 재생** — `m_Avatar` 가 null 이다. 같은 fbx 의 클립이라 트랜스폼 경로 바인딩으로 돌 것이나 확인 못 했다
+- **어퍼·잡기가 어느 손인지** — 오른손(`Hand_R`)으로 잡은 건 **추정**. 클립을 보고 다르면 SO 에서 `Hand_L` 로 바꾸면 끝
+- **히트 타이밍** — 훅·어퍼(≈22f)·대시(≈30f)는 **추정값**. `grab`·`landingattack` 은 아티스트 시간 승계라 신뢰 가능
+- **앵커 크기** 1.2m / 돌진 2×2×2.6 은 눈대중 초기값
+
+### 🔴 남은 셰이더 에러 2건은 우리 것이 아니다 (팀장 판단 = 그냥 둠)
+
+`Generic_Basic`·`Generic_Standard` 셰이더그래프가 `WallOcclusionClip.hlsl` 을 못 찾는다. 그 파일은
+git `ec1c996`(**`origin/feature/trensparent` 에만**, development 미머지)에 있다. SVN r274/r275 가
+셰이더그래프와 `ZoneLayoutCatalog`(존 프리팹 11개 새 GUID)를 가져왔는데 **git 쪽이 안 따라온** 상태다.
+영향 = 맵 프롭 머티리얼 3개. **`bossroom` 은 무관**하다. 근본 해결은 `feature/trensparent` 머지.
+
+### 🔴🔴 SVN — **커밋하기 전에 반드시 볼 것**
+
+`svn status` 에 **`MapGen/MapObj/ZoneLayout/ZoneLayoutCatalog.asset` 이 `M` 으로 떠 있는데,
+이건 우리가 고친 것이 아니다.** Unity 가 **자기 메모리에 들고 있던 낡은 사본으로 덮어썼다** —
+존 프리팹 11개 참조가 r274 이전 GUID 로 **되돌아갔다**.
+
+- 원인: SVN 업데이트로 파일이 바뀌었는데 Unity 가 리프레시를 안 해 낡은 사본을 들고 있었고,
+  그 뒤 어떤 계기로 dirty 가 되면서 **자기 것을 디스크에 썼다**(교훈 #69 의 반대 방향).
+- 🔴 **이대로 커밋하면 이지원 님의 r274("V3 zone, stage 프리펩들 수정함")를 팀 전체에서 되돌린다.**
+- 판단 필요: r275 를 되살리면(`svn revert`) 이 머신에서는 존 프리팹 11개가 **깨진 참조**가 된다
+  (그 프리팹들이 git `feature/trensparent` 에만 있어서). 즉 **머지 전까지는 어느 쪽도 완전하지 않다.**
+- 권장: **SVN 커밋은 `SK_23.fbx.meta` 만 경로 지정해서** 하고, 카탈로그는 `feature/trensparent`
+  머지 시점에 함께 정리한다.
+
+```bash
+svn commit "Assets/50.Art/Char/Boss/SK/SK_23.fbx.meta" -m "feat(boss): 23호 클립 애니 이벤트 저작 + idle/charging Loop Time"
+```
+
+⚠️ 나머지 14건(노멀맵 7 · 슬로프/계단 fbx 4 등)은 **이전부터 밀려 있던 팀장 작업분**이라 그대로 뒀다.
+
+### 미커밋 목록
+
+신규 = `2.Prefabs/Monster/Boss/`(4) · `MA_AreaZone_Fire.mat` · 에디터 도구 2 · 요청문서 1
+수정 = `BossEncounterDirector.cs` · `TwentyThreeBoss.cs` · `MonsterBase.cs` · `MonsterMeleeAttack.cs` ·
+`MonsterAnimationEventRelay.cs` · `No23.asset` · `bossroom.prefab` · `DefaultNetworkPrefabs.asset` · 씬 3개
+삭제 = `BossArenaContext.cs` · `BossArenaWiring.cs`
+SVN = `SK_23.fbx.meta`
+
+---
+
+## ▶▶ 이전 시작점 — 보스 재작성 (2026-08-08 종료)
 
 🔴 **브랜치 `feature/Boss23`** · **컴파일 0에러 0경고** · **`development` 머지 완료(behind 0)** · **전부 커밋됨**
 
