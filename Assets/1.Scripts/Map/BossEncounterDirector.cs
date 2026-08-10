@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.AI;
@@ -12,13 +12,23 @@ using UnityEngine.AI;
 /// <item><see cref="BossTeleportManager.AlivePlayersArrived"/>를 받아 참가자를 스냅샷한다(생존자만).</item>
 /// <item>참가자를 <see cref="PlayerEncounterLock"/>으로 잠그고, 보스를 <b>한 번만</b> NetworkSpawn한다.</item>
 /// <item>상공 → 착지점 하강을 서버가 구동하고, 착지 후 전투로 전환한다.</item>
-/// <item>보스룸 충전 기둥 4개를 보스의 <see cref="ChargeController"/>에 주입한다(패턴 재사용 전제).</item>
-/// <item><see cref="EnemyBTActivator.OpenBT"/> 호출과 참가자 잠금 해제를 한 전환점에서 수행한다.</item>
+/// <item>참가자 잠금 해제를 그 전환점에서 수행한다.</item>
 /// <item>보스 사망을 클리어 판정(<see cref="SessionStatsTracker"/>)과 결과 화면 전환에 연결한다.</item>
 /// </list>
 ///
 /// 씬에 하나만 배치한다(MapScene 상주 NetworkObject). MapScene에는 보스를 스폰하는 다른 주체가
 /// 없어야 한다 — <c>TwentyThreeArenaContext</c>는 BossScene·PlayerBossTest 전용이다.
+///
+/// 🔴 **2026-08-10 — BT 시대의 배선을 전부 걷어냈다.** 이 클래스는 원래 BT 보스를 전제로 쓰였고,
+///    그 흔적이 전부 **부착 0곳인 컴포넌트에 대한 죽은 호출**로 남아 있었다(실측):
+///    <c>ChargeController</c>·<c>JumpController</c>·<c>EnemyBTActivator</c>·<c>SpawnPointer</c> —
+///    넷 다 보스 프리팹에 없어서 <c>GetComponentInChildren</c> 이 항상 null 이었고, 결과적으로
+///    "전투를 시작할 수 없습니다" 같은 **거짓 에러 로그만** 남기고 있었다.
+///    아레나 부품 묶음(<c>BossArenaContext</c>)도 함께 삭제했다 — 4개를 노출하는데 실제 소비자가
+///    착지점 1건뿐이었고, 나머지는 죽었거나 <c>BossTeleportManager</c> 가 자기 방식으로 중복 구현 중이었다.
+///
+///    신형 보스(<c>TwentyThreeBoss</c>)는 스폰되면 <c>MonsterBase.Update</c> 로 스스로 행동하므로
+///    "BT 개방" 같은 별도 게이트가 필요 없다. 연출(하강·임팩트)만 이 클래스의 책임으로 남았다.
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class BossEncounterDirector : NetworkBehaviour
@@ -43,13 +53,6 @@ public sealed class BossEncounterDirector : NetworkBehaviour
 
     [Tooltip("착지 후 전투 시작까지 정지 시간(초).")]
     [SerializeField, Min(0f)] private float impactHoldSeconds = 0.9f;
-
-    [Header("아레나 (bossroom)")]
-    [Tooltip("보스룸이 자기 부품을 들고 있는 컴포넌트. 비우면 씬에서 찾는다(정상 = 1개).")]
-    [SerializeField] private BossArenaContext arena;
-
-    [Tooltip("보스룸 충전 기둥. 비우면 arena에서 가져온다. 보스 스폰 직후 ChargeController에 주입한다.")]
-    [SerializeField] private List<ChargingObject> chargingObjects = new List<ChargingObject>();
 
     [Header("클리어 판정")]
     [Tooltip("보스 격파 시 결과 화면으로 전환한다. 비어 있으면 씬에서 찾는다.")]
@@ -89,19 +92,10 @@ public sealed class BossEncounterDirector : NetworkBehaviour
 
     private readonly List<ulong> _eligibleClientIds = new List<ulong>();
 
-    // 부활 감시 대상. 전투 시작 시 참가자별로 구독하고, 종료 경로에서 반드시 해제한다
-    // (씬 전환 후 남은 콜백이 사라진 Director를 만지는 사고를 막는다).
-    private readonly List<PlayerLifeCycleController> _revivalWatchers =
-        new List<PlayerLifeCycleController>();
-
     private BossTeleportManager _teleportManager;
     private NetworkObject _bossNetworkObject;
     private Unit _bossUnit;
-    private EnemyBTActivator _btActivator;
-    private ChargeController _chargeController;
-    private JumpController _jumpController;
     private NavMeshAgent _bossAgent;
-    private SpawnPointer _bossSpawnPointer;
 
     private Vector3 _descendFrom;
     private Vector3 _descendTo;
@@ -152,7 +146,6 @@ public sealed class BossEncounterDirector : NetworkBehaviour
             NetworkManager.OnClientDisconnectCallback -= HandleClientDisconnect;
 
         UnsubscribeBossDeath();
-        UnsubscribeParticipantRevivals();
 
         base.OnNetworkDespawn();
     }
@@ -175,28 +168,36 @@ public sealed class BossEncounterDirector : NetworkBehaviour
         if (mapSceneManager == null)
             mapSceneManager = FindFirstObjectByType<MapSceneManager>();
 
-        // 아레나 부품(착지점·BossArea·충전 기둥)은 bossroom 프리팹이 스스로 들고 있다.
-        // 그래서 씬 배선이 비어 있어도 여기서 채워진다 — 저작 도구가 기준점을 재생성해 참조가
-        // 끊기거나, bossroom을 다른 씬에 인스턴스화해도 동작한다.
-        if (arena == null)
-            arena = BossArenaContext.FindInScene(this);
-
-        if (bossLandingPoint == null && arena != null)
-            bossLandingPoint = arena.BossLandingPoint;
-
-        // 이름 전역검색은 최후 폴백으로만 남긴다 — 씬에 동명 오브젝트가 둘이면 어느 것을 잡을지
-        // 보장이 없다(아레나 좌표가 맵 밖 x≈500이라 잘못 잡으면 보스가 엉뚱한 곳으로 내려온다).
+        // 착지점은 씬 배선이 정본이고, 비어 있으면 이름으로 찾는다.
+        // 🔴 동명 오브젝트가 둘이면 어느 것을 잡을지 보장이 없다 — 아레나 좌표가 맵 밖(x≈500)이라
+        //    잘못 잡으면 보스가 엉뚱한 곳으로 내려온다. 그래서 "조용히 첫 번째"가 아니라 소리를 낸다.
+        //    (삭제된 BossArenaContext 가 제공했던 실질 가치는 이 중복 검사뿐이었다.)
         if (bossLandingPoint == null)
-            bossLandingPoint = FindLandingPointByName();
-
-        if (chargingObjects.Count == 0 && arena != null)
-            chargingObjects.AddRange(arena.ChargingPillars);
+            bossLandingPoint = FindLandingPointByName(this);
     }
 
-    private static Transform FindLandingPointByName()
+    private const string BossLandingName = "BossLandingPoint";
+
+    private static Transform FindLandingPointByName(Object context)
     {
-        GameObject found = GameObject.Find("BossLandingPoint");
-        return found != null ? found.transform : null;
+        GameObject[] all = FindObjectsByType<GameObject>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        Transform found = null;
+        int count = 0;
+
+        for (int i = 0; i < all.Length; i++)
+        {
+            if (all[i].name != BossLandingName) continue;
+            count++;
+            if (found == null) found = all[i].transform;
+        }
+
+        if (count > 1)
+            Edit.LogError(
+                $"[BossEncounter] '{BossLandingName}' 오브젝트가 씬에 {count}개입니다 — 어느 곳으로 보스를 " +
+                "내려보낼지 보장할 수 없습니다. bossroom 인스턴스를 하나만 두거나 착지점을 직접 배선하세요.",
+                context);
+
+        return found;
     }
 
     private void ValidateSetup()
@@ -209,74 +210,9 @@ public sealed class BossEncounterDirector : NetworkBehaviour
         if (bossLandingPoint == null)
             Edit.LogError("[BossEncounter] 착지점(BossLandingPoint)을 찾지 못했습니다.", this);
 
-        chargingObjects.RemoveAll(o => o == null);
-
-        if (arena != null)
-        {
-            // 기둥 개수·콜라이더·NetworkObject·BossArea 태그는 아레나가 자기 부품에 대해 검사한다
-            // (부품의 소유자가 검사도 소유한다 — 두 곳에서 검사하면 메시지가 갈라진다).
-            arena.Validate();
-        }
-        else
-        {
-            if (chargingObjects.Count != ChargePillarCount)
-                Edit.LogWarning(
-                    $"[BossEncounter] 충전 기둥이 {chargingObjects.Count}개입니다(기대 {ChargePillarCount}). " +
-                    "충전 패턴이 인원수만큼 활성되지 않을 수 있습니다.", this);
-
-            // 기둥은 활성 상태에서만 콜라이더를 켜서 피격을 받는다(ChargingObject.SetColliderEnabled).
-            // 콜라이더가 아예 없으면 예외 없이 조용히 무적이 되어 충전 패턴을 깰 수 없다.
-            foreach (ChargingObject pillar in chargingObjects)
-                if (pillar.GetComponent<Collider>() == null)
-                    Edit.LogError(
-                        $"[BossEncounter] 충전 기둥 '{pillar.name}'에 Collider가 없습니다 — 피격되지 않아 " +
-                        "충전 패턴을 깰 수 없습니다.", pillar);
-        }
-
-        // 씬 전역 중복은 아레나가 아니라 여기서 본다 — BT의 FindObjectWithTag는 씬 전체를 훑는다.
-        ValidateBossAreaTag();
-    }
-
-    private const int ChargePillarCount = 4;
-    private const string BossAreaTag = "BossArea";
-
-    /// <summary>
-    /// No.23 BT는 <c>BossArea</c>를 블랙보드로 주입받지 않는다 — <c>FindObjectWithTagAction</c>으로
-    /// 태그 <c>BossArea</c>를 씬에서 직접 찾아 <c>SetEnableBoxColliderAction</c>으로 켠다
-    /// (<c>8.BehaviorTreeGraph/Boss/Wells&amp;No.23/No.23.asset</c>). 그래서 Director가 주입할 것은 없다.
-    ///
-    /// 다만 태그가 0개면 BT가 null을 잡고, 2개 이상이면 <b>어느 것을 잡을지 보장이 없다</b>
-    /// (씬 순회 순서에 의존). 두 경우 모두 증상은 "보스 패턴이 이상하다"로만 나타나 원인 추적이
-    /// 오래 걸리므로 여기서 소리내어 잡는다. BossScene의 BossArea를 MapScene으로 복사해 오면
-    /// 정확히 이 2개 상태가 된다.
-    /// </summary>
-    private void ValidateBossAreaTag()
-    {
-        GameObject[] areas;
-        try
-        {
-            areas = GameObject.FindGameObjectsWithTag(BossAreaTag);
-        }
-        catch (UnityException)
-        {
-            Edit.LogError($"[BossEncounter] 태그 '{BossAreaTag}'가 프로젝트에 정의돼 있지 않습니다.", this);
-            return;
-        }
-
-        if (areas.Length == 1) return;
-
-        if (areas.Length == 0)
-        {
-            Edit.LogError(
-                $"[BossEncounter] 태그 '{BossAreaTag}' 오브젝트가 씬에 없습니다 — No.23 BT가 아레나 " +
-                "콜라이더를 못 찾습니다. bossroom 인스턴스가 씬에 있는지 확인하세요.", this);
-            return;
-        }
-
-        Edit.LogError(
-            $"[BossEncounter] 태그 '{BossAreaTag}' 오브젝트가 {areas.Length}개입니다 " +
-            $"({string.Join(", ", System.Array.ConvertAll(areas, a => a.name))}) — BT가 어느 것을 잡을지 " +
-            "보장되지 않습니다. 씬에 정확히 1개만 두세요(정본 = bossroom 프리팹의 BossArea).", this);
+        // 🔴 송전탑 검증은 여기서 하지 않는다 — 신형 `BossChargingPylon` 은 스폰 시 자기를
+        //    **정적 레지스트리**(`BossChargingPylon.Active`)에 등록하고, 보스의 `BossChargeSequence` 가
+        //    거기서 필요한 수만큼 고른다. 디렉터가 목록을 들고 주입할 이유가 사라졌다.
     }
 
     // ── 연출 진입 ──────────────────────────────────────────────────────────
@@ -405,28 +341,6 @@ public sealed class BossEncounterDirector : NetworkBehaviour
         if (_bossAgent != null)
             _bossAgent.enabled = false;
 
-        // 연출 착지가 전투 판정·장판을 만들지 않게 한다.
-        _jumpController?.SetCinematicLandingMode(true);
-
-        // ⚠️ BT가 "복귀/중앙 위치"로 쓰는 SpawnPoint는 프리팹 기본값 (0,0,0)이고 아무도 채우지 않는다.
-        // BossScene은 아레나가 원점이라 우연히 맞았지만, 보스룸은 맵 밖 좌표(x≈500)라 그대로 두면
-        // 충전 페이즈에서 보스가 월드 원점으로 이동해 맵 밖으로 사라진다. 착지점(=방 중앙)으로 채운다.
-        if (_bossSpawnPointer != null)
-        {
-            _bossSpawnPointer.SetSpawnPoint(landing);
-            Edit.Log($"[BossEncounter] 보스 SpawnPoint를 방 중앙 {landing}으로 설정.", this);
-        }
-        else
-        {
-            Edit.LogWarning(
-                "[BossEncounter] 보스에 SpawnPointer가 없습니다 — BT의 복귀 위치가 (0,0,0)으로 남아 " +
-                "충전 페이즈에서 맵 밖으로 이동할 수 있습니다.", this);
-        }
-
-        SeedArenaPositionBlackboard(landing);
-
-        // 충전 기둥은 스폰 이후에 주입해야 ChargeController의 서버 게이트를 통과한다.
-        InjectChargingObjects();
         SubscribeBossDeath();
 
         _descendFrom = spawnPosition;
@@ -441,41 +355,13 @@ public sealed class BossEncounterDirector : NetworkBehaviour
     private void CacheBossComponents(GameObject bossInstance)
     {
         _bossUnit = bossInstance.GetComponent<Unit>();
-        _btActivator = bossInstance.GetComponent<EnemyBTActivator>();
-        _chargeController = bossInstance.GetComponentInChildren<ChargeController>(true);
-        _jumpController = bossInstance.GetComponentInChildren<JumpController>(true);
         _bossAgent = bossInstance.GetComponent<NavMeshAgent>();
-        _bossSpawnPointer = bossInstance.GetComponentInChildren<SpawnPointer>(true);
 
         if (_bossUnit == null)
             Edit.LogError("[BossEncounter] 보스에 Unit이 없어 사망(클리어) 판정을 연결할 수 없습니다.", this);
 
-        if (_btActivator == null)
-            Edit.LogError("[BossEncounter] 보스에 EnemyBTActivator가 없어 전투를 시작할 수 없습니다.", this);
-
-        if (_chargeController == null)
-            Edit.LogWarning("[BossEncounter] 보스에 ChargeController가 없습니다 — 충전 패턴이 동작하지 않습니다.", this);
-
         if (_bossAgent == null)
             Edit.LogWarning("[BossEncounter] 보스에 NavMeshAgent가 없습니다 — 이동 확인이 필요합니다.", this);
-    }
-
-    private void InjectChargingObjects()
-    {
-        if (_chargeController == null)
-            return;
-
-        chargingObjects.RemoveAll(o => o == null);
-        if (chargingObjects.Count == 0)
-        {
-            Edit.LogError(
-                "[BossEncounter] 충전 기둥 목록이 비어 있습니다 — 충전 패턴에서 " +
-                "ChargeController가 오류를 냅니다. bossroom의 ChargingObject 4개를 연결하세요.", this);
-            return;
-        }
-
-        _chargeController.SetList(chargingObjects);
-        Edit.Log($"[BossEncounter] 충전 기둥 {chargingObjects.Count}개 주입 완료.", this);
     }
 
     private void BeginDescent()
@@ -553,18 +439,9 @@ public sealed class BossEncounterDirector : NetworkBehaviour
 
         SnapBossToNavMesh();
 
-        // 연출 가드 해제가 먼저다 — BT가 열린 뒤 첫 패턴이 판정 없이 지나가지 않게.
-        _jumpController?.SetCinematicLandingMode(false);
-
         UnlockAllParticipants();
-
-        _btActivator?.OpenBT();
-
-        // 1인 플레이에서 사망으로 BT가 닫힌 뒤 부활하면 다시 열어 준다.
-        SubscribeParticipantRevivals();
-
         SetPhase(BossEncounterPhase.Combat);
-        Edit.Log($"[BossEncounter] 전투 시작 — 참가자 {_eligibleClientIds.Count}명, BT 개방.", this);
+        Edit.Log($"[BossEncounter] 전투 시작 — 참가자 {_eligibleClientIds.Count}명.", this);
     }
 
     /// <summary>연출을 안전하게 중단한다. 참가자 잠금을 풀고 보스를 되돌린다. 멱등.</summary>
@@ -576,7 +453,6 @@ public sealed class BossEncounterDirector : NetworkBehaviour
         Edit.LogWarning($"[BossEncounter] 연출 중단 — {reason}", this);
 
         UnlockAllParticipants();
-        UnsubscribeParticipantRevivals();
         DespawnBoss();
 
         _eligibleClientIds.Clear();
@@ -585,61 +461,6 @@ public sealed class BossEncounterDirector : NetworkBehaviour
 
         SetPhase(BossEncounterPhase.FailedSafe);
     }
-
-    /// <summary>
-    /// No.23 BT의 <b>절대 위치 블랙보드 변수를 아레나 중앙으로 미리 채운다</b>(서버, 보스 스폰 직후).
-    ///
-    /// 왜 필요한가 — BT 루트가 <c>ParallelAllComposite</c>이고 8개 <c>Start</c> 브랜치가 동시에 돈다.
-    /// 그 중
-    /// <list type="bullet">
-    /// <item>브랜치[1]에 <c>NavigateToLocationAction(Location = "Spawn Point")</c> — <b>읽는</b> 쪽</item>
-    /// <item>브랜치[4]에 <c>GetSpawnPointAction</c> — <b>쓰는</b> 쪽</item>
-    /// </list>
-    /// 이 있다. 병렬이라 쓰기가 먼저라는 보장이 없고, 인덱스 순 틱이면 읽기가 먼저다 →
-    /// 첫 프레임에 <c>Spawn Point</c>의 초기값 <c>(0,0,0)</c>을 읽어 <b>보스가 월드 원점으로 향한다</b>.
-    ///
-    /// <c>ArrivePoint</c>도 같은 함정이다. 원래 <see cref="JumpController.SetTarget"/>이 채우는데,
-    /// 연출 착지 중에는 <c>_isCinematicLanding</c>으로 조기 반환해 <b>한 번도 채워지지 않는다</b>.
-    /// 그 상태로 BT가 열리면 <c>SetPositionThroughRaycastAction</c>/<c>MoveForDurationAction</c>이
-    /// <c>(0,0,0)</c>을 목표로 삼아 위치를 직접 쓴다 — 아레나가 x≈500이라 원점으로 순간이동한다.
-    ///
-    /// 그래프를 고치는 게 정석이지만 BT는 보스 담당 영역이라, 여기서 <b>초기값을 안전한 값(방 중앙)으로
-    /// 덮어</b> 경합의 최악값을 없앤다. 이후 BT가 정상적으로 다시 채우면 그 값이 이긴다.
-    /// </summary>
-    private void SeedArenaPositionBlackboard(Vector3 arenaCenter)
-    {
-        var agent = _bossNetworkObject != null
-            ? _bossNetworkObject.GetComponentInChildren<Unity.Behavior.BehaviorGraphAgent>(true)
-            : null;
-
-        if (agent == null || agent.BlackboardReference == null)
-        {
-            Edit.LogWarning(
-                "[BossEncounter] 보스에 BehaviorGraphAgent가 없어 위치 블랙보드를 초기화하지 못했습니다 — " +
-                "BT가 (0,0,0)을 목표로 삼을 수 있습니다.", this);
-            return;
-        }
-
-        foreach (string variableName in ArenaPositionVariables)
-        {
-            if (agent.BlackboardReference.GetVariable<Vector3>(variableName, out var variable))
-            {
-                variable.Value = arenaCenter;
-                continue;
-            }
-
-            Edit.LogWarning(
-                $"[BossEncounter] BT 블랙보드에 Vector3 '{variableName}'이 없습니다 — 이름이 바뀐 것인지 " +
-                "확인하세요(초기화를 건너뜁니다).", this);
-        }
-
-        Edit.Log($"[BossEncounter] BT 위치 블랙보드 초기화 — {string.Join(", ", ArenaPositionVariables)} = {arenaCenter}", this);
-    }
-
-    // BT가 절대 위치로 소비하는 Vector3 블랙보드 변수 이름. 그래프에서 확인한 실제 이름이다
-    // ('Spawn Point'는 공백 포함 — 'Spawn Pointer'(컴포넌트 참조)와 다른 변수다).
-    private static readonly string[] ArenaPositionVariables = { "Spawn Point", "ArrivePoint" };
-
     private void SnapBossToNavMesh()
     {
         if (_bossNetworkObject == null)
@@ -709,11 +530,7 @@ public sealed class BossEncounterDirector : NetworkBehaviour
 
         _bossNetworkObject = null;
         _bossUnit = null;
-        _btActivator = null;
-        _chargeController = null;
-        _jumpController = null;
         _bossAgent = null;
-        _bossSpawnPointer = null;
     }
 
     private void PruneEligible()
@@ -751,82 +568,6 @@ public sealed class BossEncounterDirector : NetworkBehaviour
             _bossUnit.Died -= HandleBossDefeated;
     }
 
-    // ── 부활 시 전투 재개 ──────────────────────────────────────────────────
-    //
-    // No.23 BT는 생존 인원이 없어지면 스스로 `IsOpen`을 false로 내린다
-    // (그래프 안 SetVariableValueAction 2곳, 이를 읽는 조건 6곳). 1인 플레이에서는
-    // 그 플레이어가 죽는 순간 BT가 멈추는데, 목숨이 남아 부활할 수 있으므로
-    // 부활 시점에 `IsOpen`을 다시 올려 전투를 이어 줘야 한다.
-    //
-    // BT 그래프는 보스 담당 영역이라 손대지 않는다 — 레버는 기존 EnemyBTActivator 하나뿐이고,
-    // `IsOpen = true` 대입이라 여러 번 불려도 안전(멱등)하다. 2~3인에서는 한 명 사망으로
-    // BT가 닫히지 않으므로 이 재호출은 사실상 no-op이 된다.
-    private void SubscribeParticipantRevivals()
-    {
-        UnsubscribeParticipantRevivals();
-
-        for (int i = 0; i < _eligibleClientIds.Count; i++)
-        {
-            PlayerLifeCycleController lifeCycle = GetLifeCycle(_eligibleClientIds[i]);
-            if (lifeCycle == null)
-                continue;
-
-            lifeCycle.LifeStateChanged += HandleParticipantLifeStateChanged;
-            _revivalWatchers.Add(lifeCycle);
-        }
-    }
-
-    private void UnsubscribeParticipantRevivals()
-    {
-        for (int i = 0; i < _revivalWatchers.Count; i++)
-        {
-            if (_revivalWatchers[i] != null)
-                _revivalWatchers[i].LifeStateChanged -= HandleParticipantLifeStateChanged;
-        }
-
-        _revivalWatchers.Clear();
-    }
-
-    private PlayerLifeCycleController GetLifeCycle(ulong clientId)
-    {
-        if (NetworkManager == null || !NetworkManager.ConnectedClients.ContainsKey(clientId))
-            return null;
-
-        NetworkObject playerObject = NetworkManager.ConnectedClients[clientId].PlayerObject;
-        return playerObject != null ? playerObject.GetComponent<PlayerLifeCycleController>() : null;
-    }
-
-    private void HandleParticipantLifeStateChanged(PlayerLifeState previous, PlayerLifeState current)
-    {
-        if (!IsServer)
-            return;
-
-        // Alive로 "들어오는" 전이만 본다. 같은 상태 재발행이나 Soul/PermanentDead 전이는 무시.
-        if (current != PlayerLifeState.Alive || previous == PlayerLifeState.Alive)
-            return;
-
-        // ⚠️ 전투 중이고 보스가 살아 있을 때만. 이 가드가 없으면 격파 후 부활에 시체의 BT가 되살아난다.
-        if (!_combatStarted || _defeatHandled)
-            return;
-
-        if (_bossUnit == null || _bossUnit.CurrentHealth <= 0)
-            return;
-
-        // 차징 도중에 죽었다면 ChargeController 의 카운터가 중간값으로 남아 있을 수 있다.
-        // 그 상태를 함께 남긴다 — 재개방이 "무시되는" 것처럼 보이는 원인을 여기서 가른다.
-        string chargeState = _chargeController != null
-            ? $"IsDefeated={_chargeController.IsDefeated}, IsReached={_chargeController.IsReached}"
-            : "ChargeController 없음";
-
-        // OpenBT 만으로는 부족했다 — IsOpen 을 되돌려도 BT가 파킹된 서브트리에서 빠져나오지 못했다.
-        // 민경 님이 추가한 RaiseRestart 는 ReStart 이벤트 채널을 발행해 그래프의 On Start 구독 노드를
-        // 트리거하고 OpenBT 까지 함께 수행한다(c7f7b1c). 재개는 이 경로 하나로 통일한다.
-        _btActivator?.RaiseRestart();
-        Edit.Log(
-            $"[BossEncounter] 참가자 부활({previous} → {current}) — BT 재시작 요청(RaiseRestart). " +
-            $"보스 체력={_bossUnit.CurrentHealth}, 차징 {chargeState}", this);
-    }
-
     private void HandleBossDefeated()
     {
         if (!IsServer || _defeatHandled)
@@ -834,14 +575,8 @@ public sealed class BossEncounterDirector : NetworkBehaviour
 
         _defeatHandled = true;
 
-        // 격파 후 부활로 BT가 되살아나지 않게 감시를 먼저 끊는다.
-        UnsubscribeParticipantRevivals();
-
         // 결과 화면이 읽을 값을 씬 전환 전에 확정한다(전멸 경로는 PartyWipeWatcher가 false로 확정).
         SessionStatsTracker.Active?.Capture(cleared: true);
-
-        // 충전 기둥이 올라와 있는 채로 끝날 수 있어 원위치로 되돌린다.
-        _chargeController?.EndCharge();
 
         _resultTransitionAt = NetworkManager.ServerTime.Time + Mathf.Max(0f, defeatResultDelaySeconds);
         Edit.Log("[BossEncounter] 보스 격파 — 클리어로 기록, 결과 화면 전환 예약.", this);

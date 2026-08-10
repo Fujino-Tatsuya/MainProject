@@ -871,11 +871,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TwentyThreeArenaContext
   ShowTopMostFoldoutHeaderGroup: 1
   bossPrefab: {fileID: 5372104213593212626, guid: 1100cccaacdc1fe4ca3e1eb9680f8c75, type: 3}
-  ChargingObjects:
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
   bossPos: {x: 10, y: 0, z: 10}
 --- !u!1 &1063592036
 GameObject:
