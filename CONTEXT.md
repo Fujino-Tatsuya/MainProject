@@ -4,7 +4,41 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 현재 인수인계 (2026-08-06 · Effect System v1, 브랜치 `feature/VFX`)
+## ▶▶ 현재 인수인계 (2026-08-11 · 피격 이펙트 클라 복제 + 교체 HUD, 브랜치 `feature/VFX`)
+
+작업 세션: **민경(Claude)**. 계획·근거는 [PLAN.md](PLAN.md) 최상단 항목.
+수정 파일: `Effects/EffectManager.cs` · `Effects/HitVFXPlayback.cs`(신규) ·
+`Monster/MonsterBase.cs` · `Enemy/Enemy.cs` · `Dev/HitVFXDebugHUD.cs`(신규).
+**프리팹·씬·`EffectCatalog.asset`은 건드리지 않았다.** 컴파일 0 에러 / 0 경고.
+
+- 🔴 **피격 이펙트는 서버가 재생하지 않는다.** `ReceiveAttack`은 서버에서만 불리므로(BaseAttack의
+  `IsServer` 게이트) 거기서 `Play`하면 **호스트에서만 보인다**. 서버는 `sourcePosition`만
+  unreliable RPC로 보내고, 재생은 각 피어가 `HitVFXPlayback.Play`로 로컬 처리한다.
+  (`AoeTelegraph`·`GauntletBot.ShowTelegraphClientRpc`와 같은 패턴.)
+- 🔴 **타격점을 서버가 계산해 보내면 안 된다.** 클라의 몹은 `NetworkTransform` 보간 때문에 서버보다
+  뒤에 그려진다(TickRate 30, 100ms 안팎 → 4m/s면 0.3~0.4m). 월드 절대 좌표를 보내면 이펙트가
+  몸에서 떨어진다. 수신측이 **자기 콜라이더로** 다시 계산해야 항상 표면에 붙는다.
+- ⚠️ **호스트 화면으로는 이 부류의 버그가 안 보인다** — 호스트 = 서버라 어긋남이 0이다.
+  검증은 반드시 **MPPM 클라이언트 창에서, 몹이 이동 중일 때**.
+- ⚠️ **이펙트 오버라이드를 `EffectCatalog`(SO)에 두지 말 것.** SO는 플레이 모드 중 변경이 에셋에
+  눌러앉아 `.asset` diff로 커밋되고 팀 전체 기본값이 바뀐다. `EffectManager`의 런타임 필드에 둔다.
+- ⚠️ **`HitPointInfo.facingHint`에 아무거나 넣지 말 것.** `Facing` 사다리의 ①이라 나머지 계산을
+  **전부 제친다.** 근접 피격에 넣으면 실제 표면점으로 계산하는 ②(`origin - point`)를 덮어써
+  오히려 부정확해진다. 현재 이걸 쓰는 곳은 `CameraDir` 모드뿐이다.
+- ⚠️ **`Specific_Position` 모드는 방향 추론이 `Quaternion.identity`로 떨어질 수 있다.**
+  그 분기는 `center`를 `point`와 같게 놓아 ③이 구조적으로 항상 0이고, 공격자 위치가 앵커와
+  겹치면 ②마저 죽는다(장판·지속피해처럼 "공격자 위치"에 피격자 좌표를 넣는 경우).
+  ④(구 `-source.forward`)는 RPC 수신측에 공격자 Transform이 없어 죽은 코드라 제거했다.
+  이 모드를 실제로 쓸 때 방향이 고정돼 보이면 여기가 원인이다.
+- **`hitPointMode`는 유닛이 아니라 `EffectManager`가 소유한다.** 프리팹 9개가 전부 같은 값
+  (`ColliderHit`)이라 거기로 올렸다 — `MonsterBase`/`Enemy`에는 더 이상 그 필드가 없다.
+  반면 `hitVFXType`은 유닛마다 남아 있고, `EffectManager`의 오버라이드가 그 위에 씌워진다.
+- 디버그 HUD: `F1` 이펙트 종류 순환(마지막 다음은 "프리팹 값" = 오버라이드 해제) /
+  `F2` 타격점 방식 순환. `#if UNITY_EDITOR || DEVELOPMENT_BUILD`(ProfilerHUD 관례).
+  변경은 **머신별**이다(각 피어가 로컬 해석) — MPPM 창별 동시 비교가 가능하다.
+- ⏳ **미검증**: MPPM 2인 Play 검증이 남았다. 완료 조건 체크리스트는 PLAN.md 참조.
+
+### 이전 인수인계 (2026-08-06 · Effect System v1, 브랜치 `feature/VFX`)
 
 작업 세션: **민경(Claude)**. 설계 원본은 레포 밖 `D:\김민경\유니티\VFX-Learning\design\effect-system-v1.md`.
 
