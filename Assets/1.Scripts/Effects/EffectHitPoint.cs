@@ -39,14 +39,14 @@ public static class EffectHitPoint
     }
     public struct HitPointInfo
     {
-        public AttackHitContext ctx;
+        public Vector3 sourcePosition;
         public Collider effectCollider;
         public Transform fallbackAnchor;
         public Vector3 facingHint;
 
-        public HitPointInfo(AttackHitContext _ctx, Collider _collider, Transform _anchor)
+        public HitPointInfo(Vector3 _sourcePosition, Collider _collider, Transform _anchor)
         {
-            ctx = _ctx;
+            sourcePosition = _sourcePosition;
             effectCollider = _collider;
             fallbackAnchor = _anchor;
             facingHint = default;
@@ -68,8 +68,8 @@ public static class EffectHitPoint
     /// </param>
     public static Pose Resolve(HitPointMode mode, HitPointInfo hitInfo)
     {
-        Vector3 origin = hitInfo.ctx.sourcePosition;
-        Collider collider = (hitInfo.effectCollider == null) ? hitInfo.ctx.hitCollider : hitInfo.effectCollider;
+        Vector3 origin = hitInfo.sourcePosition;
+        Collider collider = hitInfo.effectCollider;
 
         Vector3 point = origin;
         Vector3 center = origin;
@@ -99,7 +99,7 @@ public static class EffectHitPoint
             }
         }
 
-        return new Pose(point, Facing(origin, point, center, hitInfo.ctx.sourceTransform, hitInfo.facingHint));
+        return new Pose(point, Facing(origin, point, center, hitInfo.facingHint));
     }
 
     /// <summary>콜라이더 표면에서 <paramref name="origin"/>에 가장 가까운 점.</summary>
@@ -131,7 +131,7 @@ public static class EffectHitPoint
     /// 파티클 프리팹이 +Z로 방출한다는 전제다(유니티 기본값).
     /// </summary>
     private static Quaternion Facing(Vector3 origin, Vector3 point, Vector3 center,
-                                     Transform source, Vector3 hint)
+                                     Vector3 hint)
     {
         // ① 호출자가 방향을 알고 있으면 그대로 쓴다
         if (hint.sqrMagnitude > MinSqrMagnitude) return Quaternion.LookRotation(hint);
@@ -143,9 +143,6 @@ public static class EffectHitPoint
         // ③ 투사체는 sourcePosition이 곧 접촉점이라 ②가 0이 된다 → 피격자 중심에서 바깥으로
         Vector3 outward = point - center;
         if (outward.sqrMagnitude > MinSqrMagnitude) return Quaternion.LookRotation(outward);
-
-        // ④ 진행 방향의 반대 (투사체가 이동 방향으로 정렬돼 있을 때)
-        if (source != null) return Quaternion.LookRotation(-source.forward);
 
         return Quaternion.identity;
     }

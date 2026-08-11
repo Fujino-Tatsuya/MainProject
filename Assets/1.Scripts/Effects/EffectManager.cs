@@ -30,6 +30,55 @@ public class EffectManager : MonoBehaviour
     /// <summary>중앙 이펙트 카탈로그. 예: EffectManager.Instance.Catalog.HitSpark</summary>
     public EffectCatalog Catalog => catalog;
 
+    // 피격 이펙트 디버그 오버라이드. null = 해제(각 대상의 원래 hitVFXType을 쓴다).
+    //
+    // ⚠️ EffectCatalog(ScriptableObject)가 아니라 여기에 둔다. SO는 씬 오브젝트와 달리 플레이 모드
+    // 중의 변경이 에셋에 그대로 눌러앉는다 — 플레이를 멈춰도 안 돌아오고, .asset 변경으로 git에
+    // 잡히고, 최악은 그대로 커밋돼 팀 전체의 기본 피격 이펙트가 바뀐다. 씬 오브젝트인 이 매니저의
+    // 런타임 필드는 플레이 종료와 함께 확실히 사라진다.
+    //
+    // 쓰는 쪽은 개발 빌드 전용 HUD(HitVFXDebugHUD) 하나뿐이다 — 릴리스 빌드엔 그 클래스가 아예
+    // 없으므로 이 필드는 항상 null로 남는다. 프로덕션 코드는 GetHitEffect로 읽기만 한다.
+    private EffectCatalog.HitVFXType? _hitVFXOverride;
+
+    /// <summary>
+    /// 피격 이펙트 디버그 오버라이드(개발 빌드 전용 HUD가 쓴다). null을 넣으면 해제된다.
+    /// </summary>
+    public EffectCatalog.HitVFXType? HitVFXOverride
+    {
+        get => _hitVFXOverride;
+        set => _hitVFXOverride = value;
+    }
+
+    /// <summary>
+    /// 피격 이펙트 조회. 오버라이드가 걸려 있으면 그것을, 없으면 인자로 받은 종류를 돌려준다.
+    ///
+    /// 피격 시점마다 부른다(호출부에서 캐시 금지) — 그래야 런타임 교체가 다음 피격부터 바로 반영된다.
+    /// </summary>
+    public EffectEntry GetHitEffect(EffectCatalog.HitVFXType hitVFXType)
+    {
+        if (catalog == null) return null;
+        return catalog.GetHitEffect(_hitVFXOverride ?? hitVFXType);
+    }
+
+    [Header("피격 타격점 계산 방식")]
+    [Tooltip("전 유닛 공통. 예전에는 몬스터 프리팹마다 들고 있었지만 9개가 전부 같은 값이라 " +
+             "여기로 올렸다 — 런타임 비교(HitVFXDebugHUD F2)도 여기서 한 번에 바뀐다.")]
+    [SerializeField] private EffectHitPoint.HitPointMode hitPointMode = EffectHitPoint.HitPointMode.ColliderHit;
+
+    /// <summary>
+    /// 타격점 계산 방식(전 유닛 공통). <see cref="_hitVFXOverride"/>와 달리 "해제" 상태가 없다 —
+    /// 프리팹이 각자 들고 있던 값을 여기로 올렸으므로 이 값 자체가 진실이다.
+    ///
+    /// 이 매니저는 <b>씬 오브젝트</b>라 런타임 변경이 플레이 종료와 함께 사라진다.
+    /// (ScriptableObject였다면 에셋에 눌러앉아 커밋됐을 것이다 — 오버라이드를 카탈로그에 두지 않은 이유와 같다.)
+    /// </summary>
+    public EffectHitPoint.HitPointMode HitPointMode
+    {
+        get => hitPointMode;
+        set => hitPointMode = value;
+    }
+
     private readonly List<IEffectSystem> _drivers = new List<IEffectSystem>();
     private readonly List<ActiveEffect> _slots = new List<ActiveEffect>();
     private readonly Stack<int> _freeSlots = new Stack<int>();

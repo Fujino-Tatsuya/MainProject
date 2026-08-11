@@ -3,7 +3,6 @@ using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.AI;
 using static EffectCatalog;
-using static EffectHitPoint;
 
 // 몬스터 코드 FSM 두뇌. 서버 권한.
 //
@@ -31,11 +30,10 @@ public class MonsterBase : Unit
     [SerializeField] protected LayerMask playerMask;         // 인지 대상(플레이어) 레이어
     [SerializeField] protected int maxDetectionResults = 16;
 
+    // hitPointMode는 여기 없다 — 전 유닛 공통이라 EffectManager로 올렸다(런타임 교체도 거기서).
     [Header("피격 이펙트 제어")]
     [SerializeField] Collider hitVFXCollider;
-    [SerializeField] HitPointMode hitPointMode;
     [SerializeField] HitVFXType hitVFXType;
-    EffectEntry _slashFX;
 
     [Header("사망 시 비활성화할 콜라이더(선택)")]
     [SerializeField] protected Collider bodyCollider;
@@ -672,14 +670,33 @@ public class MonsterBase : Unit
             TryEnterKnockback(dir.normalized, attackInfo);
         }
 
-        // 몬스터 피격 이펙트
-        _slashFX = EffectManager.Instance.Catalog.GetHitEffect(hitVFXType);
-
-        HitPointInfo hitPointInfo = new HitPointInfo(hitContext, hitVFXCollider, hitVFXCollider.transform);
-        Pose pose = EffectHitPoint.Resolve(hitPointMode, hitPointInfo);
-        EffectManager.Instance.Play(_slashFX, pose.position, pose.rotation);
+        // 피격 이펙트는 판정이 아니라 연출이다 — 서버는 위치만 알리고 재생은 각 피어가 로컬로 한다.
+        // ReceiveAttack은 서버에서만 불리므로(BaseAttack.TryResolveHit의 IsServer 게이트) 여기서
+        // 직접 Play하면 호스트에서만 보인다.
+        if (IsServer)
+            PlayHitVFXRpc(hitContext.sourcePosition);
 
         return resolved;
+    }
+
+    // 서버가 보내는 것은 공격자 위치 하나뿐이다. 계산이 끝난 타격점(Pose)을 보내지 않는 이유:
+    //
+    // 클라이언트의 몹은 NetworkTransform 보간 때문에 서버보다 뒤에 그려진다(TickRate 30 + 보간
+    // 버퍼 → 100ms 안팎, 4m/s면 0.3~0.4m = 몸통 반쯤). 서버가 계산한 월드 절대 좌표를 그대로
+    // 재생하면 그 차이만큼 이펙트가 몸에서 떨어져 허공에 뜬다. 수신측이 자기 콜라이더로 다시
+    // 계산하면 결과는 언제나 그 몹 표면 위다.
+    //
+    // 반대로 origin(공격자 위치)이 조금 틀리는 것은 무해하다 — origin은 "표면의 어느 쪽을
+    // 고를지"만 정하지 이펙트를 몸에서 떼어내지 못한다. 그래서 origin만 서버 값을 쓴다.
+    //
+    // ⚠️ 호스트는 곧 서버라 이 어긋남이 0이다. 호스트 화면으로는 잘못된 구현도 정상으로 보인다 —
+    // 검증은 반드시 MPPM 클라이언트 창에서, 몹이 이동 중일 때 한다.
+    //
+    // Unreliable: 순수 연출이라 유실돼도 상태가 발산하지 않는다(이펙트 하나가 빠질 뿐).
+    [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
+    void PlayHitVFXRpc(Vector3 sourcePosition)
+    {
+        HitVFXPlayback.Play(this, hitVFXCollider, hitVFXType, sourcePosition);
     }
 
     // 넉백 진입/갱신. 슈퍼아머·사망·그로기·복귀 중에는 무시(기존 CC 무시 규칙 일관).
