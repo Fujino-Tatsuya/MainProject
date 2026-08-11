@@ -1,4 +1,152 @@
 # CURRENT PLAN — DevSceneBooter: 씬 이름 한 줄로 원하는 씬 부팅 (2026-08-10)
+# CURRENT PLAN — 피격 이펙트 클라이언트 복제 + 런타임 교체 디버그 HUD (2026-08-11)
+
+> 상태: **grill 완료, 승인 대기**. 브랜치 `feature/VFX`.
+> 아래 Wall Occlusion(07-28) 항목은 별개 작업 — 이 계획과 무관.
+
+## 배경 — 작업이 둘로 갈렸다
+
+원래 요청은 "키 입력으로 피격 이펙트를 런타임에 바꿔보는 디버그 툴"이었다. 조사 중
+**별개의 실 버그**가 드러났다: 몬스터 피격 이펙트가 **호스트에서만 보인다.**
+
+`BaseAttack.TryResolveHit`가 전부 `IsServer` 게이트라(`BaseAttack.cs:132`) `ReceiveAttack`
+자체가 서버에서만 불리고, `EffectManager.Play` 호출이 그 안에 있다(`MonsterBase.cs:680`).
+리슨 서버에서 호스트는 곧 서버라 호스트 화면에는 보이지만, **순수 클라이언트는 몬스터를
+때려도 피격 이펙트가 아예 안 뜬다.** 디버그 편의가 아니라 출하 품질 문제다.
+
+그래서 **A(버그 수정)와 B(디버그 툴)를 커밋 분리**해서 진행한다. B는 A 위에서만 의미가
+있으므로 순서는 A → B.
+
+## 확정 사항 (grill 결과)
+
+| # | 결정 | 기각한 대안과 이유 |
+|---|---|---|
+| 1 | 이펙트 교체는 `EffectManager`의 **전역 오버라이드** | 몬스터 컨테이너 순회 — 레지스트리를 새로 만들어야 하고, 순회 후 스폰된 몹을 놓치며, 각 몹의 인스펙터 원본값을 파괴한다 |
+| 2 | 서버가 **`sourcePosition`만** ClientRpc로 전 피어 브로드캐스트 | 이펙트를 NetworkObject로 — `EffectManager`의 풀링·수명·히트스톱 인프라를 통째로 우회하고 복제 트래픽이 RPC보다 훨씬 크다 |
+| 3 | 각 피어가 **자기 로컬 콜라이더**로 `Resolve` + `Play` | 서버가 계산한 `Pose` 전송 — 아래 §A-2 참조 |
+| 4 | `MonsterBase` / `Enemy` **각각 구현** (2벌 중복 감수) | `Unit`으로 올리기 — 코어는 은희 담당, 사전 합의 필요. 새 컴포넌트 분리 — `Enemy`가 곧 제거될 예정이라 중복 제거 명분이 사라짐 |
+| 5 | IMGUI HUD, `Assets/1.Scripts/Dev/`, `F1`~`F5` 선택 + `F6` 해제 | 씬에 Canvas 배치 — `4.MapScene`은 팀 공용이고 Unity 씬 파일 머지 충돌이 지독하다 |
+| 6 | `#if UNITY_EDITOR \|\| DEVELOPMENT_BUILD`로 릴리스 제외 | — `ProfilerHUD`와 동일한 관례 |
+
+---
+
+## A. 피격 이펙트 클라이언트 복제 (버그 수정)
+
+### A-1. 구조
+서버는 **판정만**, 재생은 각 피어가 로컬로. 이 레포에 이미 정착된 패턴이다 —
+`AoeTelegraph`(`AoeTelegraph.cs:12`)와 `GauntletBot.ShowTelegraphClientRpc`가 동일 구조.
+
+- 서버: `ReceiveAttack`에서 `hitContext.sourcePosition`(Vector3)만 ClientRpc로 전 피어에 브로드캐스트
+- 각 피어: 수신 → 자기 로컬 `hitVFXCollider` / `hitPointMode` / `hitVFXType`로
+  `EffectHitPoint.Resolve` → `EffectManager.Play`
+- RPC는 **unreliable** — 순수 연출이라 유실이 상태 발산을 만들지 않는다
+
+### A-2. 왜 `Pose`가 아니라 `sourcePosition`인가 (핵심 근거)
+
+`NetworkManager.prefab`의 `TickRate: 30`, 몬스터 프리팹의 `NetworkTransform`은 `Interpolate: 1`.
+클라이언트는 스냅샷 사이를 보간하려고 **의도적으로 과거를 그린다.** 렌더 지연 = 보간 버퍼
+(1~2틱, 33~66ms) + 편도 지연. 인터넷 대전이면 100ms 안팎 → 몹이 4m/s로 움직일 때 **0.3~0.4m**,
+몸통 반쯤 되는 거리만큼 서버 위치와 어긋난다.
+
+서버가 계산한 `Pose`는 **월드 절대 좌표**라 그 어긋남만큼 이펙트가 몸에서 떨어져 허공에 뜬다.
+반면 `SurfacePoint(collider, bounds, origin)`를 수신측이 다시 계산하면 콜라이더가 로컬
+오브젝트이므로 **결과가 무조건 그 몹 표면 위**다.
+
+비대칭이 이 설계의 근거다:
+- **콜라이더 위치가 틀리면** → 이펙트가 몸에서 떨어진다 (치명적)
+- **`origin`이 조금 틀리면** → 표면 위에서 점이 옆으로 미끄러질 뿐 (무해)
+
+`origin`은 "표면의 어느 쪽을 고를지"만 결정하지 이펙트를 몸에서 떼어내지 못한다.
+그래서 origin은 서버 값을 그대로 쓰고, 콜라이더는 반드시 로컬 것을 쓴다.
+
+부수 이점: 페이로드 12B (Pose+인덱스 29B 대비 절반 이하).
+
+### A-3. `hitVFXCollider` null 가드 (같이 처리)
+현재 `MonsterBase.cs:678`이 `hitVFXCollider.transform`을 무방비로 역참조한다. 프리팹 9개에는
+전부 배선돼 있어 당장 안 터지지만, **배선을 잊은 몹이 추가되면 맞을 때마다 예외**를 뿜는다.
+그리고 이 줄을 RPC 수신부로 옮기면 **터지는 지점이 1개에서 N개(전 피어)로 늘어난다.**
+어차피 만지는 줄이므로 가드를 함께 넣는다 — 없으면 경고 1회 후 조용히 스킵(게임은 정상 진행).
+
+⚠️ 세션 중 논의했던 `fallbackAnchor` 재설계(`hitVFXAnchor` 필드 신설)는 **범위 밖**.
+프리팹 9개를 다시 건드려야 한다. 가드만 넣고 넘어간다.
+
+### A-4. 대상
+| 프리팹 | 클래스 |
+|---|---|
+| ChompBot · HumanoidBot · MortarBot · PeekABot · TeslaBot · WallBot | `MonsterBase` |
+| GauntletBot · SpinnerBot | `MonsterBase` 하위 (자동 커버) |
+| **TwentyThree (No.23 보스)** · ModularRobots_R1 | **`Enemy`** |
+
+`Enemy`는 제거 예정이지만 **7월 마일스톤의 보스가 그 위에 올라가 있어** 빼면 안 된다.
+
+---
+
+## B. 런타임 이펙트 교체 디버그 HUD
+
+### B-1. 오버라이드 저장 위치 — `EffectManager` (SO 아님)
+`EffectCatalog`는 `ScriptableObject`다. **여기에 오버라이드를 직렬화 필드로 두면 안 된다** —
+SO는 씬 오브젝트와 달리 플레이 모드 중 변경이 에셋에 그대로 눌러앉는다. 플레이를 멈춰도
+안 돌아오고, `.asset` 변경으로 git에 잡히고, 최악은 그대로 커밋돼 **팀 전체 기본 이펙트가
+바뀐다.**
+
+- 오버라이드는 `EffectManager`(MonoBehaviour 싱글톤)의 **런타임 필드** — 플레이 종료 시 확실히 소멸
+- `EffectCatalog`는 순수 데이터로 유지
+- 호출부는 `Catalog.GetHitEffect(...)` → `EffectManager.Instance.GetHitEffect(...)`로 변경
+
+> 참고: `EnterPlayModeOptions: 0`(= 아무것도 비활성화 안 함) 확인 — 도메인 리로드는 정상
+> 동작하므로 static 필드도 안전하지만, 위 이유로 SO 필드만 피하면 된다.
+
+### B-2. 빌드 격리 제약
+HUD가 `#if UNITY_EDITOR || DEVELOPMENT_BUILD`면 **릴리스 빌드엔 클래스가 없다.** 따라서
+프로덕션 코드(`MonsterBase`/`Enemy`)가 HUD를 직접 참조하면 릴리스 빌드가 깨진다.
+저장소를 `EffectManager`(모든 빌드에 존재)에 두면 자동 해결 — **HUD는 쓰기만, 프로덕션은 읽기만.**
+
+### B-3. 입력 / 표시
+프로젝트 전체가 Input System(`Keyboard.current`)을 쓴다.
+
+- `F1`~`F5` → `HitEffect1`~`HitEffect5` 직접 선택 (순환보다 원하는 걸 바로 짚는 게 비교에 유리)
+- `F6` → 오버라이드 해제, 각 몹 원래 `hitVFXType`으로 복귀
+- 현재 적용 중인 이펙트 이름을 화면에 IMGUI로 표시
+- **이미 쓰이는 키(피할 것)**: `F8` ProfilerHUD · `F10` 디버그 부활 · `M` 맵 오버뷰 ·
+  `F` 다리 상호작용 · `[` `]` 카메라 전환/미니맵 줌 · `ESC` 씬 전환
+
+### B-4. 오버라이드 범위는 **머신별**
+A-1에서 각 피어가 로컬로 `GetHitEffect`를 부르므로, 키를 누른 창만 바뀐다.
+디버깅엔 오히려 장점 — MPPM 창 두 개를 나란히 놓고 `HitEffect2` vs `HitEffect4`를
+**동시에 비교**할 수 있다. 대신 여럿이 같이 볼 때는 "지금 뭘 보고 있는지"를 말로 맞춰야 한다.
+
+---
+
+## 리스크
+
+- **호스트에서는 이 버그가 안 보인다.** 호스트 = 서버라 보간 어긋남이 0이다. 반드시
+  **MPPM 클라이언트 창에서, 몹이 이동 중일 때** 때려서 검증해야 한다. 정지한 몹으로
+  테스트하면 잘못된 구현도 통과한다.
+- `MonsterBase`/`Enemy` 2벌 중복 — `Enemy` 제거 시 자연 해소되므로 부채로 남기지 않는다.
+- `EffectCatalog.asset`이 의도치 않게 변경돼 커밋되지 않는지 `git status` 확인.
+- 몹이 디스폰된 직후 RPC가 도착하면 수신측 콜라이더가 없다 → A-3 가드가 흡수(이펙트 하나 누락, 무해).
+
+## 완료 조건
+
+- [ ] MPPM 호스트+클라 2인, **몹이 이동 중일 때** 피격 → **양쪽 화면 모두** 이펙트가 몹 몸에 붙어 재생
+- [ ] No.23 보스(`Enemy` 경로)에서도 동일하게 확인
+- [ ] `F1`~`F5`로 이펙트 전환, HUD에 현재 이름 표시
+- [ ] `F6`으로 각 몹 원래 값 복귀
+- [ ] `hitVFXCollider` 미배선 몹에서 예외 대신 경고 1회 + 게임 정상 진행
+- [ ] 콘솔 0 에러 — **호스트·클라 양쪽 모두** 확인
+- [ ] 릴리스 빌드 컴파일 확인 (HUD 클래스 부재 상태에서 `MonsterBase` 참조 안 깨짐)
+- [ ] `EffectCatalog.asset` 무변경 확인
+
+## 커밋 분리
+
+1. `fix(fx): 몬스터 피격 이펙트를 전 피어에 복제` — A
+2. `feat(dev): 피격 이펙트 런타임 교체 HUD` — B
+
+A는 리뷰 포인트가 네트워크라 팀장이 따로 볼 항목이다.
+
+---
+
+# CURRENT PLAN — Wall Occlusion per-pixel 재설계 (2026-07-28)
 
 > 상태: **승인 대기**. 구현 착수 전.
 > 요청자·담당: 은희. `GameManager.cs` 수정 포함 — 2026-08-03 계획서는 이 파일을 팀장 영역이라 봤으나,

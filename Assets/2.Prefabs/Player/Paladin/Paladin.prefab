@@ -6721,6 +6721,8 @@ GameObject:
   - component: {fileID: 1461530121226363041}
   - component: {fileID: 3420145443151374840}
   - component: {fileID: 6118376412819370303}
+  - component: {fileID: 2050612571752285464}
+  - component: {fileID: 7746500284878980271}
   m_Layer: 6
   m_Name: Paladin
   m_TagString: Player
@@ -7423,6 +7425,15 @@ MonoBehaviour:
   skillController: {fileID: 8323634410014447556}
   body: {fileID: 786699605289514005}
 --- !u!114 &6118376412819370303
+--- !u!81 &2050612571752285464
+AudioListener:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6077492126708577103}
+  m_Enabled: 1
+--- !u!114 &7746500284878980271
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -7436,6 +7447,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FirstMeleeInterruptSkill
   data: {fileID: 11400000, guid: 617280762f0032c4096fd2b1967e3bf1, type: 2}
   hitboxAnchor: {fileID: 2360924950670046369}
+  m_Script: {fileID: 11500000, guid: 600743207dcdea7459d72b9ff80c9038, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerAudioListenerActivator
+  ShowTopMostFoldoutHeaderGroup: 1
 --- !u!1 &6097337715216137025
 GameObject:
   m_ObjectHideFlags: 0

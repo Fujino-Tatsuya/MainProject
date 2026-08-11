@@ -328,6 +328,9 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 64
   maxDetectionResults: 16
+  hitVFXCollider: {fileID: 138876035767613204}
+  hitPointMode: 2
+  hitVFXType: 1
   bodyCollider: {fileID: 4040508410350868295}
 --- !u!114 &765449773972238274
 MonoBehaviour:
