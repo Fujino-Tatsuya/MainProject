@@ -42,7 +42,7 @@ EditorBuildSettings:
     path: Assets/0.Scenes/BossScene.unity
     guid: 4df41e85c6a1dba4d9f41195a1ab45c8
   - enabled: 1
-    path: Assets/0.Scenes/Dev/Dev_Boot.unity
+    path: Assets/0.Scenes/Dev_Boot.unity
     guid: 180a2dd6e0939fed247ab6908eb0ec7d
   - enabled: 1
     path: Assets/0.Scenes/MainFlow/4.MapScene-trensparent.unity

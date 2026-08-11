@@ -249,7 +249,7 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 8a54a70264d851a4db24001989d8afa1, type: 3}
---- !u!1001 &782395078
+--- !u!1001 &1666983772
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
@@ -257,47 +257,47 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
-    - target: {fileID: 8316864054380081523, guid: 9af5b1b42ff1c58469ddae1f66bb1059, type: 3}
+    - target: {fileID: 1833513688387863072, guid: 2992aa2f5841df44992eefdc2b4662d5, type: 3}
       propertyPath: m_Name
-      value: AudioManager
+      value: EffectManager
       objectReference: {fileID: 0}
-    - target: {fileID: 9207822553765348557, guid: 9af5b1b42ff1c58469ddae1f66bb1059, type: 3}
+    - target: {fileID: 7026773245212881865, guid: 2992aa2f5841df44992eefdc2b4662d5, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 1280
+      value: 41.37239
       objectReference: {fileID: 0}
-    - target: {fileID: 9207822553765348557, guid: 9af5b1b42ff1c58469ddae1f66bb1059, type: 3}
+    - target: {fileID: 7026773245212881865, guid: 2992aa2f5841df44992eefdc2b4662d5, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 720
-      objectReference: {fileID: 0}
-    - target: {fileID: 9207822553765348557, guid: 9af5b1b42ff1c58469ddae1f66bb1059, type: 3}
-      propertyPath: m_LocalPosition.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 9207822553765348557, guid: 9af5b1b42ff1c58469ddae1f66bb1059, type: 3}
+    - target: {fileID: 7026773245212881865, guid: 2992aa2f5841df44992eefdc2b4662d5, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -7.2117
+      objectReference: {fileID: 0}
+    - target: {fileID: 7026773245212881865, guid: 2992aa2f5841df44992eefdc2b4662d5, type: 3}
       propertyPath: m_LocalRotation.w
       value: 1
       objectReference: {fileID: 0}
-    - target: {fileID: 9207822553765348557, guid: 9af5b1b42ff1c58469ddae1f66bb1059, type: 3}
+    - target: {fileID: 7026773245212881865, guid: 2992aa2f5841df44992eefdc2b4662d5, type: 3}
       propertyPath: m_LocalRotation.x
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 9207822553765348557, guid: 9af5b1b42ff1c58469ddae1f66bb1059, type: 3}
+    - target: {fileID: 7026773245212881865, guid: 2992aa2f5841df44992eefdc2b4662d5, type: 3}
       propertyPath: m_LocalRotation.y
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 9207822553765348557, guid: 9af5b1b42ff1c58469ddae1f66bb1059, type: 3}
+    - target: {fileID: 7026773245212881865, guid: 2992aa2f5841df44992eefdc2b4662d5, type: 3}
       propertyPath: m_LocalRotation.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 9207822553765348557, guid: 9af5b1b42ff1c58469ddae1f66bb1059, type: 3}
+    - target: {fileID: 7026773245212881865, guid: 2992aa2f5841df44992eefdc2b4662d5, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 9207822553765348557, guid: 9af5b1b42ff1c58469ddae1f66bb1059, type: 3}
+    - target: {fileID: 7026773245212881865, guid: 2992aa2f5841df44992eefdc2b4662d5, type: 3}
       propertyPath: m_LocalEulerAnglesHint.y
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 9207822553765348557, guid: 9af5b1b42ff1c58469ddae1f66bb1059, type: 3}
+    - target: {fileID: 7026773245212881865, guid: 2992aa2f5841df44992eefdc2b4662d5, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
@@ -305,7 +305,7 @@ PrefabInstance:
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: 9af5b1b42ff1c58469ddae1f66bb1059, type: 3}
+  m_SourcePrefab: {fileID: 100100000, guid: 2992aa2f5841df44992eefdc2b4662d5, type: 3}
 --- !u!1 &1980000001
 GameObject:
   m_ObjectHideFlags: 0
@@ -350,7 +350,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 05799538caae795449e8787a138f9deb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  scene: 4.MapScene-trensparent
+  scene: PlayerBossTest
   autoBootOnPlay: 1
   replaceBootScene: 1
   playerPrefabOverride: {fileID: 0}
@@ -419,5 +419,5 @@ SceneRoots:
   - {fileID: 292827578}
   - {fileID: 200501556}
   - {fileID: 7955492866393264753}
-  - {fileID: 782395078}
+  - {fileID: 1666983772}
   - {fileID: 1980000002}

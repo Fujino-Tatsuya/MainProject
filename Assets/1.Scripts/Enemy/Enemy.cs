@@ -72,7 +72,7 @@ public class Enemy : Unit
 
     public override bool ReceiveAttack(AttackInfo attackInfo, AttackHitContext hitContext)
     {
-        TakeDamage(attackInfo);
+        bool resolved = base.ReceiveAttack(attackInfo, hitContext);
 
         // 피격 이펙트는 판정이 아니라 연출이다 — 서버는 위치만 알리고 재생은 각 피어가 로컬로 한다.
         // ReceiveAttack은 서버에서만 불리므로(BaseAttack.TryResolveHit의 IsServer 게이트) 여기서
@@ -80,7 +80,7 @@ public class Enemy : Unit
         if (IsServer)
             PlayHitVFXRpc(hitContext.sourcePosition);
 
-        return true;
+        return resolved;
     }
 
     // 서버가 보내는 것은 공격자 위치 하나뿐이다. 계산이 끝난 타격점(Pose)을 보내지 않는 이유:
