@@ -169,7 +169,13 @@ public class EffectManager : MonoBehaviour
     /// 반환값이 없는 것은 의도다 — 끌 것이 없고, 핸들을 발급하면 버려도 무해한 핸들이 생겨
     /// 루프 핸들(버리면 풀이 고갈된다)과 실패 모드가 뒤섞인다.
     /// </summary>
-    public void Play(EffectEntry entry, Vector3 position, Quaternion rotation)
+    /// <param name="scale">
+    /// 프리팹에 저작된 크기에 <b>곱해지는 배율</b>(1 = 원래 크기). 파트 offset도 함께 곱해져
+    /// 컴포지트가 통째로 확대된다. 반납 시 원래 크기로 되돌아간다.
+    /// ⚠️ 유니티 scale은 <b>수명(Start Lifetime)을 건드리지 않는다</b> — 크기와 속도만 커지므로
+    /// 큰 배율에서는 "커졌다"보다 "빨라졌다"로 보인다. 프리팹 규칙 문서의 주의사항을 볼 것.
+    /// </param>
+    public void Play(EffectEntry entry, Vector3 position, Quaternion rotation, float scale = 1f)
     {
         if (!CanPlay(entry)) return;
 
@@ -180,6 +186,7 @@ public class EffectManager : MonoBehaviour
         active.position = position;
         active.rotation = rotation;
         active.offset = Vector3.zero;
+        active.scale = SanitizeScale(entry, scale);
         float life = entry.ResolvedDuration;
         active.life = life;
         active.lifeCounting = true;
@@ -202,7 +209,8 @@ public class EffectManager : MonoBehaviour
     }
 
     /// <summary>원샷 재생(회전 없음).</summary>
-    public void Play(EffectEntry entry, Vector3 position) => Play(entry, position, Quaternion.identity);
+    public void Play(EffectEntry entry, Vector3 position, float scale = 1f)
+        => Play(entry, position, Quaternion.identity, scale);
 
     /// <summary>
     /// 루프 재생. <b>호출자가 반드시 <see cref="Release"/>로 끝내야 한다</b> — 안 그러면 풀이 고갈된다.
@@ -210,21 +218,27 @@ public class EffectManager : MonoBehaviour
     /// null이 아니면 매 프레임 그 대상을 따라간다(SetParent를 쓰지 않으므로 대상의 scale이 곱해지지 않고,
     /// 대상이 파괴돼도 풀 인스턴스가 딸려 죽지 않는다).
     /// </summary>
-    public EffectHandle PlayLooping(EffectEntry entry, Transform follow, Vector3 offset = default)
+    /// <param name="scale">
+    /// 프리팹 크기에 곱해지는 배율. <b><paramref name="offset"/>에는 곱해지지 않는다</b> —
+    /// 그건 호출자가 월드 단위로 정한 부착 위치이고, 호출자가 직접 조절할 수 있다.
+    /// 반면 엔트리 안의 파트 offset은 호출자가 손댈 수 없으므로 함께 곱해진다.
+    /// </param>
+    public EffectHandle PlayLooping(EffectEntry entry, Transform follow, Vector3 offset = default,
+                                    float scale = 1f)
     {
         return follow != null
-            ? PlayLoopingCore(entry, follow, offset, follow.rotation)
-            : PlayLoopingCore(entry, null, offset, Quaternion.identity);
+            ? PlayLoopingCore(entry, follow, offset, follow.rotation, scale)
+            : PlayLoopingCore(entry, null, offset, Quaternion.identity, scale);
     }
 
     /// <summary>루프 재생을 월드 좌표·회전에 고정한다. (설계 API에 대한 편의 오버로드)</summary>
-    public EffectHandle PlayLooping(EffectEntry entry, Vector3 position, Quaternion rotation)
+    public EffectHandle PlayLooping(EffectEntry entry, Vector3 position, Quaternion rotation, float scale = 1f)
     {
-        return PlayLoopingCore(entry, null, position, rotation);
+        return PlayLoopingCore(entry, null, position, rotation, scale);
     }
 
     private EffectHandle PlayLoopingCore(EffectEntry entry, Transform follow, Vector3 offsetOrPosition,
-                                         Quaternion rotation)
+                                         Quaternion rotation, float scale)
     {
         if (!CanPlay(entry)) return EffectHandle.None;
 
@@ -233,6 +247,7 @@ public class EffectManager : MonoBehaviour
         active.attached = follow != null;
         active.follow = follow;
         active.rotation = rotation;
+        active.scale = SanitizeScale(entry, scale);
 
         if (follow != null)
         {
@@ -432,7 +447,7 @@ public class EffectManager : MonoBehaviour
 
         if (part.prefab != null)
         {
-            GameObject instance = _pool.Rent(part.prefab);
+            GameObject instance = _pool.Rent(part.prefab, active.scale);
             instance.transform.SetPositionAndRotation(worldPosition, active.rotation);
             instance.SetActive(true);
 
@@ -473,6 +488,7 @@ public class EffectManager : MonoBehaviour
         active.released = false;
         active.lifeCounting = false;
         active.playRate = 1f;
+        active.scale = 1f;
         active.inUse = false;      // 세대는 다음 대출에서 새로 발급된다 → stale 핸들은 여기서 죽는다
 
         _freeSlots.Push(active.slot);
@@ -480,7 +496,9 @@ public class EffectManager : MonoBehaviour
 
     private static Vector3 WorldPosition(ActiveEffect active, Vector3 partOffset)
     {
-        return active.position + active.rotation * (active.offset + partOffset);
+        // 파트 offset만 배율을 탄다 — 이펙트의 '내부 구성'이라 확대의 일부다.
+        // active.offset(호출자가 준 추종 오프셋)은 월드 단위로 정한 부착 위치라 건드리지 않는다.
+        return active.position + active.rotation * (active.offset + partOffset * active.scale);
     }
 
     #endregion
@@ -502,6 +520,19 @@ public class EffectManager : MonoBehaviour
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// 배율이 0 이하면 이펙트가 사라지거나(0) 뒤집힌다(음수). 둘 다 재생은 되면서 화면에만 이상이 생겨
+    /// 원인을 찾기 어렵다 — 명백한 오용이므로 1로 되돌리고 알린다.
+    /// </summary>
+    private float SanitizeScale(EffectEntry entry, float scale)
+    {
+        if (scale > 0f) return scale;
+
+        WarnOnce(entry, "scale", $"[EffectManager] '{entry.name}'를 배율 {scale}로 재생하려 했다. " +
+                                 "0이면 보이지 않고 음수면 뒤집힌다. 1로 되돌린다.");
+        return 1f;
     }
 
     private ActiveEffect AcquireSlot(EffectEntry entry)
@@ -638,6 +669,7 @@ public class EffectManager : MonoBehaviour
         public bool lifeCounting;
         public float life;         // 남은 수명(초)
         public float playRate = 1f;
+        public float scale = 1f;   // 프리팹 크기에 곱해지는 배율. 파트 offset에도 곱해진다
 
         public Transform follow;   // null = 월드 고정
         public bool attached;      // 추종 대상을 지정하고 시작했는가 (대상 소멸 감지용)
