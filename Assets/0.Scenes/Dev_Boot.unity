@@ -350,7 +350,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 05799538caae795449e8787a138f9deb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  scene: PlayerBossTest
+  scene: 4.MapScene-trensparent
   autoBootOnPlay: 1
   replaceBootScene: 1
   playerPrefabOverride: {fileID: 0}
