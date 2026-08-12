@@ -29,10 +29,20 @@ public class EffectPool
         _maxSizePerPrefab = Mathf.Max(1, maxSizePerPrefab);
     }
 
-    /// <summary>비활성 상태의 인스턴스를 빌린다. 호출자가 위치를 잡은 뒤 직접 활성화한다.</summary>
-    public GameObject Rent(GameObject prefab)
+    /// <summary>
+    /// 비활성 상태의 인스턴스를 빌린다. 호출자가 위치를 잡은 뒤 직접 활성화한다.
+    /// <paramref name="scale"/>는 프리팹에 저작된 scale에 <b>곱해진다</b>(1 = 원래 크기).
+    /// 배율이 1이든 아니든 <b>대출할 때마다 명시적으로</b> 설정한다 — 반납 복원이 한 번 누락돼도
+    /// 다음 대출자가 이상한 크기로 나오지 않게 하기 위해서다.
+    /// </summary>
+    public GameObject Rent(GameObject prefab, float scale = 1f)
     {
-        return PoolFor(prefab).Get();
+        GameObject instance = PoolFor(prefab).Get();
+
+        var id = instance.GetComponent<EffectInstance>();
+        if (id != null) instance.transform.localScale = id.originalScale * scale;
+
+        return instance;
     }
 
     /// <summary>인스턴스를 되돌린다. 이미 파괴됐거나 풀 소속이 아니면 조용히 무시한다.</summary>
@@ -52,6 +62,10 @@ public class EffectPool
             UnityEngine.Object.Destroy(instance);
             return;
         }
+
+        // 배율 재생으로 늘어난 크기를 프리팹 원래 값으로 되돌린다.
+        // 풀 키가 프리팹이라 다음 대출자가 이 인스턴스를 그대로 물려받는다.
+        instance.transform.localScale = id.originalScale;
 
         pool.Release(instance);
     }
@@ -116,6 +130,10 @@ public class EffectPool
         var id = instance.AddComponent<EffectInstance>();
         id.sourcePrefab = prefab;
         id.driver = _resolveDriver(instance);
+
+        // Instantiate(prefab, _root)는 프리팹의 localScale을 그대로 가져온다(_root는 항등).
+        // 배율 재생이 이 값을 기준으로 곱하고, 반납할 때 이 값으로 되돌아간다.
+        id.originalScale = instance.transform.localScale;
 
         return instance;
     }
