@@ -14,16 +14,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MaskBlurSettings
   enabled: 1
   center: {x: 0.5, y: 0.5}
-  size: {x: 0.65, y: 0.34}
+  size: {x: 0.45, y: 0.28}
   matchAspect: 1
-  roundness: 4
-  feather: 0.35
+  roundness: 8.59
+  feather: 0.495
   maskTexture: {fileID: 0}
-  blurStrength: 1
+  blurStrength: 1.42
   downsampleShift: 1
   desaturate: 0
-  darken: 0
+  darken: 0.063
   pixelateEnabled: 1
   pixelBlockSize: 8
   pixelateMode: 0
-  pixelateRegionScale: 1.242
+  pixelateRegionScale: 1.146

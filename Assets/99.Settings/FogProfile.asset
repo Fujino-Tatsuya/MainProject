@@ -36,16 +36,18 @@ MonoBehaviour:
   dimRangeDown: 0
   dimFadeUp: 3
   dimFadeDown: 3
-  dimSaturation: 0.17
-  dimBrightness: 0.116
+  dimSaturation: 1
+  dimBrightness: 0.497
   dimAffectSky: 0.714
   viewRange: 18
   viewFade: 4
-  losDarken: 1
+  losDarken: 0.814
   losDistanceBias: 0
   losEdgeFade: 5.71
-  losBrightness: 1
-  losSaturation: 0.566
+  losBrightness: 0.201
+  losSaturation: 0
+  losTint: {r: 0, g: 1, b: 0.3953488, a: 1}
+  losTintStrength: 0.232
   losAngleJitter: 0.03
   abyssEnabled: 1
   abyssColor: {r: 0.0028924812, g: 0.010691476, b: 0.02044022, a: 1}
