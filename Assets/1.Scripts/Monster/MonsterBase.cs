@@ -572,6 +572,17 @@ public class MonsterBase : Unit
         SetState(MonsterState.Attack);
     }
 
+    /// <summary>
+    /// 공격이 진행되는 <b>동안</b>에도 매 틱 타깃을 향해 몸을 돌리는가.
+    ///
+    /// 기본 <c>true</c> = 지금까지의 동작(일반 몹 8종·중간보스 3종은 그대로다).
+    /// 🔴 23호 보스만 <c>false</c> 다 — 팀장 확정(2026-08-13): <b>공격을 시도 중일 때는 회전이 없다.</b>
+    ///    특히 돌진은 플레이어를 밀고 <b>지나가야</b> 하는데, 매 틱 타깃을 향해 돌면 보스가 대상을
+    ///    계속 따라 돌아 제자리에서 맴돈다.
+    /// 조준은 <see cref="StartAttack"/> 직전의 <c>FaceTarget()</c> 1회로 확정된다.
+    /// </summary>
+    protected virtual bool FaceTargetWhileAttacking => true;
+
     protected virtual void HandleAttack(float dt)
     {
         // 선딜(준비) 중 타깃이 사거리+여유를 벗어나면 공격 취소 → 추격 복귀.
@@ -588,7 +599,8 @@ public class MonsterBase : Unit
         }
 
         _stateTimer -= dt;
-        FaceTarget();
+        if (FaceTargetWhileAttacking)
+            FaceTarget();
 
         // 히트: 애니 OnAttackHit 이벤트(NotifyAttackHit) 전용 — 플레이어(DefaultAttackController)와 동일하게
         // 이벤트가 없으면 데미지가 나가지 않는다(타이머 폴백 제거). FireAttackHitOnce가 중복 발동만 막는다.

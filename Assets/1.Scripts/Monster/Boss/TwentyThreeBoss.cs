@@ -668,7 +668,10 @@ public class TwentyThreeBoss : MonsterBase
 
         _stateTimer -= dt;      // 데드락 안전망(단계 합보다 넉넉하게 잡아 둔다)
         _attackPhaseTimer -= dt;
-        FaceChainTarget();
+
+        // 🔴 **체인 중에는 회전하지 않는다**(팀장 확정 2026-08-13). 이전 판은 여기서 매 틱
+        //    `FaceChainTarget()` 으로 타깃을 향해 돌았다 — 그래서 돌진이 플레이어를 밀고 지나가지
+        //    못하고 대상을 따라 맴돌았다. 방향은 `StartAttack` 직전 조준 1회로 확정된다.
 
         switch (_attackPhase)
         {
@@ -881,22 +884,17 @@ public class TwentyThreeBoss : MonsterBase
 
     bool IsGrabbedValid() => _grabbed != null && _grabbed.gameObject.activeInHierarchy;
 
-    // 체인 중 몸이 엉뚱한 곳을 보지 않게 한다.
+    // 🔴 **공격 중에는 회전하지 않는다**(팀장 확정 2026-08-13). base 의 매 틱 회전도 함께 끈다.
     //
-    // 🔴 **잡고 있는 동안에는 회전하지 않는다**(2026-08-10, Play 관찰 기반 수정).
-    //    잡힌 플레이어는 보스의 **손 소켓**(`GrabSocket`)을 매 틱 따라간다. 그런데 이전 판은
-    //    그 플레이어를 향해 `LookRotation` 을 걸었다 → 보스가 돌면 손도 돌고, 손을 따라가는
-    //    플레이어도 돌아서 **방향 벡터가 보스와 함께 회전한다** → 되먹임으로 끝없이 돈다.
-    //    증상: "잡기 성공하면 보스가 엄청 돈다."
-    //    손에 들고 있는 대상을 **겨냥할 이유가 없으므로** 잡은 시점의 방향을 그대로 유지한다.
-    //    ⚠️ 이 되먹임은 소켓이 없을 때는 나타나지 않았다(`followTarget` 이 null 이라 플레이어가
-    //       붙지 않았다). 소켓을 살리면서 드러난 결함이다.
-    void FaceChainTarget()
-    {
-        if (IsGrabbedValid()) return;
-
-        FaceTarget();
-    }
+    //    확정 스펙: 돌진은 플레이어를 **밀고 지나가고**, 돌진이 **끝나야** 다시 플레이어를 본다.
+    //    회전을 남겨 두면 어떤 공격이든 보스가 대상을 따라 돌아 제자리에서 맴돈다.
+    //    조준은 `StartAttack` 직전의 `FaceTarget()` 1회 — 그 방향이 공격이 끝날 때까지 유지된다.
+    //    공격이 끝나면 Chase/Idle 로 돌아가며 base 가 다시 타깃을 본다.
+    //
+    //    ⚠️ 잡기 되먹임(2026-08-10 수정)도 이 규칙이 함께 덮는다 — 잡힌 플레이어가 손 소켓을
+    //       따라가는데 그 플레이어를 향해 `LookRotation` 을 걸면 끝없이 돌던 문제.
+    //    ⚠️ 대가: 훅·잡기가 움직이는 플레이어를 놓치기 쉬워진다. 확정 스펙이므로 그대로 둔다.
+    protected override bool FaceTargetWhileAttacking => false;
 
     Player FindGrabTarget()
     {
@@ -1488,7 +1486,9 @@ public class TwentyThreeBoss : MonsterBase
     //      · 프리팹에 콜라이더·레이어·충돌 매트릭스를 더 얹지 않아도 된다
     void BeginDash()
     {
-        FaceTarget();
+        // 🔴 여기서 다시 조준하지 않는다(2026-08-13). 돌진은 애니 이벤트(클립 0.15초)로 시작하는데
+        //    그 순간 타깃 쪽으로 한 번 더 돌면 "공격 중 회전 없음" 규칙이 깨지고, 선딜을 보고 피한
+        //    플레이어를 다시 따라잡는 꼴이 된다. 방향은 StartAttack 조준에서 이미 확정됐다.
         _dashDir = transform.forward;
         _dashDir.y = 0f;
         if (_dashDir.sqrMagnitude < 0.0001f) _dashDir = Vector3.forward;
