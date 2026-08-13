@@ -330,6 +330,51 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 81c70da5a2e747148bf71f917743b5fd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ColliderInfo
+--- !u!1 &4428266645866178655
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5812967423476021960}
+  - component: {fileID: 8105872901339179434}
+  m_Layer: 0
+  m_Name: GrabSocket
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &5812967423476021960
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4428266645866178655}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 0.01, y: 0.01, z: 0.01}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 564008308436468704}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &8105872901339179434
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4428266645866178655}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3adf94732dbea6448b001086a684ee66, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BossGrabSocketUpright
+  yawSource: {fileID: 0}
 --- !u!1 &6928635095488946580
 GameObject:
   m_ObjectHideFlags: 0
@@ -351,6 +396,7 @@ GameObject:
   - component: {fileID: 5941236961246511350}
   - component: {fileID: 8594560318188141930}
   - component: {fileID: 28148461371597482}
+  - component: {fileID: 4265590449314754425}
   m_Layer: 8
   m_Name: TwentyThree
   m_TagString: Untagged
@@ -643,6 +689,25 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FloatingDamageAnchor
   anchorTransform: {fileID: 6168542492047789391}
   localOffset: {x: 0, y: 0, z: 0}
+--- !u!114 &4265590449314754425
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6928635095488946580}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 585d3d41612fde4429b4febba3277f45, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GrabController
+  ShowTopMostFoldoutHeaderGroup: 1
+  grabSocket: {fileID: 5812967423476021960}
+  grabColliderInfo: {fileID: 0}
+  targetMask:
+    serializedVersion: 2
+    m_Bits: 0
+  bt: {fileID: 0}
 --- !u!1001 &1176435436855418437
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -781,6 +846,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 1302593118246615575, guid: 471c30ff001a0254e8af63991ec73cf2, type: 3}
       insertIndex: -1
       addedObject: {fileID: 7434424548007149982}
+    - targetCorrespondingSourceObject: {fileID: 1302593118246615575, guid: 471c30ff001a0254e8af63991ec73cf2, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 5812967423476021960}
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 471c30ff001a0254e8af63991ec73cf2, type: 3}
       insertIndex: -1
