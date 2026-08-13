@@ -279,10 +279,25 @@ public class BossBomb : NetworkBehaviour, IAttackReceiver
     void OnTriggerEnter(Collider other)
     {
         if (!IsServer || _state == BossBombState.Exploded) return;
-        if (_state == BossBombState.Thrown) return; // 투척 중 스쳐도 안 터진다(공중 통과)
 
-        if (other.GetComponentInParent<Unit>() != null)
-            Explode();
+        Unit unit = other.GetComponentInParent<Unit>();
+        if (unit == null) return;
+
+        // 🔴 **비행 중에도 플레이어에 닿으면 즉시 터진다**(팀장 확정 2026-08-13).
+        //    이전 판은 `Thrown` 이면 통째로 무시했다("공중 통과"). 그 대가가 관찰된 증상이다 —
+        //    플레이어 **머리 위로 떨어진 폭탄이 터지지도, 착지하지도 않고 머리에 얹혀 있었다.**
+        //    착지 판정은 `groundMask` 레이어에만 반응하므로 플레이어는 바닥으로 잡히지 않아
+        //    폭탄이 `Thrown` 상태에 **영구 고착**된다(퓨즈는 흐르지만 폭발은 정지 후로 미뤄지므로 영원히 대기).
+        //
+        //    ⚠️ 던진 주체(보스·Wells)는 **비행 중에는 무시한다** — 손을 떠나는 순간 스쳐서
+        //       손에서 터지면 안 된다. 착지 뒤(Sliding/Resting)에는 보스 충돌도 즉시 폭발이 맞다.
+        if (_state == BossBombState.Thrown)
+        {
+            if (unit is Player) Explode();
+            return;
+        }
+
+        Explode();
     }
 
     // 상대 폭탄이 나를 쳤을 때(당구) — 타이머를 멈추기 위해 Sliding 으로 올린다.
