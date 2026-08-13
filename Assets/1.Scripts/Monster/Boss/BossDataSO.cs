@@ -301,4 +301,38 @@ public class BossDataSO : MonsterDataSO
     [Tooltip("[S8] 투척 상향각(도). 폭탄은 **대각선으로 던져 포물선**을 그린 뒤 바닥에서 수평 당구로 바뀐다. " +
              "🔴 소켓 회전에 의존하지 않는 이유: 아트 임포트 회전 때문에 고정 방향이 뒤집혀 있던 전례가 있다.")]
     [Range(0f, 80f)] public float bombThrowPitch = 35f;
+
+    // ─── 폭발 장판(FireFloor) ─────────────────────────────────────────────
+    //
+    // 🔴 **0 = 프리팹 값을 그대로 쓴다.** 값을 넣은 항목만 덮어쓴다.
+    //    이 규약을 쓰는 이유: `AreaZone` 은 "타입별 수치는 프리팹으로 저작"이 원래 설계라
+    //    (컴포넌트 헤더 주석) SO 가 무조건 이기게 만들면 **정본이 둘**이 된다. 기존 애셋에는
+    //    이 필드들이 없어 코드 초기값(0)이 적용되므로, 이관 자체로는 동작이 바뀌지 않는다.
+    //
+    // ⚠️ 주입은 **스폰 전에만** 유효하다 — `AreaZone.OnNetworkSpawn` 이 수명 타이머를 시작하기
+    //    때문이다. 그래서 `SpawnOrGrow` 의 Instantiate↔Spawn 사이에서 적용한다(`ApplyTuning`).
+    //    이미 스폰된 장판에 값을 밀면 타이머가 프리팹 값으로 이미 흐른 뒤라 의미가 깨진다.
+    [Header("폭발 장판(FireFloor) — 0 이면 프리팹 값")]
+    [Tooltip("장판 스폰 반경(m). 0 = 프리팹 값.")]
+    [Min(0f)] public float fireZoneRadius;
+
+    [Tooltip("장판 성장 상한 반경(m). 0 = 프리팹 값.")]
+    [Min(0f)] public float fireZoneMaxRadius;
+
+    [Tooltip("장판 수명(초). 0 = 프리팹 값. 확정값은 10초다.")]
+    [Min(0f)] public float fireZoneLifetime;
+
+    [Tooltip("겹쳐 성장할 때 수명을 다시 채우나. UsePrefab = 프리팹 값을 건드리지 않는다.")]
+    public AreaZoneToggleOverride fireZoneRefreshLifetimeOnGrow = AreaZoneToggleOverride.UsePrefab;
+}
+
+/// <summary>
+/// bool 값의 3상태 덮어쓰기. SO 에서 "안 건드림"을 표현하기 위해 필요하다 —
+/// 그냥 bool 이면 기본값 false 가 곧 "끄기 지시"가 돼 프리팹 저작을 조용히 뒤집는다.
+/// </summary>
+public enum AreaZoneToggleOverride
+{
+    UsePrefab = 0,
+    ForceOn = 1,
+    ForceOff = 2,
 }

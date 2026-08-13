@@ -240,7 +240,43 @@ public class AreaZone : NetworkBehaviour
     /// </summary>
     /// <param name="prefab">AreaZone + NetworkObject 프리팹. NetworkManager 의 NetworkPrefabs 에 등록돼 있어야 한다.</param>
     /// <returns>새로 스폰했거나 성장시킨 장판. 실패 시 null.</returns>
-    public static AreaZone SpawnOrGrow(GameObject prefab, Vector3 position, int extraGroundMask = 0)
+    /// <summary>
+    /// 스폰 **전에만** 부를 수 있는 값 덮어쓰기. 0(또는 null)인 항목은 프리팹 값을 그대로 둔다.
+    ///
+    /// 🔴 왜 스폰 전인가 — <see cref="OnNetworkSpawn"/> 이 <c>_lifeTimer = lifetime</c> 으로
+    ///    수명 타이머를 **시작**한다. 스폰 뒤에 lifetime 을 바꾸면 이미 흐르기 시작한 타이머와
+    ///    어긋나 "10초로 바꿨는데 6초에 사라진다" 같은 결과가 나온다.
+    ///    그래서 <see cref="SpawnOrGrow"/> 의 Instantiate↔Spawn 사이에서만 적용한다.
+    /// </summary>
+    public void ApplyTuning(float radiusOverride, float maxRadiusOverride,
+                            float lifetimeOverride, bool? refreshLifetimeOnGrowOverride)
+    {
+        if (IsSpawned)
+        {
+            Debug.LogError($"[AreaZone] {name}: 스폰된 뒤에는 값을 덮어쓸 수 없다 " +
+                           "— 수명 타이머가 이미 프리팹 값으로 시작했다. 무시한다.", this);
+            return;
+        }
+
+        if (radiusOverride > 0f) radius = radiusOverride;
+        if (maxRadiusOverride > 0f) maxRadius = maxRadiusOverride;
+        if (lifetimeOverride > 0f) lifetime = lifetimeOverride;
+        if (refreshLifetimeOnGrowOverride.HasValue) refreshLifetimeOnGrow = refreshLifetimeOnGrowOverride.Value;
+
+        // 상한이 스폰 반경보다 작으면 성장이 즉시 막힌다 — 저작 실수를 조용히 넘기지 않는다.
+        if (maxRadius < radius)
+        {
+            Debug.LogWarning($"[AreaZone] {name}: maxRadius({maxRadius}) < radius({radius}) — " +
+                             "성장하지 않는다. SO 값을 확인할 것.", this);
+        }
+    }
+
+    /// <param name="configure">
+    /// 스폰 **직전**에 새 장판을 손볼 훅(<see cref="ApplyTuning"/> 용). 기존 장판을 성장시키는
+    /// 경로에서는 불리지 않는다 — 그쪽은 이미 저작된 장판이다.
+    /// </param>
+    public static AreaZone SpawnOrGrow(GameObject prefab, Vector3 position, int extraGroundMask = 0,
+                                       System.Action<AreaZone> configure = null)
     {
         NetworkManager nm = NetworkManager.Singleton;
         if (nm == null || !nm.IsServer)
@@ -287,8 +323,12 @@ public class AreaZone : NetworkBehaviour
             return null;
         }
 
+        // 🔴 스폰 **전에** 값을 확정한다 — OnNetworkSpawn 이 수명 타이머를 시작하기 때문이다.
+        AreaZone spawned = go.GetComponent<AreaZone>();
+        if (configure != null && spawned != null) configure(spawned);
+
         netObj.Spawn();
-        return go.GetComponent<AreaZone>();
+        return spawned;
     }
 
     // 같은 타입이고, 그 장판 반경 안에 지점이 들어오면 "겹친다"로 본다.

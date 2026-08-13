@@ -1250,6 +1250,20 @@ public class TwentyThreeBoss : MonsterBase
             Destroy(go);
             return;
         }
+
+        // 🔴 장판 값은 **스폰 전에** 실어 준다. 폭탄이 터질 때 그대로 장판에 넘긴다.
+        //    스폰 뒤에 넘기면 늦는 게 아니라(폭발은 나중이다) — 규약을 한 곳으로 모으기 위해서다.
+        //    SO 가 0 이면 프리팹 값이 그대로 산다(BossDataSO 의 장판 블록 참조).
+        go.TryGetComponent(out BossBomb bomb);
+        bomb?.ConfigureZone(
+            _boss.fireZoneRadius, _boss.fireZoneMaxRadius, _boss.fireZoneLifetime,
+            _boss.fireZoneRefreshLifetimeOnGrow switch
+            {
+                AreaZoneToggleOverride.ForceOn => true,
+                AreaZoneToggleOverride.ForceOff => false,
+                _ => (bool?)null,
+            });
+
         netObj.Spawn();
 
         // 대각선 임펄스 — 좌우 분산(spreadAngle)과 상향각(bombThrowPitch)을 함께 준다.
@@ -1260,7 +1274,7 @@ public class TwentyThreeBoss : MonsterBase
         if (flat.sqrMagnitude < 0.0001f) flat = Vector3.forward;
         Vector3 dir = Quaternion.Euler(-_boss.bombThrowPitch, spread, 0f) * flat.normalized;
 
-        if (go.TryGetComponent(out BossBomb bomb))
+        if (bomb != null)
             bomb.Throw(dir.normalized * Mathf.Max(0.1f, _boss.throwImpulse));
         else
             Debug.LogError($"{name}: bombPrefab({go.name}) 에 BossBomb 이 없다 — 던질 수 없다.", this);

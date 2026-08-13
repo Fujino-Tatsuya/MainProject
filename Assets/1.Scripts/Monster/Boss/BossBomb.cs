@@ -346,6 +346,25 @@ public class BossBomb : NetworkBehaviour, IAttackReceiver
         return true;
     }
 
+    // ─── 장판 값 전달(SO → 폭탄 → 장판) ───────────────────────────────
+    //
+    // 폭탄은 값을 **쓰지 않고 실어 나르기만 한다.** 장판을 스폰하는 주체가 폭탄이라 어쩔 수 없이
+    // 여기를 거친다. 0/null 은 "프리팹 값을 그대로" 라는 뜻이다(BossDataSO 의 장판 블록 참조).
+    float _zoneRadius, _zoneMaxRadius, _zoneLifetime;
+    bool? _zoneRefreshLifetimeOnGrow;
+
+    /// <summary>보스가 **스폰 전에** 부른다. 서버 전용 런타임 값이라 복제하지 않는다(장판 스폰도 서버).</summary>
+    public void ConfigureZone(float radius, float maxRadius, float lifetime, bool? refreshLifetimeOnGrow)
+    {
+        _zoneRadius = radius;
+        _zoneMaxRadius = maxRadius;
+        _zoneLifetime = lifetime;
+        _zoneRefreshLifetimeOnGrow = refreshLifetimeOnGrow;
+    }
+
+    void ApplyZoneTuning(AreaZone zone) =>
+        zone.ApplyTuning(_zoneRadius, _zoneMaxRadius, _zoneLifetime, _zoneRefreshLifetimeOnGrow);
+
     // ─── 폭발 ─────────────────────────────────────────────────────────
     public void Explode()
     {
@@ -357,7 +376,7 @@ public class BossBomb : NetworkBehaviour, IAttackReceiver
         // 장판을 별도 스폰하고 폭탄은 즉시 despawn(정본 §10.5.2).
         // 같은 타입 장판이 이미 있으면 SpawnOrGrow 가 성장으로 갈음한다 → 겹쳐 스폰되지 않는다.
         if (zonePrefab != null)
-            AreaZone.SpawnOrGrow(zonePrefab, transform.position);
+            AreaZone.SpawnOrGrow(zonePrefab, transform.position, 0, ApplyZoneTuning);
 
         if (NetworkObject != null && NetworkObject.IsSpawned)
             NetworkObject.Despawn();
