@@ -192,9 +192,7 @@ MonoBehaviour:
   jumpLandingState: JumpLanding
   jumpTelegraphPrefab: {fileID: 5101064300646047659, guid: 703b2a15442ef56499ecba1ee0b9f2f2, type: 3}
   jumpLandSeparation: 1.2
-  jumpKnockbackStrength: 9
-  jumpKnockbackDuration: 0.3
-  jumpKnockbackStagger: 0
+  jumpKnockbackStrength: 5
   jumpTelegraphOuterAlpha: 0.12
   jumpTelegraphFillAlpha: 0.85
   chargeTimeLimit: 20
@@ -206,7 +204,7 @@ MonoBehaviour:
   rageDashCount: 3
   rageDashInterval: 0.5
   rageDashDuration: 0.7
-  rageDashSpeedMultiplier: 8
+  rageDashSpeedMultiplier: 6
   rageDashMaxDistance: 16
   rageDashDamage: 0
   dashDuration: 0.7
@@ -215,8 +213,7 @@ MonoBehaviour:
   dashDamage: 0
   dashCarryFrontOffset: 1.8
   dashStunDuration: 1
-  dashKnockbackStrength: 12
-  dashKnockbackDuration: 0.3
+  dashKnockbackStrength: 5
   bombThrowInterval: 6
   bombPrefab: {fileID: 7643126938755057433, guid: ede00d4e6aaec7442abf1ed83b4a7234, type: 3}
   throwImpulse: 8
@@ -229,11 +226,10 @@ MonoBehaviour:
   chargeAuraRadius: 3.5
   chargeAuraInterval: 1
   chargeAuraDamage: 20
-  chargeAuraKnockbackStrength: 8
-  chargeAuraKnockbackDuration: 0.25
-  chargeAuraStagger: 0
+  chargeAuraKnockbackStrength: 5
   chargeAuraTelegraphPrefab: {fileID: 5101064300646047659, guid: 703b2a15442ef56499ecba1ee0b9f2f2, type: 3}
-  chargeMoveArriveDistance: 0.6
+  chargeMoveArriveDistance: 0.2
+  chargeMoveSpeedMultiplier: 5
   chargeMoveTimeout: 4
   fireZoneRadius: 0
   fireZoneMaxRadius: 0
