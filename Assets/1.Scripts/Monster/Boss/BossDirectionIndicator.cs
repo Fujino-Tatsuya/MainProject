@@ -151,6 +151,16 @@ public class BossDirectionIndicator : MonoBehaviour, IBossTelegraph
     }
 
     // ─── IBossTelegraph ───────────────────────────────────────────────
+    /// <summary>
+    /// 앞뒤 표식을 강제로 숨긴다. 점프처럼 <b>착지 전에는 방향을 보여선 안 되는</b> 구간에서
+    /// 보스가 켜고 끈다(도약 시작 → true, 착지 → false).
+    ///
+    /// 높이 기반 <c>airborneHideHeight</c> 와 별개로 필요하다 — 도약 준비 동안 보스는 아직 땅에 있다.
+    /// </summary>
+    public void SetSuppressed(bool suppressed) => _suppressed = suppressed;
+
+    bool _suppressed;
+
     public void SetCounterWindow(bool open)
     {
         if (_counterWindowOpen == open) return;
@@ -173,6 +183,13 @@ public class BossDirectionIndicator : MonoBehaviour, IBossTelegraph
         // 발밑 바닥을 찾는다. GroundProbe 는 Unit 계층 콜라이더를 제외하므로
         // 보스 자기 히트박스(Default 레이어)를 바닥으로 오인하지 않는다.
         if (!GroundProbe.TryFindGround(boss.position, extraGroundMask, out RaycastHit ground, out _))
+            return false;
+
+        // 🔴 **명시적 억제** — 보스가 "착지 전에는 방향을 보여선 안 된다"고 알려 준 구간(2026-08-10).
+        //    아래 높이 판정만으로는 부족하다: 도약 **준비(선딜)** 동안 보스는 아직 땅에 있어서
+        //    표식이 그대로 보인다. Play 에서 "앞뒤 표식이 점프 착지 전에 미리 나온다"로 관찰됐다.
+        //    확정 스펙 = 착지 전에는 **예고 원만**, 앞뒤 구분은 **착지 후에** 보인다.
+        if (_suppressed)
             return false;
 
         // 🔴 점프 등 공중 상태 — 링이 공중에 뜨거나 발과 떨어져 어색해진다. 실측으로 판단한다.

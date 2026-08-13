@@ -32,6 +32,29 @@ public class AoeTelegraph : MonoBehaviour
     Mesh _circleMesh; // 코드 생성 디스크(지름 1 — Quad와 동일 스케일 수식 호환)
     Coroutine _hideRoutine;
 
+    /// <summary>
+    /// 이 인스턴스의 알파만 바꾼다. 같은 프리팹을 **역할별로 두 개** 쓰기 때문에 필요하다 —
+    /// 점프 예고는 "큰 원(연하게) + 채워지는 작은 원(진하게)" 두 벌이고, 프리팹은 하나다.
+    ///
+    /// ⚠️ `material`(인스턴스)을 쓴다. `sharedMaterial` 을 건드리면 **애셋이 오염되고** 두 인스턴스가
+    ///    같은 값을 공유해 애초의 목적이 깨진다.
+    /// </summary>
+    public void SetAlpha(float alpha)
+    {
+        if (_renderer == null) _renderer = GetComponent<MeshRenderer>();
+        if (_renderer == null) return;
+
+        Material m = _renderer.material;
+        if (m == null || !m.HasProperty(BaseColorId)) return;
+
+        Color c = m.GetColor(BaseColorId);
+        c.a = Mathf.Clamp01(alpha);
+        m.SetColor(BaseColorId, c);
+    }
+
+    MeshRenderer _renderer;
+    static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
+
     // radius만큼 반영해 표시하고, duration초 후 자동으로 숨긴다.
     public void Show(float radius, float duration)
     {

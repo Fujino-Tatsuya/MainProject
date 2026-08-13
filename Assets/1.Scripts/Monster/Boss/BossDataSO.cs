@@ -211,6 +211,11 @@ public class BossDataSO : MonsterDataSO
              "그래서 각 피어가 이 프리팹을 착지점에 로컬로 띄운다.")]
     public GameObject jumpTelegraphPrefab;
 
+    [Tooltip("점프 예고 — **큰 원(고정, 최종 범위)** 의 알파. 연할수록 범위만 암시한다.")]
+    [Range(0f, 1f)] public float jumpTelegraphOuterAlpha = 0.12f;
+    [Tooltip("점프 예고 — **차오르는 작은 원** 의 알파. 진할수록 '언제 떨어지는가'가 또렷해진다.")]
+    [Range(0f, 1f)] public float jumpTelegraphFillAlpha = 0.85f;
+
     [Header("송전기(차징) — 페이즈 진입 시퀀스")]
     [Tooltip("제한시간(초). 이 시간 안에 송전탑을 전부 부수지 못하면 레이지로 넘어간다.")]
     [Min(1f)] public float chargeTimeLimit = 20f;

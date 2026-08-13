@@ -837,6 +837,8 @@ public class TwentyThreeBoss : MonsterBase
         //    예고 장판도 바닥에 영구히 남는다. 둘 다 여기서 되돌린다.
         SetModelVisibleClientRpc(true);
         HideJumpTelegraphClientRpc();
+        // 같은 이유로 앞뒤 표식 억제도 되돌린다 — 안 하면 표식이 **영구히 숨은 채** 남는다.
+        ReleaseDirectionIndicatorClientRpc();
 
         // 🔴 Rage: 돌진 중 끊기면 **에이전트 속도가 8배로 고정되고 히트 윈도우가 열린 채 남는다**
         //    (그 뒤 모든 이동이 초고속이 되고, 다음 공격이 유닛당 1회 제한을 물려받는다).
@@ -1080,14 +1082,18 @@ public class TwentyThreeBoss : MonsterBase
         if (_telegraphFixed == null) _telegraphFixed = SpawnLocalTelegraph();
         if (_telegraphGrowing == null) _telegraphGrowing = SpawnLocalTelegraph();
 
+        // 🔴 알파를 역할별로 갈라 준다(팀장 확정 2026-08-10) — 프리팹은 하나이므로 인스턴스 재질로만 가능하다.
+        //    큰 원은 **더 연하게**(범위만 암시), 차오르는 원은 **더 진하게**(타이밍을 또렷하게).
         if (_telegraphFixed != null)
         {
             _telegraphFixed.transform.position = point + Vector3.up * 0.01f;
+            _telegraphFixed.SetAlpha(_boss.jumpTelegraphOuterAlpha);
             _telegraphFixed.Show(radius, growTime);
         }
         if (_telegraphGrowing != null)
         {
             _telegraphGrowing.transform.position = point + Vector3.up * 0.02f;
+            _telegraphGrowing.SetAlpha(_boss.jumpTelegraphFillAlpha);
             _telegraphGrowing.ShowGrowing(0.1f, radius, growTime, 0f);
         }
     }
@@ -1147,10 +1153,39 @@ public class TwentyThreeBoss : MonsterBase
     [ClientRpc]
     void CrossFadeJumpStateClientRpc(bool landing)
     {
+        // 🔴 앞뒤 표식은 **착지 후에만** 보인다(팀장 확정 2026-08-10).
+        //    이 RPC 가 점프 비행 구간을 전 피어에서 정확히 감싸므로 여기서 켜고 끈다.
+        //    · 서버에서만 끄면 클라 화면에는 그대로 보인다 — 표식은 클라 비주얼이다.
+        //    · 표시기의 높이 기반 숨김(airborneHideHeight)만으로는 부족하다: 도약 **준비** 동안
+        //      보스는 아직 땅에 있어서 표식이 미리 나온다(Play 에서 관찰된 증상).
+        //    · `SetModelVisibleClientRpc` 는 표시기를 일부러 건드리지 않는다(그쪽 주석 참조) —
+        //      그래서 별도 억제가 필요하다.
+        DirectionIndicator?.SetSuppressed(!landing);
+
         if (_boss == null) return;
         string state = landing ? _boss.jumpLandingState : _boss.jumpHoverState;
         if (!string.IsNullOrEmpty(state))
             SafeCrossFade(state);
+    }
+
+    // 점프가 착지 없이 끊겼을 때(카운터·사망) 억제를 되돌린다.
+    [ClientRpc]
+    void ReleaseDirectionIndicatorClientRpc() => DirectionIndicator?.SetSuppressed(false);
+
+    // 방향 표시기(앞뒤 링). 클라에도 있어야 하므로 지연 캐시로 잡는다.
+    BossDirectionIndicator _dirIndicator;
+    bool _dirIndicatorSearched;
+    BossDirectionIndicator DirectionIndicator
+    {
+        get
+        {
+            if (!_dirIndicatorSearched)
+            {
+                _dirIndicator = GetComponentInChildren<BossDirectionIndicator>(true);
+                _dirIndicatorSearched = true;
+            }
+            return _dirIndicator;
+        }
     }
 
     void WarnNoJumpTelegraphOnce()
