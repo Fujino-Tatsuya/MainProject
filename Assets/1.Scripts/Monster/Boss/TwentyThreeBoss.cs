@@ -1586,10 +1586,24 @@ public class TwentyThreeBoss : MonsterBase
                                                   ChargeCenterSampleRadius, UnityEngine.AI.NavMesh.AllAreas))
             _chargeMoveTarget = hit.position;
 
+        // 🔴 **빠르게 간다**(팀장 확정 2026-08-13: "지금 가는 상태도 너무 느리다").
+        //    돌진과 같은 이유로 **속도만 올려서는 안 된다** — 가속도가 그 속도에 도달할 시간을 안 준다.
+        //    그래서 돌진의 저장·복원 규약(`_dashPrev*`)을 그대로 재사용한다. 복원은 도착 시
+        //    `StartChargingInPlace` 의 `EndDashMove()` 가 한다.
         if (agent != null && agent.enabled && agent.isOnNavMesh)
         {
+            if (_dashPrevStopDistance < 0f) _dashPrevStopDistance = agent.stoppingDistance;
+            if (_dashPrevAcceleration < 0f)
+            {
+                _dashPrevAcceleration = agent.acceleration;
+                _dashPrevAutoBraking = agent.autoBraking;
+            }
+
+            agent.stoppingDistance = 0f;          // 목표 지점에 정확히 붙는다
+            agent.autoBraking = true;             // 지나치지 않게 감속은 켠 채로
+            agent.acceleration = DashAcceleration;
             agent.isStopped = false;
-            agent.speed = MoveSpeed;
+            agent.speed = MoveSpeed * ChargeMoveSpeedMul;
             agent.SetDestination(_chargeMoveTarget);
         }
 
@@ -1614,9 +1628,15 @@ public class TwentyThreeBoss : MonsterBase
 
         if (!arrived && _attackPhaseTimer > 0f) return;
 
+        // 🔴 **제자리에서 차징하지 않는다**(팀장 확정 2026-08-13: "제대로 위치에 도착 안 해도 charging 을 함").
+        //    시간이 다 됐는데 못 갔으면 **그 지점으로 워프**한다. 차징 위치는 연출·오라 범위의 기준이라
+        //    어긋나면 안 되고, 점프어택이 이미 같은 방식으로 착지점에 워프한다(같은 규약).
         if (!arrived)
-            Debug.LogWarning($"[23호] 송전기 — 중심까지 {ChargeMoveTimeout:0.#}초 안에 못 갔다. " +
-                             "그 자리에서 차징한다(경로가 막혔는지 확인할 것).", this);
+        {
+            Debug.LogWarning($"[23호] 송전기 — {ChargeMoveTimeout:0.#}초 안에 못 갔다(남은 거리 " +
+                             $"{Vector3.Distance(a, b):0.#}m). **워프**로 맞춘다 — 경로가 막혔는지 확인할 것.", this);
+            WarpTo(_chargeMoveTarget);
+        }
 
         StartChargingInPlace();
     }
@@ -1624,7 +1644,8 @@ public class TwentyThreeBoss : MonsterBase
     // 실제 차징 시작 — 송전탑을 올리고, 장판·오라를 켜고, 차징 클립을 튼다.
     void StartChargingInPlace()
     {
-        StopAgentHard();
+        // 이동용으로 올려 뒀던 속도·가속도·정지거리를 되돌리고 멈춘다(돌진과 같은 복원 경로).
+        EndDashMove();
 
         _charge?.Begin(_chargePylons, ChargeTimeLimit);
         SpawnChargeZone();
@@ -1663,6 +1684,7 @@ public class TwentyThreeBoss : MonsterBase
     const float ChargeCenterSampleRadius = 4f;   // 중심을 보행면으로 스냅할 때 허용 반경
     float ChargeArriveDistance => _boss != null ? Mathf.Max(0.1f, _boss.chargeMoveArriveDistance) : 0.6f;
     float ChargeMoveTimeout => _boss != null ? Mathf.Max(0.5f, _boss.chargeMoveTimeout) : 4f;
+    float ChargeMoveSpeedMul => _boss != null ? Mathf.Max(1f, _boss.chargeMoveSpeedMultiplier) : 3f;
 
     // 임의의 상태명을 전 피어에 CrossFade 한다(관용구 2 — 다지선다 애니는 상태 복제로 못 싣는다).
     [ClientRpc]
@@ -2089,6 +2111,13 @@ public class TwentyThreeBoss : MonsterBase
             p = new Vector3(p.x, GroundProbe.SurfaceY(ground), p.z);
 
         _chargeAuraTelegraph.transform.position = p + Vector3.up * 0.03f;
+
+        // 🔴 **보스를 따라가게 붙인다**(2026-08-13). 판정은 매 틱 `transform.position` 기준인데
+        //    그림은 한 번만 놓으면 보스가 움직인 만큼 **예고가 판정과 어긋난다**(차징 시작 직후
+        //    아직 미끄러지는 구간이 있다). 예고가 판정에 대해 거짓말하지 않게 하는 것이 이 프로젝트 규약이다.
+        //    ⚠️ 점프 예고를 자식으로 두면 안 되는 이유(보스가 체공 중 순간이동한다)는 여기 해당하지 않는다
+        //       — 오라는 차징 동안만 살고, 그 사이 보스는 워프하지 않는다.
+        _chargeAuraTelegraph.transform.SetParent(transform, worldPositionStays: true);
         // 차징은 최대 chargeTimeLimit 초 유지된다 — 그동안 계속 보여야 하므로 넉넉히 잡고,
         // 실제 종료는 HideChargeAuraClientRpc 가 한다.
         _chargeAuraTelegraph.Show(radius, ChargeTimeLimit + 2f);

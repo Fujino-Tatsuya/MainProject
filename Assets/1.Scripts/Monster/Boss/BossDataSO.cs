@@ -377,8 +377,12 @@ public class BossDataSO : MonsterDataSO
     [Tooltip("차징 위치로 이동할 때 이 거리 안에 들어오면 도착으로 본다(m).")]
     [Min(0.1f)] public float chargeMoveArriveDistance = 0.6f;
 
-    [Tooltip("차징 위치로 이동하는 데 허용하는 최대 시간(초). 넘으면 그 자리에서 차징을 시작한다 " +
-             "— 못 가는 지형에서 시퀀스가 통째로 막히지 않게 한다.")]
+    [Tooltip("차징 위치로 이동할 때 이동속도 배수(moveSpeed × 이 값). **빠르게 가야 한다**(확정 스펙).\n" +
+             "⚠️ 배수만 올려서는 안 빨라진다 — 가속도도 함께 올린다(코드가 돌진과 같은 값을 쓴다).")]
+    [Min(1f)] public float chargeMoveSpeedMultiplier = 3f;
+
+    [Tooltip("차징 위치로 이동하는 데 허용하는 최대 시간(초). 넘으면 **그 지점으로 워프**한 뒤 차징한다 " +
+             "— 제자리에서 차징하면 오라 범위와 연출 기준이 어긋나기 때문이다(확정 스펙).")]
     [Min(0.5f)] public float chargeMoveTimeout = 4f;
 
     // ─── 폭발 장판(FireFloor) ─────────────────────────────────────────────

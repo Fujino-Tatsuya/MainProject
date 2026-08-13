@@ -229,6 +229,14 @@ PrefabInstance:
       propertyPath: m_Name
       value: bossroom
       objectReference: {fileID: 0}
+    - target: {fileID: 3593709065173503763, guid: 09f37616c8805a244ae999c00477d2ab, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0.067
+      objectReference: {fileID: 0}
+    - target: {fileID: 3593709065173503763, guid: 09f37616c8805a244ae999c00477d2ab, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0.101
+      objectReference: {fileID: 0}
     - target: {fileID: 4627039947633231218, guid: 09f37616c8805a244ae999c00477d2ab, type: 3}
       propertyPath: GlobalObjectIdHash
       value: 2388388347
@@ -407,7 +415,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &580685370
 MonoBehaviour:
   m_ObjectHideFlags: 0
