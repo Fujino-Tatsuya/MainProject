@@ -46,6 +46,38 @@ public static class BossDataWiring
         Debug.Log(sb.ToString());
     }
 
+    // 차징 오라 범위 표시 — 점프 예고와 **같은 프리팹**(`TelegraphPrefabPath`)을 재사용한다.
+    // 둘 다 바닥에 눕는 원이라 새로 만들 이유가 없다.
+    //
+    // 🔴 오라 범위가 **보여야** 플레이어가 피한다. 비워 두면 판정만 있고 표시가 없어
+    //    "갑자기 밀린다"가 된다 — 예고 없는 판정은 이 프로젝트에서 금지에 가깝다.
+    [MenuItem("Tools/Boss/보스 데이터 — 차징 오라 예고 배선")]
+    public static void WireChargeAura()
+    {
+        var telegraph = AssetDatabase.LoadAssetAtPath<GameObject>(TelegraphPrefabPath);
+        if (telegraph == null) { Debug.LogError($"[BossData] {TelegraphPrefabPath} 를 못 찾았다."); return; }
+
+        int changed = 0;
+        foreach (string path in new[] { BossDataPath, SoloDataPath })
+        {
+            var data = AssetDatabase.LoadAssetAtPath<BossDataSO>(path);
+            if (data == null) { Debug.LogWarning($"[BossData] {path} 없음 — 건너뛴다."); continue; }
+
+            var so = new SerializedObject(data);
+            SerializedProperty p = so.FindProperty("chargeAuraTelegraphPrefab");
+            if (p == null) { Debug.LogError($"[BossData] {data.name}: chargeAuraTelegraphPrefab 필드가 없다."); continue; }
+            if (p.objectReferenceValue == telegraph) continue;
+
+            p.objectReferenceValue = telegraph;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            changed++;
+            Debug.Log($"[BossData] {data.name}.chargeAuraTelegraphPrefab → {telegraph.name}", data);
+        }
+
+        if (changed > 0) AssetDatabase.SaveAssets();
+        Debug.Log($"[BossData] 차징 오라 예고 배선 완료 — 변경 {changed}건(멱등, 이미 맞으면 0건).");
+    }
+
     [MenuItem("Tools/Boss/보스 데이터 — 프리팹 참조 배선 (bombPrefab)")]
     public static void Wire()
     {

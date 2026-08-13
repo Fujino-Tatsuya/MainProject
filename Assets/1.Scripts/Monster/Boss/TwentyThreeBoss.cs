@@ -478,7 +478,10 @@ public class TwentyThreeBoss : MonsterBase
                     _stateTimer = JumpHover + JumpLanding + JumpRecovery + data.attackDuration;
                     break;
                 case BossAttackId.ChargeSequence:
-                    _stateTimer = ChargeTimeLimit + data.attackDuration;
+                    // 🔴 **이동 구간을 예산에 넣는다**(2026-08-13). 차징은 송전탑 중심으로 이동한 뒤
+                    //    시작하므로 체인 길이 = 이동 + 제한시간 + 복귀다. 돌진에서 선딜 몫을 빠뜨려
+                    //    매번 안전망이 터졌던 것과 **같은 종류의 실수**라 여기서 미리 닫는다.
+                    _stateTimer = ChargeMoveTimeout + ChargeTimeLimit + data.attackDuration;
                     break;
                 case BossAttackId.RageDash:
                     _stateTimer = RageTotalTime + data.attackDuration;
@@ -701,7 +704,12 @@ public class TwentyThreeBoss : MonsterBase
                 break;
 
             // ── 페이즈 시퀀스 ─────────────────────────────────────────
+            case BossAttackPhase.ChargeMove:
+                TickChargeMove();
+                break;
+
             case BossAttackPhase.ChargeWait:
+                TickChargeAura(dt);   // 접근 차단 오라는 차징 대기 구간에서만 돈다
                 TickCharge();
                 break;
 
@@ -872,6 +880,7 @@ public class TwentyThreeBoss : MonsterBase
 
         // 🔴 송전기: 전기 장판과 송전탑이 남는다 — 보스가 죽어도 아레나에 계속 피해를 준다.
         EndChargeZone();
+        EndChargeAura();     // 접근 차단 오라도 함께 끈다(카운터·사망으로 끊길 때)
         _charge?.Cancel();
 
         _attackPhase = BossAttackPhase.None;
@@ -1428,32 +1437,103 @@ public class TwentyThreeBoss : MonsterBase
     //
     // ⚠️ 송전탑 구현(아레나 오브젝트)은 IBossChargeSequence 로 분리했다. 구현이 없어도 시퀀스는
     //    **일관되게 돈다** — 제한시간이 끝나면 스펙대로 Rage 로 넘어간다(실패 취급).
+    // 🔴 확정 스펙(2026-08-13): 차징은 **송전탑들의 중심으로 이동한 뒤**에 애니메이션을 한다.
+    //    그래서 이 함수는 더 이상 차징을 시작하지 않는다 — **이동 구간(ChargeMove)** 을 연다.
+    //    실제 시작은 도착(또는 이동 타임아웃) 뒤의 `StartChargingInPlace()` 다.
     void BeginCharge()
     {
-        StopAgentHard();
         SetCounterWindow(false); // 차징 중엔 카운터 창 없음(확정 스펙)
 
-        int players = CountAlivePlayers();
-        int pylons = PylonCountFor(players);
+        _chargePlayers = CountAlivePlayers();
+        _chargePylons = PylonCountFor(_chargePlayers);
 
         if (_charge == null) _charge = GetComponentInChildren<IBossChargeSequence>(true);
-        if (_charge != null)
+
+        // 참여 송전탑을 **미리 고르고** 중심을 받는다. 여기서 고른 집합을 Begin 이 그대로 쓴다
+        // — 이동한 뒤 다시 고르면 `pickNearest` 결과가 달라져 목표와 다른 탑이 올라온다.
+        _chargeMoveTarget = transform.position;
+        bool haveCenter = _charge != null && _charge.TryPrepareCenter(_chargePylons, out _chargeMoveTarget);
+
+        if (!haveCenter)
         {
-            _charge.Begin(pylons, ChargeTimeLimit);
-        }
-        else if (!_warnedNoCharge)
-        {
-            _warnedNoCharge = true;
-            Debug.LogWarning(
-                $"{name}: IBossChargeSequence 구현이 없다 — 송전탑이 활성되지 않고 제한시간 뒤 " +
-                "그대로 레이지로 넘어간다(스펙상 '실패'와 같은 경로).", this);
+            if (!_warnedNoCharge)
+            {
+                _warnedNoCharge = true;
+                Debug.LogWarning(
+                    $"{name}: 송전탑 중심을 잡지 못했다(구현 없음 또는 탑 0개) — 제자리에서 차징한다. " +
+                    "제한시간 뒤 그대로 레이지로 넘어간다(스펙상 '실패'와 같은 경로).", this);
+            }
+            StartChargingInPlace();
+            return;
         }
 
+        // 보행 가능한 지점으로 스냅한다 — 중심이 탑 위·틈이면 에이전트가 영영 도착하지 못한다.
+        if (UnityEngine.AI.NavMesh.SamplePosition(_chargeMoveTarget, out UnityEngine.AI.NavMeshHit hit,
+                                                  ChargeCenterSampleRadius, UnityEngine.AI.NavMesh.AllAreas))
+            _chargeMoveTarget = hit.position;
+
+        if (agent != null && agent.enabled && agent.isOnNavMesh)
+        {
+            agent.isStopped = false;
+            agent.speed = MoveSpeed;
+            agent.SetDestination(_chargeMoveTarget);
+        }
+
+        // 이동 중에는 로코모션 클립을 보여 준다 — 차징 클립은 도착한 뒤에 튼다(확정 스펙).
+        if (data != null && !string.IsNullOrEmpty(data.locomotionState))
+            CrossFadeStateClientRpc(data.locomotionState);
+
+        Debug.Log($"[23호] 송전기 — 중심 {_chargeMoveTarget} 으로 이동 시작 " +
+                  $"(인원 {_chargePlayers}명 → 송전탑 {_chargePylons}개)", this);
+
+        EnterPhase(BossAttackPhase.ChargeMove, ChargeMoveTimeout);
+    }
+
+    // 중심으로 이동하는 구간. 도착하거나 시간이 다하면 그 자리에서 차징을 시작한다.
+    void TickChargeMove()
+    {
+        Vector3 a = transform.position; a.y = 0f;
+        Vector3 b = _chargeMoveTarget;  b.y = 0f;
+        bool arrived = (a - b).sqrMagnitude <= ChargeArriveDistance * ChargeArriveDistance;
+
+        if (!arrived && _attackPhaseTimer > 0f) return;
+
+        if (!arrived)
+            Debug.LogWarning($"[23호] 송전기 — 중심까지 {ChargeMoveTimeout:0.#}초 안에 못 갔다. " +
+                             "그 자리에서 차징한다(경로가 막혔는지 확인할 것).", this);
+
+        StartChargingInPlace();
+    }
+
+    // 실제 차징 시작 — 송전탑을 올리고, 장판·오라를 켜고, 차징 클립을 튼다.
+    void StartChargingInPlace()
+    {
+        StopAgentHard();
+
+        _charge?.Begin(_chargePylons, ChargeTimeLimit);
         SpawnChargeZone();
+        BeginChargeAura();
 
-        Debug.Log($"[23호] 송전기 시작 — 인원 {players}명 → 송전탑 {pylons}개, 제한시간 {ChargeTimeLimit:0.#}초", this);
+        // 도착했으니 이제 차징 애니메이션을 튼다.
+        BossAttackEntry e = _currentEntry;
+        if (e != null && !string.IsNullOrEmpty(e.animatorStateName))
+            CrossFadeStateClientRpc(e.animatorStateName);
+
+        Debug.Log($"[23호] 송전기 시작 — 인원 {_chargePlayers}명 → 송전탑 {_chargePylons}개, " +
+                  $"제한시간 {ChargeTimeLimit:0.#}초", this);
         EnterPhase(BossAttackPhase.ChargeWait, ChargeTimeLimit);
     }
+
+    Vector3 _chargeMoveTarget;
+    int _chargePylons;
+    int _chargePlayers;
+    const float ChargeCenterSampleRadius = 4f;   // 중심을 보행면으로 스냅할 때 허용 반경
+    float ChargeArriveDistance => _boss != null ? Mathf.Max(0.1f, _boss.chargeMoveArriveDistance) : 0.6f;
+    float ChargeMoveTimeout => _boss != null ? Mathf.Max(0.5f, _boss.chargeMoveTimeout) : 4f;
+
+    // 임의의 상태명을 전 피어에 CrossFade 한다(관용구 2 — 다지선다 애니는 상태 복제로 못 싣는다).
+    [ClientRpc]
+    void CrossFadeStateClientRpc(string stateName) => SafeCrossFade(stateName);
 
     void TickCharge()
     {
@@ -1465,6 +1545,7 @@ public class TwentyThreeBoss : MonsterBase
 
         bool cleared = result == BossChargeResult.AllPylonsDestroyed;
         EndChargeZone();
+        EndChargeAura();     // 🔴 성공·실패 **양쪽 모두** 여기를 지난다 — 오라가 남으면 영구 장판이 된다
         _charge?.Cancel();
 
         if (cleared)
@@ -1780,6 +1861,120 @@ public class TwentyThreeBoss : MonsterBase
         agent.isStopped = true;
         agent.velocity = Vector3.zero;
     }
+
+    #region 차징 오라 — 접근 차단 (H1/H2)
+    // 🔴 확정 스펙(2026-08-13): 차징 동안 보스 **주변 원형 범위**가 **주기적으로** 데미지 + 넉백을
+    //    줘서 플레이어가 다가와 때리지 못하게 한다. 크기는 점프어택과 비슷(SO 기본 3.5m).
+    //
+    // ⚠️ `chargeZonePrefab`(AreaZone) 과는 별개다. 그쪽은 배선이 비어 있고 **밀치기 경로가 없다**
+    //    (SpawnChargeZone 주석 참조). 여기는 **넉백까지** 필요하므로 보스가 직접 판정한다.
+    // ⚠️ 판정은 서버 전용, 예고 비주얼은 전 피어. 예고가 판정에 대해 거짓말하지 않게
+    //    **같은 반경**을 쓴다(점프 예고·방향 표시기와 같은 원칙).
+    void BeginChargeAura()
+    {
+        if (ChargeAuraRadius <= 0f) return;
+
+        _chargeAuraActive = true;
+        _chargeAuraTimer = 0f;   // 시작하자마자 1회 — "다가와 있으면 즉시 밀린다"
+        ShowChargeAuraClientRpc(ChargeAuraRadius);
+    }
+
+    void TickChargeAura(float dt)
+    {
+        if (!_chargeAuraActive) return;
+
+        _chargeAuraTimer -= dt;
+        if (_chargeAuraTimer > 0f) return;
+        _chargeAuraTimer = ChargeAuraInterval;
+
+        int dmg = Mathf.Max(0, Mathf.RoundToInt(ChargeAuraDamage * PhaseDamageMultiplier));
+        if (_aoeBuffer == null) _aoeBuffer = new Collider[16];
+
+        int count = Physics.OverlapSphereNonAlloc(
+            transform.position, ChargeAuraRadius, _aoeBuffer, playerMask, QueryTriggerInteraction.Collide);
+
+        _aoeHits.Clear();
+        for (int i = 0; i < count; i++)
+        {
+            Collider hit = _aoeBuffer[i];
+            if (hit == null) continue;
+
+            Player p = hit.GetComponentInParent<Player>();
+            if (p == null || !_aoeHits.Add(p)) continue;   // 콜라이더 여러 개짜리 대상 중복 방지
+
+            // 넉백 방향 = **보스 → 대상** 바깥쪽. 겹쳐 서 있으면 대상의 전방으로 민다(0 벡터 금지).
+            Vector3 push = p.transform.position - transform.position;
+            push.y = 0f;
+            if (push.sqrMagnitude < 0.0001f) push = p.transform.forward;
+            push.Normalize();
+
+            var info = new AttackInfo(dmg, AttackType.Default)
+            {
+                knockbackStrength = ChargeAuraKnockback,
+                knockbackDuration = ChargeAuraKnockbackTime,
+                staggerDuration = ChargeAuraStagger,
+                knockbackDirection = push,
+            };
+            var ctx = new AttackHitContext(transform.position, transform);
+
+            // Hurtbox 를 우선한다(방어·쉴드 계산을 우회하지 않는 서버 경로).
+            Hurtbox hurtbox = p.GetComponentInChildren<Hurtbox>();
+            if (hurtbox != null) hurtbox.ReceiveAttack(info, ctx);
+            else p.ReceiveAttack(info, ctx);
+        }
+    }
+
+    void EndChargeAura()
+    {
+        if (!_chargeAuraActive) return;
+        _chargeAuraActive = false;
+        HideChargeAuraClientRpc();
+    }
+
+    // ─── 오라 예고(클라 비주얼) ──────────────────────────────────────────
+    // 🔴 표식·예고는 **클라 비주얼**이다 — 서버에서만 끄면 클라 화면에 그대로 남는다(점프 예고와 같은 함정).
+    [ClientRpc]
+    void ShowChargeAuraClientRpc(float radius)
+    {
+        if (_boss == null || _boss.chargeAuraTelegraphPrefab == null) return;
+
+        if (_chargeAuraTelegraph == null)
+        {
+            GameObject go = Instantiate(_boss.chargeAuraTelegraphPrefab);
+            go.TryGetComponent(out _chargeAuraTelegraph);
+        }
+        if (_chargeAuraTelegraph == null) return;
+
+        // 보스 발밑에 눕힌다. 절대 Y 금지 — 찾은 바닥 + 표준 간격(GroundProbe 규약).
+        Vector3 p = transform.position;
+        if (GroundProbe.TryFindGround(p, 0, out RaycastHit ground, out _))
+            p = new Vector3(p.x, GroundProbe.SurfaceY(ground), p.z);
+
+        _chargeAuraTelegraph.transform.position = p + Vector3.up * 0.03f;
+        // 차징은 최대 chargeTimeLimit 초 유지된다 — 그동안 계속 보여야 하므로 넉넉히 잡고,
+        // 실제 종료는 HideChargeAuraClientRpc 가 한다.
+        _chargeAuraTelegraph.Show(radius, ChargeTimeLimit + 2f);
+    }
+
+    [ClientRpc]
+    void HideChargeAuraClientRpc()
+    {
+        if (_chargeAuraTelegraph == null) return;
+        Destroy(_chargeAuraTelegraph.gameObject);
+        _chargeAuraTelegraph = null;
+    }
+
+    bool _chargeAuraActive;
+    float _chargeAuraTimer;
+    AoeTelegraph _chargeAuraTelegraph;
+
+    float ChargeAuraRadius => _boss != null ? Mathf.Max(0f, _boss.chargeAuraRadius) : 3.5f;
+    float ChargeAuraInterval => _boss != null ? Mathf.Max(0.1f, _boss.chargeAuraInterval) : 1f;
+    int ChargeAuraDamage => _boss != null ? Mathf.Max(0, _boss.chargeAuraDamage) : 20;
+    float ChargeAuraKnockback => _boss != null ? Mathf.Max(0f, _boss.chargeAuraKnockbackStrength) : 8f;
+    float ChargeAuraKnockbackTime => _boss != null ? Mathf.Max(0f, _boss.chargeAuraKnockbackDuration) : 0.25f;
+    float ChargeAuraStagger => _boss != null ? Mathf.Max(0f, _boss.chargeAuraStagger) : 0f;
+    #endregion
 
     void SpawnChargeZone()
     {

@@ -27,6 +27,17 @@ public enum BossChargeResult
 /// </summary>
 public interface IBossChargeSequence
 {
+    /// <summary>
+    /// 참여할 송전탑을 <b>미리 고르고</b> 그 중심을 돌려준다(서버). 아직 올리지는 않는다.
+    ///
+    /// 🔴 확정 스펙(2026-08-13): 보스는 차징 전에 <b>송전탑들의 중심으로 이동</b>한 뒤 애니메이션을
+    ///    한다 → <see cref="Begin"/> 보다 먼저 중심을 알아야 한다.
+    ///    여기서 고른 집합을 <see cref="Begin"/> 이 <b>그대로 재사용</b>해야 한다 — 이동 뒤 다시 고르면
+    ///    "가까운 순" 정렬이 달라져 목표로 삼았던 중심과 다른 탑이 올라온다.
+    /// </summary>
+    /// <returns>고를 탑이 하나도 없으면 <c>false</c>(그때는 보스가 제자리에서 차징한다).</returns>
+    bool TryPrepareCenter(int pylonCount, out UnityEngine.Vector3 center);
+
     /// <summary>시퀀스 시작(서버). <paramref name="pylonCount"/> 는 보스가 인원수로 산출해 넘긴다.</summary>
     void Begin(int pylonCount, float timeLimit);
 

@@ -37,14 +37,49 @@ public class BossChargeSequence : MonoBehaviour, IBossChargeSequence
     float _deadline;
     bool _running;
 
+    /// <summary>
+    /// 이번에 참여할 송전탑을 <b>미리 고르고</b> 그 중심을 돌려준다. 아직 올리지는 않는다.
+    ///
+    /// 🔴 확정 스펙(2026-08-13): 보스는 차징을 시작하기 전에 <b>송전탑들의 중심</b>으로 이동한 뒤
+    ///    애니메이션을 한다. 그래서 <see cref="Begin"/> 보다 먼저 중심을 알아야 한다.
+    ///    여기서 고른 집합을 그대로 들고 있다가 <see cref="Begin"/> 이 재사용하므로
+    ///    <b>이동 목표와 실제로 올라오는 송전탑이 어긋나지 않는다</b>(두 번 고르면 갈릴 수 있다).
+    /// </summary>
+    public bool TryPrepareCenter(int pylonCount, out Vector3 center)
+    {
+        center = transform.position;
+        if (!IsServerRuntime()) return false;
+
+        Cancel();                              // 이전 잔존물 정리(멱등)
+        SelectPylons(Mathf.Max(1, pylonCount));
+        _prepared = _engaged.Count > 0;
+        if (!_prepared) return false;
+
+        Vector3 sum = Vector3.zero;
+        for (int i = 0; i < _engaged.Count; i++) sum += _engaged[i].transform.position;
+        center = sum / _engaged.Count;
+        return true;
+    }
+
+    bool _prepared;   // TryPrepareCenter 가 고른 집합이 아직 유효한가
+
     public void Begin(int pylonCount, float timeLimit)
     {
         if (!IsServerRuntime()) return;
 
-        Cancel(); // 이전 시퀀스 잔존물 정리(멱등)
-
         int want = Mathf.Max(1, pylonCount);
-        SelectPylons(want);
+
+        // 🔴 미리 고른 집합이 있으면 **다시 고르지 않는다.** 다시 고르면 보스가 이동해 온 만큼
+        //    `pickNearest` 정렬 결과가 달라져, 이동 목표로 삼았던 중심과 다른 송전탑이 올라온다.
+        if (_prepared && _engaged.Count > 0)
+        {
+            _prepared = false;
+        }
+        else
+        {
+            Cancel(); // 이전 시퀀스 잔존물 정리(멱등)
+            SelectPylons(want);
+        }
 
         if (_engaged.Count == 0)
         {
@@ -102,6 +137,7 @@ public class BossChargeSequence : MonoBehaviour, IBossChargeSequence
 
         _engaged.Clear();
         _running = false;
+        _prepared = false;
     }
 
     void SelectPylons(int count)
