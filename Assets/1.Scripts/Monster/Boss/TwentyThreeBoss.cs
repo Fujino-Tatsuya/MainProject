@@ -879,6 +879,9 @@ public class TwentyThreeBoss : MonsterBase
         // 🔴 Jump: 체공 중 끊기면(카운터·사망) **메시가 꺼진 채로 남아 보스가 투명해진다.**
         //    예고 장판도 바닥에 영구히 남는다. 둘 다 여기서 되돌린다.
         SetModelVisibleClientRpc(true);
+        // 🔴 피격 콜라이더도 반드시 되살린다 — 안 하면 보스가 **영구 무적**으로 남는다.
+        //    메시 복구와 정확히 같은 이유이고, 빠뜨리면 훨씬 치명적이다(전투가 끝나지 않는다).
+        SetHurtableClientRpc(true);
         HideJumpTelegraphClientRpc();
         // 같은 이유로 앞뒤 표식 억제도 되돌린다 — 안 하면 표식이 **영구히 숨은 채** 남는다.
         ReleaseDirectionIndicatorClientRpc();
@@ -1004,6 +1007,9 @@ public class TwentyThreeBoss : MonsterBase
         // 체공 동안 메시를 감춘다 — 착지점으로 순간이동하는 것이 보이지 않게.
         SetModelVisibleClientRpc(false);
 
+        // 메시만 끄면 **보이지 않는 보스가 맞는다** — 피격 콜라이더도 함께 끈다(2026-08-13).
+        SetHurtableClientRpc(false);
+
         CrossFadeJumpStateClientRpc(landing: false);
 
         // 🔴 **공중에서는 폭탄을 던지지 않는다**(팀장 확정 2026-08-13). Wells 는 23호 상태와 무관하게
@@ -1019,6 +1025,7 @@ public class TwentyThreeBoss : MonsterBase
     {
         WarpTo(_jumpArrivePoint);
         SetModelVisibleClientRpc(true);
+        SetHurtableClientRpc(true);   // 착지했으니 다시 맞는다(BeginJump 의 짝)
 
         CrossFadeJumpStateClientRpc(landing: true);
 
@@ -1222,6 +1229,49 @@ public class TwentyThreeBoss : MonsterBase
             if (_modelRenderers[i] != null)
                 _modelRenderers[i].enabled = visible;
     }
+
+    // 🔴 **체공 중에는 보스를 때릴 수 없다**(팀장 확정 2026-08-13).
+    //    증상: 점프어택 중 화면에는 예고 장판만 있는데 **보이지 않는 보스가 맞았다.**
+    //    `SetModelVisibleClientRpc` 는 **메시만** 끈다 — 콜라이더는 그대로 남아 판정이 살아 있었다.
+    //
+    // 🔴 끄는 대상이 **둘**이다. 하나만 끄면 여전히 맞는다:
+    //    ① `HurtBox`(layer EnemyHurtBox=14) — 정상 피격 경로
+    //    ② **보스 루트의 몸 콜라이더**(layer Enemy=8) — 플레이어 공격 마스크(17664 = 8·10·14)에
+    //       이것도 들어 있다. 루트 콜라이더에서 `GetComponentInParent<Hurtbox>()` 는 **자식인
+    //       HurtBox 를 찾지 못하므로**(부모 방향 탐색) `Unit` 폴백 경로로 데미지가 그대로 들어간다.
+    //
+    // ⚠️ 전 피어에서 끈다. 판정은 서버만 하지만, 콜라이더가 클라에 남아 있으면 플레이어가
+    //    **보이지 않는 몸에 막힌다**(체공 중 보스는 이륙 지점에 그대로 서 있다).
+    [ClientRpc]
+    void SetHurtableClientRpc(bool hurtable)
+    {
+        if (_hurtColliders == null) CacheHurtColliders();
+        if (_hurtColliders == null) return;
+
+        for (int i = 0; i < _hurtColliders.Length; i++)
+            if (_hurtColliders[i] != null)
+                _hurtColliders[i].enabled = hurtable;
+    }
+
+    void CacheHurtColliders()
+    {
+        var list = new List<Collider>(4);
+
+        // ① Hurtbox 가 붙은 오브젝트의 콜라이더(Hurtbox 는 RequireComponent(Collider) 다)
+        foreach (Hurtbox h in GetComponentsInChildren<Hurtbox>(true))
+            if (h != null && h.TryGetComponent(out Collider c)) list.Add(c);
+
+        // ② 루트 몸 콜라이더. 무기 히트박스(layer Weapon)는 **넣지 않는다** — 보스의 공격 판정이라
+        //    이걸 끄면 착지 공격이 죽는다.
+        foreach (Collider c in GetComponents<Collider>())
+            if (c != null && !c.isTrigger && !list.Contains(c)) list.Add(c);
+
+        _hurtColliders = list.ToArray();
+        if (_hurtColliders.Length == 0)
+            Debug.LogWarning($"{name}: 끌 피격 콜라이더를 하나도 못 찾았다 — 체공 중에도 맞는다.", this);
+    }
+
+    Collider[] _hurtColliders;
 
     void CacheModelRenderers()
     {
