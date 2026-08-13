@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -7,8 +8,16 @@ using UnityEngine;
 //
 // ⚠️ **"중력 포물선"이 아니라 2단계 모델이다.**
 //    단계 1(Thrown) = Wells 손에서 대각선 투척, 중력 on, 포물선.
-//    단계 2(Sliding/Resting) = 바닥 최초 접촉 이후. 중력 off, **Y 고정**, 방향벡터 일직선.
-//    폭탄끼리 당구처럼 부딪히고 서로 밀리는 것이 이 기믹의 핵심 재미다.
+//    단계 2(Resting/Sliding) = 바닥 최초 접촉 이후. 중력 off, **Y 고정**, 방향벡터 일직선.
+//
+// 🔴 **2026-08-10 정정 — 착지하면 그 자리에 멈춘다.**
+//    이전 판은 착지 후 남은 수평 속도로 Sliding 에 들어가 **폭탄이 땅에 붙어 계속 미끄러졌다.**
+//    팀장 확정: "바닥에 닿으면 그 위치에 그대로 있음." → `EnterHorizontalPhase` 에서 속도를 죽인다.
+//    ⚠️ 그래서 **당구(Sliding)는 되쳐내기 이후에만** 성립한다 — 투척 착지로는 Sliding 에 들어가지 않는다.
+//    폭탄끼리 밀고 밀리는 재미는 **플레이어가 되쳐낸 폭탄**에서 나온다.
+//
+// 🔴 **퓨즈 규칙**: 5초는 **착지 시점부터** 센다. 되쳐내 날아가는 중에도 시간은 흐르지만
+//    **폭발은 정지한 뒤로 보류**된다("터지는 시간이 되어도 안 터지고 도착한 후 터짐").
 //
 // ─── 되쳐내기 경로 ─────────────────────────────────────────────────────────
 // 플레이어 기본공격 → (공격 판정) → 폭탄 자식의 `Hurtbox` → `IAttackReceiver.ReceiveAttack`.
@@ -34,8 +43,9 @@ public class BossBomb : NetworkBehaviour, IAttackReceiver
 {
     [Header("폭발")]
     [SerializeField, Min(0.1f)]
-    [Tooltip("정지(Resting) 상태에서 폭발까지 걸리는 시간(초). 비행 중에는 흐르지 않는다.")]
-    float bombTimer = 4f;
+    [Tooltip("**착지 시점부터** 폭발까지 걸리는 시간(초). 확정값 5.\n" +
+             "되쳐내 날아가는 중에도 시간은 흐르지만, 폭발은 정지한 뒤로 보류된다.")]
+    float bombTimer = 5f;
     [SerializeField, Min(0)]
     [Tooltip("폭발 데미지.")]
     int bombDamage = 20;
@@ -98,6 +108,15 @@ public class BossBomb : NetworkBehaviour, IAttackReceiver
 
     public BossBombState State => _state;
 
+    /// <summary>
+    /// 살아 있는 폭탄(**서버 전용**). 점프어택 범위 판정처럼 "폭탄을 찾아 터뜨리는" 소비자가 쓴다.
+    ///
+    /// 레이어 마스크로 훑지 않고 레지스트리로 두는 이유는 이 프로젝트의 기존 방식과 같다
+    /// (`AreaZone.Active` · `BossChargingPylon.Active`) — 소비자가 마스크 필드를 배선하지 않아도 되고,
+    /// 마스크를 잘못 넣어 조용히 0건이 되는 사고(교훈 #33·#34)를 원천 차단한다.
+    /// </summary>
+    public static readonly List<BossBomb> Active = new List<BossBomb>();
+
     void Awake()
     {
         _rb = GetComponent<Rigidbody>();
@@ -119,7 +138,18 @@ public class BossBomb : NetworkBehaviour, IAttackReceiver
         // 단계 1 — 중력 켜고 Y 자유(포물선).
         _rb.useGravity = true;
         _rb.constraints = RigidbodyConstraints.FreezeRotation;
+
+        if (!Active.Contains(this)) Active.Add(this);
     }
+
+    public override void OnNetworkDespawn()
+    {
+        Active.Remove(this);
+        base.OnNetworkDespawn();
+    }
+
+    // Despawn 을 거치지 않고 파괴되는 경로(씬 종료·에디터 정지)에서도 목록이 새지 않게.
+    void OnDestroy() => Active.Remove(this);
 
     /// <summary>서버에서 투척한다(Wells 손 소켓 → 대각선 임펄스). 단계 1 로 들어간다.</summary>
     public void Throw(Vector3 impulse)
@@ -136,11 +166,17 @@ public class BossBomb : NetworkBehaviour, IAttackReceiver
     {
         if (!IsServer || _state == BossBombState.Exploded) return;
 
+        // 🔴 **퓨즈는 흐르고, 폭발만 보류한다**(팀장 확정 2026-08-10):
+        //    "폭탄이 날아가는 중이라면 터지는 시간이 되어도 안 터지고 도착한 후 터짐."
+        //    이전 판은 퓨즈 **자체를** 멈춰서, 되쳐내 날아간 시간만큼 폭발이 뒤로 밀렸다.
+        //    지금은 비행 중 만료되면 정지하는 프레임에 즉시 터진다.
+        //    투척 비행(Thrown)은 제외한다 — 5초는 **착지 시점부터** 센다.
+        if (_state != BossBombState.Thrown)
+            _fuse -= Time.fixedDeltaTime;
+
         switch (_state)
         {
             case BossBombState.Resting:
-                // 🔴 타이머는 **정지 상태에서만** 흐른다(기획 그대로).
-                _fuse -= Time.fixedDeltaTime;
                 if (_fuse <= 0f) Explode();
                 break;
 
@@ -255,11 +291,19 @@ public class BossBomb : NetworkBehaviour, IAttackReceiver
         Vector3 p = transform.position;
         transform.position = new Vector3(p.x, groundY + restHeightOffset, p.z);
 
-        // 바닥에 닿은 직후 남은 수평 속도가 있으면 당구(Sliding), 없으면 바로 정지.
-        _state = v.sqrMagnitude > restVelocityEpsilon * restVelocityEpsilon
-            ? BossBombState.Sliding
-            : BossBombState.Resting;
+        // 🔴 **착지 즉시 정지한다**(팀장 확정 2026-08-10):
+        //    "한번 바닥에 떨어진 후 그 반동으로 움직이는 게 아니라, 바닥에 닿으면 그 위치에 그대로 있음."
+        //    이전 판은 남은 수평 속도로 Sliding 에 들어가서 **폭탄이 땅에 붙어 계속 미끄러졌다**
+        //    — Play 에서 관찰된 그 증상이고, 아레나 반대쪽까지 흘러가 "웰즈 없는 보스가 던졌다"는
+        //    오해까지 만들었다. 그래서 수평 속도를 여기서 죽인다.
+        //    당구(Sliding)는 이제 **되쳐내기 이후에만** 쓰인다 — 투척 착지 경로에서는 쓰지 않는다.
+        _rb.linearVelocity = Vector3.zero;
+        _rb.angularVelocity = Vector3.zero;
+        _state = BossBombState.Resting;
         _slowFor = 0f;
+
+        // 5초 퓨즈는 **착지 시점부터** 센다. 공중에 머문 시간은 세지 않는다.
+        _fuse = bombTimer;
     }
 
     // 벽 반사 — 속도를 접촉 법선으로 반사한다. 물리 바운시 머티리얼에 의존하지 않아 결정적이다.

@@ -990,6 +990,28 @@ public class TwentyThreeBoss : MonsterBase
             if (hurtbox != null) hurtbox.ReceiveAttack(info, ctx);
             else unit.ReceiveAttack(info, ctx);
         }
+
+        DetonateBombsInJumpRange();
+    }
+
+    // 🔴 점프어택 범위 안의 폭탄은 함께 터진다(팀장 확정 2026-08-10).
+    //
+    // 위의 데미지 판정은 `playerMask` 로 훑기 때문에 폭탄(layer 10)이 **한 건도 걸리지 않는다** —
+    // 마스크를 넓히는 대신 폭탄의 정적 레지스트리를 쓴다(`BossBomb.Active`, 서버 전용).
+    // ⚠️ `Explode()` 가 레지스트리에서 자기를 빼므로 **역순 순회**한다.
+    void DetonateBombsInJumpRange()
+    {
+        float r = JumpAoeRadius;
+        float sqr = r * r;
+
+        for (int i = BossBomb.Active.Count - 1; i >= 0; i--)
+        {
+            BossBomb bomb = BossBomb.Active[i];
+            if (bomb == null) continue;
+            if ((bomb.transform.position - transform.position).sqrMagnitude > sqr) continue;
+
+            bomb.Explode();
+        }
     }
 
     // 최원거리 플레이어(서버). base 의 _target 은 최근접 락온이라 쓸 수 없어 직접 훑는다.
@@ -1173,6 +1195,12 @@ public class TwentyThreeBoss : MonsterBase
         }
 
         Transform socket = _wells != null ? _wells.BombSocket : transform;
+
+        // 🔴 진단(2026-08-10) — "Wells 없는 보스가 폭탄을 던졌다"는 관찰을 확정/반증하기 위해
+        //    **투척 주체를 이름으로 남긴다.** 코드상 이 함수는 `_wells.ThrowRequested` 로만 불리므로
+        //    Wells 가 없으면 도달할 수 없어야 한다. 로그에 `wells=(없음)` 이 찍히면 그 전제가 틀린 것이다.
+        Debug.Log($"[23호/폭탄] 투척 — boss={name} · wells={(_wells != null ? _wells.name : "(없음)")} " +
+                  $"· socket={socket.name} @ {socket.position}", this);
 
         GameObject go = Instantiate(_boss.bombPrefab, socket.position, Quaternion.identity);
         if (!go.TryGetComponent(out NetworkObject netObj))
