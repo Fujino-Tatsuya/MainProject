@@ -4,7 +4,94 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 다음 세션 시작점 — MonsterScene 한 사이클 (2026-08-10 종료)
+## ▶▶ 다음 세션 시작점 — 보스 거동 잔여 4건 (2026-08-10 저녁 종료)
+
+**브랜치 `feature/Boss23`** · **컴파일 0에러 0경고** · **기능별 6커밋 완료 · 미푸시**
+
+팀장 지시(Play 확인 후 기능별 분할)대로 2026-08-13 에 끊었다.
+
+| 커밋 | 내용 |
+|---|---|
+| `019431e` | 폭탄 착지 정지 + 퓨즈 5초 + 점프 범위 동반 폭발 |
+| `c451259` | 잡기 소켓 한시 복구 + 잡는 동안 회전 금지 |
+| `6035aaf` | 점프 착지 예고 원 2개 + 앞뒤 표식은 착지 후에만 |
+| `ba66e1b` | No23 단독 변형 — 중간보스로 재활용 |
+| `afab6b8` | No23 데이터 배선 + 장판 10초 + 저작 도구 |
+| `c1a7342` | MonsterScene 보스 전투 씬 구성 (P7) |
+
+🔴 **일부러 커밋하지 않은 것 3건** — 기능 변화가 0 이거나 보스 작업이 아니다.
+`4.MapScene.unity`(fileID churn 46/46) · `MultiplayerManager.asset`(줄끝만, numstat 0/0) ·
+`ZoneL_typeC.prefab`(**맵/아트 변경** — `crane_prefabs (1)` 중첩 추가. 이 세션 전부터 작업
+트리에 있던 것이라 **누구 작업인지 확인이 필요하다**).
+
+**한 줄 상태: 보스가 Play 에서 한 사이클을 돈다. 남은 것은 결함 4건이다.**
+
+### ✅ 이번 세션에 Play 로 확인된 것 (팀장 육안 승인)
+
+| | 확인 |
+|---|---|
+| 보스 스폰·추격·공격·페이즈·**송전기 전 시퀀스**·처치 | 로그 + 육안 |
+| **폭탄** — 착지 지점 정지 · 좌클릭 당구 · **벽 1회 반사** | 육안 |
+| **잡기** — 회전 폭주 없음 · 플레이어가 **서 있는 자세**로 붙음 | 육안 |
+| **점프 예고** — 큰 원 + 차오르는 작은 원, 다 차는 순간 착지 | 육안 |
+| **앞뒤 표식** — **착지 후에만** 나온다 | 육안 |
+
+### 🔴 남은 결함 4건 (다음 세션 작업 순서)
+
+1. **폭탄이 플레이어 평타에 안 맞는 경로가 남아 있다** — 로그: `후보: Bomb(Clone)(layer 10, hurtbox, **unit없음**)`.
+   `BossBomb` 은 `IAttackReceiver` 를 구현하고 `Hurtbox` 도 붙어 있는데, 플레이어 평타가 **`Unit` 을
+   요구**해서 그 앞에서 걸러진다. `Hurtbox.ownerUnit` 을 P2 에서 의도적으로 비웠기 때문(폭탄은 Unit 이 아니다).
+   🔴 **플레이어 코드는 은희 담당 경계** — 폭탄/Hurtbox 쪽에서 흡수할 방법을 먼저 찾을 것.
+2. **돌진이 실제로 전진하지 않는다** — 애니메이션만 돈다. 🔴 **코드는 이미 있다**
+   (`StartDashMove` · `TickDash` · `EndDashMove` · `_dashBlockedAhead` 벽 감지). 미구현이 아니라
+   **작동하지 않는 버그**다 → **진단 먼저**(후보: `_dashDir` 0 / 즉시 차단 판정 / NavMeshAgent 가 위치를
+   되돌림 / `TickDash` 미도달). 추측으로 코드를 더 쓰면 중복 구현이 된다.
+3. **Grab 체인이 Recovery 에서 타임아웃** — `4/4 재현`. `grab` 클립의 `OnAttackEnd` 수신 여부부터.
+4. **장판 값 SO 이관 미완** — 지금 값은 FireFloor 프리팹에 있다(`lifetime 10` · `radius 2` · `maxRadius 5`).
+   SO 로 빼려면 스키마 추가 + 주입이 필요한데, **수명 타이머가 프리팹 값으로 이미 시작한 뒤 덮어쓰면
+   타이밍 의미가 깨진다** — 그 설계를 하고 나서 옮길 것.
+
+### 🔴 이번 세션에 확정된 함정 (다음 사람이 밟을 지점)
+
+- **`Env` 를 통째로 끄면 NavMesh 가 함께 죽는다** — NavMeshSurface 가 `Env` 에 붙어 있다(`NavMesh-Env.asset`).
+  그 서피스는 원래 `CollectObjects=Children`+`RenderMeshes` 였다 → bossroom 을 루트에 두면 **빈 NavMesh**.
+  `MapNavMeshBaker` 가 검증한 설정(**PhysicsColliders / All / Default∪Ground**)으로 바꿔 뒀다.
+- **`hand.r` 을 이름으로 깊이우선 탐색하면 Wells 의 손이 먼저 걸린다** — Wells 가 23호 리그
+  `c_root_master.x` 밑에 중첩돼 있고 자기 리그에 같은 이름의 본을 갖고 있다. 내 잡기 소켓 초판이 이걸
+  밟았다(검증 출력이 잡아냈다). **조상에 `BossWells` 가 없는 후보**만 골라야 한다.
+  ⚠️ 기존 히트박스 앵커 3개(`Hand_L`·`Hand_R`·`DashBody`)는 **정상**임을 함께 확인했다.
+- **잡기 소켓을 살리면 보스가 무한 회전한다** — 잡힌 플레이어가 손을 따라가는데 보스가 그 플레이어를
+  향해 `LookRotation` 하면 되먹임이 생긴다. **잡는 동안에는 회전하지 않는 것**이 맞다.
+- **플레이어는 소켓의 회전까지 복사한다**(`followTarget.rotation`) → 손 본의 자세를 물려받아 **눕는다.**
+  손은 애니메이션으로 매 프레임 돌기 때문에 **정적 로컬 회전으로는 못 고친다** →
+  `BossGrabSocketUpright`(LateUpdate 에서 yaw 만 물려받아 세움).
+- **표식·예고는 클라 비주얼이다** — 서버에서만 끄면 클라 화면에는 그대로 보인다. 점프 구간 억제는
+  `CrossFadeJumpStateClientRpc` 에 얹었고, 끊길 때 영구히 숨는 것을 막기 위해 `AbortAttackChain` 에서 해제한다.
+- **`AoeTelegraph` 디스크는 XY 평면**(`(cos,sin,0)`, 지름 1, 노멀 −Z)이고 `Show()` 가 **루트를 직접**
+  스케일한다. `Instantiate(prefab)` 이라 프리팹 회전이 보존되므로 **루트 X=90** 이어야 바닥에 눕는다.
+- **`GrabController` 를 되살릴 때는 `enabled = false`** — `Start()` 가 LogError, `Update()` 가 초기화 안 된
+  블랙보드를 읽어 NRE 를 쏟는다. 비활성 컴포넌트도 `GetComponentInChildren` 은 찾으므로 소켓 게터만 남는다.
+
+### 🔴 팀장 액션 (변동 없음 + 1건 추가)
+
+1. **SVN 커밋** — `svn commit "Assets/50.Art/Char/Boss/SK/SK_23.fbx.meta"`. `ZoneLayoutCatalog.asset` 은 **절대 함께 넣지 말 것**
+2. **은희 님께 요청 전달** — [request-player-grabsocket-decoupling.md](Docs/tech/request-player-grabsocket-decoupling.md).
+   🔴 원격 전 브랜치를 확인했다: `IGrabSocketProvider` **없음**, `GetComponentInChildren<GrabController>` 의존
+   **그대로 1건**(development 포함). 미착수 확정. 그래서 프리팹에 레거시를 한시적으로 되살려 뒀다 —
+   **인터페이스가 들어오면 걷어내고 `Enemy/Boss/` 삭제를 마무리한다.**
+3. **`development` 19커밋 미반영** — Player/Monster 를 만진 3건은 전부 VFX(민경). `b1980d3` 이 **피격
+   이펙트를 `Unit` 에 배선**하므로 보스 계통과 겹친다. **커밋 후 별도 단계로** 가져올 것.
+
+### 산출물 (위 6커밋에 들어갔다)
+
+프리팹 3종 신규 = `TwentyThree_Solo` · `JumpTelegraph` · (기존 4종 + `GrabSocket` 부착) ·
+SO 1종 신규 = `No23_Solo`(패턴 6종) · 런타임 스크립트 1종 = `BossGrabSocketUpright` ·
+저작 도구 5종 = `MonsterSceneBossSetup` · `BossDataWiring` · `BossVariantAuthoring` ·
+`BossGrabSocketAuthoring` (+ 기존 `No23ClipEventAuthoring` · `BonePathDump`) · 씬 = `MonsterScene`(P7 구성 + MidBossSpawner)
+
+---
+
+## ▶▶ 이전 시작점 — MonsterScene 한 사이클 (2026-08-10 낮)
 
 **브랜치 `feature/Boss23`** · **컴파일 0에러 0경고** · **P0~P6 커밋·푸시 완료** (`66d3741`, ahead 0)
 — 아래 「커밋 상태」의 잔여 3건만 작업 트리에 남아 있다.
@@ -27,14 +114,64 @@ Update this file when a term becomes important enough that future agents or team
 | **P5** | `bossroom.prefab` 송전탑 `ChargingObject`×4 → **`BossChargingPylon`×4**, `maxHp` 5→200 | 인스턴스화 후 컴포넌트 조회 |
 | **P6** | **레거시 정리** — `BossArenaContext`·`BossArenaWiring` 삭제, `BossEncounterDirector` **889→624줄** | 컴파일 0/0, dll 에서 타입 소멸 확인 |
 
-### ▶ 다음 = P7 `MonsterScene` 재구성
+### ✅ P7 `MonsterScene` 재구성 — 완료 (2026-08-10, 미커밋)
 
-1. 기존 몹 세팅(`MonsterSpawner` + `MonsterSpawnPoint`×9 + `TestBootStrap`)은 **삭제 말고 비활성 보존**
-2. `bossroom.prefab` 배치
-3. **`ForProfile` 추가** — 🔴 MonsterScene 에 없다. 이게 없으면 "Start Host" 버튼이 안 떠서 **아무것도 스폰되지 않는다**(이번 세션에 PlayerBossTest 에서 30분 날린 지점). `PlayerPrefab` 은 이미 Paladin 으로 설정돼 있다
-4. `TwentyThreeArenaContext` 로 보스 스폰 (씬 3곳에서 이미 쓰는 신형 스포너). `bossPos` 가 **절대좌표**라 bossroom 위치에 맞춰야 한다
-5. **NavMesh 재베이크** — 안 하면 보스가 제자리에 선다
-6. 그 다음 P8(충돌 매트릭스) → P9(Play 한 사이클)
+저작 도구 **`Monster/Editor/MonsterSceneBossSetup.cs`** 신규(멱등, 재실행 가능).
+메뉴 = `Tools > Boss > MonsterScene — 보스 전투 씬 구성 (P7)` + `… 구성 검증 (읽기 전용)`.
+
+| 한 것 | 값 |
+|---|---|
+| `bossroom` 배치 | **`(0, -0.50, 0)`** — 보행면을 월드 y=0 으로 내렸다(아래 🔴) |
+| 기존 몹 세팅 | `MonsterSpawner`·`TestBootStrap` **비활성 보존** |
+| 기존 지오메트리 | `Env/Ground`·`Wall1~4` **자식만** 비활성 — `Env` 루트는 살렸다(아래 🔴) |
+| `ForProfile` | `BossTestRig` 오브젝트에 신규 |
+| 보스 스폰 | `TwentyThreeArenaContext`(+NetworkObject), `bossPrefab`=신규 `TwentyThree`, `bossPos`=`(0.49, 0, 5.49)` |
+| `PlayerPrefab` | 구 `Player` → **Paladin** (아래 🔴) |
+| NavMesh | 재베이크 — 삼각형 8개, **19.7×19.8m**(바닥 21m − 에이전트 반지름 0.5m 인셋), y 0.08 |
+
+검증(도구의 읽기 전용 메뉴): 위 전 항목 ✓ · 송전탑 4개 ✓ · 표본 4지점(원점·보스 스폰·양 구석)
+전부 메시 0.08m 이내 ✓ · 보스 `NavMeshAgent.agentTypeID=0`/radius 0.5 = 베이크 타입과 일치 ✓.
+컴파일 0/0. **Play 미실행.**
+
+### 🔴 P7 에서 문서가 틀렸던 것 2건 (실물이 이겼다)
+
+1. **"`ForProfile` 이 없으면 아무것도 스폰되지 않는다"는 반만 맞다.** `MonsterTestBootstrap` 이
+   `autoStartHostOnPlay` 로 **이미 자동 StartHost + 호스트 플레이어 스폰**을 하고 있었다.
+   PLAN 대로 그걸 비활성 보존하니 **그때 비로소** `ForProfile` 이 필요해진 것이다.
+   → 지금 Play 하면 **화면 왼쪽 위 "Start Host" 를 눌러야** 시작된다(자동 시작 아님).
+2. 🔴 **"`PlayerPrefab` 은 이미 Paladin" 은 사실이 아니었다.** `NetworkManager.PlayerPrefab` 과
+   `MonsterTestBootstrap.playerPrefab` 이 **둘 다 구 `Player.prefab`**(guid `55ee4e06…`)을 가리켰다.
+   Paladin(`af4a760f…`)은 이 씬에 한 번도 나오지 않았다. 둘 다 Paladin 으로 바꿨다.
+
+### 🔴 P7 에서 확정된 것 (다음 사람이 밟을 지점)
+
+- **`Env` 를 통째로 끄면 안 된다** — **NavMeshSurface 가 `Env` 에 붙어 있다**(베이크 산출물이
+  `NavMesh-Env.asset` 인 이유). 끄면 NavMesh 가 함께 죽는다. 지오메트리 자식만 끈다.
+- 그 서피스는 `CollectObjects=Children` + `UseGeometry=RenderMeshes` 였다 → bossroom 을 루트에
+  두면 **수집 대상이 아니어서 빈 NavMesh** 가 구워진다. `MapNavMeshBaker` 가 검증한 설정
+  (**PhysicsColliders / All / Default∪Ground**)으로 바꿨다.
+- **보행면 = 로컬 y 0.50 실측** — `BossFloorCollider` 의 BoxCollider 가 `size.y=1`·`center.y=0` 이라
+  박스가 −0.5…+0.5 를 덮고 **윗면이 0.50**. `BossLandingPoint`·`BossArea`·`PlayerArrivalPoints` 와 일치.
+  → bossroom 을 **y −0.50** 에 놓아 보행면을 y=0 으로 만들었다. NGO 는 `PlayerPrefab` 을 **프리팹
+  좌표(원점)** 에 스폰하므로, 방을 원점에 두면 호스트든 MPPM 클라이언트든 바닥 0.5m 안에 박힌 채
+  시작한다. 이 씬에서만 방이 0.5m 내려가 있다 — 4.MapScene 과 다르다.
+- ⚠️ 송전탑(layer `Enemy`)·투명 경계(layer `Wall`)는 수집 마스크 밖이라 **NavMesh 를 카브하지 않는다.**
+  보스가 송전탑을 관통하는 경로를 계획할 수 있다(물리로는 막힌다). P9 에서 끼는지 볼 것.
+
+### 🔴 입장 연출은 이 씬에서 검증할 수 없다
+
+`BossEncounterDirector` 는 자기 주석대로 **MapScene 상주**이고, 스폰이
+`BossTeleportManager.AlivePlayersArrived` **뒤에** 있다. MonsterScene 에는 텔레포트 사슬이 없어
+넣어도 "BossTeleportManager를 찾지 못했습니다" LogError 만 내고 **아무것도 스폰하지 않는다.**
+그래서 P7 은 PLAN 의 단계표대로 `TwentyThreeArenaContext`(직접 스폰)로 갔다.
+→ **PLAN 목표문의 "입장 연출 → 전투"** 중 연출은 **MapScene 몫**이다. 이 씬은 전투 사이클 전용.
+
+### ▶ 다음 = P9 (Play 한 사이클)
+
+`MonsterScene` Play → **"Start Host" 클릭** → `ValidateContract` LogError 0건 확인 → 추격·공격 8종·
+카운터·페이즈·송전기·처치. 미확인 항목(애니 재생·어느 손·히트 타이밍)은 아래 「미확인」 참조.
+P8 은 **NetworkPrefabs 등록으로 이미 끝났다**(`TwentyThree`·`Bomb`·`FireFloor`). 충돌 매트릭스는
+Play 에서 안 맞는 게 나오면 그때 본다.
 
 ### 🔴 새로 만든 것 — 경로
 
@@ -106,7 +243,7 @@ svn commit "Assets/50.Art/Char/Boss/SK/SK_23.fbx.meta" -m "feat(boss): 23호 클
 
 | 파일 | 무엇 | 판단 |
 |---|---|---|
-| `0.Scenes/MonsterScene.unity` | 디스크에 **`FireFloor`·`Bomb` 인스턴스 2개**(+140줄)가 들어 있는데 **Unity 메모리에는 없다.** P1·P2 스크린샷 검증용으로 놓고 저장됐다가 지운 뒤 저장을 안 한 것으로 보인다 | P7 이 이 씬을 재구성하므로 그때 정리한다. **Ctrl+S 하면 +140줄이 사라지고, 저장 없이 커밋하면 잔재가 들어간다** |
+| ~~`0.Scenes/MonsterScene.unity`~~ | ✅ **해소됨** — P7 저작 도구가 씬을 저장하면서 `FireFloor`·`Bomb` 잔재가 사라졌다(파일에서 두 GUID **0건** 확인). 지금 이 씬의 변경분은 P7 구성이다 | — |
 | `0.Scenes/MainFlow/4.MapScene.unity` | `FloatingDamageSpawner` 가 **같은 설정으로 fileID 만 새로 발급**됐다(46+/46−). 기능 변화 0 | 공용 씬에 무의미한 충돌을 만들 뿐이라 커밋하지 않았다. 되돌리는 게 맞다 |
 | `ProjectSettings/MultiplayerManager.asset` | `--ignore-all-space` 로 diff 0 = **줄끝만 다시 써짐** | 실질 변경 없음 |
 

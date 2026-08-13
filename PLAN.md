@@ -1,10 +1,228 @@
+# CURRENT PLAN — 보스 거동 결함 4건 + 예고·폭탄 스펙 반영 (2026-08-10)
+
+> 상태: **승인·부분 완료** (2026-08-13 갱신). 브랜치 `feature/Boss23`. 담당: 경석(Claude).
+> ✅ 항목은 **기능별 6커밋으로 끊었다**(`019431e`…`c1a7342`, 미푸시). 커밋 목록 = CONTEXT.md 최상단.
+> 출처: 팀장 Play 관찰 + 문답 2건(로스트아크식 예고 원 · 폭탄 생애주기). 레퍼런스 스크린샷 제공됨.
+>
+> | B0 | B1 폭탄 | B2 평타필터 | B3 예고원 | B3b 앞뒤표식 | B4 장판 | B5 돌진 | B6 Grab타임아웃 | B7 잡기소켓 |
+> |---|---|---|---|---|---|---|---|---|
+> | ✅ | ✅ | ▶ | ✅ | ✅ | ✅ 값만(SO 이관 ▶) | ▶ | ▶ | ✅ (가) |
+>
+> ✅ 항목은 **팀장 Play 육안 승인**을 받았다(폭탄 착지정지·당구·벽1회 / 잡기 회전·자세 / 예고 원 2개 /
+> 앞뒤 표식 착지 후). 알파는 SO 슬라이더 2개로 노출했다(`jumpTelegraphOuterAlpha` 0.12 ·
+> `jumpTelegraphFillAlpha` 0.85). 남은 ▶ 4건의 상세·순서는 **CONTEXT.md 최상단**.
+
+## 목표
+
+Play 에서 관찰된 **거동 결함 4건**을 고치고, 확정된 **점프 예고 / 폭탄 생애주기 스펙**을 반영한다.
+
+## 확정된 스펙 (팀장 문답)
+
+**폭탄 생애주기**
+1. Wells 투척 → 비행 → **착지하면 그 자리에 정지**(구르지 않는다. 이전 세션의 "당구" 개념은 **폐기**)
+2. 착지 시점부터 **5초 대기** → 폭발 → `FireFloor` 장판
+3. **좌클릭(평타)은 밀기만** — 폭발시키지 않는다
+4. **밀려 날아가는 중에는 타이머가 만료돼도 폭발을 보류**하고, **도착(정지) 후 폭발**한다
+5. **접촉하면 즉시 폭발** — 플레이어가 걸어서 닿음 · 보스와 충돌 · **점프어택 범위 안에 있음**
+6. 좌클릭을 제외한 **다른 상호작용은 없다**(스킬로는 반응하지 않는다)
+
+**점프어택 예고 (로스트아크 방식)**
+- **큰 원** = 최종 범위. 빨강, **알파 약함**. 고정
+- **작은 원** = 0 에서 큰 원까지 **차오른다**. 다 차는 순간 착지
+- 보스는 사라졌다 위에서 나타나며, **착지 전에 이 표식이 보인다**
+
+## 확정된 사실 (실측)
+
+| 사실 | 근거 |
+|---|---|
+| ✅ **`AoeTelegraph` 가 이미 차오름을 지원한다** — `ShowGrowing(fromRadius, toRadius, growTime, holdAfter)` | [AoeTelegraph.cs:55](Assets/1.Scripts/Monster/AoeTelegraph.cs:55) |
+| 🔴 **없는 것은 프리팹뿐이다** — 스크립트와 `MA_AoeTelegraph_Red.mat` 만 있고 프리팹이 없어서 `jumpTelegraphPrefab` 이 계속 비어 있었다 | `find` 전수 |
+| 🔴 **돌진 이동은 이미 구현돼 있다** — `StartDashMove(dir, speedMul, maxDistance)` · `TickDash()`(`HandleAttack` 에서 호출) · `EndDashMove()` · `_dashBlockedAhead`(벽 감지) | `TwentyThreeBoss.cs:1386`·`:1399`·`:695`·`:1509` |
+| → 그래서 **D2 는 미구현이 아니라 작동하지 않는 버그**다. 원인 확정 없이 코드를 더 쓰면 안 된다 | — |
+| 폭탄이 플레이어 평타에서 걸러진다 — `후보: Bomb(Clone)(layer 10, hurtbox, **unit없음**)` | Play 로그 |
+| 단독 프리팹은 `Wells.prefab` 을 중첩하지 않는다(중첩 1개 = SK_23 모델) | 프리팹 YAML `m_SourcePrefab` |
+| `SpawnAndThrowBomb` 의 호출자는 `_wells.ThrowRequested` **하나뿐**이다 | `TwentyThreeBoss.cs:1150` |
+
+## 접근 — 슬라이스
+
+## 🔴 2차 조사 결과 — 요청분 대부분이 **이미 구현돼 있다**
+
+| 요청 | 실물 상태 | 남은 일 |
+|---|---|---|
+| 좌클릭 시 당구 · **벽 1회 반사** | ✅ `wallBounceLimit = 1` 기본값 + `BounceOff()` 에서 `Vector3.Reflect` | 없음(값 확인만) |
+| 비행 거리 = **데미지값 판정** | ✅ 계수가 필드로 노출돼 있다. 주석: *"레거시는 `distance = damage` 로 계수 없이 하드코딩돼 있었다 — 그래서 노출한다"* | 없음 |
+| 폭탄이 평타를 받는 경로 | ✅ `BossBomb : IAttackReceiver` + `ReceiveAttack()` 구현. `Hurtbox` → `GetComponentInParent<IAttackReceiver>()` 로 이어진다 | **필터 1곳**(아래) |
+| 장판 **생명주기** | ✅ `AreaZone.lifetime` 존재(현재 **6초**) | **10초로** + SO 노출 |
+| 장판 **크기 조절** | ✅ `radius`(2) · `maxRadius`(5) 존재 | SO 노출 |
+| 장판 **겹치면 합치고 생명주기 리셋** | ✅ **이미 구현** — `maxRadius` + `refreshLifetimeOnGrow = true` + `AreaZone.Active` 정적 레지스트리 | 값 확인만 |
+| 잡기 시 손에 붙기 | 🔴 **플레이어 계통이 막고 있다**(아래) | 결정 필요 |
+
+**폭탄 평타 필터**: Play 로그가 `후보: Bomb(Clone)(layer 10, hurtbox, **unit없음**)` 이라 했다. 즉
+`Hurtbox` 는 있는데 `ownerUnit` 이 비어서 **플레이어 평타가 `IAttackReceiver` 에 닿기 전에 걸러진다.**
+P2 에서 `ownerUnit` 을 의도적으로 비웠는데(폭탄은 `Unit` 이 아니다), 그 대가가 이것이다.
+
+**🔴 잡기 소켓 — 원인 확정**: [PlayerStateController.cs:760](Assets/1.Scripts/Player/PlayerStateController.cs:760) 이
+`instigator.GetComponentInChildren<GrabController>()` 로 소켓을 찾는다. `RestraintMode.Carry` 주석도
+*"시전자의 `GrabController.GrabSocket` 에 종속된다"* 라고 못 박혀 있다. 그런데 **`GrabController` 는 신형
+보스에서 제거된 레거시**(부착 0곳)다 → `followTarget = null` → **손에 붙지 않는다.**
+이건 이미 은희 님께 보낼 요청 문서 [request-player-grabsocket-decoupling.md](Docs/tech/request-player-grabsocket-decoupling.md)
+의 대상이다(팀장 전달 대기).
+
+## 접근 — 슬라이스 (2차 조사 반영)
+
+| # | 슬라이스 | 내용 |
+|---|---|---|
+| **B0** | 진단 로그 | 폭탄 스폰 시 **투척 주체 이름**을 남긴다 — "Wells 없는 보스가 던졌다"를 확정/반증 |
+| **B1** | `BossBomb` 착지 정지 + 퓨즈 | 착지 감지 → 정지 고정 → **퓨즈 5초** → 폭발. **비행 중 폭발 보류**(도착 후 터짐). 접촉(플레이어·보스·점프 범위) 즉시 폭발. 퓨즈·거리 계수를 SO 로 노출 |
+| **B2** | 평타 필터 통과 | 폭탄이 좌클릭에 맞게 한다. 🔴 **플레이어 코드를 건드리지 않는 방법을 먼저 찾는다** — `Hurtbox` 쪽에서 `Unit` 없이도 `IAttackReceiver` 로 넘기는 경로가 있는지. 없으면 요청 문서로 넘긴다 |
+| **B3** | 점프 예고 프리팹 | `AoeTelegraph` 프리팹 신규 — **외곽 고정 링(알파 약함) + 내부 차오름** 2중. `ShowGrowing()` 재사용. 차오름 = **체공 시간과 동기**, 큰 원 = `jumpAoeRadius`. **착지 전에는 보스 앞뒤 구분을 보이지 않는다** |
+| **B3b** | **착지 후** 앞뒤 표식 | 착지 직후 보스의 **앞/뒤 구분 이미지**를 표시한다. `BossDirectionIndicator`(카운터 방향 표시기)가 이미 있으니 그 계통을 재사용할지 먼저 본다 |
+| **B4** | 장판 값 조정 + SO 노출 | `lifetime` **6 → 10**. `radius`·`maxRadius`·`lifetime`·`refreshLifetimeOnGrow` 를 SO 로 뺀다(현재 프리팹 필드). 병합 동작은 이미 있으니 **값 확인만** |
+| **B5** | 돌진 이동 **진단 → 수정** | 코드는 있다(`StartDashMove`·`TickDash`·벽 감지). 왜 안 움직이는지 로그로 확정 후 최소 수정 |
+| **B6** | Grab Recovery 타임아웃 | 4/4 재현. `grab` 클립의 `OnAttackEnd` 수신 여부부터 |
+| **B7** | 잡기 소켓 | 🔴 **결정 필요** — 아래 「열린 결정」 |
+
+## 🔴 열린 결정 — 잡기 소켓을 어떻게 살리나
+
+| | 방법 | 대가 |
+|---|---|---|
+| (가) | **신형 보스 프리팹에 레거시 `GrabController` 를 붙이고 `GrabSocket` 만 설정** | 즉시 작동. 플레이어 코드 무수정. 대신 **지우려던 레거시를 되살린다**(요청 문서의 명분도 약해진다) |
+| (나) | **은희 님 인터페이스 작업을 기다린다** | 설계가 깨끗하다. 대신 **그때까지 잡기 연출이 안 붙는다**(4줄 변경이지만 남의 일정) |
+| (다) | 보스가 `GrabController` **파생/대체 컴포넌트**를 제공 | 플레이어 무수정 + 레거시 소스는 유지. 사실상 (가)의 변종 |
+
+## 리스크 / 한계
+
+- 🔴 **접촉 폭발과 좌클릭 밀기가 근접 거리에서 충돌한다.** 평타 사거리 안이면 대개 콜라이더도 닿는다 →
+  "닿으면 폭발"이 "때리면 밀기"를 잡아먹을 수 있다. **접촉 판정 주체를 플레이어 콜라이더가 아니라
+  이동 접촉으로 좁히거나, 피격 직후 짧은 접촉 무시 창**이 필요하다. 설계 시 명시한다.
+- 🔴 **담당 경계**: `PlayerDefaultAttack` 은 Player 계통(은희)이다. B2 를 플레이어 쪽에서 고치면 경계를
+  넘는다 — 폭탄 쪽에서 흡수하는 설계를 우선한다. 불가능하면 요청 문서로 넘긴다.
+- B4·B5 는 **원인 미확정**이라 공수를 못 박을 수 없다. 진단에서 원인이 플레이어·엔진 쪽으로 나오면 범위가 바뀐다.
+- 폭탄 퓨즈 5초를 SO 로 빼면 `BossDataSO` 스키마가 **1필드 늘어난다**(추가만이라 기존 값 무영향).
+
+## 범위 밖
+
+`chargeZonePrefab` 배선 · 페이즈 배수 밸런스 · `WeaponTrailEffect` NRE(민경 VFX) · `arcMaterial` 투명 큐 ·
+V4b 실제 맵 편입(`MapGenConfig`, SVN) · 단독 변형의 공격 6종 전수 육안 확인.
+
+## 완료 조건
+
+1. 폭탄이 **착지 지점에 정지**하고, **5초 후** 폭발해 장판을 깐다
+2. 비행 중에는 퓨즈가 만료돼도 터지지 않고, **도착 후** 터진다
+3. 좌클릭으로 폭탄이 **밀리고 그때는 터지지 않는다**
+4. 걸어서 닿음 · 보스 충돌 · 점프 범위 안 — **셋 다 즉시 폭발**한다
+5. 점프어택 전에 **큰 원(알파 약함) + 차오르는 작은 원**이 보이고, **다 차는 순간 착지**한다
+6. 돌진이 **벽에 부딪히기 전까지 실제로 전진**한다
+7. Grab 체인 타임아웃 경고가 **0건**
+8. 단독 변형에서 **폭탄이 한 개도 나오지 않는다**(B0 진단으로 확정)
+9. 좌클릭으로 밀린 폭탄이 **벽을 한 번 튕긴다**(`wallBounceLimit = 1` 실동작 확인)
+10. 장판이 **10초** 유지되고 사라진다. 크기·지속시간이 **SO 에서 조절된다**
+11. 장판이 겹치면 **하나의 더 큰 장판**이 되고 생명주기가 **10초로 리셋**된다
+12. **착지 전에는** 원 표식만 보이고 **보스 앞뒤 구분은 보이지 않는다**. **착지 후에** 앞뒤 구분 이미지가 나타난다
+13. 잡기 시 플레이어가 **보스 손에 붙어 따라간다**
+
+---
+
+# CURRENT PLAN — 보스 변형 2종 분리: `No23 & Wells` / `No23 단독`(중간보스) (2026-08-10)
+
+> 상태: **승인 대기.** 브랜치 `feature/Boss23`. 담당: 경석(Claude).
+> 지시(팀장, 2026-08-10 문답): 보스를 두 벌로 만든다 — ① 지금처럼 **No23 + Wells** 붙어 있는 것,
+> ② **No23 단독**(Wells·송전탑 없음)을 존에 배치해 **중간보스로 재활용**. 패턴은 지금처럼 SO 로
+> 넣고 뺀다. 단독은 **Wells·송전기·레이지 돌진 셋 다 제외**, 나머지는 동일.
+
+## 목표
+
+보스를 **데이터로 갈리는 변형 2종**으로 분리한다. 코드 변경 0을 목표로 한다.
+
+| | 프리팹 | 데이터 | 용도 |
+|---|---|---|---|
+| **V1 `No23 & Wells`** | 현재 `TwentyThree.prefab` (Wells 중첩) | 현재 `No23.asset` | 최종 보스. **신규 작업 없음** |
+| **V2 `No23 단독`** | 신규 (Wells 중첩 제거) | 신규 (패턴 6종) | **중간보스 재활용.** 존에 배치 |
+
+## 확정된 사실 (전부 실측 — 문서 인용 아님)
+
+| 사실 | 근거 |
+|---|---|
+| 패턴·페이즈·프리팹 참조가 **전부 SO** 에 있다 — `attacks[8]`·`phases[2]`·`bombPrefab`·`chargeZonePrefab`·`jumpTelegraphPrefab` | `BossDataWiring` 진단 출력 |
+| 🔴 보스 코드는 Wells 를 **널안전**하게 쓴다 — `_wells = GetComponentInChildren<BossWells>(true)`, 소비는 전부 `_wells?.` | [TwentyThreeBoss.cs:149](Assets/1.Scripts/Monster/Boss/TwentyThreeBoss.cs:149)·`:1163`·`:1213` |
+| 🔴 **잡기는 Wells 와 무관하다** — `BeginRestrainedByInstigator(gameObject, …)` 의 주체가 보스 자신이다. Wells 가 가진 소켓은 `bombSocket` 하나뿐 | `TwentyThreeBoss.cs:1436` · [BossWells.cs:46](Assets/1.Scripts/Monster/Boss/BossWells.cs:46) |
+| 폭탄 투척 주체가 **Wells 의 애니 이벤트**다 → Wells 제거 = 폭탄 자동 제거 | [BossWells.cs:140](Assets/1.Scripts/Monster/Boss/BossWells.cs:140) `ThrowBombEvent` |
+| `ValidateContract` 가 강제하는 것 = `archetype=Boss` · `attacks` 비지 않음 · **페이즈 임계 내림차순** · 각 공격의 `animatorStateName` 이 컨트롤러에 실존 | `TwentyThreeBoss.cs:213` 부근 |
+| 공격 8종 = `LeftHook`/`RightHook`/`Upper`/`Grab`/`Jump`/`Dash`/`ChargeSequence`/`RageDash`. 카운터 창은 **Grab·Dash 뿐** | 진단 출력 |
+| `MonsterSpawner` 는 **프리팹 기반**이다 — `defaultMonsterPrefab` + `MonsterSpawnPoint.monsterPrefabOverride` | [MonsterSpawner.cs:15](Assets/1.Scripts/Monster/MonsterSpawner.cs:15) · [MonsterSpawnPoint.cs:9](Assets/1.Scripts/Monster/MonsterSpawnPoint.cs:9) |
+| 실제 맵 경로는 **그룹 ID → 프리팹** 해석이다 — `ResolveMonsterPrefab(gen, monsterGroupID)` | [MapContentSpawner.cs](Assets/1.Scripts/Map/MapContentSpawner.cs) `SpawnGroupAt` |
+| 기존 중간보스급 체력 = WallBot **600** · GauntletBot **300** · SpinnerBot **260** (보스 No23 = 2000) | 데이터 애셋 실측 |
+
+## 접근 — 슬라이스
+
+| # | 슬라이스 | 내용 |
+|---|---|---|
+| **V0** | ✅ **완료** | `No23.asset` 정리 — `bombPrefab` 배선 + `hasSuperArmorWhileAttacking` off(계약 에러 해소, 거동 동일) |
+| **V1** | 데이터 신규 | `No23_Solo.asset` — `attacks` **6종**(`ChargeSequence`·`RageDash` 제외) · `phases[].sequence` = **`None`** · `bombPrefab`·`chargeZonePrefab` 비움 · `maxHp` **600**(WallBot 기준) · `archetype=Boss` 유지(ValidateContract 요구) |
+| **V2** | 프리팹 신규 | `TwentyThree_Solo.prefab` — 현재 프리팹을 복제해 **Wells 중첩만 제거**하고 `data` = `No23_Solo`. 리그·앵커(`Hand_L`/`Hand_R`/`DashBody`)·Animator(`No23Controller`)는 그대로 |
+| **V3** | 네트워크 등록 | `DefaultNetworkPrefabs.asset` 에 `TwentyThree_Solo` 추가 |
+| **V4** | 배치 | 🔴 **결정 필요 — 아래 「열린 결정」** |
+| **V5** | Play 검증 | `MonsterScene` 에서 단독 변형 1기 + (별도로) 기존 V1 1기. 완료 조건 참조 |
+
+전부 **저작 도구**로 만든다(멱등·재실행 가능) — `Monster/Editor/BossVariantAuthoring.cs` 신규 예정.
+데이터·프리팹을 손으로 만들면 다음에 패턴을 넣고 뺄 때 재현이 안 된다.
+
+## 🔴 열린 결정 1건 — 배치 경로
+
+"MonsterSpawner 경로 재사용"으로 확정받았는데, 실물에는 **이름이 비슷한 두 경로**가 있다.
+
+| | 경로 | 성격 |
+|---|---|---|
+| (a) | `MonsterSpawner` + `MonsterSpawnPoint.monsterPrefabOverride` | `MonsterScene` 등 **테스트 씬**용. 씬에 스포너를 놓는다 |
+| (b) | `MapContentSpawner` + 존의 `MonsterGroupID` → `MapGenConfig` 매핑 | **실제 `4.MapScene`** 의 정본 경로 |
+
+중간보스를 실제 맵에 넣는 게 목적이면 **(b)가 정본**이다. 그런데 (b)는 `MapGenConfig` 를 건드려야
+하고 그 애셋은 **SVN 관할**이라 커밋이 팀장 손에 있다(메모리에 남은 미커밋 건과 같은 파일).
+
+**권고: (a)로 먼저 `MonsterScene` 에서 동작을 검증하고, 그 다음 (b)로 맵에 편입한다.** V4 를 둘로 쪼갠다.
+그렇게 하면 SVN 대기 때문에 검증이 막히지 않는다.
+
+## 리스크 / 한계
+
+- 🔴 **새 프리팹 = 새 GUID.** `DefaultNetworkPrefabs` 등록을 빠뜨리면 클라에서 스폰이 실패한다(V3).
+- **복제 방식의 승계**: 기존 프리팹을 복제하면 리그·앵커·콜라이더 튜닝이 그대로 승계된다. 같은 모델·같은
+  리그이므로 이번엔 **의도된 승계**지만, 그 값들이 아직 Play 로 검증된 적 없다는 사실은 그대로다(교훈 #68).
+- **페이즈를 2개 유지하되 `sequence=None`** 이면 페이즈는 배수만 바꾼다. 지금 배수가 ×1 이라 사실상
+  아무 일도 안 한다 — 중간보스에서 페이즈를 의미 있게 만들려면 배수를 정해야 한다(**범위 밖, 별건**).
+- 중간보스에 카운터 창(Grab·Dash)이 남는다. 인터럽트 스킬이 없는 원거리(징크스)에게 불리할 수 있다 — 밸런스는 범위 밖.
+- `archetype` 을 `Boss` 로 유지해야 한다. 바꾸면 `ValidateContract` 가 첫 줄에서 LogError 를 낸다.
+
+## 범위 밖
+
+`jumpTelegraphPrefab` 프리팹 제작 · `chargeZonePrefab` 배선 · **Grab 체인 Recovery 타임아웃**(2/2 재현, 별건) ·
+`WeaponTrailEffect` NRE(민경 VFX) · `arcMaterial` 투명 큐 · 페이즈 배수·밸런스 수치 · V1 프리팹/애셋 개명.
+
+## 완료 조건
+
+1. `No23_Solo` 스폰 시 **`ValidateContract` LogError 0건**
+2. **Wells 관련 경고 0건** — 특히 `BossWells 자식이 없어 폭탄 살포가 돌지 않는다` 가 뜨지 않는다
+3. 공격 **6종이 실제로 나오고 데미지가 들어간다**(로그로 확인)
+4. **송전기·레이지 돌진이 한 번도 발동하지 않는다**
+5. 기존 V1(`No23 & Wells`) 경로에 **회귀 없음** — 폭탄 투척·송전기가 그대로 돈다
+
+---
+
 # CURRENT PLAN — 보스 전투 한 사이클: MonsterScene 재구성 + 프리팹 4종 신규 제작 (2026-08-10)
 
-> 상태: **P0~P6 완료 · P7부터 남음** (2026-08-10 갱신). 브랜치 `feature/Boss23`. 담당: 경석(Claude).
+> 상태: **P0~P8 완료 · P9(Play)만 남음** (2026-08-10 갱신). 브랜치 `feature/Boss23`. 담당: 경석(Claude).
 >
 > | P0 | P1 | P2 | P3 | P4 | P5 | P6 | P7 | P8 | P9 |
 > |---|---|---|---|---|---|---|---|---|---|
-> | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ▶ | — | — |
+> | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ▶ |
+>
+> P7 저작 도구 = `Monster/Editor/MonsterSceneBossSetup.cs`(멱등). P8(NetworkPrefabs 등록)은 P1~P4
+> 프리팹 커밋에 이미 포함됐다. **P9 는 사람이 Play 해야 한다** — TestBootStrap 을 비활성 보존했으므로
+> 화면 왼쪽 위 **"Start Host" 를 눌러야** 시작된다.
+>
+> 🔴 P7 에서 이 계획서의 전제 2개가 틀렸던 것으로 확인됐다 — ① `ForProfile` 부재가 곧 "스폰 0" 은
+> 아니었다(`MonsterTestBootstrap` 이 자동 StartHost 를 하고 있었다) ② `PlayerPrefab` 은 Paladin 이
+> 아니라 **구 `Player.prefab`** 이었다. 경위·실측값 = CONTEXT.md 최상단, 이탈 근거 =
+> [IMPLEMENTATION_NOTES.md](IMPLEMENTATION_NOTES.md) 최하단.
 >
 > P6 은 팀장 지시로 **범위가 늘었다** — 디렉터를 신형 타입으로 "개조"하는 대신, 죽은 레거시를
 > 전수 실측해 **삭제**했다(`BossArenaContext` 176줄 · `BossArenaWiring` 136줄 ·
