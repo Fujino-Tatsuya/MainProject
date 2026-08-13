@@ -91,6 +91,15 @@ public class TwentyThreeBoss : MonsterBase
     bool _dashBlockedAhead;                         // 목적지가 보행면 끝에서 잘렸나(= 벽에 처박는다)
     Vector3 _dashDestination;                       // 클램프된 목적지. 도착 판정의 기준
     float _dashPrevStopDistance = -1f;              // 돌진 전 stoppingDistance(복원용). -1 = 저장 안 됨
+    float _dashPrevAcceleration = -1f;              // 돌진 전 acceleration(복원용). -1 = 저장 안 됨
+    bool _dashPrevAutoBraking;                      // 돌진 전 autoBraking(복원용)
+
+    // 🔴 돌진 중 가속도. 레거시 BT 의 `SetAgentDashModeAction` 이 쓰던 값과 같다(999 / autoBraking off).
+    //    FSM 재작성판이 speed 와 stoppingDistance 만 승계하고 **이 둘을 빠뜨려서 돌진이 전진하지 않았다.**
+    //    산수: 프리팹 acceleration 8m/s² 로는 0.7초 동안 5.6m/s 까지밖에 못 올라가 약 1.96m 만 간다
+    //    (목표는 moveSpeed 2.5 × 6 = 15m/s, 최대 16m). autoBraking 까지 켜져 있어 목적지 근처에서 더 준다.
+    //    → "애니메이션만 돌고 안 나간다"로 보인다.
+    const float DashAcceleration = 999f;
 
     const float DashCarryProbeRadius = 1.2f;        // 캐리 판정 구 반경(보스 정면 offset 지점 기준)
     const float DashCarryWallMargin = 0.6f;         // 벽 앞 추가 여유 — 플레이어 캡슐 반경분
@@ -475,8 +484,15 @@ public class TwentyThreeBoss : MonsterBase
                     _stateTimer = RageTotalTime + data.attackDuration;
                     break;
                 case BossAttackId.Dash:
-                    // 돌진 본체 + 복귀(= attackDuration). 슈퍼아머 길이이자 데드락 안전망이다.
-                    _stateTimer = DashDuration + data.attackDuration;
+                    // 선딜 + 돌진 본체 + 복귀. 슈퍼아머 길이이자 데드락 안전망이다.
+                    //
+                    // 🔴 **선딜 몫을 반드시 넣어야 한다**(2026-08-13 수정). 돌진은 애니 이벤트
+                    //    `OnAttackHit`(dash 클립 0.15초)이 와야 시작하는데, 이전 판은 예산을
+                    //    `DashDuration + attackDuration`(0.7+0.9=1.6초)으로만 잡았다. 실제 체인은
+                    //    0.15 + 0.7 + 0.9 = 1.75초라 **매번 0.15초씩 초과**해 Recovery 도중 안전망이
+                    //    터졌다(4/4 재현). Grab 이 attackDuration 을 선딜 몫으로 이미 잡아 두는 것과
+                    //    같은 규약인데, 돌진은 그 값을 Recovery(StopDash)가 쓰므로 몫이 통째로 없었다.
+                    _stateTimer = data.attackDuration + DashDuration + data.attackDuration;
                     break;
             }
         }
@@ -703,7 +719,11 @@ public class TwentyThreeBoss : MonsterBase
         // 안전망: 이벤트 유실·예상 밖 지연으로 체인이 고착되면 강제 종료한다(조용히 멈추지 않게).
         if (_stateTimer <= 0f && _attackPhase != BossAttackPhase.None)
         {
-            Debug.LogWarning($"[23호] Grab 체인이 {_attackPhase} 에서 타임아웃 — 강제 종료한다.", this);
+            // 🔴 예전엔 이 문구가 "Grab 체인"으로 **하드코딩**돼 있었다. 실제로는 Dash·Jump·Charge·Rage
+            //    체인도 같은 안전망을 쓰기 때문에, 돌진의 예산 부족이 **grab 버그로 오진**됐다(한 세션 소모).
+            //    어느 공격인지 반드시 같이 찍는다 — 진단은 자기가 무엇을 봤는지 말해야 한다.
+            string chain = _currentEntry != null ? _currentEntry.attackId.ToString() : "(엔트리 없음)";
+            Debug.LogWarning($"[23호] {chain} 체인이 {_attackPhase} 에서 타임아웃 — 강제 종료한다.", this);
             AbortAttackChain();
             DecideNextAfterAction();
         }
@@ -1582,7 +1602,14 @@ public class TwentyThreeBoss : MonsterBase
     {
         Vector3 a = transform.position; a.y = 0f;
         Vector3 b = _dashDestination;   b.y = 0f;
-        return (a - b).sqrMagnitude <= DashArriveEpsilon * DashArriveEpsilon;
+        if ((a - b).sqrMagnitude <= DashArriveEpsilon * DashArriveEpsilon) return true;
+
+        // 🔴 **지나쳤으면 도착이다.** 가속도를 제대로 올린 뒤에야 문제가 되는 판정 —
+        //    15m/s 면 60fps 에서 프레임당 0.25m 라 epsilon(0.35m) 안에 걸리지만, 30fps 면 0.5m 라
+        //    목적지를 건너뛴다. 그러면 arrived 가 영원히 false 라 **벽 충돌 데미지·기절이 죽는다**
+        //    (StopDash 의 hitWall 인자가 arrived 를 요구한다).
+        Vector3 flat = _dashDir; flat.y = 0f;
+        return Vector3.Dot(a - b, flat) > 0f;
     }
     #endregion
 
@@ -1611,6 +1638,17 @@ public class TwentyThreeBoss : MonsterBase
         //    목적지에서 그만큼 앞에 멈춰 "도착"이 영원히 성립하지 않는다 → 벽 충돌 판정이 죽는다.
         if (_dashPrevStopDistance < 0f) _dashPrevStopDistance = agent.stoppingDistance;
         agent.stoppingDistance = 0f;
+
+        // 🔴 속도만 올려서는 안 나간다 — 가속도가 그 속도에 **도달할 시간을 주지 않는다**(위 상수 주석).
+        //    stoppingDistance 와 같은 저장/복원 규약을 따른다(재진입 시 원본을 덮어쓰지 않게 -1 가드).
+        if (_dashPrevAcceleration < 0f)
+        {
+            _dashPrevAcceleration = agent.acceleration;
+            _dashPrevAutoBraking = agent.autoBraking;
+        }
+        agent.acceleration = DashAcceleration;
+        agent.autoBraking = false;      // 목적지 근처 감속 금지 — 벽에 처박는 판정이 이 속도를 전제한다
+
         agent.isStopped = false;
         agent.speed = Mathf.Max(0.1f, MoveSpeed * speedMultiplier);
         agent.SetDestination(desired);
@@ -1626,8 +1664,17 @@ public class TwentyThreeBoss : MonsterBase
         {
             agent.speed = MoveSpeed;
             if (_dashPrevStopDistance >= 0f) agent.stoppingDistance = _dashPrevStopDistance;
+
+            // 가속도·자동감속도 되돌린다 — 안 되돌리면 이후 **모든 추격이 즉시 최고속**이 되고
+            // 목적지 앞에서 멈추지 않아 대상에 파고든다(speed 를 되돌리는 것과 같은 이유).
+            if (_dashPrevAcceleration >= 0f)
+            {
+                agent.acceleration = _dashPrevAcceleration;
+                agent.autoBraking = _dashPrevAutoBraking;
+            }
         }
         _dashPrevStopDistance = -1f;
+        _dashPrevAcceleration = -1f;
         StopAgentHard();
     }
 
