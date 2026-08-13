@@ -1,4 +1,93 @@
-# CURRENT PLAN — 보스 거동 결함 4건 + 예고·폭탄 스펙 반영 (2026-08-10)
+# CURRENT PLAN — 회전·표식·Wells 폭탄·차징 (2026-08-13)
+
+> 상태: **승인·구현 완료 (Play 미검증)**. 브랜치 `feature/Boss23`. 담당: 경석(Claude).
+> 출처: 팀장 Play 스크린샷 + 지시 8건 + 문답 3건(표식 색 기준 · 차징 위치 · 차징 공격 방식).
+>
+> | C1 표식색 | C2 회전 | C3 Wells | D1 폭탄착지 | F1 점프억제 | G1 차징이동 | H1/H2 오라 |
+> |---|---|---|---|---|---|---|
+> | ✅ | ✅ | ▶ 진단만 | ✅ | ✅ | ✅ | ✅ |
+>
+> 커밋 `03c2966` · `1cfad5d` · `5122e34` · `2348ef8` · `acf129c` (미푸시). 컴파일 0/0.
+> 🔴 **전부 Play 미검증**이다. C3 는 원인을 못 찾아 **진단 로그만** 넣었다(아래).
+
+## 목표
+
+Play 에서 관찰된 **거동 4건**(표식 색 · 공격 중 회전 · Wells 폭탄 · 차징)을 확정 스펙대로 고친다.
+
+## 확정된 스펙 (팀장 지시 + 문답)
+
+| # | 확정 내용 |
+|---|---|
+| **A** | **표식 색은 처음 저작값 그대로 끝까지 유지**. 전방 = 주황빨강, 후방 = 파랑. 잡기 때 노랑 전환 **제거**. 잡기 인터럽트는 **추후 이펙트로** 처리 |
+| **B** | **공격을 시도 중일 때는 회전이 없다.** 돌진은 플레이어를 밀고 **지나가고**, 돌진이 **끝나야** 다시 플레이어를 본다. 지금은 모든 공격이 플레이어를 계속 따라 돈다 |
+| **C** | **Wells 가 실제로 폭탄을 던져야 한다**(프리팹엔 이미 중첩돼 있다 → 왜 안 던지는지 진단) |
+| **D** | 폭탄은 **랜덤하게** 던지되 **무조건 room 안**에 떨어진다. **벽에 걸쳐도 안 된다** |
+| **E** | 폭탄은 Wells **손에서 Throw 순간 AddForce** 로 날아간다(현행 유지) |
+| **F** | **JumpAttack 중에는 폭탄을 던지지 않는다**(공중 투척 금지) |
+| **G** | 차징은 **송전탑 4개의 중심**으로 **이동한 뒤** 애니메이션을 한다 |
+| **H** | 차징 동안 보스 주변에 **원형 강공격** — 데미지 + 넉백으로 접근을 막는다. 크기는 **점프어택과 비슷**(`jumpAoeRadius` 3.5m 기준). **주기 반복**. 값은 **SO 로 노출**해 팀장이 조절 |
+
+## 확정된 사실 (실측)
+
+| 사실 | 근거 |
+|---|---|
+| 표식 노랑의 정체 = `ApplyColors()` 가 카운터 창에 `counterReadyColor` 로 바꾼다 | [BossDirectionIndicator.cs:342](Assets/1.Scripts/Monster/Boss/BossDirectionIndicator.cs:342) |
+| 🔴 후방 호는 **파랑으로 저작**돼 있는데 화면엔 빨강이다 — 색 적용에 **별도 결함**이 있다 | 프리팹 `backColor: {0.3, 0.7, 1}` vs 스크린샷 |
+| 회전 출처 **2곳** — 체인은 `FaceChainTarget()`, 단타는 `MonsterBase.HandleAttack` 이 **매 틱** `FaceTarget()` | [TwentyThreeBoss.cs:655](Assets/1.Scripts/Monster/Boss/TwentyThreeBoss.cs:655) · [MonsterBase.cs:591](Assets/1.Scripts/Monster/MonsterBase.cs:591) |
+| `MonsterBase` 는 몹 8종·중간보스 3종이 공유한다 → **직접 수정 금지**, 훅으로 뺀다 | 담당 경계 |
+| **Wells 는 이미 `TwentyThree.prefab` 에 중첩**돼 있고 배선도 있다(`GetComponentInChildren<BossWells>`·`ThrowRequested`) | 프리팹 YAML + [TwentyThreeBoss.cs:158](Assets/1.Scripts/Monster/Boss/TwentyThreeBoss.cs:158) |
+| 투척은 **Wells fbx 클립의 `ThrowBombEvent`** 가 있어야 발동한다(SVN 자산) | [BossWells.cs:135](Assets/1.Scripts/Monster/Boss/BossWells.cs:135) |
+| 넉백은 `AttackInfo` 에 이미 있다 — `knockbackStrength`/`knockbackDuration`/`staggerDuration`/`knockbackDirection` | [BaseAttack.cs](Assets/1.Scripts/Unit/Weapon/BaseAttack.cs) · `Player.OnKnockback` |
+| 차징 기둥 집합은 `BossChargeSequence._engaged` 가 이미 들고 있다 → **중심 계산 가능** | [BossChargeSequence.cs:36](Assets/1.Scripts/Monster/Boss/BossChargeSequence.cs:36) |
+| `jumpAoeRadius` = **3.5m** (H 의 기준값) | No23.asset |
+
+## 접근 — 슬라이스
+
+| # | 슬라이스 | 내용 |
+|---|---|---|
+| **C1** | 표식 색 고정 | 카운터 창의 색 전환 제거(A). `counterReadyColor` 필드는 **남겨 둔다** — 추후 이펙트 전환 때 쓴다. 후방이 빨강으로 나오는 **별도 결함을 함께 진단**해 파랑이 나오게 고친다 |
+| **C2** | 공격 중 회전 금지 | `MonsterBase` 에 `protected virtual bool FaceTargetWhileAttacking => true` 훅 추가(**기본값 = 지금 동작**, 다른 몹 무영향) → 23호만 `false`. 조준은 `StartAttack` 직전 1회(`FaceTarget`)로 확정. 체인 쪽 `FaceChainTarget()` 도 회전을 뺀다. **돌진이 끝나면**(`FinishChain`/`DecideNextAfterAction`) 추격 상태로 돌아가며 자연히 다시 본다 |
+| **C3** | Wells 투척 진단 | 폭탄이 안 나오는 지점을 **로그로 가른다**: ① 주기 만료(`ThrowCycleElapsed`) ② 투척 애니 브로드캐스트 ③ 클립 이벤트(`ThrowBombEvent`) ④ 스폰. 원인이 **클립 이벤트 부재**면 저작 도구(`No23ClipEventAuthoring` 방식)로 Wells fbx 에 심는다 — ⚠️ `50.Art` 는 **SVN** 이라 팀장 커밋 필요 |
+| **D1** | 폭탄 착지 지점 보장 | **착지 지점을 먼저 뽑고 임펄스를 역산**한다(지금은 임펄스를 랜덤으로 줘서 어디 떨어질지 모른다). 후보 지점 = 보스 주변 링에서 랜덤 → **NavMesh 로 검증**(`SamplePosition` + `FindClosestEdge` 로 가장자리에서 **폭탄 반경 + 여유**만큼 안쪽) → 실패 시 재추첨 N회 → 그래도 실패면 보스 발밑. 벽 기준을 NavMesh 로 잡는 것은 돌진과 **같은 규약**이다 |
+| **F1** | 공중 투척 금지 | 점프 체인 동안 `_wells.SetSuppressed(true)`, 착지/체인 종료에 해제. 이미 있는 억제 API 를 쓴다(그로기·사망과 같은 경로) |
+| **G1** | 차징 위치 이동 | `BossChargeSequence` 에 **참여 기둥 중심** 게터 추가 → 보스가 `ChargeWait` 진입 **전에** 그 지점으로 이동, 도착 후 차징 애니 재생. 도착 판정·타임아웃은 돌진의 `StartDashMove` 규약 재사용 |
+| **H1** | 차징 원형 장판 | 보스 주변 원형 판정. 반경 = SO(`chargeAuraRadius`, 기본 **3.5**), 주기 = SO(`chargeAuraInterval`, 기본 **1.0초**), 데미지 = SO(`chargeAuraDamage`), 넉백 = SO(`chargeAuraKnockbackStrength`/`Duration`). 방향 = **보스 → 대상** 바깥쪽. 차징 시작에 켜고 **끝(성공·실패·중단)에 반드시 끈다** |
+| **H2** | 장판 비주얼 | 기존 `AoeTelegraph` 프리팹 재사용으로 범위를 보여 준다(플레이어가 크기를 알아야 피한다) |
+
+## 리스크 / 한계
+
+- 🔴 **C2 가 근접 명중률을 낮춘다.** 회전을 완전히 끊으면 훅·잡기가 움직이는 플레이어를 놓친다.
+  확정 스펙이 그것이므로 그대로 가되, **조준 시점(공격 시작 1회)** 은 남긴다. 너무 안 맞으면
+  "선딜 동안만 느리게 추적"을 옵션으로 추가하는 것이 다음 후보다.
+- 🔴 **C3 의 원인이 SVN 자산(Wells fbx 클립)이면 내가 끝낼 수 없다** — 저작 도구까지 만들고
+  팀장 SVN 커밋으로 넘긴다. 그 경우 이번 세션 Play 검증은 폭탄만 미검증으로 남는다.
+- 🔴 **D1 은 물리 역산이라 오차가 있다**(경사·소켓 높이·항력). 착지 후 정지 규약이 이미 있어
+  구르지는 않지만, 좌클릭으로 밀린 폭탄은 여전히 밖으로 갈 수 있다 — 그건 `InvisibleBoundaries`
+  와 벽 반사(`wallBounceLimit`)의 몫으로 남긴다(범위 밖).
+- **H1 의 넉백은 플레이어 계통 API 를 호출만 한다**(`AttackInfo.knockback*`). 플레이어 코드는 안 만진다.
+- `MonsterBase` 를 만지지만 **추가만** 한다(가상 프로퍼티 1개, 기본값 = 현행). 다른 몹 동작 무변화.
+
+## 범위 밖
+
+잡기 인터럽트 이펙트(추후) · 폭탄이 좌클릭에 밀려 나가는 경계 처리 · 페이즈 밸런스 ·
+`chargeZonePrefab` 배선 · 플레이어 평타 진단 로그(은희 경계) · 실제 맵(`MapGenConfig`) 편입.
+
+## 완료 조건
+
+1. 잡기·공격 어느 경우에도 표식 색이 **바뀌지 않는다**. 전방 주황 / **후방 파랑**
+2. 공격 중 보스가 **회전하지 않는다**. 돌진은 플레이어를 밀고 **지나가고**, **끝난 뒤에** 다시 본다
+3. Wells 가 **폭탄을 던진다**(또는 원인이 SVN 자산임을 로그로 확정하고 저작 도구를 넘긴다)
+4. 던져진 폭탄이 **100% room 안**에 떨어진다. 벽에 걸치지 않는다
+5. **점프 중에는 폭탄이 한 개도 안 나온다**
+6. 차징 시작 시 보스가 **송전탑 4개의 중심으로 이동**한 뒤 차징 애니를 한다
+7. 차징 동안 보스 주변 원형 범위가 **주기적으로** 데미지 + 넉백을 준다. 범위가 **눈에 보인다**
+8. 차징이 끝나면(성공·실패·중단 전부) 원형 공격이 **반드시 꺼진다**
+9. 반경·주기·데미지·넉백이 **SO 에서 조절된다**
+10. 컴파일 0에러 0경고
+
+---
+
+# 이전 PLAN — 보스 거동 결함 4건 + 예고·폭탄 스펙 반영 (2026-08-10, 종료)
 
 > 상태: **승인·부분 완료** (2026-08-13 갱신). 브랜치 `feature/Boss23`. 담당: 경석(Claude).
 > ✅ 항목은 **기능별 6커밋으로 끊었다**(`019431e`…`c1a7342`, 미푸시). 커밋 목록 = CONTEXT.md 최상단.
