@@ -1065,19 +1065,17 @@ public class TwentyThreeBoss : MonsterBase
             if (unit == null || unit == this) continue;
             if (!_aoeHits.Add(unit)) continue; // 유닛당 1회
 
-            // 🔴 **착지 충격으로 밀어낸다**(팀장 확정 2026-08-13). 방향은 대상별로 다르므로
-            //    AttackInfo 를 루프 안에서 만든다(하나를 돌려 쓰면 전원이 같은 방향으로 밀린다).
-            var info = new AttackInfo(dmg, AttackType.Default)
-            {
-                knockbackStrength = JumpKnockback,
-                knockbackDuration = JumpKnockbackTime,
-                staggerDuration = JumpKnockbackStagger,
-                knockbackDirection = AwayFromBoss(unit.transform.position),
-            };
-
+            var info = new AttackInfo(dmg, AttackType.Default);
             var ctx = new AttackHitContext(transform.position, transform, hit);
             if (hurtbox != null) hurtbox.ReceiveAttack(info, ctx);
             else unit.ReceiveAttack(info, ctx);
+
+            // 🔴 **넉백은 따로 불러야 한다**(2026-08-13 실측). `Unit.ReceiveAttack` 은 `TakeDamage` 만
+            //    하고 `AttackInfo.knockback*` 를 **읽지 않는다** — 그 필드를 채워 보냈더니 아무 일도
+            //    일어나지 않았다. 넉백 진입점은 `Unit.Knockback(방향, 강도)` 하나뿐이다.
+            //    ⚠️ 그 안에서 서버 가드와 **슈퍼아머 차단**을 이미 처리한다(중복 검사 불필요).
+            if (JumpKnockback > 0f)
+                unit.Knockback(AwayFromBoss(unit.transform.position), JumpKnockback);
         }
 
         DetonateBombsInJumpRange();
@@ -1148,11 +1146,10 @@ public class TwentyThreeBoss : MonsterBase
     float JumpRecovery => _boss != null ? Mathf.Max(0f, _boss.jumpRecoveryDuration) : 0.4f;
     float JumpAoeRadius => _boss != null ? Mathf.Max(0.1f, _boss.jumpAoeRadius) : 3.5f;
     float JumpLandSeparation => _boss != null ? Mathf.Max(0f, _boss.jumpLandSeparation) : 1.2f;
+    // 🔴 강도만 있다. `Unit.Knockback(방향, 강도)` 이 받는 것이 그것뿐이라 지속·경직 노브는 두지 않는다
+    //    (지속을 노출해 두면 조절해도 아무 일이 없어 "고장난 노브"가 된다).
     float JumpKnockback => _boss != null ? Mathf.Max(0f, _boss.jumpKnockbackStrength) : 9f;
-    float JumpKnockbackTime => _boss != null ? Mathf.Max(0f, _boss.jumpKnockbackDuration) : 0.3f;
-    float JumpKnockbackStagger => _boss != null ? Mathf.Max(0f, _boss.jumpKnockbackStagger) : 0f;
     float DashKnockback => _boss != null ? Mathf.Max(0f, _boss.dashKnockbackStrength) : 12f;
-    float DashKnockbackTime => _boss != null ? Mathf.Max(0f, _boss.dashKnockbackDuration) : 0.3f;
 
     // 보스에게서 **멀어지는** 수평 방향. 겹쳐 서 있으면 보스 전방으로 민다(0 벡터 금지).
     Vector3 AwayFromBoss(Vector3 targetPosition)
@@ -1500,19 +1497,35 @@ public class TwentyThreeBoss : MonsterBase
 
         if (_charge == null) _charge = GetComponentInChildren<IBossChargeSequence>(true);
 
-        // 참여 송전탑을 **미리 고르고** 중심을 받는다. 여기서 고른 집합을 Begin 이 그대로 쓴다
-        // — 이동한 뒤 다시 고르면 `pickNearest` 결과가 달라져 목표와 다른 탑이 올라온다.
+        // 🔴 **차징 위치 = `BossLandingPoint`**(팀장 확정 2026-08-13).
+        //    처음엔 "송전탑들의 중심"으로 갔는데 Play 에서 중앙으로 가지 않았다. 송전탑 선택 시점과
+        //    등록 상태에 얽혀 있어(런타임 정적 레지스트리) 확정적이지 않다 →
+        //    팀장 대안대로 **아레나에 이미 있는 고정 마커**로 돌아가서 차징한다.
+        //    ⚠️ 참여 송전탑은 여전히 미리 골라 둔다(`TryPrepareCenter`) — Begin 이 그 집합을 재사용해
+        //       이동 후 다시 고르는 것을 막는다. 중심 좌표는 마커가 없을 때만 폴백으로 쓴다.
         _chargeMoveTarget = transform.position;
-        bool haveCenter = _charge != null && _charge.TryPrepareCenter(_chargePylons, out _chargeMoveTarget);
+        // 🔴 `out` 을 `&&` 오른쪽에 두면 단축평가로 **대입되지 않는 경로**가 생긴다(컴파일 에러).
+        Vector3 pylonCenter = transform.position;
+        bool havePylonCenter = _charge != null && _charge.TryPrepareCenter(_chargePylons, out pylonCenter);
 
-        if (!haveCenter)
+        Transform landing = FindChargeLandingPoint();
+        if (landing != null)
+        {
+            _chargeMoveTarget = landing.position;
+        }
+        else if (havePylonCenter)
+        {
+            _chargeMoveTarget = pylonCenter;
+            Debug.LogWarning($"{name}: '{ChargeLandingName}' 을 못 찾아 송전탑 중심으로 간다.", this);
+        }
+        else
         {
             if (!_warnedNoCharge)
             {
                 _warnedNoCharge = true;
                 Debug.LogWarning(
-                    $"{name}: 송전탑 중심을 잡지 못했다(구현 없음 또는 탑 0개) — 제자리에서 차징한다. " +
-                    "제한시간 뒤 그대로 레이지로 넘어간다(스펙상 '실패'와 같은 경로).", this);
+                    $"{name}: 차징 위치를 잡지 못했다('{ChargeLandingName}' 없음 + 송전탑 0개) — " +
+                    "제자리에서 차징한다.", this);
             }
             StartChargingInPlace();
             return;
@@ -1534,8 +1547,10 @@ public class TwentyThreeBoss : MonsterBase
         if (data != null && !string.IsNullOrEmpty(data.locomotionState))
             CrossFadeStateClientRpc(data.locomotionState);
 
-        Debug.Log($"[23호] 송전기 — 중심 {_chargeMoveTarget} 으로 이동 시작 " +
-                  $"(인원 {_chargePlayers}명 → 송전탑 {_chargePylons}개)", this);
+        Debug.Log($"[23호] 송전기 — {_chargeMoveTarget} 으로 이동 시작 " +
+                  $"(기준 {(landing != null ? ChargeLandingName : "송전탑 중심")} · " +
+                  $"인원 {_chargePlayers}명 → 송전탑 {_chargePylons}개 · " +
+                  $"거리 {Vector3.Distance(transform.position, _chargeMoveTarget):0.#}m)", this);
 
         EnterPhase(BossAttackPhase.ChargeMove, ChargeMoveTimeout);
     }
@@ -1577,6 +1592,20 @@ public class TwentyThreeBoss : MonsterBase
 
     float _lastAttackTickTime = -999f;   // 마지막으로 공격 중이던 시각(= 공격 종료 시각)
     float GlobalAttackInterval => _boss != null ? Mathf.Max(0f, _boss.globalAttackInterval) : 1.5f;
+
+    // 차징 위치 마커. bossroom 에 이미 있는 것을 쓴다(`BossEncounterDirector` 도 같은 이름을 찾는다).
+    const string ChargeLandingName = "BossLandingPoint";
+    Transform _chargeLanding;
+
+    Transform FindChargeLandingPoint()
+    {
+        // 한 번 찾으면 캐시한다. 씬이 바뀌면 파괴되므로 null 검사로 다시 찾는다.
+        if (_chargeLanding != null) return _chargeLanding;
+
+        GameObject go = GameObject.Find(ChargeLandingName);
+        _chargeLanding = go != null ? go.transform : null;
+        return _chargeLanding;
+    }
 
     Vector3 _chargeMoveTarget;
     int _chargePylons;
@@ -1806,19 +1835,18 @@ public class TwentyThreeBoss : MonsterBase
 
         if (dmg > 0)
         {
-            // 🔴 **벽에 처박은 충격으로 밀어낸다**(팀장 확정 2026-08-13). 기절(아래)과 함께 들어간다.
-            //    방향은 보스 → 대상 바깥쪽 = 벽 쪽이다(돌진해 온 방향과 같다).
-            var info = new AttackInfo(dmg, AttackType.Default)
-            {
-                knockbackStrength = DashKnockback,
-                knockbackDuration = DashKnockbackTime,
-                knockbackDirection = AwayFromBoss(carried.transform.position),
-            };
+            var info = new AttackInfo(dmg, AttackType.Default);
             var ctx = new AttackHitContext(transform.position, transform);
             Hurtbox hurtbox = carried.GetComponentInChildren<Hurtbox>();
             if (hurtbox != null) hurtbox.ReceiveAttack(info, ctx);
             else carried.ReceiveAttack(info, ctx);
         }
+
+        // 🔴 **벽에 처박은 충격으로 밀어낸다**(팀장 확정 2026-08-13). 방향 = 보스 → 대상 바깥쪽(벽 쪽).
+        //    데미지와 **별개 호출**이다 — ReceiveAttack 은 AttackInfo 의 넉백 필드를 읽지 않는다.
+        //    데미지가 0 이어도 밀리는 것이 맞으므로 위 `dmg > 0` 블록 밖에 둔다.
+        if (DashKnockback > 0f)
+            carried.Knockback(AwayFromBoss(carried.transform.position), DashKnockback);
 
         // 실제로 밀린 대상만 기절한다 — 슈퍼아머로 캐리를 거부한 대상은 여기 오지 않는다.
         if (DashStunDuration > 0f && carried.StatusEffects != null)
@@ -1969,19 +1997,18 @@ public class TwentyThreeBoss : MonsterBase
             if (push.sqrMagnitude < 0.0001f) push = p.transform.forward;
             push.Normalize();
 
-            var info = new AttackInfo(dmg, AttackType.Default)
-            {
-                knockbackStrength = ChargeAuraKnockback,
-                knockbackDuration = ChargeAuraKnockbackTime,
-                staggerDuration = ChargeAuraStagger,
-                knockbackDirection = push,
-            };
+            var info = new AttackInfo(dmg, AttackType.Default);
             var ctx = new AttackHitContext(transform.position, transform);
 
             // Hurtbox 를 우선한다(방어·쉴드 계산을 우회하지 않는 서버 경로).
             Hurtbox hurtbox = p.GetComponentInChildren<Hurtbox>();
             if (hurtbox != null) hurtbox.ReceiveAttack(info, ctx);
             else p.ReceiveAttack(info, ctx);
+
+            // 🔴 넉백은 **별도 호출**이다 — ReceiveAttack 은 AttackInfo 의 넉백 필드를 읽지 않는다.
+            //    이걸 몰라서 오라·점프·돌진 세 곳 모두 "밀리지 않는" 상태였다(2026-08-13).
+            if (ChargeAuraKnockback > 0f)
+                p.Knockback(push, ChargeAuraKnockback);
         }
     }
 
@@ -2033,8 +2060,6 @@ public class TwentyThreeBoss : MonsterBase
     float ChargeAuraInterval => _boss != null ? Mathf.Max(0.1f, _boss.chargeAuraInterval) : 1f;
     int ChargeAuraDamage => _boss != null ? Mathf.Max(0, _boss.chargeAuraDamage) : 20;
     float ChargeAuraKnockback => _boss != null ? Mathf.Max(0f, _boss.chargeAuraKnockbackStrength) : 8f;
-    float ChargeAuraKnockbackTime => _boss != null ? Mathf.Max(0f, _boss.chargeAuraKnockbackDuration) : 0.25f;
-    float ChargeAuraStagger => _boss != null ? Mathf.Max(0f, _boss.chargeAuraStagger) : 0f;
     #endregion
 
     void SpawnChargeZone()

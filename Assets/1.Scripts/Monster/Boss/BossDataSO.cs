@@ -218,14 +218,12 @@ public class BossDataSO : MonsterDataSO
     [Min(0f)] public float jumpLandSeparation = 1.2f;
 
     // 🔴 확정 스펙(2026-08-13): **돌진과 점프어택은 플레이어를 넉백시킨다.**
-    [Tooltip("착지 AoE 넉백 속도(m/s). 0 이면 밀지 않는다. 방향은 **보스 → 대상** 바깥쪽이다.")]
+    // ⚠️ **강도만 노출한다.** 넉백 진입점 `Unit.Knockback(방향, 강도)` 이 받는 것이 그것뿐이다.
+    //    지속·경직을 노출해 두면 조절해도 아무 일이 없는 "고장난 노브"가 된다
+    //    (`AttackInfo.knockbackDuration` 등은 이 경로에서 **읽히지 않는다** — 2026-08-13 실측).
+    [Tooltip("착지 AoE 넉백 속도(m/s). 0 이면 밀지 않는다. 방향은 **보스 → 대상** 바깥쪽이다.\n" +
+             "⚠️ 슈퍼아머 대상은 밀리지 않는다(Unit.Knockback 이 차단한다).")]
     [Min(0f)] public float jumpKnockbackStrength = 9f;
-
-    [Tooltip("착지 AoE 넉백 지속(초).")]
-    [Min(0f)] public float jumpKnockbackDuration = 0.3f;
-
-    [Tooltip("착지 AoE 넉백 후 경직(초). 0 이면 경직 없음.")]
-    [Min(0f)] public float jumpKnockbackStagger;
 
     [Tooltip("점프 예고 — **큰 원(고정, 최종 범위)** 의 알파. 연할수록 범위만 암시한다.")]
     [Range(0f, 1f)] public float jumpTelegraphOuterAlpha = 0.12f;
@@ -300,13 +298,10 @@ public class BossDataSO : MonsterDataSO
     [Tooltip("벽 충돌 시 끌려온 대상에게 거는 기절(초). 슈퍼아머라 밀리지 않은 대상에겐 걸지 않는다.")]
     [Min(0f)] public float dashStunDuration = 1f;
 
-    // 🔴 확정 스펙(2026-08-13): **돌진은 플레이어를 넉백시킨다.**
+    // 🔴 확정 스펙(2026-08-13): **돌진은 플레이어를 넉백시킨다.** 강도만 노출한다(위 점프 주석 참조).
     [Tooltip("벽 충돌 넉백 속도(m/s). 0 이면 밀지 않는다. 방향은 **보스 → 대상** 바깥쪽(= 벽 쪽)이다.\n" +
              "⚠️ 경로를 스치기만 한 대상은 여기 해당하지 않는다 — 끌려간(캐리된) 대상이 벽에 처박힐 때다.")]
     [Min(0f)] public float dashKnockbackStrength = 12f;
-
-    [Tooltip("벽 충돌 넉백 지속(초).")]
-    [Min(0f)] public float dashKnockbackDuration = 0.3f;
 
     [Header("Wells (23호에 종속) — [S8]")]
     [Tooltip("[S8] 폭탄 투척 주기(초). Wells 는 23호 NetworkObject 에 상태를 싣는다 — " +
@@ -370,14 +365,9 @@ public class BossDataSO : MonsterDataSO
     [Tooltip("1회 데미지.")]
     [Min(0)] public int chargeAuraDamage = 20;
 
-    [Tooltip("넉백 속도(m/s). 0 이면 밀지 않는다. 방향은 **보스 → 대상** 바깥쪽이다.")]
+    [Tooltip("넉백 속도(m/s). 0 이면 밀지 않는다. 방향은 **보스 → 대상** 바깥쪽이다.\n" +
+             "⚠️ 강도만 있다 — 넉백 진입점이 강도만 받는다(위 점프 넉백 주석 참조).")]
     [Min(0f)] public float chargeAuraKnockbackStrength = 8f;
-
-    [Tooltip("넉백 지속(초).")]
-    [Min(0f)] public float chargeAuraKnockbackDuration = 0.25f;
-
-    [Tooltip("넉백이 끝난 뒤 경직(초). 0 이면 경직 없음.")]
-    [Min(0f)] public float chargeAuraStagger;
 
     [Tooltip("오라 범위 표시용 프리팹(AoeTelegraph). 비우면 범위가 보이지 않는다 — " +
              "플레이어가 크기를 알아야 피할 수 있으므로 배선을 권장한다. " +
