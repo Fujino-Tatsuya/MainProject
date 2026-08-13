@@ -1053,7 +1053,6 @@ public class TwentyThreeBoss : MonsterBase
         int count = Physics.OverlapSphereNonAlloc(
             transform.position, JumpAoeRadius, _aoeBuffer, playerMask, QueryTriggerInteraction.Collide);
 
-        var info = new AttackInfo(dmg, AttackType.Default);
         _aoeHits.Clear();
         for (int i = 0; i < count; i++)
         {
@@ -1065,6 +1064,16 @@ public class TwentyThreeBoss : MonsterBase
             Unit unit = hurtbox != null ? hurtbox.OwnerUnit : hit.GetComponentInParent<Unit>();
             if (unit == null || unit == this) continue;
             if (!_aoeHits.Add(unit)) continue; // 유닛당 1회
+
+            // 🔴 **착지 충격으로 밀어낸다**(팀장 확정 2026-08-13). 방향은 대상별로 다르므로
+            //    AttackInfo 를 루프 안에서 만든다(하나를 돌려 쓰면 전원이 같은 방향으로 밀린다).
+            var info = new AttackInfo(dmg, AttackType.Default)
+            {
+                knockbackStrength = JumpKnockback,
+                knockbackDuration = JumpKnockbackTime,
+                staggerDuration = JumpKnockbackStagger,
+                knockbackDirection = AwayFromBoss(unit.transform.position),
+            };
 
             var ctx = new AttackHitContext(transform.position, transform, hit);
             if (hurtbox != null) hurtbox.ReceiveAttack(info, ctx);
@@ -1139,6 +1148,20 @@ public class TwentyThreeBoss : MonsterBase
     float JumpRecovery => _boss != null ? Mathf.Max(0f, _boss.jumpRecoveryDuration) : 0.4f;
     float JumpAoeRadius => _boss != null ? Mathf.Max(0.1f, _boss.jumpAoeRadius) : 3.5f;
     float JumpLandSeparation => _boss != null ? Mathf.Max(0f, _boss.jumpLandSeparation) : 1.2f;
+    float JumpKnockback => _boss != null ? Mathf.Max(0f, _boss.jumpKnockbackStrength) : 9f;
+    float JumpKnockbackTime => _boss != null ? Mathf.Max(0f, _boss.jumpKnockbackDuration) : 0.3f;
+    float JumpKnockbackStagger => _boss != null ? Mathf.Max(0f, _boss.jumpKnockbackStagger) : 0f;
+    float DashKnockback => _boss != null ? Mathf.Max(0f, _boss.dashKnockbackStrength) : 12f;
+    float DashKnockbackTime => _boss != null ? Mathf.Max(0f, _boss.dashKnockbackDuration) : 0.3f;
+
+    // 보스에게서 **멀어지는** 수평 방향. 겹쳐 서 있으면 보스 전방으로 민다(0 벡터 금지).
+    Vector3 AwayFromBoss(Vector3 targetPosition)
+    {
+        Vector3 d = targetPosition - transform.position;
+        d.y = 0f;
+        if (d.sqrMagnitude < 0.0001f) return transform.forward;
+        return d.normalized;
+    }
 
     // ─── 표현(각 피어 로컬) ────────────────────────────────────────────
     // 🔴 예고 장판은 **보스 자식이 아니다.** 보스가 체공 중 착지점으로 이동하므로 자식이면 따라가 버린다.
@@ -1783,7 +1806,14 @@ public class TwentyThreeBoss : MonsterBase
 
         if (dmg > 0)
         {
-            var info = new AttackInfo(dmg, AttackType.Default);
+            // 🔴 **벽에 처박은 충격으로 밀어낸다**(팀장 확정 2026-08-13). 기절(아래)과 함께 들어간다.
+            //    방향은 보스 → 대상 바깥쪽 = 벽 쪽이다(돌진해 온 방향과 같다).
+            var info = new AttackInfo(dmg, AttackType.Default)
+            {
+                knockbackStrength = DashKnockback,
+                knockbackDuration = DashKnockbackTime,
+                knockbackDirection = AwayFromBoss(carried.transform.position),
+            };
             var ctx = new AttackHitContext(transform.position, transform);
             Hurtbox hurtbox = carried.GetComponentInChildren<Hurtbox>();
             if (hurtbox != null) hurtbox.ReceiveAttack(info, ctx);

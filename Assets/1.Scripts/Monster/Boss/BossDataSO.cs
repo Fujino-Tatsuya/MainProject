@@ -217,6 +217,16 @@ public class BossDataSO : MonsterDataSO
              "착지 AoE 반경(jumpAoeRadius)이 이 값보다 크면 데미지는 그대로 들어간다.")]
     [Min(0f)] public float jumpLandSeparation = 1.2f;
 
+    // 🔴 확정 스펙(2026-08-13): **돌진과 점프어택은 플레이어를 넉백시킨다.**
+    [Tooltip("착지 AoE 넉백 속도(m/s). 0 이면 밀지 않는다. 방향은 **보스 → 대상** 바깥쪽이다.")]
+    [Min(0f)] public float jumpKnockbackStrength = 9f;
+
+    [Tooltip("착지 AoE 넉백 지속(초).")]
+    [Min(0f)] public float jumpKnockbackDuration = 0.3f;
+
+    [Tooltip("착지 AoE 넉백 후 경직(초). 0 이면 경직 없음.")]
+    [Min(0f)] public float jumpKnockbackStagger;
+
     [Tooltip("점프 예고 — **큰 원(고정, 최종 범위)** 의 알파. 연할수록 범위만 암시한다.")]
     [Range(0f, 1f)] public float jumpTelegraphOuterAlpha = 0.12f;
     [Tooltip("점프 예고 — **차오르는 작은 원** 의 알파. 진할수록 '언제 떨어지는가'가 또렷해진다.")]
@@ -289,6 +299,14 @@ public class BossDataSO : MonsterDataSO
 
     [Tooltip("벽 충돌 시 끌려온 대상에게 거는 기절(초). 슈퍼아머라 밀리지 않은 대상에겐 걸지 않는다.")]
     [Min(0f)] public float dashStunDuration = 1f;
+
+    // 🔴 확정 스펙(2026-08-13): **돌진은 플레이어를 넉백시킨다.**
+    [Tooltip("벽 충돌 넉백 속도(m/s). 0 이면 밀지 않는다. 방향은 **보스 → 대상** 바깥쪽(= 벽 쪽)이다.\n" +
+             "⚠️ 경로를 스치기만 한 대상은 여기 해당하지 않는다 — 끌려간(캐리된) 대상이 벽에 처박힐 때다.")]
+    [Min(0f)] public float dashKnockbackStrength = 12f;
+
+    [Tooltip("벽 충돌 넉백 지속(초).")]
+    [Min(0f)] public float dashKnockbackDuration = 0.3f;
 
     [Header("Wells (23호에 종속) — [S8]")]
     [Tooltip("[S8] 폭탄 투척 주기(초). Wells 는 23호 NetworkObject 에 상태를 싣는다 — " +

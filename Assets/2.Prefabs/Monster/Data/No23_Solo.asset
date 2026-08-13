@@ -57,7 +57,7 @@ MonoBehaviour:
     animatorStateName: LeftHook
     cooldown: 2.5
     minDistance: 0
-    maxDistance: 2.6
+    maxDistance: 3.2
     ignoreDistanceWindow: 0
     targetRule: 0
     weight: 30
@@ -70,7 +70,7 @@ MonoBehaviour:
     animatorStateName: RightHook
     cooldown: 2.5
     minDistance: 0
-    maxDistance: 2.6
+    maxDistance: 3.2
     ignoreDistanceWindow: 0
     targetRule: 0
     weight: 30
@@ -83,7 +83,7 @@ MonoBehaviour:
     animatorStateName: Uppercut
     cooldown: 3
     minDistance: 0
-    maxDistance: 2.3
+    maxDistance: 2.8
     ignoreDistanceWindow: 0
     targetRule: 0
     weight: 12
@@ -166,6 +166,9 @@ MonoBehaviour:
   jumpLandingState: JumpLanding
   jumpTelegraphPrefab: {fileID: 5101064300646047659, guid: 703b2a15442ef56499ecba1ee0b9f2f2, type: 3}
   jumpLandSeparation: 1.2
+  jumpKnockbackStrength: 9
+  jumpKnockbackDuration: 0.3
+  jumpKnockbackStagger: 0
   jumpTelegraphOuterAlpha: 0.12
   jumpTelegraphFillAlpha: 0.85
   chargeTimeLimit: 20
@@ -186,6 +189,8 @@ MonoBehaviour:
   dashDamage: 0
   dashCarryFrontOffset: 1.8
   dashStunDuration: 1
+  dashKnockbackStrength: 12
+  dashKnockbackDuration: 0.3
   bombThrowInterval: 6
   bombPrefab: {fileID: 0}
   throwImpulse: 8
