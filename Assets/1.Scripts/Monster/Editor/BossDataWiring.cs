@@ -90,6 +90,63 @@ public static class BossDataWiring
     //
     // ⚠️ 거리창이 좁아지면 후보가 없어지고, 그때 `SeekBoss` 가 `attackRange`(2m)까지 **걸어서 접근**한다
     //    — 그게 요청받은 동작이다. 코드는 이미 그렇게 돼 있었고 **데이터가 틀렸던 것**이다.
+    const string BossPrefabPath = "Assets/2.Prefabs/Monster/Boss/TwentyThree.prefab";
+
+    // 손 히트박스(`Hand_L`/`Hand_R`)의 **실제 맞는 범위**를 키운다 (팀장 확정 2026-08-13).
+    //
+    // 거리창만 좁혔더니 "훅이 안 맞는다"가 됐다 — 거리창은 **고를 조건**이고 실제 명중은
+    // 이 박스가 만든다. 둘을 같이 움직여야 한다.
+    // 팀장 확정: **"공격이 보이는 것보다 아주 약간 더 커도 괜찮다"**(이펙트로 덮을 예정).
+    //
+    // ⚠️ 앵커는 100배 리그 밑에서 `localScale 0.01` 로 월드 1 을 만들어 뒀다 → 여기 숫자는 **미터**다.
+    [MenuItem("Tools/Boss/보스 데이터 — 손 히트박스 크기 반영")]
+    public static void WireHandHitboxes()
+    {
+        const float want = 1.8f;   // 기존 1.2 → 1.8 (반깊이 0.6 → 0.9)
+
+        GameObject contents = PrefabUtility.LoadPrefabContents(BossPrefabPath);
+        try
+        {
+            int changed = 0;
+            var sb = new StringBuilder("[BossData] 손 히트박스:\n");
+
+            foreach (string boneName in new[] { "Hand_L", "Hand_R" })
+            {
+                Transform t = FindDeep(contents.transform, boneName);
+                if (t == null) { Debug.LogWarning($"[BossData] {boneName} 을 못 찾았다."); continue; }
+                if (!t.TryGetComponent(out BoxCollider box)) { Debug.LogWarning($"[BossData] {boneName} 에 BoxCollider 가 없다."); continue; }
+
+                if (Mathf.Approximately(box.size.x, want)) { sb.AppendLine($"  {boneName}: 이미 {want}"); continue; }
+
+                sb.AppendLine($"  {boneName}: size {box.size.x} → {want}");
+                box.size = Vector3.one * want;
+                changed++;
+            }
+
+            if (changed > 0)
+            {
+                PrefabUtility.SaveAsPrefabAsset(contents, BossPrefabPath, out bool saved);
+                sb.AppendLine(saved ? $"  → {changed}건 저장" : "  🔴 저장 실패");
+            }
+            Debug.Log(sb.ToString());
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(contents);
+        }
+    }
+
+    static Transform FindDeep(Transform root, string name)
+    {
+        if (root.name == name) return root;
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform f = FindDeep(root.GetChild(i), name);
+            if (f != null) return f;
+        }
+        return null;
+    }
+
     [MenuItem("Tools/Boss/보스 데이터 — 근접 거리창 실측 반영")]
     public static void WireMeleeRanges()
     {
@@ -112,10 +169,12 @@ public static class BossDataWiring
 
                 float want = id switch
                 {
-                    // 훅 — 손 박스 반깊이(0.6) + 팔 뻗음 + 플레이어 캡슐 반경 여유
-                    BossAttackId.LeftHook or BossAttackId.RightHook => 2.2f,
+                    // 훅 — 손 박스를 1.8m 로 키운 뒤의 도달거리(2026-08-13 2차 조정).
+                    //   1차로 2.2 로 줄였더니 "훅이 안 맞는다" → 히트박스와 함께 키웠다.
+                    //   팀장 확정: "공격이 보이는 것보다 아주 약간 더 커도 괜찮다"(이펙트로 덮는다).
+                    BossAttackId.LeftHook or BossAttackId.RightHook => 2.6f,
                     // 어퍼 — 위로 치는 모션이라 앞 도달이 훅보다 짧다
-                    BossAttackId.Upper => 2f,
+                    BossAttackId.Upper => 2.3f,
                     // 🔴 잡기 — grabRadius 를 **넘으면 안 된다**(넘으면 반드시 헛잡기)
                     BossAttackId.Grab => Mathf.Min(2.2f, data.grabRadius),
                     _ => -1f,   // 나머지(점프·돌진·시퀀스)는 건드리지 않는다

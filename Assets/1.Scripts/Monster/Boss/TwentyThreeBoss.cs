@@ -976,7 +976,22 @@ public class TwentyThreeBoss : MonsterBase
         // 착지점 = 최원거리 플레이어의 발밑(바닥에 투영). 없으면 제자리.
         Vector3 point = transform.position;
         Player farthest = FindFarthestPlayer();
-        if (farthest != null) point = farthest.transform.position;
+        if (farthest != null)
+        {
+            point = farthest.transform.position;
+
+            // 🔴 **플레이어 정확히 위에 내려앉으면 안 된다**(팀장 관찰 2026-08-13:
+            //    "플레이어가 가만히 있으면 띄워지고 그 위로 올라가짐").
+            //    `agent.Warp` 로 보스 캡슐을 플레이어 캡슐 안에 꽂아 넣으면 물리 디페네트레이션이
+            //    두 캡슐을 밀어내는데, 수평으로 막히면 **위로** 빠진다 → 플레이어가 떠오른다.
+            //    → 착지점을 **보스가 오던 방향으로** 조금 당겨 캡슐이 겹치지 않게 한다.
+            //    ⚠️ 예고 장판도 이 지점을 쓴다(아래) — 판정과 예고가 어긋나지 않는다.
+            //    ⚠️ 착지 AoE 반경(3.5)이 이 간격보다 훨씬 커서 **데미지는 그대로 들어간다.**
+            Vector3 back = transform.position - point;
+            back.y = 0f;
+            if (back.sqrMagnitude < 0.0001f) back = -transform.forward;
+            point += back.normalized * JumpLandSeparation;
+        }
 
         if (GroundProbe.TryFindGround(point, 0, out RaycastHit ground, out _))
             point = new Vector3(point.x, ground.point.y, point.z);
@@ -1123,6 +1138,7 @@ public class TwentyThreeBoss : MonsterBase
     float JumpLanding => _boss != null ? Mathf.Max(0.1f, _boss.jumpLandingDuration) : 1f;
     float JumpRecovery => _boss != null ? Mathf.Max(0f, _boss.jumpRecoveryDuration) : 0.4f;
     float JumpAoeRadius => _boss != null ? Mathf.Max(0.1f, _boss.jumpAoeRadius) : 3.5f;
+    float JumpLandSeparation => _boss != null ? Mathf.Max(0f, _boss.jumpLandSeparation) : 1.2f;
 
     // ─── 표현(각 피어 로컬) ────────────────────────────────────────────
     // 🔴 예고 장판은 **보스 자식이 아니다.** 보스가 체공 중 착지점으로 이동하므로 자식이면 따라가 버린다.

@@ -84,7 +84,7 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 0
   serializedVersion: 3
-  m_Size: {x: 1.2, y: 1.2, z: 1.2}
+  m_Size: {x: 1.8, y: 1.8, z: 1.8}
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!114 &673455989277597155
 MonoBehaviour:
@@ -250,7 +250,7 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 0
   serializedVersion: 3
-  m_Size: {x: 1.2, y: 1.2, z: 1.2}
+  m_Size: {x: 1.8, y: 1.8, z: 1.8}
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!114 &5640552027000463598
 MonoBehaviour:
@@ -435,7 +435,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 3079088629
+  GlobalObjectIdHash: 373754331
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -730,35 +730,35 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1192077260575253837, guid: f8443bb2c6c3e714397c2ad2da093cf8, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 0
+      value: -0
       objectReference: {fileID: 0}
     - target: {fileID: 1192077260575253837, guid: f8443bb2c6c3e714397c2ad2da093cf8, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0
+      value: 0.0146
       objectReference: {fileID: 0}
     - target: {fileID: 1192077260575253837, guid: f8443bb2c6c3e714397c2ad2da093cf8, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 0
+      value: -0.00118
       objectReference: {fileID: 0}
     - target: {fileID: 1192077260575253837, guid: f8443bb2c6c3e714397c2ad2da093cf8, type: 3}
       propertyPath: m_LocalRotation.w
-      value: 1
+      value: 0.9918723
       objectReference: {fileID: 0}
     - target: {fileID: 1192077260575253837, guid: f8443bb2c6c3e714397c2ad2da093cf8, type: 3}
       propertyPath: m_LocalRotation.x
-      value: 0
+      value: -0.12723725
       objectReference: {fileID: 0}
     - target: {fileID: 1192077260575253837, guid: f8443bb2c6c3e714397c2ad2da093cf8, type: 3}
       propertyPath: m_LocalRotation.y
-      value: 0
+      value: 0.00000002701216
       objectReference: {fileID: 0}
     - target: {fileID: 1192077260575253837, guid: f8443bb2c6c3e714397c2ad2da093cf8, type: 3}
       propertyPath: m_LocalRotation.z
-      value: 0
+      value: -0.00000002644492
       objectReference: {fileID: 0}
     - target: {fileID: 1192077260575253837, guid: f8443bb2c6c3e714397c2ad2da093cf8, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
-      value: 0
+      value: -14.62
       objectReference: {fileID: 0}
     - target: {fileID: 1192077260575253837, guid: f8443bb2c6c3e714397c2ad2da093cf8, type: 3}
       propertyPath: m_LocalEulerAnglesHint.y

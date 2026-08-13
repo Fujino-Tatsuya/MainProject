@@ -211,6 +211,12 @@ public class BossDataSO : MonsterDataSO
              "그래서 각 피어가 이 프리팹을 착지점에 로컬로 띄운다.")]
     public GameObject jumpTelegraphPrefab;
 
+    [Tooltip("착지점을 대상에게서 **이만큼 떨어뜨린다**(m). 0 이면 플레이어 위에 정확히 내려앉는다.\n" +
+             "🔴 0 으로 두면 안 된다 — 보스 캡슐을 플레이어 캡슐 안에 꽂으면 물리 디페네트레이션이 " +
+             "수평으로 못 밀어내고 **위로** 밀어내서 플레이어가 떠오른다(2026-08-13 관찰).\n" +
+             "착지 AoE 반경(jumpAoeRadius)이 이 값보다 크면 데미지는 그대로 들어간다.")]
+    [Min(0f)] public float jumpLandSeparation = 1.2f;
+
     [Tooltip("점프 예고 — **큰 원(고정, 최종 범위)** 의 알파. 연할수록 범위만 암시한다.")]
     [Range(0f, 1f)] public float jumpTelegraphOuterAlpha = 0.12f;
     [Tooltip("점프 예고 — **차오르는 작은 원** 의 알파. 진할수록 '언제 떨어지는가'가 또렷해진다.")]
