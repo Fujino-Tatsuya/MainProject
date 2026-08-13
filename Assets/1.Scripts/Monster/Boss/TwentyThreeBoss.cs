@@ -376,6 +376,13 @@ public class TwentyThreeBoss : MonsterBase
                 "SO 에 weight 0 행으로 추가할 것. 이번 시퀀스는 건너뛴다.", this);
         }
 
+        // 🔴 **전역 공격 간격**(팀장 확정 2026-08-13: "다음 공격까지가 너무 빠르다").
+        //    쿨다운이 행마다 따로라 훅L(2.5s)·훅R(2.5s)·어퍼(3s)를 번갈아 쓰면 **쉬는 구간이 0** 이었다.
+        //    행 쿨다운과 별개로, 공격이 끝난 뒤 이 시간만큼은 아무것도 고르지 않는다.
+        //    ⚠️ 페이즈 시퀀스 진입(위)보다 **뒤에** 둔다 — 연출 전환은 기다리게 하면 안 된다.
+        if (Time.time - _lastAttackTickTime < GlobalAttackInterval)
+            return NoAttack;
+
         if (_weightBuffer == null || _weightBuffer.Length != rows.Length)
             _weightBuffer = new float[rows.Length];
 
@@ -663,6 +670,11 @@ public class TwentyThreeBoss : MonsterBase
     //    그래서 base 의 선딜 취소(cancelWindupIfTargetLeavesRange) 경로를 타지 않는다.
     protected override void HandleAttack(float dt)
     {
+        // 🔴 공격이 **끝난 시각**을 이렇게 잡는다 — 이 함수는 Attack 상태 동안 매 틱 도는데,
+        //    체인이든 단타든 전부 여기를 지난다. 그래서 마지막으로 갱신된 값이 곧 "공격 종료 시각"이다.
+        //    (`DecideNextAfterAction` 은 virtual 이 아니라 훅을 걸 수 없고, 종료 경로가 4곳으로 흩어져 있다.)
+        _lastAttackTickTime = Time.time;
+
         if (_attackPhase == BossAttackPhase.None)
         {
             base.HandleAttack(dt); // 단타 공격 — 히트는 애니 이벤트, 종료는 이벤트 + 타이머 폴백
@@ -1523,6 +1535,9 @@ public class TwentyThreeBoss : MonsterBase
                   $"제한시간 {ChargeTimeLimit:0.#}초", this);
         EnterPhase(BossAttackPhase.ChargeWait, ChargeTimeLimit);
     }
+
+    float _lastAttackTickTime = -999f;   // 마지막으로 공격 중이던 시각(= 공격 종료 시각)
+    float GlobalAttackInterval => _boss != null ? Mathf.Max(0f, _boss.globalAttackInterval) : 1.5f;
 
     Vector3 _chargeMoveTarget;
     int _chargePylons;

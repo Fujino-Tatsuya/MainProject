@@ -78,6 +78,70 @@ public static class BossDataWiring
         Debug.Log($"[BossData] 차징 오라 예고 배선 완료 — 변경 {changed}건(멱등, 이미 맞으면 0건).");
     }
 
+    // 근접 공격의 **거리창을 실측에 맞춘다** (팀장 확정 2026-08-13).
+    //
+    // ── 왜 필요했나 ─────────────────────────────────────────────────────────────
+    // "공격 범위가 아닌데 훅·어퍼·잡기를 한다. 범위 안일 때만 공격하고 아니면 walk 로 다가와야 한다."
+    // 실측하니 거리창이 실제 도달거리보다 넓었다:
+    //   · 손 히트박스(`Hand_R`)는 **1.2m 정육면체**이고 대기 자세에서 몸 앞 **0.21m** 에 있다.
+    //     팔을 뻗어도 앞으로 1.5m 남짓이라 훅의 `maxDistance: 3` 은 1m 가까이 과대였다.
+    //   · 🔴 **잡기는 확정 불일치였다** — `maxDistance: 3.5` 인데 `grabRadius: 2.2` 다.
+    //     2.2m 밖에서 시전하면 `FindGrabTarget` 이 아무도 못 찾아 **반드시 헛잡기**가 된다.
+    //
+    // ⚠️ 거리창이 좁아지면 후보가 없어지고, 그때 `SeekBoss` 가 `attackRange`(2m)까지 **걸어서 접근**한다
+    //    — 그게 요청받은 동작이다. 코드는 이미 그렇게 돼 있었고 **데이터가 틀렸던 것**이다.
+    [MenuItem("Tools/Boss/보스 데이터 — 근접 거리창 실측 반영")]
+    public static void WireMeleeRanges()
+    {
+        foreach (string path in new[] { BossDataPath, SoloDataPath })
+        {
+            var data = AssetDatabase.LoadAssetAtPath<BossDataSO>(path);
+            if (data == null) { Debug.LogWarning($"[BossData] {path} 없음 — 건너뛴다."); continue; }
+            if (data.attacks == null) continue;
+
+            var so = new SerializedObject(data);
+            SerializedProperty rows = so.FindProperty("attacks");
+            var sb = new StringBuilder($"[BossData] {data.name} 거리창:\n");
+            int changed = 0;
+
+            for (int i = 0; i < rows.arraySize; i++)
+            {
+                SerializedProperty row = rows.GetArrayElementAtIndex(i);
+                var id = (BossAttackId)row.FindPropertyRelative("attackId").enumValueIndex;
+                SerializedProperty max = row.FindPropertyRelative("maxDistance");
+
+                float want = id switch
+                {
+                    // 훅 — 손 박스 반깊이(0.6) + 팔 뻗음 + 플레이어 캡슐 반경 여유
+                    BossAttackId.LeftHook or BossAttackId.RightHook => 2.2f,
+                    // 어퍼 — 위로 치는 모션이라 앞 도달이 훅보다 짧다
+                    BossAttackId.Upper => 2f,
+                    // 🔴 잡기 — grabRadius 를 **넘으면 안 된다**(넘으면 반드시 헛잡기)
+                    BossAttackId.Grab => Mathf.Min(2.2f, data.grabRadius),
+                    _ => -1f,   // 나머지(점프·돌진·시퀀스)는 건드리지 않는다
+                };
+                if (want < 0f) continue;
+
+                if (!Mathf.Approximately(max.floatValue, want))
+                {
+                    sb.AppendLine($"  {id}: maxDistance {max.floatValue} → {want}");
+                    max.floatValue = want;
+                    changed++;
+                }
+            }
+
+            if (changed > 0)
+            {
+                so.ApplyModifiedPropertiesWithoutUndo();
+                sb.AppendLine($"  → {changed}건 변경. 접근 정지 거리(attackRange)={data.attackRange}, grabRadius={data.grabRadius}");
+                Debug.Log(sb.ToString(), data);
+            }
+            else Debug.Log($"[BossData] {data.name} 거리창 — 변경 0건(이미 맞다).", data);
+        }
+
+        AssetDatabase.SaveAssets();
+    }
+
     [MenuItem("Tools/Boss/보스 데이터 — 프리팹 참조 배선 (bombPrefab)")]
     public static void Wire()
     {

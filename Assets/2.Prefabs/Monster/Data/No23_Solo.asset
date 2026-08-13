@@ -57,7 +57,7 @@ MonoBehaviour:
     animatorStateName: LeftHook
     cooldown: 2.5
     minDistance: 0
-    maxDistance: 3
+    maxDistance: 2.2
     ignoreDistanceWindow: 0
     targetRule: 0
     weight: 30
@@ -70,7 +70,7 @@ MonoBehaviour:
     animatorStateName: RightHook
     cooldown: 2.5
     minDistance: 0
-    maxDistance: 3
+    maxDistance: 2.2
     ignoreDistanceWindow: 0
     targetRule: 0
     weight: 30
@@ -83,7 +83,7 @@ MonoBehaviour:
     animatorStateName: Uppercut
     cooldown: 3
     minDistance: 0
-    maxDistance: 2.5
+    maxDistance: 2
     ignoreDistanceWindow: 0
     targetRule: 0
     weight: 12
@@ -96,7 +96,7 @@ MonoBehaviour:
     animatorStateName: Grab
     cooldown: 10
     minDistance: 0
-    maxDistance: 3.5
+    maxDistance: 2.2
     ignoreDistanceWindow: 0
     targetRule: 0
     weight: 15
@@ -190,6 +190,7 @@ MonoBehaviour:
   throwImpulse: 8
   spreadAngle: 15
   bombThrowPitch: 35
+  globalAttackInterval: 1.5
   bombLandingMinDistance: 3
   bombLandingMaxDistance: 9
   bombWallMargin: 1.2
