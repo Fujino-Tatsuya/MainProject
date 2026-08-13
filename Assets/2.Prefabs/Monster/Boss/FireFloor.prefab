@@ -74,7 +74,7 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   zoneType: 0
   radius: 2
-  lifetime: 6
+  lifetime: 10
   growPerOverlap: 0.5
   maxRadius: 5
   refreshLifetimeOnGrow: 1
