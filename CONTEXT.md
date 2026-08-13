@@ -6,7 +6,7 @@ Update this file when a term becomes important enough that future agents or team
 
 ## ▶▶ 다음 세션 시작점 — 보스 거동 잔여 4건 (2026-08-10 저녁 종료)
 
-**브랜치 `feature/Boss23`** · **컴파일 0에러 0경고** · **9커밋 완료 · 미푸시**
+**브랜치 `feature/Boss23`** · **컴파일 0에러 0경고** · **10커밋 완료 · 미푸시**(`8170481..HEAD`)
 
 **한 줄 상태: 잔여 결함 4건이 전부 닫혔다. 남은 것은 Play 육안 검증이다.**
 
