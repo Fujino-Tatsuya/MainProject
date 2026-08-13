@@ -337,22 +337,44 @@ public class BossDirectionIndicator : MonoBehaviour, IBossTelegraph
         return mesh;
     }
 
+    // 🔴 **색은 저작값 그대로, 끝까지 유지한다**(팀장 확정 2026-08-13).
+    //    이전 판은 카운터 창이 열리면 전방 호를 `counterReadyColor`(노랑)로 바꿨다 — "잡기할 때만
+    //    정면이 노랗게 변한다"가 그것이다. 상태를 색으로 알리는 방식은 폐기하고, **잡기 인터럽트는
+    //    추후 별도 이펙트**로 표현한다. `counterReadyColor` 필드는 그때 쓰려고 남겨 둔다.
     void ApplyColors()
     {
-        SetRendererColor(_frontRenderer, _counterWindowOpen ? counterReadyColor : frontColor);
+        SetRendererColor(_frontRenderer, frontColor);
         SetRendererColor(_backRenderer, backColor);
     }
 
     // 머티리얼 인스턴스화 없이 렌더러별 색만 다르게 — HitFlash 와 같은 MPB 패턴.
+    // 🔴 **둘 다 넣는다.** 이전 판은 `_BaseColor` 가 있으면 그것만 넣고 끝냈는데, 셰이더가 둘 다
+    //    노출하는 경우(이 프로젝트의 `MA_AoeTelegraph_Red` 가 그렇다) 남은 하나가 재질 원본값
+    //    (순빨강)으로 남아 그쪽이 이기면 **전방·후방이 똑같이 빨갛게** 보인다. 실제로 Play 에서
+    //    후방 호가 파랑(저작값)이 아니라 빨강으로 나왔다.
+    //    그리고 **둘 다 없으면 조용히 실패하지 않고 경고한다** — 색이 안 먹는 것을 눈으로만
+    //    발견하게 두면 다음 사람이 또 재질을 의심하며 시간을 쓴다.
     void SetRendererColor(MeshRenderer r, Color c)
     {
         if (r == null || arcMaterial == null) return;
 
+        bool applied = false;
         r.GetPropertyBlock(_mpb);
-        if (arcMaterial.HasProperty(BaseColorId)) _mpb.SetColor(BaseColorId, c);
-        else if (arcMaterial.HasProperty(ColorId)) _mpb.SetColor(ColorId, c);
+        if (arcMaterial.HasProperty(BaseColorId)) { _mpb.SetColor(BaseColorId, c); applied = true; }
+        if (arcMaterial.HasProperty(ColorId)) { _mpb.SetColor(ColorId, c); applied = true; }
         r.SetPropertyBlock(_mpb);
+
+        if (!applied && !_colorPropWarned)
+        {
+            _colorPropWarned = true;
+            Debug.LogWarning(
+                $"[보스/표식] {name}: 머티리얼 '{arcMaterial.name}'(셰이더 {arcMaterial.shader?.name}) 에 " +
+                "`_BaseColor` 도 `_Color` 도 없다 — 호 색이 재질 원본값으로 고정된다. " +
+                "셰이더가 노출하는 색 프로퍼티 이름을 확인할 것.", this);
+        }
     }
+
+    bool _colorPropWarned;
 
 #if UNITY_EDITOR
     // 인스펙터에서 색·각도를 돌리면 즉시 반영(Play 중 튜닝용).
