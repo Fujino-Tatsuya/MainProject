@@ -70,9 +70,12 @@
 | 어두운 곳 색이 너무 빠졌다 | `dimSaturation` | 0.17 | 키우면 색이 살아남 |
 | 하늘까지 어두워진다 | `dimAffectSky` | 0.714 | 낮추면 하늘은 덜 어두워짐 |
 | 밝게 보이는 범위 | `viewRange` / `viewFade` | 18 / 4 | 거리·경계 부드러움 |
-| 차폐 그림자가 너무 새까맣다 | `losDarken` | 1 | 낮추면 옅어짐 |
+| 차폐 적용 자체가 너무 강하다 | `losDarken` | 1 | 낮추면 차폐 색조가 옅게 섞임 |
 | 차폐 경계가 딱딱하다 | `losEdgeFade` | 5.71 | 키우면 부드러워짐 |
-| 차폐된 곳 색감 | `losSaturation` / `losBrightness` | 0.566 / 1 | — |
+| 차폐된 곳이 너무 어둡다/밝다 | `losBrightness` | 0.35 | 키우면 차폐 영역만 밝아짐 |
+| 차폐된 곳의 원래 색이 너무 강하다 | `losSaturation` | 0.3 | 낮추면 지정 색조가 더 또렷함 |
+| 차폐 색상 | `losTint` | 남청색 `(0.08, 0.22, 0.42)` | 원하는 색으로 변경 |
+| 차폐 색상이 너무 강하다/약하다 | `losTintStrength` | 0.65 | 0=색조 없음, 1=지정 색조 |
 
 **밝은 반경 자체를 바꾸려면 — 씬 오브젝트**
 `4.MapScene` → Hierarchy 의 **`FogManager`** → `losMaxDist` (**지금 4**)
