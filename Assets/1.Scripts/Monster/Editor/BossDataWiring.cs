@@ -91,6 +91,77 @@ public static class BossDataWiring
     // ⚠️ 거리창이 좁아지면 후보가 없어지고, 그때 `SeekBoss` 가 `attackRange`(2m)까지 **걸어서 접근**한다
     //    — 그게 요청받은 동작이다. 코드는 이미 그렇게 돼 있었고 **데이터가 틀렸던 것**이다.
     const string BossPrefabPath = "Assets/2.Prefabs/Monster/Boss/TwentyThree.prefab";
+    const string FrontMatPath = "Assets/3.Materials/MA_BossDirection_Front.mat";
+    const string BackMatPath = "Assets/3.Materials/MA_BossDirection_Back.mat";
+
+    // 앞뒤 방향 표식 **전용 머티리얼**을 만들고 배선한다 (팀장 확정 2026-08-13).
+    //
+    // ── 왜 필요했나 ─────────────────────────────────────────────────────────────
+    // 표식이 피격 후 **영구히 빨강**이 됐다. 원인이 두 겹이었다:
+    //   ① `HitFlash` 가 유닛의 **모든 렌더러**를 긁는다 → 런타임 생성 호(FrontArc/BackArc)도 물든다.
+    //      게다가 원래 색을 `sharedMaterial` 에서 캐시하므로 플래시가 끝나면 **재질 원색으로 복원**한다.
+    //   ② 그 재질이 장판과 공유하는 `MA_AoeTelegraph_Red`(순빨강)였다 → 복원 색이 빨강.
+    // → 전용 재질로 공유를 끊고(여기), 호는 `NoHitFlash` 마커로 플래시에서 빠지고,
+    //   색 주입(MaterialPropertyBlock) 코드는 제거했다. **색은 이제 재질에 박힌다.**
+    //
+    // 셰이더·렌더큐를 맞추기 위해 기존 장판 재질을 **복사**해서 만든다(투명 큐가 요구사항이다).
+    [MenuItem("Tools/Boss/표식 — 전용 머티리얼 생성·배선")]
+    public static void WireDirectionMaterials()
+    {
+        Material front = EnsureMaterial(FrontMatPath, new Color(1f, 0.35f, 0.25f, 0.45f));
+        Material back = EnsureMaterial(BackMatPath, new Color(0.3f, 0.7f, 1f, 0.45f));
+        if (front == null || back == null) return;
+
+        GameObject contents = PrefabUtility.LoadPrefabContents(BossPrefabPath);
+        try
+        {
+            var ind = contents.GetComponentInChildren<BossDirectionIndicator>(true);
+            if (ind == null) { Debug.LogError("[표식] 보스 프리팹에 BossDirectionIndicator 가 없다."); return; }
+
+            var so = new SerializedObject(ind);
+            so.FindProperty("frontMaterial").objectReferenceValue = front;
+            so.FindProperty("backMaterial").objectReferenceValue = back;
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            PrefabUtility.SaveAsPrefabAsset(contents, BossPrefabPath, out bool saved);
+            Debug.Log(saved
+                ? $"[표식] ✅ 전용 머티리얼 배선 완료 — 전방 {front.name} · 후방 {back.name}"
+                : "[표식] 🔴 프리팹 저장 실패");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(contents);
+        }
+        AssetDatabase.SaveAssets();
+    }
+
+    // 없으면 장판 재질을 복사해 만들고, 있으면 색만 맞춘다(멱등).
+    static Material EnsureMaterial(string path, Color color)
+    {
+        var mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+        if (mat == null)
+        {
+            if (!AssetDatabase.CopyAsset(TelegraphMatPath, path))
+            {
+                Debug.LogError($"[표식] {TelegraphMatPath} → {path} 복사 실패.");
+                return null;
+            }
+            AssetDatabase.ImportAsset(path);
+            mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (mat == null) { Debug.LogError($"[표식] {path} 를 읽지 못했다."); return null; }
+        }
+
+        // 셰이더가 노출하는 색 프로퍼티에 **전부** 넣는다 — 어느 쪽이 실제로 쓰이는지 재질마다 다르다.
+        bool applied = false;
+        if (mat.HasProperty("_BaseColor")) { mat.SetColor("_BaseColor", color); applied = true; }
+        if (mat.HasProperty("_Color")) { mat.SetColor("_Color", color); applied = true; }
+        if (!applied)
+            Debug.LogWarning($"[표식] {mat.name}: `_BaseColor`·`_Color` 가 없다 — 색을 넣지 못했다. " +
+                             $"셰이더({mat.shader?.name})가 노출하는 이름을 확인할 것.");
+
+        EditorUtility.SetDirty(mat);
+        return mat;
+    }
 
     // 손 히트박스(`Hand_L`/`Hand_R`)의 **실제 맞는 범위**를 키운다 (팀장 확정 2026-08-13).
     //
@@ -102,7 +173,9 @@ public static class BossDataWiring
     [MenuItem("Tools/Boss/보스 데이터 — 손 히트박스 크기 반영")]
     public static void WireHandHitboxes()
     {
-        const float want = 1.8f;   // 기존 1.2 → 1.8 (반깊이 0.6 → 0.9)
+        // 1.2 → 1.8 로 키웠는데도 "훅이 안 맞는다" → **2.6** 으로 한 번 더 키운다(3차 조정).
+        // 팀장 확정: 보이는 것보다 커도 괜찮다(이펙트로 덮는다). 손 박스는 이제 몸통만큼 크다.
+        const float want = 2.6f;
 
         GameObject contents = PrefabUtility.LoadPrefabContents(BossPrefabPath);
         try
@@ -172,9 +245,9 @@ public static class BossDataWiring
                     // 훅 — 손 박스를 1.8m 로 키운 뒤의 도달거리(2026-08-13 2차 조정).
                     //   1차로 2.2 로 줄였더니 "훅이 안 맞는다" → 히트박스와 함께 키웠다.
                     //   팀장 확정: "공격이 보이는 것보다 아주 약간 더 커도 괜찮다"(이펙트로 덮는다).
-                    BossAttackId.LeftHook or BossAttackId.RightHook => 2.6f,
+                    BossAttackId.LeftHook or BossAttackId.RightHook => 3.2f,
                     // 어퍼 — 위로 치는 모션이라 앞 도달이 훅보다 짧다
-                    BossAttackId.Upper => 2.3f,
+                    BossAttackId.Upper => 2.8f,
                     // 🔴 잡기 — grabRadius 를 **넘으면 안 된다**(넘으면 반드시 헛잡기)
                     BossAttackId.Grab => Mathf.Min(2.2f, data.grabRadius),
                     _ => -1f,   // 나머지(점프·돌진·시퀀스)는 건드리지 않는다

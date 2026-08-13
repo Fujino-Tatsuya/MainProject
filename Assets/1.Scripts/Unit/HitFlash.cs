@@ -104,6 +104,13 @@ public class HitFlash : MonoBehaviour
         {
             if (r == null || r.sharedMaterial == null) continue;
             if (r.GetComponentInParent<AoeTelegraph>() != null) continue; // 장판 등 연출용 제외
+
+            // 🔴 **연출용 렌더러는 스스로 제외를 표시한다**(2026-08-13). 위의 AoeTelegraph 예외만으로는
+            //    부족했다 — 앞뒤 방향 표식의 호는 런타임에 만들어지는 그냥 MeshRenderer 라 걸리지 않아
+            //    피격 때 함께 빨개졌고, 원래 색을 sharedMaterial 에서 캐시하기 때문에 **플래시가 끝난
+            //    뒤에도 재질 원색(빨강)으로 복원**돼 표식이 영구히 빨강이 됐다.
+            //    타입을 하나씩 예외로 추가하면 새 연출마다 같은 버그가 재발하므로 마커로 바꾼다.
+            if (r.GetComponentInParent<NoHitFlash>() != null) continue;
             list.Add(r);
         }
 

@@ -84,7 +84,7 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 0
   serializedVersion: 3
-  m_Size: {x: 1.8, y: 1.8, z: 1.8}
+  m_Size: {x: 2.6, y: 2.6, z: 2.6}
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!114 &673455989277597155
 MonoBehaviour:
@@ -250,7 +250,7 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 0
   serializedVersion: 3
-  m_Size: {x: 1.8, y: 1.8, z: 1.8}
+  m_Size: {x: 2.6, y: 2.6, z: 2.6}
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!114 &5640552027000463598
 MonoBehaviour:
@@ -650,6 +650,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fe0051b99c590994ba5574366d1615ea, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BossDirectionIndicator
+  frontMaterial: {fileID: 2100000, guid: 5149a4be7f7b74b4aa1c9c3a4d21d868, type: 2}
+  backMaterial: {fileID: 2100000, guid: 3ea3e0880eba2334a89775bb58385754, type: 2}
   arcMaterial: {fileID: 2100000, guid: 7b27a57664d778945a9e71ec8a5b3021, type: 2}
   innerRadius: 1.6
   outerRadius: 2.6

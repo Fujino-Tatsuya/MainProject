@@ -30,13 +30,26 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public class BossDirectionIndicator : MonoBehaviour, IBossTelegraph
 {
-    [Header("머티리얼 — 🔴 투명 큐 URP Unlit 을 배선할 것")]
+    [Header("머티리얼 — 🔴 투명 큐 URP Unlit, 표식 전용을 배선할 것")]
     [SerializeField]
-    [Tooltip("두 호가 공유하는 머티리얼. 색은 MaterialPropertyBlock 으로 호별로 따로 넣는다.\n" +
+    [Tooltip("전방 호 전용 머티리얼. **색이 이 재질에 박혀 있다** — 런타임에 색을 주입하지 않는다.\n" +
+             "🔴 다른 연출(장판·예고)과 **공유하지 말 것.** 공유하면 그쪽에서 재질을 만지는 순간 " +
+             "표식 색이 함께 바뀐다(2026-08-13: 장판 재질을 공유해 표식이 빨강으로 고정됐다).\n" +
              "🔴 Surface Type = Transparent 여야 한다. 불투명이면 z-fighting 이 나고, " +
              "'항상 위에(ZTest Always)' 설정이면 플레이어 위에 그려진다.\n" +
              "🔴 Shader.Find 가 아니라 이 인스펙터 참조로 물려야 빌드에서 스트립되지 않는다.")]
+    Material frontMaterial;
+
+    [SerializeField]
+    [Tooltip("후방 호 전용 머티리얼. 위와 같은 규칙.")]
+    Material backMaterial;
+
+    [SerializeField]
+    [Tooltip("⚠️ 레거시 — 전용 머티리얼이 비었을 때만 폴백으로 쓴다. 새로 배선하지 말 것.")]
     Material arcMaterial;
+
+    Material FrontMaterial => frontMaterial != null ? frontMaterial : arcMaterial;
+    Material BackMaterial => backMaterial != null ? backMaterial : arcMaterial;
 
     [Header("모양")]
     [SerializeField, Min(0.1f)]
@@ -80,7 +93,6 @@ public class BossDirectionIndicator : MonoBehaviour, IBossTelegraph
     MeshRenderer _backRenderer;
     Mesh _frontMesh;
     Mesh _backMesh;
-    MaterialPropertyBlock _mpb;
     bool _counterWindowOpen;
     bool _visible = true;
 
@@ -91,31 +103,36 @@ public class BossDirectionIndicator : MonoBehaviour, IBossTelegraph
     float _builtOuter = -1f;
     int _builtSegments = -1;
 
-    static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
-    static readonly int ColorId = Shader.PropertyToID("_Color");
-
     void Awake()
     {
-        _mpb = new MaterialPropertyBlock();
         _boss = GetComponentInParent<MonsterBase>();
         _data = ResolveData();
 
-        if (arcMaterial == null)
+        if (FrontMaterial == null || BackMaterial == null)
         {
             Debug.LogError(
-                $"{name}: arcMaterial 이 비어 있다 — 방향 표시기가 아무것도 그리지 않는다. " +
-                "투명(Transparent) URP Unlit 머티리얼을 배선할 것.",
+                $"{name}: 표식 머티리얼이 비어 있다 — 방향 표시기가 아무것도 그리지 않는다. " +
+                "전방/후방 전용 투명(Transparent) URP Unlit 머티리얼을 배선할 것 " +
+                "(메뉴: Tools/Boss/표식 — 전용 머티리얼 생성·배선).",
                 this);
             enabled = false;
             return;
         }
 
-        // 불투명 큐면 바닥과 z-fighting 이 나고, 플레이어를 가릴 수도 있다.
-        if (arcMaterial.renderQueue < (int)UnityEngine.Rendering.RenderQueue.Transparent)
+        // 🔴 전방·후방이 **같은 재질**이면 색을 가를 수 없다. 이제 색은 재질에 박혀 있으므로
+        //    공유하면 앞뒤가 같은 색으로 나온다(그리고 다른 연출이 그 재질을 만지면 함께 바뀐다).
+        if (FrontMaterial == BackMaterial)
             Debug.LogWarning(
-                $"{name}: arcMaterial 의 renderQueue({arcMaterial.renderQueue}) 가 투명 큐가 아니다 — " +
-                "바닥과 z-fighting 이 나거나 플레이어 위에 그려질 수 있다. Surface Type 을 Transparent 로 둘 것.",
-                this);
+                $"{name}: 전방/후방 호가 **같은 머티리얼**을 쓴다 — 앞뒤 색이 구분되지 않는다. " +
+                "각각 전용 머티리얼을 배선할 것.", this);
+
+        // 불투명 큐면 바닥과 z-fighting 이 나고, 플레이어를 가릴 수도 있다.
+        foreach (Material m in new[] { FrontMaterial, BackMaterial })
+            if (m.renderQueue < (int)UnityEngine.Rendering.RenderQueue.Transparent)
+                Debug.LogWarning(
+                    $"{name}: '{m.name}' 의 renderQueue({m.renderQueue}) 가 투명 큐가 아니다 — " +
+                    "바닥과 z-fighting 이 나거나 플레이어 위에 그려질 수 있다. Surface Type 을 Transparent 로 둘 것.",
+                    this);
 
         BuildRenderers();
     }
@@ -229,9 +246,15 @@ public class BossDirectionIndicator : MonoBehaviour, IBossTelegraph
         var go = new GameObject(childName);
         go.transform.SetParent(transform, false);
 
+        // 🔴 **피격 플래시에서 제외한다**(2026-08-13). `HitFlash` 는 유닛의 모든 렌더러를 긁으므로
+        //    이 호도 피격 때 빨개지고, 원래 색을 sharedMaterial 에서 캐시하기 때문에 플래시가 끝난
+        //    뒤에도 **재질 원색으로 복원**돼 표식이 영구히 빨강이 됐다. 마커로 스스로 빠진다.
+        go.AddComponent<NoHitFlash>();
+
         go.AddComponent<MeshFilter>();
         MeshRenderer r = go.AddComponent<MeshRenderer>();
-        r.sharedMaterial = arcMaterial;
+        // 전방/후방이 **각자 자기 머티리얼**을 쓴다 — 색이 재질에 박혀 있어 런타임 주입이 필요 없다.
+        r.sharedMaterial = childName == "FrontArc" ? FrontMaterial : BackMaterial;
 
         // 바닥 장식이므로 그림자에 관여하지 않는다(그림자 캐스팅은 순전히 낭비 + 지면에 얼룩을 만든다).
         r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
@@ -337,52 +360,28 @@ public class BossDirectionIndicator : MonoBehaviour, IBossTelegraph
         return mesh;
     }
 
-    // 🔴 **색은 저작값 그대로, 끝까지 유지한다**(팀장 확정 2026-08-13).
-    //    이전 판은 카운터 창이 열리면 전방 호를 `counterReadyColor`(노랑)로 바꿨다 — "잡기할 때만
-    //    정면이 노랗게 변한다"가 그것이다. 상태를 색으로 알리는 방식은 폐기하고, **잡기 인터럽트는
-    //    추후 별도 이펙트**로 표현한다. `counterReadyColor` 필드는 그때 쓰려고 남겨 둔다.
-    void ApplyColors()
-    {
-        SetRendererColor(_frontRenderer, frontColor);
-        SetRendererColor(_backRenderer, backColor);
-    }
-
-    // 머티리얼 인스턴스화 없이 렌더러별 색만 다르게 — HitFlash 와 같은 MPB 패턴.
-    // 🔴 **둘 다 넣는다.** 이전 판은 `_BaseColor` 가 있으면 그것만 넣고 끝냈는데, 셰이더가 둘 다
-    //    노출하는 경우(이 프로젝트의 `MA_AoeTelegraph_Red` 가 그렇다) 남은 하나가 재질 원본값
-    //    (순빨강)으로 남아 그쪽이 이기면 **전방·후방이 똑같이 빨갛게** 보인다. 실제로 Play 에서
-    //    후방 호가 파랑(저작값)이 아니라 빨강으로 나왔다.
-    //    그리고 **둘 다 없으면 조용히 실패하지 않고 경고한다** — 색이 안 먹는 것을 눈으로만
-    //    발견하게 두면 다음 사람이 또 재질을 의심하며 시간을 쓴다.
-    void SetRendererColor(MeshRenderer r, Color c)
-    {
-        if (r == null || arcMaterial == null) return;
-
-        bool applied = false;
-        r.GetPropertyBlock(_mpb);
-        if (arcMaterial.HasProperty(BaseColorId)) { _mpb.SetColor(BaseColorId, c); applied = true; }
-        if (arcMaterial.HasProperty(ColorId)) { _mpb.SetColor(ColorId, c); applied = true; }
-        r.SetPropertyBlock(_mpb);
-
-        if (!applied && !_colorPropWarned)
-        {
-            _colorPropWarned = true;
-            Debug.LogWarning(
-                $"[보스/표식] {name}: 머티리얼 '{arcMaterial.name}'(셰이더 {arcMaterial.shader?.name}) 에 " +
-                "`_BaseColor` 도 `_Color` 도 없다 — 호 색이 재질 원본값으로 고정된다. " +
-                "셰이더가 노출하는 색 프로퍼티 이름을 확인할 것.", this);
-        }
-    }
-
-    bool _colorPropWarned;
+    // 🔴 **색은 재질에 박혀 있다. 런타임에 아무것도 주입하지 않는다**(팀장 확정 2026-08-13).
+    //
+    //    두 단계에 걸쳐 여기까지 왔다:
+    //    ① 카운터 창이 열리면 전방을 노랑으로 바꾸던 전환을 제거했다(색으로 상태를 알리지 않는다.
+    //       잡기 인터럽트는 추후 별도 이펙트로 표현한다 — `counterReadyColor` 는 그때 쓴다).
+    //    ② 그런데도 표식이 빨강으로 남았다. 원인은 **다른 스크립트**였다 —
+    //       `HitFlash` 가 유닛의 모든 렌더러를 긁어 피격 때 물들이고, 원래 색을 `sharedMaterial`
+    //       에서 캐시하기 때문에 플래시가 끝나면 **재질 원색으로 복원**한다. 표식이 장판 재질
+    //       (`MA_AoeTelegraph_Red`, 순빨강)을 공유하고 있어서 그 원색이 빨강이었다.
+    //       → 전용 재질로 분리(공유 끊기) + `NoHitFlash` 마커로 제외 + **색 주입 코드 제거**.
+    //       MaterialPropertyBlock 으로 넣던 색은 남의 MPB 쓰기에 언제든 덮일 수 있어 애초에 약했다.
+    //
+    //    색을 바꾸려면 **재질을 고친다**(또는 저작 메뉴를 다시 실행한다).
+    void ApplyColors() { }
 
 #if UNITY_EDITOR
-    // 인스펙터에서 색·각도를 돌리면 즉시 반영(Play 중 튜닝용).
+    // 인스펙터에서 각도·반지름을 돌리면 즉시 반영(Play 중 튜닝용).
+    // ⚠️ 색은 여기서 다루지 않는다 — 재질에 박혀 있다(위 ApplyColors 주석).
     void OnValidate()
     {
-        if (!Application.isPlaying || _mpb == null) return;
+        if (!Application.isPlaying || _frontRenderer == null) return;
         RebuildMeshesIfNeeded();
-        ApplyColors();
     }
 #endif
 }
