@@ -52,40 +52,6 @@ public sealed class MaskBlurSettings : ScriptableObject
     [Tooltip("블러 영역을 어둡게 한다. 비네트와 겹치므로 둘 중 하나만 쓰는 게 낫다.")]
     [Range(0f, 1f)] public float darken = 0f;
 
-    [Header("픽셀레이트")]
-    // 2026-08-06: 팀장 판단으로 픽셀레이트는 룩 A·B '공통'이 됐다. 그래서 룩 토글이
-    // 소유하지 않고 이 애셋이 단독으로 결정한다(A/B 차이는 디밍·저채도·차폐뿐).
-    [Tooltip("픽셀레이트 활성 여부. 룩 A·B 공통이라 F9 토글은 이 값을 건드리지 않는다.\n" +
-             "Play 중에 껐다 켜서 픽셀레이트만 따로 비교할 수 있다.")]
-    public bool pixelateEnabled = true;
-
-    [Tooltip("블록 한 변의 크기(화면 픽셀). 클수록 거칠다.\n\n" +
-             "🔴 블록은 '블러 반경보다 확실히 커야' 보인다. 블러된 그림은 인접 픽셀의 색 " +
-             "차이가 이미 없어서, 블록이 작으면 잘라도 경계에 대비가 남지 않는다 — " +
-             "화면이 그냥 흐릿하게만 보인다(2026-08-06 실측: 4px 는 전혀 안 보였다).\n\n" +
-             "반해상도(downsampleShift 1) 5탭 블러의 실효 반경이 대략 4~8px 이므로 " +
-             "16px 부터가 눈에 들어오고, 또렷한 레트로 룩은 20~28px 대다. " +
-             "더 단단한 픽셀을 원하면 blurStrength 를 같이 내린다.")]
-    [Range(1, 64)] public int pixelBlockSize = 16;
-
-    [Tooltip("OutsideOnly = 마스크 바깥만 픽셀화. 중앙은 선명하게 남는다.\n" +
-             "FullScreen = 플레이어까지 화면 전체를 픽셀화(레트로 룩). 아래 배율은 무시된다.")]
-    public PixelateMode pixelateMode = PixelateMode.OutsideOnly;
-
-    [Tooltip("픽셀 영역의 반경 배율. 블러와 같은 중심·모양을 쓰되 반경만 이 배율로 키운다.\n\n" +
-             "1 = 블러 영역과 정확히 같은 범위.\n" +
-             "1 보다 크면 선명하게 남는 중앙이 넓어져 → 좌우·상하 모두 " +
-             "'픽셀이 걸리는 영역이 좁아진다'.\n\n" +
-             "블러 범위(size)와 따로 두는 이유: size 를 키워 픽셀을 좁히면 " +
-             "배경 디포커스까지 같이 줄어든다. 두 효과의 범위를 독립으로 잡기 위한 값이다.")]
-    [Range(1f, 3f)] public float pixelateRegionScale = 1.35f;
-
-    public enum PixelateMode
-    {
-        OutsideOnly = 0,
-        FullScreen = 1,
-    }
-
     private void OnValidate()
     {
         size.x = Mathf.Max(0.01f, size.x);

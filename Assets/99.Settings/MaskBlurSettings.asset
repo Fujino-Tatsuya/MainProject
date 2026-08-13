@@ -23,7 +23,3 @@ MonoBehaviour:
   downsampleShift: 1
   desaturate: 0
   darken: 0.063
-  pixelateEnabled: 1
-  pixelBlockSize: 8
-  pixelateMode: 0
-  pixelateRegionScale: 1.146

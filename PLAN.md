@@ -1,4 +1,132 @@
-# CURRENT PLAN — DevSceneBooter: 씬 이름 한 줄로 원하는 씬 부팅 (2026-08-10)
+# CURRENT PLAN — 전체 화면 픽셀레이트 + V축 스캔라인 (2026-08-13)
+
+> 상태: **구현 및 기본 플레이 검증 완료**. 브랜치 `fix/pixel`.
+> 아래 기존 CURRENT PLAN 항목들은 이전 작업 기록이며 이번 렌더링 작업과 무관하다.
+
+## 목표
+
+기존 마스크 블러가 소유하던 픽셀레이트를 독립된 화면 효과로 분리한다.
+
+- 블러는 기존처럼 화면공간 마스크 바깥 영역에만 적용한다.
+- 픽셀레이트는 블러 영역과 무관하게 월드 화면 전체에 적용한다.
+- 화면 V 좌표만 사용하는 가로 스캔라인을 함께 제공한다.
+- 픽셀레이트와 스캔라인은 각각 독립적으로 켜고 끌 수 있다.
+- UI는 두 효과에서 제외한다.
+
+## 확정 사항
+
+| 항목 | 결정 |
+|---|---|
+| 픽셀 범위 | 블러 마스크와 완전히 분리된 전체 화면 |
+| 스캔라인 방향 | 화면 V 좌표만 사용 — 가로줄 |
+| 스캔라인 패턴 | `scanlineThicknessPx`만큼 색 적용 + `scanlineSpacingPx`만큼 원본 구간 반복 |
+| 스캔라인 두께 | 픽셀레이트 크기와 독립된 `scanlineThicknessPx` 화면 픽셀 값 |
+| 스캔라인 간격 | 두께와 독립된 `scanlineSpacingPx` 화면 픽셀 값 |
+| 스캔라인 색 | RGB 색상 필드 |
+| 스캔라인 강도 | 색상 Alpha와 분리한 `0~1` 필드 |
+| 활성화 | 픽셀레이트 / 스캔라인 독립 토글 |
+| UI | Screen Space Overlay UI 제외 |
+| 네트워크 | 로컬 카메라 연출이므로 동기화·RPC 없음 |
+
+## 접근
+
+### 1. 마스크 블러에서 픽셀레이트 제거
+
+`MaskBlurSettings`, `MaskBlurFeature`, `MaskBlur.shader`에서 픽셀레이트 설정·파라미터·샘플링을
+제거한다. 마스크 블러는 블러와 바깥 영역 톤 합성만 담당하게 되며, 마스크 크기는 더 이상
+픽셀레이트 범위에 영향을 주지 않는다.
+
+### 2. 독립 `PixelScanline` 렌더러 피처 추가
+
+새 설정·컨트롤러·렌더러 피처·셰이더를 `Assets/1.Scripts/Rendering/PixelScanline/`에 둔다.
+
+- `PixelScanlineSettings`: 전체 활성화, 픽셀 토글/크기, 스캔라인 토글/두께(px)/간격(px)/색/불투명도
+- `PixelScanlineController`: 전투 씬에서만 패스를 허용하는 씬 상주 게이트
+- `PixelScanlineFeature`: URP 17 RenderGraph 풀스크린 1패스
+- `PixelScanline.shader`: 전체 화면 UV 픽셀 양자화 후 V축 스캔라인 합성
+- Editor authoring 도구: 설정 애셋, PC Renderer 피처, 열린 씬 컨트롤러를 안전하게 배선
+
+패스는 `AfterRenderingPostProcessing`에 넣는다. 기존 Volume 후처리가 끝난 월드 화면에 효과를
+적용하므로 블록과 스캔라인이 블룸·SMAA에 다시 흐려지지 않고, Screen Space Overlay UI는 그 뒤에
+그려져 선명하게 유지된다.
+
+### 3. 해상도 대응
+
+UV 블록 개수를 반올림해 나누는 기존 방식 대신 실제 렌더 타깃 픽셀 좌표를 사용한다.
+
+`pixel = uv * resolution` → `floor(pixel / pixelSize)` → 블록 중심을 다시 UV로 변환한다.
+
+따라서 1920×1080, 2560×1440, 3840×2160처럼 해상도가 바뀌어도 픽셀 블록 크기와 독립된
+스캔라인 두께가 각각 지정한 렌더 픽셀 수로 유지된다. 화면 끝에는 해상도가 패턴 주기의
+배수가 아닐 때만 정상적인 부분 패턴이 생긴다.
+
+## 변경 예정 파일
+
+- 수정: `Assets/1.Scripts/Rendering/MaskBlur/MaskBlurSettings.cs`
+- 수정: `Assets/1.Scripts/Rendering/MaskBlur/MaskBlurFeature.cs`
+- 수정: `Assets/1.Scripts/Rendering/MaskBlur/Shaders/MaskBlur.shader`
+- 신규: `Assets/1.Scripts/Rendering/PixelScanline/` 아래 런타임·셰이더·Editor 파일과 `.meta`
+- 신규: `Assets/99.Settings/PixelScanlineSettings.asset`과 `.meta`
+- 수정: `Assets/99.Settings/PC_Renderer.asset` — 새 피처와 셰이더 직렬화 참조
+- 수정: 정본 전투 씬 `Assets/0.Scenes/MainFlow/4.MapScene-trensparent.unity` — 컨트롤러 배선
+
+현재 작업트리의 Bootstrap, Addressables, ProjectSettings, 문서 변경은 사용자 작업으로 보고
+건드리지 않는다.
+
+## 위험과 대응
+
+- **추가 풀스크린 패스 1회:** 픽셀·스캔라인을 블러에서 독립시키는 비용이다. 두 효과가 모두
+  꺼지면 패스를 큐잉하지 않아 비용 0으로 만든다.
+- **다중 카메라:** Preview, Reflection, RenderTexture 대상(미니맵 베이크) 카메라는 제외해
+  의도치 않은 중복 적용을 막는다.
+- **셰이더 빌드 스트립:** 셰이더를 PC Renderer의 피처에 직렬화 참조한다.
+- **동적 해상도/Render Scale:** 렌더 타깃 해상도를 기준으로 계산한다. 실제 출력 픽셀과 1:1인지
+  여부는 Render Scale 1 기준으로 검증하고, 비정상 배율도 별도 확인한다.
+- **씬 게이트 누락:** authoring 도구가 설정·피처·컨트롤러 세 지점을 한 번에 검사·배선한다.
+
+## 범위 밖
+
+- Screen Space Overlay UI 픽셀레이트 또는 스캔라인 적용
+- 픽셀 블록과 스캔라인의 시간 애니메이션·스크롤·노이즈·왜곡
+- 모바일 Renderer와 PP Renderer 적용
+- 네트워크 상태 동기화
+- 기존 블러 룩과 포그·디밍 값 변경
+
+## 완료 조건
+
+- 블러 마스크 크기를 바꿔도 픽셀레이트 범위는 화면 전체로 유지된다.
+- 픽셀레이트만, 스캔라인만, 둘 다, 둘 다 끔의 네 조합이 정상 동작한다.
+- 픽셀 크기를 바꾸면 픽셀 블록만 바뀌고 스캔라인 두께는 유지된다.
+- `scanlineThicknessPx`를 바꾸면 픽셀 블록 크기와 무관하게 색 띠 두께만 바뀐다.
+- `scanlineSpacingPx`를 바꾸면 두께를 유지한 채 색 띠 사이의 원본 구간만 바뀐다.
+- 스캔라인은 V축에만 반응하며 가로 방향으로 끊기거나 반복되지 않는다.
+- 스캔라인 RGB와 불투명도를 독립적으로 조절할 수 있다.
+- 16:9 두 해상도 이상과 다른 종횡비 하나에서 블록·띠 두께가 픽셀 기준으로 유지된다.
+- HUD와 미니맵 UI는 효과 없이 선명하다.
+- Unity 컴파일·셰이더 컴파일 오류와 렌더링 콘솔 오류가 없다.
+
+## 검증 계획
+
+1. 정적 검사와 Unity 컴파일/셰이더 임포트 오류 확인.
+2. 정본 전투 씬을 Bootstrap 경로로 실행해 블러와 전체 화면 픽셀 분리를 육안 확인.
+3. 픽셀/스캔라인 토글 네 조합과 색상·불투명도 실시간 튜닝 확인.
+4. Game View 해상도를 최소 1920×1080, 2560×1440, 1024×768로 바꿔 캡처 비교.
+5. HUD·미니맵이 선명한지 확인하고 미니맵 RenderTexture에 효과가 들어가지 않는지 확인.
+6. 가능하면 MPPM 호스트/클라이언트 양쪽에서 동일한 로컬 화면 결과 확인.
+
+## 구현 및 검증 결과
+
+- 기존 MaskBlur에서 픽셀레이트 설정·파라미터·셰이더 샘플링을 제거했다.
+- 독립 PixelScanline 렌더러 피처와 설정 애셋을 추가하고 정본 전투 씬에 연결했다.
+- Unity 6000.3.16f1 Play Mode에서 전체 화면 픽셀레이트와 V축 스캔라인을 확인했다.
+- 픽셀레이트/스캔라인 독립 토글과 Screen Space Overlay UI 제외를 확인했다.
+- 최종 저장 설정은 픽셀 크기 4px, 스캔라인 두께 2px, 간격 4px, 불투명도 0.2다.
+- Assembly-CSharp와 Assembly-CSharp-Editor 빌드가 오류 없이 완료됐다.
+- 추가 해상도 전환 캡처와 MPPM 비교는 수행하지 않았다. 해상도 대응은 현재 렌더 타깃의 실제 픽셀 해상도를 매 프레임 전달하는 방식으로 구현했다.
+
+---
+
+# PREVIOUS PLAN — DevSceneBooter: 씬 이름 한 줄로 원하는 씬 부팅 (2026-08-10)
 # CURRENT PLAN — 피격 이펙트 클라이언트 복제 + 런타임 교체 디버그 HUD (2026-08-11)
 
 > 상태: **grill 완료, 승인 대기**. 브랜치 `feature/VFX`.
