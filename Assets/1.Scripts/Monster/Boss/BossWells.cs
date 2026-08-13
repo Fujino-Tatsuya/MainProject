@@ -96,6 +96,14 @@ public class BossWells : MonoBehaviour
         if (_cycle > 0f) return;
 
         _cycle = _cycleInterval;
+
+        // 🔴 투척 체인 진단(2026-08-13). "폭탄이 한 개도 안 나온다"의 끊긴 지점을 가른다.
+        //    체인 = ①주기 만료 → ②보스가 Throw 상태 브로드캐스트 → ③클립의 ThrowBombEvent
+        //    → ④보스가 폭탄 스폰. 각 단계가 자기 이름을 남기므로 **안 찍히는 로그가 곧 범인**이다.
+        //    (같은 지점에서 두 번 추측이 빗나가면 진단을 심는다 — 교훈 #24·#72.)
+        Debug.Log($"[Wells/진단] ① 주기 만료 — 구독자 {(ThrowCycleElapsed != null ? "있음" : "🔴없음")} " +
+                  $"· 주기 {_cycleInterval}s · 억제 {_suppressed}", this);
+
         ThrowCycleElapsed?.Invoke();
     }
 
@@ -103,6 +111,14 @@ public class BossWells : MonoBehaviour
     public void PlayState(BossWellsState next)
     {
         _state = next;
+
+        // ② 상태 브로드캐스트 도달. 애니메이터가 없거나 컨트롤러가 비면 여기서 조용히 끝나므로
+        //    **그 사실을 찍는다** — 이 줄이 "Throw" 로 찍히는데 ③이 안 오면 클립 쪽 문제다.
+        if (next == BossWellsState.Throw)
+            Debug.Log($"[Wells/진단] ② Throw 상태 수신 — animator={(animator != null ? "있음" : "🔴없음")} " +
+                      $"· controller={(animator != null && animator.runtimeAnimatorController != null ? animator.runtimeAnimatorController.name : "🔴없음")} " +
+                      $"· 활성={isActiveAndEnabled} · 트리거='{throwTrigger}'", this);
+
         if (animator == null || animator.runtimeAnimatorController == null) return;
 
         switch (next)
@@ -135,6 +151,11 @@ public class BossWells : MonoBehaviour
     public void ThrowBombEvent()
     {
         ShowHeldBomb(false); // 손에서 사라지는 연출은 모든 피어
+
+        // ③ 클립 이벤트 도달. 이 줄이 안 찍히면 클립이 재생되지 않은 것이다
+        //    (컨트롤러 전이 조건 · 트리거 이름 불일치 · 애니메이터 컬링을 의심).
+        Debug.Log($"[Wells/진단] ③ ThrowBombEvent 도달 — 서버={IsServerRuntime()} " +
+                  $"· 구독자 {(ThrowRequested != null ? "있음" : "🔴없음")}", this);
 
         if (!IsServerRuntime()) return;
         ThrowRequested?.Invoke();
