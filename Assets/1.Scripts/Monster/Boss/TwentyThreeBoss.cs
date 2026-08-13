@@ -862,6 +862,8 @@ public class TwentyThreeBoss : MonsterBase
         HideJumpTelegraphClientRpc();
         // 같은 이유로 앞뒤 표식 억제도 되돌린다 — 안 하면 표식이 **영구히 숨은 채** 남는다.
         ReleaseDirectionIndicatorClientRpc();
+        // 🔴 점프가 착지 없이 끊기면 Wells 투척 억제가 **영구히 걸린 채** 남는다 → 폭탄이 영영 안 나온다.
+        ReleaseWellsSuppression();
 
         // 🔴 Rage: 돌진 중 끊기면 **에이전트 속도가 8배로 고정되고 히트 윈도우가 열린 채 남는다**
         //    (그 뒤 모든 이동이 초고속이 되고, 다음 공격이 유닛당 1회 제한을 물려받는다).
@@ -968,6 +970,11 @@ public class TwentyThreeBoss : MonsterBase
 
         CrossFadeJumpStateClientRpc(landing: false);
 
+        // 🔴 **공중에서는 폭탄을 던지지 않는다**(팀장 확정 2026-08-13). Wells 는 23호 상태와 무관하게
+        //    자기 주기로 살포하므로, 억제하지 않으면 체공 중에 손 소켓(= 공중)에서 폭탄이 나간다.
+        //    그로기·사망과 같은 억제 경로를 쓴다. 해제는 착지(ArriveJump)와 체인 중단(AbortAttackChain).
+        _wells?.SetSuppressed(true);
+
         EnterPhase(BossAttackPhase.Leap, JumpHover);
     }
 
@@ -979,7 +986,18 @@ public class TwentyThreeBoss : MonsterBase
 
         CrossFadeJumpStateClientRpc(landing: true);
 
+        // 땅에 닿았으니 투척 억제를 푼다(BeginJump 의 짝). 🔴 그로기 중이면 그쪽이 다시 억제하므로
+        //    여기서 무조건 풀어도 안전하다 — PushWellsState 가 상태를 매번 다시 밀어 준다.
+        ReleaseWellsSuppression();
+
         EnterPhase(BossAttackPhase.Land, JumpLanding);
+    }
+
+    // 점프 억제 해제 — 지금 보스 상태가 다시 억제를 요구하면(그로기·사망) 그대로 유지한다.
+    void ReleaseWellsSuppression()
+    {
+        if (_wells == null) return;
+        PushWellsState(State);
     }
 
     // 착지 AoE — 애니 이벤트(OnAttackHit)에서 호출된다. 예고 장판과 **같은 반경**을 쓴다
@@ -1255,11 +1273,15 @@ public class TwentyThreeBoss : MonsterBase
 
         Transform socket = _wells != null ? _wells.BombSocket : transform;
 
-        // 🔴 진단(2026-08-10) — "Wells 없는 보스가 폭탄을 던졌다"는 관찰을 확정/반증하기 위해
-        //    **투척 주체를 이름으로 남긴다.** 코드상 이 함수는 `_wells.ThrowRequested` 로만 불리므로
-        //    Wells 가 없으면 도달할 수 없어야 한다. 로그에 `wells=(없음)` 이 찍히면 그 전제가 틀린 것이다.
-        Debug.Log($"[23호/폭탄] 투척 — boss={name} · wells={(_wells != null ? _wells.name : "(없음)")} " +
+        // 🔴 ④ 진단 — 투척 주체와 착지 목표를 남긴다. `[Wells/진단] ①②③` 과 한 줄로 이어진다.
+        Debug.Log($"[23호/폭탄] ④ 스폰 — boss={name} · wells={(_wells != null ? _wells.name : "(없음)")} " +
                   $"· socket={socket.name} @ {socket.position}", this);
+
+        // 🔴 **착지 지점을 먼저 정한다**(팀장 확정 2026-08-13: 폭탄은 무조건 room 안).
+        //    이전 판은 임펄스를 랜덤으로 줘서 **어디 떨어질지 모르는** 구조였다 — 그래서 벽 밖으로도
+        //    나갔다. 지금은 보행 가능 영역(NavMesh) 안의 지점을 뽑고 **그 지점에 닿는 속도를 역산**한다.
+        //    벽 기준을 콜라이더가 아니라 NavMesh 로 잡는 것은 돌진(StartDashMove)과 같은 규약이다.
+        Vector3 landing = PickBombLandingPoint(socket.position);
 
         GameObject go = Instantiate(_boss.bombPrefab, socket.position, Quaternion.identity);
         if (!go.TryGetComponent(out NetworkObject netObj))
@@ -1284,19 +1306,92 @@ public class TwentyThreeBoss : MonsterBase
 
         netObj.Spawn();
 
-        // 대각선 임펄스 — 좌우 분산(spreadAngle)과 상향각(bombThrowPitch)을 함께 준다.
-        // 🔴 소켓 회전에 의존하지 않는다(아트 임포트 회전에 따라 뒤집힌 전례가 있다) — 보스 전방 기준으로 만든다.
-        float spread = _boss.spreadAngle > 0f ? Random.Range(-_boss.spreadAngle, _boss.spreadAngle) : 0f;
-        Vector3 flat = transform.forward;
-        flat.y = 0f;
-        if (flat.sqrMagnitude < 0.0001f) flat = Vector3.forward;
-        Vector3 dir = Quaternion.Euler(-_boss.bombThrowPitch, spread, 0f) * flat.normalized;
-
-        if (bomb != null)
-            bomb.Throw(dir.normalized * Mathf.Max(0.1f, _boss.throwImpulse));
-        else
+        if (bomb == null)
+        {
             Debug.LogError($"{name}: bombPrefab({go.name}) 에 BossBomb 이 없다 — 던질 수 없다.", this);
+            return;
+        }
+
+        // 확정된 착지 지점에 **닿는 속도**를 역산해서 던진다. 상향각은 SO 값(포물선 모양)을 유지한다.
+        bomb.ThrowWithVelocity(BallisticVelocity(socket.position, landing, _boss.bombThrowPitch));
     }
+
+    // ─── 폭탄 착지 지점 / 탄도 ────────────────────────────────────────────
+    //
+    // 🔴 확정 스펙(2026-08-13): **랜덤하게 던지되 무조건 room 안. 벽에 걸쳐도 안 된다.**
+    //    보행 가능 영역(NavMesh)을 room 의 정의로 쓴다 — 돌진이 벽을 판정하는 기준과 같다.
+    //    ⚠️ 콜라이더를 안 쓰는 이유: 벽 콜라이더는 낭떠러지를 막아 주지 않고, 레이어·매트릭스를
+    //       하나 더 물어야 한다. NavMesh 는 "설 수 있는 곳"이라는 의미가 이미 맞다.
+    Vector3 PickBombLandingPoint(Vector3 from)
+    {
+        float min = Mathf.Max(0f, BombLandingMinDistance);
+        float max = Mathf.Max(min + 0.5f, BombLandingMaxDistance);
+
+        for (int i = 0; i < BombLandingTries; i++)
+        {
+            // 보스 전방 부채꼴이 아니라 **전 방향**에서 뽑는다(팀장: 랜덤하게).
+            float angle = Random.Range(0f, 360f);
+            float dist = Random.Range(min, max);
+            Vector3 candidate = transform.position + Quaternion.Euler(0f, angle, 0f) * Vector3.forward * dist;
+
+            if (IsInsideRoom(candidate, out Vector3 snapped)) return snapped;
+        }
+
+        // 전부 실패하면 **보스 발밑**으로 떨어뜨린다. 밖으로 내보내느니 가까이 두는 편이 안전하다.
+        Debug.LogWarning($"[23호/폭탄] 착지 지점을 {BombLandingTries}회 뽑아도 room 안을 못 찾았다 — " +
+                         "보스 발밑에 떨어뜨린다. NavMesh 가 구워져 있는지 확인할 것.", this);
+        return IsInsideRoom(transform.position, out Vector3 here) ? here : transform.position;
+    }
+
+    // room 안이고 **가장자리에서 충분히 떨어져 있나**(= 벽에 걸치지 않나).
+    bool IsInsideRoom(Vector3 point, out Vector3 snapped)
+    {
+        snapped = point;
+
+        if (!UnityEngine.AI.NavMesh.SamplePosition(
+                point, out UnityEngine.AI.NavMeshHit hit, BombLandingSampleRadius,
+                UnityEngine.AI.NavMesh.AllAreas))
+            return false;
+
+        // 🔴 가장자리 여유 — 이게 "벽에 걸쳐도 안 된다"를 만든다. 폭탄 반경만큼 안쪽이어야 한다.
+        if (UnityEngine.AI.NavMesh.FindClosestEdge(
+                hit.position, out UnityEngine.AI.NavMeshHit edge, UnityEngine.AI.NavMesh.AllAreas)
+            && edge.distance < BombWallMargin)
+            return false;
+
+        snapped = hit.position;
+        return true;
+    }
+
+    // 상향각 pitch(도)로 from → to 에 도달하는 **초기 속도 벡터**.
+    //   Δy = d·tanθ − g·d² / (2·v²·cos²θ)  →  v² = g·d² / (2·cos²θ·(d·tanθ − Δy))
+    // ⚠️ 공기저항(drag)은 무시한다. drag 가 있으면 **덜 날아가므로** 여전히 room 안이다(안전한 방향).
+    static Vector3 BallisticVelocity(Vector3 from, Vector3 to, float pitchDegrees)
+    {
+        Vector3 flat = to - from;
+        float dy = flat.y;
+        flat.y = 0f;
+
+        float d = flat.magnitude;
+        if (d < 0.01f) return Vector3.up * 0.1f;   // 제자리 — 살짝 띄우기만 한다
+
+        Vector3 dir = flat / d;
+        float theta = Mathf.Deg2Rad * Mathf.Clamp(pitchDegrees, 5f, 80f);
+        float g = Mathf.Abs(Physics.gravity.y);
+
+        float denom = 2f * Mathf.Cos(theta) * Mathf.Cos(theta) * (d * Mathf.Tan(theta) - dy);
+        // 목표가 각도로 도달 불가능한 위치면(위쪽 급경사) 각도를 포기하고 직선으로 던진다.
+        if (denom <= 0.0001f) return (to - from).normalized * 10f;
+
+        float v = Mathf.Sqrt(g * d * d / denom);
+        return (dir * Mathf.Cos(theta) + Vector3.up * Mathf.Sin(theta)) * v;
+    }
+
+    float BombLandingMinDistance => _boss != null ? Mathf.Max(0f, _boss.bombLandingMinDistance) : 3f;
+    float BombLandingMaxDistance => _boss != null ? Mathf.Max(1f, _boss.bombLandingMaxDistance) : 9f;
+    float BombWallMargin => _boss != null ? Mathf.Max(0f, _boss.bombWallMargin) : 1.2f;
+    const int BombLandingTries = 12;
+    const float BombLandingSampleRadius = 2f;   // 후보에서 이만큼 안에 보행면이 있으면 스냅한다
 
     // 23호 → Wells **단방향 푸시**. 🔴 Wells 가 23호를 폴링하면 순서 의존이 생긴다(정본 §10).
     void PushWellsState(MonsterState bossState)

@@ -302,6 +302,59 @@ public class BossDataSO : MonsterDataSO
              "🔴 소켓 회전에 의존하지 않는 이유: 아트 임포트 회전 때문에 고정 방향이 뒤집혀 있던 전례가 있다.")]
     [Range(0f, 80f)] public float bombThrowPitch = 35f;
 
+    // ─── 폭탄 착지 지점 ───────────────────────────────────────────────────
+    //
+    // 🔴 확정 스펙(2026-08-13): 폭탄은 **랜덤하게** 던져지되 **무조건 room 안**에 떨어지고
+    //    **벽에 걸쳐서도 안 된다.** 그래서 임펄스를 랜덤으로 주는 대신 **착지 지점을 먼저 뽑고
+    //    속도를 역산**한다. room 의 정의는 **NavMesh(보행 가능 영역)** 다 — 돌진이 벽을 판정하는
+    //    기준과 같다. 아래 값이 그 추첨 범위다.
+    [Header("[S8] 폭탄 착지 — 무조건 room 안")]
+    [Tooltip("보스로부터 최소 이 거리 밖에 떨어진다(m). 발밑에 쌓이는 것을 막는다.")]
+    [Min(0f)] public float bombLandingMinDistance = 3f;
+
+    [Tooltip("보스로부터 최대 이 거리 안에 떨어진다(m).")]
+    [Min(1f)] public float bombLandingMaxDistance = 9f;
+
+    [Tooltip("보행 영역 **가장자리에서 이만큼 안쪽**에만 떨어뜨린다(m). 이 값이 '벽에 걸치지 않는다'를 " +
+             "만든다. 폭탄 반경 + 여유로 잡을 것.")]
+    [Min(0f)] public float bombWallMargin = 1.2f;
+
+    // ─── 차징(송전기) 중 근접 차단 오라 ───────────────────────────────────
+    //
+    // 🔴 확정 스펙(2026-08-13): 차징 동안 보스는 **송전탑들의 중심**으로 이동해 애니메이션을 하고,
+    //    그동안 **주변 원형 범위**가 **주기적으로** 데미지 + 넉백을 줘 플레이어가 다가와 때리지
+    //    못하게 한다. 크기는 점프어택과 비슷하게 잡는다(`jumpAoeRadius` 기준값 3.5).
+    [Header("차징 오라 — 접근 차단")]
+    [Tooltip("오라 반경(m). 점프어택(jumpAoeRadius)과 비슷하게 잡는다. 0 이면 오라를 쓰지 않는다.")]
+    [Min(0f)] public float chargeAuraRadius = 3.5f;
+
+    [Tooltip("타격 주기(초). 범위 안에 머무는 동안 이 간격으로 계속 맞는다.")]
+    [Min(0.1f)] public float chargeAuraInterval = 1f;
+
+    [Tooltip("1회 데미지.")]
+    [Min(0)] public int chargeAuraDamage = 20;
+
+    [Tooltip("넉백 속도(m/s). 0 이면 밀지 않는다. 방향은 **보스 → 대상** 바깥쪽이다.")]
+    [Min(0f)] public float chargeAuraKnockbackStrength = 8f;
+
+    [Tooltip("넉백 지속(초).")]
+    [Min(0f)] public float chargeAuraKnockbackDuration = 0.25f;
+
+    [Tooltip("넉백이 끝난 뒤 경직(초). 0 이면 경직 없음.")]
+    [Min(0f)] public float chargeAuraStagger;
+
+    [Tooltip("오라 범위 표시용 프리팹(AoeTelegraph). 비우면 범위가 보이지 않는다 — " +
+             "플레이어가 크기를 알아야 피할 수 있으므로 배선을 권장한다. " +
+             "점프 예고와 같은 프리팹(JumpTelegraph)을 그대로 써도 된다.")]
+    public GameObject chargeAuraTelegraphPrefab;
+
+    [Tooltip("차징 위치로 이동할 때 이 거리 안에 들어오면 도착으로 본다(m).")]
+    [Min(0.1f)] public float chargeMoveArriveDistance = 0.6f;
+
+    [Tooltip("차징 위치로 이동하는 데 허용하는 최대 시간(초). 넘으면 그 자리에서 차징을 시작한다 " +
+             "— 못 가는 지형에서 시퀀스가 통째로 막히지 않게 한다.")]
+    [Min(0.5f)] public float chargeMoveTimeout = 4f;
+
     // ─── 폭발 장판(FireFloor) ─────────────────────────────────────────────
     //
     // 🔴 **0 = 프리팹 값을 그대로 쓴다.** 값을 넣은 항목만 덮어쓴다.

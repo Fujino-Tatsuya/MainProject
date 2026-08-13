@@ -162,6 +162,23 @@ public class BossBomb : NetworkBehaviour, IAttackReceiver
         _rb.AddForce(impulse, ForceMode.Impulse);
     }
 
+    /// <summary>
+    /// 서버에서 **목표 속도로** 투척한다. 착지 지점을 먼저 정하고 속도를 역산하는 경로가 쓴다
+    /// (팀장 확정 2026-08-13: 폭탄은 무조건 room 안에 떨어진다).
+    ///
+    /// 🔴 <see cref="ForceMode.VelocityChange"/> 다 — 질량을 곱할 필요가 없어 역산이 그대로 산다.
+    ///    `Impulse` 를 쓰면 프리팹 질량이 바뀔 때 사거리가 조용히 달라진다.
+    /// </summary>
+    public void ThrowWithVelocity(Vector3 velocity)
+    {
+        if (!IsServer) return;
+
+        _state = BossBombState.Thrown;
+        _rb.useGravity = true;
+        _rb.constraints = RigidbodyConstraints.FreezeRotation;
+        _rb.AddForce(velocity, ForceMode.VelocityChange);
+    }
+
     void FixedUpdate()
     {
         if (!IsServer || _state == BossBombState.Exploded) return;
