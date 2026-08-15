@@ -4,7 +4,64 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 다음 세션 시작점 — 보스 거동 잔여 4건 (2026-08-10 저녁 종료)
+## ▶▶ 다음 세션 시작점 — 아트 머지 후 Unity 검증 (2026-08-15 저녁 종료)
+
+**브랜치 `feature/Boss23`** · 머지 커밋 `71dabb1` (부모 `3a8743d` + `86da52c`)
+**백업 = 로컬 브랜치 `backup/boss23-20260815`** (머지 직전 `3a8743d` 시점)
+
+**한 줄 상태: `origin/fix/pixel` 아트 머지를 끝냈다. Unity 를 아직 한 번도 안 열었다.**
+
+### 0번 할 일 — Unity 열고 콘솔 읽기
+
+머지 후 Unity 를 **한 번도 실행하지 않았다.** 임포트가 처음 돌면서 나오는 콘솔이 다음 작업의 지도다.
+정본 씬은 `Assets/0.Scenes/MainFlow/4.MapScene-trensparent.unity` 이고
+진입은 `0.BootStrapScene` 에서 Play (F8 = ProfilerHUD, F9 = 룩 A/B).
+상세 = [Docs/tech/map-rendering-lighting-handoff.md](Docs/tech/map-rendering-lighting-handoff.md).
+
+⚠️ **머지 전 콘솔 에러 17건의 정체**(대조용): 컨베이어 죽은 참조(ZoneL_typeA) · MCP
+`README_ko.md` meta 없음 12건 · `NetworkAnimator.OnValidate` NRE 3건 · 50.Art TestAssets 3건.
+**첫 번째만 이 머지로 해소된다.** 나머지 3종은 그대로 뜨는 게 정상이다.
+
+### 예상되는 결손 참조 — 전부 이미 조사됐다. 새 버그로 오진하지 말 것
+
+| 대상 | 결손 | 성격 |
+|---|---|---|
+| `LevelDeliveryV3` 프리팹 124개 | `OcclusionSection`·`ElevationStack`·`ElevationLevel` 132참조 | 🔴 아래 |
+| `ModularRobots_R1.prefab` | `CommonMeleeRobot.asset` | **의도된 것** — 팀장이 삭제 결정 |
+| `Stage1.prefab` | 3 | 머지 전 `HEAD`·`leejiwon` 양쪽 동일 |
+| `4.MapScene(-trensparent)` | `FogManager.maskTexture` | 머지 전부터 |
+| `VFXScene.unity` · `Player.prefab` | 각 1 | 아트/SVN 쪽 기존 결손 |
+
+🔴 **`LevelDeliveryV3` 124개** — `fix/pixel` 이 그대로 들고 온 상태이지 이 머지가 만든 게 아니다.
+필요한 스크립트 3종이 **`feature/trensparent` 에만** 있다. 정본 씬은 이 프리팹을 쓰지 않으므로
+게임 경로 영향은 없고 콘솔 Missing Script 경고만 뜬다.
+→ 고치려면 `origin/feature/trensparent` 추가 머지(충돌 12건)인데 `WallOcclusion*` 코드가
+`fix/pixel` 쪽이 더 최신이라 **역행 위험**이 있다. 별건으로 판단할 것.
+
+### 🔴 팀장 액션 2건
+
+1. **원격 브랜치 삭제 미완** — 자격증명(Git Credential Manager GUI)이 떠서 CLI 로는 못 지웠다.
+   터미널에서 직접: `git push origin --delete feature/maprendering`
+   (`feature/Boss23` 에 100% 포함돼 있어 잃는 커밋 없음. 복구용 해시 `2e14b18`)
+2. **은희 님께 플레이어 수정분 push 요청** — "플레이어 버그를 고쳤다"고 했으나 **원격 어디에도 없다.**
+   `Player/`·`Unit/`·`PlayerVariant/` 가 모든 원격 브랜치에서 `feature/Boss23` 과 **0 파일 차이**이고,
+   `Player/` 를 만진 마지막 커밋은 `257cb4c`(2026-08-07)로 이미 들어와 있다.
+   은희 님 미머지분은 `fix/property_change` 1커밋뿐인데 씬 전환·빌드 설정이라 플레이어가 아니다.
+
+### 이번 머지에서 확정된 것
+
+- **아트 브랜치 5개는 사실상 1개다** — `fix/pixel` 이 `leejiwon`·`fix/art_zone` 을 조상으로 포함하고,
+  `fix/convayor`·`fix/movingplatform` 은 내용이 체리픽(`0494685`·`a48680d`)돼 blob 해시까지 같다.
+- **레이어 17 = `Effect`(아트), 18 = `CombatTarget`** 으로 확정. [layer-standard.md](Docs/tech/layer-standard.md) 갱신 완료.
+- **`CommonMeleeRobot.asset` 은 머지 사고로 사라진 것이었다** — `1bf654f`(은희, feature/VFX→development)
+  에서 **양쪽 부모에 다 있는데** 결과에서 빠졌다. 되돌리기 반복은 금지(원인·금지사항 =
+  [Docs/tech/bt-subgraph-reference-loss.md](Docs/tech/bt-subgraph-reference-loss.md)). 팀장이 삭제 수용으로 종결.
+- ⚠️ **`Assets/50.Art` 는 OneDrive 정션**이고 이 PC 에 `.svn` 작업사본도 `svn` 클라이언트도 없다.
+  GUID 결손 조사 시 `grep -r Assets` 는 정션을 **안 따라간다** — `Assets/50.Art` 를 명령줄에 직접 줘야 한다.
+
+---
+
+## 이전 시작점 — 보스 거동 잔여 4건 (2026-08-10 저녁 종료)
 
 **브랜치 `feature/Boss23`** · **컴파일 0에러 0경고** · **`8170481..HEAD` 전부 미푸시**
 (개수는 적지 않는다 — 개수를 적으면 그걸 적는 커밋이 자기 자신을 못 세서 매번 어긋난다)
