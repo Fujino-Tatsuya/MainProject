@@ -166,6 +166,8 @@ public sealed class FogManager : MonoBehaviour
     private static readonly int ID_LosEdgeFade = Shader.PropertyToID("_LosEdgeFade");
     private static readonly int ID_LosBrightness = Shader.PropertyToID("_LosBrightness");
     private static readonly int ID_LosSaturation = Shader.PropertyToID("_LosSaturation");
+    private static readonly int ID_LosTint = Shader.PropertyToID("_LosTint");
+    private static readonly int ID_LosTintStrength = Shader.PropertyToID("_LosTintStrength");
     private static readonly int ID_LosAngleJitter = Shader.PropertyToID("_LosAngleJitter");
 
     private static readonly int ID_AbyssEnabled = Shader.PropertyToID("_AbyssEnabled");
@@ -422,6 +424,8 @@ public sealed class FogManager : MonoBehaviour
         Shader.SetGlobalFloat(ID_LosEdgeFade, p.losEdgeFade);
         Shader.SetGlobalFloat(ID_LosBrightness, p.losBrightness);
         Shader.SetGlobalFloat(ID_LosSaturation, p.losSaturation);
+        Shader.SetGlobalColor(ID_LosTint, p.losTint);
+        Shader.SetGlobalFloat(ID_LosTintStrength, p.losTintStrength);
         Shader.SetGlobalFloat(ID_LosAngleJitter, p.losAngleJitter);
     }
 

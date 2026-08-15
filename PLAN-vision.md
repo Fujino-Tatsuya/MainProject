@@ -465,6 +465,8 @@ F9 토글·토스트·디밍은 정상 작동 확인. 두 가지를 고쳤다.
 - 씬 값 `losMaxDist: 4` 를 그대로 쓴다 — 툴팁이 "이 너머는 항상 가려진 것으로 본다"이므로
   **플레이어 반경 4m 만 밝고 나머지가 어두워진다.** 원하는 그림과 일치해 손대지 않았다.
   세기 조절은 `FogProfile` 의 `losDarken` · `losEdgeFade` · `losDistanceBias` 로 한다.
+  차폐 톤은 일반 거리·층 디밍과 분리했다(2026-08-12). `losBrightness` · `losSaturation` ·
+  `losTint` · `losTintStrength` 로 벽/노드 뒤에만 색조를 입히며 원본 명암과 텍스처는 보존한다.
 - ⚠️ **룩 B 에서는 먼 거리의 적이 보이지 않는다. 이건 결함이 아니라 의도다.**
   단 룩 A 로 돌아올 때 반드시 원래 값으로 복구돼야 게임플레이로 새지 않는다
   (`RestoreSnapshot` 이 담당하며, Play 중 변경은 어차피 폐기된다).
@@ -563,3 +565,56 @@ F9 토글·토스트·디밍은 정상 작동 확인. 두 가지를 고쳤다.
 "포그를 껐다"는 결정이 무관한 기능을 조용히 함께 껐다. 매니저 컴포넌트의 `enabled` 로
 한 기능만 토글하는 것도 같은 실수다 — 그 매니저에 얹힌 다른 기능이 같이 죽는다.
 `FogManager` 는 이름이 "Fog" 지만 실제로는 **포그·디밍·차폐·어비스 4계통의 호스트**다.
+
+---
+
+## 9. `4.MapScene-trensparent` Stage + Zone 라이팅 (2026-08-13)
+
+> 상태: **계획 승인됨**(팀장·아트). 최종 대상 씬은 `4.MapScene-trensparent`.
+> `ZoneL_typeA` 의 기존 미커밋 광원 변경은 보존 대상이 아니며 다시 저작해도 된다.
+
+### 9.1 목표와 소유권
+
+- **Stage/씬 상주**: ACES, Ambient Gradient, Directional Light, 전역 Fog·Abyss·Dim·LoS,
+  전체 그림자·SSAO 기준과 최종 컬러 그레이딩.
+- **Zone 프리팹**: 가로등·창·교차점·전투 중심 등 구조에 종속된 Realtime Point/Spot Light.
+- Zone 은 `MapContentSpawner` 가 슬롯 위치와 `YawSteps` 회전으로 로컬 생성하므로, 개별 광원은
+  반드시 Zone 프리팹의 로컬 좌표로 저작한다. Stage 슬롯 좌표에 Zone용 광원을 고정하지 않는다.
+- 외곽·낙차 공간 Fog 는 월드 위치 의미이므로 Stage가 소유한다. Zone 고유 연출일 때만
+  `FogVolume` 을 Zone에 둔다.
+
+### 9.2 승인된 순서
+
+1. 기존 값·고정 시드·고정 촬영 위치 백업
+2. 대상 씬 전용 Volume Profile 복제 후 ACES 기준 노출 설정
+3. Stage Ambient Gradient 설계
+4. Stage Directional Light 방향·색온도·강도·Shadow Strength 설정
+5. Directional Shadow와 SSAO 미세 조정
+6. Zone별 국소광 저작(대형→중형→소형→역할 Zone), 모든 `YawSteps` 회전 검증
+7. Stage 전역 Fog·Abyss·Dim·LoS 및 공간 명도 계층 조정
+8. Color Adjustments→Bloom→Vignette→Chromatic Aberration→Mask Blur 순으로 마감
+9. 다중 시드·MPPM·1080p/1440p/4K·GPU Frame Time 검증
+
+Stage의 ACES·Ambient·Directional Light 방향은 승인됐으며, 이 기준을 먼저 만든 뒤 모든 Zone에
+국소광을 확장한다. PC의 `AdditionalLightsPerObjectLimit` 가 4이므로 총 광원 수보다 한 Renderer에
+겹치는 광원 수를 4 이하로 관리하고, Zone 국소광 그림자는 기본 OFF로 둔다.
+
+### 9.3 제외 범위
+
+- CRT 및 HUD의 CRT 제외 처리
+- 공격 범위·텔레그래프 가독성
+- DoF
+- 카메라·맵 지오메트리·NavMesh·Collider·Trigger·Spawn Point·게임플레이 변경
+- 1차 작업의 정적 라이트 베이크·Light Probe·Reflection Probe 본격 도입
+
+### 9.4 적용 결과 (2026-08-13)
+
+- 상태: **1차 적용 완료**.
+- Stage: 전용 `VP_CombatLevel_Target` 프로파일, ACES, Ambient Gradient, Directional Light,
+  Color Adjustments, Bloom, Vignette, Chromatic Aberration 적용. DoF는 비활성 유지.
+- Zone: 12개 Zone 프리팹에 로컬 `Lighting_Target_CombatLevel` 리그 적용.
+  대형·보스 3등, 중형·퀘스트 2등, 소형·진입·시작 1등. 모든 국소광 그림자 OFF.
+- 기존 Fog·Abyss·Dim·LoS 및 공유 URP/SSAO 값은 보존했다.
+- 호스트 플로우로 최종 씬 진입, 셔플된 10개 Zone 리그 생성, HUD 비영향,
+  1920×1080 렌더와 에디터 재임포트 오류 없음을 확인했다.
+- 후속 검증: 다중 시드 반복, MPPM 클라이언트, 1440p/4K, 정식 GPU 캡처.

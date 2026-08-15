@@ -36,6 +36,21 @@ MonoBehaviour:
       surfaceData: 2
     screenSpaceSettings:
       normalBlend: 0
+--- !u!114 &6519473205289754683
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 49d00577b3854fc4a972507541847274, type: 3}
+  m_Name: PixelScanlineFeature
+  m_EditorClassIdentifier: Assembly-CSharp::PixelScanlineFeature
+  m_Active: 1
+  _shader: {fileID: 4800000, guid: 213505f4ae8f4088900604e1724311c4, type: 3}
+  _injectionPoint: 600
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -65,7 +80,8 @@ MonoBehaviour:
   - {fileID: -2294799603617760137}
   - {fileID: 2500393459794982227}
   - {fileID: -8862228372950060840}
-  m_RendererFeatureMap: ad6b866f10d7b46c77fca73beb3b27e05335caa19a2eb322d870ecb73f0a0385
+  - {fileID: 6519473205289754683}
+  m_RendererFeatureMap: ad6b866f10d7b46c77fca73beb3b27e05335caa19a2eb322d870ecb73f0a03853b20f9ab56d2795a
   m_UseNativeRenderPass: 1
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}

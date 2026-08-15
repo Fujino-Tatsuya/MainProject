@@ -77,6 +77,10 @@ public sealed class FogProfile : ScriptableObject
     [Range(0f, 1f)] public float losBrightness = 0.32f;
     [Tooltip("차폐 시 채도 잔량(0=흑백, 1=원색 유지). 자연스러우려면 0.3 안팎.")]
     [Range(0f, 1f)] public float losSaturation = 0.35f;
+    [Tooltip("차폐 영역에 입힐 색조. 밝기는 losBrightness가 담당하므로 이 색의 명도는 정규화해서 사용한다.")]
+    [ColorUsage(false, true)] public Color losTint = new Color(0.08f, 0.22f, 0.42f, 1f);
+    [Tooltip("차폐 색조 적용 강도(0=색조 없음, 1=지정 색조). 원본 명암과 텍스처는 유지된다.")]
+    [Range(0f, 1f)] public float losTintStrength = 0.65f;
     [Tooltip("차폐 경계 각도 흔들기(0=직선, 클수록 유기적으로 뭉갬). 노이즈로 부채꼴 경계 직선/삼각형을 완화. 0.01~0.04 권장.")]
     [Range(0f, 0.1f)] public float losAngleJitter = 0.02f;
 

@@ -1,0 +1,285 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &4113930652156066955
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7305054492310442018}
+  m_Layer: 0
+  m_Name: Floor_urethane01
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &7305054492310442018
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4113930652156066955}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 94.42999, y: 0, z: 49.510002}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 2790664300483505112}
+  - {fileID: 1638036599543025047}
+  - {fileID: 3630160705802463720}
+  - {fileID: 3055392066991617265}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1001 &510356099356077488
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 7305054492310442018}
+    m_Modifications:
+    - target: {fileID: 1274060957731741735, guid: 2dcbdff8c7486be44b2bcda2805ba1a4, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -4
+      objectReference: {fileID: 0}
+    - target: {fileID: 1274060957731741735, guid: 2dcbdff8c7486be44b2bcda2805ba1a4, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -0.50000036
+      objectReference: {fileID: 0}
+    - target: {fileID: 1274060957731741735, guid: 2dcbdff8c7486be44b2bcda2805ba1a4, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1274060957731741735, guid: 2dcbdff8c7486be44b2bcda2805ba1a4, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1274060957731741735, guid: 2dcbdff8c7486be44b2bcda2805ba1a4, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1274060957731741735, guid: 2dcbdff8c7486be44b2bcda2805ba1a4, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1274060957731741735, guid: 2dcbdff8c7486be44b2bcda2805ba1a4, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1274060957731741735, guid: 2dcbdff8c7486be44b2bcda2805ba1a4, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1274060957731741735, guid: 2dcbdff8c7486be44b2bcda2805ba1a4, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1274060957731741735, guid: 2dcbdff8c7486be44b2bcda2805ba1a4, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1938112566374644381, guid: 2dcbdff8c7486be44b2bcda2805ba1a4, type: 3}
+      propertyPath: m_Name
+      value: floor_urethane_.003 (4)
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 2dcbdff8c7486be44b2bcda2805ba1a4, type: 3}
+--- !u!4 &1638036599543025047 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 1274060957731741735, guid: 2dcbdff8c7486be44b2bcda2805ba1a4, type: 3}
+  m_PrefabInstance: {fileID: 510356099356077488}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1001 &981412666068362657
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 7305054492310442018}
+    m_Modifications:
+    - target: {fileID: 3798107747750074099, guid: f7738fcb6b9ac36418a4698fe58c799d, type: 3}
+      propertyPath: m_Name
+      value: floor_urethane_.001 (4)
+      objectReference: {fileID: 0}
+    - target: {fileID: 4611200528376728649, guid: f7738fcb6b9ac36418a4698fe58c799d, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4611200528376728649, guid: f7738fcb6b9ac36418a4698fe58c799d, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -0.50000036
+      objectReference: {fileID: 0}
+    - target: {fileID: 4611200528376728649, guid: f7738fcb6b9ac36418a4698fe58c799d, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4611200528376728649, guid: f7738fcb6b9ac36418a4698fe58c799d, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4611200528376728649, guid: f7738fcb6b9ac36418a4698fe58c799d, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4611200528376728649, guid: f7738fcb6b9ac36418a4698fe58c799d, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4611200528376728649, guid: f7738fcb6b9ac36418a4698fe58c799d, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4611200528376728649, guid: f7738fcb6b9ac36418a4698fe58c799d, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4611200528376728649, guid: f7738fcb6b9ac36418a4698fe58c799d, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4611200528376728649, guid: f7738fcb6b9ac36418a4698fe58c799d, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: f7738fcb6b9ac36418a4698fe58c799d, type: 3}
+--- !u!4 &3630160705802463720 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 4611200528376728649, guid: f7738fcb6b9ac36418a4698fe58c799d, type: 3}
+  m_PrefabInstance: {fileID: 981412666068362657}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1001 &1556179036062480568
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 7305054492310442018}
+    m_Modifications:
+    - target: {fileID: 3798107747750074099, guid: f7738fcb6b9ac36418a4698fe58c799d, type: 3}
+      propertyPath: m_Name
+      value: floor_urethane_.001 (3)
+      objectReference: {fileID: 0}
+    - target: {fileID: 4611200528376728649, guid: f7738fcb6b9ac36418a4698fe58c799d, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4611200528376728649, guid: f7738fcb6b9ac36418a4698fe58c799d, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 4611200528376728649, guid: f7738fcb6b9ac36418a4698fe58c799d, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4611200528376728649, guid: f7738fcb6b9ac36418a4698fe58c799d, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.7071068
+      objectReference: {fileID: 0}
+    - target: {fileID: 4611200528376728649, guid: f7738fcb6b9ac36418a4698fe58c799d, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4611200528376728649, guid: f7738fcb6b9ac36418a4698fe58c799d, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0.7071068
+      objectReference: {fileID: 0}
+    - target: {fileID: 4611200528376728649, guid: f7738fcb6b9ac36418a4698fe58c799d, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4611200528376728649, guid: f7738fcb6b9ac36418a4698fe58c799d, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4611200528376728649, guid: f7738fcb6b9ac36418a4698fe58c799d, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: -90
+      objectReference: {fileID: 0}
+    - target: {fileID: 4611200528376728649, guid: f7738fcb6b9ac36418a4698fe58c799d, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: f7738fcb6b9ac36418a4698fe58c799d, type: 3}
+--- !u!4 &3055392066991617265 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 4611200528376728649, guid: f7738fcb6b9ac36418a4698fe58c799d, type: 3}
+  m_PrefabInstance: {fileID: 1556179036062480568}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1001 &3968851965108390911
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 7305054492310442018}
+    m_Modifications:
+    - target: {fileID: 1274060957731741735, guid: 2dcbdff8c7486be44b2bcda2805ba1a4, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1274060957731741735, guid: 2dcbdff8c7486be44b2bcda2805ba1a4, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 1274060957731741735, guid: 2dcbdff8c7486be44b2bcda2805ba1a4, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 4
+      objectReference: {fileID: 0}
+    - target: {fileID: 1274060957731741735, guid: 2dcbdff8c7486be44b2bcda2805ba1a4, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.7071068
+      objectReference: {fileID: 0}
+    - target: {fileID: 1274060957731741735, guid: 2dcbdff8c7486be44b2bcda2805ba1a4, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1274060957731741735, guid: 2dcbdff8c7486be44b2bcda2805ba1a4, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0.7071068
+      objectReference: {fileID: 0}
+    - target: {fileID: 1274060957731741735, guid: 2dcbdff8c7486be44b2bcda2805ba1a4, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1274060957731741735, guid: 2dcbdff8c7486be44b2bcda2805ba1a4, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1274060957731741735, guid: 2dcbdff8c7486be44b2bcda2805ba1a4, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 90
+      objectReference: {fileID: 0}
+    - target: {fileID: 1274060957731741735, guid: 2dcbdff8c7486be44b2bcda2805ba1a4, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1938112566374644381, guid: 2dcbdff8c7486be44b2bcda2805ba1a4, type: 3}
+      propertyPath: m_Name
+      value: floor_urethane_.003 (3)
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 2dcbdff8c7486be44b2bcda2805ba1a4, type: 3}
+--- !u!4 &2790664300483505112 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 1274060957731741735, guid: 2dcbdff8c7486be44b2bcda2805ba1a4, type: 3}
+  m_PrefabInstance: {fileID: 3968851965108390911}
+  m_PrefabAsset: {fileID: 0}

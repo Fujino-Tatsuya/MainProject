@@ -97,8 +97,6 @@ public sealed class MaskBlurFeature : ScriptableRendererFeature
         private static readonly int IdFlags = Shader.PropertyToID("_MaskBlurFlags");
         private static readonly int IdMaskTex = Shader.PropertyToID("_MaskBlurMaskTex");
         private static readonly int IdBlurTex = Shader.PropertyToID("_MaskBlurTex");
-        private static readonly int IdPixel = Shader.PropertyToID("_MaskBlurPixel");
-        private static readonly int IdPixelSize = Shader.PropertyToID("_MaskBlurPixelSize");
 
         private readonly Material _material;
         private MaskBlurSettings _settings;
@@ -196,38 +194,6 @@ public sealed class MaskBlurFeature : ScriptableRendererFeature
             if (useTexture)
                 _material.SetTexture(IdMaskTex, _settings.maskTexture);
 
-            PushPixelateParams(fullDesc, resolved);
-        }
-
-        // 블록 개수를 CPU 에서 계산해 넘긴다. 셰이더가 해상도를 몰라도 되고,
-        // 블록 크기를 픽셀 단위로 지정할 수 있어 해상도가 바뀌어도 블록 크기가 유지된다.
-        //
-        // ⚠️ 양자화 기준은 블러 텍스처가 아니라 '풀 해상도'다. 블러는 downsampleShift 만큼
-        //    낮은 해상도에서 돌지만, 블록은 화면에서 보이는 크기로 지정하는 게 직관에 맞다.
-        private void PushPixelateParams(RenderTextureDescriptor fullDesc, Vector2 blurRadius)
-        {
-            if (!_settings.pixelateEnabled)
-            {
-                // w = 0 이면 셰이더가 픽셀 경로를 통째로 건너뛴다(추가 비용 0).
-                _material.SetVector(IdPixel, Vector4.zero);
-                return;
-            }
-
-            int block = Mathf.Max(1, _settings.pixelBlockSize);
-            float blocksX = Mathf.Max(1f, Mathf.Floor((float)fullDesc.width / block));
-            float blocksY = Mathf.Max(1f, Mathf.Floor((float)fullDesc.height / block));
-
-            float fullScreen =
-                _settings.pixelateMode == MaskBlurSettings.PixelateMode.FullScreen ? 1f : 0f;
-
-            _material.SetVector(IdPixel, new Vector4(blocksX, blocksY, fullScreen, 1f));
-
-            // 픽셀 영역은 블러와 같은 중심·모양에 반경만 배율을 먹인다.
-            // 배율이 1 보다 크면 선명한 중앙이 넓어져 픽셀이 걸리는 영역이 좁아진다.
-            float scale = Mathf.Max(1f, _settings.pixelateRegionScale);
-            _material.SetVector(
-                IdPixelSize,
-                new Vector4(blurRadius.x * scale, blurRadius.y * scale, 0f, 0f));
         }
 
         // globalTexture 가 유효하면 그 핸들을 읽기로 잡는다(합성 패스가 전역으로 샘플).

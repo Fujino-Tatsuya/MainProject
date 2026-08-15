@@ -22,7 +22,7 @@ public static class BuildWindowsPlayer
         BootstrapScenePath,
         "Assets/0.Scenes/MainFlow/1.TitleScene.unity",
         "Assets/0.Scenes/MainFlow/2.LoadingScene.unity",
-        "Assets/0.Scenes/MainFlow/3.BeaverLobby.unity",
+        "Assets/0.Scenes/MainFlow/3.LobbyScene.unity",
         "Assets/0.Scenes/MainFlow/4.MapScene.unity",
         "Assets/0.Scenes/MainFlow/5.ResultScene.unity",
     };
