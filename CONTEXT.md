@@ -38,12 +38,13 @@ Update this file when a term becomes important enough that future agents or team
 → 고치려면 `origin/feature/trensparent` 추가 머지(충돌 12건)인데 `WallOcclusion*` 코드가
 `fix/pixel` 쪽이 더 최신이라 **역행 위험**이 있다. 별건으로 판단할 것.
 
-### 🔴 팀장 액션 2건
+### ✅ 원격 `feature/maprendering` 삭제 완료
 
-1. **원격 브랜치 삭제 미완** — 자격증명(Git Credential Manager GUI)이 떠서 CLI 로는 못 지웠다.
-   터미널에서 직접: `git push origin --delete feature/maprendering`
-   (`feature/Boss23` 에 100% 포함돼 있어 잃는 커밋 없음. 복구용 해시 `2e14b18`)
-2. **은희 님께 플레이어 수정분 push 요청** — "플레이어 버그를 고쳤다"고 했으나 **원격 어디에도 없다.**
+`feature/Boss23` 에 100% 포함돼 있었다(ahead 91 / behind 0). 되살리려면 `2e14b18` 로 push.
+
+### 🔴 팀장 액션 1건
+
+1. **은희 님께 플레이어 수정분 push 요청** — "플레이어 버그를 고쳤다"고 했으나 **원격 어디에도 없다.**
    `Player/`·`Unit/`·`PlayerVariant/` 가 모든 원격 브랜치에서 `feature/Boss23` 과 **0 파일 차이**이고,
    `Player/` 를 만진 마지막 커밋은 `257cb4c`(2026-08-07)로 이미 들어와 있다.
    은희 님 미머지분은 `fix/property_change` 1커밋뿐인데 씬 전환·빌드 설정이라 플레이어가 아니다.
