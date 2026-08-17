@@ -11,10 +11,16 @@ using UnityEngine;
 /// </summary>
 public static class EffectSystemSetup
 {
+    // 🔴 이 폴더는 더 이상 없다. b1980d3 "VFX 에셋을 SVN(50.Art)으로 이관" 에서 Assets/5.VFX 가
+    // 통째로 사라졌다. 엔트리를 새로 만드는 경로(v1 기본 에셋 생성)는 그래서 지금 동작하지 않는다.
+    // 새 위치는 SVN 관리 영역(Assets/50.Art/VFX)이라 에디터 도구가 임의로 쓸 자리가 아니다 —
+    // 되살릴지 폐기할지는 VFX 담당(민경) 판단이 필요하다. 2026-08-18 확인.
     private const string EntryFolder = "Assets/5.VFX/Common";
     private const string CatalogFolder = "Assets/9.ScriptableObject/Effects";
     private const string CatalogPath = CatalogFolder + "/EffectCatalog.asset";
-    private const string ManagerPrefabPath = "Assets/5.VFX/EffectManager.prefab";
+
+    // 같은 이관에서 매니저 프리팹만 git 쪽에 남았고 위치가 바뀌었다(구 Assets/5.VFX/EffectManager.prefab).
+    private const string ManagerPrefabPath = "Assets/2.Prefabs/Managers/EffectManager.prefab";
 
     [MenuItem("Tools/Effects/v1 기본 에셋 생성")]
     public static void Run()

@@ -30,7 +30,11 @@ public static class WallOcclusionAuthoring
         "Assets/50.Art/MapGen/MapObj/material";
     // dash-soul 머지에서 씬이 0.Scenes/MainFlow/ 아래로 재편됐다(구 경로 "0.Scenes/MapScene.unity"는
     // 더 이상 존재하지 않아 이 도구가 씬을 못 찾고 있었다).
-    private const string MapScenePath = "Assets/0.Scenes/MainFlow/4.MapScene.unity";
+    //
+    // 🔴 2026-08-18: 정본 전투 맵이 4.MapScene-trensparent 로 바뀌었다(아트 인수인계
+    // Docs/tech/map-rendering-lighting-handoff.md §2 — 4.MapScene 은 실험 이력이 남은 보조 장면).
+    // 보조 장면에 적용해도 실제 검수 화면에는 반영되지 않으므로 정본을 가리킨다.
+    private const string MapScenePath = "Assets/0.Scenes/MainFlow/4.MapScene-trensparent.unity";
 
     // 바닥/천장은 셰이더의 wallness 판정으로 이미 제외되므로 변종을 만들지 않는다.
     // 만들어봐야 룩만 근사치로 바뀌고 얻는 게 없다.
