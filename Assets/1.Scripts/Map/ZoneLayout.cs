@@ -39,7 +39,7 @@ public class ZoneLayout : MonoBehaviour
 
     [Tooltip("마커별 몬스터 지정. 여기에 항목이 하나라도 있으면 이 목록이 권위이고 " +
              "MonsterSpawnPoints 는 무시된다. 비어 있으면 기존 동작(모든 마커에 MonsterGroupID 하나)을 유지한다. " +
-             "메뉴 Tools/Map/Authoring/Migrate Monster Spawn Points → Entries 로 기존 마커에서 채울 수 있다.")]
+             "손으로 채운다 — 구 마커에서 옮겨주던 마이그레이션 메뉴는 소진돼 2026-08-18 에 삭제했다.")]
     public List<MonsterSpawnEntry> MonsterSpawnEntries = new List<MonsterSpawnEntry>();
 
     /// <summary>

@@ -75,19 +75,6 @@ public static class BossPrefabAuthoring
         typeof(BossDirectionIndicator),
     };
 
-    [MenuItem("Tools/Boss/23호 — 보스 프리팹 컴포넌트 교체")]
-    public static void Rebuild()
-    {
-        bool go = EditorUtility.DisplayDialog(
-            "23호 보스 프리팹 — 컴포넌트 교체",
-            "레거시 컴포넌트 14종을 제거하고 신규 5종을 붙인다.\n" +
-            "NetworkAnimator 제거 · BehaviorGraphAgent OFF · 참조 배선까지 한다.\n\n" +
-            "🔴 되돌리려면 git 으로 프리팹을 복원해야 한다.\n\n진행할까?",
-            "교체", "취소");
-        if (!go) return;
-        Run(dryRun: false);
-    }
-
     [MenuItem("Tools/Boss/23호 — 보스 프리팹 검증만 (변경 없음)")]
     public static void Validate() => Run(dryRun: true);
 
