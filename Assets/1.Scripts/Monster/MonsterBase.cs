@@ -232,9 +232,33 @@ public class MonsterBase : Unit
         }
     }
 
+    /// <summary>
+    /// 리쉬·복귀·재배치의 <b>기준점</b>을 옮긴다. 연출로 몬스터를 이동시키는 스포너는
+    /// <b>연출이 끝난 뒤</b> 이걸 호출해야 한다.
+    ///
+    /// 🔴 왜 있는가 (2026-08-18 실제 사고): 보스는 착지점 <b>18m 위</b>에서 Instantiate 된 뒤
+    /// <c>BossEncounterDirector</c> 가 1.2초간 내려보낸다. 그런데 기준점은 <c>Awake</c> 시점 위치라
+    /// 착지하는 순간 <c>leashRadius</c>(No23 = 15m) <b>밖</b>이 되고, <see cref="HandleSeekAndCombat"/>
+    /// 첫 줄에서 <b>매 프레임</b> 리쉬 복귀가 걸린다 → <c>EnterReturn</c> 의 <c>Revive()</c> 로 체력이
+    /// 최대로 되돌아가고 공격 체인이 계속 끊긴다.
+    /// 겉으로는 "데미지가 안 박히고 애니메이션이 안 나온다"로 보여 원인을 찾기 어렵다.
+    ///
+    /// 기준점 하나가 리쉬 판정·복귀 목표·재배치 클램프를 모두 결정하므로 여기만 맞으면 전부 맞는다.
+    /// leashRadius 를 키워 가리는 것은 답이 아니다 — spawnHeight 가 바뀌면 그대로 재발한다.
+    /// </summary>
+    public void SetSpawnAnchor(Vector3 worldPosition)
+    {
+        Vector3 previous = _spawnPosition;
+        _spawnPosition = worldPosition;
+        Edit.Log($"[Monster] {name} 리쉬 기준점 이동 — {previous} → {worldPosition} " +
+                 $"(leash {data?.leashRadius ?? 0}m)", this);
+    }
+
     void HandleSeekAndCombat()
     {
         // 리쉬: 스폰 지점에서 leash 밖이면 복귀 우선(진입 즉시 상태 초기화 + 최대 체력 회복).
+        // ⚠️ 연출로 내려오는 보스처럼 스폰 위치와 전투 원점이 다른 경우는 스포너가 착지 후
+        //    SetSpawnAnchor 로 기준점을 옮겨야 한다. 안 옮기면 여기서 매 프레임 걸린다.
         if (Vector3.Distance(transform.position, _spawnPosition) > data.leashRadius)
         {
             EnterReturn();

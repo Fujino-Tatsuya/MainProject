@@ -97,6 +97,9 @@ public sealed class BossEncounterDirector : NetworkBehaviour
     private Unit _bossUnit;
     private NavMeshAgent _bossAgent;
 
+    // 착지 후 리쉬 기준점을 옮겨 주기 위해 들고 있는다 — 이유는 AttachBossToNavMesh 주석 참조.
+    private MonsterBase _bossMonster;
+
     private Vector3 _descendFrom;
     private Vector3 _descendTo;
     private bool _combatStarted;
@@ -346,6 +349,19 @@ public sealed class BossEncounterDirector : NetworkBehaviour
         _descendFrom = spawnPosition;
         _descendTo = landing;
 
+        // 리쉬 기준점을 스폰 즉시 착지점으로 잡아 둔다.
+        //
+        // ⚠️ 이걸로 하강 중 리쉬가 안 걸리는 것은 아니다 — 기준점이 상공이면 하강 끝에서,
+        // 착지점이면 하강 초반에 leashRadius 를 넘는다. 어느 쪽이든 잠깐 걸린다.
+        // 하강 중에는 무해하다: 에이전트가 꺼져 있고(위 344행) 위치는 Director 가 직접 몰기 때문에
+        // Return 상태로 잠깐 들어가도 착지 시 거리 0 이라 곧바로 빠져나온다.
+        // 문제였던 것은 **착지 후에도 영구히** 걸리는 쪽이었다.
+        //
+        // 그래도 여기서 미리 잡는 실익: AttachBossToNavMesh 는 NavMesh 샘플 실패·드리프트 과다면
+        // **기준점을 못 옮기고 early return** 한다(아래 477~496행). 그때 기준점이 상공에 남으면
+        // 보스가 영구 리쉬에 걸린다. 미리 착지점으로 잡아 두면 그 실패 경로에서도 안전하다.
+        _bossMonster?.SetSpawnAnchor(landing);
+
         Edit.Log(
             $"[BossEncounter] 보스 스폰 — 참가자 {_eligibleClientIds.Count}명, " +
             $"착지점 {landing}, 스폰 높이 {spawnHeight}m", this);
@@ -356,12 +372,17 @@ public sealed class BossEncounterDirector : NetworkBehaviour
     {
         _bossUnit = bossInstance.GetComponent<Unit>();
         _bossAgent = bossInstance.GetComponent<NavMeshAgent>();
+        _bossMonster = bossInstance.GetComponent<MonsterBase>();
 
         if (_bossUnit == null)
             Edit.LogError("[BossEncounter] 보스에 Unit이 없어 사망(클리어) 판정을 연결할 수 없습니다.", this);
 
         if (_bossAgent == null)
             Edit.LogWarning("[BossEncounter] 보스에 NavMeshAgent가 없습니다 — 이동 확인이 필요합니다.", this);
+
+        if (_bossMonster == null)
+            Edit.LogWarning("[BossEncounter] 보스에 MonsterBase가 없습니다 — 착지 후 리쉬 기준점을 " +
+                            "옮길 수 없어 보스가 리쉬 복귀에 걸릴 수 있습니다.", this);
     }
 
     private void BeginDescent()
@@ -498,6 +519,18 @@ public sealed class BossEncounterDirector : NetworkBehaviour
         _bossAgent.enabled = true;
         _bossAgent.Warp(hit.position);
         Edit.Log($"[BossEncounter] 보스 NavMesh 부착 완료 — {hit.position} (착지점 오차 {drift:F2}m)", this);
+
+        // 🔴 여기가 보스의 **전투 원점**이 확정되는 순간이다. 리쉬 기준점을 여기로 옮긴다.
+        //
+        // 안 옮기면: 기준점은 MonsterBase.Awake 시점 위치 = 착지점 + spawnHeight(18m) 다.
+        // 착지하면 그 기준점에서 18m 떨어진 셈이 되어 leashRadius(No23 = 15m)를 넘고,
+        // MonsterBase.HandleSeekAndCombat 첫 줄에서 **매 프레임** 리쉬 복귀가 걸린다.
+        // 그 안의 Revive() 가 체력을 최대로 되돌리고 상태를 Return 으로 덮어 공격이 영원히 안 나온다.
+        // (2026-08-18 실제로 그랬다 — 증상은 "데미지가 안 박히고 애니메이션이 안 들어간다"였다.)
+        //
+        // Warp 뒤에 부르는 이유: hit.position 이 실제로 에이전트가 앉은 곳이다. _descendTo 는
+        // 의도한 착지점이고 NavMesh 샘플링으로 최대 NavSampleRadius 만큼 어긋날 수 있다.
+        _bossMonster?.SetSpawnAnchor(hit.position);
     }
 
     // 착지점에서 NavMesh를 찾는 반경. 아레나 바닥은 착지점 바로 아래라 넉넉할 필요가 없다 —
