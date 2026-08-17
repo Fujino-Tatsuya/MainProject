@@ -1973,7 +1973,21 @@ public class TwentyThreeBoss : MonsterBase
     bool StartDashMove(Vector3 dir, float speedMultiplier, float maxDistance, float clearance = 0f)
     {
         _dashDestination = transform.position;
-        if (agent == null || !agent.enabled || !agent.isOnNavMesh) return false;
+
+        // 🔴 **조용히 실패하지 않는다**(2026-08-18). 여기서 그냥 return 하면 목적지가 제자리로 남아
+        //    TickDash 의 도착 판정이 즉시 성립하고, 보스는 클립만 재생하며 한 발도 안 나간다.
+        //    실제로 그 증상으로 한 세션이 소모됐다(연출 중 FSM 이 돌아 에이전트가 꺼진 채 시작한 돌진).
+        //    원인은 MonsterBase.SetServerLogicSuspended 에서 닫았지만, 다른 경로로 또 들어오면
+        //    무엇이 없었는지 이 줄이 말해 준다 — 진단은 자기가 무엇을 봤는지 말해야 한다.
+        if (agent == null || !agent.enabled || !agent.isOnNavMesh)
+        {
+            string why = agent == null ? "agent 없음"
+                       : !agent.enabled ? "agent 꺼짐(연출·넉백 구간에서 시작했나?)"
+                       : "NavMesh 밖";
+            Debug.LogWarning($"[23호/돌진] 이동을 시작하지 못했다 — {why}. 목적지가 제자리로 남아 " +
+                             "애니메이션만 돌고 변위가 0 이 된다.", this);
+            return false;
+        }
 
         Vector3 origin = transform.position;
         Vector3 desired = origin + dir * maxDistance;
@@ -2007,6 +2021,15 @@ public class TwentyThreeBoss : MonsterBase
         agent.speed = Mathf.Max(0.1f, MoveSpeed * speedMultiplier);
         agent.SetDestination(desired);
         _dashDestination = desired;
+
+        // 클램프가 목적지를 출발점까지 끌어당겼으면 이번 돌진은 변위가 0 이다. 벽에 코를 박고
+        // 시전한 정상 상황일 수도 있지만, NavMesh.Raycast 가 **출발점이 메시 밖일 때** 같은 결과를
+        // 내므로 조용히 넘기면 위와 똑같이 "제자리 돌진"으로 보인다. 값을 찍어 둘을 가른다.
+        if ((desired - origin).sqrMagnitude <= DashArriveEpsilon * DashArriveEpsilon)
+            Debug.LogWarning($"[23호/돌진] 목적지가 출발점과 같다 — 변위 0. origin {origin}, " +
+                             $"desired {desired}, blocked {blocked}, clearance {clearance:F2}. " +
+                             "벽에 붙어 시전했거나 출발점이 NavMesh 밖이다.", this);
+
         return blocked;
     }
 

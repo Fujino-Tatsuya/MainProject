@@ -344,6 +344,14 @@ public sealed class BossEncounterDirector : NetworkBehaviour
         if (_bossAgent != null)
             _bossAgent.enabled = false;
 
+        // 🔴 에이전트만 끄면 **FSM 은 계속 돈다.** 보스는 Spawn 되는 순간부터 Update 가 살아 있어
+        //    하강 막바지(detectionRadius 8m 안)와 착지 후 impactHoldSeconds(0.9초) 동안 공격을
+        //    고르고 시작해 버린다. 그 구간에서 시작된 돌진은 에이전트가 없어 변위 0 이 되고
+        //    클립만 재생된다 — 2026-08-18 "착지 직후 첫 돌진이 제자리" 의 정체가 이것이다.
+        //    (훅·잡기는 그 구간에 허공에 대고 나간다.)
+        //    → 연출 동안에는 FSM 자체를 세운다. 해제는 BeginCombatServer 한 곳뿐이다.
+        _bossMonster?.SetServerLogicSuspended(true);
+
         SubscribeBossDeath();
 
         _descendFrom = spawnPosition;
@@ -459,6 +467,13 @@ public sealed class BossEncounterDirector : NetworkBehaviour
         _combatStarted = true;
 
         SnapBossToNavMesh();
+
+        // ⚠️ 순서 주의: 반드시 SnapBossToNavMesh **뒤**다. 그 안에서 에이전트를 켜고 NavMesh 에
+        //    앉히고 리쉬 기준점까지 옮긴다 — 그게 끝나야 FSM 이 온전한 몸으로 깨어난다.
+        //    (SnapBossToNavMesh 가 NavMesh 를 못 찾아 early return 하면 에이전트는 꺼진 채로
+        //     남지만, 그건 LogError 로 이미 크게 울린다. 여기서 FSM 을 붙잡아 두면 보스가
+        //     통째로 얼어 원인이 더 안 보인다.)
+        _bossMonster?.SetServerLogicSuspended(false);
 
         UnlockAllParticipants();
         SetPhase(BossEncounterPhase.Combat);

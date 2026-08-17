@@ -85,6 +85,7 @@ public class MonsterBase : Unit
     float _staggerAfterKnockback;  // 넉백 종료 후 Stunned 경직 시간(초)
     bool _isDead;
     bool _initialized;
+    bool _serverLogicSuspended;    // 연출 구간 게이트(SetServerLogicSuspended). true 면 서버 FSM 이 안 돈다
     Coroutine _deathFxRoutine;              // 임시 사망 표시 코루틴(모든 피어)
     const float DeathPlaceholderDuration = 1f; // 임시 사망 표시 지속(디졸브/애니 도입 시 제거)
 
@@ -191,6 +192,14 @@ public class MonsterBase : Unit
         if (!IsServer || !_initialized || _isDead)
             return;
 
+        // 연출이 몸을 몰고 있는 동안에는 FSM 을 돌리지 않는다(SetServerLogicSuspended 주석 참조).
+        if (_serverLogicSuspended)
+        {
+            if (!Mathf.Approximately(0f, _animSpeed.Value))
+                _animSpeed.Value = 0f;
+            return;
+        }
+
         TickServer(Time.deltaTime);
 
         // 이동 속도 복제 갱신(에이전트 실제 속도 기반).
@@ -246,6 +255,44 @@ public class MonsterBase : Unit
     /// 기준점 하나가 리쉬 판정·복귀 목표·재배치 클램프를 모두 결정하므로 여기만 맞으면 전부 맞는다.
     /// leashRadius 를 키워 가리는 것은 답이 아니다 — spawnHeight 가 바뀌면 그대로 재발한다.
     /// </summary>
+    /// <summary>
+    /// 서버 FSM 을 <b>일시 정지</b>한다. 연출로 몬스터의 위치를 직접 모는 스포너가
+    /// <b>연출 동안</b> 켜 두고, 전투로 넘길 때 끈다.
+    ///
+    /// 🔴 왜 있는가 (2026-08-18 실제 사고 — "착지 직후 첫 돌진이 제자리에서 애니만 돈다"):
+    /// 보스는 <c>Spawn()</c> 되는 순간부터 <see cref="Update"/> 가 돌아 FSM 이 <b>살아 있다.</b>
+    /// 그런데 <c>BossEncounterDirector</c> 는 하강 연출과 싸우지 않으려고 스폰 직후
+    /// <c>NavMeshAgent</c> 를 <b>꺼 둔다</b>(그리고 착지 후 <c>impactHoldSeconds</c> 0.9초 동안도
+    /// 꺼진 채다). 즉 <b>FSM 은 켜져 있는데 다리는 없는 구간이 1초 넘게</b> 존재한다.
+    /// 하강 막바지에 플레이어가 <c>detectionRadius</c>(No23 = 8m) 안에 들어오면 보스는 그 구간에서
+    /// 공격을 고르고 시작한다. 돌진이 걸리면 <c>StartDashMove</c> 가 에이전트를 못 찾아 조용히
+    /// 아무것도 하지 않고, 클립만 재생돼 <b>"제자리 돌진"</b> 이 된다.
+    /// 에이전트가 없어도 도는 공격(훅·잡기)은 그 구간에 <b>허공에 대고 나간다.</b>
+    ///
+    /// 그래서 고칠 자리는 돌진이 아니라 <b>연출 중에 FSM 이 도는 것</b> 자체다.
+    /// 호출처는 보스 Director 뿐이라 몹 8종·중간보스 3종의 경로는 그대로다.
+    ///
+    /// ⚠️ 이건 <b>정지</b>이지 무적이 아니다. 피격·사망 경로(<see cref="TakeDamage"/>)는 그대로 살아 있다.
+    /// </summary>
+    public void SetServerLogicSuspended(bool suspended)
+    {
+        if (_serverLogicSuspended == suspended) return;
+        _serverLogicSuspended = suspended;
+
+        if (!IsServer) return;
+
+        if (suspended)
+        {
+            // 진행 중이던 이동·공격을 정리하고 대기 자세로 내려놓는다 — 연출이 끝난 뒤
+            // 반쯤 진행된 공격 체인이 되살아나지 않게.
+            ClearReposition();
+            StopAgent();
+            SetState(MonsterState.Idle);
+        }
+
+        Edit.Log($"[Monster] {name} 서버 FSM {(suspended ? "정지" : "재개")} — 연출 구간 게이트", this);
+    }
+
     public void SetSpawnAnchor(Vector3 worldPosition)
     {
         Vector3 previous = _spawnPosition;
