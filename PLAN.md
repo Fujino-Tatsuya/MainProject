@@ -1,4 +1,93 @@
-# CURRENT PLAN — 회전·표식·Wells 폭탄·차징 (2026-08-13)
+# CURRENT PLAN — 보스 감속 회전 + 첫 돌진 미이동 (2026-08-18)
+
+> 상태: **구현 완료 · Play 미검증**. 브랜치 `feature/Boss23`. 담당: 경석(Claude).
+> 출처: 팀장 지시 2건 + 문답 2건(회전 적용 범위 · "착지"의 정의).
+>
+> | R1 감속 회전 | R2 선딜 조준 | R3 즉시 조준 예외 | D1 연출 중 FSM 정지 | D2 돌진 진단 |
+> |---|---|---|---|---|
+> | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+## 확정된 스펙 (팀장 문답 2026-08-18)
+
+| # | 확정 내용 |
+|---|---|
+| **A** | 보스 회전을 플레이어처럼 감속시킨다. 방식은 플레이어와 동일 — `Slerp(현재, 목표, turnSpeed × dt)` + `Dot > 0.999` 도달 클램프 |
+| **B** | **조준도 감속한다.** 대신 **공격 선딜 동안에는 회전을 허용**한다(히트 이벤트가 나가면 그때부터 회전 없음). "공격 중 회전 없음" 규칙 자체는 유지 |
+| **C** | "착지 직후 돌진이 안 나간다"의 착지 = **보스 입장 연출 하강 착지**. 전투 시작 후 **첫 돌진**이다 |
+
+## 확정된 사실 (실측)
+
+| 사실 | 근거 |
+|---|---|
+| `FaceTarget()` 호출처는 인수인계가 적은 3곳이 아니라 **9곳**이다 | `MonsterBase.cs` 315·335·362·373·380·473·575·596 + `TwentyThreeBoss.cs:1748` |
+| `552c44a` 의 `acceleration` 승계는 **아직 살아 있다** — 이 회귀가 아니다 | `TwentyThreeBoss.StartDashMove` (`DashAcceleration = 999f`, `autoBraking = false`) |
+| 복원용 필드 `_dashPrevStopDistance`·`_dashPrevAcceleration` 은 `-1f` 초기화가 정상 | `TwentyThreeBoss.cs:93~94` |
+| 🔴 **보스는 `Spawn()` 되는 순간부터 서버 FSM 이 돈다** — `_initialized` 가 `OnNetworkSpawn` 에서 켜진다 | `MonsterBase.ServerInitialize` |
+| 🔴 그런데 Director 는 스폰 직후 `NavMeshAgent` 를 **끈다**(하강 연출과 싸우지 않으려고) | `BossEncounterDirector.cs:344` |
+| 🔴 에이전트는 `BeginCombatServer` → `SnapBossToNavMesh` 에서야 켜진다 — 하강 1.2초 + `impactHoldSeconds` 0.9초 동안 **FSM 은 켜져 있는데 다리가 없다** | `BossEncounterDirector.cs:519` |
+| No23 `detectionRadius` = **8m**, `attackRange` = 2 → 하강 막바지에 플레이어가 인지 반경에 들어온다 | `No23.asset:23~24` |
+| `StartDashMove` 는 에이전트가 없으면 **조용히 return** 하고 목적지를 제자리로 남긴다 → 도착 판정 즉시 성립 → **클립만 재생** | `TwentyThreeBoss.StartDashMove` 첫 줄 |
+
+## 원인 확정 — 첫 돌진 미이동
+
+**연출 구간에서 시작된 공격이라 다리가 없었다.** 돌진 코드의 결함이 아니다.
+
+```
+Spawn()                     → FSM 살아남 (_initialized = true)
+agent.enabled = false       → 다리 없음 (하강 연출 보호)
+  … 하강 1.2초 … 착지 … impactHold 0.9초 …   ← 이 구간에서 FSM 이 공격을 고른다
+BeginCombatServer → SnapBossToNavMesh → agent.enabled = true
+```
+
+돌진이 그 구간에 걸리면 `StartDashMove` 가 에이전트를 못 찾아 아무것도 하지 않고,
+`_dashDestination` 이 제자리로 남아 `DashDestinationReached()` 가 즉시 참이 된다 → **변위 0, 애니만 재생**.
+같은 구간에서 훅·잡기가 걸리면 **허공에 대고 나간다**(같은 뿌리의 다른 증상).
+
+## 접근 — 슬라이스
+
+| # | 슬라이스 | 내용 |
+|---|---|---|
+| **R1** | 감속 회전 | `MonsterDataSO.turnSpeed` 신규(**기본 0 = 즉시 회전**, 장판 SO 이관 때 쓴 규약). `MonsterBase.RotateToward()` 를 회전 단일 지점으로 만들고 `FaceTarget`·`FaceVelocity` 가 통과. No23·No23_Solo 만 **10**(플레이어 `rotate_Speed` 와 동일) |
+| **R2** | 선딜 조준 | `MonsterBase.FaceTargetDuringWindup` 훅 신규(**기본 false = 현행**) → 23호만 true. base 경로는 `!_attackFired && !_commitFired` 구간. 잡기는 base 를 안 타므로 체인의 `Windup` 단계에서 같은 일을 한다 |
+| **R3** | 즉시 조준 예외 | `FaceTargetImmediate()` 신규. **레이지 돌진**만 쓴다 — `FaceTarget()` 바로 다음 줄에서 `transform.forward` 를 방향으로 굳히기 때문에 감속을 쓰면 어중간한 각도가 박힌다 |
+| **D1** | 연출 중 FSM 정지 | `MonsterBase.SetServerLogicSuspended(bool)` 신규(**additive**, 호출처 = Director 2곳). 스폰 직후 정지 → `SnapBossToNavMesh` **뒤** 재개 |
+| **D2** | 돌진 진단 | `StartDashMove` 가 조용히 실패하지 않게 한다 — ① 에이전트 부재/꺼짐/오프메시를 문구로 가름 ② 클램프된 목적지가 출발점과 같으면 값과 함께 경고 |
+
+## 리스크 / 한계
+
+- 🔴 **감속 회전은 근접 명중률을 바꾼다.** 선딜 조준(R2)이 대부분 흡수하지만, 돌진 선딜은
+  클립 이벤트가 **0.15초**뿐이라 `turnSpeed 10` 으로 약 80%만 수렴한다. 크게 어긋나면
+  `turnSpeed` 를 올리는 것이 첫 번째 노브다(SO, Play 중 조절 가능).
+- **카운터 정면 판정(`IsCounterFromFront`, ±`counterFrontAngle`)이 회전 지연만큼 늦게 따라온다.**
+  판정 자체는 그대로고 보스가 몸을 늦게 트는 것뿐이다.
+- **D1 은 정지이지 무적이 아니다** — 피격·사망 경로는 그대로 산다. 다만 연출 중 플레이어는 잠겨 있다.
+- `SnapBossToNavMesh` 가 NavMesh 를 못 찾아 early return 하면 에이전트는 꺼진 채 남는다.
+  그 경우에도 **FSM 은 재개한다** — 붙잡아 두면 보스가 통째로 얼어 원인이 더 안 보인다.
+  대신 D2 의 경고가 매 돌진마다 무엇이 없었는지 찍는다.
+- `MonsterBase` 를 만지지만 **추가만** 한다(가상 프로퍼티 1개 + 공개 메서드 1개 + 회전 헬퍼 2개,
+  전부 기본값 = 현행). **몹 8종·중간보스 3종 거동 무변화.**
+
+## 범위 밖
+
+`MonsterScene` 의 `TwentyThreeArenaContext` 경로(연출이 없어 D1 대상이 아니다) ·
+감속 회전을 몹 8종에 적용(`turnSpeed` 를 0 이 아닌 값으로 채우면 그때 켜진다) · 넉백 세기 튜닝 ·
+`AudioManager` NRE(은희 담당).
+
+## 완료 조건
+
+1. 보스가 타깃을 향할 때 **한 프레임에 스냅하지 않는다**(추격·대기·복귀 전부)
+2. 공격 선딜 동안에는 계속 조준하고, **히트가 나간 뒤에는 회전하지 않는다**
+3. 돌진이 여전히 플레이어를 **밀고 지나간다**(대상을 따라 맴돌지 않는다)
+4. 잡기에서 **무한 회전이 재발하지 않는다**
+5. 레이지 돌진이 **플레이어 쪽으로** 나간다(어중간한 각도로 새지 않는다)
+6. **입장 연출 착지 직후 첫 돌진이 실제로 전진한다**
+7. 연출 구간(하강 + impact 홀드) 동안 보스가 **공격을 시작하지 않는다**
+8. 몹 8종·중간보스 3종 거동 무변화 — 회전은 여전히 즉시다
+9. 컴파일 0에러
+
+---
+
+# 이전 PLAN — 회전·표식·Wells 폭탄·차징 (2026-08-13)
 
 > 상태: **승인·구현 완료 (Play 미검증)**. 브랜치 `feature/Boss23`. 담당: 경석(Claude).
 > 출처: 팀장 Play 스크린샷 + 지시 8건 + 문답 3건(표식 색 기준 · 차징 위치 · 차징 공격 방식).

@@ -4,7 +4,76 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 다음 세션 시작점 — 보스 회전 감속 + 돌진 미이동 (2026-08-18 새벽 종료)
+## ▶▶ 다음 세션 시작점 — Play 검증 (2026-08-18 낮)
+
+**브랜치 `feature/Boss23`** · **컴파일 0에러** · **커밋 미푸시** (개수는 적지 않는다 — 아래 이유)
+**백업 = 로컬 `backup/boss23-20260815`**
+
+**한 줄 상태: 팀장 지시 2건(회전 감속·첫 돌진)을 코드로 닫았다. 남은 것은 Play 육안 검증뿐이다.**
+
+### ✅ 이번에 닫은 것
+
+**1. 보스 회전 감속** — `MonsterDataSO.turnSpeed` 신규. **0 = 즉시 회전**이라 몹 8종·중간보스 3종은
+무영향이고, `No23`·`No23_Solo` 만 **10**(플레이어 `rotate_Speed` 와 동일값)이다.
+회전 단일 지점 = `MonsterBase.RotateToward()` — `FaceTarget`·`FaceVelocity` 가 전부 통과한다.
+
+🔴 **팀장 확정: 조준도 감속 + 선딜 동안만 회전 허용.** 감속 회전은 매 틱 불러야 도달하는데
+23호의 조준은 `StartAttack` 직전 **1회**뿐이라 그대로 두면 엉뚱한 데를 때린다. 그래서
+`FaceTargetDuringWindup` 훅(기본 false)을 만들어 **히트 이벤트 전까지**를 조준 구간으로 썼다.
+"공격 중 회전 없음"(`FaceTargetWhileAttacking => false`) 규칙 자체는 그대로다.
+⚠️ 잡기 되먹임은 여전히 안전하다 — 되먹임은 플레이어가 손 소켓에 붙은 **뒤**(= 히트 시점) 생긴다.
+
+🔴 **`FaceTargetImmediate()` 예외가 하나 필요했다** — `BeginRageDash` 는 `FaceTarget()` **바로 다음 줄**에서
+`transform.forward` 를 돌진 방향으로 굳힌다. 감속을 쓰면 그 프레임의 어중간한 각도가 박힌다.
+**"돌아본 뒤 그 방향을 즉시 소비하는" 자리**는 앞으로도 이 함수를 써야 한다.
+
+**2. 착지 직후 첫 돌진 미이동 — 돌진 코드의 결함이 아니었다**
+
+🔴 **원인 = 연출 구간에 FSM 이 돌아서 다리 없이 공격을 시작한 것.**
+
+```
+Spawn()                → FSM 살아남(_initialized = true)
+agent.enabled = false  → 다리 없음 (하강 연출 보호, Director:344)
+  … 하강 1.2초 … 착지 … impactHold 0.9초 …   ← 이 2초 넘는 구간에서 FSM 이 공격을 고른다
+BeginCombatServer → SnapBossToNavMesh → agent.enabled = true
+```
+
+No23 `detectionRadius` 8m 라 하강 막바지에 플레이어가 인지 반경에 들어온다.
+그 구간에 돌진이 걸리면 `StartDashMove` 가 에이전트를 못 찾아 **조용히 return** 하고
+목적지가 제자리로 남아 도착 판정이 즉시 성립한다 → **변위 0, 클립만 재생**.
+**훅·잡기가 걸리면 허공에 대고 나간다 — 같은 뿌리의 다른 증상이다.**
+
+수정 = `MonsterBase.SetServerLogicSuspended(bool)` 신규(additive, 호출처 = Director 2곳).
+스폰 직후 정지 → `SnapBossToNavMesh` **뒤** 재개. `SetSpawnAnchor` 와 같은 모양의 seam 이다.
+
+⚠️ **인수인계에 적힌 후보 2개는 둘 다 아니었다** — `552c44a` 의 `acceleration` 승계는 살아 있고
+(`DashAcceleration 999` + `autoBraking=false`), 복원용 필드도 `-1f` 초기화가 정상이다.
+
+**3. 돌진이 조용히 실패하지 않게 했다** — `StartDashMove` 가 ① 에이전트 부재/꺼짐/오프메시를
+문구로 가르고 ② 클램프된 목적지가 출발점과 같으면 값과 함께 경고한다.
+같은 증상이 다른 경로로 또 오면 **한 줄이 무엇이 없었는지 말한다.**
+
+### 🔴 다음 세션 = Play 육안 검증
+
+1. **회전** — 보스가 한 프레임에 확 돌지 않는가 / 돌진이 여전히 **밀고 지나가는가**(따라 맴돌지 않는가) /
+   잡기 무한 회전 재발 없는가 / 레이지 돌진이 플레이어 쪽으로 나가는가
+2. **첫 돌진** — 입장 연출 착지 직후 돌진이 **실제로 전진하는가** / 연출 구간(하강 + impact 0.9초)에
+   보스가 공격을 시작하지 않는가
+3. **명중률** — 감속 때문에 훅·잡기가 눈에 띄게 빗나가면 첫 노브는 `No23.asset` 의 **`turnSpeed`**(현재 10).
+   ⚠️ 돌진 선딜은 클립 이벤트가 **0.15초**뿐이라 10 으로 약 80%만 수렴한다
+4. **몹 8종·중간보스 3종에 회귀가 없는가** — `turnSpeed` 가 0 이라 회전은 여전히 즉시여야 한다
+
+### 🔴 남아 있는 팀장 액션 3건 (변동 없음)
+
+1. **은희 님께 플레이어 수정분 push 요청** + `AudioManager` NRE 9건 전달
+   (`TitleSceneManager.cs:33`·`LobbySceneManager.cs:77` — `Instance` 또는 `.Catalog` 가 null 인데
+   두 곳 다 null 검사 없이 두 단계를 체이닝한다. 아트 머지에서 배선이 빠진 것으로 보인다)
+2. **`Build/Windows64 Player`** 가 필수 맵을 보조 씬(`4.MapScene`)으로 고정 — 정본은 `-trensparent`
+3. **`layprefab.prefab` 의 `LaserBlockWall` 걷어내기** — ⚠️ Quest 통로 차단의 **대체 구현은 없다**
+
+---
+
+## 이전 시작점 — 보스 회전 감속 + 돌진 미이동 (2026-08-18 새벽 종료)
 
 **브랜치 `feature/Boss23`** · **컴파일 0에러** · **커밋 6개 미푸시** (`3a8743d..8af4b8e`)
 **백업 = 로컬 `backup/boss23-20260815`**
