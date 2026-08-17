@@ -18,8 +18,36 @@ using UnityEngine;
 public static class ZoneBridgeGateWiring
 {
     const string ZonePath = "Assets/2.Prefabs/Map/Zoneprefab/ZoneL_typeB.prefab";
-    const string PanelPrefix = "Env_panel";
-    const string BridgePrefix = "Env_bridge";
+
+    // 🔴 아트 V3 납품이 존을 통째로 교체하면서 이름이 바뀌었다(소실 커밋 1bffe5a "LevelPackage.Ver10 Import").
+    // 구 이름은 Env_panel / Env_bridge01 이었고 원본 프리팹째로 사라졌다 — git·디스크 어디에도 없다.
+    // 이 도구는 이름으로 수집하므로 아트가 또 이름을 바꾸면 여기만 고치면 된다.
+    const string PanelPrefix = "PF_Prop_object_panel";
+
+    // ⚠️ "floor_" 로 뭉뚱그리면 floor_stone·floor_staire·floor_stone_trench 까지 전부 걸린다.
+    // 존 하나에 floor_stone 이 100개 넘게 있으므로 반드시 정확히 적는다.
+    static readonly string[] BridgePrefixes = { "floor_bridge", "floor_MV_bridge" };
+
+    // 실제로 움직이는 조각. MV = MoVing — Z로 4m 긴 데크판이다.
+    // floor_bridge 는 Z 0.85m·높이 1.88m 짜리 짧고 두꺼운 교대(橋台)라 제자리에 남는다.
+    // 구 저작도 외곽 2조각만 움직였고 내측 2조각은 Open == Closed 였다.
+    const string MovingPrefix = "floor_MV_bridge";
+
+    // 팀장 지정 개통 위치(2026-08-17). **이동량이 아니라 도착 Z 절대좌표**다.
+    // 데크 길이 4m · 콜라이더 중심 오프셋 −0.408 이라 열리면 각각
+    //   001: z 13.278 → 10.6   → 점유 [8.19, 12.19]
+    //   002: z −12.871 → −10.14 → 점유 [−12.55, −8.55]
+    // 를 덮어 중앙 플랫폼(≈ ±8)과 교대 floor_bridge(z = 12.19 / −11.79)를 잇는다.
+    // 🔴 좌우가 비대칭인 것은 사람이 눈으로 맞춘 값이라 그렇다 — 같게 만들지 말 것.
+    static readonly (string Name, float OpenZ)[] AuthoredOpenZ =
+    {
+        ("floor_MV_bridge_001", 10.6f),
+        ("floor_MV_bridge_002", -10.14f),
+    };
+
+    // 구 저작의 연출값(같은 커밋). AddComponent 기본값(1.2 / 0.12)과 다르므로 새로 붙일 때 복원한다.
+    const float LegacyRingRadius = 1.55f;
+    const float LegacyRingWidth = 0.2f;
 
     [MenuItem("Tools/Map/Authoring/Wire Zone Bridge Gate (ZoneL_typeB)")]
     public static void WireGate()
@@ -33,7 +61,17 @@ public static class ZoneBridgeGateWiring
             if (added) gate = root.AddComponent<ZoneBridgeGate>();
 
             List<Transform> panels = Collect(root, PanelPrefix);
-            List<Transform> bridges = Collect(root, BridgePrefix);
+            List<Transform> bridges = Collect(root, BridgePrefixes);
+
+            // 새로 붙인 것이면 구 저작의 연출값을 복원한다. 컴포넌트 기본값과 다르므로
+            // 이걸 빼면 링이 눈에 띄게 작고 얇아진다(반지름 1.55→1.2 · 굵기 0.2→0.12).
+            if (added)
+            {
+                var soLook = new SerializedObject(gate);
+                soLook.FindProperty("ringRadius").floatValue = LegacyRingRadius;
+                soLook.FindProperty("ringWidth").floatValue = LegacyRingWidth;
+                soLook.ApplyModifiedPropertiesWithoutUndo();
+            }
 
             var log = new StringBuilder($"[BridgeGate] {(added ? "컴포넌트 추가" : "기존 컴포넌트 갱신")} — {ZonePath}\n");
 
@@ -46,15 +84,46 @@ public static class ZoneBridgeGateWiring
 
             SerializedProperty segs = so.FindProperty("segments");
             segs.arraySize = bridges.Count;
-            int kept = 0;
+            int kept = 0, authored = 0, heldStatic = 0;
             for (int i = 0; i < bridges.Count; i++)
             {
+                string name = bridges[i].name;
+                Vector3 closed = bridges[i].localPosition;
+
                 SerializedProperty e = segs.GetArrayElementAtIndex(i);
                 e.FindPropertyRelative("Target").objectReferenceValue = bridges[i];
-                e.FindPropertyRelative("ClosedLocalPosition").vector3Value = bridges[i].localPosition;
+                e.FindPropertyRelative("ClosedLocalPosition").vector3Value = closed;
 
-                bool has = previous.TryGetValue(bridges[i].name, out var prev) && prev.has;
-                e.FindPropertyRelative("OpenLocalPosition").vector3Value = has ? prev.open : bridges[i].localPosition;
+                bool has = previous.TryGetValue(name, out var prev) && prev.has;
+                Vector3 open = has ? prev.open : closed;
+
+                // 🔴 저작표에 있는 조각은 여기서 바로 채운다. 예전엔 Wire 만 돌리고 끝나서
+                // "F는 먹는데 다리가 안 움직인다"로 헤맸다(2026-08-17) — 한 번에 끝나게 한다.
+                if (!has)
+                {
+                    int row = System.Array.FindIndex(AuthoredOpenZ, a => a.Name == name);
+                    if (row >= 0)
+                    {
+                        open = closed;
+                        open.z = AuthoredOpenZ[row].OpenZ;
+                        has = true;
+                        authored++;
+                        log.AppendLine($"    ↔ 저작표 적용: {name} z {closed.z:F3} → {open.z:F3}");
+                    }
+                    else if (!name.StartsWith(MovingPrefix))
+                    {
+                        // 표에 없고 이름도 '움직이는 조각'이 아니면 고정 교대다. Open == Closed 로
+                        // **명시 저작**한다 — 미저작으로 남기면 런타임이 "어디로 갈지 모른다"며 매 스폰마다
+                        // 에러를 뱉는데, 이건 정상 상황이라 거짓 경보가 된다. 구 저작도 이렇게 했다
+                        // (2026-07-29: 내측 2조각이 HasOpenPosition=1 · Open==Closed).
+                        open = closed;
+                        has = true;
+                        heldStatic++;
+                        log.AppendLine($"    · 고정으로 저작: {name} (Open = Closed)");
+                    }
+                }
+
+                e.FindPropertyRelative("OpenLocalPosition").vector3Value = open;
                 e.FindPropertyRelative("HasOpenPosition").boolValue = has;
                 if (has) kept++;
             }
@@ -67,18 +136,129 @@ public static class ZoneBridgeGateWiring
             // 개통해도 그 위를 걸을 수 없다(실제로 그렇게 났다). 여기서 보장한다.
             int collidersAdded = EnsureMeshColliders(bridges, log);
             log.AppendLine($"  MeshCollider 신규 부착 {collidersAdded}개");
-            log.AppendLine($"  닫힘 위치 = 현재 위치로 기록 / 열림 위치 보존 {kept}건 · 미저작 {bridges.Count - kept}건");
+            log.AppendLine($"  닫힘 위치 = 현재 위치로 기록 / 열림 위치: 저작표 적용 {authored}건 · " +
+                           $"고정 저작 {heldStatic}건 · 기존 보존 {kept - authored - heldStatic}건 · " +
+                           $"미저작 {bridges.Count - kept}건");
 
             if (panels.Count == 0)
-                Debug.LogError($"[BridgeGate] '{PanelPrefix}*' 오브젝트가 없습니다 — F 대상이 생기지 않습니다.");
+                Debug.LogError($"[BridgeGate] '{PanelPrefix}*' 오브젝트가 없습니다 — F 대상이 생기지 않습니다. " +
+                               "아트가 이름을 또 바꿨는지 확인하고 PanelPrefix 를 고치세요.");
             if (bridges.Count == 0)
-                Debug.LogError($"[BridgeGate] '{BridgePrefix}*' 오브젝트가 없습니다 — 움직일 다리가 없습니다.");
+                Debug.LogError($"[BridgeGate] '{string.Join("* / ", BridgePrefixes)}*' 오브젝트가 없습니다 — 움직일 다리가 없습니다. " +
+                               "아트가 이름을 또 바꿨는지 확인하고 BridgePrefixes 를 고치세요.");
+            // 미저작이 남았다는 것은 "개통해도 그 조각은 안 움직인다"는 뜻이다 — 로그 한 줄로 묻히면
+            // 원인을 못 찾는다(2026-08-17). 움직여야 할 이름인데 표에 없으면 에러로 올린다.
             if (kept < bridges.Count)
-                log.AppendLine("  → 열림 위치 미저작분이 있습니다. ZoneL_typeB를 프리팹 모드로 열어 다리를 " +
-                               "연결 위치로 옮기고 'Record Bridge Open Positions'를 실행하세요 " +
-                               "(추정값이 필요하면 'Estimate Bridge Open Positions' 먼저).");
+            {
+                var stuck = bridges.Where(b => b.name.StartsWith(MovingPrefix))
+                                   .Select(b => b.name)
+                                   .Where(n => System.Array.FindIndex(AuthoredOpenZ, a => a.Name == n) < 0)
+                                   .ToList();
+
+                if (stuck.Count > 0)
+                    Debug.LogError($"[BridgeGate] '{MovingPrefix}*' 인데 AuthoredOpenZ 표에 없어 " +
+                                   $"개통해도 안 움직입니다: {string.Join(", ", stuck)} — 표를 갱신하세요 " +
+                                   $"({nameof(ZoneBridgeGateWiring)}.{nameof(AuthoredOpenZ)}).");
+
+                log.AppendLine($"  → 미저작 {bridges.Count - kept}조각은 개통해도 제자리에 머뭅니다. " +
+                               "움직일 조각이면 AuthoredOpenZ 표에 넣거나, 프리팹 모드에서 손으로 맞춘 뒤 " +
+                               "'Record Bridge OPEN Positions'로 저장하세요. " +
+                               "(고정 교대는 미저작이 정상입니다.)");
+            }
 
             PrefabUtility.SaveAsPrefabAsset(root, ZonePath);
+            Debug.Log(log.ToString());
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    /// <summary>
+    /// 팀장이 지정한 개통 위치(<see cref="AuthoredOpenZ"/>)를 써 넣는다.
+    ///
+    /// 왜 추정(<see cref="EstimateOpenPositions"/>)이 아닌가: 추정은 "안쪽 끝을 존 중앙(0)에 붙인다"는
+    /// 규칙인데 이 존은 <b>중앙에 플랫폼이 있다</b> — 중앙까지 밀면 다리가 플랫폼을 파고든다.
+    /// 실제로 필요한 것은 플랫폼 가장자리(≈ ±8)까지이고, 그 값은 사람이 보고 정한다.
+    ///
+    /// 움직이는 것은 표에 적힌 조각뿐이고 나머지는 <c>Open == Closed</c> 로 둔다.
+    /// </summary>
+    [MenuItem("Tools/Map/Authoring/Apply Authored Bridge Open Positions (ZoneL_typeB)")]
+    public static void ApplyAuthoredOpenPositions()
+    {
+        GameObject root = PrefabUtility.LoadPrefabContents(ZonePath);
+
+        try
+        {
+            var gate = root.GetComponent<ZoneBridgeGate>();
+            if (gate == null)
+            {
+                Debug.LogError("[BridgeGate] 먼저 'Wire Zone Bridge Gate'를 실행하세요.");
+                return;
+            }
+
+            var so = new SerializedObject(gate);
+            SerializedProperty segs = so.FindProperty("segments");
+            if (segs.arraySize == 0)
+            {
+                Debug.LogError("[BridgeGate] segments 가 비어 있습니다 — Wire 가 다리를 못 찾은 것입니다.");
+                return;
+            }
+
+            // 저작값이 Z 절대좌표이므로 배치가 Z축이 아니면 그대로 쓰면 안 된다.
+            int axis = DetectBridgeAxis(segs);
+            if (axis != 2)
+            {
+                Debug.LogError($"[BridgeGate] 다리 축이 {AxisName(axis)} 로 감지됐습니다 — 저작표는 Z 절대좌표 기준입니다. " +
+                               "아트가 존을 회전시켰다면 AuthoredOpenZ 를 다시 정해야 합니다. 중단합니다.");
+                return;
+            }
+
+            var log = new StringBuilder("[BridgeGate] 팀장 지정 개통 위치 적용 (Z 절대좌표)\n");
+            int moved = 0, held = 0;
+            var unmatched = new List<string>();
+
+            for (int i = 0; i < segs.arraySize; i++)
+            {
+                SerializedProperty e = segs.GetArrayElementAtIndex(i);
+                var t = e.FindPropertyRelative("Target").objectReferenceValue as Transform;
+                if (t == null) continue;
+
+                Vector3 closed = e.FindPropertyRelative("ClosedLocalPosition").vector3Value;
+                Vector3 open = closed;
+
+                int row = System.Array.FindIndex(AuthoredOpenZ, a => a.Name == t.name);
+                if (row >= 0)
+                {
+                    open.z = AuthoredOpenZ[row].OpenZ;
+                    moved++;
+                    log.AppendLine($"  ↔ {t.name}: z {closed.z:F3} → {open.z:F3} (이동 {open.z - closed.z:+0.000;-0.000})");
+                }
+                else
+                {
+                    held++;
+                    log.AppendLine($"  · {t.name}: 고정 (Open = Closed)");
+                    if (t.name.StartsWith(MovingPrefix)) unmatched.Add(t.name);
+                }
+
+                e.FindPropertyRelative("OpenLocalPosition").vector3Value = open;
+                e.FindPropertyRelative("HasOpenPosition").boolValue = true;
+            }
+
+            so.ApplyModifiedPropertiesWithoutUndo();
+            PrefabUtility.SaveAsPrefabAsset(root, ZonePath);
+
+            log.AppendLine($"완료: 이동 {moved}조각 · 고정 {held}조각.");
+
+            // 움직여야 할 이름인데 표에 없으면 조용히 고정돼 버린다 — 그건 반드시 알려야 한다.
+            if (unmatched.Count > 0)
+                Debug.LogError($"[BridgeGate] '{MovingPrefix}*' 인데 AuthoredOpenZ 표에 없어 고정으로 처리된 조각: " +
+                               $"{string.Join(", ", unmatched)} — 표를 갱신하세요.");
+            if (moved != AuthoredOpenZ.Length)
+                Debug.LogWarning($"[BridgeGate] 표에는 {AuthoredOpenZ.Length}개가 있는데 {moved}개만 적용됐습니다 — " +
+                                 "이름이 바뀌었는지 확인하세요.");
+
             Debug.Log(log.ToString());
         }
         finally
@@ -104,7 +284,11 @@ public static class ZoneBridgeGateWiring
             var so = new SerializedObject(gate);
             SerializedProperty segs = so.FindProperty("segments");
 
-            // 좌/우 묶음을 각각 통째로 슬라이드한다. 안쪽 끝이 x=0에 닿는 양만큼 옮기고, 같은 쪽의
+            // 🔴 축을 하드코딩하지 않는다. 이 도구는 원래 X축 다리를 전제로 썼는데 V3 아트 납품이
+            // 존을 Z축 배치로 바꿔 그대로 돌리면 조용히 엉뚱한 값을 쓴다. 저작 데이터에서 알아낸다.
+            int axis = DetectBridgeAxis(segs);
+
+            // 양쪽 묶음을 각각 통째로 슬라이드한다. 안쪽 끝이 0에 닿는 양만큼 옮기고, 같은 쪽의
             // 다른 조각도 같은 델타로 움직여 조각 간 상대 배치를 유지한다(신축 다리 가정).
             var byside = new Dictionary<int, List<int>>();
             var innerEdge = new Dictionary<int, float>();
@@ -114,20 +298,20 @@ public static class ZoneBridgeGateWiring
                 var t = segs.GetArrayElementAtIndex(i).FindPropertyRelative("Target").objectReferenceValue as Transform;
                 if (t == null) continue;
 
-                int side = t.localPosition.x >= 0f ? 1 : -1;
+                int side = t.localPosition[axis] >= 0f ? 1 : -1;
                 if (!byside.TryGetValue(side, out var list)) byside[side] = list = new List<int>();
                 list.Add(i);
 
                 if (!TryLocalBounds(gate.transform, t, out Bounds b)) continue;
 
-                // 중앙(x=0)을 향한 끝. 오른쪽 묶음은 min.x, 왼쪽 묶음은 max.x가 안쪽이다.
-                float edge = side > 0 ? b.min.x : b.max.x;
+                // 중앙(0)을 향한 끝. + 묶음은 min, − 묶음은 max 가 안쪽이다.
+                float edge = side > 0 ? b.min[axis] : b.max[axis];
                 if (!innerEdge.TryGetValue(side, out float cur) ||
                     (side > 0 ? edge < cur : edge > cur))
                     innerEdge[side] = edge;
             }
 
-            var log = new StringBuilder("[BridgeGate] 열림 위치 추정(안쪽 끝이 x=0에 닿도록 묶음 슬라이드):\n");
+            var log = new StringBuilder($"[BridgeGate] 열림 위치 추정(안쪽 끝이 {AxisName(axis)}=0에 닿도록 묶음 슬라이드):\n");
             foreach (KeyValuePair<int, List<int>> kv in byside)
             {
                 if (!innerEdge.TryGetValue(kv.Key, out float edge))
@@ -137,13 +321,17 @@ public static class ZoneBridgeGateWiring
                 }
 
                 float delta = -edge;   // 안쪽 끝을 0으로
-                log.AppendLine($"  side {(kv.Key > 0 ? "+X" : "-X")}: 안쪽 끝 x={edge:F2} → 슬라이드 {delta:+0.00;-0.00}");
+                log.AppendLine($"  side {(kv.Key > 0 ? "+" : "-")}{AxisName(axis)}: " +
+                               $"안쪽 끝 {AxisName(axis)}={edge:F2} → 슬라이드 {delta:+0.00;-0.00}");
+
+                Vector3 offset = Vector3.zero;
+                offset[axis] = delta;
 
                 foreach (int i in kv.Value)
                 {
                     SerializedProperty e = segs.GetArrayElementAtIndex(i);
                     Vector3 closed = e.FindPropertyRelative("ClosedLocalPosition").vector3Value;
-                    Vector3 open = closed + new Vector3(delta, 0f, 0f);
+                    Vector3 open = closed + offset;
                     e.FindPropertyRelative("OpenLocalPosition").vector3Value = open;
                     e.FindPropertyRelative("HasOpenPosition").boolValue = true;
 
@@ -269,10 +457,21 @@ public static class ZoneBridgeGateWiring
 
         foreach (Transform bridge in bridges)
         {
+            // 🔴 V3 아트는 콜라이더를 조각 루트에 두고 메시는 중첩 프리팹 안에 둔다.
+            // 그래서 자식 MeshFilter 만 보면 "콜라이더 없음"으로 읽혀 중복 MeshCollider 를 얹고,
+            // 게다가 중첩 프리팹에 added-component 오버라이드까지 남긴다.
+            // 조각 어딘가에 이미 콜라이더가 있으면 그 조각은 통째로 건너뛴다.
+            Collider existing = bridge.GetComponentInChildren<Collider>(true);
+            if (existing != null)
+            {
+                log.AppendLine($"    = 콜라이더 있음, 건너뜀: {bridge.name} ({existing.GetType().Name} on {existing.name})");
+                continue;
+            }
+
             foreach (MeshFilter mf in bridge.GetComponentsInChildren<MeshFilter>(true))
             {
                 if (mf.sharedMesh == null) continue;
-                if (mf.GetComponent<Collider>() != null) continue;
+                if (mf.GetComponentInParent<Collider>() != null) continue;
 
                 var mc = mf.gameObject.AddComponent<MeshCollider>();
                 mc.convex = false;
@@ -284,9 +483,41 @@ public static class ZoneBridgeGateWiring
         return added;
     }
 
+    /// <summary>
+    /// 다리가 뻗는 축을 저작 데이터에서 알아낸다(0 = X, 2 = Z). Y는 후보가 아니다 — 수평 다리다.
+    ///
+    /// 🔴 하드코딩하면 아트가 존 배치를 돌릴 때 <b>조용히</b> 틀린다. 실제로 그렇게 됐다 —
+    /// 구 저작은 <c>x = ±14</c> 였고 V3 납품 후에는 <c>x = 0.037</c> 고정 · <c>z = ±13</c> 이다.
+    /// 조각들의 닫힘 위치가 존 중앙에서 더 크게 벌어진 축을 고른다.
+    /// </summary>
+    static int DetectBridgeAxis(SerializedProperty segs)
+    {
+        float spreadX = 0f, spreadZ = 0f;
+
+        for (int i = 0; i < segs.arraySize; i++)
+        {
+            Vector3 closed = segs.GetArrayElementAtIndex(i)
+                                 .FindPropertyRelative("ClosedLocalPosition").vector3Value;
+            spreadX = Mathf.Max(spreadX, Mathf.Abs(closed.x));
+            spreadZ = Mathf.Max(spreadZ, Mathf.Abs(closed.z));
+        }
+
+        return spreadZ > spreadX ? 2 : 0;
+    }
+
+    static string AxisName(int axis) => axis == 0 ? "x" : axis == 1 ? "y" : "z";
+
     static List<Transform> Collect(GameObject root, string prefix)
+        => Collect(root, new[] { prefix });
+
+    /// <summary>
+    /// 이름 접두사로 수집한다. 접두사가 여러 개인 이유는 아트가 다리를 두 종류
+    /// (<c>floor_bridge</c> 교대 + <c>floor_MV_bridge</c> 데크)로 나눠 납품했기 때문이다.
+    /// 정렬은 이름순 — <b>이 순서가 곧 패널 인덱스이자 복제 키</b>라 안정적이어야 한다.
+    /// </summary>
+    static List<Transform> Collect(GameObject root, string[] prefixes)
         => root.GetComponentsInChildren<Transform>(true)
-               .Where(t => t != root.transform && t.name.StartsWith(prefix))
+               .Where(t => t != root.transform && prefixes.Any(p => t.name.StartsWith(p)))
                .OrderBy(t => t.name)
                .ToList();
 
