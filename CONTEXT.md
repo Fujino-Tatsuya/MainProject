@@ -4,7 +4,96 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 다음 세션 시작점 — 아트 머지 후 Unity 검증 (2026-08-15 저녁 종료)
+## ▶▶ 다음 세션 시작점 — 보스 회전 감속 + 돌진 미이동 (2026-08-18 새벽 종료)
+
+**브랜치 `feature/Boss23`** · **컴파일 0에러** · **커밋 6개 미푸시** (`3a8743d..8af4b8e`)
+**백업 = 로컬 `backup/boss23-20260815`**
+
+**한 줄 상태: 다리 개통·도구 정리·레거시 보스 교체·리쉬 버그까지 닫혔고 Play 로 확인됐다.
+남은 것은 보스 거동 2건이다.**
+
+### 🔴 다음 세션 할 일 2건 (팀장 지시)
+
+**1. 보스 회전을 플레이어처럼 부드럽게**
+
+지금 보스는 타깃을 향해 **한 프레임에 확 돌아본다** — 비주얼이 불편하다는 판단이다.
+플레이어의 감속 회전 방식을 그대로 가져온다.
+
+| | 위치 |
+|---|---|
+| 보스(즉시 회전) | [MonsterBase.cs:1142](Assets/1.Scripts/Monster/MonsterBase.cs:1142) `FaceTarget()` — `transform.rotation = Quaternion.LookRotation(dir)` 한 줄 |
+| 플레이어(감속 회전) | [PlayerMovement.cs:179](Assets/1.Scripts/Player/PlayerMovement.cs:179) `Quaternion.Slerp(현재, 목표, rotate_Speed * Time.deltaTime)` + `Dot > 0.999f` 도달 클램프 |
+| 호출처 | `MonsterBase.cs:315`·`335`, `TwentyThreeBoss.cs:1748` |
+
+⚠️ **`FaceTarget` 은 몹 8종·중간보스 3종이 공유한다.** 즉시 회전을 그냥 바꾸면 전부 바뀐다 —
+`data` 에 회전 속도 필드를 추가하고 **0 이면 기존 즉시 회전**으로 두는 식이 안전하다(장판 SO 이관 때 쓴 규약).
+⚠️ 회전은 서버 권한이고 클라는 `NetworkTransform` 보간으로 받는다 — 서버에서만 감속하면 된다.
+⚠️ [TwentyThreeBoss.cs:923](Assets/1.Scripts/Monster/Boss/TwentyThreeBoss.cs:923) `FaceTargetWhileAttacking => false` 는
+**의도된 것**이다(잡기 소켓 되먹임으로 무한 회전한 사고 때문). 공격 중 회전을 되살리지 말 것.
+
+**2. 착지 직후 돌진이 앞으로 안 나간다 — 애니메이션만 제자리에서 돈다**
+
+landing 직후 바로 돌진을 하는데 **실제 변위가 0** 이다.
+
+🔴 **전에 같은 증상을 한 번 고쳤다** — `552c44a`: `StartDashMove` 가 프리팹의 `acceleration`(8m/s²)을
+승계하지 않아 0.7초에 1.96m 만 가던 문제. 레거시 BT 의 `SetAgentDashModeAction` 은 `999`/`autoBraking=false`
+로 바꾸고 있었다. **먼저 그 승계가 아직 살아 있는지 확인할 것.**
+그 다음 후보: 돌진은 `agent` 이동이 아니라 **NavMesh 클램프 방식**이다(IMPLEMENTATION_NOTES.md) —
+착지 직후엔 에이전트가 막 켜진 시점이라 클램프 기준이 안 잡혔을 수 있다.
+
+### ✅ 2026-08-18 새벽에 닫은 것 (커밋 6개)
+
+| 커밋 | 내용 |
+|---|---|
+| `fdd37eb` | ZoneL_typeB 다리 개통 복원 — 아트 V3 교체로 날아간 `ZoneBridgeGate` 재연결 |
+| `0aa000c` | 아트 머지로 죽은 도구 경로 3건 정정 |
+| `962c3e9` | 소진된 일회성 에디터 도구 25개 제거 (83 → 58) |
+| `9181e75` | 레거시 보스 프리팹 참조를 신규 `Monster/Boss` 로 교체 (5곳) |
+| `f64e599` | 보스 프리팹 검증 도구 제거 — 검증 대상이 죽었다 |
+| `8af4b8e` | 착지 후 영구 리쉬 복귀 수정 — 리쉬 기준점을 전투 원점으로 |
+
+**리쉬 버그가 이번 세션의 핵심 교훈이다.** `bossPrefab` 을 레거시(BT)에서 신규(FSM)로 바꾸자
+`MonsterBase.HandleSeekAndCombat` 이 보스에 대해 처음 실행되면서 드러났다 —
+상공 18m 스폰 위치가 리쉬 기준점으로 잡혀 `leashRadius`(15m)를 영구 초과했고,
+`EnterReturn` 의 `Revive()` 가 매 프레임 체력을 최대로 되돌렸다.
+증상은 "데미지가 안 박히고 애니메이션이 안 나온다"로 보였다. 해결 = `SetSpawnAnchor` seam.
+
+### 🔴 새로 발견된 별건 — 은희 님 담당
+
+**`AudioManager` NRE 9건** — Play 부트 흐름에서 터진다. BGM 이 안 나오는 것 말고 흐름은 진행된다.
+
+```
+TitleSceneManager.cs:33   AudioManager.Instance.PlayBGM(AudioManager.Instance.Catalog.TitleBGM)  ×5
+LobbySceneManager.cs:77   AudioManager.Instance.PlayBGM(AudioManager.Instance.Catalog.LobbyBGM)  ×4
+```
+
+`Instance` 또는 `.Catalog` 가 null 인데 두 곳 다 null 검사 없이 두 단계를 체이닝한다.
+`LobbySceneManager` 는 아트 머지에서 `BeaverLobbySceneManager` 의 GUID 를 물려받으며 613줄 개편된
+파일이고 `3.LobbyScene` 도 +3,037줄 바뀌었다 — **머지 과정에서 배선이 빠진 것으로 보인다.**
+
+### 🔴 팀장 액션
+
+1. **은희 님께 플레이어 수정분 push 요청** — "플레이어 버그를 고쳤다"고 했으나 **원격 어디에도 없다.**
+   `Player/`·`Unit/`·`PlayerVariant/` 가 모든 원격 브랜치에서 `feature/Boss23` 과 0 파일 차이이고,
+   마지막 커밋은 `257cb4c`(2026-08-07)로 이미 들어와 있다. 위 `AudioManager` 건도 같이 전달.
+2. **`Build/Windows64 Player`** 가 필수 맵을 보조 씬(`4.MapScene`)으로 고정한다 —
+   정본은 `-trensparent`. 빌드 산출물에 영향이라 판단 필요해 손대지 않았다.
+3. **`layprefab.prefab` 의 `LaserBlockWall` 걷어내기** — 걷어내면
+   `Tools/Map/Authoring/Remove Quest Laser Blockers` 와 그 파일도 지울 수 있다.
+   ⚠️ Quest 통로 차단의 **대체 구현은 없다**(구 주석의 `AttachQuestBlockade` 는 코드에 존재하지 않는다).
+
+### 도구 정리 결과 — 메뉴 83 → 57개
+
+읽기전용 검증·덤프, Bridge Gate 5종, MapGen, Rendering Look, 잡기 소켓(은희 인터페이스 대기)은 유지.
+Codex CLI 교차검증에서 **Codex 가 2건 틀렸다** — `AttachQuestBlockade` 를 주석에서 읽고 구현으로 오독,
+`LaserBlockWall` 잔존을 0건으로 판단. 그래서 `Remove` 는 남겼다.
+
+⚠️ 지시대로 남긴 3개는 **지금 정상 동작하지 않는다**: `Effects/v1 기본 에셋 생성`·`Effects/스모크 테스트`
+(`EntryFolder = Assets/5.VFX/Common` 사망, `EffectSmokeTestRunner` 타입 없음) · `Build/Windows64 Player`.
+
+---
+
+## 이전 시작점 — 아트 머지 후 Unity 검증 (2026-08-15 저녁 종료)
 
 **브랜치 `feature/Boss23`** · 머지 커밋 `71dabb1` (부모 `3a8743d` + `86da52c`)
 **백업 = 로컬 브랜치 `backup/boss23-20260815`** (머지 직전 `3a8743d` 시점)
