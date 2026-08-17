@@ -24,6 +24,14 @@ public class MonsterDataSO : ScriptableObject
     public float leashRadius = 15f;     // 스폰 지점에서 이 거리 벗어나면 복귀
     public float returnSpeedMultiplier = 5f; // 복귀 시 이동속도 배수(복귀속도 = MoveSpeed × 이 값)
 
+    [Header("회전")]
+    // 몸을 돌리는 속도. **0 = 즉시 회전**(한 프레임에 목표 방향으로 스냅 — 몹 8종·중간보스 3종의 기존 동작).
+    // >0 이면 플레이어와 같은 규약으로 감속 회전한다(PlayerMovement.rotate_Speed 기본 10):
+    //   Slerp(현재, 목표, turnSpeed × deltaTime) + Dot > 0.999 도달 클램프.
+    // 🔴 회전은 **서버 권한**이다 — 클라는 NetworkTransform 보간으로 받으므로 서버에서만 감속하면 된다.
+    // ⚠️ 0 을 기본값으로 두는 것이 이 필드의 계약이다. 기본을 >0 으로 바꾸면 몹 전체 거동이 한꺼번에 바뀐다.
+    public float turnSpeed = 0f;
+
     [Header("회피 / 크라우드 (부분 겹침·성능)")]
     // NavMeshAgent 회피 반경. CapsuleCollider(히트박스)보다 작게 두면 몹끼리 '부분 겹침'이 허용된다(작을수록 더 겹침).
     // 물리(RB)로 밀어내지 않고 이 값만으로 겹침량을 조절 — 서버권한 crowd에서 가장 저렴. 콜라이더는 히트용으로 별도 유지.

@@ -24,6 +24,7 @@ MonoBehaviour:
   attackRange: 2
   leashRadius: 15
   returnSpeedMultiplier: 5
+  turnSpeed: 10
   avoidanceRadius: 0.3
   obstacleAvoidance: 2
   projectilePrefab: {fileID: 0}

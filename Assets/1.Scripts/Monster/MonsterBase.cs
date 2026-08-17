@@ -573,7 +573,7 @@ public class MonsterBase : Unit
         Vector3 v = agent != null && agent.enabled ? agent.velocity : Vector3.zero;
         v.y = 0f;
         if (v.sqrMagnitude < 0.04f) { FaceTarget(); return; }
-        transform.rotation = Quaternion.LookRotation(v.normalized);
+        RotateToward(v.normalized);
     }
     #endregion
 
@@ -613,6 +613,20 @@ public class MonsterBase : Unit
     /// </summary>
     protected virtual bool FaceTargetWhileAttacking => true;
 
+    /// <summary>
+    /// 공격의 <b>선딜 동안만</b>(= 히트 이벤트가 나가기 전까지) 타깃을 향해 계속 도는가.
+    ///
+    /// 기본 <c>false</c> = 지금까지의 동작. <see cref="FaceTargetWhileAttacking"/> 가 <c>true</c> 면
+    /// 이미 매 틱 돌므로 이 값은 아무 일도 하지 않는다 — 즉 <b>몹 8종·중간보스 3종은 무영향</b>이다.
+    ///
+    /// 🔴 왜 생겼는가 (2026-08-18 팀장 확정): 보스 회전을 감속으로 바꾸면
+    /// <see cref="StartAttack"/> 직전의 <c>FaceTarget()</c> <b>1회</b> 조준이 무력해진다 —
+    /// 감속 회전은 한 프레임에 몇 도밖에 못 돌기 때문이다. 조준을 즉시 회전으로 남기면 그 순간만
+    /// 뚝 끊겨 보이므로, <b>선딜 구간을 조준 구간으로 쓴다.</b> 히트가 나간 뒤부터는 회전이 없다
+    /// (<see cref="FaceTargetWhileAttacking"/> 의 확정 스펙 — 돌진은 밀고 지나가야 한다).
+    /// </summary>
+    protected virtual bool FaceTargetDuringWindup => false;
+
     protected virtual void HandleAttack(float dt)
     {
         // 선딜(준비) 중 타깃이 사거리+여유를 벗어나면 공격 취소 → 추격 복귀.
@@ -629,7 +643,9 @@ public class MonsterBase : Unit
         }
 
         _stateTimer -= dt;
-        if (FaceTargetWhileAttacking)
+        // 선딜 조준(FaceTargetDuringWindup)은 히트가 나가기 전까지만이다. _commitFired 까지 보는 것은
+        // 위 취소 창과 같은 기준을 쓰기 위해서다 — 커밋한 공격은 이미 방향이 확정된 것으로 본다.
+        if (FaceTargetWhileAttacking || (FaceTargetDuringWindup && !_attackFired && !_commitFired))
             FaceTarget();
 
         // 히트: 애니 OnAttackHit 이벤트(NotifyAttackHit) 전용 — 플레이어(DefaultAttackController)와 동일하게
@@ -1145,7 +1161,52 @@ public class MonsterBase : Unit
         Vector3 dir = _target.position - transform.position;
         dir.y = 0f;
         if (dir.sqrMagnitude < 0.0001f) return;
+        RotateToward(dir);
+    }
+
+    /// <summary>
+    /// 타깃 방향으로 <b>한 프레임에</b> 스냅한다(<c>data.turnSpeed</c> 무시).
+    ///
+    /// 🔴 왜 따로 있는가: 감속 회전은 <b>매 틱 불러야</b> 목표에 도달한다. 그런데 회전 직후
+    /// <c>transform.forward</c> 를 그대로 소비해 방향을 확정하는 자리가 있다(레이지 돌진 =
+    /// <c>BeginRageDash</c>). 거기서 감속을 쓰면 그 프레임의 어중간한 각도가 돌진 방향으로
+    /// 굳어 버린다. <b>"돌아본 뒤 그 방향을 즉시 쓰는" 자리에서만</b> 이걸 쓴다.
+    /// </summary>
+    protected void FaceTargetImmediate()
+    {
+        if (_target == null) return;
+        Vector3 dir = _target.position - transform.position;
+        dir.y = 0f;
+        if (dir.sqrMagnitude < 0.0001f) return;
         transform.rotation = Quaternion.LookRotation(dir);
+    }
+
+    /// <summary>
+    /// 몬스터 회전의 <b>단일 지점</b>. <c>data.turnSpeed</c> 가 0 이면 기존처럼 즉시 스냅하고,
+    /// >0 이면 플레이어(<c>PlayerMovement</c>)와 같은 규약으로 감속한다.
+    ///
+    /// 🔴 도달 클램프(<c>Dot &gt; 0.999f</c>)가 필요한 이유: Slerp 는 목표에 <b>점근</b>할 뿐
+    /// 도달하지 않는다. 클램프가 없으면 거의 맞춘 상태에서 매 프레임 미세하게 계속 돌아
+    /// 회전이 "끝났다"고 말할 수 있는 시점이 생기지 않는다(플레이어도 같은 처리를 한다).
+    /// </summary>
+    void RotateToward(Vector3 dir)
+    {
+        Quaternion target = Quaternion.LookRotation(dir);
+
+        float turnSpeed = data != null ? data.turnSpeed : 0f;
+        if (turnSpeed <= 0f)
+        {
+            transform.rotation = target; // 0 = 즉시 회전(기존 동작)
+            return;
+        }
+
+        if (Vector3.Dot(dir.normalized, transform.forward) > 0.999f)
+        {
+            transform.rotation = target;
+            return;
+        }
+
+        transform.rotation = Quaternion.Slerp(transform.rotation, target, turnSpeed * Time.deltaTime);
     }
 
     void SetState(MonsterState next)

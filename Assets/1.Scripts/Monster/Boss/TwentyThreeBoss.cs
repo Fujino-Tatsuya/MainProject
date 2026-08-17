@@ -693,6 +693,12 @@ public class TwentyThreeBoss : MonsterBase
             case BossAttackPhase.Windup:
                 // 판정은 애니 이벤트(OnAttackHit → PerformAttackHit)가 만든다.
                 // 이벤트가 유실되면 여기 타이머가 만료돼 아래 안전망으로 빠진다.
+                //
+                // 🔴 선딜 조준(2026-08-18). Windup 을 쓰는 것은 **잡기뿐**이고, 잡기는 base 의
+                //    HandleAttack 을 타지 않아 FaceTargetDuringWindup 이 닿지 않는다 — 그래서 여기서
+                //    같은 일을 한다. 잡기가 성립하는 순간(AcquireGrab)에 Hold 로 넘어가므로
+                //    되먹임 구간에는 들어오지 않는다.
+                FaceTarget();
                 break;
 
             case BossAttackPhase.Hold:
@@ -921,6 +927,14 @@ public class TwentyThreeBoss : MonsterBase
     //       따라가는데 그 플레이어를 향해 `LookRotation` 을 걸면 끝없이 돌던 문제.
     //    ⚠️ 대가: 훅·잡기가 움직이는 플레이어를 놓치기 쉬워진다. 확정 스펙이므로 그대로 둔다.
     protected override bool FaceTargetWhileAttacking => false;
+
+    // 🔴 **선딜 동안에는 돈다**(팀장 확정 2026-08-18). 위 규칙(공격 중 회전 없음)은 그대로다 —
+    //    바뀐 것은 회전이 감속(No23 = turnSpeed 10)이 되면서 "조준 1회"가 성립하지 않게 된 점이다.
+    //    한 프레임 Slerp 로는 몇 도밖에 못 돌아 보스가 엉뚱한 데를 때린다. 그래서 히트 이벤트가
+    //    나가기 전까지를 조준 구간으로 쓴다.
+    //    ⚠️ 잡기 되먹임은 여전히 안전하다 — 되먹임은 플레이어가 손 소켓에 붙은 **뒤**(AcquireGrab,
+    //       즉 히트 이벤트 시점) 생긴다. 그 순간부터는 이 값이 false 인 것과 같다.
+    protected override bool FaceTargetDuringWindup => true;
 
     Player FindGrabTarget()
     {
@@ -1745,7 +1759,10 @@ public class TwentyThreeBoss : MonsterBase
 
     void BeginRageDash()
     {
-        FaceTarget();
+        // 🔴 **즉시 조준이어야 한다.** 바로 다음 줄에서 transform.forward 를 돌진 방향으로 굳히기
+        //    때문이다 — 감속 회전을 쓰면 그 프레임의 어중간한 각도가 그대로 방향이 된다.
+        //    레이지는 연타(rageDashCount)라 매 회 새로 조준한다. (2026-08-18 감속 회전 도입)
+        FaceTargetImmediate();
         _rageDashDir = transform.forward;
         _rageDashDir.y = 0f;
         if (_rageDashDir.sqrMagnitude < 0.0001f) _rageDashDir = Vector3.forward;
