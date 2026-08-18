@@ -184,6 +184,7 @@ GameObject:
   m_Component:
   - component: {fileID: 5484054633064661158}
   - component: {fileID: 7447756877851427495}
+  - component: {fileID: 2052202881775860678}
   m_Layer: 0
   m_Name: ZoneL_typeB
   m_TagString: Untagged
@@ -512,6 +513,23 @@ MonoBehaviour:
   ringWidth: 0.2
   ringGroundLift: 0.05
   ringPrefabOverride: {fileID: 0}
+--- !u!114 &2052202881775860678
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 411843160232409271}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b8927339de8b5484ea4d7236ae12660a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MonsterSpawner
+  ShowTopMostFoldoutHeaderGroup: 1
+  defaultMonsterPrefab: {fileID: 6303057502177232290, guid: 1f13e06cd8ea3c14eb063c61e7298d62, type: 3}
+  spawnPoints: []
+  autoSpawnOnStart: 1
+  maxAlive: 0
 --- !u!1 &878429546644021613
 GameObject:
   m_ObjectHideFlags: 0

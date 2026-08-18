@@ -2393,6 +2393,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 3735471301859160650}
+  - component: {fileID: 4146595535436099827}
   m_Layer: 0
   m_Name: ZoneL_typeA
   m_TagString: Untagged
@@ -2424,6 +2425,23 @@ Transform:
   - {fileID: 7678624497219752177}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &4146595535436099827
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8379410028330111424}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b8927339de8b5484ea4d7236ae12660a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MonsterSpawner
+  ShowTopMostFoldoutHeaderGroup: 1
+  defaultMonsterPrefab: {fileID: 6303057502177232290, guid: 1f13e06cd8ea3c14eb063c61e7298d62, type: 3}
+  spawnPoints: []
+  autoSpawnOnStart: 1
+  maxAlive: 0
 --- !u!1 &9045009281738173941
 GameObject:
   m_ObjectHideFlags: 0
