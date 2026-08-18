@@ -4,7 +4,106 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 다음 세션 시작점 — 넉백 세기 튜닝 (2026-08-18 낮 종료)
+## ▶▶ 다음 세션 시작점 — 넉백 세기 튜닝 (2026-08-18 밤 종료)
+
+**브랜치 `feature/Boss23`** · **컴파일 0에러** · **원격 동기화 완료(ahead 0 / behind 0)**
+**백업 = 로컬 `backup/boss23-20260815`**
+
+**한 줄 상태: 존 몬스터 스폰이 맵 경로에서 처음으로 돈다(Play 확인). 빌드도 뽑았다.
+남은 것은 넉백 세기 튜닝이다.**
+
+### 🔴 다음 할 일 — 넉백 세기 튜닝 (이월)
+
+팀장 판단: **넉백이 조금 과하다.** 전부 `No23.asset`(단독 변형은 `No23_Solo.asset`) 노브다.
+
+| 노브 | 현재 | 절반 기준 출발점 |
+|---|---|---|
+| `dashKnockbackStrength` | 12 | 6 |
+| `jumpKnockbackStrength` | 9 | 4.5 |
+| `chargeAuraKnockbackStrength` | 8 | 4 |
+
+⚠️ **강도 노브만 있다.** 진입점 `Unit.Knockback(방향, 강도)` 이 강도만 받으므로 지속·경직 노브는
+**일부러 두지 않았다** — 노출해도 아무 일이 없는 "고장난 노브"가 되기 때문이다.
+
+### ✅ 2026-08-18 밤에 닫은 것 — 존 몬스터 스폰 (Play 검증 완료)
+
+**아트가 마커를 저작하면 실제 맵에 몬스터가 나온다.** 이번에 처음 연결됐다.
+
+| 커밋 | 내용 |
+|---|---|
+| `20d657a`·`07ffe1f` | 아트(이지원) — 존 9종에 `MonsterSpawnPoint` 50개 + 씬/NetworkPrefabs |
+| `6106636` | 맵 생성 경로가 존의 `MonsterSpawner` 저작을 실행하게 |
+| `8d2c3d1` | 존 8종에 `MonsterSpawner` 배선 + 저작 도구 |
+
+**저작 조합 = `MonsterSpawner`(존 루트) + `MonsterSpawnPoint`(자식 마커).**
+지점 `Override` 가 있으면 그것, 없으면 스포너의 기본 몬스터.
+
+| 존 | 기본 | 마커 | |
+|---|---|---|---|
+| `ZoneL_typeA/B/C` | MortarBot | 7/7/7 | 각 1지점 Gauntlet·Wall·Humanoid |
+| `ZoneM_typeA/B` | PeekABot | 5/6 | |
+| `ZoneS_typeA`·`Quest01/02` | ChompBot | 5/5/4 | |
+| `ZoneS_typeStart` | — | 4 | 🔴 **일부러 제외**(시작 지점) |
+| `ZoneS_typeBossEnter`·`ZoneM_typeC` | — | 0 | 마커 없음 |
+
+🔴 **`spawner.SpawnWave()` 를 부를 수 없다 — 이번 세션의 핵심 교훈.**
+`NetworkBehaviour.IsServer` 는 계산 프로퍼티가 아니라 **네트워크 스폰 때 세팅되는 자동
+프로퍼티**다(`NetworkBehaviour.cs:476`). 존은 「비네트워크 규약」이라 `Spawn()` 되지 않으므로
+존에 붙은 스포너의 `IsServer` 는 **영원히 false** 이고 `SpawnWave()`·`SpawnAt()`·`SpawnOne()`
+이 전부 첫 줄에서 return 한다. **존에 `NetworkObject` 를 붙여도 아무도 Spawn 해 주지 않아
+결과가 같다.** → `MapContentSpawner.SpawnFromZoneSpawner` 가 마커만 읽어 서버에서 직접 스폰한다.
+
+⚠️ **자동 수집은 `MonsterSpawner.ResolveSpawnPoints()` 로 뺐다.** 원래 `OnNetworkSpawn` 안에만
+있어서 네트워크 스폰되지 않는 오브젝트에서는 수집조차 돌지 않았다. `Spawn Points` 목록은
+**비워 두는 것이 규약**이다 — 채우면 아트가 마커를 추가해도 반영되지 않는다.
+
+**저작 도구** = `Tools/Map/Authoring/존 몬스터 스포너 배선` (적용 + 읽기전용 검증). 멱등하다.
+기본 몬스터를 바꾸거나 존이 늘면 **손으로 만지지 말고 이걸 돌린다.**
+
+### ✅ 함께 닫은 것
+
+| 커밋 | 내용 |
+|---|---|
+| `1048386` | 보스 회전 감속 + 선딜 조준 (Play 검증) |
+| `370e7df` | 착지 직후 첫 돌진 미이동 — 연출 중 FSM 정지 (Play 검증) |
+| `f96fbd4` | 빌드 게이트가 정본 전투 맵(`-trensparent`)을 요구하게 |
+| `57c58dc` | 로비 Relay 조인코드가 **흰 배경에 흰 글씨**라 안 보이던 것 |
+
+### 🔴 이번 세션에 확정된 함정 (다음 사람이 밟을 지점)
+
+- **정본 존 프리팹은 `Assets/2.Prefabs/Map/Zoneprefab/` 이다.** 판단 기준은 "어느 프리팹에
+  컴포넌트가 붙어 있나"가 아니라 **`ZoneLayoutCatalog` 가 무엇을 가리키나**다.
+  `LevelDeliveryV3/Zones/PF_Zone_*_V3` 는 `ZoneLayout` 저작이 들어 있지만 **카탈로그에 없어
+  맵에 안 나온다.** 내가 이걸 거꾸로 읽어 문서를 두 번 다시 썼다.
+- **`ZoneLayout`·`NodeMarker`·`MonsterSpawnEntries` 경로는 지금 안 쓰인다.** 정본 존 11개에
+  `ZoneLayout` 이 아예 없어 `MapContentSpawner.SpawnMonstersFor` 가 항상 0 을 반환한다.
+  `MonsterSpawnEntries` 는 **스크립트가 아니라 `ZoneLayout.cs:43` 의 필드**다(Add Component 에 안 뜬다).
+- **맵 생성은 `MapGenerator.Start()` 가 아니라 `MapNetworkSync.OnNetworkSpawn()` 이 한다.**
+  씬의 `AutoGenerateOnStart: 0` 이고 `Start()` 는 `NetworkManager.IsListening` 이면 early return 한다.
+  서버가 시드를 뽑아 복제하고 클라가 같은 시드로 각자 생성한다.
+- **빌드 산출물의 `MainProject.exe`·`UnityPlayer.dll` 은 내용이 안 바뀌면 갱신되지 않는다.**
+  실제 콘텐츠는 `MainProject_Data/`(`level0`~ · `sharedassets*`)다. exe 타임스탬프로 빌드 여부를
+  판단하면 안 된다.
+- **인스턴스 2개를 띄우면 `Player.log` 는 먼저 잡은 쪽만 쓴다.** 나중에 뜬 쪽 로그는 남지 않는다.
+  로그로 "인스턴스가 몇 개였나"를 추론할 수 없다.
+
+### 🔴 남아 있는 팀장 액션 3건
+
+1. **은희 님께 플레이어 수정분 push 요청** + `AudioManager` NRE 전달
+   (`LobbySceneManager.Start()` **마지막 줄**이라 BGM 만 안 나오고 흐름은 정상)
+2. **로비 UX** — 호스트가 조인코드를 정할 수 없는데(`StartRelayHost` 가 입력칸을 안 읽는다)
+   입력칸이 열려 있어 "입력하면 방 코드가 되겠지"로 읽힌다. 호스트일 때 비활성화 + 발급 코드
+   자동 채움이 맞다. 은희 담당
+3. **`layprefab.prefab` 의 `LaserBlockWall` 걷어내기** — ⚠️ Quest 통로 차단 대체 구현 없음
+
+### 아트 전달용 문서
+
+정본 = [zone-monster-spawn-authoring.md](Docs/design/zone-monster-spawn-authoring.md)
+넘길 사본(md+html) = `C:\Unity\_Handoff\zone-monster-spawn\` (레포 밖, 스냅샷)
+
+---
+
+## 이전 시작점 — 회전 감속·첫 돌진 마감 (2026-08-18 낮)
 
 **브랜치 `feature/Boss23`** · **컴파일 0에러** · **`origin/feature/Boss23` 과 동기화 완료(ahead 0 / behind 0)**
 **백업 = 로컬 `backup/boss23-20260815`**

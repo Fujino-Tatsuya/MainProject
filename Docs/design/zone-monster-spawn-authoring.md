@@ -11,7 +11,7 @@
 | | |
 |---|---|
 | **어디에 붙이나** | 존 프리팹 **루트** — `Assets/2.Prefabs/Map/Zoneprefab/` |
-| **뭘 붙이나** | `MonsterSpawner` **+ `NetworkObject`** (둘 다 필요, 아래 [1단계](#1단계--존-프리팹에-monsterspawner-붙이기)) |
+| **뭘 붙이나** | **`MonsterSpawner` 하나뿐.** `NetworkObject` 는 붙이지 않는다 |
 | **최소 저작** | `Default Monster Prefab` 칸에 몬스터 프리팹 하나 |
 | **위치 지정** | 빈 오브젝트 + `MonsterSpawnPoint` 를 **자식으로** 두면 끝. 목록에 등록할 필요 **없다** |
 | **몬스터 프리팹** | `Assets/2.Prefabs/Monster/` — ChompBot · MortarBot · PeekABot · HumanoidBot · SpinnerBot · WallBot · GauntletBot |
@@ -27,12 +27,9 @@
 1. `Assets/2.Prefabs/Map/Zoneprefab/` 에서 프리팹을 더블클릭해 **프리팹 편집 모드**로 연다
 2. **루트** 오브젝트를 선택
 3. `Add Component` → **`Monster Spawner`**
-4. `Add Component` → **`Network Object`** ← 🔴 **이걸 빠뜨리면 몬스터가 한 마리도 안 나온다**
 
-> **왜 `NetworkObject` 가 필요한가**
-> `MonsterSpawner` 는 네트워크 스크립트다. 서버가 이 오브젝트를 네트워크에 올려 줘야
-> 스폰 코드가 돌기 시작한다. `NetworkObject` 가 그 표식이다.
-> 몬스터는 **서버만** 만들고 다른 사람 화면엔 자동 복제된다 — 그래서 이 규약이 필요하다.
+> ⚠️ **`NetworkObject` 는 붙이지 않는다.** 존 프리팹은 네트워크 오브젝트가 아니라는 규약이고,
+> 붙여도 아무 효과가 없다. 몬스터를 서버가 만들어 복제하는 처리는 맵 생성 쪽이 알아서 한다.
 
 ### 인스펙터 값
 
@@ -100,37 +97,56 @@ Play 후 Console 에서 아래 에러가 없으면 정상이다.
 
 ---
 
-## 🔴 반드시 알아야 할 제약 — 맵 생성으로 깔리는 존에서는 아직 안 돈다
-
-**존 프리팹을 씬에 직접 놓고 쓰면 위 방법 그대로 동작한다.** (`MonsterScene` 이 그렇게 되어 있다.)
-
-그런데 **맵 생성기가 자동으로 깔아 주는 존**에서는 지금 상태로는 **동작하지 않는다.**
-
-- 맵 생성기(`MapContentSpawner`)는 존 프리팹을 **일반 오브젝트로만** 만든다 —
-  네트워크에 올리지(`Spawn()`) 않는다
-- 코드 주석에 **"존 프리팹은 비네트워크 규약"** 이라고 명시돼 있다
-- 그래서 존에 `NetworkObject` + `MonsterSpawner` 를 붙여도 **스폰 코드가 시작되지 않는다**
-
-**즉 지금 당장 쓸 수 있는 경우 / 없는 경우:**
+## 어디서 동작하나
 
 | 상황 | 동작 |
 |---|---|
-| 존 프리팹을 **씬에 직접 배치** | ✅ 위 1~3단계 그대로 동작 |
-| **테스트 씬**(`MonsterScene` 등)에 스포너 배치 | ✅ 동작 (지금 그렇게 쓰고 있다) |
-| **맵 생성기가 깔아 주는 존** | ❌ **프로그래머 작업 필요** (존을 네트워크로 올리는 처리) |
+| **맵 생성기가 깔아 주는 존** (실제 게임) | ✅ 동작 |
+| 존 프리팹을 **씬에 직접 배치** | ✅ 동작 (이 경우엔 `NetworkObject` 가 필요하다 — 프로그래머에게) |
+| **테스트 씬**(`MonsterScene` 등)에 스포너 배치 | ✅ 동작 |
 
-**아트 작업 자체는 지금 해 두셔도 된다.** 마커 배치와 값 세팅은 그대로 남고,
-맵 생성 경로 연결은 프로그래머가 붙이면 그때부터 그대로 살아난다.
+> 맵 생성 경로는 존을 네트워크 오브젝트로 올리지 않는 규약이라, 서버가 스포너의 저작 데이터를
+> 대신 읽어 몬스터를 만든다(`MapContentSpawner.SpawnFromZoneSpawner`). **아트는 이 차이를 신경 쓸
+> 필요가 없다** — 위 1~3단계대로만 하면 된다.
 
 ---
 
 ## 하지 말아야 할 것
 
 - ❌ 존 프리팹에 **몬스터 프리팹을 자식으로 직접 넣기** — 네트워크 복제가 안 돼 호스트에만 보인다
-- ❌ `MonsterSpawner` 만 붙이고 **`NetworkObject` 를 안 붙이기** — 가장 흔한 실수
+- ❌ 존 프리팹에 **`NetworkObject` 붙이기** — 규약 위반이고 아무 효과도 없다
 - ❌ `Spawn Points` 목록에 **일부만** 등록 — 목록이 비어 있지 않으면 **자동 수집이 꺼진다**
 - ❌ `Assets/2.Prefabs/Map/LevelDeliveryV3/Zones/` 프리팹 수정 — 카탈로그에 없어 맵에 안 나온다
 - ❌ `Assets/2.Prefabs/Monster/` 밖의 아무 프리팹이나 지정 — `NetworkObject` 가 없으면 에러
+
+---
+
+## 현재 저작 상태 (2026-08-18)
+
+존 8개는 **이미 배선돼 있다.** 아래는 스포너의 기본 몬스터이고, 지점에 `Override` 를 넣으면
+그 자리만 다른 몬스터가 된다.
+
+| 존 프리팹 | 기본 몬스터 | 스폰 지점 | 비고 |
+|---|---|---|---|
+| `ZoneL_typeA` | MortarBot | 7 | 1지점 **GauntletBot** |
+| `ZoneL_typeB` | MortarBot | 7 | 1지점 **WallBot** |
+| `ZoneL_typeC` | MortarBot | 7 | 1지점 **HumanoidBot** |
+| `ZoneM_typeA` | PeekABot | 5 | |
+| `ZoneM_typeB` | PeekABot | 6 | |
+| `ZoneS_typeA` | ChompBot | 5 | |
+| `Zone_typeQuest01` | ChompBot | 5 | |
+| `Zone_typeQuest02` | ChompBot | 4 | |
+| `ZoneS_typeStart` | — | 4 | 🔴 **일부러 비워 둠** — 시작 지점이라 전투 없음 |
+| `ZoneS_typeBossEnter` · `ZoneM_typeC` | — | 0 | 지점 없음 |
+
+**기본 몬스터를 바꾸거나 존을 추가할 때는 손으로 만지지 말고 저작 도구를 쓴다:**
+
+```
+Tools > Map > Authoring > 존 몬스터 스포너 배선 — 검증 (읽기 전용)   ← 먼저 무엇이 바뀔지 본다
+Tools > Map > Authoring > 존 몬스터 스포너 배선 (적용)
+```
+
+멱등하다(여러 번 돌려도 같은 결과). 지점의 `Override` 는 건드리지 않는다.
 
 ---
 
