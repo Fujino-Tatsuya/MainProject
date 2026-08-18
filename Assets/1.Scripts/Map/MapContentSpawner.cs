@@ -71,6 +71,7 @@ public class MapContentSpawner : MonoBehaviour
 
                 // 몬스터 — 서버만 스폰 (NetworkObject → NGO 복제, 클라는 수신)
                 if (isServer) monsters += SpawnMonstersFor(zoneGo, gen);
+                if (isServer) monsters += SpawnFromZoneSpawner(zoneGo);
 
                 // BossRoom 역할 존: 진입 트리거(서버 판정) + 범위 표시(전 피어) 부착 — PLAN §6.
                 // 존 프리팹은 비네트워크 규약이라 프리팹에 미리 넣지 않고 스폰 시 동적 부착한다.
@@ -146,6 +147,54 @@ public class MapContentSpawner : MonoBehaviour
         box.size = size;
         zoneGo.AddComponent<BossEnterTrigger>();
         Edit.Log($"[MapContentSpawner] BossEnter 트리거 부착 — {zoneGo.name} @ {zoneGo.transform.position} (박스 {box.size})", zoneGo);
+    }
+
+    /// <summary>
+    /// 존 프리팹에 저작된 <see cref="MonsterSpawner"/> 를 서버가 대신 실행한다.
+    /// 아트가 존 프리팹에 스포너를 붙이고 자식으로 <see cref="MonsterSpawnPoint"/> 를 놓는 저작 방식.
+    ///
+    /// 🔴 <b>왜 스포너의 <c>SpawnWave()</c> 를 부르지 않는가</b> (2026-08-18 실측):
+    /// <c>NetworkBehaviour.IsServer</c> 는 계산 프로퍼티가 아니라 <b>네트워크 스폰 때 세팅되는
+    /// 자동 프로퍼티</b>다. 존은 「비네트워크 규약」(이 파일 헤더)이라 <c>Spawn()</c> 되지 않으므로
+    /// 존에 붙은 스포너의 <c>IsServer</c> 는 <b>영원히 false</b> 이고, <c>SpawnWave()</c>·<c>SpawnAt()</c>
+    /// 이 첫 줄에서 그대로 return 한다. 존에 <c>NetworkObject</c> 를 붙여도 아무도 스폰해 주지 않아
+    /// 결과가 같다. 그래서 마커만 읽어 <b>여기서</b> 스폰한다 — 존 규약을 깨지 않는 쪽이다.
+    ///
+    /// 스폰 자체는 기존 경로(<see cref="SpawnMonsterInstance"/>)를 그대로 쓴다. 바닥 스냅·NGO 복제·
+    /// 정리 추적이 마커 경로와 동일해진다.
+    /// </summary>
+    private int SpawnFromZoneSpawner(GameObject zoneGo)
+    {
+        var spawner = zoneGo.GetComponentInChildren<MonsterSpawner>(true);
+        if (spawner == null) return 0;
+
+        int n = 0;
+        foreach (MonsterSpawnPoint point in spawner.ResolveSpawnPoints())
+        {
+            if (point == null) continue;
+
+            // 지점별 지정이 우선, 없으면 스포너의 기본 몬스터(스포너 자신의 규약과 동일).
+            GameObject prefab = point.MonsterPrefabOverride != null
+                ? point.MonsterPrefabOverride
+                : spawner.DefaultMonsterPrefab;
+            if (prefab == null)
+            {
+                Edit.LogWarning(
+                    $"[MapContentSpawner] {zoneGo.name}/{point.name} 에 스폰할 프리팹이 없다 — " +
+                    "MonsterSpawner 의 Default Monster Prefab 또는 지점의 Override 를 채울 것.");
+                continue;
+            }
+
+            for (int i = 0; i < point.Count; i++)
+            {
+                if (!TryResolveSpawnPoint(point.GetSpawnPosition(i), zoneGo, out Vector3 spawnPoint))
+                    continue;
+
+                SpawnMonsterInstance(prefab, spawnPoint, point.transform.rotation);
+                n++;
+            }
+        }
+        return n;
     }
 
     private int SpawnMonstersFor(GameObject zoneGo, MapGenerator gen)

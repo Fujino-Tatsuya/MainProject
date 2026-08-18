@@ -30,12 +30,29 @@ public class MonsterSpawner : NetworkBehaviour
         base.OnNetworkSpawn();
         if (!IsServer) return;
 
-        if (spawnPoints == null || spawnPoints.Count == 0)
-            spawnPoints = new List<MonsterSpawnPoint>(GetComponentsInChildren<MonsterSpawnPoint>(true));
+        ResolveSpawnPoints();
 
         if (autoSpawnOnStart)
             SpawnWave();
     }
+
+    /// <summary>
+    /// 이 스포너가 쓸 스폰 지점을 확정한다. 인스펙터 목록이 비어 있으면 자식 계층에서 자동 수집한다.
+    ///
+    /// 🔴 왜 <see cref="OnNetworkSpawn"/> 밖으로 뺐는가: 존 프리팹처럼 <b>네트워크 스폰되지 않는</b>
+    /// 오브젝트에 붙었을 때는 그 콜백이 오지 않아 수집 자체가 돌지 않는다. 그러면 목록이 빈 채로
+    /// 남아 스폰이 0 이 되는데, 원인이 "마커를 안 놨다"로 보여 찾기 어렵다.
+    /// 맵 생성 경로(<c>MapContentSpawner</c>)가 이 메서드를 직접 불러 같은 규약을 공유한다.
+    /// </summary>
+    public IReadOnlyList<MonsterSpawnPoint> ResolveSpawnPoints()
+    {
+        if (spawnPoints == null || spawnPoints.Count == 0)
+            spawnPoints = new List<MonsterSpawnPoint>(GetComponentsInChildren<MonsterSpawnPoint>(true));
+        return spawnPoints;
+    }
+
+    /// <summary>지점에 개별 지정이 없을 때 쓸 기본 몬스터. 맵 생성 경로가 읽는다.</summary>
+    public GameObject DefaultMonsterPrefab => defaultMonsterPrefab;
 
     // 등록된 모든 스폰 지점에서 몬스터 스폰(서버 전용). 스폰된 마리 수 반환.
     public int SpawnWave()
