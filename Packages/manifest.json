@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "com.community.unity-mcp": "https://github.com/Seoki2000/unity-mcp.git#fedda873b4e662008d437db0bf56f6f1fd766c0d",
+    "com.community.unity-mcp": "https://github.com/Seoki2000/unity-mcp.git#a191eee276b7d319117079965379361704b556aa",
     "com.unity.2d.sprite": "1.0.0",
     "com.unity.addressables": "2.9.1",
     "com.unity.ai.navigation": "2.0.13",
