@@ -103,6 +103,50 @@ Update this file when a term becomes important enough that future agents or team
 
 ---
 
+## ✅ 2026-08-23 — 인프라 세션 (MCP 패키지 · SVN · git 위생). 게임플레이 변경 없음
+
+**게임 코드·프리팹·씬은 건드리지 않았다.** 위 넉백 세기 튜닝이 여전히 다음 할 일이다.
+바뀐 것은 MCP 패키지, 아트 워킹카피 위치, git 줄바꿈 처리다.
+
+### 🔴 이번 세션에 확정된 함정 (다음 사람이 밟을 지점)
+
+- **`Assets/50.Art` 는 정션이고, 도구마다 보이지 않는다.** `find` · PowerShell
+  `Get-ChildItem -Recurse` · Node `readdirSync` 는 이 폴더를 **통째로 건너뛴다**
+  (Dirent 가 `isDirectory()=false` / `isSymbolicLink()=true` 라 두 분기 모두 빠진다).
+  Python `os.walk` 만 따라간다. MCP 프로젝트 인덱스가 이 이유로 프로젝트 `.meta` 의
+  **35%(1,105개)** 를 못 보고 있었다. 아트 자산을 세거나 훑는 계측·스크립트는 이걸 먼저
+  확인할 것. **`filesFailed: 0` 같은 통계는 근거가 못 된다** — 건너뛴 것은 실패로 세지 않는다.
+- **아트 변경은 git 에 안 보인다.** `Assets/50.Art` 는 `.gitignore` 대상이고 실제 관리는
+  **SVN** (`https://svna.gameinjae.kr/svn/GA7thFinal_VeyTrace`) 이다. "아트가 뭘 바꿨나"는
+  `git status` 가 아니라 `svn status -u` 로 본다. svn CLI 를 이 PC 에 설치했다
+  (`C:\Program Files\SlikSvn\bin\svn.exe`, PATH 등록).
+- **아트 워킹카피를 옮겼다.** `OneDrive\바탕 화면\GA7thFinal_VeyTrace` →
+  **`C:\svn\GA7thFinal_VeyTrace`**. 개인 OneDrive 가 `.svn/wc.db`(36 GB)를 동기화하면
+  워킹카피가 깨진다. 정션도 새 경로로 다시 걸었다. 예전 경로를 박아둔 스크립트가 있으면 고칠 것.
+- **`git status` 의 `M` 이 내용 변경을 뜻하지 않는다.** `ProjectSettings/*.asset` 등 5건이
+  수정됨으로 떠 있었는데 `git diff --stat` 은 **변경 0줄**이었다. Unity 는 LF 로 쓰고
+  `core.autocrlf=true` 는 CRLF 로 체크아웃하기 때문이다. **버리기 전에 `git diff --stat` 을
+  먼저 보라** — 그 안에 진짜 변경이 섞여 있을 수 있다(실제로 `UnityConnectSettings.m_Enabled`
+  0→1 한 건이 섞여 있었다). 원인은 `.gitattributes` 에 `eol=lf` 를 걸어 없앴다.
+- **MCP 패키지 핀은 안정 브랜치에서 도달 가능한 커밋이어야 한다.** feature 브랜치만 가리키는
+  커밋을 핀한 뒤 그 브랜치를 지우면 팀원 Unity 가 패키지를 해석하지 못한다. 그래서 포크의
+  작업 브랜치를 `optimized` 로 합치고 핀을 그 계보로 옮겼다.
+
+### ✅ 닫은 것
+
+- MCP 코드 2건을 게임 레포에서 패키지로 회수(`.mcp-bridge-launcher.js`,
+  `UnityMcpBehaviorGraphTools.cs`). **툴 이름 6개는 그대로** — 호출부는 안 깨진다
+- 패키지 핀 `2ea969e` → `633c7f5` (dev-0.0.1). 실측 기록은 패키지 `README_ko.md` 참조
+- 패키지 버그 2건 수정: 정션 스캔 누락(깨진 스크립트 탐지 9→13건), 런처 경로 탐색
+- `.gitattributes` 에 Unity YAML 자산 `eol=lf` (바이너리 `.asset` 오버라이드는 그대로 유지)
+- `ProjectSettings/ScriptableBuildPipeline.json` 팀 공유 시작 (Addressables 빌드 설정)
+- SVN r283 → r286 동기화. 받을 것·커밋할 것 없었다 (아트는 r283 이후 변경 없음)
+
+### 🔴 팀원에게 알려야 할 것
+
+MCP 를 쓰는 사람은 **설정을 한 번 고쳐야 한다.** 런처가 레포 루트에서 사라져 패키지 안으로
+갔다. 절차는 패키지의 `LOCAL_DEV_SETUP.md` 에 있다.
+
 ## 이전 시작점 — 회전 감속·첫 돌진 마감 (2026-08-18 낮)
 
 **브랜치 `feature/Boss23`** · **컴파일 0에러** · **`origin/feature/Boss23` 과 동기화 완료(ahead 0 / behind 0)**
