@@ -1432,8 +1432,10 @@ VFX 로 따로 넣는다** — 그래야 통제가 된다. `m_Antialiasing: 2` �
   `Get-CimInstance Win32_Process -Filter "name='node.exe'" | Select CommandLine`.
 - 🔴 **브릿지 사본을 홈(`~/.unity-mcp/`)에 두지 말 것.** 사본은 패키지가 갱신돼도 조용히 낡고,
   낡았다는 신호가 어디에도 안 뜬다. 경로가 흔들리는 문제는 사본이 아니라 **런처로** 푼다 —
-  `.mcp-bridge-launcher.js`(레포 루트, 커밋됨)가 `PackageCache` 를 실행 시점에 탐색하므로
-  **앞으로 패키지 핀을 갱신해도 개인 설정을 고칠 필요가 없다.**
+  런처가 `PackageCache` 를 실행 시점에 탐색하므로 **패키지 핀을 갱신해도 개인 설정을 고칠
+  필요가 없다.** 런처 정본은 이제 MCP 패키지 안에 있다 — `Bridge/mcp-bridge-launcher.js`
+  (예전엔 이 레포 루트의 `.mcp-bridge-launcher.js`). 등록 방법은 포크 레포의
+  `LOCAL_DEV_SETUP.md` 를 본다.
 - ⚠️ **MCP 무한대기의 원인은 타임아웃 부재가 아니라 응답 id 유실이었다.** 서버가 합성 에러에
   id 를 안 실으면(`id:null`) HTTP 200 으로 나가고, 브릿지는 "정상 응답"으로 처리해
   **자체 타임아웃·재시도가 아예 발동하지 않는다.** 요청-응답 프로토콜에서 무한대기를 만나면
