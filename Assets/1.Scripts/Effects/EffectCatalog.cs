@@ -22,8 +22,14 @@ public class EffectCatalog : ScriptableObject
     [field: SerializeField] public EffectEntry HitEffect4 { get; private set; }
     [field: SerializeField] public EffectEntry HitEffect5 { get; private set; }
 
+
+
     [Header("Boss")]
+    [field: SerializeField] public EffectEntry Drop_Charge_Boundary { get; private set; }
+    [field: SerializeField] public EffectEntry Drop_Charge_Indicator { get; private set; }
+    [field: SerializeField] public EffectEntry Drop_Collision { get; private set; }
     [field: SerializeField] public EffectEntry BossRage { get; private set; }
+    [field: SerializeField] public EffectEntry Grab_ArmElectric { get; private set; }
 
     private List<EffectEntry> _all;
     // 피격 이펙트 테스트용 enum
