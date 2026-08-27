@@ -18,7 +18,12 @@ public class ShurikenEffectSystem : IEffectSystem
         return instance.GetComponentInChildren<ParticleSystem>(true) != null;
     }
 
-    public void Play(GameObject instance)
+    /// <summary>
+    /// <paramref name="duration"/>는 <b>의도적으로 무시한다.</b> 파티클의 시간축은 프리팹의 Start Lifetime이
+    /// 진실이고, 그걸 런타임에 덮어쓰면 저작자가 에디터에서 본 것과 다른 이펙트가 재생된다.
+    /// 수명은 매니저의 타이머가 따로 재고 있으므로 여기서 맞출 필요도 없다.
+    /// </summary>
+    public void Play(GameObject instance, float duration)
     {
         ShurikenPartCache cache = Cache(instance);
 

@@ -107,6 +107,7 @@ public class EffectManager : MonoBehaviour
         // 드라이버는 컴파일 타임에 전부 알려져 있다. SO/리플렉션 등록은 간접층만 늘린다.
         // 기술을 추가할 때 고치는 곳은 여기 한 줄이다.
         _drivers.Add(new ShurikenEffectSystem());
+        _drivers.Add(new FloorAreaEffectSystem());
 
         // 풀 루트는 매니저와 분리한다 — 매니저의 scale이 이펙트 크기에 곱해지지 않게.
         var rootObject = new GameObject("[EffectPool]");
@@ -175,7 +176,19 @@ public class EffectManager : MonoBehaviour
     /// ⚠️ 유니티 scale은 <b>수명(Start Lifetime)을 건드리지 않는다</b> — 크기와 속도만 커지므로
     /// 큰 배율에서는 "커졌다"보다 "빨라졌다"로 보인다. 프리팹 규칙 문서의 주의사항을 볼 것.
     /// </param>
-    public void Play(EffectEntry entry, Vector3 position, Quaternion rotation, float scale = 1f)
+    /// <param name="durationOverride">
+    /// 0보다 크면 <see cref="EffectEntry.ResolvedDuration"/> 대신 이 값을 수명으로 쓴다(0 = 데이터를 따른다).
+    ///
+    /// <b>"수명은 데이터가 진실"과 충돌하지 않는다.</b> 그 축이 막으려는 것은 <i>런타임이 프리팹을 들여다보는 것</i>이지
+    /// 호출자가 수명을 명시하는 것이 아니다 — <c>duration &gt; 0</c> 저작 오버라이드가 이미 같은 일을 하고 있고,
+    /// 이건 그 계층을 호출 시점까지 한 단계 민 것이다.
+    ///
+    /// 쓰는 곳은 <b>수명이 매번 계산되는 이펙트</b>다. No.23 JumpAttack의 예고 장판이 그렇다 —
+    /// 성장 시간이 서버가 점프 체공시간으로 계산한 값이라 저작 시점에 적을 수가 없다.
+    /// 이 값은 파트 드라이버에게도 그대로 전달된다(<see cref="IEffectSystem.Play"/>).
+    /// </param>
+    public void Play(EffectEntry entry, Vector3 position, Quaternion rotation, float scale = 1f,
+                     float durationOverride = 0f)
     {
         if (!CanPlay(entry)) return;
 
@@ -187,14 +200,15 @@ public class EffectManager : MonoBehaviour
         active.rotation = rotation;
         active.offset = Vector3.zero;
         active.scale = SanitizeScale(entry, scale);
-        float life = entry.ResolvedDuration;
+        float life = durationOverride > 0f ? durationOverride : entry.ResolvedDuration;
         active.life = life;
         active.lifeCounting = true;
 
         if (life <= 0f)
         {
             WarnOnce(entry, "duration", $"[EffectManager] '{entry.name}'의 duration이 0이라 재생 즉시 반납된다. " +
-                            "파티클 파트가 없어 자동 계산이 안 되는 엔트리라면 직접 값을 적을 것.");
+                            "파티클 파트가 없어 자동 계산이 안 되는 엔트리라면 직접 값을 적거나 " +
+                            "재생 시 durationOverride를 넘길 것.");
         }
         else if (life < entry.LongestPartDelay)
         {
@@ -209,8 +223,8 @@ public class EffectManager : MonoBehaviour
     }
 
     /// <summary>원샷 재생(회전 없음).</summary>
-    public void Play(EffectEntry entry, Vector3 position, float scale = 1f)
-        => Play(entry, position, Quaternion.identity, scale);
+    public void Play(EffectEntry entry, Vector3 position, float scale = 1f, float durationOverride = 0f)
+        => Play(entry, position, Quaternion.identity, scale, durationOverride);
 
     /// <summary>
     /// 루프 재생. <b>호출자가 반드시 <see cref="Release"/>로 끝내야 한다</b> — 안 그러면 풀이 고갈된다.
@@ -223,22 +237,27 @@ public class EffectManager : MonoBehaviour
     /// 그건 호출자가 월드 단위로 정한 부착 위치이고, 호출자가 직접 조절할 수 있다.
     /// 반면 엔트리 안의 파트 offset은 호출자가 손댈 수 없으므로 함께 곱해진다.
     /// </param>
+    /// <param name="partDuration">
+    /// 파트 드라이버에게 넘길 시간(초). <b>수명이 아니다</b> — 루프의 수명은 <see cref="Release"/>가 정한다.
+    /// 시간축을 호출자가 정하는 드라이버만 쓴다(파티클은 무시). 0이면 "시간 없음".
+    /// </param>
     public EffectHandle PlayLooping(EffectEntry entry, Transform follow, Vector3 offset = default,
-                                    float scale = 1f)
+                                    float scale = 1f, float partDuration = 0f)
     {
         return follow != null
-            ? PlayLoopingCore(entry, follow, offset, follow.rotation, scale)
-            : PlayLoopingCore(entry, null, offset, Quaternion.identity, scale);
+            ? PlayLoopingCore(entry, follow, offset, follow.rotation, scale, partDuration)
+            : PlayLoopingCore(entry, null, offset, Quaternion.identity, scale, partDuration);
     }
 
     /// <summary>루프 재생을 월드 좌표·회전에 고정한다. (설계 API에 대한 편의 오버로드)</summary>
-    public EffectHandle PlayLooping(EffectEntry entry, Vector3 position, Quaternion rotation, float scale = 1f)
+    public EffectHandle PlayLooping(EffectEntry entry, Vector3 position, Quaternion rotation,
+                                    float scale = 1f, float partDuration = 0f)
     {
-        return PlayLoopingCore(entry, null, position, rotation, scale);
+        return PlayLoopingCore(entry, null, position, rotation, scale, partDuration);
     }
 
     private EffectHandle PlayLoopingCore(EffectEntry entry, Transform follow, Vector3 offsetOrPosition,
-                                         Quaternion rotation, float scale)
+                                         Quaternion rotation, float scale, float partDuration)
     {
         if (!CanPlay(entry)) return EffectHandle.None;
 
@@ -248,6 +267,7 @@ public class EffectManager : MonoBehaviour
         active.follow = follow;
         active.rotation = rotation;
         active.scale = SanitizeScale(entry, scale);
+        active.driverDuration = Mathf.Max(0f, partDuration);
 
         if (follow != null)
         {
@@ -454,7 +474,9 @@ public class EffectManager : MonoBehaviour
             IEffectSystem driver = DriverOf(instance);
             if (driver != null)
             {
-                driver.Play(instance);
+                // 원샷은 남은 수명을 넘긴다 — delay가 걸린 파트는 그만큼 짧게 받아야 회수 시점과 어긋나지 않는다.
+                // 루프는 수명을 세지 않으므로 호출자가 PlayLooping에 준 값을 그대로 넘긴다(안 줬으면 0).
+                driver.Play(instance, active.lifeCounting ? active.life : active.driverDuration);
                 if (!Mathf.Approximately(active.playRate, 1f)) driver.SetPlayRate(instance, active.playRate);
             }
 
@@ -489,6 +511,7 @@ public class EffectManager : MonoBehaviour
         active.lifeCounting = false;
         active.playRate = 1f;
         active.scale = 1f;
+        active.driverDuration = 0f;
         active.inUse = false;      // 세대는 다음 대출에서 새로 발급된다 → stale 핸들은 여기서 죽는다
 
         _freeSlots.Push(active.slot);
@@ -670,6 +693,11 @@ public class EffectManager : MonoBehaviour
         public float life;         // 남은 수명(초)
         public float playRate = 1f;
         public float scale = 1f;   // 프리팹 크기에 곱해지는 배율. 파트 offset에도 곱해진다
+
+        // 드라이버에게 넘길 시간(초). 루프 전용이다 — 원샷은 남은 수명(life)을 그대로 쓴다.
+        // 루프는 수명이 외부 이벤트(Release)로 정해지므로 "얼마나 살지"와 "파트가 얼마 동안 움직일지"가
+        // 서로 다른 수가 된다. No.23 예고 장판이 그 경우다: 성장은 growDuration, 소멸은 착지 시점.
+        public float driverDuration;
 
         public Transform follow;   // null = 월드 고정
         public bool attached;      // 추종 대상을 지정하고 시작했는가 (대상 소멸 감지용)
