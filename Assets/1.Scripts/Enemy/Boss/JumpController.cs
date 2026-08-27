@@ -1,7 +1,9 @@
-using Unity.Netcode;
-using UnityEngine;
 using System.Collections.Generic;
 using Unity.Behavior;
+using Unity.Netcode;
+using UnityEngine;
+using UnityEngine.UIElements;
+using static EffectCatalog;
 
 public class JumpController : NetworkBehaviour, IDamageSettable
 {
@@ -15,9 +17,19 @@ public class JumpController : NetworkBehaviour, IDamageSettable
     [SerializeField] List<GameObject> meshRenderer;
 
     [Header("장판")]
-    [SerializeField] Transform floorRoot;      // 두 장판을 담는 위치 기준 컨테이너
-    [SerializeField] SpriteRenderer floorBase;  // 장판1: 크기 고정 기준 + 데미지 범위 기준
-    [SerializeField] FloorAreaEffect floorGrow; // 장판2: 0.1 → 장판1 크기로 시간 점증
+    [SerializeField] Transform floorRoot;       // 장판1의 위치 기준 컨테이너(보스 자식이라 LateUpdate 보정이 붙는다)
+    [SerializeField] GameObject floorBase;      // 장판1: 크기 고정 기준 + 데미지 범위 기준
+    float _floorRadius = 1f;                    // 장판1의 실제 시각 크기 기준. 착지 데미지 범위 계산용
+
+    // 장판2는 이 컴포넌트가 들고 있지 않다 — EffectManager가 풀에서 대출해 월드 고정으로 재생한다
+    // (Catalog.Drop_Charge_Indicator).
+    //
+    // 원샷이 아니라 루프로 재생하는 이유: 소멸 시점이 "시간"이 아니라 "착지(OnLanded)"라는 이벤트다.
+    // 예측한 수명으로 끄면 낙하 애니메이션 길이가 흔들릴 때 장판이 착지보다 먼저/늦게 사라진다.
+    //
+    // ⚠️ 루프 핸들은 버리면 풀 인스턴스가 영원히 돌아오지 않는다. 핸들은 피어마다 자기 EffectManager에서
+    // 발급받으므로 이 필드도 피어 로컬이다 — 재생 전·해제 시·디스폰 시 세 곳에서 모두 정리한다.
+    EffectHandle _indicatorHandle = EffectHandle.None;
 
     [Header("장판 시간 보정을 위한 변수")]
     [SerializeField] Animator animator;
@@ -29,7 +41,6 @@ public class JumpController : NetworkBehaviour, IDamageSettable
     BlackboardVariable<Vector3> ArrivePoint;
     BlackboardVariable<float> JumpingTime;
 
-    SpriteRenderer _floorGrowRenderer;
 
     KnockbackAttack _knockbackAttack;
 
@@ -62,7 +73,6 @@ public class JumpController : NetworkBehaviour, IDamageSettable
     public override void OnNetworkSpawn()
     {
         _baseRotation = floorRoot.rotation;
-        _floorGrowRenderer = floorGrow.GetComponent<SpriteRenderer>();
         Initialize();
 
         if (!IsServer) return;
@@ -185,12 +195,11 @@ public class JumpController : NetworkBehaviour, IDamageSettable
         if (_isCinematicLanding) return;
 
         // 데미지 범위는 장판1(floorBase)의 실제 시각 크기 기준
-        Vector3 center = floorBase.bounds.center;
-        float radius = Mathf.Max(floorBase.bounds.extents.x, floorBase.bounds.extents.z);
+        _floorRadius = Mathf.Max(floorBase.transform.localScale.x, floorBase.transform.localScale.y, floorBase.transform.localScale.z);
 
         int hitCount = Physics.OverlapSphereNonAlloc(
-            center,
-            radius,
+            floorBase.transform.position,
+            _floorRadius,
             results,
             playerLayer,
             QueryTriggerInteraction.Ignore
@@ -218,6 +227,7 @@ public class JumpController : NetworkBehaviour, IDamageSettable
             _knockbackAttack.ApplyKnockbackAttack(unit.gameObject);
         }
 
+        PlayDropVFXRpc(floorBase.transform.position);
         HideFloorsClientRpc();
     }
 
@@ -239,8 +249,9 @@ public class JumpController : NetworkBehaviour, IDamageSettable
 
     void SetFloorsEnable(bool enable)
     {
-        floorBase.enabled = enable;
-        _floorGrowRenderer.enabled = enable;
+        // 장판2는 여기서 끄지 않는다. 풀 인스턴스라 수명이 다하면 스스로 반납된다 —
+        // 외부에서 꺼 버리면 반납 경로를 타지 않은 인스턴스가 풀에 돌아가지 않는다.
+        floorBase.SetActive(enable);
     }
 
     void Initialize()
@@ -266,8 +277,14 @@ public class JumpController : NetworkBehaviour, IDamageSettable
         floorRoot.SetPositionAndRotation(position, rotation);
         SetFloorsEnable(true);
 
-        // 장판2: 0.1(prefab 시작 크기) → 장판1 크기까지 growDuration(서버 계산) 동안 성장
-        floorGrow.StartOverTimeGrow(growDuration, floorBase.transform.localScale);
+        // 장판2: 목표 크기의 startRatio(기본 1/10)에서 시작해 growDuration 동안 _floorRadius까지 성장하고,
+        // 그 뒤로는 최대 크기를 유지하다 OnLanded → HideFloorsClientRpc에서 해제된다.
+        // 크기는 scale 인자가, 성장 시간은 partDuration이 정한다 — 둘 다 서버가 매번 계산하는 런타임 값이다.
+        // rotation을 넘기는 것은 경사면 정렬 때문이다(_floorRootRot).
+        ReleaseIndicator();   // 이전 점프의 핸들이 남아 있으면 먼저 회수한다(재진입 방어)
+        _indicatorHandle = EffectManager.Instance.PlayLooping(
+            EffectManager.Instance.Catalog.Drop_Charge_Indicator,
+            position, rotation, _floorRadius, growDuration);
     }
 
     [ClientRpc]
@@ -275,5 +292,31 @@ public class JumpController : NetworkBehaviour, IDamageSettable
     {
         _isJumping = false;
         SetFloorsEnable(false);
+        ReleaseIndicator();   // 장판2 소멸 = 착지. 서버가 OnLanded에서 이 RPC를 쏜다
+    }
+
+    /// <summary>
+    /// 예고 장판(루프) 핸들을 회수한다. 미발급·이미 해제된 핸들은 매니저 쪽에서 조용한 no-op이라
+    /// 여러 번 불려도 안전하다.
+    /// </summary>
+    void ReleaseIndicator()
+    {
+        if (!_indicatorHandle.IsSet) return;
+
+        if (EffectManager.Instance != null) EffectManager.Instance.Release(_indicatorHandle);
+        _indicatorHandle = EffectHandle.None;
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        // 점프 도중 보스가 사라지면 HideFloorsClientRpc가 오지 않는다 → 여기서 풀 인스턴스를 되돌린다.
+        ReleaseIndicator();
+        base.OnNetworkDespawn();
+    }
+
+    [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
+    void PlayDropVFXRpc(Vector3 pos)
+    {
+        EffectManager.Instance.Play(EffectManager.Instance.Catalog.Drop_Collision, pos, _floorRadius);
     }
 }
