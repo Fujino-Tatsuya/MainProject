@@ -10,6 +10,14 @@ public class GrabController : NetworkBehaviour
     [SerializeField] LayerMask targetMask;
     [SerializeField] BehaviorGraphAgent bt;
 
+    [Tooltip("grabSocket에서 아래로 바닥을 훑는 최대 거리(m). 소켓은 보스 손 높이라 이보다 멀면 바닥이 아니다")]
+    [SerializeField, Min(0f)] float groundProbeDistance = 30f;
+
+    // 바닥 탐색용 레이 버퍼. NonAlloc의 목적이 호출마다 배열을 새로 만들지 않는 것이므로 필드로 둔다.
+    // 크기 8: 소켓 아래에 겹칠 수 있는 바닥/슬래브 수를 넉넉히 잡은 값이다. 버퍼가 꽉 차면
+    // 유니티가 결과를 잘라내므로(정렬도 안 한다) 그 안에 최근접이 없을 수 있다 — 늘려야 하면 이 값을 키운다.
+    readonly RaycastHit[] _groundHits = new RaycastHit[8];
+
     int grabDamagePercentage;
     int holdDamagePercentage;
     float holdAttackPeriod;
@@ -66,7 +74,7 @@ public class GrabController : NetworkBehaviour
             Edit.LogError("[No.23] Blackboard variable 'GrabbedPlayer' not found.", this);
         }
 
-        if(!bt.BlackboardReference.GetVariable("CurrentState", out CurrentState))
+        if (!bt.BlackboardReference.GetVariable("CurrentState", out CurrentState))
         {
             Edit.LogError("[No.23] Blackboard variable 'CurrentState' not found.", this);
         }
@@ -82,6 +90,7 @@ public class GrabController : NetworkBehaviour
                 if (_holdTimer >= holdAttackPeriod)
                 {
                     ApplyDamage(holdDamagePercentage);
+                    PlayGrabbedLightningVFXClientRpc();
                     _holdTimer = 0f;
                 }
             }
@@ -110,7 +119,7 @@ public class GrabController : NetworkBehaviour
         switch (overlapCollider)
         {
             case OverlapCollider.Box:
-            {
+                {
                     BoxColliderInfo info = new BoxColliderInfo();
                     grabColliderInfo.GetBoxColliderInfo(ref info);
                     _resultCount = Physics.OverlapBoxNonAlloc(
@@ -122,10 +131,10 @@ public class GrabController : NetworkBehaviour
                         QueryTriggerInteraction.Ignore
                     );
                     break;
-            }
+                }
 
             case OverlapCollider.Sphere:
-            {
+                {
                     SphereColliderInfo info = new SphereColliderInfo();
                     grabColliderInfo.GetSphereColliderInfo(ref info);
                     _resultCount = Physics.OverlapSphereNonAlloc(
@@ -136,10 +145,10 @@ public class GrabController : NetworkBehaviour
                         QueryTriggerInteraction.Ignore
                     );
                     break;
-            }
+                }
 
             case OverlapCollider.Capsule:
-            {
+                {
                     CapsuleColliderInfo info = new CapsuleColliderInfo();
                     grabColliderInfo.GetCapsuleColliderInfo(ref info);
                     _resultCount = Physics.OverlapCapsuleNonAlloc(
@@ -151,7 +160,7 @@ public class GrabController : NetworkBehaviour
                         QueryTriggerInteraction.Ignore
                     );
                     break;
-            }
+                }
 
         }
 
@@ -186,7 +195,7 @@ public class GrabController : NetworkBehaviour
         {
             Edit.Log("[No.23] 그랩 성공!");
         }
-        else 
+        else
         {
             Edit.Log("[No.23] 그랩 실패!");
         }
@@ -223,6 +232,7 @@ public class GrabController : NetworkBehaviour
     {
         if (!IsServer) return;
 
+        PlayThrowLightningVFXClientRpc();
         ApplyDamage(landingDamagePercentage);
         if (_targetPlayer != null)
             _targetPlayer.EndGrabbedByInstigator();
@@ -256,5 +266,32 @@ public class GrabController : NetworkBehaviour
 
         int damage = Mathf.RoundToInt(_targetHp * (percentage / 100f));
         _targetUnit.TakeDamage(new AttackInfo(damage));
+    }
+
+    [ClientRpc]
+    public void PlayLightningVFXClientRpc()
+    {
+        EffectManager.Instance.Play(EffectManager.Instance.Catalog.Grab_Lightning, transform.position, Quaternion.identity);
+    }
+
+    [ClientRpc]
+    void PlayGrabbedLightningVFXClientRpc()
+    {
+        EffectManager.Instance.Play(EffectManager.Instance.Catalog.Grabbed_Electric, grabSocket.transform.position, Quaternion.identity);
+    }
+
+    [ClientRpc]
+    void PlayThrowLightningVFXClientRpc()
+    {
+        // 바닥을 못 찾으면 소켓 위치에 그대로 재생한다 — 이펙트가 통째로 사라지는 것보다 낫다.
+        Vector3 spawnPoint = grabSocket.position;
+        Quaternion slopeRotation = Quaternion.identity;
+        if (GroundProbe.TryFindGround(grabSocket.position, 0, out RaycastHit hit, out string report))
+        {
+            spawnPoint = hit.point;
+            slopeRotation = Quaternion.FromToRotation(Vector3.up, hit.normal);
+        }
+
+        EffectManager.Instance.Play(EffectManager.Instance.Catalog.Throw_Lightning, spawnPoint, slopeRotation);
     }
 }
