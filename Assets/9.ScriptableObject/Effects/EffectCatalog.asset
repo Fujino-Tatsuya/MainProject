@@ -21,4 +21,7 @@ MonoBehaviour:
   <Drop_Charge_Indicator>k__BackingField: {fileID: 11400000, guid: 12f5c15d731222a4fb5899aa42423fc8, type: 2}
   <Drop_Collision>k__BackingField: {fileID: 11400000, guid: 8bba3a5cded85e14699a98dc88d6d3bc, type: 2}
   <BossRage>k__BackingField: {fileID: 0}
+  <Grab_Lightning>k__BackingField: {fileID: 11400000, guid: 6718432e9f0395642a71c720aa5181fd, type: 2}
   <Grab_ArmElectric>k__BackingField: {fileID: 11400000, guid: b0551a23e7c04f1d90c3a2b7e4d61f03, type: 2}
+  <Grabbed_Electric>k__BackingField: {fileID: 11400000, guid: 4c27dd41039aaa44fbf590ac0a0c5b91, type: 2}
+  <Throw_Lightning>k__BackingField: {fileID: 11400000, guid: 74fea13bb963e4c4ebfd7f0e6a5a4fbf, type: 2}
