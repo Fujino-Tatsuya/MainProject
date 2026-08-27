@@ -34,6 +34,13 @@ public class ShurikenEffectSystem : IEffectSystem
             cache.roots[i].Clear(true);
             cache.roots[i].Play(true);
         }
+
+        // 트레일도 이력을 먼저 지운다. 안 지우면 이전 대출자가 있던 자리에서 지금 위치까지 줄이 한 번 그어진다.
+        for (int i = 0; i < cache.trails.Length; i++)
+        {
+            cache.trails[i].Clear();
+            cache.trails[i].emitting = true;
+        }
     }
 
     public void Stop(GameObject instance, bool immediate)
@@ -44,8 +51,19 @@ public class ShurikenEffectSystem : IEffectSystem
         {
             for (int i = 0; i < cache.roots.Length; i++)
                 cache.roots[i].Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+
+            for (int i = 0; i < cache.trails.Length; i++)
+            {
+                cache.trails[i].emitting = false;
+                cache.trails[i].Clear();
+            }
             return;
         }
+
+        // 트레일의 "자연스러운 해제" = 발생만 끄고 남은 궤적은 TrailRenderer.time 동안 알아서 사라진다.
+        // 여기서 Clear()를 부르면 휘두르던 궤적이 뚝 끊긴다 — 파티클의 StopEmitting과 같은 의도다.
+        for (int i = 0; i < cache.trails.Length; i++)
+            cache.trails[i].emitting = false;
 
         // 루프 시스템만 "발생 정지". StopEmittingAndClear를 쓰면 뚝 끊긴다 —
         // 이 인자 하나가 "자연스러운 해제"의 정체다.
@@ -67,6 +85,9 @@ public class ShurikenEffectSystem : IEffectSystem
             ParticleSystem.MainModule main = cache.all[i].main;
             main.simulationSpeed = rate;
         }
+
+        // 트레일에는 배율 개념이 없다(재생 속도 속성이 없다). 대신 궤적은 트랜스폼 이동으로 그려지므로,
+        // 히트스톱으로 대상이 멈추면 궤적도 자연히 자라지 않는다 — 여기서 할 일이 없다.
     }
 
     public void ResetForPool(GameObject instance)
@@ -75,6 +96,14 @@ public class ShurikenEffectSystem : IEffectSystem
 
         for (int i = 0; i < cache.roots.Length; i++)
             cache.roots[i].Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+
+        // 트레일은 반드시 여기서 지운다. 정점 이력은 Stop으로 사라지지 않아서, 남겨두면
+        // 다음 대출 때 그 자리에서 새 위치까지 줄이 이어진다.
+        for (int i = 0; i < cache.trails.Length; i++)
+        {
+            cache.trails[i].emitting = false;
+            cache.trails[i].Clear();
+        }
 
         // 감속이 걸린 채 반납되면 다음 대출자가 얼어붙은 이펙트를 받는다.
         SetPlayRate(instance, 1f);
@@ -96,12 +125,13 @@ public class ShurikenEffectSystem : IEffectSystem
     private static ShurikenPartCache Cache(GameObject instance)
     {
         var cache = instance.GetComponent<ShurikenPartCache>();
-        if (cache != null && cache.all != null) return cache;
+        if (cache != null && cache.all != null && cache.trails != null) return cache;
 
         if (cache == null) cache = instance.AddComponent<ShurikenPartCache>();
 
         cache.all = instance.GetComponentsInChildren<ParticleSystem>(true);
         cache.roots = FindRoots(cache.all, instance.transform);
+        cache.trails = instance.GetComponentsInChildren<TrailRenderer>(true);
         return cache;
     }
 
