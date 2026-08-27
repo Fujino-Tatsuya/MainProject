@@ -90,7 +90,8 @@ public class EffectDurationProbe : MonoBehaviour
 
                 if (_shuriken.CanDrive(instance))
                 {
-                    _shuriken.Play(instance);
+                    // duration 0 — 이 프로브가 재려는 것이 바로 그 수명이다. 넘길 값이 아직 없다.
+                    _shuriken.Play(instance, 0f);
                     driven++;
                 }
             }
