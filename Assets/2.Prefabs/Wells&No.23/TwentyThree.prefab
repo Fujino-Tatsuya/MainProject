@@ -103,6 +103,7 @@ GameObject:
   - component: {fileID: 328986694273374958}
   - component: {fileID: 6116763131625831750}
   - component: {fileID: 3298624546661411796}
+  - component: {fileID: 8591840531920802899}
   m_Layer: 0
   m_Name: RightHookAttack
   m_TagString: Untagged
@@ -180,6 +181,23 @@ MonoBehaviour:
   attackType: 0
   triggerMode: 0
   stayTime: 0
+--- !u!114 &8591840531920802899
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 859237602223199644}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
+  effect: {fileID: 11400000, guid: 2cf993c9d1c269442bc4513cdd2f0447, type: 2}
+  socket: {fileID: 6782823595335115580}
+  offset: {x: 0, y: 0, z: 0}
+  scale: 1
+  safetyTimeout: 5
 --- !u!1 &898394340034172007
 GameObject:
   m_ObjectHideFlags: 0
@@ -885,6 +903,7 @@ GameObject:
   - component: {fileID: 3174080452546132724}
   - component: {fileID: 8820610430510614129}
   - component: {fileID: 3484998061978514129}
+  - component: {fileID: 2623283441777893365}
   m_Layer: 0
   m_Name: UpperAttack
   m_TagString: Untagged
@@ -962,6 +981,23 @@ MonoBehaviour:
   attackType: 0
   triggerMode: 0
   stayTime: 0
+--- !u!114 &2623283441777893365
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5112472842191727821}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
+  effect: {fileID: 11400000, guid: 2cf993c9d1c269442bc4513cdd2f0447, type: 2}
+  socket: {fileID: 6782823595335115580}
+  offset: {x: 0, y: 0, z: 0}
+  scale: 1
+  safetyTimeout: 5
 --- !u!1 &5222937470714169413
 GameObject:
   m_ObjectHideFlags: 0
@@ -1598,6 +1634,7 @@ GameObject:
   - component: {fileID: 2347615363194617035}
   - component: {fileID: 5256932725647423925}
   - component: {fileID: 5991986677993798632}
+  - component: {fileID: 7234033495184810587}
   m_Layer: 0
   m_Name: LeftHookAttack
   m_TagString: Untagged
@@ -1675,6 +1712,23 @@ MonoBehaviour:
   attackType: 0
   triggerMode: 0
   stayTime: 0
+--- !u!114 &7234033495184810587
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6682516438038340514}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
+  effect: {fileID: 11400000, guid: 2cf993c9d1c269442bc4513cdd2f0447, type: 2}
+  socket: {fileID: 3757913526965277339}
+  offset: {x: 0, y: 0, z: 0}
+  scale: 1
+  safetyTimeout: 5
 --- !u!1 &6887850482435865838
 GameObject:
   m_ObjectHideFlags: 0
@@ -1891,6 +1945,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 64
   bt: {fileID: 7434833580858265621}
+  groundProbeDistance: 30
 --- !u!1 &8300409248683084403
 GameObject:
   m_ObjectHideFlags: 0
@@ -2383,9 +2438,17 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   grabController: {fileID: 8939195106823421711}
   jumpController: {fileID: 273769967766734601}
+  upperAttackTrail: {fileID: 2623283441777893365}
+  rightHookTrail: {fileID: 8591840531920802899}
+  leftHookTrail: {fileID: 7234033495184810587}
 --- !u!4 &3124792699938015558 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 471c30ff001a0254e8af63991ec73cf2, type: 3}
+  m_PrefabInstance: {fileID: 3231270175939980973}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &3757913526965277339 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -7426139554570961866, guid: 471c30ff001a0254e8af63991ec73cf2, type: 3}
   m_PrefabInstance: {fileID: 3231270175939980973}
   m_PrefabAsset: {fileID: 0}
 --- !u!4 &4044831474187336012 stripped
@@ -2406,5 +2469,10 @@ Transform:
 --- !u!4 &6091234240197950150 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -549528910085843861, guid: 471c30ff001a0254e8af63991ec73cf2, type: 3}
+  m_PrefabInstance: {fileID: 3231270175939980973}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &6782823595335115580 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -939377630700827247, guid: 471c30ff001a0254e8af63991ec73cf2, type: 3}
   m_PrefabInstance: {fileID: 3231270175939980973}
   m_PrefabAsset: {fileID: 0}
