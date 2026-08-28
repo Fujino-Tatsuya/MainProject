@@ -377,17 +377,40 @@ Codex CLI 교차검증에서 **Codex 가 2건 틀렸다** — `AttachQuestBlocka
 
 | 대상 | 결손 | 성격 |
 |---|---|---|
-| `LevelDeliveryV3` 프리팹 124개 | `OcclusionSection`·`ElevationStack`·`ElevationLevel` 132참조 | 🔴 아래 |
+| `LevelDeliveryV3` 프리팹 ~~124개~~ **110개** | `OcclusionSection`·`ElevationStack`·`ElevationLevel` (에셋,GUID) 쌍 132 / 컴포넌트 **560** | 🔴 아래 |
 | `ModularRobots_R1.prefab` | `CommonMeleeRobot.asset` | **의도된 것** — 팀장이 삭제 결정 |
 | `Stage1.prefab` | 3 | 머지 전 `HEAD`·`leejiwon` 양쪽 동일 |
 | `4.MapScene(-trensparent)` | `FogManager.maskTexture` | 머지 전부터 |
 | `VFXScene.unity` · `Player.prefab` | 각 1 | 아트/SVN 쪽 기존 결손 |
 
-🔴 **`LevelDeliveryV3` 124개** — `fix/pixel` 이 그대로 들고 온 상태이지 이 머지가 만든 게 아니다.
+🔴 **`LevelDeliveryV3` ~~124개~~ 110개** (2026-08-29 정정 — 아래 참조) — `fix/pixel` 이 그대로 들고 온 상태이지 이 머지가 만든 게 아니다.
 필요한 스크립트 3종이 **`feature/trensparent` 에만** 있다. 정본 씬은 이 프리팹을 쓰지 않으므로
 게임 경로 영향은 없고 콘솔 Missing Script 경고만 뜬다.
 → 고치려면 `origin/feature/trensparent` 추가 머지(충돌 12건)인데 `WallOcclusion*` 코드가
 `fix/pixel` 쪽이 더 최신이라 **역행 위험**이 있다. 별건으로 판단할 것.
+
+> **✅ 2026-08-29 종결 — 현상 유지로 결정.** 위 판단이 맞았고, 근거를 네 축으로 다시 쟀다.
+> - **삭제된 적이 없다.** 세 클래스(`OcclusionSection`·`ElevationLevel`·`ElevationStack`)는
+>   `bb35c92` "feat: redesign registered wall occlusion"(2026-08-09, noisyboy632)에서 **추가**됐고
+>   그 커밋은 `origin/feature/trensparent` 에만 있다(`git merge-base --is-ancestor bb35c92 HEAD` = false).
+>   전 브랜치에 **삭제 커밋이 없다** — "왜 지웠나" 가 아니라 "아직 안 왔다" 가 맞는 질문이었다.
+> - **정확한 규모**: 프리팹 **110개** / (에셋,GUID) 쌍 **132** / **실제 컴포넌트 인스턴스 560개**
+>   (OcclusionSection 515 · ElevationLevel 33 · ElevationStack 12). 도구가 말하는 "132 참조" 는
+>   쌍 수이지 컴포넌트 수가 아니다 — 정리를 택했다면 지울 대상은 560 이었다.
+>   **110 은 두 독립 방법으로 맞췄다**(python YAML 집계 · `grep -rl` 합집합). 기존 문서의
+>   "124개"/"125개" 는 근거가 없는 수다 — GUID별 108/12/12 는 도구와 정확히 일치한다.
+> - **게임 경로 영향 없음(4축 전부 0)**: 씬 직접 참조 0 · **27개 씬 전수 GUID 전이 BFS 도달 0** ·
+>   Addressables 그룹 교집합 0 · 코드의 경로 로드 0.
+> - **왜 복원하지 않나**: 좁은 복원의 최소 폐포는 4파일(세 클래스 + `WallOcclusionRegistry`)이고
+>   컴파일은 닫히지만, **우리 브랜치에는 이 타입을 쓰는 코드가 0건**이다(드라이버가 `fix/pixel` 계열).
+>   살아나는 것은 인스펙터의 오소링 데이터뿐이고 런타임 동작은 없다 — 죽은 코드를 넣는 대가로
+>   콘솔 경고를 지우는 셈이고, 나중에 trensparent 를 제대로 머지할 때 충돌만 늘린다.
+> - **프리팹 정리는 하지 말 것.** 되돌릴 수 없고 trensparent 리디자인이 전제하는 오소링 기록
+>   (`renderers`/`colliders`/`contentRoot`/`contentRenderers`)을 없앤다.
+>
+> **다시 판단하지 말 것.** 바뀔 조건은 하나 — `feature/trensparent` 를 머지하기로 할 때다.
+> 재현 스크립트와 상세 근거는 MCP 포크의 `HANDOFF.md` §5 / §4-(44) 와
+> `Tools/scan/occlusion-reach.py` 에 있다.
 
 ### ✅ 원격 `feature/maprendering` 삭제 완료
 
