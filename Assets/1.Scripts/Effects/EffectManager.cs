@@ -30,6 +30,39 @@ public class EffectManager : MonoBehaviour
     /// <summary>중앙 이펙트 카탈로그. 예: EffectManager.Instance.Catalog.HitSpark</summary>
     public EffectCatalog Catalog => catalog;
 
+    /// <summary>
+    /// 연출 호출부용 안전 접근자. <c>EffectManager.Instance.Catalog.X</c>를 그대로 쓰면
+    /// 매니저가 없는 씬에서 <see cref="System.NullReferenceException"/>이 난다 —
+    /// RPC 핸들러 안이면 NGO가 "Unhandled RPC exception"으로 감싸 던진다.
+    ///
+    /// <b>조용히 넘기지 않는다.</b> 원인은 "씬에 매니저 프리팹을 빠뜨렸다" 하나인데, 증상은
+    /// "이 씬에서만 이펙트가 일부 안 나온다"로 나타나 찾는 데 시간이 걸린다.
+    /// (실제로 4.MapScene에 EffectManager가 없어 이 문제가 났다.)
+    /// </summary>
+    /// <param name="manager">사용 가능한 매니저. false를 돌려줄 때는 null이다</param>
+    /// <param name="context">경고를 클릭했을 때 하이라이트할 오브젝트</param>
+    public static bool TryGet(out EffectManager manager, Object context = null)
+    {
+        manager = Instance;
+
+        if (manager == null)
+        {
+            Edit.LogWarning("[EffectManager] 이 씬에 EffectManager가 없습니다 — 이펙트가 재생되지 않습니다. " +
+                            "Assets/2.Prefabs/Managers/EffectManager.prefab을 씬에 넣을 것.", context);
+            return false;
+        }
+
+        if (manager.Catalog == null)
+        {
+            manager = null;
+            Edit.LogWarning("[EffectManager] EffectCatalog가 연결되지 않았습니다 — " +
+                            "EffectManager 프리팹의 인스펙터에서 연결할 것.", context);
+            return false;
+        }
+
+        return true;
+    }
+
     // 피격 이펙트 디버그 오버라이드. null = 해제(각 대상의 원래 hitVFXType을 쓴다).
     //
     // ⚠️ EffectCatalog(ScriptableObject)가 아니라 여기에 둔다. SO는 씬 오브젝트와 달리 플레이 모드
