@@ -271,18 +271,24 @@ public class GrabController : NetworkBehaviour
     [ClientRpc]
     public void PlayLightningVFXClientRpc()
     {
-        EffectManager.Instance.Play(EffectManager.Instance.Catalog.Grab_Lightning, transform.position, Quaternion.identity);
+        if (!EffectManager.TryGet(out EffectManager effects, this)) return;
+
+        effects.Play(effects.Catalog.Grab_Lightning, transform.position, Quaternion.identity);
     }
 
     [ClientRpc]
     void PlayGrabbedLightningVFXClientRpc()
     {
-        EffectManager.Instance.Play(EffectManager.Instance.Catalog.Grabbed_Electric, grabSocket.transform.position, Quaternion.identity);
+        if (!EffectManager.TryGet(out EffectManager effects, this)) return;
+
+        effects.Play(effects.Catalog.Grabbed_Electric, grabSocket.transform.position, Quaternion.identity);
     }
 
     [ClientRpc]
     void PlayThrowLightningVFXClientRpc()
     {
+        if (!EffectManager.TryGet(out EffectManager effects, this)) return;
+
         // 바닥을 못 찾으면 소켓 위치에 그대로 재생한다 — 이펙트가 통째로 사라지는 것보다 낫다.
         Vector3 spawnPoint = grabSocket.position;
         Quaternion slopeRotation = Quaternion.identity;
@@ -292,6 +298,6 @@ public class GrabController : NetworkBehaviour
             slopeRotation = Quaternion.FromToRotation(Vector3.up, hit.normal);
         }
 
-        EffectManager.Instance.Play(EffectManager.Instance.Catalog.Throw_Lightning, spawnPoint, slopeRotation);
+        effects.Play(effects.Catalog.Throw_Lightning, spawnPoint, slopeRotation);
     }
 }

@@ -282,8 +282,11 @@ public class JumpController : NetworkBehaviour, IDamageSettable
         // 크기는 scale 인자가, 성장 시간은 partDuration이 정한다 — 둘 다 서버가 매번 계산하는 런타임 값이다.
         // rotation을 넘기는 것은 경사면 정렬 때문이다(_floorRootRot).
         ReleaseIndicator();   // 이전 점프의 핸들이 남아 있으면 먼저 회수한다(재진입 방어)
-        _indicatorHandle = EffectManager.Instance.PlayLooping(
-            EffectManager.Instance.Catalog.Drop_Charge_Indicator,
+
+        if (!EffectManager.TryGet(out EffectManager effects, this)) return;
+
+        _indicatorHandle = effects.PlayLooping(
+            effects.Catalog.Drop_Charge_Indicator,
             position, rotation, _floorRadius, growDuration);
     }
 
@@ -317,6 +320,8 @@ public class JumpController : NetworkBehaviour, IDamageSettable
     [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
     void PlayDropVFXRpc(Vector3 pos)
     {
-        EffectManager.Instance.Play(EffectManager.Instance.Catalog.Drop_Collision, pos, _floorRadius);
+        if (!EffectManager.TryGet(out EffectManager effects, this)) return;
+
+        effects.Play(effects.Catalog.Drop_Collision, pos, _floorRadius);
     }
 }
