@@ -25,3 +25,7 @@ MonoBehaviour:
   <Grab_ArmElectric>k__BackingField: {fileID: 11400000, guid: b0551a23e7c04f1d90c3a2b7e4d61f03, type: 2}
   <Grabbed_Electric>k__BackingField: {fileID: 11400000, guid: 4c27dd41039aaa44fbf590ac0a0c5b91, type: 2}
   <Throw_Lightning>k__BackingField: {fileID: 11400000, guid: 74fea13bb963e4c4ebfd7f0e6a5a4fbf, type: 2}
+  <ChargeBall_Grow>k__BackingField: {fileID: 11400000, guid: f3693d35287b49f7b7ba750c52cb6840, type: 2}
+  <ChargeBall_Loop>k__BackingField: {fileID: 11400000, guid: bb39a066d0454af88683e332e64a3e59, type: 2}
+  <ChargeBall_FadeOut>k__BackingField: {fileID: 11400000, guid: 5d28b04cd06644d7b77bb5c9505f3de8, type: 2}
+  <ChargeBall_Break>k__BackingField: {fileID: 11400000, guid: 3c3031593b194504a7a6a779cf151ce4, type: 2}
