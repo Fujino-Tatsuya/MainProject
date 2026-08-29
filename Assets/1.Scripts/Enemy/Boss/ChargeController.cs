@@ -16,6 +16,24 @@ public class ChargeController : NetworkBehaviour, IDamageSettable
     [SerializeField] GameObject floor;
     ColliderBasicAttack _floorColliderAttack;
 
+    [Header("차징 번개구슬 VFX")]
+    [Tooltip("성장 연출이 최종 크기에 도달하기까지의 시간(초). 프리팹에 저작된 성장 길이와 맞출 것.\n" +
+             "이 시간이 지나면 Grow를 Loop로 교체한다")]
+    [SerializeField, Min(0f)] float chargeBallGrowDuration = 1f;
+
+    [Tooltip("구슬 중심의 추가 오프셋(월드). 콜라이더 중심이 바닥에 붙어 있으면 여기서 띄운다")]
+    [SerializeField] Vector3 chargeBallOffset;
+
+    // 구슬은 Floor의 SphereCollider와 같은 크기여야 한다 — 예고가 곧 판정 범위이므로
+    // 값을 하드코딩하지 않고 콜라이더에서 매번 읽는다.
+    SphereCollider _floorSphere;
+
+    // 루프 핸들. 피어마다 자기 EffectManager에서 발급받으므로 이 필드도 피어 로컬이다.
+    EffectHandle _growHandle;
+    EffectHandle _loopHandle;
+    float _growElapsed;
+    bool _growing;
+
     int _max = 0;
     int _destroyCount = 0;
     // 테스트를 위해 잠시 public 처리.
@@ -29,6 +47,10 @@ public class ChargeController : NetworkBehaviour, IDamageSettable
     {
         base.OnNetworkSpawn();
         SetFloorActive(false);
+
+        // 모든 피어가 각자 계산한다 — 구슬 위치·크기를 RPC로 보내지 않는 이유다.
+        // floor는 보스의 자식이라 트랜스폼이 복제되므로 각 피어의 로컬 값이 곧 정답이다.
+        if (floor != null) _floorSphere = floor.GetComponent<SphereCollider>();
 
         if (!IsServer) return;
 
@@ -56,8 +78,120 @@ public class ChargeController : NetworkBehaviour, IDamageSettable
         if (IsServer)
             UnsubscribeAll();
 
+        // 핸들 회수는 서버·클라 모두 해야 한다. 차징 도중 디스폰되면 종료 RPC가 오지 않아
+        // 루프 인스턴스가 풀로 돌아오지 못한다.
+        ReleaseChargeBall();
+
         base.OnNetworkDespawn();
     }
+
+    #region 차징 번개구슬 VFX
+
+    /// <summary>
+    /// <see cref="SphereCollider"/>의 실제 월드 반지름. 스케일이 축마다 다르면 유니티가
+    /// <b>가장 큰 축</b>으로 구를 만들므로 판정도 그 값을 따른다(Floor는 3,3,1 → 3배).
+    /// </summary>
+    static float GetWorldRadius(SphereCollider sphere)
+    {
+        Vector3 s = sphere.transform.lossyScale;
+        float max = Mathf.Max(Mathf.Abs(s.x), Mathf.Abs(s.y), Mathf.Abs(s.z));
+        return sphere.radius * max;
+    }
+
+    static Vector3 GetWorldCenter(SphereCollider sphere)
+        => sphere.transform.TransformPoint(sphere.center);
+
+    /// <summary>
+    /// [ClientRpc] 구슬 성장 시작. <b>IsServer 가드가 없는 것은 의도다</b> — 연출은 각 피어가
+    /// 자기 화면에 그려야 한다. 위치·크기는 각자 로컬 콜라이더에서 계산하므로 페이로드가 없다.
+    /// </summary>
+    [ClientRpc]
+    void PlayChargeBallClientRpc()
+    {
+        ReleaseChargeBall();   // 이전 차징이 남아 있으면 먼저 회수(재진입 방어)
+
+        if (!TryGetBallPose(out Vector3 center, out float radius)) return;
+        EffectEntry grow = EffectManager.Instance?.Catalog?.ChargeBall_Grow;
+        if (grow == null) return;
+
+        _growHandle = EffectManager.Instance.PlayLooping(grow, center, Quaternion.identity, radius);
+        _growElapsed = 0f;
+        _growing = true;
+    }
+
+    /// <summary>
+    /// [ClientRpc] 구슬 종료. <paramref name="broken"/>이면 깨지는 연출, 아니면 서서히 사라지는 연출.
+    /// </summary>
+    [ClientRpc]
+    void EndChargeBallClientRpc(bool broken)
+    {
+        if (TryGetBallPose(out Vector3 center, out float radius) && EffectManager.Instance != null)
+        {
+            EffectEntry outro = broken
+                ? EffectManager.Instance.Catalog?.ChargeBall_Break
+                : EffectManager.Instance.Catalog?.ChargeBall_FadeOut;
+
+            if (outro != null)
+                EffectManager.Instance.Play(outro, center, Quaternion.identity, radius);
+        }
+
+        ReleaseChargeBall();
+    }
+
+    bool TryGetBallPose(out Vector3 center, out float radius)
+    {
+        center = default;
+        radius = 1f;
+        if (_floorSphere == null || EffectManager.Instance == null) return false;
+
+        center = GetWorldCenter(_floorSphere) + chargeBallOffset;
+        radius = GetWorldRadius(_floorSphere);
+        return radius > 0f;
+    }
+
+    void Update()
+    {
+        if (!_growing) return;
+
+        _growElapsed += Time.deltaTime;
+        if (_growElapsed < chargeBallGrowDuration) return;
+
+        _growing = false;
+
+        // Loop를 먼저 켜고 같은 프레임에 Grow를 지운다 — 순서를 뒤집으면 한 프레임 구슬이 사라진다.
+        if (TryGetBallPose(out Vector3 center, out float radius))
+        {
+            EffectEntry loop = EffectManager.Instance.Catalog?.ChargeBall_Loop;
+            if (loop != null)
+                _loopHandle = EffectManager.Instance.PlayLooping(loop, center, Quaternion.identity, radius);
+        }
+
+        if (_growHandle.IsSet)
+        {
+            EffectManager.Instance?.ReleaseImmediate(_growHandle);
+            _growHandle = EffectHandle.None;
+        }
+    }
+
+    /// <summary>루프 핸들 전부 회수. 여러 번 불려도 안전하다.</summary>
+    void ReleaseChargeBall()
+    {
+        _growing = false;
+        _growElapsed = 0f;
+
+        if (_growHandle.IsSet)
+        {
+            EffectManager.Instance?.ReleaseImmediate(_growHandle);
+            _growHandle = EffectHandle.None;
+        }
+        if (_loopHandle.IsSet)
+        {
+            EffectManager.Instance?.ReleaseImmediate(_loopHandle);
+            _loopHandle = EffectHandle.None;
+        }
+    }
+
+    #endregion
 
     public void SetDamage(int value)
     {
@@ -131,6 +265,7 @@ public class ChargeController : NetworkBehaviour, IDamageSettable
         }
         Init();
         SetFloorEnableClientRpc(true);
+        PlayChargeBallClientRpc();
 
         int clampedPlayers = Mathf.Clamp(playerCount, 1, 3);
         _max = (clampedPlayers == 1) ? player1 : (clampedPlayers == 2) ? player2 : player3;
@@ -150,8 +285,14 @@ public class ChargeController : NetworkBehaviour, IDamageSettable
     {
         if (!IsServer) return;
 
+        // ⚠️ Init()이 _isDefeated를 지운다. 종료 분기를 가르는 값이므로 반드시 그 전에 읽는다.
+        // 기둥이 전부 파괴됐다(= 플레이어가 차징을 저지했다) → 구슬이 깨지는 연출.
+        // 그 외(차징 완주 등) → 서서히 사라지는 연출.
+        bool broken = _isDefeated;
+
         Init();
         SetFloorEnableClientRpc(false);
+        EndChargeBallClientRpc(broken);
 
         if (chargeObjects == null) return;
 
