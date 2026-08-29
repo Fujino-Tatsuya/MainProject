@@ -16,7 +16,7 @@ MonoBehaviour:
   increaseHpAmount: 2
   increaseShieldAmount: 2
   maxGroggyCount: 2
-  dashSpeed: 10
+  dashSpeed: 20
   grabCoolTime: 5
   chargingTime: 10
   groggyTime: 5
