@@ -16,6 +16,10 @@ public class TwentyThreeAnimEvents : NetworkBehaviour
     [SerializeField] EffectSocketPlayer leftHookTrail;
     [SerializeField] EffectSocketPlayer dashAttackTrail;
 
+    [Tooltip("돌진·레이지의 공기 저항 연출(FX_Rage_Smash). 궤적과 별개의 EffectSocketPlayer다 — " +
+             "같은 상태에서 둘을 독립적으로 켜고 끌 수 있어야 한다")]
+    [SerializeField] EffectSocketPlayer dashAirDrag;
+
     void Start()
     {
 
@@ -38,6 +42,9 @@ public class TwentyThreeAnimEvents : NetworkBehaviour
 
     public void DashAttackTrailStart() => dashAttackTrail?.Play();
     public void DashAttackTrailEnd() => dashAttackTrail?.Stop();
+
+    public void DashAirDragStart() => dashAirDrag?.Play();
+    public void DashAirDragEnd() => dashAirDrag?.Stop();
 
     public void GrabLightningEvent()
     {
