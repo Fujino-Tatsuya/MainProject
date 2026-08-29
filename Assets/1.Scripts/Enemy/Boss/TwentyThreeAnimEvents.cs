@@ -7,12 +7,14 @@ public class TwentyThreeAnimEvents : NetworkBehaviour
     [SerializeField] JumpController jumpController;
 
     [Header("공격 궤적 VFX")]
-    [Tooltip("각 공격 오브젝트(UpperAttack / RightHookAttack / LeftHookAttack)에 붙인 EffectSocketPlayer.\n" +
+    [Tooltip("각 공격 오브젝트(UpperAttack / RightHookAttack / LeftHookAttack / DashAttack)에 붙인 " +
+             "EffectSocketPlayer.\n" +
              "애니메이션 이벤트는 Animator가 붙은 오브젝트의 컴포넌트에만 전달되므로, 자식에 붙은 것들은 " +
              "여기서 중계해야 한다")]
     [SerializeField] EffectSocketPlayer upperAttackTrail;
     [SerializeField] EffectSocketPlayer rightHookTrail;
     [SerializeField] EffectSocketPlayer leftHookTrail;
+    [SerializeField] EffectSocketPlayer dashAttackTrail;
 
     void Start()
     {
@@ -33,6 +35,10 @@ public class TwentyThreeAnimEvents : NetworkBehaviour
 
     public void LeftHookTrailStart() => leftHookTrail?.Play();
     public void LeftHookTrailEnd() => leftHookTrail?.Stop();
+
+    public void DashAttackTrailStart() => dashAttackTrail?.Play();
+    public void DashAttackTrailEnd() => dashAttackTrail?.Stop();
+
     public void GrabLightningEvent()
     {
         if (IsServer)

@@ -505,6 +505,7 @@ GameObject:
   - component: {fileID: 3578002433487090739}
   - component: {fileID: 7903687224634922449}
   - component: {fileID: 5579044265559132990}
+  - component: {fileID: 2931758949223477035}
   m_Layer: 0
   m_Name: DashAttack
   m_TagString: Untagged
@@ -581,6 +582,23 @@ MonoBehaviour:
     m_Bits: 64
   attackType: 0
   knockbackStrength: 0
+--- !u!114 &2931758949223477035
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2884726549167042591}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
+  effect: {fileID: 11400000, guid: 5e2b9092a0a182648b88a2717c00b8ef, type: 2}
+  socket: {fileID: 2847793121951866063}
+  offset: {x: 0, y: 0, z: 0}
+  scale: 1
+  safetyTimeout: 5
 --- !u!1 &3178699018579886661
 GameObject:
   m_ObjectHideFlags: 0
@@ -2441,6 +2459,12 @@ MonoBehaviour:
   upperAttackTrail: {fileID: 2623283441777893365}
   rightHookTrail: {fileID: 8591840531920802899}
   leftHookTrail: {fileID: 7234033495184810587}
+  dashAttackTrail: {fileID: 2931758949223477035}
+--- !u!4 &2847793121951866063 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 815894645405561442, guid: 471c30ff001a0254e8af63991ec73cf2, type: 3}
+  m_PrefabInstance: {fileID: 3231270175939980973}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &3124792699938015558 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 471c30ff001a0254e8af63991ec73cf2, type: 3}
