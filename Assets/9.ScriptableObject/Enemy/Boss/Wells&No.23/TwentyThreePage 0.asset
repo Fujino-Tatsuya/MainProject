@@ -23,7 +23,7 @@ MonoBehaviour:
   grabAttackPercentage: 100
   jumpAttackMinDistance: 5
   jumpAttackMaxDistance: 10
-  jumpAttackPercentage: 60
+  jumpAttackPercentage: 0
   dashAttackMinDistance: 5
   dashAttackMaxDistance: 10
   dashAttackPercentage: 40
