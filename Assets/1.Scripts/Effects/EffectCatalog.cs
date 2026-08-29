@@ -34,6 +34,14 @@ public class EffectCatalog : ScriptableObject
     [field: SerializeField] public EffectEntry Grabbed_Electric { get; private set; }
     [field: SerializeField] public EffectEntry Throw_Lightning { get; private set; }
 
+    [Header("Boss — 차징 번개구슬 (4단계)")]
+    // 한 엔트리에 파트로 몰지 않고 넷으로 나눈 이유: FadeOut과 Break가 서로 다른 종료 분기다.
+    // 하나로 묶으면 "어느 쪽으로 끝났는지"를 데이터가 표현할 수 없다.
+    [field: SerializeField] public EffectEntry ChargeBall_Grow { get; private set; }
+    [field: SerializeField] public EffectEntry ChargeBall_Loop { get; private set; }
+    [field: SerializeField] public EffectEntry ChargeBall_FadeOut { get; private set; }
+    [field: SerializeField] public EffectEntry ChargeBall_Break { get; private set; }
+
     private List<EffectEntry> _all;
     // 피격 이펙트 테스트용 enum
     public enum HitVFXType
