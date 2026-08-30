@@ -80,7 +80,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MonsterMeleeAttack
   damage: 0
-  isGroggyAttack: 0
   targetLayer:
     serializedVersion: 2
     m_Bits: 64
@@ -107,6 +106,7 @@ GameObject:
   - component: {fileID: 3659388602388330377}
   - component: {fileID: 735775874105135194}
   - component: {fileID: 3386316598579503912}
+  - component: {fileID: 8854267420545635175}
   m_Layer: 8
   m_Name: SpinnerBot
   m_TagString: Untagged
@@ -329,7 +329,6 @@ MonoBehaviour:
     m_Bits: 64
   maxDetectionResults: 16
   hitVFXCollider: {fileID: 327031985263396855}
-  hitPointMode: 2
   hitVFXType: 1
   bodyCollider: {fileID: 6162152019073814685}
   spinChance: 0.4
@@ -356,11 +355,76 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e59f6031be80d1c40ab161abf0873167, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DissolveDeath
+  ShowTopMostFoldoutHeaderGroup: 1
+  dissolveTemplate: {fileID: 2100000, guid: 2aa1c6b21e004e799e426acfd55ec726, type: 2}
+  particlePrefab: {fileID: 7019508933032447489, guid: 0e15d6fc561b43fa95fadff8ab04b5fd, type: 3}
+  duration: 1
+  despawnGrace: 0.5
   renderers: []
-  dissolveProperty: _DissolveAmount
-  duration: 1.5
-  from: 0
-  to: 1
+--- !u!114 &8854267420545635175
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2579433155061434859}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c3be8650c7d44c62b26029cb86c1168a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EffectAnimEvents
+  animator: {fileID: 0}
+  players: []
+--- !u!1 &8327972900299513230
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6392946693987458399}
+  - component: {fileID: 3081950701350684263}
+  m_Layer: 19
+  m_Name: SpinAttack_Socket
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &6392946693987458399
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8327972900299513230}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0.99, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 4778074410999527526}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &3081950701350684263
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8327972900299513230}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
+  id: Spin
+  effect: {fileID: 11400000, guid: 441f6790e2a95274c9e92be056389101, type: 2}
+  socket: {fileID: 0}
+  offset: {x: 0, y: 0, z: 0}
+  scale: 2
+  safetyTimeout: 5
 --- !u!1 &8744036715416638561
 GameObject:
   m_ObjectHideFlags: 0
@@ -484,11 +548,19 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
-    m_AddedGameObjects: []
+    m_AddedGameObjects:
+    - targetCorrespondingSourceObject: {fileID: 3436586203325481903, guid: 3b73a8d629c6c5d499be6573d1d6e2bb, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 6392946693987458399}
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 3b73a8d629c6c5d499be6573d1d6e2bb, type: 3}
 --- !u!4 &386543029237954844 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 7539961990892634837, guid: 3b73a8d629c6c5d499be6573d1d6e2bb, type: 3}
+  m_PrefabInstance: {fileID: 7925796227985963977}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &4778074410999527526 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 3436586203325481903, guid: 3b73a8d629c6c5d499be6573d1d6e2bb, type: 3}
   m_PrefabInstance: {fileID: 7925796227985963977}
   m_PrefabAsset: {fileID: 0}

@@ -149,7 +149,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MonsterMeleeAttack
   damage: 0
-  isGroggyAttack: 0
   targetLayer:
     serializedVersion: 2
     m_Bits: 64
@@ -400,7 +399,6 @@ MonoBehaviour:
     m_Bits: 64
   maxDetectionResults: 16
   hitVFXCollider: {fileID: 3147570509364327094}
-  hitPointMode: 2
   hitVFXType: 1
   bodyCollider: {fileID: 2687977088537551207}
 --- !u!114 &4671480735823204164
@@ -415,11 +413,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e59f6031be80d1c40ab161abf0873167, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DissolveDeath
+  ShowTopMostFoldoutHeaderGroup: 1
+  dissolveTemplate: {fileID: 2100000, guid: 2aa1c6b21e004e799e426acfd55ec726, type: 2}
+  particlePrefab: {fileID: 7019508933032447489, guid: 0e15d6fc561b43fa95fadff8ab04b5fd, type: 3}
+  duration: 1
+  despawnGrace: 0.5
   renderers: []
-  dissolveProperty: _DissolveAmount
-  duration: 1.5
-  from: 0
-  to: 1
 --- !u!114 &7264363400000000001
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -433,7 +432,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   damage: 0
-  isGroggyAttack: 0
   targetLayer:
     serializedVersion: 2
     m_Bits: 64
