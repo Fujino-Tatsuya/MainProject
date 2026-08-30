@@ -20,6 +20,15 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public class EffectSocketPlayer : MonoBehaviour
 {
+    [Header("식별")]
+    [Tooltip("애니메이션 이벤트가 이 이펙트를 지목할 때 쓰는 이름(예: Slash, UpperTrail).\n" +
+             "한 유닛 안에서 고유해야 한다. 비워두면 EffectAnimEvents가 찾지 못한다 — " +
+             "애니메이션 이벤트를 안 쓰고 코드에서 직접 부르는 경우에는 비워도 된다")]
+    [SerializeField] string id;
+
+    /// <summary>애니메이션 이벤트에서 이 이펙트를 지목하는 이름.</summary>
+    public string Id => id;
+
     [Header("무엇을")]
     [Tooltip("재생할 이펙트 엔트리. 비어 있으면 이 컴포넌트는 아무 일도 하지 않는다")]
     [SerializeField] EffectEntry effect;
@@ -64,6 +73,29 @@ public class EffectSocketPlayer : MonoBehaviour
         Transform follow = socket != null ? socket : transform;
         _handle = EffectManager.Instance.PlayLooping(effect, follow, offset, scale);
         _elapsed = 0f;
+    }
+
+    /// <summary>
+    /// [애니메이션 이벤트] <b>원샷</b> 재생. 종료 이벤트가 필요 없는 짧은 연출용이다
+    /// (베기 섬광, 착지 충격 등). 수명은 엔트리의 duration이 정한다.
+    ///
+    /// <see cref="Play"/>와 달리 핸들을 들고 있지 않으므로 회수 책임도 없다 —
+    /// 대신 <b>도중에 끌 수 없다</b>. 끝을 애니메이션이 정해야 하는 연출이면 <see cref="Play"/>를 쓸 것.
+    ///
+    /// 소켓을 <b>따라가지 않고</b> 재생 시점의 위치·회전에 찍는다. 원샷은 짧아서 추종이 필요 없고,
+    /// 추종하려면 루프 핸들이 필요해진다.
+    /// </summary>
+    public void PlayOnce()
+    {
+        if (effect == null)
+        {
+            Edit.LogWarning($"[EffectSocketPlayer] '{name}'에 EffectEntry가 연결되지 않았다.", this);
+            return;
+        }
+        if (EffectManager.Instance == null) return;
+
+        Transform from = socket != null ? socket : transform;
+        EffectManager.Instance.Play(effect, from.position + offset, from.rotation, scale);
     }
 
     /// <summary>[애니메이션 이벤트] 재생 종료. 재생 중이 아니면 조용한 no-op이다.</summary>
