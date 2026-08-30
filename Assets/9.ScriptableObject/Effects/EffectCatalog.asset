@@ -17,6 +17,7 @@ MonoBehaviour:
   <HitEffect3>k__BackingField: {fileID: 11400000, guid: 95bc2f495f06df446a3400d6d765c175, type: 2}
   <HitEffect4>k__BackingField: {fileID: 11400000, guid: 0aec711001a248348ae18f18058b84ed, type: 2}
   <HitEffect5>k__BackingField: {fileID: 11400000, guid: 5b297260b68709f4eba95575765449e4, type: 2}
+  <Mob_Slash>k__BackingField: {fileID: 11400000, guid: d57f39897b08b004c84a995edbd7fde8, type: 2}
   <Drop_Charge_Boundary>k__BackingField: {fileID: 11400000, guid: a250c4956ae6d604195af8c0ef58fe0f, type: 2}
   <Drop_Charge_Indicator>k__BackingField: {fileID: 11400000, guid: 12f5c15d731222a4fb5899aa42423fc8, type: 2}
   <Drop_Collision>k__BackingField: {fileID: 11400000, guid: 8bba3a5cded85e14699a98dc88d6d3bc, type: 2}

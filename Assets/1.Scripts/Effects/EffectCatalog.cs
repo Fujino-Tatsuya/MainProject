@@ -24,6 +24,12 @@ public class EffectCatalog : ScriptableObject
 
 
 
+    [Header("Monster")]
+    // 카탈로그에 넣는 이유는 룩업이 아니라 ①프리워밍 ②빌드 포함 보장이다.
+    // 이 이펙트는 EffectSocketPlayer가 인스펙터 참조로 직접 들고 있어 코드 룩업은 쓰지 않지만,
+    // 몹이 동시에 여러 마리 때리므로 prewarmCount가 실제로 동작해야 첫 타격이 끊기지 않는다.
+    [field: SerializeField] public EffectEntry Mob_Slash { get; private set; }
+
     [Header("Boss")]
     [field: SerializeField] public EffectEntry Drop_Charge_Boundary { get; private set; }
     [field: SerializeField] public EffectEntry Drop_Charge_Indicator { get; private set; }
