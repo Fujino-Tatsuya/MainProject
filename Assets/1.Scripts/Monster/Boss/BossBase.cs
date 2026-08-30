@@ -563,7 +563,11 @@ public class BossBase : Unit
                 break;
             case BossState.Dead:
                 SafeSetTrigger(data.deathTrigger);
-                PlayDeathPlaceholder();
+                // 임시 사망 표시(모델 축소 + 빨강 틴트)는 DissolveDeath 도입으로 역할이 끝났다.
+                // 둘 다 디졸브와 충돌한다 — 축소는 디졸브 중인 메쉬를 함께 줄여버리고,
+                // 틴트는 MaterialPropertyBlock으로 _BaseColor를 덮어써 디졸브 머티리얼까지 빨개진다.
+                // MonsterBase의 같은 자리와 함께 껐다. 메서드 본체는 남겨 둔다(PlayDeathPlaceholder).
+                //PlayDeathPlaceholder();
                 break;
         }
     }
