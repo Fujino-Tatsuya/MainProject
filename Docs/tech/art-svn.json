@@ -1,0 +1,21 @@
+{
+  "_comment": [
+    "이 git 커밋이 전제하는 아트(SVN) 상태. Assets/50.Art 는 git 이 아니라 SVN 이 소유한다.",
+    "여기 적힌 리비전과 다른 아트를 받으면 Unity 는 대체로 그냥 열린다 - 그리고 조용히 다른",
+    "메시/머티리얼/임포터 설정을 쓴다. 같은 git SHA 인데 화면이 다르면 먼저 이 파일과",
+    "실제 작업사본을 대조할 것. 검사: python Docs/tech/check-environment.py",
+    "아트를 새로 받아 git 에 반영할 때는 pinnedRevision 과 pinnedAt 을 같이 갱신한다."
+  ],
+  "url": "https://svna.gameinjae.kr/svn/GA7thFinal_VeyTrace",
+  "subtree": "4_Resources/Art",
+  "junctionPath": "Assets/50.Art",
+  "pinnedRevision": 286,
+  "pinnedAt": "2026-08-30",
+  "expected": {
+    "metaFiles": 1105,
+    "ownedGuids": 1105,
+    "gitFilesReferencing": 392,
+    "guidOccurrencesInGit": 23097,
+    "_comment": "2026-08-30 실측. 이 수가 크게 줄면 정션이 안 걸렸거나 아트가 낡은 것이다."
+  }
+}

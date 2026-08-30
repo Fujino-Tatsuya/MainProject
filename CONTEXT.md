@@ -1,5 +1,9 @@
 # CONTEXT.md - Shared Project Language
 
+> 🆕 **새 환경에서 처음 여는 사람은 [Docs/tech/environment-setup.md](Docs/tech/environment-setup.md) 부터.**
+> 이 프로젝트는 git 만으로 안 선다 — 아트가 SVN 에 있고, 없어도 Unity 는 조용히 열린다.
+> 열기 전에 `python Docs/tech/check-environment.py` 를 돌릴 것.
+
 This file defines the shared vocabulary for the project. Keep it concise. It is not a full spec and should not contain implementation plans.
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
@@ -431,8 +435,12 @@ Codex CLI 교차검증에서 **Codex 가 2건 틀렸다** — `AttachQuestBlocka
 - **`CommonMeleeRobot.asset` 은 머지 사고로 사라진 것이었다** — `1bf654f`(은희, feature/VFX→development)
   에서 **양쪽 부모에 다 있는데** 결과에서 빠졌다. 되돌리기 반복은 금지(원인·금지사항 =
   [Docs/tech/bt-subgraph-reference-loss.md](Docs/tech/bt-subgraph-reference-loss.md)). 팀장이 삭제 수용으로 종결.
-- ⚠️ **`Assets/50.Art` 는 OneDrive 정션**이고 이 PC 에 `.svn` 작업사본도 `svn` 클라이언트도 없다.
-  GUID 결손 조사 시 `grep -r Assets` 는 정션을 **안 따라간다** — `Assets/50.Art` 를 명령줄에 직접 줘야 한다.
+- ⚠️ **`Assets/50.Art` 는 정션이다.** GUID 결손 조사 시 `grep -r Assets` 는 정션을 **안 따라간다** —
+  `Assets/50.Art` 를 명령줄에 직접 줘야 한다.
+  > **2026-08-30 정정**: 이 줄은 원래 "OneDrive 정션이고 이 PC 에 `.svn` 작업사본도 `svn`
+  > 클라이언트도 없다" 였다. **둘 다 이제 틀렸다** — 2026-08-23 에 작업사본을
+  > `C:\svn\GA7thFinal_VeyTrace` 로 옮기고 SlikSvn 을 설치했다(위 2026-08-23 절).
+  > 셋업 절차는 [Docs/tech/environment-setup.md](Docs/tech/environment-setup.md).
 
 ---
 
