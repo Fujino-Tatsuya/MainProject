@@ -384,6 +384,8 @@ MonoBehaviour:
     m_Bits: 8256
   attackType: 0
   knockbackStrength: 0
+  hitEffect: {fileID: 0}
+  effectRelay: {fileID: 0}
 --- !u!1 &2878115523209849289
 GameObject:
   m_ObjectHideFlags: 0
@@ -582,6 +584,8 @@ MonoBehaviour:
     m_Bits: 64
   attackType: 0
   knockbackStrength: 0
+  hitEffect: {fileID: 0}
+  effectRelay: {fileID: 0}
 --- !u!114 &2931758949223477035
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -835,6 +839,8 @@ MonoBehaviour:
     m_Bits: 8256
   attackType: 0
   knockbackStrength: 0
+  hitEffect: {fileID: 0}
+  effectRelay: {fileID: 0}
 --- !u!1 &3908396834888608453
 GameObject:
   m_ObjectHideFlags: 0
@@ -1177,6 +1183,8 @@ GameObject:
   - component: {fileID: 9114957203948571100}
   - component: {fileID: 3492608744245104837}
   - component: {fileID: 8569880327811348480}
+  - component: {fileID: 4794102354308325376}
+  - component: {fileID: 5238882027279329280}
   m_Layer: 8
   m_Name: TwentyThree
   m_TagString: Untagged
@@ -1695,6 +1703,54 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FloatingDamageAnchor
   anchorTransform: {fileID: 5727676292926268320}
   localOffset: {x: 0, y: 0, z: 0}
+--- !u!114 &8569880327811348480
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5372104213593212626}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4781035385304bdaa3e2f0bae2047117, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AttackEffectRelay
+  ShowTopMostFoldoutHeaderGroup: 1
+  sources:
+  - {fileID: 6555260676494401482}
+--- !u!114 &4794102354308325376
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5372104213593212626}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e59f6031be80d1c40ab161abf0873167, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DissolveDeath
+  ShowTopMostFoldoutHeaderGroup: 1
+  dissolveTemplate: {fileID: 2100000, guid: 2aa1c6b21e004e799e426acfd55ec726, type: 2}
+  particlePrefab: {fileID: 7019508933032447489, guid: 0e15d6fc561b43fa95fadff8ab04b5fd, type: 3}
+  duration: 2
+  despawnGrace: 0.5
+  renderers: []
+--- !u!114 &5238882027279329280
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5372104213593212626}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6b22e85544084f06bc0b0c88c21586d9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BossDeathEffectBinder
+  ShowTopMostFoldoutHeaderGroup: 1
+  unit: {fileID: 0}
+  deathEffect: {fileID: 4794102354308325376}
 --- !u!1 &5983189518809354529
 GameObject:
   m_ObjectHideFlags: 0
@@ -2590,17 +2646,3 @@ Transform:
   m_CorrespondingSourceObject: {fileID: -939377630700827247, guid: 471c30ff001a0254e8af63991ec73cf2, type: 3}
   m_PrefabInstance: {fileID: 3231270175939980973}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &8569880327811348480
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5372104213593212626}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4781035385304bdaa3e2f0bae2047117, type: 3}
-  m_Name:
-  m_EditorClassIdentifier: Assembly-CSharp::AttackEffectRelay
-  sources:
-  - {fileID: 6555260676494401482}
