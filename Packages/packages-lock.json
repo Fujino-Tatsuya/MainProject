@@ -1,11 +1,11 @@
 {
   "dependencies": {
     "com.community.unity-mcp": {
-      "version": "https://github.com/Seoki2000/unity-mcp.git#ea95b2ede694d7804c9ee79de219a24c67f7abb1",
+      "version": "https://github.com/Seoki2000/unity-mcp.git#d77ff64c3e3d12ff060342ccbacec434f4d5ba62",
       "depth": 0,
       "source": "git",
       "dependencies": {},
-      "hash": "ea95b2ede694d7804c9ee79de219a24c67f7abb1"
+      "hash": "d77ff64c3e3d12ff060342ccbacec434f4d5ba62"
     },
     "com.unity.2d.sprite": {
       "version": "1.0.0",
