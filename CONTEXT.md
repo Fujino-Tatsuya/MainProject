@@ -4,7 +4,43 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 현재 인수인계 (2026-08-07 · 보스 FSM 지원 2건 — 인터럽트 식별자 + 캐리 소켓)
+## ▶▶ 현재 인수인계 (2026-08-30 · 사망 디졸브 연출, 브랜치 `feature/VFX`)
+
+작업 세션: **민경(Claude)**. 계획·근거는 [PLAN.md](PLAN.md) 최상단 항목(**승인 대기**).
+
+**수정 예정 (동시 편집 금지)**: `Assets/1.Scripts/Monster/DissolveDeath.cs`(재작성) ·
+`Assets/1.Scripts/Enemy/Boss/BossDeathEffectBinder.cs`(신규) ·
+`Assets/2.Prefabs/Monster/*.prefab`(8종 배선) · `Assets/2.Prefabs/Wells&No.23/TwentyThree.prefab` ·
+`Assets/TheVayuputra/DissolveShader/`(머티리얼 템플릿·파티클 사본)
+
+이번에 확인된 계약만 적는다:
+
+- 🔴 **몬스터와 보스는 사망 경로가 다르다.** 몬스터 = `MonsterBase.EnterDead()` → `IDeathEffect.Play`
+  → `DespawnNow`. 보스(TwentyThree) = `Enemy : Unit`이라 그 훅이 **없고**, `Unit.Died`(서버 전용)만
+  있으며 **디스폰되지 않는다** — `BossEncounterDirector`가 `defeatResultDelaySeconds`(=3) 뒤
+  결과 씬으로 넘긴다. 보스 사망 연출은 3초 안에 끝나야 한다.
+- 🔴 **위 보스 경로는 한시적이다.** 기존 보스(`Enemy : Unit` 계열)는 **폐기되고, 일반 몬스터와
+  똑같은 방식으로 새로 만들어진다** — 즉 `MonsterBase`/`BossBase` 계통으로 옮겨가
+  `EnterDead()` → `IDeathEffect.Play` 경로를 그대로 탄다. 그러면 지금의 두 갈래가 하나로 합쳐진다.
+  **따라서 보스 전용 우회로를 늘리지 말 것.** `BossDeathEffectBinder`는 그때까지만 필요한
+  어댑터이고, 보스가 새로 만들어지는 시점에 통째로 지운다(`DissolveDeath` 자체는 그대로 쓴다).
+- 🔴 **`IDeathEffect.Play`는 서버에서만 불린다.** 여기서 바로 연출을 재생하면 호스트에서만 보인다
+  (이 레포의 반복 버그. `PLAN.md` 08-11 §A). 연출은 RPC로 전 피어에 퍼뜨리고 각 피어가
+  자기 로컬 렌더러로 그린다 — 좌표는 싣지 않는다.
+- **`DissolveFx` 셰이더의 `_Cutoff`는 1 = 보임, 0 = 사라짐**이다. 기존 `DissolveDeath`
+  플레이스홀더의 `_DissolveAmount` 0→1과 방향이 반대다.
+- **몬스터 albedo는 사실상 하나다**(`T_RobotTexture.png`, 예외는 `M_SpinBotBlades`).
+  그래서 캐릭터별 디졸브 머티리얼을 만들지 않고 **템플릿 1개 + 런타임 `_BaseMap` 복사**로 간다.
+- 🔴 **`sharedMaterial`을 쓰지 말 것.** 플레이 모드 변경이 `.mat` 에셋에 눌러앉아 그대로 커밋되면
+  팀 전체 캐릭터 머티리얼이 바뀐다. `renderer.material`(인스턴스) 또는 MPB만 쓴다.
+- **몬스터 렌더러는 프리팹 루트에 없다** — 중첩 모델 프리팹/FBX 안에 있어 인스펙터 배선이 어렵다.
+  런타임에 `GetComponentsInChildren<Renderer>(true)`로 수집하고, 파티클 Shape(메쉬 방출)도
+  코드로 지정한다.
+
+---
+
+
+## 이전 인수인계 (2026-08-07 · 보스 FSM 지원 2건 — 인터럽트 식별자 + 캐리 소켓)
 
 작업 세션: **은희(Claude)**. 워크트리 `C:\UnityProject\MainProject-WorkTree`,
 브랜치 `feature/InterruptSkill-CarrySocket` (base `MainProject/development` `6dbc1c34a`).
