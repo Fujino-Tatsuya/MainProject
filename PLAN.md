@@ -1,3 +1,172 @@
+# CURRENT PLAN — 몬스터/보스 사망 디졸브 연출 (2026-08-30)
+
+> 상태: **구현 완료, Unity Play 수동 검증 대기**. 브랜치 `feature/VFX`. 작업자 민경(Claude).
+> 패키지: `Assets/TheVayuputra/DissolveShader` (URP Lit 기반 Shader Graph).
+
+## 목표
+
+몬스터 8종(`Assets/2.Prefabs/Monster/`)과 보스 `TwentyThree.prefab`이 죽을 때
+`DissolveParticle`을 재생하면서 디졸브 셰이더로 사라지게 한다. **전 피어에서 보여야 한다.**
+
+## 확인된 현재 상태 (조사 결과)
+
+- `IDeathEffect` 훅이 이미 있다 — `MonsterBase.cs:869`, `BossBase.cs:418`가
+  `GetComponent<IDeathEffect>()`를 찾아 `Play(DespawnNow)`를 부른다.
+- `DissolveDeath`(플레이스홀더)가 **몬스터 프리팹 8종에 이미 붙어 있다**. 다만
+  찾는 프로퍼티가 `_DissolveAmount`(존재하지 않음)이고 값 방향도 반대라 항상
+  "1.5초 대기 후 디스폰" 폴백으로 빠진다.
+- 🔴 **몬스터와 보스는 사망 경로가 완전히 다르다.**
+  | | 몬스터 8종 | TwentyThree |
+  |---|---|---|
+  | 베이스 | `MonsterBase` (`GauntletBot` 포함) | **`Enemy : Unit`** |
+  | 사망 진입 | `EnterDead()` (서버) | `Unit.Died` 이벤트 (서버) |
+  | `IDeathEffect` 훅 | 있음 | **없음** |
+  | 클라 사망 신호 | `_state` NetworkVariable → `Dead` | **없음** |
+  | 사망 후 | `DespawnNow()` | **디스폰하지 않음** — `BossEncounterDirector`가 3초 뒤 결과 씬 |
+- `BossEncounterDirector.defeatResultDelaySeconds = 3`(4.MapScene 실측). 보스 디졸브는
+  이보다 짧아야 한다.
+- 셰이더 `DissolveFx`: URP **Lit** SubTarget / AlphaClip / 양면. 노출 프로퍼티는
+  `_MainTexture` `_BaseColor` `_NoiseTexture` `_NoiseScale` `_Cutoff` `_Edge_Size` `_Edge_Color`.
+  **`_Cutoff` 1 = 보임, 0 = 사라짐** (기존 `DissolveDeath`의 0→1과 반대).
+- `DissolveParticle.prefab`: Shape **Sphere/radius 1**, `lengthInSec 2`, `looping 0`,
+  **`playOnAwake 1`**, `scalingMode Local`, maxParticles 1000.
+- 🔴 **몬스터 머티리얼은 albedo를 공유한다.** `M_*Bot_01` 전부 `T_RobotTexture.png`,
+  예외는 `M_SpinBotBlades`(`T_SpinBotBlades_01.png`) 하나. 보스는 `Boss_23_basecolor.png`.
+- 렌더러는 프리팹 루트에 없다 — 중첩 모델 프리팹/FBX 안에 있다.
+  **런타임에 `GetComponentsInChildren<Renderer>(true)`로 수집해야 한다**(기존 코드가 이미 그렇게 한다).
+
+## 결정 (합의됨)
+
+| # | 질문 | 결정 |
+|---|---|---|
+| 1 | 머티리얼 처리 | **A — 사망 시 교체** (셰이더그래프 확장/표준셰이더 이관은 하지 않음) |
+| 2 | 파티클 Shape | **캐릭터 메쉬에서 방출** |
+| 3 | 디졸브 길이 | **몬스터 0.5초 · 보스 1.0초** (보스 상한 = defeatResultDelaySeconds 3초) |
+| 4 | 코어 수정 | **하지 않는다** — `MonsterBase`/`BossBase` 무수정, 어댑터로 해결 |
+| 5 | 범위 | 몬스터 8종 + TwentyThree. `P_MonsterProjectile`(Unit 아님)·`Wells.prefab`(부속) 제외 |
+
+### 1번의 세부 — 캐릭터별 머티리얼 9개 → **템플릿 1개 + 런타임 복사**
+
+조사에서 몬스터 albedo가 사실상 하나(`T_RobotTexture.png`)로 드러났다. 캐릭터별로
+머티리얼을 미리 만들 이유가 사라졌으므로, 교체 시점에 원본에서 텍스처만 옮겨 적는다:
+
+```csharp
+Material dissolve = new Material(dissolveTemplate);
+dissolve.SetTexture("_MainTexture", original.GetTexture("_BaseMap"));
+dissolve.SetColor("_BaseColor", original.GetColor("_BaseColor"));
+```
+
+여전히 "A = 사망 시 교체"이고, 달라지는 건 **아트 작업이 머티리얼 9개 제작 → 템플릿 1개
+튜닝으로 줄어든다**는 점뿐이다. 서브메쉬가 여러 개인 캐릭터(PeekABot 본체+안테나,
+SpinnerBot 본체+블레이드)도 슬롯마다 원본 텍스처를 그대로 따라가므로 자동으로 맞는다.
+새 캐릭터가 들어와도 배선이 필요 없다.
+
+## 접근
+
+### A. `DissolveDeath`를 `NetworkBehaviour`로 승격 (코어 무수정)
+
+```
+[서버] EnterDead()
+   └─ fx.Play(DespawnNow)                 ← IDeathEffect 시그니처 유지 = MonsterBase 무수정
+        ├─ PlayDissolveRpc()  ──────────► [전 피어] 로컬 재생
+        │                                   ├─ 렌더러 수집 → 슬롯별 디졸브 머티리얼 교체
+        │                                   ├─ 파티클 Shape를 이 캐릭터 메쉬로 지정 후 Play
+        │                                   └─ MPB로 _Cutoff 1 → 0 (duration)
+        └─ [서버] duration 뒤 onComplete() → Despawn
+```
+
+- `[Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]` — 순수 연출.
+  `JumpController.PlayDropVFXRpc`·`AttackEffectRelay`와 같은 규약.
+- **좌표를 싣지 않는다.** 각 피어가 자기 렌더러를 자기가 녹인다.
+- `sharedMaterial`은 절대 쓰지 않는다 — 에셋이 오염되고 커밋되면 팀 전체 캐릭터가 바뀐다.
+
+### B. 파티클 Shape를 런타임에 캐릭터 메쉬로 지정
+
+렌더러가 중첩 프리팹 안에 있어 인스펙터 배선이 8종 × N슬롯이 된다. 코드로 붙인다:
+
+```csharp
+var shape = particle.shape;
+if (smr != null) { shape.shapeType = ParticleSystemShapeType.SkinnedMeshRenderer;
+                   shape.skinnedMeshRenderer = smr; }
+else if (mr != null) { shape.shapeType = ParticleSystemShapeType.MeshRenderer;
+                       shape.meshRenderer = mr; }
+```
+
+- 대상은 `GetComponentsInChildren`로 찾은 첫 번째 렌더러.
+- 메쉬를 못 찾으면 원본 Sphere Shape를 그대로 둔다(폴백).
+- 파티클 프리팹 사본을 만들어 **`playOnAwake`를 끈다**(원본은 켜져 있어 스폰 즉시 터진다).
+
+### C. 보스 어댑터
+
+`Enemy`(공용)를 고치지 않고 보스 전용 컴포넌트를 하나 붙인다.
+
+```
+TwentyThree.prefab (루트)
+  └─ BossDeathEffectBinder : NetworkBehaviour   (신규)
+        OnNetworkSpawn:  if (IsServer) unit.Died += OnBossDied
+        OnBossDied():    GetComponent<DissolveDeath>().Play(null)
+```
+
+`onComplete = null` — 보스는 디스폰되지 않는다. 길이만 3초(`defeatResultDelaySeconds`)보다
+짧으면 된다.
+
+## 작업 목록
+
+**아트 (SVN — `Assets/50.Art` 또는 패키지 폴더)**
+1. `M_Dissolve_Template.mat` 생성 (`DissolveFx` 셰이더). `_NoiseTexture`·`_NoiseScale`·
+   `_Edge_Size`·`_Edge_Color` 튜닝. 로봇이므로 `3_DissolveFx_Electric` 프리셋
+   (`_Edge_Size 0.0352`, `_NoiseScale 2`, 청백 HDR)이 출발점.
+2. `DissolveParticle` 사본 제작 — **`playOnAwake` 끄기**. 색/수명을 캐릭터 톤에 맞춤.
+
+**코드 (git)**
+
+3. `DissolveDeath` 재작성
+   - `MonoBehaviour` → `NetworkBehaviour`
+   - `_DissolveAmount` → `_Cutoff`, 값 방향 `1 → 0`
+   - 머티리얼 슬롯별 교체 + 원본 `_BaseMap`/`_BaseColor` 복사
+   - 파티클 필드 + 메쉬 Shape 런타임 지정
+   - `Play(onComplete)` → RPC 브로드캐스트 + 서버 타이머
+   - 렌더러/파티클이 없으면 예외 없이 `onComplete` (기존 폴백 성질 유지)
+4. `BossDeathEffectBinder` 신규
+
+**프리팹 배선 (git)**
+
+5. 몬스터 8종: 파티클 자식 오브젝트 추가 + `DissolveDeath` 필드 채우기(템플릿/파티클/duration)
+6. `TwentyThree.prefab`: `DissolveDeath` + `BossDeathEffectBinder` 추가 + 배선
+
+## 구현 결과 (2026-08-30)
+
+- 코드: `DissolveDeath` 재작성(NetworkBehaviour · `_Cutoff` 1→0 · 템플릿 복제 · 메쉬 Shape · RPC),
+  `BossDeathEffectBinder` 신규. 빌드 오류 0.
+- 에셋(SVN): `Assets/50.Art/VFX/Common/Dissolve/M_Dissolve_Template.mat`(Electric 프리셋 기반),
+  `FX_Dissolve_Death.prefab`(`playOnAwake` 꺼진 `DissolveParticle` 사본).
+- 배선: 몬스터 8종(duration 0.5 / grace 0.5), `TwentyThree.prefab`(duration 1.0 / grace 0.5).
+- 파티클은 자식으로 미리 넣지 않고 **에셋 참조 → 사망 시 Instantiate**로 바꿨다.
+  중첩 프리팹 안의 컴포넌트를 9개 프리팹에 stripped 참조로 배선하는 것보다 안전하다.
+
+## 검증 (완료 조건)
+
+- [ ] 몬스터 사망 시 디졸브 + 파티클이 재생되고, 끝난 뒤 디스폰된다
+- [ ] 🔴 **MPPM 2인 — 호스트와 클라이언트 양쪽에서 디졸브가 보인다**
+- [ ] 파티클이 캐릭터 실루엣을 따라 방출된다(구체가 아니라)
+- [ ] 보스 디졸브가 결과 화면 전환(3초)보다 먼저 끝난다
+- [ ] PeekABot(본체+안테나)·SpinnerBot(본체+블레이드) 등 다중 머티리얼 캐릭터에서
+      슬롯별 텍스처가 어긋나지 않는다
+- [ ] `M_*.mat` 원본 에셋이 플레이 후 git/SVN에 변경으로 잡히지 않는다(= sharedMaterial 미오염)
+
+## 리스크 / 범위 밖
+
+- **재질감 팝.** `DissolveFx`는 노말/메탈릭/스무스니스 입력이 없어 교체 프레임에 음영이
+  바뀐다. 결정 1(A)에서 감수하기로 했다. 거슬리면 셰이더그래프에 슬롯을 추가하는
+  상위호환 경로가 있다(머티리얼 재작업 불필요).
+- **`DissolveDeath`가 `NetworkBehaviour`가 되면서** 몬스터 프리팹의 `NetworkBehaviour`
+  목록에 하나 추가된다. 전 피어가 같은 프리팹을 쓰므로 인덱스는 일치하지만,
+  프리팹 재직렬화가 발생하므로 8종 커밋을 한 번에 넣는다.
+- **범위 밖**: 플레이어 사망 연출, `Wells.prefab`, `P_MonsterProjectile`,
+  캐릭터 셰이더 표준화(결정 1의 C안).
+
+---
+
 # CURRENT PLAN — DevSceneBooter: 씬 이름 한 줄로 원하는 씬 부팅 (2026-08-10)
 # CURRENT PLAN — 피격 이펙트 클라이언트 복제 + 런타임 교체 디버그 HUD (2026-08-11)
 
