@@ -57,6 +57,16 @@ public class TwentyThreeBoss : MonsterBase
     // 달리 쓰이지 않으므로 그 값을 리액션 길이로 재사용한다(죽은 필드를 재사용한다).
     float HitReactionDuration => data != null ? Mathf.Max(0.05f, data.hitStunDuration) : 0.4f;
 
+    // ─── 카운터 선딜 게이트 (서버 전용 판정 + 전 피어 자세 홀드) ───────────────
+    // 공격 발사는 "창 타이머 만료 AND 애니 준비 도달" 두 사건이 다 서야 일어난다(BossCounterWindupGate).
+    readonly BossCounterWindupGate _counterWindup = new BossCounterWindupGate();
+    bool _warnedCounterTimerBeforeAnimation;
+
+    /// 지금 공격 행의 카운터 창 길이. 창을 여는 공격이 아니면 0.
+    float CounterWindowDuration => _currentEntry != null && _currentEntry.opensCounterWindow
+        ? Mathf.Clamp(_currentEntry.counterWindowDuration, 0f, 2f)
+        : 0f;
+
     // ─── Grab 체인 (서버 전용) ───────────────────────────────────────
     BossAttackPhase _attackPhase = BossAttackPhase.None;
     float _attackPhaseTimer;
@@ -477,9 +487,14 @@ public class TwentyThreeBoss : MonsterBase
             switch (e.attackId)
             {
                 case BossAttackId.Grab:
+                    // 선딜 몫 = max(카운터 창, attackDuration).
+                    // 🔴 창으로 **교체**하면 안 된다. 창이 클립의 OnAttackHit 이벤트보다 짧으면 실제
+                    //    선딜은 창이 아니라 이벤트 도착까지이므로 예산이 모자라 안전망이 터진다
+                    //    — 돌진에서 선딜 몫을 빠뜨려 4/4 재현됐던 사고와 같은 종류다(2026-08-13).
+                    //    기존 몫을 하한으로 남겨 그 회귀를 막는다.
                     _attackPhase = BossAttackPhase.Windup;
-                    _attackPhaseTimer = data.attackDuration;
-                    _stateTimer = data.attackDuration + GrabHold + GrabThrowTime + GrabRecovery;
+                    _attackPhaseTimer = Mathf.Max(CounterWindowDuration, data.attackDuration);
+                    _stateTimer = _attackPhaseTimer + GrabHold + GrabThrowTime + GrabRecovery;
                     break;
                 case BossAttackId.Jump:
                     _stateTimer = JumpHover + JumpLanding + JumpRecovery + data.attackDuration;
@@ -502,7 +517,13 @@ public class TwentyThreeBoss : MonsterBase
                     //    0.15 + 0.7 + 0.9 = 1.75초라 **매번 0.15초씩 초과**해 Recovery 도중 안전망이
                     //    터졌다(4/4 재현). Grab 이 attackDuration 을 선딜 몫으로 이미 잡아 두는 것과
                     //    같은 규약인데, 돌진은 그 값을 Recovery(StopDash)가 쓰므로 몫이 통째로 없었다.
-                    _stateTimer = data.attackDuration + DashDuration + data.attackDuration;
+                    //
+                    // 🔴 카운터 창(2026-09-02): 선딜 몫을 max(창, attackDuration) 으로 올린다.
+                    //    창으로 교체하지 않는 이유는 Grab 쪽 주석과 같다 — 창이 이벤트보다 짧으면
+                    //    실제 선딜이 예산을 넘는다.
+                    _attackPhaseTimer = Mathf.Max(CounterWindowDuration, data.attackDuration);
+                    _attackPhase = BossAttackPhase.Windup;
+                    _stateTimer = _attackPhaseTimer + DashDuration + data.attackDuration;
                     break;
             }
         }
@@ -513,10 +534,18 @@ public class TwentyThreeBoss : MonsterBase
         if (e != null && e.superArmor && status != null)
             status.ApplyStatus(StatusEffectType.SuperArmor, _stateTimer);
 
-        // 카운터 창: 창을 여는 공격(Grab·Dash)이면 지금부터 **히트 순간까지** 열어 둔다.
-        // Grab = 잡기 판정 직전까지 / Dash = 돌진 시작 직전까지 — 확정 스펙의 두 구간이 모두
-        // "공격 시작 → 히트"와 같으므로 phase 기계 없이 이 한 줄로 성립한다.
+        // 카운터 창: 창을 여는 공격(Grab·Dash)이면 지금 연다.
+        // ⚠️ 정정(2026-09-02): 예전엔 "공격 시작 → 히트"가 곧 창이라 phase 기계가 필요 없었다.
+        //    이제 창 길이가 데이터(counterWindowDuration)로 정해지고 히트와 분리됐다 —
+        //    닫는 것은 히트가 아니라 아래 게이트의 발사(TryReleaseCounterAttack)다.
         SetCounterWindow(e != null && e.opensCounterWindow);
+
+        // 카운터 선딜 게이트 시작. 창을 여는 공격이면 창 길이로, 아니면 0(비활성)이다.
+        // 🔴 창이 열린 공격은 애니 이벤트가 와도 **즉시 발사하지 않는다** — NotifyAttackHit 이
+        //    준비만 래치하고, 창 타이머가 끝나야 TryReleaseCounterAttack 이 실제 발사를 한다.
+        _warnedCounterTimerBeforeAnimation = false;
+        if (e != null && e.opensCounterWindow) _counterWindup.Begin(CounterWindowDuration);
+        else _counterWindup.Reset();
 
         // 관용구 2: 다지선다 애니는 상태 복제로 실을 수 없다 → ClientRpc 로 CrossFade.
         // 문자열이 아니라 슬롯 번호를 보낸다(각 피어가 같은 SO 에서 상태명을 조회한다 — GauntletBot 선례).
@@ -691,14 +720,29 @@ public class TwentyThreeBoss : MonsterBase
         switch (_attackPhase)
         {
             case BossAttackPhase.Windup:
-                // 판정은 애니 이벤트(OnAttackHit → PerformAttackHit)가 만든다.
-                // 이벤트가 유실되면 여기 타이머가 만료돼 아래 안전망으로 빠진다.
+                // 판정은 애니 이벤트(OnAttackHit → NotifyAttackHit)가 **준비**를 알리고,
+                // 실제 발사는 아래 게이트가 창 타이머 만료까지 미룬다(2026-09-02).
+                // 이벤트가 유실되면 게이트가 안 열리고 _stateTimer 안전망으로 빠진다.
                 //
-                // 🔴 선딜 조준(2026-08-18). Windup 을 쓰는 것은 **잡기뿐**이고, 잡기는 base 의
-                //    HandleAttack 을 타지 않아 FaceTargetDuringWindup 이 닿지 않는다 — 그래서 여기서
-                //    같은 일을 한다. 잡기가 성립하는 순간(AcquireGrab)에 Hold 로 넘어가므로
-                //    되먹임 구간에는 들어오지 않는다.
-                FaceTarget();
+                // 🔴 선딜 조준(2026-08-18)은 **잡기 전용으로 유지한다.** 돌진도 Windup 을 쓰게
+                //    됐지만(카운터 창), 돌진이 창 1.5초 동안 타깃을 계속 쫓으면 밀고 지나가야 할
+                //    돌진이 유도탄이 되어 회피 난이도가 통째로 바뀐다 — 이번 스코프 밖의 밸런스
+                //    변경이라 넣지 않는다. 잡기는 성립 순간 Hold 로 넘어가 되먹임이 없다.
+                if (_currentEntry != null && _currentEntry.attackId == BossAttackId.Grab)
+                    FaceTarget();
+
+                _counterWindup.Tick(dt);
+
+                if (_counterWindup.TimerElapsedBeforeAnimationReady && !_warnedCounterTimerBeforeAnimation)
+                {
+                    _warnedCounterTimerBeforeAnimation = true;
+                    Debug.LogWarning(
+                        $"[23호] {_currentEntry?.attackId} 카운터 창({CounterWindowDuration:0.##}초)이 " +
+                        "애니 준비 이벤트보다 먼저 끝났다 — 이벤트를 기다린다. " +
+                        "창을 늘리거나 클립 이벤트를 앞당길 것.", this);
+                }
+
+                TryReleaseCounterAttack();
                 break;
 
             case BossAttackPhase.Hold:
@@ -2249,6 +2293,43 @@ public class TwentyThreeBoss : MonsterBase
     #endregion
 
     #region 카운터 (창 + 정면 판정 + 그로기/Break)
+
+    // ─── 선딜 게이트: 애니 준비 래치 + 창 만료 후 발사 ────────────────────────
+
+    /// <summary>
+    /// 애니 <c>OnAttackHit</c> 수신. 카운터 창이 열린 공격은 여기서 <b>발사하지 않는다</b> —
+    /// "애니가 준비 자세에 도달했다"만 래치하고, 실제 발사는 창 타이머가 끝난 뒤
+    /// <see cref="TryReleaseCounterAttack"/> 이 한다(설계 §4.2).
+    ///
+    /// 창이 없는 공격은 base 그대로 — 이벤트 즉시 발사다.
+    /// </summary>
+    public override void NotifyAttackHit()
+    {
+        if (!IsServer || State != MonsterState.Attack) return;
+
+        if (!_counterWindup.IsActive)
+        {
+            base.NotifyAttackHit();
+            return;
+        }
+
+        // 중복 이벤트가 와도 래치라 한 번만 선다(FireAttackHitOnce 의 1회 가드와 이중 방어).
+        _counterWindup.MarkAnimationReady();
+        TryReleaseCounterAttack();
+    }
+
+    /// <summary>
+    /// 두 사건(창 만료 + 애니 준비)이 다 섰을 때만 실제 공격을 내보낸다.
+    /// 멱등이다 — 게이트를 먼저 비우므로 두 번 불려도 한 번만 발사된다.
+    /// </summary>
+    void TryReleaseCounterAttack()
+    {
+        if (!_counterWindup.ShouldRelease) return;
+
+        _counterWindup.Reset();
+        SetCounterWindow(false);   // 발사 순간 창이 닫힌다 — 이후 히트는 카운터로 인정되지 않는다
+        FireAttackHitOnce();
+    }
     // 데미지 유입 단일 진입점. 카운터 판정을 여기에 얹는다 —
     // 플레이어 인터럽트 스킬의 히트가 **서버 경로**(BaseAttack → ReceiveAttack)로 들어온 시점에
     // 보스의 창 상태 + 정면 각도를 서버가 본다. 클라 예측 없음(정본 §6).

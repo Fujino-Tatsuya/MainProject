@@ -64,4 +64,16 @@ public sealed class BossCounterWindupGateTests
         gate.MarkAnimationReady();
         Assert.That(gate.ShouldRelease, Is.True);
     }
+
+    /// 애니 이벤트가 중복 도착해도(같은 클립에서 이벤트가 두 번 실리는 경우) 판정이 흔들리지 않아야 한다.
+    [Test]
+    public void DuplicateReadySignal_ReleasesOnlyOnceThroughSameDecision()
+    {
+        var gate = new BossCounterWindupGate();
+        gate.Begin(1f);
+        gate.MarkAnimationReady();
+        gate.MarkAnimationReady();
+        gate.Tick(1f);
+        Assert.That(gate.ShouldRelease, Is.True);
+    }
 }
