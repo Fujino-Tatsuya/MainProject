@@ -2354,6 +2354,17 @@ public class TwentyThreeBoss : MonsterBase
                        && IsInterruptAttack(attackInfo)
                        && IsCounterFromFront(hitContext);
 
+        // 진단(2026-09-02): 인터럽트가 들어왔는데 카운터로 성립하지 않으면 **어느 조건이 거짓인지** 찍는다.
+        // 인터럽트 히트에서만 돌므로 조용하다. 성립하면 EnterCounterGroggy 가 따로 로그를 남긴다.
+        if (IsInterruptAttack(attackInfo) && !counter)
+        {
+            Debug.LogWarning(
+                $"[23호] 인터럽트가 카운터로 성립하지 않았다 — " +
+                $"서버={IsServer} · 창열림={_counterWindow.Value} · " +
+                $"정면={IsCounterFromFront(hitContext)} (허용 {(_boss != null ? _boss.counterFrontAngle : 60f):0}°) · " +
+                $"상태={State} · 페이즈={_attackPhase} · 공격={_currentEntry?.attackId}", this);
+        }
+
         // 실패든 성공이든 데미지는 정상 처리된다 — 카운터 실패에 패널티는 없다(확정 스펙).
         bool resolved = base.ReceiveAttack(attackInfo, hitContext);
 
