@@ -34,7 +34,7 @@ public static class BossDataWiring
         if (data.attacks != null)
             foreach (BossAttackEntry a in data.attacks)
                 sb.AppendLine($"      {a.attackId,-14} state='{a.animatorStateName}' anchor='{a.hitboxAnchorName}'" +
-                              $"{(a.opensCounterWindow ? " [카운터]" : "")}{(a.superArmor ? " [슈퍼아머]" : "")}");
+                              $"{(a.opensCounterWindow ? $" [카운터 {a.counterWindowDuration:0.##}초]" : "")}{(a.superArmor ? " [슈퍼아머]" : "")}");
 
         sb.AppendLine($"  phases {data.phases?.Length ?? 0}개:");
         if (data.phases != null)
