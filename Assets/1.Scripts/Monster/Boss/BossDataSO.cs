@@ -45,6 +45,11 @@ public class BossAttackEntry
              "훅·어퍼까지 열면 카운터가 상시 자원이 되어 그로기가 흔해진다(팀장 확정).")]
     public bool opensCounterWindow = false;
 
+    [Tooltip("[S3] 이 공격의 카운터 입력 가능 시간(초). opensCounterWindow 가 false 면 쓰지 않는다. " +
+             "확정 초기값 = Grab 1.0 / Dash 1.5. 🔴 클립의 OnAttackHit 이벤트보다 짧으면 " +
+             "타이머가 먼저 끝나 진단 경고가 뜬다(공격은 이벤트 도착 후 발사된다).")]
+    [Range(0f, 2f)] public float counterWindowDuration = 0f;
+
     [Tooltip("이 공격 중 슈퍼아머(경직 무시). 🔴 SO 의 hasSuperArmorWhileAttacking 은 **false 로 둘 것** — " +
              "켜 두면 base 가 전 공격에 슈퍼아머를 걸어 이 플래그가 무의미해진다(스폰 시 LogError 로 잡는다).")]
     public bool superArmor = false;
