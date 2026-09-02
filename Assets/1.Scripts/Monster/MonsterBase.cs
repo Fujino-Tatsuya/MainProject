@@ -1007,9 +1007,12 @@ public class MonsterBase : Unit
 
         // 피격 경직: 공격 중 피격 시 공격 취소 + Hit. 단 슈퍼아머면 취소하지 않고 데미지만.
         // 지속넉백 중에는 Hit로 덮지 않는다(밀림 유지 — 데미지만 누적, ReceiveAttack이 넉백을 갱신).
+        // 🔴 공격 커밋(2026-09-02): 공격 중 들어온 **평타**는 경직시키지 않는다. 평타 한 대마다
+        //    EnterHit 이 걸려 일반 몬스터가 공격을 끝내지 못하던 문제. 판정은 전부
+        //    MonsterHitReactionPolicy 에 있다(EditMode 로 전 조합 고정) — 조건을 여기서 늘리지 말 것.
         bool superArmor = status != null && status.BlocksInterrupt;
-        if (!superArmor && _state.Value != MonsterState.Groggy && _state.Value != MonsterState.Return
-            && _state.Value != MonsterState.Knockback)
+        if (MonsterHitReactionPolicy.ShouldEnterAutomaticHit(
+                _state.Value, attackInfo.attackType, superArmor))
             EnterHit();
     }
 
