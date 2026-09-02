@@ -21,9 +21,14 @@ public sealed class BossCounterDataTests
         BossAttackEntry grab = data.attacks.Single(a => a.attackId == BossAttackId.Grab);
         BossAttackEntry dash = data.attacks.Single(a => a.attackId == BossAttackId.Dash);
 
-        // 확정 초기값 — Grab 1.0 / Dash 1.5 (설계 §3.2)
+        // 확정값 — Grab 1.5 / Dash 1.5.
+        // 🔴 Grab 은 설계 초기값이 1.0 이었으나 실측으로 올렸다(2026-09-02, 팀장 확정).
+        //    Grab 클립의 OnAttackHit 은 정규화 0.354 = 188프레임/60fps × 0.354 = **1.11초** 에 온다.
+        //    창이 그보다 짧으면 게이트가 붙잡을 시간이 없어 창이 하는 일이 없어진다
+        //    (설계 §4.3 의 "이벤트가 창보다 먼저 온다" 전제가 Grab 에서 깨져 있었다).
+        //    Dash 는 0.15 = 86프레임/60fps × 0.15 = 0.22초라 1.5 초 창이 1.29초를 붙잡는다.
         Assert.That(grab.opensCounterWindow, Is.True);
-        Assert.That(grab.counterWindowDuration, Is.EqualTo(1f));
+        Assert.That(grab.counterWindowDuration, Is.EqualTo(1.5f));
         Assert.That(dash.opensCounterWindow, Is.True);
         Assert.That(dash.counterWindowDuration, Is.EqualTo(1.5f));
 

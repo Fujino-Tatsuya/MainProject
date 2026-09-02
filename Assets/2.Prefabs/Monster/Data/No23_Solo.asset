@@ -107,7 +107,7 @@ MonoBehaviour:
     allowedFromPhase: 0
     damage: 0
     opensCounterWindow: 1
-    counterWindowDuration: 1
+    counterWindowDuration: 1.5
     superArmor: 1
     hitboxAnchorName: Hand_R
   - attackId: 4

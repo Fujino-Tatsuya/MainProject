@@ -61,6 +61,7 @@ public class TwentyThreeBoss : MonsterBase
     // 공격 발사는 "창 타이머 만료 AND 애니 준비 도달" 두 사건이 다 서야 일어난다(BossCounterWindupGate).
     readonly BossCounterWindupGate _counterWindup = new BossCounterWindupGate();
     bool _warnedCounterTimerBeforeAnimation;
+    float _counterWindupStartedAt;   // 진단용 — 준비 신호가 실제로 몇 초 만에 오는지 재려고 둔다
 
     /// 지금 공격 행의 카운터 창 길이. 창을 여는 공격이 아니면 0.
     float CounterWindowDuration => _currentEntry != null && _currentEntry.opensCounterWindow
@@ -544,6 +545,7 @@ public class TwentyThreeBoss : MonsterBase
         // 🔴 창이 열린 공격은 애니 이벤트가 와도 **즉시 발사하지 않는다** — NotifyAttackHit 이
         //    준비만 래치하고, 창 타이머가 끝나야 TryReleaseCounterAttack 이 실제 발사를 한다.
         _warnedCounterTimerBeforeAnimation = false;
+        _counterWindupStartedAt = Time.time;
         if (e != null && e.opensCounterWindow) _counterWindup.Begin(CounterWindowDuration);
         else _counterWindup.Reset();
 
@@ -2311,6 +2313,16 @@ public class TwentyThreeBoss : MonsterBase
         {
             base.NotifyAttackHit();
             return;
+        }
+
+        // 준비 신호가 창보다 늦게 온 경우에만 실제 도달 시각을 남긴다 — 창 값을 정하는 근거다.
+        // (정상 경로에서는 아무것도 찍지 않는다. 매 공격 로그는 정작 필요한 진단을 밀어낸다.)
+        if (_counterWindup.TimerElapsedBeforeAnimationReady)
+        {
+            Debug.LogWarning(
+                $"[23호] {_currentEntry?.attackId} 애니 준비 신호가 공격 시작 후 " +
+                $"{Time.time - _counterWindupStartedAt:0.###}초에 도달했다 " +
+                $"(창 {CounterWindowDuration:0.##}초). 창을 이 값 이상으로 잡아야 한다.", this);
         }
 
         // 중복 이벤트가 와도 래치라 한 번만 선다(FireAttackHitOnce 의 1회 가드와 이중 방어).
