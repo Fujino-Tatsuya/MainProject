@@ -1,4 +1,19 @@
-# CURRENT PLAN — 보스 감속 회전 + 첫 돌진 미이동 (2026-08-18)
+# CURRENT PLAN — 보스 카운터 + 일반 몬스터 공격 커밋 보호 (2026-09-02)
+
+상태: **설계 승인 완료 / 구현 계획 잠금 / 구현 전**
+
+- 목표: 23호 Grab·Dash에 SO 기반 정면 카운터 창을 적용하고, 일반 몬스터가 평타 경직 때문에 공격을 완료하지 못하는 문제를 해결한다.
+- 보스 초기값: Grab 1.0초 / Dash 1.5초 / 일반 Groggy 총 0.5초 / Break 총 2초 / Break 임계 5회.
+- 일반 몬스터: `MonsterState.Attack` 동안 `AttackType.Default`의 자동 Hit만 막는다. 데미지·넉백·기절은 유지한다.
+- 범위 밖: 중간보스 3종의 카운터 가능 공격 선정과 전용 창 구현.
+- 네트워크: 카운터 타이머·판정·공격 발동·Groggy/Break·몬스터 피격 반응은 서버 권한, 표현만 모든 피어에 복제한다.
+- 설계: `Docs/superpowers/specs/2026-09-02-boss-counter-and-monster-hit-commitment-design.md`
+- 구현 계획: `Docs/superpowers/plans/2026-09-02-boss-counter-and-monster-hit-commitment.md`
+- 검증: EditMode 정책/데이터 테스트 + MPPM 2인 Grab/Dash 성공·실패·후방·창 밖 + 일반 몬스터 평타/넉백/기절.
+
+---
+
+# 이전 PLAN — 보스 감속 회전 + 첫 돌진 미이동 (2026-08-18)
 
 > 상태: **구현·Play 검증 완료(팀장 육안) · 푸시 완료**. 브랜치 `feature/Boss23`. 담당: 경석(Claude).
 > 출처: 팀장 지시 2건 + 문답 2건(회전 적용 범위 · "착지"의 정의).
