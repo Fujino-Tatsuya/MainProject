@@ -37,6 +37,8 @@
 ## 6. 문서 인덱스
 - 설계(GDD): [Docs/design/](Docs/design/) — 보스 / 플레이어 / 상태이상 / 빌드
 - 기술: [Docs/tech/](Docs/tech/) — 아키텍처 / 네트워크 / 컨벤션 / 워크플로우
+- 레포지토리 맵(자동생성): [Docs/tech/repo_map.md](Docs/tech/repo_map.md) — 클래스/인터페이스
+  구조·상속·Facade 위임 관계 요약. 재생성은 `DevTools/RepoMap/`(`npm run generate`).
 - 일정: `Project_MT 일정.xlsx` (담당: 이지원) — 팀 지식베이스 Vault `Core/project-schedule-2026.md` 스냅샷 참조
 
 ## 7. AI 협업 규칙 / 공유 이해도 문서

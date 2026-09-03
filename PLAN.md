@@ -1,3 +1,85 @@
+# CURRENT PLAN — 레포지토리 맵(Repo Map) 생성 도구 (2026-09-02)
+
+> 상태: **grill 완료(채팅에서), 승인 대기**. 브랜치 `fix/property_change`.
+> 게임플레이 코드 변경 없음 — 순수 개발 도구(devtool) 추가. 아래 다른 항목들과 무관.
+
+## 배경
+
+AI 에이전트/팀원이 매번 전체 `.cs`를 읽지 않고도 클래스 구조·상속·의존 관계를 빠르게
+파악하도록, `Assets/**/*.cs`를 tree-sitter로 파싱해 압축된 지도(Markdown+JSON)를 만든다.
+Aider의 repo-map 개념을 참고하되, 이 프로젝트는 **Facade/Deep Module 패턴**으로 짜여 있어
+"공개 계약(얕은 층)"과 "내부 구현(깊은 층)"을 구분해 보여주는 게 핵심 차별점이다.
+
+## 확정 사항 (grill 결과, 채팅에서 진행)
+
+| # | 결정 | 기각한 대안과 이유 |
+|---|---|---|
+| 1 | **Node.js** + `tree-sitter` + `tree-sitter-c-sharp` | Python — 이 머신에 정상 설치 안 돼 있음(`python --version` 실패), Node는 v24 확인됨 |
+| 2 | 정보 우선순위: **①`interface_declaration` 전체 노출 → ②"wrapping 함수"(위임) → ③나머지는 이름만/생략** | 참조 횟수(fan-in) 랭킹만으로 판단 — 이 코드베이스는 인터페이스·위임 구조가 이미 명시적이라 굳이 통계적 추정이 필요 없음 |
+| 3 | "wrapping 함수" 판정 = **AST 구조 기준**: 메서드 본문 statement ≤2개, 그 중 하나가 다른 멤버 호출(`invocation_expression`), `if/for/while/switch` 없음 | XML 주석 `"래퍼"` 키워드만으로 판정 — 그레핑 결과 팀 코드에 3건뿐(`Player.cs` 2건 + 무관한 로그 유틸 1건)이라 신호가 너무 희소함. **주석 키워드는 AST 판정에 곁들이는 보너스 신호로만 사용**(있으면 신뢰도 표시) |
+| 4 | 실제 검증 케이스: `Player.BeginGrabbedByInstigator`(Player.cs:303) — AST 기준에 정확히 부합 | — |
+| 5 | 출력 = **Markdown(사람/AI 가독용) + JSON(원본 데이터, 재사용용)** 둘 다 생성 | Markdown만 — 나중에 다른 도구가 재사용하려면 구조화된 원본이 필요 |
+| 6 | 폴더/네임스페이스 단위로 그룹, 클래스별 한 줄~몇 줄 요약 | 파일당 통짜 목록 — 가독성 낮음 |
+| 7 | **서드파티 에셋 폴더 제외**(`Assets/BroAudio` 등 asset-store 플러그인) | 전체 포함 — "Wrapper" 그레핑에서 확인, 우리 코드가 아닌 결과가 대부분 섞여 나옴 |
+| 8 | 스크립트+생성물 모두 **GitHub 쪽**(코드/문서) 커밋 — `Tools/RepoMap/`, `Docs/tech/repo_map.md`, `repo_map.json` | SVN — 아트/오디오 전용, 코드·문서는 AGENT.md 3번 규칙상 GitHub |
+| 9 | 재생성은 **수동 실행**(`node Tools/RepoMap/generate.js`)만 v1 범위 | pre-commit hook/CI 자동화 — 범위 밖으로 명시적으로 미룸(아래 「범위 제외」) |
+
+## 접근
+
+1. `Tools/RepoMap/`에 Node 스크립트(+ `package.json`, devDependency만) 작성.
+2. `Assets/**/*.cs` 순회(제외 목록: `Assets/BroAudio` 등 서드파티 식별되는 대로 추가), 파일별로 tree-sitter 파싱.
+3. 클래스/인터페이스/구조체 선언 + `base_list`(상속/구현) 추출.
+4. 인터페이스 멤버는 전체 시그니처 추출. 클래스 메서드는 "wrapping 함수" AST 기준으로 스캔해
+   해당하면 시그니처 + 위임 대상(`→ delegates to X`) 기록, 아니면 깊은 내부로 분류(지도에서 생략,
+   개수만 카운트).
+5. 상속 그래프(`A : B`) + 위임 그래프(`A.Foo() → B.Bar()`) 조립.
+6. `Docs/tech/repo_map.md`(폴더별 그룹, 사람이 읽는 요약) + `Docs/tech/repo_map.json`(원본 데이터) 출력.
+7. `AGENTS.md` 문서 인덱스(6번 항목)에 `repo_map.md` 링크 추가.
+
+## 리스크 / 열린 질문
+
+- tree-sitter-c-sharp 문법이 partial class·제네릭·특성(Attribute) 조합에서 완벽하지 않을 수 있음 →
+  v1은 best-effort, 파싱 실패 파일은 목록에 경고로 남기고 건너뜀(전체 실패시키지 않음).
+- "wrapping 함수" AST 기준(statement ≤2개)이 과탐/누락할 수 있음 → 휴리스틱임을 문서에 명시.
+- 서드파티 제외 목록은 지금 확인된 것(`BroAudio`)만 반영, 추후 다른 에셋 추가되면 목록 갱신 필요.
+
+## 범위 제외 (v1)
+
+- git hook/CI 자동 재생성 — 수동 실행만.
+- 시각적 다이어그램(Graphviz 등) 렌더링.
+- C# 외 파일(셰이더, 씬 YAML 등) 파싱.
+- "참조 횟수 랭킹" 같은 통계적 중요도 판단 — 이번엔 구조적 판정(인터페이스/위임)만.
+
+## 완료조건 / 검증 계획
+
+- `npm run generate`(`DevTools/RepoMap/`) 실행 시 에러 없이 `Docs/tech/repo_map.md`/`repo_map.json` 생성. ✅
+- 아래 실제 코드 케이스가 지도에 올바르게 나타나는지 확인:
+  - ⚠️ **`architecture.md`/`AGENTS.md`가 부르는 `UnitBase`/`IDamageable`는 실제 코드에 없다** —
+    실제 클래스명은 `Unit : BaseNetworkBehaviour, IAttackReceiver`이고, `Enemy`/`MonsterBase`/
+    `BossBase`/`Player`/`ChargingObject`가 전부 `Unit`을 상속한다. 문서가 옛 명명을 쓰고 있다
+    (CLAUDE.md 규칙상 "문서와 코드가 충돌하면 실제 코드를 확인한 뒤 문서를 바로잡는다" — 이번
+    작업 범위 밖이라 고치지 않고 발견만 기록). 검증은 **실제 이름 기준으로 통과**: 상속
+    그래프에 `Unit` → 5개 서브클래스가 정확히 나타남. ✅
+  - `IAttackReceiver` 인터페이스 전체 시그니처 노출. ✅
+  - `Player.BeginGrabbedByInstigator` → `[wrapper·주석확인]` 태그 + `BeginRestrainedByInstigator`
+    위임 표시(XML 주석의 "래퍼" 키워드로 신뢰도 confirmed까지 확인됨). ✅
+- 생성된 Markdown 육안 확인 — 폴더별 그룹, 인터페이스 전체 노출, 위임 관계 요약 섹션 모두 의도대로 나옴. ✅
+
+### 구현 중 발견/조정 사항
+- 애초 계획한 Node 네이티브 `tree-sitter`/`tree-sitter-c-sharp`는 Windows 네이티브 빌드
+  의존성 때문에 팀원 전원이 빌드 툴체인 없이 쓰기 어려움 → **`web-tree-sitter`(wasm) +
+  `tree-sitter-wasms`(사전 빌드된 grammar)** 로 전환. ABI 버전 호환 문제로 `web-tree-sitter`는
+  최신(0.27) 대신 그 wasm이 빌드된 시점과 맞는 **`0.20.8`로 고정**.
+- `Tools/`가 `.gitignore`로 전체 제외돼 있어(개인 에이전트 협업 파일 전용 구역) 팀 공유가
+  안 됨 → 사용자 확인 후 **`DevTools/RepoMap/`으로 이동**(새 최상위 폴더, ignore 규칙 영향 없음).
+- `.cs`가 팀 컨벤션상 UTF-8 **BOM**으로 저장돼 있어 BOM 미제거 시 전 파일 파싱 실패 → 읽을 때
+  BOM 스트립 추가.
+- 이 `web-tree-sitter` 버전은 `hasError`/`isMissing`이 getter가 아니라 **메서드**라 `()` 호출 필요.
+- 노드 객체가 접근마다 새로 생성돼 `===` 참조비교가 작동하지 않음 → 형제 탐색은 `startIndex`
+  (바이트 오프셋) 비교로 수정.
+
+---
+
 # CURRENT PLAN — DevSceneBooter: 씬 이름 한 줄로 원하는 씬 부팅 (2026-08-10)
 # CURRENT PLAN — 피격 이펙트 클라이언트 복제 + 런타임 교체 디버그 HUD (2026-08-11)
 
