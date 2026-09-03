@@ -182,7 +182,7 @@ MonoBehaviour:
   hitReactionState: getowned
   breakDuration: 2
   aggroRetargetInterval: 8
-  aggroAvoidsRepeatTarget: 0
+  aggroAvoidsRepeatTarget: 1
   chargeClearGroggyDuration: 1.5
   grabRadius: 2.2
   grabHoldDuration: 2
