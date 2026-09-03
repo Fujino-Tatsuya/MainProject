@@ -63,6 +63,11 @@ public class TwentyThreeBoss : MonsterBase
     bool _warnedCounterTimerBeforeAnimation;
     float _counterWindupStartedAt;   // 진단용 — 준비 신호가 실제로 몇 초 만에 오는지 재려고 둔다
 
+    // 자세 홀드는 **각 피어의 로컬 상태**다(애니메이터는 복제되지 않는다).
+    // 서버가 RPC 로 걸고 풀며, 아래 두 값은 그 피어에서만 의미가 있다.
+    bool _counterAnimatorHeldLocally;
+    float _counterAnimatorResumeSpeed = 1f;
+
     /// 지금 공격 행의 카운터 창 길이. 창을 여는 공격이 아니면 0.
     float CounterWindowDuration => _currentEntry != null && _currentEntry.opensCounterWindow
         ? Mathf.Clamp(_currentEntry.counterWindowDuration, 0f, 2f)
@@ -239,6 +244,24 @@ public class TwentyThreeBoss : MonsterBase
         {
             Debug.LogError($"{name}: 공격 테이블이 비어 있다 — 보스가 아무 공격도 못 한다.", this);
             return;
+        }
+
+        // 카운터 창 계약 — 창을 여는 행은 Grab·Dash 뿐이고, 길이는 (0, 2] 여야 한다.
+        // 🔴 길이 0 은 "창이 있다"고 저작해 놓고 실제로는 게이트가 붙잡을 시간이 0 인 상태라
+        //    조용히 무효가 된다. 그래서 opensCounterWindow 와 짝이 맞는지 여기서 잡는다.
+        foreach (BossAttackEntry e in _boss.attacks)
+        {
+            if (e == null || !e.opensCounterWindow) continue;
+
+            if (e.attackId != BossAttackId.Grab && e.attackId != BossAttackId.Dash)
+                Debug.LogError(
+                    $"{name}: {e.attackId} 행에 opensCounterWindow 가 켜져 있다 — 카운터 창은 " +
+                    "Grab·Dash 만 연다(확정 스펙). 훅·어퍼까지 열면 카운터가 상시 자원이 된다.", this);
+
+            if (e.counterWindowDuration <= 0f || e.counterWindowDuration > 2f)
+                Debug.LogError(
+                    $"{name}: {e.attackId} 의 counterWindowDuration 이 {e.counterWindowDuration:0.##} 다 — " +
+                    "(0, 2] 이어야 한다. 0 이면 창이 열려 있다고 저작해 놓고 실제로는 아무 효과가 없다.", this);
         }
 
         // 페이즈 임계는 내림차순(0.66 → 0.33)이어야 페이즈 계산이 성립한다.
@@ -936,6 +959,11 @@ public class TwentyThreeBoss : MonsterBase
     void AbortAttackChain()
     {
         if (!IsServer) return;
+        // 🔴 조기 반환 **앞**이다. 체인이 이미 None 이어도 자세 홀드는 남아 있을 수 있다
+        //    (준비 자세에서 멈춘 채 카운터를 맞으면 phase 는 정리됐는데 애니는 0 속도다).
+        //    뒤에 두면 그 경우 보스가 영구히 굳는다.
+        ResetCounterWindup();
+
         if (_attackPhase == BossAttackPhase.None && _grabbed == null && _dashCarried == null) return;
 
         // Grab: 잡은 대상을 놓는다.
@@ -2347,7 +2375,68 @@ public class TwentyThreeBoss : MonsterBase
 
         // 중복 이벤트가 와도 래치라 한 번만 선다(FireAttackHitOnce 의 1회 가드와 이중 방어).
         _counterWindup.MarkAnimationReady();
+        SetCounterPoseHeldClientRpc(true);   // 준비 자세에서 정지 — 창이 끝날 때까지 붙잡는다
         TryReleaseCounterAttack();
+    }
+
+    /// <summary>
+    /// 모든 피어의 보스 애니메이터를 준비 자세에서 <b>정지/재개</b>한다.
+    ///
+    /// 애니메이터는 복제되지 않으므로 각 피어가 자기 것을 멈춘다. 서버가 진실의 원천이고
+    /// 이 RPC 는 표현만 옮긴다(정본 §6).
+    ///
+    /// 🔴 <b>멱등이어야 한다.</b> 같은 값이 두 번 와도, 원래 정상 속도였어도 부작용이 없어야 한다 —
+    ///    풀 때 "저장해 둔 값"이 아니라 0 을 복원하면 보스가 영구히 얼어붙는다.
+    ///    그래서 걸 때만 현재 속도를 저장하고(`_counterAnimatorHeldLocally` 가 그 래치다),
+    ///    풀 때는 저장본을 되돌린다.
+    /// </summary>
+    [ClientRpc]
+    void SetCounterPoseHeldClientRpc(bool held)
+    {
+        if (animator == null) return;
+
+        if (held)
+        {
+            if (_counterAnimatorHeldLocally) return;   // 이미 잡고 있다 — 0 을 저장하는 사고를 막는다
+            _counterAnimatorResumeSpeed = animator.speed;
+            animator.speed = 0f;
+            _counterAnimatorHeldLocally = true;
+            return;
+        }
+
+        RestoreCounterPose();
+    }
+
+    /// <summary>
+    /// 카운터 선딜 상태를 통째로 비운다 — 게이트 · 창 · 자세 홀드.
+    ///
+    /// 🔴 <b>모든 중단 경로가 여기를 지나야 한다.</b> 자세 홀드는 애니메이터 속도를 0 으로 만드는
+    ///    조작이라, 푸는 걸 한 곳이라도 빠뜨리면 보스가 그 자세로 <b>영구히 굳는다</b>.
+    ///    호출처를 늘리지 말고 <see cref="AbortAttackChain"/> 한 곳에 모아 뒀다 —
+    ///    상태 이탈 · 사망 · 체인 타임아웃 · 디스폰 · 카운터 성공이 전부 그리로 흐른다.
+    ///
+    /// 멱등이다. 이미 비어 있어도 부작용이 없다.
+    /// </summary>
+    void ResetCounterWindup()
+    {
+        if (!IsServer) return;
+
+        _counterWindup.Reset();
+        SetCounterWindow(false);
+
+        // 자세는 각 피어의 로컬 상태라 RPC 로 푼다. 디스폰 중에는 RPC 가 못 나가므로
+        // 로컬 복원도 함께 부른다(호스트가 멈춘 채 남지 않게). 둘 다 멱등이라 중복 호출이 안전하다.
+        if (IsSpawned) SetCounterPoseHeldClientRpc(false);
+        RestoreCounterPose();
+    }
+
+    /// <summary>자세 홀드를 푼다. 안 잡고 있으면 아무 일도 하지 않는다(멱등).</summary>
+    void RestoreCounterPose()
+    {
+        if (!_counterAnimatorHeldLocally || animator == null) return;
+
+        animator.speed = _counterAnimatorResumeSpeed;
+        _counterAnimatorHeldLocally = false;
     }
 
     /// <summary>
@@ -2360,6 +2449,7 @@ public class TwentyThreeBoss : MonsterBase
 
         _counterWindup.Reset();
         SetCounterWindow(false);   // 발사 순간 창이 닫힌다 — 이후 히트는 카운터로 인정되지 않는다
+        SetCounterPoseHeldClientRpc(false);  // 자세를 풀어 클립을 이어 재생한다
         FireAttackHitOnce();
     }
     // 데미지 유입 단일 진입점. 카운터 판정을 여기에 얹는다 —
@@ -2438,24 +2528,28 @@ public class TwentyThreeBoss : MonsterBase
     {
         if (!IsServer) return;
 
-        _counterGroggyCount++;
+        BossCounterOutcome outcome = BossCounterProgress.Resolve(
+            _counterGroggyCount,
+            data != null ? data.maxGroggyCount : 5,
+            allowBreak,
+            data != null ? data.groggyDuration : 0.5f,
+            _boss != null ? _boss.breakDuration : 2f);
+
+        _counterGroggyCount = outcome.NextCount;
+
+        // 예약된 공격·준비 래치·자세 홀드를 폐기하고 체인을 정리한다(설계 §4.4 1~4).
+        // ResetCounterWindup 은 이 안에서 함께 돈다.
+        AbortAttackChain();
+
+        // 🔴 Hit 리액션을 **앞에 더하지 않는다**(설계 §3.3). 예전엔
+        //    ForceHitReaction(HitReactionDuration, groggy) 라 SO 의 0.5 위에 0.4 가 얹혀
+        //    실제 행동 불능이 0.9초였다 — SO 값이 곧 체감 시간이어야 튜닝이 성립한다.
+        ForceGroggy(outcome.Duration);
 
         int max = data != null ? Mathf.Max(1, data.maxGroggyCount) : 5;
-        bool breakNow = allowBreak && _counterGroggyCount >= max;
-        if (breakNow) _counterGroggyCount = 0;
-
-        float groggy = breakNow
-            ? (_boss != null ? _boss.breakDuration : 5f)
-            : (data != null ? data.groggyDuration : 2f);
-
-        SetCounterWindow(false);
-
-        // Hit(리액션) → 타이머 종료 후 Groggy/Break. base 의 ForceHitReaction 이 진행 중 공격을 취소한다.
-        ForceHitReaction(HitReactionDuration, groggy);
-
         Debug.Log(
-            $"[23호] 카운터 성공 — 그로기 카운트 {(breakNow ? max : _counterGroggyCount)}/{max}" +
-            (breakNow ? $" → BREAK {groggy:0.#}초" : $" → 그로기 {groggy:0.#}초"),
+            $"[23호] 카운터 성공 — 그로기 카운트 {(outcome.IsBreak ? max : outcome.NextCount)}/{max}" +
+            (outcome.IsBreak ? $" → BREAK {outcome.Duration:0.#}초" : $" → 그로기 {outcome.Duration:0.#}초"),
             this);
     }
 

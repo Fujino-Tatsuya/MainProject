@@ -7,8 +7,52 @@
 This file defines the shared vocabulary for the project. Keep it concise. It is not a full spec and should not contain implementation plans.
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
+## ▶▶ 다음 세션 시작점 — 보스 카운터 Task 3 덩이 ② (2026-09-03)
 
-## ▶▶ 다음 세션 시작점 — 넉백 세기 튜닝 (2026-08-18 밤 종료)
+**브랜치 `feature/Boss23`** · 컴파일 0에러 · 전투 EditMode **29/29** · 백업 `backup/Boss23-local-20260902`
+
+작업 세션: **경석(Claude)**. 수정 중인 파일 — `TwentyThreeBoss.cs` · `MonsterBase.cs` ·
+`Monster/Boss/BossCounter*.cs` · `No23(.._Solo).asset`. Codex 는 이 파일들을 피할 것.
+
+계획: [Docs/superpowers/plans/2026-09-02-boss-counter-and-monster-hit-commitment.md](Docs/superpowers/plans/2026-09-02-boss-counter-and-monster-hit-commitment.md)
+설계: [Docs/superpowers/specs/2026-09-02-boss-counter-and-monster-hit-commitment-design.md](Docs/superpowers/specs/2026-09-02-boss-counter-and-monster-hit-commitment-design.md)
+
+### 진행 상황
+
+| Task | 상태 |
+|---|---|
+| 4 몬스터 공격 커밋 | ✅ Play 검증 완료 |
+| 1 선딜 게이트 · 2 진행도/SO · 5 저작 | ✅ |
+| 3 덩이 ① 발사 제어 | ✅ Play 검증 완료 (카운터 성공 확인) |
+| **3 덩이 ② 자세 홀드 + 5경로 리셋 + Hit·Groggy 스택 제거** | **← 여기부터** |
+| 6 전체 회귀 + MPPM 2인 | 대기 |
+
+### 🔴 대기열 — 덩이 ② 끝나면 바로 (팀장 지시 2026-09-03)
+
+**보스 타겟팅이 멀티를 고려하지 않는다.** 두 결함이 겹쳐 있다.
+
+1. **`BossAttackEntry.targetRule` 이 죽은 데이터다** — enum(`CurrentTarget`/`FarthestPlayer`)도 있고
+   Jump 행에 `FarthestPlayer` 가 저작돼 있는데 **읽는 코드가 전수 0건**이다.
+   `[S3]` 스펙의 "점프 = 거리 무관 + **최원거리 타겟**" 중 뒤쪽 절반이 미구현이다.
+2. **타깃이 항상 최근접 1명이다** — `_target = FindNearestTarget()` 한 곳뿐이고 23호는
+   오버라이드하지 않는다. `SelectAttackSlot(dist)` 의 `dist` 도 그 최근접까지의 거리다.
+
+멀티 결과 — 한 명만 붙어 있으면 다른 사람이 아무리 멀어도 Dash 거리창이 안 열리고,
+Jump 는 후열이 아니라 최근접에게 뛴다. **멀티 특유의 압박이 통째로 없다.**
+
+⚠️ 보기보다 크다. 타깃이 공격마다 바뀌면 `FaceTarget`·리쉬·`_target` 수명이 전부 엮인다 —
+`AIRULE.md` 의 grill → PLAN → 승인 절차를 탈 것.
+
+### 그 밖의 미해결 (별건, 이번 작업과 무관)
+
+- **스피너봇 평타 조기 판정** — 애니 시작 즉시 데미지가 나가 칼이 안 맞았는데 피격된다.
+- **`[23호] Grab 체인이 Recovery 에서 타임아웃`** — 카운터 창 0 일 때도 발생했다.
+  즉 창 작업과 무관한 기존 결함이다(예산 계산이 원본과 동일한 조건에서 재현).
+
+---
+
+
+## 이전 시작점 — 넉백 세기 튜닝 (2026-08-18 밤 종료)
 
 **브랜치 `feature/Boss23`** · **컴파일 0에러** · **원격 동기화 완료(ahead 0 / behind 0)**
 **백업 = 로컬 `backup/boss23-20260815`**
