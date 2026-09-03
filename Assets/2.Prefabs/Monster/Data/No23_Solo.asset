@@ -107,7 +107,7 @@ MonoBehaviour:
     allowedFromPhase: 0
     damage: 0
     opensCounterWindow: 1
-    counterWindowDuration: 1.5
+    counterWindowDuration: 1.3
     superArmor: 1
     hitboxAnchorName: Hand_R
   - attackId: 4
@@ -153,6 +153,7 @@ MonoBehaviour:
   backAttackAngle: 60
   hitReactionState: getowned
   breakDuration: 2
+  chargeClearGroggyDuration: 1
   grabRadius: 2.2
   grabHoldDuration: 2
   grabTickInterval: 0.5

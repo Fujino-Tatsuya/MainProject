@@ -28,7 +28,7 @@ public sealed class BossCounterDataTests
         //    (설계 §4.3 의 "이벤트가 창보다 먼저 온다" 전제가 Grab 에서 깨져 있었다).
         //    Dash 는 0.15 = 86프레임/60fps × 0.15 = 0.22초라 1.5 초 창이 1.29초를 붙잡는다.
         Assert.That(grab.opensCounterWindow, Is.True);
-        Assert.That(grab.counterWindowDuration, Is.EqualTo(1.5f));
+        Assert.That(grab.counterWindowDuration, Is.EqualTo(1.3f));
         Assert.That(dash.opensCounterWindow, Is.True);
         Assert.That(dash.counterWindowDuration, Is.EqualTo(1.5f));
 
@@ -40,5 +40,8 @@ public sealed class BossCounterDataTests
         Assert.That(data.maxGroggyCount, Is.EqualTo(5));
         Assert.That(data.groggyDuration, Is.EqualTo(0.5f));
         Assert.That(data.breakDuration, Is.EqualTo(2f));
+
+        // 송전기 전멸은 기믹을 깬 보상이라 일반 카운터(0.5)보다 길다(팀장 확정 2026-09-03).
+        Assert.That(data.chargeClearGroggyDuration, Is.EqualTo(1f));
     }
 }

@@ -154,6 +154,11 @@ public class BossDataSO : MonsterDataSO
     [Tooltip("[S3] Break(그로기 카운트 최대 도달) 지속 시간(초). 일반 그로기는 base 의 groggyDuration 을 쓴다.")]
     [Min(0f)] public float breakDuration = 5f;
 
+    [Tooltip("[S7] 송전기(차징) 전멸 성공 시의 전체 행동 불능 시간(초). 일반 카운터 그로기(groggyDuration)와 " +
+             "따로 두는 이유 — 기믹을 깬 보상이라 카운터 한 번보다 길어야 손맛이 산다(팀장 확정 2026-09-03). " +
+             "🔴 Break 로 승격하지는 않는다(페이즈 연출 직후 장시간 무력화가 겹치면 연출이 죽는다).")]
+    [Min(0f)] public float chargeClearGroggyDuration = 1f;
+
     [Header("Grab 체인 — 값은 플레이로 튜닝(PLAN §9)")]
     [Tooltip("잡기 판정 반경(m). 애니 이벤트(OnAttackHit) 시점에 이 반경 안의 최근접 플레이어를 잡는다.")]
     [Min(0.1f)] public float grabRadius = 2.2f;

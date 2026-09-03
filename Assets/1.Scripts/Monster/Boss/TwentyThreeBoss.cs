@@ -68,6 +68,12 @@ public class TwentyThreeBoss : MonsterBase
     bool _counterAnimatorHeldLocally;
     float _counterAnimatorResumeSpeed = 1f;
 
+    // 체인 예산(_stateTimer)의 여유분. 예산은 **데드락 안전망**이지 정밀 종료 기준이 아니다 —
+    // 실제 길이와 정확히 같게 잡으면 프레임 오차 한 번에 안전망이 터진다.
+    // 🔴 실측(2026-09-03): 창 1.5초 + 홀드 1.5초로 여유가 0 이 되자 Dash 가 Recovery 에서
+    //    타임아웃하기 시작했다(2회). 정상 종료는 애니 이벤트가 만들고, 이 값은 그 뒤를 받친다.
+    const float ChainBudgetSlack = 0.5f;
+
     /// 지금 공격 행의 카운터 창 길이. 창을 여는 공격이 아니면 0.
     float CounterWindowDuration => _currentEntry != null && _currentEntry.opensCounterWindow
         ? Mathf.Clamp(_currentEntry.counterWindowDuration, 0f, 2f)
@@ -538,7 +544,7 @@ public class TwentyThreeBoss : MonsterBase
                     //    기존 몫을 하한으로 남겨 그 회귀를 막는다.
                     _attackPhase = BossAttackPhase.Windup;
                     _attackPhaseTimer = Mathf.Max(CounterWindowDuration, data.attackDuration);
-                    _stateTimer = _attackPhaseTimer + GrabHold + GrabThrowTime + GrabRecovery;
+                    _stateTimer = _attackPhaseTimer + GrabHold + GrabThrowTime + GrabRecovery + ChainBudgetSlack;
                     break;
                 case BossAttackId.Jump:
                     _stateTimer = JumpHover + JumpLanding + JumpRecovery + data.attackDuration;
@@ -567,7 +573,7 @@ public class TwentyThreeBoss : MonsterBase
                     //    실제 선딜이 예산을 넘는다.
                     _attackPhaseTimer = Mathf.Max(CounterWindowDuration, data.attackDuration);
                     _attackPhase = BossAttackPhase.Windup;
-                    _stateTimer = _attackPhaseTimer + DashDuration + data.attackDuration;
+                    _stateTimer = _attackPhaseTimer + DashDuration + data.attackDuration + ChainBudgetSlack;
                     break;
             }
         }
@@ -1817,7 +1823,9 @@ public class TwentyThreeBoss : MonsterBase
             //    페이즈 전환 직후 5초 무력화가 겹치면 페이즈 연출이 죽는다(확정 스펙).
             _attackPhase = BossAttackPhase.None;
             Debug.Log("[23호] 송전기 전멸 — 그로기(Break 승격 없음)", this);
-            EnterCounterGroggy(allowBreak: false);
+            EnterCounterGroggy(
+                allowBreak: false,
+                durationOverride: _boss != null ? _boss.chargeClearGroggyDuration : 1f);
             return;
         }
 
@@ -2524,7 +2532,12 @@ public class TwentyThreeBoss : MonsterBase
     /// 송전기 실패(S7)는 false — **카운트는 올리되 Break 로 승격하지 않는다**
     /// (페이즈 전환 직후 5초 무력화가 겹치면 페이즈 연출이 죽는다 — 확정 스펙).
     /// </summary>
-    protected void EnterCounterGroggy(bool allowBreak)
+    /// <param name="durationOverride">
+    /// 0 보다 크면 이 시간을 전체 행동 불능 시간으로 쓴다(카운트 누적은 그대로).
+    /// 송전기 전멸처럼 <b>보상의 무게가 다른</b> 경로가 쓴다 — 일반 카운터와 값을 나누기 위해서다.
+    /// Break 는 임계 도달의 결과라 덮지 않는다.
+    /// </param>
+    protected void EnterCounterGroggy(bool allowBreak, float durationOverride = -1f)
     {
         if (!IsServer) return;
 
@@ -2537,6 +2550,8 @@ public class TwentyThreeBoss : MonsterBase
 
         _counterGroggyCount = outcome.NextCount;
 
+        float duration = (!outcome.IsBreak && durationOverride > 0f) ? durationOverride : outcome.Duration;
+
         // 예약된 공격·준비 래치·자세 홀드를 폐기하고 체인을 정리한다(설계 §4.4 1~4).
         // ResetCounterWindup 은 이 안에서 함께 돈다.
         AbortAttackChain();
@@ -2544,12 +2559,12 @@ public class TwentyThreeBoss : MonsterBase
         // 🔴 Hit 리액션을 **앞에 더하지 않는다**(설계 §3.3). 예전엔
         //    ForceHitReaction(HitReactionDuration, groggy) 라 SO 의 0.5 위에 0.4 가 얹혀
         //    실제 행동 불능이 0.9초였다 — SO 값이 곧 체감 시간이어야 튜닝이 성립한다.
-        ForceGroggy(outcome.Duration);
+        ForceGroggy(duration);
 
         int max = data != null ? Mathf.Max(1, data.maxGroggyCount) : 5;
         Debug.Log(
             $"[23호] 카운터 성공 — 그로기 카운트 {(outcome.IsBreak ? max : outcome.NextCount)}/{max}" +
-            (outcome.IsBreak ? $" → BREAK {outcome.Duration:0.#}초" : $" → 그로기 {outcome.Duration:0.#}초"),
+            (outcome.IsBreak ? $" → BREAK {duration:0.#}초" : $" → 그로기 {duration:0.#}초"),
             this);
     }
 
