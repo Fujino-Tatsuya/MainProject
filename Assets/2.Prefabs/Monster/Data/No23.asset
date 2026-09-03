@@ -181,7 +181,7 @@ MonoBehaviour:
   backAttackAngle: 60
   hitReactionState: getowned
   breakDuration: 2
-  chargeClearGroggyDuration: 1
+  chargeClearGroggyDuration: 1.5
   grabRadius: 2.2
   grabHoldDuration: 2
   grabTickInterval: 0.5

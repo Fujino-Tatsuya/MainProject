@@ -41,7 +41,8 @@ public sealed class BossCounterDataTests
         Assert.That(data.groggyDuration, Is.EqualTo(0.5f));
         Assert.That(data.breakDuration, Is.EqualTo(2f));
 
-        // 송전기 전멸은 기믹을 깬 보상이라 일반 카운터(0.5)보다 길다(팀장 확정 2026-09-03).
-        Assert.That(data.chargeClearGroggyDuration, Is.EqualTo(1f));
+        // 송전기 전멸은 기믹을 깬 보상이라 일반 카운터(0.5)보다 길다.
+        // 1.0 은 체감이 부족해 1.5 로 올렸다(팀장 Play 확정 2026-09-03).
+        Assert.That(data.chargeClearGroggyDuration, Is.EqualTo(1.5f));
     }
 }
