@@ -7,50 +7,58 @@
 This file defines the shared vocabulary for the project. Keep it concise. It is not a full spec and should not contain implementation plans.
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
-## ▶▶ 다음 세션 시작점 — 보스 카운터 Task 3 덩이 ② (2026-09-03)
+## ▶▶ 다음 세션 시작점 — MPPM 2인 검증 (2026-09-03 종료)
 
-**브랜치 `feature/Boss23`** · 컴파일 0에러 · 전투 EditMode **29/29** · 백업 `backup/Boss23-local-20260902`
+**브랜치 `feature/Boss23`** · 컴파일 0에러 · 전투 EditMode **40/40** · 백업 `backup/Boss23-local-20260902`
+**원격 대비 ahead** — 아직 푸시 안 함.
 
-작업 세션: **경석(Claude)**. 수정 중인 파일 — `TwentyThreeBoss.cs` · `MonsterBase.cs` ·
-`Monster/Boss/BossCounter*.cs` · `No23(.._Solo).asset`. Codex 는 이 파일들을 피할 것.
+### 한 줄 상태
 
-계획: [Docs/superpowers/plans/2026-09-02-boss-counter-and-monster-hit-commitment.md](Docs/superpowers/plans/2026-09-02-boss-counter-and-monster-hit-commitment.md)
-설계: [Docs/superpowers/specs/2026-09-02-boss-counter-and-monster-hit-commitment-design.md](Docs/superpowers/specs/2026-09-02-boss-counter-and-monster-hit-commitment-design.md)
+보스 카운터(Task 1~5)와 어그로 재선정이 **코드·단독 Play 까지 완료**됐다.
+남은 것은 **MPPM 2인 검증** 하나이고, 팀원 일정에 맞춰 돌리기로 했다.
 
-### 진행 상황
+### 🔴 다음 할 일 — MPPM 2인으로 한 번에 검증
 
-| Task | 상태 |
-|---|---|
-| 4 몬스터 공격 커밋 | ✅ Play 검증 완료 |
-| 1 선딜 게이트 · 2 진행도/SO · 5 저작 | ✅ |
-| 3 덩이 ① 발사 제어 | ✅ Play 검증 완료 (카운터 성공 확인) |
-| **3 덩이 ② 자세 홀드 + 5경로 리셋 + Hit·Groggy 스택 제거** | **← 여기부터** |
-| 6 전체 회귀 + MPPM 2인 | 대기 |
+**A. 카운터 (계획서 Task 6)**
+- 카운터 창 · **자세 홀드** · 그로기가 호스트/클라 **일치**하는가
+  🔴 자세 홀드는 각 피어의 로컬 애니메이터 상태다 — 단독 Play 로는 안 드러나는 결함이 여기서 나온다.
+- 홀드 중 처치·이탈에서 보스가 굳지 않는가 (단독은 확인 완료)
 
-### 🔴 대기열 — 덩이 ② 끝나면 바로 (팀장 지시 2026-09-03)
+**B. 어그로 (이번 세션 신규)**
+- 어그로가 실제로 도는가 — `aggroAvoidsRepeatTarget` **켜고 끄며 비교**
+  ⚠️ 끔(기본)이면 최근접을 다시 고르므로, 근접이 탱킹하는 구도에서는 어그로가 거의 안 돈다.
+  켜면 돌지만 **후열이 과하게 압박받을 수 있다** — 이걸 보고 확정한다.
+- 점프가 후열을 노리는가(이제 데이터 경로) / 개전 첫 행동이 접근 후 근접인가
 
-**보스 타겟팅이 멀티를 고려하지 않는다.** 두 결함이 겹쳐 있다.
+### 튜닝 노브 — `No23.asset` · `No23_Solo.asset`
 
-1. **`BossAttackEntry.targetRule` 이 죽은 데이터다** — enum(`CurrentTarget`/`FarthestPlayer`)도 있고
-   Jump 행에 `FarthestPlayer` 가 저작돼 있는데 **읽는 코드가 전수 0건**이다.
-   `[S3]` 스펙의 "점프 = 거리 무관 + **최원거리 타겟**" 중 뒤쪽 절반이 미구현이다.
-2. **타깃이 항상 최근접 1명이다** — `_target = FindNearestTarget()` 한 곳뿐이고 23호는
-   오버라이드하지 않는다. `SelectAttackSlot(dist)` 의 `dist` 도 그 최근접까지의 거리다.
+| 노브 | 현재 | 비고 |
+|---|---|---|
+| `aggroRetargetInterval` | 8초 | 0 이면 기능 끔 |
+| `aggroAvoidsRepeatTarget` | **끔** | MPPM 으로 확정할 값 |
+| `chargeClearGroggyDuration` | 1.5초 | 송전기 전멸 보상 |
+| Grab / Dash `counterWindowDuration` | 1.3 / 1.5 | Grab 준비 도달이 1.11초라 그보다 커야 홀드가 생긴다 |
 
-멀티 결과 — 한 명만 붙어 있으면 다른 사람이 아무리 멀어도 Dash 거리창이 안 열리고,
-Jump 는 후열이 아니라 최근접에게 뛴다. **멀티 특유의 압박이 통째로 없다.**
+🔴 **이 값들은 `BossCounterDataTests` 가 고정한다.** 튜닝값을 확정하면 테스트 기대값도 함께 갱신할 것 —
+안 그러면 다음 실행에서 빨간불이 뜬다(저작이 조용히 흘러가지 않게 하려는 의도).
 
-⚠️ 보기보다 크다. 타깃이 공격마다 바뀌면 `FaceTarget`·리쉬·`_target` 수명이 전부 엮인다 —
-`AIRULE.md` 의 grill → PLAN → 승인 절차를 탈 것.
+### 이 세션에 확립된 것
 
-### 그 밖의 미해결 (별건, 이번 작업과 무관)
+- ✅ **어그로는 피해 분배를 바꾸지 않는다.** `_target` 은 "어디로 가고 누굴 보는지"만 정하고,
+  누가 맞는지는 공간 판정이 따로 고른다(훅은 히트박스에 겹친 전원, Grab 은 포획 순간 반경 내
+  최근접, Dash 는 경로에 먼저 걸린 사람). 후열 압박은 어그로가 아니라 Jump·Dash 가 만든다.
+- ✅ **체인 예산은 데드락 안전망이지 정밀 종료 기준이 아니다.** 실제 길이와 같게 잡았더니
+  프레임 오차로 타임아웃이 났다 — `ChainBudgetSlack` 0.5초 도입 후 Grab·Dash 타임아웃 0건.
+- ⚠️ **Play 로그는 MCP 콘솔이 아니라 `Editor.log` 로 본다.** 콘솔 버퍼는 100개라 플레이어
+  대시 경고에 1900건 넘게 밀려난다. `unity_get_console_logs` 의 `droppedCount` 를 항상 볼 것.
+- ⚠️ **Unity Hub 를 오래 켜 두면 그 안의 Unity 가 낡은 PATH 를 물려받는다**(교훈 #81).
+
+### 별건 (이번 작업과 무관, 미해결)
 
 - **스피너봇 평타 조기 판정** — 애니 시작 즉시 데미지가 나가 칼이 안 맞았는데 피격된다.
-- **`[23호] Grab 체인이 Recovery 에서 타임아웃`** — 카운터 창 0 일 때도 발생했다.
-  즉 창 작업과 무관한 기존 결함이다(예산 계산이 원본과 동일한 조건에서 재현).
+- ~~`Grab 체인 Recovery 타임아웃`~~ → **해소됨**. 원인은 체인 예산 여유 부족이었다.
 
 ---
-
 
 ## 이전 시작점 — 넉백 세기 튜닝 (2026-08-18 밤 종료)
 
