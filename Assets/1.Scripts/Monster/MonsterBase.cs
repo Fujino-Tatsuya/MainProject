@@ -336,7 +336,12 @@ public class MonsterBase : Unit
             //    훑는데, 락온 규약은 "인지반경 밖으로 나가도 리쉬 전까진 추격"이다.
             //    빈손을 그대로 대입하면 인지반경~리쉬 사이(23호 기준 8~15m)를 달리던 추격이
             //    재선정 순간 조용히 끊기고 보스가 Idle 로 빠진다.
-            Transform candidate = FindNearestTarget();
+            // 같은 사람을 다시 고르지 않게 할지는 파생이 정한다(23호는 SO 노브).
+            // 대안이 없으면 candidate 가 null 이라 아래 가드가 기존 타깃을 지킨다 —
+            // 1대1 에서는 자동으로 현행(계속 물기)과 같아진다.
+            Transform candidate = RetargetAvoidsCurrentTarget
+                ? FindNearestTarget(exclude: _target)
+                : FindNearestTarget();
             if (candidate != null) _target = candidate;
         }
 
@@ -665,6 +670,15 @@ public class MonsterBase : Unit
     /// 새로 탐색한다 — 파생은 "언제 바꿀지"만 정하고 "어떻게 고를지"는 base 가 갖는다.
     /// </summary>
     protected virtual bool ShouldReacquireTarget() => false;
+
+    /// <summary>
+    /// 주기 재선정에서 <b>지금 물고 있는 대상을 후보에서 뺄</b> 것인가. 기본 <c>false</c>.
+    ///
+    /// false 면 최근접을 다시 고르므로, 같은 사람이 계속 최근접이면 어그로가 실질적으로 안 돈다
+    /// (근접이 탱킹하는 구도에서 그렇다). true 면 8초마다 실제로 다른 사람에게 압박이 간다.
+    /// ⚠️ 대신 후열이 과하게 압박받을 수 있다 — MPPM 으로 보고 정할 값이라 노브로 뺐다.
+    /// </summary>
+    protected virtual bool RetargetAvoidsCurrentTarget => false;
 
     protected virtual void StartAttack()
     {
@@ -1200,7 +1214,11 @@ public class MonsterBase : Unit
     }
 
     // 인지 반경 내 최근접 플레이어 Transform 탐색(서버 전용).
-    Transform FindNearestTarget()
+    /// <param name="exclude">
+    /// 후보에서 제외할 대상(보통 지금 물고 있는 타깃). null 이면 제외 없음.
+    /// 주기 어그로 재선정에서 "같은 사람을 다시 고르는 것"을 막는 데 쓴다.
+    /// </param>
+    Transform FindNearestTarget(Transform exclude = null)
     {
         if (_detectBuffer == null) return null;
 
@@ -1220,6 +1238,10 @@ public class MonsterBase : Unit
 
             // 루트 오브젝트 기준 거리(콜라이더가 자식일 수 있음).
             Transform root = c.transform.root;
+
+            // 제외 대상은 건너뛴다. 루트로 비교하는 이유 — exclude 로 넘어오는 _target 도
+            // 루트라서, 콜라이더 트랜스폼과 직접 비교하면 자식 콜라이더에서 안 걸린다.
+            if (exclude != null && root == exclude) continue;
             float sqr = (root.position - transform.position).sqrMagnitude;
             if (sqr < best)
             {

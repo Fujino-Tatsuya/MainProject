@@ -395,6 +395,10 @@ public class TwentyThreeBoss : MonsterBase
     /// 주기가 지났고 교전 중 대기/추격이면 타깃을 다시 고른다.
     /// 판정은 <see cref="BossAggroPolicy"/> 에 있다(EditMode 로 경계·억제를 고정).
     /// </summary>
+    /// <summary>같은 사람을 다시 고르지 않게 할지 — SO 노브. MPPM 검증 후 확정할 값이다.</summary>
+    protected override bool RetargetAvoidsCurrentTarget =>
+        _boss != null && _boss.aggroAvoidsRepeatTarget;
+
     protected override bool ShouldReacquireTarget()
     {
         float interval = _boss != null ? _boss.aggroRetargetInterval : 0f;
