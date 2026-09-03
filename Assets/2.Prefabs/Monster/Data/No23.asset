@@ -127,11 +127,11 @@ MonoBehaviour:
   - attackId: 5
     animatorStateName: DashAttack
     cooldown: 5
-    minDistance: 0
+    minDistance: 5
     maxDistance: 20
     ignoreDistanceWindow: 0
     targetRule: 0
-    weight: 200
+    weight: 20
     allowedFromPhase: 0
     damage: 0
     opensCounterWindow: 1
