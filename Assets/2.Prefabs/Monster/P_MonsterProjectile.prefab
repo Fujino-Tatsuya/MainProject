@@ -16,6 +16,7 @@ GameObject:
   - component: {fileID: 2869338560897578882}
   - component: {fileID: 740064040405123367}
   - component: {fileID: 8618555654953711266}
+  - component: {fileID: 5234042224851591168}
   m_Layer: 0
   m_Name: P_MonsterProjectile
   m_TagString: Untagged
@@ -227,3 +228,19 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MonsterProjectile
   ShowTopMostFoldoutHeaderGroup: 1
+--- !u!114 &5234042224851591168
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8845096525963102658}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 129620ace88a4b7a830f721c84d7242b, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::MonsterProjectileEffects
+  trail: {fileID: 11400000, guid: 3ed42faac15a0544c8c338c7e5f78954, type: 2}
+  explode: {fileID: 11400000, guid: 88b33c4c16ab5ba46928596f04744e2c, type: 2}
+  explodeOffset: {x: 0, y: 0, z: 0}
+  scale: 1
