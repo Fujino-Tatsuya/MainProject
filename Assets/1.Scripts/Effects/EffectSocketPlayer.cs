@@ -41,7 +41,7 @@ public class EffectSocketPlayer : MonoBehaviour
     [Tooltip("소켓 기준 월드 단위 오프셋. 배율(scale)에 곱해지지 않는다")]
     [SerializeField] Vector3 offset;
 
-    [Tooltip("프리팹에 저작된 크기에 곱해지는 배율")]
+    [Tooltip("프리팹에 저작된 크기에 곱해지는 배율. 런타임에 바뀌는 값이면 SetScale로 밀어넣는다")]
     [SerializeField, Min(0.01f)] float scale = 1f;
 
     [Header("안전장치")]
@@ -54,6 +54,17 @@ public class EffectSocketPlayer : MonoBehaviour
 
     /// <summary>지금 재생 중인가.</summary>
     public bool IsPlaying => _handle.IsSet;
+
+    /// <summary>
+    /// 배율을 런타임에 바꾼다. 크기가 저작 시점에 정해지지 않는 연출용이다 —
+    /// 예고 장판은 판정 반경(인스펙터 튜닝값)과 크기가 같아야 하는데, 애니메이션 이벤트는
+    /// 인자를 하나만 넘길 수 있어 "어느 이펙트인가"에 이미 써버린다. 그래서 <b>크기는 코드가,
+    /// 타이밍은 애니메이션 이벤트가</b> 정한다.
+    ///
+    /// ⚠️ <b>재생 중에 부르면 이번 재생에는 반영되지 않는다</b> — 배율은 대출 시점에 확정된다.
+    /// 반드시 <see cref="Play"/>보다 먼저 부를 것.
+    /// </summary>
+    public void SetScale(float value) => scale = Mathf.Max(0.01f, value);
 
     /// <summary>
     /// [애니메이션 이벤트] 재생 시작. 이미 재생 중이면 먼저 회수하고 새로 시작한다
