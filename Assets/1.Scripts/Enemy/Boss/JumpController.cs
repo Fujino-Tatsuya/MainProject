@@ -2,8 +2,6 @@ using System.Collections.Generic;
 using Unity.Behavior;
 using Unity.Netcode;
 using UnityEngine;
-using UnityEngine.UIElements;
-using static EffectCatalog;
 
 public class JumpController : NetworkBehaviour, IDamageSettable
 {
@@ -144,7 +142,11 @@ public class JumpController : NetworkBehaviour, IDamageSettable
         float growDuration = JumpingTime.Value + _jumpDiff;
 
         _isJumping = true;
-        ShowFloorsClientRpc(_floorRootPos, _floorRootRot, growDuration);
+
+        // 데미지 범위는 장판1(floorBase)의 실제 시각 크기 기준
+        _floorRadius = Mathf.Max(floorBase.transform.localScale.x, floorBase.transform.localScale.y, floorBase.transform.localScale.z);
+
+        ShowFloorsClientRpc(_floorRootPos, _floorRootRot, growDuration, _floorRadius);
         ShowMyMeshClientRpc(false);
     }
 
@@ -194,9 +196,6 @@ public class JumpController : NetworkBehaviour, IDamageSettable
         // 연출 착지는 피해를 주지 않는다. 장판도 켜지지 않았으므로 숨김 처리도 불필요.
         if (_isCinematicLanding) return;
 
-        // 데미지 범위는 장판1(floorBase)의 실제 시각 크기 기준
-        _floorRadius = Mathf.Max(floorBase.transform.localScale.x, floorBase.transform.localScale.y, floorBase.transform.localScale.z);
-
         int hitCount = Physics.OverlapSphereNonAlloc(
             floorBase.transform.position,
             _floorRadius,
@@ -227,7 +226,7 @@ public class JumpController : NetworkBehaviour, IDamageSettable
             _knockbackAttack.ApplyKnockbackAttack(unit.gameObject);
         }
 
-        PlayDropVFXRpc(floorBase.transform.position);
+        PlayDropVFXRpc(floorBase.transform.position, _floorRadius);
         HideFloorsClientRpc();
     }
 
@@ -268,7 +267,7 @@ public class JumpController : NetworkBehaviour, IDamageSettable
     }
 
     [ClientRpc]
-    void ShowFloorsClientRpc(Vector3 position, Quaternion rotation, float growDuration)
+    void ShowFloorsClientRpc(Vector3 position, Quaternion rotation, float growDuration, float radius)
     {
         _floorRootPos = position;
         _floorRootRot = rotation;
@@ -287,7 +286,7 @@ public class JumpController : NetworkBehaviour, IDamageSettable
 
         _indicatorHandle = effects.PlayLooping(
             effects.Catalog.Drop_Charge_Indicator,
-            position, rotation, _floorRadius, growDuration);
+            position, rotation, radius, growDuration);
     }
 
     [ClientRpc]
@@ -318,10 +317,10 @@ public class JumpController : NetworkBehaviour, IDamageSettable
     }
 
     [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
-    void PlayDropVFXRpc(Vector3 pos)
+    void PlayDropVFXRpc(Vector3 pos, float radius)
     {
         if (!EffectManager.TryGet(out EffectManager effects, this)) return;
 
-        effects.Play(effects.Catalog.Drop_Collision, pos, _floorRadius);
+        effects.Play(effects.Catalog.Drop_Collision, pos, radius);
     }
 }
