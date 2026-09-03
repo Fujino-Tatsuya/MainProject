@@ -368,6 +368,26 @@ public class TwentyThreeBoss : MonsterBase
     #region 공격 선택기 (거리창 → 가중치 → 연속 감쇠 → 폴백)
     // base 의 SeekBoss 가 매 틱 부른다. NoAttack(-1)을 돌리면 base 가 접근/대기로 폴백한다
     // (= 전부 쿨이어도 제자리에 멈춰 서지 않는다 — 수용기준 #1).
+    /// <summary>
+    /// 개전 직후 원거리 진입기(Dash·Jump)에 쿨을 걸어 <b>걸어 들어가서 때리게</b> 한다.
+    ///
+    /// 왜 필요한지와 왜 새 상태를 안 만들었는지는 <see cref="BossOpeningAttackPolicy"/> 참조.
+    /// 요지 — 개전엔 플레이어가 멀어 거리창을 통과하는 행이 그 둘뿐이라 룰렛이 반드시 그중
+    /// 하나를 뽑는다(구조적이라 가중치로 못 막는다). 쿨은 시간이 지나면 스스로 풀린다.
+    /// </summary>
+    protected override void OnServerLogicResumed()
+    {
+        base.OnServerLogicResumed();
+        if (!IsServer) return;
+
+        BossAttackEntry[] rows = _boss != null ? _boss.attacks : null;
+        if (rows == null) return;
+
+        for (int i = 0; i < rows.Length; i++)
+            if (BossOpeningAttackPolicy.IsRangedOpener(rows[i]))
+                MarkAttackJustUsed(i);
+    }
+
     protected override int SelectAttackSlot(float dist)
     {
         BossAttackEntry[] rows = _boss != null ? _boss.attacks : null;

@@ -20,7 +20,8 @@ internal static class CombatEditModeTestRunner
     static readonly string[] Fixtures =
     {
         "^MonsterHitReactionPolicyTests",
-        "^BossCounter"   // BossCounterWindupGateTests / BossCounterProgressTests / BossCounterDataTests
+        "^BossCounter",  // BossCounterWindupGateTests / BossCounterProgressTests / BossCounterDataTests
+        "^BossOpening"   // BossOpeningAttackPolicyTests
     };
 
     const string Tag = "[CombatTests]";

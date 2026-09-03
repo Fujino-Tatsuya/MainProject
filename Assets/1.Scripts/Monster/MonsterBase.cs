@@ -290,8 +290,17 @@ public class MonsterBase : Unit
             SetState(MonsterState.Idle);
         }
 
+        // 연출이 끝나고 FSM 이 깨어나는 시점 — 파생이 개전 처리를 얹을 수 있게 훅을 연다.
+        if (!suspended) OnServerLogicResumed();
+
         Edit.Log($"[Monster] {name} 서버 FSM {(suspended ? "정지" : "재개")} — 연출 구간 게이트", this);
     }
+
+    /// <summary>
+    /// 서버 FSM 이 연출 정지에서 <b>깨어난</b> 직후 1회. 파생이 개전 처리를 얹는 자리다.
+    /// (정지로 들어갈 때는 불리지 않는다 — 그쪽은 위에서 이미 정리한다.)
+    /// </summary>
+    protected virtual void OnServerLogicResumed() { }
 
     public void SetSpawnAnchor(Vector3 worldPosition)
     {
@@ -1143,6 +1152,19 @@ public class MonsterBase : Unit
     }
 
     /// <summary>슬롯별 쿨 길이(초)를 설정한다. 0 이하면 base 간격(1/AttackSpeed)을 쓴다.</summary>
+    /// <summary>
+    /// 슬롯을 "방금 썼다"고 표시해 쿨다운을 지금부터 돌린다.
+    ///
+    /// 실제로 공격하지 않고 <b>쿨만 거는</b> 용도다 — 특정 공격을 일정 시간 후보에서 빼고 싶을 때
+    /// 새 게이트를 만드는 대신 기존 쿨다운 기계를 재사용한다. 시간이 지나면 스스로 풀리므로
+    /// 해제를 잊어 상태가 고착될 위험이 없다(23호 개전 억제가 이 경로를 쓴다).
+    /// </summary>
+    protected void MarkAttackJustUsed(int attackSlot)
+    {
+        if (attackSlot < 0 || attackSlot >= _lastUsedByAttack.Length) return;
+        _lastUsedByAttack[attackSlot] = Time.time;
+    }
+
     protected void SetAttackCooldown(int attackSlot, float seconds)
     {
         if (attackSlot < 0 || attackSlot >= _cooldownByAttack.Length) return;
