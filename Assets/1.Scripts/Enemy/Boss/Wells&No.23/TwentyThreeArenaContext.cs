@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Unity.Netcode;
 using Unity.VisualScripting;
@@ -8,6 +9,8 @@ public class TwentyThreeArenaContext : NetworkBehaviour
     [SerializeField] GameObject bossPrefab;
     [SerializeField] List<ChargingObject> ChargingObjects;
     [SerializeField] Vector3 bossPos;
+
+    EnemyBTActivator _btActivator;
 
     public override void OnNetworkSpawn()
     {
@@ -33,12 +36,21 @@ public class TwentyThreeArenaContext : NetworkBehaviour
         }
         controller.SetList(ChargingObjects);
 
-        EnemyBTActivator btActivator = boss.GetComponent<EnemyBTActivator>();
-        if (btActivator == null)
+        _btActivator = boss.GetComponent<EnemyBTActivator>();
+        if (_btActivator == null)
         {
             Edit.LogError("[No.23] 해당 보스에 EnemyBTActivator 컴포넌트가 없습니다. 추가해주세요.");
             return;
         }
-        //btActivator.OpenBT();
+        //_btActivator.OpenBT();
+    }
+
+    private void Update()
+    {
+        if (!IsServer) return;
+        if (Input.GetKeyDown(KeyCode.F11))
+        {
+            _btActivator.OpenBT();
+        }
     }
 }
