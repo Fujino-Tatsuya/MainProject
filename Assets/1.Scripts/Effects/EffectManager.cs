@@ -141,6 +141,7 @@ public class EffectManager : MonoBehaviour
         // 기술을 추가할 때 고치는 곳은 여기 한 줄이다.
         _drivers.Add(new ShurikenEffectSystem());
         _drivers.Add(new FloorAreaEffectSystem());
+        _drivers.Add(new FadeInHoldEffectSystem());
 
         // 풀 루트는 매니저와 분리한다 — 매니저의 scale이 이펙트 크기에 곱해지지 않게.
         var rootObject = new GameObject("[EffectPool]");
