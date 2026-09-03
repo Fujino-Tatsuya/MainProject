@@ -60,7 +60,7 @@ MonoBehaviour:
     minDistance: 0
     maxDistance: 3.2
     ignoreDistanceWindow: 0
-    targetRule: 0
+    attackTargeting: 0
     weight: 30
     allowedFromPhase: 0
     damage: 0
@@ -74,7 +74,7 @@ MonoBehaviour:
     minDistance: 0
     maxDistance: 3.2
     ignoreDistanceWindow: 0
-    targetRule: 0
+    attackTargeting: 0
     weight: 30
     allowedFromPhase: 0
     damage: 0
@@ -88,7 +88,7 @@ MonoBehaviour:
     minDistance: 0
     maxDistance: 2.8
     ignoreDistanceWindow: 0
-    targetRule: 0
+    attackTargeting: 0
     weight: 12
     allowedFromPhase: 0
     damage: 0
@@ -102,7 +102,7 @@ MonoBehaviour:
     minDistance: 0
     maxDistance: 2.2
     ignoreDistanceWindow: 0
-    targetRule: 0
+    attackTargeting: 0
     weight: 15
     allowedFromPhase: 0
     damage: 0
@@ -116,7 +116,7 @@ MonoBehaviour:
     minDistance: 0
     maxDistance: 3
     ignoreDistanceWindow: 1
-    targetRule: 1
+    attackTargeting: 1
     weight: 15
     allowedFromPhase: 0
     damage: 0
@@ -130,7 +130,7 @@ MonoBehaviour:
     minDistance: 5
     maxDistance: 20
     ignoreDistanceWindow: 0
-    targetRule: 0
+    attackTargeting: 0
     weight: 20
     allowedFromPhase: 0
     damage: 0
@@ -144,7 +144,7 @@ MonoBehaviour:
     minDistance: 0
     maxDistance: 3
     ignoreDistanceWindow: 1
-    targetRule: 0
+    attackTargeting: 0
     weight: 0
     allowedFromPhase: 0
     damage: 0
@@ -158,7 +158,7 @@ MonoBehaviour:
     minDistance: 0
     maxDistance: 3
     ignoreDistanceWindow: 1
-    targetRule: 0
+    attackTargeting: 0
     weight: 0
     allowedFromPhase: 0
     damage: 0
@@ -181,6 +181,7 @@ MonoBehaviour:
   backAttackAngle: 60
   hitReactionState: getowned
   breakDuration: 2
+  aggroRetargetInterval: 8
   chargeClearGroggyDuration: 1.5
   grabRadius: 2.2
   grabHoldDuration: 2

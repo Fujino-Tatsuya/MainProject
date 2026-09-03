@@ -252,6 +252,19 @@ public class TwentyThreeBoss : MonsterBase
             return;
         }
 
+        // 타겟 규칙 계약 — FarthestPlayer 는 Jump 전용이다(확정 스펙).
+        // 🔴 다른 행에 켜면 그 공격이 조용히 후열을 노리게 되는데, 거리창까지 함께 보므로
+        //    "가까운 사람만 후보인데 먼 사람을 노린다"는 앞뒤 안 맞는 조합이 된다.
+        foreach (BossAttackEntry e in _boss.attacks)
+        {
+            if (e == null || e.attackTargeting != BossAttackTargeting.FarthestPlayer) continue;
+            if (e.attackId == BossAttackId.Jump) continue;
+
+            Debug.LogError(
+                $"{name}: {e.attackId} 행의 attackTargeting 이 FarthestPlayer 다 — 최원거리 타겟은 " +
+                "Jump 전용이다(확정 스펙). 거리창을 쓰는 공격과 조합하면 앞뒤가 안 맞는다.", this);
+        }
+
         // 카운터 창 계약 — 창을 여는 행은 Grab·Dash 뿐이고, 길이는 (0, 2] 여야 한다.
         // 🔴 길이 0 은 "창이 있다"고 저작해 놓고 실제로는 게이트가 붙잡을 시간이 0 인 상태라
         //    조용히 무효가 된다. 그래서 opensCounterWindow 와 짝이 맞는지 여기서 잡는다.
@@ -373,6 +386,25 @@ public class TwentyThreeBoss : MonsterBase
             }
             _anchors.Add(ci.name, ci);
         }
+    }
+
+    // ─── 어그로 주기 재선정 ────────────────────────────────────────────
+    float _lastRetargetTime;
+
+    /// <summary>
+    /// 주기가 지났고 교전 중 대기/추격이면 타깃을 다시 고른다.
+    /// 판정은 <see cref="BossAggroPolicy"/> 에 있다(EditMode 로 경계·억제를 고정).
+    /// </summary>
+    protected override bool ShouldReacquireTarget()
+    {
+        float interval = _boss != null ? _boss.aggroRetargetInterval : 0f;
+        if (!BossAggroPolicy.ShouldRetarget(State, Time.time - _lastRetargetTime, interval))
+            return false;
+
+        // 🔴 성립한 순간 시계를 리셋한다. 여기서 안 하면 base 가 매 틱 재탐색해
+        //    "주기 재선정"이 "상시 최근접 추적"이 된다 — 의도와 정반대다.
+        _lastRetargetTime = Time.time;
+        return true;
     }
 
     // hitboxAnchorName 도 문자열 규약이라 오타가 조용히 무시된다(정본 §10.3 경고).
@@ -1086,16 +1118,18 @@ public class TwentyThreeBoss : MonsterBase
     //    다음 JumpAttack 이 영원히 안 나온다")은 그 Int 로 클립을 넘기는 구조 때문에 생긴다.
     //    단계별 상태명 CrossFade(관용구 2)로 가면 그 함정이 아예 성립하지 않는다.
     //
-    // 🔴 **타겟은 최원거리 플레이어**다. 거리 무관 + 쿨만이 게이트면 10초마다 기계적으로 나와 읽히므로,
-    //    타겟 규칙이 이 공격의 의도를 만든다(팀장 확정).
+    // 🔴 **타겟은 행의 attackTargeting 이 정한다.** 거리 무관 + 쿨만이 게이트면 10초마다 기계적으로
+    //    나와 읽히므로, 타겟 규칙이 이 공격의 의도를 만든다(팀장 확정).
+    //    2026-09-03 이전에는 여기가 FindFarthestPlayer() 하드코딩이었고 SO 의 규칙 필드는
+    //    아무도 안 읽는 죽은 데이터였다 — 의도를 데이터로 되돌린 것이 그 정리다.
     void BeginJump()
     {
-        // 착지점 = 최원거리 플레이어의 발밑(바닥에 투영). 없으면 제자리.
+        // 착지점 = 이 공격이 노리는 대상의 발밑(바닥에 투영). 없으면 제자리.
         Vector3 point = transform.position;
-        Player farthest = FindFarthestPlayer();
-        if (farthest != null)
+        Transform aimed = ResolveAttackTarget(_currentEntry);
+        if (aimed != null)
         {
-            point = farthest.transform.position;
+            point = aimed.position;
 
             // 🔴 **플레이어 정확히 위에 내려앉으면 안 된다**(팀장 관찰 2026-08-13:
             //    "플레이어가 가만히 있으면 띄워지고 그 위로 올라가짐").
@@ -1222,7 +1256,28 @@ public class TwentyThreeBoss : MonsterBase
         }
     }
 
-    // 최원거리 플레이어(서버). base 의 _target 은 최근접 락온이라 쓸 수 없어 직접 훑는다.
+    /// <summary>
+    /// 이 공격이 <b>노릴 대상</b>을 행의 <c>attackTargeting</c> 으로 고른다(서버 전용).
+    ///
+    /// ⚠️ "누가 맞는가"는 여기서 안 정해진다 — 실제 피해는 히트박스·반경 판정이 따로 고른다
+    ///    (훅은 겹친 전원, Grab 은 포획 순간 반경 내 최근접, Dash 는 경로에 먼저 걸린 사람).
+    ///    이 함수가 정하는 것은 보스가 어디를 노리고 어디로 가느냐뿐이다.
+    ///
+    /// 대상을 못 찾으면 <c>null</c> 을 돌려준다 — 호출측이 폴백을 정한다(Jump 는 제자리).
+    /// </summary>
+    Transform ResolveAttackTarget(BossAttackEntry entry)
+    {
+        if (entry != null && entry.attackTargeting == BossAttackTargeting.FarthestPlayer)
+        {
+            Player farthest = FindFarthestPlayer();
+            return farthest != null ? farthest.transform : null;
+        }
+
+        // AggroTarget — base 가 물고 있는 대상. 주기 재선정은 ShouldReacquireTarget 이 돌린다.
+        return Target;
+    }
+
+    // 최원거리 플레이어(서버). 어그로 대상은 최근접 락온이라 이 규칙엔 쓸 수 없어 직접 훑는다.
     Player FindFarthestPlayer()
     {
         if (_aoeBuffer == null) _aoeBuffer = new Collider[16];

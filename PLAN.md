@@ -1,4 +1,93 @@
-# CURRENT PLAN — 보스 카운터 + 일반 몬스터 공격 커밋 보호 (2026-09-02)
+# CURRENT PLAN — 23호 어그로 재선정 + 공격별 타겟 규칙 재설계 (2026-09-03)
+
+상태: **설계 문답 완료 / 구현 계획 승인 대기 / 구현 전**
+
+## 목표
+
+23호의 타겟팅을 두 가지로 고친다.
+
+1. **어그로 고착 해소** — 지금은 처음 문 플레이어를 죽을 때까지 바꾸지 않는다. 교체 트리거가
+   사망·디스폰·리쉬 셋뿐이고 거리·시간·위협도가 없다. 3인전에서 한 명만 계속 물린다.
+2. **`targetRule` 폐기 후 재설계** — 필드는 있는데 읽는 코드가 0건인 죽은 데이터다. 반면
+   "점프는 최원거리"라는 의도는 `BeginJump` 하드코딩으로 살아 있다. 데이터 주도로 되돌린다.
+
+## 확정 스펙 (팀장 문답 2026-09-03)
+
+| # | 확정 |
+|---|---|
+| **A** | 어그로 전환은 **주기 재선정**으로 한다. 위협도 누적(피해량 기반)은 8월 확장으로 미룬다 |
+| **B** | "먼 플레이어가 안전하게 딜하는" 문제는 **어그로가 아니라 Jump·Dash 가 후열을 응징**해서 푼다. 어그로에 거리 가산을 넣으면 보스가 원거리만 쫓아 근접이 할 일이 없어진다 |
+| **C** | `targetRule`·`BossTargetRule` 은 **지우고** 실제로 소비되는 새 필드를 만든다 |
+| **D** | Dash 의 거리창 판정은 **현행 유지**(최근접 기준) |
+
+## 확정된 사실 (실측 · Codex 교차검증 완료)
+
+| 사실 | 근거 |
+|---|---|
+| `_target` 교체는 `FindNearestTarget()` 한 곳뿐. 해제는 `EnterReturn()`(리쉬) | `MonsterBase.cs:325` · `792` |
+| `IsTargetValid` = `MonsterTargeting.IsAttackable` — null·비활성·非Alive 만 무효. **거리를 안 본다** | `MonsterTargeting.cs:19` |
+| `targetRule` 런타임 읽기 **0건** | `BossDataSO.cs:33` 선언, 소비처 없음 |
+| Jump 최원거리는 `BeginJump` → `FindFarthestPlayer()` **하드코딩** | `TwentyThreeBoss.cs:1091` |
+| 🔴 **`_target` 과 "실제 맞는 사람"은 별개 체계다** — 훅·어퍼는 히트박스에 겹친 전원, Grab 은 포획 순간 반경 내 최근접 재탐색, Dash 는 경로에 먼저 걸린 사람 | `MonsterMeleeAttack.cs:62` · `TwentyThreeBoss.cs:864` · `1974` |
+
+🔴 마지막 항목이 이 작업의 성격을 정한다 — **어그로는 피해 분배를 바꾸지 않는다.**
+바뀌는 것은 보스의 위치·시선·압박 방향뿐이다.
+
+## 접근
+
+### 1. 주기 어그로 재선정 (23호 한정)
+
+`MonsterBase` 에 훅만 열고 정책은 23호가 갖는다 — 몹 8종·중간보스 3종의 락온 동작은 그대로 둔다.
+
+- `MonsterBase`: `protected virtual bool ShouldReacquireTarget() => false;`
+  `TickServer` 의 타깃 유지 분기에서 `if (!IsTargetValid(_target) || ShouldReacquireTarget())` 로 확장.
+- `TwentyThreeBoss`: 마지막 재선정 후 `aggroRetargetInterval` 이 지났으면 true.
+- 판정은 순수 함수로 분리해 EditMode 로 고정한다(`BossAggroPolicy.ShouldRetarget(경과, 간격)`).
+
+⚠️ **공격 도중에는 바꾸지 않는다.** `MonsterState.Attack` 중 타깃이 바뀌면 조준·체인·잡기 대상이
+흔들린다. 재선정은 Idle/Chase 에서만 성립시킨다.
+
+### 2. 공격별 타겟 규칙 (데이터 주도)
+
+- `BossAttackEntry.targetRule` 과 `enum BossTargetRule` **삭제**.
+- 신설 `enum BossAttackTargeting { AggroTarget, FarthestPlayer }` + 필드 `attackTargeting`.
+- `BeginJump` 의 `FindFarthestPlayer()` 하드코딩을 이 규칙 경로로 옮긴다.
+- 규칙은 **둘만** 둔다. "최근접"·"어그로 1위"는 지금 쓰는 데가 없어 넣지 않는다(죽은 데이터를
+  지우는 작업에서 새 죽은 데이터를 만들지 않는다).
+- `ValidateContract` 에 계약 추가: `FarthestPlayer` 는 Jump 행만.
+
+### 3. 저작
+
+`No23.asset` · `No23_Solo.asset` — `targetRule` 키 제거(Unity 재직렬화), `attackTargeting` 저작,
+`aggroRetargetInterval` 신설(초기값 **8초** — 플레이 튜닝 대상).
+
+## 범위 밖
+
+- 위협도(피해량) 누적 어그로 — 8월 확장.
+- 일반 몹·중간보스의 타겟팅 — `MonsterBase` 기본값을 바꾸지 않는다.
+- 피해 분배 규칙 — 어그로는 이걸 안 건드린다(위 확정된 사실 참조).
+- Dash 거리창 판정(확정 D).
+
+## 리스크
+
+- 🔴 **공격 중 타깃 교체가 새는 것** — 잡기 체인·돌진 방향이 흔들린다. Attack 상태 가드가 이 작업의 핵심 안전장치다.
+- 어그로가 너무 자주 바뀌면 보스가 우왕좌왕한다 — 간격은 데이터 노브로 두고 Play 로 정한다.
+- `targetRule` 삭제 시 에셋에 고아 키가 남는다 — Unity 재직렬화로 정리되며, `isGroggyAttack` 때와 같은 부류다(무해).
+
+## 검증
+
+1. EditMode — 재선정 판정(경계·공격 중 억제), 타겟 규칙 해석, 에셋 저작값.
+2. 컴파일 0에러 + 전투 EditMode 전체 통과.
+3. Play(단독) — 어그로가 주기적으로 바뀌는가 / 공격 도중에는 안 바뀌는가 / 점프가 여전히 후열을 노리는가.
+4. **MPPM 2인** — Task 6 과 함께 검증한다(팀원 일정 조율 후).
+
+## 완료 조건
+
+전 항목 컴파일·테스트 통과 + Play 검증 + `targetRule` 잔재 0건(코드·에셋) + Codex 교차검증 반영.
+
+---
+
+# 이전 PLAN — 보스 카운터 + 일반 몬스터 공격 커밋 보호 (2026-09-02, Task 6 MPPM 미검증)
 
 상태: **설계 승인 완료 / 구현 계획 잠금 / 구현 전**
 

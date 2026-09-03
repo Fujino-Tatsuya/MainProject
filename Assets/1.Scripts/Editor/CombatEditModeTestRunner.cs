@@ -21,7 +21,8 @@ internal static class CombatEditModeTestRunner
     {
         "^MonsterHitReactionPolicyTests",
         "^BossCounter",  // BossCounterWindupGateTests / BossCounterProgressTests / BossCounterDataTests
-        "^BossOpening"   // BossOpeningAttackPolicyTests
+        "^BossOpening",  // BossOpeningAttackPolicyTests
+        "^BossAggro"     // BossAggroPolicyTests
     };
 
     const string Tag = "[CombatTests]";

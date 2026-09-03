@@ -44,5 +44,15 @@ public sealed class BossCounterDataTests
         // 송전기 전멸은 기믹을 깬 보상이라 일반 카운터(0.5)보다 길다.
         // 1.0 은 체감이 부족해 1.5 로 올렸다(팀장 Play 확정 2026-09-03).
         Assert.That(data.chargeClearGroggyDuration, Is.EqualTo(1.5f));
+
+        // 🔴 최원거리 타겟은 Jump 전용이다. 이 규칙의 전신(targetRule)은 아무도 안 읽는 죽은
+        //    데이터였다가 2026-09-03 에 교체됐다 — 같은 일이 반복되지 않게 저작을 고정한다.
+        Assert.That(
+            data.attacks.Where(a => a.attackTargeting == BossAttackTargeting.FarthestPlayer)
+                .Select(a => a.attackId),
+            Is.EquivalentTo(new[] { BossAttackId.Jump }));
+
+        // 어그로 주기 재선정 — 0 이면 기능이 꺼져 "처음 문 대상을 끝까지" 로 되돌아간다.
+        Assert.That(data.aggroRetargetInterval, Is.EqualTo(8f));
     }
 }

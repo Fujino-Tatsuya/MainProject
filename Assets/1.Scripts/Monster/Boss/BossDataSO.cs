@@ -28,9 +28,11 @@ public class BossAttackEntry
     [Tooltip("거리창을 무시한다(어디서든 후보). JumpAttack 전용 — '거리 무관 + 최원거리 타겟'이 확정 스펙이다.")]
     public bool ignoreDistanceWindow = false;
 
-    [Tooltip("[S6] 타겟 규칙. Jump 는 FarthestPlayer(최원거리 플레이어)로 잡는다. " +
-             "쿨만이 게이트면 10초마다 기계적으로 나와 읽히므로 타겟 규칙이 의도를 만든다.")]
-    public BossTargetRule targetRule = BossTargetRule.CurrentTarget;
+    [Tooltip("[S6] 이 공격이 노릴 대상. AggroTarget = 지금 어그로가 물린 대상, " +
+             "FarthestPlayer = 최원거리 플레이어(Jump 전용). " +
+             "🔴 '누가 맞는가'는 이걸로 안 정해진다 — 실제 피해는 히트박스·반경 판정이 따로 고른다. " +
+             "이 값이 정하는 것은 보스가 어디를 노리고 어디로 가느냐다.")]
+    public BossAttackTargeting attackTargeting = BossAttackTargeting.AggroTarget;
 
     [Tooltip("가중치 룰렛 비중. 후보들 가중치 합에서 비율로 뽑는다. 0 이면 절대 안 나온다.")]
     [Min(0f)] public float weight = 10f;
@@ -59,11 +61,15 @@ public class BossAttackEntry
     public string hitboxAnchorName = "";
 }
 
-// 공격의 타겟 선정 규칙. [S6]
-public enum BossTargetRule
+// 공격이 노릴 대상. [S6]
+//
+// 🔴 값 추가는 끝에만(직렬화 정수). 그리고 **쓰는 데가 생길 때만** 추가할 것 —
+//    이 enum 의 전신(BossTargetRule)은 아무도 읽지 않는 죽은 데이터로 남아 있다가
+//    2026-09-03 에 제거됐다. 그때 Jump 의 "최원거리" 의도는 하드코딩으로만 살아 있었다.
+public enum BossAttackTargeting
 {
-    CurrentTarget,   // base 가 잡고 있는 현재 타겟(최근접 락온)
-    FarthestPlayer,  // 최원거리 플레이어 — JumpAttack 스펙
+    AggroTarget,     // 지금 어그로가 물린 대상(base 의 _target)
+    FarthestPlayer,  // 최원거리 플레이어 — Jump 전용. 후열이 안전하게 딜하는 것을 응징한다
 }
 
 // 페이즈 진입 시 실행할 고정 시퀀스. [S7]
@@ -112,7 +118,7 @@ public class BossDataSO : MonsterDataSO
         new BossAttackEntry { attackId = BossAttackId.RightHook, animatorStateName = "", cooldown = 2.5f, minDistance = 0f, maxDistance = 3f,  weight = 30f, superArmor = true },
         new BossAttackEntry { attackId = BossAttackId.Upper,     animatorStateName = "", cooldown = 3f,   minDistance = 0f, maxDistance = 2.5f, weight = 12f, superArmor = true },
         new BossAttackEntry { attackId = BossAttackId.Grab,      animatorStateName = "", cooldown = 10f,  minDistance = 0f, maxDistance = 3.5f, weight = 15f, superArmor = true,  opensCounterWindow = true },
-        new BossAttackEntry { attackId = BossAttackId.Jump,      animatorStateName = "", cooldown = 10f,  ignoreDistanceWindow = true, targetRule = BossTargetRule.FarthestPlayer, weight = 15f, superArmor = true },
+        new BossAttackEntry { attackId = BossAttackId.Jump,      animatorStateName = "", cooldown = 10f,  ignoreDistanceWindow = true, attackTargeting = BossAttackTargeting.FarthestPlayer, weight = 15f, superArmor = true },
         new BossAttackEntry { attackId = BossAttackId.Dash,      animatorStateName = "", cooldown = 5f,   minDistance = 5f, maxDistance = 20f, weight = 20f, superArmor = true,  opensCounterWindow = true },
 
         // 🔴 아래 2행은 **weight 0** — 룰렛이 뽑지 않고 페이즈 시스템이 직접 트리거한다.
@@ -153,6 +159,11 @@ public class BossDataSO : MonsterDataSO
 
     [Tooltip("[S3] Break(그로기 카운트 최대 도달) 지속 시간(초). 일반 그로기는 base 의 groggyDuration 을 쓴다.")]
     [Min(0f)] public float breakDuration = 5f;
+
+    [Tooltip("어그로 재선정 주기(초). 0 이면 끈다(= 처음 문 대상을 끝까지 문다). " +
+             "🔴 base 의 락온은 사망·디스폰·리쉬로만 풀려서 3인전에서 한 명만 계속 물린다. " +
+             "공격 도중에는 바뀌지 않는다 — 조준·잡기 체인·돌진 방향이 흔들리기 때문(BossAggroPolicy).")]
+    [Min(0f)] public float aggroRetargetInterval = 8f;
 
     [Tooltip("[S7] 송전기(차징) 전멸 성공 시의 전체 행동 불능 시간(초). 일반 카운터 그로기(groggyDuration)와 " +
              "따로 두는 이유 — 기믹을 깬 보상이라 카운터 한 번보다 길어야 손맛이 산다(팀장 확정 2026-09-03). " +

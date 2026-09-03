@@ -323,8 +323,22 @@ public class MonsterBase : Unit
 
         // 타겟 락온: 유효한 타겟이 있으면 계속 유지한다(인지반경 밖으로 나가도 리쉬 전까진 추격).
         // 타겟이 없거나 무효(디스폰/비활성)일 때만 새로 탐색한다.
+        //
+        // 🔴 파생이 ShouldReacquireTarget 으로 **주기 재선정**을 얹을 수 있다(23호 어그로).
+        //    기본값이 false 라 몹 8종·중간보스 3종의 락온 동작은 그대로다.
         if (!IsTargetValid(_target))
+        {
             _target = FindNearestTarget();
+        }
+        else if (ShouldReacquireTarget())
+        {
+            // 🔴 **빈손이면 기존 타깃을 유지한다.** FindNearestTarget 은 detectionRadius 안만
+            //    훑는데, 락온 규약은 "인지반경 밖으로 나가도 리쉬 전까진 추격"이다.
+            //    빈손을 그대로 대입하면 인지반경~리쉬 사이(23호 기준 8~15m)를 달리던 추격이
+            //    재선정 순간 조용히 끊기고 보스가 Idle 로 빠진다.
+            Transform candidate = FindNearestTarget();
+            if (candidate != null) _target = candidate;
+        }
 
         if (_target == null)
         {
@@ -637,6 +651,20 @@ public class MonsterBase : Unit
     // Soul(유령) 플레이어는 활성 상태로 남으므로 null·active 검사만으로는 걸러지지 않는다.
     // 생명주기까지 봐야 사망 직전에 잡힌 타겟이 즉시 풀린다(MonsterTargeting).
     bool IsTargetValid(Transform t) => MonsterTargeting.IsAttackable(t);
+
+    /// <summary>
+    /// 지금 어그로가 물린 대상(읽기 전용). 파생이 조준·타겟 규칙에 쓴다.
+    /// 🔴 교체는 base 만 한다 — 파생이 직접 대입하면 락온·리쉬 규칙이 두 곳으로 갈린다.
+    /// </summary>
+    protected Transform Target => _target;
+
+    /// <summary>
+    /// 타겟이 <b>아직 유효한데도</b> 다시 고를 것인가. 기본 <c>false</c> = 지금까지의 락온 동작.
+    ///
+    /// 23호가 주기 어그로 재선정에 쓴다. 여기서 true 를 돌려주면 위 락온 분기가 타깃을
+    /// 새로 탐색한다 — 파생은 "언제 바꿀지"만 정하고 "어떻게 고를지"는 base 가 갖는다.
+    /// </summary>
+    protected virtual bool ShouldReacquireTarget() => false;
 
     protected virtual void StartAttack()
     {
