@@ -389,6 +389,11 @@ public class TwentyThreeBoss : MonsterBase
     }
 
     // ─── 어그로 주기 재선정 ────────────────────────────────────────────
+    //
+    // 🔴 시계는 **두 사건**에 묶여 있다(2026-09-03) — 그러지 않으면 "8초 주기"가 성립하지 않는다.
+    //    ① 전투 시작(OnServerLogicResumed) ② 어그로가 실제로 갈아탄 순간(AdoptAggro / ShouldReacquireTarget).
+    //    ⚠️ 초기값 0 을 그대로 두면 착지 시점에 `Time.time - 0` 이 이미 8초를 넘어 있어서
+    //       FSM 이 깨어난 **첫 틱**에 재선정이 돈다("내려오자마자 어그로가 튄다" — 팀장 관찰).
     float _lastRetargetTime;
 
     /// <summary>
@@ -409,6 +414,47 @@ public class TwentyThreeBoss : MonsterBase
         //    "주기 재선정"이 "상시 최근접 추적"이 된다 — 의도와 정반대다.
         _lastRetargetTime = Time.time;
         return true;
+    }
+
+    /// <summary>
+    /// 이 공격이 고른 대상을 <b>어그로로 승계</b>한다 — 점프·돌진 전용(서버).
+    ///
+    /// 🔴 왜 시계를 함께 리셋하는가 (2026-09-03 팀장 관찰 — "점프로 후열을 때리고 원래 대상으로
+    ///    돌아온다"): 승계만 하고 시계를 그대로 두면, 착지해 Idle 로 돌아온 순간 이미 만료된
+    ///    주기 재선정이 즉시 최근접(= 원래 대상)을 다시 물어 <b>승계가 한 프레임짜리</b>가 된다.
+    ///    "어그로가 바뀌었으면 그때부터 다시 8초"가 이 기능의 규약이다.
+    /// </summary>
+    void AdoptAggro(Transform t, string reason)
+    {
+        if (!AdoptTarget(t)) return;
+
+        _lastRetargetTime = Time.time;
+        Edit.Log($"[23호/어그로] {reason} → {t.name} 로 승계 (다음 주기 재선정까지 " +
+                 $"{(_boss != null ? _boss.aggroRetargetInterval : 0f)}초)", this);
+    }
+
+    // ─── 접촉 사거리 진입/이탈 ─────────────────────────────────────────
+    // 판정은 BossContactReachPolicy 에 있다(EditMode 로 경계를 고정). 여기는 상태만 들고 있다.
+    bool _inContactReach;
+
+    // 이탈 경계 = 접촉 행 거리창의 최댓값. 저작이 바뀌면 함께 따라와야 하므로 첫 사용 시 1회 계산한다
+    // (data·_boss 가 배선되기 전에 계산하면 0 이 박힌다 — 스폰 순서에 기대지 않는 편이 안전하다).
+    float _contactReachExit;
+
+    float ContactReachExit(BossAttackEntry[] rows)
+    {
+        if (_contactReachExit > 0f) return _contactReachExit;
+
+        // 하한은 attackRange 다 — 접촉 행이 하나도 없어도 이탈 경계가 진입 경계보다 좁아지지 않게.
+        float exit = data.attackRange;
+        for (int i = 0; i < rows.Length; i++)
+        {
+            if (!BossContactReachPolicy.IsContactRow(rows[i], data.attackRange)) continue;
+            if (rows[i].maxDistance > exit) exit = rows[i].maxDistance;
+        }
+
+        _contactReachExit = exit;
+        return _contactReachExit;
     }
 
     // hitboxAnchorName 도 문자열 규약이라 오타가 조용히 무시된다(정본 §10.3 경고).
@@ -444,6 +490,14 @@ public class TwentyThreeBoss : MonsterBase
     {
         base.OnServerLogicResumed();
         if (!IsServer) return;
+
+        // 🔴 **어그로 주기의 0초는 여기다**(2026-09-03). 이 훅은 BossEncounterDirector 가 착지·NavMesh
+        //    스냅을 끝낸 뒤 부르는 단일 전환점이라 "착지 완료 = 전투 시작"과 정확히 일치한다.
+        //    안 하면 초기값 0 때문에 첫 틱에 재선정이 돌아 어그로가 착지하자마자 튄다.
+        _lastRetargetTime = Time.time;
+
+        // 연출 동안의 접촉 상태는 의미가 없다 — 전투가 새로 시작되므로 "안 붙은" 상태에서 출발한다.
+        _inContactReach = false;
 
         BossAttackEntry[] rows = _boss != null ? _boss.attacks : null;
         if (rows == null) return;
@@ -482,6 +536,12 @@ public class TwentyThreeBoss : MonsterBase
         if (_weightBuffer == null || _weightBuffer.Length != rows.Length)
             _weightBuffer = new float[rows.Length];
 
+        // 🔴 접촉 사거리 진입/이탈을 여기서 갱신한다 — 이 함수는 Idle/Chase 마다 불리므로
+        //    "지금 붙어 있는가"를 관측할 수 있는 유일한 지점이다. 공격 도중에는 안 불리는데,
+        //    그 구간에 상태가 굳는 것은 의도한 것이다(후속타가 붙은 상태에서 이어져야 한다).
+        _inContactReach = BossContactReachPolicy.StaysInReach(
+            _inContactReach, dist, data.attackRange, ContactReachExit(rows));
+
         // 1) 게이트 3단: 페이즈 → 거리창 → 쿨다운. 셋 다 통과 + 가중치 > 0 인 것만 후보다.
         int candidates = 0;
         int fallbackSlot = NoAttack;
@@ -492,7 +552,16 @@ public class TwentyThreeBoss : MonsterBase
             BossAttackEntry e = rows[i];
             if (e == null || e.weight <= 0f) continue;
             if (CurrentPhase < e.allowedFromPhase) continue;
-            if (!e.ignoreDistanceWindow && (dist < e.minDistance || dist > e.maxDistance)) continue;
+
+            // 🔴 상한은 저작값이 아니라 **개시 상한**이다 — 접촉 공격은 attackRange 안까지 걸어
+            //    들어간 뒤에만 시작한다(허공 훅 차단). 붙은 뒤에는 저작값까지 계속 때린다.
+            //    돌진·점프는 접촉 행이 아니라 영향을 받지 않는다(BossContactReachPolicy 주석).
+            if (!e.ignoreDistanceWindow)
+            {
+                float max = BossContactReachPolicy.EffectiveMaxDistance(e, data.attackRange, _inContactReach);
+                if (dist < e.minDistance || dist > max) continue;
+            }
+
             if (!CooldownReady(i)) continue;
 
             _weightBuffer[i] = e.weight;
@@ -1133,6 +1202,13 @@ public class TwentyThreeBoss : MonsterBase
         Transform aimed = ResolveAttackTarget(_currentEntry);
         if (aimed != null)
         {
+            // 🔴 **노린 사람이 어그로를 가져간다**(2026-09-03 확정). 여기서 승계하지 않으면 착지 후
+            //    보스가 원래 대상에게 되돌아 달려가 "멀리 때리고 돌아온다"가 된다 — 후열을 응징하려고
+            //    후열을 노리게 만든 공격인데 압박이 안 남는다.
+            //    ⚠️ 체공 중에는 모델이 숨겨져 있어(SetModelVisibleClientRpc) 선딜 조준이 새 대상으로
+            //       돌아도 보이지 않는다. 착지점은 아래에서 이 aimed 로 이미 확정된다.
+            AdoptAggro(aimed, "점프 조준");
+
             point = aimed.position;
 
             // 🔴 **플레이어 정확히 위에 내려앉으면 안 된다**(팀장 관찰 2026-08-13:
@@ -1359,12 +1435,16 @@ public class TwentyThreeBoss : MonsterBase
         //    큰 원은 **더 연하게**(범위만 암시), 차오르는 원은 **더 진하게**(타이밍을 또렷하게).
         if (_telegraphFixed != null)
         {
+            // ⚠️ 이 1cm 로는 아레나 중앙 바닥판(보행면 +6cm)을 못 넘어 예고가 판에 묻힌다.
+            //    표준 간격까지 올려 봤다가 되돌렸다 — 시차 때문이다(GroundProbe.SurfaceOffset 주석).
+            //    데칼·스텐실 작업에서 함께 0 으로 간다.
             _telegraphFixed.transform.position = point + Vector3.up * 0.01f;
             _telegraphFixed.SetAlpha(_boss.jumpTelegraphOuterAlpha);
             _telegraphFixed.Show(radius, growTime);
         }
         if (_telegraphGrowing != null)
         {
+            // 차오르는 원은 고정 원보다 1cm 위 — 둘의 **상대** 순서만 이 1cm 가 정한다.
             _telegraphGrowing.transform.position = point + Vector3.up * 0.02f;
             _telegraphGrowing.SetAlpha(_boss.jumpTelegraphFillAlpha);
             _telegraphGrowing.ShowGrowing(0.1f, radius, growTime, 0f);
@@ -2050,6 +2130,13 @@ public class TwentyThreeBoss : MonsterBase
 
             _dashCarried = p;
 
+            // 🔴 **밀고 간 사람이 어그로를 가져간다**(2026-09-03 확정). 돌진은 조준 기준으로는 이미
+            //    어그로 대상에게 가므로 승계할 새 대상이 없다 — 실제로 압박을 받은 사람은 경로에
+            //    걸린 이 플레이어다. 돌진이 끝나면 보스가 그 옆에 서 있으니 어그로도 거기 남는다.
+            //    ⚠️ 헛돌면(캐리 미성립) 여기까지 오지 않으므로 어그로는 그대로다.
+            //    ⚠️ 방향(_dashDir)은 이미 고정돼 있고 히트도 나간 뒤라 조준이 흔들리지 않는다.
+            AdoptAggro(p.transform, "돌진 캐리");
+
             // 이제 끌고 가므로 목적지를 앞당겨 다시 잡는다 — 안 하면 대상이 벽 안에 낀다.
             _dashBlockedAhead = StartDashMove(
                 _dashDir, DashSpeedMul, DashMaxDistance, DashCarryFrontOffset + DashCarryWallMargin);
@@ -2311,7 +2398,10 @@ public class TwentyThreeBoss : MonsterBase
         if (GroundProbe.TryFindGround(p, 0, out RaycastHit ground, out _))
             p = new Vector3(p.x, GroundProbe.SurfaceY(ground), p.z);
 
-        _chargeAuraTelegraph.transform.position = p + Vector3.up * 0.03f;
+        // p 는 이미 표준 간격(GroundProbe.SurfaceY)이 들어간 값이다 — 여기서 더 올리지 않는다.
+        // 예전엔 +0.03 을 덧붙여 "표식보다 위"를 만들려 했지만, 그 순서는 높이가 아니라
+        // 표식 억제(아래)로 정한다(같은 위치의 투명 메시는 거리 정렬이 불안정하다).
+        _chargeAuraTelegraph.transform.position = p;
 
         // 🔴 **보스를 따라가게 붙인다**(2026-08-13). 판정은 매 틱 `transform.position` 기준인데
         //    그림은 한 번만 놓으면 보스가 움직인 만큼 **예고가 판정과 어긋난다**(차징 시작 직후
@@ -2319,6 +2409,15 @@ public class TwentyThreeBoss : MonsterBase
         //    ⚠️ 점프 예고를 자식으로 두면 안 되는 이유(보스가 체공 중 순간이동한다)는 여기 해당하지 않는다
         //       — 오라는 차징 동안만 살고, 그 사이 보스는 워프하지 않는다.
         _chargeAuraTelegraph.transform.SetParent(transform, worldPositionStays: true);
+
+        // 🔴 **차징 동안 앞뒤 표식을 숨긴다**(팀장 확정 2026-09-03: "빨간 장판만 보여야 한다").
+        //    ⚠️ 높이로 순서를 정하려 하면 안 된다 — 오라(바닥+0.08)가 표식(+0.04)보다 위인데도
+        //       표식이 보였다. 투명 메시 정렬은 **오브젝트 단위 카메라 거리**로 갈리고 이 둘은
+        //       **같은 위치(보스)** 에 있어 순서가 불안정하며, 장판이 반투명이라 아래가 비친다.
+        //    차징 중에는 카운터 창도 안 열리므로 표식이 주는 정보도 없다.
+        //    점프에서 쓰는 억제 경로와 같다(CrossFadeJumpStateClientRpc) — 둘은 동시에 못 일어난다.
+        DirectionIndicator?.SetSuppressed(true);
+
         // 차징은 최대 chargeTimeLimit 초 유지된다 — 그동안 계속 보여야 하므로 넉넉히 잡고,
         // 실제 종료는 HideChargeAuraClientRpc 가 한다.
         _chargeAuraTelegraph.Show(radius, ChargeTimeLimit + 2f);
@@ -2327,6 +2426,11 @@ public class TwentyThreeBoss : MonsterBase
     [ClientRpc]
     void HideChargeAuraClientRpc()
     {
+        // 🔴 **억제 해제는 아래 early return 보다 앞이다.** 예고가 이미 없는 경로(중복 종료·프리팹
+        //    미배선)에서 return 뒤에 두면 표식이 영구히 숨은 채로 남는다 — 켜는 쪽은 예고가 실제로
+        //    생겼을 때만, 끄는 쪽은 **항상** 돈다.
+        DirectionIndicator?.SetSuppressed(false);
+
         if (_chargeAuraTelegraph == null) return;
         Destroy(_chargeAuraTelegraph.gameObject);
         _chargeAuraTelegraph = null;

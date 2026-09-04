@@ -660,8 +660,34 @@ public class MonsterBase : Unit
     /// <summary>
     /// 지금 어그로가 물린 대상(읽기 전용). 파생이 조준·타겟 규칙에 쓴다.
     /// 🔴 교체는 base 만 한다 — 파생이 직접 대입하면 락온·리쉬 규칙이 두 곳으로 갈린다.
+    /// 파생이 갈아타야 할 때 쓰는 진입점은 <see cref="AdoptTarget"/> 하나뿐이다.
     /// </summary>
     protected Transform Target => _target;
+
+    /// <summary>
+    /// 어그로 대상을 <b>지금 이 대상으로 갈아탄다</b>(서버 전용). 파생이 쓰는 유일한 교체 진입점이다.
+    ///
+    /// 🔴 왜 base 에 있는가 — <c>_target</c> 대입을 한 곳에 모아 락온·리쉬 규칙이 갈리지 않게 한다.
+    ///    파생은 "언제 갈아탈지"만 정하고, 유효성 판정(<see cref="IsTargetValid"/> = 사망·유령·디스폰)은
+    ///    base 가 갖는다.
+    ///
+    /// 23호가 <b>점프·돌진</b>에서 쓴다(2026-09-03). 그 둘은 어그로 대상이 아닌 사람을 노리거나
+    /// 밀고 가는데, 끝난 뒤 압박이 원래 대상으로 되돌아가면 <b>"멀리 때리고 돌아온다"</b>가 된다.
+    ///
+    /// ⚠️ 주기 재선정과 달리 <b>여기서는 상태를 보지 않는다.</b> 공격 도중에 불리는 것이 정상이다
+    ///    (그 공격이 대상을 고른 순간이 곧 승계 시점이다). 조준이 흔들리지 않는 것은 호출처가
+    ///    보장한다 — 23호는 <c>FaceTargetWhileAttacking = false</c> 이고 방향이 이미 확정된 뒤에 부른다.
+    /// </summary>
+    /// <returns>실제로 갈아탔으면 true. null·같은 대상·무효한 대상이면 아무 일도 하지 않고 false.</returns>
+    protected bool AdoptTarget(Transform t)
+    {
+        if (!IsServer) return false;
+        if (t == null || t == _target) return false;
+        if (!IsTargetValid(t)) return false;
+
+        _target = t;
+        return true;
+    }
 
     /// <summary>
     /// 타겟이 <b>아직 유효한데도</b> 다시 고를 것인가. 기본 <c>false</c> = 지금까지의 락온 동작.

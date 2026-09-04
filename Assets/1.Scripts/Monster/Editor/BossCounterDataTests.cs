@@ -54,6 +54,18 @@ public sealed class BossCounterDataTests
 
         // 어그로 주기 재선정 — 0 이면 기능이 꺼져 "처음 문 대상을 끝까지" 로 되돌아간다.
         Assert.That(data.aggroRetargetInterval, Is.EqualTo(8f));
+
+        // 🔴 접촉 공격의 거리창은 **attackRange 보다 좁아서는 안 된다**(2026-09-03).
+        //    개시는 BossContactReachPolicy 가 attackRange 로 좁히므로, 저작값이 그보다 작으면
+        //    그 행은 "붙어도 못 나가는" 구간이 생긴다. 값 자체(훅 2.6 / 어퍼 2.4)는 실측 확정 전
+        //    잠정값이라 **고정하지 않는다** — 어그로 노브와 같은 판단이다. 관계만 고정한다.
+        foreach (BossAttackEntry contact in data.attacks.Where(
+                     a => BossContactReachPolicy.IsContactRow(a, data.attackRange)))
+        {
+            Assert.That(contact.maxDistance, Is.GreaterThanOrEqualTo(data.attackRange),
+                $"{contact.attackId} 의 거리창이 attackRange({data.attackRange})보다 좁다 — " +
+                "개시 게이트와 겹쳐 이 공격이 조용히 안 나온다");
+        }
         // 🔴 aggroAvoidsRepeatTarget 은 **일부러 고정하지 않는다.** MPPM 으로 후열 압박을 보며
         //    켜고 끄는 A/B 평가 중인 값이라, 계약으로 박으면 튜닝할 때마다 거짓 빨간불이 난다.
         //    확정되면 그때 여기에 기대값을 넣는다(2026-09-03).

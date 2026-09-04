@@ -58,7 +58,7 @@ MonoBehaviour:
     animatorStateName: LeftHook
     cooldown: 2.5
     minDistance: 0
-    maxDistance: 3.2
+    maxDistance: 2.6
     ignoreDistanceWindow: 0
     attackTargeting: 0
     weight: 30
@@ -72,7 +72,7 @@ MonoBehaviour:
     animatorStateName: RightHook
     cooldown: 2.5
     minDistance: 0
-    maxDistance: 3.2
+    maxDistance: 2.6
     ignoreDistanceWindow: 0
     attackTargeting: 0
     weight: 30
@@ -86,7 +86,7 @@ MonoBehaviour:
     animatorStateName: Uppercut
     cooldown: 3
     minDistance: 0
-    maxDistance: 2.8
+    maxDistance: 2.4
     ignoreDistanceWindow: 0
     attackTargeting: 0
     weight: 12
