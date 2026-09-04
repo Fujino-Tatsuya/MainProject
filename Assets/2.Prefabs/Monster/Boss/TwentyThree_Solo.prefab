@@ -606,6 +606,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BossDirectionIndicator
   arcMaterial: {fileID: 2100000, guid: 7b27a57664d778945a9e71ec8a5b3021, type: 2}
+  decalMaterial: {fileID: 2100000, guid: c3d3d2122c7238547b41939029544154, type: 2}
+  decalProjectionDepth: 4
+  decalAlpha: 0.85
   innerRadius: 1.6
   outerRadius: 2.6
   segmentsPerArc: 24

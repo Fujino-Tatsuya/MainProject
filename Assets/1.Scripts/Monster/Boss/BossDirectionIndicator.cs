@@ -167,7 +167,10 @@ public class BossDirectionIndicator : MonoBehaviour, IBossTelegraph
         if (boss == null) boss = transform;
 
         // 위치 = 보스 XZ + 찾은 바닥 Y(+간격). 절대 Y 상수 금지.
-        transform.position = new Vector3(boss.position.x, groundPoint.y + heightOffset, boss.position.z);
+        // 🔴 데칼은 **띄우지 않는다**(오프셋 0) — 표면에 투영되므로 띄울 이유가 없고, 띄우는 만큼
+        //    탑다운에서 밀려 보이는 시차가 이 작업의 원인이었다. 메시 경로만 heightOffset 을 쓴다.
+        float y = UseDecals ? groundPoint.y : groundPoint.y + heightOffset;
+        transform.position = new Vector3(boss.position.x, y, boss.position.z);
 
         // 회전 = yaw 만. 보스 애니가 루트를 기울여도 링은 눕는다.
         Vector3 forward = boss.forward;
@@ -235,6 +238,10 @@ public class BossDirectionIndicator : MonoBehaviour, IBossTelegraph
 
         if (_frontRenderer != null) _frontRenderer.enabled = visible;
         if (_backRenderer != null) _backRenderer.enabled = visible;
+
+        // 데칼도 같은 조건으로 끈다 — 억제·공중 숨김·사망 판정은 경로와 무관하게 하나다.
+        if (_frontDecal != null) _frontDecal.enabled = visible;
+        if (_backDecal != null) _backDecal.enabled = visible;
     }
 
     // ─── 생성 ─────────────────────────────────────────────────────────
@@ -244,12 +251,68 @@ public class BossDirectionIndicator : MonoBehaviour, IBossTelegraph
         return _boss is TwentyThreeBoss boss ? boss.Data : null;
     }
 
+    // ─── 데칼 모드 ─────────────────────────────────────────────────────
+    //
+    // 🔴 왜 데칼인가(2026-09-04, 1단계 검증 통과): 메시 호는 바닥에 **띄워야** z-fighting 을 피하는데,
+    //    띄운 만큼 탑다운에서 밀려 보이고(시차) 아레나 중앙 바닥판(보행면 +6cm)과 파일런에 묻혔다.
+    //    데칼은 표면에 투영되므로 시차 0 이고 단차·프롭을 타고 이어진다.
+    //
+    // ⚠️ 색은 **여기서도 재질이 출처다** — 텍스처를 만들 때 기존 재질의 `_BaseColor` 를 읽어
+    //    구워 넣는다(내장 데칼 셰이더에 색 프로퍼티가 없어 텍스처가 색을 들고 갈 수밖에 없다).
+    //    값을 코드에 복제하면 "색은 재질이 정한다"는 규약이 깨진다.
+    [Header("데칼 모드 — 재질을 배선하면 메시 대신 데칼로 그린다")]
+    [SerializeField]
+    [Tooltip("데칼용 재질(Shader Graphs/Decal). 비우면 기존 메시 경로로 그린다 — 되돌리기가 이 한 칸이다.\n" +
+             "🔴 Shader.Find 가 아니라 이 참조로 물려야 빌드에서 셰이더가 스트립되지 않는다.")]
+    Material decalMaterial;
+
+    [SerializeField, Min(0.5f)]
+    [Tooltip("데칼 투영 깊이(m). 아레나 프롭(송전기)을 덮을 만큼 커야 프롭 위로 이어진다.")]
+    float decalProjectionDepth = 4f;
+
+    [SerializeField, Range(0f, 1f)]
+    [Tooltip("데칼 알파. 🔴 재질 알파(0.45)를 그대로 쓰면 희미하다 — 내장 데칼 셰이더는 **알베도**를 " +
+             "칠해서 조명을 타기 때문이다(메시 경로는 Unlit 이라 조명과 무관했다). 1단계 실측으로 정한 값.")]
+    float decalAlpha = 0.85f;
+
+    bool UseDecals => decalMaterial != null;
+
+    UnityEngine.Rendering.Universal.DecalProjector _frontDecal;
+    UnityEngine.Rendering.Universal.DecalProjector _backDecal;
+    Texture2D _frontTexture;
+    Texture2D _backTexture;
+
     void BuildRenderers()
     {
+        if (UseDecals)
+        {
+            _frontDecal = CreateArcDecal("FrontArcDecal");
+            _backDecal = CreateArcDecal("BackArcDecal");
+            RebuildMeshesIfNeeded();
+            return;
+        }
+
         _frontRenderer = CreateArcRenderer("FrontArc");
         _backRenderer = CreateArcRenderer("BackArc");
         RebuildMeshesIfNeeded();
         ApplyColors();
+    }
+
+    UnityEngine.Rendering.Universal.DecalProjector CreateArcDecal(string childName)
+    {
+        var go = new GameObject(childName);
+        go.transform.SetParent(transform, false);
+
+        // 🔴 자식에 X+90 을 준다 — 프로젝터는 로컬 +Z 로 투영하므로 그 축이 아래를 봐야 한다.
+        //    이 회전이면 로컬 +Y 가 부모의 정면(+Z)이 되어, 텍스처의 +V 를 "보스 정면"으로 구울 수 있다.
+        //    부모(이 컴포넌트)는 yaw 만 들고 있으므로 보스가 돌면 호도 함께 돈다.
+        go.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+
+        var decal = go.AddComponent<UnityEngine.Rendering.Universal.DecalProjector>();
+        decal.material = new Material(decalMaterial);   // 인스턴스 — 애셋 오염 금지
+        decal.renderingLayerMask = DecalReceivers.Mask; // 캐릭터 제외는 이 마스크가 보장한다
+        decal.fadeFactor = 1f;
+        return decal;
     }
 
     MeshRenderer CreateArcRenderer(string childName)
@@ -292,6 +355,18 @@ public class BossDirectionIndicator : MonoBehaviour, IBossTelegraph
         float outer = Mathf.Max(inner + 0.05f, outerRadius);
         int seg = Mathf.Clamp(segmentsPerArc, 4, 64);
 
+        if (UseDecals)
+        {
+            RebuildDecals(front, back, inner, outer);
+
+            _builtFrontAngle = front;
+            _builtBackAngle = back;
+            _builtInner = innerRadius;
+            _builtOuter = outerRadius;
+            _builtSegments = seg;
+            return;
+        }
+
         // 전방 = 보스 forward(+Z) 중심 ±front / 후방 = 뒤(180°) 중심 ±back.
         _frontMesh = BuildArcMesh(_frontMesh, "BossFrontArc", -front, front, inner, outer, seg);
         _backMesh = BuildArcMesh(_backMesh, "BossBackArc", 180f - back, 180f + back, inner, outer, seg);
@@ -311,6 +386,96 @@ public class BossDirectionIndicator : MonoBehaviour, IBossTelegraph
         if (r == null || mesh == null) return;
         if (r.TryGetComponent(out MeshFilter mf))
             mf.sharedMesh = mesh;
+    }
+
+    // ─── 데칼: 환형 섹터를 텍스처로 구운다 ───────────────────────────────
+    //
+    // 메시(BuildArcMesh)와 **같은 각도 규약**을 쓴다 — +V(로컬 +Y) = 보스 정면 0°, 시계방향 +.
+    // 그래서 전방은 |각도| <= front, 후방은 |각도| >= 180 - back 이다(메시 판정과 1:1).
+    void RebuildDecals(float front, float back, float inner, float outer)
+    {
+        float size = outer * 2f;   // 프로젝터 발자국 = 외반경 지름
+
+        ApplyDecal(_frontDecal, ref _frontTexture, FrontMaterial, front, isBack: false, inner, outer, size);
+        ApplyDecal(_backDecal, ref _backTexture, BackMaterial, back, isBack: true, inner, outer, size);
+    }
+
+    void ApplyDecal(UnityEngine.Rendering.Universal.DecalProjector decal, ref Texture2D texture,
+                    Material colorSource, float halfAngle, bool isBack,
+                    float inner, float outer, float size)
+    {
+        if (decal == null) return;
+
+        decal.size = new Vector3(size, size, decalProjectionDepth);
+
+        // 색은 재질에서 읽는다(단일 출처). 알파만 데칼용 값으로 갈아탄다 — 위 decalAlpha 주석 참조.
+        Color color = colorSource != null && colorSource.HasProperty(BaseColorId)
+            ? colorSource.GetColor(BaseColorId)
+            : Color.red;
+        color.a = decalAlpha;
+
+        if (texture != null) Destroy(texture);
+        texture = BuildArcTexture(color, halfAngle, isBack, inner, outer, DecalTextureSize);
+
+        if (decal.material != null && decal.material.HasProperty(DecalBaseMapId))
+            decal.material.SetTexture(DecalBaseMapId, texture);
+    }
+
+    const int DecalTextureSize = 256;
+    static readonly int DecalBaseMapId = Shader.PropertyToID("Base_Map");
+    static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
+
+    /// <summary>
+    /// 환형 섹터 알파 마스크. 반경·각도 경계를 몇 픽셀/도 만큼 부드럽게 떨어뜨려 계단을 없앤다.
+    /// 🔴 각도 0 = +V(보스 정면). 메시 경로의 "+Z 기준 yaw(x = sin, z = cos)"와 같은 규약이다.
+    /// </summary>
+    static Texture2D BuildArcTexture(Color color, float halfAngleDeg, bool isBack,
+                                     float inner, float outer, int size)
+    {
+        var tex = new Texture2D(size, size, TextureFormat.RGBA32, false)
+        {
+            name = isBack ? "BossBackArcDecal" : "BossFrontArcDecal",
+            wrapMode = TextureWrapMode.Clamp,
+            filterMode = FilterMode.Bilinear,
+        };
+
+        float half = size * 0.5f;
+        float radiusFeather = outer * (2f / size) * 2f;   // 약 2픽셀
+        const float AngleFeather = 2f;                    // 도
+
+        var pixels = new Color32[size * size];
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float u = ((x + 0.5f) - half) / half;   // 로컬 +X = 보스 오른쪽
+                float v = ((y + 0.5f) - half) / half;   // 로컬 +Y = 보스 정면
+                float r = Mathf.Sqrt(u * u + v * v) * outer;
+
+                float a = color.a;
+
+                // 반경 밴드
+                a *= Mathf.Clamp01((r - inner) / radiusFeather);
+                a *= Mathf.Clamp01((outer - r) / radiusFeather);
+
+                // 각도 섹터 — 정면 0°, 후방 ±180°
+                float angle = Mathf.Abs(Mathf.Atan2(u, v) * Mathf.Rad2Deg);
+                float edge = isBack ? (angle - (180f - halfAngleDeg)) : (halfAngleDeg - angle);
+                a *= Mathf.Clamp01(edge / AngleFeather);
+
+                pixels[y * size + x] = new Color(color.r, color.g, color.b, Mathf.Clamp01(a));
+            }
+        }
+
+        tex.SetPixels32(pixels);
+        tex.Apply(false, false);
+        return tex;
+    }
+
+    void OnDestroy()
+    {
+        if (_frontTexture != null) Destroy(_frontTexture);
+        if (_backTexture != null) Destroy(_backTexture);
     }
 
     /// <summary>전방 반각(도). 🔴 카운터 판정과 **같은 값**을 쓴다 — 표시가 판정에 대해 거짓말할 수 없다.</summary>
@@ -391,7 +556,8 @@ public class BossDirectionIndicator : MonoBehaviour, IBossTelegraph
     // ⚠️ 색은 여기서 다루지 않는다 — 재질에 박혀 있다(위 ApplyColors 주석).
     void OnValidate()
     {
-        if (!Application.isPlaying || _frontRenderer == null) return;
+        if (!Application.isPlaying) return;
+        if (_frontRenderer == null && _frontDecal == null) return;
         RebuildMeshesIfNeeded();
     }
 #endif

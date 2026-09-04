@@ -202,7 +202,7 @@ MonoBehaviour:
   jumpLandingDamage: 0
   jumpHoverState: JumpHover
   jumpLandingState: JumpLanding
-  jumpTelegraphPrefab: {fileID: 5101064300646047659, guid: 703b2a15442ef56499ecba1ee0b9f2f2, type: 3}
+  jumpTelegraphPrefab: {fileID: 5997264177071607445, guid: a325fc2b60be455428b04ab67232fb24, type: 3}
   jumpLandSeparation: 1.2
   jumpKnockbackStrength: 5
   jumpTelegraphOuterAlpha: 0.12
@@ -239,7 +239,7 @@ MonoBehaviour:
   chargeAuraInterval: 1
   chargeAuraDamage: 20
   chargeAuraKnockbackStrength: 5
-  chargeAuraTelegraphPrefab: {fileID: 5101064300646047659, guid: 703b2a15442ef56499ecba1ee0b9f2f2, type: 3}
+  chargeAuraTelegraphPrefab: {fileID: 5997264177071607445, guid: a325fc2b60be455428b04ab67232fb24, type: 3}
   chargeMoveArriveDistance: 0.2
   chargeMoveSpeedMultiplier: 3
   chargeMoveTimeout: 4

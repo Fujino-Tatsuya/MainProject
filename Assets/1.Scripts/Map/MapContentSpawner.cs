@@ -76,7 +76,23 @@ public class MapContentSpawner : MonoBehaviour
                 // BossRoom 역할 존: 진입 트리거(서버 판정) + 범위 표시(전 피어) 부착 — PLAN §6.
                 // 존 프리팹은 비네트워크 규약이라 프리팹에 미리 넣지 않고 스폰 시 동적 부착한다.
                 if (p.Slot.AssignedRole == ZoneRole.BossRoom)
+                {
                     AttachBossEnterZone(zoneGo, isServer);
+
+                    // 바닥 표식·장판 데칼이 칠해질 표면 표시(전 피어) — 아레나 바닥과 프롭 전부.
+                    // 🔴 파일런도 포함해야 표식이 프롭 위로 이어진다(빼면 지금처럼 프롭이 표식을 가린다).
+                    //    캐릭터는 이 비트가 없어 자동으로 제외된다(DecalReceivers 주석 — 조명 사고 방지).
+                    int tagged = DecalReceivers.Tag(zoneGo);
+                    if (tagged == 0)
+                        Debug.LogWarning(
+                            $"[MapContentSpawner] {zoneGo.name}: 데칼 수신자로 표시할 렌더러가 0개다 — " +
+                            "보스 바닥 표식이 아무 표면에도 안 그려진다.", zoneGo);
+                    else
+                        // 🔴 성공도 남긴다 — 0건 경고만 있으면 "안 돌았다"와 "돌았는데 안 보인다"를
+                        //    구분할 수 없다(데칼은 실패해도 조용하다).
+                        Debug.Log($"[MapContentSpawner] {zoneGo.name}: 데칼 수신자 {tagged}개 표시 " +
+                                  $"(mask 0x{DecalReceivers.Mask:X})", zoneGo);
+                }
 
                 // 다리 개통 장치(ZoneL_typeB 등): 존 프리팹이 저작 데이터·로컬 연출을 들고 있고,
                 // 상태 복제·판정은 씬 상주 ZoneBridgeGateManager가 (SlotID, 패널 인덱스) 키로 맡는다.
