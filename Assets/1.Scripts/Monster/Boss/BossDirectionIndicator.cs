@@ -25,6 +25,12 @@ using UnityEngine;
 //    항상 "찾은 바닥 + 간격"으로 눕힌다(GroundProbe 규약).
 //    간격은 표준 0.05 보다 **의도적으로 낮은 0.04** 다 — AoE 장판(0.05)이 항상 위에 오게 해서
 //    같은 평면 투명 정렬 깜빡임을 없앤다.
+//    ⚠️ **정정(2026-09-03)**: 높이차는 "같은 평면 z-fighting"만 없앤다 — **그리는 순서를 정하지는
+//       않는다.** 투명 메시 정렬은 오브젝트 단위 카메라 거리로 갈리므로, 장판이 이 링과 **같은
+//       위치**(보스 발밑: 차징 오라·점프 예고)에 있으면 높이를 올려도 순서가 불안정하고,
+//       장판이 반투명이라 아래 링이 비쳐 보인다. 그 조합은 **억제로 끈다**(SetSuppressed) —
+//       차징은 ShowChargeAuraClientRpc, 점프는 CrossFadeJumpStateClientRpc 가 부른다.
+//       위치가 다른 장판(폭탄·불장판)은 거리 정렬이 정상 동작하므로 높이 관례만으로 충분하다.
 //
 // 🔴 **회전은 yaw 만** 가져온다. 보스 애니메이션이 루트를 기울이면 링이 같이 기울어진다.
 [DisallowMultipleComponent]
@@ -75,8 +81,13 @@ public class BossDirectionIndicator : MonoBehaviour, IBossTelegraph
 
     [Header("배치 / 예외 처리")]
     [SerializeField, Min(0f)]
-    [Tooltip("바닥 위로 띄우는 간격(m). 표준(GroundProbe.SurfaceOffset = 0.05)보다 살짝 낮게 둬서 " +
-             "AoE 장판이 항상 이 링 위에 그려지게 한다(같은 평면 투명 정렬 깜빡임 방지).")]
+    [Tooltip("바닥 위로 띄우는 간격(m). 표준(GroundProbe.SurfaceOffset)보다 1cm 낮게 둬서 " +
+             "같은 평면 z-fighting 을 없앤다.\n" +
+             "🔴 **이 값으로 바닥 단차를 넘으려 하지 말 것**(2026-09-03 팀장 확정). 아레나 중앙 " +
+             "바닥판이 보행면보다 6cm 높아서 링이 그 판에 묻히는데, 넘도록 올려 봤다가(0.11) " +
+             "탑다운 시차 때문에 되돌렸다. 그건 데칼·스텐실로 풀 문제이고 그때 이 값은 0 이 된다.\n" +
+             "⚠️ 이 값이 **장판과의 그리는 순서를 정하지는 않는다** — 보스 발밑 장판(차징 오라·" +
+             "점프 예고)과의 순서는 억제(SetSuppressed)로 정한다. 위 클래스 주석의 정정 참조.")]
     float heightOffset = 0.04f;
     [SerializeField, Min(0.05f)]
     [Tooltip("보스와 발밑 바닥의 높이 차가 이 값을 넘으면 숨긴다 — 점프 공격 등 공중 상태. " +
