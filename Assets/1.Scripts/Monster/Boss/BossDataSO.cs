@@ -253,8 +253,13 @@ public class BossDataSO : MonsterDataSO
              "⚠️ 슈퍼아머 대상은 밀리지 않는다(Unit.Knockback 이 차단한다).")]
     [Min(0f)] public float jumpKnockbackStrength = 9f;
 
-    [Tooltip("점프 예고 — **큰 원(고정, 최종 범위)** 의 알파. 연할수록 범위만 암시한다.")]
-    [Range(0f, 1f)] public float jumpTelegraphOuterAlpha = 0.12f;
+    [Tooltip("점프 예고 — **큰 원(고정, 최종 범위)** 의 알파. 연할수록 범위만 암시한다.\n" +
+             "🔴 데칼 전환(2026-09-04) 후 이 값의 **의미가 바뀌었다** — 재질 색의 알파를 갈아치우는 " +
+             "것이 아니라 `DecalProjector.fadeFactor` 다. 텍스처 알파(0.85)에 곱해지고, 데칼은 " +
+             "알베도라 조명까지 타므로 **같은 숫자가 예전보다 훨씬 연하게 보인다.**\n" +
+             "그래서 0.12 → 0.4 로 올렸다(팀장 Play: \"큰 원이 너무 안 보인다\"). 예전 값으로 " +
+             "되돌리려면 숫자가 아니라 **보이는 결과**를 기준으로 잡을 것.")]
+    [Range(0f, 1f)] public float jumpTelegraphOuterAlpha = 0.4f;
     [Tooltip("점프 예고 — **차오르는 작은 원** 의 알파. 진할수록 '언제 떨어지는가'가 또렷해진다.")]
     [Range(0f, 1f)] public float jumpTelegraphFillAlpha = 0.85f;
 

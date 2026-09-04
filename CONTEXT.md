@@ -93,6 +93,16 @@ Update this file when a term becomes important enough that future agents or team
     차징 오라는 이펙트로 바뀔 수 있고, 점프 예고는 현 상태 유지 + **착지 시 이펙트**.
     인수인계 지점은 `ApplyJumpLandingDamage` 의 `HideJumpTelegraphClientRpc()`(= 예고 종료 =
     착지 이펙트 시작)와 `Show/HideChargeAuraClientRpc` 다. 자세한 표는 [PLAN.md](PLAN.md).
+- 🔴 **보스방에 있던 클라가 "게임 시작 스폰 위치"로 복귀했다** (팀장 빌드 관찰 2026-09-04 · 원인 미확정)
+  - 2인 입장 후 잠깐 안 보는 사이에 **한 클라만** 보스방이 아니라 진입 시 스폰 위치로 돌아갔다.
+  - 팀장 회상: **낙사 복귀**에서도 "저장했던 위치가 아니라 스폰 위치로 돌아가는" 경우가 있었다 →
+    같은 뿌리(복귀 지점 선택)일 가능성이 있다.
+  - 🔴 **진단 데이터가 없다.** Development Build 의 `Player.log`(1.6MB)에 `BossTeleport`·스폰·복귀
+    키워드가 **0건**이다 — 그 계통이 전부 `Edit.Log` 로 찍고, `Edit.*` 는 `[Conditional("UNITY_EDITOR")]`
+    라 **빌드에서 호출이 사라진다**(교훈 #86). 다음에 재현하려면 **먼저 로거를 고쳐야 한다** —
+    `Edit` 에 `[Conditional("DEVELOPMENT_BUILD")]` 를 함께 붙이면 호출부 수정 0으로 개발 빌드에서 살아난다.
+  - 그 로그에 남아 있던 예외 2건은 별건이다: `ResultSceneManager.Start:24` · `LobbySceneManager.Start:77`
+    NullReference (로비·결과 씬 UI — 은희님 영역).
 - **스피너봇 평타 조기 판정** — 애니 시작 즉시 데미지가 나가 칼이 안 맞았는데 피격된다.
 - ✅ **23호 프리팹 중복 정리 완료 (2026-09-04).** 낡은 사본 `Assets/2.Prefabs/Wells&No.23/TwentyThree.prefab`
   (guid `1100cccaacdc1fe4ca3e1eb9680f8c75` · 앵커가 옛 규약 `LeftHookAttack`/`UpperAttack` 등)을 삭제하고

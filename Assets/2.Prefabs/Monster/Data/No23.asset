@@ -205,7 +205,7 @@ MonoBehaviour:
   jumpTelegraphPrefab: {fileID: 5997264177071607445, guid: a325fc2b60be455428b04ab67232fb24, type: 3}
   jumpLandSeparation: 1.2
   jumpKnockbackStrength: 5
-  jumpTelegraphOuterAlpha: 0.12
+  jumpTelegraphOuterAlpha: 0.4
   jumpTelegraphFillAlpha: 0.85
   chargeTimeLimit: 20
   chargeShieldGainPerSec: 0

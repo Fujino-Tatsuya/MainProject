@@ -179,7 +179,7 @@ MonoBehaviour:
   jumpKnockbackStrength: 9
   jumpKnockbackDuration: 0.3
   jumpKnockbackStagger: 0
-  jumpTelegraphOuterAlpha: 0.12
+  jumpTelegraphOuterAlpha: 0.4
   jumpTelegraphFillAlpha: 0.85
   chargeTimeLimit: 20
   chargeShieldGainPerSec: 0
