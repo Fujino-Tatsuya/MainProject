@@ -1275,6 +1275,10 @@ public class TwentyThreeBoss : MonsterBase
     // (예고가 판정에 대해 거짓말하지 않게 — 방향 표시기와 같은 원칙).
     void ApplyJumpLandingDamage(BossAttackEntry entry)
     {
+        // 🔴 **여기가 "예고 → 착지 이펙트" 인수인계 지점이다**(VFX 배선 자리 · 팀장 확정 2026-09-04).
+        //    예고는 이 줄에서 사라지고, 착지 이펙트는 이 시점부터 시작해야 겹치지 않는다.
+        //    같은 프레임에 데미지 판정도 나가므로(아래) 이펙트·판정·예고 종료가 한 지점에 모인다.
+        //    ⚠️ 이펙트를 다른 지점(애니 클립 이벤트 등)에 걸면 예고와 겹치거나 빈 프레임이 생긴다.
         HideJumpTelegraphClientRpc();
 
         int dmg = _boss.jumpLandingDamage > 0
@@ -2390,6 +2394,18 @@ public class TwentyThreeBoss : MonsterBase
         {
             GameObject go = Instantiate(_boss.chargeAuraTelegraphPrefab);
             go.TryGetComponent(out _chargeAuraTelegraph);
+
+            // 🔴 조용히 실패하지 않는다. 오라 프리팹을 이펙트로 갈아끼울 때(VFX 로드맵) 그 프리팹에
+            //    AoeTelegraph 가 없으면 여기서 아무 일도 안 일어나고 **아무 신호도 없다** —
+            //    "차징 범위가 안 보인다"만 남아 원인 찾기가 어려워진다. 점프 예고 쪽과 같은 규약이다.
+            if (_chargeAuraTelegraph == null)
+            {
+                Debug.LogError(
+                    $"{name}: chargeAuraTelegraphPrefab({go.name}) 에 AoeTelegraph 컴포넌트가 없다 — " +
+                    "차징 범위 예고가 표시되지 않는다. 이펙트로 교체하려면 그 프리팹도 같은 컴포넌트를 " +
+                    "갖거나(Show/Hide 규약), 이 호출부를 함께 바꿀 것.", this);
+                Destroy(go);
+            }
         }
         if (_chargeAuraTelegraph == null) return;
 
