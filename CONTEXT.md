@@ -7,58 +7,103 @@
 This file defines the shared vocabulary for the project. Keep it concise. It is not a full spec and should not contain implementation plans.
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
-## ▶▶ 다음 세션 시작점 — MPPM 2인 검증 (2026-09-03 종료)
+## ▶▶ 다음 세션 시작점 — 어그로 후속 3건 Play 재검증 (2026-09-03 종료)
 
-**브랜치 `feature/Boss23`** · 컴파일 0에러 · 전투 EditMode **40/40** · 백업 `backup/Boss23-local-20260902`
-**원격 대비 ahead** — 아직 푸시 안 함.
+**브랜치 `feature/Boss23`** · 컴파일 0에러 · EditMode **112/112**(전체 · 신규 `BossContactReachPolicyTests` 14건 포함) · 원격 미푸시
 
 ### 한 줄 상태
 
-보스 카운터(Task 1~5)와 어그로 재선정이 **코드·단독 Play 까지 완료**됐다.
-남은 것은 **MPPM 2인 검증** 하나이고, 팀원 일정에 맞춰 돌리기로 했다.
+어그로 재선정을 단독 Play 로 보니 결함 3건이 나왔다(착지 후 8초 미적용 · 허공 훅 · 점프 후 어그로 복귀).
+셋 다 원인을 코드에서 확정해 고쳤다. 남은 것은 **Play 재검증**이다 — 계획은 [PLAN.md](PLAN.md) 상단.
 
-### 🔴 다음 할 일 — MPPM 2인으로 한 번에 검증
+### 🔴 다음 할 일 — 단독 Play 4건 + MPPM
 
-**A. 카운터 (계획서 Task 6)**
-- 카운터 창 · **자세 홀드** · 그로기가 호스트/클라 **일치**하는가
-  🔴 자세 홀드는 각 피어의 로컬 애니메이터 상태다 — 단독 Play 로는 안 드러나는 결함이 여기서 나온다.
-- 홀드 중 처치·이탈에서 보스가 굳지 않는가 (단독은 확인 완료)
+| 확인 | 기대 동작 |
+|---|---|
+| 착지 후 어그로 | **8초가 지나서야** 첫 재선정. 내려오자마자 튀지 않는다 |
+| 훅 개시 거리 | **2.0m 안까지 걸어 들어간 다음** 훅. 가만히 선 대상에게 허공 훅이 없다 |
+| 점프 후 어그로 | 후열을 때린 뒤 **그 대상에게 압박이 남는다**(원래 대상으로 안 돌아간다) |
+| 돌진 캐리 | **밀고 간 플레이어**가 어그로를 가져간다 |
+| MPPM 2인 | 카운터 자세 홀드 호스트/클라 일치(계획서 Task 6) + 어그로 노브 A/B |
 
-**B. 어그로 (이번 세션 신규)**
-- 어그로가 실제로 도는가 — `aggroAvoidsRepeatTarget` **켜고 끄며 비교**
-  ⚠️ 끔(기본)이면 최근접을 다시 고르므로, 근접이 탱킹하는 구도에서는 어그로가 거의 안 돈다.
-  켜면 돌지만 **후열이 과하게 압박받을 수 있다** — 이걸 보고 확정한다.
-- 점프가 후열을 노리는가(이제 데이터 경로) / 개전 첫 행동이 접근 후 근접인가
+🔴 MPPM 이 아니면 안 드러나는 것 — **카운터 자세 홀드는 각 피어의 로컬 애니메이터 상태다.**
+단독 Play 로는 호스트/클라 불일치가 보이지 않는다(계획서 Task 6 의 핵심).
+
+⚡ **테스트 단축키 — `F5` = 보스방 진입 패드로 순간이동**(개발용, 2026-09-03 추가).
+스폰 지점에서 걸어가는 시간만 없애고 이후 흐름(카운트다운 → 산개 → 등장 연출)은 그대로 돈다.
+씬 배치 없이 런타임에 스스로 붙는다(`Assets/1.Scripts/Dev/DevBossEntranceWarp.cs`).
+⚠️ 빌드에서 쓰려면 **Development Build 를 켜야** 한다(`DEVELOPMENT_BUILD` 없으면 클래스 자체가 없다).
+쓰는 키 현황 — F1·F2 이펙트 HUD · **F5 보스방 워프** · F8 프로파일러 · F9 룩 A/B · F10 디버그 부활 · M 맵 · `[` `]` 카메라.
+
+승계는 로그로 확인된다 — `[23호/어그로] 점프 조준 → ... 로 승계` · `돌진 캐리 → ...`.
+⚠️ Play 로그는 MCP 콘솔이 아니라 `Editor.log` 로 본다(콘솔 버퍼 100개 — `droppedCount` 를 항상 볼 것).
+
+### 이번에 고친 것 — 증상 → 원인
+
+| 증상 | 원인 | 수정 |
+|---|---|---|
+| 내려오자마자 어그로가 튄다 | `_lastRetargetTime` 초기값 **0** → 착지 시점엔 `Time.time - 0` 이 이미 8초를 넘어 있다 | `OnServerLogicResumed`(= 착지·NavMesh 스냅 완료 지점)에서 시계 리셋 |
+| 훅 거리도 안 됐는데 때린다(허공) | 훅 거리창 3.2 > `attackRange` 2.0. `SeekBoss` 는 슬롯이 잡히는 즉시 멈춰 때린다 | `BossContactReachPolicy` — 접촉 공격은 `attackRange` 안에서만 **개시**, 붙은 뒤에는 저작값까지 유지 |
+| 점프로 후열을 때리고 원래 대상으로 돌아온다 | `ResolveAttackTarget` 이 **조준만** 정했다. 게다가 착지 시점에 주기 시계가 만료 상태였다 | `MonsterBase.AdoptTarget` 진입점 + 점프·돌진에서 승계 + 시계 리셋 |
+
+🔴 1번과 3번은 **같은 뿌리**였다 — 주기 시계가 "전투 시작"도 "어그로가 바뀐 순간"도 모르고 있었다.
+어그로 기능을 얹을 때 **시계를 어떤 사건에 묶을지**를 함께 정하지 않으면 이 두 결함이 같이 나온다.
 
 ### 튜닝 노브 — `No23.asset` · `No23_Solo.asset`
 
 | 노브 | 현재 | 비고 |
 |---|---|---|
-| `aggroRetargetInterval` | 8초 | 0 이면 기능 끔 |
-| `aggroAvoidsRepeatTarget` | **끔** | MPPM 으로 확정할 값 |
+| `aggroRetargetInterval` | 8초 | 0 이면 기능 끔. 착지·승계 시점부터 센다 |
+| `aggroAvoidsRepeatTarget` | No23 **켬** / Solo 끔 | MPPM 으로 확정할 값 |
+| 훅 `maxDistance` | 3.2 → **2.6** | **잠정값.** 개시는 게이트(2.0)가 정하고 이 값은 "붙은 뒤 유지 상한"만 정한다 |
+| 어퍼 `maxDistance` | 2.8 → **2.4** | 같음 |
 | `chargeClearGroggyDuration` | 1.5초 | 송전기 전멸 보상 |
 | Grab / Dash `counterWindowDuration` | 1.3 / 1.5 | Grab 준비 도달이 1.11초라 그보다 커야 홀드가 생긴다 |
 
-🔴 **이 값들은 `BossCounterDataTests` 가 고정한다.** 튜닝값을 확정하면 테스트 기대값도 함께 갱신할 것 —
-안 그러면 다음 실행에서 빨간불이 뜬다(저작이 조용히 흘러가지 않게 하려는 의도).
+🔴 `BossCounterDataTests` 는 **관계만** 고정한다(접촉 행 `maxDistance >= attackRange`). 거리창 값과
+`aggroAvoidsRepeatTarget` 은 A/B 중이라 기대값으로 박지 않았다 — 박으면 튜닝마다 거짓 빨간불이 난다.
 
-### 이 세션에 확립된 것
+### 어그로 계약 (변동 없음)
 
 - ✅ **어그로는 피해 분배를 바꾸지 않는다.** `_target` 은 "어디로 가고 누굴 보는지"만 정하고,
   누가 맞는지는 공간 판정이 따로 고른다(훅은 히트박스에 겹친 전원, Grab 은 포획 순간 반경 내
-  최근접, Dash 는 경로에 먼저 걸린 사람). 후열 압박은 어그로가 아니라 Jump·Dash 가 만든다.
-- ✅ **체인 예산은 데드락 안전망이지 정밀 종료 기준이 아니다.** 실제 길이와 같게 잡았더니
-  프레임 오차로 타임아웃이 났다 — `ChainBudgetSlack` 0.5초 도입 후 Grab·Dash 타임아웃 0건.
-- ⚠️ **Play 로그는 MCP 콘솔이 아니라 `Editor.log` 로 본다.** 콘솔 버퍼는 100개라 플레이어
-  대시 경고에 1900건 넘게 밀려난다. `unity_get_console_logs` 의 `droppedCount` 를 항상 볼 것.
-- ⚠️ **Unity Hub 를 오래 켜 두면 그 안의 Unity 가 낡은 PATH 를 물려받는다**(교훈 #81).
+  최근접, Dash 는 경로에 먼저 걸린 사람).
+- ✅ 주기 재선정은 `Idle`/`Chase` 에서만 성립한다(공격 중 타깃이 바뀌면 조준·체인이 흔들린다).
+  **승계는 예외다** — 그 공격이 대상을 고른 순간이 승계 시점이라 공격 도중에 일어난다.
+- ✅ **체인 예산은 데드락 안전망이지 정밀 종료 기준이 아니다**(`ChainBudgetSlack` 0.5초).
 
 ### 별건 (이번 작업과 무관, 미해결)
 
+- 🔴 **바닥 표식·장판 가려짐 — 원인이 둘이다** (팀장 Play 2026-09-03)
+  - 확정 스펙: **캐릭터(플레이어·보스) 아래 · 바닥과 장애물 위**. 로스트아크와 같은 그림이다.
+  - ⏳ **(a) 아레나 중앙 바닥판 6cm 단차 — 원인 확정, 미해결.** `bossroom.prefab` 의
+    `Env_Floor_bosscharger`(Y **0.56** · MeshCollider 포함)가 보행면(**0.50**) 위에 얹혀 있고,
+    띄우는 간격이 1~5cm 라 판 옆을 찍으면 장판이 판에 묻힌다. `GroundProbe` 마스크에 그 판도
+    들어가므로 **판 위를 찍으면 반대로 위로 나온다** → "같은 장판이 위로도 아래로도" 보인다.
+    🔴 **높이로 넘는 것은 팀장이 거부했다**(0.12 로 올려 봤고 되돌렸다 — 탑다운 시차가 "예고가
+    판정에 대해 거짓말하지 않는다"를 깬다). (b)와 **같은 수정으로 함께 풀린다** — 목표는 오프셋 0.
+  - ⏳ **(b) 키 큰 파일런 4개 — 남았다.** 표식·장판은 바닥에 눕힌 **투명 메시 + 일반 깊이 테스트**라,
+    송전기(`Env_Mv_bosscharger_upper.fbx` · 4개)가 깊이를 먼저 쓰면 그 픽셀에서 ZTest 에 걸려 사라진다.
+    이건 높이로 못 고친다(프롭이 캐릭터 키만큼 높다) — 아래 후보 참조.
+  - 🔴 **`ZTest Always` 단독은 답이 아니다** — 캐릭터 위에도 그려져 확정 스펙을 깬다
+    ([BossDirectionIndicator.cs](Assets/1.Scripts/Monster/Boss/BossDirectionIndicator.cs) 클래스 주석의 2026-08-13 결정).
+  - 측정해 둔 제약 2건: **URP Unlit 셰이더는 `_ZTest` 를 노출하지 않는다**(재질 값만으로는 불가,
+    전용 셰이더 필요) · **`Assets/99.Settings/PP_Renderer.asset` 의 `m_RendererFeatures` 가 빈 배열**
+    (데칼·RenderObjects 둘 다 없다 → 팀 공용 렌더러 애셋 변경이 필요하고 민경·은희와 겹친다).
+  - 후보: ① 전용 셰이더 + 스텐실(캐릭터 레이어를 먼저 찍고 표식은 `ZTest Always` + Stencil NotEqual)
+    ② URP 데칼 + Rendering Layers(정석이지만 링을 절차적 메시에서 데칼로 재설계).
+  - 🔴 **결정 대기 — 실측 사실·후보 비교·Codex 에게 묻는 것은 [PLAN.md](PLAN.md) 「결정 대기 — 바닥
+    표식·장판을 "바닥에 딱 붙여" 그리는 방법」 절에 있다.** 팀장이 Codex 와 함께 판단하라고 했다.
 - **스피너봇 평타 조기 판정** — 애니 시작 즉시 데미지가 나가 칼이 안 맞았는데 피격된다.
-- ~~`Grab 체인 Recovery 타임아웃`~~ → **해소됨**. 원인은 체인 예산 여유 부족이었다.
-
----
+- 🔴 **23호 프리팹이 두 개다.** 실사용은 `Assets/2.Prefabs/Monster/Boss/TwentyThree.prefab`
+  (모든 씬에 배치된 것 · 히트박스 앵커 `Hand_L`/`Hand_R`/`DashBody`). `Assets/2.Prefabs/Wells&No.23/TwentyThree.prefab`
+  은 **낡은 사본**인데 `TwentyThreeBoss` + 같은 `No23.asset` 을 물고 있고 `DefaultNetworkPrefabs.asset`
+  에도 아직 등록돼 있어 진짜처럼 보인다 — 앵커 이름이 옛 규약(`LeftHookAttack` 등)이라 그쪽을 읽고
+  분석하면 없는 결함을 만들어낸다. **보스 프리팹을 열 때 경로를 먼저 확인할 것.**
+- ⚠️ **Unity Hub 를 오래 켜 두면 그 안의 Unity 가 낡은 PATH 를 물려받는다**(교훈 #81).
+- ⚠️ **배치모드 테스트는 `-quit` 를 주면 안 된다** — 테스트 전에 종료돼 XML 이 안 나오고
+  로그만 "Exiting batchmode successfully" 로 끝난다(거짓 초록의 전형). 에디터가 열려 있으면
+  프로젝트 잠금 때문에 아예 안 돈다(return code 1).
 
 ## 이전 시작점 — 넉백 세기 튜닝 (2026-08-18 밤 종료)
 

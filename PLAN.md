@@ -1,6 +1,200 @@
-# CURRENT PLAN — 23호 어그로 재선정 + 공격별 타겟 규칙 재설계 (2026-09-03)
+# CURRENT PLAN — 어그로 Play 검증 후속 3건 (2026-09-03)
 
-상태: **설계 문답 완료 / 구현 계획 승인 대기 / 구현 전**
+상태: **구현 완료 / Play 재검증 대기** — EditMode 112/112, 컴파일 0에러.
+
+팀장 Play 검증(단독)에서 어그로 재선정 자체는 "어색함 없이 바뀐다"로 확인됐고, 그 위에
+결함 3건이 나왔다. 셋 다 원인을 코드에서 확정했다.
+
+## 증상 → 원인 (전부 확정)
+
+| # | 증상 | 원인 | 자리 |
+|---|---|---|---|
+| 1 | 착지하고 내려오자마자 어그로가 튄다. 8초를 안 센다 | `_lastRetargetTime` 초기값 **0** → 착지 시점엔 `Time.time - 0` 이 이미 8초를 넘어 있다. FSM 이 깨어난 **첫 틱**에 조건이 참이 된다 | `TwentyThreeBoss.cs:392` |
+| 2 | 어그로가 바뀐 뒤, 가만히 선 플레이어에게 훅 거리까지 못 갔는데 때린다(허공) | 훅 행 `maxDistance` **3.2** > `attackRange` **2.0**. `SeekBoss` 는 슬롯이 잡히는 즉시 `StopAgent` → 공격이라, 접근 중 3.2m 를 지나는 순간 훅이 나간다. 히트박스는 손 본에 붙은 2.6m 큐브(반 1.3m)라 그 거리엔 안 닿는다 | `MonsterBase.cs:383` · `No23.asset` |
+| 3 | 점프로 후열을 때리고도 어그로가 원래 대상으로 돌아온다 | `ResolveAttackTarget` 은 **조준만** 정하고 `_target` 을 바꾸지 않는다. 게다가 착지 후 Idle 로 돌아온 순간 8초 타이머가 만료 상태면 즉시 최근접(=원래 대상)으로 재선정된다 | `TwentyThreeBoss.cs:1272` |
+
+🔴 1번과 3번은 **같은 뿌리**다 — 주기 시계(`_lastRetargetTime`)가 "전투가 시작된 시점"과
+"어그로가 실제로 바뀐 시점"을 모르고 있다. 시계를 그 두 사건에 묶는 것이 이 작업의 핵심이다.
+
+## 확정 스펙 (팀장 문답 2026-09-03)
+
+| # | 확정 |
+|---|---|
+| **A** | 8초는 **착지 완료 = 전투 시작** 부터 센다. 기준점은 `BeginCombatServer` → `OnServerLogicResumed` (착지·NavMesh 스냅이 끝난 뒤 부르는 단일 전환점) |
+| **B** | 허공 훅은 **개시 게이트 + 히스테리시스와 SO 거리창 하향을 둘 다** 넣는다 |
+| **C** | 접촉 공격은 `attackRange` 안까지 **걸어 들어간 뒤에만 개시**한다. 일단 붙은 뒤에는 행의 `maxDistance` 까지 계속 때린다 — "뒤로 빠지는 플레이어를 쫓아 치는" 저작 의도는 살린다 |
+| **D** | 어그로 승계는 **점프와 돌진 둘 다**. 둘 다 "갑자기 원거리에 공격을 하는" 행동이라 그 대상이 어그로를 가져가야 한다 |
+| **E** | 돌진의 승계 대상은 조준 대상이 아니라 **실제로 밀고 간 사람**(`_dashCarried`). 돌진은 이미 어그로 대상에게 가므로 조준 기준으로는 승계할 새 대상이 없다. 헛도면 어그로는 그대로 둔다 |
+| **F** | `FarthestPlayer` = Jump 전용 스펙은 **유지**. 돌진 행의 타겟 규칙은 건드리지 않는다 |
+
+## 접근
+
+### 1. 주기 시계를 두 사건에 묶는다 (증상 1·3)
+
+- `OnServerLogicResumed` 에서 `_lastRetargetTime = Time.time` — 이미 개전 쿨을 거는 자리다.
+  함께 `_inContactReach = false` 로 접촉 상태도 초기화한다(전투가 새로 시작되므로).
+- 어그로가 **승계로** 바뀔 때도 시계를 리셋한다. 안 하면 착지 직후 만료 상태인 타이머가
+  즉시 최근접으로 되돌려 승계가 한 프레임짜리가 된다 — 증상 3의 절반이 이것이다.
+
+### 2. 어그로 승계 (증상 3)
+
+`_target` 교체를 base 가 독점하는 규약을 지킨다 — `MonsterBase` 에 승계 진입점 하나만 연다.
+
+- `MonsterBase`: `protected bool AdoptTarget(Transform t)` — null·동일·`IsTargetValid` 실패면
+  아무 일도 하지 않고 false. 성공하면 `_target` 교체. `Target` 의 "교체는 base 만 한다" 주석을
+  이 진입점으로 갱신한다.
+- `TwentyThreeBoss`: `void AdoptAggro(Transform t, string reason)` — `AdoptTarget` 성공 시
+  `_lastRetargetTime = Time.time` + `Edit.Log`. 호출처 2곳:
+  - `BeginJump` — `ResolveAttackTarget` 이 고른 최원거리 대상
+  - `TryCarryDashTarget` — 캐리가 성립한 그 플레이어
+- ⚠️ 둘 다 Attack 중에 불린다. 보스는 `FaceTargetWhileAttacking = false` 이고
+  `FaceTargetDuringWindup` 은 히트 전까지만이라, 돌진은 이미 히트가 나간 뒤여서 방향이 흔들리지
+  않는다(`_dashDir` 도 이미 고정). 점프는 체공 중 모델이 숨겨져 있어 회전이 보이지 않는다.
+
+### 3. 접촉 사거리 개시 게이트 (증상 2)
+
+판정은 순수 함수로 빼서 EditMode 로 고정한다 — `BossAggroPolicy` 와 같은 방식.
+
+`BossContactReachPolicy`
+- `IsContactRow(entry, attackRange)` = `!ignoreDistanceWindow && minDistance <= attackRange`
+  → 훅·어퍼·잡기가 접촉 행. 돌진(min 5)·점프(거리창 무시)는 **아니다**.
+- `EffectiveMaxDistance(entry, attackRange, inReach)` = `inReach ? maxDistance : min(maxDistance, attackRange)`
+- `StaysInReach(inReach, dist, attackRange, exitDistance)` — `dist <= attackRange` 면 진입,
+  `dist > exitDistance` 면 이탈, 그 사이면 유지(깜빡임 방지).
+
+`TwentyThreeBoss`
+- `_inContactReach` bool + `_contactReachExit`(스폰 시 1회 = 접촉 행 `maxDistance` 의 최댓값).
+- `SelectAttackSlot` 진입부에서 상태를 갱신하고, 거리창 게이트에서 `EffectiveMaxDistance` 를 쓴다.
+- 🔴 몹 8종·중간보스 3종은 `SelectAttackSlot` 을 override 하지 않으므로 **무영향**이다.
+
+### 4. SO 거리창 하향 (증상 2, 잠정값)
+
+| 행 | 현재 | 변경 | 근거 |
+|---|---|---|---|
+| LeftHook / RightHook | 3.2 | **2.6** | 손 큐브 반 1.3m + 플레이어 반경 0.5 |
+| Uppercut | 2.8 | **2.4** | 클립이 수직이라 전방 리치가 더 짧다 |
+| Grab | 2.2 | 유지 | 실제 포획은 `grabRadius` 2.2 가 따로 판정한다 |
+
+⚠️ **이 값은 잠정이다.** 게이트가 본판이고(개시는 2.0m 안), 이 값은 "붙은 뒤 유지 상한"만
+정한다. 실측으로 확정할 때까지 `BossCounterDataTests` 에 기대값으로 **박지 않는다** —
+A/B 중인 값을 계약으로 박으면 거짓 빨간불이 난다(어그로 노브와 같은 판단).
+대신 **관계**만 고정한다: 접촉 행의 `maxDistance >= attackRange` (아니면 그 행은 영원히 못 나간다).
+
+## 변경 예정 파일
+
+- `Assets/1.Scripts/Monster/MonsterBase.cs` — `AdoptTarget` 추가, `Target` 주석 갱신
+- `Assets/1.Scripts/Monster/Boss/TwentyThreeBoss.cs` — 시계 리셋 · 승계 2곳 · 접촉 게이트
+- `Assets/1.Scripts/Monster/Boss/BossContactReachPolicy.cs` — 신규
+- `Assets/1.Scripts/Monster/Editor/BossContactReachPolicyTests.cs` — 신규
+- `Assets/1.Scripts/Monster/Editor/BossCounterDataTests.cs` — 접촉 행 관계 검증 1건 추가
+- `Assets/2.Prefabs/Monster/Data/No23.asset` · `No23_Solo.asset` — 거리창 하향 (두 변형 동시)
+
+## 위험과 대응
+
+| 위험 | 대응 |
+|---|---|
+| 승계 + `aggroAvoidsRepeatTarget` 이 겹쳐 어그로가 8초보다 빠르게 돈다 | 의도된 결과다(점프·돌진이 후열을 응징하는 확정 스펙 B). 과하면 노브로 끈다 — MPPM 에서 볼 항목에 추가 |
+| 게이트 때문에 보스가 2.0m 밖에서 아무것도 안 하고 서 있는다 | 접근 분기는 그대로다(`dist > attackRange` 면 Chase). 게이트는 "고를 수 있는가"만 좁히고, 못 고르면 기존대로 걸어 들어간다 |
+| `No23_Solo.asset` 을 빠뜨려 두 변형이 갈린다 | 이번엔 **둘 다** 고친다(지난 커밋에서 Solo 를 빼 둔 것이 남아 있다) |
+| 돌진 캐리 승계가 슈퍼아머 플레이어에서 안 도는다 | `BeginRestrainedByInstigator` 가 false 면 캐리가 성립하지 않으므로 승계도 없다 — 어그로는 그대로. 의도된 동작이다 |
+
+## 완료 조건
+
+1. 착지 후 **8초가 지나서야** 첫 어그로 재선정이 일어난다(그 전에는 절대 안 바뀐다).
+2. 어그로가 바뀐 뒤 보스가 **2.0m 안까지 걸어 들어간 다음** 훅을 시작한다. 가만히 선 플레이어에게
+   허공 훅이 나가지 않는다.
+3. 점프로 후열을 때리면 **그 대상이 어그로를 유지**한다(착지 직후 원래 대상으로 되돌아가지 않는다).
+4. 돌진으로 밀고 간 플레이어가 어그로를 가져간다.
+5. 전투 EditMode 그린 유지 + 신규 정책 테스트 통과, 컴파일 0에러.
+
+## 검증 계획
+
+- EditMode: `BossContactReachPolicyTests`(경계·이탈·접촉 행 판별) + 기존 40건 회귀.
+- 단독 Play: 착지 후 8초 측정(로그) · 훅 개시 거리 · 점프 후 어그로 유지.
+- MPPM 2인: 승계가 두 피어에서 같게 보이는지(어그로는 서버 전용 상태라 시선·이동으로만 드러난다) +
+  기존 카운터 검증 항목(계획서 Task 6).
+
+## 범위 밖
+
+- 위협도 누적 어그로(8월 확장), 돌진 행의 타겟 규칙 변경, 스피너봇 평타 조기 판정(별건),
+  `aggroAvoidsRepeatTarget` 최종값 확정(MPPM 후).
+
+# 결정 대기 — 바닥 표식·장판을 "바닥에 딱 붙여" 그리는 방법 (2026-09-03)
+
+> **Codex 의견 요청.** 팀장 지시로 이 항목만 두 에이전트가 함께 판단한다.
+> 이 세션에는 `agent-context-bridge` MCP 가 보이지 않아 파일로 남긴다(CLAUDE.md 폴백 규약).
+> Codex 는 아래 「Codex 에게 묻는 것」에 답을 이 문서에 덧붙일 것.
+
+## 확정 스펙 (팀장)
+
+1. 표식·장판은 **캐릭터(플레이어·보스 몸통) 아래**에 그려진다. 로스트아크와 같은 그림이다.
+2. 동시에 **바닥·장애물보다는 위**에 그려진다.
+3. 🔴 **높이 오프셋으로 풀지 않는다.** 띄우면 탑다운에서 장판이 바닥 기준으로 밀려 보이고
+   (시차), 그건 "예고가 판정에 대해 거짓말하지 않는다"는 규약을 깬다 — **팀장이 명시적으로 거부**했다.
+   즉 목표는 **오프셋 0**이다.
+
+## 지금 상태 (2026-09-03 되돌림 완료)
+
+- `GroundProbe.SurfaceOffset` **0.05**(0.12 로 올렸다가 되돌림) · 표식 `heightOffset` **0.04**
+  (프리팹 2개 포함 되돌림) · 점프 예고 +0.01/+0.02(원복) · 차징 오라는 표준(+0.03 제거, 0.08→0.05).
+- 차징 중 방향 표식 억제(`SetSuppressed`)는 **유지**한다 — 이 결정과 무관하게 맞는 수정이다.
+- 즉 아래 두 증상은 **미해결 상태로 되돌아갔다**:
+  - (a) 아레나 중앙 바닥판 6cm 단차 → 장판이 판에 묻힌다(판 위/옆에 따라 위로도 아래로도 보인다)
+  - (b) 송전기 프롭 4개 → 깊이 테스트로 표식·장판을 가린다
+
+## 실측해 둔 사실 (다시 파지 말 것)
+
+| # | 사실 |
+|---|---|
+| 1 | 대상 비주얼: `BossDirectionIndicator` 전/후방 호(**절차적 메시**, 24세그먼트, 각도=SO `counterFrontAngle`·반경 런타임 가변) · `AoeTelegraph`(`JumpTelegraph.prefab` — 점프 예고와 차징 오라가 같은 프리팹) · `AreaZone`(불장판) · 폭탄 예고 |
+| 2 | 재질 3개(`MA_BossDirection_Front`/`_Back`, `MA_AoeTelegraph_Red`) = URP Unlit · Transparent · `m_CustomRenderQueue: 2999` · `_ZWrite: 0` · **일반 ZTest** |
+| 3 | **URP Unlit 셰이더는 `_ZTest` 를 노출하지 않는다** → 재질 값만으로는 불가, 전용 셰이더/Shader Graph 필요 |
+| 4 | **`Assets/99.Settings/PP_Renderer.asset` 의 `m_RendererFeatures` 가 빈 배열** — 데칼도 RenderObjects 도 없다(둘 다 이 팀 공용 애셋 변경) |
+| 5 | 단차 출처: `bossroom.prefab` 의 `Env_Floor_bosscharger` = Y **0.56** + MeshCollider, 보행면은 **0.50**. `GroundProbe` 마스크(Default·Ground)에 이 판도 걸린다 |
+| 6 | 프롭: `Env_Mv_bosscharger`(visual) + `Env_Mv_bosscharger_upper`(**layer Enemy** · NetworkObject · BossChargingPylon) × 4, Y 0.55 · scale 0.24/0.28 |
+| 7 | 벽 오클루전 `WallOcclusionDither.shader` = `Queue=Geometry` · `ZWrite On` · 디더 클립 → 오클루더도 여전히 불투명 깊이 기록자다(재사용 불가) |
+| 8 | 이 URP 버전(`@97f77d4dda9a`)의 `DecalProjector` 에 **`renderingLayerMask` 가 있다**(`Runtime/Decal/DecalProjector.cs:174`) → 데칼 레이어 필터 가능 |
+| 9 | `DecalRendererFeature` 의 기법 옵션 = Automatic / **DBuffer** / **ScreenSpace**(`Runtime/RendererFeatures/DecalRendererFeature.cs`) |
+| 10 | 🔴 `BossDirectionIndicator` 클래스 주석에 **"`ZTest Always` 를 쓰면 플레이어 위에 그려져 깨진다"** 는 2026-08-13 결정이 박혀 있다 — 스텐실 없이 ZTest 만 바꾸면 스펙 위반 |
+
+## 후보 A — 전용 셰이더(ZTest Always) + RenderObjects 스텐실
+
+- 캐릭터를 스텐실에 찍고 표식은 `ZTest Always` + `Stencil Comp NotEqual`,
+  또는 **반대로 바닥·프롭을 찍고 `Comp Equal`**(이쪽이 벽·캐릭터 양쪽을 한 번에 막는다).
+- 깊이 비교가 없으므로 **오프셋 0 에서 z-fighting 이 원리적으로 없다** → 시차 0, 단차 자동 해결.
+- 절차적 메시를 그대로 쓴다 → 아트 작업 0, 재질 3개만 교체.
+- ⚠️ 파일런 `_upper` 가 **layer Enemy** 다. 캐릭터를 Player+Enemy 로 찍으면 **파일런도 표식을
+  가리게 되어 (b)가 안 고쳐진다.** 레이어 재배치 또는 마스크 분리가 선행 결정이다.
+- ⚠️ 커스텀 메커니즘이라 유지비가 있다(다음 사람이 스텐실 규약을 알아야 한다).
+
+## 후보 B — URP 데칼 + Rendering Layers (팀장 선호)
+
+- 표면에 **투영**되므로 시차 0 · 단차·경사에서 원리적으로 정확 · 표준 기능(장기 회귀 적음).
+- 캐릭터 제외는 `renderingLayerMask`(사실 8)로 한다.
+- 🔴 **최대 난점: 전/후방 호가 절차적 메시다.** 각도(`counterFrontAngle`)와 반경이 런타임 값이라
+  데칼로 옮기면 "가변 각도 아크"를 어떻게 만들지가 설계의 핵심이다
+  (① Decal Shader Graph 에 각도·반경 파라미터를 넣고 UV 로 마스킹 ② 텍스처 여러 장 ③ 메시 데칼).
+- ⚠️ DBuffer 기법은 DepthNormal 프리패스를 요구한다(사실 9) — 모바일 타일 렌더러에 불리하다고
+  패키지 주석이 경고한다. 이 프로젝트는 PC 전용이라 문제 없어 보이지만 **성능·플랫폼 판단 필요**.
+- ⚠️ 텍스처가 필요해지면 민경(VFX) 작업이 끼어든다.
+
+## Codex 에게 묻는 것
+
+1. **A/B 중 어느 쪽을 권하는가.** 특히 "가변 각도 아크를 데칼로 만드는 비용"을 어떻게 보는가 —
+   Decal Shader Graph 파라미터로 각도 마스킹이 실무적으로 되는가, 아니면 텍스처 세트가 필수인가?
+2. B 로 갈 때 **DBuffer vs ScreenSpace** 중 무엇을 권하는가. 이 프로젝트(URP · PC · 리슨서버,
+   벽 오클루전 디더 셰이더 병용)에서 걸릴 만한 지점이 있는가?
+3. A 로 갈 때 **스텐실 방향**(캐릭터를 찍고 NotEqual vs 바닥·프롭을 찍고 Equal) 중 어느 쪽이
+   이 프로젝트 레이어 구성(사실 6 — 파일런이 Enemy)에 맞는가?
+4. `PP_Renderer.asset` 에 피처를 처음 추가하는 것이라 **은희(파이프라인)·민경(VFX)** 과의 합의
+   범위를 어디까지 잡아야 한다고 보는가? (코어 인터페이스 변경 = 사전 합의 규약)
+
+> 결론이 나오면 이 절을 `PLAN.md` 의 정식 계획(목표·접근·리스크·검증)으로 승격하고 팀장 승인을 받는다.
+> 그 전에는 구현에 들어가지 않는다.
+
+# PREVIOUS PLAN — 23호 어그로 재선정 + 공격별 타겟 규칙 재설계 (2026-09-03, 구현 완료)
+
+상태: **구현 완료** — 아래 후속 3건이 이 계획의 Play 검증에서 나왔다.
 
 ## 목표
 
