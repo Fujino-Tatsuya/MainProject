@@ -13,10 +13,23 @@ public class BossEnterZoneVisual : MonoBehaviour
     private LineRenderer _line;
     private Material _material;
     private Color _current;
+    private Vector3 _centerLocal;
+
+    /// <summary>
+    /// 진입 패드 중앙의 월드 좌표(존 회전·스케일 반영). <b>y 는 존 바닥 기준</b>이다 —
+    /// <see cref="Setup"/> 이 받는 <c>centerLocal.y</c> 는 트리거 박스 중심 높이(2m)라 여기서 버린다.
+    ///
+    /// 🔴 이 값을 아는 것이 <b>모든 피어</b>에서 이 컴포넌트뿐이다. 트리거(BoxCollider +
+    ///    BossEnterTrigger)는 <see cref="MapContentSpawner"/> 가 <b>서버에만</b> 붙이므로
+    ///    클라에서는 패드를 찾을 방법이 없다. 개발용 워프(DevBossEntranceWarp)가 이걸 쓴다.
+    /// </summary>
+    public Vector3 PadCenterWorld => transform.TransformPoint(new Vector3(_centerLocal.x, 0f, _centerLocal.z));
 
     /// <summary>존 로컬 기준 테두리 생성. center/size는 트리거 박스와 동일 값 사용.</summary>
     public void Setup(Vector3 centerLocal, Vector2 sizeXZ)
     {
+        _centerLocal = centerLocal;
+
         _line = gameObject.AddComponent<LineRenderer>();
         _line.useWorldSpace = false;
         _line.loop = true;
