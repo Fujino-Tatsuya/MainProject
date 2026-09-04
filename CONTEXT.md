@@ -74,32 +74,33 @@ Update this file when a term becomes important enough that future agents or team
 
 ### 별건 (이번 작업과 무관, 미해결)
 
-- 🔴 **바닥 표식·장판 가려짐 — 원인이 둘이다** (팀장 Play 2026-09-03)
-  - 확정 스펙: **캐릭터(플레이어·보스) 아래 · 바닥과 장애물 위**. 로스트아크와 같은 그림이다.
-  - ⏳ **(a) 아레나 중앙 바닥판 6cm 단차 — 원인 확정, 미해결.** `bossroom.prefab` 의
-    `Env_Floor_bosscharger`(Y **0.56** · MeshCollider 포함)가 보행면(**0.50**) 위에 얹혀 있고,
-    띄우는 간격이 1~5cm 라 판 옆을 찍으면 장판이 판에 묻힌다. `GroundProbe` 마스크에 그 판도
-    들어가므로 **판 위를 찍으면 반대로 위로 나온다** → "같은 장판이 위로도 아래로도" 보인다.
-    🔴 **높이로 넘는 것은 팀장이 거부했다**(0.12 로 올려 봤고 되돌렸다 — 탑다운 시차가 "예고가
-    판정에 대해 거짓말하지 않는다"를 깬다). (b)와 **같은 수정으로 함께 풀린다** — 목표는 오프셋 0.
-  - ⏳ **(b) 키 큰 파일런 4개 — 남았다.** 표식·장판은 바닥에 눕힌 **투명 메시 + 일반 깊이 테스트**라,
-    송전기(`Env_Mv_bosscharger_upper.fbx` · 4개)가 깊이를 먼저 쓰면 그 픽셀에서 ZTest 에 걸려 사라진다.
-    이건 높이로 못 고친다(프롭이 캐릭터 키만큼 높다) — 아래 후보 참조.
-  - 🔴 **`ZTest Always` 단독은 답이 아니다** — 캐릭터 위에도 그려져 확정 스펙을 깬다
-    ([BossDirectionIndicator.cs](Assets/1.Scripts/Monster/Boss/BossDirectionIndicator.cs) 클래스 주석의 2026-08-13 결정).
-  - 측정해 둔 제약 2건: **URP Unlit 셰이더는 `_ZTest` 를 노출하지 않는다**(재질 값만으로는 불가,
-    전용 셰이더 필요) · **`Assets/99.Settings/PP_Renderer.asset` 의 `m_RendererFeatures` 가 빈 배열**
-    (데칼·RenderObjects 둘 다 없다 → 팀 공용 렌더러 애셋 변경이 필요하고 민경·은희와 겹친다).
-  - 후보: ① 전용 셰이더 + 스텐실(캐릭터 레이어를 먼저 찍고 표식은 `ZTest Always` + Stencil NotEqual)
-    ② URP 데칼 + Rendering Layers(정석이지만 링을 절차적 메시에서 데칼로 재설계).
-  - 🔴 **결정 대기 — 실측 사실·후보 비교·Codex 에게 묻는 것은 [PLAN.md](PLAN.md) 「결정 대기 — 바닥
-    표식·장판을 "바닥에 딱 붙여" 그리는 방법」 절에 있다.** 팀장이 Codex 와 함께 판단하라고 했다.
+- ✅ **바닥 표식·장판을 URP 데칼로 전환 — 1·2단계 완료** (2026-09-04, 팀장+팀원 육안 판정 통과)
+  - 확정 스펙: **캐릭터 아래 · 바닥과 장애물 위 · 오프셋 0**(높이로 띄우면 탑다운에서 밀려 보인다 =
+    "예고가 판정에 대해 거짓말한다"). 전환 대상은 **전/후방 표식 · 차징 오라 · 점프 예고**.
+  - 전환된 것: 표식(`BossDirectionIndicator` 데칼 경로) · 오라·점프 예고(`AoeTelegraph` 데칼 경로 +
+    `AoeDecalTelegraph.prefab`). 아크·원은 **코드 생성 텍스처**라 아트 작업이 0이다.
+  - 🔴 **되돌리기가 한 칸이다** — 표식은 `decalMaterial` 을 비우면 메시, 장판은 SO 프리팹 필드를
+    옛 것으로. 두 경로가 코드에 공존한다.
+  - 🔴 실측으로 확정된 것 3개(다시 파지 말 것):
+    ① 활성 렌더러는 `PC_Renderer.asset` 이고 **데칼 피처가 이미 켜져 있다**(`PP_Renderer`·`PP.asset` 은 죽은 애셋).
+    ② `m_SupportsLightLayers: 1` + 모든 라이트가 bit 0 → **캐릭터를 다른 비트로 옮기면 어두워진다.**
+    그래서 수신자(바닥·프롭)에 비트를 **OR 로 추가**한다(`DecalReceivers` · 지우기 금지).
+    ③ 아레나는 스폰 존이 아니라 **맵 밖 x≈500 씬 고정 배치**다 — 수신자 표시는
+    `BossArenaDecalReceiverInstaller`(런타임 자체 설치 · 전 피어)가 랜드마크 이름으로 찾아서 한다.
+  - ⚠️ 내장 데칼 셰이더는 **알베도**를 칠해 조명을 탄다(메시는 Unlit 이었다). 알파 0.85 로 우회했고,
+    어두운 구역에서 문제가 재발하면 **Emission 커스텀 Decal Shader Graph** 로 가야 한다.
+  - 🔴 **VFX 로드맵 경계**(팀장 2026-09-04): 불장판은 **이펙트로 대체 예정이라 데칼로 안 옮긴다.**
+    차징 오라는 이펙트로 바뀔 수 있고, 점프 예고는 현 상태 유지 + **착지 시 이펙트**.
+    인수인계 지점은 `ApplyJumpLandingDamage` 의 `HideJumpTelegraphClientRpc()`(= 예고 종료 =
+    착지 이펙트 시작)와 `Show/HideChargeAuraClientRpc` 다. 자세한 표는 [PLAN.md](PLAN.md).
 - **스피너봇 평타 조기 판정** — 애니 시작 즉시 데미지가 나가 칼이 안 맞았는데 피격된다.
-- 🔴 **23호 프리팹이 두 개다.** 실사용은 `Assets/2.Prefabs/Monster/Boss/TwentyThree.prefab`
-  (모든 씬에 배치된 것 · 히트박스 앵커 `Hand_L`/`Hand_R`/`DashBody`). `Assets/2.Prefabs/Wells&No.23/TwentyThree.prefab`
-  은 **낡은 사본**인데 `TwentyThreeBoss` + 같은 `No23.asset` 을 물고 있고 `DefaultNetworkPrefabs.asset`
-  에도 아직 등록돼 있어 진짜처럼 보인다 — 앵커 이름이 옛 규약(`LeftHookAttack` 등)이라 그쪽을 읽고
-  분석하면 없는 결함을 만들어낸다. **보스 프리팹을 열 때 경로를 먼저 확인할 것.**
+- ✅ **23호 프리팹 중복 정리 완료 (2026-09-04).** 낡은 사본 `Assets/2.Prefabs/Wells&No.23/TwentyThree.prefab`
+  (guid `1100cccaacdc1fe4ca3e1eb9680f8c75` · 앵커가 옛 규약 `LeftHookAttack`/`UpperAttack` 등)을 삭제하고
+  `DefaultNetworkPrefabs.asset` 등록 목록에서도 뺐다(참조는 자기 `.meta` 와 그 목록 2곳뿐이었고 씬 배치 0건).
+  **23호 프리팹은 이제 `Assets/2.Prefabs/Monster/Boss/TwentyThree.prefab` 하나뿐**이다
+  (앵커 `Hand_L`/`Hand_R`/`DashBody` = `No23.asset` 의 `hitboxAnchorName`).
+  `TwentyThree_Solo.prefab` 은 에디터 오소링이 쓰는 별개의 정상 변형이니 건드리지 말 것.
+  🔴 **검증 미완 — NGO 네트워크 프리팹 목록이 바뀌었다. MPPM 2인 접속 + 보스 스폰까지 한 번 확인해야 한다.**
 - ⚠️ **Unity Hub 를 오래 켜 두면 그 안의 Unity 가 낡은 PATH 를 물려받는다**(교훈 #81).
 - ⚠️ **배치모드 테스트는 `-quit` 를 주면 안 된다** — 테스트 전에 종료돼 XML 이 안 나오고
   로그만 "Exiting batchmode successfully" 로 끝난다(거짓 초록의 전형). 에디터가 열려 있으면

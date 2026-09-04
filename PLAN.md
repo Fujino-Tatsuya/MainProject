@@ -1,4 +1,192 @@
-# CURRENT PLAN — 어그로 Play 검증 후속 3건 (2026-09-03)
+# CURRENT PLAN — 바닥 표식·장판을 URP 데칼로 (2026-09-04, 승인 대기)
+
+상태: **1단계 검증 통과(팀장 + 팀원 교차 확인) / 2단계 구현 완료 / Play 검증 대기** — 컴파일 0에러.
+
+### 1단계 판정 결과 (2026-09-04) — 4/4 통과
+
+바닥판에서 안 끊김 · 파일런 위로 이어짐 · 캐릭터에 안 칠해짐 · 밝기 쓸 만함. **설계 성립.**
+
+가는 길에 두 번 막혔고 둘 다 로그로 풀었다(추측으로는 못 찾았다):
+- **수신자를 엉뚱한 데 붙였다.** `ZoneRole.BossRoom` 존은 **진입 패드**(`ZoneS_typeBossEnter`)고
+  아레나는 맵 밖 **x≈500 에 씬 고정 배치**였다 → 스폰 훅으로는 영원히 안 잡힌다.
+  🔴 아레나를 아는 기존 코드(`BossEncounterDirector`·`BossTeleportManager`)는 둘 다
+  `if (!IsServer) return` 이다 — 거기 붙였으면 **클라에서만 안 보이는** 더 고약한 버그가 됐다.
+  → `BossArenaDecalReceiverInstaller`(런타임 자체 설치 · 전 피어 · 랜드마크 이름으로 탐색).
+- **데칼이 조명을 탄다.** 내장 `Shader Graphs/Decal` 은 **알베도**를 칠하고 기존 메시는 **Unlit** 이라,
+  같은 알파에서 데칼만 희미했다. 알파 0.85 로 우회했고 **근본은 Emission 커스텀 그래프**다(보류).
+
+### 2단계 구현 내역 (2026-09-04)
+
+| 대상 | 방식 |
+|---|---|
+| 점프 예고 2개 | `jumpTelegraphPrefab` 을 데칼 프리팹으로 (SO 필드 1개 × 2 애셋). `SetAlpha`→`fadeFactor`, `ShowGrowing`→프로젝터 크기 애니로 이미 대응돼 있다 |
+| 전/후방 표식 | `BossDirectionIndicator` 에 데칼 경로 추가 — 자식 `DecalProjector` 2개를 런타임 생성(로컬 X+90), 환형 섹터를 **코드 생성 텍스처**로 구움. 각도 규약은 메시와 1:1(+V = 정면) |
+| 색 | 🔴 **기존 재질의 `_BaseColor` 를 읽어** 텍스처에 굽는다 — "색은 재질이 정한다" 규약 유지(값 복제 금지) |
+| 높이 | 데칼 경로는 `heightOffset` 을 **쓰지 않는다**(오프셋 0). 메시 경로만 쓴다 |
+| 되돌리기 | 표식은 `decalMaterial` 을 비우면 메시로, 장판은 SO 필드를 옛 프리팹으로 |
+
+신규 애셋: `MA_BossMarkerDecal.mat`. 보스 프리팹 2개에 `decalMaterial`·`decalProjectionDepth`·`decalAlpha` 배선.
+
+### 1단계 구현 내역 (2026-09-04)
+
+| 파일 | 내용 |
+|---|---|
+| `UniversalRenderPipelineGlobalSettings.asset` | 렌더링 레이어 1 이름 `Light Layer 1` → **`DecalReceiver`**(라벨만, 비트 불변) |
+| `Assets/1.Scripts/Rendering/DecalReceivers.cs` (신규) | 수신자 비트 **OR** 유틸. `LayerIndex = 1` · `Mask` · `Tag(root)`. 🔴 지우지 않고 더하기만 |
+| `MapContentSpawner.cs` | BossRoom 존 스폰 시 존 하위 렌더러 전부를 수신자로 표시(전 피어). 0개면 경고 |
+| `AoeTelegraph.cs` | 같은 오브젝트에 `DecalProjector` 가 있으면 **데칼 경로**로 분기. 반경 → `size(2r,2r,깊이)` · 알파 → `fadeFactor` · 모양 → **코드 생성 디스크 텍스처**(아트 0). 재질은 인스턴스 복제 |
+| `MA_AoeDecal_Red.mat` (신규) | `Shader Graphs/Decal` |
+| `AoeDecalTelegraph.prefab` (신규) | 회전 X+90(로컬 +Z = 아래) · `m_Offset.z = 0`(바닥을 걸치게 → 프롭 측면까지 칠함) · `m_Size = (2,2,4)` |
+| `No23.asset` · `No23_Solo.asset` | **`chargeAuraTelegraphPrefab` 만** 새 프리팹으로. `jumpTelegraphPrefab` 은 그대로(기존 메시 경로) |
+
+되돌리기 = SO 필드 한 개를 옛 프리팹으로 돌리면 끝이다(코드 두 경로가 공존한다).
+
+⚠️ 아직 **눈으로 본 것이 하나도 없다** — 아래 검증 계획의 1단계가 그것이고, 실패 모드별 대응은
+「Play 에서 볼 것」 절에 적어 두었다.
+
+### Play 에서 볼 것 (실패 모드 → 원인 → 한 줄 대응)
+
+| 보이는 것 | 원인 | 대응 |
+|---|---|---|
+| 오라가 **아예 안 보인다** | 투영 축이 반대 | 프리팹 회전 X `90` → `-90` |
+| 바닥엔 보이는데 **파일런엔 안 칠해진다** | 투영 깊이 부족 또는 파일런이 수신자가 아님 | `projectionDepth` 상향 / 콘솔의 "수신자 0개" 경고 확인 |
+| **플레이어 몸에도 칠해진다** | 데칼 레이어 마스크가 안 먹는다 | 🔴 설계 전제가 깨진 것 — 스텐실 폴백으로 전환 |
+| 어디에도 안 칠해진다 | 수신자 표시가 안 돌았다(존 역할이 BossRoom 아님) | 로그 확인 후 호출처 재배치 |
+
+## 목표
+
+표식·장판을 **바닥·프롭 표면에 붙여서** 그린다. 셋을 동시에 만족시키는 것이 목표다:
+
+1. **시차 0** — 높이로 띄우지 않는다(오프셋 0). 지금 0.01~0.08 로 띄운 것이 탑다운에서 밀려 보였다.
+2. **바닥 단차·프롭에 안 묻힌다** — 데칼은 표면에 투영되므로 6cm 바닥판이든 파일런이든 따라 붙는다.
+3. **캐릭터에는 안 칠한다** — 플레이어·보스 몸통 위로 표식이 올라오지 않는다.
+
+## 확정 스펙 (팀장)
+
+| # | 확정 |
+|---|---|
+| A | **캐릭터 아래 · 바닥과 장애물 위.** 로스트아크와 같은 그림 |
+| B | **높이 오프셋으로 풀지 않는다** — 시차는 "예고가 판정에 대해 거짓말하지 않는다"를 깬다 |
+| C | 방식은 **URP 데칼**(스텐실 안) |
+| D | 범위는 **보스 4종 먼저** — 전/후방 표식 2개 · 차징 오라 · 점프 예고 2개. 폭탄·불장판(`AreaZone`)은 2단계 |
+| E | 아크 모양은 **셰이더로 해석적으로** 그린다(텍스처 0 · 아트 작업 0) |
+
+## 실측 사실
+
+🔴 **어제 기록의 정정부터.** "렌더러에 피처가 하나도 없다(`PP_Renderer.asset`)"는 **틀렸다** —
+`PP_Renderer` / `PP.asset` 은 **아무도 안 쓰는 죽은 애셋**이다(23호 프리팹이 두 개였던 것과 같은 함정).
+
+| # | 사실 | 출처 |
+|---|---|---|
+| 1 | 활성 품질 레벨 = **PC**(`m_CurrentQuality: 1`) → `PC_RPAsset` → **`PC_Renderer.asset`** | `ProjectSettings/QualitySettings.asset` · `GraphicsSettings.asset` |
+| 2 | 🔴 **`DecalRendererFeature` 가 이미 붙어 있고 켜져 있다** — `technique: Automatic` · **`decalLayers: 1`** · `maxDrawDistance: 1000` · `dBuffer.surfaceData: AlbedoNormalMAOS` · `screenSpace.normalBlend: Low` | `PC_Renderer.asset` |
+| 3 | 같은 렌더러의 다른 피처: SSAO · `FogRendererFeature`(450) · `MaskBlurFeature`(550) · `PixelScanlineFeature`(600). 렌더링 모드 **Forward+** | 위 |
+| 4 | 🔴 **`m_SupportsLightLayers: 1`** (PC·Mobile 둘 다) — URP 에서 Rendering Layer 는 **Light Layer 와 같은 비트**다 | `PC_RPAsset` · `Mobile_RPAsset` |
+| 5 | 🔴 **모든 라이트가 bit 0 만 비춘다** — `4.MapScene` 라이트 `m_RenderingLayers: 1`, `bossroom.prefab` 라이트 3개는 키 자체가 없어 기본값(bit 0) | 씬·프리팹 |
+| 6 | 프로젝트 코드에서 `renderingLayerMask` 사용 **0건** — 이 상호작용을 아는 코드가 아직 없다 | `Assets/1.Scripts` 전수 |
+| 7 | 렌더링 레이어 이름이 URP 기본값(`Light Layer default`, `Light Layer 1`…) · `m_ValidRenderingLayers: 0` | `UniversalRenderPipelineGlobalSettings.asset` |
+| 8 | `DecalProjector.renderingLayerMask` 존재 · 데칼별 마스크가 드로우콜까지 실려 간다 | `Runtime/Decal/DecalProjector.cs:174` · `Entities/DecalCreateDrawCallSystem.cs` |
+
+## 🔴 핵심 설계 결정 — 비트는 **수신자에게 OR** 한다
+
+"캐릭터에 전용 레이어를 주고 데칼이 그 레이어를 피한다"는 **쓰면 안 된다.** 사실 4·5 때문이다 —
+캐릭터를 bit 0 에서 **옮기는** 순간 모든 라이트(bit 0)가 캐릭터를 비추지 않아 **캐릭터가 어두워진다.**
+
+그래서 방향을 뒤집는다:
+
+- **수신자**(보스룸 바닥·프롭)의 `renderingLayerMask` 에 `DecalReceiver` 비트를 **OR** 한다.
+- 데칼 프로젝터의 마스크는 **그 비트만**.
+- 결과: 아무 오브젝트도 bit 0 을 **잃지 않으므로 조명은 무변경**이고, 캐릭터는 그 비트가 없어
+  자동으로 제외된다. 캐릭터 프리팹은 **한 개도 건드리지 않는다**(은희·민경 작업과 충돌 0).
+
+⚠️ 규약으로 박을 것: **이 시스템은 비트를 추가만 하고 절대 지우지 않는다.**
+
+## 접근
+
+### 1. 렌더링 레이어 1개 명명
+`UniversalRenderPipelineGlobalSettings.asset` 의 `Light Layer 1` → **`DecalReceiver`**.
+라벨만 바뀌는 변경이고(비트 값은 그대로), 인스펙터에서 마스크를 사람이 읽을 수 있게 하는 목적이다.
+
+### 2. 수신자 비트 부여 (런타임, 보스룸 존 한정)
+`MapContentSpawner` 가 BossRoom 역할 존을 스폰할 때 그 하위 렌더러 전부에 비트를 OR 한다
+(`AttachBossEnterZone` 옆에 같은 방식으로 붙인다 — 이미 트리거·링을 그렇게 달고 있다).
+- 존 프리팹·씬을 저작하지 않으므로 머지 충돌이 없고, 존이 재스폰되면 자동으로 다시 부여된다.
+- 🔴 파일런(`Env_Mv_bosscharger_upper`, layer **Enemy**)도 **수신자에 포함**한다 — 표식이 프롭
+  위로 이어져야 "장애물보다 위에"가 성립한다. 프롭을 빼면 지금과 같이 끊겨 보인다.
+
+### 3. Decal Shader Graph 1개 (해석적)
+UV → 극좌표로 반경·각도를 마스킹한다. 파라미터: `innerRadius` · `outerRadius` ·
+`startAngle` · `sweepAngle` · `color`(알파 포함). 이걸로 **도넛 조각(표식)과 원(장판)을 한 셰이더로** 낸다.
+- 각도는 지금도 SO `counterFrontAngle` 이 정하므로 그 값을 그대로 넘긴다.
+- 재질 인스턴스: 표식 전/후 2개 + 오라 1개 + 점프 예고 2개(연한 큰 원 · 진한 차오름).
+- Base Color + Alpha 만 쓴다(노멀·MAOS 미사용) → 데칼 비용 최소.
+
+### 4. 호출처 교체 (보스 4종)
+- `BossDirectionIndicator`: 절차적 메시 2개 → `DecalProjector` 2개. 높이 오프셋 **0**.
+  회전은 지금처럼 yaw 만, 억제(`SetSuppressed`)·공중 숨김·색 전환은 그대로 유지.
+- `AoeTelegraph`: 차징 오라·점프 예고를 프로젝터로. `ShowGrowing` 의 반경 애니는 셰이더
+  파라미터 애니로 옮긴다(지금은 스케일 애니).
+- 프로젝터 **볼륨 높이**는 파일런을 덮을 만큼(2~3m) 잡는다. 🔴 얇게 잡으면 프롭 측면에 안 칠해져
+  카메라에서 여전히 프롭이 표식을 가린다 — 데칼이 프롭을 덮는 것이 이 수정의 핵심이다.
+
+## 리스크와 대응
+
+| 리스크 | 대응 |
+|---|---|
+| 데칼이 **프롭 측면까지 칠한다** — 의도된 그림이지만 실제로 보면 판단이 갈릴 수 있다 | 프로토타입 1개로 먼저 눈으로 본다(아래 검증 1단계). 싫으면 프롭을 수신자에서 빼는 노브를 남긴다 |
+| `Automatic` 이 DBuffer 를 고르면 **DepthNormals 프리패스** 비용이 붙는다 | 프로파일러 HUD(F8)로 전후 비교. 필요하면 `ScreenSpace` + normalBlend Low 로 고정 |
+| MaskBlur·PixelScanline·Fog 와의 **패스 순서** 간섭 | 프로토타입에서 화면 확인. 세 피처의 주입 지점(450/550/600)이 데칼보다 뒤라 영향은 낮다 |
+| 벽 오클루전 디더와 겹치는 구간 | 오클루더가 디더로 클립될 때 그 픽셀의 데칼도 사라지는지 확인(같은 깊이 기반) |
+| 존 재스폰·씬 전환에서 비트 부여 누락 | 부여를 스폰 경로 한 곳에 두고, 누락 시 진단 로그를 남긴다 |
+| `Mobile` 품질 레벨로 바뀌면 설정이 다르다(`m_PrefilterWriteRenderingLayers: 1`) | 지금 미사용이라 범위 밖. 쓰게 되면 그때 같은 확인을 한다 |
+
+## 완료 조건
+
+1. 표식·장판이 **바닥과 같은 높이**에 그려진다(오프셋 0) — 밀려 보이지 않는다.
+2. 아레나 중앙 6cm 바닥판에서 **끊기지 않는다**(위/아래로 뒤집히는 현상 소멸).
+3. 파일런 4개 **위로 이어져 보인다**.
+4. 플레이어·보스 몸통에는 **칠해지지 않는다.**
+5. 조명이 **이전과 동일**하다(비트를 OR 만 했으므로 회귀가 없어야 한다 — 눈으로 확인).
+6. 컴파일 0에러 · 전투 EditMode 그린 유지.
+
+## 검증 계획
+
+- **1단계 프로토타입**: 차징 오라 하나만 데칼로 바꿔 단독 Play. 여기서 위 완료조건 2·3·4·5를 본다.
+  이 단계에서 그림이 아니면 설계를 되돌린다(나머지 3개를 안 건드린 상태라 비용이 작다).
+- **2단계**: 표식 2개 + 점프 예고 2개 전환. F8 로 프레임 비교.
+- **3단계**: MPPM 2인 — 표식은 각 피어 로컬 비주얼이라 호스트/클라 양쪽에서 본다.
+
+## 🔴 VFX 로드맵과의 경계 (팀장 확정 2026-09-04) — 이 계획의 종료 조건
+
+민경님 이펙트 작업이 진행 중이고, 그 계획이 이 데칼 작업의 **범위를 줄인다**:
+
+| 대상 | 앞으로 | 이 계획에서 |
+|---|---|---|
+| **불장판**(`AreaZone`) | **이펙트로 대체** | 🔴 **데칼로 전환하지 않는다.** 곧 사라질 것을 옮기는 건 순수 낭비다 |
+| **차징 오라** | 범위만 보여주고, **이펙트로 바뀔 수 있음** | 데칼 유지. 교체는 SO 필드 한 칸이라 그대로 넘긴다 |
+| **점프 예고** | **현 상태 유지** + 착지 시 이펙트 | 데칼 유지. 예고 종료 지점을 이펙트 시작점으로 넘긴다 |
+| 전/후방 표식 | 유지(교체 계획 없음) | 데칼 전환 완료 |
+
+**인수인계 지점 2곳** — 이펙트를 붙일 자리를 코드에 명시해 뒀다:
+- `ApplyJumpLandingDamage` 의 `HideJumpTelegraphClientRpc()` = **예고 종료 = 착지 이펙트 시작.**
+  같은 프레임에 데미지 판정도 나가므로 예고·판정·이펙트가 한 지점에 모인다. 다른 지점(애니 클립
+  이벤트 등)에 걸면 예고와 겹치거나 빈 프레임이 생긴다.
+- `ShowChargeAuraClientRpc` / `HideChargeAuraClientRpc` = 차징 범위 표시의 수명. 프리팹만 갈아끼우면
+  보스 코드는 안 건드린다.
+
+⚠️ **교체 시 함정**: 보스는 프리팹에서 `AoeTelegraph` 컴포넌트를 찾아 `Show/Hide` 를 부른다.
+이펙트 프리팹에 그 컴포넌트가 없으면 **아무 일도 안 일어난다.** 그래서 두 경로 모두 이제
+`LogError` 를 낸다(예전엔 오라 쪽이 조용히 실패했다) — 이펙트 프리팹은 같은 컴포넌트를 갖거나
+호출부를 함께 바꿔야 한다.
+
+## 범위 밖
+
+- `AreaZone`(불장판)·폭탄 예고 — **이펙트로 대체될 예정이라 전환하지 않는다**(위 경계 표).
+- 스텐실(`ZTest Always` + RenderObjects) 방식 — 데칼이 실패할 때의 폴백으로만 남긴다.
+- `PP_Renderer` / `PP.asset` 정리(죽은 애셋) — 별건.
+- 렌더링 레이어를 캐릭터 쪽에 부여하는 접근 — 위 「핵심 설계 결정」대로 **채택하지 않는다.**
+
+# PREVIOUS PLAN — 어그로 Play 검증 후속 3건 (2026-09-03, 구현 완료·커밋 3d552b9)
 
 상태: **구현 완료 / Play 재검증 대기** — EditMode 112/112, 컴파일 0에러.
 
@@ -118,79 +306,6 @@ A/B 중인 값을 계약으로 박으면 거짓 빨간불이 난다(어그로 �
 
 - 위협도 누적 어그로(8월 확장), 돌진 행의 타겟 규칙 변경, 스피너봇 평타 조기 판정(별건),
   `aggroAvoidsRepeatTarget` 최종값 확정(MPPM 후).
-
-# 결정 대기 — 바닥 표식·장판을 "바닥에 딱 붙여" 그리는 방법 (2026-09-03)
-
-> **Codex 의견 요청.** 팀장 지시로 이 항목만 두 에이전트가 함께 판단한다.
-> 이 세션에는 `agent-context-bridge` MCP 가 보이지 않아 파일로 남긴다(CLAUDE.md 폴백 규약).
-> Codex 는 아래 「Codex 에게 묻는 것」에 답을 이 문서에 덧붙일 것.
-
-## 확정 스펙 (팀장)
-
-1. 표식·장판은 **캐릭터(플레이어·보스 몸통) 아래**에 그려진다. 로스트아크와 같은 그림이다.
-2. 동시에 **바닥·장애물보다는 위**에 그려진다.
-3. 🔴 **높이 오프셋으로 풀지 않는다.** 띄우면 탑다운에서 장판이 바닥 기준으로 밀려 보이고
-   (시차), 그건 "예고가 판정에 대해 거짓말하지 않는다"는 규약을 깬다 — **팀장이 명시적으로 거부**했다.
-   즉 목표는 **오프셋 0**이다.
-
-## 지금 상태 (2026-09-03 되돌림 완료)
-
-- `GroundProbe.SurfaceOffset` **0.05**(0.12 로 올렸다가 되돌림) · 표식 `heightOffset` **0.04**
-  (프리팹 2개 포함 되돌림) · 점프 예고 +0.01/+0.02(원복) · 차징 오라는 표준(+0.03 제거, 0.08→0.05).
-- 차징 중 방향 표식 억제(`SetSuppressed`)는 **유지**한다 — 이 결정과 무관하게 맞는 수정이다.
-- 즉 아래 두 증상은 **미해결 상태로 되돌아갔다**:
-  - (a) 아레나 중앙 바닥판 6cm 단차 → 장판이 판에 묻힌다(판 위/옆에 따라 위로도 아래로도 보인다)
-  - (b) 송전기 프롭 4개 → 깊이 테스트로 표식·장판을 가린다
-
-## 실측해 둔 사실 (다시 파지 말 것)
-
-| # | 사실 |
-|---|---|
-| 1 | 대상 비주얼: `BossDirectionIndicator` 전/후방 호(**절차적 메시**, 24세그먼트, 각도=SO `counterFrontAngle`·반경 런타임 가변) · `AoeTelegraph`(`JumpTelegraph.prefab` — 점프 예고와 차징 오라가 같은 프리팹) · `AreaZone`(불장판) · 폭탄 예고 |
-| 2 | 재질 3개(`MA_BossDirection_Front`/`_Back`, `MA_AoeTelegraph_Red`) = URP Unlit · Transparent · `m_CustomRenderQueue: 2999` · `_ZWrite: 0` · **일반 ZTest** |
-| 3 | **URP Unlit 셰이더는 `_ZTest` 를 노출하지 않는다** → 재질 값만으로는 불가, 전용 셰이더/Shader Graph 필요 |
-| 4 | **`Assets/99.Settings/PP_Renderer.asset` 의 `m_RendererFeatures` 가 빈 배열** — 데칼도 RenderObjects 도 없다(둘 다 이 팀 공용 애셋 변경) |
-| 5 | 단차 출처: `bossroom.prefab` 의 `Env_Floor_bosscharger` = Y **0.56** + MeshCollider, 보행면은 **0.50**. `GroundProbe` 마스크(Default·Ground)에 이 판도 걸린다 |
-| 6 | 프롭: `Env_Mv_bosscharger`(visual) + `Env_Mv_bosscharger_upper`(**layer Enemy** · NetworkObject · BossChargingPylon) × 4, Y 0.55 · scale 0.24/0.28 |
-| 7 | 벽 오클루전 `WallOcclusionDither.shader` = `Queue=Geometry` · `ZWrite On` · 디더 클립 → 오클루더도 여전히 불투명 깊이 기록자다(재사용 불가) |
-| 8 | 이 URP 버전(`@97f77d4dda9a`)의 `DecalProjector` 에 **`renderingLayerMask` 가 있다**(`Runtime/Decal/DecalProjector.cs:174`) → 데칼 레이어 필터 가능 |
-| 9 | `DecalRendererFeature` 의 기법 옵션 = Automatic / **DBuffer** / **ScreenSpace**(`Runtime/RendererFeatures/DecalRendererFeature.cs`) |
-| 10 | 🔴 `BossDirectionIndicator` 클래스 주석에 **"`ZTest Always` 를 쓰면 플레이어 위에 그려져 깨진다"** 는 2026-08-13 결정이 박혀 있다 — 스텐실 없이 ZTest 만 바꾸면 스펙 위반 |
-
-## 후보 A — 전용 셰이더(ZTest Always) + RenderObjects 스텐실
-
-- 캐릭터를 스텐실에 찍고 표식은 `ZTest Always` + `Stencil Comp NotEqual`,
-  또는 **반대로 바닥·프롭을 찍고 `Comp Equal`**(이쪽이 벽·캐릭터 양쪽을 한 번에 막는다).
-- 깊이 비교가 없으므로 **오프셋 0 에서 z-fighting 이 원리적으로 없다** → 시차 0, 단차 자동 해결.
-- 절차적 메시를 그대로 쓴다 → 아트 작업 0, 재질 3개만 교체.
-- ⚠️ 파일런 `_upper` 가 **layer Enemy** 다. 캐릭터를 Player+Enemy 로 찍으면 **파일런도 표식을
-  가리게 되어 (b)가 안 고쳐진다.** 레이어 재배치 또는 마스크 분리가 선행 결정이다.
-- ⚠️ 커스텀 메커니즘이라 유지비가 있다(다음 사람이 스텐실 규약을 알아야 한다).
-
-## 후보 B — URP 데칼 + Rendering Layers (팀장 선호)
-
-- 표면에 **투영**되므로 시차 0 · 단차·경사에서 원리적으로 정확 · 표준 기능(장기 회귀 적음).
-- 캐릭터 제외는 `renderingLayerMask`(사실 8)로 한다.
-- 🔴 **최대 난점: 전/후방 호가 절차적 메시다.** 각도(`counterFrontAngle`)와 반경이 런타임 값이라
-  데칼로 옮기면 "가변 각도 아크"를 어떻게 만들지가 설계의 핵심이다
-  (① Decal Shader Graph 에 각도·반경 파라미터를 넣고 UV 로 마스킹 ② 텍스처 여러 장 ③ 메시 데칼).
-- ⚠️ DBuffer 기법은 DepthNormal 프리패스를 요구한다(사실 9) — 모바일 타일 렌더러에 불리하다고
-  패키지 주석이 경고한다. 이 프로젝트는 PC 전용이라 문제 없어 보이지만 **성능·플랫폼 판단 필요**.
-- ⚠️ 텍스처가 필요해지면 민경(VFX) 작업이 끼어든다.
-
-## Codex 에게 묻는 것
-
-1. **A/B 중 어느 쪽을 권하는가.** 특히 "가변 각도 아크를 데칼로 만드는 비용"을 어떻게 보는가 —
-   Decal Shader Graph 파라미터로 각도 마스킹이 실무적으로 되는가, 아니면 텍스처 세트가 필수인가?
-2. B 로 갈 때 **DBuffer vs ScreenSpace** 중 무엇을 권하는가. 이 프로젝트(URP · PC · 리슨서버,
-   벽 오클루전 디더 셰이더 병용)에서 걸릴 만한 지점이 있는가?
-3. A 로 갈 때 **스텐실 방향**(캐릭터를 찍고 NotEqual vs 바닥·프롭을 찍고 Equal) 중 어느 쪽이
-   이 프로젝트 레이어 구성(사실 6 — 파일런이 Enemy)에 맞는가?
-4. `PP_Renderer.asset` 에 피처를 처음 추가하는 것이라 **은희(파이프라인)·민경(VFX)** 과의 합의
-   범위를 어디까지 잡아야 한다고 보는가? (코어 인터페이스 변경 = 사전 합의 규약)
-
-> 결론이 나오면 이 절을 `PLAN.md` 의 정식 계획(목표·접근·리스크·검증)으로 승격하고 팀장 승인을 받는다.
-> 그 전에는 구현에 들어가지 않는다.
 
 # PREVIOUS PLAN — 23호 어그로 재선정 + 공격별 타겟 규칙 재설계 (2026-09-03, 구현 완료)
 
