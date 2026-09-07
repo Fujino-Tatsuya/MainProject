@@ -30,6 +30,7 @@ MonoBehaviour:
     raycastRange: 20
     attackDamageMultiplier: 1
     flatDamageBonus: 0
+    loopBackEntryTime: 0.2
   - clip: {fileID: 7400000, guid: 12312a1688de53a45ad3c5dfe98321e4, type: 2}
     motionDuration: 0
     movementType: 2
