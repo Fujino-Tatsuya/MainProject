@@ -9,7 +9,11 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 5829290245294863495}
-  m_Layer: 0
+  - component: {fileID: 7661751253771073776}
+  - component: {fileID: 7628395284414272455}
+  - component: {fileID: 5848476614549520573}
+  - component: {fileID: -5135999090155933355}
+  m_Layer: 14
   m_Name: PF_box2stack
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -33,6 +37,96 @@ Transform:
   - {fileID: 5522230716717539919}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &7661751253771073776
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5602553857708557834}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c2a252d0daad8e6438c39fa142fe1788, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BreakableCrate
+  hp: 1
+  burstEntry: {fileID: 11400000, guid: 2fbc4bb6d3c3c6a4b9cbc4cc7c73a276, type: 2}
+  pieces:
+  - {fileID: 5522230716717539919}
+  - {fileID: 5295226765975241831}
+  pieceStagger: 0.05
+  authoredId: 0
+  onBrokenLocal:
+    m_PersistentCalls:
+      m_Calls:
+      - m_Target: {fileID: -5135999090155933355}
+        m_TargetAssemblyTypeName: EffectSocketPlayer, Assembly-CSharp
+        m_MethodName: PlayOnce
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
+  onBrokenServer:
+    m_PersistentCalls:
+      m_Calls: []
+--- !u!65 &7628395284414272455
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5602553857708557834}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.7577157, y: 1.7543232, z: 1.2578459}
+  m_Center: {x: 0.12114215, y: -0.11266506, z: -0.44512773}
+--- !u!114 &5848476614549520573
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5602553857708557834}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4ff6f17a7ad346d48ad09109dd1ef5d3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Hurtbox
+  ownerUnit: {fileID: 0}
+  attackReceiverSource: {fileID: 7661751253771073776}
+--- !u!114 &-5135999090155933355
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5602553857708557834}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
+  id: 
+  effect: {fileID: 11400000, guid: 2467c3b9b7e3cb5449c53e68811cc57f, type: 2}
+  socket: {fileID: 0}
+  offset: {x: 0, y: 0, z: 0}
+  scale: 1
+  safetyTimeout: 5
 --- !u!1001 &5290801064841637731
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -44,6 +138,10 @@ PrefabInstance:
     - target: {fileID: 1445169785673062, guid: 5295178ce7cafde41a6316e25bf298d4, type: 3}
       propertyPath: m_Name
       value: SM_Prop_Crate_02 (1)
+      objectReference: {fileID: 0}
+    - target: {fileID: 1445169785673062, guid: 5295178ce7cafde41a6316e25bf298d4, type: 3}
+      propertyPath: m_Layer
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 4749037282306820, guid: 5295178ce7cafde41a6316e25bf298d4, type: 3}
       propertyPath: m_LocalPosition.x
@@ -106,6 +204,10 @@ PrefabInstance:
     - target: {fileID: 1215906189075168, guid: a39495696f707e84a96ff152d750caa2, type: 3}
       propertyPath: m_Name
       value: SM_Prop_Crate_01 (1)
+      objectReference: {fileID: 0}
+    - target: {fileID: 1215906189075168, guid: a39495696f707e84a96ff152d750caa2, type: 3}
+      propertyPath: m_Layer
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 4941976373556218, guid: a39495696f707e84a96ff152d750caa2, type: 3}
       propertyPath: m_LocalPosition.x
