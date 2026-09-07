@@ -4,7 +4,145 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 현재 인수인계 (2026-08-30 · 사망 디졸브 연출, 브랜치 `feature/VFX`)
+## ▶▶ 현재 인수인계 (2026-09-07 · 파괴 가능한 상자 + 파편 버스트, 브랜치 `feature/VFX`)
+
+작업 세션: **민경(Claude)**. 계획·근거는 [PLAN.md](PLAN.md) 최상단 —
+**코드 구현 완료, Unity 저작과 MPPM 검증 대기**.
+
+**수정함 (동시 편집 주의)**: `Assets/1.Scripts/Map/Breakable/`(신규 4종) ·
+`Assets/1.Scripts/Effects/FragmentBurstEffect{,System}.cs`(신규) · `Effects/EffectManager.cs` ·
+`Assets/fragments/MeshFragmentSet.cs` · `fragments/Editor/MeshFragmentSetEditor.cs` ·
+`Map/MapContentSpawner.cs` · 🔴 `Unit/Hurtbox.cs` · `Player/PlayerDefaultAttack.cs` ·
+`Player/Skill/FirstMelee{Main,Interrupt}Skill.cs`
+
+### 🔴 다른 담당 영역을 건드렸다 — 공유 필요
+
+| 파일 | 변경 | 담당 |
+|---|---|---|
+| `Unit/Hurtbox.cs` | `attackReceiverSource`(MonoBehaviour) 필드 추가 | 코어(은희) |
+| `Player/PlayerDefaultAttack.cs` | 진단 로그 거짓 양성 수정 | Player(은희) |
+| `Player/Skill/FirstMelee*Skill.cs` | 중복 방지 셋 `HashSet<Unit>` → `HashSet<Object>` | Player(은희) |
+
+전부 **하위 호환**이다 — `Hurtbox`는 `ownerUnit`이 최우선이라 기존 유닛 경로가 그대로고,
+스킬은 게이트만 넓혔다. 그래도 AGENTS.md §4(코어 인터페이스 변경 사전 합의) 대상이다.
+
+### 이번에 확립된 계약
+
+- 🔴 **상자는 `Unit`이 아니다.** `MonoBehaviour, IAttackReceiver`다. 상자 100개면
+  NetworkObject 100개 + NetworkVariable 400개인데 **동기화할 상태가 없다** — 사건 하나뿐이다.
+  기존 데미지 파이프라인은 Unit 없이 돈다: `BaseAttack`이 Hurtbox를 찾으면 Unit을 안 거치고,
+  `Hurtbox`가 `IAttackReceiver`로 폴백한다.
+- 🔴 **파괴 단위는 프롭 프리팹(더미) 전체다.** 더미 안 상자들은 Rigidbody 없는 정적
+  지오메트리라 아래만 끄면 위가 허공에 뜬다. 게다가 3단 더미는 반듯한 탑이 아니라
+  바닥 2 + **걸쳐진** 1이라 지지 관계가 단일하지 않다.
+- **판정 콜라이더와 차단 콜라이더를 분리한다.** 루트에 레이어 14 + 트리거 BoxCollider(판정),
+  자식 MeshCollider는 원래 레이어 그대로(물리 차단). 자식 레이어를 옮기면 플레이어가 상자를 통과한다.
+- **상자 ID = 스폰 순번** `((slotID + 1) << 16) | index`. 맵이 시드 기반 결정적 생성이라
+  (`MapNetworkSync` → `MapGenerator`의 격리된 `System.Random`) 모든 피어가 같은 값을 낸다.
+  좌표를 RPC에 실을 필요가 없다.
+  - ⚠️ **`slotID + 1`이 필수다.** `ZoneSlot.SlotID`는 0부터라 +1이 없으면
+    (슬롯 0, 인덱스 0)이 ID 0을 내는데 0은 "미할당" 표식이다.
+  - 씬에 **손으로 배치한 상자**는 스포너를 안 거치므로 `authoredId`(음수)를 굽는다 —
+    `Tools > Crates > 씬의 상자에 ID 부여`. 저작=음수 / 생성=양수로 공간이 분리된다.
+- **파괴 전파는 `CrateBreakBroadcaster` 하나로 모은다.** `MapNetworkSync`와 같은 오브젝트에
+  둔다 — 맵이 없으면 상자도 없으니 수명이 맞고, 빠뜨리면 맵 자체가 안 생겨 즉시 드러난다.
+  RPC는 **Reliable(기본)**: `DissolveDeath`가 Unreliable인 것과 달리, 유실되면 때린 플레이어
+  눈앞에서 상자가 이펙트 없이 증발한다.
+- **파괴 이벤트는 둘이다.** `onBrokenLocal`(전 피어, 연출) / `onBrokenServer`(서버 1회, 드롭·보상).
+  하나로 두면 연출이 호스트에만 보이거나 드롭이 인원수만큼 중복된다.
+- **파편에 콜라이더를 달지 않는다.** 피어마다 다른 난수로 흩어지므로, 충돌시키면 플레이어가
+  밀리는 결과가 클라마다 갈려 **연출이 아니라 디싱크**가 된다.
+
+### 🔴 조용한 실패를 만들지 말 것 — 이번에 세 번 겪었다
+
+"때려도 안 부서지는데 로그가 한 줄도 없다"로 세 번 시간을 썼다. 세 지점에 진단을 넣었으니
+비슷한 구조를 만들 때 참고할 것.
+
+| 지점 | 증상이었던 것 | 지금 |
+|---|---|---|
+| ID 0 상자 | 무반응 | Error + 두 원인 모두 안내 |
+| 레지스트리 조회 실패 | 무반응 | Warning + 등록 개수 |
+| 브로드캐스터 누락 | **호스트만 부서짐** | 네트워크 중이면 Error |
+
+마지막이 특히 위험하다 — **호스트 혼자 테스트하면 정상처럼 보인다.** MPPM 2인을 띄워야 드러난다.
+
+### 미결
+
+- Unity 저작 6건(버스트 프리팹 굽기 · EffectEntry · 프롭 6종 · 브로드캐스터 부착 등) —
+  체크리스트는 `PLAN.md`의 "Unity 저작" 절.
+- 파편이 바닥을 통과하는 정도가 어색한지 **육안 확인** → 어색하면 `duration`을 0.4~0.6초로.
+- `Assets/fragments/`가 아직 git 미추적(`?? Assets/fragments/`).
+
+---
+
+
+## 이전 인수인계 (2026-09-07 · 프로파일링 기준 + 파편 폭발 계측, 브랜치 `feature/VFX`)
+
+작업 세션: **민경(Claude)**.
+
+**수정함**: `Assets/fragments/FragmentExploder.cs` · `Assets/fragments/Editor/MeshFragmentSetEditor.cs`(이동) ·
+`Assets/1.Scripts/Dev/Profiler/Prof.cs` · `Assembly-CSharp*.csproj`.
+`Assets/fragments/`는 **아직 git 미추적**이다(`?? Assets/fragments/`).
+
+### 🔴 에디터 프로파일러의 프레임 총합을 믿지 말 것
+
+플레이 모드 프로파일링에서 **`EditorLoop`이 프레임의 90%를 차지한다**. 실측 2회 모두 동일했다:
+
+| | 에디터 | 빌드본(Development) |
+|---|---|---|
+| CPU Active | 21.4 ~ 22.9ms | **2.20ms** |
+| EditorLoop | 19.4 ~ 20.4ms | 없음 |
+| Scripts | 0.9 ~ 1.1ms | — |
+
+`EditorLoop`은 Scene 뷰·인스펙터·**프로파일러 창 자신**의 리페인트다(`Profiler.ParseThreadData`가
+top marker에 뜬다). 게임을 느리게 만드는 게 아니라 프레임에 남의 일을 얹는 것이므로,
+**"프레임이 튄다"의 원인 지목에 쓰면 반드시 오진한다.**
+
+- **믿을 수 없는 것**: CPU Active Time · 프레임 타임 · FPS · 그래프 스파이크
+- **대체로 믿을 수 있는 것**: Scripts / Physics / Rendering 버킷 · GC Alloc · 마커별 ms
+- **예산 판정(16.67ms)은 반드시 Development Build에서 한다.** Deep Profiling Support는 끌 것.
+- 에디터에서 봐야 하면 최소한 **Maximize On Play** + F2 HUD(`HitVFXDebugHUD`) 끄기 +
+  Profiler Frame Count를 300으로. 버퍼에 9만 프레임이 쌓이면 창 자체가 스파이크 원인이 된다.
+
+빌드 산출물: `D:\김민경\유니티\MainProject\Build\` (프로젝트 밖, D 드라이브).
+
+### 🔴 에디터 전용 스크립트를 `Editor/` 밖에 두면 플레이어 빌드가 깨진다
+
+증상이 **`BuildFailedException: Failed to build Addressables content ... "SBP ErrorError"`** 로 뜬다.
+Addressables는 무죄고, 진짜 원인은 Editor.log의 그 위에 있는 `CS0246`이다 —
+스크립트 컴파일이 먼저 실패했고 Addressables 전처리기가 뒤이어 예외를 던진 것뿐이다.
+
+`MeshFragmentSetEditor.cs`가 `Assets/fragments/`(= `Assembly-CSharp`)에 있어서 이랬다.
+에디터에서는 `Assembly-CSharp`이 `UnityEditor.dll`을 참조하므로 멀쩡히 컴파일되고,
+**플레이어 빌드에서만** 터진다. `Assets/fragments/Editor/`로 옮겨 해결.
+**빌드 실패 시 다이얼로그 메시지보다 `%LOCALAPPDATA%\Unity\Editor\Editor.log`를 먼저 볼 것.**
+
+### FragmentExploder 실측 — 재조사 불필요
+
+크레이트 **5개 동시 폭발**(파편 75개) 한 프레임, Development Build 기준:
+
+```
+Fragment.Explode      Calls  5   0.32ms   ← 60fps 예산의 1.9%
+├ Fragment.Activate   Calls 75   0.19ms   (SetActive의 렌더러 등록 + PhysX actor 생성. Self는 0.01ms)
+├ Fragment.OnExploded Calls  5   0.07ms   (이펙트 재생. 할당 160B는 전부 여기 UnityEvent)
+└ Fragment.Forces     Calls 75   0.04ms
+```
+
+**프레임 드랍의 원인이 아니다.** 상시 비용도 0(`Update` 5콜 0.00ms / 0B).
+Rigidbody 제거 같은 최적화는 **하지 말 것** — 0.19ms를 위해 검증된 코드를 다시 쓰는 건 손해다.
+
+- 마커는 [`Prof.cs`](Assets/1.Scripts/Dev/Profiler/Prof.cs)에 있다(`Fragment.*`). 프로파일러가
+  안 붙어 있으면 비용이 없으므로 릴리스에도 그대로 둔다. 검색어는 `Fragment.`(점 포함) —
+  점이 없으면 `FragmentExploder.Update()`가 같이 걸려 노이즈가 된다.
+- `fragmentCollision` 기본값 **false**(파편은 연출이지 게임플레이가 아니다). 끄면 파편이
+  바닥을 통과하므로 `debrisLifetime`이 짧아야 한다 — **Play 육안 검증 대기**.
+- 콜라이더를 다시 켜면 충돌 비용은 `Explode()` 프레임이 아니라 **이후 FixedUpdate의 `Physics`**에
+  잡힌다. `Fragment.*` 마커에는 안 나타난다.
+
+---
+
+
+## 이전 인수인계 (2026-08-30 · 사망 디졸브 연출, 브랜치 `feature/VFX`)
 
 작업 세션: **민경(Claude)**. 계획·근거는 [PLAN.md](PLAN.md) 최상단 항목(**승인 대기**).
 
