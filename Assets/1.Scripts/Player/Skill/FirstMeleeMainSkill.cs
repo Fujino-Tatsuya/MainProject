@@ -15,7 +15,9 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
     private PlayerMovement movement;
     private PlayerAimIndicator aimIndicator;
     private Collider[] hitResults;
-    private readonly HashSet<Unit> tickTargets = new HashSet<Unit>();
+    // 키가 Unit이 아니라 Object인 이유: 파괴 가능한 상자처럼 Unit이 아닌 IAttackReceiver도
+    // 피격 대상이다. 그런 대상은 Hurtbox를 키로 쓴다(아래 히트 루프 참조).
+    private readonly HashSet<Object> tickTargets = new HashSet<Object>();
 
     // 진행 방향 장부. 이동 권위 피어는 실제 이동에, 서버는 판정·넉백 방향에 사용한다.
     private Vector3 heading = Vector3.forward;
@@ -102,7 +104,11 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
                 continue;
 
             Unit unit = ResolveHitUnit(hit, out Hurtbox hurtbox);
-            if (unit == null || unit == owner || !tickTargets.Add(unit))
+
+            // 파괴 가능한 상자처럼 Unit이 아닌 대상은 unit이 null이고 hurtbox만 잡힌다.
+            // unit으로 게이트하면 그런 대상이 통째로 걸러진다 — 중복 방지 키를 넓힌다.
+            Object target = unit != null ? (Object)unit : hurtbox;
+            if (target == null || unit == owner || !tickTargets.Add(target))
                 continue;
 
             // 견인: 넉백/경직 값을 AttackInfo에 실어 전달 — 수신측(MonsterBase)이 지속넉백(Knockback 상태,
@@ -125,7 +131,8 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
             if (!resolved)
                 continue;
 
-            Edit.Log($"[Skill] 진격의 방패 틱 — {unit.name} 피해 {attackInfo.damage} + 견인", this);
+            // unit이 아니라 target을 찍는다 — Unit이 아닌 대상(상자 등)은 unit이 null이다.
+            Edit.Log($"[Skill] 진격의 방패 틱 — {target.name} 피해 {attackInfo.damage} + 견인", this);
         }
     }
 

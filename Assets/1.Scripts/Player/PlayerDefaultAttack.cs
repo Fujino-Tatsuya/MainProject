@@ -84,6 +84,11 @@ public class PlayerDefaultAttack : BaseAttack
 
         swingHitBuffer.Clear();
 
+        // "무언가 맞췄다"와 "Unit을 맞췄다"는 다르다. 파괴 가능한 상자처럼 Unit이 아닌
+        // IAttackReceiver도 명중 대상이므로, 진단은 이쪽으로 판단해야 한다
+        // (swingHitBuffer는 패시브 발동용이라 Unit만 담는다 — 아래 참고).
+        bool anyResolved = false;
+
         int hitCount = OverlapHitbox(hitbox);
         for (int i = 0; i < hitCount; i++)
         {
@@ -103,7 +108,11 @@ public class PlayerDefaultAttack : BaseAttack
                 bool resolved = TryResolveHit(hurtbox, hit);
                 if (resolved)
                 {
+                    anyResolved = true;
                     damagedHurtboxes.Add(hurtbox);
+
+                    // Unit이 없는 대상(상자 등)은 중복 방지를 Hurtbox로 하고,
+                    // 패시브 통지에서는 빠진다 — 패시브가 Unit을 요구한다.
                     if (ownerUnit != null)
                     {
                         damagedUnits.Add(ownerUnit);
@@ -120,6 +129,7 @@ public class PlayerDefaultAttack : BaseAttack
 
             if (TryResolveHit(target))
             {
+                anyResolved = true;
                 damagedUnits.Add(target);
                 swingHitBuffer.Add(target);
             }
@@ -128,7 +138,10 @@ public class PlayerDefaultAttack : BaseAttack
         // 이번 스윙에 명중시킨 적이 있으면 통지 (패시브 발동 트리거). 허공 스윙은 통지하지 않는다.
         if (swingHitBuffer.Count > 0)
             ServerHitEnemiesResolved?.Invoke(swingHitBuffer);
-        else
+
+        // 진단은 통지와 별개다. swingHitBuffer로 판단하면 Unit이 아닌 대상만 맞췄을 때
+        // "전부 걸러졌다"고 거짓 보고한다(상자를 실제로 부수고도 경고가 찍혔다).
+        if (!anyResolved)
             LogEmptySwing(hitCount);
     }
 

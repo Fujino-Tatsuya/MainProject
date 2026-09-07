@@ -15,7 +15,9 @@ using UnityEngine;
 public class FirstMeleeInterruptSkill : PlayerInstantSkill
 {
     private Collider[] hitResults;
-    private readonly HashSet<Unit> hitTargets = new HashSet<Unit>();
+    // 키가 Unit이 아니라 Object인 이유: 파괴 가능한 상자처럼 Unit이 아닌 IAttackReceiver도
+    // 피격 대상이다. 그런 대상은 Hurtbox를 키로 쓴다(아래 히트 루프 참조).
+    private readonly HashSet<Object> hitTargets = new HashSet<Object>();
 
     private float hitTime;
     private float endTime;
@@ -96,7 +98,11 @@ public class FirstMeleeInterruptSkill : PlayerInstantSkill
                 continue;
 
             Unit unit = ResolveHitUnit(hit, out Hurtbox hurtbox);
-            if (unit == null || unit == owner || !hitTargets.Add(unit))
+
+            // 파괴 가능한 상자처럼 Unit이 아닌 대상은 unit이 null이고 hurtbox만 잡힌다.
+            // unit으로 게이트하면 그런 대상이 통째로 걸러진다 — 중복 방지 키를 넓힌다.
+            Object target = unit != null ? (Object)unit : hurtbox;
+            if (target == null || unit == owner || !hitTargets.Add(target))
                 continue;
 
             // isInterruptAttack = 보스가 카운터 판정에 쓰는 유일한 근거.
@@ -110,7 +116,8 @@ public class FirstMeleeInterruptSkill : PlayerInstantSkill
                 : unit.ReceiveAttack(attackInfo, hitContext);
 
             if (resolved)
-                Edit.Log($"[Skill] 단죄의 방패 적중 — {unit.name} 피해 {attackInfo.damage} (Interrupt)", this);
+                // unit이 아니라 target을 찍는다 — Unit이 아닌 대상(상자 등)은 unit이 null이다.
+                Edit.Log($"[Skill] 단죄의 방패 적중 — {target.name} 피해 {attackInfo.damage} (Interrupt)", this);
         }
     }
 }
