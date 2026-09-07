@@ -11,7 +11,7 @@ Update this file when a term becomes important enough that future agents or team
 
 **수정함 (동시 편집 주의)**: `Assets/1.Scripts/Map/Breakable/`(신규 4종) ·
 `Assets/1.Scripts/Effects/FragmentBurstEffect{,System}.cs`(신규) · `Effects/EffectManager.cs` ·
-`Assets/fragments/MeshFragmentSet.cs` · `fragments/Editor/MeshFragmentSetEditor.cs` ·
+`Assets/1.Scripts/fragments/MeshFragmentSet.cs` · `Assets/1.Scripts/fragments/Editor/MeshFragmentSetEditor.cs` ·
 `Map/MapContentSpawner.cs` · 🔴 `Unit/Hurtbox.cs` · `Player/PlayerDefaultAttack.cs` ·
 `Player/Skill/FirstMelee{Main,Interrupt}Skill.cs`
 
@@ -71,7 +71,8 @@ Update this file when a term becomes important enough that future agents or team
 - Unity 저작 6건(버스트 프리팹 굽기 · EffectEntry · 프롭 6종 · 브로드캐스터 부착 등) —
   체크리스트는 `PLAN.md`의 "Unity 저작" 절.
 - 파편이 바닥을 통과하는 정도가 어색한지 **육안 확인** → 어색하면 `duration`을 0.4~0.6초로.
-- `Assets/fragments/`가 아직 git 미추적(`?? Assets/fragments/`).
+- ~~`Assets/fragments/`가 아직 git 미추적~~ → **해결.** `Assets/1.Scripts/fragments/`로 옮겨
+  git에 추적되기 시작했다(`fe913115`). 이전 경로를 가리키는 문서·주석이 있으면 함께 고칠 것.
 
 ---
 
@@ -80,9 +81,9 @@ Update this file when a term becomes important enough that future agents or team
 
 작업 세션: **민경(Claude)**.
 
-**수정함**: `Assets/fragments/FragmentExploder.cs` · `Assets/fragments/Editor/MeshFragmentSetEditor.cs`(이동) ·
+**수정함**: `Assets/1.Scripts/fragments/FragmentExploder.cs` · `Assets/1.Scripts/fragments/Editor/MeshFragmentSetEditor.cs`(이동) ·
 `Assets/1.Scripts/Dev/Profiler/Prof.cs` · `Assembly-CSharp*.csproj`.
-`Assets/fragments/`는 **아직 git 미추적**이다(`?? Assets/fragments/`).
+(당시 `Assets/fragments/`는 git 미추적이었다. 지금은 `Assets/1.Scripts/fragments/`로 옮겨 추적된다.)
 
 ### 🔴 에디터 프로파일러의 프레임 총합을 믿지 말 것
 
@@ -112,9 +113,9 @@ top marker에 뜬다). 게임을 느리게 만드는 게 아니라 프레임에 
 Addressables는 무죄고, 진짜 원인은 Editor.log의 그 위에 있는 `CS0246`이다 —
 스크립트 컴파일이 먼저 실패했고 Addressables 전처리기가 뒤이어 예외를 던진 것뿐이다.
 
-`MeshFragmentSetEditor.cs`가 `Assets/fragments/`(= `Assembly-CSharp`)에 있어서 이랬다.
+`MeshFragmentSetEditor.cs`가 `Assets/1.Scripts/fragments/`(= `Assembly-CSharp`)에 있어서 이랬다.
 에디터에서는 `Assembly-CSharp`이 `UnityEditor.dll`을 참조하므로 멀쩡히 컴파일되고,
-**플레이어 빌드에서만** 터진다. `Assets/fragments/Editor/`로 옮겨 해결.
+**플레이어 빌드에서만** 터진다. `Assets/1.Scripts/fragments/Editor/`로 옮겨 해결.
 **빌드 실패 시 다이얼로그 메시지보다 `%LOCALAPPDATA%\Unity\Editor\Editor.log`를 먼저 볼 것.**
 
 ### FragmentExploder 실측 — 재조사 불필요
