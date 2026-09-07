@@ -48,6 +48,10 @@ public class EffectCatalog : ScriptableObject
     [field: SerializeField] public EffectEntry ChargeBall_FadeOut { get; private set; }
     [field: SerializeField] public EffectEntry ChargeBall_Break { get; private set; }
 
+    [Header("기타")]
+    [field: SerializeField] public EffectEntry Explosion_Basic { get; private set; }
+    [field: SerializeField] public EffectEntry Frag_Crate_01 { get; private set; }
+
     private List<EffectEntry> _all;
     // 피격 이펙트 테스트용 enum
     public enum HitVFXType
