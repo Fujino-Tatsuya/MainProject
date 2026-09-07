@@ -7068,7 +7068,7 @@ MonoBehaviour:
   animator: {fileID: 0}
   mainSkill: {fileID: 2590523662464605774}
   subSkill: {fileID: 2188207255195787144}
-  interruptSkill: {fileID: 0}
+  interruptSkill: {fileID: 7746500284878980271}
   ultimateSkill: {fileID: 1492765860989694546}
   endFallbackPadding: 0.1
 --- !u!114 &87698441936007240

@@ -248,6 +248,10 @@ PrefabInstance:
       propertyPath: resultSceneName
       value: 5.ResultScene
       objectReference: {fileID: 0}
+    - target: {fileID: 8468152987463888396, guid: 8a54a70264d851a4db24001989d8afa1, type: 3}
+      propertyPath: mainGameSceneName
+      value: 4.MapScene-trensparent
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

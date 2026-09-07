@@ -206,7 +206,6 @@
 | `Assets/1.Scripts/Utility/ColliderInfo.cs` | Box/Capsule/Sphere collider 정보를 공통 형식으로 보관·overlap 계산 | **연결됨**. 보스 공격과 BT 물리 노드 |
 | `Assets/1.Scripts/Utility/Edit.cs` | `[Conditional("UNITY_EDITOR")]` 로그와 편집기 보조를 감싼 정적 도우미 | **지원 코드**. Player build에서는 호출 자체가 제거됨 |
 | `Assets/1.Scripts/Utility/Editor/BossAreaSubgraphExampleBuilder.cs` | BossArea Behavior Graph/subgraph 예제 자산을 생성 | **Editor 도구**. 메뉴 기반 제작 지원 |
-| `Assets/1.Scripts/Utility/Editor/UnityMcpBehaviorGraphTools.cs` | MCP 도구로 Graph 검색·열기·설명·노드 위치·blackboard 값 조회/수정 | **Editor 통합/연결됨**. `[McpToolProvider]` reflection 등록, 호출자 검색만으로 미사용 판정 금지 |
 | `Assets/1.Scripts/Utility/EnableCollider.cs` | Box/Capsule/Sphere/Mesh collider를 서버 gate로 enable/disable | **연결됨/비복제**. Robot·TwentyThree와 BT Action; 서버 변화가 클라이언트에 동기화되지 않음 |
 | `Assets/1.Scripts/Utility/Math/ColliderMathUtility.cs` | collider의 월드 중심·반경·half extents·방향을 계산하는 정적 수학 도우미 | **지원 코드/연결됨**. ColliderInfo와 공격 판정 |
 | `Assets/1.Scripts/Utility/SpawnPointer.cs` | AI spawn 위치·방향을 보관하는 scene marker | **연결됨**. Robot·TwentyThree prefab과 GetSpawnPointAction |
@@ -400,6 +399,6 @@ Behavior Graph 자산은 C# GUID가 아니라 직렬화된 타입 문자열로 �
 
 1. 추상 클래스, enum, struct, interface는 prefab에 직접 붙지 않아도 **지원 코드**로 실제 사용될 수 있다.
 2. Behavior Graph 노드는 일반 `m_Script` 참조가 아니라 타입 문자열로 직렬화될 수 있다.
-3. `UnityMcpBehaviorGraphTools`처럼 attribute/reflection으로 발견되는 코드는 직접 호출자가 없어도 활성이다.
+3. `[McpToolProvider]` 처럼 attribute/reflection으로 발견되는 코드는 직접 호출자가 없어도 활성이다. 해당 MCP 도구들은 이 레포를 떠나 MCP 패키지로 옮겼다.
 4. `WeaponTrailEffect`처럼 외부 패키지 코드도 Player 시각 prefab에 붙으면 실제 런타임 경로다.
 5. “연결됨”은 기능 완성을 뜻하지 않는다. Map의 하위 배선, Charge 목록, Build Settings처럼 필요한 주변 연결이 빠진 경우는 **부분 연결**로 따로 표시했다.

@@ -1,0 +1,2858 @@
+using System.Collections.Generic;
+using Unity.Netcode;
+using UnityEngine;
+
+// 보스 23호 — MonsterBase 코드 FSM 위에 "공격 6종 선택기 + 페이즈"만 얹는다.
+//
+// 이동/추격/타게팅/피격/그로기/사망/디스폰/상태복제/HitFlash 는 전부 base 그대로다.
+// 확장 표면은 훅뿐이고, MonsterState 에 값을 추가하지 않는다 —
+// 중간보스 3종(WallBot·GauntletBot·SpinnerBot)이 전부 이 안에서 끝냈다(WallBot 은 C# 0줄).
+//
+// 정본: Docs/tech/boss-rebuild-standard.md (§2 훅 / §2.1 관용구 3 / §10 SO 설계)
+//
+// 현재 슬라이스 = S1(FSM 골격 + 공격 선택기). 각 공격의 실제 기믹은 뒤 슬라이스다:
+//   S2 근접 3종 히트 정밀화(앵커 전환·어퍼 Airborne) / S3 카운터 창 / S4 Grab 체인 /
+//   S5 Dash 캐리-푸시 / S6 Jump 장판 / S7 페이즈 시퀀스(송전기)
+// 미구현 공격은 애니만 재생되고 히트 시 **1회 경고**를 남긴다(조용한 실패 금지).
+public class TwentyThreeBoss : MonsterBase
+{
+    // 서버·클라 공통(프리팹에 직렬화된 data 를 캐스팅) — 클라도 애니 상태명을 조회해야 한다.
+    BossDataSO _boss;
+
+    // 서버 전용 런타임.
+    BossAttackEntry _currentEntry;   // 지금 수행 중인 공격 행
+    int _lastSlot = NoAttack;        // 직전에 실제로 쓴 슬롯(선택기 감쇠용)
+    int _consecutive;                // 같은 슬롯 연속 사용 횟수
+    float[] _weightBuffer;           // 룰렛 가중치(매 틱 재사용 — 할당 없음)
+    int _warnedAttackMask;           // 미구현 공격 경고 1회 가드
+
+    // 히트박스 앵커 — 이름 → ColliderInfo. 공격마다 판정 형상이 다르므로 히트 직전에 갈아끼운다.
+    Dictionary<string, ColliderInfo> _anchors;
+    ColliderInfo _defaultAnchor;     // 프리팹에 배선된 원본(앵커 미지정 공격이 되돌아갈 자리)
+
+    // 카운터 창 — Server write / Everyone read. **판정은 서버, 표현은 각 피어**(정본 §6).
+    // 클라 예측 없음: 오판정하면 그로기가 클라마다 갈린다.
+    readonly NetworkVariable<bool> _counterWindow = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    /// <summary>지금 카운터로 끊을 수 있는가(표현·디버그용 읽기 전용).</summary>
+    public bool CounterWindowOpen => _counterWindow.Value;
+
+    // 🔴 배열이다. 텔레그래프는 **여러 개가 동시에** 붙는다(방향 표시 링 + 전신 틴트 + 나중에 VFX).
+    //    하나만 집으면(GetComponentInChildren<T> 단일) 나머지가 조용히 안 돈다.
+    IBossTelegraph[] _telegraphs;
+    int _counterGroggyCount;         // 보스 자체 그로기 카운트 — base 것은 AutoHitReactions=false 라 안 돈다
+
+    /// <summary>보스 데이터(읽기 전용). 방향 표시기가 각도를 판정과 **같은 출처**에서 읽기 위해 노출한다.</summary>
+    public BossDataSO Data => _boss;
+
+    // 🔴 base 의 자동 피격 반응 3종을 전부 끈다: Hit 경직 · isInterruptAttack 그로기 누적 · Knockback.
+    //    정본 §1.1 · §4 — Hit 은 카운터 성공 전용이고, 그로기는 인터럽트 스킬·송전기만 유발하며,
+    //    보스는 밀리지 않는다. 데미지·사망 판정과 HitFlash(피격 색)는 그대로 돈다.
+    protected override bool AutoHitReactions => false;
+
+    // 카운터 리액션(getowned) 길이. AutoHitReactions=false 라 base 의 hitStunDuration 은 보스에서
+    // 달리 쓰이지 않으므로 그 값을 리액션 길이로 재사용한다(죽은 필드를 재사용한다).
+    float HitReactionDuration => data != null ? Mathf.Max(0.05f, data.hitStunDuration) : 0.4f;
+
+    // ─── 카운터 선딜 게이트 (서버 전용 판정 + 전 피어 자세 홀드) ───────────────
+    // 공격 발사는 "창 타이머 만료 AND 애니 준비 도달" 두 사건이 다 서야 일어난다(BossCounterWindupGate).
+    readonly BossCounterWindupGate _counterWindup = new BossCounterWindupGate();
+    bool _warnedCounterTimerBeforeAnimation;
+    float _counterWindupStartedAt;   // 진단용 — 준비 신호가 실제로 몇 초 만에 오는지 재려고 둔다
+
+    // 자세 홀드는 **각 피어의 로컬 상태**다(애니메이터는 복제되지 않는다).
+    // 서버가 RPC 로 걸고 풀며, 아래 두 값은 그 피어에서만 의미가 있다.
+    bool _counterAnimatorHeldLocally;
+    float _counterAnimatorResumeSpeed = 1f;
+
+    // 체인 예산(_stateTimer)의 여유분. 예산은 **데드락 안전망**이지 정밀 종료 기준이 아니다 —
+    // 실제 길이와 정확히 같게 잡으면 프레임 오차 한 번에 안전망이 터진다.
+    // 🔴 실측(2026-09-03): 창 1.5초 + 홀드 1.5초로 여유가 0 이 되자 Dash 가 Recovery 에서
+    //    타임아웃하기 시작했다(2회). 정상 종료는 애니 이벤트가 만들고, 이 값은 그 뒤를 받친다.
+    const float ChainBudgetSlack = 0.5f;
+
+    /// 지금 공격 행의 카운터 창 길이. 창을 여는 공격이 아니면 0.
+    float CounterWindowDuration => _currentEntry != null && _currentEntry.opensCounterWindow
+        ? Mathf.Clamp(_currentEntry.counterWindowDuration, 0f, 2f)
+        : 0f;
+
+    // ─── Grab 체인 (서버 전용) ───────────────────────────────────────
+    BossAttackPhase _attackPhase = BossAttackPhase.None;
+    float _attackPhaseTimer;
+    float _grabTickTimer;
+    Player _grabbed;                 // 붙잡고 있는 플레이어(없으면 null)
+    Collider[] _grabBuffer;
+    bool _warnedThrowDisplacement;
+
+    // ─── JumpAttack (서버 + 각 피어 연출) ─────────────────────────────
+    Vector3 _jumpArrivePoint;
+    Collider[] _aoeBuffer;                          // 최원거리 탐색 · 착지 AoE 공용
+    readonly HashSet<Unit> _aoeHits = new HashSet<Unit>();
+    Renderer[] _modelRenderers;                     // 체공 중 숨길 모델 렌더러(animator 하위만)
+    AoeTelegraph _telegraphFixed;                   // 착지 위치(고정 크기)
+    AoeTelegraph _telegraphGrowing;                 // 착지 타이밍(0.1 → AoE 점증)
+    bool _warnedNoJumpTelegraph;
+
+    // ─── 페이즈 시퀀스 (송전기 / 레이지) ──────────────────────────────
+    bool _pendingPhaseSequence;                     // 페이즈 통과 후 "행동이 끝나면 시작할 것"
+    IBossChargeSequence _charge;
+    AreaZone _chargeZone;
+    bool _warnedNoCharge;
+    int _rageRemaining;
+    Vector3 _rageDashDir;
+    bool _rageDashing;                              // RageDash phase 안의 구간 구분(돌진 중 / 간격 대기)
+
+    // ─── 돌진(S5) ─────────────────────────────────────────────────────
+    // 🔴 끌고 가는 대상은 **1명뿐**이다(라인하르트 핀과 같은 규칙). 여러 명을 끌면 각자의
+    //    followTarget 이 같은 지점을 가리켜 겹쳐 쌓이고, 해제 누락 위험도 인원수만큼 늘어난다.
+    Player _dashCarried;
+    Vector3 _dashDir;
+    bool _dashBlockedAhead;                         // 목적지가 보행면 끝에서 잘렸나(= 벽에 처박는다)
+    Vector3 _dashDestination;                       // 클램프된 목적지. 도착 판정의 기준
+    float _dashPrevStopDistance = -1f;              // 돌진 전 stoppingDistance(복원용). -1 = 저장 안 됨
+    float _dashPrevAcceleration = -1f;              // 돌진 전 acceleration(복원용). -1 = 저장 안 됨
+    bool _dashPrevAutoBraking;                      // 돌진 전 autoBraking(복원용)
+
+    // 🔴 돌진 중 가속도. 레거시 BT 의 `SetAgentDashModeAction` 이 쓰던 값과 같다(999 / autoBraking off).
+    //    FSM 재작성판이 speed 와 stoppingDistance 만 승계하고 **이 둘을 빠뜨려서 돌진이 전진하지 않았다.**
+    //    산수: 프리팹 acceleration 8m/s² 로는 0.7초 동안 5.6m/s 까지밖에 못 올라가 약 1.96m 만 간다
+    //    (목표는 moveSpeed 2.5 × 6 = 15m/s, 최대 16m). autoBraking 까지 켜져 있어 목적지 근처에서 더 준다.
+    //    → "애니메이션만 돌고 안 나간다"로 보인다.
+    const float DashAcceleration = 999f;
+
+    const float DashCarryProbeRadius = 1.2f;        // 캐리 판정 구 반경(보스 정면 offset 지점 기준)
+    const float DashCarryWallMargin = 0.6f;         // 벽 앞 추가 여유 — 플레이어 캡슐 반경분
+    const float DashArriveEpsilon = 0.35f;          // 목적지 도착으로 볼 수평 거리
+
+    // ─── Wells (23호에 탑승) ──────────────────────────────────────────
+    // 🔴 Wells 는 **스폰되지 않는 중첩 NetworkObject** 라 자기 NetworkVariable 을 가질 수 없다.
+    //    그래서 지속 상태(Idle/Groggy/Dead)를 **23호의 NetworkObject 에 실어** 복제한다(정본 §10.1).
+    //    투척은 **일회성 이벤트**라 NetworkVariable 로 못 싣는다(같은 값이면 OnValueChanged 가 안 뜬다)
+    //    → ClientRpc 로 보낸다. 이 프로젝트의 "지속=복제 / 일회성=RPC" 분리와 같다.
+    readonly NetworkVariable<BossWellsState> _wellsState = new NetworkVariable<BossWellsState>(
+        BossWellsState.Idle,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    BossWells _wells;
+    bool _warnedNoBombPrefab;
+
+    /// <summary>현재 다단계 공격 단계(디버그·확장용 읽기 전용).</summary>
+    public BossAttackPhase AttackPhase => _attackPhase;
+
+    /// <summary>0 = 1페이즈(개전). 임계를 통과할 때마다 1 오른다. 회복해도 내려가지 않는다.</summary>
+    public int CurrentPhase { get; private set; }
+
+    // 현재 페이즈에 해당하는 배수 행. CurrentPhase 0 이면 배수 없음(null).
+    BossPhaseEntry ActivePhase =>
+        _boss != null && _boss.phases != null && CurrentPhase > 0 && CurrentPhase <= _boss.phases.Length
+            ? _boss.phases[CurrentPhase - 1]
+            : null;
+
+    float PhaseDamageMultiplier => ActivePhase != null ? Mathf.Max(0f, ActivePhase.damageMultiplier) : 1f;
+
+    // 페이즈 이동속도 배수 — base 의 SeekBoss 가 chaseSpeed 에 곱한다.
+    protected override float ChaseSpeedMultiplier =>
+        ActivePhase != null ? Mathf.Max(0.1f, ActivePhase.speedMultiplier) : 1f;
+
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn(); // 참조 자동 탐색 + (서버)ServerInitialize + 스폰 시점 상태 애니 반영
+
+        _boss = data as BossDataSO;
+        if (_boss == null)
+        {
+            Debug.LogError(
+                $"{name}: BossDataSO 가 필요하다(현재 {(data == null ? "null" : data.GetType().Name)}) — 보스 로직을 끈다.",
+                this);
+            enabled = false;
+            return;
+        }
+
+        // 카운터 창 표현은 모든 피어에서 돈다(서버가 창을 쓰고, 각 피어가 텔레그래프를 구동).
+        _counterWindow.OnValueChanged += OnCounterWindowChanged;
+        ResolveTelegraphs();
+
+        // Wells 는 모든 피어에서 로컬 애니메이터를 구동한다(상태는 이 NetworkObject 가 복제).
+        _wells = GetComponentInChildren<BossWells>(true);
+        _wellsState.OnValueChanged += OnWellsStateChanged;
+        if (_wells != null)
+            _wells.PlayState(_wellsState.Value); // 늦게 접속한 클라도 현재 상태를 받는다
+
+        if (!IsServer)
+            return;
+
+        // 공격 슬롯 수 = 테이블 행 수. 행마다 쿨을 등록한다(0 이면 base 의 1/attackSpeed 로 폴백).
+        int count = _boss.attacks != null ? _boss.attacks.Length : 0;
+        ConfigureAttackSlots(count);
+        for (int i = 0; i < count; i++)
+            SetAttackCooldown(i, _boss.attacks[i].cooldown);
+
+        CacheHitboxAnchors();
+        SetupWellsServer();
+        ValidateContract();
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        _counterWindow.OnValueChanged -= OnCounterWindowChanged;
+        _wellsState.OnValueChanged -= OnWellsStateChanged;
+
+        // Wells 콜백이 파괴된 보스를 붙잡지 않게 끊는다(Wells 는 MonoBehaviour 라 수명이 다르다).
+        if (_wells != null)
+        {
+            _wells.ThrowCycleElapsed = null;
+            _wells.ThrowRequested = null;
+            _wells.SetSuppressed(true);
+        }
+
+        // 디스폰 시 잡고 있던 플레이어를 반드시 놓는다 — 안 놓으면 풀어 줄 주체가 사라져 영구 구속된다.
+        // 체공 중이었다면 메시도 되살린다(꺼진 채 남으면 다음 스폰까지 투명하다).
+        AbortAttackChain();
+
+        base.OnNetworkDespawn();
+    }
+
+    // NetworkBehaviour.OnDestroy 는 virtual 이고 자체 정리를 한다 — 반드시 override + base 호출.
+    public override void OnDestroy()
+    {
+        // 예고 장판은 씬 루트에 띄운 로컬 인스턴스라 보스와 함께 자동 소멸하지 않는다 — 직접 지운다.
+        if (_telegraphFixed != null) Destroy(_telegraphFixed.gameObject);
+        if (_telegraphGrowing != null) Destroy(_telegraphGrowing.gameObject);
+
+        base.OnDestroy();
+    }
+
+    #region 계약 검증 (죽은 설정값 방지)
+    // 🔴 애니메이터·앵커 접근이 전부 graceful 이라 이름이 틀려도 예외가 안 난다.
+    //    그래서 이 프로젝트에는 이미 조용히 무시되는 설정값이 9건 쌓여 있다(정본 §6).
+    //    같은 함정을 또 파지 않기 위해 스폰 시 전수 검증해 LogError 를 남긴다.
+    //
+    // ⚠️ 정본 §3.2 는 "Awake 에서 검증"이라고 적혀 있으나 Awake 에는 animator 참조가 아직 없다
+    //    (base 가 OnNetworkSpawn 에서 GetComponentInChildren 으로 채운다). 그래서 여기서 한다.
+    void ValidateContract()
+    {
+        if (data.archetype != MonsterArchetype.Boss)
+            Debug.LogError(
+                $"{name}: archetype 이 {data.archetype} 이다 — Boss 여야 거리창+가중치 선택기(SeekBoss)가 돈다.",
+                this);
+
+        if (data.hasSuperArmorWhileAttacking)
+            Debug.LogError(
+                $"{name}: hasSuperArmorWhileAttacking 이 켜져 있다 — base 가 전 공격에 슈퍼아머를 걸어 " +
+                "공격별 superArmor 플래그가 무의미해진다. SO 에서 끄고 테이블에서 공격별로 제어할 것.",
+                this);
+
+        if (_boss.attacks == null || _boss.attacks.Length == 0)
+        {
+            Debug.LogError($"{name}: 공격 테이블이 비어 있다 — 보스가 아무 공격도 못 한다.", this);
+            return;
+        }
+
+        // 타겟 규칙 계약 — FarthestPlayer 는 Jump 전용이다(확정 스펙).
+        // 🔴 다른 행에 켜면 그 공격이 조용히 후열을 노리게 되는데, 거리창까지 함께 보므로
+        //    "가까운 사람만 후보인데 먼 사람을 노린다"는 앞뒤 안 맞는 조합이 된다.
+        foreach (BossAttackEntry e in _boss.attacks)
+        {
+            if (e == null || e.attackTargeting != BossAttackTargeting.FarthestPlayer) continue;
+            if (e.attackId == BossAttackId.Jump) continue;
+
+            Debug.LogError(
+                $"{name}: {e.attackId} 행의 attackTargeting 이 FarthestPlayer 다 — 최원거리 타겟은 " +
+                "Jump 전용이다(확정 스펙). 거리창을 쓰는 공격과 조합하면 앞뒤가 안 맞는다.", this);
+        }
+
+        // 카운터 창 계약 — 창을 여는 행은 Grab·Dash 뿐이고, 길이는 (0, 2] 여야 한다.
+        // 🔴 길이 0 은 "창이 있다"고 저작해 놓고 실제로는 게이트가 붙잡을 시간이 0 인 상태라
+        //    조용히 무효가 된다. 그래서 opensCounterWindow 와 짝이 맞는지 여기서 잡는다.
+        foreach (BossAttackEntry e in _boss.attacks)
+        {
+            if (e == null || !e.opensCounterWindow) continue;
+
+            if (e.attackId != BossAttackId.Grab && e.attackId != BossAttackId.Dash)
+                Debug.LogError(
+                    $"{name}: {e.attackId} 행에 opensCounterWindow 가 켜져 있다 — 카운터 창은 " +
+                    "Grab·Dash 만 연다(확정 스펙). 훅·어퍼까지 열면 카운터가 상시 자원이 된다.", this);
+
+            if (e.counterWindowDuration <= 0f || e.counterWindowDuration > 2f)
+                Debug.LogError(
+                    $"{name}: {e.attackId} 의 counterWindowDuration 이 {e.counterWindowDuration:0.##} 다 — " +
+                    "(0, 2] 이어야 한다. 0 이면 창이 열려 있다고 저작해 놓고 실제로는 아무 효과가 없다.", this);
+        }
+
+        // 페이즈 임계는 내림차순(0.66 → 0.33)이어야 페이즈 계산이 성립한다.
+        if (_boss.phases != null)
+        {
+            for (int i = 1; i < _boss.phases.Length; i++)
+            {
+                if (_boss.phases[i].hpThreshold < _boss.phases[i - 1].hpThreshold) continue;
+                Debug.LogError(
+                    $"{name}: phases[{i}].hpThreshold({_boss.phases[i].hpThreshold}) 가 앞 페이즈보다 크거나 같다 — " +
+                    "내림차순으로 저작할 것(0.66 → 0.33).",
+                    this);
+            }
+        }
+
+        // 애니메이터 컨트롤러가 아직 없으면 전수 검증이 전부 오류로 도배된다 — 한 줄만 남기고 건너뛴다.
+        if (animator == null || animator.runtimeAnimatorController == null)
+        {
+            Debug.LogWarning($"{name}: Animator 컨트롤러가 없어 애니 계약 검증을 건너뛴다.", this);
+            ValidateHitboxAnchors();
+            return;
+        }
+
+        // 보스가 실제로 쓰는 것만 검증한다.
+        // attackTrigger 는 검증 대상이 아니다 — 보스의 공격 애니는 ClientRpc CrossFade 로 재생하므로
+        // PlayStateAnimation(Attack) 을 스킵한다(관용구 2). 그래서 값이 있으면 오해의 소지가 있다.
+        if (!string.IsNullOrEmpty(data.attackTrigger))
+            Debug.LogWarning(
+                $"{name}: attackTrigger(\"{data.attackTrigger}\") 는 보스에서 쓰이지 않는다 " +
+                "(공격 애니 = CrossFade 경로). 비워 두는 것이 맞다.",
+                this);
+
+        ValidateParam(data.animSpeedParam, nameof(data.animSpeedParam));
+        ValidateParam(data.hitTrigger, nameof(data.hitTrigger));
+        ValidateParam(data.groggyBool, nameof(data.groggyBool));
+        ValidateParam(data.deathTrigger, nameof(data.deathTrigger));
+        ValidateState(data.locomotionState, nameof(data.locomotionState));
+        ValidateState(_boss.hitReactionState, nameof(_boss.hitReactionState));
+
+        for (int i = 0; i < _boss.attacks.Length; i++)
+        {
+            BossAttackEntry e = _boss.attacks[i];
+            if (e == null)
+            {
+                Debug.LogError($"{name}: attacks[{i}] 가 null 이다.", this);
+                continue;
+            }
+
+            // 공격 행의 상태명은 **비어 있어도 에러**다. ValidateState 는 빈 값을 "의도적 미사용"으로
+            // 건너뛰므로(SO 의 선택 필드용 규칙) 여기서 따로 잡아야 미저작 공격이 애니 없이 도는 것을 막는다.
+            if (string.IsNullOrEmpty(e.animatorStateName))
+            {
+                Debug.LogError(
+                    $"{name}: attacks[{i}]({e.attackId}).animatorStateName 이 비어 있다 — " +
+                    "이 공격은 애니가 재생되지 않는다(판정만 나간다). 애니메이터 상태명을 저작할 것.",
+                    this);
+                continue;
+            }
+            ValidateState(e.animatorStateName, $"attacks[{i}]({e.attackId}).animatorStateName");
+        }
+
+        ValidateHitboxAnchors();
+    }
+
+    void ValidateParam(string param, string field)
+    {
+        if (string.IsNullOrEmpty(param)) return; // 비움 = 의도적 미사용
+        AnimatorControllerParameter[] ps = animator.parameters;
+        for (int i = 0; i < ps.Length; i++)
+            if (ps[i].name == param) return;
+
+        Debug.LogError($"{name}: {field}=\"{param}\" 파라미터가 애니메이터에 없다 — 조용히 무시된다.", this);
+    }
+
+    void ValidateState(string stateName, string field)
+    {
+        if (string.IsNullOrEmpty(stateName)) return;
+        if (animator.HasState(0, Animator.StringToHash(stateName))) return;
+
+        Debug.LogError($"{name}: {field}=\"{stateName}\" 상태가 애니메이터에 없다 — CrossFade 가 조용히 무시된다.", this);
+    }
+
+    // 앵커를 이름으로 1회 색인한다(히트마다 GetComponentsInChildren 을 돌리지 않기 위해).
+    void CacheHitboxAnchors()
+    {
+        _defaultAnchor = meleeAttack != null ? meleeAttack.ColliderInfo : null;
+
+        ColliderInfo[] found = GetComponentsInChildren<ColliderInfo>(true);
+        _anchors = new Dictionary<string, ColliderInfo>(found.Length);
+
+        for (int i = 0; i < found.Length; i++)
+        {
+            ColliderInfo ci = found[i];
+            if (ci == null) continue;
+
+            // 같은 이름이 둘이면 어느 쪽이 잡힐지 모른다 — 설정 결함이므로 소리를 낸다.
+            if (_anchors.ContainsKey(ci.name))
+            {
+                Debug.LogError(
+                    $"{name}: ColliderInfo 자식 이름 \"{ci.name}\" 이 중복이다 — 앵커 지정이 모호해진다. 이름을 유일하게 할 것.",
+                    this);
+                continue;
+            }
+            _anchors.Add(ci.name, ci);
+        }
+    }
+
+    // ─── 어그로 주기 재선정 ────────────────────────────────────────────
+    //
+    // 🔴 시계는 **두 사건**에 묶여 있다(2026-09-03) — 그러지 않으면 "8초 주기"가 성립하지 않는다.
+    //    ① 전투 시작(OnServerLogicResumed) ② 어그로가 실제로 갈아탄 순간(AdoptAggro / ShouldReacquireTarget).
+    //    ⚠️ 초기값 0 을 그대로 두면 착지 시점에 `Time.time - 0` 이 이미 8초를 넘어 있어서
+    //       FSM 이 깨어난 **첫 틱**에 재선정이 돈다("내려오자마자 어그로가 튄다" — 팀장 관찰).
+    float _lastRetargetTime;
+
+    /// <summary>
+    /// 주기가 지났고 교전 중 대기/추격이면 타깃을 다시 고른다.
+    /// 판정은 <see cref="BossAggroPolicy"/> 에 있다(EditMode 로 경계·억제를 고정).
+    /// </summary>
+    /// <summary>같은 사람을 다시 고르지 않게 할지 — SO 노브. MPPM 검증 후 확정할 값이다.</summary>
+    protected override bool RetargetAvoidsCurrentTarget =>
+        _boss != null && _boss.aggroAvoidsRepeatTarget;
+
+    protected override bool ShouldReacquireTarget()
+    {
+        float interval = _boss != null ? _boss.aggroRetargetInterval : 0f;
+        if (!BossAggroPolicy.ShouldRetarget(State, Time.time - _lastRetargetTime, interval))
+            return false;
+
+        // 🔴 성립한 순간 시계를 리셋한다. 여기서 안 하면 base 가 매 틱 재탐색해
+        //    "주기 재선정"이 "상시 최근접 추적"이 된다 — 의도와 정반대다.
+        _lastRetargetTime = Time.time;
+        return true;
+    }
+
+    /// <summary>
+    /// 이 공격이 고른 대상을 <b>어그로로 승계</b>한다 — 점프·돌진 전용(서버).
+    ///
+    /// 🔴 왜 시계를 함께 리셋하는가 (2026-09-03 팀장 관찰 — "점프로 후열을 때리고 원래 대상으로
+    ///    돌아온다"): 승계만 하고 시계를 그대로 두면, 착지해 Idle 로 돌아온 순간 이미 만료된
+    ///    주기 재선정이 즉시 최근접(= 원래 대상)을 다시 물어 <b>승계가 한 프레임짜리</b>가 된다.
+    ///    "어그로가 바뀌었으면 그때부터 다시 8초"가 이 기능의 규약이다.
+    /// </summary>
+    void AdoptAggro(Transform t, string reason)
+    {
+        if (!AdoptTarget(t)) return;
+
+        _lastRetargetTime = Time.time;
+        Edit.Log($"[23호/어그로] {reason} → {t.name} 로 승계 (다음 주기 재선정까지 " +
+                 $"{(_boss != null ? _boss.aggroRetargetInterval : 0f)}초)", this);
+    }
+
+    // ─── 접촉 사거리 진입/이탈 ─────────────────────────────────────────
+    // 판정은 BossContactReachPolicy 에 있다(EditMode 로 경계를 고정). 여기는 상태만 들고 있다.
+    bool _inContactReach;
+
+    // 이탈 경계 = 접촉 행 거리창의 최댓값. 저작이 바뀌면 함께 따라와야 하므로 첫 사용 시 1회 계산한다
+    // (data·_boss 가 배선되기 전에 계산하면 0 이 박힌다 — 스폰 순서에 기대지 않는 편이 안전하다).
+    float _contactReachExit;
+
+    float ContactReachExit(BossAttackEntry[] rows)
+    {
+        if (_contactReachExit > 0f) return _contactReachExit;
+
+        // 하한은 attackRange 다 — 접촉 행이 하나도 없어도 이탈 경계가 진입 경계보다 좁아지지 않게.
+        float exit = data.attackRange;
+        for (int i = 0; i < rows.Length; i++)
+        {
+            if (!BossContactReachPolicy.IsContactRow(rows[i], data.attackRange)) continue;
+            if (rows[i].maxDistance > exit) exit = rows[i].maxDistance;
+        }
+
+        _contactReachExit = exit;
+        return _contactReachExit;
+    }
+
+    // hitboxAnchorName 도 문자열 규약이라 오타가 조용히 무시된다(정본 §10.3 경고).
+    void ValidateHitboxAnchors()
+    {
+        if (_boss.attacks == null) return;
+
+        for (int i = 0; i < _boss.attacks.Length; i++)
+        {
+            BossAttackEntry e = _boss.attacks[i];
+            if (e == null || string.IsNullOrEmpty(e.hitboxAnchorName)) continue;
+            if (_anchors != null && _anchors.ContainsKey(e.hitboxAnchorName)) continue;
+
+            Debug.LogError(
+                $"{name}: attacks[{i}]({e.attackId}).hitboxAnchorName=\"{e.hitboxAnchorName}\" 에 해당하는 " +
+                "ColliderInfo 자식이 없다 — 앵커 지정이 조용히 무시된다.",
+                this);
+        }
+    }
+    #endregion
+
+    #region 공격 선택기 (거리창 → 가중치 → 연속 감쇠 → 폴백)
+    // base 의 SeekBoss 가 매 틱 부른다. NoAttack(-1)을 돌리면 base 가 접근/대기로 폴백한다
+    // (= 전부 쿨이어도 제자리에 멈춰 서지 않는다 — 수용기준 #1).
+    /// <summary>
+    /// 개전 직후 원거리 진입기(Dash·Jump)에 쿨을 걸어 <b>걸어 들어가서 때리게</b> 한다.
+    ///
+    /// 왜 필요한지와 왜 새 상태를 안 만들었는지는 <see cref="BossOpeningAttackPolicy"/> 참조.
+    /// 요지 — 개전엔 플레이어가 멀어 거리창을 통과하는 행이 그 둘뿐이라 룰렛이 반드시 그중
+    /// 하나를 뽑는다(구조적이라 가중치로 못 막는다). 쿨은 시간이 지나면 스스로 풀린다.
+    /// </summary>
+    protected override void OnServerLogicResumed()
+    {
+        base.OnServerLogicResumed();
+        if (!IsServer) return;
+
+        // 🔴 **어그로 주기의 0초는 여기다**(2026-09-03). 이 훅은 BossEncounterDirector 가 착지·NavMesh
+        //    스냅을 끝낸 뒤 부르는 단일 전환점이라 "착지 완료 = 전투 시작"과 정확히 일치한다.
+        //    안 하면 초기값 0 때문에 첫 틱에 재선정이 돌아 어그로가 착지하자마자 튄다.
+        _lastRetargetTime = Time.time;
+
+        // 연출 동안의 접촉 상태는 의미가 없다 — 전투가 새로 시작되므로 "안 붙은" 상태에서 출발한다.
+        _inContactReach = false;
+
+        BossAttackEntry[] rows = _boss != null ? _boss.attacks : null;
+        if (rows == null) return;
+
+        for (int i = 0; i < rows.Length; i++)
+            if (BossOpeningAttackPolicy.IsRangedOpener(rows[i]))
+                MarkAttackJustUsed(i);
+    }
+
+    protected override int SelectAttackSlot(float dist)
+    {
+        BossAttackEntry[] rows = _boss != null ? _boss.attacks : null;
+        if (rows == null || rows.Length == 0)
+            return base.SelectAttackSlot(dist);
+
+        // 🔴 페이즈 시퀀스 소비 지점. 이 함수는 Idle/Walk 에서만 불리므로 여기가 "행동이 끝난 직후"다
+        //    (정본 §9 — 행동 도중 강제 중단 금지).
+        if (_pendingPhaseSequence)
+        {
+            _pendingPhaseSequence = false;
+            int seq = FindSlot(BossAttackId.ChargeSequence);
+            if (seq != NoAttack) return seq;
+
+            Debug.LogError(
+                $"{name}: 페이즈 시퀀스를 시작해야 하는데 공격 테이블에 ChargeSequence 행이 없다 — " +
+                "SO 에 weight 0 행으로 추가할 것. 이번 시퀀스는 건너뛴다.", this);
+        }
+
+        // 🔴 **전역 공격 간격**(팀장 확정 2026-08-13: "다음 공격까지가 너무 빠르다").
+        //    쿨다운이 행마다 따로라 훅L(2.5s)·훅R(2.5s)·어퍼(3s)를 번갈아 쓰면 **쉬는 구간이 0** 이었다.
+        //    행 쿨다운과 별개로, 공격이 끝난 뒤 이 시간만큼은 아무것도 고르지 않는다.
+        //    ⚠️ 페이즈 시퀀스 진입(위)보다 **뒤에** 둔다 — 연출 전환은 기다리게 하면 안 된다.
+        if (Time.time - _lastAttackTickTime < GlobalAttackInterval)
+            return NoAttack;
+
+        if (_weightBuffer == null || _weightBuffer.Length != rows.Length)
+            _weightBuffer = new float[rows.Length];
+
+        // 🔴 접촉 사거리 진입/이탈을 여기서 갱신한다 — 이 함수는 Idle/Chase 마다 불리므로
+        //    "지금 붙어 있는가"를 관측할 수 있는 유일한 지점이다. 공격 도중에는 안 불리는데,
+        //    그 구간에 상태가 굳는 것은 의도한 것이다(후속타가 붙은 상태에서 이어져야 한다).
+        _inContactReach = BossContactReachPolicy.StaysInReach(
+            _inContactReach, dist, data.attackRange, ContactReachExit(rows));
+
+        // 1) 게이트 3단: 페이즈 → 거리창 → 쿨다운. 셋 다 통과 + 가중치 > 0 인 것만 후보다.
+        int candidates = 0;
+        int fallbackSlot = NoAttack;
+        for (int i = 0; i < rows.Length; i++)
+        {
+            _weightBuffer[i] = 0f;
+
+            BossAttackEntry e = rows[i];
+            if (e == null || e.weight <= 0f) continue;
+            if (CurrentPhase < e.allowedFromPhase) continue;
+
+            // 🔴 상한은 저작값이 아니라 **개시 상한**이다 — 접촉 공격은 attackRange 안까지 걸어
+            //    들어간 뒤에만 시작한다(허공 훅 차단). 붙은 뒤에는 저작값까지 계속 때린다.
+            //    돌진·점프는 접촉 행이 아니라 영향을 받지 않는다(BossContactReachPolicy 주석).
+            if (!e.ignoreDistanceWindow)
+            {
+                float max = BossContactReachPolicy.EffectiveMaxDistance(e, data.attackRange, _inContactReach);
+                if (dist < e.minDistance || dist > max) continue;
+            }
+
+            if (!CooldownReady(i)) continue;
+
+            _weightBuffer[i] = e.weight;
+            candidates++;
+            fallbackSlot = i;
+        }
+        if (candidates == 0)
+            return NoAttack;
+
+        // 2) 연속 감쇠. 직전에 쓴 공격은 가중치를 깎고, repeatBlockAfter 회 연속이면 후보에서 아예 뺀다.
+        //    확률 감쇠(repeatPenalty)만으로는 "연속 N회 금지"를 보장할 수 없어 하드 제외가 따로 필요하다.
+        //
+        // 🔴 여기서 수용기준 두 개가 충돌한다 — #2 "같은 공격 연속 3회 금지" vs
+        //    #1 "쿨이어도 멈추지 않는다". 후보가 그 공격 하나뿐이면 둘 중 하나를 깨야 한다.
+        //    멈춰 서는 쪽이 더 나쁜 버그이므로 **대안이 하나도 없을 때만(candidates > 1) 제외**한다.
+        if (_lastSlot >= 0 && _lastSlot < rows.Length && _weightBuffer[_lastSlot] > 0f)
+        {
+            if (_boss.repeatBlockAfter > 0 && _consecutive >= _boss.repeatBlockAfter && candidates > 1)
+            {
+                _weightBuffer[_lastSlot] = 0f;
+                candidates--;
+            }
+            else
+            {
+                _weightBuffer[_lastSlot] *= _boss.repeatPenalty;
+            }
+        }
+
+        // 3) 가중치 룰렛.
+        float total = 0f;
+        for (int i = 0; i < rows.Length; i++)
+            total += _weightBuffer[i];
+
+        // repeatPenalty 가 0 이고 후보가 직전 공격 하나뿐이면 합이 0 이 된다 — 멈추지 않도록 그 후보를 쓴다.
+        if (total <= 0f)
+            return fallbackSlot;
+
+        float roll = Random.value * total;
+        for (int i = 0; i < rows.Length; i++)
+        {
+            roll -= _weightBuffer[i];
+            if (roll < 0f) return i;
+        }
+        return fallbackSlot; // 부동소수 잔차 안전망
+    }
+    #endregion
+
+    #region 훅 — StartAttack / PerformAttackHit / PlayStateAnimation
+    // 관용구 1: 선택 결과를 base.StartAttack() **전에** 확정한다.
+    //           base 가 SetState(Attack)까지 하므로 그 시점에 _currentEntry 가 이미 있어야 한다.
+    protected override void StartAttack()
+    {
+        BossAttackEntry e = EntryFor(CurrentAttackSlot);
+        _currentEntry = e;
+
+        // 연속 카운트는 "실제로 쓴 것" 기준으로 센다(SelectAttackSlot 은 NoAttack 을 돌릴 수 있다).
+        if (CurrentAttackSlot == _lastSlot)
+        {
+            _consecutive++;
+        }
+        else
+        {
+            _lastSlot = CurrentAttackSlot;
+            _consecutive = 1;
+        }
+
+        // 데미지·히트박스 앵커는 여기서 세팅하지 않는다 — 히트 직전(PerformAttackHit)에 확정한다.
+        // meleeAttack 하나를 공격 6종이 돌려 쓰므로, 히트 시점에 세팅하는 편이 항상 _currentEntry 와 일치한다.
+
+        // 쿨 기록(CurrentAttackSlot) + _stateTimer(데드락 타임아웃) + StopAgent + FaceTarget + SetState(Attack).
+        base.StartAttack();
+
+        // 다단계 체인은 관용구 3 대로 base 의 종료 타이머를 **체인 전체 길이**로 덮어쓴다
+        // — 안 늘리면 attackDuration 이 만료돼 다음 단계에 들어가기도 전에 Attack 을 벗어난다.
+        // 여기서 세팅한 _stateTimer 가 곧 슈퍼아머 길이이자 데드락 안전망이 된다.
+        if (e != null)
+        {
+            switch (e.attackId)
+            {
+                case BossAttackId.Grab:
+                    // 선딜 몫 = max(카운터 창, attackDuration).
+                    // 🔴 창으로 **교체**하면 안 된다. 창이 클립의 OnAttackHit 이벤트보다 짧으면 실제
+                    //    선딜은 창이 아니라 이벤트 도착까지이므로 예산이 모자라 안전망이 터진다
+                    //    — 돌진에서 선딜 몫을 빠뜨려 4/4 재현됐던 사고와 같은 종류다(2026-08-13).
+                    //    기존 몫을 하한으로 남겨 그 회귀를 막는다.
+                    _attackPhase = BossAttackPhase.Windup;
+                    _attackPhaseTimer = Mathf.Max(CounterWindowDuration, data.attackDuration);
+                    _stateTimer = _attackPhaseTimer + GrabHold + GrabThrowTime + GrabRecovery + ChainBudgetSlack;
+                    break;
+                case BossAttackId.Jump:
+                    _stateTimer = JumpHover + JumpLanding + JumpRecovery + data.attackDuration;
+                    break;
+                case BossAttackId.ChargeSequence:
+                    // 🔴 **이동 구간을 예산에 넣는다**(2026-08-13). 차징은 송전탑 중심으로 이동한 뒤
+                    //    시작하므로 체인 길이 = 이동 + 제한시간 + 복귀다. 돌진에서 선딜 몫을 빠뜨려
+                    //    매번 안전망이 터졌던 것과 **같은 종류의 실수**라 여기서 미리 닫는다.
+                    _stateTimer = ChargeMoveTimeout + ChargeTimeLimit + data.attackDuration;
+                    break;
+                case BossAttackId.RageDash:
+                    _stateTimer = RageTotalTime + data.attackDuration;
+                    break;
+                case BossAttackId.Dash:
+                    // 선딜 + 돌진 본체 + 복귀. 슈퍼아머 길이이자 데드락 안전망이다.
+                    //
+                    // 🔴 **선딜 몫을 반드시 넣어야 한다**(2026-08-13 수정). 돌진은 애니 이벤트
+                    //    `OnAttackHit`(dash 클립 0.15초)이 와야 시작하는데, 이전 판은 예산을
+                    //    `DashDuration + attackDuration`(0.7+0.9=1.6초)으로만 잡았다. 실제 체인은
+                    //    0.15 + 0.7 + 0.9 = 1.75초라 **매번 0.15초씩 초과**해 Recovery 도중 안전망이
+                    //    터졌다(4/4 재현). Grab 이 attackDuration 을 선딜 몫으로 이미 잡아 두는 것과
+                    //    같은 규약인데, 돌진은 그 값을 Recovery(StopDash)가 쓰므로 몫이 통째로 없었다.
+                    //
+                    // 🔴 카운터 창(2026-09-02): 선딜 몫을 max(창, attackDuration) 으로 올린다.
+                    //    창으로 교체하지 않는 이유는 Grab 쪽 주석과 같다 — 창이 이벤트보다 짧으면
+                    //    실제 선딜이 예산을 넘는다.
+                    _attackPhaseTimer = Mathf.Max(CounterWindowDuration, data.attackDuration);
+                    _attackPhase = BossAttackPhase.Windup;
+                    _stateTimer = _attackPhaseTimer + DashDuration + data.attackDuration + ChainBudgetSlack;
+                    break;
+            }
+        }
+
+        // 공격별 슈퍼아머. SO 전역 플래그(hasSuperArmorWhileAttacking)는 꺼진 상태를 전제한다
+        // — 켜져 있으면 ValidateContract 가 LogError 로 잡는다.
+        // 체인 공격은 전체 길이 동안 유지해야 중간에 경직으로 끊기지 않는다.
+        if (e != null && e.superArmor && status != null)
+            status.ApplyStatus(StatusEffectType.SuperArmor, _stateTimer);
+
+        // 카운터 창: 창을 여는 공격(Grab·Dash)이면 지금 연다.
+        // ⚠️ 정정(2026-09-02): 예전엔 "공격 시작 → 히트"가 곧 창이라 phase 기계가 필요 없었다.
+        //    이제 창 길이가 데이터(counterWindowDuration)로 정해지고 히트와 분리됐다 —
+        //    닫는 것은 히트가 아니라 아래 게이트의 발사(TryReleaseCounterAttack)다.
+        SetCounterWindow(e != null && e.opensCounterWindow);
+
+        // 카운터 선딜 게이트 시작. 창을 여는 공격이면 창 길이로, 아니면 0(비활성)이다.
+        // 🔴 창이 열린 공격은 애니 이벤트가 와도 **즉시 발사하지 않는다** — NotifyAttackHit 이
+        //    준비만 래치하고, 창 타이머가 끝나야 TryReleaseCounterAttack 이 실제 발사를 한다.
+        _warnedCounterTimerBeforeAnimation = false;
+        _counterWindupStartedAt = Time.time;
+        if (e != null && e.opensCounterWindow) _counterWindup.Begin(CounterWindowDuration);
+        else _counterWindup.Reset();
+
+        // 관용구 2: 다지선다 애니는 상태 복제로 실을 수 없다 → ClientRpc 로 CrossFade.
+        // 문자열이 아니라 슬롯 번호를 보낸다(각 피어가 같은 SO 에서 상태명을 조회한다 — GauntletBot 선례).
+        PlayAttackAnimClientRpc(CurrentAttackSlot);
+
+        // 애니가 나간 **뒤에** 각 체인의 진입 처리를 한다(클립이 먼저 보여야 한다).
+        if (e == null) return;
+        switch (e.attackId)
+        {
+            case BossAttackId.Jump: BeginJump(); break;
+            case BossAttackId.ChargeSequence: BeginCharge(); break;
+            case BossAttackId.RageDash: BeginRage(); break;
+        }
+    }
+
+    // 애니 이벤트 OnAttackHit → base.NotifyAttackHit → FireAttackHitOnce 경로로 들어온다.
+    // 히트 이벤트가 없는 클립은 데미지가 나가지 않는다(타이머 폴백 없음 — 넣으면 이벤트 추가 후 두 번 맞는다).
+    protected override void PerformAttackHit()
+    {
+        BossAttackEntry e = _currentEntry;
+        if (e == null)
+        {
+            base.PerformAttackHit();
+            return;
+        }
+
+        // 히트 순간에 카운터 창이 닫힌다 — 못 끊으면 잡힌다/밀린다(창에 실패 대가가 붙는다).
+        SetCounterWindow(false);
+
+        ApplyAttackProfile(e);
+
+        switch (e.attackId)
+        {
+            case BossAttackId.LeftHook:
+            case BossAttackId.RightHook:
+                meleeAttack?.Hit();
+                break;
+
+            case BossAttackId.Upper:
+                meleeAttack?.Hit();
+                OnUpperHit();
+                break;
+
+            case BossAttackId.Grab:
+                // 잡기 판정 순간 = Acquire. 이후 Hold → Throw → Recovery 는 HandleAttack 이 몬다.
+                AcquireGrab();
+                break;
+
+            case BossAttackId.Jump:
+                // 착지 클립의 히트 프레임. Land 단계가 아니면 도약 클립의 오발동이므로 무시한다.
+                if (_attackPhase == BossAttackPhase.Land)
+                    ApplyJumpLandingDamage(e);
+                break;
+
+            case BossAttackId.Dash:
+                // 돌진 시작. 여기가 카운터 창이 닫히는 순간이기도 하다(위에서 이미 닫았다).
+                BeginDash();
+                break;
+
+            // 🔴 이 둘은 히트 이벤트로 시작하지 않는다 — StartAttack 이 이미 BeginRage/BeginCharge 를 했다.
+            //    그런데 **Rage 는 DashAttack 과 같은 클립(Boss_23_dash)을 쓴다.** 그 클립에 심은
+            //    OnAttackHit 이 레이지 중에도 여기로 들어오므로, 명시적으로 받아 두지 않으면
+            //    "미구현" 경고가 뜬다(경고는 신호를 덮는다 — 교훈 #8).
+            case BossAttackId.RageDash:
+            case BossAttackId.ChargeSequence:
+                break;
+
+            default:
+                WarnUnimplementedOnce(e.attackId);
+                break;
+        }
+    }
+
+    // 이 공격의 데미지·판정 형상을 근접 판정기에 반영한다.
+    //
+    // 🔴 StartAttack 이 아니라 **히트 직전**에 하는 이유: meleeAttack 하나를 공격 6종이 돌려 쓰므로
+    //    값을 히트 시점에 확정하면 애니 이벤트가 늦게 도착해도 항상 _currentEntry 와 일치한다.
+    void ApplyAttackProfile(BossAttackEntry e)
+    {
+        if (meleeAttack == null) return;
+
+        // 데미지: 0 이면 SO 의 attackDamage, 페이즈 배수를 곱한다.
+        int dmg = e.damage > 0 ? e.damage : AttackDamage;
+        meleeAttack.SetDamageSnapshot(Mathf.Max(0, Mathf.RoundToInt(dmg * PhaseDamageMultiplier)));
+
+        // 앵커: 지정이 없으면 프리팹에 배선된 원본으로 되돌린다(직전 공격의 앵커가 남지 않게).
+        if (string.IsNullOrEmpty(e.hitboxAnchorName))
+        {
+            meleeAttack.SetColliderInfo(_defaultAnchor);
+            return;
+        }
+        if (_anchors != null && _anchors.TryGetValue(e.hitboxAnchorName, out ColliderInfo anchor))
+            meleeAttack.SetColliderInfo(anchor);
+        // 못 찾으면 직전 형상을 유지한다 — 이름 오타는 스폰 시 ValidateHitboxAnchors 가 LogError 로 잡는다.
+    }
+
+    // 어퍼 Airborne CC 훅 — **의도적으로 비어 있다.**
+    // 팀장 판단(2026-08-07): 어퍼 에어본은 아직 넣지 않는다. 플레이어 수신측이 AttackInfo 의 CC 필드를
+    // 읽지 않기 때문이다(정본 §3.4 — 실제로 `knockbackStrength`/`staggerDuration` 을 읽는 곳이
+    // 플레이어 쪽에 0건이다. 채우는 쪽만 있다: FirstMeleeMainSkill).
+    // 되살릴 때는 이 훅에서 서버가 직접 status 를 걸면 된다 — 대상은 meleeAttack 의 히트 목록에서 받는다.
+    protected virtual void OnUpperHit() { }
+
+    // 공격 애니는 PlayAttackAnimClientRpc 가 CrossFade 로 담당하므로 base 의 attackTrigger 발동을 건너뛴다.
+    // 그 외 상태는 base 매핑 유지 — 단 Hit 은 카운터 전용이라 전용 리액션으로 갈아탄다.
+    protected override void PlayStateAnimation(MonsterState s)
+    {
+        // Attack 을 벗어나면 카운터 창을 닫고 Grab 체인을 끊는다(공격 취소·카운터·사망 전 경로 포함).
+        // base 에 Exit 훅이 없어서, 파생이 상태 전이를 관측할 수 있는 지점은 여기뿐이다.
+        //
+        // 🔴 여기서 AbortAttackChain 을 부르지 않으면 카운터로 잡기를 끊거나 보스가 죽었을 때
+        //    잡힌 플레이어가 이동 권한을 잃은 채 **영구히 갇힌다**(풀어 줄 주체가 사라진다).
+        if (IsServer && s != MonsterState.Attack)
+        {
+            SetCounterWindow(false);
+            AbortAttackChain();
+        }
+
+        // 23호 → Wells **단방향 푸시**(그로기/사망 동반 정지). 상태 전이를 관측할 수 있는 유일한 지점이다.
+        if (IsServer)
+            PushWellsState(s);
+
+        if (s == MonsterState.Attack) return;
+
+        // Hit = 카운터 성공 전용. base 의 hitTrigger 대신 지정된 리액션 상태(getowned)로 CrossFade 한다.
+        // 🔴 RPC 가 아니라 **상태 복제**로 돌기 때문에 늦게 접속한 클라도 같은 애니를 본다.
+        if (_boss != null && s == MonsterState.Hit && !string.IsNullOrEmpty(_boss.hitReactionState))
+        {
+            SafeSetBool(data.groggyBool, false); // Groggy 로 넘어갈 때 base 가 다시 true 로 올린다
+            SafeCrossFade(_boss.hitReactionState);
+            return;
+        }
+
+        base.PlayStateAnimation(s);
+    }
+
+    [ClientRpc]
+    void PlayAttackAnimClientRpc(int slot)
+    {
+        BossAttackEntry e = EntryFor(slot);
+        if (e != null)
+            SafeCrossFade(e.animatorStateName);
+    }
+    #endregion
+
+    #region Grab 체인 (Attack 안의 AttackPhase)
+    // 관용구 3: Attack 안에 서브 시퀀스를 접을 때는 base 의 종료 타이머(_stateTimer)를 통째로
+    // 덮어쓰고 자체 elapsed 로 단계를 나눈다(SpinnerBot 선례).
+    //
+    // 🔴 Grab 체인은 **커밋**이다 — 시작하면 타깃이 범위를 벗어나도 중단하지 않는다.
+    //    그래서 base 의 선딜 취소(cancelWindupIfTargetLeavesRange) 경로를 타지 않는다.
+    protected override void HandleAttack(float dt)
+    {
+        // 🔴 공격이 **끝난 시각**을 이렇게 잡는다 — 이 함수는 Attack 상태 동안 매 틱 도는데,
+        //    체인이든 단타든 전부 여기를 지난다. 그래서 마지막으로 갱신된 값이 곧 "공격 종료 시각"이다.
+        //    (`DecideNextAfterAction` 은 virtual 이 아니라 훅을 걸 수 없고, 종료 경로가 4곳으로 흩어져 있다.)
+        _lastAttackTickTime = Time.time;
+
+        if (_attackPhase == BossAttackPhase.None)
+        {
+            base.HandleAttack(dt); // 단타 공격 — 히트는 애니 이벤트, 종료는 이벤트 + 타이머 폴백
+            return;
+        }
+
+        _stateTimer -= dt;      // 데드락 안전망(단계 합보다 넉넉하게 잡아 둔다)
+        _attackPhaseTimer -= dt;
+
+        // 🔴 **체인 중에는 회전하지 않는다**(팀장 확정 2026-08-13). 이전 판은 여기서 매 틱
+        //    `FaceChainTarget()` 으로 타깃을 향해 돌았다 — 그래서 돌진이 플레이어를 밀고 지나가지
+        //    못하고 대상을 따라 맴돌았다. 방향은 `StartAttack` 직전 조준 1회로 확정된다.
+
+        switch (_attackPhase)
+        {
+            case BossAttackPhase.Windup:
+                // 판정은 애니 이벤트(OnAttackHit → NotifyAttackHit)가 **준비**를 알리고,
+                // 실제 발사는 아래 게이트가 창 타이머 만료까지 미룬다(2026-09-02).
+                // 이벤트가 유실되면 게이트가 안 열리고 _stateTimer 안전망으로 빠진다.
+                //
+                // 🔴 선딜 조준(2026-08-18)은 **잡기 전용으로 유지한다.** 돌진도 Windup 을 쓰게
+                //    됐지만(카운터 창), 돌진이 창 1.5초 동안 타깃을 계속 쫓으면 밀고 지나가야 할
+                //    돌진이 유도탄이 되어 회피 난이도가 통째로 바뀐다 — 이번 스코프 밖의 밸런스
+                //    변경이라 넣지 않는다. 잡기는 성립 순간 Hold 로 넘어가 되먹임이 없다.
+                if (_currentEntry != null && _currentEntry.attackId == BossAttackId.Grab)
+                    FaceTarget();
+
+                _counterWindup.Tick(dt);
+
+                if (_counterWindup.TimerElapsedBeforeAnimationReady && !_warnedCounterTimerBeforeAnimation)
+                {
+                    _warnedCounterTimerBeforeAnimation = true;
+                    Debug.LogWarning(
+                        $"[23호] {_currentEntry?.attackId} 카운터 창({CounterWindowDuration:0.##}초)이 " +
+                        "애니 준비 이벤트보다 먼저 끝났다 — 이벤트를 기다린다. " +
+                        "창을 늘리거나 클립 이벤트를 앞당길 것.", this);
+                }
+
+                TryReleaseCounterAttack();
+                break;
+
+            case BossAttackPhase.Hold:
+                TickGrabHold(dt);
+                if (_attackPhaseTimer <= 0f) BeginGrabThrow();
+                break;
+
+            case BossAttackPhase.Throw:
+                if (_attackPhaseTimer <= 0f) ReleaseGrabThrow();
+                break;
+
+            // ── JumpAttack ────────────────────────────────────────────
+            case BossAttackPhase.Leap:
+                if (_attackPhaseTimer <= 0f) ArriveJump();
+                break;
+
+            case BossAttackPhase.Land:
+                // 착지 데미지는 애니 이벤트(OnAttackHit)가 만든다. 이벤트가 없으면 데미지가 없다
+                // (폴백을 넣으면 이벤트 추가 후 두 번 맞는다 — 정본 §3.3 비대칭 규칙).
+                if (_attackPhaseTimer <= 0f) EnterPhase(BossAttackPhase.Recovery, JumpRecovery);
+                break;
+
+            // ── 페이즈 시퀀스 ─────────────────────────────────────────
+            case BossAttackPhase.ChargeMove:
+                TickChargeMove();
+                break;
+
+            case BossAttackPhase.ChargeWait:
+                TickChargeAura(dt);   // 접근 차단 오라는 차징 대기 구간에서만 돈다
+                TickCharge();
+                break;
+
+            case BossAttackPhase.RageDash:
+                TickRage(dt);
+                break;
+
+            // ── 돌진(S5) ──────────────────────────────────────────────
+            case BossAttackPhase.Dash:
+                TickDash();
+                break;
+
+            case BossAttackPhase.Recovery:
+                if (_attackPhaseTimer <= 0f) FinishChain();
+                break;
+        }
+
+        // 안전망: 이벤트 유실·예상 밖 지연으로 체인이 고착되면 강제 종료한다(조용히 멈추지 않게).
+        if (_stateTimer <= 0f && _attackPhase != BossAttackPhase.None)
+        {
+            // 🔴 예전엔 이 문구가 "Grab 체인"으로 **하드코딩**돼 있었다. 실제로는 Dash·Jump·Charge·Rage
+            //    체인도 같은 안전망을 쓰기 때문에, 돌진의 예산 부족이 **grab 버그로 오진**됐다(한 세션 소모).
+            //    어느 공격인지 반드시 같이 찍는다 — 진단은 자기가 무엇을 봤는지 말해야 한다.
+            string chain = _currentEntry != null ? _currentEntry.attackId.ToString() : "(엔트리 없음)";
+            Debug.LogWarning($"[23호] {chain} 체인이 {_attackPhase} 에서 타임아웃 — 강제 종료한다.", this);
+            AbortAttackChain();
+            DecideNextAfterAction();
+        }
+    }
+
+    // 애니 이벤트 종료로 체인을 끊지 않는다 — 체인이 자기 종료를 소유한다.
+    // (잡기 클립의 OnAttackEnd 가 base 로 가면 Hold 에 들어가기도 전에 Attack 을 벗어난다.)
+    public override void NotifyAttackEnd()
+    {
+        if (IsServer && _attackPhase != BossAttackPhase.None) return;
+        base.NotifyAttackEnd();
+    }
+
+    // 잡기 판정 순간(Acquire). 반경 안 최근접 플레이어를 잡는다.
+    void AcquireGrab()
+    {
+        _attackPhase = BossAttackPhase.Acquire;
+
+        Player target = FindGrabTarget();
+        if (target == null || !target.BeginGrabbedByInstigator(gameObject))
+        {
+            // 헛잡기 — 복귀 경직만 지고 끝낸다(창에 실패 대가가 붙는 것과 대칭).
+            _grabbed = null;
+            EnterPhase(BossAttackPhase.Recovery, GrabRecovery);
+            return;
+        }
+
+        _grabbed = target;
+        _grabTickTimer = 0f;
+        EnterPhase(BossAttackPhase.Hold, GrabHold);
+        CrossFadeGrabStateClientRpc(false);
+    }
+
+    void TickGrabHold(float dt)
+    {
+        // 잡힌 대상이 사라지면(사망·디스폰) 체인을 정리하고 복귀한다.
+        if (!IsGrabbedValid())
+        {
+            _grabbed = null;
+            EnterPhase(BossAttackPhase.Recovery, GrabRecovery);
+            return;
+        }
+
+        if (_boss == null || _boss.grabTickInterval <= 0f || _boss.grabTickDamage <= 0) return;
+
+        _grabTickTimer -= dt;
+        if (_grabTickTimer > 0f) return;
+        _grabTickTimer = _boss.grabTickInterval;
+
+        // 전기 데미지 — 서버 경로(ReceiveAttack)로 넣어 방어/쉴드 계산을 우회하지 않는다.
+        var info = new AttackInfo(_boss.grabTickDamage, AttackType.Default);
+        var ctx = new AttackHitContext(transform.position, transform, null);
+        _grabbed.ReceiveAttack(info, ctx);
+    }
+
+    void BeginGrabThrow()
+    {
+        EnterPhase(BossAttackPhase.Throw, GrabThrowTime);
+        CrossFadeGrabStateClientRpc(true);
+    }
+
+    void ReleaseGrabThrow()
+    {
+        if (IsGrabbedValid())
+        {
+            Player thrown = _grabbed;
+            Vector3 dir = transform.forward;
+            dir.y = 0f;
+            if (dir.sqrMagnitude < 0.0001f) dir = Vector3.forward;
+            dir.Normalize();
+
+            thrown.EndGrabbedByInstigator();
+
+            if (_boss != null && _boss.grabThrowDamage > 0)
+            {
+                var info = new AttackInfo(_boss.grabThrowDamage, AttackType.Default);
+                var ctx = new AttackHitContext(transform.position, transform, null);
+                thrown.ReceiveAttack(info, ctx);
+            }
+
+            OnGrabThrowRelease(thrown, dir, _boss != null ? _boss.grabThrowDistance : 0f);
+        }
+
+        _grabbed = null;
+        EnterPhase(BossAttackPhase.Recovery, GrabRecovery);
+    }
+
+    /// <summary>
+    /// 던진 대상을 실제로 날리는 지점. **의도적으로 비어 있다.**
+    ///
+    /// 🔴 플레이어에게 변위·CC 를 적용할 경로가 아직 없다(PLAN §5.1 G1 — `AttackInfo` 의 CC 필드를
+    /// 읽는 코드가 플레이어 쪽에 0건이고, 플레이어 이동 권한은 오너에게 있어 서버가 위치를 써도
+    /// 복제되지 않는다). CC 적용 주체가 정해지면 여기 한 곳만 채우면 된다.
+    /// </summary>
+    protected virtual void OnGrabThrowRelease(Player thrown, Vector3 direction, float distance)
+    {
+        if (_warnedThrowDisplacement) return;
+        _warnedThrowDisplacement = true;
+
+        Debug.LogWarning(
+            $"[23호] Grab Throw 의 변위({distance:0.#}m)가 아직 적용되지 않는다 — 데미지만 나간다. " +
+            "플레이어 CC 수신 경로 결정 후 OnGrabThrowRelease 를 채울 것(PLAN §5.1 G1).",
+            this);
+    }
+
+    void FinishChain()
+    {
+        _attackPhase = BossAttackPhase.None;
+        DecideNextAfterAction();
+    }
+
+    // 체인을 즉시 끊고 잡은 대상을 반드시 놓는다.
+    // 🔴 카운터 성공·사망·디스폰 등 **모든 이탈 경로**에서 불러야 한다 — 안 놓으면 플레이어가
+    //    이동 권한을 잃은 채 영구히 갇힌다(보스가 죽으면 아무도 풀어 줄 수 없다).
+    void AbortAttackChain()
+    {
+        if (!IsServer) return;
+        // 🔴 조기 반환 **앞**이다. 체인이 이미 None 이어도 자세 홀드는 남아 있을 수 있다
+        //    (준비 자세에서 멈춘 채 카운터를 맞으면 phase 는 정리됐는데 애니는 0 속도다).
+        //    뒤에 두면 그 경우 보스가 영구히 굳는다.
+        ResetCounterWindup();
+
+        if (_attackPhase == BossAttackPhase.None && _grabbed == null && _dashCarried == null) return;
+
+        // Grab: 잡은 대상을 놓는다.
+        if (IsGrabbedValid())
+            _grabbed.EndGrabbedByInstigator();
+        _grabbed = null;
+
+        // 🔴 Dash: 끌고 가던 대상도 반드시 놓는다. Grab 과 **정확히 같은 이유** —
+        //    카운터·사망으로 돌진이 끊기면 플레이어가 이동 권한을 잃은 채 영구히 갇힌다.
+        //    (해제 없이 보스가 죽으면 아무도 풀어 줄 수 없다.)
+        ReleaseDashCarry(applyImpact: false);
+
+        // 🔴 Jump: 체공 중 끊기면(카운터·사망) **메시가 꺼진 채로 남아 보스가 투명해진다.**
+        //    예고 장판도 바닥에 영구히 남는다. 둘 다 여기서 되돌린다.
+        SetModelVisibleClientRpc(true);
+        // 🔴 피격 콜라이더도 반드시 되살린다 — 안 하면 보스가 **영구 무적**으로 남는다.
+        //    메시 복구와 정확히 같은 이유이고, 빠뜨리면 훨씬 치명적이다(전투가 끝나지 않는다).
+        SetHurtableClientRpc(true);
+        HideJumpTelegraphClientRpc();
+        // 같은 이유로 앞뒤 표식 억제도 되돌린다 — 안 하면 표식이 **영구히 숨은 채** 남는다.
+        ReleaseDirectionIndicatorClientRpc();
+        // 🔴 점프가 착지 없이 끊기면 Wells 투척 억제가 **영구히 걸린 채** 남는다 → 폭탄이 영영 안 나온다.
+        ReleaseWellsSuppression();
+
+        // 🔴 Rage: 돌진 중 끊기면 **에이전트 속도가 8배로 고정되고 히트 윈도우가 열린 채 남는다**
+        //    (그 뒤 모든 이동이 초고속이 되고, 다음 공격이 유닛당 1회 제한을 물려받는다).
+        if (_rageDashing) StopRageDash();
+        _rageRemaining = 0;
+
+        // 🔴 송전기: 전기 장판과 송전탑이 남는다 — 보스가 죽어도 아레나에 계속 피해를 준다.
+        EndChargeZone();
+        EndChargeAura();     // 접근 차단 오라도 함께 끈다(카운터·사망으로 끊길 때)
+        _charge?.Cancel();
+
+        _attackPhase = BossAttackPhase.None;
+        _attackPhaseTimer = 0f;
+    }
+
+    void EnterPhase(BossAttackPhase phase, float duration)
+    {
+        _attackPhase = phase;
+        _attackPhaseTimer = Mathf.Max(0f, duration);
+    }
+
+    bool IsGrabbedValid() => _grabbed != null && _grabbed.gameObject.activeInHierarchy;
+
+    // 🔴 **공격 중에는 회전하지 않는다**(팀장 확정 2026-08-13). base 의 매 틱 회전도 함께 끈다.
+    //
+    //    확정 스펙: 돌진은 플레이어를 **밀고 지나가고**, 돌진이 **끝나야** 다시 플레이어를 본다.
+    //    회전을 남겨 두면 어떤 공격이든 보스가 대상을 따라 돌아 제자리에서 맴돈다.
+    //    조준은 `StartAttack` 직전의 `FaceTarget()` 1회 — 그 방향이 공격이 끝날 때까지 유지된다.
+    //    공격이 끝나면 Chase/Idle 로 돌아가며 base 가 다시 타깃을 본다.
+    //
+    //    ⚠️ 잡기 되먹임(2026-08-10 수정)도 이 규칙이 함께 덮는다 — 잡힌 플레이어가 손 소켓을
+    //       따라가는데 그 플레이어를 향해 `LookRotation` 을 걸면 끝없이 돌던 문제.
+    //    ⚠️ 대가: 훅·잡기가 움직이는 플레이어를 놓치기 쉬워진다. 확정 스펙이므로 그대로 둔다.
+    protected override bool FaceTargetWhileAttacking => false;
+
+    // 🔴 **선딜 동안에는 돈다**(팀장 확정 2026-08-18). 위 규칙(공격 중 회전 없음)은 그대로다 —
+    //    바뀐 것은 회전이 감속(No23 = turnSpeed 10)이 되면서 "조준 1회"가 성립하지 않게 된 점이다.
+    //    한 프레임 Slerp 로는 몇 도밖에 못 돌아 보스가 엉뚱한 데를 때린다. 그래서 히트 이벤트가
+    //    나가기 전까지를 조준 구간으로 쓴다.
+    //    ⚠️ 잡기 되먹임은 여전히 안전하다 — 되먹임은 플레이어가 손 소켓에 붙은 **뒤**(AcquireGrab,
+    //       즉 히트 이벤트 시점) 생긴다. 그 순간부터는 이 값이 false 인 것과 같다.
+    protected override bool FaceTargetDuringWindup => true;
+
+    Player FindGrabTarget()
+    {
+        if (_grabBuffer == null) _grabBuffer = new Collider[8];
+
+        float radius = _boss != null ? _boss.grabRadius : 2.2f;
+        int count = Physics.OverlapSphereNonAlloc(
+            transform.position, radius, _grabBuffer, playerMask, QueryTriggerInteraction.Collide);
+
+        Player nearest = null;
+        float best = float.MaxValue;
+        for (int i = 0; i < count; i++)
+        {
+            Collider c = _grabBuffer[i];
+            if (c == null) continue;
+            if (!MonsterTargeting.IsAttackable(c)) continue; // 유령은 잡지 않는다
+
+            Player p = c.GetComponentInParent<Player>();
+            if (p == null) continue;
+
+            float sqr = (p.transform.position - transform.position).sqrMagnitude;
+            if (sqr >= best) continue;
+            best = sqr;
+            nearest = p;
+        }
+        return nearest;
+    }
+
+    float GrabHold => _boss != null ? _boss.grabHoldDuration : 2f;
+    float GrabThrowTime => _boss != null ? _boss.grabThrowDuration : 0.6f;
+    float GrabRecovery => _boss != null ? _boss.grabRecoveryDuration : 0.8f;
+
+    // Hold/Throw 애니. 상태 복제로는 단계를 실을 수 없어(전부 Attack 이다) ClientRpc 로 보낸다.
+    [ClientRpc]
+    void CrossFadeGrabStateClientRpc(bool throwPhase)
+    {
+        if (_boss == null) return;
+        string state = throwPhase ? _boss.grabThrowState : _boss.grabHoldState;
+        if (!string.IsNullOrEmpty(state))
+            SafeCrossFade(state);
+    }
+    #endregion
+
+    #region JumpAttack (Attack 안의 AttackPhase)
+    // 시퀀스: Leap(도약+체공, 착지점 확정·예고 장판·메시 off) → 착지점으로 이동 + 메시 on
+    //         → Land(착지 클립, OnAttackHit 에 AoE) → Recovery → 재판단.
+    //
+    // ⚠️ **애니메이터 `Jump` Int 를 쓰지 않는다.** 정본 §7 의 🔴 함정("Jump 를 0 으로 되돌리지 않으면
+    //    다음 JumpAttack 이 영원히 안 나온다")은 그 Int 로 클립을 넘기는 구조 때문에 생긴다.
+    //    단계별 상태명 CrossFade(관용구 2)로 가면 그 함정이 아예 성립하지 않는다.
+    //
+    // 🔴 **타겟은 행의 attackTargeting 이 정한다.** 거리 무관 + 쿨만이 게이트면 10초마다 기계적으로
+    //    나와 읽히므로, 타겟 규칙이 이 공격의 의도를 만든다(팀장 확정).
+    //    2026-09-03 이전에는 여기가 FindFarthestPlayer() 하드코딩이었고 SO 의 규칙 필드는
+    //    아무도 안 읽는 죽은 데이터였다 — 의도를 데이터로 되돌린 것이 그 정리다.
+    void BeginJump()
+    {
+        // 착지점 = 이 공격이 노리는 대상의 발밑(바닥에 투영). 없으면 제자리.
+        Vector3 point = transform.position;
+        Transform aimed = ResolveAttackTarget(_currentEntry);
+        if (aimed != null)
+        {
+            // 🔴 **노린 사람이 어그로를 가져간다**(2026-09-03 확정). 여기서 승계하지 않으면 착지 후
+            //    보스가 원래 대상에게 되돌아 달려가 "멀리 때리고 돌아온다"가 된다 — 후열을 응징하려고
+            //    후열을 노리게 만든 공격인데 압박이 안 남는다.
+            //    ⚠️ 체공 중에는 모델이 숨겨져 있어(SetModelVisibleClientRpc) 선딜 조준이 새 대상으로
+            //       돌아도 보이지 않는다. 착지점은 아래에서 이 aimed 로 이미 확정된다.
+            AdoptAggro(aimed, "점프 조준");
+
+            point = aimed.position;
+
+            // 🔴 **플레이어 정확히 위에 내려앉으면 안 된다**(팀장 관찰 2026-08-13:
+            //    "플레이어가 가만히 있으면 띄워지고 그 위로 올라가짐").
+            //    `agent.Warp` 로 보스 캡슐을 플레이어 캡슐 안에 꽂아 넣으면 물리 디페네트레이션이
+            //    두 캡슐을 밀어내는데, 수평으로 막히면 **위로** 빠진다 → 플레이어가 떠오른다.
+            //    → 착지점을 **보스가 오던 방향으로** 조금 당겨 캡슐이 겹치지 않게 한다.
+            //    ⚠️ 예고 장판도 이 지점을 쓴다(아래) — 판정과 예고가 어긋나지 않는다.
+            //    ⚠️ 착지 AoE 반경(3.5)이 이 간격보다 훨씬 커서 **데미지는 그대로 들어간다.**
+            Vector3 back = transform.position - point;
+            back.y = 0f;
+            if (back.sqrMagnitude < 0.0001f) back = -transform.forward;
+            point += back.normalized * JumpLandSeparation;
+        }
+
+        if (GroundProbe.TryFindGround(point, 0, out RaycastHit ground, out _))
+            point = new Vector3(point.x, ground.point.y, point.z);
+
+        _jumpArrivePoint = point;
+
+        // 예고 2개: 고정 크기(어디에 떨어지는가) + 0.1 → AoE 점증(언제 떨어지는가).
+        ShowJumpTelegraphClientRpc(point, JumpAoeRadius, JumpHover);
+
+        // 체공 동안 메시를 감춘다 — 착지점으로 순간이동하는 것이 보이지 않게.
+        SetModelVisibleClientRpc(false);
+
+        // 메시만 끄면 **보이지 않는 보스가 맞는다** — 피격 콜라이더도 함께 끈다(2026-08-13).
+        SetHurtableClientRpc(false);
+
+        CrossFadeJumpStateClientRpc(landing: false);
+
+        // 🔴 **공중에서는 폭탄을 던지지 않는다**(팀장 확정 2026-08-13). Wells 는 23호 상태와 무관하게
+        //    자기 주기로 살포하므로, 억제하지 않으면 체공 중에 손 소켓(= 공중)에서 폭탄이 나간다.
+        //    그로기·사망과 같은 억제 경로를 쓴다. 해제는 착지(ArriveJump)와 체인 중단(AbortAttackChain).
+        _wells?.SetSuppressed(true);
+
+        EnterPhase(BossAttackPhase.Leap, JumpHover);
+    }
+
+    // 체공 종료 — 착지점으로 이동하고 메시를 되살린 뒤 착지 클립으로 넘어간다.
+    void ArriveJump()
+    {
+        WarpTo(_jumpArrivePoint);
+        SetModelVisibleClientRpc(true);
+        SetHurtableClientRpc(true);   // 착지했으니 다시 맞는다(BeginJump 의 짝)
+
+        CrossFadeJumpStateClientRpc(landing: true);
+
+        // 땅에 닿았으니 투척 억제를 푼다(BeginJump 의 짝). 🔴 그로기 중이면 그쪽이 다시 억제하므로
+        //    여기서 무조건 풀어도 안전하다 — PushWellsState 가 상태를 매번 다시 밀어 준다.
+        ReleaseWellsSuppression();
+
+        EnterPhase(BossAttackPhase.Land, JumpLanding);
+    }
+
+    // 점프 억제 해제 — 지금 보스 상태가 다시 억제를 요구하면(그로기·사망) 그대로 유지한다.
+    void ReleaseWellsSuppression()
+    {
+        if (_wells == null) return;
+        PushWellsState(State);
+    }
+
+    // 착지 AoE — 애니 이벤트(OnAttackHit)에서 호출된다. 예고 장판과 **같은 반경**을 쓴다
+    // (예고가 판정에 대해 거짓말하지 않게 — 방향 표시기와 같은 원칙).
+    void ApplyJumpLandingDamage(BossAttackEntry entry)
+    {
+        // 🔴 **여기가 "예고 → 착지 이펙트" 인수인계 지점이다**(VFX 배선 자리 · 팀장 확정 2026-09-04).
+        //    예고는 이 줄에서 사라지고, 착지 이펙트는 이 시점부터 시작해야 겹치지 않는다.
+        //    같은 프레임에 데미지 판정도 나가므로(아래) 이펙트·판정·예고 종료가 한 지점에 모인다.
+        //    ⚠️ 이펙트를 다른 지점(애니 클립 이벤트 등)에 걸면 예고와 겹치거나 빈 프레임이 생긴다.
+        HideJumpTelegraphClientRpc();
+
+        int dmg = _boss.jumpLandingDamage > 0
+            ? _boss.jumpLandingDamage
+            : (entry != null && entry.damage > 0 ? entry.damage : AttackDamage);
+        dmg = Mathf.Max(0, Mathf.RoundToInt(dmg * PhaseDamageMultiplier));
+        if (dmg <= 0) return;
+
+        if (_aoeBuffer == null) _aoeBuffer = new Collider[16];
+
+        int count = Physics.OverlapSphereNonAlloc(
+            transform.position, JumpAoeRadius, _aoeBuffer, playerMask, QueryTriggerInteraction.Collide);
+
+        _aoeHits.Clear();
+        for (int i = 0; i < count; i++)
+        {
+            Collider hit = _aoeBuffer[i];
+            if (hit == null) continue;
+            if (!MonsterTargeting.IsAttackable(hit)) continue;
+
+            Hurtbox hurtbox = hit.GetComponentInParent<Hurtbox>();
+            Unit unit = hurtbox != null ? hurtbox.OwnerUnit : hit.GetComponentInParent<Unit>();
+            if (unit == null || unit == this) continue;
+            if (!_aoeHits.Add(unit)) continue; // 유닛당 1회
+
+            var info = new AttackInfo(dmg, AttackType.Default);
+            var ctx = new AttackHitContext(transform.position, transform, hit);
+            if (hurtbox != null) hurtbox.ReceiveAttack(info, ctx);
+            else unit.ReceiveAttack(info, ctx);
+
+            // 🔴 **넉백은 따로 불러야 한다**(2026-08-13 실측). `Unit.ReceiveAttack` 은 `TakeDamage` 만
+            //    하고 `AttackInfo.knockback*` 를 **읽지 않는다** — 그 필드를 채워 보냈더니 아무 일도
+            //    일어나지 않았다. 넉백 진입점은 `Unit.Knockback(방향, 강도)` 하나뿐이다.
+            //    ⚠️ 그 안에서 서버 가드와 **슈퍼아머 차단**을 이미 처리한다(중복 검사 불필요).
+            if (JumpKnockback > 0f)
+                unit.Knockback(AwayFromBoss(unit.transform.position), JumpKnockback);
+        }
+
+        DetonateBombsInJumpRange();
+    }
+
+    // 🔴 점프어택 범위 안의 폭탄은 함께 터진다(팀장 확정 2026-08-10).
+    //
+    // 위의 데미지 판정은 `playerMask` 로 훑기 때문에 폭탄(layer 10)이 **한 건도 걸리지 않는다** —
+    // 마스크를 넓히는 대신 폭탄의 정적 레지스트리를 쓴다(`BossBomb.Active`, 서버 전용).
+    // ⚠️ `Explode()` 가 레지스트리에서 자기를 빼므로 **역순 순회**한다.
+    void DetonateBombsInJumpRange()
+    {
+        float r = JumpAoeRadius;
+        float sqr = r * r;
+
+        for (int i = BossBomb.Active.Count - 1; i >= 0; i--)
+        {
+            BossBomb bomb = BossBomb.Active[i];
+            if (bomb == null) continue;
+            if ((bomb.transform.position - transform.position).sqrMagnitude > sqr) continue;
+
+            bomb.Explode();
+        }
+    }
+
+    /// <summary>
+    /// 이 공격이 <b>노릴 대상</b>을 행의 <c>attackTargeting</c> 으로 고른다(서버 전용).
+    ///
+    /// ⚠️ "누가 맞는가"는 여기서 안 정해진다 — 실제 피해는 히트박스·반경 판정이 따로 고른다
+    ///    (훅은 겹친 전원, Grab 은 포획 순간 반경 내 최근접, Dash 는 경로에 먼저 걸린 사람).
+    ///    이 함수가 정하는 것은 보스가 어디를 노리고 어디로 가느냐뿐이다.
+    ///
+    /// 대상을 못 찾으면 <c>null</c> 을 돌려준다 — 호출측이 폴백을 정한다(Jump 는 제자리).
+    /// </summary>
+    Transform ResolveAttackTarget(BossAttackEntry entry)
+    {
+        if (entry != null && entry.attackTargeting == BossAttackTargeting.FarthestPlayer)
+        {
+            Player farthest = FindFarthestPlayer();
+            return farthest != null ? farthest.transform : null;
+        }
+
+        // AggroTarget — base 가 물고 있는 대상. 주기 재선정은 ShouldReacquireTarget 이 돌린다.
+        return Target;
+    }
+
+    // 최원거리 플레이어(서버). 어그로 대상은 최근접 락온이라 이 규칙엔 쓸 수 없어 직접 훑는다.
+    Player FindFarthestPlayer()
+    {
+        if (_aoeBuffer == null) _aoeBuffer = new Collider[16];
+
+        float radius = _boss != null ? _boss.jumpSearchRadius : 30f;
+        int count = Physics.OverlapSphereNonAlloc(
+            transform.position, radius, _aoeBuffer, playerMask, QueryTriggerInteraction.Collide);
+
+        Player farthest = null;
+        float best = -1f;
+        for (int i = 0; i < count; i++)
+        {
+            Collider c = _aoeBuffer[i];
+            if (c == null) continue;
+            if (!MonsterTargeting.IsAttackable(c)) continue; // 유령은 타겟이 아니다
+
+            Player p = c.GetComponentInParent<Player>();
+            if (p == null) continue;
+
+            float sqr = (p.transform.position - transform.position).sqrMagnitude;
+            if (sqr <= best) continue;
+            best = sqr;
+            farthest = p;
+        }
+        return farthest;
+    }
+
+    // NavMeshAgent 를 쓰는 몸을 순간이동시킨다. Warp 를 안 쓰고 transform 만 옮기면
+    // 에이전트 내부 위치가 갱신되지 않아 다음 이동에서 원래 자리로 튄다.
+    void WarpTo(Vector3 position)
+    {
+        if (agent != null && agent.enabled)
+        {
+            agent.Warp(position);
+            return;
+        }
+        transform.position = position;
+    }
+
+    float JumpHover => _boss != null ? Mathf.Max(0.1f, _boss.jumpHoverTime) : 1.2f;
+    float JumpLanding => _boss != null ? Mathf.Max(0.1f, _boss.jumpLandingDuration) : 1f;
+    float JumpRecovery => _boss != null ? Mathf.Max(0f, _boss.jumpRecoveryDuration) : 0.4f;
+    float JumpAoeRadius => _boss != null ? Mathf.Max(0.1f, _boss.jumpAoeRadius) : 3.5f;
+    float JumpLandSeparation => _boss != null ? Mathf.Max(0f, _boss.jumpLandSeparation) : 1.2f;
+    // 🔴 강도만 있다. `Unit.Knockback(방향, 강도)` 이 받는 것이 그것뿐이라 지속·경직 노브는 두지 않는다
+    //    (지속을 노출해 두면 조절해도 아무 일이 없어 "고장난 노브"가 된다).
+    float JumpKnockback => _boss != null ? Mathf.Max(0f, _boss.jumpKnockbackStrength) : 9f;
+    float DashKnockback => _boss != null ? Mathf.Max(0f, _boss.dashKnockbackStrength) : 12f;
+
+    // 보스에게서 **멀어지는** 수평 방향. 겹쳐 서 있으면 보스 전방으로 민다(0 벡터 금지).
+    Vector3 AwayFromBoss(Vector3 targetPosition)
+    {
+        Vector3 d = targetPosition - transform.position;
+        d.y = 0f;
+        if (d.sqrMagnitude < 0.0001f) return transform.forward;
+        return d.normalized;
+    }
+
+    // ─── 표현(각 피어 로컬) ────────────────────────────────────────────
+    // 🔴 예고 장판은 **보스 자식이 아니다.** 보스가 체공 중 착지점으로 이동하므로 자식이면 따라가 버린다.
+    //    그래서 각 피어가 프리팹을 착지점에 로컬로 띄운다(복제할 상태가 없는 순수 연출).
+    [ClientRpc]
+    void ShowJumpTelegraphClientRpc(Vector3 point, float radius, float growTime)
+    {
+        if (_boss == null || _boss.jumpTelegraphPrefab == null)
+        {
+            WarnNoJumpTelegraphOnce();
+            return;
+        }
+
+        if (_telegraphFixed == null) _telegraphFixed = SpawnLocalTelegraph();
+        if (_telegraphGrowing == null) _telegraphGrowing = SpawnLocalTelegraph();
+
+        // 🔴 알파를 역할별로 갈라 준다(팀장 확정 2026-08-10) — 프리팹은 하나이므로 인스턴스 재질로만 가능하다.
+        //    큰 원은 **더 연하게**(범위만 암시), 차오르는 원은 **더 진하게**(타이밍을 또렷하게).
+        if (_telegraphFixed != null)
+        {
+            // ⚠️ 이 1cm 로는 아레나 중앙 바닥판(보행면 +6cm)을 못 넘어 예고가 판에 묻힌다.
+            //    표준 간격까지 올려 봤다가 되돌렸다 — 시차 때문이다(GroundProbe.SurfaceOffset 주석).
+            //    데칼·스텐실 작업에서 함께 0 으로 간다.
+            _telegraphFixed.transform.position = point + Vector3.up * 0.01f;
+            _telegraphFixed.SetAlpha(_boss.jumpTelegraphOuterAlpha);
+            _telegraphFixed.Show(radius, growTime);
+        }
+        if (_telegraphGrowing != null)
+        {
+            // 차오르는 원은 고정 원보다 1cm 위 — 둘의 **상대** 순서만 이 1cm 가 정한다.
+            _telegraphGrowing.transform.position = point + Vector3.up * 0.02f;
+            _telegraphGrowing.SetAlpha(_boss.jumpTelegraphFillAlpha);
+            _telegraphGrowing.ShowGrowing(0.1f, radius, growTime, 0f);
+        }
+    }
+
+    [ClientRpc]
+    void HideJumpTelegraphClientRpc()
+    {
+        _telegraphFixed?.Hide();
+        _telegraphGrowing?.Hide();
+    }
+
+    AoeTelegraph SpawnLocalTelegraph()
+    {
+        // 부모 없이(씬 루트) 만들어 보스 이동에 끌려가지 않게 한다. 재사용하므로 점프마다 할당이 없다.
+        GameObject go = Instantiate(_boss.jumpTelegraphPrefab);
+        if (go.TryGetComponent(out AoeTelegraph t)) return t;
+
+        Debug.LogError(
+            $"{name}: jumpTelegraphPrefab({go.name}) 에 AoeTelegraph 컴포넌트가 없다 — 예고가 표시되지 않는다.", this);
+        Destroy(go);
+        return null;
+    }
+
+    // 체공 중 메시 숨김. 🔴 animator.transform 하위만 토글한다 —
+    // 보스 루트 하위에는 방향 표시기(BossDirectionIndicator)도 있어서 전체를 끄면 그것까지 사라진다.
+    [ClientRpc]
+    void SetModelVisibleClientRpc(bool visible)
+    {
+        if (_modelRenderers == null) CacheModelRenderers();
+        if (_modelRenderers == null) return;
+
+        for (int i = 0; i < _modelRenderers.Length; i++)
+            if (_modelRenderers[i] != null)
+                _modelRenderers[i].enabled = visible;
+    }
+
+    // 🔴 **체공 중에는 보스를 때릴 수 없다**(팀장 확정 2026-08-13).
+    //    증상: 점프어택 중 화면에는 예고 장판만 있는데 **보이지 않는 보스가 맞았다.**
+    //    `SetModelVisibleClientRpc` 는 **메시만** 끈다 — 콜라이더는 그대로 남아 판정이 살아 있었다.
+    //
+    // 🔴 끄는 대상이 **둘**이다. 하나만 끄면 여전히 맞는다:
+    //    ① `HurtBox`(layer EnemyHurtBox=14) — 정상 피격 경로
+    //    ② **보스 루트의 몸 콜라이더**(layer Enemy=8) — 플레이어 공격 마스크(17664 = 8·10·14)에
+    //       이것도 들어 있다. 루트 콜라이더에서 `GetComponentInParent<Hurtbox>()` 는 **자식인
+    //       HurtBox 를 찾지 못하므로**(부모 방향 탐색) `Unit` 폴백 경로로 데미지가 그대로 들어간다.
+    //
+    // ⚠️ 전 피어에서 끈다. 판정은 서버만 하지만, 콜라이더가 클라에 남아 있으면 플레이어가
+    //    **보이지 않는 몸에 막힌다**(체공 중 보스는 이륙 지점에 그대로 서 있다).
+    [ClientRpc]
+    void SetHurtableClientRpc(bool hurtable)
+    {
+        if (_hurtColliders == null) CacheHurtColliders();
+        if (_hurtColliders == null) return;
+
+        for (int i = 0; i < _hurtColliders.Length; i++)
+            if (_hurtColliders[i] != null)
+                _hurtColliders[i].enabled = hurtable;
+    }
+
+    void CacheHurtColliders()
+    {
+        var list = new List<Collider>(4);
+
+        // ① Hurtbox 가 붙은 오브젝트의 콜라이더(Hurtbox 는 RequireComponent(Collider) 다)
+        foreach (Hurtbox h in GetComponentsInChildren<Hurtbox>(true))
+            if (h != null && h.TryGetComponent(out Collider c)) list.Add(c);
+
+        // ② 루트 몸 콜라이더. 무기 히트박스(layer Weapon)는 **넣지 않는다** — 보스의 공격 판정이라
+        //    이걸 끄면 착지 공격이 죽는다.
+        foreach (Collider c in GetComponents<Collider>())
+            if (c != null && !c.isTrigger && !list.Contains(c)) list.Add(c);
+
+        _hurtColliders = list.ToArray();
+        if (_hurtColliders.Length == 0)
+            Debug.LogWarning($"{name}: 끌 피격 콜라이더를 하나도 못 찾았다 — 체공 중에도 맞는다.", this);
+    }
+
+    Collider[] _hurtColliders;
+
+    void CacheModelRenderers()
+    {
+        Transform model = animator != null ? animator.transform : null;
+        if (model == null) { _modelRenderers = System.Array.Empty<Renderer>(); return; }
+
+        Renderer[] all = model.GetComponentsInChildren<Renderer>(true);
+        var keep = new List<Renderer>(all.Length);
+        for (int i = 0; i < all.Length; i++)
+        {
+            Renderer r = all[i];
+            if (r == null) continue;
+            // 연출용(장판 등)은 모델이 아니다 — HitFlash 와 같은 제외 규칙.
+            if (r.GetComponentInParent<AoeTelegraph>() != null) continue;
+            keep.Add(r);
+        }
+        _modelRenderers = keep.ToArray();
+    }
+
+    // 🔴 NGO 는 RPC 파라미터로 System.String 을 지원하지 않는다 — 상태명을 보내지 말고
+    //    각 피어가 같은 SO 에서 조회하게 한다(Grab 의 CrossFadeGrabStateClientRpc 와 동일 패턴).
+    [ClientRpc]
+    void CrossFadeJumpStateClientRpc(bool landing)
+    {
+        // 🔴 앞뒤 표식은 **착지 후에만** 보인다(팀장 확정 2026-08-10).
+        //    이 RPC 가 점프 비행 구간을 전 피어에서 정확히 감싸므로 여기서 켜고 끈다.
+        //    · 서버에서만 끄면 클라 화면에는 그대로 보인다 — 표식은 클라 비주얼이다.
+        //    · 표시기의 높이 기반 숨김(airborneHideHeight)만으로는 부족하다: 도약 **준비** 동안
+        //      보스는 아직 땅에 있어서 표식이 미리 나온다(Play 에서 관찰된 증상).
+        //    · `SetModelVisibleClientRpc` 는 표시기를 일부러 건드리지 않는다(그쪽 주석 참조) —
+        //      그래서 별도 억제가 필요하다.
+        DirectionIndicator?.SetSuppressed(!landing);
+
+        if (_boss == null) return;
+        string state = landing ? _boss.jumpLandingState : _boss.jumpHoverState;
+        if (!string.IsNullOrEmpty(state))
+            SafeCrossFade(state);
+    }
+
+    // 점프가 착지 없이 끊겼을 때(카운터·사망) 억제를 되돌린다.
+    [ClientRpc]
+    void ReleaseDirectionIndicatorClientRpc() => DirectionIndicator?.SetSuppressed(false);
+
+    // 방향 표시기(앞뒤 링). 클라에도 있어야 하므로 지연 캐시로 잡는다.
+    BossDirectionIndicator _dirIndicator;
+    bool _dirIndicatorSearched;
+    BossDirectionIndicator DirectionIndicator
+    {
+        get
+        {
+            if (!_dirIndicatorSearched)
+            {
+                _dirIndicator = GetComponentInChildren<BossDirectionIndicator>(true);
+                _dirIndicatorSearched = true;
+            }
+            return _dirIndicator;
+        }
+    }
+
+    void WarnNoJumpTelegraphOnce()
+    {
+        if (_warnedNoJumpTelegraph) return;
+        _warnedNoJumpTelegraph = true;
+        Debug.LogWarning(
+            $"{name}: jumpTelegraphPrefab 이 없어 착지 예고가 표시되지 않는다 — 플레이어가 피할 근거가 없다. " +
+            "AoeTelegraph 프리팹을 배선할 것(NetworkObject 는 붙이지 말 것).", this);
+    }
+    #endregion
+
+    #region Wells (폭탄 살포 + 23호 그로기 동반 정지)
+    void SetupWellsServer()
+    {
+        if (_wells == null)
+        {
+            // 웰즈 없는 보스도 성립하므로 에러가 아니다. 다만 폭탄이 안 나가는 건 알려 준다.
+            Debug.LogWarning($"{name}: BossWells 자식이 없어 폭탄 살포가 돌지 않는다.", this);
+            return;
+        }
+
+        _wells.ConfigureCycle(_boss != null ? _boss.bombThrowInterval : 6f);
+        _wells.ThrowCycleElapsed = OnWellsThrowCycle;   // 주기 만료(서버) → 투척 애니 브로드캐스트
+        _wells.ThrowRequested = SpawnAndThrowBomb;      // 클립 이벤트(서버) → 폭탄 실물 스폰
+        _wells.ValidateContract(name);
+    }
+
+    // 서버: 투척 주기가 돌았다 → 전 피어에서 투척 애니를 재생한다.
+    // 실제 폭탄은 클립의 ThrowBombEvent 프레임에 서버가 스폰한다(손을 떠나는 타이밍과 일치).
+    void OnWellsThrowCycle()
+    {
+        if (!IsServer || State == MonsterState.Dead) return;
+        PlayWellsThrowClientRpc();
+    }
+
+    [ClientRpc]
+    void PlayWellsThrowClientRpc() => _wells?.PlayState(BossWellsState.Throw);
+
+    // 클립 이벤트 시점(서버) — 손 소켓에서 대각선 임펄스로 던진다.
+    void SpawnAndThrowBomb()
+    {
+        if (!IsServer || _boss == null) return;
+        if (_boss.bombPrefab == null)
+        {
+            WarnNoBombPrefabOnce();
+            return;
+        }
+
+        Transform socket = _wells != null ? _wells.BombSocket : transform;
+
+        // 🔴 ④ 진단 — 투척 주체와 착지 목표를 남긴다. `[Wells/진단] ①②③` 과 한 줄로 이어진다.
+        Debug.Log($"[23호/폭탄] ④ 스폰 — boss={name} · wells={(_wells != null ? _wells.name : "(없음)")} " +
+                  $"· socket={socket.name} @ {socket.position}", this);
+
+        // 🔴 **착지 지점을 먼저 정한다**(팀장 확정 2026-08-13: 폭탄은 무조건 room 안).
+        //    이전 판은 임펄스를 랜덤으로 줘서 **어디 떨어질지 모르는** 구조였다 — 그래서 벽 밖으로도
+        //    나갔다. 지금은 보행 가능 영역(NavMesh) 안의 지점을 뽑고 **그 지점에 닿는 속도를 역산**한다.
+        //    벽 기준을 콜라이더가 아니라 NavMesh 로 잡는 것은 돌진(StartDashMove)과 같은 규약이다.
+        Vector3 landing = PickBombLandingPoint(socket.position);
+
+        GameObject go = Instantiate(_boss.bombPrefab, socket.position, Quaternion.identity);
+        if (!go.TryGetComponent(out NetworkObject netObj))
+        {
+            Debug.LogError($"{name}: bombPrefab({go.name}) 에 NetworkObject 가 없다 — 스폰할 수 없다.", this);
+            Destroy(go);
+            return;
+        }
+
+        // 🔴 장판 값은 **스폰 전에** 실어 준다. 폭탄이 터질 때 그대로 장판에 넘긴다.
+        //    스폰 뒤에 넘기면 늦는 게 아니라(폭발은 나중이다) — 규약을 한 곳으로 모으기 위해서다.
+        //    SO 가 0 이면 프리팹 값이 그대로 산다(BossDataSO 의 장판 블록 참조).
+        go.TryGetComponent(out BossBomb bomb);
+        bomb?.ConfigureZone(
+            _boss.fireZoneRadius, _boss.fireZoneMaxRadius, _boss.fireZoneLifetime,
+            _boss.fireZoneRefreshLifetimeOnGrow switch
+            {
+                AreaZoneToggleOverride.ForceOn => true,
+                AreaZoneToggleOverride.ForceOff => false,
+                _ => (bool?)null,
+            });
+
+        netObj.Spawn();
+
+        if (bomb == null)
+        {
+            Debug.LogError($"{name}: bombPrefab({go.name}) 에 BossBomb 이 없다 — 던질 수 없다.", this);
+            return;
+        }
+
+        // 확정된 착지 지점에 **닿는 속도**를 역산해서 던진다. 상향각은 SO 값(포물선 모양)을 유지한다.
+        bomb.ThrowWithVelocity(BallisticVelocity(socket.position, landing, _boss.bombThrowPitch));
+    }
+
+    // ─── 폭탄 착지 지점 / 탄도 ────────────────────────────────────────────
+    //
+    // 🔴 확정 스펙(2026-08-13): **랜덤하게 던지되 무조건 room 안. 벽에 걸쳐도 안 된다.**
+    //    보행 가능 영역(NavMesh)을 room 의 정의로 쓴다 — 돌진이 벽을 판정하는 기준과 같다.
+    //    ⚠️ 콜라이더를 안 쓰는 이유: 벽 콜라이더는 낭떠러지를 막아 주지 않고, 레이어·매트릭스를
+    //       하나 더 물어야 한다. NavMesh 는 "설 수 있는 곳"이라는 의미가 이미 맞다.
+    Vector3 PickBombLandingPoint(Vector3 from)
+    {
+        float min = Mathf.Max(0f, BombLandingMinDistance);
+        float max = Mathf.Max(min + 0.5f, BombLandingMaxDistance);
+
+        for (int i = 0; i < BombLandingTries; i++)
+        {
+            // 보스 전방 부채꼴이 아니라 **전 방향**에서 뽑는다(팀장: 랜덤하게).
+            float angle = Random.Range(0f, 360f);
+            float dist = Random.Range(min, max);
+            Vector3 candidate = transform.position + Quaternion.Euler(0f, angle, 0f) * Vector3.forward * dist;
+
+            if (IsInsideRoom(candidate, out Vector3 snapped)) return snapped;
+        }
+
+        // 전부 실패하면 **보스 발밑**으로 떨어뜨린다. 밖으로 내보내느니 가까이 두는 편이 안전하다.
+        Debug.LogWarning($"[23호/폭탄] 착지 지점을 {BombLandingTries}회 뽑아도 room 안을 못 찾았다 — " +
+                         "보스 발밑에 떨어뜨린다. NavMesh 가 구워져 있는지 확인할 것.", this);
+        return IsInsideRoom(transform.position, out Vector3 here) ? here : transform.position;
+    }
+
+    // room 안이고 **가장자리에서 충분히 떨어져 있나**(= 벽에 걸치지 않나).
+    bool IsInsideRoom(Vector3 point, out Vector3 snapped)
+    {
+        snapped = point;
+
+        if (!UnityEngine.AI.NavMesh.SamplePosition(
+                point, out UnityEngine.AI.NavMeshHit hit, BombLandingSampleRadius,
+                UnityEngine.AI.NavMesh.AllAreas))
+            return false;
+
+        // 🔴 가장자리 여유 — 이게 "벽에 걸쳐도 안 된다"를 만든다. 폭탄 반경만큼 안쪽이어야 한다.
+        if (UnityEngine.AI.NavMesh.FindClosestEdge(
+                hit.position, out UnityEngine.AI.NavMeshHit edge, UnityEngine.AI.NavMesh.AllAreas)
+            && edge.distance < BombWallMargin)
+            return false;
+
+        snapped = hit.position;
+        return true;
+    }
+
+    // 상향각 pitch(도)로 from → to 에 도달하는 **초기 속도 벡터**.
+    //   Δy = d·tanθ − g·d² / (2·v²·cos²θ)  →  v² = g·d² / (2·cos²θ·(d·tanθ − Δy))
+    // ⚠️ 공기저항(drag)은 무시한다. drag 가 있으면 **덜 날아가므로** 여전히 room 안이다(안전한 방향).
+    static Vector3 BallisticVelocity(Vector3 from, Vector3 to, float pitchDegrees)
+    {
+        Vector3 flat = to - from;
+        float dy = flat.y;
+        flat.y = 0f;
+
+        float d = flat.magnitude;
+        if (d < 0.01f) return Vector3.up * 0.1f;   // 제자리 — 살짝 띄우기만 한다
+
+        Vector3 dir = flat / d;
+        float theta = Mathf.Deg2Rad * Mathf.Clamp(pitchDegrees, 5f, 80f);
+        float g = Mathf.Abs(Physics.gravity.y);
+
+        float denom = 2f * Mathf.Cos(theta) * Mathf.Cos(theta) * (d * Mathf.Tan(theta) - dy);
+        // 목표가 각도로 도달 불가능한 위치면(위쪽 급경사) 각도를 포기하고 직선으로 던진다.
+        if (denom <= 0.0001f) return (to - from).normalized * 10f;
+
+        float v = Mathf.Sqrt(g * d * d / denom);
+        return (dir * Mathf.Cos(theta) + Vector3.up * Mathf.Sin(theta)) * v;
+    }
+
+    float BombLandingMinDistance => _boss != null ? Mathf.Max(0f, _boss.bombLandingMinDistance) : 3f;
+    float BombLandingMaxDistance => _boss != null ? Mathf.Max(1f, _boss.bombLandingMaxDistance) : 9f;
+    float BombWallMargin => _boss != null ? Mathf.Max(0f, _boss.bombWallMargin) : 1.2f;
+    const int BombLandingTries = 12;
+    const float BombLandingSampleRadius = 2f;   // 후보에서 이만큼 안에 보행면이 있으면 스냅한다
+
+    // 23호 → Wells **단방향 푸시**. 🔴 Wells 가 23호를 폴링하면 순서 의존이 생긴다(정본 §10).
+    void PushWellsState(MonsterState bossState)
+    {
+        if (!IsServer) return;
+
+        BossWellsState next = bossState switch
+        {
+            MonsterState.Dead => BossWellsState.Dead,
+            // Hit 은 카운터 성공 리액션이고 곧 Groggy 로 이어지므로 함께 멈춘다.
+            MonsterState.Groggy or MonsterState.Hit => BossWellsState.Groggy,
+            _ => BossWellsState.Idle,
+        };
+
+        _wells?.SetSuppressed(next != BossWellsState.Idle);
+
+        if (_wellsState.Value != next)
+            _wellsState.Value = next;
+    }
+
+    void OnWellsStateChanged(BossWellsState previous, BossWellsState next) => _wells?.PlayState(next);
+
+    void WarnNoBombPrefabOnce()
+    {
+        if (_warnedNoBombPrefab) return;
+        _warnedNoBombPrefab = true;
+        Debug.LogWarning($"{name}: bombPrefab 이 비어 있어 Wells 가 빈손으로 던진다.", this);
+    }
+    #endregion
+
+    #region 페이즈 시퀀스 — 송전기(차징) → 실패 시 레이지 돌진
+    // 정본 §9.1: ① Charging 진입(중앙 이동 후 대기) ② 전기 장판 on ③ 실드 점증
+    //            ④ 송전탑 활성(1인 1 / 2인 2 / **3인 이상 4**) ⑤ 전멸 → Groggy / 시간초과 → Rage
+    //
+    // ⚠️ 송전탑 구현(아레나 오브젝트)은 IBossChargeSequence 로 분리했다. 구현이 없어도 시퀀스는
+    //    **일관되게 돈다** — 제한시간이 끝나면 스펙대로 Rage 로 넘어간다(실패 취급).
+    // 🔴 확정 스펙(2026-08-13): 차징은 **송전탑들의 중심으로 이동한 뒤**에 애니메이션을 한다.
+    //    그래서 이 함수는 더 이상 차징을 시작하지 않는다 — **이동 구간(ChargeMove)** 을 연다.
+    //    실제 시작은 도착(또는 이동 타임아웃) 뒤의 `StartChargingInPlace()` 다.
+    void BeginCharge()
+    {
+        SetCounterWindow(false); // 차징 중엔 카운터 창 없음(확정 스펙)
+
+        _chargePlayers = CountAlivePlayers();
+        _chargePylons = PylonCountFor(_chargePlayers);
+
+        if (_charge == null) _charge = GetComponentInChildren<IBossChargeSequence>(true);
+
+        // 🔴 **차징 위치 = `BossLandingPoint`**(팀장 확정 2026-08-13).
+        //    처음엔 "송전탑들의 중심"으로 갔는데 Play 에서 중앙으로 가지 않았다. 송전탑 선택 시점과
+        //    등록 상태에 얽혀 있어(런타임 정적 레지스트리) 확정적이지 않다 →
+        //    팀장 대안대로 **아레나에 이미 있는 고정 마커**로 돌아가서 차징한다.
+        //    ⚠️ 참여 송전탑은 여전히 미리 골라 둔다(`TryPrepareCenter`) — Begin 이 그 집합을 재사용해
+        //       이동 후 다시 고르는 것을 막는다. 중심 좌표는 마커가 없을 때만 폴백으로 쓴다.
+        _chargeMoveTarget = transform.position;
+        // 🔴 `out` 을 `&&` 오른쪽에 두면 단축평가로 **대입되지 않는 경로**가 생긴다(컴파일 에러).
+        Vector3 pylonCenter = transform.position;
+        bool havePylonCenter = _charge != null && _charge.TryPrepareCenter(_chargePylons, out pylonCenter);
+
+        Transform landing = FindChargeLandingPoint();
+        if (landing != null)
+        {
+            _chargeMoveTarget = landing.position;
+        }
+        else if (havePylonCenter)
+        {
+            _chargeMoveTarget = pylonCenter;
+            Debug.LogWarning($"{name}: '{ChargeLandingName}' 을 못 찾아 송전탑 중심으로 간다.", this);
+        }
+        else
+        {
+            if (!_warnedNoCharge)
+            {
+                _warnedNoCharge = true;
+                Debug.LogWarning(
+                    $"{name}: 차징 위치를 잡지 못했다('{ChargeLandingName}' 없음 + 송전탑 0개) — " +
+                    "제자리에서 차징한다.", this);
+            }
+            StartChargingInPlace();
+            return;
+        }
+
+        // 보행 가능한 지점으로 스냅한다 — 중심이 탑 위·틈이면 에이전트가 영영 도착하지 못한다.
+        if (UnityEngine.AI.NavMesh.SamplePosition(_chargeMoveTarget, out UnityEngine.AI.NavMeshHit hit,
+                                                  ChargeCenterSampleRadius, UnityEngine.AI.NavMesh.AllAreas))
+            _chargeMoveTarget = hit.position;
+
+        // 🔴 **빠르게 간다**(팀장 확정 2026-08-13: "지금 가는 상태도 너무 느리다").
+        //    돌진과 같은 이유로 **속도만 올려서는 안 된다** — 가속도가 그 속도에 도달할 시간을 안 준다.
+        //    그래서 돌진의 저장·복원 규약(`_dashPrev*`)을 그대로 재사용한다. 복원은 도착 시
+        //    `StartChargingInPlace` 의 `EndDashMove()` 가 한다.
+        if (agent != null && agent.enabled && agent.isOnNavMesh)
+        {
+            if (_dashPrevStopDistance < 0f) _dashPrevStopDistance = agent.stoppingDistance;
+            if (_dashPrevAcceleration < 0f)
+            {
+                _dashPrevAcceleration = agent.acceleration;
+                _dashPrevAutoBraking = agent.autoBraking;
+            }
+
+            agent.stoppingDistance = 0f;          // 목표 지점에 정확히 붙는다
+            agent.autoBraking = true;             // 지나치지 않게 감속은 켠 채로
+            agent.acceleration = DashAcceleration;
+            agent.isStopped = false;
+            agent.speed = MoveSpeed * ChargeMoveSpeedMul;
+            agent.SetDestination(_chargeMoveTarget);
+        }
+
+        // 이동 중에는 로코모션 클립을 보여 준다 — 차징 클립은 도착한 뒤에 튼다(확정 스펙).
+        if (data != null && !string.IsNullOrEmpty(data.locomotionState))
+            CrossFadeStateClientRpc(data.locomotionState);
+
+        Debug.Log($"[23호] 송전기 — {_chargeMoveTarget} 으로 이동 시작 " +
+                  $"(기준 {(landing != null ? ChargeLandingName : "송전탑 중심")} · " +
+                  $"인원 {_chargePlayers}명 → 송전탑 {_chargePylons}개 · " +
+                  $"거리 {Vector3.Distance(transform.position, _chargeMoveTarget):0.#}m)", this);
+
+        EnterPhase(BossAttackPhase.ChargeMove, ChargeMoveTimeout);
+    }
+
+    // 중심으로 이동하는 구간. 도착하거나 시간이 다하면 그 자리에서 차징을 시작한다.
+    void TickChargeMove()
+    {
+        Vector3 a = transform.position; a.y = 0f;
+        Vector3 b = _chargeMoveTarget;  b.y = 0f;
+        bool arrived = (a - b).sqrMagnitude <= ChargeArriveDistance * ChargeArriveDistance;
+
+        if (!arrived && _attackPhaseTimer > 0f) return;
+
+        // 🔴 **제자리에서 차징하지 않는다**(팀장 확정 2026-08-13: "제대로 위치에 도착 안 해도 charging 을 함").
+        //    시간이 다 됐는데 못 갔으면 **그 지점으로 워프**한다. 차징 위치는 연출·오라 범위의 기준이라
+        //    어긋나면 안 되고, 점프어택이 이미 같은 방식으로 착지점에 워프한다(같은 규약).
+        if (!arrived)
+        {
+            Debug.LogWarning($"[23호] 송전기 — {ChargeMoveTimeout:0.#}초 안에 못 갔다(남은 거리 " +
+                             $"{Vector3.Distance(a, b):0.#}m). **워프**로 맞춘다 — 경로가 막혔는지 확인할 것.", this);
+            WarpTo(_chargeMoveTarget);
+        }
+
+        StartChargingInPlace();
+    }
+
+    // 실제 차징 시작 — 송전탑을 올리고, 장판·오라를 켜고, 차징 클립을 튼다.
+    void StartChargingInPlace()
+    {
+        // 이동용으로 올려 뒀던 속도·가속도·정지거리를 되돌리고 멈춘다(돌진과 같은 복원 경로).
+        EndDashMove();
+
+        _charge?.Begin(_chargePylons, ChargeTimeLimit);
+        SpawnChargeZone();
+        BeginChargeAura();
+
+        // 도착했으니 이제 차징 애니메이션을 튼다.
+        BossAttackEntry e = _currentEntry;
+        if (e != null && !string.IsNullOrEmpty(e.animatorStateName))
+            CrossFadeStateClientRpc(e.animatorStateName);
+
+        Debug.Log($"[23호] 송전기 시작 — 인원 {_chargePlayers}명 → 송전탑 {_chargePylons}개, " +
+                  $"제한시간 {ChargeTimeLimit:0.#}초", this);
+        EnterPhase(BossAttackPhase.ChargeWait, ChargeTimeLimit);
+    }
+
+    float _lastAttackTickTime = -999f;   // 마지막으로 공격 중이던 시각(= 공격 종료 시각)
+    float GlobalAttackInterval => _boss != null ? Mathf.Max(0f, _boss.globalAttackInterval) : 1.5f;
+
+    // 차징 위치 마커. bossroom 에 이미 있는 것을 쓴다(`BossEncounterDirector` 도 같은 이름을 찾는다).
+    const string ChargeLandingName = "BossLandingPoint";
+    Transform _chargeLanding;
+
+    Transform FindChargeLandingPoint()
+    {
+        // 한 번 찾으면 캐시한다. 씬이 바뀌면 파괴되므로 null 검사로 다시 찾는다.
+        if (_chargeLanding != null) return _chargeLanding;
+
+        GameObject go = GameObject.Find(ChargeLandingName);
+        _chargeLanding = go != null ? go.transform : null;
+        return _chargeLanding;
+    }
+
+    Vector3 _chargeMoveTarget;
+    int _chargePylons;
+    int _chargePlayers;
+    const float ChargeCenterSampleRadius = 4f;   // 중심을 보행면으로 스냅할 때 허용 반경
+    float ChargeArriveDistance => _boss != null ? Mathf.Max(0.1f, _boss.chargeMoveArriveDistance) : 0.6f;
+    float ChargeMoveTimeout => _boss != null ? Mathf.Max(0.5f, _boss.chargeMoveTimeout) : 4f;
+    float ChargeMoveSpeedMul => _boss != null ? Mathf.Max(1f, _boss.chargeMoveSpeedMultiplier) : 3f;
+
+    // 임의의 상태명을 전 피어에 CrossFade 한다(관용구 2 — 다지선다 애니는 상태 복제로 못 싣는다).
+    [ClientRpc]
+    void CrossFadeStateClientRpc(string stateName) => SafeCrossFade(stateName);
+
+    void TickCharge()
+    {
+        BossChargeResult result = _charge != null ? _charge.Poll() : BossChargeResult.InProgress;
+
+        // 제한시간 만료 = 실패(정본 §9.1). 구현이 없을 때도 이 경로로 빠진다.
+        if (result == BossChargeResult.InProgress && _attackPhaseTimer > 0f)
+            return;
+
+        bool cleared = result == BossChargeResult.AllPylonsDestroyed;
+        EndChargeZone();
+        EndChargeAura();     // 🔴 성공·실패 **양쪽 모두** 여기를 지난다 — 오라가 남으면 영구 장판이 된다
+        _charge?.Cancel();
+
+        if (cleared)
+        {
+            // 🔴 송전기 그로기는 카운트를 올리되 **Break 로 승격하지 않는다** —
+            //    페이즈 전환 직후 5초 무력화가 겹치면 페이즈 연출이 죽는다(확정 스펙).
+            _attackPhase = BossAttackPhase.None;
+            Debug.Log("[23호] 송전기 전멸 — 그로기(Break 승격 없음)", this);
+            EnterCounterGroggy(
+                allowBreak: false,
+                durationOverride: _boss != null ? _boss.chargeClearGroggyDuration : 1f);
+            return;
+        }
+
+        Debug.Log("[23호] 송전기 실패 — 레이지 돌진으로 넘어간다", this);
+        StartRageAfterCharge();
+    }
+
+    // 차징 실패 → 레이지. 같은 Attack 상태를 이어 쓰지 않고 공격을 새로 시작한다
+    // (레이지는 별도 행이라 쿨·슈퍼아머·애니를 자기 것으로 받아야 한다).
+    void StartRageAfterCharge()
+    {
+        _attackPhase = BossAttackPhase.None;
+
+        int slot = FindSlot(BossAttackId.RageDash);
+        if (slot == NoAttack)
+        {
+            Debug.LogError(
+                $"{name}: 공격 테이블에 RageDash 행이 없다 — 레이지를 건너뛴다. SO 에 weight 0 행으로 추가할 것.", this);
+            DecideNextAfterAction();
+            return;
+        }
+
+        CurrentAttackSlot = slot;
+        StartAttack();
+    }
+
+    void BeginRage()
+    {
+        _rageRemaining = _boss != null ? Mathf.Max(1, _boss.rageDashCount) : 3;
+        SetCounterWindow(false); // 레이지는 카운터 창 없음(실패 벌칙이 쉽게 풀려선 안 된다)
+        BeginRageDash();
+    }
+
+    void BeginRageDash()
+    {
+        // 🔴 **즉시 조준이어야 한다.** 바로 다음 줄에서 transform.forward 를 돌진 방향으로 굳히기
+        //    때문이다 — 감속 회전을 쓰면 그 프레임의 어중간한 각도가 그대로 방향이 된다.
+        //    레이지는 연타(rageDashCount)라 매 회 새로 조준한다. (2026-08-18 감속 회전 도입)
+        FaceTargetImmediate();
+        _rageDashDir = transform.forward;
+        _rageDashDir.y = 0f;
+        if (_rageDashDir.sqrMagnitude < 0.0001f) _rageDashDir = Vector3.forward;
+        _rageDashDir.Normalize();
+
+        _rageDashing = true;
+        meleeAttack?.BeginHitWindow(); // 경로상 유닛당 1회 보장(SpinnerBot 선례)
+        ApplyRageDamageSnapshot();
+        StartDashMove(_rageDashDir, RageDashSpeedMul, RageDashMaxDistance);
+
+        EnterPhase(BossAttackPhase.RageDash, RageDashDuration);
+    }
+
+    // 한 phase(RageDash) 안에서 **돌진 중 / 간격 대기 중** 두 구간이 번갈아 돈다.
+    // 구간 구분은 _rageDashing 이 한다 — 타이머만으로는 둘을 가를 수 없다.
+    void TickRage(float dt)
+    {
+        if (_rageDashing)
+        {
+            meleeAttack?.Hit(); // 히트 윈도우가 중복 피격을 막는다
+            if (_attackPhaseTimer > 0f) return;
+
+            StopRageDash();
+            _rageRemaining--;
+
+            if (_rageRemaining > 0)
+            {
+                _attackPhaseTimer = RageDashInterval; // 같은 phase 로 간격 대기
+                return;
+            }
+
+            EnterPhase(BossAttackPhase.Recovery, RageDashInterval);
+            return;
+        }
+
+        // 간격 대기 중 — 끝나면 다음 돌진.
+        if (_attackPhaseTimer > 0f) return;
+        BeginRageDash();
+    }
+
+    void StopRageDash()
+    {
+        _rageDashing = false;
+        meleeAttack?.EndHitWindow();
+        EndDashMove();
+    }
+
+    void ApplyRageDamageSnapshot()
+    {
+        if (meleeAttack == null) return;
+
+        BossAttackEntry e = _currentEntry;
+        int dmg = _boss != null && _boss.rageDashDamage > 0
+            ? _boss.rageDashDamage
+            : (e != null && e.damage > 0 ? e.damage : AttackDamage);
+        meleeAttack.SetDamageSnapshot(Mathf.Max(0, Mathf.RoundToInt(dmg * PhaseDamageMultiplier)));
+    }
+
+    #region 돌진 (S5 — 캐리-푸시)
+    // 설계 참조 = 오버워치 라인하르트 돌진. 가져온 규칙 3가지는 BossDataSO 의 Dash 헤더에 적어 뒀다.
+    //
+    // 🔴 **왜 콜라이더가 아니라 NavMesh 클램프인가** (팀 논의에서 콜라이더 안이 먼저 나왔다):
+    //    `Restrained.Push` 는 서버가 매 틱 "보스위치 + forward × offset" 으로 플레이어 **위치를 강제**한다.
+    //    즉 끌려가는 플레이어의 콜라이더는 벽을 막아 주지 못하고, 보스 콜라이더가 벽에 닿을 때면
+    //    플레이어는 이미 벽 **안**이다. 그래서 목적지를 offset + 여유만큼 앞당겨 보스가 먼저 멈추게 한다.
+    //    벽 콜라이더 대신 NavMesh 를 기준으로 삼은 이유:
+    //      · 기준이 "보행 가능 영역의 끝"이라 **낭떠러지로 밀어넣는 사고까지 함께 막힌다**(이 맵엔 낙하 구역이 있다)
+    //      · 속도배수 6짜리 고속 이동에서 트리거 콜라이더는 프레임 사이를 건너뛴다(터널링). 레이캐스트는 안 놓친다
+    //      · 프리팹에 콜라이더·레이어·충돌 매트릭스를 더 얹지 않아도 된다
+    void BeginDash()
+    {
+        // 🔴 여기서 다시 조준하지 않는다(2026-08-13). 돌진은 애니 이벤트(클립 0.15초)로 시작하는데
+        //    그 순간 타깃 쪽으로 한 번 더 돌면 "공격 중 회전 없음" 규칙이 깨지고, 선딜을 보고 피한
+        //    플레이어를 다시 따라잡는 꼴이 된다. 방향은 StartAttack 조준에서 이미 확정됐다.
+        _dashDir = transform.forward;
+        _dashDir.y = 0f;
+        if (_dashDir.sqrMagnitude < 0.0001f) _dashDir = Vector3.forward;
+        _dashDir.Normalize();
+
+        _dashCarried = null;
+        meleeAttack?.BeginHitWindow();   // 경로상 유닛당 1회 보장 — 스침 데미지가 중복되지 않는다
+        ApplyDashDamageSnapshot();
+
+        // 아직 아무도 안 끌고 있으니 여유 0. 캐리가 성립하는 순간 다시 잡는다.
+        _dashBlockedAhead = StartDashMove(_dashDir, DashSpeedMul, DashMaxDistance);
+
+        EnterPhase(BossAttackPhase.Dash, DashDuration);
+    }
+
+    void TickDash()
+    {
+        meleeAttack?.Hit();              // 경로상 스침 데미지(히트 윈도우가 중복을 막는다)
+
+        if (_dashCarried == null)
+            TryCarryDashTarget();
+
+        bool arrived = DashDestinationReached();
+        if (_attackPhaseTimer > 0f && !arrived) return;
+
+        // 목적지에 **닿아서** 멈췄고 그 목적지가 보행면 끝이었으면 벽 충돌이다.
+        // 시간이 먼저 끝났으면 거리를 소진한 것이라 데미지가 없다(라인하르트 규칙 ②).
+        StopDash(hitWall: _dashBlockedAhead && arrived);
+        EnterPhase(BossAttackPhase.Recovery, data != null ? data.attackDuration : 0.9f);
+    }
+
+    // 라인하르트 규칙 ① — 직접 충돌한 **첫 1명**만 끌고 간다. 나머지는 스침 데미지만 받는다.
+    void TryCarryDashTarget()
+    {
+        if (_grabBuffer == null) _grabBuffer = new Collider[8];
+
+        Vector3 probe = transform.position + _dashDir * DashCarryFrontOffset;
+        int count = Physics.OverlapSphereNonAlloc(
+            probe, DashCarryProbeRadius, _grabBuffer, playerMask, QueryTriggerInteraction.Collide);
+
+        for (int i = 0; i < count; i++)
+        {
+            Player p = _grabBuffer[i] != null ? _grabBuffer[i].GetComponentInParent<Player>() : null;
+            if (p == null) continue;
+
+            // 🔴 bool 반환이 계약이다 — 슈퍼아머면 **밀리지 않는다**(확정 스펙: 밀림✕ 기절✕ 데미지○).
+            //    데미지는 히트 윈도우가 따로 처리하므로, 여기서 거부돼도 그 대상은 맞긴 맞는다.
+            if (!p.BeginRestrainedByInstigator(gameObject, RestraintMode.Push, DashCarryFrontOffset))
+                continue;
+
+            _dashCarried = p;
+
+            // 🔴 **밀고 간 사람이 어그로를 가져간다**(2026-09-03 확정). 돌진은 조준 기준으로는 이미
+            //    어그로 대상에게 가므로 승계할 새 대상이 없다 — 실제로 압박을 받은 사람은 경로에
+            //    걸린 이 플레이어다. 돌진이 끝나면 보스가 그 옆에 서 있으니 어그로도 거기 남는다.
+            //    ⚠️ 헛돌면(캐리 미성립) 여기까지 오지 않으므로 어그로는 그대로다.
+            //    ⚠️ 방향(_dashDir)은 이미 고정돼 있고 히트도 나간 뒤라 조준이 흔들리지 않는다.
+            AdoptAggro(p.transform, "돌진 캐리");
+
+            // 이제 끌고 가므로 목적지를 앞당겨 다시 잡는다 — 안 하면 대상이 벽 안에 낀다.
+            _dashBlockedAhead = StartDashMove(
+                _dashDir, DashSpeedMul, DashMaxDistance, DashCarryFrontOffset + DashCarryWallMargin);
+            return;
+        }
+    }
+
+    void StopDash(bool hitWall)
+    {
+        meleeAttack?.EndHitWindow();
+        EndDashMove();
+        ReleaseDashCarry(applyImpact: hitWall);
+    }
+
+    // 라인하르트 규칙 ② — **벽에 처박혔을 때만** 충돌 데미지와 기절을 준다.
+    // 거리를 소진하고 멈추면 놓아주기만 한다(위치 선정에 보상을 주는 설계).
+    void ReleaseDashCarry(bool applyImpact)
+    {
+        if (_dashCarried == null) return;
+
+        Player carried = _dashCarried;
+        _dashCarried = null;
+
+        if (carried == null || !carried.gameObject.activeInHierarchy) return;
+
+        carried.EndRestrainedByInstigator();
+        if (!applyImpact) return;
+
+        int dmg = _boss != null && _boss.dashDamage > 0
+            ? _boss.dashDamage
+            : (_currentEntry != null && _currentEntry.damage > 0 ? _currentEntry.damage : AttackDamage);
+        dmg = Mathf.Max(0, Mathf.RoundToInt(dmg * PhaseDamageMultiplier));
+
+        if (dmg > 0)
+        {
+            var info = new AttackInfo(dmg, AttackType.Default);
+            var ctx = new AttackHitContext(transform.position, transform);
+            Hurtbox hurtbox = carried.GetComponentInChildren<Hurtbox>();
+            if (hurtbox != null) hurtbox.ReceiveAttack(info, ctx);
+            else carried.ReceiveAttack(info, ctx);
+        }
+
+        // 🔴 **벽에 처박은 충격으로 밀어낸다**(팀장 확정 2026-08-13). 방향 = 보스 → 대상 바깥쪽(벽 쪽).
+        //    데미지와 **별개 호출**이다 — ReceiveAttack 은 AttackInfo 의 넉백 필드를 읽지 않는다.
+        //    데미지가 0 이어도 밀리는 것이 맞으므로 위 `dmg > 0` 블록 밖에 둔다.
+        if (DashKnockback > 0f)
+            carried.Knockback(AwayFromBoss(carried.transform.position), DashKnockback);
+
+        // 실제로 밀린 대상만 기절한다 — 슈퍼아머로 캐리를 거부한 대상은 여기 오지 않는다.
+        if (DashStunDuration > 0f && carried.StatusEffects != null)
+            carried.StatusEffects.Apply(StatusEffectType.Stunned, DashStunDuration, NetworkObjectId);
+    }
+
+    void ApplyDashDamageSnapshot()
+    {
+        if (meleeAttack == null) return;
+
+        // 경로 스침 데미지. 벽 충돌 데미지(ReleaseDashCarry)와 달리 공격 행 값을 그대로 쓴다.
+        BossAttackEntry e = _currentEntry;
+        int dmg = e != null && e.damage > 0 ? e.damage : AttackDamage;
+        meleeAttack.SetDamageSnapshot(Mathf.Max(0, Mathf.RoundToInt(dmg * PhaseDamageMultiplier)));
+    }
+
+    bool DashDestinationReached()
+    {
+        Vector3 a = transform.position; a.y = 0f;
+        Vector3 b = _dashDestination;   b.y = 0f;
+        if ((a - b).sqrMagnitude <= DashArriveEpsilon * DashArriveEpsilon) return true;
+
+        // 🔴 **지나쳤으면 도착이다.** 가속도를 제대로 올린 뒤에야 문제가 되는 판정 —
+        //    15m/s 면 60fps 에서 프레임당 0.25m 라 epsilon(0.35m) 안에 걸리지만, 30fps 면 0.5m 라
+        //    목적지를 건너뛴다. 그러면 arrived 가 영원히 false 라 **벽 충돌 데미지·기절이 죽는다**
+        //    (StopDash 의 hitWall 인자가 arrived 를 요구한다).
+        Vector3 flat = _dashDir; flat.y = 0f;
+        return Vector3.Dot(a - b, flat) > 0f;
+    }
+    #endregion
+
+    // NavMesh 경계까지 클램프한 목표로 돌진(SpinnerBot 선례 — 낭떠러지 진입 불가, 가장자리에서 정지).
+    // 반환값 = **목적지가 경계에서 잘렸나**(true 면 그 끝이 벽/낭떠러지다). 돌진이 벽 충돌을 판정하는 근거다.
+    // clearance > 0 이면 그 지점에서 그만큼 **앞당겨** 멈춘다(캐리 대상이 벽에 끼지 않게).
+    bool StartDashMove(Vector3 dir, float speedMultiplier, float maxDistance, float clearance = 0f)
+    {
+        _dashDestination = transform.position;
+
+        // 🔴 **조용히 실패하지 않는다**(2026-08-18). 여기서 그냥 return 하면 목적지가 제자리로 남아
+        //    TickDash 의 도착 판정이 즉시 성립하고, 보스는 클립만 재생하며 한 발도 안 나간다.
+        //    실제로 그 증상으로 한 세션이 소모됐다(연출 중 FSM 이 돌아 에이전트가 꺼진 채 시작한 돌진).
+        //    원인은 MonsterBase.SetServerLogicSuspended 에서 닫았지만, 다른 경로로 또 들어오면
+        //    무엇이 없었는지 이 줄이 말해 준다 — 진단은 자기가 무엇을 봤는지 말해야 한다.
+        if (agent == null || !agent.enabled || !agent.isOnNavMesh)
+        {
+            string why = agent == null ? "agent 없음"
+                       : !agent.enabled ? "agent 꺼짐(연출·넉백 구간에서 시작했나?)"
+                       : "NavMesh 밖";
+            Debug.LogWarning($"[23호/돌진] 이동을 시작하지 못했다 — {why}. 목적지가 제자리로 남아 " +
+                             "애니메이션만 돌고 변위가 0 이 된다.", this);
+            return false;
+        }
+
+        Vector3 origin = transform.position;
+        Vector3 desired = origin + dir * maxDistance;
+        bool blocked = UnityEngine.AI.NavMesh.Raycast(origin, desired, out UnityEngine.AI.NavMeshHit hit,
+                                                      UnityEngine.AI.NavMesh.AllAreas);
+        if (blocked) desired = hit.position;
+
+        if (clearance > 0f)
+        {
+            Vector3 pulled = desired - dir * clearance;
+            // 앞당긴 지점이 출발점보다 뒤면 이미 벽에 붙어 있는 것 — 제자리에 선다(뒷걸음질 금지).
+            desired = Vector3.Dot(pulled - origin, dir) > 0f ? pulled : origin;
+        }
+
+        // 🔴 stoppingDistance 를 0 으로 내린다. base 기본값(attackRange × 0.8 ≈ 1.6m)이면
+        //    목적지에서 그만큼 앞에 멈춰 "도착"이 영원히 성립하지 않는다 → 벽 충돌 판정이 죽는다.
+        if (_dashPrevStopDistance < 0f) _dashPrevStopDistance = agent.stoppingDistance;
+        agent.stoppingDistance = 0f;
+
+        // 🔴 속도만 올려서는 안 나간다 — 가속도가 그 속도에 **도달할 시간을 주지 않는다**(위 상수 주석).
+        //    stoppingDistance 와 같은 저장/복원 규약을 따른다(재진입 시 원본을 덮어쓰지 않게 -1 가드).
+        if (_dashPrevAcceleration < 0f)
+        {
+            _dashPrevAcceleration = agent.acceleration;
+            _dashPrevAutoBraking = agent.autoBraking;
+        }
+        agent.acceleration = DashAcceleration;
+        agent.autoBraking = false;      // 목적지 근처 감속 금지 — 벽에 처박는 판정이 이 속도를 전제한다
+
+        agent.isStopped = false;
+        agent.speed = Mathf.Max(0.1f, MoveSpeed * speedMultiplier);
+        agent.SetDestination(desired);
+        _dashDestination = desired;
+
+        // 클램프가 목적지를 출발점까지 끌어당겼으면 이번 돌진은 변위가 0 이다. 벽에 코를 박고
+        // 시전한 정상 상황일 수도 있지만, NavMesh.Raycast 가 **출발점이 메시 밖일 때** 같은 결과를
+        // 내므로 조용히 넘기면 위와 똑같이 "제자리 돌진"으로 보인다. 값을 찍어 둘을 가른다.
+        if ((desired - origin).sqrMagnitude <= DashArriveEpsilon * DashArriveEpsilon)
+            Debug.LogWarning($"[23호/돌진] 목적지가 출발점과 같다 — 변위 0. origin {origin}, " +
+                             $"desired {desired}, blocked {blocked}, clearance {clearance:F2}. " +
+                             "벽에 붙어 시전했거나 출발점이 NavMesh 밖이다.", this);
+
+        return blocked;
+    }
+
+    // 돌진 종료 공통 — 속도·정지거리를 되돌리고 멈춘다. 되돌리지 않으면 이후 **모든 이동이 초고속**이 되고
+    // 정지거리가 0 인 채로 남아 추격이 대상에 파고든다.
+    void EndDashMove()
+    {
+        if (agent != null && agent.enabled)
+        {
+            agent.speed = MoveSpeed;
+            if (_dashPrevStopDistance >= 0f) agent.stoppingDistance = _dashPrevStopDistance;
+
+            // 가속도·자동감속도 되돌린다 — 안 되돌리면 이후 **모든 추격이 즉시 최고속**이 되고
+            // 목적지 앞에서 멈추지 않아 대상에 파고든다(speed 를 되돌리는 것과 같은 이유).
+            if (_dashPrevAcceleration >= 0f)
+            {
+                agent.acceleration = _dashPrevAcceleration;
+                agent.autoBraking = _dashPrevAutoBraking;
+            }
+        }
+        _dashPrevStopDistance = -1f;
+        _dashPrevAcceleration = -1f;
+        StopAgentHard();
+    }
+
+    // base 의 StopAgent 는 private 이라 파생이 못 부른다 — 같은 일을 하는 최소 구현.
+    void StopAgentHard()
+    {
+        if (agent == null || !agent.enabled || !agent.isOnNavMesh) return;
+        agent.isStopped = true;
+        agent.velocity = Vector3.zero;
+    }
+
+    #region 차징 오라 — 접근 차단 (H1/H2)
+    // 🔴 확정 스펙(2026-08-13): 차징 동안 보스 **주변 원형 범위**가 **주기적으로** 데미지 + 넉백을
+    //    줘서 플레이어가 다가와 때리지 못하게 한다. 크기는 점프어택과 비슷(SO 기본 3.5m).
+    //
+    // ⚠️ `chargeZonePrefab`(AreaZone) 과는 별개다. 그쪽은 배선이 비어 있고 **밀치기 경로가 없다**
+    //    (SpawnChargeZone 주석 참조). 여기는 **넉백까지** 필요하므로 보스가 직접 판정한다.
+    // ⚠️ 판정은 서버 전용, 예고 비주얼은 전 피어. 예고가 판정에 대해 거짓말하지 않게
+    //    **같은 반경**을 쓴다(점프 예고·방향 표시기와 같은 원칙).
+    void BeginChargeAura()
+    {
+        if (ChargeAuraRadius <= 0f) return;
+
+        _chargeAuraActive = true;
+        _chargeAuraTimer = 0f;   // 시작하자마자 1회 — "다가와 있으면 즉시 밀린다"
+        ShowChargeAuraClientRpc(ChargeAuraRadius);
+    }
+
+    void TickChargeAura(float dt)
+    {
+        if (!_chargeAuraActive) return;
+
+        _chargeAuraTimer -= dt;
+        if (_chargeAuraTimer > 0f) return;
+        _chargeAuraTimer = ChargeAuraInterval;
+
+        int dmg = Mathf.Max(0, Mathf.RoundToInt(ChargeAuraDamage * PhaseDamageMultiplier));
+        if (_aoeBuffer == null) _aoeBuffer = new Collider[16];
+
+        int count = Physics.OverlapSphereNonAlloc(
+            transform.position, ChargeAuraRadius, _aoeBuffer, playerMask, QueryTriggerInteraction.Collide);
+
+        _aoeHits.Clear();
+        for (int i = 0; i < count; i++)
+        {
+            Collider hit = _aoeBuffer[i];
+            if (hit == null) continue;
+
+            Player p = hit.GetComponentInParent<Player>();
+            if (p == null || !_aoeHits.Add(p)) continue;   // 콜라이더 여러 개짜리 대상 중복 방지
+
+            // 넉백 방향 = **보스 → 대상** 바깥쪽. 겹쳐 서 있으면 대상의 전방으로 민다(0 벡터 금지).
+            Vector3 push = p.transform.position - transform.position;
+            push.y = 0f;
+            if (push.sqrMagnitude < 0.0001f) push = p.transform.forward;
+            push.Normalize();
+
+            var info = new AttackInfo(dmg, AttackType.Default);
+            var ctx = new AttackHitContext(transform.position, transform);
+
+            // Hurtbox 를 우선한다(방어·쉴드 계산을 우회하지 않는 서버 경로).
+            Hurtbox hurtbox = p.GetComponentInChildren<Hurtbox>();
+            if (hurtbox != null) hurtbox.ReceiveAttack(info, ctx);
+            else p.ReceiveAttack(info, ctx);
+
+            // 🔴 넉백은 **별도 호출**이다 — ReceiveAttack 은 AttackInfo 의 넉백 필드를 읽지 않는다.
+            //    이걸 몰라서 오라·점프·돌진 세 곳 모두 "밀리지 않는" 상태였다(2026-08-13).
+            if (ChargeAuraKnockback > 0f)
+                p.Knockback(push, ChargeAuraKnockback);
+        }
+    }
+
+    void EndChargeAura()
+    {
+        if (!_chargeAuraActive) return;
+        _chargeAuraActive = false;
+        HideChargeAuraClientRpc();
+    }
+
+    // ─── 오라 예고(클라 비주얼) ──────────────────────────────────────────
+    // 🔴 표식·예고는 **클라 비주얼**이다 — 서버에서만 끄면 클라 화면에 그대로 남는다(점프 예고와 같은 함정).
+    [ClientRpc]
+    void ShowChargeAuraClientRpc(float radius)
+    {
+        if (_boss == null || _boss.chargeAuraTelegraphPrefab == null) return;
+
+        if (_chargeAuraTelegraph == null)
+        {
+            GameObject go = Instantiate(_boss.chargeAuraTelegraphPrefab);
+            go.TryGetComponent(out _chargeAuraTelegraph);
+
+            // 🔴 조용히 실패하지 않는다. 오라 프리팹을 이펙트로 갈아끼울 때(VFX 로드맵) 그 프리팹에
+            //    AoeTelegraph 가 없으면 여기서 아무 일도 안 일어나고 **아무 신호도 없다** —
+            //    "차징 범위가 안 보인다"만 남아 원인 찾기가 어려워진다. 점프 예고 쪽과 같은 규약이다.
+            if (_chargeAuraTelegraph == null)
+            {
+                Debug.LogError(
+                    $"{name}: chargeAuraTelegraphPrefab({go.name}) 에 AoeTelegraph 컴포넌트가 없다 — " +
+                    "차징 범위 예고가 표시되지 않는다. 이펙트로 교체하려면 그 프리팹도 같은 컴포넌트를 " +
+                    "갖거나(Show/Hide 규약), 이 호출부를 함께 바꿀 것.", this);
+                Destroy(go);
+            }
+        }
+        if (_chargeAuraTelegraph == null) return;
+
+        // 보스 발밑에 눕힌다. 절대 Y 금지 — 찾은 바닥 + 표준 간격(GroundProbe 규약).
+        Vector3 p = transform.position;
+        if (GroundProbe.TryFindGround(p, 0, out RaycastHit ground, out _))
+            p = new Vector3(p.x, GroundProbe.SurfaceY(ground), p.z);
+
+        // p 는 이미 표준 간격(GroundProbe.SurfaceY)이 들어간 값이다 — 여기서 더 올리지 않는다.
+        // 예전엔 +0.03 을 덧붙여 "표식보다 위"를 만들려 했지만, 그 순서는 높이가 아니라
+        // 표식 억제(아래)로 정한다(같은 위치의 투명 메시는 거리 정렬이 불안정하다).
+        _chargeAuraTelegraph.transform.position = p;
+
+        // 🔴 **보스를 따라가게 붙인다**(2026-08-13). 판정은 매 틱 `transform.position` 기준인데
+        //    그림은 한 번만 놓으면 보스가 움직인 만큼 **예고가 판정과 어긋난다**(차징 시작 직후
+        //    아직 미끄러지는 구간이 있다). 예고가 판정에 대해 거짓말하지 않게 하는 것이 이 프로젝트 규약이다.
+        //    ⚠️ 점프 예고를 자식으로 두면 안 되는 이유(보스가 체공 중 순간이동한다)는 여기 해당하지 않는다
+        //       — 오라는 차징 동안만 살고, 그 사이 보스는 워프하지 않는다.
+        _chargeAuraTelegraph.transform.SetParent(transform, worldPositionStays: true);
+
+        // 🔴 **차징 동안 앞뒤 표식을 숨긴다**(팀장 확정 2026-09-03: "빨간 장판만 보여야 한다").
+        //    ⚠️ 높이로 순서를 정하려 하면 안 된다 — 오라(바닥+0.08)가 표식(+0.04)보다 위인데도
+        //       표식이 보였다. 투명 메시 정렬은 **오브젝트 단위 카메라 거리**로 갈리고 이 둘은
+        //       **같은 위치(보스)** 에 있어 순서가 불안정하며, 장판이 반투명이라 아래가 비친다.
+        //    차징 중에는 카운터 창도 안 열리므로 표식이 주는 정보도 없다.
+        //    점프에서 쓰는 억제 경로와 같다(CrossFadeJumpStateClientRpc) — 둘은 동시에 못 일어난다.
+        DirectionIndicator?.SetSuppressed(true);
+
+        // 차징은 최대 chargeTimeLimit 초 유지된다 — 그동안 계속 보여야 하므로 넉넉히 잡고,
+        // 실제 종료는 HideChargeAuraClientRpc 가 한다.
+        _chargeAuraTelegraph.Show(radius, ChargeTimeLimit + 2f);
+    }
+
+    [ClientRpc]
+    void HideChargeAuraClientRpc()
+    {
+        // 🔴 **억제 해제는 아래 early return 보다 앞이다.** 예고가 이미 없는 경로(중복 종료·프리팹
+        //    미배선)에서 return 뒤에 두면 표식이 영구히 숨은 채로 남는다 — 켜는 쪽은 예고가 실제로
+        //    생겼을 때만, 끄는 쪽은 **항상** 돈다.
+        DirectionIndicator?.SetSuppressed(false);
+
+        if (_chargeAuraTelegraph == null) return;
+        Destroy(_chargeAuraTelegraph.gameObject);
+        _chargeAuraTelegraph = null;
+    }
+
+    bool _chargeAuraActive;
+    float _chargeAuraTimer;
+    AoeTelegraph _chargeAuraTelegraph;
+
+    float ChargeAuraRadius => _boss != null ? Mathf.Max(0f, _boss.chargeAuraRadius) : 3.5f;
+    float ChargeAuraInterval => _boss != null ? Mathf.Max(0.1f, _boss.chargeAuraInterval) : 1f;
+    int ChargeAuraDamage => _boss != null ? Mathf.Max(0, _boss.chargeAuraDamage) : 20;
+    float ChargeAuraKnockback => _boss != null ? Mathf.Max(0f, _boss.chargeAuraKnockbackStrength) : 8f;
+    #endregion
+
+    void SpawnChargeZone()
+    {
+        if (_boss == null || _boss.chargeZonePrefab == null) return;
+        // ⚠️ 정본의 zonePushForce(밀치기)는 플레이어 변위 경로가 없어 아직 적용되지 않는다 — 데미지만.
+        _chargeZone = AreaZone.SpawnOrGrow(_boss.chargeZonePrefab, transform.position);
+    }
+
+    void EndChargeZone()
+    {
+        if (_chargeZone == null) return;
+        _chargeZone.Despawn();
+        _chargeZone = null;
+    }
+
+    // 🔴 1인 1 / 2인 2 / **3인 이상 4**. 레거시의 Clamp(playerCount,1,3)+player3=3 버그를 여기서 닫는다.
+    int PylonCountFor(int playerCount)
+    {
+        if (_boss == null) return Mathf.Clamp(playerCount, 1, 4);
+        if (playerCount <= 1) return Mathf.Max(1, _boss.chargePylonsSolo);
+        if (playerCount == 2) return Mathf.Max(1, _boss.chargePylonsDuo);
+        return Mathf.Max(1, _boss.chargePylonsTrioPlus);
+    }
+
+    int CountAlivePlayers()
+    {
+        if (_aoeBuffer == null) _aoeBuffer = new Collider[16];
+
+        float radius = _boss != null ? _boss.jumpSearchRadius : 30f;
+        int count = Physics.OverlapSphereNonAlloc(
+            transform.position, radius, _aoeBuffer, playerMask, QueryTriggerInteraction.Collide);
+
+        _aoeHits.Clear();
+        for (int i = 0; i < count; i++)
+        {
+            Collider c = _aoeBuffer[i];
+            if (c == null) continue;
+            if (!MonsterTargeting.IsAttackable(c)) continue; // 유령은 인원수에 안 넣는다
+            Unit u = c.GetComponentInParent<Unit>();
+            if (u != null) _aoeHits.Add(u);
+        }
+        return Mathf.Max(1, _aoeHits.Count);
+    }
+
+    int FindSlot(BossAttackId id)
+    {
+        BossAttackEntry[] rows = _boss != null ? _boss.attacks : null;
+        if (rows == null) return NoAttack;
+        for (int i = 0; i < rows.Length; i++)
+            if (rows[i] != null && rows[i].attackId == id) return i;
+        return NoAttack;
+    }
+
+    float ChargeTimeLimit => _boss != null ? Mathf.Max(1f, _boss.chargeTimeLimit) : 20f;
+    float RageDashDuration => _boss != null ? Mathf.Max(0.1f, _boss.rageDashDuration) : 0.7f;
+    float RageDashInterval => _boss != null ? Mathf.Max(0f, _boss.rageDashInterval) : 0.5f;
+    float RageDashSpeedMul => _boss != null ? Mathf.Max(1f, _boss.rageDashSpeedMultiplier) : 8f;
+
+    float DashDuration => _boss != null ? Mathf.Max(0.1f, _boss.dashDuration) : 0.7f;
+    float DashSpeedMul => _boss != null ? Mathf.Max(1f, _boss.dashSpeedMultiplier) : 6f;
+    float DashMaxDistance => _boss != null ? Mathf.Max(1f, _boss.dashMaxDistance) : 16f;
+    float DashCarryFrontOffset => _boss != null ? Mathf.Max(0f, _boss.dashCarryFrontOffset) : 1.8f;
+    float DashStunDuration => _boss != null ? Mathf.Max(0f, _boss.dashStunDuration) : 1f;
+    float RageDashMaxDistance => _boss != null ? Mathf.Max(1f, _boss.rageDashMaxDistance) : 16f;
+    float RageTotalTime =>
+        (_boss != null ? Mathf.Max(1, _boss.rageDashCount) : 3) * (RageDashDuration + RageDashInterval);
+    #endregion
+
+    #region 카운터 (창 + 정면 판정 + 그로기/Break)
+
+    // ─── 선딜 게이트: 애니 준비 래치 + 창 만료 후 발사 ────────────────────────
+
+    /// <summary>
+    /// 애니 <c>OnAttackHit</c> 수신. 카운터 창이 열린 공격은 여기서 <b>발사하지 않는다</b> —
+    /// "애니가 준비 자세에 도달했다"만 래치하고, 실제 발사는 창 타이머가 끝난 뒤
+    /// <see cref="TryReleaseCounterAttack"/> 이 한다(설계 §4.2).
+    ///
+    /// 창이 없는 공격은 base 그대로 — 이벤트 즉시 발사다.
+    /// </summary>
+    public override void NotifyAttackHit()
+    {
+        if (!IsServer || State != MonsterState.Attack) return;
+
+        if (!_counterWindup.IsActive)
+        {
+            base.NotifyAttackHit();
+            return;
+        }
+
+        // 준비 신호가 창보다 늦게 온 경우에만 실제 도달 시각을 남긴다 — 창 값을 정하는 근거다.
+        // (정상 경로에서는 아무것도 찍지 않는다. 매 공격 로그는 정작 필요한 진단을 밀어낸다.)
+        if (_counterWindup.TimerElapsedBeforeAnimationReady)
+        {
+            Debug.LogWarning(
+                $"[23호] {_currentEntry?.attackId} 애니 준비 신호가 공격 시작 후 " +
+                $"{Time.time - _counterWindupStartedAt:0.###}초에 도달했다 " +
+                $"(창 {CounterWindowDuration:0.##}초). 창을 이 값 이상으로 잡아야 한다.", this);
+        }
+
+        // 중복 이벤트가 와도 래치라 한 번만 선다(FireAttackHitOnce 의 1회 가드와 이중 방어).
+        _counterWindup.MarkAnimationReady();
+        SetCounterPoseHeldClientRpc(true);   // 준비 자세에서 정지 — 창이 끝날 때까지 붙잡는다
+        TryReleaseCounterAttack();
+    }
+
+    /// <summary>
+    /// 모든 피어의 보스 애니메이터를 준비 자세에서 <b>정지/재개</b>한다.
+    ///
+    /// 애니메이터는 복제되지 않으므로 각 피어가 자기 것을 멈춘다. 서버가 진실의 원천이고
+    /// 이 RPC 는 표현만 옮긴다(정본 §6).
+    ///
+    /// 🔴 <b>멱등이어야 한다.</b> 같은 값이 두 번 와도, 원래 정상 속도였어도 부작용이 없어야 한다 —
+    ///    풀 때 "저장해 둔 값"이 아니라 0 을 복원하면 보스가 영구히 얼어붙는다.
+    ///    그래서 걸 때만 현재 속도를 저장하고(`_counterAnimatorHeldLocally` 가 그 래치다),
+    ///    풀 때는 저장본을 되돌린다.
+    /// </summary>
+    [ClientRpc]
+    void SetCounterPoseHeldClientRpc(bool held)
+    {
+        if (animator == null) return;
+
+        if (held)
+        {
+            if (_counterAnimatorHeldLocally) return;   // 이미 잡고 있다 — 0 을 저장하는 사고를 막는다
+            _counterAnimatorResumeSpeed = animator.speed;
+            animator.speed = 0f;
+            _counterAnimatorHeldLocally = true;
+            return;
+        }
+
+        RestoreCounterPose();
+    }
+
+    /// <summary>
+    /// 카운터 선딜 상태를 통째로 비운다 — 게이트 · 창 · 자세 홀드.
+    ///
+    /// 🔴 <b>모든 중단 경로가 여기를 지나야 한다.</b> 자세 홀드는 애니메이터 속도를 0 으로 만드는
+    ///    조작이라, 푸는 걸 한 곳이라도 빠뜨리면 보스가 그 자세로 <b>영구히 굳는다</b>.
+    ///    호출처를 늘리지 말고 <see cref="AbortAttackChain"/> 한 곳에 모아 뒀다 —
+    ///    상태 이탈 · 사망 · 체인 타임아웃 · 디스폰 · 카운터 성공이 전부 그리로 흐른다.
+    ///
+    /// 멱등이다. 이미 비어 있어도 부작용이 없다.
+    /// </summary>
+    void ResetCounterWindup()
+    {
+        if (!IsServer) return;
+
+        _counterWindup.Reset();
+        SetCounterWindow(false);
+
+        // 자세는 각 피어의 로컬 상태라 RPC 로 푼다. 디스폰 중에는 RPC 가 못 나가므로
+        // 로컬 복원도 함께 부른다(호스트가 멈춘 채 남지 않게). 둘 다 멱등이라 중복 호출이 안전하다.
+        if (IsSpawned) SetCounterPoseHeldClientRpc(false);
+        RestoreCounterPose();
+    }
+
+    /// <summary>자세 홀드를 푼다. 안 잡고 있으면 아무 일도 하지 않는다(멱등).</summary>
+    void RestoreCounterPose()
+    {
+        if (!_counterAnimatorHeldLocally || animator == null) return;
+
+        animator.speed = _counterAnimatorResumeSpeed;
+        _counterAnimatorHeldLocally = false;
+    }
+
+    /// <summary>
+    /// 두 사건(창 만료 + 애니 준비)이 다 섰을 때만 실제 공격을 내보낸다.
+    /// 멱등이다 — 게이트를 먼저 비우므로 두 번 불려도 한 번만 발사된다.
+    /// </summary>
+    void TryReleaseCounterAttack()
+    {
+        if (!_counterWindup.ShouldRelease) return;
+
+        _counterWindup.Reset();
+        SetCounterWindow(false);   // 발사 순간 창이 닫힌다 — 이후 히트는 카운터로 인정되지 않는다
+        SetCounterPoseHeldClientRpc(false);  // 자세를 풀어 클립을 이어 재생한다
+        FireAttackHitOnce();
+    }
+    // 데미지 유입 단일 진입점. 카운터 판정을 여기에 얹는다 —
+    // 플레이어 인터럽트 스킬의 히트가 **서버 경로**(BaseAttack → ReceiveAttack)로 들어온 시점에
+    // 보스의 창 상태 + 정면 각도를 서버가 본다. 클라 예측 없음(정본 §6).
+    public override bool ReceiveAttack(AttackInfo attackInfo, AttackHitContext hitContext)
+    {
+        // 🔴 조건은 base 호출 **전에** 스냅샷한다. base 가 사망·상태를 바꿀 수 있어서,
+        //    뒤에서 읽으면 이미 닫힌 창을 보게 된다.
+        bool counter = IsServer
+                       && _counterWindow.Value
+                       && IsInterruptAttack(attackInfo)
+                       && IsCounterFromFront(hitContext);
+
+        // 진단(2026-09-02): 인터럽트가 들어왔는데 카운터로 성립하지 않으면 **어느 조건이 거짓인지** 찍는다.
+        // 인터럽트 히트에서만 돌므로 조용하다. 성립하면 EnterCounterGroggy 가 따로 로그를 남긴다.
+        if (IsInterruptAttack(attackInfo) && !counter)
+        {
+            Debug.LogWarning(
+                $"[23호] 인터럽트가 카운터로 성립하지 않았다 — " +
+                $"서버={IsServer} · 창열림={_counterWindow.Value} · " +
+                $"정면={IsCounterFromFront(hitContext)} (허용 {(_boss != null ? _boss.counterFrontAngle : 60f):0}°) · " +
+                $"상태={State} · 페이즈={_attackPhase} · 공격={_currentEntry?.attackId}", this);
+        }
+
+        // 실패든 성공이든 데미지는 정상 처리된다 — 카운터 실패에 패널티는 없다(확정 스펙).
+        bool resolved = base.ReceiveAttack(attackInfo, hitContext);
+
+        if (counter && resolved && State != MonsterState.Dead)
+            EnterCounterGroggy(allowBreak: true);
+
+        return resolved;
+    }
+
+    /// <summary>
+    /// 이 히트가 인터럽트 스킬인가.
+    ///
+    /// ✅ R1 수령 완료(은희, `a75398c`) — 식별자는 <c>AttackType</c> enum 값이 아니라
+    /// <c>AttackInfo.isInterruptAttack</c> **플래그**로 왔다. <c>AttackType</c> 은 "어느 출처가 쐈나"라
+    /// 인터럽트와 직교하기 때문이다(Q 슬롯이면서 인터럽트인 스킬을 표현할 수 없게 된다).
+    ///
+    /// **플래그는 하나뿐이고 소비 방식은 수신측이 정한다** — 일반몹·중간보스는
+    /// <c>maxGroggyCount</c> 누적으로 소비하고, 23호는 여기서 **카운터 창 + 정면 각도**로 소비한다.
+    /// virtual 로 둔 것은 파생 보스가 판별을 좁힐 수 있게 하기 위해서다.
+    /// </summary>
+    protected virtual bool IsInterruptAttack(AttackInfo attackInfo) => attackInfo.isInterruptAttack;
+
+    /// <summary>
+    /// 보스 정면에서 들어온 히트인가(<c>counterFrontAngle</c> = 전방 기준 ±각도).
+    /// 헤드어택(은희) 구현 후 그쪽 판정으로 **교체될 지점**이라 virtual 로 분리해 둔다.
+    /// </summary>
+    protected virtual bool IsCounterFromFront(AttackHitContext hitContext)
+    {
+        // 🔴 sourcePosition 이 아니라 공격자 **루트**를 우선 쓴다.
+        //    BaseAttack.CreateHitContext 는 `transform.position` 을 담는데, 그 transform 은 플레이어
+        //    루트가 아니라 무기/히트박스 자식이다(이미 보스 쪽으로 뻗어 있음). 그 점으로 각도를 재면
+        //    "앞에서 쳤는가"가 무기 길이만큼 편향된다. 루트가 없을 때만 sourcePosition 으로 폴백한다.
+        Vector3 origin = hitContext.sourceTransform != null
+            ? hitContext.sourceTransform.root.position
+            : hitContext.sourcePosition;
+
+        Vector3 to = origin - transform.position;
+        to.y = 0f;
+        if (to.sqrMagnitude < 0.0001f) return true; // 완전히 겹침 — 정면으로 본다
+
+        float limit = _boss != null ? _boss.counterFrontAngle : 60f;
+        return Vector3.Angle(transform.forward, to.normalized) <= limit;
+    }
+
+    /// <summary>
+    /// 그로기 유발. 카운터 성공은 <paramref name="allowBreak"/> = true.
+    /// 송전기 실패(S7)는 false — **카운트는 올리되 Break 로 승격하지 않는다**
+    /// (페이즈 전환 직후 5초 무력화가 겹치면 페이즈 연출이 죽는다 — 확정 스펙).
+    /// </summary>
+    /// <param name="durationOverride">
+    /// 0 보다 크면 이 시간을 전체 행동 불능 시간으로 쓴다(카운트 누적은 그대로).
+    /// 송전기 전멸처럼 <b>보상의 무게가 다른</b> 경로가 쓴다 — 일반 카운터와 값을 나누기 위해서다.
+    /// Break 는 임계 도달의 결과라 덮지 않는다.
+    /// </param>
+    protected void EnterCounterGroggy(bool allowBreak, float durationOverride = -1f)
+    {
+        if (!IsServer) return;
+
+        BossCounterOutcome outcome = BossCounterProgress.Resolve(
+            _counterGroggyCount,
+            data != null ? data.maxGroggyCount : 5,
+            allowBreak,
+            data != null ? data.groggyDuration : 0.5f,
+            _boss != null ? _boss.breakDuration : 2f);
+
+        _counterGroggyCount = outcome.NextCount;
+
+        float duration = (!outcome.IsBreak && durationOverride > 0f) ? durationOverride : outcome.Duration;
+
+        // 예약된 공격·준비 래치·자세 홀드를 폐기하고 체인을 정리한다(설계 §4.4 1~4).
+        // ResetCounterWindup 은 이 안에서 함께 돈다.
+        AbortAttackChain();
+
+        // 🔴 Hit 리액션을 **앞에 더하지 않는다**(설계 §3.3). 예전엔
+        //    ForceHitReaction(HitReactionDuration, groggy) 라 SO 의 0.5 위에 0.4 가 얹혀
+        //    실제 행동 불능이 0.9초였다 — SO 값이 곧 체감 시간이어야 튜닝이 성립한다.
+        ForceGroggy(duration);
+
+        int max = data != null ? Mathf.Max(1, data.maxGroggyCount) : 5;
+        Debug.Log(
+            $"[23호] 카운터 성공 — 그로기 카운트 {(outcome.IsBreak ? max : outcome.NextCount)}/{max}" +
+            (outcome.IsBreak ? $" → BREAK {duration:0.#}초" : $" → 그로기 {duration:0.#}초"),
+            this);
+    }
+
+    void SetCounterWindow(bool open)
+    {
+        if (!IsServer) return;
+        if (_counterWindow.Value == open) return;
+        _counterWindow.Value = open;
+    }
+
+    // 모든 피어에서 호출된다(서버 포함) — 표현만 담당. 붙어 있는 텔레그래프 **전부**를 구동한다.
+    void OnCounterWindowChanged(bool previous, bool next)
+    {
+        if (_telegraphs == null || _telegraphs.Length == 0) ResolveTelegraphs();
+        if (_telegraphs == null) return;
+
+        for (int i = 0; i < _telegraphs.Length; i++)
+            _telegraphs[i]?.SetCounterWindow(next);
+    }
+
+    void ResolveTelegraphs()
+    {
+        _telegraphs = GetComponentsInChildren<IBossTelegraph>(true);
+        if (_telegraphs == null || _telegraphs.Length == 0)
+        {
+            Debug.LogWarning(
+                $"{name}: IBossTelegraph 구현이 하나도 없다 — 카운터 창이 화면에 전혀 표시되지 않는다. " +
+                "BossDirectionIndicator(방향 링) 또는 BossCounterTelegraph(전신 틴트)를 붙일 것.",
+                this);
+            return;
+        }
+
+        for (int i = 0; i < _telegraphs.Length; i++)
+            _telegraphs[i]?.SetCounterWindow(_counterWindow.Value);
+    }
+    #endregion
+
+    #region 페이즈 (HP 임계 전환)
+    public override void TakeDamage(AttackInfo attackInfo)
+    {
+        base.TakeDamage(attackInfo); // 서버 가드 + 방어/체력 + 사망/그로기/피격경직 판정
+
+        if (!IsServer || State == MonsterState.Dead)
+            return;
+
+        EvaluatePhase();
+    }
+
+    // 체력 비율이 임계를 넘어설 때마다 페이즈를 1 올린다.
+    // 🔴 페이즈는 되돌아가지 않는다 — 회복(리쉬 리셋 등)이 페이즈 연출을 다시 트리거하면 안 된다.
+    void EvaluatePhase()
+    {
+        BossPhaseEntry[] phases = _boss != null ? _boss.phases : null;
+        if (phases == null || phases.Length == 0) return;
+
+        int max = FinalMaxHp;
+        if (max <= 0) return;
+
+        float ratio = (float)CurrentHealth / max;
+        int next = 0;
+        for (int i = 0; i < phases.Length; i++)
+            if (ratio <= phases[i].hpThreshold)
+                next = i + 1;
+
+        if (next <= CurrentPhase) return;
+
+        CurrentPhase = next;
+
+        // 🔴 시퀀스를 **여기서 시작하지 않는다.** 정본 §9: "_pendingCharging 은 현재 행동이 끝난 뒤
+        //    소비한다 — 행동 도중 강제 중단하지 않는다." TakeDamage 는 공격 한복판에도 들어오므로
+        //    여기서 바로 시작하면 진행 중인 잡기·점프를 끊어 버린다.
+        //    소비 지점은 SelectAttackSlot — 그 함수는 Idle/Walk 에서만 호출되므로 곧 "행동 종료 직후"다.
+        BossPhaseEntry entered = ActivePhase;
+        if (entered != null && entered.sequence != BossPhaseSequence.None)
+            _pendingPhaseSequence = true;
+
+        OnPhaseEntered(next);
+    }
+
+    // 페이즈 진입 확장점. TODO(S7): sequence == ChargeSequence → 송전기 시퀀스(실패 시 레이지 돌진 3회).
+    protected virtual void OnPhaseEntered(int phase)
+    {
+        BossPhaseEntry p = ActivePhase;
+        Debug.Log(
+            $"[23호] 페이즈 {phase} 진입 — 체력 {CurrentHealth}/{FinalMaxHp}, " +
+            $"데미지 ×{PhaseDamageMultiplier:0.##}, 이동 ×{ChaseSpeedMultiplier:0.##}, " +
+            $"시퀀스 {(p != null ? p.sequence.ToString() : "None")}",
+            this);
+    }
+    #endregion
+
+    #region 유틸
+    BossAttackEntry EntryFor(int slot)
+    {
+        BossAttackEntry[] rows = _boss != null ? _boss.attacks : null;
+        if (rows == null || slot < 0 || slot >= rows.Length) return null;
+        return rows[slot];
+    }
+
+    // 미구현 공격은 조용히 지나가지 않게 1회만 경고한다(매 히트 로그는 신호를 덮는다).
+    void WarnUnimplementedOnce(BossAttackId id)
+    {
+        int bit = 1 << (int)id;
+        if ((_warnedAttackMask & bit) != 0) return;
+        _warnedAttackMask |= bit;
+
+        Debug.LogWarning(
+            $"[23호] {id} 는 히트 판정이 아직 없다 — 애니만 재생된다. (Grab=S4 / Dash=S5 / Jump=S6)",
+            this);
+    }
+    #endregion
+}

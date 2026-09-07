@@ -70,6 +70,8 @@ float  _LosDistanceBias;     // 자기차폐 방지 여유(m)
 float  _LosEdgeFade;         // 차폐 경계 페이드(m)
 float  _LosBrightness;       // 차폐 시 명도 곱(층 디밍과 별개, 0≈검정 1=영향없음)
 float  _LosSaturation;       // 차폐 시 채도 잔량(0=흑백 1=원색)
+float4 _LosTint;             // 차폐 색조(HDR). 명도는 정규화해 _LosBrightness와 분리
+float  _LosTintStrength;     // 색조 적용 강도(0=없음, 1=지정 색조)
 float  _LosAngleJitter;      // 차폐 경계 각도 노이즈(부채꼴 직선/삼각형 완화)
 
 // ---------------- 어비스(바닥 구멍) 물안개 ----------------
@@ -321,6 +323,24 @@ float3 Dim_Apply(float3 color, float t, float brightness, float saturation)
     float3 desat = lerp(color, luma.xxx, t * (1.0 - saturation));
     float darkenMul = lerp(1.0, brightness, t);
     return desat * darkenMul;
+}
+
+// 시야 차폐 전용 톤. 색조의 명도는 Rec.709 기준으로 정규화하므로,
+// 최종 밝기는 _LosBrightness 하나로 조절되고 tint는 색상만 바꾼다.
+// 원본 luminance를 다시 곱해 벽/바닥 텍스처의 명암을 보존한다.
+float3 Los_Style(float3 color, float brightness, float saturation, float3 tint, float tintStrength)
+{
+    const float3 lumaWeights = float3(0.2126, 0.7152, 0.0722);
+    float sourceLuma = dot(color, lumaWeights);
+    float3 graded = lerp(sourceLuma.xxx, color, saturation) * brightness;
+
+    float3 safeTint = max(tint, 0.0);
+    float tintLuma = max(dot(safeTint, lumaWeights), 1e-4);
+    float3 normalizedTint = min(safeTint / tintLuma, float3(4.0, 4.0, 4.0));
+    float gradedLuma = dot(graded, lumaWeights);
+    float3 tinted = gradedLuma * normalizedTint;
+
+    return lerp(graded, tinted, saturate(tintStrength));
 }
 
 #endif // FOG_CORE_INCLUDED

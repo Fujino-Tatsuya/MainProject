@@ -107,62 +107,74 @@ public sealed class ZoneBridgeGate : MonoBehaviour
 
     const float CarveVerticalPadding = 2f;
 
-    NavMeshObstacle _gapObstacle;
+    readonly List<NavMeshObstacle> _gapObstacles = new List<NavMeshObstacle>();
 
+    /// <summary>
+    /// 열림 위치를 점유할 구간을 <b>조각마다 따로</b> 카브한다.
+    ///
+    /// 🔴 조각 전체를 한 바운즈로 합치면 안 된다. 다리는 존 <b>양쪽</b>에 하나씩 있어서 합친 박스가
+    /// 중앙 플랫폼을 가로지르는 20m 넘는 띠가 되고, 평상시에 그 띠만큼 <b>중앙 바닥의 NavMesh 가
+    /// 사라진다</b>. 플레이어는 물리라 멀쩡해서 눈치채기 어렵고 몬스터만 중앙을 못 지나간다.
+    /// (2026-08-17 확인 — 구 저작은 x=±10 이라 같은 모양이었다.)
+    ///
+    /// 움직이지 않는 조각은 대상이 아니다 — 제자리에 있으니 베이크 결과가 이미 맞다.
+    /// </summary>
     void BuildGapObstacle()
     {
-        if (_gapObstacle != null || segments == null || segments.Count == 0) return;
-        if (!TryGetOpenSpanBounds(out Bounds localBounds)) return;
-
-        var go = new GameObject("BridgeGapCarve");
-        go.transform.SetParent(transform, false);
-        go.transform.localPosition = localBounds.center;
-        go.transform.localRotation = Quaternion.identity;
-
-        _gapObstacle = go.AddComponent<NavMeshObstacle>();
-        _gapObstacle.shape = NavMeshObstacleShape.Box;
-
-        // 데크가 얇아 바운즈 그대로 쓰면 카브 박스가 NavMesh 표면을 스치지 못하고 빗나간다.
-        // 위아래로 넉넉히 부풀려 확실히 파낸다(가로·세로는 다리 폭 그대로 — 넓히면 옆 바닥을 깎는다).
-        Vector3 size = localBounds.size;
-        size.y = Mathf.Max(size.y, 1f) + CarveVerticalPadding;
-        _gapObstacle.size = size;
-        _gapObstacle.carving = true;
-        _gapObstacle.carveOnlyStationary = false;   // 켜고 끄는 순간 바로 반영돼야 한다
-    }
-
-    /// <summary>다리가 열렸을 때 걸을 수 있게 되는 구간의 로컬 바운즈. 카브 박스 크기의 근거.</summary>
-    bool TryGetOpenSpanBounds(out Bounds localBounds)
-    {
-        localBounds = default;
-        bool any = false;
+        if (_gapObstacles.Count > 0 || segments == null || segments.Count == 0) return;
 
         foreach (Segment s in segments)
         {
             if (s.Target == null || !s.HasOpenPosition) continue;
+            if (s.OpenLocalPosition == s.ClosedLocalPosition) continue;
+            if (!TryGetOpenSpanBounds(s, out Bounds localBounds)) continue;
 
-            Renderer[] renderers = s.Target.GetComponentsInChildren<Renderer>(true);
-            if (renderers.Length == 0) continue;
+            var go = new GameObject($"BridgeGapCarve_{s.Target.name}");
+            go.transform.SetParent(transform, false);
+            go.transform.localPosition = localBounds.center;
+            go.transform.localRotation = Quaternion.identity;
 
-            // 조각을 열림 위치로 옮겨 놓고 바운즈를 읽은 뒤 되돌린다 — 열림 상태의 실제 점유 공간이
-            // 필요하므로 닫힘 위치의 바운즈를 평행이동하는 것으로는 회전·스케일을 못 맞춘다.
-            Vector3 saved = s.Target.localPosition;
-            s.Target.localPosition = s.OpenLocalPosition;
+            var obstacle = go.AddComponent<NavMeshObstacle>();
+            obstacle.shape = NavMeshObstacleShape.Box;
 
-            foreach (Renderer r in renderers)
-            {
-                Bounds w = r.bounds;
-                Vector3 c = transform.InverseTransformPoint(w.center);
-                Vector3 e = transform.InverseTransformVector(w.extents);
-                var lb = new Bounds(c, new Vector3(Mathf.Abs(e.x), Mathf.Abs(e.y), Mathf.Abs(e.z)) * 2f);
+            // 데크가 얇아 바운즈 그대로 쓰면 카브 박스가 NavMesh 표면을 스치지 못하고 빗나간다.
+            // 위아래로 넉넉히 부풀려 확실히 파낸다(가로·세로는 다리 폭 그대로 — 넓히면 옆 바닥을 깎는다).
+            Vector3 size = localBounds.size;
+            size.y = Mathf.Max(size.y, 1f) + CarveVerticalPadding;
+            obstacle.size = size;
+            obstacle.carving = true;
+            obstacle.carveOnlyStationary = false;   // 켜고 끄는 순간 바로 반영돼야 한다
 
-                if (!any) { localBounds = lb; any = true; }
-                else localBounds.Encapsulate(lb);
-            }
+            _gapObstacles.Add(obstacle);
+        }
+    }
 
-            s.Target.localPosition = saved;
+    /// <summary>조각 하나가 열렸을 때 점유하는 로컬 바운즈. 카브 박스 크기의 근거.</summary>
+    bool TryGetOpenSpanBounds(Segment s, out Bounds localBounds)
+    {
+        localBounds = default;
+
+        Renderer[] renderers = s.Target.GetComponentsInChildren<Renderer>(true);
+        if (renderers.Length == 0) return false;
+
+        // 조각을 열림 위치로 옮겨 놓고 바운즈를 읽은 뒤 되돌린다 — 열림 상태의 실제 점유 공간이
+        // 필요하므로 닫힘 위치의 바운즈를 평행이동하는 것으로는 회전·스케일을 못 맞춘다.
+        Vector3 saved = s.Target.localPosition;
+        s.Target.localPosition = s.OpenLocalPosition;
+
+        bool any = false;
+        foreach (Renderer r in renderers)
+        {
+            Bounds w = r.bounds;
+            Vector3 c = transform.InverseTransformPoint(w.center);
+            Vector3 e = transform.InverseTransformVector(w.extents);
+            var lb = new Bounds(c, new Vector3(Mathf.Abs(e.x), Mathf.Abs(e.y), Mathf.Abs(e.z)) * 2f);
+
+            if (!any) { localBounds = lb; any = true; }
+            else localBounds.Encapsulate(lb);
         }
 
+        s.Target.localPosition = saved;
         return any;
     }
 
@@ -205,7 +217,8 @@ public sealed class ZoneBridgeGate : MonoBehaviour
 
     void SetGapCarveEnabled(bool enabled)
     {
-        if (_gapObstacle != null) _gapObstacle.enabled = enabled;
+        foreach (NavMeshObstacle o in _gapObstacles)
+            if (o != null) o.enabled = enabled;
     }
 
     /// <summary>

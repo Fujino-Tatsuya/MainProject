@@ -995,7 +995,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerDefaultAttack
   damage: 0
-  isGroggyAttack: 0
   targetLayer:
     serializedVersion: 2
     m_Bits: 256

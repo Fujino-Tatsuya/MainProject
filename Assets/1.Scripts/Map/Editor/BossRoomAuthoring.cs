@@ -110,6 +110,81 @@ public static class BossRoomAuthoring
             $"박스 {box.size} (트리거). ArenaContext는 붙이지 않음(스폰 소유자는 Director).");
     }
 
+    // ── 충전 발판 콜라이더 (2026-08-13, 팀장 Play 관찰) ───────────────────
+
+    const string ChargeFloorName = "Env_Floor_bosscharger (1)";
+
+    /// <summary>
+    /// 충전 발판(<c>Env_Floor_bosscharger (1)</c>)에 <b>MeshCollider 를 붙인다.</b>
+    ///
+    /// 🔴 왜 필요한가 — 팀장 관찰: "저 오브젝트보다 아래에 그려지니까 장판이 제대로 안 보인다.
+    ///    바닥을 보고 그 위에 그려져야 한다."
+    ///    이 발판은 <b>렌더러만 있고 콜라이더가 없었다</b>(Transform·MeshFilter·MeshRenderer 뿐).
+    ///    그래서 <see cref="GroundProbe"/> 의 레이캐스트가 발판을 못 보고 <b>그 아래 바닥(y≈0)</b> 을
+    ///    잡는다 → 장판·예고·표식이 발판 y=0.06 보다 낮게 놓여 **발판 메시에 가려진다.**
+    ///    "바닥을 보고 그 위에" 를 만족시키려면 그 바닥이 레이캐스트에 보여야 한다.
+    ///
+    /// 왜 BoxCollider 가 아니라 MeshCollider 인가: 발판은 원판 + 십자 팔 모양이라 박스로 감싸면
+    /// <b>발판이 없는 곳까지 높이가 올라가</b> 장판이 허공에 뜬다. 실제 형상을 따라야 한다.
+    ///
+    /// ⚠️ 레이어는 그대로 둔다(Default) — GroundProbe 가 Default∪Ground 를 항상 포함한다.
+    /// ⚠️ NavMesh 는 다시 굽지 않는다. 이 발판은 높이 6cm 라 보행면 판정에 의미가 없고,
+    ///    재베이크는 보스룸 전체에 영향을 주므로 별도 판단이 필요하다.
+    /// 재실행해도 중복 부착하지 않는다(멱등).
+    /// </summary>
+    [MenuItem("Tools/Map/Authoring/Setup Boss Charge Floor Collider")]
+    public static void SetupBossChargeFloorCollider()
+    {
+        GameObject root = PrefabUtility.LoadPrefabContents(BossRoomPath);
+        try
+        {
+            Transform floor = FindChild(root.transform, ChargeFloorName);
+            if (floor == null)
+            {
+                Debug.LogError($"[BossRoom] '{ChargeFloorName}' 을 못 찾았다 — 이름이 바뀌었는지 확인할 것.");
+                return;
+            }
+
+            if (floor.GetComponent<Collider>() != null)
+            {
+                Debug.Log($"[BossRoom] '{floor.name}' 에 이미 콜라이더가 있다 — 변경 없음(멱등).");
+                return;
+            }
+
+            var mf = floor.GetComponent<MeshFilter>();
+            if (mf == null || mf.sharedMesh == null)
+            {
+                Debug.LogError($"[BossRoom] '{floor.name}' 에 메시가 없어 MeshCollider 를 붙일 수 없다.");
+                return;
+            }
+
+            var mc = floor.gameObject.AddComponent<MeshCollider>();
+            mc.sharedMesh = mf.sharedMesh;
+            mc.convex = false;   // 정적 바닥이라 볼록 제한이 필요 없다
+
+            PrefabUtility.SaveAsPrefabAsset(root, BossRoomPath, out bool saved);
+            Debug.Log(saved
+                ? $"[BossRoom] ✅ '{floor.name}' 에 MeshCollider 부착 — 이제 GroundProbe 가 이 발판을 " +
+                  $"바닥으로 본다(장판·예고가 위에 그려진다). 발판 y={floor.position.y:F2}"
+                : "[BossRoom] 🔴 프리팹 저장 실패");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    static Transform FindChild(Transform root, string name)
+    {
+        if (root.name == name) return root;
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform f = FindChild(root.GetChild(i), name);
+            if (f != null) return f;
+        }
+        return null;
+    }
+
     // ── 충전 기둥 (승인 계획 Task 6) ──────────────────────────────────────
 
     const string ChargePillarName = "Env_Mv_bosscharger_upper";

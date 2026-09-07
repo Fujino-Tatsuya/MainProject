@@ -111,9 +111,13 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
         int unauthored = gate.CountUnauthoredSegments();
         if (unauthored > 0)
         {
-            Edit.LogWarning(
+            // 🔴 이 경고를 놓치면 "F는 먹는데 다리가 안 움직인다"로 보인다(2026-08-17 실제로 그랬다 —
+            // 경고 700개에 묻혔다). 원인이 저작 누락임을 문구만 보고 알 수 있게 적는다.
+            Edit.LogError(
                 $"[BridgeGate] Slot {gate.SlotID}: 다리 {unauthored}조각의 열림 위치가 미저작입니다 — " +
-                "그 조각은 움직이지 않습니다. 'Tools/Map/Authoring/Record Bridge Open Positions'로 저장하세요.", gate);
+                "개통 판정은 정상이어도 그 조각은 제자리에 머뭅니다(추측 이동 금지 규약). " +
+                "'Tools/Map/Authoring/Apply Authored Bridge Open Positions' 를 실행하거나, " +
+                "프리팹 모드에서 손으로 맞춘 뒤 'Record Bridge OPEN Positions' 로 저장하세요.", gate);
         }
 
         EnsureStateEntry(gate.SlotID);

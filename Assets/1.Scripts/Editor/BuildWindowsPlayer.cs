@@ -9,21 +9,32 @@ using UnityEngine;
 /// <summary>
 /// Windows(StandaloneWindows64) 플레이어 빌드 자동화.
 /// CLI: Unity.exe -batchmode -quit -projectPath &lt;proj&gt; -executeMethod BuildWindowsPlayer.BuildWindows64 -buildOutput &lt;exe경로&gt;
-/// 씬 목록의 정본은 EditorBuildSettings(enabled 항목)이며, 이 스크립트는 메인 플로우 6개 씬이
+/// 씬 목록의 정본은 EditorBuildSettings(enabled 항목)이며, 이 스크립트는 메인 플로우 필수 씬이
 /// 빠지지 않았는지와 0번이 부트스트랩인지만 검증한다.
 /// </summary>
 public static class BuildWindowsPlayer
 {
     private const string BootstrapScenePath = "Assets/0.Scenes/MainFlow/0.BootStrapScene.unity";
 
-    /// <summary>실행 시 반드시 빌드에 포함되어야 하는 메인 플로우 씬.</summary>
+    /// <summary>
+    /// 실행 시 반드시 빌드에 포함되어야 하는 메인 플로우 씬.
+    ///
+    /// 🔴 전투 맵이 <b>두 개 다</b> 들어 있다(2026-08-18 팀장 확정 — 레거시도 계속 출하한다).
+    /// 정본은 <c>4.MapScene-trensparent</c> 다: <c>0.BootStrapScene</c> 의 GameManager 인스턴스가
+    /// <c>mainGameSceneName</c> 을 그 이름으로 오버라이드하므로 <b>빌드된 게임이 실제로 여는 씬</b>이
+    /// 정본 쪽이다(프리팹 기본값만 레거시라 코드만 읽으면 반대로 보인다).
+    ///
+    /// 이전에는 여기서 <b>레거시만</b> 요구했다 — 즉 정본이 빌드 목록에서 빠져도 빌드는 통과하고
+    /// 실행하면 맵에 못 들어갔다. 게이트가 정작 지켜야 할 것을 안 지키고 있었다.
+    /// </summary>
     private static readonly string[] RequiredScenes =
     {
         BootstrapScenePath,
         "Assets/0.Scenes/MainFlow/1.TitleScene.unity",
         "Assets/0.Scenes/MainFlow/2.LoadingScene.unity",
         "Assets/0.Scenes/MainFlow/3.LobbyScene.unity",
-        "Assets/0.Scenes/MainFlow/4.MapScene.unity",
+        "Assets/0.Scenes/MainFlow/4.MapScene.unity",             // 레거시 — 계속 출하한다
+        "Assets/0.Scenes/MainFlow/4.MapScene-trensparent.unity", // 🔴 정본 — 부트스트랩이 여는 씬
         "Assets/0.Scenes/MainFlow/5.ResultScene.unity",
     };
 

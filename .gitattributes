@@ -21,16 +21,21 @@
 *.yaml text
 *.yml text
 
-# Unity YAML assets are text, but avoid forcing line endings here to reduce
-# scene/prefab churn across Windows editors.
-*.anim text
-*.asset text
-*.controller text
-*.mat text
-*.meta text
-*.prefab text
-*.unity text
-*.vfx text
+# Unity YAML assets are text. Force LF: Unity itself writes these files with
+# LF, so checking them out as CRLF makes every editor touch show up as
+# "modified" with an empty diff. Measured 2026-08-23: five ProjectSettings and
+# 99.Settings .asset files were dirty in git status while git diff --stat
+# reported zero changed lines. Forcing LF removes that churn rather than
+# adding it. The binary overrides below still win for .asset files Unity
+# serializes as binary.
+*.anim text eol=lf
+*.asset text eol=lf
+*.controller text eol=lf
+*.mat text eol=lf
+*.meta text eol=lf
+*.prefab text eol=lf
+*.unity text eol=lf
+*.vfx text eol=lf
 
 # Some .asset files are ALWAYS binary, even with Force Text serialization.
 # Treating them as text corrupts them on checkout/merge (CRLF conversion,

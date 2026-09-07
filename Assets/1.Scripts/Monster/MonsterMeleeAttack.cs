@@ -5,8 +5,11 @@ using UnityEngine;
 // OverlapAttack과 동일한 ColliderInfo 오버랩 패턴을 따르되, 넉백까지 책임진다는 점이 다르다.
 //
 // 히트 판정 진입점 Hit():
-//  - 서버 애니메이션 이벤트 프레임에서 호출하거나(권장, Animator 확정 후),
-//  - Animator/이벤트가 아직 없으면 MonsterBase가 선딜(attackWindup) 후 코드로 직접 호출한다.
+//  - 애니메이션 이벤트 OnAttackHit → MonsterBase.NotifyAttackHit → PerformAttackHit 경로가 기본이다.
+//    🔴 **타이머 폴백은 없다** — 클립에 이벤트가 없으면 이 공격은 데미지를 내지 못한다
+//    (attackWindup 은 더 이상 base 가 소비하지 않는다. MonsterBase.HandleAttack 참조).
+//  - 그 외에 파생 클래스가 자기 틱에서 직접 부르는 경로가 있다(지속 판정용 —
+//    SpinnerBot 스핀, 23호 Dash/RageDash. BeginHitWindow 로 유닛당 1회를 보장한다).
 // 두 경로 모두 서버에서만 실효(BaseAttack.IsServer 가드 + TryResolveHit 내부 가드).
 public class MonsterMeleeAttack : BaseAttack
 {
@@ -26,6 +29,19 @@ public class MonsterMeleeAttack : BaseAttack
     // 지속 공격(예: SpinnerBot 스핀 대시) 시작 시 열고, 끝나면 닫는다.
     public void BeginHitWindow() { _hitWindowOpen = true; _windowHits.Clear(); }
     public void EndHitWindow() { _hitWindowOpen = false; _windowHits.Clear(); }
+
+    /// <summary>프리팹에 배선된 판정 형상. 파생이 앵커를 교체하기 전에 원본을 보관하는 데 쓴다.</summary>
+    public ColliderInfo ColliderInfo { get { return colliderInfo; } }
+
+    /// <summary>
+    /// 판정 형상(앵커)을 교체한다. 공격 종류마다 히트박스가 다른 보스가 히트 직전에 갈아끼운다.
+    /// 기존 몬스터는 호출하지 않으므로 인스펙터 배선 그대로 동작한다(SetDamageSnapshot 과 같은 계약).
+    /// </summary>
+    public void SetColliderInfo(ColliderInfo value)
+    {
+        if (value != null)
+            colliderInfo = value;
+    }
 
     private void Awake()
     {

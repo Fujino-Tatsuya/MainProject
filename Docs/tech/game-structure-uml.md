@@ -1181,12 +1181,11 @@ flowchart TB
 | `BitMaskHelper<T>` | enum flag 비트 조작 | 코드 보조, 직접 에셋 참조 불필요 |
 | `Edit` | 에디터용 dirty/undo·asset 저장 보조 | 편집기 도구에서 사용 |
 | `BossAreaSubgraphExampleBuilder` | BossArea Behavior Graph 예제 생성 | Editor 메뉴 도구 |
-| `UnityMcpBehaviorGraphTools` | MCP에서 Graph 목록·노드·blackboard를 조회/수정 | `[McpToolProvider]` 기반 에디터 통합 |
 | `BoundsFixerWindow` | 여러 prefab의 SkinnedMeshRenderer localBounds를 축별 배율로 확장 | 로컬 `Assets/Editor`, EditorWindow |
 | `FileExtensionGUI` | Project 창 list view에 파일 확장자를 덧그림 | 로컬 `Assets/Editor`, InitializeOnLoad/reflection |
 | `FolderStructureGenerator` | 캐릭터명별 Scripts/Prefabs/Materials/Animations 폴더를 생성 | 로컬 `Assets/Editor`, EditorWindow |
 
-`UnityMcpBehaviorGraphTools`는 일반 코드 호출자가 없어도 reflection/attribute로 등록되는 도구다. 단순 “호출자 없음” 검색으로 dormant로 분류하면 안 된다.
+`[McpToolProvider]` 로 등록되는 MCP 도구는 일반 코드 호출자가 없어도 활성이다. 단순 "호출자 없음" 검색으로 dormant 로 분류하면 안 된다. 해당 도구들은 MCP 패키지로 옮겼다.
 
 ## 12. 외부 에셋 경계
 

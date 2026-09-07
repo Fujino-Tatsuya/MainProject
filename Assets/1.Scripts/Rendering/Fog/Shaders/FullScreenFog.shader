@@ -34,7 +34,13 @@ Shader "Hidden/Fog/FullScreenFog"
 
                 bool fogOn = _FogGlobalEnabled >= 0.5;
                 bool dimOn = _DimEnabled >= 0.5;
-                if (!fogOn && !dimOn)
+
+                // 어비스는 포그·디밍과 독립이다. 예전에는 이 조기 반환과 아래 3) 이 둘 다
+                // 포그에 묶여 있어서, 포그를 끄면 abyssEnabled 가 켜져 있어도 물안개가
+                // 조용히 사라졌다(2026-08-06 수정).
+                bool abyssOn = _AbyssEnabled >= 0.5;
+
+                if (!fogOn && !dimOn && !abyssOn)
                     return half4(sceneColor, 1.0);
 
                 float depth = SampleSceneDepth(uv);
@@ -54,18 +60,29 @@ Shader "Hidden/Fog/FullScreenFog"
                     outColor = lerp(outColor, fogColor, saturate(f));
                 }
 
-                // 2) 그 위에 디밍 — 층/시야범위 + 시야 차폐를 max 로 합쳐 단일 톤 1회 적용.
-                //    톤 통일(원형·부채꼴 경계 톤차 제거) + Dim_Apply 1회로 비용↓.
-                //    (_LosBrightness/_LosSaturation 는 이제 미사용 — 톤은 _DimBrightness/_DimSaturation 로 일원화.)
+                // 2) 일반 디밍과 시야 차폐를 분리한다.
+                //    층/시야범위는 기존 디밍 톤, 벽/노드 뒤는 LoS 전용 밝기·채도·색조를 쓴다.
+                //    LoS 결과는 원본 명암을 보존한 채 차폐 강도로 블렌딩하므로 평평한 단색이 되지 않는다.
                 if (dimOn)
                 {
-                    float t = max(Dim_Amount(worldPos, skyMask), Los_DimAmount(worldPos, skyMask));
-                    outColor = Dim_Apply(outColor, t, _DimBrightness, _DimSaturation);
+                    float3 colorBeforeDim = outColor;
+                    float dimAmount = Dim_Amount(worldPos, skyMask);
+                    float losAmount = Los_DimAmount(worldPos, skyMask);
+
+                    float3 dimmed = Dim_Apply(
+                        colorBeforeDim, dimAmount, _DimBrightness, _DimSaturation);
+                    float3 losStyled = Los_Style(
+                        colorBeforeDim, _LosBrightness, _LosSaturation,
+                        _LosTint.rgb, _LosTintStrength);
+
+                    // 완전 차폐에서는 LoS 색조가 일반 거리/층 디밍을 대체한다.
+                    // 경계에서는 losAmount로 자연스럽게 두 결과를 교차시킨다.
+                    outColor = lerp(dimmed, losStyled, losAmount);
                 }
 
                 // 3) 어비스 물안개 — 디밍 위에 심연색으로 덮음(구멍 내부만, 하늘 제외).
                 //    디밍의 탈채도가 심연색을 흑백으로 날리지 않도록 마지막에 합성.
-                if (fogOn && _AbyssEnabled >= 0.5)
+                if (abyssOn)
                 {
                     float3 abyssCol;
                     float a = Abyss_Evaluate(worldPos, abyssCol) * (1.0 - skyMask);

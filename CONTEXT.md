@@ -1,8 +1,1175 @@
 # CONTEXT.md - Shared Project Language
 
+> 🆕 **새 환경에서 처음 여는 사람은 [Docs/tech/environment-setup.md](Docs/tech/environment-setup.md) 부터.**
+> 이 프로젝트는 git 만으로 안 선다 — 아트가 SVN 에 있고, 없어도 Unity 는 조용히 열린다.
+> 열기 전에 `python Docs/tech/check-environment.py` 를 돌릴 것.
+
 This file defines the shared vocabulary for the project. Keep it concise. It is not a full spec and should not contain implementation plans.
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
+## ▶▶ 다음 세션 시작점 — 어그로 후속 3건 Play 재검증 (2026-09-03 종료)
+
+**브랜치 `feature/Boss23`** · 컴파일 0에러 · EditMode **112/112**(전체 · 신규 `BossContactReachPolicyTests` 14건 포함) · 원격 미푸시
+
+### 한 줄 상태
+
+어그로 재선정을 단독 Play 로 보니 결함 3건이 나왔다(착지 후 8초 미적용 · 허공 훅 · 점프 후 어그로 복귀).
+셋 다 원인을 코드에서 확정해 고쳤다. 남은 것은 **Play 재검증**이다 — 계획은 [PLAN.md](PLAN.md) 상단.
+
+### 🔴 다음 할 일 — 단독 Play 4건 + MPPM
+
+| 확인 | 기대 동작 |
+|---|---|
+| 착지 후 어그로 | **8초가 지나서야** 첫 재선정. 내려오자마자 튀지 않는다 |
+| 훅 개시 거리 | **2.0m 안까지 걸어 들어간 다음** 훅. 가만히 선 대상에게 허공 훅이 없다 |
+| 점프 후 어그로 | 후열을 때린 뒤 **그 대상에게 압박이 남는다**(원래 대상으로 안 돌아간다) |
+| 돌진 캐리 | **밀고 간 플레이어**가 어그로를 가져간다 |
+| MPPM 2인 | 카운터 자세 홀드 호스트/클라 일치(계획서 Task 6) + 어그로 노브 A/B |
+
+🔴 MPPM 이 아니면 안 드러나는 것 — **카운터 자세 홀드는 각 피어의 로컬 애니메이터 상태다.**
+단독 Play 로는 호스트/클라 불일치가 보이지 않는다(계획서 Task 6 의 핵심).
+
+⚡ **테스트 단축키 — `F5` = 보스방 진입 패드로 순간이동**(개발용, 2026-09-03 추가).
+스폰 지점에서 걸어가는 시간만 없애고 이후 흐름(카운트다운 → 산개 → 등장 연출)은 그대로 돈다.
+씬 배치 없이 런타임에 스스로 붙는다(`Assets/1.Scripts/Dev/DevBossEntranceWarp.cs`).
+⚠️ 빌드에서 쓰려면 **Development Build 를 켜야** 한다(`DEVELOPMENT_BUILD` 없으면 클래스 자체가 없다).
+쓰는 키 현황 — F1·F2 이펙트 HUD · **F5 보스방 워프** · F8 프로파일러 · F9 룩 A/B · F10 디버그 부활 · M 맵 · `[` `]` 카메라.
+
+승계는 로그로 확인된다 — `[23호/어그로] 점프 조준 → ... 로 승계` · `돌진 캐리 → ...`.
+⚠️ Play 로그는 MCP 콘솔이 아니라 `Editor.log` 로 본다(콘솔 버퍼 100개 — `droppedCount` 를 항상 볼 것).
+
+### 이번에 고친 것 — 증상 → 원인
+
+| 증상 | 원인 | 수정 |
+|---|---|---|
+| 내려오자마자 어그로가 튄다 | `_lastRetargetTime` 초기값 **0** → 착지 시점엔 `Time.time - 0` 이 이미 8초를 넘어 있다 | `OnServerLogicResumed`(= 착지·NavMesh 스냅 완료 지점)에서 시계 리셋 |
+| 훅 거리도 안 됐는데 때린다(허공) | 훅 거리창 3.2 > `attackRange` 2.0. `SeekBoss` 는 슬롯이 잡히는 즉시 멈춰 때린다 | `BossContactReachPolicy` — 접촉 공격은 `attackRange` 안에서만 **개시**, 붙은 뒤에는 저작값까지 유지 |
+| 점프로 후열을 때리고 원래 대상으로 돌아온다 | `ResolveAttackTarget` 이 **조준만** 정했다. 게다가 착지 시점에 주기 시계가 만료 상태였다 | `MonsterBase.AdoptTarget` 진입점 + 점프·돌진에서 승계 + 시계 리셋 |
+
+🔴 1번과 3번은 **같은 뿌리**였다 — 주기 시계가 "전투 시작"도 "어그로가 바뀐 순간"도 모르고 있었다.
+어그로 기능을 얹을 때 **시계를 어떤 사건에 묶을지**를 함께 정하지 않으면 이 두 결함이 같이 나온다.
+
+### 튜닝 노브 — `No23.asset` · `No23_Solo.asset`
+
+| 노브 | 현재 | 비고 |
+|---|---|---|
+| `aggroRetargetInterval` | 8초 | 0 이면 기능 끔. 착지·승계 시점부터 센다 |
+| `aggroAvoidsRepeatTarget` | No23 **켬** / Solo 끔 | MPPM 으로 확정할 값 |
+| 훅 `maxDistance` | 3.2 → **2.6** | **잠정값.** 개시는 게이트(2.0)가 정하고 이 값은 "붙은 뒤 유지 상한"만 정한다 |
+| 어퍼 `maxDistance` | 2.8 → **2.4** | 같음 |
+| `chargeClearGroggyDuration` | 1.5초 | 송전기 전멸 보상 |
+| Grab / Dash `counterWindowDuration` | 1.3 / 1.5 | Grab 준비 도달이 1.11초라 그보다 커야 홀드가 생긴다 |
+
+🔴 `BossCounterDataTests` 는 **관계만** 고정한다(접촉 행 `maxDistance >= attackRange`). 거리창 값과
+`aggroAvoidsRepeatTarget` 은 A/B 중이라 기대값으로 박지 않았다 — 박으면 튜닝마다 거짓 빨간불이 난다.
+
+### 어그로 계약 (변동 없음)
+
+- ✅ **어그로는 피해 분배를 바꾸지 않는다.** `_target` 은 "어디로 가고 누굴 보는지"만 정하고,
+  누가 맞는지는 공간 판정이 따로 고른다(훅은 히트박스에 겹친 전원, Grab 은 포획 순간 반경 내
+  최근접, Dash 는 경로에 먼저 걸린 사람).
+- ✅ 주기 재선정은 `Idle`/`Chase` 에서만 성립한다(공격 중 타깃이 바뀌면 조준·체인이 흔들린다).
+  **승계는 예외다** — 그 공격이 대상을 고른 순간이 승계 시점이라 공격 도중에 일어난다.
+- ✅ **체인 예산은 데드락 안전망이지 정밀 종료 기준이 아니다**(`ChainBudgetSlack` 0.5초).
+
+### 별건 (이번 작업과 무관, 미해결)
+
+- ✅ **바닥 표식·장판을 URP 데칼로 전환 — 1·2단계 완료** (2026-09-04, 팀장+팀원 육안 판정 통과)
+  - 확정 스펙: **캐릭터 아래 · 바닥과 장애물 위 · 오프셋 0**(높이로 띄우면 탑다운에서 밀려 보인다 =
+    "예고가 판정에 대해 거짓말한다"). 전환 대상은 **전/후방 표식 · 차징 오라 · 점프 예고**.
+  - 전환된 것: 표식(`BossDirectionIndicator` 데칼 경로) · 오라·점프 예고(`AoeTelegraph` 데칼 경로 +
+    `AoeDecalTelegraph.prefab`). 아크·원은 **코드 생성 텍스처**라 아트 작업이 0이다.
+  - 🔴 **되돌리기가 한 칸이다** — 표식은 `decalMaterial` 을 비우면 메시, 장판은 SO 프리팹 필드를
+    옛 것으로. 두 경로가 코드에 공존한다.
+  - 🔴 실측으로 확정된 것 3개(다시 파지 말 것):
+    ① 활성 렌더러는 `PC_Renderer.asset` 이고 **데칼 피처가 이미 켜져 있다**(`PP_Renderer`·`PP.asset` 은 죽은 애셋).
+    ② `m_SupportsLightLayers: 1` + 모든 라이트가 bit 0 → **캐릭터를 다른 비트로 옮기면 어두워진다.**
+    그래서 수신자(바닥·프롭)에 비트를 **OR 로 추가**한다(`DecalReceivers` · 지우기 금지).
+    ③ 아레나는 스폰 존이 아니라 **맵 밖 x≈500 씬 고정 배치**다 — 수신자 표시는
+    `BossArenaDecalReceiverInstaller`(런타임 자체 설치 · 전 피어)가 랜드마크 이름으로 찾아서 한다.
+  - ⚠️ 내장 데칼 셰이더는 **알베도**를 칠해 조명을 탄다(메시는 Unlit 이었다). 알파 0.85 로 우회했고,
+    어두운 구역에서 문제가 재발하면 **Emission 커스텀 Decal Shader Graph** 로 가야 한다.
+  - 🔴 **VFX 로드맵 경계**(팀장 2026-09-04): 불장판은 **이펙트로 대체 예정이라 데칼로 안 옮긴다.**
+    차징 오라는 이펙트로 바뀔 수 있고, 점프 예고는 현 상태 유지 + **착지 시 이펙트**.
+    인수인계 지점은 `ApplyJumpLandingDamage` 의 `HideJumpTelegraphClientRpc()`(= 예고 종료 =
+    착지 이펙트 시작)와 `Show/HideChargeAuraClientRpc` 다. 자세한 표는 [PLAN.md](PLAN.md).
+- 🔴 **보스방에 있던 클라가 "게임 시작 스폰 위치"로 복귀했다** (팀장 빌드 관찰 2026-09-04 · 원인 미확정)
+  - 2인 입장 후 잠깐 안 보는 사이에 **한 클라만** 보스방이 아니라 진입 시 스폰 위치로 돌아갔다.
+  - 팀장 회상: **낙사 복귀**에서도 "저장했던 위치가 아니라 스폰 위치로 돌아가는" 경우가 있었다 →
+    같은 뿌리(복귀 지점 선택)일 가능성이 있다.
+  - 🔴 **진단 데이터가 없다.** Development Build 의 `Player.log`(1.6MB)에 `BossTeleport`·스폰·복귀
+    키워드가 **0건**이다 — 그 계통이 전부 `Edit.Log` 로 찍고, `Edit.*` 는 `[Conditional("UNITY_EDITOR")]`
+    라 **빌드에서 호출이 사라진다**(교훈 #86). 다음에 재현하려면 **먼저 로거를 고쳐야 한다** —
+    `Edit` 에 `[Conditional("DEVELOPMENT_BUILD")]` 를 함께 붙이면 호출부 수정 0으로 개발 빌드에서 살아난다.
+  - 그 로그에 남아 있던 예외 2건은 별건이다: `ResultSceneManager.Start:24` · `LobbySceneManager.Start:77`
+    NullReference (로비·결과 씬 UI — 은희님 영역).
+- **스피너봇 평타 조기 판정** — 애니 시작 즉시 데미지가 나가 칼이 안 맞았는데 피격된다.
+- ✅ **23호 프리팹 중복 정리 완료 (2026-09-04).** 낡은 사본 `Assets/2.Prefabs/Wells&No.23/TwentyThree.prefab`
+  (guid `1100cccaacdc1fe4ca3e1eb9680f8c75` · 앵커가 옛 규약 `LeftHookAttack`/`UpperAttack` 등)을 삭제하고
+  `DefaultNetworkPrefabs.asset` 등록 목록에서도 뺐다(참조는 자기 `.meta` 와 그 목록 2곳뿐이었고 씬 배치 0건).
+  **23호 프리팹은 이제 `Assets/2.Prefabs/Monster/Boss/TwentyThree.prefab` 하나뿐**이다
+  (앵커 `Hand_L`/`Hand_R`/`DashBody` = `No23.asset` 의 `hitboxAnchorName`).
+  `TwentyThree_Solo.prefab` 은 에디터 오소링이 쓰는 별개의 정상 변형이니 건드리지 말 것.
+  🔴 **검증 미완 — NGO 네트워크 프리팹 목록이 바뀌었다. MPPM 2인 접속 + 보스 스폰까지 한 번 확인해야 한다.**
+- ⚠️ **Unity Hub 를 오래 켜 두면 그 안의 Unity 가 낡은 PATH 를 물려받는다**(교훈 #81).
+- ⚠️ **배치모드 테스트는 `-quit` 를 주면 안 된다** — 테스트 전에 종료돼 XML 이 안 나오고
+  로그만 "Exiting batchmode successfully" 로 끝난다(거짓 초록의 전형). 에디터가 열려 있으면
+  프로젝트 잠금 때문에 아예 안 돈다(return code 1).
+
+## 이전 시작점 — 넉백 세기 튜닝 (2026-08-18 밤 종료)
+
+**브랜치 `feature/Boss23`** · **컴파일 0에러** · **원격 동기화 완료(ahead 0 / behind 0)**
+**백업 = 로컬 `backup/boss23-20260815`**
+
+**한 줄 상태: 존 몬스터 스폰이 맵 경로에서 처음으로 돈다(Play 확인). 빌드도 뽑았다.
+남은 것은 넉백 세기 튜닝이다.**
+
+### 🔴 다음 할 일 — 넉백 세기 튜닝 (이월)
+
+팀장 판단: **넉백이 조금 과하다.** 전부 `No23.asset`(단독 변형은 `No23_Solo.asset`) 노브다.
+
+| 노브 | 현재 | 절반 기준 출발점 |
+|---|---|---|
+| `dashKnockbackStrength` | 12 | 6 |
+| `jumpKnockbackStrength` | 9 | 4.5 |
+| `chargeAuraKnockbackStrength` | 8 | 4 |
+
+⚠️ **강도 노브만 있다.** 진입점 `Unit.Knockback(방향, 강도)` 이 강도만 받으므로 지속·경직 노브는
+**일부러 두지 않았다** — 노출해도 아무 일이 없는 "고장난 노브"가 되기 때문이다.
+
+### ✅ 2026-08-18 밤에 닫은 것 — 존 몬스터 스폰 (Play 검증 완료)
+
+**아트가 마커를 저작하면 실제 맵에 몬스터가 나온다.** 이번에 처음 연결됐다.
+
+| 커밋 | 내용 |
+|---|---|
+| `20d657a`·`07ffe1f` | 아트(이지원) — 존 9종에 `MonsterSpawnPoint` 50개 + 씬/NetworkPrefabs |
+| `6106636` | 맵 생성 경로가 존의 `MonsterSpawner` 저작을 실행하게 |
+| `8d2c3d1` | 존 8종에 `MonsterSpawner` 배선 + 저작 도구 |
+
+**저작 조합 = `MonsterSpawner`(존 루트) + `MonsterSpawnPoint`(자식 마커).**
+지점 `Override` 가 있으면 그것, 없으면 스포너의 기본 몬스터.
+
+| 존 | 기본 | 마커 | |
+|---|---|---|---|
+| `ZoneL_typeA/B/C` | MortarBot | 7/7/7 | 각 1지점 Gauntlet·Wall·Humanoid |
+| `ZoneM_typeA/B` | PeekABot | 5/6 | |
+| `ZoneS_typeA`·`Quest01/02` | ChompBot | 5/5/4 | |
+| `ZoneS_typeStart` | — | 4 | 🔴 **일부러 제외**(시작 지점) |
+| `ZoneS_typeBossEnter`·`ZoneM_typeC` | — | 0 | 마커 없음 |
+
+🔴 **`spawner.SpawnWave()` 를 부를 수 없다 — 이번 세션의 핵심 교훈.**
+`NetworkBehaviour.IsServer` 는 계산 프로퍼티가 아니라 **네트워크 스폰 때 세팅되는 자동
+프로퍼티**다(`NetworkBehaviour.cs:476`). 존은 「비네트워크 규약」이라 `Spawn()` 되지 않으므로
+존에 붙은 스포너의 `IsServer` 는 **영원히 false** 이고 `SpawnWave()`·`SpawnAt()`·`SpawnOne()`
+이 전부 첫 줄에서 return 한다. **존에 `NetworkObject` 를 붙여도 아무도 Spawn 해 주지 않아
+결과가 같다.** → `MapContentSpawner.SpawnFromZoneSpawner` 가 마커만 읽어 서버에서 직접 스폰한다.
+
+⚠️ **자동 수집은 `MonsterSpawner.ResolveSpawnPoints()` 로 뺐다.** 원래 `OnNetworkSpawn` 안에만
+있어서 네트워크 스폰되지 않는 오브젝트에서는 수집조차 돌지 않았다. `Spawn Points` 목록은
+**비워 두는 것이 규약**이다 — 채우면 아트가 마커를 추가해도 반영되지 않는다.
+
+**저작 도구** = `Tools/Map/Authoring/존 몬스터 스포너 배선` (적용 + 읽기전용 검증). 멱등하다.
+기본 몬스터를 바꾸거나 존이 늘면 **손으로 만지지 말고 이걸 돌린다.**
+
+### ✅ 함께 닫은 것
+
+| 커밋 | 내용 |
+|---|---|
+| `1048386` | 보스 회전 감속 + 선딜 조준 (Play 검증) |
+| `370e7df` | 착지 직후 첫 돌진 미이동 — 연출 중 FSM 정지 (Play 검증) |
+| `f96fbd4` | 빌드 게이트가 정본 전투 맵(`-trensparent`)을 요구하게 |
+| `57c58dc` | 로비 Relay 조인코드가 **흰 배경에 흰 글씨**라 안 보이던 것 |
+
+### 🔴 이번 세션에 확정된 함정 (다음 사람이 밟을 지점)
+
+- **정본 존 프리팹은 `Assets/2.Prefabs/Map/Zoneprefab/` 이다.** 판단 기준은 "어느 프리팹에
+  컴포넌트가 붙어 있나"가 아니라 **`ZoneLayoutCatalog` 가 무엇을 가리키나**다.
+  `LevelDeliveryV3/Zones/PF_Zone_*_V3` 는 `ZoneLayout` 저작이 들어 있지만 **카탈로그에 없어
+  맵에 안 나온다.** 내가 이걸 거꾸로 읽어 문서를 두 번 다시 썼다.
+- **`ZoneLayout`·`NodeMarker`·`MonsterSpawnEntries` 경로는 지금 안 쓰인다.** 정본 존 11개에
+  `ZoneLayout` 이 아예 없어 `MapContentSpawner.SpawnMonstersFor` 가 항상 0 을 반환한다.
+  `MonsterSpawnEntries` 는 **스크립트가 아니라 `ZoneLayout.cs:43` 의 필드**다(Add Component 에 안 뜬다).
+- **맵 생성은 `MapGenerator.Start()` 가 아니라 `MapNetworkSync.OnNetworkSpawn()` 이 한다.**
+  씬의 `AutoGenerateOnStart: 0` 이고 `Start()` 는 `NetworkManager.IsListening` 이면 early return 한다.
+  서버가 시드를 뽑아 복제하고 클라가 같은 시드로 각자 생성한다.
+- **빌드 산출물의 `MainProject.exe`·`UnityPlayer.dll` 은 내용이 안 바뀌면 갱신되지 않는다.**
+  실제 콘텐츠는 `MainProject_Data/`(`level0`~ · `sharedassets*`)다. exe 타임스탬프로 빌드 여부를
+  판단하면 안 된다.
+- **인스턴스 2개를 띄우면 `Player.log` 는 먼저 잡은 쪽만 쓴다.** 나중에 뜬 쪽 로그는 남지 않는다.
+  로그로 "인스턴스가 몇 개였나"를 추론할 수 없다.
+
+### 🔴 남아 있는 팀장 액션 3건
+
+1. **은희 님께 플레이어 수정분 push 요청** + `AudioManager` NRE 전달
+   (`LobbySceneManager.Start()` **마지막 줄**이라 BGM 만 안 나오고 흐름은 정상)
+2. **로비 UX** — 호스트가 조인코드를 정할 수 없는데(`StartRelayHost` 가 입력칸을 안 읽는다)
+   입력칸이 열려 있어 "입력하면 방 코드가 되겠지"로 읽힌다. 호스트일 때 비활성화 + 발급 코드
+   자동 채움이 맞다. 은희 담당
+3. **`layprefab.prefab` 의 `LaserBlockWall` 걷어내기** — ⚠️ Quest 통로 차단 대체 구현 없음
+
+### 아트 전달용 문서
+
+정본 = [zone-monster-spawn-authoring.md](Docs/design/zone-monster-spawn-authoring.md)
+넘길 사본(md+html) = `C:\Unity\_Handoff\zone-monster-spawn\` (레포 밖, 스냅샷)
+
+---
+
+## ✅ 2026-08-23 — 인프라 세션 (MCP 패키지 · SVN · git 위생). 게임플레이 변경 없음
+
+**게임 코드·프리팹·씬은 건드리지 않았다.** 위 넉백 세기 튜닝이 여전히 다음 할 일이다.
+바뀐 것은 MCP 패키지, 아트 워킹카피 위치, git 줄바꿈 처리다.
+
+### 🔴 이번 세션에 확정된 함정 (다음 사람이 밟을 지점)
+
+- **`Assets/50.Art` 는 정션이고, 도구마다 보이지 않는다.** `find` · PowerShell
+  `Get-ChildItem -Recurse` · Node `readdirSync` 는 이 폴더를 **통째로 건너뛴다**
+  (Dirent 가 `isDirectory()=false` / `isSymbolicLink()=true` 라 두 분기 모두 빠진다).
+  Python `os.walk` 만 따라간다. MCP 프로젝트 인덱스가 이 이유로 프로젝트 `.meta` 의
+  **35%(1,105개)** 를 못 보고 있었다. 아트 자산을 세거나 훑는 계측·스크립트는 이걸 먼저
+  확인할 것. **`filesFailed: 0` 같은 통계는 근거가 못 된다** — 건너뛴 것은 실패로 세지 않는다.
+- **아트 변경은 git 에 안 보인다.** `Assets/50.Art` 는 `.gitignore` 대상이고 실제 관리는
+  **SVN** (`https://svna.gameinjae.kr/svn/GA7thFinal_VeyTrace`) 이다. "아트가 뭘 바꿨나"는
+  `git status` 가 아니라 `svn status -u` 로 본다. svn CLI 를 이 PC 에 설치했다
+  (`C:\Program Files\SlikSvn\bin\svn.exe`, PATH 등록).
+- **아트 워킹카피를 옮겼다.** `OneDrive\바탕 화면\GA7thFinal_VeyTrace` →
+  **`C:\svn\GA7thFinal_VeyTrace`**. 개인 OneDrive 가 `.svn/wc.db`(36 GB)를 동기화하면
+  워킹카피가 깨진다. 정션도 새 경로로 다시 걸었다. 예전 경로를 박아둔 스크립트가 있으면 고칠 것.
+- **`git status` 의 `M` 이 내용 변경을 뜻하지 않는다.** `ProjectSettings/*.asset` 등 5건이
+  수정됨으로 떠 있었는데 `git diff --stat` 은 **변경 0줄**이었다. Unity 는 LF 로 쓰고
+  `core.autocrlf=true` 는 CRLF 로 체크아웃하기 때문이다. **버리기 전에 `git diff --stat` 을
+  먼저 보라** — 그 안에 진짜 변경이 섞여 있을 수 있다(실제로 `UnityConnectSettings.m_Enabled`
+  0→1 한 건이 섞여 있었다). 원인은 `.gitattributes` 에 `eol=lf` 를 걸어 없앴다.
+- **MCP 패키지 핀은 안정 브랜치에서 도달 가능한 커밋이어야 한다.** feature 브랜치만 가리키는
+  커밋을 핀한 뒤 그 브랜치를 지우면 팀원 Unity 가 패키지를 해석하지 못한다. 그래서 포크의
+  작업 브랜치를 `optimized` 로 합치고 핀을 그 계보로 옮겼다.
+
+### ✅ 닫은 것
+
+- MCP 코드 2건을 게임 레포에서 패키지로 회수(`.mcp-bridge-launcher.js`,
+  `UnityMcpBehaviorGraphTools.cs`). **툴 이름 6개는 그대로** — 호출부는 안 깨진다
+- 패키지 핀 `2ea969e` → `633c7f5` (dev-0.0.1). 실측 기록은 패키지 `README_ko.md` 참조
+- 패키지 버그 2건 수정: 정션 스캔 누락(깨진 스크립트 탐지 9→13건), 런처 경로 탐색
+- `.gitattributes` 에 Unity YAML 자산 `eol=lf` (바이너리 `.asset` 오버라이드는 그대로 유지)
+- `ProjectSettings/ScriptableBuildPipeline.json` 팀 공유 시작 (Addressables 빌드 설정)
+- SVN r283 → r286 동기화. 받을 것·커밋할 것 없었다 (아트는 r283 이후 변경 없음)
+
+### 🔴 팀원에게 알려야 할 것
+
+MCP 를 쓰는 사람은 **설정을 한 번 고쳐야 한다.** 런처가 레포 루트에서 사라져 패키지 안으로
+갔다. 절차는 패키지의 `LOCAL_DEV_SETUP.md` 에 있다.
+
+## 이전 시작점 — 회전 감속·첫 돌진 마감 (2026-08-18 낮)
+
+**브랜치 `feature/Boss23`** · **컴파일 0에러** · **`origin/feature/Boss23` 과 동기화 완료(ahead 0 / behind 0)**
+**백업 = 로컬 `backup/boss23-20260815`**
+
+**한 줄 상태: 팀장 지시 2건(회전 감속·첫 돌진)을 닫고 Play 로 확인받았다. 원격에도 올라갔다.
+다음은 넉백 세기 튜닝이다.**
+
+### 🔴 다음 할 일 — 넉백 세기 튜닝
+
+팀장 판단: **넉백이 조금 과하다.** 전부 `No23.asset`(단독 변형은 `No23_Solo.asset`)의 노브다.
+
+| 노브 | 현재 | 절반 기준 출발점 |
+|---|---|---|
+| `dashKnockbackStrength` | 12 | 6 |
+| `jumpKnockbackStrength` | 9 | 4.5 |
+| `chargeAuraKnockbackStrength` | 8 | 4 |
+
+⚠️ **강도 노브만 있다.** 진입점인 `Unit.Knockback(방향, 강도)` 이 강도만 받으므로 지속·경직 노브는
+**일부러 두지 않았다** — 노출해도 조절이 아무 일도 안 하는 "고장난 노브"가 되기 때문이다.
+지속·경직까지 만지려면 `Unit` 쪽 계약을 바꿔야 하고 그건 은희 담당 경계다.
+
+### ✅ 2026-08-18 낮에 닫은 것 (커밋 3개 · Play 검증 완료 · 푸시 완료)
+
+| 커밋 | 내용 |
+|---|---|
+| `1048386` | 보스 회전 감속 + 선딜 조준 |
+| `370e7df` | 착지 직후 첫 돌진 미이동 — 연출 중에는 FSM 을 세운다 |
+| `f10551b` | 문서 갱신(팀장 문답 2건 기록) |
+
+**1. 보스 회전 감속** — `MonsterDataSO.turnSpeed` 신규. **0 = 즉시 회전**이라 몹 8종·중간보스 3종은
+무영향이고, `No23`·`No23_Solo` 만 **10**(플레이어 `rotate_Speed` 와 동일값)이다.
+회전 단일 지점 = `MonsterBase.RotateToward()` — `FaceTarget`·`FaceVelocity` 가 전부 통과한다.
+
+🔴 **팀장 확정: 조준도 감속 + 선딜 동안만 회전 허용.** 감속 회전은 매 틱 불러야 도달하는데
+23호의 조준은 `StartAttack` 직전 **1회**뿐이라 그대로 두면 엉뚱한 데를 때린다. 그래서
+`FaceTargetDuringWindup` 훅(기본 false)을 만들어 **히트 이벤트 전까지**를 조준 구간으로 썼다.
+"공격 중 회전 없음"(`FaceTargetWhileAttacking => false`) 규칙 자체는 그대로다.
+⚠️ 잡기 되먹임은 여전히 안전하다 — 되먹임은 플레이어가 손 소켓에 붙은 **뒤**(= 히트 시점) 생긴다.
+
+🔴 **`FaceTargetImmediate()` 예외가 하나 필요했다** — `BeginRageDash` 는 `FaceTarget()` **바로 다음 줄**에서
+`transform.forward` 를 돌진 방향으로 굳힌다. 감속을 쓰면 그 프레임의 어중간한 각도가 박힌다.
+**"돌아본 뒤 그 방향을 즉시 소비하는" 자리**는 앞으로도 이 함수를 써야 한다.
+
+**2. 착지 직후 첫 돌진 미이동 — 돌진 코드의 결함이 아니었다**
+
+🔴 **원인 = 연출 구간에 FSM 이 돌아서 다리 없이 공격을 시작한 것.**
+
+```
+Spawn()                → FSM 살아남(_initialized = true)
+agent.enabled = false  → 다리 없음 (하강 연출 보호, Director:344)
+  … 하강 1.2초 … 착지 … impactHold 0.9초 …   ← 이 2초 넘는 구간에서 FSM 이 공격을 고른다
+BeginCombatServer → SnapBossToNavMesh → agent.enabled = true
+```
+
+No23 `detectionRadius` 8m 라 하강 막바지에 플레이어가 인지 반경에 들어온다.
+그 구간에 돌진이 걸리면 `StartDashMove` 가 에이전트를 못 찾아 **조용히 return** 하고
+목적지가 제자리로 남아 도착 판정이 즉시 성립한다 → **변위 0, 클립만 재생**.
+**훅·잡기가 걸리면 허공에 대고 나간다 — 같은 뿌리의 다른 증상이다.**
+
+수정 = `MonsterBase.SetServerLogicSuspended(bool)` 신규(additive, 호출처 = Director 2곳).
+스폰 직후 정지 → `SnapBossToNavMesh` **뒤** 재개. `SetSpawnAnchor` 와 같은 모양의 seam 이다.
+
+⚠️ **인수인계에 적힌 후보 2개는 둘 다 아니었다** — `552c44a` 의 `acceleration` 승계는 살아 있고
+(`DashAcceleration 999` + `autoBraking=false`), 복원용 필드도 `-1f` 초기화가 정상이다.
+
+**3. 돌진이 조용히 실패하지 않게 했다** — `StartDashMove` 가 ① 에이전트 부재/꺼짐/오프메시를
+문구로 가르고 ② 클램프된 목적지가 출발점과 같으면 값과 함께 경고한다.
+같은 증상이 다른 경로로 또 오면 **한 줄이 무엇이 없었는지 말한다.**
+
+### ✅ Play 육안 검증 — 팀장 확인 (2026-08-18 낮)
+
+| | 확인 |
+|---|---|
+| 회전이 한 프레임에 스냅하지 않는다 | ✅ |
+| 돌진이 여전히 **밀고 지나간다**(따라 맴돌지 않는다) | ✅ |
+| 잡기 무한 회전 재발 없음 | ✅ |
+| 입장 연출 착지 직후 **첫 돌진이 전진한다** | ✅ |
+| 몹 8종·중간보스 3종 회귀 없음(회전 여전히 즉시) | ✅ |
+
+명중률은 이상 없다고 판단됐다. 어긋나면 첫 노브는 `No23.asset` 의 **`turnSpeed`**(현재 10) —
+⚠️ 돌진 선딜은 클립 이벤트가 **0.15초**뿐이라 10 으로 약 80%만 수렴한다.
+
+### 🔴 빌드 씬 — 정본은 이미 `-trensparent` 다. 다만 **게이트가 거꾸로 걸려 있다**
+
+이전 인수인계의 "`Build/Windows64 Player` 가 필수 맵을 보조 씬으로 고정한다"는 **절반만 맞았다.**
+실측 결과 **빌드된 게임이 실제로 여는 씬은 정본**이다.
+
+| 지점 | 값 | 판정 |
+|---|---|---|
+| `0.BootStrapScene` 의 GameManager 인스턴스 오버라이드 | **`4.MapScene-trensparent`** | ✅ **이것이 실제 런타임 결정자다** |
+| `EditorBuildSettings` | `4.MapScene` · `4.MapScene-trensparent` **둘 다 enabled** | ✅ 정본이 빌드에 들어간다 |
+| `GameManager.prefab` 기본값 | `4.MapScene` | ⚠️ 오버라이드 없는 다른 씬에서 쓰면 레거시로 간다 |
+| [BuildWindowsPlayer.cs:26](Assets/1.Scripts/Editor/BuildWindowsPlayer.cs:26) `RequiredScenes` | `4.MapScene` **만** 요구 | 🔴 **거꾸로다**(아래) |
+
+🔴 **게이트가 지켜야 할 것을 안 지킨다.** `RequiredScenes` 는 레거시를 요구하고 정본은 요구하지 않는다.
+그래서 **정본을 빌드 목록에서 실수로 빼도 빌드는 통과하고, 실행하면 게임이 맵에 못 들어간다.**
+반대로 레거시를 빼면 멀쩡한 빌드가 실패한다. **판단 필요** — 레거시 `4.MapScene` 을 계속 출하할지
+정하면 그에 맞춰 `RequiredScenes` 를 고친다(정본 추가 / 레거시 유지 여부).
+
+### 🔴 남아 있는 팀장 액션 3건 (변동 없음)
+
+1. **은희 님께 플레이어 수정분 push 요청** + `AudioManager` NRE 9건 전달
+   (`TitleSceneManager.cs:33`·`LobbySceneManager.cs:77` — `Instance` 또는 `.Catalog` 가 null 인데
+   두 곳 다 null 검사 없이 두 단계를 체이닝한다. 아트 머지에서 배선이 빠진 것으로 보인다)
+2. **빌드 게이트** — 위 표 참조. 이전 판의 "보조 씬으로 고정" 서술은 정정됐다
+3. **`layprefab.prefab` 의 `LaserBlockWall` 걷어내기** — ⚠️ Quest 통로 차단의 **대체 구현은 없다**
+
+### 🔴 그 밖에 열려 있는 것
+
+- **Wells 폭탄 진단 로그**(`[Wells/진단] ①②③` + `[23호/폭탄] ④`)는 **남겨 뒀다.** 다시 끊기면
+  **안 찍히는 번호**가 범인이다.
+- **돌진 경로 스침 넉백 없음** — 공용 `MonsterMeleeAttack` 경로라 손대면 몹 8종·중간보스 3종에
+  회귀 위험. 필요하면 별건으로 판단.
+- `No23.asset` 에 **제거된 키 5개**(`*KnockbackDuration`·`*Stagger`)가 남아 있다. Unity 가 로드 시
+  무시하고 다음 저장에 사라진다.
+
+---
+
+## 이전 시작점 — 보스 회전 감속 + 돌진 미이동 (2026-08-18 새벽 종료)
+
+**브랜치 `feature/Boss23`** · **컴파일 0에러** · **커밋 6개 미푸시** (`3a8743d..8af4b8e`)
+**백업 = 로컬 `backup/boss23-20260815`**
+
+**한 줄 상태: 다리 개통·도구 정리·레거시 보스 교체·리쉬 버그까지 닫혔고 Play 로 확인됐다.
+남은 것은 보스 거동 2건이다.**
+
+### 🔴 다음 세션 할 일 2건 (팀장 지시)
+
+**1. 보스 회전을 플레이어처럼 부드럽게**
+
+지금 보스는 타깃을 향해 **한 프레임에 확 돌아본다** — 비주얼이 불편하다는 판단이다.
+플레이어의 감속 회전 방식을 그대로 가져온다.
+
+| | 위치 |
+|---|---|
+| 보스(즉시 회전) | [MonsterBase.cs:1142](Assets/1.Scripts/Monster/MonsterBase.cs:1142) `FaceTarget()` — `transform.rotation = Quaternion.LookRotation(dir)` 한 줄 |
+| 플레이어(감속 회전) | [PlayerMovement.cs:179](Assets/1.Scripts/Player/PlayerMovement.cs:179) `Quaternion.Slerp(현재, 목표, rotate_Speed * Time.deltaTime)` + `Dot > 0.999f` 도달 클램프 |
+| 호출처 | `MonsterBase.cs:315`·`335`, `TwentyThreeBoss.cs:1748` |
+
+⚠️ **`FaceTarget` 은 몹 8종·중간보스 3종이 공유한다.** 즉시 회전을 그냥 바꾸면 전부 바뀐다 —
+`data` 에 회전 속도 필드를 추가하고 **0 이면 기존 즉시 회전**으로 두는 식이 안전하다(장판 SO 이관 때 쓴 규약).
+⚠️ 회전은 서버 권한이고 클라는 `NetworkTransform` 보간으로 받는다 — 서버에서만 감속하면 된다.
+⚠️ [TwentyThreeBoss.cs:923](Assets/1.Scripts/Monster/Boss/TwentyThreeBoss.cs:923) `FaceTargetWhileAttacking => false` 는
+**의도된 것**이다(잡기 소켓 되먹임으로 무한 회전한 사고 때문). 공격 중 회전을 되살리지 말 것.
+
+**2. 착지 직후 돌진이 앞으로 안 나간다 — 애니메이션만 제자리에서 돈다**
+
+landing 직후 바로 돌진을 하는데 **실제 변위가 0** 이다.
+
+🔴 **전에 같은 증상을 한 번 고쳤다** — `552c44a`: `StartDashMove` 가 프리팹의 `acceleration`(8m/s²)을
+승계하지 않아 0.7초에 1.96m 만 가던 문제. 레거시 BT 의 `SetAgentDashModeAction` 은 `999`/`autoBraking=false`
+로 바꾸고 있었다. **먼저 그 승계가 아직 살아 있는지 확인할 것.**
+그 다음 후보: 돌진은 `agent` 이동이 아니라 **NavMesh 클램프 방식**이다(IMPLEMENTATION_NOTES.md) —
+착지 직후엔 에이전트가 막 켜진 시점이라 클램프 기준이 안 잡혔을 수 있다.
+
+### ✅ 2026-08-18 새벽에 닫은 것 (커밋 6개)
+
+| 커밋 | 내용 |
+|---|---|
+| `fdd37eb` | ZoneL_typeB 다리 개통 복원 — 아트 V3 교체로 날아간 `ZoneBridgeGate` 재연결 |
+| `0aa000c` | 아트 머지로 죽은 도구 경로 3건 정정 |
+| `962c3e9` | 소진된 일회성 에디터 도구 25개 제거 (83 → 58) |
+| `9181e75` | 레거시 보스 프리팹 참조를 신규 `Monster/Boss` 로 교체 (5곳) |
+| `f64e599` | 보스 프리팹 검증 도구 제거 — 검증 대상이 죽었다 |
+| `8af4b8e` | 착지 후 영구 리쉬 복귀 수정 — 리쉬 기준점을 전투 원점으로 |
+
+**리쉬 버그가 이번 세션의 핵심 교훈이다.** `bossPrefab` 을 레거시(BT)에서 신규(FSM)로 바꾸자
+`MonsterBase.HandleSeekAndCombat` 이 보스에 대해 처음 실행되면서 드러났다 —
+상공 18m 스폰 위치가 리쉬 기준점으로 잡혀 `leashRadius`(15m)를 영구 초과했고,
+`EnterReturn` 의 `Revive()` 가 매 프레임 체력을 최대로 되돌렸다.
+증상은 "데미지가 안 박히고 애니메이션이 안 나온다"로 보였다. 해결 = `SetSpawnAnchor` seam.
+
+### 🔴 새로 발견된 별건 — 은희 님 담당
+
+**`AudioManager` NRE 9건** — Play 부트 흐름에서 터진다. BGM 이 안 나오는 것 말고 흐름은 진행된다.
+
+```
+TitleSceneManager.cs:33   AudioManager.Instance.PlayBGM(AudioManager.Instance.Catalog.TitleBGM)  ×5
+LobbySceneManager.cs:77   AudioManager.Instance.PlayBGM(AudioManager.Instance.Catalog.LobbyBGM)  ×4
+```
+
+`Instance` 또는 `.Catalog` 가 null 인데 두 곳 다 null 검사 없이 두 단계를 체이닝한다.
+`LobbySceneManager` 는 아트 머지에서 `BeaverLobbySceneManager` 의 GUID 를 물려받으며 613줄 개편된
+파일이고 `3.LobbyScene` 도 +3,037줄 바뀌었다 — **머지 과정에서 배선이 빠진 것으로 보인다.**
+
+### 🔴 팀장 액션
+
+1. **은희 님께 플레이어 수정분 push 요청** — "플레이어 버그를 고쳤다"고 했으나 **원격 어디에도 없다.**
+   `Player/`·`Unit/`·`PlayerVariant/` 가 모든 원격 브랜치에서 `feature/Boss23` 과 0 파일 차이이고,
+   마지막 커밋은 `257cb4c`(2026-08-07)로 이미 들어와 있다. 위 `AudioManager` 건도 같이 전달.
+2. **`Build/Windows64 Player`** 가 필수 맵을 보조 씬(`4.MapScene`)으로 고정한다 —
+   정본은 `-trensparent`. 빌드 산출물에 영향이라 판단 필요해 손대지 않았다.
+3. **`layprefab.prefab` 의 `LaserBlockWall` 걷어내기** — 걷어내면
+   `Tools/Map/Authoring/Remove Quest Laser Blockers` 와 그 파일도 지울 수 있다.
+   ⚠️ Quest 통로 차단의 **대체 구현은 없다**(구 주석의 `AttachQuestBlockade` 는 코드에 존재하지 않는다).
+
+### 도구 정리 결과 — 메뉴 83 → 57개
+
+읽기전용 검증·덤프, Bridge Gate 5종, MapGen, Rendering Look, 잡기 소켓(은희 인터페이스 대기)은 유지.
+Codex CLI 교차검증에서 **Codex 가 2건 틀렸다** — `AttachQuestBlockade` 를 주석에서 읽고 구현으로 오독,
+`LaserBlockWall` 잔존을 0건으로 판단. 그래서 `Remove` 는 남겼다.
+
+⚠️ 지시대로 남긴 3개는 **지금 정상 동작하지 않는다**: `Effects/v1 기본 에셋 생성`·`Effects/스모크 테스트`
+(`EntryFolder = Assets/5.VFX/Common` 사망, `EffectSmokeTestRunner` 타입 없음) · `Build/Windows64 Player`.
+
+---
+
+## 이전 시작점 — 아트 머지 후 Unity 검증 (2026-08-15 저녁 종료)
+
+**브랜치 `feature/Boss23`** · 머지 커밋 `71dabb1` (부모 `3a8743d` + `86da52c`)
+**백업 = 로컬 브랜치 `backup/boss23-20260815`** (머지 직전 `3a8743d` 시점)
+
+**한 줄 상태: `origin/fix/pixel` 아트 머지를 끝냈다. Unity 를 아직 한 번도 안 열었다.**
+
+### 0번 할 일 — Unity 열고 콘솔 읽기
+
+머지 후 Unity 를 **한 번도 실행하지 않았다.** 임포트가 처음 돌면서 나오는 콘솔이 다음 작업의 지도다.
+정본 씬은 `Assets/0.Scenes/MainFlow/4.MapScene-trensparent.unity` 이고
+진입은 `0.BootStrapScene` 에서 Play (F8 = ProfilerHUD, F9 = 룩 A/B).
+상세 = [Docs/tech/map-rendering-lighting-handoff.md](Docs/tech/map-rendering-lighting-handoff.md).
+
+⚠️ **머지 전 콘솔 에러 17건의 정체**(대조용): 컨베이어 죽은 참조(ZoneL_typeA) · MCP
+`README_ko.md` meta 없음 12건 · `NetworkAnimator.OnValidate` NRE 3건 · 50.Art TestAssets 3건.
+**첫 번째만 이 머지로 해소된다.** 나머지 3종은 그대로 뜨는 게 정상이다.
+
+### 예상되는 결손 참조 — 전부 이미 조사됐다. 새 버그로 오진하지 말 것
+
+| 대상 | 결손 | 성격 |
+|---|---|---|
+| `LevelDeliveryV3` 프리팹 ~~124개~~ **110개** | `OcclusionSection`·`ElevationStack`·`ElevationLevel` (에셋,GUID) 쌍 132 / 컴포넌트 **560** | 🔴 아래 |
+| `ModularRobots_R1.prefab` | `CommonMeleeRobot.asset` | **의도된 것** — 팀장이 삭제 결정 |
+| `Stage1.prefab` | 3 | 머지 전 `HEAD`·`leejiwon` 양쪽 동일 |
+| `4.MapScene(-trensparent)` | `FogManager.maskTexture` | 머지 전부터 |
+| `VFXScene.unity` · `Player.prefab` | 각 1 | 아트/SVN 쪽 기존 결손 |
+
+🔴 **`LevelDeliveryV3` ~~124개~~ 110개** (2026-08-29 정정 — 아래 참조) — `fix/pixel` 이 그대로 들고 온 상태이지 이 머지가 만든 게 아니다.
+필요한 스크립트 3종이 **`feature/trensparent` 에만** 있다. 정본 씬은 이 프리팹을 쓰지 않으므로
+게임 경로 영향은 없고 콘솔 Missing Script 경고만 뜬다.
+→ 고치려면 `origin/feature/trensparent` 추가 머지(충돌 12건)인데 `WallOcclusion*` 코드가
+`fix/pixel` 쪽이 더 최신이라 **역행 위험**이 있다. 별건으로 판단할 것.
+
+> **✅ 2026-08-29 종결 — 현상 유지로 결정.** 위 판단이 맞았고, 근거를 네 축으로 다시 쟀다.
+> - **삭제된 적이 없다.** 세 클래스(`OcclusionSection`·`ElevationLevel`·`ElevationStack`)는
+>   `bb35c92` "feat: redesign registered wall occlusion"(2026-08-09, noisyboy632)에서 **추가**됐고
+>   그 커밋은 `origin/feature/trensparent` 에만 있다(`git merge-base --is-ancestor bb35c92 HEAD` = false).
+>   전 브랜치에 **삭제 커밋이 없다** — "왜 지웠나" 가 아니라 "아직 안 왔다" 가 맞는 질문이었다.
+> - **정확한 규모**: 프리팹 **110개** / (에셋,GUID) 쌍 **132** / **실제 컴포넌트 인스턴스 560개**
+>   (OcclusionSection 515 · ElevationLevel 33 · ElevationStack 12). 도구가 말하는 "132 참조" 는
+>   쌍 수이지 컴포넌트 수가 아니다 — 정리를 택했다면 지울 대상은 560 이었다.
+>   **110 은 두 독립 방법으로 맞췄다**(python YAML 집계 · `grep -rl` 합집합). 기존 문서의
+>   "124개"/"125개" 는 근거가 없는 수다 — GUID별 108/12/12 는 도구와 정확히 일치한다.
+> - **게임 경로 영향 없음(4축 전부 0)**: 씬 직접 참조 0 · **27개 씬 전수 GUID 전이 BFS 도달 0** ·
+>   Addressables 그룹 교집합 0 · 코드의 경로 로드 0.
+> - **왜 복원하지 않나**: 좁은 복원의 최소 폐포는 4파일(세 클래스 + `WallOcclusionRegistry`)이고
+>   컴파일은 닫히지만, **우리 브랜치에는 이 타입을 쓰는 코드가 0건**이다(드라이버가 `fix/pixel` 계열).
+>   살아나는 것은 인스펙터의 오소링 데이터뿐이고 런타임 동작은 없다 — 죽은 코드를 넣는 대가로
+>   콘솔 경고를 지우는 셈이고, 나중에 trensparent 를 제대로 머지할 때 충돌만 늘린다.
+> - **프리팹 정리는 하지 말 것.** 되돌릴 수 없고 trensparent 리디자인이 전제하는 오소링 기록
+>   (`renderers`/`colliders`/`contentRoot`/`contentRenderers`)을 없앤다.
+>
+> **다시 판단하지 말 것.** 바뀔 조건은 하나 — `feature/trensparent` 를 머지하기로 할 때다.
+> 재현 스크립트와 상세 근거는 MCP 포크의 `HANDOFF.md` §5 / §4-(44) 와
+> `Tools/scan/occlusion-reach.py` 에 있다.
+
+### ✅ 원격 `feature/maprendering` 삭제 완료
+
+`feature/Boss23` 에 100% 포함돼 있었다(ahead 91 / behind 0). 되살리려면 `2e14b18` 로 push.
+
+### 🔴 팀장 액션 1건
+
+1. **은희 님께 플레이어 수정분 push 요청** — "플레이어 버그를 고쳤다"고 했으나 **원격 어디에도 없다.**
+   `Player/`·`Unit/`·`PlayerVariant/` 가 모든 원격 브랜치에서 `feature/Boss23` 과 **0 파일 차이**이고,
+   `Player/` 를 만진 마지막 커밋은 `257cb4c`(2026-08-07)로 이미 들어와 있다.
+   은희 님 미머지분은 `fix/property_change` 1커밋뿐인데 씬 전환·빌드 설정이라 플레이어가 아니다.
+
+### 이번 머지에서 확정된 것
+
+- **아트 브랜치 5개는 사실상 1개다** — `fix/pixel` 이 `leejiwon`·`fix/art_zone` 을 조상으로 포함하고,
+  `fix/convayor`·`fix/movingplatform` 은 내용이 체리픽(`0494685`·`a48680d`)돼 blob 해시까지 같다.
+- **레이어 17 = `Effect`(아트), 18 = `CombatTarget`** 으로 확정. [layer-standard.md](Docs/tech/layer-standard.md) 갱신 완료.
+- **`CommonMeleeRobot.asset` 은 머지 사고로 사라진 것이었다** — `1bf654f`(은희, feature/VFX→development)
+  에서 **양쪽 부모에 다 있는데** 결과에서 빠졌다. 되돌리기 반복은 금지(원인·금지사항 =
+  [Docs/tech/bt-subgraph-reference-loss.md](Docs/tech/bt-subgraph-reference-loss.md)). 팀장이 삭제 수용으로 종결.
+- ⚠️ **`Assets/50.Art` 는 정션이다.** GUID 결손 조사 시 `grep -r Assets` 는 정션을 **안 따라간다** —
+  `Assets/50.Art` 를 명령줄에 직접 줘야 한다.
+  > **2026-08-30 정정**: 이 줄은 원래 "OneDrive 정션이고 이 PC 에 `.svn` 작업사본도 `svn`
+  > 클라이언트도 없다" 였다. **둘 다 이제 틀렸다** — 2026-08-23 에 작업사본을
+  > `C:\svn\GA7thFinal_VeyTrace` 로 옮기고 SlikSvn 을 설치했다(위 2026-08-23 절).
+  > 셋업 절차는 [Docs/tech/environment-setup.md](Docs/tech/environment-setup.md).
+
+---
+
+## 이전 시작점 — 보스 거동 잔여 4건 (2026-08-10 저녁 종료)
+
+**브랜치 `feature/Boss23`** · **컴파일 0에러 0경고** · **`8170481..HEAD` 전부 미푸시**
+(개수는 적지 않는다 — 개수를 적으면 그걸 적는 커밋이 자기 자신을 못 세서 매번 어긋난다)
+
+**한 줄 상태: 잔여 결함 4건이 전부 닫혔다. 남은 것은 Play 육안 검증이다.**
+
+팀장 지시(Play 확인 후 기능별 분할)대로 2026-08-13 에 끊었다.
+
+| 커밋 | 내용 |
+|---|---|
+| `d7445db` | 장판 값 SO 이관 — 0 이면 프리팹 값 |
+| `552c44a` | 돌진 전진 복구 + 체인 예산에 선딜 반영 |
+| `019431e` | 폭탄 착지 정지 + 퓨즈 5초 + 점프 범위 동반 폭발 |
+| `c451259` | 잡기 소켓 한시 복구 + 잡는 동안 회전 금지 |
+| `6035aaf` | 점프 착지 예고 원 2개 + 앞뒤 표식은 착지 후에만 |
+| `ba66e1b` | No23 단독 변형 — 중간보스로 재활용 |
+| `afab6b8` | No23 데이터 배선 + 장판 10초 + 저작 도구 |
+| `c1a7342` | MonsterScene 보스 전투 씬 구성 (P7) |
+
+🔴 **일부러 커밋하지 않은 것 3건** — 기능 변화가 0 이거나 보스 작업이 아니다.
+`4.MapScene.unity`(fileID churn 46/46) · `MultiplayerManager.asset`(줄끝만, numstat 0/0) ·
+`ZoneL_typeC.prefab`(**맵/아트 변경** — `crane_prefabs (1)` 중첩 추가. 이 세션 전부터 작업
+트리에 있던 것이라 **누구 작업인지 확인이 필요하다**).
+
+**한 줄 상태: 보스가 Play 에서 한 사이클을 돈다. 남은 것은 결함 4건이다.**
+
+### ✅ 이번 세션에 Play 로 확인된 것 (팀장 육안 승인)
+
+| | 확인 |
+|---|---|
+| 보스 스폰·추격·공격·페이즈·**송전기 전 시퀀스**·처치 | 로그 + 육안 |
+| **폭탄** — 착지 지점 정지 · 좌클릭 당구 · **벽 1회 반사** | 육안 |
+| **잡기** — 회전 폭주 없음 · 플레이어가 **서 있는 자세**로 붙음 | 육안 |
+| **점프 예고** — 큰 원 + 차오르는 작은 원, 다 차는 순간 착지 | 육안 |
+| **앞뒤 표식** — **착지 후에만** 나온다 | 육안 |
+
+### ✅ 잔여 4건 — 2026-08-13 전부 처리 (커밋 `d7445db` · `552c44a`)
+
+> **🔴 세 건 중 두 건은 인수인계에 적힌 원인이 틀렸다.** 로그 문구와 경고 문구를 원인으로
+> 읽은 것이 화근이었다. 아래는 코드로 확정한 결과다.
+
+| # | 인수인계가 말한 원인 | **실제 원인** | 결과 |
+|---|---|---|---|
+| 1 | 플레이어 평타가 `Unit` 을 요구해 폭탄이 걸러진다 | ❌ **틀렸다. 폭탄은 이미 맞고 있다** | 수정 없음 |
+| 2 | 돌진이 안 나간다(원인 미상) | `StartDashMove` 가 **`acceleration` 을 승계하지 않았다** | 수정 |
+| 3 | `grab` 클립의 `OnAttackEnd` 미수신 | ❌ **grab 이 아니라 dash 였다** — 돌진 체인 예산 부족 | 수정 |
+| 4 | 수명 타이머 때문에 SO 이관이 위험하다 | ❌ **Instantiate↔Spawn 사이 창을 쓰면 안전하다** | 이관 완료 |
+
+**1 — 폭탄 평타는 정상이다.** `PlayerDefaultAttack.HitOverlap` 은 `Unit` 을 요구하지 않는다
+(`ownerUnit == null` 이어도 통과해 `TryResolveHit(hurtbox, hit)` 까지 간다 →
+`Hurtbox.ResolveReferences` 가 `GetComponentInParent<IAttackReceiver>()` 로 `BossBomb` 을 찾는다).
+로그의 `unit없음` 은 **필터가 아니라 진단 출력 문구**다. 거짓 경보의 뿌리는 따로 있다 —
+`LogEmptySwing` 이 `swingHitBuffer.Count == 0` 으로 발동하는데 그 버퍼는 **`Unit` 만 담는다**
+(패시브 통지용). 그래서 폭탄을 성공적으로 때린 스윙도 "전부 걸러졌다"로 찍힌다.
+팀장 육안 승인(좌클릭 당구 작동)과도 일치한다. 🔴 **고칠 것은 플레이어 쪽 로그 3줄뿐이고 은희
+담당 경계라 손대지 않았다.** 게임플레이 영향 0 — 콘솔 노이즈만 남는다.
+
+**2 — 돌진.** 프리팹 `acceleration` 8m/s² 로는 0.7초에 5.6m/s 까지만 올라 **약 1.96m** 만 간다
+(목표 15m/s·16m). 레거시 BT 의 `SetAgentDashModeAction` 은 999 / `autoBraking=false` 로 바꾸고
+있었다 — FSM 재작성판이 `speed`·`stoppingDistance` 만 승계하며 이 둘을 빠뜨렸다.
+
+**3 — 타임아웃은 dash 것이다.** 경고 문구가 `"Grab 체인이 …"` 로 **하드코딩**돼 있었고 이 안전망은
+Dash·Jump·Charge·Rage 도 함께 쓴다. 돌진 예산 `0.7+0.9=1.6초` vs 실제 `0.15(히트이벤트)+0.7+0.9=1.75초`
+→ 매번 0.15초 초과. 이제 경고가 **어느 공격인지 찍는다.**
+참고: `grab` 클립에 `OnAttackEnd` 가 없는 것은 **의도**다(저작 도구 주석: "잡기 체인이 자기 종료를
+소유한다"). 그쪽은 결함이 아니었다.
+
+**4 — 장판 SO.** `AreaZone.OnNetworkSpawn` 이 타이머를 시작하므로 **스폰 전에** 주입하면 된다.
+`SpawnOrGrow` 의 Instantiate↔Spawn 사이에 창이 있다. **0 = 프리팹 값** 규약이라 SO 를 안 채우면
+동작이 그대로다. ⚠️ 지금 실효값은 여전히 프리팹(FireFloor `lifetime 10`·`radius 2`·`maxRadius 5`) —
+SO 로 조절하려면 `No23.asset` 인스펙터 「폭발 장판」에 0 아닌 값을 넣으면 된다.
+
+### ✅ 2026-08-13 저녁 — Play 피드백 6라운드 반영 (커밋 `99525da`…`30ee2e5`)
+
+**팀장 Play 육안 승인분** — 넉백 3종 · 차징이 landingpos 로 이동 · 점프 때 플레이어 안 뜸 ·
+피격 후 표식 색 유지(후방 파랑) · 훅 명중 · 폭탄 room 안 투척(장판 확인).
+
+| 라운드 | 증상 | 진짜 원인 | 커밋 |
+|---|---|---|---|
+| 1 | 범위 밖인데 훅·어퍼·잡기를 함 | **데이터가 틀렸다** — 거리창이 실제 도달거리보다 넓었다. 잡기는 `maxDistance 3.5` vs `grabRadius 2.2` **확정 불일치**(밖에서 시전하면 반드시 헛잡기) | `99525da` |
+| 1 | 공격 간격이 너무 빠름 | **전역 간격이 없었다** — 쿨다운이 행마다 따로라 훅L·훅R·어퍼를 번갈아 쓰면 쉬는 구간 0 | `99525da` |
+| 2 | 훅이 안 맞음 | 거리창만 좁혀서 생긴 반작용. **거리창은 "고를 조건", 명중은 손 박스**가 만든다 → 둘을 같이 키워야 한다 | `57fa7ef`·`dd5e49e` |
+| 2 | 점프 착지 때 플레이어가 **위로 떠오름** | `agent.Warp` 로 보스 캡슐을 플레이어 캡슐 **안에** 꽂으면 디페네트레이션이 수평으로 못 밀어 **위로** 뺀다 | `57fa7ef` |
+| 3 | 표식이 피격 후 **영구 빨강** | **원인 2겹** — ① `HitFlash` 가 유닛의 모든 렌더러를 긁어 표식 호까지 물들이고 ② 원래 색을 `sharedMaterial` 에서 캐시하는데 그 재질이 장판과 공유하는 순빨강이라 **복원 색이 빨강** | `61dad2b` |
+| 4 | 넉백이 **3곳 전부** 안 걸림 | `Unit.ReceiveAttack` 은 `AttackInfo.knockback*` 를 **읽지 않는다.** 진입점은 `Unit.Knockback(방향, 강도)` 하나뿐 | `04da127` |
+| 5 | 점프 체공 중 **보이지 않는 보스가 맞음** | 메시만 껐다. 끌 콜라이더가 **둘**(HurtBox layer 14 + 루트 몸 layer 8, 마스크 17664 에 둘 다 포함) | `66eed97` |
+| 6 | 차징 위치에 **정확히 못 감** | `stoppingDistance` base 기본값이 **1.6m** 라 0.6m 도착 판정이 영원히 성립 못 함 → 매번 타임아웃. 🔴 **돌진에서 이미 밟은 함정을 새 이동 코드에 승계하지 않았다** | `30ee2e5` |
+
+### 🔴 지금 열려 있는 것
+
+- **Wells 폭탄** — 정상 투척 중(장판으로 확인). 진단 로그 `[Wells/진단] ①②③` + `[23호/폭탄] ④` 는
+  남겨 뒀다. 다시 끊기면 **안 찍히는 번호**가 범인이다.
+- **돌진 경로 스침 넉백 없음** — 공용 `MonsterMeleeAttack` 경로라 손대면 몹 8종·중간보스 3종에
+  회귀 위험. 필요하면 별도 판단.
+- `No23.asset` 에 **제거된 키 5개**(`*KnockbackDuration`·`*Stagger`)가 남아 있다. Unity 가 로드 시
+  무시하고 다음 저장에 사라진다.
+
+### 🔴 세션 중 저절로 바뀌어 있던 애셋 2건 — 되돌렸다
+
+둘 다 원인 미상이고 기능을 조용히 깨뜨리는 값이었다. **재발하면 무엇이 건드리는지 볼 것.**
+
+- `bossroom.prefab` — 송전탑 Y `0.55 → −0.041`(바닥 아래로 가라앉는다)
+- `FireFloor.prefab` — `m_Layer 9 → 0`(Default = 미분류 전부) + 컴포넌트 구성 교체.
+  팀장 확인: **프리팹 에디터 작업 중 실수 저장**이었고 되돌린 것이 맞다.
+
+### ▶ 2026-08-13 오후 — 팀장 지시 8건 구현 (커밋 `03c2966`…`acf129c`)
+
+| 지시 | 결과 |
+|---|---|
+| 표식 색 처음 그대로 | ✅ 카운터 노랑 전환 제거. **후방 호가 파랑으로 바뀐다**(저작값) — 지금 화면과 달라짐 |
+| 공격 중 회전 없음 | ✅ 출처 2곳(`FaceChainTarget` + `MonsterBase.HandleAttack`) + `BeginDash` 재조준까지 제거 |
+| Wells 폭탄 | ▶ **원인 미확정 — 진단만 넣었다**(아래) |
+| 폭탄 room 안 · 벽 금지 | ✅ 착지 지점 먼저 추첨(NavMesh 검증) → **속도 역산**. `ThrowWithVelocity` 신규 |
+| 점프 중 투척 금지 | ✅ 체공 동안 억제. 해제를 **착지·체인중단 양쪽**에 |
+| 차징 = 송전탑 중심으로 이동 후 애니 | ✅ `ChargeMove` 단계 신설 + `TryPrepareCenter` |
+| 차징 중 접근 차단 오라 | ✅ 주기 반복 데미지+넉백, 반경 3.5 기본, 범위 표시, 전부 SO |
+
+**🔴 Wells — 내가 두 번 오진했다. 다음 사람은 진단 로그부터 볼 것.**
+- ❌ "`rig` 본 계층 누락" → **있다.** 스킨 본 147개 중 끊긴 것 0개. `BombSocket` 이 `Bone` 본
+  밑이라 경로 조회가 실패한 것을 부재로 읽었다.
+- ❌ "Avatar null 이라 클립이 안 돈다" → **아니다.** `TwentyThree.prefab` 도 `m_Avatar: 0` 인데
+  보스 애니는 정상이다(Generic 은 Avatar 없이 경로 이름으로 바인딩).
+- → `Tools/Boss/Wells — 검증 (읽기 전용)` 으로 애셋 상태를 보고, Play 에서
+  **`[Wells/진단] ① ② ③` 과 `[23호/폭탄] ④`** 중 **안 찍히는 번호**를 찾으면 그게 범인이다.
+
+⚠️ `bossroom.prefab` 이 세션 중 **송전탑 Y 0.55 → −0.041** 로 바뀌어 있었다(원인 미상, 바닥
+아래로 가라앉는 값) → **커밋된 상태로 되돌렸다.** 다시 나타나면 무엇이 건드리는지 볼 것.
+
+### 🔴 다음 세션에 할 것
+
+1. **Play 육안 검증 — 마지막 라운드분**(`66eed97`·`30ee2e5`, 코드만 확인했다):
+   ① 점프 체공 중 보스가 **안 맞는지**(그리고 착지 후 **다시 맞는지** — 무적이 남으면 전투가 안 끝난다)
+   ② 차징 위치에 **정확히·빠르게** 도착하는지 ③ 오라 원이 보스를 따라가는지
+   (Play 하면 화면 왼쪽 위 **Start Host** 를 눌러야 시작된다)
+2. **넉백 세기 튜닝** — 팀장이 "조금 과하다"고 했다. `dashKnockbackStrength`(12) ·
+   `jumpKnockbackStrength`(9) · `chargeAuraKnockbackStrength`(8). 절반쯤이면 6 / 4.5 / 4 가 출발점.
+   ⚠️ **강도만 있다** — 진입점(`Unit.Knockback`)이 강도만 받으므로 지속·경직 노브는 일부러 없다.
+3. 남은 것은 **팀장 액션 3건**(아래)뿐이다.
+
+### 튜닝 노브 위치 (전부 `No23.asset` / 단독 변형은 `No23_Solo.asset`)
+
+| 헤더 | 필드 | 현재 |
+|---|---|---|
+| 인지/교전 | `attackRange` — 보스가 **접근을 멈추는** 거리 | 2 |
+| 공격 간격 — 전역 | `globalAttackInterval` | 1.5초 |
+| attacks[] | 훅 `maxDistance` / 어퍼 / 잡기 | 3.2 / 2.8 / 2.2 |
+| 돌진 | `dashKnockbackStrength` | 12 |
+| 점프 어택 | `jumpLandSeparation` · `jumpKnockbackStrength` | 1.2 / 9 |
+| 차징 오라 | `chargeAuraRadius`·`Interval`·`Damage`·`KnockbackStrength` | 3.5 / 1 / 20 / 8 |
+| 차징 이동 | `chargeMoveSpeedMultiplier`·`ArriveDistance`·`Timeout` | 3 / 0.6 / 4 |
+| 폭발 장판 | `fireZone*` (**0 = 프리팹 값**) | 전부 0 |
+| 폭탄 착지 | `bombLandingMin/MaxDistance` · `bombWallMargin` | 3 / 9 / 1.2 |
+
+⚠️ 손 히트박스(**훅이 실제로 맞는 범위**)는 SO 가 아니라 **프리팹**이다 —
+`TwentyThree.prefab` 의 `Hand_L`/`Hand_R` BoxCollider `size`(현재 **2.6**).
+메뉴 `Tools/Boss/보스 데이터 — 손 히트박스 크기 반영` 으로도 바꿀 수 있다.
+⚠️ `attackRange` 를 거리창보다 크게 올리면 **보스가 멈춰 선 채 아무 공격도 못 한다.**
+⚠️ 잡기 `maxDistance` 는 **`grabRadius`(2.2)를 넘으면 안 된다** — 넘으면 반드시 헛잡기다.
+
+### 🔴 이번 세션에 확정된 함정 (다음 사람이 밟을 지점)
+
+- **`Env` 를 통째로 끄면 NavMesh 가 함께 죽는다** — NavMeshSurface 가 `Env` 에 붙어 있다(`NavMesh-Env.asset`).
+  그 서피스는 원래 `CollectObjects=Children`+`RenderMeshes` 였다 → bossroom 을 루트에 두면 **빈 NavMesh**.
+  `MapNavMeshBaker` 가 검증한 설정(**PhysicsColliders / All / Default∪Ground**)으로 바꿔 뒀다.
+- **`hand.r` 을 이름으로 깊이우선 탐색하면 Wells 의 손이 먼저 걸린다** — Wells 가 23호 리그
+  `c_root_master.x` 밑에 중첩돼 있고 자기 리그에 같은 이름의 본을 갖고 있다. 내 잡기 소켓 초판이 이걸
+  밟았다(검증 출력이 잡아냈다). **조상에 `BossWells` 가 없는 후보**만 골라야 한다.
+  ⚠️ 기존 히트박스 앵커 3개(`Hand_L`·`Hand_R`·`DashBody`)는 **정상**임을 함께 확인했다.
+- **잡기 소켓을 살리면 보스가 무한 회전한다** — 잡힌 플레이어가 손을 따라가는데 보스가 그 플레이어를
+  향해 `LookRotation` 하면 되먹임이 생긴다. **잡는 동안에는 회전하지 않는 것**이 맞다.
+- **플레이어는 소켓의 회전까지 복사한다**(`followTarget.rotation`) → 손 본의 자세를 물려받아 **눕는다.**
+  손은 애니메이션으로 매 프레임 돌기 때문에 **정적 로컬 회전으로는 못 고친다** →
+  `BossGrabSocketUpright`(LateUpdate 에서 yaw 만 물려받아 세움).
+- **표식·예고는 클라 비주얼이다** — 서버에서만 끄면 클라 화면에는 그대로 보인다. 점프 구간 억제는
+  `CrossFadeJumpStateClientRpc` 에 얹었고, 끊길 때 영구히 숨는 것을 막기 위해 `AbortAttackChain` 에서 해제한다.
+- **`AoeTelegraph` 디스크는 XY 평면**(`(cos,sin,0)`, 지름 1, 노멀 −Z)이고 `Show()` 가 **루트를 직접**
+  스케일한다. `Instantiate(prefab)` 이라 프리팹 회전이 보존되므로 **루트 X=90** 이어야 바닥에 눕는다.
+- **`GrabController` 를 되살릴 때는 `enabled = false`** — `Start()` 가 LogError, `Update()` 가 초기화 안 된
+  블랙보드를 읽어 NRE 를 쏟는다. 비활성 컴포넌트도 `GetComponentInChildren` 은 찾으므로 소켓 게터만 남는다.
+
+### 🔴 팀장 액션 (변동 없음 + 1건 추가)
+
+1. **SVN 커밋** — `svn commit "Assets/50.Art/Char/Boss/SK/SK_23.fbx.meta"`. `ZoneLayoutCatalog.asset` 은 **절대 함께 넣지 말 것**
+2. **은희 님께 요청 전달** — [request-player-grabsocket-decoupling.md](Docs/tech/request-player-grabsocket-decoupling.md).
+   🔴 원격 전 브랜치를 확인했다: `IGrabSocketProvider` **없음**, `GetComponentInChildren<GrabController>` 의존
+   **그대로 1건**(development 포함). 미착수 확정. 그래서 프리팹에 레거시를 한시적으로 되살려 뒀다 —
+   **인터페이스가 들어오면 걷어내고 `Enemy/Boss/` 삭제를 마무리한다.**
+3. **`development` 19커밋 미반영** — Player/Monster 를 만진 3건은 전부 VFX(민경). `b1980d3` 이 **피격
+   이펙트를 `Unit` 에 배선**하므로 보스 계통과 겹친다. **커밋 후 별도 단계로** 가져올 것.
+
+### 산출물 (위 6커밋에 들어갔다)
+
+프리팹 3종 신규 = `TwentyThree_Solo` · `JumpTelegraph` · (기존 4종 + `GrabSocket` 부착) ·
+SO 1종 신규 = `No23_Solo`(패턴 6종) · 런타임 스크립트 1종 = `BossGrabSocketUpright` ·
+저작 도구 5종 = `MonsterSceneBossSetup` · `BossDataWiring` · `BossVariantAuthoring` ·
+`BossGrabSocketAuthoring` (+ 기존 `No23ClipEventAuthoring` · `BonePathDump`) · 씬 = `MonsterScene`(P7 구성 + MidBossSpawner)
+
+---
+
+## ▶▶ 이전 시작점 — MonsterScene 한 사이클 (2026-08-10 낮)
+
+**브랜치 `feature/Boss23`** · **컴파일 0에러 0경고** · **P0~P6 커밋·푸시 완료** (`66d3741`, ahead 0)
+— 아래 「커밋 상태」의 잔여 3건만 작업 트리에 남아 있다.
+
+**한 줄 상태: 프리팹 4종을 새로 만들었고 레거시 정리까지 끝났다. 다음은 `MonsterScene` 을 꾸미는 것(P7)이다.**
+
+> 팀장 지시(2026-08-10): 기존 `2.Prefabs/Wells&No.23/` 3개는 **쓰지 않는다.** MonsterScene 에
+> bossroom 을 깔고 **Paladin 이 보스 연출부터 전투까지 한 사이클**을 도는 테스트 환경을 만든다.
+> 계획서 = [PLAN.md](PLAN.md) 최상단(슬라이스 P0~P9).
+
+### ✅ 이번 세션 완료 — P0~P6
+
+| # | 한 것 | 검증 |
+|---|---|---|
+| **P0** | **애니 이벤트 저작** — 저작 도구 `No23ClipEventAuthoring` 신규. `OnAttackHit` 6 + `OnAttackEnd` 4, 구 이름 0건. `idle`·`charging` Loop Time on | `.fbx.meta` 직접 확인 |
+| **P1** | `FireFloor.prefab` 신규 (`AreaZone`, layer 9, 콜라이더 0, Quad+Circle 알파로 **원형**) | 씬 뷰 스크린샷 |
+| **P2** | `Bomb.prefab` 신규 (`BossBomb`, layer 10, **논키네마틱**+ContinuousDynamic, `bomb.fbx` 비주얼, `zonePrefab`→FireFloor) | 스크린샷 + YAML |
+| **P3** | `Wells.prefab` 신규 (`BossWells`, `WellsBossController`, `hand.r/Bone/BombSocket`, **NetworkObject 없음**) | `unity_get_animator_info` 로 바인딩 확인 |
+| **P4** | `TwentyThree.prefab` 신규 — **히트박스 새 설계**(`Hand_L`/`Hand_R` = 손 본 / `DashBody` = 루트 자식) | Unity 가 참조를 해석하는지 되읽어 확인 |
+| **P5** | `bossroom.prefab` 송전탑 `ChargingObject`×4 → **`BossChargingPylon`×4**, `maxHp` 5→200 | 인스턴스화 후 컴포넌트 조회 |
+| **P6** | **레거시 정리** — `BossArenaContext`·`BossArenaWiring` 삭제, `BossEncounterDirector` **889→624줄** | 컴파일 0/0, dll 에서 타입 소멸 확인 |
+
+### ✅ P7 `MonsterScene` 재구성 — 완료 (2026-08-10, 미커밋)
+
+저작 도구 **`Monster/Editor/MonsterSceneBossSetup.cs`** 신규(멱등, 재실행 가능).
+메뉴 = `Tools > Boss > MonsterScene — 보스 전투 씬 구성 (P7)` + `… 구성 검증 (읽기 전용)`.
+
+| 한 것 | 값 |
+|---|---|
+| `bossroom` 배치 | **`(0, -0.50, 0)`** — 보행면을 월드 y=0 으로 내렸다(아래 🔴) |
+| 기존 몹 세팅 | `MonsterSpawner`·`TestBootStrap` **비활성 보존** |
+| 기존 지오메트리 | `Env/Ground`·`Wall1~4` **자식만** 비활성 — `Env` 루트는 살렸다(아래 🔴) |
+| `ForProfile` | `BossTestRig` 오브젝트에 신규 |
+| 보스 스폰 | `TwentyThreeArenaContext`(+NetworkObject), `bossPrefab`=신규 `TwentyThree`, `bossPos`=`(0.49, 0, 5.49)` |
+| `PlayerPrefab` | 구 `Player` → **Paladin** (아래 🔴) |
+| NavMesh | 재베이크 — 삼각형 8개, **19.7×19.8m**(바닥 21m − 에이전트 반지름 0.5m 인셋), y 0.08 |
+
+검증(도구의 읽기 전용 메뉴): 위 전 항목 ✓ · 송전탑 4개 ✓ · 표본 4지점(원점·보스 스폰·양 구석)
+전부 메시 0.08m 이내 ✓ · 보스 `NavMeshAgent.agentTypeID=0`/radius 0.5 = 베이크 타입과 일치 ✓.
+컴파일 0/0. **Play 미실행.**
+
+### 🔴 P7 에서 문서가 틀렸던 것 2건 (실물이 이겼다)
+
+1. **"`ForProfile` 이 없으면 아무것도 스폰되지 않는다"는 반만 맞다.** `MonsterTestBootstrap` 이
+   `autoStartHostOnPlay` 로 **이미 자동 StartHost + 호스트 플레이어 스폰**을 하고 있었다.
+   PLAN 대로 그걸 비활성 보존하니 **그때 비로소** `ForProfile` 이 필요해진 것이다.
+   → 지금 Play 하면 **화면 왼쪽 위 "Start Host" 를 눌러야** 시작된다(자동 시작 아님).
+2. 🔴 **"`PlayerPrefab` 은 이미 Paladin" 은 사실이 아니었다.** `NetworkManager.PlayerPrefab` 과
+   `MonsterTestBootstrap.playerPrefab` 이 **둘 다 구 `Player.prefab`**(guid `55ee4e06…`)을 가리켰다.
+   Paladin(`af4a760f…`)은 이 씬에 한 번도 나오지 않았다. 둘 다 Paladin 으로 바꿨다.
+
+### 🔴 P7 에서 확정된 것 (다음 사람이 밟을 지점)
+
+- **`Env` 를 통째로 끄면 안 된다** — **NavMeshSurface 가 `Env` 에 붙어 있다**(베이크 산출물이
+  `NavMesh-Env.asset` 인 이유). 끄면 NavMesh 가 함께 죽는다. 지오메트리 자식만 끈다.
+- 그 서피스는 `CollectObjects=Children` + `UseGeometry=RenderMeshes` 였다 → bossroom 을 루트에
+  두면 **수집 대상이 아니어서 빈 NavMesh** 가 구워진다. `MapNavMeshBaker` 가 검증한 설정
+  (**PhysicsColliders / All / Default∪Ground**)으로 바꿨다.
+- **보행면 = 로컬 y 0.50 실측** — `BossFloorCollider` 의 BoxCollider 가 `size.y=1`·`center.y=0` 이라
+  박스가 −0.5…+0.5 를 덮고 **윗면이 0.50**. `BossLandingPoint`·`BossArea`·`PlayerArrivalPoints` 와 일치.
+  → bossroom 을 **y −0.50** 에 놓아 보행면을 y=0 으로 만들었다. NGO 는 `PlayerPrefab` 을 **프리팹
+  좌표(원점)** 에 스폰하므로, 방을 원점에 두면 호스트든 MPPM 클라이언트든 바닥 0.5m 안에 박힌 채
+  시작한다. 이 씬에서만 방이 0.5m 내려가 있다 — 4.MapScene 과 다르다.
+- ⚠️ 송전탑(layer `Enemy`)·투명 경계(layer `Wall`)는 수집 마스크 밖이라 **NavMesh 를 카브하지 않는다.**
+  보스가 송전탑을 관통하는 경로를 계획할 수 있다(물리로는 막힌다). P9 에서 끼는지 볼 것.
+
+### 🔴 입장 연출은 이 씬에서 검증할 수 없다
+
+`BossEncounterDirector` 는 자기 주석대로 **MapScene 상주**이고, 스폰이
+`BossTeleportManager.AlivePlayersArrived` **뒤에** 있다. MonsterScene 에는 텔레포트 사슬이 없어
+넣어도 "BossTeleportManager를 찾지 못했습니다" LogError 만 내고 **아무것도 스폰하지 않는다.**
+그래서 P7 은 PLAN 의 단계표대로 `TwentyThreeArenaContext`(직접 스폰)로 갔다.
+→ **PLAN 목표문의 "입장 연출 → 전투"** 중 연출은 **MapScene 몫**이다. 이 씬은 전투 사이클 전용.
+
+### ▶ 다음 = P9 (Play 한 사이클)
+
+`MonsterScene` Play → **"Start Host" 클릭** → `ValidateContract` LogError 0건 확인 → 추격·공격 8종·
+카운터·페이즈·송전기·처치. 미확인 항목(애니 재생·어느 손·히트 타이밍)은 아래 「미확인」 참조.
+P8 은 **NetworkPrefabs 등록으로 이미 끝났다**(`TwentyThree`·`Bomb`·`FireFloor`). 충돌 매트릭스는
+Play 에서 안 맞는 게 나오면 그때 본다.
+
+### 🔴 새로 만든 것 — 경로
+
+| | |
+|---|---|
+| 프리팹 4종 | `Assets/2.Prefabs/Monster/Boss/` — `TwentyThree` · `Wells` · `Bomb` · `FireFloor` |
+| 머티리얼 | `Assets/3.Materials/MA_AreaZone_Fire.mat` (주황 — 예고 장판 빨강과 구분) |
+| 저작 도구 | `Monster/Editor/No23ClipEventAuthoring.cs` (클립 이벤트, **멱등·재실행 가능**) |
+| 조사 도구 | `Monster/Editor/BonePathDump.cs` (본 경로 + **lossyScale** 덤프, 읽기 전용) |
+| 요청 문서 | `Docs/tech/request-player-grabsocket-decoupling.md` (은희 님께 팀장이 전달) |
+
+**NetworkPrefabs 18개** — `TwentyThree`·`Bomb`·`FireFloor` 등록됨. Wells 는 중첩이라 대상 아님.
+
+### 🔴 팀장 액션 2건
+
+1. **SVN 커밋** — `svn commit "Assets/50.Art/Char/Boss/SK/SK_23.fbx.meta"`. git 은 `50.Art` 를 무시한다(`.gitignore:84`)
+2. **은희 님께 요청 전달** — 위 요청 문서. `PlayerStateController.cs:760` 이 `GrabController` 를 구체 타입으로 잡아 레거시 폴더 삭제가 막혀 있다. **4줄 변경, 동작 변경 0**
+
+### ⚠️ 이번 세션에 확정된 것
+
+- **리그 스케일 100배 실측 확정** — `hand.l`/`hand.r` 의 `lossyScale (100,100,100)`. 앵커의 **localScale 을 0.01** 로 둬서 `lossyScale = 1` 을 만들었다 → **콜라이더 크기를 미터 그대로 읽고 튜닝**할 수 있다(1/100 값을 안 봐도 된다)
+- **보스 리그 경로**: `rig/c_pos/c_traj/forearm.{l,r}/hand.{l,r}` · `…/c_spine_01.x/c_spine_02.x/spine_02.x`
+- **앵커 콜라이더는 전부 `enabled: 0`** — `ColliderInfo` 가 형상 데이터로만 읽는다
+- **돌진 앵커만 본이 아니라 루트 자식** — 본에 붙이면 박스가 본 회전을 따라가는데 돌진은 보스 정면으로 뻗어야 한다
+- **Animator 를 보스 루트에 두면 안 된다** — 점프 체공 중 `animator.transform` 하위 렌더러를 전부 끄므로 방향 표시기까지 사라진다
+- 🔴 **레거시 보스의 Avatar 는 `SKM_Golem.fbx`(다른 테스트 모델) 것이었다** — 승계하지 않았다. 새 프리팹은 `m_Avatar: 0`(Wells 와 동일)
+
+### ⚠️ 미확인 — Play 에서 판단할 것
+
+- **애니 재생** — `m_Avatar` 가 null 이다. 같은 fbx 의 클립이라 트랜스폼 경로 바인딩으로 돌 것이나 확인 못 했다
+- **어퍼·잡기가 어느 손인지** — 오른손(`Hand_R`)으로 잡은 건 **추정**. 클립을 보고 다르면 SO 에서 `Hand_L` 로 바꾸면 끝
+- **히트 타이밍** — 훅·어퍼(≈22f)·대시(≈30f)는 **추정값**. `grab`·`landingattack` 은 아티스트 시간 승계라 신뢰 가능
+- **앵커 크기** 1.2m / 돌진 2×2×2.6 은 눈대중 초기값
+
+### 🔴 남은 셰이더 에러 2건은 우리 것이 아니다 (팀장 판단 = 그냥 둠)
+
+`Generic_Basic`·`Generic_Standard` 셰이더그래프가 `WallOcclusionClip.hlsl` 을 못 찾는다. 그 파일은
+git `ec1c996`(**`origin/feature/trensparent` 에만**, development 미머지)에 있다. SVN r274/r275 가
+셰이더그래프와 `ZoneLayoutCatalog`(존 프리팹 11개 새 GUID)를 가져왔는데 **git 쪽이 안 따라온** 상태다.
+영향 = 맵 프롭 머티리얼 3개. **`bossroom` 은 무관**하다. 근본 해결은 `feature/trensparent` 머지.
+
+### 🔴🔴 SVN — **커밋하기 전에 반드시 볼 것**
+
+`svn status` 에 **`MapGen/MapObj/ZoneLayout/ZoneLayoutCatalog.asset` 이 `M` 으로 떠 있는데,
+이건 우리가 고친 것이 아니다.** Unity 가 **자기 메모리에 들고 있던 낡은 사본으로 덮어썼다** —
+존 프리팹 11개 참조가 r274 이전 GUID 로 **되돌아갔다**.
+
+- 원인: SVN 업데이트로 파일이 바뀌었는데 Unity 가 리프레시를 안 해 낡은 사본을 들고 있었고,
+  그 뒤 어떤 계기로 dirty 가 되면서 **자기 것을 디스크에 썼다**(교훈 #69 의 반대 방향).
+- 🔴 **이대로 커밋하면 이지원 님의 r274("V3 zone, stage 프리펩들 수정함")를 팀 전체에서 되돌린다.**
+- 판단 필요: r275 를 되살리면(`svn revert`) 이 머신에서는 존 프리팹 11개가 **깨진 참조**가 된다
+  (그 프리팹들이 git `feature/trensparent` 에만 있어서). 즉 **머지 전까지는 어느 쪽도 완전하지 않다.**
+- 권장: **SVN 커밋은 `SK_23.fbx.meta` 만 경로 지정해서** 하고, 카탈로그는 `feature/trensparent`
+  머지 시점에 함께 정리한다.
+
+```bash
+svn commit "Assets/50.Art/Char/Boss/SK/SK_23.fbx.meta" -m "feat(boss): 23호 클립 애니 이벤트 저작 + idle/charging Loop Time"
+```
+
+⚠️ 나머지 14건(노멀맵 7 · 슬로프/계단 fbx 4 등)은 **이전부터 밀려 있던 팀장 작업분**이라 그대로 뒀다.
+
+### 커밋 상태 (2026-08-10 갱신)
+
+**P0~P6 전량 커밋·푸시됨** — 7커밋 `26c70b4`~`66d3741`. 이전에 밀려 있던 50커밋도 함께 올라가
+`origin/feature/Boss23` 과 완전히 동기화됐다(ahead 0). 커밋 분할은 주석규약 / 앵커재매핑 /
+프리팹4종 / 레거시삭제·송전탑 / 에디터도구 / 문서 / 포그(별건) 순.
+
+🔴 **작업 트리에 의도적으로 남긴 3건 — P7 착수 전에 처리할 것**
+
+| 파일 | 무엇 | 판단 |
+|---|---|---|
+| ~~`0.Scenes/MonsterScene.unity`~~ | ✅ **해소됨** — P7 저작 도구가 씬을 저장하면서 `FireFloor`·`Bomb` 잔재가 사라졌다(파일에서 두 GUID **0건** 확인). 지금 이 씬의 변경분은 P7 구성이다 | — |
+| `0.Scenes/MainFlow/4.MapScene.unity` | `FloatingDamageSpawner` 가 **같은 설정으로 fileID 만 새로 발급**됐다(46+/46−). 기능 변화 0 | 공용 씬에 무의미한 충돌을 만들 뿐이라 커밋하지 않았다. 되돌리는 게 맞다 |
+| `ProjectSettings/MultiplayerManager.asset` | `--ignore-all-space` 로 diff 0 = **줄끝만 다시 써짐** | 실질 변경 없음 |
+
+미추적으로 남긴 것: `Docs/superpowers/**`(아트 피치 세션 산출물) · `tmp/` · 레포 루트의
+**`작성`(0바이트, 8/7 실수 생성)**.
+
+⚠️ **에디터 밖 YAML 쓰기가 UTF-8 BOM 을 심는다** — `No23.asset`·`bossroom.prefab`·
+`TwentyThree.prefab` 3건에 들어가 있었다. Unity 는 **예외 없이 그냥 읽어서** 알아채기 어렵다.
+커밋 전에 제거했고(`tail -c +4`), 제거 후 `Assets/Refresh` → 프리팹 정상 해석·컴파일 0/0 확인.
+같은 뿌리 = 교훈 #15(인코딩 확인 없이 경계 넘김).
+
+SVN = `SK_23.fbx.meta` **미커밋(팀장 액션, 위 참조)**. git 은 `50.Art` 를 무시한다.
+
+---
+
+## ▶▶ 이전 시작점 — 보스 재작성 (2026-08-08 종료)
+
+🔴 **브랜치 `feature/Boss23`** · **컴파일 0에러 0경고** · **`development` 머지 완료(behind 0)** · **전부 커밋됨**
+
+**한 줄 상태: 코드·애니메이터·데이터·보스 프리팹까지 끝났다. 다음은 `PlayerBossTest` 에서 Play 하는 것이다.**
+보스가 **아직 한 번도 스폰된 적이 없다** — `ValidateContract` 가 아직 한 번도 안 돌았다.
+그래서 다음 세션의 0번 할 일은 **구현이 아니라 Play 하고 로그를 읽는 것**이다(아래 착수 순서 §0).
+
+> **2026-08-07 밤 갱신** — 아래 **1·2단계는 완료**됐다. 컨트롤러를 고치는 게 아니라 **전면 재작성**으로
+> 갔다(팀장 확정). 저작 도구 = `Assets/1.Scripts/Monster/Editor/TwentyThreeBossAuthoring.cs`
+> (`Tools > Boss > 23호 — 컨트롤러 전면 재작성 + 데이터 저작`, 멱등).
+>
+> · `No23Controller` **신규** — 18상태 / 파라미터 `Speed`(Float)·`Groggy`(Bool)·`Death`(Trigger) /
+>   전이 **5개뿐**(AnyState⇒Dead, AnyState⇒GroggyStart⇒Groggy⇒GroggyEnd⇒Locomotion). 나머지는 CrossFade.
+> · `WellsBossController` **신규** — 4상태 / 트리거 4. 레거시 컨트롤러 2개는 **삭제**했다.
+> · 로코모션은 `Speed` BlendTree(idle@0 / walk@2.5) — `_animSpeed` 는 `agent.velocity.magnitude` **원값(m/s)**.
+> · 그로기·사망을 **파라미터 + AnyState** 로 받아 base 경로가 살아난다 → **코드·SO 스키마 수정 0줄.**
+> · `No23.asset` 저작 완료(`archetype: Boss`, 공격 8행 상태명 전량, 애니 계약 필드 전량).
+>
+> 🔴 **`attackDuration` 은 올리지 않았다** — 아래 2단계 표의 "상향"은 오독이다. 보스가
+> `_stateTimer = 체인길이 + attackDuration` 으로 이미 더한다(`TwentyThreeBoss.cs:456`).
+> 🔴 **착지 상태는 원래 있었다** — `Arrive` 가 `landingattack` 을 쓰고 있었다. 다만 입장 연출
+> (`BossEncounterDirector`)은 애니메이터를 **한 줄도 안 건드리므로** 고아였다. 새 컨트롤러엔
+> `JumpLanding` 으로 다시 뒀다.
+> 🔴 **fbx 후속(SVN)**: `Boss_23_idle`·`Boss_23_charging` 의 **Loop Time 이 꺼져 있다** — 오래
+> 유지되는 상태인데 한 바퀴 뒤 마지막 프레임에서 굳는다. 애니 이벤트 저작과 같이 처리.
+> 상세·이탈 근거 = [IMPLEMENTATION_NOTES.md](IMPLEMENTATION_NOTES.md) 최하단.
+
+### 정본 문서 (읽는 순서)
+
+| # | 문서 | 무엇 |
+|---|---|---|
+| 1 | [PLAN-boss-fsm.md](PLAN-boss-fsm.md) | 🔴 **구현 정본.** §5.1~5.11 에 슬라이스별 결정·근거·함정이 전부 있다 |
+| 2 | [Docs/tech/boss-rebuild-standard.md](Docs/tech/boss-rebuild-standard.md) | 3층 구조·훅·규약·SO 설계(§10). §10.3.1 에 스키마 변경 이력 |
+| 3 | [Docs/tech/boss-fsm-detailed-spec.md](Docs/tech/boss-fsm-detailed-spec.md) | 애니 계약(§1) · 점프(§7) · 폭탄/장판(§10.5) · 송전기(§9). **§1.1·§4 는 폐기** |
+| 4 | [Docs/tech/handoff-boss-reply-interrupt-restrained.md](Docs/tech/handoff-boss-reply-interrupt-restrained.md) | 은희 회신(개정 1판) — 인터럽트·`Restrained` |
+| 5 | [Docs/tech/layer-standard.md](Docs/tech/layer-standard.md) | 레이어 표준 + 이관 완료 기록 |
+
+### ✅ 완료 — 슬라이스 **9개 전부** (코드)
+
+| S1 | S2 | S3 | S4 | S5 | S6-0 | S6 | S7 | S8 | S9 |
+|---|---|---|---|---|---|---|---|---|---|
+| ✅ | ✅* | ✅ | ✅* | **✅** | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+`*` 부분 보류 2건만 남았다 — 둘 다 **지금은 막혀 있지 않다**:
+- **S2 어퍼 에어본** — 팀장 판단 보류. G1 정정으로 구현 자체는 가능하다.
+- **S4 Throw 변위** — "변위 경로가 없다"고 적혀 있었으나 은희 머지로 전제가 바뀌었다.
+  `Unit.Knockback` 이 임펄스 1회라 **던지기에는 오히려 맞는 모양**이다(지속 밀기가 아니라서
+  돌진이 `Restrained.Push` 로 간 것이지, 던지기는 임펄스가 맞다). 재검토 가치 있음 — 미확인.
+
+**S5 돌진 = 캐리-푸시** (2026-08-08 완료). 참조 설계 = 오버워치 라인하르트 돌진:
+① 끌고 가는 대상은 **첫 1명뿐**(나머지는 스침 데미지) ② **벽에 처박혔을 때만** 데미지 —
+거리 소진이면 기절도 데미지도 없다 ③ 슈퍼아머는 안 밀린다(`BeginRestrainedByInstigator` 의 bool).
+🔴 벽 정지는 **콜라이더가 아니라 NavMesh 클램프 앞당기기**로 했다 — 낭떠러지까지 함께 막히고
+고속 이동의 트리거 터널링이 없다. 근거·되돌리는 법 = IMPLEMENTATION_NOTES.md.
+SO 에 `dash*` 6필드 + `BossAttackPhase.Dash` 추가(끝에). **숫자는 전부 placeholder**(GDD가 TBD).
+
+**신규 파일 15개** (`Assets/1.Scripts/`)
+
+| 위치 | 파일 |
+|---|---|
+| `Monster/` | `AreaZone.cs` · `AreaZoneType.cs` |
+| `Monster/Boss/` | `TwentyThreeBoss.cs` · `BossDataSO.cs` · `BossAttackId.cs` · `BossAttackPhase.cs` · `IBossTelegraph.cs` · `BossCounterTelegraph.cs` · `BossDirectionIndicator.cs` · `BossBomb.cs` · `BossBombState.cs` · `BossWells.cs` · `BossWellsState.cs` · `IBossChargeSequence.cs` · `BossChargeSequence.cs` · `BossChargingPylon.cs` |
+
+**폐기 4파일 삭제 완료** (`BossBase`·`BossState`·`BossBasicAttackType`·`BossBasicAttackChoice`) — 어셈블리에서 사라진 것까지 확인.
+
+### 🔴 base(공유 자산) 변경 4건 — 전부 additive, 기존 11종 기본값 유지
+
+| 파일 | 추가 | 왜 |
+|---|---|---|
+| `MonsterBase` | `ChaseSpeedMultiplier` | 페이즈 이동속도. **`SeekBoss` 분기에서만** 곱해진다 |
+| `MonsterBase` | `AutoHitReactions`(보스만 false) | base 의 자동 피격 반응 **3종**(Hit·그로기누적·Knockback)을 끈다 |
+| `MonsterBase` | `ForceHitReaction(duration, groggyAfter)` | `SetState`·`EnterHit` 이 private 이라 **보스가 `Hit` 에 들어갈 방법이 없었다** |
+| `MonsterMeleeAttack` | `SetColliderInfo`/`ColliderInfo` | 공격별 히트박스 앵커 스왑 |
+| `HitFlash` | `SetBaseTint`/`ClearBaseTint` | 카운터 색이 피격 플래시에 안 지워지게 |
+| `AoeTelegraph` | `ShowGrowing` | 점프 착지 예고(시간 성장) |
+
+### ▶ 다음 세션 착수 순서 — **Play 검증부터**
+
+🔴 **씬: `Assets/0.Scenes/PlayerBossTest.unity`** — 배선을 여기까지 끝내 뒀다. 열고 **Play** 하면 된다.
+
+**1·2단계(애니메이터·데이터) ✅ 완료 · 3단계(프리팹 조립) = 보스 본체만 완료**
+
+#### 0. 첫 관문 — `ValidateContract` 로그 읽기
+
+보스가 **아직 한 번도 스폰된 적이 없다.** Play 하면 처음으로 `ValidateContract` 가 돈다.
+그 로그가 남은 작업의 지도다 — 그래서 이게 0번이다.
+
+- 🔴 `LogError` = **남은 배선 목록**. 상태명·파라미터·앵커 중 뭐가 비었는지 이름으로 알려 준다.
+- ⚠️ **정상인 경고 3건** — 다음 단계 작업이라 지금 뜨는 게 맞다:
+  · `BossWells 자식이 없어 폭탄 살포가 돌지 않는다`
+  · 방향 표시기 안 그려짐(호 머티리얼 미저작)
+  · 폭탄·장판 안 나옴(SO 의 `bombPrefab`·`chargeZonePrefab` 이 비어 있다)
+- 🔴 **의심할 것 = NavMesh.** 이 씬의 `NavMeshSurface` 가 **다른 씬(KMKScene)의 베이크 데이터**를
+  참조한다. `not close enough to the NavMesh` 가 뜨면 스폰 위치 `(10,0,10)` 가 NavMesh 밖이라는
+  뜻이고, 그러면 보스가 서 있기만 한다.
+- 단독 Play 로 볼 수 있는 것 = **스폰 · 계약 · 이동 · 공격 선택**까지.
+  **상태이상(기절·그로기)은 MPPM 2인에서만** 걸린다(`CanWrite = IsSpawned && IsServer`).
+  단독 Play 로 "기절이 안 된다"를 버그로 오진하지 말 것.
+
+#### 🔴 히트박스 전면 재설계 — 팀장 확정 (2026-08-08). **Play 보다 먼저 판단할 것**
+
+**현재 프리팹의 히트박스는 레거시 승계분이고 새 설계와 맞지 않는다.** in-place 교체를 하면서
+리그·앵커·콜라이더를 그대로 물려받았는데, 값이 애니메이션에 맞춰 튜닝된 것이 아니라
+대충 놓은 라운드 값(`2×3×2` / center ±1)이었다. **승계 사실을 검증 없이 "재사용 이점"으로 넘긴 것이 실수다.**
+
+실측값:
+
+| 앵커 | 콜라이더 | 문제 |
+|---|---|---|
+| `LeftHookAttack` | Box 2×3×2 center(-1, 1.5, 1) | 우훅·어퍼와 볼륨이 거의 겹친다 |
+| `RightHookAttack` | Box 2×3×2 center(+1, 1.5, 1) | 〃 |
+| `UpperAttack` | Box 2×3×2 center(0, 1.5, 1) | **두 훅 안에 완전히 포함**된다 |
+| `Grab` | Box 1.2×3×1 center(0, 1.5, 0.5) | 유일하게 `enabled=0`(형상 전용) — **이게 정답 형태** |
+| `DashAttack` | Sphere r=1.25 center(0, 1.71, 0) | **보스 자기 중심**. 앞으로 안 뻗어 캐리-푸시와 안 맞는다 |
+| `Rage` | Sphere r=1.25 center(0, 1.71, 0) | **DashAttack 과 완전 동일**(강화판이어야 하는데) |
+
+앵커가 전부 `pos(0,0,0)` 이라 **본에 안 붙어 있고 보스 루트 기준 고정 볼륨**이다. 주먹을 안 따라간다.
+게다가 레거시는 공격마다 검출 방식이 달랐는데(`ColliderBasicAttack` / `KnockbackAttack` / **트리거**
+`TriggerKnockbackAttack`) 지금은 전부 `MonsterMeleeAttack` 오버랩 하나로 바뀌었다 —
+**모양은 그대로인데 의미가 바뀌었다.**
+
+**확정된 새 설계:**
+- **훅·어퍼·잡기 → 손 본에 붙인다.** 넷 다 손에서 처리되므로 고정 볼륨 4개는 중복이다.
+  좌손/우손 앵커 2개로 줄이고, 어퍼·잡기가 어느 손인지는 클립을 보고 정한다.
+- **돌진 → 몸통에 콜라이더를 따로** 둔다.
+- **점프 → 바닥 원.** 이미 코드가 `jumpAoeRadius` OverlapSphere 로 처리한다 → **앵커 불필요**.
+- 그에 맞춰 `No23.asset` 의 `hitboxAnchorName` 매핑도 다시 잡는다(현재는 레거시 앵커 6개를 가리킨다).
+
+**함께 지울 레거시 서브트리** — 전부 새 코드가 대체했다:
+`JumpAttack/FloorRoot/FloorBase`·`FloorGrow`(예고 장판 스프라이트 → `AoeTelegraph` 가 대체) ·
+`ChargeAttack/Floor`(차징 장판 + 공격 2종 → `AreaZone` 이 대체) · `ColliderBasicAttack` ×4 ·
+`KnockbackAttack` ×4 · `TriggerKnockbackAttack` · 컴포넌트 제거 후 남은 빈 껍데기 `Initializer`
+
+🔴 **본에 붙일 때 함정**: `rig` 의 **스케일이 100배**, 회전이 (270.02, 0, 0) 이다.
+본 아래에 콜라이더를 넣으면 그 스케일을 상속하므로 **크기를 1/100 로 넣어야** 의도한 월드 크기가 나온다.
+
+리그는 Auto-Rig Pro 계열(`c_` 접두사 · `.x`/`.l`/`.r` 접미사)이고 경로는
+`Components/Amature/rig/c_pos/c_traj/c_root_master.x/…` 다(`c_root_master.x` 의 자식 3개 중 하나가
+중첩 `Wells`). ⚠️ **정확한 손 본 이름은 Hierarchy 창에서 눈으로 확인할 것** —
+MCP 의 `unity_get_hierarchy` 는 **3단계까지만** 열거해서 본이 안 보인다.
+
+#### 나머지 승계분 — 아직 미검증 (같이 점검할 것)
+
+| 대상 | 현재 | 상태 |
+|---|---|---|
+| `HurtBox` | Box 2.03×3.48×1 center(0.014, 1.43, 0) | 보스 몸 크기와 맞는지 **미검증** |
+| `NavMeshAgent` | — | ✅ 무관 — `ServerInitialize` 가 `speed`/`radius`/`stoppingDistance` 를 SO 값으로 덮어쓴다 |
+| `Rigidbody` | — | **미검증** |
+| 웰즈 손 소켓 | — | 아직 없음(웰즈 조립 때) |
+| `FD_Anchor` | y=3.5 | 은희 것 — 그대로 둔다 |
+
+#### 씬별 상태
+
+| 씬 | 상태 |
+|---|---|
+| `PlayerBossTest.unity` | ✅ **배선 완료** — 기둥 4개 교체 + 스폰 주체 정리. **여기서 시작한다** |
+| `BossScene.unity` | ❓ 미확인. 같은 기둥 교체가 필요할 수 있다 |
+| `4.MapScene.unity` | 실제 맵. `bossroom.prefab` 의 `Env_Mv_bosscharger_upper` **4개**를 교체해야 한다 |
+
+#### 남은 조립 4건
+
+| 대상 | 할 일 |
+|---|---|
+| **웰즈** | `Wells.prefab` 이 아직 레거시(`BombLauncher`·`WellsAnimEvents`) → **`BossWells`** 로 교체 + 손 소켓 |
+| **폭탄** | `Bomb.prefab` 이 아직 레거시(`Bomb`·`BombController`·`BombAreaEffect`) → **`BossBomb`**. `Rigidbody`(useGravity on / FreezeRotation / ContinuousDynamic) + `Hurtbox`(**ownerUnit 비움** → `IAttackReceiver` 폴백) + NetworkPrefabs 등록. ⚠️ **정지해도 논키네마틱 유지**(재우면 당구가 안 된다) |
+| **장판** | 프리팹이 **아예 없다** — 신규 생성: `NetworkObject` + `AreaZone` + 비주얼 자식(로컬 XY 지름 1) + 레이어 **`HazardArea(9)`** + NetworkPrefabs 등록 |
+| **송전탑** | `bossroom.prefab` 의 4개 교체(위 씬 표 참조) |
+| **프로젝트 설정** | 🔴 충돌 매트릭스에서 **폭탄 레이어 ↔ 유닛 레이어 물리 응답을 끊을 것**(유닛 감지는 트리거로 하므로 폭발은 산다) |
+
+#### 🔴 저작 도구 3개 — **수명에 주의**
+
+전부 `Assets/1.Scripts/Monster/Editor/` 에 있다. 파괴적이라 **언제 그만 써야 하는지**가 중요하다.
+
+| 도구 | 성격 | 언제 그만 쓰나 |
+|---|---|---|
+| `TwentyThreeBossAuthoring` | 컨트롤러 2개를 **매번 지우고 새로 만든다**(GUID 도 매번 바뀐다) + `No23.asset` 저작 | 🔴 **애니메이터를 손으로 튜닝하기 시작하면 다시 돌리면 안 된다** — 손댄 것이 전부 사라진다. 그 시점에 컨트롤러 생성부를 지우고 **SO 저작만 남길 것** |
+| `BossPrefabAuthoring` | 보스 프리팹 컴포넌트 교체. **사실상 1회용** — 이미 끝났다 | 프리팹이 깨졌을 때 복구용으로만 남긴다. 4단계 레거시 정리 때 함께 삭제 |
+
+두 도구 모두 **검증 전용 메뉴**가 따로 있다(`… — 검증만`). 파괴적 메뉴를 누르기 전에 그걸로 먼저 읽을 것.
+멱등하게 짜여 있어 여러 번 눌러도 결과는 같다(`= 이미 …` 로 지나간다).
+
+#### 조절해서 처리하는 값 — 코드 수정 불필요
+
+전부 인스펙터에서 만진다. **GDD 가 TBD 로 비워 둔 구간이라 현재 값은 거의 placeholder 다.**
+
+- **`No23.asset`** — `dash*` 6필드(S5 신규) · `jump*` · `grab*` · `charge*` · `rageDash*` ·
+  `bombThrowInterval`/`throwImpulse`/`spreadAngle`/`bombThrowPitch` · 공격 행별 `cooldown`·`weight`·거리창·`damage`
+- **프리팹** — `BossChargingPylon.maxHp`(200)·`defense` · `BossDirectionIndicator` 반지름/색/세그먼트 ·
+  `BossChargeSequence` 여유시간·선택 기준
+- **코드 상수 2개**(눈으로 보고 맞춰야 하는 값) — `DashCarryProbeRadius`(1.2) · `DashCarryWallMargin`(0.6)
+
+#### 🔴 SVN 후속 (git 아님 — 팀장이 "추후"로 확정)
+
+- `Boss_23_idle`·`Boss_23_charging` 의 **Loop Time 이 꺼져 있다** — 로코모션과 차징(최대 20초)이
+  한 바퀴 뒤 마지막 프레임에서 굳는다. 저작 도구가 실행할 때마다 경고로 다시 알린다.
+- 애니 이벤트 `OnAttackHit`/`OnAttackEnd` 저작 — 없으면 공격이 `attackDuration` 타임아웃으로만 끝난다.
+  ⚠️ Wells 클립 이벤트 이름은 **fbx 에 이미 박혀 있다**(`ThrowBombEvent`/`BombDestroyEvent`). 바꾸면 조용히 무시된다.
+
+#### 4단계 이후
+
+S2 어퍼 에어본(팀장 판단 대기) → S4 Throw 변위 재검토(`Unit.Knockback` 임펄스가 던지기엔 오히려
+맞는 모양이다 — **미확인**) → **어색한 것들 수정**(팀장 목록 대기) → MPPM 2인 검증 →
+레거시 `Enemy/Boss`·`8.BehaviorTreeGraph` 삭제.
+
+⚠️ 그때 `TwentyThreeArenaContext` 는 **삭제가 아니라 `Monster/Boss/` 로 이동**해야 한다 —
+씬 3개가 이 컴포넌트를 참조한다. 파일을 옮기면 `.meta` 가 따라가 GUID 가 유지되므로 참조는 안 깨진다.
+
+### 은희 의존 — ✅ **R1·R2 둘 다 종결. `development` 에 머지 완료**(`a75398c`, 2026-08-07)
+
+브랜치 `feature/InterruptSkill-CarrySocket` — `feature/maprendering` 이 아니라 **공통 조상 `cbb51b1`**
+(PR #10 머지 지점)에서 갈라졌다. 회신 문서 = `Docs/tech/player-interrupt-restrained-handoff.md`.
+**합의한 계약대로 왔다 — 수정 요청할 것 없음.** 코드에서 대조한 결과:
+
+| 계약 | 실물 |
+|---|---|
+| R1 인터럽트 식별자 | `AttackInfo.isInterruptAttack` (bool 플래그, enum 아님) |
+| R2 `Restrained` | `RestraintMode { Carry = 0, Push = 1 }` |
+| Push 만 슈퍼아머 거부 + `bool` 반환 | `PlayerStateController.cs:149` |
+| **S4 Grab 무수정 보장** | `BeginGrabbedByInstigator`/`EndGrabbedByInstigator` **래퍼 유지** |
+
+**내가 할 일 2건**
+- `TwentyThreeBoss.IsInterruptAttack` 의 `isGroggyAttack` → **`isInterruptAttack`** (한 단어).
+- **S5 Dash 착수 가능** — `BeginRestrainedByInstigator(gameObject, RestraintMode.Push, frontOffset)`.
+
+🔴 **머지 충돌은 `MonsterBase.cs` 딱 1파일**(양쪽이 동시에 건드린 유일한 파일). 해소 = 둘 다 살리기
+(이름은 은희 쪽, `if (!AutoHitReactions) return;` 는 보스 쪽, **조기 반환이 먼저**).
+추가로 내가 삭제한 `BossBase.cs` 를 은희가 리네임 때문에 건드려서 **delete/modify 충돌**이 뜬다 →
+**삭제를 채택.** `AttackType` 축소(`None/Default/Skill`)는 내 코드에 무영향(`Default` 만 쓴다).
+- 🔴 **머지 충돌 1곳**: `MonsterBase.TakeDamage` 의 `isGroggyAttack` 줄. 해소 = **둘 다 살리기**
+  (이름은 은희 쪽, `if (!AutoHitReactions) return;` 는 보스 쪽, **조기 반환이 먼저**).
+  순서는 은희 → `development` → 보스가 받는 방향(충돌 면적이 작다).
+
+### ⚠️ 이 세션에 확정·정정된 것 (상세는 PLAN 링크)
+
+- **뒤집힌 것 3건**: ① "돌진 = 매 틱 넉백 재적용" → **`Restrained.Push`**(`Unit.Knockback` 은 duration 없는 임펄스 1회라 누적되면 플레이어가 튀어나간다) ② **슈퍼아머로 돌진 버티기 = 의도**(기획 회의) → `Push` 에 슈퍼아머 검사 + `bool` 반환 요청. 슈퍼아머면 **밀림✕/기절✕/데미지○** ③ **"플레이어 CC 경로 없음"은 절반 틀렸다** — 상태이상은 `Unit.StatusEffects.Apply` 로 **오늘 가능**, 막힌 건 **변위뿐** (→ PLAN §5.1 G1 정정)
+- **"도달"은 송전기 실패 조건이 아니다** — `ReachEvent` 는 "상승 완료"라 모든 기둥이 반드시 도달한다. 실패는 **제한시간 초과 단독** (→ PLAN §5.11)
+- **JumpAttack 의 빨간 장판은 예고 표시(`AoeTelegraph`)이지 `AreaZone` 이 아니다** — 섞지 말 것
+
+### 🔴 알아 둘 것 (함정)
+
+- **`git status` 가 `Docs/` 변경을 숨긴다** — `core.fsmonitor` + `Docs` 정션. **`git -c core.fsmonitor=false` 로 커밋할 것**
+- **컴파일 판정은 MCP 응답이 아니라 산출물로** — `Assembly-CSharp.dll` mtime > 최종 소스 + **dll 안에 새 타입 실존**(`grep -a`). MCP 의 `success:true` 는 접수 확인일 뿐이고, `Editor.log` 엔 직전 실패의 에러가 남는다(교훈 #61)
+- **보스 검증은 MPPM 2인 이상에서만** — 오프라인/미스폰이면 `CanWrite = IsSpawned && IsServer` 라 **상태이상이 안 걸린다.** 단독 Play 로 "기절이 안 된다"를 버그로 오진하지 말 것
+- **파생에 `Update()` 를 선언하면 `MonsterBase.Update` 를 가려 FSM 이 통째로 멈춘다**
+- **enum 값 추가는 끝에만** — `MonsterArchetype`·`BossAttackId`·`AreaZoneType` 전부 SO 에 정수 직렬화
+- **애니·앵커 접근이 graceful 이라 이름 오타가 무증상** — 죽은 설정값 9건 실재(교훈 #59). `ValidateContract` 가 스폰 시 잡는다
+- **Codex 는 숫자·경로를 지어낸다** — 결론만 채택하고 재확인
+
+---
 
 ## ▶▶ 현재 인수인계 (2026-08-07 · 보스 FSM 지원 2건 — 인터럽트 식별자 + 캐리 소켓)
 
@@ -51,6 +1218,149 @@ Update this file when a term becomes important enough that future agents or team
   거동 스펙이 `Docs/design/`에 없어 "짧은 전방 강타 + Interrupt 태그"로 가정했다(PLAN 「명시적 가정」).
   판정 타이밍은 **애니 클립 수정 없이** SO 타이머(`hitDelay`)로 잡고, Hit 애니 이벤트가 나중에 심어지면
   그쪽이 우선하되 **1회만** 발동한다.
+### 이전 렌더링 인수인계 보존본 (2026-08-05)
+
+팀장이 AI 생성 레퍼런스 이미지를 **목표 룩**으로 제시했다(2026-08-05, 채팅 첨부).
+탑다운 쿼터뷰 고정 / 셀셰이딩 캐릭터 + 회화풍 배경 / 부드러운 접지 그림자 +
+따뜻한 국소 조명(가로등·창) / 물·금속 반사 / 원경 디포커스 / 채도 높은 소품.
+이미지에는 HUD 배치안(특성·강화·스탯 육각 슬롯, 하단 스킬 슬롯, HP/MP 바, 남은 시간,
+우상단 미니맵)도 손으로 얹혀 있으나 **HUD 는 이 세션 범위와 별개 트랙**이다.
+
+🔴 **레퍼런스 이미지는 아직 채팅에만 있다 — `Docs/design/` 에 저장할 것.**
+
+- **카메라 조절은 완료** — FOV 52→34 / Priority 100 (`0522731`, development 에 포함).
+  이번 세션은 카메라가 아니라 **셰이딩·조명·포스트프로세싱**이다.
+- 승인된 계획서는 `PLAN.md` 가 아니라 **`PLAN-vision.md` §7** 이다(§4 단계 2~3 재개).
+- 선행 참고: 툰셰이더 현황(`e5cc012`) · 벽 차폐/투명화 · `Docs/tech/fog-system.md`.
+
+### ▶▶ 다음 세션 시작점 — Play 테스트부터 (2026-08-05 마감, `317a2a1`, **미push ahead 10**)
+
+**코드 작업은 일단락됐고 남은 것은 육안 검증이다.** 컴파일 0에러/0경고, 콘솔 에러 0건,
+`svn status Assets/50.Art` missing 0건, 배선 14개 항목 전수 확인 완료.
+
+**이번 세션에 닫은 것**
+
+| 닫은 것 | 커밋 |
+|---|---|
+| 그레이딩 LDR→HDR + 톤매핑·화이트밸런스·컬러조정·비네트 도입 | `77e6063` |
+| 벽 투명화 복원 + **포그 매니저 OFF** | `3b2d07f` |
+| **카메라 포스트프로세싱 활성** + TAA | `0dfec30` |
+| 벽 투명화 대상을 Stage1 로 한정 + AA·디더 토글 분리 | `82b079b` |
+| ProfilerHUD 배치 + DoF Bokeh | `421b844` |
+| **화면공간 마스크 블러** 신설(셰이더·피처·컨트롤러·설정) | `e07d2ac` |
+| 마스크 블러 `size.x` 무시 수정 + 성능 실측 기록 | `959b8c2` |
+| HUD 마커를 마스크 블러 4패스로 교체 | `317a2a1` |
+
+**AA 결정 = SMAA** (2026-08-05 팀장 판단). TAA 와 큰 차이를 못 느꼈고,
+**고스팅이 없는 쪽이 맞다**는 판단이다. 대시 잔상은 TAA 부산물이 아니라 **대시 전용
+VFX 로 따로 넣는다** — 그래야 통제가 된다. `m_Antialiasing: 2` 적용됨.
+🔴 SMAA 에서는 `WallOcclusionSettings.animateDither` 를 켜면 안 된다(기본값 OFF, 유지).
+
+**다음 세션 목표 — 두 룩을 키 하나로 비교 (팀장 지시, 2026-08-05)**
+
+지금은 채도를 살리는 방향으로 왔지만, 원래는 **어둡고 디밍이 들어간 상태**였다.
+그쪽에 **픽셀레이트 + 블러**까지 얹은 것과 지금 화면을 **키 입력 한 번으로 전환**해
+직접 비교할 수 있게 만든다.
+
+| | A (현재) | B (비교 대상) |
+|---|---|---|
+| 채도·톤 | 살림 | 저채도 |
+| 디밍 | 없음 | 있음 |
+| 블러 | 마스크 블러 | 마스크 블러 |
+| 픽셀레이트 | 없음 | **있음(신규)** |
+
+착수 전 알아 둘 것:
+
+- 🔴 **런타임에 `volume.sharedProfile` 값을 바꾸면 에디터에서 애셋이 영구 수정된다.**
+  Play 를 끝내도 남는다. 씬에 Volume 을 2개 두고 weight 를 토글하거나
+  `volume.profile`(런타임 클론)을 쓸 것.
+- 🔴 **디밍을 되살리려고 `FogManager` 를 통째로 켜면 시야 제한(LoS)도 같이 돌아온다.**
+  `dimEnabled` 와 `losEnabled` 는 독립 토글이므로 디밍만 원하면 `losEnabled: 0` 으로 둔다.
+  (현재 값: `fogEnabled 0` / `dimEnabled 1` / `losEnabled 1`, 컴포넌트 자체가 OFF)
+- 두 룩이 갈리는 축이 4개다(볼륨 값 · 디밍 · 마스크블러 설정 · 픽셀레이트).
+  **"룩 프리셋" ScriptableObject 하나로 묶어 통째로 스왑**하는 편이 토글이 단순해진다.
+- 픽셀레이트는 마스크 블러와 같은 계통의 풀스크린 패스다 — `MaskBlurFeature` 구조를
+  그대로 재사용할 수 있다. ⚠️ **순서를 정해야 한다**: 블러→픽셀레이트면 블록 경계가
+  또렷하고, 픽셀레이트→블러면 블록이 뭉개진다. 원하는 그림이 어느 쪽인지 먼저 결정.
+- 토글 키는 **F8 을 피할 것**(ProfilerHUD 가 쓴다). 이 프로젝트는 신 Input System 이다.
+
+**그 외 남은 것**
+
+1. **Play 육안 검증** — 마스크 블러의 `feather`(0.35)·`blurStrength`(1)·`roundness`(4)
+   는 전부 추정값이고 화면으로 확인한 적 없다.
+2. **저사양 성능 재측정** — 팀장 PC 는 GPU 2.89ms 로 여유롭지만 고사양 기준이다.
+   비싸면 `downsampleShift` 1→2 → `blurStrength` 하향 → 패스 축소 순.
+3. 남은 격차 = **국소 조명**(가로등·창). 라이트맵 방향이 정해져야 착수 가능(아래 미해결).
+
+**🔴 미해결 / 결정 대기**
+
+- **라이트맵 베이크가 현재 맵 구조와 충돌한다.** `MapContentSpawner.cs:62` 가 존 레이아웃
+  프리팹(바닥·벽 포함)을 런타임 `Instantiate` 하는데, 라이트맵 데이터는 씬 렌더러에
+  직렬화되므로 런타임 생성물은 받지 못한다. 씬의 static 플래그도 0개다. 게다가 슬롯
+  위치가 시드마다 셔플된다. 선택지 = 프리팹 라이트맵 베이크 / 라이트 프로브·APV /
+  Stage1 만 굽고 생성물은 실시간. **조명 단계 전에 방향 결정 필요.**
+- **퓨즈박스가 어둡다 — 미해결.** `Level_wall_hallway.prefab`(Stage1 에 13개)이 쓰는
+  `MA_prop03` 은 `prop03_basecolor` + `pipe_basecolor` 두 장인데 오클루전 변종은 한 장만
+  가져간다. 변종 14개 중 4개가 3~5장 → 1장으로 붕괴하고, **13개는 노멀맵을 잃었다**
+  (노멀 텍스처 5개가 `textureType: 0`=Default 로 임포트돼 `IsNormalMap()` 이 false 를
+  반환하기 때문 — 팀장이 재임포트 예정). 근본 해결은 변종 머티리얼을 없애고 원본
+  ShaderGraph 에 디더를 심는 것. `50.Art` = SVN 이라 단일 담당 필요.
+- ⚠️ **`ProfilerHUD` 는 제출 빌드 전에 MapScene 에서 제거할 것.** 클래스가
+  `#if UNITY_EDITOR || DEVELOPMENT_BUILD` 로 감싸져 있어 릴리스 빌드에서 missing script 가 된다.
+- 🔴 **`Paladin.prefab` 의 `PlayerInput` 이 `m_Enabled: 0 → 1` 로 켜져 있다(미커밋).**
+  `Player.cs:146` 주석대로 **프리팹 기본값은 비활성이 맞고**, `EnableLocalInput()` 이
+  로컬(오너/오프라인)만 켠다 — 원격 클론이 디바이스 페어링을 시도해
+  "Cannot find matching control scheme" 경고를 내는 것을 막기 위한 설계다.
+  `Player.prefab` 은 여전히 `0` 이라 Paladin 만 어긋났다. **커밋하지 말고 되돌릴 것:**
+  `git checkout -- Assets/2.Prefabs/Player/Paladin/Paladin.prefab`
+
+**미커밋으로 남긴 것** — 전부 팀장이 인스펙터에서 튜닝 중인 값이라 손대지 않았다:
+`Global Volume Profile`(비네트 색 warm→진회색, 강도 0.606 / 대비 -3.7 / 채도 -11.6 —
+내가 넣었던 +12·+18 이 과해서 되돌린 것) · `MaskBlurSettings`(`size.x` 0.65) ·
+`Paladin.prefab`(위 항목, 되돌릴 것) · 줄바꿈 노이즈 2건.
+
+**이 세션에 확립된 것**
+
+- 🔴 **"적용했는데 화면이 그대로"가 세 번 나왔고 원인이 매번 달랐다.**
+  ① `VolumeProfile.Add<T>()` 는 서브에셋 등록을 안 해 저장 시 `{fileID: 0}` 널이 된다
+  (게다가 널이 되기 전 메모리 인스턴스를 `TryGet` 이 찾아 "이미 있음"으로 오판한다 —
+  판단 기준은 존재 여부가 아니라 `AssetDatabase.Contains`).
+  ② **카메라 포스트프로세싱이 꺼져 있었다**(`m_RenderPostProcessing: 0`).
+  ③ `MaskBlurSettings.ResolveSize` 가 `size.x` 를 y 에서 유도해 인스펙터 값을 버렸다.
+  **공통 교훈: 도구가 "성공" 로그를 찍어도 산출물 파일을 직접 열어 확인할 것.**
+- 🔴 **게임플레이 카메라는 씬에 없다.** `4.MapScene` 의 Camera 는 0개이고
+  `CameraTargetSwitcher.cs:132` 가 `CameraSwitcher.prefab` → `MainCamera.prefab` 을 런타임
+  `Instantiate` 한다. 그 프리팹은 `CamaraScene`·`PlayerScene`(테스트 씬)에서만 직접 쓰이므로
+  **씬만 훑으면 실제 카메라 설정에 도달하지 못한다.**
+- ⚠️ **`FogManager` 는 이름과 달리 포그가 범인이 아니다.** 씬 값이 `fogEnabled: 0` 이라
+  포그는 안 그려지고 있었고, 화면을 어둡게 만든 것은 `dimEnabled: 1` + `losEnabled: 1`
+  (`losMaxDist: 4`)이다. 지금 OFF 라 **먼 거리 적이 전부 보인다** — 게임플레이 영향 있음.
+- ⚠️ **탑다운에서 DoF 로 화면 외곽을 흐리게 할 수 없다.** DoF 는 깊이로 판단하는데
+  좌우 외곽은 중앙과 깊이가 같다. 그래서 화면공간 마스크 블러를 새로 만들었다.
+- ⚠️ **벽 투명화의 디더 무늬는 품질 결함이 아니라 의도된 비용 절충**이다(반투명 블렌딩
+  대신 `clip()` 으로 불투명 큐 한 패스). 보기 싫다고 끄지 말 것 — 끄면 벽 뒤 플레이어가
+  그냥 안 보인다. 디더+TAA 로 녹이는 시도는 **실패했다**(TAA 분산 클램프가 디더 변동을
+  기각해 뿌연 얼룩이 된다). 2안 = MSAA + `AlphaToMask`.
+- ✅ **렌더러 피처를 코드로 추가할 때는 `AddObjectToAsset` + `m_RendererFeatureMap` 정합
+  확인이 필수다.** 맵은 features 개수와 길이가 맞아야 한다(long 1개 = hex 16자).
+  URP 의 `ValidateRendererFeatures()` 가 재계산하지만 `internal` 이라 리플렉션으로 깨웠다.
+- ✅ 셰이더는 반드시 **직렬화 참조**로 물릴 것(`MaskBlurFeature._shader`). `Shader.Find`
+  만으로는 빌드에서 스트립된다(미니맵 전례).
+
+### 브랜치 정리 (세션 시작 시)
+
+- `feature/map-player-merge` 삭제(`8e5a2ae`) — `origin/development` 에 전부 포함된 것을
+  확인한 뒤. `ahead 2` 는 **자기 원격 ref 가 낡아서 생긴 착시**였다.
+- 로컬 `development` 를 `origin/development`(`cbb51b1`) 로 갱신 후 거기서 분기.
+  `fix/AlphaAlert` 에는 development 에만 있는 커밋 12개가 빠져 있었다(ConveyorBelt 정리,
+  진입점 단일화, 미니맵 머티리얼 배선, 루프백 바인딩 수정, 50.Art gitignore 통일 등).
+- 🔴 **git↔SVN 하이브리드 함정 — "git 추적 해제" 커밋을 가로지르는 체크아웃은 SVN 소유
+  파일을 디스크에서 지운다.** development 의 `5cd384f`(SVN 소유 아트 `.meta` 140건 추적 해제)를
+  넘어오면서 git 이 `TestAssets/Temp_Images` 아래 `.meta` 5개를 **삭제**했다. 그대로 Unity 를
+  켰으면 GUID 재발급으로 참조가 깨졌을 것이다. SVN 이 `!`(missing) 로 잡고 있어 `svn revert`
+  로 복구, GUID 가 git 원본과 일치하는 것까지 확인했다.
+  **브랜치를 갈아탄 뒤 Unity 를 켜기 전에 아래를 볼 것:**
+  `svn status Assets/50.Art | Select-String "^!"`
 
 ---
 
@@ -77,7 +1387,255 @@ Unity에서 직접** 한다. Codex는 `.cs` 4개만 건드리고 프리팹·씬�
 
 ---
 
-## 이전 인수인계 (2026-07-31 · 보스 이슈 정리 + 툰셰이딩 + Windows 빌드, `93716e0` 미push)
+## 이전 인수인계 (2026-08-06 · 렌더링 룩 A/B + 픽셀레이트 + 어비스 복구 — `37a338f` **push 완료**)
+
+브랜치 `feature/maprendering` 원격 동기화 완료(ahead 0). 커밋 5개:
+`88f43cb` 픽셀레이트 · `3f7c43d` 룩 A/B 토글(F9) · `062308a` DoF 비활성 ·
+`a239923` 아트 가이드+계획서 · `37a338f` 어비스 복구.
+
+**닫은 것**
+
+- **픽셀레이트** — 합성 패스 UV 양자화로 구현(패스 추가 0, 각 0.01ms). 블러와 **독립 반경**
+  (`pixelateRegionScale`)이라 픽셀 범위만 좁힐 수 있다. 룩 A·B **공통**.
+- **룩 A/B 토글(F9)** — A = 채도 살림 / B = 디밍 + 저채도 + **시야 차폐**.
+  토글은 `dimEnabled`·`losEnabled` **필드만** 오간다(컴포넌트를 끄면 어비스가 함께 죽는다).
+- **DoF 비활성** — 배경 흐림은 마스크 블러 단독. 삭제 아니라 `active: 0`(튜닝값 보존).
+- **어비스 물안개 복구** — 포그 게이트에 묶여 **렌더되지 않고 있었다**(원인 3곳).
+
+**문서**: [Docs/design/look-ab-tuning.md](Docs/design/look-ab-tuning.md)(아트용) ·
+`PLAN-vision.md` §8.11~8.13 · 볼트 `Programming/Setting/렌더링 설정 종합 정리` ·
+볼트 `Art-Planning/Setting 사용법/룩 A-B 비교와 설정 조절`.
+
+**남은 육안 검증 2건** — ① 픽셀 영역 배율(`pixelateRegionScale` 1.242) 적정성
+② **어비스 tint 는 8~19% 로 은은해 구멍 근처에서만 보인다** — 확인 필요.
+
+**미커밋으로 남은 것** = `0.BootStrapScene` · `Paladin.prefab` · `TwentyThree.prefab` ·
+`MultiplayerManager.asset` 4개인데 **전부 내용 변경 0(줄바꿈 노이즈)** 이다.
+(이전 인계에 있던 "Paladin PlayerInput 되돌릴 것" 항목은 현재 diff 0 이라 **해소됨**.)
+
+**🔴 이 세션의 반복 패턴 3건 — 다음에 의심할 것**
+
+1. **C# 기본값을 바꿔도 이미 직렬화된 애셋은 안 바뀐다.** `pixelBlockSize` 4→16 을 코드에서만
+   올려 화면이 그대로였다. 필드 기본값을 바꿀 때는 **애셋 파일의 실제 값을 열어 확인**할 것.
+2. **한 계통을 다른 계통의 게이트 안에 두지 말 것.** 어비스가 포그 안에 있어서 "포그를 껐다"가
+   무관한 기능을 조용히 껐다. 매니저 컴포넌트의 `enabled` 로 한 기능만 토글하는 것도 같은 실수.
+3. **로그의 실패 기록이 현재 상태가 아닐 수 있다.** 셰이더 에러가 중간 편집 상태의 기록이었다 —
+   로그를 믿지 말고 **현재 파일과 강제 재임포트로 재판정**할 것.
+
+**⚠️ 신 Input System 은 에디터에서 Game View 포커스를 따른다.** 포커스 없으면 F9 가 안 먹는다.
+그래서 `LookToggle` 은 콘솔에도 로그를 남긴다(입력 도달 여부와 적용 결과를 갈라내기 위함).
+
+---
+
+## 이전 인수인계 (2026-08-05 · 렌더링 조명·포스트프로세싱 — 브랜치 `feature/maprendering`)
+
+작업 세션: **경석(Claude)**. 브랜치 `feature/maprendering`
+(= `development` `cbb51b1` 기준으로 분기, 원격 push 완료).
+
+**수정 예정 영역 — 렌더링/조명/포스트프로세싱.** Codex·팀원 동시 수정 주의 대상:
+`Assets/99.Settings/*`(URP 애셋·볼륨 프로파일) · 툰 셰이더/머티리얼 ·
+`4.MapScene`·`bossroom` 의 조명·볼륨 오브젝트. 세부 파일은 범위 확정 후 여기 추가한다.
+
+### 목표 — "레퍼런스 이미지 수준의 플레이 화면"
+
+팀장이 AI 생성 레퍼런스 이미지를 **목표 룩**으로 제시했다(2026-08-05, 채팅 첨부).
+탑다운 쿼터뷰 고정 / 셀셰이딩 캐릭터 + 회화풍 배경 / 부드러운 접지 그림자 +
+따뜻한 국소 조명(가로등·창) / 물·금속 반사 / 원경 디포커스 / 채도 높은 소품.
+이미지에는 HUD 배치안(특성·강화·스탯 육각 슬롯, 하단 스킬 슬롯, HP/MP 바, 남은 시간,
+우상단 미니맵)도 손으로 얹혀 있으나 **HUD 는 이 세션 범위와 별개 트랙**이다.
+
+🔴 **레퍼런스 이미지는 아직 채팅에만 있다 — `Docs/design/` 에 저장할 것.**
+
+- **카메라 조절은 완료** — FOV 52→34 / Priority 100 (`0522731`, development 에 포함).
+  이번 세션은 카메라가 아니라 **셰이딩·조명·포스트프로세싱**이다.
+- 승인된 계획서는 `PLAN.md` 가 아니라 **`PLAN-vision.md` §7** 이다(§4 단계 2~3 재개).
+- 선행 참고: 툰셰이더 현황(`e5cc012`) · 벽 차폐/투명화 · `Docs/tech/fog-system.md`.
+
+### 2026-08-05 마감 시점 기록 (`317a2a1`) — ✅ 이후 전부 push 됨
+
+**코드 작업은 일단락됐고 남은 것은 육안 검증이다.** 컴파일 0에러/0경고, 콘솔 에러 0건,
+`svn status Assets/50.Art` missing 0건, 배선 14개 항목 전수 확인 완료.
+
+**이번 세션에 닫은 것**
+
+| 닫은 것 | 커밋 |
+|---|---|
+| 그레이딩 LDR→HDR + 톤매핑·화이트밸런스·컬러조정·비네트 도입 | `77e6063` |
+| 벽 투명화 복원 + **포그 매니저 OFF** | `3b2d07f` |
+| **카메라 포스트프로세싱 활성** + TAA | `0dfec30` |
+| 벽 투명화 대상을 Stage1 로 한정 + AA·디더 토글 분리 | `82b079b` |
+| ProfilerHUD 배치 + DoF Bokeh | `421b844` |
+| **화면공간 마스크 블러** 신설(셰이더·피처·컨트롤러·설정) | `e07d2ac` |
+| 마스크 블러 `size.x` 무시 수정 + 성능 실측 기록 | `959b8c2` |
+| HUD 마커를 마스크 블러 4패스로 교체 | `317a2a1` |
+
+**AA 결정 = SMAA** (2026-08-05 팀장 판단). TAA 와 큰 차이를 못 느꼈고,
+**고스팅이 없는 쪽이 맞다**는 판단이다. 대시 잔상은 TAA 부산물이 아니라 **대시 전용
+VFX 로 따로 넣는다** — 그래야 통제가 된다. `m_Antialiasing: 2` 적용됨.
+🔴 SMAA 에서는 `WallOcclusionSettings.animateDither` 를 켜면 안 된다(기본값 OFF, 유지).
+
+**두 룩을 키 하나로 비교 (팀장 지시, 2026-08-05) — ✅ 2026-08-06 완료(위 인수인계 참조)**
+
+지금은 채도를 살리는 방향으로 왔지만, 원래는 **어둡고 디밍이 들어간 상태**였다.
+그쪽에 **픽셀레이트 + 블러**까지 얹은 것과 지금 화면을 **키 입력 한 번으로 전환**해
+직접 비교할 수 있게 만든다.
+
+| | A (현재) | B (비교 대상) |
+|---|---|---|
+| 채도·톤 | 살림 | 저채도 |
+| 디밍 | 없음 | 있음 |
+| 블러 | 마스크 블러 | 마스크 블러 |
+| 픽셀레이트 | 없음 | **있음(신규)** |
+
+착수 전 알아 둘 것:
+
+- 🔴 **런타임에 `volume.sharedProfile` 값을 바꾸면 에디터에서 애셋이 영구 수정된다.**
+  Play 를 끝내도 남는다. 씬에 Volume 을 2개 두고 weight 를 토글하거나
+  `volume.profile`(런타임 클론)을 쓸 것.
+- 🔴 **디밍을 되살리려고 `FogManager` 를 통째로 켜면 시야 제한(LoS)도 같이 돌아온다.**
+  `dimEnabled` 와 `losEnabled` 는 독립 토글이므로 디밍만 원하면 `losEnabled: 0` 으로 둔다.
+  (현재 값: `fogEnabled 0` / `dimEnabled 1` / `losEnabled 1`, 컴포넌트 자체가 OFF)
+- 두 룩이 갈리는 축이 4개다(볼륨 값 · 디밍 · 마스크블러 설정 · 픽셀레이트).
+  **"룩 프리셋" ScriptableObject 하나로 묶어 통째로 스왑**하는 편이 토글이 단순해진다.
+- 픽셀레이트는 마스크 블러와 같은 계통의 풀스크린 패스다 — `MaskBlurFeature` 구조를
+  그대로 재사용할 수 있다. ⚠️ **순서를 정해야 한다**: 블러→픽셀레이트면 블록 경계가
+  또렷하고, 픽셀레이트→블러면 블록이 뭉개진다. 원하는 그림이 어느 쪽인지 먼저 결정.
+- 토글 키는 **F8 을 피할 것**(ProfilerHUD 가 쓴다). 이 프로젝트는 신 Input System 이다.
+
+**그 외 남은 것**
+
+1. **Play 육안 검증** — 마스크 블러의 `feather`(0.35)·`blurStrength`(1)·`roundness`(4)
+   는 전부 추정값이고 화면으로 확인한 적 없다.
+2. **저사양 성능 재측정** — 팀장 PC 는 GPU 2.89ms 로 여유롭지만 고사양 기준이다.
+   비싸면 `downsampleShift` 1→2 → `blurStrength` 하향 → 패스 축소 순.
+3. 남은 격차 = **국소 조명**(가로등·창). 라이트맵 방향이 정해져야 착수 가능(아래 미해결).
+
+**🔴 미해결 / 결정 대기**
+
+- **라이트맵 베이크가 현재 맵 구조와 충돌한다.** `MapContentSpawner.cs:62` 가 존 레이아웃
+  프리팹(바닥·벽 포함)을 런타임 `Instantiate` 하는데, 라이트맵 데이터는 씬 렌더러에
+  직렬화되므로 런타임 생성물은 받지 못한다. 씬의 static 플래그도 0개다. 게다가 슬롯
+  위치가 시드마다 셔플된다. 선택지 = 프리팹 라이트맵 베이크 / 라이트 프로브·APV /
+  Stage1 만 굽고 생성물은 실시간. **조명 단계 전에 방향 결정 필요.**
+- **퓨즈박스가 어둡다 — 미해결.** `Level_wall_hallway.prefab`(Stage1 에 13개)이 쓰는
+  `MA_prop03` 은 `prop03_basecolor` + `pipe_basecolor` 두 장인데 오클루전 변종은 한 장만
+  가져간다. 변종 14개 중 4개가 3~5장 → 1장으로 붕괴하고, **13개는 노멀맵을 잃었다**
+  (노멀 텍스처 5개가 `textureType: 0`=Default 로 임포트돼 `IsNormalMap()` 이 false 를
+  반환하기 때문 — 팀장이 재임포트 예정). 근본 해결은 변종 머티리얼을 없애고 원본
+  ShaderGraph 에 디더를 심는 것. `50.Art` = SVN 이라 단일 담당 필요.
+- ⚠️ **`ProfilerHUD` 는 제출 빌드 전에 MapScene 에서 제거할 것.** 클래스가
+  `#if UNITY_EDITOR || DEVELOPMENT_BUILD` 로 감싸져 있어 릴리스 빌드에서 missing script 가 된다.
+- ✅ **해소됨 (2026-08-06 확인) — 아래 되돌리기 명령은 실행하지 말 것.**
+  `Paladin.prefab` 의 `git diff` 는 현재 **내용 변경 0**(줄바꿈 노이즈만)이다. 아래는
+  당시 기록으로만 남긴다.
+  <br>~~`PlayerInput` 이 `m_Enabled: 0 → 1` 로 켜져 있다(미커밋).~~
+  단, **규칙 자체는 유효하다**: `Player.cs:146` 주석대로 프리팹 기본값은 비활성이 맞고,
+  `EnableLocalInput()` 이 로컬(오너/오프라인)만 켠다 — 원격 클론이 디바이스 페어링을 시도해
+  "Cannot find matching control scheme" 경고를 내는 것을 막기 위한 설계다.
+  **`PlayerInput` 을 프리팹에서 켜 두면 안 된다.**
+
+**미커밋으로 남긴 것** — 전부 팀장이 인스펙터에서 튜닝 중인 값이라 손대지 않았다:
+`Global Volume Profile`(비네트 색 warm→진회색, 강도 0.606 / 대비 -3.7 / 채도 -11.6 —
+내가 넣었던 +12·+18 이 과해서 되돌린 것) · `MaskBlurSettings`(`size.x` 0.65) ·
+`Paladin.prefab`(위 항목, 되돌릴 것) · 줄바꿈 노이즈 2건.
+
+**이 세션에 확립된 것**
+
+- 🔴 **"적용했는데 화면이 그대로"가 세 번 나왔고 원인이 매번 달랐다.**
+  ① `VolumeProfile.Add<T>()` 는 서브에셋 등록을 안 해 저장 시 `{fileID: 0}` 널이 된다
+  (게다가 널이 되기 전 메모리 인스턴스를 `TryGet` 이 찾아 "이미 있음"으로 오판한다 —
+  판단 기준은 존재 여부가 아니라 `AssetDatabase.Contains`).
+  ② **카메라 포스트프로세싱이 꺼져 있었다**(`m_RenderPostProcessing: 0`).
+  ③ `MaskBlurSettings.ResolveSize` 가 `size.x` 를 y 에서 유도해 인스펙터 값을 버렸다.
+  **공통 교훈: 도구가 "성공" 로그를 찍어도 산출물 파일을 직접 열어 확인할 것.**
+- 🔴 **게임플레이 카메라는 씬에 없다.** `4.MapScene` 의 Camera 는 0개이고
+  `CameraTargetSwitcher.cs:132` 가 `CameraSwitcher.prefab` → `MainCamera.prefab` 을 런타임
+  `Instantiate` 한다. 그 프리팹은 `CamaraScene`·`PlayerScene`(테스트 씬)에서만 직접 쓰이므로
+  **씬만 훑으면 실제 카메라 설정에 도달하지 못한다.**
+- ⚠️ **`FogManager` 는 이름과 달리 포그가 범인이 아니다.** 씬 값이 `fogEnabled: 0` 이라
+  포그는 안 그려지고 있었고, 화면을 어둡게 만든 것은 `dimEnabled: 1` + `losEnabled: 1`
+  (`losMaxDist: 4`)이다. 지금 OFF 라 **먼 거리 적이 전부 보인다** — 게임플레이 영향 있음.
+- ⚠️ **탑다운에서 DoF 로 화면 외곽을 흐리게 할 수 없다.** DoF 는 깊이로 판단하는데
+  좌우 외곽은 중앙과 깊이가 같다. 그래서 화면공간 마스크 블러를 새로 만들었다.
+- ⚠️ **벽 투명화의 디더 무늬는 품질 결함이 아니라 의도된 비용 절충**이다(반투명 블렌딩
+  대신 `clip()` 으로 불투명 큐 한 패스). 보기 싫다고 끄지 말 것 — 끄면 벽 뒤 플레이어가
+  그냥 안 보인다. 디더+TAA 로 녹이는 시도는 **실패했다**(TAA 분산 클램프가 디더 변동을
+  기각해 뿌연 얼룩이 된다). 2안 = MSAA + `AlphaToMask`.
+- ✅ **렌더러 피처를 코드로 추가할 때는 `AddObjectToAsset` + `m_RendererFeatureMap` 정합
+  확인이 필수다.** 맵은 features 개수와 길이가 맞아야 한다(long 1개 = hex 16자).
+  URP 의 `ValidateRendererFeatures()` 가 재계산하지만 `internal` 이라 리플렉션으로 깨웠다.
+- ✅ 셰이더는 반드시 **직렬화 참조**로 물릴 것(`MaskBlurFeature._shader`). `Shader.Find`
+  만으로는 빌드에서 스트립된다(미니맵 전례).
+
+### 브랜치 정리 (세션 시작 시)
+
+- `feature/map-player-merge` 삭제(`8e5a2ae`) — `origin/development` 에 전부 포함된 것을
+  확인한 뒤. `ahead 2` 는 **자기 원격 ref 가 낡아서 생긴 착시**였다.
+- 로컬 `development` 를 `origin/development`(`cbb51b1`) 로 갱신 후 거기서 분기.
+  `fix/AlphaAlert` 에는 development 에만 있는 커밋 12개가 빠져 있었다(ConveyorBelt 정리,
+  진입점 단일화, 미니맵 머티리얼 배선, 루프백 바인딩 수정, 50.Art gitignore 통일 등).
+- 🔴 **git↔SVN 하이브리드 함정 — "git 추적 해제" 커밋을 가로지르는 체크아웃은 SVN 소유
+  파일을 디스크에서 지운다.** development 의 `5cd384f`(SVN 소유 아트 `.meta` 140건 추적 해제)를
+  넘어오면서 git 이 `TestAssets/Temp_Images` 아래 `.meta` 5개를 **삭제**했다. 그대로 Unity 를
+  켰으면 GUID 재발급으로 참조가 깨졌을 것이다. SVN 이 `!`(missing) 로 잡고 있어 `svn revert`
+  로 복구, GUID 가 git 원본과 일치하는 것까지 확인했다.
+  **브랜치를 갈아탄 뒤 Unity 를 켜기 전에 아래를 볼 것:**
+  `svn status Assets/50.Art | Select-String "^!"`
+
+---
+
+## 이전 인수인계 (2026-08-05 · MCP 무한대기 해소 + 네트워크 권한 결함 2건, **PR #10 머지 완료** `cbb51b1`)
+
+작업 세션: **경석(Claude)**. `fix/AlphaAlert` → `development` 머지 완료, 원격 동기화됨.
+워킹트리에 남은 것은 **줄바꿈 노이즈 1개**(`MultiplayerManager`)뿐이다 — 아래 07-31 항목의
+"내용 변경 0" 부류와 같다. 커밋하지 말 것.
+
+### 이번에 닫은 것
+
+| 닫은 것 | 커밋 |
+|---|---|
+| **결과 씬 전환 메시지에 송신자 검증** — 클라가 named message 로 호스트를 결과 화면으로 끌고 갈 수 있었다 | `6d34ea1` |
+| **대시 서버 검증에 사망/영혼 배선** — 판정 입력이 `false` 하드코딩이라 죽은 플레이어 대시를 못 막았다 | `66d99af` |
+| **Unity MCP 무한대기 해소 + 브릿지 런처** (핀 `cf61cc5`→`2ea969e`) | `58f3c19` · `effdf12` |
+| 툰 룩 동결값 — 카메라 FOV 52→34 / Priority 100 / Paladin 툰 4값 | `0522731` |
+
+두 결함은 Codex·Claude 교차 코드리뷰에서 나왔다. 리뷰 원문·39건 목록은 개인 보관.
+
+### 다음 시작점 — 렌더링 수정 (**새 브랜치에서 작업**)
+
+팀장 지시: 다음 작업은 렌더링 수정이며 **브랜치를 새로 파서** 진행한다. 구체 범위는 다음 세션에
+확정. 관련 기존 문서를 먼저 확인할 것 — 툰셰이더 현황(위 07-31 §이번에 닫은 것 `e5cc012`),
+벽 차폐/투명화, `Docs/tech/fog-system.md`.
+
+### 이 세션에 확립된 것
+
+- 🔴 **Claude Code 는 프로젝트 `.mcp.json` 이 아니라 `~/.claude.json` 의 user 스코프
+  `mcpServers` 를 우선한다.** 둘 다 `unity` 가 있으면 프로젝트 쪽은 무시된다.
+  MCP 가 "고쳤는데 그대로"면 **실행 중인 프로세스의 커맨드라인부터 본다**:
+  `Get-CimInstance Win32_Process -Filter "name='node.exe'" | Select CommandLine`.
+- 🔴 **브릿지 사본을 홈(`~/.unity-mcp/`)에 두지 말 것.** 사본은 패키지가 갱신돼도 조용히 낡고,
+  낡았다는 신호가 어디에도 안 뜬다. 경로가 흔들리는 문제는 사본이 아니라 **런처로** 푼다 —
+  런처가 `PackageCache` 를 실행 시점에 탐색하므로 **패키지 핀을 갱신해도 개인 설정을 고칠
+  필요가 없다.** 런처 정본은 이제 MCP 패키지 안에 있다 — `Bridge/mcp-bridge-launcher.js`
+  (예전엔 이 레포 루트의 `.mcp-bridge-launcher.js`). 등록 방법은 포크 레포의
+  `LOCAL_DEV_SETUP.md` 를 본다.
+- ⚠️ **MCP 무한대기의 원인은 타임아웃 부재가 아니라 응답 id 유실이었다.** 서버가 합성 에러에
+  id 를 안 실으면(`id:null`) HTTP 200 으로 나가고, 브릿지는 "정상 응답"으로 처리해
+  **자체 타임아웃·재시도가 아예 발동하지 않는다.** 요청-응답 프로토콜에서 무한대기를 만나면
+  "응답이 오는가"보다 **"응답의 상관키가 맞는가"** 를 먼저 본다.
+- ✅ **MCP 패키지 수정 절차**: `C:\Users\user\unity-mcp-fork` 의 **`optimized` 브랜치**에서
+  수정 → push → `Packages/manifest.json` 핀 갱신 → Unity 재시작. `main` 은 이 프로젝트가
+  쓰는 계보가 아니다. lock(`packages-lock.json`)도 같이 커밋해야 팀원이 새 버전을 받는다.
+- ⚠️ **`MapSceneManager` 만 송신자 검증이 빠져 있었다** — `LobbyUIController:259`,
+  `NetworkLoadingFlowController:766`, `NetworkClock:264` 는 이미 하고 있었다. NGO custom
+  named message 핸들러를 새로 추가할 때는 이 가드를 기본으로 넣을 것.
+- ⚠️ **`PlayerDashController` 는 `PlayerLifeCycleController` 가 없으면 "살아있음"으로 폴백한다**
+  (대시 전용 테스트 씬 대응). 프로덕션 프리팹에서 이 컴포넌트가 누락되면 사망 검증이 조용히
+  빠지므로, 서버 스폰 경고(`[DashAlert] PlayerLifeCycleController가 없어…`)를 무시하지 말 것.
+- 팀원 조치 안내는 볼트 `Core/MCP패키지_포크전환_안내.md`(2026-08-05 최신화)에 정리했다.
+
+---
+
 ## ▶▶ 현재 인수인계 (2026-08-11 · 피격 이펙트 클라 복제 + 교체 HUD, 브랜치 `feature/VFX`)
 
 작업 세션: **민경(Claude)**. 계획·근거는 [PLAN.md](PLAN.md) 최상단 항목.
@@ -134,7 +1692,7 @@ Unity에서 직접** 한다. Codex는 `.cs` 4개만 건드리고 프리팹·씬�
 - ✅ 검증: `Tools/Effects/스모크 테스트 (Play Mode)` → 23/23 통과(배관만).
   연출의 자연스러움은 `EffectSceneTester`로 VFXScene에서 눈으로 본다.
 
-### 이전 인수인계 (2026-07-31 · 보스 이슈 정리 + 툰셰이딩 + Windows 빌드, `93716e0` 미push)
+## 이전 인수인계 (2026-07-31 · 보스 이슈 정리 + 툰셰이딩 + Windows 빌드, `93716e0` — PR #10 로 머지됨)
 
 작업 세션: **경석(Claude)**. 브랜치 `feature/map-player-merge`, origin 대비 **ahead 1**.
 워킹트리에 남은 것은 **내용 변경 0 인 줄바꿈 노이즈 4개**뿐이다

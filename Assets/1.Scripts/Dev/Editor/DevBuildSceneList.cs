@@ -29,7 +29,8 @@ public static class DevBuildSceneList
         "Assets/0.Scenes/PlayerScene.unity",
         "Assets/0.Scenes/PlayerBossTest.unity",
         "Assets/0.Scenes/PlayerDashTest.unity",
-        "Assets/0.Scenes/CamaraScene.unity",
+        // CamaraScene 은 2026-08-15 아트 머지(origin/fix/pixel)에서 삭제됐다 — 목록에 남기면
+        // 활성/비활성 때마다 누락 경고가 난다. 나머지 5개는 실물 확인했다.
     };
 
     [MenuItem(MenuRoot + "테스트 씬 활성화 (DevSceneBooter 용)")]

@@ -56,7 +56,18 @@ public class MonsterBase : Unit
     Quaternion _spawnRotation;
     Transform _target;
     Collider[] _detectBuffer;
-    float _lastAttackTime = -999f;
+
+    // 공격 슬롯별 쿨다운.
+    // 일반 몬스터는 공격이 1종이라 슬롯 0 하나만 쓰고, 그 경우 동작은 단일 쿨다운 시절과 완전히 같다.
+    // 보스처럼 공격이 여러 종류면 ConfigureAttackSlots(n)으로 슬롯을 늘리고 슬롯마다 쿨을 따로 돌린다.
+    float[] _lastUsedByAttack = { -999f };
+    float[] _cooldownByAttack = { 0f };   // 0 이하면 base 쿨(1/AttackSpeed)로 폴백
+
+    protected const int DefaultAttackSlot = 0;
+    protected const int NoAttack = -1;     // SelectAttackSlot 반환값: "지금 쓸 공격이 없다"
+
+    /// <summary>StartAttack 이 쿨을 기록할 슬롯. 파생이 공격을 고른 뒤 세팅한다(기본 0).</summary>
+    protected int CurrentAttackSlot { get; set; } = DefaultAttackSlot;
     protected float _stateTimer;   // 서브클래스(콤보 보스 등)가 공격 커밋 길이를 덮어쓸 수 있게 protected.
     bool _attackFired;
     bool _commitFired;             // attackFinishTrigger 1회 발동 가드(커밋 이벤트/히트 중 먼저 온 쪽만)
@@ -68,11 +79,13 @@ public class MonsterBase : Unit
     float _combatMoveSpeed;        // 커밋 이동 속도(후퇴=chaseSpeed, 재배치=MoveSpeed)
     bool _combatMoveRepick;        // 도착 시 다음 지점 재선택 여부(재배치=true, 후퇴=false)
     int _groggyCount;
+    float _groggyAfterHit;         // Hit 종료 후 이어붙일 Groggy 길이(0 = 평소대로 Idle 재평가). ForceHitReaction 이 세팅.
     Vector3 _knockbackDir;         // 지속넉백 방향(수평 정규화)
     float _knockbackSpeed;         // 지속넉백 속도(m/s) = AttackInfo.knockbackStrength
     float _staggerAfterKnockback;  // 넉백 종료 후 Stunned 경직 시간(초)
     bool _isDead;
     bool _initialized;
+    bool _serverLogicSuspended;    // 연출 구간 게이트(SetServerLogicSuspended). true 면 서버 FSM 이 안 돈다
     Coroutine _deathFxRoutine;              // 임시 사망 표시 코루틴(모든 피어)
     const float DeathPlaceholderDuration = 1f; // 임시 사망 표시 지속(디졸브/애니 도입 시 제거)
 
@@ -93,7 +106,9 @@ public class MonsterBase : Unit
         if (rangedAttack == null) rangedAttack = GetComponentInChildren<MonsterRangedAttack>();
 
         // 공격 애니 이벤트 릴레이 자동 부착(Animator 오브젝트에 — 이벤트는 같은 GO의 메서드만 호출 가능).
-        // 클립에 OnAttackHit/OnAttackEnd 이벤트가 없으면 HandleAttack 타이머가 폴백이므로 무해.
+        // 🔴 부착이 곧 동작은 아니다. OnAttackHit 은 **폴백이 없어서**, 클립에 그 이벤트가 없으면
+        //    그 공격은 데미지를 내지 못한다(OnAttackEnd 만 attackDuration 타이머가 폴백한다).
+        //    비대칭인 이유는 HandleAttack 주석 참조.
         if (animator != null && !animator.TryGetComponent(out MonsterAnimationEventRelay _))
             animator.gameObject.AddComponent<MonsterAnimationEventRelay>();
 
@@ -177,6 +192,14 @@ public class MonsterBase : Unit
         if (!IsServer || !_initialized || _isDead)
             return;
 
+        // 연출이 몸을 몰고 있는 동안에는 FSM 을 돌리지 않는다(SetServerLogicSuspended 주석 참조).
+        if (_serverLogicSuspended)
+        {
+            if (!Mathf.Approximately(0f, _animSpeed.Value))
+                _animSpeed.Value = 0f;
+            return;
+        }
+
         TickServer(Time.deltaTime);
 
         // 이동 속도 복제 갱신(에이전트 실제 속도 기반).
@@ -218,9 +241,80 @@ public class MonsterBase : Unit
         }
     }
 
+    /// <summary>
+    /// 리쉬·복귀·재배치의 <b>기준점</b>을 옮긴다. 연출로 몬스터를 이동시키는 스포너는
+    /// <b>연출이 끝난 뒤</b> 이걸 호출해야 한다.
+    ///
+    /// 🔴 왜 있는가 (2026-08-18 실제 사고): 보스는 착지점 <b>18m 위</b>에서 Instantiate 된 뒤
+    /// <c>BossEncounterDirector</c> 가 1.2초간 내려보낸다. 그런데 기준점은 <c>Awake</c> 시점 위치라
+    /// 착지하는 순간 <c>leashRadius</c>(No23 = 15m) <b>밖</b>이 되고, <see cref="HandleSeekAndCombat"/>
+    /// 첫 줄에서 <b>매 프레임</b> 리쉬 복귀가 걸린다 → <c>EnterReturn</c> 의 <c>Revive()</c> 로 체력이
+    /// 최대로 되돌아가고 공격 체인이 계속 끊긴다.
+    /// 겉으로는 "데미지가 안 박히고 애니메이션이 안 나온다"로 보여 원인을 찾기 어렵다.
+    ///
+    /// 기준점 하나가 리쉬 판정·복귀 목표·재배치 클램프를 모두 결정하므로 여기만 맞으면 전부 맞는다.
+    /// leashRadius 를 키워 가리는 것은 답이 아니다 — spawnHeight 가 바뀌면 그대로 재발한다.
+    /// </summary>
+    /// <summary>
+    /// 서버 FSM 을 <b>일시 정지</b>한다. 연출로 몬스터의 위치를 직접 모는 스포너가
+    /// <b>연출 동안</b> 켜 두고, 전투로 넘길 때 끈다.
+    ///
+    /// 🔴 왜 있는가 (2026-08-18 실제 사고 — "착지 직후 첫 돌진이 제자리에서 애니만 돈다"):
+    /// 보스는 <c>Spawn()</c> 되는 순간부터 <see cref="Update"/> 가 돌아 FSM 이 <b>살아 있다.</b>
+    /// 그런데 <c>BossEncounterDirector</c> 는 하강 연출과 싸우지 않으려고 스폰 직후
+    /// <c>NavMeshAgent</c> 를 <b>꺼 둔다</b>(그리고 착지 후 <c>impactHoldSeconds</c> 0.9초 동안도
+    /// 꺼진 채다). 즉 <b>FSM 은 켜져 있는데 다리는 없는 구간이 1초 넘게</b> 존재한다.
+    /// 하강 막바지에 플레이어가 <c>detectionRadius</c>(No23 = 8m) 안에 들어오면 보스는 그 구간에서
+    /// 공격을 고르고 시작한다. 돌진이 걸리면 <c>StartDashMove</c> 가 에이전트를 못 찾아 조용히
+    /// 아무것도 하지 않고, 클립만 재생돼 <b>"제자리 돌진"</b> 이 된다.
+    /// 에이전트가 없어도 도는 공격(훅·잡기)은 그 구간에 <b>허공에 대고 나간다.</b>
+    ///
+    /// 그래서 고칠 자리는 돌진이 아니라 <b>연출 중에 FSM 이 도는 것</b> 자체다.
+    /// 호출처는 보스 Director 뿐이라 몹 8종·중간보스 3종의 경로는 그대로다.
+    ///
+    /// ⚠️ 이건 <b>정지</b>이지 무적이 아니다. 피격·사망 경로(<see cref="TakeDamage"/>)는 그대로 살아 있다.
+    /// </summary>
+    public void SetServerLogicSuspended(bool suspended)
+    {
+        if (_serverLogicSuspended == suspended) return;
+        _serverLogicSuspended = suspended;
+
+        if (!IsServer) return;
+
+        if (suspended)
+        {
+            // 진행 중이던 이동·공격을 정리하고 대기 자세로 내려놓는다 — 연출이 끝난 뒤
+            // 반쯤 진행된 공격 체인이 되살아나지 않게.
+            ClearReposition();
+            StopAgent();
+            SetState(MonsterState.Idle);
+        }
+
+        // 연출이 끝나고 FSM 이 깨어나는 시점 — 파생이 개전 처리를 얹을 수 있게 훅을 연다.
+        if (!suspended) OnServerLogicResumed();
+
+        Edit.Log($"[Monster] {name} 서버 FSM {(suspended ? "정지" : "재개")} — 연출 구간 게이트", this);
+    }
+
+    /// <summary>
+    /// 서버 FSM 이 연출 정지에서 <b>깨어난</b> 직후 1회. 파생이 개전 처리를 얹는 자리다.
+    /// (정지로 들어갈 때는 불리지 않는다 — 그쪽은 위에서 이미 정리한다.)
+    /// </summary>
+    protected virtual void OnServerLogicResumed() { }
+
+    public void SetSpawnAnchor(Vector3 worldPosition)
+    {
+        Vector3 previous = _spawnPosition;
+        _spawnPosition = worldPosition;
+        Edit.Log($"[Monster] {name} 리쉬 기준점 이동 — {previous} → {worldPosition} " +
+                 $"(leash {data?.leashRadius ?? 0}m)", this);
+    }
+
     void HandleSeekAndCombat()
     {
         // 리쉬: 스폰 지점에서 leash 밖이면 복귀 우선(진입 즉시 상태 초기화 + 최대 체력 회복).
+        // ⚠️ 연출로 내려오는 보스처럼 스폰 위치와 전투 원점이 다른 경우는 스포너가 착지 후
+        //    SetSpawnAnchor 로 기준점을 옮겨야 한다. 안 옮기면 여기서 매 프레임 걸린다.
         if (Vector3.Distance(transform.position, _spawnPosition) > data.leashRadius)
         {
             EnterReturn();
@@ -229,8 +323,27 @@ public class MonsterBase : Unit
 
         // 타겟 락온: 유효한 타겟이 있으면 계속 유지한다(인지반경 밖으로 나가도 리쉬 전까진 추격).
         // 타겟이 없거나 무효(디스폰/비활성)일 때만 새로 탐색한다.
+        //
+        // 🔴 파생이 ShouldReacquireTarget 으로 **주기 재선정**을 얹을 수 있다(23호 어그로).
+        //    기본값이 false 라 몹 8종·중간보스 3종의 락온 동작은 그대로다.
         if (!IsTargetValid(_target))
+        {
             _target = FindNearestTarget();
+        }
+        else if (ShouldReacquireTarget())
+        {
+            // 🔴 **빈손이면 기존 타깃을 유지한다.** FindNearestTarget 은 detectionRadius 안만
+            //    훑는데, 락온 규약은 "인지반경 밖으로 나가도 리쉬 전까진 추격"이다.
+            //    빈손을 그대로 대입하면 인지반경~리쉬 사이(23호 기준 8~15m)를 달리던 추격이
+            //    재선정 순간 조용히 끊기고 보스가 Idle 로 빠진다.
+            // 같은 사람을 다시 고르지 않게 할지는 파생이 정한다(23호는 SO 노브).
+            // 대안이 없으면 candidate 가 null 이라 아래 가드가 기존 타깃을 지킨다 —
+            // 1대1 에서는 자동으로 현행(계속 물기)과 같아진다.
+            Transform candidate = RetargetAvoidsCurrentTarget
+                ? FindNearestTarget(exclude: _target)
+                : FindNearestTarget();
+            if (candidate != null) _target = candidate;
+        }
 
         if (_target == null)
         {
@@ -252,10 +365,67 @@ public class MonsterBase : Unit
             case MonsterArchetype.RangedMobile:
                 SeekMobile(dist, movementBlocked, attackBlocked);
                 break;
+            case MonsterArchetype.Boss:
+                SeekBoss(dist, movementBlocked, attackBlocked);
+                break;
             default:
                 SeekMelee(dist, movementBlocked, attackBlocked);
                 break;
         }
+    }
+
+    // 보스: 공격이 여러 종류다. 어떤 공격을 쓸지는 SelectAttackSlot(파생이 override)이 정하고,
+    // 여기서는 "고를 게 있으면 친다 / 없으면 접근한다"는 이동 정책만 담당한다.
+    //
+    // 🔴 고를 게 없을 때 제자리에 서 있지 않는 것이 핵심이다.
+    //    먼 거리에서 돌진·점프가 전부 쿨이면 걸어서 접근하고, 가까워지면 근접 공격의 거리창이
+    //    열리므로 "전부 쿨"이 자연히 풀린다. (사거리 안에서 전부 쿨인 구간은 짧게 지나간다.)
+    void SeekBoss(float dist, bool movementBlocked, bool attackBlocked)
+    {
+        int slot = attackBlocked ? NoAttack : SelectAttackSlot(dist);
+
+        if (slot != NoAttack)
+        {
+            StopAgent();
+            FaceTarget();
+            CurrentAttackSlot = slot;
+            StartAttack();
+            return;
+        }
+
+        // 쓸 공격이 없다 — 사거리 밖이면 접근, 안이면 자세만 잡고 쿨을 기다린다.
+        if (dist > data.attackRange)
+        {
+            SetState(MonsterState.Chase);
+            if (!movementBlocked)
+                MoveAgentTo(_target.position, data.chaseSpeed * ChaseSpeedMultiplier);
+        }
+        else
+        {
+            StopAgent();
+            if (_state.Value != MonsterState.Chase)
+                SetState(MonsterState.Chase);
+        }
+
+        FaceTarget();
+    }
+
+    /// <summary>
+    /// 추격 이동속도 배수(보스 페이즈용). 기본 1 = 변화 없음.
+    /// 🔴 <see cref="SeekBoss"/> 분기에서만 곱해진다 — 일반 몬스터 경로(SeekMelee/SeekMobile/SeekTurret)는
+    /// 이 값을 거치지 않으므로 기존 8종에 회귀 위험이 없다.
+    /// (MoveAgentTo 가 매 틱 agent.speed 를 덮어쓰기 때문에 파생이 agent 를 직접 만져서는 유지되지 않는다.)
+    /// </summary>
+    protected virtual float ChaseSpeedMultiplier => 1f;
+
+    /// <summary>
+    /// 이 거리에서 쓸 공격 슬롯을 고른다. <see cref="NoAttack"/>(-1)이면 "지금 쓸 게 없다"(→ 접근).
+    /// 기본 구현은 일반 몬스터와 같은 단일 공격이고, 보스 파생이 거리창+가중치로 override 한다.
+    /// </summary>
+    protected virtual int SelectAttackSlot(float dist)
+    {
+        if (dist > data.attackRange) return NoAttack;
+        return CooldownReady(DefaultAttackSlot) ? DefaultAttackSlot : NoAttack;
     }
 
     // 근접: 사거리 안이면 멈춰서 쿨마다 공격, 밖이면 추격.
@@ -478,7 +648,7 @@ public class MonsterBase : Unit
         Vector3 v = agent != null && agent.enabled ? agent.velocity : Vector3.zero;
         v.y = 0f;
         if (v.sqrMagnitude < 0.04f) { FaceTarget(); return; }
-        transform.rotation = Quaternion.LookRotation(v.normalized);
+        RotateToward(v.normalized);
     }
     #endregion
 
@@ -487,9 +657,62 @@ public class MonsterBase : Unit
     // 생명주기까지 봐야 사망 직전에 잡힌 타겟이 즉시 풀린다(MonsterTargeting).
     bool IsTargetValid(Transform t) => MonsterTargeting.IsAttackable(t);
 
+    /// <summary>
+    /// 지금 어그로가 물린 대상(읽기 전용). 파생이 조준·타겟 규칙에 쓴다.
+    /// 🔴 교체는 base 만 한다 — 파생이 직접 대입하면 락온·리쉬 규칙이 두 곳으로 갈린다.
+    /// 파생이 갈아타야 할 때 쓰는 진입점은 <see cref="AdoptTarget"/> 하나뿐이다.
+    /// </summary>
+    protected Transform Target => _target;
+
+    /// <summary>
+    /// 어그로 대상을 <b>지금 이 대상으로 갈아탄다</b>(서버 전용). 파생이 쓰는 유일한 교체 진입점이다.
+    ///
+    /// 🔴 왜 base 에 있는가 — <c>_target</c> 대입을 한 곳에 모아 락온·리쉬 규칙이 갈리지 않게 한다.
+    ///    파생은 "언제 갈아탈지"만 정하고, 유효성 판정(<see cref="IsTargetValid"/> = 사망·유령·디스폰)은
+    ///    base 가 갖는다.
+    ///
+    /// 23호가 <b>점프·돌진</b>에서 쓴다(2026-09-03). 그 둘은 어그로 대상이 아닌 사람을 노리거나
+    /// 밀고 가는데, 끝난 뒤 압박이 원래 대상으로 되돌아가면 <b>"멀리 때리고 돌아온다"</b>가 된다.
+    ///
+    /// ⚠️ 주기 재선정과 달리 <b>여기서는 상태를 보지 않는다.</b> 공격 도중에 불리는 것이 정상이다
+    ///    (그 공격이 대상을 고른 순간이 곧 승계 시점이다). 조준이 흔들리지 않는 것은 호출처가
+    ///    보장한다 — 23호는 <c>FaceTargetWhileAttacking = false</c> 이고 방향이 이미 확정된 뒤에 부른다.
+    /// </summary>
+    /// <returns>실제로 갈아탔으면 true. null·같은 대상·무효한 대상이면 아무 일도 하지 않고 false.</returns>
+    protected bool AdoptTarget(Transform t)
+    {
+        if (!IsServer) return false;
+        if (t == null || t == _target) return false;
+        if (!IsTargetValid(t)) return false;
+
+        _target = t;
+        return true;
+    }
+
+    /// <summary>
+    /// 타겟이 <b>아직 유효한데도</b> 다시 고를 것인가. 기본 <c>false</c> = 지금까지의 락온 동작.
+    ///
+    /// 23호가 주기 어그로 재선정에 쓴다. 여기서 true 를 돌려주면 위 락온 분기가 타깃을
+    /// 새로 탐색한다 — 파생은 "언제 바꿀지"만 정하고 "어떻게 고를지"는 base 가 갖는다.
+    /// </summary>
+    protected virtual bool ShouldReacquireTarget() => false;
+
+    /// <summary>
+    /// 주기 재선정에서 <b>지금 물고 있는 대상을 후보에서 뺄</b> 것인가. 기본 <c>false</c>.
+    ///
+    /// false 면 최근접을 다시 고르므로, 같은 사람이 계속 최근접이면 어그로가 실질적으로 안 돈다
+    /// (근접이 탱킹하는 구도에서 그렇다). true 면 8초마다 실제로 다른 사람에게 압박이 간다.
+    /// ⚠️ 대신 후열이 과하게 압박받을 수 있다 — MPPM 으로 보고 정할 값이라 노브로 뺐다.
+    /// </summary>
+    protected virtual bool RetargetAvoidsCurrentTarget => false;
+
     protected virtual void StartAttack()
     {
-        _lastAttackTime = Time.time;
+        // 쿨은 "지금 쓰는 슬롯"에 기록한다. 파생이 CurrentAttackSlot 을 안 건드리면 항상 0 —
+        // 즉 공격이 1종인 몬스터는 단일 쿨다운 시절과 동작이 같다.
+        int slot = Mathf.Clamp(CurrentAttackSlot, 0, _lastUsedByAttack.Length - 1);
+        _lastUsedByAttack[slot] = Time.time;
+
         _stateTimer = data.attackDuration;
         _attackFired = false;
         _commitFired = false;
@@ -502,6 +725,31 @@ public class MonsterBase : Unit
 
         SetState(MonsterState.Attack);
     }
+
+    /// <summary>
+    /// 공격이 진행되는 <b>동안</b>에도 매 틱 타깃을 향해 몸을 돌리는가.
+    ///
+    /// 기본 <c>true</c> = 지금까지의 동작(일반 몹 8종·중간보스 3종은 그대로다).
+    /// 🔴 23호 보스만 <c>false</c> 다 — 팀장 확정(2026-08-13): <b>공격을 시도 중일 때는 회전이 없다.</b>
+    ///    특히 돌진은 플레이어를 밀고 <b>지나가야</b> 하는데, 매 틱 타깃을 향해 돌면 보스가 대상을
+    ///    계속 따라 돌아 제자리에서 맴돈다.
+    /// 조준은 <see cref="StartAttack"/> 직전의 <c>FaceTarget()</c> 1회로 확정된다.
+    /// </summary>
+    protected virtual bool FaceTargetWhileAttacking => true;
+
+    /// <summary>
+    /// 공격의 <b>선딜 동안만</b>(= 히트 이벤트가 나가기 전까지) 타깃을 향해 계속 도는가.
+    ///
+    /// 기본 <c>false</c> = 지금까지의 동작. <see cref="FaceTargetWhileAttacking"/> 가 <c>true</c> 면
+    /// 이미 매 틱 돌므로 이 값은 아무 일도 하지 않는다 — 즉 <b>몹 8종·중간보스 3종은 무영향</b>이다.
+    ///
+    /// 🔴 왜 생겼는가 (2026-08-18 팀장 확정): 보스 회전을 감속으로 바꾸면
+    /// <see cref="StartAttack"/> 직전의 <c>FaceTarget()</c> <b>1회</b> 조준이 무력해진다 —
+    /// 감속 회전은 한 프레임에 몇 도밖에 못 돌기 때문이다. 조준을 즉시 회전으로 남기면 그 순간만
+    /// 뚝 끊겨 보이므로, <b>선딜 구간을 조준 구간으로 쓴다.</b> 히트가 나간 뒤부터는 회전이 없다
+    /// (<see cref="FaceTargetWhileAttacking"/> 의 확정 스펙 — 돌진은 밀고 지나가야 한다).
+    /// </summary>
+    protected virtual bool FaceTargetDuringWindup => false;
 
     protected virtual void HandleAttack(float dt)
     {
@@ -519,7 +767,10 @@ public class MonsterBase : Unit
         }
 
         _stateTimer -= dt;
-        FaceTarget();
+        // 선딜 조준(FaceTargetDuringWindup)은 히트가 나가기 전까지만이다. _commitFired 까지 보는 것은
+        // 위 취소 창과 같은 기준을 쓰기 위해서다 — 커밋한 공격은 이미 방향이 확정된 것으로 본다.
+        if (FaceTargetWhileAttacking || (FaceTargetDuringWindup && !_attackFired && !_commitFired))
+            FaceTarget();
 
         // 히트: 애니 OnAttackHit 이벤트(NotifyAttackHit) 전용 — 플레이어(DefaultAttackController)와 동일하게
         // 이벤트가 없으면 데미지가 나가지 않는다(타이머 폴백 제거). FireAttackHitOnce가 중복 발동만 막는다.
@@ -590,8 +841,18 @@ public class MonsterBase : Unit
     void HandleTimedResume(float dt)
     {
         _stateTimer -= dt;
-        if (_stateTimer <= 0f)
-            DecideNextAfterAction();
+        if (_stateTimer > 0f) return;
+
+        // ForceHitReaction 이 이어붙인 그로기가 있으면 Idle 대신 그쪽으로 간다(보스 카운터: Hit → Groggy/Break).
+        if (_groggyAfterHit > 0f)
+        {
+            float groggy = _groggyAfterHit;
+            _groggyAfterHit = 0f;
+            ForceGroggy(groggy);
+            return;
+        }
+
+        DecideNextAfterAction();
     }
 
     void HandleGroggy(float dt)
@@ -652,7 +913,8 @@ public class MonsterBase : Unit
     {
         bool resolved = base.ReceiveAttack(attackInfo, hitContext);
 
-        if (IsServer && resolved && attackInfo.knockbackStrength > 0f && attackInfo.knockbackDuration > 0f)
+        if (IsServer && resolved && AutoHitReactions
+            && attackInfo.knockbackStrength > 0f && attackInfo.knockbackDuration > 0f)
         {
             Vector3 dir = attackInfo.knockbackDirection;
             dir.y = 0f;
@@ -803,6 +1065,11 @@ public class MonsterBase : Unit
             return;
         }
 
+        // 자동 피격 반응을 쓰지 않는 파생(보스)은 여기서 끝 — 데미지·사망 판정만 받는다.
+        // 🔴 조기 반환이 **먼저**다. 아래 누적을 지나면 보스가 base 그로기까지 이중으로 받는다.
+        if (!AutoHitReactions)
+            return;
+
         // 인터럽트 누적 → 그로기. "인터럽트를 어떻게 소비할지"는 수신측 결정이고, 이 계통은 누적식이다
         // (보스 No.23은 같은 플래그를 카운터 창 판정으로 소비한다).
         if (attackInfo.isInterruptAttack && data != null && data.maxGroggyCount > 0)
@@ -817,15 +1084,19 @@ public class MonsterBase : Unit
 
         // 피격 경직: 공격 중 피격 시 공격 취소 + Hit. 단 슈퍼아머면 취소하지 않고 데미지만.
         // 지속넉백 중에는 Hit로 덮지 않는다(밀림 유지 — 데미지만 누적, ReceiveAttack이 넉백을 갱신).
+        // 🔴 공격 커밋(2026-09-02): 공격 중 들어온 **평타**는 경직시키지 않는다. 평타 한 대마다
+        //    EnterHit 이 걸려 일반 몬스터가 공격을 끝내지 못하던 문제. 판정은 전부
+        //    MonsterHitReactionPolicy 에 있다(EditMode 로 전 조합 고정) — 조건을 여기서 늘리지 말 것.
         bool superArmor = status != null && status.BlocksInterrupt;
-        if (!superArmor && _state.Value != MonsterState.Groggy && _state.Value != MonsterState.Return
-            && _state.Value != MonsterState.Knockback)
+        if (MonsterHitReactionPolicy.ShouldEnterAutomaticHit(
+                _state.Value, attackInfo.attackType, superArmor))
             EnterHit();
     }
 
     void EnterHit()
     {
         _stateTimer = data != null ? data.hitStunDuration : 0.4f;
+        _groggyAfterHit = 0f; // 일반 피격 경직은 그로기로 이어지지 않는다(ForceHitReaction 전용 경로와 분리).
         StopAgent();
         SetState(MonsterState.Hit);
     }
@@ -836,6 +1107,31 @@ public class MonsterBase : Unit
         _stateTimer = data != null ? data.groggyDuration : 3f;
         StopAgent();
         SetState(MonsterState.Groggy);
+    }
+
+    /// <summary>
+    /// 일반 피격이 자동으로 반응을 유발하는가. 기본 true — 기존 몬스터 8종·중간보스 3종은 그대로다.
+    ///
+    /// 🔴 보스는 false 다. 정본(boss-rebuild-standard.md §1.1 · §4)이 셋 다 부정하기 때문이다:
+    ///   ① <c>Hit</c> 는 **카운터 성공 전용** — 일반 피격은 색 변경만(HitFlash)
+    ///   ② 그로기는 **인터럽트 스킬·송전기만** 유발 — <c>isInterruptAttack</c> 누적을 쓰지 않는다
+    ///   ③ **보스는 안 밀린다** — Knockback 상태를 만들지 않는다
+    /// 데미지·사망 판정은 이 값과 무관하게 항상 돈다.
+    /// </summary>
+    protected virtual bool AutoHitReactions => true;
+
+    /// <summary>
+    /// 피격 리액션(<c>Hit</c>)을 강제 진입시킨다 — 진행 중 공격이 취소된다. <see cref="ForceGroggy"/> 의 형제.
+    /// <paramref name="groggyAfter"/> 가 0보다 크면 타이머 종료 후 <c>Idle</c> 이 아니라 그 길이만큼
+    /// <c>Groggy</c> 로 넘어간다(보스 카운터: Hit → Groggy/Break 가 확정 스펙).
+    /// </summary>
+    protected void ForceHitReaction(float duration, float groggyAfter = 0f)
+    {
+        if (!IsServer || _isDead) return;
+        _stateTimer = Mathf.Max(0.05f, duration);
+        _groggyAfterHit = Mathf.Max(0f, groggyAfter);
+        StopAgent();
+        SetState(MonsterState.Hit);
     }
 
     // 서브클래스가 특정 행동 뒤 스스로 그로기(취약)에 빠지게 하는 훅. 예: SpinnerBot 스핀 종료 → Dizzy.
@@ -892,11 +1188,63 @@ public class MonsterBase : Unit
     #endregion
 
     #region 유틸
-    // 공격 간격 = 1 / 공격속도(Unit.AttackSpeed, 초당 공격 횟수). 예: 0.5 → 2초당 1회.
-    bool CooldownReady() => Time.time - _lastAttackTime >= 1f / Mathf.Max(0.01f, AttackSpeed);
+    // 공격 슬롯의 쿨다운이 돌았는가.
+    // 슬롯 쿨(_cooldownByAttack)이 0 이하면 base 간격 = 1 / 공격속도로 폴백한다.
+    // (AttackSpeed = 초당 공격 횟수. 0.5 → 2초당 1회.)
+    // 인자를 안 주면 슬롯 0 — 공격이 1종인 일반 몬스터는 이 경로만 탄다.
+    protected bool CooldownReady(int attackSlot = DefaultAttackSlot)
+    {
+        if (attackSlot < 0 || attackSlot >= _lastUsedByAttack.Length)
+            attackSlot = DefaultAttackSlot;
+
+        float cooldown = _cooldownByAttack[attackSlot];
+        if (cooldown <= 0f)
+            cooldown = 1f / Mathf.Max(0.01f, AttackSpeed);
+
+        return Time.time - _lastUsedByAttack[attackSlot] >= cooldown;
+    }
+
+    /// <summary>
+    /// 공격 슬롯 수를 확보한다. 보스처럼 공격이 여러 종류인 파생이 스폰 시 1회 호출한다.
+    /// 호출하지 않으면 슬롯 1개(=단일 공격)로 남고 기존 동작과 동일하다.
+    /// </summary>
+    protected void ConfigureAttackSlots(int count)
+    {
+        count = Mathf.Max(1, count);
+        if (_lastUsedByAttack.Length == count) return;
+
+        _lastUsedByAttack = new float[count];
+        _cooldownByAttack = new float[count];
+        for (int i = 0; i < count; i++)
+            _lastUsedByAttack[i] = -999f;   // 스폰 직후 첫 공격이 쿨에 걸리지 않게
+    }
+
+    /// <summary>슬롯별 쿨 길이(초)를 설정한다. 0 이하면 base 간격(1/AttackSpeed)을 쓴다.</summary>
+    /// <summary>
+    /// 슬롯을 "방금 썼다"고 표시해 쿨다운을 지금부터 돌린다.
+    ///
+    /// 실제로 공격하지 않고 <b>쿨만 거는</b> 용도다 — 특정 공격을 일정 시간 후보에서 빼고 싶을 때
+    /// 새 게이트를 만드는 대신 기존 쿨다운 기계를 재사용한다. 시간이 지나면 스스로 풀리므로
+    /// 해제를 잊어 상태가 고착될 위험이 없다(23호 개전 억제가 이 경로를 쓴다).
+    /// </summary>
+    protected void MarkAttackJustUsed(int attackSlot)
+    {
+        if (attackSlot < 0 || attackSlot >= _lastUsedByAttack.Length) return;
+        _lastUsedByAttack[attackSlot] = Time.time;
+    }
+
+    protected void SetAttackCooldown(int attackSlot, float seconds)
+    {
+        if (attackSlot < 0 || attackSlot >= _cooldownByAttack.Length) return;
+        _cooldownByAttack[attackSlot] = Mathf.Max(0f, seconds);
+    }
 
     // 인지 반경 내 최근접 플레이어 Transform 탐색(서버 전용).
-    Transform FindNearestTarget()
+    /// <param name="exclude">
+    /// 후보에서 제외할 대상(보통 지금 물고 있는 타깃). null 이면 제외 없음.
+    /// 주기 어그로 재선정에서 "같은 사람을 다시 고르는 것"을 막는 데 쓴다.
+    /// </param>
+    Transform FindNearestTarget(Transform exclude = null)
     {
         if (_detectBuffer == null) return null;
 
@@ -916,6 +1264,10 @@ public class MonsterBase : Unit
 
             // 루트 오브젝트 기준 거리(콜라이더가 자식일 수 있음).
             Transform root = c.transform.root;
+
+            // 제외 대상은 건너뛴다. 루트로 비교하는 이유 — exclude 로 넘어오는 _target 도
+            // 루트라서, 콜라이더 트랜스폼과 직접 비교하면 자식 콜라이더에서 안 걸린다.
+            if (exclude != null && root == exclude) continue;
             float sqr = (root.position - transform.position).sqrMagnitude;
             if (sqr < best)
             {
@@ -957,7 +1309,52 @@ public class MonsterBase : Unit
         Vector3 dir = _target.position - transform.position;
         dir.y = 0f;
         if (dir.sqrMagnitude < 0.0001f) return;
+        RotateToward(dir);
+    }
+
+    /// <summary>
+    /// 타깃 방향으로 <b>한 프레임에</b> 스냅한다(<c>data.turnSpeed</c> 무시).
+    ///
+    /// 🔴 왜 따로 있는가: 감속 회전은 <b>매 틱 불러야</b> 목표에 도달한다. 그런데 회전 직후
+    /// <c>transform.forward</c> 를 그대로 소비해 방향을 확정하는 자리가 있다(레이지 돌진 =
+    /// <c>BeginRageDash</c>). 거기서 감속을 쓰면 그 프레임의 어중간한 각도가 돌진 방향으로
+    /// 굳어 버린다. <b>"돌아본 뒤 그 방향을 즉시 쓰는" 자리에서만</b> 이걸 쓴다.
+    /// </summary>
+    protected void FaceTargetImmediate()
+    {
+        if (_target == null) return;
+        Vector3 dir = _target.position - transform.position;
+        dir.y = 0f;
+        if (dir.sqrMagnitude < 0.0001f) return;
         transform.rotation = Quaternion.LookRotation(dir);
+    }
+
+    /// <summary>
+    /// 몬스터 회전의 <b>단일 지점</b>. <c>data.turnSpeed</c> 가 0 이면 기존처럼 즉시 스냅하고,
+    /// >0 이면 플레이어(<c>PlayerMovement</c>)와 같은 규약으로 감속한다.
+    ///
+    /// 🔴 도달 클램프(<c>Dot &gt; 0.999f</c>)가 필요한 이유: Slerp 는 목표에 <b>점근</b>할 뿐
+    /// 도달하지 않는다. 클램프가 없으면 거의 맞춘 상태에서 매 프레임 미세하게 계속 돌아
+    /// 회전이 "끝났다"고 말할 수 있는 시점이 생기지 않는다(플레이어도 같은 처리를 한다).
+    /// </summary>
+    void RotateToward(Vector3 dir)
+    {
+        Quaternion target = Quaternion.LookRotation(dir);
+
+        float turnSpeed = data != null ? data.turnSpeed : 0f;
+        if (turnSpeed <= 0f)
+        {
+            transform.rotation = target; // 0 = 즉시 회전(기존 동작)
+            return;
+        }
+
+        if (Vector3.Dot(dir.normalized, transform.forward) > 0.999f)
+        {
+            transform.rotation = target;
+            return;
+        }
+
+        transform.rotation = Quaternion.Slerp(transform.rotation, target, turnSpeed * Time.deltaTime);
     }
 
     void SetState(MonsterState next)
