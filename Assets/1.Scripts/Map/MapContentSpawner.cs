@@ -66,6 +66,9 @@ public class MapContentSpawner : MonoBehaviour
                 idc.SlotID = p.Slot.SlotID;
                 idc.SourcePrefab = p.LayoutPrefab;
 
+                // 파괴 가능한 상자 더미에 공용 ID 부여 — 전 피어에서 같은 값이 나온다(아래 주석).
+                AssignCrateIds(zoneGo, p.Slot.SlotID);
+
                 p.Slot.IsFilled = true;
                 visuals++;
 
@@ -85,6 +88,46 @@ public class MapContentSpawner : MonoBehaviour
         }
 
         Edit.Log($"[MapContentSpawner] 존 비주얼 {visuals} / 몬스터 {monsters} 스폰 (서버:{isServer}).");
+    }
+
+    /// <summary>
+    /// 상자 더미에 <b>스폰 순번 ID</b>를 부여한다. 파괴 RPC가 "어느 상자인가"를 지목하는 키다.
+    ///
+    /// <b>왜 이 값이 피어 간에 일치하는가.</b> 서버가 정한 시드가 NetworkVariable로 복제되고
+    /// (<see cref="MapNetworkSync"/>), 모든 피어가 그 시드로 <b>각자</b> Generate한다.
+    /// <see cref="MapGenerator"/>는 격리된 <c>System.Random</c>을 쓰므로 다른 코드에 흐트러지지 않는다.
+    /// 결과적으로 placements 순서도, 존 프리팹의 자식 계층도 모든 피어에서 같다 —
+    /// 좌표나 이름을 실을 필요 없이 순번만으로 상자를 지목할 수 있다.
+    ///
+    /// 전역 카운터가 아니라 (SlotID, 존 내 인덱스) 복합키를 쓴다. 존 하나가 바뀌어도 다른 존의
+    /// ID가 밀리지 않고, 슬롯을 <c>(id >> 16) - 1</c>로 읽을 수 있어 디버깅이 된다.
+    ///
+    /// ⚠️ <b>슬롯 번호에 +1을 한다.</b> <c>SlotID</c>는 0부터 시작하는 평범한 int라
+    /// (슬롯 0, 인덱스 0)이 그대로면 ID가 <b>0</b>이 되는데, 0은 "미할당" 표식이라
+    /// 그 상자가 자기 자신을 거부한다. 실제로 겪은 버그다.
+    /// 저작 ID(음수)와도 겹치지 않도록 항상 양수로 유지한다.
+    /// </summary>
+    private static void AssignCrateIds(GameObject zoneGo, int slotID)
+    {
+        // 깊이 우선 순회라 같은 프리팹이면 순서가 같다.
+        // includeInactive: true — 꺼진 더미를 건너뛰면 그 뒤 순번이 전부 밀린다.
+        BreakableCrate[] crates = zoneGo.GetComponentsInChildren<BreakableCrate>(true);
+        if (crates.Length == 0) return;
+
+        if (slotID < 0 || slotID >= 0x7FFE)
+        {
+            Edit.LogError($"[MapContentSpawner] SlotID {slotID}는 상자 ID로 쓸 수 있는 범위(0~32765)를 벗어난다.", zoneGo);
+            return;
+        }
+
+        if (crates.Length > 0xFFFF)
+        {
+            Edit.LogError($"[MapContentSpawner] Slot {slotID}의 상자가 65535개를 넘어 ID가 충돌한다.", zoneGo);
+            return;
+        }
+
+        for (int i = 0; i < crates.Length; i++)
+            crates[i].AssignId(((slotID + 1) << 16) | i);
     }
 
     // 존 프리팹이 다리 개통 장치를 들고 있으면 씬 매니저에 등록한다(전 피어 — 링 표시·다리 보간은
@@ -311,6 +354,10 @@ public class MapContentSpawner : MonoBehaviour
     // 이전 생성물 제거 (재생성/디버그). 서버라면 네트워크 오브젝트도 despawn.
     public void ClearGenerated()
     {
+        // 상자 ID는 이번 생성에 종속이다. 남겨두면 같은 ID가 옛 맵의 상자를 가리켜
+        // 엉뚱한 상자가 부서진다. 오브젝트를 지우기 전에 먼저 비운다.
+        CrateRegistry.Clear();
+
         foreach (var netObj in _spawnedNetObjs)
         {
             if (netObj != null && netObj.IsSpawned) netObj.Despawn();
