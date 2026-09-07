@@ -30,3 +30,5 @@ MonoBehaviour:
   <ChargeBall_Loop>k__BackingField: {fileID: 11400000, guid: bb39a066d0454af88683e332e64a3e59, type: 2}
   <ChargeBall_FadeOut>k__BackingField: {fileID: 11400000, guid: 5d28b04cd06644d7b77bb5c9505f3de8, type: 2}
   <ChargeBall_Break>k__BackingField: {fileID: 11400000, guid: 3c3031593b194504a7a6a779cf151ce4, type: 2}
+  <Explosion_Basic>k__BackingField: {fileID: 11400000, guid: 2467c3b9b7e3cb5449c53e68811cc57f, type: 2}
+  <Frag_Crate_01>k__BackingField: {fileID: 11400000, guid: 2fbc4bb6d3c3c6a4b9cbc4cc7c73a276, type: 2}
