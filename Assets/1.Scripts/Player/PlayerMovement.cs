@@ -20,6 +20,15 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private float alignThreshold = 0.98f;
     [SerializeField] private float viewYaw = -45f;
 
+    [Header("충돌 (일반 이동 스윕)")]
+    [SerializeField] private PlayerGameRuleData gameRule;
+    [SerializeField, Min(0f)] private float collisionSkin = 0.02f;
+    [SerializeField, Min(1)] private int maxSweepIterations = 3;
+
+    private const int CastBufferSize = 8;
+    private const float DefaultMaxWalkableSlopeAngle = 60f;
+    private readonly RaycastHit[] castBuffer = new RaycastHit[CastBufferSize];
+
     private Vector2 prevDir_for_Rotate = new Vector2(0f, -1f);
     private bool hasRotate = true;
     private float currentSpeed;
@@ -105,6 +114,14 @@ public class PlayerMovement : MonoBehaviour
         // 캐리는 CanMove/입력과 무관하게 적용 → 스턴/사망 중에도 플랫폼에 실려 이동(시체 잔류).
         Vector3 total = ProjectOntoGround(inputMove) + _carryDelta;
         _carryDelta = Vector3.zero;
+
+        // 대시와 동일한 스윕(PlayerMotionSweep)으로 벽 관통을 막는다. ClampByStaticGeometry(MoveRoot용)와
+        // 달리 걸을 수 있는 경사(gameRule.MaxWalkableSlopeAngle)는 장애물로 보지 않고 통과시키며,
+        // 막힌 경우엔 완전히 멈추는 대신 벽 표면을 따라 미끄러지듯 남은 이동량을 이어간다.
+        total = PlayerMotionSweep.Resolve(
+            capsule, total,
+            gameRule != null ? gameRule.MaxWalkableSlopeAngle : DefaultMaxWalkableSlopeAngle,
+            rootMoveBlockingMask, collisionSkin, maxSweepIterations, castBuffer);
 
         if (total.sqrMagnitude > 0f)
         {
