@@ -72,12 +72,14 @@ public class GauntletBot : MonsterBase
     [SerializeField, Min(1)]
     [Tooltip("스매시 AoE OverlapSphere 결과 버퍼 크기.")]
     int smashMaxHitCount = 8;
-    [SerializeField, Min(0f)]
-    [Tooltip("텔레그래프 표시 지속 시간(초). 대략 예비동작+스매시 히트 프레임까지의 시간 — Play로 튜닝.")]
-    float telegraphDuration = 1.2f;
+    // 표시 지속시간 필드는 없앴다. 예전에는 telegraphDuration(1.2초) 하드코딩이었는데,
+    // 애니메이션과 독립이라 스매시 클립을 손볼 때마다 장판이 히트보다 먼저 사라지거나 남았다.
+    // 이제 시작·종료를 예비동작 클립의 애니메이션 이벤트가 정한다(StartEffect/StopEffect).
+
     [SerializeField]
-    [Tooltip("스매시 장판(텔레그래프) 비주얼 컴포넌트. 프리팹의 SmashTelegraph 자식(Quad)에 연결.")]
-    AoeTelegraph smashTelegraph;
+    [Tooltip("스매시 장판(텔레그래프) 이펙트. 프리팹의 SmashTelegraph 자식에 연결.\n" +
+             "크기는 매 발동마다 smashRadius로 덮어쓰므로 인스펙터의 scale 값은 무시된다")]
+    EffectSocketPlayer smashTelegraph;
 
     [Header("애니메이션 — CrossFade 대상 상태명(컨트롤러 상태명과 일치해야 함)")]
     [SerializeField]
@@ -110,8 +112,11 @@ public class GauntletBot : MonsterBase
 
         PlayAttackAnimClientRpc(_currentAttack);
 
+        // 크기만 미리 밀어넣는다. 켜고 끄는 것은 예비동작 클립의 애니메이션 이벤트가 한다.
+        // 이 RPC와 위의 CrossFade RPC가 같은 프레임에 순서대로 나가고 애니 이벤트는 그 뒤에
+        // 발화하므로, 이벤트가 도착할 때 배율은 이미 확정되어 있다.
         if (_currentAttack == GauntletAttackId.Smash)
-            ShowTelegraphClientRpc(smashRadius, telegraphDuration);
+            SetTelegraphScaleClientRpc(smashRadius);
     }
 
     // 공격 히트 실행(애니 이벤트 OnAttackHit → base.NotifyAttackHit → FireAttackHitOnce 경로).
@@ -142,6 +147,13 @@ public class GauntletBot : MonsterBase
     // attackTrigger 발동을 건너뛴다. 그 외 상태(Hit/Groggy/Return/Dead)는 base 매핑 유지.
     protected override void PlayStateAnimation(MonsterState s)
     {
+        // 🔴 예고 장판 안전망. 종료는 예비동작 클립의 애니메이션 이벤트가 맡지만, 스매시 도중
+        // 그로기·피격·사망으로 클립이 잘리면 그 이벤트가 오지 않는다 — 예고만 뜬 채 안 꺼진다.
+        // 이 메서드는 _state 복제 콜백을 타고 모든 피어에서 불리므로 여기가 유일하게 맞는 자리다.
+        // (Stop은 재생 중이 아니면 조용한 no-op이라 매 상태 전이마다 불려도 무해하다.)
+        if (s != MonsterState.Attack && smashTelegraph != null)
+            smashTelegraph.Stop();
+
         if (s == MonsterState.Attack)
             return;
         base.PlayStateAnimation(s);
@@ -233,11 +245,22 @@ public class GauntletBot : MonsterBase
         SafeCrossFade(StateNameFor(attackId));
     }
 
+    /// <summary>
+    /// [전 피어] 예고 장판의 크기를 판정 반경에 맞춘다.
+    ///
+    /// <b>크기는 코드가, 타이밍은 애니메이션이 정한다.</b> 애니메이션 이벤트는 인자를 하나만
+    /// 넘길 수 있고 그건 "어느 이펙트인가"에 이미 쓰였다 — 인스펙터 튜닝값인
+    /// <see cref="smashRadius"/>를 클립이 알 방법이 없으므로 여기서 밀어넣는다.
+    ///
+    /// ⚠️ <b>이펙트 프리팹은 반경 1로 저작해야 한다.</b> <c>scale</c>은 저작 크기에 곱해지는
+    /// 배율이라, 프리팹 크기를 바꾸면 예고 범위와 실제 판정
+    /// (<c>OverlapSphere(transform.position, smashRadius)</c>)이 조용히 어긋난다.
+    /// </summary>
     [ClientRpc]
-    void ShowTelegraphClientRpc(float radius, float duration)
+    void SetTelegraphScaleClientRpc(float radius)
     {
         if (smashTelegraph != null)
-            smashTelegraph.Show(radius, duration);
+            smashTelegraph.SetScale(radius);
     }
 
     string StateNameFor(GauntletAttackId id)
