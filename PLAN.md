@@ -153,20 +153,99 @@ WallBot 은 공격 클립이 1종이라 "평타"도 같은 클립을 쓴다 — 
 - [ ] 중간보스 인터럽트: 창 안 → 즉시 그로기(Spinner=Dizzy 클립 / Gauntlet=Idle 자세 정지) · 창 밖 → 데미지만
 - [ ] 근접 3종 개시 거리: 최대 거리에서 때려도 **판정이 붙는다**(Spinner 2.0 · Gauntlet 3.2 — Wall 은 통과)
 
-## 머지 (팀원 → 나) — 브랜치와 함정
+## 머지 — **실측 조사 완료 (2026-09-09). 아직 실행 안 함**
 
-- 병합 대상: **`feature/VFX-merged`**(민경님 전달, 2026-09-08). 은희님 브랜치는 `transparentv3` 계열.
-- 은희님 쪽에서 **조용히 넘어오는 것 3개**(내 브랜치가 안 건드린 파일이라 충돌 없이 들어온다):
-  빌드 씬 목록에서 보스·몬스터 단독 테스트 씬 제거 / `Dev_Boot` 부팅 대상 / MPPM 시나리오 5개 → 1개
-  (내가 추가한 `MidBossTest` 도 삭제로 들어온다 — 되살릴지 판단)
-- 민경님 쪽 예상 충돌: `AoeTelegraph`(내 데칼 경로 ↔ `EffectSocketPlayer` 전환) ·
-  **23호 프리팹 경로**(내가 지운 `Wells&No.23/TwentyThree.prefab` 에 민경님 VFX 배선 6커밋이 있다) ·
-  `MonsterBase`/`BossBase`/`MapContentSpawner`/`TwentyThreeArenaContext`
+`git fetch` + `merge-tree`(워킹트리 안 건드리는 예측) + `svn status -u` 로 전부 실측했다.
+**이전 판의 예상 충돌 목록은 대부분 틀렸다** — 아래가 실측이다.
+
+### 브랜치 실측
+
+| 브랜치 | 사람 | base(5af300ed) 이후 | 관계 |
+|---|---|---|---|
+| `origin/feature/VFX-merged` | 민경 (SimJangBounce) | 49커밋 | ✅ **`transparentV3` 를 이미 품고 있다**(은희 7커밋 포함) |
+| `origin/transparentV3` | 은희 | 7커밋 | VFX-merged 의 조상 — **따로 머지할 필요 없음** |
+| `origin/fix/CameraFeedBackFix` | 은희 | 9커밋 | 🔴 **VFX-merged 에 안 들어 있다.** transparentV3 7 + 신규 2 |
+| `origin/development` | — | 0커밋 | 안 움직였다(내가 200 앞섬) |
+
+🔴 PLAN 이 찾던 `feature/vfx-onto-transparentv3` 는 **원격에 없다.** `feature/VFX-merged` 로 대체된 듯하다.
+
+🔴 **`fix/CameraFeedBackFix` 의 신규 2커밋** — 팀장 판단 필요:
+- `bebd1b8c` 팔라딘 기본공격 콤보 타이밍/루프백 + **`Dev_Boot` 카메라 스폰 수정**
+- `592c432f` 피격/타격 카메라 쉐이크 on-off 토글
+
+⚠️ `bebd1b8c` 가 `Dev_Boot` 를 건드린다. 내 워킹카피에 **커밋 안 한 `Dev_Boot` 변경**(부팅 대상
+`4.MapScene-trensparent`, 커밋 제외 지시)이 있어 머지 전에 정리해야 한다.
+
+### 충돌 실측 (`git merge-tree`)
+
+`HEAD ← feature/VFX-merged` = **충돌 5건**
+
+| 파일 | 민경 쪽 변경량 | 메모 |
+|---|---|---|
+| `Assets/1.Scripts/Monster/Boss/GauntletBot.cs` | 39줄 | 코드 충돌 |
+| `Assets/2.Prefabs/Monster/GauntletBot.prefab` | 186줄 | 🔴 프리팹 |
+| `Assets/2.Prefabs/Monster/SpinnerBot.prefab` | 86줄 | 🔴 프리팹 |
+| `Assets/2.Prefabs/Monster/WallBot.prefab` | 9줄 | 🔴 프리팹 |
+| `PLAN.md` | — | 내 것 채택 |
+
+- ✅ **`MonsterBase.cs` 는 자동 머지된다**(민경 7줄 ↔ 내 116줄). 충돌 없음
+- ✅ `HEAD ← fix/CameraFeedBackFix` 는 **충돌 0**
+- ❌ 이전 판이 예상한 `AoeTelegraph` · `MapContentSpawner` · `TwentyThreeArenaContext` **충돌 안 난다**
+- ❌ **23호 프리팹 경로 걱정도 사실이 아니었다** — `Assets/2.Prefabs/Wells&No.23/` 는 양쪽에
+  **그대로 있고**, 민경님이 건드린 건 그 안의 `Bomb.prefab` 뿐이다(`TwentyThree.prefab` 아님)
+
+🔴 **프리팹 3종이 하필 이번에 내가 작업한 중간보스다**(`MonsterCounterWindow` 부착 + WallBot
+스크립트 교체). lessons 「프리팹 머지가 컴포넌트를 조용히 떨어뜨림」(#35 #41, 이미 2건) 재발
+1순위 지점이다. **머지 후 반드시** 컴포넌트 집합 비교를 돌릴 것:
+
+```
+git show HEAD:Assets/2.Prefabs/Monster/WallBot.prefab | grep -o "Assembly-CSharp::[A-Za-z_0-9]*" | sort -u
+```
+머지 전/후를 `comm -23` 로 비교. 내 쪽 필수: `MonsterCounterWindow`(WallBot·Spinner·Gauntlet 3종 전부).
+
+## 🔴 머지 순서 — **git 먼저, SVN 나중** (2026-09-09 근거 확정)
+
+두 쪽이 **한 변경의 두 짝**이라 순서가 정해진다.
+
+- SVN **r294**(민경, 09-08 20:09)가 몹 클립에 **`PlayEffect` / `StopEffect` 애니 이벤트**를 붙였다
+  (예: `A_Spinner_Dizzy` → `StopEffect` data `Spin`).
+- 그 **수신자**는 git `feature/VFX-merged` 의 `Assets/1.Scripts/Effects/EffectAnimEventRelay.cs`
+  (`PlayEffect(string)` / `StopEffect(string)`)다. **내 브랜치엔 없다.**
+- `MonsterAnimationEventRelay` 는 `OnAttackHit`/`OnAttackCommit`/`OnAttackEnd` 만 받는다.
+
+→ **SVN 을 먼저 올리면** 몹이 공격할 때마다 "AnimationEvent has no receiver" 경고가 쏟아진다
+(lessons #8: 고빈도 로그가 정작 필요한 1회성 로그를 밀어낸다).
+→ **git 을 먼저 머지하면** 수신자만 있고 이벤트가 없어 VFX 가 안 나올 뿐, 조용하고 무해하다.
+
+**권장 순서**
+1. 커밋 안 한 `Dev_Boot.unity` 정리(되돌리거나 스태시) — `bebd1b8c` 와 겹친다
+2. **MPPM 2인 어그로 검증** — `MidBossTest` 가 머지에 삭제로 들어온다
+3. `git merge origin/feature/VFX-merged` → 충돌 5건 해소 → **프리팹 컴포넌트 집합 비교**
+4. `fix/CameraFeedBackFix` 신규 2커밋을 가져올지 판단 → 가져오면 머지(현재 충돌 0)
+5. **그 다음** `svn update`
+6. 감사 도구 2종 재실행 + 아래 「SVN 최신화」 확인 목록
 
 ## 🔴 SVN 최신화 — 업데이트 후 반드시 다시 확인할 것
 
 민경님이 **일반몹 애니메이션 이벤트 부착** 때문에 art fbx.meta 를 여럿 고쳤다(2026-09-08 연락).
 내 카운터 구현이 **그 클립들의 프레임 수를 근거로** 홀드를 뺀 것이므로, 업데이트 후 재확인이 필수다.
+
+### 실측 (2026-09-09, `svn status -u` · `svn log`) — 업데이트 **전에** 확인한 것
+
+- 워킹카피 **r281** → 서버 **r294**. `*` 표시 대상 **1127건**.
+- 🔴 **내 r290·r292 는 안 덮인다.** r294(민경)가 건드린 7개에 둘 다 없다:
+  - r290 = `A_Spinner_AttackWhip L/R.fbx.meta` (채찍) — r294 대상 아님 ✅
+  - r292 = `Controller_SpinBot.controller` — r294 대상 아님 ✅
+- 🔴 **WallBot 애셋은 서버에서 하나도 안 바뀐다.** 이번에 고친 것(`loopTime` 전제 · 자세 홀드 ·
+  `gatherStateName`)은 SVN 업데이트로 안 깨진다 ✅
+- **r294(민경, 09-08 20:09) 가 바꾸는 몬스터 애니 7건** — 아래 확인 목록과 정확히 겹친다:
+  `HumanoidBot/A_Attack` · `PeekABot/A_Shoot` · `Controller_PeekABot` ·
+  `Spinner/A_Spinner_AttackStart` · `Spinner/A_Spinner_Dizzy` ·
+  `Gauntlet/A_GauntletBot_Smash` · `Gauntlet/A_GauntletBot_SmashAntici`
+- 그 외 들어오는 것: `Title/01_mesh` fbx 13개 + `Title/02_texture` + `HDRI` + `VFX/Common/Monsters`
+  프리팹 16종(민경 이펙트) — **몬스터 로직과 무관**하다.
+- **로컬 수정 22건**(전부 `VFX/Textures/**.meta`)은 서버에서 안 바뀌는 파일이라 **업데이트 충돌
+  없다.** 미추적 `?` 로 `Char/Boss/SK/welz_*.mat` 6종 + `.omc` 가 있다(SVN 에 안 올라간 로컬 파일).
 
 - 내가 올린 것: **r290**(채찍 히트 이벤트 Start → End 이동) · **r292**(SpinBot `AnyState → Dizzy` 전이).
   SVN 워킹카피 루트는 `Assets/50.Art` 다(레포 루트에서 svn 명령이 안 먹는다).
