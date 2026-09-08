@@ -41,6 +41,6 @@ MonoBehaviour:
   attackTrigger: Charge
   attackFinishTrigger: Attack
   hitTrigger: Hit
-  groggyBool: Groggy
+  groggyBool: 
   deathTrigger: 
   locomotionState: Idle

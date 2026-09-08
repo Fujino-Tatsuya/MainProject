@@ -47,5 +47,5 @@ MonoBehaviour:
   attackTrigger: Cast
   attackFinishTrigger: Attack
   hitTrigger: Hit
-  groggyBool: Groggy
+  groggyBool: 
   deathTrigger: 

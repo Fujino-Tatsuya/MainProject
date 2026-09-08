@@ -40,6 +40,6 @@ MonoBehaviour:
   animSpeedParam: RunBlend
   attackTrigger: Shoot
   hitTrigger: Hit
-  groggyBool: Groggy
+  groggyBool: 
   deathTrigger: 
   locomotionState: Idle

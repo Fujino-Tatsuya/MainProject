@@ -36,5 +36,5 @@ MonoBehaviour:
   animSpeedParam: RunBlend
   attackTrigger: Attack
   hitTrigger: Hit
-  groggyBool: Groggy
+  groggyBool: 
   deathTrigger: 
