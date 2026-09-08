@@ -22,12 +22,13 @@ MonoBehaviour:
   maxShield: 0
   detectionRadius: 9
   detectionHeightTolerance: 2
-  attackRange: 2.4
+  attackRange: 2
   leashRadius: 18
   returnSpeedMultiplier: 5
   turnSpeed: 10
   attackDuration: 1.6
   attackWindup: 0.5
+  cancelWindupIfTargetLeavesRange: 1
   maxGroggyCount: 4
   groggyDuration: 3
   startsWithSuperArmor: 0

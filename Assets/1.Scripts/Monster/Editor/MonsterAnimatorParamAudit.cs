@@ -68,6 +68,61 @@ public static class MonsterAnimatorParamAudit
         else Debug.Log(report.ToString());
     }
 
+    // 플레이어 HurtBox 반경(Paladin.prefab 실측, layer 13 CapsuleCollider). 접촉 거리 계산의 상수다.
+    // 🔴 이 값을 눈으로 추정하면 안 된다 — 0.4 로 어림잡았다가 WallBot 이 최대 거리에서 항상
+    //    헛스윙하는 결함을 만들었다(2026-09-08). 실제 값은 0.2 다.
+    const float PlayerHurtboxRadius = 0.2f;
+
+    /// <summary>
+    /// 근접 공격의 **개시 거리 ↔ 히트박스 실도달** 정합 감사.
+    ///
+    /// 실효 접촉 = 히트박스 전방 도달 + 플레이어 반경. <c>attackRange</c> 가 그보다 크면
+    /// 그 구간에서 시작한 공격은 **판정이 없다** — 팔만 휘두르고 데미지가 안 나간다.
+    /// 히트가 선딜 뒤에 나오므로(예: WallBot 0.33초) 실제로는 마진이 더 필요하다.
+    /// </summary>
+    [MenuItem("Tools/Boss/몬스터 — 근접 공격 거리 정합 감사 (읽기 전용)")]
+    public static void AuditMeleeReach()
+    {
+        string[] guids = AssetDatabase.FindAssets("t:Prefab", new[] { PrefabFolder });
+        var sb = new StringBuilder("[ReachAudit] 개시 거리 vs 히트박스 실도달 (실효 접촉 = 도달 + 플레이어 반경 0.2)\n");
+        int bad = 0;
+
+        foreach (string guid in guids)
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            if (prefab == null || prefab.GetComponent<MonsterBase>() == null) continue;
+
+            MonsterDataSO data = FindData(prefab);
+            var melee = prefab.GetComponentInChildren<MonsterMeleeAttack>(true);
+            if (data == null || melee == null) continue;
+
+            // 🔴 원거리 아키타입은 제외한다 — 그 `attackRange` 는 **사격 거리**다(PeekABot 10 · TeslaBot 11 ·
+            //    MortarBot 9). 근접 히트박스도 달려 있어서 그냥 재면 "8m 부족"으로 오탐이 뜬다.
+            if (data.archetype == MonsterArchetype.RangedTurret ||
+                data.archetype == MonsterArchetype.RangedMobile) continue;
+
+            var box = melee.GetComponent<BoxCollider>();
+            var sphere = melee.GetComponent<SphereCollider>();
+            float reach;
+            string shape;
+            if (box != null) { reach = box.center.z + box.size.z * 0.5f; shape = $"Box z {box.size.z} @ {box.center.z}"; }
+            else if (sphere != null) { reach = sphere.center.z + sphere.radius; shape = $"Sphere r {sphere.radius} @ {sphere.center.z}"; }
+            else continue;
+
+            float contact = reach + PlayerHurtboxRadius;
+            bool over = data.attackRange > contact;
+            if (over) bad++;
+
+            sb.AppendLine($"  {(over ? "❌" : "  ")} {prefab.name,-14} 개시 {data.attackRange,5} / 도달 {reach,5} / " +
+                          $"접촉 {contact,5} ({shape})" + (over ? $"  → {contact - data.attackRange:0.##}m 부족" : ""));
+        }
+
+        sb.Append($"\n  개시 거리가 접촉보다 먼 몹: {bad}종. 0 이 아니면 그 구간에서 판정 없는 공격이 나간다.");
+        if (bad > 0) Debug.LogWarning(sb.ToString());
+        else Debug.Log(sb.ToString());
+    }
+
     // 데이터 값이 **에디터에 실제로 로드된 값**인지 본다.
     // 🔴 YAML 을 손으로 고치면 에디터가 들고 있는 인스턴스는 그대로일 수 있다(Assets/Refresh 전).
     //    "고쳤는데 Play 에서 안 먹는다"의 흔한 원인이라, 튜닝값은 이 창으로 확인한다.

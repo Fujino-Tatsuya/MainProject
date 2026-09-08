@@ -22,7 +22,7 @@ MonoBehaviour:
   maxShield: 0
   detectionRadius: 10
   detectionHeightTolerance: 2
-  attackRange: 2.5
+  attackRange: 2
   leashRadius: 18
   retargetInterval: 8
   returnSpeedMultiplier: 5
