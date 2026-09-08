@@ -108,17 +108,67 @@ API: `OpenWindow()` / `NotifyAnimReached()` / `TryPass()` / `TryConsumeInterrupt
 - 23호 카운터를 공용 부품으로 이사 — 확정 #4 에서 기각.
 - 카운터/충격파 VFX·SFX — 민경님 축. 지금은 기존 노란 틴트만 쓴다.
 
-## 8. Codex 교차검증 요청 항목
+## 8. 교차검증 결과 (Codex 0.153.4 read-only + 팀장측 재확인, 2026-09-08)
 
-구현 전 이 4개를 반대편에서 봐 달라고 넘긴다:
+Codex 판정 4건과 추가 지적 3건을 받았고, **주장마다 파일을 다시 열어 확인**했다. 확인 과정에서
+계획을 막는 사실 하나가 더 나왔다(§8.3).
 
-1. **자세 홀드 방식** — 애니메이터 속도 0 이 `Smash Anticipation → Smash`(조건 없는 exitTime 1.0) 전이를
-   실제로 붙잡는가. 속도 0 에서 exitTime 판정이 어떻게 도는지가 핵심.
-2. **`BeginHitWindow()` 재호출 방식의 지속 데미지** — 집합만 비우는 것으로 충분한가, 넉백·히트플래시가
-   0.5초마다 재발동해 연출이 깨지지 않는가.
-3. **Dizzy 삭제의 파급** — `dizzyBool`(=`groggyBool` 과 같은 `IsDizzy`) 을 안 쓰게 되면 그로기 애니 경로가
-   어떻게 되는가. 같은 파라미터를 두 용도로 쓰고 있다.
-4. **`ShouldReacquireTarget` 기본 구현 변경** — 기본값 0 게이트만으로 일반몹 8종·23호 무회귀가 정말 보장되는가.
+### 8.1 자세 홀드 — 조건부 성립
+
+- 23호 방식은 **이식 가능**: 준비 이벤트에서 전 피어에 홀드 RPC · 원래 속도를 저장하고 복원한다
+  (`TwentyThreeBoss.cs:2564` · `:2587` · `:2625`).
+- `exitTime` 은 정규화 시간이라 **1.0 도달 전에** 속도를 0 으로 만들어야 붙잡힌다. 이미 시작된 전이를
+  되돌린다는 보장은 없다. 무조건 전이 위치: `Controller_SpinBot.controller:479` · `:488`,
+  `Controller_TrainerBot_Boss.controller:195` · `:204`.
+- 🔴 **홀드 신호로 `OnAttackHit` 를 쓰면 늦다** — Gauntlet 의 `OnAttackHit` 는 이미 Smash **타격 시점**이다
+  (`GauntletBot.cs:115`). `Smash Anticipation` 진입 직후 **서버 타이머**로 걸어야 한다.
+
+### 8.2 지속 데미지 — 조건부 성립
+
+- `BeginHitWindow()` 재호출 + 매 틱 `Hit()` 로 재히트가 성립한다(`MonsterMeleeAttack.cs:30` · `:72`,
+  `SpinnerBot.cs:113`).
+- ⚠️ **유닛별 0.5초 쿨다운이 아니다.** 집합 초기화 경계 직전에 처음 맞으면 직후에 곧바로 또 맞는다.
+  "0.5초마다 한 대"를 보장해야 하면 유닛별 마지막 히트 시각을 따로 들어야 한다.
+- 반복 넉백은 지금은 없다 — Spinner 는 `applyKnockback: 0`(`SpinnerBot.prefab:90`). 켜면 매 히트 넉백된다.
+- 히트플래시는 0.35초라 0.5초 주기와 누적 충돌이 없다(`HitFlash.cs:24` · `:91`).
+- ⚠️ **플레이어 패시브 쿨감이 히트마다 돈다**(`FirstMeleePassive.cs:108`, `Player.cs:420` · `:434`).
+  피해가 막혀도 호출되는 경로라 지속 데미지는 곧 **플레이어 스킬 회전율 상승**이다 — 밸런스 영향.
+
+### 8.3 🔴 그로기 애니 경로가 두 종 모두 없다 — 계획 수정 필요
+
+Codex 가 SpinBot 에서 잡아낸 것을 확인하고, Gauntlet 까지 넓혀 보니 더 나빴다.
+
+| 종 | 그로기 파라미터 | 상태/클립 | 진입 경로 |
+|---|---|---|---|
+| Spinner | `IsDizzy`(= `dizzyBool` 과 **같은 불**) | `Dizzy` 상태 + 클립 있음 | 🔴 **`Spin Attack Loop` 에서만** (`Controller_SpinBot.controller:752` · `:779`). AnyState·Movement 에 경로 없음(`:104` · `:581`) |
+| Gauntlet | `groggyBool: Groggy` | 🔴 **파라미터·상태·클립 전무** — 컨트롤러 파라미터는 Hit/RunBlend/AttackSmash/Defeat/FinishedCombo 5개뿐이고 clip 목록에도 그로기류가 없다 | 없음 |
+
+즉 지금 상태로 "카운터 성공 → 즉시 그로기"를 넣으면 **논리만 그로기고 화면은 그대로**다.
+Gauntlet 은 존재하지 않는 파라미터에 `SetBool` 을 하는 중이다(조용히 무시된다).
+
+**선택지 3개** — 팀장 판단 필요:
+
+1. **자세 얼리기(권장)** — 카운터 성공 시 애니메이터 속도 0 으로 **때리려던 자세에서 정지** + 틴트.
+   §8.1 의 홀드 부품을 그대로 재사용하므로 신규 클립·아트 작업이 **0** 이고 두 종에 같은 방식으로 들어간다.
+2. **컨트롤러에 진입 전이 추가** — SpinBot 은 `AnyState → Dizzy (IsDizzy)` 한 줄로 해결되지만
+   Gauntlet 은 클립 자체가 없어 반쪽이 된다. 그리고 컨트롤러는 **SVN 아트 파일**이다.
+3. **그로기 클립 발주** — 일정 밖. 7월 스코프에 없다.
+
+### 8.4 주기 재선정 기본 구현 변경 — 조건부 성립
+
+- `interval` 이 0 이면 즉시 false 라 기존 기본 구현과 동일하다(`BossAggroPolicy.cs:24`, `MonsterBase.cs:705`).
+- 23호 override 는 base 를 부르지 않고 자체 시계를 쓴다(`TwentyThreeBoss.cs:407`) → 무변경 확인.
+- 주기 판정 호출 지점은 `MonsterBase.cs:337` **한 곳**이다.
+- 남는 것은 무효 타깃 재탐색(`:335`)과 23호의 공격 대상 승계(`TwentyThreeBoss.cs:427`)인데 둘 다 기존 동작이다.
+
+### 8.5 그 외 반영할 것 2개
+
+- **Gauntlet `attackDuration: 3` 이 홀드를 모른다.** `_stateTimer` 는 애니메이터를 멈춰도 계속 줄어든다
+  (`MonsterBase.cs:776`). 창 1.5초를 타이머에 더하지 않으면 **타격 전에 Attack 이 종료**될 수 있다.
+- **Spinner Dizzy 분기에 정리 작업이 묶여 있다** — 히트창 종료 · 에이전트 속도 복원 · 정지 ·
+  슈퍼아머 해제(`SpinnerBot.cs:116~125`). Dizzy 를 없애면 이 넷을 돌진 종료 쪽으로 옮겨야 하고
+  `SpinCommit` 에서도 `dizzyDuration` 을 빼야 한다(`SpinnerBot.cs:58`).
+
 
 ---
 
