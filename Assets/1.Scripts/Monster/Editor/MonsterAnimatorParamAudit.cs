@@ -68,6 +68,28 @@ public static class MonsterAnimatorParamAudit
         else Debug.Log(report.ToString());
     }
 
+    // 데이터 값이 **에디터에 실제로 로드된 값**인지 본다.
+    // 🔴 YAML 을 손으로 고치면 에디터가 들고 있는 인스턴스는 그대로일 수 있다(Assets/Refresh 전).
+    //    "고쳤는데 Play 에서 안 먹는다"의 흔한 원인이라, 튜닝값은 이 창으로 확인한다.
+    [MenuItem("Tools/Boss/몬스터 — 인지·전투 값 점검 (읽기 전용)")]
+    public static void ReportCombatValues()
+    {
+        string[] guids = AssetDatabase.FindAssets("t:MonsterDataSO", new[] { "Assets/2.Prefabs/Monster/Data" });
+        var sb = new StringBuilder("[ValueAudit] 인지 반경 / 높이 허용 / 공격 거리 / 회전 속도 / 재선정 / 그로기 누적\n");
+
+        foreach (string guid in guids)
+        {
+            var d = AssetDatabase.LoadAssetAtPath<MonsterDataSO>(AssetDatabase.GUIDToAssetPath(guid));
+            if (d == null) continue;
+
+            sb.AppendLine($"  {d.name,-18} 인지 {d.detectionRadius,4} / 높이 {d.detectionHeightTolerance,4} / " +
+                          $"공격 {d.attackRange,4} / 회전 {d.turnSpeed,4} / 재선정 {d.retargetInterval,4} / " +
+                          $"그로기누적 {d.maxGroggyCount}");
+        }
+
+        Debug.Log(sb.ToString());
+    }
+
     // 비어 있는 이름은 "안 쓴다"는 뜻이라 정상이다 — 채워져 있는데 없는 것만 잡는다.
     static void Check(HashSet<string> names, List<string> missing, string field, string value)
     {

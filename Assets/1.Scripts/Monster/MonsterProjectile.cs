@@ -18,6 +18,12 @@ public class MonsterProjectile : NetworkBehaviour
     LayerMask _targetLayer;
     float _despawnTime;
     bool _launched;
+    Vector3 _launchPosition;
+
+    [SerializeField, Min(0f)]
+    [Tooltip("무장 거리(m). 발사 원점에서 이 거리 안에서는 벽·지면 충돌을 무시한다. " +
+             "총구가 몸통·받침대에 겹쳐 있어도 발사와 동시에 죽지 않게 하는 가드.")]
+    float armingDistance = 0.7f;
 
     // 포물선(탄도) 모드 — MortarBot 등. arcHeight > 0일 때 MonsterRangedAttack.Fire가 사용.
     bool _ballistic;
@@ -37,6 +43,7 @@ public class MonsterProjectile : NetworkBehaviour
         _targetLayer = targetLayer;
         _despawnTime = Time.time + Mathf.Max(0.1f, lifetime);
         _launched = true;
+        _launchPosition = transform.position;
         _ballistic = false;
         transform.rotation = Quaternion.LookRotation(_direction);
     }
@@ -49,6 +56,7 @@ public class MonsterProjectile : NetworkBehaviour
         _targetLayer = targetLayer;
         _despawnTime = Time.time + Mathf.Max(0.1f, lifetime);
         _launched = true;
+        _launchPosition = transform.position;
         _ballistic = true;
         _velocity = initialVelocity;
         _splashRadius = Mathf.Max(0f, splashRadius);
@@ -129,6 +137,14 @@ public class MonsterProjectile : NetworkBehaviour
         //     "벽만" 고를 수 없다 → 바닥·경사도 장애물이다. 오르막에 맞으면 사라진다(층 분리와 같은 방향).
         if (other.GetComponentInParent<Unit>() == null && !other.isTrigger)
         {
+            // 🔴 **무장 거리** — 발사 직후 이 거리 안에서는 환경 충돌을 무시한다.
+            //    `MonsterRangedAttack` 은 `muzzle` 이 비어 있으면 발사 원점으로 **봇 루트(발밑)** 를 쓴다.
+            //    PeekABot·TeslaBot 이 그 상태라 반경 0.5 트리거가 받침대·지면과 겹친 채 태어난다 →
+            //    무장 거리가 없으면 발사와 동시에 죽어 **공격이 아예 안 나간다**(2026-09-08 실측).
+            //    근본은 muzzle 배선이지만, 벽에 붙어 쏘는 경우까지 덮으려면 이 가드가 있어야 한다.
+            if ((transform.position - _launchPosition).sqrMagnitude < armingDistance * armingDistance)
+                return;
+
             if (_ballistic && _splashRadius > 0f) Detonate();
             else Despawn();
         }

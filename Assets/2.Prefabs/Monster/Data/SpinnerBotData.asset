@@ -26,7 +26,7 @@ MonoBehaviour:
   leashRadius: 18
   retargetInterval: 8
   returnSpeedMultiplier: 5
-  turnSpeed: 0
+  turnSpeed: 10
   avoidanceRadius: 0.3
   obstacleAvoidance: 2
   projectilePrefab: {fileID: 0}

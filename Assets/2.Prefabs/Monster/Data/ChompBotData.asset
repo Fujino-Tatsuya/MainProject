@@ -25,6 +25,7 @@ MonoBehaviour:
   attackRange: 2
   leashRadius: 15
   returnSpeedMultiplier: 5
+  turnSpeed: 10
   attackDuration: 1.6
   attackWindup: 0.35
   maxGroggyCount: 0

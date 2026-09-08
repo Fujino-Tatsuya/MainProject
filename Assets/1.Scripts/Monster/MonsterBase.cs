@@ -87,6 +87,9 @@ public class MonsterBase : Unit
     bool _initialized;
     bool _inAttackRange;           // 사거리 안에 들어와 있나(히스테리시스 적용). 진입 순간에 첫 공격 지연을 건다
     float _lastRetargetTime = -1f; // 마지막 주기 재선정 시각(초). **-1 = 아직 교전 전**
+    float _heightLostSince = -1f;  // 물고 있는 대상이 높이 조건을 벗어난 시각(-1 = 정상)
+    // 경사·계단을 오르내리는 동안 판정이 깜빡여 타깃이 튀는 것을 막는 유예(초).
+    const float HeightLossGrace = 0.5f;
     bool _animatorHeldLocally;     // 이 피어에서 애니메이터를 정지시켜 뒀나(자세 홀드 래치)
     float _animatorResumeSpeed = 1f; // 홀드 전 애니메이터 속도 — 풀 때 이 값을 되돌린다
     IBossTelegraph _telegraph;     // 카운터 창 표현(있으면). 지연 해석 — 런타임 부착일 수 있다
@@ -334,6 +337,29 @@ public class MonsterBase : Unit
         //
         // 🔴 파생이 ShouldReacquireTarget 으로 **주기 재선정**을 얹을 수 있다(23호 어그로).
         //    기본값이 false 라 몹 8종·중간보스 3종의 락온 동작은 그대로다.
+        // 층이 갈렸으면 물고 있던 대상도 놓는다.
+        //
+        // 🔴 왜 리쉬로는 안 풀리는가 — 리쉬는 **몬스터 자신이 스폰 지점에서 멀어졌는지**만 본다.
+        //    고정 포탑(PeekABot·TeslaBot)은 움직이지 않으니 그 거리가 영원히 0 이다 → 한 번 문 대상을
+        //    **영원히** 물고 위층·아래층으로 계속 쏜다(2026-09-08 실측: Δy 2.93m 인데도 공격).
+        //    그래서 유지 조건에도 높이를 넣는다. 인지와 같은 임계값을 쓰고, 경사에서 깜빡이는 것을
+        //    막기 위해 유예를 둔다.
+        if (_target != null && !MonsterPerceptionPolicy.WithinHeight(
+                transform.position.y, _target.position.y, data.detectionHeightTolerance))
+        {
+            if (_heightLostSince < 0f) _heightLostSince = Time.time;
+            if (Time.time - _heightLostSince >= HeightLossGrace)
+            {
+                _target = null;
+                _heightLostSince = -1f;
+                _lastRetargetTime = -1f;   // 다음 교전에서 시계를 다시 센다
+            }
+        }
+        else
+        {
+            _heightLostSince = -1f;
+        }
+
         if (!IsTargetValid(_target))
         {
             _target = FindNearestTarget();

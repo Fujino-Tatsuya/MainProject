@@ -25,6 +25,7 @@ MonoBehaviour:
   attackRange: 11
   leashRadius: 15
   returnSpeedMultiplier: 5
+  turnSpeed: 10
   projectilePrefab: {fileID: 8845096525963102658, guid: 54c0baf85e460bc478f1db5826ccde56, type: 3}
   projectileSpeed: 14
   projectileLifetime: 4

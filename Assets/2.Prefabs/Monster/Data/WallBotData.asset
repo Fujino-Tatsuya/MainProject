@@ -22,9 +22,10 @@ MonoBehaviour:
   maxShield: 0
   detectionRadius: 9
   detectionHeightTolerance: 2
-  attackRange: 3.5
+  attackRange: 2.4
   leashRadius: 18
   returnSpeedMultiplier: 5
+  turnSpeed: 10
   attackDuration: 1.6
   attackWindup: 0.5
   maxGroggyCount: 4
