@@ -20,7 +20,10 @@ internal static class CombatEditModeTestRunner
     static readonly string[] Fixtures =
     {
         "^MonsterHitReactionPolicyTests",
+        "^MonsterEngagePolicy",   // MonsterEngagePolicyTests — 사거리 진입 후 첫 공격 지연
+        "^CounterWindow",         // CounterWindowTests — 중간보스 인터럽트 카운터 창
         "^BossCounter",  // BossCounterWindupGateTests / BossCounterProgressTests / BossCounterDataTests
+        "^BossContactReach",      // BossContactReachPolicyTests — 접촉 공격 개시 거리
         "^BossOpening",  // BossOpeningAttackPolicyTests
         "^BossAggro"     // BossAggroPolicyTests
     };

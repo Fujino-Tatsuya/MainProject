@@ -92,6 +92,7 @@ public class GauntletBot : MonsterBase
 
     // 서버 전용 런타임 상태.
     GauntletAttackId _currentAttack;
+    MonsterCounterWindow _counter;
     Collider[] _nearbyBuffer;
     readonly HashSet<Transform> _nearbyRoots = new HashSet<Transform>();
     Collider[] _smashHitBuffer;
@@ -110,14 +111,75 @@ public class GauntletBot : MonsterBase
 
         PlayAttackAnimClientRpc(_currentAttack);
 
-        if (_currentAttack == GauntletAttackId.Smash)
-            ShowTelegraphClientRpc(smashRadius, telegraphDuration);
+        if (_currentAttack != GauntletAttackId.Smash) return;
+
+        ShowTelegraphClientRpc(smashRadius, telegraphDuration);
+
+        // 인터럽트 카운터 창 — 스매시 **예비동작 안에서** 열린다.
+        // 🔴 별도 홀드가 필요 없다: `Smash Anticipation` 이 60프레임(2.0초)이라 창(기본 1.5초)을 덮는다.
+        //    창이 예비동작보다 길게 저작되면 스매시가 창 안에서 터질 수 있는데, 그때는 히트 시점에
+        //    창을 닫아 막는다(PerformAttackHit) — 23호의 "발사 순간 창이 닫힌다"와 같은 규약이다.
+        if (Counter == null) return;
+
+        Counter.Open();
+        if (Counter.IsOpen) ServerSetCounterWindow(true);
+    }
+
+    /// <summary>카운터 창 컴포넌트(없으면 null = 카운터 없는 몹으로 동작).</summary>
+    MonsterCounterWindow Counter =>
+        _counter != null ? _counter : (_counter = GetComponent<MonsterCounterWindow>());
+
+    // 창 시간을 흘린다. 만료 = **인터럽트 실패 확정** — 예고를 끄고 스매시가 그대로 진행된다.
+    protected override void HandleAttack(float dt)
+    {
+        if (Counter != null && Counter.IsOpen && Counter.TickAndDetectExpiry(dt))
+            ServerSetCounterWindow(false);
+
+        base.HandleAttack(dt);
+    }
+
+    /// <summary>
+    /// 인터럽트 카운터 판정 지점. 데미지는 base 가 먼저 처리하고, 창이 열려 있을 때만 성공으로 센다.
+    ///
+    /// 🔴 창 <b>밖</b>의 인터럽트는 데미지만 남는다 — 누적식(`maxGroggyCount`)은 데이터에서 0 으로 껐다.
+    /// </summary>
+    public override void TakeDamage(AttackInfo attackInfo)
+    {
+        base.TakeDamage(attackInfo);
+
+        if (!IsServer || !attackInfo.isInterruptAttack || Counter == null) return;
+        if (!Counter.TryConsumeInterrupt()) return;
+
+        CounterSucceeded();
+    }
+
+    // 카운터 성공 — 스매시를 취소하고 즉시 그로기.
+    // 🔴 이 컨트롤러에는 그로기·피격 클립도, 그로기 파라미터도 없다(PLAN §9.1). 그래서 그로기를
+    //    **대기 자세로 갈아탄 뒤 정지**시켜 보여 준다 — 창(팔 든 스매시 자세)과 자세로 구분된다.
+    void CounterSucceeded()
+    {
+        ServerSetCounterWindow(false);
+        HideTelegraphClientRpc();
+
+        meleeAttack?.EndHitWindow();
+        status?.RemoveStatus(StatusEffectType.SuperArmor);
+
+        ForceGroggy(Counter.GroggyDuration);
+        ServerFreezeAtLocomotion();   // ForceGroggy 뒤에 불러야 한다 — 상태 전이가 자세를 덮지 않게
     }
 
     // 공격 히트 실행(애니 이벤트 OnAttackHit → base.NotifyAttackHit → FireAttackHitOnce 경로).
     // 스매시=AoE, 어퍼컷(Punch03)=단타 데미지+CC 훅, 그 외=단타 데미지.
     protected override void PerformAttackHit()
     {
+        // 발사 순간 창이 닫힌다 — 이후 히트는 카운터로 인정되지 않는다(창이 예비동작보다 길게
+        // 저작된 경우의 안전망. 23호와 같은 규약).
+        if (Counter != null && Counter.IsOpen)
+        {
+            Counter.Close();
+            ServerSetCounterWindow(false);
+        }
+
         switch (_currentAttack)
         {
             case GauntletAttackId.Smash:
@@ -238,6 +300,15 @@ public class GauntletBot : MonsterBase
     {
         if (smashTelegraph != null)
             smashTelegraph.Show(radius, duration);
+    }
+
+    // 카운터 성공으로 스매시가 취소됐을 때 장판을 즉시 지운다 — 안 지우면 아무 일도 안 일어나는
+    // 위험 표시가 `telegraphDuration` 만큼 바닥에 남는다.
+    [ClientRpc]
+    void HideTelegraphClientRpc()
+    {
+        if (smashTelegraph != null)
+            smashTelegraph.Hide();
     }
 
     string StateNameFor(GauntletAttackId id)

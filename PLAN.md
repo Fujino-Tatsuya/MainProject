@@ -26,46 +26,78 @@
 - `MonsterMeleeAttack.BeginHitWindow()` 는 **유닛별 중복 방지 집합을 비운다** — 즉 0.5초마다 다시 부르면
   지속 데미지가 코드 추가 없이 성립한다(§3.1).
 
-## 3. 1차 구현
+## 3. 1차 구현 (2026-09-08 확정 · 구현 착수)
 
-### 공통 — `MonsterCounterWindow`(신규 컴포넌트, 프리팹 2개에 부착)
+### 공통 — 카운터 창 + 자세 홀드
 
-저작값: **창 길이(기본 1.5초)** · 성공 시 Hit 리액션 길이 · 성공 시 그로기 길이.
-보유: `BossCounterWindupGate` 인스턴스 · `IBossTelegraph` 참조.
-API: `OpenWindow()` / `NotifyAnimReached()` / `TryPass()` / `TryConsumeInterrupt()` / `CloseWindow()`. **서버 전용 판정.**
+**`MonsterCounterWindow`**(신규 컴포넌트 · Spinner·Gauntlet 프리팹에 부착) — **서버 전용 판정**.
+저작값: **창 길이(기본 1.5초)** · **그로기 길이(기본 0.5초, 최대 1초)**.
+내부에 `BossCounterWindupGate`(①타이머 만료 ∧ ②애니 준비 도달) 를 그대로 재사용한다.
 
-성공 시 → `ForceHitReaction(hit, groggyAfter: groggy)`. 새 상태를 만들지 않는다.
-창 밖 인터럽트는 **데미지만** — 3종 데이터의 `maxGroggyCount` 를 **0** 으로 내려 누적식을 끈다(코드 0줄, 이미 게이트됨).
+- 창 동안 **애니 속도 0 으로 자세를 붙잡는다**(23호 방식 = 원래 속도 저장 → 0 → 복원,
+  `TwentyThreeBoss.cs:2564~2625`). 저장·복원은 `MonsterBase` 의 작은 protected 헬퍼로 뺀다 —
+  호출하지 않으면 아무 경로도 안 생긴다.
+- 창이 열린 동안 `isInterruptAttack` 이 들어오면 **성공** → 진행 중 공격 취소 + **즉시 그로기**(0.5초).
+  누적 단계는 없다.
+- 창을 통과하면 **실패** → 공격이 그대로 나간다. **그로기를 주지 않는다.**
+- 🔴 **그로기 틴트는 넣지 않는다**(팀장 확정 2026-09-08). 인터럽트 성공 이펙트가 그 자리를 맡는다.
+  덤으로 `HitFlash.SetBaseTint` 가 단일 슬롯이라 창 색과 충돌하던 문제(§8 지적)도 사라진다.
+  **창 텔레그래프(노란 틴트)는 유지**한다 — 인터럽트 가능 구간을 알리는 별 기능이다.
+- 누적식은 데이터로 끈다 — 2종의 `maxGroggyCount` → **0**. `TakeDamage:1082` 가 이미
+  `maxGroggyCount > 0` 로 게이트돼 있어 **코드 0줄**로 꺼진다(창 밖 인터럽트는 데미지만).
+- 그로기는 `Hit` 단계를 거치지 않고 **바로 Groggy** 로 간다 — 두 종 다 Hit 클립이 없다(§9.1).
+
+### 그로기를 화면에 보여주는 방식 (종별로 다름 · §9 근거)
+
+| 종 | 방식 | 필요한 작업 |
+|---|---|---|
+| **Spinner** | `Dizzy` 클립 재생 | 컨트롤러에 **`AnyState → Dizzy (IsDizzy == true)` 전이 1개** 추가. 이탈은 이미 있다 |
+| **Gauntlet** | **Idle 자세로 끊고 그 자세에서 정지** | `SafeCrossFade(data.locomotionState)` → 애니 속도 0. 클립 도입 경로가 전부 막혔다(§9.3) |
+
+Gauntlet 은 창(Smash 자세 정지)과 그로기(Idle 자세 정지)가 **자세로 구분**되므로 색이 없어도 읽힌다.
 
 ### 3.1 SpinnerBot — 스핀 돌진
 
 | | 현재 | 목표 |
 |---|---|---|
-| 예비동작 | `spinWindup` 1초 제자리 회전 | **카운터 창 1.5초**(자세 홀드 + 노란 틴트). 창 통과 = 인터럽트 실패 |
-| 돌진 데미지 | `BeginHitWindow` 1회 → 유닛당 1틱 | **0.5초 주기 반복**(간격은 데이터 노브). 범위 안에 계속 있으면 계속 맞는다 |
-| 돌진 후 | `dizzyDuration` 만큼 Dizzy(취약) | 🔴 **Dizzy 삭제** — 확정 #3. 인터럽트 실패의 대가가 그로기면 안 된다 |
-| 인터럽트 성공 | (없음) | 돌진 취소 + 즉시 그로기 1회 |
+| 예비동작 | `spinWindup` 1초 제자리 회전 | **카운터 창 1.5초**(자세 홀드). 통과 = 인터럽트 실패 |
+| 돌진 데미지 | `BeginHitWindow` 1회 → 유닛당 1틱 | **주기 반복(기본 0.5초, 노브)** — 범위 안에 계속 있으면 계속 맞는다 |
+| 돌진 후 | `dizzyDuration` 만큼 Dizzy(취약) | 🔴 **삭제** — 실패의 대가가 그로기면 안 된다 |
+| 인터럽트 성공 | (없음) | 돌진 취소 + 그로기 0.5초(`Dizzy` 클립) |
 
-반복 데미지는 `BeginHitWindow()` 를 주기마다 다시 부르는 것으로 구현한다(집합이 비워지므로 재히트 성립).
-`dizzy*` 필드와 `PlayDizzyClientRpc` 는 제거하지 않고 **호출만 끊는다** — 되돌리기 비용을 0으로 두기 위해서.
+- 반복 히트는 `BeginHitWindow()` 를 주기마다 다시 부른다(유닛별 중복 집합이 비워진다).
+  ⚠️ **유닛별 0.5초 쿨다운이 아니다** — 집합 리셋 경계라 경계 직전/직후 연속 2히트가 가능하다(§8.2).
+  1차는 그대로 두고, 실측에서 과하면 유닛별 마지막 히트 시각을 들인다.
+- `dizzy*` 필드와 `PlayDizzyClientRpc` 는 **지우지 않고 호출만 끊는다**(되돌리기 비용 0).
+  Dizzy 분기에 묶여 있던 히트창 종료·에이전트 속도 복원·정지·슈퍼아머 해제는 **돌진 종료 쪽으로 옮긴다**.
+  `SpinCommit` 에서 `dizzyDuration` 을 뺀다(§8.5).
 
 ### 3.2 GauntletBot — Smash
 
 | | 현재 | 목표 |
 |---|---|---|
-| 예비동작 | `Smash Anticipation` → exitTime 1.0 으로 `Smash` 자동 연결 | **손 올린 지점에서 1.5초 카운터 창**. 창 통과 후 `Smash` 로 넘어간다 |
-| 실패 시 | `smashRadius` AoE 1회 | 같음(주변 범위 공격). **반경 상향 예정** — 값은 튜닝, 테스트로 잠그지 않는다 |
-| 인터럽트 성공 | (없음) | Smash 취소 + 즉시 그로기 1회 |
+| 예비동작 | `Smash Anticipation` → exitTime 1.0 으로 `Smash` 자동 연결 | 그 자리에서 **1.5초 창**(자세 홀드) |
+| 실패 시 | `smashRadius` AoE 1회 | 같음. **반경 상향 예정**(튜닝값, 테스트로 잠그지 않는다) |
+| 인터럽트 성공 | (없음) | Smash 취소 + 그로기 0.5초(**Idle 자세 정지**) |
 
-🔴 컨트롤러의 `Smash Anticipation → Smash` 전이가 **조건 없는 exitTime 1.0** 이다. 창 동안 붙잡으려면
-애니메이터 속도 0 으로 홀드해야 한다(23호 자세 홀드 선례). 전이 자체는 건드리지 않는다 — 아트/SVN 관할이다.
+- 🔴 홀드 신호로 `OnAttackHit` 를 쓰면 늦다 — 그 이벤트는 이미 **타격 시점**이다(`GauntletBot.cs:115`).
+  `Smash Anticipation` 진입 직후 **서버 타이머**로 홀드한다.
+- 🔴 `attackDuration: 3` 이 홀드를 모른다 — `_stateTimer` 는 애니를 멈춰도 줄어든다(`MonsterBase.cs:776`).
+  창 길이를 타이머에 더한다.
 
 ### 3.3 주기 어그로 (2종 공통)
 
 - `MonsterDataSO.retargetInterval`(초, **기본 0 = 끔**) 추가. 2종 데이터에만 값을 넣는다.
 - `MonsterBase.ShouldReacquireTarget()` 기본 구현을 `BossAggroPolicy.ShouldRetarget(state, 경과, interval)` 로 채운다.
-  기본 0 이라 일반몹 8종 무회귀. 23호는 자기 override 가 우선이라 무변경.
-- 재선정 시각은 **첫 타깃 획득 시점에 초기화**한다. 0 으로 두면 첫 틱에 곧바로 재선정이 도는 함정(교훈 #85)이다.
+  기본 0 이라 일반몹 8종 무회귀. 23호는 자기 override 가 우선이라 무변경(§8.4 확인).
+- 재선정 시각은 **첫 타깃 획득 시점에 초기화**한다(0 이면 첫 틱에 곧바로 재선정 — 교훈 #85).
+
+### 3.4 구현 순서
+
+1. `Controller_SpinBot.controller` 에 `AnyState → Dizzy` 전이 추가 → **SVN 커밋**(아트 파일, git 아님)
+2. 공통 부품(`MonsterCounterWindow` + 홀드 헬퍼 + 순수 정책) + EditMode 테스트
+3. Spinner 배선 → 4. Gauntlet 배선 → 5. 어그로 노브
+6. 죽은 데이터값 정리(`groggyBool`·`deathTrigger` 미배선 4건) — **별 커밋으로 분리**
 
 ## 4. 2차 — WallBot 재구성 (별 작업, 이번 승인 범위 아님)
 
@@ -169,6 +201,67 @@ Gauntlet 은 존재하지 않는 파라미터에 `SetBool` 을 하는 중이다(
   슈퍼아머 해제(`SpinnerBot.cs:116~125`). Dizzy 를 없애면 이 넷을 돌진 종료 쪽으로 옮겨야 하고
   `SpinCommit` 에서도 `dizzyDuration` 을 빼야 한다(`SpinnerBot.cs:58`).
 
+
+## 9. 그로기 표현 결정과 그때 생기는 문제 (2026-09-08 2차)
+
+팀장 결정: **Spinner = 전이 한 줄 추가 / Gauntlet = Hit 으로 처리 / WallBot 은 Hit·Groggy 유무 확인.**
+확인 결과 셋 중 **하나는 그대로 안 된다.**
+
+### 9.1 3종 애니 자산 실측표
+
+| 종 | Hit 클립·상태 | 그로기 파라미터 | 사망 |
+|---|---|---|---|
+| **Spinner** | ❌ 클립 없음. `Hit` 트리거는 **Movement 로 복귀시키는 취소용**으로만 배선 | ✅ `IsDizzy` + `Dizzy` 상태·클립 있음. **진입 전이만 부족** | ❌ `deathTrigger: Death` 가 컨트롤러에 없는 파라미터 |
+| **Gauntlet** | ❌ **클립도 상태도 없음.** `Hit` 트리거는 파라미터만 있고 **소비하는 전이가 0** | ❌ 파라미터·상태·클립 전무 | ✅ `Defeat` 파라미터·`Gauntlet_Defeat` 상태 있음 |
+| **WallBot** | ✅ **있음** — `Hit` 클립 + `Hit` 상태 + `AnyState → Hit`, `Hit → Movement`(exitTime) | ❌ `groggyBool: Groggy` 가 없는 파라미터 | ❌ `deathTrigger: Death` 가 없는 파라미터 |
+
+🔴 **왜 아무도 몰랐나** — `MonsterBase.SafeSetTrigger/SafeSetBool` 이 `HasParameter` 로 막고
+**조용히 no-op** 한다(`MonsterBase.cs:1476~1499`). 경고도 없다. 즉 지금도 Gauntlet·WallBot 은
+그로기 불을, Spinner·WallBot 은 사망 트리거를 **허공에 쓰고 있다.**
+(사망은 민경님 디졸브 연출로 대체된 상태일 수 있어 버그로 단정하지 않는다 — 확인 필요.)
+
+### 9.2 종별 결론 (확정)
+
+- **Spinner — 성립.** `AnyState → Dizzy (IsDizzy == true)` 전이 **한 줄**. 이탈은 이미 있다
+  (`Dizzy → Movement`, `IsDizzy IfNot 0`). 돌진 후 Dizzy 단계를 없애면 이 불은 **그로기 전용**이 되므로
+  한 파라미터 두 용도 문제도 같이 사라진다. 파일은 SVN(`Controller_SpinBot.controller`).
+- **WallBot(2차) — Hit 은 있고 그로기는 없다.** 그로기를 `Hit` 클립으로 표현할 수 있으나
+  `Hit → Movement` 가 exitTime 이라 그로기 길이만큼 안 버틴다 — 속도 0 홀드나 재트리거가 필요하다.
+  `groggyBool` 은 죽은 값이라 데이터에서 비운다.
+- **Gauntlet — 클립을 가져올 길이 전부 막혔다** → **Idle 자세로 끊고 정지**(색 없음).
+
+### 9.3 Gauntlet 에 클립을 가져오지 못하는 이유 (호환성 실측, 2026-09-08)
+
+팀장 가설: "다 휴머노이드면 Spinner Dizzy 를 그대로 쓸 수 있다." → **전제가 성립하지 않는다.**
+
+| | SpinnerBot | GauntletBot |
+|---|---|---|
+| 리그 | `animationType: 2` = **Generic** | `animationType: 2` = **Generic** |
+| 루트 본 | `Root` | `Hips` |
+| 스켈레톤 | `Root → Suspension / Tire` — **바퀴 로봇, 다리·척추 없음** | `Hips → Leg.L / Leg.R / Spine / Sword01_WPN` — 이족 |
+| 모델 | `R_Spinnerbot_01` | `R_CombatBot` |
+
+- **Generic 은 리타기팅이 없다.** 클립이 **트랜스폼 경로 이름**으로 바인딩되므로 이름·계층이 맞는 본만 움직인다.
+  두 리그에서 겹치는 이름은 `Root` 뿐이고 **Gauntlet 의 `Root` 는 자식이 0개**다 → 아무 본도 안 움직인다.
+- **Humanoid 로 바꾸는 길도 막혔다** — Spinner 는 Hips·Spine·UpperLeg 같은 필수 본이 없어
+  Humanoid 아바타를 **만들 수 없다**.
+- 프로젝트의 Humanoid 자산은 15개이고 **전부 플레이어 계열**(Paladin·PlayerBaseModel·Garen 공격 4종·
+  Parry·Run·Idle·Walk·T-Pose) — **그로기/피격 클립이 없다.**
+- 다른 Dizzy 후보 `50.Art/TestAssets/KMKTestAssets/FBX/Dizzy.fbx`(128프레임)는 **23호 보스 세트**다
+  (Break·Charging·DashAttack·Grab·Hook·JumpAttack·Throw·Uppercut·`SKM_Golem`). 역시 Generic 이고
+  23호 본 명명은 `Hand_L`(언더스코어), Gauntlet 은 `Leg.L`(점) — 규약이 달라 경로가 안 맞는다.
+- 남는 길은 **Blender 에서 Gauntlet 리그에 맞춰 다시 굽는 것**뿐이고 그건 아트 작업 = 일정 밖이다.
+
+### 9.4 이 결정으로 새로 생기는 작업
+
+1. `Controller_SpinBot.controller` 전이 1개 추가 → **SVN 커밋**. 팀원은 `svn update` 필요.
+   리비전 번호를 git 커밋 메시지에 적는다(채찍 이벤트 r290 선례).
+2. 죽은 데이터값 정리 — Gauntlet·WallBot 의 `groggyBool`, Spinner·WallBot 의 `deathTrigger`.
+   `SafeSetTrigger/SafeSetBool` 이 `HasParameter` 로 막고 **조용히 no-op** 하기 때문에 지금까지 안 보였다
+   (`MonsterBase.cs:1476~1499`). 사망은 디졸브 연출로 대체된 것일 수 있어 확인 후 정리한다.
+   **카운터 작업과 섞지 않는다.**
+3. 자세 홀드를 창과 그로기 양쪽에서 쓰므로 **홀드는 `MonsterCounterWindow` 안에 묶지 않고**
+   `MonsterBase` 의 protected 헬퍼로 둔다 — 트리거가 다르다(창=공격 보류, 그로기=피격 정지).
 
 ---
 

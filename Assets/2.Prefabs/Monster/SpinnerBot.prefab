@@ -80,7 +80,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MonsterMeleeAttack
   damage: 0
-  isGroggyAttack: 0
   targetLayer:
     serializedVersion: 2
     m_Bits: 64
@@ -107,6 +106,7 @@ GameObject:
   - component: {fileID: 3659388602388330377}
   - component: {fileID: 735775874105135194}
   - component: {fileID: 3386316598579503912}
+  - component: {fileID: 7497952774599520461}
   m_Layer: 8
   m_Name: SpinnerBot
   m_TagString: Untagged
@@ -329,21 +329,19 @@ MonoBehaviour:
     m_Bits: 64
   maxDetectionResults: 16
   hitVFXCollider: {fileID: 327031985263396855}
-  hitPointMode: 2
   hitVFXType: 1
   bodyCollider: {fileID: 6162152019073814685}
   spinChance: 0.4
   spinCooldown: 6
   spinWindup: 1
   dashDuration: 1.2
+  dashRepeatInterval: 0.5
   dashSpeedMultiplier: 15
   dashMaxDistance: 40
-  dizzyDuration: 1
   spinStartState: Spin Attack Start
   spinLoopState: Spin Attack Loop
   whipStateR: Attack Whip R Start
   whipStateL: Attack Whip L Start
-  dizzyBool: IsDizzy
 --- !u!114 &3386316598579503912
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -361,6 +359,20 @@ MonoBehaviour:
   duration: 1.5
   from: 0
   to: 1
+--- !u!114 &7497952774599520461
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2579433155061434859}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 61349f523c460af499e8ba439023b8ff, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MonsterCounterWindow
+  windowDuration: 1.5
+  groggyDuration: 0.5
 --- !u!1 &8744036715416638561
 GameObject:
   m_ObjectHideFlags: 0

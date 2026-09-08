@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 576305eb4d78f0c4eb97b90edc8cae21, type: 3}
   m_Name: GauntletBotData
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   archetype: 0
   attackDamage: 18
   moveSpeed: 2.5
@@ -23,10 +23,25 @@ MonoBehaviour:
   detectionRadius: 10
   attackRange: 3.5
   leashRadius: 18
+  retargetInterval: 8
   returnSpeedMultiplier: 5
+  turnSpeed: 0
+  avoidanceRadius: 0.3
+  obstacleAvoidance: 2
+  projectilePrefab: {fileID: 0}
+  projectileSpeed: 12
+  projectileLifetime: 4
+  minStandoff: 4
+  projectileArcHeight: 0
+  projectileSplashRadius: 0
+  repositionBetweenAttacks: 0
+  retreatMinDuration: 1.2
+  repositionMinDuration: 1.2
   attackDuration: 3
   attackWindup: 0.4
-  maxGroggyCount: 3
+  cancelWindupIfTargetLeavesRange: 0
+  engageAttackDelay: 0
+  maxGroggyCount: 0
   groggyDuration: 3
   startsWithSuperArmor: 0
   hasSuperArmorWhileAttacking: 1
@@ -35,6 +50,8 @@ MonoBehaviour:
   isMidBoss: 1
   animSpeedParam: RunBlend
   attackTrigger: Attack
+  attackFinishTrigger: 
   hitTrigger: Hit
   groggyBool: Groggy
   deathTrigger: Defeat
+  locomotionState: Movement

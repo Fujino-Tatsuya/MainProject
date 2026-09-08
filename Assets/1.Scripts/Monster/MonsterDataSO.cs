@@ -22,6 +22,10 @@ public class MonsterDataSO : ScriptableObject
     public float detectionRadius = 8f;  // 타깃 인지 반경
     public float attackRange = 2f;      // 이 거리 이내면 공격
     public float leashRadius = 15f;     // 스폰 지점에서 이 거리 벗어나면 복귀
+    // 주기 어그로 재선정 간격(초). 0 = 끔(기존 락온 유지 — 사망·디스폰·리쉬로만 풀린다).
+    // 판정은 BossAggroPolicy.ShouldRetarget 이고 교전 중 Idle/Chase 에서만 성립한다(공격 커밋 구간은 건드리지 않는다).
+    // 중간보스 2종에만 값을 넣었다 — 일반몹 8종은 0 이라 동작이 그대로다.
+    public float retargetInterval = 0f;
     public float returnSpeedMultiplier = 5f; // 복귀 시 이동속도 배수(복귀속도 = MoveSpeed × 이 값)
 
     [Header("회전")]

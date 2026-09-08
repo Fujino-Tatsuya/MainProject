@@ -86,6 +86,10 @@ public class MonsterBase : Unit
     bool _isDead;
     bool _initialized;
     bool _inAttackRange;           // 사거리 안에 들어와 있나(히스테리시스 적용). 진입 순간에 첫 공격 지연을 건다
+    float _lastRetargetTime = -1f; // 마지막 주기 재선정 시각(초). **-1 = 아직 교전 전**
+    bool _animatorHeldLocally;     // 이 피어에서 애니메이터를 정지시켜 뒀나(자세 홀드 래치)
+    float _animatorResumeSpeed = 1f; // 홀드 전 애니메이터 속도 — 풀 때 이 값을 되돌린다
+    IBossTelegraph _telegraph;     // 카운터 창 표현(있으면). 지연 해석 — 런타임 부착일 수 있다
     bool _serverLogicSuspended;    // 연출 구간 게이트(SetServerLogicSuspended). true 면 서버 FSM 이 안 돈다
     Coroutine _deathFxRoutine;              // 임시 사망 표시 코루틴(모든 피어)
     const float DeathPlaceholderDuration = 1f; // 임시 사망 표시 지속(디졸브/애니 도입 시 제거)
@@ -333,6 +337,10 @@ public class MonsterBase : Unit
         if (!IsTargetValid(_target))
         {
             _target = FindNearestTarget();
+
+            // 교전 시작 시각 = 주기 재선정 시계의 0 점. 여기서 세워야 첫 타깃을 잡은 틱에
+            // 곧바로 재선정이 도는 것을 막는다.
+            if (_target != null && _lastRetargetTime < 0f) _lastRetargetTime = Time.time;
         }
         else if (ShouldReacquireTarget())
         {
@@ -347,6 +355,10 @@ public class MonsterBase : Unit
                 ? FindNearestTarget(exclude: _target)
                 : FindNearestTarget();
             if (candidate != null) _target = candidate;
+
+            // 🔴 후보를 못 찾았어도 시계를 다시 돌린다. 안 그러면 다음 틱에 또 재선정 조건이 서서
+            //    빈손 탐색(FindNearestTarget)이 매 틱 돈다.
+            _lastRetargetTime = Time.time;
         }
 
         if (_target == null)
@@ -699,10 +711,24 @@ public class MonsterBase : Unit
     /// <summary>
     /// 타겟이 <b>아직 유효한데도</b> 다시 고를 것인가. 기본 <c>false</c> = 지금까지의 락온 동작.
     ///
-    /// 23호가 주기 어그로 재선정에 쓴다. 여기서 true 를 돌려주면 위 락온 분기가 타깃을
-    /// 새로 탐색한다 — 파생은 "언제 바꿀지"만 정하고 "어떻게 고를지"는 base 가 갖는다.
+    /// 여기서 true 를 돌려주면 위 락온 분기가 타깃을 새로 탐색한다 — 파생은 "언제 바꿀지"만
+    /// 정하고 "어떻게 고를지"는 base 가 갖는다.
+    ///
+    /// 기본 구현은 <see cref="MonsterDataSO.retargetInterval"/> 이 <b>0 보다 클 때만</b> 돈다.
+    /// 저작 안 한 몹(일반몹 8종 = 0)은 예전처럼 항상 false 다. 23호는 자기 override 로 우선되므로
+    /// 이 경로를 타지 않는다.
     /// </summary>
-    protected virtual bool ShouldReacquireTarget() => false;
+    protected virtual bool ShouldReacquireTarget()
+    {
+        if (data == null) return false;
+
+        // 🔴 교전 시작 전(_combatStartedAt 미설정)에는 재선정하지 않는다. 0 으로 두면 "아주 오래전"이
+        //    되어 첫 타깃을 잡은 그 틱에 곧바로 재선정이 돌아 버린다(교훈 #85 와 같은 뿌리).
+        if (_lastRetargetTime < 0f) return false;
+
+        return BossAggroPolicy.ShouldRetarget(
+            _state.Value, Time.time - _lastRetargetTime, data.retargetInterval);
+    }
 
     /// <summary>
     /// 주기 재선정에서 <b>지금 물고 있는 대상을 후보에서 뺄</b> 것인가. 기본 <c>false</c>.
@@ -1411,6 +1437,11 @@ public class MonsterBase : Unit
     #region 애니메이션(상태→Animator 매핑 단일 지점)
     void OnStateChanged(MonsterState previous, MonsterState next)
     {
+        // 자세를 붙잡는 상태는 Groggy 하나뿐이다(그로기 클립이 없는 몹의 표현).
+        // 그 밖으로 나가면 무조건 푼다 — 해제를 개별 경로에 맡기면 하나만 빠져도 몹이 영구히 얼어붙는다.
+        if (next != MonsterState.Groggy)
+            ApplyAnimatorHold(false);
+
         // 액션(공격/피격/그로기)에서 이동계열(대기/추격/복귀)로 전이 시, 진행 중이던 액션 클립을
         // 끊고 로코모션으로 강제 복귀. (공격 도중 리쉬 복귀 등으로 애니가 공격 클립에 눌러앉는 문제 해결.)
         if (IsActionAnimState(previous) && IsLocomotionAnimState(next))
@@ -1438,6 +1469,86 @@ public class MonsterBase : Unit
     {
         if (HasParameter(animator, param)) animator.ResetTrigger(param);
     }
+
+    #region 카운터 창 표현 · 그로기 자세 정지 — 중간보스 전용 진입점
+    // 🔴 애니메이터는 복제되지 않는다. 서버가 진실의 원천이고 아래 RPC 들은 표현만 옮긴다.
+    //    정지/재개는 **멱등**이어야 한다 — 풀 때 0 을 복원하면 몹이 영구히 얼어붙는다. 그래서 걸 때만
+    //    현재 속도를 저장하고(_animatorHeldLocally 가 그 래치), 풀 때 저장본을 되돌린다.
+    //    (23호 SetCounterPoseHeldClientRpc 선례를 그대로 옮긴 것이다.)
+    //
+    // ⚠️ **창 동안에는 애니를 멈추지 않는다**(2026-09-08 구현 중 확정). 23호는 준비 자세를 붙잡지만
+    //    중간보스는 예비동작 클립이 창을 이미 덮는다 — Spinner `AttackStart` 45프레임 = 1.5초(창과 동일,
+    //    이어지는 `AttackLoop` 는 루프) · Gauntlet `Smash Anticipation` 60프레임 = 2.0초 > 창 1.5초.
+    //    돌고 있는 스피너를 얼리면 오히려 고장난 것처럼 보이고, 피어별 정지 프레임 차이도 생긴다.
+    //    자세 정지는 **그로기 클립이 없는 몹의 그로기 표현**에만 쓴다(Gauntlet).
+
+    /// <summary>카운터 창 표현(텔레그래프)을 켜고 끈다. 서버에서 부른다.</summary>
+    protected void ServerSetCounterWindow(bool open)
+    {
+        if (!IsServer) return;
+
+        ApplyCounterWindowVisual(open);          // 호스트 자신
+        if (IsSpawned) SetCounterWindowClientRpc(open);
+    }
+
+    /// <summary>
+    /// 로코모션 첫 프레임 자세로 갈아탄 뒤 정지한다 — <b>그로기 클립이 없는 몹</b>의 그로기 표현.
+    /// 서버에서 부른다. 해제는 상태 이탈이 알아서 한다(<see cref="OnStateChanged"/>).
+    /// </summary>
+    protected void ServerFreezeAtLocomotion()
+    {
+        if (!IsServer) return;
+
+        ApplyLocomotionFreeze();
+        if (IsSpawned) FreezeAtLocomotionClientRpc();
+    }
+
+    [ClientRpc] void SetCounterWindowClientRpc(bool open) => ApplyCounterWindowVisual(open);
+    [ClientRpc] void FreezeAtLocomotionClientRpc() => ApplyLocomotionFreeze();
+
+    void ApplyCounterWindowVisual(bool open)
+    {
+        if (_telegraph == null) _telegraph = GetComponentInChildren<IBossTelegraph>(true);
+        _telegraph?.SetCounterWindow(open);
+    }
+
+    // 🔴 CrossFade 가 아니라 Play 다. 속도 0 에서는 블렌드가 진행되지 않아 CrossFade 로는
+    //    자세가 바뀌지 않는다(창 홀드 → 그로기 전환에서 Smash 자세에 눌러앉는다).
+    //    이동 블렌드 파라미터도 0 으로 눌러 대기 자세를 집는다 — 걷던 프레임에서 얼지 않게.
+    void ApplyLocomotionFreeze()
+    {
+        if (animator == null || data == null) return;
+
+        ApplyAnimatorHold(false);
+        SafeSetFloat(data.animSpeedParam, 0f);
+        SafeResetTrigger(data.attackTrigger);
+        SafeResetTrigger(data.hitTrigger);
+
+        int hash = Animator.StringToHash(data.locomotionState);
+        if (animator.runtimeAnimatorController != null && animator.HasState(0, hash))
+            animator.Play(hash, 0, 0f);
+
+        ApplyAnimatorHold(true);
+    }
+
+    void ApplyAnimatorHold(bool held)
+    {
+        if (animator == null) return;
+
+        if (held)
+        {
+            if (_animatorHeldLocally) return;   // 이미 잡고 있다 — 0 을 저장하는 사고를 막는다
+            _animatorResumeSpeed = animator.speed;
+            animator.speed = 0f;
+            _animatorHeldLocally = true;
+            return;
+        }
+
+        if (!_animatorHeldLocally) return;
+        animator.speed = _animatorResumeSpeed;
+        _animatorHeldLocally = false;
+    }
+    #endregion
 
     protected void SafeCrossFade(string stateName)
     {
