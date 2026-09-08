@@ -23,6 +23,10 @@
 3. `Tools/Boss/중간보스 — 인터럽트 카운터 배선 검증` · `Tools/Boss/몬스터 — 근접 공격 거리 정합 감사` ·
    `Tools/Boss/몬스터 — 인지·전투 값 점검` 세 개 돌려 값 확인
 4. `Tools/Tests/전투 EditMode 테스트 실행` — 직전 기준 **95/95**
+5. 🔴 **`WallBot.cs.meta` 를 커밋할 것.** Play 중이라 임포트가 안 돼서 `.cs` 만 커밋됐다.
+   `.meta` 가 빠지면 팀원 쪽에서 **스크립트 GUID 가 달라져 WallBot 프리팹이 "Missing script"** 가 된다
+   (`AGENTS.md` 3번: `.meta` 는 에셋과 같은 VCS 로 함께 커밋한다). 임포트 후 바로 `git add` 할 것.
+   같이 생길 프리팹 변경(`WallBot.prefab`)과 한 커밋으로 묶으면 된다.
 
 ## Play 체크리스트 (직전 커밋 50a48745 기준)
 
