@@ -2144,7 +2144,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5f494a3dfb3a07c438ce1300b3ecb257, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MonsterSpawnPoint
-  monsterPrefabOverride: {fileID: 2289540308195322763, guid: 959abbfa6214e0c42a0b997163c969f9, type: 3}
+  monsterPrefabOverride: {fileID: 2579433155061434859, guid: ed9187a4073864040b799770ea6278a4, type: 3}
   count: 1
   scatterRadius: 1.5
 --- !u!1001 &763788014416458
