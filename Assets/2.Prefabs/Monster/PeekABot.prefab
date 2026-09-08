@@ -69,6 +69,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Hurtbox
   ownerUnit: {fileID: 2501883898151287011}
+  attackReceiverSource: {fileID: 0}
 --- !u!1 &1351560125244360941
 GameObject:
   m_ObjectHideFlags: 0
@@ -487,7 +488,7 @@ MonoBehaviour:
     m_Bits: 64
   attackType: 0
   projectilePrefab: {fileID: 0}
-  muzzle: {fileID: 0}
+  muzzle: {fileID: 5446708710169467134}
   projectileSpeed: 12
   projectileLifetime: 4
 --- !u!114 &3267179814220467379
