@@ -1,3 +1,63 @@
+# ▶▶ 다음 착수점 — 남은 순서와 함정 (2026-09-08 기록)
+
+> 인수인계를 `CONTEXT.md` 가 아니라 여기에 적는다 — `CONTEXT.md` 에 **다른 세션(프로파일링)의
+> 미커밋 202줄**이 얹혀 있어, 지금 건드리면 그 세션 판단과 섞여 커밋된다.
+
+## 순서 (팀장 확정)
+
+1. **Play 재확인** — 아래 「Play 체크리스트」
+2. **WallBot 인터럽트 추가** (2차 범위였던 것) — 전용 클래스 신설 필요, PLAN §4 설계 그대로
+3. **중간보스 어그로 확인** — 재선정 8초가 2인에서 실제로 도는지(MPPM `MidBossTest`)
+4. 검증 끝나면 **팀원 머지 반영** → 5. **SVN 최신화**
+
+## Play 체크리스트 (직전 커밋 50a48745 기준)
+
+- [ ] PeekABot·TeslaBot 공격이 다시 나간다(무장 거리 0.7m 로 즉사 회귀 수정)
+- [ ] 벽 뒤로 숨으면 투사체가 벽에서 사라진다 / 다른 몹 사이로는 지나간다
+- [ ] 위층·아래층 몹이 서로 모른다 — **포탑 포함**(고정 포탑은 리쉬가 영원히 안 걸려 유지 조건에도 높이를 넣었다)
+- [ ] WallBot 이 허공을 안 때린다(공격 거리 3.5 → 2.4, 히트박스 실도달 2.0)
+- [ ] 몬스터가 스냅이 아니라 부드럽게 돈다(turnSpeed 10, 23호와 같은 규약)
+- [ ] 23호 차징이 화면 아래를 본다
+- [ ] 중간보스 인터럽트: 창 안 → 즉시 그로기(Spinner=Dizzy 클립 / Gauntlet=Idle 자세 정지) · 창 밖 → 데미지만
+
+## 머지 (팀원 → 나) — 브랜치와 함정
+
+- 병합 대상: **`feature/VFX-merged`**(민경님 전달, 2026-09-08). 은희님 브랜치는 `transparentv3` 계열.
+- 은희님 쪽에서 **조용히 넘어오는 것 3개**(내 브랜치가 안 건드린 파일이라 충돌 없이 들어온다):
+  빌드 씬 목록에서 보스·몬스터 단독 테스트 씬 제거 / `Dev_Boot` 부팅 대상 / MPPM 시나리오 5개 → 1개
+  (내가 추가한 `MidBossTest` 도 삭제로 들어온다 — 되살릴지 판단)
+- 민경님 쪽 예상 충돌: `AoeTelegraph`(내 데칼 경로 ↔ `EffectSocketPlayer` 전환) ·
+  **23호 프리팹 경로**(내가 지운 `Wells&No.23/TwentyThree.prefab` 에 민경님 VFX 배선 6커밋이 있다) ·
+  `MonsterBase`/`BossBase`/`MapContentSpawner`/`TwentyThreeArenaContext`
+
+## 🔴 SVN 최신화 — 업데이트 후 반드시 다시 확인할 것
+
+민경님이 **일반몹 애니메이션 이벤트 부착** 때문에 art fbx.meta 를 여럿 고쳤다(2026-09-08 연락).
+내 카운터 구현이 **그 클립들의 프레임 수를 근거로** 홀드를 뺀 것이므로, 업데이트 후 재확인이 필수다.
+
+- 내가 올린 것: **r290**(채찍 히트 이벤트 Start → End 이동) · **r292**(SpinBot `AnyState → Dizzy` 전이).
+  SVN 워킹카피 루트는 `Assets/50.Art` 다(레포 루트에서 svn 명령이 안 먹는다).
+- 업데이트 후 확인:
+  1. `A_Spinner_Dizzy` 에 붙은 이벤트 — `OnAttackHit` 류가 있으면 **그로기 중 데미지가 나간다**
+  2. `A_Spinner_AttackStart` 프레임 — 45(1.5초)여야 스핀 창을 덮는다
+  3. `A_GauntletBot_SmashAntici` 프레임 — 60(2.0초)여야 창 1.5초를 덮는다
+  4. `Controller_PeekABot` — Hit 상태가 생겼으면 감사의 죽은 값 2건이 해소된다
+  5. 내 r290 채찍 이벤트가 살아 있는지(아트가 fbx 를 다시 올리면 임포터 설정이 초기화된다 →
+     `Tools/Boss/중간보스 — SpinnerBot 그로기 진입 전이 보장` 메뉴가 멱등 복구용이다)
+  6. `Tools/Boss/몬스터 — 애니메이터 파라미터 감사` · `Tools/Boss/몬스터 — 인지·전투 값 점검` 재실행
+
+## 미커밋으로 남겨 둔 것 (의도)
+
+- `Assets/0.Scenes/Dev_Boot.unity` — 부팅 대상을 `4.MapScene-trensparent` 로 바꾼 팀장 변경. 커밋 제외 지시.
+- `ProjectSettings` 3개 · `CONTEXT.md` · 포폴 문서 — 내 작업 아님(다른 세션/Unity 노이즈).
+
+## 판단 대기 2건
+
+- `WallBotData.maxGroggyCount: 4` — 창 없는 누적식이 살아 있어 인터럽트 4회로 눕는다. 2번 작업에서 0 으로.
+- PeekABot·TeslaBot `muzzle` 미배선 — 발사 원점이 발밑이다. `TrackingLaser` 가 y 1.35 라 그 높이가 기준.
+
+---
+
 # CURRENT PLAN — 머지 전 마무리 3건 (2026-09-08, 구현 착수)
 
 머지 순서(팀장 확정): **① 내 작업 완료 → ② 은희·민경 머지 결과(`feature/vfx-onto-transparentv3`)와
