@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 576305eb4d78f0c4eb97b90edc8cae21, type: 3}
   m_Name: WallBotData
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   archetype: 0
   attackDamage: 16
   moveSpeed: 2
@@ -24,12 +24,25 @@ MonoBehaviour:
   detectionHeightTolerance: 2
   attackRange: 2
   leashRadius: 18
+  retargetInterval: 8
   returnSpeedMultiplier: 5
   turnSpeed: 10
+  avoidanceRadius: 0.3
+  obstacleAvoidance: 2
+  projectilePrefab: {fileID: 0}
+  projectileSpeed: 12
+  projectileLifetime: 4
+  minStandoff: 4
+  projectileArcHeight: 0
+  projectileSplashRadius: 0
+  repositionBetweenAttacks: 0
+  retreatMinDuration: 1.2
+  repositionMinDuration: 1.2
   attackDuration: 1.6
   attackWindup: 0.5
   cancelWindupIfTargetLeavesRange: 1
-  maxGroggyCount: 4
+  engageAttackDelay: 0
+  maxGroggyCount: 0
   groggyDuration: 3
   startsWithSuperArmor: 0
   hasSuperArmorWhileAttacking: 1
@@ -42,3 +55,4 @@ MonoBehaviour:
   hitTrigger: Hit
   groggyBool: 
   deathTrigger: 
+  locomotionState: Movement

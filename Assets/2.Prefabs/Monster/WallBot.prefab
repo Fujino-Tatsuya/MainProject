@@ -80,7 +80,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MonsterMeleeAttack
   damage: 0
-  isGroggyAttack: 0
   targetLayer:
     serializedVersion: 2
     m_Bits: 64
@@ -107,6 +106,7 @@ GameObject:
   - component: {fileID: 3212671186718207182}
   - component: {fileID: 5419735519947956318}
   - component: {fileID: 765449773972238274}
+  - component: {fileID: 8513829195212904834}
   m_Layer: 8
   m_Name: WallBot
   m_TagString: Untagged
@@ -314,7 +314,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 6850862162668286586}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 69efb46ca0e14814ba2b04c39ca4e1da, type: 3}
+  m_Script: {fileID: 11500000, guid: 542d8fc414d3f764c935ffcc62d75335, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MonsterBase
   ShowTopMostFoldoutHeaderGroup: 1
@@ -329,9 +329,16 @@ MonoBehaviour:
     m_Bits: 64
   maxDetectionResults: 16
   hitVFXCollider: {fileID: 138876035767613204}
-  hitPointMode: 2
   hitVFXType: 1
   bodyCollider: {fileID: 4040508410350868295}
+  dashDuration: 0.8
+  dashSpeedMultiplier: 6
+  dashMaxDistance: 8
+  dashRepeatInterval: 0.5
+  shockRadius: 3
+  shockDamageMultiplier: 1.2
+  shockKnockback: 6
+  shockMaxHitCount: 8
 --- !u!114 &765449773972238274
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -349,6 +356,20 @@ MonoBehaviour:
   duration: 1.5
   from: 0
   to: 1
+--- !u!114 &8513829195212904834
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6850862162668286586}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 61349f523c460af499e8ba439023b8ff, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MonsterCounterWindow
+  windowDuration: 1.5
+  groggyDuration: 0.5
 --- !u!1 &8280573472769756640
 GameObject:
   m_ObjectHideFlags: 0
