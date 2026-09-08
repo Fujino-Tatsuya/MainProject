@@ -1904,6 +1904,8 @@ public class TwentyThreeBoss : MonsterBase
         // 이동용으로 올려 뒀던 속도·가속도·정지거리를 되돌리고 멈춘다(돌진과 같은 복원 경로).
         EndDashMove();
 
+        FaceScreenSouthForCharge();   // EndDashMove 뒤에 — 에이전트가 멈춘 다음 방향을 확정한다
+
         _charge?.Begin(_chargePylons, ChargeTimeLimit);
         SpawnChargeZone();
         BeginChargeAura();
@@ -1916,6 +1918,27 @@ public class TwentyThreeBoss : MonsterBase
         Debug.Log($"[23호] 송전기 시작 — 인원 {_chargePlayers}명 → 송전탑 {_chargePylons}개, " +
                   $"제한시간 {ChargeTimeLimit:0.#}초", this);
         EnterPhase(BossAttackPhase.ChargeWait, ChargeTimeLimit);
+    }
+
+    /// <summary>
+    /// 차징 자세를 <b>화면 아래(남쪽)</b>로 고정한다. 규칙과 톱다운 경계 처리는
+    /// <see cref="BossChargeFacingPolicy"/> 참조.
+    ///
+    /// 회전은 서버 권한이고 <c>NetworkTransform</c> 이 복제하므로 RPC 가 필요 없다.
+    /// 차징 대기 페이즈는 오라·차징만 돌려 재조준이 없어 한 번 돌려놓으면 유지된다.
+    /// </summary>
+    void FaceScreenSouthForCharge()
+    {
+        Camera cam = Camera.main;
+        Vector3 dir = cam != null
+            ? BossChargeFacingPolicy.ScreenSouth(
+                cam.transform.forward, cam.transform.up, BossChargeFacingPolicy.DefaultFallback)
+            : BossChargeFacingPolicy.DefaultFallback;
+
+        transform.rotation = Quaternion.LookRotation(dir, Vector3.up);
+
+        if (cam == null)
+            Edit.LogWarning($"{name}: 차징 방향 — 활성 카메라를 못 찾아 월드 −Z 로 섰다.", this);
     }
 
     float _lastAttackTickTime = -999f;   // 마지막으로 공격 중이던 시각(= 공격 종료 시각)

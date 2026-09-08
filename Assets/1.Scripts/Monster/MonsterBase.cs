@@ -1338,6 +1338,13 @@ public class MonsterBase : Unit
             // 제외 대상은 건너뛴다. 루트로 비교하는 이유 — exclude 로 넘어오는 _target 도
             // 루트라서, 콜라이더 트랜스폼과 직접 비교하면 자식 콜라이더에서 안 걸린다.
             if (exclude != null && root == exclude) continue;
+
+            // 층 분리 — 수직 차가 크면 인지하지 않는다(위층 몹이 아래를 때리던 문제).
+            // 규칙과 한계는 MonsterPerceptionPolicy 참조. 데이터 값이 0 이면 예전처럼 높이를 무시한다.
+            if (!MonsterPerceptionPolicy.WithinHeight(
+                    transform.position.y, root.position.y, data.detectionHeightTolerance))
+                continue;
+
             float sqr = (root.position - transform.position).sqrMagnitude;
             if (sqr < best)
             {

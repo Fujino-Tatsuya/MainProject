@@ -21,6 +21,7 @@ MonoBehaviour:
   defense: 0
   maxShield: 0
   detectionRadius: 12
+  detectionHeightTolerance: 2
   attackRange: 10
   leashRadius: 15
   returnSpeedMultiplier: 5

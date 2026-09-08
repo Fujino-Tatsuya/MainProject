@@ -117,10 +117,20 @@ public class MonsterProjectile : NetworkBehaviour
             return;
         }
 
-        // 환경 착탄(지면/벽 등 타깃이 아닌 콜라이더) — 탄도 모드에서만 폭발 처리.
-        if (_ballistic && other.GetComponentInParent<Unit>() == null && !other.isTrigger)
+        // 환경 착탄(벽·프롭·지면 등 타깃이 아닌 콜라이더) — **직선도 여기서 죽는다**.
+        //
+        // 🔴 예전에는 `_ballistic` 일 때만 처리해서 직선 투사체가 **벽을 통과**했다
+        //    (2026-09-08 팀장 관찰). 원거리 공격이 벽 뒤를 때리면 엄폐가 의미를 잃는다.
+        //
+        // 규칙: `Unit` 이 아니고 트리거도 아니면 장애물이다.
+        //  - 몬스터·플레이어는 `Unit` 이라 그대로 통과한다 → "다른 몹이 대신 맞지 않는다"는 사양 유지.
+        //  - 장판·구역·다른 투사체는 `isTrigger` 라 무시된다.
+        //  ⚠️ 존 프리팹의 벽·통로·바닥이 전부 `Default` 레이어라(Wall/Env 를 쓰지 않는다) 레이어로
+        //     "벽만" 고를 수 없다 → 바닥·경사도 장애물이다. 오르막에 맞으면 사라진다(층 분리와 같은 방향).
+        if (other.GetComponentInParent<Unit>() == null && !other.isTrigger)
         {
-            Detonate();
+            if (_ballistic && _splashRadius > 0f) Detonate();
+            else Despawn();
         }
     }
 

@@ -20,6 +20,10 @@ public class MonsterDataSO : ScriptableObject
 
     [Header("인지 / 교전 범위")]
     public float detectionRadius = 8f;  // 타깃 인지 반경
+    // 인지 허용 수직 차(m). |Δy| 가 이 값을 넘으면 반경 안이라도 **인지하지 않는다** — 층 분리용.
+    // 0 이면 제한을 끈다(예전 동작 = 높이 무시). 규칙과 한계는 MonsterPerceptionPolicy 참조.
+    // 획득 단계에만 적용된다 — 이미 문 대상은 leashRadius 로만 풀린다.
+    public float detectionHeightTolerance = 2f;
     public float attackRange = 2f;      // 이 거리 이내면 공격
     public float leashRadius = 15f;     // 스폰 지점에서 이 거리 벗어나면 복귀
     // 주기 어그로 재선정 간격(초). 0 = 끔(기존 락온 유지 — 사망·디스폰·리쉬로만 풀린다).
