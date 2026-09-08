@@ -1,3 +1,511 @@
+> 🔴 **아래 두 계획서는 `feature/VFX`에서 옮겨 온 기록이다** (2026-09-08).
+> VFX 작업이 `transparentV3` 위로 옮겨 갔고 이 브랜치가 그 결과다. 이식 범위와 남은 것은
+> [CONTEXT.md](CONTEXT.md) 최상단 인수인계를 볼 것 — 보스 프리팹 배선 7건은 이식하지 못했다.
+
+---
+
+# CURRENT PLAN — 파괴 가능한 상자 + 파편 버스트 이펙트화 (2026-09-07)
+
+> 상태: **코드 구현 완료 · Unity 저작과 MPPM 검증 대기**. 브랜치 `feature/VFX`. 작업자 민경(Claude).
+> 선행 작업: 파편 폭발 프로파일링(완료) — `CONTEXT.md` 2026-09-07 인수인계 참조.
+>
+> 🔴 **코어 공용 코드를 하나 건드렸다** — `Hurtbox.cs`에 인스펙터 배선용 필드 추가.
+> 하위 호환이지만 AGENTS.md §4 기준 사전 공유 대상이다(아래 "구현 중 계획과 달라진 것" ①).
+
+## 목표
+
+1. 플레이어가 공격하면 맵의 상자가 부서지고, **전 피어에서** 파편 버스트가 재생된다.
+2. 파편 풀링을 **상자마다 하나씩**에서 **EffectManager 공유 풀**로 옮긴다.
+
+## 왜 지금 하는가 — 현재 구조의 결함
+
+🔴 **`FragmentExploder`는 상자가 Destroy되면 같이 죽는다.**
+
+```csharp
+// FragmentExploder.cs:209
+poolRoot = new GameObject($"{name}_Fragments").transform;
+poolRoot.SetParent(transform, false);   // ← 상자의 자식
+```
+
+풀 루트가 상자의 자식이고, `debrisLifetime` 타이머도 상자의 `Update()`가 돌린다.
+**수명을 소유한 객체가 먼저 죽는 구조**라 "부서지면 Destroy"를 넣는 순간 파편이 날아가는
+도중에 통째로 사라진다. 지금 `explodeNOW` 체크박스로만 테스트해서 드러나지 않았을 뿐이다.
+
+그리고 상주 비용이 **배치된 상자 수**에 비례한다(상자 100개 = GameObject 1,500개,
+전부 `Start()`에서 생성). 공유 풀이면 **동시 폭발 수**에만 비례한다.
+
+## 확인된 현재 상태 (조사 결과)
+
+### 성능 — 재조사 불필요
+
+Development Build 실측, 상자 5개 동시 폭발(파편 75개) 한 프레임:
+
+```
+Fragment.Explode      Calls  5   0.32ms   ← 60fps 예산의 1.9%
+├ Fragment.Activate   Calls 75   0.19ms   (SetActive의 엔진 작업. Self는 0.01ms)
+├ Fragment.OnExploded Calls  5   0.07ms
+└ Fragment.Forces     Calls 75   0.04ms
+```
+
+**성능은 이 작업의 동기가 아니다.** 동기는 위의 수명 결함과 확장성이다.
+
+### 맵은 시드 기반 결정적 생성이다 — ID 문제가 여기서 풀린다
+
+- `MapNetworkSync`: 서버가 시드 결정 → `NetworkVariable<int> _seed` 복제 → **전 피어가 각자 Generate**
+  (레이트 조인 포함, `_ready.OnValueChanged`).
+- `MapGenerator.cs:58`: `_rng = new System.Random(mapSeed)` — **격리된 인스턴스**.
+  전역 `UnityEngine.Random`이 아니라 다른 코드에 흐트러지지 않는다.
+- `MapContentSpawner.cs:36`: `foreach (var p in placements) Instantiate(p.LayoutPrefab, ...)` —
+  **존 비주얼은 전 피어가 같은 순서로** 로컬 Instantiate한다(`isServer`는 몬스터만 게이트).
+
+→ 상자 식별자는 **스폰 순번**으로 충분하다. 에디터 베이크(런타임 생성이라 불가)도,
+위치 해시(상자가 움직이면 깨짐)도 필요 없다.
+
+### 데미지 파이프라인은 Unit 없이도 돈다
+
+- `BaseAttack.cs:138`: Hurtbox를 찾으면 **Unit을 거치지 않고** `TryResolveHit(hurtbox, ...)`.
+- `Hurtbox.cs:68`: ownerUnit이 없으면 `GetComponentInParent<IAttackReceiver>()`로 폴백.
+- `PlayerDefaultAttack.cs:96` 이후 코드가 전부 `if (ownerUnit != null)` 가드.
+- `IAttackReceiver`는 메서드 하나뿐: `bool ReceiveAttack(AttackInfo, AttackHitContext)`.
+- `BaseAttack.cs:132`: `if (!IsServer) return false` — 공격 판정은 서버 전용.
+
+→ 🔴 **상자를 `Unit`으로 만들면 안 된다.** 상자 100개 = NetworkObject 100개 +
+NetworkVariable 400개(`_currentHp`/`_maxHp`/`_currentShield`/`_hasShield`)인데,
+상자가 동기화해야 할 상태는 **없다**. 사건 하나뿐이다.
+
+### 상자 저작 현황
+
+- 존 프롭 프리팹 6종에 크레이트 오브젝트 14개(`box2stack` ×2, `box_3stack` ×4).
+- 각 크레이트는 **평범한 GameObject** — MeshFilter + MeshRenderer + MeshCollider.
+  프리팹 인스턴스가 아니라 구워진 지오메트리다.
+- ✅ **프롭 프리팹에 MonoBehaviour가 하나도 없다** — 런타임 랜덤화로 피어 간
+  상자 구성이 갈릴 위험이 없다.
+- 상자 스케일은 (1,1,1). 비균등 스케일 문제 없음.
+
+### 🔴 상자 더미는 "쌓인 지오메트리"다 — 개별 파괴가 성립하지 않는다
+
+**Rigidbody가 0개**다. 전부 MeshCollider만 있는 정적 지오메트리라, 아래 상자를 끄면
+위 상자가 **허공에 그대로 떠 있는다**.
+
+그리고 더미가 반듯한 탑이 아니다. `box_3stack_1e9ab3da` 실측 localPosition:
+
+| 오브젝트 | x | **y** | z |
+|---|---|---|---|
+| `SM_Prop_Crate_01_1` | 0.070 | **0** | -0.440 |
+| `SM_Prop_Crate_01_2` | 0.339 | **0** | 0.478 |
+| `SM_Prop_Crate_01_3` | 0.339 | **0.814** | -0.074 |
+
+바닥에 2개 + 위에 1개인데, 위 상자의 XZ가 아래 두 상자 **사이에 걸쳐** 있다.
+"누가 누구를 받치는가"가 단일 관계로 정해지지 않는다.
+
+(`box2stack_03d76815`은 y = -0.865 / -0.031 로 진짜 2층이다.)
+
+→ 지지 그래프를 계산하는 대신 **프롭 프리팹 자체를 파괴 단위로 삼는다**(결정 9).
+아티스트가 "상자 더미"라는 하나의 프롭으로 저작한 것을 그대로 존중하는 쪽이기도 하다.
+
+## 결정 (합의됨)
+
+| # | 질문 | 결정 |
+|---|---|---|
+| 1 | 파편 풀링 방식 | **루트 A** — EffectManager에 얹는다(전용 매니저 안 만듦) |
+| 2 | 상자 베이스 클래스 | **`MonoBehaviour, IAttackReceiver`** — Unit/NetworkObject 안 씀 |
+| 3 | 파괴 전파 | **브로드캐스터 1개** (공격자 릴레이 방식 기각) |
+| 4 | 브로드캐스터 위치 | **`MapNetworkSync`와 같은 오브젝트** — 맵 없으면 상자도 없다 |
+| 5 | 상자 ID | **스폰 순번** `(slotID << 16) \| localIndex` |
+| 6 | 중간 접속 대응 | **안 함** — `NetworkList` 넣지 않는다 |
+| 7 | `FragmentExploder` | **참고용으로 남긴다** — 신규 경로 완성 전까지 |
+| 8 | 파편 충돌 | **끈 채로 유지** — 연출이지 게임플레이가 아니다 |
+| 9 | 파괴 단위 | **프롭 프리팹 루트** — 더미 전체가 한 번에 부서진다. 개별 상자 파괴 안 함 |
+
+결정 9로 함께 기각한 것:
+
+- **Y 캐스케이드**(아래를 깨면 위도 연쇄) — 걸쳐 있는 상자 때문에 지지 관계가 애매하고,
+  로직이 한 겹 늘어난다. 나중에 개별 파괴가 필요해지면 이쪽으로 확장한다
+  (`BreakableCrate`가 자식 목록을 드는 구조는 양쪽이 같다).
+- **위 상자에 Rigidbody를 달아 낙하** — 낙하 결과가 피어마다 갈리는데 상자는 플레이어를
+  막는 콜라이더라 **실제 디싱크**가 된다. 막으려면 상자마다 NetworkObject +
+  NetworkTransform이 필요한데, 그건 결정 2에서 피한 바로 그 비용이다.
+
+## 작업 항목
+
+### A. 파편 버스트를 이펙트로 (루트 A)
+
+1. **`MeshFragmentSetEditor` Bake 확장** — 파편 메시에 더해 **버스트 프리팹**까지 굽는다.
+   루트 1개 + 파편 N개 자식(MeshFilter/MeshRenderer/Rigidbody 사전 세팅, 콜라이더 없음).
+2. **`FragmentBurstEffect`** (MonoBehaviour, 버스트 프리팹 루트에 부착) —
+   `Burst()`로 전 파편에 폭발력·회전 부여, `ResetForPool()`로 제자리 복귀.
+   폭발력·질량·회전 범위 파라미터는 **버스트 프리팹이 소유**한다(상자 배치가 아니라 파편 세트의 속성).
+3. **`FragmentBurstEffectSystem : IEffectSystem`** — 4번째 파트 드라이버.
+   `EffectManager.Awake`에 한 줄 등록.
+4. **`EffectEntry` 에셋** 상자 종류별 1개. `duration` = 파편 수명, `prewarmCount` = 동시 폭발 상한.
+
+> ⚠️ 파편은 피어마다 다른 난수로 흩어진다. **연출이라 무방**하지만, 충돌을 켜면
+> 파편이 플레이어를 미는 결과가 클라마다 갈려 실제 디싱크가 된다 — 결정 8의 근거.
+
+### B. 파괴 가능한 상자
+
+5. **`BreakableCrate : MonoBehaviour, IAttackReceiver`** — **프롭 프리팹 루트에** 붙인다(결정 9).
+   - 서버 전용 `int _hp`(동기화 안 함), `EffectEntry burstEntry`, `int _crateId`
+   - `Transform[] pieces` — 더미를 구성하는 상자 자식들. 비어 있으면 자식 렌더러에서 자동 수집
+   - `ReceiveAttack` → hp 0이면 `CrateBreakBroadcaster.ServerBreak(_crateId)`
+   - `BreakLocal()` → **자식 상자 위치마다 버스트를 한 번씩** 재생 + `SetActive(false)`
+
+   ```csharp
+   // 한 방에 뿅 사라지지 않도록 어긋나게 재생한다 — 더미가 우르르 무너지는 느낌.
+   // EffectManager.Play는 원샷 fire-and-forget이라 핸들을 들 필요가 없다.
+   for (int i = 0; i < pieces.Length; i++)
+       StartCoroutine(PlayBurstAfter(pieces[i].position, pieces[i].rotation, i * pieceStagger));
+   ```
+
+   > `prewarmCount`는 **더미 수가 아니라 상자 개수** 기준으로 잡아야 한다 —
+   > 3단 더미 하나가 버스트 3개를 소비한다.
+6. **`CrateRegistry`** (static) — `id → BreakableCrate` 딕셔너리. 등록은 로컬 동작이라
+   순서 무관(베이크된 ID가 키). 중복 ID를 여기서 잡는다.
+7. **`CrateBreakBroadcaster : NetworkBehaviour`** — `MapNetworkSync`와 같은 오브젝트.
+   ```csharp
+   [Rpc(SendTo.ClientsAndHost)]   // ← Reliable(기본). 유실되면 상자가 이펙트 없이 증발한다
+   void BreakCrateRpc(int crateId) => CrateRegistry.BreakLocal(crateId);
+   ```
+   > `DissolveDeath`가 `Unreliable`인 것과 다르다. 디졸브는 유실돼도 오브젝트가 어차피
+   > 사라지지만, 상자는 때린 플레이어 눈앞에서 이펙트 없이 사라진다.
+
+### C. ID 부여
+
+8. **`MapContentSpawner.SpawnPlacements`** Instantiate 직후 한 줄:
+   ```csharp
+   GameObject zoneGo = Instantiate(p.LayoutPrefab, pos, rot, _root);
+   AssignCrateIds(zoneGo, p.Slot.SlotID);
+   ```
+   ```csharp
+   // GetComponentsInChildren은 깊이 우선 순회 — 같은 프리팹이면 순서가 같다.
+   // includeInactive: true 필수. 꺼진 더미를 건너뛰면 그 뒤 순번이 전부 밀린다.
+   var crates = zoneGo.GetComponentsInChildren<BreakableCrate>(true);
+   for (int i = 0; i < crates.Length; i++) crates[i].AssignId((slotId << 16) | i);
+   ```
+   결정 9로 `BreakableCrate`가 **프롭 루트에 하나씩**이므로, 존 하나에 더미 몇 개가
+   있든 인덱스는 더미 단위로 매겨진다. 코드는 그대로 쓴다.
+
+### D. 프리팹 저작
+
+9. 프롭 프리팹 6종에 컴포넌트를 붙인다. **부착 위치가 두 층으로 나뉜다:**
+
+   | 대상 | 붙일 것 |
+   |---|---|
+   | 프롭 프리팹 **루트** (6개) | `BreakableCrate` + `Hurtbox` |
+   | 자식 크레이트 **MeshCollider** (14개) | 레이어를 **`EnemyHurtBox`(14)** 로 변경 |
+
+   근거 — `BaseAttack.cs:220`의 `IsInTargetLayer(hit)`는 **`hit.gameObject.layer`** 를 본다.
+   즉 레이어는 실제로 맞는 **콜라이더 쪽**에 있어야 한다. 반면
+   `BaseAttack.cs:138`의 `hit.GetComponentInParent<Hurtbox>()`는 부모로 거슬러 올라가므로
+   **`Hurtbox`는 루트에 하나만** 있으면 자식 콜라이더 어디를 맞아도 찾힌다.
+   → 더미의 어느 상자를 때려도 루트의 `BreakableCrate` 하나로 모인다. 결정 9와 딱 맞는다.
+
+   수작업이 반복적이므로 **에디터 툴로 일괄 처리**한다 — 크레이트 메시를 참조하는
+   MeshFilter를 가진 자식을 찾아 레이어를 바꾸고, 루트에 두 컴포넌트를 붙이는 방식.
+
+## 구현 중 계획과 달라진 것 (2026-09-07 갱신)
+
+### ① 🔴 `Hurtbox.cs`에 인스펙터 배선 필드 추가 — 코어 공용 코드
+
+`Hurtbox`는 `[SerializeField] Unit ownerUnit` 하나뿐이라 **Unit이 아닌 수신자를 인스펙터로
+연결할 방법이 없었다**. 유니티는 인터페이스 필드를 직렬화하지 못하므로 `MonoBehaviour`로 받고
+`OnValidate`에서 타입을 검사한다.
+
+```csharp
+[SerializeField] private MonoBehaviour attackReceiverSource;   // IAttackReceiver가 아니면 OnValidate가 비운다
+```
+
+`ResolveReferences`는 **명시 → 자동** 순서: ① `ownerUnit` ② `attackReceiverSource`
+③ `GetComponentInParent<Unit>()` ④ `GetComponentInParent<IAttackReceiver>()`.
+`ownerUnit`이 최우선이라 **기존 플레이어·몬스터·보스 프리팹은 동작이 바뀌지 않는다**.
+
+### ② 콜라이더·Hurtbox는 루트에만 (작업 D 수정)
+
+계획서 초안은 자식 콜라이더에 레이어를 주고 루트에 Hurtbox를 두려 했으나,
+`Hurtbox`가 `[RequireComponent(typeof(Collider))]`라 **콜라이더와 같은 오브젝트**여야 한다.
+최종 형태는 기존 몬스터 프리팹과 동일하다 — 루트에 레이어 14 + **트리거** BoxCollider +
+`Hurtbox` + `BreakableCrate`, **자식은 손대지 않는다**(기존 MeshCollider는 플레이어를 막는
+물리 차단 역할이라 레이어를 옮기면 통과하게 된다).
+
+판정 트리거 하나라 **한 번 휘두르면 한 번만 판정**된다(상자마다 Hurtbox를 두면 hp가 중복 차감).
+
+### ③ 저작 ID 경로 추가 — 씬에 직접 배치한 상자
+
+`AssignId`는 `MapContentSpawner`만 부르므로 **BossScene처럼 손으로 배치한 상자는 조용히
+등록되지 않았다**. `BreakableCrate.authoredId`(음수)를 추가하고 `Awake`에서 자가 등록한다.
+`Tools > Crates > 씬의 상자에 ID 부여`가 계층 경로 순으로 `-1, -2, …`를 굽는다.
+
+**ID 공간 분리**: 저작 = 음수, 생성 = 양수.
+
+### ④ 🔴 ID 공식 수정 — 슬롯 0의 첫 상자가 0이 되던 버그
+
+`ZoneSlot.SlotID`는 0부터 시작하는 평범한 int라 `(slotID << 16) | i`가
+(슬롯 0, 인덱스 0)에서 **0**을 냈고, 0은 "미할당" 표식이라 그 상자가 자기 자신을 거부했다.
+
+```csharp
+crates[i].AssignId(((slotID + 1) << 16) | i);   // 항상 0이 아니고 항상 양수
+```
+
+디버깅: 슬롯 = `(id >> 16) - 1`, 인덱스 = `id & 0xFFFF`.
+
+### ⑤ 진단 로그 거짓 양성 수정 — `PlayerDefaultAttack`
+
+`swingHitBuffer`는 패시브 발동용이라 **Unit만** 담는데, 진단이 그 버퍼를 "뭔가 맞췄나"의
+신호로 재사용하고 있었다. 상자를 실제로 부수고도 "후보를 전부 걸렀다"고 거짓 보고했다.
+`bool anyResolved`를 따로 두고 진단만 그쪽으로 판단한다(통지는 그대로 Unit 전용).
+
+### ⑥ 스킬 2종이 상자를 걸러내던 것 수정
+
+`FirstMeleeMainSkill` · `FirstMeleeInterruptSkill`이 `if (unit == null) continue`로
+상자를 탈락시켰다. 중복 방지 셋을 `HashSet<Unit>` → **`HashSet<Object>`** 로 넓히고,
+Unit이 없으면 Hurtbox를 키로 쓴다. `ResolveHitUnit`의 시그니처는 건드리지 않았다.
+
+- `FirstMeleeUltimateSkill`(단일 타겟 hp 락온) · `FirstMeleePassive`(Unit 버퍼 소비)는
+  **의도적으로 제외** — 상자가 대상이 아닌 게 맞다.
+
+### ⑦ 파괴 UnityEvent 2종 추가
+
+`FragmentExploder.onExploded`에 대응하되 **둘로 나눴다**. 하나면 반드시 사고가 난다 —
+연출을 서버 이벤트에 걸면 호스트에서만 보이고, 드롭을 로컬 이벤트에 걸면 인원수만큼 중복된다.
+
+| 이벤트 | 시점 | 용도 |
+|---|---|---|
+| `onBrokenLocal` | 전 피어, `BreakLocal()` | 소리·추가 이펙트 |
+| `onBrokenServer` | 서버 1회, 파괴 확정 | 드롭·보상·점수 |
+
+⚠️ `onBrokenLocal` 직후 `SetActive(false)`다. 리스너가 이 오브젝트에서 `StartCoroutine`을
+걸면 즉시 죽는다.
+
+### ⑧ 조용한 실패를 전부 시끄럽게
+
+구현 중 **세 번 다** "때려도 안 부서지는데 로그가 없다"로 시간을 썼다. 세 지점에 진단을 넣었다.
+
+| 지점 | 조건 | 레벨 |
+|---|---|---|
+| `BreakableCrate.ReceiveAttack` | ID가 0 | Error + 로컬로는 부숨 |
+| `CrateRegistry.BreakLocal` | 조회 실패 | Warning + 등록 개수 표시 |
+| `CrateBreakBroadcaster.ServerBreak` | 브로드캐스터 없음 | 네트워크 중이면 **Error**, 아니면 정보 로그 |
+
+마지막 것이 특히 중요하다 — 폴백은 **호스트 혼자 테스트하면 정상처럼 보이고** MPPM 2인을
+띄워야 드러난다.
+
+## 리스크
+
+| 리스크 | 대응 |
+|---|---|
+| 맵 생성 결정성이 깨지면 ID가 어긋난다 | **게임이 이미 의존하는 성질**. 깨지면 플레이어가 서로 다른 맵에 있게 되므로 상자보다 먼저 터진다 |
+| 존 프리팹에 나중에 랜덤화 스크립트가 들어옴 | 현재 MonoBehaviour 0개. 규칙으로 `CONTEXT.md`에 남긴다 |
+| 상자 ID 중복 | 구조적으로 불가(슬롯×인덱스). `CrateRegistry`가 이중 검사 |
+| 브로드캐스터 누락 | `MapNetworkSync`에 동거 + 폴백 시 Error 로그(위 ⑧) |
+| 파편이 바닥을 통과 | `debrisLifetime`을 짧게. **육안 검증 필요** |
+| `Hurtbox` 변경이 다른 유닛에 영향 | `ownerUnit` 최우선이라 기존 경로 불변. 팀 공유 필요 |
+
+## Unity 저작 (에디터 필요 — 미완)
+
+- [ ] `Frag_Box_01.asset`에 **Fragment Material** 지정 → **"버스트 프리팹 굽기"**
+- [ ] **`EffectEntry`** 생성 — `parts[0].prefab` = 버스트 프리팹, `duration` = 파편 수명(1초 이하 권장,
+      콜라이더가 없어 바닥을 통과한다), `prewarmCount` = **동시에 터질 상자 개수**(3단 더미 하나가 3개를 쓴다)
+- [ ] `Tools > Crates > 선택한 프리팹을 파괴 가능하게 만들기` — PropContent의 `box2stack`·`box_3stack` 6종
+- [ ] 각 프롭 프리팹의 `BreakableCrate`에 **EffectEntry 배선**
+- [ ] `4.MapScene` 하이어라키 최상단 **`MapNetworkSync` 오브젝트**에 `CrateBreakBroadcaster` 추가
+      (그 오브젝트에 `NetworkObject`가 이미 있다. 배선할 필드는 없다)
+- [ ] BossScene 등 **손으로 배치한 상자가 있는 씬**은 `Tools > Crates > 씬의 상자에 ID 부여` → 씬 저장
+
+## 검증
+
+- [ ] **MPPM 2인** — 한쪽이 상자를 깰 때 **양쪽 다** 파편이 보이고 상자가 사라지는가
+- [ ] 기본공격 · **Q(진격의 방패)** · **우클릭(단죄의 방패)** 세 경로 전부로 부서지는가(위 ⑥)
+- [ ] 호스트가 깰 때 / 클라가 깰 때 **양방향** 확인
+- [ ] 상자를 여러 개 연속으로 깨도 풀이 마르지 않는가(`prewarmCount` 초과 시 증설되는가)
+- [ ] 파편이 바닥을 뚫지 않는가(육안)
+- [ ] **`box_3stack`의 아래 상자를 때렸을 때 더미 전체가 사라지는가** —
+      떠 있는 상자가 하나도 남지 않아야 한다(결정 9의 존재 이유)
+- [ ] 더미의 **어느 상자를 때려도** 반응하는가(자식 콜라이더 3개 전부 레이어가 맞는지)
+- [ ] 3단 더미의 버스트 3개가 어긋나게 재생되는가(`pieceStagger`)
+- [ ] `Fragment.*` 마커로 폭발 프레임 비용 재측정(Development Build)
+- [ ] 레이트 조인 시 **이미 깨진 상자가 멀쩡히 보이는 것은 알려진 제약**(결정 6)
+
+## 범위 밖
+
+- 상자 드롭 아이템 / 보상
+- **개별 상자 파괴 / 더미 붕괴 물리**(결정 9) — 필요해지면 Y 캐스케이드로 확장
+- 상자 종류별 다른 파편 세트(구조는 지원하되 저작은 나중)
+- 중간 접속 동기화(결정 6)
+- `FragmentExploder` 제거(결정 7 — 신규 경로 완성 후 별도 판단)
+
+---
+
+# 이전 PLAN — 몬스터/보스 사망 디졸브 연출 (2026-08-30)
+
+> 상태: **구현 완료, Unity Play 수동 검증 대기**. 브랜치 `feature/VFX`. 작업자 민경(Claude).
+> 패키지: `Assets/TheVayuputra/DissolveShader` (URP Lit 기반 Shader Graph).
+
+## 목표
+
+몬스터 8종(`Assets/2.Prefabs/Monster/`)과 보스 `TwentyThree.prefab`이 죽을 때
+`DissolveParticle`을 재생하면서 디졸브 셰이더로 사라지게 한다. **전 피어에서 보여야 한다.**
+
+## 확인된 현재 상태 (조사 결과)
+
+- `IDeathEffect` 훅이 이미 있다 — `MonsterBase.cs:869`, `BossBase.cs:418`가
+  `GetComponent<IDeathEffect>()`를 찾아 `Play(DespawnNow)`를 부른다.
+- `DissolveDeath`(플레이스홀더)가 **몬스터 프리팹 8종에 이미 붙어 있다**. 다만
+  찾는 프로퍼티가 `_DissolveAmount`(존재하지 않음)이고 값 방향도 반대라 항상
+  "1.5초 대기 후 디스폰" 폴백으로 빠진다.
+- 🔴 **몬스터와 보스는 사망 경로가 완전히 다르다.**
+  | | 몬스터 8종 | TwentyThree |
+  |---|---|---|
+  | 베이스 | `MonsterBase` (`GauntletBot` 포함) | **`Enemy : Unit`** |
+  | 사망 진입 | `EnterDead()` (서버) | `Unit.Died` 이벤트 (서버) |
+  | `IDeathEffect` 훅 | 있음 | **없음** |
+  | 클라 사망 신호 | `_state` NetworkVariable → `Dead` | **없음** |
+  | 사망 후 | `DespawnNow()` | **디스폰하지 않음** — `BossEncounterDirector`가 3초 뒤 결과 씬 |
+- `BossEncounterDirector.defeatResultDelaySeconds = 3`(4.MapScene 실측). 보스 디졸브는
+  이보다 짧아야 한다.
+- 셰이더 `DissolveFx`: URP **Lit** SubTarget / AlphaClip / 양면. 노출 프로퍼티는
+  `_MainTexture` `_BaseColor` `_NoiseTexture` `_NoiseScale` `_Cutoff` `_Edge_Size` `_Edge_Color`.
+  **`_Cutoff` 1 = 보임, 0 = 사라짐** (기존 `DissolveDeath`의 0→1과 반대).
+- `DissolveParticle.prefab`: Shape **Sphere/radius 1**, `lengthInSec 2`, `looping 0`,
+  **`playOnAwake 1`**, `scalingMode Local`, maxParticles 1000.
+- 🔴 **몬스터 머티리얼은 albedo를 공유한다.** `M_*Bot_01` 전부 `T_RobotTexture.png`,
+  예외는 `M_SpinBotBlades`(`T_SpinBotBlades_01.png`) 하나. 보스는 `Boss_23_basecolor.png`.
+- 렌더러는 프리팹 루트에 없다 — 중첩 모델 프리팹/FBX 안에 있다.
+  **런타임에 `GetComponentsInChildren<Renderer>(true)`로 수집해야 한다**(기존 코드가 이미 그렇게 한다).
+
+## 결정 (합의됨)
+
+| # | 질문 | 결정 |
+|---|---|---|
+| 1 | 머티리얼 처리 | **A — 사망 시 교체** (셰이더그래프 확장/표준셰이더 이관은 하지 않음) |
+| 2 | 파티클 Shape | **캐릭터 메쉬에서 방출** |
+| 3 | 디졸브 길이 | **몬스터 0.5초 · 보스 1.0초** (보스 상한 = defeatResultDelaySeconds 3초) |
+| 4 | 코어 수정 | **하지 않는다** — `MonsterBase`/`BossBase` 무수정, 어댑터로 해결 |
+| 5 | 범위 | 몬스터 8종 + TwentyThree. `P_MonsterProjectile`(Unit 아님)·`Wells.prefab`(부속) 제외 |
+
+### 1번의 세부 — 캐릭터별 머티리얼 9개 → **템플릿 1개 + 런타임 복사**
+
+조사에서 몬스터 albedo가 사실상 하나(`T_RobotTexture.png`)로 드러났다. 캐릭터별로
+머티리얼을 미리 만들 이유가 사라졌으므로, 교체 시점에 원본에서 텍스처만 옮겨 적는다:
+
+```csharp
+Material dissolve = new Material(dissolveTemplate);
+dissolve.SetTexture("_MainTexture", original.GetTexture("_BaseMap"));
+dissolve.SetColor("_BaseColor", original.GetColor("_BaseColor"));
+```
+
+여전히 "A = 사망 시 교체"이고, 달라지는 건 **아트 작업이 머티리얼 9개 제작 → 템플릿 1개
+튜닝으로 줄어든다**는 점뿐이다. 서브메쉬가 여러 개인 캐릭터(PeekABot 본체+안테나,
+SpinnerBot 본체+블레이드)도 슬롯마다 원본 텍스처를 그대로 따라가므로 자동으로 맞는다.
+새 캐릭터가 들어와도 배선이 필요 없다.
+
+## 접근
+
+### A. `DissolveDeath`를 `NetworkBehaviour`로 승격 (코어 무수정)
+
+```
+[서버] EnterDead()
+   └─ fx.Play(DespawnNow)                 ← IDeathEffect 시그니처 유지 = MonsterBase 무수정
+        ├─ PlayDissolveRpc()  ──────────► [전 피어] 로컬 재생
+        │                                   ├─ 렌더러 수집 → 슬롯별 디졸브 머티리얼 교체
+        │                                   ├─ 파티클 Shape를 이 캐릭터 메쉬로 지정 후 Play
+        │                                   └─ MPB로 _Cutoff 1 → 0 (duration)
+        └─ [서버] duration 뒤 onComplete() → Despawn
+```
+
+- `[Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]` — 순수 연출.
+  `JumpController.PlayDropVFXRpc`·`AttackEffectRelay`와 같은 규약.
+- **좌표를 싣지 않는다.** 각 피어가 자기 렌더러를 자기가 녹인다.
+- `sharedMaterial`은 절대 쓰지 않는다 — 에셋이 오염되고 커밋되면 팀 전체 캐릭터가 바뀐다.
+
+### B. 파티클 Shape를 런타임에 캐릭터 메쉬로 지정
+
+렌더러가 중첩 프리팹 안에 있어 인스펙터 배선이 8종 × N슬롯이 된다. 코드로 붙인다:
+
+```csharp
+var shape = particle.shape;
+if (smr != null) { shape.shapeType = ParticleSystemShapeType.SkinnedMeshRenderer;
+                   shape.skinnedMeshRenderer = smr; }
+else if (mr != null) { shape.shapeType = ParticleSystemShapeType.MeshRenderer;
+                       shape.meshRenderer = mr; }
+```
+
+- 대상은 `GetComponentsInChildren`로 찾은 첫 번째 렌더러.
+- 메쉬를 못 찾으면 원본 Sphere Shape를 그대로 둔다(폴백).
+- 파티클 프리팹 사본을 만들어 **`playOnAwake`를 끈다**(원본은 켜져 있어 스폰 즉시 터진다).
+
+### C. 보스 어댑터
+
+`Enemy`(공용)를 고치지 않고 보스 전용 컴포넌트를 하나 붙인다.
+
+```
+TwentyThree.prefab (루트)
+  └─ BossDeathEffectBinder : NetworkBehaviour   (신규)
+        OnNetworkSpawn:  if (IsServer) unit.Died += OnBossDied
+        OnBossDied():    GetComponent<DissolveDeath>().Play(null)
+```
+
+`onComplete = null` — 보스는 디스폰되지 않는다. 길이만 3초(`defeatResultDelaySeconds`)보다
+짧으면 된다.
+
+## 작업 목록
+
+**아트 (SVN — `Assets/50.Art` 또는 패키지 폴더)**
+1. `M_Dissolve_Template.mat` 생성 (`DissolveFx` 셰이더). `_NoiseTexture`·`_NoiseScale`·
+   `_Edge_Size`·`_Edge_Color` 튜닝. 로봇이므로 `3_DissolveFx_Electric` 프리셋
+   (`_Edge_Size 0.0352`, `_NoiseScale 2`, 청백 HDR)이 출발점.
+2. `DissolveParticle` 사본 제작 — **`playOnAwake` 끄기**. 색/수명을 캐릭터 톤에 맞춤.
+
+**코드 (git)**
+
+3. `DissolveDeath` 재작성
+   - `MonoBehaviour` → `NetworkBehaviour`
+   - `_DissolveAmount` → `_Cutoff`, 값 방향 `1 → 0`
+   - 머티리얼 슬롯별 교체 + 원본 `_BaseMap`/`_BaseColor` 복사
+   - 파티클 필드 + 메쉬 Shape 런타임 지정
+   - `Play(onComplete)` → RPC 브로드캐스트 + 서버 타이머
+   - 렌더러/파티클이 없으면 예외 없이 `onComplete` (기존 폴백 성질 유지)
+4. `BossDeathEffectBinder` 신규
+
+**프리팹 배선 (git)**
+
+5. 몬스터 8종: 파티클 자식 오브젝트 추가 + `DissolveDeath` 필드 채우기(템플릿/파티클/duration)
+6. `TwentyThree.prefab`: `DissolveDeath` + `BossDeathEffectBinder` 추가 + 배선
+
+## 구현 결과 (2026-08-30)
+
+- 코드: `DissolveDeath` 재작성(NetworkBehaviour · `_Cutoff` 1→0 · 템플릿 복제 · 메쉬 Shape · RPC),
+  `BossDeathEffectBinder` 신규. 빌드 오류 0.
+- 에셋(SVN): `Assets/50.Art/VFX/Common/Dissolve/M_Dissolve_Template.mat`(Electric 프리셋 기반),
+  `FX_Dissolve_Death.prefab`(`playOnAwake` 꺼진 `DissolveParticle` 사본).
+- 배선: 몬스터 8종(duration 0.5 / grace 0.5), `TwentyThree.prefab`(duration 1.0 / grace 0.5).
+- 파티클은 자식으로 미리 넣지 않고 **에셋 참조 → 사망 시 Instantiate**로 바꿨다.
+  중첩 프리팹 안의 컴포넌트를 9개 프리팹에 stripped 참조로 배선하는 것보다 안전하다.
+
+## 검증 (완료 조건)
+
+- [ ] 몬스터 사망 시 디졸브 + 파티클이 재생되고, 끝난 뒤 디스폰된다
+- [ ] 🔴 **MPPM 2인 — 호스트와 클라이언트 양쪽에서 디졸브가 보인다**
+- [ ] 파티클이 캐릭터 실루엣을 따라 방출된다(구체가 아니라)
+- [ ] 보스 디졸브가 결과 화면 전환(3초)보다 먼저 끝난다
+- [ ] PeekABot(본체+안테나)·SpinnerBot(본체+블레이드) 등 다중 머티리얼 캐릭터에서
+      슬롯별 텍스처가 어긋나지 않는다
+- [ ] `M_*.mat` 원본 에셋이 플레이 후 git/SVN에 변경으로 잡히지 않는다(= sharedMaterial 미오염)
+
+## 리스크 / 범위 밖
+
+- **재질감 팝.** `DissolveFx`는 노말/메탈릭/스무스니스 입력이 없어 교체 프레임에 음영이
+  바뀐다. 결정 1(A)에서 감수하기로 했다. 거슬리면 셰이더그래프에 슬롯을 추가하는
+  상위호환 경로가 있다(머티리얼 재작업 불필요).
+- **`DissolveDeath`가 `NetworkBehaviour`가 되면서** 몬스터 프리팹의 `NetworkBehaviour`
+  목록에 하나 추가된다. 전 피어가 같은 프리팹을 쓰므로 인덱스는 일치하지만,
+  프리팹 재직렬화가 발생하므로 8종 커밋을 한 번에 넣는다.
+- **범위 밖**: 플레이어 사망 연출, `Wells.prefab`, `P_MonsterProjectile`,
+  캐릭터 셰이더 표준화(결정 1의 C안).
+
+---
+
+---
+
 # CURRENT PLAN — 바닥 표식·장판을 URP 데칼로 (2026-09-04, 승인 대기)
 
 상태: **1단계 검증 통과(팀장 + 팀원 교차 확인) / 2단계 구현 완료 / Play 검증 대기** — 컴파일 0에러.
