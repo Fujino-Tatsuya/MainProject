@@ -92,6 +92,7 @@ public class MonsterBase : Unit
     const float HeightLossGrace = 0.5f;
     bool _animatorHeldLocally;     // 이 피어에서 애니메이터를 정지시켜 뒀나(자세 홀드 래치)
     float _animatorResumeSpeed = 1f; // 홀드 전 애니메이터 속도 — 풀 때 이 값을 되돌린다
+    Coroutine _actionPoseHoldRoutine; // 클립 끝에서 자세를 잡으려고 대기 중인 예약(피어 로컬)
     IBossTelegraph _telegraph;     // 카운터 창 표현(있으면). 지연 해석 — 런타임 부착일 수 있다
     bool _serverLogicSuspended;    // 연출 구간 게이트(SetServerLogicSuspended). true 면 서버 FSM 이 안 돈다
     Coroutine _deathFxRoutine;              // 임시 사망 표시 코루틴(모든 피어)
@@ -1472,15 +1473,30 @@ public class MonsterBase : Unit
     {
         // 자세를 붙잡는 상태는 Groggy 하나뿐이다(그로기 클립이 없는 몹의 표현).
         // 그 밖으로 나가면 무조건 푼다 — 해제를 개별 경로에 맡기면 하나만 빠져도 몹이 영구히 얼어붙는다.
+        // 🔴 대기 중인 "클립 끝에서 잡기" 예약도 함께 취소한다. 홀드만 풀면 예약이 살아남아
+        //    상태를 빠져나간 뒤에 뒤늦게 애니메이터를 얼려 버린다.
         if (next != MonsterState.Groggy)
-            ApplyAnimatorHold(false);
+            ApplyReleaseActionPose();
 
         // 액션(공격/피격/그로기)에서 이동계열(대기/추격/복귀)로 전이 시, 진행 중이던 액션 클립을
         // 끊고 로코모션으로 강제 복귀. (공격 도중 리쉬 복귀 등으로 애니가 공격 클립에 눌러앉는 문제 해결.)
         if (IsActionAnimState(previous) && IsLocomotionAnimState(next))
             ResetToLocomotion();
         PlayStateAnimation(next);
+
+        OnMonsterStateChanged(previous, next);
     }
+
+    /// <summary>
+    /// 상태 전이 <b>직후</b> 파생이 자기 런타임을 정리할 훅. 전 피어에서 불린다(서버 가드는 파생 몫).
+    ///
+    /// 🔴 왜 필요한가 (2026-09-08 WallBot 실측): 파생이 <see cref="HandleAttack"/> 안에서만 도는
+    ///    다단 시퀀스를 들고 있으면, <c>Attack</c> 밖으로 튕기는 <b>다른</b> 경로(피격 경직 · 넉백 ·
+    ///    리쉬 복귀 · 사망)에서 그 시퀀스가 <b>정리되지 않은 채 얼어붙는다</b> — 히트 윈도우가 열린
+    ///    채 남고, 카운터 창이 안 닫혀 이후 근접 판정이 영구히 막힌다. 이탈 경로마다 정리를 심는
+    ///    대신 전이 지점 하나에서 받는다(해제를 개별 경로에 맡기지 않는다 = 자세 홀드와 같은 원칙).
+    /// </summary>
+    protected virtual void OnMonsterStateChanged(MonsterState previous, MonsterState next) { }
 
     static bool IsActionAnimState(MonsterState s) =>
         s == MonsterState.Attack || s == MonsterState.Hit || s == MonsterState.Groggy
@@ -1495,6 +1511,7 @@ public class MonsterBase : Unit
         if (animator == null || data == null) return;
         SafeResetTrigger(data.attackTrigger);
         SafeResetTrigger(data.hitTrigger);
+        SafeResetTrigger(data.attackFinishTrigger);   // 🔴 래치 이유는 PlayStateAnimation 의 Attack 주석 참조
         SafeCrossFade(data.locomotionState);
     }
 
@@ -1536,8 +1553,98 @@ public class MonsterBase : Unit
         if (IsSpawned) FreezeAtLocomotionClientRpc();
     }
 
+    /// <summary>
+    /// 지금 재생 중인 액션 클립이 <b>한 바퀴를 마치면</b> 그 마지막 자세에서 정지시킨다.
+    /// 서버에서 부르면 전 피어가 <b>각자의 애니메이터 시간</b>으로 판정한다(지연에 안 흔들린다).
+    /// 해제는 <see cref="ServerReleaseActionPose"/> 또는 Groggy 밖으로의 상태 이탈이 한다.
+    ///
+    /// 🔴 왜 "정지 전이가 없으니 마지막 프레임에서 알아서 멈춘다"에 기대면 안 되는가 (2026-09-08):
+    ///    <c>A_WallBot_AttackStart</c> 는 <c>loopTime: 1</c> 이라 25프레임(≈0.8초)을 <b>계속 반복한다.</b>
+    ///    클립 안의 <c>OnAttackHit</c> 이 루프마다 다시 발화해 2단 트리거까지 쳐 버렸다.
+    ///    <b>클립이 멈추는지는 전이가 아니라 임포터의 loopTime 이 정한다</b> — 컨트롤러만 보고 단정하지 말 것.
+    /// </summary>
+    /// <param name="stateName">붙잡을 애니메이터 상태 이름. 다른 상태로 이미 넘어갔으면 잡지 않는다.</param>
+    protected void ServerHoldActionPoseAtClipEnd(string stateName)
+    {
+        if (!IsServer) return;
+
+        ApplyHoldAtClipEnd(stateName);
+        if (IsSpawned) HoldActionPoseClientRpc(stateName);
+    }
+
+    /// <summary>붙잡아 둔 자세를 푼다(대기 중인 예약도 취소). 멱등이다.</summary>
+    protected void ServerReleaseActionPose()
+    {
+        if (!IsServer) return;
+
+        ApplyReleaseActionPose();
+        if (IsSpawned) ReleaseActionPoseClientRpc();
+    }
+
     [ClientRpc] void SetCounterWindowClientRpc(bool open) => ApplyCounterWindowVisual(open);
     [ClientRpc] void FreezeAtLocomotionClientRpc() => ApplyLocomotionFreeze();
+    [ClientRpc] void HoldActionPoseClientRpc(string stateName) => ApplyHoldAtClipEnd(stateName);
+    [ClientRpc] void ReleaseActionPoseClientRpc() => ApplyReleaseActionPose();
+
+    // 클립 끝을 기다렸다 잡는다. 루프 클립은 normalizedTime 이 1 을 넘겨 계속 자라므로 임계값을
+    // 1 직전(0.98)에 두고, 잡는 순간 그 시점으로 Play 해 **피어마다 같은 프레임**에 고정한다.
+    // (1.0 을 기다리면 이미 다음 바퀴 초반을 한 프레임 그린 뒤라 시작 자세에서 얼어붙는다.)
+    const float ActionPoseHoldNormalizedTime = 0.98f;
+    const float ActionPoseHoldTimeout = 3f;   // 이 안에 대상 상태에 못 들어가면 포기하고 경고
+
+    void ApplyHoldAtClipEnd(string stateName)
+    {
+        if (animator == null || string.IsNullOrEmpty(stateName)) return;
+
+        ApplyReleaseActionPose();
+        _actionPoseHoldRoutine = StartCoroutine(HoldAtClipEndRoutine(stateName));
+    }
+
+    void ApplyReleaseActionPose()
+    {
+        if (_actionPoseHoldRoutine != null)
+        {
+            StopCoroutine(_actionPoseHoldRoutine);
+            _actionPoseHoldRoutine = null;
+        }
+        ApplyAnimatorHold(false);
+    }
+
+    IEnumerator HoldAtClipEndRoutine(string stateName)
+    {
+        int hash = Animator.StringToHash(stateName);
+
+        // 전이 중이면 아직 그 상태가 아니다 — 들어올 때까지 기다린다.
+        // 🔴 무한 대기 금지: 상태 이름이 틀렸거나 컨트롤러가 바뀌면 조용히 영원히 돈다. 못 잡으면
+        //    자세를 안 잡은 채로 경고를 남기고 빠진다(안 잡히는 것보다 모르는 게 나쁘다).
+        float deadline = Time.time + ActionPoseHoldTimeout;
+        bool caught = false;
+        while (Time.time < deadline)
+        {
+            if (animator == null || animator.runtimeAnimatorController == null) yield break;
+
+            AnimatorStateInfo info = animator.GetCurrentAnimatorStateInfo(0);
+            if (info.shortNameHash == hash && info.normalizedTime >= ActionPoseHoldNormalizedTime)
+            {
+                caught = true;
+                break;
+            }
+            yield return null;
+        }
+
+        if (!caught)
+        {
+            Debug.LogWarning(
+                $"{name}: 애니메이터 상태 '{stateName}' 를 {ActionPoseHoldTimeout:0.#}초 안에 못 잡아 자세 홀드를 건너뛴다. " +
+                "상태 **이름**(트리거 이름이 아니다)이 컨트롤러와 맞는지 확인할 것.", this);
+            _actionPoseHoldRoutine = null;
+            yield break;
+        }
+
+        animator.Play(hash, 0, ActionPoseHoldNormalizedTime);
+        ApplyAnimatorHold(true);
+        _actionPoseHoldRoutine = null;
+    }
 
     void ApplyCounterWindowVisual(bool open)
     {
@@ -1602,6 +1709,13 @@ public class MonsterBase : Unit
         switch (s)
         {
             case MonsterState.Attack:
+                // 🔴 이전 공격이 남긴 2단 트리거를 **먼저 지운다.** Unity 트리거는 소비할 전이가
+                //    없으면 사라지지 않고 래치된다 — WallBot 실측(2026-09-08): 충격파에서 친
+                //    `AttackEnd` 가 갈 곳이 없어 남았고, 다음 공격이 `AttackStart` 에 들어간 바로
+                //    그 프레임에 래치가 `AttackStart→AttackEnd`(전이시간 0)를 발동시켜 모으기
+                //    자세가 0프레임이 됐다. 코드는 그동안 카운터 창을 열고 Gather 를 돌아
+                //    "애니와 피격 처리가 전혀 안 맞는" 상태가 됐다.
+                SafeResetTrigger(data.attackFinishTrigger);
                 SafeSetTrigger(data.attackTrigger);
                 break;
             case MonsterState.Hit:
