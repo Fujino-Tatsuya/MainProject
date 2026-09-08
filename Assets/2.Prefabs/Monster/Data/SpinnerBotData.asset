@@ -26,6 +26,7 @@ MonoBehaviour:
   returnSpeedMultiplier: 5
   attackDuration: 1.6
   attackWindup: 0.3
+  engageAttackDelay: 0.6
   maxGroggyCount: 3
   groggyDuration: 3
   startsWithSuperArmor: 0

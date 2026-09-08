@@ -56,6 +56,9 @@ public class MonsterDataSO : ScriptableObject
     public float attackDuration = 0.9f; // 공격 상태 지속(모션 길이 근사)
     public float attackWindup = 0.35f;  // (이벤트 전환으로 base 미사용 — 서브클래스/폴백 참고용)
     public bool cancelWindupIfTargetLeavesRange = false; // 선딜(히트 발생 전) 중 타깃이 사거리+여유를 벗어나면 공격을 취소하고 추격 복귀(원거리 준비-취소 설계, MortarBot). 멜리 커밋 몹은 false 유지.
+    // 사거리 안으로 들어온 순간부터 첫 공격까지 최소 지연(초). 0 = 기존 동작 — 사거리에 닿는 프레임에 바로 때린다.
+    // 규칙과 구현 근거는 MonsterEngagePolicy 참조. 완전히 벗어났다 다시 들어오면 다시 걸린다.
+    public float engageAttackDelay = 0f;
 
     [Header("그로기")]
     public int maxGroggyCount = 3;      // 그로기 공격 누적 임계

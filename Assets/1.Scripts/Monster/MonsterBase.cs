@@ -85,9 +85,13 @@ public class MonsterBase : Unit
     float _staggerAfterKnockback;  // 넉백 종료 후 Stunned 경직 시간(초)
     bool _isDead;
     bool _initialized;
+    bool _inAttackRange;           // 사거리 안에 들어와 있나(히스테리시스 적용). 진입 순간에 첫 공격 지연을 건다
     bool _serverLogicSuspended;    // 연출 구간 게이트(SetServerLogicSuspended). true 면 서버 FSM 이 안 돈다
     Coroutine _deathFxRoutine;              // 임시 사망 표시 코루틴(모든 피어)
     const float DeathPlaceholderDuration = 1f; // 임시 사망 표시 지속(디졸브/애니 도입 시 제거)
+    // 사거리 이탈 판정에 더하는 여유(m). 경계에서 진입/이탈이 깜빡이는 것을 막는다.
+    // 공격 중 재조준 이탈 판정도 같은 값을 쓴다 — 두 곳이 어긋나면 한쪽만 깜빡인다.
+    const float AttackRangeExitMargin = 0.5f;
 
     // NavMeshAgent 회피 우선순위(낮을수록 우선 = 남이 비켜감). 정지(공격/피격 등) 중인 몹이
     // 이동 중인 다른 몹에게 밀려나지 않도록 정지 시 우선순위를 높인다(값을 낮춘다).
@@ -348,6 +352,7 @@ public class MonsterBase : Unit
         if (_target == null)
         {
             StopAgent();
+            _inAttackRange = false;
             SetState(MonsterState.Idle);
             return;
         }
@@ -355,6 +360,8 @@ public class MonsterBase : Unit
         float dist = Vector3.Distance(transform.position, _target.position);
         bool movementBlocked = status != null && status.BlocksMovement;
         bool attackBlocked = status != null && status.BlocksAttack;
+
+        UpdateAttackRangeEntry(dist);
 
         // 아키타입별 이동/교전 분기.
         switch (data.archetype)
@@ -759,7 +766,7 @@ public class MonsterBase : Unit
         if (data.cancelWindupIfTargetLeavesRange && !_attackFired && !_commitFired)
         {
             float d = _target != null ? Vector3.Distance(transform.position, _target.position) : float.MaxValue;
-            if (!IsTargetValid(_target) || d > data.attackRange + 0.5f) // +0.5 히스테리시스(경계 깜빡임 방지)
+            if (!IsTargetValid(_target) || d > data.attackRange + AttackRangeExitMargin) // 히스테리시스(경계 깜빡임 방지)
             {
                 SetState(MonsterState.Chase); // Attack(액션)→Chase(로코) 전이 → ResetToLocomotion이 애니를 Movement로 복귀시킨다.
                 return;
@@ -1197,11 +1204,48 @@ public class MonsterBase : Unit
         if (attackSlot < 0 || attackSlot >= _lastUsedByAttack.Length)
             attackSlot = DefaultAttackSlot;
 
-        float cooldown = _cooldownByAttack[attackSlot];
-        if (cooldown <= 0f)
-            cooldown = 1f / Mathf.Max(0.01f, AttackSpeed);
+        return Time.time - _lastUsedByAttack[attackSlot] >= EffectiveCooldown(attackSlot);
+    }
 
-        return Time.time - _lastUsedByAttack[attackSlot] >= cooldown;
+    // 슬롯의 실제 쿨 길이. 저작값이 0 이하면 base 간격(1/공격속도)으로 폴백한다.
+    float EffectiveCooldown(int attackSlot)
+    {
+        float cooldown = _cooldownByAttack[attackSlot];
+        return cooldown > 0f ? cooldown : 1f / Mathf.Max(0.01f, AttackSpeed);
+    }
+
+    // 사거리 진입/이탈을 추적하고, **진입한 프레임에** 첫 공격 지연을 건다.
+    //
+    // 왜 조우(타깃 획득)가 아니라 진입인가 — 인지(10m)에서 사거리(2.5m)까지 걸어오는 데
+    // 이미 2초 넘게 걸린다. 조우 시점에 걸면 도착할 때쯤 지연이 다 지나 있어 아무 효과가 없다.
+    // 팀장이 본 것은 "사거리에 발 들이는 프레임에 때린다"이므로 기준점도 그 프레임이어야 한다.
+    void UpdateAttackRangeEntry(float dist)
+    {
+        bool nowInRange = MonsterEngagePolicy.IsInAttackRange(
+            _inAttackRange, dist, data.attackRange, AttackRangeExitMargin);
+
+        if (nowInRange && !_inAttackRange)
+            DelayFirstAttack(data.engageAttackDelay);
+
+        _inAttackRange = nowInRange;
+    }
+
+    /// <summary>
+    /// 사거리 진입 직후 첫 공격을 <paramref name="delaySeconds"/> 만큼 늦춘다(모든 슬롯).
+    ///
+    /// 새 게이트 없이 쿨다운 도장을 되감아 구현한다 — 규칙과 이유는
+    /// <see cref="MonsterEngagePolicy"/> 참조.
+    ///
+    /// 🔴 나중에 <see cref="SetAttackCooldown"/> 로 쿨 길이를 바꾸면 남은 지연도 함께 변한다.
+    ///    사거리 진입 시 한 번 걸고 잊는 용도로만 쓸 것.
+    /// </summary>
+    protected void DelayFirstAttack(float delaySeconds)
+    {
+        if (!MonsterEngagePolicy.ShouldDelay(delaySeconds)) return;
+
+        for (int i = 0; i < _lastUsedByAttack.Length; i++)
+            _lastUsedByAttack[i] = MonsterEngagePolicy.FirstAttackStamp(
+                Time.time, EffectiveCooldown(i), delaySeconds);
     }
 
     /// <summary>
