@@ -53,5 +53,5 @@ MonoBehaviour:
   attackFinishTrigger: 
   hitTrigger: Hit
   groggyBool: IsDizzy
-  deathTrigger: Death
+  deathTrigger: 
   locomotionState: Movement

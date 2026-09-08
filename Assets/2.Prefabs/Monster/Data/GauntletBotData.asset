@@ -49,9 +49,9 @@ MonoBehaviour:
   despawnDelay: 2
   isMidBoss: 1
   animSpeedParam: RunBlend
-  attackTrigger: Attack
+  attackTrigger: 
   attackFinishTrigger: 
   hitTrigger: Hit
-  groggyBool: Groggy
+  groggyBool: 
   deathTrigger: Defeat
   locomotionState: Movement
