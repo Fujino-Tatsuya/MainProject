@@ -402,6 +402,22 @@ guid 집합으로 다시 돌려야 차이가 보인다. 실제로 이름 grep �
 
 ## 판단 대기
 
+- 🔴 **`BossDirectionIndicator` 가 보스 루트 GameObject 에 직접 붙어 있다** (2026-09-09 교차검증에서 발견).
+  스크립트는 **자식 전제**로 짜여 있다 — `GetComponentInParent<MonsterBase>()` 는 **자기 GO 부터** 찾으므로
+  `boss == transform` 이 되고, `LateUpdate` 의
+  `transform.position = new Vector3(boss.position.x, y, boss.position.z)` 가
+  **매 프레임 보스 루트의 Y 를 지면+`heightOffset`(0.04) 으로 덮어쓴다.**
+  표식을 옮기려던 코드가 보스 본체를 옮기고 있다. `TwentyThree.prefab` · `TwentyThree_Solo.prefab` 둘 다.
+  - 회전 쪽(`LookRotation(자기 forward)`)은 자기 yaw 재대입이라 **무해**하다 — 등장 각도 문제와 무관.
+  - **지금 티가 안 나는 이유**: `ShouldShow()` 가 `airborneHideHeight`(0.6) 위면 숨기고 곧바로 return 해
+    위치를 안 쓴다. 지상에서는 Y 가 이미 지면이라 덮어써도 값이 같다.
+  - **언제 터지나**: 보스가 지면보다 살짝 뜬 채 표시기가 안 숨는 구간(0.6m 이하) — 경사·단차·넉백.
+    보스가 바닥에 빨려 붙는다.
+  - **팀장 판단(2026-09-09): 지금은 고치지 않는다.** 관측된 증상이 없고, 방금 4건을 고쳐 Play 검증을
+    끝낸 직후라 보스 프리팹을 또 만지면 그 검증이 흔들린다. `development` 는 예정대로 올리고 별건으로 잡는다.
+  - 고칠 때 선택지: ① 표시기를 자식 GO 로 분리(구조가 원래 의도대로) ② `boss == transform` 이면
+    위치 쓰기를 건너뛰는 가드 한 줄(프리팹 무변경).
+
 - **평타/3단 구분 신호** — 둘이 같은 클립이라 구분이 "1.5초 정지" 하나다. 중간보스 3종 모두
   `IBossTelegraph` 구현이 프리팹에 없어 `ServerSetCounterWindow` 가 no-op 다.
   선택지: `BossCounterTelegraph` 부착(코드 있음) / 민경님 VFX / 정지만으로 충분하다고 확정.
