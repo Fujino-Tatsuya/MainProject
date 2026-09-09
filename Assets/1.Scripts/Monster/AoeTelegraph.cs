@@ -114,29 +114,77 @@ public class AoeTelegraph : MonoBehaviour
     {
         if (_decal == null || _decal.material == null) return;
 
-        if (_discTexture == null) _discTexture = BuildDiscTexture(decalColor, 128);
+        // 아트가 준 모양이 있으면 그걸 쓰고, 없으면 예전처럼 코드로 굽는다.
+        // 🔴 아트 텍스처는 **복제하지 않는다** — 애셋을 그대로 참조하므로 Destroy 대상이 아니다.
+        //    코드 생성분만 인스턴스 소유이고 OnDestroy 에서 지운다(_discTexture 만).
+        Texture2D shape = shapeTexture;
+        if (shape == null)
+        {
+            if (_discTexture == null) _discTexture = BuildDiscTexture(decalColor, 128, fillAlpha, rimWidth);
+            shape = _discTexture;
+        }
 
         _decal.material = new Material(_decal.material);
         bool hasBaseMap = _decal.material.HasProperty(BaseMapId);
         if (hasBaseMap)
-            _decal.material.SetTexture(BaseMapId, _discTexture);
+            _decal.material.SetTexture(BaseMapId, shape);
+
+        // 아트 텍스처는 대개 흰 그림이라 색이 안 들어간다 — decalColor 의 **RGB만** 틴트로 얹는다.
+        // 🔴 알파는 1 로 고정한다. 투명도는 `SetAlpha` 가 프로젝터의 fadeFactor 로 따로 정하는데
+        //    (점프 예고가 두 겹을 0.4 / 0.85 로 쓴다), 여기서 decalColor.a(0.35)까지 곱하면
+        //    0.35 × 0.85 ≈ 0.3 으로 눌려 두 겹의 대비가 사라진다.
+        //    코드 생성 경로는 픽셀에 알파가 이미 구워져 있어 이 줄을 타지 않는다.
+        if (shapeTexture != null && _decal.material.HasProperty(BaseColorId))
+            _decal.material.SetColor(BaseColorId, new Color(decalColor.r, decalColor.g, decalColor.b, 1f));
 
         // 🔴 침묵은 성공이 아니다. 데칼은 안 보일 때 예외도 경고도 없이 그냥 안 그려지므로,
         //    "이 경로가 돌았고 무엇으로 그리는지"를 한 번 남긴다(인스턴스당 1회).
         Debug.Log($"[AoeTelegraph/데칼] {name} 초기화 — 재질 '{_decal.material.shader?.name}' · " +
+                  $"모양 {(shapeTexture != null ? $"아트 '{shapeTexture.name}'" : "코드 생성 원판")} · " +
                   $"Base_Map {(hasBaseMap ? "설정" : "🔴프로퍼티 없음")} · " +
                   $"mask 0x{(uint)_decal.renderingLayerMask:X} · 깊이 {projectionDepth}m", this);
     }
 
     [SerializeField]
-    [Tooltip("데칼 모드에서 생성할 디스크 색(알파 포함). 메시 경로는 재질의 _BaseColor 를 쓴다.")]
+    [Tooltip("데칼 모드에서 생성할 디스크 색(알파 포함). 메시 경로는 재질의 _BaseColor 를 쓴다.\n" +
+             "shapeTexture 를 넣으면 이 색은 **틴트로만** 쓰인다(텍스처 알파 × 이 알파).")]
     Color decalColor = new Color(1f, 0f, 0f, 0.35f);
+
+    [SerializeField, Range(0f, 1f)]
+    [Tooltip("코드 생성 모양의 **내부 채움 세기**. 0 = 테두리만(외곽선) · 1 = 꽉 찬 원판.\n" +
+             "🔴 0 으로 두지 말 것 — 외곽선만 있으면 공격 범위로 안 읽히고, 점프 예고의 " +
+             "**점증 레이어가 '면이 차오른다'가 아니라 '테두리가 밀려난다'로 보인다**(2026-09-09 팀장 판정).")]
+    float fillAlpha = 0.45f;
+
+    [SerializeField, Range(0f, 0.5f)]
+    [Tooltip("테두리 강조 폭(정규화 반경). 이 폭 안쪽으로 갈수록 알파가 1 로 올라가 경계가 또렷해진다.\n" +
+             "0 이면 예전처럼 균일하게 채운 원판이다.")]
+    float rimWidth = 0.12f;
+
+    // 🔴 색은 여기서 **픽셀에 굽는다** — URP 데칼 셰이더는 패키지 소유(`Decal.shadergraph`)이고
+    //    노출 프로퍼티가 `Base Map`·`Normal Map`·`Normal Blend` 3개뿐이라 **색 프로퍼티가 아예 없다.**
+    //    그래서 shapeTexture(아트 그림)를 물리면 그 그림의 색이 그대로 나온다 — 흰 그림은 흰색이다.
+    //    셰이더를 포크해 `_BaseColor` 를 만들면 ApplyDecalShape 가 이미 그걸 세팅하므로 코드 변경 없이
+    //    아트 텍스처도 틴트된다(decisions #11 과 같은 뿌리 — 데칼은 색을 텍스처로 받는다).
+
+    [SerializeField]
+    [Tooltip("데칼 모양 텍스처(선택). 비우면 지금처럼 코드가 모양을 굽는다.\n" +
+             "🔴 넣으면 그 그림이 그대로 장판이 된다 — 링·테두리처럼 수식으로 만들기 번거로운 모양을 " +
+             "아트에서 받을 때 쓴다(예: VFX/Textures/ring06.png = GauntletBot 스매시 장판과 같은 그림).\n" +
+             "⚠️ 아크(각도) 예고는 각도가 런타임 값이라 이미지로 고정할 수 없다 — 그건 비워 둘 것.")]
+    Texture2D shapeTexture;
 
     Texture2D _discTexture;
     static readonly int BaseMapId = Shader.PropertyToID("Base_Map");
 
     // 지름이 텍스처 폭에 꽉 차는 디스크. 테두리 1px 은 알파를 부드럽게 떨어뜨려 계단을 없앤다.
-    static Texture2D BuildDiscTexture(Color color, int size)
+    /// <summary>
+    /// 장판 텍스처를 굽는다 — <b>채워진 면 + 또렷한 테두리</b>.
+    ///
+    /// 🔴 채움이 핵심이다. 외곽선만 그리면 ① 공격 범위로 안 읽히고 ② 점프 예고의 점증 레이어가
+    ///    "면이 차오른다"가 아니라 "테두리가 밖으로 밀려난다"로 보인다(2026-09-09 팀장 판정).
+    /// </summary>
+    static Texture2D BuildDiscTexture(Color color, int size, float fill, float rim)
     {
         var tex = new Texture2D(size, size, TextureFormat.RGBA32, false)
         {
@@ -144,6 +192,11 @@ public class AoeTelegraph : MonoBehaviour
             wrapMode = TextureWrapMode.Clamp,
             filterMode = FilterMode.Bilinear,
         };
+
+        // 바깥 경계를 부드럽게 떨어뜨릴 폭(정규화 반경 기준) — 계단 제거용.
+        float feather = 1f / (size * 0.05f);
+        float rimW = Mathf.Clamp(rim, 0f, 0.5f);
+        float fillA = Mathf.Clamp01(fill);
 
         float half = size * 0.5f;
         var pixels = new Color32[size * size];
@@ -155,8 +208,14 @@ public class AoeTelegraph : MonoBehaviour
                 float dy = (y + 0.5f) - half;
                 float d = Mathf.Sqrt(dx * dx + dy * dy) / half;   // 0 = 중심, 1 = 테두리
 
-                float a = color.a * Mathf.Clamp01((1f - d) * size * 0.05f);
-                pixels[y * size + x] = new Color(color.r, color.g, color.b, a);
+                // 내부는 fillA 로 균일하게 채우고, 테두리 밴드로 갈수록 1 까지 올린다.
+                float rimA = rimW > 0f ? Mathf.Clamp01((d - (1f - rimW)) / rimW) : 0f;
+                float a = Mathf.Max(fillA, rimA);
+
+                // 바깥으로 나가는 순간은 페더로 끊는다.
+                a *= Mathf.Clamp01((1f - d) / feather);
+
+                pixels[y * size + x] = new Color(color.r, color.g, color.b, color.a * a);
             }
         }
 
