@@ -22,8 +22,35 @@ public class EffectCatalog : ScriptableObject
     [field: SerializeField] public EffectEntry HitEffect4 { get; private set; }
     [field: SerializeField] public EffectEntry HitEffect5 { get; private set; }
 
+
+
+    [Header("Monster")]
+    // 카탈로그에 넣는 이유는 룩업이 아니라 ①프리워밍 ②빌드 포함 보장이다.
+    // 이 이펙트는 EffectSocketPlayer가 인스펙터 참조로 직접 들고 있어 코드 룩업은 쓰지 않지만,
+    // 몹이 동시에 여러 마리 때리므로 prewarmCount가 실제로 동작해야 첫 타격이 끊기지 않는다.
+    [field: SerializeField] public EffectEntry Mob_Slash { get; private set; }
+
     [Header("Boss")]
+    [field: SerializeField] public EffectEntry Drop_Charge_Boundary { get; private set; }
+    [field: SerializeField] public EffectEntry Drop_Charge_Indicator { get; private set; }
+    [field: SerializeField] public EffectEntry Drop_Collision { get; private set; }
     [field: SerializeField] public EffectEntry BossRage { get; private set; }
+    [field: SerializeField] public EffectEntry Grab_Lightning { get; private set; }
+    [field: SerializeField] public EffectEntry Grab_ArmElectric { get; private set; }
+    [field: SerializeField] public EffectEntry Grabbed_Electric { get; private set; }
+    [field: SerializeField] public EffectEntry Throw_Lightning { get; private set; }
+
+    [Header("Boss — 차징 번개구슬 (4단계)")]
+    // 한 엔트리에 파트로 몰지 않고 넷으로 나눈 이유: FadeOut과 Break가 서로 다른 종료 분기다.
+    // 하나로 묶으면 "어느 쪽으로 끝났는지"를 데이터가 표현할 수 없다.
+    [field: SerializeField] public EffectEntry ChargeBall_Grow { get; private set; }
+    [field: SerializeField] public EffectEntry ChargeBall_Loop { get; private set; }
+    [field: SerializeField] public EffectEntry ChargeBall_FadeOut { get; private set; }
+    [field: SerializeField] public EffectEntry ChargeBall_Break { get; private set; }
+
+    [Header("기타")]
+    [field: SerializeField] public EffectEntry Explosion_Basic { get; private set; }
+    [field: SerializeField] public EffectEntry Frag_Crate_01 { get; private set; }
 
     private List<EffectEntry> _all;
     // 피격 이펙트 테스트용 enum

@@ -17,4 +17,18 @@ MonoBehaviour:
   <HitEffect3>k__BackingField: {fileID: 11400000, guid: 95bc2f495f06df446a3400d6d765c175, type: 2}
   <HitEffect4>k__BackingField: {fileID: 11400000, guid: 0aec711001a248348ae18f18058b84ed, type: 2}
   <HitEffect5>k__BackingField: {fileID: 11400000, guid: 5b297260b68709f4eba95575765449e4, type: 2}
+  <Mob_Slash>k__BackingField: {fileID: 11400000, guid: d57f39897b08b004c84a995edbd7fde8, type: 2}
+  <Drop_Charge_Boundary>k__BackingField: {fileID: 11400000, guid: a250c4956ae6d604195af8c0ef58fe0f, type: 2}
+  <Drop_Charge_Indicator>k__BackingField: {fileID: 11400000, guid: 12f5c15d731222a4fb5899aa42423fc8, type: 2}
+  <Drop_Collision>k__BackingField: {fileID: 11400000, guid: 8bba3a5cded85e14699a98dc88d6d3bc, type: 2}
   <BossRage>k__BackingField: {fileID: 0}
+  <Grab_Lightning>k__BackingField: {fileID: 11400000, guid: 6718432e9f0395642a71c720aa5181fd, type: 2}
+  <Grab_ArmElectric>k__BackingField: {fileID: 11400000, guid: b0551a23e7c04f1d90c3a2b7e4d61f03, type: 2}
+  <Grabbed_Electric>k__BackingField: {fileID: 11400000, guid: 4c27dd41039aaa44fbf590ac0a0c5b91, type: 2}
+  <Throw_Lightning>k__BackingField: {fileID: 11400000, guid: 74fea13bb963e4c4ebfd7f0e6a5a4fbf, type: 2}
+  <ChargeBall_Grow>k__BackingField: {fileID: 11400000, guid: f3693d35287b49f7b7ba750c52cb6840, type: 2}
+  <ChargeBall_Loop>k__BackingField: {fileID: 11400000, guid: bb39a066d0454af88683e332e64a3e59, type: 2}
+  <ChargeBall_FadeOut>k__BackingField: {fileID: 11400000, guid: 5d28b04cd06644d7b77bb5c9505f3de8, type: 2}
+  <ChargeBall_Break>k__BackingField: {fileID: 11400000, guid: 3c3031593b194504a7a6a779cf151ce4, type: 2}
+  <Explosion_Basic>k__BackingField: {fileID: 11400000, guid: 2467c3b9b7e3cb5449c53e68811cc57f, type: 2}
+  <Frag_Crate_01>k__BackingField: {fileID: 11400000, guid: 2fbc4bb6d3c3c6a4b9cbc4cc7c73a276, type: 2}

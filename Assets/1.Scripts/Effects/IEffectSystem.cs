@@ -21,7 +21,14 @@ public interface IEffectSystem
     bool CanDrive(GameObject instance);
 
     /// <summary>풀에서 대출된 인스턴스를 처음부터 재생한다.</summary>
-    void Play(GameObject instance);
+    /// <param name="duration">
+    /// 이 파트가 살아 있을 시간(초). 재생 시점의 <b>남은 수명</b>이라 delay가 걸린 파트는 그만큼 짧게 받는다.
+    /// 수명이 정해지지 않은 재생(루프)에서는 0이 온다.
+    ///
+    /// <b>시간축을 호출자가 정하는 기술만 이 값을 쓴다.</b> 파티클은 자기 Start Lifetime이 진실이므로 무시한다 —
+    /// 반대로 코드로 크기를 구동하는 파트는 프리팹에 적을 시간이 아예 없어서 이 인자가 유일한 통로다.
+    /// </param>
+    void Play(GameObject instance, float duration);
 
     /// <summary>
     /// 정지. <paramref name="immediate"/> = false면 <b>발생만 멈추고 살아 있는 입자는 수명대로 사라진다</b>

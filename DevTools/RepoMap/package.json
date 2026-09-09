@@ -1,0 +1,14 @@
+{
+  "name": "repomap",
+  "version": "1.0.0",
+  "description": "Assets/**/*.cs를 tree-sitter로 파싱해 Docs/tech/repo_map.md·json을 생성하는 devtool",
+  "type": "module",
+  "scripts": {
+    "generate": "node generate.js"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "tree-sitter-wasms": "^0.1.13",
+    "web-tree-sitter": "0.20.8"
+  }
+}

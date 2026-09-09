@@ -21,8 +21,13 @@ public class BombController : NetworkBehaviour
     [Header("폭탄 표시 오브젝트")]
     [SerializeField] GameObject bomb;
     [SerializeField] GameObject floor;
-    SpriteRenderer _floorRenderer;
+
     Collider _floorCollider;
+
+    [Tooltip("Floor 상태 동안 계속 재생되는 장판 이펙트. floor 하위 자식으로 두면 " +
+             "FloorAreaEffect가 장판을 키울 때 스케일이 공짜로 따라온다.\n" +
+             "비워두면 floor 하위에서 자동으로 찾는다")]
+    [SerializeField] ParticleSystem floorEffect;
 
     [Header("\n타이머")]
     [SerializeField] float bombTime;
@@ -46,6 +51,14 @@ public class BombController : NetworkBehaviour
     [Header("\n스케일 (손 → 착지)")]
     [SerializeField] float heldScale = 0.5f;
     [SerializeField] float landedScale = 1f;
+
+    [Header("\nVFX")]
+    [Tooltip("InitFlight / Flight 구간에만 재생되는 궤적. 폭탄 본체를 따라간다.\n" +
+             "비워두면 아무 일도 하지 않는다")]
+    [SerializeField] EffectSocketPlayer trailPlayer;
+
+    [Tooltip("폭발 순간 1회 재생. 비워두면 아무 일도 하지 않는다")]
+    [SerializeField] EffectEntry explodeEffect;
 
     #endregion
 
@@ -88,10 +101,26 @@ public class BombController : NetworkBehaviour
     /// <summary>
     /// 네트워크 스폰 시 폭탄 표시 상태와 서버 전용 컴포넌트 참조를 초기화합니다.
     /// </summary>
+    /// <summary>
+    /// 자기 자신에 붙은 컴포넌트는 여기서 잡는다.
+    /// <see cref="OnNetworkSpawn"/>에서 잡으면 그 앞줄이 하나라도 던질 때 통째로 날아간다.
+    /// </summary>
+    void Awake()
+    {
+        _rigidbody = GetComponent<Rigidbody>();
+        if (_rigidbody == null)
+        {
+            Edit.LogAssertion("[No.23] Rigidbody 컴포넌트가 연결되어 있지 않습니다.");
+        }
+    }
+
     public override void OnNetworkSpawn()
     {
-        _floorRenderer = floor.GetComponent<SpriteRenderer>();
-        _floorCollider = floor.GetComponent<Collider>();
+        _floorCollider = floor != null ? floor.GetComponent<Collider>() : null;
+
+        // 인스펙터에서 지정하지 않았으면 장판 하위에서 찾는다 — 이펙트를 다시 끼워 넣어도 따라온다.
+        if (floorEffect == null && floor != null)
+            floorEffect = floor.GetComponentInChildren<ParticleSystem>(true);
 
         bomb.SetActive(true);
         SetFloorEnable(false);
@@ -114,12 +143,6 @@ public class BombController : NetworkBehaviour
             Edit.LogAssertion("[No.23] KnockbackAttack 컴포넌트가 연결되어 있지 않습니다.");
         }
 
-        _rigidbody = GetComponent<Rigidbody>();
-        if (_rigidbody == null)
-        {
-            Edit.LogAssertion("[No.23] Rigidbody 컴포넌트가 연결되어 있지 않습니다.");
-        }
-
         _baseRot = transform.rotation;
 
         // [임시 진단] ground 마스크 실제 런타임 값 확인 (Ground만이면 8, Ground+Default면 9)
@@ -128,6 +151,10 @@ public class BombController : NetworkBehaviour
 
     public override void OnNetworkDespawn()
     {
+        // 가드보다 앞이다. 궤적 핸들은 서버·클라 모두 회수해야 풀 인스턴스가 돌아온다
+        // (폭탄은 파괴되지 않고 재사용되므로 놓치면 조금씩 샌다).
+        trailPlayer?.Stop();
+
         if (!IsServer) return;
 
         if (_bombComponent != null)
@@ -171,7 +198,7 @@ public class BombController : NetworkBehaviour
         if (!IsServer) return;
 
         _followTarget = socket;
-        _bombState = BombState.None;
+        SetBombState(BombState.None);
 
         _rigidbody.useGravity = false;
         _rigidbody.isKinematic = true;
@@ -191,7 +218,7 @@ public class BombController : NetworkBehaviour
         if (!IsServer) return;
 
         _followTarget = null;
-        _bombState = BombState.InitFlight;
+        SetBombState(BombState.InitFlight);
 
         _startPos = transform.position;
         _prevPos = _startPos;
@@ -213,7 +240,7 @@ public class BombController : NetworkBehaviour
         if (!IsServer) return;
 
         _followTarget = null;
-        _bombState = BombState.Flight;
+        SetBombState(BombState.Flight);
 
         _startPos = transform.position;
         _prevPos = _startPos;
@@ -247,7 +274,7 @@ public class BombController : NetworkBehaviour
     {
         transform.rotation = _baseRot;
         ApplyUniformScale(landedScale);
-        _bombState = BombState.None;
+        SetBombState(BombState.None);
         _bombTimer = 0f;
         _floorTimer = 0f;
     }
@@ -330,7 +357,7 @@ public class BombController : NetworkBehaviour
         {
             _rigidbody.MovePosition(_targetPos);
             ApplyUniformScale(landedScale);
-            _bombState = BombState.BombTimer;
+            SetBombState(BombState.BombTimer);
             _elapsed = 0f;
         }
     }
@@ -456,7 +483,7 @@ public class BombController : NetworkBehaviour
 
             // 목표 지점보다 먼저 바닥에 닿은 경우 — 보간이 끝나기 전이므로 여기서 원래 크기로 맞춘다.
             ApplyUniformScale(landedScale);
-            _bombState = BombState.BombTimer;
+            SetBombState(BombState.BombTimer);
         }
     }
 
@@ -486,6 +513,24 @@ public class BombController : NetworkBehaviour
     void Explode()
     {
         SetBombEnableClientRpc(false);
+        PlayExplodeEffectClientRpc();
+    }
+
+    /// <summary>
+    /// [ClientRpc] 폭발 이펙트를 각 피어가 자기 폭탄 위치에서 1회 재생한다.
+    ///
+    /// <b>좌표를 싣지 않는다.</b> 폭탄에 <c>NetworkTransform</c>이 있어 위치가 복제되고,
+    /// 폭발 시점의 폭탄은 이미 착지해 멈춰 있으므로 각 피어의 로컬 위치가 곧 정답이다.
+    /// 서버 좌표를 보내면 보간 지연만큼 어긋난다.
+    ///
+    /// <b>IsServer 가드가 없는 것은 의도다</b> — 연출은 각 피어가 자기 화면에 그려야 한다.
+    /// </summary>
+    [ClientRpc]
+    void PlayExplodeEffectClientRpc()
+    {
+        if (explodeEffect == null || EffectManager.Instance == null) return;
+
+        EffectManager.Instance.Play(explodeEffect, transform.position, Quaternion.identity);
     }
 
     void MakeFloor()
@@ -533,7 +578,7 @@ public class BombController : NetworkBehaviour
         transform.rotation = Quaternion.identity;
 
         SetFloorEnableClientRpc(true);
-        _bombState = BombState.Floor;
+        SetBombState(BombState.Floor);
     }
 
     FloorAreaEffect CheckDoubleExplosion()
@@ -559,6 +604,48 @@ public class BombController : NetworkBehaviour
         }
 
         return bombAreaEffect;
+    }
+
+    #endregion
+
+    #region 비행 궤적 VFX
+
+    /// <summary>비행 중인가. 궤적은 이 구간에서만 재생된다.</summary>
+    static bool IsFlying(BombState state)
+        => state == BombState.InitFlight || state == BombState.Flight;
+
+    /// <summary>
+    /// 상태 전이의 <b>단일 통로</b>. 궤적 on/off를 여기 한 곳에 묶어 두면
+    /// 전이 지점이 늘어나도 켜고 끄는 짝이 어긋나지 않는다.
+    ///
+    /// 궤적은 <see cref="_bombState"/>가 비행 구간에 <b>들어올 때</b> 켜고 <b>나갈 때</b> 끈다.
+    /// InitFlight → Flight는 같은 구간 안의 이동이라 재생이 끊기지 않는다.
+    /// </summary>
+    void SetBombState(BombState next)
+    {
+        if (_bombState == next) return;
+
+        bool wasFlying = IsFlying(_bombState);
+        bool nowFlying = IsFlying(next);
+        _bombState = next;
+
+        // 상태 변경은 전부 서버에서 일어난다. 연출만 전 피어로 내보낸다.
+        if (IsServer && wasFlying != nowFlying)
+            SetTrailClientRpc(nowFlying);
+    }
+
+    /// <summary>
+    /// [ClientRpc] 각 피어가 자기 폭탄에 궤적을 켜고 끈다.
+    /// <b>IsServer 가드가 없는 것은 의도다</b> — 연출은 각자 그려야 한다.
+    /// 폭탄에 <c>NetworkTransform</c>이 있어 위치가 복제되므로, 궤적은 로컬에서 따라가면 된다.
+    /// </summary>
+    [ClientRpc]
+    void SetTrailClientRpc(bool play)
+    {
+        if (trailPlayer == null) return;
+
+        if (play) trailPlayer.Play();
+        else trailPlayer.Stop();
     }
 
     #endregion
@@ -596,10 +683,30 @@ public class BombController : NetworkBehaviour
         }
     }
 
+    /// <summary>
+    /// 장판의 표시/판정을 켜고 끈다. 스폰 시 false, <see cref="MakeFloor"/>에서 true,
+    /// 장판 시간이 끝나면 다시 false — Floor 상태의 시작과 끝이 정확히 여기로 모인다.
+    ///
+    /// <b>이펙트는 SetActive로 다루지 않는다.</b> 장판(Circle)에는 <c>NetworkTransform</c>이 있어
+    /// GameObject를 껐다 켜면 문제가 됐다(그래서 렌더러 토글로 바꿨다). 파티클도 같은 이유로
+    /// 오브젝트를 건드리지 않고 <c>Play</c>/<c>Stop</c>만 쓴다.
+    ///
+    /// ⚠️ 널 검사는 장식이 아니다. 이 메서드는 <see cref="OnNetworkSpawn"/> 초반에 불리므로,
+    /// 여기서 터지면 <b>그 뒤의 컴포넌트 캐싱이 통째로 건너뛰어진다</b>. 실제로 장판의
+    /// SpriteRenderer를 인스펙터에서 지웠더니 <c>_rigidbody</c>가 null로 남아
+    /// 엉뚱하게 <c>UpdateFlight</c>에서 NRE가 났다.
+    /// </summary>
     void SetFloorEnable(bool enable)
     {
-        _floorRenderer.enabled = enable;
-        _floorCollider.enabled = enable;
+        if (_floorCollider != null) _floorCollider.enabled = enable;
+
+        if (floorEffect == null) return;
+
+        // withChildren: true — 프리팹 루트만 잡아도 하위 파티클(fire/circle/particles)까지 함께 간다.
+        if (enable)
+            floorEffect.Play(true);
+        else
+            floorEffect.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
     }
     [ClientRpc]
     void SetFloorEnableClientRpc(bool enable)

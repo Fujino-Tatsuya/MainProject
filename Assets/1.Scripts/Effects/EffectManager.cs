@@ -30,6 +30,39 @@ public class EffectManager : MonoBehaviour
     /// <summary>중앙 이펙트 카탈로그. 예: EffectManager.Instance.Catalog.HitSpark</summary>
     public EffectCatalog Catalog => catalog;
 
+    /// <summary>
+    /// 연출 호출부용 안전 접근자. <c>EffectManager.Instance.Catalog.X</c>를 그대로 쓰면
+    /// 매니저가 없는 씬에서 <see cref="System.NullReferenceException"/>이 난다 —
+    /// RPC 핸들러 안이면 NGO가 "Unhandled RPC exception"으로 감싸 던진다.
+    ///
+    /// <b>조용히 넘기지 않는다.</b> 원인은 "씬에 매니저 프리팹을 빠뜨렸다" 하나인데, 증상은
+    /// "이 씬에서만 이펙트가 일부 안 나온다"로 나타나 찾는 데 시간이 걸린다.
+    /// (실제로 4.MapScene에 EffectManager가 없어 이 문제가 났다.)
+    /// </summary>
+    /// <param name="manager">사용 가능한 매니저. false를 돌려줄 때는 null이다</param>
+    /// <param name="context">경고를 클릭했을 때 하이라이트할 오브젝트</param>
+    public static bool TryGet(out EffectManager manager, Object context = null)
+    {
+        manager = Instance;
+
+        if (manager == null)
+        {
+            Edit.LogWarning("[EffectManager] 이 씬에 EffectManager가 없습니다 — 이펙트가 재생되지 않습니다. " +
+                            "Assets/2.Prefabs/Managers/EffectManager.prefab을 씬에 넣을 것.", context);
+            return false;
+        }
+
+        if (manager.Catalog == null)
+        {
+            manager = null;
+            Edit.LogWarning("[EffectManager] EffectCatalog가 연결되지 않았습니다 — " +
+                            "EffectManager 프리팹의 인스펙터에서 연결할 것.", context);
+            return false;
+        }
+
+        return true;
+    }
+
     // 피격 이펙트 디버그 오버라이드. null = 해제(각 대상의 원래 hitVFXType을 쓴다).
     //
     // ⚠️ EffectCatalog(ScriptableObject)가 아니라 여기에 둔다. SO는 씬 오브젝트와 달리 플레이 모드
@@ -107,6 +140,9 @@ public class EffectManager : MonoBehaviour
         // 드라이버는 컴파일 타임에 전부 알려져 있다. SO/리플렉션 등록은 간접층만 늘린다.
         // 기술을 추가할 때 고치는 곳은 여기 한 줄이다.
         _drivers.Add(new ShurikenEffectSystem());
+        _drivers.Add(new FloorAreaEffectSystem());
+        _drivers.Add(new FadeInHoldEffectSystem());
+        _drivers.Add(new FragmentBurstEffectSystem());
 
         // 풀 루트는 매니저와 분리한다 — 매니저의 scale이 이펙트 크기에 곱해지지 않게.
         var rootObject = new GameObject("[EffectPool]");
@@ -169,7 +205,25 @@ public class EffectManager : MonoBehaviour
     /// 반환값이 없는 것은 의도다 — 끌 것이 없고, 핸들을 발급하면 버려도 무해한 핸들이 생겨
     /// 루프 핸들(버리면 풀이 고갈된다)과 실패 모드가 뒤섞인다.
     /// </summary>
-    public void Play(EffectEntry entry, Vector3 position, Quaternion rotation)
+    /// <param name="scale">
+    /// 프리팹에 저작된 크기에 <b>곱해지는 배율</b>(1 = 원래 크기). 파트 offset도 함께 곱해져
+    /// 컴포지트가 통째로 확대된다. 반납 시 원래 크기로 되돌아간다.
+    /// ⚠️ 유니티 scale은 <b>수명(Start Lifetime)을 건드리지 않는다</b> — 크기와 속도만 커지므로
+    /// 큰 배율에서는 "커졌다"보다 "빨라졌다"로 보인다. 프리팹 규칙 문서의 주의사항을 볼 것.
+    /// </param>
+    /// <param name="durationOverride">
+    /// 0보다 크면 <see cref="EffectEntry.ResolvedDuration"/> 대신 이 값을 수명으로 쓴다(0 = 데이터를 따른다).
+    ///
+    /// <b>"수명은 데이터가 진실"과 충돌하지 않는다.</b> 그 축이 막으려는 것은 <i>런타임이 프리팹을 들여다보는 것</i>이지
+    /// 호출자가 수명을 명시하는 것이 아니다 — <c>duration &gt; 0</c> 저작 오버라이드가 이미 같은 일을 하고 있고,
+    /// 이건 그 계층을 호출 시점까지 한 단계 민 것이다.
+    ///
+    /// 쓰는 곳은 <b>수명이 매번 계산되는 이펙트</b>다. No.23 JumpAttack의 예고 장판이 그렇다 —
+    /// 성장 시간이 서버가 점프 체공시간으로 계산한 값이라 저작 시점에 적을 수가 없다.
+    /// 이 값은 파트 드라이버에게도 그대로 전달된다(<see cref="IEffectSystem.Play"/>).
+    /// </param>
+    public void Play(EffectEntry entry, Vector3 position, Quaternion rotation, float scale = 1f,
+                     float durationOverride = 0f)
     {
         if (!CanPlay(entry)) return;
 
@@ -180,14 +234,16 @@ public class EffectManager : MonoBehaviour
         active.position = position;
         active.rotation = rotation;
         active.offset = Vector3.zero;
-        float life = entry.ResolvedDuration;
+        active.scale = SanitizeScale(entry, scale);
+        float life = durationOverride > 0f ? durationOverride : entry.ResolvedDuration;
         active.life = life;
         active.lifeCounting = true;
 
         if (life <= 0f)
         {
             WarnOnce(entry, "duration", $"[EffectManager] '{entry.name}'의 duration이 0이라 재생 즉시 반납된다. " +
-                            "파티클 파트가 없어 자동 계산이 안 되는 엔트리라면 직접 값을 적을 것.");
+                            "파티클 파트가 없어 자동 계산이 안 되는 엔트리라면 직접 값을 적거나 " +
+                            "재생 시 durationOverride를 넘길 것.");
         }
         else if (life < entry.LongestPartDelay)
         {
@@ -202,7 +258,8 @@ public class EffectManager : MonoBehaviour
     }
 
     /// <summary>원샷 재생(회전 없음).</summary>
-    public void Play(EffectEntry entry, Vector3 position) => Play(entry, position, Quaternion.identity);
+    public void Play(EffectEntry entry, Vector3 position, float scale = 1f, float durationOverride = 0f)
+        => Play(entry, position, Quaternion.identity, scale, durationOverride);
 
     /// <summary>
     /// 루프 재생. <b>호출자가 반드시 <see cref="Release"/>로 끝내야 한다</b> — 안 그러면 풀이 고갈된다.
@@ -210,21 +267,32 @@ public class EffectManager : MonoBehaviour
     /// null이 아니면 매 프레임 그 대상을 따라간다(SetParent를 쓰지 않으므로 대상의 scale이 곱해지지 않고,
     /// 대상이 파괴돼도 풀 인스턴스가 딸려 죽지 않는다).
     /// </summary>
-    public EffectHandle PlayLooping(EffectEntry entry, Transform follow, Vector3 offset = default)
+    /// <param name="scale">
+    /// 프리팹 크기에 곱해지는 배율. <b><paramref name="offset"/>에는 곱해지지 않는다</b> —
+    /// 그건 호출자가 월드 단위로 정한 부착 위치이고, 호출자가 직접 조절할 수 있다.
+    /// 반면 엔트리 안의 파트 offset은 호출자가 손댈 수 없으므로 함께 곱해진다.
+    /// </param>
+    /// <param name="partDuration">
+    /// 파트 드라이버에게 넘길 시간(초). <b>수명이 아니다</b> — 루프의 수명은 <see cref="Release"/>가 정한다.
+    /// 시간축을 호출자가 정하는 드라이버만 쓴다(파티클은 무시). 0이면 "시간 없음".
+    /// </param>
+    public EffectHandle PlayLooping(EffectEntry entry, Transform follow, Vector3 offset = default,
+                                    float scale = 1f, float partDuration = 0f)
     {
         return follow != null
-            ? PlayLoopingCore(entry, follow, offset, follow.rotation)
-            : PlayLoopingCore(entry, null, offset, Quaternion.identity);
+            ? PlayLoopingCore(entry, follow, offset, follow.rotation, scale, partDuration)
+            : PlayLoopingCore(entry, null, offset, Quaternion.identity, scale, partDuration);
     }
 
     /// <summary>루프 재생을 월드 좌표·회전에 고정한다. (설계 API에 대한 편의 오버로드)</summary>
-    public EffectHandle PlayLooping(EffectEntry entry, Vector3 position, Quaternion rotation)
+    public EffectHandle PlayLooping(EffectEntry entry, Vector3 position, Quaternion rotation,
+                                    float scale = 1f, float partDuration = 0f)
     {
-        return PlayLoopingCore(entry, null, position, rotation);
+        return PlayLoopingCore(entry, null, position, rotation, scale, partDuration);
     }
 
     private EffectHandle PlayLoopingCore(EffectEntry entry, Transform follow, Vector3 offsetOrPosition,
-                                         Quaternion rotation)
+                                         Quaternion rotation, float scale, float partDuration)
     {
         if (!CanPlay(entry)) return EffectHandle.None;
 
@@ -233,6 +301,8 @@ public class EffectManager : MonoBehaviour
         active.attached = follow != null;
         active.follow = follow;
         active.rotation = rotation;
+        active.scale = SanitizeScale(entry, scale);
+        active.driverDuration = Mathf.Max(0f, partDuration);
 
         if (follow != null)
         {
@@ -432,14 +502,16 @@ public class EffectManager : MonoBehaviour
 
         if (part.prefab != null)
         {
-            GameObject instance = _pool.Rent(part.prefab);
+            GameObject instance = _pool.Rent(part.prefab, active.scale);
             instance.transform.SetPositionAndRotation(worldPosition, active.rotation);
             instance.SetActive(true);
 
             IEffectSystem driver = DriverOf(instance);
             if (driver != null)
             {
-                driver.Play(instance);
+                // 원샷은 남은 수명을 넘긴다 — delay가 걸린 파트는 그만큼 짧게 받아야 회수 시점과 어긋나지 않는다.
+                // 루프는 수명을 세지 않으므로 호출자가 PlayLooping에 준 값을 그대로 넘긴다(안 줬으면 0).
+                driver.Play(instance, active.lifeCounting ? active.life : active.driverDuration);
                 if (!Mathf.Approximately(active.playRate, 1f)) driver.SetPlayRate(instance, active.playRate);
             }
 
@@ -473,6 +545,8 @@ public class EffectManager : MonoBehaviour
         active.released = false;
         active.lifeCounting = false;
         active.playRate = 1f;
+        active.scale = 1f;
+        active.driverDuration = 0f;
         active.inUse = false;      // 세대는 다음 대출에서 새로 발급된다 → stale 핸들은 여기서 죽는다
 
         _freeSlots.Push(active.slot);
@@ -480,7 +554,9 @@ public class EffectManager : MonoBehaviour
 
     private static Vector3 WorldPosition(ActiveEffect active, Vector3 partOffset)
     {
-        return active.position + active.rotation * (active.offset + partOffset);
+        // 파트 offset만 배율을 탄다 — 이펙트의 '내부 구성'이라 확대의 일부다.
+        // active.offset(호출자가 준 추종 오프셋)은 월드 단위로 정한 부착 위치라 건드리지 않는다.
+        return active.position + active.rotation * (active.offset + partOffset * active.scale);
     }
 
     #endregion
@@ -502,6 +578,19 @@ public class EffectManager : MonoBehaviour
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// 배율이 0 이하면 이펙트가 사라지거나(0) 뒤집힌다(음수). 둘 다 재생은 되면서 화면에만 이상이 생겨
+    /// 원인을 찾기 어렵다 — 명백한 오용이므로 1로 되돌리고 알린다.
+    /// </summary>
+    private float SanitizeScale(EffectEntry entry, float scale)
+    {
+        if (scale > 0f) return scale;
+
+        WarnOnce(entry, "scale", $"[EffectManager] '{entry.name}'를 배율 {scale}로 재생하려 했다. " +
+                                 "0이면 보이지 않고 음수면 뒤집힌다. 1로 되돌린다.");
+        return 1f;
     }
 
     private ActiveEffect AcquireSlot(EffectEntry entry)
@@ -638,6 +727,12 @@ public class EffectManager : MonoBehaviour
         public bool lifeCounting;
         public float life;         // 남은 수명(초)
         public float playRate = 1f;
+        public float scale = 1f;   // 프리팹 크기에 곱해지는 배율. 파트 offset에도 곱해진다
+
+        // 드라이버에게 넘길 시간(초). 루프 전용이다 — 원샷은 남은 수명(life)을 그대로 쓴다.
+        // 루프는 수명이 외부 이벤트(Release)로 정해지므로 "얼마나 살지"와 "파트가 얼마 동안 움직일지"가
+        // 서로 다른 수가 된다. No.23 예고 장판이 그 경우다: 성장은 growDuration, 소멸은 착지 시점.
+        public float driverDuration;
 
         public Transform follow;   // null = 월드 고정
         public bool attached;      // 추종 대상을 지정하고 시작했는가 (대상 소멸 감지용)

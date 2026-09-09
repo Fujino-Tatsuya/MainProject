@@ -87,6 +87,7 @@ GameObject:
   - component: {fileID: 1907635930272247084}
   - component: {fileID: 6868425966318957232}
   - component: {fileID: 8101405107818820969}
+  - component: {fileID: 4462577184190413312}
   m_Layer: 8
   m_Name: HumanoidBot
   m_TagString: Untagged
@@ -309,7 +310,6 @@ MonoBehaviour:
     m_Bits: 64
   maxDetectionResults: 16
   hitVFXCollider: {fileID: 4605070822929556597}
-  hitPointMode: 2
   hitVFXType: 1
   bodyCollider: {fileID: 452222744320752660}
 --- !u!114 &8101405107818820969
@@ -324,11 +324,76 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e59f6031be80d1c40ab161abf0873167, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DissolveDeath
+  ShowTopMostFoldoutHeaderGroup: 1
+  dissolveTemplate: {fileID: 2100000, guid: 2aa1c6b21e004e799e426acfd55ec726, type: 2}
+  particlePrefab: {fileID: 7019508933032447489, guid: 0e15d6fc561b43fa95fadff8ab04b5fd, type: 3}
+  duration: 1
+  despawnGrace: 0.5
   renderers: []
-  dissolveProperty: _DissolveAmount
-  duration: 1.5
-  from: 0
-  to: 1
+--- !u!114 &4462577184190413312
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2289540308195322763}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c3be8650c7d44c62b26029cb86c1168a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EffectAnimEvents
+  animator: {fileID: 4092700320975204421}
+  players: []
+--- !u!1 &8136740581150105276
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7299121220594530743}
+  - component: {fileID: 3433408684423304704}
+  m_Layer: 0
+  m_Name: SlashVFX_Socket
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &7299121220594530743
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8136740581150105276}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
+  m_LocalPosition: {x: 0, y: -0.7, z: 1.426}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 1
+  m_Children: []
+  m_Father: {fileID: 638770696805391109}
+  m_LocalEulerAnglesHint: {x: 90, y: 0, z: 0}
+--- !u!114 &3433408684423304704
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8136740581150105276}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
+  id: Slash
+  effect: {fileID: 11400000, guid: d57f39897b08b004c84a995edbd7fde8, type: 2}
+  socket: {fileID: 7299121220594530743}
+  offset: {x: 0, y: 0, z: 0}
+  scale: 1
+  safetyTimeout: 5
 --- !u!1 &8425586465457076251
 GameObject:
   m_ObjectHideFlags: 0
@@ -409,7 +474,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MonsterMeleeAttack
   damage: 0
-  isGroggyAttack: 0
   targetLayer:
     serializedVersion: 2
     m_Bits: 64
@@ -426,6 +490,14 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 2248960605757644715}
     m_Modifications:
+    - target: {fileID: 1809863710549298422, guid: dd75013c6bd4fca44b98880b462059e7, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0.964
+      objectReference: {fileID: 0}
+    - target: {fileID: 1809863710549298422, guid: dd75013c6bd4fca44b98880b462059e7, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0.94
+      objectReference: {fileID: 0}
     - target: {fileID: 3170371216191921136, guid: dd75013c6bd4fca44b98880b462059e7, type: 3}
       propertyPath: m_Name
       value: Model
@@ -472,11 +544,44 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedGameObjects:
+    - targetCorrespondingSourceObject: {fileID: 7434479147878184843, guid: dd75013c6bd4fca44b98880b462059e7, type: 3}
+      insertIndex: 0
+      addedObject: {fileID: 7299121220594530743}
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 762798077475511307, guid: dd75013c6bd4fca44b98880b462059e7, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2564574668524838109}
   m_SourcePrefab: {fileID: 100100000, guid: dd75013c6bd4fca44b98880b462059e7, type: 3}
+--- !u!4 &638770696805391109 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 7434479147878184843, guid: dd75013c6bd4fca44b98880b462059e7, type: 3}
+  m_PrefabInstance: {fileID: 8066454860944403598}
+  m_PrefabAsset: {fileID: 0}
+--- !u!95 &4092700320975204421 stripped
+Animator:
+  m_CorrespondingSourceObject: {fileID: 6286458518938246347, guid: dd75013c6bd4fca44b98880b462059e7, type: 3}
+  m_PrefabInstance: {fileID: 8066454860944403598}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &4904039733445687157 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 3170371216191921147, guid: dd75013c6bd4fca44b98880b462059e7, type: 3}
   m_PrefabInstance: {fileID: 8066454860944403598}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &7307034569894998149 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 762798077475511307, guid: dd75013c6bd4fca44b98880b462059e7, type: 3}
+  m_PrefabInstance: {fileID: 8066454860944403598}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &2564574668524838109
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7307034569894998149}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87e4983a5c2d4af3a98a2f07f88ddeb5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EffectAnimEventRelay
