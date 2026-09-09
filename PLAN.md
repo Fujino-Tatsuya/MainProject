@@ -203,6 +203,58 @@ git show HEAD:Assets/2.Prefabs/Monster/WallBot.prefab | grep -o "Assembly-CSharp
 ```
 머지 전/후를 `comm -23` 로 비교. 내 쪽 필수: `MonsterCounterWindow`(WallBot·Spinner·Gauntlet 3종 전부).
 
+## ✅ 머지 교차검증 결과 (2026-09-09, 독립 에이전트 2대)
+
+Codex 는 **워크스페이스 크레딧 소진**으로 못 돌렸다(경로·플래그는 정상, `out of credits`).
+
+### 프리팹 3종 — 이상 없음
+
+댕글링 참조 0 · 고아 앵커 0 · 앵커 중복 0 · 충돌 마커 0 · YAML 타입헤더 정합 ·
+직렬화 필드 ↔ 스크립트 대조 100%(WallBot 19/19 · SpinnerBot 22/22 · GauntletBot 30/30).
+참조 타입까지 대조해 "A 스크립트에 B 컴포넌트가 물리는" 사고가 없음을 확인했다.
+
+### 🔴 검사 방법의 함정 — `Assembly-CSharp::` grep 이 **거짓 초록**을 냈다
+
+`m_EditorClassIdentifier` 가 **빈 문자열**인 컴포넌트가 있어서 이름 grep 에 안 잡힌다.
+guid 집합으로 다시 돌려야 차이가 보인다. 실제로 이름 grep 이 놓친 것 2건:
+
+| | 이름 grep | guid 비교 | 판정 |
+|---|---|---|---|
+| WallBot 루트 스크립트 | 차이 없음 | P2 는 `MonsterBase`, 결과물은 `WallBot.cs` | ✅ P1 의 스크립트 교체(`68b2d199`)가 이긴 것 — 맞다 |
+| GauntletBot `AoeTelegraph` | 차이 없음 | **P1 에 있고 결과물에 없다** | ✅ 의도된 제거(아래) |
+
+⚠️ **정정**: 앞서 "양쪽 어디서도 사라진 컴포넌트 0" 이라고 적었는데 그 근거가 이 grep 이었다.
+정확히는 **GauntletBot 의 `AoeTelegraph` 는 제거됐다.** 다만 의도한 것이고 정합하다 —
+`GauntletBot.cs` 의 필드 타입도 `AoeTelegraph` → `EffectSocketPlayer` 로 함께 넘어왔다
+(`.cs` 와 `.prefab` 이 같은 방향). `AoeTelegraph.cs` 자체는 남아 있고
+`AoeDecalTelegraph.prefab`·`JumpTelegraph.prefab`(23호)이 계속 쓴다.
+
+**부수 발견**: `WallBot.prefab:315` · `SpinnerBot.prefab:316` 의 `m_EditorClassIdentifier` 가
+아직 `Assembly-CSharp::MonsterBase` 다(`m_Script` guid 는 올바름). 로드에는 무해하지만
+위 거짓 초록의 원인이다. **다음에 이 grep 을 쓸 때 같은 함정에 빠진다 — guid 로 세라.**
+
+### C# — 이상 없음
+
+양쪽 부모의 **순수 union**(어느 부모에도 없는 변경 0). `MonsterBase.cs` 자동 머지도
+내 3건(트리거 래치 리셋 · `ServerHoldActionPoseAtClipEnd` · `OnMonsterStateChanged`)과
+민경님 7줄이 모두 생존. 카운터 성공 → 텔레그래프 소등 경로 도달 확인.
+
+### 머지가 만들지 않은 기존 위험 3건 (판단 대기로 이월)
+
+1. 🔴 **`maxGroggyCount` 를 켜면 장판 소등이 조용히 깨진다.** 누적식이 먼저 `Groggy` 로 보내면
+   `CounterSucceeded` 의 `SetState(Groggy)` 가 같은 값이라 콜백이 안 뜨고 `Stop()` 이 안 돈다.
+   지금은 `GauntletBotData.maxGroggyCount: 0` 이라 비활성. **소등 지점을 하나로 모은 결정의 대가**다.
+2. **인터럽트가 킬링블로우면** `ServerFreezeAtLocomotion()` 에 `_isDead` 가드가 없어 사망 연출과
+   충돌할 수 있다(코드 추론, Play 미검증).
+3. **GauntletBot 카운터 창은 화면 표시가 없다** — `IBossTelegraph` 구현체가 프리팹에 없어
+   `ServerSetCounterWindow` 가 no-op(중간보스 3종 공통, 위 「판단 대기」 참조).
+
+### 남은 미검증
+
+**Play 검증.** 두 에이전트 모두 정적 분석이다. 이 머지의 유일한 실질 동작 변경이
+`AoeTelegraph → EffectSocketPlayer` 전환이므로 **GauntletBot 스매시 장판이 실제로 뜨고 꺼지는지**
+부터 보는 게 맞다.
+
 ## 🔴 머지 순서 — **git 먼저, SVN 나중** (2026-09-09 근거 확정)
 
 두 쪽이 **한 변경의 두 짝**이라 순서가 정해진다.
@@ -249,7 +301,46 @@ git show HEAD:Assets/2.Prefabs/Monster/WallBot.prefab | grep -o "Assembly-CSharp
 
 - 내가 올린 것: **r290**(채찍 히트 이벤트 Start → End 이동) · **r292**(SpinBot `AnyState → Dizzy` 전이).
   SVN 워킹카피 루트는 `Assets/50.Art` 다(레포 루트에서 svn 명령이 안 먹는다).
-- 업데이트 후 확인:
+### ✅ 업데이트 실행 결과 (2026-09-09) — r281 → **r294**
+
+- **충돌 0** · 로컬 수정 22건(`VFX/Textures/**.meta`) **그대로 보존** · 컴파일 0에러
+- **내 r290·r292 생존 확인** — `A_Spinner_AttackWhip R` 의 `OnAttackHit` 살아 있고,
+  `Controller_SpinBot` 의 `Dizzy` 전이도 남아 있다(r294 가 두 파일을 안 건드렸다)
+- 확인 목록 결과:
+
+| | 확인한 것 | 결과 |
+|---|---|---|
+| 1 | `A_Spinner_Dizzy` 이벤트 | ✅ **`StopEffect`(data `Spin`) 하나뿐.** `OnAttackHit` 류 없음 → 그로기 중 데미지 안 나간다 |
+| 2 | `A_Spinner_AttackStart` 프레임 | ✅ **0~45** (1.5초) — 스핀 창을 덮는다. 이벤트 `StartEffect` @0.33s |
+| 3 | `A_GauntletBot_SmashAntici` 프레임 | ✅ **0~60** (2.0초) — 창 1.5초를 덮는다. 이벤트 `StartEffect` @0.29s |
+| 4 | `Controller_PeekABot` 에 Hit 상태 | ❌ **아직 없다**(Hide·Raise·Idle·Shoot 4개). 감사의 죽은 값 2건은 그대로 — 이미 "정상으로 확정"한 것이라 조치 불필요 |
+
+- 이벤트 이름은 `StartEffect`/`StopEffect` 인데 `EffectAnimEvents`·`EffectAnimEventRelay` 둘 다
+  `PlayEffect`/`StartEffect`/`StopEffect` 3종을 모두 갖고 있다 → **수신 메서드는 다 있다.**
+- ⚠️ **정정 (2026-09-09, 교차검증에서 잡힘)**: 앞서 "SpinnerBot 에 `EffectAnimEventRelay` 가 없어
+  이벤트가 수신자를 못 찾는다"고 적었는데 **틀렸다. 조치할 것 없다.**
+  `EffectAnimEvents.Awake()` → `EnsureRelay()`(EffectAnimEvents.cs:38, 65-78)가
+  `animator.gameObject.AddComponent<EffectAnimEventRelay>()` 로 **런타임에 자동 부착**한다
+  (`MonsterAnimationEventRelay` 와 같은 방식이다). 프리팹에 저작돼 있으면 그건 no-op 이고,
+  GauntletBot 만 저작돼 있는 것은 선택의 문제였지 결함이 아니었다.
+  id 도 맞는다 — SpinnerBot `EffectSocketPlayer.id = Spin` ↔ 클립 `StartEffect/StopEffect` data `Spin`.
+  🔴 **교훈**: "프리팹에 컴포넌트가 없다"를 결함으로 단정하기 전에 **런타임 자동 부착 경로를
+  먼저 찾을 것**(이 레포는 릴레이를 둘 다 그렇게 붙인다). 부재 증명은 배선만으로 안 된다.
+
+### 🔴 별건 — `UI/char_select/` 의 `.meta` 가 SVN 에 없다 (2026-09-09 발견)
+
+`svn update` 후 미추적(`?`) 파일이 13 → 25 로 늘었다. 늘어난 12개가 전부
+`UI\char_select\*.png.meta` + `char_select.meta` 다.
+
+- 저장소에는 **png 11개만 있고 `.meta` 는 하나도 없다**(`svn ls` 로 확인). r291 이지원님 커밋.
+- 즉 **Unity 가 로컬에서 새 GUID 로 meta 를 만든 것**이다. 팀원마다 GUID 가 갈린다.
+- ⚠️ **에디터를 켜 놓고 업데이트해서 생긴 게 아니다** — 저장소에 애초에 없다. 껐다 켜도 같다.
+- 🔴 AGENTS.md §3 위반이다: *".meta 는 에셋과 같은 VCS 로 함께 관리 … GUID 깨지면 프리팹 참조
+  전부 깨짐."* 이 png 로 UI 를 만들면 **다른 사람 머신에서 참조가 깨진다.**
+- **할 일**: 이지원님께 알리고, 누군가 이 `.meta` 12개를 SVN 에 커밋해 GUID 를 고정한다.
+  (먼저 올리는 사람의 GUID 가 정본이 되므로 **한 사람이 한 번에** 올려야 한다.)
+
+- (원래 목록) 업데이트 후 확인:
   1. `A_Spinner_Dizzy` 에 붙은 이벤트 — `OnAttackHit` 류가 있으면 **그로기 중 데미지가 나간다**
   2. `A_Spinner_AttackStart` 프레임 — 45(1.5초)여야 스핀 창을 덮는다
   3. `A_GauntletBot_SmashAntici` 프레임 — 60(2.0초)여야 창 1.5초를 덮는다
@@ -294,6 +385,20 @@ git show HEAD:Assets/2.Prefabs/Monster/WallBot.prefab | grep -o "Assembly-CSharp
 
 ⚠️ **머지 전에 할 것.** `MidBossTest` 는 은희님 브랜치에서 **삭제로 들어온다**(MPPM 시나리오 5개 → 1개).
 머지 후에 하려면 되살려야 한다.
+
+## ✅ 4차 Play 라운드 결과 (2026-09-09) — 전부 통과
+
+| 건 | 원인 | 조치 |
+|---|---|---|
+| 사망 시 애니가 계속 돈다 | 12종 중 **7종이 `deathTrigger` 미저작** | 파라미터 없을 때만 애니메이터 정지. 있는 몹은 그대로 |
+| SpinnerBot 스핀 이펙트 잔존 | `StopEffect` 가 **`A_Spinner_Dizzy` 에만** 있는데 **돌진 후 Dizzy 단계를 없앴다** → 인터럽트 실패 시 종료 이벤트가 영영 안 옴 | `PlayStateAnimation(s != Attack)` 에서 코드가 끈다 |
+| WallBot 돌진이 멀리서 맞음 | 돌진이 **평타 히트박스를 공유**(전방 2.0m = 몸통 반지름 4배) | `DashHitbox` 분리 — 전방 1.0m · 좌우 ±0.5m. 평타는 그대로 |
+| 보스 등장 각도 | 위 §3 | `EntranceRotation()` |
+
+🔴 **SpinnerBot 건이 이 세션에서 가장 값진 발견이다** — 민경님은 "스핀은 항상 Dizzy 로 끝난다"를
+전제로 클립에 종료 이벤트를 걸었는데, 팀장이 그 단계를 없앴다. **두 사람의 전제가 어긋난 것**이고
+어느 쪽 코드도 틀리지 않았다. 클립 이벤트로 켠 이펙트는 **그 클립을 안 지나는 이탈 경로가 하나라도
+있으면 샌다** — 아트와 코드가 나뉜 이 프로젝트에서 반복될 유형이다.
 
 ## 판단 대기
 
@@ -354,7 +459,25 @@ git show HEAD:Assets/2.Prefabs/Monster/WallBot.prefab | grep -o "Assembly-CSharp
   `Wall(7)`·`Env(11)` 레이어를 쓰지 않는다(ZoneL_typeC 실측: 23개 전부 layer 0).
   그래서 바닥·경사도 장애물로 취급된다 — 오르막에 맞으면 사라진다. 1번(층 분리)과 같은 방향이라 수용.
 
-## 3. 보스 차징이 화면 남쪽을 본다
+## 3. 보스가 화면 남쪽을 본다 — ✅ **차징 + 등장 연출** (2026-09-09, Play 통과)
+
+⚠️ **용어 주의 — "landing" 이 두 개다.** 이걸 혼동해서 한참 엉뚱한 곳을 고쳤다:
+- ① **등장 연출 착지** = 게임 시작 시 보스가 `BossLandingPoint` 로 내려오는 것 → **이쪽이 대상이었다**
+- ② 점프 공격 착지(`ArriveJump`) → 대상 아님. 건드리지 않았다
+
+**수정**: `BossEncounterDirector` 의 스폰 회전을 `bossLandingPoint.rotation`(씬 마커 회전) →
+`EntranceRotation()`(= 차징과 같은 `BossChargeFacingPolicy.ScreenSouth`)로 바꿨다.
+등장 연출은 별도 애니를 안 틀고 Director 가 transform 만 내리므로 스폰 회전이 곧 착지 자세다.
+`bossLandingPoint` 의 **위치는 그대로** 쓴다.
+
+🔴 **알아 둘 구조** (교차검증에서 나온 사실): 보스 Animator 는 프리팹 루트가 아니라 **중첩된
+`SK_23` 모델 자식**에 있다. `m_Avatar` 없음 · Root Node **None** · Generic · `WriteDefaultValues 1`
+조합이라 **클립 최상위 노드(`c_traj`)의 회전 커브가 그 자식의 로컬 회전에 매 프레임 씌워진다.**
+즉 화면 각도 = **루트 회전 + 클립 yaw**. 지금은 관련 클립의 yaw 가 0에 가까워 문제가 없지만,
+아트가 클립을 바꾸면 여기가 조용히 틀어진다. 각도가 "일정하게 밀려" 보이면 이걸 의심할 것.
+(`m_ApplyRootMotion: 0` 이라 루트 모션은 아니다 — 그쪽은 이미 기각했다.)
+
+## 3-1. (원래 계획 본문)
 
 문제 — `StartChargingInPlace` 에 회전 지정이 없어 **도착 당시 방향**이 그대로 남는다(지금은 화면 좌측).
 
