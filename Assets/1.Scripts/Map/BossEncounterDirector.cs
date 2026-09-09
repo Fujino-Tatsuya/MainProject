@@ -325,7 +325,7 @@ public sealed class BossEncounterDirector : NetworkBehaviour
         Vector3 landing = bossLandingPoint.position;
         Vector3 spawnPosition = landing + Vector3.up * spawnHeight;
 
-        GameObject bossInstance = Instantiate(bossPrefab, spawnPosition, bossLandingPoint.rotation);
+        GameObject bossInstance = Instantiate(bossPrefab, spawnPosition, EntranceRotation());
         _bossNetworkObject = bossInstance.GetComponent<NetworkObject>();
         if (_bossNetworkObject == null)
         {
@@ -444,6 +444,31 @@ public sealed class BossEncounterDirector : NetworkBehaviour
 
         MoveBoss(_descendTo);
         SetPhase(BossEncounterPhase.Impact);
+    }
+
+    /// <summary>
+    /// 등장 연출에서 보스가 설 방향 — <b>화면 아래(남쪽)</b>.
+    ///
+    /// 🔴 예전에는 `bossLandingPoint.rotation`(씬에 놓인 마커의 회전)을 그대로 썼다. 그러면 마커를
+    ///    어떻게 돌려 놨느냐에 따라 등장 각도가 정해져 **플레이어를 안 보고 내려온다**
+    ///    (팀장 판정 2026-09-09: "처음 시작 시 연출로 내려올 때 각도가 바뀌어야 한다").
+    ///    차징이 쓰는 <see cref="BossChargeFacingPolicy"/> 와 **같은 규칙**을 쓴다 — 탑다운에서
+    ///    화면 아래를 보면 플레이어를 마주 보는 것으로 읽힌다.
+    ///
+    /// ⚠️ 카메라를 못 찾으면 월드 −Z 로 폴백한다(고정 톱다운의 화면 아래).
+    /// </summary>
+    private Quaternion EntranceRotation()
+    {
+        Camera cam = Camera.main;
+        Vector3 dir = cam != null
+            ? BossChargeFacingPolicy.ScreenSouth(
+                cam.transform.forward, cam.transform.up, BossChargeFacingPolicy.DefaultFallback)
+            : BossChargeFacingPolicy.DefaultFallback;
+
+        if (cam == null)
+            Edit.LogWarning("[BossEncounter] 등장 방향 — 활성 카메라를 못 찾아 월드 −Z 로 세웁니다.", this);
+
+        return Quaternion.LookRotation(dir, Vector3.up);
     }
 
     private void MoveBoss(Vector3 position)
