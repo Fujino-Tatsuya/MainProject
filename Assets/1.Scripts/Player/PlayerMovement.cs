@@ -20,12 +20,31 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private float alignThreshold = 0.98f;
     [SerializeField] private float viewYaw = -45f;
 
+    [Header("충돌 (일반 이동 스윕)")]
+    [SerializeField] private PlayerGameRuleData gameRule;
+    [SerializeField, Min(0f)] private float collisionSkin = 0.02f;
+    [SerializeField, Min(1)] private int maxSweepIterations = 3;
+
+    private const int CastBufferSize = 8;
+    private const float DefaultMaxWalkableSlopeAngle = 60f;
+    private readonly RaycastHit[] castBuffer = new RaycastHit[CastBufferSize];
+
+    // 평지 판정 기준. QA의 P9-PlayerWallClimb 디텍터와 같은 값이라 디텍터가 이상으로 보는 구간이
+    // 그대로 Y 잠금 구간이 된다(경사·램프는 이 값을 못 넘어 잠기지 않는다).
+    private const float FlatGroundNormalY = 0.999f;
+    private const float VerticalIntentEpsilon = 0.00005f;
+
     private Vector2 prevDir_for_Rotate = new Vector2(0f, -1f);
     private bool hasRotate = true;
     private float currentSpeed;
 
     // 이동 플랫폼 캐리: 이번 프레임 외부 이동량(플랫폼). Move()에서 입력 이동과 합산 후 리셋.
     private Vector3 _carryDelta;
+
+    // Y 잠금 판정용(ApplyFlatGroundYLock 참조). 스크립트가 스스로 넣은 수직 이동이 있으면 잠그지
+    // 않아야 하므로 직전 프레임의 의도값을 남긴다. initialConstraints는 저작된 제약(회전 고정)이다.
+    private float lastVerticalIntentY;
+    private RigidbodyConstraints initialConstraints;
 
     /// <summary>이동 플랫폼 등 외부 이동량을 이번 프레임 이동에 가산한다(소유자측에서 호출).</summary>
     public void AddCarryDelta(Vector3 delta)
@@ -41,6 +60,7 @@ public class PlayerMovement : MonoBehaviour
         rb = GetComponent<Rigidbody>();
         capsule = GetComponent<CapsuleCollider>();
         grounding = GetComponent<PlayerGroundingSensor>();
+        initialConstraints = rb.constraints;
 
         // MoveRoot(평타 러시 스텝/스킬 전진) 관통 방지 스윕 대상 — 정적 지오메트리만.
         // 유닛(Enemy/Player)은 제외해 러시가 몹 사이를 지나는 기존 감각을 유지한다.
@@ -59,6 +79,13 @@ public class PlayerMovement : MonoBehaviour
     {
         Move();
         Rotate();
+    }
+
+    private void FixedUpdate()
+    {
+        // Y 잠금은 물리 케이던스로 갱신한다 — 프레임 히치로 한 프레임에 물리 스텝이 여러 번 돌 때
+        // Update에서 한 번만 갱신하면 그 스텝들이 낡은 판정을 공유해 상승분이 새어 들어간다.
+        ApplyFlatGroundYLock();
     }
 
     private void Move()
@@ -106,6 +133,17 @@ public class PlayerMovement : MonoBehaviour
         Vector3 total = ProjectOntoGround(inputMove) + _carryDelta;
         _carryDelta = Vector3.zero;
 
+        // 대시와 동일한 스윕(PlayerMotionSweep)으로 벽 관통을 막는다. ClampByStaticGeometry(MoveRoot용)와
+        // 달리 걸을 수 있는 경사(gameRule.MaxWalkableSlopeAngle)는 장애물로 보지 않고 통과시키며,
+        // 막힌 경우엔 완전히 멈추는 대신 벽 표면을 따라 미끄러지듯 남은 이동량을 이어간다.
+        total = PlayerMotionSweep.Resolve(
+            capsule, total,
+            gameRule != null ? gameRule.MaxWalkableSlopeAngle : DefaultMaxWalkableSlopeAngle,
+            rootMoveBlockingMask, collisionSkin, maxSweepIterations, castBuffer);
+
+        // 스윕까지 끝난 이번 프레임의 수직 의도값 — FixedUpdate의 Y 잠금 판정에 쓴다.
+        lastVerticalIntentY = total.y;
+
         if (total.sqrMagnitude > 0f)
         {
             // 대시 중에는 CanMove=false라 입력 이동이 0이므로, 여기 남는 건 플랫폼 캐리뿐이다.
@@ -119,6 +157,44 @@ public class PlayerMovement : MonoBehaviour
 
             rb.MovePosition(rb.position + total);
         }
+    }
+
+    /// <summary>
+    /// 평지 접지 중에는 Rigidbody의 Y축을 잠근다(그 외에는 저작된 제약으로 되돌린다).
+    ///
+    /// 루트 Rigidbody는 저작상 non-kinematic이라(Paladin 프리팹) <c>rb.MovePosition</c>이 텔레포트가
+    /// 아니라 "목표까지 가는 속도 + 솔버의 충돌 해석"으로 동작한다. 그래서 캡슐이 벽 모서리에 눌리면
+    /// PhysX가 접촉 법선 방향으로 관통을 밀어내는데, 모서리·베벨 면의 법선에 섞인 미세한 +Y가 매
+    /// 스텝 쌓여 벽을 타고 오른다(QA P9-PlayerWallClimb). <see cref="PlayerMotionSweep"/>은
+    /// MovePosition <b>전에</b> 끝나 이걸 막을 수 없고 사후 보정은 한 프레임 늦으므로, 솔버가 Y를
+    /// 아예 못 건드리게 제약으로 막는다. 잠긴 축의 접촉 해석은 수평 성분만 남아 벽을 따라 미끄러지는
+    /// 동작은 그대로다. 판정은 <see cref="FixedUpdate"/>에서 물리 스텝마다 갱신한다.
+    ///
+    /// 다음 중 하나라도 어긋나면 즉시 잠금을 푼다(정상적인 수직 이동 보호):
+    /// - 평지 접지가 아님(경사·램프는 법선이 <see cref="FlatGroundNormalY"/> 미만 → 등판·낙하 정상)
+    /// - 이동 플랫폼 위(플랫폼이 수직으로 움직인다)
+    /// - 스크립트가 직접 수직 이동을 넣었음(플랫폼 캐리 등)
+    /// - 넉백 중(위로 띄우는 넉백이라면 Y가 잠긴 채로는 떠오르지 못해 접지도 안 풀린다)
+    ///
+    /// 대시는 제외하지 않는다 — 설계상 평면 이동이고(<c>planar.y = 0f</c>), 절벽에서 떨어지는
+    /// 수직 이동은 접지가 풀리는 순간 이 잠금도 같이 풀리므로 평지 접지 게이트만으로 충분하다.
+    /// </summary>
+    private void ApplyFlatGroundYLock()
+    {
+        bool lockY =
+            grounding != null &&
+            grounding.IsGrounded &&
+            !grounding.IsMovingPlatform &&
+            grounding.GroundNormal.y >= FlatGroundNormalY &&
+            Mathf.Abs(lastVerticalIntentY) <= VerticalIntentEpsilon &&
+            (player == null || player.CurrentState != PlayerActionState.Knockback);
+
+        RigidbodyConstraints desired = lockY
+            ? initialConstraints | RigidbodyConstraints.FreezePositionY
+            : initialConstraints;
+
+        if (rb.constraints != desired)
+            rb.constraints = desired;
     }
 
     /// <summary>
