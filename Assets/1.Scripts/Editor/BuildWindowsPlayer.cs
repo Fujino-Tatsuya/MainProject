@@ -19,13 +19,11 @@ public static class BuildWindowsPlayer
     /// <summary>
     /// 실행 시 반드시 빌드에 포함되어야 하는 메인 플로우 씬.
     ///
-    /// 🔴 전투 맵이 <b>두 개 다</b> 들어 있다(2026-08-18 팀장 확정 — 레거시도 계속 출하한다).
-    /// 정본은 <c>4.MapScene-trensparent</c> 다: <c>0.BootStrapScene</c> 의 GameManager 인스턴스가
-    /// <c>mainGameSceneName</c> 을 그 이름으로 오버라이드하므로 <b>빌드된 게임이 실제로 여는 씬</b>이
-    /// 정본 쪽이다(프리팹 기본값만 레거시라 코드만 읽으면 반대로 보인다).
-    ///
-    /// 이전에는 여기서 <b>레거시만</b> 요구했다 — 즉 정본이 빌드 목록에서 빠져도 빌드는 통과하고
-    /// 실행하면 맵에 못 들어갔다. 게이트가 정작 지켜야 할 것을 안 지키고 있었다.
+    /// 🔴 2026-09-09 씬 재배치: 전투 맵은 <c>4.MapScene</c> <b>하나</b>다. 구 정본
+    /// <c>4.MapScene-trensparent</c> 는 <c>0.Scenes/Lagacy/4.MapScene_Lagacy.unity</c> 로 보관 이동했고
+    /// EditorBuildSettings 에서도 빠졌다 — 더 이상 출하하지 않으므로 여기서도 요구하지 않는다.
+    /// <c>0.BootStrapScene</c> 의 GameManager 인스턴스가 <c>mainGameSceneName</c> 을
+    /// <c>4.MapScene</c> 으로 오버라이드한다.
     /// </summary>
     private static readonly string[] RequiredScenes =
     {
@@ -33,8 +31,7 @@ public static class BuildWindowsPlayer
         "Assets/0.Scenes/MainFlow/1.TitleScene.unity",
         "Assets/0.Scenes/MainFlow/2.LoadingScene.unity",
         "Assets/0.Scenes/MainFlow/3.LobbyScene.unity",
-        "Assets/0.Scenes/MainFlow/4.MapScene.unity",             // 레거시 — 계속 출하한다
-        "Assets/0.Scenes/MainFlow/4.MapScene-trensparent.unity", // 🔴 정본 — 부트스트랩이 여는 씬
+        "Assets/0.Scenes/MainFlow/4.MapScene.unity", // 🔴 정본 — 부트스트랩이 여는 전투 맵
         "Assets/0.Scenes/MainFlow/5.ResultScene.unity",
     };
 
