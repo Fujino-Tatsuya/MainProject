@@ -15,7 +15,7 @@ using UnityEngine;
 // 걷어내고 나면 이 파일도 지워도 된다.
 public static class QuestLaserBlockerAuthoring
 {
-    const string LaserPrefabPath = "Assets/2.Prefabs/Map/Props/layprefab.prefab";
+    const string LaserPrefabPath = "Assets/2.Prefabs/Environment/Machinery/Lasers/layprefab.prefab";
     const string BlockerName = "LaserBlockWall";
 
     /// <summary>레이저 프리팹에 심은 차단벽을 제거한다. 멱등 — 없으면 아무것도 하지 않는다.</summary>
