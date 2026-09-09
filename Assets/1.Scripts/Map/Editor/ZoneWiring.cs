@@ -1,36 +1,30 @@
 #if UNITY_EDITOR
-using System.Collections.Generic;
-using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
-// 와이어링(에디터 전용): 씬 ZoneVolume → ZoneSlot 스켈레톤 생성 +
-// ZoneLayoutCatalog 등록 + MapGenerator 참조 연결 + 임시 Zone_* 숨김. + 셔플 generate 메뉴.
-// 배치 소스오브트루스 = ZoneVolume(씬). 볼륨을 옮기고 Wire 재실행하면 맵이 따라온다.
-// 2026-07 리팩토링: 통로는 Stage1/Level_wall_hallway 손배치로 고정 — 절차생성/연결그래프/벽컷/개방변 매칭은 폐기.
+// MapGen 테스트 생성 메뉴 (에디터 전용). 씬의 MapGenerator 를 찾아 시드로 Generate 한다.
+//
+// ⚠️ 파일명이 내용과 다르다 — 실질은 `MapGenTestMenu` 다. 원래 이 파일에는 와이어링 도구
+//    (씬 ZoneVolume → ZoneSlot 스켈레톤 생성 + ZoneLayoutCatalog 등록 + MapGenerator 참조 연결)가
+//    있었으나 2026-07 리팩토링에서 폐기됐다 — 통로는 Stage1/Level_wall_hallway 손배치로 고정됐고,
+//    절차생성·연결그래프·벽컷·개방변 매칭이 함께 사라졌다. `ZoneVolume`·`ZoneDefinitionSO` 타입도
+//    프로젝트에 없다(`ZoneSlot.cs` 헤더가 그 모델을 대체했다고 적고 있다).
+//
+// 2026-09-09 전수조사에서 그 폐기된 구현을 설명하던 주석과, 아무도 읽지 않는 상수 2개를 제거했다:
+//    `PrefabDir = "Assets/50.Art/MapGen/MapObj/Zoneprefab"`  ← 존재하지 않는 폴더였다
+//    `CatalogPath = ".../ZoneLayoutCatalog.asset"`
+//    미사용 using 2개(`System.Collections.Generic`, `System.Linq`)
+//
+// 배치 저작의 현재 정본은 `SavePlacements`(Tools/MapGen/Save Placements) + `ZoneSlot` 이다.
+// 역할 배정·프리팹 선택 규칙은 `MapGenerator.AssignSlotRoles` 와 `LayoutPlacer` 를 읽을 것 —
+// 여기에 규칙을 주석으로 복제하면 또 낡는다(이 파일이 그렇게 낡았다).
 public static class ZoneWiring
 {
-    const string PrefabDir = "Assets/50.Art/MapGen/MapObj/Zoneprefab"; // 2026-07-03 아트가 prefab→Zoneprefab로 폴더명 변경(GUID 유지)
-    const string CatalogPath = "Assets/50.Art/MapGen/MapObj/ZoneLayout/ZoneLayoutCatalog.asset";
-
-    // 배치 소스오브트루스 = 씬(Stage1)의 ZoneVolume 10개 (2026-07 리팩토링).
-    //  - ZoneVolume.transform.position → 슬롯 중심 (Y는 0으로 클램프)
-    //  - ZoneVolume.Size 가로세로비 → 크기/회전 (양축≥30m=대형 / 한축만≥30m=중형, X가 길면 90° / 그 외=소형)
-    //  - ZoneDefinitionSO 플래그 → 퀘스트/스폰/보스입구 후보
-    //  - SlotID = ZoneID - 1 (1~10 필수, 결정적 순서)
-    // 디자이너가 씬에서 볼륨을 옮기면 Wire 재실행만으로 배치가 따라온다.
-
-    // 카탈로그 (prefab 폴더, 2026-07 정리 완료).
-    // 대형: 3디자인 ↔ 3슬롯 시드 셔플(재사용 없음).
-    // 중형: 퀘스트 슬롯(4후보 중 랜덤 1곳) = 전용 디자인 2종(Quest01/02) 중 랜덤 1개.
-    // 소형: typeA=우상단 고정 전투, typeBossEnter=보스맵 입구, typeStart=스폰
-    //       (좌상/좌하 후보 2곳에 스폰/보스입구가 매판 랜덤 배정).
-
-    // 매번 다른 배치: 대형 3 순열 / 중형 3+퀘스트(4곳 중 1) / 스폰↔보스입구(좌상·좌하 랜덤)
+    // 매번 다른 배치 — 시드 랜덤.
     [MenuItem("Tools/MapGen/Test Generate (random seed)")]
     static void GenRandom() => RunGen(System.Environment.TickCount);
 
-    // 고정 시드 — 재현/디버그용
+    // 고정 시드 — 재현/디버그용.
     [MenuItem("Tools/MapGen/Test Generate (seed 12345, 재현용)")]
     static void Gen12345() => RunGen(12345);
 
