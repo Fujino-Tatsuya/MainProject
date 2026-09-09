@@ -44,7 +44,25 @@ public static class PlayerMotionSweep
                 float allowed = Mathf.Max(0f, hitDistance - skin);
                 accumulated += dir * allowed;
                 Vector3 leftover = dir * (dist - allowed);
-                remaining = Vector3.ProjectOnPlane(leftover, hit.normal);
+
+                // 장애물(걸을 수 없는 경사/벽) 히트는 수직 장애물로 취급해야 하는데, 모서리 등에서
+                // PhysX가 반환하는 접촉 법선은 완벽히 수직이 아닌 경우가 흔하다(비볼록 메시 접합부 등).
+                // 원래 수평(y=0)이던 leftover를 그 법선 그대로 ProjectOnPlane하면 법선의 미세한 Y 성분이
+                // 그대로 새어 들어간다 — 좌우 연타로 모서리를 반복 스치면 이게 누적돼 벽을 타고 올라가는
+                // 버그(QA 재현: 틱당 +6.9~34.4mm 상승)가 된다. 법선의 수평 성분만 남겨 슬라이드를 순수
+                // 수평으로 고정한다.
+                Vector3 slideNormal = FlattenToHorizontal(hit.normal);
+
+                if (Mathf.Abs(Vector3.ProjectOnPlane(leftover, hit.normal).y) > 0.00005f)
+                {
+                    Edit.LogWarning(
+                        $"[MotionSweep] 벽 히트 법선 Y 누수 후보 " +
+                        $"{Vector3.ProjectOnPlane(leftover, hit.normal).y * 1000f:F3}mm 차단됨 " +
+                        $"(콜라이더='{hit.collider.name}', 법선={hit.normal:F4}).",
+                        owner);
+                }
+
+                remaining = Vector3.ProjectOnPlane(leftover, slideNormal);
             }
             else
             {
@@ -54,6 +72,18 @@ public static class PlayerMotionSweep
         }
 
         return accumulated;
+    }
+
+    /// <summary>
+    /// 장애물 슬라이드용으로 법선의 수평 성분만 남긴다. 걸을 수 없는 경사/벽 히트는 항상 수직
+    /// 장애물로 취급하려는 의도라, 원본 법선의 미세한 Y 성분(모서리 접촉 등)이 슬라이드에 섞이지
+    /// 않게 한다. 이 스윕은 TryCast에서 걸을 수 있는 경사(각도 &lt;= maxWalkableAngle)를 이미
+    /// 걸러내므로, 여기 들어오는 법선은 수평 성분이 지배적이라 결과가 퇴화(0벡터)할 일은 없다.
+    /// </summary>
+    private static Vector3 FlattenToHorizontal(Vector3 normal)
+    {
+        Vector3 flat = new Vector3(normal.x, 0f, normal.z);
+        return flat.sqrMagnitude > 1e-8f ? flat.normalized : normal;
     }
 
     /// <param name="skin">

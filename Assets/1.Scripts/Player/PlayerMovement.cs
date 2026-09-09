@@ -123,6 +123,18 @@ public class PlayerMovement : MonoBehaviour
             gameRule != null ? gameRule.MaxWalkableSlopeAngle : DefaultMaxWalkableSlopeAngle,
             rootMoveBlockingMask, collisionSkin, maxSweepIterations, castBuffer);
 
+        // QA 진단용: 문제2(벽 타기) 재현 검증 — 프레임당 실제 적용되는 수직 이동량을 남긴다.
+        // 접지 중 경사가 아닌데도(평지) 이 값이 반복적으로 누적되면 벽/모서리에서 Y가 새는 중이다.
+        if (Mathf.Abs(total.y) > 0.00005f)
+        {
+            Edit.Log(
+                $"[Move] 프레임 적용 Y {total.y * 1000f:F3}mm " +
+                $"(접지={(grounding != null && grounding.IsGrounded)}, " +
+                $"지면법선={(grounding != null ? grounding.GroundNormal : Vector3.up):F4}, " +
+                $"위치={rb.position:F3}).",
+                this);
+        }
+
         if (total.sqrMagnitude > 0f)
         {
             // 대시 중에는 CanMove=false라 입력 이동이 0이므로, 여기 남는 건 플랫폼 캐리뿐이다.
