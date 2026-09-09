@@ -41,7 +41,7 @@ using UnityEngine.SceneManagement;
 public static class MonsterSceneBossSetup
 {
     const string SceneName = "MonsterScene";
-    const string BossRoomPrefab = "Assets/2.Prefabs/Map/Zoneprefab/bossroom.prefab";
+    const string BossRoomPrefab = "Assets/2.Prefabs/Environment/Layouts/Zones/bossroom.prefab";
     const string BossPrefab = "Assets/2.Prefabs/Monster/Boss/TwentyThree.prefab";
     const string PaladinPrefab = "Assets/2.Prefabs/Player/Paladin/Paladin.prefab";
     const string NavMeshAssetPath = "Assets/0.Scenes/MonsterScene/NavMesh-Env.asset";
