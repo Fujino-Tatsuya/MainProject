@@ -136,6 +136,10 @@ public class MonsterBase : Unit
             if (agent != null) agent.enabled = false;
         }
 
+        // 🔴 이전 생애가 남긴 자세 홀드를 먼저 푼다. 사망 시 애니메이터를 멈추므로(아래 Dead 케이스),
+        //    이 오브젝트가 풀로 재사용되면 **얼어붙은 채로 되살아난다.** 스폰은 멱등해야 한다.
+        ApplyReleaseActionPose();
+
         // 스폰 시점의 상태를 즉시 애니메이션에 반영(뒤늦게 접속한 클라 포함).
         PlayStateAnimation(_state.Value);
     }
@@ -1732,6 +1736,16 @@ public class MonsterBase : Unit
                 // 보스도 이 자리를 타므로 (BossBase가 MonsterBase로 통합됐다) 끄는 곳은 여기 한 곳이다.
                 // 되살릴 일이 있을 수 있어 메서드 본체는 남겨 둔다(PlayDeathPlaceholder).
                 //PlayDeathPlaceholder();
+
+                // 🔴 사망 클립이 **없는 몹이 대부분이다** — 12종 중 7종이 `deathTrigger` 미저작
+                //    (ChompBot·HumanoidBot·MortarBot·PeekABot·SpinnerBot·TeslaBot·WallBot).
+                //    그대로 두면 죽는 동안 걷기·공격 애니가 계속 돌면서 디졸브된다(2026-09-09 Play 판정).
+                //    클립이 있는 몹(Gauntlet `Defeat` · 23호/원거리 `Death`)은 그 클립이 끝까지 돌아야
+                //    하므로 건드리지 않는다 — **파라미터 유무로 가른다.**
+                //    ⚠️ 파라미터가 있어도 컨트롤러에 전이가 없으면 여전히 안 멈춘다(클립 존재 ≠ 상태 배치).
+                //       그 경우는 감사 도구가 죽은 이름으로 잡아 준다.
+                if (!HasParameter(animator, data.deathTrigger))
+                    ApplyAnimatorHold(true);
                 break;
         }
     }

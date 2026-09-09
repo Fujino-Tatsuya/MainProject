@@ -55,6 +55,12 @@ public class WallBot : MonsterBase
     [Tooltip("돌진 중 반복 히트 주기(초). 경로 안에 계속 있으면 이 주기마다 한 번 맞는다.")]
     float dashRepeatInterval = 0.5f;
 
+    [SerializeField]
+    [Tooltip("돌진 전용 히트박스(프리팹의 DashHitbox 자식). 비우면 평타 히트박스를 그대로 쓴다.\n" +
+             "🔴 평타 박스는 전방 2.0m 라 12m/s 로 스쳐 지나가도 맞았다(2026-09-09 Play 판정) — " +
+             "돌진만 몸통 폭(전방 1.0m · 좌우 ±0.5m)으로 좁힌다. 평타 판정은 건드리지 않는다.")]
+    ColliderInfo dashColliderInfo;
+
     [Header("착지 충격파 (돌진 종료)")]
     [SerializeField, Min(0.1f)]
     [Tooltip("충격파 반경(m).")]
@@ -93,6 +99,7 @@ public class WallBot : MonsterBase
     readonly HashSet<Unit> _shockHitUnits = new HashSet<Unit>();
 
     float _lastShieldTime = -999f;
+    ColliderInfo _defaultColliderInfo;   // 평타 히트박스 원본 — 돌진이 갈아끼우기 전에 보관
 
     MonsterCounterWindow _counter;
 
@@ -212,6 +219,15 @@ public class WallBot : MonsterBase
         _phase = ShieldPhase.Dash;
         _phaseTimer = dashDuration;
         _nextRepeatHitTime = 0f;   // 첫 틱에 바로 열린다
+
+        // 돌진 판정만 좁은 박스로 갈아끼운다. 원본은 처음 한 번만 보관하고
+        // ClearSequenceRuntime 이 되돌린다(모든 종료·중단 경로가 그곳을 지난다).
+        if (dashColliderInfo != null && meleeAttack != null)
+        {
+            if (_defaultColliderInfo == null) _defaultColliderInfo = meleeAttack.ColliderInfo;
+            meleeAttack.SetColliderInfo(dashColliderInfo);
+        }
+
         Log("돌진 시작 (인터럽트 실패)");
 
         // 자세는 계속 붙잡아 둔다 — 방패를 든 채 돌진하는 그림이고, 풀면 AttackStart 가 다시
@@ -282,6 +298,9 @@ public class WallBot : MonsterBase
         meleeAttack?.EndHitWindow();
         if (agent != null) agent.speed = MoveSpeed;
         status?.RemoveStatus(StatusEffectType.SuperArmor);
+
+        // 돌진 히트박스를 평타용 원본으로 되돌린다. 안 되돌리면 **다음 평타가 좁은 박스로 나가** 헛스윙한다.
+        if (_defaultColliderInfo != null) meleeAttack?.SetColliderInfo(_defaultColliderInfo);
 
         _phase = ShieldPhase.None;
     }

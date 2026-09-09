@@ -52,6 +52,10 @@ public class SpinnerBot : MonsterBase
     [SerializeField] string spinLoopState = "Spin Attack Loop";
     [SerializeField] string whipStateR = "Attack Whip R Start";
     [SerializeField] string whipStateL = "Attack Whip L Start";
+    [SerializeField]
+    [Tooltip("스핀 이펙트의 id. 클립 이벤트 문자열(A_Spinner_AttackStart 의 StartEffect data)과 " +
+             "프리팹 EffectSocketPlayer.Id 가 쓰는 그 값이다. 아트가 바꾸면 여기도 고칠 것.")]
+    string spinEffectId = "Spin";
 
     // 서버 전용 스핀 런타임
     SpinPhase _phase;
@@ -62,6 +66,7 @@ public class SpinnerBot : MonsterBase
     bool _whipUseR;
 
     MonsterCounterWindow _counter;
+    EffectAnimEvents _effects;
 
     bool SpinReady => Time.time - _lastSpinTime >= spinCooldown;
 
@@ -236,6 +241,28 @@ public class SpinnerBot : MonsterBase
     {
         if (s == MonsterState.Attack) return;
         base.PlayStateAnimation(s);
+
+        // 🔴 스핀 이펙트를 코드에서 끈다 (2026-09-09 Play 에서 잡힘).
+        //    `StartEffect "Spin"` 은 `A_Spinner_AttackStart` 에 있는데 `StopEffect "Spin"` 은
+        //    **`A_Spinner_Dizzy` 에만** 있다. 그런데 이 파일 상단대로 **돌진 후 Dizzy 단계를 없앴다**
+        //    → 인터럽트를 실패하면 그 클립을 안 지나가서 종료 이벤트가 영영 오지 않는다.
+        //    (성공하면 ForceGroggy → IsDizzy → Dizzy 클립이 돌아 정상적으로 꺼졌다. 그래서
+        //     카운터 경로만 멀쩡해 보였다.)
+        //    `safetyTimeout`(5초)이 강제 회수하긴 하지만 그동안 이펙트가 남고 경고가 쌓인다.
+        //    ⚠️ `EndSpin()` 한 곳만 막으면 사망·리쉬·넉백 이탈에서 다시 샌다 —
+        //       그래서 상태 이탈 지점에서 끈다(GauntletBot 의 smashTelegraph 와 같은 규약).
+        StopSpinEffect();
+    }
+
+    /// <summary>
+    /// 스핀 이펙트를 끈다. 이미 꺼져 있으면 무해한 no-op 이다
+    /// (<c>EffectSocketPlayer.Stop</c> 이 <c>_handle.IsSet</c> 으로 가드한다).
+    /// 전 피어에서 불린다 — 이펙트는 로컬 연출이라 서버로 게이트하면 호스트에서만 꺼진다.
+    /// </summary>
+    void StopSpinEffect()
+    {
+        if (_effects == null && !TryGetComponent(out _effects)) return;
+        _effects.StopEffect(spinEffectId);
     }
 
     [ClientRpc] void PlaySpinStartClientRpc() => SafeCrossFade(spinStartState);
