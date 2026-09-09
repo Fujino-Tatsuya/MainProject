@@ -8,7 +8,53 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 현재 인수인계 (2026-09-07 · 파괴 가능한 상자 + 파편 버스트, 브랜치 `feature/VFX`)
+## ▶▶ 현재 인수인계 (2026-09-09 · 죽은 코드 정리 + 존 NetworkBehaviour 제거, 브랜치 `feature/Boss23`)
+
+작업 세션: **경석(Claude)**. 조사·근거는 [Docs/04-report/deadcode-audit-2026-09-09.md](Docs/04-report/deadcode-audit-2026-09-09.md).
+Play 검증 통과(팀장 확인). 커밋 8건 — `7b257f19` `df5249af` `91493afc` `f6175811` `51d6eb51`
+`df3caf44` `2f0a0b4f` `53f3413f`.
+
+### 🔴 이번에 확립된 규약 — 존 프리팹에 `NetworkBehaviour` 를 붙이지 않는다
+
+`MonsterSpawner`(NetworkBehaviour)가 존 프리팹 루트에 있던 것이 **「Remove Component 해도
+`NetworkObject` 가 되붙는다」의 원인**이었다. NGO 의 `NetworkBehaviourEditor.cs:321→413` 이
+인스펙터를 그릴 때마다 다이얼로그를 띄우고 **기본 버튼이 "Yes"** 이며, 제거하면
+`NetworkObjectEditor.cs:188` 이 되붙인다. 게이트인 `Check for NetworkObject Component` 는
+**`EditorPrefs`(머신 단위)** 라 팀원은 각자 다시 밟는다.
+
+→ 존 쪽 저작 데이터는 **`ZoneMonsterSpawnSet`(순수 `MonoBehaviour`)** 을 쓴다.
+   이관 도구: `Tools/Map/Authoring/존 몬스터 스포너 배선 (적용)` (멱등 · 구 컴포넌트와
+   `NetworkObject` 를 함께 걷는다). 존 프리팹 8종 이관 완료.
+   ⚠️ **존에 새 컴포넌트를 붙일 때 `NetworkBehaviour` 를 상속하지 말 것.** 상태 복제가 필요하면
+   `ZoneBridgeGateManager` 처럼 **씬 상주 매니저 + `SlotID` 키** 로 한다.
+
+`MonsterSpawner` 자체는 유지된다 — `MonsterScene`·`TrashMobScene` 에서 진짜 네트워크
+스포너로 쓰인다. 존에서만 뗐다.
+
+### 🔴 다른 담당 영역 — 공유 필요
+
+| 대상 | 무엇 | 담당 |
+|---|---|---|
+| `Player/PlayerColorAssigner.cs` | 무참조로 삭제했다가 **팀장 지시로 원복**(`2f0a0b4f`). guid 동일. 아직 어디에도 부착 0. 재질 변경 본문이 `:26` 부터 주석 처리된 상태 — 배선 계획이 있으면 은희가 진행 | **은희** |
+| `Unit/Weapon/{AttackElement,AttackTriggerRelay,OverlapAttack}.cs` | 참조 0으로 측정됐지만 **손대지 않았다**(팀장 지시). 삭제/유지는 은희 판단 | **은희** |
+| `Effects/Editor/EffectSystemSetup.cs` | 파일 자신이 *"이 폴더는 더 이상 없다 … 되살릴지 폐기할지는 VFX 담당(민경) 판단이 필요하다"* 고 적고 있다. 이번에 판단하지 않고 남겼다 | **민경** |
+| `Effects/EffectTestMover.cs` | 참조 0이지만 **팀장 지시로 보존** | 민경 참고 |
+| `TextMesh Pro/Resources/TMP Settings.asset` | 한글 폴백에 `NotoSansKR SDF` 등록(`53f3413f`). 전 UI 에 영향 — 앞으로 한글 텍스트는 폰트를 직접 안 갈아도 폴백으로 렌더된다 | UI 전체 |
+
+### ⚠️ 미해결 — 고정형 몬스터 파트 분리 (PeekABot · TeslaBot)
+
+Play 는 정상이지만 **몸체가 여러 파트로 분리돼 보인다.** 이번 조사에서 **배제된 원인**:
+메시 분리 아님(`SkinnedMeshRenderer` **1개** — 본이 벌어진 것) · 랙돌 아님(아트 프리팹
+전부 `isKinematic: 1`, 정상인 SpinnerBot 17개 포함) · 컨트롤러 부재 아님(감사 결과 전 몬스터
+컨트롤러 보유) · **공중 스포너 낙하설 아님**(구조상 성립하지 않음).
+
+남은 단서 2개: ① 아트 프리팹의 비주얼 소스가 정식 메시(`Models/R_PeekABot.fbx`)가 아니라
+**애니메이션 FBX**(`Animations/PeekABot/A_Alert.fbx`, `animationType: 2`)다. 정상인 ChompBot 만
+모델을 프리팹에 직접 포함한다. ② 감사에서 **`hitTrigger="Hit"` 가 컨트롤러에 없는 몬스터가
+정확히 PeekABot·TeslaBot 2종** — 증상이 보고된 그 2종이다(MortarBot 은 깨끗).
+**확정에는 Play 중 Animator 상태 판독이 필요하다**(현재 state·clip·Avatar 유효성).
+
+## 이전 인수인계 (2026-09-07 · 파괴 가능한 상자 + 파편 버스트, 브랜치 `feature/VFX`)
 
 > 🔴 **이 절과 아래 두 절은 `feature/VFX`에서 옮겨 온 기록이다** (2026-09-08).
 > VFX 작업은 `transparentV3` 위로 옮겨 갔다 — 이 브랜치가 그 결과다.
