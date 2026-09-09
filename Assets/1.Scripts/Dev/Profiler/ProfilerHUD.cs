@@ -74,6 +74,7 @@ public sealed class ProfilerHUD : MonoBehaviour
     // ───────── 내부 상태 ─────────
     bool _visible;
     float _budgetMs;
+    int _appliedTargetFps;   // targetFps 를 런타임에 바꿔도 예산이 따라오게 하는 캐시
     float _accum;
     readonly StringBuilder _sb = new StringBuilder(512);
 
@@ -100,6 +101,19 @@ public sealed class ProfilerHUD : MonoBehaviour
     // 캐시된 표시 문자열
     string _line1 = "", _line2 = "", _line3 = "";
     readonly List<string> _markerLines = new List<string>();
+    readonly List<double> _markerMs = new List<double>();   // 색 판정용. OnGUI 에서 재계산하지 않는다.
+
+    // ⚠️ IMGUI 드로우 수 절감(2026-09-04)
+    // 이전: 라벨 3+N개 + 그래프 막대 120개를 각각 그려 SetPass 가 프레임당 130 가까이 늘었다
+    //       (측정 결과: HUD ON 230 / OFF 101 — 도구가 렌더 통계를 절반 이상 부풀렸다).
+    // 이후: richText 색 태그로 텍스트를 한 문자열에 합쳐 라벨 1개, 그래프는 픽셀을 직접
+    //       구워 텍스처 1장으로 그린다 → 배경 1 + 라벨 1 + 그래프 1 = 3 드로우.
+    readonly StringBuilder _sbAll = new StringBuilder(768);
+    string _combined = "";
+    readonly GUIContent _content = new GUIContent();
+    const int kGraphTexH = 48;
+    Texture2D _graphTex;
+    Color32[] _graphPixels;
 
     // GUI 리소스
     Texture2D _whiteTex;
@@ -109,7 +123,8 @@ public sealed class ProfilerHUD : MonoBehaviour
     void OnEnable()
     {
         _visible = startVisible;
-        _budgetMs = 1000f / Mathf.Max(1, targetFps);
+        _appliedTargetFps = Mathf.Max(1, targetFps);
+        _budgetMs = 1000f / _appliedTargetFps;
 
         _mainThread = ProfilerRecorder.StartNew(ProfilerCategory.Internal, "Main Thread", 15);
         _drawCalls  = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Draw Calls Count");
@@ -132,6 +147,13 @@ public sealed class ProfilerHUD : MonoBehaviour
         _whiteTex = new Texture2D(1, 1, TextureFormat.RGBA32, false);
         _whiteTex.SetPixel(0, 0, Color.white);
         _whiteTex.Apply();
+
+        _graphTex = new Texture2D(kHistory, kGraphTexH, TextureFormat.RGBA32, false)
+        {
+            filterMode = FilterMode.Point,   // 막대 경계가 뭉개지지 않게
+            wrapMode = TextureWrapMode.Clamp
+        };
+        _graphPixels = new Color32[kHistory * kGraphTexH];
     }
 
     void OnDisable()
@@ -150,6 +172,7 @@ public sealed class ProfilerHUD : MonoBehaviour
         }
         _markerRecorders.Clear();
         if (_whiteTex != null) Destroy(_whiteTex);
+        if (_graphTex != null) Destroy(_graphTex);
     }
 
     void Update()
@@ -160,6 +183,15 @@ public sealed class ProfilerHUD : MonoBehaviour
 #else
         if (Input.GetKeyDown(toggleKey)) _visible = !_visible;
 #endif
+        // 인스펙터에서 targetFps 를 런타임에 바꾸면 예산도 따라간다.
+        // (OnEnable 에서만 계산하면 실행 중 목표 변경이 색·그래프에 반영되지 않는다.)
+        int wantFps = Mathf.Max(1, targetFps);
+        if (wantFps != _appliedTargetFps)
+        {
+            _appliedTargetFps = wantFps;
+            _budgetMs = 1000f / _appliedTargetFps;
+        }
+
         if (!_visible) return;
 
         // 프레임 타이밍 캡처 (몇 프레임 지연되어 채워짐)
@@ -196,6 +228,7 @@ public sealed class ProfilerHUD : MonoBehaviour
             _gcAlloc.LastValue / 1024.0, _sysMem.LastValue / (1024.0 * 1024.0));
 
         _markerLines.Clear();
+        _markerMs.Clear();
         for (int i = 0; i < _markerRecorders.Count; i++)
         {
             var r = _markerRecorders[i];
@@ -204,11 +237,85 @@ public sealed class ProfilerHUD : MonoBehaviour
             if (!r.Valid)
             {
                 _markerLines.Add(Fmt("{0,-12} (마커 없음)", label));
+                _markerMs.Add(0.0);
                 continue;
             }
             double ms = NsToMs(Average(r));
             _markerLines.Add(Fmt("{0,-12} {1,6:0.00} ms", label, ms));
+            _markerMs.Add(ms);
         }
+
+        RebuildCombined(totalMs);
+        RebuildGraphTexture();
+    }
+
+    // 라벨 3+N개를 richText 색 태그가 박힌 한 문자열로 합친다(드로우 1회).
+    void RebuildCombined(float totalMs)
+    {
+        _sbAll.Clear();
+        AppendColored(_sbAll, _line1, BudgetColor(totalMs, _budgetMs));
+        _sbAll.Append('\n').Append(_line2);
+        _sbAll.Append('\n').Append(_line3);
+
+        for (int i = 0; i < _markerLines.Count; i++)
+        {
+            float bMs = (i < customMarkers.Count && customMarkers[i] != null) ? customMarkers[i].budgetMs : 0f;
+            double ms = i < _markerMs.Count ? _markerMs[i] : 0.0;
+            Color c = (bMs > 0f) ? BudgetColor((float)ms, bMs) : new Color(0.8f, 0.85f, 1f);
+            _sbAll.Append('\n');
+            AppendColored(_sbAll, _markerLines[i], c);
+        }
+
+        _combined = _sbAll.ToString();
+        _content.text = _combined;
+    }
+
+    static void AppendColored(StringBuilder sb, string text, Color c)
+    {
+        sb.Append("<color=#");
+        AppendHex2(sb, c.r); AppendHex2(sb, c.g); AppendHex2(sb, c.b);
+        sb.Append('>').Append(text).Append("</color>");
+    }
+
+    static void AppendHex2(StringBuilder sb, float v01)
+    {
+        int v = Mathf.Clamp(Mathf.RoundToInt(v01 * 255f), 0, 255);
+        const string hex = "0123456789ABCDEF";
+        sb.Append(hex[v >> 4]).Append(hex[v & 0xF]);
+    }
+
+    // 막대 120개를 픽셀로 구워 텍스처 1장으로 만든다(드로우 1회).
+    // 텍스처 (0,0) 은 좌하단이므로 y 를 그대로 위로 쌓으면 아래에서 자라는 막대가 된다.
+    void RebuildGraphTexture()
+    {
+        if (_graphTex == null || _graphPixels == null) return;
+
+        var bg = new Color32(255, 255, 255, 16);
+        for (int i = 0; i < _graphPixels.Length; i++) _graphPixels[i] = bg;
+
+        float maxMs = Mathf.Max(_budgetMs * 2f, 1f);
+
+        // 예산 라인
+        int by = Mathf.Clamp(Mathf.RoundToInt((_budgetMs / maxMs) * (kGraphTexH - 1)), 0, kGraphTexH - 1);
+        var budgetC = new Color32(255, 230, 51, 160);
+        int bRow = by * kHistory;
+        for (int x = 0; x < kHistory; x++) _graphPixels[bRow + x] = budgetC;
+
+        // 막대
+        for (int i = 0; i < kHistory; i++)
+        {
+            int idx = (_historyIndex + i) % kHistory;
+            float ms = _history[idx];
+            if (ms <= 0f) continue;
+
+            int bh = Mathf.Clamp(Mathf.RoundToInt(Mathf.Clamp01(ms / maxMs) * kGraphTexH), 0, kGraphTexH);
+            Color32 c = BudgetColor(ms, _budgetMs);
+            c.a = 217;
+            for (int y = 0; y < bh; y++) _graphPixels[y * kHistory + i] = c;
+        }
+
+        _graphTex.SetPixels32(_graphPixels);
+        _graphTex.Apply(false);
     }
 
     static double Average(ProfilerRecorder rec)
@@ -266,57 +373,23 @@ public sealed class ProfilerHUD : MonoBehaviour
         float cx = x + pad;
         float cy = y + pad;
 
-        // 1행: FPS/프레임 — 예산 기준 색
-        float total = CurrentTotalMs();
-        GUI.color = BudgetColor(total, _budgetMs);
-        GUI.Label(new Rect(cx, cy, w, lineH), _line1, _labelStyle);
-        cy += lineH;
-
+        // 텍스트 전체를 라벨 1개로 그린다. 줄별 색은 richText 태그로 문자열에 박혀 있다.
         GUI.color = Color.white;
-        GUI.Label(new Rect(cx, cy, w, lineH), _line2, _labelStyle); cy += lineH;
-        GUI.Label(new Rect(cx, cy, w, lineH), _line3, _labelStyle); cy += lineH;
+        GUI.Label(new Rect(cx, cy, w - pad * 2, lineH * (3 + extraLines)), _content, _labelStyle);
+        cy += lineH * (3 + extraLines);
 
-        // 패스 마커 행
-        for (int i = 0; i < _markerLines.Count; i++)
+        // 그래프는 미리 구운 텍스처 1장.
+        if (_graphTex != null)
         {
-            float bMs = customMarkers[i] != null ? customMarkers[i].budgetMs : 0f;
-            double ms = _markerRecorders[i].Valid ? NsToMs(Average(_markerRecorders[i])) : 0;
-            GUI.color = (bMs > 0f) ? BudgetColor((float)ms, bMs) : new Color(0.8f, 0.85f, 1f);
-            GUI.Label(new Rect(cx, cy, w, lineH), _markerLines[i], _labelStyle);
-            cy += lineH;
+            GUI.DrawTexture(new Rect(cx, cy + 4f * scale, w - pad * 2, graphH),
+                            _graphTex, ScaleMode.StretchToFill, true);
         }
-        GUI.color = Color.white;
-
-        // 그래프
-        DrawGraph(new Rect(cx, cy + 4f * scale, w - pad * 2, graphH));
     }
 
     float CurrentTotalMs()
     {
         int idx = (_historyIndex - 1 + kHistory) % kHistory;
         return _history[idx];
-    }
-
-    void DrawGraph(Rect r)
-    {
-        DrawRect(r, new Color(1f, 1f, 1f, 0.06f));
-
-        // 예산 라인
-        float maxMs = Mathf.Max(_budgetMs * 2f, 1f);
-        float budgetY = r.yMax - (_budgetMs / maxMs) * r.height;
-        DrawRect(new Rect(r.x, budgetY, r.width, 1f), new Color(1f, 0.9f, 0.2f, 0.6f));
-
-        float barW = r.width / kHistory;
-        for (int i = 0; i < kHistory; i++)
-        {
-            int idx = (_historyIndex + i) % kHistory;
-            float ms = _history[idx];
-            if (ms <= 0f) continue;
-            float bh = Mathf.Clamp01(ms / maxMs) * r.height;
-            var c = BudgetColor(ms, _budgetMs);
-            c.a = 0.85f;
-            DrawRect(new Rect(r.x + i * barW, r.yMax - bh, Mathf.Max(1f, barW - 0.5f), bh), c);
-        }
     }
 
     static Color BudgetColor(float ms, float budget)
