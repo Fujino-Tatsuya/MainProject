@@ -3,6 +3,7 @@ using System.Text;
 using UnityEditor;
 using UnityEditor.Animations;
 using UnityEngine;
+using UnityEngine.AI;
 
 /// <summary>
 /// 고정 터렛(PeekABot·TeslaBot)의 애니메이터를 <b>`Idle` + `Shoot` 둘만</b> 있는 컨트롤러로 교체한다.
@@ -84,16 +85,19 @@ public static class TurretAnimatorAuthoring
             if (dryRun)
             {
                 bool exists = AssetDatabase.LoadAssetAtPath<AnimatorController>(ctrlPath) != null;
+                bool hasAgent = prefabAsset.GetComponent<NavMeshAgent>() != null;
                 log.AppendLine($"  ▶ {t.Name} — 컨트롤러 {(exists ? "재생성" : "생성")} ({ctrlPath}) + " +
-                               $"프리팹 배선 + 데이터 정리 (clips: {idle.name}, {shoot.name})");
+                               $"데이터 정리 + NavMeshAgent {(hasAgent ? "제거" : "이미 없음")} " +
+                               $"(clips: {idle.name}, {shoot.name})");
                 done++;
                 continue;
             }
 
             AnimatorController controller = BuildController(ctrlPath, idle, shoot);
             string dataFix = FixData(prefabAsset, controller);
+            string agentFix = StripNavMeshAgent(prefabPath);
 
-            log.AppendLine($"  ✓ {t.Name} — {ctrlPath}\n      데이터: {dataFix}");
+            log.AppendLine($"  ✓ {t.Name} — {ctrlPath}\n      데이터: {dataFix}\n      NavMeshAgent: {agentFix}");
             done++;
         }
 
@@ -106,6 +110,74 @@ public static class TurretAnimatorAuthoring
         log.Append($"\n  처리 {done} / 실패 {failed}");
         if (failed > 0) Debug.LogError(log.ToString());
         else Debug.Log(log.ToString());
+    }
+
+    /// <summary>이미 「Shoot 파라미터 1개 + Idle·Shoot 상태 2개(클립 일치)」인가.</summary>
+    static bool AlreadyCorrect(AnimatorController c, AnimationClip idleClip, AnimationClip shootClip)
+    {
+        if (c.parameters.Length != 1) return false;
+        if (c.parameters[0].name != "Shoot" ||
+            c.parameters[0].type != AnimatorControllerParameterType.Trigger) return false;
+        if (c.layers == null || c.layers.Length == 0) return false;
+
+        AnimatorStateMachine sm = c.layers[0].stateMachine;
+        if (sm.states.Length != 2 || sm.stateMachines.Length != 0) return false;
+
+        AnimatorState idle = null, shoot = null;
+        foreach (ChildAnimatorState cs in sm.states)
+        {
+            if (cs.state == null) return false;
+            if (cs.state.name == "Idle") idle = cs.state;
+            else if (cs.state.name == "Shoot") shoot = cs.state;
+        }
+
+        return idle != null && shoot != null
+               && idle.motion == idleClip && shoot.motion == shootClip
+               && sm.defaultState == idle;
+    }
+
+    /// <summary>
+    /// 고정 터렛에서 <see cref="NavMeshAgent"/> 를 제거한다(팀장 확정 2026-09-10).
+    ///
+    /// 🔴 <b>왜</b> — 고정형은 이동하지 않으므로 에이전트가 필요 없는데, 스폰 지점이 NavMesh 밖이면
+    ///    에이전트가 배치에 실패한다. <c>MapContentSpawner.TryResolveSpawnPoint</c> 는 바닥
+    ///    레이캐스트(<c>Default</c>∪<c>Ground</c>)만 하고 <b>NavMesh 를 샘플링하지 않는다</b> —
+    ///    바닥 위이지만 NavMesh 밖인 지점이 그대로 통과한다. 없는 컴포넌트는 실패할 수 없다.
+    ///
+    /// <b>안전한 근거</b>(2026-09-10 전수 확인):
+    ///   · <c>RequireComponent(typeof(NavMeshAgent))</c> 선언 <b>0건</b>
+    ///   · <c>MonsterBase</c> 는 모든 접근을 가드한다 — 초기 설정은 <c>if (agent != null)</c> 블록(`:195~204`),
+    ///     <c>DriveCombatMove</c>(`:643`)·<c>MoveAgentTo</c>(`:1402`)·<c>StopAgent</c>(`:1412`) 는 조기 반환
+    ///   · 복귀 판정에 <b>거리 폴백</b>이 있다(`:954`) → 에이전트가 없어도 상태가 안 멈춘다.
+    ///     고정형은 스폰 지점을 벗어나지 않으니 항상 도착 판정이다
+    ///   · <c>LinearKnockback</c> 은 4곳 전부 <c>if (_navMeshAgent)</c> 가드. RangedTurret 은 애초에
+    ///     넉백 무효다(<c>MonsterBase.cs:1050</c>)
+    ///   · 터렛의 나머지 컴포넌트(ColliderInfo·DissolveDeath·EffectSocketPlayer·EffectAnimEvents·
+    ///     Hurtbox·MonsterMeleeAttack·MonsterStatusEffect)는 에이전트를 쓰지 않는다
+    ///
+    /// ⚠️ <b>이동형에는 하면 안 된다.</b> MortarBot(RangedMobile)·근접 3종은 에이전트로 움직인다.
+    ///    그쪽의 NavMesh 밖 스폰은 별 문제로 남아 있다(팀장 판단: 지금은 스폰되지 않아 보류).
+    /// </summary>
+    static string StripNavMeshAgent(string prefabPath)
+    {
+        GameObject root = PrefabUtility.LoadPrefabContents(prefabPath);
+        try
+        {
+            var agent = root.GetComponent<NavMeshAgent>();
+            if (agent == null) return "이미 없음";
+
+            Object.DestroyImmediate(agent, true);
+            PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+
+        // 되읽어 확인한다 — 프리팹 저장이 조용히 안 먹은 전례가 있다(m_Controller 오버라이드).
+        var saved = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+        bool gone = saved != null && saved.GetComponent<NavMeshAgent>() == null;
+        return gone ? "제거 (되읽기: 없음 ✓)" : "🔴 제거했는데 되읽으니 아직 있다";
     }
 
     /// <summary>FBX 안의 서브 애셋에서 이름으로 클립을 찾는다. 팩은 한 FBX 에 여러 클립을 담는다.</summary>
@@ -133,6 +205,12 @@ public static class TurretAnimatorAuthoring
         if (c == null)
         {
             c = AnimatorController.CreateAnimatorControllerAtPath(path);
+        }
+        else if (AlreadyCorrect(c, idleClip, shootClip))
+        {
+            // 🔴 이미 원하는 모양이면 손대지 않는다. 제자리 재구성도 상태 fileID 를 새로 만들어
+            //    매 실행 컨트롤러가 전량 churn(63+/63-) 한다 — 재실행할 때마다 헛 diff 가 남는다.
+            return c;
         }
         else
         {
