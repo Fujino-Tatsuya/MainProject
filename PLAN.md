@@ -1,3 +1,214 @@
+# ▶▶▶ CURRENT PLAN — 퀘스트 영역 v1: 웨이브 봉쇄 퀘스트 (2026-09-09, **승인 대기**)
+
+> 팀장 지시로 grill 5라운드를 거쳐 확정한 계획. 구현 착수 전 승인 필요(AIRULE §Before Coding).
+> 아래 「잠긴 결정」은 채팅에서 확정된 것이며, 이 파일이 그 정본이다.
+
+## 목표
+
+슬롯 8(좌측 하단) × `Zone_typeQuest02` 에 **「계단 아래로 내려가 상호작용 → 계단 봉쇄 → 몬스터 웨이브 3회 →
+전멸시키면 완료·봉쇄 해제」** 수직 슬라이스를 만든다. 리슨 서버(호스트 권한)에서 동작하고 MPPM 2인으로 검증한다.
+
+보상은 **함수 자리만 만들고 본문은 주석**이다 — 보상 테이블이 아직 없다(팀장 판단).
+
+## 잠긴 결정 (grill 결과)
+
+| # | 결정 | 근거 |
+|---|---|---|
+| 1 | 대상 = **슬롯 8 × `Zone_typeQuest02`** | 좌측 하단. 슬롯 8의 구 guid fileID `4989893049714783035` 가 현 Quest02 와 일치 = 원래 의도된 페어링 |
+| 2 | 차단 지점 = **계단 1곳** (존 프리팹에 로컬 저작) | 피트로 들어가는 유일한 통로. 스크린샷 확인 |
+| 3 | 물리 벽 + **carving `NavMeshObstacle`** 병행 | 벽만으론 NavMeshAgent 가 통과한다. 재베이크 0회 (`ZoneBridgeGate.BuildGapObstacle` 패턴) |
+| 4 | 어그로 = **서버가 스폰 직후 초기 타깃 주입** + `SetSpawnAnchor(피트 중앙)` | 아래 §「왜 이게 필요한가」 |
+| 5 | 시간제한 = **퀘스트 전체 1개 타이머** (기본 180초) | 표시가 하나라 「남은 시간」의 의미가 끝까지 안 바뀐다 |
+| 6 | 실패 조건 = **타임아웃 OR 전원 Soul** → 봉쇄 해제 (**편도**) | 런이 벽돌이 되지 않게. 부활이 F10 자가 부활이라 실패를 되돌리면 판정이 흔들린다 |
+| 7 | 지각 입장 = **clientId 당 1회, 텔레포트로 투입** | 벽을 잠깐 열면 그 틈으로 몹이 나간다. 텔레포트는 틈이 0이고 결정적. 선례 = `BossTeleportManager` |
+| 8 | 첫 스폰 억제 = Quest 역할 존은 `SpawnFromZoneSpawner` 건너뜀 | 지금은 맵 생성 시점에 이미 8마리가 서 있다 |
+| 9 | 웨이브 구성 = **8 / 8 / 8** (4지점 × `count: 2`), 배율 노브만 뚫음 | 미검증 값을 설계처럼 박지 않는다 (교훈 #68). MPPM 보고 팀장이 돌린다 |
+| 10 | 웨이브 간격 = **2초** (노브) | 즉시 스폰은 사망 이펙트와 겹쳐 무슨 일이 났는지 안 보인다 |
+| 11 | 재도전 = **1회성**. 완료 후 상호작용 무효, 봉쇄 영구 해제 | |
+| 12 | 차단 아트 = **플레이스홀더** + 프리팹 override 슬롯 1개 | VFX 는 민경 담당. `ZoneBridgeGate.ringPrefabOverride` 와 같은 방식 |
+| 13 | UI = 우측 끝 중앙 · 반투명 배경 · 제목 + 남은시간 + 웨이브 | 팀장 UI 초안. 제목 텍스트는 팀장이 나중에 교체 |
+| 14 | 존 프리팹에 `NetworkObject` 를 **붙이지 않는다** | 「존 비네트워크 규약」 유지. 아래 §되돌린 것 |
+
+## 왜 어그로 개입이 필요한가 (실측)
+
+`Assets/2.Prefabs/Monster/Data/ChompBotData.asset` — `detectionRadius: 8` / `leashRadius: 15` /
+`detectionHeightTolerance: 2` / `moveSpeed: 2.5`.
+
+기존 마커 4개는 `(±8, 0, ±17.5)` 이고 모서리→존 중앙이 **√(8²+17.5²) ≈ 19.2m** 다.
+
+1. **인지 불가** — `FindNearestTarget` 은 `OverlapSphereNonAlloc(detectionRadius)` **순수 반경**이다
+   (`MonsterBase.cs:1352`). 19.2m 는 8m 밖이라 스폰만 되고 제자리에 선다.
+2. **인지해도 리쉬가 되돌린다** — `MonsterBase.cs:334` 가 `스폰 지점에서 15m 초과 → EnterReturn()`
+   (상태 초기화 + **최대 체력 회복**). 모서리→중앙 19.2m 는 **구조적으로 도달 불가**다.
+
+→ 해법 2개를 함께 쓴다. 둘 다 기존 공개 API 위에 얹는다:
+   - `MonsterBase.SetSpawnAnchor(피트 중앙)` — 이미 **public** 이고 `BossEncounterDirector.cs:371` 이
+     같은 이유(보스가 연출로 내려온 뒤 전투 원점이 달라짐)로 쓴다. 15m 가 피트를 덮는다.
+   - **서버가 초기 타깃을 물려 준다** — `AdoptTarget` 이 `protected` 라 서버 전용 공개 래퍼
+     `ServerAdoptTarget(Transform)` 1개를 `MonsterBase` 에 추가한다(본문은 기존 `AdoptTarget` 위임).
+     락온은 인지반경 밖에서도 유지되므로(`MonsterBase.cs:340`) 한 번 물리면 피트 끝에서 끝까지 추격한다.
+
+**다른 장소의 ChompBot 은 1바이트도 안 바뀐다** — 데이터 에셋을 건드리지 않는다.
+`MonsterBase` 는 AGENTS.md §5 기준 **팀장 단독 영역**이라 타 담당과 충돌이 없다.
+
+## 아키텍처 — 존 비네트워크 규약을 그대로 유지한다
+
+`ZoneBridgeGate` ↔ `ZoneBridgeGateManager` 분업을 복제한다. 존 프리팹은 양쪽 피어에서 로컬
+`Instantiate` 되고 NGO 복제를 타지 않으므로(`MapContentSpawner` 헤더) 존 쪽에는 `NetworkBehaviour` 를
+붙일 수 없다. 상태는 씬 상주 매니저가 `SlotID` 키로 복제한다.
+
+### 신규 1 — `QuestZoneAuthoring` (MonoBehaviour, 존 프리팹에 부착)
+
+**저작 데이터와 로컬 연출만.** 좌표는 **전부 로컬**이다 — 셔플로 슬롯이 바뀌면 절대좌표는 즉시 어긋난다.
+
+- `interactAnchor` (Transform) + `interactRadius` — 계단 아래 상호작용 지점
+- `entryAnchor` (Transform) — 지각 팀원을 텔레포트로 투입할 피트 내부 지점
+- `arenaCenter` (Transform) — 리쉬 기준점. 웨이브 몹 전원이 이걸 받는다
+- `blockades` (List) — 차단면: `Transform Anchor` + `Vector3 Size` (계단 통로). 리스트인 이유는
+  입구가 1개라는 실측이 아직 미완이기 때문(§리스크 1)
+- `blockadePrefabOverride` (GameObject) — 비우면 플레이스홀더. VFX 교체 경로
+- `waveSpawnPoints` (List<MonsterSpawnPoint>) — 비우면 존의 기존 `MonsterSpawner` 마커를 자동 수집
+- `ZoneInteractRing.Create(...)` 재사용해 상호작용 링을 켠다 (전 피어 로컬 연출)
+- **미저작이면 움직이지 않고 `LogError`** — 추측한 위치로 벽을 세우면 통로와 어긋나 조용히 틈이 남는다
+  (`ZoneBridgeGate` 규약과 동일)
+
+### 신규 2 — `QuestZoneManager` (씬 상주 `NetworkBehaviour`, 서버 권한)
+
+`MapScene` 에 배치. `ZoneBridgeGateManager` 를 골격으로 쓴다(스폰 순서 함정·조기 반환 로깅·서버 재검증
+전부 그 파일에서 이미 해결된 문제다).
+
+복제 상태 `NetworkVariable<QuestState>` — 진행도가 아니라 **기준 시각**을 복제한다:
+
+```
+struct QuestState : INetworkSerializable, IEquatable<QuestState>
+{
+    int    SlotID;
+    byte   Phase;                  // 0 Idle / 1 Wave1 / 2 Wave2 / 3 Wave3 / 4 Completed / 5 Failed
+    byte   AliveCount;             // 현재 웨이브 잔존 (UI 표시용)
+    double DeadlineServerTime;     // 0 미만 = 미시작. 남은 시간은 각 피어가 계산
+    double NextWaveServerTime;     // 웨이브 간 유예 종료 시각
+    int    EntryGrantMask;         // clientId 비트 — 지각 입장 1회 소진 표식
+}
+```
+
+서버가 하는 일:
+- `RequestInteractServerRpc(slotID)` — 보낸 클라의 플레이어가 **실제로 anchor 반경 안에 살아 있는지
+  재검증**한다. 클라 검사만 믿으면 어디서든 퀘스트를 시작할 수 있다
+- Idle 에서 성공 → Phase 1, `DeadlineServerTime = ServerTime + timeLimit`, 봉쇄 ON, 웨이브 1 스폰
+- 진행 중 + 밖에 있는 플레이어의 요청 → `EntryGrantMask` 확인 후 1회 `entryAnchor` 로 텔레포트
+- 웨이브 스폰: `MapContentSpawner` 와 **같은 경로**로 스폰한다(바닥 스냅·NGO 복제·정리 추적 공유).
+  스폰 직후 각 몹에 `SetSpawnAnchor(arenaCenter)` + `ServerAdoptTarget(최근접 생존 플레이어)`
+- `MonsterDeathEvents.ServerMonsterDied` 구독 → 이 퀘스트가 스폰한 몹이면 카운트 감소
+- 잔존 0 → `NextWaveServerTime = ServerTime + 2f` → 다음 웨이브 / 3웨이브였으면 Completed
+- `ServerTime > DeadlineServerTime` → Failed
+- 존 안 플레이어 전원이 `PlayerLifeState.Alive` 가 아니면 → Failed
+- Completed/Failed: 잔존 몹 despawn + 봉쇄 OFF. **편도** — 되돌아오는 전이가 없다
+- `GrantQuestReward(...)` 호출 — **본문은 주석**. 보상 테이블 확정 시 채운다
+
+각 피어가 하는 일: F 키 입력 → ServerRpc, 복제 상태를 봉쇄 오브젝트·링·HUD 에 그린다.
+
+### 신규 3 — `QuestZoneHUD` (`CombatHUD` 하위)
+
+우측 끝 중앙 앵커. 반투명 패널(화면을 가리지 않음). 제목(`퀘스트 영역`, 인스펙터 문자열 —
+팀장이 교체) + `남은 시간 mm:ss` + `웨이브 n / 3 · 남은 적 k`. Completed/Failed 는 3초 표시 후 숨김.
+
+### 신규 4 — 공용 상호작용 프롬프트
+
+이 프로젝트엔 **월드 상호작용 프롬프트가 아예 없다**(다리 게이트도 링만 켠다). 퀘스트용으로 새로
+만들면 곧 두 벌이 되므로 **처음부터 공용**으로 뽑고, 다리 게이트도 같이 쓰게 한다.
+
+### 수정 — `MapContentSpawner`
+
+- `AssignedRole == ZoneRole.Quest` 인 존은 `SpawnFromZoneSpawner` 를 **건너뛴다**
+  (지금은 맵 생성 시점에 8마리가 스폰된다)
+- `RegisterBridgeGate` 와 같은 자리에서 `QuestZoneAuthoring` 을 찾아 `QuestZoneManager` 에 등록.
+  매니저가 씬에 없으면 `LogError` (조용히 꺼지지 않게)
+
+### 수정 — `MonsterBase`
+
+- `public bool ServerAdoptTarget(Transform)` 추가 (기존 `protected AdoptTarget` 위임, 서버 게이트 유지)
+
+## 상태 기계
+
+```
+Idle ──(F, 서버 재검증)──▶ Wave1 ──(잔존0 +2s)──▶ Wave2 ──(잔존0 +2s)──▶ Wave3 ──(잔존0)──▶ Completed
+  │                          │                      │                      │
+  │                          └──────────────────────┴──────────────────────┴──▶ Failed
+  │                                (타임아웃 · 존 안 전원 Soul)
+  └── 진행 중 밖에서 F → 1회 입장 (텔레포트). Phase 는 안 바뀐다
+```
+
+`Completed` · `Failed` 는 둘 다 「봉쇄 해제 + 몹 despawn」이고 **편도**다. 차이는 보상 호출 유무뿐.
+
+## 네트워크 권한
+
+| 대상 | 권한 | 근거 |
+|---|---|---|
+| F 키 입력 | 각 피어 로컬 → ServerRpc | AGENTS.md §4 (입력은 오너) |
+| 시작·웨이브·타이머·완료/실패 판정 | **서버** | AGENTS.md §4 (게임 진행 = 서버) |
+| 웨이브 몬스터 스폰·despawn | **서버** (NGO 복제) | |
+| 봉쇄 오브젝트 생성·carve | 전 피어 로컬 (복제 상태에서 파생) | 존이 비네트워크. 결정적이라 같은 결과 |
+| 링·프롬프트·HUD | 로컬 연출 | 판정과 무관 |
+
+## 되돌린 것 (이번 세션)
+
+세션 중 워킹트리에 **두 퀘스트 존 프리팹 루트의 `NetworkObject` 추가** + `DefaultNetworkPrefabs.asset`
+자동 등록이 들어와 있었다. 팀장 확인 후 `git checkout` 으로 3파일 되돌렸다(잔존 0 확인).
+
+되돌린 이유 — `MapContentSpawner.SpawnFromZoneSpawner` 헤더가 2026-08-18 실측으로 이미 적고 있다:
+**존에 `NetworkObject` 를 붙여도 아무도 `Spawn()` 해 주지 않아 결과가 같다.** 게다가
+`Zone_typeQuest01` 은 `GlobalObjectIdHash: 0` 이라 네트워크 프리팹 목록에 등록되면
+`NetworkManager` 시작 검증에서 걸릴 수 있었다.
+
+## 리스크 / 열린 질문
+
+1. 🔴 **마커 4개가 피트 안인지 밖인지 미확정.** 존이 대략 20×40 인데 마커가 `±8 / ±17.5` 면
+   벽에서 2~2.5m 다 — 바깥 통로 링일 수 있고, 그러면 몹이 봉쇄 밖에서 스폰된다.
+   → **착수 첫 단계에서 Unity `unity_raycast` 로 피트 바닥 y 와 마커 4개 포함 여부를 실측한다.**
+   밖이면 `QuestZoneAuthoring.waveSpawnPoints` 에 피트 내부 4모서리를 새로 **저작**한다(추측 금지).
+2. 🔴 **Soul 이 차단벽을 통과할 수 있다.** `PlayerSoulController.SetRootLayer` 가 루트를 `Soul` 레이어로
+   옮기고 허트박스를 끈다. 차단벽 레이어가 `Soul` 과 충돌하도록 Physics 매트릭스에 잡혀 있지 않으면
+   유령이 걸어 나가 밖에서 부활한다 → 「나가지는 못하게」가 사망으로 우회된다.
+   → 차단벽 레이어 확정 시 매트릭스를 함께 확인. Play 로 검증 가능.
+3. **몹이 사망 이벤트 없이 사라지는 경로**(낙사·강제 despawn)가 있으면 `AliveCount` 가 0에 안 닿아
+   퀘스트가 정지한다. → 사망 이벤트만 믿지 않고 **주기적으로 `NetworkObject.IsSpawned` 로 정합**한다
+   (교훈 #24/#59 — 폴백은 로그를 남긴다).
+4. **`Stage1.prefab` dangling guid 3건** — `09f1c8cc…`(슬롯 4 QuestPrefab) · `0c9618bf…`(슬롯 8
+   QuestPrefab) · `8c16f46f…`. 원인은 `4dc81649 chore(vcs): stop tracking SVN-owned art tree` 로
+   존 프리팹이 SVN 트리 → `2.Prefabs` 사본으로 옮겨지며 guid 가 갈렸고 `ZoneLayoutCatalog.asset` 만
+   갱신된 것. 복구 전에는 슬롯 8이 **랜덤 프리팹 + 슬롯 baseline 위치**로 앉는다.
+   → **복구는 팀장 승인 대기**(`Stage1.prefab` 은 공유 애셋).
+5. 플레이어가 피트에서 대시로 기어 올라올 수 있는지 미확인. 단차 실측 후 판단.
+6. 3웨이브 × 8마리 = 8 동시 생존이 리슨 서버 프레임에 어떤지 미측정. `ProfilerHUD` 로 본다.
+
+## 범위 밖 (이번 작업에서 안 한다)
+
+- 보상 테이블·보상 지급 로직 (함수 자리만)
+- 퀘스트 종류 확장 / 슬롯 4 × `Zone_typeQuest01`
+- 미니맵·오버뷰에 퀘스트 **상태** 반영 (역할 아이콘은 이미 있음)
+- 사운드 (은희), 차단·완료 VFX 최종 아트 (민경)
+- `QuestLaserBlockerAuthoring.cs` 및 `layprefab` 의 `LaserBlockWall` 정리 — 별건(PLAN 구 절 참조)
+
+## 완료 조건 (MPPM 2인)
+
+1. 호스트가 계단을 내려가 F → **양쪽 화면**에 계단 봉쇄물이 생기고, 웨이브 1이 스폰되고,
+   몹이 **리쉬로 되돌아가지 않고** 플레이어를 끝까지 추격한다
+2. 웨이브 1 전멸 → 2초 후 웨이브 2 → 전멸 → 웨이브 3 → 전멸 → **완료**, 봉쇄 해제, 계단 통행 복구
+3. 밖에 있는 클라가 계단에서 F → **1회 입장**(텔레포트). 다시 F → 무효. 안에서 밖으로는 못 나감
+4. 타이머 0 → **실패**, 잔존 몹 despawn, 봉쇄 해제
+5. 안에서 전원 Soul → 실패 (4와 같은 경로)
+6. HUD: 우측 끝 중앙 반투명, 제목/남은시간/웨이브가 **양 피어에서 같은 값**으로 갱신
+7. 컴파일 0에러, 신규 경고 0
+
+## 검증 계획
+
+- 컴파일 확인 (`unity_get_compilation_status`)
+- 위 7건 MPPM 2인 수동 검증. 결과를 이 절 아래에 라운드별로 append
+- **조기 반환마다 이름을 남긴다** (교훈 #28/#30 — 게이트 3개 이상인 진입 함수)
+- 「F 가 안 먹는다」류 보고를 원인까지 좁힐 수 있게 `ZoneBridgeGateManager` 수준의 진단 로그를 넣는다
+- 프리팹 저작 후 `m_Script` **guid** 로 컴포넌트 집합을 센다 (교훈 #91 — `m_EditorClassIdentifier` 금지)
+
+---
 # ▶▶▶ 다음 세션 = **퀘스트 영역** (2026-09-09 인수인계)
 
 > 이번 세션은 **머지 + development 반영까지 끝났다.** 아래 「2026-09-08 기록」 절부터는 그 이력이다.
@@ -157,7 +368,9 @@ WallBot 은 공격 클립이 1종이라 "평타"도 같은 클립을 쓴다 — 
 - 배선 검증: 중간보스 3종 모두 창 1.5초 / 그로기 0.5초 / 누적식 0 / 재선정 8초
 - WallBot 스크립트 교체 후 필수 참조 전부 보존 — `data`·`agent`·`meleeAttack`·`status`·`bodyCollider`·`playerMask 64`
 - 근접 거리 정합 감사: **개시 거리가 접촉보다 먼 몹 0종**
-- 애니메이터 파라미터 감사: 죽은 이름 **2개**(PeekA·Tesla `hitTrigger`) — 피격 클립이 없어 **정상으로 확정**한 것
+- 애니메이터 배선 감사: 죽은 이름 **2개**(PeekA·Tesla `hitTrigger`) — 피격 클립이 없어 **정상으로 확정**한 것
+  (2026-09-10: 도구 이름이 「파라미터 감사」→「배선 감사」로 바뀌고 **상태 이름·파라미터 타입까지** 검사한다.
+   그때 PeekABot 은 `locomotionState` 도 없다는 것이 새로 드러났다 — `hitTrigger` 와 달리 이건 미확정)
 - EditMode **95/95**
 - `WallBot.cs.meta` 커밋 완료(프리팹 `m_Script` 가 같은 guid 를 가리키는 것까지 확인)
 
@@ -402,7 +615,7 @@ guid 집합으로 다시 돌려야 차이가 보인다. 실제로 이름 grep �
   4. `Controller_PeekABot` — Hit 상태가 생겼으면 감사의 죽은 값 2건이 해소된다
   5. 내 r290 채찍 이벤트가 살아 있는지(아트가 fbx 를 다시 올리면 임포터 설정이 초기화된다 →
      `Tools/Boss/중간보스 — SpinnerBot 그로기 진입 전이 보장` 메뉴가 멱등 복구용이다)
-  6. `Tools/Boss/몬스터 — 애니메이터 파라미터 감사` · `Tools/Boss/몬스터 — 인지·전투 값 점검` 재실행
+  6. `Tools/Boss/몬스터 — 애니메이터 배선 감사` · `Tools/Boss/몬스터 — 인지·전투 값 점검` 재실행
 
 ## 미커밋으로 남겨 둔 것 (의도)
 
