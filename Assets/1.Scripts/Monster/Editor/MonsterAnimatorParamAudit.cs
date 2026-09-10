@@ -52,7 +52,7 @@ public static class MonsterAnimatorParamAudit
             MonsterDataSO data = FindData(prefab);
             Animator animator = prefab.GetComponentInChildren<Animator>(true);
 
-            // 🔴 **실효** 컨트롤러를 봐야 한다 — `MonsterBase.Awake` 는 데이터의
+            // 🔴 **실효** 컨트롤러를 봐야 한다 — `MonsterBase.OnNetworkSpawn` 은 데이터의
             //    `animatorControllerOverride` 가 있으면 그것으로 덮는다. 프리팹 쪽만 보면
             //    런타임에 쓰이지 않는 컨트롤러를 감사해 거짓 신호를 낸다.
             var controller = data != null ? data.animatorControllerOverride as AnimatorController : null;

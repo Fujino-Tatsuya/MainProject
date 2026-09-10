@@ -182,7 +182,8 @@ public static class TurretAnimatorAuthoring
     ///    <b>저장은 성공하고 YAML 에 엔트리도 남는데 로드하면 null</b> 이다(오버라이드 타깃이
     ///    해석되지 않는다). 인스턴스를 만들어 물어봐야만 드러나는 <b>조용한 실패</b>다.
     ///    아트 프리팹을 고치는 길도 있지만 SVN 이고 팩 업데이트에 덮인다.
-    ///    → <c>MonsterDataSO.animatorControllerOverride</c> 에 넣고 <c>MonsterBase.Awake</c> 가 덮는다.
+    ///    → <c>MonsterDataSO.animatorControllerOverride</c> 에 넣고 <c>MonsterBase.OnNetworkSpawn</c> 이
+    ///      덮는다(<c>IsServer</c> 게이트 없음 = 전 피어. 클라에서도 같은 컨트롤러여야 보이는 것이 같다).
     /// </summary>
     static string FixData(GameObject prefabAsset, AnimatorController controller)
     {

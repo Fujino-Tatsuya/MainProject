@@ -96,7 +96,8 @@ public class MonsterDataSO : ScriptableObject
 
     [Header("애니메이터 컨트롤러 교체 (선택)")]
     [Tooltip("비우면 프리팹/아트 프리팹에 배선된 컨트롤러를 그대로 쓴다. " +
-             "채우면 MonsterBase 가 Awake 에서 이것으로 덮는다.\n\n" +
+             "채우면 MonsterBase 가 OnNetworkSpawn 에서 이것으로 덮는다(게이트 없음 = 전 피어).\n" +
+             "⚠️ 에디터/프리팹 인스펙터에는 여전히 원래 컨트롤러가 보인다 — 교체는 런타임에만 일어난다.\n\n" +
              "🔴 아트 팩 컨트롤러에 '우리 코드가 빠져나올 수 없는 상태'가 있을 때 쓴다 — " +
              "PeekABot 의 Hide/Raise, TeslaBot 의 Charge(→Shoot 전이가 우리가 안 쓰는 Attack 트리거를 요구)가 " +
              "그랬고, 그 상태로 들어가면 3단 신축 컬럼이 중간에 걸려 몸체가 분리돼 보였다.\n\n" +
