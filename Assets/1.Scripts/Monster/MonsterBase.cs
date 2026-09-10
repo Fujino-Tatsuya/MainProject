@@ -113,6 +113,17 @@ public class MonsterBase : Unit
         // 참조 자동 보강(인스펙터 미할당 대비).
         if (agent == null) agent = GetComponent<NavMeshAgent>();
         if (animator == null) animator = GetComponentInChildren<Animator>();
+
+        // 데이터가 컨트롤러를 지정했으면 그것으로 덮는다(비어 있으면 프리팹 배선을 그대로 쓴다).
+        // 🔴 왜 데이터로 넣는가 — Animator 가 2단 중첩 프리팹(우리 프리팹 → 아트 프리팹 → FBX) 안에
+        //    있어서 외부 프리팹에서 `m_Controller` 를 오버라이드하면 **타깃이 해석되지 않는다**
+        //    (2026-09-10 실측: 저장 성공 + YAML 에 엔트리 존재 + 로드하면 null = 조용한 실패).
+        //    아트 프리팹을 고치면 SVN 이고 팩 업데이트에 덮인다. 그래서 git 쪽 데이터에 둔다.
+        //    쓰는 곳: 고정 터렛(PeekABot·TeslaBot) — 아트 컨트롤러에 우리가 빠져나올 수 없는
+        //    상태(Hide/Raise, Charge)가 있어 몸체가 분리돼 보였다.
+        if (animator != null && data != null && data.animatorControllerOverride != null)
+            animator.runtimeAnimatorController = data.animatorControllerOverride;
+
         if (status == null) status = GetComponent<MonsterStatusEffect>();
         if (meleeAttack == null) meleeAttack = GetComponentInChildren<MonsterMeleeAttack>();
         if (rangedAttack == null) rangedAttack = GetComponentInChildren<MonsterRangedAttack>();

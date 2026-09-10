@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 576305eb4d78f0c4eb97b90edc8cae21, type: 3}
   m_Name: PeekABotData
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   archetype: 1
   attackDamage: 7
   moveSpeed: 1
@@ -24,14 +24,24 @@ MonoBehaviour:
   detectionHeightTolerance: 2
   attackRange: 10
   leashRadius: 15
+  retargetInterval: 0
   returnSpeedMultiplier: 5
   turnSpeed: 10
+  avoidanceRadius: 0.3
+  obstacleAvoidance: 2
   projectilePrefab: {fileID: 8845096525963102658, guid: 54c0baf85e460bc478f1db5826ccde56, type: 3}
   projectileSpeed: 14
   projectileLifetime: 4
   minStandoff: 4
+  projectileArcHeight: 0
+  projectileSplashRadius: 0
+  repositionBetweenAttacks: 0
+  retreatMinDuration: 1.2
+  repositionMinDuration: 1.2
   attackDuration: 0.8
   attackWindup: 0.35
+  cancelWindupIfTargetLeavesRange: 0
+  engageAttackDelay: 0
   maxGroggyCount: 0
   groggyDuration: 3
   startsWithSuperArmor: 0
@@ -39,9 +49,11 @@ MonoBehaviour:
   hitStunDuration: 0.4
   despawnDelay: 2
   isMidBoss: 0
-  animSpeedParam: RunBlend
+  animSpeedParam: 
   attackTrigger: Shoot
-  hitTrigger: Hit
+  attackFinishTrigger: 
+  hitTrigger: 
   groggyBool: 
   deathTrigger: 
   locomotionState: Idle
+  animatorControllerOverride: {fileID: 9100000, guid: 292844ba7d1ca444ab742cb4631a182d, type: 2}

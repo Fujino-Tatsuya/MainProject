@@ -93,4 +93,15 @@ public class MonsterDataSO : ScriptableObject
     public string groggyBool = "Groggy";      // bool
     public string deathTrigger = "Death";     // trigger
     public string locomotionState = "Movement"; // 이동(로코모션) 상태명 — 액션 클립 강제 종료 후 복귀 CrossFade 대상
+
+    [Header("애니메이터 컨트롤러 교체 (선택)")]
+    [Tooltip("비우면 프리팹/아트 프리팹에 배선된 컨트롤러를 그대로 쓴다. " +
+             "채우면 MonsterBase 가 Awake 에서 이것으로 덮는다.\n\n" +
+             "🔴 아트 팩 컨트롤러에 '우리 코드가 빠져나올 수 없는 상태'가 있을 때 쓴다 — " +
+             "PeekABot 의 Hide/Raise, TeslaBot 의 Charge(→Shoot 전이가 우리가 안 쓰는 Attack 트리거를 요구)가 " +
+             "그랬고, 그 상태로 들어가면 3단 신축 컬럼이 중간에 걸려 몸체가 분리돼 보였다.\n\n" +
+             "왜 프리팹 오버라이드가 아니라 데이터인가: Animator 가 2단 중첩 프리팹 안에 있어 " +
+             "외부 프리팹에서 m_Controller 를 오버라이드하면 타깃이 해석되지 않는다(2026-09-10 실측 — " +
+             "저장은 성공하고 YAML 에도 남는데 로드하면 null 이다).")]
+    public RuntimeAnimatorController animatorControllerOverride;
 }
