@@ -1,7 +1,7 @@
 'use strict';
 const fs=require('fs'),path=require('path'),http=require('http'),os=require('os');
 const {spawn}=require('child_process');const readline=require('readline');
-const root=process.cwd(),out=process.env.AUDIT_OUTPUT||path.join(root,'output/unity-mcp-audit-2026-09-08');
+const root=process.cwd(),out=path.resolve(process.env.AUDIT_OUTPUT||path.join(root,'output/unity-mcp-audit-2026-09-08'));
 fs.mkdirSync(out,{recursive:true});
 const authFile=path.join(os.homedir(),'.unity-mcp','auth-token-3000.json');
 const auth=JSON.parse(fs.readFileSync(authFile,'utf8'));
@@ -50,8 +50,21 @@ function rpc(host,id,method,params){return new Promise(resolve=>{
   const contractOk=name!=='unity_explain_compile_errors'||(value?.freshness?.state==='unknown'&&value?.freshness?.reportedHasErrors===false);
   result.local.push({name,ms:r.ms,bytes:Buffer.byteLength(JSON.stringify(r.response)),ok:!!value&&!value.error&&!r.response.error&&!r.response.result?.isError&&contractOk,summary:value?.summary||value?.freshness||value?.stats||null});
  }
+ if(process.env.AUDIT_EXTENDED==='1'){
+  result.extended=[];
+  const checks=[
+   ['unity_get_source_declarations',{path:'Assets/1.Scripts/Utility/SpawnPointer.cs',defines:['UNITY_EDITOR']},v=>v?.success===true&&v.declarations.length>0&&v.evidence?.detail?.sourceHash===require('crypto').createHash('sha256').update(fs.readFileSync('Assets/1.Scripts/Utility/SpawnPointer.cs')).digest('hex')],
+   ['unity_inspect_prefab_values',{assetPath:'Assets/2.Prefabs/UI/OverheadHealthBar.prefab',targetPath:'.',componentType:'UnityEngine.GameObject',propertyPath:'m_Name'},v=>v?.success===true&&v.properties.length===1&&v.properties[0].value==='OverheadHealthBar'&&v.evidence?.basis==='editor-observation'],
+  ];
+  for(const [name,args,check] of checks){
+   const r=await call(name,'tools/call',{name,arguments:args});let value;try{value=JSON.parse(r.response.result.content[0].text);}catch{}
+   fs.writeFileSync(path.join(out,'extended-'+name+'.json'),JSON.stringify(r.response,null,2));
+   result.extended.push({name,ms:r.ms,bytes:Buffer.byteLength(JSON.stringify(r.response)),ok:!!check(value)});
+  }
+ }
  child.stdin.end();result.launcherLog=stderr;result.messages=messages;
  result.ok=!!host && !list.response.error && !list.response.auditTimeout && Array.isArray(list.response.result?.tools) && result.stdio.every(x=>!x.response?.error&&!x.response?.auditTimeout&&!x.response?.result?.isError) && result.local.every(x=>x.ok);
+ result.ok=result.ok&&(!result.extended||result.extended.every(x=>x.ok));
  process.exitCode=result.ok?0:1;
  fs.writeFileSync(path.join(out,'live-results.json'),JSON.stringify(result,null,2));
  console.log(JSON.stringify({...result,tools:result.tools?{ms:result.tools.ms,count:result.tools.json?.result?.tools?.length,bytes:result.tools.bytes}:null},null,2));

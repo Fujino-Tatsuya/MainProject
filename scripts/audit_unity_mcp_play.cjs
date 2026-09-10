@@ -1,6 +1,6 @@
 'use strict';
 const fs=require('fs'),path=require('path'),{spawn}=require('child_process'),readline=require('readline');
-const root=process.cwd(),out=process.env.AUDIT_OUTPUT||path.join(root,'output/unity-mcp-audit-2026-09-08');
+const root=process.cwd(),out=path.resolve(process.env.AUDIT_OUTPUT||path.join(root,'output/unity-mcp-audit-2026-09-08'));
 const bridge=process.env.AUDIT_PACKAGE?path.join(process.env.AUDIT_PACKAGE,'Bridge/mcp-bridge.js'):path.join(root,'Library/PackageCache/com.community.unity-mcp@85f6c175c082/Bridge/mcp-bridge.js');
 const child=spawn(process.execPath,['--require',path.join(out,'live-preload.cjs'),bridge],{cwd:root,env:{...process.env,USERPROFILE:path.join(out,'live-profile'),UNITY_MCP_PROJECT:root,UNITY_MCP_HOST:'::1'},stdio:['pipe','pipe','pipe']});
 const waiters=new Map(),records=[];let serial=0,stderr='';child.stderr.on('data',c=>stderr+=c);

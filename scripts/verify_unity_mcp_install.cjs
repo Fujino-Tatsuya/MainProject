@@ -24,7 +24,7 @@ assert.equal(candidates.length, 1, 'Expected one cache for selected SHA');
 const installed = path.resolve('Library/PackageCache', candidates[0]);
 const digest = p => crypto.createHash('sha256').update(fs.readFileSync(p, 'utf8').replace(/\r\n/g, '\n')).digest('hex');
 const checks = [];
-for (const file of ['Bridge/mcp-bridge.js', 'Bridge/mcp-bridge-launcher.js', 'Bridge/index/scan.js', 'Bridge/index/tools.js', 'Bridge/index/errorimpact.js']) {
+for (const file of ['Bridge/mcp-bridge.js', 'Bridge/mcp-bridge-launcher.js', 'Bridge/index/scan.js', 'Bridge/index/tools.js', 'Bridge/index/errorimpact.js', 'Bridge/index/evidence.js', 'Bridge/index/sourceast.js', 'Bridge/SourceAst~/Program.cs', 'Editor/Tools/PrefabInspectionTools.cs', 'Editor/Core/JsonRpcHandler.cs']) {
   const actual = digest(path.join(installed, file));
   assert.equal(actual, digest(path.join(source, file)), file + ' differs from verified source');
   checks.push({ file, sha256NormalizedText: actual });
@@ -34,7 +34,9 @@ assert.equal(digest(launcher), digest(path.join(source, 'Bridge/mcp-bridge-launc
 const live = readJson(path.join(out, 'live-results.json'));
 assert.equal(live.ok, true, 'Installed live checks failed');
 assert.ok(live.launcherLog.replace(/\\/g, '/').includes(installed.replace(/\\/g, '/') + '/Bridge/mcp-bridge.js'), 'Launcher did not report selected cache path');
-assert.equal(live.stdio.find(x => x.name === 'tools/list').count, 85);
+const names = readJson(path.join(out, 'stdio-tools.json')).result.tools.map(t => t.name);
+for (const name of ['unity_get_source_declarations', 'unity_inspect_prefab_values', 'unity_project_map']) assert.ok(names.includes(name), name + ' missing');
+assert.equal(new Set(names).size, names.length, 'Duplicate tool names');
 const result = { at: new Date().toISOString(), expected, dependency, installed, launcher, checks, liveVerified: true, ok: true };
 fs.writeFileSync(path.join(out, 'installation-verification.json'), JSON.stringify(result, null, 2));
 console.log(JSON.stringify(result, null, 2));
