@@ -4,6 +4,7 @@ using UnityEngine;
 [RequireComponent(typeof(Player))]
 [RequireComponent(typeof(PlayerInputReader))]
 [RequireComponent(typeof(PlayerMovement))]
+[RequireComponent(typeof(PlayerMotor))]
 [RequireComponent(typeof(PlayerAimIndicator))]
 [RequireComponent(typeof(DefaultAttackController))]
 [RequireComponent(typeof(StatusEffectController))]
@@ -51,7 +52,7 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
             GetComponent<PlayerAimIndicator>(),
             GetComponent<DefaultAttackController>(),
             statusEffects,
-            GetComponent<Rigidbody>(),
+            GetComponent<PlayerMotor>(),
             GetComponentInChildren<Animator>(),
             GetComponent<PlayerSkillController>(),
             GetComponent<PlayerDashController>(),
@@ -87,6 +88,13 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
         }
 
         currentState?.Tick();
+        context.Input?.ConsumeStateTickEdges();
+    }
+
+    /// <summary>상태 판단과 입력 소비는 Update에 두고, 물리 이동 의도만 고정 틱에 제출한다.</summary>
+    public void FixedTick()
+    {
+        currentState?.FixedTick();
     }
 
     public bool ShouldTickForNetwork(bool isOwner, bool hasStateAuthority)
@@ -436,7 +444,7 @@ public sealed class PlayerStateContext
         PlayerAimIndicator aim,
         DefaultAttackController defaultAttack,
         StatusEffectController statusEffects,
-        Rigidbody rigidbody,
+        PlayerMotor motor,
         Animator animator,
         PlayerSkillController skills,
         PlayerDashController dash,
@@ -449,7 +457,7 @@ public sealed class PlayerStateContext
         Aim = aim;
         DefaultAttack = defaultAttack;
         StatusEffects = statusEffects;
-        Rigidbody = rigidbody;
+        Motor = motor;
         Animator = animator;
         Skills = skills;
         Dash = dash;
@@ -463,7 +471,7 @@ public sealed class PlayerStateContext
     public PlayerAimIndicator Aim { get; }
     public DefaultAttackController DefaultAttack { get; }
     public StatusEffectController StatusEffects { get; }
-    public Rigidbody Rigidbody { get; }
+    public PlayerMotor Motor { get; }
     public Animator Animator { get; }
     // 스킬 시스템 미장착 프리팹에서는 null — 사용처는 전부 null 허용으로 다룬다
     public PlayerSkillController Skills { get; }
@@ -479,6 +487,7 @@ public interface IPlayerState
     bool RequiresStateAuthorityTick { get; }
     void Enter(PlayerActionState previousState);
     void Tick();
+    void FixedTick();
     void Exit(PlayerActionState nextState);
 }
 
@@ -496,6 +505,7 @@ public abstract class PlayerStateBase : IPlayerState
 
     public virtual void Enter(PlayerActionState previousState) { }
     public virtual void Tick() { }
+    public virtual void FixedTick() { }
     public virtual void Exit(PlayerActionState nextState) { }
 
     protected bool TryConsumeActionInput()
@@ -630,6 +640,11 @@ public sealed class PlayerAttackState : PlayerStateBase
         Context.DefaultAttack.Tick();
     }
 
+    public override void FixedTick()
+    {
+        Context.DefaultAttack.FixedTickMovement();
+    }
+
     public override void Exit(PlayerActionState nextState)
     {
         if (nextState != PlayerActionState.Attack)
@@ -681,20 +696,24 @@ public sealed class PlayerInterruptState : PlayerStateBase
     public override void Tick()
     {
         Context.Player.SetAnimatorMoving(false);
-        MoveDuringAction();
 
         if (Time.time >= actionEndTime)
             Context.Controller.ChangeState(PlayerActionState.Idle);
     }
 
+    public override void FixedTick()
+    {
+        MoveDuringAction();
+    }
+
     private void MoveDuringAction()
     {
-        if (actionMoveRemaining <= 0f)
+        if (actionMoveRemaining <= 0f || Time.fixedTime >= actionEndTime)
             return;
 
-        float moveDistance = Mathf.Min(actionMoveSpeed * Time.deltaTime, actionMoveRemaining);
+        float moveDistance = Mathf.Min(actionMoveSpeed * Time.fixedDeltaTime, actionMoveRemaining);
         actionMoveRemaining -= moveDistance;
-        Context.Movement.MoveRoot(actionDirection * moveDistance);
+        Context.Motor.AddDisplacement(actionDirection * moveDistance);
     }
 }
 
@@ -726,6 +745,8 @@ public sealed class PlayerRestrainedState : PlayerStateBase
     private readonly GameObject instigator;
     private readonly RestraintMode mode;
     private readonly float frontOffset;
+    private readonly Rigidbody playerRigidbody;
+    private readonly PlayerMotor motor;
     private bool wasKinematic;
     private bool wasDetectingCollisions;
     private bool hadRigidbody;
@@ -745,6 +766,8 @@ public sealed class PlayerRestrainedState : PlayerStateBase
         this.instigator = instigator;
         this.mode = mode;
         this.frontOffset = frontOffset;
+        playerRigidbody = context.Player != null ? context.Player.GetComponent<Rigidbody>() : null;
+        motor = context.Motor;
     }
 
     public override PlayerActionState StateType => PlayerActionState.Restrained;
@@ -779,7 +802,7 @@ public sealed class PlayerRestrainedState : PlayerStateBase
         // Example: Context.Animator.SetBool("IsGrabbed", false);
     }
 
-    public override void Tick()
+    public override void FixedTick()
     {
         if (!Context.Player.IsMovementAuthority)
             return;
@@ -787,14 +810,7 @@ public sealed class PlayerRestrainedState : PlayerStateBase
         if (!TryGetTargetPose(out Vector3 position, out Quaternion rotation))
             return;
 
-        if (Context.Rigidbody != null)
-        {
-            Context.Rigidbody.MovePosition(position);
-            Context.Rigidbody.MoveRotation(rotation);
-            return;
-        }
-
-        Context.Player.transform.SetPositionAndRotation(position, rotation);
+        motor?.SetPoseTarget(position, rotation);
     }
 
     /// <summary>추종할 목표 위치·회전. 대상이 사라졌거나 소켓이 없으면 false — 이때 위치만 놓아준다.</summary>
@@ -835,28 +851,28 @@ public sealed class PlayerRestrainedState : PlayerStateBase
 
     private void DelegatePhysicsAndCollisionToInstigator()
     {
-        if (!Context.Player.IsMovementAuthority || Context.Rigidbody == null)
+        if (!Context.Player.IsMovementAuthority || playerRigidbody == null)
             return;
 
         hadRigidbody = true;
-        wasKinematic = Context.Rigidbody.isKinematic;
-        wasDetectingCollisions = Context.Rigidbody.detectCollisions;
+        wasKinematic = playerRigidbody.isKinematic;
+        wasDetectingCollisions = playerRigidbody.detectCollisions;
 
-        Context.Rigidbody.linearVelocity = Vector3.zero;
-        Context.Rigidbody.angularVelocity = Vector3.zero;
-        Context.Rigidbody.isKinematic = true;
-        Context.Rigidbody.detectCollisions = false;
+        playerRigidbody.linearVelocity = Vector3.zero;
+        playerRigidbody.angularVelocity = Vector3.zero;
+        playerRigidbody.isKinematic = true;
+        playerRigidbody.detectCollisions = false;
     }
 
     private void RestorePlayerPhysicsAndCollision()
     {
-        if (!hadRigidbody || Context.Rigidbody == null)
+        if (!hadRigidbody || playerRigidbody == null)
             return;
 
-        Context.Rigidbody.isKinematic = wasKinematic;
-        Context.Rigidbody.detectCollisions = wasDetectingCollisions;
-        Context.Rigidbody.linearVelocity = Vector3.zero;
-        Context.Rigidbody.angularVelocity = Vector3.zero;
+        playerRigidbody.isKinematic = wasKinematic;
+        playerRigidbody.detectCollisions = wasDetectingCollisions;
+        playerRigidbody.linearVelocity = Vector3.zero;
+        playerRigidbody.angularVelocity = Vector3.zero;
     }
 
     // 소켓/정면 추종 중 생긴 기울어짐을 정리하고 시전자 방향(yaw만)으로 세운다.
@@ -873,8 +889,8 @@ public sealed class PlayerRestrainedState : PlayerStateBase
 
         Quaternion rotation = Quaternion.LookRotation(lookDirection.normalized);
 
-        if (Context.Rigidbody != null)
-            Context.Rigidbody.rotation = rotation;
+        if (playerRigidbody != null)
+            playerRigidbody.rotation = rotation;
 
         Context.Player.transform.rotation = rotation;
     }
@@ -884,12 +900,14 @@ public sealed class PlayerKnockbackState : PlayerStateBase
 {
     private readonly Vector3 direction;
     private readonly float strength;
+    private readonly Rigidbody playerRigidbody;
     private float startTime;
 
     public PlayerKnockbackState(PlayerStateContext context, Vector3 direction, float strength) : base(context)
     {
         this.direction = direction;
         this.strength = strength;
+        playerRigidbody = context.Player != null ? context.Player.GetComponent<Rigidbody>() : null;
     }
 
     public override PlayerActionState StateType => PlayerActionState.Knockback;
@@ -904,15 +922,15 @@ public sealed class PlayerKnockbackState : PlayerStateBase
         startTime = Time.time;
 
         // 물리 적용은 이동 권위(오너/오프라인)만 — 서버(비오너) 사본은 상태 장부만 기록
-        if (!Context.Player.IsMovementAuthority || Context.Rigidbody == null)
+        if (!Context.Player.IsMovementAuthority || playerRigidbody == null)
             return;
 
-        Context.Rigidbody.isKinematic = false;
-        Context.Rigidbody.linearVelocity = Vector3.zero;
-        Context.Rigidbody.angularVelocity = Vector3.zero;
+        playerRigidbody.isKinematic = false;
+        playerRigidbody.linearVelocity = Vector3.zero;
+        playerRigidbody.angularVelocity = Vector3.zero;
 
         if (direction.sqrMagnitude > 0.001f && strength > 0f)
-            Context.Rigidbody.AddForce(direction.normalized * strength, ForceMode.Impulse);
+            playerRigidbody.AddForce(direction.normalized * strength, ForceMode.Impulse);
     }
 
     public override void Tick()
@@ -929,7 +947,7 @@ public sealed class PlayerKnockbackState : PlayerStateBase
             return;
         }
 
-        if (Context.Rigidbody == null)
+        if (playerRigidbody == null)
         {
             EndAndNotifyServer("rigidbody-null", Time.time - startTime, -1f);
             return;
@@ -940,23 +958,23 @@ public sealed class PlayerKnockbackState : PlayerStateBase
             return;
 
         float stopSpeed = Context.Controller.KnockbackStopSpeed;
-        bool slowEnough = Context.Rigidbody.linearVelocity.sqrMagnitude <= stopSpeed * stopSpeed;
+        bool slowEnough = playerRigidbody.linearVelocity.sqrMagnitude <= stopSpeed * stopSpeed;
         bool timeout = elapsed >= Context.Controller.MaxKnockbackTime;
 
         if (slowEnough || timeout)
         {
             string reason = slowEnough ? "slow-enough" : "owner-timeout";
-            EndAndNotifyServer(reason, elapsed, Context.Rigidbody.linearVelocity.magnitude);
+            EndAndNotifyServer(reason, elapsed, playerRigidbody.linearVelocity.magnitude);
         }
     }
 
     public override void Exit(PlayerActionState nextState)
     {
-        if (!Context.Player.IsMovementAuthority || Context.Rigidbody == null)
+        if (!Context.Player.IsMovementAuthority || playerRigidbody == null)
             return;
 
-        Context.Rigidbody.linearVelocity = Vector3.zero;
-        Context.Rigidbody.angularVelocity = Vector3.zero;
+        playerRigidbody.linearVelocity = Vector3.zero;
+        playerRigidbody.angularVelocity = Vector3.zero;
     }
 
     private void EndAndNotifyServer(string reason, float elapsed, float speed)
@@ -970,7 +988,6 @@ public sealed class PlayerKnockbackState : PlayerStateBase
 // W2는 평지 단순 이동만 담당한다. 경사·벽·절벽·공중 관성은 W3에서 대체·확장한다.
 public sealed class PlayerDashState : PlayerStateBase
 {
-    private const int CastBufferSize = 8;
     private const float MaxFallSpeed = 30f; // 대시 공중 낙하 속도 상한 (PLAN §5)
 
     private readonly Vector3 direction; // 평면 정규화 방향(시작 순간 확정)
@@ -978,9 +995,6 @@ public sealed class PlayerDashState : PlayerStateBase
     private readonly float duration;    // 요청된 지속시간(진단 로그용 원본)
     private readonly float startTime;   // 상태 생성 시각(진단용)
     private readonly float endTime;
-    private readonly DashMotionSettings motion;
-    private readonly CapsuleCollider capsule;
-    private readonly RaycastHit[] castBuffer = new RaycastHit[CastBufferSize];
 
     private float airborneVerticalSpeed; // 절벽 낙하 중 누적 하강 속도(공중 구간에서만)
 
@@ -1003,17 +1017,15 @@ public sealed class PlayerDashState : PlayerStateBase
             : Context.Movement.CurrentFacing;
         this.speed = Mathf.Max(0f, speed);
         this.duration = Mathf.Max(0f, duration);
-        this.motion = motion;
         startTime = Time.time;
         endTime = Time.time + Mathf.Max(0f, duration);
-        capsule = Context.Player != null ? Context.Player.GetComponent<CapsuleCollider>() : null;
     }
 
     public override PlayerActionState StateType => PlayerActionState.Dash;
 
-    /// <summary>대시 이동량 계산에 쓰는 현재 위치(Rigidbody 우선 — MoveRoot가 rb.position 기준이다).</summary>
+    /// <summary>대시 이동량 계산에 쓰는 Motor/Rigidbody 기준 현재 위치.</summary>
     private Vector3 CurrentPosition =>
-        Context.Rigidbody != null ? Context.Rigidbody.position : Context.Player.transform.position;
+        Context.Motor != null ? Context.Motor.Position : Context.Player.transform.position;
 
     public override void Enter(PlayerActionState previousState)
     {
@@ -1023,21 +1035,18 @@ public sealed class PlayerDashState : PlayerStateBase
         startPosition = CurrentPosition;
         PlayerGroundingSensor sensor = Context.GroundingSensor;
         wasGrounded = sensor != null && sensor.IsGrounded;
+        if (Context.Motor != null)
+            Context.Motor.MovementResolved += OnMotorMovementResolved;
 
         Edit.Log(
             $"[Dash] 상태 진입 — 이전상태={previousState} 방향=({direction.x:F2}, {direction.z:F2}) " +
             $"속도={speed:F1} 지속={duration:F3}s 종료예정={endTime:F3} 접지={wasGrounded} " +
-            $"이동권한={Context.Player.IsMovementAuthority} 시작위치={startPosition} | " +
-            // 충돌 튜닝은 PlayerDashData 에셋이 W3 필드 추가 이전에 저장돼 YAML에 키가 없다 —
-            // 런타임 실제값(마스크 0이면 스윕 무력화)을 여기서 확인한다.
-            $"장애물마스크={motion.ObstacleMask.value} 스킨={motion.CollisionSkin:F3} " +
-            $"스윕반복={motion.MaxSweepIterations} 등판각={motion.MaxWalkableSlopeAngle:F1}°", Context.Player);
+            $"이동권한={Context.Player.IsMovementAuthority} 시작위치={startPosition} | 충돌해결=PlayerMotor", Context.Player);
 
-        // 아래 두 경우는 대시가 "시작은 되는데 제대로 안 나가는" 조용한 원인이다.
-        if (capsule == null)
+        if (Context.Motor == null)
         {
             Edit.LogWarning(
-                "[Dash] CapsuleCollider가 없어 충돌 스윕(PlayerMotionSweep)을 건너뜁니다 — 벽 관통/막힘이 클램프 없이 발생합니다.",
+                "[Dash] PlayerMotor가 없어 대시 이동을 제출할 수 없습니다.",
                 Context.Player);
         }
 
@@ -1051,14 +1060,22 @@ public sealed class PlayerDashState : PlayerStateBase
 
     public override void Tick()
     {
+        if (Time.time >= endTime)
+            Context.Controller.ChangeState(PlayerActionState.Idle);
+    }
+
+    public override void FixedTick()
+    {
+        if (Time.fixedTime >= endTime)
+            return;
+
         tickCount++;
 
         // 정면 벽으로 이동이 0이 되어도 대시 상태는 원래 종료시각까지 유지한다. (불변식: 상태·무적 유지)
         Vector3 delta = Vector3.zero;
         if (speed > 0f)
         {
-            Vector3 moveDir = ResolvePlanarSlopeDirection(); // 접지면 경사 투영, 공중이면 flat 수평
-            delta = moveDir * speed * Time.deltaTime;
+            delta = direction * speed * Time.fixedDeltaTime;
         }
         else if (tickCount == 1) // 매 tick 반복될 값이라 첫 tick에만 남긴다
         {
@@ -1082,9 +1099,9 @@ public sealed class PlayerDashState : PlayerStateBase
         if (!grounded)
         {
             lostGroundingDuringDash = true;
-            airborneVerticalSpeed += Physics.gravity.y * Time.deltaTime; // gravity.y < 0
+            airborneVerticalSpeed += Physics.gravity.y * Time.fixedDeltaTime; // gravity.y < 0
             airborneVerticalSpeed = Mathf.Max(airborneVerticalSpeed, -MaxFallSpeed);
-            delta.y += airborneVerticalSpeed * Time.deltaTime;
+            delta.y += airborneVerticalSpeed * Time.fixedDeltaTime;
         }
         else
         {
@@ -1092,10 +1109,7 @@ public sealed class PlayerDashState : PlayerStateBase
         }
 
         if (delta.sqrMagnitude > 0f)
-            MoveWithSweep(delta);
-
-        if (Time.time >= endTime)
-            Context.Controller.ChangeState(PlayerActionState.Idle);
+            Context.Motor?.AddGroundedDisplacement(delta);
     }
 
     /// <summary>
@@ -1105,6 +1119,9 @@ public sealed class PlayerDashState : PlayerStateBase
     /// </summary>
     public override void Exit(PlayerActionState nextState)
     {
+        if (Context.Motor != null)
+            Context.Motor.MovementResolved -= OnMotorMovementResolved;
+
         float elapsed = Time.time - startTime;
         bool expired = Time.time >= endTime;
         Vector3 total = CurrentPosition - startPosition;
@@ -1140,15 +1157,13 @@ public sealed class PlayerDashState : PlayerStateBase
         {
             Edit.LogWarning(
                 $"[Dash] 이동 손실(스윕): 요청 {requestedDistance:F2}m 중 {appliedDistance:F2}m만 적용됐습니다 — " +
-                $"벽/급경사(등판각 {motion.MaxWalkableSlopeAngle:F0}° 초과)에 막혔습니다. " +
-                $"장애물 마스크={motion.ObstacleMask.value}, 막힌tick={blockedTickCount}", Context.Player);
+                $"PlayerMotor의 벽/급경사 판정에 막혔습니다. 막힌tick={blockedTickCount}", Context.Player);
         }
         else if (appliedDistance > 0.01f && actualPlanarDistance < appliedDistance * 0.5f)
         {
             Edit.LogWarning(
                 $"[Dash] 이동 손실(적용 후): 스윕은 {appliedDistance:F2}m를 적용했지만 실제 위치는 {actualPlanarDistance:F2}m만 움직였습니다 — " +
-                "PlayerMovement.MoveRoot의 정적 지오메트리 클램프, 같은 프레임의 다른 MovePosition 호출, " +
-                "또는 비권한 피어 위치 복제(NetworkTransform)와 경쟁하는 경우입니다.", Context.Player);
+                "PhysX 접촉 해석 또는 비권한 피어 위치 복제(NetworkTransform)와 경쟁하는 경우입니다.", Context.Player);
         }
     }
 
@@ -1172,66 +1187,26 @@ public sealed class PlayerDashState : PlayerStateBase
         }
     }
 
-    // 지면이 걷기 가능 경사면 지면 평면에 투영해 오르막/내리막을 따라가고,
-    // maxWalkableSlopeAngle 초과 급경사는 벽으로 취급해 투영하지 않는다(스윕이 클램프). (PLAN §8 / W3a·W3b)
-    private Vector3 ResolvePlanarSlopeDirection()
+    private void OnMotorMovementResolved(Vector3 requestedDelta, Vector3 appliedDelta, bool wasBlocked)
     {
-        PlayerGroundingSensor sensor = Context.GroundingSensor;
-        if (sensor != null && sensor.IsGrounded)
-        {
-            float angle = Vector3.Angle(sensor.GroundNormal, Vector3.up);
-            if (angle <= motion.MaxWalkableSlopeAngle)
-            {
-                Vector3 projected = Vector3.ProjectOnPlane(direction, sensor.GroundNormal);
-                if (projected.sqrMagnitude > 0.0001f)
-                    return projected.normalized;
-            }
-        }
-
-        return direction;
-    }
-
-    // 대시·일반 이동이 공유하는 스윕으로 벽/급경사 관통을 막고 접선으로 미끄러진다. (PlayerMotionSweep 단일 소스)
-    private void MoveWithSweep(Vector3 delta)
-    {
-        // 진단: 요청/적용 이동량은 수평 성분만 비교한다(공중 낙하 y는 대시 거리와 무관).
-        float requested = new Vector3(delta.x, 0f, delta.z).magnitude;
+        float requested = new Vector3(requestedDelta.x, 0f, requestedDelta.z).magnitude;
+        float applied = new Vector3(appliedDelta.x, 0f, appliedDelta.z).magnitude;
         requestedDistance += requested;
-
-        if (capsule == null)
-        {
-            if (delta.sqrMagnitude > 0f)
-            {
-                appliedDistance += requested;
-                Context.Movement.MoveRoot(delta);
-            }
-            return;
-        }
-
-        Vector3 resolved = PlayerMotionSweep.Resolve(
-            capsule, delta, motion.MaxWalkableSlopeAngle, motion.ObstacleMask,
-            motion.CollisionSkin, motion.MaxSweepIterations, castBuffer);
-
-        float applied = new Vector3(resolved.x, 0f, resolved.z).magnitude;
         appliedDistance += applied;
 
         // 요청량의 10% 미만만 남았으면 사실상 벽에 막힌 tick으로 센다.
-        if (requested > 0.0001f && applied < requested * 0.1f)
+        if (wasBlocked && requested > 0.0001f && applied < requested * 0.1f)
         {
             blockedTickCount++;
             Edit.LogWarning(
                 $"[Dash] tick #{tickCount}: 스윕이 이동을 차단 — 요청 {requested:F3}m → 적용 {applied:F3}m " +
-                $"(등판각 {motion.MaxWalkableSlopeAngle:F0}° 초과 경사/벽). 대시 상태와 무적은 종료시각까지 유지됩니다.",
+                "(PlayerMotor 벽/급경사 판정). 대시 상태와 무적은 종료시각까지 유지됩니다.",
                 Context.Player);
         }
 
-        if (resolved.sqrMagnitude > 1e-10f)
+        if (wasBlocked && requested > 0.0001f && applied <= 0.0001f)
         {
-            Context.Movement.MoveRoot(resolved);
-        }
-        else if (requested > 0.0001f)
-        {
-            Edit.LogWarning($"[Dash] tick #{tickCount}: 적용 이동량이 0이라 MoveRoot를 호출하지 않았습니다.", Context.Player);
+            Edit.LogWarning($"[Dash] tick #{tickCount}: PlayerMotor 적용 이동량이 0입니다.", Context.Player);
         }
     }
 }

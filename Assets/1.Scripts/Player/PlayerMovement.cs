@@ -9,10 +9,8 @@ public class PlayerMovement : MonoBehaviour
     private Player player;
     private PlayerSoulController soulController;
     private Rigidbody rb;
-    private CapsuleCollider capsule;
     private PlayerGroundingSensor grounding;
     private PlayerMotor motor;
-    private LayerMask rootMoveBlockingMask;
 
     [SerializeField] private Transform armature;
     [SerializeField] private float rotate_Speed = 10f;
@@ -42,14 +40,9 @@ public class PlayerMovement : MonoBehaviour
         player = GetComponent<Player>();
         soulController = GetComponent<PlayerSoulController>();
         rb = GetComponent<Rigidbody>();
-        capsule = GetComponent<CapsuleCollider>();
         grounding = GetComponent<PlayerGroundingSensor>();
         motor = GetComponent<PlayerMotor>();
         initialConstraints = rb.constraints;
-
-        // MoveRoot(평타 러시 스텝/스킬 전진) 관통 방지 스윕 대상 — 정적 지오메트리만.
-        // 유닛(Enemy/Player)은 제외해 러시가 몹 사이를 지나는 기존 감각을 유지한다.
-        rootMoveBlockingMask = LayerMask.GetMask("Default", "Ground", "Wall", "Env");
 
         if (armature == null)
             armature = transform.Find("Armature");
@@ -226,49 +219,6 @@ public class PlayerMovement : MonoBehaviour
         );
     }
 
-    public void MoveRoot(Vector3 deltaPosition)
-    {
-        rb.MovePosition(rb.position + ClampByStaticGeometry(deltaPosition));
-    }
-
-    // MovePosition은 스윕 없이 목표 지점으로 이동해, 평타 러시 스텝처럼 한 프레임 대이동이
-    // 논컨벡스 벽 MeshCollider를 그대로 관통한다 — 벽에 막히면 그 앞까지로 이동량을 클램프.
-    private Vector3 ClampByStaticGeometry(Vector3 delta)
-    {
-        float dist = delta.magnitude;
-        if (dist < 0.0001f || capsule == null)
-            return delta;
-
-        Vector3 dir = delta / dist;
-        Vector3 center = rb.position + capsule.center;
-        float half = Mathf.Max(0f, capsule.height * 0.5f - capsule.radius);
-        // 반경/정지거리에 스킨 여유 — 바닥 등 기존 접촉면 스침으로 제자리 클램프되는 것 방지.
-        float radius = Mathf.Max(0.01f, capsule.radius - 0.02f);
-
-        if (Physics.CapsuleCast(
-                center + Vector3.up * half, center - Vector3.up * half, radius,
-                dir, out RaycastHit hit, dist, rootMoveBlockingMask, QueryTriggerInteraction.Ignore))
-        {
-            float allowed = Mathf.Max(0f, hit.distance - 0.02f);
-
-            // ⚠️ 대시는 PlayerMotionSweep으로 이미 충돌을 해결한 뒤 여기로 온다. 이 클램프는 마스크
-            // (Default/Ground/Wall/Env)와 등판각 판정이 달라, 대시 스윕이 통과시킨 경사·지면을
-            // 여기서 다시 막을 수 있다 — "대시가 시작은 됐는데 안 나간다"의 마지막 후보다.
-            if (player != null && player.CurrentState == PlayerActionState.Dash && allowed < dist * 0.9f)
-            {
-                Edit.LogWarning(
-                    $"[Dash] MoveRoot 클램프: 요청 {dist:F3}m → 허용 {allowed:F3}m, " +
-                    $"막은 콜라이더='{hit.collider.name}' (레이어 {LayerMask.LayerToName(hit.collider.gameObject.layer)}), " +
-                    $"법선각={Vector3.Angle(hit.normal, Vector3.up):F0}°. " +
-                    "대시 스윕(PlayerMotionSweep)과 마스크·등판각 판정이 다른 2차 클램프입니다.", this);
-            }
-
-            return dir * allowed;
-        }
-
-        return delta;
-    }
-
     /// <summary>
     /// 현재 이동 입력을 뷰(viewYaw) 기준 월드 평면 방향으로 변환한다. 입력이 없으면 zero.
     /// 대시 등 외부 소비자가 이동과 동일한 입력→월드 매핑을 공유하기 위한 진입점.
@@ -295,30 +245,11 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// 오너 자동 이동(스킬 사거리 확보용). worldTarget 방향으로 최대 이속(상태이상 배율 반영)으로 이동하며
-    /// armature를 진행 방향으로 회전시킨다. CanMove가 막히면(CC 등) 그 프레임은 정지한다.
-    /// 수동 입력이 없을 때만 호출되므로 Move()의 입력 이동과 충돌하지 않는다.
-    /// </summary>
-    public void MoveTowardsPoint(Vector3 worldTarget)
-    {
-        if (rb == null)
-            return;
+    /// <summary>자동 이동도 수동 이동과 같은 상태이상 속도 배율을 사용한다.</summary>
+    internal float MaxResolvedMoveSpeed => ResolveMoveSpeed(maxSpeed);
 
-        if (player != null && !player.CanMove)
-            return;
-
-        Vector3 dir = worldTarget - rb.position;
-        dir.y = 0f;
-        if (dir.sqrMagnitude < 0.0001f)
-            return;
-
-        dir.Normalize();
-
-        rb.MovePosition(
-            rb.position + dir * (ResolveMoveSpeed(maxSpeed) * Time.deltaTime));
-        RotateToward(dir, rotate_Speed);
-    }
+    /// <summary>자동 이동 회전은 일반 이동과 같은 보간 속도를 사용한다.</summary>
+    internal float AutoMoveRotationSpeed => rotate_Speed;
 
     private float ResolveMoveSpeed(float baseSpeed)
     {

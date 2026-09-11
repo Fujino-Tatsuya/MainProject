@@ -19,6 +19,8 @@ public class PlayerInputReader : BaseNetworkBehaviour
     private bool uiInputSuppressed;
     private bool combatInputEnabled = true;
     private bool controlEnabled = true;
+    private bool dashPressedLatched;
+    private bool dashCallbackRegistered;
 
     public Vector2 Direction { get; private set; }
     public bool HasMoveInput => Direction.sqrMagnitude > 0.01f;
@@ -30,8 +32,7 @@ public class PlayerInputReader : BaseNetworkBehaviour
     // 키는 에셋에서만 바꾼다 — 예전처럼 코드에 키를 박으면 리바인딩이 불가능해진다.
     // ⚠️ combatInputEnabled 게이트를 타지 않는 것은 의도다 — Soul 차단은 서버
     //    DashValidationPolicy(Dead||Soul)와 TryBeginPredictedDash의 CanMove가 담당한다.
-    public bool DashPressed =>
-        EffectiveInputEnabled && dashAction != null && dashAction.WasPressedThisFrame();
+    public bool DashPressed => EffectiveInputEnabled && dashPressedLatched;
 
     private bool CanUseLocalControl =>
         !IsNetworkActive || IsOwner;
@@ -54,10 +55,46 @@ public class PlayerInputReader : BaseNetworkBehaviour
         skillSubAction = playerInput.actions.FindAction("SkillSub");
         skillUltimateAction = playerInput.actions.FindAction("SkillUltimate");
         dashAction = playerInput.actions.FindAction("Dash");
+        RegisterDashCallback();
 
         // 액션이 없으면 대시 입력이 조용히 사라진다(예전 Shift 직접 판정과 달리 폴백이 없다).
         if (dashAction == null)
             Debug.LogWarning("[DashAlert] 입력 에셋에 \"Dash\" 액션이 없어 대시 입력을 읽을 수 없습니다.", this);
+    }
+
+    /// <summary>PlayerStateController가 상태 판단을 마친 뒤 그 틱의 엣지 입력을 소비한다.</summary>
+    public void ConsumeStateTickEdges()
+    {
+        dashPressedLatched = false;
+    }
+
+    private void RegisterDashCallback()
+    {
+        if (dashAction == null || dashCallbackRegistered)
+            return;
+
+        dashAction.performed += OnDashPerformed;
+        dashCallbackRegistered = true;
+    }
+
+    private void UnregisterDashCallback()
+    {
+        if (dashAction == null || !dashCallbackRegistered)
+            return;
+
+        dashAction.performed -= OnDashPerformed;
+        dashCallbackRegistered = false;
+    }
+
+    private void OnDashPerformed(InputAction.CallbackContext context)
+    {
+        if (EffectiveInputEnabled)
+            dashPressedLatched = true;
+    }
+
+    private void OnEnable()
+    {
+        RegisterDashCallback();
     }
 
     public bool GetSkillPressed(PlayerSkillSlot slot)
@@ -151,7 +188,10 @@ public class PlayerInputReader : BaseNetworkBehaviour
             playerInput.enabled = EffectiveInputEnabled;
 
         if (!EffectiveInputEnabled)
+        {
             Direction = Vector2.zero;
+            dashPressedLatched = false;
+        }
     }
 
     private void Update()
@@ -168,5 +208,7 @@ public class PlayerInputReader : BaseNetworkBehaviour
     private void OnDisable()
     {
         Direction = Vector2.zero;
+        dashPressedLatched = false;
+        UnregisterDashCallback();
     }
 }

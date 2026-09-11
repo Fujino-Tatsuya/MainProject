@@ -13,6 +13,7 @@ using UnityEngine;
 public class FirstMeleeMainSkill : PlayerHoldSkill
 {
     private PlayerMovement movement;
+    private PlayerMotor motor;
     private PlayerAimIndicator aimIndicator;
     private Collider[] hitResults;
     // 키가 Unit이 아니라 Object인 이유: 파괴 가능한 상자처럼 Unit이 아닌 IAttackReceiver도
@@ -35,6 +36,7 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
     {
         base.Initialize(owner, controller);
         movement = owner.GetComponent<PlayerMovement>();
+        motor = owner.GetComponent<PlayerMotor>();
         aimIndicator = owner.GetComponent<PlayerAimIndicator>();
     }
 
@@ -160,7 +162,18 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
         RotateHeadingToward(aim, Time.deltaTime);
 
         movement.RotateImmediately(heading);
-        movement.MoveRoot(heading * (data.AdvanceSpeed * Time.deltaTime));
+    }
+
+    private void FixedUpdate()
+    {
+        if (!isLocallySimulating)
+            return;
+
+        FirstMeleeMainSkillData data = MainSkillData;
+        if (data == null || motor == null)
+            return;
+
+        motor.AddDisplacement(heading * (data.AdvanceSpeed * Time.fixedDeltaTime));
     }
 
     // 에임 방향으로 틱당 SteerAnglePerTick(도)만큼 조향 — 프레임에서는 시간 비례 분할 적용.

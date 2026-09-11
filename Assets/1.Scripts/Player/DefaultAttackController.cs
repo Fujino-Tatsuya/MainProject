@@ -47,6 +47,7 @@ public enum DefaultAttackHitType
 [RequireComponent(typeof(Player))]
 [RequireComponent(typeof(PlayerInputReader))]
 [RequireComponent(typeof(PlayerMovement))]
+[RequireComponent(typeof(PlayerMotor))]
 [RequireComponent(typeof(PlayerAimIndicator))]
 [RequireComponent(typeof(PlayerDefaultAttack))]
 public class DefaultAttackController : BaseNetworkBehaviour
@@ -80,6 +81,7 @@ public class DefaultAttackController : BaseNetworkBehaviour
     private PlayerStateController stateController;
     private PlayerInputReader inputReader;
     private PlayerMovement movement;
+    private PlayerMotor motor;
     private PlayerAimIndicator aimIndicator;
     private Vector3 attackDirection;
     private Vector3 queuedAttackDirection;
@@ -109,6 +111,7 @@ public class DefaultAttackController : BaseNetworkBehaviour
         stateController = GetComponent<PlayerStateController>();
         inputReader = GetComponent<PlayerInputReader>();
         movement = GetComponent<PlayerMovement>();
+        motor = GetComponent<PlayerMotor>();
         aimIndicator = GetComponent<PlayerAimIndicator>();
 
         if (playerDefaultAttack == null)
@@ -243,10 +246,19 @@ public class DefaultAttackController : BaseNetworkBehaviour
         if (HasGameplayAuthority && IsAttacking)
             TickServerFallbacks();
 
-        // 전진·회전 변위는 owner-authority NetworkTransform의 쓰기 주체만 수행한다.
-        // 서버는 승인·판정·종료 장부만 관리하고 오너가 복제한 위치를 사용한다.
+        // 회전은 렌더 틱에서 최신 에임을 따른다. 전진은 FixedTickMovement에서 별도로 제출한다.
         if (!IsNetworkActive || IsOwner)
-            TickMovementAndRotation();
+            TickRotation();
+    }
+
+    public void FixedTickMovement()
+    {
+        // 전진 변위는 owner-authority NetworkTransform의 쓰기 주체만 수행한다.
+        // 서버는 승인·판정·종료 장부만 관리하고 오너가 복제한 위치를 사용한다.
+        if (IsNetworkActive && !IsOwner)
+            return;
+
+        TickScriptedMovement();
     }
 
     public void CancelCurrentAttack()
@@ -359,7 +371,7 @@ public class DefaultAttackController : BaseNetworkBehaviour
         if (Mathf.Abs(forwardDistance) <= 0.0001f)
             return;
 
-        movement.MoveRoot(attackDirection * forwardDistance);
+        motor.AddDisplacement(attackDirection * forwardDistance);
     }
 
     [Rpc(SendTo.Server)]
@@ -560,7 +572,7 @@ public class DefaultAttackController : BaseNetworkBehaviour
             CompleteCurrentAttackStep();
     }
 
-    private void TickMovementAndRotation()
+    private void TickRotation()
     {
         if (!HasAttackStep(currentAttackIndex))
             return;
@@ -569,13 +581,21 @@ public class DefaultAttackController : BaseNetworkBehaviour
 
         if (step.RotationType == DefaultAttackRotationType.TrackAimDuringAttack)
             movement.RotateToward(GetCurrentAimDirection(), step.TrackRotationSpeed);
+    }
+
+    private void TickScriptedMovement()
+    {
+        if (!HasAttackStep(currentAttackIndex))
+            return;
+
+        DefaultAttackStep step = attackSteps[currentAttackIndex];
 
         if (moveRemaining <= 0f)
             return;
 
-        float moveDistance = Mathf.Min(moveSpeed * Time.deltaTime, moveRemaining);
+        float moveDistance = Mathf.Min(moveSpeed * Time.fixedDeltaTime, moveRemaining);
         moveRemaining -= moveDistance;
-        movement.MoveRoot(attackDirection * moveDistance);
+        motor.AddDisplacement(attackDirection * moveDistance);
     }
 
     private void TryQueueNextAttackFromInput()

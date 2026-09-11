@@ -27,11 +27,21 @@ public sealed class PlayerMotor : MonoBehaviour
     private LayerMask obstacleMask;
 
     private Vector3 pendingVelocity;
+    private Vector3 pendingGroundedDisplacement;
     private Vector3 pendingDisplacement;
+    private Vector3 pendingPosePosition;
+    private Quaternion pendingPoseRotation;
+    private bool hasPendingPose;
     private float lastVerticalIntentY;
 
     /// <summary>직전 Motor 틱에서 최종 이동 스윕이 요청 이동을 제한했는지 여부.</summary>
     public bool WasBlockedThisTick { get; private set; }
+
+    /// <summary>Motor가 한 물리 틱의 요청 이동을 스윕한 직후 알린다.</summary>
+    public event System.Action<Vector3, Vector3, bool> MovementResolved;
+
+    /// <summary>Rigidbody 기준 현재 위치. 지연 적용되는 MovePosition과 같은 좌표계를 쓴다.</summary>
+    public Vector3 Position => playerRigidbody != null ? playerRigidbody.position : transform.position;
 
     /// <summary>이번 물리 틱에 적용할 월드 속도(m/s)를 더한다.</summary>
     public void AddVelocity(Vector3 worldVelocity)
@@ -43,6 +53,26 @@ public sealed class PlayerMotor : MonoBehaviour
     public void AddDisplacement(Vector3 worldDelta)
     {
         pendingDisplacement += worldDelta;
+    }
+
+    /// <summary>
+    /// 이번 물리 틱에 적용할 자발 이동 변위(m)를 더한다.
+    /// 걷기 속도 채널과 같이 접지면에 투영되지만, 플랫폼 캐리 같은 외부 변위와는 분리된다.
+    /// </summary>
+    public void AddGroundedDisplacement(Vector3 worldDelta)
+    {
+        pendingGroundedDisplacement += worldDelta;
+    }
+
+    /// <summary>
+    /// 구속 추종처럼 절대 월드 포즈가 필요한 이동을 제출한다. 같은 물리 틱에는 마지막 제출이 이기며,
+    /// 일반 이동 의도보다 우선한다. 실제 Rigidbody 위치/회전 쓰기는 여전히 Motor만 수행한다.
+    /// </summary>
+    public void SetPoseTarget(Vector3 worldPosition, Quaternion worldRotation)
+    {
+        pendingPosePosition = worldPosition;
+        pendingPoseRotation = worldRotation;
+        hasPendingPose = true;
     }
 
     private void Awake()
@@ -63,15 +93,36 @@ public sealed class PlayerMotor : MonoBehaviour
 
     private void Tick(float deltaTime)
     {
+        if (hasPendingPose)
+        {
+            Vector3 requestedPoseDelta = pendingPosePosition - playerRigidbody.position;
+
+            pendingVelocity = Vector3.zero;
+            pendingGroundedDisplacement = Vector3.zero;
+            pendingDisplacement = Vector3.zero;
+            hasPendingPose = false;
+            WasBlockedThisTick = false;
+            lastVerticalIntentY = requestedPoseDelta.y;
+
+            ApplyRigidbodyPose(pendingPosePosition, pendingPoseRotation, true);
+            MovementResolved?.Invoke(requestedPoseDelta, requestedPoseDelta, false);
+
+            if (movement != null)
+                movement.ApplyPostMotorGroundLock(lastVerticalIntentY);
+
+            return;
+        }
+
         // 🔴 경사 투영은 "스스로 걷는 이동"(속도 채널)에만 적용한다. 플랫폼 캐리 같은 외부 변위는
         // 월드가 정한 이동이라 지면 평면으로 회전시키면 안 된다 — ProjectOntoGround는 크기를 보존한
         // 채 방향만 바꾸므로, 경사면 위에서 수직으로 움직이는 플랫폼의 변위가 수평 이동으로 뒤바뀐다.
         // 변경 전 PlayerMovement.Move()도 `ProjectOntoGround(inputMove) + _carryDelta` 였다.
-        // (2단계-b에서 대시가 변위 채널로 들어올 때는 대시가 스스로 투영해 제출한다 — 기존
-        //  PlayerDashState.ResolvePlanarSlopeDirection과 같은 책임 배치다.)
+        // 대시는 grounded displacement 채널로 들어와 같은 투영을 공유한다.
         Vector3 desiredDelta =
-            ProjectOntoGround(pendingVelocity * deltaTime) + pendingDisplacement;
+            ProjectOntoGround(pendingVelocity * deltaTime + pendingGroundedDisplacement) +
+            pendingDisplacement;
         pendingVelocity = Vector3.zero;
+        pendingGroundedDisplacement = Vector3.zero;
         pendingDisplacement = Vector3.zero;
 
         Vector3 resolvedDelta = PlayerMotionSweep.Resolve(
@@ -87,9 +138,10 @@ public sealed class PlayerMotor : MonoBehaviour
             (desiredDelta - resolvedDelta).sqrMagnitude >
             MovementComparisonEpsilon * MovementComparisonEpsilon;
         lastVerticalIntentY = resolvedDelta.y;
+        MovementResolved?.Invoke(desiredDelta, resolvedDelta, WasBlockedThisTick);
 
         if (resolvedDelta.sqrMagnitude > 0f)
-            playerRigidbody.MovePosition(playerRigidbody.position + resolvedDelta);
+            ApplyRigidbodyPose(playerRigidbody.position + resolvedDelta, default, false);
 
         // Y 잠금은 이번 틱의 최종 수직 의도와 MovePosition 제출이 확정된 뒤 판정해야 한다.
         if (movement != null)
@@ -116,10 +168,19 @@ public sealed class PlayerMotor : MonoBehaviour
         return projected.normalized * distance;
     }
 
+    private void ApplyRigidbodyPose(Vector3 position, Quaternion rotation, bool applyRotation)
+    {
+        playerRigidbody.MovePosition(position);
+        if (applyRotation)
+            playerRigidbody.MoveRotation(rotation);
+    }
+
     private void OnDisable()
     {
         pendingVelocity = Vector3.zero;
+        pendingGroundedDisplacement = Vector3.zero;
         pendingDisplacement = Vector3.zero;
+        hasPendingPose = false;
         WasBlockedThisTick = false;
     }
 

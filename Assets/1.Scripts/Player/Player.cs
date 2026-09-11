@@ -183,6 +183,12 @@ public class Player : Unit
         {
             ApplyPlatformCarry();
         }
+
+        if (!IsNetworkActive ||
+            stateController.ShouldTickForNetwork(IsOwner, HasStateAuthority))
+        {
+            stateController.FixedTick();
+        }
     }
 
     /// <summary>발밑에 캐리 표면이 있으면 그 이동량을 플레이어 이동에 가산한다.</summary>

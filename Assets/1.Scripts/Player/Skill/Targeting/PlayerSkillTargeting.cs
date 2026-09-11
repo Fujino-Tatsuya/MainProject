@@ -30,6 +30,7 @@ public class PlayerSkillTargeting : MonoBehaviour
     private PlayerSkillController controller;
     private PlayerAimIndicator aimIndicator;
     private PlayerMovement movement;
+    private PlayerMotor motor;
     private PlayerInputReader input;
 
     private bool isTargeting;      // 조준 대기 모드(인디케이터 표시)
@@ -63,6 +64,7 @@ public class PlayerSkillTargeting : MonoBehaviour
         controller = GetComponent<PlayerSkillController>();
         aimIndicator = GetComponent<PlayerAimIndicator>();
         movement = GetComponent<PlayerMovement>();
+        motor = GetComponent<PlayerMotor>();
         input = GetComponent<PlayerInputReader>();
 
         // 인디케이터는 기본 비활성 — 조준 진입 시에만 켠다
@@ -156,6 +158,22 @@ public class PlayerSkillTargeting : MonoBehaviour
 
         if (WasConfirmPressed())
             HandleConfirm();
+    }
+
+    private void FixedUpdate()
+    {
+        if (!isMovingToCast || owner == null || !owner.IsMovementAuthority || !owner.CanMove)
+            return;
+
+        if (pendingTarget == null || motor == null || movement == null)
+            return;
+
+        Vector3 direction = pendingTarget.transform.position - motor.Position;
+        direction.y = 0f;
+        if (direction.sqrMagnitude < 0.0001f)
+            return;
+
+        motor.AddVelocity(direction.normalized * movement.MaxResolvedMoveSpeed);
     }
 
     private bool WasCancelPressed()
@@ -323,7 +341,10 @@ public class PlayerSkillTargeting : MonoBehaviour
         }
 
         if (movement != null)
-            movement.MoveTowardsPoint(targetPos);
+        {
+            Vector3 direction = targetPos - owner.transform.position;
+            movement.RotateToward(direction, movement.AutoMoveRotationSpeed);
+        }
 
         if (owner != null)
             owner.SetAnimatorMoving(true);
