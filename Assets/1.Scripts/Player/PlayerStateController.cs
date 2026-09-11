@@ -766,6 +766,11 @@ public sealed class PlayerRestrainedState : PlayerStateBase
         this.instigator = instigator;
         this.mode = mode;
         this.frontOffset = frontOffset;
+
+        // 🔴 Rigidbody 직접 참조 예외 — 이동 자체는 motor.SetPoseTarget으로 제출한다.
+        // 이 참조는 구속 중 물리 위임(isKinematic/detectCollisions 저장·복원)에만 쓴다.
+        // 3단계에서 전 피어가 kinematic이 되면 그 토글이 없어지면서 이 참조도 사라진다.
+        // 새 상태를 만들 때 이 패턴을 따라 하지 말 것 — 이동은 Motor로 제출한다.
         playerRigidbody = context.Player != null ? context.Player.GetComponent<Rigidbody>() : null;
         motor = context.Motor;
     }
@@ -907,6 +912,12 @@ public sealed class PlayerKnockbackState : PlayerStateBase
     {
         this.direction = direction;
         this.strength = strength;
+
+        // 🔴 Rigidbody 직접 참조 예외 — 위치는 PlayerMotor가 독점하지만 넉백만 아직 PhysX가
+        // 운전한다(isKinematic 해제 + AddForce + 마찰 감속). `PlayerStateContext.Rigidbody`를
+        // 없앤 것은 상태들이 물리를 임의로 만지는 것을 막기 위해서이므로, 여기서만 국소적으로 잡는다.
+        // 3단계에서 넉백이 Motor 속도 채널 + 명시적 감쇠로 바뀌면 이 참조도 사라진다.
+        // 새 상태를 만들 때 이 패턴을 따라 하지 말 것 — 이동은 Motor로 제출한다.
         playerRigidbody = context.Player != null ? context.Player.GetComponent<Rigidbody>() : null;
     }
 
