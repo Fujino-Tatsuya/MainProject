@@ -25,7 +25,11 @@ MonoBehaviour:
   <Grab_Lightning>k__BackingField: {fileID: 11400000, guid: 6718432e9f0395642a71c720aa5181fd, type: 2}
   <Grab_ArmElectric>k__BackingField: {fileID: 11400000, guid: b0551a23e7c04f1d90c3a2b7e4d61f03, type: 2}
   <Grabbed_Electric>k__BackingField: {fileID: 11400000, guid: 4c27dd41039aaa44fbf590ac0a0c5b91, type: 2}
-  <Throw_Lightning>k__BackingField: {fileID: 11400000, guid: 74fea13bb963e4c4ebfd7f0e6a5a4fbf, type: 2}
+  <Throw>k__BackingField: {fileID: 11400000, guid: 74fea13bb963e4c4ebfd7f0e6a5a4fbf, type: 2}
+  <Punch_HitSpark>k__BackingField: {fileID: 11400000, guid: 8557fc2524e7d5f4aaeed27b0eb3865a, type: 2}
+  <Wells_Bomb_Trail>k__BackingField: {fileID: 11400000, guid: d64d9b6f106204e468d0364e3216f54e, type: 2}
+  <Bomb_Explode>k__BackingField: {fileID: 11400000, guid: 8078106485e08b34f997de3fe7ee4147, type: 2}
+  <Bomb_Exploded>k__BackingField: {fileID: 11400000, guid: 107075cc61c064b4c9f979d41cfed66d, type: 2}
   <ChargeBall_Grow>k__BackingField: {fileID: 11400000, guid: f3693d35287b49f7b7ba750c52cb6840, type: 2}
   <ChargeBall_Loop>k__BackingField: {fileID: 11400000, guid: bb39a066d0454af88683e332e64a3e59, type: 2}
   <ChargeBall_FadeOut>k__BackingField: {fileID: 11400000, guid: 5d28b04cd06644d7b77bb5c9505f3de8, type: 2}
