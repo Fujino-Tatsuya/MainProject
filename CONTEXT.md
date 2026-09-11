@@ -8,6 +8,27 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 현재 인수인계 (2026-09-11 · 플레이어 이동 Motor 재정립 1단계, 브랜치 `feature/player-motor`)
+
+작업 세션: **은희(Claude → Codex 위임)**. 브랜치 `feature/player-motor` (base `origin/development` `72392d6`).
+계획·근거·완료조건은 [PLAN-player-motor.md](PLAN-player-motor.md) — 여기에 중복 기술하지 않는다.
+
+**1단계 수정 예정 (동시 편집 금지)**: `Assets/1.Scripts/Player/PlayerMovement.cs` ·
+`Assets/1.Scripts/Player/Player.cs`
+
+이번에 확정된 계약만 적는다:
+
+- 🔴 **플레이어 위치는 최종적으로 `PlayerMotor` 하나만 쓴다.** 현재 `rb.MovePosition` 호출부가
+  7곳(+중력)으로 흩어져 있고, 이게 벽 관통·경사·모서리 Y누수·대시 제자리종료의 공통 원인이다.
+  2단계부터 `MoveRoot`/`MoveTowardsPoint`가 사라지고 `PlayerStateContext.Rigidbody`도 제거된다.
+  **Player 하위에서 `MovePosition`/`transform.position`을 새로 추가하지 말 것.**
+- **1단계 범위는 루프 정정뿐이다** — `Move()`/`ApplyPlatformCarry()`를 `FixedUpdate`로,
+  `Time.deltaTime` → `Time.fixedDeltaTime`. 물리 플래그·넉백·마스크는 **건드리지 않는다**.
+- `PlayerMovement`에는 이미 `FixedUpdate`가 있다(`ApplyFlatGroundYLock`, development에서 추가됨).
+  새로 만들지 말고 **기존 것에 합류**시킬 것. 이 Y잠금은 3단계에서 삭제된다(kinematic 전환 후 불필요).
+- 🔴 **`AddCarryDelta`는 변위(m), 입력 이동은 속도×dt다.** 1단계에서 둘 다 `FixedUpdate`로 가야
+  일관된다 — 한쪽만 옮기면 플랫폼 탑승 중 이동량이 프레임레이트에 따라 갈린다.
+
 ## ▶▶ 현재 인수인계 (2026-09-07 · 파괴 가능한 상자 + 파편 버스트, 브랜치 `feature/VFX`)
 
 > 🔴 **이 절과 아래 두 절은 `feature/VFX`에서 옮겨 온 기록이다** (2026-09-08).
