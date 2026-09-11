@@ -1,7 +1,77 @@
-# ▶▶▶ 다음 세션 = **퀘스트 영역** (2026-09-09 인수인계)
+# ▶▶▶ 진행 중 = **23호 VFX 배선** (2026-09-09 · 코드 완료 · Unity 저작과 Play 검증 대기)
 
-> 이번 세션은 **머지 + development 반영까지 끝났다.** 아래 「2026-09-08 기록」 절부터는 그 이력이다.
-> 다음 세션의 상세 지시는 팀장이 그때 준다. 여기에는 **먼저 알고 들어가야 할 것**만 적는다.
+> 작업 세션: **민경(Claude)**, 브랜치 `feature/VFX`.
+> 계약 요약은 [CONTEXT.md](CONTEXT.md) 최상단 인수인계. 여기에는 **왜 그렇게 했는지와 검증 방법**을 적는다.
+> 🔴 **아직 한 번도 Play 로 보지 않았다.** 컴파일도 Unity 쪽 확인이 필요하다.
+
+## 한 일 (전부 `feature/VFX`, 미커밋)
+
+| # | 무엇 | 파일 |
+|---|---|---|
+| 1 | 점프 착지 예고 2개를 `AoeTelegraph` 프리팹 → **카탈로그 루프 이펙트** | `Monster/Boss/TwentyThreeBoss.cs` · `Monster/Boss/BossDataSO.cs` |
+| 2 | 착지 순간 **`Drop_Collision` 원샷** 추가 | `Monster/Boss/TwentyThreeBoss.cs` |
+| 3 | 애니 이벤트 이펙트를 **인터페이스로 개방** | `Effects/IAnimEventEffect.cs`(신규) · `Effects/EffectAnimEvents.cs` · `Effects/EffectSocketPlayer.cs` |
+| 4 | 구 `GrabPulseDriver` → **`EffectPathPlayer`** 로 일반화해 이식 | `Effects/EffectPathPlayer.cs`(신규) |
+| 5 | 그랩 팔 전기를 **`TwentyThreeBoss` 가 켜고 끄게** 배선 | `Monster/Boss/TwentyThreeBoss.cs` |
+
+## 결정과 근거
+
+| 결정 | 왜 |
+|---|---|
+| 예고 크기 = `scale` 에 **판정 반경 그대로** | 예고가 판정에 대해 거짓말하지 않게. 방향 표시기와 같은 원칙 |
+| 성장 시간만 `partDuration` | 경계는 자라지 않아 드라이버에 줄 시간축이 없다 |
+| 착지 원샷은 **Unreliable**, 예고 해제는 **Reliable** | 원샷 유실 = 이펙트 하나 빠짐 / 예고 해제 유실 = **장판이 영구히 남음** |
+| 착지 원샷을 데미지 0 조기 반환 **위**에 | 데미지가 0 이어도 착지는 일어났다 |
+| 착지 원샷을 **RPC 로** | 호출부가 `NotifyAttackHit`(`IsServer`) 아래다. 직접 재생하면 호스트에서만 보인다 |
+| 팔 펄스 경로를 `Transform[]` 로 일반화 | 컴포넌트가 아는 것은 "월드 좌표를 가진 트랜스폼의 순서"뿐이다 — 팔 전용일 이유가 없다 |
+| 구간 보간을 **길이 비례**로 | 균등 분할하면 위팔·아래팔 길이 차만큼 관절에서 속도가 튄다 |
+| 팔 전기를 **코드**가 켜고 끈다(클립 이벤트 ✕) | 그랩이 끝나는 길이 넷이라, 클립에 맡기면 하나만 빠져도 전기가 영영 남는다 |
+| 보스가 `EffectPathPlayer` 를 **직접 참조** | 코드 제어라 id 문자열이 필요 없다 → 오타 실패 모드 제거 |
+| 켜는 시점 = **그랩 애니 시작**(판정 ✕) | 판정은 히트 프레임이라 거기서 켜면 팔을 뻗는 동안 예고가 없다 |
+| 끄는 시점 = **`ReleaseGrabThrow`**(`BeginGrabThrow` ✕) | 던지기 준비 내내 전기가 붙어야 "감전시켜 던진다"로 읽힌다. 구 프로파일도 Throw 상태에서 계속 냈다 |
+
+## 이식하면서 버린 것
+
+- **`GrabPulseProfile`(SO + 스크립트 2종)을 이식하지 않았다.** 그 SO 의 존재 이유는 "지금 재생할
+  상태인가"를 애니메이터 상태 이름으로 판정하는 것이었고, 그건 **SSM 진입 트랜지션이
+  `OnStateMachineEnter` 를 안 태우는 문제의 우회**였다. 시작·종료가 코드로 오면 그 판정이 통째로 없어진다.
+  상태별 타이밍(Grab 0.4/0.6 · Holding 0.3/0.35 · Throw 0.25/0.5)은 **한 벌(0.4/0.6)로 통일**했다
+  (팀장 결정: 일단 통일, 강약이 필요해지면 그때 `EffectPathPlayer` 를 나눈다).
+- **애니 이벤트 경로는 죽이지 않았다.** `EffectPathPlayer` 는 계속 `IAnimEventEffect` 라
+  클립에서 `StartEffect`/`StopEffect` 로 부를 수 있다. 이번 보스가 안 쓸 뿐이다.
+
+## 🔴 죽은 설정값 4건 — 지우지 않고 명시만 했다
+
+`BossDataSO.jumpTelegraphPrefab` · `jumpTelegraphOuterAlpha` · `jumpTelegraphFillAlpha` ·
+`AoeTelegraph.ShowGrowing`(호출자 0). 툴팁에 **⚠️ 미사용**을 박았다 — 실제 삭제는 SO 에 저장된 값을
+잃으므로 **팀장 확인 후**. `AoeTelegraph` 클래스 자체는 송전기 차징 오라가 아직 쓴다.
+
+## 남은 것 — Unity 저작
+
+1. 보스 프리팹(`2.Prefabs/Monster/Boss/TwentyThree.prefab`) 루트에 **`EffectPathPlayer`** 부착 —
+   `effect = FX_Grab_ArmElectric_Entry` · `path = [어깨, 팔꿈치, 손]` 순서대로.
+   `Id` 는 비워도 된다(코드가 직접 참조).
+2. 같은 루트의 **`TwentyThreeBoss.grabPulse`** 에 그 컴포넌트를 연결. 비어 있으면 첫 그랩에 1회 경고.
+3. 카탈로그는 손댈 것이 없다 — `Drop_Charge_Boundary` / `Drop_Charge_Indicator` / `Drop_Collision` /
+   `Grab_ArmElectric` 넷 다 `EffectCatalog.asset` 에 이미 배선돼 있다(확인 완료).
+
+## 검증 방법
+
+- **점프어택**: 예고 두 겹이 같은 반경으로 뜨는가 → 착지 순간 예고가 사라지고 충돌 이펙트가 뜨는가
+  (겹치거나 빈 프레임이 생기면 인수인계 지점이 어긋난 것).
+- **그랩**: 팔을 뻗기 시작할 때 전기가 흐르는가 → **헛잡기** 했을 때 꺼지는가 → 던진 뒤 꺼지는가.
+- 🔴 **그랩 도중 카운터로 끊어 볼 것.** 여기가 유일하게 "전기가 영영 남는" 경로다.
+- 🔴 **MPPM 2인 필수.** 이 변경의 실패 모드 대부분(RPC 누락 → 호스트에서만 보임)은
+  **호스트 단독 Play 로는 정상처럼 보인다.** 반드시 클라이언트 창에서 확인한다.
+- 풀 누수 점검: 그랩·점프를 여러 번 반복한 뒤에도 이펙트가 계속 뜨는가
+  (핸들을 흘리면 몇 번 만에 조용히 안 나오기 시작한다).
+
+---
+
+# ▶▶ 대기 중 = **퀘스트 영역** (2026-09-09 인수인계)
+
+> 아래 「2026-09-08 기록」 절부터는 머지 이력이다.
+> 퀘스트 세션의 상세 지시는 팀장이 그때 준다. 여기에는 **먼저 알고 들어가야 할 것**만 적는다.
 
 ## 지금 상태 (모두 반영 완료)
 
