@@ -13,8 +13,10 @@ Update this file when a term becomes important enough that future agents or team
 작업 세션: **은희(Claude → Codex 위임)**. 브랜치 `feature/player-motor` (base `origin/development` `72392d6`).
 계획·근거·완료조건은 [PLAN-player-motor.md](PLAN-player-motor.md) — 여기에 중복 기술하지 않는다.
 
-**1단계 수정 예정 (동시 편집 금지)**: `Assets/1.Scripts/Player/PlayerMovement.cs` ·
-`Assets/1.Scripts/Player/Player.cs`
+**1단계 수정함 (동시 편집 금지)**: `Assets/1.Scripts/Player/PlayerMovement.cs` ·
+`Assets/1.Scripts/Player/Player.cs` · 🔴 `Assets/1.Scripts/Map/MovingPlatform.cs`(회귀 수정)
+
+커밋: `1e6113b`(Codex, 루프 정정) → `76824f2`(회귀 수정). **MPPM 검증 대기.**
 
 이번에 확정된 계약만 적는다:
 
@@ -28,6 +30,11 @@ Update this file when a term becomes important enough that future agents or team
   새로 만들지 말고 **기존 것에 합류**시킬 것. 이 Y잠금은 3단계에서 삭제된다(kinematic 전환 후 불필요).
 - 🔴 **`AddCarryDelta`는 변위(m), 입력 이동은 속도×dt다.** 1단계에서 둘 다 `FixedUpdate`로 가야
   일관된다 — 한쪽만 옮기면 플랫폼 탑승 중 이동량이 프레임레이트에 따라 갈린다.
+- 🔴 **`ISurfaceCarrier` 구현체 둘의 계약이 다르다.** `ConveyorTile`은 `speed × dt`(속도형,
+  루프 무관)지만 `MovingPlatform`은 `dt`를 **무시하고** 직전 샘플과의 차분을 돌려준다(변위형).
+  **변위형은 생산 주기와 소비 주기가 반드시 같아야 한다** — 소비자만 `FixedUpdate`로 옮겼다가
+  고프레임에서 이동량의 ~35%만 전달되는 회귀가 났다(`76824f2`에서 수정).
+  새 `ISurfaceCarrier`를 만들 때 어느 쪽 계약인지 먼저 정할 것.
 
 ## ▶▶ 현재 인수인계 (2026-09-07 · 파괴 가능한 상자 + 파편 버스트, 브랜치 `feature/VFX`)
 
