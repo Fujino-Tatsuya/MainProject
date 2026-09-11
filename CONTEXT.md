@@ -41,18 +41,33 @@ Play 검증 통과(팀장 확인). 커밋 8건 — `7b257f19` `df5249af` `91493a
 | `Effects/EffectTestMover.cs` | 참조 0이지만 **팀장 지시로 보존** | 민경 참고 |
 | `TextMesh Pro/Resources/TMP Settings.asset` | 한글 폴백에 `NotoSansKR SDF` 등록(`53f3413f`). 전 UI 에 영향 — 앞으로 한글 텍스트는 폰트를 직접 안 갈아도 폴백으로 렌더된다 | UI 전체 |
 
-### ⚠️ 미해결 — 고정형 몬스터 파트 분리 (PeekABot · TeslaBot)
+### ✅ 해결 — 고정형 몬스터 파트 분리 (PeekABot · TeslaBot)
 
-Play 는 정상이지만 **몸체가 여러 파트로 분리돼 보인다.** 이번 조사에서 **배제된 원인**:
-메시 분리 아님(`SkinnedMeshRenderer` **1개** — 본이 벌어진 것) · 랙돌 아님(아트 프리팹
-전부 `isKinematic: 1`, 정상인 SpinnerBot 17개 포함) · 컨트롤러 부재 아님(감사 결과 전 몬스터
-컨트롤러 보유) · **공중 스포너 낙하설 아님**(구조상 성립하지 않음).
+**원인은 팀장이 짚었다**: 아트 팩 컨트롤러에 `Hide`/`Raise`(PeekABot)·`Charge`(TeslaBot) 상태가
+남아 있고, 거기서 나오는 전이가 **우리가 쓰지 않는 트리거**를 요구해 몹이 그 상태에 갇혔다.
+3단 신축 컬럼이 중간에 걸려 몸체가 분리돼 보였던 것이다.
+(내가 배제/추정한 것들 — 애니메이션 FBX 소스, `hitTrigger` 부재 — 은 **원인이 아니었다**.
+`hitTrigger` 없음은 [PLAN.md](PLAN.md) 에 이미 *의도된 정상*으로 기록돼 있었다.)
 
-남은 단서 2개: ① 아트 프리팹의 비주얼 소스가 정식 메시(`Models/R_PeekABot.fbx`)가 아니라
-**애니메이션 FBX**(`Animations/PeekABot/A_Alert.fbx`, `animationType: 2`)다. 정상인 ChompBot 만
-모델을 프리팹에 직접 포함한다. ② 감사에서 **`hitTrigger="Hit"` 가 컨트롤러에 없는 몬스터가
-정확히 PeekABot·TeslaBot 2종** — 증상이 보고된 그 2종이다(MortarBot 은 깨끗).
-**확정에는 Play 중 Animator 상태 판독이 필요하다**(현재 state·clip·Avatar 유효성).
+수정: `Idle` + `Shoot` 두 상태만 있는 컨트롤러를 만들어 **데이터로 교체**한다 —
+`MonsterDataSO.animatorControllerOverride` → `MonsterBase.OnNetworkSpawn` 에서 적용(전 피어).
+⚠️ 프리팹 오버라이드로는 안 된다 — Animator 가 2단 중첩 프리팹 안에 있어 외부에서
+`m_Controller` 를 덮으면 **저장은 되고 YAML 에도 남는데 로드하면 null** 이다(2026-09-10 실측).
+커밋 `9a662add`(감사 확장) `8c7af3d2`(컨트롤러) `d4069344`(주석 정정) `c148bdf8`(에이전트 제거).
+
+고정 터렛이므로 **`NavMeshAgent` 도 제거**했다(PeekABot·TeslaBot 만 · 나머지 6종 유지).
+`RequireComponent` 0건 · `MonsterBase` 의 모든 접근이 null 가드 · 복귀 판정에 거리 폴백이
+있어 에이전트 없이도 상태가 안 멈춘다. 도구 재실행 시 md5 동일(멱등).
+
+### 🟡 보류 — 스폰 지점이 NavMesh 밖일 수 있다 (팀장 결정 2026-09-11)
+
+`MapContentSpawner.TryResolveSpawnPoint` 는 **바닥만** 보고 NavMesh 를 보지 않는다. "바닥 위지만
+NavMesh 밖"인 지점이 통과하고, 이동형 몹이 거기 서면 **에러 없이 조용히 안 움직인다.**
+→ Play 에서 실제 문제로 드러나지 않으면 **그대로 둔다.**
+
+덧붙일 때의 게이트는 **프리팹에 `NavMeshAgent` 가 있을 때만 샘플링**이다(근거는 해당 함수 주석).
+NavMesh 를 읽는 소비자가 에이전트이므로, 고정 터렛 2종은 자동으로 빠진다 —
+`archetype == RangedTurret` 로 걸면 지금은 같은 결과지만 대리 지표라 나중에 어긋난다.
 
 ## 이전 인수인계 (2026-09-07 · 파괴 가능한 상자 + 파편 버스트, 브랜치 `feature/VFX`)
 

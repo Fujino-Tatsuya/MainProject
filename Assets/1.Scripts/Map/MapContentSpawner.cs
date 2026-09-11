@@ -370,6 +370,17 @@ public class MapContentSpawner : MonoBehaviour
     // 그러면 몹이 공중에서 중력으로 어비스로 떨어진다(실제 Play 로그: Zone_typeQuest02 마커 2개).
     // 존 transform 원점은 회전·어긋난 배치에서 바닥 위가 아닐 수 있으므로, 폴백은 **존 렌더러
     // 바운즈 위**에서 쏜다 — 존 자신의 바닥은 언제나 자기 바운즈 안에 있다.
+    //
+    // 🟡 보류(2026-09-11 팀장 결정): 여기는 **바닥만** 보고 NavMesh 는 보지 않는다. 그래서
+    // "바닥 위지만 NavMesh 밖"인 지점이 통과하고, 이동형 몹이 그 위에 서면 에러 없이 조용히 안 움직인다.
+    // Play 에서 실제 문제로 드러나지 않으면 그대로 둔다 — 드러날 때만 NavMesh.SamplePosition 을 덧붙인다.
+    //
+    // ⚠️ 덧붙일 때의 게이트: **프리팹에 NavMeshAgent 가 있을 때만 샘플링한다.**
+    //   NavMesh 를 읽는 소비자가 에이전트이므로 에이전트가 없으면 샘플링 결과를 쓸 곳이 없다 —
+    //   고정 터렛(PeekABot·TeslaBot, c148bdf8 에서 에이전트 제거)은 여기서 자동으로 빠진다.
+    //   archetype == RangedTurret 로 걸지 말 것 — 지금은 결과가 같지만 대리 지표라서,
+    //   에이전트 달린 터렛이나 고정형 Melee 가 생기면 어긋난다.
+    //   프리팹당 1회 조회 후 캐시할 것(같은 프리팹이 마커 수만큼 반복 스폰된다).
     private static bool TryResolveSpawnPoint(Vector3 markerPosition, GameObject zoneGo, out Vector3 result)
     {
         // ⚠️ Default 단독이면 안 된다. c5826a3 이 보행면 833건을 Default → Ground 로 옮겼기 때문에
