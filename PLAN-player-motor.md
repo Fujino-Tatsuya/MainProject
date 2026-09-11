@@ -397,13 +397,13 @@ Unit.Knockback(dir, strength)              공통 진입점 (서버 가드 + 슈
 - [ ] 평타 루트모션 전진이 기존과 동일한 거리를 낸다.
 
 **3단계**
-- [ ] `Player.prefab` = `IsKinematic on` / `UseGravity off` / `Interpolate`.
-- [ ] `isKinematic`·`useGravity`를 쓰는 코드가 **`PlayerMotor` 한 곳뿐**이다(D-6).
-- [ ] 넉백 거리가 SO 값으로 튜닝된다(마찰 의존 제거).
+- [x] `Player.prefab` = `IsKinematic on` / `UseGravity off` / `Interpolate`.
+- [x] `isKinematic`·`useGravity`를 쓰는 코드가 **`PlayerMotor` 한 곳뿐**이다(D-6, 별도 Corpse 물리 제외).
+- [x] 넉백 거리가 SO 값으로 튜닝된다(마찰 의존 제거).
 - [ ] **넉백이 벽에 박으면 그 자리에 정지한다** — 튕김·슬라이드 없음.
 - [ ] **벽에 박아도 넉백 경직 시간은 줄지 않는다**(벽 앞/개활지 경직 시간 동일).
 - [ ] `Motor.SetMode`가 존재하고 속도 인계가 테스트로 덮인다. **사용처는 0개.**
-- [ ] 장애물·지면 마스크가 **`PlayerGameRuleData` 단일 소스**다.
+- [x] 장애물·지면 마스크가 **`PlayerGameRuleData` 단일 소스**다.
       `dashObstacleMask`·`aliveGroundMask`·`soulGroundMask`의 `~0`이 전부 제거됨.
 - [ ] **플레이어끼리 통과한다**(기본값). `blockOtherPlayers`를 켜면 막힌다 — 양방향 확인.
 - [ ] **Soul이 Player를 통과하고 Player도 Soul을 통과한다.** `blockOtherPlayers`가 켜져 있어도 Soul은 통과.

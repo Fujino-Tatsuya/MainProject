@@ -8,6 +8,30 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 현재 인수인계 (2026-09-11 · 플레이어 이동 Motor 재정립 3단계, 브랜치 `feature/player-motor`)
+
+작업 세션: **은희(Claude → Codex 위임)**. 승인 계획은 [PLAN-player-motor.md](PLAN-player-motor.md).
+
+**3단계 코드 완료, Play/MPPM 검증 대기** — 구현 커밋 `b9bd537`.
+
+- 플레이어 루트 Rigidbody는 두 프리팹 모두 `IsKinematic on` / `UseGravity off` / `Interpolate`다.
+  본체의 `isKinematic`·`useGravity` 쓰기는 `PlayerMotor`만 소유한다(별도 물리 오브젝트인 Corpse 제외).
+- Motor가 수직 속도 적분·최대 낙하속도·접지 스냅을 담당한다. 센서가 캡슐 표면과 지면의 간격을
+  복원하므로 살짝 뜬 경우는 아래로, 얕게 파묻힌 경우는 위로 보정한다.
+- `ApplyFlatGroundYLock`과 대시 자체 중력은 삭제했다. 걷기·대시·낙하는 같은 Motor 중력을 쓴다.
+- 플레이어 넉백은 `AddForce` 대신 초기 속도 + 6m/s² 선형 감쇠를 Motor에 제출한다. 벽 차단 시
+  속도만 0으로 만들고 계획된 경직 종료시각은 유지한다.
+- `PlayerGameRuleData`가 장애물/Alive 지면/Soul 지면/플레이어 상호 차단/낙하/넉백 값을 소유한다.
+  기본 마스크는 장애물=`Default|Ground|Wall|Env`, 지면=`Default|Ground|Env`다.
+- 기본값은 플레이어끼리 통과(`blockOtherPlayers=false`). Soul은 이 값이 켜져도 Player를 통과하며,
+  생명 상태 전환은 Motor 중력 채널만 끄고 켠다.
+- `PlayerMotor.SetMode(Kinematic|Dynamic)`은 수직 속도 양방향 인계 계약만 마련했고 gameplay 사용처는 0개다.
+- 비권한 피어는 Rigidbody 플래그를 바꾸지 않고 `PlayerMotor.enabled=false`로 NetworkTransform과의 경쟁을 막는다.
+
+정적 검증: Dash 어셈블리 오류/경고 0, `Assembly-CSharp` 오류 0(기존 경고 18), 구형 기호·프리팹
+플래그·`SetMode` 사용처 검사 통과. 사용자 지시로 Play/MPPM은 실행하지 않았다. 특히 접지 스냅,
+내리막 대시 후 이동, 넉백 벽 충돌/경직, 플레이어·Soul 통과, 낙사 복귀는 수동 검증이 필요하다.
+
 ## ▶▶ 현재 인수인계 (2026-09-11 · 플레이어 이동 Motor 재정립 2단계-b, 브랜치 `feature/player-motor`)
 
 작업 세션: **은희(Claude → Codex 위임)**. 브랜치 `feature/player-motor` (base `origin/development` `72392d6`).
