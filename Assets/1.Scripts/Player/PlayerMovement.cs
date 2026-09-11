@@ -2,6 +2,7 @@
 
 [RequireComponent(typeof(PlayerInputReader))]
 [RequireComponent(typeof(Rigidbody))]
+[RequireComponent(typeof(PlayerMotor))]
 public class PlayerMovement : MonoBehaviour
 {
     private PlayerInputReader reader;
@@ -10,6 +11,7 @@ public class PlayerMovement : MonoBehaviour
     private Rigidbody rb;
     private CapsuleCollider capsule;
     private PlayerGroundingSensor grounding;
+    private PlayerMotor motor;
     private LayerMask rootMoveBlockingMask;
 
     [SerializeField] private Transform armature;
@@ -20,15 +22,6 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private float alignThreshold = 0.98f;
     [SerializeField] private float viewYaw = -45f;
 
-    [Header("충돌 (일반 이동 스윕)")]
-    [SerializeField] private PlayerGameRuleData gameRule;
-    [SerializeField, Min(0f)] private float collisionSkin = 0.02f;
-    [SerializeField, Min(1)] private int maxSweepIterations = 3;
-
-    private const int CastBufferSize = 8;
-    private const float DefaultMaxWalkableSlopeAngle = 60f;
-    private readonly RaycastHit[] castBuffer = new RaycastHit[CastBufferSize];
-
     // 평지 판정 기준. QA의 P9-PlayerWallClimb 디텍터와 같은 값이라 디텍터가 이상으로 보는 구간이
     // 그대로 Y 잠금 구간이 된다(경사·램프는 이 값을 못 넘어 잠기지 않는다).
     private const float FlatGroundNormalY = 0.999f;
@@ -38,19 +31,10 @@ public class PlayerMovement : MonoBehaviour
     private bool hasRotate = true;
     private float currentSpeed;
 
-    // 이동 플랫폼 캐리: 이번 물리 틱의 외부 이동량(플랫폼). Move()에서 입력 이동과 합산 후 리셋.
-    private Vector3 _carryDelta;
-
     // Y 잠금 판정용(ApplyFlatGroundYLock 참조). 스크립트가 스스로 넣은 수직 이동이 있으면 잠그지
-    // 않아야 하므로 직전 프레임의 의도값을 남긴다. initialConstraints는 저작된 제약(회전 고정)이다.
+    // 않아야 하므로 이번 물리 틱의 최종 의도값을 남긴다. initialConstraints는 저작된 제약(회전 고정)이다.
     private float lastVerticalIntentY;
     private RigidbodyConstraints initialConstraints;
-
-    /// <summary>이동 플랫폼 등 외부 이동량을 이번 물리 틱 이동에 가산한다(소유자측에서 호출).</summary>
-    public void AddCarryDelta(Vector3 delta)
-    {
-        _carryDelta += delta;
-    }
 
     private void Awake()
     {
@@ -60,6 +44,7 @@ public class PlayerMovement : MonoBehaviour
         rb = GetComponent<Rigidbody>();
         capsule = GetComponent<CapsuleCollider>();
         grounding = GetComponent<PlayerGroundingSensor>();
+        motor = GetComponent<PlayerMotor>();
         initialConstraints = rb.constraints;
 
         // MoveRoot(평타 러시 스텝/스킬 전진) 관통 방지 스윕 대상 — 정적 지오메트리만.
@@ -83,15 +68,11 @@ public class PlayerMovement : MonoBehaviour
     private void FixedUpdate()
     {
         Move();
-
-        // Y 잠금은 물리 케이던스로 갱신한다 — 프레임 히치로 한 프레임에 물리 스텝이 여러 번 돌 때
-        // Update에서 한 번만 갱신하면 그 스텝들이 낡은 판정을 공유해 상승분이 새어 들어간다.
-        ApplyFlatGroundYLock();
     }
 
     private void Move()
     {
-        Vector3 inputMove = Vector3.zero;
+        Vector3 inputVelocity = Vector3.zero;
 
         bool canMove = player == null || player.CanMove;
         if (canMove && reader.HasMoveInput)
@@ -121,43 +102,22 @@ public class PlayerMovement : MonoBehaviour
                 );
             }
 
-            inputMove = worldDir * ResolveMoveSpeed(currentSpeed) * Time.fixedDeltaTime;
+            inputVelocity = worldDir * ResolveMoveSpeed(currentSpeed);
         }
         else
         {
             currentSpeed = 0f;
         }
 
-        // 입력 이동 + 플랫폼 캐리를 단일 MovePosition으로 적용.
-        // (MovePosition을 프레임당 두 번 호출하면 뒤엣것이 덮어쓰므로 반드시 합산.)
-        // 캐리는 CanMove/입력과 무관하게 적용 → 스턴/사망 중에도 플랫폼에 실려 이동(시체 잔류).
-        Vector3 total = ProjectOntoGround(inputMove) + _carryDelta;
-        _carryDelta = Vector3.zero;
+        if (motor != null && inputVelocity.sqrMagnitude > 0f)
+            motor.AddVelocity(inputVelocity);
+    }
 
-        // 대시와 동일한 스윕(PlayerMotionSweep)으로 벽 관통을 막는다. ClampByStaticGeometry(MoveRoot용)와
-        // 달리 걸을 수 있는 경사(gameRule.MaxWalkableSlopeAngle)는 장애물로 보지 않고 통과시키며,
-        // 막힌 경우엔 완전히 멈추는 대신 벽 표면을 따라 미끄러지듯 남은 이동량을 이어간다.
-        total = PlayerMotionSweep.Resolve(
-            capsule, total,
-            gameRule != null ? gameRule.MaxWalkableSlopeAngle : DefaultMaxWalkableSlopeAngle,
-            rootMoveBlockingMask, collisionSkin, maxSweepIterations, castBuffer);
-
-        // 스윕까지 끝난 이번 물리 틱의 수직 의도값 — FixedUpdate의 Y 잠금 판정에 쓴다.
-        lastVerticalIntentY = total.y;
-
-        if (total.sqrMagnitude > 0f)
-        {
-            // 대시 중에는 CanMove=false라 입력 이동이 0이므로, 여기 남는 건 플랫폼 캐리뿐이다.
-            // MovePosition을 한 프레임에 두 번 호출하면 나중 것이 이기므로 대시 변위가 사라질 수 있다.
-            if (player != null && player.CurrentState == PlayerActionState.Dash)
-            {
-                Edit.LogWarning(
-                    $"[Dash] 같은 프레임에 PlayerMovement.Move가 MovePosition을 호출합니다(캐리 {total.magnitude:F3}m) — " +
-                    "실행 순서에 따라 대시 변위가 덮어써질 수 있습니다(이동 플랫폼 위에서 대시한 경우).", this);
-            }
-
-            rb.MovePosition(rb.position + total);
-        }
+    /// <summary>Motor가 최종 이동을 적용한 뒤 같은 물리 틱의 Y 잠금 판정을 마무리한다.</summary>
+    internal void ApplyPostMotorGroundLock(float verticalIntentY)
+    {
+        lastVerticalIntentY = verticalIntentY;
+        ApplyFlatGroundYLock();
     }
 
     /// <summary>
@@ -169,7 +129,7 @@ public class PlayerMovement : MonoBehaviour
     /// 스텝 쌓여 벽을 타고 오른다(QA P9-PlayerWallClimb). <see cref="PlayerMotionSweep"/>은
     /// MovePosition <b>전에</b> 끝나 이걸 막을 수 없고 사후 보정은 한 프레임 늦으므로, 솔버가 Y를
     /// 아예 못 건드리게 제약으로 막는다. 잠긴 축의 접촉 해석은 수평 성분만 남아 벽을 따라 미끄러지는
-    /// 동작은 그대로다. 판정은 <see cref="FixedUpdate"/>에서 물리 스텝마다 갱신한다.
+    /// 동작은 그대로다. 판정은 <see cref="PlayerMotor"/>가 최종 이동을 제출한 뒤 물리 스텝마다 갱신한다.
     ///
     /// 다음 중 하나라도 어긋나면 즉시 잠금을 푼다(정상적인 수직 이동 보호):
     /// - 평지 접지가 아님(경사·램프는 법선이 <see cref="FlatGroundNormalY"/> 미만 → 등판·낙하 정상)
@@ -196,32 +156,6 @@ public class PlayerMovement : MonoBehaviour
 
         if (rb.constraints != desired)
             rb.constraints = desired;
-    }
-
-    /// <summary>
-    /// 접지 중이면 수평 이동을 지면 평면에 투영한다.
-    /// MovePosition은 CharacterController와 달리 경사 보정을 해 주지 않아서, 수평 벡터를 그대로
-    /// 밀면 경사면에 파고들며 막힌다(계단·경사로를 못 올라가던 원인). 지면 노멀에 투영하면
-    /// 같은 거리를 경사면을 따라 이동하므로 등판이 된다. 평지에서는 결과가 동일하다.
-    /// </summary>
-    private Vector3 ProjectOntoGround(Vector3 horizontalMove)
-    {
-        if (grounding == null || !grounding.IsGrounded)
-            return horizontalMove;
-
-        float distance = horizontalMove.magnitude;
-        if (distance <= Mathf.Epsilon)
-            return horizontalMove;
-
-        Vector3 normal = grounding.GroundNormal;
-        if (normal.y >= 0.999f) // 평지
-            return horizontalMove;
-
-        Vector3 projected = Vector3.ProjectOnPlane(horizontalMove, normal);
-        if (projected.sqrMagnitude <= 1e-6f)
-            return horizontalMove;
-
-        return projected.normalized * distance;
     }
 
     private void Rotate()

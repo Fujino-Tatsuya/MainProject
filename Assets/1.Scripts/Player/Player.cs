@@ -4,6 +4,7 @@ using Unity.Netcode;
 
 [RequireComponent(typeof(PlayerInputReader))]
 [RequireComponent(typeof(PlayerMovement))]
+[RequireComponent(typeof(PlayerMotor))]
 [RequireComponent(typeof(PlayerAimIndicator))]
 [RequireComponent(typeof(DefaultAttackController))]
 [RequireComponent(typeof(PlayerStateController))]
@@ -45,7 +46,7 @@ public class Player : Unit
     private PlayerStateController stateController;
     private DefaultAttackController defaultAttack;
     private FirstMeleePassive passive;
-    private PlayerMovement movement;
+    private PlayerMotor motor;
     private PlayerInvulnerability invulnerability;
     private Rigidbody playerRigidbody;
     private bool initialRigidbodyIsKinematic;
@@ -69,7 +70,7 @@ public class Player : Unit
 
         defaultAttack = GetComponent<DefaultAttackController>();
         passive = GetComponent<FirstMeleePassive>();
-        movement = GetComponent<PlayerMovement>();
+        motor = GetComponent<PlayerMotor>();
         invulnerability = GetComponent<PlayerInvulnerability>();
         playerRigidbody = GetComponent<Rigidbody>();
         if (playerRigidbody != null)
@@ -187,7 +188,7 @@ public class Player : Unit
     /// <summary>발밑에 캐리 표면이 있으면 그 이동량을 플레이어 이동에 가산한다.</summary>
     private void ApplyPlatformCarry()
     {
-        if (movement == null)
+        if (motor == null)
         {
             return;
         }
@@ -207,7 +208,7 @@ public class Player : Unit
                 hits[i].collider.GetComponentInParent<ISurfaceCarrier>();
             if (carrier != null)
             {
-                movement.AddCarryDelta(
+                motor.AddDisplacement(
                     carrier.GetCarryDelta(transform.position, Time.fixedDeltaTime));
                 break;
             }

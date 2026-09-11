@@ -6696,6 +6696,7 @@ GameObject:
   - component: {fileID: 3136856600094551148}
   - component: {fileID: 684384627529350758}
   - component: {fileID: 4372253423484341351}
+  - component: {fileID: 800000000000000031}
   - component: {fileID: 4335259357398649415}
   - component: {fileID: 4683411582078572617}
   - component: {fileID: 6169844953318847693}
@@ -6981,6 +6982,21 @@ MonoBehaviour:
   acceleration: 80
   alignThreshold: 0.98
   viewYaw: -45
+--- !u!114 &800000000000000031
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6077492126708577103}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2f714ae95eb94b57a450b74bc822de23, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerMotor
+  gameRule: {fileID: 11400000, guid: 5a71cc8f5b32f47428af514e196e5a8c, type: 2}
+  collisionSkin: 0.02
+  maxSweepIterations: 3
 --- !u!114 &4335259357398649415
 MonoBehaviour:
   m_ObjectHideFlags: 0
