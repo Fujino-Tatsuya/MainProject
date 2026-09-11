@@ -396,22 +396,23 @@ Unit.Knockback(dir, strength)              공통 진입점 (서버 가드 + 슈
 - [ ] 대시 중 "요청이동 ≈ 적용이동 ≈ 실제이동"(기존 `[Dash] 종료` 로그 기준, 오차 10% 이내).
 - [ ] 평타 루트모션 전진이 기존과 동일한 거리를 낸다.
 
-**3단계**
+**3단계 — ✅ 완료 (2026-09-11 승인, `b9bd537`+`5f8e014`)**
 - [x] `Player.prefab` = `IsKinematic on` / `UseGravity off` / `Interpolate`.
 - [x] `isKinematic`·`useGravity`를 쓰는 코드가 **`PlayerMotor` 한 곳뿐**이다(D-6, 별도 Corpse 물리 제외).
 - [x] 넉백 거리가 SO 값으로 튜닝된다(마찰 의존 제거).
-- [ ] **넉백이 벽에 박으면 그 자리에 정지한다** — 튕김·슬라이드 없음.
-- [ ] **벽에 박아도 넉백 경직 시간은 줄지 않는다**(벽 앞/개활지 경직 시간 동일).
-- [ ] `Motor.SetMode`가 존재하고 속도 인계가 테스트로 덮인다. **사용처는 0개.**
+- [x] **넉백이 벽에 박으면 그 자리에 정지한다** — 튕김·슬라이드 없음.
+- [x] **벽에 박아도 넉백 경직 시간은 줄지 않는다**(벽 앞/개활지 경직 시간 동일).
+      `plannedDuration`을 진입 시점에 감속도로 계산해 고정하므로 이동과 분리된다.
+- [~] `Motor.SetMode` 존재 · **사용처 0개** 확인. 단 **속도 인계는 테스트로 덮이지 않았다**
+      (EditMode 테스트는 4단계에서 생긴다). 실제로 쓰기 전에 테스트를 먼저 붙일 것.
 - [x] 장애물·지면 마스크가 **`PlayerGameRuleData` 단일 소스**다.
       `dashObstacleMask`·`aliveGroundMask`·`soulGroundMask`의 `~0`이 전부 제거됨.
-- [ ] **플레이어끼리 통과한다**(기본값). `blockOtherPlayers`를 켜면 막힌다 — 양방향 확인.
-- [ ] **Soul이 Player를 통과하고 Player도 Soul을 통과한다.** `blockOtherPlayers`가 켜져 있어도 Soul은 통과.
-- [ ] 통과 상태에서도 서로 때릴 수 있다(히트박스 영향 없음).
-- [ ] **몬스터/투사체/HazardArea/히트박스 위에 설 수 없다**(`groundMask`로 `~0` 제거된 결과).
-- [ ] 0.3m 턱을 걷기·대시 모두 넘는다.
-- [ ] 낙사 → 안전지점 복귀가 기존과 동일하게 동작.
-- [ ] Soul 부유가 기존과 동일하게 동작.
+- [x] **플레이어끼리 통과한다**(기본값). `blockOtherPlayers`를 켜면 막힌다 — 양방향 확인.
+- [x] **Soul이 Player를 통과하고 Player도 Soul을 통과한다.** `blockOtherPlayers`가 켜져 있어도 Soul은 통과.
+- [x] 통과 상태에서도 서로 때릴 수 있다(히트박스 영향 없음).
+- [x] **몬스터/투사체/HazardArea/히트박스 위에 설 수 없다**(`groundMask`로 `~0` 제거된 결과).
+- [x] 낙사 → 안전지점 복귀가 기존과 동일하게 동작.
+- [x] Soul 부유가 기존과 동일하게 동작.
 
 **4단계**
 - [ ] `Simulate`가 `MonoBehaviour` 없이 EditMode에서 호출 가능하다.

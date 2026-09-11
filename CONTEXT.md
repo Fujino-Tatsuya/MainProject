@@ -12,7 +12,19 @@ Update this file when a term becomes important enough that future agents or team
 
 작업 세션: **은희(Claude → Codex 위임)**. 승인 계획은 [PLAN-player-motor.md](PLAN-player-motor.md).
 
-**3단계 코드 완료, Play/MPPM 검증 대기** — 구현 커밋 `b9bd537`.
+**✅ 1~3단계 승인 완료 (2026-09-11)** — `b9bd537` + `5f8e014`(막힘 판정 수정).
+남은 것: **stepOffset(계단)** → **4단계**(결정론/예측·재조정, 8월 이후).
+
+### 🔴 확정된 불변식 — 새 코드에서 반드시 지킬 것
+
+- **플레이어 위치는 `PlayerMotor`만 바꾼다.** `MovePosition`/`transform.position`을 Player 하위에
+  새로 추가하지 말 것(`PlayerFallRecovery` 등 텔레포트 계열만 예외). 이동은 Motor에 **의도**를 제출한다.
+- **채널이 넷이다.** `AddVelocity`(m/s, 경사 투영) · `AddGroundedDisplacement`(m, 경사 투영,
+  🔴 **수평 전용**) · `AddDisplacement`(m, 투영 없음 — 중력·플랫폼 캐리) · `SetPoseTarget`(절대 포즈, last-wins).
+  수직 성분을 `AddGroundedDisplacement`에 넣으면 **경사에서 위로 떠오른다**(제출 시점 경고 로그가 잡는다).
+- **`WasBlockedThisTick`은 제출된 수평 의도 기준**이다(Motor 자체 중력·스냅 제외). 전체 벡터로
+  비교하면 접지 중 매 틱 true가 되어 넉백이 첫 틱에 취소된다.
+- **상태는 `Tick()`(Update)에서 판단, `FixedTick()`(물리 틱)에서 이동 제출**한다.
 
 - 플레이어 루트 Rigidbody는 두 프리팹 모두 `IsKinematic on` / `UseGravity off` / `Interpolate`다.
   본체의 `isKinematic`·`useGravity` 쓰기는 `PlayerMotor`만 소유한다(별도 물리 오브젝트인 Corpse 제외).
