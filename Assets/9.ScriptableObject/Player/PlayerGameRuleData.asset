@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: PlayerGameRuleData
   m_EditorClassIdentifier: Assembly-CSharp::PlayerGameRuleData
   maxWalkableSlopeAngle: 60
+  stepOffset: 0.3
   obstacleMask:
     serializedVersion: 2
     m_Bits: 2185

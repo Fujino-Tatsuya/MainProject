@@ -17,6 +17,7 @@ public sealed class PlayerMotor : MonoBehaviour
 
     private const int CastBufferSize = 8;
     private const float DefaultMaxWalkableSlopeAngle = 60f;
+    private const float DefaultStepOffset = 0.3f;
     private const float DefaultMaxFallSpeed = 30f;
     private const float MovementComparisonEpsilon = 0.00001f;
     private const float UpwardIntentEpsilon = 0.00005f;
@@ -243,6 +244,9 @@ public sealed class PlayerMotor : MonoBehaviour
         Vector3 resolvedDelta = PlayerMotionSweep.Resolve(
             capsule,
             desiredDelta,
+            new Vector3(intentDelta.x, 0f, intentDelta.z),
+            grounded,
+            gameRule != null ? gameRule.StepOffset : DefaultStepOffset,
             gameRule != null ? gameRule.MaxWalkableSlopeAngle : DefaultMaxWalkableSlopeAngle,
             ResolveObstacleMask(),
             collisionSkin,

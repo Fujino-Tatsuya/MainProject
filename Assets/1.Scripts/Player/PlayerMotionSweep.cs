@@ -13,10 +13,16 @@ using UnityEngine;
 /// </summary>
 public static class PlayerMotionSweep
 {
+    private const float MovementEpsilon = 0.00001f;
+    private const float LandingOverlapTolerance = 0.0001f;
+
     /// <summary>desiredDelta를 충돌 해석해 실제 적용할 이동량으로 보정해 반환한다.</summary>
     public static Vector3 Resolve(
         CapsuleCollider capsule,
         Vector3 desiredDelta,
+        Vector3 horizontalStepDelta,
+        bool isGrounded,
+        float stepOffset,
         float maxWalkableAngle,
         LayerMask obstacleMask,
         float skin,
@@ -27,7 +33,54 @@ public static class PlayerMotionSweep
             return desiredDelta;
 
         Transform owner = capsule.transform;
-        Vector3 accumulated = Vector3.zero;
+        Vector3 regularDelta = ResolveMovement(
+            capsule,
+            owner,
+            Vector3.zero,
+            desiredDelta,
+            maxWalkableAngle,
+            obstacleMask,
+            skin,
+            maxIterations,
+            buffer);
+
+        Vector3 planarStepDelta = new Vector3(horizontalStepDelta.x, 0f, horizontalStepDelta.z);
+        if (!isGrounded || stepOffset <= 0f || planarStepDelta.sqrMagnitude <= MovementEpsilon * MovementEpsilon)
+            return regularDelta;
+
+        if (!TryResolveStep(
+                capsule,
+                owner,
+                planarStepDelta,
+                desiredDelta - planarStepDelta,
+                regularDelta,
+                stepOffset,
+                maxWalkableAngle,
+                obstacleMask,
+                skin,
+                maxIterations,
+                buffer,
+                out Vector3 stepDelta))
+        {
+            return regularDelta;
+        }
+
+        return stepDelta;
+    }
+
+    private static Vector3 ResolveMovement(
+        CapsuleCollider capsule,
+        Transform owner,
+        Vector3 originOffset,
+        Vector3 desiredDelta,
+        float maxWalkableAngle,
+        LayerMask obstacleMask,
+        float skin,
+        int maxIterations,
+        RaycastHit[] buffer,
+        bool constrainToHorizontal = false)
+    {
+        Vector3 accumulated = originOffset;
         Vector3 remaining = desiredDelta;
         int iterations = Mathf.Max(1, maxIterations);
 
@@ -42,12 +95,23 @@ public static class PlayerMotionSweep
             if (TryCast(capsule, owner, accumulated, dir, dist + skin, maxWalkableAngle, obstacleMask, skin, buffer,
                     out RaycastHit hit, out float hitDistance))
             {
-                bool walkableGround = Vector3.Angle(hit.normal, Vector3.up) <= maxWalkableAngle;
+                bool walkableGround = IsWalkable(hit.normal, maxWalkableAngle);
                 // 지면 스냅/중력은 표면까지 정확히 가야 한다. 벽에는 기존 skin을 유지한다.
                 float allowed = Mathf.Max(0f, hitDistance - (walkableGround ? 0f : skin));
                 accumulated += dir * allowed;
                 Vector3 leftover = dir * (dist - allowed);
-                remaining = Vector3.ProjectOnPlane(leftover, hit.normal);
+                if (constrainToHorizontal)
+                {
+                    Vector3 planarNormal = new Vector3(hit.normal.x, 0f, hit.normal.z);
+                    remaining = planarNormal.sqrMagnitude > MovementEpsilon * MovementEpsilon
+                        ? Vector3.ProjectOnPlane(leftover, planarNormal.normalized)
+                        : leftover;
+                    remaining.y = 0f;
+                }
+                else
+                {
+                    remaining = Vector3.ProjectOnPlane(leftover, hit.normal);
+                }
             }
             else
             {
@@ -56,7 +120,125 @@ public static class PlayerMotionSweep
             }
         }
 
-        return accumulated;
+        return accumulated - originOffset;
+    }
+
+    private static bool TryResolveStep(
+        CapsuleCollider capsule,
+        Transform owner,
+        Vector3 horizontalDelta,
+        Vector3 remainingDelta,
+        Vector3 regularDelta,
+        float stepOffset,
+        float maxWalkableAngle,
+        LayerMask obstacleMask,
+        float skin,
+        int maxIterations,
+        RaycastHit[] buffer,
+        out Vector3 resolvedStepDelta)
+    {
+        resolvedStepDelta = default;
+
+        float horizontalDistance = horizontalDelta.magnitude;
+        Vector3 horizontalDirection = horizontalDelta / horizontalDistance;
+
+        // 계단 후보는 제출된 수평 이동이 실제 비보행면에 막혔을 때만 만든다.
+        if (!TryCast(
+                capsule,
+                owner,
+                Vector3.zero,
+                horizontalDirection,
+                horizontalDistance + skin,
+                maxWalkableAngle,
+                obstacleMask,
+                skin,
+                buffer,
+                out RaycastHit blockingHit,
+                out _))
+        {
+            return false;
+        }
+
+        if (IsWalkable(blockingHit.normal, maxWalkableAngle))
+            return false;
+
+        // 위 이동은 텔레포트하지 않는다. 필요한 높이까지 조금이라도 막히면 계단 후보를 버린다.
+        if (TryCast(
+                capsule,
+                owner,
+                Vector3.zero,
+                Vector3.up,
+                stepOffset,
+                maxWalkableAngle,
+                obstacleMask,
+                skin,
+                buffer,
+                out _,
+                out _))
+        {
+            return false;
+        }
+
+        Vector3 raisedOffset = Vector3.up * stepOffset;
+        Vector3 raisedHorizontalDelta = ResolveMovement(
+            capsule,
+            owner,
+            raisedOffset,
+            horizontalDelta,
+            maxWalkableAngle,
+            obstacleMask,
+            skin,
+            maxIterations,
+            buffer,
+            constrainToHorizontal: true);
+
+        Vector3 landingOrigin = raisedOffset + raisedHorizontalDelta;
+        if (!TryCast(
+                capsule,
+                owner,
+                landingOrigin,
+                Vector3.down,
+                stepOffset,
+                maxWalkableAngle,
+                obstacleMask,
+                skin,
+                buffer,
+                out RaycastHit landingHit,
+                out float landingDistance))
+        {
+            return false;
+        }
+
+        if (!IsWalkable(landingHit.normal, maxWalkableAngle))
+            return false;
+
+        // 축소 캐스트가 stepOffset보다 높은 턱에 얕게 파고든 상태를 착지로 오인하지 않게 한다.
+        float castInset = GetCastInset(capsule, owner, skin);
+        if (landingHit.distance + LandingOverlapTolerance < castInset)
+            return false;
+
+        Vector3 candidateDelta = landingOrigin + Vector3.down * Mathf.Clamp(landingDistance, 0f, stepOffset);
+        if (remainingDelta.sqrMagnitude > MovementEpsilon * MovementEpsilon)
+        {
+            candidateDelta += ResolveMovement(
+                capsule,
+                owner,
+                candidateDelta,
+                remainingDelta,
+                maxWalkableAngle,
+                obstacleMask,
+                skin,
+                maxIterations,
+                buffer);
+        }
+
+        float regularProgress = Vector3.Dot(new Vector3(regularDelta.x, 0f, regularDelta.z), horizontalDirection);
+        float candidateProgress = Vector3.Dot(new Vector3(candidateDelta.x, 0f, candidateDelta.z), horizontalDirection);
+        if (candidateProgress <= regularProgress + MovementEpsilon)
+            return false;
+
+        resolvedStepDelta = candidateDelta;
+        return true;
     }
 
     /// <param name="skin">
@@ -117,7 +299,7 @@ public static class PlayerMotionSweep
                 continue;
             // 걸을 수 있는 경사는 접선 이동에는 장애물이 아니지만, 중력/스냅처럼 표면 안쪽으로
             // 향하는 이동은 막아야 kinematic 바디가 지면을 통과하지 않는다.
-            bool walkableGround = Vector3.Angle(hit.normal, Vector3.up) <= maxWalkableAngle;
+            bool walkableGround = IsWalkable(hit.normal, maxWalkableAngle);
             if (walkableGround && Vector3.Dot(dir, hit.normal) >= -0.0001f)
                 continue;
             if (hit.distance < nearest)
@@ -131,5 +313,19 @@ public static class PlayerMotionSweep
         // 인셋 보정을 되돌려 원래 반경 기준 거리로 환산한다 → 호출부의 정지 지점(hit - skin)이 종전과 같다.
         hitDistance = found ? Mathf.Max(0f, best.distance - inset) : 0f;
         return found;
+    }
+
+    private static bool IsWalkable(Vector3 normal, float maxWalkableAngle)
+    {
+        return Vector3.Angle(normal, Vector3.up) <= maxWalkableAngle;
+    }
+
+    private static float GetCastInset(CapsuleCollider capsule, Transform owner, float skin)
+    {
+        Vector3 lossy = owner.lossyScale;
+        float radiusScale = Mathf.Max(Mathf.Abs(lossy.x), Mathf.Abs(lossy.z));
+        float fullRadius = capsule.radius * radiusScale;
+        float radius = Mathf.Max(0.01f, fullRadius - skin);
+        return Mathf.Max(0f, fullRadius - radius);
     }
 }
