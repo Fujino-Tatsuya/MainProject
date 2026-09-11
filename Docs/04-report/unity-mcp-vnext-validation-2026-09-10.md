@@ -82,13 +82,30 @@ GitHub 설치 전 검증은 manifest를 잠시 후보 file: 경로로 지정해 
 
 ## 배포 상태
 
-패키지 로컬 커밋은 완료했다. 2026-09-10 자동 승인 검토가
-`https://github.com/Seoki2000/unity-mcp.git`로의 push를 차단했다. 검증 브랜치 push
-요청 자체는 있었지만 정확한 외부 저장소 주소의 명시적 승인이 없다는 이유다.
-해당 주소·브랜치 push와 SHA 적용에 대한 확인 질문을 보냈다. 우회하지 않는다.
-GitHub push와 영구 SHA 적용은 아직 완료되지 않았다.
-검증용 file: 지정은 제거하고 manifest/lock을 기존 Git SHA 85f6c175로 복원했다.
-승인 후 새 SHA를 설치하며, main/optimized를 merge하지 않는다.
+**2026-09-11 배포·프로젝트 적용 완료.** 앞서 자동 승인 검토가 정확한 목적지의 명시적
+승인 부재로 push를 차단했지만, 사용자가 저장소·브랜치 push 및 적용을 승인한 뒤 성공했다.
+
+- 원격: `https://github.com/Seoki2000/unity-mcp.git`, `codex/mcp-audit-reliability`.
+- 최종 SHA: `930124007dd42095eed64735d6f431b5df8940f5` — 구현 d5adddf에 영문·한글
+  README의 새 기능, 실측 검증, 평가·토큰 한계 설명을 추가한 커밋이다.
+- `git ls-remote`로 원격 브랜치와 로컬 HEAD 일치를 확인했다. main/optimized는 변경하지 않았다.
+- 현재 프로젝트 manifest·lock을 위 SHA로 고정했고 Unity가 GitHub에서 받은
+  `Library/PackageCache/com.community.unity-mcp@930124007dd4`로 해석했다.
+- `.mcp.json`이 실행하는 고정 런처를 검증 버전으로 갱신했다. 런처 로그에서 새 캐시
+  선택을 확인했고, 설치된 핵심 파일 10개의 정규화 SHA-256이 검증 소스와 일치했다.
+- 적용 전 회귀시험 84/84와 기존 프로브 9개를 다시 실행해 각 기준을 통과했다.
+- 첫 설치 조회에서는 Node는 새 버전이지만 Editor 어셈블리 재로드 전이라 새 프리팹
+  도구가 없었다. 패키지 해석 후 재컴파일을 수행했고 관측 어셈블리 3개, 오류 0개를
+  확인했다. 경고 4개는 기존 gameplay 코드의 deprecated RPC, OnDestroy 숨김, 미사용 필드다.
+- 재컴파일 후 **설치된 고정 런처**로 87개 도구, 실제 소스 hash, 실제 프리팹 최종 값,
+  프로젝트 맵·영향·진단 근거를 확인했다. `installation-verification.json`의 ok=true.
+- 최종 씬은 사용자가 열어 둔 **Dev_Boot**, 편집 모드다. 이번 적용에는 Play를 다시
+  실행하지 않았고, 앞선 동일 구현의 Play 2회·실제 fixture 컴파일 검증을 유지한다.
+
+오늘의 원본 결과는 `output/unity-mcp-install-2026-09-11/`의 regressions/,
+before-domain-reload-live-results.json, live-results.json, installation-verification.json에 있다.
+기존 설정과 런처도 같은 폴더에 백업했다. 이전 9월 8~10일 output 자료는 이후 루트 정리
+작업에서 이동되었을 수 있으므로 당시 보고서와 정리 커밋 기록을 함께 확인한다.
 
 ## 재현 파일과 남은 범위
 
