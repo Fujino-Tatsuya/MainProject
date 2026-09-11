@@ -2,6 +2,23 @@ using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine;
 
+/// <summary>
+/// `PlayerMotionSweep`의 단차(stepOffset) 해석 테스트.
+///
+/// ⚠️ <b>왜 여기만 .asmdef가 없는가</b> — 옆 동네 `Player/Dash/Tests/EditMode/`는 전용 asmdef를
+/// 갖는데 여기는 없다. 흉내 내지 않은 게 아니라 **낼 수 없다**: asmdef로 정의된 어셈블리는
+/// 미리 정의된 `Assembly-CSharp`을 참조할 수 없는데, 대상인 `PlayerMotionSweep`이 거기 있다.
+/// (Dash 쪽은 `BeaverLobby.Player.Dash` asmdef 안에 있어서 참조가 된다.)
+/// 그래서 `Editor/` 폴더에 두어 `Assembly-CSharp-Editor`로 컴파일시킨다 — 이 어셈블리는
+/// `nunit.framework`·`UnityEngine/UnityEditor.TestRunner`를 참조하므로 Test Runner가 발견한다.
+///
+/// 대가: `UNITY_INCLUDE_TESTS` define 제약을 걸 수 없어 테스트 코드가 항상 에디터 어셈블리에 들어간다.
+/// 제대로 분리하려면 Motor 계열을 자체 asmdef로 옮겨야 하고, 그건 순수 로직 추출이 예정된
+/// 4단계에서 같이 처리할 일이다. (PLAN-player-motor.md §3 4단계)
+///
+/// 실제 `Physics.CapsuleCast`를 타는 통합 테스트다 — 스윕 로직이 물리 쿼리 결과에 의존하므로
+/// 순수 단위 테스트로는 의미가 없다. 그래서 매 테스트가 임시 콜라이더를 만들고 TearDown에서 지운다.
+/// </summary>
 public sealed class PlayerMotionSweepStepTests
 {
     private const float StepOffset = 0.3f;
