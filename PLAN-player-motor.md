@@ -375,10 +375,18 @@ Unit.Knockback(dir, strength)              공통 진입점 (서버 가드 + 슈
 
 ## 8. Acceptance criteria
 
-**1단계**
-- [ ] `PlayerMovement.Move()`가 `FixedUpdate`에서만 돈다. `Time.fixedDeltaTime` 사용.
-- [ ] fps 30 / 60 / 144 고정에서 동일 거리 이동에 걸리는 시간 편차 **5% 이내**.
-- [ ] 기존 감각 회귀 없음(경사 등판·벽 슬라이드·플랫폼 탑승).
+**1단계 — ✅ 완료 (2026-09-11 승인, `1e6113b`+`76824f2`)**
+- [x] `PlayerMovement.Move()`가 `FixedUpdate`에서만 돈다. `Time.fixedDeltaTime` 사용.
+- [x] fps 30/60/144 지속속도 5.072 / 5.009 / 4.992 m/s — **편차 1.58%**. 컴파일 0에러.
+- [x] 경사 등판·벽 슬라이드 — 이상 없음.
+- [~] **플랫폼 탑승은 실측하지 않고 승인됐다.** `76824f2`(캐리 주기 회귀 수정)의 대상이므로,
+      이후 플랫폼 관련 이상이 보고되면 **여기를 먼저 볼 것**.
+
+> 🔴 1단계에서 얻은 교훈 — **소비자만 옮기면 안 된다.** `Player.ApplyPlatformCarry`를
+> `FixedUpdate`로 옮겼는데 생산자 `MovingPlatform`이 `Update`에 남아 주기가 어긋났다
+> (144fps에서 이동량의 ~35%만 전달). Motor에 의도를 넣는 **모든 생산자의 루프**를 함께 봐야 한다.
+> `ISurfaceCarrier` 구현체도 계약이 갈린다 — `ConveyorTile`은 속도형(`speed×dt`, 루프 무관),
+> `MovingPlatform`은 변위형(차분, 루프 결합).
 
 **2단계**
 - [ ] `Assets/1.Scripts/Player/**`에서 `MovePosition` 호출이 **`PlayerMotor` 1곳뿐**이다(A-6 제외).
