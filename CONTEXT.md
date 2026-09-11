@@ -8,7 +8,27 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 현재 인수인계 (2026-09-09 · 죽은 코드 정리 + 존 NetworkBehaviour 제거, 브랜치 `feature/Boss23`)
+## ▶▶ 현재 상태 (2026-09-11 · **대기**)
+
+**다음 작업 = 보스 몬스터 패턴 추가.** 기획이 아직 없어 대기 상태다 — 잠기면 grill → PLAN →
+승인 순서로 [PLAN.md](PLAN.md) 맨 위에 새 `CURRENT PLAN` 을 만든다.
+**퀘스트 영역은 착수 전 취소**됐다(PLAN.md 의 ❌ 절에 잠긴 결정 14건을 남겨 뒀다).
+
+이번 세션에 한 것: 고정 터렛 파트 분리 해결(아래 ✅ 절) · NavMesh 보류 확정(🟡 절) ·
+레포 루트 정리. 커밋 `9c0b496c` `1bc3a7c1` `91e25d37`.
+
+레포 루트 정리 결과 — `output/`(MCP 감사 산출물 167MB · 1403파일)을 **팀 볼트**
+`04-report/mcp-audit-output/` 으로 이관하고 보고서 링크 12곳을 새 경로로 고쳤다(전부 해석 확인).
+포폴 자료 16개는 레포 밖으로 뺐고, **같은 폴더의 MCP 감사 도구 12개는 추적 중이라 레포에 남겼다.**
+`/output/` · `/.vscode/` · `/.claude/settings.local.json` 을 gitignore 에 추가했다.
+
+미처리 2건:
+- `ProjectSettings/NetcodeForGameObjects.asset` — 미추적. 전부 기본값이지만 미추적이면 팀원마다
+  각자 재생성된다. **네트워크 = 은희 영역**이라 커밋하지 않았다 → 공유·판단 필요.
+- `PortfolioPrintPrototype`(592MB · 38,612파일) · `PortfolioDraftUpdates`(71MB) — 레포 폴더 안에
+  있으나 이미 gitignore 대상. 커밋 위험은 없지만 `git status` 를 느리게 한다.
+
+## ▶▶ 이전 인수인계 (2026-09-09 · 죽은 코드 정리 + 존 NetworkBehaviour 제거, 브랜치 `feature/Boss23`)
 
 작업 세션: **경석(Claude)**. 조사·근거는 [Docs/04-report/deadcode-audit-2026-09-09.md](Docs/04-report/deadcode-audit-2026-09-09.md).
 Play 검증 통과(팀장 확인). 커밋 8건 — `7b257f19` `df5249af` `91493afc` `f6175811` `51d6eb51`
