@@ -2,7 +2,7 @@ using Unity.Netcode;
 using UnityEngine;
 
 [RequireComponent(typeof(CapsuleCollider))]
-[RequireComponent(typeof(Rigidbody))]
+[RequireComponent(typeof(PlayerMotor))]
 public sealed class PlayerGroundingSensor : NetworkBehaviour
 {
     public enum GroundingMode
@@ -25,15 +25,13 @@ public sealed class PlayerGroundingSensor : NetworkBehaviour
 
     [Header("Ground Probe")]
     [SerializeField, Min(0f)] private float probeDistance = 0.1f;
-    [SerializeField] private LayerMask aliveGroundMask = ~0;
-    [SerializeField] private LayerMask soulGroundMask = ~0;
     [Tooltip("걸을 수 있는 최대 경사각 등 공용 규칙. 미할당 시 기본 60도(dot 0.5)로 폴백한다.")]
     [SerializeField] private PlayerGameRuleData gameRule;
 
     private readonly RaycastHit[] probeHits = new RaycastHit[MaxProbeHits];
 
     private CapsuleCollider capsuleCollider;
-    private Rigidbody playerRigidbody;
+    private PlayerMotor motor;
     private GroundingMode groundingMode;
     private float previousWorldY;
     private bool hasPreviousWorldY;
@@ -42,6 +40,8 @@ public sealed class PlayerGroundingSensor : NetworkBehaviour
     public Vector3 GroundNormal { get; private set; } = Vector3.up;
     public Collider GroundCollider { get; private set; }
     public bool IsMovingPlatform { get; private set; }
+    /// <summary>캡슐 표면과 접지면의 수직 간격. 양수는 떠 있음, 음수는 얕은 관통이다.</summary>
+    public float GroundSurfaceDistance { get; private set; }
     public float VerticalVelocity { get; private set; }
     public VerticalMotionState VerticalState { get; private set; }
     public bool IsRising => VerticalState == VerticalMotionState.Rising;
@@ -51,7 +51,7 @@ public sealed class PlayerGroundingSensor : NetworkBehaviour
     private void Awake()
     {
         capsuleCollider = GetComponent<CapsuleCollider>();
-        playerRigidbody = GetComponent<Rigidbody>();
+        motor = GetComponent<PlayerMotor>();
         previousWorldY = transform.position.y;
         hasPreviousWorldY = true;
     }
@@ -100,9 +100,9 @@ public sealed class PlayerGroundingSensor : NetworkBehaviour
     {
         float currentWorldY = transform.position.y;
 
-        if (playerRigidbody != null && !playerRigidbody.isKinematic)
+        if (motor != null && motor.enabled)
         {
-            VerticalVelocity = playerRigidbody.linearVelocity.y;
+            VerticalVelocity = motor.VerticalVelocity;
         }
         else if (hasPreviousWorldY && Time.fixedDeltaTime > 0f)
         {
@@ -130,6 +130,7 @@ public sealed class PlayerGroundingSensor : NetworkBehaviour
         GroundNormal = Vector3.up;
         GroundCollider = null;
         IsMovingPlatform = false;
+        GroundSurfaceDistance = 0f;
 
         if (capsuleCollider == null || !capsuleCollider.enabled)
             return;
@@ -139,9 +140,9 @@ public sealed class PlayerGroundingSensor : NetworkBehaviour
         float probeRadius = worldRadius * ProbeRadiusScale;
         float radiusInset = worldRadius - probeRadius;
         float castDistance = probeDistance + radiusInset;
-        LayerMask groundMask = groundingMode == GroundingMode.Soul
-            ? soulGroundMask
-            : aliveGroundMask;
+        LayerMask groundMask = gameRule != null
+            ? gameRule.GetGroundMask(groundingMode == GroundingMode.Soul)
+            : LayerMask.GetMask("Default", "Ground", "Env");
 
         // 걸을 수 있는 경사 한계는 공용 규칙에서 온다(대시 등판각과 단일 소스). 미할당 시 60도 폴백.
         float minGroundUpDot = gameRule != null ? gameRule.WalkableGroundUpDot : DefaultMinimumGroundUpDot;
@@ -172,6 +173,7 @@ public sealed class PlayerGroundingSensor : NetworkBehaviour
             IsGrounded = true;
             GroundNormal = hit.normal.normalized;
             GroundCollider = hit.collider;
+            GroundSurfaceDistance = hit.distance - radiusInset;
         }
 
         IsMovingPlatform =
@@ -214,6 +216,7 @@ public sealed class PlayerGroundingSensor : NetworkBehaviour
         GroundNormal = Vector3.up;
         GroundCollider = null;
         IsMovingPlatform = false;
+        GroundSurfaceDistance = 0f;
         VerticalVelocity = 0f;
         VerticalState = VerticalMotionState.Stable;
         hasPreviousWorldY = false;

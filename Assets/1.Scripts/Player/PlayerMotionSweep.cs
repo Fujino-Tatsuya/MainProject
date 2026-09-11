@@ -3,7 +3,8 @@ using UnityEngine;
 /// <summary>
 /// 대시와 일반 이동이 공유하는 경사/벽 충돌 해석(단일 소스). (PLAN §5, §8)
 ///
-/// - 걸을 수 있는 경사(법선 각 &lt;= maxWalkableAngle)는 장애물로 보지 않고 통과시켜 타고 오르게 한다.
+/// - 걸을 수 있는 경사(법선 각 &lt;= maxWalkableAngle)는 접선 이동에는 열고, 중력처럼 면 안쪽으로
+///   향하는 이동만 막아 kinematic 바디가 지면을 통과하지 않게 한다.
 /// - 급경사/벽/천장만 막고, 비스듬한 충돌은 접선으로 미끄러진다.
 /// - Rigidbody.MovePosition이 지연 적용되므로 한 프레임의 모든 캐스트는 누적 오프셋으로 근사하고,
 ///   호출자는 반환된 delta로 MovePosition을 1회만 적용한다.
@@ -41,7 +42,9 @@ public static class PlayerMotionSweep
             if (TryCast(capsule, owner, accumulated, dir, dist + skin, maxWalkableAngle, obstacleMask, skin, buffer,
                     out RaycastHit hit, out float hitDistance))
             {
-                float allowed = Mathf.Max(0f, hitDistance - skin);
+                bool walkableGround = Vector3.Angle(hit.normal, Vector3.up) <= maxWalkableAngle;
+                // 지면 스냅/중력은 표면까지 정확히 가야 한다. 벽에는 기존 skin을 유지한다.
+                float allowed = Mathf.Max(0f, hitDistance - (walkableGround ? 0f : skin));
                 accumulated += dir * allowed;
                 Vector3 leftover = dir * (dist - allowed);
                 remaining = Vector3.ProjectOnPlane(leftover, hit.normal);
@@ -112,8 +115,10 @@ public static class PlayerMotionSweep
                 continue;
             if (hit.collider.transform == owner || hit.collider.transform.IsChildOf(owner))
                 continue;
-            // 걸을 수 있는 경사(지면)는 막지 않는다 — 타고 오른다. 초기 겹침(normal≈0)도 여기서 무시.
-            if (Vector3.Angle(hit.normal, Vector3.up) <= maxWalkableAngle)
+            // 걸을 수 있는 경사는 접선 이동에는 장애물이 아니지만, 중력/스냅처럼 표면 안쪽으로
+            // 향하는 이동은 막아야 kinematic 바디가 지면을 통과하지 않는다.
+            bool walkableGround = Vector3.Angle(hit.normal, Vector3.up) <= maxWalkableAngle;
+            if (walkableGround && Vector3.Dot(dir, hit.normal) >= -0.0001f)
                 continue;
             if (hit.distance < nearest)
             {

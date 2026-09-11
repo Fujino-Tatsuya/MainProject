@@ -9,9 +9,17 @@ using UnityEngine;
 [RequireComponent(typeof(CapsuleCollider))]
 public sealed class PlayerMotor : MonoBehaviour
 {
+    public enum MotorMode
+    {
+        Kinematic,
+        Dynamic
+    }
+
     private const int CastBufferSize = 8;
     private const float DefaultMaxWalkableSlopeAngle = 60f;
+    private const float DefaultMaxFallSpeed = 30f;
     private const float MovementComparisonEpsilon = 0.00001f;
+    private const float UpwardIntentEpsilon = 0.00005f;
 
     /// <summary>접지 변위 채널이 허용하는 수직 성분 한계(m). 이보다 크면 제출자가 계약을 깬 것이다.</summary>
     private const float NonPlanarDisplacementTolerance = 0.0001f;
@@ -26,8 +34,6 @@ public sealed class PlayerMotor : MonoBehaviour
     private Rigidbody playerRigidbody;
     private CapsuleCollider capsule;
     private PlayerGroundingSensor grounding;
-    private PlayerMovement movement;
-    private LayerMask obstacleMask;
 
     private Vector3 pendingVelocity;
     private Vector3 pendingGroundedDisplacement;
@@ -35,8 +41,10 @@ public sealed class PlayerMotor : MonoBehaviour
     private Vector3 pendingPosePosition;
     private Quaternion pendingPoseRotation;
     private bool hasPendingPose;
-    private float lastVerticalIntentY;
     private bool warnedNonPlanarGroundedDisplacement;
+    private bool gravityEnabled = true;
+    private float verticalVelocity;
+    private MotorMode mode;
 
     /// <summary>직전 Motor 틱에서 최종 이동 스윕이 요청 이동을 제한했는지 여부.</summary>
     public bool WasBlockedThisTick { get; private set; }
@@ -46,16 +54,26 @@ public sealed class PlayerMotor : MonoBehaviour
 
     /// <summary>Rigidbody 기준 현재 위치. 지연 적용되는 MovePosition과 같은 좌표계를 쓴다.</summary>
     public Vector3 Position => playerRigidbody != null ? playerRigidbody.position : transform.position;
+    public float VerticalVelocity => verticalVelocity;
+    public bool GravityEnabled => gravityEnabled;
+    public MotorMode Mode => mode;
+    public PlayerGameRuleData GameRule => gameRule;
 
     /// <summary>이번 물리 틱에 적용할 월드 속도(m/s)를 더한다.</summary>
     public void AddVelocity(Vector3 worldVelocity)
     {
+        if (!isActiveAndEnabled)
+            return;
+
         pendingVelocity += worldVelocity;
     }
 
     /// <summary>이번 물리 틱에 적용할 월드 변위(m)를 더한다.</summary>
     public void AddDisplacement(Vector3 worldDelta)
     {
+        if (!isActiveAndEnabled)
+            return;
+
         pendingDisplacement += worldDelta;
     }
 
@@ -70,6 +88,9 @@ public sealed class PlayerMotor : MonoBehaviour
     /// </summary>
     public void AddGroundedDisplacement(Vector3 worldDelta)
     {
+        if (!isActiveAndEnabled)
+            return;
+
         // 위 주석의 전제(수평 전용)를 깨면 캐릭터가 조용히 떠오른다 — 증상만 보고는 원인을 찾기
         // 어려우므로 제출 시점에 잡는다. 인스턴스당 한 번만 남겨 스팸을 막는다.
         if (!warnedNonPlanarGroundedDisplacement &&
@@ -91,9 +112,51 @@ public sealed class PlayerMotor : MonoBehaviour
     /// </summary>
     public void SetPoseTarget(Vector3 worldPosition, Quaternion worldRotation)
     {
+        if (!isActiveAndEnabled)
+            return;
+
         pendingPosePosition = worldPosition;
         pendingPoseRotation = worldRotation;
         hasPendingPose = true;
+    }
+
+    /// <summary>Soul 부유처럼 Motor의 수동 중력 채널만 켜고 끈다.</summary>
+    public void SetGravityEnabled(bool enabled)
+    {
+        gravityEnabled = enabled;
+        if (!enabled)
+            verticalVelocity = 0f;
+
+        if (mode == MotorMode.Dynamic && playerRigidbody != null)
+            playerRigidbody.useGravity = enabled;
+    }
+
+    /// <summary>
+    /// 향후 진짜 PhysX가 필요한 상태를 위한 도피구. 현재 gameplay 사용처는 없다.
+    /// Kinematic→Dynamic은 Motor 수직 속도를 Rigidbody로 넘기고, 반대 전환은 되받는다.
+    /// </summary>
+    public void SetMode(MotorMode nextMode)
+    {
+        if (playerRigidbody == null || mode == nextMode)
+            return;
+
+        if (nextMode == MotorMode.Dynamic)
+        {
+            playerRigidbody.isKinematic = false;
+            playerRigidbody.useGravity = gravityEnabled;
+            playerRigidbody.linearVelocity = Vector3.up * verticalVelocity;
+        }
+        else
+        {
+            verticalVelocity = playerRigidbody.linearVelocity.y;
+            playerRigidbody.useGravity = false;
+            playerRigidbody.linearVelocity = Vector3.zero;
+            playerRigidbody.angularVelocity = Vector3.zero;
+            playerRigidbody.isKinematic = true;
+        }
+
+        mode = nextMode;
+        ClearPendingMotion();
     }
 
     private void Awake()
@@ -101,14 +164,20 @@ public sealed class PlayerMotor : MonoBehaviour
         playerRigidbody = GetComponent<Rigidbody>();
         capsule = GetComponent<CapsuleCollider>();
         grounding = GetComponent<PlayerGroundingSensor>();
-        movement = GetComponent<PlayerMovement>();
-
-        // 현재 걷기/루트 이동이 쓰는 계약 유지: 유닛은 통과하고 정적 지오메트리만 막는다.
-        obstacleMask = LayerMask.GetMask("Default", "Ground", "Wall", "Env");
+        mode = playerRigidbody != null && !playerRigidbody.isKinematic
+            ? MotorMode.Dynamic
+            : MotorMode.Kinematic;
     }
 
     private void FixedUpdate()
     {
+        if (mode == MotorMode.Dynamic)
+        {
+            ClearPendingMotion();
+            verticalVelocity = playerRigidbody != null ? playerRigidbody.linearVelocity.y : 0f;
+            return;
+        }
+
         Tick(Time.fixedDeltaTime);
     }
 
@@ -123,13 +192,10 @@ public sealed class PlayerMotor : MonoBehaviour
             pendingDisplacement = Vector3.zero;
             hasPendingPose = false;
             WasBlockedThisTick = false;
-            lastVerticalIntentY = requestedPoseDelta.y;
+            verticalVelocity = 0f;
 
             ApplyRigidbodyPose(pendingPosePosition, pendingPoseRotation, true);
             MovementResolved?.Invoke(requestedPoseDelta, requestedPoseDelta, false);
-
-            if (movement != null)
-                movement.ApplyPostMotorGroundLock(lastVerticalIntentY);
 
             return;
         }
@@ -139,9 +205,33 @@ public sealed class PlayerMotor : MonoBehaviour
         // 채 방향만 바꾸므로, 경사면 위에서 수직으로 움직이는 플랫폼의 변위가 수평 이동으로 뒤바뀐다.
         // 변경 전 PlayerMovement.Move()도 `ProjectOntoGround(inputMove) + _carryDelta` 였다.
         // 대시는 grounded displacement 채널로 들어와 같은 투영을 공유한다.
+        Vector3 selfPropelledDelta = pendingVelocity * deltaTime + pendingGroundedDisplacement;
+        Vector3 externalDelta = pendingDisplacement;
+        bool hasUpwardIntent = selfPropelledDelta.y + externalDelta.y > UpwardIntentEpsilon;
+
+        Vector3 gravityDelta = Vector3.zero;
+        Vector3 groundSnapDelta = Vector3.zero;
+        bool grounded = grounding != null && grounding.IsGrounded;
+
+        if (grounded)
+        {
+            verticalVelocity = 0f;
+            if (!hasUpwardIntent)
+            {
+                // 센서가 복원한 캡슐 표면 간격: +gap은 아래로, -penetration은 위로 보정한다.
+                groundSnapDelta = Vector3.down * grounding.GroundSurfaceDistance;
+            }
+        }
+        else if (gravityEnabled)
+        {
+            verticalVelocity += Physics.gravity.y * deltaTime;
+            float maxFallSpeed = gameRule != null ? gameRule.MaxFallSpeed : DefaultMaxFallSpeed;
+            verticalVelocity = Mathf.Max(verticalVelocity, -maxFallSpeed);
+            gravityDelta = Vector3.up * (verticalVelocity * deltaTime);
+        }
+
         Vector3 desiredDelta =
-            ProjectOntoGround(pendingVelocity * deltaTime + pendingGroundedDisplacement) +
-            pendingDisplacement;
+            ProjectOntoGround(selfPropelledDelta) + externalDelta + gravityDelta + groundSnapDelta;
         pendingVelocity = Vector3.zero;
         pendingGroundedDisplacement = Vector3.zero;
         pendingDisplacement = Vector3.zero;
@@ -150,7 +240,7 @@ public sealed class PlayerMotor : MonoBehaviour
             capsule,
             desiredDelta,
             gameRule != null ? gameRule.MaxWalkableSlopeAngle : DefaultMaxWalkableSlopeAngle,
-            obstacleMask,
+            ResolveObstacleMask(),
             collisionSkin,
             maxSweepIterations,
             castBuffer);
@@ -158,15 +248,28 @@ public sealed class PlayerMotor : MonoBehaviour
         WasBlockedThisTick =
             (desiredDelta - resolvedDelta).sqrMagnitude >
             MovementComparisonEpsilon * MovementComparisonEpsilon;
-        lastVerticalIntentY = resolvedDelta.y;
         MovementResolved?.Invoke(desiredDelta, resolvedDelta, WasBlockedThisTick);
 
         if (resolvedDelta.sqrMagnitude > 0f)
             ApplyRigidbodyPose(playerRigidbody.position + resolvedDelta, default, false);
+    }
 
-        // Y 잠금은 이번 틱의 최종 수직 의도와 MovePosition 제출이 확정된 뒤 판정해야 한다.
-        if (movement != null)
-            movement.ApplyPostMotorGroundLock(lastVerticalIntentY);
+    private LayerMask ResolveObstacleMask()
+    {
+        int mask = gameRule != null
+            ? gameRule.ObstacleMask.value
+            : LayerMask.GetMask("Default", "Ground", "Wall", "Env");
+        int playerBit = LayerMask.GetMask("Player");
+        int soulBit = LayerMask.GetMask("Soul");
+
+        // Player 충돌은 bool 하나로만 결정하고 Soul은 항상 Player와 상호 통과한다.
+        mask &= ~playerBit;
+        mask &= ~soulBit;
+        bool isSoul = grounding != null && grounding.Mode == PlayerGroundingSensor.GroundingMode.Soul;
+        if (!isSoul && gameRule != null && gameRule.BlockOtherPlayers)
+            mask |= playerBit;
+
+        return mask;
     }
 
     private Vector3 ProjectOntoGround(Vector3 move)
@@ -197,6 +300,12 @@ public sealed class PlayerMotor : MonoBehaviour
     }
 
     private void OnDisable()
+    {
+        ClearPendingMotion();
+        verticalVelocity = 0f;
+    }
+
+    private void ClearPendingMotion()
     {
         pendingVelocity = Vector3.zero;
         pendingGroundedDisplacement = Vector3.zero;

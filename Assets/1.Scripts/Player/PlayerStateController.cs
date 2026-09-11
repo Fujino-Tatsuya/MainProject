@@ -11,10 +11,12 @@ using UnityEngine;
 public class PlayerStateController : MonoBehaviour, IRestraintReceiver
 {
     [SerializeField] private PlayerActionState currentStateDebug;
-    [SerializeField] private float minKnockbackTime = 0.15f;
-    [SerializeField] private float maxKnockbackTime = 1.5f;
     [SerializeField, Min(0f)] private float serverKnockbackReportGraceTime = 0.25f;
-    [SerializeField] private float knockbackStopSpeed = 0.15f;
+
+    private const float DefaultMinKnockbackTime = 0.15f;
+    private const float DefaultMaxKnockbackTime = 1.5f;
+    private const float DefaultKnockbackStopSpeed = 0.15f;
+    private const float DefaultKnockbackDeceleration = 6f;
 
     private IPlayerState currentState;
     private PlayerStateContext context;
@@ -32,10 +34,12 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
     // 스킬 실행 중 이동/회전 허용 여부는 스킬 정의에 위임 (단일 Skill 상태)
     private bool AllowsSkillMovement => currentState is PlayerSkillState skillState && skillState.AllowsMovement;
     private bool AllowsSkillMovementRotate => currentState is PlayerSkillState skillState && skillState.AllowsMovementRotate;
-    public float MinKnockbackTime => minKnockbackTime;
-    public float MaxKnockbackTime => maxKnockbackTime;
+    private PlayerGameRuleData GameRule => context != null && context.Motor != null ? context.Motor.GameRule : null;
+    public float MinKnockbackTime => GameRule != null ? GameRule.MinKnockbackTime : DefaultMinKnockbackTime;
+    public float MaxKnockbackTime => GameRule != null ? GameRule.MaxKnockbackTime : DefaultMaxKnockbackTime;
     public float ServerKnockbackReportGraceTime => serverKnockbackReportGraceTime;
-    public float KnockbackStopSpeed => knockbackStopSpeed;
+    public float KnockbackStopSpeed => GameRule != null ? GameRule.KnockbackStopSpeed : DefaultKnockbackStopSpeed;
+    public float KnockbackDeceleration => GameRule != null ? GameRule.KnockbackDeceleration : DefaultKnockbackDeceleration;
 
     private void Awake()
     {
@@ -254,7 +258,7 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
     public bool IsCinematicLocked => cinematicLocked;
 
     // Dash는 방향·속도·지속시간이 필수라 인스턴스 주입 경로로만 진입한다. (예측 게이트는 PlayerDashController가 확인)
-    public bool BeginDash(Vector3 planarDirection, float speed, float duration, DashMotionSettings motion)
+    public bool BeginDash(Vector3 planarDirection, float speed, float duration)
     {
         if (CurrentState == PlayerActionState.Dead || cinematicLocked)
         {
@@ -270,7 +274,7 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
             Edit.LogWarning($"[Dash] 상태 진입: {CurrentState} 상태를 덮어쓰고 대시로 전이합니다.", this);
         }
 
-        SetState(new PlayerDashState(context, planarDirection, speed, duration, motion));
+        SetState(new PlayerDashState(context, planarDirection, speed, duration));
         return true;
     }
 
@@ -745,17 +749,13 @@ public sealed class PlayerRestrainedState : PlayerStateBase
     private readonly GameObject instigator;
     private readonly RestraintMode mode;
     private readonly float frontOffset;
-    private readonly Rigidbody playerRigidbody;
     private readonly PlayerMotor motor;
-    private bool wasKinematic;
-    private bool wasDetectingCollisions;
-    private bool hadRigidbody;
 
     // Carry 전용. null이면 위치 추종만 건너뛰고 물리 위임·입력 차단은 그대로 간다
     // (보스에 잡기 소켓이 아직 없는 동안 "제자리에 붙잡힘"이 이 성질로 성립한다 — 유지할 것).
     private Transform followTarget;
 
-    // Push 전용. 캐리 중 isKinematic이라 중력이 없으므로 Y는 진입 시점 값으로 고정한다.
+    // Push 전용. 시전자 피벗 높이를 따라가지 않도록 Y는 진입 시점 값으로 고정한다.
     // 시전자 Y를 그대로 쓰면 피벗 높이가 다를 때 플레이어가 조용히 뜨거나 잠긴다.
     private float pushHeight;
 
@@ -767,11 +767,6 @@ public sealed class PlayerRestrainedState : PlayerStateBase
         this.mode = mode;
         this.frontOffset = frontOffset;
 
-        // 🔴 Rigidbody 직접 참조 예외 — 이동 자체는 motor.SetPoseTarget으로 제출한다.
-        // 이 참조는 구속 중 물리 위임(isKinematic/detectCollisions 저장·복원)에만 쓴다.
-        // 3단계에서 전 피어가 kinematic이 되면 그 토글이 없어지면서 이 참조도 사라진다.
-        // 새 상태를 만들 때 이 패턴을 따라 하지 말 것 — 이동은 Motor로 제출한다.
-        playerRigidbody = context.Player != null ? context.Player.GetComponent<Rigidbody>() : null;
         motor = context.Motor;
     }
 
@@ -793,7 +788,6 @@ public sealed class PlayerRestrainedState : PlayerStateBase
 
         pushHeight = Context.Player.transform.position.y;
 
-        DelegatePhysicsAndCollisionToInstigator();
         FaceInstigator();
         // TODO: Play the restrained animation here after the Animator parameter/clip is configured.
         // Example: Context.Animator.SetBool("IsGrabbed", true);
@@ -801,7 +795,6 @@ public sealed class PlayerRestrainedState : PlayerStateBase
 
     public override void Exit(PlayerActionState nextState)
     {
-        RestorePlayerPhysicsAndCollision();
         FaceInstigator();
         // TODO: Stop the restrained animation here after the Animator parameter/clip is configured.
         // Example: Context.Animator.SetBool("IsGrabbed", false);
@@ -854,32 +847,6 @@ public sealed class PlayerRestrainedState : PlayerStateBase
         return true;
     }
 
-    private void DelegatePhysicsAndCollisionToInstigator()
-    {
-        if (!Context.Player.IsMovementAuthority || playerRigidbody == null)
-            return;
-
-        hadRigidbody = true;
-        wasKinematic = playerRigidbody.isKinematic;
-        wasDetectingCollisions = playerRigidbody.detectCollisions;
-
-        playerRigidbody.linearVelocity = Vector3.zero;
-        playerRigidbody.angularVelocity = Vector3.zero;
-        playerRigidbody.isKinematic = true;
-        playerRigidbody.detectCollisions = false;
-    }
-
-    private void RestorePlayerPhysicsAndCollision()
-    {
-        if (!hadRigidbody || playerRigidbody == null)
-            return;
-
-        playerRigidbody.isKinematic = wasKinematic;
-        playerRigidbody.detectCollisions = wasDetectingCollisions;
-        playerRigidbody.linearVelocity = Vector3.zero;
-        playerRigidbody.angularVelocity = Vector3.zero;
-    }
-
     // 소켓/정면 추종 중 생긴 기울어짐을 정리하고 시전자 방향(yaw만)으로 세운다.
     // instigator가 없으면 현재 바라보던 방향을 유지한 채 똑바로만 세운다.
     private void FaceInstigator()
@@ -894,9 +861,6 @@ public sealed class PlayerRestrainedState : PlayerStateBase
 
         Quaternion rotation = Quaternion.LookRotation(lookDirection.normalized);
 
-        if (playerRigidbody != null)
-            playerRigidbody.rotation = rotation;
-
         Context.Player.transform.rotation = rotation;
     }
 }
@@ -905,20 +869,14 @@ public sealed class PlayerKnockbackState : PlayerStateBase
 {
     private readonly Vector3 direction;
     private readonly float strength;
-    private readonly Rigidbody playerRigidbody;
+    private Vector3 velocity;
     private float startTime;
+    private float plannedDuration;
 
     public PlayerKnockbackState(PlayerStateContext context, Vector3 direction, float strength) : base(context)
     {
         this.direction = direction;
         this.strength = strength;
-
-        // 🔴 Rigidbody 직접 참조 예외 — 위치는 PlayerMotor가 독점하지만 넉백만 아직 PhysX가
-        // 운전한다(isKinematic 해제 + AddForce + 마찰 감속). `PlayerStateContext.Rigidbody`를
-        // 없앤 것은 상태들이 물리를 임의로 만지는 것을 막기 위해서이므로, 여기서만 국소적으로 잡는다.
-        // 3단계에서 넉백이 Motor 속도 채널 + 명시적 감쇠로 바뀌면 이 참조도 사라진다.
-        // 새 상태를 만들 때 이 패턴을 따라 하지 말 것 — 이동은 Motor로 제출한다.
-        playerRigidbody = context.Player != null ? context.Player.GetComponent<Rigidbody>() : null;
     }
 
     public override PlayerActionState StateType => PlayerActionState.Knockback;
@@ -932,16 +890,23 @@ public sealed class PlayerKnockbackState : PlayerStateBase
 
         startTime = Time.time;
 
-        // 물리 적용은 이동 권위(오너/오프라인)만 — 서버(비오너) 사본은 상태 장부만 기록
-        if (!Context.Player.IsMovementAuthority || playerRigidbody == null)
+        // 이동 적용은 이동 권위(오너/오프라인)만 — 서버 비오너 사본은 상태 장부만 기록한다.
+        if (!Context.Player.IsMovementAuthority || Context.Motor == null)
             return;
 
-        playerRigidbody.isKinematic = false;
-        playerRigidbody.linearVelocity = Vector3.zero;
-        playerRigidbody.angularVelocity = Vector3.zero;
-
         if (direction.sqrMagnitude > 0.001f && strength > 0f)
-            playerRigidbody.AddForce(direction.normalized * strength, ForceMode.Impulse);
+            velocity = direction.normalized * strength;
+
+        float deceleration = Context.Controller.KnockbackDeceleration;
+        float timeToStop = deceleration > 0f
+            ? Mathf.Max(0f, velocity.magnitude - Context.Controller.KnockbackStopSpeed) / deceleration
+            : Context.Controller.MaxKnockbackTime;
+        plannedDuration = Mathf.Clamp(
+            timeToStop,
+            Context.Controller.MinKnockbackTime,
+            Context.Controller.MaxKnockbackTime);
+
+        Context.Motor.MovementResolved += OnMotorMovementResolved;
     }
 
     public override void Tick()
@@ -958,34 +923,36 @@ public sealed class PlayerKnockbackState : PlayerStateBase
             return;
         }
 
-        if (playerRigidbody == null)
+        if (Context.Motor == null)
         {
-            EndAndNotifyServer("rigidbody-null", Time.time - startTime, -1f);
+            EndAndNotifyServer("motor-null", Time.time - startTime, -1f);
             return;
         }
 
         float elapsed = Time.time - startTime;
-        if (elapsed < Context.Controller.MinKnockbackTime)
+        if (elapsed >= plannedDuration)
+            EndAndNotifyServer("planned-duration", elapsed, velocity.magnitude);
+    }
+
+    public override void FixedTick()
+    {
+        if (!Context.Player.IsMovementAuthority || Context.Motor == null)
             return;
 
-        float stopSpeed = Context.Controller.KnockbackStopSpeed;
-        bool slowEnough = playerRigidbody.linearVelocity.sqrMagnitude <= stopSpeed * stopSpeed;
-        bool timeout = elapsed >= Context.Controller.MaxKnockbackTime;
+        if (velocity.sqrMagnitude > 0f)
+            Context.Motor.AddVelocity(velocity);
 
-        if (slowEnough || timeout)
-        {
-            string reason = slowEnough ? "slow-enough" : "owner-timeout";
-            EndAndNotifyServer(reason, elapsed, playerRigidbody.linearVelocity.magnitude);
-        }
+        velocity = Vector3.MoveTowards(
+            velocity,
+            Vector3.zero,
+            Context.Controller.KnockbackDeceleration * Time.fixedDeltaTime);
     }
 
     public override void Exit(PlayerActionState nextState)
     {
-        if (!Context.Player.IsMovementAuthority || playerRigidbody == null)
-            return;
-
-        playerRigidbody.linearVelocity = Vector3.zero;
-        playerRigidbody.angularVelocity = Vector3.zero;
+        if (Context.Motor != null)
+            Context.Motor.MovementResolved -= OnMotorMovementResolved;
+        velocity = Vector3.zero;
     }
 
     private void EndAndNotifyServer(string reason, float elapsed, float speed)
@@ -993,21 +960,27 @@ public sealed class PlayerKnockbackState : PlayerStateBase
         Context.Controller.EndKnockback();
         Context.Player.NotifyKnockbackEnded();
     }
+
+    private void OnMotorMovementResolved(Vector3 requestedDelta, Vector3 appliedDelta, bool wasBlocked)
+    {
+        if (!wasBlocked || velocity.sqrMagnitude <= 0f)
+            return;
+
+        // 벽 충돌 정책은 넉백 채널 소유자가 결정한다: 반사·지속 슬라이드 없이 즉시 속도만 없앤다.
+        // 상태 종료시각(plannedDuration)은 바꾸지 않아 벽 앞과 개활지의 경직 시간이 같다.
+        velocity = Vector3.zero;
+    }
 }
 
 // 오너 예측 대시. 방향·Root Yaw를 시작 순간 확정하고 지속시간 동안 바꾸지 않는다. (PLAN §7, 불변식 6)
 // W2는 평지 단순 이동만 담당한다. 경사·벽·절벽·공중 관성은 W3에서 대체·확장한다.
 public sealed class PlayerDashState : PlayerStateBase
 {
-    private const float MaxFallSpeed = 30f; // 대시 공중 낙하 속도 상한 (PLAN §5)
-
     private readonly Vector3 direction; // 평면 정규화 방향(시작 순간 확정)
     private readonly float speed;
     private readonly float duration;    // 요청된 지속시간(진단 로그용 원본)
     private readonly float startTime;   // 상태 생성 시각(진단용)
     private readonly float endTime;
-
-    private float airborneVerticalSpeed; // 절벽 낙하 중 누적 하강 속도(공중 구간에서만)
 
     // ── 진단 상태(로그 전용) ──
     private int tickCount;
@@ -1018,7 +991,7 @@ public sealed class PlayerDashState : PlayerStateBase
     private bool lostGroundingDuringDash;
     private bool wasGrounded;
 
-    public PlayerDashState(PlayerStateContext context, Vector3 planarDirection, float speed, float duration, DashMotionSettings motion)
+    public PlayerDashState(PlayerStateContext context, Vector3 planarDirection, float speed, float duration)
         : base(context)
     {
         Vector3 planar = planarDirection;
@@ -1064,7 +1037,7 @@ public sealed class PlayerDashState : PlayerStateBase
         if (sensor == null)
         {
             Edit.LogWarning(
-                "[Dash] PlayerGroundingSensor가 없어 대시 내내 '공중'으로 취급됩니다 — 매 tick 중력이 누적됩니다.",
+                "[Dash] PlayerGroundingSensor가 없어 접지 전이 진단을 기록할 수 없습니다.",
                 Context.Player);
         }
     }
@@ -1093,7 +1066,7 @@ public sealed class PlayerDashState : PlayerStateBase
             Edit.LogWarning("[Dash] 속도가 0이라 대시 내내 이동량이 없습니다(PlayerDashData.dashSpeed 확인).", Context.Player);
         }
 
-        // 절벽: Grounded를 잃으면 남은 대시 동안 방향 조작·Drag 없이 대시 수평속도 + 중력을 적용한다. (PLAN §8 / W3c)
+        // 절벽: Grounded를 잃어도 남은 대시 수평속도는 유지한다. 수직 중력은 Motor가 항상 담당한다.
         PlayerGroundingSensor sensor = Context.GroundingSensor;
         bool grounded = sensor != null && sensor.IsGrounded;
 
@@ -1108,33 +1081,10 @@ public sealed class PlayerDashState : PlayerStateBase
         }
 
         if (!grounded)
-        {
             lostGroundingDuringDash = true;
-            airborneVerticalSpeed += Physics.gravity.y * Time.fixedDeltaTime; // gravity.y < 0
-            airborneVerticalSpeed = Mathf.Max(airborneVerticalSpeed, -MaxFallSpeed);
-            delta.y += airborneVerticalSpeed * Time.fixedDeltaTime;
-        }
-        else
-        {
-            airborneVerticalSpeed = 0f;
-        }
-
-        // 🔴 수평과 수직을 반드시 나눠 제출한다.
-        // AddGroundedDisplacement는 접지면 투영(ProjectOntoGround)을 타는데, 그 함수는 크기를
-        // 보존한 채 방향만 바꾼다. 중력이 섞인 벡터를 기울어진 지면에 투영하면
-        // `projected = move - dot(move,n)·n` 에서 아래 방향 성분이 **위쪽 성분으로 뒤집히고**,
-        // 게다가 중력 크기만큼 커진 magnitude로 재정규화되어 위로 밀어내는 변위가 된다.
-        // 바디가 dynamic이라 MovePosition이 속도를 남기므로, 대시가 끝난 뒤에도 그 위쪽 속도로
-        // 계속 떠오른다(떠 있는 동안은 접지가 아니라 평지 Y잠금도 걸리지 않는다).
-        // 변경 전 코드도 ResolvePlanarSlopeDirection으로 **방향만** 투영하고 중력은 그 뒤에 더했다.
-        float verticalDelta = delta.y;
-        delta.y = 0f;
 
         if (delta.sqrMagnitude > 0f)
             Context.Motor?.AddGroundedDisplacement(delta);
-
-        if (verticalDelta != 0f)
-            Context.Motor?.AddDisplacement(new Vector3(0f, verticalDelta, 0f));
     }
 
     /// <summary>

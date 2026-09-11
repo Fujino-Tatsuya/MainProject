@@ -38,8 +38,6 @@ public class Player : Unit
     [SerializeField] int defense;
 
     [Header("\n이동 플랫폼 캐리")]
-    [Tooltip("발밑 플랫폼 라이더 콜라이더 검사 레이어. 기본 전체.")]
-    [SerializeField] private LayerMask platformRiderMask = ~0;
     [Tooltip("발밑 검사 거리(m).")]
     [SerializeField] private float platformGroundCheckDistance = 0.6f;
 
@@ -47,10 +45,8 @@ public class Player : Unit
     private DefaultAttackController defaultAttack;
     private FirstMeleePassive passive;
     private PlayerMotor motor;
+    private PlayerGroundingSensor groundingSensor;
     private PlayerInvulnerability invulnerability;
-    private Rigidbody playerRigidbody;
-    private bool initialRigidbodyIsKinematic;
-    private bool initialRigidbodyDetectCollisions;
 
     public PlayerActionState CurrentState => stateController != null ? stateController.CurrentState : PlayerActionState.Idle;
     public bool CanMove => stateController == null || stateController.CanMove;
@@ -71,13 +67,8 @@ public class Player : Unit
         defaultAttack = GetComponent<DefaultAttackController>();
         passive = GetComponent<FirstMeleePassive>();
         motor = GetComponent<PlayerMotor>();
+        groundingSensor = GetComponent<PlayerGroundingSensor>();
         invulnerability = GetComponent<PlayerInvulnerability>();
-        playerRigidbody = GetComponent<Rigidbody>();
-        if (playerRigidbody != null)
-        {
-            initialRigidbodyIsKinematic = playerRigidbody.isKinematic;
-            initialRigidbodyDetectCollisions = playerRigidbody.detectCollisions;
-        }
 
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
@@ -110,7 +101,7 @@ public class Player : Unit
         if (IsServer)
             Initialize(attackDamage, moveSpeed, attackSpeed, maxHp, defense);
 
-        ConfigureMovementPhysicsAuthority();
+        ConfigureMovementAuthority();
     }
 
     public override void OnNetworkDespawn()
@@ -118,20 +109,21 @@ public class Player : Unit
         if (LocalPlayer == this)
             SetLocalPlayer(null);
 
-        RestoreRigidbodyDefaults();
+        if (motor != null)
+            motor.enabled = false;
         base.OnNetworkDespawn();
     }
 
     public override void OnGainedOwnership()
     {
         base.OnGainedOwnership();
-        ConfigureMovementPhysicsAuthority();
+        ConfigureMovementAuthority();
     }
 
     public override void OnLostOwnership()
     {
         base.OnLostOwnership();
-        ConfigureMovementPhysicsAuthority();
+        ConfigureMovementAuthority();
     }
 
     private void Start()
@@ -139,6 +131,8 @@ public class Player : Unit
         // 오프라인(비네트워크) 실행은 OnNetworkSpawn이 불리지 않는다 — 테스트 씬 HUD 바인딩/입력 활성 폴백
         if (!IsNetworkActive)
         {
+            if (motor != null)
+                motor.enabled = true;
             SetLocalPlayer(this);
             EnableLocalInput();
         }
@@ -205,7 +199,7 @@ public class Player : Unit
             origin,
             Vector3.down,
             platformGroundCheckDistance,
-            platformRiderMask,
+            ResolvePlatformRiderMask(),
             QueryTriggerInteraction.Collide);
 
         for (int i = 0; i < hits.Length; i++)
@@ -219,6 +213,17 @@ public class Player : Unit
                 break;
             }
         }
+    }
+
+    private LayerMask ResolvePlatformRiderMask()
+    {
+        PlayerGameRuleData rule = motor != null ? motor.GameRule : null;
+        if (rule == null)
+            return LayerMask.GetMask("Default", "Ground", "Env");
+
+        bool isSoul = groundingSensor != null &&
+                      groundingSensor.Mode == PlayerGroundingSensor.GroundingMode.Soul;
+        return rule.GetGroundMask(isSoul);
     }
 
     public void EndDefaultAttack()
@@ -361,42 +366,18 @@ public class Player : Unit
         stateController.ApplyKnockbackFromServer(direction, strength);
     }
 
-    /// <summary>이동은 오너 권위(networking.md) — 넉백 물리를 시뮬레이션할 피어인지 여부.</summary>
+    /// <summary>이동은 오너 권위(networking.md) — Motor를 실행할 피어인지 여부.</summary>
     public bool IsMovementAuthority => !IsNetworkActive || IsOwner;
 
     /// <summary>
     /// Player 위치는 owner-authority NetworkTransform이 복제한다.
-    /// 비권한 피어의 Rigidbody는 kinematic으로 두어 중력·충돌 반응이 복제 위치와 경쟁하지 않게 한다.
-    /// 콜라이더 감지는 유지하므로 서버의 공격 판정과 Overlap 쿼리에는 계속 참여한다.
+    /// Rigidbody는 전 피어에서 kinematic이며, 비권한 피어는 Motor만 꺼 복제 위치와 경쟁하지 않게 한다.
+    /// 콜라이더는 유지하므로 서버 공격 판정과 Overlap 쿼리에는 계속 참여한다.
     /// </summary>
-    private void ConfigureMovementPhysicsAuthority()
+    private void ConfigureMovementAuthority()
     {
-        if (playerRigidbody == null)
-            return;
-
-        playerRigidbody.linearVelocity = Vector3.zero;
-        playerRigidbody.angularVelocity = Vector3.zero;
-
-        if (IsMovementAuthority)
-        {
-            playerRigidbody.detectCollisions = initialRigidbodyDetectCollisions;
-            playerRigidbody.isKinematic = initialRigidbodyIsKinematic;
-            return;
-        }
-
-        playerRigidbody.detectCollisions = initialRigidbodyDetectCollisions;
-        playerRigidbody.isKinematic = true;
-    }
-
-    private void RestoreRigidbodyDefaults()
-    {
-        if (playerRigidbody == null)
-            return;
-
-        playerRigidbody.linearVelocity = Vector3.zero;
-        playerRigidbody.angularVelocity = Vector3.zero;
-        playerRigidbody.detectCollisions = initialRigidbodyDetectCollisions;
-        playerRigidbody.isKinematic = initialRigidbodyIsKinematic;
+        if (motor != null)
+            motor.enabled = IsMovementAuthority;
     }
 
     public void NotifyKnockbackEnded()

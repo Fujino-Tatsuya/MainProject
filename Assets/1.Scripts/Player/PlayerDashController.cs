@@ -2,23 +2,6 @@ using UnityEngine;
 using Unity.Netcode;
 using BeaverLobby.Player.Dash;
 
-/// <summary>대시 상태가 이동 중 충돌 해결에 쓰는 튜닝값 묶음. (W3)</summary>
-public readonly struct DashMotionSettings
-{
-    public readonly float CollisionSkin;
-    public readonly int MaxSweepIterations;
-    public readonly float MaxWalkableSlopeAngle;
-    public readonly LayerMask ObstacleMask;
-
-    public DashMotionSettings(float collisionSkin, int maxSweepIterations, float maxWalkableSlopeAngle, LayerMask obstacleMask)
-    {
-        CollisionSkin = Mathf.Max(0f, collisionSkin);
-        MaxSweepIterations = Mathf.Max(1, maxSweepIterations);
-        MaxWalkableSlopeAngle = Mathf.Clamp(maxWalkableSlopeAngle, 1f, 89f);
-        ObstacleMask = obstacleMask;
-    }
-}
-
 /// <summary>
 /// 대시 입력·오너 예측·서버 승인·충전 정합을 담당한다. (PLAN §6, §7, §9, §10 / W2·W4)
 ///
@@ -34,12 +17,8 @@ public class PlayerDashController : NetworkBehaviour
 {
     [Tooltip("대시 튜닝 원본(ScriptableObject). 없으면 대시가 비활성화된다.")]
     [SerializeField] private PlayerDashData dashData;
-    [Tooltip("공용 이동 규칙(등판각 등). 미할당 시 60도 폴백.")]
-    [SerializeField] private PlayerGameRuleData gameRule;
     [Tooltip("지면 판정 센서. 없으면 지면 게이트를 건너뛴다.")]
     [SerializeField] private PlayerGroundingSensor groundingSensor;
-
-    private const float DefaultMaxWalkableSlopeAngle = 60f;
 
     private Player player;
     private PlayerInputReader input;
@@ -274,7 +253,7 @@ public class PlayerDashController : NetworkBehaviour
         }
 
         Vector3 direction = ResolveDashDirection();
-        bool started = stateController.BeginDash(direction, (float)config.DashSpeed, (float)config.DashDuration, BuildMotionSettings());
+        bool started = stateController.BeginDash(direction, (float)config.DashSpeed, (float)config.DashDuration);
         if (!started)
         {
             // ⚠️ 여기까지 왔다면 예측 충전은 이미 소비됐다(위 TryConsume). 상태 진입만 거부되면
@@ -504,16 +483,6 @@ public class PlayerDashController : NetworkBehaviour
     {
         if (player != null && player.IsMovementAuthority && predictedLedger != null)
             predictedLedger.ForceReset(1, OwnerNow());
-    }
-
-    private DashMotionSettings BuildMotionSettings()
-    {
-        float walkableAngle = gameRule != null ? gameRule.MaxWalkableSlopeAngle : DefaultMaxWalkableSlopeAngle;
-        return new DashMotionSettings(
-            dashData.CollisionSkin,
-            dashData.MaxSweepIterations,
-            walkableAngle,
-            dashData.DashObstacleMask);
     }
 
     private Vector3 ResolveDashDirection()

@@ -13,3 +13,18 @@ MonoBehaviour:
   m_Name: PlayerGameRuleData
   m_EditorClassIdentifier: Assembly-CSharp::PlayerGameRuleData
   maxWalkableSlopeAngle: 60
+  obstacleMask:
+    serializedVersion: 2
+    m_Bits: 2185
+  groundMask:
+    serializedVersion: 2
+    m_Bits: 2057
+  soulGroundMask:
+    serializedVersion: 2
+    m_Bits: 2057
+  blockOtherPlayers: 0
+  maxFallSpeed: 30
+  minKnockbackTime: 0.15
+  maxKnockbackTime: 1.5
+  knockbackStopSpeed: 0.15
+  knockbackDeceleration: 6

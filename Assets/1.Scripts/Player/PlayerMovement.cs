@@ -1,15 +1,12 @@
 ﻿using UnityEngine;
 
 [RequireComponent(typeof(PlayerInputReader))]
-[RequireComponent(typeof(Rigidbody))]
 [RequireComponent(typeof(PlayerMotor))]
 public class PlayerMovement : MonoBehaviour
 {
     private PlayerInputReader reader;
     private Player player;
     private PlayerSoulController soulController;
-    private Rigidbody rb;
-    private PlayerGroundingSensor grounding;
     private PlayerMotor motor;
 
     [SerializeField] private Transform armature;
@@ -20,29 +17,16 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private float alignThreshold = 0.98f;
     [SerializeField] private float viewYaw = -45f;
 
-    // 평지 판정 기준. QA의 P9-PlayerWallClimb 디텍터와 같은 값이라 디텍터가 이상으로 보는 구간이
-    // 그대로 Y 잠금 구간이 된다(경사·램프는 이 값을 못 넘어 잠기지 않는다).
-    private const float FlatGroundNormalY = 0.999f;
-    private const float VerticalIntentEpsilon = 0.00005f;
-
     private Vector2 prevDir_for_Rotate = new Vector2(0f, -1f);
     private bool hasRotate = true;
     private float currentSpeed;
-
-    // Y 잠금 판정용(ApplyFlatGroundYLock 참조). 스크립트가 스스로 넣은 수직 이동이 있으면 잠그지
-    // 않아야 하므로 이번 물리 틱의 최종 의도값을 남긴다. initialConstraints는 저작된 제약(회전 고정)이다.
-    private float lastVerticalIntentY;
-    private RigidbodyConstraints initialConstraints;
 
     private void Awake()
     {
         reader = GetComponent<PlayerInputReader>();
         player = GetComponent<Player>();
         soulController = GetComponent<PlayerSoulController>();
-        rb = GetComponent<Rigidbody>();
-        grounding = GetComponent<PlayerGroundingSensor>();
         motor = GetComponent<PlayerMotor>();
-        initialConstraints = rb.constraints;
 
         if (armature == null)
             armature = transform.Find("Armature");
@@ -104,51 +88,6 @@ public class PlayerMovement : MonoBehaviour
 
         if (motor != null && inputVelocity.sqrMagnitude > 0f)
             motor.AddVelocity(inputVelocity);
-    }
-
-    /// <summary>Motor가 최종 이동을 적용한 뒤 같은 물리 틱의 Y 잠금 판정을 마무리한다.</summary>
-    internal void ApplyPostMotorGroundLock(float verticalIntentY)
-    {
-        lastVerticalIntentY = verticalIntentY;
-        ApplyFlatGroundYLock();
-    }
-
-    /// <summary>
-    /// 평지 접지 중에는 Rigidbody의 Y축을 잠근다(그 외에는 저작된 제약으로 되돌린다).
-    ///
-    /// 루트 Rigidbody는 저작상 non-kinematic이라(Paladin 프리팹) <c>rb.MovePosition</c>이 텔레포트가
-    /// 아니라 "목표까지 가는 속도 + 솔버의 충돌 해석"으로 동작한다. 그래서 캡슐이 벽 모서리에 눌리면
-    /// PhysX가 접촉 법선 방향으로 관통을 밀어내는데, 모서리·베벨 면의 법선에 섞인 미세한 +Y가 매
-    /// 스텝 쌓여 벽을 타고 오른다(QA P9-PlayerWallClimb). <see cref="PlayerMotionSweep"/>은
-    /// MovePosition <b>전에</b> 끝나 이걸 막을 수 없고 사후 보정은 한 프레임 늦으므로, 솔버가 Y를
-    /// 아예 못 건드리게 제약으로 막는다. 잠긴 축의 접촉 해석은 수평 성분만 남아 벽을 따라 미끄러지는
-    /// 동작은 그대로다. 판정은 <see cref="PlayerMotor"/>가 최종 이동을 제출한 뒤 물리 스텝마다 갱신한다.
-    ///
-    /// 다음 중 하나라도 어긋나면 즉시 잠금을 푼다(정상적인 수직 이동 보호):
-    /// - 평지 접지가 아님(경사·램프는 법선이 <see cref="FlatGroundNormalY"/> 미만 → 등판·낙하 정상)
-    /// - 이동 플랫폼 위(플랫폼이 수직으로 움직인다)
-    /// - 스크립트가 직접 수직 이동을 넣었음(플랫폼 캐리 등)
-    /// - 넉백 중(위로 띄우는 넉백이라면 Y가 잠긴 채로는 떠오르지 못해 접지도 안 풀린다)
-    ///
-    /// 대시는 제외하지 않는다 — 설계상 평면 이동이고(<c>planar.y = 0f</c>), 절벽에서 떨어지는
-    /// 수직 이동은 접지가 풀리는 순간 이 잠금도 같이 풀리므로 평지 접지 게이트만으로 충분하다.
-    /// </summary>
-    private void ApplyFlatGroundYLock()
-    {
-        bool lockY =
-            grounding != null &&
-            grounding.IsGrounded &&
-            !grounding.IsMovingPlatform &&
-            grounding.GroundNormal.y >= FlatGroundNormalY &&
-            Mathf.Abs(lastVerticalIntentY) <= VerticalIntentEpsilon &&
-            (player == null || player.CurrentState != PlayerActionState.Knockback);
-
-        RigidbodyConstraints desired = lockY
-            ? initialConstraints | RigidbodyConstraints.FreezePositionY
-            : initialConstraints;
-
-        if (rb.constraints != desired)
-            rb.constraints = desired;
     }
 
     private void Rotate()
