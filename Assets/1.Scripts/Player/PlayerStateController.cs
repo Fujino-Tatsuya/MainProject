@@ -1119,8 +1119,22 @@ public sealed class PlayerDashState : PlayerStateBase
             airborneVerticalSpeed = 0f;
         }
 
+        // 🔴 수평과 수직을 반드시 나눠 제출한다.
+        // AddGroundedDisplacement는 접지면 투영(ProjectOntoGround)을 타는데, 그 함수는 크기를
+        // 보존한 채 방향만 바꾼다. 중력이 섞인 벡터를 기울어진 지면에 투영하면
+        // `projected = move - dot(move,n)·n` 에서 아래 방향 성분이 **위쪽 성분으로 뒤집히고**,
+        // 게다가 중력 크기만큼 커진 magnitude로 재정규화되어 위로 밀어내는 변위가 된다.
+        // 바디가 dynamic이라 MovePosition이 속도를 남기므로, 대시가 끝난 뒤에도 그 위쪽 속도로
+        // 계속 떠오른다(떠 있는 동안은 접지가 아니라 평지 Y잠금도 걸리지 않는다).
+        // 변경 전 코드도 ResolvePlanarSlopeDirection으로 **방향만** 투영하고 중력은 그 뒤에 더했다.
+        float verticalDelta = delta.y;
+        delta.y = 0f;
+
         if (delta.sqrMagnitude > 0f)
             Context.Motor?.AddGroundedDisplacement(delta);
+
+        if (verticalDelta != 0f)
+            Context.Motor?.AddDisplacement(new Vector3(0f, verticalDelta, 0f));
     }
 
     /// <summary>

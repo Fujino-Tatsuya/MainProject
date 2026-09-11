@@ -13,6 +13,9 @@ public sealed class PlayerMotor : MonoBehaviour
     private const float DefaultMaxWalkableSlopeAngle = 60f;
     private const float MovementComparisonEpsilon = 0.00001f;
 
+    /// <summary>접지 변위 채널이 허용하는 수직 성분 한계(m). 이보다 크면 제출자가 계약을 깬 것이다.</summary>
+    private const float NonPlanarDisplacementTolerance = 0.0001f;
+
     [Header("충돌 (최종 이동 스윕)")]
     [SerializeField] private PlayerGameRuleData gameRule;
     [SerializeField, Min(0f)] private float collisionSkin = 0.02f;
@@ -33,6 +36,7 @@ public sealed class PlayerMotor : MonoBehaviour
     private Quaternion pendingPoseRotation;
     private bool hasPendingPose;
     private float lastVerticalIntentY;
+    private bool warnedNonPlanarGroundedDisplacement;
 
     /// <summary>직전 Motor 틱에서 최종 이동 스윕이 요청 이동을 제한했는지 여부.</summary>
     public bool WasBlockedThisTick { get; private set; }
@@ -58,9 +62,26 @@ public sealed class PlayerMotor : MonoBehaviour
     /// <summary>
     /// 이번 물리 틱에 적용할 자발 이동 변위(m)를 더한다.
     /// 걷기 속도 채널과 같이 접지면에 투영되지만, 플랫폼 캐리 같은 외부 변위와는 분리된다.
+    ///
+    /// 🔴 <b>반드시 수평(y≈0) 벡터만 넣을 것.</b> <see cref="ProjectOntoGround"/>는 크기를 보존한 채
+    /// 방향만 바꾸므로, 수직 성분이 섞이면 기울어진 지면에서 아래 방향이 **위쪽으로 뒤집히고**
+    /// 그 크기만큼 재정규화되어 캐릭터가 떠오른다. 중력·낙하 같은 수직 성분은
+    /// <see cref="AddDisplacement"/>(투영 없음)로 따로 제출한다.
     /// </summary>
     public void AddGroundedDisplacement(Vector3 worldDelta)
     {
+        // 위 주석의 전제(수평 전용)를 깨면 캐릭터가 조용히 떠오른다 — 증상만 보고는 원인을 찾기
+        // 어려우므로 제출 시점에 잡는다. 인스턴스당 한 번만 남겨 스팸을 막는다.
+        if (!warnedNonPlanarGroundedDisplacement &&
+            Mathf.Abs(worldDelta.y) > NonPlanarDisplacementTolerance)
+        {
+            warnedNonPlanarGroundedDisplacement = true;
+            Edit.LogWarning(
+                $"[Motor] AddGroundedDisplacement에 수직 성분이 섞였습니다(y={worldDelta.y:F4}). " +
+                "접지면 투영은 크기를 보존한 채 방향만 바꾸므로 경사에서 아래 방향이 위로 뒤집힙니다. " +
+                "수직 성분은 AddDisplacement로 따로 제출하세요.", this);
+        }
+
         pendingGroundedDisplacement += worldDelta;
     }
 
