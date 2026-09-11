@@ -16,7 +16,14 @@ Update this file when a term becomes important enough that future agents or team
 **1단계 수정함 (동시 편집 금지)**: `Assets/1.Scripts/Player/PlayerMovement.cs` ·
 `Assets/1.Scripts/Player/Player.cs` · 🔴 `Assets/1.Scripts/Map/MovingPlatform.cs`(회귀 수정)
 
-커밋: `1e6113b`(Codex, 루프 정정) → `76824f2`(회귀 수정). **MPPM 검증 대기.**
+커밋: `1e6113b`(Codex, 루프 정정) → `76824f2`(회귀 수정).
+
+**실측 검증 (2026-09-11, 단일 에디터)**: 지속 이동속도 **30fps 5.072 / 60fps 5.009 / 144fps 4.992 m/s
+— 편차 1.58%** (완료조건 5% 이내 통과, `maxSpeed=5` 설정값과 일치). 컴파일 0에러.
+예외는 전부 서드파티 `INab WeaponTrailEffect`(기존 문제, 무관).
+계측기 = `Assets/1.Scripts/Dev/DevMoveSpeedProbe.cs`(**검증 종료 후 삭제할 것**).
+
+**미검증**: 이동 플랫폼 탑승(= `76824f2`가 고친 대상) · MPPM 2인 · 경사/벽 슬라이드.
 
 이번에 확정된 계약만 적는다:
 
