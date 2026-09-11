@@ -389,10 +389,10 @@ Unit.Knockback(dir, strength)              공통 진입점 (서버 가드 + 슈
 > `MovingPlatform`은 변위형(차분, 루프 결합).
 
 **2단계**
-- [ ] `Assets/1.Scripts/Player/**`에서 `MovePosition` 호출이 **`PlayerMotor` 1곳뿐**이다(A-6 제외).
-- [ ] `PlayerStateContext`에 `Rigidbody`가 없다.
-- [ ] `ClampByStaticGeometry`, `ResolvePlanarSlopeDirection` 삭제됨.
-- [ ] Script Execution Order가 `ProjectSettings`에 커밋됨.
+- [x] `Assets/1.Scripts/Player/**`에서 `MovePosition` 호출이 **`PlayerMotor` 1곳뿐**이다(A-6 제외).
+- [x] `PlayerStateContext`에 `Rigidbody`가 없다.
+- [x] `ClampByStaticGeometry`, `ResolvePlanarSlopeDirection` 삭제됨.
+- [x] Script Execution Order가 `ProjectSettings`에 커밋됨.
 - [ ] 대시 중 "요청이동 ≈ 적용이동 ≈ 실제이동"(기존 `[Dash] 종료` 로그 기준, 오차 10% 이내).
 - [ ] 평타 루트모션 전진이 기존과 동일한 거리를 낸다.
 

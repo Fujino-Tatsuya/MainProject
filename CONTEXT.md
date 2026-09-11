@@ -8,10 +8,30 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 현재 인수인계 (2026-09-11 · 플레이어 이동 Motor 재정립 1단계, 브랜치 `feature/player-motor`)
+## ▶▶ 현재 인수인계 (2026-09-11 · 플레이어 이동 Motor 재정립 2단계-b, 브랜치 `feature/player-motor`)
 
 작업 세션: **은희(Claude → Codex 위임)**. 브랜치 `feature/player-motor` (base `origin/development` `72392d6`).
 계획·근거·완료조건은 [PLAN-player-motor.md](PLAN-player-motor.md) — 여기에 중복 기술하지 않는다.
+
+**2단계-b 코드 완료, Play 검증 대기** — 커밋 `96c8350`.
+
+- `Player/**`의 실제 `MovePosition(...)` 호출은 `PlayerMotor` 내부 1곳뿐이다(추락 복귀 예외 제외).
+- FSM 판단·엣지 입력 소비는 `Update`에 유지하고, 대시·인터럽트·스크립트 평타·구속 추종의 이동 제출만
+  `FixedTick`으로 분리했다. 프레임 히치 때 물리 틱 수만큼 동일 변위를 중복 제출하지 않는다.
+- 애니메이터 루트모션은 `OnAnimatorMove`의 프레임 델타를 `AddDisplacement(+=)`로 래치해 다음 Motor 틱에 합산한다.
+- 구속 추종은 델타 누적이 아니라 절대 포즈의 **마지막 값 우선** 채널이다. 일반 이동 의도보다 우선하며
+  충돌 비활성화 상태의 기존 소켓/Push 추종 의미를 보존한다.
+- 대시의 요청/적용/차단 진단은 `PlayerMotor.MovementResolved` 결과를 집계한다. 중복 스윕과
+  `ClampByStaticGeometry`·`ResolvePlanarSlopeDirection`은 삭제했다.
+- `PlayerStateContext.Rigidbody`는 제거했다. 3단계에서 교체될 넉백·구속 물리 플래그만 각 상태가
+  자기 `Rigidbody`를 생성 시 1회 캐시한다.
+- `DashPressed`는 Input System 콜백에서 래치하고 상태 틱 종료 후 소비한다.
+
+수정 파일: `PlayerMotor.cs` · `Player.cs` · `PlayerMovement.cs` · `PlayerStateController.cs` ·
+`PlayerInputReader.cs` · `DefaultAttackController.cs` · `FirstMeleeMainSkill.cs` · `PlayerSkillTargeting.cs`.
+
+검증: `dotnet build Assembly-CSharp.csproj --no-restore` **오류 0**. 기존 경고 18건만 존재.
+사용자 지시로 Play/MPPM은 실행하지 않았다. 대시 거리·평타 루트모션·구속 추종은 수동 검증 필요.
 
 **1단계 수정함 (동시 편집 금지)**: `Assets/1.Scripts/Player/PlayerMovement.cs` ·
 `Assets/1.Scripts/Player/Player.cs` · 🔴 `Assets/1.Scripts/Map/MovingPlatform.cs`(회귀 수정)
