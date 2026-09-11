@@ -38,7 +38,7 @@ public class PlayerMovement : MonoBehaviour
     private bool hasRotate = true;
     private float currentSpeed;
 
-    // 이동 플랫폼 캐리: 이번 프레임 외부 이동량(플랫폼). Move()에서 입력 이동과 합산 후 리셋.
+    // 이동 플랫폼 캐리: 이번 물리 틱의 외부 이동량(플랫폼). Move()에서 입력 이동과 합산 후 리셋.
     private Vector3 _carryDelta;
 
     // Y 잠금 판정용(ApplyFlatGroundYLock 참조). 스크립트가 스스로 넣은 수직 이동이 있으면 잠그지
@@ -46,7 +46,7 @@ public class PlayerMovement : MonoBehaviour
     private float lastVerticalIntentY;
     private RigidbodyConstraints initialConstraints;
 
-    /// <summary>이동 플랫폼 등 외부 이동량을 이번 프레임 이동에 가산한다(소유자측에서 호출).</summary>
+    /// <summary>이동 플랫폼 등 외부 이동량을 이번 물리 틱 이동에 가산한다(소유자측에서 호출).</summary>
     public void AddCarryDelta(Vector3 delta)
     {
         _carryDelta += delta;
@@ -77,12 +77,13 @@ public class PlayerMovement : MonoBehaviour
 
     private void Update()
     {
-        Move();
         Rotate();
     }
 
     private void FixedUpdate()
     {
+        Move();
+
         // Y 잠금은 물리 케이던스로 갱신한다 — 프레임 히치로 한 프레임에 물리 스텝이 여러 번 돌 때
         // Update에서 한 번만 갱신하면 그 스텝들이 낡은 판정을 공유해 상승분이 새어 들어간다.
         ApplyFlatGroundYLock();
@@ -116,11 +117,11 @@ public class PlayerMovement : MonoBehaviour
                 currentSpeed = Mathf.MoveTowards(
                     currentSpeed,
                     maxSpeed,
-                    acceleration * Time.deltaTime
+                    acceleration * Time.fixedDeltaTime
                 );
             }
 
-            inputMove = worldDir * ResolveMoveSpeed(currentSpeed) * Time.deltaTime;
+            inputMove = worldDir * ResolveMoveSpeed(currentSpeed) * Time.fixedDeltaTime;
         }
         else
         {
@@ -141,7 +142,7 @@ public class PlayerMovement : MonoBehaviour
             gameRule != null ? gameRule.MaxWalkableSlopeAngle : DefaultMaxWalkableSlopeAngle,
             rootMoveBlockingMask, collisionSkin, maxSweepIterations, castBuffer);
 
-        // 스윕까지 끝난 이번 프레임의 수직 의도값 — FixedUpdate의 Y 잠금 판정에 쓴다.
+        // 스윕까지 끝난 이번 물리 틱의 수직 의도값 — FixedUpdate의 Y 잠금 판정에 쓴다.
         lastVerticalIntentY = total.y;
 
         if (total.sqrMagnitude > 0f)

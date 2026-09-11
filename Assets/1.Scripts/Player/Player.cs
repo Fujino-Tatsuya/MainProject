@@ -165,13 +165,6 @@ public class Player : Unit
 
     private void Update()
     {
-        // 이동 플랫폼 캐리는 이동 권한 피어(오너/오프라인)에서만 적용한다.
-        // 비오너는 루트 NetworkTransform으로 이미 동기되므로 여기서 적용하면 이중 적용된다.
-        if (IsMovementAuthority)
-        {
-            ApplyPlatformCarry();
-        }
-
         if (IsNetworkActive &&
             !stateController.ShouldTickForNetwork(IsOwner, HasStateAuthority))
         {
@@ -179,6 +172,16 @@ public class Player : Unit
         }
 
         stateController.Tick();
+    }
+
+    private void FixedUpdate()
+    {
+        // 이동 플랫폼 캐리는 이동 권한 피어(오너/오프라인)에서만 적용한다.
+        // 비오너는 루트 NetworkTransform으로 이미 동기되므로 여기서 적용하면 이중 적용된다.
+        if (IsMovementAuthority)
+        {
+            ApplyPlatformCarry();
+        }
     }
 
     /// <summary>발밑에 캐리 표면이 있으면 그 이동량을 플레이어 이동에 가산한다.</summary>
@@ -205,7 +208,7 @@ public class Player : Unit
             if (carrier != null)
             {
                 movement.AddCarryDelta(
-                    carrier.GetCarryDelta(transform.position, Time.deltaTime));
+                    carrier.GetCarryDelta(transform.position, Time.fixedDeltaTime));
                 break;
             }
         }
