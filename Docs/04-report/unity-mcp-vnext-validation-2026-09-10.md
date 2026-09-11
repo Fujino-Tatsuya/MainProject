@@ -98,7 +98,7 @@ GitHub push와 영구 SHA 적용은 아직 완료되지 않았다.
 - `AUDIT_FORCE_COMPILE_FIXTURE=1`과 `scripts/audit_unity_mcp_play.cjs`: Play/실제 컴파일.
 - `scripts/audit_unity_mcp_vnext_tokens.py`: 캡처 응답과 trace 토큰 측정.
 - `scripts/verify_unity_mcp_install.cjs <SHA> <candidate-root>`: 최종 설치 SHA/핵심 파일/런처 검증.
-- `output/unity-mcp-vnext/`: 원본 실패·성공 로그, prefab-wire-results.json,
+- `C:/Users/user/Projects/TeamVault/MainProejectVault/04-report/mcp-audit-output/unity-mcp-vnext/`: 원본 실패·성공 로그, prefab-wire-results.json,
   extended/play-results.json, final-regressions/, final-transport.log, final-eval.log,
   model-holdout/result.json, reference-dev/result.json, token-results.json. Git에는 원본
   실행 캐시와 로그 전체를 넣지 않고 재현 스크립트·검증 보고서를 커밋한다.

@@ -2,7 +2,7 @@
 
 검사 기간: 2026-09-08~09. 기준 패키지: `85f6c175c08233cc462c60557c6c2556dcde805e`.
 **후속 상태:** 9월 9일 22:51 KST부터 실제 서버 연결에 성공해 후보 Play·실제 어셈블리 컴파일까지 추가 검증했다. 아래 초기 미접속 기록은 당시의 관측이며, 최신 결과는 §7을 참조한다.
-실측 원본: [`output/unity-mcp-audit-2026-09-08`](../../output/unity-mcp-audit-2026-09-08).
+실측 원본(레포 밖 · 팀 볼트): `C:/Users/user/Projects/TeamVault/MainProejectVault/04-report/mcp-audit-output/unity-mcp-audit-2026-09-08`.
 수정 계획: [승인된 1차 범위](../superpowers/plans/2026-09-08-unity-mcp-audit-fixes.md).
 
 ## 판단
@@ -123,7 +123,7 @@ Roslyn AST의 필드 선언 줄과 출하 `unity_explain_compile_errors`의 분�
 작업 공간은 게임 바깥의 Codex writable 경로에 있으며 프로젝트 UPM 핀은 변경하지 않았다.
 
 후보 커밋: `db29827b86708e7f97c2adc8bc7b7293fe31b19f` (21파일). 작업 트리는 clean이다.
-[전체 패치](../../output/unity-mcp-audit-2026-09-09-fixed/unity-mcp-audit.patch)와 [전달 메타데이터·SHA256](../../output/unity-mcp-audit-2026-09-09-fixed/delivery.json)를 보존했다.
+[전체 패치](C:/Users/user/Projects/TeamVault/MainProejectVault/04-report/mcp-audit-output/unity-mcp-audit-2026-09-09-fixed/unity-mcp-audit.patch)와 [전달 메타데이터·SHA256](C:/Users/user/Projects/TeamVault/MainProejectVault/04-report/mcp-audit-output/unity-mcp-audit-2026-09-09-fixed/delivery.json)를 보존했다.
 원본 포크에서 `git apply --check`가 성공했고 원본의 사용자 package.json 수정도 그대로 남아 있다. 이 명령은 패치를 실제 적용하지 않는다.
 
 ### 완료한 수정
@@ -137,7 +137,7 @@ Roslyn AST의 필드 선언 줄과 출하 `unity_explain_compile_errors`의 분�
 | 기존 프로브 | 실제 Assets fixture 쓰기 제거, 과거 총계·삭제 파일 의존 감소, 캐시 그래프 전체 집합 대조, 추정 토큰 표기 정정 | 9개 실행 파일 모두 exit 0 |
 
 새 회귀시험 **51/51**. 최종 실행은 2026-09-09 22:45 KST, Node `v24.19.0`이다.
-결과: [regression-results.json](../../output/unity-mcp-audit-2026-09-09-fixed/regression-results.json), [suite-results.json](../../output/unity-mcp-audit-2026-09-09-fixed/suite-results.json).
+결과: [regression-results.json](C:/Users/user/Projects/TeamVault/MainProejectVault/04-report/mcp-audit-output/unity-mcp-audit-2026-09-09-fixed/regression-results.json), [suite-results.json](C:/Users/user/Projects/TeamVault/MainProejectVault/04-report/mcp-audit-output/unity-mcp-audit-2026-09-09-fixed/suite-results.json).
 `node scripts/audit_unity_mcp_fixed.cjs <후보 패키지 루트>`로 같은 묶음을 다시 실행할 수 있다. 실패한 하위 실행이 있으면 감사 드라이버도 비정상 종료한다.
 
 기존 지도 프로브의 성공 기준은 기본 6k 예산에서 6문항 이상이다. 최종 결과는 **6/7**이므로 9개 스위트가 성공했다는 말은 모든 내부 질문이 성공했다는 뜻이 아니다.
@@ -151,7 +151,7 @@ SVN 문제는 실제 `SkillRange.png` 조회에 `Assets/50.Art/.svn/pristine/...
 ### 설치와 검증 경계
 
 - 수정 후보는 별도 worktree 브랜치에 보존했다. **MainProject UPM 핀, 설치 런처, 실행 중 패키지는 교체하지 않았다.** push/merge도 하지 않았다.
-- 후보 읽기 연결은 initialize 38ms, tools/list 약 7,545ms·editor 약 7,560ms 후 연결 불가 오류로 종료됐다. 무한 대기는 없었지만 **온라인 Unity 통합 성공은 미확인**이다. [후보 연결 결과](../../output/unity-mcp-audit-2026-09-09-fixed/live-results.json)
+- 후보 읽기 연결은 initialize 38ms, tools/list 약 7,545ms·editor 약 7,560ms 후 연결 불가 오류로 종료됐다. 무한 대기는 없었지만 **온라인 Unity 통합 성공은 미확인**이다. [후보 연결 결과](C:/Users/user/Projects/TeamVault/MainProejectVault/04-report/mcp-audit-output/unity-mcp-audit-2026-09-09-fixed/live-results.json)
 - Play 2회/재컴파일 job은 9월 8일 기준 설치본의 실측이다. 이번 수정본의 Play/새 C# 컴파일 성공으로 옮겨 적지 않는다.
 - 변경 코드의 로컬 diff 검토와 회귀시험은 완료했다. 하위 에이전트의 후속 교차 리뷰는 사용량 제한으로 완료되지 않아 별도 독립 리뷰 통과로 표시하지 않는다.
 - 캐시 schema는 18 → 20이다. 최초 적용 시 이전 캐시는 한 번 재빌드한다. 리뷰 후 실제 적용할 때 UPM 핀과 고정 경로에 둔 런처를 함께 갱신하고, 온라인 조회·Play·실제 assembly 생성 재컴파일을 다시 확인해야 한다.
@@ -228,12 +228,12 @@ mtime/size 기반 지문은 같은 크기·같은 mtime으로 내용을 덮는 �
 | 시작 / 최종 상태 | BootStrapScene 편집 모드 → 타이틀 씬 실행 → BootStrapScene 편집 모드 |
 | 콘솔 Error 조회 | 검사 전후 반환 0건; 리로드 중 모든 로그의 보존을 증명한 것은 아님 |
 
-[Play·컴파일 원본](../../output/unity-mcp-live-2026-09-09/play-results.json), [최신 조회·해석기 원본](../../output/unity-mcp-live-2026-09-09/live-results.json).
+[Play·컴파일 원본](C:/Users/user/Projects/TeamVault/MainProejectVault/04-report/mcp-audit-output/unity-mcp-live-2026-09-09/play-results.json), [최신 조회·해석기 원본](C:/Users/user/Projects/TeamVault/MainProejectVault/04-report/mcp-audit-output/unity-mcp-live-2026-09-09/live-results.json).
 후속 조회에서 지도·Hurtbox 영향 분석·인덱스 상태까지 실제 stdio 연결을 통해 모두 정상 반환됐다.
 독립 코드 리뷰는 핵심 4파일의 `85f6c17..db29827` 변경을 읽고 도입된 release blocker를 발견하지 않았다. 리뷰어가 실행 시험을 독립 재실행한 것은 아니다.
 기존 ‘하위 에이전트 리뷰 미완료’ 상태는 이 후속 리뷰로 해소됐다.
 
-현재 프로젝트의 기존 pin/lock과 설치 런처는 `output/unity-mcp-install-2026-09-09/before-*`에 바이트 그대로 백업했다.
+현재 프로젝트의 기존 pin/lock과 설치 런처는 `C:/Users/user/Projects/TeamVault/MainProejectVault/04-report/mcp-audit-output/unity-mcp-install-2026-09-09/before-*`에 바이트 그대로 백업했다.
 최종 설치 커밋·원격 확인·설치 후 결과는 적용 검증 후 이 절에 기록한다.
 
 ## 8. 추가 조사 결과
@@ -241,5 +241,5 @@ mtime/size 기반 지문은 같은 크기·같은 mtime으로 내용을 덮는 �
 [후속 조사·교차검증 보고서](unity-mcp-followup-crosscheck-2026-09-09.md)에 공식 자료 대조, 남은 기능 범위와 평가 기준을 정리했다.
 추가로 `hadErrors=false`만으로 `current`라고 표시하는 기존 진단 오류를 재현·수정했다. 새 6개를 포함해 회귀시험 57개, 기존 프로브 9개가 각 통과 기준을 충족했다.
 후속 수정은 로컬 커밋 `f16c698`에 보존했다. 원격 push가 자동 승인 검토에서 차단되어 프로젝트 UPM 핀은 아직 기준 버전이다.
-[후속 회귀 결과](../../output/unity-mcp-followup-2026-09-09/regression-results.json), [실제 연결 결과](../../output/unity-mcp-followup-2026-09-09/live-results.json).
+[후속 회귀 결과](C:/Users/user/Projects/TeamVault/MainProejectVault/04-report/mcp-audit-output/unity-mcp-followup-2026-09-09/regression-results.json), [실제 연결 결과](C:/Users/user/Projects/TeamVault/MainProejectVault/04-report/mcp-audit-output/unity-mcp-followup-2026-09-09/live-results.json).
 이 수정은 새로운 실제 컴파일을 실행하지 않아도 되는 로컬 진단 라벨 계약 변경이다. 기존 Play/DLL 생성 검증과 추가 stdio 진단 검증을 구분한다.

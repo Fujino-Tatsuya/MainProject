@@ -140,3 +140,10 @@ Docs/temp/
 /[Aa]ssets/Unity.VisualScripting.Generated/
 /[Aa]ssets/Unity.VisualScripting.Generated.meta
 *.sync-conflict-*
+
+# 로컬 환경 / 스크래치 (2026-09-11 — 레포 루트에 쌓여 있던 것 정리)
+# output/ 은 MCP 감사 산출물 167MB 가 쌓여 있던 자리다. 증거 원본은 팀 볼트
+# 04-report/mcp-audit-output/ 으로 옮겼고, 04-report 의 보고서들이 그 경로를 가리킨다.
+/output/
+/.vscode/
+/.claude/settings.local.json

@@ -10,7 +10,7 @@
 포크에는 사용자의 package.json 변경이 있으므로 보존한다. 게임 코드·씬·프리팹·패키지 핀 변경, push/merge는 범위 밖이다.
 최종 변경은 포크에서 리뷰할 수 있는 patch와 재현 테스트로 남기고, 프로젝트 적용은 별도 단계다.
 
-실측 원본은 `output/unity-mcp-audit-2026-09-08`에 있다.
+실측 원본은 `C:/Users/user/Projects/TeamVault/MainProejectVault/04-report/mcp-audit-output/unity-mcp-audit-2026-09-08`에 있다.
 
 | 우선순위 | 확인된 문제 | 수용 기준 |
 |---|---|---|
