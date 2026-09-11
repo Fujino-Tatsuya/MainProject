@@ -49,18 +49,31 @@ public class MonsterMeleeAttack : BaseAttack
         _results = new Collider[Mathf.Max(1, maxHitCount)];
     }
 
-    // 서버 오버랩 판정 → 대상 Hurtbox/Unit.ReceiveAttack. 넉백 옵션이면 추가로 Unit.Knockback.
-    public void Hit()
+    /// <summary>
+    /// 서버 오버랩 판정 → 대상 Hurtbox/Unit.ReceiveAttack. 넉백 옵션이면 추가로 Unit.Knockback.
+    /// </summary>
+    /// <returns>
+    /// <b>실제로 피해가 들어간 대상 수.</b> 0 이면 헛스윙이다(범위에 아무도 없었거나 전부 걸러졌다).
+    ///
+    /// 값을 돌려주는 이유: "때렸다"와 "맞았다"는 다른 사건인데 지금까지 구분할 방법이 없었다.
+    /// 타격 연출·사운드·경직 같은 <b>명중했을 때만</b> 일어나야 하는 것들이 이 값을 본다.
+    /// 안 쓰는 호출부는 그대로 문장으로 두면 된다 — 기존 호출 10곳은 손대지 않았다.
+    ///
+    /// ⚠️ 서버에서만 유효하다. 클라에서는 판정 자체를 하지 않으므로 <b>항상 0</b>이다 —
+    /// 이 값으로 연출을 켜려면 반드시 RPC 로 내보낼 것. 여기서 직접 재생하면 호스트에서만 보인다.
+    /// </returns>
+    public int Hit()
     {
         if (!IsServer)
-            return;
+            return 0;
 
         if (colliderInfo == null)
         {
             Debug.LogError("MonsterMeleeAttack에 ColliderInfo가 필요합니다.", this);
-            return;
+            return 0;
         }
 
+        int applied = 0;
         int hitCount = Overlap();
         for (int i = 0; i < hitCount; i++)
         {
@@ -80,8 +93,11 @@ public class MonsterMeleeAttack : BaseAttack
                 }
             }
 
-            bool applied = TryResolveHit(hit);
-            if (!applied || !applyKnockback || hit == null)
+            bool resolved = TryResolveHit(hit);
+            if (resolved)
+                applied++;
+
+            if (!resolved || !applyKnockback || hit == null)
                 continue;
 
             Unit unit = hit.GetComponentInParent<Unit>();
@@ -93,6 +109,8 @@ public class MonsterMeleeAttack : BaseAttack
             if (dir.sqrMagnitude > 0.0001f)
                 unit.Knockback(dir.normalized, knockbackStrength);
         }
+
+        return applied;
     }
 
     private int Overlap()
