@@ -63,11 +63,17 @@ public sealed class PlayerMotor : MonoBehaviour
 
     private void Tick(float deltaTime)
     {
-        Vector3 desiredDelta = pendingVelocity * deltaTime + pendingDisplacement;
+        // 🔴 경사 투영은 "스스로 걷는 이동"(속도 채널)에만 적용한다. 플랫폼 캐리 같은 외부 변위는
+        // 월드가 정한 이동이라 지면 평면으로 회전시키면 안 된다 — ProjectOntoGround는 크기를 보존한
+        // 채 방향만 바꾸므로, 경사면 위에서 수직으로 움직이는 플랫폼의 변위가 수평 이동으로 뒤바뀐다.
+        // 변경 전 PlayerMovement.Move()도 `ProjectOntoGround(inputMove) + _carryDelta` 였다.
+        // (2단계-b에서 대시가 변위 채널로 들어올 때는 대시가 스스로 투영해 제출한다 — 기존
+        //  PlayerDashState.ResolvePlanarSlopeDirection과 같은 책임 배치다.)
+        Vector3 desiredDelta =
+            ProjectOntoGround(pendingVelocity * deltaTime) + pendingDisplacement;
         pendingVelocity = Vector3.zero;
         pendingDisplacement = Vector3.zero;
 
-        desiredDelta = ProjectOntoGround(desiredDelta);
         Vector3 resolvedDelta = PlayerMotionSweep.Resolve(
             capsule,
             desiredDelta,
