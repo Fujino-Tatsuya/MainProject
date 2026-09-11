@@ -24,6 +24,9 @@ public sealed class PlayerMotor : MonoBehaviour
     /// <summary>접지 변위 채널이 허용하는 수직 성분 한계(m). 이보다 크면 제출자가 계약을 깬 것이다.</summary>
     private const float NonPlanarDisplacementTolerance = 0.0001f;
 
+    /// <summary>요청한 수평 이동의 이 비율 미만만 적용됐으면 "막혔다"로 본다(벽 판정용).</summary>
+    private const float BlockedRatioThreshold = 0.1f;
+
     [Header("충돌 (최종 이동 스윕)")]
     [SerializeField] private PlayerGameRuleData gameRule;
     [SerializeField, Min(0f)] private float collisionSkin = 0.02f;
@@ -230,8 +233,9 @@ public sealed class PlayerMotor : MonoBehaviour
             gravityDelta = Vector3.up * (verticalVelocity * deltaTime);
         }
 
-        Vector3 desiredDelta =
-            ProjectOntoGround(selfPropelledDelta) + externalDelta + gravityDelta + groundSnapDelta;
+        // 제출된 의도(= Motor 보정 제외). 막힘 판정의 기준이다 — 아래 WasBlockedThisTick 주석 참조.
+        Vector3 intentDelta = ProjectOntoGround(selfPropelledDelta) + externalDelta;
+        Vector3 desiredDelta = intentDelta + gravityDelta + groundSnapDelta;
         pendingVelocity = Vector3.zero;
         pendingGroundedDisplacement = Vector3.zero;
         pendingDisplacement = Vector3.zero;
@@ -245,9 +249,22 @@ public sealed class PlayerMotor : MonoBehaviour
             maxSweepIterations,
             castBuffer);
 
+        // 🔴 "막혔다" 판정은 **제출된 수평 의도**만 본다. desiredDelta에는 Motor 자신의 보정
+        // (중력·접지 스냅)이 섞여 있는데, 접지 중 수평 이동에 작은 스냅이 더해지면 스윕이 1회차에
+        // 지면을 막고 접선으로 흘린다(ProjectOnPlane). 수평분은 2회차에서 복구되지만 아래 방향
+        // 스냅분은 사라지므로, 전체 벡터를 1e-5로 비교하면 **정상 보행 중에도 매 틱 true**가 된다.
+        // 넉백이 이 값을 보고 자기 속도를 0으로 만들기 때문에(벽 정지 정책), 그대로 두면 접지
+        // 상태에서 넉백이 첫 틱에 취소돼 "경직만 걸리고 안 밀리는" 증상이 된다.
+        //
+        // 그래서 수직 성분을 빼고, 절대 오차가 아니라 **상대 부족분**으로 본다(기존 대시 진단이
+        // 쓰던 `applied < requested * 0.1` 과 같은 결).
+        Vector3 intentPlanar = new Vector3(intentDelta.x, 0f, intentDelta.z);
+        Vector3 appliedPlanar = new Vector3(resolvedDelta.x, 0f, resolvedDelta.z);
+        float intentDistance = intentPlanar.magnitude;
         WasBlockedThisTick =
-            (desiredDelta - resolvedDelta).sqrMagnitude >
-            MovementComparisonEpsilon * MovementComparisonEpsilon;
+            intentDistance > MovementComparisonEpsilon &&
+            appliedPlanar.magnitude < intentDistance * BlockedRatioThreshold;
+
         MovementResolved?.Invoke(desiredDelta, resolvedDelta, WasBlockedThisTick);
 
         if (resolvedDelta.sqrMagnitude > 0f)
