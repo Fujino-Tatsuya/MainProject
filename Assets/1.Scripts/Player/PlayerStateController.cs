@@ -869,7 +869,6 @@ public sealed class PlayerKnockbackState : PlayerStateBase
 {
     private readonly Vector3 direction;
     private readonly float strength;
-    private Vector3 velocity;
     private float startTime;
     private float plannedDuration;
 
@@ -894,19 +893,20 @@ public sealed class PlayerKnockbackState : PlayerStateBase
         if (!Context.Player.IsMovementAuthority || Context.Motor == null)
             return;
 
-        if (direction.sqrMagnitude > 0.001f && strength > 0f)
-            velocity = direction.normalized * strength;
+        Vector3 initialVelocity = direction.sqrMagnitude > 0.001f && strength > 0f
+            ? direction.normalized * strength
+            : Vector3.zero;
+        Context.Motor.SetKnockbackVelocity(initialVelocity);
 
         float deceleration = Context.Controller.KnockbackDeceleration;
         float timeToStop = deceleration > 0f
-            ? Mathf.Max(0f, velocity.magnitude - Context.Controller.KnockbackStopSpeed) / deceleration
+            ? Mathf.Max(0f, initialVelocity.magnitude - Context.Controller.KnockbackStopSpeed) / deceleration
             : Context.Controller.MaxKnockbackTime;
         plannedDuration = Mathf.Clamp(
             timeToStop,
             Context.Controller.MinKnockbackTime,
             Context.Controller.MaxKnockbackTime);
 
-        Context.Motor.MovementResolved += OnMotorMovementResolved;
     }
 
     public override void Tick()
@@ -931,28 +931,12 @@ public sealed class PlayerKnockbackState : PlayerStateBase
 
         float elapsed = Time.time - startTime;
         if (elapsed >= plannedDuration)
-            EndAndNotifyServer("planned-duration", elapsed, velocity.magnitude);
-    }
-
-    public override void FixedTick()
-    {
-        if (!Context.Player.IsMovementAuthority || Context.Motor == null)
-            return;
-
-        if (velocity.sqrMagnitude > 0f)
-            Context.Motor.AddVelocity(velocity);
-
-        velocity = Vector3.MoveTowards(
-            velocity,
-            Vector3.zero,
-            Context.Controller.KnockbackDeceleration * Time.fixedDeltaTime);
+            EndAndNotifyServer("planned-duration", elapsed, Context.Motor.KnockbackVelocity.magnitude);
     }
 
     public override void Exit(PlayerActionState nextState)
     {
-        if (Context.Motor != null)
-            Context.Motor.MovementResolved -= OnMotorMovementResolved;
-        velocity = Vector3.zero;
+        Context.Motor?.ClearKnockbackVelocity();
     }
 
     private void EndAndNotifyServer(string reason, float elapsed, float speed)
@@ -961,15 +945,6 @@ public sealed class PlayerKnockbackState : PlayerStateBase
         Context.Player.NotifyKnockbackEnded();
     }
 
-    private void OnMotorMovementResolved(Vector3 requestedDelta, Vector3 appliedDelta, bool wasBlocked)
-    {
-        if (!wasBlocked || velocity.sqrMagnitude <= 0f)
-            return;
-
-        // 벽 충돌 정책은 넉백 채널 소유자가 결정한다: 반사·지속 슬라이드 없이 즉시 속도만 없앤다.
-        // 상태 종료시각(plannedDuration)은 바꾸지 않아 벽 앞과 개활지의 경직 시간이 같다.
-        velocity = Vector3.zero;
-    }
 }
 
 // 오너 예측 대시. 방향·Root Yaw를 시작 순간 확정하고 지속시간 동안 바꾸지 않는다. (PLAN §7, 불변식 6)
@@ -1056,12 +1031,7 @@ public sealed class PlayerDashState : PlayerStateBase
         tickCount++;
 
         // 정면 벽으로 이동이 0이 되어도 대시 상태는 원래 종료시각까지 유지한다. (불변식: 상태·무적 유지)
-        Vector3 delta = Vector3.zero;
-        if (speed > 0f)
-        {
-            delta = direction * speed * Time.fixedDeltaTime;
-        }
-        else if (tickCount == 1) // 매 tick 반복될 값이라 첫 tick에만 남긴다
+        if (speed <= 0f && tickCount == 1) // 매 tick 반복될 값이라 첫 tick에만 남긴다
         {
             Edit.LogWarning("[Dash] 속도가 0이라 대시 내내 이동량이 없습니다(PlayerDashData.dashSpeed 확인).", Context.Player);
         }
@@ -1083,8 +1053,7 @@ public sealed class PlayerDashState : PlayerStateBase
         if (!grounded)
             lostGroundingDuringDash = true;
 
-        if (delta.sqrMagnitude > 0f)
-            Context.Motor?.AddGroundedDisplacement(delta);
+        Context.Motor?.SetDashMotion(direction, speed, endTime - Time.fixedTime);
     }
 
     /// <summary>
@@ -1094,6 +1063,7 @@ public sealed class PlayerDashState : PlayerStateBase
     /// </summary>
     public override void Exit(PlayerActionState nextState)
     {
+        Context.Motor?.ClearDashMotion();
         if (Context.Motor != null)
             Context.Motor.MovementResolved -= OnMotorMovementResolved;
 

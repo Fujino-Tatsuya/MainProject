@@ -36,6 +36,8 @@ public class PlayerMovement : MonoBehaviour
 
         if (armature == null)
             armature = transform.Find("Armature");
+
+        motor?.SynchronizeArmatureRotation(ArmatureRotation);
     }
 
     private void Start()
@@ -43,91 +45,57 @@ public class PlayerMovement : MonoBehaviour
         rotate_Speed = 10f;
     }
 
-    private void FixedUpdate()
+    internal PlayerSimulationInput CaptureSimulationInput()
     {
-        // 회전을 먼저 한다 — Move()의 정렬도 판정(dot(worldDir, armature.forward))이 회전 결과를
-        // 읽으므로, 먼저 돌고 그 방향으로 이동하는 인과를 유지한다.
-        Rotate(Time.fixedDeltaTime);
-        Move();
+        float fixedMoveSpeed = 0f;
+        bool hasFixedMoveSpeed =
+            soulController != null &&
+            soulController.TryGetFixedMoveSpeed(out fixedMoveSpeed);
+
+        float statusMultiplier = player != null && player.StatusEffects != null
+            ? player.StatusEffects.GetStatMultiplier(StatusEffectType.MoveSpeedModifier)
+            : 1f;
+
+        return new PlayerSimulationInput
+        {
+            MoveDirection = reader != null ? reader.Direction : Vector2.zero,
+            HasMoveInput = reader != null && reader.HasMoveInput,
+            CanMove = player == null || player.CanMove,
+            CanRotate = player == null || player.CanMovementRotate,
+            HasFixedMoveSpeed = hasFixedMoveSpeed,
+            FixedMoveSpeed = hasFixedMoveSpeed ? fixedMoveSpeed : 0f,
+            MoveSpeedMultiplier = statusMultiplier
+        };
     }
 
-    private void Move()
+    internal PlayerSimulationSettings CaptureSimulationSettings()
     {
-        Vector3 inputVelocity = Vector3.zero;
-
-        bool canMove = player == null || player.CanMove;
-        if (canMove && reader.HasMoveInput)
+        return new PlayerSimulationSettings
         {
-            Vector2 input = reader.Direction;
-
-            Vector3 localDir = new Vector3(input.x, 0f, input.y);
-            Vector3 worldDir = Quaternion.Euler(0f, viewYaw, 0f) * localDir;
-            worldDir.Normalize();
-
-            Vector3 forward = armature != null ? armature.forward : transform.forward;
-            float dot = Vector3.Dot(worldDir, forward);
-
-            if (dot >= alignThreshold)
-            {
-                currentSpeed = maxSpeed;
-            }
-            else
-            {
-                if (currentSpeed > midSpeed)
-                    currentSpeed = midSpeed;
-
-                currentSpeed = Mathf.MoveTowards(
-                    currentSpeed,
-                    maxSpeed,
-                    acceleration * Time.fixedDeltaTime
-                );
-            }
-
-            inputVelocity = worldDir * ResolveMoveSpeed(currentSpeed);
-        }
-        else
-        {
-            currentSpeed = 0f;
-        }
-
-        if (motor != null && inputVelocity.sqrMagnitude > 0f)
-            motor.AddVelocity(inputVelocity);
+            RotateSpeed = rotate_Speed,
+            MaxSpeed = maxSpeed,
+            MidSpeed = midSpeed,
+            Acceleration = acceleration,
+            AlignThreshold = alignThreshold,
+            ViewYaw = viewYaw
+        };
     }
 
-    private void Rotate(float deltaTime)
+    internal Quaternion ArmatureRotation =>
+        armature != null ? armature.rotation : transform.rotation;
+
+    internal Vector2 PreviousRotateDirection => prevDir_for_Rotate;
+    internal bool HasRotate => hasRotate;
+    internal float CurrentSpeed => currentSpeed;
+
+    internal void CommitSimulationState(PlayerSimulationState state, bool applyArmatureRotation)
     {
-        if (player != null && !player.CanMovementRotate)
-            return;
+        prevDir_for_Rotate = state.PreviousRotateDirection;
+        hasRotate = state.HasRotate;
+        currentSpeed = state.CurrentSpeed;
 
-        if (armature == null)
-            return;
-
-        if (reader.HasMoveInput)
-        {
-            prevDir_for_Rotate = reader.Direction;
-            hasRotate = true;
-        }
-
-        if (!hasRotate)
-            return;
-
-        Vector3 dir = new Vector3(prevDir_for_Rotate.x, 0f, prevDir_for_Rotate.y);
-        dir = Quaternion.Euler(0f, viewYaw, 0f) * dir;
-
-        Quaternion targetRotation = Quaternion.LookRotation(dir);
-
-        if (Vector3.Dot(dir, armature.forward) > 0.999f)
-        {
-            armature.rotation = targetRotation;
-            hasRotate = false;
-            return;
-        }
-
-        armature.rotation = Quaternion.Slerp(
-            armature.rotation,
-            targetRotation,
-            rotate_Speed * deltaTime
-        );
+        if (applyArmatureRotation && armature != null)
+            armature.rotation = state.ArmatureRotation;
     }
 
     public void RotateImmediately(Vector3 direction)
@@ -142,6 +110,7 @@ public class PlayerMovement : MonoBehaviour
 
         armature.rotation = Quaternion.LookRotation(direction.normalized);
         hasRotate = false;
+        motor?.SynchronizeArmatureRotation(armature.rotation, hasRotate);
     }
 
     public void RotateToward(Vector3 direction, float speed)
@@ -160,6 +129,7 @@ public class PlayerMovement : MonoBehaviour
             targetRotation,
             speed * Time.deltaTime
         );
+        motor?.SynchronizeArmatureRotation(armature.rotation, hasRotate);
     }
 
     /// <summary>
@@ -215,5 +185,6 @@ public class PlayerMovement : MonoBehaviour
             return;
 
         armature = newArmature;
+        motor?.SynchronizeArmatureRotation(armature.rotation, hasRotate);
     }
 }

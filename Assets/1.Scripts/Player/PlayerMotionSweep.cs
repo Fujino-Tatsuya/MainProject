@@ -29,6 +29,36 @@ public static class PlayerMotionSweep
         int maxIterations,
         RaycastHit[] buffer)
     {
+        return Resolve(
+            capsule,
+            Vector3.zero,
+            desiredDelta,
+            horizontalStepDelta,
+            isGrounded,
+            stepOffset,
+            maxWalkableAngle,
+            obstacleMask,
+            skin,
+            maxIterations,
+            buffer);
+    }
+
+    /// <summary>
+    /// Rigidbody/Transform을 옮기지 않고 과거 위치에서 재생할 수 있도록 현재 캡슐 위치 기준 오프셋을 받는다.
+    /// </summary>
+    public static Vector3 Resolve(
+        CapsuleCollider capsule,
+        Vector3 originOffset,
+        Vector3 desiredDelta,
+        Vector3 horizontalStepDelta,
+        bool isGrounded,
+        float stepOffset,
+        float maxWalkableAngle,
+        LayerMask obstacleMask,
+        float skin,
+        int maxIterations,
+        RaycastHit[] buffer)
+    {
         if (capsule == null || buffer == null || desiredDelta.sqrMagnitude <= 1e-10f)
             return desiredDelta;
 
@@ -36,7 +66,7 @@ public static class PlayerMotionSweep
         Vector3 regularDelta = ResolveMovement(
             capsule,
             owner,
-            Vector3.zero,
+            originOffset,
             desiredDelta,
             maxWalkableAngle,
             obstacleMask,
@@ -51,6 +81,7 @@ public static class PlayerMotionSweep
         if (!TryResolveStep(
                 capsule,
                 owner,
+                originOffset,
                 planarStepDelta,
                 desiredDelta - planarStepDelta,
                 regularDelta,
@@ -126,6 +157,7 @@ public static class PlayerMotionSweep
     private static bool TryResolveStep(
         CapsuleCollider capsule,
         Transform owner,
+        Vector3 originOffset,
         Vector3 horizontalDelta,
         Vector3 remainingDelta,
         Vector3 regularDelta,
@@ -146,7 +178,7 @@ public static class PlayerMotionSweep
         if (!TryCast(
                 capsule,
                 owner,
-                Vector3.zero,
+                originOffset,
                 horizontalDirection,
                 horizontalDistance + skin,
                 maxWalkableAngle,
@@ -166,7 +198,7 @@ public static class PlayerMotionSweep
         if (TryCast(
                 capsule,
                 owner,
-                Vector3.zero,
+                originOffset,
                 Vector3.up,
                 stepOffset,
                 maxWalkableAngle,
@@ -179,7 +211,7 @@ public static class PlayerMotionSweep
             return false;
         }
 
-        Vector3 raisedOffset = Vector3.up * stepOffset;
+        Vector3 raisedOffset = originOffset + Vector3.up * stepOffset;
         Vector3 raisedHorizontalDelta = ResolveMovement(
             capsule,
             owner,
@@ -217,13 +249,16 @@ public static class PlayerMotionSweep
         if (landingHit.distance + LandingOverlapTolerance < castInset)
             return false;
 
-        Vector3 candidateDelta = landingOrigin + Vector3.down * Mathf.Clamp(landingDistance, 0f, stepOffset);
+        Vector3 candidateDelta =
+            raisedHorizontalDelta +
+            Vector3.up * stepOffset +
+            Vector3.down * Mathf.Clamp(landingDistance, 0f, stepOffset);
         if (remainingDelta.sqrMagnitude > MovementEpsilon * MovementEpsilon)
         {
             candidateDelta += ResolveMovement(
                 capsule,
                 owner,
-                candidateDelta,
+                originOffset + candidateDelta,
                 remainingDelta,
                 maxWalkableAngle,
                 obstacleMask,
