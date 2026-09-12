@@ -17,6 +17,19 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private float alignThreshold = 0.98f;
     [SerializeField] private float viewYaw = -45f;
 
+    // ⚠️ 임시 실험 토글 (2026-09-12, 4단계 선결 판단용). 감각 확정 후 한쪽으로 고정하고 이 필드를 지운다.
+    //
+    // 왜 필요한가: Move()의 속도 계산이 armature.forward에 의존한다
+    // (dot >= alignThreshold면 즉시 최고속, 아니면 가속). 즉 **회전이 이동 속도를 바꾸므로
+    // 회전은 사실상 시뮬레이션 상태의 일부**인데, 지금은 Update에서 렌더 레이트로 돈다.
+    // 4단계의 재생(replay)은 같은 입력에 같은 결과가 나와야 하므로 회전도 물리 틱이어야 한다.
+    //
+    // 대가: 회전 갱신이 50Hz로 떨어져 고프레임에서 덜 부드러워 보일 수 있다. 그 체감을 재려고 둔다.
+    // Play 중 인스펙터에서 토글해 A/B로 비교할 것.
+    [Header("실험 — 4단계 선결 판단용 (임시)")]
+    [Tooltip("켜면 회전을 물리 틱(FixedUpdate)에서 처리한다. 끄면 기존대로 Update.")]
+    [SerializeField] private bool rotateOnPhysicsTick = true;
+
     private Vector2 prevDir_for_Rotate = new Vector2(0f, -1f);
     private bool hasRotate = true;
     private float currentSpeed;
@@ -39,11 +52,17 @@ public class PlayerMovement : MonoBehaviour
 
     private void Update()
     {
-        Rotate();
+        if (!rotateOnPhysicsTick)
+            Rotate(Time.deltaTime);
     }
 
     private void FixedUpdate()
     {
+        // 회전을 먼저 한다 — Move()의 정렬도 판정(dot(worldDir, armature.forward))이 회전 결과를
+        // 읽으므로, 기존 Update 회전과 같은 인과(먼저 돌고 그 방향으로 이동)를 유지한다.
+        if (rotateOnPhysicsTick)
+            Rotate(Time.fixedDeltaTime);
+
         Move();
     }
 
@@ -90,7 +109,7 @@ public class PlayerMovement : MonoBehaviour
             motor.AddVelocity(inputVelocity);
     }
 
-    private void Rotate()
+    private void Rotate(float deltaTime)
     {
         if (player != null && !player.CanMovementRotate)
             return;
@@ -122,7 +141,7 @@ public class PlayerMovement : MonoBehaviour
         armature.rotation = Quaternion.Slerp(
             armature.rotation,
             targetRotation,
-            rotate_Speed * Time.deltaTime
+            rotate_Speed * deltaTime
         );
     }
 
