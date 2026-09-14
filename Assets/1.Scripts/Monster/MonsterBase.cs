@@ -732,6 +732,12 @@ public class MonsterBase : Unit
     /// </summary>
     public Transform CurrentTarget => _target;
 
+    /// <summary>선딜 길이(초). 조준 예고선처럼 <b>시각 전용</b> 요소가 표시 구간을 잡을 때 읽는다.</summary>
+    public float AttackWindupSeconds => data != null ? data.attackWindup : 0f;
+
+    /// <summary>사거리(m). 예고선 길이 산출용 — 값이 없으면 0 이다.</summary>
+    public float AttackRangeMeters => data != null ? data.attackRange : 0f;
+
     /// <summary>
     /// 이 몬스터가 <b>몸통을 돌리지 않는</b>가. 고정 터렛(<c>RangedTurret</c>)이 그렇다.
     ///

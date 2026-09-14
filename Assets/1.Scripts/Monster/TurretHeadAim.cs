@@ -46,6 +46,19 @@ public class TurretHeadAim : MonoBehaviour
              "끄면 공격 중에도 계속 타깃을 따라 돌아간다.")]
     [SerializeField] private bool holdAimWhileAttacking = true;
 
+    [Tooltip("공격이 끝난 뒤 다시 조준을 시작하기까지의 뜸(초). " +
+             "0 이면 공격이 끝나는 즉시 머리가 돈다 — 붙어서 돌면 기계적으로 보인다(팀장 피드백).")]
+    [SerializeField] private float aimResumeDelay = 0.25f;
+
+    [Header("조준 예고선 (TrackingLaser)")]
+    [Tooltip("비우면 이름으로 자동 탐색한다. 아트 프리팹에 딸려온 LineRenderer 로, 원래 비활성이다.")]
+    [SerializeField] private LineRenderer aimLaser;
+    [SerializeField] private string aimLaserName = "TrackingLaser";
+    [Tooltip("예고선을 켤지 여부. 선딜 동안만 켜고 발사 시점에 끈다.")]
+    [SerializeField] private bool showAimLaser = true;
+    [Tooltip("예고선이 벽에 막히면 거기서 끊는다. 비우면 사거리 끝까지 곧게 그린다.")]
+    [SerializeField] private LayerMask laserBlockers;
+
     [Header("진단")]
     [Tooltip("켜면 0.5초마다 상태·조준각·애니메이터 개입 여부를 콘솔에 찍는다. " +
              "머리가 폭주할 때 원인을 가르는 용도 — 평소에는 끈다.")]
@@ -78,7 +91,19 @@ public class TurretHeadAim : MonoBehaviour
                 $"[TurretHeadAim] {name}: '{headBoneName}' 본을 찾지 못해 머리 조준을 끈다. " +
                 "리그가 바뀌었으면 Head Bone 을 직접 지정할 것.", this);
             enabled = false;
+            return;
         }
+
+        if (aimLaser == null)
+        {
+            Transform t = FindBone(aimLaserName);
+            if (t != null) aimLaser = t.GetComponent<LineRenderer>();
+        }
+        // 예고선이 없어도 조준은 동작해야 하므로 여기서는 끄지 않는다(경고만).
+        if (showAimLaser && aimLaser == null)
+            Debug.LogWarning($"[TurretHeadAim] {name}: '{aimLaserName}' LineRenderer 가 없어 예고선을 끈다.", this);
+
+        if (aimLaser != null) aimLaser.enabled = false;
     }
 
     private Transform FindBone(string boneName)
@@ -100,12 +125,16 @@ public class TurretHeadAim : MonoBehaviour
     {
         if (headBone == null) return;
 
-        // 🔴 공격 중에는 조준을 갱신하지 않는다 — 「조준 → 영점 고정 → 발사 → 다시 조준」.
+        // 🔴 공격 중에는 조준을 갱신하지 않는다 — 「조준 → 영점 고정 → 발사 → 뜸 → 다시 조준」.
         //    갱신만 멈추고 각도는 계속 적용한다(멈추면 애니메이터 포즈로 머리가 튄다).
         //    몸통 쪽 규약과 같다: MonsterBase 는 StartAttack 직전 FaceTarget() 1회로 조준을 확정한다.
-        bool aimLocked = holdAimWhileAttacking
-                         && _monster != null
-                         && _monster.State == MonsterState.Attack;
+        bool attacking = _monster != null && _monster.State == MonsterState.Attack;
+        if (attacking) _resumeAimAt = Time.time + aimResumeDelay;
+
+        // 공격이 끝난 직후 바로 돌면 기계적으로 보인다(팀장 피드백) — 짧은 뜸을 둔다.
+        bool aimLocked = holdAimWhileAttacking && (attacking || Time.time < _resumeAimAt);
+
+        UpdateAimLaser(attacking);
 
         if (!aimLocked)
         {
@@ -159,6 +188,61 @@ public class TurretHeadAim : MonoBehaviour
     }
 
     private Quaternion _lastAnimPose = Quaternion.identity;
+    private float _resumeAimAt;
+    private float _attackStartedAt = -1f;
+
+    /// <summary>
+    /// 조준 예고선. <b>선딜 동안만</b> 켠다 — 발사 시점에 끄면 "지금 여기로 쏜다"는 예고가 된다.
+    ///
+    /// 🔴 <c>TrackingLaser</c> 는 아트 프리팹에 딸려 있던 <see cref="LineRenderer"/> 인데
+    /// <b>비활성이고 참조하는 코드가 하나도 없었다</b>(2026-09-14 전수 확인). 여기서 처음 배선한다.
+    /// 애니메이션 클립이 아니다 — 팩 전체에 Lazer/Laser/Beam 클립은 존재하지 않는다.
+    ///
+    /// 각 피어가 로컬로 그린다. 복제하지 않는다(시각 요소).
+    /// </summary>
+    private void UpdateAimLaser(bool attacking)
+    {
+        if (aimLaser == null) return;
+
+        if (!showAimLaser)
+        {
+            if (aimLaser.enabled) aimLaser.enabled = false;
+            return;
+        }
+
+        if (!attacking)
+        {
+            _attackStartedAt = -1f;
+            if (aimLaser.enabled) aimLaser.enabled = false;
+            return;
+        }
+
+        if (_attackStartedAt < 0f) _attackStartedAt = Time.time;
+
+        // 선딜이 지나면(= 탄이 나간 뒤) 끈다. windup 이 0 이면 공격 상태 내내 보여 준다.
+        float windup = _monster != null ? _monster.AttackWindupSeconds : 0f;
+        if (windup > 0f && Time.time - _attackStartedAt >= windup)
+        {
+            if (aimLaser.enabled) aimLaser.enabled = false;
+            return;
+        }
+
+        Vector3 origin = aimLaser.transform.position;
+        Vector3 dir = AimDirection;
+        float range = _monster != null ? _monster.AttackRangeMeters : 0f;
+        if (range <= 0f) range = 10f;
+
+        // 벽에 막히면 거기서 끊는다 — 벽을 뚫고 나간 예고선은 오히려 오해를 만든다.
+        if (laserBlockers.value != 0 &&
+            Physics.Raycast(origin, dir, out RaycastHit hit, range, laserBlockers, QueryTriggerInteraction.Ignore))
+            range = hit.distance;
+
+        aimLaser.useWorldSpace = true;
+        aimLaser.positionCount = 2;
+        aimLaser.SetPosition(0, origin);
+        aimLaser.SetPosition(1, origin + dir * range);
+        if (!aimLaser.enabled) aimLaser.enabled = true;
+    }
 
 #if UNITY_EDITOR
     private void OnDrawGizmosSelected()

@@ -160,17 +160,19 @@ public static class TurretAnimatorAuthoring
         AnimatorStateMachine shootSm = shootLayer.stateMachine;
         if (shootSm.states.Length != 2 || shootSm.stateMachines.Length != 0) return false;
 
-        AnimatorState empty = null, shoot = null;
+        AnimatorState headIdle = null, shoot = null;
         foreach (ChildAnimatorState cs in shootSm.states)
         {
             if (cs.state == null) return false;
-            if (cs.state.name == "Empty") empty = cs.state;
+            if (cs.state.name == "HeadIdle") headIdle = cs.state;
             else if (cs.state.name == "Shoot") shoot = cs.state;
         }
 
-        return empty != null && shoot != null
-               && empty.motion == null && shoot.motion == shootClip
-               && shootSm.defaultState == empty;
+        // 🔴 HeadIdle 의 모션이 Idle 클립이어야 한다. 비어 있으면(예전 "Empty") Override 레이어가
+        //    머리 본 소유권만 가져가고 아무 값도 안 써서 머리가 폭주한다(2026-09-14 실측).
+        return headIdle != null && shoot != null
+               && headIdle.motion == idleClip && shoot.motion == shootClip
+               && shootSm.defaultState == headIdle;
     }
 
     /// <summary>
@@ -440,27 +442,31 @@ public static class TurretAnimatorAuthoring
 
         AnimatorStateMachine shootSm = c.layers[1].stateMachine;
 
-        // Empty 는 모션이 없는 기본 상태다. 이게 있어야 평상시 레이어가 아무것도 덮지 않는다
-        // (Shoot 하나만 두면 머리가 발사 포즈로 고정된다).
-        AnimatorState empty = shootSm.AddState("Empty", new Vector3(300f, 0f, 0f));
-        empty.motion = null;
-        shootSm.defaultState = empty;
+        // 🔴 평상시 상태에 <b>Idle 클립을 물린다</b>. 모션을 비우면 안 된다 —
+        //    Override 레이어는 마스크에 포함된 본의 <b>소유권을 가져가는데</b>, 모션이 없으면
+        //    아무 값도 쓰지 않는다. 그러면 레이어 0 의 Idle 머리 커브가 덮이면서
+        //    <b>매 프레임 아무도 머리를 안 쓰는 구간</b>이 생기고, 그 위에 코드가 각도를 얹으면
+        //    프레임마다 쌓여 머리가 폭주한다(2026-09-14 팀장 Play 에서 실제로 터졌다).
+        //    Idle 을 물려 두면 평상시 머리 포즈가 매 프레임 확정된다.
+        AnimatorState headIdle = shootSm.AddState("HeadIdle", new Vector3(300f, 0f, 0f));
+        headIdle.motion = idleClip;
+        shootSm.defaultState = headIdle;
 
         AnimatorState shoot = shootSm.AddState("Shoot", new Vector3(600f, 120f, 0f));
         shoot.motion = shootClip;
 
         // Empty → Shoot : 트리거 즉시. exitTime 을 쓰면 사격이 한 바퀴 밀린다.
-        AnimatorStateTransition toShoot = empty.AddTransition(shoot);
+        AnimatorStateTransition toShoot = headIdle.AddTransition(shoot);
         toShoot.hasExitTime = false;
         toShoot.duration = 0.05f;
         toShoot.AddCondition(AnimatorConditionMode.If, 0f, "Shoot");
 
         // Shoot → Empty : 클립이 끝나면 돌아온다(조건 없음 — 조건을 걸면 그 트리거가 없을 때 갇힌다.
         //                 TeslaBot 이 Charge 에 갇힌 원인이 정확히 그것이었다).
-        AnimatorStateTransition toEmpty = shoot.AddTransition(empty);
-        toEmpty.hasExitTime = true;
-        toEmpty.exitTime = 0.9f;
-        toEmpty.duration = 0.1f;
+        AnimatorStateTransition toHeadIdle = shoot.AddTransition(headIdle);
+        toHeadIdle.hasExitTime = true;
+        toHeadIdle.exitTime = 0.9f;
+        toHeadIdle.duration = 0.1f;
 
         EditorUtility.SetDirty(c);
         return c;
