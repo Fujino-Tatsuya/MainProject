@@ -106,10 +106,12 @@ public static class TurretAnimatorAuthoring
             string dataFix = FixData(prefabAsset, controller);
             string agentFix = StripNavMeshAgent(prefabPath);
             string muzzleFix = WireMuzzle(prefabPath);
-            string aimFix = EnsureHeadAim(prefabPath);
+            Material laserMat = EnsureLaserMaterial(out string matFix);
+            string aimFix = EnsureHeadAim(prefabPath, laserMat);
 
             log.AppendLine($"  ✓ {t.Name} — {ctrlPath}\n      마스크: {maskFix}\n      데이터: {dataFix}" +
-                           $"\n      NavMeshAgent: {agentFix}\n      muzzle: {muzzleFix}\n      머리 조준: {aimFix}");
+                           $"\n      NavMeshAgent: {agentFix}\n      muzzle: {muzzleFix}" +
+                           $"\n      예고선 머티리얼: {matFix}\n      머리 조준: {aimFix}");
             done++;
         }
 
@@ -351,23 +353,74 @@ public static class TurretAnimatorAuthoring
     /// 몸통 회전은 <c>MonsterBase.BodyRotationLocked</c> 가 막으므로, 이게 없으면
     /// 터렛이 <b>아무 쪽도 안 보고</b> 쏘게 된다 — 빠지면 조용히 퇴보하는 자리다.
     /// </summary>
-    static string EnsureHeadAim(string prefabPath)
+    static string EnsureHeadAim(string prefabPath, Material laserMat)
     {
+        bool added = false, wired = false;
+
         GameObject root = PrefabUtility.LoadPrefabContents(prefabPath);
         try
         {
-            if (root.GetComponent<TurretHeadAim>() != null) return "이미있음";
-            root.AddComponent<TurretHeadAim>();
-            PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
+            var aim = root.GetComponent<TurretHeadAim>();
+            if (aim == null) { aim = root.AddComponent<TurretHeadAim>(); added = true; }
+
+            // 예고선 머티리얼을 배선한다. 아트 프리팹의 기본값은 내장 RP 의 Default-Line 이라
+            // URP 에서 안 보인다 — 중첩 프리팹 오버라이드 대신 이 필드로 런타임에 갈아 끼운다.
+            var so = new SerializedObject(aim);
+            SerializedProperty prop = so.FindProperty("laserMaterial");
+            if (prop != null && laserMat != null && prop.objectReferenceValue != laserMat)
+            {
+                prop.objectReferenceValue = laserMat;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                wired = true;
+            }
+
+            if (added || wired) PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
         }
         finally
         {
             PrefabUtility.UnloadPrefabContents(root);
         }
 
+        if (!added && !wired) return "이미있음";
+
         var saved = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
-        bool ok = saved != null && saved.GetComponent<TurretHeadAim>() != null;
-        return ok ? "추가 (되읽기 ✓)" : "🔴 추가했는데 되읽으니 없다";
+        var savedAim = saved != null ? saved.GetComponent<TurretHeadAim>() : null;
+        if (savedAim == null) return "🔴 추가했는데 되읽으니 없다";
+
+        var check = new SerializedObject(savedAim);
+        Object mat = check.FindProperty("laserMaterial").objectReferenceValue;
+        return $"{(added ? "추가" : "갱신")} · 예고선 머티리얼 {(mat != null ? mat.name : "🔴 비어 있음")} (되읽기 ✓)";
+    }
+
+    /// <summary>
+    /// 조준 예고선용 URP Unlit 머티리얼을 만든다(없으면).
+    ///
+    /// 🔴 <b>왜 필요한가</b>: <c>TrackingLaser</c> 의 기본 머티리얼이 내장 RP 의 <c>Default-Line</c>
+    /// (fileID 10306)이다. 이 프로젝트는 URP 라서 그대로 두면 <b>안 그려지거나 마젠타</b>가 된다.
+    /// ⚠️ 색·두께는 임시값이다 — 최종 비주얼은 VFX 담당(민경) 판단 영역이다.
+    /// </summary>
+    static Material EnsureLaserMaterial(out string report)
+    {
+        const string matPath = "Assets/3.Materials/MA_TurretAimLaser.mat";
+
+        var existing = AssetDatabase.LoadAssetAtPath<Material>(matPath);
+        if (existing != null) { report = $"이미있음 ({existing.shader.name})"; return existing; }
+
+        Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
+        if (shader == null)
+        {
+            report = "🔴 URP Unlit 셰이더를 못 찾음";
+            return null;
+        }
+
+        if (!AssetDatabase.IsValidFolder("Assets/3.Materials"))
+            AssetDatabase.CreateFolder("Assets", "3.Materials");
+
+        var mat = new Material(shader) { name = "MA_TurretAimLaser" };
+        mat.SetColor("_BaseColor", new Color(1f, 0.35f, 0.15f, 1f));
+        AssetDatabase.CreateAsset(mat, matPath);
+        report = $"생성 ({matPath})";
+        return mat;
     }
 
     static Transform FindChildByName(Transform root, string childName)

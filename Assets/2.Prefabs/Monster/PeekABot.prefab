@@ -500,6 +500,17 @@ MonoBehaviour:
   turnDegreesPerSecond: 360
   maxYaw: 180
   returnDegreesPerSecond: 120
+  holdAimWhileAttacking: 1
+  aimResumeDelay: 0.25
+  aimLaser: {fileID: 0}
+  aimLaserName: TrackingLaser
+  showAimLaser: 1
+  laserBlockers:
+    serializedVersion: 2
+    m_Bits: 0
+  laserMaterial: {fileID: 2100000, guid: 0211162a9b9101841a1e86945b6365ab, type: 2}
+  laserWidth: 0.05
+  logDiagnostics: 0
 --- !u!1001 &7660482076223886559
 PrefabInstance:
   m_ObjectHideFlags: 0

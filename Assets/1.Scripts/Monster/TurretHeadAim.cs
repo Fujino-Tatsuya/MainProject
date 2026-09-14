@@ -58,6 +58,11 @@ public class TurretHeadAim : MonoBehaviour
     [SerializeField] private bool showAimLaser = true;
     [Tooltip("예고선이 벽에 막히면 거기서 끊는다. 비우면 사거리 끝까지 곧게 그린다.")]
     [SerializeField] private LayerMask laserBlockers;
+    [Tooltip("예고선 머티리얼. 비우면 아트 프리팹에 있던 것을 그대로 쓴다 — " +
+             "그 기본값은 내장 RP 의 Default-Line 이라 URP 에서 안 보인다.")]
+    [SerializeField] private Material laserMaterial;
+    [Tooltip("예고선 두께(m).")]
+    [SerializeField] private float laserWidth = 0.05f;
 
     [Header("진단")]
     [Tooltip("켜면 0.5초마다 상태·조준각·애니메이터 개입 여부를 콘솔에 찍는다. " +
@@ -103,7 +108,20 @@ public class TurretHeadAim : MonoBehaviour
         if (showAimLaser && aimLaser == null)
             Debug.LogWarning($"[TurretHeadAim] {name}: '{aimLaserName}' LineRenderer 가 없어 예고선을 끈다.", this);
 
-        if (aimLaser != null) aimLaser.enabled = false;
+        if (aimLaser != null)
+        {
+            // 🔴 아트 프리팹의 기본 머티리얼은 내장 RP 의 Default-Line 이라 URP 에서 안 보인다.
+            //    프리팹 오버라이드로 갈지 않고 런타임에 넣는다 — 이 오브젝트는 2단 중첩 프리팹
+            //    안에 있고(우리 프리팹 → 아트 프리팹), 중첩 오버라이드가 조용히 실패한 전례가 있다.
+            if (laserMaterial != null) aimLaser.sharedMaterial = laserMaterial;
+            if (laserWidth > 0f) aimLaser.widthMultiplier = laserWidth;
+
+            aimLaser.useWorldSpace = true;
+            aimLaser.positionCount = 2;
+            // 🔴 GameObject 자체가 비활성이다(m_IsActive: 0). Renderer.enabled 만 켜면
+            //    아무것도 그려지지 않는다 — 켜고 끄는 것은 GameObject 쪽이어야 한다.
+            aimLaser.gameObject.SetActive(false);
+        }
     }
 
     private Transform FindBone(string boneName)
@@ -206,14 +224,14 @@ public class TurretHeadAim : MonoBehaviour
 
         if (!showAimLaser)
         {
-            if (aimLaser.enabled) aimLaser.enabled = false;
+            if (aimLaser.gameObject.activeSelf) aimLaser.gameObject.SetActive(false);
             return;
         }
 
         if (!attacking)
         {
             _attackStartedAt = -1f;
-            if (aimLaser.enabled) aimLaser.enabled = false;
+            if (aimLaser.gameObject.activeSelf) aimLaser.gameObject.SetActive(false);
             return;
         }
 
@@ -223,7 +241,7 @@ public class TurretHeadAim : MonoBehaviour
         float windup = _monster != null ? _monster.AttackWindupSeconds : 0f;
         if (windup > 0f && Time.time - _attackStartedAt >= windup)
         {
-            if (aimLaser.enabled) aimLaser.enabled = false;
+            if (aimLaser.gameObject.activeSelf) aimLaser.gameObject.SetActive(false);
             return;
         }
 
@@ -241,7 +259,7 @@ public class TurretHeadAim : MonoBehaviour
         aimLaser.positionCount = 2;
         aimLaser.SetPosition(0, origin);
         aimLaser.SetPosition(1, origin + dir * range);
-        if (!aimLaser.enabled) aimLaser.enabled = true;
+        if (!aimLaser.gameObject.activeSelf) aimLaser.gameObject.SetActive(true);
     }
 
 #if UNITY_EDITOR
