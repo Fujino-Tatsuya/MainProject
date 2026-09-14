@@ -41,6 +41,11 @@ public class TurretHeadAim : MonoBehaviour
     [Tooltip("타깃이 없을 때 정면(0도)으로 돌아오는 속도(도/초). 0 이면 그 자리에 멈춘다.")]
     [SerializeField] private float returnDegreesPerSecond = 120f;
 
+    [Header("조준 고정")]
+    [Tooltip("공격 중에는 조준을 고정한다(영점 고정 → 발사 → 다시 조준). " +
+             "끄면 공격 중에도 계속 타깃을 따라 돌아간다.")]
+    [SerializeField] private bool holdAimWhileAttacking = true;
+
     private MonsterBase _monster;
 
     /// 몸통 정면 대비 현재 머리 요(도). 프레임마다 애니메이터 포즈 위에 다시 얹는다.
@@ -86,26 +91,36 @@ public class TurretHeadAim : MonoBehaviour
     {
         if (headBone == null) return;
 
-        float desired = 0f;                       // 타깃이 없으면 정면으로 복귀
-        float speed = returnDegreesPerSecond;
+        // 🔴 공격 중에는 조준을 갱신하지 않는다 — 「조준 → 영점 고정 → 발사 → 다시 조준」.
+        //    갱신만 멈추고 각도는 계속 적용한다(멈추면 애니메이터 포즈로 머리가 튄다).
+        //    몸통 쪽 규약과 같다: MonsterBase 는 StartAttack 직전 FaceTarget() 1회로 조준을 확정한다.
+        bool aimLocked = holdAimWhileAttacking
+                         && _monster != null
+                         && _monster.State == MonsterState.Attack;
 
-        Transform target = _monster != null ? _monster.CurrentTarget : null;
-        if (target != null)
+        if (!aimLocked)
         {
-            Vector3 toTarget = target.position - headBone.position;
-            toTarget.y = 0f;
-            if (toTarget.sqrMagnitude > 0.0001f)
-            {
-                // 몸통 정면과 타깃 방향의 부호 있는 각차. 몸통이 고정이므로 이 값이 곧 머리 각이다.
-                desired = Vector3.SignedAngle(FlatForward(), toTarget.normalized, Vector3.up);
-                desired = Mathf.Clamp(desired, -maxYaw, maxYaw);
-                speed = turnDegreesPerSecond;
-            }
-        }
+            float desired = 0f;                       // 타깃이 없으면 정면으로 복귀
+            float speed = returnDegreesPerSecond;
 
-        _yaw = speed <= 0f
-            ? desired
-            : Mathf.MoveTowardsAngle(_yaw, desired, speed * Time.deltaTime);
+            Transform target = _monster != null ? _monster.CurrentTarget : null;
+            if (target != null)
+            {
+                Vector3 toTarget = target.position - headBone.position;
+                toTarget.y = 0f;
+                if (toTarget.sqrMagnitude > 0.0001f)
+                {
+                    // 몸통 정면과 타깃 방향의 부호 있는 각차. 몸통이 고정이므로 이 값이 곧 머리 각이다.
+                    desired = Vector3.SignedAngle(FlatForward(), toTarget.normalized, Vector3.up);
+                    desired = Mathf.Clamp(desired, -maxYaw, maxYaw);
+                    speed = turnDegreesPerSecond;
+                }
+            }
+
+            _yaw = speed <= 0f
+                ? desired
+                : Mathf.MoveTowardsAngle(_yaw, desired, speed * Time.deltaTime);
+        }
 
         if (Mathf.Abs(_yaw) < 0.01f) return;      // 정면이면 애니메이터 포즈를 건드리지 않는다
 
