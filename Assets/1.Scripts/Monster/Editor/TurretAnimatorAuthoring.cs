@@ -105,8 +105,11 @@ public static class TurretAnimatorAuthoring
             AnimatorController controller = BuildController(ctrlPath, idle, shoot, mask);
             string dataFix = FixData(prefabAsset, controller);
             string agentFix = StripNavMeshAgent(prefabPath);
+            string muzzleFix = WireMuzzle(prefabPath);
+            string aimFix = EnsureHeadAim(prefabPath);
 
-            log.AppendLine($"  ✓ {t.Name} — {ctrlPath}\n      마스크: {maskFix}\n      데이터: {dataFix}\n      NavMeshAgent: {agentFix}");
+            log.AppendLine($"  ✓ {t.Name} — {ctrlPath}\n      마스크: {maskFix}\n      데이터: {dataFix}" +
+                           $"\n      NavMeshAgent: {agentFix}\n      muzzle: {muzzleFix}\n      머리 조준: {aimFix}");
             done++;
         }
 
@@ -290,6 +293,86 @@ public static class TurretAnimatorAuthoring
         var saved = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
         bool gone = saved != null && saved.GetComponent<NavMeshAgent>() == null;
         return gone ? "제거 (되읽기: 없음 ✓)" : "🔴 제거했는데 되읽으니 아직 있다";
+    }
+
+    /// <summary>
+    /// <c>MonsterRangedAttack.muzzle</c>(발사 원점)을 머리 쪽 본에 배선한다.
+    ///
+    /// 🔴 <b>왜</b>(2026-09-14 실측): TeslaBot 은 <c>muzzle: {fileID: 0}</c> 로 <b>비어 있었다</b>.
+    /// 비면 <c>MonsterRangedAttack</c> 이 <c>transform.position</c> 으로 폴백해 <b>탄이 발밑에서</b> 나간다.
+    /// PeekABot 은 <c>Muzzle_Socket</c> 이 배선돼 있었다. TeslaBot 리그에는 그 본이 없으므로
+    /// <c>Head</c> 를 쓴다(팀장 확정). 둘 다 머리 마스크에 포함돼 있어 조준을 따라간다.
+    /// </summary>
+    static string WireMuzzle(string prefabPath)
+    {
+        GameObject root = PrefabUtility.LoadPrefabContents(prefabPath);
+        string boneName;
+        try
+        {
+            var ranged = root.GetComponent<MonsterRangedAttack>();
+            if (ranged == null) return "MonsterRangedAttack 없음 — 건너뜀";
+
+            // Muzzle_Socket 이 있으면 그것, 없으면 Head.
+            Transform bone = FindChildByName(root.transform, "Muzzle_Socket")
+                             ?? FindChildByName(root.transform, "Head");
+            if (bone == null) return "🔴 Muzzle_Socket·Head 둘 다 없음";
+            boneName = bone.name;
+
+            var so = new SerializedObject(ranged);
+            SerializedProperty prop = so.FindProperty("muzzle");
+            if (prop == null) return "🔴 muzzle 필드를 못 찾음(이름이 바뀌었나)";
+            if (prop.objectReferenceValue == bone) return $"이미맞음 ({boneName})";
+
+            prop.objectReferenceValue = bone;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+
+        // 되읽어 확인한다 — 중첩 프리팹에서 저장이 조용히 안 먹은 전례가 있다(m_Controller 오버라이드).
+        var saved = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+        var savedRanged = saved != null ? saved.GetComponent<MonsterRangedAttack>() : null;
+        if (savedRanged == null) return "🔴 되읽기 실패";
+
+        var check = new SerializedObject(savedRanged);
+        Object got = check.FindProperty("muzzle").objectReferenceValue;
+        return got != null
+            ? $"배선 → {got.name} (되읽기 ✓)"
+            : "🔴 배선했는데 되읽으니 비어 있다";
+    }
+
+    /// <summary>
+    /// 머리 조준 컴포넌트(<see cref="TurretHeadAim"/>)를 프리팹 루트에 보장한다.
+    /// 몸통 회전은 <c>MonsterBase.BodyRotationLocked</c> 가 막으므로, 이게 없으면
+    /// 터렛이 <b>아무 쪽도 안 보고</b> 쏘게 된다 — 빠지면 조용히 퇴보하는 자리다.
+    /// </summary>
+    static string EnsureHeadAim(string prefabPath)
+    {
+        GameObject root = PrefabUtility.LoadPrefabContents(prefabPath);
+        try
+        {
+            if (root.GetComponent<TurretHeadAim>() != null) return "이미있음";
+            root.AddComponent<TurretHeadAim>();
+            PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+
+        var saved = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+        bool ok = saved != null && saved.GetComponent<TurretHeadAim>() != null;
+        return ok ? "추가 (되읽기 ✓)" : "🔴 추가했는데 되읽으니 없다";
+    }
+
+    static Transform FindChildByName(Transform root, string childName)
+    {
+        foreach (Transform t in root.GetComponentsInChildren<Transform>(true))
+            if (t.name == childName) return t;
+        return null;
     }
 
     /// <summary>FBX 안의 서브 애셋에서 이름으로 클립을 찾는다. 팩은 한 FBX 에 여러 클립을 담는다.</summary>

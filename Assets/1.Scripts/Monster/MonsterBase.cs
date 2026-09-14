@@ -726,6 +726,25 @@ public class MonsterBase : Unit
     protected Transform Target => _target;
 
     /// <summary>
+    /// 현재 타깃의 <b>읽기 전용 공개</b> 접근자. 같은 오브젝트에 붙는 <b>시각 전용</b> 컴포넌트가
+    /// 조준 방향을 구하려고 읽는다(<c>TurretHeadAim</c>).
+    /// 🔴 쓰기는 열지 않는다 — 타깃 교체는 <see cref="AdoptTarget"/> 하나뿐이라는 규칙을 깨지 않는다.
+    /// </summary>
+    public Transform CurrentTarget => _target;
+
+    /// <summary>
+    /// 이 몬스터가 <b>몸통을 돌리지 않는</b>가. 고정 터렛(<c>RangedTurret</c>)이 그렇다.
+    ///
+    /// 🔴 왜(2026-09-14 팀장 확정): 고정 포탑은 자리를 지키는 설계인데 <c>turnSpeed: 10</c> 으로
+    /// 몸통 전체가 타깃을 따라 돌고 있었다("몸통이 다 틀어진다"). 조준은 <c>TurretHeadAim</c> 이
+    /// <b>머리 본만</b> 돌려서 한다. 발사 방향은 몸통과 무관하다 —
+    /// <c>MonsterRangedAttack</c> 은 <c>targetPoint - origin</c> 으로 쏘므로 영향이 없다
+    /// (<c>transform.forward</c> 는 타깃이 원점과 겹칠 때의 폴백일 뿐이다).
+    /// </summary>
+    protected bool BodyRotationLocked =>
+        data != null && data.archetype == MonsterArchetype.RangedTurret;
+
+    /// <summary>
     /// 어그로 대상을 <b>지금 이 대상으로 갈아탄다</b>(서버 전용). 파생이 쓰는 유일한 교체 진입점이다.
     ///
     /// 🔴 왜 base 에 있는가 — <c>_target</c> 대입을 한 곳에 모아 락온·리쉬 규칙이 갈리지 않게 한다.
@@ -1441,6 +1460,7 @@ public class MonsterBase : Unit
     /// </summary>
     protected void FaceTargetImmediate()
     {
+        if (BodyRotationLocked) return;   // 고정 터렛 — 머리만 돈다(TurretHeadAim)
         if (_target == null) return;
         Vector3 dir = _target.position - transform.position;
         dir.y = 0f;
@@ -1458,6 +1478,8 @@ public class MonsterBase : Unit
     /// </summary>
     void RotateToward(Vector3 dir)
     {
+        if (BodyRotationLocked) return;   // 고정 터렛 — 머리만 돈다(TurretHeadAim)
+
         Quaternion target = Quaternion.LookRotation(dir);
 
         float turnSpeed = data != null ? data.turnSpeed : 0f;
