@@ -6723,6 +6723,7 @@ GameObject:
   - component: {fileID: 6118376412819370303}
   - component: {fileID: 2050612571752285464}
   - component: {fileID: 7746500284878980271}
+  - component: {fileID: 3350826167492650867}
   m_Layer: 6
   m_Name: Paladin
   m_TagString: Player
@@ -7458,6 +7459,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FirstMeleeInterruptSkill
   data: {fileID: 11400000, guid: 617280762f0032c4096fd2b1967e3bf1, type: 2}
   hitboxAnchor: {fileID: 2360924950670046369}
+--- !u!114 &3350826167492650867
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6077492126708577103}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 49f67085e4afbf14c8e5182d6e653718, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerSilhouetteTag
+  ShowTopMostFoldoutHeaderGroup: 1
+  modelRoot: {fileID: 0}
+  logOnSpawn: 0
 --- !u!1 &6097337715216137025
 GameObject:
   m_ObjectHideFlags: 0
@@ -8499,6 +8515,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Hurtbox
   ownerUnit: {fileID: 4633887174277109591}
+  attackReceiverSource: {fileID: 0}
 --- !u!1 &6849838038897300446
 GameObject:
   m_ObjectHideFlags: 0
