@@ -50,8 +50,11 @@ public sealed class RenderCostAB : MonoBehaviour
     [SerializeField] private bool startWithWallOcclusion;
 
     [Header("자동 측정")]
-    [Tooltip("켜면 Play 시작 후 알아서 두 상태를 재고 콘솔에 요약을 찍는다.")]
-    [SerializeField] private bool autoMeasure = true;
+    [Tooltip("켜면 Play 시작 후 알아서 두 상태를 재고 콘솔에 요약을 찍는다. "
+             + "🔴 기본값이 꺼짐인 이유: 이 측정은 실루엣을 껐다 켰다 한다. 켜 둔 채로 잊으면 "
+             + "게임이 '한동안 되다가 안 되는' 상태가 된다 — 실제로 MPPM 검증 중에 그렇게 새어나갔다. "
+             + "잴 때만 켠다.")]
+    [SerializeField] private bool autoMeasure;
 
     [Tooltip("측정 전에 버리는 프레임 수. 맵 생성·셰이더 워밍업·GC 가 섞이지 않게 넉넉히 둔다.")]
     [SerializeField] private int warmupFrames = 180;
@@ -213,6 +216,16 @@ public sealed class RenderCostAB : MonoBehaviour
 
         LogSummary();
         _phase = Phase.Done;
+
+        // 🔴 측정이 끝나면 반드시 시작 상태로 되돌린다.
+        //    마지막 구간이 OFF 라서 그대로 두면 실루엣이 꺼진 채 게임이 계속된다.
+        //    "처음엔 되는데 조금 뒤부터 안 되는" 증상으로 나타나고, 원인을 찾기가 매우 어렵다.
+        if (PlayerSilhouetteFeature.DevEnabled != startWithSilhouette)
+        {
+            PlayerSilhouetteFeature.DevEnabled = startWithSilhouette;
+            Debug.Log($"[RenderCostAB] 측정 종료 — 실루엣을 시작 상태로 복구했다 " +
+                      $"({(startWithSilhouette ? "켜짐" : "꺼짐")}).", this);
+        }
     }
 
     private void Accumulate()

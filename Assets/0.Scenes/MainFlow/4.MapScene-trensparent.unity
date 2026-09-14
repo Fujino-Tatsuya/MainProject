@@ -3642,7 +3642,7 @@ MonoBehaviour:
   toggleKey: 100
   startWithSilhouette: 1
   startWithWallOcclusion: 0
-  autoMeasure: 1
+  autoMeasure: 0
   warmupFrames: 180
   sampleFrames: 240
   alternations: 4

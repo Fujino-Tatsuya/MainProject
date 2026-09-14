@@ -42,6 +42,30 @@ Shader "Custom/WaterDark"
         _DepthDrift3  ("Depth Drift 3", Vector) = (0.015, -0.02, 0, 0)
         _EdgeBrighten ("Edge Brighten (UV 가장자리, per-hole 쿼드용)", Range(0, 1)) = 0
         _EdgeWidth    ("Edge Width (UV 비율)", Range(0.01, 0.5)) = 0.08
+
+        // ── 수심 (2026-09-15 추가 · FlatKit 의 Colors 그룹에 대응) ────────────────
+        [Header(Depth)]
+        [Toggle] _UseSceneDepth ("Use Scene Depth (끄면 전부 깊은 물로 취급)", Float) = 1
+        _ShallowColor ("Shallow Color (얕은 물색)", Color) = (0.22, 0.75, 0.72, 1)
+        _ShallowDepth ("Shallow Depth (이 깊이까지 얕은색, m)", Float) = 0.6
+        _GradientSize ("Gradient Size (얕은→깊은 전환 거리, m)", Float) = 6.0
+
+        // ── 물가 띠 (FlatKit 의 Crest) ──────────────────────────────────────────
+        [Header(Shore)]
+        _ShoreColor    ("Shore Color (물가 띠 색)", Color) = (0.75, 0.98, 0.95, 1)
+        _ShoreWidth    ("Shore Width (띠 폭, m)", Float) = 0.35
+        _ShoreSharp    ("Shore Sharpness (띠 경계 날카로움)", Range(1, 8)) = 2.5
+        _ShoreStrength ("Shore Strength (띠 세기)", Range(0, 1)) = 0.9
+
+        // ── 거품 (FlatKit 의 Foam) ──────────────────────────────────────────────
+        [Header(Foam)]
+        _FoamColor      ("Foam Color (거품색)", Color) = (0.85, 1.0, 0.97, 1)
+        _FoamAmount     ("Foam Amount (수면 전체 거품량)", Range(0, 1)) = 0.24
+        _FoamScale      ("Foam Scale (얼룩 크기 — 작을수록 큰 얼룩)", Float) = 0.30
+        _FoamSharpness  ("Foam Sharpness (얼룩 경계 — 1 이면 뭉개짐)", Range(1, 24)) = 12
+        _FoamSpeed      ("Foam Speed (xy=월드 xz/s)", Vector) = (0.05, 0.03, 0, 0)
+        _FoamShoreDepth ("Foam Shore Depth (물가에서 거품이 몰리는 깊이, m)", Float) = 1.2
+        _FoamShoreBlend ("Foam Shore Blend (물가 거품 가산량)", Range(0, 1)) = 0.5
     }
 
     SubShader
@@ -58,6 +82,14 @@ Shader "Custom/WaterDark"
             #pragma vertex vert
             #pragma fragment frag
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            // 🔴 수심을 재려면 물 **뒤**의 깊이가 필요하다.
+            //    이 셰이더는 패스가 하나뿐이고 LightMode 태그가 없어서(= SRPDefaultUnlit)
+            //    뎁스(노멀) 프리패스에 **들어가지 않는다.** 그래서 _CameraDepthTexture 를 읽으면
+            //    자기 자신이 아니라 물 뒤 바닥·벽의 깊이가 나온다 — Transparent 큐로 옮기지 않고도
+            //    수심을 구할 수 있는 이유가 이것이다.
+            //    ⚠️ 프리패스는 SSAO(AfterOpaque=0)가 만든다. SSAO 를 끄면 이 전제가 무너지고
+            //       수심이 전부 0 으로 읽혀 화면이 통째로 얕은색이 된다 — 그때는 _UseSceneDepth 를 끈다.
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _DeepColor;
@@ -77,6 +109,24 @@ Shader "Custom/WaterDark"
                 float4 _DepthDrift3;
                 float  _EdgeBrighten;
                 float  _EdgeWidth;
+
+                float  _UseSceneDepth;
+                float4 _ShallowColor;
+                float  _ShallowDepth;
+                float  _GradientSize;
+
+                float4 _ShoreColor;
+                float  _ShoreWidth;
+                float  _ShoreSharp;
+                float  _ShoreStrength;
+
+                float4 _FoamColor;
+                float  _FoamAmount;
+                float  _FoamScale;
+                float  _FoamSharpness;
+                float4 _FoamSpeed;
+                float  _FoamShoreDepth;
+                float  _FoamShoreBlend;
             CBUFFER_END
 
             struct Attributes
@@ -126,13 +176,30 @@ Shader "Custom/WaterDark"
             {
                 float2 p = IN.positionWS.xz;
 
-                // 물결: 노이즈 2겹(서로 다른 스케일·방향 스크롤). 두 겹이 겹치는
-                // 곳만 얇게 밝아지도록 곱 + 샤프닝 → 흐르는 줄기 느낌.
+                // ── 수심 ───────────────────────────────────────────────────────
+                // 물 표면과 그 뒤 지오메트리 사이의 뷰 방향 거리 = "눈이 통과하는 물의 두께".
+                // 탑다운이라 이 값이 사실상 수직 수심과 같다.
+                float waterDepth = 1e6;
+                if (_UseSceneDepth > 0.5)
+                {
+                    float2 screenUV = GetNormalizedScreenSpaceUV(IN.positionHCS);
+                    float sceneEye = LinearEyeDepth(SampleSceneDepth(screenUV), _ZBufferParams);
+                    float selfEye  = LinearEyeDepth(IN.positionHCS.z, _ZBufferParams);
+                    waterDepth = max(0.0, sceneEye - selfEye);
+                }
+
+                // 얕은 → 깊은 전환. _ShallowDepth 까지는 온전히 얕은색, 그 뒤 _GradientSize 만큼 섞인다.
+                float depthT = saturate((waterDepth - _ShallowDepth) / max(_GradientSize, 1e-3));
+
+                // ── 물결 ───────────────────────────────────────────────────────
+                // 노이즈 2겹(서로 다른 스케일·방향 스크롤). 두 겹이 겹치는 곳만 얇게
+                // 밝아지도록 곱 + 샤프닝 → 흐르는 줄기 느낌.
                 float n1 = Water_ValueNoise(p * _FlowScale1 + _FlowSpeed1.xy * (_Time.y * 2) * _FlowScale1);
                 float n2 = Water_ValueNoise(p * _FlowScale2 + _FlowSpeed2.xy * (_Time.y * 2) * _FlowScale2);
                 float flow = pow(saturate(n1 * n2 * 2.2), _FlowSharp);
 
-                float3 col = lerp(_DeepColor.rgb, _FlowColor.rgb, saturate(flow * _FlowStrength));
+                float3 baseCol = lerp(_ShallowColor.rgb, _DeepColor.rgb, depthT);
+                float3 col = lerp(baseCol, _FlowColor.rgb, saturate(flow * _FlowStrength));
 
                 // fake 깊이감: 3옥타브 fBm — 옥타브마다 스케일↑·진폭↓·드리프트 방향이 달라서
                 // 작은 탁한 얼룩이 큰 탁한 얼룩 안에 겹쳐 보이는 "layered murk" 착시를 만듦.
@@ -159,7 +226,24 @@ Shader "Custom/WaterDark"
                 depthNorm += depthAmp;
 
                 float dn = depthSum / max(1e-4, depthNorm);
-                col *= lerp(1.0, 1.0 - _DepthDarken, dn);
+                // 🔴 탁함은 깊은 곳에만 얹는다(depthT 로 가중). 얕은 물가까지 어둡게 하면
+                //    레퍼런스의 "가장자리가 밝다"가 죽는다.
+                col *= lerp(1.0, 1.0 - _DepthDarken * depthT, dn);
+
+                // ── 거품 ───────────────────────────────────────────────────────
+                // 경계가 또렷한 얼룩이 레퍼런스의 인상을 만든다 — 노이즈를 세게 계단화한다.
+                // 물가에서는 _FoamShoreBlend 만큼 더 몰린다.
+                float foamN = Water_ValueNoise(p * _FoamScale + _FoamSpeed.xy * _Time.y * _FoamScale);
+                float shoreT = 1.0 - saturate(waterDepth / max(_FoamShoreDepth, 1e-3));
+                float foamWant = saturate(_FoamAmount + shoreT * _FoamShoreBlend);
+                // foamWant 가 클수록 문턱이 낮아져 얼룩이 넓어진다.
+                float foam = saturate((foamN - (1.0 - foamWant)) * _FoamSharpness);
+                col = lerp(col, _FoamColor.rgb, foam * _FoamColor.a);
+
+                // ── 물가 띠 ────────────────────────────────────────────────────
+                // 물이 벽·바닥과 만나는 선. 이게 있어야 "물이 차 있다"로 읽힌다.
+                float shoreLine = pow(1.0 - saturate(waterDepth / max(_ShoreWidth, 1e-3)), _ShoreSharp);
+                col = lerp(col, _ShoreColor.rgb, shoreLine * _ShoreStrength);
 
                 // UV 가장자리 밝힘 — 구멍에 딱 맞춘 쿼드에서만 의미 있음(메가 플레인은 0 유지).
                 float2 e = min(IN.uv, 1.0 - IN.uv);
