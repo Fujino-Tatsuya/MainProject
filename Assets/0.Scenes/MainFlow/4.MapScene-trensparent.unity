@@ -3566,6 +3566,7 @@ GameObject:
   m_Component:
   - component: {fileID: 882340004}
   - component: {fileID: 882340003}
+  - component: {fileID: 882340005}
   m_Layer: 0
   m_Name: ProfilerHUD
   m_TagString: Untagged
@@ -3604,6 +3605,12 @@ MonoBehaviour:
   - label: Blur Copy
     markerName: MaskBlur CopyBack
     budgetMs: 0
+  - label: Silh Mask
+    markerName: PlayerSilhouette Mask
+    budgetMs: 0
+  - label: Silh Comp
+    markerName: PlayerSilhouette Composite
+    budgetMs: 0
 --- !u!4 &882340004
 Transform:
   m_ObjectHideFlags: 0
@@ -3619,6 +3626,21 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &882340005
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 882340002}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b8ab627a32dd5804f9a64dbd0eb78dab, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RenderCostAB
+  toggleKey: 100
+  startWithSilhouette: 1
+  startWithWallOcclusion: 0
 --- !u!1 &898904279
 GameObject:
   m_ObjectHideFlags: 0

@@ -57,6 +57,14 @@ public sealed class PlayerSilhouetteFeature : ScriptableRendererFeature
     [SerializeField]
     private RenderPassEvent _injectionPoint = RenderPassEvent.BeforeRenderingPostProcessing;
 
+    /// <summary>
+    /// 개발용 on/off. 비용 A/B 측정(<c>RenderCostAB</c>)이 런타임에 끈다.
+    /// 🔴 <b>정적</b>인 이유: 렌더러 피처는 씬 오브젝트가 아니라 렌더러 애셋의 서브에셋이라
+    /// 씬 쪽에서 참조를 잡기가 번거롭다. 리플렉션으로 파내는 대신 플래그 하나로 끝낸다.
+    /// 기본값은 <c>true</c> — 측정 도구가 없으면 항상 켜져 있어야 한다.
+    /// </summary>
+    public static bool DevEnabled = true;
+
     private Material _maskLocalMaterial;
     private Material _maskRemoteMaterial;
     private Material _compositeMaterial;
@@ -90,6 +98,9 @@ public sealed class PlayerSilhouetteFeature : ScriptableRendererFeature
 
     public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
     {
+        if (!DevEnabled)
+            return;
+
         if (_pass == null || _compositeMaterial == null || _maskLocalMaterial == null)
             return;
 
