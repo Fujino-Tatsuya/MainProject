@@ -46,6 +46,15 @@ public class TurretHeadAim : MonoBehaviour
              "끄면 공격 중에도 계속 타깃을 따라 돌아간다.")]
     [SerializeField] private bool holdAimWhileAttacking = true;
 
+    [Header("진단")]
+    [Tooltip("켜면 0.5초마다 상태·조준각·애니메이터 개입 여부를 콘솔에 찍는다. " +
+             "머리가 폭주할 때 원인을 가르는 용도 — 평소에는 끈다.")]
+    [SerializeField] private bool logDiagnostics;
+
+    private float _nextLogTime;
+    private Quaternion _lastWritten;
+    private bool _hasWritten;
+
     private MonsterBase _monster;
 
     /// 몸통 정면 대비 현재 머리 요(도). 프레임마다 애니메이터 포즈 위에 다시 얹는다.
@@ -122,11 +131,34 @@ public class TurretHeadAim : MonoBehaviour
                 : Mathf.MoveTowardsAngle(_yaw, desired, speed * Time.deltaTime);
         }
 
-        if (Mathf.Abs(_yaw) < 0.01f) return;      // 정면이면 애니메이터 포즈를 건드리지 않는다
+        // 🔴 누적 방지: 이 프레임에 애니메이터가 본을 다시 썼는지 확인한다.
+        //    안 썼다면 지금 값은 "내가 지난 프레임에 쓴 것"이므로, 그 위에 또 얹으면
+        //    매 프레임 각도가 쌓여 머리가 폭주한다.
+        bool animatorWrote = !_hasWritten || headBone.localRotation != _lastWritten;
 
-        // 🔴 덮어쓰지 않고 얹는다. 애니메이터가 방금 쓴 회전이 피연산자다.
+        if (logDiagnostics && Time.time >= _nextLogTime)
+        {
+            _nextLogTime = Time.time + 0.5f;
+            Debug.Log($"[TurretHeadAim] {name} state={(_monster != null ? _monster.State.ToString() : "?")} " +
+                      $"lock={aimLocked} yaw={_yaw:F1} 애니메이터가씀={animatorWrote} " +
+                      $"target={(_monster != null && _monster.CurrentTarget != null ? _monster.CurrentTarget.name : "없음")}", this);
+        }
+
+        if (Mathf.Abs(_yaw) < 0.01f) { _hasWritten = false; return; } // 정면이면 포즈를 안 건드린다
+
+        if (!animatorWrote)
+        {
+            // 애니메이터가 손대지 않았다 → 내가 지난 프레임에 만든 결과를 되돌리고 기준 포즈에서 다시 얹는다.
+            headBone.localRotation = _lastAnimPose;
+        }
+
+        _lastAnimPose = headBone.localRotation;
         headBone.rotation = Quaternion.AngleAxis(_yaw, Vector3.up) * headBone.rotation;
+        _lastWritten = headBone.localRotation;
+        _hasWritten = true;
     }
+
+    private Quaternion _lastAnimPose = Quaternion.identity;
 
 #if UNITY_EDITOR
     private void OnDrawGizmosSelected()
