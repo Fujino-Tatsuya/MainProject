@@ -107,11 +107,12 @@ public static class TurretAnimatorAuthoring
             string agentFix = StripNavMeshAgent(prefabPath);
             string muzzleFix = WireMuzzle(prefabPath);
             Material laserMat = EnsureLaserMaterial(out string matFix);
+            string laserFix = EnsureAimLaser(prefabPath, laserMat);
             string aimFix = EnsureHeadAim(prefabPath, laserMat);
 
             log.AppendLine($"  ✓ {t.Name} — {ctrlPath}\n      마스크: {maskFix}\n      데이터: {dataFix}" +
                            $"\n      NavMeshAgent: {agentFix}\n      muzzle: {muzzleFix}" +
-                           $"\n      예고선 머티리얼: {matFix}\n      머리 조준: {aimFix}");
+                           $"\n      예고선 머티리얼: {matFix}\n      예고선 오브젝트: {laserFix}\n      머리 조준: {aimFix}");
             done++;
         }
 
@@ -421,6 +422,57 @@ public static class TurretAnimatorAuthoring
         AssetDatabase.CreateAsset(mat, matPath);
         report = $"생성 ({matPath})";
         return mat;
+    }
+
+    /// <summary>
+    /// 조준 예고선 오브젝트(<c>TrackingLaser</c> + <see cref="LineRenderer"/>)를 보장한다.
+    ///
+    /// 🔴 PeekABot 의 아트 프리팹에는 있지만 <b>TeslaBot 에는 없다</b>(실측: P_TeslaBot 의
+    /// TrackingLaser 0 · LineRenderer 0). 없으면 <b>우리 프리팹 루트 밑에</b> 만든다 —
+    /// 아트 프리팹은 SVN 이고 팩 업데이트에 덮이므로 거기에 넣으면 안 된다.
+    /// 위치는 중요하지 않다: <c>TurretHeadAim</c> 이 매 프레임 월드 좌표로 두 점을 직접 찍고,
+    /// 시작점은 이 오브젝트가 아니라 <c>Muzzle_Socket</c>/<c>Head</c> 를 쓴다.
+    /// </summary>
+    static string EnsureAimLaser(string prefabPath, Material laserMat)
+    {
+        const string LaserName = "TrackingLaser";
+        bool created = false;
+
+        GameObject root = PrefabUtility.LoadPrefabContents(prefabPath);
+        try
+        {
+            Transform existing = FindChildByName(root.transform, LaserName);
+            if (existing != null && existing.GetComponent<LineRenderer>() != null)
+                return $"이미있음 ({existing.name})";
+
+            var go = new GameObject(LaserName);
+            go.transform.SetParent(root.transform, false);
+
+            var lr = go.AddComponent<LineRenderer>();
+            lr.useWorldSpace = true;
+            lr.positionCount = 2;
+            lr.widthMultiplier = 0.05f;
+            lr.numCapVertices = 0;
+            lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            lr.receiveShadows = false;
+            if (laserMat != null) lr.sharedMaterial = laserMat;
+
+            go.SetActive(false);   // 예고 구간에만 켠다 — TurretHeadAim 이 토글한다
+            created = true;
+
+            PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+
+        if (!created) return "이미있음";
+
+        var saved = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+        Transform check = saved != null ? FindChildByName(saved.transform, LaserName) : null;
+        bool ok = check != null && check.GetComponent<LineRenderer>() != null;
+        return ok ? "생성 (되읽기 ✓)" : "🔴 생성했는데 되읽으니 없다";
     }
 
     static Transform FindChildByName(Transform root, string childName)

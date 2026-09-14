@@ -55,6 +55,9 @@ public class MonsterBase : Unit
     Vector3 _spawnPosition;
     Quaternion _spawnRotation;
     Transform _target;
+
+    /// 고정 터렛 조준 예고 게이트(선택). <see cref="SeekTurret"/> 만 쓴다.
+    ITurretAimGate _aimGate;
     Collider[] _detectBuffer;
 
     // 공격 슬롯별 쿨다운.
@@ -127,6 +130,9 @@ public class MonsterBase : Unit
         if (status == null) status = GetComponent<MonsterStatusEffect>();
         if (meleeAttack == null) meleeAttack = GetComponentInChildren<MonsterMeleeAttack>();
         if (rangedAttack == null) rangedAttack = GetComponentInChildren<MonsterRangedAttack>();
+
+        // 고정 터렛의 조준 예고 게이트(선택). 없으면 SeekTurret 이 예전대로 바로 쏜다.
+        _aimGate = GetComponent<ITurretAimGate>();
 
         // 공격 애니 이벤트 릴레이 자동 부착(Animator 오브젝트에 — 이벤트는 같은 GO의 메서드만 호출 가능).
         // 🔴 부착이 곧 동작은 아니다. OnAttackHit 은 **폴백이 없어서**, 클립에 그 이벤트가 없으면
@@ -510,11 +516,33 @@ public class MonsterBase : Unit
     }
 
     // 고정 포탑: 이동 없음. 사거리(attackRange) 안이면 조준·사격, 밖이면 대기.
+    //
+    // 🔴 조준 예고(2026-09-14 팀장 확정): 쏠 준비가 됐다고 바로 쏘지 않는다.
+    //    ITurretAimGate 가 붙어 있으면 조준선을 켜고 잠깐 타깃을 따라간 뒤, 게이트가 열릴 때 쏜다.
+    //    게이트가 없으면(컴포넌트 미부착) 예전 동작 그대로다 — 여기서만 갈린다.
     void SeekTurret(float dist, bool attackBlocked)
     {
         StopAgent();
         FaceTarget();
-        if (dist <= data.attackRange && !attackBlocked && CooldownReady())
+
+        bool ready = dist <= data.attackRange && !attackBlocked && CooldownReady();
+
+        if (ready && _aimGate != null)
+        {
+            _aimGate.BeginAiming();
+            if (!_aimGate.IsAimReady)
+            {
+                // 조준 중 — 아직 쏘지 않는다. 상태는 Idle 로 둔다(정지 포즈 유지).
+                if (_state.Value != MonsterState.Idle) SetState(MonsterState.Idle);
+                return;
+            }
+        }
+        else if (!ready)
+        {
+            _aimGate?.CancelAiming();
+        }
+
+        if (ready)
             StartAttack();
         else if (_state.Value != MonsterState.Idle)
             SetState(MonsterState.Idle);

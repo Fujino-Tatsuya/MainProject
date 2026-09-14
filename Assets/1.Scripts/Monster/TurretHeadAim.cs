@@ -23,7 +23,7 @@ using UnityEngine;
 /// </summary>
 [DisallowMultipleComponent]
 [RequireComponent(typeof(MonsterBase))]
-public class TurretHeadAim : MonoBehaviour
+public class TurretHeadAim : MonoBehaviour, ITurretAimGate
 {
     [Header("머리 본")]
     [Tooltip("비우면 이름으로 자동 탐색한다. 터렛 리그는 Root→Column01~03→HeadRotator 순서다.")]
@@ -63,6 +63,14 @@ public class TurretHeadAim : MonoBehaviour
     [SerializeField] private Material laserMaterial;
     [Tooltip("예고선 두께(m).")]
     [SerializeField] private float laserWidth = 0.05f;
+    [Tooltip("예고선이 나가는 지점. 비우면 Muzzle_Socket → Head → HeadRotator 순으로 자동 탐색한다. " +
+             "예고선 오브젝트의 위치를 쓰지 않는 이유는, 그 오브젝트가 머리에 붙어 있지 않을 수도 있어서다.")]
+    [SerializeField] private Transform laserOrigin;
+
+    [Header("조준 예고 시간")]
+    [Tooltip("사거리 안에 들어온 뒤 조준선을 보이며 타깃을 따라가는 시간(초). " +
+             "이 시간이 지나면 조준이 멈추고 그때 발사한다(팀장 확정: 0.5~1.0초).")]
+    [SerializeField] private float telegraphSeconds = 0.7f;
 
     [Header("진단")]
     [Tooltip("켜면 0.5초마다 상태·조준각·애니메이터 개입 여부를 콘솔에 찍는다. " +
@@ -83,6 +91,23 @@ public class TurretHeadAim : MonoBehaviour
 
     /// <summary>조준이 향하는 월드 방향(수평). 타깃이 없으면 몸통 정면.</summary>
     public Vector3 AimDirection => Quaternion.AngleAxis(_yaw, Vector3.up) * FlatForward();
+
+    private bool _telegraphing;
+    private float _telegraphStartedAt;
+
+    // ── ITurretAimGate ──────────────────────────────────────────────────────
+    /// <summary>예고 시간이 다 지났는가. 지나면 조준이 멈추고 <c>MonsterBase</c> 가 발사한다.</summary>
+    public bool IsAimReady =>
+        !_telegraphing || Time.time - _telegraphStartedAt >= telegraphSeconds;
+
+    public void BeginAiming()
+    {
+        if (_telegraphing) return;
+        _telegraphing = true;
+        _telegraphStartedAt = Time.time;
+    }
+
+    public void CancelAiming() => _telegraphing = false;
 
     private void Awake()
     {
@@ -107,6 +132,15 @@ public class TurretHeadAim : MonoBehaviour
         // 예고선이 없어도 조준은 동작해야 하므로 여기서는 끄지 않는다(경고만).
         if (showAimLaser && aimLaser == null)
             Debug.LogWarning($"[TurretHeadAim] {name}: '{aimLaserName}' LineRenderer 가 없어 예고선을 끈다.", this);
+
+        // 예고선이 나가는 지점 — 총구가 있으면 총구, 없으면 머리.
+        if (laserOrigin == null)
+            laserOrigin = FindBone("Muzzle_Socket") ?? FindBone("Head") ?? headBone;
+
+        // 🔴 막는 레이어를 안 정하면 예고선이 벽을 뚫고 나가 "저기까지 공격이 온다"로 오해된다.
+        //    지정이 없으면 바닥·구조물 레이어로 기본값을 잡는다(MapContentSpawner 와 같은 집합).
+        if (laserBlockers.value == 0)
+            laserBlockers = LayerMask.GetMask("Default", "Ground");
 
         if (aimLaser != null)
         {
@@ -147,12 +181,20 @@ public class TurretHeadAim : MonoBehaviour
         //    갱신만 멈추고 각도는 계속 적용한다(멈추면 애니메이터 포즈로 머리가 튄다).
         //    몸통 쪽 규약과 같다: MonsterBase 는 StartAttack 직전 FaceTarget() 1회로 조준을 확정한다.
         bool attacking = _monster != null && _monster.State == MonsterState.Attack;
-        if (attacking) _resumeAimAt = Time.time + aimResumeDelay;
+        if (attacking)
+        {
+            _resumeAimAt = Time.time + aimResumeDelay;
+            _telegraphing = false;   // 발사에 들어갔다 — 다음 사이클에 예고를 처음부터 다시 한다
+        }
+
+        // 예고 시간이 끝나면 조준선이 "멈춘" 상태여야 한다 — 그 순간부터 조준을 고정한다.
+        bool telegraphLocked = _telegraphing && IsAimReady;
 
         // 공격이 끝난 직후 바로 돌면 기계적으로 보인다(팀장 피드백) — 짧은 뜸을 둔다.
-        bool aimLocked = holdAimWhileAttacking && (attacking || Time.time < _resumeAimAt);
+        bool aimLocked = holdAimWhileAttacking
+                         && (attacking || telegraphLocked || Time.time < _resumeAimAt);
 
-        UpdateAimLaser(attacking);
+        UpdateAimLaser();
 
         if (!aimLocked)
         {
@@ -207,7 +249,6 @@ public class TurretHeadAim : MonoBehaviour
 
     private Quaternion _lastAnimPose = Quaternion.identity;
     private float _resumeAimAt;
-    private float _attackStartedAt = -1f;
 
     /// <summary>
     /// 조준 예고선. <b>선딜 동안만</b> 켠다 — 발사 시점에 끄면 "지금 여기로 쏜다"는 예고가 된다.
@@ -218,34 +259,19 @@ public class TurretHeadAim : MonoBehaviour
     ///
     /// 각 피어가 로컬로 그린다. 복제하지 않는다(시각 요소).
     /// </summary>
-    private void UpdateAimLaser(bool attacking)
+    private void UpdateAimLaser()
     {
         if (aimLaser == null) return;
 
-        if (!showAimLaser)
+        // 예고 구간에만 보인다: 사거리 안 + 쿨 참 → 조준선 ON → telegraphSeconds 동안 추적 →
+        // 멈추는 순간 발사(그때 _telegraphing 이 꺼지므로 선도 사라진다).
+        if (!showAimLaser || !_telegraphing)
         {
             if (aimLaser.gameObject.activeSelf) aimLaser.gameObject.SetActive(false);
             return;
         }
 
-        if (!attacking)
-        {
-            _attackStartedAt = -1f;
-            if (aimLaser.gameObject.activeSelf) aimLaser.gameObject.SetActive(false);
-            return;
-        }
-
-        if (_attackStartedAt < 0f) _attackStartedAt = Time.time;
-
-        // 선딜이 지나면(= 탄이 나간 뒤) 끈다. windup 이 0 이면 공격 상태 내내 보여 준다.
-        float windup = _monster != null ? _monster.AttackWindupSeconds : 0f;
-        if (windup > 0f && Time.time - _attackStartedAt >= windup)
-        {
-            if (aimLaser.gameObject.activeSelf) aimLaser.gameObject.SetActive(false);
-            return;
-        }
-
-        Vector3 origin = aimLaser.transform.position;
+        Vector3 origin = laserOrigin != null ? laserOrigin.position : headBone.position;
         Vector3 dir = AimDirection;
         float range = _monster != null ? _monster.AttackRangeMeters : 0f;
         if (range <= 0f) range = 10f;
