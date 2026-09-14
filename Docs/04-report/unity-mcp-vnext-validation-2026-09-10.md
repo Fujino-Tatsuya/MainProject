@@ -102,7 +102,7 @@ GitHub 설치 전 검증은 manifest를 잠시 후보 file: 경로로 지정해 
 - 최종 씬은 사용자가 열어 둔 **Dev_Boot**, 편집 모드다. 이번 적용에는 Play를 다시
   실행하지 않았고, 앞선 동일 구현의 Play 2회·실제 fixture 컴파일 검증을 유지한다.
 
-오늘의 원본 결과는 `output/unity-mcp-install-2026-09-11/`의 regressions/,
+오늘의 원본 결과는 `C:/Users/user/Projects/TeamVault/MainProejectVault/04-report/mcp-audit-output/unity-mcp-install-2026-09-11/`의 regressions/,
 before-domain-reload-live-results.json, live-results.json, installation-verification.json에 있다.
 기존 설정과 런처도 같은 폴더에 백업했다. 이전 9월 8~10일 output 자료는 이후 루트 정리
 작업에서 이동되었을 수 있으므로 당시 보고서와 정리 커밋 기록을 함께 확인한다.
