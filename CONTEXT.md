@@ -8,14 +8,53 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 현재 상태 (2026-09-11 · **대기**)
+## ▶▶ 현재 상태 (2026-09-14 · 고정 터렛 조준 개편 **완료**)
 
 **다음 작업 = 보스 몬스터 패턴 추가.** 기획이 아직 없어 대기 상태다 — 잠기면 grill → PLAN →
 승인 순서로 [PLAN.md](PLAN.md) 맨 위에 새 `CURRENT PLAN` 을 만든다.
 **퀘스트 영역은 착수 전 취소**됐다(PLAN.md 의 ❌ 절에 잠긴 결정 14건을 남겨 뒀다).
 
-이번 세션에 한 것: 고정 터렛 파트 분리 해결(아래 ✅ 절) · NavMesh 보류 확정(🟡 절) ·
-레포 루트 정리. 커밋 `9c0b496c` `1bc3a7c1` `91e25d37`.
+### 고정 터렛(PeekABot·TeslaBot) 조준 개편 — A~D 전부 Play 확인 완료
+
+커밋 13건: `d14643c5`(A 마스크) `09607915`(B 머리 조준) `41eab95e` `eac0d402` `b1eda4ed`(구조+C 예고선)
+`7fe960d9` `0b6c62e9` `cca99d4e` `17c9d428`(D 스폰) `ef614349`(발사 이벤트) `5c83eda5`(고정 유지)
+`a05a8e26`(발사 방향) `ea6884f5`(도구 삭제).
+
+동작: 사거리 진입 → 조준선 ON, **0.7초 추적** → **0.5초 고정 유지** → 발사(선 꺼짐) → 0.25초 뜸 → 재조준.
+두 시간 모두 `TurretHeadAim` 인스펙터에 노출돼 있다.
+
+구조 요점(다시 건드릴 때 필요한 것만):
+- 컨트롤러는 **2레이어**다. `Base`=Idle 전신 / `Shoot`=머리 마스크 Override weight 1.
+  레이어 1 의 평상시 상태 `HeadIdle` 에 **Idle 클립이 물려 있어야 한다** — 비우면 머리가 폭주한다(교훈 #97).
+- 몸통 회전은 `MonsterBase.BodyRotationLocked` 가 막고, 조준은 `TurretHeadAim` 이 `LateUpdate` 에서
+  머리 본에 **델타를 얹는다**(덮어쓰지 않는다 — 본 로컬 축을 모른다).
+- 발사는 `ITurretAimGate` 가 연다(`MonsterBase.SeekTurret` 한 곳에서만 물린다). 탄은
+  `MonsterRangedAttack.FireDirection` 으로 **조준선과 같은 방향**으로 나간다.
+- 예고선은 `TrackingLaser`(LineRenderer). PeekABot 은 아트에 있던 것, **TeslaBot 은 우리가 만든 것**.
+  머티리얼은 `MA_TurretAimLaser`(URP Unlit) 를 **런타임 주입**한다 — 아트 기본값이 내장 RP 라 URP 에서 안 보인다.
+
+### 🔴 SVN 커밋이 남아 있다 (git 에는 없다)
+
+| 파일 | 무엇 | 재발 |
+|---|---|---|
+| `Assets/50.Art/.../TeslaBot/A_Shoot.fbx.meta` | `Shoot` 클립에 `OnAttackHit`·`OnAttackEnd` 저작 | **아트가 팩을 갱신하면 덮인다** → TeslaBot 이 다시 발사를 멈춘다 |
+| `Assets/50.Art/MapGen/.../MapGenConfig.asset` | `GroupID 3` 을 TeslaBot 으로(자리표시자 정리) | — |
+
+재발 시 복구 도구: `git checkout a05a8e26 -- Assets/1.Scripts/Monster/Editor/TeslaShootClipEventAuthoring.cs`
+(1회용이라 `ea6884f5` 에서 지웠다. 같은 커밋에 `TurretAnimatorAuthoring`·`TeslaTurretGroupRestore` 도 있다.)
+
+### 남은 것
+
+- **예고선이 호스트에서만 보인다** — `SeekTurret` 이 서버 전용이라 클라에는 예고 상태가 안 간다.
+  멀티 테스트 전에 `NetworkVariable` 하나로 복제해야 한다.
+- 스폰 분포: `ZoneM_typeA`=PeekABot / **`ZoneM_typeB`=TeslaBot** / `ZoneL_*`=MortarBot /
+  `ZoneS_typeA`·`Quest01/02`=ChompBot. 바꾸려면 **존 프리팹의 `ZoneMonsterSpawnSet.defaultMonsterPrefab`**
+  을 고친다 — `MapGenConfig.MonsterGroups` 는 `LevelDeliveryV3` 계통 전용이라 현재 맵에 영향이 없다(교훈 #99).
+
+### 이전 세션(2026-09-11)에 한 것
+
+고정 터렛 파트 분리 해결(아래 ✅ 절) · NavMesh 보류 확정(🟡 절) · 레포 루트 정리.
+커밋 `9c0b496c` `1bc3a7c1` `91e25d37`.
 
 레포 루트 정리 결과 — `output/`(MCP 감사 산출물 167MB · 1403파일)을 **팀 볼트**
 `04-report/mcp-audit-output/` 으로 이관하고 보고서 링크 12곳을 새 경로로 고쳤다(전부 해석 확인).
