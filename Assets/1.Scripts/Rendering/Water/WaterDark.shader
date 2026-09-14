@@ -57,15 +57,20 @@ Shader "Custom/WaterDark"
         _ShoreSharp    ("Shore Sharpness (띠 경계 날카로움)", Range(1, 8)) = 2.5
         _ShoreStrength ("Shore Strength (띠 세기)", Range(0, 1)) = 0.9
 
-        // ── 물가 출렁임 (Lapping) ───────────────────────────────────────────────
-        // 🔴 이게 없으면 물가 띠가 지오메트리에만 의존해 "항상 같은 자리, 같은 밝기"로 박힌다.
-        //    물결은 흐르는데 물가만 정지해 있으면 고인 물로 읽힌다. 수심에 시간 오프셋을 더해
-        //    물가 선을 밀고 당긴다 — 들이쳤다 빠지는 느낌.
-        [Header(Lapping)]
-        _LapAmount ("Lap Amount (물가 선이 오르내리는 폭, m)", Float) = 0.45
-        _LapSpeed  ("Lap Speed (마루가 해안을 따라 흐르는 속도)", Float) = 0.35
-        _LapScale  ("Lap Scale (마루 간격 — 작을수록 길게 이어진다)", Float) = 0.12
-        _LapFreq   ("Lap Frequency (철썩이는 주기)", Float) = 0.7
+        // ── 흐름 + 파도 (Current) ──────────────────────────────────────────────
+        // 🔴 물 전체가 **한 방향으로** 흘러야 한다(2026-09-15 팀장). 이전 판은 위상을
+        //    위치 노이즈로만 흔들어서 "해안선을 따라 순서대로 깜빡이는" 그림이 됐다 —
+        //    흐르는 게 아니라 제자리에서 맥박치는 것이다.
+        //    아래 방향 하나가 깊은 물 무늬·거품·파도 마루를 **전부** 끌고 간다.
+        [Header(Current)]
+        _FlowDir    ("Flow Direction (xy = 월드 XZ. 크기는 무시)", Vector) = (1, 0.35, 0, 0)
+        _FlowMaster ("Flow Speed (수면 전체가 흘러가는 속도, m/s)", Float) = 0.6
+        _WaveLength ("Wave Length (파도 마루 간격, m)", Float) = 18
+        _WaveSpeed  ("Wave Speed (마루가 지나가는 빈도, 초당)", Float) = 0.22
+        _WaveJitter ("Wave Jitter (마루 구부러짐 — 0 이면 자로 잰 직선)", Range(0, 1)) = 0.35
+        _WaveJitterScale ("Wave Jitter Scale (구부러짐 크기)", Float) = 0.03
+        _WaveContrast ("Wave Contrast (열린 수면에 보이는 띠 세기)", Range(0, 0.3)) = 0.06
+        _LapAmount  ("Lap Amount (벽에 철썩일 때 물가가 밀리는 폭, m)", Float) = 0.9
 
         // ── 거품 (FlatKit 의 Foam) ──────────────────────────────────────────────
         [Header(Foam)]
@@ -130,10 +135,14 @@ Shader "Custom/WaterDark"
                 float  _ShoreSharp;
                 float  _ShoreStrength;
 
+                float4 _FlowDir;
+                float  _FlowMaster;
+                float  _WaveLength;
+                float  _WaveSpeed;
+                float  _WaveJitter;
+                float  _WaveJitterScale;
+                float  _WaveContrast;
                 float  _LapAmount;
-                float  _LapSpeed;
-                float  _LapScale;
-                float  _LapFreq;
 
                 float4 _FoamColor;
                 float  _FoamAmount;
@@ -208,11 +217,18 @@ Shader "Custom/WaterDark"
                 // 얕은 → 깊은 전환. _ShallowDepth 까지는 온전히 얕은색, 그 뒤 _GradientSize 만큼 섞인다.
                 float depthT = saturate((waterDepth - _ShallowDepth) / max(_GradientSize, 1e-3));
 
+                // ── 흐름 ───────────────────────────────────────────────────────
+                // 🔴 방향 하나가 무늬·거품·파도를 전부 끌고 간다. 요소마다 따로 움직이면
+                //    "흐른다"가 아니라 "각자 논다"로 보인다.
+                //    p 자체를 흐름 반대로 밀어 두면, 아래 모든 샘플이 자동으로 같이 흘러간다.
+                float2 flowDir = normalize(_FlowDir.xy + float2(1e-5, 0));
+                float2 pf = p - flowDir * (_FlowMaster * _Time.y);
+
                 // ── 물결 ───────────────────────────────────────────────────────
                 // 노이즈 2겹(서로 다른 스케일·방향 스크롤). 두 겹이 겹치는 곳만 얇게
                 // 밝아지도록 곱 + 샤프닝 → 흐르는 줄기 느낌.
-                float n1 = Water_ValueNoise(p * _FlowScale1 + _FlowSpeed1.xy * (_Time.y * 2) * _FlowScale1);
-                float n2 = Water_ValueNoise(p * _FlowScale2 + _FlowSpeed2.xy * (_Time.y * 2) * _FlowScale2);
+                float n1 = Water_ValueNoise(pf * _FlowScale1 + _FlowSpeed1.xy * (_Time.y * 2) * _FlowScale1);
+                float n2 = Water_ValueNoise(pf * _FlowScale2 + _FlowSpeed2.xy * (_Time.y * 2) * _FlowScale2);
                 float flow = pow(saturate(n1 * n2 * 2.2), _FlowSharp);
 
                 float3 baseCol = lerp(_ShallowColor.rgb, _DeepColor.rgb, depthT);
@@ -221,24 +237,26 @@ Shader "Custom/WaterDark"
                 // fake 깊이감: 3옥타브 fBm — 옥타브마다 스케일↑·진폭↓·드리프트 방향이 달라서
                 // 작은 탁한 얼룩이 큰 탁한 얼룩 안에 겹쳐 보이는 "layered murk" 착시를 만듦.
                 // 조명/카메라 각도와 무관한 순수 월드 XZ 기반 — 반사·그림자 반응 없음(의도).
+                // 🔴 pf(흐름이 적용된 좌표)를 쓴다. p 로 두면 탁함만 제자리에 붙박여
+                //    나머지가 흘러도 물이 고여 보인다.
                 float depthFreq = _DepthNoiseScale;
                 float depthAmp  = 1.0;
                 float depthSum  = 0.0;
                 float depthNorm = 0.0;
 
-                float2 dp1 = p * depthFreq + _DepthDrift1.xy * _Time.y * depthFreq;
+                float2 dp1 = pf * depthFreq + _DepthDrift1.xy * _Time.y * depthFreq;
                 depthSum  += depthAmp * Water_ValueNoise(dp1);
                 depthNorm += depthAmp;
                 depthFreq *= _DepthOctaveScale;
                 depthAmp  *= _DepthOctaveFalloff;
 
-                float2 dp2 = p * depthFreq + _DepthDrift2.xy * _Time.y * depthFreq;
+                float2 dp2 = pf * depthFreq + _DepthDrift2.xy * _Time.y * depthFreq;
                 depthSum  += depthAmp * Water_ValueNoise(dp2);
                 depthNorm += depthAmp;
                 depthFreq *= _DepthOctaveScale;
                 depthAmp  *= _DepthOctaveFalloff;
 
-                float2 dp3 = p * depthFreq + _DepthDrift3.xy * _Time.y * depthFreq;
+                float2 dp3 = pf * depthFreq + _DepthDrift3.xy * _Time.y * depthFreq;
                 depthSum  += depthAmp * Water_ValueNoise(dp3);
                 depthNorm += depthAmp;
 
@@ -247,20 +265,26 @@ Shader "Custom/WaterDark"
                 //    레퍼런스의 "가장자리가 밝다"가 죽는다.
                 col *= lerp(1.0, 1.0 - _DepthDarken * depthT, dn);
 
-                // ── 물가 출렁임 ────────────────────────────────────────────────
-                // 수심에 시간 오프셋을 더해 물가 선을 밀고 당긴다.
-                // 🔴 색(depthT)에는 적용하지 않는다 — 수면 전체가 맥박치듯 밝아졌다 어두워진다.
-                //    출렁임은 **물가 띠와 거품에만** 걸어야 파도가 들이치는 것으로 읽힌다.
-                // 노이즈를 위상에 넣는 이유: 해안선 구간마다 철썩이는 타이밍이 달라진다.
-                // 전부 같은 위상이면 해안 전체가 한꺼번에 깜빡여 기계적으로 보인다.
-                float lapN = Water_ValueNoise(p * _LapScale + float2(_LapSpeed, _LapSpeed * 0.6) * _Time.y);
-                float lapWave = sin(_Time.y * _LapFreq * 6.2831 + lapN * 6.2831);
+                // ── 진행 파도 ──────────────────────────────────────────────────
+                // 🔴 위상 = (위치·흐름방향) − 시간. 이래야 마루가 **흐름 방향으로 이동**한다.
+                //    이전 판은 위상이 위치 노이즈뿐이라 마루가 제자리에서 깜빡였다
+                //    ("해안선을 따라 순서대로 지나가는" 그림의 원인).
+                // 지터는 마루를 구부리는 용도다 — 0 이면 자로 잰 직선이 되어 인공적이다.
+                float along = dot(p, flowDir) / max(_WaveLength, 0.01);
+                float jitter = Water_ValueNoise(pf * _WaveJitterScale) - 0.5;
+                float lapWave = sin((along - _Time.y * _WaveSpeed + jitter * _WaveJitter) * 6.2831);
+
+                // 마루가 벽에 닿는 순간 물가가 밀려 올라가고, 지나가면 내려간다.
                 float shoreDepth = max(0.0, waterDepth + lapWave * _LapAmount);
+
+                // 열린 수면에도 같은 마루를 약하게 얹는다 — 이게 있어야 깊은 물도 함께 흐른다.
+                // 🔴 약하게(_WaveContrast 기본 0.06). 세게 걸면 수면 전체가 맥박친다.
+                col *= 1.0 + lapWave * _WaveContrast;
 
                 // ── 거품 ───────────────────────────────────────────────────────
                 // 경계가 또렷한 얼룩이 레퍼런스의 인상을 만든다 — 노이즈를 세게 계단화한다.
-                // 물가에서는 _FoamShoreBlend 만큼 더 몰린다(출렁임을 따라 같이 움직인다).
-                float foamN = Water_ValueNoise(p * _FoamScale + _FoamSpeed.xy * _Time.y * _FoamScale);
+                // 물가에서는 _FoamShoreBlend 만큼 더 몰린다(파도를 따라 같이 움직인다).
+                float foamN = Water_ValueNoise(pf * _FoamScale + _FoamSpeed.xy * _Time.y * _FoamScale);
                 float shoreT = 1.0 - saturate(shoreDepth / max(_FoamShoreDepth, 1e-3));
                 float foamWant = saturate(_FoamAmount + shoreT * _FoamShoreBlend);
                 // foamWant 가 클수록 문턱이 낮아져 얼룩이 넓어진다.
