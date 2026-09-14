@@ -8,6 +8,9 @@
 
 # A. 벽 가림 — 투명화(디더 클립)를 끄고 **실루엣 윤곽선**으로
 
+> 🔁 **2026-09-14 개정.** 초안을 Codex 교차검증에 걸었고 **설계 결함 3건 + 문서 오류 3건**이 나왔다.
+> 아래는 그중 직접 재확인한 것만 반영한 2판이다. 초안의 틀린 부분은 「초안에서 뒤집은 것」에 남긴다.
+
 ## 확정된 요구 (2026-09-14 팀장, 레퍼런스 2장)
 
 | 항목 | 확정 |
@@ -17,72 +20,99 @@
 | 색 | **내 캐릭터 = 초록 / 다른 팀원 = 파랑** |
 | 구 시스템 | **끄기만 한다. 파일은 지우지 않는다** |
 
-## 현재 상태 (실측 완료)
+## 🔴 초안에서 뒤집은 것 (전부 직접 재확인함)
+
+| 초안 | 실제 | 근거 |
+|---|---|---|
+| `Player` 레이어(6)로 거른다 | **레이어 필터는 0개를 그린다.** 실제 스폰되는 `Paladin` 의 렌더러 4개(`tripo_part_0`·검·방패·시체표식)가 **전부 layer 0** 이다. 루트만 6이고 **레이어는 자식에 상속되지 않는다** | `Paladin.prefab` 렌더러 전수 조회. `NetworkManager.prefab` 이 Paladin 을 참조 = 이게 진짜 플레이어다 |
+| 색을 `MaterialPropertyBlock` 으로 넘긴다 | **피격 한 번에 색이 날아간다.** `HitFlash.ClearTint()` 가 `SetPropertyBlock(null)` 로 **블록 전체**를 지운다 | [HitFlash.cs:160](Assets/1.Scripts/Unit/HitFlash.cs:160) |
+| 가려진 픽셀만 모아 그 테두리를 그린다 | **벽이 허리를 자르면 허리에 수평선이 생긴다.** 그건 *가려진 영역*의 테두리이지 *캐릭터*의 윤곽이 아니다 | 아래 A-3 |
+| Mobile/PP 에셋의 Depth Texture 가 꺼져 있어 실패할 수 있다 | **틀렸다.** 피처가 `ConfigureInput(Depth)` 로 요청하면 URP 가 만든다. 에셋 체크박스에 기댈 일이 아니다 | `FogRendererFeature.cs:53` 이 이미 그렇게 한다 |
+| `AfterRenderingTransparents` 는 블룸을 안 타서 선이 선명하다 | **틀렸다.** 500 과 550 **둘 다 포스트프로세스 이전**이다 | `RenderPassEvent` 값 |
+| 드라이버를 끄면 벽이 원래대로 돌아온다 | **머티리얼은 교체된 채로 남는다.** 되돌아오는 건 디더뿐이다(전역 `_WallOccRange.w = 0` → 셰이더가 페이드를 건너뜀). 원복 코드는 없다 | `WallOcclusionMaterialBinder` 에 restore 경로 없음 |
+
+## 현재 상태 (실측)
 
 | 사실 | 근거 |
 |---|---|
-| 투명화는 런타임 머티리얼 교체 방식이다 | Occlusion 머티리얼 14종을 **프리팹·씬이 거의 참조하지 않는다**(guid 전수 조회 — 14종 중 13종이 참조 0) |
-| 끌 때 원래 벽으로 돌아가는 경로가 이미 있다 | `WallOcclusionDriver.OnDisable` → `WallOcclusionGlobals.Disable()` (`_WallOccRange.w = 0` = 셰이더가 페이드를 통째로 건너뜀) |
-| `WallOcclusionClip.hlsl` 은 **참조 0** | 자기 자신과 svn pristine 사본 외 없음 — 죽은 파일(이번엔 손대지 않고 기록만) |
-| 렌더러 피처 선례가 이미 3개 | `MaskBlurFeature` · `PixelScanlineFeature` · `FogRendererFeature` (전부 URP 17 RenderGraph) |
-| `PC_RPAsset` 의 Depth/Opaque Texture = **켜져 있다** | `m_RequireDepthTexture: 1` `m_RequireOpaqueTexture: 1` |
-| `Player` 레이어 = 6 | `Player.prefab` · `Paladin.prefab` · `TempPlayer_Armature.prefab` |
+| 실제 플레이어 프리팹 = `Paladin.prefab` | `NetworkManager.prefab` 이 참조. `Player.prefab` 은 렌더러가 시체표식 1개뿐인 구판 |
+| 플레이어 렌더러 4개가 **전부 `m_DynamicOccludee: 1`** | 벽 뒤에서 **오클루전 컬링에 통째로 잘릴 수 있다** — 그러면 윤곽선도 같이 사라진다 |
+| 렌더링 레이어 규약이 이미 있다 | bit 0 = 조명(**지우면 캐릭터가 어두워진 전례 있음**), bit 1 = `DecalReceiver`. [DecalReceivers.cs](Assets/1.Scripts/Rendering/DecalReceivers.cs) 가 *"추가만 하고 절대 지우지 않는다"* 를 규약으로 못박아 뒀다 |
+| 피처 주입 순서 | Fog **450** → MaskBlur **550** → PixelScanline **600**(`AfterRenderingPostProcessing`) |
+| 렌더러 피처 선례 3개 | `MaskBlurFeature` · `PixelScanlineFeature` · `FogRendererFeature` (URP 17 RenderGraph) |
 
-## 접근
+## 접근 (2판)
 
-### A-1. `PlayerSilhouetteFeature` (신규 렌더러 피처)
+### A-1. 대상 선택 = **렌더링 레이어 비트** (레이어 필터 폐기)
 
-`MaskBlurFeature` 의 구조를 그대로 따른다 — **셰이더 직렬화 참조 포함.** `Shader.Find` 만 쓰면
-빌드에서 스트립된다(미니맵이 이걸로 안 보였던 전례가 주석에 남아 있다).
+`PlayerSilhouetteTag` 가 스폰 직후 자기 렌더러들에 비트를 **OR** 로 더한다 — 로컬은 bit 2, 원격은 bit 3.
 
-**패스 1 — 마스크.** `Player` 레이어 렌더러를 오버라이드 셰이더로 RGBA RT 에 그린다.
+- 🔴 **대입(`=`)이 아니라 OR(`|=`)** 이다. 대입하면 bit 0 을 잃어 캐릭터가 조명을 못 받는다.
+  이 사고는 이 저장소에서 이미 한 번 났고 `DecalReceivers` 주석에 남아 있다.
+- 소유권이 확정된 뒤(`OnNetworkSpawn`) 태깅한다. `IsOwner` 는 `NetworkBehaviour`/`NetworkObject` 것이지
+  `MonoBehaviour` 에는 없다. **리스폰·모델 교체 시 재태깅**이 필요하다.
+- 같은 자리에서 `allowOcclusionWhenDynamic = false` 로 **오클루전 컬링을 끈다**(위 위험 항목).
 
-- `ZWrite Off` / `ZTest Always` 로 그리고, 프래그먼트가 `_CameraDepthTexture` 와 자기 깊이를
-  비교해 **가려진 픽셀만** 남긴다.
-  - 깊이 버퍼를 붙이고 `ZTest Greater` 를 쓰는 방법도 있지만, RenderGraph 에서 깊이
-    어태치먼트를 읽기전용으로 묶는 것보다 셰이더에서 직접 비교하는 쪽이 의존이 적다.
-- **RGB = 그 플레이어의 색, A = 커버리지.** 색은 `MaterialPropertyBlock` 으로 들어온다.
+### A-2. 색 = **고정 머티리얼 2개** (MPB 폐기)
 
-**패스 2 — 윤곽 합성.** 풀스크린. A 를 상하좌우로 탭해서
-**`A > 0` 이면서 이웃 중 `A == 0` 이 있는 텍셀** = 안쪽 테두리. 거기서만 RGB 를 카메라 컬러에 얹는다.
+비트별로 두 번 드로우한다 — bit 2 는 초록 머티리얼로, bit 3 은 파랑 머티리얼로.
 
-- 🔴 **바깥 테두리가 아니라 안쪽 테두리인 이유**: 바깥쪽 텍셀은 `A == 0` 이라 **색이 없다.**
-  색이 플레이어마다 달라야 하므로(초록/파랑) 색을 들고 있는 쪽에 선을 그려야 한다.
-- 속은 안 칠하므로 벽이 그대로 비친다 — 이미지 3 과 같은 모양.
+- 왜: `HitFlash` 와 MPB 를 공유할 수 없다(위 표). 또 MPB 는 SRP Batcher 를 깨서
+  **실루엣뿐 아니라 그 렌더러의 평소 렌더링에도** 영향을 준다.
+- 드로우가 2번으로 늘지만 플레이어는 최대 3명이다.
 
-주입 시점은 인스펙터로 뺀다 — `AfterRenderingTransparents`(블룸 안 타서 선이 선명) vs
-`BeforeRenderingPostProcessing`(블룸이 걸려 빛남). 기본값은 후자, Play 로 고른다.
+### A-3. 마스크 = **전체 실루엣 + 가려짐**, 2채널
 
-### A-2. `PlayerSilhouetteTint` (신규 컴포넌트, 플레이어 프리팹)
+초안의 식은 `H − erode(H)`(가려진 영역의 테두리)였다. 필요한 식은:
 
-`IsOwner` 면 초록, 아니면 파랑을 자식 렌더러 전부에 `MaterialPropertyBlock` 으로 넣는다.
+```
+F = 캐릭터의 전체 투영 실루엣
+H = 그 지점의 맨 앞 표면이 씬 깊이보다 뒤인가
+윤곽선 = (F − erode(F)) × H
+```
 
-🔴 **복제하지 않는다.** 복제하면 오히려 틀린다 — "내 캐릭터"는 **보는 사람마다 다른 오브젝트**이므로
-각 클라가 자기 기준으로 칠해야 맞다. 순수 로컬 시각 값이다.
+**두 연산은 순서를 바꿀 수 없다.** 초안대로면 ① 벽이 몸을 자르는 경계에 가짜 선이 생기고
+② 팔이 몸통을 가린 것을 "가려짐"으로 오판한다.
 
-### A-3. 기존 시스템 끄기 (삭제 아님)
+- 그래서 플레이어를 **전용 깊이에 `ZWrite On` / `LEqual`** 로 그려 **맨 앞 표면만** 남긴다
+  (`Cull Back` 만으로는 자기 가림이 안 풀린다 — 뒤쪽의 앞면 삼각형이 그대로 그려진다).
+- 마스크: `A = F`(커버리지), `R = H`(가려짐). 보이는 부분도 버리지 않아야 앞 표면이 뒤를 덮는다.
+- 합성에서 **중앙 포함 5탭**을 point 샘플로 읽는다. bilinear 로 섞인 값에 `A == 0` 을 쓰면 안 된다.
 
-- 씬 2곳(`4.MapScene`, `4.MapScene-trensparent`)의 `WallOcclusionDriver` 컴포넌트를 **비활성**.
-- 그것만으로 벽이 원래 불투명으로 돌아온다 — `OnDisable` 의 `Globals.Disable()` 때문이고,
-  머티리얼 교체는 `Rebind()` 를 안 부르면 일어나지 않는다.
-- 코드 6파일·셰이더·hlsl·머티리얼 14종은 **그대로 둔다**(팀장 지시). 실루엣이 기대와 다르면
-  바로 되돌릴 수 있다.
+### A-4. 합성
+
+마스크만 샘플해 `Blend SrcAlpha OneMinusSrcAlpha` 로 카메라 어태치먼트에 **직접** 얹는다.
+카메라 컬러를 복사했다가 되돌리는(MaskBlur 식 CopyBack) 단계는 필요 없다.
+
+주입은 **550 고정**으로 간다(아무 이벤트나 고르게 열지 않는다).
+⚠️ PixelScanline 이 600 에서 블록 중앙을 재샘플하므로 **1px 선이 끊기거나 뭉개질 수 있다.**
+픽셀아트 룩에는 오히려 어울릴 수도 있어 **Play 로 고른다.**
+
+### A-5. 기존 시스템 끄기 (삭제 아님)
+
+- 씬 2곳(`4.MapScene`, `4.MapScene-trensparent`)의 `WallOcclusionDriver` 를 **비활성**.
+- 그러면 **디더가 꺼진다**(전역 enable 이 0). 다만 **교체된 머티리얼은 그대로 남는다** —
+  바인더에 원복 경로가 없다. 현재 변종 14종 모두 `_WallOcclusionOpacity: 1` 이라 시각적으로는
+  원본과 같지만, "완전 원복"이 아니라 "디더만 꺼짐"이 정확한 표현이다.
+- 코드 6파일·셰이더·hlsl·머티리얼 14종은 그대로 둔다(팀장 지시).
+
+## v1 에서 받아들이는 한계
+
+- **두 플레이어가 화면에서 겹치면** 마스크가 한 덩어리가 되어 사이 경계가 사라진다.
+  각자 윤곽을 살리려면 플레이어별 슬라이스가 필요하다 — 3인 기준 비용 대비 이득이 적어 v1 에서는 둔다.
+- **씬 깊이는 가림 주체를 구분하지 않는다.** 벽뿐 아니라 몬스터·지형 뒤에 서도 윤곽선이 뜬다.
+  벽만 원하면 환경 전용 깊이가 따로 필요하다. → **Play 에서 거슬리는지 보고 판단**한다.
+- 화면 밖으로 잘린 실루엣은 복원할 수 없다. 화면 경계의 가짜 선은 clamp 로 줄인다.
 
 ## 검증
 
 | 단계 | 보는 것 |
 |---|---|
-| 단독 Play | ① 벽이 더 이상 뚫리지 않는가(투명화 꺼짐) ② 벽 뒤에서 초록 윤곽선이 뜨는가 ③ 속이 비는가 |
-| **MPPM 2인** | 🔴 **각 화면 기준으로** 내 캐릭터가 초록이고 상대가 파랑인가 — 이게 핵심 |
+| 단독 Play | ① 디더가 꺼졌는가 ② 벽 뒤에서 초록 윤곽선이 뜨는가 ③ 속이 비는가 ④ **허리에 가짜 수평선이 없는가** |
+| **MPPM 2인** | 🔴 **각 화면 기준**으로 내 캐릭터가 초록, 상대가 파랑인가 |
+| 피격 중 | 🔴 맞고 나서도 색이 유지되는가(`HitFlash` 충돌 재발 확인) |
 | 반례 | 몬스터에는 안 뜨는가 |
-
-## 위험
-
-- `_CameraDepthTexture` 가 꺼진 품질단계에선 **통째로 안 보인다.** `PC_RPAsset` 은 켜져 있지만
-  `Mobile_RPAsset`·`PP.asset` 은 꺼져 있다 — 그 둘을 쓰면 피처가 조용히 아무것도 안 한다.
-- `Player` 레이어에 무기·이펙트가 같이 있으면 그것도 윤곽선에 포함된다. 마스크가 합쳐져 하나로
-  나오므로 보통은 문제가 아니지만, 튀어 보이면 레이어 대신 렌더링 레이어로 좁힌다.
-- 마스크를 반해상도로 내리면 선이 두꺼워진다. **처음엔 풀해상도**로 가고 비용을 본 뒤 내린다.
+| 프레임 디버거 | 드로우 목록이 비지 않았는가(오클루전 컬링·렌더링 레이어·LightMode 순으로 의심) |
 
 ---
 
