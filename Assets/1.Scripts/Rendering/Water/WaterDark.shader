@@ -57,6 +57,16 @@ Shader "Custom/WaterDark"
         _ShoreSharp    ("Shore Sharpness (띠 경계 날카로움)", Range(1, 8)) = 2.5
         _ShoreStrength ("Shore Strength (띠 세기)", Range(0, 1)) = 0.9
 
+        // ── 물가 출렁임 (Lapping) ───────────────────────────────────────────────
+        // 🔴 이게 없으면 물가 띠가 지오메트리에만 의존해 "항상 같은 자리, 같은 밝기"로 박힌다.
+        //    물결은 흐르는데 물가만 정지해 있으면 고인 물로 읽힌다. 수심에 시간 오프셋을 더해
+        //    물가 선을 밀고 당긴다 — 들이쳤다 빠지는 느낌.
+        [Header(Lapping)]
+        _LapAmount ("Lap Amount (물가 선이 오르내리는 폭, m)", Float) = 0.45
+        _LapSpeed  ("Lap Speed (마루가 해안을 따라 흐르는 속도)", Float) = 0.35
+        _LapScale  ("Lap Scale (마루 간격 — 작을수록 길게 이어진다)", Float) = 0.12
+        _LapFreq   ("Lap Frequency (철썩이는 주기)", Float) = 0.7
+
         // ── 거품 (FlatKit 의 Foam) ──────────────────────────────────────────────
         [Header(Foam)]
         _FoamColor      ("Foam Color (거품색)", Color) = (0.85, 1.0, 0.97, 1)
@@ -119,6 +129,11 @@ Shader "Custom/WaterDark"
                 float  _ShoreWidth;
                 float  _ShoreSharp;
                 float  _ShoreStrength;
+
+                float  _LapAmount;
+                float  _LapSpeed;
+                float  _LapScale;
+                float  _LapFreq;
 
                 float4 _FoamColor;
                 float  _FoamAmount;
@@ -232,11 +247,21 @@ Shader "Custom/WaterDark"
                 //    레퍼런스의 "가장자리가 밝다"가 죽는다.
                 col *= lerp(1.0, 1.0 - _DepthDarken * depthT, dn);
 
+                // ── 물가 출렁임 ────────────────────────────────────────────────
+                // 수심에 시간 오프셋을 더해 물가 선을 밀고 당긴다.
+                // 🔴 색(depthT)에는 적용하지 않는다 — 수면 전체가 맥박치듯 밝아졌다 어두워진다.
+                //    출렁임은 **물가 띠와 거품에만** 걸어야 파도가 들이치는 것으로 읽힌다.
+                // 노이즈를 위상에 넣는 이유: 해안선 구간마다 철썩이는 타이밍이 달라진다.
+                // 전부 같은 위상이면 해안 전체가 한꺼번에 깜빡여 기계적으로 보인다.
+                float lapN = Water_ValueNoise(p * _LapScale + float2(_LapSpeed, _LapSpeed * 0.6) * _Time.y);
+                float lapWave = sin(_Time.y * _LapFreq * 6.2831 + lapN * 6.2831);
+                float shoreDepth = max(0.0, waterDepth + lapWave * _LapAmount);
+
                 // ── 거품 ───────────────────────────────────────────────────────
                 // 경계가 또렷한 얼룩이 레퍼런스의 인상을 만든다 — 노이즈를 세게 계단화한다.
-                // 물가에서는 _FoamShoreBlend 만큼 더 몰린다.
+                // 물가에서는 _FoamShoreBlend 만큼 더 몰린다(출렁임을 따라 같이 움직인다).
                 float foamN = Water_ValueNoise(p * _FoamScale + _FoamSpeed.xy * _Time.y * _FoamScale);
-                float shoreT = 1.0 - saturate(waterDepth / max(_FoamShoreDepth, 1e-3));
+                float shoreT = 1.0 - saturate(shoreDepth / max(_FoamShoreDepth, 1e-3));
                 float foamWant = saturate(_FoamAmount + shoreT * _FoamShoreBlend);
                 // foamWant 가 클수록 문턱이 낮아져 얼룩이 넓어진다.
                 float foam = saturate((foamN - (1.0 - foamWant)) * _FoamSharpness);
@@ -244,7 +269,7 @@ Shader "Custom/WaterDark"
 
                 // ── 물가 띠 ────────────────────────────────────────────────────
                 // 물이 벽·바닥과 만나는 선. 이게 있어야 "물이 차 있다"로 읽힌다.
-                float shoreLine = pow(1.0 - saturate(waterDepth / max(_ShoreWidth, 1e-3)), _ShoreSharp);
+                float shoreLine = pow(1.0 - saturate(shoreDepth / max(_ShoreWidth, 1e-3)), _ShoreSharp);
                 col = lerp(col, _ShoreColor.rgb, shoreLine * _ShoreStrength);
 
                 // UV 가장자리 밝힘 — 구멍에 딱 맞춘 쿼드에서만 의미 있음(메가 플레인은 0 유지).
