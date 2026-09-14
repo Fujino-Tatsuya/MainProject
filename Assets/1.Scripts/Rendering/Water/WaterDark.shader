@@ -65,12 +65,21 @@ Shader "Custom/WaterDark"
         [Header(Current)]
         _FlowDir    ("Flow Direction (xy = 월드 XZ. 크기는 무시)", Vector) = (1, 0.35, 0, 0)
         _FlowMaster ("Flow Speed (수면 전체가 흘러가는 속도, m/s)", Float) = 0.6
-        _WaveLength ("Wave Length (파도 마루 간격, m)", Float) = 18
+
+        // 🔴 흐름의 정체는 이것이다(2026-09-15 레퍼런스 영상 0:29~0:31 프레임 분석).
+        //    FlatKit 은 **수심 값 자체를 흐르는 노이즈로 왜곡한 뒤** 색을 고른다.
+        //    그래서 얕은/깊은 경계가 넝마처럼 들쭉날쭉하고, 그 경계가 통째로 밀리면서
+        //    모양이 변한다 — 손가락처럼 뻗은 얕은 물이 깊은 쪽으로 들어가고 반대도 생긴다.
+        //    수심을 지오메트리 그대로 쓰면 경계가 깔끔한 등고선이 되어 절대 안 움직인다.
+        _DepthWarpAmount ("Depth Warp (수심을 흔드는 폭, m — 흐름의 핵심)", Float) = 2.5
+        _DepthWarpScale  ("Depth Warp Scale (왜곡 얼룩 크기)", Float) = 0.06
+
+        _WaveLength ("Wave Length (벽을 치는 마루 간격, m)", Float) = 18
         _WaveSpeed  ("Wave Speed (마루가 지나가는 빈도, 초당)", Float) = 0.22
         _WaveJitter ("Wave Jitter (마루 구부러짐 — 0 이면 자로 잰 직선)", Range(0, 1)) = 0.35
         _WaveJitterScale ("Wave Jitter Scale (구부러짐 크기)", Float) = 0.03
-        _WaveContrast ("Wave Contrast (열린 수면에 보이는 띠 세기)", Range(0, 0.3)) = 0.06
-        _LapAmount  ("Lap Amount (벽에 철썩일 때 물가가 밀리는 폭, m)", Float) = 0.9
+        _WaveContrast ("Wave Contrast (열린 수면 띠 — 왜곡이 주역이라 기본 0)", Range(0, 0.3)) = 0
+        _LapAmount  ("Lap Amount (벽에 철썩일 때 물가가 밀리는 폭, m)", Float) = 0.5
 
         // ── 거품 (FlatKit 의 Foam) ──────────────────────────────────────────────
         [Header(Foam)]
@@ -137,6 +146,8 @@ Shader "Custom/WaterDark"
 
                 float4 _FlowDir;
                 float  _FlowMaster;
+                float  _DepthWarpAmount;
+                float  _DepthWarpScale;
                 float  _WaveLength;
                 float  _WaveSpeed;
                 float  _WaveJitter;
@@ -214,15 +225,27 @@ Shader "Custom/WaterDark"
                     waterDepth = max(0.0, IN.positionWS.y - sceneWS.y);
                 }
 
-                // 얕은 → 깊은 전환. _ShallowDepth 까지는 온전히 얕은색, 그 뒤 _GradientSize 만큼 섞인다.
-                float depthT = saturate((waterDepth - _ShallowDepth) / max(_GradientSize, 1e-3));
-
                 // ── 흐름 ───────────────────────────────────────────────────────
                 // 🔴 방향 하나가 무늬·거품·파도를 전부 끌고 간다. 요소마다 따로 움직이면
                 //    "흐른다"가 아니라 "각자 논다"로 보인다.
                 //    p 자체를 흐름 반대로 밀어 두면, 아래 모든 샘플이 자동으로 같이 흘러간다.
                 float2 flowDir = normalize(_FlowDir.xy + float2(1e-5, 0));
                 float2 pf = p - flowDir * (_FlowMaster * _Time.y);
+
+                // ── 수심 왜곡 ──────────────────────────────────────────────────
+                // 🔴 흐름의 정체. 수심 값을 흐르는 노이즈로 흔든 뒤 색을 고른다.
+                //    지오메트리 수심을 그대로 쓰면 얕은/깊은 경계가 깔끔한 등고선이 되어
+                //    영원히 안 움직인다. 흔들면 경계가 넝마처럼 들쭉날쭉해지고,
+                //    노이즈가 흐르므로 그 경계가 통째로 밀리면서 모양이 변한다.
+                //    (레퍼런스 영상 0:29~0:31 프레임 대조로 확인한 구조다.)
+                // 2겹인 이유: 1겹이면 얼룩이 한 가지 크기라 규칙적으로 보인다.
+                float w1 = Water_ValueNoise(pf * _DepthWarpScale);
+                float w2 = Water_ValueNoise(pf * (_DepthWarpScale * 2.3) + 17.0);
+                float warp = ((w1 * 0.65 + w2 * 0.35) - 0.5) * 2.0 * _DepthWarpAmount;
+                float shadedDepth = max(0.0, waterDepth + warp);
+
+                // 얕은 → 깊은 전환. _ShallowDepth 까지는 온전히 얕은색, 그 뒤 _GradientSize 만큼 섞인다.
+                float depthT = saturate((shadedDepth - _ShallowDepth) / max(_GradientSize, 1e-3));
 
                 // ── 물결 ───────────────────────────────────────────────────────
                 // 노이즈 2겹(서로 다른 스케일·방향 스크롤). 두 겹이 겹치는 곳만 얇게
@@ -275,7 +298,9 @@ Shader "Custom/WaterDark"
                 float lapWave = sin((along - _Time.y * _WaveSpeed + jitter * _WaveJitter) * 6.2831);
 
                 // 마루가 벽에 닿는 순간 물가가 밀려 올라가고, 지나가면 내려간다.
-                float shoreDepth = max(0.0, waterDepth + lapWave * _LapAmount);
+                // 🔴 왜곡된 수심(shadedDepth) 위에 얹는다. 원래 수심에 얹으면 물가 띠만
+                //    매끈한 등고선으로 남아 왜곡된 색 경계와 따로 놀아 두 겹으로 보인다.
+                float shoreDepth = max(0.0, shadedDepth + lapWave * _LapAmount);
 
                 // 열린 수면에도 같은 마루를 약하게 얹는다 — 이게 있어야 깊은 물도 함께 흐른다.
                 // 🔴 약하게(_WaveContrast 기본 0.06). 세게 걸면 수면 전체가 맥박친다.
