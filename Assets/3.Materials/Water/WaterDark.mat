@@ -31,25 +31,25 @@ Material:
     - _DepthOctaveFalloff: 0.341
     - _DepthOctaveScale: 2.1
     - _DepthWarpAmount: 3.5
-    - _DepthWarpScale: 0.06
+    - _DepthWarpScale: 0.09
     - _EdgeBrighten: 0.447
     - _EdgeWidth: 0.217
-    - _FlowMaster: 0.6
+    - _FlowMaster: 1.5
     - _FlowScale1: 0.15
     - _FlowScale2: 0.33
     - _FlowSharp: 2.21
-    - _FlowStrength: 0.646
+    - _FlowStrength: 0.35
     - _FoamAmount: 0.06
     - _FoamScale: 0.8
     - _FoamSharpness: 12
     - _FoamShoreBlend: 0.35
     - _FoamShoreDepth: 4
-    - _GradientSize: 12
+    - _GradientSize: 7
     - _LapAmount: 0.9
     - _LapFreq: 0.7
     - _LapScale: 0.12
     - _LapSpeed: 0.35
-    - _ShallowDepth: 1.5
+    - _ShallowDepth: 0.8
     - _ShoreSharp: 2
     - _ShoreStrength: 0.9
     - _ShoreWidth: 2.5
@@ -60,17 +60,17 @@ Material:
     - _WaveLength: 18
     - _WaveSpeed: 0.22
     m_Colors:
-    - _DeepColor: {r: 0.11, g: 0.38, b: 0.36, a: 1}
+    - _DeepColor: {r: 0.02, g: 0.07, b: 0.09, a: 1}
     - _DepthDrift1: {r: -0.35, g: 2.3, b: 1.06, a: 0.68}
     - _DepthDrift2: {r: 1, g: 0.25, b: 0.32, a: 0}
     - _DepthDrift3: {r: 0.015, g: -0.02, b: 0, a: 0}
-    - _FlowColor: {r: 0.23, g: 0.53, b: 0.49, a: 1}
+    - _FlowColor: {r: 0.34, g: 0.88, b: 0.88, a: 1}
     - _FlowDir: {r: 1, g: 0.35, b: 0, a: 0}
     - _FlowSpeed1: {r: 0.6, g: 1, b: 0, a: 0}
     - _FlowSpeed2: {r: -0.4, g: 0.5, b: 0, a: 0}
-    - _FoamColor: {r: 0.85, g: 1, b: 0.96999997, a: 1}
+    - _FoamColor: {r: 0.9, g: 1, b: 1, a: 1}
     - _FoamSpeed: {r: 0.05, g: 0.03, b: 0, a: 0}
-    - _ShallowColor: {r: 0.21999997, g: 0.75, b: 0.72, a: 1}
-    - _ShoreColor: {r: 0.75, g: 0.97999996, b: 0.95, a: 1}
+    - _ShallowColor: {r: 0.25, g: 0.82, b: 0.84, a: 1}
+    - _ShoreColor: {r: 0.82, g: 1, b: 1, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
