@@ -2783,6 +2783,7 @@ MonoBehaviour:
   ascensionLevel: 0
   stageIndex: 0
   stageStep: 2
+  debugFixedSeed: 0
 --- !u!1 &645675147
 GameObject:
   m_ObjectHideFlags: 0
@@ -3641,6 +3642,11 @@ MonoBehaviour:
   toggleKey: 100
   startWithSilhouette: 1
   startWithWallOcclusion: 0
+  autoMeasure: 1
+  warmupFrames: 180
+  sampleFrames: 240
+  alternations: 4
+  switchSettleFrames: 30
 --- !u!1 &898904279
 GameObject:
   m_ObjectHideFlags: 0
