@@ -23,6 +23,15 @@ public static class TeslaTurretGroupRestore
     const int TargetGroupId = 3;
     const string NewGroupName = "Tesla Turret";
 
+    /// 🔴 <b>실제로 스폰을 정하는 것은 여기다</b>(2026-09-14 런타임 실측).
+    /// <c>MapGenConfig.MonsterGroups</c> 는 <c>LevelDeliveryV3/Zones/PF_Zone_*_V3</c> 계통만 쓰고,
+    /// 현재 맵이 인스턴스화하는 존은 <c>Assets/2.Prefabs/Map/Zoneprefab/*</c> 다.
+    /// 그쪽은 <c>ZoneMonsterSpawnSet.defaultMonsterPrefab</c> 으로 몹을 고른다.
+    /// 실측 분포: ZoneM_typeA·B = PeekABot / ZoneL_typeA·B·C = MortarBot /
+    ///           ZoneS_typeA·Quest01·Quest02 = ChompBot → <b>TeslaBot 은 0개였다.</b>
+    /// 팀장 확정: PeekABot 존 둘 중 <c>ZoneM_typeB</c> 를 TeslaBot 으로 돌린다.
+    const string ZonePath = "Assets/2.Prefabs/Map/Zoneprefab/ZoneM_typeB.prefab";
+
     [MenuItem("Tools/Boss/터렛 스폰 복구 — MonsterGroup 3 을 TeslaBot 으로 (검증)")]
     public static void Validate() => Run(dryRun: true);
 
@@ -95,5 +104,96 @@ public static class TeslaTurretGroupRestore
 
         if (ok) Debug.Log(log.ToString());
         else Debug.LogError(log.ToString());
+    }
+
+    [MenuItem("Tools/Boss/터렛 스폰 복구 — ZoneM_typeB 를 TeslaBot 으로 (검증)")]
+    public static void ValidateZone() => RunZone(dryRun: true);
+
+    [MenuItem("Tools/Boss/터렛 스폰 복구 — ZoneM_typeB 를 TeslaBot 으로 (적용)")]
+    public static void ApplyZone() => RunZone(dryRun: false);
+
+    /// <summary>
+    /// 존 프리팹의 <c>ZoneMonsterSpawnSet.defaultMonsterPrefab</c> 을 TeslaBot 으로 바꾼다.
+    ///
+    /// ⚠️ 필드명은 <b>소문자 <c>defaultMonsterPrefab</c></b> 이다(공개 프로퍼티는 대문자
+    /// <c>DefaultMonsterPrefab</c>). 대문자로 찾으면 YAML 에서 아무것도 안 잡혀
+    /// "비어 있다"로 오독한다 — 실제로 그렇게 틀렸다.
+    /// </summary>
+    static void RunZone(bool dryRun)
+    {
+        var log = new StringBuilder($"[TeslaZone/{(dryRun ? "검증" : "적용")}] {ZonePath}\n");
+
+        var tesla = AssetDatabase.LoadAssetAtPath<GameObject>(TeslaPath);
+        if (tesla == null)
+        {
+            log.Append("  ✗ TeslaBot 프리팹을 못 찾음");
+            Debug.LogError(log.ToString());
+            return;
+        }
+
+        string before;
+        GameObject root = PrefabUtility.LoadPrefabContents(ZonePath);
+        try
+        {
+            var set = root.GetComponentInChildren<ZoneMonsterSpawnSet>(true);
+            if (set == null)
+            {
+                log.Append("  ✗ ZoneMonsterSpawnSet 이 없다");
+                Debug.LogError(log.ToString());
+                return;
+            }
+
+            var so = new SerializedObject(set);
+            SerializedProperty prop = so.FindProperty("defaultMonsterPrefab");
+            if (prop == null)
+            {
+                log.Append("  ✗ defaultMonsterPrefab 필드를 못 찾음(이름이 바뀌었나)");
+                Debug.LogError(log.ToString());
+                return;
+            }
+
+            before = prop.objectReferenceValue != null ? prop.objectReferenceValue.name : "(없음)";
+            if (prop.objectReferenceValue == tesla)
+            {
+                log.Append($"  = 이미맞음 — defaultMonsterPrefab = {before}");
+                Debug.Log(log.ToString());
+                return;
+            }
+
+            log.AppendLine($"  ▶ defaultMonsterPrefab: {before} → {tesla.name}");
+            if (dryRun)
+            {
+                log.Append("  (검증만 — 적용하지 않았다)");
+                Debug.Log(log.ToString());
+                return;
+            }
+
+            prop.objectReferenceValue = tesla;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            PrefabUtility.SaveAsPrefabAsset(root, ZonePath);
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+
+        // 되읽어 확인한다.
+        var saved = AssetDatabase.LoadAssetAtPath<GameObject>(ZonePath);
+        var savedSet = saved != null ? saved.GetComponentInChildren<ZoneMonsterSpawnSet>(true) : null;
+        string after = savedSet != null && savedSet.DefaultMonsterPrefab != null
+            ? savedSet.DefaultMonsterPrefab.name
+            : "(없음)";
+
+        if (after == tesla.name)
+        {
+            log.Append($"  ✓ 적용 (되읽기: {after} ✓)\n" +
+                       "  ⚠️ 이미 실행 중인 Play 에는 반영되지 않는다 — 다시 진입해야 보인다.");
+            Debug.Log(log.ToString());
+        }
+        else
+        {
+            log.Append($"  🔴 적용했는데 되읽으니 {after} 다");
+            Debug.LogError(log.ToString());
+        }
     }
 }

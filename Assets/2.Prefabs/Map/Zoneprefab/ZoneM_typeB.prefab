@@ -1532,7 +1532,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 666fbe07fb6f42d459700ccb6942060f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ZoneMonsterSpawnSet
-  defaultMonsterPrefab: {fileID: 6058768013904294438, guid: 333b079c70eee3d4ca874885b13f358e, type: 3}
+  defaultMonsterPrefab: {fileID: 1485102947224704385, guid: a6380ac222b5ef440b1a21ca01db6329, type: 3}
   spawnPoints: []
 --- !u!1 &8608039759111575722
 GameObject:
