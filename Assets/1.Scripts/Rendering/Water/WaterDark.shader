@@ -177,15 +177,17 @@ Shader "Custom/WaterDark"
                 float2 p = IN.positionWS.xz;
 
                 // ── 수심 ───────────────────────────────────────────────────────
-                // 물 표면과 그 뒤 지오메트리 사이의 뷰 방향 거리 = "눈이 통과하는 물의 두께".
-                // 탑다운이라 이 값이 사실상 수직 수심과 같다.
+                // 🔴 **수직** 수심을 쓴다(월드 Y 차이). 시선 방향 거리가 아니다.
+                //    시선 거리로 재면 수평선 쪽에서 시선이 수면과 나란해져 거리가 발산한다 —
+                //    "가까운 물은 얕고 먼 물은 깊다"는 틀린 그림이 나온다(2026-09-15 실측으로 확인).
+                //    수직 수심은 카메라 각도·거리와 무관해서 같은 깊이면 화면 어디서나 같은 색이다.
                 float waterDepth = 1e6;
                 if (_UseSceneDepth > 0.5)
                 {
                     float2 screenUV = GetNormalizedScreenSpaceUV(IN.positionHCS);
-                    float sceneEye = LinearEyeDepth(SampleSceneDepth(screenUV), _ZBufferParams);
-                    float selfEye  = LinearEyeDepth(IN.positionHCS.z, _ZBufferParams);
-                    waterDepth = max(0.0, sceneEye - selfEye);
+                    float  sceneRaw = SampleSceneDepth(screenUV);
+                    float3 sceneWS  = ComputeWorldSpacePosition(screenUV, sceneRaw, UNITY_MATRIX_I_VP);
+                    waterDepth = max(0.0, IN.positionWS.y - sceneWS.y);
                 }
 
                 // 얕은 → 깊은 전환. _ShallowDepth 까지는 온전히 얕은색, 그 뒤 _GradientSize 만큼 섞인다.
