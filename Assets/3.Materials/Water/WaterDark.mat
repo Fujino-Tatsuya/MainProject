@@ -39,11 +39,11 @@ Material:
     - _FlowScale2: 0.33
     - _FlowSharp: 2.21
     - _FlowStrength: 0.35
-    - _FoamAmount: 0.06
+    - _FoamAmount: 0.04
     - _FoamScale: 0.8
     - _FoamSharpness: 12
     - _FoamShoreBlend: 0.35
-    - _FoamShoreDepth: 4
+    - _FoamShoreDepth: 1.6
     - _GradientSize: 7
     - _LapAmount: 0.9
     - _LapFreq: 0.7
