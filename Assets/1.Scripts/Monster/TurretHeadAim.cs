@@ -119,6 +119,12 @@ public class TurretHeadAim : MonoBehaviour, ITurretAimGate
     public bool IsAimReady =>
         !_telegraphing || TelegraphElapsed >= telegraphSeconds + aimHoldSeconds;
 
+    /// <summary>
+    /// 조준선과 <b>같은</b> 방향. 예고선도 이 방향으로 그리므로 선과 탄이 정확히 일치한다.
+    /// 고정 구간에는 <c>_yaw</c> 갱신이 멈춰 있어 값이 그대로 유지된다.
+    /// </summary>
+    public Vector3 LockedAimDirection => AimDirection;
+
     public void BeginAiming()
     {
         if (_telegraphing) return;

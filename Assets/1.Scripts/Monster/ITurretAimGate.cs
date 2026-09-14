@@ -14,6 +14,15 @@ public interface ITurretAimGate
     /// <summary>지금 발사해도 되는가. <c>false</c> 면 아직 조준을 따라가는 중이다.</summary>
     bool IsAimReady { get; }
 
+    /// <summary>
+    /// 조준선이 가리키는 <b>월드 방향</b>(수평, 정규화).
+    ///
+    /// 🔴 발사는 반드시 이 방향으로 해야 한다(팀장 확정 2026-09-14). 예전에는
+    /// <c>MonsterBase.PerformAttackHit</c> 이 <b>발사 순간의 플레이어 위치</b>로 쐈는데,
+    /// 조준선은 이미 고정돼 있으므로 <b>선과 탄이 어긋났다</b> — 예고가 거짓말이 된다.
+    /// </summary>
+    UnityEngine.Vector3 LockedAimDirection { get; }
+
     /// <summary>사거리 안이고 쿨이 찼다 — 조준을 시작하거나 이어 간다. 매 틱 불린다.</summary>
     void BeginAiming();
 

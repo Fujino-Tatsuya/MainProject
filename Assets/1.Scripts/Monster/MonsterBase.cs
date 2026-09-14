@@ -956,6 +956,16 @@ public class MonsterBase : Unit
         switch (data.archetype)
         {
             case MonsterArchetype.RangedTurret:
+                // 🔴 고정 터렛은 예고선이 가리키던 방향으로 쏜다 — 발사 순간의 플레이어 위치가 아니다.
+                //    예전에는 아래 공통 경로를 탔고, 그래서 선은 고정인데 탄만 타깃을 따라가
+                //    "피했는데 맞는" 상태가 됐다(2026-09-14 팀장 확인).
+                //    게이트가 없으면(예고 기능 미부착) 예전 동작 그대로 간다.
+                if (rangedAttack != null && _aimGate != null)
+                    rangedAttack.FireDirection(_aimGate.LockedAimDirection, data.attackRange);
+                else if (rangedAttack != null && _target != null)
+                    rangedAttack.Fire(_target.position + Vector3.up * 0.8f);
+                break;
+
             case MonsterArchetype.RangedMobile:
                 if (rangedAttack != null && _target != null)
                     rangedAttack.Fire(_target.position + Vector3.up * 0.8f);
