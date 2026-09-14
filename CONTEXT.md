@@ -10,7 +10,9 @@ Update this file when a term becomes important enough that future agents or team
 
 ## ▶▶ 현재 상태 (2026-09-14 · 고정 터렛 조준 개편 **완료**)
 
-**다음 작업 = 보스 몬스터 패턴 추가.** 기획이 아직 없어 대기 상태다 — 잠기면 grill → PLAN →
+**이번 주 순서(2026-09-14 팀장 확정)**: ① 조준선 클라 복제 ✅ → ② **플레이어가 벽에 가렸을 때
+비주얼 처리** → ③ **물 추가**. ②③ 은 레퍼런스가 있어서 그것에 맞추면 끝나는 작업이라 보스보다 앞에 둔다.
+**보스 몬스터 패턴은 그 다음** — 기획이 목·금(9/17~9/18)에 나온다. 나오면 grill → PLAN →
 승인 순서로 [PLAN.md](PLAN.md) 맨 위에 새 `CURRENT PLAN` 을 만든다.
 **퀘스트 영역은 착수 전 취소**됐다(PLAN.md 의 ❌ 절에 잠긴 결정 14건을 남겨 뒀다).
 
@@ -33,7 +35,7 @@ Update this file when a term becomes important enough that future agents or team
 - 예고선은 `TrackingLaser`(LineRenderer). PeekABot 은 아트에 있던 것, **TeslaBot 은 우리가 만든 것**.
   머티리얼은 `MA_TurretAimLaser`(URP Unlit) 를 **런타임 주입**한다 — 아트 기본값이 내장 RP 라 URP 에서 안 보인다.
 
-### 🔴 SVN 커밋이 남아 있다 (git 에는 없다)
+### SVN 쪽 2건 — **커밋 완료(r297)**. 재발 경로만 기억할 것
 
 | 파일 | 무엇 | 재발 |
 |---|---|---|
@@ -43,10 +45,26 @@ Update this file when a term becomes important enough that future agents or team
 재발 시 복구 도구: `git checkout a05a8e26 -- Assets/1.Scripts/Monster/Editor/TeslaShootClipEventAuthoring.cs`
 (1회용이라 `ea6884f5` 에서 지웠다. 같은 커밋에 `TurretAnimatorAuthoring`·`TeslaTurretGroupRestore` 도 있다.)
 
+### 조준 복제 (2026-09-14 추가 · **MPPM 2인 검증 대기**)
+
+`TurretHeadAim` 이 `MonoBehaviour` → **`NetworkBehaviour`** 가 됐다. 두 프리팹 모두 이미
+루트에 `NetworkObject` 가 있어 그대로 붙는다(위 "존에는 `NetworkBehaviour` 금지" 는
+**존 프리팹 한정** — 거긴 `NetworkObject` 가 없어서 에디터가 강제로 붙이는 게 문제였다).
+
+- 왜 필요했나: 주석은 "각 피어가 자기 타깃으로 같은 계산을 한다"고 적혀 있었지만 **틀렸다.**
+  타깃(`MonsterBase._target`)이 `IsServer` 게이트 안이라 **클라는 `CurrentTarget` 이 항상 null** →
+  클라에서는 머리도 안 돌고 예고선도 안 켜졌다. 피하라고 보여 주는 선이 호스트에만 보였다.
+- 복제하는 것은 **결과값 2개**뿐: `_netYaw`(float) · `_netTelegraphing`(bool). 서버 쓰기/전원 읽기.
+  타깃 참조도 `NetworkTransform` 도 안 태운다. 벽 차단 레이캐스트는 각 피어가 각자 한다.
+- **바뀔 때만** 보낸다(`yawSendThreshold` 0.5°). 고정 유지 구간·타깃 없는 동안은 0바이트.
+  단 **고정으로 넘어가는 첫 프레임은 임계값을 무시하고 보낸다** — 그 각이 곧 탄 방향이라
+  0.5° 어긋난 채 굳으면 클라 예고선이 거짓말이 된다.
+- 클라는 받은 각을 `replicationSmoothing`(0.08초) 안에 따라잡는다. 🔴 여기에
+  `turnDegreesPerSecond` 를 쓰면 **지연이 영원히 안 줄어든다**(같은 속도로 쫓으면 못 따라잡는다).
+- 늦게 들어온 클라는 `OnNetworkSpawn` 에서 현재 각을 **보간 없이** 깐다(안 깔면 휙 돈다).
+
 ### 남은 것
 
-- **예고선이 호스트에서만 보인다** — `SeekTurret` 이 서버 전용이라 클라에는 예고 상태가 안 간다.
-  멀티 테스트 전에 `NetworkVariable` 하나로 복제해야 한다.
 - 스폰 분포: `ZoneM_typeA`=PeekABot / **`ZoneM_typeB`=TeslaBot** / `ZoneL_*`=MortarBot /
   `ZoneS_typeA`·`Quest01/02`=ChompBot. 바꾸려면 **존 프리팹의 `ZoneMonsterSpawnSet.defaultMonsterPrefab`**
   을 고친다 — `MapGenConfig.MonsterGroups` 는 `LevelDeliveryV3` 계통 전용이라 현재 맵에 영향이 없다(교훈 #99).

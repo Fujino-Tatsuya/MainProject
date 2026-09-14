@@ -1,3 +1,4 @@
+using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
@@ -16,14 +17,19 @@ using UnityEngine;
 /// 애니메이터가 쓴 회전 <b>위에</b> 월드 업축 기준 요(yaw)만 얹는다. 축 방향을 몰라도 안전하고
 /// 발사 애니메이션의 포즈도 보존된다.
 ///
-/// 🔴 <b>네트워크</b>: 복제하지 않는다. 본 회전은 <b>시각 요소</b>이고 각 피어가 자기 쪽 타깃으로
-/// 같은 계산을 하면 같은 그림이 나온다. 여기서 <c>NetworkTransform</c> 을 태우면 본 하나 때문에
-/// 대역폭을 계속 쓴다. 데미지·발사 판정은 서버가 하므로 이 회전은 판정에 관여하지 않는다
-/// (<c>MonsterRangedAttack</c> 은 <c>targetPoint - origin</c> 으로 쏜다 — 머리 각도와 무관).
+/// 🔴 <b>네트워크</b>(2026-09-14 정정): <b>복제한다</b>. 예전 주석은 "각 피어가 자기 쪽 타깃으로
+/// 같은 계산을 하면 같은 그림이 나온다"고 적었는데 <b>사실이 아니었다</b> — 타깃 선정은
+/// <c>MonsterBase</c> 의 <c>IsServer</c> 게이트 안에 있어서 <b>클라에는 <c>CurrentTarget</c> 이
+/// 항상 <c>null</c></b> 이다. 그래서 클라에서는 머리가 돌지도, 예고선이 켜지지도 않았다
+/// (호스트 화면에서만 보였다). 예고선은 <b>피하라고 보여 주는 것</b>이라 안 보이면 기능이 없다.
+///
+/// 복제하는 것은 <b>결과값 두 개</b>뿐이다 — 요(yaw) 하나와 예고 중 여부 하나.
+/// 타깃 참조도, <c>NetworkTransform</c> 도 태우지 않는다(본 하나 때문에 대역폭을 계속 쓴다).
+/// 판정은 그대로 서버가 한다 — 이 회전은 판정에 관여하지 않는다.
 /// </summary>
 [DisallowMultipleComponent]
 [RequireComponent(typeof(MonsterBase))]
-public class TurretHeadAim : MonoBehaviour, ITurretAimGate
+public class TurretHeadAim : NetworkBehaviour, ITurretAimGate
 {
     [Header("머리 본")]
     [Tooltip("비우면 이름으로 자동 탐색한다. 터렛 리그는 Root→Column01~03→HeadRotator 순서다.")]
@@ -76,10 +82,32 @@ public class TurretHeadAim : MonoBehaviour, ITurretAimGate
              "이 시간이 지나야 발사한다 — 플레이어가 피할 여지를 주는 구간이다.")]
     [SerializeField] private float aimHoldSeconds = 0.5f;
 
+    [Header("네트워크")]
+    [Tooltip("서버가 조준각을 다시 보내는 최소 변화량(도). 이보다 작게 움직이면 보내지 않는다. " +
+             "0 이면 추적하는 내내 매 틱 보낸다.")]
+    [SerializeField] private float yawSendThreshold = 0.5f;
+
+    [Tooltip("클라가 받은 조준각을 따라잡는 시간(초). 복제가 틱 단위(기본 30Hz)로 오므로 " +
+             "그 간격을 메우는 값이다. 크면 머리가 늘어지고, 0 이면 계단처럼 튄다.")]
+    [SerializeField] private float replicationSmoothing = 0.08f;
+
     [Header("진단")]
     [Tooltip("켜면 0.5초마다 상태·조준각·애니메이터 개입 여부를 콘솔에 찍는다. " +
              "머리가 폭주할 때 원인을 가르는 용도 — 평소에는 끈다.")]
     [SerializeField] private bool logDiagnostics;
+
+    // ── 복제되는 값 ─────────────────────────────────────────────────────────
+    // 🔴 이 두 개가 전부다. 타깃 참조도 본 트랜스폼도 보내지 않는다 — 클라가 같은 그림을 그리는 데
+    //    필요한 최소값만 보낸다. 권한 규약은 MonsterBase._state 와 같다(서버 쓰기 / 전원 읽기).
+    private readonly NetworkVariable<float> _netYaw = new(
+        0f,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    private readonly NetworkVariable<bool> _netTelegraphing = new(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
 
     private float _nextLogTime;
     private Quaternion _lastWritten;
@@ -99,6 +127,9 @@ public class TurretHeadAim : MonoBehaviour, ITurretAimGate
     private bool _telegraphing;
     private float _telegraphStartedAt;
 
+    /// 예고선을 지금 그려야 하는가. 서버는 <see cref="_telegraphing"/> 에서, 클라는 복제값에서 온다.
+    private bool _laserVisible;
+
     /// 예고가 시작된 뒤 지난 시간(초). 예고 중이 아니면 0.
     private float TelegraphElapsed => _telegraphing ? Time.time - _telegraphStartedAt : 0f;
 
@@ -108,7 +139,17 @@ public class TurretHeadAim : MonoBehaviour, ITurretAimGate
     /// </summary>
     private bool AimHolding => _telegraphing && TelegraphElapsed >= telegraphSeconds;
 
+    /// <summary>
+    /// 조준을 <b>내가 계산하는가</b>. 서버이거나, 아직 스폰되지 않은(= 네트워크 밖) 상태면 그렇다.
+    /// 스폰 전까지 권한을 인정하는 이유는 프리뷰·단독 씬에서도 컴포넌트가 동작해야 하기 때문이다.
+    /// 스폰 전에는 <c>NetworkVariable</c> 에 쓰면 예외가 나므로 <see cref="PublishAimState"/> 가 막는다.
+    /// </summary>
+    private bool HasAimAuthority => !IsSpawned || IsServer;
+
     // ── ITurretAimGate ──────────────────────────────────────────────────────
+    // 🔴 아래 셋은 MonsterBase.SeekTurret 이 서버에서만 부른다. 그래서 _telegraphing /
+    //    _telegraphStartedAt 은 서버 전용 상태로 둔다 — 클라는 이 값들을 만들지 않고
+    //    복제된 _netTelegraphing 만 본다.
     /// <summary>
     /// 발사해도 되는가. <b>추적 + 고정 유지</b> 가 모두 끝나야 <c>true</c> 다.
     ///
@@ -183,6 +224,18 @@ public class TurretHeadAim : MonoBehaviour, ITurretAimGate
         }
     }
 
+    /// <summary>
+    /// 늦게 들어온 클라도 <b>진행 중인 예고</b>를 제대로 본다 — <c>NetworkVariable</c> 의 현재 값이
+    /// 스폰 시점에 그대로 전달되므로, 받은 각을 <b>보간 없이</b> 초기값으로 깔아 둔다.
+    /// 안 깔면 정면(0도)에서 조준 각도까지 한 번 휙 돌아가는 게 보인다.
+    /// </summary>
+    public override void OnNetworkSpawn()
+    {
+        if (IsServer) return;
+        _yaw = _netYaw.Value;
+        _laserVisible = _netTelegraphing.Value;
+    }
+
     private Transform FindBone(string boneName)
     {
         if (string.IsNullOrEmpty(boneName)) return null;
@@ -202,6 +255,16 @@ public class TurretHeadAim : MonoBehaviour, ITurretAimGate
     {
         if (headBone == null) return;
 
+        if (HasAimAuthority) TickAimAuthoritative();
+        else                 TickAimReplicated();
+
+        UpdateAimLaser();
+        ApplyHeadYaw();
+    }
+
+    /// <summary>서버(또는 네트워크 밖) — 조준각을 직접 계산하고 그 결과를 복제한다.</summary>
+    private void TickAimAuthoritative()
+    {
         // 🔴 공격 중에는 조준을 갱신하지 않는다 — 「조준 → 영점 고정 → 발사 → 뜸 → 다시 조준」.
         //    갱신만 멈추고 각도는 계속 적용한다(멈추면 애니메이터 포즈로 머리가 튄다).
         //    몸통 쪽 규약과 같다: MonsterBase 는 StartAttack 직전 FaceTarget() 1회로 조준을 확정한다.
@@ -220,8 +283,6 @@ public class TurretHeadAim : MonoBehaviour, ITurretAimGate
         // 공격이 끝난 직후 바로 돌면 기계적으로 보인다(팀장 피드백) — 짧은 뜸을 둔다.
         bool aimLocked = holdAimWhileAttacking
                          && (attacking || telegraphLocked || Time.time < _resumeAimAt);
-
-        UpdateAimLaser();
 
         if (!aimLocked)
         {
@@ -247,6 +308,60 @@ public class TurretHeadAim : MonoBehaviour, ITurretAimGate
                 : Mathf.MoveTowardsAngle(_yaw, desired, speed * Time.deltaTime);
         }
 
+        _laserVisible = _telegraphing;
+        PublishAimState(telegraphLocked);
+    }
+
+    /// <summary>
+    /// 복제 상태를 갱신한다. <b>바뀔 때만</b> 쓴다 — 고정 유지 구간과 타깃이 없는 동안에는
+    /// 한 바이트도 나가지 않는다(<c>NetworkVariable</c> 은 더티일 때만 보낸다).
+    /// </summary>
+    /// <param name="telegraphLocked">이번 프레임이 조준 고정 구간인가(<see cref="AimHolding"/>).</param>
+    private void PublishAimState(bool telegraphLocked)
+    {
+        if (!IsSpawned) return;   // 네트워크 밖(프리뷰·단독 씬) — 여기에 쓰면 예외가 난다
+
+        if (_netTelegraphing.Value != _telegraphing)
+            _netTelegraphing.Value = _telegraphing;
+
+        // 🔴 고정으로 넘어가는 첫 프레임은 임계값을 무시하고 무조건 보낸다.
+        //    이 각이 곧 탄이 날아갈 방향(LockedAimDirection)이라, 임계값만큼 어긋난 채로 굳으면
+        //    클라의 예고선과 실제 탄이 그만큼 다른 곳을 가리킨다 — 예고가 거짓말이 된다.
+        bool lockEdge = telegraphLocked && !_wasTelegraphLocked;
+        _wasTelegraphLocked = telegraphLocked;
+
+        if (lockEdge || Mathf.Abs(Mathf.DeltaAngle(_netYaw.Value, _yaw)) >= yawSendThreshold)
+            _netYaw.Value = _yaw;
+    }
+
+    /// <summary>
+    /// 클라 — 계산하지 않고 받은 각을 따라간다.
+    /// 그대로 대입하지 않는 이유는 복제가 <b>틱 단위</b>(기본 30Hz)로 오기 때문이다. 프레임마다
+    /// 남은 각을 <c>replicationSmoothing</c> 안에 메우도록 속도를 잡으면, 추적 구간은 부드럽고
+    /// 고정 구간에서는 목표값에 정확히 수렴한다 — 즉 <b>정작 중요한 순간에는 서버와 같은 각</b>이다.
+    ///
+    /// 🔴 여기서 <c>turnDegreesPerSecond</c> 를 그대로 쓰면 안 된다. 서버가 그 속도로 돌고 클라도
+    ///    같은 속도로 쫓으면 <b>지연이 영원히 안 줄어든다</b>(계속 그만큼 뒤처진 각을 그린다).
+    /// </summary>
+    private void TickAimReplicated()
+    {
+        _laserVisible = _netTelegraphing.Value;
+
+        float target = _netYaw.Value;
+        float delta = Mathf.Abs(Mathf.DeltaAngle(_yaw, target));
+        if (delta <= 0.01f || replicationSmoothing <= 0f)
+        {
+            _yaw = target;
+            return;
+        }
+
+        _yaw = Mathf.MoveTowardsAngle(
+            _yaw, target, delta / Mathf.Max(0.02f, replicationSmoothing) * Time.deltaTime);
+    }
+
+    /// <summary>애니메이터가 쓴 포즈 위에 요(yaw)를 얹는다. 서버·클라 공통 경로다.</summary>
+    private void ApplyHeadYaw()
+    {
         // 🔴 누적 방지: 이 프레임에 애니메이터가 본을 다시 썼는지 확인한다.
         //    안 썼다면 지금 값은 "내가 지난 프레임에 쓴 것"이므로, 그 위에 또 얹으면
         //    매 프레임 각도가 쌓여 머리가 폭주한다.
@@ -256,7 +371,9 @@ public class TurretHeadAim : MonoBehaviour, ITurretAimGate
         {
             _nextLogTime = Time.time + 0.5f;
             Debug.Log($"[TurretHeadAim] {name} state={(_monster != null ? _monster.State.ToString() : "?")} " +
-                      $"lock={aimLocked} yaw={_yaw:F1} 애니메이터가씀={animatorWrote} " +
+                      $"권한={HasAimAuthority} yaw={_yaw:F1} " +
+                      $"복제yaw={(IsSpawned ? _netYaw.Value.ToString("F1") : "-")} 예고={_laserVisible} " +
+                      $"애니메이터가씀={animatorWrote} " +
                       $"target={(_monster != null && _monster.CurrentTarget != null ? _monster.CurrentTarget.name : "없음")}", this);
         }
 
@@ -276,6 +393,7 @@ public class TurretHeadAim : MonoBehaviour, ITurretAimGate
 
     private Quaternion _lastAnimPose = Quaternion.identity;
     private float _resumeAimAt;
+    private bool _wasTelegraphLocked;
 
     /// <summary>
     /// 조준 예고선. <b>선딜 동안만</b> 켠다 — 발사 시점에 끄면 "지금 여기로 쏜다"는 예고가 된다.
@@ -284,7 +402,8 @@ public class TurretHeadAim : MonoBehaviour, ITurretAimGate
     /// <b>비활성이고 참조하는 코드가 하나도 없었다</b>(2026-09-14 전수 확인). 여기서 처음 배선한다.
     /// 애니메이션 클립이 아니다 — 팩 전체에 Lazer/Laser/Beam 클립은 존재하지 않는다.
     ///
-    /// 각 피어가 로컬로 그린다. 복제하지 않는다(시각 요소).
+    /// 선 자체는 각 피어가 로컬로 그린다. 오가는 것은 <b>켜짐 여부와 각도</b>뿐이다. 벽에 막히는
+    /// 계산도 각자 한다 — 같은 콜라이더를 보므로 결과가 같고, 그만큼 보낼 것이 없다.
     /// </summary>
     private void UpdateAimLaser()
     {
@@ -292,7 +411,7 @@ public class TurretHeadAim : MonoBehaviour, ITurretAimGate
 
         // 예고 구간에만 보인다: 사거리 안 + 쿨 참 → 조준선 ON → telegraphSeconds 동안 추적 →
         // 멈추는 순간 발사(그때 _telegraphing 이 꺼지므로 선도 사라진다).
-        if (!showAimLaser || !_telegraphing)
+        if (!showAimLaser || !_laserVisible)
         {
             if (aimLaser.gameObject.activeSelf) aimLaser.gameObject.SetActive(false);
             return;
