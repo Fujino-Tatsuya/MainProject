@@ -69,8 +69,12 @@ public class TurretHeadAim : MonoBehaviour, ITurretAimGate
 
     [Header("조준 예고 시간")]
     [Tooltip("사거리 안에 들어온 뒤 조준선을 보이며 타깃을 따라가는 시간(초). " +
-             "이 시간이 지나면 조준이 멈추고 그때 발사한다(팀장 확정: 0.5~1.0초).")]
+             "이 시간이 지나면 조준이 그 방향에 고정된다(팀장 확정: 0.5~1.0초).")]
     [SerializeField] private float telegraphSeconds = 0.7f;
+
+    [Tooltip("추적이 끝난 뒤 최종 방향에 조준선을 '고정한 채 유지'하는 시간(초). " +
+             "이 시간이 지나야 발사한다 — 플레이어가 피할 여지를 주는 구간이다.")]
+    [SerializeField] private float aimHoldSeconds = 0.5f;
 
     [Header("진단")]
     [Tooltip("켜면 0.5초마다 상태·조준각·애니메이터 개입 여부를 콘솔에 찍는다. " +
@@ -95,10 +99,25 @@ public class TurretHeadAim : MonoBehaviour, ITurretAimGate
     private bool _telegraphing;
     private float _telegraphStartedAt;
 
+    /// 예고가 시작된 뒤 지난 시간(초). 예고 중이 아니면 0.
+    private float TelegraphElapsed => _telegraphing ? Time.time - _telegraphStartedAt : 0f;
+
+    /// <summary>
+    /// 추적이 끝나 <b>조준선이 최종 방향에 고정된</b> 구간인가.
+    /// 「추적(<c>telegraphSeconds</c>) → 고정 유지(<c>aimHoldSeconds</c>) → 발사」의 가운데 구간이다.
+    /// </summary>
+    private bool AimHolding => _telegraphing && TelegraphElapsed >= telegraphSeconds;
+
     // ── ITurretAimGate ──────────────────────────────────────────────────────
-    /// <summary>예고 시간이 다 지났는가. 지나면 조준이 멈추고 <c>MonsterBase</c> 가 발사한다.</summary>
+    /// <summary>
+    /// 발사해도 되는가. <b>추적 + 고정 유지</b> 가 모두 끝나야 <c>true</c> 다.
+    ///
+    /// 🔴 고정 유지 구간이 따로 있는 이유(팀장 확정 2026-09-14): 조준선이 멈추는 순간 바로 쏘면
+    /// 플레이어가 피할 틈이 없다. 최종 방향에 선을 <b>박아 둔 채 잠깐 기다렸다가</b> 쏴야
+    /// 예고로서 기능한다.
+    /// </summary>
     public bool IsAimReady =>
-        !_telegraphing || Time.time - _telegraphStartedAt >= telegraphSeconds;
+        !_telegraphing || TelegraphElapsed >= telegraphSeconds + aimHoldSeconds;
 
     public void BeginAiming()
     {
@@ -187,8 +206,10 @@ public class TurretHeadAim : MonoBehaviour, ITurretAimGate
             _telegraphing = false;   // 발사에 들어갔다 — 다음 사이클에 예고를 처음부터 다시 한다
         }
 
-        // 예고 시간이 끝나면 조준선이 "멈춘" 상태여야 한다 — 그 순간부터 조준을 고정한다.
-        bool telegraphLocked = _telegraphing && IsAimReady;
+        // 🔴 추적이 끝나는 순간부터 고정한다 — IsAimReady(발사 가능)보다 aimHoldSeconds 만큼 이르다.
+        //    이 차이가 "최종 방향에 선을 박아 둔 채 기다리는" 구간을 만든다.
+        //    여기서 IsAimReady 를 쓰면 고정 구간이 사라져 멈추자마자 쏘게 된다.
+        bool telegraphLocked = AimHolding;
 
         // 공격이 끝난 직후 바로 돌면 기계적으로 보인다(팀장 피드백) — 짧은 뜸을 둔다.
         bool aimLocked = holdAimWhileAttacking
