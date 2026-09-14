@@ -87,17 +87,26 @@ public static class TurretAnimatorAuthoring
                 bool exists = AssetDatabase.LoadAssetAtPath<AnimatorController>(ctrlPath) != null;
                 bool hasAgent = prefabAsset.GetComponent<NavMeshAgent>() != null;
                 log.AppendLine($"  ▶ {t.Name} — 컨트롤러 {(exists ? "재생성" : "생성")} ({ctrlPath}) + " +
-                               $"데이터 정리 + NavMeshAgent {(hasAgent ? "제거" : "이미 없음")} " +
+                               $"머리 마스크 + 데이터 정리 + NavMeshAgent {(hasAgent ? "제거" : "이미 없음")} " +
                                $"(clips: {idle.name}, {shoot.name})");
                 done++;
                 continue;
             }
 
-            AnimatorController controller = BuildController(ctrlPath, idle, shoot);
+            string maskPath = $"{OutFolder}/Mask_{t.Name}_HeadOnly.mask";
+            AvatarMask mask = BuildHeadMask(maskPath, prefabAsset, out string maskFix);
+            if (mask == null)
+            {
+                log.AppendLine($"  ✗ {t.Name} — 마스크 생성 실패: {maskFix}");
+                failed++;
+                continue;
+            }
+
+            AnimatorController controller = BuildController(ctrlPath, idle, shoot, mask);
             string dataFix = FixData(prefabAsset, controller);
             string agentFix = StripNavMeshAgent(prefabPath);
 
-            log.AppendLine($"  ✓ {t.Name} — {ctrlPath}\n      데이터: {dataFix}\n      NavMeshAgent: {agentFix}");
+            log.AppendLine($"  ✓ {t.Name} — {ctrlPath}\n      마스크: {maskFix}\n      데이터: {dataFix}\n      NavMeshAgent: {agentFix}");
             done++;
         }
 
@@ -112,28 +121,131 @@ public static class TurretAnimatorAuthoring
         else Debug.Log(log.ToString());
     }
 
-    /// <summary>이미 「Shoot 파라미터 1개 + Idle·Shoot 상태 2개(클립 일치)」인가.</summary>
-    static bool AlreadyCorrect(AnimatorController c, AnimationClip idleClip, AnimationClip shootClip)
+    const string HeadBone = "HeadRotator";
+
+    /// <summary>
+    /// 이미 「Shoot 파라미터 1개 + Base(Idle 단독) + Shoot 레이어(마스크 적용)」인가.
+    ///
+    /// 🔴 <b>2레이어인 이유</b>(2026-09-14 Play 실측): <c>A_Shoot</c> 클립은 머리뿐 아니라
+    ///    <b>기둥 본(Column02·Column03)까지 크게 회전시킨다.</b> 증상 개체(Shoot 재생 중)는
+    ///    Column02 (335.80, 12.59, 331.15) · Column03 (5.84, 53.62, 285.40) 이었고,
+    ///    정상 개체(Idle)는 둘 다 (0,0,0) 이었다 — 컴포넌트 구성은 완전히 동일했다.
+    ///    이것이 「몸체가 분리돼 보인다」의 정체다(물리·랙돌·넉백 전부 기각).
+    ///    Unity 의 <see cref="AvatarMask"/> 는 <b>상태가 아니라 레이어 단위</b>이므로,
+    ///    Shoot 을 별도 레이어로 올려 머리 본에만 적용한다. <b>레이어 0 에는 마스크가 안 먹는다.</b>
+    /// </summary>
+    static bool AlreadyCorrect(AnimatorController c, AnimationClip idleClip, AnimationClip shootClip, AvatarMask mask)
     {
         if (c.parameters.Length != 1) return false;
         if (c.parameters[0].name != "Shoot" ||
             c.parameters[0].type != AnimatorControllerParameterType.Trigger) return false;
-        if (c.layers == null || c.layers.Length == 0) return false;
+        if (c.layers == null || c.layers.Length != 2) return false;
 
-        AnimatorStateMachine sm = c.layers[0].stateMachine;
-        if (sm.states.Length != 2 || sm.stateMachines.Length != 0) return false;
+        // 레이어 0 = Idle 단독
+        AnimatorStateMachine baseSm = c.layers[0].stateMachine;
+        if (baseSm.states.Length != 1 || baseSm.stateMachines.Length != 0) return false;
+        AnimatorState idle = baseSm.states[0].state;
+        if (idle == null || idle.name != "Idle" || idle.motion != idleClip) return false;
+        if (baseSm.defaultState != idle) return false;
 
-        AnimatorState idle = null, shoot = null;
-        foreach (ChildAnimatorState cs in sm.states)
+        // 레이어 1 = Shoot (마스크 적용, Override, weight 1)
+        AnimatorControllerLayer shootLayer = c.layers[1];
+        if (shootLayer.avatarMask != mask) return false;
+        if (shootLayer.blendingMode != AnimatorLayerBlendingMode.Override) return false;
+        if (!Mathf.Approximately(shootLayer.defaultWeight, 1f)) return false;
+
+        AnimatorStateMachine shootSm = shootLayer.stateMachine;
+        if (shootSm.states.Length != 2 || shootSm.stateMachines.Length != 0) return false;
+
+        AnimatorState empty = null, shoot = null;
+        foreach (ChildAnimatorState cs in shootSm.states)
         {
             if (cs.state == null) return false;
-            if (cs.state.name == "Idle") idle = cs.state;
+            if (cs.state.name == "Empty") empty = cs.state;
             else if (cs.state.name == "Shoot") shoot = cs.state;
         }
 
-        return idle != null && shoot != null
-               && idle.motion == idleClip && shoot.motion == shootClip
-               && sm.defaultState == idle;
+        return empty != null && shoot != null
+               && empty.motion == null && shoot.motion == shootClip
+               && shootSm.defaultState == empty;
+    }
+
+    /// <summary>
+    /// 머리(<c>HeadRotator</c> 이하)만 켜진 <see cref="AvatarMask"/> 를 만든다.
+    ///
+    /// 경로를 <b>하드코딩하지 않는다</b> — 게임 프리팹의 <see cref="Animator"/> 를 찾아 그 아래
+    /// 트랜스폼을 실제로 걸어서 경로를 뽑는다. PeekABot 과 TeslaBot 의 아트 프리팹이 서로 다른
+    /// FBX 를 참조하고(<c>P_TeslaBot</c> 은 <c>R_PeekABot</c>·<c>R_TeslaBot</c> 을 둘 다 참조한다)
+    /// 메시 노드 이름도 다르므로(<c>PeekaBot</c> / <c>G_BossMob_PeekABot</c>), 고정 경로는 조용히 빗나간다.
+    /// </summary>
+    static AvatarMask BuildHeadMask(string maskPath, GameObject gamePrefab, out string report)
+    {
+        var animator = gamePrefab.GetComponentInChildren<Animator>(true);
+        if (animator == null) { report = "Animator 를 못 찾음"; return null; }
+
+        Transform root = animator.transform;
+        Transform[] all = root.GetComponentsInChildren<Transform>(true);
+
+        Transform head = null;
+        foreach (Transform t in all) if (t.name == HeadBone) { head = t; break; }
+        if (head == null) { report = $"{HeadBone} 본이 없음 (본 {all.Length}개)"; return null; }
+
+        var paths = new List<string>();
+        var active = new List<bool>();
+        foreach (Transform t in all)
+        {
+            if (t == root) continue;                    // 루트 자신은 경로가 빈 문자열이다
+            paths.Add(AnimationUtility.CalculateTransformPath(t, root));
+            active.Add(IsSelfOrDescendantOf(t, head));
+        }
+
+        var mask = AssetDatabase.LoadAssetAtPath<AvatarMask>(maskPath);
+        bool created = mask == null;
+
+        if (!created && MaskMatches(mask, paths, active))
+        {
+            // 🔴 같은 내용이면 건드리지 않는다 — 매번 다시 쓰면 재실행마다 헛 diff 가 남는다.
+            report = $"이미맞음 (켬 {CountTrue(active)} / 전체 {paths.Count})";
+            return mask;
+        }
+
+        if (created) mask = new AvatarMask();
+        mask.transformCount = paths.Count;
+        for (int i = 0; i < paths.Count; i++)
+        {
+            mask.SetTransformPath(i, paths[i]);
+            mask.SetTransformActive(i, active[i]);
+        }
+
+        if (created) AssetDatabase.CreateAsset(mask, maskPath);
+        else EditorUtility.SetDirty(mask);
+
+        report = $"{(created ? "생성" : "갱신")} — 켬 {CountTrue(active)} / 전체 {paths.Count} ({maskPath})";
+        return mask;
+    }
+
+    static bool IsSelfOrDescendantOf(Transform t, Transform ancestor)
+    {
+        for (Transform p = t; p != null; p = p.parent) if (p == ancestor) return true;
+        return false;
+    }
+
+    static int CountTrue(List<bool> v)
+    {
+        int n = 0;
+        foreach (bool b in v) if (b) n++;
+        return n;
+    }
+
+    static bool MaskMatches(AvatarMask mask, List<string> paths, List<bool> active)
+    {
+        if (mask.transformCount != paths.Count) return false;
+        for (int i = 0; i < paths.Count; i++)
+        {
+            if (mask.GetTransformPath(i) != paths[i]) return false;
+            if (mask.GetTransformActive(i) != active[i]) return false;
+        }
+        return true;
     }
 
     /// <summary>
@@ -196,7 +308,7 @@ public static class TurretAnimatorAuthoring
     ///    배선 감사는 그 몹을 "컨트롤러 없음 → 감사 불가"로 **건너뛰어** 죽은 이름 0개라는
     ///    **거짓 초록**을 낸다. 실제로 그렇게 한 번 깼다.
     /// </summary>
-    static AnimatorController BuildController(string path, AnimationClip idleClip, AnimationClip shootClip)
+    static AnimatorController BuildController(string path, AnimationClip idleClip, AnimationClip shootClip, AvatarMask mask)
     {
         if (!AssetDatabase.IsValidFolder(OutFolder))
             AssetDatabase.CreateFolder("Assets/2.Prefabs/Monster", "Controllers");
@@ -206,7 +318,7 @@ public static class TurretAnimatorAuthoring
         {
             c = AnimatorController.CreateAnimatorControllerAtPath(path);
         }
-        else if (AlreadyCorrect(c, idleClip, shootClip))
+        else if (AlreadyCorrect(c, idleClip, shootClip, mask))
         {
             // 🔴 이미 원하는 모양이면 손대지 않는다. 제자리 재구성도 상태 fileID 를 새로 만들어
             //    매 실행 컨트롤러가 전량 churn(63+/63-) 한다 — 재실행할 때마다 헛 diff 가 남는다.
@@ -214,8 +326,9 @@ public static class TurretAnimatorAuthoring
         }
         else
         {
-            // 제자리 재구성 — guid 를 유지한다. 파라미터·상태를 비우고 아래에서 다시 만든다.
+            // 제자리 재구성 — guid 를 유지한다. 파라미터·상태·추가 레이어를 비우고 아래에서 다시 만든다.
             for (int i = c.parameters.Length - 1; i >= 0; i--) c.RemoveParameter(i);
+            for (int i = c.layers.Length - 1; i >= 1; i--) c.RemoveLayer(i);
 
             AnimatorStateMachine old = c.layers[0].stateMachine;
             foreach (ChildAnimatorState cs in old.states) old.RemoveState(cs.state);
@@ -224,28 +337,47 @@ public static class TurretAnimatorAuthoring
 
         c.AddParameter("Shoot", AnimatorControllerParameterType.Trigger);
 
-        AnimatorStateMachine sm = c.layers[0].stateMachine;
+        // ── 레이어 0 (Base) : Idle 단독 ──────────────────────────────────────────
+        // 기둥 본을 포함한 전신을 여기서 쥔다. Shoot 은 여기에 두지 않는다 —
+        // 레이어 0 에는 AvatarMask 가 적용되지 않아 기둥까지 휘둘러 버린다.
+        AnimatorStateMachine baseSm = c.layers[0].stateMachine;
 
         // 위치를 주지 않으면 노드가 원점에 겹쳐 쌓여 그래프를 손으로 열었을 때 못 읽는다.
-        AnimatorState idle = sm.AddState("Idle", new Vector3(300f, 0f, 0f));
+        AnimatorState idle = baseSm.AddState("Idle", new Vector3(300f, 0f, 0f));
         idle.motion = idleClip;
-        sm.defaultState = idle;
+        baseSm.defaultState = idle;
 
-        AnimatorState shoot = sm.AddState("Shoot", new Vector3(600f, 120f, 0f));
+        // ── 레이어 1 (Shoot) : 머리 본만 ────────────────────────────────────────
+        c.AddLayer("Shoot");
+        AnimatorControllerLayer[] layers = c.layers;
+        layers[1].avatarMask = mask;
+        layers[1].blendingMode = AnimatorLayerBlendingMode.Override;
+        layers[1].defaultWeight = 1f;
+        c.layers = layers;                       // 🔴 배열을 되돌려 넣어야 반영된다(복사본이다)
+
+        AnimatorStateMachine shootSm = c.layers[1].stateMachine;
+
+        // Empty 는 모션이 없는 기본 상태다. 이게 있어야 평상시 레이어가 아무것도 덮지 않는다
+        // (Shoot 하나만 두면 머리가 발사 포즈로 고정된다).
+        AnimatorState empty = shootSm.AddState("Empty", new Vector3(300f, 0f, 0f));
+        empty.motion = null;
+        shootSm.defaultState = empty;
+
+        AnimatorState shoot = shootSm.AddState("Shoot", new Vector3(600f, 120f, 0f));
         shoot.motion = shootClip;
 
-        // Idle → Shoot : 트리거 즉시. exitTime 을 쓰면 Idle 이 한 바퀴 돌 때까지 사격이 밀린다.
-        AnimatorStateTransition toShoot = idle.AddTransition(shoot);
+        // Empty → Shoot : 트리거 즉시. exitTime 을 쓰면 사격이 한 바퀴 밀린다.
+        AnimatorStateTransition toShoot = empty.AddTransition(shoot);
         toShoot.hasExitTime = false;
         toShoot.duration = 0.05f;
         toShoot.AddCondition(AnimatorConditionMode.If, 0f, "Shoot");
 
-        // Shoot → Idle : 클립이 끝나면 돌아온다(조건 없음 — 조건을 걸면 그 트리거가 없을 때 갇힌다.
-        //                TeslaBot 이 Charge 에 갇힌 원인이 정확히 그것이었다).
-        AnimatorStateTransition toIdle = shoot.AddTransition(idle);
-        toIdle.hasExitTime = true;
-        toIdle.exitTime = 0.9f;
-        toIdle.duration = 0.1f;
+        // Shoot → Empty : 클립이 끝나면 돌아온다(조건 없음 — 조건을 걸면 그 트리거가 없을 때 갇힌다.
+        //                 TeslaBot 이 Charge 에 갇힌 원인이 정확히 그것이었다).
+        AnimatorStateTransition toEmpty = shoot.AddTransition(empty);
+        toEmpty.hasExitTime = true;
+        toEmpty.exitTime = 0.9f;
+        toEmpty.duration = 0.1f;
 
         EditorUtility.SetDirty(c);
         return c;

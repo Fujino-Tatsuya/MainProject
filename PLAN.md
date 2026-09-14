@@ -1,3 +1,123 @@
+# ▶▶▶ CURRENT PLAN — 고정 터렛 조준 개편: 머리만 조준 + 레이저 표시 (2026-09-14, **승인 대기**)
+
+> 대상: `PeekABot` · `TeslaBot` (archetype `RangedTurret`). 담당 경석.
+> 이 계획은 **추측이 아니라 Play 실측**에서 나왔다. 근거는 아래 「실측」 절.
+
+## 문제 (확정)
+
+공격할 때 **기둥이 꺾여 몸체가 분리돼 보인다.** 원인은 **`A_Shoot` 클립이 기둥 본을 크게 회전시키는 것**이다.
+
+### 실측 — `Bent`(증상) vs `Clean`(정상) 대조 (2026-09-14, Play 일시정지)
+
+| 항목 | `Bent` | `Clean` |
+|---|---|---|
+| 애니메이터 상태 | hash `885627960`(Shoot) · t=0.995 · **전이 중** | hash `1432961145`(Idle) · t=31.96 · 전이 없음 |
+| `Column02` 로컬 회전 | **(335.80, 12.59, 331.15)** | **(0, 0, 0)** |
+| `Column03` 로컬 회전 | **(5.84, 53.62, 285.40)** · Y가 하강 | (0, 0, 0) |
+| 루트 회전 | (0, 317.41, 0) — **순수 yaw**, X·Z 기울기 0 | (0, 0, 0) |
+| 루트 `Rigidbody.isKinematic` | **True** | True |
+
+두 개체의 **컴포넌트 구성은 완전히 동일**하다. 차이는 **Shoot 을 재생 중인가** 하나뿐이다.
+
+### 배제된 원인 (근거 있음 — 다시 의심하지 말 것)
+
+- **루트 Rigidbody 물리 / 넉백 / kinematic 미복구** — `Bent` 루트가 `isKinematic: True` 이고 X·Z 기울기가 0.
+  물리가 잡았다면 X/Z 가 기울어야 한다. **기각.**
+- **`c148bdf8`(NavMeshAgent 제거) 회귀** — 위와 같은 이유로 무관. **되돌리지 않는다.**
+- **본 랙돌/`CharacterJoint`** — 본 Rigidbody 가 전부 kinematic 이라 물리가 돌지 않는다.
+  또 랙돌은 **정상인 8종 전부**가 갖고 있다(SpinBot 17/14, ChompBot 11/7, MortarBot 5/3).
+- **공격 재트리거 겹침** — 공격 간격 `1/0.8 = 1.25초` vs 애니 복귀 `exitTime 0.9 + 0.1 ≈ 0.37초`.
+  0.9초가 남아 겹칠 수 없다.
+- **Pack01/Pack02 FBX 불일치 · 아바타 오연결 · 비균일 스케일** — Codex 교차검증에서 전부 기각
+  (두 FBX 바이트 동일 · 클립이 올바른 아바타 복사 · 체인 스케일 전부 (1,1,1)).
+
+## 실측된 구조
+
+```
+PeekABot(Clone)                     Rigidbody(kinematic) · CapsuleCollider · NetworkTransform · MonsterBase
+└ Model (SphereCollider·Rigidbody)
+  └ Model
+    ├ R_PeekABot (Animator: Controller_PeekABot_Turret)
+    │ ├ Armature          rot(270.02,0,0) scale(100,100,100)   ← FBX 축변환. 건드리지 말 것
+    │ │ └ Root            → Column01 → Column02 → Column03 → HeadRotator → Head → Eye → Eyelid → EyelidEnd
+    │ ├ PeekaBot          SkinnedMeshRenderer (m_RootBone = Root)
+    │ └ TrackingLaser     LineRenderer · **active: false** · 참조 코드 0건 (미배선)
+```
+
+- `Column01` = Rigidbody+Collider(조인트 없음) / `Column02`·`Column03` = +`CharacterJoint`
+- **`HeadRotator` 는 Transform 하나뿐** — Rigidbody·Collider·Joint 없음 → 코드 회전에 가장 안전한 지점
+- 높이(정상 기준, 루트 대비): Column02 +0.45 · Column03 +0.74 · HeadRotator +0.99 · TrackingLaser +1.35
+- 데이터: 둘 다 `turnSpeed: 10` · `detectionRadius: 12` · `attackRange: 10/11` · 투사체 프리팹 동일(`54c0baf8`)
+- **프로젝트에 `AvatarMask` 에셋 0개** — 새로 만들어야 한다
+
+## 목표
+
+1. 공격해도 **기둥이 꺾이지 않는다**
+2. **머리가 플레이어를 바라보고** 쏜다 — 몸통을 통째로 돌리지 않는다(현재 루트가 yaw 317° 로 회전 중)
+3. 공격 방향을 **레이저로 표시**한다
+
+## 설계
+
+### A. 클립을 머리에만 적용 — Animator 레이어 + AvatarMask
+
+Unity 의 마스크는 **상태 단위가 아니라 레이어 단위**다. 따라서:
+
+- `Base Layer` = `Idle` 만 (Shoot 제거)
+- `Layer 1 "Shoot"` = `Shoot` 상태 · **Override** · weight 1 · **AvatarMask 적용**
+  - 마스크 포함 = `HeadRotator` 이하(`Head`·`Eye`·`Eyelid`·`EyelidEnd`)
+  - 마스크 제외 = `Root`·`Column01`·`Column02`·`Column03`
+- 마스크 에셋: `Assets/2.Prefabs/Monster/Controllers/Mask_TurretHeadOnly.mask` (신규)
+
+⚠️ **리스크**: `Shoot` 의 머리 커브는 *기둥이 휘어진 상태를 전제로* 저작됐을 수 있다.
+머리만 떼어내면 어색해질 가능성이 있으므로 **Play 확인이 필수**다.
+어색하면 대안: Shoot 레이어 weight 를 낮추거나, `Shoot` 상태를 **발사 이펙트 트리거 전용**으로 두고
+머리 포즈는 전부 코드 조준에 맡긴다.
+
+### B. 조준은 코드 — 몸통 고정, 머리만 회전
+
+- `MonsterBase` 의 회전 단일 지점(`:1452~1464`)에서 **`RangedTurret` 은 루트 회전을 건너뛴다.**
+  (현재 `turnSpeed: 10` 으로 몸통이 slerp 회전 중 — 이게 "몸통이 틀어진다"의 정체)
+- 신규 컴포넌트 `TurretHeadAim`(경석 영역, `Assets/1.Scripts/Monster/`)
+  - 인스펙터: `headBone`(비우면 `HeadRotator` 자동 탐색) · `turnSpeed` · `maxYaw`/`maxPitch` · `aimOffset`
+  - **`LateUpdate`** 에서 회전 — Animator 가 쓴 뒤에 덮어야 이긴다(`Update` 면 애니에 먹힌다)
+  - 서버 권한: 회전 값은 **서버가 계산**, 클라는 `NetworkTransform` 이 아니라 **각 피어가 자기 타깃으로 로컬 계산**
+    (본 회전까지 복제하면 대역폭 낭비 — 시각 요소이므로 로컬 계산이 규약에 맞다)
+  - 타깃 없으면 기본 포즈로 복귀
+
+### C. 레이저 방향 표시 — `TrackingLaser` 배선
+
+- 지금 `active: false` 이고 **코드 참조 0건**이다. `TurretHeadAim` 이 소유한다.
+- 표시 구간: **선딜(windup) 동안만** 켜고 발사 시 끈다 — 예고선 역할
+- 시작점 = `TrackingLaser` 위치, 끝점 = 조준 방향 × `attackRange`(벽에 막히면 레이캐스트 지점)
+- 전 피어 로컬 렌더(네트워크 복제 없음)
+
+### D. TeslaBot 스폰 복구
+
+현재 씬에 TeslaBot 이 **0마리**다(애니메이터 119개 중 PeekABot·MortarBot·ChompBot·SpinnerBot·
+GauntletBot·WallBot·Paladin 뿐). 몬스터 그룹 인덱스를 되돌려 **둘 다 스폰**되게 한다.
+⚠️ 어느 인덱스가 어떻게 바뀌었는지는 **아직 실측 안 했다** — 착수 시 `MapGenConfig.MonsterGroups` 부터 확인한다.
+
+## 범위 밖 / 보류
+
+- **RangedTurret 물리 넉백 면역(`MonsterBase.OnKnockback` 오버라이드)** — 팀장이 지시했으나,
+  원인이 기각되면서 **지금 고칠 버그가 아니게 됐다.** 넣으면 거동 변경인데 관측 증상이 없다.
+  → 별도 판단 대기. 넣기로 하면 `LinearKnockback` 컴포넌트 삭제도 같이 한다(그래야 `Unit.cs:573`
+  의 `LogError` 가 안 뜬다).
+- `LinearKnockback` 의 `isKinematic` 복구 비대칭(`StartKnockback` 은 가드 밖, `EndKnockback` 은 가드 안) —
+  **실재하는 결함이지만 이 증상의 원인은 아니다.** `Unit/Weapon/` = **은희 영역**이라 건드리지 않는다. 공유만.
+
+## 검증 (완료 조건)
+
+1. Play 에서 터렛이 **여러 번 공격해도** `Column01~03` 로컬 회전이 `(0,0,0)` 유지 — MCP 로 수치 확인
+2. `HeadRotator` 만 타깃 방향으로 회전 · 루트 회전은 `(0,0,0)` 고정
+3. 플레이어가 **뒤에 있을 때** 머리가 돌아가서 쏜다(현재는 안 돌고 쏜다)
+4. 선딜 동안 레이저가 조준 방향으로 보이고 발사 후 꺼진다
+5. **대조군**: MortarBot 거동 무변화
+6. TeslaBot 이 실제로 스폰되고 1~4 를 동일하게 만족
+7. 콘솔 에러 0
+
+---
+
 # ❌ 취소된 PLAN — 퀘스트 영역 v1: 웨이브 봉쇄 퀘스트 (2026-09-09 작성, **2026-09-11 취소**)
 
 > 🔴 **착수하지 않았다.** 팀장 결정(2026-09-11)으로 다음 작업이 **보스 몬스터 패턴 추가**로
