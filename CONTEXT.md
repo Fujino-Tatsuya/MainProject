@@ -22,11 +22,36 @@ Update this file when a term becomes important enough that future agents or team
 포폴 자료 16개는 레포 밖으로 뺐고, **같은 폴더의 MCP 감사 도구 12개는 추적 중이라 레포에 남겼다.**
 `/output/` · `/.vscode/` · `/.claude/settings.local.json` 을 gitignore 에 추가했다.
 
-미처리 2건:
-- `ProjectSettings/NetcodeForGameObjects.asset` — 미추적. 전부 기본값이지만 미추적이면 팀원마다
-  각자 재생성된다. **네트워크 = 은희 영역**이라 커밋하지 않았다 → 공유·판단 필요.
-- `PortfolioPrintPrototype`(592MB · 38,612파일) · `PortfolioDraftUpdates`(71MB) — 레포 폴더 안에
-  있으나 이미 gitignore 대상. 커밋 위험은 없지만 `git status` 를 느리게 한다.
+### 레포 밖으로 옮긴 것 — 어디에 있는지 (2026-09-14 · Codex 교차검증 후 `c614c366`)
+
+| 대상 | 간 곳 |
+|---|---|
+| MCP 감사 증거 전체(09-08 ~ 09-11) | `TeamVault/MainProejectVault/04-report/mcp-audit-output/` |
+| 포폴 웹앱·초안·도구 | `C:/Users/user/Projects/PortfolioWork/` |
+| `tmp` · `Docs_Old` · `Generated` | `C:/Users/user/Projects/MainProjectArchive/` |
+
+`PortfolioPrintPrototype/node_modules`(38,467파일)만 삭제했다 — `npm ci` 로 재생성된다.
+나머지는 **삭제하지 않았다**: `Docs_Old` 344파일 중 172개, `Generated` 128파일 중 62개가
+Git 이력·외부 사본 어디에도 복구 근거가 없다(Codex 실측).
+
+⚠️ `scripts/` 의 감사 도구 11개가 기본 출력을 **레포 내 `output/`** 으로 잡고, 그중 4개는
+**기존 산출물을 읽는다**. 재실행하려면 `AUDIT_OUTPUT` 을 위 볼트 경로로 지정해야 한다.
+
+### 🔴 손대면 안 되는 것
+
+- **`.claude/worktrees` 3.5GB** — 15개 중 **10개가 `rc=128` 로 `git status` 자체가 실패**한다
+  (`.git` 파일이 옛 경로 `C:/Users/user/MainProject` 를 가리킨다). 읽히는 5개 중 4개에
+  미커밋 변경이 있다. **빈 출력을 "클린"으로 읽으면 안 된다**(교훈 #96).
+- **`TempToybox` 497MB** — `HEAD` 가 `refs/heads/.invalid` 인 중단된 clone 잔재로 보이나,
+  진행 중인 clone 프로세스 여부가 미확인이라 보류.
+- **`Assets/` 내 바이트 중복 파일** — GUID 참조 0건이어도 동적 로딩을 배제하지 못했다.
+
+미처리 1건:
+- `ProjectSettings/NetcodeForGameObjects.asset` — **미추적 유지**(팀장 지시). `ProjectSettings`
+  30개 중 이것만 빠져 있고 `.gitignore` 가 막는 것도 아니다(커밋 이력 0건 = 한 번도 add 안 됨).
+  이 설정이 가리키는 `Assets/DefaultNetworkPrefabs.asset`(프리팹 34개)은 추적 중이라,
+  **목록은 공유되는데 목록을 자동으로 채우는 스위치는 각자 로컬**인 상태다.
+  **네트워크 = 은희 영역** → 공유·판단 대기.
 
 ## ▶▶ 이전 인수인계 (2026-09-09 · 죽은 코드 정리 + 존 NetworkBehaviour 제거, 브랜치 `feature/Boss23`)
 
