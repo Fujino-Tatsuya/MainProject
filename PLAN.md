@@ -86,30 +86,80 @@
 
 ---
 
-# B. 물 — **추가 레퍼런스 대기**
+# B. 물 — `Custom/WaterDark` 를 **파라미터 주도**로 확장
 
-## 확정된 것
+## 확정된 것 (2026-09-14 팀장)
 
-- **물결과 색만** 레퍼런스에 맞춘다. 반사는 안 넣는다(팀장 판단) — 기존 셰이더의 설계 전제와 같다.
-- 기존 `AbyssWater` 룩을 **교체**한다(새 머티리얼 추가가 아니라).
-- 팀장이 **물을 위로 크게 올릴 예정**이다 — 구멍 아래로 깊이 내리지 않고, 맵 외곽 벽에 닿게 한다.
+- 레퍼런스 = **Flat Kit: Toon Shading and Water** (Dustyroom, $39.90). **사지 않는다.**
+  *"이 툴처럼 막 자세하게 하는 것까지는 아니어도 값 조정으로 유기적으로 대응"* 이 목표다.
+  → 즉 **결과 그림이 아니라 노브 구조를 베낀다.** 튜닝을 인스펙터에서 끝낼 수 있으면 성공이다.
+- **물결과 색**을 맞춘다. 반사는 넣지 않는다(기존 셰이더의 설계 전제와 같다).
+- 기존 `AbyssWater` 룩을 **교체**한다(머티리얼 추가가 아님).
+- 팀장이 **물을 위로 크게 올릴 예정** — 구멍 아래로 내리지 않고 맵 외곽 벽에 닿게 한다.
 
-## 현재 상태 (실측)
+## 레퍼런스에서 가져올 노브 (FlatKit 인스펙터 실제 구성)
 
-| 사실 | 값 |
+우리가 **넣을 것**과 **버릴 것**을 먼저 가른다. 전부 따라가면 이번 주에 안 끝난다.
+
+| 그룹 | FlatKit | 우리 |
+|---|---|---|
+| Colors | Shallow / Deep / Shallow depth / Gradient size / Transparency / Shadow strength | ✅ **Shallow·Deep·Shallow depth·Gradient size** — 이게 레퍼런스 그림의 8할이다 |
+| Crest | Color / Size / Sharp transition | ✅ **가장자리(물가) 띠** — 벽에 닿는 선이 살아야 물이 "차 있다"로 읽힌다 |
+| Wave geometry | Shape / Speed / Amplitude / Frequency / Direction / Noise | ⚠️ **버텍스 변위는 안 한다**(기존 금지 조항). 기존 fBm 흐름의 Speed·Scale·Strength 를 같은 이름으로 노출 |
+| Foam | Source / Color / Shore Depth / Shore Blending / Amount / Scale / Stretch XY / Sharpness / Speed / Direction | ✅ **Amount·Scale·Sharpness·Speed + Shore Depth·Blending**. Stretch XY·Direction 은 후순위 |
+| Refraction | Frequency / Amplitude / Speed / Scale | ❌ **안 한다** — 투명이 전제이고(아래 참고) 프레임 예산 밖 |
+
+레퍼런스 그림의 정체를 한 줄로: **깊이로 Shallow→Deep 색을 섞고, 그 위에 경계가 또렷한
+흰 거품 얼룩(gradient noise, Sharpness 0.855)을 흩뿌리고, 물가에 얇은 띠를 두른 것.**
+
+## 🔴 실측 — 깊이 기반 그라데이션이 **지금 큐에서도 가능하다**
+
+이게 이번 조사의 핵심이고, 계획을 통째로 바꾼다.
+
+| 사실 | 근거 |
 |---|---|
-| `AbyssWater` = 기본 Quad **1장짜리 거대 평면 2개** | 200×200 @ (500, **-19**, 11) / 330×330 @ (0, **-19**, 0) |
-| 머티리얼 | `Assets/3.Materials/Water/WaterDark.mat` → `Custom/WaterDark` (Unlit 1패스 불투명) |
-| 설계 전제(2026-07) | 반사·굴절·투명블렌딩·버텍스웨이브 **금지**(프레임 예산). Geometry 큐라서 포그 FoW/LoS 디밍이 물 위에도 걸린다 |
-| `_EdgeBrighten` | per-hole 쿼드용으로 만들어졌으나 평면 1장 구조라 **기본값 0 으로 죽어 있다** |
+| `WaterDark` 는 **패스가 1개뿐**이다 (ShadowCaster·DepthOnly·DepthNormals 없음) | `WaterDark.shader:51` 이 유일한 `Pass` |
+| SSAO 가 **불투명 이전**에 돌게 설정돼 있다 | `PC_Renderer.asset` — `AfterOpaque: 0`, `Source: 1` |
+| → 그래서 URP 가 **불투명 그리기 전에 뎁스(노멀) 프리패스**를 돌린다 | SSAO 가 `ConfigureInput(Depth/Normal)` 을 걸기 때문 |
+| → 물은 그 프리패스에 **안 들어간다**(패스가 없으므로) | 위 두 줄의 결과 |
 
-## 왜 지금 착수하지 않는가
+**따라서 물 셰이더가 `SampleSceneDepth` 를 하면 자기 자신이 아니라 _물 뒤에 있는 바닥·벽_ 의
+깊이가 나온다.** Transparent 큐로 옮기지 않고도 얕은 곳/깊은 곳을 구분할 수 있다는 뜻이다.
 
-레퍼런스의 "얕은 가장자리가 밝다"를 **지금 구조에선 옮길 대상이 없었다** — 물이 바닥 19m 아래라
-구멍으로만 보이고, 물과 맞닿는 지오메트리가 없어 씬 뎁스 기반 가장자리가 성립하지 않는다.
-**물을 올려 외곽 벽에 닿게 하면** 그 접선이 생기므로 그때는 가능해진다.
+⚠️ **확인 필요**: 프레임 디버거에서 프리패스 존재와 물의 부재를 눈으로 확인할 것.
+`m_DepthPrimingMode: 0` 이라 프리패스는 SSAO 가 유일한 근거다 — SSAO 를 끄면 이 전제가 무너진다.
+(그때는 셰이더에 `DepthOnly` 패스가 없다는 것만으로는 부족해지고, 가장자리가 통째로 사라진다.)
 
-**착수 조건 2개**: ① 추가 레퍼런스 사진(물결·색) ② 물 높이 확정.
+## 왜 Transparent 큐로 안 옮기는가 (측정된 대가)
+
+레퍼런스처럼 **투명·굴절**까지 가려면 Transparent 큐로 가야 하는데, 그러면 **포그가 물에 안 걸린다.**
+
+- `FogRendererFeature.cs:22` — 주입 시점이 **`BeforeRenderingTransparents`** 다.
+- `FullScreenFog.shader:46` — `SampleSceneDepth(uv)` 로 깊이를 읽는 풀스크린 패스다.
+- 즉 투명 큐의 물은 **포그가 그려진 뒤에** 그려지므로 FoW/LoS 디밍을 안 받는다.
+  → 안개 속에서 물만 또렷하게 보인다.
+
+포그 주입 시점을 옮기면 해결되지만 **그건 모든 투명 오브젝트(스킬 장판·VFX = 민경 영역)의
+포그 거동을 바꾼다.** 이번 작업 범위 밖이다.
+
+**결론: 불투명 유지.** 투명·굴절은 버리고, 깊이 그라데이션·거품·물가 띠로 간다.
+
+## 접근 (착수 시)
+
+1. `WaterDark.shader` 에 `SampleSceneDepth` 기반 **수심** 계산 추가 → `Shallow`/`Deep` 색 lerp.
+   노브: `_ShallowColor` `_DeepColor` `_ShallowDepth` `_GradientSize`.
+2. **물가 띠**(Crest): 수심이 0 에 가까운 구간에 얇은 밝은 선. 노브: 색·굵기·경계 날카로움.
+3. **거품**(Foam): 기존 fBm 을 재활용하되 `Sharpness` 로 계단을 세워 레퍼런스의 얼룩 모양을 낸다.
+   노브: `_FoamAmount` `_FoamScale` `_FoamSharpness` `_FoamSpeed` + 물가 전용 `_ShoreDepth`.
+4. 기존 파라미터(`_FlowSpeed1/2` `_FlowScale1/2` `_DepthDrift*`)는 **이름만 그룹으로 정리**하고 유지 —
+   지우면 `WaterDark.mat` 의 기존 튜닝이 날아간다.
+5. `WaterDark.mat` 값을 레퍼런스에 맞춰 재조정(팀장이 Play 로 최종 확정).
+
+## 착수 조건
+
+- ✅ 레퍼런스 확보(FlatKit 인스펙터 4장)
+- ⬜ **물 높이 확정** — 어디까지 올릴지. 수심 그라데이션의 기준이라 이 값이 없으면 튜닝이 헛돈다.
+- ⬜ 프레임 디버거로 뎁스 프리패스 확인(위 ⚠️)
 
 ---
 
