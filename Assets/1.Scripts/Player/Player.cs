@@ -499,24 +499,23 @@ public class Player : Unit
         }
         else
         {
-            bool enableNetworkTransform;
-            if (IsServer && IsOwner)
-            {
-                // 호스트 자기 캐릭터: 서버 권위 결과를 다른 피어에 송신해야 하므로 NT를 유지한다.
-                enableNetworkTransform = true;
-            }
-            else if (IsOwner)
-            {
-                // 클라이언트 자기 캐릭터: 서버 NT가 로컬 예측 위치를 덮어쓰지 않도록 NT만 끈다.
-                enableNetworkTransform = false;
-            }
-            else
-            {
-                // 남의 캐릭터: 서버 확정 상태를 NT 보간으로 표시해야 하므로 NT를 유지한다.
-                enableNetworkTransform = true;
-            }
-
-            networkTransform.enabled = enableNetworkTransform;
+            // 🔴 b3(예측·되감기·재생·보정)가 들어오기 전까지 **전 인스턴스에서 NT를 켜 둔다.**
+            //
+            // 2026-09-15 에 "클라이언트 자기 캐릭터만 NT를 끄면 로컬 예측이 안 지워진다"고 껐다가
+            // 되돌렸다. 껐을 때 실제로 벌어진 일:
+            //   - 클라는 보정 없는 순수 로컬 예측으로 굴러가고
+            //   - 서버는 받은 입력으로 자기 시뮬레이션을 굴리며
+            //   - 둘을 맞춰주는 장치가 없어 자유롭게 발산한다.
+            // 벽·상자를 만나면 갈라짐이 급격히 커져서, 호스트 화면에서는 그 플레이어가 상자에 박혀
+            // 있는데 정작 그 클라는 전혀 다른 곳을 걸어다니는 상태가 됐다.
+            //
+            // 즉 NT의 덮어쓰기는 "입력 지연이라는 비용"이기만 한 게 아니라, **b3 이전까지 클라와
+            // 서버의 위치를 일치시켜 주는 유일한 장치**다. 보정이 생기기 전에 끄면 안 된다.
+            // 대가로 오너에게 RTT 만큼의 입력 지연이 보인다 — 그건 b3 가 회수한다.
+            //
+            // b3 착수 시 여기를 다시 `!(IsOwner && !IsServer)` 로 바꾸고, 같은 커밋에서
+            // 서버→오너 보정 채널(되감기+재생)을 반드시 함께 넣어야 한다. 둘은 한 세트다.
+            networkTransform.enabled = true;
         }
 
         LogMovementAuthorityState(reason);
