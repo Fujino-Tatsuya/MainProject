@@ -139,7 +139,7 @@ MonoBehaviour:
   minimumVisibleSeconds: 5
   readyMessageSeconds: 2.5
   requireLobbyReadyToStart: 1
-  defaultPlayerPrefab: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+  defaultPlayerPrefab: {fileID: 6077492126708577103, guid: af4a760f53d82b64f8369a09c962374c, type: 3}
   debugLogging: 1
   spawn_Offset: {x: 0, y: 10, z: 0}
 --- !u!114 &1111111111111111111
