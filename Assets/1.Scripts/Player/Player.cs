@@ -72,6 +72,15 @@ public class Player : Unit
     private int reconDiscardedSampleCount;
     private int reconSequenceBreakSampleCount;
 
+    // 서버가 원격 플레이어를 왜 못 움직이는지 한 줄로 답하기 위한 마지막 틱 스냅샷.
+    // SimulateWalking이 0을 내는 조건은 !CanMove 또는 !HasMoveInput 둘뿐이고, 그 외에 안 움직이면
+    // 스윕이 막은 것이다. 이 셋을 구분하려면 시뮬레이션 직후 값을 들고 있어야 한다.
+    private Vector3 lastServerSimPosition;
+    private Vector2 lastServerSimDirection;
+    private bool lastServerSimHasMoveInput;
+    private bool lastServerSimGrounded;
+    private bool lastServerSimBlocked;
+
     // 서버가 다음에 받기를 기대하는 입력 틱. 발산 비교는 "입력 N 을 소비한 뒤"의 두 상태를 맞대는 것이라
     // 입력 시퀀스가 끊기면(폐기·기아 반복·갭) 서버 상태가 더 이상 "입력 N 까지 소비한 결과"가 아니게 된다.
     private long expectedServerInputTick;
@@ -664,6 +673,12 @@ public class Player : Unit
             return false;
         }
 
+        lastServerSimPosition = serverState.Position;
+        lastServerSimDirection = inputForTick.Input.MoveDirection;
+        lastServerSimHasMoveInput = inputForTick.Input.HasMoveInput;
+        lastServerSimGrounded = serverState.IsGrounded;
+        lastServerSimBlocked = serverState.WasBlockedThisTick;
+
         // [Recon]은 실제 수신 샘플만 대상으로 하며 반복 입력에는 클라이언트의 같은 틱 보고가 없다.
         if (receivedFreshInput)
         {
@@ -840,10 +855,22 @@ public class Player : Unit
         NetworkClock clock = NetworkClock.Instance;
         string sent = IsOwner ? movementRpcSentCount.ToString() : "n/a";
         string received = IsServer ? movementRpcReceivedCount.ToString() : "n/a";
+
+        // 서버가 남의 캐릭터를 시뮬레이션하는 경우에만 "왜 안 움직이는가"를 함께 찍는다.
+        // 판정법: hasMove=False 면 입력이 안 실려온 것, canMove=False 면 상태 머신이 막은 것,
+        // 둘 다 True 인데 pos 가 안 변하면 스윕이 막은 것(blocked 로 확인).
+        string serverSim = IsServer && !IsOwner
+            ? $", srvPos={lastServerSimPosition.x:F2}/{lastServerSimPosition.y:F2}/{lastServerSimPosition.z:F2}" +
+              $", dir={lastServerSimDirection.x:F2}/{lastServerSimDirection.y:F2}" +
+              $", hasMove={lastServerSimHasMoveInput}, canMove={(stateController != null && stateController.CanMove)}" +
+              $", state={(stateController != null ? stateController.CurrentState.ToString() : "missing")}" +
+              $", grounded={lastServerSimGrounded}, blocked={lastServerSimBlocked}"
+            : string.Empty;
+
         Edit.Log(
             $"[MoveDiag] RPC 1s summary: {MovementDiagnosticIdentity()}, sent={sent}, " +
             $"received={received}, queued={serverRawInputQueue.Count}, droppedInputsTotal={droppedServerInputCount}, " +
-            $"motorTicks={motor?.MovementDiagnosticTickCount ?? 0}, " +
+            $"motorTicks={motor?.MovementDiagnosticTickCount ?? 0}{serverSim}, " +
             $"clock={(clock != null ? "present" : "missing")}/running={clock != null && clock.IsRunning}" +
             $"/mainStarted={clock != null && clock.HasMainGameStarted}",
             this);
