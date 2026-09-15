@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Unity.Netcode;
@@ -12,6 +13,8 @@ using Unity.Netcode;
 public class Player : Unit
 {
     private static readonly int IsMovingHash = Animator.StringToHash("IsMoving");
+    private const float ReconciliationHistorySeconds = 0.5f;
+    private const double ReconciliationLogIntervalSeconds = 1.0;
 
     /// <summary>이 클라이언트가 조작하는 플레이어. HUD 등 로컬 UI 바인딩용.</summary>
     public static Player LocalPlayer { get; private set; }
@@ -47,6 +50,32 @@ public class Player : Unit
     private PlayerMotor motor;
     private PlayerGroundingSensor groundingSensor;
     private PlayerInvulnerability invulnerability;
+    private PlayerTickRingBuffer<PlayerRawSimulationInput> ownerRawInputHistory;
+    private PlayerTickRingBuffer<PlayerSimulationState> ownerSimulationStateHistory;
+    private readonly Queue<ServerRawSimulationInput> serverRawInputQueue =
+        new Queue<ServerRawSimulationInput>();
+
+    private int reconSampleCount;
+    private double reconDivergenceSum;
+    private float reconMaxDivergence;
+    private double reconWindowStartedAt;
+    private long reconWindowFirstTick;
+    private long reconWindowLastTick;
+    private long reconWindowLastServerTick;
+
+    private readonly struct ServerRawSimulationInput
+    {
+        public ServerRawSimulationInput(long tick, PlayerRawSimulationInput input, double rttSeconds)
+        {
+            Tick = tick;
+            Input = input;
+            RttSeconds = rttSeconds;
+        }
+
+        public long Tick { get; }
+        public PlayerRawSimulationInput Input { get; }
+        public double RttSeconds { get; }
+    }
 
     public PlayerActionState CurrentState => stateController != null ? stateController.CurrentState : PlayerActionState.Idle;
     public bool CanMove => stateController == null || stateController.CanMove;
@@ -72,11 +101,22 @@ public class Player : Unit
 
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
+
+        int historyCapacity = PlayerTickRingBuffer<PlayerSimulationState>.CapacityForSeconds(
+            ReconciliationHistorySeconds,
+            Time.fixedDeltaTime);
+        ownerRawInputHistory = new PlayerTickRingBuffer<PlayerRawSimulationInput>(historyCapacity);
+        ownerSimulationStateHistory = new PlayerTickRingBuffer<PlayerSimulationState>(historyCapacity);
+
+        if (motor != null)
+            motor.SimulationCompleted += HandleOwnerSimulationCompleted;
     }
 
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
+
+        ResetReconciliationObservation();
 
         // 내가 Owner인 플레이어가 스폰되면, 카메라 매니저에게 나를 따라오라고 알린다.
         if (IsOwner)
@@ -110,7 +150,13 @@ public class Player : Unit
             SetLocalPlayer(null);
 
         if (motor != null)
+        {
+            motor.ResetServerObservation();
             motor.enabled = false;
+        }
+        ownerRawInputHistory?.Clear();
+        ownerSimulationStateHistory?.Clear();
+        serverRawInputQueue.Clear();
         base.OnNetworkDespawn();
     }
 
@@ -155,6 +201,9 @@ public class Player : Unit
         if (LocalPlayer == this)
             SetLocalPlayer(null);
 
+        if (motor != null)
+            motor.SimulationCompleted -= HandleOwnerSimulationCompleted;
+
         base.OnDestroy();
     }
 
@@ -173,7 +222,7 @@ public class Player : Unit
     {
         // 이동 플랫폼 캐리는 이동 권한 피어(오너/오프라인)에서만 적용한다.
         // 비오너는 루트 NetworkTransform으로 이미 동기되므로 여기서 적용하면 이중 적용된다.
-        if (IsMovementAuthority)
+        if (IsMovementAuthority || (IsNetworkActive && IsServer))
         {
             ApplyPlatformCarry();
         }
@@ -183,6 +232,10 @@ public class Player : Unit
         {
             stateController.FixedTick();
         }
+
+        // 네트워크 Update에서 도착한 raw 입력은 서버 물리 틱 파이프라인에서만 소비한다.
+        if (IsNetworkActive && IsServer)
+            ProcessServerObservationInputs();
     }
 
     /// <summary>발밑에 캐리 표면이 있으면 그 이동량을 플레이어 이동에 가산한다.</summary>
@@ -378,6 +431,180 @@ public class Player : Unit
     {
         if (motor != null)
             motor.enabled = IsMovementAuthority;
+    }
+
+    private void HandleOwnerSimulationCompleted(
+        PlayerRawSimulationInput rawInput,
+        PlayerSimulationState resultState)
+    {
+        NetworkClock clock = NetworkClock.Instance;
+        if (!IsSpawned || !IsOwner || clock == null || !clock.IsRunning || !clock.HasMainGameStarted)
+            return;
+
+        long tick = CurrentSharedSimulationTick();
+
+        // b2의 되감기/재생 입력과 서버 비교 대상. 동일 틱은 마지막 물리 호출 결과로 교체된다.
+        ownerRawInputHistory.Store(tick, rawInput);
+        ownerSimulationStateHistory.Store(tick, resultState);
+
+        // NGO RPC 시그니처에서는 DTO를 펼치지만 전송 값은 raw 구조체의 두 필드뿐이다.
+        SubmitMovementInputServerRpc(
+            tick,
+            rawInput.MoveDirection.x,
+            rawInput.MoveDirection.y,
+            rawInput.HasMoveInput);
+    }
+
+    [ServerRpc] // RequireOwnership 기본값 true. 서버는 raw 외의 게이트/배율/변위를 받지 않는다.
+    private void SubmitMovementInputServerRpc(
+        long tick,
+        float moveX,
+        float moveY,
+        bool hasMoveInput,
+        ServerRpcParams rpcParams = default)
+    {
+        ulong senderClientId = rpcParams.Receive.SenderClientId;
+        if (senderClientId != OwnerClientId)
+        {
+            Edit.LogWarning(
+                $"[Recon] raw 입력 거부: sender={senderClientId}, owner={OwnerClientId}, tick={tick}",
+                this);
+            return;
+        }
+
+        Vector2 direction = new Vector2(moveX, moveY);
+        if (!IsFinite(direction))
+        {
+            Edit.LogWarning($"[Recon] 비정상 raw 입력을 0으로 대체: owner={OwnerClientId}, tick={tick}", this);
+            direction = Vector2.zero;
+            hasMoveInput = false;
+        }
+        else
+        {
+            // 키보드 대각선은 (1, 1)일 수 있으므로 벡터 크기를 1로 정규화하면 오너 입력과 달라진다.
+            // 축 범위만 제한하고 HasMoveInput은 InputReader가 만든 raw 플래그 그대로 사용한다.
+            direction.x = Mathf.Clamp(direction.x, -1f, 1f);
+            direction.y = Mathf.Clamp(direction.y, -1f, 1f);
+        }
+
+        serverRawInputQueue.Enqueue(new ServerRawSimulationInput(
+            tick,
+            new PlayerRawSimulationInput(direction, hasMoveInput),
+            GetSenderRttSeconds(senderClientId)));
+    }
+
+    private void ProcessServerObservationInputs()
+    {
+        if (motor == null)
+        {
+            serverRawInputQueue.Clear();
+            return;
+        }
+
+        while (serverRawInputQueue.Count > 0)
+        {
+            ServerRawSimulationInput queued = serverRawInputQueue.Dequeue();
+            if (!motor.TrySimulateServerObservation(
+                    queued.Input,
+                    Time.fixedDeltaTime,
+                    out PlayerSimulationState serverState))
+            {
+                continue;
+            }
+
+            float divergence = Vector3.Distance(serverState.Position, motor.Position);
+            RecordReconciliationSample(
+                queued.Tick,
+                CurrentSharedSimulationTick(),
+                divergence,
+                queued.RttSeconds);
+        }
+    }
+
+    private void RecordReconciliationSample(
+        long inputTick,
+        long serverTick,
+        float divergence,
+        double rttSeconds)
+    {
+        double now = NetworkClock.Instance != null
+            ? NetworkClock.Instance.MainGameElapsed
+            : 0.0;
+
+        if (reconSampleCount == 0)
+        {
+            reconWindowStartedAt = now;
+            reconWindowFirstTick = inputTick;
+        }
+
+        reconSampleCount++;
+        reconDivergenceSum += divergence;
+        reconMaxDivergence = Mathf.Max(reconMaxDivergence, divergence);
+        reconWindowLastTick = inputTick;
+        reconWindowLastServerTick = serverTick;
+
+        if (now - reconWindowStartedAt < ReconciliationLogIntervalSeconds)
+            return;
+
+        double average = reconDivergenceSum / reconSampleCount;
+        Edit.Log(
+            $"[Recon] owner={OwnerClientId} inputTicks={reconWindowFirstTick}..{reconWindowLastTick} " +
+            $"serverTick={reconWindowLastServerTick} lagTicks={reconWindowLastServerTick - reconWindowLastTick} " +
+            $"samples={reconSampleCount} divergence avg={average:F3}m max={reconMaxDivergence:F3}m " +
+            $"RTT={rttSeconds * 1000.0:F1}ms (관측 전용, 보정 없음)",
+            this);
+
+        reconSampleCount = 0;
+        reconDivergenceSum = 0.0;
+        reconMaxDivergence = 0f;
+        reconWindowStartedAt = now;
+    }
+
+    private double GetSenderRttSeconds(ulong senderClientId)
+    {
+        if (NetworkManager == null ||
+            senderClientId == NetworkManager.ServerClientId ||
+            senderClientId == NetworkManager.LocalClientId)
+        {
+            return 0.0;
+        }
+
+        var transport = NetworkManager.NetworkConfig != null
+            ? NetworkManager.NetworkConfig.NetworkTransport
+            : null;
+        if (transport == null)
+            return 0.0;
+
+        return System.Math.Max(0.0, transport.GetCurrentRtt(senderClientId) / 1000.0);
+    }
+
+    private static long CurrentSharedSimulationTick()
+    {
+        NetworkClock clock = NetworkClock.Instance;
+        return PlayerSimulationTick.FromMainGameElapsed(
+            clock != null ? clock.MainGameElapsed : 0.0,
+            Time.fixedDeltaTime);
+    }
+
+    private void ResetReconciliationObservation()
+    {
+        ownerRawInputHistory?.Clear();
+        ownerSimulationStateHistory?.Clear();
+        serverRawInputQueue.Clear();
+        motor?.ResetServerObservation();
+        reconSampleCount = 0;
+        reconDivergenceSum = 0.0;
+        reconMaxDivergence = 0f;
+        reconWindowStartedAt = 0.0;
+        reconWindowFirstTick = 0L;
+        reconWindowLastTick = 0L;
+        reconWindowLastServerTick = 0L;
+    }
+
+    private static bool IsFinite(Vector2 value)
+    {
+        return !float.IsNaN(value.x) && !float.IsInfinity(value.x) &&
+               !float.IsNaN(value.y) && !float.IsInfinity(value.y);
     }
 
     public void NotifyKnockbackEnded()

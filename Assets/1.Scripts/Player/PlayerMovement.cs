@@ -45,7 +45,19 @@ public class PlayerMovement : MonoBehaviour
         rotate_Speed = 10f;
     }
 
-    internal PlayerSimulationInput CaptureSimulationInput()
+    /// <summary>오너 입력 장치에서 서버로 보낼 수 있는 raw 값만 캡처한다.</summary>
+    internal PlayerRawSimulationInput CaptureRawSimulationInput()
+    {
+        return new PlayerRawSimulationInput(
+            reader != null ? reader.Direction : Vector2.zero,
+            reader != null && reader.HasMoveInput);
+    }
+
+    /// <summary>
+    /// raw 입력에 이 피어가 보유한 상태 머신/Soul/서버 권위 상태이상을 합쳐 전체 시뮬레이션 입력을 만든다.
+    /// 서버 관측 경로도 이 메서드를 사용하므로 raw DTO에 권위 값을 추가하지 않는다.
+    /// </summary>
+    internal PlayerSimulationInput CaptureSimulationInput(PlayerRawSimulationInput rawInput)
     {
         float fixedMoveSpeed = 0f;
         bool hasFixedMoveSpeed =
@@ -58,8 +70,8 @@ public class PlayerMovement : MonoBehaviour
 
         return new PlayerSimulationInput
         {
-            MoveDirection = reader != null ? reader.Direction : Vector2.zero,
-            HasMoveInput = reader != null && reader.HasMoveInput,
+            MoveDirection = rawInput.MoveDirection,
+            HasMoveInput = rawInput.HasMoveInput,
             CanMove = player == null || player.CanMove,
             CanRotate = player == null || player.CanMovementRotate,
             HasFixedMoveSpeed = hasFixedMoveSpeed,

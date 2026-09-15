@@ -29,6 +29,7 @@ public sealed class PlayerMotor : MonoBehaviour
     private CapsuleCollider capsule;
     private PlayerGroundingSensor grounding;
     private PlayerMovement movement;
+    private Player player;
     private RuntimeMotionResolver motionResolver;
 
     private Vector3 pendingVelocity;
@@ -41,8 +42,19 @@ public sealed class PlayerMotor : MonoBehaviour
     private MotorMode mode;
     private PlayerSimulationState simulationState;
 
+    // 서버의 관측 전용 병행 시뮬레이션은 실제 Motor 상태/Transform과 완전히 분리한다.
+    private Vector3 serverPendingVelocity;
+    private Vector3 serverPendingGroundedDisplacement;
+    private Vector3 serverPendingDisplacement;
+    private Vector3 serverPendingPosePosition;
+    private Quaternion serverPendingPoseRotation;
+    private bool serverHasPendingPose;
+    private bool hasServerObservationState;
+    private PlayerSimulationState serverObservationState;
+
     public bool WasBlockedThisTick => simulationState.WasBlockedThisTick;
     public event System.Action<Vector3, Vector3, bool> MovementResolved;
+    public event System.Action<PlayerRawSimulationInput, PlayerSimulationState> SimulationCompleted;
 
     public Vector3 Position => playerRigidbody != null ? playerRigidbody.position : transform.position;
     public float VerticalVelocity => simulationState.VerticalVelocity;
@@ -51,12 +63,18 @@ public sealed class PlayerMotor : MonoBehaviour
     public MotorMode Mode => mode;
     public PlayerGameRuleData GameRule => gameRule;
     public PlayerSimulationState SimulationState => simulationState;
+    internal PlayerSimulationState ServerObservationState => serverObservationState;
+
+    private bool CapturesServerObservation =>
+        player != null && player.IsSpawned && player.IsServer;
 
     /// <summary>이번 물리 틱에 적용할 월드 속도(m/s)를 더한다.</summary>
     public void AddVelocity(Vector3 worldVelocity)
     {
         if (isActiveAndEnabled)
             pendingVelocity += worldVelocity;
+        if (CapturesServerObservation)
+            serverPendingVelocity += worldVelocity;
     }
 
     /// <summary>플랫폼 캐리·루트모션 같은 월드 변위(m)를 더한다. 경사 투영하지 않는다.</summary>
@@ -64,6 +82,8 @@ public sealed class PlayerMotor : MonoBehaviour
     {
         if (isActiveAndEnabled)
             pendingDisplacement += worldDelta;
+        if (CapturesServerObservation)
+            serverPendingDisplacement += worldDelta;
     }
 
     /// <summary>
@@ -72,7 +92,7 @@ public sealed class PlayerMotor : MonoBehaviour
     /// </summary>
     public void AddGroundedDisplacement(Vector3 worldDelta)
     {
-        if (!isActiveAndEnabled)
+        if (!isActiveAndEnabled && !CapturesServerObservation)
             return;
 
         if (!warnedNonPlanarGroundedDisplacement &&
@@ -85,18 +105,31 @@ public sealed class PlayerMotor : MonoBehaviour
                 "수직 성분은 AddDisplacement로 따로 제출하세요.", this);
         }
 
-        pendingGroundedDisplacement += worldDelta;
+        if (isActiveAndEnabled)
+            pendingGroundedDisplacement += worldDelta;
+        if (CapturesServerObservation)
+            serverPendingGroundedDisplacement += worldDelta;
     }
 
     /// <summary>구속 추종용 절대 포즈. 같은 틱에는 마지막 값이 이기고 다른 이동보다 우선한다.</summary>
     public void SetPoseTarget(Vector3 worldPosition, Quaternion worldRotation)
     {
-        if (!isActiveAndEnabled)
+        if (!isActiveAndEnabled && !CapturesServerObservation)
             return;
 
-        pendingPosePosition = worldPosition;
-        pendingPoseRotation = worldRotation;
-        hasPendingPose = true;
+        if (isActiveAndEnabled)
+        {
+            pendingPosePosition = worldPosition;
+            pendingPoseRotation = worldRotation;
+            hasPendingPose = true;
+        }
+
+        if (CapturesServerObservation)
+        {
+            serverPendingPosePosition = worldPosition;
+            serverPendingPoseRotation = worldRotation;
+            serverHasPendingPose = true;
+        }
     }
 
     public void SetGravityEnabled(bool enabled)
@@ -105,12 +138,25 @@ public sealed class PlayerMotor : MonoBehaviour
         if (!enabled)
             simulationState.VerticalVelocity = 0f;
 
+        if (hasServerObservationState)
+        {
+            serverObservationState.GravityEnabled = enabled;
+            if (!enabled)
+                serverObservationState.VerticalVelocity = 0f;
+        }
+
         if (mode == MotorMode.Dynamic && playerRigidbody != null)
             playerRigidbody.useGravity = enabled;
     }
 
-    public void SetKnockbackVelocity(Vector3 velocity) => simulationState.KnockbackVelocity = velocity;
-    public void ClearKnockbackVelocity() => simulationState.KnockbackVelocity = Vector3.zero;
+    public void SetKnockbackVelocity(Vector3 velocity)
+    {
+        simulationState.KnockbackVelocity = velocity;
+        if (hasServerObservationState)
+            serverObservationState.KnockbackVelocity = velocity;
+    }
+
+    public void ClearKnockbackVelocity() => SetKnockbackVelocity(Vector3.zero);
 
     public void SetDashMotion(Vector3 direction, float speed, float remainingTime)
     {
@@ -120,6 +166,13 @@ public sealed class PlayerMotor : MonoBehaviour
             : Vector3.zero;
         simulationState.DashSpeed = Mathf.Max(0f, speed);
         simulationState.DashRemainingTime = Mathf.Max(0f, remainingTime);
+
+        if (hasServerObservationState)
+        {
+            serverObservationState.DashDirection = simulationState.DashDirection;
+            serverObservationState.DashSpeed = simulationState.DashSpeed;
+            serverObservationState.DashRemainingTime = simulationState.DashRemainingTime;
+        }
     }
 
     public void ClearDashMotion()
@@ -127,6 +180,13 @@ public sealed class PlayerMotor : MonoBehaviour
         simulationState.DashDirection = Vector3.zero;
         simulationState.DashSpeed = 0f;
         simulationState.DashRemainingTime = 0f;
+
+        if (hasServerObservationState)
+        {
+            serverObservationState.DashDirection = Vector3.zero;
+            serverObservationState.DashSpeed = 0f;
+            serverObservationState.DashRemainingTime = 0f;
+        }
     }
 
     public void SynchronizeArmatureRotation(Quaternion rotation, bool? hasRotate = null)
@@ -134,6 +194,13 @@ public sealed class PlayerMotor : MonoBehaviour
         simulationState.ArmatureRotation = rotation;
         if (hasRotate.HasValue)
             simulationState.HasRotate = hasRotate.Value;
+
+        if (hasServerObservationState)
+        {
+            serverObservationState.ArmatureRotation = rotation;
+            if (hasRotate.HasValue)
+                serverObservationState.HasRotate = hasRotate.Value;
+        }
     }
 
     public void SetMode(MotorMode nextMode)
@@ -166,6 +233,7 @@ public sealed class PlayerMotor : MonoBehaviour
         capsule = GetComponent<CapsuleCollider>();
         grounding = GetComponent<PlayerGroundingSensor>();
         movement = GetComponent<PlayerMovement>();
+        player = GetComponent<Player>();
         motionResolver = new RuntimeMotionResolver(this);
         mode = playerRigidbody != null && !playerRigidbody.isKinematic
             ? MotorMode.Dynamic
@@ -202,8 +270,11 @@ public sealed class PlayerMotor : MonoBehaviour
     {
         CaptureSceneState();
 
+        PlayerRawSimulationInput rawInput = movement != null
+            ? movement.CaptureRawSimulationInput()
+            : default;
         PlayerSimulationInput input = movement != null
-            ? movement.CaptureSimulationInput()
+            ? movement.CaptureSimulationInput(rawInput)
             : new PlayerSimulationInput { MoveSpeedMultiplier = 1f };
         input.AddedVelocity = pendingVelocity;
         input.GroundedDisplacement = pendingGroundedDisplacement;
@@ -212,21 +283,7 @@ public sealed class PlayerMotor : MonoBehaviour
         input.PosePosition = pendingPosePosition;
         input.PoseRotation = pendingPoseRotation;
 
-        PlayerSimulationSettings settings = movement != null
-            ? movement.CaptureSimulationSettings()
-            : default;
-        settings.GravityY = Physics.gravity.y;
-        settings.MaxFallSpeed = gameRule != null ? gameRule.MaxFallSpeed : DefaultMaxFallSpeed;
-        settings.KnockbackDeceleration = gameRule != null
-            ? gameRule.KnockbackDeceleration
-            : DefaultKnockbackDeceleration;
-        settings.StepOffset = gameRule != null ? gameRule.StepOffset : DefaultStepOffset;
-        settings.MaxWalkableSlopeAngle = gameRule != null
-            ? gameRule.MaxWalkableSlopeAngle
-            : DefaultMaxWalkableSlopeAngle;
-        settings.ObstacleMask = ResolveObstacleMask();
-        settings.CollisionSkin = collisionSkin;
-        settings.MaxSweepIterations = maxSweepIterations;
+        PlayerSimulationSettings settings = CaptureSimulationSettings(simulationState.IsSoul);
 
         PlayerSimulationResult result = PlayerMovementSimulation.Simulate(
             simulationState, input, settings, motionResolver, deltaTime);
@@ -247,21 +304,113 @@ public sealed class PlayerMotor : MonoBehaviour
             if (result.ResolvedDelta.sqrMagnitude > 0f)
                 ApplyRigidbodyPose(simulationState.Position, default, false);
         }
+
+        SimulationCompleted?.Invoke(rawInput, simulationState);
+    }
+
+    /// <summary>
+    /// 서버가 받은 raw 입력을 서버 자신의 게이트/배율/게임 로직 산출물과 합쳐 병행 계산한다.
+    /// 결과는 관측 상태에만 저장하며 Rigidbody, Transform, Movement 상태, 이벤트에는 적용하지 않는다.
+    /// </summary>
+    internal bool TrySimulateServerObservation(
+        PlayerRawSimulationInput rawInput,
+        float deltaTime,
+        out PlayerSimulationState resultState)
+    {
+        resultState = default;
+        if (!CapturesServerObservation || mode == MotorMode.Dynamic)
+            return false;
+
+        if (!hasServerObservationState)
+        {
+            serverObservationState = simulationState;
+            CaptureSceneState(ref serverObservationState, true);
+            serverObservationState.WasBlockedThisTick = false;
+            hasServerObservationState = true;
+        }
+        else
+        {
+            // 위치/회전은 관측 상태를 누적하고, 접지처럼 서버가 매 틱 직접 아는 환경 값만 갱신한다.
+            CaptureSceneState(ref serverObservationState, false);
+        }
+
+        PlayerSimulationInput input = movement != null
+            ? movement.CaptureSimulationInput(rawInput)
+            : new PlayerSimulationInput
+            {
+                MoveDirection = rawInput.MoveDirection,
+                HasMoveInput = rawInput.HasMoveInput,
+                MoveSpeedMultiplier = 1f
+            };
+        input.AddedVelocity = serverPendingVelocity;
+        input.GroundedDisplacement = serverPendingGroundedDisplacement;
+        input.Displacement = serverPendingDisplacement;
+        input.HasPoseTarget = serverHasPendingPose;
+        input.PosePosition = serverPendingPosePosition;
+        input.PoseRotation = serverPendingPoseRotation;
+
+        PlayerSimulationResult result = PlayerMovementSimulation.Simulate(
+            serverObservationState,
+            input,
+            CaptureSimulationSettings(serverObservationState.IsSoul),
+            motionResolver,
+            deltaTime);
+
+        ClearServerPendingMotion();
+        serverObservationState = result.State;
+        resultState = serverObservationState;
+        return true;
+    }
+
+    internal void ResetServerObservation()
+    {
+        hasServerObservationState = false;
+        serverObservationState = default;
+        ClearServerPendingMotion();
+    }
+
+    private PlayerSimulationSettings CaptureSimulationSettings(bool isSoul)
+    {
+        PlayerSimulationSettings settings = movement != null
+            ? movement.CaptureSimulationSettings()
+            : default;
+        settings.GravityY = Physics.gravity.y;
+        settings.MaxFallSpeed = gameRule != null ? gameRule.MaxFallSpeed : DefaultMaxFallSpeed;
+        settings.KnockbackDeceleration = gameRule != null
+            ? gameRule.KnockbackDeceleration
+            : DefaultKnockbackDeceleration;
+        settings.StepOffset = gameRule != null ? gameRule.StepOffset : DefaultStepOffset;
+        settings.MaxWalkableSlopeAngle = gameRule != null
+            ? gameRule.MaxWalkableSlopeAngle
+            : DefaultMaxWalkableSlopeAngle;
+        settings.ObstacleMask = ResolveObstacleMask(isSoul);
+        settings.CollisionSkin = collisionSkin;
+        settings.MaxSweepIterations = maxSweepIterations;
+        return settings;
     }
 
     private void CaptureSceneState()
     {
-        simulationState.Position = playerRigidbody != null ? playerRigidbody.position : transform.position;
-        simulationState.RootRotation = playerRigidbody != null ? playerRigidbody.rotation : transform.rotation;
-        if (movement != null)
-            simulationState.ArmatureRotation = movement.ArmatureRotation;
-        simulationState.IsGrounded = grounding != null && grounding.IsGrounded;
-        simulationState.GroundNormal = grounding != null ? grounding.GroundNormal : Vector3.up;
-        simulationState.GroundSurfaceDistance = grounding != null ? grounding.GroundSurfaceDistance : 0f;
-        simulationState.IsSoul = grounding != null && grounding.Mode == PlayerGroundingSensor.GroundingMode.Soul;
+        CaptureSceneState(ref simulationState, true);
     }
 
-    private LayerMask ResolveObstacleMask()
+    private void CaptureSceneState(ref PlayerSimulationState state, bool capturePose)
+    {
+        if (capturePose)
+        {
+            state.Position = playerRigidbody != null ? playerRigidbody.position : transform.position;
+            state.RootRotation = playerRigidbody != null ? playerRigidbody.rotation : transform.rotation;
+            if (movement != null)
+                state.ArmatureRotation = movement.ArmatureRotation;
+        }
+
+        state.IsGrounded = grounding != null && grounding.IsGrounded;
+        state.GroundNormal = grounding != null ? grounding.GroundNormal : Vector3.up;
+        state.GroundSurfaceDistance = grounding != null ? grounding.GroundSurfaceDistance : 0f;
+        state.IsSoul = grounding != null && grounding.Mode == PlayerGroundingSensor.GroundingMode.Soul;
+    }
+
+    private LayerMask ResolveObstacleMask(bool isSoul)
     {
         int mask = gameRule != null
             ? gameRule.ObstacleMask.value
@@ -271,7 +420,7 @@ public sealed class PlayerMotor : MonoBehaviour
 
         mask &= ~playerBit;
         mask &= ~soulBit;
-        if (!simulationState.IsSoul && gameRule != null && gameRule.BlockOtherPlayers)
+        if (!isSoul && gameRule != null && gameRule.BlockOtherPlayers)
             mask |= playerBit;
 
         return mask;
@@ -297,6 +446,14 @@ public sealed class PlayerMotor : MonoBehaviour
         pendingDisplacement = Vector3.zero;
         hasPendingPose = false;
         simulationState.WasBlockedThisTick = false;
+    }
+
+    private void ClearServerPendingMotion()
+    {
+        serverPendingVelocity = Vector3.zero;
+        serverPendingGroundedDisplacement = Vector3.zero;
+        serverPendingDisplacement = Vector3.zero;
+        serverHasPendingPose = false;
     }
 
     private void OnValidate()

@@ -247,6 +247,127 @@ public struct PlayerSimulationInput
     public Quaternion PoseRotation;
 }
 
+/// <summary>
+/// 오너가 만든 값 중 서버로 전송해도 되는 최소 입력. 이동 게이트, 속도 배율, Soul 속도,
+/// 게임 로직 변위는 의도적으로 포함하지 않으며 서버가 자기 상태로 <see cref="PlayerSimulationInput"/>을 완성한다.
+/// </summary>
+public readonly struct PlayerRawSimulationInput
+{
+    public PlayerRawSimulationInput(Vector2 moveDirection, bool hasMoveInput)
+    {
+        MoveDirection = moveDirection;
+        HasMoveInput = hasMoveInput;
+    }
+
+    public Vector2 MoveDirection { get; }
+    public bool HasMoveInput { get; }
+}
+
+/// <summary>공유 MainGame 시각을 물리 틱 번호로 바꾸는 단일 규칙.</summary>
+public static class PlayerSimulationTick
+{
+    public static long FromMainGameElapsed(double elapsed, float fixedDeltaTime)
+    {
+        if (double.IsNaN(elapsed) || double.IsInfinity(elapsed) || elapsed <= 0.0 || fixedDeltaTime <= 0f)
+            return 0L;
+
+        double tick = System.Math.Floor(elapsed / fixedDeltaTime);
+        return tick >= long.MaxValue ? long.MaxValue : (long)tick;
+    }
+}
+
+/// <summary>
+/// b2 재생을 위한 고정 용량 틱 이력. 최신 틱과 같은 값은 교체하고, 더 과거 틱은 거부하며,
+/// 용량을 넘으면 가장 오래된 항목부터 덮어쓴다.
+/// </summary>
+public sealed class PlayerTickRingBuffer<T> where T : struct
+{
+    private struct Entry
+    {
+        public long Tick;
+        public T Value;
+    }
+
+    private readonly Entry[] entries;
+    private int first;
+    private int count;
+    private long latestTick;
+
+    public PlayerTickRingBuffer(int capacity)
+    {
+        if (capacity < 1)
+            throw new System.ArgumentOutOfRangeException(nameof(capacity));
+
+        entries = new Entry[capacity];
+    }
+
+    public int Capacity => entries.Length;
+    public int Count => count;
+
+    public static int CapacityForSeconds(float seconds, float fixedDeltaTime)
+    {
+        if (seconds <= 0f || fixedDeltaTime <= 0f)
+            return 1;
+
+        return Mathf.Max(1, Mathf.CeilToInt(seconds / fixedDeltaTime));
+    }
+
+    public bool Store(long tick, T value)
+    {
+        if (count > 0)
+        {
+            if (tick < latestTick)
+                return false;
+
+            if (tick == latestTick)
+            {
+                int latestIndex = (first + count - 1) % entries.Length;
+                entries[latestIndex].Value = value;
+                return true;
+            }
+        }
+
+        int index;
+        if (count < entries.Length)
+        {
+            index = (first + count) % entries.Length;
+            count++;
+        }
+        else
+        {
+            index = first;
+            first = (first + 1) % entries.Length;
+        }
+
+        entries[index] = new Entry { Tick = tick, Value = value };
+        latestTick = tick;
+        return true;
+    }
+
+    public bool TryGet(long tick, out T value)
+    {
+        for (int i = 0; i < count; i++)
+        {
+            Entry entry = entries[(first + i) % entries.Length];
+            if (entry.Tick == tick)
+            {
+                value = entry.Value;
+                return true;
+            }
+        }
+
+        value = default;
+        return false;
+    }
+
+    public void Clear()
+    {
+        first = 0;
+        count = 0;
+        latestTick = 0L;
+    }
+}
+
 public struct PlayerSimulationSettings
 {
     public float RotateSpeed;
