@@ -32,7 +32,7 @@ using UnityEngine.SceneManagement;
 // 프리팹만 고치면 씬 인스턴스에 레이어 오버라이드가 걸려 있을 때 반영되지 않으므로 열린 씬도 함께 처리한다.
 public static class GroundLayerAuthoring
 {
-    const string TargetFolder = "Assets/2.Prefabs/Map";
+    const string TargetFolder = "Assets/2.Prefabs/Environment";
     const string GroundLayerName = "Ground";
 
     // 밟고 지나가는 면. Env_floor_* / Env_slope_* / Env_stairs_* 계열과, 이름이 다른 개별 케이스.
