@@ -88,6 +88,15 @@ public static class WaterBedAuthoring
             GameObject bed = Place(water, mesh, bedMaterial);
             if (bed == null) continue;
 
+            // 🔴 물과 바닥은 반드시 `Water` 레이어여야 한다(2026-09-15 실측으로 확인).
+            //    `MinimapController.BakeTerrain()` 이 컬링으로 물을 빼는데, 물이 Default(0) 이면
+            //    그 컬링이 **한 장도 못 거른다.** 남은 방어는 `BakeMinWorldY = -5` 뿐이라,
+            //    수면을 -19 에서 -3.1 로 올린 순간 330m 쿼드가 미니맵을 통째로 덮게 된다.
+            //    (`MinimapController.cs:34` 주석이 정확히 이 실패를 경고하고 있었다.)
+            //    콜라이더가 없어서 물리·LoS 에는 영향이 없다.
+            EnsureWaterLayer(water.gameObject);
+            EnsureWaterLayer(bed);
+
             report.Add(water.name + " → " + bed.name +
                        " (한 변 " + size.ToString("0") + "m, 수면 " +
                        water.transform.position.y.ToString("0.##") + ")");
@@ -259,6 +268,21 @@ public static class WaterBedAuthoring
 
         EditorUtility.SetDirty(go);
         return go;
+    }
+
+    private static void EnsureWaterLayer(GameObject go)
+    {
+        int water = LayerMask.NameToLayer("Water");
+        if (water < 0)
+        {
+            // 레이어가 사라졌으면 조용히 넘어가지 않는다 — 미니맵이 다시 덮인다.
+            Debug.LogWarning("[WaterBed] 'Water' 레이어가 없다. 미니맵이 물에 덮일 수 있다.");
+            return;
+        }
+        if (go.layer == water) return;
+        Undo.RecordObject(go, "Water Layer");
+        go.layer = water;
+        EditorUtility.SetDirty(go);
     }
 
     private static Transform FindRootByName(UnityEngine.SceneManagement.Scene scene, string name)
