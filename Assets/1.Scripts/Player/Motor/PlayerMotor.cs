@@ -341,19 +341,29 @@ public sealed class PlayerMotor : MonoBehaviour
             return false;
 
         RecordMovementDiagnosticTick();
-
         if (!hasServerObservationState)
         {
             serverObservationState = simulationState;
-            CaptureSceneState(ref serverObservationState, true);
             serverObservationState.WasBlockedThisTick = false;
             hasServerObservationState = true;
         }
-        else
-        {
-            // 위치/회전은 관측 상태를 누적하고, 접지처럼 서버가 매 틱 직접 아는 환경 값만 갱신한다.
-            CaptureSceneState(ref serverObservationState, false);
-        }
+
+        // 🔴 위치·회전을 **매 틱 실제 transform에서 다시 읽는다.**
+        //
+        // b1에서 이 경로는 순수 관측이라 첫 틱에만 포즈를 잡고 이후에는 접지만 갱신했다. 복제된
+        // 위치가 비교를 오염시키면 안 됐기 때문이고, 그때는 그게 옳았다.
+        // 4b2-α가 이 경로를 **커밋 경로로 승격**시키면서 그 전제가 뒤집혔다 — 이제 이 상태가
+        // 권위이므로 실제 transform에 앵커돼 있어야 한다.
+        //
+        // 앵커하지 않으면 스폰 포즈·낙사 복귀·보스 텔레포트·NGO 스폰 동기화처럼 이 경로 **밖에서**
+        // 오브젝트를 옮기는 모든 것이 관측 상태를 영구히 어긋나게 만든다. 어긋난 뒤로는 두 시뮬레이션이
+        // 같은 입력으로 같은 운동을 하되 서로 다른 원점에서 굴러, 발산이 **고정 오프셋**으로 굳는다.
+        // 2026-09-15 실측: avg=max=50.593m 가 소수점까지 변하지 않았다(은희 MPPM 세션).
+        //
+        // 일반 모터 경로는 이미 매 틱 CaptureSceneState()로 같은 일을 한다(이 파일 286행).
+        // 커밋 경로도 같아야 한다. 정상 상태에서는 우리 자신의 커밋을 되읽는 것이라 무해하고,
+        // 외부가 오브젝트를 옮기면 다음 틱에 스스로 복구된다.
+        CaptureSceneState(ref serverObservationState, true);
 
         PlayerSimulationInput input = movement != null
             ? movement.CaptureSimulationInput(rawInput)
