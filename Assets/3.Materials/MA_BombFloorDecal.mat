@@ -37,7 +37,7 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - Base_Map:
-        m_Texture: {fileID: 2800000, guid: 51e8719fee4618b4b85feca7a170c466, type: 3}
+        m_Texture: {fileID: 2800000, guid: d55709906d5e1f842a8dbb127b9d2edb, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - Normal_Map:
@@ -64,6 +64,6 @@ Material:
     - _DecalMeshViewBias: 0
     - _DrawOrder: 0
     m_Colors:
-    - _BaseColor: {r: 1, g: 0, b: 0, a: 1}
+    - _BaseColor: {r: 1, g: 0, b: 0, a: 0.78431374}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
