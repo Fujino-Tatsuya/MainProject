@@ -1,4 +1,115 @@
-# ▶▶▶ CURRENT PLAN — 물가(shoreline)를 **"얕음" 대신 "물가까지의 거리"로** (2026-09-15, **승인 대기**)
+# ▶▶▶ CURRENT PLAN — 23호 모델을 **1.7배 신규 FBX** 로 교체 (2026-09-15, 팀장 승인됨)
+
+> 담당 경석. 아트(7A_LeeJiWon)가 SVN **r299** 로 올린 `23_action_01_RiderSlot_x1_7.fbx` 로 갈아끼운다.
+> 끝나면 `development` 머지 → 새 브랜치 → `feature/Boss23` 삭제(아래 「브랜치 정리」).
+>
+> 🔴 **"모델만 바뀐 것"이 아니다.** 착수 전 실측에서 리그·테이크·임포터 설정이 모두 달랐다.
+
+## 실측 — 무엇이 달라졌나 (2026-09-15, Unity 에디터 관찰 + FBX/메타 직독)
+
+| | `SK/SK_23.fbx` (현재) | `23_action_01_RiderSlot_x1_7.fbx` (신규) |
+|---|---|---|
+| guid | `471c30ff001a0254e8af63991ec73cf2` | `cbdaae8bc76ee814d8a32d754976bdde` |
+| 메시 노드 | `tripo_part_0` | **`Boss_23`** (개명) |
+| rig 스케일 | 100 | **1.70** — 본 로컬값이 ×100 이라 **실크기 정확히 1.7배** |
+| 신규 본 | — | **`slot_rider.x`** (`c_root_master.x` 하위. 파일명의 RiderSlot) |
+| AnimStack | 19 | 21 |
+| 테이크 개명 | `getowned01` / `getowned02` | **`getowned_L` / `getowned_R`** |
+| 테이크 추가 | — | `magneticgrab`, `dash.001` |
+| `.meta` | 22클립 저작(이벤트 10·Loop 5·분할 4) | **기본값 — `clipAnimations: []`** |
+
+### 🔴 그대로 갈아끼우면 조용히 깨지는 것
+
+신규 `.meta` 는 아트가 올린 기본값이라 r282 에서 저작한 것이 **전부 없다**:
+
+- `OnAttackHit` ×6 — landingattack · grab · hookL · hookR · uppercut · dash
+- `OnAttackEnd` ×4 — landingattack · hookL · hookR · uppercut
+- Loop Time ×5 — charging · dash · walk · idle · `.groggy_ing`
+- 분할 클립 4 — `.groggy_enter/_ing/_end`(take `.groggy`), `jumping`(take `landingattack` 0~1)
+
+r282 커밋에 적어 둔 그대로다 — *"이 meta 가 없으면 23호 공격의 훅/어퍼/대시/점프/잡기가
+데미지를 못 준다."* 히트는 **타이머 폴백이 없다**(`MonsterBase.HandleAttack`). 컴파일도 테스트도
+안 깨지고 데미지만 0 이 된다.
+
+`No23ClipEventAuthoring.cs` 가 **정확히 이 경우를 예상하고** 멱등으로 만들어져 있다
+(*"아티스트가 fbx 를 다시 올리면 임포터 설정이 초기화된다. 그때 이 메뉴를 다시 누르면 복구된다"*).
+다만 ① 경로가 `SK_23` 하드코딩 ② `clipAnimations` 가 비면 에러로 빠진다 ③ 분할 클립·`walk`/`dash`/
+`.groggy_ing` Loop 는 표에 없다(당시 손으로 저작). 이 셋을 고쳐 재사용한다.
+
+## 참조처 — 3곳뿐 (전수조사 완료)
+
+| 파일 | 내용 |
+|---|---|
+| `2.Prefabs/Monster/Boss/TwentyThree.prefab` | FBX 가 **중첩 프리팹 인스턴스**. 본에 붙인 추가 GO 4 + Animator 1 |
+| `2.Prefabs/Monster/Boss/TwentyThree_Solo.prefab` | 위와 동일 구조 |
+| `4.Animations/Wells&No.23/No.23/Controller/No23Controller.controller` | **모션 19개 전부** SK_23 클립 |
+
+### 컨트롤러 19개 모션 → 클립 대응 (실측)
+
+```
+Locomotion  → idle, walk        Dead        → .die          Leap      → jump
+Charging    → charging          Grab        → grab          Rage      → dash
+GroggyEnd   → .groggy_end ✂     DashAttack  → dash          Holding   → grabshock
+Throw       → grabdump          JumpHover   → jumping ✂     RightHook → hookR
+JumpLanding → landingattack     Uppercut    → uppercut      GroggyStart → .groggy
+getowned    → getowned01 🔴     Groggy      → .groggy_ing ✂ LeftHook  → hookL
+```
+✂ = 분할 클립(재저작 필요) · 🔴 = 신규 FBX 에 없는 이름(`getowned_L` 로 재지정)
+
+## 작업 순서
+
+1. **임포터 저작** — `No23ClipEventAuthoring` 을 신규 FBX 대상으로 고친다.
+   - `defaultClipAnimations` 로 클립을 **시드**한 뒤(비어 있으므로) 이벤트·Loop 를 얹는다.
+   - 분할 4종과 `walk`/`dash`/`.groggy_ing` Loop 를 표에 올려 **도구가 전부 소유**하게 한다.
+   - 🔴 프레임 구간(`jump 44~158`, `landingattack 8~123`, `dash 17~102`, `.groggy` 3분할)은
+     **재익스포트로 바뀌었을 수 있다.** 옛 값을 그대로 베끼지 말고 신규 take 길이로 **실측 후 재산출**.
+   - 「검증만」 메뉴로 먼저 읽고 → 「적용」.
+2. **프리팹 재배선** — `TwentyThree` / `TwentyThree_Solo` 의 중첩 모델을 신규 FBX 로 교체.
+   메시 노드 개명(`tripo_part_0`→`Boss_23`)·루트 개명 때문에 fileID 승계 여부를 먼저 실측하고,
+   안 되면 본에 붙은 추가 GO 4개를 대응 본에 다시 붙인다.
+3. **컨트롤러** — 19개 모션 재지정. `getowned` 는 `getowned_L` 로.
+4. **판정값 1.7배 스케일** (팀장 확정)
+
+   | 대상 | 현재 | → |
+   |---|---|---|
+   | CapsuleCollider (2개) `m_Radius` | 1.0 / 0.9 | 1.7 / 1.53 |
+   | CapsuleCollider `m_Height` | 3.4 | 5.78 |
+   | CapsuleCollider `m_Center.y` | 1.7 | 2.89 |
+   | NavMeshAgent `m_Radius` | 0.5 | 0.85 |
+   | NavMeshAgent `m_Height` | 2 | 3.4 |
+
+5. 🔴 **본에 붙은 히트박스의 상쇄 스케일** — 판정값 스케일과 **별개 항목**이다.
+
+   `Hand_L` · `Hand_R` · `GrabSocket` 은 본의 자식인데 `LocalScale = 0.01` 이 들어가 있다.
+   구 리그의 `rig` 월드 스케일 **100** 을 상쇄하려고 넣은 상수다(`0.01 × 100 = 1`).
+   신규 리그는 `rig` 가 **1.70** 이라 그대로 두면:
+
+   | | 현재 | 손 안 대면 | 목표(1.7배) |
+   |---|---|---|---|
+   | 본 월드 스케일 | 100 | 1.70 | 1.70 |
+   | `LocalScale` | 0.01 | 0.01 | **1.0** |
+   | BoxCollider 월드 크기 | 2.6 | **0.044** (59분의 1) | 4.42 |
+
+   → **주먹 히트박스가 사실상 사라진다.** 애니 이벤트와 무관한 **두 번째 데미지 0 경로**다.
+   교훈 #36 #37 「fbx 자식 로컬은 상쇄 상수」가 정확히 이 형태다.
+
+   ⚠️ 이동·공격 거리는 **비례로 끝나지 않는다**. `stoppingDistance` 기본이 `attackRange × 0.8` 이라
+   도착 판정이 안 서는 전례(교훈 #76)와, 속도만 올리고 `acceleration` 을 안 준 전례(#73)가 있다.
+   `SetDestination` 호출부를 grep 해 함께 만지는 필드를 세고 나서 손댄다.
+6. **검증** — Play 로 훅·어퍼·대시·착지·잡기가 **데미지를 내는지** 눈으로. 스샷 아니라 움직임으로.
+7. **머지** — `development` 받아 머지 → 푸시 → 새 브랜치 → `feature/Boss23` 삭제.
+   머지 후 `grep -o "Assembly-CSharp::[A-Za-z_0-9]*" | sort -u` 로 컴포넌트 집합 대조(교훈 #35 #41).
+
+## 미확정 — 아트 확인 필요
+
+- `magneticgrab` · `dash.001` 신규 테이크의 용도. 지금 FSM 에 대응 상태가 없다 → **이번엔 안 쓴다.**
+- `slot_rider.x` — Wells 탑승 슬롯으로 보이나 확정 아님. **이번엔 안 쓴다.**
+- `getowned01/02` → `getowned_L/_R` 이 좌/우 피격 방향이면 컨트롤러가 **1개만 쓰고 있다**(구조 변경 후보).
+- `SK/SK_23.fbx` 폐기 여부는 **아트 판단**. 이번 작업에서는 남겨 둔다.
+
+---
+
+# (이전 계획) 물가(shoreline)를 **"얕음" 대신 "물가까지의 거리"로** (2026-09-15, **승인 대기**)
 
 > 담당 경석. 아래 「B. 물」의 후속이다. 그 계획으로 만든 셰이더는 **동작한다**
 > (컴파일·렌더 확인, 커밋 `747b0a20` `00516544`). 여기서 다루는 건 그 뒤에 남은 증상이다.
