@@ -32,6 +32,56 @@ Transform:
   - {fileID: 2984383749503829408}
   m_Father: {fileID: 8530868094991501261}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &453258624001459084
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7708088474930438963}
+  - component: {fileID: 7884254431041153894}
+  m_Layer: 8
+  m_Name: InterruptFlashVFX
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &7708088474930438963
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 453258624001459084}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 7474057274361013860}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &7884254431041153894
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 453258624001459084}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
+  id: 
+  effect: {fileID: 11400000, guid: e6dad2ab1b7d86d49b816729fc8526c2, type: 2}
+  socket: {fileID: 6853948509657572636}
+  offset: {x: 0, y: 0, z: 0}
+  scale: 1.2
+  safetyTimeout: 5
 --- !u!1 &657874054223003712
 GameObject:
   m_ObjectHideFlags: 0
@@ -109,7 +159,7 @@ GameObject:
   - component: {fileID: 3656210809086141947}
   - component: {fileID: 3436399163556755229}
   m_Layer: 8
-  m_Name: GrabArmEffect
+  m_Name: GrabArmVFX
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -266,7 +316,7 @@ GameObject:
   - component: {fileID: 8630416207742527281}
   - component: {fileID: 5339617411794530451}
   m_Layer: 8
-  m_Name: RageSmashEffect
+  m_Name: RageSmashVFX
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -316,7 +366,7 @@ GameObject:
   - component: {fileID: 2091103809601799248}
   - component: {fileID: 1106473793353871622}
   m_Layer: 8
-  m_Name: ChargeEffect
+  m_Name: ChargeVFX
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -369,7 +419,7 @@ GameObject:
   - component: {fileID: 123502591369259877}
   - component: {fileID: 3968517438082274748}
   m_Layer: 8
-  m_Name: LeftPunchSparkEffect
+  m_Name: LeftPunchSparkVFX
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -485,7 +535,7 @@ GameObject:
   - component: {fileID: 2119005834390612925}
   - component: {fileID: 5508403854360970208}
   m_Layer: 8
-  m_Name: RightPunchSparkEffect
+  m_Name: RightPunchSparkVFX
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -645,7 +695,7 @@ GameObject:
   m_Component:
   - component: {fileID: 6853948509657572636}
   m_Layer: 0
-  m_Name: rageSocket
+  m_Name: MidSocket
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -728,7 +778,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 373754331
+  GlobalObjectIdHash: 1713256455
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -923,6 +973,7 @@ MonoBehaviour:
   leftHookHit: {fileID: 3968517438082274748}
   rightHookHit: {fileID: 5508403854360970208}
   upperHit: {fileID: 5508403854360970208}
+  interruptFlash: {fileID: 7884254431041153894}
   rageSmash: {fileID: 5339617411794530451}
   chargeBall: {fileID: 1106473793353871622}
 --- !u!114 &4143592804925233818
@@ -1063,6 +1114,7 @@ Transform:
   - {fileID: 123502591369259877}
   - {fileID: 2119005834390612925}
   - {fileID: 8630416207742527281}
+  - {fileID: 7708088474930438963}
   m_Father: {fileID: 8530868094991501261}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &1176435436855418437
@@ -1187,6 +1239,14 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -6290459818519570926, guid: 471c30ff001a0254e8af63991ec73cf2, type: 3}
+      propertyPath: m_Materials.Array.size
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: -6290459818519570926, guid: 471c30ff001a0254e8af63991ec73cf2, type: 3}
+      propertyPath: 'm_Materials.Array.data[1]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 98b1c99dee6c7b5488abe440aed99c45, type: 2}
     - target: {fileID: 919132149155446097, guid: 471c30ff001a0254e8af63991ec73cf2, type: 3}
       propertyPath: m_Name
       value: TwentyThree
@@ -1213,6 +1273,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 471c30ff001a0254e8af63991ec73cf2, type: 3}
       insertIndex: -1
       addedObject: {fileID: 7785889658917140854}
+    - targetCorrespondingSourceObject: {fileID: -6748287935452084066, guid: 471c30ff001a0254e8af63991ec73cf2, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 3099841726020763800}
   m_SourcePrefab: {fileID: 100100000, guid: 471c30ff001a0254e8af63991ec73cf2, type: 3}
 --- !u!4 &87143761695125014 stripped
 Transform:
@@ -1266,6 +1329,27 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 3605180668558749135, guid: 471c30ff001a0254e8af63991ec73cf2, type: 3}
   m_PrefabInstance: {fileID: 1567392425763977719}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &4006300393131716969 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: -6748287935452084066, guid: 471c30ff001a0254e8af63991ec73cf2, type: 3}
+  m_PrefabInstance: {fileID: 1567392425763977719}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &3099841726020763800
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4006300393131716969}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c7a41f60d2b84e6a9c15d380be720063, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::InterruptOverlay
+  overlayMaterialIndex: 1
+  fadeInDuration: 0.8
+  fadeOutDuration: 0.4
+  interruptible: 0
 --- !u!4 &4400268225252444794 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -6282350263528262771, guid: 471c30ff001a0254e8af63991ec73cf2, type: 3}
