@@ -48,7 +48,7 @@ public sealed class PlayerUiInputPolicy : MonoBehaviour
         if (player == null || inputReader == null)
             ResolveReferences();
 
-        if (player == null || !player.IsMovementAuthority || inputReader == null)
+        if (player == null || !player.IsInputSource || inputReader == null)
             return;
 
         inputReader.SetUiInputSuppressed(blocked);

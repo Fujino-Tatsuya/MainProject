@@ -17,6 +17,7 @@ public class Player : Unit
     private const double ReconciliationLogIntervalSeconds = 1.0;
     private const double MovementHeartbeatTimeoutSeconds = 2.0;
     private const double MovementRpcLogIntervalSeconds = 1.0;
+    private const int MaxRepeatedServerInputTicks = 10;
 
     /// <summary>이 클라이언트가 조작하는 플레이어. HUD 등 로컬 UI 바인딩용.</summary>
     public static Player LocalPlayer { get; private set; }
@@ -57,6 +58,9 @@ public class Player : Unit
     private PlayerTickRingBuffer<PlayerSimulationState> ownerSimulationStateHistory;
     private readonly Queue<ServerRawSimulationInput> serverRawInputQueue =
         new Queue<ServerRawSimulationInput>();
+    private ServerRawSimulationInput lastServerRawInput;
+    private bool hasLastServerRawInput;
+    private int repeatedServerInputTicks;
 
     private int reconSampleCount;
     private double reconDivergenceSum;
@@ -169,6 +173,9 @@ public class Player : Unit
         ownerRawInputHistory?.Clear();
         ownerSimulationStateHistory?.Clear();
         serverRawInputQueue.Clear();
+        lastServerRawInput = default;
+        hasLastServerRawInput = false;
+        repeatedServerInputTicks = 0;
         base.OnNetworkDespawn();
     }
 
@@ -237,9 +244,8 @@ public class Player : Unit
 
     private void FixedUpdate()
     {
-        // 이동 플랫폼 캐리는 이동 권한 피어(오너/오프라인)에서만 적용한다.
-        // 비오너는 루트 NetworkTransform으로 이미 동기되므로 여기서 적용하면 이중 적용된다.
-        if (IsMovementAuthority || (IsNetworkActive && IsServer))
+        // 플랫폼 변위는 Motor를 실제로 돌리는 피어만 제출한다. 원격 프록시는 서버 NT 결과만 표시한다.
+        if (IsSimulating)
         {
             ApplyPlatformCarry();
         }
@@ -251,7 +257,7 @@ public class Player : Unit
         }
 
         // 네트워크 Update에서 도착한 raw 입력은 서버 물리 틱 파이프라인에서만 소비한다.
-        if (IsNetworkActive && IsServer)
+        if (IsNetworkActive && IsServer && !IsOwner)
             ProcessServerObservationInputs();
     }
 
@@ -436,18 +442,27 @@ public class Player : Unit
         stateController.ApplyKnockbackFromServer(direction, strength);
     }
 
-    /// <summary>이동은 오너 권위(networking.md) — Motor를 실행할 피어인지 여부.</summary>
-    public bool IsMovementAuthority => !IsNetworkActive || IsOwner;
+    /// <summary>로컬 입력 장치와 로컬 UI를 읽는 주체.</summary>
+    public bool IsInputSource => !IsNetworkActive || IsOwner;
+
+    /// <summary>PlayerMotor 시뮬레이션을 로컬에서 수행하는 주체.</summary>
+    public bool IsSimulating => !IsNetworkActive || IsOwner || IsServer;
+
+    /// <summary>이동 결과를 진실로 확정하는 주체.</summary>
+    public bool IsMotionAuthority => !IsNetworkActive || IsServer;
+
+    /// <summary>서버가 확정해 복제한 이동 결과만 표시하는 원격 프록시.</summary>
+    public bool IsRemoteProxy => IsNetworkActive && !IsOwner && !IsServer;
 
     /// <summary>
-    /// Player 위치는 owner-authority NetworkTransform이 복제한다.
-    /// Rigidbody는 전 피어에서 kinematic이며, 비권한 피어는 Motor만 꺼 복제 위치와 경쟁하지 않게 한다.
+    /// Player 위치는 server-authority NetworkTransform이 복제한다.
+    /// Rigidbody는 전 피어에서 kinematic이며, 원격 프록시는 Motor만 꺼 복제 위치와 경쟁하지 않게 한다.
     /// 콜라이더는 유지하므로 서버 공격 판정과 Overlap 쿼리에는 계속 참여한다.
     /// </summary>
     private void ConfigureMovementAuthority(string reason)
     {
         if (motor != null)
-            motor.enabled = IsMovementAuthority;
+            motor.enabled = IsSimulating;
 
         LogMovementAuthorityState(reason);
     }
@@ -467,12 +482,16 @@ public class Player : Unit
         ownerSimulationStateHistory.Store(tick, resultState);
 
         // NGO RPC 시그니처에서는 DTO를 펼치지만 전송 값은 raw 구조체의 두 필드뿐이다.
-        SubmitMovementInputServerRpc(
-            tick,
-            rawInput.MoveDirection.x,
-            rawInput.MoveDirection.y,
-            rawInput.HasMoveInput);
-        RecordMovementRpcSent();
+        // 호스트 오너는 이 인스턴스의 Motor 틱 자체가 서버 커밋이다. RPC 관측 경로를 다시 돌리면 이중 시뮬레이션된다.
+        if (!IsServer)
+        {
+            SubmitMovementInputServerRpc(
+                tick,
+                rawInput.MoveDirection.x,
+                rawInput.MoveDirection.y,
+                rawInput.HasMoveInput);
+            RecordMovementRpcSent();
+        }
     }
 
     [ServerRpc] // RequireOwnership 기본값 true. 서버는 raw 외의 게이트/배율/변위를 받지 않는다.
@@ -522,23 +541,47 @@ public class Player : Unit
             return;
         }
 
-        while (serverRawInputQueue.Count > 0)
+        ServerRawSimulationInput inputForTick;
+        bool receivedFreshInput = serverRawInputQueue.Count > 0;
+        if (receivedFreshInput)
         {
-            ServerRawSimulationInput queued = serverRawInputQueue.Dequeue();
-            if (!motor.TrySimulateServerObservation(
-                    queued.Input,
-                    Time.fixedDeltaTime,
-                    out PlayerSimulationState serverState))
-            {
-                continue;
-            }
+            inputForTick = serverRawInputQueue.Dequeue();
+            lastServerRawInput = inputForTick;
+            hasLastServerRawInput = true;
+            repeatedServerInputTicks = 0;
+        }
+        else if (hasLastServerRawInput && repeatedServerInputTicks < MaxRepeatedServerInputTicks)
+        {
+            inputForTick = lastServerRawInput;
+            repeatedServerInputTicks++;
+        }
+        else
+        {
+            // 입력 기아가 10틱을 넘으면 입력을 놓은 것으로 간주한다. 감속/중력은 계속 서버에서 시뮬레이션된다.
+            inputForTick = new ServerRawSimulationInput(
+                CurrentSharedSimulationTick(),
+                default,
+                hasLastServerRawInput ? lastServerRawInput.RttSeconds : 0.0);
+        }
 
-            float divergence = Vector3.Distance(serverState.Position, motor.Position);
+        Vector3 positionBeforeCommit = motor.Position;
+        if (!motor.TrySimulateServerObservation(
+                inputForTick.Input,
+                Time.fixedDeltaTime,
+                out PlayerSimulationState serverState))
+        {
+            return;
+        }
+
+        // 기존 [Recon]은 실제 수신 샘플에 대해서만 유지한다. 커밋 전 위치를 잡아 로그가 0으로 붕괴하지 않게 한다.
+        if (receivedFreshInput)
+        {
+            float divergence = Vector3.Distance(serverState.Position, positionBeforeCommit);
             RecordReconciliationSample(
-                queued.Tick,
+                inputForTick.Tick,
                 CurrentSharedSimulationTick(),
                 divergence,
-                queued.RttSeconds);
+                inputForTick.RttSeconds);
         }
     }
 
@@ -612,6 +655,9 @@ public class Player : Unit
         ownerRawInputHistory?.Clear();
         ownerSimulationStateHistory?.Clear();
         serverRawInputQueue.Clear();
+        lastServerRawInput = default;
+        hasLastServerRawInput = false;
+        repeatedServerInputTicks = 0;
         motor?.ResetServerObservation();
         reconSampleCount = 0;
         reconDivergenceSum = 0.0;
@@ -637,7 +683,7 @@ public class Player : Unit
     [System.Diagnostics.Conditional("UNITY_EDITOR")]
     private void UpdateMovementDiagnostics()
     {
-        if (IsMovementAuthority &&
+        if (IsSimulating &&
             !movementHeartbeatWarningLogged &&
             motor != null &&
             motor.MovementDiagnosticTickCount == 0 &&
@@ -691,7 +737,8 @@ public class Player : Unit
         PlayerInput unityPlayerInput = GetComponent<PlayerInput>();
         Edit.Log(
             $"[MoveDiag] authority ({reason}): {MovementDiagnosticIdentity()}, IsOwner={IsOwner}, " +
-            $"IsServer={IsServer}, IsMovementAuthority={IsMovementAuthority}, " +
+            $"IsServer={IsServer}, IsInputSource={IsInputSource}, IsSimulating={IsSimulating}, " +
+            $"IsMotionAuthority={IsMotionAuthority}, IsRemoteProxy={IsRemoteProxy}, " +
             $"motor.enabled={motor != null && motor.enabled}, Motor.Mode={(motor != null ? motor.Mode.ToString() : "missing")}, " +
             $"NetworkClock={(clock != null ? "present" : "missing")}/running={clock != null && clock.IsRunning}" +
             $"/mainStarted={clock != null && clock.HasMainGameStarted}, " +

@@ -179,7 +179,7 @@ public class PlayerDashController : NetworkBehaviour
 
     private void Update()
     {
-        if (player == null || !player.IsMovementAuthority)
+        if (player == null || !player.IsInputSource)
             return;
 
         // 오너 예측 충전 회복.
@@ -211,7 +211,7 @@ public class PlayerDashController : NetworkBehaviour
             landingProtected: false); // TODO: W5 착지 보호
     }
 
-    /// <summary>Idle/Move 액션 입력에서 대시 우선으로 호출된다. 게이트 통과 시 예측 소비 + 대시 진입(+온라인이면 서버 요청).</summary>
+    /// <summary>Idle/Move 액션 입력에서 대시 우선으로 호출된다. 입력 주체는 요청하고 실제 대시 상태는 이동 결과 권위가 시작한다.</summary>
     public bool TryBeginPredictedDash()
     {
         // ⚠️ 아래 5개 게이트는 전부 조용히 false를 돌려줬다. 그래서 "대시가 안 되는데 로그도 없다"가
@@ -224,9 +224,10 @@ public class PlayerDashController : NetworkBehaviour
             return false;
         }
 
-        if (player == null || !player.IsMovementAuthority)
+        // 이 메서드는 입력 요청의 진입점이다. 실제 대시 상태/이동의 승인과 커밋은 서버가 담당한다.
+        if (player == null || !player.IsInputSource)
         {
-            Edit.LogWarning("[Dash] 시작 불가: 이동 권한이 없습니다(오너가 아님).", this);
+            Edit.LogWarning("[Dash] 시작 불가: 로컬 입력 주체가 아닙니다(오너가 아님).", this);
             return false;
         }
 
@@ -253,7 +254,9 @@ public class PlayerDashController : NetworkBehaviour
         }
 
         Vector3 direction = ResolveDashDirection();
-        bool started = stateController.BeginDash(direction, (float)config.DashSpeed, (float)config.DashDuration);
+        // 오프라인/호스트는 곧 이동 결과 권위이므로 즉시 시작한다. 원격 오너는 서버 승인·개시를 기다린다.
+        bool started = !player.IsMotionAuthority ||
+                       stateController.BeginDash(direction, (float)config.DashSpeed, (float)config.DashDuration);
         if (!started)
         {
             // ⚠️ 여기까지 왔다면 예측 충전은 이미 소비됐다(위 TryConsume). 상태 진입만 거부되면
@@ -334,6 +337,19 @@ public class PlayerDashController : NetworkBehaviour
             currentCrowdControlled:
                 (encounterLock != null && encounterLock.IsCinematicLocked) ||
                 (statusEffects != null && statusEffects.BlocksMovement));
+
+        // 원격 오너의 실제 대시 상태는 승인한 서버만 시작한다. 호스트 오너는 입력 시 이미 같은 권위에서 시작했다.
+        if (response.IsApproved &&
+            !response.WasInterruptedByServerState &&
+            response.RemainingServerDuration > 0.0 &&
+            !IsOwner)
+        {
+            Vector3 direction = new Vector3(directionX, 0f, directionZ);
+            stateController.BeginDash(
+                direction,
+                (float)config.DashSpeed,
+                (float)response.RemainingServerDuration);
+        }
 
         // 승인되고 실제 대시가 진행될 때만 서버 권한 무적을 남은 대시 시간만큼 부여한다. (PLAN §11)
         if (invulnerability != null &&
@@ -481,7 +497,7 @@ public class PlayerDashController : NetworkBehaviour
     /// <summary>오너 예측 충전을 1개로 강제 초기화. 다음 충전 진행도는 0부터.</summary>
     public void OwnerResetChargeToOne()
     {
-        if (player != null && player.IsMovementAuthority && predictedLedger != null)
+        if (player != null && player.IsInputSource && predictedLedger != null)
             predictedLedger.ForceReset(1, OwnerNow());
     }
 

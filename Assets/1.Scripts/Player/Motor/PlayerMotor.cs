@@ -42,7 +42,7 @@ public sealed class PlayerMotor : MonoBehaviour
     private MotorMode mode;
     private PlayerSimulationState simulationState;
 
-    // 서버의 관측 전용 병행 시뮬레이션은 실제 Motor 상태/Transform과 완전히 분리한다.
+    // 서버가 원격 오너의 raw 입력을 소비하는 커밋 경로. 입력/상태는 일반 Motor 틱과 분리해 한 번만 계산한다.
     private Vector3 serverPendingVelocity;
     private Vector3 serverPendingGroundedDisplacement;
     private Vector3 serverPendingDisplacement;
@@ -72,7 +72,7 @@ public sealed class PlayerMotor : MonoBehaviour
     internal int MovementDiagnosticTickCount => movementDiagnosticTickCount;
 
     private bool CapturesServerObservation =>
-        player != null && player.IsSpawned && player.IsServer;
+        player != null && player.IsSpawned && player.IsServer && !player.IsOwner;
 
     /// <summary>이번 물리 틱에 적용할 월드 속도(m/s)를 더한다.</summary>
     public void AddVelocity(Vector3 worldVelocity)
@@ -260,6 +260,14 @@ public sealed class PlayerMotor : MonoBehaviour
 
     private void FixedUpdate()
     {
+        if (CapturesServerObservation)
+        {
+            // 원격 플레이어는 Player.ProcessServerObservationInputs가 틱당 한 번만 시뮬레이션한다.
+            // enabled 상태는 외부 이동 채널을 받기 위해 유지하되 이 자체 FixedUpdate는 커밋하지 않는다.
+            ClearPendingMotion();
+            return;
+        }
+
         if (mode == MotorMode.Dynamic)
         {
             ClearPendingMotion();
@@ -320,8 +328,8 @@ public sealed class PlayerMotor : MonoBehaviour
     }
 
     /// <summary>
-    /// 서버가 받은 raw 입력을 서버 자신의 게이트/배율/게임 로직 산출물과 합쳐 병행 계산한다.
-    /// 결과는 관측 상태에만 저장하며 Rigidbody, Transform, Movement 상태, 이벤트에는 적용하지 않는다.
+    /// 서버가 받은 raw 입력을 서버 자신의 게이트/배율/게임 로직 산출물과 합쳐 계산하고 커밋한다.
+    /// 원격 오너의 일반 FixedUpdate는 이 경로와 이중 구동되지 않도록 건너뛴다.
     /// </summary>
     internal bool TrySimulateServerObservation(
         PlayerRawSimulationInput rawInput,
@@ -331,6 +339,8 @@ public sealed class PlayerMotor : MonoBehaviour
         resultState = default;
         if (!CapturesServerObservation || mode == MotorMode.Dynamic)
             return false;
+
+        RecordMovementDiagnosticTick();
 
         if (!hasServerObservationState)
         {
@@ -382,6 +392,22 @@ public sealed class PlayerMotor : MonoBehaviour
         ClearServerPendingMotion();
         serverObservationState = result.State;
         resultState = serverObservationState;
+
+        simulationState = serverObservationState;
+        movement?.CommitSimulationState(simulationState, !result.AppliesPoseRotation);
+
+        if (result.AppliesPoseRotation)
+        {
+            ApplyRigidbodyPose(simulationState.Position, simulationState.RootRotation, true);
+            MovementResolved?.Invoke(result.RequestedDelta, result.ResolvedDelta, result.WasBlocked);
+        }
+        else
+        {
+            MovementResolved?.Invoke(result.RequestedDelta, result.ResolvedDelta, result.WasBlocked);
+            if (result.ResolvedDelta.sqrMagnitude > 0f)
+                ApplyRigidbodyPose(simulationState.Position, default, false);
+        }
+
         return true;
     }
 

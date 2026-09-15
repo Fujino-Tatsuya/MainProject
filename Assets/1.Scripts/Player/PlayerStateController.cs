@@ -802,7 +802,8 @@ public sealed class PlayerRestrainedState : PlayerStateBase
 
     public override void FixedTick()
     {
-        if (!Context.Player.IsMovementAuthority)
+        // 구속 포즈는 서버가 확정해 NT로 복제한다. 오너가 별도로 따라가면 서버 포즈와 경쟁한다.
+        if (!Context.Player.IsMotionAuthority)
             return;
 
         if (!TryGetTargetPose(out Vector3 position, out Quaternion rotation))
@@ -889,8 +890,8 @@ public sealed class PlayerKnockbackState : PlayerStateBase
 
         startTime = Time.time;
 
-        // 이동 적용은 이동 권위(오너/오프라인)만 — 서버 비오너 사본은 상태 장부만 기록한다.
-        if (!Context.Player.IsMovementAuthority || Context.Motor == null)
+        // 넉백 속도는 판정 주체인 서버가 확정하고 Motor 커밋 경로로 복제한다.
+        if (!Context.Player.IsMotionAuthority || Context.Motor == null)
             return;
 
         Vector3 initialVelocity = direction.sqrMagnitude > 0.001f && strength > 0f
@@ -911,9 +912,9 @@ public sealed class PlayerKnockbackState : PlayerStateBase
 
     public override void Tick()
     {
-        if (!Context.Player.IsMovementAuthority)
+        if (!Context.Player.IsMotionAuthority)
         {
-            // 서버(비오너) 사본: 오너의 종료 보고가 1차 경로, 타임아웃은 보고 유실 대비 안전망
+            // 비권위 오너는 서버가 복제할 종료를 기다리고, 로컬 상태만 안전 타임아웃으로 정리한다.
             float serverFallbackTimeout = Context.Controller.MaxKnockbackTime +
                                           Context.Controller.ServerKnockbackReportGraceTime;
             if (Time.time - startTime >= serverFallbackTimeout)
@@ -947,7 +948,7 @@ public sealed class PlayerKnockbackState : PlayerStateBase
 
 }
 
-// 오너 예측 대시. 방향·Root Yaw를 시작 순간 확정하고 지속시간 동안 바꾸지 않는다. (PLAN §7, 불변식 6)
+// 이동 결과 권위 대시. 방향·Root Yaw를 시작 순간 확정하고 지속시간 동안 바꾸지 않는다. (PLAN §7, 불변식 6)
 // W2는 평지 단순 이동만 담당한다. 경사·벽·절벽·공중 관성은 W3에서 대체·확장한다.
 public sealed class PlayerDashState : PlayerStateBase
 {
@@ -981,6 +982,7 @@ public sealed class PlayerDashState : PlayerStateBase
     }
 
     public override PlayerActionState StateType => PlayerActionState.Dash;
+    public override bool RequiresStateAuthorityTick => true;
 
     /// <summary>대시 이동량 계산에 쓰는 Motor/Rigidbody 기준 현재 위치.</summary>
     private Vector3 CurrentPosition =>
@@ -1000,7 +1002,7 @@ public sealed class PlayerDashState : PlayerStateBase
         Edit.Log(
             $"[Dash] 상태 진입 — 이전상태={previousState} 방향=({direction.x:F2}, {direction.z:F2}) " +
             $"속도={speed:F1} 지속={duration:F3}s 종료예정={endTime:F3} 접지={wasGrounded} " +
-            $"이동권한={Context.Player.IsMovementAuthority} 시작위치={startPosition} | 충돌해결=PlayerMotor", Context.Player);
+            $"이동결과권한={Context.Player.IsMotionAuthority} 시작위치={startPosition} | 충돌해결=PlayerMotor", Context.Player);
 
         if (Context.Motor == null)
         {

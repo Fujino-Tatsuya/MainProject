@@ -115,7 +115,7 @@ public class PlayerSkillTargeting : MonoBehaviour
         justHandledConfirm = false;
 
         // 오너/오프라인(로컬 조작자)만 조준 UI를 돌린다. 권위 상실 시 안전 종료.
-        if (owner == null || !owner.IsMovementAuthority)
+        if (owner == null || !owner.IsInputSource)
         {
             if (isTargeting || isMovingToCast)
                 Cancel();
@@ -162,7 +162,8 @@ public class PlayerSkillTargeting : MonoBehaviour
 
     private void FixedUpdate()
     {
-        if (!isMovingToCast || owner == null || !owner.IsMovementAuthority || !owner.CanMove)
+        // 자동 접근의 Motor 채널은 시뮬레이션 피어만 제출한다(원격 프록시는 NT 표시 전용).
+        if (!isMovingToCast || owner == null || !owner.IsSimulating || !owner.CanMove)
             return;
 
         if (pendingTarget == null || motor == null || movement == null)
