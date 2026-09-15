@@ -15,6 +15,8 @@ public class Player : Unit
     private static readonly int IsMovingHash = Animator.StringToHash("IsMoving");
     private const float ReconciliationHistorySeconds = 0.5f;
     private const double ReconciliationLogIntervalSeconds = 1.0;
+    private const double MovementHeartbeatTimeoutSeconds = 2.0;
+    private const double MovementRpcLogIntervalSeconds = 1.0;
 
     /// <summary>이 클라이언트가 조작하는 플레이어. HUD 등 로컬 UI 바인딩용.</summary>
     public static Player LocalPlayer { get; private set; }
@@ -50,6 +52,7 @@ public class Player : Unit
     private PlayerMotor motor;
     private PlayerGroundingSensor groundingSensor;
     private PlayerInvulnerability invulnerability;
+    private PlayerInputReader inputReader;
     private PlayerTickRingBuffer<PlayerRawSimulationInput> ownerRawInputHistory;
     private PlayerTickRingBuffer<PlayerSimulationState> ownerSimulationStateHistory;
     private readonly Queue<ServerRawSimulationInput> serverRawInputQueue =
@@ -62,6 +65,13 @@ public class Player : Unit
     private long reconWindowFirstTick;
     private long reconWindowLastTick;
     private long reconWindowLastServerTick;
+
+    // [MoveDiag] 관측 전용 카운터. 게임 상태나 RPC 게이트에는 사용하지 않는다.
+    private double movementHeartbeatDeadline;
+    private double movementRpcWindowEndsAt;
+    private int movementRpcSentCount;
+    private int movementRpcReceivedCount;
+    private bool movementHeartbeatWarningLogged;
 
     private readonly struct ServerRawSimulationInput
     {
@@ -98,6 +108,7 @@ public class Player : Unit
         motor = GetComponent<PlayerMotor>();
         groundingSensor = GetComponent<PlayerGroundingSensor>();
         invulnerability = GetComponent<PlayerInvulnerability>();
+        inputReader = GetComponent<PlayerInputReader>();
 
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
@@ -117,6 +128,7 @@ public class Player : Unit
         base.OnNetworkSpawn();
 
         ResetReconciliationObservation();
+        BeginMovementDiagnostics();
 
         // 내가 Owner인 플레이어가 스폰되면, 카메라 매니저에게 나를 따라오라고 알린다.
         if (IsOwner)
@@ -141,7 +153,7 @@ public class Player : Unit
         if (IsServer)
             Initialize(attackDamage, moveSpeed, attackSpeed, maxHp, defense);
 
-        ConfigureMovementAuthority();
+        ConfigureMovementAuthority("network-spawn");
     }
 
     public override void OnNetworkDespawn()
@@ -163,13 +175,14 @@ public class Player : Unit
     public override void OnGainedOwnership()
     {
         base.OnGainedOwnership();
-        ConfigureMovementAuthority();
+        BeginMovementDiagnostics();
+        ConfigureMovementAuthority("gained-ownership");
     }
 
     public override void OnLostOwnership()
     {
         base.OnLostOwnership();
-        ConfigureMovementAuthority();
+        ConfigureMovementAuthority("lost-ownership");
     }
 
     private void Start()
@@ -177,10 +190,12 @@ public class Player : Unit
         // 오프라인(비네트워크) 실행은 OnNetworkSpawn이 불리지 않는다 — 테스트 씬 HUD 바인딩/입력 활성 폴백
         if (!IsNetworkActive)
         {
+            BeginMovementDiagnostics();
             if (motor != null)
                 motor.enabled = true;
             SetLocalPlayer(this);
             EnableLocalInput();
+            LogMovementAuthorityState("offline-start");
         }
     }
 
@@ -209,6 +224,8 @@ public class Player : Unit
 
     private void Update()
     {
+        UpdateMovementDiagnostics();
+
         if (IsNetworkActive &&
             !stateController.ShouldTickForNetwork(IsOwner, HasStateAuthority))
         {
@@ -427,10 +444,12 @@ public class Player : Unit
     /// Rigidbody는 전 피어에서 kinematic이며, 비권한 피어는 Motor만 꺼 복제 위치와 경쟁하지 않게 한다.
     /// 콜라이더는 유지하므로 서버 공격 판정과 Overlap 쿼리에는 계속 참여한다.
     /// </summary>
-    private void ConfigureMovementAuthority()
+    private void ConfigureMovementAuthority(string reason)
     {
         if (motor != null)
             motor.enabled = IsMovementAuthority;
+
+        LogMovementAuthorityState(reason);
     }
 
     private void HandleOwnerSimulationCompleted(
@@ -453,6 +472,7 @@ public class Player : Unit
             rawInput.MoveDirection.x,
             rawInput.MoveDirection.y,
             rawInput.HasMoveInput);
+        RecordMovementRpcSent();
     }
 
     [ServerRpc] // RequireOwnership 기본값 true. 서버는 raw 외의 게이트/배율/변위를 받지 않는다.
@@ -464,6 +484,7 @@ public class Player : Unit
         ServerRpcParams rpcParams = default)
     {
         ulong senderClientId = rpcParams.Receive.SenderClientId;
+        RecordMovementRpcReceived();
         if (senderClientId != OwnerClientId)
         {
             Edit.LogWarning(
@@ -599,6 +620,92 @@ public class Player : Unit
         reconWindowFirstTick = 0L;
         reconWindowLastTick = 0L;
         reconWindowLastServerTick = 0L;
+    }
+
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    private void BeginMovementDiagnostics()
+    {
+        double now = Time.realtimeSinceStartupAsDouble;
+        movementHeartbeatDeadline = now + MovementHeartbeatTimeoutSeconds;
+        movementRpcWindowEndsAt = now + MovementRpcLogIntervalSeconds;
+        movementRpcSentCount = 0;
+        movementRpcReceivedCount = 0;
+        movementHeartbeatWarningLogged = false;
+        motor?.BeginMovementDiagnostics();
+    }
+
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    private void UpdateMovementDiagnostics()
+    {
+        if (IsMovementAuthority &&
+            !movementHeartbeatWarningLogged &&
+            motor != null &&
+            motor.MovementDiagnosticTickCount == 0 &&
+            Time.realtimeSinceStartupAsDouble >= movementHeartbeatDeadline)
+        {
+            movementHeartbeatWarningLogged = true;
+            Edit.LogWarning(
+                $"[MoveDiag] Motor has not Tick'ed within {MovementHeartbeatTimeoutSeconds:F1}s: " +
+                $"{MovementDiagnosticIdentity()}, enabled={motor.enabled}, mode={motor.Mode}",
+                this);
+        }
+
+        if (!IsSpawned || (!IsOwner && !IsServer))
+            return;
+
+        double now = Time.realtimeSinceStartupAsDouble;
+        if (now < movementRpcWindowEndsAt)
+            return;
+
+        NetworkClock clock = NetworkClock.Instance;
+        string sent = IsOwner ? movementRpcSentCount.ToString() : "n/a";
+        string received = IsServer ? movementRpcReceivedCount.ToString() : "n/a";
+        Edit.Log(
+            $"[MoveDiag] RPC 1s summary: {MovementDiagnosticIdentity()}, sent={sent}, " +
+            $"received={received}, queued={serverRawInputQueue.Count}, motorTicks={motor?.MovementDiagnosticTickCount ?? 0}, " +
+            $"clock={(clock != null ? "present" : "missing")}/running={clock != null && clock.IsRunning}" +
+            $"/mainStarted={clock != null && clock.HasMainGameStarted}",
+            this);
+
+        movementRpcSentCount = 0;
+        movementRpcReceivedCount = 0;
+        movementRpcWindowEndsAt = now + MovementRpcLogIntervalSeconds;
+    }
+
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    private void RecordMovementRpcSent()
+    {
+        movementRpcSentCount++;
+    }
+
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    private void RecordMovementRpcReceived()
+    {
+        movementRpcReceivedCount++;
+    }
+
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    private void LogMovementAuthorityState(string reason)
+    {
+        NetworkClock clock = NetworkClock.Instance;
+        PlayerInput unityPlayerInput = GetComponent<PlayerInput>();
+        Edit.Log(
+            $"[MoveDiag] authority ({reason}): {MovementDiagnosticIdentity()}, IsOwner={IsOwner}, " +
+            $"IsServer={IsServer}, IsMovementAuthority={IsMovementAuthority}, " +
+            $"motor.enabled={motor != null && motor.enabled}, Motor.Mode={(motor != null ? motor.Mode.ToString() : "missing")}, " +
+            $"NetworkClock={(clock != null ? "present" : "missing")}/running={clock != null && clock.IsRunning}" +
+            $"/mainStarted={clock != null && clock.HasMainGameStarted}, " +
+            $"PlayerInput.enabled={unityPlayerInput != null && unityPlayerInput.enabled}, " +
+            $"EffectiveInputEnabled={inputReader != null && inputReader.DiagnosticEffectiveInputEnabled}",
+            this);
+    }
+
+    private string MovementDiagnosticIdentity()
+    {
+        ulong localClientId = NetworkManager != null
+            ? NetworkManager.LocalClientId
+            : ulong.MaxValue;
+        return $"ownerClientId={OwnerClientId}, localClientId={localClientId}";
     }
 
     private static bool IsFinite(Vector2 value)

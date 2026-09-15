@@ -52,6 +52,11 @@ public sealed class PlayerMotor : MonoBehaviour
     private bool hasServerObservationState;
     private PlayerSimulationState serverObservationState;
 
+    // [MoveDiag] 진단 전용 상태. UNITY_EDITOR 빌드에서만 호출되며 시뮬레이션 값에는 관여하지 않는다.
+    private int movementDiagnosticTickCount;
+    private bool reportedLocalNonFinite;
+    private bool reportedServerNonFinite;
+
     public bool WasBlockedThisTick => simulationState.WasBlockedThisTick;
     public event System.Action<Vector3, Vector3, bool> MovementResolved;
     public event System.Action<PlayerRawSimulationInput, PlayerSimulationState> SimulationCompleted;
@@ -64,6 +69,7 @@ public sealed class PlayerMotor : MonoBehaviour
     public PlayerGameRuleData GameRule => gameRule;
     public PlayerSimulationState SimulationState => simulationState;
     internal PlayerSimulationState ServerObservationState => serverObservationState;
+    internal int MovementDiagnosticTickCount => movementDiagnosticTickCount;
 
     private bool CapturesServerObservation =>
         player != null && player.IsSpawned && player.IsServer;
@@ -268,6 +274,7 @@ public sealed class PlayerMotor : MonoBehaviour
 
     private void Tick(float deltaTime)
     {
+        RecordMovementDiagnosticTick();
         CaptureSceneState();
 
         PlayerRawSimulationInput rawInput = movement != null
@@ -285,8 +292,12 @@ public sealed class PlayerMotor : MonoBehaviour
 
         PlayerSimulationSettings settings = CaptureSimulationSettings(simulationState.IsSoul);
 
+        DiagnoseSimulationInput("owner", rawInput, simulationState, input, settings, deltaTime);
+
         PlayerSimulationResult result = PlayerMovementSimulation.Simulate(
             simulationState, input, settings, motionResolver, deltaTime);
+
+        DiagnoseSimulationResult("owner", result);
 
         ClearPendingMotion();
         simulationState = result.State;
@@ -349,12 +360,24 @@ public sealed class PlayerMotor : MonoBehaviour
         input.PosePosition = serverPendingPosePosition;
         input.PoseRotation = serverPendingPoseRotation;
 
+        PlayerSimulationSettings settings =
+            CaptureSimulationSettings(serverObservationState.IsSoul);
+        DiagnoseSimulationInput(
+            "server-observation",
+            rawInput,
+            serverObservationState,
+            input,
+            settings,
+            deltaTime);
+
         PlayerSimulationResult result = PlayerMovementSimulation.Simulate(
             serverObservationState,
             input,
-            CaptureSimulationSettings(serverObservationState.IsSoul),
+            settings,
             motionResolver,
             deltaTime);
+
+        DiagnoseSimulationResult("server-observation", result);
 
         ClearServerPendingMotion();
         serverObservationState = result.State;
@@ -367,6 +390,194 @@ public sealed class PlayerMotor : MonoBehaviour
         hasServerObservationState = false;
         serverObservationState = default;
         ClearServerPendingMotion();
+    }
+
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    internal void BeginMovementDiagnostics()
+    {
+        movementDiagnosticTickCount = 0;
+        reportedLocalNonFinite = false;
+        reportedServerNonFinite = false;
+    }
+
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    private void RecordMovementDiagnosticTick()
+    {
+        movementDiagnosticTickCount++;
+        if (movementDiagnosticTickCount != 1)
+            return;
+
+        Edit.Log(
+            $"[MoveDiag] Motor first Tick: {DiagnosticIdentity()}, mode={mode}, enabled={enabled}",
+            this);
+    }
+
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    private void DiagnoseSimulationInput(
+        string path,
+        PlayerRawSimulationInput rawInput,
+        PlayerSimulationState state,
+        PlayerSimulationInput input,
+        PlayerSimulationSettings settings,
+        float deltaTime)
+    {
+        if (HasReportedNonFinite(path))
+            return;
+
+        System.Text.StringBuilder channels = null;
+        AppendIfNonFinite(ref channels, "raw.Direction", rawInput.MoveDirection);
+        AppendIfNonFinite(ref channels, "state.Position", state.Position);
+        AppendIfNonFinite(ref channels, "state.RootRotation", state.RootRotation);
+        AppendIfNonFinite(ref channels, "state.ArmatureRotation", state.ArmatureRotation);
+        AppendIfNonFinite(ref channels, "state.PreviousRotateDirection", state.PreviousRotateDirection);
+        AppendIfNonFinite(ref channels, "state.VerticalVelocity", state.VerticalVelocity);
+        AppendIfNonFinite(ref channels, "state.CurrentSpeed", state.CurrentSpeed);
+        AppendIfNonFinite(ref channels, "ground.GroundNormal", state.GroundNormal);
+        AppendIfNonFinite(ref channels, "ground.GroundSurfaceDistance", state.GroundSurfaceDistance);
+        AppendIfNonFinite(ref channels, "velocity.Knockback", state.KnockbackVelocity);
+        AppendIfNonFinite(ref channels, "velocity.DashDirection", state.DashDirection);
+        AppendIfNonFinite(ref channels, "velocity.DashSpeed", state.DashSpeed);
+        AppendIfNonFinite(ref channels, "velocity.DashRemainingTime", state.DashRemainingTime);
+        AppendIfNonFinite(ref channels, "input.MoveDirection", input.MoveDirection);
+        AppendIfNonFinite(ref channels, "input.FixedMoveSpeed", input.FixedMoveSpeed);
+        AppendIfNonFinite(ref channels, "input.MoveSpeedMultiplier", input.MoveSpeedMultiplier);
+        AppendIfNonFinite(ref channels, "input.AddedVelocity", input.AddedVelocity);
+        AppendIfNonFinite(ref channels, "input.GroundedDisplacement", input.GroundedDisplacement);
+        AppendIfNonFinite(ref channels, "input.Displacement", input.Displacement);
+        if (input.HasPoseTarget)
+        {
+            AppendIfNonFinite(ref channels, "input.PosePosition", input.PosePosition);
+            AppendIfNonFinite(ref channels, "input.PoseRotation", input.PoseRotation);
+        }
+        AppendIfNonFinite(ref channels, "settings.ViewYaw", settings.ViewYaw);
+        AppendIfNonFinite(ref channels, "settings.GravityY", settings.GravityY);
+        AppendIfNonFinite(ref channels, "settings.MaxFallSpeed", settings.MaxFallSpeed);
+        AppendIfNonFinite(ref channels, "settings.KnockbackDeceleration", settings.KnockbackDeceleration);
+        AppendIfNonFinite(ref channels, "deltaTime", deltaTime);
+
+        if (channels == null)
+            return;
+
+        MarkReportedNonFinite(path);
+        Edit.LogError(
+            $"[MoveDiag] non-finite before Simulate: {DiagnosticIdentity()}, path={path}, " +
+            $"channels={channels}, raw={rawInput.MoveDirection}/{rawInput.HasMoveInput}, " +
+            $"position={state.Position}, ground={state.GroundNormal}/{state.GroundSurfaceDistance}",
+            this);
+    }
+
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    private void DiagnoseSimulationResult(string path, PlayerSimulationResult result)
+    {
+        if (HasReportedNonFinite(path))
+            return;
+
+        System.Text.StringBuilder channels = null;
+        AppendIfNonFinite(ref channels, "sweep.DesiredDelta", result.RequestedDelta);
+        AppendIfNonFinite(ref channels, "sweep.ResolvedDelta", result.ResolvedDelta);
+        AppendIfNonFinite(ref channels, "result.FinalPosition", result.State.Position);
+        AppendIfNonFinite(ref channels, "result.RootRotation", result.State.RootRotation);
+        AppendIfNonFinite(ref channels, "result.ArmatureRotation", result.State.ArmatureRotation);
+        AppendIfNonFinite(ref channels, "result.VerticalVelocity", result.State.VerticalVelocity);
+        AppendIfNonFinite(ref channels, "result.CurrentSpeed", result.State.CurrentSpeed);
+        AppendIfNonFinite(ref channels, "result.GroundNormal", result.State.GroundNormal);
+        AppendIfNonFinite(ref channels, "result.GroundSurfaceDistance", result.State.GroundSurfaceDistance);
+        AppendIfNonFinite(ref channels, "result.KnockbackVelocity", result.State.KnockbackVelocity);
+
+        if (channels == null)
+            return;
+
+        MarkReportedNonFinite(path);
+        Edit.LogError(
+            $"[MoveDiag] non-finite after Simulate: {DiagnosticIdentity()}, path={path}, " +
+            $"channels={channels}, desired={result.RequestedDelta}, resolved={result.ResolvedDelta}, " +
+            $"finalPosition={result.State.Position}",
+            this);
+    }
+
+    private bool HasReportedNonFinite(string path)
+    {
+        return path == "server-observation" ? reportedServerNonFinite : reportedLocalNonFinite;
+    }
+
+    private void MarkReportedNonFinite(string path)
+    {
+        if (path == "server-observation")
+            reportedServerNonFinite = true;
+        else
+            reportedLocalNonFinite = true;
+    }
+
+    private string DiagnosticIdentity()
+    {
+        if (player == null)
+            return "ownerClientId=unknown, localClientId=unknown";
+
+        ulong localClientId = player.NetworkManager != null
+            ? player.NetworkManager.LocalClientId
+            : ulong.MaxValue;
+        return $"ownerClientId={player.OwnerClientId}, localClientId={localClientId}";
+    }
+
+    private static void AppendIfNonFinite(
+        ref System.Text.StringBuilder channels,
+        string channel,
+        float value)
+    {
+        if (!float.IsNaN(value) && !float.IsInfinity(value))
+            return;
+
+        channels ??= new System.Text.StringBuilder();
+        if (channels.Length > 0)
+            channels.Append(", ");
+        channels.Append(channel).Append('=').Append(value);
+    }
+
+    private static void AppendIfNonFinite(
+        ref System.Text.StringBuilder channels,
+        string channel,
+        Vector2 value)
+    {
+        if (IsFinite(value.x) && IsFinite(value.y))
+            return;
+
+        channels ??= new System.Text.StringBuilder();
+        if (channels.Length > 0)
+            channels.Append(", ");
+        channels.Append(channel).Append('=').Append(value);
+    }
+
+    private static void AppendIfNonFinite(
+        ref System.Text.StringBuilder channels,
+        string channel,
+        Vector3 value)
+    {
+        if (IsFinite(value.x) && IsFinite(value.y) && IsFinite(value.z))
+            return;
+
+        channels ??= new System.Text.StringBuilder();
+        if (channels.Length > 0)
+            channels.Append(", ");
+        channels.Append(channel).Append('=').Append(value);
+    }
+
+    private static void AppendIfNonFinite(
+        ref System.Text.StringBuilder channels,
+        string channel,
+        Quaternion value)
+    {
+        if (IsFinite(value.x) && IsFinite(value.y) && IsFinite(value.z) && IsFinite(value.w))
+            return;
+
+        channels ??= new System.Text.StringBuilder();
+        if (channels.Length > 0)
+            channels.Append(", ");
+        channels.Append(channel).Append('=').Append(value);
+    }
+
+    private static bool IsFinite(float value)
+    {
+        return !float.IsNaN(value) && !float.IsInfinity(value);
     }
 
     private PlayerSimulationSettings CaptureSimulationSettings(bool isSoul)

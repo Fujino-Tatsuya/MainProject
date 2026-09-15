@@ -6,6 +6,8 @@ using UnityEngine.InputSystem;
 [RequireComponent(typeof(PlayerMovement))]
 public class PlayerInputReader : BaseNetworkBehaviour
 {
+    private const double InputDiagnosticLogIntervalSeconds = 1.0;
+
     private PlayerInput playerInput;
     private PlayerMovement movement;
     private InputAction moveAction;
@@ -21,6 +23,18 @@ public class PlayerInputReader : BaseNetworkBehaviour
     private bool controlEnabled = true;
     private bool dashPressedLatched;
     private bool dashCallbackRegistered;
+
+    // [MoveDiag] 입력/게이트 엣지를 최대 초당 한 줄로 묶기 위한 관측 전용 상태.
+    private bool inputDiagnosticInitialized;
+    private Vector2 inputDiagnosticObservedDirection;
+    private bool inputDiagnosticObservedHasMove;
+    private bool inputDiagnosticObservedEffective;
+    private bool inputDiagnosticObservedPlayerInputEnabled;
+    private int inputDiagnosticPendingEdges;
+    private bool inputDiagnosticPendingSawMove;
+    private Vector2 inputDiagnosticLastEdgeDirection;
+    private string inputDiagnosticLastReason;
+    private double inputDiagnosticNextLogAt;
 
     public Vector2 Direction { get; private set; }
     public bool HasMoveInput => Direction.sqrMagnitude > 0.01f;
@@ -40,6 +54,7 @@ public class PlayerInputReader : BaseNetworkBehaviour
         EffectiveInputEnabled && combatInputEnabled;
     private bool EffectiveInputEnabled =>
         inputEnabled && !uiInputSuppressed;
+    internal bool DiagnosticEffectiveInputEnabled => EffectiveInputEnabled;
 
     private void Awake()
     {
@@ -130,12 +145,14 @@ public class PlayerInputReader : BaseNetworkBehaviour
     private void Start()
     {
         RefreshControlState();
+        ObserveInputDiagnosticEdges("start");
     }
 
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
         RefreshControlState();
+        ObserveInputDiagnosticEdges("network-spawn");
     }
 
     public override void OnNetworkDespawn()
@@ -192,6 +209,8 @@ public class PlayerInputReader : BaseNetworkBehaviour
             Direction = Vector2.zero;
             dashPressedLatched = false;
         }
+
+        ObserveInputDiagnosticEdges("gate-change");
     }
 
     private void Update()
@@ -199,10 +218,12 @@ public class PlayerInputReader : BaseNetworkBehaviour
         if (!EffectiveInputEnabled)
         {
             Direction = Vector2.zero;
+            ObserveInputDiagnosticEdges("update-gated");
             return;
         }
 
         Direction = moveAction.ReadValue<Vector2>();
+        ObserveInputDiagnosticEdges("reader-update");
     }
 
     private void OnDisable()
@@ -210,5 +231,76 @@ public class PlayerInputReader : BaseNetworkBehaviour
         Direction = Vector2.zero;
         dashPressedLatched = false;
         UnregisterDashCallback();
+        ObserveInputDiagnosticEdges("component-disable");
+    }
+
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    private void ObserveInputDiagnosticEdges(string reason)
+    {
+        bool hasMove = HasMoveInput;
+        bool effective = EffectiveInputEnabled;
+        bool playerInputEnabled = playerInput != null && playerInput.enabled;
+        double now = Time.realtimeSinceStartupAsDouble;
+
+        if (!inputDiagnosticInitialized)
+        {
+            inputDiagnosticInitialized = true;
+            inputDiagnosticObservedDirection = Direction;
+            inputDiagnosticObservedHasMove = hasMove;
+            inputDiagnosticObservedEffective = effective;
+            inputDiagnosticObservedPlayerInputEnabled = playerInputEnabled;
+            inputDiagnosticNextLogAt = now + InputDiagnosticLogIntervalSeconds;
+            LogInputDiagnosticEdges($"initial/{reason}", 1, hasMove, Direction);
+            return;
+        }
+
+        bool changed =
+            (Direction - inputDiagnosticObservedDirection).sqrMagnitude > 0.0001f ||
+            hasMove != inputDiagnosticObservedHasMove ||
+            effective != inputDiagnosticObservedEffective ||
+            playerInputEnabled != inputDiagnosticObservedPlayerInputEnabled;
+        if (changed)
+        {
+            inputDiagnosticPendingEdges++;
+            inputDiagnosticPendingSawMove |= hasMove;
+            inputDiagnosticLastEdgeDirection = Direction;
+            inputDiagnosticLastReason = reason;
+            inputDiagnosticObservedDirection = Direction;
+            inputDiagnosticObservedHasMove = hasMove;
+            inputDiagnosticObservedEffective = effective;
+            inputDiagnosticObservedPlayerInputEnabled = playerInputEnabled;
+        }
+
+        if (inputDiagnosticPendingEdges == 0 || now < inputDiagnosticNextLogAt)
+            return;
+
+        LogInputDiagnosticEdges(
+            inputDiagnosticLastReason,
+            inputDiagnosticPendingEdges,
+            inputDiagnosticPendingSawMove,
+            inputDiagnosticLastEdgeDirection);
+        inputDiagnosticPendingEdges = 0;
+        inputDiagnosticPendingSawMove = false;
+        inputDiagnosticNextLogAt = now + InputDiagnosticLogIntervalSeconds;
+    }
+
+    private void LogInputDiagnosticEdges(
+        string reason,
+        int edgeCount,
+        bool sawMove,
+        Vector2 lastEdgeDirection)
+    {
+        ulong localClientId = NetworkManager != null
+            ? NetworkManager.LocalClientId
+            : ulong.MaxValue;
+        Edit.Log(
+            $"[MoveDiag] input edge ({reason}): ownerClientId={OwnerClientId}, " +
+            $"localClientId={localClientId}, edges={edgeCount}, Direction={Direction}, " +
+            $"HasMoveInput={HasMoveInput}, sawMove={sawMove}, lastEdgeDirection={lastEdgeDirection}, " +
+            $"EffectiveInputEnabled={EffectiveInputEnabled}, inputEnabled={inputEnabled}, " +
+            $"uiSuppressed={uiInputSuppressed}, controlEnabled={controlEnabled}, " +
+            $"reader.enabled={enabled}, PlayerInput.enabled={playerInput != null && playerInput.enabled}, " +
+            $"MoveAction.enabled={moveAction != null && moveAction.enabled}",
+            this);
     }
 }
