@@ -8,7 +8,90 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 현재 인수인계 (2026-09-09 · 23호 점프어택 VFX 카탈로그 이관 + 애니 이벤트 이펙트 일반화, 브랜치 `feature/VFX`)
+## ▶▶ 현재 인수인계 (2026-09-14 · 인터럽트 연출 4종 통일 + SpinnerBot 메시 분리, 브랜치 `feature/VFX`)
+
+작업 세션: **민경(Claude)**.
+
+**수정함 (동시 편집 주의)**: 🔴 `Monster/Boss/GauntletBot.cs` · 🔴 `Monster/Boss/SpinnerBot.cs` ·
+🔴 `Monster/Boss/WallBot.cs` · `Monster/Boss/TwentyThreeBoss.cs` · `50.Art/VFX/Scripts/InterruptOverlay.cs` ·
+`Monster/Editor/SpinnerBotMeshSplit.cs`(신규) · `2.Prefabs/Monster/SpinnerBot.prefab` ·
+`50.Art/.../Models/R_Spinnerbot_01_{Body,Blades}.asset`(신규)
+🔴 = 경석 담당 파일. 공유 필요(AGENTS.md §3).
+
+### ✅ "인터럽트 가능" 오버레이는 이제 인터페이스로 붙는다
+
+`InterruptOverlay` 가 `IBossTelegraph` 를 구현한다 — `SetCounterWindow(bool) => Interruptible = open`.
+몬스터 코드는 이 컴포넌트를 **모른다.** 서버 `MonsterBase.ServerSetCounterWindow` → RPC → 각 피어의
+`ApplyCounterWindowVisual` 이 `GetComponentInChildren<IBossTelegraph>` 로 찾아 부른다.
+카운터 창을 여는 몹이면 **프리팹에 붙이기만 하면** 따라온다.
+
+⚠️ `BossCounterTelegraph`(전신 노란 틴트)는 **어느 프리팹에도 안 붙어 있다**(guid 전수 검색 0건).
+   즉 중간보스 3종은 그동안 카운터 창에 아무 표시가 없었다 — 뺏어온 게 아니라 빈자리를 채운 것이다.
+
+### ✅ 인터럽트 성공 섬광 — 보스 4종 규약 통일
+
+`FX_Interrupt_Flash_Entry`(`50.Art/VFX/Common/`, 몹 전용 아님) 원샷. 넷 다 모양이 같다:
+`[Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]` + null 가드 + 경고 1회.
+
+| 보스 | 호출 지점 | 프리팹 배선 |
+|---|---|---|
+| GauntletBot | `CounterSucceeded()` | ✅ 연결됨 |
+| SpinnerBot | `CounterSucceeded()` | ❌ EffectSocketPlayer 새로 붙여야 함 |
+| WallBot | `CounterSucceeded()` | ❌ EffectSocketPlayer 하나도 없음 |
+| TwentyThreeBoss | `ReceiveAttack()` 카운터 성사 지점 | ⚠️ 플레이어는 있음(Id 비어 방치), 슬롯만 연결 |
+
+🔴 **23호는 `EnterCounterGroggy` 안에 넣지 않았다.** 그 메서드는 송전기 전멸(S7) 경로도 함께 쓰는데
+   그건 플레이어가 끊어낸 게 아니다. 섞으면 연출이 무엇을 칭찬하는지가 흐려진다.
+
+🔴 가붕이의 `interruptFlash.PlayOnce()` 는 원래 `CounterSucceeded()` 안에서 **직접** 불렸다 —
+   `TakeDamage` 의 `IsServer` 게이트 뒤라 **호스트에서만 보였다.** 이 레포 단골 사고. RPC 로 바꿨다.
+
+### ✅ 가붕이 펀치 명중 스파크 — 좌/우
+
+`PerformAttackHit()` 에서 `meleeAttack.Hit() > 0` 일 때만 `PlaySparkRpc(_currentAttack)`.
+L/R 은 `GauntletAttackId` enum 에 이미 들어 있다. 좌/우를 RPC 인자로 싣는 이유: `_currentAttack` 은
+**복제되지 않는 서버 전용 값**이라(선택 결과는 `PlayAttackAnimClientRpc` 로만 나간다) 클라가 모른다.
+
+### 🔴 오버레이 머티리얼 슬롯 트릭의 한계 — SpinnerBot 메시 분리
+
+**머티리얼 슬롯은 서브메시와 1:1 이다.** 개수를 넘는 슬롯만 "한 번 더 그리기"가 되고,
+그 덤은 **언제나 마지막 서브메시**에 붙는다. 그래서:
+
+- Gauntlet · Wall : 서브메시 1개 → 초과 슬롯이 몸 전체 ✅ (운이 좋았던 것)
+- Spinner : 서브메시 2개(몸통 2299면 / 날개 **1면** 반투명 카드) → 초과 슬롯이 **날개**에만 ❌
+
+몸통은 URP/**Lit 불투명**, 날개는 URP/**Unlit 투명**(`_Surface: 1`)이라 **서브메시 합치기는 불가**다
+(머티리얼이 하나만 남아 둘 중 하나를 잃는다). 그래서 **몸통/날개를 렌더러 2개로 쪼갰다.**
+
+🔴 **Blender 왕복은 막힌 길이다 (2026-09-14 실측).** 재export 하면 `Armature` 노드가 끼어든다 —
+   원본 FBX(3ds Max)에 그 문자열 **0회**, Blender 재export 본에 **4회**. 이 리그는 Generic
+   (`animationType: 2`)이고 클립 7종이 전부 `R_Spinnerbot_01` 아바타를 **Copy From Other Avatar**
+   로 문다. Generic 은 본 **경로**로 바인딩하므로 노드가 하나 끼면 클립이 **조용히** 안 붙는다.
+   → FBX · 아바타 · 본 GameObject 는 건드리지 말고 **메시만 프로젝트 안에서** 쪼갤 것.
+
+도구: `Tools/Boss/SpinnerBot — 메시 분리 (몸통/날개) (멱등)` + `— 검증 (읽기 전용)`.
+본 29개를 두 렌더러가 **공유**한다(복제하면 애니가 따로 논다). 쓰지 않는 정점은 버려 압축한다 —
+통째로 복사하면 면 한 장짜리 날개가 몸통 4807 정점을 매 프레임 스키닝한다.
+가중치는 구 API(`Mesh.boneWeights`, 영향 4개로 **잘림**) 대신 `GetAllBoneWeights` 로 정확히 옮긴다.
+
+⚠️ Blender 와 Unity 는 세는 단위가 다르다. 몸통 2291정점/2299폴리곤(Blender) =
+   4807정점/4023삼각형(Unity) — Unity 는 UV 이음새·노멀이 갈리는 자리마다 정점을 쪼갠다.
+   **숫자가 안 맞는다고 버그로 의심하지 말 것.**
+
+⚠️ 프리팹에 죽은 오버라이드 `m_Materials.Array.data[2]`(= Interrupt)가 남아 있다. 배열 크기가 2라
+   지금은 무시되지만, **누가 슬롯을 하나 늘리는 순간 되살아나** 오버레이가 두 번 그려진다.
+
+### 미결
+
+- **컴파일·Play 검증 전무.** 이번 세션 변경분 전체가 한 번도 안 돌았다.
+- 스피너·월봇 프리팹에 인터럽트 섬광 `EffectSocketPlayer` 붙이기 / 23호는 슬롯만 연결
+- MPPM 2인으로 클라이언트에서 섬광·스파크가 보이는지 (가붕이 섬광은 이전엔 호스트 전용이었다)
+- **커밋이 둘로 갈린다** — `Models/R_Spinnerbot_01_*.asset` 은 **SVN**,
+  나머지 코드·프리팹은 **git**. 한쪽만 올리면 다른 사람 화면에서 스피너 메시 참조가 깨진다.
+
+---
+
+## 이전 인수인계 (2026-09-09 · 23호 점프어택 VFX 카탈로그 이관 + 애니 이벤트 이펙트 일반화, 브랜치 `feature/VFX`)
 
 작업 세션: **민경(Claude)**.
 
