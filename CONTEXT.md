@@ -8,7 +8,7 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 현재 상태 (2026-09-15 · 물 — **컴파일·렌더 확인 완료, 룩 미확정**)
+## ▶▶ 현재 상태 (2026-09-15 · 물 — **물가 마스크로 재설계, 움직임 미검증 · 커밋 안 됨**)
 
 **이번 주 순서**: ① 조준선 클라 복제 ✅ → ② 벽 가림 실루엣 ✅ → ③ **물** ← 지금 여기.
 
@@ -43,41 +43,76 @@ Update this file when a term becomes important enough that future agents or team
 - **마루 3개 중첩**(방향 34°/−57°, 파장 ×0.58/×1.9). 파장을 정수비로 두면 마디가 고정돼 "더 복잡한 빨래판"이 되므로 일부러 어긋난 비율이다.
 - 머티리얼: `_WaveLength 18→9`, `_DepthWarpScale 0.09→0.16` (뷰가 벽 사이 10~25m 웅덩이라 무늬가 너무 컸다).
 
-### 2026-09-15 에 확인·추가한 것
+### 물가를 "얕음"에서 "물가까지의 거리"로 재설계 (2026-09-15 오후)
 
-- **컴파일 통과.** `diagnosticsState: complete` / 에러 0. 씬뷰에 마젠타 없이 렌더되는 것으로 확인했고,
-  엔진이 읽은 머티리얼에 새 프로퍼티(`_Windward` `_RunupAsym` `_ShoreGain` `_Hl*` `_Wave2/3*`)가
-  전부 잡히는 것까지 봤다. **파일만 보고 판단하지 말 것** — 엔진 쪽 값을 되읽어야 한다.
-- **바닥 툴 일반화** (`WaterBedAuthoring.cs`). 전에는 수면 −3.1 · 330m 한 장이 상수로 박혀 있었다.
-  지금은 **씬에서 `WaterDark.mat` 을 쓰는 렌더러를 전부 찾아** 각 물의 위치·스케일·높이에 바닥을 깐다.
-  메뉴: `Tools/Rendering/Look/Rebuild Water Beds (open scene)`.
-  - 깊이 프로파일이 **수면 기준 상대값**이라 −3.1 물과 −19 물이 같은 색으로 나온다. 수면을 맞출 필요가 없다.
-  - 한 변 길이별로 메시를 따로 둔다: `WaterBedMesh.asset`(330) · `WaterBedMesh_200.asset`(200).
-  - 바닥이 물 쿼드보다 **크면 안 된다** — 물 밖으로 삐져나온 바닥이 그대로 보인다. 그래서 크기를 물에서 읽는다.
-- **보스룸 물 이식 완료.** 루트 `AbyssWater`(500,−19,11 · 200m) 밑에 `AbyssWater_Bed` 를 깔았다.
-  머티리얼은 원래부터 셋 다 `WaterDark` 공유라 색·파도 튜닝은 자동으로 같이 간다.
-- **측정 도구 정리.** `RenderCostAB.cs` 삭제 + 두 씬에서 컴포넌트 제거.
-  🔴 CONTEXT 에 "씬 오브젝트 삭제"라고 적혀 있었지만 **`ProfilerHUD` 오브젝트에는 상주 `ProfilerHUD`
-  스크립트가 같이 붙어 있다.** 오브젝트째 지우면 프로파일러가 죽는다 — 컴포넌트만 뗐다.
+증상 두 개가 **한 줄에서** 나왔다 — 물가색을 "물가"가 아니라 "얕음"에 칠하고 있었다.
 
-### 🔴 다음 할 일 (순서대로)
+- 벽 옆 띠 폭이 카메라 각도를 탐 → `waterDepth` 는 수면 아래 수심이 아니라 **시선이 만난 표면과의 Y 차**
+- 열린 수면 한가운데가 흰 면적 → 깊이 노이즈가 `shadedDepth` 를 0 으로 눌러 물가색이 칠해짐
 
-1. **룩 튜닝** — 레퍼런스 영상/프레임과 대조. 지금 물가 흰 덩어리(foam·shore)가 크게 읽힌다.
-   노브: `Shore Gain 2.5` · `Wave Amplitude 1.2` · `Windward Only 0.85` ·
-   `Highlight Strength 0.55` · `Highlight Bump 1.2` · `Highlight Threshold 0.3`.
-   바닥 프로파일은 `WaterBedAuthoring` 의 `CenterDepth 2.5` / `RimDepth 14` / `GradientRadius 70` /
-   `Curve 1.6`. 고치고 메뉴를 다시 돌리면 두 바닥이 같이 갱신된다.
-2. `4.MapScene` 의 실루엣/가림 씬 상태 — `MapGenerator` 의 **`WallOcclusionDriver` 가 비활성**임을 확인했다.
-   켤지 말지는 미정.
-3. **`enableFrameTimingStats` 는 원복하지 않았다.** A/B 측정용으로 켰지만
-   `ProfilerHUD.cs`·`ProfilerWindow.cs` 가 `FrameTimingManager` 를 쓴다 — 끄면 상주 HUD 의
-   CPU/GPU ms 가 deltaTime 폴백으로 떨어져 **GPU ms 를 잃는다.** 끌지 말지는 판단 필요.
+**해결: 물가까지의 거리를 에디터에서 구워 텍스처로 준다.**
 
-⚠️ **비용은 추정치다.** CPU 증가는 0(드로우콜·오브젝트·매 프레임 C# 작업 불변, 전부 유니폼).
-GPU 는 쿼드 1장 프래그먼트 ALU 약 +25~30% 추정 — 기존 실측 **9.8ms CPU / 2.3ms GPU** 기준
-최악 +0.7ms 라 CPU 바운드에 가려 fps 에는 안 나타난다. 고정 시드 + ABAB 로 실측할 것.
-참고: 나중에 깎을 때 `Wave 3 Amplitude` 를 0 으로 내려도 **명령어는 그대로 돈다**(유니폼).
-빼려면 `shader_feature` 로 컴파일에서 제외해야 한다.
+- `WaterShoreMaskBaker.cs` (신규) — 메뉴 `Tools/Rendering/Look/Bake Water Shore Mask (open scene)`
+  - 수면보다 위에 있는 **렌더러 바운즈를 CPU 로 래스터화** → Felzenszwalb–Huttenlocher 정확 EDT
+    → signed distance → `WaterShoreMask.png` (8비트, ±20m, 텍셀 0.38m)
+  - 🔴 **카메라 렌더로 점유를 찍지 않는다.** 두 번 밟았다: 알파로 빈 곳을 가렸더니 URP 가 알파를
+    1 로 채워 전 픽셀이 육지, 마젠타 배경으로 바꿨더니 다음 베이크에서 통째로 뒤집혔다.
+  - 🔴 **베이크는 셰이더가 프로퍼티를 선언한 뒤에** 돌려야 한다. 먼저 돌리면 Unity 가
+    `SetTexture` 를 **조용히 버린다**(로그는 "구웠다"인데 그림은 안 바뀐다).
+  - 🔴 R16 `Texture2D` 를 `.asset` 으로 저장하면 셰이더에서 **검게 샘플링**된다. PNG 로 간다.
+- 셰이더: 색·물가 띠·거품·파도 방향이 전부 이 거리에서 나온다. 처오름(swash)은 **물가 기준**으로
+  주기를 돈다(전역 스크롤이 아니다 — 그게 "텍스처가 흘러간다"의 정체였다).
+  - 🔴 위상은 `ωt + k·d` 라야 파면이 **물가 쪽으로** 온다. `ωt − k·d` 는 반대다.
+  - 🔴 띠는 **좁은 가우시안**이어야 한다. `1 - saturate(q/w)` 로 두면 `q<0` 전체가 1 이라 흰 면적이 재발한다.
+- 🔴 **거리장의 등고선은 직사각형이다** — 사각형 방 안에서 동심 사각형 무늬("고정 네모")로 보인다.
+  기하학적으로 맞는 값이라 버그가 아니다. `Shore Warp` 로 **색·거품용 사본만** 흔들어 흐트러뜨린다.
+  물가 판정용 거리를 흔들면 접촉선과 파도 방향까지 흔들린다.
+- 인스펙터 정리: 프로퍼티 85개 중 **21개만 노출**(나머지 `[HideInInspector]`).
+  🔴 `[Header()]` 는 **ASCII 만** 받는다. 한글을 넣으면 셰이더가 통째로 안 컴파일된다.
+
+### 보스룸 수면 −19 → −3.1 (2026-09-15 팀장 지시)
+
+맵 물과 같은 비주얼로 맞추기 위해. 같이 나온 것:
+
+- 🔴 **물 오브젝트가 전부 `Default`(0) 였다.** `MinimapController.BakeTerrain()` 이 `Water` 레이어를
+  컬링으로 빼는데 **한 장도 못 거르고 있었다.** 남은 방어가 `BakeMinWorldY = -5` 뿐이라,
+  수면을 −3.1 로 올린 시점부터 330m 쿼드가 미니맵을 덮었을 가능성이 크다
+  (`MinimapController.cs:34` 주석이 정확히 이 실패를 경고하고 있었다).
+  → 물·바닥 4개를 `Water` 레이어로 옮겼고, **`WaterBedAuthoring` 이 이 불변식을 매번 강제**한다.
+  콜라이더가 없어서 물리·LoS 에는 영향 없다. 낙사는 `fallThresholdY = -30` 이라 무관.
+- ⚠️ `unity_set_transform` 에 position 만 주면 **회전·스케일이 초기화된다.** 쿼드가 세로로 섰다.
+
+### 🔴 포그 실측 (2026-09-15) — 문서가 틀렸던 부분
+
+**안개는 실제로 꺼져 있다** (`FogManager.fogEnabled = False`). 그런데 `FogRendererFeature` 하나가
+**안개 / 디밍+LoS / 어비스 물안개** 를 함께 그리고, 게이트가 `fogEnabled || dimEnabled || abyssEnabled` 다.
+씬 값은 `dimEnabled True` · `losEnabled True` · `FogProfile.abyssEnabled 1`.
+
+→ **"불투명 큐 유지" 제약은 그대로 유효하되, 이유는 포그가 아니라 디밍/LoS 다.**
+투명 큐로 가면 시야 밖에서도 물만 환하게 남는다.
+
+어비스 물안개 실측: `a = saturate((0 - y)/50) * 0.356 * wobble(0.625~1.375)`
+→ 수면 −3.1 에서 **1.4~3.0%**(안 보임). 수면 −19 였던 보스룸은 **8.5~18.6%** 였다 —
+수면을 올리면서 이 차이도 사라졌다.
+
+### 🔴 다음 세션 = **전수조사 + 정리** (2026-09-15 팀장 지시)
+
+지금까지 물만 보고 달렸다. 주변이 성한지 확인하고 빚을 갚는 세션.
+
+1. **움직임 검증** — 정지 스샷으로는 못 본다. 플레이 모드에서 **직선 벽 한 구간**을 고정 카메라로
+   보며 `접근 → 접촉 → 후퇴 → 남은 거품`이 구별되는지. **이게 안 되면 노브를 아무리 만져도 소용없다.**
+2. **미니맵 실제 확인** — 레이어를 옮겼으니 물이 안 덮는지 Play 로 눈으로.
+3. **`4.MapScene`** — 아직 구판 그대로다. 같은 처리를 할지 팀장 판단.
+4. **빚 갚기** — 숨긴 프로퍼티 63개와 구판 수심 경로(`_UseShoreMask` off) 코드 삭제.
+   지금 지우면 되돌릴 대조군이 없어서 남겨 뒀다.
+5. **고정 맵 저작 후 마스크 재베이크** — 지금 마스크는 방 안쪽이 물로 찍혀 있다
+   (`Level_wall_hallway` 는 벽만 있고 바닥이 런타임 생성).
+6. `enableFrameTimingStats` 원복 여부 — 끄면 `ProfilerHUD` 가 GPU ms 를 잃는다.
+7. `4.MapScene` 의 `WallOcclusionDriver` 비활성 — 켤지 말지 미정.
+8. `_LapAmount/_LapFreq/_LapScale/_LapSpeed` 는 `.mat` 에 있는데 **셰이더가 안 쓴다**(죽은 값).
+
+⚠️ **비용은 아직 추정치다.** 픽셀당 텍스처 샘플 1~2개로 링 샘플링(깊이 탭 8~16)보다 싸고
+베이크는 에디터 1회라 런타임 0 이다. 그래도 `ProfilerHUD` 로 실측할 것.
 
 ## ▶▶ 이전 상태 (2026-09-14 · 고정 터렛 조준 개편 **완료**)
 
