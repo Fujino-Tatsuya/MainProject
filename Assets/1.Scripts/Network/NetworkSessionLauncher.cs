@@ -11,7 +11,6 @@ public class NetworkSessionLauncher : MonoBehaviour
     NetworkLoadingFlowController _loadingFlowController;
     DirectIPv4ConnectionProvider _directIPv4Provider;
     RelayConnectionProvider _relayProvider;
-    [SerializeField] private GameObject defaultPlayerPrefab;
 
     public SessionConnectionMode Mode { get; set; } = SessionConnectionMode.DirectIPv4;
 
@@ -28,7 +27,6 @@ public class NetworkSessionLauncher : MonoBehaviour
             _relayProvider = new RelayConnectionProvider(unityTransport);
         }
 
-        _loadingFlowController?.SetDefaultPlayerPrefab(defaultPlayerPrefab);
         Debug.Log($"[SceneFlow] NetworkSessionLauncher.Awake hasNetworkManager={_networkManager != null} hasLoadingFlow={_loadingFlowController != null}");
     }
 
@@ -276,7 +274,6 @@ public class NetworkSessionLauncher : MonoBehaviour
             Debug.Log("[SceneFlow] NetworkSessionLauncher.RegisterLoadingFlowCallbacks added NetworkLoadingFlowController");
         }
 
-        _loadingFlowController?.SetDefaultPlayerPrefab(defaultPlayerPrefab);
         _loadingFlowController?.RegisterNetworkCallbacks();
         Debug.Log($"[SceneFlow] NetworkSessionLauncher.RegisterLoadingFlowCallbacks done hasFlow={_loadingFlowController != null}");
     }

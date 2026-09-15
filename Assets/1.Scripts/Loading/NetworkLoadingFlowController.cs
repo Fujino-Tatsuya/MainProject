@@ -185,6 +185,14 @@ public class NetworkLoadingFlowController : MonoBehaviour
         ApplyViewState();
     }
 
+    /// <summary>
+    /// 스폰 프리팹을 런타임에 덮어쓴다. **개발용 오버라이드 전용**이다(<see cref="DevSceneBooter"/>).
+    /// 평소 값은 인스펙터의 <c>defaultPlayerPrefab</c> 하나뿐이다 —
+    /// 2026-09-15 이전에는 <c>NetworkSessionLauncher</c> 에도 같은 이름의 필드가 있어
+    /// Awake 에서 이 값을 덮어썼다. 그래서 **인스펙터에 보이는 프리팹과 실제로 스폰되는 프리팹이
+    /// 달랐다**(이 컴포넌트=Paladin, 실제=Player). 필드를 이쪽 하나로 합쳐 그 괴리를 없앴다.
+    /// null 은 무시한다 — 오버라이드를 안 건 씬에서 기본값이 지워지지 않게 하기 위함이다.
+    /// </summary>
     public void SetDefaultPlayerPrefab(GameObject playerPrefab)
     {
         if (playerPrefab != null)
