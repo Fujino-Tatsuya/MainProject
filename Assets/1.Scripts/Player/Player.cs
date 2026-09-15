@@ -70,7 +70,12 @@ public class Player : Unit
 
     private int reconSampleCount;
     private int reconDiscardedSampleCount;
-    private int reconTickMismatchSampleCount;
+    private int reconSequenceBreakSampleCount;
+
+    // 서버가 다음에 받기를 기대하는 입력 틱. 발산 비교는 "입력 N 을 소비한 뒤"의 두 상태를 맞대는 것이라
+    // 입력 시퀀스가 끊기면(폐기·기아 반복·갭) 서버 상태가 더 이상 "입력 N 까지 소비한 결과"가 아니게 된다.
+    private long expectedServerInputTick;
+    private bool hasExpectedServerInputTick;
     private double reconDivergenceSum;
     private float reconMaxDivergence;
     private double reconWindowStartedAt;
@@ -194,6 +199,8 @@ public class Player : Unit
         hasLastServerRawInput = false;
         repeatedServerInputTicks = 0;
         droppedServerInputCount = 0;
+        expectedServerInputTick = 0L;
+        hasExpectedServerInputTick = false;
         base.OnNetworkDespawn();
     }
 
@@ -588,6 +595,8 @@ public class Player : Unit
         {
             serverRawInputQueue.Dequeue();
             droppedServerInputCount++;
+            // 입력을 버렸으니 서버 상태는 연속된 입력열의 결과가 아니다 — 다음 샘플은 발산 집계에서 뺀다.
+            hasExpectedServerInputTick = false;
         }
     }
 
@@ -626,6 +635,8 @@ public class Player : Unit
         {
             inputForTick = lastServerRawInput;
             repeatedServerInputTicks++;
+            // 기아 반복은 클라가 실제로 보낸 입력이 아니다 — 입력열이 끊긴 것으로 본다.
+            hasExpectedServerInputTick = false;
         }
         else
         {
@@ -635,6 +646,7 @@ public class Player : Unit
                 default,
                 default,
                 hasLastServerRawInput ? lastServerRawInput.RttSeconds : 0.0);
+            hasExpectedServerInputTick = false;
         }
 
         SimulateServerObservationInput(inputForTick, false);
@@ -680,16 +692,26 @@ public class Player : Unit
         reconWindowLastTick = input.Tick;
         reconWindowLastServerTick = serverTick;
 
-        // 발산은 같은 틱 N의 오너 예측 위치와 서버 확정 위치만 비교한다. 서버가 N을 아직 돌지
-        // 않았거나 이미 지났다면(input.Tick != serverTick) 억지로 정렬하지 않고 샘플을 폐기한다.
+        // 발산 = 같은 **입력 틱 N** 에 대한 [오너가 보고한 예측 위치] vs [서버가 N을 소비한 뒤의 확정 위치].
+        // 서버가 그 입력을 자기 공유틱 몇 번에 소비했는지(lagTicks)는 무관하다 — 원격 클라에서 lag 은
+        // 구조적으로 0이 아니므로 서버틱 일치를 요구하면 모든 샘플이 폐기된다.
+        // 비교가 깨지는 경우는 **입력열이 끊겼을 때**뿐이다(큐 폐기 · 기아 반복 · 틱 갭/재정렬):
+        // 그때는 서버 상태가 더 이상 "입력 N 까지 연속 소비한 결과"가 아니다.
         // OwnerPredictedPosition은 클라이언트가 보고한 비신뢰 계측값이며 게임 로직에는 절대 사용하지 않는다.
-        if (input.Tick != serverTick ||
-            !input.HasUsableOwnerPrediction ||
-            !IsFinite(serverState.Position))
+        bool sequenceContinuous = hasExpectedServerInputTick && input.Tick == expectedServerInputTick;
+
+        // 어긋났더라도 이 입력을 기준으로 다시 맞춘다. 연속이 회복되면 다음 샘플부터 집계된다.
+        expectedServerInputTick = input.Tick + 1;
+        hasExpectedServerInputTick = true;
+
+        if (!sequenceContinuous)
         {
             reconDiscardedSampleCount++;
-            if (input.Tick != serverTick)
-                reconTickMismatchSampleCount++;
+            reconSequenceBreakSampleCount++;
+        }
+        else if (!input.HasUsableOwnerPrediction || !IsFinite(serverState.Position))
+        {
+            reconDiscardedSampleCount++;
         }
         else
         {
@@ -719,14 +741,14 @@ public class Player : Unit
             $"[Recon] owner={OwnerClientId} inputTicks={reconWindowFirstTick}..{reconWindowLastTick} " +
             $"serverTick={reconWindowLastServerTick} lagTicks={reconWindowLastServerTick - reconWindowLastTick} " +
             $"samples={reconSampleCount} discardedSamples={reconDiscardedSampleCount} " +
-            $"tickMismatchSamples={reconTickMismatchSampleCount} droppedInputsTotal={droppedServerInputCount} " +
+            $"sequenceBreakSamples={reconSequenceBreakSampleCount} droppedInputsTotal={droppedServerInputCount} " +
             $"divergence avg={average} max={maximum} " +
             $"RTT={input.RttSeconds * 1000.0:F1}ms (비신뢰 관측 전용, 보정 없음)",
             this);
 
         reconSampleCount = 0;
         reconDiscardedSampleCount = 0;
-        reconTickMismatchSampleCount = 0;
+        reconSequenceBreakSampleCount = 0;
         reconDivergenceSum = 0.0;
         reconMaxDivergence = 0f;
         reconWindowStartedAt = now;
@@ -770,7 +792,9 @@ public class Player : Unit
         motor?.ResetServerObservation();
         reconSampleCount = 0;
         reconDiscardedSampleCount = 0;
-        reconTickMismatchSampleCount = 0;
+        reconSequenceBreakSampleCount = 0;
+        expectedServerInputTick = 0L;
+        hasExpectedServerInputTick = false;
         reconDivergenceSum = 0.0;
         reconMaxDivergence = 0f;
         reconWindowStartedAt = 0.0;
