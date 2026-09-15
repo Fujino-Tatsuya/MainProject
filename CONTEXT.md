@@ -8,6 +8,37 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 현재 인수인계 (2026-09-15 · 플레이어 이동 Motor 4b2-α, 브랜치 `feature/player-motor`)
+
+**작업 세션.** Claude = PLAN·설계·리뷰 / Codex = 4b2-α 구현.
+Codex 가 수정 중인 파일: `Player/Player.cs`, `Player/PlayerStateController.cs`,
+`Player/PlayerDashController.cs`, `Player/PlayerEncounterLock.cs`, `Player/Life/PlayerLifeInputPolicy.cs`,
+`Player/PlayerUiInputPolicy.cs`, `Player/Skill/FirstMeleeMainSkill.cs`,
+`Player/Skill/Targeting/PlayerSkillTargeting.cs`, `Player/Motor/PlayerMotor.cs`.
+**이 파일들 동시 수정 금지.**
+
+**상태.** 1~3단계 · stepOffset · 4a · 4b1 전부 은희 Play 검증 통과. 지금은 4b2.
+상세 설계는 [PLAN-player-motor.md](PLAN-player-motor.md) — 여기 중복 기술하지 않는다.
+
+### 🔴 이번에 드러난 사실 — 서버 권위 NetworkTransform 이 클라 이동을 지운다
+
+`Player.prefab` 루트 `NetworkTransform` 은 `AuthorityMode: 0` = **Server** 다
+(`1ccf0d3`, 2026-07-27 이후 계속). PLAN 과 `Player.cs` 주석이 Owner 라고 적어둔 것은 **오류였다.**
+
+- `NetworkTransform.cs:3743` — 서버 권위면 `CanCommitToTransform = IsServer` → **클라는 전부 비권위**
+- `NetworkTransform.cs:4461 OnUpdate()` — 비권위 인스턴스는 매 프레임 `ApplyAuthoritativeState()` 로
+  transform 을 **무조건 덮어쓴다**
+- `Player.cs` — `motor.enabled = IsOwner` → **서버는 원격 플레이어를 영원히 안 움직인다**
+
+⇒ 오너가 로컬로 움직여도 NT 가 서버의 정지 위치로 되돌린다.
+**"클라가 스폰 직후 이동 불가" 증상의 1순위 용의자.** 4b2-α 가 이 모순을 제거한다.
+
+**교훈으로 남긴다 — 프리팹의 네트워크 설정을 코드 주석으로 믿지 마라. YAML 을 직접 읽어라.**
+
+### 후순위 미해결
+이동 플랫폼·컨베이어 위 상하 떨림(2026-09-15 은희 발견). 원인 미조사, b2/b3 와 독립.
+[PLAN-player-motor.md](PLAN-player-motor.md) "미해결 (후순위)" 절 참조.
+
 ## ▶▶ 현재 인수인계 (2026-09-11 · 플레이어 이동 Motor 재정립 3단계, 브랜치 `feature/player-motor`)
 
 작업 세션: **은희(Claude → Codex 위임)**. 승인 계획은 [PLAN-player-motor.md](PLAN-player-motor.md).
