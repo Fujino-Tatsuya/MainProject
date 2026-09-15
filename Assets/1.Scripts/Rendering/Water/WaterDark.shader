@@ -156,6 +156,13 @@ Shader "Custom/WaterDark"
         _FoamAmount     ("Foam Amount (수면 전체 거품량)", Range(0, 1)) = 0.24
         _FoamScale      ("Foam Scale (얼룩 크기 — 작을수록 큰 얼룩)", Float) = 0.30
         _FoamSharpness  ("Foam Sharpness (얼룩 경계 — 1 이면 뭉개짐)", Range(1, 24)) = 12
+        // 거품을 파동 방향(바깥쪽)으로 밀어 흘러가게 하는 값.
+        // 🔴 **기본값 0 = 꺼짐이다(2026-09-15 팀장 판단).** 켜면 물가가 서로 마주보는 구간에서
+        //    — 좁은 수로나 코너처럼 양쪽 물가의 영향이 겹치는 곳 — 변위 방향이 서로 꼬여
+        //    무늬가 어긋난다. 거리장의 최근접 물가가 바뀌는 선에서 기울기가 끊기는 것이 원인이라,
+        //    2텍셀 중앙차분으로 격자 깨짐은 잡았어도 **겹침 자체는 남는다.**
+        //    코드는 남겨 둔다 — 값만 올리면 다시 시험할 수 있다.
+        _FoamAdvect     ("Foam Advect (거품이 빠지는 방향으로 흘러감 — 0 = 끔)", Range(0, 1)) = 0
         [HideInInspector] _FoamSpeed      ("Foam Speed (xy=월드 xz/s)", Vector) = (0.05, 0.03, 0, 0)
         [HideInInspector] _FoamShoreDepth ("Foam Shore Depth (물가에서 거품이 몰리는 깊이, m)", Float) = 1.2
         _FoamShoreBlend ("Foam Shore Blend (물가 거품 가산량)", Range(0, 1)) = 0.5
@@ -293,11 +300,20 @@ Shader "Custom/WaterDark"
                 float  _SwashApproach;
                 float  _SwashWave;
                 float  _FoamLife;
+                float  _FoamAdvect;
             CBUFFER_END
 
             // 🔴 텍스처·샘플러는 CBUFFER 밖이다. 안에 넣으면 SRP 배처가 깨진다.
             TEXTURE2D(_ShoreMask);
             SAMPLER(sampler_ShoreMask);
+
+            // 물가까지의 거리(m). 인코딩: u = 0.5 + 0.5*clamp(sd/Range, -1, 1) → 물 양수 / 육지 음수.
+            float Water_ShoreDist(float2 worldXZ)
+            {
+                float2 uv = (worldXZ - _ShoreMaskRect.xy) * _ShoreMaskRect.zw;
+                float  r  = SAMPLE_TEXTURE2D(_ShoreMask, sampler_ShoreMask, uv).r;
+                return (r * 2.0 - 1.0) * _ShoreMaskRange;
+            }
 
             struct Attributes
             {
@@ -495,13 +511,19 @@ Shader "Custom/WaterDark"
                 float2 grad = float2(dpy.y * ddxD - dpx.y * ddyD,
                                      dpx.x * ddyD - dpy.x * ddxD)
                             / (abs(det) > 1e-8 ? det : 1e-8);
-                // 물가 방향 — 같은 2x2 역행렬로 **거리장**의 월드 기울기를 푼다.
+                // 물가 방향 — 마스크를 **월드 공간에서 네 번 더 읽어** 중앙차분한다.
+                // 🔴 화면 미분(ddx/ddy)으로 구하면 안 된다(2026-09-15 런타임에서 깨짐 확인).
+                //    ① 화면 미분은 **2x2 픽셀 블록 단위**라 결과가 블록마다 계단진다 → 픽셀이 깨져 보인다.
+                //    ② 마스크는 8비트라 값이 텍셀 크기와 비슷한 간격으로 양자화돼 있고,
+                //       바이리니어 보간은 **텍셀 경계마다 꺾인다.** 그 꺾임을 미분하면
+                //       **텍셀 격자가 그대로 드러나** 화면에 사각형 무늬가 생긴다.
+                //    2텍셀 간격으로 재면 그 꺾임이 평균돼 사라지고, 화면 해상도·카메라 거리와도 무관해진다.
                 // 🔴 정확한 거리장이라도 최근접 물가가 바뀌는 선(좁은 수로 한가운데)에서는
                 //    미분이 끊긴다. 크기가 작으면 방향을 지어내지 말고 **효과를 약화**한다.
-                float  sdx = ddx(dShore), sdy = ddy(dShore);
-                float2 sGrad = float2(dpy.y * sdx - dpx.y * sdy,
-                                      dpx.x * sdy - dpy.x * sdx)
-                             / (abs(det) > 1e-8 ? det : 1e-8);
+                float  gEps = max(_ShoreMaskTexel, 0.05) * 2.0;
+                float2 sGrad = float2(Water_ShoreDist(p + float2(gEps, 0)) - Water_ShoreDist(p - float2(gEps, 0)),
+                                      Water_ShoreDist(p + float2(0, gEps)) - Water_ShoreDist(p - float2(0, gEps)))
+                             / (2.0 * gEps);
                 float  sGradLen = length(sGrad);
                 float2 shoreN   = sGradLen > 1e-3 ? sGrad / sGradLen : float2(0, 0);
                 float  shoreConf = saturate(sGradLen * 2.0) * inMask * step(0.5, _UseShoreMask);
@@ -594,7 +616,15 @@ Shader "Custom/WaterDark"
                 // 🔴 얼룩 좌표를 흐름(`pf`)에 묶으면 거품이 통째로 평행이동한다 — 그게 "텍스처가
                 //    흘러간다"의 절반이다. 얼룩은 **월드에 고정**하고, 대신 *언제 어디가 켜지는지*를
                 //    사건이 정한다. 아주 약한 표류만 남긴다.
-                float foamN = Water_ValueNoise(IN.positionWS.xz * _FoamScale
+                // 🔴 얼룩을 **물가 법선 방향으로 밀어** 파동을 따라 흘러가게 한다.
+                //    `bandC` 는 접촉 직후 0 에서 시작해 빠지면서 바깥으로 커지는 값이라,
+                //    그대로 변위로 쓰면 거품이 물이 빠지는 방향으로 실려 나간다.
+                //    샘플 좌표를 **반대로** 빼야 무늬가 +shoreN 으로 움직인다.
+                //    ⚠️ `bandC` 는 다음 접촉에서 0 으로 리셋된다 — 그 순간 얼룩이 한 번 튄다.
+                //       접촉은 물가가 번쩍이는 순간이라 시선이 그쪽으로 가서 대체로 가려지는데,
+                //       거슬리면 `Foam Life` 를 줄여 리셋 전에 거의 사라지게 한다.
+                float2 foamAdv = shoreN * (bandC * _FoamAdvect * shoreConf);
+                float foamN = Water_ValueNoise((IN.positionWS.xz - foamAdv) * _FoamScale
                                                + _FoamSpeed.xy * _Time.y * _FoamScale);
                 // 구판: 수심으로 물가 거품을 깔았다(벽 아닌 곳에도 깔렸다).
                 float shoreT = 1.0 - saturate(shoreDepth / max(_FoamShoreDepth, 1e-3));
@@ -647,6 +677,21 @@ Shader "Custom/WaterDark"
 
                 // ── 물가 띠 ────────────────────────────────────────────────────
                 // 물이 벽·바닥과 만나는 선. 이게 있어야 "물이 차 있다"로 읽힌다.
+                // ── 접근 — 접촉 **직전에** 물이 물가 쪽으로 밀려드는 구간 ────────
+                // 🔴 이게 없으면 순서가 안 읽힌다(2026-09-15 팀장: "접근 접촉 후퇴 순서가
+                //    아니기도 하다"). 예전엔 접근을 하이라이트 노멀에만 태웠는데, 탑다운에
+                //    약한 스펙큘러면 사실상 안 보인다. 색에 태워야 한다.
+                // 🔴 **밝히지 않고 어둡게** 한다. 물이 쌓이는 것이라 밝아질 이유가 없고,
+                //    밝히면 "물이 너무 밝다"는 지적과 정면으로 충돌한다.
+                float appDur = max(_SwashPeriod, 0.1) * 0.35;           // 접근 구간 길이(초)
+                float tilNext = max(_SwashPeriod, 0.1) - since;         // 다음 접촉까지
+                float appT = 1.0 - saturate(tilNext / max(appDur, 1e-3)); // 0 → 1 로 다가온다
+                float appPos = _SwashRunOut * 1.6 * (1.0 - appT);       // 멀리서 물가로
+                float appQ = (dColor - appPos) / max(_SwashBand * 1.4, 0.05);
+                float approachBand = exp(-appQ * appQ) * appT;
+                col *= 1.0 - approachBand * _SwashApproach * 0.45
+                             * inMask * step(0.5, _UseShoreMask);
+
                 // 🔴 구판은 `1 - saturate(수심/폭)` 이라 **수심만** 봤다. 벽 옆인지 검사하지
                 //    않으니 ① 벽마다 띠 폭이 카메라를 타고 ② 열린 수면 한가운데도 칠해졌다.
                 //    이제 거리 기반 좁은 밴드가 부딪힌 순간에만 밝아진다.

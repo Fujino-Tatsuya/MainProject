@@ -45,10 +45,10 @@ Material:
     - _FlowSharp: 2.21
     - _FlowStrength: 0.12
     - _FoamAmount: 0.04
-    - _FoamLife: 1.6
+    - _FoamLife: 2.4
     - _FoamScale: 0.8
     - _FoamSharpness: 12
-    - _FoamShoreBlend: 0.1
+    - _FoamShoreBlend: 0.35
     - _FoamShoreDepth: 1.6
     - _GradientDist: 36
     - _GradientSize: 7
@@ -79,11 +79,11 @@ Material:
     - _ShoreWarpScale: 0.08
     - _ShoreWidth: 2.5
     - _SwashApproach: 0.35
-    - _SwashBand: 0.9
+    - _SwashBand: 1.5
     - _SwashContact: 0.18
     - _SwashPeriod: 3.4
-    - _SwashRunOut: 2.6
-    - _SwashVary: 0.7
+    - _SwashRunOut: 4
+    - _SwashVary: 0.35
     - _SwashVaryScale: 0.02
     - _SwashWave: 6
     - _UseSceneDepth: 1
