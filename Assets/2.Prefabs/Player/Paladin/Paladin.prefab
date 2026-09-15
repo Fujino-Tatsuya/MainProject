@@ -7367,6 +7367,8 @@ MonoBehaviour:
   stateController: {fileID: 1123356785223043744}
   stableSeconds: 0.5
   maxFlatAngle: 5
+  safePointQueueCapacity: 5
+  minSafePointSpacing: 1.5
   ringRadii:
   - 1
   - 2
@@ -7378,6 +7380,7 @@ MonoBehaviour:
   occupancyRadius: 0.4
   probeUpDistance: 1.5
   probeDownDistance: 3
+  safePointMarkerPrefab: {fileID: 8238544250631236300, guid: 544d09bf18809834dabb81d27868643a, type: 3}
 --- !u!114 &1461530121226363041
 MonoBehaviour:
   m_ObjectHideFlags: 0
