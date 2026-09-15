@@ -57,6 +57,14 @@ public class SpinnerBot : MonsterBase
              "프리팹 EffectSocketPlayer.Id 가 쓰는 그 값이다. 아트가 바꾸면 여기도 고칠 것.")]
     string spinEffectId = "Spin";
 
+    [Header("VFX")]
+    // 🔴 스핀 이펙트와 달리 **애니메이션 이벤트로 못 낸다.** 카운터 성공은 클립이 아니라
+    //    플레이어의 인터럽트 공격이 만드는 사건이라, 어느 프레임에 일어날지 클립이 알 수 없다.
+    //    그래서 이것만 코드가 직접 몬다(GauntletBot 과 같은 규약).
+    [Tooltip("카운터(인터럽트) 성공 순간의 섬광. 비워두면 연출만 빠진다")]
+    [SerializeField] EffectSocketPlayer interruptFlash;
+    bool _warnedNoInterruptFlash;
+
     // 서버 전용 스핀 런타임
     SpinPhase _phase;
     float _phaseTimer;          // 현재 단계의 남은 시간(초)
@@ -211,6 +219,38 @@ public class SpinnerBot : MonsterBase
 
         _phase = SpinPhase.None;
         ForceGroggy(Counter.GroggyDuration);
+
+        PlayInterruptFlashRpc();
+    }
+
+    /// <summary>
+    /// [전 피어] 카운터 성공 섬광.
+    ///
+    /// 🔴 <b>RPC 여야 한다.</b> 호출부 <see cref="CounterSucceeded"/> 는 <see cref="TakeDamage"/> 의
+    ///    <c>IsServer</c> 게이트 뒤라 서버에서만 돈다 — 직접 재생하면 호스트 화면에서만 보인다.
+    ///
+    /// Unreliable: 순수 연출이라 한 번 빠져도 상태가 발산하지 않는다.
+    /// (성공 자체는 그로기 상태 복제로 전 피어에 전달되므로 연출이 빠져도 결과는 보인다.)
+    /// </summary>
+    [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
+    void PlayInterruptFlashRpc()
+    {
+        if (interruptFlash == null)
+        {
+            WarnNoInterruptFlashOnce();
+            return;
+        }
+
+        interruptFlash.PlayOnce();
+    }
+
+    void WarnNoInterruptFlashOnce()
+    {
+        if (_warnedNoInterruptFlash) return;
+        _warnedNoInterruptFlash = true;
+
+        Debug.LogWarning(
+            $"{name}: 카운터 성공 섬광이 비어 있다 — 프리팹의 SpinnerBot 에 interruptFlash 를 물릴 것.", this);
     }
 
     void HoldAgent()

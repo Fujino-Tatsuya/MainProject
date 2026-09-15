@@ -123,6 +123,14 @@ public class TwentyThreeBoss : MonsterBase
     [SerializeField] EffectSocketPlayer upperHit;
     bool _warnedNoHitEffect;
 
+    // ─── 카운터 성공 연출 ─────────────────────────────────────────────
+    // 🔴 애니메이션 이벤트로는 못 낸다. 카운터 성공은 클립이 아니라 **플레이어의 인터럽트 공격**이
+    //    만드는 사건이라, 어느 프레임에 일어날지 클립이 알 수 없다 — 코드가 직접 몬다
+    //    (중간보스 3종과 같은 규약).
+    [Tooltip("카운터(인터럽트) 성공 순간의 섬광. 비워두면 연출만 빠진다")]
+    [SerializeField] EffectSocketPlayer interruptFlash;
+    bool _warnedNoInterruptFlash;
+
     // ─── 레이지 돌진 루프 연출 ────────────────────────────────────────
     // 🔴 명중과 무관하다 — 헛돌진에도 나온다. **돌진 1회 단위**로 켜고 끈다:
     //    레이지는 rageDashCount 번 연타인데, 연타 사이 간격은 서 있는 구간이라 연출도 끊긴다.
@@ -3149,9 +3157,46 @@ public class TwentyThreeBoss : MonsterBase
         bool resolved = base.ReceiveAttack(attackInfo, hitContext);
 
         if (counter && resolved && State != MonsterState.Dead)
+        {
             EnterCounterGroggy(allowBreak: true);
 
+            // 🔴 여기가 "인터럽트 성공"의 유일한 지점이다. EnterCounterGroggy 안에 넣지 않은 이유:
+            //    그 메서드는 송전기 전멸(S7) 경로도 함께 쓰는데, 그건 플레이어가 끊어낸 게 아니라
+            //    별개의 사건이다. 섞으면 연출이 "무엇을 칭찬하는지"가 흐려진다.
+            PlayInterruptFlashRpc();
+        }
+
         return resolved;
+    }
+
+    /// <summary>
+    /// [전 피어] 카운터 성공 섬광.
+    ///
+    /// 🔴 <b>RPC 여야 한다.</b> 호출부는 <c>counter</c> 조건에 <c>IsServer</c> 가 들어 있어 서버에서만
+    ///    도는 경로다 — 직접 재생하면 호스트 화면에서만 보인다.
+    ///
+    /// Unreliable: 순수 연출이라 한 번 빠져도 상태가 발산하지 않는다.
+    /// (성공 자체는 그로기 상태 복제로 전 피어에 전달되므로 연출이 빠져도 결과는 보인다.)
+    /// </summary>
+    [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
+    void PlayInterruptFlashRpc()
+    {
+        if (interruptFlash == null)
+        {
+            WarnNoInterruptFlashOnce();
+            return;
+        }
+
+        interruptFlash.PlayOnce();
+    }
+
+    void WarnNoInterruptFlashOnce()
+    {
+        if (_warnedNoInterruptFlash) return;
+        _warnedNoInterruptFlash = true;
+
+        Debug.LogWarning(
+            $"{name}: 카운터 성공 섬광이 비어 있다 — 프리팹의 TwentyThreeBoss 에 interruptFlash 를 물릴 것.", this);
     }
 
     /// <summary>
