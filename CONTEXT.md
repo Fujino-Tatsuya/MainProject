@@ -8,7 +8,78 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 현재 상태 (2026-09-14 · 고정 터렛 조준 개편 **완료**)
+## ▶▶ 현재 상태 (2026-09-15 · 물 — **컴파일·렌더 확인 완료, 룩 미확정**)
+
+**이번 주 순서**: ① 조준선 클라 복제 ✅ → ② 벽 가림 실루엣 ✅ → ③ **물** ← 지금 여기.
+
+🔴 **작업 대상은 `4.MapScene-trensparent` 하나다(2026-09-15 팀장 확정).**
+`4.MapScene` 의 물 2개는 **건드리지 않는다** — 수면 높이 −19 도 그대로 둔다.
+(그 씬에는 측정 도구 컴포넌트 제거만 들어갔다.)
+
+### 🔴 Unity MCP 가 끊겼을 때 — 서버를 다시 켜면 더 나빠진다
+
+이전 세션에서 세 번 반복한 함정이다. **원인은 패키지가 아니다.**
+
+- 브릿지(node) 프로세스는 **Claude 세션이 열릴 때 한 번** 뜨고 그때의 토큰을 들고 있다.
+- Unity 의 `Stop Server → Start Server` 는 `~/.unity-mcp/auth-token-3000.json` 을 **새로 발급**한다.
+- 그래서 재시작할수록 브릿지의 토큰만 더 어긋난다 → 콘솔에 `Rejected unauthorized request to /sse: Invalid session token`.
+
+증상: 커넥터 목록에 `unity` 가 **connected 인데 `tool_count: 0`**. 붙은 것처럼 보여서 오진하기 쉽다.
+확인법: 브릿지 프로세스 시작시각과 토큰 파일 mtime 을 비교한다(토큰이 더 최근이면 확정).
+**조치: Unity 서버는 켜둔 채 Claude 쪽 세션/커넥터만 다시 연다.**
+
+✅ 2026-09-15 에 이 순서(서버 재시작 → **그 뒤에** 새 Claude 세션)로 복구되는 것을 확인했다.
+`tool_count: 87`. 순서가 반대면 또 어긋난다.
+
+### 물 — 재작업한 것 (`WaterDark.shader`, `WaterDark.mat`)
+
+증상은 "물이 아니라 그냥 흐르는 텍스처". 원인은 **셰이더 안에 파형이 두 개**였던 것 —
+흐르는 얼룩(노이즈)과 벽을 치는 파도(사인)가 서로를 모르니 흐름과 벽 사이에 인과가 없었다.
+
+- **수면 높이 `h` 하나로 통일.** 열린 수면 색·물가 띠·거품이 전부 여기서 파생된다. 물가는 자기 파형을 갖지 않는다.
+- **windward 게이팅.** 화면 미분으로 월드 수심 기울기를 풀어 "얕아지는 방향"을 구하고, 흐름이 그쪽을 향하는 벽만 친다. 사방이 균일하면 파도가 아니라 수면 전체의 숨쉬기로 보인다.
+- **비대칭 런업 + 천해 증폭.** 대칭 사인은 철썩임이 아니다.
+- **수면 하이라이트 추가.** 반사 금지는 유지 — 씬을 안 읽고 고정 광원 + 절차 노멀(프래그먼트 유한차분)로 만드는 툰 스펙큘러다. 먼 수면 지직거림은 픽셀이 덮는 월드 거리로 페이드해 막았다.
+- **마루 3개 중첩**(방향 34°/−57°, 파장 ×0.58/×1.9). 파장을 정수비로 두면 마디가 고정돼 "더 복잡한 빨래판"이 되므로 일부러 어긋난 비율이다.
+- 머티리얼: `_WaveLength 18→9`, `_DepthWarpScale 0.09→0.16` (뷰가 벽 사이 10~25m 웅덩이라 무늬가 너무 컸다).
+
+### 2026-09-15 에 확인·추가한 것
+
+- **컴파일 통과.** `diagnosticsState: complete` / 에러 0. 씬뷰에 마젠타 없이 렌더되는 것으로 확인했고,
+  엔진이 읽은 머티리얼에 새 프로퍼티(`_Windward` `_RunupAsym` `_ShoreGain` `_Hl*` `_Wave2/3*`)가
+  전부 잡히는 것까지 봤다. **파일만 보고 판단하지 말 것** — 엔진 쪽 값을 되읽어야 한다.
+- **바닥 툴 일반화** (`WaterBedAuthoring.cs`). 전에는 수면 −3.1 · 330m 한 장이 상수로 박혀 있었다.
+  지금은 **씬에서 `WaterDark.mat` 을 쓰는 렌더러를 전부 찾아** 각 물의 위치·스케일·높이에 바닥을 깐다.
+  메뉴: `Tools/Rendering/Look/Rebuild Water Beds (open scene)`.
+  - 깊이 프로파일이 **수면 기준 상대값**이라 −3.1 물과 −19 물이 같은 색으로 나온다. 수면을 맞출 필요가 없다.
+  - 한 변 길이별로 메시를 따로 둔다: `WaterBedMesh.asset`(330) · `WaterBedMesh_200.asset`(200).
+  - 바닥이 물 쿼드보다 **크면 안 된다** — 물 밖으로 삐져나온 바닥이 그대로 보인다. 그래서 크기를 물에서 읽는다.
+- **보스룸 물 이식 완료.** 루트 `AbyssWater`(500,−19,11 · 200m) 밑에 `AbyssWater_Bed` 를 깔았다.
+  머티리얼은 원래부터 셋 다 `WaterDark` 공유라 색·파도 튜닝은 자동으로 같이 간다.
+- **측정 도구 정리.** `RenderCostAB.cs` 삭제 + 두 씬에서 컴포넌트 제거.
+  🔴 CONTEXT 에 "씬 오브젝트 삭제"라고 적혀 있었지만 **`ProfilerHUD` 오브젝트에는 상주 `ProfilerHUD`
+  스크립트가 같이 붙어 있다.** 오브젝트째 지우면 프로파일러가 죽는다 — 컴포넌트만 뗐다.
+
+### 🔴 다음 할 일 (순서대로)
+
+1. **룩 튜닝** — 레퍼런스 영상/프레임과 대조. 지금 물가 흰 덩어리(foam·shore)가 크게 읽힌다.
+   노브: `Shore Gain 2.5` · `Wave Amplitude 1.2` · `Windward Only 0.85` ·
+   `Highlight Strength 0.55` · `Highlight Bump 1.2` · `Highlight Threshold 0.3`.
+   바닥 프로파일은 `WaterBedAuthoring` 의 `CenterDepth 2.5` / `RimDepth 14` / `GradientRadius 70` /
+   `Curve 1.6`. 고치고 메뉴를 다시 돌리면 두 바닥이 같이 갱신된다.
+2. `4.MapScene` 의 실루엣/가림 씬 상태 — `MapGenerator` 의 **`WallOcclusionDriver` 가 비활성**임을 확인했다.
+   켤지 말지는 미정.
+3. **`enableFrameTimingStats` 는 원복하지 않았다.** A/B 측정용으로 켰지만
+   `ProfilerHUD.cs`·`ProfilerWindow.cs` 가 `FrameTimingManager` 를 쓴다 — 끄면 상주 HUD 의
+   CPU/GPU ms 가 deltaTime 폴백으로 떨어져 **GPU ms 를 잃는다.** 끌지 말지는 판단 필요.
+
+⚠️ **비용은 추정치다.** CPU 증가는 0(드로우콜·오브젝트·매 프레임 C# 작업 불변, 전부 유니폼).
+GPU 는 쿼드 1장 프래그먼트 ALU 약 +25~30% 추정 — 기존 실측 **9.8ms CPU / 2.3ms GPU** 기준
+최악 +0.7ms 라 CPU 바운드에 가려 fps 에는 안 나타난다. 고정 시드 + ABAB 로 실측할 것.
+참고: 나중에 깎을 때 `Wave 3 Amplitude` 를 0 으로 내려도 **명령어는 그대로 돈다**(유니폼).
+빼려면 `shader_feature` 로 컴파일에서 제외해야 한다.
+
+## ▶▶ 이전 상태 (2026-09-14 · 고정 터렛 조준 개편 **완료**)
 
 **이번 주 순서(2026-09-14 팀장 확정)**: ① 조준선 클라 복제 ✅ → ② **플레이어가 벽에 가렸을 때
 비주얼 처리** → ③ **물 추가**. ②③ 은 레퍼런스가 있어서 그것에 맞추면 끝나는 작업이라 보스보다 앞에 둔다.
