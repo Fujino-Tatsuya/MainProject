@@ -12,11 +12,13 @@ public sealed class CameraFeedback : MonoBehaviour
     public static bool RequiresAttributedDamageRpc => Instance != null;
 
     [Header("피격 쉐이크")]
+    [SerializeField] bool receivedHitShakeEnabled = true;
     [SerializeField, Min(0f)] float receivedHitAmplitude = 0.35f;
     [SerializeField, Min(0.01f)] float receivedHitDuration = 0.2f;
     [SerializeField, Min(0f)] float receivedHitMinInterval = 0.08f;
 
     [Header("타격 쉐이크")]
+    [SerializeField] bool dealtDamageShakeEnabled = true;
     [SerializeField, Min(0f)] float dealtDamageAmplitude = 0.12f;
     [SerializeField, Min(0.01f)] float dealtDamageDuration = 0.08f;
     [SerializeField, Min(0f)] float dealtDamageMinInterval = 0.05f;
@@ -74,6 +76,9 @@ public sealed class CameraFeedback : MonoBehaviour
 
     public void ReportLocalPlayerHit()
     {
+        if (!receivedHitShakeEnabled)
+            return;
+
         TryGenerateImpulse(
             _receivedHitImpulse,
             receivedHitAmplitude,
@@ -83,6 +88,9 @@ public sealed class CameraFeedback : MonoBehaviour
 
     public void ReportLocalPlayerDealtDamage()
     {
+        if (!dealtDamageShakeEnabled)
+            return;
+
         TryGenerateImpulse(
             _dealtDamageImpulse,
             dealtDamageAmplitude,

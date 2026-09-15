@@ -1,0 +1,47 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: CyaniluxRetroCRT
+  m_Shader: {fileID: -6465566751694194690, guid: 8989e173f579a5c25ab2f4b90edbf945, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords:
+  - CRT_WARP_ON
+  - RGB_STRIPES_ON
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties:
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs: []
+    m_Ints: []
+    m_Floats:
+    - CRT_WARP: 1
+    - DISTORT: 0
+    - RGB_STRIPES: 1
+    - SCROLL_STATIC: 0
+    - STATIC: 0
+    - Vector1_1BFF6B46: 640
+    - Vector1_5660967D: 1
+    - _BezelSize: 1
+    - _DistortionStrength: 0
+    - _QueueControl: 0
+    - _QueueOffset: 0
+    - _RGBStripeStrength: 0.15
+    - _ScanlineHeight: 2
+    - _ScanlineStrength: 0.08
+    - _StaticStrength: 0
+    m_Colors:
+    - _CRTWarpStrength: {r: 0.035, g: 0.035, b: 0, a: 0}
+  m_BuildTextureStacks: []
