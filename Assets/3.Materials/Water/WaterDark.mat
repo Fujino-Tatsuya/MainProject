@@ -31,7 +31,7 @@ Material:
     - _DepthOctaveFalloff: 0.341
     - _DepthOctaveScale: 2.1
     - _DepthWarpAmount: 3.5
-    - _DepthWarpScale: 0.09
+    - _DepthWarpScale: 0.16
     - _EdgeBrighten: 0.447
     - _EdgeWidth: 0.217
     - _FlowMaster: 1.5
@@ -57,7 +57,7 @@ Material:
     - _WaveContrast: 0.06
     - _WaveJitter: 0.35
     - _WaveJitterScale: 0.03
-    - _WaveLength: 18
+    - _WaveLength: 9
     - _WaveSpeed: 0.22
     m_Colors:
     - _DeepColor: {r: 0.02, g: 0.07, b: 0.09, a: 1}
