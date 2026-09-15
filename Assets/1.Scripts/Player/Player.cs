@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Unity.Netcode;
+using Unity.Netcode.Components;
 
 [RequireComponent(typeof(PlayerInputReader))]
 [RequireComponent(typeof(PlayerMovement))]
@@ -18,6 +19,8 @@ public class Player : Unit
     private const double MovementHeartbeatTimeoutSeconds = 2.0;
     private const double MovementRpcLogIntervalSeconds = 1.0;
     private const int MaxRepeatedServerInputTicks = 10;
+    private const int TargetServerInputQueueTicks = 2;
+    private const int MaxServerInputQueueTicks = 6;
 
     /// <summary>이 클라이언트가 조작하는 플레이어. HUD 등 로컬 UI 바인딩용.</summary>
     public static Player LocalPlayer { get; private set; }
@@ -54,6 +57,8 @@ public class Player : Unit
     private PlayerGroundingSensor groundingSensor;
     private PlayerInvulnerability invulnerability;
     private PlayerInputReader inputReader;
+    private NetworkTransform networkTransform;
+    private bool networkTransformMissingWarningLogged;
     private PlayerTickRingBuffer<PlayerRawSimulationInput> ownerRawInputHistory;
     private PlayerTickRingBuffer<PlayerSimulationState> ownerSimulationStateHistory;
     private readonly Queue<ServerRawSimulationInput> serverRawInputQueue =
@@ -61,8 +66,11 @@ public class Player : Unit
     private ServerRawSimulationInput lastServerRawInput;
     private bool hasLastServerRawInput;
     private int repeatedServerInputTicks;
+    private int droppedServerInputCount;
 
     private int reconSampleCount;
+    private int reconDiscardedSampleCount;
+    private int reconTickMismatchSampleCount;
     private double reconDivergenceSum;
     private float reconMaxDivergence;
     private double reconWindowStartedAt;
@@ -79,15 +87,23 @@ public class Player : Unit
 
     private readonly struct ServerRawSimulationInput
     {
-        public ServerRawSimulationInput(long tick, PlayerRawSimulationInput input, double rttSeconds)
+        public ServerRawSimulationInput(
+            long tick,
+            PlayerRawSimulationInput input,
+            Vector3 ownerPredictedPosition,
+            double rttSeconds)
         {
             Tick = tick;
             Input = input;
+            OwnerPredictedPosition = ownerPredictedPosition;
+            HasUsableOwnerPrediction = IsFinite(ownerPredictedPosition);
             RttSeconds = rttSeconds;
         }
 
         public long Tick { get; }
         public PlayerRawSimulationInput Input { get; }
+        public Vector3 OwnerPredictedPosition { get; }
+        public bool HasUsableOwnerPrediction { get; }
         public double RttSeconds { get; }
     }
 
@@ -113,6 +129,7 @@ public class Player : Unit
         groundingSensor = GetComponent<PlayerGroundingSensor>();
         invulnerability = GetComponent<PlayerInvulnerability>();
         inputReader = GetComponent<PlayerInputReader>();
+        networkTransform = GetComponent<NetworkTransform>();
 
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
@@ -176,6 +193,7 @@ public class Player : Unit
         lastServerRawInput = default;
         hasLastServerRawInput = false;
         repeatedServerInputTicks = 0;
+        droppedServerInputCount = 0;
         base.OnNetworkDespawn();
     }
 
@@ -464,6 +482,36 @@ public class Player : Unit
         if (motor != null)
             motor.enabled = IsSimulating;
 
+        if (networkTransform == null)
+        {
+            if (!networkTransformMissingWarningLogged)
+            {
+                networkTransformMissingWarningLogged = true;
+                Debug.LogWarning("[Player] 루트 NetworkTransform을 찾지 못해 이동 복제 활성 상태를 구성할 수 없습니다.", this);
+            }
+        }
+        else
+        {
+            bool enableNetworkTransform;
+            if (IsServer && IsOwner)
+            {
+                // 호스트 자기 캐릭터: 서버 권위 결과를 다른 피어에 송신해야 하므로 NT를 유지한다.
+                enableNetworkTransform = true;
+            }
+            else if (IsOwner)
+            {
+                // 클라이언트 자기 캐릭터: 서버 NT가 로컬 예측 위치를 덮어쓰지 않도록 NT만 끈다.
+                enableNetworkTransform = false;
+            }
+            else
+            {
+                // 남의 캐릭터: 서버 확정 상태를 NT 보간으로 표시해야 하므로 NT를 유지한다.
+                enableNetworkTransform = true;
+            }
+
+            networkTransform.enabled = enableNetworkTransform;
+        }
+
         LogMovementAuthorityState(reason);
     }
 
@@ -481,7 +529,7 @@ public class Player : Unit
         ownerRawInputHistory.Store(tick, rawInput);
         ownerSimulationStateHistory.Store(tick, resultState);
 
-        // NGO RPC 시그니처에서는 DTO를 펼치지만 전송 값은 raw 구조체의 두 필드뿐이다.
+        // 예측 위치는 같은 틱의 발산을 계측하기 위한 클라이언트 보고값일 뿐이며 게임 로직에 쓰지 않는다.
         // 호스트 오너는 이 인스턴스의 Motor 틱 자체가 서버 커밋이다. RPC 관측 경로를 다시 돌리면 이중 시뮬레이션된다.
         if (!IsServer)
         {
@@ -489,17 +537,19 @@ public class Player : Unit
                 tick,
                 rawInput.MoveDirection.x,
                 rawInput.MoveDirection.y,
-                rawInput.HasMoveInput);
+                rawInput.HasMoveInput,
+                resultState.Position);
             RecordMovementRpcSent();
         }
     }
 
-    [ServerRpc] // RequireOwnership 기본값 true. 서버는 raw 외의 게이트/배율/변위를 받지 않는다.
+    [ServerRpc] // RequireOwnership 기본값 true. 예측 위치는 신뢰하지 않는 계측값이며 판정·이동·보정에 쓰지 않는다.
     private void SubmitMovementInputServerRpc(
         long tick,
         float moveX,
         float moveY,
         bool hasMoveInput,
+        Vector3 ownerPredictedPosition,
         ServerRpcParams rpcParams = default)
     {
         ulong senderClientId = rpcParams.Receive.SenderClientId;
@@ -530,7 +580,15 @@ public class Player : Unit
         serverRawInputQueue.Enqueue(new ServerRawSimulationInput(
             tick,
             new PlayerRawSimulationInput(direction, hasMoveInput),
+            ownerPredictedPosition,
             GetSenderRttSeconds(senderClientId)));
+
+        // 버스트가 최대치를 넘으면 최신 입력을 보존하고 가장 오래된 입력부터 폐기한다.
+        while (serverRawInputQueue.Count > MaxServerInputQueueTicks)
+        {
+            serverRawInputQueue.Dequeue();
+            droppedServerInputCount++;
+        }
     }
 
     private void ProcessServerObservationInputs()
@@ -541,16 +599,30 @@ public class Player : Unit
             return;
         }
 
-        ServerRawSimulationInput inputForTick;
-        bool receivedFreshInput = serverRawInputQueue.Count > 0;
-        if (receivedFreshInput)
+        // 정상 틱에는 하나를 소비한다. 버스트로 목표 길이를 넘은 경우에는 오래된 입력도 실제로
+        // 시뮬레이션해 목표 길이까지 따라잡고, 최대 길이 초과분만 RPC 수신 시 폐기한다.
+        int freshInputsToConsume = serverRawInputQueue.Count > 0
+            ? 1 + Mathf.Max(0, serverRawInputQueue.Count - TargetServerInputQueueTicks)
+            : 0;
+
+        if (freshInputsToConsume > 0)
         {
-            inputForTick = serverRawInputQueue.Dequeue();
-            lastServerRawInput = inputForTick;
-            hasLastServerRawInput = true;
-            repeatedServerInputTicks = 0;
+            for (int i = 0; i < freshInputsToConsume; i++)
+            {
+                ServerRawSimulationInput freshInput = serverRawInputQueue.Dequeue();
+                lastServerRawInput = freshInput;
+                hasLastServerRawInput = true;
+                repeatedServerInputTicks = 0;
+
+                if (!SimulateServerObservationInput(freshInput, true))
+                    return;
+            }
+
+            return;
         }
-        else if (hasLastServerRawInput && repeatedServerInputTicks < MaxRepeatedServerInputTicks)
+
+        ServerRawSimulationInput inputForTick;
+        if (hasLastServerRawInput && repeatedServerInputTicks < MaxRepeatedServerInputTicks)
         {
             inputForTick = lastServerRawInput;
             repeatedServerInputTicks++;
@@ -561,64 +633,100 @@ public class Player : Unit
             inputForTick = new ServerRawSimulationInput(
                 CurrentSharedSimulationTick(),
                 default,
+                default,
                 hasLastServerRawInput ? lastServerRawInput.RttSeconds : 0.0);
         }
 
-        Vector3 positionBeforeCommit = motor.Position;
+        SimulateServerObservationInput(inputForTick, false);
+    }
+
+    private bool SimulateServerObservationInput(
+        ServerRawSimulationInput inputForTick,
+        bool receivedFreshInput)
+    {
+        long serverTick = CurrentSharedSimulationTick();
         if (!motor.TrySimulateServerObservation(
                 inputForTick.Input,
                 Time.fixedDeltaTime,
                 out PlayerSimulationState serverState))
         {
-            return;
+            return false;
         }
 
-        // 기존 [Recon]은 실제 수신 샘플에 대해서만 유지한다. 커밋 전 위치를 잡아 로그가 0으로 붕괴하지 않게 한다.
+        // [Recon]은 실제 수신 샘플만 대상으로 하며 반복 입력에는 클라이언트의 같은 틱 보고가 없다.
         if (receivedFreshInput)
         {
-            float divergence = Vector3.Distance(serverState.Position, positionBeforeCommit);
-            RecordReconciliationSample(
-                inputForTick.Tick,
-                CurrentSharedSimulationTick(),
-                divergence,
-                inputForTick.RttSeconds);
+            RecordReconciliationObservation(inputForTick, serverTick, serverState);
         }
+
+        return true;
     }
 
-    private void RecordReconciliationSample(
-        long inputTick,
+    private void RecordReconciliationObservation(
+        ServerRawSimulationInput input,
         long serverTick,
-        float divergence,
-        double rttSeconds)
+        PlayerSimulationState serverState)
     {
         double now = NetworkClock.Instance != null
             ? NetworkClock.Instance.MainGameElapsed
             : 0.0;
 
-        if (reconSampleCount == 0)
+        if (reconSampleCount == 0 && reconDiscardedSampleCount == 0)
         {
             reconWindowStartedAt = now;
-            reconWindowFirstTick = inputTick;
+            reconWindowFirstTick = input.Tick;
         }
 
-        reconSampleCount++;
-        reconDivergenceSum += divergence;
-        reconMaxDivergence = Mathf.Max(reconMaxDivergence, divergence);
-        reconWindowLastTick = inputTick;
+        reconWindowLastTick = input.Tick;
         reconWindowLastServerTick = serverTick;
+
+        // 발산은 같은 틱 N의 오너 예측 위치와 서버 확정 위치만 비교한다. 서버가 N을 아직 돌지
+        // 않았거나 이미 지났다면(input.Tick != serverTick) 억지로 정렬하지 않고 샘플을 폐기한다.
+        // OwnerPredictedPosition은 클라이언트가 보고한 비신뢰 계측값이며 게임 로직에는 절대 사용하지 않는다.
+        if (input.Tick != serverTick ||
+            !input.HasUsableOwnerPrediction ||
+            !IsFinite(serverState.Position))
+        {
+            reconDiscardedSampleCount++;
+            if (input.Tick != serverTick)
+                reconTickMismatchSampleCount++;
+        }
+        else
+        {
+            float divergence = Vector3.Distance(input.OwnerPredictedPosition, serverState.Position);
+            if (!IsFinite(divergence))
+            {
+                reconDiscardedSampleCount++;
+            }
+            else
+            {
+                reconSampleCount++;
+                reconDivergenceSum += divergence;
+                reconMaxDivergence = Mathf.Max(reconMaxDivergence, divergence);
+            }
+        }
 
         if (now - reconWindowStartedAt < ReconciliationLogIntervalSeconds)
             return;
 
-        double average = reconDivergenceSum / reconSampleCount;
+        string average = reconSampleCount > 0
+            ? $"{reconDivergenceSum / reconSampleCount:F3}m"
+            : "n/a";
+        string maximum = reconSampleCount > 0
+            ? $"{reconMaxDivergence:F3}m"
+            : "n/a";
         Edit.Log(
             $"[Recon] owner={OwnerClientId} inputTicks={reconWindowFirstTick}..{reconWindowLastTick} " +
             $"serverTick={reconWindowLastServerTick} lagTicks={reconWindowLastServerTick - reconWindowLastTick} " +
-            $"samples={reconSampleCount} divergence avg={average:F3}m max={reconMaxDivergence:F3}m " +
-            $"RTT={rttSeconds * 1000.0:F1}ms (관측 전용, 보정 없음)",
+            $"samples={reconSampleCount} discardedSamples={reconDiscardedSampleCount} " +
+            $"tickMismatchSamples={reconTickMismatchSampleCount} droppedInputsTotal={droppedServerInputCount} " +
+            $"divergence avg={average} max={maximum} " +
+            $"RTT={input.RttSeconds * 1000.0:F1}ms (비신뢰 관측 전용, 보정 없음)",
             this);
 
         reconSampleCount = 0;
+        reconDiscardedSampleCount = 0;
+        reconTickMismatchSampleCount = 0;
         reconDivergenceSum = 0.0;
         reconMaxDivergence = 0f;
         reconWindowStartedAt = now;
@@ -658,8 +766,11 @@ public class Player : Unit
         lastServerRawInput = default;
         hasLastServerRawInput = false;
         repeatedServerInputTicks = 0;
+        droppedServerInputCount = 0;
         motor?.ResetServerObservation();
         reconSampleCount = 0;
+        reconDiscardedSampleCount = 0;
+        reconTickMismatchSampleCount = 0;
         reconDivergenceSum = 0.0;
         reconMaxDivergence = 0f;
         reconWindowStartedAt = 0.0;
@@ -708,7 +819,8 @@ public class Player : Unit
         string received = IsServer ? movementRpcReceivedCount.ToString() : "n/a";
         Edit.Log(
             $"[MoveDiag] RPC 1s summary: {MovementDiagnosticIdentity()}, sent={sent}, " +
-            $"received={received}, queued={serverRawInputQueue.Count}, motorTicks={motor?.MovementDiagnosticTickCount ?? 0}, " +
+            $"received={received}, queued={serverRawInputQueue.Count}, droppedInputsTotal={droppedServerInputCount}, " +
+            $"motorTicks={motor?.MovementDiagnosticTickCount ?? 0}, " +
             $"clock={(clock != null ? "present" : "missing")}/running={clock != null && clock.IsRunning}" +
             $"/mainStarted={clock != null && clock.HasMainGameStarted}",
             this);
@@ -740,6 +852,7 @@ public class Player : Unit
             $"IsServer={IsServer}, IsInputSource={IsInputSource}, IsSimulating={IsSimulating}, " +
             $"IsMotionAuthority={IsMotionAuthority}, IsRemoteProxy={IsRemoteProxy}, " +
             $"motor.enabled={motor != null && motor.enabled}, Motor.Mode={(motor != null ? motor.Mode.ToString() : "missing")}, " +
+            $"NetworkTransform.enabled={(networkTransform != null ? networkTransform.enabled.ToString() : "missing")}, " +
             $"NetworkClock={(clock != null ? "present" : "missing")}/running={clock != null && clock.IsRunning}" +
             $"/mainStarted={clock != null && clock.HasMainGameStarted}, " +
             $"PlayerInput.enabled={unityPlayerInput != null && unityPlayerInput.enabled}, " +
@@ -757,8 +870,17 @@ public class Player : Unit
 
     private static bool IsFinite(Vector2 value)
     {
-        return !float.IsNaN(value.x) && !float.IsInfinity(value.x) &&
-               !float.IsNaN(value.y) && !float.IsInfinity(value.y);
+        return IsFinite(value.x) && IsFinite(value.y);
+    }
+
+    private static bool IsFinite(Vector3 value)
+    {
+        return IsFinite(value.x) && IsFinite(value.y) && IsFinite(value.z);
+    }
+
+    private static bool IsFinite(float value)
+    {
+        return !float.IsNaN(value) && !float.IsInfinity(value);
     }
 
     public void NotifyKnockbackEnded()
