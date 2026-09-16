@@ -380,10 +380,15 @@ public sealed class PlayerMotor : MonoBehaviour
             float externalShift = Vector3.Distance(positionBeforeAnchor, lastCommittedServerPosition);
             if (externalShift > ExternalMoveDetectionThreshold)
             {
+                Transform parent = transform.parent;
                 Edit.LogWarning(
                     $"[MoveDiag] 외부가 서버 플레이어를 옮겼습니다 — Motor 커밋={lastCommittedServerPosition}, " +
-                    $"이번 틱 transform={positionBeforeAnchor}, 이동거리={externalShift:F3}m. " +
-                    "Motor 밖에서 위치를 쓴 곳을 확인하세요(낙사 복귀·텔레포트 등).", this);
+                    $"이번 틱 rb.position={positionBeforeAnchor}, 이동거리={externalShift:F3}m | " +
+                    $"transform.position={transform.position}, localPosition={transform.localPosition}, " +
+                    $"parent={(parent != null ? parent.name : "none")}" +
+                    $"{(parent != null ? $"@{parent.position} scale{parent.lossyScale}" : string.Empty)}, " +
+                    $"lossyScale={transform.lossyScale}, isKinematic={playerRigidbody?.isKinematic}, " +
+                    $"interpolation={playerRigidbody?.interpolation}", this);
             }
         }
 
