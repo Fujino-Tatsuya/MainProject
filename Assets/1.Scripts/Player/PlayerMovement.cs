@@ -93,6 +93,9 @@ public class PlayerMovement : MonoBehaviour
         };
     }
 
+    /// <summary>시각 보간이 오프셋을 걸 대상. 메시 루트다.</summary>
+    public Transform ArmatureTransform => armature;
+
     internal Quaternion ArmatureRotation =>
         armature != null ? armature.rotation : transform.rotation;
 

@@ -34,6 +34,7 @@ public sealed class PlayerMotor : MonoBehaviour
     private PlayerMovement movement;
     private Player player;
     private RuntimeMotionResolver motionResolver;
+    private PlayerVisualReconciliationSmoother visualSmoother;
 
     private Vector3 pendingVelocity;
     private Vector3 pendingGroundedDisplacement;
@@ -252,6 +253,7 @@ public sealed class PlayerMotor : MonoBehaviour
         movement = GetComponent<PlayerMovement>();
         player = GetComponent<Player>();
         motionResolver = new RuntimeMotionResolver(this);
+        visualSmoother = GetComponent<PlayerVisualReconciliationSmoother>();
         mode = playerRigidbody != null && !playerRigidbody.isKinematic
             ? MotorMode.Dynamic
             : MotorMode.Kinematic;
@@ -509,6 +511,12 @@ public sealed class PlayerMotor : MonoBehaviour
 
     internal void ApplyAuthoritativeState(PlayerSimulationState state)
     {
+        // 보정 전 위치를 잡아 시각 보간에 넘긴다. 시뮬레이션은 즉시 스냅하되(물리·판정은 권위 위치가
+        // 진실이다) 화면만 이 점프를 몇 프레임에 걸쳐 흡수한다.
+        Vector3 positionBeforeCorrection = playerRigidbody != null
+            ? playerRigidbody.position
+            : transform.position;
+
         simulationState = state;
         movement?.CommitSimulationState(simulationState, true);
 
@@ -521,6 +529,8 @@ public sealed class PlayerMotor : MonoBehaviour
         {
             transform.SetPositionAndRotation(simulationState.Position, simulationState.RootRotation);
         }
+
+        visualSmoother?.AbsorbCorrection(positionBeforeCorrection - simulationState.Position);
     }
 
     /// <summary>서버가 예측 대상이 아닌 순간이동을 확정하고 다음 시뮬레이션의 기준점도 함께 옮긴다.</summary>
