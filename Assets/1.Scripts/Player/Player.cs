@@ -67,6 +67,9 @@ public class Player : Unit
     private bool hasLastServerRawInput;
     private int repeatedServerInputTicks;
     private int droppedServerInputCount;
+    // 각 피어의 물리 틱마다 정확히 한 번 증가하는 로컬 입력 시퀀스다.
+    // 서버 틱과 같은 절대 시각일 필요는 없고, 오너가 보낸 입력열의 연속성만 표현한다.
+    private long localSimulationTick;
 
     private int reconSampleCount;
     private int reconDiscardedSampleCount;
@@ -278,6 +281,9 @@ public class Player : Unit
 
     private void FixedUpdate()
     {
+        if (localSimulationTick < long.MaxValue)
+            localSimulationTick++;
+
         // 플랫폼 변위는 Motor를 실제로 돌리는 피어만 제출한다. 원격 프록시는 서버 NT 결과만 표시한다.
         if (IsSimulating)
         {
@@ -538,7 +544,7 @@ public class Player : Unit
         if (!IsSpawned || !IsOwner || clock == null || !clock.IsRunning || !clock.HasMainGameStarted)
             return;
 
-        long tick = CurrentSharedSimulationTick();
+        long tick = CurrentSimulationTick();
 
         // b2의 되감기/재생 입력과 서버 비교 대상. 동일 틱은 마지막 물리 호출 결과로 교체된다.
         ownerRawInputHistory.Store(tick, rawInput);
@@ -650,7 +656,7 @@ public class Player : Unit
         {
             // 입력 기아가 10틱을 넘으면 입력을 놓은 것으로 간주한다. 감속/중력은 계속 서버에서 시뮬레이션된다.
             inputForTick = new ServerRawSimulationInput(
-                CurrentSharedSimulationTick(),
+                CurrentSimulationTick(),
                 default,
                 default,
                 hasLastServerRawInput ? lastServerRawInput.RttSeconds : 0.0);
@@ -664,7 +670,7 @@ public class Player : Unit
         ServerRawSimulationInput inputForTick,
         bool receivedFreshInput)
     {
-        long serverTick = CurrentSharedSimulationTick();
+        long serverTick = CurrentSimulationTick();
         if (!motor.TrySimulateServerObservation(
                 inputForTick.Input,
                 Time.fixedDeltaTime,
@@ -786,13 +792,7 @@ public class Player : Unit
         return System.Math.Max(0.0, transport.GetCurrentRtt(senderClientId) / 1000.0);
     }
 
-    private static long CurrentSharedSimulationTick()
-    {
-        NetworkClock clock = NetworkClock.Instance;
-        return PlayerSimulationTick.FromMainGameElapsed(
-            clock != null ? clock.MainGameElapsed : 0.0,
-            Time.fixedDeltaTime);
-    }
+    private long CurrentSimulationTick() => localSimulationTick;
 
     private void ResetReconciliationObservation()
     {
@@ -803,6 +803,7 @@ public class Player : Unit
         hasLastServerRawInput = false;
         repeatedServerInputTicks = 0;
         droppedServerInputCount = 0;
+        localSimulationTick = 0L;
         motor?.ResetServerObservation();
         reconSampleCount = 0;
         reconDiscardedSampleCount = 0;

@@ -263,19 +263,6 @@ public readonly struct PlayerRawSimulationInput
     public bool HasMoveInput { get; }
 }
 
-/// <summary>공유 MainGame 시각을 물리 틱 번호로 바꾸는 단일 규칙.</summary>
-public static class PlayerSimulationTick
-{
-    public static long FromMainGameElapsed(double elapsed, float fixedDeltaTime)
-    {
-        if (double.IsNaN(elapsed) || double.IsInfinity(elapsed) || elapsed <= 0.0 || fixedDeltaTime <= 0f)
-            return 0L;
-
-        double tick = System.Math.Floor(elapsed / fixedDeltaTime);
-        return tick >= long.MaxValue ? long.MaxValue : (long)tick;
-    }
-}
-
 /// <summary>
 /// b2 재생을 위한 고정 용량 틱 이력. 최신 틱과 같은 값은 교체하고, 더 과거 틱은 거부하며,
 /// 용량을 넘으면 가장 오래된 항목부터 덮어쓴다.
