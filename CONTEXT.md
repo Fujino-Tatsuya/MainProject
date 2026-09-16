@@ -8,6 +8,34 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 진행 중 — 허수아비 (2026-09-16 · 브랜치 `feature/training-dummy`)
+
+**작업 세션.** Claude 단독. 수정 파일 = `Assets/1.Scripts/Map/TrainingDummy/*`,
+`Assets/2.Prefabs/TrainingDummy.prefab`, `Assets/DefaultNetworkPrefabs.asset`. **이 파일들 동시 수정 금지.**
+
+**상태.** 코드·프리팹 완료, 컴파일 오류 0. **Play 검증 대기**(호스트 단독 + MPPM 2인).
+설계·확정 사양·알려진 한계는 [PLAN-training-dummy.md](PLAN-training-dummy.md) — 여기 중복 기술하지 않는다.
+
+**용어.** *허수아비(Training Dummy)* = 연습장에 놓는 표적. **몬스터가 아니라 맵 오브젝트다** —
+`MonsterBase` 계열을 일절 쓰지 않고 `Unit` 만 상속한다. 경석(팀장)의 몬스터 담당 범위 밖.
+
+### 🔴 이번에 확인된 사실 — 전부 코드로 검증됨
+
+1. **`UnitBase` / `IDamageable` 은 이 레포에 없다.** 실제 이름은 `Unit` / `IAttackReceiver` 다.
+2. **`CombatTarget`(18) 레이어는 정의만 있고 C# 어디에서도 참조되지 않는다.**
+   여기에 무언가를 두면 플레이어 스킬이 하나도 맞지 않는다. 피격 대상은 `Enemy`(8) + `EnemyHurtBox`(14) 다.
+3. **체력 0 은 조준을 끊는다.** `PlayerSkillTargeting` 이 `CurrentHealth <= 0` 을 InvalidTarget 으로 처리한다
+   (`:201` / `:293` / `:387`). 죽지 않는 대상은 하한을 **1** 로 둬야 궁극기 조준이 유지된다.
+4. **데미지 숫자는 "실제 HP 델타"다** (`Unit.cs:533`). 체력이 하한에 붙으면 델타가 0 이라 숫자가 멈춘다.
+   명목 피해를 띄우려면 전용 RPC 경로가 필요하다.
+5. **`UnitOverheadHealthBar` 는 플레이어 전용이다** — `GetComponentInParent<Player>()` + `!IsOwner` 가 박혀 있다.
+   다른 유닛에 재사용 불가.
+
+### 다음 작업
+- 연습장 씬과 진입 흐름 (은희 · 네트워크/SceneManagement) — `NetworkLoadingFlowController` 가
+  `targetSceneName = "MapScene"` 를 하드코딩 중이라 그쪽을 손대야 한다
+- DPS 미터 / 상태이상 아이콘 UI — 별도 작업으로 분리됨
+
 ## ▶▶ 현재 인수인계 (2026-09-16 · 플레이어 이동 Motor 4b3, 브랜치 `feature/player-motor`)
 
 **상태.** 4단계까지 완료. **오너 권위 브랜치 전 항목 Play 검증 통과(2026-09-16).**
