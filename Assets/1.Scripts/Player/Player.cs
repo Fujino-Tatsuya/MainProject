@@ -1369,18 +1369,38 @@ public class Player : Unit
         // 서버가 남의 캐릭터를 시뮬레이션하는 경우에만 "왜 안 움직이는가"를 함께 찍는다.
         // 판정법: hasMove=False 면 입력이 안 실려온 것, canMove=False 면 상태 머신이 막은 것,
         // 둘 다 True 인데 pos 가 안 변하면 스윕이 막은 것(blocked 로 확인).
-        string serverSim = IsServer && !IsOwner
-            ? $", srvPos={lastServerSimPosition.x:F2}/{lastServerSimPosition.y:F2}/{lastServerSimPosition.z:F2}" +
-              $", dir={lastServerSimDirection.x:F2}/{lastServerSimDirection.y:F2}" +
-              $", hasMove={lastServerSimHasMoveInput}, canMove={(stateController != null && stateController.CanMove)}" +
-              $", state={(stateController != null ? stateController.CurrentState.ToString() : "missing")}" +
-              $", grounded={lastServerSimGrounded}, blocked={lastServerSimBlocked}"
-            : string.Empty;
+        // 🔴 실제 transform 위치는 **어느 피어에서든** 찍는다. 이게 "어디에 있나"의 1차 증거다.
+        Vector3 actualPosition = motor != null ? motor.Position : transform.position;
+        string pos =
+            $", pos={actualPosition.x:F2}/{actualPosition.y:F2}/{actualPosition.z:F2}";
+
+        // 서버 시뮬레이션 스냅샷은 **그 경로가 실제로 돈 경우에만** 의미가 있다.
+        // 오너 권위에서는 ProcessServerObservationInputs 가 아예 안 돌아 이 필드들이 전부 기본값(0)으로
+        // 남는다. 그걸 그대로 찍으면 "서버가 원점에 있다"로 읽혀 진단을 정반대로 오도한다 —
+        // 2026-09-16 실제로 그렇게 오독했다. 경로가 꺼져 있으면 값 대신 그 사실을 적는다.
+        string serverSim;
+        if (!IsServer || IsOwner)
+        {
+            serverSim = string.Empty;
+        }
+        else if (!UsesServerAuthoritativeMovement)
+        {
+            serverSim = ", serverSim=off(owner-auth)";
+        }
+        else
+        {
+            serverSim =
+                $", srvPos={lastServerSimPosition.x:F2}/{lastServerSimPosition.y:F2}/{lastServerSimPosition.z:F2}" +
+                $", dir={lastServerSimDirection.x:F2}/{lastServerSimDirection.y:F2}" +
+                $", hasMove={lastServerSimHasMoveInput}, canMove={(stateController != null && stateController.CanMove)}" +
+                $", state={(stateController != null ? stateController.CurrentState.ToString() : "missing")}" +
+                $", grounded={lastServerSimGrounded}, blocked={lastServerSimBlocked}";
+        }
 
         Edit.Log(
             $"[MoveDiag] RPC 1s summary: {MovementDiagnosticIdentity()}, sent={sent}, " +
             $"received={received}, queued={serverRawInputQueue.Count}, droppedInputsTotal={droppedServerInputCount}, " +
-            $"motorTicks={motor?.MovementDiagnosticTickCount ?? 0}{serverSim}, " +
+            $"motorTicks={motor?.MovementDiagnosticTickCount ?? 0}{pos}{serverSim}, " +
             $"clock={(clock != null ? "present" : "missing")}/running={clock != null && clock.IsRunning}" +
             $"/mainStarted={clock != null && clock.HasMainGameStarted}",
             this);
@@ -1408,7 +1428,10 @@ public class Player : Unit
         NetworkClock clock = NetworkClock.Instance;
         PlayerInput unityPlayerInput = GetComponent<PlayerInput>();
         Edit.Log(
-            $"[MoveDiag] authority ({reason}): {MovementDiagnosticIdentity()}, IsOwner={IsOwner}, " +
+            $"[MoveDiag] authority ({reason}): {MovementDiagnosticIdentity()}, " +
+            // 🔴 스폰 시점 위치. 오너 권위에서는 "서버의 스폰 좌표가 오너에게 전달됐는가"가 핵심이고,
+            // 전달 실패는 오너가 프리팹 원점(0,0,0)에 남는 형태로 나타난다.
+            $"pos={(motor != null ? motor.Position : transform.position)}, IsOwner={IsOwner}, " +
             $"IsServer={IsServer}, IsInputSource={IsInputSource}, IsSimulating={IsSimulating}, " +
             $"IsMotionAuthority={IsMotionAuthority}, IsRemoteProxy={IsRemoteProxy}, " +
             $"motor.enabled={motor != null && motor.enabled}, Motor.Mode={(motor != null ? motor.Mode.ToString() : "missing")}, " +
