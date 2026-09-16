@@ -17,6 +17,8 @@ public sealed class PlayerMotor : MonoBehaviour
     private const float DefaultMaxFallSpeed = 30f;
     private const float DefaultKnockbackDeceleration = 6f;
     private const float NonPlanarDisplacementTolerance = 0.0001f;
+    // 한 틱 최대 이동량(대시 ~20m/s × 0.02s = 0.4m)보다 넉넉히 크게 잡아 정상 이동을 오탐하지 않는다.
+    private const float ExternalMoveDetectionThreshold = 1.0f;
 
     [Header("충돌 (최종 이동 스윕)")]
     [SerializeField] private PlayerGameRuleData gameRule;
@@ -50,6 +52,11 @@ public sealed class PlayerMotor : MonoBehaviour
     private Quaternion serverPendingPoseRotation;
     private bool serverHasPendingPose;
     private bool hasServerObservationState;
+
+    // 외부 이동 감지용 — Motor가 직전 틱에 커밋한 위치. 이번 틱에 읽은 transform과 다르면
+    // 이 경로 밖의 무언가가 오브젝트를 옮긴 것이다(낙사 복귀·텔레포트·복제 등). 원인을 몰라도 범인이 잡힌다.
+    private Vector3 lastCommittedServerPosition;
+    private bool hasLastCommittedServerPosition;
     private PlayerSimulationState serverObservationState;
 
     // [MoveDiag] 진단 전용 상태. UNITY_EDITOR 빌드에서만 호출되며 시뮬레이션 값에는 관여하지 않는다.
@@ -363,6 +370,23 @@ public sealed class PlayerMotor : MonoBehaviour
         // 일반 모터 경로는 이미 매 틱 CaptureSceneState()로 같은 일을 한다(이 파일 286행).
         // 커밋 경로도 같아야 한다. 정상 상태에서는 우리 자신의 커밋을 되읽는 것이라 무해하고,
         // 외부가 오브젝트를 옮기면 다음 틱에 스스로 복구된다.
+        // 🔴 외부 이동 감지 — 앵커로 읽어들이기 **직전에** 비교해야 한다.
+        // Motor가 직전 틱에 커밋한 위치와 지금 transform이 다르면 이 경로 밖의 무언가가 옮긴 것이다.
+        // 낙사 복귀(PlayerFallRecovery는 transform/body.position을 직접 쓴다), 보스 텔레포트,
+        // 복제, 스폰 재배치 등. 원인을 몰라도 "누가 옮겼나"가 잡힌다.
+        Vector3 positionBeforeAnchor = playerRigidbody != null ? playerRigidbody.position : transform.position;
+        if (hasLastCommittedServerPosition)
+        {
+            float externalShift = Vector3.Distance(positionBeforeAnchor, lastCommittedServerPosition);
+            if (externalShift > ExternalMoveDetectionThreshold)
+            {
+                Edit.LogWarning(
+                    $"[MoveDiag] 외부가 서버 플레이어를 옮겼습니다 — Motor 커밋={lastCommittedServerPosition}, " +
+                    $"이번 틱 transform={positionBeforeAnchor}, 이동거리={externalShift:F3}m. " +
+                    "Motor 밖에서 위치를 쓴 곳을 확인하세요(낙사 복귀·텔레포트 등).", this);
+            }
+        }
+
         CaptureSceneState(ref serverObservationState, true);
 
         PlayerSimulationInput input = movement != null
@@ -418,6 +442,10 @@ public sealed class PlayerMotor : MonoBehaviour
                 ApplyRigidbodyPose(simulationState.Position, default, false);
         }
 
+        // 다음 틱의 외부 이동 감지 기준. 커밋한 위치를 그대로 기억한다.
+        lastCommittedServerPosition = simulationState.Position;
+        hasLastCommittedServerPosition = true;
+
         return true;
     }
 
@@ -425,6 +453,8 @@ public sealed class PlayerMotor : MonoBehaviour
     {
         hasServerObservationState = false;
         serverObservationState = default;
+        lastCommittedServerPosition = Vector3.zero;
+        hasLastCommittedServerPosition = false;
         ClearServerPendingMotion();
     }
 
