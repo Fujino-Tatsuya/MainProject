@@ -99,6 +99,9 @@ public class Player : Unit
     private long reconWindowFirstTick;
     private long reconWindowLastTick;
     private long reconWindowLastServerTick;
+    // 입력이 서버 지터 버퍼에서 기다린 틱 수(서버 틱끼리의 차). 옛 lagTicks 는 오너 틱과 서버 틱을
+    // 뺐는데, b3-0 이후 둘은 각자 자기 피어 스폰 시점에 0에서 출발하는 별개 카운터라 무의미했다.
+    private long reconWindowLastQueueWaitTicks;
 
     // 오너 보정 관측. 게임 판정에는 쓰지 않고 [Recon] 빈도/크기 튜닝에만 사용한다.
     private double ownerReconWindowEndsAt;
@@ -125,13 +128,15 @@ public class Player : Unit
             long tick,
             PlayerRawSimulationInput input,
             Vector3 ownerPredictedPosition,
-            double rttSeconds)
+            double rttSeconds,
+            long enqueuedServerTick)
         {
             Tick = tick;
             Input = input;
             OwnerPredictedPosition = ownerPredictedPosition;
             HasUsableOwnerPrediction = IsFinite(ownerPredictedPosition);
             RttSeconds = rttSeconds;
+            EnqueuedServerTick = enqueuedServerTick;
         }
 
         public long Tick { get; }
@@ -139,6 +144,14 @@ public class Player : Unit
         public Vector3 OwnerPredictedPosition { get; }
         public bool HasUsableOwnerPrediction { get; }
         public double RttSeconds { get; }
+
+        /// <summary>
+        /// 이 입력이 서버 큐에 들어간 순간의 **서버 자신의** localSimulationTick.
+        /// 소비 시점의 서버 틱에서 이 값을 빼면 지터 버퍼에서 기다린 틱 수가 나온다.
+        /// b3-0 이후 오너 틱과 서버 틱은 각자 자기 피어의 스폰 시점에 0에서 출발하는 별개 카운터라
+        /// 둘을 빼는 것(옛 lagTicks)은 스폰 시각 차이만큼 통째로 어긋난다. 그래서 서버 틱끼리만 뺀다.
+        /// </summary>
+        public long EnqueuedServerTick { get; }
     }
 
     public PlayerActionState CurrentState => stateController != null ? stateController.CurrentState : PlayerActionState.Idle;
@@ -606,7 +619,8 @@ public class Player : Unit
             tick,
             new PlayerRawSimulationInput(direction, hasMoveInput),
             ownerPredictedPosition,
-            GetSenderRttSeconds(senderClientId)));
+            GetSenderRttSeconds(senderClientId),
+            CurrentSimulationTick()));
 
         // 버스트가 최대치를 넘으면 최신 입력을 보존하고 가장 오래된 입력부터 폐기한다.
         while (serverRawInputQueue.Count > MaxServerInputQueueTicks)
@@ -663,7 +677,8 @@ public class Player : Unit
                 CurrentSimulationTick(),
                 default,
                 default,
-                hasLastServerRawInput ? lastServerRawInput.RttSeconds : 0.0);
+                hasLastServerRawInput ? lastServerRawInput.RttSeconds : 0.0,
+                CurrentSimulationTick());
             hasExpectedServerInputTick = false;
         }
 
@@ -948,6 +963,7 @@ public class Player : Unit
 
         reconWindowLastTick = input.Tick;
         reconWindowLastServerTick = serverTick;
+        reconWindowLastQueueWaitTicks = System.Math.Max(0L, serverTick - input.EnqueuedServerTick);
 
         // 발산 = 같은 **입력 틱 N** 에 대한 [오너가 보고한 예측 위치] vs [서버가 N을 소비한 뒤의 확정 위치].
         // 서버가 그 입력을 자기 공유틱 몇 번에 소비했는지(lagTicks)는 무관하다 — 원격 클라에서 lag 은
@@ -996,7 +1012,7 @@ public class Player : Unit
             : "n/a";
         Edit.Log(
             $"[Recon] owner={OwnerClientId} inputTicks={reconWindowFirstTick}..{reconWindowLastTick} " +
-            $"serverTick={reconWindowLastServerTick} lagTicks={reconWindowLastServerTick - reconWindowLastTick} " +
+            $"serverTick={reconWindowLastServerTick} queueWaitTicks={reconWindowLastQueueWaitTicks} " +
             $"samples={reconSampleCount} discardedSamples={reconDiscardedSampleCount} " +
             $"sequenceBreakSamples={reconSequenceBreakSampleCount} droppedInputsTotal={droppedServerInputCount} " +
             $"divergence avg={average} max={maximum} " +
@@ -1057,6 +1073,7 @@ public class Player : Unit
         reconWindowFirstTick = 0L;
         reconWindowLastTick = 0L;
         reconWindowLastServerTick = 0L;
+        reconWindowLastQueueWaitTicks = 0L;
         ownerReconWindowEndsAt = Time.realtimeSinceStartupAsDouble + ReconciliationLogIntervalSeconds;
         ownerCorrectionReceivedCount = 0;
         ownerCorrectionWithinThresholdCount = 0;
