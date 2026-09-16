@@ -67,7 +67,10 @@ public sealed class PlayerMotor : MonoBehaviour
 
     public bool WasBlockedThisTick => simulationState.WasBlockedThisTick;
     public event System.Action<Vector3, Vector3, bool> MovementResolved;
-    public event System.Action<PlayerRawSimulationInput, PlayerSimulationState> SimulationCompleted;
+    public event System.Action<
+        PlayerRawSimulationInput,
+        PlayerSimulationInput,
+        PlayerSimulationState> SimulationCompleted;
 
     public Vector3 Position => playerRigidbody != null ? playerRigidbody.position : transform.position;
     public float VerticalVelocity => simulationState.VerticalVelocity;
@@ -332,7 +335,7 @@ public sealed class PlayerMotor : MonoBehaviour
                 ApplyRigidbodyPose(simulationState.Position, default, false);
         }
 
-        SimulationCompleted?.Invoke(rawInput, simulationState);
+        SimulationCompleted?.Invoke(rawInput, input, simulationState);
     }
 
     /// <summary>
@@ -461,7 +464,7 @@ public sealed class PlayerMotor : MonoBehaviour
     /// </summary>
     internal bool TryApplyAuthoritativeStateAndReplay(
         PlayerSimulationState authoritativeState,
-        PlayerTickRingBuffer<PlayerRawSimulationInput> rawInputHistory,
+        PlayerTickRingBuffer<PlayerSimulationInput> replayInputHistory,
         PlayerTickRingBuffer<PlayerSimulationState> stateHistory,
         long firstReplayTick,
         long lastReplayTick,
@@ -474,18 +477,11 @@ public sealed class PlayerMotor : MonoBehaviour
 
         for (long tick = firstReplayTick; tick <= lastReplayTick; tick++)
         {
-            if (!rawInputHistory.TryGet(tick, out PlayerRawSimulationInput rawInput))
+            if (!replayInputHistory.TryGet(tick, out PlayerSimulationInput input))
                 return false;
 
             replayTicks.Add(tick);
-            replayInputs.Add(movement != null
-                ? movement.CaptureSimulationInput(rawInput)
-                : new PlayerSimulationInput
-                {
-                    MoveDirection = rawInput.MoveDirection,
-                    HasMoveInput = rawInput.HasMoveInput,
-                    MoveSpeedMultiplier = 1f
-                });
+            replayInputs.Add(input);
 
             if (tick == long.MaxValue)
                 break;

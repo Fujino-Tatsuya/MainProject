@@ -61,6 +61,7 @@ public class Player : Unit
     private NetworkTransform networkTransform;
     private bool networkTransformMissingWarningLogged;
     private PlayerTickRingBuffer<PlayerRawSimulationInput> ownerRawInputHistory;
+    private PlayerTickRingBuffer<PlayerSimulationInput> ownerReplayInputHistory;
     private PlayerTickRingBuffer<PlayerSimulationState> ownerSimulationStateHistory;
     private readonly Queue<ServerRawSimulationInput> serverRawInputQueue =
         new Queue<ServerRawSimulationInput>();
@@ -185,6 +186,7 @@ public class Player : Unit
             ReconciliationHistorySeconds,
             Time.fixedDeltaTime);
         ownerRawInputHistory = new PlayerTickRingBuffer<PlayerRawSimulationInput>(historyCapacity);
+        ownerReplayInputHistory = new PlayerTickRingBuffer<PlayerSimulationInput>(historyCapacity);
         ownerSimulationStateHistory = new PlayerTickRingBuffer<PlayerSimulationState>(historyCapacity);
 
         if (motor != null)
@@ -235,6 +237,7 @@ public class Player : Unit
             motor.enabled = false;
         }
         ownerRawInputHistory?.Clear();
+        ownerReplayInputHistory?.Clear();
         ownerSimulationStateHistory?.Clear();
         serverRawInputQueue.Clear();
         lastServerRawInput = default;
@@ -555,6 +558,7 @@ public class Player : Unit
 
     private void HandleOwnerSimulationCompleted(
         PlayerRawSimulationInput rawInput,
+        PlayerSimulationInput simulationInput,
         PlayerSimulationState resultState)
     {
         NetworkClock clock = NetworkClock.Instance;
@@ -563,8 +567,11 @@ public class Player : Unit
 
         long tick = CurrentSimulationTick();
 
-        // b3의 되감기/재생 입력과 서버 비교 대상. 동일 틱은 마지막 물리 호출 결과로 교체된다.
+        // raw는 서버 전송용이고, 실제 소비한 전체 입력은 오너의 로컬 재생에만 쓴다.
+        // 외부 변위를 RPC로 보내 서버가 신뢰하게 만들면 서버 권위가 무너지므로 둘을 분리한다.
+        // 동일 틱은 마지막 물리 호출 결과로 교체된다.
         ownerRawInputHistory.Store(tick, rawInput);
+        ownerReplayInputHistory.Store(tick, simulationInput);
         ownerSimulationStateHistory.Store(tick, resultState);
 
         // 예측 위치는 같은 틱의 발산을 계측하기 위한 클라이언트 보고값일 뿐이며 게임 로직에 쓰지 않는다.
@@ -875,7 +882,7 @@ public class Player : Unit
                     : long.MaxValue;
                 bool forceReplayed = motor.TryApplyAuthoritativeStateAndReplay(
                     authoritativeState,
-                    ownerRawInputHistory,
+                    ownerReplayInputHistory,
                     ownerSimulationStateHistory,
                     forceFirstReplayTick,
                     forceLatestInputTick,
@@ -885,6 +892,7 @@ public class Player : Unit
                 {
                     ownerCorrectionReplayTickCount += forceReplayedTickCount;
                     ownerRawInputHistory.DiscardThrough(inputTick);
+                    ownerReplayInputHistory.DiscardThrough(inputTick);
                     return;
                 }
 
@@ -897,6 +905,7 @@ public class Player : Unit
             ownerCorrectionHistoryMissCount++;
             motor.ApplyAuthoritativeState(authoritativeState);
             ownerRawInputHistory.Clear();
+            ownerReplayInputHistory.Clear();
             ownerSimulationStateHistory.Clear();
             return;
         }
@@ -908,6 +917,7 @@ public class Player : Unit
         {
             ownerCorrectionWithinThresholdCount++;
             ownerRawInputHistory.DiscardThrough(inputTick);
+            ownerReplayInputHistory.DiscardThrough(inputTick);
             ownerSimulationStateHistory.DiscardThrough(inputTick);
             return;
         }
@@ -921,7 +931,7 @@ public class Player : Unit
         long firstReplayTick = inputTick < long.MaxValue ? inputTick + 1 : long.MaxValue;
         bool replayed = motor.TryApplyAuthoritativeStateAndReplay(
             authoritativeState,
-            ownerRawInputHistory,
+            ownerReplayInputHistory,
             ownerSimulationStateHistory,
             firstReplayTick,
             latestInputTick,
@@ -932,6 +942,7 @@ public class Player : Unit
         {
             ownerCorrectionReplayTickCount += replayedTickCount;
             ownerRawInputHistory.DiscardThrough(inputTick);
+            ownerReplayInputHistory.DiscardThrough(inputTick);
         }
         else
         {
@@ -942,6 +953,7 @@ public class Player : Unit
             ownerCorrectionHistoryMissCount++;
             motor.ApplyAuthoritativeState(authoritativeState);
             ownerRawInputHistory.Clear();
+            ownerReplayInputHistory.Clear();
             ownerSimulationStateHistory.Clear();
         }
     }
@@ -1050,6 +1062,7 @@ public class Player : Unit
     private void ResetReconciliationObservation()
     {
         ownerRawInputHistory?.Clear();
+        ownerReplayInputHistory?.Clear();
         ownerSimulationStateHistory?.Clear();
         serverRawInputQueue.Clear();
         lastServerRawInput = default;

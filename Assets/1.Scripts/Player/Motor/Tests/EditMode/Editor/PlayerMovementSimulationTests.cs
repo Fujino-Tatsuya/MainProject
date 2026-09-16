@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using System.Reflection;
 using UnityEngine;
 
 /// <summary>
@@ -67,6 +68,69 @@ public sealed class PlayerMovementSimulationTests
         Assert.That(second.Length, Is.EqualTo(first.Length));
         for (int i = 0; i < first.Length; i++)
             AssertStatesAreBitIdentical(first[i], second[i], i);
+    }
+
+    [Test]
+    public void MotorReconciliationReplay_PreservesRecordedExternalDisplacement()
+    {
+        GameObject gameObject = new GameObject("PlayerMotorReplayExternalIntentTest");
+        PlayerMotor motor = gameObject.AddComponent<PlayerMotor>();
+        var inputHistory = new PlayerTickRingBuffer<PlayerSimulationInput>(4);
+        var stateHistory = new PlayerTickRingBuffer<PlayerSimulationState>(4);
+        PlayerSimulationState authoritative = CreateInitialState();
+        authoritative.GravityEnabled = false;
+        authoritative.VerticalVelocity = 0f;
+
+        PlayerSimulationInput[] inputs =
+        {
+            new PlayerSimulationInput
+            {
+                MoveSpeedMultiplier = 1f,
+                Displacement = new Vector3(0.35f, 0f, -0.1f)
+            },
+            new PlayerSimulationInput
+            {
+                MoveSpeedMultiplier = 1f,
+                Displacement = new Vector3(-0.05f, 0.2f, 0.4f)
+            }
+        };
+        inputHistory.Store(101, inputs[0]);
+        inputHistory.Store(102, inputs[1]);
+
+        PlayerSimulationState[] expected = PlayerSimulationReplay.Replay(
+            authoritative,
+            inputs,
+            default,
+            null,
+            DeltaTime);
+        MethodInfo replayMethod = typeof(PlayerMotor).GetMethod(
+            "TryApplyAuthoritativeStateAndReplay",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        object[] arguments =
+        {
+            authoritative,
+            inputHistory,
+            stateHistory,
+            101L,
+            102L,
+            DeltaTime,
+            0
+        };
+
+        try
+        {
+            Assert.That(replayMethod, Is.Not.Null);
+            Assert.That((bool)replayMethod.Invoke(motor, arguments), Is.True);
+            Assert.That((int)arguments[6], Is.EqualTo(inputs.Length));
+            AssertStatesAreBitIdentical(expected[1], motor.SimulationState, inputs.Length - 1);
+            Assert.That(motor.SimulationState.Position, Is.Not.EqualTo(authoritative.Position));
+            Assert.That(stateHistory.TryGet(102, out PlayerSimulationState stored), Is.True);
+            Assert.That(stored.Position, Is.EqualTo(expected[1].Position));
+        }
+        finally
+        {
+            Object.DestroyImmediate(gameObject);
+        }
     }
 
     [Test]
