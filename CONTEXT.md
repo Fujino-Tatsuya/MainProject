@@ -15,6 +15,17 @@ Update this file when a term becomes important enough that future agents or team
 입력 지연은 해소 확인됐고, 루트모션 스냅 수정(b3-3) 후 재검증이 남았다.
 상세는 [PLAN-player-motor.md](PLAN-player-motor.md) — 여기 중복 기술하지 않는다.
 
+### 🔴 개발 브랜치 = 오너 권위 (지스타까지)
+
+`feature/player-motor-owner-auth` 에서 개발한다. 서버 권위 구현은
+`feature/player-motor-server-auth` 에 완성된 채로 보존돼 있고, 스위치 하나
+(`Player.ServerAuthoritativeMovement`) + 프리팹 `AuthorityMode` 로 되살린다.
+근거와 복귀 시 체크리스트는 [PLAN-player-motor.md](PLAN-player-motor.md)
+"결정 — 지스타(1차 커트라인)까지는 오너 권위" 절.
+
+**아래 불변식 중 1번은 서버 권위 브랜치에만 해당한다.** 나머지 셋은 양쪽 공통이며,
+특히 2·4번은 서버 권위로 돌아갈 때 다시 문제가 되므로 지금도 지켜 두는 편이 싸다.
+
 ### 🔴 이번에 확정된 불변식
 
 1. **플레이어 위치의 주인은 서버 하나다.** 루트/Armature `NetworkTransform` 은 `AuthorityMode 0`(Server).
