@@ -8,7 +8,38 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 현재 인수인계 (2026-09-15 · 플레이어 이동 Motor 4b2-α, 브랜치 `feature/player-motor`)
+## ▶▶ 현재 인수인계 (2026-09-16 · 플레이어 이동 Motor 4b3, 브랜치 `feature/player-motor`)
+
+**상태.** 1~3단계 · stepOffset · 4a · 4b1 · **4b2 완료(Play 검증)**.
+4b3 은 **코드 완료 + EditMode 112/112 통과, Play 검증 대기.**
+입력 지연은 해소 확인됐고, 루트모션 스냅 수정(b3-3) 후 재검증이 남았다.
+상세는 [PLAN-player-motor.md](PLAN-player-motor.md) — 여기 중복 기술하지 않는다.
+
+### 🔴 이번에 확정된 불변식
+
+1. **플레이어 위치의 주인은 서버 하나다.** 루트/Armature `NetworkTransform` 은 `AuthorityMode 0`(Server).
+   오너 인스턴스만 NT 를 끄고 로컬 예측 + 서버 보정으로 돈다.
+2. **예측 재생은 "그 틱의 모든 의도"를 재현해야 한다.** Motor 에 의도를 넣는 채널은 넷이다 —
+   velocity / grounded displacement / displacement / pose. raw 입력만 되돌리면 루트모션·스킬 전진·
+   플랫폼 캐리·자동접근이 보정 때마다 사라진다.
+3. **서버로 가는 입력 RPC 는 raw 두 필드뿐이다.** 클라가 보고한 변위를 서버가 신뢰하면 권위가 무너진다.
+   오너의 전체 의도 기록은 **로컬 재생 전용**이다.
+4. **오너 전용 게이트(`!IsOwner return`)는 owner 권위 시절의 잔재다.** 서버 권위에서는 서버도
+   같은 의도를 만들어야 한다. 남아 있는 곳을 발견하면 `IsSimulating` 계열로 교정한다.
+
+### 🔴 다음 사람이 밟을 함정 — 프리팹 YAML
+
+**컴포넌트 블록은 반드시 `m_GameObject` fileID 로 대상을 확정한 뒤 읽는다.**
+줄 위치로 읽으면 자식(`Corpse`, `Armature`)의 컴포넌트를 루트로 오인한다.
+이번 세션에 Rigidbody 에서 한 번, NetworkTransform 에서 또 한 번 같은 실수가 났고,
+두 번째는 그 오답 위에 진단·핸드오프까지 쌓였다.
+**그리고 씬의 프리팹 인스턴스 오버라이드(`m_Modifications`)도 같이 확인한다** — 에셋 값만 보면 틀린다.
+
+### 진단 로그 (검증 끝나면 제거 대상)
+`[MoveDiag]` · `[Recon]` · `DevMoveSpeedProbe` · Motor 의 외부 이동 감지 경고.
+제거 시점은 4단계 Play 검증 완료 후.
+
+## 이전 인수인계 (2026-09-15 · 플레이어 이동 Motor 4b2-α, 브랜치 `feature/player-motor`)
 
 **작업 세션.** Claude = PLAN·설계·리뷰 / Codex = 4b2-α 구현.
 Codex 가 수정 중인 파일: `Player/Player.cs`, `Player/PlayerStateController.cs`,
@@ -34,6 +65,29 @@ Codex 가 수정 중인 파일: `Player/Player.cs`, `Player/PlayerStateControlle
 **"클라가 스폰 직후 이동 불가" 증상의 1순위 용의자.** 4b2-α 가 이 모순을 제거한다.
 
 **교훈으로 남긴다 — 프리팹의 네트워크 설정을 코드 주석으로 믿지 마라. YAML 을 직접 읽어라.**
+
+### 🆕 플레이어 프리팹 사실 원본 (2026-09-16, Claude)
+`Player.prefab` 과 `Paladin.prefab` 을 계속 헷갈리는 문제 → [Docs/tech/player-prefabs.md](Docs/tech/player-prefabs.md).
+
+- **설계 의도**: `Player` = 캐릭터에 무관한 **역할** 프리팹. 그 밑 **`Armature` 자식을 교체해서 플레이 캐릭터를 바꾼다.**
+- **현재 데이터**: 정식 흐름이 스폰하는 것은 **`Paladin.prefab`**(`NetworkLoadingFlowController.defaultPlayerPrefab`) —
+  역할+캐릭터가 한 덩어리로 평탄화된 통짜 복제본이라 의도에서 벗어나 있다.
+- 🔴 교체 메커니즘은 **코드에 이미 있다** — `PlayableCharacterVisual` + `CharacterDefinition`.
+  그런데 **어느 프리팹에도 안 붙어 있고 `CharacterDefinition` 에셋이 0개**다.
+- 🔴 `transform.Find("Armature")` 폴백이 3곳(`PlayerMovement`·`PlayerSoulController`·`PlayableCharacterVisual`)인데
+  Paladin 의 자식 이름은 `Paladin_Armature` 라 전부 불발이다. 정리 시 **이름을 `Armature` 로 통일**할 것.
+- ✅ **확정(2026-09-16)**: 캐릭터는 **스폰 전에** 유저 선택값으로 결정된다. 스폰 후 인게임 교체는 설계 범위 밖.
+- ✅ **방식 확정**: `Player.prefab` 을 base 로 하는 **캐릭터별 Prefab Variant**. 각 Variant 를 NetworkPrefab 으로
+  등록하고 스폰 시 고른다. 런타임 Armature 교체는 **미채택**(Armature 안 `NetworkTransform`·`NetworkAnimator`
+  때문에 NGO 상 위험 — 클라는 등록된 프리팹을 스스로 인스턴스화하고 `NetworkSpawnManager.cs:873`,
+  `NetworkBehaviourId` 는 계층 순서로 매겨진다 `NetworkObject.cs:2751`).
+- 🔴 착수 전 선행 조건 2개 — ① **루트의 `FirstMelee*` 스킬 5종이 전부 가붕이 전용**이라 base 에서 걷어내야 한다
+  (Variant 는 컴포넌트 제거가 취약). ② **로비에 캐릭터 선택 UI 가 없다** — 선택값 경로를 새로 만들어야 한다.
+- ✅ **경계 확정**: **스킬 5종은 Variant 로 내린다**(base 는 `PlayerSkillController` 슬롯 컨테이너까지).
+  걷어내도 코드는 안 깨진다 — `InitializeSkill`·`Player.passive?.`·`PassiveHUD.Bind` 전부 null 안전 확인.
+- ✅ **1차 범위 확정**: `Player_Paladin` Variant 까지. 로비 선택 UI·징크스는 범위 밖.
+- 📋 계획서 **[PLAN-player-variants.md](PLAN-player-variants.md) 작성 완료 — 승인 대기.**
+  ⚠️ `feature/player-motor` 와 같은 프리팹을 건드리므로 **동시 진행 금지**. 착수 시점·담당 합의 필요.
 
 ### 후순위 미해결
 이동 플랫폼·컨베이어 위 상하 떨림(2026-09-15 은희 발견). 원인 미조사, b2/b3 와 독립.
