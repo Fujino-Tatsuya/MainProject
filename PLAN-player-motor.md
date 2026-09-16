@@ -400,6 +400,37 @@ R-7 때문이다. "결정론적 이동"이라는 목표를 **두 가지로 나�
 **① `NetworkTransform`을 플레이어 루트에서 걷어내야 한다.**
 
 > 🔴 **2026-09-15 정정 — 앞선 기술이 틀렸다.** "루트는 `AuthorityMode: 1`(Owner)" 는 오답이다.
+> 🔴 **2026-09-16 재정정 — 위 "AuthorityMode: 0 = Server" 는 오답이었다. 두 번째 같은 실수다.**
+>
+> `Player.prefab:145` 는 **루트가 아니라 `Corpse` 자식**의 NetworkTransform이다
+> (`m_GameObject: 800000000000000001`). 루트는 `8559504096609571310` 이고 **Owner(1)** 였다.
+> 실제로 스폰되는 `Paladin.prefab` 도 마찬가지로 **루트 NT = Owner(1)** 였다.
+>
+> | prefab | GameObject | 동기화 | 2026-09-16 이전 |
+> |---|---|---|---|
+> | Paladin | 루트 `6077492126708577103` | 위치 XYZ | **Owner** |
+> | Paladin | `Paladin_Armature` | 회전 XYZ | **Owner** |
+> | Paladin | `Corpse` | — | Server |
+> | Player | 루트 `8559504096609571310` | 위치 XYZ | **Owner** |
+> | Player | `Corpse` | — | Server |
+>
+> **이 대화 첫머리에 은희가 지적한 것과 똑같은 실수다** — 컴포넌트 블록을 `m_GameObject` fileID 로
+> 짚지 않고 줄 위치로 읽었다. Rigidbody 때 한 번, NetworkTransform 때 또 한 번.
+> **프리팹 YAML 은 반드시 `m_GameObject` fileID 로 대상을 확정한 뒤 읽는다.**
+>
+> **이 오답 위에 세운 것들도 같이 무효다:** "서버 권위 NT 가 오너 클라의 transform 을 매 프레임
+> 덮어쓴다 → 클라 이동 불가의 1순위 용의자" 라는 진단, 그에 근거한 코덱스 핸드오프,
+> `Player.cs` 주석을 owner-authority → server-authority 로 "정정"한 것.
+> `Player.cs` 의 원래 주석("owner-authority NetworkTransform이 복제한다")이 **맞았다.**
+>
+> **진짜 원인.** 루트 NT 가 Owner 권위인데 4b2-α 가 **서버**에게 위치를 시뮬레이션·커밋시켰다.
+> 한 transform 에 주인이 둘이 되어 매 프레임 싸웠고, 호스트에서 그 결과가 원점으로 수렴했다.
+> 증상이 정확히 갈린 이유도 이것이다 — **Armature 회전은 Owner 권위 NT 라 정상 복제되고(회전은 된다),
+> 루트 위치만 두 주인이 싸웠다(이동은 안 된다).**
+>
+> **조치(2026-09-16).** 결정된 서버 권위 모델에 데이터를 맞춘다 — Paladin 루트·Armature,
+> Player 루트의 `AuthorityMode` 를 0(Server)으로 변경. Corpse 는 원래 0이라 그대로.
+
 > `Player.prefab:145` 은 `AuthorityMode: 0` = **Server** 이고, `1ccf0d3`(2026-07-27) 이후 계속 Server다.
 > `Player.cs:443`의 "owner-authority NetworkTransform이 복제한다" 주석도 같은 오류다.
 > **즉 아래의 모순은 가정이 아니라 지금 돌고 있는 상태다.**

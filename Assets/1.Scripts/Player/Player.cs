@@ -489,7 +489,7 @@ public class Player : Unit
     public bool IsRemoteProxy => IsNetworkActive && !IsOwner && !IsServer;
 
     /// <summary>
-    /// Player 위치는 server-authority NetworkTransform이 복제한다.
+    /// Player 위치는 루트 NetworkTransform이 복제한다(2026-09-16부터 server-authority — 그전에는 Owner였다).
     /// Rigidbody는 전 피어에서 kinematic이며, 원격 프록시는 Motor만 꺼 복제 위치와 경쟁하지 않게 한다.
     /// 콜라이더는 유지하므로 서버 공격 판정과 Overlap 쿼리에는 계속 참여한다.
     /// </summary>
