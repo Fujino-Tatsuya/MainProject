@@ -6724,6 +6724,7 @@ GameObject:
   - component: {fileID: 6118376412819370303}
   - component: {fileID: 2050612571752285464}
   - component: {fileID: 7746500284878980271}
+  - component: {fileID: 1234500000000000777}
   m_Layer: 6
   m_Name: Paladin
   m_TagString: Player
@@ -10680,3 +10681,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cdafc37f32b176349b1684c4455b98e9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!114 &1234500000000000777
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6077492126708577103}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7c3e5a9cfb85e1a4cb8896d14fca8554, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  maxSmoothedCorrection: 1
+  decayTimeConstant: 0.08
