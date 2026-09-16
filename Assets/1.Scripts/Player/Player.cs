@@ -24,6 +24,8 @@ public class Player : Unit
     private const int TargetServerInputQueueTicks = 2;
     private const int MaxServerInputQueueTicks = 6;
     private const float OwnerReconciliationPositionThreshold = 0.10f;
+    // 매 입력 패킷에 함께 싣는 과거 틱 수. 유실 한 장으로 서버가 굶지 않게 한다.
+    private const int InputRedundancyTicks = 3;
 
     /// <summary>이 클라이언트가 조작하는 플레이어. HUD 등 로컬 UI 바인딩용.</summary>
     public static Player LocalPlayer { get; private set; }
@@ -77,6 +79,9 @@ public class Player : Unit
     private long localSimulationTick;
     private long lastProcessedServerInputTick;
     private bool hasProcessedServerInputTick;
+    // 중복 전송 때문에 같은 틱이 여러 번 도착한다. 이미 큐에 넣은 틱을 다시 넣지 않기 위한 커서.
+    private long lastEnqueuedOwnerTick;
+    private bool hasLastEnqueuedOwnerTick;
     private long lastReceivedCorrectionTick;
     private bool hasReceivedCorrectionTick;
 
@@ -582,13 +587,69 @@ public class Player : Unit
         // 호스트 오너는 이 인스턴스의 Motor 틱 자체가 서버 커밋이다. RPC 관측 경로를 다시 돌리면 이중 시뮬레이션된다.
         if (!IsServer)
         {
+            // 🔴 입력 중복 전송 — 최근 InputRedundancyTicks 틱을 함께 싣는다.
+            // 입력 한 장만 잃어도 서버가 기아에 빠져 마지막 입력을 반복하거나 0 입력을 쓰고,
+            // 오너가 그 사이 방향을 바꿨으면 그대로 발산한다. 2026-09-16 Mobile4G(손실 4%) 실측에서
+            // correction max=2.16m / corrected 23건·s / replayedTicks 907건·s 가 그 결과였다.
+            // 연속으로 잃지 않는 한 굶지 않게 만든다 — 4% 손실에서 3연속 유실은 0.006% 다.
+            // 서버는 이미 받은 틱을 무시하므로 중복 자체는 무해하다.
             SubmitMovementInputServerRpc(
                 tick,
                 rawInput.MoveDirection.x,
                 rawInput.MoveDirection.y,
                 rawInput.HasMoveInput,
-                resultState.Position);
+                resultState.Position,
+                BuildRedundantInputPayload(tick));
             RecordMovementRpcSent();
+        }
+    }
+
+    /// <summary>
+    /// 현재 틱 직전의 입력들을 한 배열로 만든다(index 0 = tick-1, 1 = tick-2 …).
+    /// 전송량은 틱당 3 * (Vector2 + bool) ≈ 27바이트로, 50Hz 기준 초당 1.3KB 남짓이다.
+    /// 유실 한 장이 만드는 서버 기아를 없애는 값으로는 싸다.
+    /// </summary>
+    private RedundantRawInput[] BuildRedundantInputPayload(long currentTick)
+    {
+        var payload = new RedundantRawInput[InputRedundancyTicks];
+        for (int i = 0; i < InputRedundancyTicks; i++)
+        {
+            long tick = currentTick - (i + 1);
+            if (tick < 0 || !ownerRawInputHistory.TryGet(tick, out PlayerRawSimulationInput past))
+            {
+                // 빈 칸은 HasValue=false 로 보낸다. 서버가 0 입력으로 오해하면 안 된다.
+                payload[i] = default;
+                continue;
+            }
+
+            payload[i] = new RedundantRawInput(tick, past.MoveDirection, past.HasMoveInput);
+        }
+
+        return payload;
+    }
+
+    /// <summary>중복 전송되는 과거 입력 한 칸. HasValue=false 는 "그 틱 기록이 없다"는 뜻이다.</summary>
+    public struct RedundantRawInput : INetworkSerializable
+    {
+        public bool HasValue;
+        public long Tick;
+        public Vector2 MoveDirection;
+        public bool HasMoveInput;
+
+        public RedundantRawInput(long tick, Vector2 moveDirection, bool hasMoveInput)
+        {
+            HasValue = true;
+            Tick = tick;
+            MoveDirection = moveDirection;
+            HasMoveInput = hasMoveInput;
+        }
+
+        public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
+        {
+            serializer.SerializeValue(ref HasValue);
+            serializer.SerializeValue(ref Tick);
+            serializer.SerializeValue(ref MoveDirection);
+            serializer.SerializeValue(ref HasMoveInput);
         }
     }
 
@@ -599,6 +660,7 @@ public class Player : Unit
         float moveY,
         bool hasMoveInput,
         Vector3 ownerPredictedPosition,
+        RedundantRawInput[] redundantInputs,
         ServerRpcParams rpcParams = default)
     {
         ulong senderClientId = rpcParams.Receive.SenderClientId;
@@ -626,12 +688,21 @@ public class Player : Unit
             direction.y = Mathf.Clamp(direction.y, -1f, 1f);
         }
 
-        serverRawInputQueue.Enqueue(new ServerRawSimulationInput(
-            tick,
-            new PlayerRawSimulationInput(direction, hasMoveInput),
-            ownerPredictedPosition,
-            GetSenderRttSeconds(senderClientId),
-            CurrentSimulationTick()));
+        // 중복 전송분을 **오래된 것부터** 먼저 넣고, 마지막에 이번 틱을 넣는다.
+        // 유실로 비어 있던 자리를 메우는 것이 목적이므로 순서를 지켜야 큐가 연속된 입력열이 된다.
+        if (redundantInputs != null)
+        {
+            for (int i = redundantInputs.Length - 1; i >= 0; i--)
+            {
+                RedundantRawInput past = redundantInputs[i];
+                if (!past.HasValue)
+                    continue;
+
+                EnqueueOwnerInput(past.Tick, past.MoveDirection, past.HasMoveInput, Vector3.zero, false, senderClientId);
+            }
+        }
+
+        EnqueueOwnerInput(tick, direction, hasMoveInput, ownerPredictedPosition, true, senderClientId);
 
         // 버스트가 최대치를 넘으면 최신 입력을 보존하고 가장 오래된 입력부터 폐기한다.
         while (serverRawInputQueue.Count > MaxServerInputQueueTicks)
@@ -641,6 +712,46 @@ public class Player : Unit
             // 입력을 버렸으니 서버 상태는 연속된 입력열의 결과가 아니다 — 다음 샘플은 발산 집계에서 뺀다.
             hasExpectedServerInputTick = false;
         }
+    }
+
+    /// <summary>
+    /// 오너 입력을 서버 큐에 넣는다. **이미 소비했거나 큐에 있는 틱은 버린다** —
+    /// 중복 전송은 유실을 메우기 위한 것이라 같은 틱이 여러 번 도착하는 것이 정상이다.
+    /// </summary>
+    private void EnqueueOwnerInput(
+        long tick,
+        Vector2 direction,
+        bool hasMoveInput,
+        Vector3 ownerPredictedPosition,
+        bool hasOwnerPrediction,
+        ulong senderClientId)
+    {
+        if (hasProcessedServerInputTick && tick <= lastProcessedServerInputTick)
+            return;
+
+        if (hasLastEnqueuedOwnerTick && tick <= lastEnqueuedOwnerTick)
+            return;
+
+        if (!IsFinite(direction))
+        {
+            direction = Vector2.zero;
+            hasMoveInput = false;
+        }
+        else
+        {
+            direction.x = Mathf.Clamp(direction.x, -1f, 1f);
+            direction.y = Mathf.Clamp(direction.y, -1f, 1f);
+        }
+
+        serverRawInputQueue.Enqueue(new ServerRawSimulationInput(
+            tick,
+            new PlayerRawSimulationInput(direction, hasMoveInput),
+            hasOwnerPrediction ? ownerPredictedPosition : new Vector3(float.NaN, float.NaN, float.NaN),
+            GetSenderRttSeconds(senderClientId),
+            CurrentSimulationTick()));
+
+        lastEnqueuedOwnerTick = tick;
+        hasLastEnqueuedOwnerTick = true;
     }
 
     private void ProcessServerObservationInputs()
@@ -1099,6 +1210,8 @@ public class Player : Unit
         localSimulationTick = 0L;
         lastProcessedServerInputTick = 0L;
         hasProcessedServerInputTick = false;
+        lastEnqueuedOwnerTick = 0L;
+        hasLastEnqueuedOwnerTick = false;
         lastReceivedCorrectionTick = 0L;
         hasReceivedCorrectionTick = false;
         motor?.ResetServerObservation();
