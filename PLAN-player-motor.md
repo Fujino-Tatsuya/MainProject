@@ -786,8 +786,8 @@ MPPM 의 두 피어는 **같은 기계·같은 씬**에서 돈다. R-7 대로 �
 
 #### ✅ 오너 권위 브랜치 검증 완료 (2026-09-16, 은희 MPPM)
 
-`feature/player-motor-owner-auth` 에서 **전 항목 통과**. 지스타까지 이 브랜치로 간다.
-
+`feature/player-motor-owner-auth` 에서 **전 항목 통과**. 그 브랜치는 `development` 에 머지 후 삭제됐고,
+지스타까지 이 코드로 간다. 새 작업은 `development` 에서 분기한다.
 검증 항목: 스폰 위치 · 이동 · 낙사 복귀(생존/사망) · 넉백 · 보스 그랩 · 대시 ·
 루트모션 전진 · 스킬 전진 · 플랫폼 캐리 · 스킬 자동접근.
 
@@ -835,7 +835,7 @@ CapturesServerObservation` 과 `PlayerFallRecovery.TeleportOnServer`.
 
 #### 🔴 결정 — 지스타(1차 커트라인)까지는 오너 권위 (2026-09-16, 은희)
 
-**개발 브랜치는 `feature/player-motor-owner-auth` 다.** 서버 권위 구현은
+**오너 권위 이동은 `development` 에 머지됐다(2026-09-16). 그 브랜치는 삭제됐다.** 서버 권위 구현은
 `feature/player-motor-server-auth` 에 완성된 채로 보존한다.
 
 근거:

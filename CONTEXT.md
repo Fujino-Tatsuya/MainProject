@@ -17,7 +17,8 @@ Update this file when a term becomes important enough that future agents or team
 
 ### 🔴 개발 브랜치 = 오너 권위 (지스타까지)
 
-`feature/player-motor-owner-auth` 에서 개발한다. 서버 권위 구현은
+오너 권위 이동은 `development` 에 머지됐다(2026-09-16). 새 작업은 `development` 에서 분기한다.
+서버 권위 구현은
 `feature/player-motor-server-auth` 에 완성된 채로 보존돼 있고, 스위치 하나
 (`Player.ServerAuthoritativeMovement`) + 프리팹 `AuthorityMode` 로 되살린다.
 근거와 복귀 시 체크리스트는 [PLAN-player-motor.md](PLAN-player-motor.md)
@@ -100,7 +101,8 @@ Codex 가 수정 중인 파일: `Player/Player.cs`, `Player/PlayerStateControlle
 - 📋 계획서 **[PLAN-player-variants.md](PLAN-player-variants.md)** — P1 착수.
 
 **작업 세션 (2026-09-16, Claude · 브랜치 `feature/player-variants`).**
-`feature/player-motor-owner-auth`(`6c25ca60`)에서 분기했다. 수정 예정 파일:
+🔴 그 브랜치는 고유 커밋 없이 `development` 에 들어가 있어 정리 때 삭제됐다(2026-09-16).
+P1 착수할 때 `development` 에서 다시 딴다. 수정 예정 파일:
 `Assets/2.Prefabs/Player/**`, `Assets/2.Prefabs/UI/CombatHUD.prefab`,
 `Assets/DefaultNetworkPrefabs.asset`, 그리고 P4 에서 씬 6개. **새 스크립트는 없다.**
 🔴 **모터 작업과 같은 프리팹이다 — 이 브랜치 밖에서 플레이어 프리팹을 동시 수정하지 말 것.**
