@@ -97,8 +97,14 @@ Codex 가 수정 중인 파일: `Player/Player.cs`, `Player/PlayerStateControlle
 - ✅ **경계 확정**: **스킬 5종은 Variant 로 내린다**(base 는 `PlayerSkillController` 슬롯 컨테이너까지).
   걷어내도 코드는 안 깨진다 — `InitializeSkill`·`Player.passive?.`·`PassiveHUD.Bind` 전부 null 안전 확인.
 - ✅ **1차 범위 확정**: `Player_Paladin` Variant 까지. 로비 선택 UI·징크스는 범위 밖.
-- 📋 계획서 **[PLAN-player-variants.md](PLAN-player-variants.md) 작성 완료 — 승인 대기.**
-  ⚠️ `feature/player-motor` 와 같은 프리팹을 건드리므로 **동시 진행 금지**. 착수 시점·담당 합의 필요.
+- 📋 계획서 **[PLAN-player-variants.md](PLAN-player-variants.md)** — P1 착수.
+
+**작업 세션 (2026-09-16, Claude · 브랜치 `feature/player-variants`).**
+`feature/player-motor-owner-auth`(`6c25ca60`)에서 분기했다. 수정 예정 파일:
+`Assets/2.Prefabs/Player/**`, `Assets/2.Prefabs/UI/CombatHUD.prefab`,
+`Assets/DefaultNetworkPrefabs.asset`, 그리고 P4 에서 씬 6개. **새 스크립트는 없다.**
+🔴 **모터 작업과 같은 프리팹이다 — 이 브랜치 밖에서 플레이어 프리팹을 동시 수정하지 말 것.**
+모터 쪽 프리팹 변경이 들어오면 즉시 리베이스해 격차를 작게 유지한다.
 
 ### 후순위 미해결
 이동 플랫폼·컨베이어 위 상하 떨림(2026-09-15 은희 발견). 원인 미조사, b2/b3 와 독립.

@@ -5,9 +5,11 @@
 [CONTEXT.md](CONTEXT.md) · [AIRULE.md](AIRULE.md)
 
 > ⚠️ **플레이어 계통은 은희 담당 영역이다.** 착수 전 담당자 합의 필요.
-> ⚠️ 현재 브랜치 `feature/player-motor` 는 **이동 Motor 작업 진행 중**이다([PLAN-player-motor.md](PLAN-player-motor.md)).
-> 이 작업은 같은 프리팹(`Player.prefab`)을 크게 건드리므로 **동시 진행하면 충돌한다.**
-> → §6 에서 착수 시점을 다룬다.
+>
+> 🔴 **브랜치: `feature/player-variants`** — `feature/player-motor-owner-auth`(`6c25ca60`)에서 분기한다.
+> `development` 에서 따지 **않는다**: 오너 권위 전환·시각 보간 컴포넌트 등 **프리팹 변경이
+> owner-auth 브랜치에만 있어서**, development 기반으로 프리팹을 재구성하면 머지 때 GUID 단위로 충돌한다.
+> 모터 작업과 **같은 프리팹을 건드리므로**, 이 브랜치에서 분리해 진행하고 머지 순서는 모터 → Variant 로 한다.
 
 ---
 
@@ -114,8 +116,17 @@
   `InterruptAttack`·`MainSkill`·`SubSkill`·`UltimateSkill`·VFX 트레일 2종·`Animator`·`NetworkAnimator`·
   Armature `NetworkTransform`
 - 저장 위치: `Assets/2.Prefabs/Player/Paladin/Paladin_Armature.prefab`
-- `Paladin.prefab` 은 이 단계에서 **그대로 둔다**(추출만 하고 아직 교체하지 않는다)
-- ✅ 검증: `Paladin.prefab` diff 가 0 이고, Play 시 동작이 이전과 같다
+- `Paladin.prefab` 은 이 단계에서 **그대로 둔다**(추출만 하고 아직 교체하지 않는다).
+  Prefab Mode 에서 자식을 Project 로 끌면 원본의 자식이 중첩 인스턴스로 **바뀐다** —
+  그걸 피하려면 씬에 인스턴스를 놓고 거기서 뽑은 뒤 씬을 버린다
+- **에디터에서 손으로 한다. 저작 툴을 만들지 않는다** — 한 번 하고 끝나는 구조 변경이라
+  멱등 재실행이 필요 없고, `SaveAsPrefabAsset` 이 중첩 VFX 프리팹·stripped 참조를 GUI 와
+  동일하게 처리한다는 보장이 없다. (기존 `*Authoring` 툴들은 **머지에서 반복 유실되는 배선**을
+  복구하려고 만든 것이라 성격이 다르다)
+- ✅ 검증: `Paladin.prefab` **diff 가 0**. 추출물은 **YAML 파싱으로 대조**한다 —
+  Animator·컨트롤러 / SkinnedMeshRenderer / `ColliderInfo` 6개(AAC1~4·MainSkill·InterruptAttack) /
+  `NetworkTransform` 1 / `NetworkAnimator` 1 / `L_WeaponSocket`·`R_WeaponSocket` 존재.
+  ⚠️ 무기 소켓은 컴포넌트가 없어 **이름으로만** 찾을 수 있다
 
 ### 3.2 P2 — base `Player.prefab` 정리
 
@@ -129,6 +140,12 @@
 4. HUD 갈라짐 해소 — Paladin 사본의 `CombatPanel`·`ShieldBar`·`ProfilPanel` 을
    `CombatHUD.prefab` 원본으로 올린다 (§2.5-2)
 5. 스탯을 중립값으로 — 시연용 `9999`/`33` 은 Variant 로 간다
+6. **`PlayerVisualReconciliationSmoother` 를 base 에 추가** — `9e3afee9` 가 Paladin 루트에만 붙였다.
+   역할 쪽 컴포넌트이므로 base 의 것이다
+7. **권한 값(`AuthorityMode`)은 브랜치 정책을 그대로 따른다** — 현재 owner-auth 기준으로
+   루트·Armature = Owner(`1`), Corpse = Server(`0`). 🔴 **상수로 취급하지 말 것.**
+   지스타 이후 서버 권위로 되돌릴 때 **Variant 개수만큼 고칠 곳이 늘어난다** — Variant 가
+   이 값을 오버라이드하지 않고 **base 에서 상속받게** 두는 것이 이 작업의 이득 중 하나다
 - ✅ 검증: base 단독 인스턴스를 씬에 올려 **에러 없이 Awake 가 통과**하는지 (조작·전투는 불가한 게 정상)
 
 ### 3.3 P3 — `Player_Paladin.prefab` Variant 생성
@@ -139,6 +156,9 @@
 2. 스킬 5종 추가 + `PlayerSkillController` 4슬롯 배선
 3. `attackData` = `Garen/PlayerDefaultAttackData.asset`, `defaultHitbox` = Armature 안 히트박스
 4. `FirstMelee*.hitboxAnchor` 2종 · 무기 트레일 배선 (§1.4 계약)
+   💡 **여기는 저작 툴이 값어치를 할 수 있는 유일한 자리다** — 이 배선은 과거에 머지에서 반복
+   유실됐고(`PlayerEncounterLockAuthoring` 주석의 3건), 캐릭터가 늘면 Variant 마다 반복된다.
+   다만 **캐릭터가 2종 이상이 될 때** 만든다. 지금 1종에 도구를 세우는 건 이르다
 5. 스탯 오버라이드
 6. 저장: `Assets/2.Prefabs/Player/Paladin/Player_Paladin.prefab`
 - ✅ 검증: `Paladin.prefab` 과 **루트 컴포넌트 구성·주요 값이 일치**하는지 기계적으로 대조 (§4)
@@ -192,7 +212,7 @@
 
 | # | 리스크 | 완화 |
 |---|--------|------|
-| R-1 | **`feature/player-motor` 와 같은 프리팹을 건드린다** | Motor 작업(4b 단계)이 끝난 뒤 착수. 별도 브랜치 `feature/player-variants` |
+| R-1 | **모터 작업과 같은 프리팹을 건드린다** | ✅ 브랜치 분리 완료 — `feature/player-variants` (`6c25ca60` 분기). 모터 쪽 프리팹 변경이 들어오면 **Variant 작업 중이라도 즉시 리베이스**해서 격차를 작게 유지한다 |
 | R-2 | **프리팹 머지 충돌 → GUID 파손** ([AGENTS.md](AGENTS.md) §3) | P1~P5 를 각각 작은 PR 로. 작업 중 플레이어 프리팹 동시 수정 금지를 CONTEXT 에 명시 |
 | R-3 | HUD 갈라짐을 못 올리고 base 로 내려가 **HUD 퇴행** | P2-4 를 독립 커밋으로 하고, 올리기 전후 HUD 스크린샷 대조 |
 | R-4 | Variant 배선 누락(`hitboxAnchor`·`defaultHitbox`)으로 **공격이 조용히 안 나감** | §4-1 기계적 대조 + 저작 툴 재실행 |
@@ -216,6 +236,10 @@
 
 ## 8. 승인받을 것
 
-1. **착수 시점** — `feature/player-motor` 4b 완료 후로 미루는 게 맞는가?
-2. **담당** — 플레이어 계통은 은희 영역이다. 누가 하는가?
-3. **`Paladin.prefab` 삭제** — P5 에서 지우는 게 맞는가, 한동안 남겨두는가?
+1. ~~착수 시점~~ → ✅ **브랜치 분리로 해결**(2026-09-16). `feature/player-variants` 에서 병행한다.
+2. **작업 위치** — 이 워킹트리를 새 브랜치로 옮길 것인가, 별도 worktree 를 팔 것인가?
+   · 여기서 전환하면 **진행 중인 모터 Play 검증이 끊기고** Unity 재임포트가 돈다.
+   · 새 worktree 는 **SVN 아트가 없어** 모델·머티리얼이 비어 보인다([environment-setup.md](Docs/tech/environment-setup.md)).
+     프리팹 조립 작업이라 아트가 보여야 하므로 **SVN 체크아웃이 선행**돼야 한다.
+3. **담당** — 플레이어 계통은 은희 영역이다. 누가 하는가?
+4. **`Paladin.prefab` 삭제** — P5 에서 지우는 게 맞는가, 한동안 남겨두는가?
