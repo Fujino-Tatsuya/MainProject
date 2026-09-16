@@ -527,6 +527,29 @@ public sealed class PlayerMotor : MonoBehaviour
         }
     }
 
+    /// <summary>서버가 예측 대상이 아닌 순간이동을 확정하고 다음 시뮬레이션의 기준점도 함께 옮긴다.</summary>
+    internal void TeleportAuthoritative(Vector3 position)
+    {
+        PlayerSimulationState state = hasServerObservationState
+            ? serverObservationState
+            : simulationState;
+        state.Position = position;
+        state.VerticalVelocity = 0f;
+        state.WasBlockedThisTick = false;
+
+        simulationState = state;
+        if (hasServerObservationState)
+            serverObservationState = state;
+
+        ClearPendingMotion();
+        ClearServerPendingMotion();
+        ApplyAuthoritativeState(state);
+
+        // 서버 외부 이동 진단이 이 Motor 소유 순간이동을 범인으로 오인하지 않게 기준도 갱신한다.
+        lastCommittedServerPosition = position;
+        hasLastCommittedServerPosition = true;
+    }
+
     internal void ResetServerObservation()
     {
         hasServerObservationState = false;

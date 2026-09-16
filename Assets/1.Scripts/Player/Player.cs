@@ -845,8 +845,41 @@ public class Player : Unit
 
         if (!hasPredictedState)
         {
-            ownerCorrectionHistoryMissCount++;
             ownerCorrectionAppliedCount++;
+            if (forceSnap)
+                ownerCorrectionForceSnapCount++;
+
+            // 같은 inputTick의 일반 ACK가 먼저 와 N 기록을 이미 버린 뒤 forceSnap이 도착할 수 있다.
+            // 그 경우에도 N+1 이후의 미확정 입력은 남아 있으므로 텔레포트 위치에서 재생한다.
+            if (forceSnap &&
+                ownerRawInputHistory.TryGetLatestTick(out long forceLatestInputTick) &&
+                forceLatestInputTick > inputTick)
+            {
+                long forceFirstReplayTick = inputTick < long.MaxValue
+                    ? inputTick + 1
+                    : long.MaxValue;
+                bool forceReplayed = motor.TryApplyAuthoritativeStateAndReplay(
+                    authoritativeState,
+                    ownerRawInputHistory,
+                    ownerSimulationStateHistory,
+                    forceFirstReplayTick,
+                    forceLatestInputTick,
+                    Time.fixedDeltaTime,
+                    out int forceReplayedTickCount);
+                if (forceReplayed)
+                {
+                    ownerCorrectionReplayTickCount += forceReplayedTickCount;
+                    ownerRawInputHistory.DiscardThrough(inputTick);
+                    return;
+                }
+
+                Edit.LogWarning(
+                    $"[Recon] forceSnap 재생 입력열 누락으로 서버 상태에 스냅: owner={OwnerClientId}, " +
+                    $"ackTick={inputTick}, latestInputTick={forceLatestInputTick}",
+                    this);
+            }
+
+            ownerCorrectionHistoryMissCount++;
             motor.ApplyAuthoritativeState(authoritativeState);
             ownerRawInputHistory.Clear();
             ownerSimulationStateHistory.Clear();
