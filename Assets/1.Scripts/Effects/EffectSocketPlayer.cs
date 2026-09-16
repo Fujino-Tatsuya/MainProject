@@ -18,7 +18,7 @@ using UnityEngine;
 /// 세 곳에서 회수한다.
 /// </summary>
 [DisallowMultipleComponent]
-public class EffectSocketPlayer : MonoBehaviour
+public class EffectSocketPlayer : MonoBehaviour, IAnimEventEffect
 {
     [Header("식별")]
     [Tooltip("애니메이션 이벤트가 이 이펙트를 지목할 때 쓰는 이름(예: Slash, UpperTrail).\n" +

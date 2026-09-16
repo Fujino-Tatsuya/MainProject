@@ -1,5 +1,117 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!1 &1872116021878068405
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1395541841240735808}
+  - component: {fileID: 7117946031536760415}
+  m_Layer: 8
+  m_Name: PunchSparkVFX_R
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1395541841240735808
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1872116021878068405}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 62537905785275895}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &7117946031536760415
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1872116021878068405}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
+  id: Spark_R
+  effect: {fileID: 11400000, guid: 8557fc2524e7d5f4aaeed27b0eb3865a, type: 2}
+  socket: {fileID: 5833690807469857693}
+  offset: {x: 0, y: 0, z: 0}
+  scale: 1
+  safetyTimeout: 5
+--- !u!1 &2928021060883866899
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7123583704152403361}
+  m_Layer: 0
+  m_Name: Punch_R_Socket
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &7123583704152403361
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2928021060883866899}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0.7071068, z: 0.7071068, w: 0}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 5208934837360812548}
+  m_LocalEulerAnglesHint: {x: -90, y: 0, z: 180}
+--- !u!1 &3971438598114843922
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5833690807469857693}
+  m_Layer: 0
+  m_Name: Spark_R_Socket
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &5833690807469857693
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3971438598114843922}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -0, y: 0.5, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 5208934837360812548}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &4984049068230396098
 GameObject:
   m_ObjectHideFlags: 0
@@ -69,6 +181,88 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Hurtbox
   ownerUnit: {fileID: 191786273882215141}
+  attackReceiverSource: {fileID: 0}
+--- !u!1 &5266535577601202239
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1246476210315526366}
+  m_Layer: 0
+  m_Name: Punch_L_Socket
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1246476210315526366
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5266535577601202239}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0.7071068, z: 0.7071068, w: 0}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2344935514321979626}
+  m_LocalEulerAnglesHint: {x: -90, y: 0, z: 180}
+--- !u!1 &6089728648082022158
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8653466206630925695}
+  - component: {fileID: 3603264997813650131}
+  m_Layer: 8
+  m_Name: PunchSparkVFX_L
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8653466206630925695
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6089728648082022158}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 62537905785275895}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &3603264997813650131
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6089728648082022158}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
+  id: Spark_L
+  effect: {fileID: 11400000, guid: 8557fc2524e7d5f4aaeed27b0eb3865a, type: 2}
+  socket: {fileID: 5602363497766371932}
+  offset: {x: 0, y: 0, z: 0}
+  scale: 1
+  safetyTimeout: 5
 --- !u!1 &6142897331185522011
 GameObject:
   m_ObjectHideFlags: 0
@@ -207,6 +401,137 @@ MonoBehaviour:
   maxHitCount: 16
   applyKnockback: 0
   knockbackStrength: 5
+--- !u!1 &7214573055936057675
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2066648420345199114}
+  - component: {fileID: 8409003581448612320}
+  m_Layer: 8
+  m_Name: PunchWindVFX_L
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2066648420345199114
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7214573055936057675}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 62537905785275895}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &8409003581448612320
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7214573055936057675}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
+  id: Wind_L
+  effect: {fileID: 11400000, guid: 18c9fd1eb8a21da488516a9543127c05, type: 2}
+  socket: {fileID: 1246476210315526366}
+  offset: {x: 0, y: 0, z: 0.5}
+  scale: 2
+  safetyTimeout: 5
+--- !u!1 &7233796708746767978
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1962285231785867525}
+  - component: {fileID: 4349923754498865856}
+  m_Layer: 8
+  m_Name: PunchWindVFX_R
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1962285231785867525
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7233796708746767978}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 62537905785275895}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &4349923754498865856
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7233796708746767978}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
+  id: Wind_R
+  effect: {fileID: 11400000, guid: 18c9fd1eb8a21da488516a9543127c05, type: 2}
+  socket: {fileID: 7123583704152403361}
+  offset: {x: 0, y: 0, z: 0.5}
+  scale: 2
+  safetyTimeout: 5
+--- !u!1 &7262473046798766924
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 149633624239482157}
+  m_Layer: 22
+  m_Name: InterruptFlash_Socket
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &149633624239482157
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7262473046798766924}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0.182}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2953269652969223710}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &7309020434041632752
 GameObject:
   m_ObjectHideFlags: 0
@@ -251,7 +576,7 @@ Transform:
   - {fileID: 7092373302014064361}
   - {fileID: 4157877073770867174}
   - {fileID: 6142897331185522012}
-  - {fileID: 1503449028257990588}
+  - {fileID: 62537905785275895}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!54 &9015645299966101766
@@ -316,7 +641,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 2119361380
+  GlobalObjectIdHash: 3927606487
   InScenePlacedSourceGlobalObjectIdHash: 1085786765
   DeferredDespawnTick: 0
   Ownership: 1
@@ -472,6 +797,9 @@ MonoBehaviour:
   punch02RState: Gauntlet_Punch02_R
   punch03LState: Gauntlet_Punch03_L
   punch03RState: Gauntlet_Punch03_R
+  interruptFlash: {fileID: 4960452879373660667}
+  spark_L: {fileID: 3603264997813650131}
+  spark_R: {fileID: 7117946031536760415}
 --- !u!114 &9016496478334430848
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -517,7 +845,125 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EffectAnimEvents
   animator: {fileID: 0}
-  players: []
+  effects: []
+--- !u!1 &7519616710263269627
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5602363497766371932}
+  m_Layer: 0
+  m_Name: Spark_L_Socket
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &5602363497766371932
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7519616710263269627}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0.5, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2344935514321979626}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &8063177505239365483
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8146289354067046215}
+  - component: {fileID: 4960452879373660667}
+  m_Layer: 8
+  m_Name: InterruptFlashVFX
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8146289354067046215
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8063177505239365483}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 62537905785275895}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &4960452879373660667
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8063177505239365483}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
+  id: 
+  effect: {fileID: 11400000, guid: e6dad2ab1b7d86d49b816729fc8526c2, type: 2}
+  socket: {fileID: 149633624239482157}
+  offset: {x: 0, y: 0, z: 0}
+  scale: 1
+  safetyTimeout: 5
+--- !u!1 &8153849064273701021
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 62537905785275895}
+  m_Layer: 8
+  m_Name: VFX
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &62537905785275895
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8153849064273701021}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1503449028257990588}
+  - {fileID: 1962285231785867525}
+  - {fileID: 2066648420345199114}
+  - {fileID: 1395541841240735808}
+  - {fileID: 8653466206630925695}
+  - {fileID: 8146289354067046215}
+  m_Father: {fileID: 520775347813843714}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &8531709145147252329
 GameObject:
   m_ObjectHideFlags: 0
@@ -543,12 +989,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 8531709145147252329}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 520775347813843714}
+  m_Father: {fileID: 62537905785275895}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &8391215602555023674
 MonoBehaviour:
@@ -620,17 +1066,79 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 6958048089959097631, guid: c887b0c600165d74094b8f2d53288dfe, type: 3}
+      propertyPath: m_Materials.Array.size
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 6958048089959097631, guid: c887b0c600165d74094b8f2d53288dfe, type: 3}
+      propertyPath: 'm_Materials.Array.data[1]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 98b1c99dee6c7b5488abe440aed99c45, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
-    m_AddedGameObjects: []
+    m_AddedGameObjects:
+    - targetCorrespondingSourceObject: {fileID: 717907108824260129, guid: c887b0c600165d74094b8f2d53288dfe, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1246476210315526366}
+    - targetCorrespondingSourceObject: {fileID: 717907108824260129, guid: c887b0c600165d74094b8f2d53288dfe, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 5602363497766371932}
+    - targetCorrespondingSourceObject: {fileID: 7004712027421865167, guid: c887b0c600165d74094b8f2d53288dfe, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 7123583704152403361}
+    - targetCorrespondingSourceObject: {fileID: 7004712027421865167, guid: c887b0c600165d74094b8f2d53288dfe, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 5833690807469857693}
+    - targetCorrespondingSourceObject: {fileID: 108220261769502933, guid: c887b0c600165d74094b8f2d53288dfe, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 149633624239482157}
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 6432355088039365084, guid: c887b0c600165d74094b8f2d53288dfe, type: 3}
       insertIndex: -1
       addedObject: {fileID: 558819999811655896}
+    - targetCorrespondingSourceObject: {fileID: 7687531153658587284, guid: c887b0c600165d74094b8f2d53288dfe, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 705802218441475935}
   m_SourcePrefab: {fileID: 100100000, guid: c887b0c600165d74094b8f2d53288dfe, type: 3}
+--- !u!4 &2344935514321979626 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 717907108824260129, guid: c887b0c600165d74094b8f2d53288dfe, type: 3}
+  m_PrefabInstance: {fileID: 2989377343911270091}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &2953269652969223710 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 108220261769502933, guid: c887b0c600165d74094b8f2d53288dfe, type: 3}
+  m_PrefabInstance: {fileID: 2989377343911270091}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &4157877073770867174 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 1211426450854706989, guid: c887b0c600165d74094b8f2d53288dfe, type: 3}
+  m_PrefabInstance: {fileID: 2989377343911270091}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &4887529303140417119 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 7687531153658587284, guid: c887b0c600165d74094b8f2d53288dfe, type: 3}
+  m_PrefabInstance: {fileID: 2989377343911270091}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &705802218441475935
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4887529303140417119}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c7a41f60d2b84e6a9c15d380be720063, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::InterruptOverlay
+  overlayMaterialIndex: 1
+  fadeInDuration: 0.8
+  fadeOutDuration: 0.4
+  interruptible: 0
+--- !u!4 &5208934837360812548 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 7004712027421865167, guid: c887b0c600165d74094b8f2d53288dfe, type: 3}
   m_PrefabInstance: {fileID: 2989377343911270091}
   m_PrefabAsset: {fileID: 0}
 --- !u!1 &8086272522836631319 stripped

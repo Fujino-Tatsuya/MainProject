@@ -201,7 +201,353 @@ Codex 가 수정 중인 파일: `Player/Player.cs`, `Player/PlayerStateControlle
   고프레임에서 이동량의 ~35%만 전달되는 회귀가 났다(`76824f2`에서 수정).
   새 `ISurfaceCarrier`를 만들 때 어느 쪽 계약인지 먼저 정할 것.
 
-## ▶▶ 현재 인수인계 (2026-09-07 · 파괴 가능한 상자 + 파편 버스트, 브랜치 `feature/VFX`)
+## ▶▶ 현재 인수인계 (2026-09-14 · 인터럽트 연출 4종 통일 + SpinnerBot 메시 분리, 브랜치 `feature/VFX`)
+
+작업 세션: **민경(Claude)**.
+
+**수정함 (동시 편집 주의)**: 🔴 `Monster/Boss/GauntletBot.cs` · 🔴 `Monster/Boss/SpinnerBot.cs` ·
+🔴 `Monster/Boss/WallBot.cs` · `Monster/Boss/TwentyThreeBoss.cs` · `50.Art/VFX/Scripts/InterruptOverlay.cs` ·
+`Monster/Editor/SpinnerBotMeshSplit.cs`(신규) · `2.Prefabs/Monster/SpinnerBot.prefab` ·
+`50.Art/.../Models/R_Spinnerbot_01_{Body,Blades}.asset`(신규)
+🔴 = 경석 담당 파일. 공유 필요(AGENTS.md §3).
+
+### ✅ "인터럽트 가능" 오버레이는 이제 인터페이스로 붙는다
+
+`InterruptOverlay` 가 `IBossTelegraph` 를 구현한다 — `SetCounterWindow(bool) => Interruptible = open`.
+몬스터 코드는 이 컴포넌트를 **모른다.** 서버 `MonsterBase.ServerSetCounterWindow` → RPC → 각 피어의
+`ApplyCounterWindowVisual` 이 `GetComponentInChildren<IBossTelegraph>` 로 찾아 부른다.
+카운터 창을 여는 몹이면 **프리팹에 붙이기만 하면** 따라온다.
+
+⚠️ `BossCounterTelegraph`(전신 노란 틴트)는 **어느 프리팹에도 안 붙어 있다**(guid 전수 검색 0건).
+   즉 중간보스 3종은 그동안 카운터 창에 아무 표시가 없었다 — 뺏어온 게 아니라 빈자리를 채운 것이다.
+
+### ✅ 인터럽트 성공 섬광 — 보스 4종 규약 통일
+
+`FX_Interrupt_Flash_Entry`(`50.Art/VFX/Common/`, 몹 전용 아님) 원샷. 넷 다 모양이 같다:
+`[Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]` + null 가드 + 경고 1회.
+
+| 보스 | 호출 지점 | 프리팹 배선 |
+|---|---|---|
+| GauntletBot | `CounterSucceeded()` | ✅ 연결됨 |
+| SpinnerBot | `CounterSucceeded()` | ❌ EffectSocketPlayer 새로 붙여야 함 |
+| WallBot | `CounterSucceeded()` | ❌ EffectSocketPlayer 하나도 없음 |
+| TwentyThreeBoss | `ReceiveAttack()` 카운터 성사 지점 | ⚠️ 플레이어는 있음(Id 비어 방치), 슬롯만 연결 |
+
+🔴 **23호는 `EnterCounterGroggy` 안에 넣지 않았다.** 그 메서드는 송전기 전멸(S7) 경로도 함께 쓰는데
+   그건 플레이어가 끊어낸 게 아니다. 섞으면 연출이 무엇을 칭찬하는지가 흐려진다.
+
+🔴 가붕이의 `interruptFlash.PlayOnce()` 는 원래 `CounterSucceeded()` 안에서 **직접** 불렸다 —
+   `TakeDamage` 의 `IsServer` 게이트 뒤라 **호스트에서만 보였다.** 이 레포 단골 사고. RPC 로 바꿨다.
+
+### ✅ 가붕이 펀치 명중 스파크 — 좌/우
+
+`PerformAttackHit()` 에서 `meleeAttack.Hit() > 0` 일 때만 `PlaySparkRpc(_currentAttack)`.
+L/R 은 `GauntletAttackId` enum 에 이미 들어 있다. 좌/우를 RPC 인자로 싣는 이유: `_currentAttack` 은
+**복제되지 않는 서버 전용 값**이라(선택 결과는 `PlayAttackAnimClientRpc` 로만 나간다) 클라가 모른다.
+
+### 🔴 오버레이 머티리얼 슬롯 트릭의 한계 — SpinnerBot 메시 분리
+
+**머티리얼 슬롯은 서브메시와 1:1 이다.** 개수를 넘는 슬롯만 "한 번 더 그리기"가 되고,
+그 덤은 **언제나 마지막 서브메시**에 붙는다. 그래서:
+
+- Gauntlet · Wall : 서브메시 1개 → 초과 슬롯이 몸 전체 ✅ (운이 좋았던 것)
+- Spinner : 서브메시 2개(몸통 2299면 / 날개 **1면** 반투명 카드) → 초과 슬롯이 **날개**에만 ❌
+
+몸통은 URP/**Lit 불투명**, 날개는 URP/**Unlit 투명**(`_Surface: 1`)이라 **서브메시 합치기는 불가**다
+(머티리얼이 하나만 남아 둘 중 하나를 잃는다). 그래서 **몸통/날개를 렌더러 2개로 쪼갰다.**
+
+🔴 **Blender 왕복은 막힌 길이다 (2026-09-14 실측).** 재export 하면 `Armature` 노드가 끼어든다 —
+   원본 FBX(3ds Max)에 그 문자열 **0회**, Blender 재export 본에 **4회**. 이 리그는 Generic
+   (`animationType: 2`)이고 클립 7종이 전부 `R_Spinnerbot_01` 아바타를 **Copy From Other Avatar**
+   로 문다. Generic 은 본 **경로**로 바인딩하므로 노드가 하나 끼면 클립이 **조용히** 안 붙는다.
+   → FBX · 아바타 · 본 GameObject 는 건드리지 말고 **메시만 프로젝트 안에서** 쪼갤 것.
+
+도구: `Tools/Boss/SpinnerBot — 메시 분리 (몸통/날개) (멱등)` + `— 검증 (읽기 전용)`.
+본 29개를 두 렌더러가 **공유**한다(복제하면 애니가 따로 논다). 쓰지 않는 정점은 버려 압축한다 —
+통째로 복사하면 면 한 장짜리 날개가 몸통 4807 정점을 매 프레임 스키닝한다.
+가중치는 구 API(`Mesh.boneWeights`, 영향 4개로 **잘림**) 대신 `GetAllBoneWeights` 로 정확히 옮긴다.
+
+⚠️ Blender 와 Unity 는 세는 단위가 다르다. 몸통 2291정점/2299폴리곤(Blender) =
+   4807정점/4023삼각형(Unity) — Unity 는 UV 이음새·노멀이 갈리는 자리마다 정점을 쪼갠다.
+   **숫자가 안 맞는다고 버그로 의심하지 말 것.**
+
+⚠️ 프리팹에 죽은 오버라이드 `m_Materials.Array.data[2]`(= Interrupt)가 남아 있다. 배열 크기가 2라
+   지금은 무시되지만, **누가 슬롯을 하나 늘리는 순간 되살아나** 오버레이가 두 번 그려진다.
+
+### 미결
+
+- **컴파일·Play 검증 전무.** 이번 세션 변경분 전체가 한 번도 안 돌았다.
+- 스피너·월봇 프리팹에 인터럽트 섬광 `EffectSocketPlayer` 붙이기 / 23호는 슬롯만 연결
+- MPPM 2인으로 클라이언트에서 섬광·스파크가 보이는지 (가붕이 섬광은 이전엔 호스트 전용이었다)
+- **커밋이 둘로 갈린다** — `Models/R_Spinnerbot_01_*.asset` 은 **SVN**,
+  나머지 코드·프리팹은 **git**. 한쪽만 올리면 다른 사람 화면에서 스피너 메시 참조가 깨진다.
+
+---
+
+## 이전 인수인계 (2026-09-09 · 23호 점프어택 VFX 카탈로그 이관 + 애니 이벤트 이펙트 일반화, 브랜치 `feature/VFX`)
+
+작업 세션: **민경(Claude)**.
+
+**수정함 (동시 편집 주의)**: `Monster/Boss/TwentyThreeBoss.cs` · `Monster/Boss/BossDataSO.cs` ·
+🔴 `Monster/MonsterMeleeAttack.cs` · `Effects/EffectAnimEvents.cs` · `Effects/EffectSocketPlayer.cs` ·
+`Effects/IAnimEventEffect.cs`(신규) · `Effects/EffectPathPlayer.cs`(신규) ·
+`Effects/EffectStagePlayer.cs`(신규).
+**프리팹·씬·`EffectCatalog.asset`은 건드리지 않았다** — Unity 저작은 아래 「미결」 참조.
+
+### 🔴 다른 담당 영역을 건드렸다 — 공유 필요
+
+| 파일 | 변경 | 담당 |
+|---|---|---|
+| `Monster/MonsterMeleeAttack.cs` | `Hit()` 반환형 `void` → `int` (실제로 피해가 들어간 대상 수) | 몬스터 전체(경석) |
+| `Monster/Boss/BossBomb.cs` | 상태 대입을 `SetState()` 로 일원화 + 이동 트레일·폭발 연출 RPC | 몬스터 전체(경석) |
+| `Monster/AreaZone.cs` | `visualEffect`(EffectEntry) 필드 + 반경 연동 루프 재생·회수 | 몬스터 전체(경석) |
+
+**셋 다 하위 호환이다.**
+
+- `MonsterMeleeAttack.Hit()` 는 이미 내부에서 `TryResolveHit` 의 `bool` 을 받아 놓고 넉백 판단에만
+  쓰고 버리고 있었다 — 그 값을 세어 돌려줄 뿐 판정 로직은 한 줄도 바뀌지 않았다.
+  호출처 **10곳이 전부 문장 형태**(`meleeAttack?.Hit();`)라 GauntletBot·SpinnerBot·WallBot·
+  MonsterBase 어느 것도 손대지 않았고 그대로 컴파일된다.
+- `BossBomb` 은 `_state = ...` 대입 **8곳**을 `SetState()` 로 돌렸을 뿐 상태 전이 조건은 그대로다.
+  🔴 앞으로 `_state` 를 직접 대입하면 트레일 연출이 어긋난다.
+- `AreaZone` 은 **필드 추가뿐**이다. 기존 장판 프리팹은 `visualEffect` 가 비어 있어 동작이 안 바뀐다.
+
+⚠️ **`Hit()` 의 반환값은 서버에서만 유효하다.** 클라는 판정 자체를 하지 않아 **항상 0** 이다 —
+이 값으로 연출을 켜려면 반드시 RPC 로 내보낼 것(직접 재생하면 호스트에서만 보인다).
+
+### 🔴 "때렸다"와 "맞았다"를 가르는 자리가 생겼다
+
+근접 타격 연출은 **명중했을 때만** 나와야 하는데, 지금까지 그걸 알 방법이 없었다.
+🔴 **애니 이벤트로는 못 가른다 — 클립은 맞았는지 모른다.** 허공을 때려도 터진다.
+그래서 이 연출만은 **코드가 판정 결과를 보고** 낸다.
+
+- 흐름: `PerformAttackHit` 에서 `meleeAttack.Hit() > 0` → `PlayAttackHitEffectRpc(attackId)`
+  → 각 피어가 손별 `EffectSocketPlayer.PlayOnce()`.
+- 배선은 **보스 인스펙터의 직접 참조**다 — `leftHookHit` / `rightHookHit` / `upperHit`
+  (`grabPulse` · `chargeBall` 과 같은 방식). 손마다 소켓이 달라 공격별로 나눈다.
+- Unreliable: 한 대 분이 빠져도 상태가 발산하지 않는다.
+
+🔴 **`BossDataSO` 에 문자열 Id 로 두려다 되돌렸다(2026-09-10).** SO 는 에셋이라 프리팹의
+컴포넌트를 참조할 수 없어서 매핑을 데이터에 두려면 문자열밖에 없는데, 그 대가가 오타 실패 모드다.
+얻는 것은 "공격이 늘어도 코드가 안 는다" 하나뿐이고 **보스는 하나 · 근접은 3종**이라 값이 안 된다.
+같은 이유로 `grabPulse` 도 id 조회에서 직접 참조로 바꿨다 — **이 보스의 연출 배선은 전부 직접 참조로 통일한다.**
+
+⚠️ **두 계통을 섞지 말 것.** 명중과 무관한 연출(공격 궤적 등)은 애니 이벤트가 맞고,
+명중이 조건인 연출만 이 경로다.
+
+### 🔴 애니 이벤트 이펙트가 인터페이스로 열렸다
+
+`EffectAnimEvents` 가 `EffectSocketPlayer` 구체 타입을 색인하던 것을
+**`IAnimEventEffect`**(`Id` / `PlayOnce` / `Play` / `Stop`) 색인으로 바꿨다.
+**새 연출 방식은 이 인터페이스만 구현하면 클립에서 바로 부를 수 있다** — 릴레이의 이벤트 함수
+셋(`PlayEffect` / `StartEffect` / `StopEffect`)은 앞으로도 늘지 않는다.
+
+| 구현체 | 무엇 |
+|---|---|
+| `EffectSocketPlayer` | 트랜스폼 **하나**에 붙어 따라다니는 이펙트 (기존) |
+| `EffectPathPlayer` | 트랜스폼 **배열**을 훑고 지나가는 반복 펄스 (신규) |
+
+- `EffectAnimEvents.effects` 필드가 `EffectSocketPlayer[]` → `MonoBehaviour[]` 로 바뀌었다
+  (유니티가 인터페이스를 직렬화 못 한다 — `Hurtbox.attackReceiverSource` 와 같은 관용구,
+  `OnValidate` 가 타입을 검사한다). **기존 프리팹 5종 모두 이 배열이 비어 있어 유실된 값은 없다.**
+- `EffectAnimEvents.Has(id)` 추가 — **경고 없이** 존재만 본다. "없으면 그만"인 안전망 경로용이고,
+  클립이 부르는 경로는 계속 `Find`(오타를 경고로 잡는다)를 쓴다.
+
+### 🔴 `EffectPathPlayer` — 팔 전기 펄스의 일반화
+
+구 `GrabPulseDriver`(archive 브랜치)를 이식하면서 **보스·팔에 대한 의존을 전부 걷어냈다.**
+이 컴포넌트가 아는 것은 "월드 좌표를 가진 트랜스폼의 순서"뿐이라 팔·다리·무기·레일 어디에나 붙는다.
+
+- `shoulder`/`forearm`/`hand` 3개 고정 필드 → **`Transform[] path`(2개 이상)**. 구간 사이는
+  **길이 비례** 보간이다 — 균등하게 나누면 구간 길이 차만큼 관절에서 속도가 튄다.
+- **애니메이터 상태 폴링을 걷어냈다.** 구 버전은 `GrabPulseProfile` SO 에 상태 이름을 적어 두고
+  매 프레임 `GetCurrentAnimatorStateInfo` 로 재생 여부를 판정했다(SSM 전이가 콜백을 안 태워서 쓴 우회).
+  이제 시작·종료가 **애니 이벤트**라 그 판정이 필요 없다 → **`GrabPulseProfile`(SO + 스크립트 2종)은
+  이식하지 않았다.** 타이밍(`travelTime`/`interval`)은 컴포넌트 필드로 통일했다
+  (팀장 결정: 일단 통일, 상태별 강약이 필요해지면 그때 id 를 분기).
+- 앵커는 풀로 돈다 — `PlayLooping` 이 트랜스폼 하나를 추종하는데 펄스 겹침을 허용하므로
+  앵커를 공유하면 **살아 있는 펄스 전부가 같은 지점으로 끌려온다.**
+- 핸들 회수 3지점: 펄스 도착 · `Stop()` · `OnDisable()`(즉시).
+
+### 🔴 팔 전기의 켜고 끄기는 **클립이 아니라 `TwentyThreeBoss` 가 한다**
+
+애니 이벤트로 갈 수도 있었지만(경로는 열려 있다) **코드로 잡았다** — 그랩이 끝나는 길이 넷이라
+끄는 책임을 클립에 맡기면 하나만 빠져도 팔에 전기가 영영 남는다(SpinnerBot 함정).
+그래서 시작·종료를 그랩 상태 전이와 **같은 자리**에 둔다. 보스는 `EffectPathPlayer` 를
+**직접 참조**한다(`grabPulse` 필드) — id 문자열 조회를 안 거치므로 오타 실패 모드가 없다.
+
+| 시점 | 위치 |
+|---|---|
+| **시작** — 그랩 애니가 나갈 때 | `StartAttack` 의 `case BossAttackId.Grab` |
+| 종료 — 던지기(손에서 떠나는 순간) | `ReleaseGrabThrow` |
+| 종료 — 헛잡기 | `AcquireGrab` 실패 분기 |
+| 종료 — 잡힌 대상 소멸 | `TickGrabHold` |
+| 종료 — 체인 중단(카운터·그로기·사망) | `AbortAttackChain` ← **마지막 그물** |
+
+- **판정(`AcquireGrab`)이 아니라 애니 시작에서 켠다.** 판정은 히트 프레임이라 거기서 켜면
+  팔을 뻗는 동안 아무 예고가 없다. 대신 헛잡기 경로에서 반드시 꺼야 한다.
+- **Throw 는 `BeginGrabThrow` 가 아니라 `ReleaseGrabThrow` 에서 끈다** — 던지기 준비 동작 내내
+  전기가 붙어 있어야 "감전시켜 던진다"로 읽힌다(구 `GrabPulseProfile` 도 Throw 상태에서 계속 냈다).
+- 두 RPC 모두 **Reliable(기본)**. Stop 이 유실되면 전기가 영영 남는다 —
+  착지 충돌(`PlayJumpImpactRpc`)이 Unreliable 인 것과 정반대 이유다.
+- 🔴 `EffectPathPlayer.OnDisable` 안전망만으로는 부족하다 — 그로기는 컴포넌트를 끄지 않는다.
+
+### 🔴 `EffectStagePlayer` — 단계형 이펙트 (차징 구슬 · 앞으로 인터럽트 표시)
+
+`인트로(차오름) → 지속 → 종료(정상/끊김)` 4단 엔트리를 시간에 맞춰 **갈아 끼우기만** 한다.
+🔴 **아무것도 애니메이션하지 않는다** — "차오름"은 프리팹이 스스로 하는 일이라
+(셰이더 float 0→1 이든 스케일이든) 연출 방식이 바뀌어도 이 코드는 안 바뀐다.
+
+이펙트 재생기 가족이 셋이 됐다. 저 둘이 **어디서**를 달리한다면 이쪽은 **수명**을 나눈다:
+
+| | 무엇 |
+|---|---|
+| `EffectSocketPlayer` | 트랜스폼 **하나**에 붙어 따라다닌다 |
+| `EffectPathPlayer` | 트랜스폼 **배열**을 훑는 반복 펄스 |
+| `EffectStagePlayer` | **단계**로 이어지는 루프 (intro / sustain / outro / abortOutro) |
+
+- 🔴 **왜 보스 안이 아니라 별도 컴포넌트인가**: `MonsterBase.Update` 가 `if (!IsServer) return` 이라
+  (`MonsterBase.cs:208`) **보스에는 피어 로컬 타이머를 둘 수 없다.** 인트로→지속 전환이 그래서 밖으로 나왔다.
+- 지속을 **먼저 켜고** 인트로를 지운다 — 뒤집으면 한 프레임 연출이 통째로 사라진다(레거시가 같은 주석을 달았던 자리).
+- 차징 구슬 배선: 시작 `StartChargingInPlace` / 깨짐·사그라짐 `TickCharge` / 체인 중단 `AbortAttackChain`.
+  좌표·반경은 **서버가 싣는다** — 장판이 보스 자식이 아니라 별도 NetworkObject 라 클라 스폰 타이밍이 갈린다.
+- `ChargeController`(레거시)는 **참조 0건인 죽은 코드다**(전 프리팹·씬 확인). 4개 이펙트 재생 코드가
+  통째로 잠들어 있었다. 지울지 참고용으로 남길지 미정.
+
+### 🔴 화면 중앙을 벗어난 대형 VFX 는 **흐려진다** (MaskBlur)
+
+`PC_Renderer` 에 이 브랜치에서 추가된 **`MaskBlurFeature`** 가 화면 중앙의 둥근 사각형 **바깥을 블러**한다
+(`Assets/99.Settings/MaskBlurSettings.asset` — center (0.5,0.5) · size (0.45,0.28) · roundness 8.59 ·
+darken 0.063). 주입 시점이 `BeforeRenderingPostProcessing(550)` 이라 **투명 이후 = VFX 가 배경과 함께 흐려진다**
+(피처 헤더가 그렇게 적고 있다 — 의도된 동작이다).
+
+- 증상: 이펙트가 **화면 중앙 사각형 경계에서 잘린 것처럼** 보인다. 밝고 얇은 선은 살아남고
+  넓고 연한 글로우만 뭉개져 사라지므로 "일부만 잘렸다"로 읽힌다.
+- 씬 뷰·프리팹 프리뷰에는 렌더러 피처가 안 걸려 **멀쩡하게 보인다** — 이 차이 때문에 오진하기 쉽다.
+- 게이트는 `MaskBlurController` 이고 **`4.MapScene` 계열에만 있다.** `BossScene`·`PlayerBossTest`
+  에서는 안 돈다 → **같은 이펙트를 두 씬에서 비교하면 즉시 가려진다.**
+- ⚠️ 차징 구슬만의 문제가 아니다. 점프 착지 예고·장판·폭발 등 **화면 중앙 밖 대형 VFX 전부**가 걸린다.
+  보스 구간에서 컨트롤러를 끄거나(패스 통째로 빠짐, 비용 0) 보스 전용 `MaskBlurSettings` 를
+  `SetSettings` 로 물리는 쪽이 후보다. **팀장 판단 대기.**
+
+### 이번에 확립된 계약 (점프어택)
+
+- 🔴 **23호 점프 착지 예고 2개는 이제 `AoeTelegraph` 프리팹이 아니라 카탈로그 루프 이펙트다.**
+
+  | 예고 | 엔트리 | 뜻 |
+  |---|---|---|
+  | 경계 원(고정 크기) | `EffectCatalog.Drop_Charge_Boundary` | **어디에** 떨어지는가 |
+  | 차오르는 원(0.1 → AoE 점증) | `EffectCatalog.Drop_Charge_Indicator` | **언제** 떨어지는가 |
+
+  `TwentyThreeBoss.ShowJumpTelegraphClientRpc` 가 둘 다 `PlayLooping` 으로 빌리고,
+  `HideJumpTelegraphClientRpc` 가 반납한다. 구 `JumpController`(레거시 보스)가
+  `Drop_Charge_Indicator` 를 쓰던 것과 **같은 관용구**다 — 둘을 따로 만들지 말 것.
+- **착지 충돌은 `EffectCatalog.Drop_Collision` 원샷이다** (`PlayJumpImpactRpc`, Unreliable).
+  예고 2개와 달리 수명이 사건이 아니라 시간(엔트리 3.5초)이라 **핸들도 회수 책임도 없다.**
+  🔴 **RPC 로 나가야 한다** — 호출 지점 `ApplyJumpLandingDamage` 가 `NotifyAttackHit`(`IsServer`
+  게이트) 아래라 직접 재생하면 **호스트에서만 보인다**(이 레포의 단골 버그).
+  데미지 0 조기 반환보다 **위**에 둔다 — 데미지가 0 이어도 착지는 일어났다.
+  전달(Delivery)이 예고와 다른 것도 의도다: 원샷은 유실돼도 이펙트 하나가 빠질 뿐이지만,
+  예고 해제가 유실되면 **장판이 바닥에 영구히 남는다** → 그쪽은 Reliable.
+- **관용구: 크기는 `scale`, 시간은 `partDuration`, 끝은 `Release`.**
+  `scale` 에 **판정 반경을 그대로** 넘긴다(예고가 판정에 대해 거짓말하지 않게).
+  `partDuration` 은 **성장하는 쪽에만** 넘긴다 — 경계는 자라지 않아 드라이버에 줄 시간축이 없다.
+  수명이 시간이 아니라 "착지"라는 **사건**이라 원샷이 아니라 루프다.
+- 🔴 **루프 핸들은 세 곳에서 회수한다** — 재생 직전(재진입 방어) · `Hide` RPC · `OnDestroy`.
+  체공 중 보스가 파괴되면 Hide RPC 가 오지 않아 `OnDestroy` 가 마지막 그물이다.
+  빠뜨리면 보스가 죽을 때마다 풀에서 두 칸씩 새고 결국 예고가 아예 안 뜬다.
+- **회전은 `Quaternion.identity` 다 — 경사면 정렬은 아직 없다.** 하려면 서버가 착지점 노멀을
+  RPC 에 실어야 한다(`GroundProbe` 는 서버에서만 돈다). 지금 아레나가 평지라 미뤘다.
+- **가드 순서가 바뀌었다.** 예전에는 `jumpTelegraphPrefab` 이 비면 예고 전체가 early return 이었다.
+  지금은 두 엔트리가 서로 독립이고, 각각 1회 경고(`WarnNo{Boundary,Indicator}EntryOnce`)를 낸다.
+
+### ⚠️ 이 변경으로 죽은 설정값 4건 (지우지 않고 명시만 했다)
+
+정본 §6 "조용히 무시되는 설정값"을 또 만들지 않으려고 툴팁에 **⚠️ 미사용**을 박았다.
+값을 잃으므로 실제 삭제는 팀장 확인 후.
+
+| 대상 | 왜 죽었나 |
+|---|---|
+| `BossDataSO.jumpTelegraphPrefab` | 예고 2개 모두 카탈로그로 이관 |
+| `BossDataSO.jumpTelegraphOuterAlpha` | 진하기가 `FX_Drop_Charge_Boundary` 파티클 저작값으로 |
+| `BossDataSO.jumpTelegraphFillAlpha` | 진하기가 `FX_Drop_Charge_Indicator` 파티클 저작값으로 |
+| `AoeTelegraph.ShowGrowing` | **호출자 0** (유일한 사용처가 점프 예고였다) |
+
+`AoeTelegraph` 클래스 자체는 **살아 있다** — 송전기 차징 오라(`_chargeAuraTelegraph`)가 아직 쓴다.
+
+### 미결 — Unity 저작 (에디터가 필요해 못 했다)
+
+팔 전기 펄스는 **코드만 있고 아직 화면에 안 나온다.** 프리팹 배선 하나면 된다
+(클립 이벤트는 필요 없다 — 코드가 켜고 끈다):
+
+1. `2.Prefabs/Monster/Boss/TwentyThree.prefab` 루트에 **`EffectPathPlayer` 부착** —
+   `effect = FX_Grab_ArmElectric_Entry` · `path = [어깨, 팔꿈치, 손]`(예전 배선과 같은 팔 3본, 순서대로).
+   `Id` 는 비워도 된다(코드가 직접 참조한다 — 클립에서도 부르고 싶을 때만 채운다).
+2. 같은 루트의 **`TwentyThreeBoss.grabPulse`** 필드에 그 컴포넌트를 연결.
+   비어 있으면 첫 그랩에서 1회 경고가 뜬다.
+3. 상태별 강약(Grab / Holding / Throw)이 필요해지면 그때 `EffectPathPlayer` 를 나눈다.
+   지금은 한 벌(travelTime 0.4 / interval 0.6)로 통일했다.
+4. **차징 구슬** — 보스 루트에 `EffectStagePlayer` 부착, intro/sustain/outro/abortOutro =
+   `ChargeBall_Grow/Loop/FadeOut/Break`, `introDuration` 을 Grow 프리팹 저작 길이와 맞춘 뒤
+   `TwentyThreeBoss.chargeBall` 에 연결. 카탈로그 4슬롯은 이미 배선돼 있다.
+5. **근접 타격 연출** — 손별 `EffectSocketPlayer` 를 보스 인스펙터의
+   `leftHookHit` / `rightHookHit` / `upperHit` 에 물린다. 어퍼가 어느 손이면 그 손 것을 그대로 물리면 된다.
+   (`Id` 는 비워도 된다 — 코드가 직접 참조한다. 클립에서도 부르고 싶을 때만 채운다.)
+6. ✅ **폭탄 장판 데칼 전환 — 완료**(2026-09-11, 아래 절 참조).
+
+### ✅ 폭탄 장판을 데칼 + 파티클 2층으로 나눴다 (2026-09-11)
+
+바닥에 눌러붙는 원판은 **데칼**, 위로 솟는 것은 **파티클**. 하나였던 `FX_Bomb_Exploded` 를 갈랐다.
+
+| 층 | 어디에 |
+|---|---|
+| 원판(맥동) | `FireFloor.prefab` → `Visual/Decal` (`DecalProjector` + `ScalePulse`) |
+| 불꽃·연기 | `AreaZone.visualEffect` = `FX_Bomb_Exploded_Entry` (`particles` + `fire` 만 남김) |
+
+- 🔴 **`DecalProjector.ScaleMode = InheritFromHierarchy` 가 핵심이다.** 이래야
+  `AreaZone.ApplyVisualRadius` 가 이미 하고 있는 `visual.localScale = (지름, 지름, 1)` 이 그대로 먹는다
+  (URP `DecalUpdateCachedSystem` 확인: Inherit 면 `localToWorldMatrix`, 아니면 `TRS(pos, rot, 1)` 로
+  **스케일을 버린다**). 덕분에 **장판이 자랄 때 데칼은 부드럽게 커진다** — 파티클 층은 배율이
+  대출 시점에 확정이라 한 번 끊기는 것과 대조된다.
+- 🔴 **`m_RenderingLayerMask = 2`**(`DecalReceivers.Mask`). 1 로 두면 **캐릭터 몸에도 칠해진다.**
+- `m_Size = (1, 1, 4)` — XY 는 1(지름이 곱해진다) · Z 는 투영 **깊이**(반경과 무관한 축).
+- 맥동은 `ScalePulse`(신규) — `AnimationCurve` 를 그대로 돌린다. Animator·컨트롤러를 안 쓴다:
+  루프 상태 하나에 자산 둘과 Animator 평가 비용이 붙는데, 장판은 동시에 여러 개 깔린다.
+  커브는 구 `circle` 의 `Size over Lifetime` 키프레임을 그대로 옮겼다(period 0.5 = 그 파티클 수명).
+- ⚠️ **커밋이 둘로 갈린다.** `FX_Bomb_Exploded.prefab` 의 `circle` 제거만 `Assets/50.Art` =
+  **SVN** 이고, 나머지(`FireFloor.prefab` · `MA_BombFloorDecal.mat` · `SG_ColoredDecal.shadergraph` ·
+  스크립트)는 git 이다. 한쪽만 올리면 다른 사람 화면에서 원판이 둘로 보이거나(구 파티클 + 데칼) 아예 없다.
+
+### 🔴 데칼에 색을 넣으려면 셰이더부터 갈아야 한다
+
+**URP 내장 `Decal.shadergraph` 에는 색 프로퍼티가 아예 없다** — 노출 프로퍼티가
+`Base_Map` · `Normal_Map` · `Normal_Blend` **셋뿐**이고 `ColorShaderProperty` 는 0개다(패키지 소스 실측).
+머티리얼에서 색을 아무리 찾아도 없는 게 정상이고, 텍스처 색이 곧 화면 색이다.
+
+- → `Assets/3.Materials/SG_ColoredDecal.shadergraph` 를 만들었다(패키지 그래프 복사 + `_BaseColor` 추가).
+  참조 이름을 **`_BaseColor`** 로 맞춘 것은 의도다 — `AimIndicator` · `SkillRangeIndicator` 가 쓰는 이름이고
+  `AoeTelegraph` 도 `Shader.PropertyToID("_BaseColor")` 로 그걸 찾는다.
+- 🔴 **`AoeTelegraph.decalColor` 의 RGB 틴트는 지금까지 한 번도 적용된 적이 없다.**
+  `MA_AoeDecal_Red` 가 내장 Decal 셰이더를 쓰는데 거기 `_BaseColor` 가 없어서 `HasProperty` 가드에
+  걸려 조용히 무시된다(주석은 "decalColor 의 RGB만 틴트로 얹는다"고 적고 있다).
+  그 머티리얼을 `SG_ColoredDecal` 로 옮기면 비로소 동작한다 — **보스 예고 장판 색이 바뀌므로 팀장 판단 대기.**
+
+⚠️ **함정: 데칼 그래프에는 `Sample Texture 2D` 노드가 둘이다**(Base Map / Normal Map). 겉모습이 같다.
+알파를 **Normal Map 쪽**에서 뽑으면 그 프로퍼티가 비어 있어 샘플이 기본값(알파 1)을 돌려주고,
+**데칼이 텍스처 모양 없이 사각형으로 꽉 찬다.** 색이 제대로 나오는데 모양만 사각형이면 여기부터 볼 것.
+어느 쪽이 Base Map 샘플인지는 노드의 `Texture` 입력을 따라가 확인한다.
+
+### 미결 — 점프어택
+
+- **Play 육안 확인** — `scale = 반경` 규약이 두 프리팹 저작 크기와 맞는지. 어긋나면 코드가 아니라
+  `FX_Drop_Charge_{Boundary,Indicator}.prefab` 쪽에서 잡는다.
+- 예고 높이가 아직 +1cm / +2cm 다. 아레나 중앙 바닥판(보행면 +6cm)에는 못 미쳐 묻힌다 —
+  데칼·스텐실 작업에서 함께 0 으로 갈 것.
+
+---
+
+
+## 이전 인수인계 (2026-09-07 · 파괴 가능한 상자 + 파편 버스트, 브랜치 `feature/VFX`)
 
 > 🔴 **이 절과 아래 두 절은 `feature/VFX`에서 옮겨 온 기록이다** (2026-09-08).
 > VFX 작업은 `transparentV3` 위로 옮겨 갔다 — 이 브랜치가 그 결과다.
@@ -463,6 +809,8 @@ Rigidbody 제거 같은 최적화는 **하지 말 것** — 0.19ms를 위해 검
     `AoeDecalTelegraph.prefab`). 아크·원은 **코드 생성 텍스처**라 아트 작업이 0이다.
   - 🔴 **되돌리기가 한 칸이다** — 표식은 `decalMaterial` 을 비우면 메시, 장판은 SO 프리팹 필드를
     옛 것으로. 두 경로가 코드에 공존한다.
+    - ⚠️ **점프 예고는 2026-09-09 에 이 구도에서 빠졌다** — `EffectCatalog.Drop_Charge_*` 루프
+      이펙트로 이관돼 `jumpTelegraphPrefab` 을 되돌려도 아무 일도 안 난다. 오라·표식은 그대로.
   - 🔴 실측으로 확정된 것 3개(다시 파지 말 것):
     ① 활성 렌더러는 `PC_Renderer.asset` 이고 **데칼 피처가 이미 켜져 있다**(`PP_Renderer`·`PP.asset` 은 죽은 애셋).
     ② `m_SupportsLightLayers: 1` + 모든 라이트가 bit 0 → **캐릭터를 다른 비트로 옮기면 어두워진다.**
@@ -1377,7 +1725,7 @@ SO 에 `dash*` 6필드 + `BossAttackPhase.Dash` 추가(끝에). **숫자는 전�
 | `MonsterBase` | `ForceHitReaction(duration, groggyAfter)` | `SetState`·`EnterHit` 이 private 이라 **보스가 `Hit` 에 들어갈 방법이 없었다** |
 | `MonsterMeleeAttack` | `SetColliderInfo`/`ColliderInfo` | 공격별 히트박스 앵커 스왑 |
 | `HitFlash` | `SetBaseTint`/`ClearBaseTint` | 카운터 색이 피격 플래시에 안 지워지게 |
-| `AoeTelegraph` | `ShowGrowing` | 점프 착지 예고(시간 성장) |
+| `AoeTelegraph` | `ShowGrowing` | 점프 착지 예고(시간 성장) — ⚠️ **2026-09-09 이후 호출자 0**(카탈로그 이펙트로 이관) |
 
 ### ▶ 다음 세션 착수 순서 — **Play 검증부터**
 
@@ -1539,7 +1887,8 @@ S2 어퍼 에어본(팀장 판단 대기) → S4 Throw 변위 재검토(`Unit.Kn
 
 - **뒤집힌 것 3건**: ① "돌진 = 매 틱 넉백 재적용" → **`Restrained.Push`**(`Unit.Knockback` 은 duration 없는 임펄스 1회라 누적되면 플레이어가 튀어나간다) ② **슈퍼아머로 돌진 버티기 = 의도**(기획 회의) → `Push` 에 슈퍼아머 검사 + `bool` 반환 요청. 슈퍼아머면 **밀림✕/기절✕/데미지○** ③ **"플레이어 CC 경로 없음"은 절반 틀렸다** — 상태이상은 `Unit.StatusEffects.Apply` 로 **오늘 가능**, 막힌 건 **변위뿐** (→ PLAN §5.1 G1 정정)
 - **"도달"은 송전기 실패 조건이 아니다** — `ReachEvent` 는 "상승 완료"라 모든 기둥이 반드시 도달한다. 실패는 **제한시간 초과 단독** (→ PLAN §5.11)
-- **JumpAttack 의 빨간 장판은 예고 표시(`AoeTelegraph`)이지 `AreaZone` 이 아니다** — 섞지 말 것
+- **JumpAttack 의 빨간 장판은 예고 표시이지 `AreaZone` 이 아니다** — 섞지 말 것
+  (⚠️ 2026-09-09 이후 그 예고는 `AoeTelegraph` 가 아니라 `EffectCatalog.Drop_Charge_*` 루프 이펙트다)
 
 ### 🔴 알아 둘 것 (함정)
 
@@ -1553,7 +1902,7 @@ S2 어퍼 에어본(팀장 판단 대기) → S4 Throw 변위 재검토(`Unit.Kn
 
 ---
 
-## ▶▶ 현재 인수인계 (2026-08-07 · 보스 FSM 지원 2건 — 인터럽트 식별자 + 캐리 소켓)
+## 이전 인수인계 (2026-08-07 · 보스 FSM 지원 2건 — 인터럽트 식별자 + 캐리 소켓)
 
 작업 세션: **은희(Claude)**. 워크트리 `C:\UnityProject\MainProject-WorkTree`,
 브랜치 `feature/InterruptSkill-CarrySocket` (base `MainProject/development` `6dbc1c34a`).
@@ -2018,7 +2367,7 @@ VFX 로 따로 넣는다** — 그래야 통제가 된다. `m_Antialiasing: 2` �
 
 ---
 
-## ▶▶ 현재 인수인계 (2026-08-11 · 피격 이펙트 클라 복제 + 교체 HUD, 브랜치 `feature/VFX`)
+## 이전 인수인계 (2026-08-11 · 피격 이펙트 클라 복제 + 교체 HUD, 브랜치 `feature/VFX`)
 
 작업 세션: **민경(Claude)**. 계획·근거는 [PLAN.md](PLAN.md) 최상단 항목.
 수정 파일: `Effects/EffectManager.cs` · `Effects/HitVFXPlayback.cs`(신규) ·

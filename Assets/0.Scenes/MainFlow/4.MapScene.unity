@@ -6469,7 +6469,7 @@ GameObject:
   - component: {fileID: 8462001901103000002}
   - component: {fileID: 8462001901103000003}
   m_Layer: 0
-  m_Name: PixelScanlineController
+  m_Name: RetroCRTController
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -6499,10 +6499,18 @@ MonoBehaviour:
   m_GameObject: {fileID: 8462001901103000001}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: abfa259b7f4a42cfb7bbc50c3f47f09c, type: 3}
+  m_Script: {fileID: 11500000, guid: 72c3b1b8e5724a4db8d33b55564985c3, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PixelScanlineController
-  settings: {fileID: 11400000, guid: a6159148f6034bacb696189367e1093d, type: 2}
+  m_EditorClassIdentifier: Assembly-CSharp::RetroCRTController
+  _effectEnabled: 1
+  _bezelSize: 1
+  _pixelateEnabled: 0
+  _pixelBlockSize: 4
+  _scanlineEnabled: 0
+  _scanlineThicknessPx: 2
+  _scanlineSpacingPx: 4
+  _scanlineColor: {r: 0.032484863, g: 0.09433961, b: 0.06783043, a: 1}
+  _scanlineOpacity: 0.2
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
