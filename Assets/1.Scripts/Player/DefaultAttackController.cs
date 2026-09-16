@@ -55,9 +55,7 @@ public class DefaultAttackController : BaseNetworkBehaviour
     private static readonly int DefaultAttackHash = Animator.StringToHash("DefaultAttack");
     private static readonly int AttackIndexHash = Animator.StringToHash("AttackIndex");
     private static readonly int IdleHash = Animator.StringToHash("Idle");
-
-    // 꼬리를 끊고 이동으로 넘어갈 때의 블렌드. 기존 인터럽트 블렌드(0.05)와 같은 값으로 둬
-    // "끊기는 느낌"이 경로마다 달라지지 않게 한다.
+    private static readonly int MoveHash = Animator.StringToHash("Walk");
     private const float TailToMovementBlendSeconds = 0.05f;
     // 공격 상태 이름 컨벤션: 모든 캐릭터 컨트롤러는 Default_Attack0..N 상태를 가진다.
     // 체인 수는 attackSteps.Length가 결정하며, ValidateAttackStates에서 컨트롤러와 대조한다.
@@ -69,6 +67,10 @@ public class DefaultAttackController : BaseNetworkBehaviour
     [SerializeField] private Animator animator;
     [SerializeField] private DefaultAttackData attackData;
     [SerializeField] private PlayerDefaultAttack playerDefaultAttack;
+
+    [Header("공격 꼬리 → 이동 전환")]
+    [Tooltip("공격이 끝나고 남은 클립을 이동 입력으로 끊을 때의 블렌드 시간(초). 짧으면 툭 끊기고 길면 공격 포즈가 남아 보인다.")]
+    [SerializeField, Min(0f)] private float tailToMovementBlendSeconds = 0.12f;
     [SerializeField] private DefaultAttackChainPolicy chainPolicy = DefaultAttackChainPolicy.Loop;
     [SerializeField] private DefaultAttackStep[] attackSteps =
     {
@@ -316,8 +318,12 @@ public class DefaultAttackController : BaseNetworkBehaviour
         isFinishingAttackTail = false;
         finishingAttackIndex = -1;
 
+        // 🔴 Idle 이 아니라 **Walk 로 바로** 넘긴다.
+        // Idle 로 넘기면 공격 → Idle → Walk 로 두 번 전환되고, 이동 중인데 Idle 포즈를 스쳐
+        // 눈에 띄게 부자연스럽다(2026-09-16 은희 체감). Walk 의 유일한 전환은
+        // "IsMoving == false → Idle" 이므로 직접 넘겨도 멈추면 알아서 Idle 로 돌아간다.
         if (animator != null)
-            animator.CrossFadeInFixedTime(IdleHash, TailToMovementBlendSeconds);
+            animator.CrossFadeInFixedTime(MoveHash, tailToMovementBlendSeconds);
     }
 
     public void HandleAnimationEvent(DefaultAttackAnimationEventType eventType)
