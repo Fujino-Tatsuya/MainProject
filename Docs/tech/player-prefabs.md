@@ -123,7 +123,7 @@ Player                     ← 역할. 캐릭터가 뭐든 바뀌지 않는다
 NetworkBehaviour 가 늘거나 줄거나 순서가 바뀌면 **RPC 가 엉뚱한 컴포넌트로 간다.**
 
 **현재 Armature 안에 NetworkBehaviour 가 2개 있다** — `NetworkTransform`(회전 XYZ 전용, 위치·스케일 동기화
-꺼짐, 서버 권위)과 `NetworkAnimator`(오너 권위). 이게 이 설계의 핵심 제약이다.
+꺼짐)과 `NetworkAnimator`. 권한 값은 브랜치 정책에 따라 바뀌지만(§5), **개수와 위치가 제약의 본질**이다.
 
 #### 그래서 길은 둘뿐이다
 
@@ -247,13 +247,15 @@ Paladin  (루트 컴포넌트 37개 — Player 와 동일 구성)
 3. **반대로 `TempPlayer_Armature.prefab` 수정은 `Player.prefab` 에만 가고 Paladin 에는 안 간다.**
    실제 사고: `4e3b292f`(NetworkTransform 서버 권위 전환)가 `Paladin.prefab`(루트+Armature)과
    `Player.prefab`(루트)만 고쳤다. Player 쪽 Armature NT 는 `TempPlayer_Armature.prefab` 안에 있어서
-   **지금도 Owner 권한(`AuthorityMode: 1`)으로 남아 있다.**
+   **한동안 혼자 다른 값이었다**(이후 오너 권위 전환으로 우연히 일치, §5).
+   같은 이유로 **`9e3afee9`(시각 보간 컴포넌트)는 지금 Paladin 루트에만 붙어 있다.**
 
 ---
 
 ## 5. 값 차이 — 확인된 것 전부
 
-**루트 컴포넌트 목록은 양쪽이 완전히 동일하다 — 각 37개(Transform 포함), 빠진 것도 더 붙은 것도 없다.**
+**루트 컴포넌트는 `PlayerVisualReconciliationSmoother` 하나만 빼고 동일하다** — Player 37개 / Paladin 38개
+(Transform 포함). 이 하나도 캐릭터 고유가 아니라 **역할 쪽**이라, 원래는 양쪽에 있어야 한다.
 `PlayerSkillController`·`FirstMeleePassive`·`FirstMeleeInterruptSkill`·`AudioListener` 전부 양쪽에 있다.
 "어느 한쪽에 컴포넌트가 없다"는 식의 옛 서술은 전부 무효다(§6). **차이는 전부 직렬화된 '값'에 있다.**
 
@@ -266,13 +268,20 @@ Paladin  (루트 컴포넌트 37개 — Player 와 동일 구성)
 | `DefaultAttackController.attackSteps` | `[]` | `[]` | SO 에서 주입된다. 스텝별 `Hitbox` 는 SO 에 없어서 `defaultHitbox` 로 폴백 |
 | `Player.animator` · `DefaultAttackController.animator` · `PlayerSkillController.animator` | 배선됨 | **비어 있음** | ⚪ 버그 아님 — §1.4 자동 보정 |
 | `PlayerLandingProtection.blinkVisualRoot` | 배선됨 | **비어 있음** | ⚪ 경미 — 비면 루트 전체 `Renderer` 를 긁어서 Paladin 은 **무기 메시까지 함께** 깜빡인다 |
-| 루트 `NetworkTransform` | Server (`AuthorityMode: 0`) | Server (`0`) | `4e3b292f` |
-| Armature `NetworkTransform` | 🔴 **Owner (`1`)** — `TempPlayer_Armature.prefab` 안 | Server (`0`) | `4e3b292f` 가 Player 계열 Armature 를 놓쳤다 |
-| `Corpse` `NetworkTransform` | Server (`0`) | Server (`0`) | |
+| 루트 `NetworkTransform` | **Owner (`AuthorityMode: 1`)** | Owner (`1`) | ✅ 양쪽 동일 |
+| Armature `NetworkTransform` | Owner (`1`) — `TempPlayer_Armature.prefab` 안 | Owner (`1`) | ✅ 양쪽 동일 |
+| `Corpse` `NetworkTransform` | Server (`0`) | Server (`0`) | 동일 |
 | `NetworkAnimator` | Owner (`1`) | Owner (`1`) | 동일 |
+| `PlayerVisualReconciliationSmoother` | ❌ **없음** | ✅ 있음 | 🔴 `9e3afee9` 가 Paladin 루트에만 붙였다. **역할 쪽 컴포넌트**라 base 로 가야 한다 |
 | `AudioListener` + `PlayerAudioListenerActivator` | ✅ | ✅ | PLAN.md 의 "Paladin 에는 둘 다 없다"는 **해소된 과거 상태** |
 | `PlayerInput` | `m_Enabled: 0` · 같은 `.inputactions` | `m_Enabled: 0` | 양쪽 동일. CONTEXT.md 의 "Paladin 만 `m_Enabled: 1` 이라 되돌릴 것" 항목은 **해소됨** |
 | `HurtBox` 자식 | ✅ L13 (PlayerHurtbox) | ✅ L13 | 동일 |
+
+> 🔴 **권한 값은 브랜치마다 다르다.** 위 표는 `feature/player-motor-owner-auth`(지스타까지의 개발 브랜치)
+> 기준이다. `feature/player-motor-server-auth` 에서는 루트·Armature 가 Server(`0`) 다.
+> 전환 스위치는 `Player.ServerAuthoritativeMovement` + 프리팹 `AuthorityMode` 두 개다
+> ([PLAN-player-motor.md](../../PLAN-player-motor.md) "결정 — 지스타까지는 오너 권위").
+> **프리팹을 복제·분리할 때 이 값을 하드코딩된 상수로 취급하지 말 것.**
 
 ---
 
@@ -344,7 +353,10 @@ Prefab Variant 는 base 의 컴포넌트를 **추가**하긴 쉬워도 **제거*
    복구한다. 갈라진 내용(`CombatPanel`·`ShieldBar`·`ProfilPanel`)은 **원본 프리팹 쪽으로 올린다.**
 3. **수동 배선 4종 재연결**(§1.4) — `defaultHitbox` · `FirstMeleeMainSkill.hitboxAnchor` ·
    `FirstMeleeInterruptSkill.hitboxAnchor` · 무기 트레일.
-4. **네트워크 정리** — `TempPlayer_Armature.prefab` 의 Armature NT 를 **Server 권위로**(`4e3b292f` 가 놓친 것, §5).
+4. **네트워크 값 확인** — `AuthorityMode` 를 **브랜치 정책에 맞춘다**(현재 owner-auth: 루트·Armature = Owner,
+   Corpse = Server). Variant 가 이 값을 오버라이드하지 않고 **base 에서 상속**하게 두면, 지스타 이후
+   서버 권위로 되돌릴 때 base 한 곳만 고치면 된다. 🔴 상수로 취급하지 말 것(§5).
+   `PlayerVisualReconciliationSmoother`(`9e3afee9`)도 base 로 올린다 — 역할 쪽 컴포넌트다.
 5. **데이터 정리** — 시연용 값(`maxHp 9999` / `attackDamage 33`) 정리. 스탯의 소유자를 정한다 —
    프리팹의 `Player` 컴포넌트인가, `CharacterDefinition` 인가(현재 후자는 **아무도 안 읽는다**, §1.3).
 6. **씬 정리** — `TrashMobScene` · `Debug/PlayerScene` 이 아직 구 `Player.prefab` 인스턴스를 쓴다.
