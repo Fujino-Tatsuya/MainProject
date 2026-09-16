@@ -154,6 +154,56 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 81c70da5a2e747148bf71f917743b5fd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ColliderInfo
+--- !u!1 &6335958953762774111
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 145606692611650518}
+  - component: {fileID: 3099268962609029083}
+  m_Layer: 8
+  m_Name: InterruptFlashVFX
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &145606692611650518
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6335958953762774111}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 588849853845180422}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &3099268962609029083
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6335958953762774111}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
+  id: 
+  effect: {fileID: 11400000, guid: e6dad2ab1b7d86d49b816729fc8526c2, type: 2}
+  socket: {fileID: 527045099122458673}
+  offset: {x: 0, y: 0, z: 0}
+  scale: 1
+  safetyTimeout: 5
 --- !u!1 &6850862162668286586
 GameObject:
   m_ObjectHideFlags: 0
@@ -197,6 +247,7 @@ Transform:
   - {fileID: 2193510024491346301}
   - {fileID: 4492413856816540016}
   - {fileID: 5501001001001001002}
+  - {fileID: 588849853845180422}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!54 &6101595124664079037
@@ -411,6 +462,7 @@ MonoBehaviour:
   shockMaxHitCount: 8
   shockDuration: 0.7
   gatherStateName: AttackStart
+  interruptFlash: {fileID: 3099268962609029083}
   debugLog: 0
 --- !u!114 &765449773972238274
 MonoBehaviour:
@@ -514,6 +566,38 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Hurtbox
   ownerUnit: {fileID: 5419735519947956318}
   attackReceiverSource: {fileID: 0}
+--- !u!1 &8477995098353756832
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 588849853845180422}
+  m_Layer: 8
+  m_Name: VFX
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &588849853845180422
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8477995098353756832}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 145606692611650518}
+  m_Father: {fileID: 8561274492445170025}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &3449535101925055527
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -566,11 +650,48 @@ PrefabInstance:
       propertyPath: m_Name
       value: Model
       objectReference: {fileID: 0}
+    - target: {fileID: 4747561266957906064, guid: c13e2c7cc6363c2448019a9d31ae6d95, type: 3}
+      propertyPath: m_Materials.Array.size
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 4747561266957906064, guid: c13e2c7cc6363c2448019a9d31ae6d95, type: 3}
+      propertyPath: 'm_Materials.Array.data[1]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 98b1c99dee6c7b5488abe440aed99c45, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 2281227574203564149, guid: c13e2c7cc6363c2448019a9d31ae6d95, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 5300047616987237983}
   m_SourcePrefab: {fileID: 100100000, guid: c13e2c7cc6363c2448019a9d31ae6d95, type: 3}
+--- !u!4 &527045099122458673 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 2922630960727317526, guid: c13e2c7cc6363c2448019a9d31ae6d95, type: 3}
+  m_PrefabInstance: {fileID: 3449535101925055527}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &3492464006097083474 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 2281227574203564149, guid: c13e2c7cc6363c2448019a9d31ae6d95, type: 3}
+  m_PrefabInstance: {fileID: 3449535101925055527}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &5300047616987237983
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3492464006097083474}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c7a41f60d2b84e6a9c15d380be720063, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::InterruptOverlay
+  overlayMaterialIndex: 1
+  fadeInDuration: 0.8
+  fadeOutDuration: 0.4
+  interruptible: 0
 --- !u!4 &4492413856816540016 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 1263109611098764631, guid: c13e2c7cc6363c2448019a9d31ae6d95, type: 3}

@@ -108,6 +108,112 @@ public class BossBomb : NetworkBehaviour, IAttackReceiver
 
     public BossBombState State => _state;
 
+    // ─── 이동 트레일 (각 피어 로컬) ───────────────────────────────────
+    // 🔴 **움직이는 동안만** 흐른다: Thrown · Sliding = 재생 / Resting · Exploded = 정지.
+    //    상태 대입이 8곳이라 하나씩 호출을 흩뿌리면 반드시 하나를 빠뜨린다 → SetState 로 모았다.
+    //
+    // ⚠️ 이 클래스의 상태 로직은 전부 서버 전용이다(FixedUpdate 첫 줄 등). 여기서 직접 재생하면
+    //    **호스트에서만 보인다** — 그래서 RPC 로 내보낸다. 위치는 각 피어가 자기 transform 을 추종하므로
+    //    페이로드가 없다(NetworkTransform 이 폭탄 위치를 이미 복제한다).
+    EffectHandle _trail = EffectHandle.None;
+
+    /// <summary>
+    /// 상태 전이의 <b>유일한 통로</b>. 트레일 연출이 여기에 묶여 있으므로 <c>_state</c> 를 직접 대입하지 말 것.
+    /// 같은 상태로 다시 들어와도 그대로 통과시킨다 — 수신측이 멱등이라 안전하고,
+    /// 스폰 직후처럼 "이미 Thrown 인데 트레일은 아직 없는" 순간을 막지 않기 위해서다.
+    /// </summary>
+    void SetState(BossBombState next)
+    {
+        _state = next;
+
+        if (next == BossBombState.Thrown || next == BossBombState.Sliding) StartTrailRpc();
+        else StopTrailRpc();
+    }
+
+    /// <summary>
+    /// 트레일 재생. <b>멱등</b>이다 — 이미 흐르고 있으면 그대로 둔다.
+    /// (Thrown 은 스폰과 투척에서 두 번 들어오고, 되쳐내기 연타도 Sliding 을 거듭 낸다)
+    ///
+    /// Reliable(기본): 유실되면 움직이는 폭탄에 연출이 통째로 빠진다.
+    /// </summary>
+    [Rpc(SendTo.ClientsAndHost)]
+    void StartTrailRpc()
+    {
+        if (_trail.IsSet) return;
+        if (!EffectManager.TryGet(out EffectManager effects, this)) return;
+
+        EffectEntry entry = effects.Catalog.Wells_Bomb_Trail;
+        if (entry == null)
+        {
+            WarnNoTrailOnce();
+            return;
+        }
+
+        // 폭탄을 추종한다 — SetParent 를 쓰지 않으므로 폭탄 스케일이 곱해지지 않는다.
+        _trail = effects.PlayLooping(entry, transform);
+    }
+
+    /// <summary>
+    /// 트레일 정지. 🔴 <b>Reliable 이어야 한다</b> — 유실되면 멈춘 폭탄에 연출이 영원히 붙어 있고,
+    /// 풀 인스턴스도 돌아오지 않는다.
+    /// </summary>
+    [Rpc(SendTo.ClientsAndHost)]
+    void StopTrailRpc() => ReleaseTrail();
+
+    /// <summary>
+    /// 폭발 원샷. 회수 책임이 없다 — 수명은 엔트리의 duration 이 정한다.
+    ///
+    /// <b>좌표를 싣지 않는다.</b> 각 피어가 자기 폭탄 위치에서 낸다 —
+    /// 폭탄이 움직이는 중에 터지는 경로도 있어(폭탄끼리 충돌·점프어택 유폭) 서버 좌표를 박으면
+    /// 보간 지연만큼 <b>화면에 보이는 폭탄과 어긋난 자리</b>에서 터진다.
+    /// (<c>MonsterBase.PlayHitVFXRpc</c> 가 같은 이유로 같은 선택을 한다)
+    ///
+    /// 🔴 Reliable(기본)을 유지할 것 — 호출 직후 오브젝트가 despawn 되므로,
+    /// despawn 메시지와 <b>같은 순서 보장 채널</b>을 타야 먼저 도착한다.
+    /// </summary>
+    [Rpc(SendTo.ClientsAndHost)]
+    void PlayExplodeEffectRpc()
+    {
+        if (!EffectManager.TryGet(out EffectManager effects, this)) return;
+
+        EffectEntry entry = effects.Catalog.Bomb_Explode;
+        if (entry == null)
+        {
+            WarnNoExplodeOnce();
+            return;
+        }
+
+        effects.Play(entry, transform.position, Quaternion.identity);
+    }
+
+    void ReleaseTrail()
+    {
+        if (!_trail.IsSet) return;
+
+        if (EffectManager.Instance != null) EffectManager.Instance.Release(_trail);
+        _trail = EffectHandle.None;
+    }
+
+    void WarnNoTrailOnce()
+    {
+        if (_warnedNoTrail) return;
+        _warnedNoTrail = true;
+        Edit.LogWarning($"[BossBomb] EffectCatalog 에 Wells_Bomb_Trail 이 비어 있어 폭탄 이동 연출이 " +
+                        "재생되지 않는다. EffectCatalog.asset 에 FX_Wells_Bomb_Trail_Entry 를 배선할 것.", this);
+    }
+
+    void WarnNoExplodeOnce()
+    {
+        if (_warnedNoExplode) return;
+        _warnedNoExplode = true;
+        Edit.LogWarning("[BossBomb] EffectCatalog 에 Bomb_Explode 가 비어 있어 폭발 연출이 재생되지 않는다 — " +
+                        "피해와 장판은 들어가는데 터지는 게 안 보인다. " +
+                        "EffectCatalog.asset 에 FX_Bomb_Explode_Entry 를 배선할 것.", this);
+    }
+
+    bool _warnedNoTrail;
+    bool _warnedNoExplode;
+
     /// <summary>
     /// 살아 있는 폭탄(**서버 전용**). 점프어택 범위 판정처럼 "폭탄을 찾아 터뜨리는" 소비자가 쓴다.
     ///
@@ -130,7 +236,7 @@ public class BossBomb : NetworkBehaviour, IAttackReceiver
 
         if (!IsServer) return;
 
-        _state = BossBombState.Thrown;
+        SetState(BossBombState.Thrown);
         _fuse = bombTimer;
         _bouncesLeft = wallBounceLimit;
         _buffer = new Collider[Mathf.Max(1, maxTargets)];
@@ -144,6 +250,12 @@ public class BossBomb : NetworkBehaviour, IAttackReceiver
 
     public override void OnNetworkDespawn()
     {
+        // 🔴 트레일 회수의 **마지막 그물**. StopTrailRpc 가 정상 경로지만 그것만으로는 부족하다 —
+        //    폭발 말고도 despawn 되는 길이 있고(씬 전환·강제 정리) 그때는 RPC 가 아예 안 나간다.
+        //    여기는 **모든 피어에서 로컬로** 도므로 어느 경로든 걸린다.
+        //    안 걸면 폭탄이 사라진 자리에 트레일이 영원히 남고 풀 인스턴스도 안 돌아온다.
+        ReleaseTrail();
+
         Active.Remove(this);
         base.OnNetworkDespawn();
     }
@@ -155,6 +267,7 @@ public class BossBomb : NetworkBehaviour, IAttackReceiver
     //    조용히 샌다. 이 레포의 다른 NetworkBehaviour 8종은 전부 override + base 호출이다.
     public override void OnDestroy()
     {
+        ReleaseTrail();          // development: 트레일 반납
         Active.Remove(this);
         base.OnDestroy();
     }
@@ -164,7 +277,7 @@ public class BossBomb : NetworkBehaviour, IAttackReceiver
     {
         if (!IsServer) return;
 
-        _state = BossBombState.Thrown;
+        SetState(BossBombState.Thrown);
         _rb.useGravity = true;
         _rb.constraints = RigidbodyConstraints.FreezeRotation;
         _rb.AddForce(impulse, ForceMode.Impulse);
@@ -181,7 +294,7 @@ public class BossBomb : NetworkBehaviour, IAttackReceiver
     {
         if (!IsServer) return;
 
-        _state = BossBombState.Thrown;
+        SetState(BossBombState.Thrown);
         _rb.useGravity = true;
         _rb.constraints = RigidbodyConstraints.FreezeRotation;
         _rb.AddForce(velocity, ForceMode.VelocityChange);
@@ -230,7 +343,7 @@ public class BossBomb : NetworkBehaviour, IAttackReceiver
 
     void EnterResting()
     {
-        _state = BossBombState.Resting;
+        SetState(BossBombState.Resting);
         _slowFor = 0f;
         // 타이머는 이어서 흐른다(리셋하지 않는다 — "비행 중 정지, 멈추면 재개"가 기획).
     }
@@ -312,7 +425,7 @@ public class BossBomb : NetworkBehaviour, IAttackReceiver
     void EnterSlidingFromCollision()
     {
         if (!IsServer || _state == BossBombState.Exploded || _state == BossBombState.Thrown) return;
-        _state = BossBombState.Sliding;
+        SetState(BossBombState.Sliding);
         _slowFor = 0f;
     }
 
@@ -339,7 +452,7 @@ public class BossBomb : NetworkBehaviour, IAttackReceiver
         //    당구(Sliding)는 이제 **되쳐내기 이후에만** 쓰인다 — 투척 착지 경로에서는 쓰지 않는다.
         _rb.linearVelocity = Vector3.zero;
         _rb.angularVelocity = Vector3.zero;
-        _state = BossBombState.Resting;
+        SetState(BossBombState.Resting);
         _slowFor = 0f;
 
         // 5초 퓨즈는 **착지 시점부터** 센다. 공중에 머문 시간은 세지 않는다.
@@ -379,7 +492,7 @@ public class BossBomb : NetworkBehaviour, IAttackReceiver
         float force = Mathf.Max(0f, attackInfo.damage * knockCoef);
         _bouncesLeft = wallBounceLimit; // 새로 되쳐내면 쿠션 횟수를 다시 준다
 
-        _state = BossBombState.Sliding;
+        SetState(BossBombState.Sliding);
         _slowFor = 0f;
         _rb.WakeUp();
         _rb.AddForce(dir.normalized * force, ForceMode.Impulse);
@@ -409,9 +522,15 @@ public class BossBomb : NetworkBehaviour, IAttackReceiver
     public void Explode()
     {
         if (!IsServer || _state == BossBombState.Exploded) return;
-        _state = BossBombState.Exploded;
+        SetState(BossBombState.Exploded);
 
         ApplyExplosionDamage();
+
+        // 🔴 **Despawn 보다 먼저** 보내야 한다. 아래에서 오브젝트가 사라지므로, 뒤에 두면
+        //    despawn 된 대상으로 가는 RPC 가 되어 버려진다.
+        //    Reliable(기본)이라 despawn 메시지와 같은 순서 보장 채널을 타고 먼저 도착한다 —
+        //    Unreliable 로 바꾸면 채널이 갈려 이 순서가 깨진다.
+        PlayExplodeEffectRpc();
 
         // 장판을 별도 스폰하고 폭탄은 즉시 despawn(정본 §10.5.2).
         // 같은 타입 장판이 이미 있으면 SpawnOrGrow 가 성장으로 갈음한다 → 겹쳐 스폰되지 않는다.

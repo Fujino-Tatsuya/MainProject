@@ -88,8 +88,19 @@ public class AreaZone : NetworkBehaviour
              "AoeTelegraph 와 같은 규약 — 로컬 XY 지름 1 Quad/디스크.")]
     Transform visual;
     [SerializeField]
+    [Tooltip("반경에 맞춰 함께 재생할 이펙트(불꽃·연기 등). 비우면 아무 일도 없다.\n" +
+             "바닥에 눌러붙는 그림은 여기가 아니라 visual(데칼·디스크)이 맡는다 — " +
+             "이쪽은 표면 위로 솟는 층이다.\n" +
+             "🔴 EffectManager 풀을 타므로 엔트리를 EffectCatalog 에도 등록할 것(프리워밍·빌드 포함).")]
+    EffectEntry visualEffect;
+    [SerializeField]
     [Tooltip("바닥 탐색에 추가로 포함할 레이어(Default+Ground 는 GroundProbe 가 항상 포함).")]
     LayerMask extraGroundMask;
+
+    // 이펙트 루프 핸들. 각 피어가 자기 EffectManager 에서 따로 빌리므로 이 필드도 피어 로컬이다.
+    // ⚠️ RPC 가 필요 없다 — AreaZone 은 NetworkObject 라 스폰·디스폰이 이미 전 피어에서 일어나고,
+    //    OnNetworkSpawn/Despawn 이 각 피어에서 로컬로 돈다. 여기에 IsServer 를 걸면 호스트에서만 보인다.
+    EffectHandle _visualHandle = EffectHandle.None;
 
     // 반경 복제 — 성장이 모든 피어의 비주얼에 반영돼야 한다.
     readonly NetworkVariable<float> _radius = new NetworkVariable<float>(
@@ -122,14 +133,22 @@ public class AreaZone : NetworkBehaviour
         }
 
         ApplyVisualRadius(Radius);
+        PlayVisualEffect(Radius);
     }
 
     public override void OnNetworkDespawn()
     {
+        // 🔴 장판이 사라져도 이펙트는 풀 인스턴스라 따라 죽지 않는다(PlayLooping 은 SetParent 를 쓰지 않는다).
+        //    안 돌려주면 불이 바닥에 영원히 남고 풀도 고갈된다.
+        ReleaseVisualEffect();
+
         _radius.OnValueChanged -= OnRadiusChanged;
         Active.Remove(this);
         base.OnNetworkDespawn();
     }
+
+    // Despawn 을 거치지 않는 파괴 경로(씬 전환·에디터 정지)에서도 핸들이 새지 않게.
+    void OnDestroy() => ReleaseVisualEffect();
 
     void Update()
     {
@@ -223,7 +242,41 @@ public class AreaZone : NetworkBehaviour
             NetworkObject.Despawn();
     }
 
-    void OnRadiusChanged(float previous, float next) => ApplyVisualRadius(next);
+    void OnRadiusChanged(float previous, float next)
+    {
+        ApplyVisualRadius(next);
+        PlayVisualEffect(next);
+    }
+
+    /// <summary>
+    /// 반경에 맞춰 이펙트를 (다시) 빌린다.
+    ///
+    /// 🔴 <b>성장할 때마다 다시 빌려야 한다.</b> <see cref="EffectManager.PlayLooping"/> 의 배율은
+    /// <b>대출 시점에 확정</b>되어 나중에 바꿀 수 없다(SetScale 주석). 그래서 늘어난 반경을 반영하려면
+    /// 새로 빌리는 수밖에 없다 — 데칼(visual)은 스케일로 부드럽게 커지지만 이 층은 한 번 끊긴다.
+    ///
+    /// 순서가 중요하다: <b>새로 켠 뒤 옛것을 즉시 반납</b>한다. 뒤집으면 한 프레임 비어 보인다
+    /// (EffectStagePlayer 의 인트로→지속 전환과 같은 이유).
+    /// </summary>
+    void PlayVisualEffect(float r)
+    {
+        if (visualEffect == null) return;
+        if (!EffectManager.TryGet(out EffectManager effects, this)) return;
+
+        EffectHandle previous = _visualHandle;
+
+        _visualHandle = effects.PlayLooping(visualEffect, transform, Vector3.zero, Mathf.Max(0.01f, r));
+
+        if (previous.IsSet) effects.ReleaseImmediate(previous);
+    }
+
+    void ReleaseVisualEffect()
+    {
+        if (!_visualHandle.IsSet) return;
+
+        if (EffectManager.Instance != null) EffectManager.Instance.Release(_visualHandle);
+        _visualHandle = EffectHandle.None;
+    }
 
     void ApplyVisualRadius(float r)
     {

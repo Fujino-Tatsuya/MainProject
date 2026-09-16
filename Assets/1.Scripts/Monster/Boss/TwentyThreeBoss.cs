@@ -92,15 +92,68 @@ public class TwentyThreeBoss : MonsterBase
     Collider[] _aoeBuffer;                          // 최원거리 탐색 · 착지 AoE 공용
     readonly HashSet<Unit> _aoeHits = new HashSet<Unit>();
     Renderer[] _modelRenderers;                     // 체공 중 숨길 모델 렌더러(animator 하위만)
-    AoeTelegraph _telegraphFixed;                   // 착지 위치(고정 크기)
-    AoeTelegraph _telegraphGrowing;                 // 착지 타이밍(0.1 → AoE 점증)
-    bool _warnedNoJumpTelegraph;
+    // 착지 예고 2개. 둘 다 AoeTelegraph 프리팹이 아니라 EffectManager 루프 이펙트다(카탈로그 엔트리).
+    //
+    // ⚠️ 루프 핸들은 버리면 풀 인스턴스가 영원히 돌아오지 않는다. 핸들은 피어마다 자기 EffectManager 에서
+    //    발급받으므로 이 필드도 피어 로컬이다 — 재생 전·해제 시·파괴 시 세 곳에서 모두 회수한다.
+    EffectHandle _boundaryHandle = EffectHandle.None;    // 경계 원 — 어디에 떨어지는가(고정 크기)
+    EffectHandle _indicatorHandle = EffectHandle.None;   // 차오르는 원 — 언제 떨어지는가(0.1 → AoE 점증)
+    bool _warnedNoBoundaryEntry;
+    bool _warnedNoIndicatorEntry;
+    bool _warnedNoImpactEntry;
+
+    [Header("이펙트 재생기")]
+    // ─── Grab 팔 전기 펄스 ────────────────────────────────────────────
+    // 🔴 켜고 끄는 것은 **이 코드**다(애니 클립 이벤트가 아니다). 그랩 체인이 카운터·그로기·사망으로
+    //    끊기는 경로가 여럿이라, 끄는 책임을 클립에 맡기면 하나만 빠져도 팔에 전기가 영영 남는다
+    //    (SpinnerBot 에서 실제로 겪은 함정 — 컴파일도 테스트도 안 깨진다).
+    //    그래서 시작·종료를 그랩 상태 전이와 **같은 자리**에 둔다.
+    [Tooltip("Grab 동안 팔(어깨→팔꿈치→손)을 훑는 전기 펄스. 비워두면 연출만 빠지고 나머지는 그대로 돈다")]
+    [SerializeField] EffectPathPlayer grabPulse;
+    bool _warnedNoGrabPulse;
+
+    // ─── 근접 명중 타격 연출 ──────────────────────────────────────────
+    // 🔴 **맞았을 때만** 나온다. 헛스윙에는 안 나온다 — 애니 이벤트로는 못 가른다(클립은 맞았는지 모른다).
+    //    손마다 소켓이 다르므로 공격별로 따로 문다. 어퍼가 어느 손이면 그 손 것을 그대로 물리면 된다.
+    [Tooltip("좌훅 명중 시 타격 연출(왼손 소켓)")]
+    [SerializeField] EffectSocketPlayer leftHookHit;
+    [Tooltip("우훅 명중 시 타격 연출(오른손 소켓)")]
+    [SerializeField] EffectSocketPlayer rightHookHit;
+    [Tooltip("어퍼 명중 시 타격 연출. 훅과 같은 손이면 위와 같은 컴포넌트를 물리면 된다")]
+    [SerializeField] EffectSocketPlayer upperHit;
+    bool _warnedNoHitEffect;
+
+    // ─── 카운터 성공 연출 ─────────────────────────────────────────────
+    // 🔴 애니메이션 이벤트로는 못 낸다. 카운터 성공은 클립이 아니라 **플레이어의 인터럽트 공격**이
+    //    만드는 사건이라, 어느 프레임에 일어날지 클립이 알 수 없다 — 코드가 직접 몬다
+    //    (중간보스 3종과 같은 규약).
+    [Tooltip("카운터(인터럽트) 성공 순간의 섬광. 비워두면 연출만 빠진다")]
+    [SerializeField] EffectSocketPlayer interruptFlash;
+    bool _warnedNoInterruptFlash;
+
+    // ─── 레이지 돌진 루프 연출 ────────────────────────────────────────
+    // 🔴 명중과 무관하다 — 헛돌진에도 나온다. **돌진 1회 단위**로 켜고 끈다:
+    //    레이지는 rageDashCount 번 연타인데, 연타 사이 간격은 서 있는 구간이라 연출도 끊긴다.
+    [Tooltip("레이지 돌진 중 재생할 루프 연출(FX_Rage_Smash). 비워두면 연출만 빠진다")]
+    [SerializeField] EffectSocketPlayer rageSmash;
+    bool _warnedNoRageSmash;
+    GrabController _grabController;   // 그랩 소켓 보유자(레거시). 연출 좌표만 빌린다
+    bool _warnedNoGrabSocket;
+    bool _warnedNoGrabbedElectric;
+    bool _warnedNoThrowEntry;
 
     // ─── 페이즈 시퀀스 (송전기 / 레이지) ──────────────────────────────
     bool _pendingPhaseSequence;                     // 페이즈 통과 후 "행동이 끝나면 시작할 것"
     IBossChargeSequence _charge;
     AreaZone _chargeZone;
     bool _warnedNoCharge;
+
+    // 차징 번개구슬(인트로 → 지속 → 사그라짐/깨짐). 🔴 보스가 아니라 이 컴포넌트가 단계를 몬다 —
+    // MonsterBase.Update 가 서버에서만 돌아(`if (!IsServer) return`) 인트로→지속 전환 타이머를
+    // 보스 안에 둘 수 없다. 여기서는 시작·종료만 RPC 로 알린다.
+    [Tooltip("송전기 차징 번개구슬. 비워두면 연출만 빠지고 차징 자체는 그대로 돈다")]
+    [SerializeField] EffectStagePlayer chargeBall;
+    bool _warnedNoChargeBall;
     int _rageRemaining;
     Vector3 _rageDashDir;
     bool _rageDashing;                              // RageDash phase 안의 구간 구분(돌진 중 / 간격 대기)
@@ -219,9 +272,9 @@ public class TwentyThreeBoss : MonsterBase
     // NetworkBehaviour.OnDestroy 는 virtual 이고 자체 정리를 한다 — 반드시 override + base 호출.
     public override void OnDestroy()
     {
-        // 예고 장판은 씬 루트에 띄운 로컬 인스턴스라 보스와 함께 자동 소멸하지 않는다 — 직접 지운다.
-        if (_telegraphFixed != null) Destroy(_telegraphFixed.gameObject);
-        if (_telegraphGrowing != null) Destroy(_telegraphGrowing.gameObject);
+        // 🔴 예고 장판은 풀 인스턴스라 파괴가 아니라 **반납**이다(보스 자식도 아니라 함께 죽지도 않는다).
+        //    여기서 안 돌려주면 보스가 죽을 때마다 풀에서 두 칸씩 새어 나가고, 결국 예고가 아예 안 뜬다.
+        ReleaseJumpTelegraphs();
 
         base.OnDestroy();
     }
@@ -720,6 +773,11 @@ public class TwentyThreeBoss : MonsterBase
         if (e == null) return;
         switch (e.attackId)
         {
+            // 팔 전기는 **잡기 판정보다 먼저** 흐른다 — 판정(AcquireGrab)은 히트 프레임이라
+            // 거기서 켜면 팔을 뻗는 동안 아무 예고가 없다. 끄는 곳은 넷이다(ReleaseGrabThrow ·
+            // 헛잡기 · 대상 소멸 · AbortAttackChain) — 켜는 자리를 앞당긴 만큼 헛잡기 경로가 특히 중요하다.
+            case BossAttackId.Grab: StartGrabPulseClientRpc(); break;
+
             case BossAttackId.Jump: BeginJump(); break;
             case BossAttackId.ChargeSequence: BeginCharge(); break;
             case BossAttackId.RageDash: BeginRage(); break;
@@ -744,13 +802,17 @@ public class TwentyThreeBoss : MonsterBase
 
         switch (e.attackId)
         {
+            // 🔴 근접 3종은 **맞았을 때만** 타격 연출을 낸다. Hit() 가 실제로 피해가 들어간 수를
+            //    돌려주므로 헛스윙(0)과 명중을 여기서 가른다 — 애니 이벤트로는 못 가른다.
             case BossAttackId.LeftHook:
             case BossAttackId.RightHook:
-                meleeAttack?.Hit();
+                if (meleeAttack != null && meleeAttack.Hit() > 0)
+                    PlayAttackHitEffectRpc(e.attackId);
                 break;
 
             case BossAttackId.Upper:
-                meleeAttack?.Hit();
+                if (meleeAttack != null && meleeAttack.Hit() > 0)
+                    PlayAttackHitEffectRpc(e.attackId);
                 OnUpperHit();
                 break;
 
@@ -853,6 +915,65 @@ public class TwentyThreeBoss : MonsterBase
         BossAttackEntry e = EntryFor(slot);
         if (e != null)
             SafeCrossFade(e.animatorStateName);
+    }
+
+    /// <summary>
+    /// 명중 타격 연출. <b>서버가 판정 결과를 보고</b> 부른다 — 애니 이벤트로 걸면 허공을 때려도 터진다
+    /// (클립은 맞았는지 모른다). 그래서 이것만은 코드가 낸다.
+    ///
+    /// 🔴 RPC 여야 한다. 호출부(<c>PerformAttackHit</c>)가 서버 전용이라
+    /// 여기서 직접 재생하면 <b>호스트에서만 보인다</b>.
+    ///
+    /// Unreliable: 순수 연출이라 한 대 분이 빠져도 상태가 발산하지 않는다.
+    /// </summary>
+    [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
+    void PlayAttackHitEffectRpc(BossAttackId attackId)
+    {
+        EffectSocketPlayer player = HitEffectFor(attackId);
+        if (player == null)
+        {
+            WarnNoHitEffectOnce(attackId);
+            return;
+        }
+
+        player.PlayOnce();
+    }
+
+    /// <summary>
+    /// 레이지 루프 시작. 호출부(<c>BeginRage</c>)가 서버 전용이라 RPC 로 나가야 한다 —
+    /// 직접 재생하면 호스트에서만 보인다. Reliable(기본).
+    /// </summary>
+    [ClientRpc]
+    void StartRageSmashClientRpc()
+    {
+        if (rageSmash == null)
+        {
+            WarnNoRageSmashOnce();
+            return;
+        }
+
+        rageSmash.Play();
+    }
+
+    /// <summary>
+    /// 레이지 루프 종료. 🔴 <b>Reliable 이어야 한다</b> — 유실되면 연출이 보스에 영구히 붙는다.
+    /// 재생 중이 아니면 <see cref="EffectSocketPlayer.Stop"/> 이 조용한 no-op 이라 여러 경로에서 불려도 안전하다.
+    /// </summary>
+    [ClientRpc]
+    void StopRageSmashClientRpc()
+    {
+        if (rageSmash != null) rageSmash.Stop();   // 미배선은 시작 시점에 이미 1회 알렸다
+    }
+
+    EffectSocketPlayer HitEffectFor(BossAttackId attackId)
+    {
+        switch (attackId)
+        {
+            case BossAttackId.LeftHook: return leftHookHit;
+            case BossAttackId.RightHook: return rightHookHit;
+            case BossAttackId.Upper: return upperHit;
+            default: return null;
+        }
     }
     #endregion
 
@@ -984,6 +1105,8 @@ public class TwentyThreeBoss : MonsterBase
         if (target == null || !target.BeginGrabbedByInstigator(gameObject))
         {
             // 헛잡기 — 복귀 경직만 지고 끝낸다(창에 실패 대가가 붙는 것과 대칭).
+            // 🔴 전기는 StartAttack 에서 이미 켜졌다. 여기서 안 끄면 헛잡은 팔에 영영 남는다.
+            StopGrabPulseClientRpc();
             _grabbed = null;
             EnterPhase(BossAttackPhase.Recovery, GrabRecovery);
             return;
@@ -1000,6 +1123,7 @@ public class TwentyThreeBoss : MonsterBase
         // 잡힌 대상이 사라지면(사망·디스폰) 체인을 정리하고 복귀한다.
         if (!IsGrabbedValid())
         {
+            StopGrabPulseClientRpc();
             _grabbed = null;
             EnterPhase(BossAttackPhase.Recovery, GrabRecovery);
             return;
@@ -1015,6 +1139,10 @@ public class TwentyThreeBoss : MonsterBase
         var info = new AttackInfo(_boss.grabTickDamage, AttackType.Default);
         var ctx = new AttackHitContext(transform.position, transform, null);
         _grabbed.ReceiveAttack(info, ctx);
+
+        // 틱마다 감전 연출. 🔴 이 메서드는 서버 전용이라 RPC 로 나가야 한다 —
+        //    여기서 직접 재생하면 호스트에서만 보인다.
+        PlayGrabbedElectricClientRpc();
     }
 
     void BeginGrabThrow()
@@ -1043,7 +1171,15 @@ public class TwentyThreeBoss : MonsterBase
             }
 
             OnGrabThrowRelease(thrown, dir, _boss != null ? _boss.grabThrowDistance : 0f);
+
+            // 내려놓는 자리 연출. **잡고 있던 대상이 실제로 있을 때만** 낸다 —
+            // 헛돈 Throw 페이즈(대상이 이미 사라진 경우)에 바닥이 번쩍이면 거짓 신호다.
+            PlayThrowGroundVFX();
         }
+
+        // 손에서 대상이 떠나는 순간 전기도 끊는다. Throw **모션 시작**(BeginGrabThrow)이 아니라
+        // 여기인 이유: 던지기 준비 동작 내내 전기가 유지돼야 "감전시켜 던진다"로 읽힌다.
+        StopGrabPulseClientRpc();
 
         _grabbed = null;
         EnterPhase(BossAttackPhase.Recovery, GrabRecovery);
@@ -1105,15 +1241,23 @@ public class TwentyThreeBoss : MonsterBase
         HideJumpTelegraphClientRpc();
         // 같은 이유로 앞뒤 표식 억제도 되돌린다 — 안 하면 표식이 **영구히 숨은 채** 남는다.
         ReleaseDirectionIndicatorClientRpc();
+        // 🔴 Grab: 팔 전기 펄스는 그랩 애니가 나갈 때 켜진다(StartAttack). 정상 종료 경로 셋
+        //    (던지기·헛잡기·대상 소멸)은 각자 끄지만, 카운터·그로기·사망으로 끊기면 그 셋을 다 건너뛴다
+        //    → **팔에 전기가 영영 남는다.** 여기가 그 마지막 그물이다.
+        StopGrabPulseClientRpc();
         // 🔴 점프가 착지 없이 끊기면 Wells 투척 억제가 **영구히 걸린 채** 남는다 → 폭탄이 영영 안 나온다.
         ReleaseWellsSuppression();
 
         // 🔴 Rage: 돌진 중 끊기면 **에이전트 속도가 8배로 고정되고 히트 윈도우가 열린 채 남는다**
         //    (그 뒤 모든 이동이 초고속이 되고, 다음 공격이 유닛당 1회 제한을 물려받는다).
+        // StopRageDash 가 돌진 루프 연출까지 함께 회수한다(돌진이 끝나는 모든 길이 그 함수를 지난다).
         if (_rageDashing) StopRageDash();
         _rageRemaining = 0;
 
         // 🔴 송전기: 전기 장판과 송전탑이 남는다 — 보스가 죽어도 아레나에 계속 피해를 준다.
+        //    구슬도 같이 걷는다. 카운터·그로기·사망으로 끊긴 것이므로 **깨지는** 마무리다
+        //    (레거시에는 없던 경로다 — ChargeController 는 EndCharge 하나뿐이었다).
+        EndChargeBallClientRpc(broken: true);
         EndChargeZone();
         EndChargeAura();     // 접근 차단 오라도 함께 끈다(카운터·사망으로 끊길 때)
         _charge?.Cancel();
@@ -1290,6 +1434,12 @@ public class TwentyThreeBoss : MonsterBase
         //    ⚠️ 이펙트를 다른 지점(애니 클립 이벤트 등)에 걸면 예고와 겹치거나 빈 프레임이 생긴다.
         HideJumpTelegraphClientRpc();
 
+        // 🔴 착지 충돌 이펙트는 **이 메서드가 서버 전용이라** 반드시 RPC 로 나가야 한다
+        //    (`NotifyAttackHit` 이 `IsServer` 게이트다). 여기서 직접 재생하면 **호스트에서만 보인다** —
+        //    이 레포가 이미 여러 번 겪은 버그다. 아래 데미지 0 조기 반환보다 **위**인 것도 의도다:
+        //    데미지가 0 이어도 착지는 일어났고, 연출이 빠지면 판정과 화면이 어긋난다.
+        PlayJumpImpactRpc(transform.position);
+
         int dmg = _boss.jumpLandingDamage > 0
             ? _boss.jumpLandingDamage
             : (entry != null && entry.damage > 0 ? entry.damage : AttackDamage);
@@ -1431,56 +1581,221 @@ public class TwentyThreeBoss : MonsterBase
 
     // ─── 표현(각 피어 로컬) ────────────────────────────────────────────
     // 🔴 예고 장판은 **보스 자식이 아니다.** 보스가 체공 중 착지점으로 이동하므로 자식이면 따라가 버린다.
-    //    그래서 각 피어가 프리팹을 착지점에 로컬로 띄운다(복제할 상태가 없는 순수 연출).
+    //    EffectManager 는 SetParent 를 쓰지 않고 좌표만 찍으므로 이 조건을 그냥 만족한다
+    //    (복제할 상태가 없는 순수 연출이라 각 피어가 자기 매니저에서 따로 빌려 쓴다).
     [ClientRpc]
     void ShowJumpTelegraphClientRpc(Vector3 point, float radius, float growTime)
     {
-        if (_boss == null || _boss.jumpTelegraphPrefab == null)
-        {
-            WarnNoJumpTelegraphOnce();
-            return;
-        }
+        // 예고 2개 모두 카탈로그 루프 이펙트다. 수명이 시간이 아니라 "착지"라는 **사건**이라 원샷이 아니라
+        // 루프다 — 끝은 HideJumpTelegraphClientRpc 가 정한다(ApplyJumpLandingDamage / AbortAttackChain).
+        // 크기는 scale(= 판정 반경), 성장 시간은 partDuration 이 정한다. 둘 다 서버가 매번 계산해
+        // 이 RPC 로 실어 보내는 런타임 값이다.
+        ReleaseJumpTelegraphs();   // 이전 점프의 핸들이 남아 있으면 먼저 회수한다(재진입 방어)
 
-        if (_telegraphFixed == null) _telegraphFixed = SpawnLocalTelegraph();
-        if (_telegraphGrowing == null) _telegraphGrowing = SpawnLocalTelegraph();
+        // TryGet 은 매니저와 **카탈로그**가 둘 다 있을 때만 true 다(둘 다 자체 경고를 남긴다).
+        if (!EffectManager.TryGet(out EffectManager effects, this)) return;
+        EffectCatalog catalog = effects.Catalog;
 
-        // 🔴 알파를 역할별로 갈라 준다(팀장 확정 2026-08-10) — 프리팹은 하나이므로 인스턴스 재질로만 가능하다.
-        //    큰 원은 **더 연하게**(범위만 암시), 차오르는 원은 **더 진하게**(타이밍을 또렷하게).
-        if (_telegraphFixed != null)
+        // 크기는 **판정 반경**이 정한다 — 예고가 판정에 대해 거짓말하지 않게(방향 표시기와 같은 원칙).
+        // 🔴 회전은 identity 다. 경사면 정렬을 하려면 서버가 착지점 노멀을 RPC 에 함께 실어야 한다
+        //    (GroundProbe 는 서버에서만 돌았다). 지금 아레나는 평지라 뒤로 미뤘다.
+        // 경계에는 partDuration 을 넘기지 않는다 — 자라지 않으므로 드라이버에 줄 시간축이 없다.
+        if (catalog.Drop_Charge_Boundary != null)
         {
-            // ⚠️ 이 1cm 로는 아레나 중앙 바닥판(보행면 +6cm)을 못 넘어 예고가 판에 묻힌다.
-            //    표준 간격까지 올려 봤다가 되돌렸다 — 시차 때문이다(GroundProbe.SurfaceOffset 주석).
-            //    데칼·스텐실 작업에서 함께 0 으로 간다.
-            _telegraphFixed.transform.position = point + Vector3.up * 0.01f;
-            _telegraphFixed.SetAlpha(_boss.jumpTelegraphOuterAlpha);
-            _telegraphFixed.Show(radius, growTime);
+            _boundaryHandle = effects.PlayLooping(
+                catalog.Drop_Charge_Boundary, point + Vector3.up * 0.01f, Quaternion.identity, radius);
         }
-        if (_telegraphGrowing != null)
+        else WarnNoBoundaryEntryOnce();
+
+        // 차오르는 원은 경계(+1cm)보다 1cm 위 — 둘의 **상대** 순서만 이 1cm 가 정한다.
+        // ⚠️ 이 2cm 로는 아레나 중앙 바닥판(보행면 +6cm)을 못 넘어 예고가 판에 묻힌다.
+        //    표준 간격까지 올려 봤다가 되돌렸다 — 시차 때문이다(GroundProbe.SurfaceOffset 주석).
+        //    데칼·스텐실 작업에서 함께 0 으로 간다.
+        if (catalog.Drop_Charge_Indicator != null)
         {
-            // 차오르는 원은 고정 원보다 1cm 위 — 둘의 **상대** 순서만 이 1cm 가 정한다.
-            _telegraphGrowing.transform.position = point + Vector3.up * 0.02f;
-            _telegraphGrowing.SetAlpha(_boss.jumpTelegraphFillAlpha);
-            _telegraphGrowing.ShowGrowing(0.1f, radius, growTime, 0f);
+            _indicatorHandle = effects.PlayLooping(
+                catalog.Drop_Charge_Indicator, point + Vector3.up * 0.02f, Quaternion.identity,
+                radius, growTime);
         }
+        else WarnNoIndicatorEntryOnce();
     }
 
     [ClientRpc]
     void HideJumpTelegraphClientRpc()
     {
-        _telegraphFixed?.Hide();
-        _telegraphGrowing?.Hide();
+        ReleaseJumpTelegraphs();
     }
 
-    AoeTelegraph SpawnLocalTelegraph()
+    /// <summary>
+    /// 내려놓는 자리 바닥 연출 — <b>서버가 좌표를 정한다.</b>
+    ///
+    /// 감전 연출(<see cref="PlayGrabbedElectricRpc"/>)이 좌표를 안 싣는 것과 정반대인데, 이유가 있다:
+    /// 저쪽은 <b>움직이는 손</b> 위라 서버 좌표를 박으면 클라에서 몸을 벗어나지만,
+    /// 이쪽은 <b>정지한 바닥</b> 위이고 "플레이어가 어디에 떨어졌는가"라는 게임플레이 사실을 표시한다 —
+    /// 각 피어가 따로 계산하면 표시가 조금씩 갈린다.
+    ///
+    /// 놓는 위치는 <b>그랩 소켓 아래 바닥</b>이다. <c>OnGrabThrowRelease</c> 가 아직 비어 있어
+    /// (플레이어 변위 경로 미구현 — PLAN §5.1 G1) 대상은 날아가지 않고 소켓 자리에서 떨어진다.
+    /// 🔴 변위가 구현되면 이 좌표도 **날아가 닿는 지점**으로 함께 옮겨야 한다 —
+    /// 안 그러면 연출이 착지 지점에 대해 거짓말한다.
+    /// </summary>
+    void PlayThrowGroundVFX()
     {
-        // 부모 없이(씬 루트) 만들어 보스 이동에 끌려가지 않게 한다. 재사용하므로 점프마다 할당이 없다.
-        GameObject go = Instantiate(_boss.jumpTelegraphPrefab);
-        if (go.TryGetComponent(out AoeTelegraph t)) return t;
+        Transform socket = GrabSocket;
+        Vector3 from = socket != null ? socket.position : transform.position;
 
-        Debug.LogError(
-            $"{name}: jumpTelegraphPrefab({go.name}) 에 AoeTelegraph 컴포넌트가 없다 — 예고가 표시되지 않는다.", this);
-        Destroy(go);
-        return null;
+        // 바닥을 못 찾으면 소켓 위치에 그대로 재생한다 — 이펙트가 통째로 사라지는 것보다 낫다
+        // (레거시 GrabController.PlayThrowLightningVFXClientRpc 와 같은 정책).
+        Vector3 point = from;
+        Quaternion slope = Quaternion.identity;
+        if (GroundProbe.TryFindGround(from, 0, out RaycastHit ground, out _))
+        {
+            point = ground.point;
+            slope = Quaternion.FromToRotation(Vector3.up, ground.normal);
+        }
+
+        PlayThrowGroundClientRpc(point, slope);
+    }
+
+    /// <summary>Unreliable: 순수 연출이라 유실돼도 상태가 발산하지 않는다.</summary>
+    [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
+    void PlayThrowGroundClientRpc(Vector3 point, Quaternion slope)
+    {
+        if (!EffectManager.TryGet(out EffectManager effects, this)) return;
+
+        EffectEntry entry = effects.Catalog.Throw;
+        if (entry == null)
+        {
+            WarnNoThrowEntryOnce();
+            return;
+        }
+        float effectScale = 2f;
+        effects.Play(entry, point, slope, effectScale);
+    }
+
+    /// <summary>
+    /// 잡힌 대상 감전 연출 — 그랩 홀드 틱마다 원샷.
+    ///
+    /// 🔴 <b>좌표를 실어 보내지 않는다.</b> 각 피어가 자기 그랩 소켓을 읽는다 —
+    /// 소켓은 움직이는 보스의 본이라, 서버 좌표를 박아 보내면 클라에서 그만큼 몸에서 떨어져 뜬다
+    /// (<c>MonsterBase.PlayHitVFXRpc</c> 가 같은 이유로 같은 선택을 한다).
+    /// ⚠️ 호스트는 곧 서버라 이 어긋남이 0이다 — 검증은 반드시 MPPM 클라이언트 창에서 한다.
+    ///
+    /// Unreliable: 반복되는 순수 연출이라 한 틱이 빠져도 상태가 발산하지 않는다.
+    /// </summary>
+    [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
+    void PlayGrabbedElectricClientRpc()
+    {
+        if (!EffectManager.TryGet(out EffectManager effects, this)) return;
+
+        EffectEntry entry = effects.Catalog.Grabbed_Electric;
+        if (entry == null)
+        {
+            WarnNoGrabbedElectricOnce();
+            return;
+        }
+
+        // 소켓이 없으면 보스 위치로 떨어뜨린다 — 이펙트가 통째로 사라지는 것보다 낫다
+        // (레거시 GrabController.PlayThrowLightningVFXClientRpc 와 같은 정책).
+        Transform socket = GrabSocket;
+        Vector3 point = socket != null ? socket.position : transform.position;
+
+        effects.Play(entry, point, Quaternion.identity);
+    }
+
+    /// <summary>
+    /// 잡힌 플레이어가 매달리는 소켓. 레거시 <see cref="GrabController"/> 가 들고 있는 것을 그대로 쓴다 —
+    /// <c>PlayerStateController</c> 의 캐리 추종 대상도 같은 트랜스폼이라, 여기서 별도 필드를 두면
+    /// <b>연출과 실제로 잡혀 있는 위치가 갈릴 수 있다.</b>
+    /// </summary>
+    Transform GrabSocket
+    {
+        get
+        {
+            if (_grabController == null) _grabController = GetComponent<GrabController>();
+            if (_grabController != null && _grabController.GrabSocket != null)
+                return _grabController.GrabSocket;
+
+            WarnNoGrabSocketOnce();
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 팔 전기 펄스 시작. <b>각 피어가 로컬로 재생한다</b> — 호출부(<c>AcquireGrab</c>)가
+    /// 서버 전용이라 RPC 로 나가지 않으면 <b>호스트에서만 보인다</b>(이 레포의 단골 버그).
+    ///
+    /// Reliable(기본)이다. 유실되면 이후 Stop 이 껐다고 착각하는 것이 아니라 **아예 안 켜지는** 것이라
+    /// 상태가 새지는 않지만, 그랩 연출이 통째로 빠지는 것은 원샷 하나가 빠지는 것과 무게가 다르다.
+    /// </summary>
+    [ClientRpc]
+    void StartGrabPulseClientRpc()
+    {
+        if (grabPulse == null)
+        {
+            WarnNoGrabPulseOnce();
+            return;
+        }
+
+        grabPulse.Play();
+    }
+
+    /// <summary>
+    /// 팔 전기 펄스 종료. <b>이미 떠 있는 펄스는 손까지 가고 사라진다</b>(새 펄스만 멈춘다).
+    ///
+    /// 🔴 <b>Reliable 이어야 한다.</b> 이게 유실되면 팔에 전기가 영영 남는다 —
+    /// 착지 충돌 이펙트(<see cref="PlayJumpImpactRpc"/>)가 Unreliable 인 것과 정반대 이유다.
+    /// 그랩이 끝나는 길이 여럿이라(성공 던지기 · 헛잡기 · 대상 소멸 · 체인 중단) 전부에서 부른다.
+    /// </summary>
+    [ClientRpc]
+    void StopGrabPulseClientRpc()
+    {
+        // 여기서는 경고하지 않는다 — 미배선은 시작 시점에 이미 1회 알렸고,
+        // 끝나는 길이 넷이라 여기서 또 뿌리면 진짜 신호가 묻힌다(교훈 #8).
+        if (grabPulse != null) grabPulse.Stop();
+    }
+
+    /// <summary>
+    /// 착지 충돌 이펙트 — <b>원샷</b>이다. 예고와 달리 수명이 사건이 아니라 시간이라
+    /// (엔트리의 duration) 핸들도 회수 책임도 없다.
+    ///
+    /// Unreliable: 순수 연출이라 유실돼도 상태가 발산하지 않는다(펑 소리 한 번이 빠질 뿐).
+    /// 예고 해제(<see cref="HideJumpTelegraphClientRpc"/>)가 Reliable 인 것과 대비된다 —
+    /// 그쪽은 유실되면 <b>장판이 바닥에 영구히 남는다.</b>
+    /// </summary>
+    [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
+    void PlayJumpImpactRpc(Vector3 point)
+    {
+        if (!EffectManager.TryGet(out EffectManager effects, this)) return;
+
+        EffectEntry entry = effects.Catalog.Drop_Collision;
+        if (entry == null)
+        {
+            WarnNoImpactEntryOnce();
+            return;
+        }
+
+        // 예고와 **같은 반경**을 scale 로 넘긴다 — 착지 이펙트가 예고보다 크거나 작으면
+        // "예고가 판정에 대해 거짓말한" 것처럼 보인다.
+        effects.Play(entry, point, JumpAoeRadius);
+    }
+
+    /// <summary>
+    /// 예고 루프 핸들 2개를 회수한다. 미발급·이미 해제된 핸들은 매니저 쪽에서 조용한 no-op 이라
+    /// 여러 번 불려도 안전하다.
+    /// </summary>
+    void ReleaseJumpTelegraphs()
+    {
+        ReleaseHandle(ref _boundaryHandle);
+        ReleaseHandle(ref _indicatorHandle);
+    }
+
+    static void ReleaseHandle(ref EffectHandle handle)
+    {
+        if (!handle.IsSet) return;
+
+        if (EffectManager.Instance != null) EffectManager.Instance.Release(handle);
+        handle = EffectHandle.None;
     }
 
     // 체공 중 메시 숨김. 🔴 animator.transform 하위만 토글한다 —
@@ -1597,13 +1912,106 @@ public class TwentyThreeBoss : MonsterBase
         }
     }
 
-    void WarnNoJumpTelegraphOnce()
+    void WarnNoBoundaryEntryOnce()
     {
-        if (_warnedNoJumpTelegraph) return;
-        _warnedNoJumpTelegraph = true;
+        if (_warnedNoBoundaryEntry) return;
+        _warnedNoBoundaryEntry = true;
         Debug.LogWarning(
-            $"{name}: jumpTelegraphPrefab 이 없어 착지 예고가 표시되지 않는다 — 플레이어가 피할 근거가 없다. " +
-            "AoeTelegraph 프리팹을 배선할 것(NetworkObject 는 붙이지 말 것).", this);
+            $"{name}: EffectCatalog 에 Drop_Charge_Boundary 가 비어 있어 착지 예고의 **경계 원**" +
+            "(어디에 떨어지는가)이 표시되지 않는다 — 플레이어가 피할 근거가 없다. " +
+            "EffectCatalog.asset 에 FX_Drop_Charge_Boundary_Entry 를 배선할 것.", this);
+    }
+
+    void WarnNoRageSmashOnce()
+    {
+        if (_warnedNoRageSmash) return;
+        _warnedNoRageSmash = true;
+        Debug.LogWarning(
+            $"{name}: rageSmash 가 비어 있어 레이지 돌진 연출이 재생되지 않는다 — " +
+            "보스가 그냥 빠르게 걸어오는 것처럼 보인다. " +
+            "FX_Rage_Smash_Entry 를 물린 EffectSocketPlayer 를 이 필드에 연결할 것.", this);
+    }
+
+    // 공격별로 나눠 세지 않는다 — 첫 한 번이 어느 공격인지 알려 주면 배선을 찾아가기에 충분하고,
+    // 타격마다 경고가 쌓이면 진짜 신호가 묻힌다(교훈 #8).
+    void WarnNoHitEffectOnce(BossAttackId attackId)
+    {
+        if (_warnedNoHitEffect) return;
+        _warnedNoHitEffect = true;
+        Debug.LogWarning(
+            $"{name}: {attackId} 명중 타격 연출이 배선되지 않았다 — 때려도 손에서 아무 일도 안 일어난다. " +
+            "보스 인스펙터의 leftHookHit / rightHookHit / upperHit 에 EffectSocketPlayer 를 물릴 것 " +
+            "(타격 연출이 필요 없는 공격이면 무시해도 된다).", this);
+    }
+
+    void WarnNoChargeBallOnce()
+    {
+        if (_warnedNoChargeBall) return;
+        _warnedNoChargeBall = true;
+        Debug.LogWarning(
+            $"{name}: chargeBall 이 비어 있어 차징 번개구슬이 재생되지 않는다 — " +
+            "송전기 페이즈에 장판만 깔리고 무엇을 막아야 하는지 보이지 않는다. " +
+            "보스 프리팹에 EffectStagePlayer 를 붙이고(intro/sustain/outro/abortOutro = " +
+            "ChargeBall_Grow/Loop/FadeOut/Break) 이 필드에 연결할 것.", this);
+    }
+
+    void WarnNoThrowEntryOnce()
+    {
+        if (_warnedNoThrowEntry) return;
+        _warnedNoThrowEntry = true;
+        Debug.LogWarning(
+            $"{name}: EffectCatalog 에 Throw 가 비어 있어 **내려놓는 자리 연출**이 재생되지 않는다. " +
+            "EffectCatalog.asset 에 배선할 것 — 이 슬롯은 예전 이름이 Throw_Lightning 이었다.", this);
+    }
+
+    void WarnNoGrabSocketOnce()
+    {
+        if (_warnedNoGrabSocket) return;
+        _warnedNoGrabSocket = true;
+        Debug.LogWarning(
+            $"{name}: 그랩 소켓을 찾지 못해 감전 연출이 **보스 루트**에서 재생된다(발밑에 뜬다). " +
+            "보스 프리팹에 GrabController 가 붙어 있고 grabSocket 이 채워져 있는지 확인할 것 — " +
+            "Tools 의 잡기소켓 저작 도구가 채워 준다.", this);
+    }
+
+    void WarnNoGrabbedElectricOnce()
+    {
+        if (_warnedNoGrabbedElectric) return;
+        _warnedNoGrabbedElectric = true;
+        Debug.LogWarning(
+            $"{name}: EffectCatalog 에 Grabbed_Electric 이 비어 있어 **잡힌 대상 감전 연출**이 " +
+            "재생되지 않는다 — 피해는 들어가는데 화면에는 아무 일도 없어 보인다. " +
+            "EffectCatalog.asset 에 배선할 것.", this);
+    }
+
+    void WarnNoGrabPulseOnce()
+    {
+        if (_warnedNoGrabPulse) return;
+        _warnedNoGrabPulse = true;
+        Debug.LogWarning(
+            $"{name}: grabPulse 가 비어 있어 그랩 팔 전기 연출이 재생되지 않는다. " +
+            "보스 프리팹에 EffectPathPlayer 를 붙이고(path = 어깨→팔꿈치→손, " +
+            "effect = FX_Grab_ArmElectric_Entry) 이 필드에 연결할 것.", this);
+    }
+
+    void WarnNoImpactEntryOnce()
+    {
+        if (_warnedNoImpactEntry) return;
+        _warnedNoImpactEntry = true;
+        Debug.LogWarning(
+            $"{name}: EffectCatalog 에 Drop_Collision 이 비어 있어 **착지 충돌 이펙트**가 재생되지 않는다 — " +
+            "예고만 사라지고 아무 일도 안 일어난 것처럼 보인다. " +
+            "EffectCatalog.asset 에 FX_Drop_Collision_Entry 를 배선할 것.", this);
+    }
+
+    void WarnNoIndicatorEntryOnce()
+    {
+        if (_warnedNoIndicatorEntry) return;
+        _warnedNoIndicatorEntry = true;
+        Debug.LogWarning(
+            $"{name}: EffectCatalog 에 Drop_Charge_Indicator 가 비어 있어 착지 예고의 **차오르는 원**" +
+            "(언제 떨어지는가)이 표시되지 않는다 — 경계만 보이고 타이밍을 읽을 수 없다. " +
+            "EffectCatalog.asset 에 FX_Drop_Charge_Indicator_Entry 를 배선할 것.", this);
     }
     #endregion
 
@@ -1919,6 +2327,11 @@ public class TwentyThreeBoss : MonsterBase
         SpawnChargeZone();
         BeginChargeAura();
 
+        // 🔴 구슬 크기는 **판정 장판과 같은 반경**이다 — 예고가 판정에 대해 거짓말하지 않게
+        //    (레거시 ChargeController 가 floor 의 SphereCollider 를 매번 읽던 것과 같은 규약).
+        //    SpawnChargeZone 뒤여야 반경을 읽을 수 있다.
+        StartChargeBallClientRpc(transform.position, ChargeZoneRadius);
+
         // 도착했으니 이제 차징 애니메이션을 튼다.
         BossAttackEntry e = _currentEntry;
         if (e != null && !string.IsNullOrEmpty(e.animatorStateName))
@@ -1988,6 +2401,12 @@ public class TwentyThreeBoss : MonsterBase
             return;
 
         bool cleared = result == BossChargeResult.AllPylonsDestroyed;
+
+        // 🔴 EndChargeZone 보다 **먼저** — 끝나는 방식이 결과에 따라 갈린다.
+        //    기둥을 전부 부쉈다 = 플레이어가 저지했다 → 구슬이 **깨진다**(Abort).
+        //    제한시간 초과 = 차징 완주 → 서서히 **사그라진다**(Stop).
+        EndChargeBallClientRpc(broken: cleared);
+
         EndChargeZone();
         EndChargeAura();     // 🔴 성공·실패 **양쪽 모두** 여기를 지난다 — 오라가 남으면 영구 장판이 된다
         _charge?.Cancel();
@@ -2046,6 +2465,9 @@ public class TwentyThreeBoss : MonsterBase
         _rageDashDir.Normalize();
 
         _rageDashing = true;
+        // 연출도 돌진과 수명을 맞춘다 — 매 회 새로 켜고 StopRageDash 가 끈다.
+        // (Play 는 재진입 시 먼저 회수하므로 연타로 불려도 핸들이 새지 않는다)
+        StartRageSmashClientRpc();
         meleeAttack?.BeginHitWindow(); // 경로상 유닛당 1회 보장(SpinnerBot 선례)
         ApplyRageDamageSnapshot();
         StartDashMove(_rageDashDir, RageDashSpeedMul, RageDashMaxDistance);
@@ -2080,9 +2502,12 @@ public class TwentyThreeBoss : MonsterBase
         BeginRageDash();
     }
 
+    // 🔴 돌진이 끝나는 **모든** 길이 여기를 지난다 — TickRage(정상 종료)와
+    //    AbortAttackChain(카운터·그로기·사망). 그래서 연출 회수를 여기 한 곳에 둔다.
     void StopRageDash()
     {
         _rageDashing = false;
+        StopRageSmashClientRpc();
         meleeAttack?.EndHitWindow();
         EndDashMove();
     }
@@ -2508,6 +2933,49 @@ public class TwentyThreeBoss : MonsterBase
         _chargeZone = null;
     }
 
+    /// <summary>
+    /// 차징 장판의 실효 반경. 구슬 크기가 여기에 묶인다.
+    ///
+    /// ⚠️ <see cref="AreaZone.SpawnOrGrow"/> 는 같은 자리에 같은 타입 장판이 있으면 **그것을 성장시켜**
+    /// 돌려준다(폭탄 장판 등). 그래서 저작값이 아니라 <b>실제 인스턴스</b>에서 읽는다 —
+    /// 구슬이 예상보다 커 보이면 그건 여기가 아니라 장판이 자란 것이다.
+    /// </summary>
+    float ChargeZoneRadius => _chargeZone != null ? _chargeZone.Radius : ChargeAuraRadius;
+
+    /// <summary>
+    /// 구슬 시작. <b>좌표와 반경을 서버가 싣는다</b> — 장판은 보스 자식이 아니라 별도 NetworkObject 라
+    /// 클라에 아직 스폰되지 않았을 수 있고, 그때 각 피어가 스스로 재면 크기가 갈린다
+    /// (레거시가 페이로드 없이 각자 계산할 수 있었던 건 floor 가 보스 자식이었기 때문이다).
+    ///
+    /// Reliable(기본): 유실되면 구슬이 아예 안 뜬다.
+    /// </summary>
+    [ClientRpc]
+    void StartChargeBallClientRpc(Vector3 center, float radius)
+    {
+        if (chargeBall == null)
+        {
+            WarnNoChargeBallOnce();
+            return;
+        }
+
+        chargeBall.PlayAt(center, radius);
+    }
+
+    /// <summary>
+    /// 구슬 종료. <paramref name="broken"/> 이면 깨지고, 아니면 사그라진다.
+    ///
+    /// 🔴 Reliable(기본)이어야 한다 — 유실되면 <b>구슬이 아레나에 영구히 남는다.</b>
+    /// 재생 중이 아니면 컴포넌트 쪽에서 조용한 no-op 이라 여러 경로에서 불려도 안전하다.
+    /// </summary>
+    [ClientRpc]
+    void EndChargeBallClientRpc(bool broken)
+    {
+        if (chargeBall == null) return;   // 미배선은 시작 시점에 이미 1회 알렸다
+
+        if (broken) chargeBall.Abort();
+        else chargeBall.Stop();
+    }
+
     // 🔴 1인 1 / 2인 2 / **3인 이상 4**. 레거시의 Clamp(playerCount,1,3)+player3=3 버그를 여기서 닫는다.
     int PylonCountFor(int playerCount)
     {
@@ -2698,9 +3166,46 @@ public class TwentyThreeBoss : MonsterBase
         bool resolved = base.ReceiveAttack(attackInfo, hitContext);
 
         if (counter && resolved && State != MonsterState.Dead)
+        {
             EnterCounterGroggy(allowBreak: true);
 
+            // 🔴 여기가 "인터럽트 성공"의 유일한 지점이다. EnterCounterGroggy 안에 넣지 않은 이유:
+            //    그 메서드는 송전기 전멸(S7) 경로도 함께 쓰는데, 그건 플레이어가 끊어낸 게 아니라
+            //    별개의 사건이다. 섞으면 연출이 "무엇을 칭찬하는지"가 흐려진다.
+            PlayInterruptFlashRpc();
+        }
+
         return resolved;
+    }
+
+    /// <summary>
+    /// [전 피어] 카운터 성공 섬광.
+    ///
+    /// 🔴 <b>RPC 여야 한다.</b> 호출부는 <c>counter</c> 조건에 <c>IsServer</c> 가 들어 있어 서버에서만
+    ///    도는 경로다 — 직접 재생하면 호스트 화면에서만 보인다.
+    ///
+    /// Unreliable: 순수 연출이라 한 번 빠져도 상태가 발산하지 않는다.
+    /// (성공 자체는 그로기 상태 복제로 전 피어에 전달되므로 연출이 빠져도 결과는 보인다.)
+    /// </summary>
+    [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
+    void PlayInterruptFlashRpc()
+    {
+        if (interruptFlash == null)
+        {
+            WarnNoInterruptFlashOnce();
+            return;
+        }
+
+        interruptFlash.PlayOnce();
+    }
+
+    void WarnNoInterruptFlashOnce()
+    {
+        if (_warnedNoInterruptFlash) return;
+        _warnedNoInterruptFlash = true;
+
+        Debug.LogWarning(
+            $"{name}: 카운터 성공 섬광이 비어 있다 — 프리팹의 TwentyThreeBoss 에 interruptFlash 를 물릴 것.", this);
     }
 
     /// <summary>

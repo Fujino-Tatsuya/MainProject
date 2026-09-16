@@ -36,6 +36,21 @@ MonoBehaviour:
       surfaceData: 2
     screenSpaceSettings:
       normalBlend: 0
+--- !u!114 &6519473205289754683
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 949b9294f6a54970b4b8d4a18d11b837, type: 3}
+  m_Name: RetroCRTFeature
+  m_EditorClassIdentifier: Assembly-CSharp::RetroCRTFeature
+  m_Active: 1
+  _material: {fileID: 2100000, guid: 3f775673dfd7c9c4d9c625bb54e41080, type: 2}
+  _pixelScanlineShader: {fileID: 4800000, guid: 213505f4ae8f4088900604e1724311c4, type: 3}
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -131,21 +146,6 @@ MonoBehaviour:
   m_Active: 1
   _shader: {fileID: 4800000, guid: c91135b30a9f6b64a8a1538d43025786, type: 3}
   _injectionPoint: 450
---- !u!114 &6519473205289754683
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 49d00577b3854fc4a972507541847274, type: 3}
-  m_Name: PixelScanlineFeature
-  m_EditorClassIdentifier: Assembly-CSharp::PixelScanlineFeature
-  m_Active: 1
-  _shader: {fileID: 4800000, guid: 213505f4ae8f4088900604e1724311c4, type: 3}
-  _injectionPoint: 600
 --- !u!114 &7833122117494664109
 MonoBehaviour:
   m_ObjectHideFlags: 0

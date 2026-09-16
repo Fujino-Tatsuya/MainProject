@@ -17,7 +17,7 @@ using UnityEngine;
 //   3) Record — 프리팹 스테이지에서 손으로 맞춘 현재 위치를 '열림'으로 저장하고 닫힘으로 되돌림
 public static class ZoneBridgeGateWiring
 {
-    const string ZonePath = "Assets/2.Prefabs/Map/Zoneprefab/ZoneL_typeB.prefab";
+    const string ZonePath = "Assets/2.Prefabs/Environment/Layouts/Zones/ZoneL_typeB.prefab";
 
     // 🔴 아트 V3 납품이 존을 통째로 교체하면서 이름이 바뀌었다(소실 커밋 1bffe5a "LevelPackage.Ver10 Import").
     // 구 이름은 Env_panel / Env_bridge01 이었고 원본 프리팹째로 사라졌다 — git·디스크 어디에도 없다.

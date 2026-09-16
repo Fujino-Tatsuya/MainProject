@@ -29,6 +29,7 @@ public class EffectCatalog : ScriptableObject
     // 이 이펙트는 EffectSocketPlayer가 인스펙터 참조로 직접 들고 있어 코드 룩업은 쓰지 않지만,
     // 몹이 동시에 여러 마리 때리므로 prewarmCount가 실제로 동작해야 첫 타격이 끊기지 않는다.
     [field: SerializeField] public EffectEntry Mob_Slash { get; private set; }
+    [field: SerializeField] public EffectEntry Mob_Bite { get; private set; }
 
     [Header("Boss")]
     [field: SerializeField] public EffectEntry Drop_Charge_Boundary { get; private set; }
@@ -38,7 +39,18 @@ public class EffectCatalog : ScriptableObject
     [field: SerializeField] public EffectEntry Grab_Lightning { get; private set; }
     [field: SerializeField] public EffectEntry Grab_ArmElectric { get; private set; }
     [field: SerializeField] public EffectEntry Grabbed_Electric { get; private set; }
-    [field: SerializeField] public EffectEntry Throw_Lightning { get; private set; }
+    [field: SerializeField] public EffectEntry Throw { get; private set; }
+    [field: SerializeField] public EffectEntry Punch_HitSpark { get; private set; }
+
+    // 폭탄이 **움직이는 동안**만 흐르는 루프(FX_Wells_Bomb_Trail). BossBomb 이 상태 전이에서 켜고 끈다.
+    [field: SerializeField] public EffectEntry Wells_Bomb_Trail { get; private set; }
+
+    // 폭탄 폭발 원샷(FX_Bomb_Explode). 장판과 별개다 — 이건 터지는 **순간**의 연출이다.
+    [field: SerializeField] public EffectEntry Bomb_Explode { get; private set; }
+
+    // 폭발 **뒤에 남는 장판**의 비주얼(FX_Bomb_Exploded). 장판의 수명·반경은 AreaZone 이 정하고
+    // 이 엔트리는 그 위에 얹히는 그림이다 — 피해 판정은 여기에 들어 있지 않다.
+    [field: SerializeField] public EffectEntry Bomb_Exploded { get; private set; }
 
     [Header("Boss — 차징 번개구슬 (4단계)")]
     // 한 엔트리에 파트로 몰지 않고 넷으로 나눈 이유: FadeOut과 Break가 서로 다른 종료 분기다.

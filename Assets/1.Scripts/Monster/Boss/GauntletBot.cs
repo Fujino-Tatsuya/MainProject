@@ -92,6 +92,19 @@ public class GauntletBot : MonsterBase
     [SerializeField] string punch03LState = "Gauntlet_Punch03_L";
     [SerializeField] string punch03RState = "Gauntlet_Punch03_R";
 
+    [Header("VFX")]
+    [Tooltip("카운터(인터럽트) 성공 순간의 섬광. 비워두면 연출만 빠진다")]
+    [SerializeField] EffectSocketPlayer interruptFlash;
+    bool _warnedNoInterruptFlash;
+
+    // 🔴 펀치가 **맞았을 때만** 튄다. 헛스윙에는 안 나온다 — 애니 이벤트로는 못 가른다(클립은
+    //    맞았는지 모른다). 손마다 소켓이 다르므로 좌/우를 따로 문다. (23호 leftHookHit/rightHookHit 선례)
+    [Tooltip("왼손 펀치 명중 시 스파크(왼손 소켓). 비워두면 연출만 빠진다")]
+    [SerializeField] EffectSocketPlayer spark_L;
+    [Tooltip("오른손 펀치 명중 시 스파크(오른손 소켓). 비워두면 연출만 빠진다")]
+    [SerializeField] EffectSocketPlayer spark_R;
+    bool _warnedNoSpark;
+
     // 서버 전용 런타임 상태.
     GauntletAttackId _currentAttack;
     MonsterCounterWindow _counter;
@@ -174,6 +187,39 @@ public class GauntletBot : MonsterBase
 
         ForceGroggy(Counter.GroggyDuration);
         ServerFreezeAtLocomotion();   // ForceGroggy 뒤에 불러야 한다 — 상태 전이가 자세를 덮지 않게
+
+        PlayInterruptFlashRpc();
+    }
+
+    /// <summary>
+    /// [전 피어] 카운터 성공 섬광.
+    ///
+    /// 🔴 <b>RPC 여야 한다.</b> 호출부 <see cref="CounterSucceeded"/> 는 <see cref="TakeDamage"/> 의
+    ///    <c>IsServer</c> 게이트 뒤라 서버에서만 돈다 — 직접 재생하면 호스트 화면에서만 보인다.
+    ///    인자가 없는 이유는 스파크와 다르다: 이 연출은 한 종류뿐이라 실어 보낼 것이 없다.
+    ///
+    /// Unreliable: 순수 연출이라 한 번 빠져도 상태가 발산하지 않는다.
+    /// (성공 자체는 그로기 상태 복제로 전 피어에 전달되므로 연출이 빠져도 결과는 보인다.)
+    /// </summary>
+    [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
+    void PlayInterruptFlashRpc()
+    {
+        if (interruptFlash == null)
+        {
+            WarnNoInterruptFlashOnce();
+            return;
+        }
+
+        interruptFlash.PlayOnce();
+    }
+
+    void WarnNoInterruptFlashOnce()
+    {
+        if (_warnedNoInterruptFlash) return;
+        _warnedNoInterruptFlash = true;
+
+        Debug.LogWarning(
+            $"{name}: 카운터 성공 섬광이 비어 있다 — 프리팹의 GauntletBot 에 interruptFlash 를 물릴 것.", this);
     }
 
     // 공격 히트 실행(애니 이벤트 OnAttackHit → base.NotifyAttackHit → FireAttackHitOnce 경로).
@@ -193,15 +239,56 @@ public class GauntletBot : MonsterBase
             case GauntletAttackId.Smash:
                 ApplySmashAoeDamage();
                 break;
+            // 🔴 Hit() 은 **실제로 데미지가 들어간 대상 수**를 돌려준다. 헛스윙(0)과 명중을
+            //    여기서 가른다 — 연출을 애니 이벤트에 맡기면 허공을 쳐도 스파크가 튄다.
             case GauntletAttackId.Punch03_L:
             case GauntletAttackId.Punch03_R:
-                meleeAttack?.Hit();
+                if (meleeAttack != null && meleeAttack.Hit() > 0)
+                    PlaySparkRpc(_currentAttack);
                 OnUppercutHit();
                 break;
             default:
-                meleeAttack?.Hit();
+                if (meleeAttack != null && meleeAttack.Hit() > 0)
+                    PlaySparkRpc(_currentAttack);
                 break;
         }
+    }
+
+    /// <summary>
+    /// [전 피어] 펀치 명중 스파크. 어느 손이었는지를 실어 보낸다.
+    ///
+    /// 🔴 <b>RPC 여야 한다.</b> 호출부 <see cref="PerformAttackHit"/> 는 서버에서만 도는 경로다
+    ///    (<c>NotifyAttackHit</c> 이 <c>IsServer</c> 로 막는다) — 직접 재생하면 호스트 화면에서만 보인다.
+    ///    좌/우를 인자로 싣는 이유도 같다: <see cref="_currentAttack"/> 은 복제되지 않는 서버 전용
+    ///    상태라(선택 결과는 <c>PlayAttackAnimClientRpc</c> 로만 나간다) 클라가 스스로 알 방법이 없다.
+    ///
+    /// Unreliable: 순수 연출이라 한 대 분이 빠져도 상태가 발산하지 않는다.
+    /// </summary>
+    [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
+    void PlaySparkRpc(GauntletAttackId attackId)
+    {
+        EffectSocketPlayer player = IsLeftHand(attackId) ? spark_L : spark_R;
+        if (player == null)
+        {
+            WarnNoSparkOnce(attackId);
+            return;
+        }
+
+        player.PlayOnce();
+    }
+
+    static bool IsLeftHand(GauntletAttackId id) =>
+        id == GauntletAttackId.Punch01_L || id == GauntletAttackId.Punch02_L || id == GauntletAttackId.Punch03_L;
+
+    // 비어 있으면 매 타격마다 로그가 쏟아지므로 한 번만 알린다(연출은 빠지되 전투는 계속된다).
+    void WarnNoSparkOnce(GauntletAttackId attackId)
+    {
+        if (_warnedNoSpark) return;
+        _warnedNoSpark = true;
+
+        Debug.LogWarning(
+            $"{name}: {attackId} 명중 스파크가 비어 있다 — 프리팹의 GauntletBot 에 " +
+            $"{(IsLeftHand(attackId) ? "Spark_L" : "Spark_R")} 을 물릴 것.", this);
     }
 
     // 어퍼컷(Punch03) 히트 훅 — airborne CC는 은희의 Unit 상태이상 인터페이스 통합 후 연결.

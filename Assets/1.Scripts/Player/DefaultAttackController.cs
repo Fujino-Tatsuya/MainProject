@@ -91,6 +91,12 @@ public class DefaultAttackController : BaseNetworkBehaviour
     private bool isComboWindowOpen;
     private bool hasQueuedNextAttack;
     private bool hasStartedAttack;
+    // End에서 콤보로 안 이어질 때, 입력은 바로 풀어주되(EndAttackState) 화면에 남은
+    // 이 스텝의 클립은 억지로 끊지 않고 자연 재생되게 둔다. 그동안에도 루트모션은
+    // 계속 캐릭터 위치에 반영해야 발이 미끄러지지 않으므로, IsAttacking이 꺼진 뒤에도
+    // "아직 이 클립이 실제로 재생 중인가"를 이걸로 따로 추적한다.
+    private bool isFinishingAttackTail;
+    private int finishingAttackIndex = -1;
 
     public bool IsAttacking => player != null && player.CurrentState == PlayerActionState.Attack;
     public bool CanRequestStart => HasAttackSteps && CurrentStepDuration > 0f;
@@ -246,7 +252,23 @@ public class DefaultAttackController : BaseNetworkBehaviour
     public void CancelCurrentAttack()
     {
         bool hadActiveAttack = IsAttacking || hasStartedAttack || isRequestingAttack;
+
+        // EndAttackServer/EndDefaultAttackClientRpc가 player.EndAttackState()를 부르면
+        // PlayerAttackState.Exit(Idle)이 여기로 다시 캐스케이드된다(Attack→다른 상태 전이는
+        // 전부 이 메서드를 거치게 돼 있어서). isFinishingAttackTail이 이미 true라는 건
+        // "우리가 방금 그 정상 종료 시퀀스를 스스로 시작했다"는 뜻이라, 이때는 이미
+        // 클립을 자연 재생시키기로 한 결정을 이 캐스케이드가 덮어써서 강제로 Idle로
+        // 끊으면 안 된다. 진짜 외부 인터럽트(넉백/구속/연출잠금/대시 등)일 때만
+        // 즉시 Idle로 끊는다.
+        bool isGracefulEndCascade = isFinishingAttackTail;
+
         ResetAttackRuntime();
+
+        if (isGracefulEndCascade)
+            return;
+
+        isFinishingAttackTail = false;
+        finishingAttackIndex = -1;
 
         if (hadActiveAttack && animator != null)
             animator.CrossFadeInFixedTime(IdleHash, 0.05f);
@@ -301,17 +323,31 @@ public class DefaultAttackController : BaseNetworkBehaviour
     {
         // OnAnimatorMove는 Walk/Idle 중에도 매 프레임 호출되므로,
         // 공격 상태의 루트모션만 이동으로 변환한다.
-        if (!IsAttacking)
+        if (isFinishingAttackTail)
+        {
+            bool stillPlayingThisClip = animator != null
+                && HasAttackStep(finishingAttackIndex)
+                && animator.GetCurrentAnimatorStateInfo(0).shortNameHash == GetAttackStateHash(finishingAttackIndex);
+
+            if (!stillPlayingThisClip)
+            {
+                isFinishingAttackTail = false;
+                finishingAttackIndex = -1;
+            }
+        }
+
+        int stepIndex = IsAttacking ? currentAttackIndex : isFinishingAttackTail ? finishingAttackIndex : -1;
+        if (stepIndex < 0)
             return;
 
-        if (!HasAttackStep(currentAttackIndex))
+        if (!HasAttackStep(stepIndex))
             return;
 
         // 루트모션 변위도 일반 scripted 이동과 동일하게 오너만 적용한다.
         if (IsNetworkActive && !IsOwner)
             return;
 
-        DefaultAttackStep step = attackSteps[currentAttackIndex];
+        DefaultAttackStep step = attackSteps[stepIndex];
         if (step.MovementType != DefaultAttackMovementType.AnimationRootMotionProjected)
             return;
 
@@ -356,7 +392,7 @@ public class DefaultAttackController : BaseNetworkBehaviour
     }
 
     [ClientRpc]
-    private void PlayDefaultAttackClientRpc(int attackIndex, Vector3 direction, bool triggerAttack)
+    private void PlayDefaultAttackClientRpc(int attackIndex, Vector3 direction, bool triggerAttack, float crossFadeStartTime)
     {
         if (IsServer)
             return;
@@ -369,7 +405,7 @@ public class DefaultAttackController : BaseNetworkBehaviour
             return;
         }
 
-        StartAttackPresentation(attackIndex, direction, triggerAttack);
+        StartAttackPresentation(attackIndex, direction, triggerAttack, crossFadeStartTime);
     }
 
     [ClientRpc]
@@ -378,12 +414,12 @@ public class DefaultAttackController : BaseNetworkBehaviour
         if (IsServer)
             return;
 
+        isFinishingAttackTail = true;
+        finishingAttackIndex = currentAttackIndex;
+
         ResetAttackRuntime();
 
         player?.EndAttackState();
-
-        if (animator != null)
-            animator.CrossFadeInFixedTime(IdleHash, 0.05f);
     }
 
     [ClientRpc]
@@ -393,7 +429,7 @@ public class DefaultAttackController : BaseNetworkBehaviour
             isRequestingAttack = false;
     }
 
-    private void StartAttackServer(int attackIndex, Vector3 direction, bool triggerAttack)
+    private void StartAttackServer(int attackIndex, Vector3 direction, bool triggerAttack, float crossFadeStartTime = 0f)
     {
         if (!HasAttackStep(attackIndex))
         {
@@ -423,13 +459,13 @@ public class DefaultAttackController : BaseNetworkBehaviour
             player.BeginAttackState();
         }
 
-        StartAttackPresentation(attackIndex, attackDirection, triggerAttack);
+        StartAttackPresentation(attackIndex, attackDirection, triggerAttack, crossFadeStartTime);
 
         if (IsNetworkActive)
-            PlayDefaultAttackClientRpc(attackIndex, attackDirection, triggerAttack);
+            PlayDefaultAttackClientRpc(attackIndex, attackDirection, triggerAttack, crossFadeStartTime);
     }
 
-    private void StartAttackPresentation(int attackIndex, Vector3 direction, bool triggerAttack)
+    private void StartAttackPresentation(int attackIndex, Vector3 direction, bool triggerAttack, float crossFadeStartTime = 0f)
     {
         if (!HasAttackStep(attackIndex))
             return;
@@ -455,7 +491,7 @@ public class DefaultAttackController : BaseNetworkBehaviour
         if (triggerAttack)
             animator.SetTrigger(DefaultAttackHash);
         else
-            animator.CrossFadeInFixedTime(GetAttackStateHash(currentAttackIndex), 0.05f);
+            animator.CrossFadeInFixedTime(GetAttackStateHash(currentAttackIndex), 0.05f, -1, crossFadeStartTime);
     }
 
     private void CompleteCurrentAttackStep()
@@ -465,7 +501,9 @@ public class DefaultAttackController : BaseNetworkBehaviour
 
         if (ShouldStartNextAttack(out int nextIndex, out Vector3 nextDirection))
         {
-            StartAttackServer(nextIndex, nextDirection, false);
+            // 대부분의 스텝은 LoopBackEntryTime이 0이라 처음부터 재생된다 — 체인이
+            // 마지막 스텝에서 첫 스텝으로 되감길 때(0번 스텝)만 0이 아니라서 윈드업을 건너뛴다.
+            StartAttackServer(nextIndex, nextDirection, false, attackSteps[nextIndex].LoopBackEntryTime);
             return;
         }
 
@@ -502,12 +540,15 @@ public class DefaultAttackController : BaseNetworkBehaviour
 
     private void EndAttackServer()
     {
+        isFinishingAttackTail = true;
+        finishingAttackIndex = currentAttackIndex;
+
         ResetAttackRuntime();
 
+        // 콤보로 안 이어질 때는 조작(이동/스킬/대시)만 바로 풀어주고, 지금 재생 중인
+        // 클립은 억지로 Idle로 끊지 않는다 — 애니메이터에 이미 있는 exitTime=1 → Idle
+        // 자동전이가 자연스럽게 마무리하거나, 새 입력이 들어오면 그쪽이 알아서 덮어쓴다.
         player?.EndAttackState();
-
-        if (animator != null)
-            animator.CrossFadeInFixedTime(IdleHash, 0.05f);
 
         if (IsNetworkActive)
             EndDefaultAttackClientRpc();
@@ -655,6 +696,10 @@ public class DefaultAttackStep
     [SerializeField] private float raycastRange = 20f;
     [SerializeField] private float attackDamageMultiplier = 1f;
     [SerializeField] private int flatDamageBonus;
+    // 이 스텝이 체인의 첫 스텝(0번)일 때만 의미가 있다: 마지막 스텝의 LoopCheck에서
+    // 조기 루프백으로 들어올 때 처음(0초)이 아니라 여기서부터 재생해 윈드업을 건너뛴다.
+    // 초 단위, 클립 원본(스케일 안 된) 타임라인 기준.
+    [SerializeField] private float loopBackEntryTime = 0f;
 
     public AnimationClip Clip => clip;
     public float MotionDuration => motionDuration > 0f ? motionDuration : ClipDuration;
@@ -669,6 +714,7 @@ public class DefaultAttackStep
     public float RaycastRange => raycastRange;
     public float AttackDamageMultiplier => attackDamageMultiplier;
     public int FlatDamageBonus => flatDamageBonus;
+    public float LoopBackEntryTime => loopBackEntryTime;
 
     private float ClipDuration => clip != null ? clip.length : 0f;
 }

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -84,6 +85,14 @@ public class WallBot : MonsterBase
     [Tooltip("모으기 자세를 붙잡을 애니메이터 **상태** 이름. 트리거 이름(Attack)이 아니라 상태 이름이다 " +
              "— Controller_WallBot 실물 기준 'AttackStart'. 아트가 상태를 개명하면 여기도 고칠 것.")]
     string gatherStateName = "AttackStart";
+
+    [Header("VFX")]
+    // 🔴 애니메이션 이벤트로는 못 낸다. 카운터 성공은 클립이 아니라 플레이어의 인터럽트 공격이
+    //    만드는 사건이라 어느 프레임에 일어날지 클립이 알 수 없다 — 코드가 직접 몬다
+    //    (GauntletBot · SpinnerBot 과 같은 규약).
+    [Tooltip("카운터(인터럽트) 성공 순간의 섬광. 비워두면 연출만 빠진다")]
+    [SerializeField] EffectSocketPlayer interruptFlash;
+    bool _warnedNoInterruptFlash;
 
     [Header("진단")]
     [SerializeField]
@@ -348,6 +357,38 @@ public class WallBot : MonsterBase
 
         Log($"카운터 성공 — 그로기 {groggy:0.##}s");
         ForceGroggy(groggy);
+
+        PlayInterruptFlashRpc();
+    }
+
+    /// <summary>
+    /// [전 피어] 카운터 성공 섬광.
+    ///
+    /// 🔴 <b>RPC 여야 한다.</b> 호출부 <see cref="CounterSucceeded"/> 는 <see cref="TakeDamage"/> 의
+    ///    <c>IsServer</c> 게이트 뒤라 서버에서만 돈다 — 직접 재생하면 호스트 화면에서만 보인다.
+    ///
+    /// Unreliable: 순수 연출이라 한 번 빠져도 상태가 발산하지 않는다.
+    /// (성공 자체는 그로기 상태 복제로 전 피어에 전달되므로 연출이 빠져도 결과는 보인다.)
+    /// </summary>
+    [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
+    void PlayInterruptFlashRpc()
+    {
+        if (interruptFlash == null)
+        {
+            WarnNoInterruptFlashOnce();
+            return;
+        }
+
+        interruptFlash.PlayOnce();
+    }
+
+    void WarnNoInterruptFlashOnce()
+    {
+        if (_warnedNoInterruptFlash) return;
+        _warnedNoInterruptFlash = true;
+
+        Debug.LogWarning(
+            $"{name}: 카운터 성공 섬광이 비어 있다 — 프리팹의 WallBot 에 interruptFlash 를 물릴 것.", this);
     }
 
     /// <summary>

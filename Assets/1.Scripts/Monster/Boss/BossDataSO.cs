@@ -233,10 +233,12 @@ public class BossDataSO : MonsterDataSO
     [Tooltip("착지 공격 애니메이터 상태명.")]
     public string jumpLandingState = "";
 
-    [Tooltip("예고 장판 프리팹(**로컬 비주얼 전용** — NetworkObject 를 붙이지 말 것). " +
-             "AoeTelegraph 컴포넌트가 있어야 한다. 두 개를 띄운다: 고정 크기(착지 위치) + 0.1→AoE 점증(타이밍).\n" +
-             "🔴 보스 자식으로 두면 안 된다 — 보스가 체공 중 착지점으로 이동하므로 장판이 따라가 버린다. " +
-             "그래서 각 피어가 이 프리팹을 착지점에 로컬로 띄운다.")]
+    // 🔴 **지금은 아무도 읽지 않는다**(2026-09-09). 착지 예고 2개가 AoeTelegraph 프리팹 →
+    //    EffectCatalog 루프 이펙트(Drop_Charge_Boundary / Drop_Charge_Indicator)로 전부 넘어갔다.
+    //    이 레포에는 조용히 무시되는 설정값이 이미 쌓여 있어(정본 §6) 지우기 전까지 명시해 둔다.
+    [Tooltip("⚠️ **미사용** — 착지 예고는 EffectCatalog 의 Drop_Charge_Boundary(경계) + " +
+             "Drop_Charge_Indicator(차오르는 원) 이펙트가 그린다. 여기에 프리팹을 넣어도 아무 일도 안 난다.\n" +
+             "예고를 바꾸려면 EffectCatalog.asset 과 FX_Drop_Charge_* 프리팹을 볼 것.")]
     public GameObject jumpTelegraphPrefab;
 
     [Tooltip("착지점을 대상에게서 **이만큼 떨어뜨린다**(m). 0 이면 플레이어 위에 정확히 내려앉는다.\n" +
@@ -253,14 +255,14 @@ public class BossDataSO : MonsterDataSO
              "⚠️ 슈퍼아머 대상은 밀리지 않는다(Unit.Knockback 이 차단한다).")]
     [Min(0f)] public float jumpKnockbackStrength = 9f;
 
-    [Tooltip("점프 예고 — **큰 원(고정, 최종 범위)** 의 알파. 연할수록 범위만 암시한다.\n" +
-             "🔴 데칼 전환(2026-09-04) 후 이 값의 **의미가 바뀌었다** — 재질 색의 알파를 갈아치우는 " +
-             "것이 아니라 `DecalProjector.fadeFactor` 다. 텍스처 알파(0.85)에 곱해지고, 데칼은 " +
-             "알베도라 조명까지 타므로 **같은 숫자가 예전보다 훨씬 연하게 보인다.**\n" +
-             "그래서 0.12 → 0.4 로 올렸다(팀장 Play: \"큰 원이 너무 안 보인다\"). 예전 값으로 " +
-             "되돌리려면 숫자가 아니라 **보이는 결과**를 기준으로 잡을 것.")]
+    // 🔴 알파 2개도 **지금은 아무도 읽지 않는다**(2026-09-09). 진하기가 파티클 프리팹 저작값이 됐다 —
+    //    SO 에서 조절할 방법이 없다. 예고 이펙트가 확정되면 위 프리팹 필드와 함께 지운다
+    //    (SO 에 저장된 값을 잃으므로 지울 때 팀장 확인).
+    [Tooltip("⚠️ **미사용** — 큰 원(경계)은 FX_Drop_Charge_Boundary 프리팹의 파티클 저작값이 진하기를 정한다. " +
+             "여기를 아무리 조절해도 화면은 바뀌지 않는다.")]
     [Range(0f, 1f)] public float jumpTelegraphOuterAlpha = 0.4f;
-    [Tooltip("점프 예고 — **차오르는 작은 원** 의 알파. 진할수록 '언제 떨어지는가'가 또렷해진다.")]
+    [Tooltip("⚠️ **미사용** — 차오르는 작은 원은 FX_Drop_Charge_Indicator 프리팹의 파티클 저작값이 " +
+             "진하기를 정한다. 여기를 아무리 조절해도 화면은 바뀌지 않는다.")]
     [Range(0f, 1f)] public float jumpTelegraphFillAlpha = 0.85f;
 
     [Header("송전기(차징) — 페이즈 진입 시퀀스")]

@@ -25,16 +25,15 @@ public static class WallOcclusionAuthoring
     private const string SettingsPath =
         "Assets/99.Settings/WallOcclusionSettings.asset";
     private const string MaterialDirectory =
-        "Assets/3.Materials/Level1_Materials/Occlusion";
+        "Assets/3.Materials/Environment";
     private const string SourceMaterialDirectory =
-        "Assets/50.Art/MapGen/MapObj/material";
+        "Assets/50.Art/Environment/Materials";
     // dash-soul 머지에서 씬이 0.Scenes/MainFlow/ 아래로 재편됐다(구 경로 "0.Scenes/MapScene.unity"는
     // 더 이상 존재하지 않아 이 도구가 씬을 못 찾고 있었다).
     //
-    // 🔴 2026-08-18: 정본 전투 맵이 4.MapScene-trensparent 로 바뀌었다(아트 인수인계
-    // Docs/tech/map-rendering-lighting-handoff.md §2 — 4.MapScene 은 실험 이력이 남은 보조 장면).
-    // 보조 장면에 적용해도 실제 검수 화면에는 반영되지 않으므로 정본을 가리킨다.
-    private const string MapScenePath = "Assets/0.Scenes/MainFlow/4.MapScene-trensparent.unity";
+    // 🔴 2026-09-09: 씬 재배치로 정본 전투 맵이 다시 4.MapScene 하나로 정리됐다. 구 정본
+    // 4.MapScene-trensparent 는 0.Scenes/Lagacy/4.MapScene_Lagacy.unity 로 보관 이동했다.
+    private const string MapScenePath = "Assets/0.Scenes/MainFlow/4.MapScene.unity";
 
     // 바닥/천장은 셰이더의 wallness 판정으로 이미 제외되므로 변종을 만들지 않는다.
     // 만들어봐야 룩만 근사치로 바뀌고 얻는 게 없다.
@@ -42,8 +41,9 @@ public static class WallOcclusionAuthoring
 
     private static readonly string[] PrefabSearchFolders =
     {
-        "Assets/2.Prefabs/Map/WallPrefabs",
-        "Assets/2.Prefabs/Map/Zoneprefab"
+        "Assets/2.Prefabs/Environment/Architecture/Walls",
+        "Assets/2.Prefabs/Environment/Architecture/Doors",
+        "Assets/2.Prefabs/Environment/Layouts/Zones"
     };
 
     [MenuItem("Tools/Rendering/Wall Occlusion/Apply All")]
@@ -206,6 +206,8 @@ public static class WallOcclusionAuthoring
         string[] guids = AssetDatabase.FindAssets(
             "t:Material",
             new[] { SourceMaterialDirectory });
+        var existingVariants = EnumerateVariantPaths().ToDictionary(
+            Path.GetFileNameWithoutExtension, path => path, StringComparer.Ordinal);
 
         foreach (string guid in guids)
         {
@@ -213,7 +215,8 @@ public static class WallOcclusionAuthoring
 
             // FindAssets("t:Material")은 같은 폴더의 .shadergraph에 내장된 기본 머티리얼
             // 서브에셋까지 돌려준다. 실제 .mat 파일만 대상으로 삼는다.
-            if (!sourcePath.EndsWith(".mat", StringComparison.OrdinalIgnoreCase))
+            if (!sourcePath.EndsWith(".mat", StringComparison.OrdinalIgnoreCase) ||
+                sourcePath.Contains("/Markers/"))
                 continue;
 
             string fileName = Path.GetFileNameWithoutExtension(sourcePath);
@@ -224,7 +227,19 @@ public static class WallOcclusionAuthoring
             if (source == null)
                 continue;
 
-            string outputPath = $"{MaterialDirectory}/{fileName}_Occlusion.mat";
+            // 사용 여부로 분리된 기존 변종은 현재 위치에서 갱신한다.
+            // 새 변종은 실제 씬 배정이 확인되기 전까지 NotUsedInMap에 만든다.
+            if (!existingVariants.TryGetValue($"{fileName}_Occlusion", out string outputPath))
+            {
+                string relative = sourcePath.Substring(SourceMaterialDirectory.Length + 1);
+                if (relative.StartsWith("UsedInMap/", StringComparison.Ordinal) ||
+                    relative.StartsWith("NotUsedInMap/", StringComparison.Ordinal))
+                    relative = relative.Substring(relative.IndexOf('/') + 1);
+                string category = Path.GetDirectoryName(relative)?.Replace('\\', '/');
+                string outputDirectory = $"{MaterialDirectory}/NotUsedInMap/{category}/Occlusion";
+                EnsureAssetDirectory(outputDirectory);
+                outputPath = $"{outputDirectory}/{fileName}_Occlusion.mat";
+            }
             var variant = AssetDatabase.LoadAssetAtPath<Material>(outputPath);
             if (variant == null)
             {
@@ -461,7 +476,9 @@ public static class WallOcclusionAuthoring
                      "t:Material",
                      new[] { MaterialDirectory }))
         {
-            yield return AssetDatabase.GUIDToAssetPath(guid);
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            if (path.EndsWith("_Occlusion.mat", StringComparison.Ordinal))
+                yield return path;
         }
     }
 

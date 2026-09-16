@@ -221,6 +221,7 @@ public class DevSceneBooter : MonoBehaviour
 
         // 아래 셋은 전부 중복 호출 안전이 확인된 API다. 컨트롤러의 이벤트 순서에 의존하지 않기 위한 안전망.
         EnsurePlayerSpawned(networkManager, flow);
+        EnsureCameraFocused(networkManager);
 
         // MarkMainGameStart 는 멱등이 아니다(부를 때마다 재스탬프). GameManager 가 4.MapScene 일 때
         // 이미 찍어주므로, 안 찍힌 경우에만 찍는다. 재스탬프하면 락스텝 기준 시각이 밀린다.
@@ -256,6 +257,29 @@ public class DevSceneBooter : MonoBehaviour
 
         Debug.Log("[DevBoot] 호스트 플레이어가 아직 없다 — 직접 스폰한다.");
         flow.SpawnAllPlayers();
+    }
+
+    // Dev_Boot는 StartHost()를 타겟 씬 로드보다 먼저 실행한다(세션부터 올려야 하니까) —
+    // 그런데 NGO는 연결 승인과 동시에 플레이어를 그 자리(타겟 씬이 로드되기 전)에서 즉시 스폰해버려서,
+    // Player.OnNetworkSpawn()이 CameraTargetSwitcher.Active를 찾는 시점엔 그게 아직 타겟 씬에 없다
+    // (카메라 매니저는 타겟 씬 소속이라 씬이 로드돼야 존재한다). OnNetworkSpawn은 오브젝트 생애주기당
+    // 한 번뿐이라 이후 씬이 로드돼도 다시 안 불린다 — 그래서 씬 로드가 끝난 지금 시점에
+    // 호스트 자신의 카메라 포커스를 한 번 더 강제로 걸어주는 안전망이 필요하다.
+    private static void EnsureCameraFocused(NetworkManager networkManager)
+    {
+        if (CameraTargetSwitcher.Active == null)
+        {
+            return;
+        }
+
+        if (!networkManager.ConnectedClients.TryGetValue(networkManager.LocalClientId, out NetworkClient host) ||
+            host.PlayerObject == null)
+        {
+            return;
+        }
+
+        Debug.Log("[DevBoot] 카메라 포커스 안전망 — 씬 로드 완료 후 다시 요청한다.");
+        CameraTargetSwitcher.Active.FocusOwnerPlayer();
     }
 
     private static bool IsEnabledBuildScene(string sceneName)

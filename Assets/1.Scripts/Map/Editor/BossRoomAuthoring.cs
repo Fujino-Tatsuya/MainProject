@@ -12,7 +12,7 @@ using UnityEngine;
 // 크기는 렌더러 바운즈에서 실측한다 — 아트가 교체돼도 다시 돌리면 맞는다(하드코딩 금지).
 public static class BossRoomAuthoring
 {
-    const string BossRoomPath = "Assets/2.Prefabs/Map/Zoneprefab/bossroom.prefab";
+    const string BossRoomPath = "Assets/2.Prefabs/Environment/Layouts/Zones/bossroom.prefab";
 
     const string FloorColliderName = "BossFloorCollider";
     const string BoundariesName = "InvisibleBoundaries";
