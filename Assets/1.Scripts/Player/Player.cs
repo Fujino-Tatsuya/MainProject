@@ -796,7 +796,10 @@ public class Player : Unit
         {
             // 입력 기아가 10틱을 넘으면 입력을 놓은 것으로 간주한다. 감속/중력은 계속 서버에서 시뮬레이션된다.
             inputForTick = new ServerRawSimulationInput(
-                CurrentSimulationTick(),
+                // 🔴 오너 틱 자리에 서버 카운터를 넣지 않는다 — 두 카운터는 별개 번호 공간이라
+                // 섞이면 입력 필터·보정 ack 이 함께 무너진다(2026-09-16 두 번 겪었다).
+                // 추측 입력이므로 "마지막으로 본 실제 오너 틱"을 그대로 쓴다.
+                hasLastServerRawInput ? lastServerRawInput.Tick : 0L,
                 default,
                 default,
                 hasLastServerRawInput ? lastServerRawInput.RttSeconds : 0.0,
@@ -820,8 +823,16 @@ public class Player : Unit
             return false;
         }
 
-        lastProcessedServerInputTick = inputForTick.Tick;
-        hasProcessedServerInputTick = true;
+        // 🔴 **실제로 받은 오너 입력**을 소비했을 때만 갱신한다.
+        // 이 값은 "서버가 마지막으로 소비한 오너 입력 틱"이라는 뜻이고, 중복 전송 제거가 이 값으로
+        // 들어오는 입력을 거른다. 기아 폴백의 추측 틱(0 입력일 때는 서버 자기 카운터)이 섞이면
+        // 오너 틱보다 앞선 값이 들어와 **이후 오너 입력이 전부 버려진다** — 2026-09-16 실측에서
+        // received 가 50/s → 2~23/s 로 무너진 원인이다. 두 틱은 별개 번호 공간이다(b3-0).
+        if (receivedFreshInput)
+        {
+            lastProcessedServerInputTick = inputForTick.Tick;
+            hasProcessedServerInputTick = true;
+        }
 
         // 🔴 보정은 **실제로 받은 입력**을 소비했을 때만 보낸다.
         // 기아(입력 유실) 구간에서 서버는 추측으로 돈다 — 마지막 입력을 반복하거나 0 입력을 쓴다.
