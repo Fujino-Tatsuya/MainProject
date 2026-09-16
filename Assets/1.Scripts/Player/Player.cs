@@ -58,6 +58,7 @@ public class Player : Unit
     private PlayerGroundingSensor groundingSensor;
     private PlayerInvulnerability invulnerability;
     private PlayerInputReader inputReader;
+    private PlayerSkillTargeting skillTargeting;
     private NetworkTransform networkTransform;
     private bool networkTransformMissingWarningLogged;
     private PlayerTickRingBuffer<PlayerRawSimulationInput> ownerRawInputHistory;
@@ -177,6 +178,7 @@ public class Player : Unit
         groundingSensor = GetComponent<PlayerGroundingSensor>();
         invulnerability = GetComponent<PlayerInvulnerability>();
         inputReader = GetComponent<PlayerInputReader>();
+        skillTargeting = GetComponent<PlayerSkillTargeting>();
         networkTransform = GetComponent<NetworkTransform>();
 
         if (animator == null)
@@ -1251,6 +1253,57 @@ public class Player : Unit
     private static bool IsFinite(float value)
     {
         return !float.IsNaN(value) && !float.IsInfinity(value);
+    }
+
+
+    /// <summary>
+    /// 오너의 스킬 자동 접근(사거리 확보 이동) 의도를 서버에 알린다.
+    /// 위치 권위가 서버이므로 서버도 같은 전진 의도를 만들어야 한다 — 오너만 만들면 서버가 안 움직이고
+    /// 오너 예측은 보정 때마다 되돌려진다(루트모션에서 겪은 것과 같은 결함).
+    /// 목표와 사거리만 보내고 **변위는 보내지 않는다.** 클라가 보고한 이동량을 서버가 믿으면 권위가 무너진다.
+    /// </summary>
+    internal void SubmitAutoApproachIntent(Unit target, float castRange, bool active)
+    {
+        if (!IsNetworkActive || !IsOwner || IsServer)
+            return;
+
+        NetworkObject targetObject = active && target != null ? target.NetworkObject : null;
+        if (active && targetObject == null)
+            return;
+
+        SubmitAutoApproachIntentServerRpc(
+            active ? new NetworkObjectReference(targetObject) : default,
+            castRange,
+            active);
+    }
+
+    [ServerRpc] // RequireOwnership 기본값 true — 오너만 호출 가능
+    private void SubmitAutoApproachIntentServerRpc(
+        NetworkObjectReference targetReference,
+        float castRange,
+        bool active)
+    {
+        if (skillTargeting == null)
+            return;
+
+        if (!active)
+        {
+            skillTargeting.ApplyServerAutoApproach(null, 0f, false);
+            return;
+        }
+
+        if (!targetReference.TryGet(out NetworkObject targetObject) ||
+            !targetObject.TryGetComponent(out Unit target))
+        {
+            // 조용히 넘기면 "자동 접근이 가끔 안 먹는다"가 된다. 사유를 남긴다.
+            Edit.LogWarning(
+                $"[Skill] 자동 접근 대상 해석 실패 — owner={OwnerClientId}. 서버가 전진을 만들지 않는다.",
+                this);
+            skillTargeting.ApplyServerAutoApproach(null, 0f, false);
+            return;
+        }
+
+        skillTargeting.ApplyServerAutoApproach(target, castRange, true);
     }
 
     public void NotifyKnockbackEnded()
