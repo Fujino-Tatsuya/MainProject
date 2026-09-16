@@ -253,9 +253,9 @@ public class DefaultAttackController : BaseNetworkBehaviour
 
     public void FixedTickMovement()
     {
-        // 전진 변위는 owner-authority NetworkTransform의 쓰기 주체만 수행한다.
-        // 서버는 승인·판정·종료 장부만 관리하고 오너가 복제한 위치를 사용한다.
-        if (IsNetworkActive && !IsOwner)
+        // 오너는 예측용, 서버는 권위 시뮬레이션용으로 같은 전진 의도를 만든다.
+        // 원격 프록시는 NetworkTransform 표시만 하므로 제출하지 않는다.
+        if (player == null || !player.IsSimulating)
             return;
 
         TickScriptedMovement();
@@ -355,8 +355,9 @@ public class DefaultAttackController : BaseNetworkBehaviour
         if (!HasAttackStep(stepIndex))
             return;
 
-        // 루트모션 변위도 일반 scripted 이동과 동일하게 오너만 적용한다.
-        if (IsNetworkActive && !IsOwner)
+        // 오너 예측뿐 아니라 서버 권위 시뮬레이션에도 같은 루트모션 의도가 필요하다.
+        // 원격 프록시는 NetworkTransform 표시만 하므로 제출하지 않는다.
+        if (player == null || !player.IsSimulating)
             return;
 
         DefaultAttackStep step = attackSteps[stepIndex];
