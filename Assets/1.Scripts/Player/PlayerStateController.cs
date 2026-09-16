@@ -601,6 +601,11 @@ public sealed class PlayerMoveState : PlayerStateBase
 
     public override void Enter(PlayerActionState previousState)
     {
+        // 공격이 끝나고 남은 클립(꼬리)이 재생 중이면 여기서 끊는다.
+        // 애니메이터의 공격 상태에는 IsMoving 전환이 없어 클립이 끝날 때까지(ExitTime 1.0)
+        // 이동 애니메이션으로 못 넘어간다. 이동이 시작되는 이 지점이 끊기에 가장 정확한 자리다.
+        Context.DefaultAttack?.CancelFinishingTailForMovement();
+
         Context.Player.SetAnimatorMoving(true);
     }
 
