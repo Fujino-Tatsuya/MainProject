@@ -782,6 +782,35 @@ MPPM 의 두 피어는 **같은 기계·같은 씬**에서 돈다. R-7 대로 �
 ② 디버그 스위치로 서버 시뮬레이션에 인위적 오차를 주입해 보정을 강제 발동.
 ②는 지금 넣을 수 있고, 임계값을 실측으로 정하려면 결국 필요하다.
 
+
+### 브랜치 둘 — 서버 권위 / 오너 권위 (2026-09-16)
+
+매치메이킹은 **친구 초대·협동 위주**로 확정됐다(은희). 그 조건에서는 리슨 서버로 충분하고,
+서버 권위가 막는 것과 못 막는 것이 분명하다 — 참가자의 위치 핵은 막지만 **호스트 자신은 못 막는다.**
+공개 매칭 + 랭킹/경제가 들어오면 그때는 데디케이티드 서버 문제이지 이 코드의 문제가 아니다.
+
+두 선택지를 브랜치로 남긴다. **1~3단계 Motor 성과(단일 위치 소유자, 물리 틱, 마스크 통일,
+kinematic, stepOffset, 결정론 추출)는 양쪽 모두 동일하다.** 갈리는 것은 4b 뿐이다.
+
+| | `feature/player-motor-server-auth` | `feature/player-motor-owner-auth` |
+|---|---|---|
+| 위치의 주인 | 서버 | 오너 |
+| 루트/Armature `NetworkTransform.AuthorityMode` | 0 (Server) | 1 (Owner) |
+| 오너 인스턴스 NT | 끔(예측이 덮이지 않게) | 켬 |
+| 서버의 원격 플레이어 시뮬레이션 | 함 | 안 함 |
+| 입력 RPC · 보정 채널 · 되감기/재생 | 동작 | 코드는 남고 **꺼짐** |
+| 치트 방지(참가자) | ○ | ✕ |
+| 이동 신규 기능 저작 비용 | 오너·서버 양쪽 + 재생 가능해야 함 | 한 번 |
+
+**가르는 스위치는 하나다** — `Player.ServerAuthoritativeMovement` (const).
+`IsSimulating` 과 `IsMotionAuthority` 가 이 값으로 갈리고, 나머지(루트모션·스킬 전진·플랫폼 캐리·
+자동접근·넉백·구속)는 그 둘만 보므로 자동으로 따라온다. 그 외 이 값을 직접 보는 곳은 셋뿐이다:
+서버 시뮬레이션 호출, 입력 RPC 송신, `networkTransform.enabled`, 그리고 `PlayerMotor.
+CapturesServerObservation` 과 `PlayerFallRecovery.TeleportOnServer`.
+
+**오너 권위로 전환할 때 잊기 쉬운 것** — 낙사 복귀. 서버 권위에서는 서버가 자기 사본을 옮기고
+`forceSnap` 으로 오너를 맞추지만, 오너 권위에서는 서버가 옮겨봐야 오너 권위 NT 가 되돌린다.
+오너에게 직접 옮기라고 지시해야 한다(`TeleportOwnerRpc`).
 ### Open questions (1~3단계·stepOffset)
 
 없음. 전부 완료·승인됨.
