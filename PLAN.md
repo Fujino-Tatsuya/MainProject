@@ -1,4 +1,40 @@
+# ▶▶▶ CURRENT PLAN — 23호 모델 재스왑 (2026-09-16, `origin/development` 머지 이후)
+
+> 상태: **착수 전.** `origin/development` 머지(`c4dbd4b9`)에서 23호 프리팹을 **development 판
+> (구 `SK_23.fbx`)** 으로 되돌렸다. dev 의 VFX 배선 463줄이 전부 구 FBX 의 fileID 기준이라
+> 1.7배 신규 FBX 와 섞을 수 없었기 때문이다. 그래서 모델 교체를 **다시** 해야 한다.
+>
+> 아래 「머지 보존」 절의 실측·절차는 **그대로 유효하다** — 같은 FBX 로 같은 작업을 반복한다.
+> 달라진 전제만 여기 적는다.
+
+## 재스왑 시 달라진 전제
+
+1. **이번엔 dev 의 VFX 배선이 프리팹에 얹혀 있다.** 교체 전 컴포넌트 집합을 떠 두고
+   (`grep -o "Assembly-CSharp::[A-Za-z_0-9]*" | sort -u`) 교체 후 `comm -23` 으로 대조할 것.
+   현재 16종이다. 이전 교체에서 `InterruptOverlay` 가 이 방식으로 조용히 떨어졌다.
+2. **`EffectSocketPlayer` 4종 · `EffectStagePlayer` · `EffectPathPlayer` · `EffectAnimEvents` 가
+   구 FBX 의 본 fileID 를 참조한다.** 신 FBX 는 메시 노드가 `tripo_part_0` → `Boss_23` 으로
+   개명됐으므로 **메시 노드에 붙은 것은 승계되지 않는다.** 본에 붙은 것만 guid 이동으로 살아난다.
+3. 🔴 **본 밑 오브젝트의 상쇄 스케일이 바뀐다.** 구 리그 `rig` 월드 스케일 100 → 신규 1.70.
+   `LocalScale = 0.01` 상쇄를 그대로 두면 월드 크기가 59분의 1이 된다. 신규 리그에서는 **`LocalScale 1` 이 정상**이다.
+4. **오버레이 슬롯 문제가 선행 조건이다.** 지금 프리팹은 없는 머티리얼
+   (`98b1c99dee6c7b5488abe440aed99c45`)을 슬롯 1 에 꽂고 있다. 이걸 두고 교체하면
+   **재스왑 후에도 서브메시가 안 보인다.** `CONTEXT.md` 의 「지금 깨져 있는 것」 참조.
+
+## 완료 기준
+
+- 23호가 신 FBX(`23_action_01_RiderSlot_x1_7.fbx`, guid `cbdaae8b…`)로 렌더된다.
+- 교체 전후 컴포넌트 집합이 동일하다(16종).
+- 애니 이벤트(`OnAttackHit` ×6 · `OnAttackEnd` ×4)가 붙어 있어 **훅·어퍼·대시·점프·잡기가 데미지를 낸다.**
+  히트는 타이머 폴백이 없다 — 이벤트가 없으면 조용히 0 데미지다.
+- 판정값이 1.7배로 맞는다(캡슐 · NavMeshAgent · `DashBody` · `FD_Anchor` · `BossDirectionIndicator` ·
+  `No23.asset`/`No23_Solo.asset` 의 `attackRange`·`maxDistance`·`jumpAoeRadius`·`grabRadius`).
+- ⚠️ `grabRadius` 와 `Grab` 행의 `maxDistance` 는 **항상 같이 움직인다.** 한쪽만 올리면 보스가 허공을 잡는다.
+
+---
+
 > 🔀 **2026-09-16 머지 보존 — feature/Boss23 (23호 모델 교체) 쪽 절.** 아래 development 쪽 절과 함께 남겨 둔다.
+> 이 아래는 **머지 이전** 계획이다. 실측·절차는 유효하나 최신 전제는 위 절을 볼 것.
 
 # ▶▶▶ CURRENT PLAN — 23호 모델을 **1.7배 신규 FBX** 로 교체 (2026-09-15, 팀장 승인됨)
 

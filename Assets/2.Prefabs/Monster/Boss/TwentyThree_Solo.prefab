@@ -611,9 +611,9 @@ MonoBehaviour:
   frontMaterial: {fileID: 0}
   backMaterial: {fileID: 0}
   arcMaterial: {fileID: 2100000, guid: 7b27a57664d778945a9e71ec8a5b3021, type: 2}
-  innerRadius: 2.72
-  outerRadius: 4.42
-  segmentsPerArc: 24
+  innerRadius: 2
+  outerRadius: 2.25
+  segmentsPerArc: 48
   frontColor: {r: 1, g: 0.35, b: 0.25, a: 0.45}
   counterReadyColor: {r: 1, g: 0.9, b: 0.2, a: 0.8}
   backColor: {r: 0.3, g: 0.7, b: 1, a: 0.45}

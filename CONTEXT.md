@@ -8,7 +8,80 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 현재 인수인계 (2026-09-16 · `origin/development` 머지 완료, 브랜치 `feature/Boss23`)
+
+development 32커밋을 흡수했다(`c4dbd4b9`). 컴파일 에러 0, `4.MapScene` 로드 시 콘솔 0건.
+**아래 「머지 보존」 두 절은 머지 이전 각 브랜치의 옛 인수인계다 — 이 절이 최신이다.**
+
+### 머지에서 내린 결정 4가지
+
+| 대상 | 결정 | 이유 |
+|---|---|---|
+| 투명화(벽 머티리얼 교체) | **계속 OFF** | 실루엣 윤곽선(`c94ffe4e`)으로 대체한 결정 유지 |
+| 화면효과 | **development 의 RetroCRT(Cyanilux)로 통일** | 팀 전체가 쓰는 최신 방향. Boss23 의 PixelScanline 계통은 제거 |
+| 23호 프리팹 | **development 판(구 `SK_23.fbx`) 채택** | dev 의 VFX 배선 463줄이 전부 구 FBX fileID 기준이라 신 FBX 와 못 섞는다 |
+| FogManager 디밍/LoS | **0/0 으로 되돌림** | dev 가 `72392d6d` 에서 켰으나 투명화를 걷어낸 것과 같은 맥락 |
+
+현재 값(라이브 에디터 확인): `WallOcclusionDriver.m_Enabled 0` · `RenderCostAB.startWithWallOcclusion False` ·
+`startWithSilhouette True` · `toggleKey F7` · `fog/dim/los 0/0/0` · `PC_Renderer` 피처 6개
+(MaskBlur · Decal · RetroCRT · Fog · SSAO · PlayerSilhouette).
+
+### 🔴 지금 깨져 있는 것 — 몬스터 4종 (development 에서 넘어온 문제)
+
+`TwentyThree` · `GauntletBot` · `SpinnerBot` · `WallBot` 프리팹이 **존재하지 않는 에셋 2개**를 참조한다.
+
+```
+머티리얼  guid 98b1c99dee6c7b5488abe440aed99c45   m_Materials.Array.data[1] (오버레이 슬롯)
+스크립트  guid c7a41f60d2b84e6a9c15d380be720063   InterruptOverlay
+```
+
+- 디스크에 실물 없음. **git 이력에도 `.meta` 0건 — 한 번도 커밋된 적이 없다.**
+- 프리팹이 `m_Materials.Array.size: 2` 로 슬롯을 늘리고 슬롯 1 을 비워 두므로 **서브메시 하나가 렌더되지 않는다**(Play 화면에서 보스가 파편처럼 보이는 원인).
+- 유입 지점: `5092995b 인터럽트 섬광 배선 4종` / `cab1bf66 인터럽트 성공 섬광을 RPC로 — 보스 4종 규약 통일`.
+  base 와 머지 전 `feature/Boss23` 에는 **4개 전부 0건**이었고 머지로 들어왔다.
+
+🔴 **development 를 받는 사람은 누구나 같은 증상을 본다.** 담당(민경)이 두 에셋을 올려야 풀린다.
+**23호 모델 재스왑으로는 23호 하나만 고쳐지고 나머지 3종은 그대로다.**
+
+### 실종 스크립트 전수 (`unity_find_missing_scripts`, 커버리지 full)
+
+8종 / 영향 에셋 128개. **8개 전부 머지 이전부터 실종**이었음을 guid 대조로 확인했다.
+
+| 타입 | 영향 | 위치 |
+|---|---:|---|
+| `VeyTrace.Rendering.Occlusion.OcclusionSection` | 108 | `Assets/legacy/.../LevelDeliveryV3/` |
+| `VeyTrace.Rendering.Occlusion.ElevationLevel` | 12 | 〃 |
+| `VeyTrace.Rendering.Occlusion.ElevationStack` | 12 | 〃 |
+| `InterruptOverlay` | 4 | 몬스터 프리팹 4종 (위 항목) |
+| Portal VFX 2종 · INab 2종 | 19 | 외부 에셋 |
+
+`VeyTrace.Rendering.Occlusion` 어셈블리에 실제로 있는 건 `WallOcclusionGlobals` ·
+`WallOcclusionMaterialBinder` · `WallOcclusionSettings` 뿐이다.
+
+### 남은 작업
+
+1. **23호 모델 재스왑** — 계획은 아래 `PLAN.md` 에 그대로 있다.
+2. **몬스터 4종 오버레이 에셋 복구** — 민경 담당. 이게 선행되지 않으면 재스왑해도 3종은 깨진 채다.
+3. **블랙보드 실종 타입 3종** — `BaseAttackChoice` · `BombLauncher` · `BossStateChanged` 가 코드에 없다.
+   이번 세션에 경고가 안 뜬 건 고쳐져서가 아니라 **해당 블랙보드를 든 씬을 안 열었기 때문**이다.
+4. **Visual Scripting 노드 DB** — `1334 node options failed to load`. 이 프로젝트가 VS 를 실제로 쓰는지부터 확인할 것.
+5. **Play 검증 미완** — 컴파일·씬 로드까지만 확인했다.
+
+### 이번 머지에서 걸러낸 함정 (다음 머지 때 반복될 것)
+
+- git rename 탐지가 `.meta`(150~240바이트 보일러플레이트)를 **서로 다른 계통끼리 짝지었다**
+  (`PixelScanline.meta → 0.Scenes/Art/title.meta`). GUID 자체는 안 깨졌지만 **파일이 조용히 삭제된다.**
+  1차 머지에서 18건이 삭제됐고 그중 3건(물 에셋)은 지우면 안 되는 것이었다.
+  → **머지 후 `git status | grep '^D '` 를 전수 감사**하고, 각 파일이 base/HEAD/dev 중 어디에 있었는지로 판정할 것.
+- `ProfilerHUD` 가 양쪽에서 각자 생성돼 **중복될 뻔했다**(`&882340002` vs `&1493541738`).
+  그대로 두면 `RenderCostAB` 가 둘이 되어 실루엣·투명화 토글이 서로 싸운다.
+- 씬 충돌은 **변경 규모부터 재라.** `4.MapScene` 은 base→HEAD 23+/51-, base→dev 1679+/2784- 였다.
+  작은 쪽을 손으로 재적용하는 게 훨씬 안전하다(실제로 5개 중 4개만 얹으면 됐다).
+
+---
+
 > 🔀 **2026-09-16 머지 보존 — feature/Boss23 (물·실루엣·MCP) 쪽 절.** 아래 development 쪽 절과 함께 남겨 둔다.
+> 이 아래는 **머지 이전** 인수인계다. 최신 상태는 위 절을 볼 것.
 
 ## ▶▶ 현재 상태 (2026-09-15 · 물 — **물가 마스크로 재설계, 움직임 미검증 · 커밋 안 됨**)
 

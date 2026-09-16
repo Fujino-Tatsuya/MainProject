@@ -68,16 +68,10 @@ public class BossDirectionIndicator : MonoBehaviour, IBossTelegraph
     [Tooltip("호 하나당 세그먼트 수(부드러움).")]
     int segmentsPerArc = 24;
 
-    [Header("색")]
-    [SerializeField]
-    [Tooltip("전방 호(헤드어택·카운터 구역) 기본색.")]
-    Color frontColor = new Color(1f, 0.35f, 0.25f, 0.45f);
-    [SerializeField]
-    [Tooltip("카운터 창이 열린 동안의 전방 호 색(강조).")]
-    Color counterReadyColor = new Color(1f, 0.9f, 0.2f, 0.8f);
-    [SerializeField]
-    [Tooltip("후방 호(백어택 구역) 색.")]
-    Color backColor = new Color(0.3f, 0.7f, 1f, 0.45f);
+    // 🔴 색 필드는 여기 없다(2026-09-16 제거). `frontColor`·`backColor`·`counterReadyColor` 가
+    //    인스펙터에 남아 있었지만 **읽는 코드가 0곳**이라 거기서 색을 바꿔도 아무 일도 없었다.
+    //    실제 색은 `frontMaterial`/`backMaterial` 의 `_BaseColor` 에서 읽는다(아래 주석 참조).
+    //    앞/뒤 색을 바꾸려면 두 재질을 각각 수정할 것.
 
     [Header("배치 / 예외 처리")]
     [SerializeField, Min(0f)]
@@ -540,7 +534,9 @@ public class BossDirectionIndicator : MonoBehaviour, IBossTelegraph
     //
     //    두 단계에 걸쳐 여기까지 왔다:
     //    ① 카운터 창이 열리면 전방을 노랑으로 바꾸던 전환을 제거했다(색으로 상태를 알리지 않는다.
-    //       잡기 인터럽트는 추후 별도 이펙트로 표현한다 — `counterReadyColor` 는 그때 쓴다).
+    //       잡기 인터럽트는 추후 별도 이펙트로 표현한다).
+    //       ⚠️ 그때 쓰라고 남겨 뒀던 `counterReadyColor` 필드는 2026-09-16 에 지웠다 —
+    //       색의 단일 출처가 재질이 된 이상 그 이펙트도 전용 재질로 가는 것이 일관된다.
     //    ② 그런데도 표식이 빨강으로 남았다. 원인은 **다른 스크립트**였다 —
     //       `HitFlash` 가 유닛의 모든 렌더러를 긁어 피격 때 물들이고, 원래 색을 `sharedMaterial`
     //       에서 캐시하기 때문에 플래시가 끝나면 **재질 원색으로 복원**한다. 표식이 장판 재질
