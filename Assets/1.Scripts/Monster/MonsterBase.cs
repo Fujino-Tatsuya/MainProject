@@ -89,7 +89,8 @@ public class MonsterBase : Unit
     bool _isDead;
     bool _initialized;
     bool _inAttackRange;           // 사거리 안에 들어와 있나(히스테리시스 적용). 진입 순간에 첫 공격 지연을 건다
-    float _lastRetargetTime = -1f; // 마지막 주기 재선정 시각(초). **-1 = 아직 교전 전**
+    // 🔴 protected — 파생(23호)이 같은 이름을 다시 선언하면 시계가 갈린다(중복 직렬화 에러).
+    protected float _lastRetargetTime = -1f; // 마지막 주기 재선정 시각(초). **-1 = 아직 교전 전**
     float _heightLostSince = -1f;  // 물고 있는 대상이 높이 조건을 벗어난 시각(-1 = 정상)
     // 경사·계단을 오르내리는 동안 판정이 깜빡여 타깃이 튀는 것을 막는 유예(초).
     const float HeightLossGrace = 0.5f;

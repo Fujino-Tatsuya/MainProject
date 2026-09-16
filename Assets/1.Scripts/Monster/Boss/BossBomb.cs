@@ -149,7 +149,15 @@ public class BossBomb : NetworkBehaviour, IAttackReceiver
     }
 
     // Despawn 을 거치지 않고 파괴되는 경로(씬 종료·에디터 정지)에서도 목록이 새지 않게.
-    void OnDestroy() => Active.Remove(this);
+    //
+    // 🔴 base 를 반드시 부른다. 예전엔 `void OnDestroy()` 라 NetworkBehaviour.OnDestroy 를
+    //    **가리고 있었다**(CS0114). 그러면 NGO 쪽 정리가 통째로 안 돈다 — 예외가 안 나서
+    //    조용히 샌다. 이 레포의 다른 NetworkBehaviour 8종은 전부 override + base 호출이다.
+    public override void OnDestroy()
+    {
+        Active.Remove(this);
+        base.OnDestroy();
+    }
 
     /// <summary>서버에서 투척한다(Wells 손 소켓 → 대각선 임펄스). 단계 1 로 들어간다.</summary>
     public void Throw(Vector3 impulse)

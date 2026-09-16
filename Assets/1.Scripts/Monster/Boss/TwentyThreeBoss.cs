@@ -394,7 +394,12 @@ public class TwentyThreeBoss : MonsterBase
     //    ① 전투 시작(OnServerLogicResumed) ② 어그로가 실제로 갈아탄 순간(AdoptAggro / ShouldReacquireTarget).
     //    ⚠️ 초기값 0 을 그대로 두면 착지 시점에 `Time.time - 0` 이 이미 8초를 넘어 있어서
     //       FSM 이 깨어난 **첫 틱**에 재선정이 돈다("내려오자마자 어그로가 튄다" — 팀장 관찰).
-    float _lastRetargetTime;
+    //
+    // 🔴 2026-09-16 — 여기서 `float _lastRetargetTime;` 을 **다시 선언하고 있었다.**
+    //    base(MonsterBase)에 같은 이름이 있어 Unity 가 "같은 필드가 두 번 직렬화된다" 에러를 냈고,
+    //    실제로 시계가 둘로 갈려 있었다: base 는 `-1f`(교전 전) 센티넬에서 출발하는데 파생은 `0`
+    //    이었고, base 가 세우는 갱신(MonsterBase 의 재선정·타깃획득)을 파생 오버라이드가 못 읽었다.
+    //    이제 base 의 protected 필드 하나만 쓴다. 센티넬을 물려받으므로 아래 `< 0f` 가드가 필수다.
 
     /// <summary>
     /// 주기가 지났고 교전 중 대기/추격이면 타깃을 다시 고른다.
@@ -406,6 +411,10 @@ public class TwentyThreeBoss : MonsterBase
 
     protected override bool ShouldReacquireTarget()
     {
+        // 🔴 교전 시작 전(-1)에는 재선정하지 않는다 — base 와 같은 규약.
+        //    이 가드가 없으면 `Time.time - (-1)` 이 항상 주기를 넘겨 첫 틱에 어그로가 튄다.
+        if (_lastRetargetTime < 0f) return false;
+
         float interval = _boss != null ? _boss.aggroRetargetInterval : 0f;
         if (!BossAggroPolicy.ShouldRetarget(State, Time.time - _lastRetargetTime, interval))
             return false;
