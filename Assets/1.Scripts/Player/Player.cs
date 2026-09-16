@@ -22,7 +22,14 @@ public class Player : Unit
     private const double MovementRpcLogIntervalSeconds = 1.0;
     private const int MaxRepeatedServerInputTicks = 10;
     private const int TargetServerInputQueueTicks = 2;
-    private const int MaxServerInputQueueTicks = 6;
+    // 🔴 상한은 "버스트를 흡수하는 크기"여야지 "지연 상한"이 아니다.
+    // 목표치를 넘으면 같은 서버 틱에 여분을 **소비**해 따라잡으므로(ProcessServerObservationInputs),
+    // 상한을 키워도 서버가 보는 입력이 늦어지지 않는다. 넘친 분을 버리면 그 입력은 영영 사라지고
+    // 서버 궤적이 오너와 갈라진다 — 버린 입력은 100% 발산이다.
+    // 2026-09-16 실측(RTT 440ms, 지터 40ms): 상한 6틱에서 droppedInputsTotal 이 초당 ~30건씩
+    // 증가하며 divergence 가 2~3m 까지 벌어졌다. 손실 4% 가 아니라 **우리 큐가 주범**이었다.
+    // 1.5초는 보정 이력(ReconciliationHistorySeconds)과 같은 크기로, 이력이 못 덮는 만큼 쌓아둘 이유가 없다.
+    private const int MaxServerInputQueueTicks = 75;
     private const float OwnerReconciliationPositionThreshold = 0.10f;
     // 매 입력 패킷에 함께 싣는 과거 틱 수. 유실 한 장으로 서버가 굶지 않게 한다.
     private const int InputRedundancyTicks = 3;
