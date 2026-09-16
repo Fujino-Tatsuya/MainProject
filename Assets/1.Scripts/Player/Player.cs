@@ -14,7 +14,9 @@ using Unity.Netcode.Components;
 public class Player : Unit
 {
     private static readonly int IsMovingHash = Animator.StringToHash("IsMoving");
-    private const float ReconciliationHistorySeconds = 0.5f;
+    // 보정 ack 은 RTT + 서버 지터버퍼만큼 늦게 온다. 0.5s(25틱)는 RTT 200ms 대에서 이미 빠듯하고
+    // Mobile3G(왕복 720ms)에서는 넘친다. 이력 항목은 구조체라 늘려도 비용이 작다.
+    private const float ReconciliationHistorySeconds = 1.5f;
     private const double ReconciliationLogIntervalSeconds = 1.0;
     private const double MovementHeartbeatTimeoutSeconds = 2.0;
     private const double MovementRpcLogIntervalSeconds = 1.0;
@@ -709,7 +711,18 @@ public class Player : Unit
 
         lastProcessedServerInputTick = inputForTick.Tick;
         hasProcessedServerInputTick = true;
-        SendOwnerCorrection(serverState, inputForTick.Tick, false);
+
+        // 🔴 보정은 **실제로 받은 입력**을 소비했을 때만 보낸다.
+        // 기아(입력 유실) 구간에서 서버는 추측으로 돈다 — 마지막 입력을 반복하거나 0 입력을 쓴다.
+        // 그 결과를 오너에 보내면 두 가지로 깨진다(2026-09-16 Mobile4G 실측):
+        //  ① 반복 기아는 **이미 보낸 오너 틱을 다시** 보내 오너가 stale 로 버린다(초당 41~51건).
+        //  ② 0 입력 기아는 틱 자리에 **서버 자기 카운터**를 싣는다. b3-0 이후 오너 틱과 서버 틱은
+        //     별개 번호 공간이라 오너에는 그런 틱이 없고, historyMiss → 스냅 → 이력 삭제로 간다.
+        //     이력이 지워지면 뒤따르는 진짜 보정도 전부 미스가 되어 재생이 영영 돌지 않는다.
+        // 추측으로 오너를 고치는 것은 안 고치느니만 못하다. 유실 구간에는 오너가 계속 예측하고,
+        // 다음 진짜 입력이 소비될 때 한 번에 바로잡힌다.
+        if (receivedFreshInput)
+            SendOwnerCorrection(serverState, inputForTick.Tick, false);
 
         lastServerSimPosition = serverState.Position;
         lastServerSimDirection = inputForTick.Input.MoveDirection;
@@ -869,6 +882,14 @@ public class Player : Unit
 
         if (!hasPredictedState)
         {
+            // 🔴 이력보다 **과거**의 ack 이면 무시한다. 스냅하면 안 된다.
+            // 그 구간은 이미 지나갔고, 지금 예측이 더 최신이다. 옛 위치로 되돌리면 눈에 띄게 튄다.
+            if (ownerSimulationStateHistory.TryGetOldestTick(out long oldestPredictedTick) &&
+                inputTick < oldestPredictedTick)
+            {
+                ownerCorrectionStaleCount++;
+                return;
+            }
             ownerCorrectionAppliedCount++;
             if (forceSnap)
                 ownerCorrectionForceSnapCount++;
@@ -906,9 +927,12 @@ public class Player : Unit
 
             ownerCorrectionHistoryMissCount++;
             motor.ApplyAuthoritativeState(authoritativeState);
-            ownerRawInputHistory.Clear();
-            ownerReplayInputHistory.Clear();
-            ownerSimulationStateHistory.Clear();
+            // 🔴 전체 Clear 금지. ack 이하만 버린다.
+            // 이력을 통째로 지우면 **뒤따르는 진짜 보정도 전부 미스**가 되어 재생이 영영 돌지 않는다.
+            // 2026-09-16 Mobile4G 실측에서 corrected==historyMiss, replayedTicks=0 이 그 증상이었다.
+            ownerRawInputHistory.DiscardThrough(inputTick);
+            ownerReplayInputHistory.DiscardThrough(inputTick);
+            ownerSimulationStateHistory.DiscardThrough(inputTick);
             return;
         }
 
@@ -954,9 +978,10 @@ public class Player : Unit
                 this);
             ownerCorrectionHistoryMissCount++;
             motor.ApplyAuthoritativeState(authoritativeState);
-            ownerRawInputHistory.Clear();
-            ownerReplayInputHistory.Clear();
-            ownerSimulationStateHistory.Clear();
+            // 재생 입력열이 끊긴 경우다. 여기서도 전체 Clear 대신 ack 이하만 버려 다음 보정이 살아나게 한다.
+            ownerRawInputHistory.DiscardThrough(inputTick);
+            ownerReplayInputHistory.DiscardThrough(inputTick);
+            ownerSimulationStateHistory.DiscardThrough(inputTick);
         }
     }
 

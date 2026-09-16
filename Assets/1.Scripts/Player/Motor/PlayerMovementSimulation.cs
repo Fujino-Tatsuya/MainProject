@@ -392,6 +392,19 @@ public sealed class PlayerTickRingBuffer<T> where T : struct
         return true;
     }
 
+    /// <summary>가장 오래된 틱. 보정 ack 이 이력보다 과거인지(무시해야 하는지) 판단하는 데 쓴다.</summary>
+    public bool TryGetOldestTick(out long tick)
+    {
+        if (count == 0)
+        {
+            tick = 0L;
+            return false;
+        }
+
+        tick = entries[first].Tick;
+        return true;
+    }
+
     public void DiscardThrough(long tick)
     {
         while (count > 0 && entries[first].Tick <= tick)
