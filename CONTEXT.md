@@ -10,7 +10,7 @@ Update this file when a term becomes important enough that future agents or team
 
 ## ▶▶ 현재 인수인계 (2026-09-16 · 플레이어 이동 Motor 4b3, 브랜치 `feature/player-motor`)
 
-**상태.** 1~3단계 · stepOffset · 4a · 4b1 · **4b2 완료(Play 검증)**.
+**상태.** 4단계까지 완료. **오너 권위 브랜치 전 항목 Play 검증 통과(2026-09-16).**
 4b3 은 **코드 완료 + EditMode 112/112 통과, Play 검증 대기.**
 입력 지연은 해소 확인됐고, 루트모션 스냅 수정(b3-3) 후 재검증이 남았다.
 상세는 [PLAN-player-motor.md](PLAN-player-motor.md) — 여기 중복 기술하지 않는다.
