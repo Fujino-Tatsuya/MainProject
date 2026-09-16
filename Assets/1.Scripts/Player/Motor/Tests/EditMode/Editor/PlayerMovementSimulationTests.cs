@@ -97,10 +97,37 @@ public sealed class PlayerMovementSimulationTests
         inputHistory.Store(101, inputs[0]);
         inputHistory.Store(102, inputs[1]);
 
+        // 🔴 기댓값은 **모터가 실제로 쓰는 설정**으로 계산해야 한다.
+        // TryApplyAuthoritativeStateAndReplay 는 CaptureSimulationSettings() 를 쓰는데
+        // 여기서 default(전부 0)를 넘기면 서로 다른 설정으로 돌린 두 결과를 bit-identical 로
+        // 비교하게 된다. 그러면 통과하는 쪽이 우연이다 — 2026-09-16 실제로 이 이유로 실패했다.
+        MethodInfo captureSettingsMethod = typeof(PlayerMotor).GetMethod(
+            "CaptureSimulationSettings",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.That(captureSettingsMethod, Is.Not.Null);
+        var motorSettings = (PlayerSimulationSettings)captureSettingsMethod.Invoke(
+            motor,
+            new object[] { authoritative.IsSoul });
+
         PlayerSimulationState[] expected = PlayerSimulationReplay.Replay(
             authoritative,
             inputs,
-            default,
+            motorSettings,
+            null,
+            DeltaTime);
+
+        // 위 비교만으로는 "기록된 입력을 그대로 먹였는가"가 완전히 증명되지 않는다(같은 경로끼리의 비교라서).
+        // Displacement 를 0으로 지운 입력열의 결과와 **달라야** 한다는 것이 이 테스트가 막으려는 회귀다 —
+        // 모터가 raw 에서 입력을 다시 만들면 Displacement 가 0이 되어 아래 결과와 같아진다.
+        PlayerSimulationInput[] inputsWithoutDisplacement =
+        {
+            new PlayerSimulationInput { MoveSpeedMultiplier = 1f },
+            new PlayerSimulationInput { MoveSpeedMultiplier = 1f }
+        };
+        PlayerSimulationState[] withoutDisplacement = PlayerSimulationReplay.Replay(
+            authoritative,
+            inputsWithoutDisplacement,
+            motorSettings,
             null,
             DeltaTime);
         MethodInfo replayMethod = typeof(PlayerMotor).GetMethod(
@@ -124,6 +151,12 @@ public sealed class PlayerMovementSimulationTests
             Assert.That((int)arguments[6], Is.EqualTo(inputs.Length));
             AssertStatesAreBitIdentical(expected[1], motor.SimulationState, inputs.Length - 1);
             Assert.That(motor.SimulationState.Position, Is.Not.EqualTo(authoritative.Position));
+
+            // 이 테스트의 본체. Displacement 를 버린 입력열의 결과와 같아지면 회귀다.
+            Assert.That(
+                motor.SimulationState.Position,
+                Is.Not.EqualTo(withoutDisplacement[withoutDisplacement.Length - 1].Position),
+                "재생이 기록된 Displacement 를 버렸습니다 — raw 에서 입력을 다시 만들고 있지 않은지 확인하세요.");
             Assert.That(stateHistory.TryGet(102, out PlayerSimulationState stored), Is.True);
             Assert.That(stored.Position, Is.EqualTo(expected[1].Position));
         }
