@@ -8,6 +8,199 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 현재 인수인계 (2026-09-16 · 플레이어 이동 Motor 4b3, 브랜치 `feature/player-motor`)
+
+**상태.** 4단계까지 완료. **오너 권위 브랜치 전 항목 Play 검증 통과(2026-09-16).**
+4b3 은 **코드 완료 + EditMode 112/112 통과, Play 검증 대기.**
+입력 지연은 해소 확인됐고, 루트모션 스냅 수정(b3-3) 후 재검증이 남았다.
+상세는 [PLAN-player-motor.md](PLAN-player-motor.md) — 여기 중복 기술하지 않는다.
+
+### 🔴 개발 브랜치 = 오너 권위 (지스타까지)
+
+`feature/player-motor-owner-auth` 에서 개발한다. 서버 권위 구현은
+`feature/player-motor-server-auth` 에 완성된 채로 보존돼 있고, 스위치 하나
+(`Player.ServerAuthoritativeMovement`) + 프리팹 `AuthorityMode` 로 되살린다.
+근거와 복귀 시 체크리스트는 [PLAN-player-motor.md](PLAN-player-motor.md)
+"결정 — 지스타(1차 커트라인)까지는 오너 권위" 절.
+
+**아래 불변식 중 1번은 서버 권위 브랜치에만 해당한다.** 나머지 셋은 양쪽 공통이며,
+특히 2·4번은 서버 권위로 돌아갈 때 다시 문제가 되므로 지금도 지켜 두는 편이 싸다.
+
+### 🔴 이번에 확정된 불변식
+
+1. **플레이어 위치의 주인은 서버 하나다.** 루트/Armature `NetworkTransform` 은 `AuthorityMode 0`(Server).
+   오너 인스턴스만 NT 를 끄고 로컬 예측 + 서버 보정으로 돈다.
+2. **예측 재생은 "그 틱의 모든 의도"를 재현해야 한다.** Motor 에 의도를 넣는 채널은 넷이다 —
+   velocity / grounded displacement / displacement / pose. raw 입력만 되돌리면 루트모션·스킬 전진·
+   플랫폼 캐리·자동접근이 보정 때마다 사라진다.
+3. **서버로 가는 입력 RPC 는 raw 두 필드뿐이다.** 클라가 보고한 변위를 서버가 신뢰하면 권위가 무너진다.
+   오너의 전체 의도 기록은 **로컬 재생 전용**이다.
+4. **오너 전용 게이트(`!IsOwner return`)는 owner 권위 시절의 잔재다.** 서버 권위에서는 서버도
+   같은 의도를 만들어야 한다. 남아 있는 곳을 발견하면 `IsSimulating` 계열로 교정한다.
+
+### 🔴 다음 사람이 밟을 함정 — 프리팹 YAML
+
+**컴포넌트 블록은 반드시 `m_GameObject` fileID 로 대상을 확정한 뒤 읽는다.**
+줄 위치로 읽으면 자식(`Corpse`, `Armature`)의 컴포넌트를 루트로 오인한다.
+이번 세션에 Rigidbody 에서 한 번, NetworkTransform 에서 또 한 번 같은 실수가 났고,
+두 번째는 그 오답 위에 진단·핸드오프까지 쌓였다.
+**그리고 씬의 프리팹 인스턴스 오버라이드(`m_Modifications`)도 같이 확인한다** — 에셋 값만 보면 틀린다.
+
+### 진단 로그 (검증 끝나면 제거 대상)
+`[MoveDiag]` · `[Recon]` · `DevMoveSpeedProbe` · Motor 의 외부 이동 감지 경고.
+제거 시점은 4단계 Play 검증 완료 후.
+
+## 이전 인수인계 (2026-09-15 · 플레이어 이동 Motor 4b2-α, 브랜치 `feature/player-motor`)
+
+**작업 세션.** Claude = PLAN·설계·리뷰 / Codex = 4b2-α 구현.
+Codex 가 수정 중인 파일: `Player/Player.cs`, `Player/PlayerStateController.cs`,
+`Player/PlayerDashController.cs`, `Player/PlayerEncounterLock.cs`, `Player/Life/PlayerLifeInputPolicy.cs`,
+`Player/PlayerUiInputPolicy.cs`, `Player/Skill/FirstMeleeMainSkill.cs`,
+`Player/Skill/Targeting/PlayerSkillTargeting.cs`, `Player/Motor/PlayerMotor.cs`.
+**이 파일들 동시 수정 금지.**
+
+**상태.** 1~3단계 · stepOffset · 4a · 4b1 전부 은희 Play 검증 통과. 지금은 4b2.
+상세 설계는 [PLAN-player-motor.md](PLAN-player-motor.md) — 여기 중복 기술하지 않는다.
+
+### 🔴 이번에 드러난 사실 — 서버 권위 NetworkTransform 이 클라 이동을 지운다
+
+`Player.prefab` 루트 `NetworkTransform` 은 `AuthorityMode: 0` = **Server** 다
+(`1ccf0d3`, 2026-07-27 이후 계속). PLAN 과 `Player.cs` 주석이 Owner 라고 적어둔 것은 **오류였다.**
+
+- `NetworkTransform.cs:3743` — 서버 권위면 `CanCommitToTransform = IsServer` → **클라는 전부 비권위**
+- `NetworkTransform.cs:4461 OnUpdate()` — 비권위 인스턴스는 매 프레임 `ApplyAuthoritativeState()` 로
+  transform 을 **무조건 덮어쓴다**
+- `Player.cs` — `motor.enabled = IsOwner` → **서버는 원격 플레이어를 영원히 안 움직인다**
+
+⇒ 오너가 로컬로 움직여도 NT 가 서버의 정지 위치로 되돌린다.
+**"클라가 스폰 직후 이동 불가" 증상의 1순위 용의자.** 4b2-α 가 이 모순을 제거한다.
+
+**교훈으로 남긴다 — 프리팹의 네트워크 설정을 코드 주석으로 믿지 마라. YAML 을 직접 읽어라.**
+
+### 🆕 플레이어 프리팹 사실 원본 (2026-09-16, Claude)
+`Player.prefab` 과 `Paladin.prefab` 을 계속 헷갈리는 문제 → [Docs/tech/player-prefabs.md](Docs/tech/player-prefabs.md).
+
+- **설계 의도**: `Player` = 캐릭터에 무관한 **역할** 프리팹. 그 밑 **`Armature` 자식을 교체해서 플레이 캐릭터를 바꾼다.**
+- **현재 데이터**: 정식 흐름이 스폰하는 것은 **`Paladin.prefab`**(`NetworkLoadingFlowController.defaultPlayerPrefab`) —
+  역할+캐릭터가 한 덩어리로 평탄화된 통짜 복제본이라 의도에서 벗어나 있다.
+- 🔴 교체 메커니즘은 **코드에 이미 있다** — `PlayableCharacterVisual` + `CharacterDefinition`.
+  그런데 **어느 프리팹에도 안 붙어 있고 `CharacterDefinition` 에셋이 0개**다.
+- 🔴 `transform.Find("Armature")` 폴백이 3곳(`PlayerMovement`·`PlayerSoulController`·`PlayableCharacterVisual`)인데
+  Paladin 의 자식 이름은 `Paladin_Armature` 라 전부 불발이다. 정리 시 **이름을 `Armature` 로 통일**할 것.
+- ✅ **확정(2026-09-16)**: 캐릭터는 **스폰 전에** 유저 선택값으로 결정된다. 스폰 후 인게임 교체는 설계 범위 밖.
+- ✅ **방식 확정**: `Player.prefab` 을 base 로 하는 **캐릭터별 Prefab Variant**. 각 Variant 를 NetworkPrefab 으로
+  등록하고 스폰 시 고른다. 런타임 Armature 교체는 **미채택**(Armature 안 `NetworkTransform`·`NetworkAnimator`
+  때문에 NGO 상 위험 — 클라는 등록된 프리팹을 스스로 인스턴스화하고 `NetworkSpawnManager.cs:873`,
+  `NetworkBehaviourId` 는 계층 순서로 매겨진다 `NetworkObject.cs:2751`).
+- 🔴 착수 전 선행 조건 2개 — ① **루트의 `FirstMelee*` 스킬 5종이 전부 가붕이 전용**이라 base 에서 걷어내야 한다
+  (Variant 는 컴포넌트 제거가 취약). ② **로비에 캐릭터 선택 UI 가 없다** — 선택값 경로를 새로 만들어야 한다.
+- ✅ **경계 확정**: **스킬 5종은 Variant 로 내린다**(base 는 `PlayerSkillController` 슬롯 컨테이너까지).
+  걷어내도 코드는 안 깨진다 — `InitializeSkill`·`Player.passive?.`·`PassiveHUD.Bind` 전부 null 안전 확인.
+- ✅ **1차 범위 확정**: `Player_Paladin` Variant 까지. 로비 선택 UI·징크스는 범위 밖.
+- 📋 계획서 **[PLAN-player-variants.md](PLAN-player-variants.md)** — P1 착수.
+
+**작업 세션 (2026-09-16, Claude · 브랜치 `feature/player-variants`).**
+`feature/player-motor-owner-auth`(`6c25ca60`)에서 분기했다. 수정 예정 파일:
+`Assets/2.Prefabs/Player/**`, `Assets/2.Prefabs/UI/CombatHUD.prefab`,
+`Assets/DefaultNetworkPrefabs.asset`, 그리고 P4 에서 씬 6개. **새 스크립트는 없다.**
+🔴 **모터 작업과 같은 프리팹이다 — 이 브랜치 밖에서 플레이어 프리팹을 동시 수정하지 말 것.**
+모터 쪽 프리팹 변경이 들어오면 즉시 리베이스해 격차를 작게 유지한다.
+
+### 후순위 미해결
+이동 플랫폼·컨베이어 위 상하 떨림(2026-09-15 은희 발견). 원인 미조사, b2/b3 와 독립.
+[PLAN-player-motor.md](PLAN-player-motor.md) "미해결 (후순위)" 절 참조.
+
+## ▶▶ 현재 인수인계 (2026-09-11 · 플레이어 이동 Motor 재정립 3단계, 브랜치 `feature/player-motor`)
+
+작업 세션: **은희(Claude → Codex 위임)**. 승인 계획은 [PLAN-player-motor.md](PLAN-player-motor.md).
+
+**✅ 1~3단계 승인 완료 (2026-09-11)** — `b9bd537` + `5f8e014`(막힘 판정 수정).
+남은 것: **stepOffset(계단)** → **4단계**(결정론/예측·재조정, 8월 이후).
+
+### 🔴 확정된 불변식 — 새 코드에서 반드시 지킬 것
+
+- **플레이어 위치는 `PlayerMotor`만 바꾼다.** `MovePosition`/`transform.position`을 Player 하위에
+  새로 추가하지 말 것(`PlayerFallRecovery` 등 텔레포트 계열만 예외). 이동은 Motor에 **의도**를 제출한다.
+- **채널이 넷이다.** `AddVelocity`(m/s, 경사 투영) · `AddGroundedDisplacement`(m, 경사 투영,
+  🔴 **수평 전용**) · `AddDisplacement`(m, 투영 없음 — 중력·플랫폼 캐리) · `SetPoseTarget`(절대 포즈, last-wins).
+  수직 성분을 `AddGroundedDisplacement`에 넣으면 **경사에서 위로 떠오른다**(제출 시점 경고 로그가 잡는다).
+- **`WasBlockedThisTick`은 제출된 수평 의도 기준**이다(Motor 자체 중력·스냅 제외). 전체 벡터로
+  비교하면 접지 중 매 틱 true가 되어 넉백이 첫 틱에 취소된다.
+- **상태는 `Tick()`(Update)에서 판단, `FixedTick()`(물리 틱)에서 이동 제출**한다.
+
+- 플레이어 루트 Rigidbody는 두 프리팹 모두 `IsKinematic on` / `UseGravity off` / `Interpolate`다.
+  본체의 `isKinematic`·`useGravity` 쓰기는 `PlayerMotor`만 소유한다(별도 물리 오브젝트인 Corpse 제외).
+- Motor가 수직 속도 적분·최대 낙하속도·접지 스냅을 담당한다. 센서가 캡슐 표면과 지면의 간격을
+  복원하므로 살짝 뜬 경우는 아래로, 얕게 파묻힌 경우는 위로 보정한다.
+- `ApplyFlatGroundYLock`과 대시 자체 중력은 삭제했다. 걷기·대시·낙하는 같은 Motor 중력을 쓴다.
+- 플레이어 넉백은 `AddForce` 대신 초기 속도 + 6m/s² 선형 감쇠를 Motor에 제출한다. 벽 차단 시
+  속도만 0으로 만들고 계획된 경직 종료시각은 유지한다.
+- `PlayerGameRuleData`가 장애물/Alive 지면/Soul 지면/플레이어 상호 차단/낙하/넉백 값을 소유한다.
+  기본 마스크는 장애물=`Default|Ground|Wall|Env`, 지면=`Default|Ground|Env`다.
+- 기본값은 플레이어끼리 통과(`blockOtherPlayers=false`). Soul은 이 값이 켜져도 Player를 통과하며,
+  생명 상태 전환은 Motor 중력 채널만 끄고 켠다.
+- `PlayerMotor.SetMode(Kinematic|Dynamic)`은 수직 속도 양방향 인계 계약만 마련했고 gameplay 사용처는 0개다.
+- 비권한 피어는 Rigidbody 플래그를 바꾸지 않고 `PlayerMotor.enabled=false`로 NetworkTransform과의 경쟁을 막는다.
+
+정적 검증: Dash 어셈블리 오류/경고 0, `Assembly-CSharp` 오류 0(기존 경고 18), 구형 기호·프리팹
+플래그·`SetMode` 사용처 검사 통과. 사용자 지시로 Play/MPPM은 실행하지 않았다. 특히 접지 스냅,
+내리막 대시 후 이동, 넉백 벽 충돌/경직, 플레이어·Soul 통과, 낙사 복귀는 수동 검증이 필요하다.
+
+## ▶▶ 현재 인수인계 (2026-09-11 · 플레이어 이동 Motor 재정립 2단계-b, 브랜치 `feature/player-motor`)
+
+작업 세션: **은희(Claude → Codex 위임)**. 브랜치 `feature/player-motor` (base `origin/development` `72392d6`).
+계획·근거·완료조건은 [PLAN-player-motor.md](PLAN-player-motor.md) — 여기에 중복 기술하지 않는다.
+
+**2단계-b 코드 완료, Play 검증 대기** — 커밋 `96c8350`.
+
+- `Player/**`의 실제 `MovePosition(...)` 호출은 `PlayerMotor` 내부 1곳뿐이다(추락 복귀 예외 제외).
+- FSM 판단·엣지 입력 소비는 `Update`에 유지하고, 대시·인터럽트·스크립트 평타·구속 추종의 이동 제출만
+  `FixedTick`으로 분리했다. 프레임 히치 때 물리 틱 수만큼 동일 변위를 중복 제출하지 않는다.
+- 애니메이터 루트모션은 `OnAnimatorMove`의 프레임 델타를 `AddDisplacement(+=)`로 래치해 다음 Motor 틱에 합산한다.
+- 구속 추종은 델타 누적이 아니라 절대 포즈의 **마지막 값 우선** 채널이다. 일반 이동 의도보다 우선하며
+  충돌 비활성화 상태의 기존 소켓/Push 추종 의미를 보존한다.
+- 대시의 요청/적용/차단 진단은 `PlayerMotor.MovementResolved` 결과를 집계한다. 중복 스윕과
+  `ClampByStaticGeometry`·`ResolvePlanarSlopeDirection`은 삭제했다.
+- `PlayerStateContext.Rigidbody`는 제거했다. 3단계에서 교체될 넉백·구속 물리 플래그만 각 상태가
+  자기 `Rigidbody`를 생성 시 1회 캐시한다.
+- `DashPressed`는 Input System 콜백에서 래치하고 상태 틱 종료 후 소비한다.
+
+수정 파일: `PlayerMotor.cs` · `Player.cs` · `PlayerMovement.cs` · `PlayerStateController.cs` ·
+`PlayerInputReader.cs` · `DefaultAttackController.cs` · `FirstMeleeMainSkill.cs` · `PlayerSkillTargeting.cs`.
+
+검증: `dotnet build Assembly-CSharp.csproj --no-restore` **오류 0**. 기존 경고 18건만 존재.
+사용자 지시로 Play/MPPM은 실행하지 않았다. 대시 거리·평타 루트모션·구속 추종은 수동 검증 필요.
+
+**1단계 수정함 (동시 편집 금지)**: `Assets/1.Scripts/Player/PlayerMovement.cs` ·
+`Assets/1.Scripts/Player/Player.cs` · 🔴 `Assets/1.Scripts/Map/MovingPlatform.cs`(회귀 수정)
+
+커밋: `1e6113b`(Codex, 루프 정정) → `76824f2`(회귀 수정).
+
+**실측 검증 (2026-09-11, 단일 에디터)**: 지속 이동속도 **30fps 5.072 / 60fps 5.009 / 144fps 4.992 m/s
+— 편차 1.58%** (완료조건 5% 이내 통과, `maxSpeed=5` 설정값과 일치). 컴파일 0에러.
+예외는 전부 서드파티 `INab WeaponTrailEffect`(기존 문제, 무관).
+계측기 = `Assets/1.Scripts/Dev/DevMoveSpeedProbe.cs`(**검증 종료 후 삭제할 것**).
+
+**미검증**: 이동 플랫폼 탑승(= `76824f2`가 고친 대상) · MPPM 2인 · 경사/벽 슬라이드.
+
+이번에 확정된 계약만 적는다:
+
+- 🔴 **플레이어 위치는 최종적으로 `PlayerMotor` 하나만 쓴다.** 현재 `rb.MovePosition` 호출부가
+  7곳(+중력)으로 흩어져 있고, 이게 벽 관통·경사·모서리 Y누수·대시 제자리종료의 공통 원인이다.
+  2단계부터 `MoveRoot`/`MoveTowardsPoint`가 사라지고 `PlayerStateContext.Rigidbody`도 제거된다.
+  **Player 하위에서 `MovePosition`/`transform.position`을 새로 추가하지 말 것.**
+- **1단계 범위는 루프 정정뿐이다** — `Move()`/`ApplyPlatformCarry()`를 `FixedUpdate`로,
+  `Time.deltaTime` → `Time.fixedDeltaTime`. 물리 플래그·넉백·마스크는 **건드리지 않는다**.
+- `PlayerMovement`에는 이미 `FixedUpdate`가 있다(`ApplyFlatGroundYLock`, development에서 추가됨).
+  새로 만들지 말고 **기존 것에 합류**시킬 것. 이 Y잠금은 3단계에서 삭제된다(kinematic 전환 후 불필요).
+- 🔴 **`AddCarryDelta`는 변위(m), 입력 이동은 속도×dt다.** 1단계에서 둘 다 `FixedUpdate`로 가야
+  일관된다 — 한쪽만 옮기면 플랫폼 탑승 중 이동량이 프레임레이트에 따라 갈린다.
+- 🔴 **`ISurfaceCarrier` 구현체 둘의 계약이 다르다.** `ConveyorTile`은 `speed × dt`(속도형,
+  루프 무관)지만 `MovingPlatform`은 `dt`를 **무시하고** 직전 샘플과의 차분을 돌려준다(변위형).
+  **변위형은 생산 주기와 소비 주기가 반드시 같아야 한다** — 소비자만 `FixedUpdate`로 옮겼다가
+  고프레임에서 이동량의 ~35%만 전달되는 회귀가 났다(`76824f2`에서 수정).
+  새 `ISurfaceCarrier`를 만들 때 어느 쪽 계약인지 먼저 정할 것.
+
 ## ▶▶ 현재 인수인계 (2026-09-14 · 인터럽트 연출 4종 통일 + SpinnerBot 메시 분리, 브랜치 `feature/VFX`)
 
 작업 세션: **민경(Claude)**.

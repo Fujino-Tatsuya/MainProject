@@ -42,7 +42,11 @@ flowchart LR
 
 1. **실제 플레이 가능한 중심은 `PlayerBossTest`**다. Build Settings에 활성화된 씬은 이 씬 하나뿐이다.
 2. **일반 실행 흐름 코드**인 `TitleScene → Temp_LobbyScene → LoadingScene → MapScene`은 구현되어 있지만 해당 씬들이 Build Settings에 없어 현재 빌드에서는 완결되지 않는다. 코드 필드 기본값은 `Temp_inGameScene`이나 현재 `NetworkManager.prefab` 직렬화 값은 `MapScene`이다.
-3. **플레이어의 현재 기준 프리팹은 `Player.prefab`**이다. `Paladin.prefab`은 스킬 컨트롤러와 Hurtbox가 없는 이전 조립 상태다.
+3. ~~**플레이어의 현재 기준 프리팹은 `Player.prefab`**이다. `Paladin.prefab`은 스킬 컨트롤러와 Hurtbox가 없는 이전 조립 상태다.~~
+   🔴 **폐기(2026-09-16 재확인).** 두 가지가 섞여 있었다 — **설계 의도상 `Player` 는 캐릭터에 무관한 "역할" 프리팹이 맞고,
+   캐릭터는 그 밑 `Armature` 자식을 교체해서 바꾼다.** 다만 **현재 정식 흐름이 실제로 스폰하는 것은 `Paladin.prefab`**
+   (역할+캐릭터가 한 덩어리로 평탄화된 복제본)이고, `Paladin` 에도 `PlayerSkillController` 와 `Hurtbox` 가 모두 있다.
+   → [player-prefabs.md](player-prefabs.md)
 4. **전투 공통 축은 `Unit → Hurtbox/IAttackReceiver → AttackInfo → StatusEffectController`**다. 상속은 얕고 실제 기능은 컴포지션으로 붙는다.
 5. **보스는 서버 전용 Behavior Graph**로 판단하고, 공격·잡기·점프·폭탄 같은 물리 결과도 서버에서 만든다.
 6. **맵 생성 v2 코드는 존재하지만 현재 `MapScene` 배선은 미완성**이다. `ZoneSlot`과 `ZoneLayoutCatalogSO`가 연결되지 않아 코드 파이프라인이 실질적인 배치를 만들지 못한다.
@@ -431,7 +435,10 @@ flowchart TB
 
 현재 `Player.prefab`에는 Q/Main, E/Sub, R/Ultimate가 배선되어 있다. R은 `PlayerSkillTargeting`, `SkillCursorView`, DecalProjector 기반 `SkillRangeIndicator`와 연결되며 사거리 밖 대상을 확정하면 자동 이동 후 시전한다. RMB/Interrupt 슬롯은 비어 있다. 입력 에셋에는 `Attack=LMB`, `Interrupt=RMB`, `SkillMain=Q`, `SkillSub=E`, `SkillUltimate=R`가 모두 정의되어 있고 `Interact=E`도 중복 정의되지만 현재 상호작용 소비 코드는 없다.
 
-`Paladin.prefab`은 `Player`, 입력, 이동, 상태, 평타, 색상 컴포넌트까지만 있고 Hurtbox와 `PlayerSkillController`가 없다. 네트워크 프리팹 목록에는 남아 있으므로 플레이어 기준 프리팹을 하나로 수렴시키는 것이 안전하다.
+~~`Paladin.prefab`은 `Player`, 입력, 이동, 상태, 평타, 색상 컴포넌트까지만 있고 Hurtbox와 `PlayerSkillController`가 없다.~~
+🔴 **폐기(2026-09-16 재확인).** `Paladin.prefab` 은 `HurtBox` 와 `PlayerSkillController` 를 모두 갖고 있다. 두 프리팹의
+**루트 컴포넌트 구성은 완전히 동일**하고(각 37개), 차이는 직렬화된 값과 자식 조립 방식에 있다.
+어느 쪽을 고쳐야 하는가를 포함한 단일 사실 원본은 [player-prefabs.md](player-prefabs.md).
 
 ### 6.2 Player 클래스·컴포넌트 관계
 
@@ -1244,7 +1251,7 @@ Player의 검과 방패 `WeaponTrailEffect` 두 개는 같은 AnimationClip 목�
 1. **Network Prefab 목록에 해석 불가 GUID 2개**가 남아 있다.
 2. **1차 코드 asmdef 부재**로 모든 런타임 기능이 큰 Assembly-CSharp에 결합된다.
 3. **현재 코드와 설계 문서 드리프트**가 있다. Player/Unit/Ability/Physics/Boss 문서 일부가 제거된 클래스나 과거 API·enum을 설명한다.
-4. **프리팹 세대 중복.** `Player`와 불완전한 `Paladin`, 맵 레거시 볼륨과 v2 슬롯 모델이 함께 남아 있다.
+4. **프리팹 세대 중복.** 구세대 `Player`와 현행 `Paladin`(정식 흐름이 스폰하는 쪽), 맵 레거시 볼륨과 v2 슬롯 모델이 함께 남아 있다. → [player-prefabs.md](player-prefabs.md)
 5. **직렬화 잔여 필드.** 평타 SO의 과거 `comboInputType`, StatusEffect prefab의 과거 필드가 YAML에 남아 현재 코드와 혼동을 만든다.
 6. **Addressables 미사용.** 패키지와 문서 방향은 있으나 1차 코드에서 API 호출이 없다.
 7. **자동화 테스트 부재.** 이름 기준으로 확인되는 1차 테스트 스크립트가 없고 `CameraTestPlayer`만 테스트 이름을 가진 런타임 컴포넌트다.

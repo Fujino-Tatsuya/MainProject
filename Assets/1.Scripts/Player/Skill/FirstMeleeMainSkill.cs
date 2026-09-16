@@ -6,13 +6,14 @@ using UnityEngine;
 /// 서버는 스킬 틱마다 앵커 범위의 적에게 피해 + 진행 방향 넉백(견인)을 적용하고,
 /// 홀드 동안 시전자에게 슈퍼아머를 부여한다 (Unit.Knockback 공통 검사로 CC 면역).
 ///
-/// 권위 분담(networking.md): 전진·회전은 이동 권위(오너/오프라인)가 로컬 수행 — NetworkTransform이 위치를 복제한다.
-/// 아마추어 회전은 동기화되지 않으므로 서버는 기존 에임 경로(OnAimUpdated)로 같은 조향을 시뮬레이션해
-/// 판정 앵커 방향과 넉백 방향을 유지한다 (오차는 표시·판정 허용 범위, 쿨타임 미러와 같은 정책).
+/// 권위 분담(networking.md): 전진·회전은 시뮬레이션 피어가 수행하고 서버 결과를 NetworkTransform이 복제한다.
+/// 서버는 원격 오너의 기존 에임 경로(OnAimUpdated)로 같은 조향을 시뮬레이션해 판정 앵커 방향과
+/// 넉백 방향을 유지한다 (오차는 표시·판정 허용 범위, 쿨타임 미러와 같은 정책).
 /// </summary>
 public class FirstMeleeMainSkill : PlayerHoldSkill
 {
     private PlayerMovement movement;
+    private PlayerMotor motor;
     private PlayerAimIndicator aimIndicator;
     private Collider[] hitResults;
     // 키가 Unit이 아니라 Object인 이유: 파괴 가능한 상자처럼 Unit이 아닌 IAttackReceiver도
@@ -35,6 +36,7 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
     {
         base.Initialize(owner, controller);
         movement = owner.GetComponent<PlayerMovement>();
+        motor = owner.GetComponent<PlayerMotor>();
         aimIndicator = owner.GetComponent<PlayerAimIndicator>();
     }
 
@@ -52,6 +54,8 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
 
         heading = Flatten(direction);
         serverAim = heading;
+        // 전용 서버는 Client 재생 콜백을 받지 않으므로 권위 시뮬레이션을 서버 시작 경로에서 켠다.
+        isLocallySimulating = owner != null && owner.IsMotionAuthority;
 
         if (hitResults == null || hitResults.Length != data.MaxHitResults)
             hitResults = new Collider[data.MaxHitResults];
@@ -65,8 +69,8 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
     public override void OnClientPlay(Vector3 direction)
     {
         heading = Flatten(direction);
-        // 이동 권위 피어(오너/오프라인)만 전진·조향을 실제 수행한다
-        isLocallySimulating = owner != null && owner.IsMovementAuthority;
+        // Motor를 돌리는 오너/서버/오프라인만 전진·조향 채널을 제출한다.
+        isLocallySimulating = owner != null && owner.IsSimulating;
     }
 
     public override void OnAimUpdated(Vector3 direction)
@@ -77,7 +81,8 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
     public override void OnTick()
     {
         // 서버가 원격 오너의 플레이어를 대리 조향 — 판정 앵커(아마추어 하위)와 넉백 방향을 최신으로 유지
-        if (State == SkillState.Charging && owner != null && !owner.IsMovementAuthority)
+        if (State == SkillState.Charging && owner != null &&
+            owner.IsMotionAuthority && !owner.IsInputSource)
         {
             RotateHeadingToward(serverAim, Time.deltaTime);
 
@@ -160,7 +165,18 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
         RotateHeadingToward(aim, Time.deltaTime);
 
         movement.RotateImmediately(heading);
-        movement.MoveRoot(heading * (data.AdvanceSpeed * Time.deltaTime));
+    }
+
+    private void FixedUpdate()
+    {
+        if (!isLocallySimulating)
+            return;
+
+        FirstMeleeMainSkillData data = MainSkillData;
+        if (data == null || motor == null)
+            return;
+
+        motor.AddDisplacement(heading * (data.AdvanceSpeed * Time.fixedDeltaTime));
     }
 
     // 에임 방향으로 틱당 SteerAnglePerTick(도)만큼 조향 — 프레임에서는 시간 비례 분할 적용.

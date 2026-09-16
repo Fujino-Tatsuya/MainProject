@@ -37,7 +37,17 @@ public class MovingPlatform : MonoBehaviour, ISurfaceCarrier
     [Tooltip("목적지 노드의 기본 정지시간(초). 노드가 WaypointNode로 개별 지정하면 그 값이 우선.")]
     [SerializeField] private float defaultPauseSeconds = 1f;
 
-    /// <summary>이번 프레임 이동량(월드). 소유자측 플레이어 캐리가 읽는다.</summary>
+    /// <summary>
+    /// 이번 <b>물리 틱</b>의 이동량(월드). 소유자측 플레이어 캐리가 읽는다.
+    ///
+    /// 🔴 렌더 프레임이 아니라 물리 틱 단위인 이유: 소비자(<c>Player.ApplyPlatformCarry</c>)가
+    /// <c>FixedUpdate</c>에서 읽는다. 프레임 단위로 계산하면 고프레임에서는 중간 변위가 버려지고
+    /// (144fps면 물리 틱당 Update 2.88회 → 마지막 것만 소비) 저프레임에서는 같은 값이 여러 물리
+    /// 틱에 걸쳐 중복 소비된다. 생산 주기와 소비 주기는 반드시 같아야 한다.
+    ///
+    /// 위치가 시간의 순수함수라 시각 갱신(<see cref="Update"/>, 렌더 레이트)과 캐리 델타 계산
+    /// (<see cref="FixedUpdate"/>, 50Hz)을 분리해도 드리프트가 없다.
+    /// </summary>
     public Vector3 CurrentDelta { get; private set; }
 
     public Vector3 GetCarryDelta(Vector3 riderWorldPos, float dt)
@@ -60,8 +70,8 @@ public class MovingPlatform : MonoBehaviour, ISurfaceCarrier
     private readonly List<Segment> _segments = new List<Segment>();
     private double _period;
     private bool _built;
-    private Vector3 _prevPos;
-    private bool _hasPrev;
+    private Vector3 _prevPhysicsPos;
+    private bool _hasPrevPhysicsPos;
 
     private void Awake()
     {
@@ -69,12 +79,22 @@ public class MovingPlatform : MonoBehaviour, ISurfaceCarrier
         if (_built && platformBody != null)
         {
             platformBody.position = _segments[0].start;
-            _prevPos = platformBody.position;
-            _hasPrev = true;
+            _prevPhysicsPos = platformBody.position;
+            _hasPrevPhysicsPos = true;
         }
     }
 
+    /// <summary>시각·콜라이더 위치는 렌더 레이트로 갱신한다(platformBody는 Transform이라 물리 보간이 없다).</summary>
     private void Update()
+    {
+        if (!_built || platformBody == null)
+            return;
+
+        platformBody.position = Evaluate(ResolveElapsed());
+    }
+
+    /// <summary>캐리 델타는 소비자(Player.ApplyPlatformCarry)와 같은 물리 틱 주기로 계산한다.</summary>
+    private void FixedUpdate()
     {
         if (!_built || platformBody == null)
         {
@@ -82,19 +102,17 @@ public class MovingPlatform : MonoBehaviour, ISurfaceCarrier
             return;
         }
 
-        double elapsed = 0.0;
-        var clock = NetworkClock.Instance;
-        if (clock != null && clock.HasMainGameStarted)
-        {
-            elapsed = clock.MainGameElapsed;
-        }
-        // MainGame 미시작이면 elapsed=0 → 시작점에서 정지.
+        Vector3 physicsPos = Evaluate(ResolveElapsed());
+        CurrentDelta = _hasPrevPhysicsPos ? physicsPos - _prevPhysicsPos : Vector3.zero;
+        _prevPhysicsPos = physicsPos;
+        _hasPrevPhysicsPos = true;
+    }
 
-        Vector3 newPos = Evaluate(elapsed);
-        CurrentDelta = _hasPrev ? newPos - _prevPos : Vector3.zero;
-        platformBody.position = newPos;
-        _prevPos = newPos;
-        _hasPrev = true;
+    /// <summary>MainGame 미시작이면 0 → 시작점에서 정지.</summary>
+    private static double ResolveElapsed()
+    {
+        var clock = NetworkClock.Instance;
+        return clock != null && clock.HasMainGameStarted ? clock.MainGameElapsed : 0.0;
     }
 
     /// <summary>elapsed(초) → 월드 위치. 순수함수(적분 없음).</summary>

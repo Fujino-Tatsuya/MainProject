@@ -162,8 +162,8 @@ public sealed class PlayerEncounterLock : NetworkBehaviour
                 stateController.EndCinematic();
         }
 
-        // 이동 권한 피어만 물리 속도를 만든다 — 비권한 피어는 kinematic이라 건드릴 필요가 없다.
-        if (body != null && player != null && player.IsMovementAuthority)
+        // 구속에 따른 물리 정지는 권위 결과여야 한다. 입력 오너나 원격 프록시가 따로 적용하지 않는다.
+        if (body != null && player != null && player.IsMotionAuthority)
         {
             body.linearVelocity = Vector3.zero;
             body.angularVelocity = Vector3.zero;

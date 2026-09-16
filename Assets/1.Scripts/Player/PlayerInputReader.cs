@@ -6,6 +6,8 @@ using UnityEngine.InputSystem;
 [RequireComponent(typeof(PlayerMovement))]
 public class PlayerInputReader : BaseNetworkBehaviour
 {
+    private const double InputDiagnosticLogIntervalSeconds = 1.0;
+
     private PlayerInput playerInput;
     private PlayerMovement movement;
     private InputAction moveAction;
@@ -19,6 +21,20 @@ public class PlayerInputReader : BaseNetworkBehaviour
     private bool uiInputSuppressed;
     private bool combatInputEnabled = true;
     private bool controlEnabled = true;
+    private bool dashPressedLatched;
+    private bool dashCallbackRegistered;
+
+    // [MoveDiag] 입력/게이트 엣지를 최대 초당 한 줄로 묶기 위한 관측 전용 상태.
+    private bool inputDiagnosticInitialized;
+    private Vector2 inputDiagnosticObservedDirection;
+    private bool inputDiagnosticObservedHasMove;
+    private bool inputDiagnosticObservedEffective;
+    private bool inputDiagnosticObservedPlayerInputEnabled;
+    private int inputDiagnosticPendingEdges;
+    private bool inputDiagnosticPendingSawMove;
+    private Vector2 inputDiagnosticLastEdgeDirection;
+    private string inputDiagnosticLastReason;
+    private double inputDiagnosticNextLogAt;
 
     public Vector2 Direction { get; private set; }
     public bool HasMoveInput => Direction.sqrMagnitude > 0.01f;
@@ -30,8 +46,7 @@ public class PlayerInputReader : BaseNetworkBehaviour
     // 키는 에셋에서만 바꾼다 — 예전처럼 코드에 키를 박으면 리바인딩이 불가능해진다.
     // ⚠️ combatInputEnabled 게이트를 타지 않는 것은 의도다 — Soul 차단은 서버
     //    DashValidationPolicy(Dead||Soul)와 TryBeginPredictedDash의 CanMove가 담당한다.
-    public bool DashPressed =>
-        EffectiveInputEnabled && dashAction != null && dashAction.WasPressedThisFrame();
+    public bool DashPressed => EffectiveInputEnabled && dashPressedLatched;
 
     private bool CanUseLocalControl =>
         !IsNetworkActive || IsOwner;
@@ -39,6 +54,7 @@ public class PlayerInputReader : BaseNetworkBehaviour
         EffectiveInputEnabled && combatInputEnabled;
     private bool EffectiveInputEnabled =>
         inputEnabled && !uiInputSuppressed;
+    internal bool DiagnosticEffectiveInputEnabled => EffectiveInputEnabled;
 
     private void Awake()
     {
@@ -54,10 +70,46 @@ public class PlayerInputReader : BaseNetworkBehaviour
         skillSubAction = playerInput.actions.FindAction("SkillSub");
         skillUltimateAction = playerInput.actions.FindAction("SkillUltimate");
         dashAction = playerInput.actions.FindAction("Dash");
+        RegisterDashCallback();
 
         // 액션이 없으면 대시 입력이 조용히 사라진다(예전 Shift 직접 판정과 달리 폴백이 없다).
         if (dashAction == null)
             Debug.LogWarning("[DashAlert] 입력 에셋에 \"Dash\" 액션이 없어 대시 입력을 읽을 수 없습니다.", this);
+    }
+
+    /// <summary>PlayerStateController가 상태 판단을 마친 뒤 그 틱의 엣지 입력을 소비한다.</summary>
+    public void ConsumeStateTickEdges()
+    {
+        dashPressedLatched = false;
+    }
+
+    private void RegisterDashCallback()
+    {
+        if (dashAction == null || dashCallbackRegistered)
+            return;
+
+        dashAction.performed += OnDashPerformed;
+        dashCallbackRegistered = true;
+    }
+
+    private void UnregisterDashCallback()
+    {
+        if (dashAction == null || !dashCallbackRegistered)
+            return;
+
+        dashAction.performed -= OnDashPerformed;
+        dashCallbackRegistered = false;
+    }
+
+    private void OnDashPerformed(InputAction.CallbackContext context)
+    {
+        if (EffectiveInputEnabled)
+            dashPressedLatched = true;
+    }
+
+    private void OnEnable()
+    {
+        RegisterDashCallback();
     }
 
     public bool GetSkillPressed(PlayerSkillSlot slot)
@@ -93,12 +145,14 @@ public class PlayerInputReader : BaseNetworkBehaviour
     private void Start()
     {
         RefreshControlState();
+        ObserveInputDiagnosticEdges("start");
     }
 
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
         RefreshControlState();
+        ObserveInputDiagnosticEdges("network-spawn");
     }
 
     public override void OnNetworkDespawn()
@@ -151,7 +205,12 @@ public class PlayerInputReader : BaseNetworkBehaviour
             playerInput.enabled = EffectiveInputEnabled;
 
         if (!EffectiveInputEnabled)
+        {
             Direction = Vector2.zero;
+            dashPressedLatched = false;
+        }
+
+        ObserveInputDiagnosticEdges("gate-change");
     }
 
     private void Update()
@@ -159,14 +218,89 @@ public class PlayerInputReader : BaseNetworkBehaviour
         if (!EffectiveInputEnabled)
         {
             Direction = Vector2.zero;
+            ObserveInputDiagnosticEdges("update-gated");
             return;
         }
 
         Direction = moveAction.ReadValue<Vector2>();
+        ObserveInputDiagnosticEdges("reader-update");
     }
 
     private void OnDisable()
     {
         Direction = Vector2.zero;
+        dashPressedLatched = false;
+        UnregisterDashCallback();
+        ObserveInputDiagnosticEdges("component-disable");
+    }
+
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    private void ObserveInputDiagnosticEdges(string reason)
+    {
+        bool hasMove = HasMoveInput;
+        bool effective = EffectiveInputEnabled;
+        bool playerInputEnabled = playerInput != null && playerInput.enabled;
+        double now = Time.realtimeSinceStartupAsDouble;
+
+        if (!inputDiagnosticInitialized)
+        {
+            inputDiagnosticInitialized = true;
+            inputDiagnosticObservedDirection = Direction;
+            inputDiagnosticObservedHasMove = hasMove;
+            inputDiagnosticObservedEffective = effective;
+            inputDiagnosticObservedPlayerInputEnabled = playerInputEnabled;
+            inputDiagnosticNextLogAt = now + InputDiagnosticLogIntervalSeconds;
+            LogInputDiagnosticEdges($"initial/{reason}", 1, hasMove, Direction);
+            return;
+        }
+
+        bool changed =
+            (Direction - inputDiagnosticObservedDirection).sqrMagnitude > 0.0001f ||
+            hasMove != inputDiagnosticObservedHasMove ||
+            effective != inputDiagnosticObservedEffective ||
+            playerInputEnabled != inputDiagnosticObservedPlayerInputEnabled;
+        if (changed)
+        {
+            inputDiagnosticPendingEdges++;
+            inputDiagnosticPendingSawMove |= hasMove;
+            inputDiagnosticLastEdgeDirection = Direction;
+            inputDiagnosticLastReason = reason;
+            inputDiagnosticObservedDirection = Direction;
+            inputDiagnosticObservedHasMove = hasMove;
+            inputDiagnosticObservedEffective = effective;
+            inputDiagnosticObservedPlayerInputEnabled = playerInputEnabled;
+        }
+
+        if (inputDiagnosticPendingEdges == 0 || now < inputDiagnosticNextLogAt)
+            return;
+
+        LogInputDiagnosticEdges(
+            inputDiagnosticLastReason,
+            inputDiagnosticPendingEdges,
+            inputDiagnosticPendingSawMove,
+            inputDiagnosticLastEdgeDirection);
+        inputDiagnosticPendingEdges = 0;
+        inputDiagnosticPendingSawMove = false;
+        inputDiagnosticNextLogAt = now + InputDiagnosticLogIntervalSeconds;
+    }
+
+    private void LogInputDiagnosticEdges(
+        string reason,
+        int edgeCount,
+        bool sawMove,
+        Vector2 lastEdgeDirection)
+    {
+        ulong localClientId = NetworkManager != null
+            ? NetworkManager.LocalClientId
+            : ulong.MaxValue;
+        Edit.Log(
+            $"[MoveDiag] input edge ({reason}): ownerClientId={OwnerClientId}, " +
+            $"localClientId={localClientId}, edges={edgeCount}, Direction={Direction}, " +
+            $"HasMoveInput={HasMoveInput}, sawMove={sawMove}, lastEdgeDirection={lastEdgeDirection}, " +
+            $"EffectiveInputEnabled={EffectiveInputEnabled}, inputEnabled={inputEnabled}, " +
+            $"uiSuppressed={uiInputSuppressed}, controlEnabled={controlEnabled}, " +
+            $"reader.enabled={enabled}, PlayerInput.enabled={playerInput != null && playerInput.enabled}, " +
+            $"MoveAction.enabled={moveAction != null && moveAction.enabled}",
+            this);
     }
 }

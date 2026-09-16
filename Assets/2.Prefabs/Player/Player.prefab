@@ -697,6 +697,7 @@ GameObject:
   - component: {fileID: 1825865676068489031}
   - component: {fileID: 9007214485145382345}
   - component: {fileID: 4342448094249856294}
+  - component: {fileID: 800000000000000031}
   - component: {fileID: 4525831256458907740}
   - component: {fileID: 5274188098871446382}
   - component: {fileID: 8345678279683584363}
@@ -800,9 +801,9 @@ Rigidbody:
     m_Bits: 0
   m_ImplicitCom: 1
   m_ImplicitTensor: 1
-  m_UseGravity: 1
-  m_IsKinematic: 0
-  m_Interpolate: 0
+  m_UseGravity: 0
+  m_IsKinematic: 1
+  m_Interpolate: 1
   m_Constraints: 112
   m_CollisionDetection: 0
 --- !u!114 &1976202963046299133
@@ -927,9 +928,6 @@ MonoBehaviour:
   attackSpeed: 0
   maxHp: 50
   defense: 25
-  platformRiderMask:
-    serializedVersion: 2
-    m_Bits: 4294967295
   platformGroundCheckDistance: 0.6
 --- !u!114 &1825865676068489031
 MonoBehaviour:
@@ -982,6 +980,21 @@ MonoBehaviour:
   acceleration: 80
   alignThreshold: 0.98
   viewYaw: -45
+--- !u!114 &800000000000000031
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8559504096609571310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2f714ae95eb94b57a450b74bc822de23, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerMotor
+  gameRule: {fileID: 11400000, guid: 5a71cc8f5b32f47428af514e196e5a8c, type: 2}
+  collisionSkin: 0.02
+  maxSweepIterations: 3
 --- !u!114 &4525831256458907740
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1049,10 +1062,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerStateController
   currentStateDebug: 0
-  minKnockbackTime: 0.15
-  maxKnockbackTime: 1.5
   serverKnockbackReportGraceTime: 0.25
-  knockbackStopSpeed: 0.15
 --- !u!114 &4711829301158223401
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1214,10 +1224,6 @@ MonoBehaviour:
   soulHiddenEquipment: []
   hurtboxColliders: []
   soulMoveSpeed: 5
-  hoverProbeDistance: 6
-  hoverGroundMask:
-    serializedVersion: 2
-    m_Bits: 4294967295
 --- !u!114 &800000000000000022
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1280,7 +1286,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerDashController
   ShowTopMostFoldoutHeaderGroup: 1
   dashData: {fileID: 11400000, guid: f2e9be4143ad74d4fb3f49788c28f857, type: 2}
-  gameRule: {fileID: 11400000, guid: 5a71cc8f5b32f47428af514e196e5a8c, type: 2}
   groundingSensor: {fileID: 3406906192496269592}
 --- !u!114 &3406906192496269592
 MonoBehaviour:
@@ -1296,12 +1301,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerGroundingSensor
   ShowTopMostFoldoutHeaderGroup: 1
   probeDistance: 0.1
-  aliveGroundMask:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  soulGroundMask:
-    serializedVersion: 2
-    m_Bits: 4294967295
   gameRule: {fileID: 11400000, guid: 5a71cc8f5b32f47428af514e196e5a8c, type: 2}
 --- !u!114 &1111000000000000010
 MonoBehaviour:
