@@ -21,6 +21,7 @@ public class Player : Unit
     private const int MaxRepeatedServerInputTicks = 10;
     private const int TargetServerInputQueueTicks = 2;
     private const int MaxServerInputQueueTicks = 6;
+    private const float OwnerReconciliationPositionThreshold = 0.10f;
 
     /// <summary>이 클라이언트가 조작하는 플레이어. HUD 등 로컬 UI 바인딩용.</summary>
     public static Player LocalPlayer { get; private set; }
@@ -70,6 +71,10 @@ public class Player : Unit
     // 각 피어의 물리 틱마다 정확히 한 번 증가하는 로컬 입력 시퀀스다.
     // 서버 틱과 같은 절대 시각일 필요는 없고, 오너가 보낸 입력열의 연속성만 표현한다.
     private long localSimulationTick;
+    private long lastProcessedServerInputTick;
+    private bool hasProcessedServerInputTick;
+    private long lastReceivedCorrectionTick;
+    private bool hasReceivedCorrectionTick;
 
     private int reconSampleCount;
     private int reconDiscardedSampleCount;
@@ -94,6 +99,18 @@ public class Player : Unit
     private long reconWindowFirstTick;
     private long reconWindowLastTick;
     private long reconWindowLastServerTick;
+
+    // 오너 보정 관측. 게임 판정에는 쓰지 않고 [Recon] 빈도/크기 튜닝에만 사용한다.
+    private double ownerReconWindowEndsAt;
+    private int ownerCorrectionReceivedCount;
+    private int ownerCorrectionWithinThresholdCount;
+    private int ownerCorrectionAppliedCount;
+    private int ownerCorrectionForceSnapCount;
+    private int ownerCorrectionHistoryMissCount;
+    private int ownerCorrectionStaleCount;
+    private int ownerCorrectionReplayTickCount;
+    private double ownerCorrectionDistanceSum;
+    private float ownerCorrectionMaxDistance;
 
     // [MoveDiag] 관측 전용 카운터. 게임 상태나 RPC 게이트에는 사용하지 않는다.
     private double movementHeartbeatDeadline;
@@ -269,6 +286,7 @@ public class Player : Unit
     private void Update()
     {
         UpdateMovementDiagnostics();
+        UpdateOwnerReconciliationDiagnostics();
 
         if (IsNetworkActive &&
             !stateController.ShouldTickForNetwork(IsOwner, HasStateAuthority))
@@ -514,23 +532,9 @@ public class Player : Unit
         }
         else
         {
-            // 🔴 b3(예측·되감기·재생·보정)가 들어오기 전까지 **전 인스턴스에서 NT를 켜 둔다.**
-            //
-            // 2026-09-15 에 "클라이언트 자기 캐릭터만 NT를 끄면 로컬 예측이 안 지워진다"고 껐다가
-            // 되돌렸다. 껐을 때 실제로 벌어진 일:
-            //   - 클라는 보정 없는 순수 로컬 예측으로 굴러가고
-            //   - 서버는 받은 입력으로 자기 시뮬레이션을 굴리며
-            //   - 둘을 맞춰주는 장치가 없어 자유롭게 발산한다.
-            // 벽·상자를 만나면 갈라짐이 급격히 커져서, 호스트 화면에서는 그 플레이어가 상자에 박혀
-            // 있는데 정작 그 클라는 전혀 다른 곳을 걸어다니는 상태가 됐다.
-            //
-            // 즉 NT의 덮어쓰기는 "입력 지연이라는 비용"이기만 한 게 아니라, **b3 이전까지 클라와
-            // 서버의 위치를 일치시켜 주는 유일한 장치**다. 보정이 생기기 전에 끄면 안 된다.
-            // 대가로 오너에게 RTT 만큼의 입력 지연이 보인다 — 그건 b3 가 회수한다.
-            //
-            // b3 착수 시 여기를 다시 `!(IsOwner && !IsServer)` 로 바꾸고, 같은 커밋에서
-            // 서버→오너 보정 채널(되감기+재생)을 반드시 함께 넣어야 한다. 둘은 한 세트다.
-            networkTransform.enabled = true;
+            // 오너 클라는 Motor 예측을 즉시 표시하고 서버 보정 RPC로만 되감기/재생한다.
+            // 호스트와 원격 프록시는 계속 NT를 사용한다. 이 분기는 보정 채널과 반드시 한 세트다.
+            networkTransform.enabled = !(IsOwner && !IsServer);
         }
 
         LogMovementAuthorityState(reason);
@@ -546,7 +550,7 @@ public class Player : Unit
 
         long tick = CurrentSimulationTick();
 
-        // b2의 되감기/재생 입력과 서버 비교 대상. 동일 틱은 마지막 물리 호출 결과로 교체된다.
+        // b3의 되감기/재생 입력과 서버 비교 대상. 동일 틱은 마지막 물리 호출 결과로 교체된다.
         ownerRawInputHistory.Store(tick, rawInput);
         ownerSimulationStateHistory.Store(tick, resultState);
 
@@ -679,6 +683,10 @@ public class Player : Unit
             return false;
         }
 
+        lastProcessedServerInputTick = inputForTick.Tick;
+        hasProcessedServerInputTick = true;
+        SendOwnerCorrection(serverState, inputForTick.Tick, false);
+
         lastServerSimPosition = serverState.Position;
         lastServerSimDirection = inputForTick.Input.MoveDirection;
         lastServerSimHasMoveInput = inputForTick.Input.HasMoveInput;
@@ -692,6 +700,202 @@ public class Player : Unit
         }
 
         return true;
+    }
+
+    private void SendOwnerCorrection(
+        PlayerSimulationState serverState,
+        long inputTick,
+        bool forceSnap)
+    {
+        if (!IsServer || IsOwner)
+        {
+            Edit.LogWarning(
+                $"[Recon] 보정 송신 주체가 아님: owner={OwnerClientId}, IsServer={IsServer}, IsOwner={IsOwner}, " +
+                $"tick={inputTick}, forceSnap={forceSnap}",
+                this);
+            return;
+        }
+
+        ReconcileOwnerClientRpc(
+            inputTick,
+            serverState.Position,
+            serverState.VerticalVelocity,
+            serverState.CurrentSpeed,
+            serverState.ArmatureRotation,
+            serverState.KnockbackVelocity,
+            serverState.DashDirection,
+            serverState.DashSpeed,
+            serverState.DashRemainingTime,
+            serverState.GravityEnabled,
+            forceSnap,
+            CreateOwnerClientRpcParams());
+    }
+
+    /// <summary>서버가 예측 대상이 아닌 위치 변경을 확정한 뒤 오너에게 강제 보정을 보낸다.</summary>
+    internal void ForceOwnerReconciliation()
+    {
+        if (!IsServer || IsOwner || motor == null)
+        {
+            Edit.LogWarning(
+                $"[Recon] forceSnap 송신 불가: owner={OwnerClientId}, IsServer={IsServer}, IsOwner={IsOwner}, " +
+                $"motor={(motor != null ? "present" : "missing")}",
+                this);
+            return;
+        }
+
+        long inputTick = hasProcessedServerInputTick
+            ? lastProcessedServerInputTick
+            : CurrentSimulationTick();
+        SendOwnerCorrection(motor.SimulationState, inputTick, true);
+    }
+
+    [ClientRpc(Delivery = RpcDelivery.Unreliable)]
+    private void ReconcileOwnerClientRpc(
+        long inputTick,
+        Vector3 position,
+        float verticalVelocity,
+        float currentSpeed,
+        Quaternion armatureRotation,
+        Vector3 knockbackVelocity,
+        Vector3 dashDirection,
+        float dashSpeed,
+        float dashRemainingTime,
+        bool gravityEnabled,
+        bool forceSnap,
+        ClientRpcParams clientRpcParams = default)
+    {
+        if (!IsOwner || IsServer)
+        {
+            Edit.LogWarning(
+                $"[Recon] 오너가 아닌 인스턴스가 보정을 수신: owner={OwnerClientId}, " +
+                $"IsOwner={IsOwner}, IsServer={IsServer}, tick={inputTick}",
+                this);
+            return;
+        }
+
+        ownerCorrectionReceivedCount++;
+        bool stale = hasReceivedCorrectionTick && inputTick <= lastReceivedCorrectionTick && !forceSnap;
+        if (stale)
+        {
+            ownerCorrectionStaleCount++;
+        }
+        else
+        {
+            if (!hasReceivedCorrectionTick || inputTick > lastReceivedCorrectionTick)
+            {
+                lastReceivedCorrectionTick = inputTick;
+                hasReceivedCorrectionTick = true;
+            }
+
+            ReconcileOwnerPrediction(
+                inputTick,
+                position,
+                verticalVelocity,
+                currentSpeed,
+                armatureRotation,
+                knockbackVelocity,
+                dashDirection,
+                dashSpeed,
+                dashRemainingTime,
+                gravityEnabled,
+                forceSnap);
+        }
+    }
+
+    private void ReconcileOwnerPrediction(
+        long inputTick,
+        Vector3 position,
+        float verticalVelocity,
+        float currentSpeed,
+        Quaternion armatureRotation,
+        Vector3 knockbackVelocity,
+        Vector3 dashDirection,
+        float dashSpeed,
+        float dashRemainingTime,
+        bool gravityEnabled,
+        bool forceSnap)
+    {
+        if (motor == null)
+        {
+            Edit.LogError(
+                $"[Recon] 보정을 적용할 PlayerMotor가 없습니다: owner={OwnerClientId}, tick={inputTick}",
+                this);
+            return;
+        }
+
+        bool hasPredictedState = ownerSimulationStateHistory.TryGet(
+            inputTick,
+            out PlayerSimulationState predictedState);
+        PlayerSimulationState authoritativeState = hasPredictedState
+            ? predictedState
+            : motor.SimulationState;
+        authoritativeState.Position = position;
+        authoritativeState.VerticalVelocity = verticalVelocity;
+        authoritativeState.CurrentSpeed = currentSpeed;
+        authoritativeState.ArmatureRotation = armatureRotation;
+        authoritativeState.KnockbackVelocity = knockbackVelocity;
+        authoritativeState.DashDirection = dashDirection;
+        authoritativeState.DashSpeed = dashSpeed;
+        authoritativeState.DashRemainingTime = dashRemainingTime;
+        authoritativeState.GravityEnabled = gravityEnabled;
+
+        float correctionDistance = hasPredictedState
+            ? Vector3.Distance(predictedState.Position, position)
+            : float.PositiveInfinity;
+
+        if (!hasPredictedState)
+        {
+            ownerCorrectionHistoryMissCount++;
+            ownerCorrectionAppliedCount++;
+            motor.ApplyAuthoritativeState(authoritativeState);
+            ownerRawInputHistory.Clear();
+            ownerSimulationStateHistory.Clear();
+            return;
+        }
+
+        ownerCorrectionDistanceSum += correctionDistance;
+        ownerCorrectionMaxDistance = Mathf.Max(ownerCorrectionMaxDistance, correctionDistance);
+
+        if (!forceSnap && correctionDistance <= OwnerReconciliationPositionThreshold)
+        {
+            ownerCorrectionWithinThresholdCount++;
+            ownerRawInputHistory.DiscardThrough(inputTick);
+            ownerSimulationStateHistory.DiscardThrough(inputTick);
+            return;
+        }
+
+        ownerCorrectionAppliedCount++;
+        if (forceSnap)
+            ownerCorrectionForceSnapCount++;
+
+        if (!ownerRawInputHistory.TryGetLatestTick(out long latestInputTick))
+            latestInputTick = inputTick;
+        long firstReplayTick = inputTick < long.MaxValue ? inputTick + 1 : long.MaxValue;
+        bool replayed = motor.TryApplyAuthoritativeStateAndReplay(
+            authoritativeState,
+            ownerRawInputHistory,
+            ownerSimulationStateHistory,
+            firstReplayTick,
+            latestInputTick,
+            Time.fixedDeltaTime,
+            out int replayedTickCount);
+
+        if (replayed)
+        {
+            ownerCorrectionReplayTickCount += replayedTickCount;
+            ownerRawInputHistory.DiscardThrough(inputTick);
+        }
+        else
+        {
+            Edit.LogWarning(
+                $"[Recon] 재생 입력열 누락으로 서버 상태에 스냅: owner={OwnerClientId}, " +
+                $"ackTick={inputTick}, latestInputTick={latestInputTick}",
+                this);
+            ownerCorrectionHistoryMissCount++;
+            motor.ApplyAuthoritativeState(authoritativeState);
+            ownerRawInputHistory.Clear();
+            ownerSimulationStateHistory.Clear();
+        }
     }
 
     private void RecordReconciliationObservation(
@@ -804,6 +1008,10 @@ public class Player : Unit
         repeatedServerInputTicks = 0;
         droppedServerInputCount = 0;
         localSimulationTick = 0L;
+        lastProcessedServerInputTick = 0L;
+        hasProcessedServerInputTick = false;
+        lastReceivedCorrectionTick = 0L;
+        hasReceivedCorrectionTick = false;
         motor?.ResetServerObservation();
         reconSampleCount = 0;
         reconDiscardedSampleCount = 0;
@@ -816,6 +1024,54 @@ public class Player : Unit
         reconWindowFirstTick = 0L;
         reconWindowLastTick = 0L;
         reconWindowLastServerTick = 0L;
+        ownerReconWindowEndsAt = Time.realtimeSinceStartupAsDouble + ReconciliationLogIntervalSeconds;
+        ownerCorrectionReceivedCount = 0;
+        ownerCorrectionWithinThresholdCount = 0;
+        ownerCorrectionAppliedCount = 0;
+        ownerCorrectionForceSnapCount = 0;
+        ownerCorrectionHistoryMissCount = 0;
+        ownerCorrectionStaleCount = 0;
+        ownerCorrectionReplayTickCount = 0;
+        ownerCorrectionDistanceSum = 0.0;
+        ownerCorrectionMaxDistance = 0f;
+    }
+
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    private void UpdateOwnerReconciliationDiagnostics()
+    {
+        if (!IsOwner || IsServer || Time.realtimeSinceStartupAsDouble < ownerReconWindowEndsAt)
+            return;
+
+        if (ownerCorrectionReceivedCount > 0)
+        {
+            int measuredCount = ownerCorrectionWithinThresholdCount +
+                                ownerCorrectionAppliedCount -
+                                ownerCorrectionHistoryMissCount;
+            string average = measuredCount > 0
+                ? $"{ownerCorrectionDistanceSum / measuredCount:F3}m"
+                : "n/a";
+            string maximum = measuredCount > 0
+                ? $"{ownerCorrectionMaxDistance:F3}m"
+                : "n/a";
+            Edit.Log(
+                $"[Recon] owner correction 1s: owner={OwnerClientId}, received={ownerCorrectionReceivedCount}, " +
+                $"withinThreshold={ownerCorrectionWithinThresholdCount}, corrected={ownerCorrectionAppliedCount}, " +
+                $"forceSnap={ownerCorrectionForceSnapCount}, historyMiss={ownerCorrectionHistoryMissCount}, " +
+                $"stale={ownerCorrectionStaleCount}, replayedTicks={ownerCorrectionReplayTickCount}, " +
+                $"threshold={OwnerReconciliationPositionThreshold:F2}m, correction avg={average} max={maximum}",
+                this);
+        }
+
+        ownerCorrectionReceivedCount = 0;
+        ownerCorrectionWithinThresholdCount = 0;
+        ownerCorrectionAppliedCount = 0;
+        ownerCorrectionForceSnapCount = 0;
+        ownerCorrectionHistoryMissCount = 0;
+        ownerCorrectionStaleCount = 0;
+        ownerCorrectionReplayTickCount = 0;
+        ownerCorrectionDistanceSum = 0.0;
+        ownerCorrectionMaxDistance = 0f;
+        ownerReconWindowEndsAt = Time.realtimeSinceStartupAsDouble + ReconciliationLogIntervalSeconds;
     }
 
     [System.Diagnostics.Conditional("UNITY_EDITOR")]

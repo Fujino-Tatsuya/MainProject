@@ -46,6 +46,30 @@ public sealed class PlayerMovementSimulationTests
     }
 
     [Test]
+    public void RewindAndReplay_SameAuthoritativeStateAndInputs_ProducesBitIdenticalTimeline()
+    {
+        PlayerSimulationState authoritative = CreateInitialState();
+        PlayerSimulationSettings settings = CreateSettings();
+        PlayerSimulationInput[] inputs =
+        {
+            CreateInput(new Vector2(1f, 0f)),
+            CreateInput(new Vector2(1f, 1f)),
+            CreateInput(new Vector2(0f, 1f)),
+            CreateInput(Vector2.zero),
+            CreateInput(new Vector2(-1f, 0.5f))
+        };
+
+        PlayerSimulationState[] first = PlayerSimulationReplay.Replay(
+            authoritative, inputs, settings, null, DeltaTime);
+        PlayerSimulationState[] second = PlayerSimulationReplay.Replay(
+            authoritative, inputs, settings, null, DeltaTime);
+
+        Assert.That(second.Length, Is.EqualTo(first.Length));
+        for (int i = 0; i < first.Length; i++)
+            AssertStatesAreBitIdentical(first[i], second[i], i);
+    }
+
+    [Test]
     public void RepeatedSimulation_DoesNotMoveRigidbody()
     {
         GameObject gameObject = new GameObject("PlayerMovementSimulationSideEffectTest");
@@ -117,6 +141,46 @@ public sealed class PlayerMovementSimulationTests
         Assert.That(history.TryGet(29, out _), Is.False);
         Assert.That(history.TryGet(30, out PlayerRawSimulationInput stored), Is.True);
         Assert.That(stored.MoveDirection, Is.EqualTo(latest.MoveDirection));
+    }
+
+    [Test]
+    public void TickRingBuffer_DiscardThrough_KeepsOnlyUnacknowledgedInputs()
+    {
+        var history = new PlayerTickRingBuffer<PlayerRawSimulationInput>(4);
+        history.Store(40, new PlayerRawSimulationInput(Vector2.right, true));
+        history.Store(41, new PlayerRawSimulationInput(Vector2.up, true));
+        history.Store(42, new PlayerRawSimulationInput(Vector2.left, true));
+
+        history.DiscardThrough(41);
+
+        Assert.That(history.Count, Is.EqualTo(1));
+        Assert.That(history.TryGet(40, out _), Is.False);
+        Assert.That(history.TryGet(41, out _), Is.False);
+        Assert.That(history.TryGet(42, out _), Is.True);
+        Assert.That(history.TryGetLatestTick(out long latestTick), Is.True);
+        Assert.That(latestTick, Is.EqualTo(42));
+    }
+
+    private static void AssertStatesAreBitIdentical(
+        PlayerSimulationState expected,
+        PlayerSimulationState actual,
+        int replayIndex)
+    {
+        Assert.That(actual.Position, Is.EqualTo(expected.Position), $"Position at replay index {replayIndex}");
+        Assert.That(actual.RootRotation, Is.EqualTo(expected.RootRotation), $"RootRotation at replay index {replayIndex}");
+        Assert.That(actual.ArmatureRotation, Is.EqualTo(expected.ArmatureRotation), $"ArmatureRotation at replay index {replayIndex}");
+        Assert.That(actual.VerticalVelocity, Is.EqualTo(expected.VerticalVelocity), $"VerticalVelocity at replay index {replayIndex}");
+        Assert.That(actual.CurrentSpeed, Is.EqualTo(expected.CurrentSpeed), $"CurrentSpeed at replay index {replayIndex}");
+        Assert.That(actual.PreviousRotateDirection, Is.EqualTo(expected.PreviousRotateDirection), $"PreviousRotateDirection at replay index {replayIndex}");
+        Assert.That(actual.HasRotate, Is.EqualTo(expected.HasRotate), $"HasRotate at replay index {replayIndex}");
+        Assert.That(actual.IsGrounded, Is.EqualTo(expected.IsGrounded), $"IsGrounded at replay index {replayIndex}");
+        Assert.That(actual.GroundNormal, Is.EqualTo(expected.GroundNormal), $"GroundNormal at replay index {replayIndex}");
+        Assert.That(actual.GroundSurfaceDistance, Is.EqualTo(expected.GroundSurfaceDistance), $"GroundSurfaceDistance at replay index {replayIndex}");
+        Assert.That(actual.GravityEnabled, Is.EqualTo(expected.GravityEnabled), $"GravityEnabled at replay index {replayIndex}");
+        Assert.That(actual.KnockbackVelocity, Is.EqualTo(expected.KnockbackVelocity), $"KnockbackVelocity at replay index {replayIndex}");
+        Assert.That(actual.DashDirection, Is.EqualTo(expected.DashDirection), $"DashDirection at replay index {replayIndex}");
+        Assert.That(actual.DashSpeed, Is.EqualTo(expected.DashSpeed), $"DashSpeed at replay index {replayIndex}");
+        Assert.That(actual.DashRemainingTime, Is.EqualTo(expected.DashRemainingTime), $"DashRemainingTime at replay index {replayIndex}");
     }
 
     private static PlayerSimulationState CreateInitialState()

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -195,6 +196,38 @@ public static class PlayerMovementSimulation
     }
 }
 
+/// <summary>
+/// 서버 확정 상태에서 입력열을 다시 적용하는 순수 재생 경로다.
+/// 씬 쓰기와 이벤트 발행은 하지 않으며, 충돌 조회가 필요하면 읽기 전용 resolver만 사용한다.
+/// </summary>
+public static class PlayerSimulationReplay
+{
+    public static PlayerSimulationState[] Replay(
+        PlayerSimulationState authoritativeState,
+        IReadOnlyList<PlayerSimulationInput> inputs,
+        PlayerSimulationSettings settings,
+        IPlayerSimulationMotionResolver motionResolver,
+        float deltaTime)
+    {
+        int count = inputs != null ? inputs.Count : 0;
+        var states = new PlayerSimulationState[count];
+        PlayerSimulationState state = authoritativeState;
+
+        for (int i = 0; i < count; i++)
+        {
+            state = PlayerMovementSimulation.Simulate(
+                state,
+                inputs[i],
+                settings,
+                motionResolver,
+                deltaTime).State;
+            states[i] = state;
+        }
+
+        return states;
+    }
+}
+
 public interface IPlayerSimulationMotionResolver
 {
     Vector3 Resolve(
@@ -264,7 +297,7 @@ public readonly struct PlayerRawSimulationInput
 }
 
 /// <summary>
-/// b2 재생을 위한 고정 용량 틱 이력. 최신 틱과 같은 값은 교체하고, 더 과거 틱은 거부하며,
+/// b3 재생을 위한 고정 용량 틱 이력. 최신 틱과 같은 값은 교체하고, 더 과거 틱은 거부하며,
 /// 용량을 넘으면 가장 오래된 항목부터 덮어쓴다.
 /// </summary>
 public sealed class PlayerTickRingBuffer<T> where T : struct
@@ -345,6 +378,33 @@ public sealed class PlayerTickRingBuffer<T> where T : struct
 
         value = default;
         return false;
+    }
+
+    public bool TryGetLatestTick(out long tick)
+    {
+        if (count == 0)
+        {
+            tick = 0L;
+            return false;
+        }
+
+        tick = latestTick;
+        return true;
+    }
+
+    public void DiscardThrough(long tick)
+    {
+        while (count > 0 && entries[first].Tick <= tick)
+        {
+            first = (first + 1) % entries.Length;
+            count--;
+        }
+
+        if (count == 0)
+        {
+            first = 0;
+            latestTick = 0L;
+        }
     }
 
     public void Clear()

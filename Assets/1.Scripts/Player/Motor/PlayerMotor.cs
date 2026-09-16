@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -452,6 +453,78 @@ public sealed class PlayerMotor : MonoBehaviour
         hasLastCommittedServerPosition = true;
 
         return true;
+    }
+
+    /// <summary>
+    /// 서버 확정 상태로 되감은 뒤 보관한 입력을 순서대로 재생하고, 최종 상태만 씬에 커밋한다.
+    /// 재생 중에는 MovementResolved/SimulationCompleted를 발행하지 않는다.
+    /// </summary>
+    internal bool TryApplyAuthoritativeStateAndReplay(
+        PlayerSimulationState authoritativeState,
+        PlayerTickRingBuffer<PlayerRawSimulationInput> rawInputHistory,
+        PlayerTickRingBuffer<PlayerSimulationState> stateHistory,
+        long firstReplayTick,
+        long lastReplayTick,
+        float deltaTime,
+        out int replayedTickCount)
+    {
+        replayedTickCount = 0;
+        var replayTicks = new List<long>();
+        var replayInputs = new List<PlayerSimulationInput>();
+
+        for (long tick = firstReplayTick; tick <= lastReplayTick; tick++)
+        {
+            if (!rawInputHistory.TryGet(tick, out PlayerRawSimulationInput rawInput))
+                return false;
+
+            replayTicks.Add(tick);
+            replayInputs.Add(movement != null
+                ? movement.CaptureSimulationInput(rawInput)
+                : new PlayerSimulationInput
+                {
+                    MoveDirection = rawInput.MoveDirection,
+                    HasMoveInput = rawInput.HasMoveInput,
+                    MoveSpeedMultiplier = 1f
+                });
+
+            if (tick == long.MaxValue)
+                break;
+        }
+
+        PlayerSimulationSettings settings = CaptureSimulationSettings(authoritativeState.IsSoul);
+        PlayerSimulationState[] replayedStates = PlayerSimulationReplay.Replay(
+            authoritativeState,
+            replayInputs,
+            settings,
+            motionResolver,
+            deltaTime);
+
+        stateHistory.Clear();
+        for (int i = 0; i < replayedStates.Length; i++)
+            stateHistory.Store(replayTicks[i], replayedStates[i]);
+
+        PlayerSimulationState finalState = replayedStates.Length > 0
+            ? replayedStates[replayedStates.Length - 1]
+            : authoritativeState;
+        ApplyAuthoritativeState(finalState);
+        replayedTickCount = replayedStates.Length;
+        return true;
+    }
+
+    internal void ApplyAuthoritativeState(PlayerSimulationState state)
+    {
+        simulationState = state;
+        movement?.CommitSimulationState(simulationState, true);
+
+        if (playerRigidbody != null)
+        {
+            playerRigidbody.position = simulationState.Position;
+            playerRigidbody.rotation = simulationState.RootRotation;
+        }
+        else
+        {
+            transform.SetPositionAndRotation(simulationState.Position, simulationState.RootRotation);
+        }
     }
 
     internal void ResetServerObservation()
