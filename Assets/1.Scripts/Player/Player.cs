@@ -347,7 +347,8 @@ public class Player : Unit
         }
 
         // 네트워크 Update에서 도착한 raw 입력은 서버 물리 틱 파이프라인에서만 소비한다.
-        if (IsNetworkActive && IsServer && !IsOwner)
+        // 오너 권위에서는 서버가 원격 플레이어를 시뮬레이션하지 않는다 — 위치의 주인은 오너다.
+        if (ServerAuthoritativeMovement && IsNetworkActive && IsServer && !IsOwner)
             ProcessServerObservationInputs();
     }
 
@@ -532,16 +533,44 @@ public class Player : Unit
         stateController.ApplyKnockbackFromServer(direction, strength);
     }
 
+
+    /// <summary>
+    /// 🔴 **이 브랜치는 오너 권위 이동이다.** 서버 권위 브랜치와 가르는 단 하나의 스위치.
+    ///
+    /// 서버 권위(feature/player-motor-server-auth)에서는 서버가 오너의 raw 입력으로 직접
+    /// 시뮬레이션해 위치를 확정하고, 오너는 예측 후 되감기·재생으로 보정받는다. 치트 방지가 되지만
+    /// 이동에 관여하는 모든 기능을 오너·서버 양쪽에서 성립시켜야 한다.
+    ///
+    /// 여기서는 그 전부를 끈다 — 오너가 위치의 주인이고 NetworkTransform 이 오너 권위로 복제한다.
+    /// 치트 방지는 포기하는 대신 구조가 단순하고, 이동 신규 기능을 한 번만 저작하면 된다.
+    ///
+    /// 되살리는 법: 이 값을 true 로 바꾸고 Paladin/Player 프리팹의 루트·Armature
+    /// NetworkTransform.AuthorityMode 를 0(Server)으로 되돌린다. 코드는 지우지 않고 남겨 뒀다.
+    /// </summary>
+    private const bool ServerAuthoritativeMovement = false;
+
+    /// <summary>다른 컴포넌트(PlayerMotor 등)가 같은 스위치를 참조하기 위한 창구.</summary>
+    public static bool UsesServerAuthoritativeMovement => ServerAuthoritativeMovement;
     /// <summary>로컬 입력 장치와 로컬 UI를 읽는 주체.</summary>
     public bool IsInputSource => !IsNetworkActive || IsOwner;
 
-    /// <summary>PlayerMotor 시뮬레이션을 로컬에서 수행하는 주체.</summary>
-    public bool IsSimulating => !IsNetworkActive || IsOwner || IsServer;
+    /// <summary>
+    /// PlayerMotor 시뮬레이션을 로컬에서 수행하는 주체.
+    /// 서버 권위에서는 서버도 원격 플레이어를 시뮬레이션하지만, 오너 권위에서는 오너만 돈다.
+    /// 루트모션·스킬 전진·플랫폼 캐리·자동접근이 전부 이 값으로 게이팅되므로, 여기 하나만 바꾸면
+    /// 그 채널들이 통째로 오너 전용으로 돌아간다.
+    /// </summary>
+    public bool IsSimulating =>
+        !IsNetworkActive || IsOwner || (ServerAuthoritativeMovement && IsServer);
 
-    /// <summary>이동 결과를 진실로 확정하는 주체.</summary>
-    public bool IsMotionAuthority => !IsNetworkActive || IsServer;
+    /// <summary>
+    /// 이동 결과를 진실로 확정하는 주체. 넉백·구속·대시 개시가 이 값으로 갈린다.
+    /// 오너 권위에서는 오너가 자기 이동을 확정하므로 오너다(데미지·상태이상 판정은 여전히 서버다 —
+    /// 그쪽은 IsServer 를 직접 쓰지 이 값을 쓰지 않는다).
+    /// </summary>
+    public bool IsMotionAuthority =>
+        !IsNetworkActive || (ServerAuthoritativeMovement ? IsServer : IsOwner);
 
-    /// <summary>서버가 확정해 복제한 이동 결과만 표시하는 원격 프록시.</summary>
     public bool IsRemoteProxy => IsNetworkActive && !IsOwner && !IsServer;
 
     /// <summary>
@@ -566,7 +595,9 @@ public class Player : Unit
         {
             // 오너 클라는 Motor 예측을 즉시 표시하고 서버 보정 RPC로만 되감기/재생한다.
             // 호스트와 원격 프록시는 계속 NT를 사용한다. 이 분기는 보정 채널과 반드시 한 세트다.
-            networkTransform.enabled = !(IsOwner && !IsServer);
+            // 서버 권위에서만 오너의 NT 를 끈다(예측이 덮이지 않도록). 오너 권위에서는 NT 가
+            // 오너 권위 모드로 그 오너의 위치를 복제하므로 전 인스턴스에서 켜 둔다.
+            networkTransform.enabled = !(ServerAuthoritativeMovement && IsOwner && !IsServer);
         }
 
         LogMovementAuthorityState(reason);
@@ -592,7 +623,8 @@ public class Player : Unit
 
         // 예측 위치는 같은 틱의 발산을 계측하기 위한 클라이언트 보고값일 뿐이며 게임 로직에 쓰지 않는다.
         // 호스트 오너는 이 인스턴스의 Motor 틱 자체가 서버 커밋이다. RPC 관측 경로를 다시 돌리면 이중 시뮬레이션된다.
-        if (!IsServer)
+        // 오너 권위에서는 서버가 입력으로 시뮬레이션하지 않으므로 입력 RPC 자체가 불필요하다.
+        if (ServerAuthoritativeMovement && !IsServer)
         {
             // 🔴 입력 중복 전송 — 최근 InputRedundancyTicks 틱을 함께 싣는다.
             // 입력 한 장만 잃어도 서버가 기아에 빠져 마지막 입력을 반복하거나 0 입력을 쓰고,

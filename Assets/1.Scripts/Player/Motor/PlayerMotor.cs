@@ -84,7 +84,9 @@ public sealed class PlayerMotor : MonoBehaviour
     internal int MovementDiagnosticTickCount => movementDiagnosticTickCount;
 
     private bool CapturesServerObservation =>
-        player != null && player.IsSpawned && player.IsServer && !player.IsOwner;
+        player != null && player.IsSpawned && player.IsServer && !player.IsOwner &&
+        // 오너 권위 브랜치에서는 서버가 원격 플레이어를 시뮬레이션하지 않는다.
+        Player.UsesServerAuthoritativeMovement;
 
     /// <summary>이번 물리 틱에 적용할 월드 속도(m/s)를 더한다.</summary>
     public void AddVelocity(Vector3 worldVelocity)

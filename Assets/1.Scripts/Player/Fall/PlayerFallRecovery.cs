@@ -201,10 +201,30 @@ public sealed class PlayerFallRecovery : NetworkBehaviour
             return false;
         }
 
+        // 🔴 오너 권위 브랜치: 위치의 주인은 오너다. 서버가 자기 사본을 옮겨봐야 오너 권위
+        // NetworkTransform 이 오너의 위치를 복제하므로 되돌아온다. 오너에게 직접 옮기라고 지시한다.
+        // (서버 권위 브랜치에서는 반대다 — 서버가 옮기고 보정 채널의 forceSnap 으로 오너를 맞춘다.)
+        if (!Player.UsesServerAuthoritativeMovement)
+        {
+            if (IsOwner)
+                motor.TeleportAuthoritative(returnPoint);
+            else
+                TeleportOwnerRpc(returnPoint);
+            return true;
+        }
+
         motor.TeleportAuthoritative(returnPoint);
         if (sendForceSnap && !IsOwner)
             player.ForceOwnerReconciliation();
         return true;
+    }
+
+    /// <summary>오너 권위에서만 쓴다. 위치를 확정하는 주체가 오너이므로 오너가 직접 옮긴다.</summary>
+    [Rpc(SendTo.Owner)]
+    private void TeleportOwnerRpc(Vector3 returnPoint)
+    {
+        if (motor != null)
+            motor.TeleportAuthoritative(returnPoint);
     }
 
     private void CancelServerReturnRoutine()
