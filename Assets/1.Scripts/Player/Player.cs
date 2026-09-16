@@ -240,6 +240,25 @@ public class Player : Unit
             Initialize(attackDamage, moveSpeed, attackSpeed, maxHp, defense);
 
         ConfigureMovementAuthority("network-spawn");
+
+        // 🔴 오너에게 스폰 좌표를 명시적으로 알려준다.
+        //
+        // NGO 는 클라에서 프리팹을 **프리팹 좌표(원점)** 로 생성한 뒤 NetworkTransform 이 복제 상태를
+        // 적용해 제자리로 옮긴다. 그런데 오너 권위 NT 에서는 **오너 인스턴스가 권위**라
+        // (CanCommitToTransform = IsOwner) 들어오는 상태를 적용하지 않는다. 그래서 오너만 원점에
+        // 남고, 오히려 그 원점을 모두에게 내보낸다 — 2026-09-16 실측:
+        //   서버 pos=(5.52, 10.00, -49.30) / 오너 pos=(0.00, 0.00, 0.00)
+        // 서버 권위에서는 오너가 비권위라 서버 좌표를 그대로 받으므로 이 문제가 없었다.
+        //
+        // 스폰 위치는 서버가 정하는 값이므로(NetworkLoadingFlowController.SpawnPlayerForClient)
+        // 권위 모드와 무관하게 서버가 오너에게 직접 전달하는 것이 맞다.
+        if (IsNetworkActive && IsServer && !IsOwner)
+        {
+            PlaceOwnerAtSpawnClientRpc(
+                transform.position,
+                transform.rotation,
+                CreateOwnerClientRpcParams());
+        }
     }
 
     public override void OnNetworkDespawn()
@@ -1515,6 +1534,32 @@ public class Player : Unit
         }
 
         skillTargeting.ApplyServerAutoApproach(target, castRange, true);
+    }
+
+
+    /// <summary>
+    /// 서버가 정한 스폰 포즈를 오너에게 확정시킨다. 오너 권위 NT 는 들어오는 상태를 적용하지 않으므로
+    /// 이 경로가 없으면 오너만 프리팹 원점에 남는다.
+    /// Motor 를 거쳐 적용해 시뮬레이션 상태와 transform 이 같이 맞춰지게 한다 —
+    /// transform 만 옮기면 다음 틱에 Motor 가 옛 위치에서 다시 굴린다.
+    /// </summary>
+    [ClientRpc]
+    private void PlaceOwnerAtSpawnClientRpc(
+        Vector3 position,
+        Quaternion rotation,
+        ClientRpcParams clientRpcParams = default)
+    {
+        if (!IsOwner)
+            return;
+
+        transform.rotation = rotation;
+
+        if (motor != null)
+            motor.TeleportAuthoritative(position);
+        else
+            transform.position = position;
+
+        Edit.Log($"[MoveDiag] 오너 스폰 포즈 확정: owner={OwnerClientId}, pos={position}", this);
     }
 
     public void NotifyKnockbackEnded()
