@@ -130,7 +130,7 @@ PrefabInstance:
     - target: {fileID: 384461437578062136, guid: d78501012a484a84287af3ca22ef5e90, type: 3}
       propertyPath: defaultPlayerPrefab
       value: 
-      objectReference: {fileID: 6077492126708577103, guid: af4a760f53d82b64f8369a09c962374c, type: 3}
+      objectReference: {fileID: 6077492126708577103, guid: 8d5b48551745dae429fc070cfa0af71f, type: 3}
     - target: {fileID: 3362302585047461588, guid: d78501012a484a84287af3ca22ef5e90, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
@@ -175,6 +175,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: NetworkManager
       objectReference: {fileID: 0}
+    - target: {fileID: 7043847080119373261, guid: d78501012a484a84287af3ca22ef5e90, type: 3}
+      propertyPath: defaultPlayerPrefab
+      value: 
+      objectReference: {fileID: 6077492126708577103, guid: 8d5b48551745dae429fc070cfa0af71f, type: 3}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -350,7 +354,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 05799538caae795449e8787a138f9deb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  scene: BossScene
+  scene: TrashMobScene
   autoBootOnPlay: 1
   replaceBootScene: 1
   playerPrefabOverride: {fileID: 0}
