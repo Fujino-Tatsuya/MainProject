@@ -394,6 +394,7 @@ GameObject:
   - component: {fileID: 3469248587046884746}
   - component: {fileID: 8912826902117648901}
   - component: {fileID: 8971677398558433232}
+  - component: {fileID: 2625076210644002172}
   m_Layer: 8
   m_Name: TrainingDummy
   m_TagString: Untagged
@@ -600,6 +601,20 @@ MonoBehaviour:
   minKnockbackTime: 0.15
   maxKnockbackTime: 1.5
   stopSpeed: 0.15
+--- !u!114 &2625076210644002172
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5939870581278475531}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 986a97ab4d0049840a2d1231b3ff2054, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TrainingDummyHitFlash
+  flashColor: {r: 1, g: 0.25, b: 0.25, a: 1}
+  flashDuration: 0.35
 --- !u!1 &8715967668323187371
 GameObject:
   m_ObjectHideFlags: 0

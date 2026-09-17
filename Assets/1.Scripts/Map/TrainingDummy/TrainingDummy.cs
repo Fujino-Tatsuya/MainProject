@@ -50,11 +50,13 @@ public sealed class TrainingDummy : Unit
     {
         base.OnNetworkSpawn();
 
-        // Unit 이 방금 자동 부착한 기본 소비자 둘을 걷어낸다. 둘 다 "실제 HP 델타"를 소비하는데
-        // 허수아비는 체력 하한 1 에 붙어도 명목 피해를 계속 보여줘야 한다.
-        // 그 역할은 TrainingDummyDamagePresenter 가 전담한다 — 함께 두면 숫자가 두 번 뜬다.
-        StripAutoComponent<FloatingDamagePresenter>();
-        StripAutoComponent<UnitCameraFeedbackReporter>();
+        // Unit 이 방금 자동 부착한 기본 연출 소비자들을 걷어낸다. 셋 다 "실제 HP 델타"를 소비하는데
+        // 허수아비는 체력 하한 1 에 붙어도 계속 반응해야 한다 — 하한에서는 델타가 0 이라 전부 멈춘다.
+        // 대역은 명목 피해(NominalDamaged)를 구독하는 허수아비 전용 컴포넌트들이 맡는다.
+        // 함께 두면 같은 타격에 숫자가 두 번 뜬다.
+        StripAutoComponent<FloatingDamagePresenter>();   // → TrainingDummyDamagePresenter
+        StripAutoComponent<UnitCameraFeedbackReporter>(); // → TrainingDummyDamagePresenter
+        StripAutoComponent<HitFlash>();                   // → TrainingDummyHitFlash
 
         _rigidbody = GetComponent<Rigidbody>();
         _spawnKinematic = _rigidbody != null && _rigidbody.isKinematic;

@@ -59,9 +59,19 @@
 - `Unit` 기본 경로는 **실제 HP 델타**를 띄우므로(`Unit.cs:533`) 쓸 수 없다
 - **`Unit.cs` 는 건드리지 않는다.** 대신 허수아비 전용 RPC → `TrainingDummyDamagePresenter` →
   `FloatingDamageSpawner.Submit(this, …)` 직접 호출
-- `Unit.OnNetworkSpawn` 이 자동 부착하는 `FloatingDamagePresenter` 와 `UnitCameraFeedbackReporter` 는
-  스폰 직후 **제거**한다. 안 그러면 같은 타격에 숫자가 두 번 뜬다
+- `Unit.OnNetworkSpawn` 이 자동 부착하는 `FloatingDamagePresenter` · `UnitCameraFeedbackReporter` ·
+  `HitFlash` 는 스폰 직후 **제거**한다. 셋 다 실제 HP 델타를 소비해서 체력 하한에서 멈추고,
+  남겨두면 같은 타격에 숫자가 두 번 뜬다
 - 타격 카메라 쉐이크도 전용 presenter 가 같이 맡는다 (공격자 clientId 를 RPC 로 함께 보냄)
+
+### 피격 플래시 — `HitFlash` 복제본
+- **`TrainingDummyHitFlash` 는 `HitFlash.cs` 의 의도적 복제본이다.** 갈라진 곳은 구독하는 이벤트뿐
+  (`Unit.ClientDamaged` → `TrainingDummy.NominalDamaged`). 나머지 본문은 1:1 로 맞춰 두었으니
+  **`HitFlash` 가 고쳐지면 두 파일을 `diff` 해서 같은 수정을 옮길 것**
+- 상속으로 풀 수 없었던 이유: `Unit.ClientDamaged` 는 `virtual` 이 아니고, 애초에 **C# 은 파생 클래스가
+  기반 클래스의 이벤트를 발화하는 것을 허용하지 않는다.** `HitFlash.OnDamaged` 도 private non-virtual 이다
+- 대안이던 "`HitFlash` 에 `public void Flash()` 2줄 추가"는 사용자 판단으로 채택하지 않았다 —
+  코어(`Assets/1.Scripts/Unit/`) 를 안 건드리는 쪽을 택했다
 
 ### HP 바
 - **신규 전용 컴포넌트** `TrainingDummyHealthBar`.
@@ -94,9 +104,10 @@
 
 ## 리스크와 알려진 한계
 
-1. **체력 1 에 붙어 있는 동안 히트플래시와 피격 쉐이크가 멈춘다.**
-   `HitFlash` 는 `Unit.ClientDamaged`(실제 HP 델타) 를 구독하는데 하한 1 에서는 델타가 0 이다.
-   데미지 숫자는 전용 경로라 계속 뜬다. 플래시까지 살리려면 `HitFlash` 를 건드려야 해서 범위 밖으로 둔다
+1. **`TrainingDummyHitFlash` 는 `HitFlash` 의 복제본이라 코어 수정이 자동으로 따라오지 않는다.**
+   `HitFlash` 의 렌더러 캐싱에는 버그 수정 이력이 두 건 박혀 있다 —
+   `NoHitFlash` 마커 도입(2026-08-13), `sharedMaterial` 원색 캐시 때문에 연출 렌더러가 영구 빨강이 되던 건.
+   다음 수정은 사람이 옮겨야 한다
 2. **방어력 경감 공식을 `TrainingDummy` 가 자체 계산한다.** 명목 피해를 알아야 하는데
    `Unit` 이 경감 후 값을 돌려주는 API 가 없다. `Unit.ApplyMitigatedHealthDamage` 와 **중복**이므로
    코어 공식이 바뀌면 같이 고쳐야 한다. 코드에 주석으로 표시한다
