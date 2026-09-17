@@ -213,6 +213,82 @@
 | S7 | 폭탄 SO 필드 | **남긴다.** `bombPrefab` 등은 죽은 데이터가 되지만 **드론이 재사용할 수 있어** 지금 지우지 않는다 |
 | S8 | 전기 지대 | **다음에.** 설계가 덜 나왔고 **이펙트도 없다** |
 
+## 3-A. 🟢 다음 작업 = **G4 점프 이륙** (바로 착수 가능)
+
+> 이 절만 읽으면 재측정 없이 구현에 들어갈 수 있다. 실측값은 전부 확정된 것이다.
+
+### 무엇을 고치나
+
+지금 점프는 **상승이 없다.** `BeginJump()` 가 공격 시작과 동시에
+① 모델을 숨기고 ② `JumpHover`(= `Boss_23_jumping`, **landingattack 0~1 프레임 = 사실상 정지 포즈**)로
+바꾸고 ③ 1.2초 뒤 `WarpTo` 로 순간이동한다. 팀장 지적: *"올라가는 애니가 있는데 그게 없이
+순간이동으로 하늘로 올려버린다."*
+
+`Leap` 상태(클립 `Boss_23_jump`)는 컨트롤러에 **배선만 돼 있고 코드가 한 번도 재생하지 않는다.**
+
+### 확정된 방식 (Z1/Z2 — 팀장 확정)
+
+| 항목 | 값 |
+|---|---|
+| 클립 | `Boss_23_jump` — 44~158프레임 = **114프레임 @60fps = 1.90초** |
+| 재생 | **클립 전체를 3배속** → **0.633초** |
+| 🔴 `.meta` 절단 | **하지 않는다.** `.meta` 는 SVN 이라 아트가 fbx 를 다시 올리면 저작이 날아간다(재스왓 때 겪음). 재생속도는 git 쪽에 있어 그 위험이 없다 |
+| 이륙 중 피격 | **맞는다.** 숨기는 시점부터 무적(E19) |
+| 착지점 | **즉시 확정 유지**(E18). 기획의 "따라가다 고정"은 채택하지 않음 |
+
+### 구현 순서
+
+1. **`BossAttackPhase` 끝에 `JumpTakeoff` 추가** (값 추가는 끝에만 — 파일 상단 규약).
+2. **`BossDataSO` 에 필드 2개**
+   - `jumpTakeoffState = "Leap"` (상태명. `ValidateState` 에도 추가할 것)
+   - `jumpTakeoffDuration = 0.633f` (초). 0 이면 이륙 없음 = 기존 동작
+3. **`BeginJump()` 분해** — 지금 한 함수가 다 하고 있다. 이렇게 나눐다:
+   - `BeginJump()` : 착지점 확정 + 예고 장판 + `_wells.SetSuppressed(true)` + **이륙 시작**
+     (모델을 숨기지 않고, 피격 콜라이더도 남긴다) → `EnterPhase(JumpTakeoff, JumpTakeoffDuration)`
+   - **`BeginJumpHover()` 신규** : `SetModelVisibleClientRpc(false)` + `SetHurtableClientRpc(false)`
+     + `CrossFadeJumpStateClientRpc(landing: false)` → `EnterPhase(Leap, JumpHover)` ← 기존 체공
+   - `ArriveJump()` 는 그대로
+4. **`HandleAttack` 에 `case JumpTakeoff`** : `if (_attackPhaseTimer <= 0f) BeginJumpHover();`
+5. **이륙 애니 재생 + 속도 역산 (ClientRpc)**
+   ```
+   SafeCrossFade(jumpTakeoffState);
+   animator.Update(0f);                               // 상태 정보가 즉시 갱신되게
+   float len = animator.GetCurrentAnimatorStateInfo(0).length;
+   animator.speed = len / jumpTakeoffDuration;        // 클립이 바뀜어도 따라간다
+   ```
+   🔴 **속도를 상수 3 으로 박지 말 것.** 클립 길이가 바뀌면 조용히 어긋난다.
+   복원은 `BeginJumpHover()` 에서 `animator.speed = 1f`.
+6. **예산** : `_stateTimer` 에 `JumpTakeoffDuration` 을 더한다
+   (지금 `JumpHover + JumpLanding + JumpRecovery + attackDuration`).
+   → 안 더하면 체인 도중 데드락 안전망이 터진다(돌진이 선딜 몫을 빼뜨려 매번 터졌던 것과 같은 종류).
+7. **예고 장판 성장시간** : `ShowJumpTelegraphClientRpc(point, radius, growTime)` 의 `growTime` 을
+   `JumpHover` → **`JumpTakeoffDuration + JumpHover`** 로 바꾼다.
+   🔴 이걸 안 바꾸면 장판이 **이륙 중에 이미 다 차고** 보스는 아직 공중에 있다 —
+   "다 차면 판정"이 깨진다.
+
+### 🔴 이 작업의 함정
+
+- **`animator.speed` 는 공유 자원이다.** 자세 홀드(`_counterAnimatorHeldLocally`/`_counterAnimatorResumeSpeed`)와
+  잡기 사이클 배수(`SetGrabCycleSpeedClientRpc`)가 **같은 값을 만진다.**
+  점프는 자세 홀드를 안 쓰지만, **복원을 빼먹으면 이후 모든 애니가 3배속으로 남는다.**
+  `AbortAttackChain` 에도 복원을 넣을 것(이미 잡기 배수 복원이 거기 있다 — **조기 반환 앞**).
+- **이륙 중에는 모델도 콜라이더도 살아 있어야 한다.** 지금 `BeginJump` 가 둘 다 끄므로
+  그 두 줄을 `BeginJumpHover` 로 **옳기는 것**이 핵심 변경이다.
+- **`AbortAttackChain` 은 이미 모델·콜라이더를 되살린다** — 이륙 중 끊겨도 안전하다. 그대로 둠.
+- `Boss_23_jump` 클립에 애니 이벤트가 있는지는 **확인하지 않았다.** 있으면 이륙 중 `OnAttackHit` 이
+  날아들어올 수 있다 — `NotifyAttackHit` 에 `JumpTakeoff` 거부를 넣을지 판단할 것
+  (Telegraph 단계가 이미 같은 가드를 가지고 있다).
+
+### 완료 기준
+
+1. 점프 시 **상승이 눈에 보인다**(0.6초대). 그 동안 보스는 **보이고 맞는다.**
+2. 이륙이 끝나는 순간 숨고, 그 뒤로는 안 맞는다.
+3. 예고 장판이 **착지 순간에** 가득 차다(이륙 중에 다 차지 않는다).
+4. 점프를 연속으로 써도 애니 속도가 3배로 남지 않는다.
+5. 컴파일 에러 0.
+
+---
+
 ## 4. 접근 — 슬라이스
 
 각 슬라이스는 단독으로 MPPM 검증이 가능하도록 끊었다. **G1 이 G2~G3 의 전제다.**
