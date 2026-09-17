@@ -1,9 +1,12 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Unity.Netcode;
+using Unity.Netcode.Components;
 
 [RequireComponent(typeof(PlayerInputReader))]
 [RequireComponent(typeof(PlayerMovement))]
+[RequireComponent(typeof(PlayerMotor))]
 [RequireComponent(typeof(PlayerAimIndicator))]
 [RequireComponent(typeof(DefaultAttackController))]
 [RequireComponent(typeof(PlayerStateController))]
@@ -11,6 +14,25 @@ using Unity.Netcode;
 public class Player : Unit
 {
     private static readonly int IsMovingHash = Animator.StringToHash("IsMoving");
+    // 보정 ack 은 RTT + 서버 지터버퍼만큼 늦게 온다. 0.5s(25틱)는 RTT 200ms 대에서 이미 빠듯하고
+    // Mobile3G(왕복 720ms)에서는 넘친다. 이력 항목은 구조체라 늘려도 비용이 작다.
+    private const float ReconciliationHistorySeconds = 1.5f;
+    private const double ReconciliationLogIntervalSeconds = 1.0;
+    private const double MovementHeartbeatTimeoutSeconds = 2.0;
+    private const double MovementRpcLogIntervalSeconds = 1.0;
+    private const int MaxRepeatedServerInputTicks = 10;
+    private const int TargetServerInputQueueTicks = 2;
+    // 🔴 상한은 "버스트를 흡수하는 크기"여야지 "지연 상한"이 아니다.
+    // 목표치를 넘으면 같은 서버 틱에 여분을 **소비**해 따라잡으므로(ProcessServerObservationInputs),
+    // 상한을 키워도 서버가 보는 입력이 늦어지지 않는다. 넘친 분을 버리면 그 입력은 영영 사라지고
+    // 서버 궤적이 오너와 갈라진다 — 버린 입력은 100% 발산이다.
+    // 2026-09-16 실측(RTT 440ms, 지터 40ms): 상한 6틱에서 droppedInputsTotal 이 초당 ~30건씩
+    // 증가하며 divergence 가 2~3m 까지 벌어졌다. 손실 4% 가 아니라 **우리 큐가 주범**이었다.
+    // 1.5초는 보정 이력(ReconciliationHistorySeconds)과 같은 크기로, 이력이 못 덮는 만큼 쌓아둘 이유가 없다.
+    private const int MaxServerInputQueueTicks = 75;
+    private const float OwnerReconciliationPositionThreshold = 0.10f;
+    // 매 입력 패킷에 함께 싣는 과거 틱 수. 유실 한 장으로 서버가 굶지 않게 한다.
+    private const int InputRedundancyTicks = 3;
 
     /// <summary>이 클라이언트가 조작하는 플레이어. HUD 등 로컬 UI 바인딩용.</summary>
     public static Player LocalPlayer { get; private set; }
@@ -37,19 +59,116 @@ public class Player : Unit
     [SerializeField] int defense;
 
     [Header("\n이동 플랫폼 캐리")]
-    [Tooltip("발밑 플랫폼 라이더 콜라이더 검사 레이어. 기본 전체.")]
-    [SerializeField] private LayerMask platformRiderMask = ~0;
     [Tooltip("발밑 검사 거리(m).")]
     [SerializeField] private float platformGroundCheckDistance = 0.6f;
 
     private PlayerStateController stateController;
     private DefaultAttackController defaultAttack;
     private FirstMeleePassive passive;
-    private PlayerMovement movement;
+    private PlayerMotor motor;
+    private PlayerGroundingSensor groundingSensor;
     private PlayerInvulnerability invulnerability;
-    private Rigidbody playerRigidbody;
-    private bool initialRigidbodyIsKinematic;
-    private bool initialRigidbodyDetectCollisions;
+    private PlayerInputReader inputReader;
+    private PlayerSkillTargeting skillTargeting;
+    private NetworkTransform networkTransform;
+    private bool networkTransformMissingWarningLogged;
+    private PlayerTickRingBuffer<PlayerRawSimulationInput> ownerRawInputHistory;
+    private PlayerTickRingBuffer<PlayerSimulationInput> ownerReplayInputHistory;
+    private PlayerTickRingBuffer<PlayerSimulationState> ownerSimulationStateHistory;
+    private readonly Queue<ServerRawSimulationInput> serverRawInputQueue =
+        new Queue<ServerRawSimulationInput>();
+    private ServerRawSimulationInput lastServerRawInput;
+    private bool hasLastServerRawInput;
+    private int repeatedServerInputTicks;
+    private int droppedServerInputCount;
+    // 각 피어의 물리 틱마다 정확히 한 번 증가하는 로컬 입력 시퀀스다.
+    // 서버 틱과 같은 절대 시각일 필요는 없고, 오너가 보낸 입력열의 연속성만 표현한다.
+    private long localSimulationTick;
+    private long lastProcessedServerInputTick;
+    private bool hasProcessedServerInputTick;
+    // 중복 전송 때문에 같은 틱이 여러 번 도착한다. 이미 큐에 넣은 틱을 다시 넣지 않기 위한 커서.
+    private long lastEnqueuedOwnerTick;
+    private bool hasLastEnqueuedOwnerTick;
+    private long lastReceivedCorrectionTick;
+    private bool hasReceivedCorrectionTick;
+
+    private int reconSampleCount;
+    private int reconDiscardedSampleCount;
+    private int reconSequenceBreakSampleCount;
+
+    // 서버가 원격 플레이어를 왜 못 움직이는지 한 줄로 답하기 위한 마지막 틱 스냅샷.
+    // SimulateWalking이 0을 내는 조건은 !CanMove 또는 !HasMoveInput 둘뿐이고, 그 외에 안 움직이면
+    // 스윕이 막은 것이다. 이 셋을 구분하려면 시뮬레이션 직후 값을 들고 있어야 한다.
+    private Vector3 lastServerSimPosition;
+    private Vector2 lastServerSimDirection;
+    private bool lastServerSimHasMoveInput;
+    private bool lastServerSimGrounded;
+    private bool lastServerSimBlocked;
+
+    // 서버가 다음에 받기를 기대하는 입력 틱. 발산 비교는 "입력 N 을 소비한 뒤"의 두 상태를 맞대는 것이라
+    // 입력 시퀀스가 끊기면(폐기·기아 반복·갭) 서버 상태가 더 이상 "입력 N 까지 소비한 결과"가 아니게 된다.
+    private long expectedServerInputTick;
+    private bool hasExpectedServerInputTick;
+    private double reconDivergenceSum;
+    private float reconMaxDivergence;
+    private double reconWindowStartedAt;
+    private long reconWindowFirstTick;
+    private long reconWindowLastTick;
+    private long reconWindowLastServerTick;
+    // 입력이 서버 지터 버퍼에서 기다린 틱 수(서버 틱끼리의 차). 옛 lagTicks 는 오너 틱과 서버 틱을
+    // 뺐는데, b3-0 이후 둘은 각자 자기 피어 스폰 시점에 0에서 출발하는 별개 카운터라 무의미했다.
+    private long reconWindowLastQueueWaitTicks;
+
+    // 오너 보정 관측. 게임 판정에는 쓰지 않고 [Recon] 빈도/크기 튜닝에만 사용한다.
+    private double ownerReconWindowEndsAt;
+    private int ownerCorrectionReceivedCount;
+    private int ownerCorrectionWithinThresholdCount;
+    private int ownerCorrectionAppliedCount;
+    private int ownerCorrectionForceSnapCount;
+    private int ownerCorrectionHistoryMissCount;
+    private int ownerCorrectionStaleCount;
+    private int ownerCorrectionReplayTickCount;
+    private double ownerCorrectionDistanceSum;
+    private float ownerCorrectionMaxDistance;
+
+    // [MoveDiag] 관측 전용 카운터. 게임 상태나 RPC 게이트에는 사용하지 않는다.
+    private double movementHeartbeatDeadline;
+    private double movementRpcWindowEndsAt;
+    private int movementRpcSentCount;
+    private int movementRpcReceivedCount;
+    private bool movementHeartbeatWarningLogged;
+
+    private readonly struct ServerRawSimulationInput
+    {
+        public ServerRawSimulationInput(
+            long tick,
+            PlayerRawSimulationInput input,
+            Vector3 ownerPredictedPosition,
+            double rttSeconds,
+            long enqueuedServerTick)
+        {
+            Tick = tick;
+            Input = input;
+            OwnerPredictedPosition = ownerPredictedPosition;
+            HasUsableOwnerPrediction = IsFinite(ownerPredictedPosition);
+            RttSeconds = rttSeconds;
+            EnqueuedServerTick = enqueuedServerTick;
+        }
+
+        public long Tick { get; }
+        public PlayerRawSimulationInput Input { get; }
+        public Vector3 OwnerPredictedPosition { get; }
+        public bool HasUsableOwnerPrediction { get; }
+        public double RttSeconds { get; }
+
+        /// <summary>
+        /// 이 입력이 서버 큐에 들어간 순간의 **서버 자신의** localSimulationTick.
+        /// 소비 시점의 서버 틱에서 이 값을 빼면 지터 버퍼에서 기다린 틱 수가 나온다.
+        /// b3-0 이후 오너 틱과 서버 틱은 각자 자기 피어의 스폰 시점에 0에서 출발하는 별개 카운터라
+        /// 둘을 빼는 것(옛 lagTicks)은 스폰 시각 차이만큼 통째로 어긋난다. 그래서 서버 틱끼리만 뺀다.
+        /// </summary>
+        public long EnqueuedServerTick { get; }
+    }
 
     public PlayerActionState CurrentState => stateController != null ? stateController.CurrentState : PlayerActionState.Idle;
     public bool CanMove => stateController == null || stateController.CanMove;
@@ -69,22 +188,33 @@ public class Player : Unit
 
         defaultAttack = GetComponent<DefaultAttackController>();
         passive = GetComponent<FirstMeleePassive>();
-        movement = GetComponent<PlayerMovement>();
+        motor = GetComponent<PlayerMotor>();
+        groundingSensor = GetComponent<PlayerGroundingSensor>();
         invulnerability = GetComponent<PlayerInvulnerability>();
-        playerRigidbody = GetComponent<Rigidbody>();
-        if (playerRigidbody != null)
-        {
-            initialRigidbodyIsKinematic = playerRigidbody.isKinematic;
-            initialRigidbodyDetectCollisions = playerRigidbody.detectCollisions;
-        }
+        inputReader = GetComponent<PlayerInputReader>();
+        skillTargeting = GetComponent<PlayerSkillTargeting>();
+        networkTransform = GetComponent<NetworkTransform>();
 
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
+
+        int historyCapacity = PlayerTickRingBuffer<PlayerSimulationState>.CapacityForSeconds(
+            ReconciliationHistorySeconds,
+            Time.fixedDeltaTime);
+        ownerRawInputHistory = new PlayerTickRingBuffer<PlayerRawSimulationInput>(historyCapacity);
+        ownerReplayInputHistory = new PlayerTickRingBuffer<PlayerSimulationInput>(historyCapacity);
+        ownerSimulationStateHistory = new PlayerTickRingBuffer<PlayerSimulationState>(historyCapacity);
+
+        if (motor != null)
+            motor.SimulationCompleted += HandleOwnerSimulationCompleted;
     }
 
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
+
+        ResetReconciliationObservation();
+        BeginMovementDiagnostics();
 
         // 내가 Owner인 플레이어가 스폰되면, 카메라 매니저에게 나를 따라오라고 알린다.
         if (IsOwner)
@@ -109,7 +239,26 @@ public class Player : Unit
         if (IsServer)
             Initialize(attackDamage, moveSpeed, attackSpeed, maxHp, defense);
 
-        ConfigureMovementPhysicsAuthority();
+        ConfigureMovementAuthority("network-spawn");
+
+        // 🔴 오너에게 스폰 좌표를 명시적으로 알려준다.
+        //
+        // NGO 는 클라에서 프리팹을 **프리팹 좌표(원점)** 로 생성한 뒤 NetworkTransform 이 복제 상태를
+        // 적용해 제자리로 옮긴다. 그런데 오너 권위 NT 에서는 **오너 인스턴스가 권위**라
+        // (CanCommitToTransform = IsOwner) 들어오는 상태를 적용하지 않는다. 그래서 오너만 원점에
+        // 남고, 오히려 그 원점을 모두에게 내보낸다 — 2026-09-16 실측:
+        //   서버 pos=(5.52, 10.00, -49.30) / 오너 pos=(0.00, 0.00, 0.00)
+        // 서버 권위에서는 오너가 비권위라 서버 좌표를 그대로 받으므로 이 문제가 없었다.
+        //
+        // 스폰 위치는 서버가 정하는 값이므로(NetworkLoadingFlowController.SpawnPlayerForClient)
+        // 권위 모드와 무관하게 서버가 오너에게 직접 전달하는 것이 맞다.
+        if (IsNetworkActive && IsServer && !IsOwner)
+        {
+            PlaceOwnerAtSpawnClientRpc(
+                transform.position,
+                transform.rotation,
+                CreateOwnerClientRpcParams());
+        }
     }
 
     public override void OnNetworkDespawn()
@@ -117,20 +266,35 @@ public class Player : Unit
         if (LocalPlayer == this)
             SetLocalPlayer(null);
 
-        RestoreRigidbodyDefaults();
+        if (motor != null)
+        {
+            motor.ResetServerObservation();
+            motor.enabled = false;
+        }
+        ownerRawInputHistory?.Clear();
+        ownerReplayInputHistory?.Clear();
+        ownerSimulationStateHistory?.Clear();
+        serverRawInputQueue.Clear();
+        lastServerRawInput = default;
+        hasLastServerRawInput = false;
+        repeatedServerInputTicks = 0;
+        droppedServerInputCount = 0;
+        expectedServerInputTick = 0L;
+        hasExpectedServerInputTick = false;
         base.OnNetworkDespawn();
     }
 
     public override void OnGainedOwnership()
     {
         base.OnGainedOwnership();
-        ConfigureMovementPhysicsAuthority();
+        BeginMovementDiagnostics();
+        ConfigureMovementAuthority("gained-ownership");
     }
 
     public override void OnLostOwnership()
     {
         base.OnLostOwnership();
-        ConfigureMovementPhysicsAuthority();
+        ConfigureMovementAuthority("lost-ownership");
     }
 
     private void Start()
@@ -138,8 +302,12 @@ public class Player : Unit
         // 오프라인(비네트워크) 실행은 OnNetworkSpawn이 불리지 않는다 — 테스트 씬 HUD 바인딩/입력 활성 폴백
         if (!IsNetworkActive)
         {
+            BeginMovementDiagnostics();
+            if (motor != null)
+                motor.enabled = true;
             SetLocalPlayer(this);
             EnableLocalInput();
+            LogMovementAuthorityState("offline-start");
         }
     }
 
@@ -160,17 +328,16 @@ public class Player : Unit
         if (LocalPlayer == this)
             SetLocalPlayer(null);
 
+        if (motor != null)
+            motor.SimulationCompleted -= HandleOwnerSimulationCompleted;
+
         base.OnDestroy();
     }
 
     private void Update()
     {
-        // 이동 플랫폼 캐리는 이동 권한 피어(오너/오프라인)에서만 적용한다.
-        // 비오너는 루트 NetworkTransform으로 이미 동기되므로 여기서 적용하면 이중 적용된다.
-        if (IsMovementAuthority)
-        {
-            ApplyPlatformCarry();
-        }
+        UpdateMovementDiagnostics();
+        UpdateOwnerReconciliationDiagnostics();
 
         if (IsNetworkActive &&
             !stateController.ShouldTickForNetwork(IsOwner, HasStateAuthority))
@@ -181,10 +348,33 @@ public class Player : Unit
         stateController.Tick();
     }
 
+    private void FixedUpdate()
+    {
+        if (localSimulationTick < long.MaxValue)
+            localSimulationTick++;
+
+        // 플랫폼 변위는 Motor를 실제로 돌리는 피어만 제출한다. 원격 프록시는 서버 NT 결과만 표시한다.
+        if (IsSimulating)
+        {
+            ApplyPlatformCarry();
+        }
+
+        if (!IsNetworkActive ||
+            stateController.ShouldTickForNetwork(IsOwner, HasStateAuthority))
+        {
+            stateController.FixedTick();
+        }
+
+        // 네트워크 Update에서 도착한 raw 입력은 서버 물리 틱 파이프라인에서만 소비한다.
+        // 오너 권위에서는 서버가 원격 플레이어를 시뮬레이션하지 않는다 — 위치의 주인은 오너다.
+        if (ServerAuthoritativeMovement && IsNetworkActive && IsServer && !IsOwner)
+            ProcessServerObservationInputs();
+    }
+
     /// <summary>발밑에 캐리 표면이 있으면 그 이동량을 플레이어 이동에 가산한다.</summary>
     private void ApplyPlatformCarry()
     {
-        if (movement == null)
+        if (motor == null)
         {
             return;
         }
@@ -195,7 +385,7 @@ public class Player : Unit
             origin,
             Vector3.down,
             platformGroundCheckDistance,
-            platformRiderMask,
+            ResolvePlatformRiderMask(),
             QueryTriggerInteraction.Collide);
 
         for (int i = 0; i < hits.Length; i++)
@@ -204,11 +394,22 @@ public class Player : Unit
                 hits[i].collider.GetComponentInParent<ISurfaceCarrier>();
             if (carrier != null)
             {
-                movement.AddCarryDelta(
-                    carrier.GetCarryDelta(transform.position, Time.deltaTime));
+                motor.AddDisplacement(
+                    carrier.GetCarryDelta(transform.position, Time.fixedDeltaTime));
                 break;
             }
         }
+    }
+
+    private LayerMask ResolvePlatformRiderMask()
+    {
+        PlayerGameRuleData rule = motor != null ? motor.GameRule : null;
+        if (rule == null)
+            return LayerMask.GetMask("Default", "Ground", "Env");
+
+        bool isSoul = groundingSensor != null &&
+                      groundingSensor.Mode == PlayerGroundingSensor.GroundingMode.Soul;
+        return rule.GetGroundMask(isSoul);
     }
 
     public void EndDefaultAttack()
@@ -351,42 +552,1014 @@ public class Player : Unit
         stateController.ApplyKnockbackFromServer(direction, strength);
     }
 
-    /// <summary>이동은 오너 권위(networking.md) — 넉백 물리를 시뮬레이션할 피어인지 여부.</summary>
-    public bool IsMovementAuthority => !IsNetworkActive || IsOwner;
 
     /// <summary>
-    /// Player 위치는 owner-authority NetworkTransform이 복제한다.
-    /// 비권한 피어의 Rigidbody는 kinematic으로 두어 중력·충돌 반응이 복제 위치와 경쟁하지 않게 한다.
-    /// 콜라이더 감지는 유지하므로 서버의 공격 판정과 Overlap 쿼리에는 계속 참여한다.
+    /// 🔴 **이 브랜치는 오너 권위 이동이다.** 서버 권위 브랜치와 가르는 단 하나의 스위치.
+    ///
+    /// 서버 권위(feature/player-motor-server-auth)에서는 서버가 오너의 raw 입력으로 직접
+    /// 시뮬레이션해 위치를 확정하고, 오너는 예측 후 되감기·재생으로 보정받는다. 치트 방지가 되지만
+    /// 이동에 관여하는 모든 기능을 오너·서버 양쪽에서 성립시켜야 한다.
+    ///
+    /// 여기서는 그 전부를 끈다 — 오너가 위치의 주인이고 NetworkTransform 이 오너 권위로 복제한다.
+    /// 치트 방지는 포기하는 대신 구조가 단순하고, 이동 신규 기능을 한 번만 저작하면 된다.
+    ///
+    /// 되살리는 법: 이 값을 true 로 바꾸고 Paladin/Player 프리팹의 루트·Armature
+    /// NetworkTransform.AuthorityMode 를 0(Server)으로 되돌린다. 코드는 지우지 않고 남겨 뒀다.
     /// </summary>
-    private void ConfigureMovementPhysicsAuthority()
+    private const bool ServerAuthoritativeMovement = false;
+
+    /// <summary>다른 컴포넌트(PlayerMotor 등)가 같은 스위치를 참조하기 위한 창구.</summary>
+    public static bool UsesServerAuthoritativeMovement => ServerAuthoritativeMovement;
+    /// <summary>로컬 입력 장치와 로컬 UI를 읽는 주체.</summary>
+    public bool IsInputSource => !IsNetworkActive || IsOwner;
+
+    /// <summary>
+    /// PlayerMotor 시뮬레이션을 로컬에서 수행하는 주체.
+    /// 서버 권위에서는 서버도 원격 플레이어를 시뮬레이션하지만, 오너 권위에서는 오너만 돈다.
+    /// 루트모션·스킬 전진·플랫폼 캐리·자동접근이 전부 이 값으로 게이팅되므로, 여기 하나만 바꾸면
+    /// 그 채널들이 통째로 오너 전용으로 돌아간다.
+    /// </summary>
+    public bool IsSimulating =>
+        !IsNetworkActive || IsOwner || (ServerAuthoritativeMovement && IsServer);
+
+    /// <summary>
+    /// 이동 결과를 진실로 확정하는 주체. 넉백·구속·대시 개시가 이 값으로 갈린다.
+    /// 오너 권위에서는 오너가 자기 이동을 확정하므로 오너다(데미지·상태이상 판정은 여전히 서버다 —
+    /// 그쪽은 IsServer 를 직접 쓰지 이 값을 쓰지 않는다).
+    /// </summary>
+    public bool IsMotionAuthority =>
+        !IsNetworkActive || (ServerAuthoritativeMovement ? IsServer : IsOwner);
+
+    public bool IsRemoteProxy => IsNetworkActive && !IsOwner && !IsServer;
+
+    /// <summary>
+    /// Player 위치는 루트 NetworkTransform이 복제한다(2026-09-16부터 server-authority — 그전에는 Owner였다).
+    /// Rigidbody는 전 피어에서 kinematic이며, 원격 프록시는 Motor만 꺼 복제 위치와 경쟁하지 않게 한다.
+    /// 콜라이더는 유지하므로 서버 공격 판정과 Overlap 쿼리에는 계속 참여한다.
+    /// </summary>
+    private void ConfigureMovementAuthority(string reason)
     {
-        if (playerRigidbody == null)
+        if (motor != null)
+            motor.enabled = IsSimulating;
+
+        if (networkTransform == null)
+        {
+            if (!networkTransformMissingWarningLogged)
+            {
+                networkTransformMissingWarningLogged = true;
+                Debug.LogWarning("[Player] 루트 NetworkTransform을 찾지 못해 이동 복제 활성 상태를 구성할 수 없습니다.", this);
+            }
+        }
+        else
+        {
+            // 오너 클라는 Motor 예측을 즉시 표시하고 서버 보정 RPC로만 되감기/재생한다.
+            // 호스트와 원격 프록시는 계속 NT를 사용한다. 이 분기는 보정 채널과 반드시 한 세트다.
+            // 서버 권위에서만 오너의 NT 를 끈다(예측이 덮이지 않도록). 오너 권위에서는 NT 가
+            // 오너 권위 모드로 그 오너의 위치를 복제하므로 전 인스턴스에서 켜 둔다.
+            networkTransform.enabled = !(ServerAuthoritativeMovement && IsOwner && !IsServer);
+        }
+
+        LogMovementAuthorityState(reason);
+    }
+
+    private void HandleOwnerSimulationCompleted(
+        PlayerRawSimulationInput rawInput,
+        PlayerSimulationInput simulationInput,
+        PlayerSimulationState resultState)
+    {
+        NetworkClock clock = NetworkClock.Instance;
+        if (!IsSpawned || !IsOwner || clock == null || !clock.IsRunning || !clock.HasMainGameStarted)
             return;
 
-        playerRigidbody.linearVelocity = Vector3.zero;
-        playerRigidbody.angularVelocity = Vector3.zero;
+        long tick = CurrentSimulationTick();
 
-        if (IsMovementAuthority)
+        // raw는 서버 전송용이고, 실제 소비한 전체 입력은 오너의 로컬 재생에만 쓴다.
+        // 외부 변위를 RPC로 보내 서버가 신뢰하게 만들면 서버 권위가 무너지므로 둘을 분리한다.
+        // 동일 틱은 마지막 물리 호출 결과로 교체된다.
+        ownerRawInputHistory.Store(tick, rawInput);
+        ownerReplayInputHistory.Store(tick, simulationInput);
+        ownerSimulationStateHistory.Store(tick, resultState);
+
+        // 예측 위치는 같은 틱의 발산을 계측하기 위한 클라이언트 보고값일 뿐이며 게임 로직에 쓰지 않는다.
+        // 호스트 오너는 이 인스턴스의 Motor 틱 자체가 서버 커밋이다. RPC 관측 경로를 다시 돌리면 이중 시뮬레이션된다.
+        // 오너 권위에서는 서버가 입력으로 시뮬레이션하지 않으므로 입력 RPC 자체가 불필요하다.
+        if (ServerAuthoritativeMovement && !IsServer)
         {
-            playerRigidbody.detectCollisions = initialRigidbodyDetectCollisions;
-            playerRigidbody.isKinematic = initialRigidbodyIsKinematic;
+            // 🔴 입력 중복 전송 — 최근 InputRedundancyTicks 틱을 함께 싣는다.
+            // 입력 한 장만 잃어도 서버가 기아에 빠져 마지막 입력을 반복하거나 0 입력을 쓰고,
+            // 오너가 그 사이 방향을 바꿨으면 그대로 발산한다. 2026-09-16 Mobile4G(손실 4%) 실측에서
+            // correction max=2.16m / corrected 23건·s / replayedTicks 907건·s 가 그 결과였다.
+            // 연속으로 잃지 않는 한 굶지 않게 만든다 — 4% 손실에서 3연속 유실은 0.006% 다.
+            // 서버는 이미 받은 틱을 무시하므로 중복 자체는 무해하다.
+            SubmitMovementInputServerRpc(
+                tick,
+                rawInput.MoveDirection.x,
+                rawInput.MoveDirection.y,
+                rawInput.HasMoveInput,
+                resultState.Position,
+                BuildRedundantInputPayload(tick));
+            RecordMovementRpcSent();
+        }
+    }
+
+    /// <summary>
+    /// 현재 틱 직전의 입력들을 한 배열로 만든다(index 0 = tick-1, 1 = tick-2 …).
+    /// 전송량은 틱당 3 * (Vector2 + bool) ≈ 27바이트로, 50Hz 기준 초당 1.3KB 남짓이다.
+    /// 유실 한 장이 만드는 서버 기아를 없애는 값으로는 싸다.
+    /// </summary>
+    private RedundantRawInput[] BuildRedundantInputPayload(long currentTick)
+    {
+        var payload = new RedundantRawInput[InputRedundancyTicks];
+        for (int i = 0; i < InputRedundancyTicks; i++)
+        {
+            long tick = currentTick - (i + 1);
+            if (tick < 0 || !ownerRawInputHistory.TryGet(tick, out PlayerRawSimulationInput past))
+            {
+                // 빈 칸은 HasValue=false 로 보낸다. 서버가 0 입력으로 오해하면 안 된다.
+                payload[i] = default;
+                continue;
+            }
+
+            payload[i] = new RedundantRawInput(tick, past.MoveDirection, past.HasMoveInput);
+        }
+
+        return payload;
+    }
+
+    /// <summary>중복 전송되는 과거 입력 한 칸. HasValue=false 는 "그 틱 기록이 없다"는 뜻이다.</summary>
+    public struct RedundantRawInput : INetworkSerializable
+    {
+        public bool HasValue;
+        public long Tick;
+        public Vector2 MoveDirection;
+        public bool HasMoveInput;
+
+        public RedundantRawInput(long tick, Vector2 moveDirection, bool hasMoveInput)
+        {
+            HasValue = true;
+            Tick = tick;
+            MoveDirection = moveDirection;
+            HasMoveInput = hasMoveInput;
+        }
+
+        public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
+        {
+            serializer.SerializeValue(ref HasValue);
+            serializer.SerializeValue(ref Tick);
+            serializer.SerializeValue(ref MoveDirection);
+            serializer.SerializeValue(ref HasMoveInput);
+        }
+    }
+
+    [ServerRpc] // RequireOwnership 기본값 true. 예측 위치는 신뢰하지 않는 계측값이며 판정·이동·보정에 쓰지 않는다.
+    private void SubmitMovementInputServerRpc(
+        long tick,
+        float moveX,
+        float moveY,
+        bool hasMoveInput,
+        Vector3 ownerPredictedPosition,
+        RedundantRawInput[] redundantInputs,
+        ServerRpcParams rpcParams = default)
+    {
+        ulong senderClientId = rpcParams.Receive.SenderClientId;
+        RecordMovementRpcReceived();
+        if (senderClientId != OwnerClientId)
+        {
+            Edit.LogWarning(
+                $"[Recon] raw 입력 거부: sender={senderClientId}, owner={OwnerClientId}, tick={tick}",
+                this);
             return;
         }
 
-        playerRigidbody.detectCollisions = initialRigidbodyDetectCollisions;
-        playerRigidbody.isKinematic = true;
+        Vector2 direction = new Vector2(moveX, moveY);
+        if (!IsFinite(direction))
+        {
+            Edit.LogWarning($"[Recon] 비정상 raw 입력을 0으로 대체: owner={OwnerClientId}, tick={tick}", this);
+            direction = Vector2.zero;
+            hasMoveInput = false;
+        }
+        else
+        {
+            // 키보드 대각선은 (1, 1)일 수 있으므로 벡터 크기를 1로 정규화하면 오너 입력과 달라진다.
+            // 축 범위만 제한하고 HasMoveInput은 InputReader가 만든 raw 플래그 그대로 사용한다.
+            direction.x = Mathf.Clamp(direction.x, -1f, 1f);
+            direction.y = Mathf.Clamp(direction.y, -1f, 1f);
+        }
+
+        // 중복 전송분을 **오래된 것부터** 먼저 넣고, 마지막에 이번 틱을 넣는다.
+        // 유실로 비어 있던 자리를 메우는 것이 목적이므로 순서를 지켜야 큐가 연속된 입력열이 된다.
+        if (redundantInputs != null)
+        {
+            for (int i = redundantInputs.Length - 1; i >= 0; i--)
+            {
+                RedundantRawInput past = redundantInputs[i];
+                if (!past.HasValue)
+                    continue;
+
+                EnqueueOwnerInput(past.Tick, past.MoveDirection, past.HasMoveInput, Vector3.zero, false, senderClientId);
+            }
+        }
+
+        EnqueueOwnerInput(tick, direction, hasMoveInput, ownerPredictedPosition, true, senderClientId);
+
+        // 버스트가 최대치를 넘으면 최신 입력을 보존하고 가장 오래된 입력부터 폐기한다.
+        while (serverRawInputQueue.Count > MaxServerInputQueueTicks)
+        {
+            serverRawInputQueue.Dequeue();
+            droppedServerInputCount++;
+            // 입력을 버렸으니 서버 상태는 연속된 입력열의 결과가 아니다 — 다음 샘플은 발산 집계에서 뺀다.
+            hasExpectedServerInputTick = false;
+        }
     }
 
-    private void RestoreRigidbodyDefaults()
+    /// <summary>
+    /// 오너 입력을 서버 큐에 넣는다. **이미 소비했거나 큐에 있는 틱은 버린다** —
+    /// 중복 전송은 유실을 메우기 위한 것이라 같은 틱이 여러 번 도착하는 것이 정상이다.
+    /// </summary>
+    private void EnqueueOwnerInput(
+        long tick,
+        Vector2 direction,
+        bool hasMoveInput,
+        Vector3 ownerPredictedPosition,
+        bool hasOwnerPrediction,
+        ulong senderClientId)
     {
-        if (playerRigidbody == null)
+        if (hasProcessedServerInputTick && tick <= lastProcessedServerInputTick)
             return;
 
-        playerRigidbody.linearVelocity = Vector3.zero;
-        playerRigidbody.angularVelocity = Vector3.zero;
-        playerRigidbody.detectCollisions = initialRigidbodyDetectCollisions;
-        playerRigidbody.isKinematic = initialRigidbodyIsKinematic;
+        if (hasLastEnqueuedOwnerTick && tick <= lastEnqueuedOwnerTick)
+            return;
+
+        if (!IsFinite(direction))
+        {
+            direction = Vector2.zero;
+            hasMoveInput = false;
+        }
+        else
+        {
+            direction.x = Mathf.Clamp(direction.x, -1f, 1f);
+            direction.y = Mathf.Clamp(direction.y, -1f, 1f);
+        }
+
+        serverRawInputQueue.Enqueue(new ServerRawSimulationInput(
+            tick,
+            new PlayerRawSimulationInput(direction, hasMoveInput),
+            hasOwnerPrediction ? ownerPredictedPosition : new Vector3(float.NaN, float.NaN, float.NaN),
+            GetSenderRttSeconds(senderClientId),
+            CurrentSimulationTick()));
+
+        lastEnqueuedOwnerTick = tick;
+        hasLastEnqueuedOwnerTick = true;
+    }
+
+    private void ProcessServerObservationInputs()
+    {
+        if (motor == null)
+        {
+            serverRawInputQueue.Clear();
+            return;
+        }
+
+        // 정상 틱에는 하나를 소비한다. 버스트로 목표 길이를 넘은 경우에는 오래된 입력도 실제로
+        // 시뮬레이션해 목표 길이까지 따라잡고, 최대 길이 초과분만 RPC 수신 시 폐기한다.
+        int freshInputsToConsume = serverRawInputQueue.Count > 0
+            ? 1 + Mathf.Max(0, serverRawInputQueue.Count - TargetServerInputQueueTicks)
+            : 0;
+
+        if (freshInputsToConsume > 0)
+        {
+            for (int i = 0; i < freshInputsToConsume; i++)
+            {
+                ServerRawSimulationInput freshInput = serverRawInputQueue.Dequeue();
+                lastServerRawInput = freshInput;
+                hasLastServerRawInput = true;
+                repeatedServerInputTicks = 0;
+
+                if (!SimulateServerObservationInput(freshInput, true))
+                    return;
+            }
+
+            return;
+        }
+
+        ServerRawSimulationInput inputForTick;
+        if (hasLastServerRawInput && repeatedServerInputTicks < MaxRepeatedServerInputTicks)
+        {
+            inputForTick = lastServerRawInput;
+            repeatedServerInputTicks++;
+            // 기아 반복은 클라가 실제로 보낸 입력이 아니다 — 입력열이 끊긴 것으로 본다.
+            hasExpectedServerInputTick = false;
+        }
+        else
+        {
+            // 입력 기아가 10틱을 넘으면 입력을 놓은 것으로 간주한다. 감속/중력은 계속 서버에서 시뮬레이션된다.
+            inputForTick = new ServerRawSimulationInput(
+                // 🔴 오너 틱 자리에 서버 카운터를 넣지 않는다 — 두 카운터는 별개 번호 공간이라
+                // 섞이면 입력 필터·보정 ack 이 함께 무너진다(2026-09-16 두 번 겪었다).
+                // 추측 입력이므로 "마지막으로 본 실제 오너 틱"을 그대로 쓴다.
+                hasLastServerRawInput ? lastServerRawInput.Tick : 0L,
+                default,
+                default,
+                hasLastServerRawInput ? lastServerRawInput.RttSeconds : 0.0,
+                CurrentSimulationTick());
+            hasExpectedServerInputTick = false;
+        }
+
+        SimulateServerObservationInput(inputForTick, false);
+    }
+
+    private bool SimulateServerObservationInput(
+        ServerRawSimulationInput inputForTick,
+        bool receivedFreshInput)
+    {
+        long serverTick = CurrentSimulationTick();
+        if (!motor.TrySimulateServerObservation(
+                inputForTick.Input,
+                Time.fixedDeltaTime,
+                out PlayerSimulationState serverState))
+        {
+            return false;
+        }
+
+        // 🔴 **실제로 받은 오너 입력**을 소비했을 때만 갱신한다.
+        // 이 값은 "서버가 마지막으로 소비한 오너 입력 틱"이라는 뜻이고, 중복 전송 제거가 이 값으로
+        // 들어오는 입력을 거른다. 기아 폴백의 추측 틱(0 입력일 때는 서버 자기 카운터)이 섞이면
+        // 오너 틱보다 앞선 값이 들어와 **이후 오너 입력이 전부 버려진다** — 2026-09-16 실측에서
+        // received 가 50/s → 2~23/s 로 무너진 원인이다. 두 틱은 별개 번호 공간이다(b3-0).
+        if (receivedFreshInput)
+        {
+            lastProcessedServerInputTick = inputForTick.Tick;
+            hasProcessedServerInputTick = true;
+        }
+
+        // 🔴 보정은 **실제로 받은 입력**을 소비했을 때만 보낸다.
+        // 기아(입력 유실) 구간에서 서버는 추측으로 돈다 — 마지막 입력을 반복하거나 0 입력을 쓴다.
+        // 그 결과를 오너에 보내면 두 가지로 깨진다(2026-09-16 Mobile4G 실측):
+        //  ① 반복 기아는 **이미 보낸 오너 틱을 다시** 보내 오너가 stale 로 버린다(초당 41~51건).
+        //  ② 0 입력 기아는 틱 자리에 **서버 자기 카운터**를 싣는다. b3-0 이후 오너 틱과 서버 틱은
+        //     별개 번호 공간이라 오너에는 그런 틱이 없고, historyMiss → 스냅 → 이력 삭제로 간다.
+        //     이력이 지워지면 뒤따르는 진짜 보정도 전부 미스가 되어 재생이 영영 돌지 않는다.
+        // 추측으로 오너를 고치는 것은 안 고치느니만 못하다. 유실 구간에는 오너가 계속 예측하고,
+        // 다음 진짜 입력이 소비될 때 한 번에 바로잡힌다.
+        if (receivedFreshInput)
+            SendOwnerCorrection(serverState, inputForTick.Tick, false);
+
+        lastServerSimPosition = serverState.Position;
+        lastServerSimDirection = inputForTick.Input.MoveDirection;
+        lastServerSimHasMoveInput = inputForTick.Input.HasMoveInput;
+        lastServerSimGrounded = serverState.IsGrounded;
+        lastServerSimBlocked = serverState.WasBlockedThisTick;
+
+        // [Recon]은 실제 수신 샘플만 대상으로 하며 반복 입력에는 클라이언트의 같은 틱 보고가 없다.
+        if (receivedFreshInput)
+        {
+            RecordReconciliationObservation(inputForTick, serverTick, serverState);
+        }
+
+        return true;
+    }
+
+    private void SendOwnerCorrection(
+        PlayerSimulationState serverState,
+        long inputTick,
+        bool forceSnap)
+    {
+        if (!IsServer || IsOwner)
+        {
+            Edit.LogWarning(
+                $"[Recon] 보정 송신 주체가 아님: owner={OwnerClientId}, IsServer={IsServer}, IsOwner={IsOwner}, " +
+                $"tick={inputTick}, forceSnap={forceSnap}",
+                this);
+            return;
+        }
+
+        ReconcileOwnerClientRpc(
+            inputTick,
+            serverState.Position,
+            serverState.VerticalVelocity,
+            serverState.CurrentSpeed,
+            serverState.ArmatureRotation,
+            serverState.KnockbackVelocity,
+            serverState.DashDirection,
+            serverState.DashSpeed,
+            serverState.DashRemainingTime,
+            serverState.GravityEnabled,
+            forceSnap,
+            CreateOwnerClientRpcParams());
+    }
+
+    /// <summary>서버가 예측 대상이 아닌 위치 변경을 확정한 뒤 오너에게 강제 보정을 보낸다.</summary>
+    internal void ForceOwnerReconciliation()
+    {
+        if (!IsServer || IsOwner || motor == null)
+        {
+            Edit.LogWarning(
+                $"[Recon] forceSnap 송신 불가: owner={OwnerClientId}, IsServer={IsServer}, IsOwner={IsOwner}, " +
+                $"motor={(motor != null ? "present" : "missing")}",
+                this);
+            return;
+        }
+
+        long inputTick = hasProcessedServerInputTick
+            ? lastProcessedServerInputTick
+            : CurrentSimulationTick();
+        SendOwnerCorrection(motor.SimulationState, inputTick, true);
+    }
+
+    [ClientRpc(Delivery = RpcDelivery.Unreliable)]
+    private void ReconcileOwnerClientRpc(
+        long inputTick,
+        Vector3 position,
+        float verticalVelocity,
+        float currentSpeed,
+        Quaternion armatureRotation,
+        Vector3 knockbackVelocity,
+        Vector3 dashDirection,
+        float dashSpeed,
+        float dashRemainingTime,
+        bool gravityEnabled,
+        bool forceSnap,
+        ClientRpcParams clientRpcParams = default)
+    {
+        if (!IsOwner || IsServer)
+        {
+            Edit.LogWarning(
+                $"[Recon] 오너가 아닌 인스턴스가 보정을 수신: owner={OwnerClientId}, " +
+                $"IsOwner={IsOwner}, IsServer={IsServer}, tick={inputTick}",
+                this);
+            return;
+        }
+
+        ownerCorrectionReceivedCount++;
+        bool stale = hasReceivedCorrectionTick && inputTick <= lastReceivedCorrectionTick && !forceSnap;
+        if (stale)
+        {
+            ownerCorrectionStaleCount++;
+        }
+        else
+        {
+            if (!hasReceivedCorrectionTick || inputTick > lastReceivedCorrectionTick)
+            {
+                lastReceivedCorrectionTick = inputTick;
+                hasReceivedCorrectionTick = true;
+            }
+
+            ReconcileOwnerPrediction(
+                inputTick,
+                position,
+                verticalVelocity,
+                currentSpeed,
+                armatureRotation,
+                knockbackVelocity,
+                dashDirection,
+                dashSpeed,
+                dashRemainingTime,
+                gravityEnabled,
+                forceSnap);
+        }
+    }
+
+    private void ReconcileOwnerPrediction(
+        long inputTick,
+        Vector3 position,
+        float verticalVelocity,
+        float currentSpeed,
+        Quaternion armatureRotation,
+        Vector3 knockbackVelocity,
+        Vector3 dashDirection,
+        float dashSpeed,
+        float dashRemainingTime,
+        bool gravityEnabled,
+        bool forceSnap)
+    {
+        if (motor == null)
+        {
+            Edit.LogError(
+                $"[Recon] 보정을 적용할 PlayerMotor가 없습니다: owner={OwnerClientId}, tick={inputTick}",
+                this);
+            return;
+        }
+
+        bool hasPredictedState = ownerSimulationStateHistory.TryGet(
+            inputTick,
+            out PlayerSimulationState predictedState);
+        PlayerSimulationState authoritativeState = hasPredictedState
+            ? predictedState
+            : motor.SimulationState;
+        authoritativeState.Position = position;
+        authoritativeState.VerticalVelocity = verticalVelocity;
+        authoritativeState.CurrentSpeed = currentSpeed;
+        authoritativeState.ArmatureRotation = armatureRotation;
+        authoritativeState.KnockbackVelocity = knockbackVelocity;
+        authoritativeState.DashDirection = dashDirection;
+        authoritativeState.DashSpeed = dashSpeed;
+        authoritativeState.DashRemainingTime = dashRemainingTime;
+        authoritativeState.GravityEnabled = gravityEnabled;
+
+        float correctionDistance = hasPredictedState
+            ? Vector3.Distance(predictedState.Position, position)
+            : float.PositiveInfinity;
+
+        if (!hasPredictedState)
+        {
+            // 🔴 이력보다 **과거**의 ack 이면 무시한다. 스냅하면 안 된다.
+            // 그 구간은 이미 지나갔고, 지금 예측이 더 최신이다. 옛 위치로 되돌리면 눈에 띄게 튄다.
+            if (ownerSimulationStateHistory.TryGetOldestTick(out long oldestPredictedTick) &&
+                inputTick < oldestPredictedTick)
+            {
+                ownerCorrectionStaleCount++;
+                return;
+            }
+            ownerCorrectionAppliedCount++;
+            if (forceSnap)
+                ownerCorrectionForceSnapCount++;
+
+            // 같은 inputTick의 일반 ACK가 먼저 와 N 기록을 이미 버린 뒤 forceSnap이 도착할 수 있다.
+            // 그 경우에도 N+1 이후의 미확정 입력은 남아 있으므로 텔레포트 위치에서 재생한다.
+            if (forceSnap &&
+                ownerRawInputHistory.TryGetLatestTick(out long forceLatestInputTick) &&
+                forceLatestInputTick > inputTick)
+            {
+                long forceFirstReplayTick = inputTick < long.MaxValue
+                    ? inputTick + 1
+                    : long.MaxValue;
+                bool forceReplayed = motor.TryApplyAuthoritativeStateAndReplay(
+                    authoritativeState,
+                    ownerReplayInputHistory,
+                    ownerSimulationStateHistory,
+                    forceFirstReplayTick,
+                    forceLatestInputTick,
+                    Time.fixedDeltaTime,
+                    out int forceReplayedTickCount);
+                if (forceReplayed)
+                {
+                    ownerCorrectionReplayTickCount += forceReplayedTickCount;
+                    ownerRawInputHistory.DiscardThrough(inputTick);
+                    ownerReplayInputHistory.DiscardThrough(inputTick);
+                    return;
+                }
+
+                Edit.LogWarning(
+                    $"[Recon] forceSnap 재생 입력열 누락으로 서버 상태에 스냅: owner={OwnerClientId}, " +
+                    $"ackTick={inputTick}, latestInputTick={forceLatestInputTick}",
+                    this);
+            }
+
+            ownerCorrectionHistoryMissCount++;
+            motor.ApplyAuthoritativeState(authoritativeState);
+            // 🔴 전체 Clear 금지. ack 이하만 버린다.
+            // 이력을 통째로 지우면 **뒤따르는 진짜 보정도 전부 미스**가 되어 재생이 영영 돌지 않는다.
+            // 2026-09-16 Mobile4G 실측에서 corrected==historyMiss, replayedTicks=0 이 그 증상이었다.
+            ownerRawInputHistory.DiscardThrough(inputTick);
+            ownerReplayInputHistory.DiscardThrough(inputTick);
+            ownerSimulationStateHistory.DiscardThrough(inputTick);
+            return;
+        }
+
+        ownerCorrectionDistanceSum += correctionDistance;
+        ownerCorrectionMaxDistance = Mathf.Max(ownerCorrectionMaxDistance, correctionDistance);
+
+        if (!forceSnap && correctionDistance <= OwnerReconciliationPositionThreshold)
+        {
+            ownerCorrectionWithinThresholdCount++;
+            ownerRawInputHistory.DiscardThrough(inputTick);
+            ownerReplayInputHistory.DiscardThrough(inputTick);
+            ownerSimulationStateHistory.DiscardThrough(inputTick);
+            return;
+        }
+
+        ownerCorrectionAppliedCount++;
+        if (forceSnap)
+            ownerCorrectionForceSnapCount++;
+
+        if (!ownerRawInputHistory.TryGetLatestTick(out long latestInputTick))
+            latestInputTick = inputTick;
+        long firstReplayTick = inputTick < long.MaxValue ? inputTick + 1 : long.MaxValue;
+        bool replayed = motor.TryApplyAuthoritativeStateAndReplay(
+            authoritativeState,
+            ownerReplayInputHistory,
+            ownerSimulationStateHistory,
+            firstReplayTick,
+            latestInputTick,
+            Time.fixedDeltaTime,
+            out int replayedTickCount);
+
+        if (replayed)
+        {
+            ownerCorrectionReplayTickCount += replayedTickCount;
+            ownerRawInputHistory.DiscardThrough(inputTick);
+            ownerReplayInputHistory.DiscardThrough(inputTick);
+        }
+        else
+        {
+            Edit.LogWarning(
+                $"[Recon] 재생 입력열 누락으로 서버 상태에 스냅: owner={OwnerClientId}, " +
+                $"ackTick={inputTick}, latestInputTick={latestInputTick}",
+                this);
+            ownerCorrectionHistoryMissCount++;
+            motor.ApplyAuthoritativeState(authoritativeState);
+            // 재생 입력열이 끊긴 경우다. 여기서도 전체 Clear 대신 ack 이하만 버려 다음 보정이 살아나게 한다.
+            ownerRawInputHistory.DiscardThrough(inputTick);
+            ownerReplayInputHistory.DiscardThrough(inputTick);
+            ownerSimulationStateHistory.DiscardThrough(inputTick);
+        }
+    }
+
+    private void RecordReconciliationObservation(
+        ServerRawSimulationInput input,
+        long serverTick,
+        PlayerSimulationState serverState)
+    {
+        double now = NetworkClock.Instance != null
+            ? NetworkClock.Instance.MainGameElapsed
+            : 0.0;
+
+        if (reconSampleCount == 0 && reconDiscardedSampleCount == 0)
+        {
+            reconWindowStartedAt = now;
+            reconWindowFirstTick = input.Tick;
+        }
+
+        reconWindowLastTick = input.Tick;
+        reconWindowLastServerTick = serverTick;
+        reconWindowLastQueueWaitTicks = System.Math.Max(0L, serverTick - input.EnqueuedServerTick);
+
+        // 발산 = 같은 **입력 틱 N** 에 대한 [오너가 보고한 예측 위치] vs [서버가 N을 소비한 뒤의 확정 위치].
+        // 서버가 그 입력을 자기 공유틱 몇 번에 소비했는지(lagTicks)는 무관하다 — 원격 클라에서 lag 은
+        // 구조적으로 0이 아니므로 서버틱 일치를 요구하면 모든 샘플이 폐기된다.
+        // 비교가 깨지는 경우는 **입력열이 끊겼을 때**뿐이다(큐 폐기 · 기아 반복 · 틱 갭/재정렬):
+        // 그때는 서버 상태가 더 이상 "입력 N 까지 연속 소비한 결과"가 아니다.
+        // OwnerPredictedPosition은 클라이언트가 보고한 비신뢰 계측값이며 게임 로직에는 절대 사용하지 않는다.
+        bool sequenceContinuous = hasExpectedServerInputTick && input.Tick == expectedServerInputTick;
+
+        // 어긋났더라도 이 입력을 기준으로 다시 맞춘다. 연속이 회복되면 다음 샘플부터 집계된다.
+        expectedServerInputTick = input.Tick + 1;
+        hasExpectedServerInputTick = true;
+
+        if (!sequenceContinuous)
+        {
+            reconDiscardedSampleCount++;
+            reconSequenceBreakSampleCount++;
+        }
+        else if (!input.HasUsableOwnerPrediction || !IsFinite(serverState.Position))
+        {
+            reconDiscardedSampleCount++;
+        }
+        else
+        {
+            float divergence = Vector3.Distance(input.OwnerPredictedPosition, serverState.Position);
+            if (!IsFinite(divergence))
+            {
+                reconDiscardedSampleCount++;
+            }
+            else
+            {
+                reconSampleCount++;
+                reconDivergenceSum += divergence;
+                reconMaxDivergence = Mathf.Max(reconMaxDivergence, divergence);
+            }
+        }
+
+        if (now - reconWindowStartedAt < ReconciliationLogIntervalSeconds)
+            return;
+
+        string average = reconSampleCount > 0
+            ? $"{reconDivergenceSum / reconSampleCount:F3}m"
+            : "n/a";
+        string maximum = reconSampleCount > 0
+            ? $"{reconMaxDivergence:F3}m"
+            : "n/a";
+        Edit.Log(
+            $"[Recon] owner={OwnerClientId} inputTicks={reconWindowFirstTick}..{reconWindowLastTick} " +
+            $"serverTick={reconWindowLastServerTick} queueWaitTicks={reconWindowLastQueueWaitTicks} " +
+            $"samples={reconSampleCount} discardedSamples={reconDiscardedSampleCount} " +
+            $"sequenceBreakSamples={reconSequenceBreakSampleCount} droppedInputsTotal={droppedServerInputCount} " +
+            $"divergence avg={average} max={maximum} " +
+            $"RTT={input.RttSeconds * 1000.0:F1}ms (비신뢰 관측 전용, 보정 없음)",
+            this);
+
+        reconSampleCount = 0;
+        reconDiscardedSampleCount = 0;
+        reconSequenceBreakSampleCount = 0;
+        reconDivergenceSum = 0.0;
+        reconMaxDivergence = 0f;
+        reconWindowStartedAt = now;
+    }
+
+    private double GetSenderRttSeconds(ulong senderClientId)
+    {
+        if (NetworkManager == null ||
+            senderClientId == NetworkManager.ServerClientId ||
+            senderClientId == NetworkManager.LocalClientId)
+        {
+            return 0.0;
+        }
+
+        var transport = NetworkManager.NetworkConfig != null
+            ? NetworkManager.NetworkConfig.NetworkTransport
+            : null;
+        if (transport == null)
+            return 0.0;
+
+        return System.Math.Max(0.0, transport.GetCurrentRtt(senderClientId) / 1000.0);
+    }
+
+    private long CurrentSimulationTick() => localSimulationTick;
+
+    private void ResetReconciliationObservation()
+    {
+        ownerRawInputHistory?.Clear();
+        ownerReplayInputHistory?.Clear();
+        ownerSimulationStateHistory?.Clear();
+        serverRawInputQueue.Clear();
+        lastServerRawInput = default;
+        hasLastServerRawInput = false;
+        repeatedServerInputTicks = 0;
+        droppedServerInputCount = 0;
+        localSimulationTick = 0L;
+        lastProcessedServerInputTick = 0L;
+        hasProcessedServerInputTick = false;
+        lastEnqueuedOwnerTick = 0L;
+        hasLastEnqueuedOwnerTick = false;
+        lastReceivedCorrectionTick = 0L;
+        hasReceivedCorrectionTick = false;
+        motor?.ResetServerObservation();
+        reconSampleCount = 0;
+        reconDiscardedSampleCount = 0;
+        reconSequenceBreakSampleCount = 0;
+        expectedServerInputTick = 0L;
+        hasExpectedServerInputTick = false;
+        reconDivergenceSum = 0.0;
+        reconMaxDivergence = 0f;
+        reconWindowStartedAt = 0.0;
+        reconWindowFirstTick = 0L;
+        reconWindowLastTick = 0L;
+        reconWindowLastServerTick = 0L;
+        reconWindowLastQueueWaitTicks = 0L;
+        ownerReconWindowEndsAt = Time.realtimeSinceStartupAsDouble + ReconciliationLogIntervalSeconds;
+        ownerCorrectionReceivedCount = 0;
+        ownerCorrectionWithinThresholdCount = 0;
+        ownerCorrectionAppliedCount = 0;
+        ownerCorrectionForceSnapCount = 0;
+        ownerCorrectionHistoryMissCount = 0;
+        ownerCorrectionStaleCount = 0;
+        ownerCorrectionReplayTickCount = 0;
+        ownerCorrectionDistanceSum = 0.0;
+        ownerCorrectionMaxDistance = 0f;
+    }
+
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    private void UpdateOwnerReconciliationDiagnostics()
+    {
+        if (!IsOwner || IsServer || Time.realtimeSinceStartupAsDouble < ownerReconWindowEndsAt)
+            return;
+
+        if (ownerCorrectionReceivedCount > 0)
+        {
+            int measuredCount = ownerCorrectionWithinThresholdCount +
+                                ownerCorrectionAppliedCount -
+                                ownerCorrectionHistoryMissCount;
+            string average = measuredCount > 0
+                ? $"{ownerCorrectionDistanceSum / measuredCount:F3}m"
+                : "n/a";
+            string maximum = measuredCount > 0
+                ? $"{ownerCorrectionMaxDistance:F3}m"
+                : "n/a";
+            Edit.Log(
+                $"[Recon] owner correction 1s: owner={OwnerClientId}, received={ownerCorrectionReceivedCount}, " +
+                $"withinThreshold={ownerCorrectionWithinThresholdCount}, corrected={ownerCorrectionAppliedCount}, " +
+                $"forceSnap={ownerCorrectionForceSnapCount}, historyMiss={ownerCorrectionHistoryMissCount}, " +
+                $"stale={ownerCorrectionStaleCount}, replayedTicks={ownerCorrectionReplayTickCount}, " +
+                $"threshold={OwnerReconciliationPositionThreshold:F2}m, correction avg={average} max={maximum}",
+                this);
+        }
+
+        ownerCorrectionReceivedCount = 0;
+        ownerCorrectionWithinThresholdCount = 0;
+        ownerCorrectionAppliedCount = 0;
+        ownerCorrectionForceSnapCount = 0;
+        ownerCorrectionHistoryMissCount = 0;
+        ownerCorrectionStaleCount = 0;
+        ownerCorrectionReplayTickCount = 0;
+        ownerCorrectionDistanceSum = 0.0;
+        ownerCorrectionMaxDistance = 0f;
+        ownerReconWindowEndsAt = Time.realtimeSinceStartupAsDouble + ReconciliationLogIntervalSeconds;
+    }
+
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    private void BeginMovementDiagnostics()
+    {
+        double now = Time.realtimeSinceStartupAsDouble;
+        movementHeartbeatDeadline = now + MovementHeartbeatTimeoutSeconds;
+        movementRpcWindowEndsAt = now + MovementRpcLogIntervalSeconds;
+        movementRpcSentCount = 0;
+        movementRpcReceivedCount = 0;
+        movementHeartbeatWarningLogged = false;
+        motor?.BeginMovementDiagnostics();
+    }
+
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    private void UpdateMovementDiagnostics()
+    {
+        if (IsSimulating &&
+            !movementHeartbeatWarningLogged &&
+            motor != null &&
+            motor.MovementDiagnosticTickCount == 0 &&
+            Time.realtimeSinceStartupAsDouble >= movementHeartbeatDeadline)
+        {
+            movementHeartbeatWarningLogged = true;
+            Edit.LogWarning(
+                $"[MoveDiag] Motor has not Tick'ed within {MovementHeartbeatTimeoutSeconds:F1}s: " +
+                $"{MovementDiagnosticIdentity()}, enabled={motor.enabled}, mode={motor.Mode}",
+                this);
+        }
+
+        if (!IsSpawned || (!IsOwner && !IsServer))
+            return;
+
+        double now = Time.realtimeSinceStartupAsDouble;
+        if (now < movementRpcWindowEndsAt)
+            return;
+
+        NetworkClock clock = NetworkClock.Instance;
+        string sent = IsOwner ? movementRpcSentCount.ToString() : "n/a";
+        string received = IsServer ? movementRpcReceivedCount.ToString() : "n/a";
+
+        // 서버가 남의 캐릭터를 시뮬레이션하는 경우에만 "왜 안 움직이는가"를 함께 찍는다.
+        // 판정법: hasMove=False 면 입력이 안 실려온 것, canMove=False 면 상태 머신이 막은 것,
+        // 둘 다 True 인데 pos 가 안 변하면 스윕이 막은 것(blocked 로 확인).
+        // 🔴 실제 transform 위치는 **어느 피어에서든** 찍는다. 이게 "어디에 있나"의 1차 증거다.
+        Vector3 actualPosition = motor != null ? motor.Position : transform.position;
+        string pos =
+            $", pos={actualPosition.x:F2}/{actualPosition.y:F2}/{actualPosition.z:F2}";
+
+        // 서버 시뮬레이션 스냅샷은 **그 경로가 실제로 돈 경우에만** 의미가 있다.
+        // 오너 권위에서는 ProcessServerObservationInputs 가 아예 안 돌아 이 필드들이 전부 기본값(0)으로
+        // 남는다. 그걸 그대로 찍으면 "서버가 원점에 있다"로 읽혀 진단을 정반대로 오도한다 —
+        // 2026-09-16 실제로 그렇게 오독했다. 경로가 꺼져 있으면 값 대신 그 사실을 적는다.
+        string serverSim;
+        if (!IsServer || IsOwner)
+        {
+            serverSim = string.Empty;
+        }
+        else if (!UsesServerAuthoritativeMovement)
+        {
+            serverSim = ", serverSim=off(owner-auth)";
+        }
+        else
+        {
+            serverSim =
+                $", srvPos={lastServerSimPosition.x:F2}/{lastServerSimPosition.y:F2}/{lastServerSimPosition.z:F2}" +
+                $", dir={lastServerSimDirection.x:F2}/{lastServerSimDirection.y:F2}" +
+                $", hasMove={lastServerSimHasMoveInput}, canMove={(stateController != null && stateController.CanMove)}" +
+                $", state={(stateController != null ? stateController.CurrentState.ToString() : "missing")}" +
+                $", grounded={lastServerSimGrounded}, blocked={lastServerSimBlocked}";
+        }
+
+        Edit.Log(
+            $"[MoveDiag] RPC 1s summary: {MovementDiagnosticIdentity()}, sent={sent}, " +
+            $"received={received}, queued={serverRawInputQueue.Count}, droppedInputsTotal={droppedServerInputCount}, " +
+            $"motorTicks={motor?.MovementDiagnosticTickCount ?? 0}{pos}{serverSim}, " +
+            $"clock={(clock != null ? "present" : "missing")}/running={clock != null && clock.IsRunning}" +
+            $"/mainStarted={clock != null && clock.HasMainGameStarted}",
+            this);
+
+        movementRpcSentCount = 0;
+        movementRpcReceivedCount = 0;
+        movementRpcWindowEndsAt = now + MovementRpcLogIntervalSeconds;
+    }
+
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    private void RecordMovementRpcSent()
+    {
+        movementRpcSentCount++;
+    }
+
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    private void RecordMovementRpcReceived()
+    {
+        movementRpcReceivedCount++;
+    }
+
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    private void LogMovementAuthorityState(string reason)
+    {
+        NetworkClock clock = NetworkClock.Instance;
+        PlayerInput unityPlayerInput = GetComponent<PlayerInput>();
+        Edit.Log(
+            $"[MoveDiag] authority ({reason}): {MovementDiagnosticIdentity()}, " +
+            // 🔴 스폰 시점 위치. 오너 권위에서는 "서버의 스폰 좌표가 오너에게 전달됐는가"가 핵심이고,
+            // 전달 실패는 오너가 프리팹 원점(0,0,0)에 남는 형태로 나타난다.
+            $"pos={(motor != null ? motor.Position : transform.position)}, IsOwner={IsOwner}, " +
+            $"IsServer={IsServer}, IsInputSource={IsInputSource}, IsSimulating={IsSimulating}, " +
+            $"IsMotionAuthority={IsMotionAuthority}, IsRemoteProxy={IsRemoteProxy}, " +
+            $"motor.enabled={motor != null && motor.enabled}, Motor.Mode={(motor != null ? motor.Mode.ToString() : "missing")}, " +
+            $"NetworkTransform.enabled={(networkTransform != null ? networkTransform.enabled.ToString() : "missing")}, " +
+            $"NetworkClock={(clock != null ? "present" : "missing")}/running={clock != null && clock.IsRunning}" +
+            $"/mainStarted={clock != null && clock.HasMainGameStarted}, " +
+            $"PlayerInput.enabled={unityPlayerInput != null && unityPlayerInput.enabled}, " +
+            $"EffectiveInputEnabled={inputReader != null && inputReader.DiagnosticEffectiveInputEnabled}",
+            this);
+    }
+
+    private string MovementDiagnosticIdentity()
+    {
+        ulong localClientId = NetworkManager != null
+            ? NetworkManager.LocalClientId
+            : ulong.MaxValue;
+        return $"ownerClientId={OwnerClientId}, localClientId={localClientId}";
+    }
+
+    private static bool IsFinite(Vector2 value)
+    {
+        return IsFinite(value.x) && IsFinite(value.y);
+    }
+
+    private static bool IsFinite(Vector3 value)
+    {
+        return IsFinite(value.x) && IsFinite(value.y) && IsFinite(value.z);
+    }
+
+    private static bool IsFinite(float value)
+    {
+        return !float.IsNaN(value) && !float.IsInfinity(value);
+    }
+
+
+    /// <summary>
+    /// 오너의 스킬 자동 접근(사거리 확보 이동) 의도를 서버에 알린다.
+    /// 위치 권위가 서버이므로 서버도 같은 전진 의도를 만들어야 한다 — 오너만 만들면 서버가 안 움직이고
+    /// 오너 예측은 보정 때마다 되돌려진다(루트모션에서 겪은 것과 같은 결함).
+    /// 목표와 사거리만 보내고 **변위는 보내지 않는다.** 클라가 보고한 이동량을 서버가 믿으면 권위가 무너진다.
+    /// </summary>
+    internal void SubmitAutoApproachIntent(Unit target, float castRange, bool active)
+    {
+        if (!IsNetworkActive || !IsOwner || IsServer)
+            return;
+
+        NetworkObject targetObject = active && target != null ? target.NetworkObject : null;
+        if (active && targetObject == null)
+            return;
+
+        SubmitAutoApproachIntentServerRpc(
+            active ? new NetworkObjectReference(targetObject) : default,
+            castRange,
+            active);
+    }
+
+    [ServerRpc] // RequireOwnership 기본값 true — 오너만 호출 가능
+    private void SubmitAutoApproachIntentServerRpc(
+        NetworkObjectReference targetReference,
+        float castRange,
+        bool active)
+    {
+        if (skillTargeting == null)
+            return;
+
+        if (!active)
+        {
+            skillTargeting.ApplyServerAutoApproach(null, 0f, false);
+            return;
+        }
+
+        if (!targetReference.TryGet(out NetworkObject targetObject) ||
+            !targetObject.TryGetComponent(out Unit target))
+        {
+            // 조용히 넘기면 "자동 접근이 가끔 안 먹는다"가 된다. 사유를 남긴다.
+            Edit.LogWarning(
+                $"[Skill] 자동 접근 대상 해석 실패 — owner={OwnerClientId}. 서버가 전진을 만들지 않는다.",
+                this);
+            skillTargeting.ApplyServerAutoApproach(null, 0f, false);
+            return;
+        }
+
+        skillTargeting.ApplyServerAutoApproach(target, castRange, true);
+    }
+
+
+    /// <summary>
+    /// 서버가 정한 스폰 포즈를 오너에게 확정시킨다. 오너 권위 NT 는 들어오는 상태를 적용하지 않으므로
+    /// 이 경로가 없으면 오너만 프리팹 원점에 남는다.
+    /// Motor 를 거쳐 적용해 시뮬레이션 상태와 transform 이 같이 맞춰지게 한다 —
+    /// transform 만 옮기면 다음 틱에 Motor 가 옛 위치에서 다시 굴린다.
+    /// </summary>
+    [ClientRpc]
+    private void PlaceOwnerAtSpawnClientRpc(
+        Vector3 position,
+        Quaternion rotation,
+        ClientRpcParams clientRpcParams = default)
+    {
+        if (!IsOwner)
+            return;
+
+        transform.rotation = rotation;
+
+        if (motor != null)
+            motor.TeleportAuthoritative(position);
+        else
+            transform.position = position;
+
+        Edit.Log($"[MoveDiag] 오너 스폰 포즈 확정: owner={OwnerClientId}, pos={position}", this);
     }
 
     public void NotifyKnockbackEnded()

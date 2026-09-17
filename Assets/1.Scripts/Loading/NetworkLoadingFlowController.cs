@@ -185,6 +185,14 @@ public class NetworkLoadingFlowController : MonoBehaviour
         ApplyViewState();
     }
 
+    /// <summary>
+    /// 스폰 프리팹을 런타임에 덮어쓴다. **개발용 오버라이드 전용**이다(<see cref="DevSceneBooter"/>).
+    /// 평소 값은 인스펙터의 <c>defaultPlayerPrefab</c> 하나뿐이다 —
+    /// 2026-09-15 이전에는 <c>NetworkSessionLauncher</c> 에도 같은 이름의 필드가 있어
+    /// Awake 에서 이 값을 덮어썼다. 그래서 **인스펙터에 보이는 프리팹과 실제로 스폰되는 프리팹이
+    /// 달랐다**(이 컴포넌트=Paladin, 실제=Player). 필드를 이쪽 하나로 합쳐 그 괴리를 없앴다.
+    /// null 은 무시한다 — 오버라이드를 안 건 씬에서 기본값이 지워지지 않게 하기 위함이다.
+    /// </summary>
     public void SetDefaultPlayerPrefab(GameObject playerPrefab)
     {
         if (playerPrefab != null)
@@ -419,6 +427,12 @@ public class NetworkLoadingFlowController : MonoBehaviour
 
         if (client.PlayerObject != null)
         {
+            // 조용히 넘기면 "왜 이 클라만 엉뚱한 곳에 있나"를 추적할 수 없다.
+            // 이미 PlayerObject 가 있으면 이 스폰은 건너뛰므로, 그 오브젝트가 어디에 있든 그대로 남는다.
+            Edit.LogWarning(
+                $"[Loading] clientId={clientId} 는 이미 PlayerObject 를 갖고 있어 스폰을 건너뜁니다. " +
+                $"기존 위치={client.PlayerObject.transform.position}, " +
+                $"이번에 스폰했을 위치={ResolvePlayerSpawnPose(spawnIndex, baseSpawnPoint).position}");
             return;
         }
 
@@ -445,7 +459,11 @@ public class NetworkLoadingFlowController : MonoBehaviour
 
         player.GetComponent<NetworkObject>().SpawnAsPlayerObject(clientId, true);
 
-        LogDebug($"Spawned player. clientId={clientId}, prefab={prefab.name}, position={spawnPose.position}.");
+        // 스폰 좌표는 "이 클라만 엉뚱한 위치" 류 문제의 1차 증거다. debugLogging 설정과 무관하게 남긴다.
+        Edit.Log(
+            $"[Loading] Spawned player. clientId={clientId}, prefab={prefab.name}, " +
+            $"spawnIndex={spawnIndex}, baseSpawnPoint={(baseSpawnPoint != null ? baseSpawnPoint.position.ToString() : "null(폴백)")}, " +
+            $"position={spawnPose.position}.");
     }
 
     private GameObject ResolvePlayerPrefabForClient(ulong clientId)

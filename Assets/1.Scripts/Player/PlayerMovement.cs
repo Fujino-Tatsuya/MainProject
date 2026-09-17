@@ -1,16 +1,13 @@
 ﻿using UnityEngine;
 
 [RequireComponent(typeof(PlayerInputReader))]
-[RequireComponent(typeof(Rigidbody))]
+[RequireComponent(typeof(PlayerMotor))]
 public class PlayerMovement : MonoBehaviour
 {
     private PlayerInputReader reader;
     private Player player;
     private PlayerSoulController soulController;
-    private Rigidbody rb;
-    private CapsuleCollider capsule;
-    private PlayerGroundingSensor grounding;
-    private LayerMask rootMoveBlockingMask;
+    private PlayerMotor motor;
 
     [SerializeField] private Transform armature;
     [SerializeField] private float rotate_Speed = 10f;
@@ -20,54 +17,27 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private float alignThreshold = 0.98f;
     [SerializeField] private float viewYaw = -45f;
 
-    [Header("충돌 (일반 이동 스윕)")]
-    [SerializeField] private PlayerGameRuleData gameRule;
-    [SerializeField, Min(0f)] private float collisionSkin = 0.02f;
-    [SerializeField, Min(1)] private int maxSweepIterations = 3;
-
-    private const int CastBufferSize = 8;
-    private const float DefaultMaxWalkableSlopeAngle = 60f;
-    private readonly RaycastHit[] castBuffer = new RaycastHit[CastBufferSize];
-
-    // 평지 판정 기준. QA의 P9-PlayerWallClimb 디텍터와 같은 값이라 디텍터가 이상으로 보는 구간이
-    // 그대로 Y 잠금 구간이 된다(경사·램프는 이 값을 못 넘어 잠기지 않는다).
-    private const float FlatGroundNormalY = 0.999f;
-    private const float VerticalIntentEpsilon = 0.00005f;
+    // 🔴 회전은 물리 틱에서 돈다 — 시각 효과가 아니라 **시뮬레이션 상태**이기 때문이다.
+    // Move()의 속도 계산이 armature.forward에 의존한다(dot >= alignThreshold면 즉시 최고속,
+    // 아니면 가속). 즉 회전이 이동 속도를 바꾸므로, 회전이 렌더 레이트로 돌면 같은 입력이
+    // 프레임레이트에 따라 다른 속도를 낸다 — 4단계의 재생(replay)이 성립하지 않는다.
+    // 2026-09-12 A/B 실측으로 감각 영향 없음 확인 후 확정(임시 토글 제거).
 
     private Vector2 prevDir_for_Rotate = new Vector2(0f, -1f);
     private bool hasRotate = true;
     private float currentSpeed;
-
-    // 이동 플랫폼 캐리: 이번 프레임 외부 이동량(플랫폼). Move()에서 입력 이동과 합산 후 리셋.
-    private Vector3 _carryDelta;
-
-    // Y 잠금 판정용(ApplyFlatGroundYLock 참조). 스크립트가 스스로 넣은 수직 이동이 있으면 잠그지
-    // 않아야 하므로 직전 프레임의 의도값을 남긴다. initialConstraints는 저작된 제약(회전 고정)이다.
-    private float lastVerticalIntentY;
-    private RigidbodyConstraints initialConstraints;
-
-    /// <summary>이동 플랫폼 등 외부 이동량을 이번 프레임 이동에 가산한다(소유자측에서 호출).</summary>
-    public void AddCarryDelta(Vector3 delta)
-    {
-        _carryDelta += delta;
-    }
 
     private void Awake()
     {
         reader = GetComponent<PlayerInputReader>();
         player = GetComponent<Player>();
         soulController = GetComponent<PlayerSoulController>();
-        rb = GetComponent<Rigidbody>();
-        capsule = GetComponent<CapsuleCollider>();
-        grounding = GetComponent<PlayerGroundingSensor>();
-        initialConstraints = rb.constraints;
-
-        // MoveRoot(평타 러시 스텝/스킬 전진) 관통 방지 스윕 대상 — 정적 지오메트리만.
-        // 유닛(Enemy/Player)은 제외해 러시가 몹 사이를 지나는 기존 감각을 유지한다.
-        rootMoveBlockingMask = LayerMask.GetMask("Default", "Ground", "Wall", "Env");
+        motor = GetComponent<PlayerMotor>();
 
         if (armature == null)
             armature = transform.Find("Armature");
+
+        motor?.SynchronizeArmatureRotation(ArmatureRotation);
     }
 
     private void Start()
@@ -75,188 +45,72 @@ public class PlayerMovement : MonoBehaviour
         rotate_Speed = 10f;
     }
 
-    private void Update()
+    /// <summary>오너 입력 장치에서 서버로 보낼 수 있는 raw 값만 캡처한다.</summary>
+    internal PlayerRawSimulationInput CaptureRawSimulationInput()
     {
-        Move();
-        Rotate();
-    }
-
-    private void FixedUpdate()
-    {
-        // Y 잠금은 물리 케이던스로 갱신한다 — 프레임 히치로 한 프레임에 물리 스텝이 여러 번 돌 때
-        // Update에서 한 번만 갱신하면 그 스텝들이 낡은 판정을 공유해 상승분이 새어 들어간다.
-        ApplyFlatGroundYLock();
-    }
-
-    private void Move()
-    {
-        Vector3 inputMove = Vector3.zero;
-
-        bool canMove = player == null || player.CanMove;
-        if (canMove && reader.HasMoveInput)
-        {
-            Vector2 input = reader.Direction;
-
-            Vector3 localDir = new Vector3(input.x, 0f, input.y);
-            Vector3 worldDir = Quaternion.Euler(0f, viewYaw, 0f) * localDir;
-            worldDir.Normalize();
-
-            Vector3 forward = armature != null ? armature.forward : transform.forward;
-            float dot = Vector3.Dot(worldDir, forward);
-
-            if (dot >= alignThreshold)
-            {
-                currentSpeed = maxSpeed;
-            }
-            else
-            {
-                if (currentSpeed > midSpeed)
-                    currentSpeed = midSpeed;
-
-                currentSpeed = Mathf.MoveTowards(
-                    currentSpeed,
-                    maxSpeed,
-                    acceleration * Time.deltaTime
-                );
-            }
-
-            inputMove = worldDir * ResolveMoveSpeed(currentSpeed) * Time.deltaTime;
-        }
-        else
-        {
-            currentSpeed = 0f;
-        }
-
-        // 입력 이동 + 플랫폼 캐리를 단일 MovePosition으로 적용.
-        // (MovePosition을 프레임당 두 번 호출하면 뒤엣것이 덮어쓰므로 반드시 합산.)
-        // 캐리는 CanMove/입력과 무관하게 적용 → 스턴/사망 중에도 플랫폼에 실려 이동(시체 잔류).
-        Vector3 total = ProjectOntoGround(inputMove) + _carryDelta;
-        _carryDelta = Vector3.zero;
-
-        // 대시와 동일한 스윕(PlayerMotionSweep)으로 벽 관통을 막는다. ClampByStaticGeometry(MoveRoot용)와
-        // 달리 걸을 수 있는 경사(gameRule.MaxWalkableSlopeAngle)는 장애물로 보지 않고 통과시키며,
-        // 막힌 경우엔 완전히 멈추는 대신 벽 표면을 따라 미끄러지듯 남은 이동량을 이어간다.
-        total = PlayerMotionSweep.Resolve(
-            capsule, total,
-            gameRule != null ? gameRule.MaxWalkableSlopeAngle : DefaultMaxWalkableSlopeAngle,
-            rootMoveBlockingMask, collisionSkin, maxSweepIterations, castBuffer);
-
-        // 스윕까지 끝난 이번 프레임의 수직 의도값 — FixedUpdate의 Y 잠금 판정에 쓴다.
-        lastVerticalIntentY = total.y;
-
-        if (total.sqrMagnitude > 0f)
-        {
-            // 대시 중에는 CanMove=false라 입력 이동이 0이므로, 여기 남는 건 플랫폼 캐리뿐이다.
-            // MovePosition을 한 프레임에 두 번 호출하면 나중 것이 이기므로 대시 변위가 사라질 수 있다.
-            if (player != null && player.CurrentState == PlayerActionState.Dash)
-            {
-                Edit.LogWarning(
-                    $"[Dash] 같은 프레임에 PlayerMovement.Move가 MovePosition을 호출합니다(캐리 {total.magnitude:F3}m) — " +
-                    "실행 순서에 따라 대시 변위가 덮어써질 수 있습니다(이동 플랫폼 위에서 대시한 경우).", this);
-            }
-
-            rb.MovePosition(rb.position + total);
-        }
+        return new PlayerRawSimulationInput(
+            reader != null ? reader.Direction : Vector2.zero,
+            reader != null && reader.HasMoveInput);
     }
 
     /// <summary>
-    /// 평지 접지 중에는 Rigidbody의 Y축을 잠근다(그 외에는 저작된 제약으로 되돌린다).
-    ///
-    /// 루트 Rigidbody는 저작상 non-kinematic이라(Paladin 프리팹) <c>rb.MovePosition</c>이 텔레포트가
-    /// 아니라 "목표까지 가는 속도 + 솔버의 충돌 해석"으로 동작한다. 그래서 캡슐이 벽 모서리에 눌리면
-    /// PhysX가 접촉 법선 방향으로 관통을 밀어내는데, 모서리·베벨 면의 법선에 섞인 미세한 +Y가 매
-    /// 스텝 쌓여 벽을 타고 오른다(QA P9-PlayerWallClimb). <see cref="PlayerMotionSweep"/>은
-    /// MovePosition <b>전에</b> 끝나 이걸 막을 수 없고 사후 보정은 한 프레임 늦으므로, 솔버가 Y를
-    /// 아예 못 건드리게 제약으로 막는다. 잠긴 축의 접촉 해석은 수평 성분만 남아 벽을 따라 미끄러지는
-    /// 동작은 그대로다. 판정은 <see cref="FixedUpdate"/>에서 물리 스텝마다 갱신한다.
-    ///
-    /// 다음 중 하나라도 어긋나면 즉시 잠금을 푼다(정상적인 수직 이동 보호):
-    /// - 평지 접지가 아님(경사·램프는 법선이 <see cref="FlatGroundNormalY"/> 미만 → 등판·낙하 정상)
-    /// - 이동 플랫폼 위(플랫폼이 수직으로 움직인다)
-    /// - 스크립트가 직접 수직 이동을 넣었음(플랫폼 캐리 등)
-    /// - 넉백 중(위로 띄우는 넉백이라면 Y가 잠긴 채로는 떠오르지 못해 접지도 안 풀린다)
-    ///
-    /// 대시는 제외하지 않는다 — 설계상 평면 이동이고(<c>planar.y = 0f</c>), 절벽에서 떨어지는
-    /// 수직 이동은 접지가 풀리는 순간 이 잠금도 같이 풀리므로 평지 접지 게이트만으로 충분하다.
+    /// raw 입력에 이 피어가 보유한 상태 머신/Soul/서버 권위 상태이상을 합쳐 전체 시뮬레이션 입력을 만든다.
+    /// 서버 관측 경로도 이 메서드를 사용하므로 raw DTO에 권위 값을 추가하지 않는다.
     /// </summary>
-    private void ApplyFlatGroundYLock()
+    internal PlayerSimulationInput CaptureSimulationInput(PlayerRawSimulationInput rawInput)
     {
-        bool lockY =
-            grounding != null &&
-            grounding.IsGrounded &&
-            !grounding.IsMovingPlatform &&
-            grounding.GroundNormal.y >= FlatGroundNormalY &&
-            Mathf.Abs(lastVerticalIntentY) <= VerticalIntentEpsilon &&
-            (player == null || player.CurrentState != PlayerActionState.Knockback);
+        float fixedMoveSpeed = 0f;
+        bool hasFixedMoveSpeed =
+            soulController != null &&
+            soulController.TryGetFixedMoveSpeed(out fixedMoveSpeed);
 
-        RigidbodyConstraints desired = lockY
-            ? initialConstraints | RigidbodyConstraints.FreezePositionY
-            : initialConstraints;
+        float statusMultiplier = player != null && player.StatusEffects != null
+            ? player.StatusEffects.GetStatMultiplier(StatusEffectType.MoveSpeedModifier)
+            : 1f;
 
-        if (rb.constraints != desired)
-            rb.constraints = desired;
+        return new PlayerSimulationInput
+        {
+            MoveDirection = rawInput.MoveDirection,
+            HasMoveInput = rawInput.HasMoveInput,
+            CanMove = player == null || player.CanMove,
+            CanRotate = player == null || player.CanMovementRotate,
+            HasFixedMoveSpeed = hasFixedMoveSpeed,
+            FixedMoveSpeed = hasFixedMoveSpeed ? fixedMoveSpeed : 0f,
+            MoveSpeedMultiplier = statusMultiplier
+        };
     }
 
-    /// <summary>
-    /// 접지 중이면 수평 이동을 지면 평면에 투영한다.
-    /// MovePosition은 CharacterController와 달리 경사 보정을 해 주지 않아서, 수평 벡터를 그대로
-    /// 밀면 경사면에 파고들며 막힌다(계단·경사로를 못 올라가던 원인). 지면 노멀에 투영하면
-    /// 같은 거리를 경사면을 따라 이동하므로 등판이 된다. 평지에서는 결과가 동일하다.
-    /// </summary>
-    private Vector3 ProjectOntoGround(Vector3 horizontalMove)
+    internal PlayerSimulationSettings CaptureSimulationSettings()
     {
-        if (grounding == null || !grounding.IsGrounded)
-            return horizontalMove;
-
-        float distance = horizontalMove.magnitude;
-        if (distance <= Mathf.Epsilon)
-            return horizontalMove;
-
-        Vector3 normal = grounding.GroundNormal;
-        if (normal.y >= 0.999f) // 평지
-            return horizontalMove;
-
-        Vector3 projected = Vector3.ProjectOnPlane(horizontalMove, normal);
-        if (projected.sqrMagnitude <= 1e-6f)
-            return horizontalMove;
-
-        return projected.normalized * distance;
+        return new PlayerSimulationSettings
+        {
+            RotateSpeed = rotate_Speed,
+            MaxSpeed = maxSpeed,
+            MidSpeed = midSpeed,
+            Acceleration = acceleration,
+            AlignThreshold = alignThreshold,
+            ViewYaw = viewYaw
+        };
     }
 
-    private void Rotate()
+    /// <summary>시각 보간이 오프셋을 걸 대상. 메시 루트다.</summary>
+    public Transform ArmatureTransform => armature;
+
+    internal Quaternion ArmatureRotation =>
+        armature != null ? armature.rotation : transform.rotation;
+
+    internal Vector2 PreviousRotateDirection => prevDir_for_Rotate;
+    internal bool HasRotate => hasRotate;
+    internal float CurrentSpeed => currentSpeed;
+
+    internal void CommitSimulationState(PlayerSimulationState state, bool applyArmatureRotation)
     {
-        if (player != null && !player.CanMovementRotate)
-            return;
+        prevDir_for_Rotate = state.PreviousRotateDirection;
+        hasRotate = state.HasRotate;
+        currentSpeed = state.CurrentSpeed;
 
-        if (armature == null)
-            return;
-
-        if (reader.HasMoveInput)
-        {
-            prevDir_for_Rotate = reader.Direction;
-            hasRotate = true;
-        }
-
-        if (!hasRotate)
-            return;
-
-        Vector3 dir = new Vector3(prevDir_for_Rotate.x, 0f, prevDir_for_Rotate.y);
-        dir = Quaternion.Euler(0f, viewYaw, 0f) * dir;
-
-        Quaternion targetRotation = Quaternion.LookRotation(dir);
-
-        if (Vector3.Dot(dir, armature.forward) > 0.999f)
-        {
-            armature.rotation = targetRotation;
-            hasRotate = false;
-            return;
-        }
-
-        armature.rotation = Quaternion.Slerp(
-            armature.rotation,
-            targetRotation,
-            rotate_Speed * Time.deltaTime
-        );
+        if (applyArmatureRotation && armature != null)
+            armature.rotation = state.ArmatureRotation;
     }
 
     public void RotateImmediately(Vector3 direction)
@@ -271,6 +125,7 @@ public class PlayerMovement : MonoBehaviour
 
         armature.rotation = Quaternion.LookRotation(direction.normalized);
         hasRotate = false;
+        motor?.SynchronizeArmatureRotation(armature.rotation, hasRotate);
     }
 
     public void RotateToward(Vector3 direction, float speed)
@@ -289,49 +144,7 @@ public class PlayerMovement : MonoBehaviour
             targetRotation,
             speed * Time.deltaTime
         );
-    }
-
-    public void MoveRoot(Vector3 deltaPosition)
-    {
-        rb.MovePosition(rb.position + ClampByStaticGeometry(deltaPosition));
-    }
-
-    // MovePosition은 스윕 없이 목표 지점으로 이동해, 평타 러시 스텝처럼 한 프레임 대이동이
-    // 논컨벡스 벽 MeshCollider를 그대로 관통한다 — 벽에 막히면 그 앞까지로 이동량을 클램프.
-    private Vector3 ClampByStaticGeometry(Vector3 delta)
-    {
-        float dist = delta.magnitude;
-        if (dist < 0.0001f || capsule == null)
-            return delta;
-
-        Vector3 dir = delta / dist;
-        Vector3 center = rb.position + capsule.center;
-        float half = Mathf.Max(0f, capsule.height * 0.5f - capsule.radius);
-        // 반경/정지거리에 스킨 여유 — 바닥 등 기존 접촉면 스침으로 제자리 클램프되는 것 방지.
-        float radius = Mathf.Max(0.01f, capsule.radius - 0.02f);
-
-        if (Physics.CapsuleCast(
-                center + Vector3.up * half, center - Vector3.up * half, radius,
-                dir, out RaycastHit hit, dist, rootMoveBlockingMask, QueryTriggerInteraction.Ignore))
-        {
-            float allowed = Mathf.Max(0f, hit.distance - 0.02f);
-
-            // ⚠️ 대시는 PlayerMotionSweep으로 이미 충돌을 해결한 뒤 여기로 온다. 이 클램프는 마스크
-            // (Default/Ground/Wall/Env)와 등판각 판정이 달라, 대시 스윕이 통과시킨 경사·지면을
-            // 여기서 다시 막을 수 있다 — "대시가 시작은 됐는데 안 나간다"의 마지막 후보다.
-            if (player != null && player.CurrentState == PlayerActionState.Dash && allowed < dist * 0.9f)
-            {
-                Edit.LogWarning(
-                    $"[Dash] MoveRoot 클램프: 요청 {dist:F3}m → 허용 {allowed:F3}m, " +
-                    $"막은 콜라이더='{hit.collider.name}' (레이어 {LayerMask.LayerToName(hit.collider.gameObject.layer)}), " +
-                    $"법선각={Vector3.Angle(hit.normal, Vector3.up):F0}°. " +
-                    "대시 스윕(PlayerMotionSweep)과 마스크·등판각 판정이 다른 2차 클램프입니다.", this);
-            }
-
-            return dir * allowed;
-        }
-
-        return delta;
+        motor?.SynchronizeArmatureRotation(armature.rotation, hasRotate);
     }
 
     /// <summary>
@@ -360,30 +173,11 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// 오너 자동 이동(스킬 사거리 확보용). worldTarget 방향으로 최대 이속(상태이상 배율 반영)으로 이동하며
-    /// armature를 진행 방향으로 회전시킨다. CanMove가 막히면(CC 등) 그 프레임은 정지한다.
-    /// 수동 입력이 없을 때만 호출되므로 Move()의 입력 이동과 충돌하지 않는다.
-    /// </summary>
-    public void MoveTowardsPoint(Vector3 worldTarget)
-    {
-        if (rb == null)
-            return;
+    /// <summary>자동 이동도 수동 이동과 같은 상태이상 속도 배율을 사용한다.</summary>
+    internal float MaxResolvedMoveSpeed => ResolveMoveSpeed(maxSpeed);
 
-        if (player != null && !player.CanMove)
-            return;
-
-        Vector3 dir = worldTarget - rb.position;
-        dir.y = 0f;
-        if (dir.sqrMagnitude < 0.0001f)
-            return;
-
-        dir.Normalize();
-
-        rb.MovePosition(
-            rb.position + dir * (ResolveMoveSpeed(maxSpeed) * Time.deltaTime));
-        RotateToward(dir, rotate_Speed);
-    }
+    /// <summary>자동 이동 회전은 일반 이동과 같은 보간 속도를 사용한다.</summary>
+    internal float AutoMoveRotationSpeed => rotate_Speed;
 
     private float ResolveMoveSpeed(float baseSpeed)
     {
@@ -406,5 +200,6 @@ public class PlayerMovement : MonoBehaviour
             return;
 
         armature = newArmature;
+        motor?.SynchronizeArmatureRotation(armature.rotation, hasRotate);
     }
 }

@@ -72,7 +72,7 @@ public sealed class PlayerLifeInputPolicy : MonoBehaviour
 
     private void ApplyAccess(PlayerLifeGameplayAccess access)
     {
-        if (player == null || !player.IsMovementAuthority || inputReader == null)
+        if (player == null || !player.IsInputSource || inputReader == null)
             return;
 
         // 연출 잠금은 생명주기 허용값 위에 덮어쓰는 추가 차단이다(둘 중 하나라도 막으면 막힌다).

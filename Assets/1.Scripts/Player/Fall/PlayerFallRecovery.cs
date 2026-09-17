@@ -6,11 +6,12 @@ using UnityEngine;
 /// 생존 추락 복귀 흐름. (PLAN §13, §14 / W11·W12)
 ///
 /// 서버가 PlayerFallController.ServerFallSurvived를 받아 복귀 지점·복귀 무적·충전 리셋을 확정하고,
-/// 오너에게 로컬 연출(Float Camera → 지연 → 순간이동/응시 → Follow Camera → 입력 잠금)을 지시한다.
-/// 위치 쓰기는 오너 권한이므로 순간이동은 오너가 수행한다.
+/// 오너에게 로컬 연출(Float Camera → 지연 → 응시 → Follow Camera → 입력 잠금)을 지시한다.
+/// 서버가 복귀 위치를 먼저 확정하고 Motor를 순간이동한 뒤 오너에게 forceSnap 보정을 보낸다.
 /// </summary>
 [DisallowMultipleComponent]
 [RequireComponent(typeof(Player))]
+[RequireComponent(typeof(PlayerMotor))]
 public sealed class PlayerFallRecovery : NetworkBehaviour
 {
     [SerializeField] private PlayerFallController fallController;
@@ -19,14 +20,18 @@ public sealed class PlayerFallRecovery : NetworkBehaviour
     [SerializeField] private PlayerDashController dashController;
     [SerializeField] private PlayerMovement movement;
     [SerializeField] private PlayerInputReader input;
-    [SerializeField] private Rigidbody body;
     [SerializeField] private PlayerGroundingSensor grounding;
+    [SerializeField] private PlayerMotor motor;
 
     [Header("Timing (PLAN §5)")]
     [SerializeField, Min(0f)] private float fallReturnDelay = 0.75f;
     [SerializeField, Min(0f)] private float landedFollowCameraDelay = 0.5f;
     [SerializeField, Min(0f)] private float fallReturnInputLock = 0.5f;
     [SerializeField, Min(0f)] private float fallReturnInvulnerability = 1.5f;
+
+    private Player player;
+    private Coroutine serverReturnRoutine;
+    private Coroutine ownerRecoveryRoutine;
 
     private void Awake()
     {
@@ -49,6 +54,9 @@ public sealed class PlayerFallRecovery : NetworkBehaviour
 
     public override void OnNetworkDespawn()
     {
+        CancelServerReturnRoutine();
+        CancelOwnerRecoveryRoutine();
+
         if (fallController != null)
         {
             fallController.ServerFallSurvived -= HandleServerFallSurvived;
@@ -69,24 +77,16 @@ public sealed class PlayerFallRecovery : NetworkBehaviour
             ? safePointTracker.ResolveReturnPoint(context.FallPoint)
             : transform.position;
 
-        ReturnAfterFallDeathRpc(returnPoint);
+        CancelServerReturnRoutine();
+        if (!TeleportOnServer(returnPoint))
+            return;
+        ReturnAfterFallDeathRpc();
     }
 
     [Rpc(SendTo.Owner)]
-    private void ReturnAfterFallDeathRpc(Vector3 returnPoint)
+    private void ReturnAfterFallDeathRpc()
     {
-        StopAllCoroutines(); // 생존 복귀 연출이 돌고 있었다면 중단
-
-        if (body != null)
-        {
-            body.position = returnPoint;
-            body.linearVelocity = Vector3.zero;
-            body.angularVelocity = Vector3.zero;
-        }
-        else
-        {
-            transform.position = returnPoint;
-        }
+        CancelOwnerRecoveryRoutine();
 
         // 낙하 뷰로 전환돼 있을 수 있으므로 일반 추적 카메라로 되돌린다.
         // 입력 잠금은 건드리지 않는다 — 사망/Soul 전환은 PlayerLifeInputPolicy가 소유한다.
@@ -108,14 +108,38 @@ public sealed class PlayerFallRecovery : NetworkBehaviour
         if (dashController != null)
             dashController.ServerResetChargeToOne();
 
+        CancelServerReturnRoutine();
+        serverReturnRoutine = StartCoroutine(ServerReturnRoutine(returnPoint, fallPoint));
         BeginRecoveryRpc(returnPoint, fallPoint);
     }
 
     [Rpc(SendTo.Owner)]
     private void BeginRecoveryRpc(Vector3 returnPoint, Vector3 fallPoint)
     {
-        StopAllCoroutines();
-        StartCoroutine(OwnerRecoveryRoutine(returnPoint, fallPoint));
+        CancelOwnerRecoveryRoutine();
+        ownerRecoveryRoutine = StartCoroutine(OwnerRecoveryRoutine(returnPoint, fallPoint));
+    }
+
+    private IEnumerator ServerReturnRoutine(Vector3 returnPoint, Vector3 fallPoint)
+    {
+        yield return new WaitForSeconds(fallReturnDelay);
+
+        if (!TeleportOnServer(returnPoint, sendForceSnap: false))
+        {
+            serverReturnRoutine = null;
+            yield break;
+        }
+
+        Vector3 look = fallPoint - returnPoint;
+        look.y = 0f;
+        if (look.sqrMagnitude > 0.0001f)
+            movement?.RotateImmediately(look);
+
+        // 회전까지 Motor 상태에 반영한 뒤 보내야 forceSnap이 오너의 동일한 응시 방향을 보존한다.
+        if (!IsOwner)
+            player.ForceOwnerReconciliation();
+
+        serverReturnRoutine = null;
     }
 
     private IEnumerator OwnerRecoveryRoutine(Vector3 returnPoint, Vector3 fallPoint)
@@ -128,19 +152,8 @@ public sealed class PlayerFallRecovery : NetworkBehaviour
         // 2. fallReturnDelay 동안 계속 낙하.
         yield return new WaitForSeconds(fallReturnDelay);
 
-        // 3. 안전지점으로 순간이동 + 속도 0.
-        if (body != null)
-        {
-            body.position = returnPoint;
-            body.linearVelocity = Vector3.zero;
-            body.angularVelocity = Vector3.zero;
-        }
-        else
-        {
-            transform.position = returnPoint;
-        }
-
-        // 4. 추락 지점을 바라본다.
+        // 3. 서버가 같은 시점에 순간이동하고 forceSnap을 보낸다. 오너는 위치를 직접 쓰지 않는다.
+        // 4. 보정 도착 전 한 프레임에도 기존 연출 방향이 유지되도록 로컬 응시도 즉시 맞춘다.
         Vector3 look = fallPoint - returnPoint;
         look.y = 0f;
         if (look.sqrMagnitude > 0.0001f)
@@ -173,6 +186,63 @@ public sealed class PlayerFallRecovery : NetworkBehaviour
         // 6. 입력 잠금 0.5초 유지 후 해제. (무적/Blink는 서버가 별도로 1.5초 유지)
         yield return new WaitForSeconds(fallReturnInputLock);
         input?.SetInputEnabled(true);
+        ownerRecoveryRoutine = null;
+    }
+
+    private bool TeleportOnServer(Vector3 returnPoint, bool sendForceSnap = true)
+    {
+        if (!IsServer || motor == null || (!IsOwner && player == null))
+        {
+            Debug.LogError(
+                $"[PlayerFallRecovery] 서버 순간이동 불가: IsServer={IsServer}, " +
+                $"motor={(motor != null ? "present" : "missing")}, " +
+                $"player={(player != null ? "present" : "missing")}",
+                this);
+            return false;
+        }
+
+        // 🔴 오너 권위 브랜치: 위치의 주인은 오너다. 서버가 자기 사본을 옮겨봐야 오너 권위
+        // NetworkTransform 이 오너의 위치를 복제하므로 되돌아온다. 오너에게 직접 옮기라고 지시한다.
+        // (서버 권위 브랜치에서는 반대다 — 서버가 옮기고 보정 채널의 forceSnap 으로 오너를 맞춘다.)
+        if (!Player.UsesServerAuthoritativeMovement)
+        {
+            if (IsOwner)
+                motor.TeleportAuthoritative(returnPoint);
+            else
+                TeleportOwnerRpc(returnPoint);
+            return true;
+        }
+
+        motor.TeleportAuthoritative(returnPoint);
+        if (sendForceSnap && !IsOwner)
+            player.ForceOwnerReconciliation();
+        return true;
+    }
+
+    /// <summary>오너 권위에서만 쓴다. 위치를 확정하는 주체가 오너이므로 오너가 직접 옮긴다.</summary>
+    [Rpc(SendTo.Owner)]
+    private void TeleportOwnerRpc(Vector3 returnPoint)
+    {
+        if (motor != null)
+            motor.TeleportAuthoritative(returnPoint);
+    }
+
+    private void CancelServerReturnRoutine()
+    {
+        if (serverReturnRoutine == null)
+            return;
+
+        StopCoroutine(serverReturnRoutine);
+        serverReturnRoutine = null;
+    }
+
+    private void CancelOwnerRecoveryRoutine()
+    {
+        if (ownerRecoveryRoutine == null)
+            return;
+
+        StopCoroutine(ownerRecoveryRoutine);
+        ownerRecoveryRoutine = null;
     }
 
     private void ResolveReferences()
@@ -183,7 +253,8 @@ public sealed class PlayerFallRecovery : NetworkBehaviour
         if (dashController == null) dashController = GetComponent<PlayerDashController>();
         if (movement == null) movement = GetComponent<PlayerMovement>();
         if (input == null) input = GetComponent<PlayerInputReader>();
-        if (body == null) body = GetComponent<Rigidbody>();
         if (grounding == null) grounding = GetComponent<PlayerGroundingSensor>();
+        if (motor == null) motor = GetComponent<PlayerMotor>();
+        if (player == null) player = GetComponent<Player>();
     }
 }
