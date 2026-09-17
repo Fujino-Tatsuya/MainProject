@@ -8,6 +8,70 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 진행 중 — 허수아비 (2026-09-16 · 브랜치 `feature/training-dummy`)
+
+**작업 세션.** Claude 단독. 수정 파일 = `Assets/1.Scripts/Map/TrainingDummy/*`,
+`Assets/2.Prefabs/TrainingDummy.prefab`, `Assets/DefaultNetworkPrefabs.asset`. **이 파일들 동시 수정 금지.**
+
+**상태.** 코드·프리팹·검증 씬 완료, 컴파일 오류 0. **Play 검증 대기**(호스트 단독 + MPPM 2인).
+설계·확정 사양·알려진 한계는 [PLAN-training-dummy.md](PLAN-training-dummy.md) — 여기 중복 기술하지 않는다.
+
+**검증 경로 = `Dev_Boot` 씬.** `DevSceneBooter.scene` 에 띄울 씬 이름을 적고 Play 하면
+호스트 기동 → **`NetworkSceneManager` 로 씬 로드**(씬에 배치된 NetworkObject 가 자동 스폰된다)
+→ 플레이어 스폰까지 정식 흐름 그대로 돈다. 대상 씬은 **빌드 목록에 enabled 로 등록**돼 있어야 한다.
+허수아비 검증 씬은 `Assets/0.Scenes/Debug/TrainingDummy.unity`.
+`MonsterTestBootstrap` 은 쓰지 않는다 — 좌클릭 디버그 공격이 플레이어 기본 공격과 입력이 겹친다.
+
+⚠️ **씬마다 `FloatingDamageSpawner` 를 직접 넣어야 데미지 숫자가 뜬다.** 씬 싱글턴이라
+`4.MapScene` 것이 따라오지 않는다.
+
+**용어.** *허수아비(Training Dummy)* = 연습장에 놓는 표적. **몬스터가 아니라 맵 오브젝트다** —
+`MonsterBase` 계열을 일절 쓰지 않고 `Unit` 만 상속한다. 경석(팀장)의 몬스터 담당 범위 밖.
+
+### 🔴 이번에 확인된 사실 — 전부 코드로 검증됨
+
+1. **`UnitBase` / `IDamageable` 은 이 레포에 없다.** 실제 이름은 `Unit` / `IAttackReceiver` 다.
+2. **`CombatTarget`(18) 레이어는 정의만 있고 C# 어디에서도 참조되지 않는다.**
+   여기에 무언가를 두면 플레이어 스킬이 하나도 맞지 않는다. 피격 대상은 `Enemy`(8) + `EnemyHurtBox`(14) 다.
+3. **체력 0 은 조준을 끊는다.** `PlayerSkillTargeting` 이 `CurrentHealth <= 0` 을 InvalidTarget 으로 처리한다
+   (`:201` / `:293` / `:387`). 죽지 않는 대상은 하한을 **1** 로 둬야 궁극기 조준이 유지된다.
+4. **데미지 숫자는 "실제 HP 델타"다** (`Unit.cs:533`). 체력이 하한에 붙으면 델타가 0 이라 숫자가 멈춘다.
+   명목 피해를 띄우려면 전용 RPC 경로가 필요하다.
+5. **`UnitOverheadHealthBar` 는 플레이어 전용이다** — `GetComponentInParent<Player>()` + `!IsOwner` 가 박혀 있다.
+   다른 유닛에 재사용 불가.
+
+### 다음 작업
+- 연습장 씬과 진입 흐름 (은희 · 네트워크/SceneManagement) — `NetworkLoadingFlowController` 가
+  `targetSceneName = "MapScene"` 를 하드코딩 중이라 그쪽을 손대야 한다
+- DPS 미터 / 상태이상 아이콘 UI — 별도 작업으로 분리됨
+
+## ▶▶ 현재 인수인계 (2026-09-16 · Hold 스킬 토글 조작 옵션, 브랜치 `fix/PaladinQCastToggle`)
+
+**작업 세션.** Claude. 수정 파일 = `Player/UserInputConfig.cs`(신규),
+`Player/Skill/PlayerSkillController.cs`. **이 두 파일 동시 수정 금지.**
+
+**상태.** 코드 완료, **Play 검증 대기**(Unity 에디터가 이 워크트리에 붙어 있지 않아 컴파일도 미확인).
+
+### 용어 — "조작 방식"은 "스킬 설계값"이 아니다
+
+`PlayerSkillInputType`(Press/Hold)은 **스킬의 수명주기 타입**이다 — 어떤 `PlayerSkillBase` 파생을
+쓰는지가 여기서 갈린다. 여기에 `Toggle` 을 세 번째 값으로 넣지 않는다.
+**같은 Hold 스킬을 꾹 눌러 쓰느냐 토글로 쓰느냐는 유저 조작 취향**이고, 레이어가 다르다.
+
+- `UserInputConfig.HoldSkillAsToggle` — 로컬 유저 설정(PlayerPrefs). 기본 false.
+  true 면 Hold 스킬은 **눌러서 진입 → 다시 누르거나 지속시간 만료 시 종료**.
+- **스킬 SO 값(지속시간·쿨타임·피해·전진속도)은 두 방식이 완전히 동일하다.** 같은 스킬이기 때문.
+- **네트워크에 실리지 않는다.** 서버는 이 설정을 모른다 — 종료 신호는 기존
+  `NotifySkillReleasedRpc` → `OnReleased()` 경로로 똑같이 도착한다. 서버 코드 변경 0.
+- 지속시간 만료 종료는 두 방식 모두 기존 서버 안전망(`MaxDurationReached`)이 처리한다.
+  토글은 "끄는 입력"이 한 번 더 와야 하므로 **안전망 의존도가 홀드보다 높다** — 없애지 말 것.
+- 조작 방식은 **시전 시점에 확정**한다(`activeHoldUsesToggle`). 시전 중 옵션이 바뀌어도 그 시전은 안 흔들린다.
+- 옵션 UI 는 아직 없다. `TitleOptionsPanel` 의 Controls 탭이 비어 있고, 붙일 때
+  `UserInputConfig.HoldSkillAsToggle` 만 읽고 쓰면 된다.
+
+**함정.** 토글은 시전한 그 press 가 곧바로 종료 입력으로 읽힌다 — 켜자마자 꺼진다.
+`isToggleEndArmed` 가 "시전 입력이 한 번 떨어졌는지"를 보고 그 전의 재입력을 무시한다. 지우지 말 것.
+
 ## ▶▶ 현재 인수인계 (2026-09-16 · 플레이어 이동 Motor 4b3, 브랜치 `feature/player-motor`)
 
 **상태.** 4단계까지 완료. **오너 권위 브랜치 전 항목 Play 검증 통과(2026-09-16).**
