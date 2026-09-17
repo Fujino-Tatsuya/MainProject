@@ -46,6 +46,11 @@ public sealed class TrainingDummy : Unit
     Vector3 _anchorPosition;
     Quaternion _anchorRotation;
 
+    // 지속 넉백 상태 (서버 전용)
+    Vector3 _knockbackDir;
+    float _knockbackSpeed;
+    float _knockbackTimer;
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
@@ -86,6 +91,7 @@ public sealed class TrainingDummy : Unit
         // Unit 의 기본 구현이 쓰는 귀속 RPC 경로는 타지 않는다 — 공격자 clientId 는
         // 허수아비 전용 RPC 가 직접 싣고, 그 소비자(UnitCameraFeedbackReporter)는 스폰 때 제거했다.
         ApplyDummyDamage(attackInfo.damage, ResolveAttackerClientId(hitContext));
+        TryEnterKnockback(attackInfo, hitContext);
         return true;
     }
 
@@ -146,6 +152,67 @@ public sealed class TrainingDummy : Unit
     }
     #endregion
 
+    #region 넉백 (서버 전용)
+    /// <summary>
+    /// `AttackInfo` 의 넉백 지시를 해석한다.
+    /// </summary>
+    /// <remarks>
+    /// 🔴 <b>이 해석기가 없으면 허수아비는 안 밀린다.</b> `Unit` 은 넉백을 전혀 처리하지 않고,
+    /// `AttackInfo.knockbackStrength/Duration` 을 읽는 곳은 `MonsterBase.ReceiveAttack` 하나뿐이다.
+    /// 여기 로직은 그 본문(방향 폴백 체인 포함)을 옮겨온 것이다.
+    ///
+    /// 프리팹의 `LinearKnockback` 은 <b>다른 경로</b>다 — `Unit.Knockback(방향, 세기)` 이 쓰는
+    /// 임펄스 방식이고, 보스가 플레이어를 밀 때 쓴다. 플레이어 스킬은 그쪽을 호출하지 않는다.
+    /// 붙여만 두는 이유는 보스가 허수아비를 밀 때 `Unit.OnKnockback` 이 LogError 를 찍지 않게 하려는 것.
+    ///
+    /// `MonsterBase` 와 달리 NavMesh 경계 클램프는 하지 않는다 — 허수아비는 NavMesh 밖에 놓일 수
+    /// 있고, 밀려난 거리는 `resetDistance` 자리 복귀가 어차피 잡는다.
+    /// </remarks>
+    void TryEnterKnockback(AttackInfo attackInfo, AttackHitContext hitContext)
+    {
+        if (!IsServer || HasSuperArmor)
+            return;
+
+        if (attackInfo.knockbackStrength <= 0f || attackInfo.knockbackDuration <= 0f)
+            return;
+
+        // 공격이 방향을 명시하면 그대로(방향성 공격 — 견인 등),
+        // 아니면 방사형(허수아비 - 공격자, 수평) 폴백.
+        Vector3 dir = attackInfo.knockbackDirection;
+        dir.y = 0f;
+
+        if (dir.sqrMagnitude < 0.0001f)
+        {
+            dir = transform.position - hitContext.sourcePosition;
+            dir.y = 0f;
+        }
+
+        if (dir.sqrMagnitude < 0.0001f)
+        {
+            // 공격자와 겹침 — 공격자의 전방(있으면)으로 밀어낸다.
+            dir = hitContext.sourceTransform != null ? hitContext.sourceTransform.forward : -transform.forward;
+            dir.y = 0f;
+        }
+
+        if (dir.sqrMagnitude < 0.0001f)
+            return;
+
+        _knockbackDir = dir.normalized;
+        _knockbackSpeed = attackInfo.knockbackStrength;
+        _knockbackTimer = attackInfo.knockbackDuration;
+    }
+
+    // 서버틱 지속 밀기. 임펄스가 아니라 "knockbackDuration 초 동안 knockbackStrength m/s 로 민다".
+    void TickKnockback(float deltaTime)
+    {
+        if (_knockbackTimer <= 0f)
+            return;
+
+        _knockbackTimer -= deltaTime;
+        transform.position += _knockbackDir * (_knockbackSpeed * deltaTime);
+    }
+    #endregion
+
     #region 회복 · 자리 복귀 (서버 전용)
     void Update()
     {
@@ -156,13 +223,19 @@ public sealed class TrainingDummy : Unit
         if (heal > 0)
             HealHp(heal);
 
+        // 밀어낸 뒤에 거리를 재야 같은 프레임에 이탈을 잡는다.
+        TickKnockback(Time.deltaTime);
+
         if ((transform.position - _anchorPosition).sqrMagnitude > resetDistance * resetDistance)
             ReturnToAnchor();
     }
 
     void ReturnToAnchor()
     {
-        // 남은 넉백 속도를 안 지우면 복귀 → 그 속도로 재이탈 → 복귀 루프가 된다.
+        // 남은 넉백을 안 지우면 복귀 → 남은 시간 동안 다시 밀림 → 재이탈 루프가 된다.
+        _knockbackTimer = 0f;
+
+        // LinearKnockback(임펄스 경로)이 남긴 속도도 같은 이유로 지운다.
         if (_rigidbody != null)
         {
             _rigidbody.linearVelocity = Vector3.zero;

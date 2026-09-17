@@ -80,7 +80,18 @@
 - 머리 위 월드스페이스 빌보드 / **항상 표시** / **게이지 + 숫자(`342 / 500`)** / 거리 컬링 없음
 
 ### 피격 반응
-- **넉백 받는다** — `LinearKnockback` + **Rigidbody(회전 3축 전부 고정)**. 밀리되 안 넘어진다
+- **넉백 받는다** — `TrainingDummy.TryEnterKnockback` + `TickKnockback` 이 직접 처리한다.
+  🔴 **`Unit` 은 넉백을 전혀 처리하지 않는다.** `AttackInfo.knockbackStrength/Duration` 을 읽는 곳은
+  `MonsterBase.ReceiveAttack` 하나뿐이라, `Unit` 만 상속하면 해석기가 통째로 빠진다(2026-09-17 실제로 안 밀림).
+  `MonsterBase` 본문(방향 폴백 체인 포함)을 옮겨왔다. NavMesh 경계 클램프만 뺐다 — 허수아비는
+  NavMesh 밖에 놓일 수 있고, 밀려난 거리는 자리 복귀가 잡는다
+- **넉백은 임펄스가 아니라 서버틱 지속 밀기다** — `knockbackDuration` 초 동안 `knockbackStrength` m/s.
+  프리팹의 `LinearKnockback` 은 **다른 경로**(`Unit.Knockback(방향, 세기)` 임펄스, 보스가 플레이어를 밀 때)라
+  플레이어 스킬로는 호출되지 않는다. 붙여두는 이유는 보스가 허수아비를 밀 때
+  `Unit.OnKnockback` 이 LogError 를 찍지 않게 하려는 것뿐이다
+- **넉백을 싣는 플레이어 스킬은 `FirstMeleeMainSkill`(진격의 방패) 하나뿐이다.**
+  기본 공격·차단기·궁극기·패시브는 `AttackInfo` 의 넉백 필드가 0 이다 — 그걸로 테스트하면 안 밀리는 게 정상
+- Rigidbody 는 **kinematic 유지 + 회전 3축 고정**
 - **상태이상 받는다** — **`StatusEffectController`**(플레이어형) 부착.
   몬스터형 `MonsterStatusEffect` 는 `AreaZone` 장판이 안 걸리고 `GetStatMultiplier` 가 항상 `1f` 라 못 쓴다
 - **상태이상 시각화는 범위 밖.** 허수아비는 안 움직여서 슬로우/루트/침묵이 눈에 안 보이고,
