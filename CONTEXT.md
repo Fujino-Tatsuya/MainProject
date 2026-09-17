@@ -8,6 +8,33 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 현재 인수인계 (2026-09-16 · Hold 스킬 토글 조작 옵션, 브랜치 `fix/PaladinQCastToggle`)
+
+**작업 세션.** Claude. 수정 파일 = `Player/UserInputConfig.cs`(신규),
+`Player/Skill/PlayerSkillController.cs`. **이 두 파일 동시 수정 금지.**
+
+**상태.** 코드 완료, **Play 검증 대기**(Unity 에디터가 이 워크트리에 붙어 있지 않아 컴파일도 미확인).
+
+### 용어 — "조작 방식"은 "스킬 설계값"이 아니다
+
+`PlayerSkillInputType`(Press/Hold)은 **스킬의 수명주기 타입**이다 — 어떤 `PlayerSkillBase` 파생을
+쓰는지가 여기서 갈린다. 여기에 `Toggle` 을 세 번째 값으로 넣지 않는다.
+**같은 Hold 스킬을 꾹 눌러 쓰느냐 토글로 쓰느냐는 유저 조작 취향**이고, 레이어가 다르다.
+
+- `UserInputConfig.HoldSkillAsToggle` — 로컬 유저 설정(PlayerPrefs). 기본 false.
+  true 면 Hold 스킬은 **눌러서 진입 → 다시 누르거나 지속시간 만료 시 종료**.
+- **스킬 SO 값(지속시간·쿨타임·피해·전진속도)은 두 방식이 완전히 동일하다.** 같은 스킬이기 때문.
+- **네트워크에 실리지 않는다.** 서버는 이 설정을 모른다 — 종료 신호는 기존
+  `NotifySkillReleasedRpc` → `OnReleased()` 경로로 똑같이 도착한다. 서버 코드 변경 0.
+- 지속시간 만료 종료는 두 방식 모두 기존 서버 안전망(`MaxDurationReached`)이 처리한다.
+  토글은 "끄는 입력"이 한 번 더 와야 하므로 **안전망 의존도가 홀드보다 높다** — 없애지 말 것.
+- 조작 방식은 **시전 시점에 확정**한다(`activeHoldUsesToggle`). 시전 중 옵션이 바뀌어도 그 시전은 안 흔들린다.
+- 옵션 UI 는 아직 없다. `TitleOptionsPanel` 의 Controls 탭이 비어 있고, 붙일 때
+  `UserInputConfig.HoldSkillAsToggle` 만 읽고 쓰면 된다.
+
+**함정.** 토글은 시전한 그 press 가 곧바로 종료 입력으로 읽힌다 — 켜자마자 꺼진다.
+`isToggleEndArmed` 가 "시전 입력이 한 번 떨어졌는지"를 보고 그 전의 재입력을 무시한다. 지우지 말 것.
+
 ## ▶▶ 현재 인수인계 (2026-09-16 · 플레이어 이동 Motor 4b3, 브랜치 `feature/player-motor`)
 
 **상태.** 4단계까지 완료. **오너 권위 브랜치 전 항목 Play 검증 통과(2026-09-16).**
