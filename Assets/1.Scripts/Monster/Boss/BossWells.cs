@@ -1,7 +1,13 @@
 using Unity.Netcode;
 using UnityEngine;
 
-// Wells(웰즈) — 23호 등에 탑승한 폭탄 투척수.
+// Wells(웰즈) — 23호 등에 탑승한 동승자.
+//
+// 🔴 **2026-09-16: 폭탄 투척이 제거됐다(팀장 확정).** 지금 Wells 는 23호 위에 앉아 있는 **장식**이고,
+//    자폭 드론 공격이 리소스와 함께 들어오면 그 자리에 넣는다.
+//    남겨 둔 것: 공격 **주기**(`ConfigureCycle` → `ThrowCycleElapsed`)와 그로기·사망 **억제**.
+//    드론도 "웰즈가 자기 주기로 살포한다"는 같은 규약을 쓰고, 23호 그로기 중에는 함께 멈춰야 한다.
+//    배선 지점은 `TwentyThreeBoss.OnWellsAttackCycle`.
 //
 // 정본: Docs/tech/boss-fsm-detailed-spec.md §10 / §10.1 / §10.2.
 //
@@ -97,13 +103,9 @@ public class BossWells : MonoBehaviour
 
         _cycle = _cycleInterval;
 
-        // 🔴 투척 체인 진단(2026-08-13). "폭탄이 한 개도 안 나온다"의 끊긴 지점을 가른다.
-        //    체인 = ①주기 만료 → ②보스가 Throw 상태 브로드캐스트 → ③클립의 ThrowBombEvent
-        //    → ④보스가 폭탄 스폰. 각 단계가 자기 이름을 남기므로 **안 찍히는 로그가 곧 범인**이다.
-        //    (같은 지점에서 두 번 추측이 빗나가면 진단을 심는다 — 교훈 #24·#72.)
-        Debug.Log($"[Wells/진단] ① 주기 만료 — 구독자 {(ThrowCycleElapsed != null ? "있음" : "🔴없음")} " +
-                  $"· 주기 {_cycleInterval}s · 억제 {_suppressed}", this);
-
+        // ⚠️ 여기 있던 투척 체인 진단(①~④)은 **제거했다**(2026-09-16). 폭탄 투척이 없어진 뒤로는
+        //    6초마다 영원히 찍히기만 하고 가려낼 대상이 없다 — 고빈도 로그는 정작 필요한 1회성
+        //    진단을 밀어낸다. 공백이 의도임은 보스 쪽에서 **1회만** 알린다(OnWellsAttackCycle).
         ThrowCycleElapsed?.Invoke();
     }
 
@@ -111,13 +113,6 @@ public class BossWells : MonoBehaviour
     public void PlayState(BossWellsState next)
     {
         _state = next;
-
-        // ② 상태 브로드캐스트 도달. 애니메이터가 없거나 컨트롤러가 비면 여기서 조용히 끝나므로
-        //    **그 사실을 찍는다** — 이 줄이 "Throw" 로 찍히는데 ③이 안 오면 클립 쪽 문제다.
-        if (next == BossWellsState.Throw)
-            Debug.Log($"[Wells/진단] ② Throw 상태 수신 — animator={(animator != null ? "있음" : "🔴없음")} " +
-                      $"· controller={(animator != null && animator.runtimeAnimatorController != null ? animator.runtimeAnimatorController.name : "🔴없음")} " +
-                      $"· 활성={isActiveAndEnabled} · 트리거='{throwTrigger}'", this);
 
         if (animator == null || animator.runtimeAnimatorController == null) return;
 
@@ -152,11 +147,10 @@ public class BossWells : MonoBehaviour
     {
         ShowHeldBomb(false); // 손에서 사라지는 연출은 모든 피어
 
-        // ③ 클립 이벤트 도달. 이 줄이 안 찍히면 클립이 재생되지 않은 것이다
-        //    (컨트롤러 전이 조건 · 트리거 이름 불일치 · 애니메이터 컬링을 의심).
-        Debug.Log($"[Wells/진단] ③ ThrowBombEvent 도달 — 서버={IsServerRuntime()} " +
-                  $"· 구독자 {(ThrowRequested != null ? "있음" : "🔴없음")}", this);
-
+        // 🔴 **구독자가 없는 것이 지금의 정상이다**(2026-09-16). 폭탄 투척이 제거돼 보스가
+        //    `ThrowRequested` 를 구독하지 않는다. 이 메서드를 지우면 fbx(SVN)에 박힌 클립 이벤트가
+        //    수신자를 잃어 **AnimationEvent 미싱 경고**가 뜨므로 껍데기로 남겨 둔다.
+        //    드론이 이 타이밍(손을 떠나는 프레임)을 쓰게 되면 여기에 다시 구독을 건다.
         if (!IsServerRuntime()) return;
         ThrowRequested?.Invoke();
     }

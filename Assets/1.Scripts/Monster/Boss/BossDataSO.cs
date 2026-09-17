@@ -59,6 +59,67 @@ public class BossAttackEntry
     [Tooltip("[S2] 히트 판정 형상을 제공할 ColliderInfo 자식의 오브젝트 이름. 비우면 기본 MeleeHitbox 를 쓴다. " +
              "🔴 문자열이라 오타가 조용히 무시된다 → 스폰 시 실존을 검증해 LogError 를 남긴다.")]
     public string hitboxAnchorName = "";
+
+    // ─── [G1] 전진 공격(Lunge) ────────────────────────────────────────
+    // 기획 문서: 훅·어퍼는 "플레이어 방향으로 전진하면서" 때린다. 전진 구간부터 이미 공격이라
+    // 경로에 닿은 사람도 맞는다(팀장 확정 B5) — 돌진과 섞인 공격으로 본다.
+    //
+    // 🔴 클립에는 전진이 들어 있지 않다(팀장 확인). 루트모션이 아니라 **코드 이동**이다.
+
+    [Tooltip("[G1] 공격 시작과 함께 전방으로 전진하는 거리(m). 0 이면 전진 없음(제자리 공격). " +
+             "확정 초기값 = 훅·어퍼 2.5. 전진은 애니 히트 이벤트(OnAttackHit)가 오면 멈춘다 — " +
+             "즉 '전진하면서 휘두르고 주먹이 닿을 때 멈춘다'가 되고, 클립 길이와 자동으로 맞는다.")]
+    [Min(0f)] public float lungeDistance = 0f;
+
+    [Tooltip("[G1] 전진 속도 = moveSpeed × 이 값.\n" +
+             "🔴 **전진이 히트 이벤트보다 먼저 끝나야 한다.** 늦으면 보스가 아직 이동 중일 때 판정이 나서 " +
+             "예고를 그린 자리와 실제 판정 자리가 어긋난다. 훅·어퍼 기준 필요 속도는 " +
+             "lungeDistance ÷ (히트 정규화 − telegraphPoseNormalized) × 클립길이 다 " +
+             "(2.5m ÷ 0.2325초 = 10.75m/s → moveSpeed 2.5 기준 배수 4.3 이 하한, 여유를 둬 5).")]
+    [Min(0.1f)] public float lungeSpeedMultiplier = 5f;
+
+    [Tooltip("[G1] 전진 **경로** 판정 반경(m). 보스 몸통 크기로 준다(NavMeshAgent radius 0.85 기준 1.2 권장). " +
+             "0 이면 전진은 하되 경로 데미지가 없다.\n" +
+             "🔴 매 틱 이 반경의 구로 때리므로 지나간 자리가 **캡슐(띠)** 이 된다 — 예고로 그리는 도형과 " +
+             "정확히 같은 모양이라 예고가 판정에 대해 거짓말하지 않는다.\n" +
+             "⚠️ 예전엔 ColliderInfo 이름(DashBody)을 썼는데, 그건 돌진 전용 히트박스라 " +
+             "**3.4m 폭 × 보스 앞 4.42m** 로 지나치게 컸다 — 부채꼴 모양이 무의미해졌다.")]
+    [Min(0f)] public float lungePathRadius = 0f;
+
+    // ─── [G2] 끝점 부채꼴 판정 ────────────────────────────────────────
+    // 기획 문서: 훅은 "공격하는 팔 방향으로 넓은 범위", 어퍼는 "끝나는 지점에서 원형으로 더 넓게".
+    //
+    // 🔴 물리 질의에는 **원뿔 형상이 없다.** 구 오버랩 + 각도 필터가 표준이고, 이 프로젝트도
+    //    이미 같은 패턴을 쓴다(FindGrabTarget 의 OverlapSphere · IsCounterFromFront 의 각도).
+    //    박스를 비스듬히 두 개 붙이는 근사는 **예고 데칼과 모서리가 어긋나서** 채택하지 않았다.
+    //
+    // 🔴 여기 값이 **예고 데칼과 판정 양쪽을 동시에** 먹인다. 갈라 두면 예고가 판정에 대해 거짓말한다.
+
+    [Tooltip("[G2] 끝점 부채꼴 반경(m). 0 이면 부채꼴을 쓰지 않고 위 hitboxAnchorName 형상으로 판정한다.")]
+    [Min(0f)] public float coneRadius = 0f;
+
+    [Tooltip("[G2] 부채꼴 **전체** 각(도). 90 이면 중심 기준 ±45. " +
+             "360 = 각도 제한 없음(원형) — 어퍼의 '끝점 원형'이 이 값이다.")]
+    [Range(0f, 360f)] public float coneAngle = 90f;
+
+    [Tooltip("[G2] 부채꼴 중심을 보스 정면에서 **좌/우로 치우치게** 하는 각(도). + = 오른쪽. " +
+             "오른손 훅은 +, 왼손 훅은 − 를 준다 — 문서의 '공격하는 팔 쪽이 넓어진다'가 이 한 칸이다.")]
+    [Range(-180f, 180f)] public float coneOffsetAngle = 0f;
+
+    // ─── [G2] 예고 구간 ──────────────────────────────────────────────
+    // 🔴 **예고는 판정보다 먼저 끝나야 한다.** 예고와 공격을 같은 순간에 시작하면 반응 시간이 0 이라
+    //    예고가 아니라 사후 통보가 된다(2026-09-16 팀장 지적으로 이 구간이 생겼다).
+    //
+    // 순서: 준비 자세에서 정지 → 부채꼴이 차오름 → 다 차면 자세를 풀고 **전진 + 공격**.
+
+    [Tooltip("[G2] 예고 길이(초). 이 시간 동안 보스는 **준비 자세에서 멈춰** 있고 바닥 부채꼴이 차오른다. " +
+             "0 이면 예고 없이 즉발(기존 동작). 확정 초기값 = 훅·어퍼 0.7.")]
+    [Min(0f)] public float telegraphDuration = 0f;
+
+    [Tooltip("[G2] 예고 동안 멈춰 있을 **자세**(공격 클립의 정규화 시간 0~1). " +
+             "0.15 면 '팔을 뒤로 당긴' 근처다. 🔴 이 값이 클립의 OnAttackHit 시점보다 크면 " +
+             "히트 프레임을 이미 지나쳐 **데미지가 나가지 않는다** — 훅·어퍼는 0.4 미만이어야 한다.")]
+    [Range(0f, 0.95f)] public float telegraphPoseNormalized = 0.15f;
 }
 
 // 공격이 노릴 대상. [S6]
@@ -157,6 +218,12 @@ public class BossDataSO : MonsterDataSO
     [Tooltip("카운터 성공 시 재생할 피격 리액션 애니메이터 상태명(예: getowned). 스폰 시 HasState 로 검증한다.")]
     public string hitReactionState = "getowned";
 
+    [Tooltip("[G6] 인터럽트 성공 리액션 — **오른쪽** 상태명. 위 hitReactionState 는 왼쪽이다. " +
+             "🔴 잡기는 **항상 오른쪽**, 돌진은 **L·R 50:50 난수**다(팀장 확정 R1). " +
+             "난수는 서버가 뽑아 복제한다 — 피어마다 따로 뽑으면 화면이 갈린다. " +
+             "비우면 왼쪽 하나만 쓴다(기존 동작).")]
+    public string hitReactionStateRight = "getowned_R";
+
     [Tooltip("[S3] Break(그로기 카운트 최대 도달) 지속 시간(초). 일반 그로기는 base 의 groggyDuration 을 쓴다.")]
     [Min(0f)] public float breakDuration = 5f;
 
@@ -207,6 +274,47 @@ public class BossDataSO : MonsterDataSO
 
     [Tooltip("Throw 단계 애니메이터 상태명. 비우면 Hold 클립을 그대로 유지한다.")]
     public string grabThrowState = "";
+
+    // ─── [G5] 잡기 재설계 (2026-09-16 팀장 확정) ──────────────────────
+    // 최종 사이클: **예고 → 끌어당김 → 붙잡기 → 지짐이 → 내려치기 ×3 → 놓아주기**
+    //
+    // 클립 대응(FBX 60fps 실측):
+    //   MagneticGrab(1.65s) → Grab(3.12s 중 붙잡는 순간까지) → Holding(1.13s)
+    //   → Throw(0.65s) ×3 → GrabEnd(1.37s)
+    //
+    // 🔴 **끌어당기는 순간까지는 인터럽트가 안 된다.** 실제로 붙잡은 뒤부터 3번째 내려치기 직전까지만
+    //    열린다 — 그래서 잡기의 카운터 창은 공격 **시작**이 아니라 붙잡기 성립 시점에 열린다.
+
+    [Tooltip("[G5] 🔴 **잡기 사이클 전체 속도 배수.** 애니 재생속도와 코드 단계 타이머에 **동시에** 걸린다 — " +
+             "이 한 칸만 바꾸면 사이클 전체가 같이 빨라진다.\n" +
+             "🔴 한쪽에만 걸면 애니와 FSM 이 어긋나고, 이 프로젝트에서 그건 **조용한 데미지 0** 으로 나타난다.\n" +
+             "확정 초기값 1.4(9.2초짜리 원본 사이클이 길어서).")]
+    [Range(0.25f, 3f)] public float grabCycleSpeed = 1.4f;
+
+    [Tooltip("[G5] 끌어당김 구간 길이(초) = MagneticGrab 클립 길이. 이 구간에 부채꼴 안의 **전원**이 끌려온다.")]
+    [Min(0f)] public float grabPullDuration = 1.65f;
+
+    [Tooltip("[G5] 끌어당김 뒤 **붙잡기까지** 걸리는 시간(초). Grab 클립에서 손이 닿는 순간까지다 " +
+             "(클립 전체 3.12초를 다 쓰지 않는다 — 붙잡은 뒤엔 지짐이로 넘어간다).")]
+    [Min(0f)] public float grabCatchDuration = 1.1f;
+
+    [Tooltip("[G5] 내려치기 횟수. **3번째에서 플레이어를 놓아준다.**")]
+    [Min(1)] public int grabSlamCount = 3;
+
+    [Tooltip("[G5] 내려치기 1회 데미지. 0 이면 grabThrowDamage 를 쓴다.")]
+    [Min(0)] public int grabSlamDamage = 0;
+
+    [Tooltip("[G5] 놓아주는 구간 길이(초) = GrabEnd 클립 길이.")]
+    [Min(0f)] public float grabEndDuration = 1.37f;
+
+    [Tooltip("[G5] 붙잡기 단계 애니메이터 상태명. 비우면 공격 행의 animatorStateName 을 그대로 쓴다.")]
+    public string grabCatchState = "Grab";
+
+    [Tooltip("[G5] 놓아주기 단계 애니메이터 상태명.")]
+    public string grabEndState = "GrabEnd";
+
+    [Tooltip("[G5] 끌려왔지만 **붙잡히지 않은** 플레이어를 보스 전방으로 밀어내는 세기. 0 이면 밀지 않는다.")]
+    [Min(0f)] public float grabPullKnockback = 4f;
 
     [Header("JumpAttack — 거리 무관 / 최원거리 플레이어 타겟")]
     [Tooltip("최원거리 플레이어를 찾는 탐색 반경(m). 보스룸을 덮을 만큼 넉넉히 — 이 밖이면 못 찾는다.")]
