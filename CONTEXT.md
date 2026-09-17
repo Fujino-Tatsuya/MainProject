@@ -13,8 +13,17 @@ Update this file when a term becomes important enough that future agents or team
 **작업 세션.** Claude 단독. 수정 파일 = `Assets/1.Scripts/Map/TrainingDummy/*`,
 `Assets/2.Prefabs/TrainingDummy.prefab`, `Assets/DefaultNetworkPrefabs.asset`. **이 파일들 동시 수정 금지.**
 
-**상태.** 코드·프리팹 완료, 컴파일 오류 0. **Play 검증 대기**(호스트 단독 + MPPM 2인).
+**상태.** 코드·프리팹·검증 씬 완료, 컴파일 오류 0. **Play 검증 대기**(호스트 단독 + MPPM 2인).
 설계·확정 사양·알려진 한계는 [PLAN-training-dummy.md](PLAN-training-dummy.md) — 여기 중복 기술하지 않는다.
+
+**검증 경로 = `Dev_Boot` 씬.** `DevSceneBooter.scene` 에 띄울 씬 이름을 적고 Play 하면
+호스트 기동 → **`NetworkSceneManager` 로 씬 로드**(씬에 배치된 NetworkObject 가 자동 스폰된다)
+→ 플레이어 스폰까지 정식 흐름 그대로 돈다. 대상 씬은 **빌드 목록에 enabled 로 등록**돼 있어야 한다.
+허수아비 검증 씬은 `Assets/0.Scenes/Debug/TrainingDummy.unity`.
+`MonsterTestBootstrap` 은 쓰지 않는다 — 좌클릭 디버그 공격이 플레이어 기본 공격과 입력이 겹친다.
+
+⚠️ **씬마다 `FloatingDamageSpawner` 를 직접 넣어야 데미지 숫자가 뜬다.** 씬 싱글턴이라
+`4.MapScene` 것이 따라오지 않는다.
 
 **용어.** *허수아비(Training Dummy)* = 연습장에 놓는 표적. **몬스터가 아니라 맵 오브젝트다** —
 `MonsterBase` 계열을 일절 쓰지 않고 `Unit` 만 상속한다. 경석(팀장)의 몬스터 담당 범위 밖.
