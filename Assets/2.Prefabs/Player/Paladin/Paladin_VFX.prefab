@@ -7638,7 +7638,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2f714ae95eb94b57a450b74bc822de23, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerMotor
-  gameRule: {fileID: 0}
+  gameRule: {fileID: 11400000, guid: 5a71cc8f5b32f47428af514e196e5a8c, type: 2}
   collisionSkin: 0.02
   maxSweepIterations: 3
 --- !u!114 &3913405706086165160
