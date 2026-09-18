@@ -175,6 +175,10 @@ PrefabInstance:
       propertyPath: targetSceneName
       value: 4.MapScene
       objectReference: {fileID: 0}
+    - target: {fileID: 7043847080119373261, guid: d78501012a484a84287af3ca22ef5e90, type: 3}
+      propertyPath: defaultPlayerPrefab
+      value: 
+      objectReference: {fileID: 6077492126708577103, guid: 8d5b48551745dae429fc070cfa0af71f, type: 3}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

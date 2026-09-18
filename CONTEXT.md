@@ -8,6 +8,108 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 진행 중 (2026-09-18 · **PC 간** Relay 접속 실패 — 진단 계측 투입, 브랜치 `development`)
+
+작업자: **Claude**. 수정 파일: `Assets/1.Scripts/Network/NetworkDiagnosticsLog.cs`(신규) ·
+`NetworkSessionLauncher.cs` · `Session/RelayConnectionProvider.cs` · `UnityServicesBootstrap.cs` ·
+`Assets/1.Scripts/Managers/LobbySceneManager.cs`.
+
+**증상** (팀장 확인, 2026-09-18) — **같은 PC 에서 빌드 두 개를 띄우면 붙는다.**
+**다른 PC 와 붙이려 하면 안 된다.** 에디터도 된다.
+→ 처음엔 "빌드에서만"으로 잡았는데 **범위가 틀렸다. PC 간에만 나는 문제다.**
+
+같은 PC 에서 되는 것이 제일 큰 단서다 — 같은 실행 파일이라 `configHash` 가 자동으로 일치한다.
+다른 PC 는 그 보장이 없다. **양쪽 빌드가 서로 다른 커밋인 경우가 1순위 용의자.**
+새 빌드 없이 판정하는 법: **본인 빌드 폴더를 통째로 복사해 상대 PC 에서 실행**해 보면 된다.
+
+**Player.log 에서 읽어낸 것** — 릴레이는 뚫렸다. `RelayServiceException` 이 없고
+`StartClient success` 까지 간 뒤 `reason='Client-1 disconnected by server.'` 로 끊긴다.
+이 문구는 NGO 의 `NetworkManager.DisconnectClient(clientId)` 한 곳에서만 나오고
+우리 코드에는 호출부가 없다. 호스트가 거절한 것이고, 패키지 내부 호출부는 둘뿐이다.
+
+1. `ConnectionRequestMessage.Deserialize` → `NetworkConfig.CompareConfig` **해시 불일치**. 즉시 끊긴다.
+2. `NetworkConnectionManager` 의 **pending 타임아웃**(`ClientConnectionBufferTimeout` 10초) —
+   transport 는 붙었는데 connection request 메시지가 안 온 경우. **약 10초 뒤** 끊긴다.
+
+둘 다 경고가 **호스트 쪽에만**, 2번은 심지어 `LogLevel.Developer` 에서만 찍혀서
+기본 설정으로는 어느 쪽인지 알 수 없었다. → 그래서 계측을 넣었다.
+
+**넣은 것**
+- `NetworkDiagnosticsLog` — 실행 파일 옆(에디터는 프로젝트 루트)에 `network.log`.
+  접속 관련 `Debug` 로그와 **모든 경고·에러**를 모으고, `StartHost/Client` 직후
+  **NetworkConfig 해시와 프리팹 목록 전체**를 블록으로 남긴다. `AutoFlush` 라 크래시해도 남는다.
+- `NetworkSessionLauncher.verboseNetcodeLogging`(기본 켜짐) — NGO 로그를 Developer 로 올린다.
+  위 2번 경고를 보이게 하는 유일한 방법이다.
+- **로비 화면에 `cfg=<해시>` 표시** — 호스트/클라가 다른 PC 에 있으면 한쪽 network.log 만으로는
+  아무것도 못 가린다. 파일을 주고받는 대신 두 사람이 화면의 숫자만 맞춰 보면 된다.
+  조인코드 옆·Host 시작·접속 시도 중·거절 메시지에 붙는다.
+- 호스트가 명시적으로 끊은 경우(`disconnected by server`)의 안내 문구를 분리했다.
+  기존의 "IP/Port 를 확인하세요" 는 릴레이가 이미 뚫린 상황이라 사람을 엉뚱한 데로 보냈다.
+
+### ✅ 판정 완료 (2026-09-18 19:47, 3인 실측 — 은희·지원·태형)
+
+**같은 빌드를 셋이 나눠 쓰니 붙었다.** 3인 Relay 세션이 끝까지 돌았다 —
+은희 호스트(`DPH867`) → 지원 `clientId=1` → 태형 `clientId=2`,
+`4.MapScene` 3인 동시 로드(`tracked=3`) → 보스전 → Result → Lobby 복귀.
+마지막 끊김은 호스트의 `OnApplicationQuit` 이다(버그 아님).
+
+**`configHash` 3대 전부 `2385332456939975880`, 프리팹 26개** — 에디터 값과도 같다.
+→ **앞으로 PC 간 테스트는 빌드 폴더를 복사해 쓰고, 화면의 `cfg=` 숫자를 먼저 맞춰 볼 것.**
+
+### ✅ 이전 실패의 원인 확정 — 릴레이가 아니라 빌드 버전 차이
+
+실패한 PC(`D:/p_MT/26.09.18-Build/`)의 `Player-prev.log` 가 결정적이었다. **28회 시도했다.**
+
+| 방식 | 횟수 | 결과 |
+|---|---|---|
+| Relay 조인코드 | 7 | `Client-1`~`Client-7 disconnected by server.` |
+| **Direct IPv4 `172.33.1.3:7777`** | 21 | `Client-1`~`Client-21 disconnected by server.` |
+
+**전송 계층을 LAN 직결로 바꿔도 똑같이 거부당했다** → 릴레이·DTLS·방화벽 전부 배제.
+`Client-N` 의 N 이 연속 증가하므로 호스트가 살아서 id 를 발급하고 끊은 것이고,
+`ConnectionApproval=0` 이라 남는 거부 사유는 **`NetworkConfig` 해시 불일치** 하나뿐이다.
+→ 그 PC 의 빌드와 호스트 빌드가 서로 다른 커밋이었다.
+
+### 🔴 같은 로그에서 나온 진짜 버그 — 로딩 0% 고정 (고침, 2026-09-18)
+
+28회 실패 후 그 PC 가 직접 호스트를 켜고 게임 시작을 눌렀는데
+`StartGameLoading` 다음에 **`HandleSceneEvent` 가 한 줄도 안 나왔다.**
+정상 실행에는 Load → LoadComplete → LoadEventCompleted 가 찍히고 그래야
+`StartTargetLoadAfterSceneEvent` 가 타깃 씬 로드를 시작한다 → **MapScene 로드가 시작조차 안 됨.**
+
+원인은 [NetworkLoadingFlowController](Assets/1.Scripts/Loading/NetworkLoadingFlowController.cs) 의
+`_callbacksRegistered` 래치다. 이 래치는 `OnDestroy` 에서만 풀리는데,
+**NGO 는 `Start*` 마다 `SceneManager`·`CustomMessagingManager` 를 새로 만들고 Shutdown 때 null 로 만든다**
+(`NetworkManager.cs` 의 Initialize/ShutdownInternal). 그래서 두 번째 세션부터는
+죽은 객체에 붙은 구독만 남고 새 객체에는 영영 안 붙었다.
+
+- **재현 조건**: 같은 실행 안에서 접속을 한 번이라도 시도한 뒤 호스트를 켜면 발생.
+  프로그램을 새로 켜고 바로 호스트하면 정상(그래서 여태 안 잡혔다).
+- **수정**: 래치 대신 **구독 대상 인스턴스를 기억**해 세대가 바뀌면 떼고 다시 붙인다
+  (`IsRegistrationCurrent`). `UnregisterNetworkCallbacks` 도 현재 프로퍼티가 아니라
+  기억해 둔 객체에서 뗀다.
+- `CustomMessagingManager` 핸들러도 같이 죽으므로 클라의 진행률 메시지도 함께 복구된다.
+
+### 🔴 같은 로그에서 나온 별건 — 오디오가 통째로 죽어 있다
+
+3대 + 에디터 **전부** 동일하게 씬마다 NRE 가 난다. 세 줄 다 `AudioManager.Instance.___` 다.
+
+- `TitleSceneManager.cs:33` · `LobbySceneManager.cs:77` · `ResultSceneManager.cs:24`
+- `AudioManager` 컴포넌트를 가진 것은 **`BossScene.unity` 와 `AudioManager.prefab` 뿐**이고
+  MainFlow 씬(BootStrap/Title/Loading/Lobby/Map/Result) 어디에도 없다.
+  게다가 `BossScene` 은 `c603e699` 에서 빌드 설정에서 빠졌다.
+- → **BGM 이 한 번도 안 나오고 있다.** `AudioManager.prefab` 을 `0.BootStrapScene` 에 넣으면 된다
+  (`DontDestroyOnLoad` 라 한 번만).
+
+### 🔴 보스 데이터 (호스트 로그에만 — 서버 권한)
+
+`TwentyThree(Clone): Dash 행의 attackTargeting 이 FarthestPlayer 다` — `No23.asset` 의 Dash 행.
+검증 코드가 스스로 잡았다. 그 밖에 전투 중 경고:
+`송전기 — 4초 안에 못 갔다(2.1m) → 워프` · `인터럽트가 카운터로 성립하지 않았다` ·
+`Failed to create agent because it is not close enough to the NavMesh`.
+
+---
+
 ## ▶▶ 현재 인수인계 (2026-09-18 · 공격 범위/회전 재작업 + G4 **완료**, 브랜치 `feature/Boss23`)
 
 작업자: **경석(Claude)**. 계획: [PLAN-boss-attack-shapes.md](PLAN-boss-attack-shapes.md) (승인됨 2026-09-18).

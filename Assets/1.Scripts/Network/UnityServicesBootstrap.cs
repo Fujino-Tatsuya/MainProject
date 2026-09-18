@@ -8,6 +8,7 @@ public static class UnityServicesBootstrap
 {
     private const string DefaultProfile = "Player1";
     private const string PlayerNameArgument = "-name";
+    private const string DiagTag = "UnityServicesBootstrap";
 
     private static Task _initializationTask;
     private static string _failureReason = string.Empty;
@@ -88,11 +89,17 @@ public static class UnityServicesBootstrap
             }
 
             _failureReason = string.Empty;
+            NetworkDiagnosticsLog.Log(
+                $"{DiagTag}.InitializeAsync",
+                $"완료 state={UnityServices.State} signedIn={authentication.IsSignedIn} " +
+                $"profile={authentication.Profile} playerId={authentication.PlayerId} " +
+                $"cloudProjectId='{Application.cloudProjectId}'");
         }
         catch (Exception exception)
         {
             _failureReason = $"Unity Services 초기화 또는 익명 로그인에 실패했습니다: {exception.Message}";
             Debug.LogError($"[Relay] {_failureReason}\n{exception}");
+            NetworkDiagnosticsLog.LogError($"{DiagTag}.InitializeAsync", exception.ToString());
         }
     }
 

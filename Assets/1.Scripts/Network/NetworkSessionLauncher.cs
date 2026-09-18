@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Unity.Netcode;
@@ -7,10 +9,24 @@ using UnityEngine;
 
 public class NetworkSessionLauncher : MonoBehaviour
 {
+    private const string DiagTag = "NetworkSessionLauncher";
+
+    /// <summary>
+    /// NGO 의 내부 진단 로그를 Developer 수준까지 연다.
+    ///
+    /// 왜 필요한가 — 호스트가 클라를 끊는 두 경로 중 하나인
+    /// "transport 연결은 붙었는데 connection request 메시지가 안 왔다"(<c>ClientConnectionBufferTimeout</c>)
+    /// 경고는 <b>Developer 수준에서만</b> 찍힌다. 기본값 Normal 로는 호스트 로그가 한 줄도 없이
+    /// 클라만 "Client-N disconnected by server." 를 받아 원인이 보이지 않는다.
+    /// </summary>
+    [Tooltip("NGO 내부 로그를 Developer 수준으로 올려 network.log 에 담는다. 접속 문제를 다 잡은 뒤 끄면 된다.")]
+    [SerializeField] private bool verboseNetcodeLogging = true;
+
     NetworkManager _networkManager;
     NetworkLoadingFlowController _loadingFlowController;
     DirectIPv4ConnectionProvider _directIPv4Provider;
     RelayConnectionProvider _relayProvider;
+    UnityTransport _transport;
 
     public SessionConnectionMode Mode { get; set; } = SessionConnectionMode.DirectIPv4;
 
@@ -20,14 +36,24 @@ public class NetworkSessionLauncher : MonoBehaviour
     {
         _networkManager = GetComponent<NetworkManager>();
         _loadingFlowController = GetComponent<NetworkLoadingFlowController>();
-        var unityTransport = GetComponent<UnityTransport>();
-        if (unityTransport != null)
+        if (verboseNetcodeLogging && _networkManager != null && _networkManager.LogLevel > LogLevel.Developer)
         {
-            _directIPv4Provider = new DirectIPv4ConnectionProvider(unityTransport);
-            _relayProvider = new RelayConnectionProvider(unityTransport);
+            _networkManager.LogLevel = LogLevel.Developer;
+        }
+
+        _transport = GetComponent<UnityTransport>();
+        if (_transport != null)
+        {
+            _directIPv4Provider = new DirectIPv4ConnectionProvider(_transport);
+            _relayProvider = new RelayConnectionProvider(_transport);
         }
 
         Debug.Log($"[SceneFlow] NetworkSessionLauncher.Awake hasNetworkManager={_networkManager != null} hasLoadingFlow={_loadingFlowController != null}");
+        NetworkDiagnosticsLog.Log(
+            $"{DiagTag}.Awake",
+            $"hasNetworkManager={_networkManager != null} hasTransport={_transport != null} " +
+            $"hasDirectProvider={_directIPv4Provider != null} hasRelayProvider={_relayProvider != null} mode={Mode} " +
+            $"ngoLogLevel={(_networkManager != null ? _networkManager.LogLevel.ToString() : "(없음)")}");
     }
 
     public bool StartHost()
@@ -57,18 +83,28 @@ public class NetworkSessionLauncher : MonoBehaviour
 
     public async Task<SessionStartResult> StartHostAsync(CancellationToken cancellationToken)
     {
+        NetworkDiagnosticsLog.Log($"{DiagTag}.StartHostAsync", $"begin mode={Mode}");
+
         if (!TryGetProvider(out var provider, out var failureResult))
         {
+            NetworkDiagnosticsLog.LogWarning(
+                $"{DiagTag}.StartHostAsync", $"프로바이더 없음 reason='{failureResult.FailureReason}'");
             return failureResult;
         }
 
         var prepareResult = await PrepareHostAsync(provider, cancellationToken);
+        NetworkDiagnosticsLog.Log(
+            $"{DiagTag}.StartHostAsync",
+            $"prepare success={prepareResult.Success} shareCode='{prepareResult.ShareCode}' " +
+            $"reason='{prepareResult.FailureReason}'");
         if (!prepareResult.Success)
         {
             return prepareResult;
         }
 
-        return StartHostCore()
+        var started = StartHostCore();
+        NetworkDiagnosticsLog.Log($"{DiagTag}.StartHostAsync", $"end started={started}");
+        return started
             ? SessionStartResult.Succeeded(prepareResult.ShareCode)
             : SessionStartResult.Failed("Host 시작에 실패했습니다. 포트가 이미 사용 중인지 확인하세요.");
     }
@@ -77,39 +113,53 @@ public class NetworkSessionLauncher : MonoBehaviour
         string joinInput,
         CancellationToken cancellationToken)
     {
+        NetworkDiagnosticsLog.Log(
+            $"{DiagTag}.StartClientAsync", $"begin mode={Mode} joinInput='{joinInput}'");
+
         if (!TryGetProvider(out var provider, out var failureResult))
         {
+            NetworkDiagnosticsLog.LogWarning(
+                $"{DiagTag}.StartClientAsync", $"프로바이더 없음 reason='{failureResult.FailureReason}'");
             return failureResult;
         }
 
         var prepareResult = await PrepareClientAsync(provider, joinInput, cancellationToken);
+        NetworkDiagnosticsLog.Log(
+            $"{DiagTag}.StartClientAsync",
+            $"prepare success={prepareResult.Success} reason='{prepareResult.FailureReason}'");
         if (!prepareResult.Success)
         {
             return prepareResult;
         }
 
-        return StartClientCore()
+        var started = StartClientCore();
+        NetworkDiagnosticsLog.Log($"{DiagTag}.StartClientAsync", $"end started={started}");
+        return started
             ? SessionStartResult.Succeeded(prepareResult.ShareCode)
             : SessionStartResult.Failed("Client 시작에 실패했습니다.");
     }
 
     public void BeginHost()
     {
+        NetworkDiagnosticsLog.Log($"{DiagTag}.BeginHost", $"mode={Mode}");
         CompleteSessionStartAsync(StartHostAsync(CancellationToken.None));
     }
 
     public void BeginClient(string joinInput)
     {
+        NetworkDiagnosticsLog.Log($"{DiagTag}.BeginClient", $"mode={Mode} joinInput='{joinInput}'");
         CompleteSessionStartAsync(StartClientAsync(joinInput, CancellationToken.None));
     }
 
     private bool StartHostCore()
     {
         Debug.Log($"[SceneFlow] NetworkSessionLauncher.StartHost before listening={_networkManager.IsListening}");
+        LogTransportSnapshot("StartHost.before");
         if (_networkManager.StartHost())
         {
             RegisterLoadingFlowCallbacks();
             Debug.Log($"[SceneFlow] NetworkSessionLauncher.StartHost success localClientId={_networkManager.LocalClientId}");
+            LogNetworkConfigSnapshot("StartHost.after");
             return true;
         }
 
@@ -120,10 +170,12 @@ public class NetworkSessionLauncher : MonoBehaviour
     private bool StartClientCore()
     {
         Debug.Log($"[SceneFlow] NetworkSessionLauncher.StartClient before listening={_networkManager.IsListening}");
+        LogTransportSnapshot("StartClient.before");
         if (_networkManager.StartClient())
         {
             RegisterLoadingFlowCallbacks();
             Debug.Log($"[SceneFlow] NetworkSessionLauncher.StartClient success localClientId={_networkManager.LocalClientId}");
+            LogNetworkConfigSnapshot("StartClient.after");
             return true;
         }
 
@@ -134,15 +186,102 @@ public class NetworkSessionLauncher : MonoBehaviour
     private bool StartServerCore()
     {
         Debug.Log($"[SceneFlow] NetworkSessionLauncher.StartServer before listening={_networkManager.IsListening}");
+        LogTransportSnapshot("StartServer.before");
         if (_networkManager.StartServer())
         {
             RegisterLoadingFlowCallbacks();
             Debug.Log("[SceneFlow] NetworkSessionLauncher.StartServer success");
+            LogNetworkConfigSnapshot("StartServer.after");
             return true;
         }
 
         Debug.Log("[SceneFlow] NetworkSessionLauncher.StartServer failed");
         return false;
+    }
+
+    /// <summary>
+    /// 전송 계층이 실제로 무엇을 들고 있는지 남긴다 — Relay 를 골랐는데
+    /// <c>Protocol</c> 이 <c>UnityTransport</c> 면 <c>SetRelayServerData</c> 가 안 먹은 것이다.
+    /// </summary>
+    private void LogTransportSnapshot(string context)
+    {
+        if (_transport == null)
+        {
+            NetworkDiagnosticsLog.LogWarning($"{DiagTag}.{context}", "UnityTransport 가 없습니다.");
+            return;
+        }
+
+        var connection = _transport.ConnectionData;
+        NetworkDiagnosticsLog.Log(
+            $"{DiagTag}.{context}",
+            $"mode={Mode} protocol={_transport.Protocol} address={connection.Address}:{connection.Port} " +
+            $"listen={connection.ServerListenAddress} webSockets={_transport.UseWebSockets} " +
+            $"encryption={_transport.UseEncryption} maxPayload={_transport.MaxPayloadSize} " +
+            $"listening={_networkManager != null && _networkManager.IsListening}");
+    }
+
+    /// <summary>
+    /// 접속 거부의 결정적 증거. NGO 는 호스트와 클라의 <see cref="NetworkConfig"/> 해시가
+    /// 다르면 아무 설명 없이 <c>"Client-N disconnected by server."</c> 로 끊는다
+    /// (<c>ConnectionRequestMessage.Deserialize</c> → <c>CompareConfig</c>).
+    /// 해시 재료(프리팹 GlobalObjectIdHash 목록·TickRate·플래그)를 통째로 남겨
+    /// 양쪽 network.log 를 diff 하면 어느 항목이 어긋났는지 바로 드러나게 한다.
+    ///
+    /// ⚠️ <c>GetConfig(false)</c> 로 부른다 — 기본값 <c>true</c> 는 해시를 캐시해버려서
+    /// 진단 호출이 실제 접속에 쓰일 해시를 고정시키는 부작용이 생긴다.
+    /// </summary>
+    private void LogNetworkConfigSnapshot(string context)
+    {
+        LogTransportSnapshot(context);
+
+        if (_networkManager == null)
+        {
+            NetworkDiagnosticsLog.LogWarning($"{DiagTag}.{context}", "NetworkManager 가 없습니다.");
+            return;
+        }
+
+        var config = _networkManager.NetworkConfig;
+        if (config == null)
+        {
+            NetworkDiagnosticsLog.LogWarning($"{DiagTag}.{context}", "NetworkConfig 가 null 입니다.");
+            return;
+        }
+
+        var lines = new List<string>
+        {
+            $"configHash          = {config.GetConfig(false)}",
+            $"protocolVersion     = {config.ProtocolVersion}",
+            $"tickRate            = {config.TickRate}",
+            $"connectionApproval  = {config.ConnectionApproval}",
+            $"forceSamePrefabs    = {config.ForceSamePrefabs}",
+            $"enableSceneMgmt     = {config.EnableSceneManagement}",
+            $"varLengthSafety     = {config.EnsureNetworkVariableLengthSafety}",
+            $"rpcHashSize         = {config.RpcHashSize}",
+            $"playerPrefab        = {(config.PlayerPrefab != null ? config.PlayerPrefab.name : "(없음)")}",
+        };
+
+        var prefabs = config.Prefabs;
+        if (prefabs == null)
+        {
+            lines.Add("prefabs             = (null)");
+        }
+        else
+        {
+            var links = prefabs.NetworkPrefabOverrideLinks;
+            lines.Add($"prefabLists         = {prefabs.NetworkPrefabsLists.Count}");
+            lines.Add($"prefabOverrideLinks = {links.Count}");
+
+            // 정렬 순서는 NetworkConfig.GetConfig 가 해시를 만들 때 쓰는 순서와 같다.
+            foreach (var entry in links.OrderBy(pair => pair.Key))
+            {
+                var prefabName = entry.Value != null && entry.Value.Prefab != null
+                    ? entry.Value.Prefab.name
+                    : "(없음)";
+                lines.Add($"    {entry.Key,12} {prefabName}");
+            }
+        }
+
+        NetworkDiagnosticsLog.LogBlock($"{DiagTag}.{context} NetworkConfig", lines);
     }
 
     private void SetDirectConnectionData(string ip, ushort port)
@@ -181,9 +320,14 @@ public class NetworkSessionLauncher : MonoBehaviour
 
         if (!provider.IsAvailable(out var unavailableReason))
         {
+            NetworkDiagnosticsLog.LogWarning(
+                $"{DiagTag}.TryGetProvider",
+                $"mode={Mode} 사용 불가 reason='{unavailableReason}'");
             failureResult = SessionStartResult.Failed(unavailableReason);
             return false;
         }
+
+        NetworkDiagnosticsLog.Log($"{DiagTag}.TryGetProvider", $"mode={Mode} provider={provider.GetType().Name}");
 
         failureResult = default;
         return true;
@@ -199,10 +343,12 @@ public class NetworkSessionLauncher : MonoBehaviour
         }
         catch (OperationCanceledException)
         {
+            NetworkDiagnosticsLog.LogWarning($"{DiagTag}.PrepareHostAsync", "취소되었습니다.");
             return SessionStartResult.Failed("세션 시작이 취소되었습니다.");
         }
         catch (Exception exception)
         {
+            NetworkDiagnosticsLog.LogError($"{DiagTag}.PrepareHostAsync", $"예외 {exception}");
             return SessionStartResult.Failed($"세션 연결 준비에 실패했습니다: {exception.Message}");
         }
     }
@@ -218,10 +364,12 @@ public class NetworkSessionLauncher : MonoBehaviour
         }
         catch (OperationCanceledException)
         {
+            NetworkDiagnosticsLog.LogWarning($"{DiagTag}.PrepareClientAsync", "취소되었습니다.");
             return SessionStartResult.Failed("세션 시작이 취소되었습니다.");
         }
         catch (Exception exception)
         {
+            NetworkDiagnosticsLog.LogError($"{DiagTag}.PrepareClientAsync", $"예외 {exception}");
             return SessionStartResult.Failed($"세션 연결 준비에 실패했습니다: {exception.Message}");
         }
     }
@@ -243,6 +391,10 @@ public class NetworkSessionLauncher : MonoBehaviour
             Debug.LogError($"[SceneFlow] NetworkSessionLauncher 세션 시작 중 예외: {exception}", this);
             result = SessionStartResult.Failed($"세션 시작 중 예외가 발생했습니다: {exception.Message}");
         }
+
+        NetworkDiagnosticsLog.Log(
+            $"{DiagTag}.CompleteSessionStartAsync",
+            $"success={result.Success} shareCode='{result.ShareCode}' reason='{result.FailureReason}'");
 
         try
         {
@@ -281,9 +433,17 @@ public class NetworkSessionLauncher : MonoBehaviour
     private void OnApplicationQuit()
     {
         Debug.Log("[SceneFlow] NetworkSessionLauncher.OnApplicationQuit");
+        NetworkDiagnosticsLog.Log(
+            $"{DiagTag}.OnApplicationQuit",
+            $"listening={NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening}");
+
         if (NetworkManager.Singleton != null)
         {
             NetworkManager.Singleton.Shutdown();
         }
+
+        // Shutdown 이 남기는 마지막 줄까지 담고 디스크에 밀어 넣는다.
+        // 닫기는 프로세스 종료 시점의 NetworkDiagnosticsLog 가 알아서 한다.
+        NetworkDiagnosticsLog.MarkSessionEnd();
     }
 }

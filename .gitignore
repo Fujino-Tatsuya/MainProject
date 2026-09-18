@@ -147,3 +147,6 @@ Docs/temp/
 /output/
 /.vscode/
 /.claude/settings.local.json
+
+# 접속 진단 로그 (NetworkDiagnosticsLog) — 실행할 때마다 덮어쓴다
+/network.log
