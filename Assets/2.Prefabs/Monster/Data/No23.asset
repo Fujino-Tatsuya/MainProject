@@ -23,7 +23,7 @@ MonoBehaviour:
   detectionRadius: 8
   detectionHeightTolerance: 0
   attackRange: 3.4
-  leashRadius: 15
+  leashRadius: 22
   returnSpeedMultiplier: 5
   turnSpeed: 10
   avoidanceRadius: 0.3
@@ -71,10 +71,14 @@ MonoBehaviour:
     hitboxAnchorName: Hand_L
     lungeDistance: 2.5
     lungeSpeedMultiplier: 5
-    lungePathRadius: 1.2
-    coneRadius: 4.42
+    lungePathRadius: 0
+    coneRadius: 0
     coneAngle: 120
     coneOffsetAngle: -30
+    boxWidth: 4.1
+    boxLength: 6
+    boxLateralOffset: -1.07
+    boxBackOffset: 2
     telegraphDuration: 0.7
     telegraphPoseNormalized: 0.15
   - attackId: 1
@@ -93,10 +97,14 @@ MonoBehaviour:
     hitboxAnchorName: Hand_R
     lungeDistance: 2.5
     lungeSpeedMultiplier: 5
-    lungePathRadius: 1.2
-    coneRadius: 4.42
+    lungePathRadius: 0
+    coneRadius: 0
     coneAngle: 120
     coneOffsetAngle: 30
+    boxWidth: 4.1
+    boxLength: 6
+    boxLateralOffset: 1.07
+    boxBackOffset: 2
     telegraphDuration: 0.7
     telegraphPoseNormalized: 0.15
   - attackId: 2
@@ -113,11 +121,11 @@ MonoBehaviour:
     counterWindowDuration: 0
     superArmor: 1
     hitboxAnchorName: Hand_R
-    lungeDistance: 2.5
+    lungeDistance: 3.75
     lungeSpeedMultiplier: 5
-    lungePathRadius: 1.2
-    coneRadius: 4.08
-    coneAngle: 180
+    lungePathRadius: 1.8
+    coneRadius: 2.25
+    coneAngle: 360
     coneOffsetAngle: 0
     telegraphDuration: 0.7
     telegraphPoseNormalized: 0.15
@@ -168,6 +176,7 @@ MonoBehaviour:
     counterWindowDuration: 1.5
     superArmor: 1
     hitboxAnchorName: DashBody
+    hitEventFallbackNormalized: 0.57
   - attackId: 6
     animatorStateName: Charging
     cooldown: 0
@@ -240,6 +249,8 @@ MonoBehaviour:
   jumpRecoveryDuration: 0.4
   jumpAoeRadius: 5.25
   jumpLandingDamage: 0
+  jumpTakeoffState: Leap
+  jumpTakeoffDuration: 0.633
   jumpHoverState: JumpHover
   jumpLandingState: JumpLanding
   jumpTelegraphPrefab: {fileID: 5997264177071607445, guid: a325fc2b60be455428b04ab67232fb24, type: 3}
@@ -259,7 +270,7 @@ MonoBehaviour:
   rageDashSpeedMultiplier: 6
   rageDashMaxDistance: 16
   rageDashDamage: 0
-  dashDuration: 0.7
+  dashDuration: 0.91
   dashSpeedMultiplier: 6
   dashMaxDistance: 16
   dashDamage: 0

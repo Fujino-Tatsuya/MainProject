@@ -410,6 +410,7 @@ public class TwentyThreeBoss : MonsterBase
         ValidateState(_boss.hitReactionStateRight, nameof(_boss.hitReactionStateRight));
         ValidateState(_boss.grabCatchState, nameof(_boss.grabCatchState));
         ValidateState(_boss.grabEndState, nameof(_boss.grabEndState));
+        ValidateState(_boss.jumpTakeoffState, nameof(_boss.jumpTakeoffState));   // [G4]
 
         for (int i = 0; i < _boss.attacks.Length; i++)
         {
@@ -571,8 +572,10 @@ public class TwentyThreeBoss : MonsterBase
                                "앵커 지정이 조용히 무시된다");
 
             // [G1] 전진은 있는데 경로 반경이 0 이면 "전진만 하고 아무도 안 맞는" 조합이다.
+            // ⚠️ 네모 공격(boxWidth > 0)은 **일부러** 경로를 비운다 — 예고가 끝점 네모 하나라,
+            //    그리지 않은 경로에 데미지가 있으면 그것이야말로 과소 표시다. 경고 대상이 아니다.
             // 의도일 수 있으므로(연출성 전진) 에러가 아니라 경고로 남긴다.
-            if (e.lungeDistance > 0f && e.lungePathRadius <= 0f)
+            if (e.lungeDistance > 0f && e.lungePathRadius <= 0f && e.boxWidth <= 0f)
                 Debug.LogWarning(
                     $"{name}: attacks[{i}]({e.attackId}) 는 {e.lungeDistance:0.##}m 전진하는데 " +
                     "lungePathRadius 가 0 이다 — 전진 경로에 데미지가 없다.", this);
@@ -796,7 +799,10 @@ public class TwentyThreeBoss : MonsterBase
                     break;
 
                 case BossAttackId.Jump:
-                    _stateTimer = JumpHover + JumpLanding + JumpRecovery + data.attackDuration;
+                    // 🔴 [G4] 이륙 몴을 반드시 더한다 — 빼면 체인 도중 데드락 안전망이 터진다
+                    //    (돌진이 선딜 몫을 빼뜨려 매번 타임아웃하던 것과 같은 종류).
+                    _stateTimer = JumpTakeoffDuration + JumpHover + JumpLanding + JumpRecovery
+                                + data.attackDuration;
                     break;
                 case BossAttackId.ChargeSequence:
                     // 🔴 **이동 구간을 예산에 넣는다**(2026-08-13). 차징은 송전탑 중심으로 이동한 뒤
@@ -1000,6 +1006,21 @@ public class TwentyThreeBoss : MonsterBase
     int StrikeMelee(BossAttackEntry e)
     {
         if (meleeAttack == null) return 0;
+        // 🔴 **네모가 부채꼴보다 우선이다**(T4). 예고도 같은 조건으로 네모 하나만 그린다 —
+        //    둘이 같은 칸을 보는 것이 예고가 거짓말하지 않는 유일한 방법이다.
+        //    원점은 **현재 위치**다 — 히트 시점에는 이미 전진을 마쳤거나 마쳤어야 한다.
+        if (e != null && e.boxWidth > 0f && e.boxLength > 0f)
+        {
+            // 예고와 **같은 치우침**을 판정에도 먹인다 — 한쪽만 옮기면 예고가 거짓말이 된다.
+            Vector3 fwd = transform.forward; fwd.y = 0f;
+            if (fwd.sqrMagnitude < 0.0001f) fwd = Vector3.forward;
+            fwd.Normalize();
+            Vector3 origin = transform.position
+                           + Vector3.Cross(Vector3.up, fwd) * e.boxLateralOffset
+                           - fwd * e.boxBackOffset;
+            return meleeAttack.HitBox(origin, fwd, e.boxWidth, e.boxLength);
+        }
+
         if (e == null || e.coneRadius <= 0f) return meleeAttack.Hit();
 
         return meleeAttack.HitCone(transform.position, ConeForward(e), e.coneRadius, e.coneAngle);
@@ -1048,10 +1069,26 @@ public class TwentyThreeBoss : MonsterBase
     {
         BossAttackEntry e = EntryFor(slot);
         if (e == null) return;
-        if (e.coneRadius <= 0f && e.lungePathRadius <= 0f) return;
+        if (e.coneRadius <= 0f && e.lungePathRadius <= 0f && e.boxWidth <= 0f) return;
 
         // 🔴 부채꼴 꼭짓점은 **전진 끝점**이다 — 판정도 전진을 마친 자리에서 나가기 때문이다.
         //    보스 현재 위치에 그리면 예고와 판정이 전진 거리만큼 어긋난다.
+        // 🔴 네모 공격은 **사각형 하나**로 그린다(팀장 확정 2026-09-18).
+        //    네모는 **전진 끝점**(lungeDistance 앞)에 놓는다 — 판정도 거기서 나가기 때문이다.
+        //    전진 경로는 그리지 않으므로 네모 공격은 lungePathRadius 를 0 으로 두어
+        //    **그리지 않은 경로에서 맞는 일**(과소 표시)이 없게 한다.
+        if (e.boxWidth > 0f && e.boxLength > 0f)
+        {
+            AttackCone.Show(coneRadius: 0f, coneAngleDeg: 0f, coneOffsetAngleDeg: 0f,
+                            coneForwardOffset: 0f,
+                            pathRadius: e.boxWidth * 0.5f,
+                            pathLength: e.boxLength,
+                            pathForwardOffset: e.lungeDistance - e.boxBackOffset,
+                            pathLateralOffset: e.boxLateralOffset,
+                            growTime: growTime);
+            return;
+        }
+
         AttackCone.Show(e.coneRadius, e.coneAngle, e.coneOffsetAngle,
                         coneForwardOffset: e.lungeDistance,
                         pathRadius: e.lungePathRadius,
@@ -1064,7 +1101,7 @@ public class TwentyThreeBoss : MonsterBase
 
     // 예고로 그릴 도형이 하나라도 있는가(끝점 부채꼴 또는 전진 경로 띠).
     static bool HasTelegraphShape(BossAttackEntry e) =>
-        e != null && (e.coneRadius > 0f || e.lungePathRadius > 0f);
+        e != null && (e.coneRadius > 0f || e.lungePathRadius > 0f || e.boxWidth > 0f);
 
     // ─── [G3] 돌진 예고 — 채워지는 직선 띠 ─────────────────────────────
     // 기획: "돌진 전에 이동 경로를 보여주기 때문에 대상과 주변 플레이어가 경로 밖으로 피할 수 있다."
@@ -1113,7 +1150,10 @@ public class TwentyThreeBoss : MonsterBase
         BoxColliderInfo box = default;
         anchor.GetBoxColliderInfo(ref box);
 
-        halfWidth = Mathf.Max(box.halfExtents.x, box.halfExtents.z);
+        // 🔴 **폭은 x 만 읽는다.** 예전에 Max(x, z) 였는데 z 는 앞으로 뻗은 **깊이**라,
+        //    깊이가 폭보다 크면(DashBody = 3.4 × 4.42) 예고 띠가 판정보다 넓게 그려졌다.
+        //    깊이는 아래 forwardReach 가 따로 처리한다 — 여기서 두 번 세면 안 된다.
+        halfWidth = box.halfExtents.x;
         // 박스 중심이 보스 앞으로 얼마나 나가 있는지 + 그 방향 반길이.
         forwardReach = Vector3.Dot(box.center - transform.position, dir) + box.halfExtents.z;
         return halfWidth > 0f;
@@ -1160,6 +1200,13 @@ public class TwentyThreeBoss : MonsterBase
 
         _attackPhase = BossAttackPhase.Telegraph;
         _attackPhaseTimer = e.telegraphDuration;
+
+        // 🔴 **예고 시작에 한 번에 스냅해 조준을 확정한다**(팀장 확정 2026-09-18).
+        //    예전에는 예고 동안 매 틱 FaceTarget() 으로 계속 돌았고, 그래서 장판이
+        //    플레이어를 끝까지 따라돌아 **피할 수가 없었다.** 방향은 여기서 끝이다.
+        //    ⚠️ Slerp(FaceTarget) 가 아니라 **즉시 회전**이어야 한다 — turnSpeed 10 으로는 한
+        //    프레임에 몇 도밖에 못 돌아 보스가 엉뚱한 데를 때린다(2026-08-18 사고).
+        FaceTargetImmediate();
 
         // 🔴 예산에 예고 몫을 넣는다. 안 넣으면 예고가 끝나기도 전에 안전망이 터진다 —
         //    돌진이 선딜 몫을 빠뜨려 매번 타임아웃하던 사고(2026-08-13)와 **같은 종류**다.
@@ -1380,12 +1427,11 @@ public class TwentyThreeBoss : MonsterBase
         {
             // [G2] 예고 — 준비 자세에서 멈춘 채 부채꼴이 차오른다. 다 차면 전진 + 공격.
             case BossAttackPhase.Telegraph:
-                // 🔴 예고 동안에는 **계속 조준한다.** turnSpeed 10 이라 한 프레임 Slerp 로는 몇 도밖에
-                //    못 돌아, 조준을 여기서 끊으면 보스가 엉뚱한 데를 때린다
-                //    (2026-08-18 에 FaceTargetDuringWindup 이 생긴 것과 정확히 같은 이유).
-                //    부채꼴은 매 프레임 보스 정면에서 다시 그려지므로 예고도 함께 돈다 —
-                //    플레이어는 부채꼴이 자기를 향해 도는 것을 보고 빠져나갈 수 있다.
-                FaceTarget();
+                // 🔴 **예고 중에는 돌지 않는다**(팀장 확정 2026-09-18 — 2026-08-18 확정의 뒤집기).
+                //    예전에는 여기서 FaceTarget() 을 돌려 "장판이 도는 걸 보고 피한다"로 보았는데,
+                //    실제로는 장판이 플레이어를 끝까지 따라돌아 **피할 수가 없었다.**
+                //    조준은 BeginTelegraph 의 스냅 1회로 끝난다 — 돌진과 같은 성질이 됐다.
+                //    ⚠️ 대가: 훅·잡기가 움직이는 플레이어를 더 자주 놓친다. 그게 맞다(팀장 확정).
                 if (_attackPhaseTimer <= 0f) ReleaseTelegraph();
                 break;
 
@@ -1398,8 +1444,14 @@ public class TwentyThreeBoss : MonsterBase
                 //    됐지만(카운터 창), 돌진이 창 1.5초 동안 타깃을 계속 쫓으면 밀고 지나가야 할
                 //    돌진이 유도탄이 되어 회피 난이도가 통째로 바뀐다 — 이번 스코프 밖의 밸런스
                 //    변경이라 넣지 않는다. 잡기는 성립 순간 Hold 로 넘어가 되먹임이 없다.
-                if (_currentEntry != null && _currentEntry.attackId == BossAttackId.Grab)
-                    FaceTarget();
+                // 🔴 잡기 전용 선딜 조준도 **제거했다**(2026-09-18). 예고를 보고 옆으로
+                //    빠졌는데 Windup 에서 다시 따라오면 예고가 거짓말이 된다 — 훅·어퍼와 같은 규칙.
+
+                // 🔴 [T5] 클립에 OnAttackHit 이벤트가 없으면 게이트가 **영영 안 열린다**
+                //    (녹리곱이라 IsAnimationReady 가 false 로 남는다). 실제로 Boss_23_dash.001 로
+                //    갈아끼우자 돌진이 애니만 잠깐 나오고 전진을 안 했다(팀장 관찰 2026-09-18).
+                //    이벤트를 .meta 에 심지 않고(SVN 에서 날아간다) 정규화 시간으로 대신한다.
+                TickHitEventFallback();
 
                 _counterWindup.Tick(dt);
 
@@ -1443,6 +1495,11 @@ public class TwentyThreeBoss : MonsterBase
                 break;
 
             // ── JumpAttack ────────────────────────────────────────────
+            // [G4] 이륙 — 올라가는 동안. 다 오르면 체공으로 넘긴다.
+            case BossAttackPhase.JumpTakeoff:
+                if (_attackPhaseTimer <= 0f) BeginJumpHover();
+                break;
+
             case BossAttackPhase.Leap:
                 if (_attackPhaseTimer <= 0f) ArriveJump();
                 break;
@@ -1513,16 +1570,10 @@ public class TwentyThreeBoss : MonsterBase
 
         BossAttackEntry e = _currentEntry;
         float radius = e != null && e.coneRadius > 0f ? e.coneRadius : GrabRadius;
-        float angle = e != null && e.coneAngle > 0f ? e.coneAngle : 90f;
 
         if (_grabBuffer == null) _grabBuffer = new Collider[16];
         int count = Physics.OverlapSphereNonAlloc(
             transform.position, radius, _grabBuffer, playerMask, QueryTriggerInteraction.Collide);
-
-        Vector3 fwd = transform.forward; fwd.y = 0f;
-        if (fwd.sqrMagnitude < 0.0001f) fwd = Vector3.forward;
-        fwd.Normalize();
-        float cos = Mathf.Cos(Mathf.Clamp(angle, 0f, 360f) * 0.5f * Mathf.Deg2Rad);
 
         for (int i = 0; i < count; i++)
         {
@@ -1532,10 +1583,9 @@ public class TwentyThreeBoss : MonsterBase
             Player p = c.GetComponentInParent<Player>();
             if (p == null || _pulledPlayers.Contains(p)) continue;
 
-            // 🔴 부채꼴 판정은 **예고와 같은 기준**이어야 한다 — 수평면 중심점 + 각도.
-            Vector3 to = p.transform.position - transform.position;
-            to.y = 0f;
-            if (to.sqrMagnitude > 0.0001f && Vector3.Dot(fwd, to.normalized) < cos) continue;
+            // 🔴 부채꼴 판정은 **예고와 같은 기준**이어야 한다 — FindGrabTarget 과 같은 헬퍼를 쓴다.
+            //    두 곳이 각자 식을 갖고 있어서 갈라졌던 것이 이번 버그의 원인이다.
+            if (!InAttackCone(p.transform.position, e, 90f)) continue;
 
             if (p.BeginRestrainedByInstigator(gameObject, RestraintMode.Push, GrabPullFrontOffset))
                 _pulledPlayers.Add(p);
@@ -1864,7 +1914,35 @@ public class TwentyThreeBoss : MonsterBase
     //    ⚠️ 조건이 `_lunging` 이 아니라 `_attackFacingLocked` 인 이유가 있다. 전진이 히트보다 먼저
     //       끝나면 `_lunging` 은 그 순간 false 가 되고, 그러면 **히트 직전에 다시 조준이 돌아**
     //       끝점 부채꼴이 예고와 다른 곳을 때린다. 잠금은 히트까지 유지해야 한다.
-    protected override bool FaceTargetDuringWindup => !_attackFacingLocked;
+    // 🔴 **예고가 있는 공격은 선딜에도 돌지 않는다**(2026-09-18). 예고 시작에 스냅했으니
+    //    그 방향을 히트까지 가져간다. ⚠️ 플래그를 따로 두지 않고 `_currentEntry` 에서
+    //    파생시킨다 — `_attackFacingLocked` 는 EndLunge() 가 푸는데 **잡기는 EndLunge 를 안 타서**
+    //    잡기에 같이 쓰면 잠금이 영원히 남는다.
+    protected override bool FaceTargetDuringWindup =>
+        !_attackFacingLocked && !(_currentEntry != null && _currentEntry.telegraphDuration > 0f);
+
+    /// <summary>
+    /// 수평면 기준으로 <paramref name="worldPos"/> 가 이 공격의 부채꼴 안인가.
+    ///
+    /// 🔴 <b>예고·끌어당김·붙잡기가 전부 이 함수 하나를 써야 한다.</b> 예전에는
+    ///    <c>BeginGrabPull</c> 만 각도를 보고 <c>FindGrabTarget</c> 은 360° 구였다 —
+    ///    그래서 <b>예고 밖에 서 있는데 잡히는</b> 버그가 났다(2026-09-18).
+    /// </summary>
+    bool InAttackCone(Vector3 worldPos, BossAttackEntry e, float fallbackAngleDeg)
+    {
+        float angle = e != null && e.coneAngle > 0f ? e.coneAngle : fallbackAngleDeg;
+        if (angle >= 360f) return true;   // 원형 — 방향 무관
+
+        Vector3 fwd = transform.forward; fwd.y = 0f;
+        if (fwd.sqrMagnitude < 0.0001f) fwd = Vector3.forward;
+        fwd.Normalize();
+
+        Vector3 to = worldPos - transform.position; to.y = 0f;
+        if (to.sqrMagnitude < 0.0001f) return true;   // 발밑 — 방향을 정할 수 없다
+
+        float cos = Mathf.Cos(Mathf.Clamp(angle, 0f, 360f) * 0.5f * Mathf.Deg2Rad);
+        return Vector3.Dot(fwd, to.normalized) >= cos;
+    }
 
     Player FindGrabTarget()
     {
@@ -1884,6 +1962,11 @@ public class TwentyThreeBoss : MonsterBase
 
             Player p = c.GetComponentInParent<Player>();
             if (p == null) continue;
+
+            // 🔴 **예고와 같은 부채꼴 안에서만 고른다**(2026-09-18 버그 수정).
+            //    이전에는 각도 판정이 없는 **360° 구**였다 — 그래서 예고가 안 그려진
+            //    보스 뒤·옆에 서 있어도 grabRadius 안이면 잡혔다(팀장 관찰).
+            if (!InAttackCone(p.transform.position, _currentEntry, 90f)) continue;
 
             float sqr = (p.transform.position - transform.position).sqrMagnitude;
             if (sqr >= best) continue;
@@ -2012,21 +2095,46 @@ public class TwentyThreeBoss : MonsterBase
 
         _jumpArrivePoint = point;
 
-        // 예고 2개: 고정 크기(어디에 떨어지는가) + 0.1 → AoE 점증(언제 떨어지는가).
-        ShowJumpTelegraphClientRpc(point, JumpAoeRadius, JumpHover);
+        // 🔴 [G4] 착지 예고는 **체공이 시작할 때** 띄운다(BeginJumpHover).
+        //    이륙 구간에 띄우면 보스가 아직 땅에 서 있는데 착지 표식이 먼저 나온다
+        //    (팀장 관찰 2026-09-18: "이펙트가 바로 생성된다").
+
+        // 🔴 **공중에서는 폭탄을 던지지 않는다**(팀장 확정 2026-08-13).
+        //    해제는 착지(ArriveJump)와 체인 중단(AbortAttackChain).
+        _wells?.SetSuppressed(true);
+
+        // 🔴 [G4] **이륙 구간.** 여기서는 모델도 피격 콜라이더도 살아 있다 — 보이고 맞는다(E19).
+        //    숨김·무적은 이륙이 끝난 뒤(BeginJumpHover)로 미룬다 — 이게 이번 변경의 핵심이다.
+        if (JumpTakeoffDuration > 0f && !string.IsNullOrEmpty(JumpTakeoffState))
+        {
+            CrossFadeJumpTakeoffClientRpc();
+            EnterPhase(BossAttackPhase.JumpTakeoff, JumpTakeoffDuration);
+            return;
+        }
+
+        BeginJumpHover();   // 이륙 없음(저작값 0) = 기존 동작
+    }
+
+    /// <summary>
+    /// 체공 시작 — 여기서부터 보스는 <b>안 보이고 안 맞는다.</b>
+    /// 🔴 이륙 배속을 반드시 되돌린다 — 빼먹으면 이후 모든 애니가 그 배수로 남는다.
+    /// </summary>
+    void BeginJumpHover()
+    {
+        RestoreAnimatorSpeedClientRpc();
 
         // 체공 동안 메시를 감춘다 — 착지점으로 순간이동하는 것이 보이지 않게.
         SetModelVisibleClientRpc(false);
 
-        // 메시만 끄면 **보이지 않는 보스가 맞는다** — 피격 콜라이더도 함께 끈다(2026-08-13).
+        // 메시만 끄면 **보이지 않는 보스가 맞는다** — 피격 콜라이더도 함께 끔다(2026-08-13).
         SetHurtableClientRpc(false);
 
-        CrossFadeJumpStateClientRpc(landing: false);
+        // 예고 2개: 고정 크기(어디에 떨어지는가) + 차오르는 원(언제 떨어지는가).
+        // 성장시간은 **체공 길이**다 — 여기서 띄우므로 이륙 몴을 더하지 않는다.
+        //    그래야 원이 **착지 순간**에 가득 찬다.
+        ShowJumpTelegraphClientRpc(_jumpArrivePoint, JumpAoeRadius, JumpHover);
 
-        // 🔴 **공중에서는 폭탄을 던지지 않는다**(팀장 확정 2026-08-13). Wells 는 23호 상태와 무관하게
-        //    자기 주기로 살포하므로, 억제하지 않으면 체공 중에 손 소켓(= 공중)에서 폭탄이 나간다.
-        //    그로기·사망과 같은 억제 경로를 쓴다. 해제는 착지(ArriveJump)와 체인 중단(AbortAttackChain).
-        _wells?.SetSuppressed(true);
+        CrossFadeJumpStateClientRpc(landing: false);
 
         EnterPhase(BossAttackPhase.Leap, JumpHover);
     }
@@ -2193,6 +2301,8 @@ public class TwentyThreeBoss : MonsterBase
     float JumpHover => _boss != null ? Mathf.Max(0.1f, _boss.jumpHoverTime) : 1.2f;
     float JumpLanding => _boss != null ? Mathf.Max(0.1f, _boss.jumpLandingDuration) : 1f;
     float JumpRecovery => _boss != null ? Mathf.Max(0f, _boss.jumpRecoveryDuration) : 0.4f;
+    float JumpTakeoffDuration => _boss != null ? Mathf.Max(0f, _boss.jumpTakeoffDuration) : 0f;
+    string JumpTakeoffState => _boss != null ? _boss.jumpTakeoffState : null;
     float JumpAoeRadius => _boss != null ? Mathf.Max(0.1f, _boss.jumpAoeRadius) : 3.5f;
     float JumpLandSeparation => _boss != null ? Mathf.Max(0f, _boss.jumpLandSeparation) : 1.2f;
     // 🔴 강도만 있다. `Unit.Knockback(방향, 강도)` 이 받는 것이 그것뿐이라 지속·경직 노브는 두지 않는다
@@ -2504,6 +2614,42 @@ public class TwentyThreeBoss : MonsterBase
 
     // 🔴 NGO 는 RPC 파라미터로 System.String 을 지원하지 않는다 — 상태명을 보내지 말고
     //    각 피어가 같은 SO 에서 조회하게 한다(Grab 의 CrossFadeGrabStateClientRpc 와 동일 패턴).
+    /// <summary>
+    /// [G4] 이륙 클립을 틀고 <b>재생속도를 클립 길이에서 역산</b>한다.
+    ///
+    /// 🔴 속도를 상수로 박지 않는다 — 아트가 클립을 다시 올려 길이가 바뀜어도
+    ///    여기가 자동으로 따라간다. 상수면 조용히 어긋난다.
+    /// ⚠️ <c>animator.speed</c> 는 자세 홀드·잡기 배수와 **공유**하는 값이다.
+    ///    홀드 중이면 지금 속도를 바꾸지 않고 복원될 값만 갈아 끼운다(잡기와 같은 규약).
+    /// </summary>
+    [ClientRpc]
+    void CrossFadeJumpTakeoffClientRpc()
+    {
+        if (animator == null || _boss == null) return;
+
+        string state = _boss.jumpTakeoffState;
+        if (string.IsNullOrEmpty(state)) return;
+
+        SafeCrossFade(state);
+        animator.Update(0f);   // 상태 정보가 이번 프레임에 즉시 갱신되게
+
+        float len = animator.GetCurrentAnimatorStateInfo(0).length;
+        float dur = Mathf.Max(0.01f, _boss.jumpTakeoffDuration);
+        float speed = len > 0.01f ? len / dur : 1f;
+
+        if (_counterAnimatorHeldLocally) _counterAnimatorResumeSpeed = speed;
+        else animator.speed = speed;
+    }
+
+    /// <summary>[G4] 이륙 배속을 1 로 되돌린다. 잡기 배수 복원과 같은 규약.</summary>
+    [ClientRpc]
+    void RestoreAnimatorSpeedClientRpc()
+    {
+        if (animator == null) return;
+        if (_counterAnimatorHeldLocally) _counterAnimatorResumeSpeed = 1f;
+        else animator.speed = 1f;
+    }
+
     [ClientRpc]
     void CrossFadeJumpStateClientRpc(bool landing)
     {
@@ -3669,6 +3815,23 @@ public class TwentyThreeBoss : MonsterBase
     ///
     /// 창이 없는 공격은 base 그대로 — 이벤트 즉시 발사다.
     /// </summary>
+    /// <summary>
+    /// 클립에 <c>OnAttackHit</c> 이벤트가 없는 공격을 위해 <b>정규화 시간으로</b> 준비 신호를 대신 낸다.
+    /// 값이 0 이면 아무것도 하지 않는다 — 이벤트가 있는 클립은 기존 경로 그대로다.
+    /// </summary>
+    void TickHitEventFallback()
+    {
+        BossAttackEntry e = _currentEntry;
+        if (e == null || e.hitEventFallbackNormalized <= 0f) return;
+        if (animator == null || _counterWindup.IsAnimationReady) return;
+
+        AnimatorStateInfo st = animator.GetCurrentAnimatorStateInfo(0);
+        if (!string.IsNullOrEmpty(e.animatorStateName) && !st.IsName(e.animatorStateName)) return;
+
+        if (st.normalizedTime >= e.hitEventFallbackNormalized)
+            _counterWindup.MarkAnimationReady();
+    }
+
     public override void NotifyAttackHit()
     {
         if (!IsServer || State != MonsterState.Attack) return;
@@ -3679,10 +3842,10 @@ public class TwentyThreeBoss : MonsterBase
         //    이 가드가 없으면 막을 것이 하나도 없다.
         //    정상 경로에서는 자세가 멈춰 있어 이벤트가 오지 않지만, `animator.Play` + `Update(0)` 가
         //    이벤트를 흘릴 여지가 문서로 보장되지 않아 방어한다(Codex 교차검증 지적).
-        if (_attackPhase == BossAttackPhase.Telegraph)
+        if (_attackPhase == BossAttackPhase.Telegraph || _attackPhase == BossAttackPhase.JumpTakeoff)
         {
             Debug.LogWarning(
-                $"[23호] {_currentEntry?.attackId} 예고 중에 OnAttackHit 이 도착했다 — 무시한다. " +
+                $"[23호] {_currentEntry?.attackId} 예고/이륙 중에 OnAttackHit 이 도착했다 — 무시한다. " +
                 "자세 정지 지점(telegraphPoseNormalized)이 클립의 히트 프레임보다 뒤인지 확인할 것.", this);
             return;
         }

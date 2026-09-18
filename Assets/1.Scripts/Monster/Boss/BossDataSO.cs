@@ -106,6 +106,24 @@ public class BossAttackEntry
              "오른손 훅은 +, 왼손 훅은 − 를 준다 — 문서의 '공격하는 팔 쪽이 넓어진다'가 이 한 칸이다.")]
     [Range(-180f, 180f)] public float coneOffsetAngle = 0f;
 
+    [Tooltip("[T4] 끝점 부채꼴 대신 쓰는 **네모** 폭(m). 0 이면 부채꼴을 쓴다. " +
+             "🔴 coneRadius 보다 우선한다 — 둘 다 켜면 네모만 남는다(예고도 네모 하나).")]
+    [Min(0f)] public float boxWidth = 0f;
+
+    [Tooltip("[T4] 네모 길이(m) — 보스 정면으로 뻗는다. boxWidth > 0 일 때만 쓴다. " +
+             "시작점은 **전진 끝점**(lungeDistance) 이다 — 판정도 거기서 나가기 때문이다.")]
+    [Min(0f)] public float boxLength = 0f;
+
+    [Tooltip("[T4] 네모를 보스 정면 기준 **좌/우로 치우치게** 하는 거리(m). + = 오른쪽. " +
+             "오른손 훅은 +, 왼손 훅은 − 를 준다 — 부채꼴의 coneOffsetAngle 에 해당하는 칸이다. " +
+             "🔴 각도가 아니라 **거리**다 — 네모는 회전하지 않고 옆으로 평행이동한다.")]
+    public float boxLateralOffset = 0f;
+
+    [Tooltip("[T4] 네모가 **보스 뒤쪽으로** 뻗는 길이(m). 0 이면 보스 중심에서 시작한다. " +
+             "🔴 훅은 전진하며 때리는데, 네모가 전진 끝점에서만 시작하면 " +
+             "**보스 몸에 붙은 플레이어가 안 맞는다**. 그 빈 구간을 메우는 칸이다.")]
+    [Min(0f)] public float boxBackOffset = 0f;
+
     // ─── [G2] 예고 구간 ──────────────────────────────────────────────
     // 🔴 **예고는 판정보다 먼저 끝나야 한다.** 예고와 공격을 같은 순간에 시작하면 반응 시간이 0 이라
     //    예고가 아니라 사후 통보가 된다(2026-09-16 팀장 지적으로 이 구간이 생겼다).
@@ -115,6 +133,12 @@ public class BossAttackEntry
     [Tooltip("[G2] 예고 길이(초). 이 시간 동안 보스는 **준비 자세에서 멈춰** 있고 바닥 부채꼴이 차오른다. " +
              "0 이면 예고 없이 즉발(기존 동작). 확정 초기값 = 훅·어퍼 0.7.")]
     [Min(0f)] public float telegraphDuration = 0f;
+
+    [Tooltip("[T5] 클립에 OnAttackHit **애니 이벤트가 없을 때** 이 정규화 시간(0~1)에 " +
+             "도달하면 “준비됨”으로 본다. 0 이면 이벤트만 쓴다(기존 동작). " +
+             "🔴 아트가 fbx 를 다시 올리면 .meta 의 이벤트 저작은 날아간다(SVN). " +
+             "그래서 이벤트를 심는 대신 **git 쪽 데이터**로 같은 시점을 잡는다.")]
+    [Range(0f, 1f)] public float hitEventFallbackNormalized = 0f;
 
     [Tooltip("[G2] 예고 동안 멈춰 있을 **자세**(공격 클립의 정규화 시간 0~1). " +
              "0.15 면 '팔을 뒤로 당긴' 근처다. 🔴 이 값이 클립의 OnAttackHit 시점보다 크면 " +
@@ -334,6 +358,13 @@ public class BossDataSO : MonsterDataSO
 
     [Tooltip("착지 데미지. 0 이면 공격 테이블 행의 damage(그것도 0 이면 attackDamage)를 쓴다.")]
     [Min(0)] public int jumpLandingDamage = 0;
+
+    [Tooltip("[G4] 이륙(올라가는) 구간에 재생할 애니메이터 **상태명**. 비우면 이륙 없음(기존 동작).")]
+    public string jumpTakeoffState = "Leap";
+
+    [Tooltip("[G4] 이륙 길이(초). 클립 전체를 이 시간에 맞추어 재생한다 — " +
+             "🔴 재생속도는 클립 길이에서 역산한다(상수로 박지 않는다). 0 이면 이륙 없음.")]
+    [Min(0f)] public float jumpTakeoffDuration = 0.633f;
 
     [Tooltip("체공 포즈 애니메이터 상태명. 비우면 도약 클립을 유지한다.")]
     public string jumpHoverState = "";

@@ -122,7 +122,45 @@ public class MonsterMeleeAttack : BaseAttack
         return applied;
     }
 
+    /// <summary>
+    /// 보스 정면으로 뻗은 <b>네모</b> 판정. <paramref name="origin"/> 이 뒤끕 중앙이다.
+    /// 🔴 예고 띄와 <b>같은 사각형</b>을 그려야 한다 — 한쪽만 고치면 예고가 거짓말이 된다.
+    /// </summary>
+    public int HitBox(Vector3 origin, Vector3 forward, float width, float length)
+    {
+        if (!IsServer) return 0;
+        if (width <= 0f || length <= 0f) return 0;
+
+        Vector3 fwd = forward; fwd.y = 0f;
+        if (fwd.sqrMagnitude < 0.0001f) fwd = Vector3.forward;
+        fwd.Normalize();
+
+        _boxOrigin = origin;
+        _boxForward = fwd;
+        _boxHalfWidth = width * 0.5f;
+        _boxLength = length;
+        _boxActive = true;
+
+        // 높이는 넓게 잡는다 — 바닥 장판과 같은 전제(수평면 판정)라 높이로 걸러내지 않는다.
+        Vector3 center = origin + fwd * (length * 0.5f);
+        int hitCount = Physics.OverlapBoxNonAlloc(
+            center, new Vector3(width * 0.5f, 5f, length * 0.5f), _results,
+            Quaternion.LookRotation(fwd, Vector3.up), targetLayer, QueryTriggerInteraction.Collide);
+
+        int applied = ApplyHits(hitCount);
+
+        _boxActive = false;
+        return applied;
+    }
+
     // 부채꼴 필터 상태. HitCone 이 여는 동안만 유효하다(재진입 없음 — 판정은 서버 단일 스레드).
+    // 네모 필터 상태. HitBox 가 여는 동안만 유효하다(부채꼴과 같은 규약).
+    private bool _boxActive;
+    private Vector3 _boxOrigin;    // 네모 뒤끕 중앙(= 전진 끝점)
+    private Vector3 _boxForward;
+    private float _boxHalfWidth;
+    private float _boxLength;
+
     private bool _coneActive;
     private Vector3 _coneOrigin;
     private Vector3 _coneForward;
@@ -141,6 +179,19 @@ public class MonsterMeleeAttack : BaseAttack
     /// </summary>
     private bool PassesConeFilter(Collider hit)
     {
+        // 🔴 네모가 열려 있으면 네모로 판정한다. 부채꼴과 같은 이유로 오버랩은
+        //    브로드페이즈로만 쓰고, 최종 판정은 **수평면**에서 다시 한다 —
+        //    그래야 바닥에 그린 예고와 판정 도형이 같아진다.
+        if (_boxActive)
+        {
+            Vector3 d = hit.bounds.center - _boxOrigin;
+            d.y = 0f;
+            float along = Vector3.Dot(d, _boxForward);
+            if (along < 0f || along > _boxLength) return false;
+            Vector3 right = Vector3.Cross(Vector3.up, _boxForward);
+            return Mathf.Abs(Vector3.Dot(d, right)) <= _boxHalfWidth;
+        }
+
         if (!_coneActive)
             return true;
 
