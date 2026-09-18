@@ -1495,9 +1495,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 291114742444156246}
-  - component: {fileID: 2394872005953408652}
-  - component: {fileID: 5243336546692282196}
-  - component: {fileID: 5498519820104931471}
   m_Layer: 6
   m_Name: Slash04
   m_TagString: Untagged
@@ -1520,84 +1517,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 8034039703531113329}
   m_LocalEulerAnglesHint: {x: -33.001, y: -10.937, z: 194.46}
---- !u!33 &2394872005953408652
-MeshFilter:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1116417233646819517}
-  m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
---- !u!23 &5243336546692282196
-MeshRenderer:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1116417233646819517}
-  m_Enabled: 0
-  m_CastShadows: 1
-  m_ReceiveShadows: 1
-  m_DynamicOccludee: 1
-  m_StaticShadowCaster: 0
-  m_MotionVectors: 1
-  m_LightProbeUsage: 1
-  m_ReflectionProbeUsage: 1
-  m_RayTracingMode: 2
-  m_RayTraceProcedural: 0
-  m_RayTracingAccelStructBuildFlagsOverride: 0
-  m_RayTracingAccelStructBuildFlags: 1
-  m_SmallMeshCulling: 1
-  m_ForceMeshLod: -1
-  m_MeshLodSelectionBias: 0
-  m_RenderingLayerMask: 1
-  m_RendererPriority: 0
-  m_Materials:
-  - {fileID: 2100000, guid: c1cb4507129f426c839b2570c241f3dc, type: 2}
-  m_StaticBatchInfo:
-    firstSubMesh: 0
-    subMeshCount: 0
-  m_StaticBatchRoot: {fileID: 0}
-  m_ProbeAnchor: {fileID: 0}
-  m_LightProbeVolumeOverride: {fileID: 0}
-  m_ScaleInLightmap: 1
-  m_ReceiveGI: 1
-  m_PreserveUVs: 0
-  m_IgnoreNormalsForChartDetection: 0
-  m_ImportantGI: 0
-  m_StitchLightmapSeams: 1
-  m_SelectedEditorRenderState: 3
-  m_MinimumChartSize: 4
-  m_AutoUVMaxDistance: 0.5
-  m_AutoUVMaxAngle: 89
-  m_LightmapParameters: {fileID: 0}
-  m_GlobalIlluminationMeshLod: 0
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
-  m_SortingOrder: 0
-  m_MaskInteraction: 0
-  m_AdditionalVertexStreams: {fileID: 0}
---- !u!65 &5498519820104931471
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1116417233646819517}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 0
-  serializedVersion: 3
-  m_Size: {x: 1, y: 1, z: 1}
-  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &1155768829846907406
 GameObject:
   m_ObjectHideFlags: 0
@@ -6953,6 +6872,9 @@ GameObject:
   - component: {fileID: 2050612571752285464}
   - component: {fileID: 7746500284878980271}
   - component: {fileID: 7601287734901230009}
+  - component: {fileID: 6909544522566629635}
+  - component: {fileID: 3913405706086165160}
+  - component: {fileID: 1216733944170950928}
   m_Layer: 6
   m_Name: Paladin_VFX
   m_TagString: Player
@@ -7030,9 +6952,9 @@ Rigidbody:
     m_Bits: 0
   m_ImplicitCom: 1
   m_ImplicitTensor: 1
-  m_UseGravity: 1
-  m_IsKinematic: 0
-  m_Interpolate: 0
+  m_UseGravity: 0
+  m_IsKinematic: 1
+  m_Interpolate: 1
   m_Constraints: 112
   m_CollisionDetection: 0
 --- !u!114 &2384752072208766483
@@ -7157,9 +7079,6 @@ MonoBehaviour:
   attackSpeed: 0
   maxHp: 9999
   defense: 25
-  platformRiderMask:
-    serializedVersion: 2
-    m_Bits: 4294967295
   platformGroundCheckDistance: 0.6
 --- !u!114 &3136856600094551148
 MonoBehaviour:
@@ -7212,9 +7131,6 @@ MonoBehaviour:
   acceleration: 80
   alignThreshold: 0.98
   viewYaw: -45
-  gameRule: {fileID: 0}
-  collisionSkin: 0.02
-  maxSweepIterations: 3
 --- !u!114 &4335259357398649415
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -7259,6 +7175,7 @@ MonoBehaviour:
   animator: {fileID: 0}
   attackData: {fileID: 11400000, guid: 8d6735b7ed4fc9e49b360d6bbcb907a5, type: 2}
   playerDefaultAttack: {fileID: 4335259357398649415}
+  tailToMovementBlendSeconds: 0.12
   chainPolicy: 0
   attackSteps: []
   defaultHitbox: {fileID: 198944881668606307}
@@ -7292,10 +7209,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerStateController
   currentStateDebug: 0
-  minKnockbackTime: 0.15
-  maxKnockbackTime: 1.5
   serverKnockbackReportGraceTime: 0.25
-  knockbackStopSpeed: 0.15
 --- !u!114 &8323634410014447556
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -7460,10 +7374,6 @@ MonoBehaviour:
   soulHiddenEquipment: []
   hurtboxColliders: []
   soulMoveSpeed: 5
-  hoverProbeDistance: 6
-  hoverGroundMask:
-    serializedVersion: 2
-    m_Bits: 4294967295
 --- !u!114 &303136547922001840
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -7526,7 +7436,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerDashController
   ShowTopMostFoldoutHeaderGroup: 1
   dashData: {fileID: 11400000, guid: f2e9be4143ad74d4fb3f49788c28f857, type: 2}
-  gameRule: {fileID: 11400000, guid: 5a71cc8f5b32f47428af514e196e5a8c, type: 2}
   groundingSensor: {fileID: 4508196937444636850}
 --- !u!114 &4508196937444636850
 MonoBehaviour:
@@ -7542,12 +7451,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerGroundingSensor
   ShowTopMostFoldoutHeaderGroup: 1
   probeDistance: 0.1
-  aliveGroundMask:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  soulGroundMask:
-    serializedVersion: 2
-    m_Bits: 4294967295
   gameRule: {fileID: 11400000, guid: 5a71cc8f5b32f47428af514e196e5a8c, type: 2}
 --- !u!114 &7549880373700647455
 MonoBehaviour:
@@ -7614,6 +7517,8 @@ MonoBehaviour:
   stateController: {fileID: 1123356785223043744}
   stableSeconds: 0.5
   maxFlatAngle: 5
+  safePointQueueCapacity: 5
+  minSafePointSpacing: 1.5
   ringRadii:
   - 1
   - 2
@@ -7625,6 +7530,7 @@ MonoBehaviour:
   occupancyRadius: 0.4
   probeUpDistance: 1.5
   probeDownDistance: 3
+  safePointMarkerPrefab: {fileID: 0}
 --- !u!114 &1461530121226363041
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -7644,8 +7550,8 @@ MonoBehaviour:
   dashController: {fileID: 7175446840252978217}
   movement: {fileID: 4372253423484341351}
   input: {fileID: 3136856600094551148}
-  body: {fileID: 786699605289514005}
   grounding: {fileID: 4508196937444636850}
+  motor: {fileID: 0}
   fallReturnDelay: 0.75
   landedFollowCameraDelay: 1
   fallReturnInputLock: 0.5
@@ -7720,6 +7626,50 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   barrierLoop: {fileID: 7601287734901230005}
   breakBurst: {fileID: 7601287734901230008}
+--- !u!114 &6909544522566629635
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6077492126708577103}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2f714ae95eb94b57a450b74bc822de23, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerMotor
+  gameRule: {fileID: 0}
+  collisionSkin: 0.02
+  maxSweepIterations: 3
+--- !u!114 &3913405706086165160
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6077492126708577103}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 49f67085e4afbf14c8e5182d6e653718, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerSilhouetteTag
+  ShowTopMostFoldoutHeaderGroup: 1
+  modelRoot: {fileID: 0}
+  logOnSpawn: 0
+--- !u!114 &1216733944170950928
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6077492126708577103}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7c3e5a9cfb85e1a4cb8896d14fca8554, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  maxSmoothedCorrection: 1
+  decayTimeConstant: 0.08
 --- !u!1 &6097337715216137025
 GameObject:
   m_ObjectHideFlags: 0
