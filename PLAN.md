@@ -1,3 +1,110 @@
+# ▶▶▶ 진행 중 = **수호자의 의지(E) 보호막 VFX — 이펙트 정책 이식** (2026-09-17 · 코드·에셋 완료 · Play 검증 대기)
+
+> 작업 세션: **민경(Claude)**, 브랜치 `feature/VFX`.
+> 🔴 **아직 Play 로 보지 않았다.** 컴파일도 Unity 쪽 확인이 필요하다.
+
+## 문제 — 에셋 팩 프리팹이 풀링을 전혀 전제하지 않았다
+
+`Effect_09_HolyShield.prefab`(SpecialSkillsEffectsPack 파생)은 손으로 얹은 `ShieldDismiss` /
+`ShieldHitReceiver` 와 팩의 `NewMaterialChange` / `ShieldActivate` 가 각자 수명을 관리하고 있었다.
+
+| 위반 | 결과 |
+|---|---|
+| `ShieldDismiss.Update` 의 `Destroy(gameObject)` (`destroyWhenDone: 1`) | 풀 인스턴스 증발 — 시전마다 새 Instantiate, **풀링 무효** |
+| 같은 곳의 `enabled = false` + `_ColorFactor` 0 으로 종료 | 위를 끄면 이게 터진다 — **2회차부터 투명한 채로 영영 안 보임** |
+| `NewMaterialChange.LateUpdate` 의 `Destroy(gameObject)` | `ShieldDismiss.Awake` 가 `m_timeToReduce = +∞` 로 밀어 무력화 중이었다 |
+| 4개 스크립트 전부 `Awake`/`Start` 1회 셋업, 리셋 없음 | 풀은 `SetActive` 토글이라 재대출에 안 돈다 |
+| `autoDismissAfter` / `effectLifetime` / `burstLifetime` | `EffectEntry.duration`·`outroDuration` 과 이중 장부 |
+| 루트 Transform `y: 1` | `EffectManager.Fire` 의 `SetPositionAndRotation` 이 덮어써 **사라진다** |
+| 한 프리팹에 메쉬 + 파티클 혼재 | 드라이버 둘이 손 들면 `ResolveDriver` 가 LogError |
+| `EffectEntry` 에셋 없음 | `EffectSocketPlayer` 가 물 대상이 없었다 |
+
+`ShieldDismiss` · `ShieldHitReceiver` 를 부르는 코드는 **한 줄도 없었다**(인스펙터 체크박스뿐).
+
+## 한 일
+
+| # | 무엇 | 파일 |
+|---|---|---|
+| 1 | 배리어를 **코드 구동 파트 드라이버**로 다시 씀 | `Effects/HolyShieldEffect.cs` · `Effects/HolyShieldEffectSystem.cs` (둘 다 신규) |
+| 2 | 드라이버 등록 (다섯 번째) | `Effects/EffectManager.cs` |
+| 3 | 프리팹을 **기술별 파트 2개**로 분리 | `FX_HolyShield_Barrier.prefab` · `FX_HolyShield_Motes.prefab` (신규, SVN) |
+| 4 | 엔트리 2개 — 루프 + 파괴 원샷 | `FX_HolyShield_Entry.asset` · `FX_HolyShield_Break_Entry.asset` (신규, SVN) |
+| 5 | 연출 창구 = **NetworkBehaviour** 신규 | `Player/PlayerShieldVfx.cs` (신규) |
+| 6 | 시전/종료 배선 + 소진 감지 | `Player/Skill/FirstMeleeSubSkill.cs` 🔴 은희 |
+| 7 | 소켓 2개 + 컴포넌트 배선 | `2.Prefabs/Player/Paladin/Paladin_VFX.prefab` |
+
+## 결정과 근거
+
+| 결정 | 왜 |
+|---|---|
+| 배리어를 파티클이 아니라 **코드 구동** | 유지 구간의 끝이 시간이 아니라 "보호막이 사라지는 순간"이라는 **이벤트**다. Color over Lifetime 은 수명에 묶인 커브라 무기한 유지를 못 만든다 (`FadeInHoldEffect` 와 같은 판단) |
+| `_ColorFactor` 를 주 노브로 | rgb·alpha 양쪽에 곱해져 두 겹을 함께 걷는다. `_MaskCutOut` 은 `IS_MASK_FADE` 가 있는 `Effect_09_Shield` 에서만 동작하고 `_Shield_2` 에선 무효다 |
+| 기준값은 **`Collect()` 에서 한 번만** 읽는다 | `Apply` 가 한 번이라도 돌면 인스턴스 값은 저작 값이 아니다. 다시 읽으면 재사용마다 배리어가 어두워진다 |
+| 프리팹을 **메쉬/파티클로 분리** | 단일 기술 규칙. 한 프리팹에 두면 `HolyShieldEffectSystem` 과 `ShurikenEffectSystem` 이 같이 손을 든다 |
+| 파괴 연출을 `outroParts` 가 아니라 **별도 원샷 엔트리** | `outroParts` 는 하나뿐이라 자연소멸/파괴 두 갈래를 담을 수 없다 |
+| `Entry.outroDuration(1.0) ≥ HolyShieldEffect.outroDuration(0.8)` | `IEffectSystem.Stop` 에 시간 인자가 없어 드라이버가 전달할 통로가 없다. 엔트리가 짧으면 **걷히다 말고 툭 사라진다**. 1.0 은 입자 수명(`startLifetime` 1s)에 맞춘 값 |
+| 연출 창구를 **새 NetworkBehaviour** 로 | `PlayerSkillBase` 가 `MonoBehaviour` 라 스킬에 RPC 를 못 단다. `Player`/`PlayerSkillController` 에 얹으면 은희 코어를 건드린다 |
+| 시작은 **RPC 없음**, 종료만 RPC | `OnClientPlay` 는 이미 전 피어에서 돈다(서버 직접 / 클라 `PlaySkillClientRpc`) |
+| 종료 RPC 는 **Reliable** | 루프 *정지*다. 유실되면 배리어가 영영 뜨고 풀 인스턴스도 안 돌아온다 |
+| 만료 코루틴에 `CurrentShield <= 0` 확인 추가 | 소진은 피격 처리에서 일어나 코루틴을 지나지 않는다. 없으면 **깨진 뒤에도 타이머 끝까지 배리어가 떠 있다** |
+| 깨짐/걷힘 구분을 **서버가** 판정 | 복제되는 보호막 값은 둘 다 N→0 이라 클라에서 가를 수 없다 |
+| 소켓 `safetyTimeout: 8` | 보호막 지속 5초 < 8. 기본값 5 를 두면 정상 재생이 잘린다 — **`shieldDuration` 을 올리면 같이 올려야 한다** |
+| 히트 파문(`ShieldActivate`)은 **이번에 제외** | 풀 인스턴스 안으로 손을 뻗을 방법이 따로 필요하다. `SphereCollider`·`ShieldHitReceiver` 도 같이 뺐다 |
+
+## 검증 방법
+
+1. **콘솔**: 첫 시전에 `드라이버 두 개가 몰겠다고 한다` / `몰 드라이버가 없다` 경고가 없어야 한다.
+2. **2회 이상 재시전**: 두 번째부터 배리어가 안 보이면 `ResetForPool` 실패. 원본의 대표 증상이다.
+3. **풀 재사용**: 시전을 반복해도 `[EffectPool]` 아래 `FX_HolyShield_Barrier` 인스턴스가 **1개**로 유지돼야 한다.
+4. **깨짐 vs 걷힘**: 맞아서 소진 → `FX_HolyShield_Break` 재생 / 5초 만료 → 조용히 페이드.
+5. **MPPM 2인**: 클라가 시전한 보호막이 **호스트에도** 보이는지, 그리고 **양쪽에서 같이 걷히는지**.
+6. **사망 중 시전 유지**: 보호막이 뜬 채로 죽으면 배리어가 걷혀야 한다(코루틴의 Dead 분기).
+
+## 미결
+
+- 🔴 **삭제 대기** (권한 거부로 못 지웠다): `Assets/50.Art/VFX/Common/Player1/Skill02/Effect_09_HolyShield.prefab`(+meta, SVN) · `Assets/1.Scripts/ShieldDismiss.cs`(+meta) · `Assets/1.Scripts/ShieldHitReceiver.cs`(+meta). 참조는 서로뿐이라 남겨둬도 컴파일은 된다.
+- 위 프리팹을 지우면 `50.Art/VFX/Scripts/ShieldActivate.cs` · `NewMaterialChange.cs` 도 죽은 코드가 된다(2026-09-18 에셋 팩 정리로 여기 옮겨 왔다. 유일한 참조처가 그 프리팹이다).
+
+## 곁들여 한 일 — 에셋 팩 3종 정리 (2026-09-18)
+
+`Assets/GameVFX Buff Collection` · `Assets/Game VFX - Magic Projectiles Vol.1` ·
+`Assets/SpecialSkillsEffectsPack` 에 남아 있던 **12개 파일**을 `50.Art/VFX` 규약 폴더로 옮겼다.
+`.meta` 를 항상 같이 옮겨 GUID 를 보존했고, 소비자 7종의 참조가 전부 해소되는 것을 확인했다.
+
+| 파일 | → | 근거 |
+|---|---|---|
+| `mask_7.png` · `glow_ball2_grey.png` | `Textures/` | 루트의 `mask_1/4/5/6`, `Glow`·`glow_blue_01` 옆 |
+| `PerlinMap_2.png` | `Textures/Noise/` | `PerlinNoise_5.png` 옆 |
+| `Normal_10.png` | `Textures/Normal/` | `Normal_13/14/16` 시리즈 |
+| `sphere_18pl.fbx` | `Models/` | |
+| `Effect_09_{Particle_2,Shield,Shield_2}.mat` · `glow_ball2_grey.mat` | `_Materials/` | `Effect_09_SphereMesh` 등 `Effect_NN_*` 이 이미 루트에 있다 |
+| `ShieldActivate.cs` · `NewMaterialChange.cs` | `Scripts/` | `InterruptOverlay.cs` 선례 |
+
+### `Eric/URP Particles/Additive` 사본 3개 → 1개로 합쳤다
+
+세 파일이 **바이트 단위로 동일**하고(`md5 7532af19`) 같은 셰이더 이름 `Eric/URP Particles/Additive` 를
+선언하고 있었다. 같은 이름을 셋이 선언하면 유니티가 이름으로 고를 때 어느 것을 집을지 정해져 있지 않다
+(`Additive 1.shader` 의 `" 1"` 자체가 예전 충돌 때 유니티가 붙인 흔적이다).
+
+| 파일 | 출처(에셋스토어) | 처리 |
+|---|---|---|
+| `50.Art/VFX/Shaders/Additive.shader` | Game VFX - Buff Collection(URP) | **남긴다** — 머티리얼 13개가 여기를 가리킨다 |
+| `50.Art/VFX/Shaders/Additive 1.shader` | RPG_GameVFX Collection Vol.3(URP) | 참조 7건을 위로 옮김 → **참조 0, 삭제 대상** |
+| `Game VFX - Magic Projectiles Vol.1/Shaders/Additive.shader` | — | 원래 참조 0건 → **삭제 대상** |
+
+⚠️ **참조 수를 셀 때 `.svn/pristine/` 를 빼야 한다.** 처음에 13건으로 셌던 것은 절반이 SVN 내부
+사본이었다 — 실제 소비자는 6건이었다(`--exclude-dir=.svn`). 합친 뒤가 13건이다.
+
+두 `.meta` 는 `guid` 와 에셋스토어 출처 블록(`productId`/`packageName`/`assetPath`)만 달랐다 —
+임포터 설정(`defaultTextures` 등)이 같아 바꿔 물려도 동작이 같다. 머티리얼 7개는 `m_Shader` **한 줄만** 바뀌었다.
+
+⚠️ `50.Art` 는 gitignore(`.gitignore:84`) 대상이다 — 이 파일들은 **git → SVN 으로 관리 주체가 바뀌었다.**
+`svn add` 가 필요하다.
+- 히트 파문(피격 방향 파문 + 표면 버스트) 재설계.
+- `FirstMeleeSubSkill.cs` 공유 — 은희 (AGENTS.md §3).
+
+---
+
 # ▶▶▶ CURRENT PLAN — 23호 공격 5종을 기획 문서대로 재작업 (2026-09-16)
 
 > 상태: **승인 대기.** 담당 경석. 브랜치 `feature/Boss23`.
@@ -1296,7 +1403,7 @@ Idle ──(F, 서버 재검증)──▶ Wave1 ──(잔존0 +2s)──▶ Wav
 
 ---
 
-# ▶▶▶ 진행 중 = **23호 VFX 배선** (2026-09-09 · 코드 완료 · Unity 저작과 Play 검증 대기)
+# 이전 = **23호 VFX 배선** (2026-09-09 · 코드 완료 · Unity 저작과 Play 검증 대기)
 
 ---
 

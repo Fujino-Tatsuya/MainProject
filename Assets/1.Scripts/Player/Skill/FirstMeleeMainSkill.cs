@@ -12,6 +12,22 @@ using UnityEngine;
 /// </summary>
 public class FirstMeleeMainSkill : PlayerHoldSkill
 {
+    // 홀드 동안 이어지는 루프 연출(방패 스매시). 켜고 끄는 지점이 OnClientPlay / OnEnd 다.
+    //
+    // 🔴 여기는 **RPC 가 필요 없다** — 이 프로젝트의 다른 연출과 다른 점이다.
+    //    OnClientPlay 와 OnEnd 는 둘 다 전 피어에서 돈다:
+    //      시작 → 서버는 TryStartSkillServer 가, 클라는 PlaySkillClientRpc 가 PlaySkillPresentation 을 탄다
+    //      종료 → 서버는 EndActiveSkillServer 가, 클라는 EndSkillClientRpc 가 OnEnd 를 부른다
+    //    서버 전용 스코프에서 재생해 호스트에만 보이던 사고(보스 연출 선례)가 여기선 구조적으로 안 난다.
+    [Header("연출")]
+    [Tooltip("홀드 동안 재생할 루프 연출. 프리팹의 'Smash' EffectSocketPlayer 를 물린다.\n" +
+             "비워두면 연출만 빠진다")]
+    [SerializeField] private EffectSocketPlayer smashLoop;
+
+    [Tooltip("홀드 동안 재생할 궤적 루프. 프리팹의 'Trail' EffectSocketPlayer 를 물린다.\n" +
+             "비워두면 연출만 빠진다")]
+    [SerializeField] private EffectSocketPlayer trailLoop;
+
     private PlayerMovement movement;
     private PlayerMotor motor;
     private PlayerAimIndicator aimIndicator;
@@ -71,6 +87,11 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
         heading = Flatten(direction);
         // Motor를 돌리는 오너/서버/오프라인만 전진·조향 채널을 제출한다.
         isLocallySimulating = owner != null && owner.IsSimulating;
+
+        // 연출은 권위와 무관하다 — 모든 피어가 각자 켠다.
+        // Play 는 이미 재생 중이면 먼저 회수하므로 두 번 불려도 겹치지 않는다.
+        smashLoop?.Play();
+        trailLoop?.Play();
     }
 
     public override void OnAimUpdated(Vector3 direction)
@@ -146,6 +167,11 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
         base.OnEnd(reason);
 
         isLocallySimulating = false;
+
+        // 🔴 종료 사유를 가리지 않는다. 취소·사망·안전망 만료 어느 쪽으로 끝나도 여기를 지나므로
+        //    루프가 남는 경로가 없다. (Stop 은 재생 중이 아니면 조용한 no-op 이다)
+        smashLoop?.Stop();
+        trailLoop?.Stop();
 
         // 서버 전용 쓰기(CanWrite) 가드가 내장돼 있어 클라에서는 no-op
         if (owner != null && owner.StatusEffects != null)

@@ -8,6 +8,12 @@ using UnityEngine;
 /// </summary>
 public class FirstMeleeSubSkill : PlayerInstantSkill
 {
+    // 연출은 PlayerShieldVfx 가 들고 있다 — 이 클래스의 부모(PlayerSkillBase)는 MonoBehaviour 라
+    // RPC 를 달 수 없는데, 보호막이 끝나는 지점(ExpireShield)은 서버 전용이라 전파가 필요하다.
+    [Header("연출")]
+    [Tooltip("보호막 연출 창구. 플레이어 루트의 PlayerShieldVfx 를 물린다.\n비워두면 연출만 빠진다")]
+    [SerializeField] private PlayerShieldVfx shieldVfx;
+
     private Coroutine expiryRoutine;
 
     public override PlayerSkillSlot Slot => PlayerSkillSlot.Sub;
@@ -40,12 +46,17 @@ public class FirstMeleeSubSkill : PlayerInstantSkill
 
     public override void OnClientPlay(Vector3 direction)
     {
-        // 보호막 생성/파괴/자연 소멸 연출은 VFX 확정 후 추가
+        // 전 피어에서 돈다 — 서버는 직접 경로, 클라는 PlaySkillClientRpc 로 들어온다. RPC 불필요.
+        shieldVfx?.PlayLocal();
     }
 
     private IEnumerator ExpireShield(float duration)
     {
         float endTime = Time.time + duration;
+
+        // 깨진 것(피해로 소진)과 걷힌 것(시간 만료·사망)은 연출이 다르다. 서버만 이유를 알고 있으므로
+        // 여기서 판정해 ServerEnd 로 넘긴다 — 복제되는 보호막 값만 봐서는 둘을 가를 수 없다.
+        bool broken = false;
 
         // duration이 0 이하면 시간 만료 없이 사망 감시만 한다
         while (duration <= 0f || Time.time < endTime)
@@ -53,11 +64,21 @@ public class FirstMeleeSubSkill : PlayerInstantSkill
             if (owner.CurrentState == PlayerActionState.Dead)
                 break;
 
+            // 피해로 먼저 소진된 경우. 이 확인이 없으면 보호막이 이미 깨졌는데도 코루틴이 타이머 끝까지
+            // 돌아, 배리어가 남은 시간 내내 떠 있는다(소진은 피격 처리에서 일어나 여기를 지나지 않는다).
+            if (owner.CurrentShield <= 0)
+            {
+                broken = true;
+                break;
+            }
+
             yield return null;
         }
 
         // 자연 소멸 또는 사망 시 즉시 소멸 (소진에 의한 소멸은 피격 처리에서 이미 0)
         owner.SetShield(0);
         expiryRoutine = null;
+
+        shieldVfx?.ServerEnd(broken);
     }
 }

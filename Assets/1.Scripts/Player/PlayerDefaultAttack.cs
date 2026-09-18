@@ -50,36 +50,48 @@ public class PlayerDefaultAttack : BaseAttack
         damagedHurtboxes.Clear();
     }
 
-    public void HitCurrentStep()
+    /// <summary>
+    /// 이번 판정에서 <b>실제로 무언가를 맞췄는가.</b>
+    ///
+    /// 반환값을 쓰는 곳은 연출이다 — 헛스윙과 명중에 다른 이펙트를 내려면 이걸 밖에서 알아야 하는데,
+    /// <b>애니메이션 이벤트로는 못 가른다</b>(클립은 맞았는지 모른다). 예전에는 이 정보가
+    /// <see cref="HitOverlap"/> 안의 지역 변수로만 있다가 진단 로그에 쓰이고 버려졌다.
+    ///
+    /// ⚠️ 투사체는 **항상 false** 다. 발사 시점에는 맞을지 알 수 없다 — 명중은 날아간 뒤에 난다.
+    ///    투사체 평타에 명중 연출이 필요해지면 <c>DefaultAttackProjectile</c> 쪽에서 따로 내야 한다.
+    /// </summary>
+    /// <returns>명중 대상이 하나라도 있으면 true. 서버가 아니거나 판정이 없었으면 false.</returns>
+    public bool HitCurrentStep()
     {
         if (!IsServer)
-            return;
+            return false;
 
         if (currentStep == null)
-            return;
+            return false;
 
         switch (currentStep.HitType)
         {
             case DefaultAttackHitType.Overlap:
-                HitOverlap();
-                break;
+                return HitOverlap();
 
             case DefaultAttackHitType.Projectile:
                 SpawnProjectile();
-                break;
+                return false;
 
             case DefaultAttackHitType.Raycast:
-                HitRaycast();
-                break;
+                return HitRaycast();
         }
+
+        return false;
     }
 
-    private void HitOverlap()
+    /// <returns>하나라도 명중했으면 true.</returns>
+    private bool HitOverlap()
     {
         if (hitbox == null)
         {
             Edit.LogWarning("[Player] PlayerDefaultAttack requires a ColliderInfo hitbox.", this);
-            return;
+            return false;
         }
 
         swingHitBuffer.Clear();
@@ -143,6 +155,8 @@ public class PlayerDefaultAttack : BaseAttack
         // "전부 걸러졌다"고 거짓 보고한다(상자를 실제로 부수고도 경고가 찍혔다).
         if (!anyResolved)
             LogEmptySwing(hitCount);
+
+        return anyResolved;
     }
 
     // 진단 — "때려도 안 맞는다"의 원인을 로그로 가른다(2026-07-30).
@@ -197,29 +211,30 @@ public class PlayerDefaultAttack : BaseAttack
         projectile.Launch(owner, attackDirection, currentStep.ProjectileSpeed, damage, targetLayer);
     }
 
-    private void HitRaycast()
+    /// <returns>명중했으면 true. 레이가 빗나갔거나 대상이 자기 자신이면 false.</returns>
+    private bool HitRaycast()
     {
         Vector3 origin = muzzle != null ? muzzle.position : transform.position;
 
         if (!Physics.Raycast(origin, attackDirection, out RaycastHit hit, currentStep.RaycastRange, targetLayer, QueryTriggerInteraction.Collide))
         {
-            return;
+            return false;
         }
 
         if (TryGetHurtbox(hit.collider, out Hurtbox hurtbox))
         {
             hurtbox.TryGetOwner(out Unit ownerUnit);
             if (ownerUnit != owner)
-                TryResolveHit(hurtbox, hit.collider);
+                return TryResolveHit(hurtbox, hit.collider);
 
-            return;
+            return false;
         }
 
         Unit target = hit.collider.GetComponentInParent<Unit>();
         if (target == null || target == owner)
-            return;
+            return false;
 
-        TryResolveHit(target);
+        return TryResolveHit(target);
     }
 
     private int OverlapHitbox(ColliderInfo hitbox)

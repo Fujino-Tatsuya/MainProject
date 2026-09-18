@@ -64,6 +64,23 @@ public class DefaultAttackController : BaseNetworkBehaviour
         return Animator.StringToHash($"Default_Attack{index}");
     }
 
+    // ─── 평타 베기 연출 ────────────────────────────────────────────────
+    // 🔴 명중과 헛스윙을 **가른다.** 애니메이션 이벤트로는 못 가른다 — 클립은 맞았는지 모른다.
+    //    판정은 서버만 하므로(HandleAnimationEvent 가 IsServer 로 막혀 있다) RPC 로 내보낸다.
+    //    소켓이 필요해서 카탈로그 룩업이 아니라 EffectSocketPlayer 직접 참조다(보스 연출과 같은 규약).
+    // 🔴 **타마다 소켓이 다르다**(2026-09-16). 4타는 스윙 궤적이 전부 달라서 검기가 나가는
+    //    자리·각도도 다르다. 그래서 칼에 소켓 하나를 붙여 공용으로 쓰던 방식을 버리고,
+    //    플레이어 루트 아래 `Slash01~04` 를 두고 **공격 단계로 인덱싱**한다.
+    //    배열 첨자 = Default_Attack{N} 의 N 이다 — 순서를 섞지 말 것.
+    [Header("연출 — 평타 (첨자 = 공격 단계)")]
+    [Tooltip("각 타 명중 시. [0~2]=FX_SingleSlash_O · [3]=FX_DoubleSlash_O.\n" +
+             "비워두면 그 타의 연출만 빠진다")]
+    [SerializeField] private EffectSocketPlayer[] slashHit = new EffectSocketPlayer[4];
+    [Tooltip("각 타 헛스윙 시. [0~2]=FX_SingleSlash_X · [3]=FX_DoubleSlash_X")]
+    [SerializeField] private EffectSocketPlayer[] slashMiss = new EffectSocketPlayer[4];
+
+    private bool warnedNoSlashVfx;
+
     [SerializeField] private Animator animator;
     [SerializeField] private DefaultAttackData attackData;
     [SerializeField] private PlayerDefaultAttack playerDefaultAttack;
@@ -339,7 +356,7 @@ public class DefaultAttackController : BaseNetworkBehaviour
         switch (eventType)
         {
             case DefaultAttackAnimationEventType.Hit:
-                playerDefaultAttack.HitCurrentStep();
+                FireHitAndPlayVfx();
                 break;
 
             case DefaultAttackAnimationEventType.ComboWindowOpen:
@@ -365,7 +382,69 @@ public class DefaultAttackController : BaseNetworkBehaviour
     public void HitCurrentAttack()
     {
         if (HasGameplayAuthority)
-            playerDefaultAttack.HitCurrentStep();
+            FireHitAndPlayVfx();
+    }
+
+    /// <summary>
+    /// 판정 1회 + 그 결과에 맞는 베기 연출. 판정 지점이 둘(<see cref="HandleAnimationEvent"/> ·
+    /// <see cref="HitCurrentAttack"/>)이라 한 곳으로 모은다 — 갈라 두면 한쪽만 고쳐 어긋난다.
+    /// </summary>
+    private void FireHitAndPlayVfx()
+    {
+        bool hit = playerDefaultAttack.HitCurrentStep();
+
+        // 🔴 여기서 직접 재생하면 안 된다. 이 경로는 서버에서만 돈다 — 호스트 화면에만 나온다.
+        if (IsNetworkActive)
+            PlaySlashVfxRpc(currentAttackIndex, hit);
+        else
+            PlaySlashVfx(currentAttackIndex, hit);   // 오프라인(단독 실행) 경로
+    }
+
+    /// <summary>
+    /// [전 피어] 평타 베기 연출. 어느 단계였는지와 맞췄는지를 실어 보낸다.
+    ///
+    /// 둘 다 인자로 싣는 이유는 같다 — <b>클라가 스스로 알 수 없다.</b> 명중 판정은 서버 전용이고,
+    /// <see cref="currentAttackIndex"/> 도 클라에서는 RPC 로 받은 값이라 판정 시점과 어긋날 수 있다.
+    ///
+    /// Unreliable: 순수 연출이라 한 대 분이 빠져도 상태가 발산하지 않는다.
+    /// </summary>
+    [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
+    private void PlaySlashVfxRpc(int attackIndex, bool hit) => PlaySlashVfx(attackIndex, hit);
+
+    private void PlaySlashVfx(int attackIndex, bool hit)
+    {
+        EffectSocketPlayer[] players = hit ? slashHit : slashMiss;
+
+        // 배열이 콤보 길이보다 짧게 저작돼 있어도 조용히 빠진다 — 연출이 없는 것이
+        // 전투가 예외로 멈추는 것보다 낫다. 대신 아래 경고가 어느 첨자인지 짚어 준다.
+        if (players == null || attackIndex < 0 || attackIndex >= players.Length)
+        {
+            WarnNoSlashVfxOnce(attackIndex, hit);
+            return;
+        }
+
+        EffectSocketPlayer player = players[attackIndex];
+        if (player == null)
+        {
+            WarnNoSlashVfxOnce(attackIndex, hit);
+            return;
+        }
+
+        player.PlayOnce();
+    }
+
+    // 비어 있으면 평타마다 로그가 쏟아지므로 한 번만 알린다(연출은 빠지되 전투는 계속된다).
+    private void WarnNoSlashVfxOnce(int attackIndex, bool hit)
+    {
+        if (warnedNoSlashVfx)
+            return;
+
+        warnedNoSlashVfx = true;
+
+        string slot = hit ? "slashHit" : "slashMiss";
+        Debug.LogWarning(
+            $"{name}: {attackIndex}타 평타 연출이 비어 있다 — 프리팹의 DefaultAttackController 에 " +
+            $"{slot}[{attackIndex}] 을 물릴 것.", this);
     }
 
     public void HandleAnimatorMove(Vector3 deltaPosition, Vector3 animatorForward)
