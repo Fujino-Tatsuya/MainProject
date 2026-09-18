@@ -7626,6 +7626,7 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   barrierLoop: {fileID: 7601287734901230005}
   breakBurst: {fileID: 7601287734901230008}
+  minHitDistance: 0.15
 --- !u!114 &6909544522566629635
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -9734,7 +9735,7 @@ MonoBehaviour:
   effect: {fileID: 11400000, guid: 55589f8e8b5bf68db05c619dd5ab540a, type: 2}
   socket: {fileID: 5953840363612247574}
   offset: {x: 0, y: 0, z: 0}
-  scale: 1
+  scale: 0.5
   safetyTimeout: 8
 --- !u!1 &7601287734901230006
 GameObject:
@@ -9784,7 +9785,7 @@ MonoBehaviour:
   effect: {fileID: 11400000, guid: 5d9491b166e58d4dcce879b6919626d2, type: 2}
   socket: {fileID: 5953840363612247574}
   offset: {x: 0, y: 0, z: 0}
-  scale: 1
+  scale: 0.5
   safetyTimeout: 5
 --- !u!1 &7712004551986330001
 GameObject:
@@ -10821,7 +10822,7 @@ Transform:
   m_GameObject: {fileID: 9111370052655921459}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 0, y: 0.672, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
