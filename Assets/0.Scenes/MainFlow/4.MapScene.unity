@@ -1959,13 +1959,13 @@ Light:
   m_InnerSpotAngle: 21.80208
   m_CookieSize2D: {x: 0.5, y: 0.5}
   m_Shadows:
-    m_Type: 2
+    m_Type: 1
     m_Resolution: -1
     m_CustomResolution: -1
-    m_Strength: 0.8
+    m_Strength: 1
     m_Bias: 0.035
     m_NormalBias: 0.28
-    m_NearPlane: 0.2
+    m_NearPlane: 0.1
     m_CullingMatrixOverride:
       e00: 1
       e01: 0
@@ -2015,13 +2015,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 529259874}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.11345882, y: -0.86816835, z: 0.42343405, w: 0.23262504}
+  m_LocalRotation: {x: 0.1491917, y: -0.78930134, z: 0.5567909, w: 0.21149269}
   m_LocalPosition: {x: 0, y: 3, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 55.77, y: -167.4, z: 0}
+  m_LocalEulerAnglesHint: {x: 70.4, y: -150, z: 0}
 --- !u!114 &529259877
 MonoBehaviour:
   m_ObjectHideFlags: 0
