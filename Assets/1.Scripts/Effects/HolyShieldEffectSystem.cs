@@ -41,7 +41,7 @@ public class HolyShieldEffectSystem : IEffectSystem
 
         if (immediate)
         {
-            shield.ResetForPool();
+            ResetForPool(instance);
             instance.SetActive(false);
             return;
         }
@@ -51,8 +51,20 @@ public class HolyShieldEffectSystem : IEffectSystem
 
     public void SetPlayRate(GameObject instance, float rate) => Find(instance)?.SetPlayRate(rate);
 
-    public void ResetForPool(GameObject instance) => Find(instance)?.ResetForPool();
+    /// <summary>
+    /// 같은 프리팹에 얹힌 <see cref="ShieldRippleEffect"/>도 함께 되돌린다.
+    /// 그쪽은 드라이버가 아니라(단일 기술 규칙) 풀이 직접 부르지 않으므로,
+    /// <b>여기서 챙기지 않으면 다음 대출자가 이전 시전의 파문을 물려받는다.</b>
+    /// </summary>
+    public void ResetForPool(GameObject instance)
+    {
+        Find(instance)?.ResetForPool();
+        FindRipple(instance)?.ResetForPool();
+    }
 
     private static HolyShieldEffect Find(GameObject instance)
         => instance.GetComponentInChildren<HolyShieldEffect>(true);
+
+    private static ShieldRippleEffect FindRipple(GameObject instance)
+        => instance.GetComponentInChildren<ShieldRippleEffect>(true);
 }
