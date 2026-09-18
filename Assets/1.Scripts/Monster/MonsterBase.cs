@@ -1438,8 +1438,12 @@ public class MonsterBase : Unit
             // 바꾸고 자식 콜라이더는 그대로 남는다).
             if (!MonsterTargeting.IsAttackable(c)) continue;
 
-            // 루트 오브젝트 기준 거리(콜라이더가 자식일 수 있음).
-            Transform root = c.transform.root;
+            // 🔴 타깃 기준은 **Player 트랜스폼**이다(2026-09-18). 예전에는 `transform.root` 였는데,
+            //    플레이어가 무언가의 자식이면 **그 부모의 피벗**을 쿫게 돼 보스가 엉뚱한 데로 간다.
+            //    또 AdoptAggro·최원거리 탐색은 `Player.transform` 을 써서 기준이 갈라져 있었다 —
+            //    exclude 비교가 어긋나는 원인이기도 했다. 한 곳으로 맞춘다.
+            Player owner = c.GetComponentInParent<Player>();
+            Transform root = owner != null ? owner.transform : c.transform.root;
 
             // 제외 대상은 건너뛴다. 루트로 비교하는 이유 — exclude 로 넘어오는 _target 도
             // 루트라서, 콜라이더 트랜스폼과 직접 비교하면 자식 콜라이더에서 안 걸린다.
