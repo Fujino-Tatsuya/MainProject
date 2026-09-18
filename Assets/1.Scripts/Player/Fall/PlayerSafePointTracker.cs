@@ -40,6 +40,8 @@ public sealed class PlayerSafePointTracker : NetworkBehaviour
     [SerializeField, Min(0.1f)] private float probeDownDistance = 3.0f;
 
     [Header("안전지점 마커 (Owner 전용 로컬 시각화)")]
+    [Tooltip("끄면 마커를 생성하지 않는다. 안전지점 기록·복귀 로직은 그대로 동작한다(시각화 전용).")]
+    [SerializeField] private bool showSafePointMarkers = true;
     [SerializeField] private GameObject safePointMarkerPrefab;
 
     private readonly Queue<Vector3> _safePointQueue = new Queue<Vector3>();
@@ -113,7 +115,7 @@ public sealed class PlayerSafePointTracker : NetworkBehaviour
     {
         ClearMarkers();
 
-        if (safePointMarkerPrefab == null)
+        if (!showSafePointMarkers || safePointMarkerPrefab == null)
             return;
 
         foreach (Vector3 point in points)

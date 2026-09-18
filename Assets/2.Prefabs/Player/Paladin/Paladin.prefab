@@ -3129,7 +3129,7 @@ Transform:
   - {fileID: 782687988524311039}
   - {fileID: 923204050092782863}
   - {fileID: 42216994756734784}
-  - {fileID: 5977490345982917294}
+  - {fileID: 3934993282841624722}
   - {fileID: 6295488262120027750}
   - {fileID: 6652138831437743955}
   m_Father: {fileID: 0}
@@ -3759,6 +3759,7 @@ MonoBehaviour:
   occupancyRadius: 0.4
   probeUpDistance: 1.5
   probeDownDistance: 3
+  showSafePointMarkers: 0
   safePointMarkerPrefab: {fileID: 8238544250631236300, guid: 544d09bf18809834dabb81d27868643a, type: 3}
 --- !u!114 &1461530121226363041
 MonoBehaviour:
@@ -4173,7 +4174,7 @@ MonoBehaviour:
   m_UVBias: {x: 0, y: 0}
   m_RenderingLayerMask:
     serializedVersion: 0
-    m_Bits: 256
+    m_Bits: 1
   m_ScaleMode: 1
   m_Offset: {x: 0, y: 0, z: 0}
   m_Size: {x: 1, y: 1, z: 5}
@@ -5261,7 +5262,7 @@ VisualEffect:
   m_CorrespondingSourceObject: {fileID: 7482175182576855390, guid: 59f037210bef4f3489b17af8c4fefdd2, type: 3}
   m_PrefabInstance: {fileID: 1944846718625063402}
   m_PrefabAsset: {fileID: 0}
---- !u!1001 &5977490345982917323
+--- !u!1001 &3934993282841624823
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
@@ -5370,10 +5371,10 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 34df118ba6f24cd2945c523d7569cb92, type: 3}
---- !u!224 &5977490345982917294 stripped
+--- !u!224 &3934993282841624722 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 101, guid: 34df118ba6f24cd2945c523d7569cb92, type: 3}
-  m_PrefabInstance: {fileID: 5977490345982917323}
+  m_PrefabInstance: {fileID: 3934993282841624823}
   m_PrefabAsset: {fileID: 0}
 --- !u!1001 &8867899183467976874
 PrefabInstance:
