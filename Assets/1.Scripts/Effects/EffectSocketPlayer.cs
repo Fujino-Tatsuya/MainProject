@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -107,6 +108,26 @@ public class EffectSocketPlayer : MonoBehaviour, IAnimEventEffect
 
         Transform from = socket != null ? socket : transform;
         EffectManager.Instance.Play(effect, from.position + offset, from.rotation, scale);
+    }
+
+    /// <summary>
+    /// 지금 재생 중인 파트 인스턴스들을 <paramref name="buffer"/>에 채운다. 반환값은 채운 개수다.
+    ///
+    /// 재생 도중 인스턴스에 무언가를 알려야 하는 연출용이다(보호막 피격 파문 등).
+    /// <b><see cref="Play"/>로 시작한 루프만 대상이다</b> — <see cref="PlayOnce"/>는 핸들을 들지 않아
+    /// 도중에 닿을 방법이 없다(그래서 도중에 끌 수도 없다).
+    ///
+    /// ⚠️ 담긴 GameObject 는 <b>풀 소유</b>다. 들고 있지 말고 부른 그 프레임에 쓰고 버릴 것.
+    /// </summary>
+    public int GetInstances(List<GameObject> buffer)
+    {
+        if (!_handle.IsSet || EffectManager.Instance == null)
+        {
+            buffer?.Clear();
+            return 0;
+        }
+
+        return EffectManager.Instance.GetInstances(_handle, buffer);
     }
 
     /// <summary>[애니메이션 이벤트] 재생 종료. 재생 중이 아니면 조용한 no-op이다.</summary>
