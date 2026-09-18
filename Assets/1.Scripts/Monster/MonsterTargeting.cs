@@ -15,14 +15,23 @@ using UnityEngine;
 /// </summary>
 public static class MonsterTargeting
 {
-    /// <summary>플레이어가 아닌 대상은 종전대로 유효하다(생명주기 개념이 없으므로).</summary>
+    /// <summary>
+    /// 이 대상을 노려도 되는가. 🔴 <b>플레이어만</b> 해당한다(팀장 확정 2026-09-18).
+    ///
+    /// 예전에는 <c>PlayerLifeCycleController</c> 가 없으면 <c>true</c> 를 돌려줘서,
+    /// <c>playerMask</c> 레이어에 올라온 대상이면 <b>지형·구조물이든 전부 타겟</b>이 됐다.
+    /// 그러면 보스가 엉뚱한 오브젝트를 물고 그쪽으로 가버린다 — 즉 “어그로가 튀는” 것처럼 보인다.
+    /// 프로젝트에서 몬스터가 노려야 할 대상은 플레이어뿐이므로 여기서 닫는다.
+    /// </summary>
     public static bool IsAttackable(Transform target)
     {
         if (target == null || !target.gameObject.activeInHierarchy) return false;
 
         // 콜라이더가 자식일 수 있으므로 부모로 거슬러 찾는다.
+        if (target.GetComponentInParent<Player>() == null) return false;
+
         PlayerLifeCycleController lifeCycle = target.GetComponentInParent<PlayerLifeCycleController>();
-        if (lifeCycle == null) return true;
+        if (lifeCycle == null) return true;   // Player 는 맞는데 생명주기가 없는 구성
 
         return lifeCycle.State == PlayerLifeState.Alive;
     }
