@@ -31,6 +31,8 @@ MonoBehaviour:
   animatorStateName: Garen_Main_Skill
   snapRotationOnStart: 1
   advanceSpeed: 6
-  steerAnglePerTick: 5
+  steerAnglePerTick: 20
   knockbackStrength: 3
+  knockbackDuration: 0.25
+  staggerDuration: 0.2
   maxHitResults: 16

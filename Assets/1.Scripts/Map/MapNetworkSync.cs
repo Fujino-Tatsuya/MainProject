@@ -18,6 +18,12 @@ public class MapNetworkSync : NetworkBehaviour
     [Tooltip("스테이지당 난이도 가산량.")]
     [SerializeField] private int stageStep = 2;
 
+    [Header("=== 디버그 ===")]
+    [Tooltip("0 이 아니면 이 값을 맵 시드로 고정한다. 0 = 매번 랜덤(정상 동작).\n" +
+             "🔴 성능 측정처럼 두 Play 를 비교할 때 반드시 필요하다 — 맵이 매번 다르면 " +
+             "드로우콜·삼각형 수가 통째로 달라져서 Play 간 비교가 전부 무의미해진다.")]
+    [SerializeField] private int debugFixedSeed = 0;
+
     // 서버가 결정한 값 — 복제되어 늦게 합류한 클라도 동일 시드/난이도로 생성
     private readonly NetworkVariable<int> _seed = new NetworkVariable<int>();
     private readonly NetworkVariable<int> _difficulty = new NetworkVariable<int>();
@@ -36,7 +42,9 @@ public class MapNetworkSync : NetworkBehaviour
 
         if (IsServer)
         {
-            int seed = Random.Range(int.MinValue, int.MaxValue);
+            int seed = debugFixedSeed != 0
+                ? debugFixedSeed
+                : Random.Range(int.MinValue, int.MaxValue);
             _seed.Value = seed;
             _difficulty.Value = ComposeDifficultyLevel();
             _ready.Value = true;                         // 복제 → 클라 트리거(레이트 조인 포함)

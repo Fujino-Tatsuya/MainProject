@@ -136957,7 +136957,7 @@ AnimationClip:
     floatParameter: 0
     intParameter: 1
     messageOptions: 0
-  - time: 0.4
+  - time: 0.36666667
     functionName: HitDefaultAttack
     data: 
     objectReferenceParameter: {fileID: 0}

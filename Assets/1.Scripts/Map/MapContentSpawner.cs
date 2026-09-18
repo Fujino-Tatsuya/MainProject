@@ -209,30 +209,42 @@ public class MapContentSpawner : MonoBehaviour
     }
 
     /// <summary>
-    /// 존 프리팹에 저작된 <see cref="MonsterSpawner"/> 를 서버가 대신 실행한다.
-    /// 아트가 존 프리팹에 스포너를 붙이고 자식으로 <see cref="MonsterSpawnPoint"/> 를 놓는 저작 방식.
+    /// 존 프리팹에 저작된 <see cref="ZoneMonsterSpawnSet"/> 을 서버가 읽어 스폰한다.
+    /// 아트가 존 프리팹에 그 컴포넌트를 붙이고 자식으로 <see cref="MonsterSpawnPoint"/> 를 놓는 저작 방식.
     ///
-    /// 🔴 <b>왜 스포너의 <c>SpawnWave()</c> 를 부르지 않는가</b> (2026-08-18 실측):
-    /// <c>NetworkBehaviour.IsServer</c> 는 계산 프로퍼티가 아니라 <b>네트워크 스폰 때 세팅되는
-    /// 자동 프로퍼티</b>다. 존은 「비네트워크 규약」(이 파일 헤더)이라 <c>Spawn()</c> 되지 않으므로
-    /// 존에 붙은 스포너의 <c>IsServer</c> 는 <b>영원히 false</b> 이고, <c>SpawnWave()</c>·<c>SpawnAt()</c>
-    /// 이 첫 줄에서 그대로 return 한다. 존에 <c>NetworkObject</c> 를 붙여도 아무도 스폰해 주지 않아
-    /// 결과가 같다. 그래서 마커만 읽어 <b>여기서</b> 스폰한다 — 존 규약을 깨지 않는 쪽이다.
+    /// 🔴 <b>왜 <c>MonsterSpawner</c> 를 쓰지 않는가</b>: 그것은 <c>NetworkBehaviour</c> 이고
+    /// <c>IsServer</c> 는 계산 프로퍼티가 아니라 <b>네트워크 스폰 때 세팅되는 자동 프로퍼티</b>다.
+    /// 존은 「비네트워크 규약」(이 파일 헤더)이라 <c>Spawn()</c> 되지 않으므로 존에 붙은 스포너의
+    /// <c>IsServer</c> 는 <b>영원히 false</b> 이고 <c>SpawnWave()</c> 가 첫 줄에서 return 했다
+    /// (2026-08-18 실측). 즉 존에서는 처음부터 <b>저작 데이터로만</b> 쓰이고 있었다.
+    /// 게다가 그 <c>NetworkBehaviour</c> 하나 때문에 NGO 에디터가 존 프리팹에 <c>NetworkObject</c> 를
+    /// 계속 되붙였다(2026-09-09 — 7종 중 4종 감염. 자세한 경위는 <see cref="ZoneMonsterSpawnSet"/> 주석).
+    /// → 2026-09-09 에 존 쪽을 순수 <c>MonoBehaviour</c> 로 갈았다.
     ///
     /// 스폰 자체는 기존 경로(<see cref="SpawnMonsterInstance"/>)를 그대로 쓴다. 바닥 스냅·NGO 복제·
     /// 정리 추적이 마커 경로와 동일해진다.
     /// </summary>
     private int SpawnFromZoneSpawner(GameObject zoneGo)
     {
-        var spawner = zoneGo.GetComponentInChildren<MonsterSpawner>(true);
-        if (spawner == null) return 0;
+        var spawner = zoneGo.GetComponentInChildren<ZoneMonsterSpawnSet>(true);
+        if (spawner == null)
+        {
+            // 🔴 조용히 0 을 돌려주지 않는다 — 이관이 안 된 프리팹은 "마커는 있는데 몹이 0마리"로
+            //    보이고, 원인이 "아트가 마커를 안 놨다"로 오진된다.
+            if (zoneGo.GetComponentInChildren<MonsterSpawner>(true) != null)
+                Edit.LogError(
+                    $"[MapContentSpawner] {zoneGo.name} 이 아직 구 MonsterSpawner 를 들고 있다 — " +
+                    "이 존은 몬스터를 스폰하지 않는다. 'Tools/Map/Authoring/존 몬스터 스포너 배선 (적용)' " +
+                    "을 실행해 ZoneMonsterSpawnSet 으로 이관할 것.", zoneGo);
+            return 0;
+        }
 
         int n = 0;
         foreach (MonsterSpawnPoint point in spawner.ResolveSpawnPoints())
         {
             if (point == null) continue;
 
-            // 지점별 지정이 우선, 없으면 스포너의 기본 몬스터(스포너 자신의 규약과 동일).
+            // 지점별 지정이 우선, 없으면 존의 기본 몬스터.
             GameObject prefab = point.MonsterPrefabOverride != null
                 ? point.MonsterPrefabOverride
                 : spawner.DefaultMonsterPrefab;
@@ -240,7 +252,7 @@ public class MapContentSpawner : MonoBehaviour
             {
                 Edit.LogWarning(
                     $"[MapContentSpawner] {zoneGo.name}/{point.name} 에 스폰할 프리팹이 없다 — " +
-                    "MonsterSpawner 의 Default Monster Prefab 또는 지점의 Override 를 채울 것.");
+                    "ZoneMonsterSpawnSet 의 Default Monster Prefab 또는 지점의 Override 를 채울 것.");
                 continue;
             }
 
@@ -358,6 +370,17 @@ public class MapContentSpawner : MonoBehaviour
     // 그러면 몹이 공중에서 중력으로 어비스로 떨어진다(실제 Play 로그: Zone_typeQuest02 마커 2개).
     // 존 transform 원점은 회전·어긋난 배치에서 바닥 위가 아닐 수 있으므로, 폴백은 **존 렌더러
     // 바운즈 위**에서 쏜다 — 존 자신의 바닥은 언제나 자기 바운즈 안에 있다.
+    //
+    // 🟡 보류(2026-09-11 팀장 결정): 여기는 **바닥만** 보고 NavMesh 는 보지 않는다. 그래서
+    // "바닥 위지만 NavMesh 밖"인 지점이 통과하고, 이동형 몹이 그 위에 서면 에러 없이 조용히 안 움직인다.
+    // Play 에서 실제 문제로 드러나지 않으면 그대로 둔다 — 드러날 때만 NavMesh.SamplePosition 을 덧붙인다.
+    //
+    // ⚠️ 덧붙일 때의 게이트: **프리팹에 NavMeshAgent 가 있을 때만 샘플링한다.**
+    //   NavMesh 를 읽는 소비자가 에이전트이므로 에이전트가 없으면 샘플링 결과를 쓸 곳이 없다 —
+    //   고정 터렛(PeekABot·TeslaBot, c148bdf8 에서 에이전트 제거)은 여기서 자동으로 빠진다.
+    //   archetype == RangedTurret 로 걸지 말 것 — 지금은 결과가 같지만 대리 지표라서,
+    //   에이전트 달린 터렛이나 고정형 Melee 가 생기면 어긋난다.
+    //   프리팹당 1회 조회 후 캐시할 것(같은 프리팹이 마커 수만큼 반복 스폰된다).
     private static bool TryResolveSpawnPoint(Vector3 markerPosition, GameObject zoneGo, out Vector3 result)
     {
         // ⚠️ Default 단독이면 안 된다. c5826a3 이 보행면 833건을 Default → Ground 로 옮겼기 때문에

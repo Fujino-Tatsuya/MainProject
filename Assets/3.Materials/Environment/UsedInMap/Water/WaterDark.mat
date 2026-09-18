@@ -12,7 +12,9 @@ Material:
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
-  m_InvalidKeywords: []
+  m_InvalidKeywords:
+  - _USESCENEDEPTH_ON
+  - _USESHOREMASK_ON
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
@@ -22,26 +24,100 @@ Material:
   m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
-    m_TexEnvs: []
+    m_TexEnvs:
+    - _ShoreMask:
+        m_Texture: {fileID: 2800000, guid: f8dc2e0a6f90dc547982d016f36638f3, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
     - _DepthDarken: 0.56
     - _DepthNoiseScale: 0.002
     - _DepthOctaveFalloff: 0.341
     - _DepthOctaveScale: 2.1
-    - _EdgeBrighten: 0.447
+    - _DepthWarpAmount: 0.8
+    - _DepthWarpScale: 0.16
+    - _EdgeBrighten: 0
     - _EdgeWidth: 0.217
+    - _FlowMaster: 0.15
     - _FlowScale1: 0.15
     - _FlowScale2: 0.33
     - _FlowSharp: 2.21
-    - _FlowStrength: 0.646
+    - _FlowStrength: 0.12
+    - _FoamAmount: 0.04
+    - _FoamLife: 2.4
+    - _FoamScale: 0.8
+    - _FoamSharpness: 12
+    - _FoamShoreBlend: 0.35
+    - _FoamShoreDepth: 1.6
+    - _GradientDist: 36
+    - _GradientSize: 7
+    - _HlBump: 1.2
+    - _HlCrestH: 0.35
+    - _HlEps: 0.6
+    - _HlPower: 48
+    - _HlRipple: 0.25
+    - _HlRippleScale: 0.5
+    - _HlSoft: 0.07
+    - _HlStrength: 0.32
+    - _HlThreshold: 0.3
+    - _LapAmount: 0.9
+    - _LapFreq: 0.7
+    - _LapScale: 0.12
+    - _LapSpeed: 0.35
+    - _RunupAsym: 2.2
+    - _ShallowDepth: 0.8
+    - _ShallowDist: 0
+    - _ShoreGain: 0
+    - _ShoreGainDepth: 5
+    - _ShoreMaskRange: 48
+    - _ShoreMaskTexel: 0.38134766
+    - _ShoreSharp: 2
+    - _ShoreStrength: 0.55
+    - _ShoreWarpAmount: 2.5
+    - _ShoreWarpDrift: 0.015
+    - _ShoreWarpScale: 0.08
+    - _ShoreWidth: 2.5
+    - _SwashApproach: 0.35
+    - _SwashBand: 1.5
+    - _SwashContact: 0.18
+    - _SwashPeriod: 3.4
+    - _SwashRunOut: 4
+    - _SwashVary: 0.35
+    - _SwashVaryScale: 0.02
+    - _SwashWave: 6
+    - _UseSceneDepth: 1
+    - _UseShoreMask: 1
+    - _Wave2Amp: 0.6
+    - _Wave2Angle: 34
+    - _Wave2Len: 0.58
+    - _Wave2Speed: 1.35
+    - _Wave3Amp: 0.45
+    - _Wave3Angle: -57
+    - _Wave3Len: 1.9
+    - _Wave3Speed: 0.7
+    - _WaveAmp: 0.25
+    - _WaveContrast: 0
+    - _WaveJitter: 0.35
+    - _WaveJitterScale: 0.03
+    - _WaveLength: 9
+    - _WaveSpeed: 0.22
+    - _Windward: 0
     m_Colors:
-    - _DeepColor: {r: 0.11, g: 0.38, b: 0.36, a: 1}
+    - _DeepColor: {r: 0.02, g: 0.07, b: 0.09, a: 1}
     - _DepthDrift1: {r: -0.35, g: 2.3, b: 1.06, a: 0.68}
     - _DepthDrift2: {r: 1, g: 0.25, b: 0.32, a: 0}
     - _DepthDrift3: {r: 0.015, g: -0.02, b: 0, a: 0}
-    - _FlowColor: {r: 0.23, g: 0.53, b: 0.49, a: 1}
+    - _FlowColor: {r: 0.34, g: 0.88, b: 0.88, a: 1}
+    - _FlowDir: {r: 1, g: 0.35, b: 0, a: 0}
     - _FlowSpeed1: {r: 0.6, g: 1, b: 0, a: 0}
     - _FlowSpeed2: {r: -0.4, g: 0.5, b: 0, a: 0}
+    - _FoamColor: {r: 0.5, g: 0.66, b: 0.66, a: 1}
+    - _FoamSpeed: {r: 0.05, g: 0.03, b: 0, a: 0}
+    - _HlColor: {r: 0.78, g: 1, b: 1, a: 1}
+    - _HlDir: {r: 0.45, g: 0.8, b: 0.4, a: 0}
+    - _ShallowColor: {r: 0.06, g: 0.2, b: 0.21, a: 1}
+    - _ShoreColor: {r: 0.42, g: 0.6, b: 0.6, a: 1}
+    - _ShoreMaskRect: {r: -173, g: -173.00002, b: 0.0012804097, a: 0.002890173}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

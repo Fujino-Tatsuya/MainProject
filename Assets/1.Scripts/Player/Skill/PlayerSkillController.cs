@@ -37,6 +37,10 @@ public class PlayerSkillController : BaseNetworkBehaviour
     private float nextAimSendTime;
     private bool hasNotifiedRelease;
     private bool isRequestingSkill;
+    // 시전 시점에 확정한 홀드 조작 방식 (UserInputConfig). 진행 중 옵션이 바뀌어도 이번 시전은 흔들리지 않는다.
+    private bool activeHoldUsesToggle;
+    // 토글 종료 입력 수용 여부. 시전한 그 입력이 떨어지기 전까지는 false다.
+    private bool isToggleEndArmed;
 
     public PlayerSkillBase ActiveSkill => activeSkill;
     public bool IsSkillActive => activeSkill != null;
@@ -366,15 +370,33 @@ public class PlayerSkillController : BaseNetworkBehaviour
                 UpdateSkillAimRpc(direction);
         }
 
-        if (!hasNotifiedRelease && inputReader != null && !inputReader.GetSkillHeld(activeSkill.Slot))
-        {
-            hasNotifiedRelease = true;
+        if (hasNotifiedRelease || inputReader == null || !ShouldEndHold())
+            return;
 
-            if (!IsNetworkActive)
-                activeSkill.OnReleased();
-            else
-                NotifySkillReleasedRpc();
+        hasNotifiedRelease = true;
+
+        if (!IsNetworkActive)
+            activeSkill.OnReleased();
+        else
+            NotifySkillReleasedRpc();
+    }
+
+    // 홀드 종료 판정. 기본 조작은 키를 뗀 순간, 토글 조작은 키를 '다시 누른' 순간이다.
+    // 지속시간 만료는 두 방식 모두 서버 안전망(EndActiveSkillServer / MaxDurationReached)이 처리한다.
+    private bool ShouldEndHold()
+    {
+        if (!activeHoldUsesToggle)
+            return !inputReader.GetSkillHeld(activeSkill.Slot);
+
+        // 시전한 입력이 한 번 떨어지기 전에는 재입력을 받지 않는다 —
+        // 안 그러면 시전 프레임의 press가 그대로 종료 입력이 돼 켜자마자 꺼진다.
+        if (!isToggleEndArmed)
+        {
+            isToggleEndArmed = !inputReader.GetSkillHeld(activeSkill.Slot);
+            return false;
         }
+
+        return inputReader.GetSkillPressed(activeSkill.Slot);
     }
 
     // ── RPC (오너 → 서버) ──
@@ -477,6 +499,10 @@ public class PlayerSkillController : BaseNetworkBehaviour
     {
         hasNotifiedRelease = false;
         nextAimSendTime = 0f;
+        // 로컬 조작자의 설정만 의미가 있다 — 이 값을 읽는 TickOwnerHoldInput은 오너/오프라인에서만 돈다.
+        activeHoldUsesToggle = skill.Data.InputType == PlayerSkillInputType.Hold &&
+            UserInputConfig.HoldSkillAsToggle;
+        isToggleEndArmed = false;
 
         if (skill.Data.SnapRotationOnStart && movement != null)
             movement.RotateImmediately(direction);

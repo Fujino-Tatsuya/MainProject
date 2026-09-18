@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!319 &31900000
+AvatarMask:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Mask_TeslaBot_HeadOnly
+  m_Mask: 01000000010000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000
+  m_Elements:
+  - m_Path: Armature
+    m_Weight: 0
+  - m_Path: Armature/Root
+    m_Weight: 0
+  - m_Path: Armature/Root/Column01
+    m_Weight: 0
+  - m_Path: Armature/Root/Column01/Column02
+    m_Weight: 0
+  - m_Path: Armature/Root/Column01/Column02/Column03
+    m_Weight: 0
+  - m_Path: Armature/Root/Column01/Column02/Column03/HeadRotator
+    m_Weight: 1
+  - m_Path: Armature/Root/Column01/Column02/Column03/HeadRotator/Head
+    m_Weight: 1
+  - m_Path: Armature/Root/Column01/Column02/Column03/HeadRotator/Head/Antenna
+    m_Weight: 1
+  - m_Path: Armature/Root/Column01/Column02/Column03/HeadRotator/Head/Eye
+    m_Weight: 1
+  - m_Path: Armature/Root/Column01/Column02/Column03/HeadRotator/Head/Eye/Eyelid
+    m_Weight: 1
+  - m_Path: Armature/Root/Column01/Column02/Column03/HeadRotator/Head/Eye/Eyelid/EyelidEnd
+    m_Weight: 1
+  - m_Path: G_BossMob_PeekABot
+    m_Weight: 0

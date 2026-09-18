@@ -30,6 +30,7 @@ public class PlayerSkillTargeting : MonoBehaviour
     private PlayerSkillController controller;
     private PlayerAimIndicator aimIndicator;
     private PlayerMovement movement;
+    private PlayerMotor motor;
     private PlayerInputReader input;
 
     private bool isTargeting;      // 조준 대기 모드(인디케이터 표시)
@@ -52,6 +53,16 @@ public class PlayerSkillTargeting : MonoBehaviour
     private PlayerSkillSlot pendingSlot;
     private float pendingCastRange;
 
+    // 🔴 자동 접근의 **서버 전용** 상태. 오너 필드(isMovingToCast/pendingTarget)와 분리한다.
+    // 이유 둘:
+    // ① 조준 UI를 도는 Update()는 비오너에서 isMovingToCast가 켜져 있으면 즉시 Cancel() 한다.
+    //    같은 필드를 서버가 쓰면 다음 프레임에 지워진다.
+    // ② 서버 권위에서 위치의 주인은 서버다. 오너만 상태를 들고 있으면 서버는 전진 의도를 만들지 못하고,
+    //    오너 예측은 보정 때마다 되돌려진다 — 루트모션(D1)과 같은 결함이다.
+    private Unit serverAutoApproachTarget;
+    private bool serverAutoApproachActive;
+    private float serverAutoApproachRange;
+
     public bool IsTargeting => isTargeting;
     // FSM이 조준 대기/확정 직후 프레임 동안만 일반 액션 입력을 억제한다.
     // 자동 이동(isMovingToCast)은 억제하지 않는다 — 다른 입력이 들어오면 그 행동이 수행되면서 자동 이동은 취소된다.
@@ -63,6 +74,7 @@ public class PlayerSkillTargeting : MonoBehaviour
         controller = GetComponent<PlayerSkillController>();
         aimIndicator = GetComponent<PlayerAimIndicator>();
         movement = GetComponent<PlayerMovement>();
+        motor = GetComponent<PlayerMotor>();
         input = GetComponent<PlayerInputReader>();
 
         // 인디케이터는 기본 비활성 — 조준 진입 시에만 켠다
@@ -113,7 +125,7 @@ public class PlayerSkillTargeting : MonoBehaviour
         justHandledConfirm = false;
 
         // 오너/오프라인(로컬 조작자)만 조준 UI를 돌린다. 권위 상실 시 안전 종료.
-        if (owner == null || !owner.IsMovementAuthority)
+        if (owner == null || !owner.IsInputSource)
         {
             if (isTargeting || isMovingToCast)
                 Cancel();
@@ -156,6 +168,78 @@ public class PlayerSkillTargeting : MonoBehaviour
 
         if (WasConfirmPressed())
             HandleConfirm();
+    }
+
+    private void FixedUpdate()
+    {
+        // 자동 접근의 Motor 채널은 시뮬레이션 피어만 제출한다(원격 프록시는 NT 표시 전용).
+        if (owner == null || !owner.IsSimulating || !owner.CanMove)
+            return;
+
+        // 오너는 자기 조준 상태로, 서버는 오너가 보낸 의도로 같은 전진을 만든다.
+        // 둘 다 만들어야 예측(오너)과 권위(서버)가 같은 결과로 수렴한다.
+        bool active;
+        Unit target;
+        float castRange;
+        if (owner.IsInputSource)
+        {
+            active = isMovingToCast;
+            target = pendingTarget;
+            castRange = pendingCastRange;
+        }
+        else
+        {
+            active = serverAutoApproachActive;
+            target = serverAutoApproachTarget;
+            castRange = serverAutoApproachRange;
+        }
+
+        if (!active)
+            return;
+
+        // 대상이 사라지면 서버가 스스로 멈춘다 — 정지 RPC가 유실돼도 영원히 밀지 않게.
+        if (target == null || target.CurrentHealth <= 0)
+        {
+            if (!owner.IsInputSource)
+                ClearServerAutoApproach();
+            return;
+        }
+
+        if (motor == null || movement == null)
+            return;
+
+        Vector3 direction = target.transform.position - motor.Position;
+        direction.y = 0f;
+        if (direction.sqrMagnitude < 0.0001f)
+            return;
+
+        // 사거리 안에 들면 멈춘다. 오너의 정지 조건(TickMoveToCast)과 같은 식이라 결과가 갈리지 않는다.
+        if (!owner.IsInputSource)
+        {
+            float stopRange = Mathf.Max(0f, castRange - RangeBuffer);
+            if (direction.sqrMagnitude <= stopRange * stopRange)
+            {
+                ClearServerAutoApproach();
+                return;
+            }
+        }
+
+        motor.AddVelocity(direction.normalized * movement.MaxResolvedMoveSpeed);
+    }
+
+    /// <summary>서버가 오너의 자동 접근 의도를 받는다. 위치 권위가 서버이므로 서버도 같은 전진을 만들어야 한다.</summary>
+    internal void ApplyServerAutoApproach(Unit target, float castRange, bool active)
+    {
+        serverAutoApproachActive = active && target != null;
+        serverAutoApproachTarget = active ? target : null;
+        serverAutoApproachRange = castRange;
+    }
+
+    private void ClearServerAutoApproach()
+    {
+        serverAutoApproachActive = false;
+        serverAutoApproachTarget = null;
+        serverAutoApproachRange = 0f;
     }
 
     private bool WasCancelPressed()
@@ -293,6 +377,9 @@ public class PlayerSkillTargeting : MonoBehaviour
         pendingSlot = slot;
         pendingCastRange = castRange;
         isMovingToCast = true;
+
+        // 서버도 같은 전진 의도를 만들어야 한다 — 위치 권위는 서버다.
+        owner?.SubmitAutoApproachIntent(target, castRange, true);
     }
 
     private void TickMoveToCast()
@@ -323,7 +410,10 @@ public class PlayerSkillTargeting : MonoBehaviour
         }
 
         if (movement != null)
-            movement.MoveTowardsPoint(targetPos);
+        {
+            Vector3 direction = targetPos - owner.transform.position;
+            movement.RotateToward(direction, movement.AutoMoveRotationSpeed);
+        }
 
         if (owner != null)
             owner.SetAnimatorMoving(true);
@@ -359,6 +449,7 @@ public class PlayerSkillTargeting : MonoBehaviour
         if (!isMovingToCast)
             return;
 
+        owner?.SubmitAutoApproachIntent(null, 0f, false);
         isMovingToCast = false;
         pendingTarget = null;
 

@@ -68,16 +68,10 @@ public class BossDirectionIndicator : MonoBehaviour, IBossTelegraph
     [Tooltip("호 하나당 세그먼트 수(부드러움).")]
     int segmentsPerArc = 24;
 
-    [Header("색")]
-    [SerializeField]
-    [Tooltip("전방 호(헤드어택·카운터 구역) 기본색.")]
-    Color frontColor = new Color(1f, 0.35f, 0.25f, 0.45f);
-    [SerializeField]
-    [Tooltip("카운터 창이 열린 동안의 전방 호 색(강조).")]
-    Color counterReadyColor = new Color(1f, 0.9f, 0.2f, 0.8f);
-    [SerializeField]
-    [Tooltip("후방 호(백어택 구역) 색.")]
-    Color backColor = new Color(0.3f, 0.7f, 1f, 0.45f);
+    // 🔴 색 필드는 여기 없다(2026-09-16 제거). `frontColor`·`backColor`·`counterReadyColor` 가
+    //    인스펙터에 남아 있었지만 **읽는 코드가 0곳**이라 거기서 색을 바꿔도 아무 일도 없었다.
+    //    실제 색은 `frontMaterial`/`backMaterial` 의 `_BaseColor` 에서 읽는다(아래 주석 참조).
+    //    앞/뒤 색을 바꾸려면 두 재질을 각각 수정할 것.
 
     [Header("배치 / 예외 처리")]
     [SerializeField, Min(0f)]
@@ -426,11 +420,28 @@ public class BossDirectionIndicator : MonoBehaviour, IBossTelegraph
     static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
 
     /// <summary>
+    /// 이 보스의 바닥 데칼 재질. <see cref="BossAttackConeTelegraph"/> 가 **같은 재질**로 공격 예고를
+    /// 그리기 위해 읽는다 — 재질을 따로 들면 예고와 표식의 셰이더·리시버 설정이 갈라진다.
+    /// 🔴 읽는 쪽은 반드시 <c>new Material(...)</c> 로 인스턴스를 떠야 한다(애셋 오염 금지).
+    /// </summary>
+    public Material DecalMaterial => decalMaterial;
+
+    /// <summary>
     /// 환형 섹터 알파 마스크. 반경·각도 경계를 몇 픽셀/도 만큼 부드럽게 떨어뜨려 계단을 없앤다.
     /// 🔴 각도 0 = +V(보스 정면). 메시 경로의 "+Z 기준 yaw(x = sin, z = cos)"와 같은 규약이다.
+    ///
+    /// ⚠️ 공격 예고(<see cref="BossAttackConeTelegraph"/>)도 이 하나를 쓴다 — 두 벌로 나누면
+    ///    예고와 표식의 페더·각도 규약이 조용히 갈라진다.
     /// </summary>
-    static Texture2D BuildArcTexture(Color color, float halfAngleDeg, bool isBack,
-                                     float inner, float outer, int size)
+    /// <param name="rimWidth">
+    /// 0 보다 크면 <b>윤곽선 모드</b> — 섹터 경계에서 이 거리(월드 단위, <paramref name="outer"/> 와 같은
+    /// 축)만큼만 진하게 그리고 내부는 <paramref name="interiorAlphaScale"/> 배로 흐려진다.
+    /// 0 이면 지금까지처럼 면 전체를 균일하게 칠한다(방향 표식이 쓰는 경로 — 동작 불변).
+    /// </param>
+    /// <param name="interiorAlphaScale">윤곽선 모드에서 내부에 남길 알파 비율(0 = 완전히 빈 내부).</param>
+    public static Texture2D BuildArcTexture(Color color, float halfAngleDeg, bool isBack,
+                                            float inner, float outer, int size,
+                                            float rimWidth = 0f, float interiorAlphaScale = 0f)
     {
         var tex = new Texture2D(size, size, TextureFormat.RGBA32, false)
         {
@@ -462,6 +473,21 @@ public class BossDirectionIndicator : MonoBehaviour, IBossTelegraph
                 float angle = Mathf.Abs(Mathf.Atan2(u, v) * Mathf.Rad2Deg);
                 float edge = isBack ? (angle - (180f - halfAngleDeg)) : (halfAngleDeg - angle);
                 a *= Mathf.Clamp01(edge / AngleFeather);
+
+                // 🔴 윤곽선 모드(rimWidth > 0) — 섹터 **경계만** 진하게, 내부는 흐리게 한다.
+                //    로스트아크식 장판 규약: "윤곽선이 먼저 그려지고 내부는 텅 빈 상태"에서
+                //    채움이 차오르는 것이 타이머다. 내부를 처음부터 칠하면 채움이 안 읽힌다.
+                //    rimWidth 0 이면 이 블록이 통째로 꺼져 **기존 동작 그대로**다(방향 표식 경로).
+                if (rimWidth > 0f && a > 0f)
+                {
+                    // 바깥 호까지의 거리 + 두 직선 모서리까지의 거리(호 길이 근사) 중 가까운 쪽.
+                    float toOuterArc = outer - r;
+                    float toAngularEdge = (edge <= 0f ? 0f : edge) * Mathf.Deg2Rad * r;
+                    float toBoundary = Mathf.Min(toOuterArc, toAngularEdge);
+
+                    float rim = Mathf.Clamp01(1f - toBoundary / rimWidth);
+                    a *= Mathf.Max(interiorAlphaScale, rim);
+                }
 
                 pixels[y * size + x] = new Color(color.r, color.g, color.b, Mathf.Clamp01(a));
             }
@@ -540,7 +566,9 @@ public class BossDirectionIndicator : MonoBehaviour, IBossTelegraph
     //
     //    두 단계에 걸쳐 여기까지 왔다:
     //    ① 카운터 창이 열리면 전방을 노랑으로 바꾸던 전환을 제거했다(색으로 상태를 알리지 않는다.
-    //       잡기 인터럽트는 추후 별도 이펙트로 표현한다 — `counterReadyColor` 는 그때 쓴다).
+    //       잡기 인터럽트는 추후 별도 이펙트로 표현한다).
+    //       ⚠️ 그때 쓰라고 남겨 뒀던 `counterReadyColor` 필드는 2026-09-16 에 지웠다 —
+    //       색의 단일 출처가 재질이 된 이상 그 이펙트도 전용 재질로 가는 것이 일관된다.
     //    ② 그런데도 표식이 빨강으로 남았다. 원인은 **다른 스크립트**였다 —
     //       `HitFlash` 가 유닛의 모든 렌더러를 긁어 피격 때 물들이고, 원래 색을 `sharedMaterial`
     //       에서 캐시하기 때문에 플래시가 끝나면 **재질 원색으로 복원**한다. 표식이 장판 재질

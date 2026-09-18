@@ -55,6 +55,9 @@ public class MonsterBase : Unit
     Vector3 _spawnPosition;
     Quaternion _spawnRotation;
     Transform _target;
+
+    /// 고정 터렛 조준 예고 게이트(선택). <see cref="SeekTurret"/> 만 쓴다.
+    ITurretAimGate _aimGate;
     Collider[] _detectBuffer;
 
     // 공격 슬롯별 쿨다운.
@@ -86,7 +89,8 @@ public class MonsterBase : Unit
     bool _isDead;
     bool _initialized;
     bool _inAttackRange;           // 사거리 안에 들어와 있나(히스테리시스 적용). 진입 순간에 첫 공격 지연을 건다
-    float _lastRetargetTime = -1f; // 마지막 주기 재선정 시각(초). **-1 = 아직 교전 전**
+    // 🔴 protected — 파생(23호)이 같은 이름을 다시 선언하면 시계가 갈린다(중복 직렬화 에러).
+    protected float _lastRetargetTime = -1f; // 마지막 주기 재선정 시각(초). **-1 = 아직 교전 전**
     float _heightLostSince = -1f;  // 물고 있는 대상이 높이 조건을 벗어난 시각(-1 = 정상)
     // 경사·계단을 오르내리는 동안 판정이 깜빡여 타깃이 튀는 것을 막는 유예(초).
     const float HeightLossGrace = 0.5f;
@@ -113,9 +117,23 @@ public class MonsterBase : Unit
         // 참조 자동 보강(인스펙터 미할당 대비).
         if (agent == null) agent = GetComponent<NavMeshAgent>();
         if (animator == null) animator = GetComponentInChildren<Animator>();
+
+        // 데이터가 컨트롤러를 지정했으면 그것으로 덮는다(비어 있으면 프리팹 배선을 그대로 쓴다).
+        // 🔴 왜 데이터로 넣는가 — Animator 가 2단 중첩 프리팹(우리 프리팹 → 아트 프리팹 → FBX) 안에
+        //    있어서 외부 프리팹에서 `m_Controller` 를 오버라이드하면 **타깃이 해석되지 않는다**
+        //    (2026-09-10 실측: 저장 성공 + YAML 에 엔트리 존재 + 로드하면 null = 조용한 실패).
+        //    아트 프리팹을 고치면 SVN 이고 팩 업데이트에 덮인다. 그래서 git 쪽 데이터에 둔다.
+        //    쓰는 곳: 고정 터렛(PeekABot·TeslaBot) — 아트 컨트롤러에 우리가 빠져나올 수 없는
+        //    상태(Hide/Raise, Charge)가 있어 몸체가 분리돼 보였다.
+        if (animator != null && data != null && data.animatorControllerOverride != null)
+            animator.runtimeAnimatorController = data.animatorControllerOverride;
+
         if (status == null) status = GetComponent<MonsterStatusEffect>();
         if (meleeAttack == null) meleeAttack = GetComponentInChildren<MonsterMeleeAttack>();
         if (rangedAttack == null) rangedAttack = GetComponentInChildren<MonsterRangedAttack>();
+
+        // 고정 터렛의 조준 예고 게이트(선택). 없으면 SeekTurret 이 예전대로 바로 쏜다.
+        _aimGate = GetComponent<ITurretAimGate>();
 
         // 공격 애니 이벤트 릴레이 자동 부착(Animator 오브젝트에 — 이벤트는 같은 GO의 메서드만 호출 가능).
         // 🔴 부착이 곧 동작은 아니다. OnAttackHit 은 **폴백이 없어서**, 클립에 그 이벤트가 없으면
@@ -499,11 +517,33 @@ public class MonsterBase : Unit
     }
 
     // 고정 포탑: 이동 없음. 사거리(attackRange) 안이면 조준·사격, 밖이면 대기.
+    //
+    // 🔴 조준 예고(2026-09-14 팀장 확정): 쏠 준비가 됐다고 바로 쏘지 않는다.
+    //    ITurretAimGate 가 붙어 있으면 조준선을 켜고 잠깐 타깃을 따라간 뒤, 게이트가 열릴 때 쏜다.
+    //    게이트가 없으면(컴포넌트 미부착) 예전 동작 그대로다 — 여기서만 갈린다.
     void SeekTurret(float dist, bool attackBlocked)
     {
         StopAgent();
         FaceTarget();
-        if (dist <= data.attackRange && !attackBlocked && CooldownReady())
+
+        bool ready = dist <= data.attackRange && !attackBlocked && CooldownReady();
+
+        if (ready && _aimGate != null)
+        {
+            _aimGate.BeginAiming();
+            if (!_aimGate.IsAimReady)
+            {
+                // 조준 중 — 아직 쏘지 않는다. 상태는 Idle 로 둔다(정지 포즈 유지).
+                if (_state.Value != MonsterState.Idle) SetState(MonsterState.Idle);
+                return;
+            }
+        }
+        else if (!ready)
+        {
+            _aimGate?.CancelAiming();
+        }
+
+        if (ready)
             StartAttack();
         else if (_state.Value != MonsterState.Idle)
             SetState(MonsterState.Idle);
@@ -715,6 +755,31 @@ public class MonsterBase : Unit
     protected Transform Target => _target;
 
     /// <summary>
+    /// 현재 타깃의 <b>읽기 전용 공개</b> 접근자. 같은 오브젝트에 붙는 <b>시각 전용</b> 컴포넌트가
+    /// 조준 방향을 구하려고 읽는다(<c>TurretHeadAim</c>).
+    /// 🔴 쓰기는 열지 않는다 — 타깃 교체는 <see cref="AdoptTarget"/> 하나뿐이라는 규칙을 깨지 않는다.
+    /// </summary>
+    public Transform CurrentTarget => _target;
+
+    /// <summary>선딜 길이(초). 조준 예고선처럼 <b>시각 전용</b> 요소가 표시 구간을 잡을 때 읽는다.</summary>
+    public float AttackWindupSeconds => data != null ? data.attackWindup : 0f;
+
+    /// <summary>사거리(m). 예고선 길이 산출용 — 값이 없으면 0 이다.</summary>
+    public float AttackRangeMeters => data != null ? data.attackRange : 0f;
+
+    /// <summary>
+    /// 이 몬스터가 <b>몸통을 돌리지 않는</b>가. 고정 터렛(<c>RangedTurret</c>)이 그렇다.
+    ///
+    /// 🔴 왜(2026-09-14 팀장 확정): 고정 포탑은 자리를 지키는 설계인데 <c>turnSpeed: 10</c> 으로
+    /// 몸통 전체가 타깃을 따라 돌고 있었다("몸통이 다 틀어진다"). 조준은 <c>TurretHeadAim</c> 이
+    /// <b>머리 본만</b> 돌려서 한다. 발사 방향은 몸통과 무관하다 —
+    /// <c>MonsterRangedAttack</c> 은 <c>targetPoint - origin</c> 으로 쏘므로 영향이 없다
+    /// (<c>transform.forward</c> 는 타깃이 원점과 겹칠 때의 폴백일 뿐이다).
+    /// </summary>
+    protected bool BodyRotationLocked =>
+        data != null && data.archetype == MonsterArchetype.RangedTurret;
+
+    /// <summary>
     /// 어그로 대상을 <b>지금 이 대상으로 갈아탄다</b>(서버 전용). 파생이 쓰는 유일한 교체 진입점이다.
     ///
     /// 🔴 왜 base 에 있는가 — <c>_target</c> 대입을 한 곳에 모아 락온·리쉬 규칙이 갈리지 않게 한다.
@@ -892,6 +957,16 @@ public class MonsterBase : Unit
         switch (data.archetype)
         {
             case MonsterArchetype.RangedTurret:
+                // 🔴 고정 터렛은 예고선이 가리키던 방향으로 쏜다 — 발사 순간의 플레이어 위치가 아니다.
+                //    예전에는 아래 공통 경로를 탔고, 그래서 선은 고정인데 탄만 타깃을 따라가
+                //    "피했는데 맞는" 상태가 됐다(2026-09-14 팀장 확인).
+                //    게이트가 없으면(예고 기능 미부착) 예전 동작 그대로 간다.
+                if (rangedAttack != null && _aimGate != null)
+                    rangedAttack.FireDirection(_aimGate.LockedAimDirection, data.attackRange);
+                else if (rangedAttack != null && _target != null)
+                    rangedAttack.Fire(_target.position + Vector3.up * 0.8f);
+                break;
+
             case MonsterArchetype.RangedMobile:
                 if (rangedAttack != null && _target != null)
                     rangedAttack.Fire(_target.position + Vector3.up * 0.8f);
@@ -1430,6 +1505,7 @@ public class MonsterBase : Unit
     /// </summary>
     protected void FaceTargetImmediate()
     {
+        if (BodyRotationLocked) return;   // 고정 터렛 — 머리만 돈다(TurretHeadAim)
         if (_target == null) return;
         Vector3 dir = _target.position - transform.position;
         dir.y = 0f;
@@ -1447,6 +1523,8 @@ public class MonsterBase : Unit
     /// </summary>
     void RotateToward(Vector3 dir)
     {
+        if (BodyRotationLocked) return;   // 고정 터렛 — 머리만 돈다(TurretHeadAim)
+
         Quaternion target = Quaternion.LookRotation(dir);
 
         float turnSpeed = data != null ? data.turnSpeed : 0f;

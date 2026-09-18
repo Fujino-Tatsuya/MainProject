@@ -45,12 +45,12 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 49d00577b3854fc4a972507541847274, type: 3}
-  m_Name: PixelScanlineFeature
-  m_EditorClassIdentifier: Assembly-CSharp::PixelScanlineFeature
+  m_Script: {fileID: 11500000, guid: 949b9294f6a54970b4b8d4a18d11b837, type: 3}
+  m_Name: RetroCRTFeature
+  m_EditorClassIdentifier: Assembly-CSharp::RetroCRTFeature
   m_Active: 1
-  _shader: {fileID: 4800000, guid: 213505f4ae8f4088900604e1724311c4, type: 3}
-  _injectionPoint: 600
+  _material: {fileID: 2100000, guid: 3f775673dfd7c9c4d9c625bb54e41080, type: 2}
+  _pixelScanlineShader: {fileID: 4800000, guid: 213505f4ae8f4088900604e1724311c4, type: 3}
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -81,7 +81,8 @@ MonoBehaviour:
   - {fileID: 2500393459794982227}
   - {fileID: -8862228372950060840}
   - {fileID: 6519473205289754683}
-  m_RendererFeatureMap: ad6b866f10d7b46c77fca73beb3b27e05335caa19a2eb322d870ecb73f0a03853b20f9ab56d2795a
+  - {fileID: 785780402380302125}
+  m_RendererFeatureMap: ad6b866f10d7b46c77fca73beb3b27e05335caa19a2eb322d870ecb73f0a03853b20f9ab56d2795a2d6757db1ca7e70a
   m_UseNativeRenderPass: 1
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
@@ -110,6 +111,26 @@ MonoBehaviour:
   m_DepthTextureFormat: 0
   m_AccurateGbufferNormals: 0
   m_IntermediateTextureMode: 0
+--- !u!114 &785780402380302125
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8432e609ca68d7343af6b64034a4a91e, type: 3}
+  m_Name: PlayerSilhouetteFeature
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerSilhouetteFeature
+  m_Active: 1
+  _maskShader: {fileID: 4800000, guid: 9873b0fd5f912b241abdfbda995fabe3, type: 3}
+  _compositeShader: {fileID: 4800000, guid: e741bbb4945600342a9df4eb8d2086a8, type: 3}
+  _localColor: {r: 0.25, g: 1, b: 0.45, a: 1}
+  _remoteColor: {r: 0.3, g: 0.65, b: 1, a: 1}
+  _outlineWidth: 1.5
+  _occludeBias: 0.03
+  _injectionPoint: 550
 --- !u!114 &2500393459794982227
 MonoBehaviour:
   m_ObjectHideFlags: 0

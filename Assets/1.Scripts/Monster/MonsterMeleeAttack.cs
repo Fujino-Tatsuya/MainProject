@@ -73,12 +73,103 @@ public class MonsterMeleeAttack : BaseAttack
             return 0;
         }
 
+        return ApplyHits(Overlap());
+    }
+
+    /// <summary>
+    /// <b>부채꼴 판정.</b> 구 오버랩 + 각도 필터 — 물리 질의에는 원뿔 형상이 없으므로 이것이 표준 방식이다.
+    /// <see cref="Hit"/> 와 <b>같은 파이프라인</b>(히트 윈도우 · 데미지 스냅샷 · 넉백)을 쓰므로,
+    /// 전진 경로(<see cref="Hit"/>)와 부채꼴 끝점이 섞여도 <b>한 사람은 한 번만</b> 맞는다.
+    ///
+    /// 🔴 <paramref name="angleDegrees"/> 는 <b>전체 각</b>이다(90 이면 정면 기준 ±45).
+    ///    예고 데칼도 이 값을 그대로 먹여야 한다 — 두 값이 갈라지면 예고가 판정에 대해 거짓말한다.
+    ///
+    /// ⚠️ 판정은 <b>수평면</b>에서 한다(y 무시). 높이 차이로 빠져나가는 일이 없도록 —
+    ///    반경 안이면 위아래는 묻지 않는다. 기존 구/박스 오버랩과 같은 전제다.
+    /// </summary>
+    /// <param name="origin">부채꼴 꼭짓점(보통 보스 위치).</param>
+    /// <param name="forward">부채꼴 중심 방향. 정규화하지 않아도 된다.</param>
+    /// <param name="radius">반경(m). 0 이하면 아무 일도 하지 않는다.</param>
+    /// <param name="angleDegrees">전체 각(도). 360 이상이면 각도 필터 없이 구 전체가 된다.</param>
+    /// <returns>실제로 피해가 들어간 대상 수. <see cref="Hit"/> 와 같은 계약이다.</returns>
+    public int HitCone(Vector3 origin, Vector3 forward, float radius, float angleDegrees)
+    {
+        if (!IsServer)
+            return 0;
+
+        if (radius <= 0f)
+            return 0;
+
+        Vector3 flatForward = forward;
+        flatForward.y = 0f;
+        if (flatForward.sqrMagnitude < 0.0001f)
+            flatForward = Vector3.forward;
+        flatForward.Normalize();
+
+        _coneOrigin = origin;
+        _coneForward = flatForward;
+        // 전체 각 → 반각의 코사인. 360 이상이면 -1 보다 작게 두어 모든 방향을 통과시킨다.
+        _coneCos = angleDegrees >= 360f ? -2f : Mathf.Cos(angleDegrees * 0.5f * Mathf.Deg2Rad);
+        _coneRadiusSq = radius * radius;
+        _coneActive = true;
+
+        int hitCount = Physics.OverlapSphereNonAlloc(
+            origin, radius, _results, targetLayer, QueryTriggerInteraction.Collide);
+
+        int applied = ApplyHits(hitCount);
+
+        _coneActive = false;
+        return applied;
+    }
+
+    // 부채꼴 필터 상태. HitCone 이 여는 동안만 유효하다(재진입 없음 — 판정은 서버 단일 스레드).
+    private bool _coneActive;
+    private Vector3 _coneOrigin;
+    private Vector3 _coneForward;
+    private float _coneCos;
+    private float _coneRadiusSq;
+
+    /// <summary>
+    /// 수평면 부채꼴 안인가. <b>반경과 각도를 같은 기준점으로</b> 본다.
+    ///
+    /// 🔴 앞의 <c>OverlapSphere</c> 는 **콜라이더 겹침**(3D)이라 기준이 다르다 — 그것만 믿으면
+    ///    "몸통 끝자락만 걸쳐도 반경 안"이 되어 <b>바닥에 그린 예고보다 넓게 맞는다</b>.
+    ///    오버랩은 후보를 추리는 브로드페이즈로만 쓰고, 최종 판정은 여기서 한다.
+    ///    그래야 판정 도형이 데칼과 같아진다(예고가 판정에 대해 거짓말하지 않는다).
+    ///
+    /// ⚠️ 수평면 판정이라 높이는 묻지 않는다 — 바닥 장판과 같은 전제다.
+    /// </summary>
+    private bool PassesConeFilter(Collider hit)
+    {
+        if (!_coneActive)
+            return true;
+
+        Vector3 to = hit.bounds.center - _coneOrigin;
+        to.y = 0f;
+
+        // 꼭짓점에 겹쳐 선 대상은 방향이 없다 — 안쪽으로 본다(빠져나가는 편보다 낫다).
+        float distSq = to.sqrMagnitude;
+        if (distSq < 0.0001f)
+            return true;
+
+        if (distSq > _coneRadiusSq)
+            return false;
+
+        return Vector3.Dot(_coneForward, to / Mathf.Sqrt(distSq)) >= _coneCos;
+    }
+
+    // Hit / HitCone 공용 — 오버랩 결과에 히트 윈도우·데미지·넉백을 적용한다.
+    // 🔴 두 진입점이 이 하나를 공유해야 **같은 히트 윈도우**가 걸린다(1인 1회의 근거).
+    private int ApplyHits(int hitCount)
+    {
         int applied = 0;
-        int hitCount = Overlap();
         for (int i = 0; i < hitCount; i++)
         {
             Collider hit = _results[i];
             if (hit == null)
+                continue;
+
+            if (!PassesConeFilter(hit))
                 continue;
 
             // 히트 윈도우 중이면 이미 맞은 Unit은 스킵(유닛당 1틱).

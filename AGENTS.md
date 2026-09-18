@@ -40,6 +40,11 @@
 ## 6. 문서 인덱스
 - 설계(GDD): [Docs/design/](Docs/design/) — 보스 / 플레이어 / 상태이상 / 빌드
 - 기술: [Docs/tech/](Docs/tech/) — 아키텍처 / 네트워크 / 컨벤션 / 워크플로우
+- **플레이어 프리팹**: [Docs/tech/player-prefabs.md](Docs/tech/player-prefabs.md) — 단일 사실 원본.
+  **설계 의도 = `Player` 는 역할, 그 밑 `Armature` 자식을 교체해 플레이 캐릭터를 바꾼다.
+  캐릭터는 스폰 전에 유저 선택값으로 결정된다.**
+  단 **현재 스폰되는 것은 통짜 복제본인 `Paladin.prefab`** 이라 의도와 데이터가 어긋나 있다.
+  플레이어 프리팹·스폰·캐릭터 교체를 건드리기 전에 읽을 것.
 - 레포지토리 맵(자동생성): [Docs/tech/repo_map.md](Docs/tech/repo_map.md) — 클래스/인터페이스
   구조·상속·Facade 위임 관계 요약. 재생성은 `DevTools/RepoMap/`(`npm run generate`).
 - 일정: `Project_MT 일정.xlsx` (담당: 이지원) — 팀 지식베이스 Vault `Core/project-schedule-2026.md` 스냅샷 참조

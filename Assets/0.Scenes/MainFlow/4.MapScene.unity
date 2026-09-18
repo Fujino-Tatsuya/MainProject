@@ -33,7 +33,7 @@ RenderSettings:
   m_HaloTexture: {fileID: 0}
   m_SpotCookie: {fileID: 10001, guid: 0000000000000000e000000000000000, type: 0}
   m_DefaultReflectionMode: 0
-  m_DefaultReflectionResolution: 128
+  m_DefaultReflectionResolution: 512
   m_ReflectionBounces: 1
   m_ReflectionIntensity: 0.6
   m_CustomReflection: {fileID: 0}
@@ -93,7 +93,7 @@ LightmapSettings:
     m_ExportTrainingData: 0
     m_TrainingDataDestination: TrainingData
     m_LightProbeSampleCountMultiplier: 4
-  m_LightingDataAsset: {fileID: 20201, guid: 0000000000000000f000000000000000, type: 0}
+  m_LightingDataAsset: {fileID: 112000000, guid: 0c32b9fbc6f97f24ba28244632ef416d, type: 2}
   m_LightingSettings: {fileID: 0}
 --- !u!196 &4
 NavMeshSettings:
@@ -149,7 +149,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 4001382856
+  GlobalObjectIdHash: 2493109305
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -435,7 +435,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 99066890}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 903a1b7c13836134592f9e0132502576, type: 3}
   m_Name: 
@@ -957,7 +957,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 4041815484
+  GlobalObjectIdHash: 1554909941
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -2081,7 +2081,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 953646125
+  GlobalObjectIdHash: 1139285423
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -2456,7 +2456,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1185646441
+  GlobalObjectIdHash: 3343419440
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -2529,7 +2529,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 2129804297
+  GlobalObjectIdHash: 2213399674
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -2575,6 +2575,7 @@ MonoBehaviour:
   ascensionLevel: 0
   stageIndex: 0
   stageStep: 2
+  debugFixedSeed: 0
 --- !u!1 &645675147
 GameObject:
   m_ObjectHideFlags: 0
@@ -2699,7 +2700,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 2841127102
+  GlobalObjectIdHash: 2776485797
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -3358,6 +3359,7 @@ GameObject:
   m_Component:
   - component: {fileID: 882340004}
   - component: {fileID: 882340003}
+  - component: {fileID: 1493541741}
   m_Layer: 0
   m_Name: ProfilerHUD
   m_TagString: Untagged
@@ -3395,6 +3397,12 @@ MonoBehaviour:
     budgetMs: 0
   - label: Blur Copy
     markerName: MaskBlur CopyBack
+    budgetMs: 0
+  - label: Silh Mask
+    markerName: PlayerSilhouette Mask
+    budgetMs: 0
+  - label: Silh Comp
+    markerName: PlayerSilhouette Composite
     budgetMs: 0
 --- !u!4 &882340004
 Transform:
@@ -5077,6 +5085,26 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 1776944610068765502, guid: 752c9377d228ec54f8c1b2bdcdd8e603, type: 3}
   m_PrefabInstance: {fileID: 1484446796}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &1493541741
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 882340002}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b8ab627a32dd5804f9a64dbd0eb78dab, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RenderCostAB
+  toggleKey: 100
+  startWithSilhouette: 1
+  startWithWallOcclusion: 0
+  autoMeasure: 0
+  warmupFrames: 180
+  sampleFrames: 120
+  alternations: 4
+  switchSettleFrames: 30
 --- !u!1 &1495805556
 GameObject:
   m_ObjectHideFlags: 0
@@ -5553,9 +5581,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FogManager
   fogEnabled: 0
   profile: {fileID: 11400000, guid: 9183e1848aa2d5f478208fafdaa8425f, type: 2}
-  dimEnabled: 1
+  dimEnabled: 0
   dimPlayerOverride: {fileID: 0}
-  losEnabled: 1
+  losEnabled: 0
   losWallMask:
     serializedVersion: 2
     m_Bits: 4294967295
@@ -6469,7 +6497,7 @@ GameObject:
   - component: {fileID: 8462001901103000002}
   - component: {fileID: 8462001901103000003}
   m_Layer: 0
-  m_Name: PixelScanlineController
+  m_Name: RetroCRTController
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -6499,10 +6527,18 @@ MonoBehaviour:
   m_GameObject: {fileID: 8462001901103000001}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: abfa259b7f4a42cfb7bbc50c3f47f09c, type: 3}
+  m_Script: {fileID: 11500000, guid: 72c3b1b8e5724a4db8d33b55564985c3, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PixelScanlineController
-  settings: {fileID: 11400000, guid: a6159148f6034bacb696189367e1093d, type: 2}
+  m_EditorClassIdentifier: Assembly-CSharp::RetroCRTController
+  _effectEnabled: 1
+  _bezelSize: 1
+  _pixelateEnabled: 0
+  _pixelBlockSize: 4
+  _scanlineEnabled: 0
+  _scanlineThicknessPx: 2
+  _scanlineSpacingPx: 4
+  _scanlineColor: {r: 0.032484863, g: 0.09433961, b: 0.06783043, a: 1}
+  _scanlineOpacity: 0.2
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

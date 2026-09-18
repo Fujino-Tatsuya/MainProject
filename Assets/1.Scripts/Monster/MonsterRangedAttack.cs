@@ -33,6 +33,22 @@ public class MonsterRangedAttack : BaseAttack
     }
 
     // 서버에서 targetPoint를 향해 투사체 발사.
+    /// <summary>
+    /// <b>지정한 방향</b>으로 발사한다. 조준선(예고선)과 탄 방향을 일치시킬 때 쓴다.
+    ///
+    /// 🔴 왜 필요한가(2026-09-14 팀장 확인): <see cref="Fire"/> 는 넘겨받은 지점을 향해 쏘는데,
+    /// <c>MonsterBase</c> 가 넘기는 것은 <b>발사 순간의 플레이어 위치</b>다. 고정 터렛은 예고선을
+    /// 미리 고정해 두므로 그 방식이면 <b>선과 탄이 어긋난다</b> — 피했는데 맞는다.
+    /// 총구에서 이 방향으로 <paramref name="distance"/> 만큼 떨어진 점을 목표로 삼아
+    /// <see cref="Fire"/> 에 그대로 넘긴다(탄도 계산 경로를 하나로 유지한다).
+    /// </summary>
+    public void FireDirection(Vector3 direction, float distance)
+    {
+        if (direction.sqrMagnitude < 0.0001f) return;
+        Vector3 origin = muzzle != null ? muzzle.position : transform.position;
+        Fire(origin + direction.normalized * Mathf.Max(1f, distance));
+    }
+
     public void Fire(Vector3 targetPoint)
     {
         if (!IsServer)
