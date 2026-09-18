@@ -8,6 +8,117 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 현재 인수인계 (2026-09-18 · 공격 범위/회전 재작업 + G4 **완료**, 브랜치 `feature/Boss23`)
+
+작업자: **경석(Claude)**. 계획: [PLAN-boss-attack-shapes.md](PLAN-boss-attack-shapes.md) (승인됨 2026-09-18).
+
+**수정 예정 파일 — Codex 는 이 파일들을 동시에 건드리지 말 것:**
+`Assets/2.Prefabs/Monster/Boss/TwentyThree.prefab` ·
+`Assets/2.Prefabs/Monster/Data/No23.asset` ·
+`Assets/1.Scripts/Monster/Boss/TwentyThreeBoss.cs` ·
+`Assets/1.Scripts/Monster/Boss/BossAttackConeTelegraph.cs` ·
+`Assets/1.Scripts/Monster/Boss/BossDataSO.cs` ·
+`Assets/4.Animations/Wells&No.23/No.23/Controller/No23Controller.controller`
+
+### ✅ 팀장 Play 검증 완료 (2026-09-18)
+
+| 항목 | 결과 |
+|---|---|
+| 돌진 폭·길이 1.3배 + 예고 폭 버그(`Max(x,z)`→`x`) | ✅ |
+| 어퍼컷 띄+원 **합집합 한 덩어리**(SDF min) | ✅ |
+| 훅 네모(4.1×6, 치우침 ∓1.07, 몸통 커버 `boxBackOffset 2`) | ✅ |
+| 예고 중 회전 잠금(스냅 1회 후 고정) | ✅ |
+| 잡기 부채꼴 밖에서 잡히던 버그(`InAttackCone` 공용화) | ✅ |
+| 돌진 클립 `Boss_23_dash.001` | ✅ |
+| G4 점프 이륙 + 이펙트 타이밍 | ✅ |
+
+🟡 **미검증 1건** — 완료기준 4번(점프 연속 사용 시 애니 배속 잔존). 복원은 두 곳에 있다 —
+`BeginJumpHover()` 의 `RestoreAnimatorSpeedClientRpc()` 와 `AbortAttackChain` 의 기존 복원(조기 반환 앞).
+깨는 가장 빠른 길은 **이륙 중에 그로기·카운터로 끊는 것**(그 경로가 `AbortAttackChain` 을 탄다).
+
+### 🔴 돌진 클립 교체의 숨은 비용 — 애니 이벤트가 같이 사라진다
+
+`Boss_23_dash` 에만 `OnAttackHit`(정규화 0.15)가 있고 `.001` 은 **이벤트 0개**다.
+선딜 게이트가 `IsAnimationReady && IsTimerElapsed` **논리곱**이라 교체 직후 돌진이
+**애니만 나오고 전진 0m** 가 됐다(에러·로그 없음).
+
+→ `.meta` 에 이벤트를 심지 않고(SVN) **`BossAttackEntry.hitEventFallbackNormalized`** 칸을 신설해
+정규화 시간으로 준비 신호를 대신 낸다. 돌진 = **0.57** (클립 2.633초 × 0.57 = 창 1.5초).
+컨트롤러 `DashAttack` 속도는 **1** 이다(2.894 는 클립을 창보다 먼저 끝내버렸다).
+⚠️ **다른 클립을 교체할 때도 `.fbx.meta` 의 `functionName` 개수를 먼저 비교할 것.**
+
+### 이번에 확정된 것 (팀장, 2026-09-18)
+
+- **돌진 폭·길이 둘 다 1.3배.** 폭은 `DashBody` 콜라이더, 길이는 `dashDuration`.
+- **훅·어퍼·잡기는 예고 중 회전하지 않는다** — 2026-08-18 확정의 **뒤집기**.
+  "더 자주 빗나가는 게 맞다"(팀장). 예고 시작에 스냅 조준하고 잠근다.
+- 훅 = **네모**(예고·판정 동시), 어퍼 = **띠 + 끝점 원형**(`coneAngle 180 → 360`).
+- 돌진 클립 → `Boss_23_dash.001`, 재생속도 **1.2배** 검토.
+
+### 🔴 다시 재지 말 것 — 이번에 실측한 것
+
+- **`dashMaxDistance` 는 구속하지 않는다.** `0.7 × 2.5 × 6 = 10.5m < 16m` 라 **시간이 먼저 끝난다.**
+  이 칸만 올리면 아무 변화가 없다. 길이는 `dashDuration` 또는 `dashSpeedMultiplier` 로 바꾼다.
+- **돌진 예고 폭은 SO 에 없다.** `TwentyThree.prefab` 의 `DashBody` `m_Size` 에서 읽는다
+  (`TryGetDashFootprint`, `halfExtents` 는 `lossyScale` 반영 월드값).
+- **훅·어퍼·잡기의 판정은 앵커 콜라이더가 아니라 부채꼴이다** — `coneRadius > 0` 이면
+  `HitCone(coneRadius, coneAngle)` 을 탄다(`TwentyThreeBoss.cs:1003`). `Hand_L/R` 의
+  BoxCollider(2.6³)는 이 경로에서 안 쓰인다. **예고와 판정은 이미 같은 칸에서 나온다.**
+- **돌진은 이미 원샷이다.** `BeginDash` 가 `SetDestination` 1회, `TickDash` 는
+  **시간 만료 또는 도착** 중 먼저 오는 쪽에서 끝난다. "반복"으로 보이는 것은
+  `Boss_23_dash` 의 **`loopTime: 1`**(애니 루프) 또는 `rageDashCount: 3`(과충전 3연속)이다.
+- 돌진 클립 비교(60fps): `Boss_23_dash` 17→102 = **1.42초 루프** /
+  `Boss_23_dash.001` 0→158 = **2.63초 원샷**. internalID 는 각각
+  `4043419722265811029` / `-3181347391771587835`, FBX guid `cbdaae8bc76ee814d8a32d754976bdde`.
+
+### 🔴 어그로가 "가운데로 튀는" 건 — Codex 교차검증 결과 (2026-09-18)
+
+원인 후보가 **셋**이고 로그로 구분된다. 다시 조사하지 말 것.
+
+| 보이는 것 | 원인 |
+|---|---|
+| `State=Return` + HP 가 **2000 으로 즉시 회복** | 리쉬 |
+| `[23호] 송전기 — … 이동 시작` / `**워프**로 맞춘다` | 차징 기믹(의도됨) |
+| 위 둘 없는데 Idle/Chase 에서 중앙을 봄 | 타깃 오식별 |
+
+- 🔴 **차징은 배제됨** — 팀장 관찰상 **만피에서도 발생**하는데, 차징은 `phases` 의 66%/33% 임계에서만 예약된다.
+- **리쉬는 실재한다.** `EnterReturn()` → `Unit.Revive()` → `Health.Revive()` → `_currentHp = _maxHp`.
+  **복귀 완료가 아니라 진입 즉시**다. 그리고 페이즈는 안 되돌려서 "HP 만따인데 페이즈는 진행된" 상태가 가능.
+- **리쉬(15m)를 넘기는 경로는 전부 클램프가 없다**: 점프 착지 ~43.8m · 레이지 3연속 합계 31.5m ·
+  차징 워프 상한 없음 · 일반 돌진 13.65m · 어퍼 3.75m · 훅 2.5m · 일반 추격 상한 없음.
+  `TwentyThreeBoss.cs` 에 `leash` 문자열은 **0건**이다.
+- `_spawnPosition` 은 **Awake 가 아니라 `ServerInitialize()`(OnNetworkSpawn)** 에서 잡힌다(`MonsterBase.cs:198`).
+  씬에 직접 배치된 보스는 **그 순간의 자기 위치**가 기준이다(`BossLandingPoint` 를 자동으로 안 따른다).
+- **고친 것(2026-09-18)**: `MonsterTargeting.IsAttackable` 이 이제 **`Player` 컴포넌트를 요구**한다.
+  예전엔 생명주기 컴포넌트가 없으면 `true` 라 `playerMask` 에 걸린 지형·구조물도 타깃이 됐다.
+  함께 `FindNearestTarget` 의 타깃 기준을 `transform.root` → **`Player.transform`** 으로 통일했다
+  (AdoptAggro·최원거리 탐색과 기준이 갈라져 exclude 비교가 어긋나던 문제).
+  ⚠️ **정적 검색상 Player 레이어(6)에는 플레이어 프리팹뿐이다** — 가드만으로 안 잡힐 수 있다.
+  그러면 발생 시점의 `_target` 이름을 로그로 찍어 좁혀야 한다.
+- 🟢 **원인 확정 (2026-09-18, Editor.log 실측)** — 리쉬가 맞다. 다시 조사하지 말 것.
+  로그: `[Monster] TwentyThree(Clone) 리쉬 기준점 이동 — (500.00, 18.73, 0.00) → (500.00, 0.75, 0.00) (leash 15m)`
+  보스룸은 `4.MapScene` 에 **x=500** 으로 놓인 `bossroom.prefab`(Floor **30×30**, Area 28.5×28.5,
+  모든 스케일 1, `1bd65563` 이후 미변경). **방이 커진 것이 아니다.**
+  보스룸 구간 표본 501개를 기준점 대비로 재보면:
+  x `-11.5~13.6` · z `-13.6~6.8` (둘 다 ±15 안) 이지만 **대각선 최대 19.2m**.
+  → **15m 초과 표본이 124개(25%)**, 22m 초과는 0개.
+  즉 **정사각형 방(30×30) 안에 원형 리쉬(반경 15)를 넣어 네 모서리(21.2m)가 튀어나온 구조**였다.
+  조치: `leashRadius: 15 → 22`. 돌진 증가(10.5→13.65m)는 주원인이 아니다 —
+  플레이어 자기 이동만으로 이미 25%가 리쉬 밖이었다.
+  배제된 것: `송전기` 로그 **0건**(차징 아님) · `23호/어그로` **0건**(AdoptAggro 아님) ·
+  `워프` 7건은 전부 `[Dev] F5 워프` · CombatHUD 캔버스는 **콜라이더가 없어** 타깃이 될 수 없다.
+- 남은 결함(고치지 않음): 보스 이동 목적지에 리쉬 클램프 없음 · `EnterReturn` 이 페이즈를 안 되돌림.
+
+### 보류된 작업
+
+- **미니맵** — [PLAN-minimap.md](PLAN-minimap.md). 팀원이 `CombatHUD.prefab` 에 키가이드·미니맵 UI 를
+  **미푸시 로컬**로 갖고 있어, 같은 프리팹을 건드리면 머지 충돌이 난다. 푸시 후 재개.
+- 🔴 **SVN `.meta` 누락 5건** (서버에도 없음 — 팀원마다 guid 가 갈린다):
+  `gauge_HP.png` · `gauge_HP_noncolor.png` · `portrail_gunner.png` ·
+  `slot_cooldown1,5.png` · `slot_cooldown2,3,4.png`. **은희에게 `.meta` 커밋 요청 필요.**
+  배선하면 전원 참조가 깨지므로 그때까지 쓰지 말 것.
+- `Dev_Boot` 부트 씬이 `TrainingDummy` → **`4.MapScene`** 으로 바뀌었다(`c446e980`). 빌드 시 주의.
+
 ## ▶▶ 현재 인수인계 (2026-09-17 · 23호 공격 재작업 G1·G2·G3·G5·G6·G7 완료, 브랜치 `feature/Boss23`)
 
 작업자: **경석(Claude)**. 계획·근거는 [PLAN.md](PLAN.md) 최상단(1~8차 확정) — 기획 문서
