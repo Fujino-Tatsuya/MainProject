@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using BaseNetCode;
 using Unity.Netcode;
 using UnityEngine;
@@ -31,6 +32,14 @@ public class PlayerShieldVfx : BaseNetworkBehaviour
              "비워두면 깨지는 순간에도 조용히 걷히기만 한다")]
     [SerializeField] private EffectSocketPlayer breakBurst;
 
+    [Tooltip("공격 지점이 배리어 중심에서 이만큼도 떨어져 있지 않으면 파문을 건너뛴다(미터).\n" +
+             "장판 한가운데서 맞으면 방향이 서지 않는다 — 엉뚱한 쪽에 띄우는 것보다 안 띄우는 게 낫다")]
+    [SerializeField, Min(0f)] private float minHitDistance = 0.15f;
+
+    // 풀 인스턴스를 담아 둘 수 없으므로(반납되면 다른 연출에 재대출된다) 매번 다시 받는다.
+    // 리스트만 재사용해 할당을 없앤다.
+    private readonly List<GameObject> _instances = new List<GameObject>();
+
     /// <summary>
     /// [전 피어] 배리어를 띄운다. 스킬 재생 경로(OnClientPlay)에서 불리므로 RPC가 필요 없다.
     /// 재시전이면 <c>Play</c>가 먼저 회수하고 다시 시작하므로 두 겹으로 겹치지 않는다.
@@ -55,10 +64,66 @@ public class PlayerShieldVfx : BaseNetworkBehaviour
         EndShieldVfxRpc(broken);
     }
 
+    /// <summary>
+    /// [서버] 보호막이 공격을 받아냈다. 맞은 방향에 파문을 띄우라고 전 피어에 알린다.
+    ///
+    /// <b>여기만 RPC 가 불가피하다.</b> 공격 판정은 전부 서버 전용 스코프 안에서 돌아
+    /// (<c>MonsterMeleeAttack</c>·<c>AreaZone</c>·<c>BossBomb</c> 모두 <c>if (!IsServer) return;</c>),
+    /// <see cref="AttackHitContext"/>가 리모트 클라에는 아예 도착하지 않는다. 클라가 아는 것은
+    /// "쉴드가 줄었다"는 복제값뿐이라 <b>방향을 알 방법이 없다.</b>
+    /// </summary>
+    /// <param name="sourceWorldPosition">공격이 들어온 지점(보통 공격자 위치). 거리는 버리고 방향만 쓴다.</param>
+    public void ServerHit(Vector3 sourceWorldPosition)
+    {
+        if (!IsNetworkActive)
+        {
+            HitLocal(sourceWorldPosition);
+            return;
+        }
+
+        if (!IsServer) return;
+
+        HitShieldVfxRpc(sourceWorldPosition);
+    }
+
     // 🔴 루프 '정지'라 Reliable 이다. 유실되면 배리어가 영영 떠 있고 풀 인스턴스도 안 돌아온다.
     //    (원샷 연출이었다면 Unreliable 이 맞다 — 이 레포의 다른 연출 RPC들과 갈리는 지점)
     [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Reliable)]
     private void EndShieldVfxRpc(bool broken) => EndLocal(broken);
+
+    // 이쪽은 원샷이라 Unreliable 이다. 한 발 유실되면 파문 하나가 안 뜰 뿐 상태가 어긋나지 않는다 —
+    // 난타 중에 신뢰 전송으로 줄 세울 이유가 없다.
+    [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
+    private void HitShieldVfxRpc(Vector3 sourceWorldPosition) => HitLocal(sourceWorldPosition);
+
+    private void HitLocal(Vector3 sourceWorldPosition)
+    {
+        if (barrierLoop == null) return;
+        if (barrierLoop.GetInstances(_instances) == 0) return;
+
+        for (int i = 0; i < _instances.Count; i++)
+        {
+            GameObject instance = _instances[i];
+            if (instance == null) continue;
+
+            // 걷히는 중이거나 이미 꺼진 배리어에는 띄우지 않는다.
+            HolyShieldEffect barrier = instance.GetComponentInChildren<HolyShieldEffect>(true);
+            if (barrier != null && !barrier.AcceptsHits) continue;
+
+            ShieldRippleEffect ripple = instance.GetComponentInChildren<ShieldRippleEffect>(true);
+            if (ripple == null) continue;
+
+            // 파트 인스턴스의 위치가 곧 배리어 중심이다(EffectManager 가 매 프레임 소켓 위치로 옮긴다).
+            Vector3 center = instance.transform.position;
+            Vector3 direction = sourceWorldPosition - center;
+
+            // 🔴 장판 한가운데서 맞은 경우 — AreaZone 은 sourcePosition 으로 장판 자신의 위치를 넘긴다.
+            //    플레이어가 중앙에 서 있으면 방향이 서지 않는다. 엉뚱한 쪽에 띄우느니 건너뛴다.
+            if (direction.sqrMagnitude < minHitDistance * minHitDistance) continue;
+
+            ripple.AddHit(center + direction.normalized);
+        }
+    }
 
     private void EndLocal(bool broken)
     {
