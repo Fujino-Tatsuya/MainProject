@@ -8,7 +8,57 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 현재 인수인계 (2026-09-14 · 인터럽트 연출 4종 통일 + SpinnerBot 메시 분리, 브랜치 `feature/VFX`)
+## ▶▶ 현재 인수인계 (2026-09-17 · 보호막 VFX 를 이펙트 정책으로 이식, 브랜치 `feature/VFX`)
+
+작업 세션: **민경(Claude)**. 계획·근거·검증은 [PLAN.md](PLAN.md) 최상단.
+
+**수정함 (동시 편집 주의)**: 🔴 `Player/Skill/FirstMeleeSubSkill.cs` · `Player/PlayerShieldVfx.cs`(신규) ·
+`Effects/HolyShieldEffect.cs`(신규) · `Effects/HolyShieldEffectSystem.cs`(신규) · `Effects/EffectManager.cs` ·
+`2.Prefabs/Player/Paladin/Paladin_VFX.prefab` ·
+`50.Art/VFX/Common/Player1/Skill02/FX_HolyShield_{Barrier,Motes}.prefab`(신규) ·
+`…/FX_HolyShield_{,Break_}Entry.asset`(신규)
+🔴 = 은희 담당 파일. 공유 필요(AGENTS.md §3).
+
+### 새 용어 — **파트 드라이버는 다섯 종이 됐다**
+
+`HolyShieldEffectSystem` 이 Shuriken · FloorArea · FadeInHold · FragmentBurst 에 이어 등록됐다.
+붙이는 법은 그대로 — `IEffectSystem` 구현 + `EffectManager.Awake` 한 줄.
+
+### 🔴 에셋 팩 프리팹은 **풀링을 전제하지 않는다**
+
+`Destroy(gameObject)` · `Awake`/`Start` 1회 셋업 · `enabled = false` 로 끝내기 — 셋 다 풀에서는
+조용히 깨진다(2회차 대출부터 안 보이거나, 풀 인스턴스가 증발한다). `EffectPrefabRules` 는
+`ParticleSystem.stopAction` 과 `TrailRenderer.autodestruct` 만 잡으므로 **MonoBehaviour 의 Destroy 는
+그냥 통과한다.** 팩에서 가져온 프리팹은 스크립트를 먼저 걷어내고 드라이버로 다시 쓸 것.
+
+### 🔴 `PlayerSkillBase` 는 MonoBehaviour 다 — 스킬에 RPC 를 못 단다
+
+서버 전용 경로(만료 코루틴 등)에서 연출을 켜고 꺼야 하면 별도 `NetworkBehaviour` 가 필요하다.
+`PlayerShieldVfx` 가 그 선례다 — 시작은 `OnClientPlay`(전 피어)라 RPC 없이, 종료만 Reliable RPC.
+
+### `EffectEntry.outroDuration` 은 **모든 파트 중 가장 늦게 끝나는 것**에 맞춘다
+
+`IEffectSystem.Stop` 에 시간 인자가 없어 드라이버가 자기 outro 길이를 매니저에 알릴 통로가 없다.
+엔트리 값이 짧으면 코드 구동 파트가 **걷히다 말고 반납된다**.
+
+### 🔴 알려진 문제 — `Effect_48_Impact.mat` 은 텍스처가 빠져 이상하게 보인다 (2026-09-18)
+
+`Assets/50.Art/VFX/_Materials/Effect_48_Impact.mat` 의 `_MainTex`(`3884f641…`)와
+`_MaskTex`(`36e6fefa…`)가 **프로젝트 어디에도 없다** — `Assets` · `Packages` · `PackageCache` ·
+SVN pristine 까지 확인했다. `Effect_48` 계열 중 이 머티리얼만 살아남았다.
+
+유니티는 빈 텍스처 슬롯을 셰이더 선언의 기본값으로 채우는데 둘 다 `= "white"` 다. 그래서
+`Shader_IntegratedEffect` 의 `tex *= tex2D(_MainTex, …)` 루프가 전부 ×1 이 되어 `tex` 가 1.0 인 채로
+나오고, `res = tex × _TintColor(0.93, 2.26, 7.33)` 이 **쿼드 전체에 균일하게** 적용된다 —
+무늬로 어두워지는 곳이 없어 블룸이 통째로 물린다. 모양은 `_FixedMaskTex`(`mask_4.png`)가 알파만 깎아
+겨우 남아 있다. **"갑자기 밝아졌다"의 원인은 톤매핑이 아니라 이것이다.**
+
+영향: `Effect_48_Impact.mat` → `FX_Punch_Wind.prefab` → `FX_Punch_Wind_Entry.asset` 하나뿐
+(TrashMobScene 에서 보인다). **원본 팩에서 텍스처를 다시 import 해 물리면 끝난다** — 민경이 나중에 처리.
+
+---
+
+## 이전 인수인계 (2026-09-14 · 인터럽트 연출 4종 통일 + SpinnerBot 메시 분리, 브랜치 `feature/VFX`)
 
 작업 세션: **민경(Claude)**.
 
