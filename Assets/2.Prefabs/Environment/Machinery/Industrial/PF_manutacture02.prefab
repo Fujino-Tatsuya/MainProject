@@ -401,6 +401,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: afb4f857aeadb824eadd0c164e680f17, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 2a95f9ff80948c643a57b9e94a98eb3f, type: 2}
     - target: {fileID: 919132149155446097, guid: afb4f857aeadb824eadd0c164e680f17, type: 3}
       propertyPath: m_Name
       value: object_pipe_tank
@@ -587,6 +591,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: 5e66118c0848f4345b0251bd20eff1f5, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 2a95f9ff80948c643a57b9e94a98eb3f, type: 2}
     - target: {fileID: 919132149155446097, guid: 5e66118c0848f4345b0251bd20eff1f5, type: 3}
       propertyPath: m_Name
       value: object_pipe_compressor
@@ -773,6 +781,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: e3319147894db6746ac75a955f9ce1b8, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 2a95f9ff80948c643a57b9e94a98eb3f, type: 2}
     - target: {fileID: 919132149155446097, guid: e3319147894db6746ac75a955f9ce1b8, type: 3}
       propertyPath: m_Name
       value: object_machine_engine

@@ -1341,6 +1341,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 8477925714550822324}
+  - component: {fileID: 8804252711470417947}
   - component: {fileID: 8537949228978890573}
   m_Layer: 0
   m_Name: ZoneM_typeB
@@ -1520,6 +1521,31 @@ Transform:
   - {fileID: 52938611417121128}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &8804252711470417947
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8347943596951360987}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
+  GlobalObjectIdHash: 2426400810
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  DeferredDespawnTick: 0
+  Ownership: 1
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 1
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1
+  SyncOwnerTransformWhenParented: 1
+  AllowOwnerToParent: 0
 --- !u!114 &8537949228978890573
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6434,10 +6460,18 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 8477925714550822324}
     m_Modifications:
+    - target: {fileID: 3595860702374176750, guid: 5badd8610cb982744b3308d8ded6e5be, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 2a95f9ff80948c643a57b9e94a98eb3f, type: 2}
     - target: {fileID: 4504288864407625269, guid: 5badd8610cb982744b3308d8ded6e5be, type: 3}
       propertyPath: m_Name
       value: PF_Prop_PF_manutacture02
       objectReference: {fileID: 0}
+    - target: {fileID: 4759049330136827575, guid: 5badd8610cb982744b3308d8ded6e5be, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 2a95f9ff80948c643a57b9e94a98eb3f, type: 2}
     - target: {fileID: 6235097022824026977, guid: 5badd8610cb982744b3308d8ded6e5be, type: 3}
       propertyPath: m_LocalPosition.x
       value: -7.8635893
@@ -6478,6 +6512,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 6928030776000943760, guid: 5badd8610cb982744b3308d8ded6e5be, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 2a95f9ff80948c643a57b9e94a98eb3f, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
