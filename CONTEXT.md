@@ -8,6 +8,57 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 현재 인수인계 (2026-09-19 · 동기화·빌드 정상화 완료, 다음은 **미니맵**)
+
+작업자: **경석(Claude)**. 브랜치 `feature/Boss23` — 원격과 동기(`e610df18`).
+보스 작업은 **이미 development 에도 들어가 있다**(`8635dd40` 가 `feature/Boss23` 를 머지).
+
+### 다음 세션은 여기부터 — **미니맵**
+
+[PLAN-minimap.md](PLAN-minimap.md) 를 열면 바로 착수할 수 있다. 보류 사유였던
+"팀원의 `CombatHUD.prefab` 미푸시"는 **해소됐다**(`c44d235c`, `c603e699` → development → 내 브랜치).
+
+🔴 **단, 들어온 건 키가이드뿐이다** (2026-09-19 실측):
+
+| 항목 | 프리팹 내 참조 |
+|---|---|
+| `keyguide.png` | **1건** — 오브젝트 이름이 그냥 **`Image`** (이름 안 바꿈) |
+| `minimap` 문자열 | **0건** — 슬롯도 스크립트도 없다 |
+| 타이머 아트 3종 | **0건** |
+
+→ 계획의 **D5·D6(프리팹을 건드리지 않고 슬롯을 이름으로 찾는다)은 폐기**했다.
+이제는 `CombatHUD.prefab` 에 슬롯을 **직접 만드는 게 맞다** — 충돌 위험이 사라졌기 때문이다.
+나머지 결정(D1~D4·D7·D8)과 슬라이스 S1~S5 는 그대로 유효하다.
+
+핵심 요약 — **새 렌더러를 만들 필요가 없다.** 맵 모양(`_SilTex`)은 `BuildSilhouette()` 가
+이미 정확히 생성하고 있고, 탐사 3단계도 `MinimapUI.shader` 에 구현돼 있다.
+룹이 다른 이유는 채움이 **지형 사진(`_MainTex`)** 이고 외곽선이 없고 코너가 직각이기 때문이다.
+
+### 이번에 마무리한 것
+
+| | |
+|---|---|
+| SVN | **r316** — 23호 클립 저작 복구 + 최신화. 충돌 5건은 서버(은희 `r315`)본으로 |
+| CombatHUD 흰색 | **해결** — `.meta` 가 없어 스프라이트 참조 7건이 끊겨 있었다 |
+| git | `feature/Boss23` == 원격. development 흡수 완료 |
+| 돌진 캐리 | `dashCarryFrontOffset 1.8 → 2.2` (보스 캐슐 안으로 0.11m 파고들던 겹침 제거) |
+
+### 🔴 닫히지 않은 것
+
+1. **맵 가장자에 끼면 못 움직임** — **미해결. 플레이어 측(은희)으로 넘김**(팀장이 전달 완료).
+   지형은 정상으로 확인됐다 — `bossroom.prefab` 의 바닥(30×1×30, 윗면 y=0.5)이
+   네 방향 벽 밑으로 **0.51m 더 들어가 있고** 벽 아랫면도 y=0.5 로 딱 맞물린다. 툁·틈 없음.
+   의심 지점은 `Paladin.prefab` 의 **`MainSkill` 콜라이더** — `enabled=1` · `isTrigger=0` ·
+   `2×1×2` · 몸 앞 0.8m. 몸통 캡슐이 `r=0.38` 인데 **폭이 5배**다.
+   끄는 코드는 없고, `Player(6)` 레이어는 `Ground·Wall·Env` 와 충돌한다.
+2. **점프 연속 사용 시 애니 배속 잔존** — 미검증(G4 완료기준 4번).
+   깨는 가장 빠른 길은 **이륙 중에 그로기·카운터로 끊는 것**(`AbortAttackChain` 경로).
+3. 🔴 **`VisualSVN Server license expired`** — r316 커밋은 통과했지만 곷 막힐 수 있다. 관리자 통보 필요.
+4. `gauge_HP_noncolor` 만 `textureType: 0` — 마스크 원본이면 의도. 은희에게 확인.
+5. `Assets/Resources/PerformanceTestRun*.json` 4개가 untracked — `Resources/` 라 **빌드에 들어간다.** `.gitignore` 검토.
+6. `Assets/AddressableAssetsData/link.xml` 이 한 번 삭제된 적 있다(복구함).
+   다시 뜨면 Addressables 재빌드가 지우는 것 — 은희 영역.
+
 ## ▶▶ 진행 중 (2026-09-18 · **PC 간** Relay 접속 실패 — 진단 계측 투입, 브랜치 `development`)
 
 작업자: **Claude**. 수정 파일: `Assets/1.Scripts/Network/NetworkDiagnosticsLog.cs`(신규) ·
@@ -110,7 +161,7 @@ Update this file when a term becomes important enough that future agents or team
 
 ---
 
-## ▶▶ 현재 인수인계 (2026-09-18 · 공격 범위/회전 재작업 + G4 **완료**, 브랜치 `feature/Boss23`)
+## ▶▶ 이전 인수인계 (2026-09-18 · 공격 범위/회전 재작업 + G4 **완료**, 브랜치 `feature/Boss23`)
 
 작업자: **경석(Claude)**. 계획: [PLAN-boss-attack-shapes.md](PLAN-boss-attack-shapes.md) (승인됨 2026-09-18).
 
