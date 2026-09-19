@@ -274,7 +274,7 @@ MonoBehaviour:
   dashSpeedMultiplier: 6
   dashMaxDistance: 16
   dashDamage: 0
-  dashCarryFrontOffset: 1.8
+  dashCarryFrontOffset: 2.2
   dashStunDuration: 1
   dashKnockbackStrength: 5
   bombThrowInterval: 6
