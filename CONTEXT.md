@@ -1,4 +1,4 @@
-# CONTEXT.md - Shared Project Language
+﻿# CONTEXT.md - Shared Project Language
 
 > 🆕 **새 환경에서 처음 여는 사람은 [Docs/tech/environment-setup.md](Docs/tech/environment-setup.md) 부터.**
 > 이 프로젝트는 git 만으로 안 선다 — 아트가 SVN 에 있고, 없어도 Unity 는 조용히 열린다.
@@ -8,7 +8,503 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 현재 인수인계 (2026-09-18 · 공격 범위/회전 재작업 + G4 **완료**, 브랜치 `feature/Boss23`)
+## ▶▶ 현재 인수인계 (2026-09-21 #2 · 입장 연출·차징 점프·돌진 사거리 — **전부 Play 검증 대기**)
+
+작업자: **경석(Claude)**. 브랜치 `feature/Boss23`. 컴파일 통과(에러 0).
+
+### ✅ development 머지 완료 (2026-09-21) + 🔴 **SVN 쪽에 따로 들어간 정리 1건**
+
+`feature/Boss23` → `development` **fast-forward**(충돌 0). 커밋 13개 / 44파일 / `+3018 −366`.
+로컬 체크아웃 없이 `git push origin feature/Boss23:development` 로 올렸다 —
+체크아웃하면 워킹트리가 뒤로 갔다 앞으로 오며 **Unity 리임포트가 두 번** 돈다.
+(`Packages/manifest.json` 변경이 없는 것을 먼저 확인했다. 있으면 에디터를 닫아야 한다.)
+
+🔴 **git 에 없는 변경이 하나 있다 — SVN r319.**
+`MapPrefabCatalog.asset`(유령 키 20개) · `MapGenConfig.asset`(3개)에서 **대응 필드가 사라진
+저작값 23개를 제거**했다. 이 둘은 `Assets/50.Art/` 밑이라 **`.gitignore:84` 로 git 제외 · SVN 소유**다
+→ **development 머지에는 안 실려 있다. SVN 최신화(r319+)를 받아야 반영된다.**
+
+- 왜 지웠나 — 필드를 주석 처리(`5e858c5b`)했는데 에셋에는 값이 남아 있었다. Unity 는 대응 필드가
+  없는 키를 **로드 때 무시하고 다음 저장 때 조용히 버린다** → 누가 인스펙터를 건드리는 순간
+  예고 없이 사라지는 상태였다. 의도적으로 지금 지웠다.
+- 기능 영향 없음 — 소비처(`MapCatalogPopulator` / `MapGeometryBuilder`)는 development 에도 없다.
+  원격 브랜치 12개 중 남은 곳은 `feature/Level1` 뿐인데 development 보다 **957 커밋 뒤처진** 브랜치다.
+- 남긴 값 — `BossIcon`/`SpawnIcon`/`QuestIcon` · `MonsterGroups` 8건. Unity 로 되읽어 `unknownKeys` 0 확인.
+
+⚠️ **함정(한 번 밟았다)** — 에셋을 `utf-8-sig` 로 쓰면 **BOM 이 붙어 `%YAML` 헤더가 깨진다.**
+Unity 가 "not text-serialized YAML" 로 거부해서 발견했다. `.asset`·`.prefab`·`.unity` 는
+**BOM 없이** 쓸 것. 쓰기 전후로 첫 5바이트가 `%YAML` 인지 확인하면 걸린다.
+
+✅ **welz 머티리얼 12건**(`Char/Boss/SK/welz_*.mat`)이 SVN 미추가(`?`)로 보이지만
+**로컬 잔재라 무시한다**(팀장 확정 2026-09-21). 보스 모델 수정분은 이미 development 에 들어가 있다.
+→ 다음 세션에서 다시 꺼내지 말 것.
+
+### 🟡 은희에게 넘김 — **결과 화면이 호스트에서만 채워진다** (경석 진단 완료 · 팀장 확정 "지금은 둔다")
+
+**증상**(2026-09-21 MPPM 실측) — 클리어 후 ResultScene 에서 호스트만
+`CLEAR / 생존 시간 04:35 / 처치 11` 이 나오고, **원격 클라는 `-` / `--:--` / `-`** 다.
+
+🔴 **고장이 아니라 미구현이다.** `SessionResult.cs` 의 docstring 이 이미 적어 두고 있다 —
+*"정적 보관으로 둔다(리슨 서버 로컬 표시 기준). 원격 클라이언트에도 같은 값을 보여야 하면
+**서버 브로드캐스트를 얹어야 한다 — 지금은 미구현**."* 클라가 보는 값은 `ResultStatsView` 의
+`!SessionResult.HasValue` 분기 그대로다(값이 **도달한 적이 없다**).
+
+```
+SessionStatsTracker (MonoBehaviour · 서버만 집계)
+  → SessionResult.Capture()      ← static. 호스트 프로세스 안에만 존재한다
+  → ResultStatsView 가 그 static 을 읽는다
+```
+
+- 집계 진입점 2곳: `BossEncounterDirector:688`(클리어) · `PartyWipeWatcher:66`(전멸)
+- **`SessionStatsTracker` 도 `PartyWipeWatcher` 도 `MonoBehaviour` 다** — 복제 수단이 없다.
+
+🔴 **손댈 때 걸릴 함정 — 브로드캐스트와 씬 전환이 경쟁한다.**
+`Capture` 직후 ResultScene 으로 넘어가므로, 단순히 ClientRpc 를 쏘면 **씬 언로드가 더 빨라
+클라가 여전히 빈 값을 본다.** 값을 씬 전환 뒤까지 살아남는 쪽에 실어야 한다 —
+`DontDestroyOnLoad` 네트워크 싱글톤의 `NetworkVariable`, 또는 **ResultScene 자체를 네트워크 씬**으로.
+어느 쪽이든 SceneManagement 설계를 건드리므로 **은희 영역**이다(AGENTS.md §5).
+
+### 🔴 다음은 MPPM 2~3인 **한 판으로 몰아서** — 검증 목록이 아래 하나로 합쳐졌다
+
+계획서 [PLAN-boss-entrance-charge.md](PLAN-boss-entrance-charge.md) 의 완료 기준을 그대로 따라간다.
+
+0. ✅ **잡기 = 1명만 Carry / 나머지 넉백 — 2026-09-21 실측 통과**(B0 검증 2번).
+   같은 판에서 **인터럽트가 안 되는 별개 버그**가 드러나 고쳤다(`29c4389b`, 아래) → **재검증 필요**:
+   ① `Hold`·`Throw` 에서 인터럽트가 통하는가 ② **3타째에는 안 통하는가** ③ 성공 시 잡힌 사람이 풀려나는가
+1. **잡기 나머지 2건** — [PLAN-boss-backlog.md](PLAN-boss-backlog.md) **B0**
+2. **입장 연출** — 하강 중 체공 포즈 / 착지 클립 / **데미지 0** /
+   🔴 **MPPM 클라(호스트 아님) 화면에서도 보이는가**(스폰과 같은 프레임 RPC라 실측 안 됨) /
+   🔴 **전투 시작 후 착지 포즈가 안 남는가**(보스를 Idle 에 머물게 해서 확인)
+3. **차징 점프** — 올라갔다 사라지고 `BossLandingPoint` 에 떨어지는가 / 착지 직후 차징 정상 시작 /
+   체공 중 무적·착지 후 피격 / 차징 착지 데미지 0 / 끊었을 때 투명·무적 잔존 없음 / 배속 잔존 없음
+4. **돌진** — 실사거리 13.65m → **29.25m** 로 2.1배. 🔴 **체감 과하면 `dashDuration` 부터 내린다**
+
+### 이번에 넣은 것 (2026-09-21 #2)
+
+| | |
+|---|---|
+| **입장 연출 애니** | 하강 `JumpHover` / 착지 `JumpLanding` / 전투 직전 로코모션 복귀. 새 RPC 없이 점프어택 경로 재사용. seam = `IBossEntranceAnimation`(신규) |
+| **차징 진입 = 점프** | 걸어가던 `ChargeMove` 구간 **제거**. 기존 `JumpTakeoff`/`Leap`/`Land` 재사용 + `_chargeJump` 플래그로 종료 분기만 가름 |
+| **돌진 사거리** | `dashDuration` 0.91→**1.5** · `dashSpeedMultiplier` 6→**7.8** · `dashMaxDistance` 16→**30** |
+| **개명** | `jumpSearchRadius` → **`playerScanRadius`** (점프 전용이 아니었다 — 차징 송전탑 인원 계산도 같은 값을 쓴다) |
+| **SO 정리** | `chargeMoveArriveDistance`/`chargeMoveSpeedMultiplier`/`chargeMoveTimeout` 3종 제거(읽는 코드가 사라짐) |
+| **잡기 인터럽트** | 🔴 **실측으로 잡은 버그**(`29c4389b`) — `PerformAttackHit` 이 공격 종류를 안 가리고 카운터 창을 닫아, **잡기 클립 자신의 `OnAttackHit`(정규화 0.354)** 이 창을 0.25초 만에 꺼 버렸다. `StartAttack` 에는 같은 Grab 예외가 이미 있었는데 여기만 빠져 있었다 — G6 에서 창을 옮길 때 **여닫는 지점 한쪽만** 고친 것 |
+
+### 🔴 이번에 드러난 것 — **PLAN §5 의 거리값 2건은 효과가 0 이었다**
+
+`No23.asset` 값을 올려도 **아무 일도 안 일어나는** 상태였다.
+
+- 돌진 `maxDistance` — DashAttack 은 `ignoreDistanceWindow: 1` 이라 거리창을 **아예 안 읽는다**.
+- `dashMaxDistance` — 실사거리가 `min(값, 지속시간×속도)` 인데 **지속시간이 먼저 물렸다**(13.65m).
+
+**코드 주석이 이미 그렇게 말하고 있었는데 PLAN 이 그걸 모르고 쓰였다.**
+→ 교훈: **SO 값을 올리기 전에 그 값을 읽는 코드에 클램프가 있는지 먼저 본다.**
+
+### ⚠️ 확인했지만 안 고친 것
+
+1. **`playerScanRadius` 가 두 용도 공용이다** — 점프 타겟 탐색 + **차징 송전탑 인원 계산**.
+   30 → 45 로 올렸을 때 송전탑 개수 판정 반경도 같이 올라갔다. **의도였는지 기록이 없다.**
+   지금은 Tooltip·주석으로 명시만 했다. 송전탑 개수가 인원과 안 맞으면 여기를 의심할 것.
+2. **`chargeZonePrefab` 이 비어 있다**(`{fileID: 0}`) → 차징 **전기 장판은 지금 데이터로 안 나온다.**
+   검증할 때 없는 걸 찾지 말 것.
+3. ~~돌진(1.5초)이 `dashStunDuration`(1초)보다 길어져 끌려가는 도중 스턴이 풀린다~~
+   → ⚠️ **정정(2026-09-21): 그런 일은 없다. 내가 틀렸다.**
+   `dashStunDuration` 은 캐리를 붙잡는 값이 **아니다** — `ReleaseDashCarry` 에서 구속을 푼
+   **다음 줄**에, 그것도 **벽에 처박았을 때만** 거는 사후 기절이다(Tooltip 도 "벽 충돌 시"라고 적혀 있다).
+   캐리는 `PlayerActionState.Restrained` 이고 **타이머가 없다** — 보스가 `EndRestrained()` 를
+   부를 때까지 유지된다. 즉 캐리(돌진 내내) → 해제 → 스턴 시작 순서라 **둘이 겹치지 않는다.**
+   `dashDuration` 을 늘려도 스턴에는 영향이 없다.
+4. `attacks[].damage` 8개는 전부 0 이지만 **정상이다** — `attackDamage: 10` 폴백. 건드리지 말 것.
+
+---
+
+## ▶▶ 이전 인수인계 (2026-09-21 #1 · 미니맵·보스타이머 구현 완료, 다음은 **잡기 검증**)
+
+작업자: **경석(Claude)**. 브랜치 `feature/Boss23`.
+
+### 🔴 다음 세션은 여기부터 — MPPM 2~3인으로 **검증 3건**
+
+[PLAN-boss-backlog.md](PLAN-boss-backlog.md) 의 **B0** 를 열면 그대로 따라 할 수 있다.
+코드는 다 들어갔고 컴파일도 통과했다. **Play 확인만 남았다.**
+
+1. 잡기 — 예고가 끝난 뒤 다가간다 → **안 잡혀야** 정상
+2. 잡기 — 예고 안에 3명 → **1명 Carry / 2명 넉백**
+3. 잡기 — 끌려간 뒤 붙잡히기 전에 죽는다 → **유령이 안 잡혀야** 정상
+
+이어서 미니맵·타이머 쪽도 아직 실측이 남았다(아래 "이번에 넣은 것" 참조).
+
+### 이번에 넣은 것 (2026-09-19 ~ 21)
+
+| | |
+|---|---|
+| **보스 제한시간** | `BossTimerManager`(신규, 서버 권한 5분) + 만료 시 강제 개시. HUD 게이지 동작 확인됨 |
+| **미니맵 룩** | 플랫 회색 + 외곽선 + 45° 회전 + 둥근 코너. 미탐사=어두운 채움(팀장 실측으로 1회 뒤집음) |
+| **HUD 슬롯** | `CombatHUD.prefab` 에 저작 스크립트로 생성(멱등). 순수 추가 329줄, `.meta` guid 불변 |
+| **호스트 ACK 버그** | 기존 버그 — MPPM 2인 실측으로 확정 후 수정(T16) |
+| **SO 전수조사** | 유령 필드 54 → **현역 0**. 레거시 트리 `_Legacy` 로 격리 |
+| **잡기 예고/판정** | 재탐색 제거 + 유령 방지 — **위 검증 3건 대기** |
+
+🔴 **커밋 전 확인** — `Assets/AddressableAssetsData/link.xml` 이 또 삭제돼 있다(`git status` 의 `D`).
+Addressables 재빌드가 지우는 것이고 **은희 영역**이다. 내 작업과 무관하니 복구하고 커밋할 것.
+
+---
+
+## ▶▶ 이전 인수인계 (2026-09-19 · 동기화·빌드 정상화 완료, 다음은 **미니맵**)
+
+작업자: **경석(Claude)**. 브랜치 `feature/Boss23` — 원격과 동기(`e610df18`).
+보스 작업은 **이미 development 에도 들어가 있다**(`8635dd40` 가 `feature/Boss23` 를 머지).
+
+### 다음 세션은 여기부터 — **미니맵**
+
+[PLAN-minimap.md](PLAN-minimap.md) 를 열면 바로 착수할 수 있다. 보류 사유였던
+"팀원의 `CombatHUD.prefab` 미푸시"는 **해소됐다**(`c44d235c`, `c603e699` → development → 내 브랜치).
+
+🔴 **단, 들어온 건 키가이드뿐이다** (2026-09-19 실측):
+
+| 항목 | 프리팹 내 참조 |
+|---|---|
+| `keyguide.png` | **1건** — 오브젝트 이름이 그냥 **`Image`** (이름 안 바꿈) |
+| `minimap` 문자열 | **0건** — 슬롯도 스크립트도 없다 |
+| 타이머 아트 3종 | **0건** |
+
+→ 계획의 **D5·D6(프리팹을 건드리지 않고 슬롯을 이름으로 찾는다)은 폐기**했다.
+이제는 `CombatHUD.prefab` 에 슬롯을 **직접 만드는 게 맞다** — 충돌 위험이 사라졌기 때문이다.
+나머지 결정(D1~D4·D7·D8)과 슬라이스 S1~S5 는 그대로 유효하다.
+
+핵심 요약 — **새 렌더러를 만들 필요가 없다.** 맵 모양(`_SilTex`)은 `BuildSilhouette()` 가
+이미 정확히 생성하고 있고, 탐사 3단계도 `MinimapUI.shader` 에 구현돼 있다.
+룹이 다른 이유는 채움이 **지형 사진(`_MainTex`)** 이고 외곽선이 없고 코너가 직각이기 때문이다.
+
+### 이번에 마무리한 것
+
+| | |
+|---|---|
+| SVN | **r316** — 23호 클립 저작 복구 + 최신화. 충돌 5건은 서버(은희 `r315`)본으로 |
+| CombatHUD 흰색 | **해결** — `.meta` 가 없어 스프라이트 참조 7건이 끊겨 있었다 |
+| git | `feature/Boss23` == 원격. development 흡수 완료 |
+| 돌진 캐리 | `dashCarryFrontOffset 1.8 → 2.2` (보스 캐슐 안으로 0.11m 파고들던 겹침 제거) |
+
+### 🔴 닫히지 않은 것
+
+1. **맵 가장자에 끼면 못 움직임** — **미해결. 플레이어 측(은희)으로 넘김**(팀장이 전달 완료).
+   지형은 정상으로 확인됐다 — `bossroom.prefab` 의 바닥(30×1×30, 윗면 y=0.5)이
+   네 방향 벽 밑으로 **0.51m 더 들어가 있고** 벽 아랫면도 y=0.5 로 딱 맞물린다. 툁·틈 없음.
+   의심 지점은 `Paladin.prefab` 의 **`MainSkill` 콜라이더** — `enabled=1` · `isTrigger=0` ·
+   `2×1×2` · 몸 앞 0.8m. 몸통 캡슐이 `r=0.38` 인데 **폭이 5배**다.
+   끄는 코드는 없고, `Player(6)` 레이어는 `Ground·Wall·Env` 와 충돌한다.
+2. **점프 연속 사용 시 애니 배속 잔존** — 미검증(G4 완료기준 4번).
+   깨는 가장 빠른 길은 **이륙 중에 그로기·카운터로 끊는 것**(`AbortAttackChain` 경로).
+3. 🔴 **`VisualSVN Server license expired`** — r316 커밋은 통과했지만 곷 막힐 수 있다. 관리자 통보 필요.
+   → **2026-09-21 재확인: 여전히 만료 상태이고, 여전히 커밋은 된다**(r319 통과).
+   경고가 **커밋 *뒤*에** 뜨는 형태라 실패로 오인하기 쉽다 — `Committed revision N` 이 찍혔으면 들어간 것이다.
+   상태는 그대로이므로 **관리자 통보는 아직 유효한 할 일**이다.
+4. `gauge_HP_noncolor` 만 `textureType: 0` — 마스크 원본이면 의도. 은희에게 확인.
+5. `Assets/Resources/PerformanceTestRun*.json` 4개가 untracked — `Resources/` 라 **빌드에 들어간다.** `.gitignore` 검토.
+6. `Assets/AddressableAssetsData/link.xml` 이 한 번 삭제된 적 있다(복구함).
+   다시 뜨면 Addressables 재빌드가 지우는 것 — 은희 영역.
+
+## ▶▶ 작업 세션 (2026-09-19 · 미니맵 룩 + **보스 제한시간 타이머** — 계획 승인 대기)
+
+작업자: **경석(Claude)**. 브랜치 `feature/Boss23`. Codex 는 아래 파일을 건드리지 말 것.
+
+**계획서 2종 — 승인 후 구현 시작**: [PLAN-minimap.md](PLAN-minimap.md)(D9~D12 추가) ·
+[PLAN-boss-timer.md](PLAN-boss-timer.md)(신규). 🔴 PLAN-minimap §7 의 "보스 타이머 = 범위 밖" 은 폐기.
+
+**수정 예정 파일**
+
+| 파일 | 내용 |
+|---|---|
+| `Rendering/Minimap/MinimapUI.shader` | 플랫 채움 + 외곽선, 배경 알파 0 |
+| `Map/Minimap/MinimapController.cs` | 둥근 코너 · 베이크 건너뛰기 · 45° 회전 · 슬롯 부착 |
+| `Map/BossTimerManager.cs` (신규) | 서버 권한 제한시간(기본 300초) |
+| `Map/BossTeleportManager.cs` | `ForceStartEncounter()` + 이동 대상 판정 변경 + **호스트 ACK 순서 수정** |
+| `Map/BossEncounterDirector.cs` | 참가자 판정 `Alive` → `!= PermanentDead` (한 줄) |
+| `Player/Fall/PlayerFallRecovery.cs` | 강제 이동 시 지연 복귀 취소 |
+| `UI/Combat/BossTimerHUD.cs` (신규) | 게이지 표시 전용 |
+| `UI/Editor/CombatHudSlotAuthoring.cs` (신규) | 프리팹 슬롯 저작 메뉴 |
+| `2.Prefabs/UI/CombatHUD.prefab` | 슬롯 2개 추가 **(이것 외 변경 금지)** |
+
+🔴 **그릴에서 확정된 것 중 기존 동작을 바꾸는 것 1건** — 보스룸 이동 대상이
+"생존자만"에서 **"`PermanentDead` 가 아닌 전원(Soul 포함)"** 으로 바뀐다. 타이머 강제 이동뿐 아니라
+**평소 패드 진입 경로도 같이 바뀐다**(같은 코드를 쓴다). 팀장 지시: 목숨 남은 사망자를 두고 가면 이동이 꼬인다.
+
+### ✅ SO 전수조사 + 정리 (2026-09-21) — "뭘 만져야 바뀌는지" 가 안 보이던 원인
+
+**증상** — 팀장: "SO 가 너무 많아서 어떤 걸 조절해야 수정이 되는지 명확하게 안 보인다."
+**원인** — 값은 저장돼 있는데 **코드가 읽지 않는 필드**가 섞여 있었다. 만져도 아무 일이 안 난다.
+
+직렬화 필드 **392개**를 훑어 분류했다(스크립트는 세션 스크래치패드의 `so_audit3.py`):
+
+| 판정 | 정리 전 | 정리 후 |
+|---|---|---|
+| live (밖에서 직접 읽힘) | 299 | 299 |
+| via (같은 파일 프로퍼티 경유) | 15 | 15 |
+| ⚠️ check (파일 안에서만 쓰임 — 사람 확인) | 24 | 24 |
+| 🔴 **ghost (아무도 안 읽음)** | **54** | **25 (전부 `_Legacy` 안)** |
+
+→ **현역 코드의 유령 0개.**
+
+**한 것**
+1. `Assets/9.ScriptableObject/Enemy/Boss/Wells&No.23/` → **`Assets/_Legacy/Wells&No.23/`**
+   (민경이 작업하던 구 보스 데이터. 경석이 인수해 보스를 재작성하면서 남은 잔재 — 팀장 확인.
+   `hookDamage`·`jumpDamage`·`grabCoolTime` 등 **보스 튜닝처럼 생긴 29필드가 전부 참조 0** 이었다.)
+   🔴 Unity `AssetDatabase.MoveAsset` 으로 옮겼다 — 에디터를 켠 채 파일시스템으로 옮기면
+   `CLAUDE.md §6` 의 EPERM 사고가 난다. **에디터가 직접 옮기게 하면 GUID·`.meta` 가 보존된다.**
+2. 현역 SO 의 유령 **29개 주석 처리** — 주석마다 **마지막 저작값과 "실제로 만질 곳"** 을 남겼다
+   (주석 처리하면 Unity 가 다음 직렬화에서 에셋 값을 버리므로).
+
+**정본이 어디인지 — 헷갈리던 것들**
+
+| 무엇 | 만져도 안 되던 곳 | 실제로 만질 곳 |
+|---|---|---|
+| 보스 데미지·쿨타임·넉백 | `_Legacy/Wells&No.23/*.asset` | **`2.Prefabs/Monster/Data/No23.asset`** (`BossDataSO`) |
+| 폭탄 투척·착지 | `BossDataSO.bomb*` | **`BossBomb` 프리팹** (`[SerializeField]` 12개) |
+| 폭발 장판 | `BossDataSO.fireZone*` (전부 0, "0=프리팹값" 오버라이드가 미구현) | **FireFloor 프리팹** |
+| 점프 예고 진하기 | `BossDataSO.jumpTelegraph*Alpha` | **`FX_Drop_Charge_*` 파티클 프리팹** |
+| 차징 밀어내기 | — | `BossDataSO.chargeAuraRadius`(3.5) · `chargeAuraKnockbackStrength`(5) ✅ **정상 동작** |
+
+**중간보스 판정** — `MonsterDataSO.isMidBoss` 는 에셋 12개에 값이 있고 3개가 true 였지만
+(Gauntlet·Spinner·WallBot) **코드가 한 번도 읽지 않는다.** 실제 구분은 **전용 클래스 +
+`MonsterCounterWindow` 컴포넌트**가 한다. 기능 결손은 아니고 플래그만 죽어 있었다.
+
+🔴 **아직 안 닫힌 것** — `MapPrefabCatalogSO` 는 `GetPool`/`PickVariantIndex`/`GetPrefab`
+**세 공개 메서드도 밖에서 참조 0** 이다. 즉 이 SO 에서 살아 있는 건 미니맵/오버뷰 아이콘
+`Texture2D` 3개뿐이다. 필드가 아니라 **API 를 들어내는 일**이라 이번엔 건드리지 않고 주석으로 표시만 했다.
+맵 생성 재개 계획이 없으면 블록 전체가 삭제 후보다.
+
+🔴 **내가 한 번 틀렸다** — `jumpTelegraphPrefab` 을 "지금은 아무도 읽지 않는다" 는 **코드 주석을
+믿고** 잘랐다가 컴파일이 깨졌다. 실제로는 `Monster/Editor/BossDataWiring.cs:30` 이 쓴다(복구함).
+**낡은 주석보다 실측이 우선이다** — 내 감사 데이터는 그 필드를 처음부터 `live` 로 잡고 있었다.
+
+### ✅ Codex 3차 교차검증 (2026-09-21) — 구현 코드. 버그 7건 잡아 전부 수정
+
+계약 8개 중 **6개 [지킴]**(T16·T8·T14·T15·D15·D9), 컴파일 오류 0. 잡힌 것과 수정:
+
+| # | 문제 | 수정 |
+|---|---|---|
+| 1 | 🔴 **제때 도착해도 강제 이동이 또 걸린다** — 도착 콜백이 `_expired` 를 안 지워서 이미 도착한 플레이어를 다시 끌고 감 | 도착 확정 시 `_expired` 해제 |
+| 2 | 🔴 **ACK 실패 후 제한시간 집행이 끝난다** — `ForceStartEncounter` 성공은 "경고 시작" 일 뿐인데 거기서 재시도 플래그를 소모 | `_expired` 는 **도착 확정에서만** 해제. 0.5초 간격 재시도 |
+| 3 | 🔴 **원격 오너가 낙하 카메라·입력 잠금에 갇힌 채 끌려간다** — 서버의 코루틴 필드로 원격 연출 진행 여부를 판정하고 있었음(원격은 서버 사본에 항상 null) | 조기 반환 가드 제거, 취소 RPC 항상 전송(멱등) |
+| 4 | 🔴 **타이머 HUD 가 스스로를 꺼서 영원히 안 돌아온다** — `root` 가 자기 GameObject 라 `SetActive(false)` 하면 `Update` 가 멈춤 | `CanvasGroup.alpha` 로 교체. 컴포넌트는 계속 살아 있음 |
+| 5 | **대시 중 텔레포트하면 도착 지점부터 남은 대시를 이어 달린다** | 오너 쪽에서 `PlayerStateController.EndDash()` 호출 |
+| 6 | **`[` `]` 크기 단축키가 슬롯 크기를 무시**(400 → 외접 566, 화면 밖) / 슬롯 해제 시 외접 크기 미복원 | 슬롯 부착 중 단축키 차단, 해제 시 `ApplyPanelSize` 재적용 |
+| 7 | 반전 모드에서 `Stopped` 가 게이지를 가득 채움 / 대기 중 로그 폭주 / 미니맵 자원 미해제 / T1 시계 샘플 불일치 | `Stopped` 는 방향 무관 0, 로그 제거, `OnDestroy` 정리, **서버 시계 하나만 사용** |
+
+🔴 **2번은 계획서(리스크 7)에 이미 적혀 있던 요구였는데 구현에서 빠졌다.** 계획에 적는 것과
+구현이 지키는 것은 별개다 — 교차검증이 그 간극을 잡았다.
+
+### ✅ MPPM 2인 실측 판정 (2026-09-20 17:48) — 호스트 ACK 버그 **확정**
+
+계측을 넣고 2인으로 돌린 결과, 가설이 그대로 재현됐다(계측은 판정 후 제거함):
+
+```
+TeleportAlivePlayers 시작 — 대상 2명 [0,1]
+CompleteArrival 호출 #1 — arrived=[0] awaiting=0      ← 루프 첫 바퀴 중에 이미 완료
+HandleAlivePlayersArrived — 도착=[0] → 잠금명단=[0] (접속자 2명)
+연출 잠금 적용 → clientId=0                            ← clientId=1 없음
+CompleteArrival 호출 #2 — arrived=[0,1]               ← 올바른 명단이 뒤늦게 완성되지만
+[BossEncounter] 이미 진행 중(Descending)이라 도착 신호를 무시합니다.   ← 버려짐
+```
+
+→ **원격 플레이어는 보스 등장 연출 중 잠기지 않았다.** T16 으로 수정함.
+
+🔴 **왜 빌드 테스트로는 안 잡혔나** — `[BossTeleport]`·`[BossEncounter]` 로그는 전부 `Edit.Log`
+(`[Conditional("UNITY_EDITOR")]`)라 **빌드에는 존재하지 않는다.** 9/18 3인 세션은 빌드였으므로
+"정상으로 보였다"는 관찰에 **로그 근거가 애초에 없었다.** 앞으로 흐름 검증은 MPPM(에디터)로 한다.
+
+**덤으로 확인된 것** — 같은 로그에 유니티가
+`Setting linear velocity of a kinematic body is not supported.` 를 찍고 있었다.
+Motor 구동 중 리지드바디는 kinematic 이라 텔레포트의 `rb.linearVelocity = 0` 이 **아무것도 지우지
+않았다.** 그래서 보스 텔레포트를 `PlayerMotor.TeleportAuthoritative` 경유로 바꿨다(수직 속도·예약 이동 정리).
+
+### 보스 잡기 인터럽트 — **버그 아님. 사양대로다** (2026-09-20 판정)
+
+"지짐이·내려찍기 3회 동안 인터럽트가 안 된다"를 조사한 결과, 로그의 내장 진단이 답을 갖고 있었다:
+
+```
+[23호] 인터럽트가 카운터로 성립하지 않았다 — 서버=True · 창열림=False · 정면=True · 페이즈=Throw
+```
+
+창은 **붙잡기 성공 시점에 열리고 3번째 내려치기 시작에 닫힌다**(`AdvanceGrabSlam` 의
+`_grabSlamsLeft <= 1`). 주석에 **"팀장 확정 C10 — 3번째 직전까지가 인터럽트 가능"** 으로 박혀 있다.
+즉 지짐이 + 내려치기 1·2타(약 2.5초)는 가능하고 3타만 불가다. **팀장 재확인: 스펙 유지.**
+
+🔴 **함정** — `No23.asset` 의 Grab 행에 `counterWindowDuration: 1.3` 이 저작돼 있지만
+**Grab 에서는 이 값이 창 길이로 쓰이지 않는다**(`opensNow` 가 Grab 을 명시적으로 제외한다).
+Dash 전용이다. 이 값을 키워도 잡기 인터럽트 구간은 1초도 안 늘어난다.
+
+### Codex 교차검증 (2026-09-20) — 계획에 구멍 5개, 전부 계획에 흡수됨
+
+`codex exec -s read-only` 로 두 계획서 + 관련 코드 12개를 검증시켰다. **주요 주장 3개는 코드로 재확인했다.**
+
+1. 🔴 **원안 T7 이 제한시간을 우회시켰다** — 만료 직전 패드 진입 → 만료 시 타이머 종료 → 패드 이탈 →
+   **보스 이동도 제한시간도 소멸.** → T7 개정 + T13(Pad/Forced 분리).
+2. 🔴 **전원 Soul 도착 시 보스가 안 나온다** — `BossEncounterDirector.IsAliveParticipant` 가 `State == Alive`
+   만 통과시켜 `_eligibleClientIds` 0 → Idle 복귀. **부활해도 Director 재진입 경로가 없어 교착.**
+   → 팀장 확정: **만료 시 Soul 을 목숨 1개씩 써서 강제 부활시킨 뒤 이동**(T14) + 참가자 판정 확장(T15).
+3. 🔴 **기존 버그 — 호스트 ACK 조기 확정.** `TeleportAlivePlayers` 가 `_awaitingArrival.Add` 직후 루프 안에서
+   RPC 를 보내는데 NGO 는 **호스트 대상 ClientRpc 를 동기 실행**한다(`clientRpcMessage.Handle` 확인).
+   호스트가 slot0 이면 **원격 등록 전에 `CompleteArrival()`** → `_eligibleClientIds` 가 호스트 1명.
+   9/18 3인 세션이 "정상"으로 보인 이유는 **보스는 뜨고 전투도 굴러가기 때문**이다(잠금만 누락).
+   → 팀장 확정: **이번에 같이 고친다**(T16).
+4. `PlayerFallRecovery` 의 **지연 복귀 코루틴**이 보스룸 도착 후 옛 안전지점으로 되돌릴 수 있다 → T17.
+5. 미니맵 — `_BgAlpha` 는 `.mat` 에 0.35 로 저장돼 **셰이더 기본값만 바꾸면 안 먹고**,
+   D4 의 "미탐사=외곽선만" 은 **현재 동작이 아니라 새로 만들어야 하는 것**이다 → D11·D13~D15.
+
+**아직 안 닫힌 것** — Soul 을 텔레포트한 뒤 Motor 내부 속도 때문에 **옛 좌표로 되돌아가는지**는
+정적 분석으로 판정 불가. **MPPM 실측 항목**이다(패드 경로의 Soul 동반 이동에만 남는 리스크).
+
+🔴 **알려진 대가** — `CombatHUD` 가 `Player.prefab` 자식이고 `PlayerCombatUiLifecyclePolicy` 가
+완전 사망 시 캔버스를 끄므로 **죽으면 미니맵·보스 타이머가 같이 사라진다.** 브리핑 후 그대로 가기로 함.
+완화하려면 은희 영역(플레이어 UI 수명) 합의 필요.
+
+## ▶▶ 진행 중 (2026-09-18 · **PC 간** Relay 접속 실패 — 진단 계측 투입, 브랜치 `development`)
+
+작업자: **Claude**. 수정 파일: `Assets/1.Scripts/Network/NetworkDiagnosticsLog.cs`(신규) ·
+`NetworkSessionLauncher.cs` · `Session/RelayConnectionProvider.cs` · `UnityServicesBootstrap.cs` ·
+`Assets/1.Scripts/Managers/LobbySceneManager.cs`.
+
+**증상** (팀장 확인, 2026-09-18) — **같은 PC 에서 빌드 두 개를 띄우면 붙는다.**
+**다른 PC 와 붙이려 하면 안 된다.** 에디터도 된다.
+→ 처음엔 "빌드에서만"으로 잡았는데 **범위가 틀렸다. PC 간에만 나는 문제다.**
+
+같은 PC 에서 되는 것이 제일 큰 단서다 — 같은 실행 파일이라 `configHash` 가 자동으로 일치한다.
+다른 PC 는 그 보장이 없다. **양쪽 빌드가 서로 다른 커밋인 경우가 1순위 용의자.**
+새 빌드 없이 판정하는 법: **본인 빌드 폴더를 통째로 복사해 상대 PC 에서 실행**해 보면 된다.
+
+**Player.log 에서 읽어낸 것** — 릴레이는 뚫렸다. `RelayServiceException` 이 없고
+`StartClient success` 까지 간 뒤 `reason='Client-1 disconnected by server.'` 로 끊긴다.
+이 문구는 NGO 의 `NetworkManager.DisconnectClient(clientId)` 한 곳에서만 나오고
+우리 코드에는 호출부가 없다. 호스트가 거절한 것이고, 패키지 내부 호출부는 둘뿐이다.
+
+1. `ConnectionRequestMessage.Deserialize` → `NetworkConfig.CompareConfig` **해시 불일치**. 즉시 끊긴다.
+2. `NetworkConnectionManager` 의 **pending 타임아웃**(`ClientConnectionBufferTimeout` 10초) —
+   transport 는 붙었는데 connection request 메시지가 안 온 경우. **약 10초 뒤** 끊긴다.
+
+둘 다 경고가 **호스트 쪽에만**, 2번은 심지어 `LogLevel.Developer` 에서만 찍혀서
+기본 설정으로는 어느 쪽인지 알 수 없었다. → 그래서 계측을 넣었다.
+
+**넣은 것**
+- `NetworkDiagnosticsLog` — 실행 파일 옆(에디터는 프로젝트 루트)에 `network.log`.
+  접속 관련 `Debug` 로그와 **모든 경고·에러**를 모으고, `StartHost/Client` 직후
+  **NetworkConfig 해시와 프리팹 목록 전체**를 블록으로 남긴다. `AutoFlush` 라 크래시해도 남는다.
+- `NetworkSessionLauncher.verboseNetcodeLogging`(기본 켜짐) — NGO 로그를 Developer 로 올린다.
+  위 2번 경고를 보이게 하는 유일한 방법이다.
+- **로비 화면에 `cfg=<해시>` 표시** — 호스트/클라가 다른 PC 에 있으면 한쪽 network.log 만으로는
+  아무것도 못 가린다. 파일을 주고받는 대신 두 사람이 화면의 숫자만 맞춰 보면 된다.
+  조인코드 옆·Host 시작·접속 시도 중·거절 메시지에 붙는다.
+- 호스트가 명시적으로 끊은 경우(`disconnected by server`)의 안내 문구를 분리했다.
+  기존의 "IP/Port 를 확인하세요" 는 릴레이가 이미 뚫린 상황이라 사람을 엉뚱한 데로 보냈다.
+
+### ✅ 판정 완료 (2026-09-18 19:47, 3인 실측 — 은희·지원·태형)
+
+**같은 빌드를 셋이 나눠 쓰니 붙었다.** 3인 Relay 세션이 끝까지 돌았다 —
+은희 호스트(`DPH867`) → 지원 `clientId=1` → 태형 `clientId=2`,
+`4.MapScene` 3인 동시 로드(`tracked=3`) → 보스전 → Result → Lobby 복귀.
+마지막 끊김은 호스트의 `OnApplicationQuit` 이다(버그 아님).
+
+**`configHash` 3대 전부 `2385332456939975880`, 프리팹 26개** — 에디터 값과도 같다.
+→ **앞으로 PC 간 테스트는 빌드 폴더를 복사해 쓰고, 화면의 `cfg=` 숫자를 먼저 맞춰 볼 것.**
+
+### ✅ 이전 실패의 원인 확정 — 릴레이가 아니라 빌드 버전 차이
+
+실패한 PC(`D:/p_MT/26.09.18-Build/`)의 `Player-prev.log` 가 결정적이었다. **28회 시도했다.**
+
+| 방식 | 횟수 | 결과 |
+|---|---|---|
+| Relay 조인코드 | 7 | `Client-1`~`Client-7 disconnected by server.` |
+| **Direct IPv4 `172.33.1.3:7777`** | 21 | `Client-1`~`Client-21 disconnected by server.` |
+
+**전송 계층을 LAN 직결로 바꿔도 똑같이 거부당했다** → 릴레이·DTLS·방화벽 전부 배제.
+`Client-N` 의 N 이 연속 증가하므로 호스트가 살아서 id 를 발급하고 끊은 것이고,
+`ConnectionApproval=0` 이라 남는 거부 사유는 **`NetworkConfig` 해시 불일치** 하나뿐이다.
+→ 그 PC 의 빌드와 호스트 빌드가 서로 다른 커밋이었다.
+
+### 🔴 같은 로그에서 나온 진짜 버그 — 로딩 0% 고정 (고침, 2026-09-18)
+
+28회 실패 후 그 PC 가 직접 호스트를 켜고 게임 시작을 눌렀는데
+`StartGameLoading` 다음에 **`HandleSceneEvent` 가 한 줄도 안 나왔다.**
+정상 실행에는 Load → LoadComplete → LoadEventCompleted 가 찍히고 그래야
+`StartTargetLoadAfterSceneEvent` 가 타깃 씬 로드를 시작한다 → **MapScene 로드가 시작조차 안 됨.**
+
+원인은 [NetworkLoadingFlowController](Assets/1.Scripts/Loading/NetworkLoadingFlowController.cs) 의
+`_callbacksRegistered` 래치다. 이 래치는 `OnDestroy` 에서만 풀리는데,
+**NGO 는 `Start*` 마다 `SceneManager`·`CustomMessagingManager` 를 새로 만들고 Shutdown 때 null 로 만든다**
+(`NetworkManager.cs` 의 Initialize/ShutdownInternal). 그래서 두 번째 세션부터는
+죽은 객체에 붙은 구독만 남고 새 객체에는 영영 안 붙었다.
+
+- **재현 조건**: 같은 실행 안에서 접속을 한 번이라도 시도한 뒤 호스트를 켜면 발생.
+  프로그램을 새로 켜고 바로 호스트하면 정상(그래서 여태 안 잡혔다).
+- **수정**: 래치 대신 **구독 대상 인스턴스를 기억**해 세대가 바뀌면 떼고 다시 붙인다
+  (`IsRegistrationCurrent`). `UnregisterNetworkCallbacks` 도 현재 프로퍼티가 아니라
+  기억해 둔 객체에서 뗀다.
+- `CustomMessagingManager` 핸들러도 같이 죽으므로 클라의 진행률 메시지도 함께 복구된다.
+
+### 🔴 같은 로그에서 나온 별건 — 오디오가 통째로 죽어 있다
+
+3대 + 에디터 **전부** 동일하게 씬마다 NRE 가 난다. 세 줄 다 `AudioManager.Instance.___` 다.
+
+- `TitleSceneManager.cs:33` · `LobbySceneManager.cs:77` · `ResultSceneManager.cs:24`
+- `AudioManager` 컴포넌트를 가진 것은 **`BossScene.unity` 와 `AudioManager.prefab` 뿐**이고
+  MainFlow 씬(BootStrap/Title/Loading/Lobby/Map/Result) 어디에도 없다.
+  게다가 `BossScene` 은 `c603e699` 에서 빌드 설정에서 빠졌다.
+- → **BGM 이 한 번도 안 나오고 있다.** `AudioManager.prefab` 을 `0.BootStrapScene` 에 넣으면 된다
+  (`DontDestroyOnLoad` 라 한 번만).
+
+### 🔴 보스 데이터 (호스트 로그에만 — 서버 권한)
+
+`TwentyThree(Clone): Dash 행의 attackTargeting 이 FarthestPlayer 다` — `No23.asset` 의 Dash 행.
+검증 코드가 스스로 잡았다. 그 밖에 전투 중 경고:
+`송전기 — 4초 안에 못 갔다(2.1m) → 워프` · `인터럽트가 카운터로 성립하지 않았다` ·
+`Failed to create agent because it is not close enough to the NavMesh`.
+
+
+---
+
+## 🔴 공격속도 — **속성 추가 안 함, 클립 길이 일반화로 간다** (2026-09-21 확정)
+
+브랜치 `feature/PlayerAttackSpeedAttribute` 는 **커밋 0개로 폐기**했다. 이름과 달리 스탯을 새로
+만드는 작업이 아니었다.
+
+**결정**: 공격속도는 스탯/모디파이어로 풀지 않는다. **모든 playable 캐릭터의 공격 애니메이션
+클립 길이를 일반화(정규화)** 하는 방향으로 간다.
+
+**왜 — 조사에서 나온 것 (다시 조사하지 말 것)**
+
+- **평타 타이밍은 100% 애니메이션 이벤트가 결정한다.** `Hit`/`ComboWindowOpen`/
+  `ComboWindowClose`/`End` 전부 클립에 박힌 AnimationEvent →
+  `PlayerAnimationEventRelay.cs:21` → `DefaultAttackController.cs:346` (`IsServer` 게이트).
+- **`DefaultAttackStep.MotionDuration` 은 함정이다.** 에셋의 `motionDuration` 은 4스텝 전부 `0`
+  이라 실효값은 `clip.length` 인데, 이 값은 **End 이벤트 유실 대비 fallback** 과 (현재 미사용인)
+  스크립트 이동에만 쓰인다. 여기에 배율을 곱해도 **화면상 공격은 안 빨라지고 fallback 만 일찍
+  터진다.**
+- **플레이어엔 평타 쿨다운도 입력 버퍼도 없다.** 게이트는 `PlayerStateController.CanAttack` 뿐.
+  연타 상한은 순전히 "End 이벤트가 언제 오는가" 다.
+- **`animator.speed` 를 만지는 플레이어 코드 0건**, `PlayerAnimatorController` 에 speed 파라미터
+  없음(공격 state 4개 모두 `m_Speed: 1`, `m_SpeedParameterActive: 0`).
+- 클립 실측: `Garen_Default_Attack_1~4` 길이 2.0 / 1.5 / 1.833 / 1.6초인데 **End 이벤트는
+  0.733 / 0.567 / 0.733 / 0.533초.** 클립 뒷부분이 통째로 잘린다. ← 일반화 작업의 출발점.
+
+**죽어 있는 것 — 살릴지 지울지 아직 미정**
+
+- `Unit.FinalAttackSpeed` (`Unit.cs:367`) **게임플레이 소비자 0건.**
+  `Docs/tech/game-structure-uml.md:401` 이 이미 이 사실을 적어 뒀다.
+- `Unit.ChangeAttackSpeedValue` / `ChangeAttackSpeedValueRpc` 호출처 0건.
+- `StatusEffectType.AttackSpeedModifier` (`1 << 9`) 를 `Apply` 하는 코드·에셋 0건.
+  (대조: `MoveSpeedModifier` 는 `PlayerMovement.cs:68,191` 에서 실사용 중)
+- 🔴 **`Player.prefab:929` 의 `attackSpeed` 값이 `0`이다** (Paladin·Paladin_VFX 도 전부 0).
+  아무도 안 읽어서 안 터졌을 뿐, 배선하는 순간 배율 0이 된다.
+- `CharacterDefinition` 은 중복 스탯 소스가 **아니라 사문(死文)** 이다. 이 SO 의 에셋 인스턴스가
+  프로젝트에 **0개**고, 읽는 쪽 `PlayableCharacterVisual` 은 어떤 프리팹·씬에도 안 붙어 있다.
+  실제 스탯 소스는 `Player.prefab` 의 SerializeField 하나뿐.
+
+**몬스터 쪽은 의미가 다르다** — `MonsterBase.cs:1346` 은 `간격 = 1 / AttackSpeed`(초당 횟수)로
+살아 있다. 단 행별 명시 쿨다운이 있으면 무시되므로 **보스에선 죽어 있다**
+(`BossDataSO.cs:503` 주석). 플레이어와 같은 `Unit._attackSpeed` 필드를 쓰지만 의미가 다르다.
+
+---
+
+## ▶▶ 이전 인수인계 (2026-09-18 · 공격 범위/회전 재작업 + G4 **완료**, 브랜치 `feature/Boss23`)
 
 작업자: **경석(Claude)**. 계획: [PLAN-boss-attack-shapes.md](PLAN-boss-attack-shapes.md) (승인됨 2026-09-18).
 

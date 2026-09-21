@@ -1,4 +1,4 @@
-%YAML 1.1
+﻿%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!114 &11400000
 MonoBehaviour:
@@ -206,7 +206,7 @@ MonoBehaviour:
   grabCatchState: Grab
   grabEndState: GrabEnd
   grabPullKnockback: 4
-  jumpSearchRadius: 45
+  playerScanRadius: 45
   jumpHoverTime: 1.2
   jumpLandingDuration: 1
   jumpRecoveryDuration: 0.4
@@ -257,8 +257,6 @@ MonoBehaviour:
   chargeAuraKnockbackDuration: 0.25
   chargeAuraStagger: 0
   chargeAuraTelegraphPrefab: {fileID: 5997264177071607445, guid: a325fc2b60be455428b04ab67232fb24, type: 3}
-  chargeMoveArriveDistance: 0.6
-  chargeMoveTimeout: 4
   fireZoneRadius: 0
   fireZoneMaxRadius: 0
   fireZoneLifetime: 0

@@ -36,6 +36,11 @@ public class NetworkLoadingFlowController : MonoBehaviour
     private Coroutine _completionRoutine;
     private Coroutine _registerCallbacksRoutine;
     private bool _callbacksRegistered;
+
+    // 구독한 상대. NGO 가 세션마다 갈아치우므로 "등록 여부"가 아니라 "등록 대상"을 들고 있어야 한다.
+    // 자세한 이유는 IsRegistrationCurrent 주석 참조.
+    private NetworkSceneManager _registeredSceneManager;
+    private CustomMessagingManager _registeredMessagingManager;
     private bool _playersSpawnedForCurrentTargetScene;
     private uint _flowId;
     private float _averageProgress;
@@ -63,10 +68,16 @@ public class NetworkLoadingFlowController : MonoBehaviour
 
     public void RegisterNetworkCallbacks()
     {
-        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.RegisterNetworkCallbacks requested registered={_callbacksRegistered} canRegister={CanRegisterNetworkCallbacks()}");
-        if (_callbacksRegistered)
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.RegisterNetworkCallbacks requested registered={_callbacksRegistered} current={IsRegistrationCurrent()} canRegister={CanRegisterNetworkCallbacks()}");
+        if (IsRegistrationCurrent())
         {
             return;
+        }
+
+        // 여기까지 왔는데 등록 상태라면, 구독해 둔 상대가 이미 죽은 객체다. 떼고 다시 붙인다.
+        if (_callbacksRegistered)
+        {
+            UnregisterNetworkCallbacks();
         }
 
         if (_networkManager == null)
@@ -84,9 +95,13 @@ public class NetworkLoadingFlowController : MonoBehaviour
             return;
         }
 
-        _networkManager.SceneManager.OnSceneEvent += HandleSceneEvent;
-        _networkManager.CustomMessagingManager.RegisterNamedMessageHandler(ProgressMessageName, HandleProgressMessage);
-        _networkManager.CustomMessagingManager.RegisterNamedMessageHandler(StateMessageName, HandleStateMessage);
+        // 구독한 "대상"을 기억해 둔다 — 아래 IsRegistrationCurrent 가 이걸로 세대를 판별한다.
+        _registeredSceneManager = _networkManager.SceneManager;
+        _registeredMessagingManager = _networkManager.CustomMessagingManager;
+
+        _registeredSceneManager.OnSceneEvent += HandleSceneEvent;
+        _registeredMessagingManager.RegisterNamedMessageHandler(ProgressMessageName, HandleProgressMessage);
+        _registeredMessagingManager.RegisterNamedMessageHandler(StateMessageName, HandleStateMessage);
         _networkManager.OnClientConnectedCallback += HandleClientConnected;
         _callbacksRegistered = true;
 
@@ -94,9 +109,31 @@ public class NetworkLoadingFlowController : MonoBehaviour
         LogDebug("Network callbacks registered.");
     }
 
+    /// <summary>
+    /// 지금 구독이 <b>현재 세션의</b> 객체에 붙어 있는가.
+    ///
+    /// 🔴 NGO 는 <c>StartHost/StartClient</c> 마다 <see cref="NetworkManager.SceneManager"/> 와
+    /// <see cref="NetworkManager.CustomMessagingManager"/> 를 <b>새로 만들고</b>, Shutdown 때 null 로 만든다
+    /// (NetworkManager.cs 의 Initialize / ShutdownInternal). 그래서 "등록했는가"(bool) 로 판단하면
+    /// 두 번째 세션부터 죽은 객체에 붙은 구독만 남고 새 객체에는 영영 안 붙는다.
+    ///
+    /// 2026-09-18 빌드에서 이것 때문에 로딩이 0% 에서 멈췄다 — 접속에 실패한 뒤 같은 실행에서
+    /// 호스트를 켜면 <c>OnSceneEvent</c> 가 한 번도 안 와서 <c>StartTargetLoadAfterSceneEvent</c> 가
+    /// 돌지 않고, 타깃 씬 로드가 시작조차 되지 않았다(로그에 HandleSceneEvent 가 0줄).
+    /// 그래서 "누구에게 등록했는가"를 본다.
+    /// </summary>
+    private bool IsRegistrationCurrent()
+    {
+        return _callbacksRegistered &&
+               _networkManager != null &&
+               _registeredSceneManager != null &&
+               ReferenceEquals(_registeredSceneManager, _networkManager.SceneManager) &&
+               ReferenceEquals(_registeredMessagingManager, _networkManager.CustomMessagingManager);
+    }
+
     private IEnumerator RegisterNetworkCallbacksWhenReady()
     {
-        while (!_callbacksRegistered)
+        while (!IsRegistrationCurrent())
         {
             if (_networkManager == null)
             {
@@ -204,23 +241,32 @@ public class NetworkLoadingFlowController : MonoBehaviour
     private void UnregisterNetworkCallbacks()
     {
         Debug.Log($"[SceneFlow] NetworkLoadingFlowController.UnregisterNetworkCallbacks registered={_callbacksRegistered}");
-        if (!_callbacksRegistered || _networkManager == null)
+        if (!_callbacksRegistered)
         {
             return;
         }
 
-        if (_networkManager.SceneManager != null)
+        // ⚠️ 현재의 NetworkManager.SceneManager 가 아니라 **구독할 때 기억해 둔 객체**에서 뗀다.
+        // 세션이 바뀌었으면 그 프로퍼티는 이미 다른 객체(또는 null)라, 현재 것을 쓰면
+        // 엉뚱한 대상에서 떼거나 조용히 아무것도 안 한 채 낡은 구독이 남는다.
+        if (_registeredSceneManager != null)
         {
-            _networkManager.SceneManager.OnSceneEvent -= HandleSceneEvent;
+            _registeredSceneManager.OnSceneEvent -= HandleSceneEvent;
         }
 
-        if (_networkManager.CustomMessagingManager != null)
+        if (_registeredMessagingManager != null)
         {
-            _networkManager.CustomMessagingManager.UnregisterNamedMessageHandler(ProgressMessageName);
-            _networkManager.CustomMessagingManager.UnregisterNamedMessageHandler(StateMessageName);
+            _registeredMessagingManager.UnregisterNamedMessageHandler(ProgressMessageName);
+            _registeredMessagingManager.UnregisterNamedMessageHandler(StateMessageName);
         }
 
-        _networkManager.OnClientConnectedCallback -= HandleClientConnected;
+        if (_networkManager != null)
+        {
+            _networkManager.OnClientConnectedCallback -= HandleClientConnected;
+        }
+
+        _registeredSceneManager = null;
+        _registeredMessagingManager = null;
         _callbacksRegistered = false;
 
         LogDebug("Network callbacks unregistered.");

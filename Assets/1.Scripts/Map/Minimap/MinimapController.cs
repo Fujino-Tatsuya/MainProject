@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -24,6 +24,36 @@ public class MinimapController : MonoBehaviour
     [Tooltip("현재 시야 반경(m) — 팀원 전원 합산")] public float SightRadius = 15f;
     [Tooltip("탐사 마스크 해상도")] public int MaskResolution = 128;
     [Tooltip("마스크 갱신 주기(초)")] public float MaskTick = 0.35f;
+
+    [Header("=== 룩 (PLAN-minimap 2026-09-20) ===")]
+    [Tooltip("지형 사진을 굽는다. 끄면(기본) 균일 회색 플랫 채움 — minimap.png 룩. " +
+             "베이크는 밝기 0 재시도·어비스 물 plane 같은 함정이 있어 기본은 꺼 둔다.")]
+    public bool UseTerrainBake = false;
+
+    [Tooltip("미니맵 회전(도). 카메라 요각과 맞춘다 — 레퍼런스의 마름모가 이 회전의 결과다. " +
+             "월드 슬롯은 축 정렬이라 0 이면 반듯한 사각형으로 보인다.")]
+    public float MapRotationDegrees = 45f;
+
+    [Tooltip("방 모서리 반경(m). 통로는 항상 각지게 둔다.")]
+    public float RoomCornerMeters = 2.5f;
+
+    public Color FlatColor = new Color(0.58f, 0.58f, 0.58f, 1f);
+    public Color OutlineColor = new Color(0.13f, 0.15f, 0.17f, 1f);
+
+    [Tooltip("미탐사 구역 밝기(0=검정, 1=탐사와 동일). 🔴 0 이면 안 보인다 — 맵 전체 모양이 " +
+             "어두운 회색으로 늘 깔려 있고, 탐사하면 밝아지는 게 레퍼런스 룩이다.")]
+    [Range(0f, 1f)] public float UnexploredDim = 0.34f;
+
+    [Tooltip("탐사했지만 지금 시야 밖인 구역의 밝기.")]
+    [Range(0f, 1f)] public float ExploredDim = 0.62f;
+
+    [Tooltip("역할 아이콘(퀘스트·스폰·보스입구)을 맵과 함께 회전시킨다. " +
+             "아트가 직사각형이라 정립시키면 마름모 미니맵 위에서 축이 어긋나 보인다(팀장 확정 2026-09-20). " +
+             "아이콘 아트가 회전 무관한 모양으로 바뀌면 끄면 된다.")]
+    public bool RotateRoleIconsWithMap = true;
+
+    [Tooltip("CombatHUD 안의 미니맵 슬롯 이름. 찾으면 그 밑에 붙고, 못 찾으면 자체 Canvas 로 폴백한다.")]
+    public string MinimapSlotName = "MinimapSlot";
 
     [Header("=== 베이크 ===")]
     [Tooltip("지형 베이크 해상도")] public int BakeResolution = 1024;
@@ -56,12 +86,15 @@ public class MinimapController : MonoBehaviour
 
     // UI
     private Canvas _canvas;
-    private RectTransform _mapRect;    // 마커 부모 (RawImage 위)
+    private RectTransform _mapRoot;    // 회전 없는 컨테이너 (슬롯/화면에 고정)
+    private RectTransform _mapRect;    // 마커 부모 (RawImage 위). 회전은 여기에 걸린다
     private Material _mapMat;
     private Sprite _dotSprite;
 
     // 마커
-    private readonly List<(RectTransform rt, Vector3 world)> _staticMarkers = new List<(RectTransform, Vector3)>();
+    // upright = true 면 맵 회전을 역보정해 아이콘을 세운다. false 면 맵과 함께 돈다.
+    private readonly List<(RectTransform rt, Vector3 world, bool upright)> _staticMarkers =
+        new List<(RectTransform, Vector3, bool)>();
     private readonly Dictionary<Component, Image> _dynMarkers = new Dictionary<Component, Image>();
     private readonly List<Component> _dynRemove = new List<Component>();
     private readonly List<Transform> _players = new List<Transform>(); // TODO: NetworkManager.ConnectedClients 기반으로 주기적 캐싱 구현 필요
@@ -87,7 +120,10 @@ public class MinimapController : MonoBehaviour
     {
         Generator = gen;
         ComputeWorldRect(gen);
-        BakeTerrain();
+
+        // 플랫 채움 룩에서는 지형 사진이 필요 없다 — 카메라 생성·렌더·재시도를 통째로 건너뛴다.
+        if (UseTerrainBake) BakeTerrain();
+
         EnsureUI();
         BuildSilhouette(gen);
         ResetMask();
@@ -95,7 +131,7 @@ public class MinimapController : MonoBehaviour
         _baked = true;
 
         // 클라에서 씬 로드 직후 렌더 요청이 빈 결과를 줄 수 있음 — 밝기 0이면 재시도
-        if (_lastBakeLuminance < 0.01f) StartCoroutine(RetryBake());
+        if (UseTerrainBake && _lastBakeLuminance < 0.01f) StartCoroutine(RetryBake());
     }
 
     private float _lastBakeLuminance;
@@ -222,6 +258,39 @@ public class MinimapController : MonoBehaviour
                 px[y * res + x] = 255;
         }
 
+        // 코너를 둥글게 깎아 채운다(PLAN-minimap D3). 반경 0 이면 기존 사각형과 같다.
+        void FillWorldRoundedRect(float minX, float minZ, float maxX, float maxZ, float cornerMeters)
+        {
+            if (cornerMeters <= 0f) { FillWorldRect(minX, minZ, maxX, maxZ); return; }
+
+            float pxPerMeter = res / _worldRect.width;
+            float r = cornerMeters * pxPerMeter;
+
+            float fx0 = (minX - _worldRect.xMin) * pxPerMeter;
+            float fx1 = (maxX - _worldRect.xMin) * pxPerMeter;
+            float fy0 = (minZ - _worldRect.yMin) * pxPerMeter;
+            float fy1 = (maxZ - _worldRect.yMin) * pxPerMeter;
+
+            // 반경이 변의 절반을 넘으면 모양이 뭉개진다 — 짧은 변에 맞춰 줄인다.
+            r = Mathf.Min(r, (fx1 - fx0) * 0.5f, (fy1 - fy0) * 0.5f);
+            if (r <= 0.5f) { FillWorldRect(minX, minZ, maxX, maxZ); return; }
+
+            int x0 = Mathf.Clamp(Mathf.FloorToInt(fx0), 0, res - 1);
+            int x1 = Mathf.Clamp(Mathf.CeilToInt(fx1), 0, res - 1);
+            int y0 = Mathf.Clamp(Mathf.FloorToInt(fy0), 0, res - 1);
+            int y1 = Mathf.Clamp(Mathf.CeilToInt(fy1), 0, res - 1);
+
+            for (int y = y0; y <= y1; y++)
+            for (int x = x0; x <= x1; x++)
+            {
+                // 모서리 안쪽으로 r 만큼 들어간 사각형까지의 거리로 판정한다.
+                float cx = Mathf.Clamp(x + 0.5f, fx0 + r, fx1 - r);
+                float cy = Mathf.Clamp(y + 0.5f, fy0 + r, fy1 - r);
+                float dx = x + 0.5f - cx, dy = y + 0.5f - cy;
+                if (dx * dx + dy * dy <= r * r) px[y * res + x] = 255;
+            }
+        }
+
         // 존 풋프린트 (회전 반영)
         foreach (var s in gen.Slots)
         {
@@ -230,7 +299,7 @@ public class MinimapController : MonoBehaviour
                 ? new Vector2(s.Footprint.y, s.Footprint.x) * 0.5f
                 : s.Footprint * 0.5f;
             Vector3 p = s.transform.position;
-            FillWorldRect(p.x - half.x, p.z - half.y, p.x + half.x, p.z + half.y);
+            FillWorldRoundedRect(p.x - half.x, p.z - half.y, p.x + half.x, p.z + half.y, RoomCornerMeters);
         }
 
         // 5) 복도/방 연결부 (보통 얇고 긴 메쉬)
@@ -348,31 +417,137 @@ public class MinimapController : MonoBehaviour
         canvasGo.AddComponent<CanvasScaler>().uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         canvasGo.GetComponent<CanvasScaler>().referenceResolution = new Vector2(1920, 1080);
 
+        // 컨테이너(회전 없음) — 화면 우하단에 고정된다.
+        var rootGo = new GameObject("MinimapRoot", typeof(RectTransform));
+        rootGo.transform.SetParent(canvasGo.transform, false);
+        _mapRoot = rootGo.GetComponent<RectTransform>();
+        _mapRoot.anchorMin = _mapRoot.anchorMax = new Vector2(1f, 0f); // 우하단
+        _mapRoot.pivot = new Vector2(1f, 0f);
+        _mapRoot.anchoredPosition = new Vector2(-Margin.x, Margin.y);
+
+        // 🔴 회전은 **pivot 이 중앙인 안쪽 컨텐츠**에 건다.
+        //    컨테이너(pivot 우하단)를 직접 돌리면 화면 우하단 모서리를 축으로 돌아
+        //    한 변 L 에 대해 L/√2 만큼(350 이면 약 246 UI 단위) 화면 밖으로 빠진다.
         var mapGo = new GameObject("Minimap", typeof(RawImage));
-        mapGo.transform.SetParent(canvasGo.transform, false);
+        mapGo.transform.SetParent(rootGo.transform, false);
         var raw = mapGo.GetComponent<RawImage>();
-        //var shader = Shader.Find("UI/MinimapComposite");
-        //_mapMat = new Material(shader);
 
-        _mapMat = new Material(MinimapComsite); //##경슥아 이거 수정했음 26.7.31
-
+        _mapMat = new Material(MinimapComsite);
         _mapMat.SetTexture("_MainTex", _bakeRT);
-        raw.texture = _bakeRT;
+        raw.texture = _bakeRT != null ? (Texture)_bakeRT : Texture2D.whiteTexture;
         raw.material = _mapMat;
+        raw.raycastTarget = false;
+
+        // 🔴 머티리얼에 예전 값(_BgAlpha 0.35)이 저장돼 있어 셰이더 기본값만으로는 안 먹는다.
+        //    맵 모양 바깥은 완전 투명이어야 한다 — 회전하면 패널 사각형이 그대로 드러나기 때문.
+        ApplyLookToMaterial();
 
         _mapRect = mapGo.GetComponent<RectTransform>();
-        _mapRect.anchorMin = _mapRect.anchorMax = new Vector2(1f, 0f); // 우하단
-        _mapRect.pivot = new Vector2(1f, 0f);
-        _mapRect.anchoredPosition = new Vector2(-Margin.x, Margin.y);
-        _mapRect.sizeDelta = Vector2.one * PanelSize;
+        _mapRect.anchorMin = _mapRect.anchorMax = new Vector2(0.5f, 0.5f);
+        _mapRect.pivot = new Vector2(0.5f, 0.5f);
+        _mapRect.anchoredPosition = Vector2.zero;
 
         _dotSprite = MakeCircleSprite(32);
         if (_maskTex != null) _mapMat.SetTexture("_MaskTex", _maskTex);
 
-        _mapRect.sizeDelta = Vector2.one * PanelSize; // 인스펙터/기본값 반영
+        ApplyPanelSize(PanelSize);
+
+        // 플레이어 HUD 안의 슬롯에 붙을 수 있으면 붙는다(없으면 이 자체 Canvas 로 남는다).
+        Player.LocalPlayerChanged += HandleLocalPlayerChanged;
+        TryAttachToSlot(Player.LocalPlayer);
+
         // 네트워크 세션 중이면 플레이어 스폰 전(로딩 화면)엔 숨김 — Update가 상태 갱신
         var nm = Unity.Netcode.NetworkManager.Singleton;
         _canvas.enabled = !(nm != null && nm.IsListening);
+    }
+
+    /// <summary>룩 파라미터를 머티리얼 인스턴스에 적용한다. 인스펙터에서 바꾸면 바로 반영된다.</summary>
+    private void ApplyLookToMaterial()
+    {
+        if (_mapMat == null) return;
+        _mapMat.SetColor("_FlatColor", FlatColor);
+        _mapMat.SetColor("_OutlineColor", OutlineColor);
+        _mapMat.SetFloat("_UnexploredDim", UnexploredDim);
+        _mapMat.SetFloat("_DimExplored", ExploredDim);
+        _mapMat.SetFloat("_BgAlpha", 0f);
+    }
+
+    // ---------------- CombatHUD 슬롯 부착 ----------------
+    //
+    // 🔴 CombatHUD 는 씬이 아니라 **Player.prefab 의 자식**이다. 그래서 슬롯은 로컬 플레이어가
+    //    스폰된 뒤에야 생기고, 디스폰하면 **붙여 둔 UI 가 플레이어와 함께 파괴된다.**
+    //    베이크·마스크·실루엣은 이 씬 상주 컴포넌트가 계속 들고 있으므로 UI 만 다시 붙이면 된다.
+    //
+    // ⚠️ 전역 검색(FindObjectsByType)으로 슬롯을 찾으면 **원격 플레이어의 HUD** 를 잡을 수 있다
+    //    (원격 HUD 는 Player.OnNetworkSpawn 에서 꺼지지만 그 전 한 프레임이 있다).
+    //    그래서 반드시 LocalPlayerChanged 가 준 로컬 Player 밑에서만 찾는다.
+    private RectTransform _slot;
+
+    private void HandleLocalPlayerChanged(Player player) => TryAttachToSlot(player);
+
+    private void TryAttachToSlot(Player player)
+    {
+        if (_mapRoot == null) return;
+
+        RectTransform slot = FindSlot(player);
+
+        if (slot == null)
+        {
+            // 슬롯이 사라졌다(디스폰 등) — 자체 Canvas 로 되돌린다.
+            if (_slot != null && _canvas != null)
+            {
+                _mapRoot.SetParent(_canvas.transform, false);
+                _mapRoot.anchorMin = _mapRoot.anchorMax = new Vector2(1f, 0f);
+                _mapRoot.pivot = new Vector2(1f, 0f);
+                _mapRoot.anchoredPosition = new Vector2(-Margin.x, Margin.y);
+                _slot = null;
+
+                // 🔴 부착할 때 stretch(offset 0)로 만들면서 sizeDelta 가 0 이 됐다.
+                //    되돌릴 때 외접 크기를 다시 계산하지 않으면 미니맵 중심이 화면 우하단
+                //    모서리에 놓여 통째로 잘린다. (_slot 을 먼저 null 로 둬야 아래가 크기를 쓴다.)
+                ApplyPanelSize(PanelSize);
+            }
+            return;
+        }
+
+        if (_slot == slot) return;
+
+        _slot = slot;
+        _mapRoot.SetParent(slot, false);
+
+        // 위치·크기는 슬롯이 정한다 — 디자이너가 프리팹에서 조정할 수 있어야 한다.
+        _mapRoot.anchorMin = Vector2.zero;
+        _mapRoot.anchorMax = Vector2.one;
+        _mapRoot.pivot = new Vector2(0.5f, 0.5f);
+        _mapRoot.offsetMin = Vector2.zero;
+        _mapRoot.offsetMax = Vector2.zero;
+        _mapRoot.anchoredPosition = Vector2.zero;
+
+        // 🔴 표시 권한은 HUD 정책(PlayerCombatUiLifecyclePolicy)에 남긴다 — 우리 Canvas 는 비운다.
+        if (_canvas != null) _canvas.enabled = false;
+
+        // 크기의 주인은 슬롯이다 — 디자이너가 프리팹에서 슬롯을 키우면 미니맵도 따라 커진다.
+        // 회전한 정사각형이 슬롯 안에 들어가야 하므로 외접 계수로 나눈다(45° → √2).
+        float rad = MapRotationDegrees * Mathf.Deg2Rad;
+        float ratio = Mathf.Abs(Mathf.Cos(rad)) + Mathf.Abs(Mathf.Sin(rad));
+        float slotSide = Mathf.Min(slot.rect.width, slot.rect.height);
+        if (slotSide > 1f && ratio > 0.01f)
+            ApplyPanelSize(slotSide / ratio);
+
+        Debug.Log($"[Minimap] CombatHUD 슬롯 '{MinimapSlotName}' 에 부착했다.");
+    }
+
+    private RectTransform FindSlot(Player player)
+    {
+        if (player == null || string.IsNullOrEmpty(MinimapSlotName)) return null;
+
+        var hud = player.GetComponentInChildren<CombatHUD>(true);
+        if (hud == null) return null;
+
+        foreach (var rt in hud.GetComponentsInChildren<RectTransform>(true))
+            if (rt.name == MinimapSlotName) return rt;
+
+        return null;
     }
 
     private static Sprite MakeCircleSprite(int size)
@@ -399,7 +574,7 @@ public class MinimapController : MonoBehaviour
         return new Vector2(u * PanelSize - PanelSize, v * PanelSize); // pivot(1,0) 기준
     }
 
-    private Image MakeMarkerImage(string name, Sprite sprite, Color color, float size)
+    private Image MakeMarkerImage(string name, Sprite sprite, Color color, float size, bool upright = true)
     {
         var go = new GameObject(name, typeof(Image));
         go.transform.SetParent(_mapRect, false);
@@ -409,6 +584,10 @@ public class MinimapController : MonoBehaviour
         img.raycastTarget = false;
         img.rectTransform.anchorMin = img.rectTransform.anchorMax = new Vector2(1f, 0f);
         img.rectTransform.sizeDelta = Vector2.one * size;
+        // 부모(_mapRect)가 회전한다. 정립시킬 아이콘만 되돌린다(D10·D14).
+        img.rectTransform.localRotation = upright
+            ? Quaternion.Euler(0f, 0f, -MapRotationDegrees)
+            : Quaternion.identity;
         return img;
     }
 
@@ -416,7 +595,7 @@ public class MinimapController : MonoBehaviour
 
     private void BuildStaticMarkers(MapGenerator gen)
     {
-        foreach (var (rt, _) in _staticMarkers) if (rt != null) Destroy(rt.gameObject);
+        foreach (var (rt, _, _) in _staticMarkers) if (rt != null) Destroy(rt.gameObject);
         _staticMarkers.Clear();
 
         var cat = gen.Catalog;
@@ -430,12 +609,13 @@ public class MinimapController : MonoBehaviour
                 _ => (null, null),
             };
             if (label == null) continue;
-            var img = MakeMarkerImage($"Role_{label}", null, Color.white, RoleIconSize);
+            bool upright = !RotateRoleIconsWithMap;
+            var img = MakeMarkerImage($"Role_{label}", null, Color.white, RoleIconSize, upright);
             if (tex != null)
                 img.sprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), Vector2.one * 0.5f);
             else { img.sprite = _dotSprite; img.color = label == "Boss" ? MonsterColor : Color.yellow; }
             img.rectTransform.anchoredPosition = WorldToMap(s.transform.position);
-            _staticMarkers.Add((img.rectTransform, s.transform.position));
+            _staticMarkers.Add((img.rectTransform, s.transform.position, upright));
         }
 
         // 티어 노드 — 스폰된 존 안의 NodeMarker (보상 오브젝트 시스템 확정 전 임시 소스)
@@ -449,7 +629,7 @@ public class MinimapController : MonoBehaviour
             };
             var img = MakeMarkerImage($"Node_{node.Tier}", _dotSprite, c, NodeDotSize);
             img.rectTransform.anchoredPosition = WorldToMap(node.transform.position);
-            _staticMarkers.Add((img.rectTransform, node.transform.position));
+            _staticMarkers.Add((img.rectTransform, node.transform.position, true));
         }
     }
 
@@ -461,14 +641,37 @@ public class MinimapController : MonoBehaviour
     {
         PanelSize = size;
         if (_mapRect == null) return;
+
         _mapRect.sizeDelta = Vector2.one * PanelSize;
-        foreach (var (rt, world) in _staticMarkers)
-            if (rt != null) rt.anchoredPosition = WorldToMap(world);
-        // 동적 마커는 매 프레임 재배치되므로 별도 처리 불필요
+        _mapRect.localRotation = Quaternion.Euler(0f, 0f, MapRotationDegrees);
+
+        // 🔴 회전한 정사각형의 외접 영역을 컨테이너가 예약해야 화면 밖으로 안 빠진다.
+        //    45° 면 한 변의 √2 배다(350 → 495).
+        if (_mapRoot != null && _slot == null)
+        {
+            float rad = MapRotationDegrees * Mathf.Deg2Rad;
+            float extent = PanelSize * (Mathf.Abs(Mathf.Cos(rad)) + Mathf.Abs(Mathf.Sin(rad)));
+            _mapRoot.sizeDelta = Vector2.one * extent;
+        }
+
+        // 아이콘은 정립 유지 — 같이 기울면 해골·퀘스트 아이콘이 비뚤어져 읽힌다.
+        Quaternion uprightRot = Quaternion.Euler(0f, 0f, -MapRotationDegrees);
+        foreach (var (rt, world, upright) in _staticMarkers)
+            if (rt != null)
+            {
+                rt.anchoredPosition = WorldToMap(world);
+                rt.localRotation = upright ? uprightRot : Quaternion.identity;
+            }
+        foreach (var kv in _dynMarkers)
+            if (kv.Value != null) kv.Value.rectTransform.localRotation = uprightRot;
     }
 
     private void HandleSizeInput()
     {
+        // 🔴 슬롯에 붙어 있으면 크기의 주인은 슬롯이다. 여기서 프리셋(300/400/520)으로 바꾸면
+        //    회전 외접이 슬롯을 넘어 **화면 밖으로 잘려 나간다**(400 → 외접 566).
+        if (_slot != null) return;
+
 #if ENABLE_INPUT_SYSTEM
         var kb = UnityEngine.InputSystem.Keyboard.current;
         if (kb == null) return;
@@ -497,6 +700,9 @@ public class MinimapController : MonoBehaviour
             _playerScanTimer = 1f;
             ScanPlayers();
             UpdateCanvasVisibility();
+
+            // 플레이 중에 인스펙터로 룩을 맞출 수 있게 주기적으로 다시 밀어 넣는다(초당 1회, 비용 무시).
+            ApplyLookToMaterial();
         }
 
         _maskTimer -= Time.deltaTime;
@@ -513,6 +719,10 @@ public class MinimapController : MonoBehaviour
     // 네트워크 세션 중엔 플레이어가 스폰된 뒤에만 표시. 오프라인(에디터 단독 테스트)은 항상 표시.
     private void UpdateCanvasVisibility()
     {
+        // 🔴 CombatHUD 슬롯에 붙었으면 표시 권한은 그쪽 정책(PlayerCombatUiLifecyclePolicy)의 것이다.
+        //    여기서 매초 켜면 **사망으로 숨긴 HUD 전체를 되살린다.**
+        if (_slot != null) return;
+
         if (_canvas == null) return;
         var nm = Unity.Netcode.NetworkManager.Singleton;
         bool online = nm != null && nm.IsListening;
@@ -615,6 +825,20 @@ public class MinimapController : MonoBehaviour
 
     private void OnDestroy()
     {
-        if (_bakeRT != null) _bakeRT.Release();
+        Player.LocalPlayerChanged -= HandleLocalPlayerChanged;
+
+        // 런타임에 만든 것들은 씬을 떠나도 자동으로 사라지지 않는다 — 명시적으로 버린다.
+        if (_bakeRT != null) { _bakeRT.Release(); Destroy(_bakeRT); _bakeRT = null; }
+        if (_mapMat != null) { Destroy(_mapMat); _mapMat = null; }
+        if (_maskTex != null) { Destroy(_maskTex); _maskTex = null; }
+        if (_silTex != null) { Destroy(_silTex); _silTex = null; }
+
+        if (_dotSprite != null)
+        {
+            // Sprite.Create 로 만든 것은 스프라이트와 원본 텍스처가 따로 남는다.
+            if (_dotSprite.texture != null) Destroy(_dotSprite.texture);
+            Destroy(_dotSprite);
+            _dotSprite = null;
+        }
     }
 }

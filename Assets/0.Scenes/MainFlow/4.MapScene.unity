@@ -2062,6 +2062,7 @@ GameObject:
   - component: {fileID: 544654495}
   - component: {fileID: 544654494}
   - component: {fileID: 544654496}
+  - component: {fileID: 544654497}
   m_Layer: 0
   m_Name: BossTeleportManager
   m_TagString: Untagged
@@ -2133,6 +2134,22 @@ MonoBehaviour:
   fadeOutSeconds: 0.3
   fadeInSeconds: 0.5
   fadeColor: {r: 0, g: 0, b: 0, a: 1}
+--- !u!114 &544654497
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 544654493}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 543b2886f05150949a930a887647c9be, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BossTimerManager
+  ShowTopMostFoldoutHeaderGroup: 1
+  limitSeconds: 300
+  forceWarnSeconds: 3
+  fillUpAsTimePasses: 1
 --- !u!1 &564278533
 GameObject:
   m_ObjectHideFlags: 0
@@ -2661,6 +2678,12 @@ MonoBehaviour:
   SightRadius: 15
   MaskResolution: 128
   MaskTick: 0.15
+  UseTerrainBake: 0
+  MapRotationDegrees: 45
+  RoomCornerMeters: 2.5
+  FlatColor: {r: 0.58, g: 0.58, b: 0.58, a: 1}
+  OutlineColor: {r: 0.13, g: 0.15, b: 0.17, a: 1}
+  MinimapSlotName: MinimapSlot
   BakeResolution: 1024
   BoundsMargin: 8
   BakeCameraHeight: 120

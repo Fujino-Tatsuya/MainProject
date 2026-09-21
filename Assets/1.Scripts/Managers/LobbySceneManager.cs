@@ -6,6 +6,8 @@ using UnityEngine.UI;
 
 public class LobbySceneManager : NemoSceneManager
 {
+    private const string DiagTag = "LobbySceneManager";
+
     [Header("Connection Inputs")]
     [SerializeField] private TMP_InputField ipInputField;
     [SerializeField] private TMP_InputField portInputField;
@@ -61,6 +63,16 @@ public class LobbySceneManager : NemoSceneManager
         BindButtons();
         RegisterNetworkCallbacks();
         RegisterSessionLauncherEvents();
+
+        // 빌드에서만 나는 문제는 이름 기반 해석이 실패한 경우가 많다 — 어떤 참조가 비었는지
+        // 한 줄로 남겨 둔다. (ResolveSceneReferences 의 WarnIfMissing 은 콘솔로만 간다.)
+        NetworkDiagnosticsLog.Log(
+            $"{DiagTag}.Awake",
+            $"networkManager={_networkManager != null} sessionLauncher={_sessionLauncher != null} " +
+            $"relayPanel={relayPanel != null} directPanel={directPanel != null} " +
+            $"relayHostButton={relayHostButton != null} relayJoinButton={relayJoinButton != null} " +
+            $"modeToggleButton={modeToggleButton != null} joinCodeInput={joinCodeInputField != null} " +
+            $"joinCodeDisplay={joinCodeDisplayText != null} errorText={errorText != null}");
     }
 
     private void Start()
@@ -86,12 +98,14 @@ public class LobbySceneManager : NemoSceneManager
 
     public void ApplyConnectionData()
     {
+        NetworkDiagnosticsLog.Log($"{DiagTag}.ApplyConnectionData", "버튼 입력");
         TryApplyConnectionData();
     }
 
     public void StartHost()
     {
         Debug.Log($"[SceneFlow] LobbySceneManager.StartHost hasSessionLauncher={_sessionLauncher != null}");
+        NetworkDiagnosticsLog.Log($"{DiagTag}.StartHost", $"버튼 입력 hasSessionLauncher={_sessionLauncher != null}");
         if (_sessionLauncher == null)
         {
             WarnMissingReference(nameof(NetworkSessionLauncher));
@@ -107,7 +121,7 @@ public class LobbySceneManager : NemoSceneManager
         if (_sessionLauncher.StartHost())
         {
             Debug.Log("[SceneFlow] LobbySceneManager.StartHost succeeded");
-            SetErrorMessage(string.Empty);
+            SetErrorMessage($"Host 시작됨 ({DescribeConfigHash()})");
             SetSessionConnectPanel(false);
             ApplyRoleUi();
         }
@@ -121,6 +135,7 @@ public class LobbySceneManager : NemoSceneManager
     public void StartClient()
     {
         Debug.Log($"[SceneFlow] LobbySceneManager.StartClient hasSessionLauncher={_sessionLauncher != null}");
+        NetworkDiagnosticsLog.Log($"{DiagTag}.StartClient", $"버튼 입력 hasSessionLauncher={_sessionLauncher != null}");
         if (_sessionLauncher == null)
         {
             WarnMissingReference(nameof(NetworkSessionLauncher));
@@ -137,7 +152,7 @@ public class LobbySceneManager : NemoSceneManager
         {
             Debug.Log("[SceneFlow] LobbySceneManager.StartClient connecting");
             _clientConnectPending = true;
-            SetErrorMessage("서버 접속 시도 중...");
+            SetErrorMessage($"서버 접속 시도 중... ({DescribeConfigHash()})");
             SetConnectControlsInteractable(false);
         }
         else
@@ -149,6 +164,8 @@ public class LobbySceneManager : NemoSceneManager
 
     public void SelectDirectMode()
     {
+        NetworkDiagnosticsLog.Log($"{DiagTag}.SelectDirectMode", $"hasSessionLauncher={_sessionLauncher != null}");
+
         if (_sessionLauncher != null)
         {
             _sessionLauncher.Mode = SessionConnectionMode.DirectIPv4;
@@ -160,6 +177,8 @@ public class LobbySceneManager : NemoSceneManager
 
     public void SelectRelayMode()
     {
+        NetworkDiagnosticsLog.Log($"{DiagTag}.SelectRelayMode", $"hasSessionLauncher={_sessionLauncher != null}");
+
         if (_sessionLauncher != null)
         {
             _sessionLauncher.Mode = SessionConnectionMode.UnityRelay;
@@ -171,6 +190,8 @@ public class LobbySceneManager : NemoSceneManager
 
     public void StartRelayHost()
     {
+        NetworkDiagnosticsLog.Log($"{DiagTag}.StartRelayHost", "버튼 입력");
+
         if (!TryBeginRelayStart(true))
         {
             return;
@@ -188,6 +209,10 @@ public class LobbySceneManager : NemoSceneManager
     public void StartRelayJoin()
     {
         var joinCode = joinCodeInputField != null ? joinCodeInputField.text : string.Empty;
+        NetworkDiagnosticsLog.Log(
+            $"{DiagTag}.StartRelayJoin",
+            $"버튼 입력 hasInputField={joinCodeInputField != null} joinCode='{joinCode}'");
+
         if (string.IsNullOrWhiteSpace(joinCode))
         {
             SetErrorMessage("Relay 조인코드를 입력하세요.");
@@ -207,6 +232,7 @@ public class LobbySceneManager : NemoSceneManager
     {
         var controller = ResolveLobbyUIController();
         Debug.Log($"[SceneFlow] LobbySceneManager.ToggleReady hasLobbyUIController={controller != null}");
+        NetworkDiagnosticsLog.Log($"{DiagTag}.ToggleReady", $"버튼 입력 hasLobbyUIController={controller != null}");
         if (controller == null)
         {
             WarnMissingReference(nameof(LobbyUIController));
@@ -220,6 +246,11 @@ public class LobbySceneManager : NemoSceneManager
     public void StartGameLoading()
     {
         Debug.Log($"[SceneFlow] LobbySceneManager.StartGameLoading hasSessionLauncher={_sessionLauncher != null}");
+        NetworkDiagnosticsLog.Log(
+            $"{DiagTag}.StartGameLoading",
+            $"버튼 입력 hasSessionLauncher={_sessionLauncher != null} " +
+            $"isHost={_networkManager != null && _networkManager.IsHost} " +
+            $"connectedCount={(_networkManager != null && _networkManager.IsServer ? _networkManager.ConnectedClientsIds.Count : -1)}");
         if (_sessionLauncher == null)
         {
             WarnMissingReference(nameof(NetworkSessionLauncher));
@@ -281,6 +312,7 @@ public class LobbySceneManager : NemoSceneManager
 
         _sessionLauncher.OnSetConnectionData(ipText, port);
         _connectionDataApplied = true;
+        NetworkDiagnosticsLog.Log($"{DiagTag}.TryApplyConnectionData", $"적용 {ipText}:{port}");
         SetErrorMessage($"연결 대상 설정: {ipText}:{port}");
         return true;
     }
@@ -319,6 +351,13 @@ public class LobbySceneManager : NemoSceneManager
 
     private void HandleClientConnected(ulong clientId)
     {
+        NetworkDiagnosticsLog.Log(
+            $"{DiagTag}.HandleClientConnected",
+            $"clientId={clientId} localClientId={(_networkManager != null ? _networkManager.LocalClientId : 0)} " +
+            $"isHost={_networkManager != null && _networkManager.IsHost} " +
+            $"isServer={_networkManager != null && _networkManager.IsServer} " +
+            $"connectedCount={(_networkManager != null && _networkManager.IsServer ? _networkManager.ConnectedClientsIds.Count : -1)}");
+
         if (_networkManager == null || clientId != _networkManager.LocalClientId)
         {
             return;
@@ -341,6 +380,17 @@ public class LobbySceneManager : NemoSceneManager
         }
 
         Debug.Log($"[SceneFlow] LobbySceneManager.HandleClientDisconnected clientId={clientId} isServer={_networkManager.IsServer} reason='{_networkManager.DisconnectReason}'");
+
+        // 🔴 여기가 지금 문제의 착지점이다. reason 이 "Client-N disconnected by server." 면
+        // 릴레이는 뚫린 것이고 호스트가 거절한 것이다 — NGO 는 NetworkConfig 해시가 어긋나면
+        // 이 문구로 끊는다(ConnectionRequestMessage.Deserialize → CompareConfig).
+        // 호스트 쪽 network.log 의 "NetworkConfig mismatch" 경고와 configHash 블록을 대조할 것.
+        NetworkDiagnosticsLog.LogWarning(
+            $"{DiagTag}.HandleClientDisconnected",
+            $"clientId={clientId} localClientId={_networkManager.LocalClientId} " +
+            $"isServer={_networkManager.IsServer} connectPending={_clientConnectPending} " +
+            $"reason='{_networkManager.DisconnectReason}'");
+
         if (_networkManager.IsServer)
         {
             if (clientId != _networkManager.LocalClientId)
@@ -356,9 +406,23 @@ public class LobbySceneManager : NemoSceneManager
             return;
         }
 
-        SetErrorMessage(_clientConnectPending
-            ? "서버 접속에 실패했습니다. IP/Port와 Host 상태를 확인하세요."
-            : "서버와의 연결이 끊어졌습니다.");
+        // 호스트가 명시적으로 끊은 경우는 "접속이 안 된다"와 원인이 전혀 다르다.
+        // 여기까지 왔다는 건 릴레이·방화벽은 뚫렸고 호스트가 거절했다는 뜻이라,
+        // IP/Port 를 확인하라는 기존 안내는 오히려 사람을 엉뚱한 데로 보낸다.
+        var rejectedByHost = _networkManager.DisconnectReason != null &&
+                             _networkManager.DisconnectReason.Contains("disconnected by server");
+
+        if (rejectedByHost)
+        {
+            SetErrorMessage(
+                $"호스트가 접속을 거절했습니다. 양쪽 빌드가 같은 버전인지 확인하세요. (내 {DescribeConfigHash()})");
+        }
+        else
+        {
+            SetErrorMessage(_clientConnectPending
+                ? "서버 접속에 실패했습니다. IP/Port와 Host 상태를 확인하세요."
+                : "서버와의 연결이 끊어졌습니다.");
+        }
         _clientConnectPending = false;
         SetSessionConnectPanel(true);
         SetConnectControlsInteractable(true);
@@ -369,6 +433,9 @@ public class LobbySceneManager : NemoSceneManager
     private void HandleTransportFailure()
     {
         Debug.LogError("[SceneFlow] LobbySceneManager.HandleTransportFailure");
+        NetworkDiagnosticsLog.LogError(
+            $"{DiagTag}.HandleTransportFailure",
+            $"connectPending={_clientConnectPending} relayPending={_relayStartPending}");
         SetErrorMessage("네트워크 전송 오류가 발생했습니다.");
         _clientConnectPending = false;
         SetSessionConnectPanel(true);
@@ -388,6 +455,8 @@ public class LobbySceneManager : NemoSceneManager
 
         if (_relayStartPending)
         {
+            NetworkDiagnosticsLog.LogWarning(
+                $"{DiagTag}.TryBeginRelayStart", $"이미 진행 중이라 무시 hosting={hosting}");
             return false;
         }
 
@@ -396,11 +465,38 @@ public class LobbySceneManager : NemoSceneManager
         _relayHostPending = hosting;
         SetConnectControlsInteractable(false);
         SetRelayControlsInteractable(false);
+        NetworkDiagnosticsLog.Log($"{DiagTag}.TryBeginRelayStart", $"시작 hosting={hosting} mode={_sessionLauncher.Mode}");
         return true;
+    }
+
+    /// <summary>
+    /// 접속 거절을 <b>화면에서 바로</b> 대조할 수 있게 만드는 짧은 식별자.
+    ///
+    /// 왜 화면에 띄우나 — 호스트와 클라가 서로 다른 PC 에 있으면 한쪽 network.log 만으로는
+    /// 아무것도 못 가린다. 파일을 주고받는 대신 두 사람이 이 숫자만 맞춰 보면 된다.
+    /// NGO 는 이 값이 다르면 설명 없이 "Client-N disconnected by server." 로 끊는다.
+    ///
+    /// ⚠️ <c>NetworkManager</c> 초기화 뒤(= <c>Start*</c> 이후)에만 의미가 있다.
+    /// 그 전에는 프리팹 링크가 비어 있어 실제 접속에 쓰일 값과 다르다.
+    /// ⚠️ <c>GetConfig(false)</c> — 기본값 <c>true</c> 는 해시를 캐시해 실제 접속에 영향을 준다.
+    /// </summary>
+    private string DescribeConfigHash()
+    {
+        if (_networkManager == null || _networkManager.NetworkConfig == null)
+        {
+            return "cfg=?";
+        }
+
+        return $"cfg={_networkManager.NetworkConfig.GetConfig(false)}";
     }
 
     private void HandleSessionStartCompleted(SessionStartResult result)
     {
+        NetworkDiagnosticsLog.Log(
+            $"{DiagTag}.HandleSessionStartCompleted",
+            $"success={result.Success} shareCode='{result.ShareCode}' reason='{result.FailureReason}' " +
+            $"relayPending={_relayStartPending} hostPending={_relayHostPending}");
+
         if (!_relayStartPending)
         {
             return;
@@ -425,9 +521,10 @@ public class LobbySceneManager : NemoSceneManager
                 joinCodeDisplayText.text = result.ShareCode;
             }
 
+            // 조인코드 옆에 설정 해시를 같이 띄운다 — 상대와 이 숫자가 다르면 무조건 못 붙는다.
             SetErrorMessage(string.IsNullOrEmpty(result.ShareCode)
-                ? "Relay Host가 시작되었습니다."
-                : $"Relay 조인코드: {result.ShareCode}");
+                ? $"Relay Host가 시작되었습니다. ({DescribeConfigHash()})"
+                : $"Relay 조인코드: {result.ShareCode} ({DescribeConfigHash()})");
             SetConnectControlsInteractable(false);
             SetRelayControlsInteractable(false);
             ApplyRoleUi();
@@ -435,7 +532,7 @@ public class LobbySceneManager : NemoSceneManager
         }
 
         _clientConnectPending = true;
-        SetErrorMessage("서버 접속 시도 중...");
+        SetErrorMessage($"서버 접속 시도 중... ({DescribeConfigHash()})");
     }
 
     private void RegisterSessionLauncherEvents()
@@ -470,6 +567,7 @@ public class LobbySceneManager : NemoSceneManager
         _networkManager.OnClientDisconnectCallback += HandleClientDisconnected;
         _networkManager.OnTransportFailure += HandleTransportFailure;
         _networkCallbacksRegistered = true;
+        NetworkDiagnosticsLog.Log($"{DiagTag}.RegisterNetworkCallbacks", "등록 완료");
     }
 
     private void UnregisterNetworkCallbacks()
@@ -604,6 +702,10 @@ public class LobbySceneManager : NemoSceneManager
 
     private void ToggleConnectionMode()
     {
+        NetworkDiagnosticsLog.Log(
+            $"{DiagTag}.ToggleConnectionMode",
+            $"현재 mode={(_sessionLauncher != null ? _sessionLauncher.Mode.ToString() : "(런처 없음)")}");
+
         if (_sessionLauncher != null && _sessionLauncher.Mode == SessionConnectionMode.UnityRelay)
         {
             SelectDirectMode();
