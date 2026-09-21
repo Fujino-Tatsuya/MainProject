@@ -912,7 +912,18 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         }
 
         // 히트 순간에 카운터 창이 닫힌다 — 못 끊으면 잡힌다/밀린다(창에 실패 대가가 붙는다).
-        SetCounterWindow(false);
+        //
+        // 🔴 **잡기는 예외다**(2026-09-21 수정 · G6). 잡기의 창은 히트가 아니라 **잡기 사이클이
+        //    소유한다** — `AcquireGrab` 이 붙잡기에 성공한 순간 열고, `AdvanceGrabSlam` 이
+        //    마지막 타 직전에 닫는다. 그런데 `Boss_23_grab` 클립에는 `OnAttackHit` 이
+        //    **정규화 0.354** 에 박혀 있어(fbx.meta 확인), 붙잡는 모션 중 이 함수가 반드시 한 번
+        //    불린다. 여기서 무조건 닫으면 **창이 Acquire 중에 0.25초만 열렸다 닫히고**
+        //    정작 플레이어가 끊으려는 Hold·Throw 구간에는 이미 닫혀 있다.
+        //    (2026-09-21 MPPM 실측 로그: `페이즈=Hold/Throw · 창열림=False · 정면=True`)
+        //    ⚠️ `StartAttack` 에는 같은 예외가 이미 있었는데(`e.attackId != Grab`) 여기만 빠져 있었다.
+        //       창을 여닫는 지점을 늘릴 때는 **양쪽을 같이** 볼 것.
+        if (e.attackId != BossAttackId.Grab)
+            SetCounterWindow(false);
 
         // [G1] 주먹이 닿는 순간 전진을 멈춘다 — "전진하며 휘두르다 닿으면 선다".
         // 🔴 **이동만** 멈추고 히트 윈도우는 열어 둔다. 아래 끝점 판정이 같은 윈도우를 써야
