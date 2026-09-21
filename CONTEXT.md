@@ -458,6 +458,50 @@ Dash 전용이다. 이 값을 키워도 잡기 인터럽트 구간은 1초도 �
 `송전기 — 4초 안에 못 갔다(2.1m) → 워프` · `인터럽트가 카운터로 성립하지 않았다` ·
 `Failed to create agent because it is not close enough to the NavMesh`.
 
+
+---
+
+## 🔴 공격속도 — **속성 추가 안 함, 클립 길이 일반화로 간다** (2026-09-21 확정)
+
+브랜치 `feature/PlayerAttackSpeedAttribute` 는 **커밋 0개로 폐기**했다. 이름과 달리 스탯을 새로
+만드는 작업이 아니었다.
+
+**결정**: 공격속도는 스탯/모디파이어로 풀지 않는다. **모든 playable 캐릭터의 공격 애니메이션
+클립 길이를 일반화(정규화)** 하는 방향으로 간다.
+
+**왜 — 조사에서 나온 것 (다시 조사하지 말 것)**
+
+- **평타 타이밍은 100% 애니메이션 이벤트가 결정한다.** `Hit`/`ComboWindowOpen`/
+  `ComboWindowClose`/`End` 전부 클립에 박힌 AnimationEvent →
+  `PlayerAnimationEventRelay.cs:21` → `DefaultAttackController.cs:346` (`IsServer` 게이트).
+- **`DefaultAttackStep.MotionDuration` 은 함정이다.** 에셋의 `motionDuration` 은 4스텝 전부 `0`
+  이라 실효값은 `clip.length` 인데, 이 값은 **End 이벤트 유실 대비 fallback** 과 (현재 미사용인)
+  스크립트 이동에만 쓰인다. 여기에 배율을 곱해도 **화면상 공격은 안 빨라지고 fallback 만 일찍
+  터진다.**
+- **플레이어엔 평타 쿨다운도 입력 버퍼도 없다.** 게이트는 `PlayerStateController.CanAttack` 뿐.
+  연타 상한은 순전히 "End 이벤트가 언제 오는가" 다.
+- **`animator.speed` 를 만지는 플레이어 코드 0건**, `PlayerAnimatorController` 에 speed 파라미터
+  없음(공격 state 4개 모두 `m_Speed: 1`, `m_SpeedParameterActive: 0`).
+- 클립 실측: `Garen_Default_Attack_1~4` 길이 2.0 / 1.5 / 1.833 / 1.6초인데 **End 이벤트는
+  0.733 / 0.567 / 0.733 / 0.533초.** 클립 뒷부분이 통째로 잘린다. ← 일반화 작업의 출발점.
+
+**죽어 있는 것 — 살릴지 지울지 아직 미정**
+
+- `Unit.FinalAttackSpeed` (`Unit.cs:367`) **게임플레이 소비자 0건.**
+  `Docs/tech/game-structure-uml.md:401` 이 이미 이 사실을 적어 뒀다.
+- `Unit.ChangeAttackSpeedValue` / `ChangeAttackSpeedValueRpc` 호출처 0건.
+- `StatusEffectType.AttackSpeedModifier` (`1 << 9`) 를 `Apply` 하는 코드·에셋 0건.
+  (대조: `MoveSpeedModifier` 는 `PlayerMovement.cs:68,191` 에서 실사용 중)
+- 🔴 **`Player.prefab:929` 의 `attackSpeed` 값이 `0`이다** (Paladin·Paladin_VFX 도 전부 0).
+  아무도 안 읽어서 안 터졌을 뿐, 배선하는 순간 배율 0이 된다.
+- `CharacterDefinition` 은 중복 스탯 소스가 **아니라 사문(死文)** 이다. 이 SO 의 에셋 인스턴스가
+  프로젝트에 **0개**고, 읽는 쪽 `PlayableCharacterVisual` 은 어떤 프리팹·씬에도 안 붙어 있다.
+  실제 스탯 소스는 `Player.prefab` 의 SerializeField 하나뿐.
+
+**몬스터 쪽은 의미가 다르다** — `MonsterBase.cs:1346` 은 `간격 = 1 / AttackSpeed`(초당 횟수)로
+살아 있다. 단 행별 명시 쿨다운이 있으면 무시되므로 **보스에선 죽어 있다**
+(`BossDataSO.cs:503` 주석). 플레이어와 같은 `Unit._attackSpeed` 필드를 쓰지만 의미가 다르다.
+
 ---
 
 ## ▶▶ 이전 인수인계 (2026-09-18 · 공격 범위/회전 재작업 + G4 **완료**, 브랜치 `feature/Boss23`)
