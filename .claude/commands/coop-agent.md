@@ -104,7 +104,9 @@ while :; do
   fi
   w=$(wc -l < "$H/watcher.log")
   if [ "$w" -gt "$base_wlog" ]; then
-    d=$(sed -n "$((base_wlog+1)),\$p" "$H/watcher.log" | grep -E 'DONE id=|보고 없음|실패|\[RELOAD\]')
+    d=$(sed -n "$((base_wlog+1)),\$p" "$H/watcher.log" \
+        | grep -v '\[codex\]' \
+        | grep -E 'DONE id=|REPORTED |\[RELOAD\]|ERROR:')
     [ -n "$d" ] && { echo "$d" | cut -c1-500; exit 0; }
     base_wlog=$w
   fi
@@ -113,8 +115,14 @@ done
 ```
 
 - 🔴 **성공만 잡으면 안 된다.** Codex가 크래시하거나 사용량 한도에 걸리면 `work_completed`가
-  영영 안 온다. `DONE id=` · `보고 없음` · `실패` 도 종료 조건에 넣어야 침묵과 실패가 구분된다.
+  영영 안 온다. `DONE id=` · `REPORTED ` · `ERROR:` 도 종료 조건에 넣어야 침묵과 실패가 구분된다.
   `"sender":"codex"` 로 잡으면 `type:"message"`(질문)도 걸려서 Codex가 막혔을 때도 깨어난다.
+- 🔴 **`watcher.log` 에서 `[codex]` 줄은 반드시 걸러라.** 워처는 codex stdout 을 그대로
+  `... [<LANE>] [codex] <원문>` 으로 옮겨 적는다. 그래서 `실패` · `보고 없음` 같은 **한국어 단어로
+  매칭하면 Codex가 출력한 소스 주석에 걸려 오탐한다** — 2026-09-21 에 실제로
+  `[codex] + // 실패한 테스트도 ...` 한 줄에 감시가 깨어났다.
+  워처 자신이 쓴 줄만 봐야 하므로 `grep -v '\[codex\]'` 를 먼저 태우고,
+  종료 신호는 워처가 실제로 쓰는 고정 문자열(`DONE id=` · `REPORTED ` · `[RELOAD]` · `ERROR:`)로만 잡는다.
 - `cut -c1-500` 으로 줄을 잘라라. `conversation.jsonl` 한 줄이 handoff 본문 전체다.
 - 무한 루프이므로 **시간 안전장치**(예: 3시간)를 넣고 초과 시 종료 코드를 달리해라.
 - 깨어나면 `/coop-agent-reload` 를 제안한다.
