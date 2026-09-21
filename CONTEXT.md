@@ -8,6 +8,24 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 진행 중 (2026-09-21 · 구역 진입 기반 벽 투명화 1단계, 브랜치 `feature/TransparentV2-keepgoing`)
+
+작업자: **은희(Claude)**. 계획·근거·검증은 [PLAN.md](PLAN.md) 최상단 (**승인 대기**).
+
+수정 예정 파일:
+- 신규 `Assets/1.Scripts/Rendering/Occlusion/WallTransparencyGroup.cs` (표현)
+- 신규 `Assets/1.Scripts/Rendering/WallTransparencyZone.cs` (감지)
+- 신규 `Assets/3.Materials/Level1_Materials/Occlusion/WallTransparencyDither.hlsl`
+- 🔴 **SVN** `Assets/50.Art/MapGen/MapObj/material/Generic_Standard.shadergraph` — **사용자가 Unity 에서 직접 수정**
+
+**용어** — 여기서 "구역 투명화" 는 *구역에 플레이어가 있으면 그 구역이 지정한 벽 그룹이 통째로
+디더로 사라지는 것* 이다. **시선 차단 판정이 아니다.** 기존 `WallOcclusionDriver` 의
+카메라-플레이어 선분 기반 픽셀 투명화(= "A 시스템", 현재 `m_Enabled: 0` 으로 비활성)와는 별개다.
+
+**2026-09-21 결정(은희)** — `PLAN.md` 의 2026-09-14 「투명화 끄고 실루엣으로」(경석)에 대해,
+**실루엣은 그대로 두고 벽 투명화를 함께 간다.** 기존 투명화 시스템은 끄지도 지우지도 않는다.
+
+
 ## ▶▶ 진행 중 (2026-09-18 · **PC 간** Relay 접속 실패 — 진단 계측 투입, 브랜치 `development`)
 
 작업자: **Claude**. 수정 파일: `Assets/1.Scripts/Network/NetworkDiagnosticsLog.cs`(신규) ·

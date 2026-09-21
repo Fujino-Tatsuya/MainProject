@@ -1,3 +1,107 @@
+# ▶▶▶ CURRENT PLAN — 구역 진입 기반 벽 투명화 1단계 (2026-09-21, **✅ 승인됨**)
+
+> 작업 세션: **은희(Claude)**, 브랜치 `feature/TransparentV2-keepgoing` (base `development` `10cbe8d0`).
+> 설계 합의는 grill 로 진행했고, 아래는 그 결과다.
+> **2026-09-21 은희 승인.** 코드 구현은 Agent-Bridge 로 Codex 에 위임
+> (handoff `a038ee5c-a920-4b0f-aa7c-a107dd31a461`, 레인 `MainProject-WorkTree`).
+
+## 0. 팀장 결정과의 관계 — 되돌리는 게 아니라 병행이다
+
+[PLAN.md 「A. 벽 가림 — 투명화(디더 클립)를 끄고 실루엣 윤곽선으로」](PLAN.md)(2026-09-14, 경석)에서
+투명화를 끄고 실루엣으로 갔고, **이미 실행되어 있다**:
+
+| 실측 | 값 |
+|---|---|
+| `4.MapScene` 의 `WallOcclusionDriver` | `m_Enabled: 0` — 이미 비활성 |
+| `PC_Renderer.asset` 의 `PlayerSilhouetteFeature` | `m_Enabled: 1` / `m_Active: 1` (로컬 초록·원격 파랑) |
+| 커밋 `c4dbd4b9` | `merge: … (투명화 OFF 유지 + 화면효과 RetroCRT 통일)` |
+
+🔴 **2026-09-21 결정(은희): 실루엣은 그대로 두고, 시야를 가리는 벽 투명화를 함께 간다.**
+둘은 목적이 다르다 — 실루엣은 *플레이어가 벽 뒤 어디 있는지*, 구역 투명화는 *방 안 구조가 보이는지*.
+기존 시스템은 **끄지도 지우지도 않는다.** 이미 꺼져 있으므로 씬에서 할 일도 없다.
+
+## 1. 목표
+
+**구역 안에 플레이어가 하나라도 있으면, 그 구역이 지정한 벽 그룹이 디더로 투명해진다.**
+
+- 네트워크 동기화 코드 **없음**. 각 클라이언트가 로컬에서 독립 판정한다.
+- 가림(시선 차단) 판정 **없음**. 그룹은 통째로 같이 투명해진다.
+- 1단계는 **독립적으로 완결**되며, 2단계는 이 위에 얹는다.
+
+## 2. 확정 결정
+
+| # | 결정 | 근거 |
+|---|---|---|
+| 1 | 구역 = **수동 오서링 트리거 볼륨** | 맵 생성 시스템에 결합시키면 그쪽이 바뀔 때 같이 깨진다 |
+| 2 | 구역이 대상 벽을 **명시적 Renderer 리스트**로 보유 | `Wall(7)` 레이어에 존 오브젝트가 **0개**(199개 중 193개가 layer 0) — 레이어 자동 수집은 불가능 |
+| 3 | 점유 판정 = **`Player(6)` 레이어**, 단 **루트 오브젝트 단위로 카운트** | `Paladin` 의 layer 6 콜라이더가 **7개**(루트 캡슐 + 공격 히트박스 6개). 콜라이더로 세면 공격할 때마다 카운트가 요동친다 |
+| 4 | 인스펙터 토글로 **모든 플레이어 ↔ 로컬 플레이어만** | 어느 쪽이 나은지는 붙여봐야 안다. 필터 한 줄 차이 |
+| 5 | 표현 = **디더 클립** (알파 블렌딩 아님) | Opaque 유지 → 정렬·ZWrite·SSAO/Fog/Silhouette 상호작용·Forward+ 함정을 전부 회피 |
+| 6 | 디더를 **원본 Shader Graph 에 심는다** (변종 머티리얼 폐기) | 기존 변종 14쌍은 원본 그래프의 **손으로 만든 근사치**라 톤이 튄다고 문서에 기록됨. 원본에 심으면 톤 차이 0 |
+| 7 | **Shader Graph 키워드**로 디더 대상을 가른다 | `Generic_01_A` 는 바닥·파이프·기계·문도 쓴다. 키워드 OFF 면 코드가 컴파일에서 빠져 **비용 0** |
+| 8 | 벽은 **Material Variant**(키워드 ON)를 쓴다 | Variant 는 부모를 상속 → 아트가 원본을 고치면 자동 반영. 기존 14쌍의 유지보수 문제가 원천적으로 없다 |
+| 9 | 페이드 값은 **그룹당 머티리얼 인스턴스 1개** (MPB 폐기) | MPB 는 **SRP Batcher 를 깬다**(`PC_RPAsset.asset:72` = 켜짐). 그룹은 통째로 같은 값이라 렌더러별 값이 필요 없다 |
+| 10 | 구역 중첩 = **OR**(참조 카운트) + 에디터 중복 경고 | 인접 구역이 칸막이 벽을 공유하는 건 흔하다 |
+| 11 | 페이드 인/아웃 시간·목표 불투명도 = **인스펙터 변수** | 이탈을 길게 두면 경계 깜빡임이 완화된다 |
+| 12 | 감지 = `Assembly-CSharp` / 표현 = `VeyTrace.Rendering.Occlusion` | 분리 경계를 **어셈블리 경계로 강제**한다 |
+| 13 | 기존 A 시스템 코드·셰이더·변종 14쌍 **전부 유지** | 되돌릴 여지. 이미 비활성이라 간섭 없음 |
+
+## 3. 구성
+
+**감지 — `WallTransparencyZone`** (`Assembly-CSharp`)
+- `BoxCollider(isTrigger)` + `Player(6)` 레이어 진입 감지
+- **루트 오브젝트 단위 `HashSet`** 으로 카운트 (콜라이더 7개 → 1명)
+- 다중 콜라이더 가드: [BossEnterTrigger.cs:41](Assets/1.Scripts/Map/BossEnterTrigger.cs:41) 처럼 `bounds.Contains()` 재확인 + 주기적 prune (사망·디스폰 대비)
+- 토글: 모든 플레이어 ↔ 로컬만 / 대상 그룹 참조
+
+**표현 — `WallTransparencyGroup`** (`VeyTrace.Rendering.Occlusion`)
+- `Renderer[]` 명시 리스트 + 참조 카운트(OR)
+- 시작 시 **머티리얼 인스턴스 1개** 생성해 그룹 전원이 공유, 그 인스턴스의 `_WallOcclusionOpacity` 를 보간
+- 인스턴스는 자동 해제가 안 되므로 `OnDestroy` 에서 `Destroy`
+
+**셰이더** — 🔴 SVN (`Assets/50.Art/`, gitignore 대상)
+- `Assets/50.Art/MapGen/MapObj/material/Generic_Standard.shadergraph` 에 Custom Function + 불리언 키워드 추가 → **사용자가 Unity 에서 직접**
+- hlsl 은 **신규 작성, git** 의 `Assets/3.Materials/Level1_Materials/Occlusion/` 에 배치
+  (기존 `WallOcclusionClip.hlsl` 은 **쓰지 않는다** — B브랜치의 화면공간 캡슐 방식이라 `_WallOccCapsuleA/B`·`_WallOccViewProjection`·`_WallOccScreenRect` 를 요구한다)
+- 노출 프로퍼티 이름 **`_WallOcclusionOpacity`**, 기본값 1
+- 성공 후 `Generic_Basic.shadergraph`(펜스 `PolygonConstruction_01_A`)에 동일 적용
+
+## 4. 순서
+
+| 단계 | 내용 | 주체 |
+|---|---|---|
+| 1 | hlsl 작성 + 그래프 수정 지시서 | Claude |
+| 2 | `Generic_Standard.shadergraph` 수정 + Material Variant 생성 | **사용자 (Unity)** |
+| 3 | `WallTransparencyGroup` / `WallTransparencyZone` 구현 | Claude |
+| 4 | 테스트씬 제작 | **사용자** |
+| 5 | Play 검증 → 튜닝값 확정 | **사용자** |
+| 6 | `Generic_Basic` 동일 적용 → 존 프리팹 1종 파일럿 오서링 | 사용자 |
+
+## 5. 리스크
+
+| 리스크 | 대응 |
+|---|---|
+| **디더가 정적 패턴** — A 드라이버가 없으니 디더 오프셋 전역값이 0 고정 | 지글거림은 없다. 격자 패턴 고정이 눈에 거슬리는지 Play 로 판단 |
+| **바닥 렌더러를 그룹 리스트에 잘못 넣으면 바닥이 사라진다** | 에디터 검증에서 경고 |
+| **SVN 셰이더 수정은 git PR 에 안 올라간다** | 팀에 SVN 업데이트 공지 필요 |
+| 컨베이어 벨트 머티리얼 2종은 대상 아님 | 그룹에 들어가면 조용히 안 사라짐 → 에디터 경고 |
+
+## 6. 검증
+
+1. 사용자가 **테스트씬** 제작 → `Player(6)` 레이어 캡슐로 구역 출입 확인
+2. **원본 벽 / 디더 벽 나란히** 놓고 톤 차이 확인 (Material Variant 라 0 이어야 정상)
+3. 구역 중첩(OR) 동작
+4. **MPPM 2인** 으로 토글 양쪽 — 🔴 **Play 는 사용자가 직접** (MCP 로 걸면 MPPM 이 깨진다)
+
+## 7. 범위 밖
+
+- 시선 차단 판정 / 층(Elevation) 개념 / 보스 연출 연동 — 2단계 이후
+- `origin/feature/transparent` 브랜치 머지 (merge-base `9e8a3069` 로 낡아 RetroCRT·Silhouette 이 되돌아간다)
+- 실루엣 시스템 수정 — **손대지 않는다**
+- `4.MapScene` 수정 — 드라이버가 이미 비활성이라 할 일 없음
+
+---
+
 # ▶▶▶ 진행 중 = **수호자의 의지(E) 보호막 VFX — 이펙트 정책 이식** (2026-09-17 · 코드·에셋 완료 · Play 검증 대기)
 
 > 작업 세션: **민경(Claude)**, 브랜치 `feature/VFX`.
