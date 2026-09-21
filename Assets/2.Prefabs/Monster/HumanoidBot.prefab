@@ -69,6 +69,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Hurtbox
   ownerUnit: {fileID: 6868425966318957232}
+  attackReceiverSource: {fileID: 0}
 --- !u!1 &2289540308195322763
 GameObject:
   m_ObjectHideFlags: 0
@@ -327,7 +328,7 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   dissolveTemplate: {fileID: 2100000, guid: 2aa1c6b21e004e799e426acfd55ec726, type: 2}
   particlePrefab: {fileID: 7019508933032447489, guid: 0e15d6fc561b43fa95fadff8ab04b5fd, type: 3}
-  duration: 1
+  duration: 1.5
   despawnGrace: 0.5
   renderers: []
 --- !u!114 &4462577184190413312
@@ -343,7 +344,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EffectAnimEvents
   animator: {fileID: 4092700320975204421}
-  players: []
+  effects: []
 --- !u!1 &8136740581150105276
 GameObject:
   m_ObjectHideFlags: 0

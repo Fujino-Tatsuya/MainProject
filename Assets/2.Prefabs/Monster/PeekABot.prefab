@@ -445,7 +445,7 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   dissolveTemplate: {fileID: 2100000, guid: 2aa1c6b21e004e799e426acfd55ec726, type: 2}
   particlePrefab: {fileID: 7019508933032447489, guid: 0e15d6fc561b43fa95fadff8ab04b5fd, type: 3}
-  duration: 1
+  duration: 1.5
   despawnGrace: 0.5
   renderers: []
 --- !u!114 &7264363400000000001
@@ -482,7 +482,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EffectAnimEvents
   animator: {fileID: 0}
-  players: []
+  effects: []
 --- !u!114 &8433259596113430102
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -495,6 +495,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ef27b6c476e735f4aa09fc2dbd4f90e1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TurretHeadAim
+  ShowTopMostFoldoutHeaderGroup: 1
   headBone: {fileID: 0}
   headBoneName: HeadRotator
   turnDegreesPerSecond: 360
@@ -510,6 +511,11 @@ MonoBehaviour:
     m_Bits: 0
   laserMaterial: {fileID: 2100000, guid: 0211162a9b9101841a1e86945b6365ab, type: 2}
   laserWidth: 0.05
+  laserOrigin: {fileID: 0}
+  telegraphSeconds: 0.7
+  aimHoldSeconds: 0.5
+  yawSendThreshold: 0.5
+  replicationSmoothing: 0.08
   logDiagnostics: 0
 --- !u!1001 &7660482076223886559
 PrefabInstance:
