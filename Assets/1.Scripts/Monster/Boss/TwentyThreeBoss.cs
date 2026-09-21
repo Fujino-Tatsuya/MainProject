@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -1599,8 +1599,16 @@ public class TwentyThreeBoss : MonsterBase
 
         Player target = FindNearestPulled();
 
-        // 끌려온 사람이 없으면(전원 슈퍼아머·범위 밖) 반경 안에서 한 번 더 찾는다 — 기존 동작 보존.
-        if (target == null) target = FindGrabTarget();
+        // 🔴 2026-09-21 — **붙잡는 순간의 재탐색을 없앴다**(팀장 확정).
+        //    예전에는 끌려온 사람이 없으면 여기서 반경(grabRadius)을 다시 훑어 잡았다.
+        //    그런데 예고(부채꼴)는 **끌어당김이 시작될 때 이미 꺼진다** — 그 뒤 GrabPull 구간
+        //    약 1.2초 동안은 화면에 아무 경고가 없다. 재탐색은 그 창에 **걸어 들어온 사람**을
+        //    잡았고, 그 사람은 예고를 한 번도 본 적이 없었다(팀장 관찰: "장판이 사라지고
+        //    다가가서 공격하려는데 잡힌다").
+        //
+        //    이제 잡히는 대상은 **예고된 부채꼴 안에서 실제로 끌려온 사람뿐**이다.
+        //    그래서 "예고가 판정에 대해 거짓말하지 않는다"는 이 레포의 규약이 지켜진다.
+        //    대가: 전원이 슈퍼아머거나 범위 밖이면 헛잡기가 된다 — 그게 의도다.
 
         if (target != null)
         {
@@ -1652,6 +1660,13 @@ public class TwentyThreeBoss : MonsterBase
         {
             Player p = _pulledPlayers[i];
             if (p == null || !p.gameObject.activeInHierarchy) continue;
+
+            // 🔴 **유령은 잡지 않는다.** 끌려온 뒤 붙잡히기까지 약 1.2초가 있어서 그 사이에
+            //    죽을 수 있다. Soul 은 같은 오브젝트라 activeInHierarchy 가 그대로 true 이고,
+            //    구속 진입부(CanReceiveServerInteraction)도 생명 상태를 보지 않는다 —
+            //    즉 여기서 거르지 않으면 **유령이 붙잡힌다.**
+            //    (폴백 재탐색 FindGrabTarget 에는 이 검사가 있었는데 이쪽에는 없었다.)
+            if (!MonsterTargeting.IsAttackable(p.transform)) continue;
 
             float d = (p.transform.position - transform.position).sqrMagnitude;
             if (d >= best) continue;
@@ -1944,37 +1959,40 @@ public class TwentyThreeBoss : MonsterBase
         return Vector3.Dot(fwd, to.normalized) >= cos;
     }
 
-    Player FindGrabTarget()
-    {
-        if (_grabBuffer == null) _grabBuffer = new Collider[8];
-
-        float radius = _boss != null ? _boss.grabRadius : 2.2f;
-        int count = Physics.OverlapSphereNonAlloc(
-            transform.position, radius, _grabBuffer, playerMask, QueryTriggerInteraction.Collide);
-
-        Player nearest = null;
-        float best = float.MaxValue;
-        for (int i = 0; i < count; i++)
-        {
-            Collider c = _grabBuffer[i];
-            if (c == null) continue;
-            if (!MonsterTargeting.IsAttackable(c)) continue; // 유령은 잡지 않는다
-
-            Player p = c.GetComponentInParent<Player>();
-            if (p == null) continue;
-
-            // 🔴 **예고와 같은 부채꼴 안에서만 고른다**(2026-09-18 버그 수정).
-            //    이전에는 각도 판정이 없는 **360° 구**였다 — 그래서 예고가 안 그려진
-            //    보스 뒤·옆에 서 있어도 grabRadius 안이면 잡혔다(팀장 관찰).
-            if (!InAttackCone(p.transform.position, _currentEntry, 90f)) continue;
-
-            float sqr = (p.transform.position - transform.position).sqrMagnitude;
-            if (sqr >= best) continue;
-            best = sqr;
-            nearest = p;
-        }
-        return nearest;
-    }
+    // ⚠️ 2026-09-21 — **미사용이 됐다.** 붙잡는 순간의 재탐색을 없애면서(위 AcquireGrab 주석)
+    //    유일한 호출부가 사라졌다. 죽은 채로 두면 다음 사람이 "이게 판정이겠지" 하고 읽는다.
+    //    재탐색을 되살릴 일이 있으면 **예고를 그 구간까지 유지하는 것과 세트로** 해야 한다.
+    // Player FindGrabTarget()
+    // {
+    // if (_grabBuffer == null) _grabBuffer = new Collider[8];
+    //
+    // float radius = _boss != null ? _boss.grabRadius : 2.2f;
+    // int count = Physics.OverlapSphereNonAlloc(
+    // transform.position, radius, _grabBuffer, playerMask, QueryTriggerInteraction.Collide);
+    //
+    // Player nearest = null;
+    // float best = float.MaxValue;
+    // for (int i = 0; i < count; i++)
+    // {
+    // Collider c = _grabBuffer[i];
+    // if (c == null) continue;
+    // if (!MonsterTargeting.IsAttackable(c)) continue; // 유령은 잡지 않는다
+    //
+    // Player p = c.GetComponentInParent<Player>();
+    // if (p == null) continue;
+    //
+    // // 🔴 **예고와 같은 부채꼴 안에서만 고른다**(2026-09-18 버그 수정).
+    // //    이전에는 각도 판정이 없는 **360° 구**였다 — 그래서 예고가 안 그려진
+    // //    보스 뒤·옆에 서 있어도 grabRadius 안이면 잡혔다(팀장 관찰).
+    // if (!InAttackCone(p.transform.position, _currentEntry, 90f)) continue;
+    //
+    // float sqr = (p.transform.position - transform.position).sqrMagnitude;
+    // if (sqr >= best) continue;
+    // best = sqr;
+    // nearest = p;
+    // }
+    // return nearest;
+    // }
 
     // 🔴 잡기 단계 길이는 **전부 `GrabCycleSpeed` 로 나눈다** — 애니 재생속도에도 같은 배수가 걸리므로
     //    한쪽만 적용하면 애니와 FSM 이 어긋난다(그러면 이 프로젝트에선 조용한 데미지 0 이 된다).
