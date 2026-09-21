@@ -51,7 +51,13 @@ Update this file when a term becomes important enough that future agents or team
    지금은 Tooltip·주석으로 명시만 했다. 송전탑 개수가 인원과 안 맞으면 여기를 의심할 것.
 2. **`chargeZonePrefab` 이 비어 있다**(`{fileID: 0}`) → 차징 **전기 장판은 지금 데이터로 안 나온다.**
    검증할 때 없는 걸 찾지 말 것.
-3. **돌진(1.5초)이 `dashStunDuration`(1초)보다 길어졌다** — 캐리 대상이 끌려가는 도중 스턴이 풀린다.
+3. ~~돌진(1.5초)이 `dashStunDuration`(1초)보다 길어져 끌려가는 도중 스턴이 풀린다~~
+   → ⚠️ **정정(2026-09-21): 그런 일은 없다. 내가 틀렸다.**
+   `dashStunDuration` 은 캐리를 붙잡는 값이 **아니다** — `ReleaseDashCarry` 에서 구속을 푼
+   **다음 줄**에, 그것도 **벽에 처박았을 때만** 거는 사후 기절이다(Tooltip 도 "벽 충돌 시"라고 적혀 있다).
+   캐리는 `PlayerActionState.Restrained` 이고 **타이머가 없다** — 보스가 `EndRestrained()` 를
+   부를 때까지 유지된다. 즉 캐리(돌진 내내) → 해제 → 스턴 시작 순서라 **둘이 겹치지 않는다.**
+   `dashDuration` 을 늘려도 스턴에는 영향이 없다.
 4. `attacks[].damage` 8개는 전부 0 이지만 **정상이다** — `attackDamage: 10` 폴백. 건드리지 말 것.
 
 ---
