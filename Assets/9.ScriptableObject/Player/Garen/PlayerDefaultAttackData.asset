@@ -20,7 +20,7 @@ MonoBehaviour:
   attackSteps:
   - clip: {fileID: 7400000, guid: 39d36e6d9f0eb8c44b900cdf070eebfe, type: 2}
     motionDuration: 0
-    movementType: 0
+    movementType: 2
     forwardDistance: 0.5
     rotationType: 1
     trackRotationSpeed: 12
@@ -33,7 +33,7 @@ MonoBehaviour:
     loopBackEntryTime: 0.107327722
   - clip: {fileID: 7400000, guid: 12312a1688de53a45ad3c5dfe98321e4, type: 2}
     motionDuration: 0
-    movementType: 0
+    movementType: 2
     forwardDistance: 0.5
     rotationType: 1
     trackRotationSpeed: 12
@@ -45,7 +45,7 @@ MonoBehaviour:
     flatDamageBonus: 0
   - clip: {fileID: 7400000, guid: 56128d2b850943d4e82bfc7eaeedc12d, type: 2}
     motionDuration: 0
-    movementType: 0
+    movementType: 2
     forwardDistance: 0.5
     rotationType: 1
     trackRotationSpeed: 12
@@ -57,7 +57,7 @@ MonoBehaviour:
     flatDamageBonus: 0
   - clip: {fileID: 7400000, guid: 1c32f02fd71b2e24db9075ea68dc1aed, type: 2}
     motionDuration: 0
-    movementType: 0
+    movementType: 2
     forwardDistance: 0.5
     rotationType: 1
     trackRotationSpeed: 12
