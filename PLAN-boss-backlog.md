@@ -58,7 +58,14 @@ GameObject** 라 `activeInHierarchy` 가 계속 true 이고, 구속 진입부 `C
 
 ## 🟢 바로 착수 가능 (선행조건 없음)
 
-### B1. G4 — 점프 이륙 ⬅ **추천 1순위**
+### ~~B1. G4 — 점프 이륙~~ ✅ **완료** (2026-09-21 확인 — 이 항목이 낡아 있었다)
+
+`BossAttackPhase.JumpTakeoff` · `CrossFadeJumpTakeoffClientRpc` · `BeginJumpTakeoff` 배선 완료,
+`No23.asset` 에 `jumpTakeoffState: Leap` / `jumpTakeoffDuration: 0.633` 저작됨.
+🔴 **이 항목이 "다음 1순위"로 남아 있어 한 세션이 같은 걸 또 하려다 멈췄다.** 완료분은 즉시 옮길 것.
+이륙 구간은 2026-09-21 부터 **차징 진입도 공유한다**([PLAN-boss-entrance-charge.md](PLAN-boss-entrance-charge.md) E4).
+
+<details><summary>원래 내용</summary>
 
 | | |
 |---|---|
@@ -71,12 +78,26 @@ GameObject** 라 `activeInHierarchy` 가 계속 true 이고, 구속 진입부 `C
 🔴 §3-A 의 함정 중 셋이 특히 틀리기 쉽다 — 재생속도 상수 박기 금지(클립 길이에서 역산) ·
 `_stateTimer` 예산에 이륙 몫 더하기 · 예고 `growTime` 을 `이륙 + 체공` 으로 늘리기.
 
-### B2. 데미지 밸런스
+</details>
+
+### B2. 데미지 밸런스 — 🟡 **급하지 않다. 지금 값은 정상 동작한다**
+
+🔴 **이 항목의 예전 문구가 "8개 전부 damage: 0" 이라 "데미지가 안 들어간다"로 읽혔다.
+그게 아니다**(2026-09-21 팀장 정정 + 실측). `damage: 0` 은 **미설정이 아니라 "폴백을 쓴다"** 는 뜻이다.
+이 레포에는 `e.damage > 0 ? e.damage : AttackDamage` 형태의 폴백이 5군데 있다.
+
+| 공격 | 실제 데미지원 |
+|---|---|
+| 훅·어퍼·대시·점프 등 8종 | `attackDamage: 10` 폴백 |
+| 잡기 지짐이 | `grabTickDamage: 5` |
+| 잡기 던지기 | `grabThrowDamage: 20` |
+| 잡기 내려치기 | `grabSlamDamage`(0) → **`grabThrowDamage`(20)** 폴백 — `AttackDamage` 아니다 |
+| 차징 오라 | `chargeAuraDamage: 20` |
 
 | | |
 |---|---|
-| **무엇** | 공격별 데미지를 실제 값으로 채운다. |
-| **왜** | **8개 공격 전부 `damage: 0`** 이다. 코드가 `e.damage > 0 ? e.damage : AttackDamage` 로 폴백하므로 훅·어퍼·대시·점프·잡기가 **전부 동일한 10 데미지**다. 의도된 임시 균등이고(팀장 확정) 밸런스는 미착수. |
+| **무엇** | 공격별로 **서로 다른** 데미지를 주고 싶어지면 그때 채운다. |
+| **왜** | 지금은 근접 8종이 전부 10 으로 균등하다. **의도된 임시 균등**(팀장 확정)이고 밸런스는 미착수. |
 | **어디서 시작** | `Assets/2.Prefabs/Monster/Data/No23.asset` 의 `attacks[].damage`. 잡기 전용은 `grabSlamDamage`/`grabTickDamage`/`grabThrowDamage`. |
 | **선행조건** | 없음 (데이터만) |
 | **크기** | 작음. 다만 **Play 튜닝 반복**이 본체다 |

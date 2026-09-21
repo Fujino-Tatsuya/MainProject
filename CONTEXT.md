@@ -8,7 +8,55 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 현재 인수인계 (2026-09-21 · 미니맵·보스타이머 구현 완료, 다음은 **잡기 검증**)
+## ▶▶ 현재 인수인계 (2026-09-21 #2 · 입장 연출·차징 점프·돌진 사거리 — **전부 Play 검증 대기**)
+
+작업자: **경석(Claude)**. 브랜치 `feature/Boss23`. 컴파일 통과(에러 0).
+
+### 🔴 다음은 MPPM 2~3인 **한 판으로 몰아서** — 검증 목록이 아래 하나로 합쳐졌다
+
+계획서 [PLAN-boss-entrance-charge.md](PLAN-boss-entrance-charge.md) 의 완료 기준을 그대로 따라간다.
+
+1. **잡기 3건** — 기존 대기분. [PLAN-boss-backlog.md](PLAN-boss-backlog.md) **B0**
+2. **입장 연출** — 하강 중 체공 포즈 / 착지 클립 / **데미지 0** /
+   🔴 **MPPM 클라(호스트 아님) 화면에서도 보이는가**(스폰과 같은 프레임 RPC라 실측 안 됨) /
+   🔴 **전투 시작 후 착지 포즈가 안 남는가**(보스를 Idle 에 머물게 해서 확인)
+3. **차징 점프** — 올라갔다 사라지고 `BossLandingPoint` 에 떨어지는가 / 착지 직후 차징 정상 시작 /
+   체공 중 무적·착지 후 피격 / 차징 착지 데미지 0 / 끊었을 때 투명·무적 잔존 없음 / 배속 잔존 없음
+4. **돌진** — 실사거리 13.65m → **29.25m** 로 2.1배. 🔴 **체감 과하면 `dashDuration` 부터 내린다**
+
+### 이번에 넣은 것 (2026-09-21 #2)
+
+| | |
+|---|---|
+| **입장 연출 애니** | 하강 `JumpHover` / 착지 `JumpLanding` / 전투 직전 로코모션 복귀. 새 RPC 없이 점프어택 경로 재사용. seam = `IBossEntranceAnimation`(신규) |
+| **차징 진입 = 점프** | 걸어가던 `ChargeMove` 구간 **제거**. 기존 `JumpTakeoff`/`Leap`/`Land` 재사용 + `_chargeJump` 플래그로 종료 분기만 가름 |
+| **돌진 사거리** | `dashDuration` 0.91→**1.5** · `dashSpeedMultiplier` 6→**7.8** · `dashMaxDistance` 16→**30** |
+| **개명** | `jumpSearchRadius` → **`playerScanRadius`** (점프 전용이 아니었다 — 차징 송전탑 인원 계산도 같은 값을 쓴다) |
+| **SO 정리** | `chargeMoveArriveDistance`/`chargeMoveSpeedMultiplier`/`chargeMoveTimeout` 3종 제거(읽는 코드가 사라짐) |
+
+### 🔴 이번에 드러난 것 — **PLAN §5 의 거리값 2건은 효과가 0 이었다**
+
+`No23.asset` 값을 올려도 **아무 일도 안 일어나는** 상태였다.
+
+- 돌진 `maxDistance` — DashAttack 은 `ignoreDistanceWindow: 1` 이라 거리창을 **아예 안 읽는다**.
+- `dashMaxDistance` — 실사거리가 `min(값, 지속시간×속도)` 인데 **지속시간이 먼저 물렸다**(13.65m).
+
+**코드 주석이 이미 그렇게 말하고 있었는데 PLAN 이 그걸 모르고 쓰였다.**
+→ 교훈: **SO 값을 올리기 전에 그 값을 읽는 코드에 클램프가 있는지 먼저 본다.**
+
+### ⚠️ 확인했지만 안 고친 것
+
+1. **`playerScanRadius` 가 두 용도 공용이다** — 점프 타겟 탐색 + **차징 송전탑 인원 계산**.
+   30 → 45 로 올렸을 때 송전탑 개수 판정 반경도 같이 올라갔다. **의도였는지 기록이 없다.**
+   지금은 Tooltip·주석으로 명시만 했다. 송전탑 개수가 인원과 안 맞으면 여기를 의심할 것.
+2. **`chargeZonePrefab` 이 비어 있다**(`{fileID: 0}`) → 차징 **전기 장판은 지금 데이터로 안 나온다.**
+   검증할 때 없는 걸 찾지 말 것.
+3. **돌진(1.5초)이 `dashStunDuration`(1초)보다 길어졌다** — 캐리 대상이 끌려가는 도중 스턴이 풀린다.
+4. `attacks[].damage` 8개는 전부 0 이지만 **정상이다** — `attackDamage: 10` 폴백. 건드리지 말 것.
+
+---
+
+## ▶▶ 이전 인수인계 (2026-09-21 #1 · 미니맵·보스타이머 구현 완료, 다음은 **잡기 검증**)
 
 작업자: **경석(Claude)**. 브랜치 `feature/Boss23`.
 
