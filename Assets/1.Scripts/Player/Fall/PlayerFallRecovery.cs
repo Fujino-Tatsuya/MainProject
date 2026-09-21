@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -225,6 +225,37 @@ public sealed class PlayerFallRecovery : NetworkBehaviour
     {
         if (motor != null)
             motor.TeleportAuthoritative(returnPoint);
+    }
+
+    /// <summary>
+    /// 진행 중인 낙하 복구를 **서버에서** 중단한다(멱등). 보스룸 강제/패드 이동처럼
+    /// 다른 주체가 위치를 확정할 때 부른다 — 안 부르면 지연 복귀가 나중에 **안전지점으로 되돌린다.**
+    /// 오너 쪽 연출(낙하 카메라·입력 잠금)도 함께 되돌린다.
+    /// </summary>
+    public void CancelRecoveryServer()
+    {
+        if (!IsServer)
+            return;
+
+        // 🔴 여기서 로컬 코루틴 필드로 "복구 중인가" 를 판정하면 안 된다.
+        //    서버 코루틴은 fallReturnDelay 뒤 끝나지만, **오너 쪽 연출(접지 대기·카메라 복귀·입력 잠금)은
+        //    그보다 오래 간다.** 게다가 원격 플레이어의 `ownerRecoveryRoutine` 은 그 클라에만 있어서
+        //    서버 사본에서는 항상 null 이다. 두 필드를 보고 조기 반환하면 **원격 오너가 낙하 카메라와
+        //    입력 잠금에 갇힌 채** 보스룸으로 끌려간다.
+        //    → 항상 보낸다. 오너 쪽 처리는 멱등하다.
+        CancelServerReturnRoutine();
+        CancelRecoveryOwnerRpc();
+    }
+
+    /// <summary>오너의 복구 연출을 중단하고 카메라·입력을 정상으로 돌린다.</summary>
+    [Rpc(SendTo.Owner)]
+    private void CancelRecoveryOwnerRpc()
+    {
+        CancelOwnerRecoveryRoutine();
+
+        // 코루틴이 중간에 끊기면 카메라와 입력이 잠긴 채로 남는다 — 둘 다 명시적으로 되돌린다.
+        CameraTargetSwitcher.Active?.ReturnToPlayerView();
+        input?.SetInputEnabled(true);
     }
 
     private void CancelServerReturnRoutine()

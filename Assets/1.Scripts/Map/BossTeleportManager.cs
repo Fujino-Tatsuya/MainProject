@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using Unity.Netcode;
@@ -55,6 +55,10 @@ public class BossTeleportManager : NetworkBehaviour
     private readonly NetworkVariable<bool> _occupied = new NetworkVariable<bool>(
         false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
+    /// <summary>카운트다운을 누가 시작했나. 패드 이탈은 <see cref="CountdownCause.Pad"/> 만 취소한다.</summary>
+    private enum CountdownCause { None, Pad, Forced }
+
+    private CountdownCause _countdownCause;
     private Coroutine _pending;
     private GUIStyle _countdownStyle;
 
@@ -161,25 +165,121 @@ public class BossTeleportManager : NetworkBehaviour
         {
             // 연출/도착 대기 중에는 재진입 카운트다운을 만들지 않는다.
             if (IsEncounterBusy) return;
-            _teleportAt.Value = NetworkManager.ServerTime.Time + countdownSeconds;
-            _pending = StartCoroutine(TeleportAfter(countdownSeconds));
-            Edit.Log($"[BossTeleport] 카운트다운 시작 — {countdownSeconds:0}초 후 생존자 전원 보스룸 이동.", this);
+            BeginCountdown(countdownSeconds, CountdownCause.Pad);
+            Edit.Log($"[BossTeleport] 카운트다운 시작 — {countdownSeconds:0}초 후 참가자 전원 보스룸 이동.", this);
         }
         else if (_pending != null)
         {
-            StopCoroutine(_pending);
-            _pending = null;
-            _teleportAt.Value = 0d;
+            // 🔴 강제 이동(제한시간 만료)은 패드 이탈로 취소되지 않는다.
+            //    예전에는 `_pending` 하나를 두 경로가 공유해서, 강제 경고 중에 누가 패드에
+            //    들어왔다 나가기만 해도 강제 이동이 조용히 사라졌다 — 제한시간이 통째로 우회됐다.
+            if (_countdownCause == CountdownCause.Forced)
+            {
+                Edit.Log("[BossTeleport] 존 이탈 — 그러나 강제 이동 중이라 취소하지 않는다.", this);
+                return;
+            }
+
+            CancelCountdown();
             Edit.Log("[BossTeleport] 존 이탈 — 카운트다운 취소.", this);
         }
+    }
+
+    private void BeginCountdown(float seconds, CountdownCause cause)
+    {
+        _countdownCause = cause;
+        _teleportAt.Value = NetworkManager.ServerTime.Time + seconds;
+        _pending = StartCoroutine(TeleportAfter(seconds));
+    }
+
+    private void CancelCountdown()
+    {
+        if (_pending != null)
+        {
+            StopCoroutine(_pending);
+            _pending = null;
+        }
+
+        _countdownCause = CountdownCause.None;
+        _teleportAt.Value = 0d;
+    }
+
+    /// <summary>
+    /// 제한시간 만료로 보스전을 강제 개시한다(서버 전용). <see cref="BossTimerManager"/> 가 부른다.
+    ///
+    /// 🔴 패드 진입과 **같은 경로**로 합류한다 — 산개 좌표·도착 ACK·페이드·연출 진입이 전부
+    ///    그 안에 있어서, 따로 구현하면 두 경로가 갈린다.
+    ///
+    /// 이미 진행 중(패드 카운트다운·연출·도착 대기)이면 <c>false</c> 를 돌려준다.
+    /// 🔴 호출자는 그때 **만료 사실을 버리지 말고 유지**했다가, 그 진행이 취소되면 다시 불러야 한다.
+    ///    안 그러면 "만료 직전에 패드를 밟았다 나가면 제한시간이 사라지는" 구멍이 생긴다.
+    /// </summary>
+    public bool ForceStartEncounter(float warnSeconds)
+    {
+        if (!IsServer || !IsSpawned)
+            return false;
+
+        // 호출자(BossTimerManager)가 만료 사실을 유지한 채 주기적으로 재시도한다 —
+        // 여기서 로그를 남기면 대기 구간 내내 쌓이기만 한다. 조용히 거절한다.
+        if (IsEncounterBusy || IsCountdownActive)
+            return false;
+
+        BeginCountdown(Mathf.Max(0f, warnSeconds), CountdownCause.Forced);
+        Edit.Log($"[BossTeleport] 🔴 제한시간 만료 — {warnSeconds:0.#}초 후 강제 이동.", this);
+        return true;
     }
 
     private IEnumerator TeleportAfter(float seconds)
     {
         yield return new WaitForSeconds(seconds);
-        TeleportAlivePlayers();
+
+        // 강제 이동이면 목숨이 남은 Soul 을 먼저 되살린다(팀장 확정 2026-09-20) —
+        // Soul 만 도착하면 Director 가 참가자를 못 잡아 보스가 아예 안 뜬다.
+        bool forced = _countdownCause == CountdownCause.Forced;
+
         _pending = null;
+        _countdownCause = CountdownCause.None;
+
+        if (forced) ReviveSoulsForForcedStart();
+
+        TeleportAlivePlayers();
         _teleportAt.Value = 0d; // 표시 종료
+    }
+
+    /// <summary>이동 대상인가. 완전 사망(PermanentDead)만 제외한다.</summary>
+    private static bool IsTeleportParticipant(NetworkObject playerObject)
+    {
+        // 생명주기 컴포넌트가 없는 구성(테스트 씬 등)에서는 예전 규칙(HP)으로 물러선다.
+        var lifeCycle = playerObject.GetComponent<PlayerLifeCycleController>();
+        if (lifeCycle == null)
+        {
+            Unit unit = playerObject.GetComponent<Unit>();
+            return unit != null && unit.CurrentHealth > 0;
+        }
+
+        return lifeCycle.State != PlayerLifeState.PermanentDead;
+    }
+
+    /// <summary>
+    /// 제한시간 만료로 끌고 갈 때, 목숨이 남은 Soul 을 **각자 목숨 1개씩 써서** 되살린다.
+    /// 목숨이 없어 부활에 실패하면 그대로 Soul 로 남고, 이동은 한다(PermanentDead 가 아니므로).
+    /// </summary>
+    private void ReviveSoulsForForcedStart()
+    {
+        if (!IsServer) return;
+
+        foreach (NetworkClient client in NetworkManager.ConnectedClientsList)
+        {
+            NetworkObject playerObject = client.PlayerObject;
+            if (playerObject == null) continue;
+
+            var lifeCycle = playerObject.GetComponent<PlayerLifeCycleController>();
+            if (lifeCycle == null || lifeCycle.State != PlayerLifeState.Soul) continue;
+
+            var revive = playerObject.GetComponent<PlayerReviveController>();
+            bool ok = revive != null && revive.TryCompleteReviveOnServer();
+
+            Edit.Log($"[BossTeleport] 강제 개시 부활 — clientId={client.ClientId} 결과={(ok ? "성공" : "실패(목숨 없음)")}", this);
+        }
     }
 
     private void TeleportAlivePlayers()
@@ -193,9 +293,11 @@ public class BossTeleportManager : NetworkBehaviour
             NetworkObject playerObject = client.PlayerObject;
             if (playerObject == null) continue;
 
-            // 생존자만 이동(팀장 확정). 사망자는 현 위치에 남는다.
-            Unit unit = playerObject.GetComponent<Unit>();
-            if (unit == null || unit.CurrentHealth <= 0) continue;
+            // 🔴 이동 대상 = **PermanentDead 가 아닌 전원**(Alive · DeadPresentation · Soul).
+            //    2026-09-20 팀장 개정 — 원래는 "생존자만" 이었다. 목숨이 남은 Soul 을 옛 맵에 두고 가면
+            //    부활해도 보스전에 합류할 길이 없다. 보스방에서 목숨을 써서 살아나 싸우는 게 의도다.
+            //    완전 사망자만 현 위치에 남는다.
+            if (!IsTeleportParticipant(playerObject)) continue;
 
             alive.Add(client.ClientId);
         }
@@ -213,13 +315,35 @@ public class BossTeleportManager : NetworkBehaviour
         _awaitingArrival.Clear();
         _arrivedClientIds.Clear();
 
+        // 🔴 순서가 계약이다 — ① 대기 명단 전원 등록 → ② ACK 타임아웃 준비 → ③ 그 다음 RPC 전송.
+        //
+        //    예전에는 한 루프 안에서 `_awaitingArrival.Add` 직후 바로 RPC 를 보냈다. 그런데 NGO 는
+        //    **호스트가 대상인 ClientRpc 를 그 자리에서 동기로 실행**하고(`clientRpcMessage.Handle`),
+        //    그 본문이 부르는 `ArrivalAppliedServerRpc` 도 호스트에서 동기로 실행된다.
+        //    호스트의 clientId 는 0 이라 `alive.Sort()` 뒤 **항상 slot0** 이므로, 원격을 명단에
+        //    넣기도 전에 대기자가 0 이 되어 `CompleteArrival()` 이 **호스트 1명만 든 명단**으로 돌았다.
+        //
+        //    결과: `BossEncounterDirector` 의 참가자 스냅샷이 호스트 1명이 되어 **원격 플레이어가
+        //    등장 연출 중 잠기지 않았고**(이동·공격 가능), 호스트가 연출 중 죽으면 나머지가 멀쩡해도
+        //    "참가자 전원 이탈" 로 연출이 중단됐다. 보스는 정상적으로 떠서 증상이 조용했다.
+        //
+        //    2026-09-20 MPPM 2인 실측으로 확정 — 도착=[0] → 잠금명단=[0] (접속자 2명),
+        //    뒤늦게 완성된 [0,1] 은 "이미 진행 중(Descending)이라 도착 신호를 무시" 로 버려졌다.
+        for (int slot = 0; slot < alive.Count; slot++)
+            _awaitingArrival.Add(alive[slot]);
+
+        if (_ackTimeout != null) StopCoroutine(_ackTimeout);
+        _ackTimeout = StartCoroutine(AwaitArrivalAck(_encounterSequence));
+
         for (int slot = 0; slot < alive.Count; slot++)
         {
             ulong clientId = alive[slot];
             NetworkObject playerObject = NetworkManager.ConnectedClients[clientId].PlayerObject;
             GetArrivalPose(slot, out Vector3 destination, out Quaternion rotation);
 
-            _awaitingArrival.Add(clientId);
+            // 🔴 낙하 복구는 **안전지점으로 되돌리는 지연 코루틴**이다. 취소하지 않고 끌고 가면
+            //    보스룸에 도착한 뒤 옛 안전지점으로 다시 끌려간다.
+            playerObject.GetComponent<PlayerFallRecovery>()?.CancelRecoveryServer();
 
             // 서버가 오너가 아닌(클라이언트 소유) NetworkTransform에 Teleport를 호출하면 예외가 발생하여 루프가 중단됨.
             // 따라서 서버(호스트) 본인 것만 여기서 처리하고, 클라이언트는 아래 RPC 내부에서 각자 처리하도록 변경.
@@ -233,9 +357,6 @@ public class BossTeleportManager : NetworkBehaviour
 
             Edit.Log($"[BossTeleport] 슬롯 {slot} 배정 — clientId={clientId}, seq={_encounterSequence}", this);
         }
-
-        if (_ackTimeout != null) StopCoroutine(_ackTimeout);
-        _ackTimeout = StartCoroutine(AwaitArrivalAck(_encounterSequence));
     }
 
     /// <summary>전원 ACK가 오지 않으면 전투를 강행하지 않고 복구한다.</summary>
@@ -261,14 +382,33 @@ public class BossTeleportManager : NetworkBehaviour
         NetworkObject playerObject = NetworkManager.LocalClient?.PlayerObject;
         if (playerObject == null) return;
 
-        if (playerObject.TryGetComponent(out Rigidbody rb))
+        // 🔴 Motor 를 거쳐 옮긴다. 예전에는 Rigidbody 에 직접 썼는데, Motor 구동 중 바디는
+        //    **kinematic** 이라 `linearVelocity = 0` 이 아무것도 지우지 않았다
+        //    (유니티가 "Setting linear velocity of a kinematic body is not supported." 로 경고까지 찍었다).
+        //    그래서 수직 속도·넉백·예약 이동이 그대로 살아남아 **도착 지점에서 미끄러졌다.**
+        //    `TeleportAuthoritative` 는 다음 시뮬레이션의 기준점까지 함께 옮긴다.
+        // 🔴 대시는 **상태**다 — Motor 필드만 지우면 대시 상태가 다음 FixedUpdate 에서 값을 다시 써서
+        //    도착 지점부터 남은 대시를 이어 달린다. 상태머신의 정상 종료 경로로 끊는다.
+        //    (여긴 오너다 — 오너 권위 이동이라 여기서 끊는 게 맞다.)
+        if (playerObject.TryGetComponent(out PlayerStateController stateController))
+            stateController.EndDash();
+
+        var motor = playerObject.GetComponent<PlayerMotor>();
+        if (motor != null)
         {
-            rb.linearVelocity = Vector3.zero;
-            rb.angularVelocity = Vector3.zero;
-            rb.position = destination;
-            rb.rotation = rotation;
+            motor.ClearKnockbackVelocity();
+            motor.TeleportAuthoritative(destination);
+            playerObject.transform.rotation = rotation;
         }
-        playerObject.transform.SetPositionAndRotation(destination, rotation);
+        else
+        {
+            if (playerObject.TryGetComponent(out Rigidbody rb))
+            {
+                rb.position = destination;
+                rb.rotation = rotation;
+            }
+            playerObject.transform.SetPositionAndRotation(destination, rotation);
+        }
 
         // 클라이언트 본인(오너) 권한으로 NetworkTransform 순간이동 처리
         if (playerObject.TryGetComponent(out NetworkTransform netTransform))
@@ -301,8 +441,17 @@ public class BossTeleportManager : NetworkBehaviour
         CompleteArrival();
     }
 
+    // 한 시퀀스에 도착 완료는 한 번뿐이다. 호스트 동기 ACK 와 원격 ACK 가 겹쳐 두 번 불리면
+    // Director 가 두 번째를 "이미 진행 중" 으로 버리면서 **올바른 전체 명단이 사라진다**.
+    private uint _completedSequence;
+
     private void CompleteArrival()
     {
+        if (_completedSequence == _encounterSequence)
+            return;
+
+        _completedSequence = _encounterSequence;
+
         if (_ackTimeout != null)
         {
             StopCoroutine(_ackTimeout);

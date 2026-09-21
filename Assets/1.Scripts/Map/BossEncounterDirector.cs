@@ -296,8 +296,12 @@ public sealed class BossEncounterDirector : NetworkBehaviour
         if (playerObject == null || !playerObject.IsSpawned)
             return false;
 
+        // 🔴 2026-09-20 개정 — 예전에는 `State == Alive` 만 통과시켰다. 그러면 도착자가 전부 Soul 일 때
+        //    참가자가 0 이 되어 **보스가 아예 스폰되지 않고** Idle 로 돌아갔고, 부활해도 여기를 다시
+        //    깨우는 경로가 없어 영구 교착이었다. Soul 은 목숨을 들고 합류를 기다리는 참가자이지 탈락자가 아니다.
+        //    덤으로 Soul 도 연출 잠금·상태이상 정리를 받게 된다(예전엔 스냅샷에서 빠져 못 받았다).
         PlayerLifeCycleController lifeCycle = playerObject.GetComponent<PlayerLifeCycleController>();
-        return lifeCycle == null || lifeCycle.State == PlayerLifeState.Alive;
+        return lifeCycle == null || lifeCycle.State != PlayerLifeState.PermanentDead;
     }
 
     private PlayerEncounterLock GetLock(ulong clientId)
