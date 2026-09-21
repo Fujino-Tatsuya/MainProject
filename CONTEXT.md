@@ -12,6 +12,33 @@ Update this file when a term becomes important enough that future agents or team
 
 작업자: **경석(Claude)**. 브랜치 `feature/Boss23`. 컴파일 통과(에러 0).
 
+### ✅ development 머지 완료 (2026-09-21) + 🔴 **SVN 쪽에 따로 들어간 정리 1건**
+
+`feature/Boss23` → `development` **fast-forward**(충돌 0). 커밋 13개 / 44파일 / `+3018 −366`.
+로컬 체크아웃 없이 `git push origin feature/Boss23:development` 로 올렸다 —
+체크아웃하면 워킹트리가 뒤로 갔다 앞으로 오며 **Unity 리임포트가 두 번** 돈다.
+(`Packages/manifest.json` 변경이 없는 것을 먼저 확인했다. 있으면 에디터를 닫아야 한다.)
+
+🔴 **git 에 없는 변경이 하나 있다 — SVN r319.**
+`MapPrefabCatalog.asset`(유령 키 20개) · `MapGenConfig.asset`(3개)에서 **대응 필드가 사라진
+저작값 23개를 제거**했다. 이 둘은 `Assets/50.Art/` 밑이라 **`.gitignore:84` 로 git 제외 · SVN 소유**다
+→ **development 머지에는 안 실려 있다. SVN 최신화(r319+)를 받아야 반영된다.**
+
+- 왜 지웠나 — 필드를 주석 처리(`5e858c5b`)했는데 에셋에는 값이 남아 있었다. Unity 는 대응 필드가
+  없는 키를 **로드 때 무시하고 다음 저장 때 조용히 버린다** → 누가 인스펙터를 건드리는 순간
+  예고 없이 사라지는 상태였다. 의도적으로 지금 지웠다.
+- 기능 영향 없음 — 소비처(`MapCatalogPopulator` / `MapGeometryBuilder`)는 development 에도 없다.
+  원격 브랜치 12개 중 남은 곳은 `feature/Level1` 뿐인데 development 보다 **957 커밋 뒤처진** 브랜치다.
+- 남긴 값 — `BossIcon`/`SpawnIcon`/`QuestIcon` · `MonsterGroups` 8건. Unity 로 되읽어 `unknownKeys` 0 확인.
+
+⚠️ **함정(한 번 밟았다)** — 에셋을 `utf-8-sig` 로 쓰면 **BOM 이 붙어 `%YAML` 헤더가 깨진다.**
+Unity 가 "not text-serialized YAML" 로 거부해서 발견했다. `.asset`·`.prefab`·`.unity` 는
+**BOM 없이** 쓸 것. 쓰기 전후로 첫 5바이트가 `%YAML` 인지 확인하면 걸린다.
+
+✅ **welz 머티리얼 12건**(`Char/Boss/SK/welz_*.mat`)이 SVN 미추가(`?`)로 보이지만
+**로컬 잔재라 무시한다**(팀장 확정 2026-09-21). 보스 모델 수정분은 이미 development 에 들어가 있다.
+→ 다음 세션에서 다시 꺼내지 말 것.
+
 ### 🟡 은희에게 넘김 — **결과 화면이 호스트에서만 채워진다** (경석 진단 완료 · 팀장 확정 "지금은 둔다")
 
 **증상**(2026-09-21 MPPM 실측) — 클리어 후 ResultScene 에서 호스트만
@@ -168,6 +195,9 @@ Addressables 재빌드가 지우는 것이고 **은희 영역**이다. 내 작�
 2. **점프 연속 사용 시 애니 배속 잔존** — 미검증(G4 완료기준 4번).
    깨는 가장 빠른 길은 **이륙 중에 그로기·카운터로 끊는 것**(`AbortAttackChain` 경로).
 3. 🔴 **`VisualSVN Server license expired`** — r316 커밋은 통과했지만 곷 막힐 수 있다. 관리자 통보 필요.
+   → **2026-09-21 재확인: 여전히 만료 상태이고, 여전히 커밋은 된다**(r319 통과).
+   경고가 **커밋 *뒤*에** 뜨는 형태라 실패로 오인하기 쉽다 — `Committed revision N` 이 찍혔으면 들어간 것이다.
+   상태는 그대로이므로 **관리자 통보는 아직 유효한 할 일**이다.
 4. `gauge_HP_noncolor` 만 `textureType: 0` — 마스크 원본이면 의도. 은희에게 확인.
 5. `Assets/Resources/PerformanceTestRun*.json` 4개가 untracked — `Resources/` 라 **빌드에 들어간다.** `.gitignore` 검토.
 6. `Assets/AddressableAssetsData/link.xml` 이 한 번 삭제된 적 있다(복구함).
