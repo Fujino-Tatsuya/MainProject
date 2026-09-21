@@ -14,7 +14,7 @@ using UnityEngine;
 //   S2 근접 3종 히트 정밀화(앵커 전환·어퍼 Airborne) / S3 카운터 창 / S4 Grab 체인 /
 //   S5 Dash 캐리-푸시 / S6 Jump 장판 / S7 페이즈 시퀀스(송전기)
 // 미구현 공격은 애니만 재생되고 히트 시 **1회 경고**를 남긴다(조용한 실패 금지).
-public class TwentyThreeBoss : MonsterBase
+public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
 {
     // 서버·클라 공통(프리팹에 직렬화된 data 를 캐스팅) — 클라도 애니 상태명을 조회해야 한다.
     BossDataSO _boss;
@@ -805,10 +805,13 @@ public class TwentyThreeBoss : MonsterBase
                                 + data.attackDuration;
                     break;
                 case BossAttackId.ChargeSequence:
-                    // 🔴 **이동 구간을 예산에 넣는다**(2026-08-13). 차징은 송전탑 중심으로 이동한 뒤
-                    //    시작하므로 체인 길이 = 이동 + 제한시간 + 복귀다. 돌진에서 선딜 몫을 빠뜨려
-                    //    매번 안전망이 터졌던 것과 **같은 종류의 실수**라 여기서 미리 닫는다.
-                    _stateTimer = ChargeMoveTimeout + ChargeTimeLimit + data.attackDuration;
+                    // 🔴 **진입 구간을 예산에 넣는다**(2026-08-13). 차징은 자리로 이동한 뒤 시작하므로
+                    //    체인 길이 = 진입 + 제한시간 + 복귀다. 돌진에서 선딜 몫을 빠뜨려 매번 안전망이
+                    //    터졌던 것과 **같은 종류의 실수**라 여기서 미리 닫는다.
+                    // ⚠️ 2026-09-21 — 진입이 걸어가기(`ChargeMoveTimeout`)에서 **점프**로 바뀌었다.
+                    //    이륙 + 체공 + 착지가 그 자리를 대신한다(BeginCharge 주석 참조).
+                    _stateTimer = JumpTakeoffDuration + JumpHover + JumpLanding
+                                + ChargeTimeLimit + data.attackDuration;
                     break;
                 case BossAttackId.RageDash:
                     _stateTimer = RageTotalTime + data.attackDuration;
@@ -1507,14 +1510,24 @@ public class TwentyThreeBoss : MonsterBase
             case BossAttackPhase.Land:
                 // 착지 데미지는 애니 이벤트(OnAttackHit)가 만든다. 이벤트가 없으면 데미지가 없다
                 // (폴백을 넣으면 이벤트 추가 후 두 번 맞는다 — 정본 §3.3 비대칭 규칙).
-                if (_attackPhaseTimer <= 0f) EnterPhase(BossAttackPhase.Recovery, JumpRecovery);
+                if (_attackPhaseTimer > 0f) break;
+
+                // 🔴 **여기가 점프어택과 차징 진입이 갈리는 유일한 지점이다**(2026-09-21).
+                //    차징은 복귀 경직 없이 곧바로 차징을 시작한다.
+                //    ⚠️ `FinishChain()` 을 건너뛰는 것은 **의도다.** 그 함수는 자원을 정리하지 않고
+                //       다음 행동만 고르므로, 차징으로 이어 갈 때는 부르면 안 된다
+                //       (Codex 교차검증 2026-09-21 확인).
+                if (_chargeJump)
+                {
+                    _chargeJump = false;
+                    StartChargingInPlace();
+                    break;
+                }
+
+                EnterPhase(BossAttackPhase.Recovery, JumpRecovery);
                 break;
 
             // ── 페이즈 시퀀스 ─────────────────────────────────────────
-            case BossAttackPhase.ChargeMove:
-                TickChargeMove();
-                break;
-
             case BossAttackPhase.ChargeWait:
                 TickChargeAura(dt);   // 접근 차단 오라는 차징 대기 구간에서만 돈다
                 TickCharge();
@@ -1849,6 +1862,10 @@ public class TwentyThreeBoss : MonsterBase
         if (IsSpawned) SetGrabCycleSpeedClientRpc(1f);
         if (animator != null && !_counterAnimatorHeldLocally) animator.speed = 1f;
 
+        // 🔴 차징 진입 점프도 **조기 반환 앞**에서 끈다. 남겨 두면 다음 점프어택이 착지하는 순간
+        //    Recovery 대신 차징을 시작한다 — 잡기 배수·전진이 여기 앞에 있는 것과 정확히 같은 이유다.
+        _chargeJump = false;
+
         if (_attackPhase == BossAttackPhase.None && _grabbed == null && _dashCarried == null) return;
 
         // Grab: 잡은 대상을 놓는다.
@@ -2121,8 +2138,22 @@ public class TwentyThreeBoss : MonsterBase
         //    해제는 착지(ArriveJump)와 체인 중단(AbortAttackChain).
         _wells?.SetSuppressed(true);
 
-        // 🔴 [G4] **이륙 구간.** 여기서는 모델도 피격 콜라이더도 살아 있다 — 보이고 맞는다(E19).
-        //    숨김·무적은 이륙이 끝난 뒤(BeginJumpHover)로 미룬다 — 이게 이번 변경의 핵심이다.
+        BeginJumpTakeoff();
+    }
+
+    /// <summary>
+    /// [G4] <b>이륙 구간 개시.</b> 여기서는 모델도 피격 콜라이더도 살아 있다 — 보이고 맞는다(E19).
+    /// 숨김·무적은 이륙이 끝난 뒤(<see cref="BeginJumpHover"/>)로 미룬다.
+    ///
+    /// 🔴 <b>점프어택과 차징 진입이 공유한다</b>(2026-09-21). 차징도 "올라갔다 사라졌다 떨어진다"라
+    ///    같은 그림인데, 전용 단계를 새로 파면 이륙 배속 역산·모델 숨김·무적 복구·
+    ///    <c>AbortAttackChain</c> 회수가 <b>전부 복제</b>된다. 그 복제본이 한쪽만 고쳐지는 것이
+    ///    이 레포에서 반복된 사고라 <b>같은 경로를 쓰고 종료 분기만</b> <c>_chargeJump</c> 로 가른다.
+    ///
+    /// ⚠️ 부르기 전에 <c>_jumpArrivePoint</c> 가 확정돼 있어야 한다.
+    /// </summary>
+    void BeginJumpTakeoff()
+    {
         if (JumpTakeoffDuration > 0f && !string.IsNullOrEmpty(JumpTakeoffState))
         {
             CrossFadeJumpTakeoffClientRpc();
@@ -2150,7 +2181,10 @@ public class TwentyThreeBoss : MonsterBase
         // 예고 2개: 고정 크기(어디에 떨어지는가) + 차오르는 원(언제 떨어지는가).
         // 성장시간은 **체공 길이**다 — 여기서 띄우므로 이륙 몴을 더하지 않는다.
         //    그래야 원이 **착지 순간**에 가득 찬다.
-        ShowJumpTelegraphClientRpc(_jumpArrivePoint, JumpAoeRadius, JumpHover);
+        // 🔴 차징 진입은 **예고를 띄우지 않는다**(팀장 확정 2026-09-21). 착지에 판정이 없어서다 —
+        //    예고는 "곧 여기가 위험하다"는 약속인데, 안 아픈 착지에 띄우면 그 약속이 거짓이 된다.
+        if (!_chargeJump)
+            ShowJumpTelegraphClientRpc(_jumpArrivePoint, JumpAoeRadius, JumpHover);
 
         CrossFadeJumpStateClientRpc(landing: false);
 
@@ -2179,6 +2213,40 @@ public class TwentyThreeBoss : MonsterBase
         if (_wells == null) return;
         PushWellsState(State);
     }
+
+    #region 입장 연출 (IBossEntranceAnimation) — BossEncounterDirector 가 시점만 알려 준다
+    // 🔴 **새 RPC 를 만들지 않는다.** 점프어택의 체공·착지 전환과 정확히 같은 그림이라
+    //    `CrossFadeJumpStateClientRpc` 를 그대로 재사용한다. 두 벌을 두면 한쪽만 고쳐진다.
+    //    덤으로 그 RPC 가 앞뒤 표식 억제(`DirectionIndicator.SetSuppressed`)까지 같이 처리한다 —
+    //    입장에도 그게 맞다(하강 중 숨고, 착지 후 나온다).
+
+    /// <summary>하강 중 체공 포즈. <see cref="IBossEntranceAnimation"/> 참조.</summary>
+    public void PlayEntranceDescentServer()
+    {
+        if (!IsServer || !IsSpawned) return;
+        CrossFadeJumpStateClientRpc(landing: false);
+    }
+
+    /// <summary>착지 클립. 데미지는 안 나간다 — 근거는 인터페이스 주석.</summary>
+    public void PlayEntranceLandingServer()
+    {
+        if (!IsServer || !IsSpawned) return;
+        CrossFadeJumpStateClientRpc(landing: true);
+    }
+
+    /// <summary>연출 종료 — 로코모션 복귀. FSM 을 깨우기 <b>직전</b>에 불린다.</summary>
+    public void EndEntranceAnimationServer()
+    {
+        if (!IsServer || !IsSpawned) return;
+
+        // 🔴 표식 억제를 **명시적으로** 되돌린다. `CrossFadeJumpStateClientRpc(true)` 가 이미
+        //    풀어 주지만, 착지 호출이 실패·생략된 경로(연출 중단 등)에서도 여기가 마지막 그물이다.
+        ReleaseDirectionIndicatorClientRpc();
+
+        if (data != null && !string.IsNullOrEmpty(data.locomotionState))
+            CrossFadeStateClientRpc(data.locomotionState);
+    }
+    #endregion
 
     // 착지 AoE — 애니 이벤트(OnAttackHit)에서 호출된다. 예고 장판과 **같은 반경**을 쓴다
     // (예고가 판정에 대해 거짓말하지 않게 — 방향 표시기와 같은 원칙).
@@ -2942,59 +3010,26 @@ public class TwentyThreeBoss : MonsterBase
                                                   ChargeCenterSampleRadius, UnityEngine.AI.NavMesh.AllAreas))
             _chargeMoveTarget = hit.position;
 
-        // 🔴 **빠르게 간다**(팀장 확정 2026-08-13: "지금 가는 상태도 너무 느리다").
-        //    돌진과 같은 이유로 **속도만 올려서는 안 된다** — 가속도가 그 속도에 도달할 시간을 안 준다.
-        //    그래서 돌진의 저장·복원 규약(`_dashPrev*`)을 그대로 재사용한다. 복원은 도착 시
-        //    `StartChargingInPlace` 의 `EndDashMove()` 가 한다.
-        if (agent != null && agent.enabled && agent.isOnNavMesh)
-        {
-            if (_dashPrevStopDistance < 0f) _dashPrevStopDistance = agent.stoppingDistance;
-            if (_dashPrevAcceleration < 0f)
-            {
-                _dashPrevAcceleration = agent.acceleration;
-                _dashPrevAutoBraking = agent.autoBraking;
-            }
+        // 🔴 **걸어가지 않는다 — 점프로 간다**(팀장 확정 2026-09-21: "charging 하러 갈 때
+        //    사라졌다가 점프어택처럼 나타나는 걸로"). 예전에는 NavMesh 로 이동했고(ChargeMove 단계 ·
+        //    `chargeMoveSpeedMultiplier` · `chargeMoveTimeout` · 못 가면 워프) 그 셋을 이번에 제거했다.
+        //    되살릴 일이 있으면 git 이력(이 커밋 직전)에 그대로 있다.
+        //
+        //    **점프어택과 같은 경로를 쓴다** — `BeginJumpTakeoff` 주석의 이유. 도착점만 갈아끼우고
+        //    종료 분기를 `_chargeJump` 로 가른다(`case Land:` 참조).
+        _chargeJump = true;
+        _jumpArrivePoint = _chargeMoveTarget;
 
-            agent.stoppingDistance = 0f;          // 목표 지점에 정확히 붙는다
-            agent.autoBraking = true;             // 지나치지 않게 감속은 켠 채로
-            agent.acceleration = DashAcceleration;
-            agent.isStopped = false;
-            agent.speed = MoveSpeed * ChargeMoveSpeedMul;
-            agent.SetDestination(_chargeMoveTarget);
-        }
+        // 🔴 공중에서는 폭탄을 던지지 않는다 — 점프어택과 같은 규약(BeginJump 의 짝).
+        //    해제는 착지(`ArriveJump`)와 체인 중단(`AbortAttackChain`)이 한다.
+        _wells?.SetSuppressed(true);
 
-        // 이동 중에는 로코모션 클립을 보여 준다 — 차징 클립은 도착한 뒤에 튼다(확정 스펙).
-        if (data != null && !string.IsNullOrEmpty(data.locomotionState))
-            CrossFadeStateClientRpc(data.locomotionState);
-
-        Debug.Log($"[23호] 송전기 — {_chargeMoveTarget} 으로 이동 시작 " +
+        Debug.Log($"[23호] 송전기 — {_chargeMoveTarget} 으로 **점프** " +
                   $"(기준 {(landing != null ? ChargeLandingName : "송전탑 중심")} · " +
                   $"인원 {_chargePlayers}명 → 송전탑 {_chargePylons}개 · " +
                   $"거리 {Vector3.Distance(transform.position, _chargeMoveTarget):0.#}m)", this);
 
-        EnterPhase(BossAttackPhase.ChargeMove, ChargeMoveTimeout);
-    }
-
-    // 중심으로 이동하는 구간. 도착하거나 시간이 다하면 그 자리에서 차징을 시작한다.
-    void TickChargeMove()
-    {
-        Vector3 a = transform.position; a.y = 0f;
-        Vector3 b = _chargeMoveTarget;  b.y = 0f;
-        bool arrived = (a - b).sqrMagnitude <= ChargeArriveDistance * ChargeArriveDistance;
-
-        if (!arrived && _attackPhaseTimer > 0f) return;
-
-        // 🔴 **제자리에서 차징하지 않는다**(팀장 확정 2026-08-13: "제대로 위치에 도착 안 해도 charging 을 함").
-        //    시간이 다 됐는데 못 갔으면 **그 지점으로 워프**한다. 차징 위치는 연출·오라 범위의 기준이라
-        //    어긋나면 안 되고, 점프어택이 이미 같은 방식으로 착지점에 워프한다(같은 규약).
-        if (!arrived)
-        {
-            Debug.LogWarning($"[23호] 송전기 — {ChargeMoveTimeout:0.#}초 안에 못 갔다(남은 거리 " +
-                             $"{Vector3.Distance(a, b):0.#}m). **워프**로 맞춘다 — 경로가 막혔는지 확인할 것.", this);
-            WarpTo(_chargeMoveTarget);
-        }
-
-        StartChargingInPlace();
+        BeginJumpTakeoff();
     }
 
     // 실제 차징 시작 — 송전탑을 올리고, 장판·오라를 켜고, 차징 클립을 튼다.
@@ -3066,9 +3101,17 @@ public class TwentyThreeBoss : MonsterBase
     int _chargePylons;
     int _chargePlayers;
     const float ChargeCenterSampleRadius = 4f;   // 중심을 보행면으로 스냅할 때 허용 반경
-    float ChargeArriveDistance => _boss != null ? Mathf.Max(0.1f, _boss.chargeMoveArriveDistance) : 0.6f;
-    float ChargeMoveTimeout => _boss != null ? Mathf.Max(0.5f, _boss.chargeMoveTimeout) : 4f;
-    float ChargeMoveSpeedMul => _boss != null ? Mathf.Max(1f, _boss.chargeMoveSpeedMultiplier) : 3f;
+
+    // 🔴 지금 도는 점프가 **차징 진입용**인가(2026-09-21). true 면 착지(`case Land:`)에서
+    //    Recovery 로 가지 않고 곧바로 `StartChargingInPlace()` 로 넘어간다.
+    //    예고 장판도 이 플래그로 억제한다(`BeginJumpHover`).
+    // ⚠️ **끄는 곳이 두 군데뿐이다** — 정상 종료(`case Land:`)와 체인 중단(`AbortAttackChain`).
+    //    빠뜨리면 다음 점프어택이 착지하자마자 차징을 시작한다.
+    bool _chargeJump;
+
+    // ⚠️ `ChargeArriveDistance`/`ChargeMoveTimeout`/`ChargeMoveSpeedMul` 은 2026-09-21 에 지웠다.
+    //    차징이 걸어가지 않고 점프로 가게 되면서 읽는 곳이 사라졌다(BeginCharge 주석 참조).
+    //    SO 필드 3종(`chargeMoveArriveDistance`/`chargeMoveSpeedMultiplier`/`chargeMoveTimeout`)도 함께.
 
     // 임의의 상태명을 전 피어에 CrossFade 한다(관용구 2 — 다지선다 애니는 상태 복제로 못 싣는다).
     [ClientRpc]

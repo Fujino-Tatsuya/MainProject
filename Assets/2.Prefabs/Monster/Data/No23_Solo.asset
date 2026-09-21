@@ -257,8 +257,6 @@ MonoBehaviour:
   chargeAuraKnockbackDuration: 0.25
   chargeAuraStagger: 0
   chargeAuraTelegraphPrefab: {fileID: 5997264177071607445, guid: a325fc2b60be455428b04ab67232fb24, type: 3}
-  chargeMoveArriveDistance: 0.6
-  chargeMoveTimeout: 4
   fireZoneRadius: 0
   fireZoneMaxRadius: 0
   fireZoneLifetime: 0

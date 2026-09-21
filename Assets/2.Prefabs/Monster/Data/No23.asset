@@ -351,6 +351,3 @@ MonoBehaviour:
   chargeAuraDamage: 20
   chargeAuraKnockbackStrength: 5
   chargeAuraTelegraphPrefab: {fileID: 5997264177071607445, guid: a325fc2b60be455428b04ab67232fb24, type: 3}
-  chargeMoveArriveDistance: 0.2
-  chargeMoveSpeedMultiplier: 3
-  chargeMoveTimeout: 4

@@ -346,8 +346,7 @@ public class BossDataSO : MonsterDataSO
     //    `attackSearchRadius` 도 후보였지만 두 번째 용도(인원 계산)가 공격 탐색이 아니라 버렸다.
     // ⚠️ `FormerlySerializedAs` 를 지우지 말 것 — 지우면 저작된 45 가 조용히 기본값 30 으로 돌아간다.
     [Header("플레이어 탐색 반경 (공용)")]
-    [Tooltip("플레이어를 훑는 반경(m). 보스룸을 덮을 만큼 넉넉히 — 이 밖이면 못 찾는다.
-" +
+    [Tooltip("플레이어를 훑는 반경(m). 보스룸을 덮을 만큼 넉넉히 — 이 밖이면 못 찾는다.\n" +
              "🔴 **두 곳이 공용으로 쓴다**: ① 점프·돌진의 최원거리 타겟 선정(FindFarthestPlayer) " +
              "② 차징 송전탑 개수를 정하는 인원 계산(CountAlivePlayers). " +
              "이 값을 바꾸면 송전탑 개수 판정 반경도 같이 바뀐다.")]
@@ -355,7 +354,6 @@ public class BossDataSO : MonsterDataSO
     [Min(1f)] public float playerScanRadius = 30f;
 
     [Header("JumpAttack — 거리 무관 / 최원거리 플레이어 타겟")]
-
     [Tooltip("체공 시간(초) = 예고 장판이 점증하는 시간. 이 시간이 끝나면 착지점으로 이동한다.")]
     [Min(0.1f)] public float jumpHoverTime = 1.2f;
 
@@ -579,16 +577,12 @@ public class BossDataSO : MonsterDataSO
              "점프 예고와 같은 프리팹(JumpTelegraph)을 그대로 써도 된다.")]
     public GameObject chargeAuraTelegraphPrefab;
 
-    [Tooltip("차징 위치로 이동할 때 이 거리 안에 들어오면 도착으로 본다(m).")]
-    [Min(0.1f)] public float chargeMoveArriveDistance = 0.6f;
-
-    [Tooltip("차징 위치로 이동할 때 이동속도 배수(moveSpeed × 이 값). **빠르게 가야 한다**(확정 스펙).\n" +
-             "⚠️ 배수만 올려서는 안 빨라진다 — 가속도도 함께 올린다(코드가 돌진과 같은 값을 쓴다).")]
-    [Min(1f)] public float chargeMoveSpeedMultiplier = 3f;
-
-    [Tooltip("차징 위치로 이동하는 데 허용하는 최대 시간(초). 넘으면 **그 지점으로 워프**한 뒤 차징한다 " +
-             "— 제자리에서 차징하면 오라 범위와 연출 기준이 어긋나기 때문이다(확정 스펙).")]
-    [Min(0.5f)] public float chargeMoveTimeout = 4f;
+    // ⚠️ 여기 있던 `chargeMoveArriveDistance` · `chargeMoveSpeedMultiplier` · `chargeMoveTimeout`
+    //    3종을 **2026-09-21 에 지웠다.** 차징이 걸어가지 않고 **점프로** 진입하게 되면서
+    //    (팀장 확정 — `TwentyThreeBoss.BeginCharge` 주석) 읽는 코드가 사라졌다.
+    //    🔴 읽히지 않는 노브를 남기면 다음 사람이 그걸 조절하고 아무 일도 안 생긴다 —
+    //       2026-09-21 유령 필드 54개를 걷어낸 것과 같은 이유다. 되살릴 일이 있으면 git 이력에 있다.
+    //    진입 길이는 이제 `jumpTakeoffDuration` + `jumpHoverTime` + `jumpLandingDuration` 이 정한다.
 
     // ─── 폭발 장판(FireFloor) ─────────────────────────────────────────────
     //
