@@ -12,11 +12,39 @@ Update this file when a term becomes important enough that future agents or team
 
 작업자: **경석(Claude)**. 브랜치 `feature/Boss23`. 컴파일 통과(에러 0).
 
+### 🟡 은희에게 넘김 — **결과 화면이 호스트에서만 채워진다** (경석 진단 완료 · 팀장 확정 "지금은 둔다")
+
+**증상**(2026-09-21 MPPM 실측) — 클리어 후 ResultScene 에서 호스트만
+`CLEAR / 생존 시간 04:35 / 처치 11` 이 나오고, **원격 클라는 `-` / `--:--` / `-`** 다.
+
+🔴 **고장이 아니라 미구현이다.** `SessionResult.cs` 의 docstring 이 이미 적어 두고 있다 —
+*"정적 보관으로 둔다(리슨 서버 로컬 표시 기준). 원격 클라이언트에도 같은 값을 보여야 하면
+**서버 브로드캐스트를 얹어야 한다 — 지금은 미구현**."* 클라가 보는 값은 `ResultStatsView` 의
+`!SessionResult.HasValue` 분기 그대로다(값이 **도달한 적이 없다**).
+
+```
+SessionStatsTracker (MonoBehaviour · 서버만 집계)
+  → SessionResult.Capture()      ← static. 호스트 프로세스 안에만 존재한다
+  → ResultStatsView 가 그 static 을 읽는다
+```
+
+- 집계 진입점 2곳: `BossEncounterDirector:688`(클리어) · `PartyWipeWatcher:66`(전멸)
+- **`SessionStatsTracker` 도 `PartyWipeWatcher` 도 `MonoBehaviour` 다** — 복제 수단이 없다.
+
+🔴 **손댈 때 걸릴 함정 — 브로드캐스트와 씬 전환이 경쟁한다.**
+`Capture` 직후 ResultScene 으로 넘어가므로, 단순히 ClientRpc 를 쏘면 **씬 언로드가 더 빨라
+클라가 여전히 빈 값을 본다.** 값을 씬 전환 뒤까지 살아남는 쪽에 실어야 한다 —
+`DontDestroyOnLoad` 네트워크 싱글톤의 `NetworkVariable`, 또는 **ResultScene 자체를 네트워크 씬**으로.
+어느 쪽이든 SceneManagement 설계를 건드리므로 **은희 영역**이다(AGENTS.md §5).
+
 ### 🔴 다음은 MPPM 2~3인 **한 판으로 몰아서** — 검증 목록이 아래 하나로 합쳐졌다
 
 계획서 [PLAN-boss-entrance-charge.md](PLAN-boss-entrance-charge.md) 의 완료 기준을 그대로 따라간다.
 
-1. **잡기 3건** — 기존 대기분. [PLAN-boss-backlog.md](PLAN-boss-backlog.md) **B0**
+0. ✅ **잡기 = 1명만 Carry / 나머지 넉백 — 2026-09-21 실측 통과**(B0 검증 2번).
+   같은 판에서 **인터럽트가 안 되는 별개 버그**가 드러나 고쳤다(`29c4389b`, 아래) → **재검증 필요**:
+   ① `Hold`·`Throw` 에서 인터럽트가 통하는가 ② **3타째에는 안 통하는가** ③ 성공 시 잡힌 사람이 풀려나는가
+1. **잡기 나머지 2건** — [PLAN-boss-backlog.md](PLAN-boss-backlog.md) **B0**
 2. **입장 연출** — 하강 중 체공 포즈 / 착지 클립 / **데미지 0** /
    🔴 **MPPM 클라(호스트 아님) 화면에서도 보이는가**(스폰과 같은 프레임 RPC라 실측 안 됨) /
    🔴 **전투 시작 후 착지 포즈가 안 남는가**(보스를 Idle 에 머물게 해서 확인)
@@ -33,6 +61,7 @@ Update this file when a term becomes important enough that future agents or team
 | **돌진 사거리** | `dashDuration` 0.91→**1.5** · `dashSpeedMultiplier` 6→**7.8** · `dashMaxDistance` 16→**30** |
 | **개명** | `jumpSearchRadius` → **`playerScanRadius`** (점프 전용이 아니었다 — 차징 송전탑 인원 계산도 같은 값을 쓴다) |
 | **SO 정리** | `chargeMoveArriveDistance`/`chargeMoveSpeedMultiplier`/`chargeMoveTimeout` 3종 제거(읽는 코드가 사라짐) |
+| **잡기 인터럽트** | 🔴 **실측으로 잡은 버그**(`29c4389b`) — `PerformAttackHit` 이 공격 종류를 안 가리고 카운터 창을 닫아, **잡기 클립 자신의 `OnAttackHit`(정규화 0.354)** 이 창을 0.25초 만에 꺼 버렸다. `StartAttack` 에는 같은 Grab 예외가 이미 있었는데 여기만 빠져 있었다 — G6 에서 창을 옮길 때 **여닫는 지점 한쪽만** 고친 것 |
 
 ### 🔴 이번에 드러난 것 — **PLAN §5 의 거리값 2건은 효과가 0 이었다**
 
