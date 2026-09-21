@@ -1,11 +1,16 @@
 using System;
 using System.Collections.Generic;
-using Unity.Netcode;
 using UnityEngine;
 using VeyTrace.Rendering.Occlusion;
 
-// 플레이어가 구역 안에 있는지만 로컬에서 감지하고, 벽의 표현은 Occlusion 어셈블리에 맡긴다.
-// 네트워크 상태를 만들거나 전송하지 않으므로 각 클라이언트의 판정이 서로 달라도 괜찮다.
+// 트리거 박스 안에 점유자가 몇 "명" 있는지만 세고, 0명↔1명 경계에서 벽 그룹에 켜/꺼를 알린다.
+//
+// 이 컴포넌트는 플레이어에 대해 아무것도 모른다. Player·Unit·NetworkObject 어느 것도 참조하지
+// 않는다 — 박스 안에 지정 레이어 콜라이더가 있느냐가 전부다. 그래서 테스트 씬에서 레이어만 바꾼
+// 캡슐 하나로 검증할 수 있고, 네트워크를 띄울 필요가 없다.
+//
+// 판정은 클라이언트마다 따로 돈다. 상태를 만들지도 보내지도 않으므로 클라이언트끼리 결과가
+// 달라도 상관없다.
 [DisallowMultipleComponent]
 [RequireComponent(typeof(BoxCollider))]
 public sealed class WallTransparencyZone : MonoBehaviour
@@ -13,26 +18,29 @@ public sealed class WallTransparencyZone : MonoBehaviour
     private const float PruneInterval = 0.5f;
 
     [Header("감지")]
-    [Tooltip("플레이어 콜라이더 레이어. 기본값은 Player(6)이다.")]
-    [SerializeField] private LayerMask playerLayers = 1 << 6;
-
-    [Tooltip("켜면 이 클라이언트가 소유한 플레이어만 센다. 끄면 모든 플레이어를 센다.")]
-    [SerializeField] private bool localPlayerOnly;
+    [Tooltip("점유자로 셀 콜라이더 레이어. 기본값 Player(6). 이 레이어를 쓰는 것은 플레이어 프리팹뿐이다.")]
+    [SerializeField] private LayerMask occupantLayers = 1 << 6;
 
     [Header("벽 그룹")]
+    [Tooltip("이 구역이 점유될 때 함께 투명해질 그룹. 여러 구역이 같은 그룹을 가리켜도 된다(OR).")]
     [SerializeField] private WallTransparencyGroup[] targetGroups =
         Array.Empty<WallTransparencyGroup>();
 
-    private readonly HashSet<Transform> _insideRoots = new HashSet<Transform>();
+    // 점유자를 루트 단위로 센다.
+    //
+    // 플레이어 프리팹에는 layer 6 BoxCollider 가 6개 더 있지만(AAC1~4·MainSkill·InterruptAttack)
+    // 전부 ColliderInfo 가 붙어 있고, ColliderInfo 는 Awake 에서 자기 콜라이더를 끈다 —
+    // 그것들은 물리 참여자가 아니라 OverlapAttack 이 읽는 모양 자료다. 그래서 런타임에 layer 6
+    // 콜라이더는 루트 캡슐 하나뿐이고, 한 명이 여러 번 세어질 일이 없다.
+    // 그래도 키를 루트로 접는 이유는 앞으로 콜라이더가 늘어도 인원수가 틀어지지 않게 하기 위해서다.
+    private readonly HashSet<Transform> _occupants = new HashSet<Transform>();
     private readonly HashSet<WallTransparencyGroup> _uniqueGroups =
         new HashSet<WallTransparencyGroup>();
-    private BoxCollider _box;
     private float _nextPruneTime;
     private bool _groupsEngaged;
 
     private void Awake()
     {
-        _box = GetComponent<BoxCollider>();
         RebuildGroupSet();
     }
 
@@ -43,98 +51,69 @@ public sealed class WallTransparencyZone : MonoBehaviour
 
     private void OnDisable()
     {
-        _insideRoots.Clear();
+        _occupants.Clear();
         SetGroupsEngaged(false);
     }
 
     private void OnTriggerEnter(Collider other)
     {
-        if (!TryResolvePlayer(other, out Transform root, out Player player))
+        if (!TryResolveOccupant(other, out Transform key))
             return;
 
-        if (player.CurrentHealth <= 0 || !PassesOwnerFilter(player))
-            return;
-
-        if (_insideRoots.Add(root) && _insideRoots.Count == 1)
-            SetGroupsEngaged(true);
+        if (_occupants.Add(key))
+            UpdateEngagement();
     }
 
     private void OnTriggerExit(Collider other)
     {
-        if (!TryResolvePlayer(other, out Transform root, out Player player))
+        if (!TryResolveOccupant(other, out Transform key))
             return;
 
-        if (!PassesOwnerFilter(player))
-            return;
-
-        // 공격 히트박스 하나가 꺼져 Exit가 와도 플레이어 본체가 아직 박스 안이면 유지한다.
-        if (_box.bounds.Contains(root.position))
-            return;
-
-        if (_insideRoots.Remove(root) && _insideRoots.Count == 0)
-            SetGroupsEngaged(false);
+        if (_occupants.Remove(key))
+            UpdateEngagement();
     }
 
     private void Update()
     {
-        if (_insideRoots.Count == 0 || Time.time < _nextPruneTime)
+        if (_occupants.Count == 0 || Time.time < _nextPruneTime)
             return;
 
         _nextPruneTime = Time.time + PruneInterval;
-
-        // 사망·디스폰·비활성화에서는 Exit가 오지 않을 수 있으므로 주기적으로 실제 점유를 고친다.
-        int removed = _insideRoots.RemoveWhere(ShouldPrune);
-        if (removed > 0 && _insideRoots.Count == 0)
-            SetGroupsEngaged(false);
+        Prune();
     }
 
-    private bool ShouldPrune(Transform root)
+    // 파괴·디스폰·비활성화에서는 Exit 가 오지 않는다. 죽은 점유자를 들고 있으면 구역이 영영
+    // 점유 상태로 남으므로 주기적으로 털어낸다.
+    private void Prune()
     {
-        if (root == null || !root.gameObject.activeInHierarchy)
-            return true;
-
-        Player player = root.GetComponent<Player>();
-        if (player == null || player.CurrentHealth <= 0)
-            return true;
-
-        if (localPlayerOnly && !PassesOwnerFilter(player))
-            return true;
-
-        return !_box.bounds.Contains(root.position);
+        if (_occupants.RemoveWhere(IsGone) > 0)
+            UpdateEngagement();
     }
 
-    private bool TryResolvePlayer(Collider other, out Transform root, out Player player)
+    private static bool IsGone(Transform occupant)
     {
-        root = null;
-        player = null;
+        return occupant == null || !occupant.gameObject.activeInHierarchy;
+    }
 
-        if (other == null || (playerLayers.value & (1 << other.gameObject.layer)) == 0)
+    private bool TryResolveOccupant(Collider other, out Transform key)
+    {
+        key = null;
+
+        if (other == null || (occupantLayers.value & (1 << other.gameObject.layer)) == 0)
             return false;
 
-        // attachedRigidbody가 있으면 물리 루트를 우선한다. 없으면 계층 루트를 써서
-        // Paladin의 캡슐과 공격 히트박스 6개가 모두 플레이어 하나로 합쳐지게 한다.
-        Transform physicsRoot = other.attachedRigidbody != null
+        // Rigidbody 가 있으면 그게 물리 단위의 주인이다(Paladin 은 루트에 있다). 없으면 계층
+        // 루트를 쓴다 — 테스트 씬의 맨 캡슐도 이 경로로 자기 자신이 키가 된다.
+        key = other.attachedRigidbody != null
             ? other.attachedRigidbody.transform
             : other.transform.root;
 
-        player = physicsRoot.GetComponent<Player>();
-        if (player == null)
-            player = other.GetComponentInParent<Player>();
-        if (player == null)
-            return false;
-
-        // 히트박스에 별도 Rigidbody가 추가되어도 카운트 키는 항상 Player 루트 하나다.
-        root = player.transform;
-        return true;
+        return key != null;
     }
 
-    private bool PassesOwnerFilter(Player player)
+    private void UpdateEngagement()
     {
-        if (!localPlayerOnly)
-            return true;
-
-        NetworkObject networkObject = player.GetComponent<NetworkObject>();
-        return networkObject != null && networkObject.IsOwner;
+        SetGroupsEngaged(_occupants.Count > 0);
     }
 
     private void SetGroupsEngaged(bool engaged)
@@ -170,8 +149,7 @@ public sealed class WallTransparencyZone : MonoBehaviour
 
     private void Reset()
     {
-        BoxCollider box = GetComponent<BoxCollider>();
-        box.isTrigger = true;
+        GetComponent<BoxCollider>().isTrigger = true;
     }
 
     private void OnValidate()
