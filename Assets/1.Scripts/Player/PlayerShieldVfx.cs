@@ -4,7 +4,9 @@ using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// 보호막(수호자의 의지) 연출의 켜고 끄는 창구. 소켓 두 개를 들고 있고 스킬이 시점만 알려 준다.
+/// 방패 계열 연출 중 <b>서버에서만 알 수 있는 시점</b>을 전 피어로 퍼뜨리는 창구.
+/// 보호막(수호자의 의지)의 등장·소멸·피격 파문과, 단죄의 방패 적중 충격파를 맡는다.
+/// 소켓을 들고 있고 스킬은 시점만 알려 준다.
 ///
 /// <b>왜 스킬이 직접 안 하고 여기로 오나.</b> <see cref="FirstMeleeSubSkill"/>의 부모인
 /// <c>PlayerSkillBase</c>는 <b>MonoBehaviour</b>라 RPC를 달 수 없다. 그런데 보호막이 끝나는
@@ -35,6 +37,10 @@ public class PlayerShieldVfx : BaseNetworkBehaviour
     [Tooltip("공격 지점이 배리어 중심에서 이만큼도 떨어져 있지 않으면 파문을 건너뛴다(미터).\n" +
              "장판 한가운데서 맞으면 방향이 서지 않는다 — 엉뚱한 쪽에 띄우는 것보다 안 띄우는 게 낫다")]
     [SerializeField, Min(0f)] private float minHitDistance = 0.15f;
+
+    [Tooltip("단죄의 방패(우클릭)가 적중했을 때 한 번 터뜨릴 충격파. 프리팹의 'ShieldWave' 를 물린다.\n" +
+             "비워두면 연출만 빠진다")]
+    [SerializeField] private EffectSocketPlayer interruptWave;
 
     // 풀 인스턴스를 담아 둘 수 없으므로(반납되면 다른 연출에 재대출된다) 매번 다시 받는다.
     // 리스트만 재사용해 할당을 없앤다.
@@ -124,6 +130,32 @@ public class PlayerShieldVfx : BaseNetworkBehaviour
             ripple.AddHit(center + direction.normalized);
         }
     }
+
+    /// <summary>
+    /// [서버] 단죄의 방패가 적중했다. 충격파를 전 피어에 한 번 터뜨린다.
+    ///
+    /// <b>왜 스킬이 직접 못 하나.</b> 적중 판정(<c>FirstMeleeInterruptSkill.ResolveHit</c>)은
+    /// <b>서버에서만</b> 돈다 — <c>OnTick</c>은 <c>TickServer</c>가, 애니메이션 이벤트는
+    /// <c>PlayerSkillController.HandleAnimationEvent</c>의 <c>if (IsNetworkActive &amp;&amp; !IsServer) return;</c>가
+    /// 각각 막는다. 거기서 바로 재생하면 <b>호스트에서만 보인다</b>.
+    /// 그리고 스킬의 부모 <c>PlayerSkillBase</c>는 MonoBehaviour라 RPC를 달 수 없다.
+    /// </summary>
+    public void ServerInterruptWave()
+    {
+        if (!IsNetworkActive)
+        {
+            interruptWave?.PlayOnce();
+            return;
+        }
+
+        if (!IsServer) return;
+
+        InterruptWaveRpc();
+    }
+
+    // 원샷이라 Unreliable 이다. 한 발 유실되면 충격파 한 번이 안 뜰 뿐 상태가 어긋나지 않는다.
+    [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
+    private void InterruptWaveRpc() => interruptWave?.PlayOnce();
 
     private void EndLocal(bool broken)
     {
