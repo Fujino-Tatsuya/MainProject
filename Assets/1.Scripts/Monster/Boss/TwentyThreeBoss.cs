@@ -2281,7 +2281,9 @@ public class TwentyThreeBoss : MonsterBase
     {
         if (_aoeBuffer == null) _aoeBuffer = new Collider[16];
 
-        float radius = _boss != null ? _boss.jumpSearchRadius : 30f;
+        // ⚠️ `playerScanRadius` 는 **여기 전용이 아니다** — CountAlivePlayers() 가 같은 값으로
+        //    차징 송전탑 개수를 정한다. 이 값을 만지면 그쪽 판정 반경도 같이 움직인다.
+        float radius = _boss != null ? _boss.playerScanRadius : 30f;
         int count = Physics.OverlapSphereNonAlloc(
             transform.position, radius, _aoeBuffer, playerMask, QueryTriggerInteraction.Collide);
 
@@ -3782,7 +3784,11 @@ public class TwentyThreeBoss : MonsterBase
     {
         if (_aoeBuffer == null) _aoeBuffer = new Collider[16];
 
-        float radius = _boss != null ? _boss.jumpSearchRadius : 30f;
+        // ⚠️ 🔴 **여기가 송전탑 개수를 정한다**(1인 1 / 2인 2 / 3인+ 4). 그런데 반경은
+        //    FindFarthestPlayer() 와 **공용**이다 — 점프 사거리 때문에 30 → 45 로 올렸을 때
+        //    이 판정 반경도 같이 올라갔다(2026-09-21 확인. 의도였는지는 기록이 없다).
+        //    송전탑 개수가 인원과 안 맞으면 여기를 먼저 의심할 것.
+        float radius = _boss != null ? _boss.playerScanRadius : 30f;
         int count = Physics.OverlapSphereNonAlloc(
             transform.position, radius, _aoeBuffer, playerMask, QueryTriggerInteraction.Collide);
 

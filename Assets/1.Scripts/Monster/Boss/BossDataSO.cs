@@ -1,5 +1,6 @@
 ﻿using System;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 // 보스 공격 테이블 1행 = 공격 1종. 배열 인덱스가 곧 MonsterBase 의 **공격 슬롯 번호**다
 // (ConfigureAttackSlots / CooldownReady / CurrentAttackSlot 이 이 인덱스를 쓴다).
@@ -340,9 +341,20 @@ public class BossDataSO : MonsterDataSO
     [Tooltip("[G5] 끌려왔지만 **붙잡히지 않은** 플레이어를 보스 전방으로 밀어내는 세기. 0 이면 밀지 않는다.")]
     [Min(0f)] public float grabPullKnockback = 4f;
 
+    // 🔴 이름이 `jumpSearchRadius` 였다(2026-09-21 개명). 점프 전용으로 읽혀서 다음 사람이
+    //    "돌진은 왜 점프 값을 보나"로 헤맸는데, 실제로는 **점프도 아닌 곳에서도 쓴다.**
+    //    `attackSearchRadius` 도 후보였지만 두 번째 용도(인원 계산)가 공격 탐색이 아니라 버렸다.
+    // ⚠️ `FormerlySerializedAs` 를 지우지 말 것 — 지우면 저작된 45 가 조용히 기본값 30 으로 돌아간다.
+    [Header("플레이어 탐색 반경 (공용)")]
+    [Tooltip("플레이어를 훑는 반경(m). 보스룸을 덮을 만큼 넉넉히 — 이 밖이면 못 찾는다.
+" +
+             "🔴 **두 곳이 공용으로 쓴다**: ① 점프·돌진의 최원거리 타겟 선정(FindFarthestPlayer) " +
+             "② 차징 송전탑 개수를 정하는 인원 계산(CountAlivePlayers). " +
+             "이 값을 바꾸면 송전탑 개수 판정 반경도 같이 바뀐다.")]
+    [FormerlySerializedAs("jumpSearchRadius")]
+    [Min(1f)] public float playerScanRadius = 30f;
+
     [Header("JumpAttack — 거리 무관 / 최원거리 플레이어 타겟")]
-    [Tooltip("최원거리 플레이어를 찾는 탐색 반경(m). 보스룸을 덮을 만큼 넉넉히 — 이 밖이면 못 찾는다.")]
-    [Min(1f)] public float jumpSearchRadius = 30f;
 
     [Tooltip("체공 시간(초) = 예고 장판이 점증하는 시간. 이 시간이 끝나면 착지점으로 이동한다.")]
     [Min(0.1f)] public float jumpHoverTime = 1.2f;
