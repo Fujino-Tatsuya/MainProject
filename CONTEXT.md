@@ -8,10 +8,35 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 작업 세션 (2026-09-21 #3 · 은희 · **이펙트 파사드는 지스타 이후로 연기** + 이벤트 이중 발화 수정)
+## ▶▶ 현재 인수인계 (2026-09-21 #3 · 은희 · **이펙트 파사드는 지스타 이후로 연기** + 이벤트 이중 발화 수정)
 
-작업자: **은희(Claude)**. 브랜치 `fix/unit-clientdamaged-double-fire`(development 기반).
-수정 파일: `Assets/1.Scripts/Unit/Unit.cs` **한 개뿐**. 전체 리빌드 에러 0. **Play 검증 대기.**
+작업자: **은희(Claude)**. 전체 리빌드 에러 0. **Play 검증만 남았다.**
+
+### ✅ development 머지 + origin 푸시 완료 (2026-09-21) — `10804346` → `1b85173b`
+
+fast-forward(충돌 0). 작업 브랜치는 `fix/unit-clientdamaged-double-fire` 였다.
+
+```
+1b85173b  chore(addressables): link.xml 제거
+52025c1d  docs: 이펙트 파사드는 지스타 이후로 연기 + 민경에게 넘길 제약 기록
+320e85fe  fix(unit): ClientDamaged 가 HP 감소마다 2회 발화하던 것 수정
+```
+
+체크아웃 없이 `git push . HEAD:development` 로 올렸다 — 워킹트리가 뒤로 갔다 앞으로 오지 않아
+**Unity 리임포트가 돌지 않았다.** (`Packages/manifest.json` 변경 없음을 먼저 확인했다.)
+
+🔴 **`1b85173b` 주의 — `Assets/AddressableAssetsData/link.xml` 이 development 에서 빠졌다.**
+Unity 가 에디터 리프레시 중에 지운 것을 그대로 확정했다. `8b1a1a70` 에서 **IL2CPP 링커 보존용으로
+의도적으로 추가**했던 파일이고, Addressables/ResourceManager 의 프로바이더 4종
+(`AssetBundleProvider` · `BundledAssetProvider` · `InstanceProvider` · `SceneProvider`)과
+`UnityEngine.ComputeShader` 를 `preserve="all"` 로 묶고 있었다.
+→ **IL2CPP 빌드 후 에셋 로딩이나 씬 전환이 실패하면 여기부터 의심할 것.**
+`git show 8b1a1a70` 으로 원본을 복구할 수 있다.
+
+### 🔴 남은 것 — Play 검증 (MPPM)
+
+이중 발화 수정은 **컴파일만 통과한 상태로 development 에 들어가 있다.** MPPM 으로 피격 시
+플래시(`HitFlash`)가 **한 번만** 도는지 확인할 것.
 
 ### 🔴 확정 — 이펙트 구조 개선은 **지스타(2026-11 중순) 이후**다
 
