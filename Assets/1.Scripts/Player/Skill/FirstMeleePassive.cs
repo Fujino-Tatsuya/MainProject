@@ -32,6 +32,10 @@ public class FirstMeleePassive : BaseNetworkBehaviour
     [SerializeField, Min(0f)] private float bonusDamageMultiplier = 1f;
     [SerializeField, Min(0)] private int bonusFlatDamage = 0;
 
+    [Header("연출")]
+    [Tooltip("Ready 상태에서 칼날을 빛낸다. 칼의 MaterialFadeEffect 를 물린다.\n비워두면 연출만 빠진다")]
+    [SerializeField] private MaterialFadeEffect bladeGlow;
+
     [Header("발동 - 체력 회복(%)")]
     // 맞은 적 수가 이 값 이하이면 최소 회복%, 초과이면 (적 수 × 타겟당 회복%)
     [SerializeField, Min(1)] private int minTargetThreshold = 5;
@@ -41,6 +45,20 @@ public class FirstMeleePassive : BaseNetworkBehaviour
     // Ready가 되는 서버 시각(GameTime). 서버만 쓰고 오너만 읽는다. VFX/HUD가 이 값으로 fill·Ready를 계산.
     private readonly NetworkVariable<double> readyServerTime = new NetworkVariable<double>(
         0d, NetworkVariableReadPermission.Owner, NetworkVariableWritePermission.Server);
+
+    /// <summary>
+    /// Ready 여부를 <b>모든 피어에</b> 복제한다 — 칼날 발광처럼 남들도 봐야 하는 연출용.
+    ///
+    /// <b>왜 위의 <see cref="readyServerTime"/>을 넓히지 않았나.</b> 그 값은 피격마다 갱신돼서
+    /// 권한을 Everyone으로 열면 <b>맞을 때마다</b> double이 전원에게 복제된다. 반면 이 bool은
+    /// <b>Ready가 실제로 뒤집힐 때만</b> 바뀌므로 쿨다운 주기당 두 번이면 끝난다.
+    ///
+    /// <b>왜 RPC가 아닌가.</b> 켜짐/꺼짐은 이벤트가 아니라 <b>상태</b>다. NetworkVariable로 두면
+    /// 늦게 접속한 클라가 현재 값을 자동으로 받고(RPC는 이미 지나간 것을 못 받는다),
+    /// 한 발 유실돼도 상태가 수렴한다.
+    /// </summary>
+    private readonly NetworkVariable<bool> readyReplicated = new NetworkVariable<bool>(
+        false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     private Player owner;
     private PlayerDefaultAttack defaultAttack;
@@ -85,10 +103,25 @@ public class FirstMeleePassive : BaseNetworkBehaviour
 
         // 서버가 초기 쿨다운을 건다(스폰/씬 진입 시 리셋). 오프라인 폴백 포함.
         if (HasGameplayAuthority)
+        {
             readyServerTime.Value = ServerNow + cooldownTime;
+            readyReplicated.Value = false;
+        }
 
         lastReadyState = IsReady;
+
+        // 늦게 접속한 클라는 이미 복제된 현재 값을 받는다 — 여기서 한 번 반영하면 상태가 맞는다.
+        readyReplicated.OnValueChanged += HandleReadyReplicated;
+        ApplyBladeGlow(readyReplicated.Value);
     }
+
+    public override void OnNetworkDespawn()
+    {
+        readyReplicated.OnValueChanged -= HandleReadyReplicated;
+        base.OnNetworkDespawn();
+    }
+
+    private void HandleReadyReplicated(bool previous, bool next) => ApplyBladeGlow(next);
 
     private void Update()
     {
@@ -100,8 +133,25 @@ public class FirstMeleePassive : BaseNetworkBehaviour
         if (ready != lastReadyState)
         {
             lastReadyState = ready;
+
+            // 연출은 여기서 직접 켜지 않는다 — 서버가 복제한 값(readyReplicated)이 전 피어를 한 경로로 몬다.
+            // 여기는 오너 HUD 용 즉시 신호다(복제 지연 없이 자기 화면에 바로 반영).
+            if (HasGameplayAuthority)
+                readyReplicated.Value = ready;
+
             ReadyChanged?.Invoke(ready);
         }
+    }
+
+    // Ready 가 되면 칼날이 켜지고, 발동해서 쿨다운이 돌면 꺼진다.
+    // FadeIn/FadeOut 은 이미 그 상태면 조용한 no-op 이라 중복 호출을 걱정하지 않아도 된다.
+    private void ApplyBladeGlow(bool ready)
+    {
+        if (bladeGlow == null)
+            return;
+
+        if (ready) bladeGlow.FadeIn();
+        else bladeGlow.FadeOut();
     }
 
     /// <summary>내가 피격당했을 때 호출(Player.ReceiveAttack). 데미지량 무관하게 Ready 시각을 앞당긴다.</summary>
