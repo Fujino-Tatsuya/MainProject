@@ -58,8 +58,8 @@ Codex와 협업하기 위한 시작 절차. Agent-Bridge MCP 도구
 ## 4. 위임했으면 완료 이벤트를 백그라운드로 감시한다 (handoff 직후 필수)
 
 Codex가 끝나도 **아무도 알려주지 않는다.** 사용자가 직접 물어보거나 `/coop-agent-reload`를
-돌려야 알게 되는데, 그러면 놓치거나 한참 뒤에 안다. 그래서 handoff를 보낸 직후
-`Monitor` 도구로 백그라운드 감시를 건다.
+돌려야 알게 되는데, 그러면 놓치거나 한참 뒤에 안다. 그래서 handoff를 보낸 직후 백그라운드
+감시를 건다.
 
 감시 대상은 레인 폴더의 파일 2개다 (`<BRIDGE_HOME>` = `C:\Users\user\Desktop\Agent-Bridge`):
 
@@ -68,20 +68,67 @@ Codex가 끝나도 **아무도 알려주지 않는다.** 사용자가 직접 물
 | `<BRIDGE_HOME>/<LANE>/conversation.jsonl` | 메시지 원본. 한 줄에 JSON 하나. 완료 보고는 `"type":"work_completed"` |
 | `<BRIDGE_HOME>/<LANE>/watcher.log` | 워처 로그. `DONE id=... (exit=N)` · `[RELOAD]` · 실패 메시지 |
 
-`Monitor` 호출 예 (`<LANE>` 만 바꿔 쓴다):
+### 🔴 `tail -F` 를 쓰지 마라 — 워처를 망가뜨린다
 
-```
+Git MSYS 의 `tail`(`tail -f` / `-F`)은 Windows 에서 파일을 **잠근다.** 그 상태에서는 워처의
+PowerShell `Add-Content` 가 "다른 프로세스에서 사용 중" 으로 **실패한다.**
+`Write-Log` 는 5회 재시도 후 **에러를 삼키고 조용히 포기**하므로
+([`codex-watcher.ps1`](file:///C:/Users/user/Desktop/Co_Working_for_Agents/agent-context-bridge/codex-watcher.ps1) 의 `Write-Log`),
+증상이 "로그가 그냥 멈춤" 으로만 보인다.
+
+2026-09-21 에 실제로 이 사고가 났다. `tail -F` 를 붙인 6초 뒤부터 `watcher.log` 가 한 줄도
+안 찍혔고, `DONE id=` 와 `[WATCHER] 실패/보고 없음` 알림이 통째로 사라졌다.
+`conversation.jsonl` 의 메시지는 MCP 서버(Node)가 써서 살아남았기 때문에
+"메시지는 오는데 로그만 죽은" 혼란스러운 상태가 됐다.
+
+**대신 짧게 열고 닫는 폴링을 쓴다.** 파일을 붙들지 않으므로 워처의 쓰기를 막지 않고,
+순간 겹쳐도 워처의 5회 재시도가 흡수한다.
+
+### 어떻게 걸까
+
+완료는 **이벤트 스트림이 아니라 "끝나면 한 번"** 이다. 그러니 `Monitor`(30분 상한이 있어
+긴 작업에서 먼저 죽는다)가 아니라 **`Bash` + `run_in_background`** 로, 조건이 서면
+**종료하는** 스크립트를 돌린다. 종료 시 자동으로 알림이 온다.
+
+스크립트 뼈대 — 15초마다 두 파일의 줄 수만 보고, 늘었으면 그 구간만 읽는다:
+
+```bash
 H="/c/Users/user/Desktop/Agent-Bridge/<LANE>"
-tail -n0 -F "$H/conversation.jsonl" "$H/watcher.log" 2>/dev/null \
-  | grep -E --line-buffered '"type":"(work_completed|review)"|DONE id=|\[RELOAD\]|보고 없음|실패|exit=[1-9]' \
-  | sed -u 's/^\(.\{0,300\}\).*/\1/'
+base_conv=$(wc -l < "$H/conversation.jsonl"); base_wlog=$(wc -l < "$H/watcher.log")
+while :; do
+  n=$(wc -l < "$H/conversation.jsonl")
+  if [ "$n" -gt "$base_conv" ]; then
+    new=$(sed -n "$((base_conv+1)),\$p" "$H/conversation.jsonl" | grep '"sender":"codex"')
+    [ -n "$new" ] && { echo "$new" | cut -c1-500; exit 0; }
+    base_conv=$n
+  fi
+  w=$(wc -l < "$H/watcher.log")
+  if [ "$w" -gt "$base_wlog" ]; then
+    d=$(sed -n "$((base_wlog+1)),\$p" "$H/watcher.log" | grep -E 'DONE id=|보고 없음|실패|\[RELOAD\]')
+    [ -n "$d" ] && { echo "$d" | cut -c1-500; exit 0; }
+    base_wlog=$w
+  fi
+  sleep 15
+done
 ```
 
 - 🔴 **성공만 잡으면 안 된다.** Codex가 크래시하거나 사용량 한도에 걸리면 `work_completed`가
-  영영 안 온다. `exit=[1-9]` · `보고 없음` · `실패` 를 같은 필터에 넣어야 침묵과 실패가 구분된다.
-- `timeout_ms` 는 최대치(1800000)로 잡는다. 만료 통지가 오면 작업이 아직이면 **다시 건다.**
-- `sed -u` 로 줄을 잘라라. `conversation.jsonl` 한 줄이 handoff 본문 전체라 안 자르면 알림이 거대해진다.
-- 이벤트가 오면 그때 `/coop-agent-reload` 를 제안한다.
+  영영 안 온다. `DONE id=` · `보고 없음` · `실패` 도 종료 조건에 넣어야 침묵과 실패가 구분된다.
+  `"sender":"codex"` 로 잡으면 `type:"message"`(질문)도 걸려서 Codex가 막혔을 때도 깨어난다.
+- `cut -c1-500` 으로 줄을 잘라라. `conversation.jsonl` 한 줄이 handoff 본문 전체다.
+- 무한 루프이므로 **시간 안전장치**(예: 3시간)를 넣고 초과 시 종료 코드를 달리해라.
+- 깨어나면 `/coop-agent-reload` 를 제안한다.
+
+### 조용할 때 생사 확인하는 법
+
+로그가 멈춰도 Codex는 대개 살아 있다. 물어보기 전에 직접 확인한다:
+
+- `Get-Process | Where-Object { $_.ProcessName -match 'codex' }` — 시작 시각이 handoff
+  발송 직후면 워처가 정상적으로 띄운 것이다
+- 작업 대상 폴더의 파일 수정 시각 (`find <dir> -newermt '-5 minutes'`)
+- `git log`/`git status` — 커밋까지 갔는지
+
+프로세스가 살아 있고 파일이 최근에 바뀌었으면 **그냥 작업 중**이다.
 
 ## 5. `$ARGUMENTS`가 없으면 — 상태 보고만
 
