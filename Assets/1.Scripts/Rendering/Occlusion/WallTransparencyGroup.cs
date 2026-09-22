@@ -50,11 +50,12 @@ namespace VeyTrace.Rendering.Occlusion
 
         [Header("높이 그라데이션")]
         [Tooltip("1층 벽 바닥의 월드 Y 오프셋. 이 컴포넌트 위치의 Y에 더해 기준 높이를 만든다. " +
-                 "구역 오브젝트를 벽 바닥에 맞춰 두면 0으로 두면 된다.")]
+                 "여기가 가장 많이 사라지는 지점이다. 구역 오브젝트를 벽 바닥에 맞춰 두면 0이면 된다.")]
         [SerializeField] private float baseYOffset;
 
-        [Tooltip("그라데이션이 끝나는 높이차. 벽 한 층이 2.5이므로 2층에 걸쳐 사라지게 하려면 5. " +
-                 "기준 높이에서 이만큼 위가 완전히 사라지고, 그보다 위는 전부 사라진 상태다.")]
+        [Tooltip("그라데이션이 끝나는 높이차. 아래가 사라지고 위가 남는 방향이다. " +
+                 "기준 높이에서 이만큼 올라가면 원래대로 돌아오고, 그보다 위는 전부 그대로다. " +
+                 "벽 한 층이 2.5이므로 2층에 걸쳐 복귀시키려면 5.")]
         [Min(0.01f)]
         [SerializeField] private float fadeHeight = WallLevelHeight * 2f;
 
