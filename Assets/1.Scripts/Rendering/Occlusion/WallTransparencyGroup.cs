@@ -12,6 +12,12 @@ namespace VeyTrace.Rendering.Occlusion
     public sealed class WallTransparencyGroup : MonoBehaviour
     {
         private static readonly int OpacityId = Shader.PropertyToID("_WallOcclusionOpacity");
+        private static readonly int BaseYId = Shader.PropertyToID("_WallOccBaseY");
+        private static readonly int FadeHeightId = Shader.PropertyToID("_WallOccFadeHeight");
+
+        // 벽 한 층의 높이. Wall_2stack.prefab 의 자식 Y(0 / 2.5 / 5)와 존 프리팹의 벽
+        // 클러스터(-5.5 / -3.0 / -0.5)에서 실측한 값이다.
+        private const float WallLevelHeight = 2.5f;
 
         [Header("대상")]
         [Tooltip("이 그룹에서 함께 투명해질 렌더러. 서브메시 머티리얼 슬롯도 모두 검사한다.")]
@@ -29,6 +35,16 @@ namespace VeyTrace.Rendering.Occlusion
         [Tooltip("투명화가 켜졌을 때 남길 불투명도. 기존 minimumOpacity와 같은 0.15를 권장한다.")]
         [Range(0f, 1f)]
         [SerializeField] private float targetOpacity = 0.15f;
+
+        [Header("높이 그라데이션")]
+        [Tooltip("1층 벽 바닥의 월드 Y 오프셋. 이 컴포넌트 위치의 Y에 더해 기준 높이를 만든다. " +
+                 "구역 오브젝트를 벽 바닥에 맞춰 두면 0으로 두면 된다.")]
+        [SerializeField] private float baseYOffset;
+
+        [Tooltip("그라데이션이 끝나는 높이차. 벽 한 층이 2.5이므로 2층에 걸쳐 사라지게 하려면 5. " +
+                 "기준 높이에서 이만큼 위가 완전히 사라지고, 그보다 위는 전부 사라진 상태다.")]
+        [Min(0.01f)]
+        [SerializeField] private float fadeHeight = WallLevelHeight * 2f;
 
         private readonly Dictionary<Material, Material> _instancesBySource =
             new Dictionary<Material, Material>();
@@ -122,6 +138,7 @@ namespace VeyTrace.Rendering.Occlusion
                         instance = Instantiate(source);
                         instance.name = $"{source.name} (Wall Transparency Group)";
                         instance.SetFloat(OpacityId, 1f);
+                        ApplyHeightGradient(instance);
                         _instancesBySource.Add(source, instance);
                         _sourceByInstance.Add(instance, source);
                     }
@@ -142,6 +159,17 @@ namespace VeyTrace.Rendering.Occlusion
                 if (instance != null)
                     instance.SetFloat(OpacityId, opacity);
             }
+        }
+
+        // 기준 높이는 월드 Y 라야 한다. 존 프리팹의 벽은 존 로컬 원점 기준 음수 좌표에
+        // 놓이고 존은 런타임에 배치되므로, 셰이더에 절대값을 박을 수 없다.
+        private void ApplyHeightGradient(Material instance)
+        {
+            if (instance.HasProperty(BaseYId))
+                instance.SetFloat(BaseYId, transform.position.y + baseYOffset);
+
+            if (instance.HasProperty(FadeHeightId))
+                instance.SetFloat(FadeHeightId, fadeHeight);
         }
 
         private void OnDestroy()
@@ -186,6 +214,7 @@ namespace VeyTrace.Rendering.Occlusion
             fadeInDuration = Mathf.Max(0f, fadeInDuration);
             fadeOutDuration = Mathf.Max(0f, fadeOutDuration);
             targetOpacity = Mathf.Clamp01(targetOpacity);
+            fadeHeight = Mathf.Max(0.01f, fadeHeight);
 
 #if UNITY_EDITOR
             if (targetRenderers == null)
