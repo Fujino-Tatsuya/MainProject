@@ -15,6 +15,18 @@ namespace VeyTrace.Rendering.Occlusion
         private static readonly int BaseYId = Shader.PropertyToID("_WallOccBaseY");
         private static readonly int FadeHeightId = Shader.PropertyToID("_WallOccFadeHeight");
 
+        // 이 그룹의 런타임 인스턴스에서만 켜는 셰이더 키워드.
+        //
+        // 벽용 Material Variant 를 따로 만들지 않는 이유가 이것이다. 벽과 바닥이 같은 원본
+        // 머티리얼(Generic_01_A)을 쓰는데, 그룹에 담긴 렌더러만 인스턴스를 받으므로 키워드도
+        // 그것들에만 붙는다. 바닥·파이프는 원본 그대로라 디더 코드가 컴파일에서 빠진 채 그려진다.
+        // 벽 프리팹의 머티리얼을 손으로 교체할 일도 없어진다.
+        //
+        // 🔴 그래프에서 이 키워드는 반드시 Multi Compile 이어야 한다. Shader Feature 는
+        // "에셋 머티리얼이 켜놓은 조합"만 컴파일하는데, 우리는 코드로 켜므로 켜진 에셋이 하나도
+        // 없다 — 빌드에서 변종이 잘려나가 에디터에서만 동작하게 된다.
+        private const string DitherKeyword = "WALL_OCCLUSION_DITHER";
+
         // 벽 한 층의 높이. Wall_2stack.prefab 의 자식 Y(0 / 2.5 / 5)와 존 프리팹의 벽
         // 클러스터(-5.5 / -3.0 / -0.5)에서 실측한 값이다.
         private const float WallLevelHeight = 2.5f;
@@ -138,6 +150,7 @@ namespace VeyTrace.Rendering.Occlusion
                         instance = Instantiate(source);
                         instance.name = $"{source.name} (Wall Transparency Group)";
                         instance.SetFloat(OpacityId, 1f);
+                        instance.EnableKeyword(DitherKeyword);
                         ApplyHeightGradient(instance);
                         _instancesBySource.Add(source, instance);
                         _sourceByInstance.Add(instance, source);
