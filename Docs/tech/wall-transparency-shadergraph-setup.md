@@ -110,7 +110,7 @@ Alpha    = result - 디더 임계값
 | Blackboard `_WallOccFadeHeight` | C 의 `FadeHeight` |
 | Blackboard `_WallOcclusionOpacity` | C 의 `Opacity` |
 | C 의 `Alpha` | **D(Keyword) 의 `On` 포트** |
-| (D 의 `Off` 포트) | **비워 둔다 → 기본값 1** |
+| (D 의 `Off` 포트) | 🔴 **숫자 칸에 `1` 을 직접 입력** (연결하지 않은 Float 포트의 기본값은 0 이다) |
 | D 의 출력 | **Master Stack 의 `Alpha`** |
 
 Blackboard 프로퍼티는 왼쪽 목록에서 **그래프 위로 드래그**하면 노드가 생긴다.
@@ -120,7 +120,11 @@ Blackboard 프로퍼티는 왼쪽 목록에서 **그래프 위로 드래그**하
 🔴 **`Branch` 노드를 쓰면 안 된다.** 겉보기가 비슷하지만 `Branch` 는 런타임 select(lerp)라
 양쪽이 **둘 다 컴파일되어 항상 실행**된다 — 키워드로 코드를 덜어내려던 목적이 무효가 된다.
 반드시 **Blackboard 의 키워드를 드래그해서 생기는 `Keyword` 노드**여야 `#if` / `#else` 로
-스트립된다. `Off` 포트를 비워 두면 Float 기본값 1 이 들어가 "평소대로" 가 된다.
+스트립된다.
+
+🔴 **`Off` 포트에는 `1` 을 직접 입력한다.** 연결하지 않은 Float 포트의 기본값은 **0** 이다.
+0 으로 두면 Alpha Clip Threshold 가 0 인 지금은 우연히 통과하지만(`clip(0)` 은 버리지 않는다),
+Threshold 를 조금이라도 올리는 순간 **키워드가 꺼진 머티리얼까지 통째로 사라진다.**
 ### 7. Alpha Clip Threshold
 
 Master Stack 의 **Alpha Clip Threshold** 에 **`0`** 을 넣는다. 함수 출력이
