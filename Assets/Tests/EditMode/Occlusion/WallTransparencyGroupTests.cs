@@ -6,6 +6,11 @@ using UnityEngine.TestTools;
 
 namespace VeyTrace.Rendering.Occlusion.Tests
 {
+    // EditMode 에서 검증하지 않는 것 — Play 로 본다:
+    //  - 시간 기반 페이드(Update 가 돌지 않는다)
+    //  - OnDestroy 의 원본 복원과 인스턴스 해제. EditMode 에서는 Awake 가 실행되지 않아
+    //    Unity 가 이 컴포넌트를 깨어난 적 없는 것으로 보고 OnDestroy 도 부르지 않는다.
+    //    검증하려면 프로덕션에서 정리 로직을 콜백 밖으로 빼내야 하는데, 그만한 값이 없다.
     public sealed class WallTransparencyGroupTests
     {
         private const string OcclusionShaderName =
@@ -159,21 +164,6 @@ namespace VeyTrace.Rendering.Occlusion.Tests
             Assert.That(propertyBlock.isEmpty, Is.True);
         }
 
-        [Test]
-        public void 컴포넌트를_파괴하면_원본을_복원하고_생성한_인스턴스를_파괴한다()
-        {
-            Material source = CreateOcclusionMaterial("복원 원본");
-            MeshRenderer renderer = CreateRenderer("복원 대상 벽", source);
-            WallTransparencyGroup group = CreateGroup(renderer);
-            Material instance = renderer.sharedMaterial;
-            TrackRuntimeMaterial(instance);
-
-            Object.DestroyImmediate(group);
-
-            Assert.That(renderer.sharedMaterial, Is.SameAs(source));
-            Assert.That(instance == null, Is.True);
-        }
-
         private WallTransparencyGroup CreateGroup(params Renderer[] renderers)
         {
             Assert.That(TargetRenderersField, Is.Not.Null);
@@ -182,6 +172,15 @@ namespace VeyTrace.Rendering.Occlusion.Tests
             WallTransparencyGroup group = gameObject.AddComponent<WallTransparencyGroup>();
             TargetRenderersField.SetValue(group, renderers);
             gameObject.SetActive(true);
+
+            // EditMode 에서는 일반 MonoBehaviour 의 Awake 가 실행되지 않으므로
+            // (ExecuteAlways 가 아니다) 머티리얼 초기화가 일어나지 않는다. 프로덕션이 갖고 있는
+            // 지연 초기화 경로(AcquireTransparency)를 한 번 태워 초기화만 유발하고, 참조
+            // 카운트는 곧바로 되돌려 각 테스트가 0에서 시작하게 한다.
+            group.AcquireTransparency();
+            group.ReleaseTransparency();
+            Assert.That(GetRequestCount(group), Is.Zero);
+
             return group;
         }
 
