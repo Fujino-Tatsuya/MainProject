@@ -8,22 +8,44 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 진행 중 (2026-09-21 · 구역 진입 기반 벽 투명화 1단계, 브랜치 `feature/TransparentV2-keepgoing`)
+## ▶▶ 현재 인수인계 (2026-09-22 · 구역 진입 기반 벽 투명화 1단계 **검증 완료**, 브랜치 `feature/TransparentV2-keepgoing`)
 
-작업자: **은희(Claude)**. 계획·근거·검증은 [PLAN.md](PLAN.md) 최상단 (**승인 대기**).
+작업자: **은희(Claude + Codex 위임)**. 계획·근거는 [PLAN.md](PLAN.md) 최상단.
+배선 절차는 [Docs/tech/wall-transparency-shadergraph-setup.md](Docs/tech/wall-transparency-shadergraph-setup.md).
 
-수정 예정 파일:
-- 신규 `Assets/1.Scripts/Rendering/Occlusion/WallTransparencyGroup.cs` (표현)
-- 신규 `Assets/1.Scripts/Rendering/WallTransparencyZone.cs` (감지)
-- 신규 `Assets/3.Materials/Level1_Materials/Occlusion/WallTransparencyDither.hlsl`
-- 🔴 **SVN** `Assets/50.Art/MapGen/MapObj/material/Generic_Standard.shadergraph` — **사용자가 Unity 에서 직접 수정**
+**상태: 코드·셰이더 완료, 사용자 Play 검증 완료.** 커밋 16개, **push 안 함.**
 
-**용어** — 여기서 "구역 투명화" 는 *구역에 플레이어가 있으면 그 구역이 지정한 벽 그룹이 통째로
-디더로 사라지는 것* 이다. **시선 차단 판정이 아니다.** 기존 `WallOcclusionDriver` 의
-카메라-플레이어 선분 기반 픽셀 투명화(= "A 시스템", 현재 `m_Enabled: 0` 으로 비활성)와는 별개다.
+| 파일 | VCS |
+|---|---|
+| `Assets/1.Scripts/Rendering/WallTransparencyZone.cs` (감지, 신규) | git |
+| `Assets/1.Scripts/Rendering/Occlusion/WallTransparencyGroup.cs` (표현, 신규) | git |
+| `Assets/3.Materials/Level1_Materials/Occlusion/WallTransparencyDither.hlsl` (신규) | git |
+| `Assets/Tests/EditMode/Occlusion/WallTransparencyGroupTests.cs` (신규, 6개) | git |
+| `Assets/50.Art/MapGen/MapObj/material/Generic_Standard.shadergraph` | 🔴 **SVN — 별도 커밋·공지 필요** |
+
+**용어** — 여기서 "구역 투명화" 는 *구역에 플레이어가 있으면 그 구역이 지정한 벽 그룹이
+높이 그라데이션으로 사라지는 것* 이다. **시선 차단 판정이 아니다.** 기존 `WallOcclusionDriver`
+의 카메라-플레이어 선분 기반 픽셀 투명화(= "A 시스템", `4.MapScene` 에서 `m_Enabled: 0`)와 별개다.
+
+**설계 요약**
+- 감지: `Player(6)` **레이어만** 본다. `Player`·`Unit`·`NetworkObject` 를 참조하지 않는다 —
+  테스트 씬에서 레이어만 바꾼 캡슐로 검증된다. 점유는 루트 Transform 단위.
+- 표현: 그룹이 원본 머티리얼 종류마다 **런타임 인스턴스 1개**를 만들어 공유한다.
+  MaterialPropertyBlock 은 쓰지 않는다 — SRP Batcher 가 깨진다.
+- 벽/바닥 구분: **Material Variant 를 만들지 않는다.** 그룹이 인스턴스에만
+  `EnableKeyword("WALL_OCCLUSION_DITHER")` 를 한다. 그래서 벽 프리팹의 머티리얼을
+  교체할 일이 없다. 🔴 그래프의 키워드는 **Multi Compile** 이어야 한다(Shader Feature 면
+  빌드에서 변종이 잘려 에디터에서만 동작한다).
+- 높이 그라데이션: **아래가 사라지고 위가 남는다.** `baseY` 에서 알파 0 → `fadeHeight`
+  만큼 위에서 1. 벽 한 층 = 2.5 이므로 기본 `fadeHeight = 5`(2층).
 
 **2026-09-21 결정(은희)** — `PLAN.md` 의 2026-09-14 「투명화 끄고 실루엣으로」(경석)에 대해,
 **실루엣은 그대로 두고 벽 투명화를 함께 간다.** 기존 투명화 시스템은 끄지도 지우지도 않는다.
+
+**남은 것**
+- 존 프리팹 오서링(구역 볼륨 + 그룹 리스트) — 파일럿부터
+- `Generic_Basic.shadergraph`(펜스) 동일 배선
+- MPPM 2인 확인 / 바닥·SSAO before-after 비교
 
 
 ## ▶▶ 진행 중 (2026-09-18 · **PC 간** Relay 접속 실패 — 진단 계측 투입, 브랜치 `development`)
