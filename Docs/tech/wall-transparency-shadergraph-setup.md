@@ -50,7 +50,12 @@ Alpha    = result - 디더 임계값
 
 ## 배선 절차
 
-1. Graph Inspector 에서 Surface Type = **Opaque** 유지, **Alpha Clipping 을 켠다.**
+1. Surface Type = **Opaque**, **Alpha Clipping** — `Generic_Standard` 는 **둘 다 이미 그렇다**
+   (`m_SurfaceType: 0`, `m_AlphaClip: true`). **건드리지 않는다.**
+
+   🔴 이 그래프는 **이미 알파 컷아웃을 쓰고 있다**: `Sample Texture 2D(Albedo) → Split → A` 가
+   `Fragment.Alpha` 로, 노출 프로퍼티 `Alpha Clip Threshold` 가 `Fragment.Alpha Clip Threshold` 로
+   들어간다. 즉 원래 동작이 `clip(A - T)` 다. **이걸 보존해야 한다** — 아래 7번 참조.
 2. Blackboard 에 노출 프로퍼티 3개를 추가한다. **Reference 이름이 정확해야** 코드가 찾는다.
 
    | 종류 | Reference | 기본값 | 비고 |
@@ -63,7 +68,7 @@ Alpha    = result - 디더 임계값
    - Reference: `WALL_OCCLUSION_DITHER` / Definition: **Shader Feature** / Scope: **Local** / Default: **Off**
    - 벽용 Material Variant 에서만 켠다.
 
-### 만들 노드는 4개뿐이다
+### 만들 노드는 6개다
 
 그래프 빈 곳에서 **우클릭 → Create Node** 로 아래를 만든다.
 
@@ -72,9 +77,12 @@ Alpha    = result - 디더 임계값
 | A | **Screen Position** | 모드 **Default** (기본값 그대로) |
 | B | **Position** | Space 를 **World** 로 바꾼다 |
 | C | **Custom Function** | 아래 5번에서 설정 |
-| D | **Keyword** | Blackboard 의 `WALL_OCCLUSION_DITHER` 를 **그래프 위로 드래그**하면 생긴다 |
+| D | **Keyword** | Blackboard 의 키워드를 **그래프 위로 드래그**하면 생긴다 |
+| E | **Subtract** | 기존 컷아웃 여유값을 만든다 (7번) |
+| F | **Minimum** | 기존 컷아웃과 디더를 합친다 (7번) |
 
-`Split`·`Multiply`·`Screen` 같은 노드는 **필요 없다.** 픽셀 변환과 Y 추출은 hlsl 안에서 한다.
+`Split`(월드 Y용)·`Multiply`·`Screen` 같은 노드는 **필요 없다.**
+픽셀 변환과 Y 추출은 hlsl 안에서 한다.
 
 ### 5. Custom Function(C) 설정
 
@@ -109,31 +117,53 @@ Alpha    = result - 디더 임계값
 | Blackboard `_WallOccBaseY` | C 의 `BaseY` |
 | Blackboard `_WallOccFadeHeight` | C 의 `FadeHeight` |
 | Blackboard `_WallOcclusionOpacity` | C 의 `Opacity` |
-| C 의 `Alpha` | **D(Keyword) 의 `On` 포트** |
-| (D 의 `Off` 포트) | 🔴 **숫자 칸에 `1` 을 직접 입력** (연결하지 않은 Float 포트의 기본값은 0 이다) |
-| D 의 출력 | **Master Stack 의 `Alpha`** |
 
 Blackboard 프로퍼티는 왼쪽 목록에서 **그래프 위로 드래그**하면 노드가 생긴다.
 `Screen Position` 출력이 Vector4 지만 Vector2 입력에 꽂으면 Shader Graph 가 **XY 만 자동으로**
 넘긴다 — 별도 Split 이 필요 없다.
+
+### 7. 🔴 기존 알파 컷아웃과 합치기 — 곱하지 말고 `min`
+
+이 그래프는 이미 `clip(A - T)` 로 컷아웃을 하고 있다(A = Albedo 텍스처의 알파, T = 노출
+프로퍼티 `Alpha Clip Threshold`). 이걸 **보존한 채** 디더를 얹어야 한다.
+
+**곱하면 안 된다.** Custom Function 의 출력은 0~1 알파가 아니라 **부호 있는 여유값**
+(`불투명도 - 디더임계값`, 0 미만이면 버림)이다. `A × 여유값` 으로 곱하면 **A 가 0 인 픽셀에서
+결과가 0** 이 되는데, 0 은 음수가 아니라 **버려지지 않는다** — 원래 컷아웃으로 사라져야 할
+픽셀이 살아난다.
+
+조건이 둘이면(텍스처가 버리라거나 / 디더가 버리라거나) **더 작은 쪽**을 취한다.
+이 레포의 다른 브랜치도 같은 식을 쓴다 — `min(BaseAlpha - BaseThreshold, occlusionMargin)`.
+
+| 노드 | 입력 |
+|---|---|
+| **E** `Subtract` | A = 기존 `Split` 의 **A(1)** / B = `Alpha Clip Threshold` 프로퍼티 |
+| **F** `Minimum` | A = **E** 출력 / B = **C** 의 `Alpha` |
+
+| 출발 | 도착 |
+|---|---|
+| **F** 출력 | D(Keyword) 의 **`On`** |
+| **E** 출력 | D(Keyword) 의 **`Off`** ← 상수 `1` 이 아니다 |
+| D 출력 | `Fragment.Alpha` |
+| 상수 **`0`** | `Fragment.Alpha Clip Threshold` (프로퍼티 연결을 **끊고** 0 을 넣는다) |
+
+검산:
+
+- **키워드 Off** → `Alpha = A - T`, threshold `0` → `clip(A - T)` — **원래와 완전히 동일**
+- **키워드 On** → `clip(min(A - T, 디더여유))` — 둘 중 하나라도 버리라면 버린다
+
+`Alpha Clip Threshold` 프로퍼티는 사라지지 않고 **E 의 Subtract 로 옮겨간다.** 머티리얼에서
+값을 조절하던 동작은 그대로다.
 
 🔴 **`Branch` 노드를 쓰면 안 된다.** 겉보기가 비슷하지만 `Branch` 는 런타임 select(lerp)라
 양쪽이 **둘 다 컴파일되어 항상 실행**된다 — 키워드로 코드를 덜어내려던 목적이 무효가 된다.
 반드시 **Blackboard 의 키워드를 드래그해서 생기는 `Keyword` 노드**여야 `#if` / `#else` 로
 스트립된다.
 
-🔴 **`Off` 포트에는 `1` 을 직접 입력한다.** 연결하지 않은 Float 포트의 기본값은 **0** 이다.
-0 으로 두면 Alpha Clip Threshold 가 0 인 지금은 우연히 통과하지만(`clip(0)` 은 버리지 않는다),
-Threshold 를 조금이라도 올리는 순간 **키워드가 꺼진 머티리얼까지 통째로 사라진다.**
-### 7. Alpha Clip Threshold
-
-Master Stack 의 **Alpha Clip Threshold** 에 **`0`** 을 넣는다. 함수 출력이
-`불투명도 - 디더 임계값` 이므로 0 을 기준으로 클립해야 한다.
-
 ### 8. 저장하고 Variant 만들기
 
 저장한 뒤 **벽용 Material Variant** 를 만든다 — `Generic_01_A.mat` 을 부모로 하는 자식
-    머티리얼에서 `WALL_OCCLUSION_DITHER` 만 **On**.
+머티리얼에서 키워드만 **On**.
 
 ## 🔴 Variant 로 가르는 것이 선택이 아니라 필수다
 
