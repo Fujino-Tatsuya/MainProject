@@ -63,31 +63,72 @@ Alpha    = result - 디더 임계값
    - Reference: `WALL_OCCLUSION_DITHER` / Definition: **Shader Feature** / Scope: **Local** / Default: **Off**
    - 벽용 Material Variant 에서만 켠다.
 
-4. **화면 픽셀 좌표**를 만든다 — `Screen Position`(Default) 의 XY × `Screen Size` 의 XY.
-5. **월드 Y** 를 만든다 — `Position` 노드의 Space 를 **World** 로 바꾸고 `Split` → **Y**.
-6. `Custom Function` 노드를 **File** 모드로 만든다.
-   - File: `Assets/3.Materials/Level1_Materials/Occlusion/WallTransparencyDither.hlsl`
-   - Name: `WallTransparencyDither` — **정밀도 접미사 `_float`/`_half` 는 적지 않는다**
-   - 입력 (이름이 hlsl 과 일치해야 한다):
+### 만들 노드는 4개뿐이다
 
-     | 이름 | 타입 | 연결 |
-     |---|---|---|
-     | `ScreenPixelPosition` | Vector 2 | 4단계 결과 |
-     | `WorldPositionY` | Vector 1 | 5단계 결과 |
-     | `BaseY` | Vector 1 | `_WallOccBaseY` |
-     | `FadeHeight` | Vector 1 | `_WallOccFadeHeight` |
-     | `Opacity` | Vector 1 | `_WallOcclusionOpacity` |
+그래프 빈 곳에서 **우클릭 → Create Node** 로 아래를 만든다.
 
-   - 출력: `Alpha` — Vector 1
+| # | 노드 | 설정 |
+|---|---|---|
+| A | **Screen Position** | 모드 **Default** (기본값 그대로) |
+| B | **Position** | Space 를 **World** 로 바꾼다 |
+| C | **Custom Function** | 아래 5번에서 설정 |
+| D | **Keyword** | Blackboard 의 `WALL_OCCLUSION_DITHER` 를 **그래프 위로 드래그**하면 생긴다 |
 
-7. 🔴 **`Branch` 노드를 쓰지 마라.** `Branch` 는 런타임 select(lerp)라 양쪽이 **둘 다 컴파일되어
-   항상 실행**된다 — 키워드로 코드를 덜어내려던 목적이 통째로 무효가 된다.
-   Blackboard 의 `WALL_OCCLUSION_DITHER` 를 **그래프 위로 드래그**해서 생기는 **`Keyword` 노드**를
-   써야 `#if` / `#else` 로 스트립된다. On 포트에 Custom Function 의 `Alpha`, Off 포트에 상수 `1`.
-8. Keyword 노드 출력 → Master Stack 의 **Alpha**.
-9. Master Stack 의 **Alpha Clip Threshold** 에 **`0`** 을 넣는다. 함수 출력이
-   `불투명도 - 디더 임계값` 이므로 0 을 기준으로 클립해야 한다.
-10. 저장한 뒤 **벽용 Material Variant** 를 만든다 — `Generic_01_A.mat` 을 부모로 하는 자식
+`Split`·`Multiply`·`Screen` 같은 노드는 **필요 없다.** 픽셀 변환과 Y 추출은 hlsl 안에서 한다.
+
+### 5. Custom Function(C) 설정
+
+노드를 선택하고 **Graph Inspector**(우측 패널)의 **Node Settings** 탭에서:
+
+- **Type**: `File`
+- **Name**: `WallTransparencyDither`
+  🔴 **`_float` / `_half` 접미사를 붙이지 않는다.** Shader Graph 가 알아서 고른다.
+- **Source**: `Assets/3.Materials/Level1_Materials/Occlusion/WallTransparencyDither.hlsl`
+- **Inputs** — `+` 를 5번 눌러 추가한다. **이름과 타입이 hlsl 과 정확히 일치해야 한다**(순서도 같게):
+
+  | 이름 | 타입 |
+  |---|---|
+  | `ScreenPosition` | Vector 2 |
+  | `WorldPosition` | Vector 3 |
+  | `BaseY` | Float |
+  | `FadeHeight` | Float |
+  | `Opacity` | Float |
+
+- **Outputs** — `+` 1번:
+
+  | 이름 | 타입 |
+  |---|---|
+  | `Alpha` | Float |
+
+### 6. 연결
+
+| 출발 | 도착 |
+|---|---|
+| A `Screen Position` 의 **Out(4)** | C 의 `ScreenPosition` |
+| B `Position` 의 **Out(3)** | C 의 `WorldPosition` |
+| Blackboard `_WallOccBaseY` | C 의 `BaseY` |
+| Blackboard `_WallOccFadeHeight` | C 의 `FadeHeight` |
+| Blackboard `_WallOcclusionOpacity` | C 의 `Opacity` |
+| C 의 `Alpha` | **D(Keyword) 의 `On` 포트** |
+| (D 의 `Off` 포트) | **비워 둔다 → 기본값 1** |
+| D 의 출력 | **Master Stack 의 `Alpha`** |
+
+Blackboard 프로퍼티는 왼쪽 목록에서 **그래프 위로 드래그**하면 노드가 생긴다.
+`Screen Position` 출력이 Vector4 지만 Vector2 입력에 꽂으면 Shader Graph 가 **XY 만 자동으로**
+넘긴다 — 별도 Split 이 필요 없다.
+
+🔴 **`Branch` 노드를 쓰면 안 된다.** 겉보기가 비슷하지만 `Branch` 는 런타임 select(lerp)라
+양쪽이 **둘 다 컴파일되어 항상 실행**된다 — 키워드로 코드를 덜어내려던 목적이 무효가 된다.
+반드시 **Blackboard 의 키워드를 드래그해서 생기는 `Keyword` 노드**여야 `#if` / `#else` 로
+스트립된다. `Off` 포트를 비워 두면 Float 기본값 1 이 들어가 "평소대로" 가 된다.
+### 7. Alpha Clip Threshold
+
+Master Stack 의 **Alpha Clip Threshold** 에 **`0`** 을 넣는다. 함수 출력이
+`불투명도 - 디더 임계값` 이므로 0 을 기준으로 클립해야 한다.
+
+### 8. 저장하고 Variant 만들기
+
+저장한 뒤 **벽용 Material Variant** 를 만든다 — `Generic_01_A.mat` 을 부모로 하는 자식
     머티리얼에서 `WALL_OCCLUSION_DITHER` 만 **On**.
 
 ## 🔴 Variant 로 가르는 것이 선택이 아니라 필수다
