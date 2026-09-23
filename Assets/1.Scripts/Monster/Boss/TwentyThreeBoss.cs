@@ -432,6 +432,12 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
                 continue;
             }
             ValidateState(e.animatorStateName, $"attacks[{i}]({e.attackId}).animatorStateName");
+
+            // [G2-P] 준비동작은 **선택**이다 — 비어 있으면 얼리기 폴백이므로 에러가 아니다.
+            //    다만 값이 있는데 상태가 없으면 예고가 통째로 안 보인다(조용한 실패) → ValidateState 가 잡는다.
+            // 🔴 클립은 SVN(FBX) · 컨트롤러는 git 이라 **한쪽만 받은 사람에게는 여기서 걸린다.**
+            //    그게 이 검증의 존재 이유다.
+            ValidateState(e.prepStateName, $"attacks[{i}]({e.attackId}).prepStateName");
         }
 
         ValidateHitboxAnchors();
@@ -1191,6 +1197,24 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         }
 
         ShowDashTelegraphClientRpc(reach, halfWidth, CounterWindowDuration);
+
+        // [G2-P] 돌진 준비동작(2026-09-23). 돌진은 `telegraphDuration: 0` 이라 BeginTelegraph 를
+        //    타지 않으므로 여기가 prep 을 트는 유일한 자리다.
+        if (string.IsNullOrEmpty(e.prepStateName)) return;
+
+        PlayPrepPoseClientRpc(CurrentAttackSlot);
+
+        // 🔴 **여기가 이 변경의 핵심이다.** 돌진의 "애니 준비 완료" 신호는 TickHitEventFallback 이
+        //    내는데, 그 함수는 `st.IsName(e.animatorStateName)` 으로 **DashAttack 상태일 때만**
+        //    통과시킨다. prep 을 틀면 그 검사가 false 라 신호가 영영 안 오고,
+        //    _counterWindup 은 **창 타이머 + 애니 준비** 둘 다 서야 발사하므로
+        //    **돌진이 아예 안 나가고 안전망 타임아웃까지 간다.**
+        //    → prep 경로에서는 준비 신호를 즉시 세워, 발사 시점을 **카운터 창(1.5초)이 단독으로**
+        //      결정하게 한다(팀장 확정 2026-09-23). 타이밍은 기존과 같다 —
+        //      0.57 × 2.633초 ≈ 1.5초로 어차피 창 길이에 맞춰 둔 값이었다.
+        // ⚠️ 그래서 돌진에서는 `hitEventFallbackNormalized` 가 **더 이상 읽히지 않는다.**
+        //    다른 공격은 그대로 쓰므로 필드를 지우지는 않는다(SO 툴팁에 명시).
+        _counterWindup.MarkAnimationReady();
     }
 
     /// <summary>돌진 경로 띠. 길이·폭은 서버가 실측해 실어 보낸다(각 피어가 따로 계산하면 갈라진다).</summary>
@@ -1234,7 +1258,14 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         if (e.superArmor && status != null)
             status.ApplyStatus(StatusEffectType.SuperArmor, _stateTimer);
 
-        HoldAttackPoseClientRpc(CurrentAttackSlot, e.telegraphPoseNormalized);
+        // [G2-P] 준비동작 클립이 저작돼 있으면 **얼리는 대신 그걸 재생**한다(2026-09-23).
+        //    클립이 예고보다 짧으면 마지막 프레임에서 스스로 멈춘다(loopTime 0 + 나가는 전이 없음).
+        //    비어 있으면 기존 경로 — 잡기가 그렇다(grab_prep 클립이 아직 없다).
+        if (!string.IsNullOrEmpty(e.prepStateName))
+            PlayPrepPoseClientRpc(CurrentAttackSlot);
+        else
+            HoldAttackPoseClientRpc(CurrentAttackSlot, e.telegraphPoseNormalized);
+
         if (HasTelegraphShape(e)) ShowAttackConeClientRpc(CurrentAttackSlot, e.telegraphDuration);
         return true;
     }
@@ -1251,8 +1282,18 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         BossAttackEntry e = _currentEntry;
 
         // 자세 홀드를 푼다(잡기·돌진의 카운터 선딜과 같은 기구·같은 복원 경로).
+        // ⚠️ prep 경로는 애초에 홀드를 안 걸지만 **그래도 부른다** — 멱등이고, 안 걸려 있으면
+        //    아무 일도 안 한다. 경로마다 해제를 가르면 한쪽이 빠졌을 때 보스가 굳는다.
         if (IsSpawned) SetCounterPoseHeldClientRpc(false);
         RestoreCounterPose();
+
+        // [G2-P] prep 을 틀었으면 애니메이터가 **준비동작 상태**에 멈춰 있다 — 공격 클립이 재생 중이
+        //    아니므로 홀드를 풀어 봐야 이어지지 않는다. 재개 지점에서 공격 클립을 다시 튼다.
+        // 🔴 재개 지점은 telegraphPoseNormalized 그대로다(0 이 아니다). 0 으로 내리면 공격 클립의
+        //    앞부분(그 클립 자체의 준비동작)이 prep 과 겹치고, 무엇보다 **OnAttackHit 이 그만큼
+        //    늦게 나가 데미지 타이밍이 밀린다** — 컴파일도 테스트도 안 깨지는 종류의 사고다.
+        if (e != null && !string.IsNullOrEmpty(e.prepStateName))
+            ResumeAttackFromPoseClientRpc(CurrentAttackSlot, e.telegraphPoseNormalized);
 
         // 다 찼으니 예고의 역할은 끝났다.
         HideAttackConeClientRpc();
@@ -1274,6 +1315,55 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     /// 공격 클립을 <paramref name="poseNormalized"/> 지점에서 <b>정지된 채</b> 보여 준다.
     /// 자세 홀드 래치는 카운터 선딜과 공유하므로, 푸는 경로(<c>AbortAttackChain</c>)도 그대로 쓴다.
     /// </summary>
+    /// <summary>
+    /// [G2-P] 예고가 끝나 <b>공격 클립을 재개 지점부터</b> 다시 튼다(prep 경로 전용).
+    ///
+    /// 🔴 <c>CrossFade</c> 가 아니라 <c>Play</c> 다. 블렌딩하면 재개 지점이 흐려져
+    ///    <c>OnAttackHit</c> 이 도달하는 시각이 프레임 단위로 흔들린다 — 히트는 애니 이벤트
+    ///    전용이고 타이머 폴백이 없어서(정본 §3.3) 그 흔들림이 곧 데미지 유실이 된다.
+    /// </summary>
+    [ClientRpc]
+    void ResumeAttackFromPoseClientRpc(int slot, float poseNormalized)
+    {
+        BossAttackEntry e = EntryFor(slot);
+        if (e == null || animator == null || animator.runtimeAnimatorController == null) return;
+
+        int hash = Animator.StringToHash(e.animatorStateName);
+        if (!animator.HasState(0, hash)) return;
+
+        animator.speed = 1f;                       // prep 은 얼리지 않지만 다른 경로가 남겼을 수 있다
+        animator.Play(hash, 0, Mathf.Clamp01(poseNormalized));
+        animator.Update(0f);
+    }
+
+    /// <summary>
+    /// [G2-P] 예고 구간에 <b>준비동작 클립</b>을 재생한다(2026-09-23 · SVN r322 아트 반입분).
+    ///
+    /// 🔴 <b>자세 홀드 래치를 쓰지 않는다.</b> 기존 방식은 <c>animator.speed = 0</c> 으로 얼리고
+    ///    <c>RestoreCounterPose</c> 로 되돌리는데, prep 은 클립이 **스스로 끝까지 가서 멈춘다**
+    ///    (`loopTime: 0` + 나가는 전이 없음). 그래서 복원 대상이 아니다.
+    ///    ⚠️ 그 조건이 깨지면(아트가 loopTime 을 켜거나 전이를 그리면) prep 이 <b>무한 반복</b>한다 —
+    ///       컴파일도 테스트도 안 깨지고 화면만 이상해진다(교훈 #87 과 같은 부류).
+    ///
+    /// ⚠️ 예고 <b>길이</b>는 여기서 정하지 않는다. <c>telegraphDuration</c> 이 정하고, 클립이 짧으면
+    ///    남은 시간은 마지막 자세로 채워진다. 클립이 길이를 정하게 두면 아트가 클립을 다시 올릴 때마다
+    ///    반응 시간(= 난이도)이 조용히 바뀐다.
+    /// </summary>
+    [ClientRpc]
+    void PlayPrepPoseClientRpc(int slot)
+    {
+        BossAttackEntry e = EntryFor(slot);
+        if (e == null || animator == null || animator.runtimeAnimatorController == null) return;
+        if (string.IsNullOrEmpty(e.prepStateName)) return;
+
+        int hash = Animator.StringToHash(e.prepStateName);
+        if (!animator.HasState(0, hash)) return;   // 오타는 스폰 시 ValidateState 가 이미 크게 울린다
+
+        animator.Play(hash, 0, 0f);
+        // 🔴 즉시 평가한다 — 안 하면 직전 자세가 한 프레임 보인다(HoldAttackPoseClientRpc 와 같은 이유).
+        animator.Update(0f);
+    }
+
     [ClientRpc]
     void HoldAttackPoseClientRpc(int slot, float poseNormalized)
     {
@@ -3279,6 +3369,20 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         _dashDir.y = 0f;
         if (_dashDir.sqrMagnitude < 0.0001f) _dashDir = Vector3.forward;
         _dashDir.Normalize();
+
+        // [G2-P] prep 을 틀었으면 애니메이터가 **DashPrep 마지막 프레임에 멈춰** 있다.
+        //    돌진이 시작되는 지금 공격 클립을 이어서 튼다.
+        // 🔴 재개 지점이 훅·어퍼와 **다르다.** 훅·어퍼는 telegraphPoseNormalized(0.15)가 선딜 완료
+        //    지점이지만, 돌진은 그 역할을 `hitEventFallbackNormalized`(0.57)가 한다 —
+        //    클립 0~0.57 이 돌진 자신의 선딜이고 0.57 부터가 실제 돌진 구간이다.
+        //    0.15 로 재개하면 **선딜을 두 번** 보여 주고 돌진이 늦게 시작하는 것처럼 보인다.
+        if (_currentEntry != null && !string.IsNullOrEmpty(_currentEntry.prepStateName))
+        {
+            float resume = _currentEntry.hitEventFallbackNormalized > 0f
+                ? _currentEntry.hitEventFallbackNormalized
+                : _currentEntry.telegraphPoseNormalized;
+            ResumeAttackFromPoseClientRpc(CurrentAttackSlot, resume);
+        }
 
         _dashCarried = null;
         meleeAttack?.BeginHitWindow();   // 경로상 유닛당 1회 보장 — 스침 데미지가 중복되지 않는다
