@@ -831,7 +831,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MonsterCounterWindow
   windowDuration: 1.5
-  groggyDuration: 0.5
+  groggyDuration: 1
 --- !u!114 &3395086952124872704
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1135,7 +1135,7 @@ MonoBehaviour:
   overlayMaterialIndex: 1
   fadeInDuration: 0.8
   fadeOutDuration: 0.4
-  interruptible: 0
+  shown: 0
 --- !u!4 &5208934837360812548 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 7004712027421865167, guid: c887b0c600165d74094b8f2d53288dfe, type: 3}

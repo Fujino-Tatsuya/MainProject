@@ -495,7 +495,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MonsterCounterWindow
   windowDuration: 1.5
-  groggyDuration: 0.5
+  groggyDuration: 1
 --- !u!1 &8280573472769756640
 GameObject:
   m_ObjectHideFlags: 0
@@ -691,7 +691,7 @@ MonoBehaviour:
   overlayMaterialIndex: 1
   fadeInDuration: 0.8
   fadeOutDuration: 0.4
-  interruptible: 0
+  shown: 0
 --- !u!4 &4492413856816540016 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 1263109611098764631, guid: c13e2c7cc6363c2448019a9d31ae6d95, type: 3}
