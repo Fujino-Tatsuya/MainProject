@@ -1397,7 +1397,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c7a41f60d2b84e6a9c15d380be720063, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::InterruptOverlay
+  m_EditorClassIdentifier: Assembly-CSharp::DissolveOverlay
   overlayMaterialIndex: 1
   fadeInDuration: 0.8
   fadeOutDuration: 0.4
