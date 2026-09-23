@@ -2679,7 +2679,7 @@ MonoBehaviour:
   MaskResolution: 128
   MaskTick: 0.15
   UseTerrainBake: 0
-  MapRotationDegrees: 45
+  MapRotationDegrees: 135
   RoomCornerMeters: 2.5
   FlatColor: {r: 0.58, g: 0.58, b: 0.58, a: 1}
   OutlineColor: {r: 0.13, g: 0.15, b: 0.17, a: 1}

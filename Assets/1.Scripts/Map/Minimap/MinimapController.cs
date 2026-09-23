@@ -32,7 +32,7 @@ public class MinimapController : MonoBehaviour
 
     [Tooltip("미니맵 회전(도). 카메라 요각과 맞춘다 — 레퍼런스의 마름모가 이 회전의 결과다. " +
              "월드 슬롯은 축 정렬이라 0 이면 반듯한 사각형으로 보인다.")]
-    public float MapRotationDegrees = 45f;
+    public float MapRotationDegrees = 135f;
 
     [Tooltip("방 모서리 반경(m). 통로는 항상 각지게 둔다.")]
     public float RoomCornerMeters = 2.5f;
