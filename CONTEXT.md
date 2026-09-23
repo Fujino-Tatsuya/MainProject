@@ -208,6 +208,15 @@ Unity 창을 한 번 클릭하면 정리된다.
 
 작업자: **경석(Claude)**. 브랜치 `feature/Boss23`. 컴파일 통과(에러 0).
 
+## 🔴 브랜치 주의 (2026-09-23) — development 의 `a8ebd7f2` 를 feature/Boss23 에 머지하지 말 것
+
+- `455c2a0b`(Boss23 ← development 머지)를 development 로 FF 푸시한 뒤, **development 에만** `a8ebd7f2` 를 올려
+  `1.TitleScene` 을 이전 평면 UI(`3810ed29` 판)로 되돌렸다 — 3D 오피스 타이틀은 메뉴가 모니터 뒤에 가려 **Start 불가**라서.
+- Boss23 에 development 를 다시 머지하면 이 복원이 딸려 와 **타이틀 작업이 통째로 되돌아간다.** 받아야 할 게 생기면
+  `a8ebd7f2` 를 제외하고 cherry-pick 하거나, 머지 후 `1.TitleScene` 을 Boss23 판으로 되돌릴 것.
+- 타이틀 완성 후 Boss23 → development 머지 때 `1.TitleScene` 충돌 → **Boss23 판 채택** + `1.TitleScene/` 라이팅 폴더 복구.
+- 타이틀 진행 상태: 계획서 `PLAN-title-flow.md` §0(3판, 승인). PRESS ANY KEY 오버레이·라이팅 베이크까지(`15aa3adf`). 다음 = 2단계(UI RT + 슬라이더).
+
 ## ▶▶ 현재 인수인계 (2026-09-23 #2 · 맵 룩 복구·미니맵 315°·**데칼 벽 타기 수정** — Play 검증 완료)
 
 작업자: **경석(Claude + Codex 교차검증)**. 브랜치 `feature/Boss23`. 컴파일 에러 0.
