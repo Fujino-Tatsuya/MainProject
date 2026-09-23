@@ -89,4 +89,34 @@ static class TitleOfficeImport
         Debug.Log($"[TitleOfficeImport] 프리팹 {PrefabPath} — 루트 {moved.Count}개 이동, 제외 [{string.Join(", ", skipped)}]. " +
                   $"타이틀 인스턴스 {(exists ? "이미 있음(유지)" : "새로 배치")}.\n이동: {string.Join(", ", moved)}");
     }
+
+    /// <summary>
+    /// 🔴 스카이박스 반사 제거(계획서 §0.4-G). 오피스의 **베이크 반사 프로브**·APV 는 아트 씬 LightingData 에만 구워져 있어
+    /// 타이틀에선 프로브가 비고 Unity 기본 스카이박스 환경 반사로 떨어진다 → 타이틀 씬에서 다시 굽는다.
+    /// </summary>
+    [MenuItem("Tools/Title/Authoring/타이틀 라이팅 베이크")]
+    static void BakeTitleLighting()
+    {
+        if (EditorApplication.isPlaying) { Debug.LogError("[TitleOfficeImport] Play 중에는 굽지 않는다."); return; }
+
+        Scene active = SceneManager.GetActiveScene();
+        if (active.path != TitleScenePath)
+        {
+            Debug.LogError($"[TitleOfficeImport] 1.TitleScene 에서 실행할 것. 현재: {active.path}");
+            return;
+        }
+
+        Lightmapping.bakeCompleted -= OnBakeCompleted;
+        Lightmapping.bakeCompleted += OnBakeCompleted;
+        bool started = Lightmapping.BakeAsync();
+        Debug.Log($"[TitleOfficeImport] 라이팅 베이크 시작={started}");
+    }
+
+    static void OnBakeCompleted()
+    {
+        Lightmapping.bakeCompleted -= OnBakeCompleted;
+        Scene active = SceneManager.GetActiveScene();
+        EditorSceneManager.SaveScene(active);
+        Debug.Log($"[TitleOfficeImport] 라이팅 베이크 완료 — {active.path} 저장. LightingData={Lightmapping.lightingDataAsset?.name ?? "null"}");
+    }
 }

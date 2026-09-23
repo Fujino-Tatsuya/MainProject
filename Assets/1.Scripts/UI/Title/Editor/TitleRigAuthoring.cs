@@ -68,7 +68,9 @@ public static class TitleRigAuthoring
 
         // ── CRT 앵커 + 월드 캔버스 ────────────────────────────────────────
         GameObject anchor = EnsureRoot("CRT_Anchor");
-        anchor.transform.SetPositionAndRotation(anchorPos, Quaternion.identity);
+        // 🔴 Y 180°. vcam 들이 캔버스 +Z 쪽에서 보므로 identity 면 UI 뒷면이 보여 글자가 좌우 반전된다
+        // (09-23 be6e69ee 에서 씬만 고쳤던 것을 도구에 반영 — 안 그러면 재실행 때 다시 뒤집힌다).
+        anchor.transform.SetPositionAndRotation(anchorPos, Quaternion.Euler(0f, 180f, 0f));
 
         // 논리 크기는 1920×1080 을 유지하고 루트만 균일 축소한다.
         // 이래야 Option_Panel 내부의 고정 좌표가 전부 보존된다(계획서 §3.4).
@@ -105,10 +107,28 @@ public static class TitleRigAuthoring
         }
 
         // ── PRESS ANY KEY / 스킵 안내 ─────────────────────────────────────
-        GameObject pressAnyKey = EnsureChild(menuCanvas.gameObject, "PressAnyKey_Root");
+        // 🔴 PRESS ANY KEY 는 모니터 안이 아니라 **화면 앞 오버레이**(계획서 §0.2-1, 09-23 팀장).
+        // 월드 캔버스에 두면 오피스 아트의 모니터 메시에 가려 안 보인다. 기존 인스턴스가 있으면 옮긴다.
+        GameObject pressParent = overlayCanvas != null ? overlayCanvas.gameObject : menuCanvas.gameObject;
+        GameObject pressAnyKey = FindInScene("PressAnyKey_Root");
+        if (pressAnyKey == null)
+            pressAnyKey = EnsureChild(pressParent, "PressAnyKey_Root");
+        else
+            pressAnyKey.transform.SetParent(pressParent.transform, false);
         StretchFull(pressAnyKey);
+
+        // 페이드 이미지보다 아래 — 암전이 글자를 덮어야 한다.
+        Transform fade = pressParent.transform.Find("Fade_Image");
+        if (fade != null)
+            pressAnyKey.transform.SetSiblingIndex(fade.GetSiblingIndex());
+
         TextMeshProUGUI pressText = EnsureLabel(pressAnyKey, "PressAnyKey_Text", "PRESS ANY KEY",
-            72, TextAlignmentOptions.Center);
+            56, TextAlignmentOptions.Center);
+        var pressRt = (RectTransform)pressText.transform;
+        pressRt.anchorMin = new Vector2(0f, 0.10f); // 화면 하단 1/4 띠 — 중앙 CRT 를 가리지 않는다
+        pressRt.anchorMax = new Vector2(1f, 0.22f);
+        pressRt.offsetMin = Vector2.zero;
+        pressRt.offsetMax = Vector2.zero;
         EnsureComponent<BlinkingText>(pressText.gameObject);
 
         GameObject skipHint = null;
