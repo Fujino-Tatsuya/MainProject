@@ -93,7 +93,7 @@ public class AoeTelegraph : MonoBehaviour
             {
                 // 수신자 마스크는 여기서 한 번 박는다 — 프리팹 저작 실수로 마스크가 전체(-1)면
                 // 캐릭터 몸에도 칠해진다(확정 스펙 위반). 코드가 계약을 지킨다.
-                _decal.renderingLayerMask = DecalReceivers.Mask;
+                DecalReceivers.ConfigureFloorProjector(_decal);
                 ApplyDecalShape();
             }
         }

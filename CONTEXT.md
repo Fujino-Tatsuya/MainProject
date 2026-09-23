@@ -140,7 +140,36 @@ Unity 창을 한 번 클릭하면 정리된다.
 
 작업자: **경석(Claude)**. 브랜치 `feature/Boss23`. 컴파일 통과(에러 0).
 
-## ▶▶ 현재 인수인계 (2026-09-23 · prep 클립·미니맵·타이틀 — **다음 세션에 4건 처리**)
+## ▶▶ 현재 인수인계 (2026-09-23 #2 · 맵 룩 복구·미니맵 315°·**데칼 벽 타기 수정** — Play 검증 완료)
+
+작업자: **경석(Claude + Codex 교차검증)**. 브랜치 `feature/Boss23`. 컴파일 에러 0.
+아래 셋은 팀장이 Play 로 확인했다(데칼·F9·디밍). 미니맵 315° 는 방향 대조가 남았다.
+
+| 건 | 내용 |
+|---|---|
+| **맵 외곽 어둡게(디밍·LoS)** | `4.MapScene` FogManager `dimEnabled/losEnabled` 0→1. 🔴 09-16 머지 `c4dbd4b9` 가 development 의 1/1 을 **0/0 으로 되돌렸던 것**이 원인 — "은희 PC 와 비주얼이 다르다"의 정체 |
+| **F9(LookToggle) 무반응** | 붙어 있던 `MaskBlurController` 오브젝트가 `c44d235c`(09-18) 에서 **비활성화**돼 한 번도 안 돌았다. 컴포넌트를 FogManager 오브젝트로 옮기고 `startLook: 1`(B). ApplyDim 이 `fogEnabled=false` 를 강제하던 줄 제거 |
+| **미니맵 각도** | 315°(= 카메라 요각 −45°). 코드 기본값·씬 값 둘 다. 135° 는 180° 뒤집혀 있었다 |
+| **F6 장판 소환** | `DevTelegraphProbe.cs` 삭제 |
+| **데칼이 벽을 타고 올라감** | 원인 3겹 — 아래 |
+
+**데칼 원인 3겹** (다음 사람이 한 겹만 고치고 "안 된다"고 하지 않게)
+1. URP 기본 `Decal.shadergraph` 는 **`angleFade: false`** — 프로젝터 각도값을 통째로 무시한다.
+   → `Assets/3.Materials/SG_DecalFloorOnly.shadergraph`(복사본, angleFade on) 로 `MA_AoeDecal_Red`·`MA_BossMarkerDecal` 교체. `SG_ColoredDecal` 도 on.
+2. **Angle Fade 값은 "도"가 아니다.** 설정값 = `180·((1−cosθ)/2)²`, 수직벽 = **45**. end ≥ 45 면 벽이 항상 50% 남는다.
+   → `DecalReceivers.FloorAngleFadeStart/End = 1.47/8.18`(실제 35°→55°). 프리팹 2개(Aoe·FireFloor) 동일.
+3. 벽 메시의 **위를 향한 면**(루버 판자·기둥 밑동)은 각도로 못 거른다.
+   → `DecalReceivers.Tag` 가 벽 형태 렌더러(높이 > 1.2m 이고 높이 > 수평 짧은 변)를 **수신자에서 뺀다**. `Unit`(송전탑) 은 예외로 남김.
+
+**남은 것**
+- 🔴 **HUD 스킬 슬롯이 청록 판으로 보임** — SVN **r326(은희)** 이 HUD 텍스처 `.meta` 5개의 **guid 를 새로 만들었다**
+  (`slot_cooldown*`, `gauge_HP*`, `portrail_gunner`). `CombatHUD.prefab` 은 옛 guid 를 가리켜 스프라이트가 끊겼다. 은희에게 전달 예정 —
+  **guid 를 옛 값으로 되돌리는 쪽 권장**(Unity 닫고).
+- 플레이어 `AimIndicator`·`SkillRangeIndicator` 데칼도 같은 증상 가능(셰이더 angleFade off, 180/180). 이번엔 보스만.
+- `fix/art_zone260923`(원격, 존 깊이 수정) 이 development 에 미머지.
+- 다음 작업: **아트 씬 오브젝트를 `1.TitleScene` 으로 이식**.
+
+## ▶▶ 이전 인수인계 (2026-09-23 · prep 클립·미니맵·타이틀 — **다음 세션에 4건 처리**)
 
 작업자: **경석(Claude)**. 브랜치 `feature/Boss23`(development 대비 **5 ahead / 0 behind**).
 컴파일 에러 0. **Play 검증은 전부 남았다.**

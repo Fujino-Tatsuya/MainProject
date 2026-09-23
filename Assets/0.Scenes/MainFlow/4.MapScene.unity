@@ -2679,7 +2679,7 @@ MonoBehaviour:
   MaskResolution: 128
   MaskTick: 0.15
   UseTerrainBake: 0
-  MapRotationDegrees: 135
+  MapRotationDegrees: 315
   RoomCornerMeters: 2.5
   FlatColor: {r: 0.58, g: 0.58, b: 0.58, a: 1}
   OutlineColor: {r: 0.13, g: 0.15, b: 0.17, a: 1}
@@ -3360,14 +3360,14 @@ MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1158182957}
+  m_GameObject: {fileID: 1643572544}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: efe621b073730fc45b0c6e85df2e7505, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LookToggle
   toggleKey: 102
-  startLook: 0
+  startLook: 1
   fogManager: {fileID: 1643572545}
   globalVolume: {fileID: 973540931}
   profileB: {fileID: 0}
@@ -4224,7 +4224,6 @@ GameObject:
   m_Component:
   - component: {fileID: 1158182959}
   - component: {fileID: 1158182958}
-  - component: {fileID: 882340001}
   m_Layer: 0
   m_Name: MaskBlurController
   m_TagString: Untagged
@@ -5648,6 +5647,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1643572546}
   - component: {fileID: 1643572545}
+  - component: {fileID: 882340001}
   m_Layer: 0
   m_Name: FogManager
   m_TagString: Untagged
@@ -5669,9 +5669,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FogManager
   fogEnabled: 0
   profile: {fileID: 11400000, guid: 9183e1848aa2d5f478208fafdaa8425f, type: 2}
-  dimEnabled: 0
+  dimEnabled: 1
   dimPlayerOverride: {fileID: 0}
-  losEnabled: 0
+  losEnabled: 1
   losWallMask:
     serializedVersion: 2
     m_Bits: 4294967295

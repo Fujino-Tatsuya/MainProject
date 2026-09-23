@@ -154,9 +154,8 @@ public sealed class LookToggle : MonoBehaviour
         if (fogManager == null)
             return;
 
-        // 포그는 두 룩 모두 꺼져 있다(씬 값 fogEnabled: 0). 어둡게 만드는 것은 dim 이다.
-        fogManager.fogEnabled = false;
-
+        // 포그는 룩과 무관하다 — 씬 값(fogEnabled)을 그대로 둔다. 어둡게 만드는 것은 dim 이다.
+        // (예전엔 여기서 fogEnabled = false 로 강제해 FogManager 에서 포그를 켜도 Play 시작 때 꺼졌다.)
         fogManager.dimEnabled = on;
 
         // 차폐도 함께 — 플레이어 주변을 뺀 나머지가 매우 어두워지는 것이 룩 B 다.
