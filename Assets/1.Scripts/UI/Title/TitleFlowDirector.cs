@@ -40,7 +40,19 @@ public sealed class TitleFlowDirector : MonoBehaviour
     [Tooltip("Far→Near 블렌드에 걸리는 시간(초). Brain 의 기본 블렌드와 맞춰 둘 것. 진행도·타임아웃 계산에 쓴다.")]
     [SerializeField, Min(0.1f)] private float _approachDuration = 2f;
 
-    [Header("월드 캔버스")]
+    [Header("중앙 모니터")]
+    [Tooltip("중앙 CRT 화면 표시(로고 ↔ UI 렌더텍스처). 비면 화면 전환 없이 기존처럼 동작.")]
+    [SerializeField] private TitleMonitorDisplay _monitorDisplay;
+
+    [Header("CRT 연출 (계획서 §0 · Codex 연출 검토 09-23)")]
+    [Tooltip("상시 CRT 시간·찢김·글리치 버스트 구동.")]
+    [SerializeField] private TitleCrtFx _crtFx;
+
+    [Tooltip("Start/Exit 공통 전체 화면 CRT 꺼짐.")]
+    [SerializeField] private TitlePowerOff _powerOff;
+
+    [Header("UI 루트")]
+    [Tooltip("PRESS ANY KEY — 화면 앞 오버레이(모니터 안이 아니다).")]
     [SerializeField] private GameObject _pressAnyKeyRoot;
     [SerializeField] private GameObject _menuRoot;
     [SerializeField] private GameObject _settingsRoot;
@@ -134,6 +146,9 @@ public sealed class TitleFlowDirector : MonoBehaviour
         SetActive(_settingsRoot, false);
         SetActive(_skipHintRoot, false);
 
+        if (_monitorDisplay != null)
+            _monitorDisplay.ShowLogo();
+
         Debug.Log("[TitleFlow] Idle");
     }
 
@@ -147,6 +162,12 @@ public sealed class TitleFlowDirector : MonoBehaviour
         SetActive(_menuRoot, false);
         SetActive(_settingsRoot, false);
         SetActive(_skipHintRoot, true);
+
+        Burst(0.8f, 0.25f);
+
+        // 로고를 끈다 — 메뉴가 꺼진 RT(검정)로 바꾸면 "화면이 꺼진" 상태가 된다(계획서 §0.2-2).
+        if (_monitorDisplay != null)
+            _monitorDisplay.ShowUI();
 
         ClearSelection();
         ActivateCamera(_vcamNear);
@@ -192,6 +213,7 @@ public sealed class TitleFlowDirector : MonoBehaviour
         SetActive(_skipHintRoot, false);
         SetActive(_settingsRoot, false);
         SetActive(_menuRoot, true);
+        Burst(0.6f, 0.22f);
 
         Select(_startButton);
 
@@ -209,7 +231,9 @@ public sealed class TitleFlowDirector : MonoBehaviour
 
         SetActive(_menuRoot, false);
         SetActive(_settingsRoot, true);
-        ActivateCamera(_vcamCloseup);
+        Burst(0.5f, 0.16f);
+        // 🔴 줌하지 않는다(팀장 09-23) — 메뉴가 보이던 Near 뷰 그대로 모니터 내용만 설정창으로 바뀐다.
+        //    예전엔 VCam_Closeup 으로 한 번 더 들어가 설정창이 화면 밖으로 잘렸다. Closeup vcam 은 남겨 두되 안 쓴다.
 
         Select(_settingsCloseButton);
 
@@ -221,8 +245,7 @@ public sealed class TitleFlowDirector : MonoBehaviour
         if (_state != TitleFlowState.Settings)
             return;
 
-        ActivateCamera(_vcamNear);
-        EnterMenu();
+        EnterMenu(); // 카메라는 이미 Near — 건드리지 않는다
     }
 
     public void StartGame()
@@ -232,12 +255,12 @@ public sealed class TitleFlowDirector : MonoBehaviour
 
         _state = TitleFlowState.Starting;
         ClearSelection();
-
-        // CRT 는 Title 소유 컨트롤러이므로 Single 씬 로드와 함께 자동 해제된다.
-        // (RetroCRTController.OnDisable 이 s_active 를 비우고, Feature 가 null 이면 즉시 리턴한다)
-        _sceneManager.StartGame();
-
+        Burst(0.35f, 0.1f);
         Debug.Log("[TitleFlow] Starting");
+
+        // Start: 모니터처럼 딱 꺼짐 → (검은 화면에서) 페이드 없이 로비. 꺼짐이 없으면 기존 페이드 경로.
+        // (Flow 혜성 트레일은 넣었다가 뺐다 — 팀장 09-23 "무지개빛 말고 그냥 모니터처럼 딱 꺼지게")
+        PowerOffThenLobby();
     }
 
     public void ExitGame()
@@ -247,9 +270,28 @@ public sealed class TitleFlowDirector : MonoBehaviour
 
         _state = TitleFlowState.Exiting;
         ClearSelection();
-        _sceneManager.ExitGame();
-
+        Burst(0.35f, 0.1f);
         Debug.Log("[TitleFlow] Exiting");
+
+        // Exit 도 같은 꺼짐(팀장 09-23).
+        if (_powerOff != null)
+            _powerOff.Play(_sceneManager.ExitGameImmediate);
+        else
+            _sceneManager.ExitGame();
+    }
+
+    private void PowerOffThenLobby()
+    {
+        if (_powerOff != null)
+            _powerOff.Play(_sceneManager.StartGameImmediate);
+        else
+            _sceneManager.StartGame();
+    }
+
+    private void Burst(float strength, float duration)
+    {
+        if (_crtFx != null)
+            _crtFx.Burst(strength, duration);
     }
 
     // ── 입력 ───────────────────────────────────────────────────────────────

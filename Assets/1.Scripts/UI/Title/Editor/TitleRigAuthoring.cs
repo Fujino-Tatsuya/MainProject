@@ -4,6 +4,8 @@ using Unity.Cinemachine;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 using UnityEngine.UI;
 
 // 타이틀 연출 리그 저작 도구. 계획서 = PLAN-title-flow.md
@@ -36,6 +38,15 @@ public static class TitleRigAuthoring
 
     const float CanvasLogicalHeight = 1080f;
     const float CanvasLogicalWidth = 1920f;
+
+    // 설정창(1920 폭)을 모니터 RT(1536 폭) 안에 넣는 배율. 3단계에서 가독성 기준(≥14px)으로 레이아웃을 다시 잡는다.
+    const float SettingsFitScale = 0.78f;
+
+    const int UILayer = 5; // 내장 "UI" 레이어 — TagManager 를 건드리지 않으려고 전용 레이어 대신 쓴다
+    const string ScreenRendererPath = "TitleOffice/monitor/monitor_screen"; // 🔴 중앙 1대. 벽 모니터도 이름이 monitor_screen
+    const string UIMaterialPath = "Assets/3.Materials/title/MA_TitleMonitorUI.mat";
+    const string PressMaterialPath = "Assets/3.Materials/title/MA_TitlePressCRT.mat";
+    const string OffMaterialPath = "Assets/3.Materials/title/MA_TitleCRTOff.mat";
 
     [MenuItem("Tools/Title/Authoring/타이틀 리그 조립")]
     public static void BuildTitleRig()
@@ -72,13 +83,16 @@ public static class TitleRigAuthoring
         // (09-23 be6e69ee 에서 씬만 고쳤던 것을 도구에 반영 — 안 그러면 재실행 때 다시 뒤집힌다).
         anchor.transform.SetPositionAndRotation(anchorPos, Quaternion.Euler(0f, 180f, 0f));
 
-        // 논리 크기는 1920×1080 을 유지하고 루트만 균일 축소한다.
-        // 이래야 Option_Panel 내부의 고정 좌표가 전부 보존된다(계획서 §3.4).
-        float visibleHeight = 2f * AnchorDistance * Mathf.Tan(Fov * 0.5f * Mathf.Deg2Rad);
-        float menuScale = visibleHeight * MenuScreenFill / CanvasLogicalHeight;
+        // ── 모니터 UI = 렌더텍스처 (계획서 §0.4-A, 2026-09-23 3판) ──────────
+        // 🔴 예전엔 CRT_Anchor 밑 월드 캔버스 2개였다. 아트 오피스가 들어오자 모니터 메시 뒤에 가려 안 보였고,
+        //    GraphicRaycaster 는 3D 가림을 몰라 "모니터 아무 데나 누르면 Start" 가 됐다. 이제 UI 카메라가 RT 에 그리고
+        //    TitleScreenRaycaster 가 화면 UV 로만 클릭을 받는다. CRT_Anchor 는 클로즈업 위치 계산용으로만 남는다.
+        Camera uiCam = EnsureUICamera(mainCamera);
+        Canvas monitorCanvas = EnsureMonitorCanvas(uiCam);
 
-        Canvas menuCanvas = EnsureWorldCanvas(anchor, "World_Menu_Canvas", mainCamera, menuScale, 10);
-        Canvas settingsCanvas = EnsureWorldCanvas(anchor, "World_Settings_Canvas", mainCamera, menuScale, 20);
+        // 메인 카메라는 UI 레이어를 안 본다 — UI 는 RT 로만 보인다(오버레이 캔버스는 레이어와 무관).
+        mainCamera.cullingMask &= ~(1 << UILayer);
+        EditorUtility.SetDirty(mainCamera);
 
         // ── 기존 위젯 이사 ────────────────────────────────────────────────
         Canvas overlayCanvas = FindRootCanvas();
@@ -87,29 +101,42 @@ public static class TitleRigAuthoring
         Button exit = FindButton("Exit_Button");
         Button close = FindButton("Close_Button");
 
-        GameObject menuRoot = EnsureChild(menuCanvas.gameObject, "Menu_Root");
+        GameObject menuRoot = FindInScene("Menu_Root") ?? EnsureChild(monitorCanvas.gameObject, "Menu_Root");
+        menuRoot.transform.SetParent(monitorCanvas.transform, false);
         StretchFull(menuRoot);
         Reparent(start, menuRoot);
         Reparent(option, menuRoot);
         Reparent(exit, menuRoot);
+        LayoutMonitorMenu(start, option, exit);
 
+        GameObject settingsRoot = EnsureChild(monitorCanvas.gameObject, "Settings_Root");
+        StretchFull(settingsRoot);
         GameObject optionPanel = FindInScene("Option_Panel");
         if (optionPanel != null)
         {
-            optionPanel.transform.SetParent(settingsCanvas.transform, false);
-            StretchFull(optionPanel);
-            // 🔴 지금까지 마스크가 없어서 모니터 경계 밖으로 삐져나가도 안 잘렸다.
+            optionPanel.transform.SetParent(settingsRoot.transform, false);
+            // 설정창 내부는 1920×1080 고정 좌표. 모니터 RT 는 세로 1080 기준 폭 1536(화면 비율 1.42)이라
+            // 늘리면(Stretch) 좌우가 잘린다 → 논리 크기를 유지한 채 가운데 기준으로 폭에 맞춰 축소한다.
+            var panelRt = (RectTransform)optionPanel.transform;
+            panelRt.anchorMin = panelRt.anchorMax = panelRt.pivot = new Vector2(0.5f, 0.5f);
+            panelRt.anchoredPosition = Vector2.zero;
+            panelRt.sizeDelta = new Vector2(CanvasLogicalWidth, CanvasLogicalHeight);
+            panelRt.localScale = Vector3.one * SettingsFitScale;
             EnsureComponent<RectMask2D>(optionPanel);
-
-            // 🔴 Option_Panel 은 켜 둔다. 표시 여부는 월드 캔버스(_settingsRoot) 를 켜고 끄는 것으로 정한다.
-            // 여기서 꺼 두면 Director 가 캔버스를 켜도 안쪽이 꺼진 채라 설정창이 안 보인다.
+            // 표시 여부는 Settings_Root 로 정한다. 안쪽을 꺼 두면 루트를 켜도 안 보인다.
             optionPanel.SetActive(true);
+            int swapped = SwapSlidersToScreenSlider(optionPanel);
+            if (swapped > 0) Debug.Log($"[TitleRig] 슬라이더 {swapped}개 → TitleScreenSlider");
         }
 
-        // ── PRESS ANY KEY / 스킵 안내 ─────────────────────────────────────
-        // 🔴 PRESS ANY KEY 는 모니터 안이 아니라 **화면 앞 오버레이**(계획서 §0.2-1, 09-23 팀장).
-        // 월드 캔버스에 두면 오피스 아트의 모니터 메시에 가려 안 보인다. 기존 인스턴스가 있으면 옮긴다.
-        GameObject pressParent = overlayCanvas != null ? overlayCanvas.gameObject : menuCanvas.gameObject;
+        SetLayerRecursive(monitorCanvas.gameObject, UILayer);
+
+        TitleMonitorDisplay monitorDisplay = EnsureMonitorDisplay(uiCam);
+
+        // ── PRESS ANY KEY (화면 앞 오버레이, CRT 룩) ─────────────────────────
+        // 🔴 모니터 안이 아니라 화면 앞(계획서 §0.2-1). 단순 깜빡임이 아니라 "모니터에 그려지는" 룩(팀장 09-23):
+        //    전용 카메라가 소형 RT 에 글자를 그리고 → 오버레이 RawImage 가 Title/CRTUI 로 보여 준다(TitleOverlayCrtImage).
+        GameObject pressParent = overlayCanvas != null ? overlayCanvas.gameObject : monitorCanvas.gameObject;
         GameObject pressAnyKey = FindInScene("PressAnyKey_Root");
         if (pressAnyKey == null)
             pressAnyKey = EnsureChild(pressParent, "PressAnyKey_Root");
@@ -117,19 +144,42 @@ public static class TitleRigAuthoring
             pressAnyKey.transform.SetParent(pressParent.transform, false);
         StretchFull(pressAnyKey);
 
-        // 페이드 이미지보다 아래 — 암전이 글자를 덮어야 한다.
         Transform fade = pressParent.transform.Find("Fade_Image");
         if (fade != null)
-            pressAnyKey.transform.SetSiblingIndex(fade.GetSiblingIndex());
+            pressAnyKey.transform.SetSiblingIndex(fade.GetSiblingIndex()); // 암전이 글자를 덮는다
 
-        TextMeshProUGUI pressText = EnsureLabel(pressAnyKey, "PressAnyKey_Text", "PRESS ANY KEY",
-            56, TextAlignmentOptions.Center);
-        var pressRt = (RectTransform)pressText.transform;
-        pressRt.anchorMin = new Vector2(0f, 0.10f); // 화면 하단 1/4 띠 — 중앙 CRT 를 가리지 않는다
-        pressRt.anchorMax = new Vector2(1f, 0.22f);
-        pressRt.offsetMin = Vector2.zero;
-        pressRt.offsetMax = Vector2.zero;
-        EnsureComponent<BlinkingText>(pressText.gameObject);
+        Camera pressCam = EnsurePressCamera(mainCamera);
+        Canvas pressCanvas = EnsurePressCanvas(pressCam);
+
+        GameObject pressTextGo = FindInScene("PressAnyKey_Text");
+        TextMeshProUGUI pressText = pressTextGo != null ? pressTextGo.GetComponent<TextMeshProUGUI>() : null;
+        if (pressText == null)
+            pressText = EnsureLabel(pressCanvas.gameObject, "PressAnyKey_Text", "PRESS ANY KEY", 120, TextAlignmentOptions.Center);
+        pressText.transform.SetParent(pressCanvas.transform, false);
+        pressText.fontSize = 120;
+        pressText.alignment = TextAlignmentOptions.Center;
+        pressText.textWrappingMode = TextWrappingModes.NoWrap;
+        pressText.color = Color.white;
+        StretchFull(pressText.gameObject);
+        var blink = pressText.GetComponent<BlinkingText>();
+        if (blink != null) Object.DestroyImmediate(blink); // 알파 0.15↔1 구형파는 요구와 다르다 — 셰이더 밝기 변조로 대체
+        var pressScramble = EnsureComponent<TextScramble>(pressText.gameObject);
+        SetFloat(pressScramble, "_duration", 1.0f);
+        SetLayerRecursive(pressCanvas.gameObject, UILayer);
+
+        GameObject pressScreen = EnsureChild(pressAnyKey, "PressAnyKey_Screen");
+        var pressImage = EnsureComponent<RawImage>(pressScreen);
+        var pressRt = (RectTransform)pressScreen.transform;
+        pressRt.anchorMin = pressRt.anchorMax = pressRt.pivot = new Vector2(0.5f, 0.16f); // 화면 하단 — 중앙 CRT 를 가리지 않는다
+        pressRt.anchoredPosition = Vector2.zero;
+        pressRt.sizeDelta = new Vector2(760f, 190f); // 소스 RT 1024×256 과 같은 4:1
+        var overlayImg = EnsureComponent<TitleOverlayCrtImage>(pressScreen);
+        var oso = new SerializedObject(overlayImg);
+        Set(oso, "_sourceCamera", pressCam);
+        Set(oso, "_sourceCanvas", pressCanvas.gameObject);
+        Set(oso, "_materialSource", EnsureMaterial(PressMaterialPath, "Title/CRTUI"));
+        oso.ApplyModifiedPropertiesWithoutUndo();
+        pressImage.raycastTarget = false;
 
         GameObject skipHint = null;
         if (overlayCanvas != null)
@@ -151,11 +201,49 @@ public static class TitleRigAuthoring
             SetActiveIfFound("title", false);
         }
 
+        // 비게 된(PRESS ANY KEY 까지 옮긴 뒤) 옛 월드 캔버스 정리.
+        DestroyIfFound("World_Menu_Canvas");
+        DestroyIfFound("World_Settings_Canvas");
+
         // ── CRT FX ────────────────────────────────────────────────────────
         GameObject fxRoot = EnsureRoot("TitleFX");
         RetroCRTController crt = EnsureComponent<RetroCRTController>(fxRoot);
         CrtFxDriver burstFx = EnsureFxDriver(fxRoot, "CrtFx_Burst", crt, BuildGlitchBurst());
         CrtFxDriver sustainFx = EnsureFxDriver(fxRoot, "CrtFx_Sustain", crt, BuildApproachSustain());
+
+        // ── 타이틀 CRT 연출 (상시·Flow·꺼짐) ────────────────────────────────
+        GameObject titleFx = EnsureRoot("TitleCrtFx");
+        TitleCrtFx crtFx = EnsureComponent<TitleCrtFx>(titleFx);
+        // Flow(TitleFlowFx) 는 넣었다가 뺐다(팀장 09-23) — 스크립트를 지워 남은 missing script 를 정리한다.
+        int missing = GameObjectUtility.RemoveMonoBehavioursWithMissingScript(titleFx);
+        if (missing > 0) Debug.Log($"[TitleRig] TitleCrtFx 의 누락 스크립트 {missing}개 제거");
+
+        TitlePowerOff powerOff = EnsureComponent<TitlePowerOff>(titleFx);
+        GameObject coverGo = overlayCanvas != null ? EnsureChild(overlayCanvas.gameObject, "PowerOff_Cover") : null;
+        if (coverGo != null)
+        {
+            StretchFull(coverGo);
+            var cover = EnsureComponent<RawImage>(coverGo);
+            cover.color = Color.white;
+            cover.raycastTarget = true; // 꺼지는 동안 뒤 UI 클릭 차단
+            coverGo.transform.SetAsLastSibling();
+            coverGo.SetActive(false);
+            var pso = new SerializedObject(powerOff);
+            Set(pso, "_cover", cover);
+            Set(pso, "_offMaterialSource", EnsureMaterial(OffMaterialPath, "Title/CRTOff"));
+            var flip = pso.FindProperty("_flipY");
+            if (flip != null) flip.boolValue = true;
+            pso.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        // 메뉴 버튼 라벨도 등장할 때 스크램블 디코드
+        foreach (Button b in new[] { start, option, exit })
+        {
+            var label = b != null ? b.GetComponentInChildren<TextMeshProUGUI>(true) : null;
+            if (label == null) continue;
+            var sc = EnsureComponent<TextScramble>(label.gameObject);
+            SetFloat(sc, "_duration", 0.45f);
+        }
 
         // ── Director ──────────────────────────────────────────────────────
         GameObject directorGo = EnsureRoot("TitleFlowDirector");
@@ -169,7 +257,10 @@ public static class TitleRigAuthoring
         Set(so, "_vcamCloseup", closeup);
         Set(so, "_pressAnyKeyRoot", pressAnyKey);
         Set(so, "_menuRoot", menuRoot);
-        Set(so, "_settingsRoot", settingsCanvas.gameObject);
+        Set(so, "_settingsRoot", settingsRoot);
+        Set(so, "_monitorDisplay", monitorDisplay);
+        Set(so, "_crtFx", crtFx);
+        Set(so, "_powerOff", powerOff);
         Set(so, "_skipHintRoot", skipHint);
         Set(so, "_startButton", start);
         Set(so, "_optionButton", option);
@@ -201,7 +292,7 @@ public static class TitleRigAuthoring
 
         EditorSceneManager.MarkSceneDirty(scene);
         Debug.Log($"[TitleRig] 조립 완료. 앵커={anchorPos} 클로즈업={closeupPos} " +
-                  $"캔버스배율={menuScale:F6} 영구콜백제거={cleared}건");
+                  $"모니터표시={(monitorDisplay != null)} 영구콜백제거={cleared}건");
     }
 
     // ── 버스트 정의 ───────────────────────────────────────────────────────
@@ -227,6 +318,264 @@ public static class TitleRigAuthoring
 
     static CrtFxDriver.Channel Channel(CrtParam p, float from, float to, AnimationCurve curve) =>
         new() { param = p, from = from, to = to, curve = curve };
+
+    /// <summary>
+    /// 모니터 안 메뉴 = 가운데 세로 3단 텍스트 버튼(START / SETTING / EXIT, 계획서 §0.2-2).
+    /// 옛 평면 UI 는 Start 가 늘어나는 앵커(폭 −1620), Setting·Exit 가 모서리 60×60 아이콘이라 RT 안에서 깨졌다.
+    /// </summary>
+    static void LayoutMonitorMenu(Button start, Button option, Button exit)
+    {
+        TMP_FontAsset font = start != null ? start.GetComponentInChildren<TextMeshProUGUI>(true)?.font : null;
+        (Button b, string label, float y)[] rows =
+        {
+            (start, "START", 170f),
+            (option, "SETTING", 0f),
+            (exit, "EXIT", -170f),
+        };
+
+        foreach (var (b, label, y) in rows)
+        {
+            if (b == null) continue;
+            var rt = (RectTransform)b.transform;
+            rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = new Vector2(0f, y - 60f); // 화면 중심보다 조금 아래 — 곡면 위쪽 가장자리를 피한다
+            rt.sizeDelta = new Vector2(600f, 120f);
+            rt.localScale = Vector3.one;
+
+            // 배경은 투명하게 두되 클릭은 받는다(alpha 0 이어도 raycastTarget 이면 판정된다).
+            var img = b.GetComponent<Image>();
+            if (img != null)
+            {
+                img.sprite = null;
+                img.color = new Color(1f, 1f, 1f, 0f);
+                img.raycastTarget = true;
+            }
+
+            TextMeshProUGUI text = b.GetComponentInChildren<TextMeshProUGUI>(true);
+            if (text == null)
+            {
+                var go = new GameObject("Text (TMP)", typeof(RectTransform));
+                go.transform.SetParent(b.transform, false);
+                text = go.AddComponent<TextMeshProUGUI>();
+            }
+            text.text = label;
+            if (font != null) text.font = font;
+            text.fontSize = 72f;
+            text.enableAutoSizing = false;
+            text.textWrappingMode = TextWrappingModes.NoWrap;
+            text.alignment = TextAlignmentOptions.Center;
+            text.color = Color.white;
+            text.raycastTarget = false;
+            StretchFull(text.gameObject);
+
+            // 호버·선택 색은 글자에 건다(배경이 투명이라 배경 틴트는 안 보인다).
+            b.targetGraphic = text;
+            ColorBlock cb = b.colors;
+            cb.normalColor = new Color(0.78f, 0.9f, 0.85f, 1f);
+            cb.highlightedColor = Color.white;
+            cb.selectedColor = Color.white;
+            cb.pressedColor = new Color(0.55f, 1f, 0.8f, 1f);
+            cb.fadeDuration = 0.08f;
+            b.colors = cb;
+            EditorUtility.SetDirty(b);
+        }
+    }
+
+    // ── 모니터 RT 리그 ────────────────────────────────────────────────────
+
+    static Camera EnsureUICamera(Camera main)
+    {
+        GameObject go = EnsureRoot("TitleUICam");
+        go.layer = UILayer;
+        Camera cam = EnsureComponent<Camera>(go);
+        cam.orthographic = true;
+        cam.orthographicSize = 5f;
+        cam.cullingMask = 1 << UILayer;
+        cam.clearFlags = CameraClearFlags.SolidColor;
+        cam.backgroundColor = Color.black;
+        cam.nearClipPlane = 0.1f;
+        cam.farClipPlane = 10f;
+        cam.depth = main.depth - 1f; // 메인보다 먼저 — 같은 프레임에 RT 가 채워진 뒤 모니터가 그린다
+        cam.targetTexture = null;    // 런타임에 TitleMonitorDisplay 가 RT 를 꽂는다(애셋 RT 를 만들지 않는다)
+        go.transform.SetPositionAndRotation(new Vector3(0f, -50f, 0f), Quaternion.identity); // 오피스와 겹치지 않게 멀리
+
+        var data = EnsureComponent<UniversalAdditionalCameraData>(go);
+        data.renderType = CameraRenderType.Base;
+        data.renderPostProcessing = false;
+        data.renderShadows = false;
+        data.antialiasing = AntialiasingMode.None;
+        EditorUtility.SetDirty(cam);
+        EditorUtility.SetDirty(data);
+
+        // AudioListener·CinemachineBrain 은 붙이지 않는다.
+        var listener = go.GetComponent<AudioListener>();
+        if (listener != null) Object.DestroyImmediate(listener);
+        return cam;
+    }
+
+    static Canvas EnsureMonitorCanvas(Camera uiCam)
+    {
+        GameObject go = EnsureRoot("Monitor_UI_Canvas");
+        go.layer = UILayer;
+        Canvas canvas = EnsureComponent<Canvas>(go);
+        canvas.renderMode = RenderMode.ScreenSpaceCamera;
+        canvas.worldCamera = uiCam;
+        canvas.planeDistance = 1f;
+
+        var scaler = EnsureComponent<CanvasScaler>(go);
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(CanvasLogicalWidth, CanvasLogicalHeight);
+        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+        scaler.matchWidthOrHeight = 1f; // 세로 1080 기준 — RT 가 4:3 이어도 글자 크기가 유지된다
+
+        // 기본 GraphicRaycaster 는 실제 화면 좌표로 판정해 모니터 밖에서도 버튼이 눌린다 → 교체.
+        var plain = go.GetComponent<GraphicRaycaster>();
+        if (plain != null && plain is not TitleScreenRaycaster) Object.DestroyImmediate(plain);
+        EnsureComponent<TitleScreenRaycaster>(go);
+        return canvas;
+    }
+
+    static TitleMonitorDisplay EnsureMonitorDisplay(Camera uiCam)
+    {
+        GameObject go = EnsureRoot("TitleMonitorDisplay");
+        var display = EnsureComponent<TitleMonitorDisplay>(go);
+
+        GameObject screenGo = GameObject.Find(ScreenRendererPath);
+        Renderer screen = screenGo != null ? screenGo.GetComponent<Renderer>() : null;
+        if (screen == null)
+            Debug.LogError($"[TitleRig] 중앙 화면 '{ScreenRendererPath}' 를 못 찾았다 — TitleOffice 이식 여부 확인.");
+
+        var so = new SerializedObject(display);
+        Set(so, "_screenRenderer", screen);
+        Set(so, "_uiCamera", uiCam);
+        Set(so, "_uiMaterialSource", EnsureUIMaterial());
+        so.ApplyModifiedPropertiesWithoutUndo();
+        return display;
+    }
+
+    static Material EnsureUIMaterial() => EnsureMaterial(UIMaterialPath, "Title/CRTScreen");
+
+    /// <summary>애셋 머티리얼을 찾거나 만들고, 셰이더가 다르면 맞춘다(URP Unlit → CRTScreen 교체 포함).</summary>
+    static Material EnsureMaterial(string path, string shaderName)
+    {
+        Shader shader = Shader.Find(shaderName);
+        if (shader == null)
+        {
+            Debug.LogError($"[TitleRig] 셰이더 '{shaderName}' 를 못 찾았다 — 컴파일 에러 확인.");
+            return AssetDatabase.LoadAssetAtPath<Material>(path);
+        }
+
+        var mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+        if (mat == null)
+        {
+            mat = new Material(shader) { name = System.IO.Path.GetFileNameWithoutExtension(path) };
+            AssetDatabase.CreateAsset(mat, path);
+        }
+        else if (mat.shader != shader)
+        {
+            mat.shader = shader;
+            EditorUtility.SetDirty(mat);
+        }
+        AssetDatabase.SaveAssets();
+        return mat;
+    }
+
+    static Camera EnsurePressCamera(Camera main)
+    {
+        GameObject go = EnsureRoot("TitlePressCam");
+        go.layer = UILayer;
+        Camera cam = EnsureComponent<Camera>(go);
+        cam.orthographic = true;
+        cam.orthographicSize = 5f;
+        cam.cullingMask = 1 << UILayer;
+        cam.clearFlags = CameraClearFlags.SolidColor;
+        cam.backgroundColor = Color.clear;
+        cam.nearClipPlane = 0.1f;
+        cam.farClipPlane = 10f;
+        cam.depth = main.depth - 2f;
+        cam.targetTexture = null; // 런타임에 TitleOverlayCrtImage 가 RT 를 꽂는다
+        // 🔴 모니터 UI 카메라(y −50)와 떨어뜨린다 — Screen Space-Camera 캔버스가 서로의 카메라에 잡히지 않게.
+        go.transform.SetPositionAndRotation(new Vector3(0f, -100f, 0f), Quaternion.identity);
+
+        var data = EnsureComponent<UniversalAdditionalCameraData>(go);
+        data.renderType = CameraRenderType.Base;
+        data.renderPostProcessing = false;
+        data.renderShadows = false;
+        data.antialiasing = AntialiasingMode.None;
+        EditorUtility.SetDirty(cam);
+        EditorUtility.SetDirty(data);
+        var listener = go.GetComponent<AudioListener>();
+        if (listener != null) Object.DestroyImmediate(listener);
+        return cam;
+    }
+
+    static Canvas EnsurePressCanvas(Camera pressCam)
+    {
+        GameObject go = EnsureRoot("Press_UI_Canvas");
+        go.layer = UILayer;
+        Canvas canvas = EnsureComponent<Canvas>(go);
+        canvas.renderMode = RenderMode.ScreenSpaceCamera;
+        canvas.worldCamera = pressCam;
+        canvas.planeDistance = 1f;
+        var scaler = EnsureComponent<CanvasScaler>(go);
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1024f, 256f);
+        scaler.matchWidthOrHeight = 1f;
+        var ray = go.GetComponent<GraphicRaycaster>();
+        if (ray != null) Object.DestroyImmediate(ray); // 클릭 받을 것이 없다
+        return canvas;
+    }
+
+    static void SetFloat(Object target, string field, float value)
+    {
+        var so = new SerializedObject(target);
+        SerializedProperty p = so.FindProperty(field);
+        if (p == null) { Debug.LogWarning($"[TitleRig] 필드 '{field}' 없음 ({target.GetType().Name})"); return; }
+        p.floatValue = value;
+        so.ApplyModifiedPropertiesWithoutUndo();
+    }
+
+    /// <summary>Slider 의 m_Script 만 TitleScreenSlider 로 바꾼다 — 필드가 같아 값·참조가 보존된다.</summary>
+    static int SwapSlidersToScreenSlider(GameObject root)
+    {
+        MonoScript target = null;
+        foreach (string guid in AssetDatabase.FindAssets("TitleScreenSlider t:MonoScript"))
+        {
+            var ms = AssetDatabase.LoadAssetAtPath<MonoScript>(AssetDatabase.GUIDToAssetPath(guid));
+            if (ms != null && ms.GetClass() == typeof(TitleScreenSlider)) { target = ms; break; }
+        }
+        if (target == null) { Debug.LogError("[TitleRig] TitleScreenSlider 스크립트를 못 찾았다."); return 0; }
+
+        int n = 0;
+        foreach (Slider slider in root.GetComponentsInChildren<Slider>(true))
+        {
+            if (slider is TitleScreenSlider) continue;
+            var so = new SerializedObject(slider);
+            so.FindProperty("m_Script").objectReferenceValue = target;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            n++;
+        }
+        return n;
+    }
+
+    static void SetLayerRecursive(GameObject go, int layer)
+    {
+        go.layer = layer;
+        foreach (Transform child in go.transform)
+            SetLayerRecursive(child.gameObject, layer);
+    }
+
+    static void DestroyIfFound(string name)
+    {
+        GameObject go = FindInScene(name);
+        if (go == null) return;
+        if (go.GetComponentsInChildren<Button>(true).Length > 0 || go.GetComponentsInChildren<Slider>(true).Length > 0)
+        {
+            Debug.LogWarning($"[TitleRig] '{name}' 에 아직 버튼/슬라이더가 남아 지우지 않는다 — 이사 누락 확인.");
+            return;
+        }
+        Object.DestroyImmediate(go);
+    }
 
     // ── 유틸 ──────────────────────────────────────────────────────────────
 

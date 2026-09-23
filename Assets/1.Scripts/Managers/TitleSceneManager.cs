@@ -82,6 +82,35 @@ public class TitleSceneManager : NemoSceneManager
         StartCoroutine(FadeThenInvoke(_gameManager.GoToLobby));
     }
 
+    /// <summary>
+    /// 🔴 화면이 이미 검은 상태(타이틀 CRT 꺼짐 연출 뒤)에서 부른다 — 기존 <see cref="StartGame"/> 은 1.5초 페이드를
+    /// 한 번 더 기다려 전환이 늘어진다(Codex 검토 09-23). 페이드 없이 바로 로비로.
+    /// </summary>
+    public void StartGameImmediate()
+    {
+        Debug.Log($"[SceneFlow] TitleSceneManager.StartGameImmediate transitioning={IsTransitioning}");
+        if (IsTransitioning || _gameManager == null)
+        {
+            return;
+        }
+
+        SetTitleButtonsInteractable(false);
+        _gameManager.GoToLobby();
+    }
+
+    /// <summary>검은 화면에서 페이드 없이 종료(<see cref="StartGameImmediate"/> 와 같은 이유).</summary>
+    public void ExitGameImmediate()
+    {
+        Debug.Log($"[SceneFlow] TitleSceneManager.ExitGameImmediate transitioning={IsTransitioning}");
+        if (IsTransitioning)
+        {
+            return;
+        }
+
+        SetTitleButtonsInteractable(false);
+        QuitApplication();
+    }
+
     public void ToggleOption()
     {
         SetOptionPanel(optionPanel == null || !optionPanel.activeSelf);
