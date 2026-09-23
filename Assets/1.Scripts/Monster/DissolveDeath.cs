@@ -137,6 +137,18 @@ public class DissolveDeath : NetworkBehaviour, IDeathEffect
         renderers = meshes.ToArray();
     }
 
+    /// <summary>
+    /// 렌더러의 머티리얼을 디졸브 사본으로 갈아끼운다.
+    ///
+    /// 🔴 <b><see cref="DissolveOverlay"/>가 쓰는 슬롯은 건너뛴다.</b> 그 슬롯은 같은 메쉬를 한 번 더
+    /// 그리려고 얹어 둔 겹이고, 셰이더(<c>VFX/DissolveOverlay</c>)에 <c>_BaseMap</c>이 없어
+    /// 원본 텍스처를 옮겨 적을 수가 없다. 그대로 갈아끼우면 템플릿 기본값(텍스처 없음 + 흰색)이 그려져
+    /// <b>본체를 덮는 흰 껍데기</b>가 되고, 그게 디졸브된다 — "죽을 때 흰색으로 변한다"의 정체다.
+    /// 인터럽트 창을 여는 몹 넷(23호·Gauntlet·Spinner·Wall)이 전부 이 조건에 걸린다.
+    ///
+    /// 건너뛰는 대신 <see cref="DissolveOverlay.Hide"/>로 걷는다. 죽는 중에 인터럽트 표시가 떠 있을
+    /// 이유가 없고, 이미 꺼져 있으면 조용한 no-op이다.
+    /// </summary>
     void SwapToDissolveMaterials()
     {
         if (dissolveTemplate == null)
@@ -150,11 +162,23 @@ public class DissolveDeath : NetworkBehaviour, IDeathEffect
             Renderer r = renderers[i];
             if (r == null) continue;
 
+            // 오버레이는 렌더러와 같은 오브젝트에 붙는다(DissolveOverlay의 RequireComponent).
+            int overlaySlot = -1;
+            if (r.TryGetComponent(out DissolveOverlay overlay))
+            {
+                overlay.Hide();
+                overlaySlot = overlay.OverlayMaterialIndex;
+            }
+
             Material[] sources = r.sharedMaterials;   // 읽기 전용. 여기서 인스턴스를 만들지 않는다
             var replaced = new Material[sources.Length];
 
             for (int s = 0; s < sources.Length; s++)
-                replaced[s] = BuildDissolveMaterial(sources[s]);
+            {
+                // 건너뛴 슬롯은 원본(shared)을 그대로 돌려놓는다. 배열 대입은 복제하지 않으므로
+                // 인스턴스가 새로 생기지 않고, 우리가 쓰지도 않으니 에셋이 오염되지도 않는다.
+                replaced[s] = s == overlaySlot ? sources[s] : BuildDissolveMaterial(sources[s]);
+            }
 
             r.materials = replaced;
         }
@@ -170,6 +194,14 @@ public class DissolveDeath : NetworkBehaviour, IDeathEffect
         {
             if (source.HasProperty(SourceBaseMapId) && m.HasProperty(MainTextureId))
                 m.SetTexture(MainTextureId, source.GetTexture(SourceBaseMapId));
+            else
+            {
+                // 여기 오면 그 슬롯은 텍스처 없이 템플릿 기본색(흰색)으로 그려진다.
+                // 오버레이처럼 건너뛰어야 할 슬롯이거나, 본체 셰이더가 _BaseMap 이 아닌 이름을 쓰는 경우다.
+                Edit.LogWarning($"[Dissolve] {name}: '{source.name}'({source.shader?.name})에서 _BaseMap 을 " +
+                                "찾지 못해 흰색으로 녹습니다. 본체 머티리얼이면 셰이더 프로퍼티 이름을, " +
+                                "덧그리는 겹이면 SwapToDissolveMaterials 의 건너뛰기 조건을 확인할 것.", this);
+            }
 
             if (source.HasProperty(BaseColorId) && m.HasProperty(BaseColorId))
                 m.SetColor(BaseColorId, source.GetColor(BaseColorId));
