@@ -8,6 +8,74 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-09-22 · **Dev 부팅 자동화 — 툴바 "Dev Boot"**, 브랜치 `tool/DevBootAutomation`)
+
+작업자: **은희(Claude 설계 → Codex 구현 위임)**, 레인 `MainProject` (= `C:\UnityProject\MainProject`).
+계획·근거·확정 결정은 [PLAN.md](PLAN.md) 최상단.
+**상태: 코드·검증 완료** (커밋 `17d92726` · `d2e3bdbb` · `7d17fbfc`). Play 검증 8항목 전부 통과.
+알려진 한계 2건(직접 Play 경로 · `playModeStartScene` 초기화 범위)은 **고치지 않기로 결정** — 근거는 [PLAN.md](PLAN.md) 7절.
+
+**무엇을 푸는가** — Dev 부팅의 두 가지 마찰:
+1. 부팅할 씬을 바꾸려면 공유 씬 `Dev_Boot.unity` 안의 `DevSceneBooter.scene` 필드를 고쳐야 한다
+   (= git 추적 씬이 dirty, 팀원 기본값이 통째로 바뀐다. 2026-09-17 Codex 리뷰 consider #4 가 이미 지적).
+2. 타겟 씬이 빌드 씬 목록에 없으면 **Play 가 이미 시작된 뒤** 로그 하나 찍고 멈춘다.
+   → 자동 등록은 **Play 진입 전 에디터 훅**에서 해야 한다.
+
+**용어** — 여기서 "Dev Boot" 는 *툴바 드롭다운에서 씬을 고르면 빌드 목록을 임시 보정하고
+`Dev_Boot` 씬으로 Play 에 진입해 그 씬을 부팅하는 것* 이다. 내장 Play 버튼은 **교체하지 않는다**
+(6000.3 의 `OverridableToolbar` 는 Scene 뷰 툴바만 지원. `[MainToolbarElement]` 로 옆에 붙인다).
+
+
+**🔴 부팅 씬 위치 — `Assets/0.Scenes/Debug/Dev_Boot.unity`** (2026-09-22 이동, `0094e75d`).
+예전 위치는 `Assets/0.Scenes/Dev_Boot.unity` 였다. meta guid `180a2dd6e0939fed247ab6908eb0ec7d`
+는 그대로라 참조는 안 깨졌다. **코드는 경로가 아니라 이 GUID 로 씬을 찾는다**
+(`DevBootLauncher.DevBootScenePath`) — 경로 상수를 다시 박지 말 것. 박아두면 다음 이동 때
+직접 Play 판정·강제 정리 메뉴·드롭다운의 자기 제외가 조용히 안 걸린다(`7359e839` 에서 겪은 일).
+
+**🔴 MPPM 과의 관계 — 시작 방법에 따라 갈린다 (2026-09-22 실측 확정)**
+
+활성 MPPM 시나리오가 있을 때, **어느 쪽이 이기는지는 Play 를 어떻게 시작했느냐로 정해진다.**
+`MPPM2` 를 활성화한 상태로 둘 다 확인했다.
+
+| 시작 방법 | 메인 에디터가 시작하는 씬 | 왜 |
+|---|---|---|
+| 툴바 `Dev Boot ▾` 에서 씬 선택 | **`Dev_Boot`** (= Dev Boot 승) | `DevBootLauncher.Launch` 가 `playModeStartScene` 을 **설정한다.** 이건 MPPM 이 씬을 연 뒤, Play 진입 시점에 치환되므로 덮어쓴다 |
+| `Dev_Boot` 씬을 열어둔 채 내장 Play | **시나리오의 InitialScene** (= 프로필 승) | `PrepareDirectDevBootIfNeeded` 는 **빌드 목록만 보정하고 `playModeStartScene` 은 건드리지 않는다.** 덮을 게 없으니 MPPM 이 연 씬이 그대로 간다 |
+
+**이 갈림은 의도된 것이다(2026-09-22 은희).** 시작 방법을 바꾸는 것만으로 "Dev Boot 단독 부팅" 과
+"MPPM 시나리오대로" 를 골라 쓸 수 있다. 경고·거부 가드는 **의도적으로 넣지 않았다** — 가드를 넣으면
+이 선택지가 막힌다.
+
+왜 두 기구가 이렇게 노는가 — MPPM 구현은 패키지가 아니라 에디터 내장
+`UnityEditor.MultiplayerModule.dll` 에 있고(`com.unity.multiplayer.playmode@2.0.2` 는 문서만 든
+껍데기다), 그 DLL 은 `playModeStartScene` 을 **전혀 참조하지 않는다.**
+`SetupAndLoadInitialScene` / `CleanupInitialScene` 이 `EditorSceneManager.OpenScene` 과
+`GetSceneManagerSetup`·`RestoreSceneManagerSetup` 으로 *에디터에 열린 씬* 을 바꿨다 되돌릴 뿐이다.
+`playModeStartScene` 은 그보다 뒤, *Play 가 실제로 시작하는 씬* 을 덮는다. 그래서 설정돼 있으면 이기고,
+없으면 MPPM 이 이긴다.
+
+참고: 활성 시나리오는 `UserSettings/PlayModeUserSettings.asset` 의 `m_LastActiveConfiguration`
+에 들어간다(git 미추적). `Assets/Settings/PlayMode/DevBoot.asset`(InitialScene=Dev_Boot 인 옛
+시나리오)은 2026-09-22 은희가 삭제했다 — 툴바가 그 역할을 대신한다.
+
+**🔴 동시 수정 주의 — 이번 세션이 건드리는 파일**
+
+| 파일 | 상태 |
+|---|---|
+| `Assets/1.Scripts/Dev/DevBootTarget.cs` | 신규(런타임) — EditorPrefs 키의 유일한 원본 |
+| `Assets/1.Scripts/Dev/Editor/DevBootLauncher.cs` | 신규 — 목록 보정·원복·Play 진입 |
+| `Assets/1.Scripts/Dev/Editor/DevBootSceneCatalog.cs` | 신규 — 씬 스캔 + 최근 목록 |
+| `Assets/1.Scripts/Dev/Editor/DevBootToolbar.cs` | 신규 — `[MainToolbarElement]` 드롭다운 |
+| `Assets/1.Scripts/Dev/Editor/DevBootLauncherTests.cs` | 신규 — EditMode |
+| `Assets/1.Scripts/Dev/DevSceneBooter.cs` | 수정 — `scene` 필드 제거(부팅 시퀀스는 무수정) |
+| `Assets/1.Scripts/Dev/Editor/DevBuildSceneList.cs` | 수정 — 썩은 `DevScenes` 배열·활성/비활성 메뉴 삭제 |
+| `ProjectSettings/EditorBuildSettings.asset` | 수정 — Dev_Boot 등록 제거 |
+
+**팀 공지** — `Dev/빌드 씬 목록/테스트 씬 활성화·비활성화` 메뉴는 **없어진다.** 툴바 `Dev Boot ▾`
+가 대신하고, 빌드 목록은 Play 종료 시 자동 원복된다. 커밋 전
+`git diff ProjectSettings/EditorBuildSettings.asset` 이 비어 있는지 확인할 것
+(에디터 크래시로 원복이 안 돌면 `Dev/Dev Boot/빌드 목록 강제 정리`).
+
 ## ▶▶ 현재 인수인계 (2026-09-22 · 구역 진입 기반 벽 투명화 1단계 **검증 완료**, 브랜치 `feature/TransparentV2-keepgoing`)
 
 작업자: **은희(Claude + Codex 위임)**. 계획·근거는 [PLAN.md](PLAN.md) 최상단.
@@ -1486,6 +1554,10 @@ NavMesh 를 읽는 소비자가 에이전트이므로, 고정 터렛 2종은 자
 
 **상태.** 코드·프리팹·검증 씬 완료, 컴파일 오류 0. **Play 검증 대기**(호스트 단독 + MPPM 2인).
 설계·확정 사양·알려진 한계는 [PLAN-training-dummy.md](PLAN-training-dummy.md) — 여기 중복 기술하지 않는다.
+
+> ⚠️ 2026-09-22 갱신: 아래 절차는 낡았다. `DevSceneBooter.scene` 필드는 제거됐고 씬도
+> `Assets/0.Scenes/Debug/Dev_Boot.unity` 로 옮겼다. 지금은 툴바 `Dev Boot ▾` 에서 고른다
+> (이 문서 최상단 「Dev 부팅 자동화」 작업 세션 참조). 씬 로드·스폰 흐름 설명은 그대로 유효하다.
 
 **검증 경로 = `Dev_Boot` 씬.** `DevSceneBooter.scene` 에 띄울 씬 이름을 적고 Play 하면
 호스트 기동 → **`NetworkSceneManager` 로 씬 로드**(씬에 배치된 NetworkObject 가 자동 스폰된다)
