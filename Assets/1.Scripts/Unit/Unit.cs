@@ -520,11 +520,13 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         base.OnNetworkDespawn();
     }
 
-    //충돌난거 임시 해결함 추후 수정 해야됨.
+    // 감소 분기는 한 곳에서만 발화시킨다. 예전에는 ClientHpChanged 직후와 아래, 두 곳에서
+    // ClientDamaged 를 불러 HP 감소마다 2회 발화했다(머지 충돌을 봉합한 자국).
+    // 유일한 구독자였던 HitFlash 는 플래시를 재시작할 뿐이라 증상이 드러나지 않았지만,
+    // 이 이벤트에 이펙트를 물리면 피격마다 그대로 두 번 터진다.
     void OnHpReplicated(int previous, int next)
     {
         ClientHpChanged?.Invoke(previous, next);
-        if (next < previous) ClientDamaged?.Invoke();
 
         if (next >= previous)
             return;

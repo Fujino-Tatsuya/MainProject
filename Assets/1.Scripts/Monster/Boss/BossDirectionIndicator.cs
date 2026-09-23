@@ -304,7 +304,7 @@ public class BossDirectionIndicator : MonoBehaviour, IBossTelegraph
 
         var decal = go.AddComponent<UnityEngine.Rendering.Universal.DecalProjector>();
         decal.material = new Material(decalMaterial);   // 인스턴스 — 애셋 오염 금지
-        decal.renderingLayerMask = DecalReceivers.Mask; // 캐릭터 제외는 이 마스크가 보장한다
+        DecalReceivers.ConfigureFloorProjector(decal); // 캐릭터 제외(마스크) + 벽 제외(각도 페이드)
         decal.fadeFactor = 1f;
         return decal;
     }

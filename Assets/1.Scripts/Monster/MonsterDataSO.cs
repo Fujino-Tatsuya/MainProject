@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.AI;
 
 // 몬스터 데이터 주도 설정. 스탯/인지/그로기/슈퍼아머/타이밍/애니 파라미터명을 한 곳에 모은다.
@@ -80,8 +80,15 @@ public class MonsterDataSO : ScriptableObject
     public float hitStunDuration = 0.4f; // 피격 경직 시간
     public float despawnDelay = 2f;      // 사망 후 디스폰까지 지연(디졸브 폴백)
 
-    [Header("중간보스 여부")]
-    public bool isMidBoss = false;
+    // ⚠️ 2026-09-21 SO 전수조사 — **유령 필드**라 주석 처리했다. 참조 0.
+    //    에셋 12개가 값을 갖고 있었고 그중 3개가 true 였다
+    //    (GauntletBotData · SpinnerBotData · WallBotData — 실제 중간보스 3종).
+    //    🔴 즉 **누군가 의도를 갖고 채웠지만 코드가 한 번도 읽지 않았다.**
+    //    중간보스 구분은 이 플래그가 아니라 **전용 클래스 + MonsterCounterWindow 컴포넌트**가 한다
+    //    (SpinnerBot·GauntletBot·WallBot). 동작은 되고 있으니 기능 결손은 아니다.
+    //
+    // [Header("중간보스 여부")]
+    // public bool isMidBoss = false;
 
     // 애니메이터 파라미터명 상수.
     // 자산(Animator Controller)이 아직 없을 수 있으므로 MonsterBase는 존재 여부를 확인 후 graceful 세팅한다.

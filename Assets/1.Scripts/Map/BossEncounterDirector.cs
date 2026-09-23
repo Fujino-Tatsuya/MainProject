@@ -100,6 +100,10 @@ public sealed class BossEncounterDirector : NetworkBehaviour
     // 착지 후 리쉬 기준점을 옮겨 주기 위해 들고 있는다 — 이유는 AttachBossToNavMesh 주석 참조.
     private MonsterBase _bossMonster;
 
+    // 입장 연출 애니메이션(하강 포즈·착지 클립·로코모션 복귀). 없으면 연출은 그대로 진행한다 —
+    // 이 seam 의 목적이 "다른 보스가 들어와도 입장이 안 깨지는 것"이다(IBossEntranceAnimation 주석).
+    private IBossEntranceAnimation _bossEntranceAnim;
+
     private Vector3 _descendFrom;
     private Vector3 _descendTo;
     private bool _combatStarted;
@@ -296,8 +300,12 @@ public sealed class BossEncounterDirector : NetworkBehaviour
         if (playerObject == null || !playerObject.IsSpawned)
             return false;
 
+        // 🔴 2026-09-20 개정 — 예전에는 `State == Alive` 만 통과시켰다. 그러면 도착자가 전부 Soul 일 때
+        //    참가자가 0 이 되어 **보스가 아예 스폰되지 않고** Idle 로 돌아갔고, 부활해도 여기를 다시
+        //    깨우는 경로가 없어 영구 교착이었다. Soul 은 목숨을 들고 합류를 기다리는 참가자이지 탈락자가 아니다.
+        //    덤으로 Soul 도 연출 잠금·상태이상 정리를 받게 된다(예전엔 스냅샷에서 빠져 못 받았다).
         PlayerLifeCycleController lifeCycle = playerObject.GetComponent<PlayerLifeCycleController>();
-        return lifeCycle == null || lifeCycle.State == PlayerLifeState.Alive;
+        return lifeCycle == null || lifeCycle.State != PlayerLifeState.PermanentDead;
     }
 
     private PlayerEncounterLock GetLock(ulong clientId)
@@ -381,6 +389,11 @@ public sealed class BossEncounterDirector : NetworkBehaviour
         _bossUnit = bossInstance.GetComponent<Unit>();
         _bossAgent = bossInstance.GetComponent<NavMeshAgent>();
         _bossMonster = bossInstance.GetComponent<MonsterBase>();
+        _bossEntranceAnim = bossInstance.GetComponent<IBossEntranceAnimation>();
+
+        if (_bossEntranceAnim == null)
+            Edit.LogWarning("[BossEncounter] 보스에 IBossEntranceAnimation 구현이 없습니다 — " +
+                            "하강·착지 애니메이션 없이 연출만 진행합니다.", this);
 
         if (_bossUnit == null)
             Edit.LogError("[BossEncounter] 보스에 Unit이 없어 사망(클리어) 판정을 연결할 수 없습니다.", this);
@@ -396,6 +409,14 @@ public sealed class BossEncounterDirector : NetworkBehaviour
     private void BeginDescent()
     {
         MoveBoss(_descendFrom);
+
+        // 🔴 하강 포즈. 안 하면 보스가 **Idle 로 서서** 내려온다(팀장 지적 2026-09-21).
+        // ⚠️ 이 RPC 는 `_bossNetworkObject.Spawn()` 과 **같은 프레임**에 나간다. NGO 가 같은 틱의
+        //    스폰 메시지와 그 오브젝트의 RPC 순서를 보장하지만 이 레포에서 실측한 적이 없다
+        //    → **MPPM 클라(호스트 아님) 화면에서 반드시 확인할 것.**
+        //    호스트에서만 보이는 종류의 버그를 이 레포가 여러 번 겪었다.
+        _bossEntranceAnim?.PlayEntranceDescentServer();
+
         SetPhase(BossEncounterPhase.Descending);
     }
 
@@ -443,6 +464,12 @@ public sealed class BossEncounterDirector : NetworkBehaviour
             return;
 
         MoveBoss(_descendTo);
+
+        // 🔴 착지 클립. **데미지는 안 나간다** — `NotifyAttackHit` 이 `State != Attack` 이면 반환하고
+        //    연출 중에는 `SetServerLogicSuspended(true)` 가 보스를 Idle 로 잡아 둔다(2026-09-21 확인).
+        //    ⚠️ 연출 중 FSM 을 깨우도록 바꾸면 **여기서 입장 AoE 가 터진다.**
+        _bossEntranceAnim?.PlayEntranceLandingServer();
+
         SetPhase(BossEncounterPhase.Impact);
     }
 
@@ -492,6 +519,15 @@ public sealed class BossEncounterDirector : NetworkBehaviour
         _combatStarted = true;
 
         SnapBossToNavMesh();
+
+        // 🔴 **착지 포즈를 여기서 되돌린다.** 안 하면 전투 중에 착지 클립이 남는다.
+        //    애니를 바꾸는 경로는 `OnStateChanged → PlayStateAnimation` 하나뿐인데, 전투가
+        //    시작돼도 보스가 Idle 에 머물면 **상태 변화가 없어 그 경로를 안 탄다.**
+        //    착지 클립(1.92초)이 impactHoldSeconds(0.9초)보다 길어 실제로 남을 수 있다.
+        //    (Codex 교차검증 2026-09-21 — 원래는 "알아서 잘린다"고 전제했다.)
+        // ⚠️ 순서: SetServerLogicSuspended(false) **보다 앞**이다. 뒤에 두면 FSM 이 고른
+        //    첫 애니메이션을 이게 덮어쓴다.
+        _bossEntranceAnim?.EndEntranceAnimationServer();
 
         // ⚠️ 순서 주의: 반드시 SnapBossToNavMesh **뒤**다. 그 안에서 에이전트를 켜고 NavMesh 에
         //    앉히고 리쉬 기준점까지 옮긴다 — 그게 끝나야 FSM 이 온전한 몸으로 깨어난다.

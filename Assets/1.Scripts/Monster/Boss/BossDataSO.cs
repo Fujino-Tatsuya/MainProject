@@ -1,5 +1,6 @@
-using System;
+﻿using System;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 // 보스 공격 테이블 1행 = 공격 1종. 배열 인덱스가 곧 MonsterBase 의 **공격 슬롯 번호**다
 // (ConfigureAttackSlots / CooldownReady / CurrentAttackSlot 이 이 인덱스를 쓴다).
@@ -106,6 +107,24 @@ public class BossAttackEntry
              "오른손 훅은 +, 왼손 훅은 − 를 준다 — 문서의 '공격하는 팔 쪽이 넓어진다'가 이 한 칸이다.")]
     [Range(-180f, 180f)] public float coneOffsetAngle = 0f;
 
+    [Tooltip("[T4] 끝점 부채꼴 대신 쓰는 **네모** 폭(m). 0 이면 부채꼴을 쓴다. " +
+             "🔴 coneRadius 보다 우선한다 — 둘 다 켜면 네모만 남는다(예고도 네모 하나).")]
+    [Min(0f)] public float boxWidth = 0f;
+
+    [Tooltip("[T4] 네모 길이(m) — 보스 정면으로 뻗는다. boxWidth > 0 일 때만 쓴다. " +
+             "시작점은 **전진 끝점**(lungeDistance) 이다 — 판정도 거기서 나가기 때문이다.")]
+    [Min(0f)] public float boxLength = 0f;
+
+    [Tooltip("[T4] 네모를 보스 정면 기준 **좌/우로 치우치게** 하는 거리(m). + = 오른쪽. " +
+             "오른손 훅은 +, 왼손 훅은 − 를 준다 — 부채꼴의 coneOffsetAngle 에 해당하는 칸이다. " +
+             "🔴 각도가 아니라 **거리**다 — 네모는 회전하지 않고 옆으로 평행이동한다.")]
+    public float boxLateralOffset = 0f;
+
+    [Tooltip("[T4] 네모가 **보스 뒤쪽으로** 뻗는 길이(m). 0 이면 보스 중심에서 시작한다. " +
+             "🔴 훅은 전진하며 때리는데, 네모가 전진 끝점에서만 시작하면 " +
+             "**보스 몸에 붙은 플레이어가 안 맞는다**. 그 빈 구간을 메우는 칸이다.")]
+    [Min(0f)] public float boxBackOffset = 0f;
+
     // ─── [G2] 예고 구간 ──────────────────────────────────────────────
     // 🔴 **예고는 판정보다 먼저 끝나야 한다.** 예고와 공격을 같은 순간에 시작하면 반응 시간이 0 이라
     //    예고가 아니라 사후 통보가 된다(2026-09-16 팀장 지적으로 이 구간이 생겼다).
@@ -116,9 +135,36 @@ public class BossAttackEntry
              "0 이면 예고 없이 즉발(기존 동작). 확정 초기값 = 훅·어퍼 0.7.")]
     [Min(0f)] public float telegraphDuration = 0f;
 
-    [Tooltip("[G2] 예고 동안 멈춰 있을 **자세**(공격 클립의 정규화 시간 0~1). " +
-             "0.15 면 '팔을 뒤로 당긴' 근처다. 🔴 이 값이 클립의 OnAttackHit 시점보다 크면 " +
-             "히트 프레임을 이미 지나쳐 **데미지가 나가지 않는다** — 훅·어퍼는 0.4 미만이어야 한다.")]
+    [Tooltip("[T5] 클립에 OnAttackHit **애니 이벤트가 없을 때** 이 정규화 시간(0~1)에 " +
+             "도달하면 “준비됨”으로 본다. 0 이면 이벤트만 쓴다(기존 동작). " +
+             "🔴 아트가 fbx 를 다시 올리면 .meta 의 이벤트 저작은 날아간다(SVN). " +
+             "그래서 이벤트를 심는 대신 **git 쪽 데이터**로 같은 시점을 잡는다.\n" +
+             "⚠️ **prepStateName 이 채워진 공격에서는 '준비됨' 판정에 쓰이지 않는다** " +
+             "(2026-09-23). prep 을 재생하면 애니메이터가 공격 상태가 아니라 prep 상태라 " +
+             "상태명 검사를 통과하지 못하므로, 준비 신호를 prep 시작과 함께 즉시 세운다. " +
+             "대신 이 값은 **공격 클립을 이어서 재생할 지점**으로 쓰인다(돌진의 0.57 = 선딜 완료).")]
+    [Range(0f, 1f)] public float hitEventFallbackNormalized = 0f;
+
+    // ─── [G2-P] 준비동작(prep) 클립 (2026-09-23, SVN r322 로 아트가 올림) ───────────
+    // 예고 구간에 **공격 클립을 얼리는 대신 전용 준비동작을 재생**한다.
+    // 🔴 예고 **길이는 여전히 telegraphDuration 이 정한다.** 클립이 정하게 두면 아트가 클립을
+    //    다시 올릴 때마다 반응 시간(= 난이도)이 조용히 흔들린다.
+    //    prep 클립이 예고보다 짧으면 마지막 프레임에서 멈춰 나머지를 채운다
+    //    (클립들이 `loopTime: 0` 이라 나가는 전이만 없으면 자동으로 그렇게 된다 — 교훈 #87).
+    [Tooltip("[G2] 예고 구간에 재생할 **준비동작** 애니메이터 상태명. " +
+             "비우면 공격 클립을 telegraphPoseNormalized 지점에서 얼리는 기존 방식으로 폴백한다" +
+             "(잡기가 그렇다 — 아직 grab_prep 클립이 없다).\n" +
+             "🔴 예고 길이는 telegraphDuration 이 정한다. 클립이 짧으면 마지막 자세에서 기다린다.\n" +
+             "🔴 이름이 틀리면 애니가 조용히 안 나온다 → 스폰 시 ValidateState 가 LogError 를 남긴다.")]
+    public string prepStateName = "";
+
+    [Tooltip("[G2] 공격 클립을 **이어서 재생할 지점**(정규화 0~1). 0.15 면 '팔을 뒤로 당긴' 근처다.\n" +
+             "· prepStateName 이 비어 있으면 = 예고 동안 **얼려 둘 자세**이자 재개 지점(기존 동작).\n" +
+             "· prepStateName 이 있으면 = 예고가 끝난 뒤 **재개할 지점**(얼리지는 않는다).\n" +
+             "🔴 어느 쪽이든 이 값이 클립의 OnAttackHit 시점보다 크면 히트 프레임을 이미 지나쳐 " +
+             "**데미지가 나가지 않는다** — 훅·어퍼는 0.4 미만이어야 한다.\n" +
+             "🔴 prep 을 넣었다고 이 값을 0 으로 내리지 말 것. 공격 클립의 앞부분이 그 클립 자체의 " +
+             "준비동작이라 prep 과 겹치고, 무엇보다 **OnAttackHit 이 그만큼 늦게 나간다.**")]
     [Range(0f, 0.95f)] public float telegraphPoseNormalized = 0.15f;
 }
 
@@ -316,10 +362,19 @@ public class BossDataSO : MonsterDataSO
     [Tooltip("[G5] 끌려왔지만 **붙잡히지 않은** 플레이어를 보스 전방으로 밀어내는 세기. 0 이면 밀지 않는다.")]
     [Min(0f)] public float grabPullKnockback = 4f;
 
-    [Header("JumpAttack — 거리 무관 / 최원거리 플레이어 타겟")]
-    [Tooltip("최원거리 플레이어를 찾는 탐색 반경(m). 보스룸을 덮을 만큼 넉넉히 — 이 밖이면 못 찾는다.")]
-    [Min(1f)] public float jumpSearchRadius = 30f;
+    // 🔴 이름이 `jumpSearchRadius` 였다(2026-09-21 개명). 점프 전용으로 읽혀서 다음 사람이
+    //    "돌진은 왜 점프 값을 보나"로 헤맸는데, 실제로는 **점프도 아닌 곳에서도 쓴다.**
+    //    `attackSearchRadius` 도 후보였지만 두 번째 용도(인원 계산)가 공격 탐색이 아니라 버렸다.
+    // ⚠️ `FormerlySerializedAs` 를 지우지 말 것 — 지우면 저작된 45 가 조용히 기본값 30 으로 돌아간다.
+    [Header("플레이어 탐색 반경 (공용)")]
+    [Tooltip("플레이어를 훑는 반경(m). 보스룸을 덮을 만큼 넉넉히 — 이 밖이면 못 찾는다.\n" +
+             "🔴 **두 곳이 공용으로 쓴다**: ① 점프·돌진의 최원거리 타겟 선정(FindFarthestPlayer) " +
+             "② 차징 송전탑 개수를 정하는 인원 계산(CountAlivePlayers). " +
+             "이 값을 바꾸면 송전탑 개수 판정 반경도 같이 바뀐다.")]
+    [FormerlySerializedAs("jumpSearchRadius")]
+    [Min(1f)] public float playerScanRadius = 30f;
 
+    [Header("JumpAttack — 거리 무관 / 최원거리 플레이어 타겟")]
     [Tooltip("체공 시간(초) = 예고 장판이 점증하는 시간. 이 시간이 끝나면 착지점으로 이동한다.")]
     [Min(0.1f)] public float jumpHoverTime = 1.2f;
 
@@ -335,6 +390,13 @@ public class BossDataSO : MonsterDataSO
     [Tooltip("착지 데미지. 0 이면 공격 테이블 행의 damage(그것도 0 이면 attackDamage)를 쓴다.")]
     [Min(0)] public int jumpLandingDamage = 0;
 
+    [Tooltip("[G4] 이륙(올라가는) 구간에 재생할 애니메이터 **상태명**. 비우면 이륙 없음(기존 동작).")]
+    public string jumpTakeoffState = "Leap";
+
+    [Tooltip("[G4] 이륙 길이(초). 클립 전체를 이 시간에 맞추어 재생한다 — " +
+             "🔴 재생속도는 클립 길이에서 역산한다(상수로 박지 않는다). 0 이면 이륙 없음.")]
+    [Min(0f)] public float jumpTakeoffDuration = 0.633f;
+
     [Tooltip("체공 포즈 애니메이터 상태명. 비우면 도약 클립을 유지한다.")]
     public string jumpHoverState = "";
 
@@ -344,15 +406,19 @@ public class BossDataSO : MonsterDataSO
     // 🔴 **지금은 아무도 읽지 않는다**(2026-09-09). 착지 예고 2개가 AoeTelegraph 프리팹 →
     //    EffectCatalog 루프 이펙트(Drop_Charge_Boundary / Drop_Charge_Indicator)로 전부 넘어갔다.
     //    이 레포에는 조용히 무시되는 설정값이 이미 쌓여 있어(정본 §6) 지우기 전까지 명시해 둔다.
+    // ⚠️ 2026-09-21 SO 전수조사 — **유령 필드 3종**이라 주석 처리했다.
+    //    이 자리에 있던 기존 주석이 "예고 이펙트가 확정되면 지운다(SO 값을 잃으므로 팀장 확인)" 였고,
+    //    팀장 확인을 받았다(2026-09-21). 마지막 저작값 — OuterAlpha 0.4 / FillAlpha 0.85 / Prefab 비어 있음.
+    //    예고를 바꾸려면 EffectCatalog.asset 과 FX_Drop_Charge_* 프리팹을 볼 것.
     [Tooltip("⚠️ **미사용** — 착지 예고는 EffectCatalog 의 Drop_Charge_Boundary(경계) + " +
-             "Drop_Charge_Indicator(차오르는 원) 이펙트가 그린다. 여기에 프리팹을 넣어도 아무 일도 안 난다.\n" +
-             "예고를 바꾸려면 EffectCatalog.asset 과 FX_Drop_Charge_* 프리팹을 볼 것.")]
+    "Drop_Charge_Indicator(차오르는 원) 이펙트가 그린다. 여기에 프리팹을 넣어도 아무 일도 안 난다.\n" +
+    "예고를 바꾸려면 EffectCatalog.asset 과 FX_Drop_Charge_* 프리팹을 볼 것.")]
     public GameObject jumpTelegraphPrefab;
 
     [Tooltip("착지점을 대상에게서 **이만큼 떨어뜨린다**(m). 0 이면 플레이어 위에 정확히 내려앉는다.\n" +
-             "🔴 0 으로 두면 안 된다 — 보스 캡슐을 플레이어 캡슐 안에 꽂으면 물리 디페네트레이션이 " +
-             "수평으로 못 밀어내고 **위로** 밀어내서 플레이어가 떠오른다(2026-08-13 관찰).\n" +
-             "착지 AoE 반경(jumpAoeRadius)이 이 값보다 크면 데미지는 그대로 들어간다.")]
+    "🔴 0 으로 두면 안 된다 — 보스 캡슐을 플레이어 캡슐 안에 꽂으면 물리 디페네트레이션이 " +
+    "수평으로 못 밀어내고 **위로** 밀어내서 플레이어가 떠오른다(2026-08-13 관찰).\n" +
+    "착지 AoE 반경(jumpAoeRadius)이 이 값보다 크면 데미지는 그대로 들어간다.")]
     [Min(0f)] public float jumpLandSeparation = 1.2f;
 
     // 🔴 확정 스펙(2026-08-13): **돌진과 점프어택은 플레이어를 넉백시킨다.**
@@ -360,26 +426,29 @@ public class BossDataSO : MonsterDataSO
     //    지속·경직을 노출해 두면 조절해도 아무 일이 없는 "고장난 노브"가 된다
     //    (`AttackInfo.knockbackDuration` 등은 이 경로에서 **읽히지 않는다** — 2026-08-13 실측).
     [Tooltip("착지 AoE 넉백 속도(m/s). 0 이면 밀지 않는다. 방향은 **보스 → 대상** 바깥쪽이다.\n" +
-             "⚠️ 슈퍼아머 대상은 밀리지 않는다(Unit.Knockback 이 차단한다).")]
+    "⚠️ 슈퍼아머 대상은 밀리지 않는다(Unit.Knockback 이 차단한다).")]
     [Min(0f)] public float jumpKnockbackStrength = 9f;
-
-    // 🔴 알파 2개도 **지금은 아무도 읽지 않는다**(2026-09-09). 진하기가 파티클 프리팹 저작값이 됐다 —
-    //    SO 에서 조절할 방법이 없다. 예고 이펙트가 확정되면 위 프리팹 필드와 함께 지운다
-    //    (SO 에 저장된 값을 잃으므로 지울 때 팀장 확인).
-    [Tooltip("⚠️ **미사용** — 큰 원(경계)은 FX_Drop_Charge_Boundary 프리팹의 파티클 저작값이 진하기를 정한다. " +
-             "여기를 아무리 조절해도 화면은 바뀌지 않는다.")]
-    [Range(0f, 1f)] public float jumpTelegraphOuterAlpha = 0.4f;
-    [Tooltip("⚠️ **미사용** — 차오르는 작은 원은 FX_Drop_Charge_Indicator 프리팹의 파티클 저작값이 " +
-             "진하기를 정한다. 여기를 아무리 조절해도 화면은 바뀌지 않는다.")]
-    [Range(0f, 1f)] public float jumpTelegraphFillAlpha = 0.85f;
+    //
+    // // 🔴 알파 2개도 **지금은 아무도 읽지 않는다**(2026-09-09). 진하기가 파티클 프리팹 저작값이 됐다 —
+    // //    SO 에서 조절할 방법이 없다. 예고 이펙트가 확정되면 위 프리팹 필드와 함께 지운다
+    // //    (SO 에 저장된 값을 잃으므로 지울 때 팀장 확인).
+    // [Tooltip("⚠️ **미사용** — 큰 원(경계)은 FX_Drop_Charge_Boundary 프리팹의 파티클 저작값이 진하기를 정한다. " +
+    // "여기를 아무리 조절해도 화면은 바뀌지 않는다.")]
+    // [Range(0f, 1f)] public float jumpTelegraphOuterAlpha = 0.4f;
+    // [Tooltip("⚠️ **미사용** — 차오르는 작은 원은 FX_Drop_Charge_Indicator 프리팹의 파티클 저작값이 " +
+    // "진하기를 정한다. 여기를 아무리 조절해도 화면은 바뀌지 않는다.")]
+    // [Range(0f, 1f)] public float jumpTelegraphFillAlpha = 0.85f;
 
     [Header("송전기(차징) — 페이즈 진입 시퀀스")]
     [Tooltip("제한시간(초). 이 시간 안에 송전탑을 전부 부수지 못하면 레이지로 넘어간다.")]
     [Min(1f)] public float chargeTimeLimit = 20f;
 
-    [Tooltip("차징 중 초당 획득 실드량. ⚠️ 실드 개념은 PlayerSkill 머지에서 Unit 에서 제거됐다 — " +
-             "되살릴 방법이 정해질 때까지 소비되지 않는다(값만 보존).")]
-    [Min(0f)] public float chargeShieldGainPerSec = 0f;
+    // ⚠️ 2026-09-21 SO 전수조사 — **유령 필드**(선언 파일 밖 참조 0)라 주석 처리했다.
+    //    주석 처리하면 Unity 가 다음 직렬화에서 에셋의 값도 버리므로, 마지막 저작값을 여기 남긴다.
+    //    마지막 저작값 0 — 실드 개념 자체가 Unit 에서 제거된 상태라 되살리려면 그쪽이 먼저다.
+    // [Tooltip("차징 중 초당 획득 실드량. ⚠️ 실드 개념은 PlayerSkill 머지에서 Unit 에서 제거됐다 — " +
+    // "되살릴 방법이 정해질 때까지 소비되지 않는다(값만 보존).")]
+    // [Min(0f)] public float chargeShieldGainPerSec = 0f;
 
     [Tooltip("차징 중 보스 발밑에 깔리는 전기 장판 프리팹(AreaZone + NetworkObject). " +
              "⚠️ 정본의 zonePushForce(밀치기)는 플레이어 변위 경로가 없어 아직 적용되지 않는다 — 데미지만 나간다.")]
@@ -454,15 +523,21 @@ public class BossDataSO : MonsterDataSO
     [Tooltip("[S8] 폭탄 프리팹(서버 스폰).")]
     public GameObject bombPrefab;
 
-    [Tooltip("[S8] 투척 초기 힘.")]
-    [Min(0f)] public float throwImpulse = 8f;
+    // ⚠️ 2026-09-21 SO 전수조사 — **유령 필드**(선언 파일 밖 참조 0)라 주석 처리했다.
+    //    주석 처리하면 Unity 가 다음 직렬화에서 에셋의 값도 버리므로, 마지막 저작값을 여기 남긴다.
+    //    마지막 저작값 8 — 실제 투척 힘은 BossBomb 프리팹의 자체 [SerializeField] 가 정한다.
+    // [Tooltip("[S8] 투척 초기 힘.")]
+    // [Min(0f)] public float throwImpulse = 8f;
 
     [Tooltip("[S8] 다발 투척 시 좌우 분산 각(도).")]
     [Min(0f)] public float spreadAngle = 15f;
 
-    [Tooltip("[S8] 투척 상향각(도). 폭탄은 **대각선으로 던져 포물선**을 그린 뒤 바닥에서 수평 당구로 바뀐다. " +
-             "🔴 소켓 회전에 의존하지 않는 이유: 아트 임포트 회전 때문에 고정 방향이 뒤집혀 있던 전례가 있다.")]
-    [Range(0f, 80f)] public float bombThrowPitch = 35f;
+    // [Tooltip("[S8] 투척 상향각(도). 폭탄은 **대각선으로 던져 포물선**을 그린 뒤 바닥에서 수평 당구로 바뀐다. " +
+    // "🔴 소켓 회전에 의존하지 않는 이유: 아트 임포트 회전 때문에 고정 방향이 뒤집혀 있던 전례가 있다.")]
+    // ⚠️ 2026-09-21 SO 전수조사 — **유령 필드**(선언 파일 밖 참조 0)라 주석 처리했다.
+    //    주석 처리하면 Unity 가 다음 직렬화에서 에셋의 값도 버리므로, 마지막 저작값을 여기 남긴다.
+    //    마지막 저작값 35 — 🔴 폭탄 튜닝은 **BossBomb 프리팹 컴포넌트**로 이사했다(거기 SerializeField 12개).
+    // [Range(0f, 80f)] public float bombThrowPitch = 35f;
 
     // ─── 공격 간격 ────────────────────────────────────────────────────────
     //
@@ -482,16 +557,22 @@ public class BossDataSO : MonsterDataSO
     //    **벽에 걸쳐서도 안 된다.** 그래서 임펄스를 랜덤으로 주는 대신 **착지 지점을 먼저 뽑고
     //    속도를 역산**한다. room 의 정의는 **NavMesh(보행 가능 영역)** 다 — 돌진이 벽을 판정하는
     //    기준과 같다. 아래 값이 그 추첨 범위다.
-    [Header("[S8] 폭탄 착지 — 무조건 room 안")]
-    [Tooltip("보스로부터 최소 이 거리 밖에 떨어진다(m). 발밑에 쌓이는 것을 막는다.")]
-    [Min(0f)] public float bombLandingMinDistance = 3f;
+    // ⚠️ 2026-09-21 SO 전수조사 — **유령 필드**(선언 파일 밖 참조 0)라 주석 처리했다.
+    //    주석 처리하면 Unity 가 다음 직렬화에서 에셋의 값도 버리므로, 마지막 저작값을 여기 남긴다.
+    //    마지막 저작값 min 3 / max 9 — 🔴 실제 착지 판정은 **BossBomb 프리팹**이 한다.
+    // [Header("[S8] 폭탄 착지 — 무조건 room 안")]
+    // [Tooltip("보스로부터 최소 이 거리 밖에 떨어진다(m). 발밑에 쌓이는 것을 막는다.")]
+    // [Min(0f)] public float bombLandingMinDistance = 3f;
+    //
+    // [Tooltip("보스로부터 최대 이 거리 안에 떨어진다(m).")]
+    // [Min(1f)] public float bombLandingMaxDistance = 9f;
 
-    [Tooltip("보스로부터 최대 이 거리 안에 떨어진다(m).")]
-    [Min(1f)] public float bombLandingMaxDistance = 9f;
-
-    [Tooltip("보행 영역 **가장자리에서 이만큼 안쪽**에만 떨어뜨린다(m). 이 값이 '벽에 걸치지 않는다'를 " +
-             "만든다. 폭탄 반경 + 여유로 잡을 것.")]
-    [Min(0f)] public float bombWallMargin = 1.2f;
+    // ⚠️ 2026-09-21 SO 전수조사 — **유령 필드**(선언 파일 밖 참조 0)라 주석 처리했다.
+    //    주석 처리하면 Unity 가 다음 직렬화에서 에셋의 값도 버리므로, 마지막 저작값을 여기 남긴다.
+    //    마지막 저작값 1.2 — 🔴 실제 값은 **BossBomb 프리팹**.
+    // [Tooltip("보행 영역 **가장자리에서 이만큼 안쪽**에만 떨어뜨린다(m). 이 값이 '벽에 걸치지 않는다'를 " +
+    // "만든다. 폭탄 반경 + 여유로 잡을 것.")]
+    // [Min(0f)] public float bombWallMargin = 1.2f;
 
     // ─── 차징(송전기) 중 근접 차단 오라 ───────────────────────────────────
     //
@@ -517,16 +598,12 @@ public class BossDataSO : MonsterDataSO
              "점프 예고와 같은 프리팹(JumpTelegraph)을 그대로 써도 된다.")]
     public GameObject chargeAuraTelegraphPrefab;
 
-    [Tooltip("차징 위치로 이동할 때 이 거리 안에 들어오면 도착으로 본다(m).")]
-    [Min(0.1f)] public float chargeMoveArriveDistance = 0.6f;
-
-    [Tooltip("차징 위치로 이동할 때 이동속도 배수(moveSpeed × 이 값). **빠르게 가야 한다**(확정 스펙).\n" +
-             "⚠️ 배수만 올려서는 안 빨라진다 — 가속도도 함께 올린다(코드가 돌진과 같은 값을 쓴다).")]
-    [Min(1f)] public float chargeMoveSpeedMultiplier = 3f;
-
-    [Tooltip("차징 위치로 이동하는 데 허용하는 최대 시간(초). 넘으면 **그 지점으로 워프**한 뒤 차징한다 " +
-             "— 제자리에서 차징하면 오라 범위와 연출 기준이 어긋나기 때문이다(확정 스펙).")]
-    [Min(0.5f)] public float chargeMoveTimeout = 4f;
+    // ⚠️ 여기 있던 `chargeMoveArriveDistance` · `chargeMoveSpeedMultiplier` · `chargeMoveTimeout`
+    //    3종을 **2026-09-21 에 지웠다.** 차징이 걸어가지 않고 **점프로** 진입하게 되면서
+    //    (팀장 확정 — `TwentyThreeBoss.BeginCharge` 주석) 읽는 코드가 사라졌다.
+    //    🔴 읽히지 않는 노브를 남기면 다음 사람이 그걸 조절하고 아무 일도 안 생긴다 —
+    //       2026-09-21 유령 필드 54개를 걷어낸 것과 같은 이유다. 되살릴 일이 있으면 git 이력에 있다.
+    //    진입 길이는 이제 `jumpTakeoffDuration` + `jumpHoverTime` + `jumpLandingDuration` 이 정한다.
 
     // ─── 폭발 장판(FireFloor) ─────────────────────────────────────────────
     //
@@ -538,18 +615,22 @@ public class BossDataSO : MonsterDataSO
     // ⚠️ 주입은 **스폰 전에만** 유효하다 — `AreaZone.OnNetworkSpawn` 이 수명 타이머를 시작하기
     //    때문이다. 그래서 `SpawnOrGrow` 의 Instantiate↔Spawn 사이에서 적용한다(`ApplyTuning`).
     //    이미 스폰된 장판에 값을 밀면 타이머가 프리팹 값으로 이미 흐른 뒤라 의미가 깨진다.
-    [Header("폭발 장판(FireFloor) — 0 이면 프리팹 값")]
-    [Tooltip("장판 스폰 반경(m). 0 = 프리팹 값.")]
-    [Min(0f)] public float fireZoneRadius;
-
-    [Tooltip("장판 성장 상한 반경(m). 0 = 프리팹 값.")]
-    [Min(0f)] public float fireZoneMaxRadius;
-
-    [Tooltip("장판 수명(초). 0 = 프리팹 값. 확정값은 10초다.")]
-    [Min(0f)] public float fireZoneLifetime;
-
-    [Tooltip("겹쳐 성장할 때 수명을 다시 채우나. UsePrefab = 프리팹 값을 건드리지 않는다.")]
-    public AreaZoneToggleOverride fireZoneRefreshLifetimeOnGrow = AreaZoneToggleOverride.UsePrefab;
+    // ⚠️ 2026-09-21 SO 전수조사 — **유령 필드**(선언 파일 밖 참조 0)라 주석 처리했다.
+    //    주석 처리하면 Unity 가 다음 직렬화에서 에셋의 값도 버리므로, 마지막 저작값을 여기 남긴다.
+    //    저작값이 전부 0 / UsePrefab 이었다 — 애초에 **'0 이면 프리팹 값' 오버라이드**로 설계됐는데
+    //    그 오버라이드를 읽는 코드가 없어서 **항상 프리팹 값**이 쓰였다. 장판 튜닝은 FireFloor 프리팹에서.
+    // [Header("폭발 장판(FireFloor) — 0 이면 프리팹 값")]
+    // [Tooltip("장판 스폰 반경(m). 0 = 프리팹 값.")]
+    // [Min(0f)] public float fireZoneRadius;
+    //
+    // [Tooltip("장판 성장 상한 반경(m). 0 = 프리팹 값.")]
+    // [Min(0f)] public float fireZoneMaxRadius;
+    //
+    // [Tooltip("장판 수명(초). 0 = 프리팹 값. 확정값은 10초다.")]
+    // [Min(0f)] public float fireZoneLifetime;
+    //
+    // [Tooltip("겹쳐 성장할 때 수명을 다시 채우나. UsePrefab = 프리팹 값을 건드리지 않는다.")]
+    // public AreaZoneToggleOverride fireZoneRefreshLifetimeOnGrow = AreaZoneToggleOverride.UsePrefab;
 }
 
 /// <summary>

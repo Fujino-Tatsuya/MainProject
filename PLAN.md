@@ -199,6 +199,276 @@ A-1 계획에는 "5초 자연 만료 시 `SetShield(0)` 도 쉴드 감소라 파
 
 ---
 
+# ▶▶▶ Dev 부팅 자동화 — 툴바 "Dev Boot" (2026-09-22 · 은희 승인 · **검증 완료**)
+
+> 작업 세션: **은희(Claude)**, 브랜치 `tool/DevBootAutomation` (base `development` `31170603`).
+> 설계 합의는 grill 로 진행했고, 아래는 그 결과다.
+>
+> **2026-09-22 구현 완료(Codex 위임).** 커밋 `17d92726` · `d2e3bdbb` · `7d17fbfc`.
+> **은희 수동 Play 검증 8항목 전부 완료** — 아래 7절. 알려진 한계 1건은 고치지 않기로 결정했다.
+
+## 1. 문제 (사용자 제기 2건 + 조사에서 나온 3건)
+
+| # | 증상 | 실측 근거 |
+|---|---|---|
+| 1 | 부팅할 씬을 바꾸려면 `Dev_Boot.unity` 에 배치된 `DevSceneBooter` 의 `scene` 필드를 고쳐야 한다 | 값이 **씬 에셋 안**에 산다 → 바꿀 때마다 git 추적 씬이 dirty, 3인 공유 충돌원 |
+| 2 | 원하는 씬이 빌드 씬 목록에 없으면 **로그 하나 찍고 멈춘다** | `DevSceneBooter.BootRoutine` 의 `IsEnabledBuildScene` 게이트 |
+| 3 | 🔴 `DevBuildSceneList.DevScenes` 5개 중 **3개 경로가 썩음** | `PlayerScene` · `PlayerBossTest` · `PlayerDashTest` 는 `Assets/0.Scenes/Debug/` 로 이동됨. 메뉴 실행 시 "씬 에셋을 찾지 못했다" 경고 |
+| 4 | 🔴 `RemoveDevBootScene` 가드가 **한 번도 안 걸린다** | 코드는 `Assets/0.Scenes/Dev/` 폴더를 보는데 실물은 `Assets/0.Scenes/Dev_Boot.unity` |
+| 5 | 🔴 그 결과 **Dev_Boot 이 빌드 목록에 enabled=1 (index 7) 로 등록돼 있다** | `ProjectSettings/EditorBuildSettings.asset` 직독. `DevSceneBooter` 주석의 "빌드 목록에 넣지 않는다" 와 모순 |
+
+**고칠 위치가 런타임이 아니다.** 2번 에러는 Play 가 이미 시작된 뒤 `BootRoutine` 안에서 난다.
+그 시점에 빌드 목록을 고쳐도 늦다 — 자동 등록은 **Play 진입 전 에디터 훅**에서 해야 한다.
+
+## 2. 확정 결정 (2026-09-22 grill, 은희)
+
+| # | 결정 | 근거 / 버린 안 |
+|---|---|---|
+| 1 | **내장 Play 버튼은 건드리지 않는다.** 툴바에 별도 `Dev Boot ▾` 드롭다운을 붙인다 | 진짜 Play 를 하이재킹하면 팀원이 정식 흐름(BootStrap→Title)을 테스트할 때 막힌다. `OverridableToolbar` enum 에도 `ToolSettings`·`ViewOptions`(Scene 뷰) 뿐이라 Play 버튼 교체는 정식 경로가 없다 — 리플렉션 해킹은 버린다 |
+| 2 | 타겟 씬을 **Play 진입 전에** 빌드 목록에 자동 추가하고, **Play 종료 시 원복**한다 | `ProjectSettings/EditorBuildSettings.asset` 은 git 추적 · 3인 공유. 순변화 0 을 유지해야 머지 충돌과 제출 빌드 오염이 안 생긴다 |
+| 3 | 드롭다운 = **최근 사용 상위 5개 + "전체" 서브메뉴** | 하드코딩 배열(문제 #3)을 버리고 `AssetDatabase` 실시간 스캔으로 간다 → 경로가 다시 썩지 않는다 |
+| 4 | `DevSceneBooter.scene` 필드를 **제거**한다. 타겟의 유일한 원본은 `EditorPrefs` | 원본이 씬 에셋 안에 있는 한 문제 #1 이 남는다. EditorPrefs 는 개인·git 미추적 |
+| 5 | `DevBuildSceneList` 의 `DevScenes` 배열과 활성/비활성 메뉴는 **삭제**한다 | 자동 등록이 생기면 존재 이유가 없고, 두 등록 경로가 공존하면 헷갈림. `현재 목록 출력` 과 Dev_Boot 제거는 경로 버그를 고쳐 남긴다 |
+| 6 | **Dev_Boot 을 빌드 목록에서 뺀다** | `EditorSceneManager.playModeStartScene` 은 SceneAsset 참조라 빌드 등록이 **필요 없다**. 빼면 제출 빌드 오염 경로 하나가 닫힌다 |
+
+## 3. 확인한 API (6000.3.16f1 설치본 직독 — 전부 정식 public)
+
+| 쓸 것 | 확인 방법 |
+|---|---|
+| `UnityEditor.Toolbars.MainToolbarElementAttribute` (`path`, `defaultDockPosition`, `defaultDockIndex`, `menuPriority`) | `UnityEditor.dll` / `UnityEditor.CoreModule.xml` |
+| `MainToolbarDropdown(MainToolbarContent, Action<Rect>)`, `MainToolbarContent(string, Texture2D, string)`, `MainToolbar.Refresh(path)` | 동일 |
+| `MainToolbarDockPosition` = `Left` / `Middle` / `Right` | 동일. Play 버튼이 `Middle` 이라 그 옆에 붙인다 |
+| `EditorSceneManager.playModeStartScene` | `UnityEditor.CoreModule.xml` |
+| `BuildProfile.GetActiveBuildProfile()` / `.overrideGlobalScenes` / `.scenes` / `.GetScenesForBuild()` | `UnityEditor.xml` |
+
+**레퍼런스 구현**: `Library/PackageCache/com.unity.services.core@.../Editor/Core/Environments/UI/Toolbar/EnvironmentToolbar.cs`
+— Unity 자신이 6000.3 에서 이 attribute 를 쓰는 실물 코드. 시그니처는 여기에 맞춘다.
+
+**현재 빌드 프로필 상태**: `Windows.asset` · `ForProfile.asset` 둘 다 `m_OverrideGlobalSceneList: 0` / `m_Scenes: []`
+→ 실효 목록은 `EditorBuildSettings.scenes`. 단 누군가 오버라이드를 켜면 글로벌만 건드리는 코드는
+조용히 무력화되므로, **양쪽을 모두 처리**한다.
+
+## 4. 구성
+
+| 파일 | 상태 | 역할 |
+|---|---|---|
+| `Assets/1.Scripts/Dev/DevBootTarget.cs` | 신규(런타임) | EditorPrefs 키의 **유일한 원본** + 읽기/쓰기 헬퍼. 키에 `Application.dataPath` 해시를 섞어 워크트리끼리 안 섞이게 한다. 전체가 `#if UNITY_EDITOR` |
+| `Assets/1.Scripts/Dev/Editor/DevBootLauncher.cs` | 신규 | 핵심. 목록 소스 판정 → 스냅샷 → 타겟 추가 → `playModeStartScene` 지정 → `EnterPlaymode()` → `EnteredEditMode` 에서 원복 |
+| `Assets/1.Scripts/Dev/Editor/DevBootSceneCatalog.cs` | 신규 | 부팅 가능 씬 스캔(`Assets/0.Scenes` 재귀, `Art/`·`Lagacy/`·`Dev_Boot` 제외) + 최근 목록(EditorPrefs) |
+| `Assets/1.Scripts/Dev/Editor/DevBootToolbar.cs` | 신규 | `[MainToolbarElement]` 드롭다운 UI 만 |
+| `Assets/1.Scripts/Dev/Editor/DevBootLauncherTests.cs` | 신규 | EditMode. 목록 보정 순수 함수 검증 |
+| `Assets/1.Scripts/Dev/DevSceneBooter.cs` | 수정 | `scene` 필드 제거 → `DevBootTarget` 에서 읽음. 나머지 필드·부팅 시퀀스는 그대로 |
+| `Assets/1.Scripts/Dev/Editor/DevBuildSceneList.cs` | 수정 | `DevScenes` 배열 + 활성/비활성 메뉴 삭제. Dev_Boot 제거 가드 경로 수정. `현재 목록 출력` 유지 + `빌드 목록 강제 정리` 추가 |
+| `ProjectSettings/EditorBuildSettings.asset` | 수정 | Dev_Boot 등록 제거 |
+
+**asmdef 없음** — `Assets/1.Scripts/Dev/` 에는 asmdef 가 없으므로 전부 `Assembly-CSharp` /
+`Assembly-CSharp-Editor` 에 들어간다. EditMode 테스트도 `Monster/Editor/*Tests.cs` 와 같은 방식
+(Editor 폴더에 그냥 두면 테스트 러너가 잡는다)을 따른다.
+
+## 5. 동작 순서
+
+**부팅**
+1. Play 중이면 거부(드롭다운 비활성).
+2. `EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()` — 저장 안 하면 중단.
+3. 실효 목록 소스 판정: 활성 프로필이 `null` 이거나 `overrideGlobalScenes == false` → `EditorBuildSettings.scenes`, 아니면 `profile.scenes`.
+4. **원본 목록 + 소스 종류**를 `SessionState` 에 JSON 스냅샷.
+5. 타겟 씬이 없으면 추가, 있는데 `enabled=0` 이면 활성화. 이미 활성이면 아무것도 안 쓴다(불필요한 diff 방지).
+6. `EditorPrefs` 에 타겟 기록 + 최근 목록 갱신.
+7. `playModeStartScene = Dev_Boot SceneAsset` (GUID `180a2dd6e0939fed247ab6908eb0ec7d` 우선, 경로 폴백).
+8. `AssetDatabase.SaveAssets()` → `EditorApplication.EnterPlaymode()`.
+
+**원복** — `[InitializeOnLoad]` + `playModeStateChanged` 의 `EnteredEditMode`
+(도메인 리로드 뒤라 `ExitingPlayMode` 보다 안전)에서 스냅샷 복원 + `playModeStartScene = null`.
+
+## 6. 리스크
+
+| 리스크 | 대응 |
+|---|---|
+| 🔴 에디터 크래시 시 `SessionState` 가 날아가 목록이 더러운 채로 남는다 | `Dev/Dev Boot/빌드 목록 강제 정리` 메뉴를 같이 넣는다. 커밋 전 `git diff ProjectSettings/EditorBuildSettings.asset` 확인을 CONTEXT 에 명시 |
+| 툴바 요소가 기본 숨김일 수 있다(6.3 툴바는 요소별 표시 메뉴가 있다) | 구현 후 **실물 확인 필요**. 안 보이면 툴바 우클릭 메뉴에서 켜는 절차를 CONTEXT 에 적는다 |
+| `scene` 필드 제거로 `Dev_Boot.unity` 에 고아 직렬화 값이 남는다 | 무해. Unity 가 다음 저장에 알아서 버린다. 씬을 손으로 편집하지 않는다 |
+| 팀원이 `Dev/빌드 씬 목록/테스트 씬 활성화` 메뉴를 쓰고 있었다면 사라진다 | CONTEXT.md 인수인계에 명시 |
+| NGO 가 빌드 목록 기준으로 씬을 검증한다 | 목록 확정을 Play 진입 **전**에 끝내고 `SaveAssets()` 로 굳힌다 |
+
+## 7. 검증 (2026-09-22 · **전 항목 완료**)
+
+| # | 항목 | 결과 |
+|---|---|---|
+| 1 | EditMode — 목록 보정 순수 함수 | **4/4 통과.** 단 4번은 `SelectBuildSceneSource` 열거 선택만 본다 — **프로필 오버라이드 ON 일 때 `WriteScenes`/`RestoreScenes` 가 실제로 프로필 쪽에 쓰는지는 미검증**(현재 두 프로필 다 오버라이드 off 라 안 타는 경로) |
+| 2 | `dotnet msbuild` 컴파일 | ✅ **성공**(기존 경고만) |
+| 3 | 툴바 요소가 Play 버튼 옆에 보이는가 | ✅ **보임** |
+| 4 | (툴바 경로) 빌드 목록에 **없던 씬**이 자동 추가되고 부팅되는가 | ✅ **됨.** `Launch()` 가 `EnterPlaymode()` **호출 전에** 목록을 쓰고 `SaveAssets` 까지 끝낸다 — 즉 이 항목이 증명한 것은 "**Play 진입 전** 쓰기는 먹힌다" 이지 `ExitingEditMode` 콜백 타이밍이 아니다(7번 참조) |
+| 5 | Play 종료 후 `git diff ProjectSettings/EditorBuildSettings.asset` | ✅ **비어 있음** — 결정 2 합격선 |
+| 6 | 활성 MPPM 시나리오와의 관계 | ✅ **시작 방법에 따라 갈린다.** 툴바 Launch → `Dev_Boot` 승(`playModeStartScene` 을 설정하므로). `Dev_Boot` 열어두고 내장 Play → **시나리오 InitialScene 승**(직접 경로는 그 값을 안 건드리므로). 표·근거는 [CONTEXT.md](CONTEXT.md) 작업 세션. **이 갈림은 의도된 것이고 가드는 넣지 않는다**(은희 결정) |
+| 7 | `Dev_Boot.unity` 를 직접 열고 그냥 Play | ✅ **마지막 타겟으로 부팅된다**(활성 시나리오 없을 때). ⚠️ 단 **마지막 타겟이 빌드 목록에 없으면 거부된다** — 아래 「직접 Play 경로의 한계」. **은희 판단: 큰 상관 없음, 고치지 않는다** |
+| 8 | 드롭다운 최근 목록이 5개로 유지되는가 | ✅ **유지됨** |
+
+### 직접 Play 경로의 한계 — 목록에 없는 씬은 거부된다 (2026-09-22 실측)
+
+`Dev_Boot` 을 열어두고 **내장 Play** 를 누르면, 마지막 타겟이 **이미 빌드 목록에 있을 때만** 부팅된다.
+목록에 없으면 `DevSceneBooter` 의 기존 게이트에 걸려 거부된다.
+
+왜 — 두 경로가 빌드 목록을 **쓰는 시점**이 다르다.
+
+| 경로 | 목록을 쓰는 시점 | 결과 |
+|---|---|---|
+| 툴바 `Launch()` | `EnterPlaymode()` **호출 전** | 먹는다 |
+| 직접 Play (`PrepareDirectDevBootIfNeeded`) | `ExitingEditMode` **콜백 안** | 그 Play 세션에는 **안 먹는 것으로 관측됨** |
+
+⚠️ 원인을 `ExitingEditMode` 가 너무 늦다는 것으로 **단정하지는 않았다.** 콜백 안의
+`AssetDatabase.SaveAssets()` 가 지연되는 것일 수도 있다. 구분하려면 별도 실험이 필요하고,
+아래 이유로 하지 않았다.
+
+**은희 판단(2026-09-22): 고치지 않는다.** 역할 분담이 자연스럽게 선다 —
+*목록에 없는 새 씬은 툴바로 부팅하고, 직접 Play 는 이미 등록된 씬에만 쓴다.*
+목록은 Play 종료 시 원복되므로(결정 2) 툴바로 한 번 부팅해도 그 씬이 목록에 남지는 않는다.
+즉 이 한계는 설계상 계속 존재한다.
+
+### 리뷰 지적 1건 — 검토 후 **현행 유지**로 결정 (2026-09-22)
+
+**지적**: `DevBootLauncher.RestorePendingChanges()` 는 스냅샷이 없어도 early-return **전에**
+`playModeStartScene` 을 null 로 만든다. 즉 Dev Boot 를 한 번도 안 쓴 사람이 Build Settings 에서
+직접 설정한 값까지 Play 종료마다 지워진다 — 범위가 과하게 넓다.
+
+**결정: 고치지 않는다.** 좁히면 두 가지를 잃는다.
+
+1. **크래시 복구가 사라진다.** `playModeStartScene` 은 프로젝트에 남는 값인데 스냅샷은
+   `SessionState` 라 에디터가 죽으면 날아간다. 그 조합에서 "우리가 설정한 것만 지운다" 로 좁히면
+   지울 근거를 잃어 `Dev_Boot` 이 시작 씬으로 **영구히** 박힌 채 남는다. 지금의 무조건 null 이
+   그 상태를 다음 Play 종료에 자동으로 푼다.
+2. **두 경로의 갈림이 깨진다.** 「7. 검증」 6번의 *툴바 = Dev Boot 승 / 직접 Play = MPPM 시나리오 승*
+   은 **툴바 부팅 뒤 값이 확실히 지워진다**는 전제 위에 선다. 값이 남으면 그다음 직접 Play 도
+   Dev Boot 승이 되어 MPPM 경로가 막힌다.
+
+지적된 피해(남이 손으로 설정한 `playModeStartScene` 이 지워짐)는 이 프로젝트에서 성립하지 않는다 —
+그 값은 이제 Dev Boot 가 전담한다. 직접 설정할 일이 생기면 그때 다시 본다.
+
+## 8. 범위 밖
+
+- 내장 Play 버튼 자체 교체(리플렉션) — 결정 1 에서 버림.
+- `BuildWindowsPlayer.Build()` 의 제출 빌드 씬 정리 — 별건. 이번엔 Dev_Boot 등록 제거까지만.
+- MPPM 다중 인스턴스 자동 부팅 — 이번 범위 아님.
+- `DevSceneBooter` 의 부팅 시퀀스(호스트 기동·NGO 로드·스폰) 자체는 **손대지 않는다.**
+
+---
+
+# ▶▶▶ 구역 진입 기반 벽 투명화 1단계 (2026-09-21 승인 · **2026-09-22 검증 완료**)
+
+> 작업 세션: **은희(Claude)**, 브랜치 `feature/TransparentV2-keepgoing` (base `development` `10cbe8d0`).
+> 설계 합의는 grill 로 진행했고, 아래는 그 결과다.
+> **2026-09-21 은희 승인.** 코드 구현은 Agent-Bridge 로 Codex 에 위임
+> (handoff `a038ee5c…` 구현 / `ae01cae1…` EditMode 테스트, 레인 `MainProject-WorkTree`).
+>
+> **2026-09-22 사용자 Play 검증 완료.** 커밋 16개, push 안 함.
+> EditMode 24/24 통과. 구현 중 확정 결정에서 바뀐 것은 아래 「구현하며 뒤집힌 결정」 참조.
+
+## 구현하며 뒤집힌 결정
+
+| 원래 계획 | 실제 | 왜 |
+|---|---|---|
+| 결정 3 · 감지에 `Player` 컴포넌트 사용 | **레이어만** | `Player` 는 `BaseNetworkBehaviour` 라 검증에 NGO 호스트가 필요했다. "네트워크 없이" 전제와 충돌 |
+| 결정 4 · 로컬 전용 토글 | **제거** | "내 플레이어" 를 알려면 소유권이 필요해 NGO 를 끌고 들어온다. 기본값이 "모든 플레이어" 였으므로 토글째 뺐다 |
+| 결정 8 · 벽용 **Material Variant** | **런타임 키워드** | 그룹이 이미 인스턴스를 만든다. 거기서 `EnableKeyword` 하면 벽 프리팹 머티리얼 교체가 통째로 없어지고, 바닥에 오배정할 위험도 사라진다 |
+| 높이 그라데이션 방향 | **아래가 사라지고 위가 남음** | 스펙 `1층 0~0.5 / 2층 0.5~1` 을 "사라지는 정도" 로 읽었으나 **알파 값**이었다 |
+| — | **기존 알파 컷아웃 보존** | `Generic_Standard` 는 이미 `clip(A-T)` 를 하고 있었다. 곱셈이 아니라 `min(A-T, 디더여유)` 로 합친다 |
+
+## 0. 팀장 결정과의 관계 — 되돌리는 게 아니라 병행이다
+
+[PLAN.md 「A. 벽 가림 — 투명화(디더 클립)를 끄고 실루엣 윤곽선으로」](PLAN.md)(2026-09-14, 경석)에서
+투명화를 끄고 실루엣으로 갔고, **이미 실행되어 있다**:
+
+| 실측 | 값 |
+|---|---|
+| `4.MapScene` 의 `WallOcclusionDriver` | `m_Enabled: 0` — 이미 비활성 |
+| `PC_Renderer.asset` 의 `PlayerSilhouetteFeature` | `m_Enabled: 1` / `m_Active: 1` (로컬 초록·원격 파랑) |
+| 커밋 `c4dbd4b9` | `merge: … (투명화 OFF 유지 + 화면효과 RetroCRT 통일)` |
+
+🔴 **2026-09-21 결정(은희): 실루엣은 그대로 두고, 시야를 가리는 벽 투명화를 함께 간다.**
+둘은 목적이 다르다 — 실루엣은 *플레이어가 벽 뒤 어디 있는지*, 구역 투명화는 *방 안 구조가 보이는지*.
+기존 시스템은 **끄지도 지우지도 않는다.** 이미 꺼져 있으므로 씬에서 할 일도 없다.
+
+## 1. 목표
+
+**구역 안에 플레이어가 하나라도 있으면, 그 구역이 지정한 벽 그룹이 디더로 투명해진다.**
+
+- 네트워크 동기화 코드 **없음**. 각 클라이언트가 로컬에서 독립 판정한다.
+- 가림(시선 차단) 판정 **없음**. 그룹은 통째로 같이 투명해진다.
+- 1단계는 **독립적으로 완결**되며, 2단계는 이 위에 얹는다.
+
+## 2. 확정 결정
+
+| # | 결정 | 근거 |
+|---|---|---|
+| 1 | 구역 = **수동 오서링 트리거 볼륨** | 맵 생성 시스템에 결합시키면 그쪽이 바뀔 때 같이 깨진다 |
+| 2 | 구역이 대상 벽을 **명시적 Renderer 리스트**로 보유 | `Wall(7)` 레이어에 존 오브젝트가 **0개**(199개 중 193개가 layer 0) — 레이어 자동 수집은 불가능 |
+| 3 | 점유 판정 = **`Player(6)` 레이어**, 단 **루트 오브젝트 단위로 카운트** | `Paladin` 의 layer 6 콜라이더가 **7개**(루트 캡슐 + 공격 히트박스 6개). 콜라이더로 세면 공격할 때마다 카운트가 요동친다 |
+| 4 | 인스펙터 토글로 **모든 플레이어 ↔ 로컬 플레이어만** | 어느 쪽이 나은지는 붙여봐야 안다. 필터 한 줄 차이 |
+| 5 | 표현 = **디더 클립** (알파 블렌딩 아님) | Opaque 유지 → 정렬·ZWrite·SSAO/Fog/Silhouette 상호작용·Forward+ 함정을 전부 회피 |
+| 6 | 디더를 **원본 Shader Graph 에 심는다** (변종 머티리얼 폐기) | 기존 변종 14쌍은 원본 그래프의 **손으로 만든 근사치**라 톤이 튄다고 문서에 기록됨. 원본에 심으면 톤 차이 0 |
+| 7 | **Shader Graph 키워드**로 디더 대상을 가른다 | `Generic_01_A` 는 바닥·파이프·기계·문도 쓴다. 키워드 OFF 면 코드가 컴파일에서 빠져 **비용 0** |
+| 8 | 벽은 **Material Variant**(키워드 ON)를 쓴다 | Variant 는 부모를 상속 → 아트가 원본을 고치면 자동 반영. 기존 14쌍의 유지보수 문제가 원천적으로 없다 |
+| 9 | 페이드 값은 **그룹당 머티리얼 인스턴스 1개** (MPB 폐기) | MPB 는 **SRP Batcher 를 깬다**(`PC_RPAsset.asset:72` = 켜짐). 그룹은 통째로 같은 값이라 렌더러별 값이 필요 없다 |
+| 10 | 구역 중첩 = **OR**(참조 카운트) + 에디터 중복 경고 | 인접 구역이 칸막이 벽을 공유하는 건 흔하다 |
+| 11 | 페이드 인/아웃 시간·목표 불투명도 = **인스펙터 변수** | 이탈을 길게 두면 경계 깜빡임이 완화된다 |
+| 12 | 감지 = `Assembly-CSharp` / 표현 = `VeyTrace.Rendering.Occlusion` | 분리 경계를 **어셈블리 경계로 강제**한다 |
+| 13 | 기존 A 시스템 코드·셰이더·변종 14쌍 **전부 유지** | 되돌릴 여지. 이미 비활성이라 간섭 없음 |
+
+## 3. 구성
+
+**감지 — `WallTransparencyZone`** (`Assembly-CSharp`)
+- `BoxCollider(isTrigger)` + `Player(6)` 레이어 진입 감지
+- **루트 오브젝트 단위 `HashSet`** 으로 카운트 (콜라이더 7개 → 1명)
+- 다중 콜라이더 가드: [BossEnterTrigger.cs:41](Assets/1.Scripts/Map/BossEnterTrigger.cs:41) 처럼 `bounds.Contains()` 재확인 + 주기적 prune (사망·디스폰 대비)
+- 토글: 모든 플레이어 ↔ 로컬만 / 대상 그룹 참조
+
+**표현 — `WallTransparencyGroup`** (`VeyTrace.Rendering.Occlusion`)
+- `Renderer[]` 명시 리스트 + 참조 카운트(OR)
+- 시작 시 **머티리얼 인스턴스 1개** 생성해 그룹 전원이 공유, 그 인스턴스의 `_WallOcclusionOpacity` 를 보간
+- 인스턴스는 자동 해제가 안 되므로 `OnDestroy` 에서 `Destroy`
+
+**셰이더** — 🔴 SVN (`Assets/50.Art/`, gitignore 대상)
+- `Assets/50.Art/MapGen/MapObj/material/Generic_Standard.shadergraph` 에 Custom Function + 불리언 키워드 추가 → **사용자가 Unity 에서 직접**
+- hlsl 은 **신규 작성, git** 의 `Assets/3.Materials/Level1_Materials/Occlusion/` 에 배치
+  (기존 `WallOcclusionClip.hlsl` 은 **쓰지 않는다** — B브랜치의 화면공간 캡슐 방식이라 `_WallOccCapsuleA/B`·`_WallOccViewProjection`·`_WallOccScreenRect` 를 요구한다)
+- 노출 프로퍼티 이름 **`_WallOcclusionOpacity`**, 기본값 1
+- 성공 후 `Generic_Basic.shadergraph`(펜스 `PolygonConstruction_01_A`)에 동일 적용
+
+## 4. 순서
+
+| 단계 | 내용 | 주체 |
+|---|---|---|
+| 1 | hlsl 작성 + 그래프 수정 지시서 | Claude |
+| 2 | `Generic_Standard.shadergraph` 수정 + Material Variant 생성 | **사용자 (Unity)** |
+| 3 | `WallTransparencyGroup` / `WallTransparencyZone` 구현 | Claude |
+| 4 | 테스트씬 제작 | **사용자** |
+| 5 | Play 검증 → 튜닝값 확정 | **사용자** |
+| 6 | `Generic_Basic` 동일 적용 → 존 프리팹 1종 파일럿 오서링 | 사용자 |
+
+## 5. 리스크
+
+| 리스크 | 대응 |
+|---|---|
+| **디더가 정적 패턴** — A 드라이버가 없으니 디더 오프셋 전역값이 0 고정 | 지글거림은 없다. 격자 패턴 고정이 눈에 거슬리는지 Play 로 판단 |
+| **바닥 렌더러를 그룹 리스트에 잘못 넣으면 바닥이 사라진다** | 에디터 검증에서 경고 |
+| **SVN 셰이더 수정은 git PR 에 안 올라간다** | 팀에 SVN 업데이트 공지 필요 |
+| 컨베이어 벨트 머티리얼 2종은 대상 아님 | 그룹에 들어가면 조용히 안 사라짐 → 에디터 경고 |
+
+## 6. 검증
+
+1. 사용자가 **테스트씬** 제작 → `Player(6)` 레이어 캡슐로 구역 출입 확인
+2. **원본 벽 / 디더 벽 나란히** 놓고 톤 차이 확인 (Material Variant 라 0 이어야 정상)
+3. 구역 중첩(OR) 동작
+4. **MPPM 2인** 으로 토글 양쪽 — 🔴 **Play 는 사용자가 직접** (MCP 로 걸면 MPPM 이 깨진다)
+
+## 7. 범위 밖
+
+- 시선 차단 판정 / 층(Elevation) 개념 / 보스 연출 연동 — 2단계 이후
+- `origin/feature/transparent` 브랜치 머지 (merge-base `9e8a3069` 로 낡아 RetroCRT·Silhouette 이 되돌아간다)
+- 실루엣 시스템 수정 — **손대지 않는다**
+- `4.MapScene` 수정 — 드라이버가 이미 비활성이라 할 일 없음
+
+---
+
 # 이전 = **수호자의 의지(E) 보호막 VFX — 이펙트 정책 이식** (2026-09-17 · 코드·에셋 완료 · Play 검증 대기)
 
 > 작업 세션: **민경(Claude)**, 브랜치 `feature/VFX`.
