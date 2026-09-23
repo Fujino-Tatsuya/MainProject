@@ -25,6 +25,13 @@ Update this file when a term becomes important enough that future agents or team
 `Dev_Boot` 씬으로 Play 에 진입해 그 씬을 부팅하는 것* 이다. 내장 Play 버튼은 **교체하지 않는다**
 (6000.3 의 `OverridableToolbar` 는 Scene 뷰 툴바만 지원. `[MainToolbarElement]` 로 옆에 붙인다).
 
+
+**🔴 부팅 씬 위치 — `Assets/0.Scenes/Debug/Dev_Boot.unity`** (2026-09-22 이동, `0094e75d`).
+예전 위치는 `Assets/0.Scenes/Dev_Boot.unity` 였다. meta guid `180a2dd6e0939fed247ab6908eb0ec7d`
+는 그대로라 참조는 안 깨졌다. **코드는 경로가 아니라 이 GUID 로 씬을 찾는다**
+(`DevBootLauncher.DevBootScenePath`) — 경로 상수를 다시 박지 말 것. 박아두면 다음 이동 때
+직접 Play 판정·강제 정리 메뉴·드롭다운의 자기 제외가 조용히 안 걸린다(`7359e839` 에서 겪은 일).
+
 **🔴 MPPM 과의 관계 — 시작 방법에 따라 갈린다 (2026-09-22 실측 확정)**
 
 활성 MPPM 시나리오가 있을 때, **어느 쪽이 이기는지는 Play 를 어떻게 시작했느냐로 정해진다.**
@@ -1429,6 +1436,10 @@ NavMesh 를 읽는 소비자가 에이전트이므로, 고정 터렛 2종은 자
 
 **상태.** 코드·프리팹·검증 씬 완료, 컴파일 오류 0. **Play 검증 대기**(호스트 단독 + MPPM 2인).
 설계·확정 사양·알려진 한계는 [PLAN-training-dummy.md](PLAN-training-dummy.md) — 여기 중복 기술하지 않는다.
+
+> ⚠️ 2026-09-22 갱신: 아래 절차는 낡았다. `DevSceneBooter.scene` 필드는 제거됐고 씬도
+> `Assets/0.Scenes/Debug/Dev_Boot.unity` 로 옮겼다. 지금은 툴바 `Dev Boot ▾` 에서 고른다
+> (이 문서 최상단 「Dev 부팅 자동화」 작업 세션 참조). 씬 로드·스폰 흐름 설명은 그대로 유효하다.
 
 **검증 경로 = `Dev_Boot` 씬.** `DevSceneBooter.scene` 에 띄울 씬 이름을 적고 Play 하면
 호스트 기동 → **`NetworkSceneManager` 로 씬 로드**(씬에 배치된 NetworkObject 가 자동 스폰된다)
