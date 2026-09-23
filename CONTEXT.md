@@ -8,7 +8,95 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 현재 인수인계 (2026-09-21 #2 · 입장 연출·차징 점프·돌진 사거리 — **전부 Play 검증 대기**)
+## ▶▶ 현재 인수인계 (2026-09-21 #3 · 은희 · **이펙트 파사드는 지스타 이후로 연기** + 이벤트 이중 발화 수정)
+
+작업자: **은희(Claude)**. 전체 리빌드 에러 0. **Play 검증까지 완료 — 이 건은 닫혔다.**
+
+### ✅ development 머지 + origin 푸시 완료 (2026-09-21) — `10804346` → `1b85173b`
+
+fast-forward(충돌 0). 작업 브랜치는 `fix/unit-clientdamaged-double-fire` 였다.
+
+```
+1b85173b  chore(addressables): link.xml 제거
+52025c1d  docs: 이펙트 파사드는 지스타 이후로 연기 + 민경에게 넘길 제약 기록
+320e85fe  fix(unit): ClientDamaged 가 HP 감소마다 2회 발화하던 것 수정
+```
+
+체크아웃 없이 `git push . HEAD:development` 로 올렸다 — 워킹트리가 뒤로 갔다 앞으로 오지 않아
+**Unity 리임포트가 돌지 않았다.** (`Packages/manifest.json` 변경 없음을 먼저 확인했다.)
+
+🔴 **`1b85173b` 주의 — `Assets/AddressableAssetsData/link.xml` 이 development 에서 빠졌다.**
+Unity 가 에디터 리프레시 중에 지운 것을 그대로 확정했다. `8b1a1a70` 에서 **IL2CPP 링커 보존용으로
+의도적으로 추가**했던 파일이고, Addressables/ResourceManager 의 프로바이더 4종
+(`AssetBundleProvider` · `BundledAssetProvider` · `InstanceProvider` · `SceneProvider`)과
+`UnityEngine.ComputeShader` 를 `preserve="all"` 로 묶고 있었다.
+→ **IL2CPP 빌드 후 에셋 로딩이나 씬 전환이 실패하면 여기부터 의심할 것.**
+`git show 8b1a1a70` 으로 원본을 복구할 수 있다.
+
+### ✅ Play 검증 완료 (2026-09-21, 은희 MPPM 실측)
+
+피격 시 플래시(`HitFlash`)가 **한 번만** 도는 것을 확인했다. 이중 발화 수정은 실기 검증까지 끝났다.
+
+### 🔴 확정 — 이펙트 구조 개선은 **지스타(2026-11 중순) 이후**다
+
+민경·은희 합의(2026-09-21): 출품 전까지 **이펙트 발동은 전부 하드코딩**으로 간다.
+**이펙트 전용 Facade + Skill ID 테이블** 관리는 출품 이후 은희가 진행한다.
+
+→ **11월 중순 전에는 이펙트 이벤트 표면 설계를 다시 꺼내지 말 것.** 이 결정을 모르면
+다음 세션의 Claude/Codex 가 또 파사드를 제안한다(실제로 이번에 `feature/PacadeForEffect`
+브랜치까지 팠다가 접었다 — 그 브랜치는 삭제됐다).
+
+### 이번에 고친 것 — `Unit.ClientDamaged` 가 HP 감소마다 **2회** 발화하고 있었다
+
+`Unit.OnHpReplicated` 가 `ClientHpChanged` 직후와 아래 블록, **두 곳에서** `ClientDamaged` 를
+불렀다. 바로 위 주석이 `//충돌난거 임시 해결함 추후 수정 해야됨.` — 머지 충돌 봉합 자국이다.
+
+지금까지 증상이 없던 이유: 유일한 구독자 `HitFlash` 는 플래시를 **재시작**할 뿐이라 두 번 불려도
+똑같아 보였다. **민경이 여기에 이펙트를 물리는 순간 피격마다 두 번 터진다** → 그래서 11월을
+기다리지 않고 지금 고쳤다. `OnShieldReplicated` 는 원래 1회라 손대지 않았다.
+
+### 🔴 민경에게 넘긴 제약 — 하드코딩 전에 반드시 읽을 것
+
+**① 회복 이펙트를 `Unit.HealHp` 자리에 하드코딩하면 호스트에서만 보인다.**
+`HealHp` 는 `if (!IsServer) return;` 가드가 걸려 있다(`Unit.cs`). 이 레포가 반복해서 밟은 버그라
+`EffectSocketPlayer`·`EffectStagePlayer`·`EffectPathPlayer` docstring 에 전부 경고가 박혀 있다.
+→ 회복 연출은 **`ClientHpChanged` 를 구독해 `next > previous` 로 판별**해야 한다.
+
+**② 힐/쉴드 RPC 3개는 죽은 코드다** — `HealHpRpc`·`IncreaseShieldRpc`·`SetShieldRpc` 는
+`SendTo.Server`(클라→서버)이고 **호출부가 0개**다. 여기 훅을 걸면 아무 일도 안 일어난다.
+
+**③ 쓸 수 있는 훅은 이게 전부다:**
+
+| 이벤트 | 용도 | 비고 |
+|---|---|---|
+| `ClientDamaged` | 피격 연출 | 이번에 이중 발화 수정됨 |
+| `ClientDamagedAmount` | 피해량별 연출 | HP/쉴드 채널 구분 |
+| `ClientDamagedAttributed` | 내가 때린 것만 | 구독자 있을 때만 RPC 발송 |
+| `ClientHpChanged` | **회복 포함** 전체 변화 | 회복은 이것으로만 가능 |
+| `Died` | 사망 연출 | ⚠️ **서버 전용** — 그대로 쓰면 호스트만 보인다 |
+
+**쉴드 획득·파괴는 이벤트가 아예 없다**(`FirstMeleeSubSkill` 의 보호막). 민경이 필요하다고 하면
+11월 전에 하나 뚫어야 할 수도 있다.
+
+### 11월 설계 때 이미 확정된 제약 — 다시 조사하지 말 것
+
+**회복 원인(Skill ID)을 클라에 보내려면 새 ClientRpc 를 파는 수밖에 없다.**
+`Unit` 의 RPC 9개 중 서버→클라는 `ClientDamagedAttributedClientRpc` **하나뿐**이고, 나머지 8개는
+전부 `SendTo.Server` 다. NetworkVariable 복제는 **값만** 넘겨 원인이 경계에서 소실된다.
+피격 쪽이 공격자 ID 를 넘기려고 별도 ClientRpc 를 판 것이 같은 이유이고,
+구독자가 있을 때만 보내는 게이팅(`RequiresAttributedDamageRpc`) 선례도 거기 있다.
+
+### ⚠️ 이번에 드러난 별건 — `.csproj` 가 낡아 `dotnet build` 가 그냥은 안 돈다
+
+Auto Refresh 가 꺼져 있어 Unity 가 `.csproj` 를 재생성하지 않았다. **양방향으로 틀린다** —
+사라진 `Wells&No.23/*.cs` 2개를 계속 참조해 `CS2001`, 새로 생긴
+`Monster/Boss/IBossEntranceAnimation.cs` 가 빠져 `CS0246`. 내 변경과 무관한 노이즈다.
+→ csproj 를 건드리지 말고 **임시 사본**을 만들어 빌드하고 지우는 식으로 우회했다.
+Unity 창을 한 번 클릭하면 정리된다.
+
+---
+
+## ▶▶ 이전 인수인계 (2026-09-21 #2 · 입장 연출·차징 점프·돌진 사거리 — **전부 Play 검증 대기**)
 
 작업자: **경석(Claude)**. 브랜치 `feature/Boss23`. 컴파일 통과(에러 0).
 
