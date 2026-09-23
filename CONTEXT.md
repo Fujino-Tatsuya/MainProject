@@ -203,6 +203,35 @@ Addressables 재빌드가 지우는 것이고 **은희 영역**이다. 내 작�
 6. `Assets/AddressableAssetsData/link.xml` 이 한 번 삭제된 적 있다(복구함).
    다시 뜨면 Addressables 재빌드가 지우는 것 — 은희 영역.
 
+## ▶▶ 작업 세션 (2026-09-21 · **타이틀 연출 + CRT FX 툴킷** — 계획 승인 대기)
+
+작업자: **경석(Claude)**. 브랜치 `feature/Boss23`. Codex 는 아래 파일을 건드리지 말 것.
+
+**계획서 2종 — 승인 후 구현 시작**: [PLAN-title-flow.md](PLAN-title-flow.md) ·
+[PLAN-crt-fx.md](PLAN-crt-fx.md)(신규). 후자가 전자의 선행 의존이다.
+
+목표 = 타이틀을 평면 UI 에서 **3D 오피스 씬 + 중앙 CRT 안의 메뉴**로 전환.
+`PRESS ANY KEY` → 카메라 인(Cinemachine vcam 3대) → 모니터 안 Start/Setting/Exit.
+
+**수정 예정 파일**
+
+| 파일 | 내용 |
+|---|---|
+| `0.Scenes/MainFlow/1.TitleScene.unity` | 아트 이식 · vcam 3대 · Canvas 3층 · 영구 콜백 재지정 |
+| `1.Scripts/UI/Title/TitleFlowDirector.cs` (신규) | 상태 머신 · 입력 · 선택 복구 · 패드 Cancel |
+| `1.Scripts/UI/Title/BlinkingText.cs` · `TextScramble.cs` (신규) | 깜빡임 · 스크램블 |
+| `1.Scripts/Managers/TitleSceneManager.cs` | ESC 처리 제거/위임 + 상태 가드 |
+| `1.Scripts/Rendering/RetroCRT/*` | 🔴 **파라미터 런타임 전달 경로** + `CrtFxDriver.cs`(신규) |
+| `0.Scenes/Art/title/GlobalVolumeProfile.asset` | ChromaticAberration 추가 |
+| `0.Scenes/Debug/CrtFxScene.unity` (신규) | FX 데모 |
+| `0.Scenes/Art/title.unity` | 🔴 **백업 보존. 손대지 않는다** |
+
+🔴 **공유 자산 주의** — `99.Settings/PC_Renderer.asset` 과 `CyaniluxRetroCRT.mat` 은 **맵 씬과 공유**한다.
+기본값은 건드리지 않고 런타임 오버라이드로만 흔든다. 보스전 룩 회귀를 검증에 포함했다.
+
+🔴 **Codex 교차검증으로 1판에서 5건이 뒤집혔다** — 목록은 [PLAN-title-flow.md](PLAN-title-flow.md) §9.
+그중 미해결 최대 리스크는 **CRT warp(0.035)와 UI 클릭 좌표 불일치**다(실측 대기).
+
 ## ▶▶ 작업 세션 (2026-09-19 · 미니맵 룩 + **보스 제한시간 타이머** — 계획 승인 대기)
 
 작업자: **경석(Claude)**. 브랜치 `feature/Boss23`. Codex 는 아래 파일을 건드리지 말 것.
