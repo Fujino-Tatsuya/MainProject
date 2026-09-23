@@ -298,6 +298,6 @@ public class GrabController : NetworkBehaviour
             slopeRotation = Quaternion.FromToRotation(Vector3.up, hit.normal);
         }
 
-        effects.Play(effects.Catalog.Throw, spawnPoint, slopeRotation);
+        effects.Play(effects.Catalog.Grab_Throw, spawnPoint, slopeRotation);
     }
 }
