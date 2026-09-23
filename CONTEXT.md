@@ -8,7 +8,135 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 현재 인수인계 (2026-09-21 #2 · 입장 연출·차징 점프·돌진 사거리 — **전부 Play 검증 대기**)
+## ▶▶ 현재 인수인계 (2026-09-22 · 구역 진입 기반 벽 투명화 1단계 **검증 완료**, 브랜치 `feature/TransparentV2-keepgoing`)
+
+작업자: **은희(Claude + Codex 위임)**. 계획·근거는 [PLAN.md](PLAN.md) 최상단.
+배선 절차는 [Docs/tech/wall-transparency-shadergraph-setup.md](Docs/tech/wall-transparency-shadergraph-setup.md).
+
+**상태: 코드·셰이더 완료, 사용자 Play 검증 완료.** 커밋 16개, **push 안 함.**
+
+| 파일 | VCS |
+|---|---|
+| `Assets/1.Scripts/Rendering/WallTransparencyZone.cs` (감지, 신규) | git |
+| `Assets/1.Scripts/Rendering/Occlusion/WallTransparencyGroup.cs` (표현, 신규) | git |
+| `Assets/3.Materials/Level1_Materials/Occlusion/WallTransparencyDither.hlsl` (신규) | git |
+| `Assets/Tests/EditMode/Occlusion/WallTransparencyGroupTests.cs` (신규, 6개) | git |
+| `Assets/50.Art/MapGen/MapObj/material/Generic_Standard.shadergraph` | 🔴 **SVN — 별도 커밋·공지 필요** |
+
+**용어** — 여기서 "구역 투명화" 는 *구역에 플레이어가 있으면 그 구역이 지정한 벽 그룹이
+높이 그라데이션으로 사라지는 것* 이다. **시선 차단 판정이 아니다.** 기존 `WallOcclusionDriver`
+의 카메라-플레이어 선분 기반 픽셀 투명화(= "A 시스템", `4.MapScene` 에서 `m_Enabled: 0`)와 별개다.
+
+**설계 요약**
+- 감지: `Player(6)` **레이어만** 본다. `Player`·`Unit`·`NetworkObject` 를 참조하지 않는다 —
+  테스트 씬에서 레이어만 바꾼 캡슐로 검증된다. 점유는 루트 Transform 단위.
+- 표현: 그룹이 원본 머티리얼 종류마다 **런타임 인스턴스 1개**를 만들어 공유한다.
+  MaterialPropertyBlock 은 쓰지 않는다 — SRP Batcher 가 깨진다.
+- 벽/바닥 구분: **Material Variant 를 만들지 않는다.** 그룹이 인스턴스에만
+  `EnableKeyword("WALL_OCCLUSION_DITHER")` 를 한다. 그래서 벽 프리팹의 머티리얼을
+  교체할 일이 없다. 🔴 그래프의 키워드는 **Multi Compile** 이어야 한다(Shader Feature 면
+  빌드에서 변종이 잘려 에디터에서만 동작한다).
+- 높이 그라데이션: **아래가 사라지고 위가 남는다.** `baseY` 에서 알파 0 → `fadeHeight`
+  만큼 위에서 1. 벽 한 층 = 2.5 이므로 기본 `fadeHeight = 5`(2층).
+
+**2026-09-21 결정(은희)** — `PLAN.md` 의 2026-09-14 「투명화 끄고 실루엣으로」(경석)에 대해,
+**실루엣은 그대로 두고 벽 투명화를 함께 간다.** 기존 투명화 시스템은 끄지도 지우지도 않는다.
+
+**남은 것**
+- 존 프리팹 오서링(구역 볼륨 + 그룹 리스트) — 파일럿부터
+- `Generic_Basic.shadergraph`(펜스) 동일 배선
+- MPPM 2인 확인 / 바닥·SSAO before-after 비교
+
+
+## ▶▶ 이전 인수인계 (2026-09-21 #3 · 은희 · **이펙트 파사드는 지스타 이후로 연기** + 이벤트 이중 발화 수정)
+
+작업자: **은희(Claude)**. 전체 리빌드 에러 0. **Play 검증까지 완료 — 이 건은 닫혔다.**
+
+### ✅ development 머지 + origin 푸시 완료 (2026-09-21) — `10804346` → `1b85173b`
+
+fast-forward(충돌 0). 작업 브랜치는 `fix/unit-clientdamaged-double-fire` 였다.
+
+```
+1b85173b  chore(addressables): link.xml 제거
+52025c1d  docs: 이펙트 파사드는 지스타 이후로 연기 + 민경에게 넘길 제약 기록
+320e85fe  fix(unit): ClientDamaged 가 HP 감소마다 2회 발화하던 것 수정
+```
+
+체크아웃 없이 `git push . HEAD:development` 로 올렸다 — 워킹트리가 뒤로 갔다 앞으로 오지 않아
+**Unity 리임포트가 돌지 않았다.** (`Packages/manifest.json` 변경 없음을 먼저 확인했다.)
+
+🔴 **`1b85173b` 주의 — `Assets/AddressableAssetsData/link.xml` 이 development 에서 빠졌다.**
+Unity 가 에디터 리프레시 중에 지운 것을 그대로 확정했다. `8b1a1a70` 에서 **IL2CPP 링커 보존용으로
+의도적으로 추가**했던 파일이고, Addressables/ResourceManager 의 프로바이더 4종
+(`AssetBundleProvider` · `BundledAssetProvider` · `InstanceProvider` · `SceneProvider`)과
+`UnityEngine.ComputeShader` 를 `preserve="all"` 로 묶고 있었다.
+→ **IL2CPP 빌드 후 에셋 로딩이나 씬 전환이 실패하면 여기부터 의심할 것.**
+`git show 8b1a1a70` 으로 원본을 복구할 수 있다.
+
+### ✅ Play 검증 완료 (2026-09-21, 은희 MPPM 실측)
+
+피격 시 플래시(`HitFlash`)가 **한 번만** 도는 것을 확인했다. 이중 발화 수정은 실기 검증까지 끝났다.
+
+### 🔴 확정 — 이펙트 구조 개선은 **지스타(2026-11 중순) 이후**다
+
+민경·은희 합의(2026-09-21): 출품 전까지 **이펙트 발동은 전부 하드코딩**으로 간다.
+**이펙트 전용 Facade + Skill ID 테이블** 관리는 출품 이후 은희가 진행한다.
+
+→ **11월 중순 전에는 이펙트 이벤트 표면 설계를 다시 꺼내지 말 것.** 이 결정을 모르면
+다음 세션의 Claude/Codex 가 또 파사드를 제안한다(실제로 이번에 `feature/PacadeForEffect`
+브랜치까지 팠다가 접었다 — 그 브랜치는 삭제됐다).
+
+### 이번에 고친 것 — `Unit.ClientDamaged` 가 HP 감소마다 **2회** 발화하고 있었다
+
+`Unit.OnHpReplicated` 가 `ClientHpChanged` 직후와 아래 블록, **두 곳에서** `ClientDamaged` 를
+불렀다. 바로 위 주석이 `//충돌난거 임시 해결함 추후 수정 해야됨.` — 머지 충돌 봉합 자국이다.
+
+지금까지 증상이 없던 이유: 유일한 구독자 `HitFlash` 는 플래시를 **재시작**할 뿐이라 두 번 불려도
+똑같아 보였다. **민경이 여기에 이펙트를 물리는 순간 피격마다 두 번 터진다** → 그래서 11월을
+기다리지 않고 지금 고쳤다. `OnShieldReplicated` 는 원래 1회라 손대지 않았다.
+
+### 🔴 민경에게 넘긴 제약 — 하드코딩 전에 반드시 읽을 것
+
+**① 회복 이펙트를 `Unit.HealHp` 자리에 하드코딩하면 호스트에서만 보인다.**
+`HealHp` 는 `if (!IsServer) return;` 가드가 걸려 있다(`Unit.cs`). 이 레포가 반복해서 밟은 버그라
+`EffectSocketPlayer`·`EffectStagePlayer`·`EffectPathPlayer` docstring 에 전부 경고가 박혀 있다.
+→ 회복 연출은 **`ClientHpChanged` 를 구독해 `next > previous` 로 판별**해야 한다.
+
+**② 힐/쉴드 RPC 3개는 죽은 코드다** — `HealHpRpc`·`IncreaseShieldRpc`·`SetShieldRpc` 는
+`SendTo.Server`(클라→서버)이고 **호출부가 0개**다. 여기 훅을 걸면 아무 일도 안 일어난다.
+
+**③ 쓸 수 있는 훅은 이게 전부다:**
+
+| 이벤트 | 용도 | 비고 |
+|---|---|---|
+| `ClientDamaged` | 피격 연출 | 이번에 이중 발화 수정됨 |
+| `ClientDamagedAmount` | 피해량별 연출 | HP/쉴드 채널 구분 |
+| `ClientDamagedAttributed` | 내가 때린 것만 | 구독자 있을 때만 RPC 발송 |
+| `ClientHpChanged` | **회복 포함** 전체 변화 | 회복은 이것으로만 가능 |
+| `Died` | 사망 연출 | ⚠️ **서버 전용** — 그대로 쓰면 호스트만 보인다 |
+
+**쉴드 획득·파괴는 이벤트가 아예 없다**(`FirstMeleeSubSkill` 의 보호막). 민경이 필요하다고 하면
+11월 전에 하나 뚫어야 할 수도 있다.
+
+### 11월 설계 때 이미 확정된 제약 — 다시 조사하지 말 것
+
+**회복 원인(Skill ID)을 클라에 보내려면 새 ClientRpc 를 파는 수밖에 없다.**
+`Unit` 의 RPC 9개 중 서버→클라는 `ClientDamagedAttributedClientRpc` **하나뿐**이고, 나머지 8개는
+전부 `SendTo.Server` 다. NetworkVariable 복제는 **값만** 넘겨 원인이 경계에서 소실된다.
+피격 쪽이 공격자 ID 를 넘기려고 별도 ClientRpc 를 판 것이 같은 이유이고,
+구독자가 있을 때만 보내는 게이팅(`RequiresAttributedDamageRpc`) 선례도 거기 있다.
+
+### ⚠️ 이번에 드러난 별건 — `.csproj` 가 낡아 `dotnet build` 가 그냥은 안 돈다
+
+Auto Refresh 가 꺼져 있어 Unity 가 `.csproj` 를 재생성하지 않았다. **양방향으로 틀린다** —
+사라진 `Wells&No.23/*.cs` 2개를 계속 참조해 `CS2001`, 새로 생긴
+`Monster/Boss/IBossEntranceAnimation.cs` 가 빠져 `CS0246`. 내 변경과 무관한 노이즈다.
+→ csproj 를 건드리지 말고 **임시 사본**을 만들어 빌드하고 지우는 식으로 우회했다.
+Unity 창을 한 번 클릭하면 정리된다.
+
+---
+
+## ▶▶ 이전 인수인계 (2026-09-21 #2 · 입장 연출·차징 점프·돌진 사거리 — **전부 Play 검증 대기**)
 
 작업자: **경석(Claude)**. 브랜치 `feature/Boss23`. 컴파일 통과(에러 0).
 
@@ -486,6 +614,50 @@ Dash 전용이다. 이 값을 키워도 잡기 인터럽트 구간은 1초도 �
 검증 코드가 스스로 잡았다. 그 밖에 전투 중 경고:
 `송전기 — 4초 안에 못 갔다(2.1m) → 워프` · `인터럽트가 카운터로 성립하지 않았다` ·
 `Failed to create agent because it is not close enough to the NavMesh`.
+
+
+---
+
+## 🔴 공격속도 — **속성 추가 안 함, 클립 길이 일반화로 간다** (2026-09-21 확정)
+
+브랜치 `feature/PlayerAttackSpeedAttribute` 는 **커밋 0개로 폐기**했다. 이름과 달리 스탯을 새로
+만드는 작업이 아니었다.
+
+**결정**: 공격속도는 스탯/모디파이어로 풀지 않는다. **모든 playable 캐릭터의 공격 애니메이션
+클립 길이를 일반화(정규화)** 하는 방향으로 간다.
+
+**왜 — 조사에서 나온 것 (다시 조사하지 말 것)**
+
+- **평타 타이밍은 100% 애니메이션 이벤트가 결정한다.** `Hit`/`ComboWindowOpen`/
+  `ComboWindowClose`/`End` 전부 클립에 박힌 AnimationEvent →
+  `PlayerAnimationEventRelay.cs:21` → `DefaultAttackController.cs:346` (`IsServer` 게이트).
+- **`DefaultAttackStep.MotionDuration` 은 함정이다.** 에셋의 `motionDuration` 은 4스텝 전부 `0`
+  이라 실효값은 `clip.length` 인데, 이 값은 **End 이벤트 유실 대비 fallback** 과 (현재 미사용인)
+  스크립트 이동에만 쓰인다. 여기에 배율을 곱해도 **화면상 공격은 안 빨라지고 fallback 만 일찍
+  터진다.**
+- **플레이어엔 평타 쿨다운도 입력 버퍼도 없다.** 게이트는 `PlayerStateController.CanAttack` 뿐.
+  연타 상한은 순전히 "End 이벤트가 언제 오는가" 다.
+- **`animator.speed` 를 만지는 플레이어 코드 0건**, `PlayerAnimatorController` 에 speed 파라미터
+  없음(공격 state 4개 모두 `m_Speed: 1`, `m_SpeedParameterActive: 0`).
+- 클립 실측: `Garen_Default_Attack_1~4` 길이 2.0 / 1.5 / 1.833 / 1.6초인데 **End 이벤트는
+  0.733 / 0.567 / 0.733 / 0.533초.** 클립 뒷부분이 통째로 잘린다. ← 일반화 작업의 출발점.
+
+**죽어 있는 것 — 살릴지 지울지 아직 미정**
+
+- `Unit.FinalAttackSpeed` (`Unit.cs:367`) **게임플레이 소비자 0건.**
+  `Docs/tech/game-structure-uml.md:401` 이 이미 이 사실을 적어 뒀다.
+- `Unit.ChangeAttackSpeedValue` / `ChangeAttackSpeedValueRpc` 호출처 0건.
+- `StatusEffectType.AttackSpeedModifier` (`1 << 9`) 를 `Apply` 하는 코드·에셋 0건.
+  (대조: `MoveSpeedModifier` 는 `PlayerMovement.cs:68,191` 에서 실사용 중)
+- 🔴 **`Player.prefab:929` 의 `attackSpeed` 값이 `0`이다** (Paladin·Paladin_VFX 도 전부 0).
+  아무도 안 읽어서 안 터졌을 뿐, 배선하는 순간 배율 0이 된다.
+- `CharacterDefinition` 은 중복 스탯 소스가 **아니라 사문(死文)** 이다. 이 SO 의 에셋 인스턴스가
+  프로젝트에 **0개**고, 읽는 쪽 `PlayableCharacterVisual` 은 어떤 프리팹·씬에도 안 붙어 있다.
+  실제 스탯 소스는 `Player.prefab` 의 SerializeField 하나뿐.
+
+**몬스터 쪽은 의미가 다르다** — `MonsterBase.cs:1346` 은 `간격 = 1 / AttackSpeed`(초당 횟수)로
+살아 있다. 단 행별 명시 쿨다운이 있으면 무시되므로 **보스에선 죽어 있다**
+(`BossDataSO.cs:503` 주석). 플레이어와 같은 `Unit._attackSpeed` 필드를 쓰지만 의미가 다르다.
 
 ---
 
