@@ -57,7 +57,7 @@ public static class DevBootLauncher
 
     private const string SnapshotSessionKey = "MainProject.DevBoot.BuildSceneSnapshot";
     private const string DevBootSceneGuid = "180a2dd6e0939fed247ab6908eb0ec7d";
-    private const string DevBootScenePathFallback = "Assets/0.Scenes/Dev_Boot.unity";
+    private const string DevBootScenePathFallback = "Assets/0.Scenes/Debug/Dev_Boot.unity";
 
     /// <summary>
     /// Dev_Boot 씬의 현재 경로. <b>GUID 로 푼다</b> — 경로를 상수로 박아두면 씬을 옮기는 순간

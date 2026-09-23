@@ -16,7 +16,7 @@ using UnityEngine.SceneManagement;
 /// 로딩 씬을 생략해도 완료 체인이 그대로 돈다. 이 부팅기는 컨트롤러가 해주지 않는 것만 메운다:
 /// 타겟 지정 · 액티브 씬 전환 · 부팅 씬 언로드 · 순서 비의존 안전망.
 ///
-/// ⚠️ Assets/0.Scenes/Dev_Boot.unity 에만 둔다. 그 씬은 빌드 목록에 넣지 않는다.
+/// ⚠️ Assets/0.Scenes/Debug/Dev_Boot.unity 에만 둔다. 그 씬은 빌드 목록에 넣지 않는다.
 /// 정식 흐름(BootStrap→Title→Lobby→Loading→Map)은 이 파일과 무관하게 그대로 동작한다.
 /// </summary>
 [DisallowMultipleComponent]
