@@ -107,6 +107,14 @@ public abstract class PlayerSkillBase : MonoBehaviour
     // 서버 전용: 홀드 해제 통보
     public virtual void OnReleased() { }
 
+    // 오너 전용: 조준 모드에 들어갔다(PlayerSkillTargeting.Begin). "시전했다"가 아니라 "조준을 켰다"는 신호다.
+    // 🔴 오너에서만 돈다 — 여기서 연출을 바로 켜면 남의 화면에는 보이지 않는다. 전파는 NetworkBehaviour 창구의 몫이다.
+    public virtual void OnOwnerAimStart() { }
+
+    // 오너 전용: 조준이 시전으로 이어지지 않고 물렸다(취소 입력·빈 곳 클릭·자동 접근 중단·사망·권한 상실).
+    // 시전으로 이어졌으면 호출되지 않는다 — 그쪽 연출 수명은 OnClientPlay/OnEnd 가 이어받는다.
+    public virtual void OnOwnerAimCancelled() { }
+
     // 종료/취소 단일 정리 경로. 모든 피어에서 호출될 수 있으므로 로컬 정리만 담당한다.
     public virtual void OnEnd(SkillEndReason reason)
     {

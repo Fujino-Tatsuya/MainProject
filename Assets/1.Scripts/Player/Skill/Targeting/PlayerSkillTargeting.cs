@@ -38,6 +38,11 @@ public class PlayerSkillTargeting : MonoBehaviour
     private bool beganThisFrame;
     private bool justHandledConfirm;
 
+    // 조준 세션 = Begin() 부터 "시전으로 이어지거나 물릴 때"까지. 오너 전용 연출(R 즉시 낙뢰)의 수명이다.
+    // isTargeting 과 다르다 — 사거리 밖을 클릭하면 조준은 닫히고 자동 접근으로 넘어가지만 세션은 이어진다.
+    private bool aimSessionActive;
+    private PlayerSkillSlot aimSessionSlot;
+
     private PlayerSkillSlot currentSlot;
     private PlayerSkillData currentData;
     private SkillCursorState cursorState = SkillCursorState.Default;
@@ -111,11 +116,17 @@ public class PlayerSkillTargeting : MonoBehaviour
         }
 
         SetCursorState(SkillCursorState.Targeting);
+
+        aimSessionActive = true;
+        aimSessionSlot = slot;
+        skill.OnOwnerAimStart();
+
         return true;
     }
 
     public void Cancel()
     {
+        EndAimSession(false);
         ExitStandby();
         StopMoveToCast();
     }
@@ -160,6 +171,7 @@ public class PlayerSkillTargeting : MonoBehaviour
         {
             // 취소 유발 입력(우클릭 등)이 같은 프레임에 FSM 액션(단죄의 방패 등)으로 새지 않도록 1프레임 억제
             justHandledConfirm = true;
+            EndAimSession(false);
             ExitStandby();
             return;
         }
@@ -342,6 +354,7 @@ public class PlayerSkillTargeting : MonoBehaviour
             bool hasPoint = hasCandidateGroundPoint;
             Vector3 point = candidateGroundPoint;
             PlayerSkillSlot slot = currentSlot;
+            EndAimSession(hasPoint && controller != null);
             ExitStandby();
             if (hasPoint && controller != null)
                 controller.ExecuteTargetedSkill(slot, null, point, true);
@@ -353,6 +366,12 @@ public class PlayerSkillTargeting : MonoBehaviour
         bool inRange = hoveredInRange;
         PlayerSkillSlot targetSlot = currentSlot;
         float range = currentData.CastRange;
+
+        // 사거리 밖이면 자동 접근으로 이어지므로 세션을 닫지 않는다 — 걸어가는 동안에도 조준 연출이 유지된다.
+        if (target == null)
+            EndAimSession(false);
+        else if (inRange)
+            EndAimSession(true);
 
         ExitStandby();
 
@@ -404,6 +423,7 @@ public class PlayerSkillTargeting : MonoBehaviour
         {
             PlayerSkillSlot slot = pendingSlot;
             Unit target = pendingTarget;
+            EndAimSession(true);
             StopMoveToCast();
             controller?.ExecuteTargetedSkill(slot, target, Vector3.zero, false);
             return;
@@ -449,6 +469,8 @@ public class PlayerSkillTargeting : MonoBehaviour
         if (!isMovingToCast)
             return;
 
+        EndAimSession(false);
+
         owner?.SubmitAutoApproachIntent(null, 0f, false);
         isMovingToCast = false;
         pendingTarget = null;
@@ -458,6 +480,24 @@ public class PlayerSkillTargeting : MonoBehaviour
     }
 
     // ── 종료/정리 ──
+
+    /// <summary>
+    /// 조준 세션 종료. <paramref name="startedCast"/>가 false 일 때만 스킬에 알린다 —
+    /// 시전으로 이어진 경우의 연출 수명은 스킬의 OnClientPlay/OnEnd 가 이어받는다.
+    /// 두 번 불려도 안전하다(이미 닫혔으면 no-op).
+    /// </summary>
+    private void EndAimSession(bool startedCast)
+    {
+        if (!aimSessionActive)
+            return;
+
+        aimSessionActive = false;
+
+        if (startedCast)
+            return;
+
+        controller?.GetSkill(aimSessionSlot)?.OnOwnerAimCancelled();
+    }
 
     private void ExitStandby()
     {
