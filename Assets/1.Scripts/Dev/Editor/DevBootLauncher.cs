@@ -59,6 +59,20 @@ public static class DevBootLauncher
     private const string DevBootSceneGuid = "180a2dd6e0939fed247ab6908eb0ec7d";
     private const string DevBootScenePathFallback = "Assets/0.Scenes/Dev_Boot.unity";
 
+    /// <summary>
+    /// Dev_Boot 씬의 현재 경로. <b>GUID 로 푼다</b> — 경로를 상수로 박아두면 씬을 옮기는 순간
+    /// 조용히 안 맞게 되고, 그게 이 도구가 애초에 고친 버그다(PLAN 1절 문제 #4).
+    /// 위 상수는 GUID 조회가 실패했을 때의 최후 폴백일 뿐이다.
+    /// </summary>
+    internal static string DevBootScenePath
+    {
+        get
+        {
+            string path = AssetDatabase.GUIDToAssetPath(DevBootSceneGuid);
+            return string.IsNullOrEmpty(path) ? DevBootScenePathFallback : path;
+        }
+    }
+
     static DevBootLauncher()
     {
         EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
@@ -144,8 +158,8 @@ public static class DevBootLauncher
             "Dev_Boot만 제거");
 
         string[] pathsToRemove = removeTarget
-            ? new[] { DevBootScenePathFallback, targetPath }
-            : new[] { DevBootScenePathFallback };
+            ? new[] { DevBootScenePath, targetPath }
+            : new[] { DevBootScenePath };
         EditorBuildSettingsScene[] cleaned = RemoveScenes(source.Scenes, pathsToRemove);
         if (cleaned.Length != source.Scenes.Length)
         {
@@ -249,7 +263,7 @@ public static class DevBootLauncher
         }
 
         Scene activeScene = SceneManager.GetActiveScene();
-        if (!string.Equals(activeScene.path, DevBootScenePathFallback, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(activeScene.path, DevBootScenePath, StringComparison.OrdinalIgnoreCase))
         {
             return; // 정식 Play 흐름은 건드리지 않는다.
         }

@@ -9,7 +9,8 @@ using UnityEngine;
 public static class DevBootSceneCatalog
 {
     private const string SceneRoot = "Assets/0.Scenes";
-    private const string DevBootScenePath = "Assets/0.Scenes/Dev_Boot.unity";
+    // 경로 상수를 박지 않는다 — 씬을 옮기면 조용히 안 맞게 된다. GUID 로 푸는 단일 원본을 쓴다.
+    private static string DevBootScenePath => DevBootLauncher.DevBootScenePath;
     private const int RecentLimit = 5;
 
     [Serializable]
