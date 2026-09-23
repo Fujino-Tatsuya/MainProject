@@ -2657,6 +2657,7 @@ GameObject:
   m_Component:
   - component: {fileID: 4509088818531277874}
   - component: {fileID: 2824800692962895580}
+  - component: {fileID: 5224000000000000020}
   m_Layer: 0
   m_Name: tripo_part_0
   m_TagString: Untagged
@@ -2705,6 +2706,7 @@ SkinnedMeshRenderer:
   m_RendererPriority: 0
   m_Materials:
   - {fileID: 2100000, guid: 49b3ffd597d90b64dbaa4f0648ddd976, type: 2}
+  - {fileID: 2100000, guid: c7a41f60d2b84e6a9c15d380be720117, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -7637,6 +7639,7 @@ MonoBehaviour:
   data: {fileID: 11400000, guid: 3c9e1f7a2b8d4e6c9a0f5d1b7e2c4a68, type: 2}
   hitboxAnchor: {fileID: 0}
   skillVfx: {fileID: 5224000000000000001}
+  superArmorOverlay: {fileID: 5224000000000000020}
 --- !u!114 &6032877627005329180
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -11577,3 +11580,19 @@ RectTransform:
   m_CorrespondingSourceObject: {fileID: 6333140226819068526, guid: 3caed5297caa7c04a9d7e3ffc0a521a4, type: 3}
   m_PrefabInstance: {fileID: 7530154802722794245}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &5224000000000000020
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2106135556701087399}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c7a41f60d2b84e6a9c15d380be720063, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DissolveOverlay
+  overlayMaterialIndex: 1
+  fadeInDuration: 0.25
+  fadeOutDuration: 0.4
+  shown: 0
