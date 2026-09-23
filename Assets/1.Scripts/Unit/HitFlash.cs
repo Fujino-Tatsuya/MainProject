@@ -2,12 +2,19 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-// 피격 플래시: Unit의 HP/쉴드 "감소" 복제 알림(Unit.ClientDamaged)을 받아, 모든 피어에서
+// 피격 플래시: Unit의 HP "감소" 복제 알림(Unit.ClientDamagedAmount)을 받아, 모든 피어에서
 // 렌더러를 잠깐 빨갛게 틴트했다가 원래 색으로 복귀시킨다(일반 게임식 피격 표시).
+//
+// 🔴 **쉴드가 막아낸 피격은 플래시하지 않는다**(2026-09-18). 예전에는 Unit.ClientDamaged 를
+//    구독했는데 그 이벤트는 **HP와 쉴드 감소 양쪽**에서 발화한다. 보호막(수호자의 의지)은
+//    ApplyMitigatedHealthDamage 가 HP보다 먼저 깎으므로, 막아내서 체력이 1도 안 줄어든 피격에도
+//    캐릭터가 빨개졌다. "막았다"와 "맞았다"가 같은 연출이면 보호막이 일하는지 알 수가 없다.
+//    그래서 채널이 있는 ClientDamagedAmount 로 바꾸고 Hp 만 통과시킨다.
+//    (쉴드가 막아낸 것은 배리어 표면의 피격 파문이 따로 보여 준다 — ShieldRippleEffect)
 //
 // - Unit.OnNetworkSpawn이 자동 부착 — Unit 계열 전체(플레이어/몬스터/보스) 공통. 프리팹에 미리
 //   붙여 색/시간을 오버라이드해도 된다(자동 부착은 없을 때만).
-// - 데미지 판정과 무관한 순수 로컬 연출(복제된 HP/쉴드 감소 기반) — RPC/추가 트래픽 없음.
+// - 데미지 판정과 무관한 순수 로컬 연출(복제된 HP 감소 기반) — RPC/추가 트래픽 없음.
 // - MaterialPropertyBlock만 사용(머티리얼 인스턴스화 없음). URP _BaseColor / 레거시 _Color 지원.
 // - AoeTelegraph(장판) 등 연출용 렌더러는 틴트에서 제외.
 [DisallowMultipleComponent]
@@ -41,12 +48,12 @@ public class HitFlash : MonoBehaviour
     void OnEnable()
     {
         if (_unit == null) _unit = GetComponent<Unit>();
-        if (_unit != null) _unit.ClientDamaged += OnDamaged;
+        if (_unit != null) _unit.ClientDamagedAmount += OnDamaged;
     }
 
     void OnDisable()
     {
-        if (_unit != null) _unit.ClientDamaged -= OnDamaged;
+        if (_unit != null) _unit.ClientDamagedAmount -= OnDamaged;
         if (_routine != null) { StopCoroutine(_routine); _routine = null; }
         ClearTint();
     }
@@ -88,8 +95,12 @@ public class HitFlash : MonoBehaviour
     // 플래시가 되돌아갈 색 = 베이스 틴트가 있으면 그것, 없으면 머티리얼 원색.
     Color BaseColorOf(int index) => _hasBaseTint ? _baseTint : _originalColors[index];
 
-    void OnDamaged()
+    void OnDamaged(int amount, DamageChannel channel)
     {
+        // 쉴드가 받아낸 몫은 플래시하지 않는다. 한 대에 쉴드와 HP가 같이 깎이면 Hp 쪽이 따로 오므로
+        // 그때는 정상적으로 한 번 뜬다(ApplyMitigatedHealthDamage 가 남은 피해만 HP로 넘긴다).
+        if (channel != DamageChannel.Hp) return;
+
         if (!isActiveAndEnabled) return;
         if (_renderers == null) CacheRenderers(); // 첫 피격 시 지연 수집(스폰 직후 모델 조립 순서 영향 최소화)
         if (_renderers.Length == 0) return;

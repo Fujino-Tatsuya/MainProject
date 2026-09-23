@@ -73,13 +73,28 @@ public class MeshFragmentSetEditor : Editor
         }
     }
 
+    // 파편이 올라가는 레이어. 자기들끼리도 충돌하지 않게 아래 마스크에서 제외한다.
+    const int FragmentLayer = 17;   // Effect
+
+    /// <summary>
+    /// 파편이 <b>충돌해도 되는</b> 레이어 — 월드 지오메트리뿐이다.
+    /// Default(0) · Ground(3) · Wall(7) · Env(11) = 2185.
+    ///
+    /// 🔴 <b>Effect(17) 자신이 빠져 있는 것이 중요하다.</b> 구워진 파편은 서로 맞닿은 채로
+    /// 시작하므로, 자기들끼리 충돌시키면 터지는 순간 상호 관통을 푸는 힘으로 폭발이 튄다.
+    /// 서로는 통과하고 월드만 막는 것이 디브리의 정석이다.
+    /// </summary>
+    const int FragmentCollisionMask = (1 << 0) | (1 << 3) | (1 << 7) | (1 << 11);
+
     /// <summary>
     /// 파편 N개를 자식으로 가진 <b>버스트 프리팹</b>을 굽는다. 이게 EffectEntry의 파트가 되어
     /// EffectManager 풀에 올라간다 — 파편 풀링이 "배치된 상자 수"가 아니라
     /// "동시 폭발 수"에 비례하게 되는 지점이다.
     ///
-    /// ⚠️ <b>콜라이더를 붙이지 않는다.</b> 파편은 피어마다 다른 난수로 흩어지므로, 충돌시키면
-    /// 플레이어가 밀리는 결과가 클라마다 갈려 디싱크가 된다. 파편은 연출이지 게임플레이가 아니다.
+    /// <b>콜라이더는 월드만 막는다.</b> 파편은 피어마다 다른 난수로 흩어지므로 플레이어를 밀면
+    /// 그 결과가 클라마다 갈려 디싱크가 된다. 그래서 콜라이더는 달되
+    /// <see cref="FragmentCollisionMask"/> 밖(플레이어·적·모든 hurtbox 등)은 전부 제외한다.
+    /// 파편은 연출이지 게임플레이가 아니라는 원칙은 그대로다.
     /// </summary>
     static void BakeBurstPrefab(MeshFragmentSet set)
     {
@@ -107,14 +122,33 @@ public class MeshFragmentSetEditor : Editor
             // FragmentBurstEffect가 반납할 때마다 이 좌표로 되돌린다.
             go.transform.localPosition = fragment.center;
 
+            go.layer = FragmentLayer;
+
             go.AddComponent<MeshFilter>().sharedMesh = fragment.mesh;
             go.AddComponent<MeshRenderer>().sharedMaterial = set.fragmentMaterial;
+
+            // 파편이 바닥·벽에 막히도록 콜라이더를 단다. 메시 바운드 크기의 박스면 충분하다 —
+            // 디브리 크기에서 볼록 MeshCollider 의 정확도 차이는 안 보이고 비용만 는다.
+            // 바운드 중심이 원점이 아니다 — 파편은 원본 메시에서 잘라낸 조각이라 보통 치우쳐 있다.
+            // center 를 0 으로 두면 콜라이더가 메시에서 어긋나 허공에서 막히거나 바닥에 파묻힌다.
+            var box = go.AddComponent<BoxCollider>();
+            box.center = fragment.mesh.bounds.center;
+            box.size = fragment.mesh.bounds.size;
+
+            // 🔴 여기가 핵심이다. 콜라이더를 그냥 달면 파편이 플레이어를 밀고, 파편 흩어짐은
+            //    피어마다 다르므로 그 결과가 갈려 디싱크가 된다(FragmentBurstEffect 주석 참조).
+            //    그래서 월드 지오메트리만 남기고 게임플레이 레이어를 전부 제외한다.
+            //    레이어 충돌 매트릭스(ProjectSettings)는 팀 공용이라 건드리지 않는다.
+            box.excludeLayers = ~FragmentCollisionMask;
 
             var rb = go.AddComponent<Rigidbody>();
             rb.mass = set.fragmentMass;
             rb.linearDamping = set.linearDamping;
             rb.angularDamping = set.angularDamping;
             rb.isKinematic = true;   // 대출 전까지 잠들어 있는다
+
+            // 파편은 작고 빠르다. Discrete 로 두면 얇은 바닥을 그냥 통과한다(터널링).
+            rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
 
             pieces[i] = go.transform;
         }

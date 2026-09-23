@@ -2592,7 +2592,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     {
         if (!EffectManager.TryGet(out EffectManager effects, this)) return;
 
-        EffectEntry entry = effects.Catalog.Throw;
+        EffectEntry entry = effects.Catalog.Grab_Throw;
         if (entry == null)
         {
             WarnNoThrowEntryOnce();
