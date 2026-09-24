@@ -148,6 +148,8 @@ public sealed class TitleFlowDirector : MonoBehaviour
 
         if (_monitorDisplay != null)
             _monitorDisplay.ShowLogo();
+        if (_crtFx != null)
+            _crtFx.AmbientBursts = true; // 로고가 지직거린다
 
         Debug.Log("[TitleFlow] Idle");
     }
@@ -165,9 +167,7 @@ public sealed class TitleFlowDirector : MonoBehaviour
 
         Burst(0.8f, 0.25f);
 
-        // 로고를 끈다 — 메뉴가 꺼진 RT(검정)로 바꾸면 "화면이 꺼진" 상태가 된다(계획서 §0.2-2).
-        if (_monitorDisplay != null)
-            _monitorDisplay.ShowUI();
+        // 접근하는 동안엔 로고가 계속 지직거리고, 도착하는 순간 메뉴로 바뀐다(팀장 09-23 — EnterMenu 에서 ShowUI).
 
         ClearSelection();
         ActivateCamera(_vcamNear);
@@ -213,7 +213,11 @@ public sealed class TitleFlowDirector : MonoBehaviour
         SetActive(_skipHintRoot, false);
         SetActive(_settingsRoot, false);
         SetActive(_menuRoot, true);
-        Burst(0.6f, 0.22f);
+        if (_monitorDisplay != null)
+            _monitorDisplay.ShowUI(); // 도착 — 로고 → START / SETTING / EXIT
+        if (_crtFx != null)
+            _crtFx.AmbientBursts = false; // 메뉴에선 끈다 — 클릭 판정이 흔들리지 않게
+        Burst(0.9f, 0.28f); // 화면 전환은 강한 버스트 한 번으로
 
         Select(_startButton);
 

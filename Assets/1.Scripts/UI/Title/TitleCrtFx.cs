@@ -22,6 +22,21 @@ public sealed class TitleCrtFx : MonoBehaviour
     [SerializeField] private Vector2 _tearHalfHeight = new(0.01f, 0.035f);
     [SerializeField] private Vector2 _tearOffset = new(0.012f, 0.035f);
 
+    [Header("상시 글리치 버스트 (Idle·접근 — 메인 모니터 지직거림)")]
+    [Tooltip("켜져 있으면 짧은 버스트를 불규칙하게 넣는다. 메뉴에서는 끈다(클릭 판정이 흔들리지 않게).")]
+    [SerializeField] private bool _ambientBursts = true;
+    [SerializeField] private Vector2 _ambientInterval = new(0.6f, 1.8f);
+    [SerializeField] private Vector2 _ambientStrength = new(0.25f, 0.6f);
+    [SerializeField] private Vector2 _ambientDuration = new(0.06f, 0.18f);
+
+    private float _nextAmbient;
+
+    public bool AmbientBursts
+    {
+        get => _ambientBursts;
+        set => _ambientBursts = value;
+    }
+
     private static readonly int IdTime = Shader.PropertyToID("_FxTime");
     private static readonly int IdGlitch = Shader.PropertyToID("_Glitch");
     private static readonly int IdTear = Shader.PropertyToID("_Tear");
@@ -83,6 +98,12 @@ public sealed class TitleCrtFx : MonoBehaviour
             _tear = new Vector4(Random.Range(0.1f, 0.9f), Random.Range(_tearHalfHeight.x, _tearHalfHeight.y),
                                 sign * Random.Range(_tearOffset.x, _tearOffset.y), 0f);
             _nextTear = _tearEnd + Random.Range(_tearInterval.x, _tearInterval.y);
+        }
+
+        if (_ambientBursts && _time >= _nextAmbient)
+        {
+            Burst(Random.Range(_ambientStrength.x, _ambientStrength.y), Random.Range(_ambientDuration.x, _ambientDuration.y));
+            _nextAmbient = _time + Random.Range(_ambientInterval.x, _ambientInterval.y);
         }
 
         _tear.w = _time < _tearEnd ? 1f - Mathf.InverseLerp(_tearStart, _tearEnd, _time) : 0f;

@@ -215,7 +215,11 @@ Unity 창을 한 번 클릭하면 정리된다.
 - Boss23 에 development 를 다시 머지하면 이 복원이 딸려 와 **타이틀 작업이 통째로 되돌아간다.** 받아야 할 게 생기면
   `a8ebd7f2` 를 제외하고 cherry-pick 하거나, 머지 후 `1.TitleScene` 을 Boss23 판으로 되돌릴 것.
 - 타이틀 완성 후 Boss23 → development 머지 때 `1.TitleScene` 충돌 → **Boss23 판 채택** + `1.TitleScene/` 라이팅 폴더 복구.
-- 타이틀 진행 상태: 계획서 `PLAN-title-flow.md` §0(3판, 승인). PRESS ANY KEY 오버레이·라이팅 베이크까지(`15aa3adf`). 다음 = 2단계(UI RT + 슬라이더).
+- 타이틀 진행 상태(09-24): 계획서 `PLAN-title-flow.md` §0.8~0.9. **팀장 Play 확인 완료** — PRESS ANY KEY CRT 룩 · 모니터 지직거림 ·
+  START/SETTING/EXIT(줌 없는 설정) · Start/Exit 전체 화면 꺼짐 · 벽 모니터 화면 반복 · 메인 모니터 로고 CRT.
+  🟡 **미결: Start 후 로비가 너무 바로 뜬다 → 로비 진입 "켜짐" 연출을 넣을지 다음 세션에 결정**(§0.9). 남은 단계: 설정창 가독성.
+- ⚠️ 09-23 밤 에디터를 켜 둔 채 Unity 내부 오디오 Assert(`Access version should be odd when acquiring lock`)가 무한 반복 →
+  로그 24.6GB → OOM 크래시(09-24 11:26). 우리 코드 무관. 다음 실행 때 "Recovering Scene Backups" 는 **No**(백업은 Play 진입 시 BootStrap 자동 백업).
 
 ## ▶▶ 현재 인수인계 (2026-09-23 #2 · 맵 룩 복구·미니맵 315°·**데칼 벽 타기 수정** — Play 검증 완료)
 

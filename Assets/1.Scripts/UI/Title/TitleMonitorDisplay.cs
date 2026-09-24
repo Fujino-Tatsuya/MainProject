@@ -23,8 +23,11 @@ public sealed class TitleMonitorDisplay : MonoBehaviour
     [Tooltip("메뉴·설정 캔버스를 그리는 UI 전용 카메라(UI 레이어만, 직교).")]
     [SerializeField] private Camera _uiCamera;
 
-    [Tooltip("RT 를 보여 줄 머티리얼 원본(URP Unlit). 런타임에 복제해 쓴다 — 애셋은 건드리지 않는다.")]
+    [Tooltip("RT 를 보여 줄 머티리얼 원본(Title/CRTScreen). 런타임에 복제해 쓴다 — 애셋은 건드리지 않는다.")]
     [SerializeField] private Material _uiMaterialSource;
+
+    [Tooltip("Idle 에 띄울 로고(Re:C). 원본 화면 머티리얼 대신 CRT 셰이더로 보여 준다 — 원본은 유리 반사에 스카이박스가 비쳤다(팀장 09-23).")]
+    [SerializeField] private Texture _logoTexture;
 
     [Header("해상도")]
     [SerializeField, Min(64)] private int _rtHeight = 1080;
@@ -112,15 +115,22 @@ public sealed class TitleMonitorDisplay : MonoBehaviour
         if (_grid != null) Destroy(_grid);
     }
 
-    /// <summary>Idle — 원본 머티리얼(Re:C 로고).</summary>
+    /// <summary>Idle·접근 — Re:C 로고를 CRT 셰이더로(지직거림은 TitleCrtFx 버스트). 로고가 없으면 원본 머티리얼.</summary>
     public void ShowLogo()
     {
         if (!enabled) return;
-        _screenRenderer.sharedMaterials = _originalMaterials;
         _showingUI = false;
+        if (_logoTexture == null)
+        {
+            _screenRenderer.sharedMaterials = _originalMaterials;
+            return;
+        }
+
+        _uiMaterial.mainTexture = _logoTexture;
+        ApplyScreenMaterial();
     }
 
-    /// <summary>입력 이후 — UI RT. 메뉴가 꺼져 있으면 RT 는 검정이라 "로고가 꺼진 화면"이 된다.</summary>
+    /// <summary>카메라 도착 — UI RT(메뉴·설정).</summary>
     public void ShowUI()
     {
         if (!enabled) return;
@@ -134,10 +144,15 @@ public sealed class TitleMonitorDisplay : MonoBehaviour
             _uiMaterial.mainTexture = _rt;
         }
 
+        ApplyScreenMaterial();
+        _showingUI = true;
+    }
+
+    private void ApplyScreenMaterial()
+    {
         var mats = (Material[])_originalMaterials.Clone();
         for (int i = 0; i < mats.Length; i++) mats[i] = _uiMaterial;
         _screenRenderer.sharedMaterials = mats;
-        _showingUI = true;
     }
 
     /// <summary>

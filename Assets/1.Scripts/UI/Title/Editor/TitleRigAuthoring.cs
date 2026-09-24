@@ -47,6 +47,13 @@ public static class TitleRigAuthoring
     const string UIMaterialPath = "Assets/3.Materials/title/MA_TitleMonitorUI.mat";
     const string PressMaterialPath = "Assets/3.Materials/title/MA_TitlePressCRT.mat";
     const string OffMaterialPath = "Assets/3.Materials/title/MA_TitleCRTOff.mat";
+    const string WallMaterialPath = "Assets/3.Materials/title/MA_TitleWallFeed.mat";
+    const string LogoTexturePath = "Assets/50.Art/Environment/Textures/Props/Office/monitor_screen.png"; // Re:C (SVN)
+    static readonly string[] WallSourceMaterials =
+    {
+        "Assets/3.Materials/Environment/NotUsedInMap/Props/Office/MA_monitor_screen glitch.mat",
+        "Assets/3.Materials/Environment/NotUsedInMap/Props/Office/MA_monitor_screen non.mat",
+    };
 
     [MenuItem("Tools/Title/Authoring/타이틀 리그 조립")]
     public static void BuildTitleRig()
@@ -235,6 +242,19 @@ public static class TitleRigAuthoring
             if (flip != null) flip.boolValue = true;
             pso.ApplyModifiedPropertiesWithoutUndo();
         }
+
+        // ── 벽 모니터 13대 = 지금 화면 반복(계획서 §0.5) ────────────────────
+        GameObject feedGo = EnsureRoot("TitleScreenFeed");
+        var feed = EnsureComponent<TitleScreenFeed>(feedGo);
+        var feso = new SerializedObject(feed);
+        Set(feso, "_targetCamera", mainCamera);
+        Set(feso, "_wallMaterialSource", EnsureWallMaterial());
+        Renderer[] walls = FindWallScreens();
+        SerializedProperty wallsProp = feso.FindProperty("_wallScreens");
+        wallsProp.arraySize = walls.Length;
+        for (int i = 0; i < walls.Length; i++) wallsProp.GetArrayElementAtIndex(i).objectReferenceValue = walls[i];
+        feso.ApplyModifiedPropertiesWithoutUndo();
+        Debug.Log($"[TitleRig] 벽 모니터 피드 대상 {walls.Length}대");
 
         // 메뉴 버튼 라벨도 등장할 때 스크램블 디코드
         foreach (Button b in new[] { start, option, exit })
@@ -449,6 +469,8 @@ public static class TitleRigAuthoring
         Set(so, "_screenRenderer", screen);
         Set(so, "_uiCamera", uiCam);
         Set(so, "_uiMaterialSource", EnsureUIMaterial());
+        // Idle 로고를 CRT 셰이더로 — 원본 화면 머티리얼은 유리 반사에 스카이박스가 비쳤다(팀장 09-23).
+        Set(so, "_logoTexture", AssetDatabase.LoadAssetAtPath<Texture>(LogoTexturePath));
         so.ApplyModifiedPropertiesWithoutUndo();
         return display;
     }
@@ -476,6 +498,44 @@ public static class TitleRigAuthoring
             mat.shader = shader;
             EditorUtility.SetDirty(mat);
         }
+        AssetDatabase.SaveAssets();
+        return mat;
+    }
+
+    /// <summary>원본 머티리얼(glitch/non)을 쓰는 화면 렌더러 = 벽 모니터. 중앙 화면은 이름이 같아도 머티리얼이 다르다.</summary>
+    static Renderer[] FindWallScreens()
+    {
+        var sources = new HashSet<Material>();
+        foreach (string path in WallSourceMaterials)
+        {
+            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (m != null) sources.Add(m);
+        }
+
+        var result = new List<Renderer>();
+        GameObject office = GameObject.Find("TitleOffice");
+        if (office == null) return result.ToArray();
+        foreach (Renderer r in office.GetComponentsInChildren<Renderer>(true))
+        {
+            foreach (Material m in r.sharedMaterials)
+                if (m != null && sources.Contains(m)) { result.Add(r); break; }
+        }
+        return result.ToArray();
+    }
+
+    static Material EnsureWallMaterial()
+    {
+        Material mat = EnsureMaterial(WallMaterialPath, "Title/CRTScreen");
+        if (mat == null) return null;
+        // 🔴 재귀마다 곱해진다 — (1 + 글로우) × 밝기 가 1 을 넘으면 몇 프레임 만에 하얗게 탄다.
+        mat.SetFloat("_Brightness", 0.8f);
+        mat.SetFloat("_Glow", 0.12f);
+        mat.SetFloat("_ChromaPx", 1.5f);
+        mat.SetFloat("_ScanStrength", 0.35f);
+        mat.SetFloat("_ScanCount", 220f);
+        mat.SetFloat("_Vignette", 0.9f);
+        mat.SetColor("_Tint", new Color(0.88f, 1f, 0.95f, 1f));
+        EditorUtility.SetDirty(mat);
         AssetDatabase.SaveAssets();
         return mat;
     }
