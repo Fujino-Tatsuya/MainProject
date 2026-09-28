@@ -8,6 +8,16 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 🔴 은희에게 — 플레이어 겹침 해소 요청 (2026-09-28 경석, `feature/Boss23`)
+
+- 보스·중간보스가 **플레이어를 막게** 했다: `PlayerGameRuleData.asset` obstacleMask 에 Enemy 추가(2185 → 2441),
+  GauntletBot·SpinnerBot 몸 캡슐 `m_Enabled: 1`. 상세·근거는 [PLAN-player-motor.md](PLAN-player-motor.md) Enemy 항목의 ⚠️ 정정.
+- **요청**: 이미 겹친 상태를 풀어 주는 처리. 서버가 움직이는 보스가 플레이어를 파고들면(추격·돌진·잡기 해제)
+  `PlayerMotionSweep` 의 CapsuleCast 가 시작 겹침을 거리 0 · 법선 = −이동방향으로 돌려줘 **전 방향이 막힌다**(끼임).
+  제안: 스윕 전에 `OverlapCapsule(obstacleMask 중 Enemy 비트)` → `Physics.ComputePenetration` 로 **수평만** 밀어내고,
+  그 변위도 정적 마스크 스윕을 거쳐 벽을 뚫지 않게. 서버·오너가 같은 모터를 돌리므로 한 곳에 넣으면 된다.
+  (모터 코드는 은희 담당이라 경석이 손대지 않았다.)
+
 ## ▶▶ 작업 세션 (2026-09-22 · **Dev 부팅 자동화 — 툴바 "Dev Boot"**, 브랜치 `tool/DevBootAutomation`)
 
 작업자: **은희(Claude 설계 → Codex 구현 위임)**, 레인 `MainProject` (= `C:\UnityProject\MainProject`).

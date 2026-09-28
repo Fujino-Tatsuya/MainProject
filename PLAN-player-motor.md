@@ -213,6 +213,11 @@ PlayerGameRuleData
   (`blockOtherPlayers = false`). 즉 의도된 동작 변경이며, 나중에 막고 싶으면 이 토글 하나만 켠다.
 - **Enemy는 계속 통과한다** — 현행 동작 유지("러시가 몹 사이를 지나는 감각", [PlayerMovement.cs:54](Assets/1.Scripts/Player/PlayerMovement.cs:54)).
   필요해지면 `blockMonsters` 형제 토글을 같은 자리에 추가한다(이번 범위 아님).
+  ⚠️ **정정 (2026-09-28 경석 · 팀장 결정)**: 보스·중간보스는 **막힌다.** 토글 대신 `PlayerGameRuleData.asset` 의
+  `obstacleMask` 에 Enemy(8)를 넣었다(2185 → 2441). 막히는 것은 **몸 콜라이더가 켜진 것만** — 23호(원래 켜짐)·
+  GauntletBot·SpinnerBot(이번에 켬)·TrainingDummy. 일반 몹은 몸 콜라이더가 꺼져 있어 **여전히 통과**한다(러시 감각 유지).
+  🔴 **겹침 해소는 미구현** — 이미 겹친 상태에서 `CapsuleCast` 는 거리 0 · 법선 = −이동방향을 돌려줘 어느 방향으로도
+  못 움직인다(`PlayerMotionSweep.cs:327`). 둘 다 kinematic 이라 솔버도 안 밀어 준다. → 은희 담당(CONTEXT 인수인계).
 - ⚠️ **비대칭 금지.** 토글은 **GameRule 애셋 하나**에서 오므로 전 플레이어가 같은 값을 본다.
   Motor별 로컬 bool로 두면 A는 B를 통과하는데 B는 A에 막혀 겹친 채 갇힌다 — 그래서 GameRule에 둔다.
 - ✅ **판정과는 자동 분리된다.** 스윕 마스크는 이동만 정한다. `PlayerHurtbox` 히트박스·Overlap 쿼리·

@@ -16,7 +16,7 @@ MonoBehaviour:
   stepOffset: 0.3
   obstacleMask:
     serializedVersion: 2
-    m_Bits: 2185
+    m_Bits: 2441
   groundMask:
     serializedVersion: 2
     m_Bits: 2057
