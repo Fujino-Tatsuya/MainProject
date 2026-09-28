@@ -739,6 +739,8 @@ GameObject:
   - component: {fileID: 28148461371597482}
   - component: {fileID: 4265590449314754425}
   - component: {fileID: 4009453750288028855}
+  - component: {fileID: 1692798668637704783}
+  - component: {fileID: 288923889857305099}
   m_Layer: 8
   m_Name: TwentyThree
   m_TagString: Untagged
@@ -778,7 +780,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 373754331
+  GlobalObjectIdHash: 1713256455
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -1008,9 +1010,6 @@ MonoBehaviour:
   innerRadius: 2
   outerRadius: 2.25
   segmentsPerArc: 48
-  frontColor: {r: 1, g: 0.35, b: 0.25, a: 0.45}
-  counterReadyColor: {r: 1, g: 0.9, b: 0.2, a: 0.8}
-  backColor: {r: 0.3, g: 0.7, b: 1, a: 0.45}
   heightOffset: 0.04
   airborneHideHeight: 0.6
   extraGroundMask:
@@ -1080,6 +1079,38 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::EffectAnimEvents
   animator: {fileID: 7785889658917140854}
   effects: []
+--- !u!114 &1692798668637704783
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6928635095488946580}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e59f6031be80d1c40ab161abf0873167, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DissolveDeath
+  ShowTopMostFoldoutHeaderGroup: 1
+  dissolveTemplate: {fileID: 2100000, guid: 2aa1c6b21e004e799e426acfd55ec726, type: 2}
+  particlePrefab: {fileID: 7019508933032447489, guid: 0e15d6fc561b43fa95fadff8ab04b5fd, type: 3}
+  duration: 2
+  despawnGrace: 0.5
+  renderers: []
+--- !u!114 &288923889857305099
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6928635095488946580}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 61349f523c460af499e8ba439023b8ff, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MonsterCounterWindow
+  windowDuration: 1.5
+  groggyDuration: 1
 --- !u!1 &7872058075082925992
 GameObject:
   m_ObjectHideFlags: 0
@@ -1248,9 +1279,17 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 2100000, guid: 98b1c99dee6c7b5488abe440aed99c45, type: 2}
     - target: {fileID: -2150004216396664862, guid: cbdaae8bc76ee814d8a32d754976bdde, type: 3}
+      propertyPath: m_Materials.Array.size
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: -2150004216396664862, guid: cbdaae8bc76ee814d8a32d754976bdde, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: 05140c2772297ca40b1428aeb4ed1c81, type: 2}
+    - target: {fileID: -2150004216396664862, guid: cbdaae8bc76ee814d8a32d754976bdde, type: 3}
+      propertyPath: 'm_Materials.Array.data[1]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 98b1c99dee6c7b5488abe440aed99c45, type: 2}
     - target: {fileID: 919132149155446097, guid: cbdaae8bc76ee814d8a32d754976bdde, type: 3}
       propertyPath: m_Name
       value: TwentyThree
@@ -1277,6 +1316,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: cbdaae8bc76ee814d8a32d754976bdde, type: 3}
       insertIndex: -1
       addedObject: {fileID: 7785889658917140854}
+    - targetCorrespondingSourceObject: {fileID: -5538276366454593418, guid: cbdaae8bc76ee814d8a32d754976bdde, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 3782540994907298649}
   m_SourcePrefab: {fileID: 100100000, guid: cbdaae8bc76ee814d8a32d754976bdde, type: 3}
 --- !u!4 &87143761695125014 stripped
 Transform:
@@ -1325,6 +1367,27 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 3982289436966222279, guid: cbdaae8bc76ee814d8a32d754976bdde, type: 3}
   m_PrefabInstance: {fileID: 1567392425763977719}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &2802481311217144193 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: -5538276366454593418, guid: cbdaae8bc76ee814d8a32d754976bdde, type: 3}
+  m_PrefabInstance: {fileID: 1567392425763977719}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &3782540994907298649
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2802481311217144193}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c7a41f60d2b84e6a9c15d380be720063, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DissolveOverlay
+  overlayMaterialIndex: 1
+  fadeInDuration: 0.8
+  fadeOutDuration: 0.4
+  shown: 0
 --- !u!4 &2866633164606936120 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 3605180668558749135, guid: cbdaae8bc76ee814d8a32d754976bdde, type: 3}

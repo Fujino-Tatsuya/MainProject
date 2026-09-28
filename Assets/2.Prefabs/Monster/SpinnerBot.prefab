@@ -411,7 +411,7 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   dissolveTemplate: {fileID: 2100000, guid: 2aa1c6b21e004e799e426acfd55ec726, type: 2}
   particlePrefab: {fileID: 7019508933032447489, guid: 0e15d6fc561b43fa95fadff8ab04b5fd, type: 3}
-  duration: 1
+  duration: 1.5
   despawnGrace: 0.5
   renderers:
   - {fileID: 9128745864370794678}
@@ -428,7 +428,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MonsterCounterWindow
   windowDuration: 1.5
-  groggyDuration: 0.5
+  groggyDuration: 1
 --- !u!114 &8854267420545635175
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1397,11 +1397,11 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c7a41f60d2b84e6a9c15d380be720063, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::InterruptOverlay
+  m_EditorClassIdentifier: Assembly-CSharp::DissolveOverlay
   overlayMaterialIndex: 1
   fadeInDuration: 0.8
   fadeOutDuration: 0.4
-  interruptible: 0
+  shown: 0
 --- !u!4 &1667784286779666150 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 8852736931235173679, guid: 3b73a8d629c6c5d499be6573d1d6e2bb, type: 3}

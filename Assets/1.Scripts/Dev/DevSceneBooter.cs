@@ -5,7 +5,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 
 /// <summary>
-/// 개발용 단독 부팅기. <c>scene</c> 필드에 적은 씬을 정식 흐름과 동일한 상태로 띄운다.
+/// 개발용 단독 부팅기. 에디터의 <c>DevBootTarget</c>에 저장된 씬을 정식 흐름과 동일한 상태로 띄운다.
 /// 호스트 기동 → NGO 씬 로드 → 액티브 씬 지정 → 플레이어 스폰 → MainGame 시작 통보 → 부팅 씬 언로드.
 ///
 /// 씬 로드를 <see cref="NetworkSceneManager"/>로 하는 것이 핵심이다. 그래야 씬에 배치된
@@ -16,17 +16,13 @@ using UnityEngine.SceneManagement;
 /// 로딩 씬을 생략해도 완료 체인이 그대로 돈다. 이 부팅기는 컨트롤러가 해주지 않는 것만 메운다:
 /// 타겟 지정 · 액티브 씬 전환 · 부팅 씬 언로드 · 순서 비의존 안전망.
 ///
-/// ⚠️ Assets/0.Scenes/Dev/Dev_Boot.unity 에만 둔다. 그 씬은 빌드 목록에 넣지 않는다.
+/// ⚠️ Assets/0.Scenes/Debug/Dev_Boot.unity 에만 둔다. 그 씬은 빌드 목록에 넣지 않는다.
 /// 정식 흐름(BootStrap→Title→Lobby→Loading→Map)은 이 파일과 무관하게 그대로 동작한다.
 /// </summary>
 [DisallowMultipleComponent]
 public class DevSceneBooter : MonoBehaviour
 {
     private const string LoadingSceneName = "2.LoadingScene";
-
-    [Header("부팅할 씬 — 이 이름만 바꾸면 된다")]
-    [Tooltip("빌드 씬 목록에 등록되고 enabled 상태여야 한다. 런타임 LoadScene은 비활성 씬을 로드하지 못한다.")]
-    [SerializeField] private string scene = "4.MapScene";
 
     [Header("옵션")]
     [SerializeField] private bool autoBootOnPlay = true;
@@ -41,7 +37,17 @@ public class DevSceneBooter : MonoBehaviour
     [SerializeField, Min(1f)] private float timeoutSeconds = 30f;
 
     /// <summary>부팅 대상 씬 이름.</summary>
-    public string TargetScene => scene;
+    public string TargetScene
+    {
+        get
+        {
+#if UNITY_EDITOR
+            return DevBootTarget.SceneName;
+#else
+            return string.Empty;
+#endif
+        }
+    }
 
     private bool _booting;
 
@@ -83,10 +89,11 @@ public class DevSceneBooter : MonoBehaviour
 
     private IEnumerator BootRoutine()
     {
-        string targetScene = string.IsNullOrWhiteSpace(scene) ? string.Empty : scene.Trim();
+        string configuredTarget = TargetScene;
+        string targetScene = string.IsNullOrWhiteSpace(configuredTarget) ? string.Empty : configuredTarget.Trim();
         if (targetScene.Length == 0)
         {
-            Debug.LogError("[DevBoot] Scene 필드가 비어 있다. 부팅할 씬 이름을 적을 것.", this);
+            Debug.LogError("[DevBoot] EditorPrefs에 부팅 타겟이 없다. 툴바 Dev Boot 드롭다운에서 씬을 선택할 것.", this);
             yield break;
         }
 

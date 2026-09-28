@@ -68,6 +68,7 @@ public class Player : Unit
     private PlayerMotor motor;
     private PlayerGroundingSensor groundingSensor;
     private PlayerInvulnerability invulnerability;
+    private PlayerShieldVfx shieldVfx;
     private PlayerInputReader inputReader;
     private PlayerSkillTargeting skillTargeting;
     private NetworkTransform networkTransform;
@@ -191,6 +192,7 @@ public class Player : Unit
         motor = GetComponent<PlayerMotor>();
         groundingSensor = GetComponent<PlayerGroundingSensor>();
         invulnerability = GetComponent<PlayerInvulnerability>();
+        shieldVfx = GetComponent<PlayerShieldVfx>();
         inputReader = GetComponent<PlayerInputReader>();
         skillTargeting = GetComponent<PlayerSkillTargeting>();
         networkTransform = GetComponent<NetworkTransform>();
@@ -1590,8 +1592,17 @@ public class Player : Unit
     // 피격당하면(데미지량 무관) 패시브(불굴의 의지) 쿨다운을 감소시킨다. 서버 권위에서만 유효.
     public override bool ReceiveAttack(AttackInfo attackInfo, AttackHitContext hitContext)
     {
+        // 보호막 피격 파문(연출)은 "어느 방향에서 맞았나"가 필요한데, 그 정보는 AttackHitContext 에만
+        // 있고 이 메서드는 서버 전용 공격 판정에서만 불린다 — 리모트 클라에는 도착하지 않는다.
+        // 그래서 여기서 쉴드 감소를 확인해 PlayerShieldVfx 가 전 피어로 퍼뜨리게 한다. (판정 영향 없음)
+        int shieldBefore = CurrentShield;
+
         bool result = base.ReceiveAttack(attackInfo, hitContext);
         passive?.NotifyOwnerHit();
+
+        if (CurrentShield < shieldBefore)
+            shieldVfx?.ServerHit(hitContext.sourcePosition);
+
         return result;
     }
 

@@ -30,5 +30,5 @@ MonoBehaviour:
     m_Bits: 0
   animatorStateName: 
   snapRotationOnStart: 0
-  shieldAmount: 10
-  shieldDuration: 5
+  shieldAmount: 100
+  shieldDuration: 10

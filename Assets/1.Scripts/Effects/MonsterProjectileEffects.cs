@@ -44,7 +44,7 @@ public class MonsterProjectileEffects : NetworkBehaviour
 
         // follow로 넘기면 SetParent를 쓰지 않으므로 투사체의 scale이 곱해지지 않고,
         // 투사체가 사라져도 풀 인스턴스가 딸려 죽지 않는다.
-        _trailHandle = EffectManager.Instance.PlayLooping(trail, transform, Vector3.zero, scale);
+        _trailHandle = EffectManager.Instance.PlayLooping(trail, transform, Vector3.zero);
     }
 
     public override void OnNetworkDespawn()

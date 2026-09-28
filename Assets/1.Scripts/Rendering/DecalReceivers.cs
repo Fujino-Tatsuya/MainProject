@@ -27,6 +27,37 @@ public static class DecalReceivers
     public const uint Mask = 1u << LayerIndex;
 
     /// <summary>
+    /// 바닥 전용 각도 페이드. 실제 기울기 35° 에서 흐려지기 시작해 55° 에서 사라진다 —
+    /// 바닥(0°)은 그대로, 벽(90°)은 안 칠해진다.
+    ///
+    /// 🔴 <b>이 값은 "도"가 아니다.</b> URP 는 x = ((1 - cos θ)/2)² 를 start/180 · end/180 과 비교한다
+    /// (<c>DecalEntityManager.cs</c> 의 angleFade 계산). 실제 각도 θ 의 설정값은
+    /// <c>180 · ((1 - cos θ)/2)²</c> 이고, <b>수직벽(90°)이 45 에 해당한다.</b>
+    /// 그래서 end 를 45 이상으로 두면(35/55, 30/60, 0/90 …) 벽이 항상 50% 남는다 — 2026-09-23 에
+    /// 값을 여러 번 바꿔도 "무시된다"고 보였던 이유. 35°→1.47, 55°→8.18.
+    /// ⚠️ 셰이더 그래프의 Angle Fade 도 켜져 있어야 한다(<c>SG_DecalFloorOnly</c>·<c>SG_ColoredDecal</c>).
+    ///    URP 기본 <c>Decal.shadergraph</c> 는 꺼져 있어 이 값을 통째로 무시한다.
+    ///
+    /// 🔴 왜 필요한가(2026-09-23): 아레나는 <b>루트째</b> 수신자로 표시돼 벽도 비트 1 을 갖는다.
+    /// 각도 페이드가 꺼져 있으면(180/180) 투영 상자 안에 들어온 벽면까지 예고가 타고 올라간다.
+    /// 수신자에서 벽을 빼는 것보다 프로젝터가 거르는 쪽이 존·아레나 저작과 무관해서 이쪽을 쓴다.
+    /// </summary>
+    public const float FloorAngleFadeStart = 1.47f;
+    public const float FloorAngleFadeEnd = 8.18f;
+
+    /// <summary>
+    /// 예고·장판 프로젝터의 공통 계약 — 수신자 마스크(캐릭터 제외) + 바닥 전용 각도 페이드(벽 제외).
+    /// 프로젝터를 만드는 곳마다 이 한 줄만 부른다.
+    /// </summary>
+    public static void ConfigureFloorProjector(UnityEngine.Rendering.Universal.DecalProjector decal)
+    {
+        if (decal == null) return;
+        decal.renderingLayerMask = Mask;
+        decal.startAngleFade = FloorAngleFadeStart;
+        decal.endAngleFade = FloorAngleFadeEnd;
+    }
+
+    /// <summary>
     /// <paramref name="root"/> 아래 모든 렌더러를 데칼 수신자로 표시한다(비활성 포함).
     ///
     /// 호출처는 <b>런타임 스폰 경로</b>다 — 존 프리팹·씬을 저작하지 않으므로 팀원 작업과 머지 충돌이
@@ -39,15 +70,37 @@ public static class DecalReceivers
         if (root == null) return 0;
 
         Renderer[] renderers = root.GetComponentsInChildren<Renderer>(true);
+        int tagged = 0;
         for (int i = 0; i < renderers.Length; i++)
         {
             Renderer r = renderers[i];
             if (r == null) continue;
 
+            // 벽·기둥은 수신자에서 뺀다. 각도 페이드가 수직면은 지우지만, 벽 메시에 붙은
+            // 위를 향한 면(루버 판자·기둥 밑동·벽 상단)은 바닥과 각도로 구분되지 않는다(2026-09-23 실측).
+            // 🔴 단, 게임플레이 오브젝트(Unit — 송전탑 등)는 모양과 무관하게 남긴다. 빼면 표식이
+            //    프롭 위로 이어지지 않고 프롭이 표식을 가린다(MapContentSpawner 주석). 벽 판정은 건축물에만.
+            if (IsWallLike(r.bounds) && r.GetComponentInParent<Unit>(true) == null) continue;
+
             // 🔴 OR 다. 대입(=)으로 바꾸면 그 렌더러가 bit 0 을 잃어 조명이 빠진다.
             r.renderingLayerMask |= Mask;
+            tagged++;
         }
 
-        return renderers.Length;
+        return tagged;
+    }
+
+    /// <summary>벽으로 보는 최소 높이(m). 낮은 상자·단차는 계속 칠해진다.</summary>
+    public const float WallMinHeight = 1.2f;
+
+    /// <summary>
+    /// 월드 경계 상자로 벽을 가른다 — <b>높고, 높이가 수평 두 변 중 짧은 쪽보다 큰 것</b>.
+    /// 긴 벽(30×3×0.5)·기둥(0.8×4×0.8)은 벽, 바닥·철망(평평)·경사로(6×1.5×3)·낮은 프롭은 바닥 쪽이다.
+    /// ⚠️ ㄱ자로 합쳐진 벽 메시처럼 수평 두 변이 모두 긴 렌더러는 벽으로 못 가른다.
+    /// </summary>
+    public static bool IsWallLike(Bounds b)
+    {
+        Vector3 s = b.size;
+        return s.y > WallMinHeight && s.y > Mathf.Min(s.x, s.z);
     }
 }

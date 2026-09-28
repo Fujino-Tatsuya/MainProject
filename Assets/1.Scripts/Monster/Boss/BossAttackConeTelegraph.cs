@@ -321,7 +321,7 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
 
         var decal = go.AddComponent<DecalProjector>();
         decal.material = new Material(source);          // 인스턴스 — 애셋 오염 금지
-        decal.renderingLayerMask = DecalReceivers.Mask; // 캐릭터에 묻지 않게(표식과 같은 마스크)
+        DecalReceivers.ConfigureFloorProjector(decal); // 캐릭터·벽에 묻지 않게(표식과 같은 계약)
         decal.fadeFactor = 1f;
         decal.enabled = false;
         return decal;

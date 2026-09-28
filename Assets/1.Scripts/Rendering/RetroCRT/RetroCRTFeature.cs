@@ -61,9 +61,13 @@ public sealed class RetroCRTFeature : ScriptableRendererFeature
             renderer.EnqueuePass(_pixelScanlinePass);
         }
 
-        if (_pass != null && _material != null && controller.EffectEnabled)
+        // 컨트롤러가 자기 머티리얼을 들고 있으면 그것을 쓴다(키워드를 따로 켜야 하는 씬용).
+        // 비어 있으면 Renderer Feature 의 공유 머티리얼 — 이쪽 저작값은 절대 건드리지 않는다.
+        Material material = controller.MaterialOverride != null ? controller.MaterialOverride : _material;
+
+        if (_pass != null && material != null && controller.EffectEnabled)
         {
-            _pass.Setup(_material, controller.BezelSize);
+            _pass.Setup(material, controller);
             renderer.EnqueuePass(_pass);
         }
     }
@@ -76,9 +80,9 @@ public sealed class RetroCRTFeature : ScriptableRendererFeature
 
     private sealed class RetroCRTPass : ScriptableRenderPass
     {
-        private static readonly int IdBezelSize = Shader.PropertyToID("_BezelSize");
         private Material _material;
-        private float _bezelSize;
+        private RetroCRTController _controller;
+        private Material _validatedMaterial;
 
         public RetroCRTPass()
         {
@@ -87,10 +91,17 @@ public sealed class RetroCRTFeature : ScriptableRendererFeature
             requiresIntermediateTexture = true;
         }
 
-        public void Setup(Material material, float bezelSize)
+        public void Setup(Material material, RetroCRTController controller)
         {
             _material = material;
-            _bezelSize = bezelSize;
+            _controller = controller;
+
+            // 참조 이름이 바뀌면 MPB 는 예외 없이 조용히 무시한다. 머티리얼이 바뀔 때 한 번만 검사한다.
+            if (_validatedMaterial != material)
+            {
+                CrtParamInfo.WarnMissingProperties(material, material);
+                _validatedMaterial = material;
+            }
         }
 
         public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
@@ -103,7 +114,7 @@ public sealed class RetroCRTFeature : ScriptableRendererFeature
             }
 
             TextureHandle source = resources.activeColorTexture;
-            if (!source.IsValid() || _material == null)
+            if (!source.IsValid() || _material == null || _controller == null)
                 return;
 
             TextureDesc descriptor = renderGraph.GetTextureDesc(source);
@@ -117,7 +128,27 @@ public sealed class RetroCRTFeature : ScriptableRendererFeature
                 source, destination, _material, 0);
             // 패스별 값만 전달한다. 공유 머티리얼 에셋과 다른 카메라의 예약된 값은 변경하지 않는다.
             var properties = new MaterialPropertyBlock();
-            properties.SetFloat(IdBezelSize, _bezelSize);
+
+            // 베젤은 기존대로 항상 컨트롤러 값을 따른다.
+            properties.SetFloat(CrtParamInfo.IdOf(CrtParam.BezelSize), _controller.BezelSize);
+
+            // 나머지는 오버라이드가 걸린 것만 덮는다.
+            // 안 걸리면 아무것도 담지 않으므로 머티리얼 저작값이 그대로 산다 — 맵 씬 룩이 안 흔들린다.
+            if (_controller.HasOverrides)
+            {
+                for (var i = 0; i < CrtParamInfo.Count; i++)
+                {
+                    var param = (CrtParam)i;
+                    if (!_controller.TryGetOverride(param, out float value))
+                        continue;
+
+                    if (CrtParamInfo.IsVector(param))
+                        properties.SetVector(CrtParamInfo.IdOf(param), new Vector4(value, value, 0f, 0f));
+                    else
+                        properties.SetFloat(CrtParamInfo.IdOf(param), value);
+                }
+            }
+
             parameters.propertyBlock = properties;
             renderGraph.AddBlitPass(parameters, passName: PassName);
 

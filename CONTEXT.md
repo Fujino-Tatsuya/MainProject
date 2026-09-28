@@ -13,7 +13,7 @@ Update this file when a term becomes important enough that future agents or team
 작업자: **은희(Claude)**, 워크트리 `MainProject-Worktree`. 계획·근거·뒤집힌 결정은
 [PLAN-transparent-group-tool.md](PLAN-transparent-group-tool.md).
 
-**상태: 구현·검증 완료. 커밋 안 함.** 아래 「구역 진입 기반 벽 투명화 1단계」의
+**상태: 구현·검증 완료, 커밋 `2207e295`.** 아래 「구역 진입 기반 벽 투명화 1단계」의
 「남은 것 · 존 프리팹 오서링」을 사람이 하기 쉽게 만드는 **에디터 전용** 보조 툴이다. 런타임 코드 0줄.
 
 **용어** — 여기서 "그룹" 은 *이름을 붙여 저장해 둔 GameObject 선택 묶음* 이다.
@@ -43,6 +43,74 @@ Update this file when a term becomes important enough that future agents or team
 **남은 것**
 - 셰이더를 `Rendering/Occlusion/Editor/Shaders/` 로 이동 (Unity 를 닫을 일이 생기면. `Shader.Find` 는 경로 무관이라 급하지 않다)
 - 범위 밖으로 둔 것들은 [PLAN-transparent-group-tool.md](PLAN-transparent-group-tool.md) §8
+
+## ▶▶ 작업 세션 (2026-09-22 · **Dev 부팅 자동화 — 툴바 "Dev Boot"**, 브랜치 `tool/DevBootAutomation`)
+
+작업자: **은희(Claude 설계 → Codex 구현 위임)**, 레인 `MainProject` (= `C:\UnityProject\MainProject`).
+계획·근거·확정 결정은 [PLAN.md](PLAN.md) 최상단.
+**상태: 코드·검증 완료** (커밋 `17d92726` · `d2e3bdbb` · `7d17fbfc`). Play 검증 8항목 전부 통과.
+알려진 한계 2건(직접 Play 경로 · `playModeStartScene` 초기화 범위)은 **고치지 않기로 결정** — 근거는 [PLAN.md](PLAN.md) 7절.
+
+**무엇을 푸는가** — Dev 부팅의 두 가지 마찰:
+1. 부팅할 씬을 바꾸려면 공유 씬 `Dev_Boot.unity` 안의 `DevSceneBooter.scene` 필드를 고쳐야 한다
+   (= git 추적 씬이 dirty, 팀원 기본값이 통째로 바뀐다. 2026-09-17 Codex 리뷰 consider #4 가 이미 지적).
+2. 타겟 씬이 빌드 씬 목록에 없으면 **Play 가 이미 시작된 뒤** 로그 하나 찍고 멈춘다.
+   → 자동 등록은 **Play 진입 전 에디터 훅**에서 해야 한다.
+
+**용어** — 여기서 "Dev Boot" 는 *툴바 드롭다운에서 씬을 고르면 빌드 목록을 임시 보정하고
+`Dev_Boot` 씬으로 Play 에 진입해 그 씬을 부팅하는 것* 이다. 내장 Play 버튼은 **교체하지 않는다**
+(6000.3 의 `OverridableToolbar` 는 Scene 뷰 툴바만 지원. `[MainToolbarElement]` 로 옆에 붙인다).
+
+
+**🔴 부팅 씬 위치 — `Assets/0.Scenes/Debug/Dev_Boot.unity`** (2026-09-22 이동, `0094e75d`).
+예전 위치는 `Assets/0.Scenes/Dev_Boot.unity` 였다. meta guid `180a2dd6e0939fed247ab6908eb0ec7d`
+는 그대로라 참조는 안 깨졌다. **코드는 경로가 아니라 이 GUID 로 씬을 찾는다**
+(`DevBootLauncher.DevBootScenePath`) — 경로 상수를 다시 박지 말 것. 박아두면 다음 이동 때
+직접 Play 판정·강제 정리 메뉴·드롭다운의 자기 제외가 조용히 안 걸린다(`7359e839` 에서 겪은 일).
+
+**🔴 MPPM 과의 관계 — 시작 방법에 따라 갈린다 (2026-09-22 실측 확정)**
+
+활성 MPPM 시나리오가 있을 때, **어느 쪽이 이기는지는 Play 를 어떻게 시작했느냐로 정해진다.**
+`MPPM2` 를 활성화한 상태로 둘 다 확인했다.
+
+| 시작 방법 | 메인 에디터가 시작하는 씬 | 왜 |
+|---|---|---|
+| 툴바 `Dev Boot ▾` 에서 씬 선택 | **`Dev_Boot`** (= Dev Boot 승) | `DevBootLauncher.Launch` 가 `playModeStartScene` 을 **설정한다.** 이건 MPPM 이 씬을 연 뒤, Play 진입 시점에 치환되므로 덮어쓴다 |
+| `Dev_Boot` 씬을 열어둔 채 내장 Play | **시나리오의 InitialScene** (= 프로필 승) | `PrepareDirectDevBootIfNeeded` 는 **빌드 목록만 보정하고 `playModeStartScene` 은 건드리지 않는다.** 덮을 게 없으니 MPPM 이 연 씬이 그대로 간다 |
+
+**이 갈림은 의도된 것이다(2026-09-22 은희).** 시작 방법을 바꾸는 것만으로 "Dev Boot 단독 부팅" 과
+"MPPM 시나리오대로" 를 골라 쓸 수 있다. 경고·거부 가드는 **의도적으로 넣지 않았다** — 가드를 넣으면
+이 선택지가 막힌다.
+
+왜 두 기구가 이렇게 노는가 — MPPM 구현은 패키지가 아니라 에디터 내장
+`UnityEditor.MultiplayerModule.dll` 에 있고(`com.unity.multiplayer.playmode@2.0.2` 는 문서만 든
+껍데기다), 그 DLL 은 `playModeStartScene` 을 **전혀 참조하지 않는다.**
+`SetupAndLoadInitialScene` / `CleanupInitialScene` 이 `EditorSceneManager.OpenScene` 과
+`GetSceneManagerSetup`·`RestoreSceneManagerSetup` 으로 *에디터에 열린 씬* 을 바꿨다 되돌릴 뿐이다.
+`playModeStartScene` 은 그보다 뒤, *Play 가 실제로 시작하는 씬* 을 덮는다. 그래서 설정돼 있으면 이기고,
+없으면 MPPM 이 이긴다.
+
+참고: 활성 시나리오는 `UserSettings/PlayModeUserSettings.asset` 의 `m_LastActiveConfiguration`
+에 들어간다(git 미추적). `Assets/Settings/PlayMode/DevBoot.asset`(InitialScene=Dev_Boot 인 옛
+시나리오)은 2026-09-22 은희가 삭제했다 — 툴바가 그 역할을 대신한다.
+
+**🔴 동시 수정 주의 — 이번 세션이 건드리는 파일**
+
+| 파일 | 상태 |
+|---|---|
+| `Assets/1.Scripts/Dev/DevBootTarget.cs` | 신규(런타임) — EditorPrefs 키의 유일한 원본 |
+| `Assets/1.Scripts/Dev/Editor/DevBootLauncher.cs` | 신규 — 목록 보정·원복·Play 진입 |
+| `Assets/1.Scripts/Dev/Editor/DevBootSceneCatalog.cs` | 신규 — 씬 스캔 + 최근 목록 |
+| `Assets/1.Scripts/Dev/Editor/DevBootToolbar.cs` | 신규 — `[MainToolbarElement]` 드롭다운 |
+| `Assets/1.Scripts/Dev/Editor/DevBootLauncherTests.cs` | 신규 — EditMode |
+| `Assets/1.Scripts/Dev/DevSceneBooter.cs` | 수정 — `scene` 필드 제거(부팅 시퀀스는 무수정) |
+| `Assets/1.Scripts/Dev/Editor/DevBuildSceneList.cs` | 수정 — 썩은 `DevScenes` 배열·활성/비활성 메뉴 삭제 |
+| `ProjectSettings/EditorBuildSettings.asset` | 수정 — Dev_Boot 등록 제거 |
+
+**팀 공지** — `Dev/빌드 씬 목록/테스트 씬 활성화·비활성화` 메뉴는 **없어진다.** 툴바 `Dev Boot ▾`
+가 대신하고, 빌드 목록은 Play 종료 시 자동 원복된다. 커밋 전
+`git diff ProjectSettings/EditorBuildSettings.asset` 이 비어 있는지 확인할 것
+(에디터 크래시로 원복이 안 돌면 `Dev/Dev Boot/빌드 목록 강제 정리`).
 
 ## ▶▶ 이전 인수인계 (2026-09-22 · 구역 진입 기반 벽 투명화 1단계 **검증 완료**, 브랜치 `feature/TransparentV2-keepgoing`)
 
@@ -175,6 +243,95 @@ Unity 창을 한 번 클릭하면 정리된다.
 ## ▶▶ 이전 인수인계 (2026-09-21 #2 · 입장 연출·차징 점프·돌진 사거리 — **전부 Play 검증 대기**)
 
 작업자: **경석(Claude)**. 브랜치 `feature/Boss23`. 컴파일 통과(에러 0).
+
+## ▶▶ 현재 인수인계 (2026-09-23 #2 · 맵 룩 복구·미니맵 315°·**데칼 벽 타기 수정** — Play 검증 완료)
+
+작업자: **경석(Claude + Codex 교차검증)**. 브랜치 `feature/Boss23`. 컴파일 에러 0.
+아래 셋은 팀장이 Play 로 확인했다(데칼·F9·디밍). 미니맵 315° 는 방향 대조가 남았다.
+
+| 건 | 내용 |
+|---|---|
+| **맵 외곽 어둡게(디밍·LoS)** | `4.MapScene` FogManager `dimEnabled/losEnabled` 0→1. 🔴 09-16 머지 `c4dbd4b9` 가 development 의 1/1 을 **0/0 으로 되돌렸던 것**이 원인 — "은희 PC 와 비주얼이 다르다"의 정체 |
+| **F9(LookToggle) 무반응** | 붙어 있던 `MaskBlurController` 오브젝트가 `c44d235c`(09-18) 에서 **비활성화**돼 한 번도 안 돌았다. 컴포넌트를 FogManager 오브젝트로 옮기고 `startLook: 1`(B). ApplyDim 이 `fogEnabled=false` 를 강제하던 줄 제거 |
+| **미니맵 각도** | 315°(= 카메라 요각 −45°). 코드 기본값·씬 값 둘 다. 135° 는 180° 뒤집혀 있었다 |
+| **F6 장판 소환** | `DevTelegraphProbe.cs` 삭제 |
+| **데칼이 벽을 타고 올라감** | 원인 3겹 — 아래 |
+
+**데칼 원인 3겹** (다음 사람이 한 겹만 고치고 "안 된다"고 하지 않게)
+1. URP 기본 `Decal.shadergraph` 는 **`angleFade: false`** — 프로젝터 각도값을 통째로 무시한다.
+   → `Assets/3.Materials/SG_DecalFloorOnly.shadergraph`(복사본, angleFade on) 로 `MA_AoeDecal_Red`·`MA_BossMarkerDecal` 교체. `SG_ColoredDecal` 도 on.
+2. **Angle Fade 값은 "도"가 아니다.** 설정값 = `180·((1−cosθ)/2)²`, 수직벽 = **45**. end ≥ 45 면 벽이 항상 50% 남는다.
+   → `DecalReceivers.FloorAngleFadeStart/End = 1.47/8.18`(실제 35°→55°). 프리팹 2개(Aoe·FireFloor) 동일.
+3. 벽 메시의 **위를 향한 면**(루버 판자·기둥 밑동)은 각도로 못 거른다.
+   → `DecalReceivers.Tag` 가 벽 형태 렌더러(높이 > 1.2m 이고 높이 > 수평 짧은 변)를 **수신자에서 뺀다**. `Unit`(송전탑) 은 예외로 남김.
+
+**남은 것**
+- 🔴 **HUD 스킬 슬롯이 청록 판으로 보임** — SVN **r326(은희)** 이 HUD 텍스처 `.meta` 5개의 **guid 를 새로 만들었다**
+  (`slot_cooldown*`, `gauge_HP*`, `portrail_gunner`). `CombatHUD.prefab` 은 옛 guid 를 가리켜 스프라이트가 끊겼다. 은희에게 전달 예정 —
+  **guid 를 옛 값으로 되돌리는 쪽 권장**(Unity 닫고).
+- 플레이어 `AimIndicator`·`SkillRangeIndicator` 데칼도 같은 증상 가능(셰이더 angleFade off, 180/180). 이번엔 보스만.
+- `fix/art_zone260923`(원격, 존 깊이 수정) 이 development 에 미머지.
+- 다음 작업: **아트 씬 오브젝트를 `1.TitleScene` 으로 이식**.
+
+## ▶▶ 이전 인수인계 (2026-09-23 · prep 클립·미니맵·타이틀 — **다음 세션에 4건 처리**)
+
+작업자: **경석(Claude)**. 브랜치 `feature/Boss23`(development 대비 **5 ahead / 0 behind**).
+컴파일 에러 0. **Play 검증은 전부 남았다.**
+
+### 🔴 다음 세션은 여기부터 — 팀장 지시 4건
+
+1. **미니맵 각도 재조정** — 135° 도 틀렸다(팀장: "내가 각도 잘못 알려줘서 다시 맞춰야 함").
+   `MinimapController.MapRotationDegrees` 는 **public 필드라 인스펙터에서 바로 돌려볼 수 있다.**
+   🔴 값을 확정하면 **코드 기본값과 `4.MapScene.unity:2682` 둘 다** 고쳐야 한다 —
+   씬에 직렬화된 값이 이기므로 코드만 고치면 아무 일도 안 일어난다(이번에 그 함정을 밟을 뻔했다).
+2. **development 비주얼 변경분 반영** — ⚠️ **확인 필요.** 팀장은 "development 최신 커밋이
+   내 비주얼과 매우 달라졌다"고 했는데, 2026-09-23 03:20 기준 **development 에 새 커밋이 0개**다
+   (내가 5 ahead / 0 behind). 09-23 에 머지한 32커밋(벽 투명화·팔라딘 애니)이 이미 그 변경분일
+   가능성이 높다. 아니라면 **누군가 푸시를 안 했다는 뜻**이므로 그것부터 확인할 것.
+3. **3D 오피스 아트를 `1.TitleScene` 으로 이식** — 지금 씬에는 **아트가 하나도 없다**
+   (루트 9개가 전부 UI·vcam·FX). 화면의 어두운 사각형은 3D 모니터가 아니라 `Option_Panel` UI 다.
+   아트가 들어오면 **`CRT_Anchor` 를 모니터 화면에 맞추면** 캔버스 2개가 따라간다.
+4. **prep 클립 Play 검증** — 아래 완료기준 참조. 🔴 **데미지 타이밍 불변이 1순위다.**
+
+### 이번에 넣은 것 (2026-09-23)
+
+| 커밋 | 내용 |
+|---|---|
+| `c1a3a4b2` | **예고 구간을 prep 클립으로** — 훅L·훅R·어퍼·돌진. 잡기는 현행(얼리기) 유지 |
+| `a40aeeb0` | 미니맵 45° → 135° (⚠️ **각도는 다시 잡아야 함**) |
+| `be6e69ee` | 타이틀 CRT 캔버스가 뒤를 보던 것 — `CRT_Anchor` Y 180° |
+| `e11776ac` | 타이틀 연출 + CRT FX 툴킷 **진행 중 보존**(계획서 2종 승인 대기) |
+| `868f300c` | 보스 취약 상태 계획서(그릴 16문항 확정, **승인 대기**) |
+
+### 🔴 prep 클립 — Play 에서 볼 것
+
+1. **데미지가 그대로 들어가는가**(최우선). 재개 지점을 `telegraphPoseNormalized` 로 유지했지만 실측 필요.
+2. 훅L·훅R·어퍼 예고에 **준비동작이 움직여 보이고**, 0.5초 뒤 멈췄다가 0.7초에 공격이 나가는가.
+3. **돌진이 정상 발동하는가** — prep 을 틀면 `TickHitEventFallback` 의 `IsName(DashAttack)` 검사가
+   막혀 **돌진이 아예 안 나갈** 수 있었다. 준비 신호를 즉시 세워 막았는데 실측이 필요하다.
+4. 잡기는 기존과 동일한가(얼린 자세 — grab_prep 클립이 아직 없다).
+
+### ⚠️ 알아 둘 것
+
+- **`unity_set_transform` 은 위험하다.** rotation 만 넘겼는데 **position 을 (0,0,0) 으로 덮어썼다**
+  (CRT_Anchor 가 원점으로 날아갔다 — 확인 안 했으면 그대로 저장될 뻔했다).
+  → **position·rotation·scale 세 개를 항상 같이 넘길 것.**
+- **타이틀 씬은 팀에서 아무도 안 만진다.** 원격 12개 브랜치 전부 최신 커밋이 `c0d4457d`(8/7)이고
+  그 위는 내 작업뿐이다. **development 껄 가져오면 CRT/카메라 1271줄이 날아간다.**
+- `No23.asset`/`No23_Solo.asset` 의 **BOM 을 제거**했다. `403d65c3` 에서 내가 붙인 것이고
+  다른 몬스터 SO 는 전부 BOM 이 없다. Unity 는 읽지만 도구가 `%YAML` 헤더를 못 찾는다.
+- **SVN r326** 최신화 완료. 보스 FBX 교체에도 **애니 이벤트 6개 전부 생존**(교훈 #109 재발 없음).
+
+### 미착수 (계획만 있음)
+
+- [PLAN-boss-vulnerable.md](PLAN-boss-vulnerable.md) — 취약 상태. **승인 대기**
+- [PLAN-title-flow.md](PLAN-title-flow.md) · [PLAN-crt-fx.md](PLAN-crt-fx.md) — **승인 대기**
+- **`.md` 전수조사·정리 계획** — 팀장 요청, 아직 안 씀. 밑작업 숫자만:
+  레포에 `.md` **335개**(절반 가까이가 `.claude/worktrees/` 의 죽은 복사본) ·
+  `CONTEXT.md` **4718줄** · `PLAN.md` 3817줄. CLAUDE.md 는 CONTEXT.md 를 *"concise, not a full spec"*
+  으로 규정하는데 실제로는 세션 인수인계가 전부 쌓여 있다.
+
+---
 
 ### ✅ development 머지 완료 (2026-09-21) + 🔴 **SVN 쪽에 따로 들어간 정리 1건**
 
@@ -366,6 +523,35 @@ Addressables 재빌드가 지우는 것이고 **은희 영역**이다. 내 작�
 5. `Assets/Resources/PerformanceTestRun*.json` 4개가 untracked — `Resources/` 라 **빌드에 들어간다.** `.gitignore` 검토.
 6. `Assets/AddressableAssetsData/link.xml` 이 한 번 삭제된 적 있다(복구함).
    다시 뜨면 Addressables 재빌드가 지우는 것 — 은희 영역.
+
+## ▶▶ 작업 세션 (2026-09-21 · **타이틀 연출 + CRT FX 툴킷** — 계획 승인 대기)
+
+작업자: **경석(Claude)**. 브랜치 `feature/Boss23`. Codex 는 아래 파일을 건드리지 말 것.
+
+**계획서 2종 — 승인 후 구현 시작**: [PLAN-title-flow.md](PLAN-title-flow.md) ·
+[PLAN-crt-fx.md](PLAN-crt-fx.md)(신규). 후자가 전자의 선행 의존이다.
+
+목표 = 타이틀을 평면 UI 에서 **3D 오피스 씬 + 중앙 CRT 안의 메뉴**로 전환.
+`PRESS ANY KEY` → 카메라 인(Cinemachine vcam 3대) → 모니터 안 Start/Setting/Exit.
+
+**수정 예정 파일**
+
+| 파일 | 내용 |
+|---|---|
+| `0.Scenes/MainFlow/1.TitleScene.unity` | 아트 이식 · vcam 3대 · Canvas 3층 · 영구 콜백 재지정 |
+| `1.Scripts/UI/Title/TitleFlowDirector.cs` (신규) | 상태 머신 · 입력 · 선택 복구 · 패드 Cancel |
+| `1.Scripts/UI/Title/BlinkingText.cs` · `TextScramble.cs` (신규) | 깜빡임 · 스크램블 |
+| `1.Scripts/Managers/TitleSceneManager.cs` | ESC 처리 제거/위임 + 상태 가드 |
+| `1.Scripts/Rendering/RetroCRT/*` | 🔴 **파라미터 런타임 전달 경로** + `CrtFxDriver.cs`(신규) |
+| `0.Scenes/Art/title/GlobalVolumeProfile.asset` | ChromaticAberration 추가 |
+| `0.Scenes/Debug/CrtFxScene.unity` (신규) | FX 데모 |
+| `0.Scenes/Art/title.unity` | 🔴 **백업 보존. 손대지 않는다** |
+
+🔴 **공유 자산 주의** — `99.Settings/PC_Renderer.asset` 과 `CyaniluxRetroCRT.mat` 은 **맵 씬과 공유**한다.
+기본값은 건드리지 않고 런타임 오버라이드로만 흔든다. 보스전 룩 회귀를 검증에 포함했다.
+
+🔴 **Codex 교차검증으로 1판에서 5건이 뒤집혔다** — 목록은 [PLAN-title-flow.md](PLAN-title-flow.md) §9.
+그중 미해결 최대 리스크는 **CRT warp(0.035)와 UI 클릭 좌표 불일치**다(실측 대기).
 
 ## ▶▶ 작업 세션 (2026-09-19 · 미니맵 룩 + **보스 제한시간 타이머** — 계획 승인 대기)
 
@@ -1404,6 +1590,10 @@ NavMesh 를 읽는 소비자가 에이전트이므로, 고정 터렛 2종은 자
 
 **상태.** 코드·프리팹·검증 씬 완료, 컴파일 오류 0. **Play 검증 대기**(호스트 단독 + MPPM 2인).
 설계·확정 사양·알려진 한계는 [PLAN-training-dummy.md](PLAN-training-dummy.md) — 여기 중복 기술하지 않는다.
+
+> ⚠️ 2026-09-22 갱신: 아래 절차는 낡았다. `DevSceneBooter.scene` 필드는 제거됐고 씬도
+> `Assets/0.Scenes/Debug/Dev_Boot.unity` 로 옮겼다. 지금은 툴바 `Dev Boot ▾` 에서 고른다
+> (이 문서 최상단 「Dev 부팅 자동화」 작업 세션 참조). 씬 로드·스폰 흐름 설명은 그대로 유효하다.
 
 **검증 경로 = `Dev_Boot` 씬.** `DevSceneBooter.scene` 에 띄울 씬 이름을 적고 Play 하면
 호스트 기동 → **`NetworkSceneManager` 로 씬 로드**(씬에 배치된 NetworkObject 가 자동 스폰된다)

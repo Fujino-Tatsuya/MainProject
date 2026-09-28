@@ -33,10 +33,21 @@ public sealed class RetroCRTController : MonoBehaviour
     [Tooltip("0=원본 화면, 1=지정 색상.")]
     [SerializeField, Range(0f, 1f)] private float _scanlineOpacity = 0.2f;
 
+    [Header("머티리얼 오버라이드 (선택)")]
+    [Tooltip("비워 두면 Renderer Feature 의 공유 머티리얼을 쓴다. " +
+             "타이틀처럼 STATIC·DISTORT 같은 키워드를 따로 켜야 하면 복제본을 만들어 여기 꽂는다. " +
+             "키워드는 MaterialPropertyBlock 으로 못 바꾸므로 이 길밖에 없다.")]
+    [SerializeField] private Material _materialOverride;
+
     private static RetroCRTController s_active;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
     private InputAction _toggleAction;
 #endif
+
+    // 런타임 오버라이드. 공유 머티리얼의 저작값은 건드리지 않고, 활성화된 것만 MPB 로 덮는다.
+    // 비어 있으면 아무것도 밀지 않으므로 맵 씬의 기존 룩이 그대로 유지된다.
+    private readonly float[] _overrideValues = new float[CrtParamInfo.Count];
+    private int _overrideMask;
 
     public static RetroCRTController ActiveController =>
         s_active != null && s_active.isActiveAndEnabled ? s_active : null;
@@ -61,6 +72,46 @@ public sealed class RetroCRTController : MonoBehaviour
     {
         get => _effectEnabled;
         set => _effectEnabled = value;
+    }
+
+    /// <summary>비었으면 Renderer Feature 의 공유 머티리얼을 쓴다.</summary>
+    internal Material MaterialOverride => _materialOverride;
+
+    /// <summary>오버라이드가 하나라도 걸려 있는지. 없으면 Feature 는 MPB 에 아무것도 담지 않는다.</summary>
+    internal bool HasOverrides => _overrideMask != 0;
+
+    /// <summary>
+    /// 한 파라미터를 런타임 값으로 덮는다. 해제 전까지 유지되므로 연출이 끝나면 반드시 지운다.
+    /// </summary>
+    public void SetOverride(CrtParam param, float value)
+    {
+        _overrideValues[(int)param] = value;
+        _overrideMask |= 1 << (int)param;
+    }
+
+    /// <summary>한 파라미터의 오버라이드를 풀어 머티리얼 저작값으로 되돌린다.</summary>
+    public void ClearOverride(CrtParam param)
+    {
+        _overrideMask &= ~(1 << (int)param);
+    }
+
+    /// <summary>전부 풀어 머티리얼 저작값으로 되돌린다.</summary>
+    public void ClearAllOverrides()
+    {
+        _overrideMask = 0;
+    }
+
+    internal bool TryGetOverride(CrtParam param, out float value)
+    {
+        var bit = 1 << (int)param;
+        if ((_overrideMask & bit) == 0)
+        {
+            value = 0f;
+            return false;
+        }
+
+        value = _overrideValues[(int)param];
+        return true;
     }
 
     private void OnValidate()
@@ -94,6 +145,9 @@ public sealed class RetroCRTController : MonoBehaviour
         _toggleAction?.Dispose();
         _toggleAction = null;
 #endif
+        // 연출 도중 씬이 바뀌어도 오버라이드가 남지 않게 한다.
+        ClearAllOverrides();
+
         if (s_active == this)
             s_active = null;
     }

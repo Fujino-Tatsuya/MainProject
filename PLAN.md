@@ -1,3 +1,357 @@
+# ▶▶▶ 진행 중 = **보호막 피격 파문 (B: 공격자 위치 RPC)** (2026-09-18 · 코드·에셋 완료 · MPPM 2인 전파 검증 통과 · 나머지 항목 검증 대기)
+
+> 작업 세션: **민경(Claude)**, 브랜치 `merge/VFX-development`.
+> 선행 작업 = 아래 「이전 = 수호자의 의지(E) 보호막 VFX」. 그때 **의도적으로 미룬 항목**을 이제 한다.
+> 🔴 Unity 를 닫아야 하는 단계가 있다(5단계). 코드 단계까지는 켜둔 채로 가능.
+
+## 목표
+
+E 보호막이 떠 있는 동안 **피격당하면 배리어 표면에 맞은 방향으로 파문이 번지게** 한다.
+
+> ⚠️ **계획 중 A-1 → B 로 바꿨다**(민경 결정, 2026-09-18). 처음에는 "RPC 없이 최근접 적 방향으로
+> 추정"으로 잡았으나, 원거리·장판 공격과 여러 몹이 겹친 경우를 추정으로는 못 맞춘다.
+> B = 서버가 아는 공격자 위치를 Unreliable RPC 로 전 피어에 전파. 대가는 `Player.cs` **11줄**뿐이고
+> **게임플레이 판정은 0줄 변경**이다. 아래 「왜 `AttackInfo`」 절이 그 배경이다.
+
+## 이미 갖춰져 있는 것 — 셰이더는 준비 끝
+
+파문은 `Shader_IntegratedEffect` 의 `IS_IMPACT` 기능이고, **현재 배리어 머티리얼에 이미 켜져 있다.**
+
+| | `Effect_09_Shield.mat` (바깥 겹) | `Effect_09_Shield_2.mat` (안쪽 겹) |
+|---|---|---|
+| `m_ValidKeywords` | **`IS_IMPACT` 포함** | 없음 |
+| `_Impact` / `_ImpactFactor` / `_ImpactSize` | 1 / 1.35 / 0.75 | 0 / 1 / 0.75 |
+
+두 머티리얼 다 `FX_HolyShield_Barrier.prefab` 의 `Shield` · `Shield_2` 자식에 그대로 붙어 있다.
+즉 **`fixed4 _Points[30]` 배열을 매 프레임 써 줄 사람만 없는 상태**다. 원본에서 그 일을 하던
+`ShieldActivate.cs` 를 정책 이식 때 뺐다(당시 사유: "풀 인스턴스 안으로 손을 뻗을 방법이 따로 필요").
+
+파문은 **바깥 겹에서만** 난다. 원본도 그랬다 — 안쪽은 `_Impact: 0`.
+
+## 🔴 왜 `AttackInfo` 가 서버에만 있나 (B 가 RPC 를 쓰는 이유)
+
+플레이어를 때리는 판정은 **전부 서버 전용 스코프** 안에 있다 —
+`GauntletBot.cs:361` · `AreaZone` · `BossBomb` 모두 `if (!IsServer) return;` 뒤에서
+`hurtbox.ReceiveAttack(info, ctx)` 를 부른다.
+
+| 피어 | 아는 것 |
+|---|---|
+| 호스트 | `AttackInfo.knockbackDirection` + `hitContext.sourcePosition` → 정확한 방향 |
+| 리모트 클라 | `_currentShield` NetworkVariable 이 줄었다는 사실**뿐** |
+
+`Hurtbox` 에도 이벤트 훅이 없어서 `Player.cs` 를 건드리지 않고 서버에서 가로챌 방법이 없다.
+따라서 **"RPC 없음 + 정확한 방향"은 양립하지 않는다.** 정확한 방향을 원하면 (B) 로 올려야 한다.
+
+### (B) 로 가는 길을 막지 않는 설계
+
+파문 컴포넌트의 입구를 **`AddHit(Vector3 worldPoint)` 하나**로 둔다.
+방향을 *어떻게 구하느냐*는 전부 **호출처**에 있다 →
+나중에 (B)(=`Player.ReceiveAttack` 3줄 + Unreliable RPC)로 올릴 때
+**컴포넌트는 그대로 두고 호출 한 줄만 바꾸면 끝**이다.
+
+## 할 일
+
+| # | 무엇 | 파일 | VCS |
+|---|---|---|---|
+| 1 | `ShieldActivate` 를 풀 대응으로 재작성 | `Effects/ShieldRippleEffect.cs` (신규) | git |
+| 2 | 핸들 → 재생 중 인스턴스 접근 API | `Effects/EffectManager.cs` | git |
+| 3 | 소켓에서 그 API 를 열어 준다 | `Effects/EffectSocketPlayer.cs` | git |
+| 4 | 피격 RPC + 방향 계산 + 게이트 | `Player/PlayerShieldVfx.cs` | git |
+| 4b | 쉴드 감소 시 방향 전달 (11줄) | `Player/Player.cs` 🔴 **은희** | git |
+| 5 | 배리어 프리팹에 컴포넌트 추가 | `FX_HolyShield_Barrier.prefab` | SVN |
+
+**1~5 전부 완료 (2026-09-18).** 🔴 **아직 Play 로 보지 않았고 컴파일도 확인하지 못했다.**
+
+5단계는 `ShieldRippleEffect` 를 **루트**(`HolyShieldEffect` 옆)에 붙였다 —
+원본 `ShieldActivate` 는 `Shield` 자식에 있었지만, 이쪽은 `Collect()` 가 자식 렌더러를 훑어
+`_Impact` 로 거르고 **찾아낸 렌더러의 transform** 을 파문 기준 공간으로 쓰기 때문에
+붙는 위치와 무관하게 결과가 같다. 드라이버(`HolyShieldEffect`)와 한자리에 모아 두는 쪽을 골랐다.
+검증: 앵커 12 / 참조 12, dangling 0, `.meta` guid(`a3492ae3…`) 보존, 줄끝·BOM 무변경.
+
+### 1. `ShieldRippleEffect` — 원본을 그대로 못 쓰는 이유
+
+`ShieldActivate` 의 알고리즘 자체는 옳다. 고칠 것은 **수명 관리**뿐이다.
+
+| 원본 문제 | 결과 | 처리 |
+|---|---|---|
+| `hits` 리스트가 반납 시 초기화되지 않음 | **다음 대출자가 이전 파문을 물려받는다** (`HolyShieldEffect` 와 같은 함정) | `ResetForPool()` 에서 비운다 |
+| `Start()` 에서만 `points`·`m_material` 셋업 | 풀은 `SetActive` 토글이라 1회만 돈다. 배열 자체는 괜찮지만 리셋 훅이 없다 | `Collect()` 지연 초기화 + `ResetForPool()` |
+| `AddEmpty()` 가 0.1초마다 슬롯 점유 | `ImpactLife 0.75` 면 상시 7~8칸. 30칸 한도에서 **난타 시 실제 피격이 밀린다** | 없앤다 — 꼬리는 이미 `Inert` 로 매 프레임 blank 된다 |
+| `SetVectorArray` 를 파문이 없어도 매 프레임 호출 | 배리어가 떠 있는 내내 30칸 업로드 | `hits.Count == 0` 이고 직전 프레임도 비었으면 건너뛴다 |
+
+유지할 것: 오브젝트 공간 변환 `transform.InverseTransformPoint(p).normalized / 2`
+(셰이더가 `i.vertex` 를 비교하므로 회전이 있어도 맞다) · `MaxPoints 30` 상한 · 꼬리 blank.
+
+⚠️ **`IEffectSystem` 으로 만들지 않는다.** 평범한 MonoBehaviour 로 둔다 —
+드라이버로 등록하면 `HolyShieldEffect` 와 둘이 손을 들어 `ResolveDriver` 가 LogError 를 낸다.
+`HolyShieldEffectSystem.Stop(immediate)` 에서 `ResetForPool()` 을 같이 불러 준다.
+
+### 2~3. 살아 있는 인스턴스에 닿는 통로
+
+선례가 있다 — `EffectManager.SetPlayRateForTarget` (`EffectManager.cs:394`) 이
+"슬롯 순회 → `active.instances` → 컴포넌트 호출" 을 이미 한다. 같은 모양으로 **제네릭하게** 하나 더 둔다.
+
+```
+// EffectManager
+public int GetInstances(EffectHandle handle, List<GameObject> buffer)   // TryResolve 재사용
+// EffectSocketPlayer
+public int GetInstances(List<GameObject> buffer)                        // _handle 을 넘긴다
+```
+
+도메인 지식(보호막)은 매니저에 넣지 않는다. 버퍼는 호출자가 재사용한다(할당 0).
+
+### 4. `PlayerShieldVfx` — 신호와 방향
+
+```
+[서버] Player.ReceiveAttack  →  쉴드가 줄었으면  shieldVfx.ServerHit(hitContext.sourcePosition)
+                             →  HitShieldVfxRpc (Unreliable, ClientsAndHost)
+[전 피어] HitLocal(sourceWorld)
+    barrierLoop.GetInstances(_instances)        // 재생 중인 파트 인스턴스
+    배리어가 AcceptsHits 아니면      → 건너뜀   (걷히는 중/꺼짐)
+    direction = sourceWorld - 인스턴스 위치
+    |direction| < minHitDistance     → 건너뜀   (장판 한가운데)
+    ripple.AddHit(center + direction.normalized)
+```
+
+**RPC 는 Unreliable** — 원샷이라 한 발 유실되면 파문 하나가 안 뜰 뿐 상태가 어긋나지 않는다.
+루프 *정지*인 `EndShieldVfxRpc`(Reliable)와 갈리는 지점이다.
+
+**시작에는 여전히 RPC 가 없다** — `PlayerShieldVfx` 에서 RPC 를 쓰는 곳은 종료와 피격 둘뿐이다.
+
+**장판 한가운데 = 파문 없음** (민경 결정). `AreaZone` 은 `sourcePosition` 으로 **장판 자신의 위치**를
+넘긴다(`AreaZone.cs:203`). 플레이어가 중앙에 서 있으면 방향 벡터가 ≈0 이라 띄울 곳이 없다.
+엉뚱한 쪽에 띄우느니 건너뛴다 — `minHitDistance`(기본 0.15m) 로 인스펙터에서 조절한다.
+
+### 검토했다가 버린 것 — 배리어에 트리거 콜라이더 붙이기
+
+"배리어에 콜라이더를 달아 충돌 위치로 파문을 띄우자"를 검토했다. **이 프로젝트에서는 성립하지 않는다.**
+
+몬스터의 `MeleeHitbox`(layer 12 Weapon)는 `BoxCollider(isTrigger, enabled)` 지만 **항상 켜져 있고**,
+`ColliderInfo` 로 **모양만** 제공한다. 실제 판정은 공격 프레임에 `MonsterMeleeAttack` 이 쏘는
+`Physics.OverlapBoxNonAlloc` 이다(`MonsterMeleeAttack.cs:207`). `AreaZone`·`BossBomb`·`TwentyThreeBoss`
+전부 같은 패턴이고 — **`OnTriggerEnter` 로 피해를 주는 공격이 하나도 없다.**
+
+그래서 레이어를 Weapon 으로 좁혀도 "공격 중인 손"이 아니라 "항상 켜진 손"을 잡는다 →
+**몬스터가 가만히 서 있어도 파문이 난다.** 필터로 고칠 수 있는 문제가 아니다.
+
+덤으로 피했어야 할 비용: 풀 인스턴스는 `SetParent` 없이 매 프레임 위치만 옮겨지므로 트리거 이벤트를
+받으려면 **kinematic Rigidbody** 가 필요하고, 전용 레이어와 **충돌 매트릭스(팀 공용 ProjectSettings)**
+수정까지 따라온다.
+
+### 🔴 자연 만료 파문 — B 에서는 문제가 사라졌다
+
+A-1 계획에는 "5초 자연 만료 시 `SetShield(0)` 도 쉴드 감소라 파문이 한 번 뜬다"는 항목이 있었고,
+대책으로 ① `AcceptsHits` 게이트 ② `ExpireShield` 에서 `ServerEnd` 를 `SetShield(0)` **앞으로** 이동,
+두 가지를 잡아 뒀다.
+
+**B 로 바꾸면서 ②는 불필요해져 하지 않았다.** 파문의 출처가 `ClientDamagedAmount`(모든 쉴드 감소)가
+아니라 `Player.ReceiveAttack`(실제 공격)으로 바뀌었기 때문이다. 만료 시의 `SetShield(0)` 은
+`ReceiveAttack` 을 지나지 않으므로 애초에 `ServerHit` 이 불리지 않는다.
+→ **은희 파일(`FirstMeleeSubSkill.cs`) 수정 1건이 줄었다.**
+
+①은 남겼다. 배리어가 **걷히는 중(Outro)에 맞는** 경우는 여전히 있고, 그때 파문을 띄우면
+사라지는 배리어가 다시 번쩍인다.
+
+## 결정과 근거
+
+| 결정 | 왜 |
+|---|---|
+| **B**(공격자 위치 RPC) | 추정(최근접 적)은 원거리·장판·다중 교전에서 틀린다. 대가가 `Player.cs` 11줄 + Unreliable RPC 1개뿐이고 **판정은 0줄 변경**이라, 그 11줄이 사는 게 맞다 |
+| 히트박스를 배리어 sphere 로 교체하지 **않음** | 판정 부피가 반경 0.2m → **2.0m** 로 커져 밸런스가 바뀐다. 게다가 `AttackHitContext` 는 여전히 서버에만 있어 **정확도가 오르지도 않는다** |
+| 배리어에 트리거 콜라이더 붙이지 **않음** | 이 레포에는 "공격 중에만 켜지는 콜라이더"가 없다(판정이 전부 오버랩 쿼리). 접촉으로 발동하면 **가만히 서 있는 몹에도 파문이 난다** |
+| 입구를 `AddHit(worldPoint)` 로 | 컴포넌트가 방향 출처를 모르게 둔다. 실제로 A-1 → B 전환이 **호출처 교체만**으로 끝났다 |
+| 신호를 `Player.ReceiveAttack` 에서 | 여기에만 `AttackHitContext` 가 있다. 덤으로 **실제 피해가 난 순간에만** 불리므로, 무적으로 0뎀이면 파문도 안 뜬다(자동으로 맞다) |
+| `ShieldRippleEffect` 를 드라이버로 만들지 **않음** | 단일 기술 규칙. 드라이버 둘이 손 들면 `ResolveDriver` 가 LogError |
+| `EffectManager` API 를 제네릭(`GetInstances`)으로 | 매니저에 보호막 지식을 넣지 않는다. 다른 연출도 쓸 수 있다 |
+| `AddEmpty()` 제거 | 30칸 중 7~8칸을 상시 먹어 난타 시 실제 파문을 떨어뜨린다. 꼬리 blank 가 이미 같은 일을 한다 |
+| 방향이 서지 않으면 **건너뛴다** | 장판 한가운데서 맞으면 방향 벡터가 ≈0 이다. 엉뚱한 쪽에 띄우는 것은 "맞은 쪽에서 난다"는 인상을 깨뜨린다 — 없는 편이 낫다 (민경 결정) |
+| 대상 머티리얼 판별을 `_Impact` 로 | 🔴 `_Points[30]` 은 Properties 가 아니라 **CGPROGRAM 안에서만** 선언된 유니폼이라 `Material.HasProperty("_Points")` 가 **false** 다(`SetVectorArray` 는 그래도 먹는다). 구현 중 발견 |
+| `HitFlash` 를 `ClientDamagedAmount(Hp)` 로 이관 | 쉴드가 막아낸 피격에도 캐릭터가 빨개졌다. "막았다"와 "맞았다"가 같은 연출이면 보호막이 일하는지 알 수 없다 |
+
+## 검증 방법
+
+1. **파문이 보이는가** — 보호막 켠 채 몹에게 맞는다. 바깥 겹에만 번져야 한다.
+2. **방향** — 몹 왼쪽/오른쪽/뒤에서 각각 맞아 파문이 그쪽에서 나는지.
+3. 🔴 **재사용** — E 를 두 번 이상 시전. **2회차 배리어에 1회차 파문이 남아 있으면 `ResetForPool` 실패.**
+4. **자연 만료** — 안 맞고 5초를 채운다. 걷히는 순간 파문이 없어야 한다(B 에서는 구조적으로 안 뜬다).
+   🔴 **걷히는 중(0.8초 페이드)에 맞아 보는 것**이 진짜 확인 대상이다 — `AcceptsHits` 게이트가 닫혀 파문이 없어야 한다.
+5. **소진 만료** — 맞아서 0이 될 때는 파문 + 파괴 버스트가 같이 나야 한다.
+6. **난타** — 여러 몹에게 동시에 맞을 때 파문이 겹쳐 나는지(30칸 상한 안에서).
+7. ✅ **MPPM 2인** — **2026-09-18 통과.** 클라가 시전한 보호막의 파문이 **호스트 화면에서도** 같은 방향으로 났다.
+   서버 전용 `AttackHitContext` 를 RPC 로 내보내는 B 안이 의도대로 동작한다 —
+   이 레포에서 반복되던 "호스트에만 보이는 연출" 사고가 이번엔 나지 않았다.
+8. **무적 중** — 대시 무적으로 피해가 0이면 파문이 **안 떠야** 한다.
+9. **풀** — 반복해도 `[EffectPool]` 아래 `FX_HolyShield_Barrier` 인스턴스가 1개로 유지되는지.
+
+## 미결 / 나중
+
+- ✅ **5단계 완료** — `FX_HolyShield_Barrier.prefab` 의 `Shield` 자식에 `ShieldRippleEffect` 부착됨.
+  MPPM 검증에서 파문이 실제로 났으므로 부착이 반영된 것이 확인된다(붙기 전에는 파문이 아예 안 난다).
+  ⚠️ **SVN 커밋 여부는 별도 확인 필요** — 이 레포에는 안 올라간다.
+- 🔴 **은희에게 공유할 것** (AGENTS.md §3): `Player.cs`(11줄, 판정 무변경) · `HitFlash.cs`(쉴드 플래시 제거) · 지난 세션의 `FirstMeleeSubSkill.cs`.
+- 🔴 **은희에게 보고할 기존 버그 2건** (내가 안 고쳤다):
+  - `Unit.OnHpReplicated` 가 `ClientDamaged` 를 **두 번** 부른다(`Unit.cs:528-534`, 같은 조건이 두 줄). 바로 위 `//충돌난거 임시 해결함 추후 수정 해야됨.` 주석대로 머지 잔재다. 그리고 이제 `ClientDamaged` 는 **구독자가 0명**이다.
+  - 보호막 **자연 만료** 시 `SetShield(0)` 이 `ClientDamagedAmount(Shield)` 를 띄워, **다른 피어 화면에** 남은 쉴드량만큼 가짜 ShieldDamage 팝업이 뜬다(`FloatingDamagePresenter`). 자기 화면에는 `IsLocalPlayerTarget()` 가드로 안 뜬다.
+- `hitBurstPrefab`(피격 지점 표면 폭발)은 **이번 범위 밖**. 원본 `ShieldHitReceiver` 가 `Instantiate`+`Destroy` 로
+  하던 것이라, 하려면 별도 원샷 엔트리 + 소켓이 필요하다.
+- `ShieldHitReceiver.cs` 는 이번에도 **쓰지 않는다** — 삭제 대기 목록에 그대로 둔다.
+  (`ShieldActivate.cs` 는 `ShieldRippleEffect` 가 대체하므로 같이 죽은 코드가 된다)
+
+---
+
+# ▶▶▶ Dev 부팅 자동화 — 툴바 "Dev Boot" (2026-09-22 · 은희 승인 · **검증 완료**)
+
+> 작업 세션: **은희(Claude)**, 브랜치 `tool/DevBootAutomation` (base `development` `31170603`).
+> 설계 합의는 grill 로 진행했고, 아래는 그 결과다.
+>
+> **2026-09-22 구현 완료(Codex 위임).** 커밋 `17d92726` · `d2e3bdbb` · `7d17fbfc`.
+> **은희 수동 Play 검증 8항목 전부 완료** — 아래 7절. 알려진 한계 1건은 고치지 않기로 결정했다.
+
+## 1. 문제 (사용자 제기 2건 + 조사에서 나온 3건)
+
+| # | 증상 | 실측 근거 |
+|---|---|---|
+| 1 | 부팅할 씬을 바꾸려면 `Dev_Boot.unity` 에 배치된 `DevSceneBooter` 의 `scene` 필드를 고쳐야 한다 | 값이 **씬 에셋 안**에 산다 → 바꿀 때마다 git 추적 씬이 dirty, 3인 공유 충돌원 |
+| 2 | 원하는 씬이 빌드 씬 목록에 없으면 **로그 하나 찍고 멈춘다** | `DevSceneBooter.BootRoutine` 의 `IsEnabledBuildScene` 게이트 |
+| 3 | 🔴 `DevBuildSceneList.DevScenes` 5개 중 **3개 경로가 썩음** | `PlayerScene` · `PlayerBossTest` · `PlayerDashTest` 는 `Assets/0.Scenes/Debug/` 로 이동됨. 메뉴 실행 시 "씬 에셋을 찾지 못했다" 경고 |
+| 4 | 🔴 `RemoveDevBootScene` 가드가 **한 번도 안 걸린다** | 코드는 `Assets/0.Scenes/Dev/` 폴더를 보는데 실물은 `Assets/0.Scenes/Dev_Boot.unity` |
+| 5 | 🔴 그 결과 **Dev_Boot 이 빌드 목록에 enabled=1 (index 7) 로 등록돼 있다** | `ProjectSettings/EditorBuildSettings.asset` 직독. `DevSceneBooter` 주석의 "빌드 목록에 넣지 않는다" 와 모순 |
+
+**고칠 위치가 런타임이 아니다.** 2번 에러는 Play 가 이미 시작된 뒤 `BootRoutine` 안에서 난다.
+그 시점에 빌드 목록을 고쳐도 늦다 — 자동 등록은 **Play 진입 전 에디터 훅**에서 해야 한다.
+
+## 2. 확정 결정 (2026-09-22 grill, 은희)
+
+| # | 결정 | 근거 / 버린 안 |
+|---|---|---|
+| 1 | **내장 Play 버튼은 건드리지 않는다.** 툴바에 별도 `Dev Boot ▾` 드롭다운을 붙인다 | 진짜 Play 를 하이재킹하면 팀원이 정식 흐름(BootStrap→Title)을 테스트할 때 막힌다. `OverridableToolbar` enum 에도 `ToolSettings`·`ViewOptions`(Scene 뷰) 뿐이라 Play 버튼 교체는 정식 경로가 없다 — 리플렉션 해킹은 버린다 |
+| 2 | 타겟 씬을 **Play 진입 전에** 빌드 목록에 자동 추가하고, **Play 종료 시 원복**한다 | `ProjectSettings/EditorBuildSettings.asset` 은 git 추적 · 3인 공유. 순변화 0 을 유지해야 머지 충돌과 제출 빌드 오염이 안 생긴다 |
+| 3 | 드롭다운 = **최근 사용 상위 5개 + "전체" 서브메뉴** | 하드코딩 배열(문제 #3)을 버리고 `AssetDatabase` 실시간 스캔으로 간다 → 경로가 다시 썩지 않는다 |
+| 4 | `DevSceneBooter.scene` 필드를 **제거**한다. 타겟의 유일한 원본은 `EditorPrefs` | 원본이 씬 에셋 안에 있는 한 문제 #1 이 남는다. EditorPrefs 는 개인·git 미추적 |
+| 5 | `DevBuildSceneList` 의 `DevScenes` 배열과 활성/비활성 메뉴는 **삭제**한다 | 자동 등록이 생기면 존재 이유가 없고, 두 등록 경로가 공존하면 헷갈림. `현재 목록 출력` 과 Dev_Boot 제거는 경로 버그를 고쳐 남긴다 |
+| 6 | **Dev_Boot 을 빌드 목록에서 뺀다** | `EditorSceneManager.playModeStartScene` 은 SceneAsset 참조라 빌드 등록이 **필요 없다**. 빼면 제출 빌드 오염 경로 하나가 닫힌다 |
+
+## 3. 확인한 API (6000.3.16f1 설치본 직독 — 전부 정식 public)
+
+| 쓸 것 | 확인 방법 |
+|---|---|
+| `UnityEditor.Toolbars.MainToolbarElementAttribute` (`path`, `defaultDockPosition`, `defaultDockIndex`, `menuPriority`) | `UnityEditor.dll` / `UnityEditor.CoreModule.xml` |
+| `MainToolbarDropdown(MainToolbarContent, Action<Rect>)`, `MainToolbarContent(string, Texture2D, string)`, `MainToolbar.Refresh(path)` | 동일 |
+| `MainToolbarDockPosition` = `Left` / `Middle` / `Right` | 동일. Play 버튼이 `Middle` 이라 그 옆에 붙인다 |
+| `EditorSceneManager.playModeStartScene` | `UnityEditor.CoreModule.xml` |
+| `BuildProfile.GetActiveBuildProfile()` / `.overrideGlobalScenes` / `.scenes` / `.GetScenesForBuild()` | `UnityEditor.xml` |
+
+**레퍼런스 구현**: `Library/PackageCache/com.unity.services.core@.../Editor/Core/Environments/UI/Toolbar/EnvironmentToolbar.cs`
+— Unity 자신이 6000.3 에서 이 attribute 를 쓰는 실물 코드. 시그니처는 여기에 맞춘다.
+
+**현재 빌드 프로필 상태**: `Windows.asset` · `ForProfile.asset` 둘 다 `m_OverrideGlobalSceneList: 0` / `m_Scenes: []`
+→ 실효 목록은 `EditorBuildSettings.scenes`. 단 누군가 오버라이드를 켜면 글로벌만 건드리는 코드는
+조용히 무력화되므로, **양쪽을 모두 처리**한다.
+
+## 4. 구성
+
+| 파일 | 상태 | 역할 |
+|---|---|---|
+| `Assets/1.Scripts/Dev/DevBootTarget.cs` | 신규(런타임) | EditorPrefs 키의 **유일한 원본** + 읽기/쓰기 헬퍼. 키에 `Application.dataPath` 해시를 섞어 워크트리끼리 안 섞이게 한다. 전체가 `#if UNITY_EDITOR` |
+| `Assets/1.Scripts/Dev/Editor/DevBootLauncher.cs` | 신규 | 핵심. 목록 소스 판정 → 스냅샷 → 타겟 추가 → `playModeStartScene` 지정 → `EnterPlaymode()` → `EnteredEditMode` 에서 원복 |
+| `Assets/1.Scripts/Dev/Editor/DevBootSceneCatalog.cs` | 신규 | 부팅 가능 씬 스캔(`Assets/0.Scenes` 재귀, `Art/`·`Lagacy/`·`Dev_Boot` 제외) + 최근 목록(EditorPrefs) |
+| `Assets/1.Scripts/Dev/Editor/DevBootToolbar.cs` | 신규 | `[MainToolbarElement]` 드롭다운 UI 만 |
+| `Assets/1.Scripts/Dev/Editor/DevBootLauncherTests.cs` | 신규 | EditMode. 목록 보정 순수 함수 검증 |
+| `Assets/1.Scripts/Dev/DevSceneBooter.cs` | 수정 | `scene` 필드 제거 → `DevBootTarget` 에서 읽음. 나머지 필드·부팅 시퀀스는 그대로 |
+| `Assets/1.Scripts/Dev/Editor/DevBuildSceneList.cs` | 수정 | `DevScenes` 배열 + 활성/비활성 메뉴 삭제. Dev_Boot 제거 가드 경로 수정. `현재 목록 출력` 유지 + `빌드 목록 강제 정리` 추가 |
+| `ProjectSettings/EditorBuildSettings.asset` | 수정 | Dev_Boot 등록 제거 |
+
+**asmdef 없음** — `Assets/1.Scripts/Dev/` 에는 asmdef 가 없으므로 전부 `Assembly-CSharp` /
+`Assembly-CSharp-Editor` 에 들어간다. EditMode 테스트도 `Monster/Editor/*Tests.cs` 와 같은 방식
+(Editor 폴더에 그냥 두면 테스트 러너가 잡는다)을 따른다.
+
+## 5. 동작 순서
+
+**부팅**
+1. Play 중이면 거부(드롭다운 비활성).
+2. `EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()` — 저장 안 하면 중단.
+3. 실효 목록 소스 판정: 활성 프로필이 `null` 이거나 `overrideGlobalScenes == false` → `EditorBuildSettings.scenes`, 아니면 `profile.scenes`.
+4. **원본 목록 + 소스 종류**를 `SessionState` 에 JSON 스냅샷.
+5. 타겟 씬이 없으면 추가, 있는데 `enabled=0` 이면 활성화. 이미 활성이면 아무것도 안 쓴다(불필요한 diff 방지).
+6. `EditorPrefs` 에 타겟 기록 + 최근 목록 갱신.
+7. `playModeStartScene = Dev_Boot SceneAsset` (GUID `180a2dd6e0939fed247ab6908eb0ec7d` 우선, 경로 폴백).
+8. `AssetDatabase.SaveAssets()` → `EditorApplication.EnterPlaymode()`.
+
+**원복** — `[InitializeOnLoad]` + `playModeStateChanged` 의 `EnteredEditMode`
+(도메인 리로드 뒤라 `ExitingPlayMode` 보다 안전)에서 스냅샷 복원 + `playModeStartScene = null`.
+
+## 6. 리스크
+
+| 리스크 | 대응 |
+|---|---|
+| 🔴 에디터 크래시 시 `SessionState` 가 날아가 목록이 더러운 채로 남는다 | `Dev/Dev Boot/빌드 목록 강제 정리` 메뉴를 같이 넣는다. 커밋 전 `git diff ProjectSettings/EditorBuildSettings.asset` 확인을 CONTEXT 에 명시 |
+| 툴바 요소가 기본 숨김일 수 있다(6.3 툴바는 요소별 표시 메뉴가 있다) | 구현 후 **실물 확인 필요**. 안 보이면 툴바 우클릭 메뉴에서 켜는 절차를 CONTEXT 에 적는다 |
+| `scene` 필드 제거로 `Dev_Boot.unity` 에 고아 직렬화 값이 남는다 | 무해. Unity 가 다음 저장에 알아서 버린다. 씬을 손으로 편집하지 않는다 |
+| 팀원이 `Dev/빌드 씬 목록/테스트 씬 활성화` 메뉴를 쓰고 있었다면 사라진다 | CONTEXT.md 인수인계에 명시 |
+| NGO 가 빌드 목록 기준으로 씬을 검증한다 | 목록 확정을 Play 진입 **전**에 끝내고 `SaveAssets()` 로 굳힌다 |
+
+## 7. 검증 (2026-09-22 · **전 항목 완료**)
+
+| # | 항목 | 결과 |
+|---|---|---|
+| 1 | EditMode — 목록 보정 순수 함수 | **4/4 통과.** 단 4번은 `SelectBuildSceneSource` 열거 선택만 본다 — **프로필 오버라이드 ON 일 때 `WriteScenes`/`RestoreScenes` 가 실제로 프로필 쪽에 쓰는지는 미검증**(현재 두 프로필 다 오버라이드 off 라 안 타는 경로) |
+| 2 | `dotnet msbuild` 컴파일 | ✅ **성공**(기존 경고만) |
+| 3 | 툴바 요소가 Play 버튼 옆에 보이는가 | ✅ **보임** |
+| 4 | (툴바 경로) 빌드 목록에 **없던 씬**이 자동 추가되고 부팅되는가 | ✅ **됨.** `Launch()` 가 `EnterPlaymode()` **호출 전에** 목록을 쓰고 `SaveAssets` 까지 끝낸다 — 즉 이 항목이 증명한 것은 "**Play 진입 전** 쓰기는 먹힌다" 이지 `ExitingEditMode` 콜백 타이밍이 아니다(7번 참조) |
+| 5 | Play 종료 후 `git diff ProjectSettings/EditorBuildSettings.asset` | ✅ **비어 있음** — 결정 2 합격선 |
+| 6 | 활성 MPPM 시나리오와의 관계 | ✅ **시작 방법에 따라 갈린다.** 툴바 Launch → `Dev_Boot` 승(`playModeStartScene` 을 설정하므로). `Dev_Boot` 열어두고 내장 Play → **시나리오 InitialScene 승**(직접 경로는 그 값을 안 건드리므로). 표·근거는 [CONTEXT.md](CONTEXT.md) 작업 세션. **이 갈림은 의도된 것이고 가드는 넣지 않는다**(은희 결정) |
+| 7 | `Dev_Boot.unity` 를 직접 열고 그냥 Play | ✅ **마지막 타겟으로 부팅된다**(활성 시나리오 없을 때). ⚠️ 단 **마지막 타겟이 빌드 목록에 없으면 거부된다** — 아래 「직접 Play 경로의 한계」. **은희 판단: 큰 상관 없음, 고치지 않는다** |
+| 8 | 드롭다운 최근 목록이 5개로 유지되는가 | ✅ **유지됨** |
+
+### 직접 Play 경로의 한계 — 목록에 없는 씬은 거부된다 (2026-09-22 실측)
+
+`Dev_Boot` 을 열어두고 **내장 Play** 를 누르면, 마지막 타겟이 **이미 빌드 목록에 있을 때만** 부팅된다.
+목록에 없으면 `DevSceneBooter` 의 기존 게이트에 걸려 거부된다.
+
+왜 — 두 경로가 빌드 목록을 **쓰는 시점**이 다르다.
+
+| 경로 | 목록을 쓰는 시점 | 결과 |
+|---|---|---|
+| 툴바 `Launch()` | `EnterPlaymode()` **호출 전** | 먹는다 |
+| 직접 Play (`PrepareDirectDevBootIfNeeded`) | `ExitingEditMode` **콜백 안** | 그 Play 세션에는 **안 먹는 것으로 관측됨** |
+
+⚠️ 원인을 `ExitingEditMode` 가 너무 늦다는 것으로 **단정하지는 않았다.** 콜백 안의
+`AssetDatabase.SaveAssets()` 가 지연되는 것일 수도 있다. 구분하려면 별도 실험이 필요하고,
+아래 이유로 하지 않았다.
+
+**은희 판단(2026-09-22): 고치지 않는다.** 역할 분담이 자연스럽게 선다 —
+*목록에 없는 새 씬은 툴바로 부팅하고, 직접 Play 는 이미 등록된 씬에만 쓴다.*
+목록은 Play 종료 시 원복되므로(결정 2) 툴바로 한 번 부팅해도 그 씬이 목록에 남지는 않는다.
+즉 이 한계는 설계상 계속 존재한다.
+
+### 리뷰 지적 1건 — 검토 후 **현행 유지**로 결정 (2026-09-22)
+
+**지적**: `DevBootLauncher.RestorePendingChanges()` 는 스냅샷이 없어도 early-return **전에**
+`playModeStartScene` 을 null 로 만든다. 즉 Dev Boot 를 한 번도 안 쓴 사람이 Build Settings 에서
+직접 설정한 값까지 Play 종료마다 지워진다 — 범위가 과하게 넓다.
+
+**결정: 고치지 않는다.** 좁히면 두 가지를 잃는다.
+
+1. **크래시 복구가 사라진다.** `playModeStartScene` 은 프로젝트에 남는 값인데 스냅샷은
+   `SessionState` 라 에디터가 죽으면 날아간다. 그 조합에서 "우리가 설정한 것만 지운다" 로 좁히면
+   지울 근거를 잃어 `Dev_Boot` 이 시작 씬으로 **영구히** 박힌 채 남는다. 지금의 무조건 null 이
+   그 상태를 다음 Play 종료에 자동으로 푼다.
+2. **두 경로의 갈림이 깨진다.** 「7. 검증」 6번의 *툴바 = Dev Boot 승 / 직접 Play = MPPM 시나리오 승*
+   은 **툴바 부팅 뒤 값이 확실히 지워진다**는 전제 위에 선다. 값이 남으면 그다음 직접 Play 도
+   Dev Boot 승이 되어 MPPM 경로가 막힌다.
+
+지적된 피해(남이 손으로 설정한 `playModeStartScene` 이 지워짐)는 이 프로젝트에서 성립하지 않는다 —
+그 값은 이제 Dev Boot 가 전담한다. 직접 설정할 일이 생기면 그때 다시 본다.
+
+## 8. 범위 밖
+
+- 내장 Play 버튼 자체 교체(리플렉션) — 결정 1 에서 버림.
+- `BuildWindowsPlayer.Build()` 의 제출 빌드 씬 정리 — 별건. 이번엔 Dev_Boot 등록 제거까지만.
+- MPPM 다중 인스턴스 자동 부팅 — 이번 범위 아님.
+- `DevSceneBooter` 의 부팅 시퀀스(호스트 기동·NGO 로드·스폰) 자체는 **손대지 않는다.**
+
+---
+
 # ▶▶▶ 구역 진입 기반 벽 투명화 1단계 (2026-09-21 승인 · **2026-09-22 검증 완료**)
 
 > 작업 세션: **은희(Claude)**, 브랜치 `feature/TransparentV2-keepgoing` (base `development` `10cbe8d0`).
@@ -115,7 +469,7 @@
 
 ---
 
-# ▶▶▶ 진행 중 = **수호자의 의지(E) 보호막 VFX — 이펙트 정책 이식** (2026-09-17 · 코드·에셋 완료 · Play 검증 대기)
+# 이전 = **수호자의 의지(E) 보호막 VFX — 이펙트 정책 이식** (2026-09-17 · 코드·에셋 완료 · Play 검증 대기)
 
 > 작업 세션: **민경(Claude)**, 브랜치 `feature/VFX`.
 > 🔴 **아직 Play 로 보지 않았다.** 컴파일도 Unity 쪽 확인이 필요하다.
