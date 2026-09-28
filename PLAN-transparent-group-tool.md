@@ -48,7 +48,7 @@ Unity 다중 선택 편집은 이미 `private [SerializeField]` 필드까지 잘
 | 19 | 멤버의 **자식 Renderer 전부 포함** | 벽 프리팹은 부모 아래 메시가 여러 개다 |
 | 20 | Renderer 없는 멤버 **허용**, 목록에 "표시 없음" 아이콘 | 존 볼륨을 같이 묶고 싶을 수 있다 |
 | 21 | **플레이 모드 진입 시 시각화 자동 OFF**, 나오면 복구 | 플레이 중엔 실제 투명화 결과를 봐야 한다 |
-| 22 | UI = **IMGUI `EditorWindow`**, 메뉴 `Tools/Rendering/Transparency/Group Tool` | 레포 관행(`ZoneRotationAuthoringWindow`, `FogPainterWindow`) |
+| 22 | UI = **IMGUI `EditorWindow`**, 메뉴 `Tools/Group Painter` | 레포 관행(`ZoneRotationAuthoringWindow`, `FogPainterWindow`) |
 
 ## 3. 데이터 모델
 
@@ -56,7 +56,7 @@ Unity 다중 선택 편집은 이미 `private [SerializeField]` 필드까지 잘
 Undo 를 걸기 위한 껍데기이고, 진짜 저장소는 JSON 이다.
 
 ```
-TransparentGroups/                      ← 프로젝트 루트, Assets/ 밖, git 추적
+GroupPainter/                           ← 프로젝트 루트, Assets/ 밖, git 추적
   4.MapScene.a1b2c3d4.json
   ZoneL_typeA.9f8e7d6c.json
 ```
@@ -164,6 +164,7 @@ Unity 가 켜진 채 에셋을 옮기는 것은 CLAUDE.md 6번의 위험군이�
 | 28 | 저장은 **마우스 이벤트당 한 번** | 오브젝트마다 `AddMembers` 를 부르면 그만큼 JSON 을 다시 쓴다. 보간된 지점들을 모아 한 번에 넘긴다 |
 | 29 | `HandleUtility.AddDefaultControl` 로 기본 클릭 선택·이동 기즈모를 가져온다. 카메라 조작은 건드리지 않는다 | 클릭이 양쪽으로 가면 칠하면서 선택이 바뀐다 |
 | 30 | 마우스 아래 오브젝트를 `Handles.DrawOutline` 로 하이라이트 + 좌하단에 대상 그룹 HUD | 무엇이 잡힐지, 어디로 들어가는지가 보여야 한다. 제거 모드면 빨강 |
+| 31 | 이름은 **Group Painter** (2026-09-28 변경). 메뉴 `Tools/Group Painter`, 저장 폴더 `GroupPainter/` | 처음 이름은 `Transparency Groups` / `Tools/Rendering/Transparency/Group Tool` 이었으나 **구현이 투명화와 아무 관계가 없다** — 그룹은 GameObject 배열이고 컴포넌트 타입을 가리지 않는다. 투명화는 첫 사용처일 뿐이라 이름이 용도를 좁게 오해시켰다. 🔴 **내부 클래스·파일·네임스페이스(`TransparentGroup*`, `VeyTrace.Rendering.Occlusion.Editor`)는 일부러 그대로 뒀다** — 갓 커밋한 것을 통째로 옮기면 git 히스토리만 지저분해지고 asmdef guid 도 새로 생긴다. 이름이 어긋나 보이면 이 줄이 이유다 |
 
 ## 6. 리스크
 

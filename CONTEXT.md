@@ -25,7 +25,7 @@ Update this file when a term becomes important enough that future agents or team
 | `Assets/1.Scripts/Rendering/Occlusion/Editor/` 8개 + `VeyTrace.Rendering.Occlusion.Editor.asmdef` (신규) | git |
 | `Assets/1.Scripts/Rendering/Editor/Shaders/TransparentGroupOverlay.shader` (신규) | git |
 | `Assets/Tests/EditMode/Occlusion/TransparentGroupStoreTests.cs` (신규, 14개) | git |
-| `TransparentGroups/*.json` — 프로젝트 루트, `Assets/` **밖** | git |
+| `GroupPainter/*.json` — 프로젝트 루트, `Assets/` **밖** | git |
 
 **실측으로 확정한 것 (재조사 금지)**
 - `Camera.SubmitRenderRequest(ObjectIdRequest)` 는 **에디트 모드 씬 뷰에서 동작한다.**

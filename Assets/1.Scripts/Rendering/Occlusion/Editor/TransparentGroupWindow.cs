@@ -13,7 +13,7 @@ namespace VeyTrace.Rendering.Occlusion.Editor
 {
     public sealed class TransparentGroupWindow : EditorWindow
     {
-        const string k_MenuPath = "Tools/Rendering/Transparency/Group Tool";
+        const string k_MenuPath = "Tools/Group Painter";
 
         Vector2 m_Scroll;
         GroupData m_RenameTarget;
@@ -23,7 +23,7 @@ namespace VeyTrace.Rendering.Occlusion.Editor
         static void Open()
         {
             var window = GetWindow<TransparentGroupWindow>();
-            window.titleContent = new GUIContent("Transparency Groups");
+            window.titleContent = new GUIContent("Group Painter");
             window.minSize = new Vector2(360f, 240f);
             window.Show();
         }
@@ -207,7 +207,7 @@ namespace VeyTrace.Rendering.Occlusion.Editor
                         if (GUILayout.Button(new GUIContent("정리", "유실된 멤버만 걷어낸다.")))
                         {
                             var removed = set.RemoveMissingMembers(group);
-                            Debug.Log($"[TransparentGroup] '{group.name}' 에서 유실 멤버 {removed}개를 정리했다.");
+                            Debug.Log($"[GroupPainter] '{group.name}' 에서 유실 멤버 {removed}개를 정리했다.");
                         }
                     }
 

@@ -1,7 +1,7 @@
 // 투명화 그룹 툴 — JSON 저장소와 컨텍스트 판별.
 // PLAN-transparent-group-tool.md 결정 5·6·7.
 //
-// 저장 위치는 Assets/ **밖**, 프로젝트 루트의 TransparentGroups/ 다.
+// 저장 위치는 Assets/ **밖**, 프로젝트 루트의 GroupPainter/ 다.
 // 그래서 .meta 도, 리임포트도, 씬 dirty 도 없다. git 에는 추적된다(결정 5).
 
 using System;
@@ -38,7 +38,7 @@ namespace VeyTrace.Rendering.Occlusion.Editor
 
     public static class TransparentGroupStore
     {
-        public const string DirectoryName = "TransparentGroups";
+        public const string DirectoryName = "GroupPainter";
 
         /// <summary>프로젝트 루트(Assets 의 부모) 아래. Assets/ 밖이라 Unity 가 임포트하지 않는다.</summary>
         public static string RootDirectory
@@ -108,14 +108,14 @@ namespace VeyTrace.Rendering.Occlusion.Editor
             {
                 Directory.CreateDirectory(RootDirectory);
                 File.Move(existing, expected);
-                Debug.Log($"[TransparentGroup] 이름 변경 감지 — 파일명 정정: " +
+                Debug.Log($"[GroupPainter] 이름 변경 감지 — 파일명 정정: " +
                           $"{Path.GetFileName(existing)} → {Path.GetFileName(expected)}");
                 return expected;
             }
             catch (IOException e)
             {
                 // 옮기지 못해도 읽기는 되어야 한다. 원래 파일을 계속 쓴다.
-                Debug.LogWarning($"[TransparentGroup] 파일명 정정 실패, 기존 경로를 그대로 쓴다: {e.Message}");
+                Debug.LogWarning($"[GroupPainter] 파일명 정정 실패, 기존 경로를 그대로 쓴다: {e.Message}");
                 return existing;
             }
         }
@@ -151,7 +151,7 @@ namespace VeyTrace.Rendering.Occlusion.Editor
 
                 if (data.version > GroupFileData.CurrentVersion)
                 {
-                    Debug.LogWarning($"[TransparentGroup] {Path.GetFileName(path)} 의 version={data.version} 은 " +
+                    Debug.LogWarning($"[GroupPainter] {Path.GetFileName(path)} 의 version={data.version} 은 " +
                                      $"이 툴({GroupFileData.CurrentVersion})보다 높다. 읽기는 하지만 모르는 필드는 버려진다.");
                 }
 
@@ -162,7 +162,7 @@ namespace VeyTrace.Rendering.Occlusion.Editor
             catch (Exception e)
             {
                 // 깨진 파일을 덮어쓰지 않는다 — 사용자가 손으로 고칠 수 있어야 한다(결정 5의 전제).
-                Debug.LogError($"[TransparentGroup] {path} 를 읽지 못했다. 이 컨텍스트는 빈 상태로 연다: {e.Message}");
+                Debug.LogError($"[GroupPainter] {path} 를 읽지 못했다. 이 컨텍스트는 빈 상태로 연다: {e.Message}");
                 return NewEmpty(context);
             }
         }
@@ -197,7 +197,7 @@ namespace VeyTrace.Rendering.Occlusion.Editor
             }
             catch (Exception e)
             {
-                Debug.LogError($"[TransparentGroup] {path} 에 저장하지 못했다: {e.Message}");
+                Debug.LogError($"[GroupPainter] {path} 에 저장하지 못했다: {e.Message}");
             }
         }
 

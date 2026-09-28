@@ -88,7 +88,7 @@ namespace VeyTrace.Rendering.Occlusion.Editor
             var shader = Shader.Find(k_ShaderName);
             if (shader == null)
             {
-                Debug.LogError($"[TransparentGroup] 셰이더를 찾지 못했다: {k_ShaderName}. 오버레이를 켤 수 없다.");
+                Debug.LogError($"[GroupPainter] 셰이더를 찾지 못했다: {k_ShaderName}. 오버레이를 켤 수 없다.");
                 TransparentGroupSession.OverlayEnabled = false;
                 return;
             }

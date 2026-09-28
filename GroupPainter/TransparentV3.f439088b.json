@@ -14,13 +14,7 @@
                 "a": 1.0
             },
             "colorIsCustom": false,
-            "members": [
-                {
-                    "globalObjectId": "GlobalObjectId_V1-2-f439088b61a8b2247aac0f4cea17b9a1-1435751219-0",
-                    "path": "Directional Light",
-                    "lastSeenName": "Directional Light"
-                }
-            ]
+            "members": []
         },
         {
             "id": "5fb47fad725645ac891c45681b074b94",
@@ -32,18 +26,7 @@
                 "a": 1.0
             },
             "colorIsCustom": false,
-            "members": [
-                {
-                    "globalObjectId": "GlobalObjectId_V1-2-f439088b61a8b2247aac0f4cea17b9a1-755086560-0",
-                    "path": "WallGroup/Cube",
-                    "lastSeenName": "Cube"
-                },
-                {
-                    "globalObjectId": "GlobalObjectId_V1-2-f439088b61a8b2247aac0f4cea17b9a1-1358246927-0",
-                    "path": "WallGroup/Cube (2)",
-                    "lastSeenName": "Cube (2)"
-                }
-            ]
+            "members": []
         }
     ]
 }
