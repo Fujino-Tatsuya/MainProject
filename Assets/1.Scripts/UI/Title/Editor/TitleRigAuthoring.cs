@@ -22,7 +22,7 @@ public static class TitleRigAuthoring
     const float Fov = 26.99f;
 
     static readonly Vector3 FarPos = new(0f, 4.26f, 13.8f);
-    static readonly Vector3 NearPos = new(0f, 3.22f, 3.47f);
+    static readonly Vector3 NearPos = new(0f, 3.395f, 3.47f); // 09-28 팀장 Play 에서 직접 맞춘 도착 구도
     static readonly Vector3 CamEuler = new(4.9f, 180f, 0f);
 
     // CRT 화면 중심. monitor_screen 의 트랜스폼 피벗은 (0, 1.11, -3.16) 이지만
@@ -50,6 +50,12 @@ public static class TitleRigAuthoring
     {
         "Assets/3.Materials/Environment/NotUsedInMap/Props/Office/MA_monitor_screen glitch.mat",
         "Assets/3.Materials/Environment/NotUsedInMap/Props/Office/MA_monitor_screen non.mat",
+    };
+    // WallSourceMaterials 와 같은 순서 — 각 셰이더 그래프에 박혀 있던 원래 이미지(SVN)
+    static readonly string[] WallImagePaths =
+    {
+        "Assets/50.Art/Environment/Textures/Props/Office/screen_glitch_v1.png",
+        "Assets/50.Art/Environment/Textures/Props/Office/screen.png",
     };
 
     [MenuItem("Tools/Title/Authoring/타이틀 리그 조립")]
@@ -253,8 +259,18 @@ public static class TitleRigAuthoring
         SerializedProperty wallsProp = feso.FindProperty("_wallScreens");
         wallsProp.arraySize = walls.Length;
         for (int i = 0; i < walls.Length; i++) wallsProp.GetArrayElementAtIndex(i).objectReferenceValue = walls[i];
+        // 09-28 팀장: 벽은 원래 이미지 + CRT 룩 + TV 롤링. 화면 반복은 _liveFeed 로 되살릴 수 있다.
+        feso.FindProperty("_liveFeed").boolValue = false;
+        SerializedProperty imagesProp = feso.FindProperty("_images");
+        imagesProp.arraySize = WallSourceMaterials.Length;
+        for (int i = 0; i < WallSourceMaterials.Length; i++)
+        {
+            SerializedProperty e = imagesProp.GetArrayElementAtIndex(i);
+            e.FindPropertyRelative("original").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Material>(WallSourceMaterials[i]);
+            e.FindPropertyRelative("image").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Texture>(WallImagePaths[i]);
+        }
         feso.ApplyModifiedPropertiesWithoutUndo();
-        Debug.Log($"[TitleRig] 벽 모니터 피드 대상 {walls.Length}대");
+        Debug.Log($"[TitleRig] 벽 모니터 대상 {walls.Length}대");
 
         // 메뉴 버튼 라벨도 등장할 때 스크램블 디코드
         foreach (Button b in new[] { start, option, exit })
@@ -289,7 +305,7 @@ public static class TitleRigAuthoring
         Set(so, "_sceneManager", manager);
         Set(so, "_burstFx", burstFx);
         Set(so, "_sustainFx", sustainFx);
-        so.FindProperty("_approachDuration").floatValue = 2f;
+        so.FindProperty("_approachDuration").floatValue = 3f; // 09-28 팀장: 더 느리게(2→3)
         so.ApplyModifiedPropertiesWithoutUndo();
 
         if (manager != null)
@@ -527,14 +543,23 @@ public static class TitleRigAuthoring
     {
         Material mat = EnsureMaterial(WallMaterialPath, "Title/CRTScreen");
         if (mat == null) return null;
-        // 🔴 재귀마다 곱해진다 — (1 + 글로우) × 밝기 가 1 을 넘으면 몇 프레임 만에 하얗게 탄다.
-        mat.SetFloat("_Brightness", 0.8f);
-        mat.SetFloat("_Glow", 0.12f);
-        mat.SetFloat("_ChromaPx", 1.5f);
-        mat.SetFloat("_ScanStrength", 0.35f);
+        // 09-28 팀장 인스펙터 튜닝값. 🔴 _liveFeed 로 화면 반복을 다시 켜면 재귀마다 곱해진다 —
+        // (1 + 글로우) × 밝기 가 1 을 넘으면 몇 프레임 만에 하얗게 탄다(지금 값은 0.33 이라 안전).
+        mat.SetFloat("_Brightness", 0.33f);
+        mat.SetFloat("_Glow", 0f);
+        mat.SetFloat("_GlowRadiusPx", 2.56f);
+        mat.SetFloat("_ChromaPx", 2.95f);
+        mat.SetFloat("_ScanStrength", 0.319f);
         mat.SetFloat("_ScanCount", 220f);
-        mat.SetFloat("_Vignette", 0.9f);
+        mat.SetFloat("_Grain", 0.0529f);
+        mat.SetFloat("_Jitter", 0.0012f);
+        mat.SetFloat("_Vignette", 0.365f);
         mat.SetColor("_Tint", new Color(0.88f, 1f, 0.95f, 1f));
+        // TV 동기 띠·지직 표현 세기 — 초기값(추정). 흐름 속도·지직 빈도는 TitleScreenFeed 인스펙터.
+        mat.SetFloat("_Roll", 0.6f);
+        mat.SetFloat("_RollWidth", 0.14f);
+        mat.SetFloat("_Flicker", 0.5f);
+        mat.SetFloat("_SeamBlend", 0.4f); // 위아래 안 이어지는 그림의 이음새 크로스페이드 폭
         EditorUtility.SetDirty(mat);
         AssetDatabase.SaveAssets();
         return mat;

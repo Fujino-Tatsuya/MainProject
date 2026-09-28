@@ -37,8 +37,12 @@ public sealed class TitleFlowDirector : MonoBehaviour
     [Tooltip("비활성 vcam 에 줄 우선순위.")]
     [SerializeField] private int _idlePriority = 10;
 
-    [Tooltip("Far→Near 블렌드에 걸리는 시간(초). Brain 의 기본 블렌드와 맞춰 둘 것. 진행도·타임아웃 계산에 쓴다.")]
-    [SerializeField, Min(0.1f)] private float _approachDuration = 2f;
+    [Tooltip("Far→Near 이동 시간(초). 🔴 이 값이 유일한 원본 — 시작할 때 Brain 의 Default Blend 시간을 이 값으로 덮는다.")]
+    [SerializeField, Min(0.1f)] private float _approachDuration = 3f;
+
+    [Tooltip("도착하면 CinemachineBrain 을 끈다. Play 중에 Main Camera 를 직접 옮겨 보며 구도를 잡을 수 있다.\n" +
+             "(맞춘 값은 Play 종료 전에 Main Camera Transform 을 Copy → VCam_Near 에 Paste)")]
+    [SerializeField] private bool _releaseCameraOnArrive = true;
 
     [Header("중앙 모니터")]
     [Tooltip("중앙 CRT 화면 표시(로고 ↔ UI 렌더텍스처). 비면 화면 전환 없이 기존처럼 동작.")]
@@ -96,6 +100,13 @@ public sealed class TitleFlowDirector : MonoBehaviour
     {
         if (_brain == null && Camera.main != null)
             _brain = Camera.main.GetComponent<CinemachineBrain>();
+
+        if (_brain != null)
+        {
+            CinemachineBlendDefinition blend = _brain.DefaultBlend;
+            blend.Time = _approachDuration;
+            _brain.DefaultBlend = blend;
+        }
 
         if (_sceneManager == null)
             _sceneManager = FindAnyObjectByType<TitleSceneManager>();
@@ -225,7 +236,24 @@ public sealed class TitleFlowDirector : MonoBehaviour
         ClearSelection();
         _lastSelected = _startButton != null ? _startButton.gameObject : null;
 
+        if (_releaseCameraOnArrive && _brain != null && _brain.enabled)
+            StartCoroutine(ReleaseCameraNextFrame());
+
         Debug.Log("[TitleFlow] Menu");
+    }
+
+    /// <summary>
+    /// 🔴 한 프레임 미룬다 — ESC 스킵은 <c>ActiveBlend = null</c> 직후 같은 프레임에 여기로 오는데,
+    /// 카메라를 Near 로 옮기는 건 Brain 의 LateUpdate 다. 바로 끄면 카메라가 중간에 멈춘다.
+    /// </summary>
+    private System.Collections.IEnumerator ReleaseCameraNextFrame()
+    {
+        yield return null;
+        if (_brain != null && _state is TitleFlowState.Menu or TitleFlowState.Settings)
+        {
+            _brain.enabled = false;
+            Debug.Log("[TitleFlow] 카메라 해제 — 이제 Main Camera 를 직접 옮길 수 있다");
+        }
     }
 
     // ── 버튼 진입점 (씬의 UnityEvent 는 이쪽으로 재지정한다) ──────────────

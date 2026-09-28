@@ -29,16 +29,20 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _Brightness: 0.8
-    - _ChromaPx: 1.5
+    - _Brightness: 0.33
+    - _ChromaPx: 2.95
+    - _Flicker: 0.5
     - _Glitch: 0
-    - _Glow: 0.12
-    - _GlowRadiusPx: 4
-    - _Grain: 0.05
+    - _Glow: 0
+    - _GlowRadiusPx: 2.56
+    - _Grain: 0.0529
     - _Jitter: 0.0012
+    - _Roll: 0.6
+    - _RollWidth: 0.14
     - _ScanCount: 220
-    - _ScanStrength: 0.35
-    - _Vignette: 0.9
+    - _ScanStrength: 0.319
+    - _SeamBlend: 0.4
+    - _Vignette: 0.365
     m_Colors:
     - _Tint: {r: 0.88, g: 1, b: 0.95, a: 1}
   m_BuildTextureStacks: []

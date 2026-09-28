@@ -263,7 +263,7 @@ Transform:
   m_GameObject: {fileID: 44174368}
   serializedVersion: 2
   m_LocalRotation: {x: -0.0000000018685542, y: 0.9990859, z: -0.042747535, w: -0.00000004367143}
-  m_LocalPosition: {x: 0, y: 3.22, z: 3.47}
+  m_LocalPosition: {x: 0, y: 3.395, z: 3.47}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -3706,7 +3706,7 @@ MonoBehaviour:
   _vcamCloseup: {fileID: 1367286806}
   _activePriority: 30
   _idlePriority: 10
-  _approachDuration: 2
+  _approachDuration: 3
   _monitorDisplay: {fileID: 1550422399}
   _crtFx: {fileID: 1471206462}
   _powerOff: {fileID: 1471206460}
@@ -4293,7 +4293,7 @@ MonoBehaviour:
     DefaultMode: 2
   DefaultBlend:
     Style: 1
-    Time: 2
+    Time: 3
     CustomCurve:
       serializedVersion: 2
       m_Curve: []
@@ -7402,6 +7402,12 @@ MonoBehaviour:
   - {fileID: 1908013122}
   _wallMaterialSource: {fileID: 2100000, guid: e20952300cbe9cb4bb274cb6f95dc13f, type: 2}
   _size: {x: 640, y: 360}
+  _liveFeed: 0
+  _images:
+  - original: {fileID: 2100000, guid: 51f4aae3402396b47b23b56345a60239, type: 2}
+    image: {fileID: 2800000, guid: fc78da5a2d59af54bbf6db88b3687c56, type: 3}
+  - original: {fileID: 2100000, guid: de4939a1b3dfd2a4c9774628ee76b30e, type: 2}
+    image: {fileID: 2800000, guid: 6c2742940ca0dcc4a80adc2f3c114bd4, type: 3}
 --- !u!4 &2137555596
 Transform:
   m_ObjectHideFlags: 0
