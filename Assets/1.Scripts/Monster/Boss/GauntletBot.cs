@@ -81,6 +81,17 @@ public class GauntletBot : MonsterBase
              "크기는 매 발동마다 smashRadius로 덮어쓰므로 인스펙터의 scale 값은 무시된다")]
     EffectSocketPlayer smashTelegraph;
 
+    [Header("펀치 예고 (2026-09-28 팀장: 범위를 보여 준 뒤 공격)")]
+    [SerializeField, Min(0f)]
+    [Tooltip("펀치를 고른 뒤 판정 박스를 바닥에 채우는 시간(초). 다 차면 펀치 모션이 나간다. 0 = 예고 없음(예전).\n" +
+             "스매시는 기존 원형 예고(클립 이벤트)를 그대로 쓴다. 재질은 MonsterBase 의 공격 예고 칸.")]
+    float punchTelegraphDuration = 0.5f;
+
+    [SerializeField, Min(0f)]
+    [Tooltip("좌/우 펀치의 판정·예고를 몸 기준 옆으로 미는 거리(m). 왼손 = 왼쪽, 오른손 = 오른쪽.\n" +
+             "23호 훅과 같은 비율(폭 4.1m 에 ±1.07m ≈ 26%) — 판정 박스 폭 3.6m 기준 0.95m. 0 = 정면 가운데.")]
+    float sideLateralOffset = 0.95f;
+
     [Header("애니메이션 — CrossFade 대상 상태명(컨트롤러 상태명과 일치해야 함)")]
     [SerializeField]
     [Tooltip("스매시 진입 상태명. 이 상태의 exit-time 전이가 Smash 상태로 자동 이어진다(컨트롤러 확인 완료).")]
@@ -112,6 +123,11 @@ public class GauntletBot : MonsterBase
     readonly HashSet<Transform> _nearbyRoots = new HashSet<Transform>();
     Collider[] _smashHitBuffer;
     readonly HashSet<Unit> _smashHitUnits = new HashSet<Unit>();
+    float _punchTelegraphTimer;   // > 0 = 펀치 예고 중(모션 보류)
+
+    // 🔴 예고 동안 몸을 돌리면 예고 박스가 따라 돌아 "피했는데 맞는" 공격이 된다 → 공격 중 회전 잠금.
+    //    조준은 StartAttack 의 FaceTarget 1회로 확정된다(23호와 같은 규약).
+    protected override bool FaceTargetWhileAttacking => false;
 
     // 공격 진입: 근접 플레이어 수 카운트 → 가중치 룰렛으로 7종 중 하나 확정(서버 권한) → base 공통 셋업
     // → 선택 결과를 ClientRpc로 전 피어에 브로드캐스트(CrossFade) → 스매시면 텔레그래프도 함께 브로드캐스트.
@@ -119,14 +135,32 @@ public class GauntletBot : MonsterBase
     {
         int nearbyCount = CountNearbyPlayers();
         _currentAttack = RollAttack(nearbyCount);
+        // 공격 1회당 한 줄. 연속 스매시·인터럽트 실패를 로그로 가리려고 남긴다(09-28 — 선택값이 로그에 없어 못 가렸다).
+        Edit.Log($"[Gauntlet] 공격 {_currentAttack} (근접 {nearbyCount}명)", this);
 
         // base 공통 셋업: _lastAttackTime, _stateTimer=data.attackDuration(안전망), StopAgent, FaceTarget,
         // (옵션)슈퍼아머, SetState(Attack). PlayStateAnimation(Attack)은 아래에서 override로 스킵된다.
         base.StartAttack();
+        _punchTelegraphTimer = 0f;
+
+        if (_currentAttack != GauntletAttackId.Smash)
+        {
+            if (HasAttackTelegraph && punchTelegraphDuration > 0f && meleeAttack != null)
+            {
+                // 예고 동안 모션을 보류한다. 안전망 타이머·슈퍼아머도 예고만큼 늘린다(안 늘리면 펀치 전에 Attack 이 끝난다).
+                _punchTelegraphTimer = punchTelegraphDuration;
+                _stateTimer += punchTelegraphDuration;
+                if (data != null && data.hasSuperArmorWhileAttacking && status != null)
+                    status.ApplyStatus(StatusEffectType.SuperArmor, data.attackDuration + punchTelegraphDuration);
+                ShowHitboxTelegraph(meleeAttack.ColliderInfo, punchTelegraphDuration, 0f, SideShift(_currentAttack));
+                return;
+            }
+
+            PlayAttackAnimClientRpc(_currentAttack);
+            return;
+        }
 
         PlayAttackAnimClientRpc(_currentAttack);
-
-        if (_currentAttack != GauntletAttackId.Smash) return;
 
         // 크기만 미리 밀어넣는다. 켜고 끄는 것은 예비동작 클립의 애니메이션 이벤트가 한다.
         // 이 RPC와 위의 CrossFade RPC가 같은 프레임에 순서대로 나가고 애니 이벤트는 그 뒤에
@@ -140,7 +174,26 @@ public class GauntletBot : MonsterBase
         if (Counter == null) return;
 
         Counter.Open();
-        if (Counter.IsOpen) ServerSetCounterWindow(true);
+        if (Counter.IsOpen) ServerSetCounterWindow(true, Counter.WindowDuration);   // 표시는 0.15초 먼저 꺼진다
+    }
+
+    /// <summary>
+    /// 🔴 <c>Attack</c> 밖으로 튕기는 <b>다른</b> 경로(안전망 타이머 · 강제 그로기 · 리쉬 · 사망)에서 간파 창을 닫는다.
+    /// 창 만료 틱은 <see cref="HandleAttack"/> 안에서만 돌아, 그런 이탈이면 창이 논리적으로 열린 채 남는다
+    /// (09-28 전수조사 #9 — WallBot 과 같은 규약). 카운터 성공은 스스로 닫았으므로 여기선 이미 닫혀 있다.
+    /// </summary>
+    protected override void OnMonsterStateChanged(MonsterState previous, MonsterState next)
+    {
+        base.OnMonsterStateChanged(previous, next);
+        if (!IsServer || next == MonsterState.Attack) return;
+
+        _punchTelegraphTimer = 0f;
+        if (Counter != null && Counter.IsOpen)
+        {
+            Counter.Close();
+            Edit.Log($"[Gauntlet] 공격 이탈({previous}→{next}) — 간파 창 정리", this);
+        }
+        ServerSetCounterWindow(false);
     }
 
     /// <summary>카운터 창 컴포넌트(없으면 null = 카운터 없는 몹으로 동작).</summary>
@@ -150,8 +203,24 @@ public class GauntletBot : MonsterBase
     // 창 시간을 흘린다. 만료 = **인터럽트 실패 확정** — 예고를 끄고 스매시가 그대로 진행된다.
     protected override void HandleAttack(float dt)
     {
+        // 펀치 예고 — 다 차는 순간 끄고 모션을 낸다. 히트는 여전히 클립의 OnAttackHit 이 낸다.
+        if (_punchTelegraphTimer > 0f)
+        {
+            _punchTelegraphTimer -= dt;
+            _stateTimer -= dt;
+            if (_punchTelegraphTimer <= 0f)
+            {
+                HideAttackTelegraph();
+                PlayAttackAnimClientRpc(_currentAttack);
+            }
+            return;
+        }
+
         if (Counter != null && Counter.IsOpen && Counter.TickAndDetectExpiry(dt))
+        {
             ServerSetCounterWindow(false);
+            Edit.Log("[Gauntlet] 카운터 창 만료 — 인터럽트 실패, 스매시 진행", this);
+        }
 
         base.HandleAttack(dt);
     }
@@ -166,8 +235,13 @@ public class GauntletBot : MonsterBase
         base.TakeDamage(attackInfo);
 
         if (!IsServer || !attackInfo.isInterruptAttack || Counter == null) return;
-        if (!Counter.TryConsumeInterrupt()) return;
+        if (!Counter.TryConsumeInterrupt())
+        {
+            Edit.Log($"[Gauntlet] 인터럽트 적중 — 창 밖이라 무효(공격 {_currentAttack}, 상태 {State})", this);
+            return;
+        }
 
+        Edit.Log("[Gauntlet] 카운터 성공 — 스매시 취소, 그로기", this);
         CounterSucceeded();
     }
 
@@ -241,14 +315,15 @@ public class GauntletBot : MonsterBase
                 break;
             // 🔴 Hit() 은 **실제로 데미지가 들어간 대상 수**를 돌려준다. 헛스윙(0)과 명중을
             //    여기서 가른다 — 연출을 애니 이벤트에 맡기면 허공을 쳐도 스파크가 튄다.
+            // 좌/우 펀치는 예고와 같은 만큼 옆으로 민 판정을 낸다(SideShift).
             case GauntletAttackId.Punch03_L:
             case GauntletAttackId.Punch03_R:
-                if (meleeAttack != null && meleeAttack.Hit() > 0)
+                if (MeleeHitShifted(SideShift(_currentAttack)) > 0)
                     PlaySparkRpc(_currentAttack);
                 OnUppercutHit();
                 break;
             default:
-                if (meleeAttack != null && meleeAttack.Hit() > 0)
+                if (MeleeHitShifted(SideShift(_currentAttack)) > 0)
                     PlaySparkRpc(_currentAttack);
                 break;
         }
@@ -276,6 +351,10 @@ public class GauntletBot : MonsterBase
 
         player.PlayOnce();
     }
+
+    // 몸 기준 옆 오프셋(+ = 오른쪽). 스매시는 몸 중심 원이라 0.
+    float SideShift(GauntletAttackId id) =>
+        id == GauntletAttackId.Smash ? 0f : (IsLeftHand(id) ? -sideLateralOffset : sideLateralOffset);
 
     static bool IsLeftHand(GauntletAttackId id) =>
         id == GauntletAttackId.Punch01_L || id == GauntletAttackId.Punch02_L || id == GauntletAttackId.Punch03_L;

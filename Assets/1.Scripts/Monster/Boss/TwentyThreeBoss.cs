@@ -37,6 +37,14 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    // 간파 창 **표시** — 판정(_counterWindow)과 분리. 판정 창이 닫히기 CounterVisualLeadSeconds(0.15초) 전에
+    // 먼저 꺼진다 → "보일 때 누르면 성공"(팀장 09-28: 유예 없음, 표시만 일찍). 텔레그래프는 이쪽을 본다.
+    readonly NetworkVariable<bool> _counterVisual = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+    float _counterVisualOffAt = -1f;   // 서버 Time.time. < 0 = 예약 없음
+
     // [G6] 인터럽트 성공 리액션이 **오른쪽인가**. 잡기는 항상 오른쪽, 돌진은 L·R 난수다(팀장 확정 R1).
     // 🔴 RPC 가 아니라 **상태 복제**로 보낸다 — 난수를 피어마다 뽑으면 화면이 갈리고,
     //    RPC 는 늦게 들어온 클라에게 재전달되지 않는다.
@@ -261,7 +269,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         }
 
         // 카운터 창 표현은 모든 피어에서 돈다(서버가 창을 쓰고, 각 피어가 텔레그래프를 구동).
-        _counterWindow.OnValueChanged += OnCounterWindowChanged;
+        _counterVisual.OnValueChanged += OnCounterWindowChanged;
         ResolveTelegraphs();
 
         // Wells 는 모든 피어에서 로컬 애니메이터를 구동한다(상태는 이 NetworkObject 가 복제).
@@ -286,7 +294,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
 
     public override void OnNetworkDespawn()
     {
-        _counterWindow.OnValueChanged -= OnCounterWindowChanged;
+        _counterVisual.OnValueChanged -= OnCounterWindowChanged;
         _wellsState.OnValueChanged -= OnWellsStateChanged;
 
         // Wells 콜백이 파괴된 보스를 붙잡지 않게 끊는다(Wells 는 MonoBehaviour 라 수명이 다르다).
@@ -856,7 +864,8 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         //    없음. 실제로 한 명을 붙잡은 뒤부터 인터럽트가 가능해짐."
         //    그래서 여기서 열지 않고 `AcquireGrab` 성공 시점에 연다.
         bool opensNow = e != null && e.opensCounterWindow && e.attackId != BossAttackId.Grab;
-        SetCounterWindow(opensNow);
+        // 창 길이 = 선딜 게이트 길이(아래 Begin) — 표시는 그보다 0.15초 먼저 꺼진다.
+        SetCounterWindow(opensNow, opensNow ? CounterWindowDuration : -1f);
 
         // 카운터 선딜 게이트 시작. 창을 여는 공격이면 창 길이로, 아니면 0(비활성)이다.
         // 🔴 창이 열린 공격은 애니 이벤트가 와도 **즉시 발사하지 않는다** — NotifyAttackHit 이
@@ -1113,7 +1122,8 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
                         coneForwardOffset: e.lungeDistance,
                         pathRadius: e.lungePathRadius,
                         pathLength: e.lungeDistance,
-                        growTime: growTime);
+                        growTime: growTime,
+                        fillInward: e.telegraphFillInward);
     }
 
     [ClientRpc]
@@ -1509,6 +1519,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         //    체인이든 단타든 전부 여기를 지난다. 그래서 마지막으로 갱신된 값이 곧 "공격 종료 시각"이다.
         //    (`DecideNextAfterAction` 은 virtual 이 아니라 훅을 걸 수 없고, 종료 경로가 4곳으로 흩어져 있다.)
         _lastAttackTickTime = Time.time;
+        TickCounterVisual();   // 간파 창은 공격 중에만 열린다 — 조기 소등 검사는 여기 한 곳이면 된다
 
         // [G1] 전진 공격은 **단계(AttackPhase)를 쓰지 않는다** — 훅·어퍼는 단타 공격이고, 전진은
         // 애니 히트 이벤트가 끝을 알리므로 단계 기계가 필요 없다. 그래서 아래 분기보다 앞에 둔다.
@@ -1847,6 +1858,9 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         EnterPhase(BossAttackPhase.Throw, GrabThrowTime);
         CrossFadeGrabCycleStateClientRpc(GrabCycleState.Slam);
         ApplyGrabSlamDamage();
+
+        // 창은 "다음 타가 마지막"이 되는 순간(AdvanceGrabSlam) 닫힌다 — 이 타가 그 직전 타면 닫힘 시각이 확정된다.
+        if (_grabSlamsLeft <= 2) ScheduleCounterVisualOff(GrabThrowTime);
     }
 
     // 한 타가 끝났다 — 남았으면 **쉼 없이** 다음 타, 마지막이었으면 놓아준다.
@@ -1860,6 +1874,8 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
 
         if (_grabSlamsLeft > 0)
         {
+            // 이번 타가 끝나면 다음 타가 마지막 → 창이 닫힌다. 표시는 그 0.15초 전에 끈다.
+            if (_grabSlamsLeft == 2) ScheduleCounterVisualOff(GrabThrowTime);
             EnterPhase(BossAttackPhase.Throw, GrabThrowTime);
             // 같은 상태를 다시 재생해야 타격이 반복으로 읽힌다(CrossFade 만으로는 이어 재생된다).
             ReplayGrabSlamClientRpc();
@@ -3657,6 +3673,9 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         StartDashMove(dir, Mathf.Max(0.1f, e.lungeSpeedMultiplier), e.lungeDistance);
         _lunging = true;
 
+        // 이미 앞에 플레이어가 붙어 있으면 전진하지 않는다(파고들면 플레이어가 못 빠져나간다 — 아래 TickLunge).
+        if (PlayerBlocksLunge(dir)) StopLungeMove();
+
         // 🔴 방향은 여기서 잠가 **히트까지** 유지한다(EndLunge 가 푼다). `_lunging` 과 같이 두면
         //    도착하는 순간 풀려 부채꼴이 돌아간다 — 위 필드 선언부 주석 참조.
         _attackFacingLocked = true;
@@ -3692,8 +3711,42 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
             _lungePathHits += meleeAttack.HitCone(transform.position, transform.forward, pathRadius, 360f);
         }
 
-        if (DashDestinationReached())
+        // 🔴 앞에 플레이어가 닿으면 전진을 멈춘다(2026-09-28 팀장 Play). 보스·중간보스가 플레이어를 막게 된 뒤로
+        //    (obstacleMask +Enemy) 서버가 몸 캡슐(r 1.53)을 플레이어에게 파고들게 하면, 플레이어 쪽 스윕은
+        //    시작 겹침을 "전 방향 막힘"으로 읽어 **어디로도 못 나간다**(겹침 해소는 모터 담당 — CONTEXT 인수인계).
+        //    NavMeshAgent 는 플레이어를 장애물로 모르므로 보스 쪽에서 멈춰야 한다. 판정은 끝점에서 그대로 나간다.
+        if (DashDestinationReached() || PlayerBlocksLunge(_dashDir))
             StopLungeMove();
+    }
+
+    // 몸 캡슐을 진행 방향으로 살짝 민 자리에 살아 있는 플레이어 몸이 있는가(앞쪽 반구만 — 뒤·옆 플레이어는 무시).
+    const float LungeBlockLookAhead = 0.15f;
+    readonly Collider[] _lungeBlockBuffer = new Collider[8];
+    int _playerBodyMask = -1;
+
+    bool PlayerBlocksLunge(Vector3 dir)
+    {
+        if (!(bodyCollider is CapsuleCollider cap) || !cap.enabled) return false;
+        if (_playerBodyMask < 0) _playerBodyMask = LayerMask.GetMask("Player");
+
+        Transform t = cap.transform;
+        float scale = Mathf.Max(Mathf.Abs(t.lossyScale.x), Mathf.Abs(t.lossyScale.z));
+        float radius = cap.radius * scale;
+        float half = Mathf.Max(0f, cap.height * Mathf.Abs(t.lossyScale.y) * 0.5f - radius);
+        Vector3 center = t.TransformPoint(cap.center) + dir * LungeBlockLookAhead;
+        Vector3 p1 = center + t.up * half, p2 = center - t.up * half;
+
+        int n = Physics.OverlapCapsuleNonAlloc(p1, p2, radius, _lungeBlockBuffer, _playerBodyMask,
+                                               QueryTriggerInteraction.Ignore);
+        for (int i = 0; i < n; i++)
+        {
+            Collider c = _lungeBlockBuffer[i];
+            if (c == null || !MonsterTargeting.IsAttackable(c)) continue;
+            Vector3 to = c.transform.position - transform.position;
+            to.y = 0f;
+            if (Vector3.Dot(to, dir) > 0f) return true;
+        }
+        return false;
     }
 
     // 전진 **이동만** 멈춘다. 히트 윈도우는 끝점 판정이 써야 하므로 여기서 닫지 않는다.
@@ -4303,11 +4356,32 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
             this);
     }
 
-    void SetCounterWindow(bool open)
+    /// <param name="windowDuration">열 때 판정 창 길이를 알면 넘긴다 → 표시가 그보다 0.15초 먼저 꺼진다. 0 이하 = 닫을 때 끈다.</param>
+    void SetCounterWindow(bool open, float windowDuration = -1f)
     {
         if (!IsServer) return;
+
+        _counterVisualOffAt = open && windowDuration > 0f
+            ? Time.time + Mathf.Max(0f, windowDuration - CounterVisualLeadSeconds)
+            : -1f;
+        if (_counterVisual.Value != open) _counterVisual.Value = open;
+
         if (_counterWindow.Value == open) return;
         _counterWindow.Value = open;
+    }
+
+    /// <summary>[서버] 열린 창이 <paramref name="remaining"/> 초 뒤 닫힐 것이 확정됐다 — 표시를 그 0.15초 전에 끄게 예약.</summary>
+    void ScheduleCounterVisualOff(float remaining)
+    {
+        if (!IsServer || !_counterWindow.Value) return;
+        _counterVisualOffAt = Time.time + Mathf.Max(0f, remaining - CounterVisualLeadSeconds);
+    }
+
+    void TickCounterVisual()
+    {
+        if (_counterVisualOffAt < 0f || Time.time < _counterVisualOffAt) return;
+        _counterVisualOffAt = -1f;
+        if (_counterVisual.Value) _counterVisual.Value = false;
     }
 
     // 모든 피어에서 호출된다(서버 포함) — 표현만 담당. 붙어 있는 텔레그래프 **전부**를 구동한다.
@@ -4333,7 +4407,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         }
 
         for (int i = 0; i < _telegraphs.Length; i++)
-            _telegraphs[i]?.SetCounterWindow(_counterWindow.Value);
+            _telegraphs[i]?.SetCounterWindow(_counterVisual.Value);
     }
     #endregion
 

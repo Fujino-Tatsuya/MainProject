@@ -166,6 +166,7 @@ MonoBehaviour:
     boxLateralOffset: 0
     boxBackOffset: 0
     telegraphDuration: 0.7
+    telegraphFillInward: 1
     hitEventFallbackNormalized: 0
     telegraphPoseNormalized: 0.15
     prepStateName: 

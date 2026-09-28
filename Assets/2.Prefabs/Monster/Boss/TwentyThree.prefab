@@ -1384,8 +1384,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DissolveOverlay
   overlayMaterialIndex: 1
-  fadeInDuration: 0.8
-  fadeOutDuration: 0.4
+  fadeInDuration: 0
+  fadeOutDuration: 0
   shown: 0
 --- !u!4 &2866633164606936120 stripped
 Transform:

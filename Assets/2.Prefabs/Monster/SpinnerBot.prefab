@@ -103,8 +103,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 1.5, y: 1.5, z: 2}
-  m_Center: {x: 0, y: 1, z: 1}
+  m_Size: {x: 2.5, y: 1.5, z: 2.8}
+  m_Center: {x: 0, y: 1, z: 1.4}
 --- !u!114 &8311129628035199906
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -369,6 +369,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 384ff11760cb52140a9d31743dd79682, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MonsterBase
+  attackTelegraphMaterial: {fileID: 2100000, guid: c3d3d2122c7238547b41939029544154, type: 2}
   ShowTopMostFoldoutHeaderGroup: 1
   data: {fileID: 11400000, guid: 4653eaa1707e0af4899593a87a70a451, type: 2}
   agent: {fileID: 3350840199952395654}
@@ -1399,8 +1400,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DissolveOverlay
   overlayMaterialIndex: 1
-  fadeInDuration: 0.8
-  fadeOutDuration: 0.4
+  fadeInDuration: 0
+  fadeOutDuration: 0
   shown: 0
 --- !u!4 &1667784286779666150 stripped
 Transform:

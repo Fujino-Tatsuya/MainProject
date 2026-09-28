@@ -79,12 +79,15 @@ public class MapContentSpawner : MonoBehaviour
                 // BossRoom 역할 존: 진입 트리거(서버 판정) + 범위 표시(전 피어) 부착 — PLAN §6.
                 // 존 프리팹은 비네트워크 규약이라 프리팹에 미리 넣지 않고 스폰 시 동적 부착한다.
                 if (p.Slot.AssignedRole == ZoneRole.BossRoom)
-                {
                     AttachBossEnterZone(zoneGo, isServer);
 
-                    // 바닥 표식·장판 데칼이 칠해질 표면 표시(전 피어) — 아레나 바닥과 프롭 전부.
-                    // 🔴 파일런도 포함해야 표식이 프롭 위로 이어진다(빼면 지금처럼 프롭이 표식을 가린다).
-                    //    캐릭터는 이 비트가 없어 자동으로 제외된다(DecalReceivers 주석 — 조명 사고 방지).
+                // 바닥 표식·장판 데칼이 칠해질 표면 표시(전 피어) — 존 바닥과 프롭 전부.
+                // ⚠️ 예전엔 BossRoom 존만 표시했다 → 일반 존의 중간보스 공격 예고가 **그려져도 칠할 표면이 없어**
+                //    안 보였다(2026-09-28 Play). 비트 추가라 조명은 무변경이고, 데칼은 투영 상자 안에서만
+                //    그려지므로 전 존을 표시해도 번지지 않는다.
+                // 🔴 파일런도 포함해야 표식이 프롭 위로 이어진다(빼면 지금처럼 프롭이 표식을 가린다).
+                //    캐릭터는 이 비트가 없어 자동으로 제외된다(DecalReceivers 주석 — 조명 사고 방지).
+                {
                     int tagged = DecalReceivers.Tag(zoneGo);
                     if (tagged == 0)
                         Debug.LogWarning(

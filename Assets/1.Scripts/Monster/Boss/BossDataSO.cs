@@ -135,6 +135,10 @@ public class BossAttackEntry
              "0 이면 예고 없이 즉발(기존 동작). 확정 초기값 = 훅·어퍼 0.7.")]
     [Min(0f)] public float telegraphDuration = 0f;
 
+    [Tooltip("예고 채움이 **바깥 끝 → 보스 쪽**으로 차오른다(끌어당기는 공격 — 잡기). 끄면 보스 → 바깥(기본).\n" +
+             "부채꼴만 있는 예고에서만 쓰인다(띠·합집합은 무시). 2026-09-28 팀장 요청.")]
+    public bool telegraphFillInward;
+
     [Tooltip("[T5] 클립에 OnAttackHit **애니 이벤트가 없을 때** 이 정규화 시간(0~1)에 " +
              "도달하면 “준비됨”으로 본다. 0 이면 이벤트만 쓴다(기존 동작). " +
              "🔴 아트가 fbx 를 다시 올리면 .meta 의 이벤트 저작은 날아간다(SVN). " +

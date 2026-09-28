@@ -10,6 +10,9 @@ public interface IDeathEffect
 {
     // 연출 재생. 끝나면 onComplete를 반드시 호출(디스폰 트리거). 서버에서 호출된다.
     void Play(Action onComplete);
+
+    // 사망 클립이 끝나기 이 시간(초) 전에 Play 를 시작한다(MonsterBase 가 읽는다). 0 = 클립 끝에 딱 맞춰.
+    float LeadBeforeClipEnd { get; }
 }
 
 /// <summary>
@@ -60,6 +63,12 @@ public class DissolveDeath : NetworkBehaviour, IDeathEffect
              "짧게 잡으면 파티클이 도중에 잘린다")]
     [SerializeField, Min(0f)] float despawnGrace = 0.5f;
 
+    [Tooltip("사망 클립이 끝나기 이 시간(초) 전에 디졸브를 시작한다. 0 = 클립 끝에 딱 맞춰.\n" +
+             "클립 뒷부분이 정지 자세이거나 디졸브 초반이 눈에 안 띄면 '끝났는데 안 녹는다'로 보인다(2026-09-28 팀장).")]
+    [SerializeField, Min(0f)] float leadBeforeClipEnd = 0.3f;
+
+    public float LeadBeforeClipEnd => leadBeforeClipEnd;
+
     [Tooltip("비우면 자식에서 자동 수집한다. 렌더러가 중첩 프리팹 안에 있어 보통 비워 둔다")]
     [SerializeField] Renderer[] renderers;
 
@@ -95,9 +104,10 @@ public class DissolveDeath : NetworkBehaviour, IDeathEffect
 
     #region 전 피어 재생
 
-    // 순수 연출이라 unreliable. 유실돼도 게임 상태가 갈라지지 않는다 —
-    // JumpController의 착지 VFX·AttackEffectRelay와 같은 규약이다.
-    [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
+    // ⚠️ 예전엔 "순수 연출이라 unreliable" 이었다. 2026-09-28 부터 reliable —
+    // 사망 클립이 끝난 뒤 **딱 한 번** 오는 신호가 됐고, 유실되면 녹지 않은 채 디스폰돼 툭 사라진다.
+    // 한 번뿐이라 비용 차이가 없다.
+    [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Reliable)]
     void PlayDissolveRpc() => PlayLocal();
 
     void PlayLocal()
