@@ -1065,7 +1065,6 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 0
   bt: {fileID: 0}
-  groundProbeDistance: 30
 --- !u!114 &4009453750288028855
 MonoBehaviour:
   m_ObjectHideFlags: 0
