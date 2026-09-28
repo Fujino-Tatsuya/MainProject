@@ -39,9 +39,6 @@ public static class TitleRigAuthoring
     const float CanvasLogicalHeight = 1080f;
     const float CanvasLogicalWidth = 1920f;
 
-    // 설정창(1920 폭)을 모니터 RT(1536 폭) 안에 넣는 배율. 3단계에서 가독성 기준(≥14px)으로 레이아웃을 다시 잡는다.
-    const float SettingsFitScale = 0.78f;
-
     const int UILayer = 5; // 내장 "UI" 레이어 — TagManager 를 건드리지 않으려고 전용 레이어 대신 쓴다
     const string ScreenRendererPath = "TitleOffice/monitor/monitor_screen"; // 🔴 중앙 1대. 벽 모니터도 이름이 monitor_screen
     const string UIMaterialPath = "Assets/3.Materials/title/MA_TitleMonitorUI.mat";
@@ -122,13 +119,16 @@ public static class TitleRigAuthoring
         if (optionPanel != null)
         {
             optionPanel.transform.SetParent(settingsRoot.transform, false);
-            // 설정창 내부는 1920×1080 고정 좌표. 모니터 RT 는 세로 1080 기준 폭 1536(화면 비율 1.42)이라
-            // 늘리면(Stretch) 좌우가 잘린다 → 논리 크기를 유지한 채 가운데 기준으로 폭에 맞춰 축소한다.
+            // 모니터 RT 는 세로 1080 기준 폭 1536(화면 비율 1.42). 예전엔 1920×1080 을 0.78배 균일 축소해
+            // 위아래 11% 씩 검은 띠가 남았다(팀장 09-28). 안쪽 내용물은 가운데 앵커로 폭 ~1025 라 1536 에
+            // 축소 없이 들어간다 → 부모에 꽉 채운다. 배경이 모니터를 채우고 글자는 1.28배 커진다.
             var panelRt = (RectTransform)optionPanel.transform;
-            panelRt.anchorMin = panelRt.anchorMax = panelRt.pivot = new Vector2(0.5f, 0.5f);
+            panelRt.anchorMin = Vector2.zero;
+            panelRt.anchorMax = Vector2.one;
+            panelRt.pivot = new Vector2(0.5f, 0.5f);
             panelRt.anchoredPosition = Vector2.zero;
-            panelRt.sizeDelta = new Vector2(CanvasLogicalWidth, CanvasLogicalHeight);
-            panelRt.localScale = Vector3.one * SettingsFitScale;
+            panelRt.sizeDelta = Vector2.zero;
+            panelRt.localScale = Vector3.one;
             EnsureComponent<RectMask2D>(optionPanel);
             // 표시 여부는 Settings_Root 로 정한다. 안쪽을 꺼 두면 루트를 켜도 안 보인다.
             optionPanel.SetActive(true);

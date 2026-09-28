@@ -122,6 +122,7 @@ public sealed class TitleFlowDirector : MonoBehaviour
                 break;
 
             case TitleFlowState.Menu:
+                ReleaseSelectionOnMouseMove();
                 RestoreSelectionIfNavigating(_startButton);
                 break;
 
@@ -219,7 +220,10 @@ public sealed class TitleFlowDirector : MonoBehaviour
             _crtFx.AmbientBursts = false; // 메뉴에선 끈다 — 클릭 판정이 흔들리지 않게
         Burst(0.9f, 0.28f); // 화면 전환은 강한 버스트 한 번으로
 
-        Select(_startButton);
+        // 🔴 처음부터 START 를 선택하면 Selected 색이 hover 처럼 보여 혼자 밝다(팀장 09-28).
+        // 셋 다 같은 색으로 시작하고, 키보드·패드 첫 입력 때 START 부터 잡히게 기억만 해 둔다.
+        ClearSelection();
+        _lastSelected = _startButton != null ? _startButton.gameObject : null;
 
         Debug.Log("[TitleFlow] Menu");
     }
@@ -370,6 +374,24 @@ public sealed class TitleFlowDirector : MonoBehaviour
             es.SetSelectedGameObject(_lastSelected);
         else
             Select(fallback);
+    }
+
+    /// <summary>
+    /// 마우스를 움직이면 키보드로 잡은 선택을 푼다 — 안 풀면 커서가 떠난 버튼이 Selected 색으로 남아
+    /// "hover 가 아니면 원래 색" 이 깨진다. 다음 키 입력 때 <see cref="_lastSelected"/> 로 복원된다.
+    /// </summary>
+    private void ReleaseSelectionOnMouseMove()
+    {
+        Mouse mouse = Mouse.current;
+        EventSystem es = EventSystem.current;
+        if (mouse == null || es == null || es.currentSelectedGameObject == null)
+            return;
+
+        if (mouse.delta.ReadValue().sqrMagnitude > 0f)
+        {
+            _lastSelected = es.currentSelectedGameObject;
+            es.SetSelectedGameObject(null);
+        }
     }
 
     private void Select(Button button)

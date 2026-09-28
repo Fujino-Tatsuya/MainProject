@@ -217,7 +217,11 @@ Unity 창을 한 번 클릭하면 정리된다.
 - 타이틀 완성 후 Boss23 → development 머지 때 `1.TitleScene` 충돌 → **Boss23 판 채택** + `1.TitleScene/` 라이팅 폴더 복구.
 - 타이틀 진행 상태(09-24): 계획서 `PLAN-title-flow.md` §0.8~0.9. **팀장 Play 확인 완료** — PRESS ANY KEY CRT 룩 · 모니터 지직거림 ·
   START/SETTING/EXIT(줌 없는 설정) · Start/Exit 전체 화면 꺼짐 · 벽 모니터 화면 반복 · 메인 모니터 로고 CRT.
-  🟡 **미결: Start 후 로비가 너무 바로 뜬다 → 로비 진입 "켜짐" 연출을 넣을지 다음 세션에 결정**(§0.9). 남은 단계: 설정창 가독성.
+  ~~🟡 미결: 로비 진입 켜짐 연출~~ → **09-28 해소**: 원인은 연출 부재가 아니라 씬 로드 직후 히치 프레임이 페이드를 삼킨 것.
+  공용 `NemoSceneManager.FadeTo` 에 프레임당 1/30초 상한(**모든 씬 진입/퇴장 페이드에 적용**). 켜짐 연출은 안 넣는다(§0.10).
+  09-28 추가: 메뉴 색 통일(START 자동 선택 제거) · 설정창 모니터 꽉 채움(§0.11). 남은 단계: 8단계 도구 멱등·재진입.
+- 🔴 **기존 버그(범위 밖, 미수정)**: `AudioManager` 인스턴스가 **어느 씬에도 없다** — `16ec8ef0`(08-11 "테스트 환경 정리")에서
+  `0.BootStrapScene` 의 `AudioManager.prefab` 인스턴스가 빠졌다. 그래서 `LobbySceneManager.cs:89` · `VolumeSlider.cs:40` NRE, BGM 무음.
 - ⚠️ 09-23 밤 에디터를 켜 둔 채 Unity 내부 오디오 Assert(`Access version should be odd when acquiring lock`)가 무한 반복 →
   로그 24.6GB → OOM 크래시(09-24 11:26). 우리 코드 무관. 다음 실행 때 "Recovering Scene Backups" 는 **No**(백업은 Play 진입 시 BootStrap 자동 백업).
 
