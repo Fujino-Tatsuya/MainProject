@@ -409,6 +409,33 @@ public class EffectManager : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// 핸들이 가리키는 <b>재생 중인 파트 인스턴스</b>들을 <paramref name="buffer"/>에 채운다.
+    /// 반환값은 채운 개수이고, 재생이 이미 끝났으면 0이다.
+    ///
+    /// <b>왜 필요한가.</b> 재생 도중 인스턴스에 무언가를 알려야 하는 연출이 있다
+    /// (보호막 피격 파문처럼 "지금 맞았다"가 밖에서 들어오는 경우). 핸들만으로는 닿을 수가 없다.
+    ///
+    /// ⚠️ <b>버퍼를 들고 있지 말 것.</b> 여기 담긴 GameObject 는 풀 소유라 반납되면 다른 연출에
+    /// 재대출된다. 부른 그 프레임에 쓰고 버린다. 버퍼 자체는 호출자가 재사용해 할당을 없앤다.
+    /// </summary>
+    public int GetInstances(EffectHandle handle, List<GameObject> buffer)
+    {
+        if (buffer == null) return 0;
+
+        buffer.Clear();
+
+        if (!TryResolve(handle, out ActiveEffect active)) return 0;
+
+        for (int i = 0; i < active.instances.Count; i++)
+        {
+            GameObject instance = active.instances[i].go;
+            if (instance != null) buffer.Add(instance);
+        }
+
+        return buffer.Count;
+    }
+
     #endregion
 
     #region 갱신

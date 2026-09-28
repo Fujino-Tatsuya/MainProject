@@ -215,6 +215,9 @@ Unity 창을 한 번 클릭하면 정리된다.
 - Boss23 에 development 를 다시 머지하면 이 복원이 딸려 와 **타이틀 작업이 통째로 되돌아간다.** 받아야 할 게 생기면
   `a8ebd7f2` 를 제외하고 cherry-pick 하거나, 머지 후 `1.TitleScene` 을 Boss23 판으로 되돌릴 것.
 - 타이틀 완성 후 Boss23 → development 머지 때 `1.TitleScene` 충돌 → **Boss23 판 채택** + `1.TitleScene/` 라이팅 폴더 복구.
+- ✅ **09-28 development(`39879c1b`) → Boss23 머지 완료** — 위 절차대로 해결(타이틀 ours · 라이팅 폴더/`1.TitleScene.meta` 복구). SVN r331 과 짝(Paladin_VFX 의 `*_MaskUV.fbx`).
+  이제 Boss23 에는 `a8ebd7f2` 가 **머지된 상태**다 — 다음에 Boss23 → development 로 올리면 타이틀이 3D 판으로 올라간다(의도).
+  🔴 SVN r328: ChompBot `OnAttackHit` 0.400 → 0.357초(민경). 판정 타이밍 변경 — 의도 확인 필요.
 - 타이틀 진행 상태(09-24): 계획서 `PLAN-title-flow.md` §0.8~0.9. **팀장 Play 확인 완료** — PRESS ANY KEY CRT 룩 · 모니터 지직거림 ·
   START/SETTING/EXIT(줌 없는 설정) · Start/Exit 전체 화면 꺼짐 · 벽 모니터 화면 반복 · 메인 모니터 로고 CRT.
   ~~🟡 미결: 로비 진입 켜짐 연출~~ → **09-28 해소**: 원인은 연출 부재가 아니라 씬 로드 직후 히치 프레임이 페이드를 삼킨 것.

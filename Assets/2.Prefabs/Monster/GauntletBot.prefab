@@ -641,7 +641,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 3927606487
+  GlobalObjectIdHash: 2119361380
   InScenePlacedSourceGlobalObjectIdHash: 1085786765
   DeferredDespawnTick: 0
   Ownership: 1
@@ -815,7 +815,7 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   dissolveTemplate: {fileID: 2100000, guid: 2aa1c6b21e004e799e426acfd55ec726, type: 2}
   particlePrefab: {fileID: 7019508933032447489, guid: 0e15d6fc561b43fa95fadff8ab04b5fd, type: 3}
-  duration: 1
+  duration: 1.5
   despawnGrace: 0.5
   renderers: []
 --- !u!114 &6550163185824853122
@@ -831,7 +831,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MonsterCounterWindow
   windowDuration: 1.5
-  groggyDuration: 0.5
+  groggyDuration: 1
 --- !u!114 &3395086952124872704
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1131,11 +1131,11 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c7a41f60d2b84e6a9c15d380be720063, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::InterruptOverlay
+  m_EditorClassIdentifier: Assembly-CSharp::DissolveOverlay
   overlayMaterialIndex: 1
   fadeInDuration: 0.8
   fadeOutDuration: 0.4
-  interruptible: 0
+  shown: 0
 --- !u!4 &5208934837360812548 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 7004712027421865167, guid: c887b0c600165d74094b8f2d53288dfe, type: 3}

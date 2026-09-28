@@ -29,7 +29,7 @@ using UnityEngine;
 //  ② 원본 렌더러 = 몸통. 머티리얼 [몸통, Interrupt] — 초과 슬롯이 이제 몸통을 덮는다
 //  ③ 형제로 날개 렌더러를 새로 만들고 **같은 bones · rootBone** 을 물린다(본은 공유, 스키닝 총량 불변)
 //
-// InterruptOverlay 는 원본 렌더러에 그대로 남는다 — 그 렌더러가 곧 몸통이 되므로 옮길 필요가 없다.
+// DissolveOverlay(구 InterruptOverlay) 는 원본 렌더러에 그대로 남는다 — 그 렌더러가 곧 몸통이 되므로 옮길 필요가 없다.
 public static class SpinnerBotMeshSplit
 {
     const string PrefabPath = "Assets/2.Prefabs/Monster/SpinnerBot.prefab";
