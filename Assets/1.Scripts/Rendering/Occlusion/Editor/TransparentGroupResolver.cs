@@ -64,11 +64,43 @@ namespace VeyTrace.Rendering.Occlusion.Editor
 
         // ── 멤버 해석 ────────────────────────────────────────────────────
 
+        // 🔴 해석 결과 캐시. 이게 없으면 툴이 쓸 수 없을 만큼 느려진다.
+        //
+        // GlobalObjectIdentifierToObjectSlow 는 이름 그대로 느리다. 그런데 창의 OnGUI 는
+        // 그룹마다 유실 수를 세느라 멤버 전부를 다시 해석했고, IMGUI 는 한 프레임에 OnGUI 를
+        // 여러 번 돌린다. 멤버 53개짜리 그룹에서 프레임당 수백 번이 됐다.
+        //
+        // 캐시는 "못 찾음"도 기억한다. 그래야 유실 멤버가 매번 재시도되지 않는다.
+        // 대신 하이어라키가 바뀌면 통째로 버린다 — 나중에 나타난 오브젝트를 영영 못 찾으면 안 된다.
+        static readonly Dictionary<string, GameObject> s_ResolveCache = new Dictionary<string, GameObject>();
+
+        /// <summary>하이어라키·씬·그룹이 바뀌면 호출한다. 캐시를 통째로 버린다.</summary>
+        public static void InvalidateCache() => s_ResolveCache.Clear();
+
         public static MemberResolution Resolve(GroupContext context, GroupMemberData member)
         {
             var strategy = TransparentGroupLogic.ChooseStrategy(member);
             if (strategy == MemberLookupStrategy.Unusable) return MemberResolution.Missing;
 
+            var cacheKey = context.Guid + "|" + (member.globalObjectId ?? member.path);
+            if (s_ResolveCache.TryGetValue(cacheKey, out var cached))
+            {
+                // 두 가지 null 을 갈라야 한다.
+                //  - ReferenceEquals(cached, null) == true  : "찾아봤지만 없더라" 를 기억해 둔 것 → 그대로 반환
+                //  - cached == null 이지만 참조는 살아 있음   : Unity 의 가짜 null(파괴된 객체) → 캐시가 상했으니 다시 찾는다
+                if (ReferenceEquals(cached, null)) return MemberResolution.Missing;
+                if (cached != null) return new MemberResolution(cached, strategy, byFallback: false);
+                s_ResolveCache.Remove(cacheKey);
+            }
+
+            var resolution = ResolveUncached(context, member, strategy);
+            s_ResolveCache[cacheKey] = resolution.Target;
+            return resolution;
+        }
+
+        static MemberResolution ResolveUncached(
+            GroupContext context, GroupMemberData member, MemberLookupStrategy strategy)
+        {
             if (strategy == MemberLookupStrategy.GlobalObjectId)
             {
                 var byId = ResolveByGlobalObjectId(member.globalObjectId);

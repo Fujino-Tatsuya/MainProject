@@ -178,7 +178,7 @@ namespace VeyTrace.Rendering.Occlusion.Editor
 
                     DrawName(set, group);
 
-                    GUILayout.Label($"{group.members.Count}개", EditorStyles.miniLabel, GUILayout.Width(40f));
+                    DrawDragHandle(context, group);
 
                     if (missing > 0)
                     {
@@ -217,6 +217,42 @@ namespace VeyTrace.Rendering.Occlusion.Editor
             }
 
             return deleteRequested;
+        }
+
+        /// <summary>
+        /// 멤버 수 라벨이 곧 드래그 손잡이다. 여기서 끌면 **그룹에 속한 GameObject 들**이 끌린다 —
+        /// 그룹은 곧 그 오브젝트들이라는 뜻이다. 인스펙터의 오브젝트 필드·배열에 그대로 떨어진다.
+        /// <para>
+        /// `Renderer[]` 같은 컴포넌트 배열에 떨궈도 된다. Unity 의 오브젝트 필드가 GameObject 를 받으면
+        /// 필요한 컴포넌트를 알아서 집는다. 그래서 굳이 Renderer 로 바꿔 넘기지 않는다.
+        /// </para>
+        /// <para>
+        /// 이름이 아니라 이 라벨을 손잡이로 삼은 이유: 이름은 클릭하면 이름 변경이라 드래그와 부딪힌다.
+        /// </para>
+        /// </summary>
+        void DrawDragHandle(GroupContext context, GroupData group)
+        {
+            var label = new GUIContent(
+                $"⠿ {group.members.Count}개",
+                "여기를 끌어서 인스펙터의 GameObject 필드나 배열에 떨어뜨린다.\n" +
+                "그룹에 속한 오브젝트가 전부 들어간다. (유실된 멤버는 빠진다)");
+
+            GUILayout.Label(label, EditorStyles.miniLabel, GUILayout.Width(56f));
+            var rect = GUILayoutUtility.GetLastRect();
+
+            if (group.members.Count == 0) return;
+            EditorGUIUtility.AddCursorRect(rect, MouseCursor.Pan);
+
+            var e = Event.current;
+            if (e.type != EventType.MouseDrag || !rect.Contains(e.mousePosition)) return;
+
+            var objects = TransparentGroupSession.ResolveMembers(context, group);
+            if (objects.Count == 0) return;
+
+            DragAndDrop.PrepareStartDrag();
+            DragAndDrop.objectReferences = objects.ToArray();
+            DragAndDrop.StartDrag($"{group.name} ({objects.Count}개)");
+            e.Use();
         }
 
         void DrawName(TransparentGroupSet set, GroupData group)

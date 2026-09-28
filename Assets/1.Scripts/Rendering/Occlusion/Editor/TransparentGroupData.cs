@@ -95,6 +95,29 @@ namespace VeyTrace.Rendering.Occlusion.Editor
         }
 
         /// <summary>
+        /// 멤버의 **신원**. 같은 오브젝트인지 판단할 때는 반드시 이것으로 비교한다.
+        /// <para>
+        /// 🔴 경로로 비교하면 안 된다. Unity 는 형제 오브젝트의 이름 중복을 허용하고, 중첩 프리팹
+        /// 인스턴스에서는 실제로 흔하다. 경로가 겹치면 (a) 뒤에 칠한 오브젝트가 중복으로 간주돼
+        /// 조용히 버려지고, (b) 하나를 빼면 경로가 같은 **다른** 오브젝트가 빠진다.
+        /// 2026-09-28 에 실제로 두 증상이 같이 나왔다.
+        /// </para>
+        /// <para>경로는 해석이 실패했을 때의 폴백일 뿐이며, 신원이 아니다.</para>
+        /// </summary>
+        public static string IdentityKey(GroupMemberData member)
+        {
+            if (member == null) return null;
+
+            // 두 키 공간이 절대 겹치지 않도록 **양쪽 모두** 접두사를 붙인다.
+            // 한쪽만 붙이면 globalObjectId 가 "path:..." 인 값일 때 경로 키와 같아진다.
+            // 실제로는 그런 값이 안 나오지만, 불변식을 주석이 아니라 코드로 두는 편이 낫다.
+            if (!string.IsNullOrEmpty(member.globalObjectId)) return "id:" + member.globalObjectId;
+
+            // GlobalObjectId 를 못 받은 멤버(미저장 오브젝트 등)만 경로로 떨어진다.
+            return string.IsNullOrEmpty(member.path) ? null : "path:" + member.path;
+        }
+
+        /// <summary>
         /// JSON 파일명: &lt;컨텍스트이름&gt;.&lt;GUID 앞 8자&gt;.json (PLAN 결정 6).
         /// 이름은 읽히라고 넣는 것이고, 동일성의 근거는 GUID 쪽이다.
         /// </summary>

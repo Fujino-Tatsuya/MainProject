@@ -75,15 +75,19 @@ namespace VeyTrace.Rendering.Occlusion.Editor
         {
             if (group == null || members == null) return;
 
-            var paths = new HashSet<string>();
+            // 🔴 경로가 아니라 신원 키로 지운다. 경로로 지우면 이름이 같은 형제가 있을 때
+            // 엉뚱한 오브젝트가 빠진다(TransparentGroupLogic.IdentityKey 주석 참조).
+            var doomed = new HashSet<string>();
             foreach (var go in members)
             {
-                if (go != null) paths.Add(TransparentGroupResolver.GetPath(Context, go));
+                if (go == null) continue;
+                var key = TransparentGroupLogic.IdentityKey(TransparentGroupResolver.CreateMember(Context, go));
+                if (key != null) doomed.Add(key);
             }
-            if (paths.Count == 0) return;
+            if (doomed.Count == 0) return;
 
             Record("Remove From Transparency Group");
-            group.members.RemoveAll(m => m != null && paths.Contains(m.path));
+            group.members.RemoveAll(m => doomed.Contains(TransparentGroupLogic.IdentityKey(m)));
             Commit();
         }
 
@@ -145,10 +149,13 @@ namespace VeyTrace.Rendering.Occlusion.Editor
             if (members == null) return;
 
             var context = Context;
+
+            // 🔴 중복 판정도 신원 키로 한다. 경로로 하면 이름이 같은 형제가 조용히 버려진다.
             var existing = new HashSet<string>();
             foreach (var m in group.members)
             {
-                if (m != null && !string.IsNullOrEmpty(m.path)) existing.Add(m.path);
+                var key = TransparentGroupLogic.IdentityKey(m);
+                if (key != null) existing.Add(key);
             }
 
             foreach (var go in members)
@@ -160,7 +167,8 @@ namespace VeyTrace.Rendering.Occlusion.Editor
 
                 // 같은 오브젝트를 한 그룹에 두 번 담지 않는다.
                 // (다른 그룹과의 중복은 허용된다 — PLAN 결정 12)
-                if (!string.IsNullOrEmpty(member.path) && !existing.Add(member.path)) continue;
+                var key = TransparentGroupLogic.IdentityKey(member);
+                if (key != null && !existing.Add(key)) continue;
 
                 group.members.Add(member);
             }
@@ -183,8 +191,34 @@ namespace VeyTrace.Rendering.Occlusion.Editor
             Changed?.Invoke();
         }
 
+        // ── 저장 유예 ───────────────────────────────────────────────────
+        //
+        // 페인트 드래그는 마우스 이벤트마다 멤버를 더한다. 그때마다 JSON 을 다시 쓰면
+        // 한 번 긋는 동안 파일을 수십 번 쓴다. 스트로크 동안 쓰기만 미루고,
+        // 화면 갱신(Changed)은 그대로 흘려보내 색이 실시간으로 보이게 둔다.
+
+        int m_SaveSuspendDepth;
+        bool m_SavePending;
+
+        public void SuspendSave() => m_SaveSuspendDepth++;
+
+        public void ResumeSave()
+        {
+            if (m_SaveSuspendDepth > 0) m_SaveSuspendDepth--;
+            if (m_SaveSuspendDepth > 0 || !m_SavePending) return;
+
+            m_SavePending = false;
+            Save();
+        }
+
         void Save()
         {
+            if (m_SaveSuspendDepth > 0)
+            {
+                m_SavePending = true;
+                return;
+            }
+
             var context = Context;
             if (!context.IsValid) return;
 

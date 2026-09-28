@@ -165,6 +165,7 @@ Unity 가 켜진 채 에셋을 옮기는 것은 CLAUDE.md 6번의 위험군이�
 | 29 | `HandleUtility.AddDefaultControl` 로 기본 클릭 선택·이동 기즈모를 가져온다. 카메라 조작은 건드리지 않는다 | 클릭이 양쪽으로 가면 칠하면서 선택이 바뀐다 |
 | 30 | 마우스 아래 오브젝트를 `Handles.DrawOutline` 로 하이라이트 + 좌하단에 대상 그룹 HUD | 무엇이 잡힐지, 어디로 들어가는지가 보여야 한다. 제거 모드면 빨강 |
 | 31 | 이름은 **Group Painter** (2026-09-28 변경). 메뉴 `Tools/Group Painter`, 저장 폴더 `GroupPainter/` | 처음 이름은 `Transparency Groups` / `Tools/Rendering/Transparency/Group Tool` 이었으나 **구현이 투명화와 아무 관계가 없다** — 그룹은 GameObject 배열이고 컴포넌트 타입을 가리지 않는다. 투명화는 첫 사용처일 뿐이라 이름이 용도를 좁게 오해시켰다. 🔴 **내부 클래스·파일·네임스페이스(`TransparentGroup*`, `VeyTrace.Rendering.Occlusion.Editor`)는 일부러 그대로 뒀다** — 갓 커밋한 것을 통째로 옮기면 git 히스토리만 지저분해지고 asmdef guid 도 새로 생긴다. 이름이 어긋나 보이면 이 줄이 이유다 |
+| 32 | 그룹 행의 **멤버 수 라벨이 드래그 손잡이**다. 끌면 그룹에 속한 **GameObject 들**이 끌린다 | 「그룹 = 그 오브젝트들」 이라는 뜻을 그대로 조작으로 만든 것. 인스펙터의 오브젝트 필드·배열에 떨어지고, `Renderer[]` 같은 컴포넌트 배열에 떨궈도 Unity 의 오브젝트 필드가 GameObject 에서 필요한 컴포넌트를 집는다 — 그래서 Renderer 로 변환해 넘기지 않는다. 이름 라벨을 손잡이로 쓰지 않은 이유는 거기 클릭이 이름 변경이라 드래그와 부딪히기 때문이다. **원래 목적(존 오서링 — `WallTransparencyGroup.targetRenderers` 채우기)이 이 조작 하나로 닫힌다** |
 
 ## 6. 리스크
 

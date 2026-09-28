@@ -87,11 +87,17 @@ namespace VeyTrace.Rendering.Occlusion.Editor
 
         // ── 스트로크 ────────────────────────────────────────────────────
 
+        static TransparentGroupSet s_StrokeSet;
+
         static void BeginStroke(Vector2 position, TransparentGroupSet set, GroupData group, bool removing)
         {
             s_Painting = true;
             s_StrokeTouched.Clear();
             s_LastMousePosition = position;
+
+            // 스트로크가 끝날 때까지 JSON 쓰기를 미룬다. 화면 갱신은 계속 돈다.
+            s_StrokeSet = set;
+            s_StrokeSet.SuspendSave();
 
             // 드래그 전체를 Undo 하나로 묶는다. EndStroke 에서 접는다.
             Undo.IncrementCurrentGroup();
@@ -112,6 +118,15 @@ namespace VeyTrace.Rendering.Occlusion.Editor
         {
             s_Painting = false;
             s_StrokeTouched.Clear();
+
+            // 미뤄 둔 저장을 여기서 한 번에 흘린다. 스트로크가 시작됐으면 반드시 통과해야 하므로
+            // 예외 경로(모드 해제·도메인 리로드)에서도 이 함수를 거치게 해 두었다.
+            if (s_StrokeSet != null)
+            {
+                s_StrokeSet.ResumeSave();
+                s_StrokeSet = null;
+            }
+
             Undo.CollapseUndoOperations(s_UndoGroup);
         }
 

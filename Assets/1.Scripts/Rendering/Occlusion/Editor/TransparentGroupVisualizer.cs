@@ -190,9 +190,15 @@ namespace VeyTrace.Rendering.Occlusion.Editor
                 depthStencilFormat: depthFormat));
         }
 
+        /// <summary>매 프레임 새로 할당하지 않으려고 들고 있는 버퍼. 필요할 때만 키운다.</summary>
+        static Color[] s_ColorScratch = new Color[1];
+
         static void UploadColorBuffer(CameraResources res, Object[] mapping)
         {
-            var colors = new Color[Mathf.Max(mapping.Length, 1)];
+            var needed = Mathf.Max(mapping.Length, 1);
+            if (s_ColorScratch.Length != needed) s_ColorScratch = new Color[needed];
+            var colors = s_ColorScratch;
+
             for (var id = 0; id < mapping.Length; id++)
             {
                 var obj = mapping[id];

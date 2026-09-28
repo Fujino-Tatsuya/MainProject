@@ -85,6 +85,52 @@ namespace VeyTrace.Rendering.Occlusion.Tests
                 TransparentGroupLogic.ChooseStrategy(prefabMember));
         }
 
+        // ── 신원 키 (2026-09-28 버그) ───────────────────────────────────
+
+        [Test]
+        public void IdentityKey_DistinguishesObjectsThatShareAPath()
+        {
+            // 형제 이름 중복은 Unity 가 허용하고 중첩 프리팹에서 흔하다. 경로로 신원을 판단하면
+            // 뒤에 칠한 것이 조용히 버려지고, 하나를 빼면 엉뚱한 것이 빠진다. 실제로 겪은 증상이다.
+            var a = new GroupMemberData
+            {
+                globalObjectId = "GlobalObjectId_V1-2-guid-111-0",
+                path = "Floor/floor_hallway_003/floor_stone (2)",
+            };
+            var b = new GroupMemberData
+            {
+                globalObjectId = "GlobalObjectId_V1-2-guid-222-0",
+                path = "Floor/floor_hallway_003/floor_stone (2)",   // 경로가 같다
+            };
+
+            Assert.AreEqual(a.path, b.path, "전제: 경로가 겹치는 상황이다");
+            Assert.AreNotEqual(TransparentGroupLogic.IdentityKey(a), TransparentGroupLogic.IdentityKey(b),
+                "경로가 같아도 신원은 달라야 한다");
+        }
+
+        [Test]
+        public void IdentityKey_FallsBackToPathWhenIdMissing()
+        {
+            var member = new GroupMemberData { path = "Root/Wall" };
+            Assert.AreEqual("path:Root/Wall", TransparentGroupLogic.IdentityKey(member));
+        }
+
+        [Test]
+        public void IdentityKey_PathFallbackCannotCollideWithGlobalObjectId()
+        {
+            // 두 키 공간이 섞이면 "path:..." 라는 이름의 GlobalObjectId 가 있을 때 충돌한다.
+            var byId = new GroupMemberData { globalObjectId = "path:Root/Wall" };
+            var byPath = new GroupMemberData { path = "Root/Wall" };
+            Assert.AreNotEqual(TransparentGroupLogic.IdentityKey(byId), TransparentGroupLogic.IdentityKey(byPath));
+        }
+
+        [Test]
+        public void IdentityKey_NullWhenNothingToGoOn()
+        {
+            Assert.IsNull(TransparentGroupLogic.IdentityKey(null));
+            Assert.IsNull(TransparentGroupLogic.IdentityKey(new GroupMemberData()));
+        }
+
         [Test]
         public void ChooseStrategy_UnusableWhenNoKeyAtAll()
         {

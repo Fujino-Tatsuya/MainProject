@@ -25,6 +25,9 @@ namespace VeyTrace.Rendering.Occlusion.Editor
             new Dictionary<GroupContext, TransparentGroupSet>();
         static readonly HashSet<string> s_SelectedGroupIds = new HashSet<string>();
 
+        /// <summary>BuildColorMap 이 멤버마다 재사용하는 버퍼. 할당을 만들지 않으려는 것뿐이다.</summary>
+        static readonly List<Renderer> s_RendererScratch = new List<Renderer>();
+
         /// <summary>컨텍스트·그룹·표시 설정 중 무엇이든 바뀌면 불린다.</summary>
         public static event Action Changed;
 
@@ -115,12 +118,17 @@ namespace VeyTrace.Rendering.Occlusion.Editor
             // 그룹 조작은 Undo 스택에 얹혀 있다(PLAN 결정 8). 되돌아간 값을 JSON 에도 반영해야 한다.
             Undo.undoRedoPerformed += OnUndoRedo;
 
+            // 오브젝트가 생기거나 사라지면 해석 캐시가 상한다. 여기서만 버리면 된다 —
+            // 그룹을 고치는 것은 오브젝트 정체를 바꾸지 않으므로 무효화가 필요 없다.
+            EditorApplication.hierarchyChanged += TransparentGroupResolver.InvalidateCache;
+
             AssemblyReloadEvents.beforeAssemblyReload += DisposeSets;
         }
 
         /// <summary>열려 있는 씬/프리팹에 맞춰 그룹 집합을 다시 만든다.</summary>
         public static void RefreshContexts()
         {
+            TransparentGroupResolver.InvalidateCache();
             var next = TransparentGroupStore.GetActiveContexts();
 
             // 사라진 컨텍스트의 집합은 버린다.
@@ -175,6 +183,23 @@ namespace VeyTrace.Rendering.Occlusion.Editor
             if (s_SelectedGroupIds.Count == 0) return;
             s_SelectedGroupIds.Clear();
             Raise();
+        }
+
+        /// <summary>
+        /// 그룹 하나의 멤버를 실제 GameObject 로 편다. 유실된 멤버는 빠진다.
+        /// 해석은 캐시를 타므로 반복 호출해도 싸다.
+        /// </summary>
+        public static List<GameObject> ResolveMembers(GroupContext context, GroupData group)
+        {
+            var result = new List<GameObject>();
+            if (group == null) return result;
+
+            foreach (var member in group.members)
+            {
+                var resolved = TransparentGroupResolver.Resolve(context, member);
+                if (!resolved.IsMissing) result.Add(resolved.Target);
+            }
+            return result;
         }
 
         /// <summary>
@@ -249,7 +274,10 @@ namespace VeyTrace.Rendering.Occlusion.Editor
                         if (resolved.IsMissing) continue;
 
                         // PLAN 결정 19 — 자식 Renderer 까지 전부.
-                        foreach (var renderer in resolved.Target.GetComponentsInChildren<Renderer>(true))
+                        // 배열을 돌려주는 오버로드는 멤버마다 할당한다. 드래그 중에는 이게 프레임마다
+                        // 멤버 수만큼 쌓이므로 리스트 재사용 오버로드를 쓴다.
+                        resolved.Target.GetComponentsInChildren(true, s_RendererScratch);
+                        foreach (var renderer in s_RendererScratch)
                         {
                             map[renderer.GetInstanceID()] = color;
                         }
