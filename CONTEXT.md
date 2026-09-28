@@ -8,7 +8,43 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 현재 인수인계 (2026-09-22 · 구역 진입 기반 벽 투명화 1단계 **검증 완료**, 브랜치 `feature/TransparentV2-keepgoing`)
+## ▶▶ 현재 인수인계 (2026-09-28 · 투명화 그룹 편집 툴 **완료 조건 8/8 통과**, 브랜치 `feature/TransparentSettingTool`)
+
+작업자: **은희(Claude)**, 워크트리 `MainProject-Worktree`. 계획·근거·뒤집힌 결정은
+[PLAN-transparent-group-tool.md](PLAN-transparent-group-tool.md).
+
+**상태: 구현·검증 완료. 커밋 안 함.** 아래 「구역 진입 기반 벽 투명화 1단계」의
+「남은 것 · 존 프리팹 오서링」을 사람이 하기 쉽게 만드는 **에디터 전용** 보조 툴이다. 런타임 코드 0줄.
+
+**용어** — 여기서 "그룹" 은 *이름을 붙여 저장해 둔 GameObject 선택 묶음* 이다.
+`WallTransparencyGroup` 컴포넌트와 **다른 것** 이며 1:1 대응도 아니다. 값 편집 UI 는 만들지 않았다 —
+그룹을 고르면 Unity `Selection` 에 밀어 넣고, 편집은 기본 다중 오브젝트 인스펙터가 한다.
+
+| 파일 | VCS |
+|---|---|
+| `Assets/1.Scripts/Rendering/Occlusion/Editor/` 8개 + `VeyTrace.Rendering.Occlusion.Editor.asmdef` (신규) | git |
+| `Assets/1.Scripts/Rendering/Editor/Shaders/TransparentGroupOverlay.shader` (신규) | git |
+| `Assets/Tests/EditMode/Occlusion/TransparentGroupStoreTests.cs` (신규, 14개) | git |
+| `TransparentGroups/*.json` — 프로젝트 루트, `Assets/` **밖** | git |
+
+**실측으로 확정한 것 (재조사 금지)**
+- `Camera.SubmitRenderRequest(ObjectIdRequest)` 는 **에디트 모드 씬 뷰에서 동작한다.**
+  NetVis 의 `Debug.Assert(Application.isPlaying)` 은 오너십 데이터 때문이지 기법의 한계가 아니다.
+- Render Graph 가 켜져 있어도(`m_EnableRenderCompatibilityMode: 0`) `cmd.Blit(CameraTarget)` 이 먹는다.
+- 🔴 `ObjectIdRequest.result.idToObjectMapping` 에 담기는 것은 **Renderer 컴포넌트**다. GameObject 가 아니다.
+  `renderer.gameObject.GetInstanceID()` 로 비교하면 영원히 0개 매칭된다.
+- 🔴 프리팹 편집 모드에서도 `GlobalObjectId` 가 **프리팹 에셋 GUID** 를 참조하고(`identifierType=2`)
+  왕복 복원된다. 그래서 씬·프리팹이 **같은 멤버 키**를 쓴다. 프리팹 전용 fileID 는 필요 없다.
+- 🔴 `PrefabUtility.GetCorrespondingObjectFromSource` 의 fileID 를 멤버 키로 쓰면 안 된다 —
+  *원본 프리팹*의 오브젝트를 가리켜 같은 프리팹을 여러 번 배치한 존에서 전부 같은 값이 된다.
+- 🔴 레포 **최초의 Editor asmdef** 를 만들었다. asmdef 테스트 어셈블리가 predefined `Assembly-CSharp-Editor`
+  를 참조할 수 없어 다른 방법이 없었다. 기존 `Rendering/Editor/` 파일들은 건드리지 않았다.
+
+**남은 것**
+- 셰이더를 `Rendering/Occlusion/Editor/Shaders/` 로 이동 (Unity 를 닫을 일이 생기면. `Shader.Find` 는 경로 무관이라 급하지 않다)
+- 범위 밖으로 둔 것들은 [PLAN-transparent-group-tool.md](PLAN-transparent-group-tool.md) §8
+
+## ▶▶ 이전 인수인계 (2026-09-22 · 구역 진입 기반 벽 투명화 1단계 **검증 완료**, 브랜치 `feature/TransparentV2-keepgoing`)
 
 작업자: **은희(Claude + Codex 위임)**. 계획·근거는 [PLAN.md](PLAN.md) 최상단.
 배선 절차는 [Docs/tech/wall-transparency-shadergraph-setup.md](Docs/tech/wall-transparency-shadergraph-setup.md).

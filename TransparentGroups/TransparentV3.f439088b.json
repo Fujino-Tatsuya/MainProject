@@ -1,0 +1,49 @@
+{
+    "version": 1,
+    "contextKind": "Scene",
+    "contextGuid": "f439088b61a8b2247aac0f4cea17b9a1",
+    "contextName": "TransparentV3",
+    "groups": [
+        {
+            "id": "4f57013e9a384161ac61705740670408",
+            "name": "Group 1",
+            "color": {
+                "r": 0.1586499661207199,
+                "g": 0.949999988079071,
+                "b": 0.14249996840953828,
+                "a": 1.0
+            },
+            "colorIsCustom": false,
+            "members": [
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-f439088b61a8b2247aac0f4cea17b9a1-1435751219-0",
+                    "path": "Directional Light",
+                    "lastSeenName": "Directional Light"
+                }
+            ]
+        },
+        {
+            "id": "5fb47fad725645ac891c45681b074b94",
+            "name": "Group 2",
+            "color": {
+                "r": 0.949999988079071,
+                "g": 0.4274999797344208,
+                "b": 0.5904132723808289,
+                "a": 1.0
+            },
+            "colorIsCustom": false,
+            "members": [
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-f439088b61a8b2247aac0f4cea17b9a1-755086560-0",
+                    "path": "WallGroup/Cube",
+                    "lastSeenName": "Cube"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-f439088b61a8b2247aac0f4cea17b9a1-1358246927-0",
+                    "path": "WallGroup/Cube (2)",
+                    "lastSeenName": "Cube (2)"
+                }
+            ]
+        }
+    ]
+}

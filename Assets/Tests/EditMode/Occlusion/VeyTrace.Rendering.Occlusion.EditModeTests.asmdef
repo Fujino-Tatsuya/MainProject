@@ -2,7 +2,8 @@
   "name": "VeyTrace.Rendering.Occlusion.EditModeTests",
   "rootNamespace": "VeyTrace.Rendering.Occlusion.Tests",
   "references": [
-    "VeyTrace.Rendering.Occlusion"
+    "VeyTrace.Rendering.Occlusion",
+    "VeyTrace.Rendering.Occlusion.Editor"
   ],
   "includePlatforms": [
     "Editor"
