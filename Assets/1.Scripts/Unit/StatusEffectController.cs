@@ -223,6 +223,40 @@ public class StatusEffectController : BaseNetworkBehaviour, IStatusEffectFacade
         return removed;
     }
 
+    /// <summary>
+    /// 서버 전용. **디버프만** 해제한다 — 버프(슈퍼아머 · 배율 &gt; 1 modifier · 플레이어 패시브 등)는 남긴다.
+    /// 보스방 진입 연출이 쓴다(팀장 2026-09-29 — ClearAll 이 플레이어 패시브 버프까지 지웠다). 해제한 개수를 반환한다.
+    /// </summary>
+    public int ClearDebuffsServer()
+    {
+        if (!CanWrite)
+            return 0;
+
+        int removed = 0;
+        for (int i = effects.Count - 1; i >= 0; i--)
+        {
+            if (!IsDebuff(effects[i]))
+                continue;
+            effects.RemoveAt(i);
+            removed++;
+        }
+
+        return removed;
+    }
+
+    // 디버프 판정: 차단류 6종은 항상 디버프, 슈퍼아머는 버프,
+    // 스탯 modifier 는 배율로 가른다(StatusEffectType 주석 — 버프 > 1, 디버프 < 1). 배율 1 은 중립이라 남긴다.
+    public static bool IsDebuff(StatusEffectInstance e)
+    {
+        const StatusEffectType Blocking =
+            StatusEffectType.Airborne | StatusEffectType.Stunned | StatusEffectType.Slowed |
+            StatusEffectType.Rooted | StatusEffectType.Silenced | StatusEffectType.Debilitated;
+
+        if ((e.type & Blocking) != 0) return true;
+        if (e.type == StatusEffectType.SuperArmor) return false;
+        return e.magnitude < 1f;
+    }
+
     private int IndexOf(StatusEffectType type, ulong sourceId)
     {
         for (int i = 0; i < effects.Count; i++)

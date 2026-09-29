@@ -94,7 +94,8 @@ public sealed class PlayerEncounterLock : NetworkBehaviour
 
         skillController?.EndActiveSkillServer(SkillEndReason.Cancelled);
         defaultAttack?.CancelCurrentAttack();
-        statusEffects?.ClearAllServer();
+        // 디버프만 — 버프(플레이어 패시브 등)는 연출을 지나도 남아야 한다(팀장 2026-09-29).
+        statusEffects?.ClearDebuffsServer();
 
         // 무기한 토큰 — EndCinematicServer/AbortEncounter가 반드시 해제해야 한다.
         invulnerability?.AddServerToken(InvulnerabilityCause.Cinematic, 0.0);

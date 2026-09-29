@@ -4214,6 +4214,11 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     [ClientRpc]
     void ShowChargeAuraClientRpc(float radius)
     {
+        // 🔴 차징 동안 앞뒤 표식 숨김은 **데칼 유무와 무관하게** 먼저 한다(팀장 09-29 — 데칼을 빼고 이펙트로 대체).
+        //    예전엔 데칼이 생겼을 때만 숨겨서, 프리팹을 비우면 표식이 되살아났다. 해제는 HideChargeAuraClientRpc 가 항상 한다.
+        DirectionIndicator?.SetSuppressed(true);
+
+        // 데칼은 선택 — 비어 있으면 그리지 않는다(판정·밀어내기는 서버 TickChargeAura 가 그대로 한다).
         if (_boss == null || _boss.chargeAuraTelegraphPrefab == null) return;
 
         if (_chargeAuraTelegraph == null)
@@ -4258,8 +4263,6 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         //       **같은 위치(보스)** 에 있어 순서가 불안정하며, 장판이 반투명이라 아래가 비친다.
         //    차징 중에는 카운터 창도 안 열리므로 표식이 주는 정보도 없다.
         //    점프에서 쓰는 억제 경로와 같다(CrossFadeJumpStateClientRpc) — 둘은 동시에 못 일어난다.
-        DirectionIndicator?.SetSuppressed(true);
-
         // 차징은 최대 chargeTimeLimit 초 유지된다 — 그동안 계속 보여야 하므로 넉넉히 잡고,
         // 실제 종료는 HideChargeAuraClientRpc 가 한다.
         _chargeAuraTelegraph.Show(radius, ChargeTimeLimit + 2f);
