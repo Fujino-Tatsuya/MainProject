@@ -33,6 +33,11 @@ Update this file when a term becomes important enough that future agents or team
   ② 23호 NavMeshAgent 반경이 런타임에 데이터 값 **0.3** 으로 덮인다(프리팹 0.85, 몸 캡슐 1.53) → 추격 중에도 파고든다.
   ③ 서버가 미는 수단(넉백)도 같은 스윕을 타서 **겹친 뒤에는 빼내지 못한다.** → 겹침 해소는 모터에서만 풀린다(팀장 09-28: 은희에게 그대로 넘김).
   경석 쪽 완화: 훅·어퍼 전진은 앞 플레이어에 닿으면 멈춤(`TwentyThreeBoss.PlayerBlocksLunge`).
+- 🔴 **09-29 경석 — `PlayerMotionSweep.cs` 동작 변경(팀장 승인: 진단으로 원인 확정 시 진행).** `TryCast` 가 **Enemy 레이어의 시작 겹침 히트**(distance 0 · point 0)를, 이동 방향이 `ComputePenetration` 분리 방향과 같은 쪽(내적 ≥ 0)일 때 무시한다(`IsEscapingEnemyOverlap`). 근거 실측: `[모터/끼임진단]` 거리 0 · 법선 −dir · 시작겹침 True · 관통 0.48m, 이동 방향 = 분리 방향인데도 막힘. 강제 밀어내기 없음(Codex 지적: 벽 사이·입력 경합 회피) — 더 파고드는 방향은 그대로 막힌다. 넉백(보스 바깥 방향)도 같은 이유로 막혔던 것으로 보고 함께 풀린다. ⚠️ 모터 EditMode 테스트 미실행.
+- ⚠️ 같은 파일에 **임시 진단 로그**(동작 무변경).
+- 🔴 **09-29 경석 → 은희 요청 2건 (팀장 09-29: 플레이어 쪽은 은희에게 넘긴다)**
+  1. **잡기 해제 위치**: Carry 구속 중 플레이어는 `GrabController.GrabSocket`(보스 손)을 그대로 따라간다(`PlayerStateController` 구속 상태 `TryGetTargetPose`). 보스가 방 가장자리에서 잡으면 손이 투명벽 밖이라 해제 위치가 **경계 밖·공중**이 된다 — 실측 (487.31, **1.42**, 14.23), 방 로컬 경계 ±14 초과, 이후 `Fence_MetalSheet`·`Boundary_XMax` 와 **정적 시작 겹침**으로 이동·대시 0m 고착(`[모터/끼임진단]` 시작겹침 True). 제안: 구속 종료 시 바닥 투영 + 정적 시작 겹침이면 안전 위치로(PhysX CCT 의 overlap recovery 와 같은 역할 — 정적 지오메트리 한정). 보스방 경계는 `InvisibleBoundaries/Boundary_*` 안쪽 면(방 로컬 축).
+  2. **모터 Enemy 시작 겹침 탈출 검토**: 위 `IsEscapingEnemyOverlap`(경석 09-29) 유지 여부·구석(벽 2개 + 보스)에서 탈출 각도(현재 내적 ≥ 0, −0.75 로 완화 검토) — 은희 판단. `Resolve` 를 `ResolveCore` + `LogIfBlockedByEnemy` 로 감쌌다 — 수평 이동이 요청의 10% 미만으로 막히고 원인이 Enemy 레이어일 때만 0.5초에 한 번 `[모터/끼임진단]` 을 찍는다(히트 콜라이더·거리·법선·시작 겹침 여부·ComputePenetration). 원인 확정 후 경석이 지운다. 모터 수정안은 Codex 검증 "보완 후 가능"이라 **보류**(근거: [PLAN-boss-counter-vulnerable.md](PLAN-boss-counter-vulnerable.md) §7-2). 경석 쪽 추가: 취약 넉백도 앞 플레이어에서 멈춤.
 
 ## ▶▶ 작업 세션 (2026-09-22 · **Dev 부팅 자동화 — 툴바 "Dev Boot"**, 브랜치 `tool/DevBootAutomation`)
 

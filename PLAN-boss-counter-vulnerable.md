@@ -149,6 +149,20 @@
 | 🔴 **제압 중 그로기 애니가 루프로 계속 재생** | ❌ 5초 동안 반복된다 → 한 번 재생 후 유지(Break 클립처럼)로 바꿔야 한다. `ForceGroggy` 의 `groggyBool` 경로 / 컨트롤러 Groggy 상태 loopTime 확인 |
 | 증기 벤트 | ⏳ 미확인 |
 | 제압 5초 → 게이지 100 | 명시 확인 없음(다른 문제 없다고 함) |
+- 🔎 **09-29 넉백 원인(코드 수정 · Play 재확인 대기)**: Editor.log 에서 두 번 모두 `취약 넉백` 직후 **첫 틱에** `외곽 벽 충돌`. `ResolveArena` 가 `Boundary_XMin` 등 이름(방 **로컬** 축)을 **월드 AABB** 로 읽는데, 존은 90° 단위 회전 배치(`MapContentSpawner.cs:61`) → 90°/270° 방에서 경계가 뒤집혀 즉시 벽 판정 → 공격자 쪽 0.5m 반동만 남음. 수정: 경계·판정을 `InvisibleBoundaries` 로컬 공간에서 계산 + 경계 1회 로그(방 회전·보스 로컬 위치). 위 ①~④ 의심은 해당 없음(`agent.Move` 는 돌았다). 🔴 방 회전값은 로그에 없어 **가설 확정은 다음 Play 의 `취약 벽 경계` 로그로**.
+- 🔎 **09-29 그로기 루프 원인(수정 · Play 재확인 대기)**: `No23Controller` 의 AnyState→GroggyStart 가 `Groggy` bool 조건 — bool 이 켜진 동안 GroggyStart→Groggy 로 넘어가면 AnyState 가 다시 GroggyStart 로 보낸다(CanTransitionToSelf 0 이어도 **다른 상태**라 막히지 않음). 1.5초 그로기는 첫 재생 도중 bool 이 꺼져 안 보였고 제압 5초에서 드러남. 수정: 그 전이 **Mute** + `TwentyThreeBoss.PlayStateAnimation` 이 Groggy 진입 시 `GroggyStart` 로 1회 CrossFade(상태 복제 경로라 늦은 합류도 동일). 종료는 기존 Groggy→GroggyEnd. ⚠️ 그로기 1.5초인데 진입 클립(0~90f)이 더 길어 **애니가 로직보다 늦게 끝나는 것**은 기존 그대로(범위 밖 — 확인 필요 시 별도).
+- ✅ **09-29 팀장 Play — 취약 넉백 동작 확인.** 로그 `방 회전 270°` → 원인 확정. 거리는 `BossDataSO` 취약 헤더 `vulnerableKnockbackDistance`(이미 노출).
+- 09-29 넉백이 플레이어를 파고듦 → `TickVulnerableKnockback` 이 진행 방향 앞 플레이어에서 멈춤(`PlayerBlocksLunge` 재사용). 벽 판정이 먼저라 벽 성공은 안 잃는다.
+- 🔎 09-29 점프어택 "둘 중 한 명만 맞음": 로그상 착지 4회 중 3회가 같은 한 명만. 버퍼(16)는 원인 아님(플레이어당 활성 콜라이더 1~2). 예고 중심 `_jumpArrivePoint` ↔ 판정 중심 `transform.position`(Warp 후) 어긋남 · 레이어/콜라이더 · 서버측 클라 위치 지연이 후보 → `LogJumpLandingDiagnostics` 임시 로그(원인 확정 후 삭제).
+- 제압 애니: 09-29 Play 에서 끼임 때문에 **못 봄** — 재확인 대기.
+- 🔴→✅ **09-29 취약 중 돌진이 안 나감**(준비 자세·경로 표시만, 로그 `Dash 체인이 Windup 에서 타임아웃`): 선딜 게이트를 `opensNow`(창 표시 여부)로 켜서 취약 중엔 꺼진 채 시작 → Windup 이 `ShouldRelease` 를 영영 못 받음. 수정: 게이트 사용 = `opensCounterWindow && !Grab`(공격 종류), 창 표시와 분리. Play 재확인 대기.
+- 09-29 끼임(모터 겹침 해소) Codex 교차검증 = **"보완 후 가능"**. 채택: 서버는 원격 플레이어 모터를 안 돈다(오너만) · 벽 사이 분리 불가 · 잡힘 포즈 경로 우회. 기각: "23호 에이전트 반경 0.3 덮어씀"(09-28 `KeepPrefabAgentRadius` 로 이미 막음) · "CapsuleCast 는 시작 겹침 미감지"(모터는 `CapsuleCastNonAlloc` — 시작 겹침을 distance 0·normal −dir 로 반환). 모터 수정은 팀장 판단 대기.
+- 🔎 09-29 2차 Play: 점프 **둘 다 맞음**(진단 전문 — 콘솔 목록은 2줄만 보여 한 명처럼 보였다). 문제는 비주얼: 두 명이 보스 중심 1.2/1.42m = 몸 반경 1.53 **안쪽**(착지가 위에 내려앉음) → 넉백 이동이 모터 시작 겹침에 막히고 플래시가 모델에 가린 것으로 추정. 끼임 진단 확정(거리 0 · 시작겹침 True · 분리 방향 = 이동 방향) → 모터 `IsEscapingEnemyOverlap` 적용(CONTEXT 은희 절). 점프 진단에 몸안·슈퍼아머 추가 — 다음 Play 로 확인.
+- 🔎 **09-29 3차 Play(1인) — "경계 밖" 연쇄**: ① 보스 중심이 벽 0.5m 까지 감(`[23호/돌진] clearance 0.00`) — NavMesh 베이크 반경 0.5 가 벽 여유를 정하고 에이전트 반경(0.85)은 벽 여유와 무관(Unity 매뉴얼) → 몸 1.53 이 투명벽 밖으로 ~1m 돌출 → 벽-보스 끼임 · ② 잡기 해제가 손 소켓 = 경계 밖(은희 인계) · ③ 방 밖 낙하(낙하 복귀는 정상) · ④ 방 밖 플레이어 노린 점프 → Warp 실패 → 에이전트 이탈 → `IsStopped` 에러 폭주 · AI 영구 정지.
+  - ✅ B 구현: 점프 착지점 = 경계 − 몸 반경 사각형 클램프 + `NavMesh.SamplePosition`(3m) · `WarpTo` 가 Warp 반환값 확인 → 재투영 → 실패 시 제자리 재부착.
+  - ✅ **A 결정(팀장 09-29): 보스방만 NavMesh 여유 띠** — 보스방엔 보스 한 마리뿐, 보스 이동은 전부 NavMesh 경유(돌진 SetDestination · 넉백 agent.Move · 점프 투영+Warp). `BossRoomAuthoring` 메뉴 **Build Boss Room NavMesh Margin** → `bossroom.prefab/NavMeshMargin/Margin_*` 4개(`NavMeshModifierVolume` Not Walkable, 폭 1.0 · 경계 = 저작된 InvisibleBoundaries 안쪽 면). Rebuild Boss Room Bounds 끝에서도 호출. 프리팹 diff 추가 232줄 · 삭제 0 · guid 불변. 🔴 폭 상한 = 가장자리 ≤ 몸 반경 1.53(넘으면 취약 벽 판정 불가). ⏳ 침식이 띠에도 붙는지 미확인 → Play 로그 `[23호] NavMesh 여유` 로 폭 조정.
+  - (기각) 보스 전용 에이전트 타입 + 추가 Surface — 한 마리뿐인 방에 과함. (기각) 매 틱 클램프 — 증상 되돌리기.
+  - ~~⏳ A 보류~~  정석 후보 = 보스 전용 에이전트 타입(반경 ≈1.5) + 보스방 한정 NavMeshSurface 추가 베이크 → NavMesh 자체가 벽 여유를 준다. 대가: `NavMesh.SamplePosition`/`CalculatePath` 의 areaMask 오버로드가 어느 에이전트 타입 메시를 조회하는지 **미확인** — 보스 경로는 `NavMeshQueryFilter.agentTypeID` 오버로드로 바꾸는 게 안전(MonsterBase 공용 코드 포함, 착수 전 확인) · 런타임 베이크 1회 추가(30×30).
 - Codex 교차검증은 크레딧 복구 후(09-28 20시 이후) — 이번 구현 전체(§3·§4 NavMesh 수정 포함).
 
 ### 다음 세션 인수인계 — 취약 (§3-2 · §3-3 · §7-1 C1~C8 참고)

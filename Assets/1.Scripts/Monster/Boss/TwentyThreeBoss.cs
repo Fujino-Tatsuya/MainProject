@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.AI;
 
 // 보스 23호 — MonsterBase 코드 FSM 위에 "공격 6종 선택기 + 페이즈"만 얹는다.
 //
@@ -884,7 +885,12 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         _counterWindupStartedAt = Time.time;
         // ⚠️ 잡기는 선딜 게이트를 쓰지 않는다 — 타이밍을 예고 구간(Telegraph)이 이미 잡는다.
         //    여기서 Begin 하면 게이트가 애니 이벤트를 기다리며 열린 채 남는다.
-        if (opensNow) _counterWindup.Begin(CounterWindowDuration);
+        // 🔴 게이트 사용 여부는 **공격 종류**로 정한다 — 창을 *보여 주는지*(opensNow)와 분리(09-29).
+        //    취약 중엔 opensNow 가 false 인데 돌진은 여전히 Windup 에서 이 게이트의 발사를 기다린다 →
+        //    게이트가 꺼진 채라 영영 안 나가고, 준비 자세·경로 표시만 남은 채 안전망 타임아웃으로 끝났다(팀장 Play).
+        //    발사 타이밍은 평소와 같다(창 길이) — 취약 중엔 판정·연출만 없다.
+        bool usesWindupGate = e != null && e.opensCounterWindow && e.attackId != BossAttackId.Grab;
+        if (usesWindupGate) _counterWindup.Begin(CounterWindowDuration);
         else _counterWindup.Reset();
 
         // 관용구 2: 다지선다 애니는 상태 복제로 실을 수 없다 → ClientRpc 로 CrossFade.
@@ -1447,7 +1453,15 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         }
 
         base.PlayStateAnimation(s);
+
+        // 🔴 그로기 진입은 **여기서 한 번만** 튼다. 컨트롤러의 AnyState→GroggyStart(Groggy bool 조건)는 Mute 했다 —
+        //    bool 이 켜진 동안 GroggyStart→Groggy 로 넘어가는 순간 AnyState 가 다시 GroggyStart 로 되돌려
+        //    제압 5초 내내 진입 클립이 반복됐다(09-29). 종료는 그대로 Groggy→GroggyEnd(bool 꺼짐)가 맡는다.
+        if (s == MonsterState.Groggy)
+            SafeCrossFade(GroggyStartState);
     }
+
+    const string GroggyStartState = "GroggyStart";
 
     [ClientRpc]
     void PlayAttackAnimClientRpc(int slot)
@@ -2255,6 +2269,15 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
             point += back.normalized * JumpLandSeparation;
         }
 
+        // 🔴 착지점은 **보스방 안쪽 − 몸 반경** 사각형 + NavMesh 위로 제한한다(09-29 팀장 Play).
+        //    잡기로 경계 밖에 나간 플레이어를 노리자 방 밖(NavMesh 밖)에 착지 → Warp 실패 →
+        //    에이전트가 NavMesh 에서 떨어져 `IsStopped` 에러가 매 프레임 쏟아지고 보스 AI 가 영구 정지했다.
+        point = ClampInsideArena(point, BodyRadius);
+        if (NavMesh.SamplePosition(point, out NavMeshHit navHit, JumpNavSnapRadius, NavMesh.AllAreas))
+            point = navHit.position;
+        else
+            point = transform.position;   // 방 안에 설 자리가 없다 — 제자리 점프(판정·연출은 그대로)
+
         if (GroundProbe.TryFindGround(point, 0, out RaycastHit ground, out _))
             point = new Vector3(point.x, ground.point.y, point.z);
 
@@ -2430,7 +2453,30 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
                 unit.Knockback(AwayFromBoss(unit.transform.position), JumpKnockback);
         }
 
+        LogJumpLandingDiagnostics(count);
         DetonateBombsInJumpRange();
+    }
+
+    // [진단 · 09-29] "범위 안에 둘인데 한 명만 맞는다"(팀장 Play) — 원인 확정 후 지운다.
+    //    예고 중심(_jumpArrivePoint)과 판정 중심(착지 뒤 보스 위치) 어긋남 · 레이어/콜라이더 · 생존 판정을 한 줄로 본다.
+    void LogJumpLandingDiagnostics(int overlapCount)
+    {
+        var sb = new System.Text.StringBuilder();
+        Vector3 c = transform.position;
+        Vector3 off = c - _jumpArrivePoint; off.y = 0f;
+        sb.Append($"[23호/점프진단] 반경 {JumpAoeRadius:0.##} · 예고↔판정 중심 {off.magnitude:0.##}m · 겹침 {overlapCount}/{_aoeBuffer.Length} · 맞음 {_aoeHits.Count}");
+        foreach (Player p in FindObjectsByType<Player>(FindObjectsSortMode.None))
+        {
+            Vector3 d = p.transform.position - c; d.y = 0f;
+            Collider body = p.GetComponent<Collider>();
+            bool hit = false;
+            foreach (Unit u in _aoeHits) if (u != null && u.transform.IsChildOf(p.transform)) { hit = true; break; }
+            // 몸안 = 보스 몸 캡슐 반경보다 가깝다 → 넉백이 모터 시작 겹침에 막히고, 피격 플래시가 보스 모델에 가린다(09-29 가설).
+            sb.Append($"\n  · {p.name}(owner {p.OwnerClientId}) 거리 {d.magnitude:0.##} (몸안 {d.magnitude < BodyRadius}) · 레이어 {LayerMask.LayerToName(p.gameObject.layer)} · " +
+                      $"몸콜라이더 {(body != null ? body.enabled.ToString() : "없음")} · 공격가능 {MonsterTargeting.IsAttackable(p.transform)} · " +
+                      $"슈퍼아머 {p.HasSuperArmor} · 맞음 {hit}");
+        }
+        Debug.Log(sb.ToString(), this);
     }
 
     // 🔴 점프어택 범위 안의 폭탄은 함께 터진다(팀장 확정 2026-08-10).
@@ -2510,11 +2556,35 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     {
         if (agent != null && agent.enabled)
         {
-            agent.Warp(position);
+            // 🔴 Warp 는 NavMesh 밖이면 false 를 돌려주고 에이전트를 **메시에서 뗀 채** 둔다 —
+            //    이후 isStopped·SetDestination 이 매 프레임 에러를 내며 FSM 이 멈춘다(09-29).
+            //    가까운 메시로 한 번 더, 그래도 안 되면 제자리에 다시 붙인다.
+            Vector3 from = transform.position;
+            if (agent.Warp(position)) return;
+            if (NavMesh.SamplePosition(position, out NavMeshHit hit, JumpNavSnapRadius, NavMesh.AllAreas) && agent.Warp(hit.position))
+                return;
+            Debug.LogWarning($"[23호] Warp 실패 — {position} 가 NavMesh 밖. 제자리({from})로 되돌린다.", this);
+            if (NavMesh.SamplePosition(from, out hit, JumpNavSnapRadius, NavMesh.AllAreas)) agent.Warp(hit.position);
             return;
         }
         transform.position = position;
     }
+
+    const float JumpNavSnapRadius = 3f;
+
+    // 보스방 경계 사각형(InvisibleBoundaries 안쪽 면)에서 margin 만큼 더 안쪽으로 가둔다. 방 로컬 축 기준(90° 회전 배치 대응).
+    Vector3 ClampInsideArena(Vector3 world, float margin)
+    {
+        if (!ResolveArena()) return world;
+        Vector3 local = _arenaRoot.InverseTransformPoint(world);
+        local.x = ClampAxis(local.x, _arenaMinX + margin, _arenaMaxX - margin);
+        local.z = ClampAxis(local.z, _arenaMinZ + margin, _arenaMaxZ - margin);
+        Vector3 clamped = _arenaRoot.TransformPoint(local);
+        clamped.y = world.y;
+        return clamped;
+    }
+
+    static float ClampAxis(float v, float min, float max) => min <= max ? Mathf.Clamp(v, min, max) : (min + max) * 0.5f;
 
     float JumpHover => _boss != null ? Mathf.Max(0.1f, _boss.jumpHoverTime) : 1.2f;
     float JumpLanding => _boss != null ? Mathf.Max(0.1f, _boss.jumpLandingDuration) : 1f;
@@ -4473,7 +4543,8 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     int _kbFrame = -1;                   // 같은 틱 여러 적중 → 첫 적중만 넉백(§5.3)
 
     bool _arenaResolved, _hasArena;
-    float _arenaMinX, _arenaMaxX, _arenaMinZ, _arenaMaxZ;
+    Transform _arenaRoot;                // 경계 사각형의 기준 공간 — 존이 90° 단위로 돌아 배치된다(MapContentSpawner)
+    float _arenaMinX, _arenaMaxX, _arenaMinZ, _arenaMaxZ;   // _arenaRoot 로컬 좌표
 
     /// <summary>[서버] 취약 중인가. 제압 중엔 취약이 아니다.</summary>
     public bool IsVulnerable => _vulnerableUntil >= 0f && !_suppressed;
@@ -4591,6 +4662,16 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
             return;
         }
 
+        // 🔴 진행 방향 앞에 플레이어 몸이 있으면 거기서 멈춘다 — agent.Move 는 플레이어를 장애물로 몰라
+        //    몸 캡슐(1.53)을 플레이어 안으로 밀어 넣고, 겹친 플레이어는 모터 스윕이 전 방향 막힘으로 읽어 끼인다(09-29 팀장 Play).
+        //    벽 판정은 위에서 먼저 끝났으므로 여기서 멈춰도 벽 성공은 잃지 않는다.
+        if (PlayerBlocksLunge(_kbDir))
+        {
+            _kbActive = false;
+            _kbRebound = false;
+            return;
+        }
+
         if (agent != null && agent.enabled && agent.isOnNavMesh) agent.Move(delta);   // NavMesh 밖으로는 안 밀린다
         else transform.position += delta;
 
@@ -4607,6 +4688,8 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     {
         if (!ResolveArena()) return false;
         float r = BodyRadius;
+        nextPos = _arenaRoot.InverseTransformPoint(nextPos);
+        dir = _arenaRoot.InverseTransformDirection(dir);
         return (dir.x < 0f && nextPos.x - r <= _arenaMinX) || (dir.x > 0f && nextPos.x + r >= _arenaMaxX)
             || (dir.z < 0f && nextPos.z - r <= _arenaMinZ) || (dir.z > 0f && nextPos.z + r >= _arenaMaxZ);
     }
@@ -4617,29 +4700,66 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
             : 1.5f;
 
     // 🔴 경계 원본 = 저작된 `InvisibleBoundaries/Boundary_*` 박스의 **안쪽 면**(BossRoomAuthoring) — 투명벽 판정과 일치(Codex C7).
+    // 🔴 이름(XMin…)은 **방 로컬 축** 기준이다. 존은 90° 단위로 돌아 배치되므로 월드 AABB(b.bounds)로 읽으면
+    //    90°/270° 방에서 X·Z 가 뒤바뀌어 경계가 뒤집히고, 넉백 첫 틱에 벽 판정이 나서 반동만 남는다(09-29 확인).
     bool ResolveArena()
     {
         if (_arenaResolved) return _hasArena;
         GameObject root = GameObject.Find("InvisibleBoundaries");
         if (root == null) return false;   // 보스방이 아직 없다 — 다음에 다시 찾는다
         _arenaResolved = true;
+        _arenaRoot = root.transform;
 
         bool xMin = false, xMax = false, zMin = false, zMax = false;
         foreach (BoxCollider b in root.GetComponentsInChildren<BoxCollider>(true))
         {
-            Bounds bb = b.bounds;
+            // 박스 중심·반크기를 방 로컬로(자식 트랜스폼은 저작상 항등이지만 가정하지 않는다).
+            Vector3 c = _arenaRoot.InverseTransformPoint(b.transform.TransformPoint(b.center));
+            Vector3 h = _arenaRoot.InverseTransformVector(b.transform.TransformVector(b.size * 0.5f));
+            float hx = Mathf.Abs(h.x), hz = Mathf.Abs(h.z);
             switch (b.name)
             {
-                case "Boundary_XMin": _arenaMinX = bb.max.x; xMin = true; break;
-                case "Boundary_XMax": _arenaMaxX = bb.min.x; xMax = true; break;
-                case "Boundary_ZMin": _arenaMinZ = bb.max.z; zMin = true; break;
-                case "Boundary_ZMax": _arenaMaxZ = bb.min.z; zMax = true; break;
+                case "Boundary_XMin": _arenaMinX = c.x + hx; xMin = true; break;
+                case "Boundary_XMax": _arenaMaxX = c.x - hx; xMax = true; break;
+                case "Boundary_ZMin": _arenaMinZ = c.z + hz; zMin = true; break;
+                case "Boundary_ZMax": _arenaMaxZ = c.z - hz; zMax = true; break;
             }
         }
         _hasArena = xMin && xMax && zMin && zMax;
         if (!_hasArena)
             Debug.LogWarning($"{name}: InvisibleBoundaries 에 Boundary_XMin/XMax/ZMin/ZMax 가 다 있지 않다 — 취약 벽 충돌을 끈다.", this);
+        else
+            Debug.Log($"[23호] 취약 벽 경계(방 로컬) X {_arenaMinX:0.#}~{_arenaMaxX:0.#} · Z {_arenaMinZ:0.#}~{_arenaMaxZ:0.#} · " +
+                      $"방 회전 {_arenaRoot.eulerAngles.y:0}° · 보스 로컬 {_arenaRoot.InverseTransformPoint(transform.position)}", this);
+        if (_hasArena) LogNavMeshMargin();
         return _hasArena;
+    }
+
+    // [확인용 · 09-29] 보스방 NavMesh 가장자리 ↔ 벽 안쪽 면 거리(네 방향). 목표 ≈1.5(몸 반경 1.53 이하 — 넘으면 취약 벽 판정이 영영 안 난다).
+    //    여유 띠는 BossRoomAuthoring "Build Boss Room NavMesh Margin". 폭 확정 후 이 로그는 지운다.
+    void LogNavMeshMargin()
+    {
+        Vector3 mid = _arenaRoot.TransformPoint(new Vector3((_arenaMinX + _arenaMaxX) * 0.5f, 0f, (_arenaMinZ + _arenaMaxZ) * 0.5f));
+        if (!NavMesh.SamplePosition(mid, out NavMeshHit c, 5f, NavMesh.AllAreas))
+        {
+            Debug.LogWarning("[23호] NavMesh 여유 — 방 중앙에 NavMesh 가 없다(측정 불가).", this);
+            return;
+        }
+        Vector3 cl = _arenaRoot.InverseTransformPoint(c.position);
+        float Edge(Vector3 localTarget, float wall, bool alongX, bool positive)
+        {
+            Vector3 target = _arenaRoot.TransformPoint(localTarget);
+            if (!NavMesh.Raycast(c.position, target, out NavMeshHit h, NavMesh.AllAreas)) return -1f;   // 벽까지 막힘 없음
+            Vector3 hl = _arenaRoot.InverseTransformPoint(h.position);
+            float e = alongX ? hl.x : hl.z;
+            return positive ? wall - e : e - wall;
+        }
+        float xMin = Edge(new Vector3(_arenaMinX - 1f, cl.y, cl.z), _arenaMinX, true, false);
+        float xMax = Edge(new Vector3(_arenaMaxX + 1f, cl.y, cl.z), _arenaMaxX, true, true);
+        float zMin = Edge(new Vector3(cl.x, cl.y, _arenaMinZ - 1f), _arenaMinZ, false, false);
+        float zMax = Edge(new Vector3(cl.x, cl.y, _arenaMaxZ + 1f), _arenaMaxZ, false, true);
+        Debug.Log($"[23호] NavMesh 여유(벽↔가장자리, 방 로컬) X− {xMin:0.##} · X+ {xMax:0.##} · Z− {zMin:0.##} · Z+ {zMax:0.##} · 몸 반경 {BodyRadius:0.##} " +
+                  "(목표 ≈1.5 · 몸 반경 초과 시 취약 벽 판정 불가)", this);
     }
 
     void OnVulnerableVisualChanged(bool previous, bool next) => ApplyVulnerableTint(next);
