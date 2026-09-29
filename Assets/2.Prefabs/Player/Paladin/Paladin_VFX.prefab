@@ -4233,8 +4233,8 @@ MonoBehaviour:
   occupancyRadius: 0.4
   probeUpDistance: 1.5
   probeDownDistance: 3
-  showSafePointMarkers: 1
-  safePointMarkerPrefab: {fileID: 0}
+  showSafePointMarkers: 0
+  safePointMarkerPrefab: {fileID: 8238544250631236300, guid: 544d09bf18809834dabb81d27868643a, type: 3}
 --- !u!114 &1461530121226363041
 MonoBehaviour:
   m_ObjectHideFlags: 0

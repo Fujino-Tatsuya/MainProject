@@ -8,6 +8,19 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-09-29 · **플레이어 프리팹 base + Variant 정리**, 브랜치 `fix/Player`)
+
+작업자: **은희(Claude, unity MCP 로 에디터 조작)**, 워크트리 `C:\UnityProject\MainProject`.
+승인 계획 = [PLAN-player-variants.md](PLAN-player-variants.md) (2026-09-29 개정·승인). 단계별 커밋 P0~P5, PR 1개.
+
+🔴 **수정 예정 파일 — 이 브랜치 밖에서 동시 수정 금지:** `Assets/2.Prefabs/Player/**`
+(특히 `Paladin/Paladin_VFX.prefab` — **민경**), `Assets/2.Prefabs/UI/CombatHUD.prefab`,
+`Assets/2.Prefabs/Network/NetworkManager.prefab`, `Assets/DefaultNetworkPrefabs.asset`,
+씬 7개(`0.BootStrapScene`·`Dev_Boot`·`BossScene`·`MonsterScene`·`PlayerDashTest`·`TrashMobScene`·`Debug/PlayerScene`).
+
+- **사실 갱신:** 정식 흐름이 스폰하는 것은 `Paladin_VFX.prefab` 이다([player-prefabs.md](Docs/tech/player-prefabs.md) §0 은 낡음 — P5 에서 갱신).
+- **P0 스냅샷 기준점:** `Paladin_VFX.prefab` = `2e1ac271`. 이후 들어온 변경은 P4 직전에 재반영.
+
 ## ▶▶ 현재 인수인계 (2026-09-28 · 투명화 그룹 편집 툴 **완료 조건 8/8 통과**, 브랜치 `feature/TransparentSettingTool`)
 
 작업자: **은희(Claude)**, 워크트리 `MainProject-Worktree`. 계획·근거·뒤집힌 결정은

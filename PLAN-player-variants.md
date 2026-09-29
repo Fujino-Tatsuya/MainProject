@@ -1,15 +1,23 @@
-# PLAN — 플레이어 프리팹을 base + 캐릭터 Variant 구조로 정리 (2026-09-16, 승인 대기)
+# PLAN — 플레이어 프리팹을 base + 캐릭터 Variant 구조로 정리 (초안 2026-09-16 · 개정 2026-09-29, 승인 대기)
 
 작성: Claude / 대상: `Assets/2.Prefabs/Player/**`, `Assets/DefaultNetworkPrefabs.asset`, 일부 씬
 관련: [Docs/tech/player-prefabs.md](Docs/tech/player-prefabs.md) (사실 원본) · [AGENTS.md](AGENTS.md) §3·§4 ·
 [CONTEXT.md](CONTEXT.md) · [AIRULE.md](AIRULE.md)
 
-> ⚠️ **플레이어 계통은 은희 담당 영역이다.** 착수 전 담당자 합의 필요.
+> ✅ **담당 = 은희** (플레이어 계통 본인 영역, 2026-09-29 착수 결정).
 >
-> 🔴 **브랜치: `feature/player-variants`** — `feature/player-motor-owner-auth`(`6c25ca60`)에서 분기한다.
-> `development` 에서 따지 **않는다**: 오너 권위 전환·시각 보간 컴포넌트 등 **프리팹 변경이
-> owner-auth 브랜치에만 있어서**, development 기반으로 프리팹을 재구성하면 머지 때 GUID 단위로 충돌한다.
-> 모터 작업과 **같은 프리팹을 건드리므로**, 이 브랜치에서 분리해 진행하고 머지 순서는 모터 → Variant 로 한다.
+> ✅ **브랜치: `fix/Player`** — `development`(`06b03801`)에서 분기(2026-09-29).
+> 초안의 `feature/player-variants`(owner-auth 기반) 전제는 **해소됐다** — owner-auth 의 프리팹 변경은
+> 이미 `development` 에 들어와 있다(루트·Armature `AuthorityMode: 1` 확인).
+
+### 개정 사항 (2026-09-29) — 초안 이후 바뀐 사실
+
+| 초안 전제 | 현재 사실 | 계획 영향 |
+|-----------|----------|-----------|
+| 정식 흐름이 스폰하는 것은 `Paladin.prefab` | 🔴 **`Paladin_VFX.prefab`**(`8d5b4855…`) — `0.BootStrapScene`·`Dev_Boot` 가 이걸 스폰. `Paladin.prefab` 은 `NetworkManager.prefab` 기본값·`BossScene`·`MonsterScene`·`PlayerDashTest` 만 | **P0(두 프리팹 병합) 신설** |
+| Paladin 의 HUD 는 링크 끊긴 사본 | ✅ **`CombatHUD.prefab` 중첩 인스턴스**로 복구돼 있다(Player·Paladin_VFX 둘 다, 오버라이드 24~26개) | P2-4 가 "사본 올리기" → **"오버라이드 대조"** 로 축소 |
+| 무기 트레일 = `WeaponTrailEffect`×2 + `TrailTransform` | `Paladin_VFX` 는 이를 걷어내고 **자체 `Trail` 소켓**을 쓴다 | §1.4 수동 배선 목록에서 트레일 항목 교체 |
+| 스킬 5종만 캐릭터 고유 | + **VFX 계층**(민경): `PlayerSkillVfx` · `PlayerShieldVfx`(NetworkBehaviour) · `DissolveOverlay` · `MaterialFadeEffect` ×2 · `EffectAnimEvents` · `EffectAnimEventRelay` · `EffectSocketPlayer` ×18 | **전부 Variant/Armature 쪽**(사용자 결정) |
 
 ---
 
@@ -32,6 +40,10 @@
 | 결정 시점 | **스폰 전.** 인게임 캐릭터 교체는 설계 범위 밖 |
 | base/Variant 경계 | **스킬은 Variant 로 내린다.** base 는 `PlayerSkillController`(슬롯 컨테이너)까지 |
 | 이번 범위 | **Paladin Variant 까지.** 선택 UI·징크스 제외 |
+| 원본 (2026-09-29) | **`Paladin_VFX` + `Paladin` 을 먼저 병합(P0)** 하고, 그 결과를 Variant 의 원본으로 쓴다 |
+| VFX 계층 위치 (2026-09-29) | **Variant.** 소켓(`EffectSocketPlayer`)은 Armature, 루트 VFX 컴포넌트는 Variant 루트 |
+| 민경 동시 수정 (2026-09-29) | **동결 없이 착수 시점 스냅샷.** 그 사이 `Paladin_VFX` 에 들어온 변경은 P4 전환 직전에 손으로 재반영 |
+| 에디터 조작 (2026-09-29) | **Claude 가 unity MCP 로.** 안 되는 단계만 은희에게 요청. **Play 는 항상 은희가 직접** |
 
 ---
 
@@ -108,24 +120,42 @@
 
 **원칙: 한 단계가 끝날 때마다 게임이 돌아야 한다.** 중간에 "스폰되는 프리팹이 없는" 상태를 만들지 않는다.
 
+### 3.0 P0 — `Paladin` → `Paladin_VFX` 병합 (텍스트 2값, 게임 동작 = 정식 흐름 그대로)
+
+필드 단위 전수 대조(2026-09-29, 루트 이름 정규화 후) 결과 **`Paladin` 에만 있는 변경은 2개**뿐이다.
+나머지 차이는 전부 `Paladin_VFX` 쪽의 **의도된** 변경이다.
+
+| 항목 | `Paladin` | `Paladin_VFX` | 병합 |
+|------|-----------|---------------|------|
+| `PlayerSafePointTracker.safePointMarkerPrefab` / `showSafePointMarkers` | `544d09bf…` / `0` | 빈 값 / `1` | **Paladin 값 가져옴** (`6ee0d95a`) |
+| `SkillRangeIndicator` 레이어 마스크 `m_Bits` | `1` | `256` | **Paladin 값 가져옴** (`6ee0d95a`) |
+| 무기 메시 (`SM_Wep_Shield_01`·`SM_Wep_Sword_03`) | 구판 | `_MaskUV` 판 | VFX 유지 (`2e1ac271` — 의도) |
+| 무기 트레일 | `WeaponTrailEffect`×2 + `TrailTransform`×4 | 자체 `Trail` | VFX 유지 |
+| VFX 소켓·컴포넌트 | 없음 | 있음 | VFX 유지 |
+
+- 방법: `Paladin_VFX.prefab` YAML 의 해당 2필드를 **텍스트 수정**(Unity 켜둔 채 가능 — CLAUDE.md §6).
+- `Paladin.prefab` 파일은 이 단계에서 **지우지 않는다** — 참조 4곳이 P4 에서 한꺼번에 `Player_Paladin` 으로 옮겨가고 P5 에서 삭제.
+- 이 시점의 `Paladin_VFX` 커밋 해시를 **스냅샷 기준점**으로 CONTEXT 에 기록한다(민경 변경 재반영용).
+- ✅ 검증: 병합 후 재대조 시 `Paladin` 쪽 고유 라인 = 0 (트레일·메시·GlobalObjectIdHash 제외). guid 불변.
+
 ### 3.1 P1 — `Paladin_Armature.prefab` 추출 (게임 동작 변화 없음)
 
-`Paladin.prefab` 에서 캐릭터 부분만 뜯어 독립 프리팹으로 만든다.
+**P0 병합 후의 `Paladin_VFX.prefab`** 에서 캐릭터 부분만 뜯어 독립 프리팹으로 만든다.
 
 - 대상: `Paladin_Armature` 서브트리 전체 — 리그·`tripo_part_0`·`DefaultAttack/AAC1~4`·
-  `InterruptAttack`·`MainSkill`·`SubSkill`·`UltimateSkill`·VFX 트레일 2종·`Animator`·`NetworkAnimator`·
-  Armature `NetworkTransform`
+  `InterruptAttack`·`MainSkill`·`SubSkill`·`UltimateSkill`·`Animator`·`NetworkAnimator`·
+  Armature `NetworkTransform`·`EffectAnimEventRelay` + **Armature 아래 VFX 소켓 전부**
 - 저장 위치: `Assets/2.Prefabs/Player/Paladin/Paladin_Armature.prefab`
-- `Paladin.prefab` 은 이 단계에서 **그대로 둔다**(추출만 하고 아직 교체하지 않는다).
+- `Paladin_VFX.prefab` 은 이 단계에서 **그대로 둔다**(추출만 하고 아직 교체하지 않는다).
   Prefab Mode 에서 자식을 Project 로 끌면 원본의 자식이 중첩 인스턴스로 **바뀐다** —
-  그걸 피하려면 씬에 인스턴스를 놓고 거기서 뽑은 뒤 씬을 버린다
-- **에디터에서 손으로 한다. 저작 툴을 만들지 않는다** — 한 번 하고 끝나는 구조 변경이라
-  멱등 재실행이 필요 없고, `SaveAsPrefabAsset` 이 중첩 VFX 프리팹·stripped 참조를 GUI 와
-  동일하게 처리한다는 보장이 없다. (기존 `*Authoring` 툴들은 **머지에서 반복 유실되는 배선**을
-  복구하려고 만든 것이라 성격이 다르다)
-- ✅ 검증: `Paladin.prefab` **diff 가 0**. 추출물은 **YAML 파싱으로 대조**한다 —
+  그걸 피하려면 **임시 씬에 인스턴스를 놓고 거기서 뽑은 뒤 씬을 버린다**
+- **Claude 가 unity MCP 로 수행한다**(인스턴스 배치 → 서브트리 prefab 저장). 저작 툴(.cs)은 만들지 않는다 —
+  한 번 하고 끝나는 구조 변경이다. MCP 로 안 되면 그 단계만 은희에게 에디터 조작을 요청한다
+- 🔴 **루트 VFX 컴포넌트가 Armature 내부를 가리키는 참조**(`PlayerSkillVfx.swordElectric` 등 소켓 참조)는
+  추출 후 Variant 에서 **중첩 인스턴스 내부 객체로 다시 배선**해야 한다 → P3 에서 전수 대조
+- ✅ 검증: `Paladin_VFX.prefab` **diff 가 0**. 추출물은 **YAML 파싱으로 대조**한다 —
   Animator·컨트롤러 / SkinnedMeshRenderer / `ColliderInfo` 6개(AAC1~4·MainSkill·InterruptAttack) /
-  `NetworkTransform` 1 / `NetworkAnimator` 1 / `L_WeaponSocket`·`R_WeaponSocket` 존재.
+  `NetworkTransform` 1 / `NetworkAnimator` 1 / `EffectSocketPlayer` 개수 / `L_WeaponSocket`·`R_WeaponSocket` 존재.
   ⚠️ 무기 소켓은 컴포넌트가 없어 **이름으로만** 찾을 수 있다
 
 ### 3.2 P2 — base `Player.prefab` 정리
@@ -137,8 +167,9 @@
    — base 는 캐릭터가 없는 상태가 정상이다
 2. 스킬 5종(§2.2) 제거 + `PlayerSkillController` 의 슬롯 4필드를 **비운다**
 3. `DefaultAttackController.attackData` / `defaultHitbox` 를 **비운다**
-4. HUD 갈라짐 해소 — Paladin 사본의 `CombatPanel`·`ShieldBar`·`ProfilPanel` 을
-   `CombatHUD.prefab` 원본으로 올린다 (§2.5-2)
+4. HUD 오버라이드 대조 — 두 프리팹 모두 `CombatHUD.prefab` 을 중첩으로 쓴다(2026-09-29 확인).
+   `Paladin_VFX` 인스턴스의 오버라이드(24개)와 `Player` 쪽(26개)을 대조해 **VFX 쪽 기준으로 맞춘다**.
+   캐릭터 고유(스킬 아이콘 등)로 보이는 오버라이드는 Variant 로 내린다
 5. 스탯을 중립값으로 — 시연용 `9999`/`33` 은 Variant 로 간다
 6. **`PlayerVisualReconciliationSmoother` 를 base 에 추가** — `9e3afee9` 가 Paladin 루트에만 붙였다.
    역할 쪽 컴포넌트이므로 base 의 것이다
@@ -155,25 +186,34 @@
 1. `Armature` 자식으로 `Paladin_Armature.prefab` 중첩 — 🔴 **오브젝트 이름은 `Armature`**(§2.5-1)
 2. 스킬 5종 추가 + `PlayerSkillController` 4슬롯 배선
 3. `attackData` = `Garen/PlayerDefaultAttackData.asset`, `defaultHitbox` = Armature 안 히트박스
-4. `FirstMelee*.hitboxAnchor` 2종 · 무기 트레일 배선 (§1.4 계약)
+4. `FirstMelee*.hitboxAnchor` 2종 · 무기 트레일(`Paladin_VFX` 의 `Trail` 소켓) 배선 (§1.4 계약)
+4-1. **VFX 계층 추가** — 루트에 `PlayerSkillVfx` · `PlayerShieldVfx` · `DissolveOverlay` · `MaterialFadeEffect`×2 ·
+   `EffectAnimEvents` 를 `Paladin_VFX` 값 그대로 얹고, 스킬 5종의 VFX 필드(`skillVfx`·`shieldVfx`·`slashHit` 등)와
+   소켓 참조를 **Armature 중첩 인스턴스 내부로** 재배선한다.
+   🔴 `PlayerShieldVfx` 는 **NetworkBehaviour** — Variant 루트에서 NetworkBehaviour 순서가 모든 피어에서 같아야 한다(§1.5-2).
+   Variant 는 그 자체로 하나의 NetworkPrefab 이라 피어 간 동일성은 보장되지만, **루트 컴포넌트 순서를 `Paladin_VFX` 와 같게** 맞춘다
    💡 **여기는 저작 툴이 값어치를 할 수 있는 유일한 자리다** — 이 배선은 과거에 머지에서 반복
    유실됐고(`PlayerEncounterLockAuthoring` 주석의 3건), 캐릭터가 늘면 Variant 마다 반복된다.
    다만 **캐릭터가 2종 이상이 될 때** 만든다. 지금 1종에 도구를 세우는 건 이르다
 5. 스탯 오버라이드
 6. 저장: `Assets/2.Prefabs/Player/Paladin/Player_Paladin.prefab`
-- ✅ 검증: `Paladin.prefab` 과 **루트 컴포넌트 구성·주요 값이 일치**하는지 기계적으로 대조 (§4)
+- ✅ 검증: **P0 병합된 `Paladin_VFX.prefab`** 과 **루트 컴포넌트 구성·주요 값이 일치**하는지 기계적으로 대조 (§4)
 
 ### 3.4 P4 — 스폰 경로 전환
 
+0. **스냅샷 재반영** — P0 기준점 이후 `Paladin_VFX.prefab` 에 들어온 변경(`git log <기준점>..origin/development`)을
+   `Player_Paladin`/`Paladin_Armature` 에 손으로 옮긴다. 이 동안만 민경에게 플레이어 프리팹 수정 보류를 요청
 1. `DefaultNetworkPrefabs.asset` 에 `Player_Paladin` **등록**
 2. `NetworkManager.prefab` 의 `defaultPlayerPrefab` → `Player_Paladin`
-3. 테스트 씬 전환 — `BossScene`·`MonsterScene`·`PlayerDashTest`·`Dev_Boot` 의 참조를 `Player_Paladin` 으로
+3. 씬 전환 — `0.BootStrapScene`·`Dev_Boot`(현재 `Paladin_VFX`) / `BossScene`·`MonsterScene`·`PlayerDashTest`(현재 `Paladin`)
 4. 구 `Player.prefab` 을 쓰던 `TrashMobScene`·`Debug/PlayerScene` 도 함께 전환
-- ✅ 검증: Play 시 `Player_Paladin(Clone)` 이 **정확히 1개** 스폰
+- ✅ 검증: 세 GUID(`Player`·`Paladin`·`Paladin_VFX`)를 참조하는 씬이 **base 외 0개**. Play 시 `Player_Paladin(Clone)` 이 **정확히 1개** 스폰
 
 ### 3.5 P5 — 구 프리팹 정리 + 툴·문서 갱신
 
-1. `Paladin.prefab` 을 `DefaultNetworkPrefabs.asset` 에서 제거 후 삭제
+1. `Paladin.prefab` · `Paladin_VFX.prefab` 을 `DefaultNetworkPrefabs.asset` 에서 제거 후
+   **`Assets/2.Prefabs/Player/Legacy/` 로 이동**(에디터 안에서, guid 유지 — §8-4).
+   🔴 `Paladin_VFX` 는 민경 작업 파일 — **이동 전 민경에게 통보**하고 이후 VFX 는 `Player_Paladin` 에서 이어가게 한다
 2. `TempPlayer_Armature.prefab` 처리 결정 — 쓰이지 않으면 삭제
 3. 저작 툴 2종의 대상 목록 갱신 (§2.5-3)
 4. base 를 네트워크 목록에서 뺄지 결정 — base 는 스폰 대상이 아니다
@@ -227,7 +267,9 @@
 - [ ] `Player.prefab` 이 캐릭터 요소 0 인 base 이고, 단독으로 에러 없이 기동한다
 - [ ] `Player_Paladin.prefab` 이 `Player.prefab` 의 Variant 이고, 자식 이름이 `Armature` 다
 - [ ] 정식 흐름·테스트 씬 전부 `Player_Paladin` 을 스폰한다
-- [ ] `Paladin.prefab` · (결정 시)`TempPlayer_Armature.prefab` 이 저장소에서 사라졌다
+- [ ] P0 병합으로 `Paladin` 고유 변경 2건이 `Paladin_VFX` 에 들어갔다
+- [ ] `Player_Paladin` 이 VFX 계층(소켓 18·루트 컴포넌트 6종)을 `Paladin_VFX` 와 동일하게 갖는다
+- [ ] `Paladin.prefab` · `Paladin_VFX.prefab` · (결정 시)`TempPlayer_Armature.prefab` 이 저장소에서 사라졌다
 - [ ] §4 의 Play 1사이클과 MPPM 2인 검증을 **은희가** 통과시켰다
 - [ ] 저작 툴 2종이 새 구조를 대상으로 돈다
 - [ ] [player-prefabs.md](Docs/tech/player-prefabs.md) 가 새 구조로 갱신됐다
@@ -236,10 +278,13 @@
 
 ## 8. 승인받을 것
 
-1. ~~착수 시점~~ → ✅ **브랜치 분리로 해결**(2026-09-16). `feature/player-variants` 에서 병행한다.
-2. **작업 위치** — 이 워킹트리를 새 브랜치로 옮길 것인가, 별도 worktree 를 팔 것인가?
-   · 여기서 전환하면 **진행 중인 모터 Play 검증이 끊기고** Unity 재임포트가 돈다.
-   · 새 worktree 는 **SVN 아트가 없어** 모델·머티리얼이 비어 보인다([environment-setup.md](Docs/tech/environment-setup.md)).
-     프리팹 조립 작업이라 아트가 보여야 하므로 **SVN 체크아웃이 선행**돼야 한다.
-3. **담당** — 플레이어 계통은 은희 영역이다. 누가 하는가?
-4. **`Paladin.prefab` 삭제** — P5 에서 지우는 게 맞는가, 한동안 남겨두는가?
+1. ~~착수 시점~~ → ✅ 해소. owner-auth 변경이 `development` 에 들어와 있다.
+2. ~~작업 위치~~ → ✅ **이 워킹트리(`C:\UnityProject\MainProject`) · 브랜치 `fix/Player`**(2026-09-29).
+3. ~~담당~~ → ✅ **은희**(Claude 가 MCP 로 에디터 조작, Play 검증은 은희).
+4. ~~구 프리팹 삭제~~ → ✅ **삭제하지 않고 `Assets/2.Prefabs/Player/Legacy/` 로 옮긴다**(2026-09-29).
+   대상 `Paladin.prefab`·`Paladin_VFX.prefab`(+ 결정 시 `TempPlayer_Armature.prefab`). NetworkPrefab 목록에서는 뺀다.
+   🔴 이동은 **에디터 안에서**(unity MCP `move_asset` = AssetDatabase.MoveAsset) 한다 — guid 유지.
+   에디터 밖 파일 이동은 CLAUDE.md §6 위반(EPERM 반쪽 이동)이다.
+5. ~~PR 단위~~ → ✅ **`fix/Player` 한 PR 에 단계별(P0~P5) 커밋.**
+
+**✅ 승인 (2026-09-29, 은희).** P0 부터 착수하고, 단계마다 멈춰서 검증 결과를 보고한다.
