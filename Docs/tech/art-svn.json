@@ -9,13 +9,13 @@
   "url": "https://svna.gameinjae.kr/svn/GA7thFinal_VeyTrace",
   "subtree": "4_Resources/Art",
   "junctionPath": "Assets/50.Art",
-  "pinnedRevision": 287,
-  "pinnedAt": "2026-08-31",
+  "pinnedRevision": 336,
+  "pinnedAt": "2026-09-29",
   "expected": {
-    "metaFiles": 1105,
+    "metaFiles": 1731,
     "ownedGuids": 1105,
-    "gitFilesReferencing": 392,
-    "guidOccurrencesInGit": 23097,
-    "_comment": "2026-08-30 실측. 이 수가 크게 줄면 정션이 안 걸렸거나 아트가 낡은 것이다."
+    "gitFilesReferencing": 422,
+    "guidOccurrencesInGit": 28751,
+    "_comment": "2026-09-29 r336 실측(metaFiles·gitFilesReferencing·guidOccurrencesInGit — ownedGuids 는 08-30 값 그대로, 미측정). 이 수가 크게 줄면 정션이 안 걸렸거나 아트가 낡은 것이다."
   }
 }
