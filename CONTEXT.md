@@ -20,7 +20,7 @@ Update this file when a term becomes important enough that future agents or team
 
 - **사실 갱신:** 정식 흐름이 스폰하는 것은 `Paladin_VFX.prefab` 이다([player-prefabs.md](Docs/tech/player-prefabs.md) §0 은 낡음 — P5 에서 갱신).
 - **P0 스냅샷 기준점:** `Paladin_VFX.prefab` = `2e1ac271`. 이후 들어온 변경은 P4 직전에 재반영.
-- **진행:** P0 `d65e1610` · P1 `ee91cd4e`(Paladin_Armature 추출) · P2 `97d0a582`(Codex — base 정리, 끊긴 참조 0, Unity 임포트 OK). P3 = `Player_Paladin.prefab`(Variant, 해시 913233600). P4 = 스폰 전환(은희 Play·MPPM 통과). P5 = 구 프리팹 `Legacy/` 이동·툴 4종·문서 갱신. **작업 완료 — PR 대기.** 남은 일 = 캐릭터 선택 경로(player-prefabs.md §8.3). 🔴 P2 의 "base 단독 Awake" 검증은 Play 가 필요해 **P4 Play 때 함께** 한다.
+- **진행:** P0 `d65e1610` · P1 `ee91cd4e`(Paladin_Armature 추출) · P2 `97d0a582`(Codex — base 정리, 끊긴 참조 0, Unity 임포트 OK). P3 = `Player_Paladin.prefab`(Variant, 해시 913233600). P4 = 스폰 전환(은희 Play·MPPM 통과). P5 = 구 프리팹 `Legacy/` 이동(`Paladin_VFX` 는 원위치 복구)·툴 4종·문서 갱신. **작업 완료 — PR 대기.** 남은 일 = 캐릭터 선택 경로(player-prefabs.md §8.3). 🔴 P2 의 "base 단독 Awake" 검증은 Play 가 필요해 **P4 Play 때 함께** 한다.
 
 ## ▶▶ 현재 인수인계 (2026-09-28 · 투명화 그룹 편집 툴 **완료 조건 8/8 통과**, 브랜치 `feature/TransparentSettingTool`)
 

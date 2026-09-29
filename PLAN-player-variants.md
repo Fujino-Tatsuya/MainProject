@@ -246,6 +246,7 @@
 - `DefaultNetworkPrefabs`: `Player`(base)·`Paladin`·`Paladin_VFX` 3항목 제거 → **`Player_Paladin` 만** 남김.
   base 제거는 Claude 판단(스폰하는 곳 0 — 동작 무변화). 되돌리려면 항목 하나 추가.
 - 에디터 안 `MoveAsset` 으로 `Paladin`·`Paladin_VFX`·`TempPlayer_Armature` → `Player/Legacy/` (guid 3개 유지, git rename 인식).
+  → 이후 **`Paladin_VFX` 만 원래 위치(`Player/Paladin/`)로 복구**(사용자 결정, guid 유지). 네트워크 목록 미등록·스폰 안 됨은 그대로. ⚠️ `PlayerEncounterLockAuthoring` 은 `Legacy/` 만 제외하므로 `Paladin_VFX` 도 순회 대상이 된다(멱등 복구라 무해).
 - 저작 툴 **4개** 갱신(계획의 2개 + 발견 2개): `PlayerInterruptSkillAuthoring`(→ `Paladin_Armature` + `Player_Paladin`) ·
   `PlayerEncounterLockAuthoring`(`Legacy/` 제외) · **`PlayerSilhouetteAuthoring`**(→ base) · **`MonsterSceneBossSetup`**(경석, → `Player_Paladin`).
 - 문서: player-prefabs.md §0 재작성·§7 결정 트리 교체·§8 완료 표기·§9 확인 명령 갱신(실행 검증함) · AGENTS.md §6 사실 정정.
@@ -301,7 +302,7 @@
 - [x] 정식 흐름·테스트 씬 전부 `Player_Paladin` 을 스폰한다
 - [x] P0 병합 — `Paladin` 고유 변경 2건 중 **1건 반영**, 1건(데칼 레이어)은 우발 변경으로 판단해 의도적으로 제외
 - [x] `Player_Paladin` 이 VFX 계층을 `Paladin_VFX` 와 동일하게 갖는다 (전 필드 대조 차이 = 해시뿐)
-- [x] `Paladin` · `Paladin_VFX` · `TempPlayer_Armature` 가 **`Legacy/` 로 이동**했다 (삭제 대신 보관 — 사용자 결정)
+- [x] `Paladin` · `TempPlayer_Armature` 가 **`Legacy/` 로 이동**했다, `Paladin_VFX` 는 원위치 보관 (삭제 대신 보관 — 사용자 결정)
 - [x] §4 의 Play 1사이클과 MPPM 2인 검증을 **은희가** 통과시켰다 (2026-09-29, P4 직후)
 - [~] 저작 툴 **4종**의 대상 경로를 새 구조로 바꿨다 ✅ — ⚠️ **툴 재실행은 안 해봤다**(컴파일만 확인)
 - [x] [player-prefabs.md](Docs/tech/player-prefabs.md) 가 새 구조로 갱신됐다
