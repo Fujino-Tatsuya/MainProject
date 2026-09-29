@@ -905,7 +905,7 @@ MonoBehaviour:
   sourceMesh: {fileID: 4300000, guid: ac2b4e0d5b9b54c418f629e5276466c1, type: 3}
   thickness: 0.1
   maxFragments: 10
-  fragmentMaterial: {fileID: 2100000, guid: 1132e5294b7220c4abac1a3b788da526, type: 2}
+  fragmentMaterial: {fileID: 2100000, guid: 180c9256ecdbad44886ce57addd4ac16, type: 2}
   fragmentMass: 0.2
   linearDamping: 0.05
   angularDamping: 0.5
