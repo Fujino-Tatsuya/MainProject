@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using BaseNetCode;
 using Unity.Netcode;
 using UnityEngine;
@@ -9,8 +8,8 @@ using UnityEngine.Serialization;
 /// 불굴의 의지 — 근접 캐릭터 자동 패시브 (슬롯 스킬 아님, 서버 권위 독립 컴포넌트). 버프 모델(PLAN-passive-onhit.md).
 ///
 /// ① 쿨타임이 끝나면 <see cref="StatusEffectType.PassiveCharge"/> 버프가 생긴다(스폰 직후에도 보유로 시작).
-/// ② 버프 보유 중 <b>적중 시 발동 공격</b>(<see cref="PlayerAttackLanded.TriggersOnHit"/>, 기본 = 평타)이 적을 맞히면
-///    버프를 소모하고 <b>처음 맞은 한 명</b>에게 추가 피해(최종공격력 × 계수 + 고정), 자신은 최대체력 healPercent% 회복.
+/// ② 버프 보유 중 <b>적중 시 발동 공격</b>(기본 = 평타)이 첫 Unit 대상을 때리기 직전
+///    버프를 소모하고 그 한 방에 추가 피해(최종공격력 × 계수 + 고정)를 합산하며, 자신은 최대체력 healPercent% 회복.
 /// ③ 소모되면 쿨타임(기본 30초)이 시작된다. 쿨타임 중 피격당할 때마다 고정 감소(데미지량 무관).
 ///
 /// 버프는 <see cref="StatusEffectController"/> 가 들고 전 피어에 복제한다 — 칼날 발광은 이걸 본다.
@@ -21,7 +20,7 @@ using UnityEngine.Serialization;
 /// </summary>
 [RequireComponent(typeof(Player))]
 [RequireComponent(typeof(StatusEffectController))]
-public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive
+public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive, IPlayerOnHitBonus
 {
     [Header("쿨다운")]
     [SerializeField, Min(0f)] private float cooldownTime = 30f;
@@ -90,7 +89,6 @@ public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive
         if (owner == null)
             return;
 
-        owner.ServerAttackLanded += HandleAttackLanded;
         owner.ServerAttackReceived += HandleAttackReceived;
     }
 
@@ -99,7 +97,6 @@ public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive
         if (owner == null)
             return;
 
-        owner.ServerAttackLanded -= HandleAttackLanded;
         owner.ServerAttackReceived -= HandleAttackReceived;
     }
 
@@ -144,51 +141,28 @@ public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive
 
     // ── 서버 판정 ───────────────────────────────────────────────────
 
-    // 내 공격 1회 판정이 적을 맞혔다. 적중 시 발동 공격 + 버프 보유면 소모·발동.
-    private void HandleAttackLanded(PlayerAttackLanded landed)
+    // 첫 Unit 대상에게 기본 피해를 넣기 직전 호출된다. 소모 상태와 부수효과를 여기서 확정하고
+    // 반환값만 원래 공격 피해에 합산한다 — 별도 추가타를 만들지 않는다.
+    public int ServerConsumeOnHitBonus(Unit target)
     {
-        if (!HasGameplayAuthority || !landed.TriggersOnHit || !HasCharge)
-            return;
+        if (!HasGameplayAuthority || !HasCharge || target == null || target == owner || target.CurrentHealth <= 0)
+            return 0;
 
-        Unit target = FirstValidTarget(landed.Targets);
-        if (target == null)
-            return;
-
-        // 소모 → 쿨타임 시작을 먼저 확정한다. 추가 피해는 공격 판정이 아니라 적중 이벤트를 발행하지 않으므로
-        // 재진입은 없지만, 상태를 먼저 바꿔 두면 순서에 기대지 않는다.
+        // 소모 → 쿨타임 시작을 먼저 확정한다. 실제 피해 적용은 이 메서드가 반환한 뒤 이어진다.
         statusEffects.Remove(StatusEffectType.PassiveCharge, ChargeSourceId);
         readyServerTime.Value = ServerNow + cooldownTime;
 
         int bonusDamage = Mathf.Max(0,
             Mathf.RoundToInt(owner.FinalAttackDamage * bonusDamageMultiplier) + bonusFlatDamage);
-        AttackHitContext hitContext = new AttackHitContext(owner.transform.position, owner.transform, sourceUnit: owner);
-        // 기본타가 막타였으면 대상은 이미 죽었고 추가타는 거절된다(Unit.ReceiveAttack). 발동(소모·회복)은 그대로다 —
-        // 막타도 적중이다. 대상을 다음 생존자로 옮기지 않는다: "처음 맞은 한 명" 이 규칙이다.
-        bool bonusLanded = target.ReceiveAttack(new AttackInfo(bonusDamage, AttackType.Default), hitContext);
 
         int healAmount = Mathf.RoundToInt(owner.MaxHp * (healPercent / 100f));
         if (healAmount > 0)
             owner.HealHp(healAmount);
 
-        ServerPlayProcVfx(bonusLanded ? target : null);
+        ServerPlayProcVfx(target);
 
-        Edit.Log($"[Passive] 불굴의 의지 발동 — {target.name}에 추가피해 {(bonusLanded ? bonusDamage.ToString() : "없음(막타)")}, 회복 {healPercent}%({healAmount})", this);
-    }
-
-    // 판정 순서상 첫 대상. 생존 여부로 거르지 않는다 — 목록은 기본타 적용 뒤라 막타 대상은 이미 죽어 있다.
-    private Unit FirstValidTarget(IReadOnlyList<Unit> targets)
-    {
-        if (targets == null)
-            return null;
-
-        for (int i = 0; i < targets.Count; i++)
-        {
-            Unit unit = targets[i];
-            if (unit != null && unit != owner)
-                return unit;
-        }
-
-        return null;
+        Edit.Log($"[Passive] 불굴의 의지 발동 — {target.name}의 원래 공격에 추가피해 {bonusDamage} 합산, 회복 {healPercent}%({healAmount})", this);
+        return bonusDamage;
     }
 
     // 내가 공격을 받았다. 쿨타임 중이면 데미지량과 무관하게 끝나는 시각을 앞당긴다.

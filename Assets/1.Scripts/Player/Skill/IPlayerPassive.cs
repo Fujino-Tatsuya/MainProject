@@ -13,3 +13,13 @@ public interface IPlayerPassive
     /// <summary>발동 가능 상태(버프 보유 등). HUD 강조.</summary>
     bool IsReady { get; }
 }
+
+/// <summary>
+/// 서버가 공격 판정의 첫 Unit 대상에게 기본 피해를 적용하기 직전에 묻는 추가 피해 제공자.
+/// 구현체는 반환과 동시에 소모·쿨타임·회복·연출 같은 발동 상태를 확정한다.
+/// </summary>
+public interface IPlayerOnHitBonus
+{
+    /// <summary>[서버] 이번 첫 대상에게 합산할 추가 피해. 발동하지 않으면 0.</summary>
+    int ServerConsumeOnHitBonus(Unit target);
+}

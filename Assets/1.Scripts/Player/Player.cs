@@ -68,6 +68,7 @@ public class Player : Unit
     private PlayerGroundingSensor groundingSensor;
     private PlayerInvulnerability invulnerability;
     private PlayerShieldVfx shieldVfx;
+    private IPlayerOnHitBonus[] onHitBonuses;
     private PlayerInputReader inputReader;
     private PlayerSkillTargeting skillTargeting;
     private NetworkTransform networkTransform;
@@ -191,6 +192,7 @@ public class Player : Unit
         groundingSensor = GetComponent<PlayerGroundingSensor>();
         invulnerability = GetComponent<PlayerInvulnerability>();
         shieldVfx = GetComponent<PlayerShieldVfx>();
+        onHitBonuses = GetComponents<IPlayerOnHitBonus>();
         inputReader = GetComponent<PlayerInputReader>();
         skillTargeting = GetComponent<PlayerSkillTargeting>();
         networkTransform = GetComponent<NetworkTransform>();
@@ -1607,6 +1609,33 @@ public class Player : Unit
             return;
 
         ServerAttackLanded?.Invoke(new PlayerAttackLanded(attackType, triggersOnHit, targets, source));
+    }
+
+    /// <summary>
+    /// [서버] 공격 판정의 첫 Unit 대상에게 기본 피해를 넣기 직전, 적중 시 발동 제공자들의
+    /// 추가 피해를 소모해 합산한다. 죽은 첫 대상이면 다음 대상으로 넘기지 않는다.
+    /// </summary>
+    public int ServerTakeOnHitBonus(bool triggersOnHit, Unit target)
+    {
+        if (!IsServer || !triggersOnHit || target == null || target == this || target.CurrentHealth <= 0)
+            return 0;
+
+        if (onHitBonuses == null)
+            onHitBonuses = GetComponents<IPlayerOnHitBonus>();
+
+        long total = 0;
+        for (int i = 0; i < onHitBonuses.Length; i++)
+        {
+            IPlayerOnHitBonus provider = onHitBonuses[i];
+            if (provider == null)
+                continue;
+
+            total += Mathf.Max(0, provider.ServerConsumeOnHitBonus(target));
+            if (total >= int.MaxValue)
+                return int.MaxValue;
+        }
+
+        return (int)total;
     }
 
     public override bool ReceiveAttack(AttackInfo attackInfo, AttackHitContext hitContext)

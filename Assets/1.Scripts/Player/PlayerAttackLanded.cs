@@ -3,10 +3,10 @@ using UnityEngine;
 
 /// <summary>
 /// [서버] 플레이어 공격 1회 판정(스윙 1회·틱 1회·투사체 1발)이 적 Unit 을 맞혔다는 통지.
-/// <see cref="Player.ServerAttackLanded"/> 로 발행된다 — 패시브 버프 소모, 이후 스택·빌드 효과가 구독한다.
+/// <see cref="Player.ServerAttackLanded"/> 로 발행된다 — 이후 스택·빌드처럼 적중 결과를 소비하는 효과가 구독한다.
 ///
 /// <b>공격자 쪽 이벤트다.</b> 피격자 쪽 <c>Unit.ReceiveAttack</c> 은 모든 피해가 지나가서
-/// "효과가 만든 피해"(패시브 추가타 등)까지 섞인다 — 거기서 발동을 걸면 자기 자신을 재발동시킨다.
+/// 장판·연쇄 피해처럼 "효과가 만든 피해"까지 섞인다 — 거기서 발동을 걸면 자기 자신을 재발동시킬 수 있다.
 /// 여기는 <b>공격 판정만</b> 발행하므로 그런 피해는 애초에 들어오지 않는다.
 /// </summary>
 public readonly struct PlayerAttackLanded

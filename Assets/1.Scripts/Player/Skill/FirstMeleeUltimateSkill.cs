@@ -102,7 +102,11 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
         if (lockedTarget == null || lockedTarget.CurrentHealth <= 0)
             return;
 
-        AttackInfo attackInfo = new AttackInfo(damageSnapshot, AttackType.Skill);
+        int bonus = owner.ServerTakeOnHitBonus(Data != null && Data.TriggersOnHit, lockedTarget);
+        int resolvedDamage = bonus >= int.MaxValue - damageSnapshot
+            ? int.MaxValue
+            : damageSnapshot + bonus;
+        AttackInfo attackInfo = new AttackInfo(resolvedDamage, AttackType.Skill);
         AttackHitContext hitContext = new AttackHitContext(owner.transform.position, owner.transform, sourceUnit: owner);
         if (lockedTarget.ReceiveAttack(attackInfo, hitContext))
         {

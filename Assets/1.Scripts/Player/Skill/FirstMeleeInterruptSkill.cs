@@ -128,6 +128,7 @@ public class FirstMeleeInterruptSkill : PlayerInstantSkill
         int hitCount = OverlapHitboxAnchor(hitResults);
         hitTargets.Clear();
         landedUnits.Clear();
+        bool onHitBonusTaken = false;
 
         int resolvedCount = 0;
 
@@ -147,7 +148,17 @@ public class FirstMeleeInterruptSkill : PlayerInstantSkill
 
             // isInterruptAttack = 보스가 카운터 판정에 쓰는 유일한 근거.
             // 소비 방식은 맞는 쪽이 정한다 — 몬스터는 누적→그로기, No.23은 카운터 창 판정.
-            AttackInfo attackInfo = new AttackInfo(damageSnapshot, AttackType.Skill, isInterruptAttack: true);
+            int resolvedDamage = damageSnapshot;
+            if (!onHitBonusTaken && unit != null)
+            {
+                onHitBonusTaken = true;
+                int bonus = owner.ServerTakeOnHitBonus(Data != null && Data.TriggersOnHit, unit);
+                resolvedDamage = bonus >= int.MaxValue - resolvedDamage
+                    ? int.MaxValue
+                    : resolvedDamage + bonus;
+            }
+
+            AttackInfo attackInfo = new AttackInfo(resolvedDamage, AttackType.Skill, isInterruptAttack: true);
             AttackHitContext hitContext =
                 new AttackHitContext(owner.transform.position, owner.transform, hit, owner);
 

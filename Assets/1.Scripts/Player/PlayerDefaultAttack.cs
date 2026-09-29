@@ -98,6 +98,7 @@ public class PlayerDefaultAttack : BaseAttack
         // IAttackReceiver도 명중 대상이므로, 진단은 이쪽으로 판단해야 한다
         // (swingHitBuffer는 적중 통지(Player.ServerAttackLanded)용이라 Unit만 담는다 — 아래 참고).
         bool anyResolved = false;
+        bool onHitBonusTaken = false;
 
         int hitCount = OverlapHitbox(hitbox);
         for (int i = 0; i < hitCount; i++)
@@ -115,14 +116,15 @@ public class PlayerDefaultAttack : BaseAttack
                 if (ownerUnit != null && damagedUnits.Contains(ownerUnit))
                     continue;
 
-                bool resolved = TryResolveHit(hurtbox, hit);
+                int? hurtboxDamage = TakeOverlapOnHitBonus(ownerUnit, ref onHitBonusTaken);
+                bool resolved = TryResolveHit(hurtbox, hit, hurtboxDamage);
                 if (resolved)
                 {
                     anyResolved = true;
                     damagedHurtboxes.Add(hurtbox);
 
                     // Unit이 없는 대상(상자 등)은 중복 방지를 Hurtbox로 하고,
-                    // 적중 통지에서는 빠진다 — 구독자(패시브 등)가 Unit을 요구한다.
+                    // 적중 통지에서는 빠진다 — 구독자는 Unit 대상만 받는다.
                     if (ownerUnit != null)
                     {
                         damagedUnits.Add(ownerUnit);
@@ -137,7 +139,8 @@ public class PlayerDefaultAttack : BaseAttack
             if (target == null || target == owner || damagedUnits.Contains(target))
                 continue;
 
-            if (TryResolveHit(target))
+            int? unitDamage = TakeOverlapOnHitBonus(target, ref onHitBonusTaken);
+            if (TryResolveHit(target, unitDamage))
             {
                 anyResolved = true;
                 damagedUnits.Add(target);
@@ -230,7 +233,8 @@ public class PlayerDefaultAttack : BaseAttack
         if (TryGetHurtbox(hit.collider, out Hurtbox hurtbox))
         {
             hurtbox.TryGetOwner(out Unit ownerUnit);
-            if (ownerUnit == owner || !TryResolveHit(hurtbox, hit.collider))
+            if (ownerUnit == owner ||
+                !TryResolveHit(hurtbox, hit.collider, TakeRaycastOnHitBonus(ownerUnit)))
                 return false;
 
             // Unit 이 아닌 대상(상자 등)은 적중 통지에서 빠진다 — Overlap 과 같은 규칙.
@@ -242,12 +246,44 @@ public class PlayerDefaultAttack : BaseAttack
         }
 
         Unit target = hit.collider.GetComponentInParent<Unit>();
-        if (target == null || target == owner || !TryResolveHit(target))
+        if (target == null || target == owner || !TryResolveHit(target, TakeRaycastOnHitBonus(target)))
             return false;
 
         swingHitBuffer.Add(target);
         RaiseLanded();
         return true;
+    }
+
+    private int? TakeOverlapOnHitBonus(Unit target, ref bool bonusTaken)
+    {
+        if (bonusTaken || target == null)
+            return null;
+
+        // 첫 Unit 대상이 죽어 있어 보너스를 거절해도 다음 대상으로 넘기지 않는다.
+        bonusTaken = true;
+        int bonus = owner != null
+            ? owner.ServerTakeOnHitBonus(currentStep != null && currentStep.TriggersOnHit, target)
+            : 0;
+        return AddBonusToDamage(bonus);
+    }
+
+    private int? TakeRaycastOnHitBonus(Unit target)
+    {
+        if (target == null)
+            return null;
+
+        int bonus = owner != null
+            ? owner.ServerTakeOnHitBonus(currentStep != null && currentStep.TriggersOnHit, target)
+            : 0;
+        return AddBonusToDamage(bonus);
+    }
+
+    private int? AddBonusToDamage(int bonus)
+    {
+        if (bonus <= 0)
+            return null;
+
+        return bonus >= int.MaxValue - damage ? int.MaxValue : damage + bonus;
     }
 
     private int OverlapHitbox(ColliderInfo hitbox)

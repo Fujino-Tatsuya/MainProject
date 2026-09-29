@@ -125,6 +125,7 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
         int hitCount = OverlapHitboxAnchor(hitResults);
         tickTargets.Clear();
         tickLandedUnits.Clear();
+        bool onHitBonusTaken = false;
 
         for (int i = 0; i < hitCount; i++)
         {
@@ -146,7 +147,17 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
             // 방사형 폴백에 맡기면 전진(6m/s)이 넉백(3m/s)을 따라잡는 순간 옆/뒤로 뒤집힌다.
             // 견인 속도 하한 = 전진 속도: 넉백이 전진보다 느리면 플레이어가 몹을 추월해 히트박스에서
             // 놓친다("한두 번 밀리고 끝"). 하한을 코드로 보장해 돌진 끝까지 방패 앞에 붙어 밀려가게 한다.
-            AttackInfo attackInfo = new AttackInfo(damageSnapshot, AttackType.Skill,
+            int resolvedDamage = damageSnapshot;
+            if (!onHitBonusTaken && unit != null)
+            {
+                onHitBonusTaken = true;
+                int bonus = owner.ServerTakeOnHitBonus(data.TriggersOnHit, unit);
+                resolvedDamage = bonus >= int.MaxValue - resolvedDamage
+                    ? int.MaxValue
+                    : resolvedDamage + bonus;
+            }
+
+            AttackInfo attackInfo = new AttackInfo(resolvedDamage, AttackType.Skill,
                 knockbackStrength: Mathf.Max(data.KnockbackStrength, data.AdvanceSpeed),
                 knockbackDuration: data.KnockbackDuration,
                 staggerDuration: data.StaggerDuration,
