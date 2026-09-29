@@ -28,7 +28,7 @@ using UnityEngine.InputSystem;   // 신 Input System (이 프로젝트: Active I
 [DisallowMultipleComponent]
 public sealed class DevBossEntranceWarp : MonoBehaviour
 {
-    // 이미 쓰이는 키 — F1·F2(HitVFXDebugHUD) · F8(ProfilerHUD) · F9(LookToggle) · F10(디버그 부활)
+    // 이미 쓰이는 키 — F1·F2(HitVFXDebugHUD) · F8(ProfilerHUD) · F10(디버그 부활) · F3·F4·F6·F9·F11(23호 공격 예약 — DevBossAttackHotkeys)
     //                M(맵 오버뷰) · [ ](카메라 타겟 전환). F5 가 비어 있어 쓴다.
 #if ENABLE_INPUT_SYSTEM
     const Key WarpKey = Key.F5;

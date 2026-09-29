@@ -714,6 +714,13 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
                 "SO 에 weight 0 행으로 추가할 것. 이번 시퀀스는 건너뛴다.", this);
         }
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        // [Dev] 단축키 예약(DevBossAttackHotkeys) — 페이즈 시퀀스 다음 우선. 간격·쿨다운·가중치 무시, 거리창만 지킨다
+        //       (사거리 밖이면 예약을 들고 추격 → 붙으면 발동). 릴리스 빌드에는 없다.
+        int devSlot = ConsumeDevReservation(rows, dist);
+        if (devSlot != NoAttack) return devSlot;
+#endif
+
         // 🔴 **전역 공격 간격**(팀장 확정 2026-08-13: "다음 공격까지가 너무 빠르다").
         //    쿨다운이 행마다 따로라 훅L(2.5s)·훅R(2.5s)·어퍼(3s)를 번갈아 쓰면 **쉬는 구간이 0** 이었다.
         //    행 쿨다운과 별개로, 공격이 끝난 뒤 이 시간만큼은 아무것도 고르지 않는다.
@@ -795,6 +802,44 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         }
         return fallbackSlot; // 부동소수 잔차 안전망
     }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+    bool _devHasReservation;
+    BossAttackId _devReserved;
+
+    /// <summary>[Dev · 서버] 다음 공격을 강제 예약한다. 이미 있으면 덮어쓴다.</summary>
+    public void DevReserveNextAttack(BossAttackId id)
+    {
+        if (!IsServer) return;
+        _devHasReservation = true;
+        _devReserved = id;
+        Debug.Log($"[23호/Dev] 다음 공격 예약 — {id} (상태={State} · 페이즈={_attackPhase})", this);
+    }
+
+    int ConsumeDevReservation(BossAttackEntry[] rows, float dist)
+    {
+        if (!_devHasReservation) return NoAttack;
+
+        int slot = FindSlot(_devReserved);
+        if (slot == NoAttack)
+        {
+            Debug.LogWarning($"[23호/Dev] 예약한 {_devReserved} 행이 공격 테이블에 없다 — 예약 취소", this);
+            _devHasReservation = false;
+            return NoAttack;
+        }
+
+        BossAttackEntry e = rows[slot];
+        if (!e.ignoreDistanceWindow)
+        {
+            float max = BossContactReachPolicy.EffectiveMaxDistance(e, data.attackRange, _inContactReach);
+            if (dist < e.minDistance || dist > max) return NoAttack;   // 예약 유지 — 추격하다 붙으면 발동
+        }
+
+        _devHasReservation = false;
+        Debug.Log($"[23호/Dev] 예약 공격 발동 — {_devReserved} (거리 {dist:0.##}m)", this);
+        return slot;
+    }
+#endif
     #endregion
 
     #region 훅 — StartAttack / PerformAttackHit / PlayStateAnimation
