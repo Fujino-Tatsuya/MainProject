@@ -1,0 +1,101 @@
+{
+    "version": 1,
+    "contextKind": "Prefab",
+    "contextGuid": "09f37616c8805a244ae999c00477d2ab",
+    "contextName": "bossroom",
+    "groups": [
+        {
+            "id": "e4b2a80211894e42a79486f5f2ce6b00",
+            "name": "Group 1",
+            "color": {
+                "r": 0.1586499661207199,
+                "g": 0.949999988079071,
+                "b": 0.14249996840953828,
+                "a": 1.0
+            },
+            "colorIsCustom": false,
+            "members": [
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-09f37616c8805a244ae999c00477d2ab-6827050600452837810-0",
+                    "path": "GameObject",
+                    "lastSeenName": "GameObject"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-09f37616c8805a244ae999c00477d2ab-7423533927488409765-3434505331067631487",
+                    "path": "walll_brick_cornerCOM_ground floor/wall_brick_basic_corner_Ground floor (15)",
+                    "lastSeenName": "wall_brick_basic_corner_Ground floor (15)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-09f37616c8805a244ae999c00477d2ab-8156269305347765668-7302559403798742043",
+                    "path": "wall_brick_window_4stack_Ground floor (12)",
+                    "lastSeenName": "wall_brick_window_4stack_Ground floor (12)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-09f37616c8805a244ae999c00477d2ab-8156269305347765668-1673317207839390268",
+                    "path": "wall_brick_window_4stack_Ground floor (15)",
+                    "lastSeenName": "wall_brick_window_4stack_Ground floor (15)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-09f37616c8805a244ae999c00477d2ab-4574981773841765999-7179976921994149569",
+                    "path": "wall_brick_basic_4stack_Ground floor (3)",
+                    "lastSeenName": "wall_brick_basic_4stack_Ground floor (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-09f37616c8805a244ae999c00477d2ab-8156269305347765668-8905529050762284904",
+                    "path": "wall_brick_window_4stack_Ground floor (13)",
+                    "lastSeenName": "wall_brick_window_4stack_Ground floor (13)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-09f37616c8805a244ae999c00477d2ab-8156269305347765668-3983615037109896283",
+                    "path": "wall_brick_window_4stack_Ground floor (14)",
+                    "lastSeenName": "wall_brick_window_4stack_Ground floor (14)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-09f37616c8805a244ae999c00477d2ab-1473947428149456335-5416814351593567828",
+                    "path": "walll_brick_cornerCOM_ground floor (3)/wall_brick_basic_corner_Ground floor (16)",
+                    "lastSeenName": "wall_brick_basic_corner_Ground floor (16)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-09f37616c8805a244ae999c00477d2ab-8745468712114186287-5416814351593567828",
+                    "path": "walll_brick_cornerCOM_ground floor (3)/wall_brick_piloti_corner_Ground floor",
+                    "lastSeenName": "wall_brick_piloti_corner_Ground floor"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-09f37616c8805a244ae999c00477d2ab-7423533927488409765-5416814351593567828",
+                    "path": "walll_brick_cornerCOM_ground floor (3)/wall_brick_basic_corner_Ground floor (15)",
+                    "lastSeenName": "wall_brick_basic_corner_Ground floor (15)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-09f37616c8805a244ae999c00477d2ab-8156269305347765668-927278444042537646",
+                    "path": "wall_brick_window_4stack_Ground floor (6)",
+                    "lastSeenName": "wall_brick_window_4stack_Ground floor (6)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-09f37616c8805a244ae999c00477d2ab-8156269305347765668-6680357386180053060",
+                    "path": "wall_brick_window_4stack_Ground floor (5)",
+                    "lastSeenName": "wall_brick_window_4stack_Ground floor (5)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-09f37616c8805a244ae999c00477d2ab-4574981773841765999-1668153526562571215",
+                    "path": "wall_brick_basic_4stack_Ground floor (1)",
+                    "lastSeenName": "wall_brick_basic_4stack_Ground floor (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-09f37616c8805a244ae999c00477d2ab-8156269305347765668-4942953242363542083",
+                    "path": "wall_brick_window_4stack_Ground floor (7)",
+                    "lastSeenName": "wall_brick_window_4stack_Ground floor (7)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-09f37616c8805a244ae999c00477d2ab-8156269305347765668-9110480335770341914",
+                    "path": "wall_brick_window_4stack_Ground floor (4)",
+                    "lastSeenName": "wall_brick_window_4stack_Ground floor (4)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-09f37616c8805a244ae999c00477d2ab-1473947428149456335-6498710419732733978",
+                    "path": "walll_brick_cornerCOM_ground floor (2)/wall_brick_basic_corner_Ground floor (16)",
+                    "lastSeenName": "wall_brick_basic_corner_Ground floor (16)"
+                }
+            ]
+        }
+    ]
+}
