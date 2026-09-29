@@ -804,27 +804,47 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-    bool _devHasReservation;
-    BossAttackId _devReserved;
+    /// <summary>[Dev] 예약 대기열 최대 길이. 넘치면 새 예약을 받지 않는다(덮어쓰지 않는다 — 넣은 순서가 곧 재현 순서다).</summary>
+    public const int DevReservationCapacity = 8;
+    readonly Queue<BossAttackId> _devReservations = new Queue<BossAttackId>(DevReservationCapacity);
 
-    /// <summary>[Dev · 서버] 다음 공격을 강제 예약한다. 이미 있으면 덮어쓴다.</summary>
-    public void DevReserveNextAttack(BossAttackId id)
+    /// <summary>[Dev · 서버] 지금 대기 중인 예약 수.</summary>
+    public int DevReservationCount => _devReservations.Count;
+
+    /// <summary>[Dev · 서버] 다음 공격 예약을 대기열 끝에 넣는다. 가득 차면 false.</summary>
+    public bool DevReserveNextAttack(BossAttackId id)
     {
-        if (!IsServer) return;
-        _devHasReservation = true;
-        _devReserved = id;
-        Debug.Log($"[23호/Dev] 다음 공격 예약 — {id} (상태={State} · 페이즈={_attackPhase})", this);
+        if (!IsServer) return false;
+        if (_devReservations.Count >= DevReservationCapacity)
+        {
+            Debug.LogWarning($"[23호/Dev] 예약 대기열이 가득 찼다({DevReservationCapacity}) — {id} 무시", this);
+            return false;
+        }
+        _devReservations.Enqueue(id);
+        Debug.Log($"[23호/Dev] 예약 추가 — {id} · 대기 {_devReservations.Count}/{DevReservationCapacity} " +
+                  $"[{string.Join(" → ", _devReservations)}] (상태={State} · 페이즈={_attackPhase})", this);
+        return true;
     }
 
+    /// <summary>[Dev · 서버] 대기열을 비운다.</summary>
+    public void DevClearReservations()
+    {
+        if (!IsServer) return;
+        _devReservations.Clear();
+        Debug.Log("[23호/Dev] 예약 대기열 비움", this);
+    }
+
+    // 맨 앞 예약만 본다 — 사거리 밖이면 **순서를 지키려고** 뒤 예약으로 건너뛰지 않고 추격한다.
     int ConsumeDevReservation(BossAttackEntry[] rows, float dist)
     {
-        if (!_devHasReservation) return NoAttack;
+        if (_devReservations.Count == 0) return NoAttack;
 
-        int slot = FindSlot(_devReserved);
+        BossAttackId next = _devReservations.Peek();
+        int slot = FindSlot(next);
         if (slot == NoAttack)
         {
-            Debug.LogWarning($"[23호/Dev] 예약한 {_devReserved} 행이 공격 테이블에 없다 — 예약 취소", this);
-            _devHasReservation = false;
+            _devReservations.Dequeue();
+            Debug.LogWarning($"[23호/Dev] 예약한 {next} 행이 공격 테이블에 없다 — 건너뜀", this);
             return NoAttack;
         }
 
@@ -835,8 +855,8 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
             if (dist < e.minDistance || dist > max) return NoAttack;   // 예약 유지 — 추격하다 붙으면 발동
         }
 
-        _devHasReservation = false;
-        Debug.Log($"[23호/Dev] 예약 공격 발동 — {_devReserved} (거리 {dist:0.##}m)", this);
+        _devReservations.Dequeue();
+        Debug.Log($"[23호/Dev] 예약 공격 발동 — {next} (거리 {dist:0.##}m) · 남은 예약 {_devReservations.Count}", this);
         return slot;
     }
 #endif

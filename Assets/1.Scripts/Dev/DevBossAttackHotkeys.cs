@@ -11,6 +11,10 @@
 //    F6   점프어택
 //    F9   잡기
 //    F11  돌진
+//    Shift+F3  예약 대기열 비우기
+//
+//  예약은 **대기열**이다 — 최대 TwentyThreeBoss.DevReservationCapacity(8)개, 넣은 순서대로 하나씩 발동.
+//  가득 차면 새 예약은 무시된다(덮어쓰지 않는다). 토스트에 "대기 n/8" 이 뜬다.
 //
 //  동작: 예약은 **다음 행동 선택 시점**에 소비된다(TwentyThreeBoss.SelectAttackSlot). 진행 중 공격은 끊지 않는다.
 //        페이즈 시퀀스(차징)가 대기 중이면 그쪽이 먼저다. 전역 간격·쿨다운·가중치는 무시하고 거리창만 지킨다 —
@@ -49,13 +53,15 @@ public sealed class DevBossAttackHotkeys : MonoBehaviour
 #if ENABLE_INPUT_SYSTEM
         Keyboard kb = Keyboard.current;
         if (kb == null) return;
-        if (kb.f3Key.wasPressedThisFrame) ReserveHook();
+        bool shift = kb.leftShiftKey.isPressed || kb.rightShiftKey.isPressed;
+        if (kb.f3Key.wasPressedThisFrame) { if (shift) ClearAll(); else ReserveHook(); }
         else if (kb.f4Key.wasPressedThisFrame) Reserve(BossAttackId.Upper, "F4");
         else if (kb.f6Key.wasPressedThisFrame) Reserve(BossAttackId.Jump, "F6");
         else if (kb.f9Key.wasPressedThisFrame) Reserve(BossAttackId.Grab, "F9");
         else if (kb.f11Key.wasPressedThisFrame) Reserve(BossAttackId.Dash, "F11");
 #else
-        if (Input.GetKeyDown(KeyCode.F3)) ReserveHook();
+        bool shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+        if (Input.GetKeyDown(KeyCode.F3)) { if (shift) ClearAll(); else ReserveHook(); }
         else if (Input.GetKeyDown(KeyCode.F4)) Reserve(BossAttackId.Upper, "F4");
         else if (Input.GetKeyDown(KeyCode.F6)) Reserve(BossAttackId.Jump, "F6");
         else if (Input.GetKeyDown(KeyCode.F9)) Reserve(BossAttackId.Grab, "F9");
@@ -71,16 +77,36 @@ public sealed class DevBossAttackHotkeys : MonoBehaviour
 
     bool Reserve(BossAttackId id, string key)
     {
+        TwentyThreeBoss boss = ResolveBoss(key);
+        if (boss == null) return false;
+
+        int cap = TwentyThreeBoss.DevReservationCapacity;
+        if (!boss.DevReserveNextAttack(id))
+        {
+            Toast($"{key}: 예약 가득 참({cap}/{cap}) — {id} 무시. Shift+F3 으로 비우기");
+            return false;
+        }
+        Toast($"{key}: 예약 {id} · 대기 {boss.DevReservationCount}/{cap}");
+        return true;
+    }
+
+    void ClearAll()
+    {
+        TwentyThreeBoss boss = ResolveBoss("Shift+F3");
+        if (boss == null) return;
+        boss.DevClearReservations();
+        Toast($"Shift+F3: 예약 비움 (0/{TwentyThreeBoss.DevReservationCapacity})");
+    }
+
+    TwentyThreeBoss ResolveBoss(string key)
+    {
         NetworkManager nm = NetworkManager.Singleton;
-        if (nm == null || !nm.IsListening) { Toast($"{key}: 네트워크가 아직 안 떴다"); return false; }
-        if (!nm.IsServer) { Toast($"{key}: 호스트 창에서만 예약할 수 있다(보스는 서버에서만 돈다)"); return false; }
+        if (nm == null || !nm.IsListening) { Toast($"{key}: 네트워크가 아직 안 떴다"); return null; }
+        if (!nm.IsServer) { Toast($"{key}: 호스트 창에서만 예약할 수 있다(보스는 서버에서만 돈다)"); return null; }
 
         TwentyThreeBoss boss = FindAnyObjectByType<TwentyThreeBoss>();
-        if (boss == null || !boss.IsSpawned) { Toast($"{key}: 23호가 아직 없다"); return false; }
-
-        boss.DevReserveNextAttack(id);
-        Toast($"{key}: 다음 공격 = {id}");
-        return true;
+        if (boss == null || !boss.IsSpawned) { Toast($"{key}: 23호가 아직 없다"); return null; }
+        return boss;
     }
 
     void Toast(string message)
