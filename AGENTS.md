@@ -41,9 +41,9 @@
 - 설계(GDD): [Docs/design/](Docs/design/) — 보스 / 플레이어 / 상태이상 / 빌드
 - 기술: [Docs/tech/](Docs/tech/) — 아키텍처 / 네트워크 / 컨벤션 / 워크플로우
 - **플레이어 프리팹**: [Docs/tech/player-prefabs.md](Docs/tech/player-prefabs.md) — 단일 사실 원본.
-  **설계 의도 = `Player` 는 역할, 그 밑 `Armature` 자식을 교체해 플레이 캐릭터를 바꾼다.
-  캐릭터는 스폰 전에 유저 선택값으로 결정된다.**
-  단 **현재 스폰되는 것은 통짜 복제본인 `Paladin.prefab`** 이라 의도와 데이터가 어긋나 있다.
+  **`Player.prefab` = 역할 base, 캐릭터마다 그 Prefab Variant(`Player_Paladin.prefab`)가
+  `Armature`·스킬·VFX 를 얹는다. 캐릭터는 스폰 전에 고른다.** 역할 동작은 base, 캐릭터 고유는 Variant 를 고친다.
+  구 통짜 복제본(`Paladin`·`Paladin_VFX`)은 `Player/Legacy/` 에 보관만 한다(2026-09-29).
   플레이어 프리팹·스폰·캐릭터 교체를 건드리기 전에 읽을 것.
 - 레포지토리 맵(자동생성): [Docs/tech/repo_map.md](Docs/tech/repo_map.md) — 클래스/인터페이스
   구조·상속·Facade 위임 관계 요약. 재생성은 `DevTools/RepoMap/`(`npm run generate`).

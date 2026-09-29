@@ -1,31 +1,42 @@
-# 플레이어 프리팹 — `Player.prefab` / `Armature` / `Paladin.prefab`
+# 플레이어 프리팹 — `Player.prefab`(base) / `Player_Paladin.prefab`(Variant) / `Armature`
 
 > **목적.** 이 프리팹들은 이름도 내용도 비슷해서 AI 에이전트와 사람이 반복해서 헷갈린다.
 > "무엇이 무슨 역할이냐", "지금 실제로 스폰되는 건 뭐냐", "어느 쪽을 고쳐야 하냐"의 **단일 사실 원본**이다.
-> 사실(as-is) 항목은 2026-09-16 기준 `feature/player-motor` 브랜치의 **YAML·코드를 직접 읽어** 확인했다.
+> 🟢 **§0 은 2026-09-29 `fix/Player` 의 base + Variant 전환 후 사실**이다([PLAN-player-variants.md](../../PLAN-player-variants.md)).
+> 🟡 **§2~§6 은 전환 이전(통짜 복제본 시절, 2026-09-16) 기록**이다 — 사고 원인·함정 설명으로만 읽을 것.
 > 코드 주석·옛 문서를 믿지 말고 §9 의 확인 명령으로 다시 검증할 것.
 
 ---
 
-## 0. 30초 요약
+## 0. 30초 요약 (2026-09-29 이후)
 
-**설계 의도(to-be).** `Player` 는 말 그대로 **플레이어라는 역할**이다 — 네트워크·입력·이동·스킬·생명주기를
-소유한다. 그 밑의 **`Armature` 자식을 교체해서 플레이 캐릭터를 바꾼다.** 캐릭터마다 프리팹을 통째로
-복제하지 않는다.
-**교체 시점 = 스폰 전.** 유저가 고른 값에 따라 어떤 캐릭터로 스폰될지가 결정된다(팀 확정 2026-09-16).
-스폰된 뒤에 캐릭터가 바뀌는 경우는 없다.
+**구조.** `Player.prefab` = 캐릭터 무관한 **역할 base**. 캐릭터마다 그 **Prefab Variant** 를 두고,
+Variant 가 `Armature`(캐릭터 몸체) · 스킬 · VFX · 무기 · 스탯 · 평타 데이터를 얹는다.
+**캐릭터는 스폰 전에 고른다** — 스폰할 Variant 를 고르는 방식이다(런타임 Armature 교체는 미채택, §1.5).
 
-**현재 데이터(as-is).** 정식 흐름이 실제로 스폰하는 것은 **`Paladin.prefab`** 이다. 이것은 역할+캐릭터가
-한 덩어리로 평탄화된 **통짜 복제본**이라 위 의도에서 벗어나 있다.
+```
+Player.prefab (base)            ← 네트워크·입력·이동·생명주기·상태이상·HUD·HurtBox·실루엣 태그·시각 보간
+└─ Player_Paladin.prefab (Variant)
+   ├─ Armature  = <중첩 Paladin/Paladin_Armature.prefab>  ← 모델·리그·Animator·히트박스·VFX 소켓
+   ├─ PlayerWaeponSlot/SM_Wep_Shield_01 · SM_Wep_Sword_03
+   ├─ VFX  (EffectSocketPlayer 들)
+   └─ 루트 추가: FirstMelee* 스킬 5종 · PlayerSkillVfx · PlayerShieldVfx · EffectAnimEvents
+```
 
 | 질문 | 답 |
 |------|-----|
-| `Player` 의 역할은? | **캐릭터에 무관한 플레이어 역할 셸.** 캐릭터는 `Armature` 자식 교체로 바꾼다 |
-| 지금 정식 흐름이 스폰하는 건? | **`Paladin.prefab`** — 의도와 다른 통짜 복제본이다 |
-| 지금 게임 동작을 바꾸려면? | **`Paladin.prefab`** 을 고친다. `Player.prefab` 만 고치면 게임에 반영되지 않는다 |
-| 교체 구조는 구현돼 있나? | **코드는 있고, 데이터가 없다** — `PlayableCharacterVisual` + `CharacterDefinition` 이 존재하지만 **어느 프리팹에도 안 붙어 있고 `CharacterDefinition` 에셋은 0개**다 (§1) |
-| 둘은 같은 프리팹의 변형(Variant)인가? | **아니다.** 완전히 독립된 프리팹이라 자동 동기화가 **전혀** 없다 |
-| 런타임 로그에서 어느 쪽인지 아는 법 | 오브젝트 이름. `Paladin(Clone)` = 현재 정상 / `Player(Clone)` = 구 경로로 스폰된 것 |
+| 지금 스폰되는 건? | **`Player_Paladin`** — 정식 흐름·테스트 씬 전부. 로그 이름 `Player_Paladin(Clone)` |
+| 전투·이동·UI 등 **역할** 동작을 바꾸려면? | **`Player.prefab`**(base). Variant 가 상속한다 |
+| 가붕이 **고유**(스킬·VFX·모델·히트박스·스탯)를 바꾸려면? | **`Player_Paladin.prefab`**, 몸체는 **`Paladin_Armature.prefab`** |
+| 새 캐릭터를 추가하려면? | base 의 Variant 를 새로 만들고 `DefaultNetworkPrefabs` 에 등록. 🔴 **`GlobalObjectIdHash` 가 YAML 에 기록됐는지 확인**(아래) |
+| 자식 이름 규칙 | 몸체 인스턴스 이름은 반드시 **`Armature`** (`transform.Find("Armature")` 폴백 3곳, §1.4) |
+| 구 프리팹은? | `Paladin.prefab` · `Paladin_VFX.prefab` · `TempPlayer_Armature.prefab` → **`Player/Legacy/`** 보관. 스폰·네트워크 목록 대상 아님 |
+| 네트워크 목록 | `DefaultNetworkPrefabs` 에 **`Player_Paladin` 만** 등록. base 는 스폰 대상이 아니라 뺐다 |
+| 캐릭터 선택 UI / `ResolvePlayerPrefabForClient` | **미구현**(범위 밖). 지금은 `defaultPlayerPrefab = Player_Paladin` |
+
+🔴 **Variant 해시 함정.** `SaveAsPrefabAsset` 만으로는 Variant 의 `NetworkObject.GlobalObjectIdHash` 오버라이드가
+YAML 에 **안 써져 base 해시를 상속**한다(에디터 메모리 값만 고유 → 빌드에서 충돌). 에셋의 NetworkObject 를
+`SetDirty` → `SaveAssetIfDirty` 해서 기록할 것. `Player_Paladin` = `913233600`, base = `1250559839`.
 
 ---
 
@@ -140,6 +151,8 @@ NetworkBehaviour 가 늘거나 줄거나 순서가 바뀌면 **RPC 가 엉뚱한
 Variant 가 아니라 **통짜 복제본**을 만들면 §4 의 어긋남이 캐릭터 수만큼 늘어난다.
 
 ---
+
+> 🟡 **여기서부터 §6 까지는 2026-09-16 전환 이전 기록이다.** 현재 구조는 §0, 수정 규칙은 §7.
 
 ## 2. 프리팹들의 신원
 
@@ -298,18 +311,19 @@ Paladin  (루트 컴포넌트 37개 — Player 와 동일 구성)
 
 ## 7. 수정할 때의 규칙
 
-**결정 트리**
+**결정 트리 (2026-09-29 이후)**
 
-1. **지금 게임 동작을 바꾼다**(전투·이동·네트워크·UI) → **`Paladin.prefab`** 을 고친다. 실제로 스폰되는 건 이쪽이다.
-2. **캐릭터 고유 데이터**(모델·리그·Animator·히트박스·무기 소켓)를 바꾼다 → **Armature 쪽**이다.
-   Paladin 은 평탄화돼 있어 `Paladin.prefab` 안에서 직접 고쳐야 한다.
-3. **스크립트(.cs)만 고친다** → 프리팹 건드릴 필요 없음. 둘 다 같은 스크립트를 쓴다.
-4. **새 컴포넌트를 플레이어에 붙인다** → 손으로 YAML 을 고치지 말고 **저작 툴**을 쓴다.
-   툴이 `Assets/2.Prefabs/Player` 폴더의 플레이어 프리팹을 **양쪽 다** 순회한다:
-   - `Tools/Player/Authoring/Repair PlayerEncounterLock Wiring` (`PlayerEncounterLockAuthoring.cs`, 멱등)
-   - `Tools/Player/Authoring/Wire Interrupt Skill (단죄의 방패)` (`PlayerInterruptSkillAuthoring.cs`)
-5. **`Player.prefab` 만 고쳤다** → 지금은 게임에 반영되지 않는다. 의도한 게 맞는지 다시 생각할 것.
-6. **역할/캐릭터 경계를 새로 긋는다** → §1.4 계약을 먼저 읽고, §8 의 미결 사항과 함께 팀에 올린다.
+1. **역할 동작**(이동·네트워크·생명주기·상태이상·HUD·실루엣 등 캐릭터 무관)을 바꾼다 → **`Player.prefab`**(base).
+   모든 캐릭터 Variant 가 상속한다. 🔴 Variant 에서 같은 필드를 오버라이드해 두면 base 수정이 가려진다 — 인스펙터의 굵은 글씨 확인.
+2. **캐릭터 고유**(스킬 5종·스킬 VFX·무기·스탯·평타 데이터)를 바꾼다 → **`Player_Paladin.prefab`**(Variant).
+3. **캐릭터 몸체**(모델·리그·Animator·히트박스·VFX 소켓 위치)를 바꾼다 → **`Paladin/Paladin_Armature.prefab`**.
+4. **스크립트(.cs)만 고친다** → 프리팹 건드릴 필요 없음.
+5. **새 컴포넌트를 플레이어에 붙인다** → 역할이면 base, 캐릭터 고유면 Variant. 손으로 YAML 을 고치지 말고 **저작 툴**을 쓴다:
+   - `Tools/Player/Authoring/Repair PlayerEncounterLock Wiring` (`PlayerEncounterLockAuthoring.cs`, 멱등 — `Player/` 폴더 순회, `Legacy/` 제외)
+   - `Tools/Player/Authoring/Wire Interrupt Skill (단죄의 방패)` (`PlayerInterruptSkillAuthoring.cs` — `Paladin_Armature` + `Player_Paladin`)
+   - `Tools/Rendering/Look/Wire Player Silhouette` (`PlayerSilhouetteAuthoring.cs` — base)
+6. **`Legacy/` 의 프리팹을 고쳤다** → 게임에 반영되지 않는다. 스폰·네트워크 목록 어디에도 없다.
+7. **역할/캐릭터 경계를 새로 긋는다** → §1.4 계약을 먼저 읽고 팀에 올린다.
 
 **주의사항**
 
@@ -322,6 +336,11 @@ Paladin  (루트 컴포넌트 37개 — Player 와 동일 구성)
 ---
 
 ## 8. 의도와 현재 데이터를 수렴시키기 — 남은 일
+
+> ✅ **8.0~8.2 완료(2026-09-29, `fix/Player`)** — base 정리·`Paladin_Armature` 추출·`Player_Paladin` Variant·스폰 전환·
+> 구 프리팹 `Legacy/` 이동. 경과와 판단은 [PLAN-player-variants.md](../../PLAN-player-variants.md) §3.
+> **남은 것 = 8.3(캐릭터 선택 경로)** 과 스탯 소유자·`PlayableCharacterVisual`/`CharacterDefinition` 존폐 결정.
+> 아래 8.0~8.2 본문은 계획 당시 기록이다.
 
 **정해진 것**(§1.0): 역할/캐릭터 분리 · 캐릭터는 **스폰 전에** 유저 선택값으로 결정 ·
 방식은 **`Player.prefab` base + 캐릭터별 Prefab Variant**.
@@ -382,19 +401,26 @@ Prefab Variant 는 base 의 컴포넌트를 **추가**하긴 쉬워도 **제거*
 
 ### 8.4 계획서
 
-위 작업의 단계·검증·리스크는 **[PLAN-player-variants.md](../../PLAN-player-variants.md)** 에 있다(승인 대기).
-이번 1차 범위는 **`Player_Paladin` Variant 까지**이고, 로비 선택 UI 와 징크스는 범위 밖이다.
-
-**진행되면 §0 · §1.0 · §1.3 · §3 · §8 을 갱신할 것.**
+위 작업의 단계·검증·리스크는 **[PLAN-player-variants.md](../../PLAN-player-variants.md)** 에 있다(2026-09-29 완료).
+1차 범위는 **`Player_Paladin` Variant 까지**였고, 로비 선택 UI 와 징크스는 범위 밖이다.
 
 ---
 
 ## 9. 재확인 명령 (이 문서를 의심할 때)
 
 ```bash
-# 어떤 씬이 어느 프리팹을 가리키는가 (Player GUID / Paladin GUID)
+# 어떤 씬이 어느 프리팹을 가리키는가
+# Player_Paladin (현행) — 씬 7개 + NetworkManager.prefab + DefaultNetworkPrefabs 가 나와야 한다
+grep -rl "df27ec97b40aab24da03bb1fb7cb43ce" Assets --include=*.unity --include=*.asset --include=*.prefab
+# 구 Paladin / Paladin_VFX / TempPlayer_Armature — Legacy/ 밖에서 결과가 나오면 안 된다
+grep -rl "af4a760f53d82b64f8369a09c962374c\|8d5b48551745dae429fc070cfa0af71f\|8de5f51f34fe3cf4aab41eb2c59d402d" Assets --include=*.unity --include=*.asset --include=*.prefab
+# base Player — Player_Paladin(Variant 의 부모)에서만 나와야 한다
 grep -rl "55ee4e06e5b56ec48a45b3796040b9ae" Assets --include=*.unity --include=*.asset --include=*.prefab
-grep -rl "af4a760f53d82b64f8369a09c962374c" Assets --include=*.unity --include=*.asset --include=*.prefab
+```
+
+```bash
+# Variant 가 고유 해시를 YAML 에 갖고 있는가 (없으면 base 해시 상속 = 충돌)
+grep -n -A1 "propertyPath: GlobalObjectIdHash" Assets/2.Prefabs/Player/Paladin/Player_Paladin.prefab
 ```
 
 ```bash
@@ -415,7 +441,7 @@ grep -rn '"Armature"' Assets/1.Scripts --include=*.cs
 
 ```bash
 # NetworkTransform / NetworkAnimator 권한 (0=Server, 1=Owner)
-grep -n "AuthorityMode" Assets/2.Prefabs/Player/Player.prefab Assets/2.Prefabs/Player/Paladin/Paladin.prefab Assets/2.Prefabs/Player/TempPlayer_Armature.prefab
+grep -n "AuthorityMode" Assets/2.Prefabs/Player/Player.prefab Assets/2.Prefabs/Player/Paladin/Paladin_Armature.prefab Assets/2.Prefabs/Player/Paladin/Player_Paladin.prefab
 ```
 
 ---

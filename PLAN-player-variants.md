@@ -242,6 +242,15 @@
 4. base 를 네트워크 목록에서 뺄지 결정 — base 는 스폰 대상이 아니다
 5. [player-prefabs.md](Docs/tech/player-prefabs.md) §0·§2·§3·§4·§8 갱신, [CONTEXT.md](CONTEXT.md) 인계 갱신
 
+**P5 결과 (2026-09-29, Claude)**
+- `DefaultNetworkPrefabs`: `Player`(base)·`Paladin`·`Paladin_VFX` 3항목 제거 → **`Player_Paladin` 만** 남김.
+  base 제거는 Claude 판단(스폰하는 곳 0 — 동작 무변화). 되돌리려면 항목 하나 추가.
+- 에디터 안 `MoveAsset` 으로 `Paladin`·`Paladin_VFX`·`TempPlayer_Armature` → `Player/Legacy/` (guid 3개 유지, git rename 인식).
+- 저작 툴 **4개** 갱신(계획의 2개 + 발견 2개): `PlayerInterruptSkillAuthoring`(→ `Paladin_Armature` + `Player_Paladin`) ·
+  `PlayerEncounterLockAuthoring`(`Legacy/` 제외) · **`PlayerSilhouetteAuthoring`**(→ base) · **`MonsterSceneBossSetup`**(경석, → `Player_Paladin`).
+- 문서: player-prefabs.md §0 재작성·§7 결정 트리 교체·§8 완료 표기·§9 확인 명령 갱신(실행 검증함) · AGENTS.md §6 사실 정정.
+- 남은 옛 참조: `Legacy/` 밖에서 0.
+
 ---
 
 ## 4. 검증 방법
@@ -287,15 +296,15 @@
 
 ## 7. 완료 조건
 
-- [ ] `Player.prefab` 이 캐릭터 요소 0 인 base 이고, 단독으로 에러 없이 기동한다
-- [ ] `Player_Paladin.prefab` 이 `Player.prefab` 의 Variant 이고, 자식 이름이 `Armature` 다
-- [ ] 정식 흐름·테스트 씬 전부 `Player_Paladin` 을 스폰한다
-- [ ] P0 병합으로 `Paladin` 고유 변경 2건이 `Paladin_VFX` 에 들어갔다
-- [ ] `Player_Paladin` 이 VFX 계층(소켓 18·루트 컴포넌트 6종)을 `Paladin_VFX` 와 동일하게 갖는다
-- [ ] `Paladin.prefab` · `Paladin_VFX.prefab` · (결정 시)`TempPlayer_Armature.prefab` 이 저장소에서 사라졌다
-- [ ] §4 의 Play 1사이클과 MPPM 2인 검증을 **은희가** 통과시켰다
-- [ ] 저작 툴 2종이 새 구조를 대상으로 돈다
-- [ ] [player-prefabs.md](Docs/tech/player-prefabs.md) 가 새 구조로 갱신됐다
+- [~] `Player.prefab` 이 캐릭터 요소 0 인 base 다 ✅ — ⚠️ **"단독 기동" 은 미검증**(base 를 스폰하는 곳이 없다. Variant Play 로 간접 확인만)
+- [x] `Player_Paladin.prefab` 이 `Player.prefab` 의 Variant 이고, 자식 이름이 `Armature` 다
+- [x] 정식 흐름·테스트 씬 전부 `Player_Paladin` 을 스폰한다
+- [x] P0 병합 — `Paladin` 고유 변경 2건 중 **1건 반영**, 1건(데칼 레이어)은 우발 변경으로 판단해 의도적으로 제외
+- [x] `Player_Paladin` 이 VFX 계층을 `Paladin_VFX` 와 동일하게 갖는다 (전 필드 대조 차이 = 해시뿐)
+- [x] `Paladin` · `Paladin_VFX` · `TempPlayer_Armature` 가 **`Legacy/` 로 이동**했다 (삭제 대신 보관 — 사용자 결정)
+- [x] §4 의 Play 1사이클과 MPPM 2인 검증을 **은희가** 통과시켰다 (2026-09-29, P4 직후)
+- [~] 저작 툴 **4종**의 대상 경로를 새 구조로 바꿨다 ✅ — ⚠️ **툴 재실행은 안 해봤다**(컴파일만 확인)
+- [x] [player-prefabs.md](Docs/tech/player-prefabs.md) 가 새 구조로 갱신됐다
 
 ---
 

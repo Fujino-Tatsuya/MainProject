@@ -43,7 +43,7 @@ public static class MonsterSceneBossSetup
     const string SceneName = "MonsterScene";
     const string BossRoomPrefab = "Assets/2.Prefabs/Environment/Layouts/Zones/bossroom.prefab";
     const string BossPrefab = "Assets/2.Prefabs/Monster/Boss/TwentyThree.prefab";
-    const string PaladinPrefab = "Assets/2.Prefabs/Player/Paladin/Paladin.prefab";
+    const string PaladinPrefab = "Assets/2.Prefabs/Player/Paladin/Player_Paladin.prefab"; // 2026-09-29 Variant 로 전환
     const string NavMeshAssetPath = "Assets/0.Scenes/MonsterScene/NavMesh-Env.asset";
 
     const string RoomName = "bossroom";

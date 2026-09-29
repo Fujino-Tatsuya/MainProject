@@ -19,6 +19,8 @@ using UnityEngine;
 public static class PlayerEncounterLockAuthoring
 {
     const string PlayerPrefabFolder = "Assets/2.Prefabs/Player";
+    // 구 통짜 복제본 보관소 — 스폰되지 않으므로 고치지 않는다 (Docs/tech/player-prefabs.md)
+    const string LegacyFolder = "Assets/2.Prefabs/Player/Legacy/";
 
     [MenuItem("Tools/Player/Authoring/Repair PlayerEncounterLock Wiring")]
     public static void Repair()
@@ -30,6 +32,9 @@ public static class PlayerEncounterLockAuthoring
         foreach (string guid in guids)
         {
             string path = AssetDatabase.GUIDToAssetPath(guid);
+            if (path.StartsWith(LegacyFolder))
+                continue;
+
             GameObject root = PrefabUtility.LoadPrefabContents(path);
 
             try

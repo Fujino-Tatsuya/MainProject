@@ -6,12 +6,13 @@ using UnityEngine;
 ///
 /// 하는 일:
 ///  1) FirstMeleeInterruptSkillData SO 에셋 생성 (없을 때만)
-///  2) 판정 앵커 InterruptAttack 노드에 BoxCollider + ColliderInfo 부착
-///     (Paladin.prefab / TempPlayer_Armature.prefab — 두 플레이어 프리팹의 앵커 출처가 다르다)
+///  2) 판정 앵커 InterruptAttack 노드에 BoxCollider + ColliderInfo 부착 (Paladin_Armature.prefab)
 ///  3) 플레이어 루트에 FirstMeleeInterruptSkill 부착 + data/hitboxAnchor 배선
-///     + PlayerSkillController.interruptSkill 슬롯 연결 (Paladin.prefab / Player.prefab)
+///     + PlayerSkillController.interruptSkill 슬롯 연결 (Player_Paladin.prefab)
 ///
-/// ⚠️ Player.prefab의 앵커는 중첩된 TempPlayer_Armature 안에 있다 — 아마추어를 먼저 처리해야 한다.
+/// ⚠️ 단죄의 방패는 가붕이 전용이라 base(Player.prefab)가 아니라 Variant(Player_Paladin)에 붙는다.
+///    앵커는 Variant 에 중첩된 Paladin_Armature 안에 있다 — 아마추어를 먼저 처리해야 한다.
+///    구조: Docs/tech/player-prefabs.md
 /// </summary>
 public static class PlayerInterruptSkillAuthoring
 {
@@ -27,15 +28,13 @@ public static class PlayerInterruptSkillAuthoring
     // 앵커 노드를 가진 프리팹 (판정 앵커 부착 대상)
     private static readonly string[] AnchorPrefabs =
     {
-        "Assets/2.Prefabs/Player/TempPlayer_Armature.prefab",
-        "Assets/2.Prefabs/Player/Paladin/Paladin.prefab",
+        "Assets/2.Prefabs/Player/Paladin/Paladin_Armature.prefab",
     };
 
     // PlayerSkillController를 가진 플레이어 루트 프리팹 (스킬 컴포넌트 부착 대상)
     private static readonly string[] PlayerPrefabs =
     {
-        "Assets/2.Prefabs/Player/Player.prefab",
-        "Assets/2.Prefabs/Player/Paladin/Paladin.prefab",
+        "Assets/2.Prefabs/Player/Paladin/Player_Paladin.prefab",
     };
 
     [MenuItem("Tools/Player/Authoring/Wire Interrupt Skill (단죄의 방패)")]
