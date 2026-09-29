@@ -34,3 +34,11 @@
 - ③ `4.MapScene`: `Stage1_Procedural` 비활성 + `Stage1`(튜토리얼). diff +66/−2 — −1 은 내가 09-28 에 뺀 `defeatResultDelaySeconds` 의 잔존 직렬화 정리(무해). 옛 Stage1 내부를 참조하는 씬 오브젝트 0.
 - ④ 바닥 지도(2m 격자): 존 사이 연결 4곳 모두 벽-바닥-벽, 복도 추락 구멍 없음.
 - 되돌리기: MapScene 에서 `Stage1`(튜토리얼) 삭제 + `Stage1_Procedural` 활성·이름 `Stage1`.
+
+## 09-29 저녁 — 스테이지 180° 회전 + 은희 투명화 존 반영
+- 은희 `fix/stage_tutorial260929`(95063bce 투명화 존 9 · 그룹 9) 머지 — 튜토리얼 벽 프리팹 충돌은 **은희 버전 채택** 후 ①번 메뉴로 콜라이더 재생성.
+- **180° 회전**(팀장 09-29: 투명화가 반대로 나와서). `StageYawSteps = 2`, 축 = 벽 인스턴스 위치 (0,0,−160.6). 존 위치·회전은 월드 값이라(`MapContentSpawner` — `TryGetPosition`·`YawSteps`) 슬롯 좌표를 같이 돌리고 `YawSteps = 2`.
+- 🔴 SVN **r340 필요**(이지원 r339·r340 `walll_brick_cornerCOM_*` — 구석 40곳이 이 프리팹으로 교체됨). r338 이면 구석 벽이 **빠진 채로** 열린다(missing prefab, 에러 없음). 핀 `art-svn.json` = 340.
+- 툴 수정: ① 투명화 존(`WallTransparencyZone`, 기본 큐브 MeshFilter)을 벽에서 제외 — 안 빼면 존 자리가 보이지 않는 실체 벽이 된다. ② 구석 판정을 이름 + **모양**(가로·세로 둘 다 두께 1.5배 초과)으로 — `cornerCOM` 은 곧은 판 2(1×4m) + 기둥 1(1.5×1.5m)이라 ㄱ 자 0개.
+- 결과(배치모드): BoxCollider 333(이름만 corner 120 → 박스 1개) + 은희 트리거 9 유지 · 슬롯 5 YawSteps 2 · 바닥 지도 존 자리 5곳이 벽 윤곽과 일치, 복도 4곳 벽-바닥-벽. 회전 후 Start 존 서쪽 벽 없음 = 존 프리팹이 자기 벽을 가짐(회전 전과 같은 모양).
+- ⏳ Play 확인: 투명화 방향 · 스폰 Start · 런타임 NavMesh(`MapNavMeshBaker` 가 `MapGenerator.OnGenerated` 에서 굽는다) · BossEnter → 보스방.

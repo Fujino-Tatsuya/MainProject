@@ -13,6 +13,7 @@ Update this file when a term becomes important enough that future agents or team
 - **다음 세션 = 전기장판 · 자폭드론** — 기획 문서 수령 대기(받으면 바로 착수). 자폭드론 자리: `TwentyThreeBoss.OnWellsAttackCycle`(Wells 공격 주기 — 현재 빈 자리 경고).
 - 09-29 반영: 취약 넉백(방 회전) · 넉백 종료 시 그로기·취약 종료 · 제압 그로기 루프 · 취약 중 돌진 · 어퍼 예고 0.5 · 차징 점프 착지 범위 공격 · 점프 체인 안 끊김 · 잡기 낚아채는 프레임 부착 · 점프 착지 경계/Warp 복구 · 보스방 NavMesh 여유 띠(실측 1.5m) · Start → 튜토리얼 스테이지([PLAN-tutorial-stage.md](PLAN-tutorial-stage.md)) · 차징 오라 데칼 제거 · 진입 연출 디버프만 해제 · Dev 공격 예약 단축키(F3/F4/F6/F9/F11, 대기열 8, Shift+F3 비우기).
   상세: [PLAN-boss-counter-vulnerable.md](PLAN-boss-counter-vulnerable.md) §7-2.
+- 🔴 **09-29 저녁 — 튜토리얼 스테이지 180° 회전 + 은희 투명화 존 머지**(`fix/stage_tutorial260929`). **SVN r340 필수**(구석 `walll_brick_cornerCOM_*`). 상세: [PLAN-tutorial-stage.md](PLAN-tutorial-stage.md) 끝. ⏳ Play 확인 대기.
 - 🔴 **SVN r338 필수** — development 의 `WallTransparencyDither.hlsl`(은희)과 r338 `Generic_Standard.shadergraph` 가 짝. r336 이하면 화면 전체 분홍(`undeclared identifier WallTransparencyDither_float`). 핀 `art-svn.json` = 338.
 - ⏳ 남은 것: 잡기 부착이 매번 `안전망` 으로 붙는다(클립 이벤트와 구간 타이머가 같은 순간 0.786s — 타이머가 Update 에서 먼저 닿음) → 짧은 유예로 이벤트 경로 우선 · 임시 진단 로그 3종 삭제(`[23호/점프진단]`·`[모터/끼임진단]`·`[23호] NavMesh 여유`) · 모터 EditMode 테스트 · 벤트 오브젝트(제작 중) 연동 확인 · 투명화는 **아트 쪽 작업**(튜토리얼·보스방 미적용).
 - ⚠️ 기존 버그(범위 밖): 결과 씬 `ResultSceneManager.cs:24` `AudioManager.Instance.StopBGM()` 널 참조(이 흐름에 AudioManager 없음) — 사운드 담당.

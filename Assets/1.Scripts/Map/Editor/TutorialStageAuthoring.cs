@@ -28,6 +28,14 @@ public static class TutorialStageAuthoring
     // 아트 씬 all_mesh.unity 의 튜토리얼 배치(회전 0). 벽 인스턴스는 z −160.6.
     static readonly Vector3 WallsPosition = new Vector3(0f, 0f, -160.6f);
 
+    // 스테이지 전체 Y 회전(90° 단위). 은희 투명화(상시 하단 / 구역 상단)가 카메라 쪽 벽을 전제로 저작돼
+    // all_mesh 배치(0°) 그대로면 반대쪽 벽이 투명해진다 → 180°(팀장 09-29).
+    // 벽 인스턴스 위치(WallsPosition)를 축으로 돌린다. 존 위치·회전은 월드 값으로 저장되므로
+    // (MapContentSpawner — TryGetPosition·YawSteps) 슬롯 좌표와 YawSteps 도 같이 돌린다.
+    const int StageYawSteps = 2;
+    static Quaternion StageRotation => Quaternion.Euler(0f, StageYawSteps * 90f, 0f);
+    static Vector3 RotateAroundWalls(Vector3 p) => WallsPosition + StageRotation * (p - WallsPosition);
+
     struct SlotSpec
     {
         public string Zone; public Vector3 Pos; public ZoneSize Size; public bool Spawn, Boss;
@@ -57,7 +65,7 @@ public static class TutorialStageAuthoring
         try
         {
             var filters = root.GetComponentsInChildren<MeshFilter>(true)
-                .Where(f => f.sharedMesh != null && !IsFloor(f.transform))
+                .Where(f => f.sharedMesh != null && !IsFloor(f.transform) && !IsOcclusionZone(f.transform))
                 .ToList();
 
             // 재실행 대비 — 이전에 이 도구가 붙인(= 추가 컴포넌트 오버라이드인) BoxCollider 를 걷어낸다.
@@ -67,13 +75,13 @@ public static class TutorialStageAuthoring
                     if (PrefabUtility.IsAddedComponentOverride(b)) { Object.DestroyImmediate(b); removed++; }
 
             float thickness = EstimateWallThickness(filters);
-            int straight = 0, corner = 0;
+            int straight = 0, corner = 0, cornerNamedBox = 0;
             var cornerLog = new List<string>();
             foreach (MeshFilter f in filters)
             {
                 f.gameObject.layer = 0;   // 본맵 벽과 같은 Default — 플레이어 장애물 마스크 ∩ NavMesh 베이크(Default+Ground)
                 Bounds mb = f.sharedMesh.bounds;
-                if (IsCorner(f.transform))
+                if (IsCorner(f.transform) && IsLShaped(mb, thickness))
                 {
                     AddCornerColliders(f, mb, thickness, cornerLog);
                     corner++;
@@ -84,12 +92,17 @@ public static class TutorialStageAuthoring
                     b.center = mb.center;
                     b.size = mb.size;
                     straight++;
+                    if (IsCorner(f.transform))
+                    {
+                        cornerNamedBox++;
+                        cornerLog.Add($"[TutorialStage] 이름만 구석 {f.transform.parent?.name}/{f.name} — 메시 크기 {mb.size.x:0.##}×{mb.size.z:0.##} → 박스 1개");
+                    }
                 }
             }
 
             PrefabUtility.SaveAsPrefabAsset(root, TutorialWallsPath);
-            Debug.Log($"[TutorialStage] 벽 콜라이더 — 일반 {straight} · 구석 {corner}(각 2개) · 이전 것 제거 {removed} · 추정 벽 두께 {thickness:0.###}m");
-            foreach (string line in cornerLog.Take(40)) Debug.Log(line);
+            Debug.Log($"[TutorialStage] 벽 콜라이더 — 일반 {straight}(그중 이름만 corner {cornerNamedBox}) · 구석 {corner}(각 2개) · 이전 것 제거 {removed} · 추정 벽 두께 {thickness:0.###}m");
+            foreach (string line in cornerLog.Take(200)) Debug.Log(line);
         }
         finally
         {
@@ -106,12 +119,21 @@ public static class TutorialStageAuthoring
         return false;
     }
 
+    // 🔴 은희 투명화 존(Occlusion_zone_*)은 기본 큐브 MeshFilter + 트리거 BoxCollider 다. 벽으로 잡으면
+    //    실체 BoxCollider 가 붙고 레이어가 0 으로 바뀌어 존 자리가 보이지 않는 벽이 된다.
+    static bool IsOcclusionZone(Transform t) => t.GetComponent<WallTransparencyZone>() != null;
+
     static bool IsCorner(Transform t)
     {
         for (; t != null; t = t.parent)
             if (t.name.IndexOf("corner", System.StringComparison.OrdinalIgnoreCase) >= 0) return true;
         return false;
     }
+
+    // 🔴 이름에 corner 가 들어가도 ㄱ 자가 아닐 수 있다 — SVN r339 `walll_brick_cornerCOM_*` 은
+    //    구석 조각 2개 + 기둥(piloti) 1개 묶음이라 자식 전부가 이름으로는 corner 다.
+    //    가로·세로 둘 다 벽 두께보다 충분히 길 때만 ㄱ 자로 본다(기둥·곧은 조각은 박스 하나).
+    static bool IsLShaped(Bounds mb, float thickness) => Mathf.Min(mb.size.x, mb.size.z) > thickness * 1.5f;
 
     // 곧은 벽 메시의 얇은 쪽 치수 중앙값 = 벽 두께.
     static float EstimateWallThickness(List<MeshFilter> filters)
@@ -158,6 +180,7 @@ public static class TutorialStageAuthoring
             var wallsInst = (GameObject)PrefabUtility.InstantiatePrefab(walls, root.transform);
             wallsInst.name = CorridorName;
             wallsInst.transform.localPosition = WallsPosition;
+            wallsInst.transform.localRotation = StageRotation;
 
             var slotsRoot = new GameObject("Slots");
             slotsRoot.transform.SetParent(root.transform, false);
@@ -170,7 +193,8 @@ public static class TutorialStageAuthoring
 
                 var go = new GameObject($"Slot_{i}_{s.Zone}");
                 go.transform.SetParent(slotsRoot.transform, false);
-                go.transform.localPosition = s.Pos;
+                Vector3 pos = RotateAroundWalls(s.Pos);
+                go.transform.localPosition = pos;
                 var slot = go.AddComponent<ZoneSlot>();
                 slot.SlotID = i;
                 slot.Size = s.Size;
@@ -181,12 +205,12 @@ public static class TutorialStageAuthoring
                 slot.FixedPrefab = zone;
                 slot.Rotations = new List<ZoneSlot.RotationEntry>
                 {
-                    new ZoneSlot.RotationEntry { Prefab = zone, YawSteps = 0, HasPosition = true, Position = s.Pos },
+                    new ZoneSlot.RotationEntry { Prefab = zone, YawSteps = StageYawSteps % 4, HasPosition = true, Position = pos },
                 };
             }
 
             PrefabUtility.SaveAsPrefabAsset(root, StagePath, out bool ok);
-            Debug.Log($"[TutorialStage] {StagePath} 저장 {(ok ? "완료" : "실패")} — 슬롯 {Slots.Length}개(Start=스폰 후보 · BossEnter=보스 후보 · 퀘스트 없음)");
+            Debug.Log($"[TutorialStage] {StagePath} 저장 {(ok ? "완료" : "실패")} — 회전 {StageYawSteps * 90}° · 슬롯 {Slots.Length}개(Start=스폰 후보 · BossEnter=보스 후보 · 퀘스트 없음)");
         }
         finally
         {

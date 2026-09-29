@@ -26,7 +26,7 @@ Transform:
   m_GameObject: {fileID: 2493142803669167178}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -10.63, y: 0, z: -210.06}
+  m_LocalPosition: {x: 10.630005, y: 0, z: -111.140015}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -54,9 +54,9 @@ MonoBehaviour:
   QuestPrefab: {fileID: 0}
   Rotations:
   - Prefab: {fileID: 411843160232409271, guid: 6849fda9e44544b4984a260535e5337f, type: 3}
-    YawSteps: 0
+    YawSteps: 2
     HasPosition: 1
-    Position: {x: -10.63, y: 0, z: -210.06}
+    Position: {x: 10.630005, y: 0, z: -111.140015}
   AssignedRole: 0
   IsFilled: 0
 --- !u!1 &3534189215017368504
@@ -85,7 +85,7 @@ Transform:
   m_GameObject: {fileID: 3534189215017368504}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.3, y: 0, z: -120.63}
+  m_LocalPosition: {x: 0.29999653, y: 0, z: -200.57}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -113,9 +113,9 @@ MonoBehaviour:
   QuestPrefab: {fileID: 0}
   Rotations:
   - Prefab: {fileID: 7716440855972029763, guid: 691f2e3d42b9b0540800bcae1bf123dd, type: 3}
-    YawSteps: 0
+    YawSteps: 2
     HasPosition: 1
-    Position: {x: -0.3, y: 0, z: -120.63}
+    Position: {x: 0.29999653, y: 0, z: -200.57}
   AssignedRole: 0
   IsFilled: 0
 --- !u!1 &4750119627183316947
@@ -180,7 +180,7 @@ Transform:
   m_GameObject: {fileID: 5827012702510178230}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.62, y: 0, z: -160.21}
+  m_LocalPosition: {x: 0.61999995, y: 0, z: -160.99}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -208,9 +208,9 @@ MonoBehaviour:
   QuestPrefab: {fileID: 0}
   Rotations:
   - Prefab: {fileID: 2495213824890675942, guid: 4a1de22fa8709074eab35571fbc920be, type: 3}
-    YawSteps: 0
+    YawSteps: 2
     HasPosition: 1
-    Position: {x: -0.62, y: 0, z: -160.21}
+    Position: {x: 0.61999995, y: 0, z: -160.99}
   AssignedRole: 0
   IsFilled: 0
 --- !u!1 &6474635608273419239
@@ -239,7 +239,7 @@ Transform:
   m_GameObject: {fileID: 6474635608273419239}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -29.4, y: 0, z: -120.8}
+  m_LocalPosition: {x: 29.399996, y: 0, z: -200.40001}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -267,9 +267,9 @@ MonoBehaviour:
   QuestPrefab: {fileID: 0}
   Rotations:
   - Prefab: {fileID: 8865995742018799504, guid: b0760a67dc21daf48bf92cb785979d38, type: 3}
-    YawSteps: 0
+    YawSteps: 2
     HasPosition: 1
-    Position: {x: -29.4, y: 0, z: -120.8}
+    Position: {x: 29.399996, y: 0, z: -200.40001}
   AssignedRole: 0
   IsFilled: 0
 --- !u!1 &7470274809770081852
@@ -331,7 +331,7 @@ Transform:
   m_GameObject: {fileID: 8283673989847625966}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 29.6, y: 0, z: -220.08}
+  m_LocalPosition: {x: -29.599995, y: 0, z: -101.12001}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -359,9 +359,9 @@ MonoBehaviour:
   QuestPrefab: {fileID: 0}
   Rotations:
   - Prefab: {fileID: 2400110006461124550, guid: 8c7389282a565a64eab74444c597f931, type: 3}
-    YawSteps: 0
+    YawSteps: 2
     HasPosition: 1
-    Position: {x: 29.6, y: 0, z: -220.08}
+    Position: {x: -29.599995, y: 0, z: -101.12001}
   AssignedRole: 0
   IsFilled: 0
 --- !u!1001 &4553638645463657464
@@ -390,7 +390,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8738484985062170394, guid: 3cb0e4648ca63544f9bef84412801916, type: 3}
       propertyPath: m_LocalRotation.w
-      value: 1
+      value: -0.00000004371139
       objectReference: {fileID: 0}
     - target: {fileID: 8738484985062170394, guid: 3cb0e4648ca63544f9bef84412801916, type: 3}
       propertyPath: m_LocalRotation.x
@@ -398,7 +398,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8738484985062170394, guid: 3cb0e4648ca63544f9bef84412801916, type: 3}
       propertyPath: m_LocalRotation.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 8738484985062170394, guid: 3cb0e4648ca63544f9bef84412801916, type: 3}
       propertyPath: m_LocalRotation.z
