@@ -76,7 +76,7 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         if (!IsServer || _health == null || damage <= 0) return;
 
         // 진단 — 여기서 조용히 버려지는 피해가 "때려도 안 맞는다"로 보인다(2026-07-30).
-        // ReceiveAttack 은 무조건 true 를 반환하므로 공격 측은 [Attack] … 적중 을 찍고,
+        // ReceiveAttack 은 살아 있는 대상에게는 무조건 true 를 반환하므로 공격 측은 [Attack] … 적중 을 찍고,
         // 피해만 사라져서 로그상 성공처럼 보인다. 누가 무엇을 거부했는지 남긴다.
         if (!CanApplyHealthDamage(damage))
         {
@@ -147,8 +147,15 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         TakeDamage(attackInfo.damage);
     }
 
+    /// <returns>
+    /// 공격이 받아들여졌는가. <b>이미 죽은 대상은 거절한다(false)</b> — 피해·피격 연출·넉백·적중 통지가
+    /// 전부 이 값을 따른다. 같은 판정 안에서 막타 직후 들어오는 추가타(패시브 등)도 여기서 걸러진다.
+    /// </returns>
     public virtual bool ReceiveAttack(AttackInfo attackInfo, AttackHitContext hitContext)
     {
+        if (CurrentHealth <= 0)
+            return false;
+
         int previousHp = CurrentHealth;
         int previousShield = CurrentShield;
 

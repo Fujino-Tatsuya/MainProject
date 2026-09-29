@@ -162,17 +162,20 @@ public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive
         int bonusDamage = Mathf.Max(0,
             Mathf.RoundToInt(owner.FinalAttackDamage * bonusDamageMultiplier) + bonusFlatDamage);
         AttackHitContext hitContext = new AttackHitContext(owner.transform.position, owner.transform, sourceUnit: owner);
-        target.ReceiveAttack(new AttackInfo(bonusDamage, AttackType.Default), hitContext);
+        // 기본타가 막타였으면 대상은 이미 죽었고 추가타는 거절된다(Unit.ReceiveAttack). 발동(소모·회복)은 그대로다 —
+        // 막타도 적중이다. 대상을 다음 생존자로 옮기지 않는다: "처음 맞은 한 명" 이 규칙이다.
+        bool bonusLanded = target.ReceiveAttack(new AttackInfo(bonusDamage, AttackType.Default), hitContext);
 
         int healAmount = Mathf.RoundToInt(owner.MaxHp * (healPercent / 100f));
         if (healAmount > 0)
             owner.HealHp(healAmount);
 
-        ServerPlayProcVfx(target);
+        ServerPlayProcVfx(bonusLanded ? target : null);
 
-        Edit.Log($"[Passive] 불굴의 의지 발동 — {target.name}에 추가피해 {bonusDamage}, 회복 {healPercent}%({healAmount})", this);
+        Edit.Log($"[Passive] 불굴의 의지 발동 — {target.name}에 추가피해 {(bonusLanded ? bonusDamage.ToString() : "없음(막타)")}, 회복 {healPercent}%({healAmount})", this);
     }
 
+    // 판정 순서상 첫 대상. 생존 여부로 거르지 않는다 — 목록은 기본타 적용 뒤라 막타 대상은 이미 죽어 있다.
     private Unit FirstValidTarget(IReadOnlyList<Unit> targets)
     {
         if (targets == null)
@@ -181,7 +184,7 @@ public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive
         for (int i = 0; i < targets.Count; i++)
         {
             Unit unit = targets[i];
-            if (unit != null && unit != owner && unit.CurrentHealth > 0)
+            if (unit != null && unit != owner)
                 return unit;
         }
 

@@ -31,7 +31,7 @@ Player.prefab (base)            ← 네트워크·입력·이동·생명주기·
 | 새 캐릭터를 추가하려면? | base 의 Variant 를 새로 만들고 `DefaultNetworkPrefabs` 에 등록. 🔴 **`GlobalObjectIdHash` 가 YAML 에 기록됐는지 확인**(아래) |
 | 새 캐릭터 패시브는? | Variant 루트에 **`IPlayerPassive`** 구현 컴포넌트를 붙인다(HUD 가 이것만 본다). 적중·피격 반응은 `Player.ServerAttackLanded` / `ServerAttackReceived` 구독 — base 는 구체 패시브를 모른다([PLAN-passive-onhit.md](../../PLAN-passive-onhit.md)) |
 | 자식 이름 규칙 | 몸체 인스턴스 이름은 반드시 **`Armature`** (`transform.Find("Armature")` 폴백 3곳, §1.4) |
-| 구 프리팹은? | `Paladin.prefab` · `TempPlayer_Armature.prefab` → **`Player/Legacy/`** 보관. `Paladin_VFX.prefab` 은 **원래 위치(`Player/Paladin/`)에 유지**(2026-09-29 사용자 결정). 셋 다 스폰·네트워크 목록 대상 아님 — 고쳐도 게임에 반영되지 않는다 |
+| 구 프리팹은? | `Paladin.prefab` · `TempPlayer_Armature.prefab` → **`Player/Legacy/`** 보관. `Paladin_VFX.prefab` 은 **원래 위치(`Player/Paladin/`)에 유지**(2026-09-29 사용자 결정). 셋 다 **스폰 대상이 아니다** — 고쳐도 게임에 반영되지 않는다. (NGO 자동 생성으로 `DefaultNetworkPrefabs` 에는 **등록돼 있다** — 아래 행) |
 | 네트워크 목록 | `DefaultNetworkPrefabs` 는 **NGO 가 자동 생성**한다(`ProjectSettings/NetcodeForGameObjects.asset` `GenerateDefaultNetworkPrefabs: 1`) — NetworkObject 가 붙은 프리팹은 base·Legacy 포함 **전부 다시 들어온다**. 손으로 빼지 말 것. 스폰되지 않는 프리팹이 목록에 있는 건 무해(해시가 전부 다르다) |
 | 캐릭터 선택 UI / `ResolvePlayerPrefabForClient` | **미구현**(범위 밖). 지금은 `defaultPlayerPrefab = Player_Paladin` |
 
@@ -323,7 +323,7 @@ Paladin  (루트 컴포넌트 37개 — Player 와 동일 구성)
    - `Tools/Player/Authoring/Repair PlayerEncounterLock Wiring` (`PlayerEncounterLockAuthoring.cs`, 멱등 — `Player/` 폴더 순회, `Legacy/` 제외)
    - `Tools/Player/Authoring/Wire Interrupt Skill (단죄의 방패)` (`PlayerInterruptSkillAuthoring.cs` — `Paladin_Armature` + `Player_Paladin`)
    - `Tools/Rendering/Look/Wire Player Silhouette` (`PlayerSilhouetteAuthoring.cs` — base)
-6. **`Legacy/` 의 프리팹이나 `Paladin/Paladin_VFX.prefab` 을 고쳤다** → 게임에 반영되지 않는다. 스폰·네트워크 목록 어디에도 없다.
+6. **`Legacy/` 의 프리팹이나 `Paladin/Paladin_VFX.prefab` 을 고쳤다** → 게임에 반영되지 않는다. 어떤 씬·스폰 경로도 가리키지 않는다(`DefaultNetworkPrefabs` 자동 등록은 스폰과 무관).
 7. **역할/캐릭터 경계를 새로 긋는다** → §1.4 계약을 먼저 읽고 팀에 올린다.
 
 **주의사항**
@@ -412,11 +412,12 @@ Prefab Variant 는 base 의 컴포넌트를 **추가**하긴 쉬워도 **제거*
 ```bash
 # 어떤 씬이 어느 프리팹을 가리키는가
 # Player_Paladin (현행) — 씬 7개 + NetworkManager.prefab + DefaultNetworkPrefabs 가 나와야 한다
+# 🔴 아래 두 검색은 DefaultNetworkPrefabs.asset 을 뺀다 — NGO 자동 생성이 NetworkObject 프리팹을 전부 등록하므로 거기엔 늘 나온다
 grep -rl "df27ec97b40aab24da03bb1fb7cb43ce" Assets --include=*.unity --include=*.asset --include=*.prefab
 # 구 Paladin / Paladin_VFX / TempPlayer_Armature 를 참조하는 곳 — 결과가 나오면 안 된다 (프리팹 자신은 guid 를 .meta 에만 갖는다)
-grep -rl "af4a760f53d82b64f8369a09c962374c\|8d5b48551745dae429fc070cfa0af71f\|8de5f51f34fe3cf4aab41eb2c59d402d" Assets --include=*.unity --include=*.asset --include=*.prefab
+grep -rl "af4a760f53d82b64f8369a09c962374c\|8d5b48551745dae429fc070cfa0af71f\|8de5f51f34fe3cf4aab41eb2c59d402d" Assets --include=*.unity --include=*.asset --include=*.prefab | grep -v DefaultNetworkPrefabs
 # base Player — Player_Paladin(Variant 의 부모)에서만 나와야 한다
-grep -rl "55ee4e06e5b56ec48a45b3796040b9ae" Assets --include=*.unity --include=*.asset --include=*.prefab
+grep -rl "55ee4e06e5b56ec48a45b3796040b9ae" Assets --include=*.unity --include=*.asset --include=*.prefab | grep -v DefaultNetworkPrefabs
 ```
 
 ```bash

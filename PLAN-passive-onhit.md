@@ -166,3 +166,24 @@
 - 컴파일: Unity 0 에러. 신규 경고는 직렬화 필드 CS0649(기존 필드와 같은 종류)뿐.
 - ⚠️ **오프라인(비네트워크) 실행에서는 패시브가 동작하지 않는다** — `StatusEffectController` 가 스폰된 서버에서만 쓰기를 받는다. 기존 오프라인 폴백(VFXScene)은 사라졌다.
 - ✅ §7-3·4 Play/MPPM **은희 검증 완료(2026-09-29)**. ⏳ §7-5(보스 입장 후 유지)는 경석 `ClearAllServer()` 수정 후.
+
+## 11. Codex 리뷰 반영 (2026-09-29, 리뷰 58da86f0)
+
+**추가 결정 (은희): 죽은 대상은 피격을 거절한다.**
+- 원인: `Unit.ReceiveAttack` 이 사망 여부와 무관하게 `true` 를 반환해, 시체에도 피격 연출·넉백·적중 통지가 났다.
+  (사망 처리 자체는 `NotifyDeathTransition` 의 `_deathNotified` 가드로 재실행되지 않는다 — 확인함)
+- 수정: `Unit.ReceiveAttack` 첫 줄 `CurrentHealth <= 0 → false`. `MonsterBase`·`Enemy` 의 피격 VFX RPC 를 `resolved` 로 게이트.
+  `Player` 는 거절 시 `ServerAttackReceived`·쉴드 파문을 내지 않는다. `TwentyThreeBoss` 는 base 결과를 그대로 쓰고, `TrainingDummy` 는 체력 1 하한이라 무관.
+  추락 피해는 `ApplyDirectHealthDamage` 경로라 무관. 공격 측 판정(`TryResolveHit`)이 이 값을 그대로 받으므로 시체는 적중 목록·명중 연출에서도 빠진다(투사체는 시체를 관통).
+- 패시브 must-fix 1: 소비 대상 = 적중 목록의 **첫 대상 그대로**(생존 필터 제거). 막타였으면 추가타만 거절되고 소모·회복은 그대로, 추가타 VFX 는 생략.
+
+**리뷰 항목 처리**
+
+| 항목 | 처리 |
+|------|------|
+| must-fix 1 패시브 대상 생존 필터 | ✅ 위 결정으로 해소 |
+| must-fix 2 `MonsterSceneBossSetup` 검증 이름 비교 | ✅ 경로 상수의 에셋과 직접 비교 |
+| consider 1 재사용 버퍼 | ⏸ 문서 경고로 유지(`PlayerAttackLanded.Targets` 주석) — 비동기 구독자가 생길 때 스냅샷 |
+| consider 2 발행 메서드 서버 가드 | ✅ `RaiseServerAttackLanded` 에 `IsServer` 가드 |
+| consider 3 문서 모순(네트워크 목록) | ✅ player-prefabs.md §0·§7·§9 — "스폰 대상 아님" 과 "NGO 자동 등록" 분리, 확인 명령에서 `DefaultNetworkPrefabs` 제외 |
+| consider 4 `PlayerEncounterLockAuthoring` 이 `Paladin_VFX` 순회 | ⏸ 경석(툴 작성자) 판단 대기 |

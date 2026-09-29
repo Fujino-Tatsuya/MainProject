@@ -1602,7 +1602,8 @@ public class Player : Unit
     /// </summary>
     public void RaiseServerAttackLanded(AttackType attackType, bool triggersOnHit, IReadOnlyList<Unit> targets, Object source)
     {
-        if (targets == null || targets.Count == 0)
+        // 서버 전용 계약을 발행 지점에서 강제한다 — 오너 클라가 부르면 구독자가 로컬 전용 효과를 낸다.
+        if (!IsServer || targets == null || targets.Count == 0)
             return;
 
         ServerAttackLanded?.Invoke(new PlayerAttackLanded(attackType, triggersOnHit, targets, source));
@@ -1616,6 +1617,9 @@ public class Player : Unit
         int shieldBefore = CurrentShield;
 
         bool result = base.ReceiveAttack(attackInfo, hitContext);
+        if (!result)
+            return false; // 이미 죽었다 — 피격 반응(패시브 쿨감·쉴드 파문)도 없다.
+
         ServerAttackReceived?.Invoke(attackInfo, hitContext);
 
         if (CurrentShield < shieldBefore)

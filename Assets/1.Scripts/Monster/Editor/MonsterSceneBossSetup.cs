@@ -300,8 +300,11 @@ public static class MonsterSceneBossSetup
 
         NetworkManager nm = scene.GetRootGameObjects()
             .Select(r => r.GetComponentInChildren<NetworkManager>(true)).FirstOrDefault(c => c != null);
-        string playerPrefab = nm != null && nm.NetworkConfig.PlayerPrefab != null ? nm.NetworkConfig.PlayerPrefab.name : "(없음)";
-        sb.AppendLine($"  {(playerPrefab == "Paladin" ? "✓" : "✗")} NetworkManager.PlayerPrefab = {playerPrefab}");
+        GameObject expectedPlayer = AssetDatabase.LoadAssetAtPath<GameObject>(PaladinPrefab);
+        GameObject assignedPlayer = nm != null ? nm.NetworkConfig.PlayerPrefab : null;
+        string playerPrefab = assignedPlayer != null ? assignedPlayer.name : "(없음)";
+        // 이름이 아니라 에셋으로 비교한다 — 경로 상수(PaladinPrefab)만 바꾸면 검증이 따라온다.
+        sb.AppendLine($"  {(assignedPlayer != null && assignedPlayer == expectedPlayer ? "✓" : "✗")} NetworkManager.PlayerPrefab = {playerPrefab}");
 
         foreach (string name in DeactivateRoots)
         {
