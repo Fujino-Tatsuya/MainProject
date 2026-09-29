@@ -43,7 +43,7 @@ MonoBehaviour:
   cancelWindupIfTargetLeavesRange: 0
   engageAttackDelay: 0
   maxGroggyCount: 5
-  groggyDuration: 0.5
+  groggyDuration: 1.5
   startsWithSuperArmor: 1
   hasSuperArmorWhileAttacking: 0
   hitStunDuration: 0.4
@@ -297,7 +297,7 @@ MonoBehaviour:
   backAttackAngle: 60
   hitReactionState: getowned
   hitReactionStateRight: getowned_R
-  breakDuration: 2
+  breakDuration: 5
   aggroRetargetInterval: 8
   aggroAvoidsRepeatTarget: 1
   chargeClearGroggyDuration: 1.5

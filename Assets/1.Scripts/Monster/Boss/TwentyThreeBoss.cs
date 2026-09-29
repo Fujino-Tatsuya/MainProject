@@ -59,7 +59,13 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     // 🔴 배열이다. 텔레그래프는 **여러 개가 동시에** 붙는다(방향 표시 링 + 전신 틴트 + 나중에 VFX).
     //    하나만 집으면(GetComponentInChildren<T> 단일) 나머지가 조용히 안 돈다.
     IBossTelegraph[] _telegraphs;
-    int _counterGroggyCount;         // 보스 자체 그로기 카운트 — base 것은 AutoHitReactions=false 라 안 돈다
+    // 간파 게이지 100 → 0(팀 기획 09-28). 전 피어 복제 — HUD 회색 바가 읽는다. 예전 성공 횟수(_counterGroggyCount)를 대체.
+    readonly NetworkVariable<float> _counterGauge = new NetworkVariable<float>(
+        BossCounterProgress.GaugeMax,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+    bool _suppressed;        // [서버] 제압 중 — 그로기 이탈 시 종료(TickSuppressExit)
+    bool _pendingSuppress;   // [서버] 필수 기믹 중 게이지 0 → 기믹이 끝나면 제압(TryConsumePendingSuppress)
 
     /// <summary>보스 데이터(읽기 전용). 방향 표시기가 각도를 판정과 **같은 출처**에서 읽기 위해 노출한다.</summary>
     public BossDataSO Data => _boss;
@@ -270,6 +276,8 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
 
         // 카운터 창 표현은 모든 피어에서 돈다(서버가 창을 쓰고, 각 피어가 텔레그래프를 구동).
         _counterVisual.OnValueChanged += OnCounterWindowChanged;
+        _vulnerableVisual.OnValueChanged += OnVulnerableVisualChanged;
+        ApplyVulnerableTint(_vulnerableVisual.Value);   // 늦게 합류한 클라도 지금 값으로
         ResolveTelegraphs();
 
         // Wells 는 모든 피어에서 로컬 애니메이터를 구동한다(상태는 이 NetworkObject 가 복제).
@@ -295,6 +303,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     public override void OnNetworkDespawn()
     {
         _counterVisual.OnValueChanged -= OnCounterWindowChanged;
+        _vulnerableVisual.OnValueChanged -= OnVulnerableVisualChanged;
         _wellsState.OnValueChanged -= OnWellsStateChanged;
 
         // Wells 콜백이 파괴된 보스를 붙잡지 않게 끊는다(Wells 는 MonoBehaviour 라 수명이 다르다).
@@ -863,7 +872,8 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         // 🔴 **잡기는 예외다**(팀장 확정 C10). 기획: "플레이어를 끌어당기는 순간까지는 인터럽트할 수
         //    없음. 실제로 한 명을 붙잡은 뒤부터 인터럽트가 가능해짐."
         //    그래서 여기서 열지 않고 `AcquireGrab` 성공 시점에 연다.
-        bool opensNow = e != null && e.opensCounterWindow && e.attackId != BossAttackId.Grab;
+        // 🔴 취약·제압 중엔 간파 창을 열지 않는다 — 간파 가능 패턴을 골라도 판정·연출 없음(기획 취약 §4.3).
+        bool opensNow = e != null && e.opensCounterWindow && e.attackId != BossAttackId.Grab && !CounterBlockedByState;
         // 창 길이 = 선딜 게이트 길이(아래 Begin) — 표시는 그보다 0.15초 먼저 꺼진다.
         SetCounterWindow(opensNow, opensNow ? CounterWindowDuration : -1f);
 
@@ -1762,7 +1772,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         //    뒤부터 3번째 내려치기 직전까지만 열려 있다(팀장 확정 C10).
         //    창을 닫는 곳은 둘이다 — 마지막 내려치기(AdvanceGrabSlam)와 이탈(AbortAttackChain).
         //    ⚠️ 데이터가 창을 끈 공격이면 열지 않는다(`opensCounterWindow`).
-        if (_currentEntry != null && _currentEntry.opensCounterWindow) SetCounterWindow(true);
+        if (_currentEntry != null && _currentEntry.opensCounterWindow && !CounterBlockedByState) SetCounterWindow(true);
 
         // 붙잡는 모션 → (Acquire 구간) → 지짐이.
         CrossFadeGrabCycleStateClientRpc(GrabCycleState.Catch);
@@ -1946,6 +1956,9 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     void FinishChain()
     {
         _attackPhase = BossAttackPhase.None;
+        // 기믹이 완전히 끝나는 지점 ② — 레이지 최종 종료(Recovery → 여기). 예약은 기믹 중에만 서므로
+        // 다른 체인의 종료에서는 늘 비어 있다.
+        if (TryConsumePendingSuppress()) return;
         DecideNextAfterAction();
     }
 
@@ -3259,9 +3272,9 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
             //    페이즈 전환 직후 5초 무력화가 겹치면 페이즈 연출이 죽는다(확정 스펙).
             _attackPhase = BossAttackPhase.None;
             Debug.Log("[23호] 송전기 전멸 — 그로기(Break 승격 없음)", this);
-            EnterCounterGroggy(
-                allowBreak: false,
-                durationOverride: _boss != null ? _boss.chargeClearGroggyDuration : 1f);
+            // 기믹이 완전히 끝나는 지점 ① — 예약된 제압이 있으면 보상 그로기 대신 제압으로.
+            if (TryConsumePendingSuppress()) return;
+            EnterPylonGroggy(_boss != null ? _boss.chargeClearGroggyDuration : 1f);
             return;
         }
 
@@ -4201,12 +4214,16 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         //    뒤에서 읽으면 이미 닫힌 창을 보게 된다.
         bool counter = IsServer
                        && _counterWindow.Value
+                       && !CounterBlockedByState          // 취약·제압 중 간파 실패(기획 간파 §8)
                        && IsInterruptAttack(attackInfo)
                        && IsCounterFromFront(hitContext);
 
+        // 취약 중 간파 스킬 = 방향 무관 넉백(간파 성공 아님 · 게이지·취약시간 불변 — 기획 취약 §4.4). 필수 기믹 중엔 피해만.
+        bool vulnerableHit = IsServer && IsVulnerable && IsInterruptAttack(attackInfo) && !IsInMandatorySequence;
+
         // 진단(2026-09-02): 인터럽트가 들어왔는데 카운터로 성립하지 않으면 **어느 조건이 거짓인지** 찍는다.
-        // 인터럽트 히트에서만 돌므로 조용하다. 성립하면 EnterCounterGroggy 가 따로 로그를 남긴다.
-        if (IsInterruptAttack(attackInfo) && !counter)
+        // 인터럽트 히트에서만 돌므로 조용하다. 취약·제압 중에는 실패가 정상이라 찍지 않는다.
+        if (IsInterruptAttack(attackInfo) && !counter && !CounterBlockedByState)
         {
             Debug.LogWarning(
                 $"[23호] 인터럽트가 카운터로 성립하지 않았다 — " +
@@ -4215,17 +4232,26 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
                 $"상태={State} · 페이즈={_attackPhase} · 공격={_currentEntry?.attackId}", this);
         }
 
+        // 제압 중 **플레이어가 주는** 최종 피해 ×1.2(기획 §8.2). 벤트 등 환경 피해는 출처가 플레이어가 아니라 제외.
+        // AttackInfo 는 값 복사 구조체라 이 지역 사본만 바뀐다(공격자 쪽 원본·코어 무수정).
+        if (IsServer && _suppressed && IsFromPlayer(hitContext))
+            attackInfo.damage = Mathf.Max(0, Mathf.RoundToInt(attackInfo.damage * SuppressDamageMultiplier));
+
         // 실패든 성공이든 데미지는 정상 처리된다 — 카운터 실패에 패널티는 없다(확정 스펙).
         bool resolved = base.ReceiveAttack(attackInfo, hitContext);
 
         if (counter && resolved && State != MonsterState.Dead)
         {
-            EnterCounterGroggy(allowBreak: true);
+            EnterCounterSuccess();
 
             // 🔴 여기가 "인터럽트 성공"의 유일한 지점이다. EnterCounterGroggy 안에 넣지 않은 이유:
             //    그 메서드는 송전기 전멸(S7) 경로도 함께 쓰는데, 그건 플레이어가 끊어낸 게 아니라
             //    별개의 사건이다. 섞으면 연출이 "무엇을 칭찬하는지"가 흐려진다.
             PlayInterruptFlashRpc();
+        }
+        else if (vulnerableHit && resolved && State != MonsterState.Dead)
+        {
+            StartVulnerableKnockback(hitContext, attackInfo);
         }
 
         return resolved;
@@ -4321,21 +4347,352 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         };
     }
 
-    protected void EnterCounterGroggy(bool allowBreak, float durationOverride = -1f)
+    /// <summary>
+    /// [서버] **간파 성공.** 간파 게이지를 깎고, 남으면 그로기 1.5초, 0 이면 제압(팀 기획 09-28 — 간파 §7).
+    /// </summary>
+    /// <remarks>
+    /// 🔴 송전기 전멸 그로기는 여기를 타지 않는다(<see cref="EnterPylonGroggy"/>) — 게이지와 무관(팀장 09-28).
+    /// TODO(다음 세션 — 취약): 게이지가 남으면 이 순간부터 취약 4초(그로기 1.5초 포함)를 건다(PLAN-boss-counter-vulnerable §3-2).
+    /// </remarks>
+    void EnterCounterSuccess()
     {
         if (!IsServer) return;
 
         BossCounterOutcome outcome = BossCounterProgress.Resolve(
-            _counterGroggyCount,
-            data != null ? data.maxGroggyCount : 5,
-            allowBreak,
-            data != null ? data.groggyDuration : 0.5f,
-            _boss != null ? _boss.breakDuration : 2f);
+            _counterGauge.Value,
+            _boss != null ? _boss.counterGaugeStep : 20f,
+            data != null ? data.groggyDuration : 1.5f,
+            _boss != null ? _boss.breakDuration : 5f);
 
-        _counterGroggyCount = outcome.NextCount;
+        _counterGauge.Value = outcome.NextGauge;
 
-        float duration = (!outcome.IsBreak && durationOverride > 0f) ? durationOverride : outcome.Duration;
+        if (outcome.IsSuppress)
+        {
+            EnterSuppress("간파 성공");
+            return;
+        }
 
+        StunForCounter(outcome.Duration);
+        Debug.Log($"[23호] 간파 성공 — 게이지 {outcome.NextGauge:0}% → 그로기 {outcome.Duration:0.#}초", this);
+        StartVulnerable();   // 그로기 시작 시점부터 4초(D1)
+    }
+
+    /// <summary>[서버] 송전기 전멸 보상 그로기 — **간파 게이지·취약과 무관**(팀장 09-28).</summary>
+    void EnterPylonGroggy(float duration)
+    {
+        if (!IsServer) return;
+        StunForCounter(Mathf.Max(0.05f, duration));
+        Debug.Log($"[23호] 송전기 전멸 그로기 {duration:0.#}초 (게이지 {_counterGauge.Value:0}% 유지)", this);
+    }
+
+    /// <summary>
+    /// [서버] **제압** — 게이지 0. 5초(Break 클립 = 긴 그로기), 받는 플레이어 피해 ×1.2, 종료 시 게이지 100.
+    /// 필수 기믹(차징·레이지) 중이면 끊지 않고 **예약**한다 — 소비는 <see cref="TryConsumePendingSuppress"/>.
+    /// </summary>
+    /// <param name="fromReservation">
+    /// 예약 소비 경로. 🔴 기믹 종료 지점(FinishChain 등)은 아직 Attack·기믹 행이라 검사를 하면 **다시 예약된다** — 건너뛴다.
+    /// </param>
+    void EnterSuppress(string reason, bool fromReservation = false)
+    {
+        if (!IsServer || State == MonsterState.Dead) return;
+
+        _counterGauge.Value = 0f;
+
+        if (!fromReservation && IsInMandatorySequence)
+        {
+            _pendingSuppress = true;
+            Debug.Log($"[23호] 게이지 0 ({reason}) — 필수 기믹 중이라 제압 **예약**", this);
+            return;
+        }
+
+        float duration = Mathf.Max(0.05f, _boss != null ? _boss.breakDuration : 5f);
+        _pendingSuppress = false;
+        EndVulnerable("제압 진입");   // 취약이면 즉시 종료(기획 §8.2)
+        _suppressed = true;
+        StunForCounter(duration);
+        Debug.Log($"[23호] 제압 진입 ({reason}) — {duration:0.#}초 · 받는 플레이어 피해 ×{SuppressDamageMultiplier:0.##}", this);
+    }
+
+    /// <summary>
+    /// [서버] 필수 기믹이 **완전히 끝나는 지점**에서 부른다 — 예약된 제압이 있으면 지금 들어간다.
+    /// 호출처는 둘뿐이다: 송전기 전멸 성공(TickCharge) · 레이지 최종 종료(FinishChain).
+    /// 차징 실패 → 레이지는 연결이라 부르지 않는다(끝이 아니다). 등장 연출 중엔 게이지가 줄 수단이 없다.
+    /// </summary>
+    /// <returns>제압에 들어갔으면 true — 호출측은 뒤이은 그로기·다음 행동 결정을 건너뛴다.</returns>
+    bool TryConsumePendingSuppress()
+    {
+        if (!_pendingSuppress || !IsServer || State == MonsterState.Dead) return false;
+        _pendingSuppress = false;
+        EnterSuppress("예약 소비", fromReservation: true);
+        return _suppressed;
+    }
+
+    // 그로기 상태를 벗어나면 제압 종료 — 게이지 100 복원(사망으로 벗어나면 복원·예약 모두 버린다).
+    void TickSuppressExit(MonsterState previous, MonsterState next)
+    {
+        if (!_suppressed || previous != MonsterState.Groggy || next == MonsterState.Groggy) return;
+
+        _suppressed = false;
+        if (next == MonsterState.Dead)
+        {
+            _pendingSuppress = false;
+            return;
+        }
+
+        _counterGauge.Value = BossCounterProgress.GaugeMax;
+        Debug.Log("[23호] 제압 종료 — 간파 게이지 100% 복원", this);
+    }
+
+    /// <summary>
+    /// [서버] 증기 벤트 분사에 맞았다(<see cref="SteamVent"/> 가 부른다 — 피해는 벤트가 이미 줬다).
+    /// 기획: 취약 중이면 넉백 여부와 무관하게 간파 게이지 −20 · 취약 즉시 종료(§6.3), 취약당 최초 1회.
+    /// </summary>
+    public void OnSteamVentHit(SteamVent vent)
+    {
+        if (!IsServer || State == MonsterState.Dead) return;
+        // 넉백 여부와 무관 — 취약이면 벤트 범위에 든 것만으로 성공(기획 §6.3). 취약당 최초 1회(§6.1).
+        if (!IsVulnerable || _environmentConsumed) return;
+        _environmentConsumed = true;
+        ApplyEnvironmentInteraction("증기 벤트");
+    }
+
+    #region 취약 (팀 기획 `Re_C_취약_및_제압_시스템.md` · PLAN-boss-counter-vulnerable §3-2~3-4)
+    // 간파 성공(게이지가 남음) → 그로기 1.5초 **시작 시점부터** 취약 4초(팀장 09-28 D1).
+    // 취약 중 간파 스킬 = 방향 무관 3m/0.35초 넉백 + 일반 공격 중단. 넉백으로 외곽 벽에 닿거나
+    // 분사 중 벤트에 들면 게이지 −20 · 취약 즉시 종료. 게이지 0 이면 제압.
+
+    readonly NetworkVariable<bool> _vulnerableVisual = new NetworkVariable<bool>(
+        false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+    float _vulnerableUntil = -1f;        // [서버] Time.time. < 0 = 취약 아님
+    bool _environmentConsumed;           // [서버] 이번 취약에서 환경 상호작용을 이미 썼나(§6.1 최초 1회)
+
+    bool _kbActive, _kbRebound;          // [서버] 넉백 / 벽 반동 진행 중
+    Vector3 _kbDir;
+    float _kbLeft, _kbSpeed;
+    int _kbFrame = -1;                   // 같은 틱 여러 적중 → 첫 적중만 넉백(§5.3)
+
+    bool _arenaResolved, _hasArena;
+    float _arenaMinX, _arenaMaxX, _arenaMinZ, _arenaMaxZ;
+
+    /// <summary>[서버] 취약 중인가. 제압 중엔 취약이 아니다.</summary>
+    public bool IsVulnerable => _vulnerableUntil >= 0f && !_suppressed;
+
+    /// <summary>취약·제압 중엔 간파 창·판정이 없다(기획 간파 §5.2 · §8).</summary>
+    bool CounterBlockedByState => IsVulnerable || _suppressed;
+
+    float VulnerableDuration => _boss != null ? Mathf.Max(0f, _boss.vulnerableDuration) : 4f;
+    float KnockbackDistance => _boss != null ? Mathf.Max(0f, _boss.vulnerableKnockbackDistance) : 3f;
+    float KnockbackTime => _boss != null ? Mathf.Max(0.01f, _boss.vulnerableKnockbackTime) : 0.35f;
+    float ReboundDistance => _boss != null ? Mathf.Max(0f, _boss.wallReboundDistance) : 0.5f;
+    float ReboundTime => _boss != null ? Mathf.Max(0.01f, _boss.wallReboundTime) : 0.3f;
+
+    void StartVulnerable()
+    {
+        if (!IsServer || IsInMandatorySequence) return;
+        _vulnerableUntil = Time.time + VulnerableDuration;
+        _environmentConsumed = false;
+        _vulnerableVisual.Value = true;
+        Debug.Log($"[23호] 취약 진입 — {VulnerableDuration:0.#}초(그로기 포함)", this);
+    }
+
+    void EndVulnerable(string why)
+    {
+        if (_vulnerableUntil < 0f) return;
+        _vulnerableUntil = -1f;
+        if (IsServer) _vulnerableVisual.Value = false;
+        // 🔴 진행 중인 넉백은 끝까지 간다(§5.4) — 이후 벽·벤트는 IsVulnerable 이 막는다.
+        Debug.Log($"[23호] 취약 종료 — {why}", this);
+    }
+
+    // 벽·벤트 공통. 게이지 −20 → 0 이면 제압, 아니면 일반 복귀(취약만 끝).
+    void ApplyEnvironmentInteraction(string reason)
+    {
+        float step = _boss != null ? _boss.environmentGaugeStep : 20f;
+        BossCounterOutcome o = BossCounterProgress.Resolve(_counterGauge.Value, step, 0f, 0f);
+        _counterGauge.Value = o.NextGauge;
+        EndVulnerable(reason);
+        Debug.Log($"[23호] 환경 상호작용({reason}) — 게이지 {o.NextGauge:0}%", this);
+        if (o.IsSuppress) EnterSuppress(reason);
+    }
+
+    /// <summary>[서버] 취약 중 간파 스킬 적중 → 공격자 반대 방향 넉백. 재적중이면 새 방향으로 처음부터(§5.2).</summary>
+    void StartVulnerableKnockback(AttackHitContext ctx, AttackInfo info)
+    {
+        if (_kbFrame == Time.frameCount) return;   // 같은 처리 시점의 두 번째 적중은 피해만(§5.3)
+        _kbFrame = Time.frameCount;
+
+        Vector3 from = ctx.sourceTransform != null ? ctx.sourceTransform.position : ctx.sourcePosition;
+        Vector3 dir = transform.position - from;
+        dir.y = 0f;
+        if (dir.sqrMagnitude < 0.0001f)   // 위치가 겹쳐 방향을 못 구하면 스킬 공격 방향(§5.1)
+        {
+            dir = info.knockbackDirection;
+            if (dir.sqrMagnitude < 0.0001f && ctx.sourceTransform != null) dir = ctx.sourceTransform.forward;
+            dir.y = 0f;
+        }
+        if (dir.sqrMagnitude < 0.0001f) dir = -transform.forward;
+        dir.Normalize();
+
+        InterruptForKnockback();
+
+        _kbActive = true;
+        _kbRebound = false;
+        _kbDir = dir;
+        _kbLeft = KnockbackDistance;
+        _kbSpeed = KnockbackDistance / KnockbackTime;
+        if (agent != null && agent.enabled && agent.isOnNavMesh) { agent.ResetPath(); agent.velocity = Vector3.zero; }
+        Debug.Log($"[23호] 취약 넉백 — {KnockbackDistance:0.#}m / {KnockbackTime:0.##}초", this);
+    }
+
+    // 진행 중 **일반** 공격을 끊는다(잡기면 그 자리 해제 — D9). 그로기면 변위만(타이머 불변).
+    // 🔴 AbortAttackChain 은 Attack 상태·돌진 이동·히트 윈도우를 남긴다(Codex C2) — 셋을 직접 끝낸다.
+    void InterruptForKnockback()
+    {
+        if (State != MonsterState.Attack || IsInMandatorySequence) return;
+        AbortAttackChain();
+        meleeAttack?.EndHitWindow();
+        EndDashMove();
+        _attackPhase = BossAttackPhase.None;
+        DecideNextAfterAction();
+    }
+
+    protected override bool OnServerPreTick(float dt)
+    {
+        // 🔴 넉백을 **먼저** 민다 — 같은 틱의 벽 도달과 취약 만료가 겹치면 환경 쪽이 먼저다(§6.5).
+        bool pushing = _kbActive;
+        if (_kbActive) TickVulnerableKnockback(dt);
+
+        if (_vulnerableUntil >= 0f)
+        {
+            if (Time.time >= _vulnerableUntil) EndVulnerable("시간 종료");
+            else if (IsInMandatorySequence) EndVulnerable("필수 기믹 우선");
+        }
+
+        // 밀리는 동안엔 추격·공격 결정을 멈춘다. 그로기면 그로기 타이머는 흘러야 하므로 FSM 을 돌린다.
+        return pushing && State != MonsterState.Groggy && State != MonsterState.Dead;
+    }
+
+    void TickVulnerableKnockback(float dt)
+    {
+        float step = Mathf.Min(_kbLeft, _kbSpeed * dt);
+        Vector3 delta = _kbDir * step;
+
+        // 외곽 벽: 넉백(반동 아님) 중 · 취약 중 · 이번 취약에서 처음일 때만(§6.1·§6.2·§5.4).
+        if (!_kbRebound && IsVulnerable && !_environmentConsumed && HitsArenaWall(transform.position + delta, _kbDir))
+        {
+            _environmentConsumed = true;
+            ApplyEnvironmentInteraction("외곽 벽 충돌");
+            // 방 안쪽으로 0.5m / 0.3초 반동(§6.2). 제압으로 넘어갔어도 반동 이동은 마친다.
+            _kbRebound = true;
+            _kbDir = -_kbDir;
+            _kbLeft = ReboundDistance;
+            _kbSpeed = ReboundDistance / ReboundTime;
+            return;
+        }
+
+        if (agent != null && agent.enabled && agent.isOnNavMesh) agent.Move(delta);   // NavMesh 밖으로는 안 밀린다
+        else transform.position += delta;
+
+        _kbLeft -= step;
+        if (_kbLeft <= 0.0001f)
+        {
+            _kbActive = false;
+            _kbRebound = false;
+        }
+    }
+
+    // 몸 캡슐(반경)이 보스방 경계 사각형(InvisibleBoundaries 네 벽 안쪽 면)을 넘는 방향으로 가는가.
+    bool HitsArenaWall(Vector3 nextPos, Vector3 dir)
+    {
+        if (!ResolveArena()) return false;
+        float r = BodyRadius;
+        return (dir.x < 0f && nextPos.x - r <= _arenaMinX) || (dir.x > 0f && nextPos.x + r >= _arenaMaxX)
+            || (dir.z < 0f && nextPos.z - r <= _arenaMinZ) || (dir.z > 0f && nextPos.z + r >= _arenaMaxZ);
+    }
+
+    float BodyRadius =>
+        bodyCollider is CapsuleCollider c
+            ? c.radius * Mathf.Max(Mathf.Abs(c.transform.lossyScale.x), Mathf.Abs(c.transform.lossyScale.z))
+            : 1.5f;
+
+    // 🔴 경계 원본 = 저작된 `InvisibleBoundaries/Boundary_*` 박스의 **안쪽 면**(BossRoomAuthoring) — 투명벽 판정과 일치(Codex C7).
+    bool ResolveArena()
+    {
+        if (_arenaResolved) return _hasArena;
+        GameObject root = GameObject.Find("InvisibleBoundaries");
+        if (root == null) return false;   // 보스방이 아직 없다 — 다음에 다시 찾는다
+        _arenaResolved = true;
+
+        bool xMin = false, xMax = false, zMin = false, zMax = false;
+        foreach (BoxCollider b in root.GetComponentsInChildren<BoxCollider>(true))
+        {
+            Bounds bb = b.bounds;
+            switch (b.name)
+            {
+                case "Boundary_XMin": _arenaMinX = bb.max.x; xMin = true; break;
+                case "Boundary_XMax": _arenaMaxX = bb.min.x; xMax = true; break;
+                case "Boundary_ZMin": _arenaMinZ = bb.max.z; zMin = true; break;
+                case "Boundary_ZMax": _arenaMaxZ = bb.min.z; zMax = true; break;
+            }
+        }
+        _hasArena = xMin && xMax && zMin && zMax;
+        if (!_hasArena)
+            Debug.LogWarning($"{name}: InvisibleBoundaries 에 Boundary_XMin/XMax/ZMin/ZMax 가 다 있지 않다 — 취약 벽 충돌을 끈다.", this);
+        return _hasArena;
+    }
+
+    void OnVulnerableVisualChanged(bool previous, bool next) => ApplyVulnerableTint(next);
+
+    // 임시 표시(코드 틴트) — 최종 VFX 는 민경(D10). HitFlash 는 Unit 이 전 피어에서 자동으로 붙인다.
+    void ApplyVulnerableTint(bool on)
+    {
+        HitFlash flash = GetComponent<HitFlash>();
+        if (flash == null) return;
+        if (on) flash.SetBaseTint(_boss != null ? _boss.vulnerableTint : new Color(0.45f, 0.75f, 1f, 1f));
+        else flash.ClearBaseTint();
+    }
+    #endregion
+
+    /// <summary>필수 기믹(차징 · 레이지 돌진) 진행 중인가. 등장 연출은 서버 로직이 멈춰 있어 여기 올 일이 없다.</summary>
+    bool IsInMandatorySequence =>
+        State == MonsterState.Attack && _currentEntry != null &&
+        (_currentEntry.attackId == BossAttackId.ChargeSequence || _currentEntry.attackId == BossAttackId.RageDash);
+
+    float SuppressDamageMultiplier => _boss != null ? Mathf.Max(0f, _boss.suppressDamageMultiplier) : 1.2f;
+
+    // 🔴 몸 캡슐 1.53 — 데이터 회피 반경 0.3 으로 덮으면 좁은 통로에서 벽·플레이어를 파고든다(09-28 NavMesh 전수조사).
+    //    프리팹 에이전트 반경(0.85)을 지킨다. 베이크는 반경 0.5(Humanoid 단일 타입)라 0.85 는 가장자리에 조금 더 보수적이다.
+    protected override bool KeepPrefabAgentRadius => true;
+
+    // 플레이어 스킬은 대부분 sourceUnit 을 비우고 sourceTransform 에 시전자 루트를 싣는다(FirstMelee*Skill) — 둘 다 본다.
+    static bool IsFromPlayer(AttackHitContext ctx) =>
+        ctx.sourceUnit is Player ||
+        (ctx.sourceTransform != null && ctx.sourceTransform.GetComponentInParent<Player>() != null);
+
+    protected override void OnMonsterStateChanged(MonsterState previous, MonsterState next)
+    {
+        base.OnMonsterStateChanged(previous, next);
+        if (!IsServer) return;
+
+        TickSuppressExit(previous, next);
+        if (next == MonsterState.Dead)   // 사망은 모든 예약·상태보다 우선(기획 §9.3 · 간파 §12.2)
+        {
+            _pendingSuppress = false;
+            EndVulnerable("사망");
+            _kbActive = false;
+        }
+    }
+
+    /// <summary>제압 중인가(서버). 받는 플레이어 피해 배율과 HUD 가 읽는다.</summary>
+    public bool IsSuppressed => _suppressed;
+
+    /// <summary>간파 게이지 0~1(전 피어 — 복제값). HUD 회색 바(`Detection_Fill`)가 읽는다.</summary>
+    public float CounterGauge01 => Mathf.Clamp01(_counterGauge.Value / BossCounterProgress.GaugeMax);
+
+    // 간파 성공·송전기·제압이 공유하는 "쓰러뜨리기". 체인 정리 + 그로기.
+    void StunForCounter(float duration)
+    {
         // 🔴 [G6] 리액션 방향을 **체인 정리보다 먼저** 확정한다 — AbortAttackChain 이 진행 중 공격을
         //    비우고 나면 "무엇을 끊었는지"를 알 수 없다.
         _hitReactionRight.Value = ResolveHitReactionRight(_currentEntry);
@@ -4348,12 +4705,6 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         //    ForceHitReaction(HitReactionDuration, groggy) 라 SO 의 0.5 위에 0.4 가 얹혀
         //    실제 행동 불능이 0.9초였다 — SO 값이 곧 체감 시간이어야 튜닝이 성립한다.
         ForceGroggy(duration);
-
-        int max = data != null ? Mathf.Max(1, data.maxGroggyCount) : 5;
-        Debug.Log(
-            $"[23호] 카운터 성공 — 그로기 카운트 {(outcome.IsBreak ? max : outcome.NextCount)}/{max}" +
-            (outcome.IsBreak ? $" → BREAK {duration:0.#}초" : $" → 그로기 {duration:0.#}초"),
-            this);
     }
 
     /// <param name="windowDuration">열 때 판정 창 길이를 알면 넘긴다 → 표시가 그보다 0.15초 먼저 꺼진다. 0 이하 = 닫을 때 끈다.</param>

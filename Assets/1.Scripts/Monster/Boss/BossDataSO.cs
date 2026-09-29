@@ -274,8 +274,38 @@ public class BossDataSO : MonsterDataSO
              "비우면 왼쪽 하나만 쓴다(기존 동작).")]
     public string hitReactionStateRight = "getowned_R";
 
-    [Tooltip("[S3] Break(그로기 카운트 최대 도달) 지속 시간(초). 일반 그로기는 base 의 groggyDuration 을 쓴다.")]
+    [Tooltip("**제압** 지속 시간(초) — 간파 게이지가 0 이 됐을 때(기획 `Re_C_취약_및_제압_시스템.md` §8, 임시 5초).\n" +
+             "필드 이름은 옛 Break 그대로(직렬화 유지). 간파 성공 그로기는 base 의 groggyDuration(1.5초)을 쓴다.")]
     [Min(0f)] public float breakDuration = 5f;
+
+    [Header("간파 게이지 · 제압 (팀 기획 09-28)")]
+    [Tooltip("간파 성공 한 번에 깎이는 간파 게이지(%). 100 에서 시작, 0 이면 제압. 임시 20(= 5회).")]
+    [Min(0f)] public float counterGaugeStep = 20f;
+
+    [Tooltip("환경 상호작용(취약 중 외곽 벽 충돌 · 증기 벤트) 한 번에 깎이는 간파 게이지(%). 임시 20.")]
+    [Min(0f)] public float environmentGaugeStep = 20f;
+
+    [Tooltip("제압 중 **플레이어가 주는** 최종 피해 배율. 벤트 등 환경 피해에는 적용하지 않는다. 임시 1.2.")]
+    [Min(0f)] public float suppressDamageMultiplier = 1.2f;
+
+    [Header("취약 (팀 기획 `Re_C_취약_및_제압_시스템.md` — 임시값)")]
+    [Tooltip("취약 지속(초). 간파 성공 **그로기 시작 시점부터** 센다(팀장 09-28) — 그로기 1.5초 포함.")]
+    [Min(0f)] public float vulnerableDuration = 4f;
+
+    [Tooltip("취약 중 간파 스킬 넉백 거리(m) — 공격자 반대 방향, 모든 캐릭터 공통.")]
+    [Min(0f)] public float vulnerableKnockbackDistance = 3f;
+
+    [Tooltip("취약 넉백 이동 시간(초).")]
+    [Min(0.01f)] public float vulnerableKnockbackTime = 0.35f;
+
+    [Tooltip("외곽 벽 충돌 성공 후 방 안쪽으로 되튕기는 거리(m).")]
+    [Min(0f)] public float wallReboundDistance = 0.5f;
+
+    [Tooltip("벽 반동 + 회복 시간(초).")]
+    [Min(0.01f)] public float wallReboundTime = 0.3f;
+
+    [Tooltip("취약 임시 표시 — 보스 몸 틴트(코드). 최종 VFX 는 민경.")]
+    public Color vulnerableTint = new Color(0.45f, 0.75f, 1f, 1f);
 
     [Tooltip("어그로 재선정 주기(초). 0 이면 끈다(= 처음 문 대상을 끝까지 문다). " +
              "🔴 base 의 락온은 사망·디스폰·리쉬로만 풀려서 3인전에서 한 명만 계속 물린다. " +

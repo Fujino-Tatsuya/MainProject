@@ -8,6 +8,16 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 현재 인수인계 (2026-09-28 · 경석 · `feature/Boss23` — 간파·취약·제압 / 중간보스 예고 / NavMesh)
+
+- 계획·진행·**다음 세션 시작점**: [PLAN-boss-counter-vulnerable.md](PLAN-boss-counter-vulnerable.md) §7-2 "09-28 팀장 Play 결과".
+  남은 버그 2건 — ① 취약 넉백이 안 밀림(공격만 끊김) ② 제압 중 그로기 애니 루프. 벤트 미확인. Codex 교차검증 대기.
+- 사망 연출·중간보스 예고: [PLAN-boss-death-telegraph.md](PLAN-boss-death-telegraph.md) (팀장 확인 완료).
+- NavMesh(몬스터 쪽): 추격 목적지 투영 + 도달 불가 시 대기(`MonsterBase.ChaseTarget`) · 재부착 수평 거리 기준 + 리쉬 기준점 갱신(`MapNavMeshBaker`) ·
+  23호 에이전트 반경 유지 · 넉백 종료 Warp 1m + 같은 섬. **아트 쪽(FBX Read/Write · 누락 콜라이더 · 보행 불가 지정)은 미착수** — 전수조사 결과는 이 세션 대화(09-28) 요약:
+  Read/Write 꺼진 MeshCollider 는 베이크 때 AABB 박스가 돼 계단·코너벽·기둥이 틀어진다(`UnreadableMeshColliderBakeScope`), `wall_basic_square` 콜라이더 없음, 보스방 FBX 272개 콜라이더 없음.
+- 🔴 로컬 커밋만 — 푸시 안 함.
+
 ## ▶▶ 🔴 은희에게 — 플레이어 겹침 해소 요청 (2026-09-28 경석, `feature/Boss23`)
 
 - 보스·중간보스가 **플레이어를 막게** 했다: `PlayerGameRuleData.asset` obstacleMask 에 Enemy 추가(2185 → 2441),
@@ -17,6 +27,12 @@ Update this file when a term becomes important enough that future agents or team
   제안: 스윕 전에 `OverlapCapsule(obstacleMask 중 Enemy 비트)` → `Physics.ComputePenetration` 로 **수평만** 밀어내고,
   그 변위도 정적 마스크 스윕을 거쳐 벽을 뚫지 않게. 서버·오너가 같은 모터를 돌리므로 한 곳에 넣으면 된다.
   (모터 코드는 은희 담당이라 경석이 손대지 않았다.)
+- ⚠️ **09-28 추가 — 팀장 Play: 23호 돌진이 끝난 뒤 플레이어가 확실히 낀다.** 보스 쪽에서는 완전히 못 막는다:
+  ① 이 브랜치는 `ServerAuthoritativeMovement = false` — 돌진 캐리 중 오너가 **자기 화면의 보스 복제 위치**를 따라 움직이는데,
+     보스는 NetworkTransform 보간으로 뒤처져 있다가 돌진이 멈추면 **따라잡으며 콜라이더가 플레이어 안으로 들어온다**(정상 종료엔 분리 없음, 넉백은 벽 충돌 때만).
+  ② 23호 NavMeshAgent 반경이 런타임에 데이터 값 **0.3** 으로 덮인다(프리팹 0.85, 몸 캡슐 1.53) → 추격 중에도 파고든다.
+  ③ 서버가 미는 수단(넉백)도 같은 스윕을 타서 **겹친 뒤에는 빼내지 못한다.** → 겹침 해소는 모터에서만 풀린다(팀장 09-28: 은희에게 그대로 넘김).
+  경석 쪽 완화: 훅·어퍼 전진은 앞 플레이어에 닿으면 멈춤(`TwentyThreeBoss.PlayerBlocksLunge`).
 
 ## ▶▶ 작업 세션 (2026-09-22 · **Dev 부팅 자동화 — 툴바 "Dev Boot"**, 브랜치 `tool/DevBootAutomation`)
 

@@ -223,7 +223,9 @@ public class MonsterBase : Unit
             agent.stoppingDistance = Mathf.Max(0f, data.attackRange * 0.8f);
             _defaultStoppingDistance = agent.stoppingDistance;
             // 부분 겹침: 회피 반경을 콜라이더보다 작게(데이터값). 물리 대신 회피로만 겹침량 조절(저비용).
-            agent.radius = Mathf.Max(0.01f, data.avoidanceRadius);
+            // ⚠️ 몸이 큰 몹(23호 — 캡슐 1.53)은 프리팹 반경을 지킨다. 0.3 으로 덮으면 좁은 통로에서 벽을 파고든다(09-28 전수조사).
+            if (!KeepPrefabAgentRadius)
+                agent.radius = Mathf.Max(0.01f, data.avoidanceRadius);
             agent.obstacleAvoidanceType = data.obstacleAvoidance;
         }
 
@@ -267,8 +269,16 @@ public class MonsterBase : Unit
     }
 
     #region 서버 FSM
+    /// <summary>
+    /// [서버] 매 틱 FSM **앞에서** 도는 파생 확장점(상태 무관). true 를 돌려주면 이번 틱 FSM 을 건너뛴다.
+    /// 23호 취약 넉백처럼 "어느 상태에서든 몸을 미는" 동작이 추격·공격 결정과 싸우지 않게 쓴다.
+    /// </summary>
+    protected virtual bool OnServerPreTick(float dt) => false;
+
     void TickServer(float dt)
     {
+        if (OnServerPreTick(dt)) return;
+
         // 이동 봉쇄 상태이상(에어본/기절/속박)이면 에이전트 정지.
         if (status != null && status.BlocksMovement)
             StopAgent();
@@ -490,7 +500,7 @@ public class MonsterBase : Unit
         {
             SetState(MonsterState.Chase);
             if (!movementBlocked)
-                MoveAgentTo(_target.position, data.chaseSpeed * ChaseSpeedMultiplier);
+                ChaseTarget(data.chaseSpeed * ChaseSpeedMultiplier);
         }
         else
         {
@@ -536,7 +546,7 @@ public class MonsterBase : Unit
 
         SetState(MonsterState.Chase);
         if (!movementBlocked)
-            MoveAgentTo(_target.position, data.chaseSpeed);
+            ChaseTarget(data.chaseSpeed);
         FaceTarget();
     }
 
@@ -630,7 +640,7 @@ public class MonsterBase : Unit
                 else if (dist > data.attackRange)
                 {
                     ClearReposition();
-                    MoveAgentTo(_target.position, data.chaseSpeed);
+                    ChaseTarget(data.chaseSpeed);
                     moving = true;
                 }
                 else if (data.repositionBetweenAttacks && !CooldownReady())
@@ -1257,6 +1267,7 @@ public class MonsterBase : Unit
         // 서버틱 직접 이동과 충돌하지 않게 에이전트를 완전히 내려놓는다(off). 종료 시 재획득.
         ClearReposition();
         StopAgent();
+        _knockbackOrigin = transform.position;   // 종료 Warp 가 같은 섬인지 확인하는 기준(ExitKnockback)
         if (agent != null) agent.enabled = false;
         SetState(MonsterState.Knockback);
     }
@@ -1285,9 +1296,21 @@ public class MonsterBase : Unit
         if (agent != null)
         {
             agent.enabled = true;
-            if (!agent.isOnNavMesh &&
-                NavMesh.SamplePosition(transform.position, out NavMeshHit navHit, 2f, NavMesh.AllAreas))
-                agent.Warp(navHit.position);
+            // ⚠️ 09-28: 반경 2m → 1m + **같은 섬 확인.** 2m 면 틈 건너 플랫폼·소품 윗면 섬으로 순간이동했다(전수조사 4순위).
+            //    넉백 시작 자리(메시 위)에서 직선으로 막힘없이 닿는 점만 받는다. 아니면 시작 자리로 돌려놓는다.
+            if (!agent.isOnNavMesh)
+            {
+                bool placed = false;
+                if (NavMesh.SamplePosition(transform.position, out NavMeshHit navHit, 1f, NavMesh.AllAreas) &&
+                    NavMesh.SamplePosition(_knockbackOrigin, out NavMeshHit originHit, 1f, NavMesh.AllAreas) &&
+                    !NavMesh.Raycast(originHit.position, navHit.position, out _, NavMesh.AllAreas))
+                {
+                    agent.Warp(navHit.position);
+                    placed = true;
+                }
+                if (!placed && NavMesh.SamplePosition(_knockbackOrigin, out NavMeshHit back, 1f, NavMesh.AllAreas))
+                    agent.Warp(back.position);
+            }
         }
 
         if (_staggerAfterKnockback > 0f)
@@ -1631,6 +1654,36 @@ public class MonsterBase : Unit
             }
         }
         return nearest;
+    }
+
+    /// <summary>몸이 큰 몹은 true — 데이터의 회피 반경(0.3)으로 프리팹 에이전트 반경을 덮지 않는다.</summary>
+    protected virtual bool KeepPrefabAgentRadius => false;
+
+    Vector3 _knockbackOrigin;
+
+    // 추격 목적지를 NavMesh 위로 투영하는 반경. 플레이어가 가장자리 띠·소품 위에 있어도 그 아래 메시를 잡는 정도.
+    const float ChaseProjectRadius = 2f;
+
+    /// <summary>
+    /// 추격 이동(보스·근접·이동형 공통). 🔴 목적지를 플레이어 좌표 그대로 주면, 플레이어가 메시 밖(가장자리 띠·상자 위·
+    /// 끊긴 계단 너머)에 있을 때 **모든 몹이 가장 가까운 메시 점 — 낭떠러지·벽 가장자리의 같은 점으로 몰린다**
+    /// (09-28 NavMesh 전수조사 1순위). 그래서 ① 목적지를 메시 위로 투영하고 ② 경로가 끝까지 닿지 않으면(Partial·Invalid)
+    /// 가장자리로 몰려가지 않고 **그 자리에서 기다린다.** 복귀·재배치는 이 규칙을 타지 않는다(MoveAgentTo 직접).
+    /// </summary>
+    void ChaseTarget(float speed)
+    {
+        if (_target == null || agent == null || !agent.enabled || !agent.isOnNavMesh) return;
+
+        if (!NavMesh.SamplePosition(_target.position, out NavMeshHit onMesh, ChaseProjectRadius, NavMesh.AllAreas))
+        {
+            StopAgent();
+            return;
+        }
+
+        MoveAgentTo(onMesh.position, speed);
+
+        if (!agent.pathPending && agent.pathStatus != NavMeshPathStatus.PathComplete)
+            StopAgent();
     }
 
     void MoveAgentTo(Vector3 destination, float speed)

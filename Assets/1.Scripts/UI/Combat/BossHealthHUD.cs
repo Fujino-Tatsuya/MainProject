@@ -10,9 +10,13 @@ public class BossHealthHUD : MonoBehaviour
 {
     [SerializeField] private GameObject barRoot;
     [SerializeField] private Image hpFill;
+    [Tooltip("HP 바 밑 회색 **간파 게이지**(Detection_Fill). 100% → 0% 로 HP 와 같은 방향으로 준다(팀 기획 09-28).\n" +
+             "간파 게이지가 없는 보스면 숨긴다.")]
+    [SerializeField] private Image counterGaugeFill;
     [SerializeField] private DelayedHealthBar delayed = new DelayedHealthBar();
 
     private Unit boundBoss;
+    private TwentyThreeBoss boundGaugeBoss;   // 간파 게이지를 가진 보스(23호)일 때만
 
     private void Update()
     {
@@ -32,6 +36,15 @@ public class BossHealthHUD : MonoBehaviour
             hpFill.fillAmount = maxHp > 0 ? Mathf.Clamp01((float)boss.CurrentHealth / maxHp) : 0f;
 
         delayed.Tick(Time.deltaTime, boss.CurrentHealth, maxHp);
+
+        if (counterGaugeFill != null)
+        {
+            bool hasGauge = boundGaugeBoss != null;
+            if (counterGaugeFill.gameObject.activeSelf != hasGauge)
+                counterGaugeFill.gameObject.SetActive(hasGauge);
+            if (hasGauge)
+                counterGaugeFill.fillAmount = boundGaugeBoss.CounterGauge01;   // 복제값 — 늦은 합류도 현재 값
+        }
     }
 
     private void OnDisable()
@@ -45,6 +58,7 @@ public class BossHealthHUD : MonoBehaviour
             boundBoss.ClientHpChanged -= delayed.OnHpChanged;
 
         boundBoss = boss;
+        boundGaugeBoss = boss as TwentyThreeBoss;
 
         if (boundBoss != null)
             boundBoss.ClientHpChanged += delayed.OnHpChanged;

@@ -128,6 +128,38 @@
 | C10 | 송전기 분리 시 게이지뿐 아니라 **취약도 주지 않는** 기믹 보상 경로로 | 명시 |
 | C11 | 테스트 영향 | `BossCounterProgressTests` · `BossCounterDataTests` · `CounterWindowTests`(공용 창 계약) 갱신 |
 
+## 7-2. 진행 (09-28 세션 끝 기준) — 🔴 **다음 세션 = 취약**
+
+| 단계 | 상태 | 비고 |
+|---|---|---|
+| 1 간파 표시 타이밍 | ✅ 팀장 확인 | 오버레이 페이드 0 · 표시 0.15초 먼저 소등(`CounterVisualLeadSeconds`) · Gauntlet 창 2.0 · 중간보스 창 NetworkVariable · 이탈 정리 |
+| 2 잡기 예고 방향 | ✅ 팀장 확인 | `BossAttackEntry.telegraphFillInward` |
+| 3 게이지 · 제압 | ✅ 구현 · **Play 대기** | `BossCounterProgress`(게이지 100→0, step 20) · `_counterGauge` NetworkVariable · `EnterCounterSuccess`/`EnterPylonGroggy`/`EnterSuppress`/`TryConsumePendingSuppress`/`TickSuppressExit` · 플레이어 피해 ×1.2 · No23/No23_Solo 그로기 1.5 · 제압 5 · 테스트 갱신 |
+| 4 **취약 넉백 · 벽** | ✅ 구현(09-28 같은 세션으로 당김 — 팀장) · **Play 대기** | `StartVulnerable/EndVulnerable` · `StartVulnerableKnockback`(agent.Move, NavMesh 밖 금지) · `InterruptForKnockback` · 벽 = `InvisibleBoundaries` 안쪽 면 − 몸 반경 · 반동 0.5/0.3 · 벤트 `OnSteamVentHit` · 틴트 `_vulnerableVisual` · `MonsterBase.OnServerPreTick` 훅 |
+| 5 증기 벤트 | ✅ 코드 · **Play 대기** | `Assets/1.Scripts/Map/SteamVent.cs` — 붙이면 자동 등록, 서버 시각 주기, 플레이어·보스 피해, 연출 훅 `onVentStart/Stop`. 취약 연동은 `TwentyThreeBoss.OnSteamVentHit`(현재 빈 자리) |
+| 6 HUD | ✅ 구현 · **Play 대기** | `BossHealthHUD.counterGaugeFill` → `Detection_Fill`(23호가 아니면 숨김) |
+
+### 🔴 09-28 팀장 Play 결과 — 다음 세션은 여기서 시작
+| 항목 | 결과 |
+|---|---|
+| 간파 성공 → 게이지 −20 · HUD 회색 바 | ✅ |
+| 취약 파란 틴트 | ✅ |
+| 취약 중 간파 스킬 → 공격 끊김 | ✅ |
+| 🔴 **취약 넉백 — 반대쪽으로 안 밀린다** | ❌ 공격만 끊긴다. 팀장 추정: "간파 스킬에 넉백 정보가 없어서". **확인 필요** — 코드는 `AttackInfo` 넉백 필드를 안 읽고 방향만 계산해 `agent.Move` 로 민다(`TickVulnerableKnockback`). 의심 순서: ① 그로기(첫 1.5초) 중 `HandleGroggy`/`ForceGroggy` 가 에이전트를 끄거나 `updatePosition` 을 막아 `agent.Move` 가 무효 ② `OnServerPreTick` 이 안 불리는 경로(Update 조기 return — `_serverLogicSuspended`·`_initialized`) ③ `_kbActive` 가 켜지자마자 꺼짐 ④ NetworkTransform 권한. **첫 한 줄: 넉백 틱마다 위치·agent.enabled·isOnNavMesh 진단 로그** |
+| 🔴 **제압 중 그로기 애니가 루프로 계속 재생** | ❌ 5초 동안 반복된다 → 한 번 재생 후 유지(Break 클립처럼)로 바꿔야 한다. `ForceGroggy` 의 `groggyBool` 경로 / 컨트롤러 Groggy 상태 loopTime 확인 |
+| 증기 벤트 | ⏳ 미확인 |
+| 제압 5초 → 게이지 100 | 명시 확인 없음(다른 문제 없다고 함) |
+- Codex 교차검증은 크레딧 복구 후(09-28 20시 이후) — 이번 구현 전체(§3·§4 NavMesh 수정 포함).
+
+### 다음 세션 인수인계 — 취약 (§3-2 · §3-3 · §7-1 C1~C8 참고)
+1. **진입**: `EnterCounterSuccess()` 의 TODO — 게이지가 남으면 `_vulnerableUntil = now + 4`(그로기 1.5초 시작 시점부터, D1). 취약 중 간파 창 안 열기(창 여는 두 곳 — `StartAttack` 의 opensNow · `AcquireGrab`).
+2. **넉백**: `ReceiveAttack` — 취약 중 `isInterruptAttack`(방향 무관) → 3m/0.35초, 공격자→보스 수평(겹치면 스킬 방향).
+   `AbortAttackChain` + 돌진 정지·히트 윈도우·Attack 이탈(C2). 그로기 중에도 변위만(그로기·취약 타이머 불변). 재적중 = 새 방향 3m 처음부터. 필수 기믹 중이면 피해만.
+3. **벽**: `InvisibleBoundaries` 네 벽 안쪽 면(`BossRoomAuthoring.cs:466`) − 몸 반경 1.53. 닿으면 게이지 −`environmentGaugeStep` · 취약 즉시 종료 · 0.5m/0.3초 반동. 0 이면 `EnterSuppress`(그로기→그로기라 **상태 콜백이 안 돈다** — `_suppressed` 플래그로 이미 대비, C1).
+4. **벤트**: `OnSteamVentHit` 채우기 — 취약이면 −20 · 취약 종료, 취약당 1회, 벽과 같은 틱이면 먼저 온 쪽.
+5. **임시 비주얼**: 취약 = 몸 틴트(`HitFlash.SetBaseTint`, 코드). VFX 에셋은 민경(D10).
+6. 🔴 끼임: 넉백이 플레이어를 파고들 수 있다 — 겹침 해소는 은희(CONTEXT). 넉백 경로도 `PlayerBlocksLunge` 식으로 앞 플레이어에서 멈출지 결정 필요.
+
 ## 8. 범위 밖
 - 간파 가능 노란빛·취약/제압 최종 VFX·효과음(민경) · 증기 벤트 배치·주기 값(추후) · `AttackInfo` 누른 시각(은희 합의)
 - 23호 정면 강조 표시 · 보스 조기 스폰(로딩 중 하늘 대기) 아이디어
