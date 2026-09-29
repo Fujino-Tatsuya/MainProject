@@ -192,6 +192,9 @@ namespace VeyTrace.Rendering.Occlusion
             }
         }
 
+        /// <summary>에디터 시각화(Group Painter 의 "벽 그룹" 표시)가 읽는다. 런타임은 쓰지 않는다.</summary>
+        public IReadOnlyList<Renderer> TargetRenderers => targetRenderers;
+
         private bool IsTransparencyActive => _transparencyRequestCount > 0;
 
         // 상단 그라데이션 = 설정값1 ↔ 설정값2 를 _zoneBlend 로 보간한 것.

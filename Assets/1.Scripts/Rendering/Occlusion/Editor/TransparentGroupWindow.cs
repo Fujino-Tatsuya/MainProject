@@ -74,6 +74,13 @@ namespace VeyTrace.Rendering.Occlusion.Editor
                     new GUIContent("씬 뷰 표시", "그룹 색으로 씬 뷰를 칠한다. 플레이 모드에서는 자동으로 꺼진다."),
                     EditorStyles.toolbarButton, GUILayout.Width(80f));
 
+                TransparentGroupSession.ShowWallGroups = GUILayout.Toggle(
+                    TransparentGroupSession.ShowWallGroups,
+                    new GUIContent("벽 그룹",
+                        "씬의 WallTransparencyGroup 마다 Target Renderers 를 한 색으로 칠한다.\n" +
+                        "WallTransparencyGroup 오브젝트를 선택하면 그 그룹만 또렷해진다."),
+                    EditorStyles.toolbarButton, GUILayout.Width(56f));
+
                 // 대상이 모호해지지 않도록 그룹이 정확히 하나 선택됐을 때만 켤 수 있다.
                 using (new EditorGUI.DisabledScope(!TransparentGroupSession.CanPaint))
                 {
@@ -89,7 +96,7 @@ namespace VeyTrace.Rendering.Occlusion.Editor
                         EditorStyles.toolbarButton, GUILayout.Width(70f));
                 }
 
-                using (new EditorGUI.DisabledScope(!TransparentGroupSession.OverlayEnabled))
+                using (new EditorGUI.DisabledScope(!TransparentGroupSession.AnyOverlayEnabled))
                 {
                     GUILayout.Label("색 세기", EditorStyles.miniLabel, GUILayout.Width(44f));
                     TransparentGroupSession.Blend = GUILayout.HorizontalSlider(

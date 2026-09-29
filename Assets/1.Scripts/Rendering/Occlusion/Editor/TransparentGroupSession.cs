@@ -43,6 +43,21 @@ namespace VeyTrace.Rendering.Occlusion.Editor
             set { if (s_OverlayEnabled != value) { s_OverlayEnabled = value; Raise(); } }
         }
 
+        static bool s_ShowWallGroups;
+
+        /// <summary>
+        /// 씬의 <see cref="WallTransparencyGroup"/> 마다 targetRenderers 를 한 색으로 칠한다.
+        /// Group Painter 그룹(JSON)과는 별개의 색 소스다 — 둘 다 켜면 Painter 그룹 색이 위에 온다.
+        /// </summary>
+        public static bool ShowWallGroups
+        {
+            get => s_ShowWallGroups;
+            set { if (s_ShowWallGroups != value) { s_ShowWallGroups = value; Raise(); } }
+        }
+
+        /// <summary>시각화가 무엇이든 그려야 하는가.</summary>
+        public static bool AnyOverlayEnabled => s_OverlayEnabled || s_ShowWallGroups;
+
         public static float Blend
         {
             get => s_Blend;
@@ -123,6 +138,19 @@ namespace VeyTrace.Rendering.Occlusion.Editor
             EditorApplication.hierarchyChanged += TransparentGroupResolver.InvalidateCache;
 
             AssemblyReloadEvents.beforeAssemblyReload += DisposeSets;
+
+            // 벽 그룹은 JSON 이 아니라 컴포넌트가 원본이다. 인스펙터에서 targetRenderers 를 고치거나
+            // 그룹을 고르면(= 활성 강조) 색 맵을 다시 만든다.
+            ObjectChangeEvents.changesPublished += OnObjectChangesPublished;
+            EditorApplication.hierarchyChanged += RaiseIfWallGroups;
+            Selection.selectionChanged += RaiseIfWallGroups;
+        }
+
+        static void OnObjectChangesPublished(ref ObjectChangeEventStream stream) => RaiseIfWallGroups();
+
+        static void RaiseIfWallGroups()
+        {
+            if (s_ShowWallGroups) Raise();
         }
 
         /// <summary>열려 있는 씬/프리팹에 맞춰 그룹 집합을 다시 만든다.</summary>
@@ -242,12 +270,80 @@ namespace VeyTrace.Rendering.Occlusion.Editor
         public static Dictionary<int, Color> BuildColorMap()
         {
             var map = new Dictionary<int, Color>();
-            if (!s_OverlayEnabled) return map;
 
-            // 비활성 → 활성 순으로 써서, 겹치는 오브젝트는 활성 그룹 색이 이기게 한다(PLAN 결정 12·17).
-            WriteGroups(map, selectedPass: false);
-            WriteGroups(map, selectedPass: true);
+            // 벽 그룹을 먼저 써서, 둘 다 켜져 있으면 Painter 그룹 색이 이기게 한다.
+            if (s_ShowWallGroups) WriteWallGroups(map);
+
+            if (s_OverlayEnabled)
+            {
+                // 비활성 → 활성 순으로 써서, 겹치는 오브젝트는 활성 그룹 색이 이기게 한다(PLAN 결정 12·17).
+                WriteGroups(map, selectedPass: false);
+                WriteGroups(map, selectedPass: true);
+            }
             return map;
+        }
+
+        static readonly List<WallTransparencyGroup> s_WallGroupScratch = new List<WallTransparencyGroup>();
+
+        /// <summary>
+        /// 벽 그룹마다 색 하나. 색 인덱스는 하이어라키 경로 순서라 씬을 다시 열어도 같은 색이 나온다
+        /// (그룹이 추가·삭제되면 뒤쪽 색은 밀린다).
+        /// 선택된 벽 그룹이 있으면 그것만 또렷하게, 나머지는 Painter 비활성 그룹처럼 흐리게 한다.
+        /// </summary>
+        static void WriteWallGroups(Dictionary<int, Color> map)
+        {
+            CollectWallGroups(s_WallGroupScratch);
+
+            var anySelected = false;
+            foreach (var group in s_WallGroupScratch)
+            {
+                if (Selection.Contains(group.gameObject)) { anySelected = true; break; }
+            }
+
+            // 비활성 → 활성 순. 한 렌더러가 여러 벽 그룹에 들어 있으면 선택된 쪽 색이 이긴다.
+            for (var pass = 0; pass < 2; pass++)
+            {
+                var selectedPass = pass == 1;
+                for (var i = 0; i < s_WallGroupScratch.Count; i++)
+                {
+                    var group = s_WallGroupScratch[i];
+                    var isActive = !anySelected || Selection.Contains(group.gameObject);
+                    if (isActive != selectedPass) continue;
+
+                    var color = TransparentGroupPalette.GetColor(i);
+                    color.a = isActive ? s_Blend : s_Blend * k_InactiveBlendScale;
+
+                    foreach (var renderer in group.TargetRenderers)
+                    {
+                        if (renderer != null) map[renderer.GetInstanceID()] = color;
+                    }
+                }
+            }
+
+            s_WallGroupScratch.Clear();
+        }
+
+        /// <summary>프리팹 편집 중이면 그 프리팹 안만, 아니면 열린 씬 전부. 씬 뷰에 보이는 범위와 같다.</summary>
+        static void CollectWallGroups(List<WallTransparencyGroup> result)
+        {
+            result.Clear();
+
+            var stage = PrefabStageUtility.GetCurrentPrefabStage();
+            if (stage != null)
+                stage.prefabContentsRoot.GetComponentsInChildren(true, result);
+            else
+                result.AddRange(UnityEngine.Object.FindObjectsByType<WallTransparencyGroup>(
+                    FindObjectsInactive.Include, FindObjectsSortMode.None));
+
+            result.Sort((a, b) => string.CompareOrdinal(HierarchyKey(a.transform), HierarchyKey(b.transform)));
+        }
+
+        /// <summary>씬 이름 + 형제 인덱스 경로. 이름이 겹쳐도 순서가 흔들리지 않는다.</summary>
+        static string HierarchyKey(Transform t)
+        {
+            var key = t.GetSiblingIndex().ToString("D5");
+            for (var p = t.parent; p != null; p = p.parent) key = p.GetSiblingIndex().ToString("D5") + "/" + key;
+            return t.gameObject.scene.path + ":" + key;
         }
 
         static void WriteGroups(Dictionary<int, Color> map, bool selectedPass)

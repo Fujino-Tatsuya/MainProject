@@ -8,6 +8,14 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-09-29 · 은희(Claude) · **Group Painter "벽 그룹" 표시**, 브랜치 `feature/WallGroupVisualize`)
+
+Group Painter 툴바에 **`벽 그룹`** 토글 추가 — 씬(또는 열린 프리팹)의 `WallTransparencyGroup` 마다
+`targetRenderers` 를 팔레트 색 하나로 씬 뷰에 칠한다. 기존 ObjectId 오버레이를 그대로 쓰고 색 소스만 하나 늘렸다.
+WallTransparencyGroup 오브젝트를 선택하면 그 그룹만 또렷해진다. 둘 다 켜면 Painter 그룹 색이 위.
+수정: `WallTransparencyGroup.cs`(읽기 전용 `TargetRenderers` 만), `Editor/TransparentGroupSession.cs`·`Visualizer.cs`·`Window.cs`.
+상태: dotnet build 통과, **에디터 확인 대기**.
+
 ## ▶▶ 현재 인수인계 (2026-09-29 · 경석 · `feature/Boss23` → development 반영)
 
 - **다음 세션 = 전기장판 · 자폭드론** — 기획 문서 수령 대기(받으면 바로 착수). 자폭드론 자리: `TwentyThreeBoss.OnWellsAttackCycle`(Wells 공격 주기 — 현재 빈 자리 경고).
