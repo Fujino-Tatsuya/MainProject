@@ -1104,10 +1104,9 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
                 break;
 
             case BossAttackId.Grab:
-                // 🔴 **아무것도 하지 않는다.** [G5] 이후 잡기 사이클은 단계 타이머가 몬다
-                //    (예고 → 끌어당김 → 붙잡기 …). 그런데 `Boss_23_grab` 클립에는 `OnAttackHit` 이
-                //    정규화 0.354 에 박혀 있어, 붙잡는 모션 중 이 이벤트가 **반드시 한 번 온다.**
-                //    예전처럼 여기서 AcquireGrab 을 부르면 **사이클 도중 붙잡기가 재실행**된다.
+                // 🔴 `Boss_23_grab` 의 `OnAttackHit`(정규화 0.354) = **낚아채는 프레임**. 여기서 손에 붙인다(팀장 09-29).
+                //    ⚠️ AcquireGrab 을 부르면 안 된다 — 사이클 도중 붙잡기가 재실행된다. Acquire 구간 밖의 도착은 무시.
+                if (_attackPhase == BossAttackPhase.Acquire) AttachGrabbed("클립 이벤트");
                 break;
 
             case BossAttackId.Jump:
@@ -1737,7 +1736,15 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
             // 붙잡는 모션 구간. 끝나면 지짐이.
             case BossAttackPhase.Acquire:
                 if (!IsGrabbedValid()) { ReleaseGrabbedPlayer(); break; }
-                if (_attackPhaseTimer <= 0f) BeginGrabShock();
+                if (_attackPhaseTimer <= 0f)
+                {
+                    if (_grabAttachPending)
+                    {
+                        Debug.LogWarning("[23호] 잡기 클립 OnAttackHit 이 Acquire 안에 오지 않았다 — 구간 끝에서 붙인다(클립 이벤트 확인)", this);
+                        AttachGrabbed("안전망");
+                    }
+                    if (_attackPhase == BossAttackPhase.Acquire) BeginGrabShock();
+                }
                 break;
 
             // 지짐이 — 붙잡은 대상에게 전기 틱 데미지.
@@ -1882,17 +1889,15 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         //    그래서 "예고가 판정에 대해 거짓말하지 않는다"는 이 레포의 규약이 지켜진다.
         //    대가: 전원이 슈퍼아머거나 범위 밖이면 헛잡기가 된다 — 그게 의도다.
 
-        if (target != null)
-        {
-            // Push 로 끌고 있던 대상을 Carry 로 **바꿔 잡는다.** 먼저 풀지 않으면 중복 구속이 된다.
-            _pulledPlayers.Remove(target);
-            target.EndRestrainedByInstigator();
-        }
+        // 🔴 대상은 **끌려온 자리(Push)에 그대로 둔다** — 손에 붙이는 건 낚아채는 순간이다(AttachGrabbed, 팀장 09-29).
+        //    예전엔 여기서 곧바로 Carry 로 바꿔 잡기 클립 0초에 손 소켓으로 붙었다 → 클립은 팔을 **우측으로 뻗은 뒤**
+        //    플레이어 쪽으로 손을 가져오는데, 플레이어가 우측으로 뻗는 팔을 따라 날아갔다가 돌아왔다(팀장 영상 1.2~1.4초).
+        if (target != null) _pulledPlayers.Remove(target);   // 아래 일괄 해제에서 빼 Push 를 유지
 
         // 붙잡히지 않은 나머지는 여기서 놓아주고 보스 바깥으로 살짝 밀어낸다(팀장 확정 C9).
         ReleasePulledPlayers(knockback: true);
 
-        if (target == null || !target.BeginGrabbedByInstigator(gameObject))
+        if (target == null)
         {
             // 헛잡기 — 복귀 경직만 지고 끝낸다(창에 실패 대가가 붙는 것과 대칭).
             // 🔴 전기는 StartAttack 에서 이미 켜졌다. 여기서 안 끄면 헛잡은 팔에 영영 남는다.
@@ -1902,18 +1907,52 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
             return;
         }
 
-        _grabbed = target;
+        _grabbed = target;          // 아직 Push — 중단 경로(AbortAttackChain 등)의 EndGrabbedByInstigator 가 Push 도 똑같이 푼다
+        _grabAttachPending = true;
         _grabTickTimer = 0f;
 
-        // 🔴 [G6] **여기서 인터럽트 창이 열린다.** 끌어당기는 동안에는 못 끊고, 실제로 붙잡은
-        //    뒤부터 3번째 내려치기 직전까지만 열려 있다(팀장 확정 C10).
+        // 붙잡는 모션 → (Acquire 구간, 도중 OnAttackHit 에서 손에 붙임) → 지짐이.
+        CrossFadeGrabCycleStateClientRpc(GrabCycleState.Catch);
+        EnterPhase(BossAttackPhase.Acquire, GrabCatchDuration);
+    }
+
+    bool _grabAttachPending;
+
+    /// <summary>
+    /// 낚아채는 순간 — 끌려와 있던 대상을 Push 에서 Carry(손 소켓)로 바꿔 잡는다.
+    /// 시점 = <c>Boss_23_grab</c> 의 <c>OnAttackHit</c>(정규화 0.354 ≈ 1.10초, 손이 플레이어 쪽으로 온 프레임).
+    /// 이벤트가 안 오면 Acquire 구간 끝(grabCatchDuration 1.1 — 같은 시점)에서 안전망으로 붙인다.
+    /// </summary>
+    void AttachGrabbed(string when)
+    {
+        if (!_grabAttachPending || _attackPhase != BossAttackPhase.Acquire) return;
+        _grabAttachPending = false;
+
+        Player target = _grabbed;
+        if (target == null || !IsGrabbedValid())
+        {
+            StopGrabPulseClientRpc();
+            _grabbed = null;
+            EnterPhase(BossAttackPhase.Recovery, GrabRecovery);
+            return;
+        }
+
+        // Push → Carry 로 **바꿔 잡는다.** 먼저 풀지 않으면 중복 구속이 된다.
+        target.EndRestrainedByInstigator();
+        if (!target.BeginGrabbedByInstigator(gameObject))
+        {
+            StopGrabPulseClientRpc();
+            _grabbed = null;
+            EnterPhase(BossAttackPhase.Recovery, GrabRecovery);
+            return;
+        }
+
+        // 🔴 [G6] **여기서 인터럽트 창이 열린다.** 끌어당기는 동안·낚아채기 전에는 못 끊고, 실제로 붙잡은
+        //    뒤부터 3번째 내려치기 직전까지만 열려 있다(팀장 확정 C10 — "실제로 붙잡은 뒤").
         //    창을 닫는 곳은 둘이다 — 마지막 내려치기(AdvanceGrabSlam)와 이탈(AbortAttackChain).
         //    ⚠️ 데이터가 창을 끈 공격이면 열지 않는다(`opensCounterWindow`).
         if (_currentEntry != null && _currentEntry.opensCounterWindow && !CounterBlockedByState) SetCounterWindow(true);
-
-        // 붙잡는 모션 → (Acquire 구간) → 지짐이.
-        CrossFadeGrabCycleStateClientRpc(GrabCycleState.Catch);
-        EnterPhase(BossAttackPhase.Acquire, GrabCatchDuration);
+        Debug.Log($"[23호] 잡기 — {target.name} 낚아챔({when}, Acquire 경과 {GrabCatchDuration - _attackPhaseTimer:0.##}s)", this);
     }
 
     // 붙잡기 모션이 끝났다 — 지짐이(전기)로 넘어간다.

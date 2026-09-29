@@ -350,56 +350,6 @@ public class Player : Unit
         stateController.Tick();
     }
 
-    #region 잡기 — 손에 붙여 그리기 (2026-09-29 경석 · 팀장 승인)
-    // 🔴 증상: 23호 낚아채기에서 팔을 휘두르는 순간 플레이어가 손에서 2~3프레임 떨어졌다 다시 붙는다(호스트 본인 화면에서도).
-    //    원인(타이밍): 구속 추종이 FixedTick 에서 손 소켓을 읽는다 — 애니메이션은 그 뒤 Update 에서 갱신되므로 **이전 프레임 손**이다.
-    //    그 값을 MovePosition 으로 다음 물리 스텝에 넣고, 리지드바디 Interpolate 가 다시 한 스텝 늦게 그린다.
-    //    남이 보는 화면은 여기에 NetworkTransform 보간(~100ms)까지 겹친다.
-    // 처방: 잡혀 있는 동안 **모든 피어가 LateUpdate(애니메이션 이후)** 에 자기 화면의 보스 손 소켓에 직접 붙여 그린다.
-    //    판정용 물리 추종(PlayerStateController 구속 상태 → Motor.SetPoseTarget)은 그대로 — 바뀌는 건 보이는 위치다.
-    private readonly NetworkVariable<NetworkObjectReference> carriedBy = new NetworkVariable<NetworkObjectReference>(
-        default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
-
-    private NetworkObject carryInstigatorCache;
-    private Transform carrySocketCache;
-
-    private void LateUpdate()
-    {
-        // 안전망 — 구속이 EndRestrainedByInstigator 말고 다른 길(사망·연출 잠금 등)로 끝나도 표시가 손에 남지 않게,
-        // 서버는 자기 상태 기계가 Restrained 가 아니면 값을 지운다.
-        if (IsServer && IsSpawned && !carriedBy.Value.Equals(default(NetworkObjectReference)) &&
-            stateController.CurrentState != PlayerActionState.Restrained)
-            carriedBy.Value = default;
-
-        if (!IsSpawned || !carriedBy.Value.TryGet(out NetworkObject instigator))
-        {
-            carryInstigatorCache = null;
-            carrySocketCache = null;
-            return;
-        }
-
-        if (instigator != carryInstigatorCache)
-        {
-            carryInstigatorCache = instigator;
-            GrabController grab = instigator.GetComponentInChildren<GrabController>();
-            carrySocketCache = grab != null ? grab.GrabSocket : null;
-        }
-        if (carrySocketCache == null)
-            return;
-
-        Vector3 position = carrySocketCache.position;
-        Quaternion rotation = carrySocketCache.rotation;
-        transform.SetPositionAndRotation(position, rotation);
-
-        // 오너(이동 권한)는 물리 몸도 같은 자리로 — 안 하면 다음 스텝의 Interpolate 가 한 틱 전 자리로 되돌려 그린다.
-        if (IsOwner && TryGetComponent(out Rigidbody body))
-        {
-            body.position = position;
-            body.rotation = rotation;
-        }
-    }
-    #endregion
-
     private void FixedUpdate()
     {
         if (localSimulationTick < long.MaxValue)
@@ -539,11 +489,6 @@ public class Player : Unit
         BeginRestrainedClientRpc(
             new NetworkObjectReference(instigatorNetworkObject), (byte)mode, frontOffset,
             CreateOwnerClientRpcParams());
-
-        // 잡기(Carry)는 **전 피어**가 알아야 손에 붙여 그릴 수 있다(LateUpdateCarryVisual) — 늦은 합류 포함이라 NV.
-        carriedBy.Value = mode == RestraintMode.Carry
-            ? new NetworkObjectReference(instigatorNetworkObject)
-            : default;
         return true;
     }
 
@@ -554,7 +499,6 @@ public class Player : Unit
 
         bool ended = stateController.EndRestrained();
         EndRestrainedClientRpc(CreateOwnerClientRpcParams());
-        carriedBy.Value = default;
         return ended;
     }
 
