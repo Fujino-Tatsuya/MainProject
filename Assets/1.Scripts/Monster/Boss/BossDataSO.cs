@@ -403,6 +403,12 @@ public class BossDataSO : MonsterDataSO
     [Tooltip("착지 공격 애니메이터 상태명.")]
     public string jumpLandingState = "";
 
+    [Tooltip("타격이 아닌 착지(보스 입장 · 차징을 위한 원점 복귀)에 쓸 애니메이터 상태명. " +
+             "비우면 jumpLandingState 를 쓴다(기존 동작). " +
+             "🔴 클립은 같고 **착지 이펙트 이벤트만 뺀** 복제본을 물린다 — 안 아픈 착지에 충격 이펙트가 나오면 안 된다.")]
+    [FormerlySerializedAs("entranceLandingState")]
+    public string silentLandingState = "";
+
     // 🔴 **지금은 아무도 읽지 않는다**(2026-09-09). 착지 예고 2개가 AoeTelegraph 프리팹 →
     //    EffectCatalog 루프 이펙트(Drop_Charge_Boundary / Drop_Charge_Indicator)로 전부 넘어갔다.
     //    이 레포에는 조용히 무시되는 설정값이 이미 쌓여 있어(정본 §6) 지우기 전까지 명시해 둔다.
