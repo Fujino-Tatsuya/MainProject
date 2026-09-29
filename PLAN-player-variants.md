@@ -128,7 +128,7 @@
 | 항목 | `Paladin` | `Paladin_VFX` | 병합 |
 |------|-----------|---------------|------|
 | `PlayerSafePointTracker.safePointMarkerPrefab` / `showSafePointMarkers` | `544d09bf…` / `0` | 빈 값 / `1` | **Paladin 값 가져옴** (`6ee0d95a`) |
-| `SkillRangeIndicator` 레이어 마스크 `m_Bits` | `1` | `256` | **Paladin 값 가져옴** (`6ee0d95a`) |
+| `SkillRangeIndicator` 데칼 `m_RenderingLayerMask` | `1` | `256` | ❌ **가져오지 않음** — `256` = "Ground Layer"(바닥에만 투영)가 의도값. `1` 은 `6ee0d95a` 에 섞인 우발 변경으로 판단(P0 실행 중 확인) |
 | 무기 메시 (`SM_Wep_Shield_01`·`SM_Wep_Sword_03`) | 구판 | `_MaskUV` 판 | VFX 유지 (`2e1ac271` — 의도) |
 | 무기 트레일 | `WeaponTrailEffect`×2 + `TrailTransform`×4 | 자체 `Trail` | VFX 유지 |
 | VFX 소켓·컴포넌트 | 없음 | 있음 | VFX 유지 |
