@@ -121,7 +121,7 @@ MonoBehaviour:
     coneRadius: 4.08
     coneAngle: 180
     coneOffsetAngle: 0
-    telegraphDuration: 0.7
+    telegraphDuration: 0.5
     telegraphPoseNormalized: 0.15
     prepStateName: UppercutPrep
   - attackId: 3

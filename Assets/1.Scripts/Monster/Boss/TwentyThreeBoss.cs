@@ -1061,7 +1061,13 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
             //    OnAttackHit 이 레이지 중에도 여기로 들어오므로, 명시적으로 받아 두지 않으면
             //    "미구현" 경고가 뜬다(경고는 신호를 덮는다 — 교훈 #8).
             case BossAttackId.RageDash:
+                break;
+
+            // 🔴 차징하러 가는 점프도 **착지 범위 공격을 낸다**(팀장 09-29 — 09-21 "무음 착지" 결정의 뒤집기).
+            //    같은 착지 클립·같은 판정(ApplyJumpLandingDamage)을 쓰고, 피해는 점프어택 행을 따른다.
             case BossAttackId.ChargeSequence:
+                if (_chargeJump && _attackPhase == BossAttackPhase.Land)
+                    ApplyJumpLandingDamage(AttackEntryOf(BossAttackId.Jump));
                 break;
 
             default:
@@ -2399,10 +2405,9 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         // 예고 2개: 고정 크기(어디에 떨어지는가) + 차오르는 원(언제 떨어지는가).
         // 성장시간은 **체공 길이**다 — 여기서 띄우므로 이륙 몴을 더하지 않는다.
         //    그래야 원이 **착지 순간**에 가득 찬다.
-        // 🔴 차징 진입은 **예고를 띄우지 않는다**(팀장 확정 2026-09-21). 착지에 판정이 없어서다 —
-        //    예고는 "곧 여기가 위험하다"는 약속인데, 안 아픈 착지에 띄우면 그 약속이 거짓이 된다.
-        if (!_chargeJump)
-            ShowJumpTelegraphClientRpc(_jumpArrivePoint, JumpAoeRadius, JumpHover);
+        // 🔴 차징 진입도 예고를 띄운다(팀장 09-29) — 착지 판정이 생겼으니 "곧 여기가 위험하다"는 약속이 참이 됐다.
+        //    ⚠️ 09-21 확정("차징은 예고 없음 — 안 아픈 착지라서")의 뒤집기다. 이유가 사라져서 결론도 바뀐다.
+        ShowJumpTelegraphClientRpc(_jumpArrivePoint, JumpAoeRadius, JumpHover);
 
         CrossFadeJumpStateClientRpc(landing: false, silentLanding: false);
 
@@ -2416,9 +2421,9 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         SetModelVisibleClientRpc(true);
         SetHurtableClientRpc(true);   // 착지했으니 다시 맞는다(BeginJump 의 짝)
 
-        // 🔴 차징 복귀도 **무음 착지**다(_chargeJump). 그 착지는 원점으로 돌아오는 이동일 뿐이라
-        //    타격이 아니다 — 예고를 안 띄우는 근거(BeginJumpHover)와 같다.
-        CrossFadeJumpStateClientRpc(landing: true, silentLanding: _chargeJump);
+        // 🔴 차징 착지도 **타격 착지**다(팀장 09-29) — 일반 착지 클립이어야 OnAttackHit(판정)·GroundBreak(연출)가 나온다.
+        //    무음 착지(silentLanding)는 이제 입장 연출 전용이다.
+        CrossFadeJumpStateClientRpc(landing: true, silentLanding: false);
 
         // 땅에 닿았으니 투척 억제를 푼다(BeginJump 의 짝). 🔴 그로기 중이면 그쪽이 다시 억제하므로
         //    여기서 무조건 풀어도 안전하다 — PushWellsState 가 상태를 매번 다시 밀어 준다.
@@ -4460,7 +4465,8 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
                        && IsCounterFromFront(hitContext);
 
         // 취약 중 간파 스킬 = 방향 무관 넉백(간파 성공 아님 · 게이지·취약시간 불변 — 기획 취약 §4.4). 필수 기믹 중엔 피해만.
-        bool vulnerableHit = IsServer && IsVulnerable && IsInterruptAttack(attackInfo) && !IsInMandatorySequence;
+        // 점프 체인 중엔 넉백 없이 피해만(IsInJumpChain — 이륙·공중·착지 모두 끊기지 않는다, 팀장 09-29).
+        bool vulnerableHit = IsServer && IsVulnerable && IsInterruptAttack(attackInfo) && !IsInMandatorySequence && !IsInJumpChain;
 
         // 진단(2026-09-02): 인터럽트가 들어왔는데 카운터로 성립하지 않으면 **어느 조건이 거짓인지** 찍는다.
         // 인터럽트 히트에서만 돌므로 조용하다. 취약·제압 중에는 실패가 정상이라 찍지 않는다.
@@ -4838,8 +4844,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         //    벽 판정은 위에서 먼저 끝났으므로 여기서 멈춰도 벽 성공은 잃지 않는다.
         if (PlayerBlocksLunge(_kbDir))
         {
-            _kbActive = false;
-            _kbRebound = false;
+            FinishVulnerableKnockback("넉백 종료(플레이어에 막힘)");
             return;
         }
 
@@ -4848,9 +4853,24 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
 
         _kbLeft -= step;
         if (_kbLeft <= 0.0001f)
+            FinishVulnerableKnockback(_kbRebound ? "벽 반동 종료" : "넉백 종료");
+    }
+
+    // 🔴 넉백이 끝나면 **그로기·취약을 함께 끝낸다**(팀장 09-29 — PLAN §3-3 "취약 4초 유지"의 뒤집기).
+    //    그로기 중 다른 플레이어의 간파로 다시 밀려도 CC 는 합산·연장 없이 시간이 흐르다가, 넉백 종료 시점에 전부 끝난다.
+    //    넉백 중 재적중은 StartVulnerableKnockback 이 새 방향 3m 로 다시 시작하므로 여기 오지 않는다.
+    //    ⚠️ 제압(벽 충돌로 게이지 0)으로 넘어갔으면 제압이 따로 5초를 가진다 — 건드리지 않는다.
+    void FinishVulnerableKnockback(string why)
+    {
+        _kbActive = false;
+        _kbRebound = false;
+        if (!IsServer || State == MonsterState.Dead || _suppressed) return;
+
+        EndVulnerable(why);
+        if (State == MonsterState.Groggy)
         {
-            _kbActive = false;
-            _kbRebound = false;
+            Debug.Log($"[23호] {why} — 그로기 즉시 해제", this);
+            DecideNextAfterAction();
         }
     }
 
@@ -4949,6 +4969,22 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     bool IsInMandatorySequence =>
         State == MonsterState.Attack && _currentEntry != null &&
         (_currentEntry.attackId == BossAttackId.ChargeSequence || _currentEntry.attackId == BossAttackId.RageDash);
+
+    /// <summary>
+    /// 점프어택 진행 중인가 — 이륙부터 착지 회복까지 **끊기지 않는다**(팀장 09-29: 공중은 절대, 이륙 도중도 안 됨).
+    /// 이륙이 공격 시작과 동시에 시작돼 "이륙 전" 구간이 없으므로 체인 전체가 대상이다(사실상 안 끊기는 패턴).
+    /// 슈퍼아머(행 superArmor)는 이미 걸려 있지만, 취약 넉백(InterruptForKnockback)은 슈퍼아머와 무관하게 끊기에 따로 막는다.
+    /// </summary>
+    bool IsInJumpChain =>
+        State == MonsterState.Attack && _currentEntry != null && _currentEntry.attackId == BossAttackId.Jump;
+
+    BossAttackEntry AttackEntryOf(BossAttackId id)
+    {
+        if (_boss == null || _boss.attacks == null) return null;
+        foreach (BossAttackEntry e in _boss.attacks)
+            if (e != null && e.attackId == id) return e;
+        return null;
+    }
 
     float SuppressDamageMultiplier => _boss != null ? Mathf.Max(0f, _boss.suppressDamageMultiplier) : 1.2f;
 

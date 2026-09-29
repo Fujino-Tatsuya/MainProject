@@ -163,6 +163,13 @@
   - ✅ **A 결정(팀장 09-29): 보스방만 NavMesh 여유 띠** — 보스방엔 보스 한 마리뿐, 보스 이동은 전부 NavMesh 경유(돌진 SetDestination · 넉백 agent.Move · 점프 투영+Warp). `BossRoomAuthoring` 메뉴 **Build Boss Room NavMesh Margin** → `bossroom.prefab/NavMeshMargin/Margin_*` 4개(`NavMeshModifierVolume` Not Walkable, 폭 1.0 · 경계 = 저작된 InvisibleBoundaries 안쪽 면). Rebuild Boss Room Bounds 끝에서도 호출. 프리팹 diff 추가 232줄 · 삭제 0 · guid 불변. 🔴 폭 상한 = 가장자리 ≤ 몸 반경 1.53(넘으면 취약 벽 판정 불가). ⏳ 침식이 띠에도 붙는지 미확인 → Play 로그 `[23호] NavMesh 여유` 로 폭 조정.
   - (기각) 보스 전용 에이전트 타입 + 추가 Surface — 한 마리뿐인 방에 과함. (기각) 매 틱 클램프 — 증상 되돌리기.
   - ~~⏳ A 보류~~  정석 후보 = 보스 전용 에이전트 타입(반경 ≈1.5) + 보스방 한정 NavMeshSurface 추가 베이크 → NavMesh 자체가 벽 여유를 준다. 대가: `NavMesh.SamplePosition`/`CalculatePath` 의 areaMask 오버로드가 어느 에이전트 타입 메시를 조회하는지 **미확인** — 보스 경로는 `NavMeshQueryFilter.agentTypeID` 오버로드로 바꾸는 게 안전(MonsterBase 공용 코드 포함, 착수 전 확인) · 런타임 베이크 1회 추가(30×30).
+- ✅ **09-29 팀장 Play 후 요청 3건 (구현 · Play 확인 대기)**
+  - 어퍼컷 예고 0.7 → **0.5**(No23·No23_Solo). FBX 60fps(TimeMode 3) → `uppercut_prep` 30f = 0.5초 — 0.7 이면 끝 프레임에서 0.2초 굳었다가 때렸다. 훅 2종도 같은 0.2초(요청 외라 유지).
+  - 차징 진입 점프 = **착지 범위 공격**(예고 원 + 일반 착지 클립 + `ApplyJumpLandingDamage`, 피해는 점프 행). 09-21 "차징은 무음 착지·예고 없음" 뒤집기.
+  - 점프어택은 체인 전체 **안 끊김**(`IsInJumpChain`): 슈퍼아머는 원래 걸려 있었고, 취약 넉백만 슈퍼아머와 무관하게 끊던 구멍(이륙 중 피격 가능)을 막음 — 피해만. "이륙 전" 구간은 이륙이 공격 시작과 동시라 없음. 플레이어에게 보스 스턴 CC 는 없음.
+  - ✅ 취약 중 근접 Q 견인 무시 = **의도(팀장 09-29 A안)**. 규칙 통일: 취약 중 넉백은 **플레이어 간파로만**, 다른 CC 는 보스에게 피해만(CC 미적용). 23호 `AutoHitReactions => false` 가 이미 그렇게 동작.
+  - 🔄 **⚠️ 뒤집음 — §3-3 "취약 4초 유지 · 재적중 = 새 방향 3m"**: 넉백이 **끝나면 그로기·취약을 함께 종료**(`FinishVulnerableKnockback` — 끝까지 밀림·플레이어에 막힘·벽 반동 종료 3경로 단일화). 그로기 중 다른 플레이어의 간파 → 다시 밀림(새 방향 3m), CC 는 합산·연장 없이 흐르다 넉백 종료 시 전부 끝. 제압으로 넘어간 경우는 제외(제압 5초 유지). 근거: 팀장 — "예외처리가 아니라 통일".
+  - 정정: 09-29 앞서 "그로기 진입 클립 90f 가 1.5초 로직보다 길다" 우려 → 60fps 라 정확히 1.5초. 문제 아님.
 - Codex 교차검증은 크레딧 복구 후(09-28 20시 이후) — 이번 구현 전체(§3·§4 NavMesh 수정 포함).
 
 ### 다음 세션 인수인계 — 취약 (§3-2 · §3-3 · §7-1 C1~C8 참고)
