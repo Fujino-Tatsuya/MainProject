@@ -837,6 +837,8 @@ public class DefaultAttackStep
     // 조기 루프백으로 들어올 때 처음(0초)이 아니라 여기서부터 재생해 윈드업을 건너뛴다.
     // 초 단위, 클립 원본(스케일 안 된) 타임라인 기준.
     [SerializeField] private float loopBackEntryTime = 0f;
+    // 이 스텝의 적중이 "적중 시 발동" 효과(패시브 버프 등)를 소모할 수 있는가. Player.ServerAttackLanded 에 실린다.
+    [SerializeField] private bool triggersOnHit = true;
 
     public AnimationClip Clip => clip;
     public float MotionDuration => motionDuration > 0f ? motionDuration : ClipDuration;
@@ -852,6 +854,7 @@ public class DefaultAttackStep
     public float AttackDamageMultiplier => attackDamageMultiplier;
     public int FlatDamageBonus => flatDamageBonus;
     public float LoopBackEntryTime => loopBackEntryTime;
+    public bool TriggersOnHit => triggersOnHit;
 
     private float ClipDuration => clip != null ? clip.length : 0f;
 }

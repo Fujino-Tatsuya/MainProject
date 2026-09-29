@@ -22,4 +22,46 @@ public enum StatusEffectType
     AttackSpeedModifier = 1 << 9,
     DefenseModifier = 1 << 10,
     MaxHpModifier = 1 << 11,
+
+    // 패시브 충전 — 소모될 때까지 유지되는 표식(duration 0). 캐릭터 무관 공용 1개(한 플레이어에 패시브는 하나).
+    // 차단·스탯 테이블에 넣지 않는다. 소모 규칙은 각 패시브가 정한다(예: FirstMeleePassive).
+    PassiveCharge = 1 << 12,
+}
+
+// 상태 효과의 성격. 연출 일괄 해제처럼 "디버프만" 골라야 하는 곳이 쓴다.
+public enum StatusEffectCategory
+{
+    Buff,
+    Debuff,
+}
+
+public static class StatusEffectCategories
+{
+    // 스탯 modifier 는 같은 타입이 버프도 디버프도 된다(가속 1.2 / 감속 0.5) — magnitude 로 가른다.
+    private const StatusEffectType StatModifiers =
+        StatusEffectType.MoveSpeedModifier | StatusEffectType.AttackDamageModifier |
+        StatusEffectType.AttackSpeedModifier | StatusEffectType.DefenseModifier | StatusEffectType.MaxHpModifier;
+
+    private const StatusEffectType Buffs = StatusEffectType.SuperArmor | StatusEffectType.PassiveCharge;
+
+    private const StatusEffectType Debuffs =
+        StatusEffectType.Airborne | StatusEffectType.Stunned | StatusEffectType.Slowed |
+        StatusEffectType.Rooted | StatusEffectType.Silenced | StatusEffectType.Debilitated;
+
+    public static StatusEffectCategory Of(in StatusEffectInstance instance) => Of(instance.type, instance.magnitude);
+
+    public static StatusEffectCategory Of(StatusEffectType type, float magnitude)
+    {
+        if ((type & StatModifiers) != 0)
+            return magnitude >= 1f ? StatusEffectCategory.Buff : StatusEffectCategory.Debuff;
+
+        if ((type & Buffs) != 0)
+            return StatusEffectCategory.Buff;
+
+        if ((type & Debuffs) == 0)
+            // 새 타입을 위 표에 안 넣었다 — 조용히 한쪽으로 떨어뜨리면 일괄 해제가 엉뚱한 걸 지운다.
+            Edit.LogWarning($"[StatusEffect] {type} 의 Buff/Debuff 분류가 없다 — StatusEffectCategories 표에 추가할 것. Debuff 로 취급한다.");
+
+        return StatusEffectCategory.Debuff;
+    }
 }

@@ -29,6 +29,7 @@ Player.prefab (base)            ← 네트워크·입력·이동·생명주기·
 | 전투·이동·UI 등 **역할** 동작을 바꾸려면? | **`Player.prefab`**(base). Variant 가 상속한다 |
 | 가붕이 **고유**(스킬·VFX·모델·히트박스·스탯)를 바꾸려면? | **`Player_Paladin.prefab`**, 몸체는 **`Paladin_Armature.prefab`** |
 | 새 캐릭터를 추가하려면? | base 의 Variant 를 새로 만들고 `DefaultNetworkPrefabs` 에 등록. 🔴 **`GlobalObjectIdHash` 가 YAML 에 기록됐는지 확인**(아래) |
+| 새 캐릭터 패시브는? | Variant 루트에 **`IPlayerPassive`** 구현 컴포넌트를 붙인다(HUD 가 이것만 본다). 적중·피격 반응은 `Player.ServerAttackLanded` / `ServerAttackReceived` 구독 — base 는 구체 패시브를 모른다([PLAN-passive-onhit.md](../../PLAN-passive-onhit.md)) |
 | 자식 이름 규칙 | 몸체 인스턴스 이름은 반드시 **`Armature`** (`transform.Find("Armature")` 폴백 3곳, §1.4) |
 | 구 프리팹은? | `Paladin.prefab` · `TempPlayer_Armature.prefab` → **`Player/Legacy/`** 보관. `Paladin_VFX.prefab` 은 **원래 위치(`Player/Paladin/`)에 유지**(2026-09-29 사용자 결정). 셋 다 스폰·네트워크 목록 대상 아님 — 고쳐도 게임에 반영되지 않는다 |
 | 네트워크 목록 | `DefaultNetworkPrefabs` 에 **`Player_Paladin` 만** 등록. base 는 스폰 대상이 아니라 뺐다 |

@@ -22,6 +22,8 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
     [SerializeField] private DissolveOverlay superArmorOverlay;
 
     private Unit lockedTarget;
+    // 완료 판정 1회의 적중 대상(1명). Player.ServerAttackLanded 통지용 버퍼.
+    private readonly System.Collections.Generic.List<Unit> landedUnits = new System.Collections.Generic.List<Unit>(1);
 
     public override PlayerSkillSlot Slot => PlayerSkillSlot.Ultimate;
 
@@ -101,8 +103,13 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
             return;
 
         AttackInfo attackInfo = new AttackInfo(damageSnapshot, AttackType.Skill);
-        AttackHitContext hitContext = new AttackHitContext(owner.transform.position, owner.transform);
-        lockedTarget.ReceiveAttack(attackInfo, hitContext);
+        AttackHitContext hitContext = new AttackHitContext(owner.transform.position, owner.transform, sourceUnit: owner);
+        if (lockedTarget.ReceiveAttack(attackInfo, hitContext))
+        {
+            landedUnits.Clear();
+            landedUnits.Add(lockedTarget);
+            owner.RaiseServerAttackLanded(AttackType.Skill, Data != null && Data.TriggersOnHit, landedUnits, this);
+        }
 
         // 🔴 여기도 서버 전용이라 창구를 거친다(OnChannelCompleted 는 TickServer 경로다).
         //    위치는 넘기지 않는다 — 각 피어가 표식을 깔 때 잡아 둔 그 트랜스폼에 떨어진다.

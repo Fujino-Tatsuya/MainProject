@@ -36,6 +36,8 @@ public class FirstMeleeInterruptSkill : PlayerInstantSkill
     // 키가 Unit이 아니라 Object인 이유: 파괴 가능한 상자처럼 Unit이 아닌 IAttackReceiver도
     // 피격 대상이다. 그런 대상은 Hurtbox를 키로 쓴다(아래 히트 루프 참조).
     private readonly HashSet<Object> hitTargets = new HashSet<Object>();
+    // 이번 판정에 맞은 Unit (Player.ServerAttackLanded 통지용). Unit 이 아닌 대상(상자 등)은 빠진다.
+    private readonly List<Unit> landedUnits = new List<Unit>();
 
     private float hitTime;
     private float endTime;
@@ -125,6 +127,7 @@ public class FirstMeleeInterruptSkill : PlayerInstantSkill
 
         int hitCount = OverlapHitboxAnchor(hitResults);
         hitTargets.Clear();
+        landedUnits.Clear();
 
         int resolvedCount = 0;
 
@@ -155,6 +158,8 @@ public class FirstMeleeInterruptSkill : PlayerInstantSkill
             if (resolved)
             {
                 resolvedCount++;
+                if (unit != null)
+                    landedUnits.Add(unit);
 
                 // unit이 아니라 target을 찍는다 — Unit이 아닌 대상(상자 등)은 unit이 null이다.
                 Edit.Log($"[Skill] 단죄의 방패 적중 — {target.name} 피해 {attackInfo.damage} (Interrupt)", this);
@@ -165,5 +170,7 @@ public class FirstMeleeInterruptSkill : PlayerInstantSkill
         // 대상 수와 무관하게 한 번만 터뜨린다 — 여럿 맞혔다고 겹쳐 재생하면 밝기만 배로 튄다.
         if (resolvedCount > 0)
             shieldVfx?.ServerInterruptWave();
+
+        owner.RaiseServerAttackLanded(AttackType.Skill, Data != null && Data.TriggersOnHit, landedUnits, this);
     }
 }

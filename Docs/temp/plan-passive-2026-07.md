@@ -1,5 +1,11 @@
 # PLAN — 패시브 '불굴의 의지' (First Melee Passive)
 
+> 🔴 **2026-09-29 대체됨 — 버프 모델로 재작성.** 현행 설계는 [PLAN-passive-onhit.md](../../PLAN-passive-onhit.md).
+> 바뀐 것: Ready → `PassiveCharge` 버프(상태이상) · 발동 = 버프 보유 중 `triggersOnHit` 공격 적중 → 소모 ·
+> 추가피해 **처음 맞은 한 명만** · 회복 **고정 %**(맞은 수 비례 폐지) · 스폰 시 **버프 보유로 시작** ·
+> 평타 전용 이벤트(`ServerHitEnemiesResolved`) → 범용 `Player.ServerAttackLanded`. 피격 쿨감은 유지.
+> 아래 본문은 2026-07 원 설계 기록이다.
+
 > 브랜치: feature/PlayerSkill
 > 상태: **그릴 완료 — 승인 대기 (구현 미착수)**
 > 기획: Google Sheet(VeyTrace) + 그릴 확정(2026-07-23)

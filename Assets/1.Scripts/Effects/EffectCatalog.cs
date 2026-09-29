@@ -45,7 +45,7 @@ public class EffectCatalog : ScriptableObject
     [field: SerializeField] public EffectEntry DoubleSlash_Miss { get; private set; }
 
     [Header("플레이어 — 불굴의 의지(패시브)")]
-    // Heal 은 시전자에게 1회, BonusHit 은 맞은 적마다 1회. FirstMeleePassive 가 같은 RPC 로 함께 뿌린다.
+    // Heal 은 시전자에게 1회, BonusHit 은 처음 맞은 적 1명에게 1회. FirstMeleePassive 가 같은 RPC 로 함께 뿌린다.
     [field: SerializeField] public EffectEntry Passive_Heal { get; private set; }
     [field: SerializeField] public EffectEntry Passive_BonusHit { get; private set; }
 

@@ -35,6 +35,8 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
     // 키가 Unit이 아니라 Object인 이유: 파괴 가능한 상자처럼 Unit이 아닌 IAttackReceiver도
     // 피격 대상이다. 그런 대상은 Hurtbox를 키로 쓴다(아래 히트 루프 참조).
     private readonly HashSet<Object> tickTargets = new HashSet<Object>();
+    // 이번 틱에 맞은 Unit (Player.ServerAttackLanded 통지용). Unit 이 아닌 대상(상자 등)은 빠진다.
+    private readonly List<Unit> tickLandedUnits = new List<Unit>();
 
     // 진행 방향 장부. 이동 권위 피어는 실제 이동에, 서버는 판정·넉백 방향에 사용한다.
     private Vector3 heading = Vector3.forward;
@@ -122,6 +124,7 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
 
         int hitCount = OverlapHitboxAnchor(hitResults);
         tickTargets.Clear();
+        tickLandedUnits.Clear();
 
         for (int i = 0; i < hitCount; i++)
         {
@@ -148,7 +151,7 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
                 knockbackDuration: data.KnockbackDuration,
                 staggerDuration: data.StaggerDuration,
                 knockbackDirection: heading);
-            AttackHitContext hitContext = new AttackHitContext(owner.transform.position, owner.transform, hit);
+            AttackHitContext hitContext = new AttackHitContext(owner.transform.position, owner.transform, hit, owner);
 
             bool resolved = hurtbox != null
                 ? hurtbox.ReceiveAttack(attackInfo, hitContext)
@@ -157,9 +160,14 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
             if (!resolved)
                 continue;
 
+            if (unit != null)
+                tickLandedUnits.Add(unit);
+
             // unit이 아니라 target을 찍는다 — Unit이 아닌 대상(상자 등)은 unit이 null이다.
             Edit.Log($"[Skill] 진격의 방패 틱 — {target.name} 피해 {attackInfo.damage} + 견인", this);
         }
+
+        owner.RaiseServerAttackLanded(AttackType.Skill, data.TriggersOnHit, tickLandedUnits, this);
     }
 
     public override void OnEnd(SkillEndReason reason)

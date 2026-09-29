@@ -2533,17 +2533,25 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::StatusEffectHUD
   widgets:
   - root: {fileID: 810}
+    icon: {fileID: 813}
     text: {fileID: 818}
   - root: {fileID: 820}
+    icon: {fileID: 823}
     text: {fileID: 828}
   - root: {fileID: 830}
+    icon: {fileID: 833}
     text: {fileID: 838}
   - root: {fileID: 840}
+    icon: {fileID: 843}
     text: {fileID: 848}
   - root: {fileID: 850}
+    icon: {fileID: 853}
     text: {fileID: 858}
   - root: {fileID: 860}
+    icon: {fileID: 863}
     text: {fileID: 868}
+  defaultIcon: {fileID: 21300000, guid: efff9d08056fd8a4ba37e0abf5b72223, type: 3}
+  icons: []
 --- !u!1 &810
 GameObject:
   m_ObjectHideFlags: 0

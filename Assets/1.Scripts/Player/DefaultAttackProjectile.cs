@@ -10,12 +10,16 @@ public class DefaultAttackProjectile : BaseAttack
     private float speed;
     private float despawnTime;
     private bool launched;
+    private bool triggersOnHit;
+    // 1발 = 1판정. 명중 대상 1명을 Player.ServerAttackLanded 로 넘길 때 쓰는 버퍼.
+    private readonly System.Collections.Generic.List<Unit> landedBuffer = new System.Collections.Generic.List<Unit>(1);
 
     protected override Unit AttackSourceUnit => owner;
 
-    public void Launch(Unit owner, Vector3 direction, float speed, int damage, LayerMask targetLayer)
+    public void Launch(Unit owner, Vector3 direction, float speed, int damage, LayerMask targetLayer, bool triggersOnHit)
     {
         this.owner = owner;
+        this.triggersOnHit = triggersOnHit;
         this.direction = direction.sqrMagnitude >= 0.001f ? direction.normalized : transform.forward;
         this.speed = Mathf.Max(0f, speed);
         despawnTime = Time.time + Mathf.Max(0.1f, lifetime);
@@ -53,7 +57,10 @@ public class DefaultAttackProjectile : BaseAttack
                 return;
 
             if (TryResolveHit(hurtbox, other))
+            {
+                RaiseLanded(ownerUnit);
                 Destroy(gameObject);
+            }
 
             return;
         }
@@ -63,6 +70,20 @@ public class DefaultAttackProjectile : BaseAttack
             return;
 
         if (TryResolveHit(target))
+        {
+            RaiseLanded(target);
             Destroy(gameObject);
+        }
+    }
+
+    // Unit 이 아닌 대상(상자 등)은 적중 통지에서 빠진다 — 평타 Overlap 과 같은 규칙.
+    private void RaiseLanded(Unit target)
+    {
+        if (target == null || !(owner is Player player))
+            return;
+
+        landedBuffer.Clear();
+        landedBuffer.Add(target);
+        player.RaiseServerAttackLanded(attackType, triggersOnHit, landedBuffer, this);
     }
 }
