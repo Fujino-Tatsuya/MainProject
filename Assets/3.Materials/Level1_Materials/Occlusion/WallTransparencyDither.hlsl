@@ -21,53 +21,73 @@ float WallTransparencyDitherThreshold(float2 screenPositionNormalized)
     return frac(52.9829189 * frac(dot(pixel, float2(0.06711056, 0.00583715))));
 }
 
-// 높이 그라데이션과 구역 강도를 합쳐 최종 불투명도를 구한다.
+// ── 분리판 (2026-09-29) ─────────────────────────────────────────────────────
 //
-// 🔴 방향: **아래가 사라지고 위가 남는다.** baseY 에서 알파 0, 위로 갈수록 선형으로 1 에
-// 도달한다. 벽 한 층이 2.5 이므로 fadeHeight 5.0 이면
-//   1층(baseY ~ +2.5)   알파 0   → 0.5
-//   2층(+2.5 ~ +5.0)    알파 0.5 → 1.0
-//   3·4층(+5.0 이상)    알파 1.0 (saturate) = 그대로 남는다
+// 두 그라데이션을 **서로 독립된 프로퍼티**로 받는다.
 //
-// opacity 는 _WallOcclusionOpacity(1 = 평소대로, 0 = 구역이 완전히 켜짐)다.
-// 구역 밖이면 1 이 들어와 strength 가 0 이 되고, 결과는 높이와 무관하게 1 — 아무 변화 없다.
-float WallTransparencyOpacity(
-    float worldPositionY,
-    float baseY,
-    float fadeHeight,
-    float opacity)
+//   ① 상시 하단  _WallOccBaseY / _WallOccFadeHeight        ← 머티리얼에 박힌 값. 그룹이 안 건드린다
+//   ② 구역 상단  _WallOccZoneBaseY / _WallOccZoneFadeHeight ← WallTransparencyGroup 이 인스턴스에만 쓴다
+//   ③ Opacity   _WallOcclusionOpacity                      ← **항상 1**
+//
+// 구역 효과는 불투명도가 아니라 **② 설정값의 보간**으로 낸다. 컴포넌트가 설정값1(구역 밖) ↔
+// 설정값2(구역 안) 를 FadeIn/FadeOut 시간에 맞춰 Lerp 해서 ② 로 흘려보낸다.
+//
+// ③ 은 값으로는 죽어 있지만 지우지 않는다 — C# 이 `HasProperty(_WallOcclusionOpacity)` 로
+// "투명화를 지원하는 머티리얼인가" 를 판별한다. 지우면 그룹이 모든 머티리얼을 건너뛴다.
+//
+// 합성은 단순 곱이다.
+//   그룹 밖 머티 : bottom × 1     = 상시 하단만 (Zone 값이 0 이라 top = 1)
+//   구역 밖      : bottom × top(설정값1)
+//   구역 안      : bottom × top(설정값2)
+//
+// 구판 WallTransparencyDither_float/half 와 그 헬퍼는 그래프가 이 함수로 넘어온 것을 확인한 뒤
+// 2026-09-29 에 제거했다.
+float WallTransparencyHeightMask(float worldPositionY, float baseY, float fadeHeight)
 {
-    float heightMask = saturate((worldPositionY - baseY) / max(fadeHeight, 1e-4));
-    float strength = 1.0 - opacity;
-    return lerp(1.0, heightMask, strength);
+    // fadeHeight 0 = 그라데이션 끔. 안 걸러내면 span 이 0 이라 baseY 를 경계로 칼같이 갈린다.
+    if (abs(fadeHeight) < 1e-6)
+        return 1.0;
+
+    float mask = saturate((worldPositionY - baseY) / abs(fadeHeight));
+
+    // 부호가 방향 — 양수: 아래가 투명 / 음수: 위가 투명
+    return (fadeHeight < 0.0) ? (1.0 - mask) : mask;
 }
 
-void WallTransparencyDither_float(
+// 🔴 인자 순서가 곧 배선이다 — Shader Graph 의 Custom Function 은 이름이 아니라 **순서**로
+//    바인딩한다. 틀려도 컴파일은 되고 값만 조용히 뒤바뀐다.
+//    그래프 노드의 슬롯 순서와 반드시 같아야 한다:
+//      ScreenPosition · WorldPosition · BaseY · FadeHeight · ZoneBaseY · ZoneFadeHeight · Opacity
+void WallTransparencyDitherSplit_float(
     float2 ScreenPosition,
     float3 WorldPosition,
     float BaseY,
     float FadeHeight,
+    float ZoneBaseY,
+    float ZoneFadeHeight,
     float Opacity,
     out float Alpha)
 {
-    float opacity = WallTransparencyOpacity(WorldPosition.y, BaseY, FadeHeight, Opacity);
+    float bottom = WallTransparencyHeightMask(WorldPosition.y, BaseY, FadeHeight);
+    float top = WallTransparencyHeightMask(WorldPosition.y, ZoneBaseY, ZoneFadeHeight);
+    float opacity = bottom * top * Opacity;
     Alpha = opacity - WallTransparencyDitherThreshold(ScreenPosition);
 }
 
-void WallTransparencyDither_half(
+void WallTransparencyDitherSplit_half(
     half2 ScreenPosition,
     half3 WorldPosition,
     half BaseY,
     half FadeHeight,
+    half ZoneBaseY,
+    half ZoneFadeHeight,
     half Opacity,
     out half Alpha)
 {
     // half 그래프에서도 계산은 float 로 유지해야 기존 셰이더와 같은 무늬가 나온다.
-    float opacity = WallTransparencyOpacity(
-        (float)WorldPosition.y,
-        (float)BaseY,
-        (float)FadeHeight,
-        (float)Opacity);
+    float bottom = WallTransparencyHeightMask((float)WorldPosition.y, (float)BaseY, (float)FadeHeight);
+    float top = WallTransparencyHeightMask((float)WorldPosition.y, (float)ZoneBaseY, (float)ZoneFadeHeight);
+    float opacity = bottom * top * (float)Opacity;
     Alpha = (half)(opacity - WallTransparencyDitherThreshold((float2)ScreenPosition));
 }
 
