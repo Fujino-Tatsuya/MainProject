@@ -191,7 +191,8 @@
    `EffectAnimEvents` 를 `Paladin_VFX` 값 그대로 얹고, 스킬 5종의 VFX 필드(`skillVfx`·`shieldVfx`·`slashHit` 등)와
    소켓 참조를 **Armature 중첩 인스턴스 내부로** 재배선한다.
    🔴 `PlayerShieldVfx` 는 **NetworkBehaviour** — Variant 루트에서 NetworkBehaviour 순서가 모든 피어에서 같아야 한다(§1.5-2).
-   Variant 는 그 자체로 하나의 NetworkPrefab 이라 피어 간 동일성은 보장되지만, **루트 컴포넌트 순서를 `Paladin_VFX` 와 같게** 맞춘다
+   Variant 는 그 자체로 하나의 NetworkPrefab 이라 피어 간 동일성은 자동 보장된다. **프리팹 간(`Paladin_VFX` 대비) 순서 일치는 필요 없다**
+   (2026-09-29 정정 — base 순서를 상속하고 Variant 추가분은 뒤에 붙는다. §4-1 대조에서 순서 차이는 의도된 차이로 본다)
    💡 **여기는 저작 툴이 값어치를 할 수 있는 유일한 자리다** — 이 배선은 과거에 머지에서 반복
    유실됐고(`PlayerEncounterLockAuthoring` 주석의 3건), 캐릭터가 늘면 Variant 마다 반복된다.
    다만 **캐릭터가 2종 이상이 될 때** 만든다. 지금 1종에 도구를 세우는 건 이르다
