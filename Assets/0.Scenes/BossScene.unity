@@ -788,11 +788,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TwentyThreeArenaContext
   ShowTopMostFoldoutHeaderGroup: 1
   bossPrefab: {fileID: 6928635095488946580, guid: f3f87bba52188544aa5e032c28ce9d60, type: 3}
-  ChargingObjects:
-  - {fileID: 1929793192}
-  - {fileID: 1063592043}
-  - {fileID: 299937201}
-  - {fileID: 30393467}
   bossPos: {x: 0, y: 0, z: 0}
 --- !u!1 &1063592036
 GameObject:
@@ -1715,7 +1710,7 @@ MonoBehaviour:
   NetworkConfig:
     ProtocolVersion: 0
     NetworkTransport: {fileID: 1792167253}
-    PlayerPrefab: {fileID: 6077492126708577103, guid: af4a760f53d82b64f8369a09c962374c, type: 3}
+    PlayerPrefab: {fileID: 7876615519038055782, guid: df27ec97b40aab24da03bb1fb7cb43ce, type: 3}
     Prefabs:
       NetworkPrefabsLists:
       - {fileID: 11400000, guid: 28ca89dc34eff6547b550c9200caee32, type: 2}

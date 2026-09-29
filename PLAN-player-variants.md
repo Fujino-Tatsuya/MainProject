@@ -220,6 +220,18 @@
 4. 구 `Player.prefab` 을 쓰던 `TrashMobScene`·`Debug/PlayerScene` 도 함께 전환
 - ✅ 검증: 세 GUID(`Player`·`Paladin`·`Paladin_VFX`)를 참조하는 씬이 **base 외 0개**. Play 시 `Player_Paladin(Clone)` 이 **정확히 1개** 스폰
 
+**P4 결과 (2026-09-29, Claude — 에디터 안 임시 스크립트, 커밋 안 함)**
+- 선행: `PlayerSilhouetteTag` 를 **base 로 이동**(사용자 결정). Variant 의 추가 컴포넌트를 지우고 base 에 추가 — 값은 기본값(`modelRoot` 없음) 그대로라 Variant 오버라이드 없음.
+- 스냅샷 재반영: `2e1ac271..origin/development` 에 `Paladin_VFX` 내용 변경 **없음**.
+- 등록: `DefaultNetworkPrefabs` 끝에 `Player_Paladin`. 기존 3개 항목은 P5 에서 제거.
+- 전환(참조 12곳): `NetworkManager.prefab.defaultPlayerPrefab` · BootStrap·Dev_Boot 의 `defaultPlayerPrefab` 오버라이드 ·
+  Boss·Monster·PlayerDash·TrashMob 의 `NetworkConfig.PlayerPrefab` · Monster·TrashMob 의 `MonsterTestBootstrap.playerPrefab` ·
+  `Debug/PlayerScene` 의 **배치 인스턴스 교체**(구 `Player` 인스턴스와 오버라이드 404줄 폐기 → 같은 위치에 `Player_Paladin`).
+- 재저장 부수효과(전부 무해로 판정): `BossScene` 의 `TwentyThreeArenaContext.ChargingObjects`(코드에서 삭제된 필드) 탈락 ·
+  `Dev_Boot` 의 `DevSceneBooter.scene`(코드에서 삭제) 탈락 · `TrashMobScene` `MonsterSpawner` 의 in-scene `GlobalObjectIdHash` NGO 재계산 ·
+  base 의 `slashHit`/`slashMiss`/`showSafePointMarkers` 코드 기본값 직렬화 · `NetworkManager.prefab` `verboseNetcodeLogging` 기본값 직렬화.
+- 수동 제거: `Dev_Boot` 의 **죽은 오버라이드** `NetworkSessionLauncher.defaultPlayerPrefab`(필드는 `9911470d` 에서 삭제) — `Paladin_VFX` 를 계속 참조하고 있었다.
+
 ### 3.5 P5 — 구 프리팹 정리 + 툴·문서 갱신
 
 1. `Paladin.prefab` · `Paladin_VFX.prefab` 을 `DefaultNetworkPrefabs.asset` 에서 제거 후

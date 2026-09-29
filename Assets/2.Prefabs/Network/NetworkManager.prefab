@@ -122,6 +122,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e79780907b68c8e4795e23dde0acb9f8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NetworkSessionLauncher
+  verboseNetcodeLogging: 1
 --- !u!114 &7043847080119373261
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -139,7 +140,7 @@ MonoBehaviour:
   minimumVisibleSeconds: 5
   readyMessageSeconds: 2.5
   requireLobbyReadyToStart: 1
-  defaultPlayerPrefab: {fileID: 6077492126708577103, guid: af4a760f53d82b64f8369a09c962374c, type: 3}
+  defaultPlayerPrefab: {fileID: 7876615519038055782, guid: df27ec97b40aab24da03bb1fb7cb43ce, type: 3}
   debugLogging: 1
   spawn_Offset: {x: 0, y: 10, z: 0}
 --- !u!114 &1111111111111111111

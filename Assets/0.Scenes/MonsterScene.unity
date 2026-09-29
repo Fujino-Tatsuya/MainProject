@@ -692,7 +692,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e21afd08793ae0d449e707c61e86d36b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MonsterTestBootstrap
-  playerPrefab: {fileID: 6077492126708577103, guid: af4a760f53d82b64f8369a09c962374c, type: 3}
+  playerPrefab: {fileID: 7876615519038055782, guid: df27ec97b40aab24da03bb1fb7cb43ce, type: 3}
   playerSpawnPoint: {fileID: 749244850}
   fallbackSpawnPosition: {x: 0, y: 1, z: 3}
   autoStartHostOnPlay: 1
@@ -1448,7 +1448,7 @@ MonoBehaviour:
   NetworkConfig:
     ProtocolVersion: 0
     NetworkTransport: {fileID: 1538840101}
-    PlayerPrefab: {fileID: 6077492126708577103, guid: af4a760f53d82b64f8369a09c962374c, type: 3}
+    PlayerPrefab: {fileID: 7876615519038055782, guid: df27ec97b40aab24da03bb1fb7cb43ce, type: 3}
     Prefabs:
       NetworkPrefabsLists:
       - {fileID: 11400000, guid: 28ca89dc34eff6547b550c9200caee32, type: 2}
