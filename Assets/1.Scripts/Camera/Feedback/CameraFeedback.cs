@@ -9,7 +9,6 @@ public sealed class CameraFeedback : MonoBehaviour
     const int ImpulseChannel = 1;
 
     public static CameraFeedback Instance { get; private set; }
-    public static bool RequiresAttributedDamageRpc => Instance != null;
 
     [Header("피격 쉐이크")]
     [SerializeField] bool receivedHitShakeEnabled = true;

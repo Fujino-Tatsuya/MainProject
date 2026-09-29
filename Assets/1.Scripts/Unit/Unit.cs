@@ -46,6 +46,7 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     NetworkVariableWritePermission.Server
 );
     bool _deathNotified;
+    ulong _damageAttackerClientId = ulong.MaxValue;
 
     /// <summary>
     /// 서버에서 생존 상태의 체력이 0으로 전환될 때 한 번 발생한다.
@@ -88,16 +89,25 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
 
         int previousHealth = _health.CurrentHealth;
 
+        int hpDealt;
+        int shieldDealt;
         if (ignoreDefenseAndShield)
         {
+            hpDealt = damage;
+            shieldDealt = 0;
             _health.TakeHpDamage(damage);
         }
         else
         {
-            ApplyMitigatedHealthDamage(damage);
+            ApplyMitigatedHealthDamage(damage, out hpDealt, out shieldDealt);
         }
 
         _currentHp.Value = _health.CurrentHealth;
+
+        // 표시용 피해량은 체력 클램프 전 최종값이다. NetworkVariable 변화량으로는 막타 초과분을
+        // 복원할 수 없으므로, 피해가 확정되는 이 지점에서 전 피어에 전달한다.
+        if (IsSpawned && (hpDealt > 0 || shieldDealt > 0))
+            ClientDamageDealtClientRpc(hpDealt, shieldDealt, _damageAttackerClientId);
 
         // 진단 — Health 의 기존 로그는 대상 이름이 없어서 누구의 체력이 줄었는지 알 수 없었다.
         // 요청값과 실제 감소량을 함께 남긴다(경감으로 1까지 깎이는 경우를 가른다).
@@ -108,9 +118,10 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         NotifyDeathTransition(previousHealth);
     }
 
-    void ApplyMitigatedHealthDamage(int damage)
+    void ApplyMitigatedHealthDamage(int damage, out int hpDealt, out int shieldDealt)
     {
         int remainingDamage = damage;
+        shieldDealt = 0;
 
         //// 방어력 경감률 적용: 최종 피해 = 피해 x 100 / (100 + 방어력), 방어력 100당 50% 경감
         remainingDamage = Mathf.RoundToInt(remainingDamage * 100f / (100f + _health.CurrentDefense));
@@ -118,18 +129,21 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         // 쉴드가 있으면 쉴드로 피해를 처리하고 남은 데미지 계산
         if (_health.HasShield)
         {
-            int shieldDamage = Mathf.Min(remainingDamage, _health.CurrentShield);
-            _health.TakeShieldDamage(shieldDamage);
+            shieldDealt = Mathf.Min(remainingDamage, _health.CurrentShield);
+            _health.TakeShieldDamage(shieldDealt);
 
             UpdateNetworkShield();
 
-            remainingDamage -= shieldDamage;
+            remainingDamage -= shieldDealt;
         }
 
+        // Health.TakeHpDamage가 0으로 클램프하기 전의 최종 HP 피해량을 보존한다.
+        hpDealt = remainingDamage;
+
         // 남은 피해는 체력으로 처리
-        if (remainingDamage > 0)
+        if (hpDealt > 0)
         {
-            _health.TakeHpDamage(remainingDamage);
+            _health.TakeHpDamage(hpDealt);
         }
     }
 
@@ -156,19 +170,17 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         if (CurrentHealth <= 0)
             return false;
 
-        int previousHp = CurrentHealth;
-        int previousShield = CurrentShield;
-
-        TakeDamage(attackInfo);
-
-        int hpDamage = Mathf.Max(0, previousHp - CurrentHealth);
-        int shieldDamage = Mathf.Max(0, previousShield - CurrentShield);
-        // 타격 쉐이크도 공격자 귀속값을 소비하므로 카메라 리그가 있으면 기존 RPC를 재사용한다.
-        if (IsServer && IsSpawned && (hpDamage > 0 || shieldDamage > 0) &&
-            (FloatingDamageSpawner.RequiresAttributedDamageRpc || CameraFeedback.RequiresAttributedDamageRpc))
+        // 공격자 귀속은 이 ReceiveAttack이 적용하는 피해에만 유효하다. 추락·비율·직접 피해처럼
+        // ApplyHealthDamage를 곧바로 타는 경로는 기본값(공격자 없음)을 유지한다.
+        ulong previousAttackerClientId = _damageAttackerClientId;
+        _damageAttackerClientId = ResolveAttackerClientId(hitContext);
+        try
         {
-            ulong attackerClientId = ResolveAttackerClientId(hitContext);
-            ClientDamagedAttributedClientRpc(hpDamage, shieldDamage, attackerClientId);
+            TakeDamage(attackInfo);
+        }
+        finally
+        {
+            _damageAttackerClientId = previousAttackerClientId;
         }
 
         return true;
@@ -491,13 +503,13 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     /// 실드 감소는 여기서 나오지 않는다(ClientDamaged 참조).
     /// </summary>
     public event System.Action<int, int> ClientHpChanged;
-    /// 모든 피어에서 복제된 실제 감소량과 채널을 전달한다. 기본 AllDamage 표시에 사용하며
-    /// 기존 ClientDamaged 이벤트와 판정 경로는 변경하지 않는다.
+    /// 모든 피어에서 복제된 실제 감소량과 채널을 전달한다.
+    /// HitFlash·카메라의 피격 반응처럼 체력 클램프 뒤 변화량이 필요한 소비자가 사용한다.
     /// </summary>
     public event Action<int, DamageChannel> ClientDamagedAmount;
 
     /// <summary>
-    /// 공격자 구분 필터가 켜졌을 때만 서버가 보내는 실제 감소량이다.
+    /// 서버가 모든 피해 적용마다 보내는 방어 적용 후·체력 클램프 전 최종 피해량이다.
     /// attackerClientId가 ulong.MaxValue면 플레이어 공격자가 아닌 피해다.
     /// </summary>
     public event Action<int, DamageChannel, ulong> ClientDamagedAttributed;
@@ -552,7 +564,7 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     }
 
     [ClientRpc]
-    void ClientDamagedAttributedClientRpc(int hpDamage, int shieldDamage, ulong attackerClientId)
+    void ClientDamageDealtClientRpc(int hpDamage, int shieldDamage, ulong attackerClientId)
     {
         if (shieldDamage > 0)
             ClientDamagedAttributed?.Invoke(shieldDamage, DamageChannel.Shield, attackerClientId);
