@@ -1,4 +1,4 @@
-# PLAN — 패시브 전면 수정 + 범용 "적중 시" 이벤트 (2026-09-29, ✅ §1~11 완료 · §12 승인 — Codex 구현 위임)
+# PLAN — 패시브 전면 수정 + 범용 "적중 시" 이벤트 (2026-09-29, ✅ §1~11 완료 · §12 구현 완료 — Play 검증 대기)
 
 > **승인 시 추가 결정 (2026-09-29 은희)**
 > - **상태이상에 Buff/Debuff 분류 enum 을 우리가 추가한다** → §4.6. (경석의 `ClearAllServer()` 디버프 한정화가 이 분류를 쓴다)
@@ -188,7 +188,7 @@
 | consider 3 문서 모순(네트워크 목록) | ✅ player-prefabs.md §0·§7·§9 — "스폰 대상 아님" 과 "NGO 자동 등록" 분리, 확인 명령에서 `DefaultNetworkPrefabs` 제외 |
 | consider 4 `PlayerEncounterLockAuthoring` 이 `Paladin_VFX` 순회 | ⏸ 경석(툴 작성자) 판단 대기 |
 
-## 12. 후속 — 초과 피해 표시 + 패시브 추가피해를 막타에 합산 (2026-09-29, ✅ 승인 — Codex 구현)
+## 12. 후속 — 초과 피해 표시 + 패시브 추가피해를 막타에 합산 (2026-09-29, ✅ 구현 완료 — Play 검증 대기)
 
 ### 확정 사항 (grill, 은희)
 
@@ -235,3 +235,13 @@
 - 컴파일. Play: 체력 10 몹에 50 → 숫자 50. 쉴드 있는 대상 → 쉴드/HP 숫자 분리. 추락 피해 숫자(타 피어 화면).
 - 패시브 버프 보유 평타 막타 → 합산 숫자 1개, 소모·회복·발동 연출. 다수 적중 시 첫 대상에만 합산.
 - MPPM 2인 — 클라 화면에서 동일.
+
+### §12 구현 결과 (2026-09-29, Codex — 3번째 위임 a88e4f8f 에서 완료, Claude 검토)
+
+- 위임 경과: 7a634d88 크레딧 소진으로 A 도중 중단 → 2846663c 워처가 옛 `codex.exe` 경로(업데이트로 삭제)를 잡고 있어 기동 실패 → 워처 재시작 후 a88e4f8f 완료.
+- **A `11d46701`** — `Unit.ApplyHealthDamage` 가 클램프 전 `hpDealt`/`shieldDealt` 를 `ClientDamageDealtClientRpc` 로 항상 발송(모든 피해 경로). 공격자 id 는 `ReceiveAttack` 이 `TakeDamage` 동안만 세팅.
+  `FloatingDamagePresenter` 는 이 이벤트만 사용(`ClientDamagedAmount` 미사용), `RequiresAttributedDamageRpc` 2개 삭제.
+  카메라: 가한 피해 쉐이크는 **피해량 비례가 아니라 고정 진폭 + 최소 간격 가드**라 초과 피해로 세지지 않음. 로컬 피격 쉐이크는 기존 `ClientDamagedAmount` 유지.
+- **B `4f5d8433`** — `IPlayerOnHitBonus` + `Player.ServerTakeOnHitBonus`(서버·`triggersOnHit`·생존 대상만). 호출 6곳(평타 Overlap·Raycast·투사체, Q·우클릭·R) — 판정당 1회, 첫 Unit 대상이 죽었으면 다음으로 넘기지 않음.
+  `FirstMeleePassive` 가 훅에서 소모·쿨타임·회복·연출 처리 후 추가 피해량 반환 → 원래 공격 피해에 합산(`overrideDamage`/`AttackInfo.damage`). 별도 추가타·`ServerAttackLanded` 구독 삭제(범용 이벤트는 유지).
+- 빌드: `dotnet build Assembly-CSharp-Editor` 오류 0(기존 경고 17). Unity 에디터 컴파일·Play 는 미확인.
