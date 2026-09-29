@@ -1,6 +1,6 @@
 # PLAN — 튜토리얼 스테이지로 갈아끼우기
 
-> 상태: **구현 완료 · Play 확인 대기** (승인 2026-09-29 "이상없으면 작업") · 작업자: 경석(Claude) · 브랜치 `feature/Boss23`
+> 상태: **구현 완료 · Play 확인 완료(09-29 180° 회전 포함)** (승인 2026-09-29 "이상없으면 작업") · 작업자: 경석(Claude) · 브랜치 `feature/Boss23`
 
 ## 확정 (팀장 09-29)
 | # | 결정 |
@@ -41,4 +41,4 @@
 - 🔴 SVN **r340 필요**(이지원 r339·r340 `walll_brick_cornerCOM_*` — 구석 40곳이 이 프리팹으로 교체됨). r338 이면 구석 벽이 **빠진 채로** 열린다(missing prefab, 에러 없음). 핀 `art-svn.json` = 340.
 - 툴 수정: ① 투명화 존(`WallTransparencyZone`, 기본 큐브 MeshFilter)을 벽에서 제외 — 안 빼면 존 자리가 보이지 않는 실체 벽이 된다. ② 구석 판정을 이름 + **모양**(가로·세로 둘 다 두께 1.5배 초과)으로 — `cornerCOM` 은 곧은 판 2(1×4m) + 기둥 1(1.5×1.5m)이라 ㄱ 자 0개.
 - 결과(배치모드): BoxCollider 333(이름만 corner 120 → 박스 1개) + 은희 트리거 9 유지 · 슬롯 5 YawSteps 2 · 바닥 지도 존 자리 5곳이 벽 윤곽과 일치, 복도 4곳 벽-바닥-벽. 회전 후 Start 존 서쪽 벽 없음 = 존 프리팹이 자기 벽을 가짐(회전 전과 같은 모양).
-- ⏳ Play 확인: 투명화 방향 · 스폰 Start · 런타임 NavMesh(`MapNavMeshBaker` 가 `MapGenerator.OnGenerated` 에서 굽는다) · BossEnter → 보스방.
+- ✅ Play 확인(팀장 09-29 "문제없음"): 투명화 방향 · 스폰 Start · 런타임 NavMesh(`MapNavMeshBaker` 가 `MapGenerator.OnGenerated` 에서 굽는다) · BossEnter → 보스방.
