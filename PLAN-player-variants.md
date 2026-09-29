@@ -200,6 +200,16 @@
 6. 저장: `Assets/2.Prefabs/Player/Paladin/Player_Paladin.prefab`
 - ✅ 검증: **P0 병합된 `Paladin_VFX.prefab`** 과 **루트 컴포넌트 구성·주요 값이 일치**하는지 기계적으로 대조 (§4)
 
+**P3 결과 (2026-09-29, Claude — 임시 에디터 빌더로 수행, 빌더는 커밋하지 않고 삭제)**
+- 방법: `Paladin_VFX` 를 `LoadPrefabContents` 로 열고 base 인스턴스와 **경로로 짝지어**(`Paladin_Armature`→`Armature`)
+  ① Armature 중첩 ② base 에 없는 서브트리 복제(무기 2·루트 `VFX`) ③ 없는 컴포넌트 추가 ④ **차이 나는 필드만** 복사 + 원본 참조를 Variant 쪽 객체로 재배선.
+- 추가된 루트 컴포넌트: 스킬 5종 · `PlayerShieldVfx` · `PlayerSkillVfx` · `EffectAnimEvents` · **`PlayerSilhouetteTag`**(목록에 없던 것 — 벽 뒤 실루엣, 역할 쪽이라 원칙상 base 후보. 사용자 결정 대기) · `PlayerWaeponSlot` 의 `WeaponTransformRelay`.
+- 대조: `Paladin_VFX` vs `Player_Paladin` 전 필드 비교 **차이 = NetworkObject 해시 2개뿐**(프리팹마다 달라야 정상). 끊긴 로컬 참조 0. 자식 이름 `Armature` 확인.
+- 🔴 **함정 — Variant 의 `GlobalObjectIdHash` 는 저절로 디스크에 안 써진다.** `SaveAsPrefabAsset` 직후 YAML 에 오버라이드가 없어
+  **base 해시(`1250559839`)를 상속**했다(에디터 메모리 값만 고유). 빌드는 직렬화 값을 쓰므로 그대로면 **base 와 해시 충돌**.
+  에셋의 NetworkObject 를 `SetDirty` → `SaveAssetIfDirty` 해서 고유값 **`913233600`** 을 기록했다. **Variant 를 새로 만들 때마다 확인할 것.**
+- 대조에서 제외한 파생값: `m_StaticBatchInfo` · `m_EditorClassIdentifier` · `NetworkAnimator.AnimatorParameterEntries` · HUD `RectTransform`(Canvas 구동).
+
 ### 3.4 P4 — 스폰 경로 전환
 
 0. **스냅샷 재반영** — P0 기준점 이후 `Paladin_VFX.prefab` 에 들어온 변경(`git log <기준점>..origin/development`)을
