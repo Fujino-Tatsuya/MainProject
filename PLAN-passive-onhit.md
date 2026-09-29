@@ -1,4 +1,4 @@
-# PLAN — 패시브 전면 수정 + 범용 "적중 시" 이벤트 (2026-09-29, ✅ 승인 · 구현 · 은희 Play·MPPM 검증 완료)
+# PLAN — 패시브 전면 수정 + 범용 "적중 시" 이벤트 (2026-09-29, ✅ §1~11 완료 · §12 승인 — Codex 구현 위임)
 
 > **승인 시 추가 결정 (2026-09-29 은희)**
 > - **상태이상에 Buff/Debuff 분류 enum 을 우리가 추가한다** → §4.6. (경석의 `ClearAllServer()` 디버프 한정화가 이 분류를 쓴다)
@@ -187,3 +187,51 @@
 | consider 2 발행 메서드 서버 가드 | ✅ `RaiseServerAttackLanded` 에 `IsServer` 가드 |
 | consider 3 문서 모순(네트워크 목록) | ✅ player-prefabs.md §0·§7·§9 — "스폰 대상 아님" 과 "NGO 자동 등록" 분리, 확인 명령에서 `DefaultNetworkPrefabs` 제외 |
 | consider 4 `PlayerEncounterLockAuthoring` 이 `Paladin_VFX` 순회 | ⏸ 경석(툴 작성자) 판단 대기 |
+
+## 12. 후속 — 초과 피해 표시 + 패시브 추가피해를 막타에 합산 (2026-09-29, ✅ 승인 — Codex 구현)
+
+### 확정 사항 (grill, 은희)
+
+| 항목 | 결정 |
+|------|------|
+| FloatingDamage 표시 값 | **방어 적용 후, 체력 클램프 전** 최종 피해 전부. 쉴드가 먹은 분은 쉴드 숫자로 따로 |
+| 적용 경로 | **모든 피해 경로**(공격·추락·최대체력 %·직접 피해) |
+| 패시브 추가피해 | **막타 한 방에 합친다** — 버프 보유 시 첫 대상의 피해에 더해 한 번에 넣는다. 숫자도 합산 1개 |
+
+### 현재 사실
+
+- 표시 필터는 `AllDamage`(`9.ScriptableObject/UI/FloatingDamageSettings.asset` `displayFilter: 0`) — **HP NetworkVariable 의 변화량**으로 숫자를 만든다(`Unit.OnHpReplicated`, `Unit.cs:542`). 체력이 0에서 멈추므로 초과분은 **구조적으로 알 수 없다**.
+- 귀속 필터용 RPC(`ClientDamagedAttributedClientRpc`)도 `previousHp - CurrentHealth`(클램프 후)를 보낸다(`Unit.cs:164`). 게다가 `ReceiveAttack` 에서만 보내서 추락·% 피해는 빠진다.
+- 체력 클램프는 `Health.TakeHpDamage`(`Health.cs:20`), 방어 경감·쉴드 분배는 `Unit.ApplyMitigatedHealthDamage`.
+
+### 접근
+
+**A. 표시용 피해 이벤트를 피해 적용 지점 한 곳에서** (`Unit.ApplyHealthDamage`)
+1. 경감·쉴드 분배 결과를 **클램프 전 값**으로 계산: `shieldDealt`, `hpDealt`(쉴드 뒤 남은 최종 피해 그대로).
+2. 서버가 `ClientDamageDealtRpc(hpDealt, shieldDealt, attackerClientId)` 를 **항상** 전 피어로 보낸다
+   (기존 `ClientDamagedAttributedClientRpc` 를 이것으로 대체 — 필터 플래그로 켜고 끄던 조건 제거). 이벤트는 기존 `ClientDamagedAttributed` 를 그대로 쓴다.
+3. 공격자 id 는 `ReceiveAttack` 이 `TakeDamage` 호출 동안만 세팅하는 서버 컨텍스트로 넘긴다(기본값 = 없음). 추락·% 피해는 공격자 없음으로 나간다.
+4. `FloatingDamagePresenter` 는 **필터와 무관하게 이 이벤트만** 쓴다. `AllDamage` = 공격자 필터 없음. HP 변화량(`ClientDamagedAmount`) 경로는 FloatingDamage 에서 뗀다 — `HitFlash`·카메라는 그대로.
+5. 부수효과: 보호막 **만료**(`SetShield(0)`)가 지금은 `AllDamage` 에서 "쉴드 피해" 숫자로 떴을 것이다 — 피해가 아니므로 더 이상 안 뜬다(의도).
+
+**B. 패시브 추가피해를 막타에 합산** (적중 **전** 훅)
+1. `IPlayerOnHitBonus`(신규): `int ServerConsumeOnHitBonus(Unit target)` — 서버, 이 판정의 첫 대상에 대해 1회 호출. 보너스를 쓰면 즉시 소모 처리하고 추가 피해량을 반환, 아니면 0.
+2. `Player.ServerTakeOnHitBonus(bool triggersOnHit, Unit target)` — `triggersOnHit` 이고 대상이 살아 있을 때만 제공자에게 묻는다. 제공자는 Player 의 `GetComponents<IPlayerOnHitBonus>()`.
+3. 공격 6경로가 **판정의 첫 Unit 대상**의 피해에 반환값을 더한다(평타 3경로는 `overrideDamage`, 스킬 3경로는 `AttackInfo.damage`). 스킬은 플래그가 false 라 지금은 0.
+4. `FirstMeleePassive`: 소모·쿨타임 시작·회복·발동 연출을 **적중 전 훅에서** 처리하고 추가 피해량만 반환. `ServerAttackLanded` 구독은 뗀다(범용 이벤트는 그대로 남는다 — 스택·빌드용).
+5. 별도 추가타(`target.ReceiveAttack(bonus)`)는 삭제 — 막타 합산이라 시체 거절 문제도 사라진다.
+6. "첫 대상" = 판정 루프에서 중복·자기 자신 필터를 통과한 첫 Unit(현행 `targets[0]` 과 같은 기준).
+
+### 리스크
+
+| # | 리스크 | 완화 |
+|---|--------|------|
+| R-12a | 6경로 각각에 "첫 대상에만 1회" 로직 — 누락·중복 | 경로마다 판정 시작 시 플래그 1개로 1회 보장, grep 으로 호출 6곳 확인 |
+| R-12b | 적중 전에 소모했는데 판정이 거절되면 버프만 날아감 | 거절 사유는 "이미 죽음" 뿐 — `ServerTakeOnHitBonus` 가 생존을 먼저 본다 |
+| R-12c | RPC 가 항상 나가면서 트래픽 증가 | 기존 귀속 필터 모드와 같은 양(피격 1회당 소형 RPC 1개). 호스트 1 + 클라 1~2 규모라 무시 가능 |
+| R-12d | 기존 `ClientDamagedAttributed` 소비자(카메라 쉐이크)가 초과 피해를 받는다 | 쉐이크 세기가 피해량 비례면 막타가 더 세진다 — 확인 후 필요 시 클램프 |
+
+### 검증
+- 컴파일. Play: 체력 10 몹에 50 → 숫자 50. 쉴드 있는 대상 → 쉴드/HP 숫자 분리. 추락 피해 숫자(타 피어 화면).
+- 패시브 버프 보유 평타 막타 → 합산 숫자 1개, 소모·회복·발동 연출. 다수 적중 시 첫 대상에만 합산.
+- MPPM 2인 — 클라 화면에서 동일.
