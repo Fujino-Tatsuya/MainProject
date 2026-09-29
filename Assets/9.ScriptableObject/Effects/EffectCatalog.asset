@@ -39,7 +39,9 @@ MonoBehaviour:
   <Drop_Charge_Boundary>k__BackingField: {fileID: 11400000, guid: a250c4956ae6d604195af8c0ef58fe0f, type: 2}
   <Drop_Charge_Indicator>k__BackingField: {fileID: 11400000, guid: 12f5c15d731222a4fb5899aa42423fc8, type: 2}
   <Drop_Collision>k__BackingField: {fileID: 11400000, guid: 257224bb915c8284b951f51f2c783638, type: 2}
-  <BossRage>k__BackingField: {fileID: 0}
+  <Drop_JumpLanding>k__BackingField: {fileID: 11400000, guid: f90b7760a173d7e4eb570c3db0ca4909, type: 2}
+  <Dash_LimbElectric>k__BackingField: {fileID: 11400000, guid: 450273ae057d428b84b164f61c4680b4, type: 2}
+  <Rage_Shield>k__BackingField: {fileID: 11400000, guid: c201e9a39f93a3c46a80851faf12f0c6, type: 2}
   <Grab_Lightning>k__BackingField: {fileID: 11400000, guid: 6718432e9f0395642a71c720aa5181fd, type: 2}
   <Grab_ArmElectric>k__BackingField: {fileID: 11400000, guid: b0551a23e7c04f1d90c3a2b7e4d61f03, type: 2}
   <Grabbed_Electric>k__BackingField: {fileID: 11400000, guid: 4c27dd41039aaa44fbf590ac0a0c5b91, type: 2}

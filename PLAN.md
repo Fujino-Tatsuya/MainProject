@@ -1,4 +1,125 @@
-# ▶▶▶ 진행 중 = **보호막 피격 파문 (B: 공격자 위치 RPC)** (2026-09-18 · 코드·에셋 완료 · MPPM 2인 전파 검증 통과 · 나머지 항목 검증 대기)
+# ▶▶▶ 진행 중 = **23호 팔다리 전기 (돌진·레이지)** (2026-09-28 · 1~6단계 구현 완료 · **7단계(도구 실행)와 Play 검증 대기**)
+
+> 작업 세션: **민경(Claude)**. 🔴 `TwentyThreeBoss.cs` 를 건드리므로 **경석 님 공유 필요**(AGENTS.md §3).
+> 선례 = `GrabArmVFX`(잡기 팔 전기). 같은 `EffectPathPlayer` 를 팔다리 네 갈래로 늘린 것이다.
+
+## 목표
+
+보스 **몸통에서 손·발까지 이어지는 전기 흐름**을 붙이고, **일반 대쉬 공격**과 **레이지 돌진**에서 재생한다.
+
+## 조사로 확정된 사실
+
+| | |
+|---|---|
+| 도구 | `EffectPathPlayer` — "트랜스폼 배열을 따라 흐르는 펄스". 🔴 **경로는 하나만 받는다. 분기 불가** → 네 갈래 = 컴포넌트 4개 |
+| 선례 | `GrabArmVFX` = `EffectPathPlayer`(`id: ArmElectric`, 3점, 0.3/0.3/pool 10). **애니 이벤트가 아니라 코드**가 켠다(`grabPulse` 필드) |
+| 애니메이터 상태 | 일반 대쉬 = `DashAttack` / 레이지 = `Rage` (별개 클립) |
+| 기존 훅 | 레이지는 `BeginRageDash` → `StartRageSmashClientRpc()` / `StopRageDash` → `Stop…` 쌍이 있다. **일반 대쉬는 연출 RPC 가 없다** |
+| 리그 | 팔 `c_shoulder → forearm → hand` · 다리 `c_thigh_b → c_thigh_fk → c_leg_fk → leg_fk → foot` · 몸통 `c_spine_02.x` / `c_root_master.x` |
+| 🔴 본 참조 | 중첩 FBX 인스턴스라 `--- !u!4 &<id> stripped` 스텁으로 들어간다. fileID 가 **이름 해시**라 텍스트로 지어낼 수 없다 |
+| `EffectPathPlayer` API | `Id · IsEmitting · Play() · PlayOnce() · Stop()`. 🔴 **`SetScale` 이 없다**(`EffectSocketPlayer` 에는 있다) |
+| `Stop()` | `!_emitting` 이면 즉시 반환 — 길목에서 무조건 불러도 안전 |
+| `Play()` | `!_ready` 면 조용히 반환 — **경로가 2점 미만이면 아무 일도 안 일어난다** |
+
+## 확정된 설계 (그릴 12문항 전부 합의)
+
+| 항목 | 결정 |
+|---|---|
+| **경로** | 4갈래. 팔 `c_spine_02.x → c_shoulder.{l,r} → forearm.{l,r} → hand.{l,r}` / 다리 `c_root_master.x → c_thigh_b.{l,r} → c_leg_fk.{l,r} → foot.{l,r}` |
+| **왜 시작점이 다른가** | 가슴에서 다리로 내려가면 몸통을 가로지르는 긴 구간이 생겨 관절 보간이 튄다 |
+| **컴포넌트** | `TwentyThree/Effects/LimbElectricVFX_{ArmL,ArmR,LegL,LegR}`, `id` 비움(코드 전용) |
+| **수치** | travelTime `0.25` / interval `0.1` / pulsePoolSize `6` / scale `1` |
+| **왜 interval < travelTime** | 펄스를 **겹치게** 해야 "띄엄띄엄 지나간다"가 아니라 "계속 흐른다"로 읽힌다 |
+| **엔트리** | `FX_Limb_Electric_Entry` 신규. 파트 프리팹은 그랩과 동일(`b0551a23…f02`), outroDuration `0.6`, **prewarmCount `24`**(4갈래×6), maxActiveWarn `40` |
+| **왜 엔트리를 나누나** | 보기엔 같아도 그랩은 1갈래·이번은 4갈래라 prewarm 수요가 다르다. 공유하면 튜닝이 서로를 흔든다 |
+| **카탈로그** | 새 헤더 `보스 — 돌진 전기` 밑에 `Dash_LimbElectric` |
+| **보스 필드** | `[SerializeField] EffectPathPlayer[] limbPulses` **1개** (경석 님 파일의 표면 최소화) |
+| **켜기** | `StartAttack()` switch — `case Dash:` · `case RageDash:` 각 한 줄. **선딜부터** |
+| **끄기** | `FinishChain()` + `AbortAttackChain()` **두 길목** |
+| **레이지 배율** | `EffectPathPlayer.SetScale(float)` 을 추가하고 레이지만 `1.6` |
+| **본 배선** | `Effects/Editor/EffectSystemSetup.cs` 에 "팔다리 경로 채우기" 메뉴 추가 |
+
+### 설계에서 특별히 짚은 것
+
+**① 끄는 자리를 열거하지 않는다.** 그랩은 `StopGrabPulseClientRpc()` 를 네 군데에 흩뿌려 놓고
+주석이 "끄는 곳은 넷이다 — 헛잡기 경로가 특히 중요하다"고 경고한다. 돌진은 그럴 필요가 없다:
+정상 종료 `FinishChain()` · 비정상 `AbortAttackChain()`(카운터·그로기·사망·타임아웃) 둘뿐이다.
+**덤으로 일반 대쉬와 레이지가 같은 두 곳으로 끝나므로 Stop 한 쌍이 둘 다 커버한다.**
+
+**② 레이지 진입점이 둘인데 저절로 풀린다.** 일반 선택과 차징 완료(`StartRageAfterCharge`) 두 경로가
+있지만, 후자도 결국 `StartAttack()` 을 다시 부른다. **switch 한 곳이면 둘 다 커버된다.**
+
+**③ 선딜부터 켜는 근거는 그랩 주석에 이미 있다.**
+> 팔 전기는 **잡기 판정보다 먼저** 흐른다 — 판정(AcquireGrab)은 히트 프레임이라 거기서 켜면
+> 팔을 뻗는 동안 아무 예고가 없다.
+
+돌진도 같다. `BeginDash()` 는 클립 0.57(실제 돌진 시작)에 불리므로 거기서 켜면 선딜이 비어 있다.
+⚠️ 다만 **선딜 정보가 하나 늘어나는 건 난이도 변경**이다 — 경석 님 확인 대상.
+
+**④ 애니메이션 이벤트를 쓰지 않는 이유.** 갈래가 4개면 id 도 4개라 클립마다 이벤트가 8개가 된다.
+게다가 이 클립들은 SVN 아트 FBX 이고, 같은 세션에서 `JumpLanding` 이벤트가 `time: 0` 에 박혀
+**조용히 안 뜨던** 사고를 이미 겪었다.
+
+**⑤ 본 참조를 손으로 끌지 않는 이유.** 4갈래 × 4점 = 16개다. 레포에 이미 같은 패턴이 있고
+(`"Tools 의 잡기소켓 저작 도구가 채워 준다"`), 이름 기반이라 **리깅이 바뀌어도 다시 돌리면 그만**이다.
+
+## 구현 단계
+
+1. **`EffectPathPlayer.SetScale(float)`** 추가 — `EffectSocketPlayer` 와 같은 3줄.
+   ⚠️ 주석에 "재생 중에 부르면 이번 재생에 반영되지 않는다(배율은 대출 시점 확정)"를 남긴다.
+2. **`FX_Limb_Electric_Entry.asset`** 신규 + `.meta`(guid 고정).
+3. **`EffectCatalog`** — `Dash_LimbElectric` 프로퍼티 + 에셋 등록.
+4. **`EffectSystemSetup.cs`** — "23호 팔다리 전기 경로 채우기" 메뉴. 본 이름으로 4갈래 자동 배선.
+5. **`TwentyThree.prefab`** — `LimbElectricVFX_*` 4개 생성, `EffectPathPlayer` 붙이고 수치 저작.
+   🔴 Unity 닫고. 경로는 비워 두고 4단계 도구로 채운다.
+6. **`TwentyThreeBoss.cs`** 🔴 경석 — 필드 1 + switch 2줄 + RPC 2개 + 길목 2줄 (총 7줄쯤).
+7. 검증.
+
+## 구현 결과 (2026-09-28)
+
+모두 완료. 계획에서 **한 가지 벗어났다**: 4단계를 `EffectSystemSetup.cs` 에 얹지 않고
+**`Effects/Editor/LimbElectricPathAuthoring.cs` 새 파일**로 뺐다 — `EffectSystemSetup` 은 자기 주석에
+"Effect System v1의 에디터 진입점 **두 가지**(기본 에셋 생성 · 스모크 테스트)"라고 적혀 있어서
+보스 본 배선을 섞으면 그 계약이 깨진다. 레포의 `*Authoring.cs` 관례(`CrateAuthoringTool`,
+`BossRoomAuthoring`, `PlayerInterruptSkillAuthoring`)와도 이쪽이 맞는다.
+
+| 파일 | 내용 |
+|---|---|
+| `Effects/EffectPathPlayer.cs` | `SetScale(float)` 추가 (Play 전 호출 경고 주석 포함) |
+| `50.Art/VFX/Common/Boss/FX_Limb_Electric_Entry.asset` 🆕 | guid `450273ae…`, prewarm 24 / maxActiveWarn 40 / outro 0.6 |
+| `Effects/EffectCatalog.cs` + `.asset` | `보스 — 돌진 전기` 헤더 + `Dash_LimbElectric` |
+| `Effects/Editor/LimbElectricPathAuthoring.cs` 🆕 | `Tools/Effects/23호 팔다리 전기 경로 채우기` |
+| `2.Prefabs/Monster/Boss/TwentyThree.prefab` | `LimbElectricVFX_{ArmL,ArmR,LegL,LegR}` 4개 (0.25/0.1/pool 6), `limbPulses` 배선 |
+| `Monster/Boss/TwentyThreeBoss.cs` 🔴경석 | 필드 1 + switch 2곳 + RPC 2개 + 길목 2곳 |
+
+검증: 앵커 105 / dangling 0 · 카탈로그 프로퍼티 43 = 필드 43 · 줄바꿈·인코딩 유지.
+
+🔴 **경로는 아직 비어 있다(`path: []`).** `Play()` 는 `_ready` 가 아니면 조용히 반환하므로
+7단계(도구 1클릭) 전에는 **아무 일도 일어나지 않는다** — "안 나온다"로 오진하지 말 것.
+
+## 검증 항목
+
+- [ ] 일반 대쉬: **선딜부터** 네 갈래가 흐르고, 돌진이 끝나면 걷힌다
+- [ ] 레이지: 차징 완료 경로로 들어가도 켜지고, **연타 사이에 끊기지 않는다**
+- [ ] 레이지가 일반 대쉬보다 **굵다**(scale 1.6)
+- [ ] 돌진 중 카운터/그로기/사망 → `AbortAttackChain` 으로 전기가 남지 않는다
+- [ ] 체인 타임아웃(안전망) 경로에서도 안 남는다
+- [ ] 🔴 **MPPM 클라 창**에서 보스가 이동 중일 때 펄스가 몸에 붙어 있다
+- [ ] 그랩 팔 전기(`GrabArmVFX`)가 **회귀하지 않았다** — 엔트리를 나눴으므로 영향 없어야 한다
+- [ ] 콘솔에 `EffectPathPlayer` 경고 없음 · 풀 고갈 경고 없음
+
+## 리스크
+
+| | |
+|---|---|
+| 🔴 경석 님 파일 | `TwentyThreeBoss.cs` 7줄. 선딜 노출은 **난이도 변경**이라 별도 확인 |
+| 본 참조 유실 | 리깅에서 본 이름이 바뀌면 끊긴다 → 4단계 도구를 다시 돌리면 복구 |
+| 펄스 과다 | 4갈래 × pool 6 = 동시 24. 프레임 문제가 보이면 interval 을 먼저 올린다 |
+| SVN | 새 엔트리 2파일(`50.Art`)은 `svn add` 필요 — 이번 세션에 미등록 에셋이 머지로 날아간 전례 있음 |
+
+---
+
+# 이전 = **보호막 피격 파문 (B: 공격자 위치 RPC)** (2026-09-18 · 코드·에셋 완료 · MPPM 2인 전파 검증 통과 · 나머지 항목 검증 대기)
 
 > 작업 세션: **민경(Claude)**, 브랜치 `merge/VFX-development`.
 > 선행 작업 = 아래 「이전 = 수호자의 의지(E) 보호막 VFX」. 그때 **의도적으로 미룬 항목**을 이제 한다.
