@@ -173,8 +173,16 @@ Update this file when a term becomes important enough that future agents or team
   `EnableKeyword("WALL_OCCLUSION_DITHER")` 를 한다. 그래서 벽 프리팹의 머티리얼을
   교체할 일이 없다. 🔴 그래프의 키워드는 **Multi Compile** 이어야 한다(Shader Feature 면
   빌드에서 변종이 잘려 에디터에서만 동작한다).
-- 높이 그라데이션: **아래가 사라지고 위가 남는다.** `baseY` 에서 알파 0 → `fadeHeight`
-  만큼 위에서 1. 벽 한 층 = 2.5 이므로 기본 `fadeHeight = 5`(2층).
+- 🔴 **투명화는 서로 독립된 두 기능이다** (2026-09-29 분리). 합성은 단순 곱.
+  - ① **상시 하단** `_WallOccBaseY` / `_WallOccFadeHeight` — **머티리얼**(`Generic_01_A.mat`)에
+    박힌 값. `WallTransparencyGroup` 은 읽기만 하고 만들지 않는다.
+  - ② **구역 상단** `_WallOccZoneBaseY` / `_WallOccZoneFadeHeight` — 그룹이 자기 머티리얼
+    인스턴스에만 쓴다. 구역 효과는 불투명도가 아니라 **설정값1(밖) ↔ 설정값2(안) 보간**이다.
+  - ③ `_WallOcclusionOpacity` 는 **항상 1**. 값으로는 죽었지만 C# 이 이 프로퍼티의 유무로
+    대상 머티리얼을 판별하므로 **지우면 안 된다.**
+  - `FadeHeight` 는 **부호가 방향**(양수: 아래가 투명 / 음수: 위가 투명), **0 은 끔**.
+    설정값1·2 의 부호를 같게 잡아야 보간 중 "팝" 이 없다.
+  - 함정과 근거 전부: [PLAN.md](PLAN.md) 「2026-09-29 — 투명화를 서로 독립된 두 기능으로 갈랐다」.
 
 **2026-09-21 결정(은희)** — `PLAN.md` 의 2026-09-14 「투명화 끄고 실루엣으로」(경석)에 대해,
 **실루엣은 그대로 두고 벽 투명화를 함께 간다.** 기존 투명화 시스템은 끄지도 지우지도 않는다.

@@ -22,8 +22,10 @@ using VeyTrace.Rendering.Occlusion;
 public static class WallOcclusionAuthoring
 {
     private const string ShaderName = "Project/Environment/Wall Occlusion Dither";
+    // 2026-09-29 레거시 표시로 파일명에 Legacy_ 접두사를 붙였다. 에셋 자체의 GUID 는 그대로라
+    // 인스펙터 참조는 안 깨졌지만, 여기처럼 **경로를 문자열로 박아둔 곳**은 같이 고쳐야 한다.
     private const string SettingsPath =
-        "Assets/99.Settings/WallOcclusionSettings.asset";
+        "Assets/99.Settings/Legacy_WallOcclusionSettings.asset";
     private const string MaterialDirectory =
         "Assets/3.Materials/Environment";
     private const string SourceMaterialDirectory =
