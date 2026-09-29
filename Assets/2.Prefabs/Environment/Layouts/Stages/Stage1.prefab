@@ -57,24 +57,12 @@ MonoBehaviour:
     YawSteps: 0
     HasPosition: 1
     Position: {x: -65.874504, y: 0.0035106242, z: -29.27327}
-  - Prefab: {fileID: 5405096093857195610, guid: 09f1c8ccfacf5174fadf9cb24da826ca, type: 3}
-    YawSteps: 1
-    HasPosition: 1
-    Position: {x: -65.874504, y: 0.0035106242, z: -29.27327}
-  - Prefab: {fileID: 4989893049714783035, guid: 0c9618bf2283f0c44ae8e8dd53dce81d, type: 3}
-    YawSteps: 1
-    HasPosition: 1
-    Position: {x: -65.84881, y: 0.0017485023, z: -29.264818}
-  - Prefab: {fileID: 1305021005575695595, guid: 8c16f46fd3628814ab54eae0c2dc92f6, type: 3}
-    YawSteps: 0
-    HasPosition: 1
-    Position: {x: -65.87279, y: -0.4982513, z: -29.273228}
   - Prefab: {fileID: 7718167059862872436, guid: 1b6898dd9b7a38340919a7081750f0c5, type: 3}
-    YawSteps: 0
+    YawSteps: 2
     HasPosition: 1
-    Position: {x: -65.874504, y: 0.0035106242, z: -29.27327}
+    Position: {x: -65.474976, y: 0.00351277, z: -29.290497}
   AssignedRole: 0
-  IsFilled: 1
+  IsFilled: 0
 --- !u!1 &1515014751915915168
 GameObject:
   m_ObjectHideFlags: 0
@@ -133,11 +121,11 @@ MonoBehaviour:
     HasPosition: 1
     Position: {x: -26.097559, y: -0.0000019073486, z: 49.890568}
   - Prefab: {fileID: 8865995742018799504, guid: b0760a67dc21daf48bf92cb785979d38, type: 3}
-    YawSteps: 0
+    YawSteps: 2
     HasPosition: 1
     Position: {x: -26.097559, y: -0.0000019073486, z: 49.890568}
   AssignedRole: 2
-  IsFilled: 1
+  IsFilled: 0
 --- !u!1 &1958097420142280190
 GameObject:
   m_ObjectHideFlags: 0
@@ -192,7 +180,7 @@ MonoBehaviour:
   QuestPrefab: {fileID: 0}
   Rotations:
   - Prefab: {fileID: 8865995742018799504, guid: b0760a67dc21daf48bf92cb785979d38, type: 3}
-    YawSteps: 0
+    YawSteps: 2
     HasPosition: 1
     Position: {x: 3.5235486, y: 0.0017549396, z: -49.295273}
   - Prefab: {fileID: 2400110006461124550, guid: 8c7389282a565a64eab74444c597f931, type: 3}
@@ -200,7 +188,7 @@ MonoBehaviour:
     HasPosition: 1
     Position: {x: 3.5235486, y: 0.0017549396, z: -49.295273}
   AssignedRole: 3
-  IsFilled: 1
+  IsFilled: 0
 --- !u!1 &2573479188793677080
 GameObject:
   m_ObjectHideFlags: 0
@@ -230,7 +218,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 8424032216079472987}
+  - {fileID: 1229712371781004818}
   - {fileID: 2151676774510131328}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -292,15 +280,15 @@ MonoBehaviour:
     HasPosition: 1
     Position: {x: 43.139038, y: -0.00000071525574, z: -39.51001}
   - Prefab: {fileID: 4475540425760197176, guid: c377f83fd2df32745bb0a27d1bb2742d, type: 3}
-    YawSteps: 0
+    YawSteps: 2
     HasPosition: 1
-    Position: {x: 42.936928, y: -0.008668218, z: -39.300873}
+    Position: {x: 43.118412, y: 0.00351291, z: -39.090233}
   - Prefab: {fileID: 8379410028330111424, guid: abf0f7b102c958b488d9c99a38d4201b, type: 3}
-    YawSteps: 0
+    YawSteps: 3
     HasPosition: 1
-    Position: {x: 43.132824, y: -0.0086673545, z: -39.500183}
+    Position: {x: 43.325024, y: 0.0035137627, z: -39.28837}
   AssignedRole: 0
-  IsFilled: 1
+  IsFilled: 0
 --- !u!1 &3988187816562432107
 GameObject:
   m_ObjectHideFlags: 0
@@ -398,17 +386,17 @@ MonoBehaviour:
   - Prefab: {fileID: 4475540425760197176, guid: c377f83fd2df32745bb0a27d1bb2742d, type: 3}
     YawSteps: 0
     HasPosition: 1
-    Position: {x: 13.334559, y: 0.000000834465, z: 39.89052}
+    Position: {x: 13.526908, y: 0.0035129786, z: 39.70502}
   - Prefab: {fileID: 8379410028330111424, guid: abf0f7b102c958b488d9c99a38d4201b, type: 3}
     YawSteps: 0
     HasPosition: 1
-    Position: {x: 13.530463, y: 0.00000086112414, z: 39.691208}
+    Position: {x: 13.526912, y: 0.0035131844, z: 39.705025}
   - Prefab: {fileID: 411843160232409271, guid: 6849fda9e44544b4984a260535e5337f, type: 3}
     YawSteps: 0
     HasPosition: 1
     Position: {x: 13.536677, y: 0.008667827, z: 39.691372}
   AssignedRole: 0
-  IsFilled: 1
+  IsFilled: 0
 --- !u!1 &5074529049402860670
 GameObject:
   m_ObjectHideFlags: 0
@@ -456,34 +444,30 @@ MonoBehaviour:
   SlotID: 4
   Size: 1
   Footprint: {x: 20, y: 40}
-  IsQuestCandidate: 1
+  IsQuestCandidate: 0
   IsBossCandidate: 0
   IsSpawnCandidate: 0
   FixedPrefab: {fileID: 0}
-  QuestPrefab: {fileID: 5405096093857195610, guid: 09f1c8ccfacf5174fadf9cb24da826ca, type: 3}
+  QuestPrefab: {fileID: 0}
   Rotations:
-  - Prefab: {fileID: 4989893049714783035, guid: 0c9618bf2283f0c44ae8e8dd53dce81d, type: 3}
-    YawSteps: 0
-    HasPosition: 0
-    Position: {x: 0, y: 0, z: 0}
-  - Prefab: {fileID: 5405096093857195610, guid: 09f1c8ccfacf5174fadf9cb24da826ca, type: 3}
-    YawSteps: 0
-    HasPosition: 1
-    Position: {x: 3.523518, y: 0, z: -9.874772}
-  - Prefab: {fileID: 1305021005575695595, guid: 8c16f46fd3628814ab54eae0c2dc92f6, type: 3}
-    YawSteps: 3
-    HasPosition: 1
-    Position: {x: 3.523518, y: 0, z: -9.874772}
   - Prefab: {fileID: 8347943596951360987, guid: e01fb5167d2bdc14f9ed5e56f7987ce2, type: 3}
-    YawSteps: 3
+    YawSteps: 0
     HasPosition: 1
     Position: {x: 3.5319548, y: 0.0017625391, z: -9.90044}
   - Prefab: {fileID: 7718167059862872436, guid: 1b6898dd9b7a38340919a7081750f0c5, type: 3}
     YawSteps: 1
     HasPosition: 1
     Position: {x: 3.5276942, y: -0.0017490685, z: -9.502858}
-  AssignedRole: 1
-  IsFilled: 1
+  - Prefab: {fileID: 5405096093857195610, guid: 4c7ada625ae3c2549842bdce023a4c8e, type: 3}
+    YawSteps: 0
+    HasPosition: 1
+    Position: {x: 3.523518, y: 0, z: -9.874772}
+  - Prefab: {fileID: 2495213824890675942, guid: 4a1de22fa8709074eab35571fbc920be, type: 3}
+    YawSteps: 0
+    HasPosition: 1
+    Position: {x: 3.5247457, y: 0.0035158396, z: -9.894993}
+  AssignedRole: 0
+  IsFilled: 0
 --- !u!1 &5630313078868935821
 GameObject:
   m_ObjectHideFlags: 0
@@ -542,15 +526,15 @@ MonoBehaviour:
     HasPosition: 1
     Position: {x: 42.929222, y: -0.003511399, z: 0.30088806}
   - Prefab: {fileID: 8347943596951360987, guid: e01fb5167d2bdc14f9ed5e56f7987ce2, type: 3}
-    YawSteps: 0
+    YawSteps: 1
     HasPosition: 1
     Position: {x: 42.929222, y: -0.003511399, z: 0.30088806}
-  - Prefab: {fileID: 1305021005575695595, guid: 8c16f46fd3628814ab54eae0c2dc92f6, type: 3}
-    YawSteps: 0
+  - Prefab: {fileID: 2495213824890675942, guid: 4a1de22fa8709074eab35571fbc920be, type: 3}
+    YawSteps: 1
     HasPosition: 1
-    Position: {x: 42.929222, y: -0.003511399, z: 0.30088806}
+    Position: {x: 42.92028, y: 0.0035135031, z: 0.3052616}
   AssignedRole: 0
-  IsFilled: 1
+  IsFilled: 0
 --- !u!1 &6539739339359297906
 GameObject:
   m_ObjectHideFlags: 0
@@ -664,19 +648,19 @@ MonoBehaviour:
   QuestPrefab: {fileID: 0}
   Rotations:
   - Prefab: {fileID: 8379410028330111424, guid: abf0f7b102c958b488d9c99a38d4201b, type: 3}
-    YawSteps: 0
+    YawSteps: 2
     HasPosition: 1
-    Position: {x: -36.07858, y: 0, z: 10.115311}
+    Position: {x: -36.08159, y: 0.0035116673, z: 10.509759}
   - Prefab: {fileID: 411843160232409271, guid: 6849fda9e44544b4984a260535e5337f, type: 3}
     YawSteps: 0
     HasPosition: 1
     Position: {x: -36.07858, y: 0, z: 10.115311}
   - Prefab: {fileID: 4475540425760197176, guid: c377f83fd2df32745bb0a27d1bb2742d, type: 3}
-    YawSteps: 0
+    YawSteps: 2
     HasPosition: 1
-    Position: {x: -36.07858, y: 0, z: 10.115311}
+    Position: {x: -36.08158, y: 0.0035127401, z: 10.509775}
   AssignedRole: 0
-  IsFilled: 1
+  IsFilled: 0
 --- !u!1 &8039527744657205583
 GameObject:
   m_ObjectHideFlags: 0
@@ -728,16 +712,8 @@ MonoBehaviour:
   IsBossCandidate: 0
   IsSpawnCandidate: 0
   FixedPrefab: {fileID: 0}
-  QuestPrefab: {fileID: 4989893049714783035, guid: 0c9618bf2283f0c44ae8e8dd53dce81d, type: 3}
+  QuestPrefab: {fileID: 4989893049714783035, guid: 1a6e7035213fd0148a68bc70eb1fa696, type: 3}
   Rotations:
-  - Prefab: {fileID: 1305021005575695595, guid: 8c16f46fd3628814ab54eae0c2dc92f6, type: 3}
-    YawSteps: 3
-    HasPosition: 1
-    Position: {x: -26.072193, y: -0.5, z: -39.48465}
-  - Prefab: {fileID: 4989893049714783035, guid: 0c9618bf2283f0c44ae8e8dd53dce81d, type: 3}
-    YawSteps: 0
-    HasPosition: 1
-    Position: {x: -26.08062, y: 0, z: -39.45067}
   - Prefab: {fileID: 8347943596951360987, guid: e01fb5167d2bdc14f9ed5e56f7987ce2, type: 3}
     YawSteps: 3
     HasPosition: 1
@@ -746,9 +722,17 @@ MonoBehaviour:
     YawSteps: 3
     HasPosition: 1
     Position: {x: -26.076363, y: -0.001748532, z: -39.459515}
-  AssignedRole: 0
-  IsFilled: 1
---- !u!1001 &590325348550286048
+  - Prefab: {fileID: 2495213824890675942, guid: 4a1de22fa8709074eab35571fbc920be, type: 3}
+    YawSteps: 1
+    HasPosition: 1
+    Position: {x: -25.272198, y: 0.007999897, z: -39.070454}
+  - Prefab: {fileID: 4989893049714783035, guid: 1a6e7035213fd0148a68bc70eb1fa696, type: 3}
+    YawSteps: 2
+    HasPosition: 1
+    Position: {x: -26.079493, y: 0.0052671432, z: -39.09024}
+  AssignedRole: 1
+  IsFilled: 0
+--- !u!1001 &4785920718496128378
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
@@ -756,47 +740,47 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 1776944610068765502}
     m_Modifications:
-    - target: {fileID: 8996342049223639995, guid: 36c8fb59498efbe4891eeb3009724053, type: 3}
+    - target: {fileID: 6015631982003499880, guid: a316e17f30b684545a9ba49510002551, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 0
+      value: 3.5205142
       objectReference: {fileID: 0}
-    - target: {fileID: 8996342049223639995, guid: 36c8fb59498efbe4891eeb3009724053, type: 3}
+    - target: {fileID: 6015631982003499880, guid: a316e17f30b684545a9ba49510002551, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0
+      value: 0.0017557144
       objectReference: {fileID: 0}
-    - target: {fileID: 8996342049223639995, guid: 36c8fb59498efbe4891eeb3009724053, type: 3}
+    - target: {fileID: 6015631982003499880, guid: a316e17f30b684545a9ba49510002551, type: 3}
       propertyPath: m_LocalPosition.z
+      value: -9.4902315
+      objectReference: {fileID: 0}
+    - target: {fileID: 6015631982003499880, guid: a316e17f30b684545a9ba49510002551, type: 3}
+      propertyPath: m_LocalRotation.w
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 8996342049223639995, guid: 36c8fb59498efbe4891eeb3009724053, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 8996342049223639995, guid: 36c8fb59498efbe4891eeb3009724053, type: 3}
+    - target: {fileID: 6015631982003499880, guid: a316e17f30b684545a9ba49510002551, type: 3}
       propertyPath: m_LocalRotation.x
       value: -0
       objectReference: {fileID: 0}
-    - target: {fileID: 8996342049223639995, guid: 36c8fb59498efbe4891eeb3009724053, type: 3}
+    - target: {fileID: 6015631982003499880, guid: a316e17f30b684545a9ba49510002551, type: 3}
       propertyPath: m_LocalRotation.y
-      value: -0
+      value: -1
       objectReference: {fileID: 0}
-    - target: {fileID: 8996342049223639995, guid: 36c8fb59498efbe4891eeb3009724053, type: 3}
+    - target: {fileID: 6015631982003499880, guid: a316e17f30b684545a9ba49510002551, type: 3}
       propertyPath: m_LocalRotation.z
       value: -0
       objectReference: {fileID: 0}
-    - target: {fileID: 8996342049223639995, guid: 36c8fb59498efbe4891eeb3009724053, type: 3}
+    - target: {fileID: 6015631982003499880, guid: a316e17f30b684545a9ba49510002551, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 8996342049223639995, guid: 36c8fb59498efbe4891eeb3009724053, type: 3}
+    - target: {fileID: 6015631982003499880, guid: a316e17f30b684545a9ba49510002551, type: 3}
       propertyPath: m_LocalEulerAnglesHint.y
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 8996342049223639995, guid: 36c8fb59498efbe4891eeb3009724053, type: 3}
+    - target: {fileID: 6015631982003499880, guid: a316e17f30b684545a9ba49510002551, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 9101261423887666712, guid: 36c8fb59498efbe4891eeb3009724053, type: 3}
+    - target: {fileID: 7111522212279758117, guid: a316e17f30b684545a9ba49510002551, type: 3}
       propertyPath: m_Name
       value: Level_wall_hallway
       objectReference: {fileID: 0}
@@ -804,9 +788,9 @@ PrefabInstance:
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: 36c8fb59498efbe4891eeb3009724053, type: 3}
---- !u!4 &8424032216079472987 stripped
+  m_SourcePrefab: {fileID: 100100000, guid: a316e17f30b684545a9ba49510002551, type: 3}
+--- !u!4 &1229712371781004818 stripped
 Transform:
-  m_CorrespondingSourceObject: {fileID: 8996342049223639995, guid: 36c8fb59498efbe4891eeb3009724053, type: 3}
-  m_PrefabInstance: {fileID: 590325348550286048}
+  m_CorrespondingSourceObject: {fileID: 6015631982003499880, guid: a316e17f30b684545a9ba49510002551, type: 3}
+  m_PrefabInstance: {fileID: 4785920718496128378}
   m_PrefabAsset: {fileID: 0}

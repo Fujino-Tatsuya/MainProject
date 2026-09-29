@@ -88,6 +88,12 @@ public class EffectCatalog : ScriptableObject
     // 이름은 "충돌"이지만 실체는 착지 먼지(FX_JumpDrop_Dust)다. 호출부가 낙하 충돌 시점에 부른다.
     [field: SerializeField] public EffectEntry Drop_Collision { get; private set; }
 
+    // 착지 연출(FX_JumpLanding). 프리팹의 EffectSocketPlayer(id: JumpLanding)가 물고 있고
+    // 클립 이벤트가 그 id 로 지목한다 — 코드 룩업은 안 쓰지만 프리워밍 목록이라 등록한다.
+    // 낙하 먼지(Drop_Collision)와 별개다 — 그쪽은 코드가 낙하 충돌 시점에 따로 부른다.
+    // (예전 에셋 이름은 FX_Rage_Smash 였다 — 레이지와 무관한데 그 이름이라 바꿨다.)
+    [field: SerializeField] public EffectEntry Drop_JumpLanding { get; private set; }
+
     [Header("보스 — 잡기 체인")]
     [field: SerializeField] public EffectEntry Grab_Lightning { get; private set; }
     [field: SerializeField] public EffectEntry Grab_ArmElectric { get; private set; }
@@ -115,9 +121,16 @@ public class EffectCatalog : ScriptableObject
     [field: SerializeField] public EffectEntry ChargeBall_FadeOut { get; private set; }
     [field: SerializeField] public EffectEntry ChargeBall_Break { get; private set; }
 
-    [Header("보스 — 미배선")]
-    // 🔴 비어 있다. 채우거나 지울 것 — 빈 슬롯은 프리워밍에서도 룩업에서도 아무 일을 하지 않는다.
-    [field: SerializeField] public EffectEntry BossRage { get; private set; }
+    [Header("보스 — 돌진 전기")]
+    // 23호가 일반 돌진·레이지 돌진을 할 때 몸통에서 손발로 흐르는 전기(EffectPathPlayer 4갈래).
+    // 그랩 팔 전기와 **파트 프리팹은 같고 엔트리만 다르다** — 그쪽은 1갈래, 이쪽은 4갈래라
+    // prewarmCount 수요가 다르다(4 vs 24). 엔트리를 공유하면 한쪽 튜닝이 다른 쪽을 흔든다.
+    [field: SerializeField] public EffectEntry Dash_LimbElectric { get; private set; }
+
+    [Header("보스 — 레이지")]
+    // 레이지 돌진 동안 몸에 두르는 루프(FX_Rage_Shield). TwentyThreeBoss 의 rageSmash 필드가
+    // 물고 있는 그것이다 — 필드 이름만 Smash 인 채로 남아 있다.
+    [field: SerializeField] public EffectEntry Rage_Shield { get; private set; }
 
     // ── 부술 수 있는 오브젝트 ──────────────────────────────────────────
 

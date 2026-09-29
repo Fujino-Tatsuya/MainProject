@@ -141,6 +141,39 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     [SerializeField] EffectPathPlayer grabPulse;
     bool _warnedNoGrabPulse;
 
+    // ─── Grab 끌어당김 자기장 ─────────────────────────────────────────
+    // 🔴 시작은 **코드**, 종료는 **클립 이벤트**다. 반씩 나눠 가진 이유가 있다.
+    //    시작을 클립에 두면 예고 자세 홀드(HoldAttackPoseClientRpc)가 클립을
+    //    telegraphPoseNormalized(0.15) 로 **건너뛰므로** 그 앞의 이벤트가 평가되지 않는다.
+    //    0.15 바로 뒤에 얹어 피할 수는 있지만, 그 값은 플레이어가 읽는 **보스의 패**라
+    //    튜닝으로 움직인다 — 움직이는 값에 이펙트를 매달면 **아무 에러 없이** 다시 안 뜬다
+    //    (2026-09-28 실제로 겪었다). <c>StartAttack</c> 의 attackId switch 는 그 결합이 없다.
+    //    덤으로 재생이 바닥 예고와 같은 순간이 된다 — 이유는 그 자리 주석.
+    //    종료는 반대다 — 끌어당김이 끝나는 프레임은 클립이 가장 잘 안다.
+    // 🔴 그래서 **비상 정지가 따로 필요하다**. 잡기는 counterWindowDuration(1.3)이
+    //    telegraphDuration(0.7)보다 길어 카운터 창이 끌어당김 구간으로 0.6초 넘어온다.
+    //    거기서 끊기면 클립이 getowned 로 잘려 종료 이벤트를 못 지나간다
+    //    — 자기장이 safetyTimeout(5초)까지 남는다. 그로기·사망도 같다 → AbortAttackChain.
+    [Tooltip("끌어당김 자기장의 id. 클립 이벤트 문자열(Boss_23_magneticgrab 의 StopEffect data)과 " +
+             "프리팹 EffectSocketPlayer.Id 가 쓰는 그 값이다. 아트가 바꾸면 여기도 고칠 것")]
+    [SerializeField] string magneticPullEffectId = "MagneticPull";
+    EffectAnimEvents _effects;
+
+    // ─── 돌진 팔다리 전기 펄스 ────────────────────────────────────────
+    // 🔴 위 grabPulse 와 같은 이유로 **코드가** 켜고 끈다. 다만 끄는 자리는 넷이 아니라 **둘**이다 —
+    //    일반 돌진도 레이지도 종료 길목이 FinishChain(정상) · AbortAttackChain(카운터·그로기·사망·
+    //    타임아웃) 뿐이라, 한 쌍이 두 공격을 다 덮는다. 그랩처럼 경로마다 흩뿌릴 필요가 없다.
+    // 배열인 이유: 갈래가 팔·다리 넷인데 EffectPathPlayer 는 경로를 **하나만** 받는다(분기 불가).
+    //    경로는 Tools/Effects/23호 팔다리 전기 경로 채우기 가 본 이름으로 채운다.
+    [Tooltip("돌진·레이지 동안 몸통→손발을 훑는 전기 펄스 4갈래. 비워두면 연출만 빠진다")]
+    [SerializeField] EffectPathPlayer[] limbPulses;
+    bool _warnedNoLimbPulses;
+
+    // 엔트리는 하나고 **배율만** 다르다. 레이지가 격노 상태라 더 굵다.
+    // 🔴 EffectPathPlayer.SetScale 은 Play 보다 먼저 불러야 반영된다(배율은 펄스 대출 시점에 확정).
+    const float DashLimbElectricScale = 1.25f;
+    const float RageLimbElectricScale = 1.6f;
+
     // ─── 근접 명중 타격 연출 ──────────────────────────────────────────
     // 🔴 **맞았을 때만** 나온다. 헛스윙에는 안 나온다 — 애니 이벤트로는 못 가른다(클립은 맞았는지 모른다).
     //    손마다 소켓이 다르므로 공격별로 따로 문다. 어퍼가 어느 손이면 그 손 것을 그대로 물리면 된다.
@@ -163,7 +196,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     // ─── 레이지 돌진 루프 연출 ────────────────────────────────────────
     // 🔴 명중과 무관하다 — 헛돌진에도 나온다. **돌진 1회 단위**로 켜고 끈다:
     //    레이지는 rageDashCount 번 연타인데, 연타 사이 간격은 서 있는 구간이라 연출도 끊긴다.
-    [Tooltip("레이지 돌진 중 재생할 루프 연출(FX_Rage_Smash). 비워두면 연출만 빠진다")]
+    [Tooltip("레이지 돌진 중 재생할 루프 연출(FX_Rage_Shield). 비워두면 연출만 빠진다")]
     [SerializeField] EffectSocketPlayer rageSmash;
     bool _warnedNoRageSmash;
     GrabController _grabController;   // 그랩 소켓 보유자(레거시). 연출 좌표만 빌린다
@@ -919,15 +952,34 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
             // 팔 전기는 **잡기 판정보다 먼저** 흐른다 — 판정(AcquireGrab)은 히트 프레임이라
             // 거기서 켜면 팔을 뻗는 동안 아무 예고가 없다. 끄는 곳은 넷이다(ReleaseGrabThrow ·
             // 헛잡기 · 대상 소멸 · AbortAttackChain) — 켜는 자리를 앞당긴 만큼 헛잡기 경로가 특히 중요하다.
-            case BossAttackId.Grab: StartGrabPulseClientRpc(); break;
+            // 🔴 자기장도 여기다 — 바닥 예고가 뜨는 것과 **같은 순간**이고,
+            //    끌어당김이 시작하는 BeginGrabPull 보다 telegraphDuration(0.7초) 앞이다.
+            //    입자가 바깥에서 안으로 날아와야 흐름이 가득 차므로 재생 직후엔 항상 비어 보인다
+            //    (입자 수명 ÷ simulationSpeed ≈ 1초 — 끌어당김 구간 1.18초와 거의 같다).
+            //    예고에 얹어 두면 그 차오르는 구간이 그대로 예고 연출이 되고, 끌릴 땐 이미 흐르고 있다.
+            //    ⚠️ 끄는 자리는 그대로다 — 클립의 StopEffect, 비상시 AbortAttackChain.
+            case BossAttackId.Grab:
+                StartGrabPulseClientRpc();
+                StartMagneticPullClientRpc();
+                break;
 
             case BossAttackId.Jump: BeginJump(); break;
             case BossAttackId.ChargeSequence: BeginCharge(); break;
-            case BossAttackId.RageDash: BeginRage(); break;
+            // 팔다리 전기는 **선딜부터** 흐른다(그랩 팔 전기와 같은 판단) — BeginDash/BeginRageDash 는
+            // 실제 돌진이 시작되는 지점이라 거기서 켜면 선딜 동안 아무 예고가 없다.
+            // 🔴 여기 하나로 레이지의 두 진입점(일반 선택 · 차징 완료 StartRageAfterCharge)이 다 덮인다 —
+            //    후자도 결국 StartAttack() 을 다시 부른다.
+            case BossAttackId.RageDash:
+                StartLimbElectricClientRpc(RageLimbElectricScale);
+                BeginRage();
+                break;
 
             // [G3] 돌진은 카운터 창 동안 경로 띠를 채운다. 끄는 곳은 히트(PerformAttackHit)와
             // 이탈(AbortAttackChain) 둘 — 훅·어퍼 예고와 같은 규약이다.
-            case BossAttackId.Dash: ShowDashTelegraph(e); break;
+            case BossAttackId.Dash:
+                StartLimbElectricClientRpc(DashLimbElectricScale);
+                ShowDashTelegraph(e);
+                break;
         }
     }
 
@@ -1969,6 +2021,9 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
 
     void FinishChain()
     {
+        // 정상 종료 길목. 재생 중이 아니면 Stop 은 조용한 no-op 이라 공격을 가리지 않고 부른다.
+        if (IsSpawned) StopLimbElectricClientRpc();
+
         _attackPhase = BossAttackPhase.None;
         // 기믹이 완전히 끝나는 지점 ② — 레이지 최종 종료(Recovery → 여기). 예약은 기믹 중에만 서므로
         // 다른 체인의 종료에서는 늘 비어 있다.
@@ -2004,6 +2059,16 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         // 🔴 잡기 사이클 배수로 돌던 애니메이터도 **여기서** 되돌린다. 뒤에 두면 조기 반환 경로에서
         //    **이후 모든 애니가 1.4배**로 남는다(돌진이 agent 속도를 안 되돌려 초고속이 됐던 것과 같은 종류).
         if (IsSpawned) SetGrabCycleSpeedClientRpc(1f);
+
+        // 🔴 팔다리 전기도 **조기 반환 앞**이다. 돌진이 히트 전에 카운터·그로기·사망으로 끊기면
+        //    네 갈래가 영영 흐른다(그랩 팔 전기가 남던 것과 같은 사고).
+        if (IsSpawned) StopLimbElectricClientRpc();
+
+        // 자기장은 시작만 코드고 종료는 클립 이벤트다 — 여기는 그 종료 이벤트를
+        // 지나가지 못한 경우(카운터·그로기·사망·타임아웃)의 비상 정지만 한다.
+        // 이미 꺼져 있으면 무해한 no-op 이다(EffectSocketPlayer.Stop 이 핸들로 가드한다).
+        if (IsSpawned) StopMagneticPullClientRpc();
+
         if (animator != null && !_counterAnimatorHeldLocally) animator.speed = 1f;
 
         // 🔴 차징 진입 점프도 **조기 반환 앞**에서 끈다. 남겨 두면 다음 점프어택이 착지하는 순간
@@ -2339,7 +2404,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         if (!_chargeJump)
             ShowJumpTelegraphClientRpc(_jumpArrivePoint, JumpAoeRadius, JumpHover);
 
-        CrossFadeJumpStateClientRpc(landing: false);
+        CrossFadeJumpStateClientRpc(landing: false, silentLanding: false);
 
         EnterPhase(BossAttackPhase.Leap, JumpHover);
     }
@@ -2351,7 +2416,9 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         SetModelVisibleClientRpc(true);
         SetHurtableClientRpc(true);   // 착지했으니 다시 맞는다(BeginJump 의 짝)
 
-        CrossFadeJumpStateClientRpc(landing: true);
+        // 🔴 차징 복귀도 **무음 착지**다(_chargeJump). 그 착지는 원점으로 돌아오는 이동일 뿐이라
+        //    타격이 아니다 — 예고를 안 띄우는 근거(BeginJumpHover)와 같다.
+        CrossFadeJumpStateClientRpc(landing: true, silentLanding: _chargeJump);
 
         // 땅에 닿았으니 투척 억제를 푼다(BeginJump 의 짝). 🔴 그로기 중이면 그쪽이 다시 억제하므로
         //    여기서 무조건 풀어도 안전하다 — PushWellsState 가 상태를 매번 다시 밀어 준다.
@@ -2377,14 +2444,14 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     public void PlayEntranceDescentServer()
     {
         if (!IsServer || !IsSpawned) return;
-        CrossFadeJumpStateClientRpc(landing: false);
+        CrossFadeJumpStateClientRpc(landing: false, silentLanding: true);
     }
 
     /// <summary>착지 클립. 데미지는 안 나간다 — 근거는 인터페이스 주석.</summary>
     public void PlayEntranceLandingServer()
     {
         if (!IsServer || !IsSpawned) return;
-        CrossFadeJumpStateClientRpc(landing: true);
+        CrossFadeJumpStateClientRpc(landing: true, silentLanding: true);
     }
 
     /// <summary>연출 종료 — 로코모션 복귀. FSM 을 깨우기 <b>직전</b>에 불린다.</summary>
@@ -2784,6 +2851,86 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     }
 
     /// <summary>
+    /// 끌어당김 자기장 시작(잡기 진입 = 바닥 예고와 같은 순간). 클립 이벤트가 아닌 이유는
+    /// <see cref="magneticPullEffectId"/> 주석 참조 — 예고 자세 홀드가 클립 앞부분을
+    /// 건너뛰어 그 구간의 애니 이벤트가 죽는다.
+    ///
+    /// 서버 전용 지점(<c>StartAttack</c> 의 attackId switch)에서 불리므로 RPC 로 나가야 한다 —
+    /// 로컬로 재생하면 <b>호스트에서만 보인다</b>(이 레포의 단골 버그).
+    /// </summary>
+    [ClientRpc]
+    void StartMagneticPullClientRpc()
+    {
+        // Play 는 재생 중이면 먼저 회수한다 — 사이클이 연달아 돌아도 핸들이 새지 않는다.
+        if (_effects == null && !TryGetComponent(out _effects)) return;
+        _effects.StartEffect(magneticPullEffectId);
+    }
+
+    /// <summary>
+    /// 끌어당김 자기장 <b>비상 정지</b>. 정상 종료는 클립의 StopEffect 가 닫으므로
+    /// 이것은 그 이벤트를 못 지나간 경우에만 일을 한다(카운터·그로기·사망·타임아웃).
+    ///
+    /// 🔴 <b>Reliable(기본) 이어야 한다.</b> 유실되면 자기장이 5초(safetyTimeout) 동안 남는다.
+    /// 서버 전용 지점(<c>AbortAttackChain</c>)에서 불리므로 RPC 가 필요하다 —
+    /// 로컬로 끄면 <b>호스트에서만 꺼진다</b>(이 레포의 단골 버그).
+    /// </summary>
+    [ClientRpc]
+    void StopMagneticPullClientRpc()
+    {
+        // SpinnerBot.StopSpinEffect 와 같은 관용구 — EffectAnimEvents 는 루트에 있다.
+        if (_effects == null && !TryGetComponent(out _effects)) return;
+        _effects.StopEffect(magneticPullEffectId);
+    }
+
+    /// <summary>
+    /// 팔다리 전기 펄스 시작 — 몸통에서 손·발까지 네 갈래가 동시에 흐른다.
+    /// 일반 돌진과 레이지가 <b>같은 엔트리를 배율만 달리해</b> 쓴다.
+    ///
+    /// ⚠️ <b><see cref="EffectPathPlayer.SetScale"/>은 반드시 Play 보다 먼저다</b> —
+    /// 배율은 펄스를 대출하는 시점에 확정되므로, 켜 둔 채 바꾸면 굵기가 도중에 섞인다.
+    ///
+    /// Reliable(기본)이다. 유실되면 상태가 새지는 않지만 돌진 연출이 통째로 빠진다
+    /// (그랩 팔 전기와 같은 판단).
+    /// </summary>
+    [ClientRpc]
+    void StartLimbElectricClientRpc(float scale)
+    {
+        if (limbPulses == null || limbPulses.Length == 0)
+        {
+            WarnNoLimbPulsesOnce();
+            return;
+        }
+
+        for (int i = 0; i < limbPulses.Length; i++)
+        {
+            EffectPathPlayer pulse = limbPulses[i];
+            if (pulse == null) continue;
+
+            pulse.SetScale(scale);
+            pulse.Play();
+        }
+    }
+
+    /// <summary>
+    /// 팔다리 전기 펄스 종료. <b>이미 떠 있는 펄스는 끝까지 가고 사라진다</b>(새 펄스만 멈춘다).
+    ///
+    /// 🔴 <b>Reliable 이어야 한다.</b> 유실되면 네 갈래가 영영 흐른다.
+    /// 부르는 곳은 둘뿐이다 — <c>FinishChain</c>(정상) · <c>AbortAttackChain</c>(그 외 전부).
+    /// 일반 돌진과 레이지가 같은 길목으로 끝나므로 이 한 쌍이 두 공격을 다 덮는다.
+    /// </summary>
+    [ClientRpc]
+    void StopLimbElectricClientRpc()
+    {
+        // 여기서는 경고하지 않는다 — 미배선은 시작 시점에 이미 1회 알렸다(교훈 #8).
+        if (limbPulses == null) return;
+
+        for (int i = 0; i < limbPulses.Length; i++)
+        {
+            if (limbPulses[i] != null) limbPulses[i].Stop();
+        }
+    }
+
+    /// <summary>
     /// 착지 충돌 이펙트 — <b>원샷</b>이다. 예고와 달리 수명이 사건이 아니라 시간이라
     /// (엔트리의 duration) 핸들도 회수 책임도 없다.
     ///
@@ -2939,7 +3086,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     }
 
     [ClientRpc]
-    void CrossFadeJumpStateClientRpc(bool landing)
+    void CrossFadeJumpStateClientRpc(bool landing, bool silentLanding)
     {
         // 🔴 앞뒤 표식은 **착지 후에만** 보인다(팀장 확정 2026-08-10).
         //    이 RPC 가 점프 비행 구간을 전 피어에서 정확히 감싸므로 여기서 켜고 끈다.
@@ -2951,7 +3098,21 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         DirectionIndicator?.SetSuppressed(!landing);
 
         if (_boss == null) return;
-        string state = landing ? _boss.jumpLandingState : _boss.jumpHoverState;
+
+        // 🔴 **착지만** 다른 상태를 쓴다. 클립은 같고 착지 이펙트 이벤트만 뺀 복제본이라
+        //    (Boss_23_landingattack_entrance) 그림과 타격 이벤트는 그대로다.
+        // ⚠️ 쓰는 곳이 **둘**이다 — 보스 입장, 그리고 차징을 위해 원점으로 돌아오는 착지.
+        //    둘 다 "떨어지긴 하는데 타격은 아니다"라 같은 클립을 쓴다. SO 필드 이름이
+        //    애니메이터 상태 이름이 아직 EntranceLanding 인 건 입장이 먼저였기 때문이다.
+        //    이벤트는 상태가 아니라 **클립**에 붙어 있어서, 같은 클립을 가리키는 상태를 하나 더
+        //    만드는 것으로는 갈라지지 않는다 — 클립 자체가 달라야 한다.
+        //    체공은 가를 필요가 없다: 그 클립에는 이펙트 이벤트가 없다.
+        //    비어 있으면 기존 상태로 폴백한다 — 이 SO 를 쓰는 다른 보스가 영향받지 않게.
+        string landingState = silentLanding && !string.IsNullOrEmpty(_boss.silentLandingState)
+            ? _boss.silentLandingState
+            : _boss.jumpLandingState;
+
+        string state = landing ? landingState : _boss.jumpHoverState;
         if (!string.IsNullOrEmpty(state))
             SafeCrossFade(state);
     }
@@ -2993,7 +3154,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         Debug.LogWarning(
             $"{name}: rageSmash 가 비어 있어 레이지 돌진 연출이 재생되지 않는다 — " +
             "보스가 그냥 빠르게 걸어오는 것처럼 보인다. " +
-            "FX_Rage_Smash_Entry 를 물린 EffectSocketPlayer 를 이 필드에 연결할 것.", this);
+            "FX_Rage_Shield_Entry 를 물린 EffectSocketPlayer 를 이 필드에 연결할 것.", this);
     }
 
     // 공격별로 나눠 세지 않는다 — 첫 한 번이 어느 공격인지 알려 주면 배선을 찾아가기에 충분하고,
@@ -3056,6 +3217,16 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
             $"{name}: grabPulse 가 비어 있어 그랩 팔 전기 연출이 재생되지 않는다. " +
             "보스 프리팹에 EffectPathPlayer 를 붙이고(path = 어깨→팔꿈치→손, " +
             "effect = FX_Grab_ArmElectric_Entry) 이 필드에 연결할 것.", this);
+    }
+
+    void WarnNoLimbPulsesOnce()
+    {
+        if (_warnedNoLimbPulses) return;
+        _warnedNoLimbPulses = true;
+        Debug.LogWarning(
+            $"{name}: limbPulses 가 비어 있어 돌진 팔다리 전기가 재생되지 않는다. " +
+            "보스 프리팹의 Effects 밑 LimbElectricVFX_ArmL/ArmR/LegL/LegR 을 이 배열에 넣고, " +
+            "Tools/Effects/23호 팔다리 전기 경로 채우기 로 본 경로를 채울 것.", this);
     }
 
     void WarnNoImpactEntryOnce()

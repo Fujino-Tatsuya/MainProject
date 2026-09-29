@@ -66,6 +66,16 @@ public class EffectPathPlayer : MonoBehaviour, IAnimEventEffect
     [Tooltip("펄스 시작·정지 시점을 콘솔에 남긴다. 연출이 안 보일 때 호출까지 왔는지 확인용")]
     [SerializeField] bool logPulses;
 
+    /// <summary>
+    /// 배율을 런타임에 바꾼다. <see cref="EffectSocketPlayer.SetScale"/> 와 같은 계약이다 —
+    /// 같은 연출을 상황에 따라 크게 쓰는 경우용이다(23호: 일반 돌진 1.0 / 레이지 1.6).
+    ///
+    /// ⚠️ <b>재생 중에 부르면 이미 떠 있는 펄스에는 반영되지 않는다</b> — 배율은 펄스를 대출하는
+    /// 시점에 확정된다. 반드시 <see cref="Play"/> 보다 <b>먼저</b> 부를 것.
+    /// (다음 펄스부터는 새 값으로 나가므로, 켜 둔 채 바꾸면 굵기가 도중에 섞인다.)
+    /// </summary>
+    public void SetScale(float value) => scale = Mathf.Max(0.01f, value);
+
     /// <summary>진행 중인 펄스 하나. 앵커와 이펙트 핸들이 한 몸으로 움직인다.</summary>
     class Pulse
     {

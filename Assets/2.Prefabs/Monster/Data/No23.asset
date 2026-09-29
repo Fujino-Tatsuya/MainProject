@@ -330,6 +330,7 @@ MonoBehaviour:
   jumpTakeoffDuration: 0.633
   jumpHoverState: JumpHover
   jumpLandingState: JumpLanding
+  silentLandingState: EntranceLanding
   jumpTelegraphPrefab: {fileID: 5997264177071607445, guid: a325fc2b60be455428b04ab67232fb24, type: 3}
   jumpLandSeparation: 1.2
   jumpKnockbackStrength: 5

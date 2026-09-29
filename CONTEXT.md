@@ -8,15 +8,17 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 현재 인수인계 (2026-09-28 · 경석 · `feature/Boss23` — 간파·취약·제압 / 중간보스 예고 / NavMesh)
+## ▶▶ 현재 인수인계 (2026-09-29 · 경석 · `feature/Boss23` — 간파·취약·제압 / 보스 경계 / 새 보스방)
 
-- 계획·진행·**다음 세션 시작점**: [PLAN-boss-counter-vulnerable.md](PLAN-boss-counter-vulnerable.md) §7-2 "09-28 팀장 Play 결과".
-  남은 버그 2건 — ① 취약 넉백이 안 밀림(공격만 끊김) ② 제압 중 그로기 애니 루프. 벤트 미확인. Codex 교차검증 대기.
+- 계획·진행·**다음 세션 시작점**: [PLAN-boss-counter-vulnerable.md](PLAN-boss-counter-vulnerable.md) §7-2 (09-29 항목들).
+  09-29 수정: 취약 벽 판정(방 회전) · 제압 그로기 루프 · 취약 중 돌진 · 점프 착지 경계/Warp 복구 · 보스방 NavMesh 여유 띠. **Play 재확인 대기**(제압 애니 · 여유 로그 · 끼임).
+- 09-29 머지: SVN **r336** + `origin/fix/zone_bossroom`(새 보스방 `8dbb04fa`) → 이어서 `origin/development`. 새 보스방은 경계·바닥 크기 동일.
+  🔴 새 보스방에는 여유 띠(`NavMeshMargin`)가 없다 — Unity 에서 `Tools/Map/Authoring/Build Boss Room NavMesh Margin` 한 번 실행.
 - 사망 연출·중간보스 예고: [PLAN-boss-death-telegraph.md](PLAN-boss-death-telegraph.md) (팀장 확인 완료).
 - NavMesh(몬스터 쪽): 추격 목적지 투영 + 도달 불가 시 대기(`MonsterBase.ChaseTarget`) · 재부착 수평 거리 기준 + 리쉬 기준점 갱신(`MapNavMeshBaker`) ·
-  23호 에이전트 반경 유지 · 넉백 종료 Warp 1m + 같은 섬. **아트 쪽(FBX Read/Write · 누락 콜라이더 · 보행 불가 지정)은 미착수** — 전수조사 결과는 이 세션 대화(09-28) 요약:
+  23호 에이전트 반경 유지 · 넉백 종료 Warp 1m + 같은 섬. **아트 쪽(FBX Read/Write · 누락 콜라이더 · 보행 불가 지정)은 미착수** —
   Read/Write 꺼진 MeshCollider 는 베이크 때 AABB 박스가 돼 계단·코너벽·기둥이 틀어진다(`UnreadableMeshColliderBakeScope`), `wall_basic_square` 콜라이더 없음, 보스방 FBX 272개 콜라이더 없음.
-- 🔴 로컬 커밋만 — 푸시 안 함.
+  ⚠️ SVN r333 새 벽 프리팹 5종(`Environment/Prefabs/Layouts/wall/`)도 **콜라이더 0 · Read/Write 꺼짐** — 보스방은 투명벽이 막아 무관, 다른 존에 쓰면 통과된다(지원 공유 필요).
 
 ## ▶▶ 🔴 은희에게 — 플레이어 겹침 해소 요청 (2026-09-28 경석, `feature/Boss23`)
 
@@ -30,14 +32,50 @@ Update this file when a term becomes important enough that future agents or team
 - ⚠️ **09-28 추가 — 팀장 Play: 23호 돌진이 끝난 뒤 플레이어가 확실히 낀다.** 보스 쪽에서는 완전히 못 막는다:
   ① 이 브랜치는 `ServerAuthoritativeMovement = false` — 돌진 캐리 중 오너가 **자기 화면의 보스 복제 위치**를 따라 움직이는데,
      보스는 NetworkTransform 보간으로 뒤처져 있다가 돌진이 멈추면 **따라잡으며 콜라이더가 플레이어 안으로 들어온다**(정상 종료엔 분리 없음, 넉백은 벽 충돌 때만).
-  ② 23호 NavMeshAgent 반경이 런타임에 데이터 값 **0.3** 으로 덮인다(프리팹 0.85, 몸 캡슐 1.53) → 추격 중에도 파고든다.
+  ② ~~23호 NavMeshAgent 반경이 런타임에 데이터 값 0.3 으로 덮인다~~ → 09-28 `KeepPrefabAgentRadius` 로 막음(0.85 유지).
   ③ 서버가 미는 수단(넉백)도 같은 스윕을 타서 **겹친 뒤에는 빼내지 못한다.** → 겹침 해소는 모터에서만 풀린다(팀장 09-28: 은희에게 그대로 넘김).
   경석 쪽 완화: 훅·어퍼 전진은 앞 플레이어에 닿으면 멈춤(`TwentyThreeBoss.PlayerBlocksLunge`).
 - 🔴 **09-29 경석 — `PlayerMotionSweep.cs` 동작 변경(팀장 승인: 진단으로 원인 확정 시 진행).** `TryCast` 가 **Enemy 레이어의 시작 겹침 히트**(distance 0 · point 0)를, 이동 방향이 `ComputePenetration` 분리 방향과 같은 쪽(내적 ≥ 0)일 때 무시한다(`IsEscapingEnemyOverlap`). 근거 실측: `[모터/끼임진단]` 거리 0 · 법선 −dir · 시작겹침 True · 관통 0.48m, 이동 방향 = 분리 방향인데도 막힘. 강제 밀어내기 없음(Codex 지적: 벽 사이·입력 경합 회피) — 더 파고드는 방향은 그대로 막힌다. 넉백(보스 바깥 방향)도 같은 이유로 막혔던 것으로 보고 함께 풀린다. ⚠️ 모터 EditMode 테스트 미실행.
 - ⚠️ 같은 파일에 **임시 진단 로그**(동작 무변경).
 - 🔴 **09-29 경석 → 은희 요청 2건 (팀장 09-29: 플레이어 쪽은 은희에게 넘긴다)**
   1. **잡기 해제 위치**: Carry 구속 중 플레이어는 `GrabController.GrabSocket`(보스 손)을 그대로 따라간다(`PlayerStateController` 구속 상태 `TryGetTargetPose`). 보스가 방 가장자리에서 잡으면 손이 투명벽 밖이라 해제 위치가 **경계 밖·공중**이 된다 — 실측 (487.31, **1.42**, 14.23), 방 로컬 경계 ±14 초과, 이후 `Fence_MetalSheet`·`Boundary_XMax` 와 **정적 시작 겹침**으로 이동·대시 0m 고착(`[모터/끼임진단]` 시작겹침 True). 제안: 구속 종료 시 바닥 투영 + 정적 시작 겹침이면 안전 위치로(PhysX CCT 의 overlap recovery 와 같은 역할 — 정적 지오메트리 한정). 보스방 경계는 `InvisibleBoundaries/Boundary_*` 안쪽 면(방 로컬 축).
-  2. **모터 Enemy 시작 겹침 탈출 검토**: 위 `IsEscapingEnemyOverlap`(경석 09-29) 유지 여부·구석(벽 2개 + 보스)에서 탈출 각도(현재 내적 ≥ 0, −0.75 로 완화 검토) — 은희 판단. `Resolve` 를 `ResolveCore` + `LogIfBlockedByEnemy` 로 감쌌다 — 수평 이동이 요청의 10% 미만으로 막히고 원인이 Enemy 레이어일 때만 0.5초에 한 번 `[모터/끼임진단]` 을 찍는다(히트 콜라이더·거리·법선·시작 겹침 여부·ComputePenetration). 원인 확정 후 경석이 지운다. 모터 수정안은 Codex 검증 "보완 후 가능"이라 **보류**(근거: [PLAN-boss-counter-vulnerable.md](PLAN-boss-counter-vulnerable.md) §7-2). 경석 쪽 추가: 취약 넉백도 앞 플레이어에서 멈춤.
+  2. **모터 Enemy 시작 겹침 탈출 검토**: 위 `IsEscapingEnemyOverlap`(경석 09-29) 유지 여부·구석(벽 2개 + 보스)에서 탈출 각도(현재 내적 ≥ 0, −0.75 로 완화 검토) — 은희 판단. `Resolve` 를 `ResolveCore` + `LogIfBlockedByEnemy` 로 감쌌다 — 수평 이동이 요청의 10% 미만으로 막히고 원인이 Enemy 레이어일 때만 0.5초에 한 번 `[모터/끼임진단]` 을 찍는다(히트 콜라이더·거리·법선·시작 겹침 여부·ComputePenetration). 원인 확정 후 경석이 지운다. (밀어내기 안은 Codex "보완 후 가능"으로 기각 — 위 좁은 수정으로 대체.) 경석 쪽 추가: 취약 넉백도 앞 플레이어에서 멈춤.
+
+## ▶▶ 현재 인수인계 (2026-09-28 · 투명화 그룹 편집 툴 **완료 조건 8/8 통과**, 브랜치 `feature/TransparentSettingTool`)
+
+작업자: **은희(Claude)**, 워크트리 `MainProject-Worktree`. 계획·근거·뒤집힌 결정은
+[PLAN-transparent-group-tool.md](PLAN-transparent-group-tool.md).
+
+**상태: 구현·검증 완료, 커밋 `2207e295`.** 아래 「구역 진입 기반 벽 투명화 1단계」의
+「남은 것 · 존 프리팹 오서링」을 사람이 하기 쉽게 만드는 **에디터 전용** 보조 툴이다. 런타임 코드 0줄.
+
+**용어** — 여기서 "그룹" 은 *이름을 붙여 저장해 둔 GameObject 선택 묶음* 이다.
+`WallTransparencyGroup` 컴포넌트와 **다른 것** 이며 1:1 대응도 아니다. 값 편집 UI 는 만들지 않았다 —
+그룹을 고르면 Unity `Selection` 에 밀어 넣고, 편집은 기본 다중 오브젝트 인스펙터가 한다.
+
+| 파일 | VCS |
+|---|---|
+| `Assets/1.Scripts/Rendering/Occlusion/Editor/` 8개 + `VeyTrace.Rendering.Occlusion.Editor.asmdef` (신규) | git |
+| `Assets/1.Scripts/Rendering/Editor/Shaders/TransparentGroupOverlay.shader` (신규) | git |
+| `Assets/Tests/EditMode/Occlusion/TransparentGroupStoreTests.cs` (신규, 14개) | git |
+| `GroupPainter/*.json` — 프로젝트 루트, `Assets/` **밖** | git |
+
+**실측으로 확정한 것 (재조사 금지)**
+- `Camera.SubmitRenderRequest(ObjectIdRequest)` 는 **에디트 모드 씬 뷰에서 동작한다.**
+  NetVis 의 `Debug.Assert(Application.isPlaying)` 은 오너십 데이터 때문이지 기법의 한계가 아니다.
+- Render Graph 가 켜져 있어도(`m_EnableRenderCompatibilityMode: 0`) `cmd.Blit(CameraTarget)` 이 먹는다.
+- 🔴 `ObjectIdRequest.result.idToObjectMapping` 에 담기는 것은 **Renderer 컴포넌트**다. GameObject 가 아니다.
+  `renderer.gameObject.GetInstanceID()` 로 비교하면 영원히 0개 매칭된다.
+- 🔴 프리팹 편집 모드에서도 `GlobalObjectId` 가 **프리팹 에셋 GUID** 를 참조하고(`identifierType=2`)
+  왕복 복원된다. 그래서 씬·프리팹이 **같은 멤버 키**를 쓴다. 프리팹 전용 fileID 는 필요 없다.
+- 🔴 `PrefabUtility.GetCorrespondingObjectFromSource` 의 fileID 를 멤버 키로 쓰면 안 된다 —
+  *원본 프리팹*의 오브젝트를 가리켜 같은 프리팹을 여러 번 배치한 존에서 전부 같은 값이 된다.
+- 🔴 레포 **최초의 Editor asmdef** 를 만들었다. asmdef 테스트 어셈블리가 predefined `Assembly-CSharp-Editor`
+  를 참조할 수 없어 다른 방법이 없었다. 기존 `Rendering/Editor/` 파일들은 건드리지 않았다.
+
+**남은 것**
+- 셰이더를 `Rendering/Occlusion/Editor/Shaders/` 로 이동 (Unity 를 닫을 일이 생기면. `Shader.Find` 는 경로 무관이라 급하지 않다)
+- 범위 밖으로 둔 것들은 [PLAN-transparent-group-tool.md](PLAN-transparent-group-tool.md) §8
 
 ## ▶▶ 작업 세션 (2026-09-22 · **Dev 부팅 자동화 — 툴바 "Dev Boot"**, 브랜치 `tool/DevBootAutomation`)
 
@@ -107,7 +145,7 @@ Update this file when a term becomes important enough that future agents or team
 `git diff ProjectSettings/EditorBuildSettings.asset` 이 비어 있는지 확인할 것
 (에디터 크래시로 원복이 안 돌면 `Dev/Dev Boot/빌드 목록 강제 정리`).
 
-## ▶▶ 현재 인수인계 (2026-09-22 · 구역 진입 기반 벽 투명화 1단계 **검증 완료**, 브랜치 `feature/TransparentV2-keepgoing`)
+## ▶▶ 이전 인수인계 (2026-09-22 · 구역 진입 기반 벽 투명화 1단계 **검증 완료**, 브랜치 `feature/TransparentV2-keepgoing`)
 
 작업자: **은희(Claude + Codex 위임)**. 계획·근거는 [PLAN.md](PLAN.md) 최상단.
 배선 절차는 [Docs/tech/wall-transparency-shadergraph-setup.md](Docs/tech/wall-transparency-shadergraph-setup.md).

@@ -1,0 +1,1464 @@
+{
+    "version": 1,
+    "contextKind": "Prefab",
+    "contextGuid": "a316e17f30b684545a9ba49510002551",
+    "contextName": "Level_wall_hallway",
+    "groups": [
+        {
+            "id": "cb8ca8c8d0f446c7ab4398f9db80287d",
+            "name": "floor",
+            "color": {
+                "r": 0.1586499661207199,
+                "g": 0.949999988079071,
+                "b": 0.14249996840953828,
+                "a": 1.0
+            },
+            "colorIsCustom": false,
+            "members": [
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-7376373082267734612-1584614656435558361",
+                    "path": "Floor/floor_hallway_003 (2)/floor_stone (2)",
+                    "lastSeenName": "floor_stone (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-2029932570527719989-6108310195403892019",
+                    "path": "Floor/floor_hallway_003/floor_metal_threshold (2)",
+                    "lastSeenName": "floor_metal_threshold (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-7376373082267734612-6108310195403892019",
+                    "path": "Floor/floor_hallway_003/floor_stone (2)",
+                    "lastSeenName": "floor_stone (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-2803296880870042905-6108310195403892019",
+                    "path": "Floor/floor_hallway_003/floor_stone (1)",
+                    "lastSeenName": "floor_stone (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-6958338097029793203-6108310195403892019",
+                    "path": "Floor/floor_hallway_003/floor_metal_threshold (1)",
+                    "lastSeenName": "floor_metal_threshold (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-2029932570527719989-1965207823162820830",
+                    "path": "Floor/floor_hallway_011/floor_metal_threshold (2)",
+                    "lastSeenName": "floor_metal_threshold (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-7376373082267734612-1965207823162820830",
+                    "path": "Floor/floor_hallway_011/floor_stone (2)",
+                    "lastSeenName": "floor_stone (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-2803296880870042905-1965207823162820830",
+                    "path": "Floor/floor_hallway_011/floor_stone (1)",
+                    "lastSeenName": "floor_stone (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-6958338097029793203-1965207823162820830",
+                    "path": "Floor/floor_hallway_011/floor_metal_threshold (1)",
+                    "lastSeenName": "floor_metal_threshold (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-2029932570527719989-4667291831049638288",
+                    "path": "Floor/floor_hallway_011 (1)/floor_metal_threshold (2)",
+                    "lastSeenName": "floor_metal_threshold (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-7376373082267734612-4667291831049638288",
+                    "path": "Floor/floor_hallway_011 (1)/floor_stone (2)",
+                    "lastSeenName": "floor_stone (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-2803296880870042905-4667291831049638288",
+                    "path": "Floor/floor_hallway_011 (1)/floor_stone (1)",
+                    "lastSeenName": "floor_stone (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-6958338097029793203-4667291831049638288",
+                    "path": "Floor/floor_hallway_011 (1)/floor_metal_threshold (1)",
+                    "lastSeenName": "floor_metal_threshold (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-6958338097029793203-2256510640079969373",
+                    "path": "Floor/floor_hallway_005/floor_metal_threshold (1)",
+                    "lastSeenName": "floor_metal_threshold (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-2803296880870042905-2256510640079969373",
+                    "path": "Floor/floor_hallway_005/floor_stone (1)",
+                    "lastSeenName": "floor_stone (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-7376373082267734612-2256510640079969373",
+                    "path": "Floor/floor_hallway_005/floor_stone (2)",
+                    "lastSeenName": "floor_stone (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-2029932570527719989-2256510640079969373",
+                    "path": "Floor/floor_hallway_005/floor_metal_threshold (2)",
+                    "lastSeenName": "floor_metal_threshold (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-6958338097029793203-8041005802262302544",
+                    "path": "Floor/floor_hallway/floor_metal_threshold (1)",
+                    "lastSeenName": "floor_metal_threshold (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-2803296880870042905-8041005802262302544",
+                    "path": "Floor/floor_hallway/floor_stone (1)",
+                    "lastSeenName": "floor_stone (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-7376373082267734612-8041005802262302544",
+                    "path": "Floor/floor_hallway/floor_stone (2)",
+                    "lastSeenName": "floor_stone (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-2029932570527719989-3674613895976060551",
+                    "path": "Floor/floor_hallway_003 (3)/floor_metal_threshold (2)",
+                    "lastSeenName": "floor_metal_threshold (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-7376373082267734612-3674613895976060551",
+                    "path": "Floor/floor_hallway_003 (3)/floor_stone (2)",
+                    "lastSeenName": "floor_stone (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-2803296880870042905-3674613895976060551",
+                    "path": "Floor/floor_hallway_003 (3)/floor_stone (1)",
+                    "lastSeenName": "floor_stone (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-6958338097029793203-4122578284597838912",
+                    "path": "Floor/floor_hallway_003 (4)/floor_metal_threshold (1)",
+                    "lastSeenName": "floor_metal_threshold (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-2803296880870042905-4122578284597838912",
+                    "path": "Floor/floor_hallway_003 (4)/floor_stone (1)",
+                    "lastSeenName": "floor_stone (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-7376373082267734612-4122578284597838912",
+                    "path": "Floor/floor_hallway_003 (4)/floor_stone (2)",
+                    "lastSeenName": "floor_stone (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-2029932570527719989-4122578284597838912",
+                    "path": "Floor/floor_hallway_003 (4)/floor_metal_threshold (2)",
+                    "lastSeenName": "floor_metal_threshold (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-6958338097029793203-3674613895976060551",
+                    "path": "Floor/floor_hallway_003 (3)/floor_metal_threshold (1)",
+                    "lastSeenName": "floor_metal_threshold (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-2029932570527719989-8041005802262302544",
+                    "path": "Floor/floor_hallway/floor_metal_threshold (2)",
+                    "lastSeenName": "floor_metal_threshold (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-2029932570527719989-3408895739400898224",
+                    "path": "Floor/floor_hallway_005 (1)/floor_metal_threshold (2)",
+                    "lastSeenName": "floor_metal_threshold (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-7376373082267734612-3408895739400898224",
+                    "path": "Floor/floor_hallway_005 (1)/floor_stone (2)",
+                    "lastSeenName": "floor_stone (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-2803296880870042905-3408895739400898224",
+                    "path": "Floor/floor_hallway_005 (1)/floor_stone (1)",
+                    "lastSeenName": "floor_stone (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-6958338097029793203-3408895739400898224",
+                    "path": "Floor/floor_hallway_005 (1)/floor_metal_threshold (1)",
+                    "lastSeenName": "floor_metal_threshold (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-6958338097029793203-4209616791622597386",
+                    "path": "Floor/floor_hallway_007/floor_metal_threshold (1)",
+                    "lastSeenName": "floor_metal_threshold (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-2803296880870042905-4209616791622597386",
+                    "path": "Floor/floor_hallway_007/floor_stone (1)",
+                    "lastSeenName": "floor_stone (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-7376373082267734612-4209616791622597386",
+                    "path": "Floor/floor_hallway_007/floor_stone (2)",
+                    "lastSeenName": "floor_stone (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-2029932570527719989-4209616791622597386",
+                    "path": "Floor/floor_hallway_007/floor_metal_threshold (2)",
+                    "lastSeenName": "floor_metal_threshold (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-6958338097029793203-87131972711671427",
+                    "path": "Floor/floor_hallway_007 (1)/floor_metal_threshold (1)",
+                    "lastSeenName": "floor_metal_threshold (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-2803296880870042905-87131972711671427",
+                    "path": "Floor/floor_hallway_007 (1)/floor_stone (1)",
+                    "lastSeenName": "floor_stone (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-7376373082267734612-87131972711671427",
+                    "path": "Floor/floor_hallway_007 (1)/floor_stone (2)",
+                    "lastSeenName": "floor_stone (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-2029932570527719989-87131972711671427",
+                    "path": "Floor/floor_hallway_007 (1)/floor_metal_threshold (2)",
+                    "lastSeenName": "floor_metal_threshold (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-2029932570527719989-1584614656435558361",
+                    "path": "Floor/floor_hallway_003 (2)/floor_metal_threshold (2)",
+                    "lastSeenName": "floor_metal_threshold (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-2029932570527719989-5446518182886569181",
+                    "path": "Floor/floor_hallway (1)/floor_metal_threshold (2)",
+                    "lastSeenName": "floor_metal_threshold (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-7376373082267734612-5446518182886569181",
+                    "path": "Floor/floor_hallway (1)/floor_stone (2)",
+                    "lastSeenName": "floor_stone (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-2803296880870042905-5446518182886569181",
+                    "path": "Floor/floor_hallway (1)/floor_stone (1)",
+                    "lastSeenName": "floor_stone (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-6958338097029793203-5446518182886569181",
+                    "path": "Floor/floor_hallway (1)/floor_metal_threshold (1)",
+                    "lastSeenName": "floor_metal_threshold (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-6958338097029793203-5230367880883824700",
+                    "path": "Floor/floor_hallway_003 (1)/floor_metal_threshold (1)",
+                    "lastSeenName": "floor_metal_threshold (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-2803296880870042905-5230367880883824700",
+                    "path": "Floor/floor_hallway_003 (1)/floor_stone (1)",
+                    "lastSeenName": "floor_stone (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-7376373082267734612-5230367880883824700",
+                    "path": "Floor/floor_hallway_003 (1)/floor_stone (2)",
+                    "lastSeenName": "floor_stone (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-2029932570527719989-5230367880883824700",
+                    "path": "Floor/floor_hallway_003 (1)/floor_metal_threshold (2)",
+                    "lastSeenName": "floor_metal_threshold (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-2803296880870042905-1584614656435558361",
+                    "path": "Floor/floor_hallway_003 (2)/floor_stone (1)",
+                    "lastSeenName": "floor_stone (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-6958338097029793203-1584614656435558361",
+                    "path": "Floor/floor_hallway_003 (2)/floor_metal_threshold (1)",
+                    "lastSeenName": "floor_metal_threshold (1)"
+                }
+            ]
+        },
+        {
+            "id": "ebb4acbf49e34783a867c44f560d5c4b",
+            "name": "BW_L3",
+            "color": {
+                "r": 0.949999988079071,
+                "g": 0.4274999797344208,
+                "b": 0.5904132723808289,
+                "a": 1.0
+            },
+            "colorIsCustom": false,
+            "members": [
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8793570476217427531-8405842909406828586",
+                    "path": "Wall_Basic_cap_035_001",
+                    "lastSeenName": "Wall_Basic_cap_035_001"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-8405842909406828586",
+                    "path": "Wall_Basic_cap_035_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-2465653795917743630",
+                    "path": "Wall_Basic_cap_035/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-2465653795917743630",
+                    "path": "Wall_Basic_cap_035/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-643576870092007358",
+                    "path": "Wall_Basic_cap_035_001_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-643576870092007358",
+                    "path": "Wall_Basic_cap_035_001_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-5683072388843911161",
+                    "path": "Wall_Basic_cap_035_001_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-5683072388843911161",
+                    "path": "Wall_Basic_cap_035_001_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-3558340519469745410",
+                    "path": "Wall_Basic_cap_034/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-1637166055553329981",
+                    "path": "Wall_Basic_cap_034/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-1637166055553329981",
+                    "path": "Wall_Basic_cap_034/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8123816960951688478-1718301416731005390",
+                    "path": "Wall_window_cap_050/wall_basic_window (1)",
+                    "lastSeenName": "wall_basic_window (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-3558340519469745410",
+                    "path": "Wall_Basic_cap_034/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-1575495126894521804-1718301416731005390",
+                    "path": "Wall_window_cap_050/wall_basic_metalcap (2)",
+                    "lastSeenName": "wall_basic_metalcap (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8123816960951688478-737564952859940035",
+                    "path": "Wall_window_cap_050/wall_basic_window (1)",
+                    "lastSeenName": "wall_basic_window (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-1575495126894521804-737564952859940035",
+                    "path": "Wall_window_cap_050/wall_basic_metalcap (2)",
+                    "lastSeenName": "wall_basic_metalcap (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-5588654728696926670",
+                    "path": "Wall_Basic_cap_033/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-5588654728696926670",
+                    "path": "Wall_Basic_cap_033/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-3899409713913065344",
+                    "path": "Wall_Basic_cap_033/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-3899409713913065344",
+                    "path": "Wall_Basic_cap_033/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-3647630075907712471",
+                    "path": "Wall_Basic_cap_033_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-3647630075907712471",
+                    "path": "Wall_Basic_cap_033_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-4152432244386410065",
+                    "path": "Wall_Basic_cap_033_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-4152432244386410065",
+                    "path": "Wall_Basic_cap_033_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-7349267863727489112",
+                    "path": "Wall_Basic_cap_032_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-3596702164563324881",
+                    "path": "Wall_Basic_cap_031_001_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-2526967162724433773",
+                    "path": "Wall_Basic_cap_030_001_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-8926501880874064381",
+                    "path": "Wall_Basic_cap_027_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-5789931196194784881",
+                    "path": "Wall_Basic_cap_028_001_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-4861097613802883802",
+                    "path": "Wall_Basic_cap_029_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3763367766014054573-8438579826719889651",
+                    "path": "Wall_corner02_047/Wall_Basic_cap/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3419251166572074518-8438579826719889651",
+                    "path": "Wall_corner02_047/wall_metal_pillar",
+                    "lastSeenName": "wall_metal_pillar"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3419251166572074518-7621948568826909993",
+                    "path": "Wall_corner02_046/wall_metal_pillar",
+                    "lastSeenName": "wall_metal_pillar"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3763367766014054573-7621948568826909993",
+                    "path": "Wall_corner02_046/Wall_Basic_cap/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-6960528005806257965",
+                    "path": "Wall_Basic_cap_029_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-6197073960743401411",
+                    "path": "Wall_Basic_cap_028_001_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-3083293879376970009",
+                    "path": "Wall_Basic_cap_027_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-8627861762040296536",
+                    "path": "Wall_Basic_cap_030_001_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-6119192876756764375",
+                    "path": "Wall_Basic_cap_031_001_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-1844708064751643820",
+                    "path": "Wall_Basic_cap_032_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-1844708064751643820",
+                    "path": "Wall_Basic_cap_032_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-6119192876756764375",
+                    "path": "Wall_Basic_cap_031_001_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-6197073960743401411",
+                    "path": "Wall_Basic_cap_028_001_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-8627861762040296536",
+                    "path": "Wall_Basic_cap_030_001_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-3083293879376970009",
+                    "path": "Wall_Basic_cap_027_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8123816960951688478-3520208742145062960",
+                    "path": "Wall_window_cap_049/wall_basic_window (1)",
+                    "lastSeenName": "wall_basic_window (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-3980293901033318423",
+                    "path": "Wall_Basic_cap_028_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8123816960951688478-7797224114842087788",
+                    "path": "Wall_window_cap_052/wall_basic_window (1)",
+                    "lastSeenName": "wall_basic_window (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3763367766014054573-4354002787357807902",
+                    "path": "Wall_corner02_045/Wall_Basic_cap/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3419251166572074518-4354002787357807902",
+                    "path": "Wall_corner02_045/wall_metal_pillar",
+                    "lastSeenName": "wall_metal_pillar"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-7331804576382177136-7621948568826909993",
+                    "path": "Wall_corner02_046/Wall_Basic_cap/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-6960528005806257965",
+                    "path": "Wall_Basic_cap_029_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8123816960951688478-4263811565623403306",
+                    "path": "Wall_window_cap_051/wall_basic_window (1)",
+                    "lastSeenName": "wall_basic_window (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-1426957445175333757",
+                    "path": "Wall_Basic_cap_031_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-3487215583137623931",
+                    "path": "Wall_Basic_cap_030_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3419251166572074518-8448455788670678875",
+                    "path": "Wall_corner02_044/wall_metal_pillar",
+                    "lastSeenName": "wall_metal_pillar"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3763367766014054573-8448455788670678875",
+                    "path": "Wall_corner02_044/Wall_Basic_cap/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8123816960951688478-6364821267474650772",
+                    "path": "Wall_window_cap_052/wall_basic_window (1)",
+                    "lastSeenName": "wall_basic_window (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-1575495126894521804-7797224114842087788",
+                    "path": "Wall_window_cap_052/wall_basic_metalcap (2)",
+                    "lastSeenName": "wall_basic_metalcap (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-3980293901033318423",
+                    "path": "Wall_Basic_cap_028_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-7331804576382177136-4354002787357807902",
+                    "path": "Wall_corner02_045/Wall_Basic_cap/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-1575495126894521804-3520208742145062960",
+                    "path": "Wall_window_cap_049/wall_basic_metalcap (2)",
+                    "lastSeenName": "wall_basic_metalcap (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-3487215583137623931",
+                    "path": "Wall_Basic_cap_030_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-1426957445175333757",
+                    "path": "Wall_Basic_cap_031_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-1575495126894521804-4263811565623403306",
+                    "path": "Wall_window_cap_051/wall_basic_metalcap (2)",
+                    "lastSeenName": "wall_basic_metalcap (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8123816960951688478-7428021021878729593",
+                    "path": "Wall_window_cap_051/wall_basic_window (1)",
+                    "lastSeenName": "wall_basic_window (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-7119936783415109447",
+                    "path": "Wall_Basic_cap_031_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-8171167952158376608",
+                    "path": "Wall_Basic_cap_030_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8123816960951688478-976950187776982142",
+                    "path": "Wall_window_cap_049/wall_basic_window (1)",
+                    "lastSeenName": "wall_basic_window (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-4899375074594077358",
+                    "path": "Wall_Basic_cap_028_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-1575495126894521804-7428021021878729593",
+                    "path": "Wall_window_cap_051/wall_basic_metalcap (2)",
+                    "lastSeenName": "wall_basic_metalcap (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-7119936783415109447",
+                    "path": "Wall_Basic_cap_031_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-8171167952158376608",
+                    "path": "Wall_Basic_cap_030_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-1575495126894521804-976950187776982142",
+                    "path": "Wall_window_cap_049/wall_basic_metalcap (2)",
+                    "lastSeenName": "wall_basic_metalcap (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-4899375074594077358",
+                    "path": "Wall_Basic_cap_028_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-1575495126894521804-6364821267474650772",
+                    "path": "Wall_window_cap_052/wall_basic_metalcap (2)",
+                    "lastSeenName": "wall_basic_metalcap (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-7331804576382177136-8448455788670678875",
+                    "path": "Wall_corner02_044/Wall_Basic_cap/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4968705601798641312-8448455788670678875",
+                    "path": "Wall_corner02_044/Wall_Basic_cap (1)/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-1545162427459963261-8448455788670678875",
+                    "path": "Wall_corner02_044/Wall_Basic_cap (1)/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4968705601798641312-4354002787357807902",
+                    "path": "Wall_corner02_045/Wall_Basic_cap (1)/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-1545162427459963261-4354002787357807902",
+                    "path": "Wall_corner02_045/Wall_Basic_cap (1)/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4968705601798641312-7621948568826909993",
+                    "path": "Wall_corner02_046/Wall_Basic_cap (1)/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-1545162427459963261-7621948568826909993",
+                    "path": "Wall_corner02_046/Wall_Basic_cap (1)/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4968705601798641312-8438579826719889651",
+                    "path": "Wall_corner02_047/Wall_Basic_cap (1)/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-1545162427459963261-8438579826719889651",
+                    "path": "Wall_corner02_047/Wall_Basic_cap (1)/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-6135427409469855816-8438579826719889651",
+                    "path": "Wall_corner02_047/Wall_Basic_cap (1)/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-3289047198916615183",
+                    "path": "Wall_Basic_cap_014_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-6297313841103547272",
+                    "path": "Wall_Basic_cap_014_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-6297313841103547272",
+                    "path": "Wall_Basic_cap_014_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8123816960951688478-1946823485924225049",
+                    "path": "Wall_window_cap_064/wall_basic_window (1)",
+                    "lastSeenName": "wall_basic_window (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-1575495126894521804-1946823485924225049",
+                    "path": "Wall_window_cap_064/wall_basic_metalcap (2)",
+                    "lastSeenName": "wall_basic_metalcap (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8123816960951688478-2662378949395465197",
+                    "path": "Wall_window_cap_064/wall_basic_window (1)",
+                    "lastSeenName": "wall_basic_window (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-1575495126894521804-2662378949395465197",
+                    "path": "Wall_window_cap_064/wall_basic_metalcap (2)",
+                    "lastSeenName": "wall_basic_metalcap (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-5918018824095568087",
+                    "path": "Wall_Basic_cap_013/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-5918018824095568087",
+                    "path": "Wall_Basic_cap_013/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-8134526549244311964",
+                    "path": "Wall_Basic_cap_013/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-8134526549244311964",
+                    "path": "Wall_Basic_cap_013/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-6331194313782287992",
+                    "path": "Wall_Basic_cap_013_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-6331194313782287992",
+                    "path": "Wall_Basic_cap_013_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-7955031600200825421",
+                    "path": "Wall_Basic_cap_013_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-7955031600200825421",
+                    "path": "Wall_Basic_cap_013_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-6616943890762420332",
+                    "path": "Wall_Basic_cap_012_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-6616943890762420332",
+                    "path": "Wall_Basic_cap_012_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-6249999074605680780",
+                    "path": "Wall_Basic_cap_012_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8123816960951688478-742611282065485184",
+                    "path": "Wall_window_cap_063/wall_basic_window (1)",
+                    "lastSeenName": "wall_basic_window (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-1575495126894521804-742611282065485184",
+                    "path": "Wall_window_cap_063/wall_basic_metalcap (2)",
+                    "lastSeenName": "wall_basic_metalcap (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8123816960951688478-5841623235870501881",
+                    "path": "Wall_window_cap_063/wall_basic_window (1)",
+                    "lastSeenName": "wall_basic_window (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-1575495126894521804-5841623235870501881",
+                    "path": "Wall_window_cap_063/wall_basic_metalcap (2)",
+                    "lastSeenName": "wall_basic_metalcap (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-4949633678356007379",
+                    "path": "Wall_Basic_cap_018_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-4949633678356007379",
+                    "path": "Wall_Basic_cap_018_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-3434454748590368629",
+                    "path": "Wall_Basic_cap_018_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-3434454748590368629",
+                    "path": "Wall_Basic_cap_018_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-1458351703572584680",
+                    "path": "Wall_Basic_cap_018_001_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-1458351703572584680",
+                    "path": "Wall_Basic_cap_018_001_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-2363718964515275282",
+                    "path": "Wall_Basic_cap_018_001_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-200998959939428856",
+                    "path": "Wall_Basic_cap_017_001_001/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-200998959939428856",
+                    "path": "Wall_Basic_cap_017_001_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-409944871236848931",
+                    "path": "Wall_Basic_cap_017_001_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-409944871236848931",
+                    "path": "Wall_Basic_cap_017_001_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-3856269616908004701",
+                    "path": "Wall_Basic_cap_017_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-3856269616908004701",
+                    "path": "Wall_Basic_cap_017_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-164799692764072852",
+                    "path": "Wall_Basic_cap_017_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-164799692764072852",
+                    "path": "Wall_Basic_cap_017_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8123816960951688478-6852728173736696122",
+                    "path": "Wall_window_cap_062/wall_basic_window (1)",
+                    "lastSeenName": "wall_basic_window (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8123816960951688478-5445764568835771737",
+                    "path": "Wall_window_cap_062/wall_basic_window (1)",
+                    "lastSeenName": "wall_basic_window (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-5791606748633288356",
+                    "path": "Wall_Basic_cap_016_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-2619883156299695314",
+                    "path": "Wall_Basic_cap_016_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-2577338806727071038",
+                    "path": "Wall_Basic_cap_015_001_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-2577338806727071038",
+                    "path": "Wall_Basic_cap_015_001_001/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-2577338806727071038",
+                    "path": "Wall_Basic_cap_015_001_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-7584046927689439644",
+                    "path": "Wall_Basic_cap_015_001_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-8041245455928668532",
+                    "path": "Wall_Basic_cap_015_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-1575495126894521804-6852728173736696122",
+                    "path": "Wall_window_cap_062/wall_basic_metalcap (2)",
+                    "lastSeenName": "wall_basic_metalcap (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-427785166444383944",
+                    "path": "Wall_Basic_cap_015_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-427785166444383944",
+                    "path": "Wall_Basic_cap_015_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-8041245455928668532",
+                    "path": "Wall_Basic_cap_015_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-3289047198916615183",
+                    "path": "Wall_Basic_cap_014_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-6249999074605680780",
+                    "path": "Wall_Basic_cap_012_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-2363718964515275282",
+                    "path": "Wall_Basic_cap_018_001_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-200998959939428856",
+                    "path": "Wall_Basic_cap_017_001_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-2619883156299695314",
+                    "path": "Wall_Basic_cap_016_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-5791606748633288356",
+                    "path": "Wall_Basic_cap_016_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-1575495126894521804-5445764568835771737",
+                    "path": "Wall_window_cap_062/wall_basic_metalcap (2)",
+                    "lastSeenName": "wall_basic_metalcap (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-7584046927689439644",
+                    "path": "Wall_Basic_cap_015_001_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-2314278131803361276",
+                    "path": "Wall_Basic_cap_011_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-2314278131803361276",
+                    "path": "Wall_Basic_cap_011_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-2697184755612307162",
+                    "path": "Wall_Basic_cap_011_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-2697184755612307162",
+                    "path": "Wall_Basic_cap_011_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8123816960951688478-3382327090054089280",
+                    "path": "Wall_window_cap_061/wall_basic_window (1)",
+                    "lastSeenName": "wall_basic_window (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-1575495126894521804-3382327090054089280",
+                    "path": "Wall_window_cap_061/wall_basic_metalcap (2)",
+                    "lastSeenName": "wall_basic_metalcap (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8123816960951688478-3226059046477725874",
+                    "path": "Wall_window_cap_061/wall_basic_window (1)",
+                    "lastSeenName": "wall_basic_window (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-1575495126894521804-3226059046477725874",
+                    "path": "Wall_window_cap_061/wall_basic_metalcap (2)",
+                    "lastSeenName": "wall_basic_metalcap (2)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-7908672294996420379",
+                    "path": "Wall_Basic_cap_038_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-7908672294996420379",
+                    "path": "Wall_Basic_cap_038_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-107958388322194745",
+                    "path": "Wall_Basic_cap_038_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-107958388322194745",
+                    "path": "Wall_Basic_cap_038_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-7999077348741722417",
+                    "path": "Wall_Basic_cap_038_001_002/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-7999077348741722417",
+                    "path": "Wall_Basic_cap_038_001_002/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-5205549753572884806",
+                    "path": "Wall_Basic_cap_038_001_001_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8955759739288517700-5205549753572884806",
+                    "path": "Wall_Basic_cap_038_001_001_001/wall_basic (1)",
+                    "lastSeenName": "wall_basic (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-7349267863727489112",
+                    "path": "Wall_Basic_cap_032_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-3596702164563324881",
+                    "path": "Wall_Basic_cap_031_001_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-2526967162724433773",
+                    "path": "Wall_Basic_cap_030_001_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-8926501880874064381",
+                    "path": "Wall_Basic_cap_027_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-7331804576382177136-8438579826719889651",
+                    "path": "Wall_corner02_047/Wall_Basic_cap/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-4861097613802883802",
+                    "path": "Wall_Basic_cap_029_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-5789931196194784881",
+                    "path": "Wall_Basic_cap_028_001_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-3300195598731502489-8405842909406828586",
+                    "path": "Wall_Basic_cap_035_001/wall_basic_metalcap (1)",
+                    "lastSeenName": "wall_basic_metalcap (1)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-8405842909406828586",
+                    "path": "Wall_Basic_cap_035_001/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-2465653795917743630",
+                    "path": "Wall_Basic_cap_035/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-643576870092007358",
+                    "path": "Wall_Basic_cap_035_001_001/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-1637166055553329981",
+                    "path": "Wall_Basic_cap_034/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-6034317931241667299-1718301416731005390",
+                    "path": "Wall_window_cap_050/floor_bar_metal (4)",
+                    "lastSeenName": "floor_bar_metal (4)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-6034317931241667299-737564952859940035",
+                    "path": "Wall_window_cap_050/floor_bar_metal (4)",
+                    "lastSeenName": "floor_bar_metal (4)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-5588654728696926670",
+                    "path": "Wall_Basic_cap_033/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-3899409713913065344",
+                    "path": "Wall_Basic_cap_033/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-3647630075907712471",
+                    "path": "Wall_Basic_cap_033_001/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-4152432244386410065",
+                    "path": "Wall_Basic_cap_033_001/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-1844708064751643820",
+                    "path": "Wall_Basic_cap_032_001/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-6034317931241667299-4263811565623403306",
+                    "path": "Wall_window_cap_051/floor_bar_metal (4)",
+                    "lastSeenName": "floor_bar_metal (4)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-6034317931241667299-7428021021878729593",
+                    "path": "Wall_window_cap_051/floor_bar_metal (4)",
+                    "lastSeenName": "floor_bar_metal (4)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-7119936783415109447",
+                    "path": "Wall_Basic_cap_031_001/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-1426957445175333757",
+                    "path": "Wall_Basic_cap_031_001/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-2526967162724433773",
+                    "path": "Wall_Basic_cap_030_001_001/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-6119192876756764375",
+                    "path": "Wall_Basic_cap_031_001_001/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-8627861762040296536",
+                    "path": "Wall_Basic_cap_030_001_001/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-6034317931241667299-3520208742145062960",
+                    "path": "Wall_window_cap_049/floor_bar_metal (4)",
+                    "lastSeenName": "floor_bar_metal (4)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-3083293879376970009",
+                    "path": "Wall_Basic_cap_027_001/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-6034317931241667299-976950187776982142",
+                    "path": "Wall_window_cap_049/floor_bar_metal (4)",
+                    "lastSeenName": "floor_bar_metal (4)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-3487215583137623931",
+                    "path": "Wall_Basic_cap_030_001/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-8171167952158376608",
+                    "path": "Wall_Basic_cap_030_001/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-6197073960743401411",
+                    "path": "Wall_Basic_cap_028_001_001/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-3980293901033318423",
+                    "path": "Wall_Basic_cap_028_001/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-4899375074594077358",
+                    "path": "Wall_Basic_cap_028_001/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-6034317931241667299-6364821267474650772",
+                    "path": "Wall_window_cap_052/floor_bar_metal (4)",
+                    "lastSeenName": "floor_bar_metal (4)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-6034317931241667299-7797224114842087788",
+                    "path": "Wall_window_cap_052/floor_bar_metal (4)",
+                    "lastSeenName": "floor_bar_metal (4)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8389859455151440280-8438579826719889651",
+                    "path": "Wall_corner02_047/Wall_Basic_cap/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-6960528005806257965",
+                    "path": "Wall_Basic_cap_029_001/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-6135427409469855816-4354002787357807902",
+                    "path": "Wall_corner02_045/Wall_Basic_cap (1)/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8389859455151440280-8448455788670678875",
+                    "path": "Wall_corner02_044/Wall_Basic_cap/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8389859455151440280-4354002787357807902",
+                    "path": "Wall_corner02_045/Wall_Basic_cap/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-8389859455151440280-7621948568826909993",
+                    "path": "Wall_corner02_046/Wall_Basic_cap/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-6135427409469855816-7621948568826909993",
+                    "path": "Wall_corner02_046/Wall_Basic_cap (1)/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-6135427409469855816-8448455788670678875",
+                    "path": "Wall_corner02_044/Wall_Basic_cap (1)/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-6034317931241667299-2662378949395465197",
+                    "path": "Wall_window_cap_064/floor_bar_metal (4)",
+                    "lastSeenName": "floor_bar_metal (4)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-6034317931241667299-1946823485924225049",
+                    "path": "Wall_window_cap_064/floor_bar_metal (4)",
+                    "lastSeenName": "floor_bar_metal (4)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-6297313841103547272",
+                    "path": "Wall_Basic_cap_014_001/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-3289047198916615183",
+                    "path": "Wall_Basic_cap_014_001/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-6331194313782287992",
+                    "path": "Wall_Basic_cap_013_001/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-8134526549244311964",
+                    "path": "Wall_Basic_cap_013/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-5918018824095568087",
+                    "path": "Wall_Basic_cap_013/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-6034317931241667299-5841623235870501881",
+                    "path": "Wall_window_cap_063/floor_bar_metal (4)",
+                    "lastSeenName": "floor_bar_metal (4)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-6034317931241667299-742611282065485184",
+                    "path": "Wall_window_cap_063/floor_bar_metal (4)",
+                    "lastSeenName": "floor_bar_metal (4)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-6249999074605680780",
+                    "path": "Wall_Basic_cap_012_001/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-6616943890762420332",
+                    "path": "Wall_Basic_cap_012_001/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-1458351703572584680",
+                    "path": "Wall_Basic_cap_018_001_001/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-3434454748590368629",
+                    "path": "Wall_Basic_cap_018_001/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-4949633678356007379",
+                    "path": "Wall_Basic_cap_018_001/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-164799692764072852",
+                    "path": "Wall_Basic_cap_017_001/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-3856269616908004701",
+                    "path": "Wall_Basic_cap_017_001/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-409944871236848931",
+                    "path": "Wall_Basic_cap_017_001_001/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-5791606748633288356",
+                    "path": "Wall_Basic_cap_016_001/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-6034317931241667299-5445764568835771737",
+                    "path": "Wall_window_cap_062/floor_bar_metal (4)",
+                    "lastSeenName": "floor_bar_metal (4)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-6034317931241667299-6852728173736696122",
+                    "path": "Wall_window_cap_062/floor_bar_metal (4)",
+                    "lastSeenName": "floor_bar_metal (4)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-427785166444383944",
+                    "path": "Wall_Basic_cap_015_001/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-8041245455928668532",
+                    "path": "Wall_Basic_cap_015_001/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-7584046927689439644",
+                    "path": "Wall_Basic_cap_015_001_001/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-2697184755612307162",
+                    "path": "Wall_Basic_cap_011_001/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-6034317931241667299-3382327090054089280",
+                    "path": "Wall_window_cap_061/floor_bar_metal (4)",
+                    "lastSeenName": "floor_bar_metal (4)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-6034317931241667299-3226059046477725874",
+                    "path": "Wall_window_cap_061/floor_bar_metal (4)",
+                    "lastSeenName": "floor_bar_metal (4)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-7908672294996420379",
+                    "path": "Wall_Basic_cap_038_001/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-107958388322194745",
+                    "path": "Wall_Basic_cap_038_001/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-7999077348741722417",
+                    "path": "Wall_Basic_cap_038_001_002/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                },
+                {
+                    "globalObjectId": "GlobalObjectId_V1-2-a316e17f30b684545a9ba49510002551-4331811633717587313-5205549753572884806",
+                    "path": "Wall_Basic_cap_038_001_001_001/floor_bar_metal (3)",
+                    "lastSeenName": "floor_bar_metal (3)"
+                }
+            ]
+        }
+    ]
+}
