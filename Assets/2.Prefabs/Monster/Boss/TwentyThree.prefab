@@ -322,6 +322,39 @@ Transform:
   m_Children: []
   m_Father: {fileID: 4400268225252444794}
   m_LocalEulerAnglesHint: {x: -221.29, y: 180, z: 0}
+--- !u!1 &1505674770611661463
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1913074251630784865}
+  m_Layer: 8
+  m_Name: Jump
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1913074251630784865
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1505674770611661463}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 4265995937890163569}
+  - {fileID: 512246015700371347}
+  m_Father: {fileID: 7474057274361013860}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1604467948647009713
 GameObject:
   m_ObjectHideFlags: 0
@@ -353,6 +386,56 @@ Transform:
   m_Children: []
   m_Father: {fileID: 8050566030959471426}
   m_LocalEulerAnglesHint: {x: -90, y: 0, z: 0}
+--- !u!1 &1673253189766082593
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 512246015700371347}
+  - component: {fileID: 2941284089641772099}
+  m_Layer: 8
+  m_Name: GroundBreak
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &512246015700371347
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1673253189766082593}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1913074251630784865}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2941284089641772099
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1673253189766082593}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
+  id: GroundBreak
+  effect: {fileID: 11400000, guid: ca4484519e927ed4ca1984de7759f364, type: 2}
+  socket: {fileID: 6822614871550549647}
+  offset: {x: 0, y: 0, z: 0}
+  scale: 3
+  safetyTimeout: 5
 --- !u!1 &1700975306886457903
 GameObject:
   m_ObjectHideFlags: 0
@@ -1159,7 +1242,7 @@ GameObject:
   m_Component:
   - component: {fileID: 6822614871550549647}
   m_Layer: 0
-  m_Name: GroundCrashVFX_Socket
+  m_Name: GroundVFX_Socket
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1442,7 +1525,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1713256455
+  GlobalObjectIdHash: 373754331
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -1804,12 +1887,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 7217997480525952235}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 7474057274361013860}
+  m_Father: {fileID: 1913074251630784865}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &3779892976675558507
 MonoBehaviour:
@@ -1892,13 +1975,13 @@ Transform:
   - {fileID: 2091103809601799248}
   - {fileID: 123502591369259877}
   - {fileID: 2119005834390612925}
-  - {fileID: 4265995937890163569}
   - {fileID: 5315580739385651090}
   - {fileID: 7708088474930438963}
   - {fileID: 3641799454362057399}
   - {fileID: 5445333853555500531}
   - {fileID: 1304259933868734774}
   - {fileID: 461791374088390855}
+  - {fileID: 1913074251630784865}
   m_Father: {fileID: 8530868094991501261}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &8213996389974915121
