@@ -1827,9 +1827,6 @@ PrefabInstance:
       addedObject: {fileID: 1140297743786010553}
     - targetCorrespondingSourceObject: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 8718492123231755377}
-    - targetCorrespondingSourceObject: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
-      insertIndex: -1
       addedObject: {fileID: 2933743684354559062}
     - targetCorrespondingSourceObject: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       insertIndex: -1
@@ -1981,21 +1978,6 @@ MonoBehaviour:
   breakBurst: {fileID: 1237510801895637324}
   minHitDistance: 0.15
   interruptWave: {fileID: 1856814881585661691}
---- !u!114 &8718492123231755377
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7876615519038055782}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 49f67085e4afbf14c8e5182d6e653718, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PlayerSilhouetteTag
-  ShowTopMostFoldoutHeaderGroup: 1
-  modelRoot: {fileID: 0}
-  logOnSpawn: 0
 --- !u!114 &2933743684354559062
 MonoBehaviour:
   m_ObjectHideFlags: 0

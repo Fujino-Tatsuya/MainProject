@@ -387,6 +387,7 @@ GameObject:
   - component: {fileID: 800000000000000030}
   - component: {fileID: 1017407548875731560}
   - component: {fileID: 133388133837901378}
+  - component: {fileID: 519902155721058497}
   m_Layer: 6
   m_Name: Player
   m_TagString: Player
@@ -666,8 +667,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7c3e5a9cfb85e1a4cb8896d14fca8554, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   maxSmoothedCorrection: 1
   decayTimeConstant: 0.08
 --- !u!114 &4525831256458907740
@@ -701,6 +702,16 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DefaultAttack
   ShowTopMostFoldoutHeaderGroup: 1
+  slashHit:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  slashMiss:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
   animator: {fileID: 0}
   attackData: {fileID: 0}
   playerDefaultAttack: {fileID: 4525831256458907740}
@@ -994,6 +1005,7 @@ MonoBehaviour:
   occupancyRadius: 0.4
   probeUpDistance: 1.5
   probeDownDistance: 3
+  showSafePointMarkers: 1
   safePointMarkerPrefab: {fileID: 0}
 --- !u!114 &1111000000000000014
 MonoBehaviour:
@@ -1061,6 +1073,21 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerAudioListenerActivator
   ShowTopMostFoldoutHeaderGroup: 1
+--- !u!114 &519902155721058497
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8559504096609571310}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 49f67085e4afbf14c8e5182d6e653718, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerSilhouetteTag
+  ShowTopMostFoldoutHeaderGroup: 1
+  modelRoot: {fileID: 0}
+  logOnSpawn: 0
 --- !u!1 &8896633917232358439
 GameObject:
   m_ObjectHideFlags: 0
