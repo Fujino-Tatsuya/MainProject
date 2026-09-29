@@ -243,7 +243,7 @@
 5. [player-prefabs.md](Docs/tech/player-prefabs.md) §0·§2·§3·§4·§8 갱신, [CONTEXT.md](CONTEXT.md) 인계 갱신
 
 **P5 결과 (2026-09-29, Claude)**
-- `DefaultNetworkPrefabs`: `Player`(base)·`Paladin`·`Paladin_VFX` 3항목 제거 → **`Player_Paladin` 만** 남김.
+- `DefaultNetworkPrefabs`: `Player`(base)·`Paladin`·`Paladin_VFX` 3항목을 뺐으나 → 🔴 **NGO 자동 생성(`GenerateDefaultNetworkPrefabs: 1`)이 다음 Play 때 전부 되돌렸다.** 자동 등록을 받아들이고 되돌림을 커밋(무해 — 해시 전부 상이). 목록을 손으로 정리하지 않는다.
   base 제거는 Claude 판단(스폰하는 곳 0 — 동작 무변화). 되돌리려면 항목 하나 추가.
 - 에디터 안 `MoveAsset` 으로 `Paladin`·`Paladin_VFX`·`TempPlayer_Armature` → `Player/Legacy/` (guid 3개 유지, git rename 인식).
   → 이후 **`Paladin_VFX` 만 원래 위치(`Player/Paladin/`)로 복구**(사용자 결정, guid 유지). 네트워크 목록 미등록·스폰 안 됨은 그대로. ⚠️ `PlayerEncounterLockAuthoring` 은 `Legacy/` 만 제외하므로 `Paladin_VFX` 도 순회 대상이 된다(멱등 복구라 무해).

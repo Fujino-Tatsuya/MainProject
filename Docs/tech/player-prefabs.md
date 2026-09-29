@@ -32,7 +32,7 @@ Player.prefab (base)            ← 네트워크·입력·이동·생명주기·
 | 새 캐릭터 패시브는? | Variant 루트에 **`IPlayerPassive`** 구현 컴포넌트를 붙인다(HUD 가 이것만 본다). 적중·피격 반응은 `Player.ServerAttackLanded` / `ServerAttackReceived` 구독 — base 는 구체 패시브를 모른다([PLAN-passive-onhit.md](../../PLAN-passive-onhit.md)) |
 | 자식 이름 규칙 | 몸체 인스턴스 이름은 반드시 **`Armature`** (`transform.Find("Armature")` 폴백 3곳, §1.4) |
 | 구 프리팹은? | `Paladin.prefab` · `TempPlayer_Armature.prefab` → **`Player/Legacy/`** 보관. `Paladin_VFX.prefab` 은 **원래 위치(`Player/Paladin/`)에 유지**(2026-09-29 사용자 결정). 셋 다 스폰·네트워크 목록 대상 아님 — 고쳐도 게임에 반영되지 않는다 |
-| 네트워크 목록 | `DefaultNetworkPrefabs` 에 **`Player_Paladin` 만** 등록. base 는 스폰 대상이 아니라 뺐다 |
+| 네트워크 목록 | `DefaultNetworkPrefabs` 는 **NGO 가 자동 생성**한다(`ProjectSettings/NetcodeForGameObjects.asset` `GenerateDefaultNetworkPrefabs: 1`) — NetworkObject 가 붙은 프리팹은 base·Legacy 포함 **전부 다시 들어온다**. 손으로 빼지 말 것. 스폰되지 않는 프리팹이 목록에 있는 건 무해(해시가 전부 다르다) |
 | 캐릭터 선택 UI / `ResolvePlayerPrefabForClient` | **미구현**(범위 밖). 지금은 `defaultPlayerPrefab = Player_Paladin` |
 
 🔴 **Variant 해시 함정.** `SaveAsPrefabAsset` 만으로는 Variant 의 `NetworkObject.GlobalObjectIdHash` 오버라이드가
