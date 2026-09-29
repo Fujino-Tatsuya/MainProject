@@ -8,12 +8,15 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 현재 인수인계 (2026-09-29 · 경석 · `feature/Boss23` — 간파·취약·제압 / 보스 경계 / 새 보스방)
+## ▶▶ 현재 인수인계 (2026-09-29 · 경석 · `feature/Boss23` → development 반영)
 
-- 계획·진행·**다음 세션 시작점**: [PLAN-boss-counter-vulnerable.md](PLAN-boss-counter-vulnerable.md) §7-2 (09-29 항목들).
-  09-29 수정: 취약 벽 판정(방 회전) · 제압 그로기 루프 · 취약 중 돌진 · 점프 착지 경계/Warp 복구 · 보스방 NavMesh 여유 띠. **Play 재확인 대기**(제압 애니 · 여유 로그 · 끼임).
-- 09-29 머지: SVN **r336** + `origin/fix/zone_bossroom`(새 보스방 `8dbb04fa`) → 이어서 `origin/development`. 새 보스방은 경계·바닥 크기 동일.
-  🔴 새 보스방에는 여유 띠(`NavMeshMargin`)가 없다 — Unity 에서 `Tools/Map/Authoring/Build Boss Room NavMesh Margin` 한 번 실행.
+- **다음 세션 = 전기장판 · 자폭드론** — 기획 문서 수령 대기(받으면 바로 착수). 자폭드론 자리: `TwentyThreeBoss.OnWellsAttackCycle`(Wells 공격 주기 — 현재 빈 자리 경고).
+- 09-29 반영: 취약 넉백(방 회전) · 넉백 종료 시 그로기·취약 종료 · 제압 그로기 루프 · 취약 중 돌진 · 어퍼 예고 0.5 · 차징 점프 착지 범위 공격 · 점프 체인 안 끊김 · 잡기 낚아채는 프레임 부착 · 점프 착지 경계/Warp 복구 · 보스방 NavMesh 여유 띠(실측 1.5m) · Start → 튜토리얼 스테이지([PLAN-tutorial-stage.md](PLAN-tutorial-stage.md)) · 차징 오라 데칼 제거 · 진입 연출 디버프만 해제 · Dev 공격 예약 단축키(F3/F4/F6/F9/F11, 대기열 8, Shift+F3 비우기).
+  상세: [PLAN-boss-counter-vulnerable.md](PLAN-boss-counter-vulnerable.md) §7-2.
+- 🔴 **SVN r338 필수** — development 의 `WallTransparencyDither.hlsl`(은희)과 r338 `Generic_Standard.shadergraph` 가 짝. r336 이하면 화면 전체 분홍(`undeclared identifier WallTransparencyDither_float`). 핀 `art-svn.json` = 338.
+- ⏳ 남은 것: 잡기 부착이 매번 `안전망` 으로 붙는다(클립 이벤트와 구간 타이머가 같은 순간 0.786s — 타이머가 Update 에서 먼저 닿음) → 짧은 유예로 이벤트 경로 우선 · 임시 진단 로그 3종 삭제(`[23호/점프진단]`·`[모터/끼임진단]`·`[23호] NavMesh 여유`) · 모터 EditMode 테스트 · 벤트 오브젝트(제작 중) 연동 확인 · 투명화는 **아트 쪽 작업**(튜토리얼·보스방 미적용).
+- ⚠️ 기존 버그(범위 밖): 결과 씬 `ResultSceneManager.cs:24` `AudioManager.Instance.StopBGM()` 널 참조(이 흐름에 AudioManager 없음) — 사운드 담당.
+
 - 사망 연출·중간보스 예고: [PLAN-boss-death-telegraph.md](PLAN-boss-death-telegraph.md) (팀장 확인 완료).
 - NavMesh(몬스터 쪽): 추격 목적지 투영 + 도달 불가 시 대기(`MonsterBase.ChaseTarget`) · 재부착 수평 거리 기준 + 리쉬 기준점 갱신(`MapNavMeshBaker`) ·
   23호 에이전트 반경 유지 · 넉백 종료 Warp 1m + 같은 섬. **아트 쪽(FBX Read/Write · 누락 콜라이더 · 보행 불가 지정)은 미착수** —
