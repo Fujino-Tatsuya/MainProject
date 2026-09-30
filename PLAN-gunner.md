@@ -126,6 +126,11 @@ G1 은 G4 전까지 어느 때든. 문서 갱신(player-prefabs.md 거너 항목
 
 ## 7. 진행
 
+- ✅ **G9 껍데기 생성 — 스폰 확인**(2026-09-30). 메뉴 `Tools/Player/Gunner/껍데기 생성 (G9)`(`Player/Editor/GunnerShellAuthoring.cs`, 재실행 시 있는 건 건너뜀)로
+  `4.Animations/Player/Gunner/GunnerAnimatorController.controller`(파라미터 5 + 빈 Idle/Walk), `2.Prefabs/Player/Gunner/Gunner_Armature.prefab`
+  (gunner.fbx + Animator·NetworkTransform 회전만·NetworkAnimator 오너·릴레이 2, `hand.r` 에 laser_gun), `Player_Gunner.prefab`(Variant, **GlobalObjectIdHash 816596077**, `DefaultNetworkPrefabs` 자동 등록) 생성.
+  Dev Boot 캐릭터 선택 = 메뉴 `Dev/Dev Boot/캐릭터/`(EditorPrefs, 씬 필드 우선). 기본 공격 컴포넌트는 아직 없음(G3).
+
 - ⏳ **G1 코드 완료 — Unity 임포트·EditMode·Play 확인 대기**(2026-09-30). `dotnet build` 오류 0.
   - 신규 `Unit/ShieldType.cs`(`ShieldType`·`ShieldStackPolicy`·`ShieldEndReason`·`ShieldTypePolicies`·`ShieldInstance`), `Unit/Editor/HealthShieldTests.cs`(5건).
   - `Health`: 보호막 = 인스턴스 목록(만료 빠른 것부터 소모, 만료 없음은 마지막). `Unit`: `AddShield`/`RemoveShield`/`ContainsShield`/`BreakShield`,
