@@ -8,6 +8,12 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-09-30 · 은희(Claude) · **원거리 캐릭터 "거너" 기획 확정 + 구현 계획**, 브랜치 `feature/SecondCharacter`)
+
+grill 완료 → 기획 원본 [character_gunner.md](Docs/design/character/character_gunner.md), 구현 계획 [PLAN-gunner.md](PLAN-gunner.md)(**승인 대기**).
+**징크스(스택 폭발) 기획은 폐기** — 기존 원거리 슬롯·모델을 거너가 쓴다(아트 `Assets/50.Art/Char/gunner/`).
+수정 중(문서만): `Docs/design/character/character_gunner.md`(신규) · `character_jinx.md`(폐기 표시) · `Docs/design/players.md` · `PLAN-gunner.md`(신규).
+
 ## ▶▶ 현재 인수인계 (2026-09-30 · 은희(Claude) · **플레이어 base+Variant + 패시브 버프 모델** → development 반영)
 
 `fix/Player` 를 development 에 **직접 머지·푸시**(은희 결정 — PR 리뷰 생략). 구조 원본 = [player-prefabs.md](Docs/tech/player-prefabs.md) §0·§7.

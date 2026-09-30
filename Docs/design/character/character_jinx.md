@@ -1,5 +1,9 @@
 # Jinx
 
+> 🔴 **폐기 (2026-09-30)** — 원거리 캐릭터는 **거너**로 대체됐다: [character_gunner.md](character_gunner.md).
+> 스택 누적·스택 발동 기획은 거너의 과열 기획으로 교체. 징크스는 "대형 무기를 몸 옆에 드는 자세" 참고 대상일 뿐
+> 별도 플레이어 캐릭터가 아니다. 아래 내용은 기록용으로만 남긴다.
+
 > Character 공통 규칙은 `../character.md`, Ability 공통 규칙은 `../ability.md`를 따른다.
 >
 > 이 문서는 Jinx의 캐릭터 고유 컨셉과 Ability 슬롯 구성을 요약한다. 실제 수치는 ScriptableObject 에셋을 단일 출처로 둔다.
