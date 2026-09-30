@@ -41,9 +41,14 @@ public class GunnerBasicAttackData : ScriptableObject
     [Tooltip("적중 시 적중 전 보너스(패시브·빌드)를 받을지.")]
     [SerializeField] private bool triggersOnHit = true;
 
-    [Header("애니메이터 상태 이름(없으면 건너뜀)")]
+    [Header("애니메이터(없으면 건너뜀)")]
+    [Tooltip("Base 레이어 — 준비 동작이자 연사 중 하체 자세(Q_charge_loop).")]
     [SerializeField] private string windupStateName = "Gunner_Attack_Start";
+    [Tooltip("상체 레이어 — 매 발 처음부터 재생.")]
     [SerializeField] private string fireStateName = "Gunner_Attack_Fire";
+    [SerializeField] private string upperBodyLayerName = "UpperBody";
+    [Tooltip("발사 클립 이름 — 길이가 발사 간격보다 길면 그만큼 빨리 재생한다(FireSpeed 파라미터).")]
+    [SerializeField] private string fireClipName = "gunner_attack";
 
     [Header("임시 연출(민경 VFX 전까지)")]
     [SerializeField, Min(0f)] private float beamViewDuration = 0.08f;
@@ -62,5 +67,7 @@ public class GunnerBasicAttackData : ScriptableObject
     public bool TriggersOnHit => triggersOnHit;
     public string WindupStateName => windupStateName;
     public string FireStateName => fireStateName;
+    public string UpperBodyLayerName => upperBodyLayerName;
+    public string FireClipName => fireClipName;
     public float BeamViewDuration => beamViewDuration;
 }

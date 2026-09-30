@@ -39,7 +39,11 @@
 
 ## 3. 접근 — 단계별 (각 단계 = 커밋 1개 이상, `dotnet build` 통과 후)
 
-### G0. 아트 준비 — 🔴 **Unity 종료 후, SVN** (은희 직접)
+### G0. 아트 준비 — SVN (은희 직접)
+- ✅ 결정(2026-09-30): Rig = **Generic**(Humanoid 는 엄지·forearm.r 인비트윈 회전 불일치 에러), Avatar = Create From This Model. 전 클립 Root Transform Bake Into Pose.
+- ✅ 애니 구성(은희): 기본 공격 **준비 동작 = `gunner_skill_Q_charge_loop`**, 연사 중 **하체 = `Q_charge_loop` 유지 + 상체 = `gunner_attack` 매 발 재생**
+  → 애니메이터 2 레이어(Base 전신 / UpperBody = 척추 이상 AvatarMask, Generic 이라 본 경로 기반). `gunner_attack` 은 Loop 끔(매 발 처음부터).
+  Loop 켬 = idle · walk · Q_charge_loop · Q_charge_move_loop.
 - `gunner.fbx.meta` 클립 분할: idle / walk / attack(준비·발사 루프) / Q_start·Q_charge_loop·Q_charge_move_loop·Q_fire·Q_recover / E_cool_backstep / RMB_interrupt / ULT_cast. 루프 플래그(idle·walk·attack 발사·Q charge loop).
 - **SVN 커밋 후 guid 불변 확인**(`.meta` guid). git 쪽 `art-svn.json` 핀 갱신.
 - 이후(git): `Gunner.controller` 애니메이터 — 가붕이 컨트롤러의 파라미터·상태 이름 규약을 따른다.

@@ -16,6 +16,8 @@ using UnityEngine;
 public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
 {
     private static readonly int IdleHash = Animator.StringToHash("Idle");
+    private static readonly int EmptyHash = Animator.StringToHash("Empty");
+    private static readonly int FireSpeedHash = Animator.StringToHash("FireSpeed");
 
     // 오너 요청 간격이 네트워크 지터로 조금 당겨져 와도 받아 준다.
     private const float IntervalTolerance = 0.75f;
@@ -33,6 +35,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
     private GunnerHeat heat;
     private GunnerBeamAttack beam;
     private LineRenderer beamView;
+    private float fireClipLength = -1f;
     private float beamViewHideTime;
 
     // 전 피어 공통 런타임
@@ -119,8 +122,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
         if (!hadActive)
             return;
 
-        if (animator != null)
-            animator.CrossFadeInFixedTime(IdleHash, 0.05f);
+        ReturnToIdlePose();
 
         if (IsNetworkActive && IsServer)
             EndRpc();
@@ -135,7 +137,10 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
     public void SetAnimator(Animator newAnimator)
     {
         if (newAnimator != null)
+        {
             animator = newAnimator;
+            fireClipLength = -1f;
+        }
     }
 
     // ── 오너 ─────────────────────────────────────────────────────────────
@@ -329,6 +334,21 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
         {
             endingGracefully = false;
         }
+
+        ReturnToIdlePose();
+    }
+
+    // 발사 자세(Q_charge_loop)는 루프라 스스로 빠져나오지 않는다 — Idle 로 돌려야 Idle↔Walk 전환이 다시 산다.
+    private void ReturnToIdlePose()
+    {
+        if (animator == null || animator.runtimeAnimatorController == null)
+            return;
+
+        animator.CrossFadeInFixedTime(IdleHash, 0.1f, 0);
+
+        int upper = UpperLayer();
+        if (upper >= 0 && animator.HasState(upper, EmptyHash))
+            animator.CrossFadeInFixedTime(EmptyHash, 0.1f, upper);
     }
 
     private void ResetRuntime()
@@ -342,9 +362,45 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
 
     private void PlayShot(Vector3 origin, Vector3 end, bool hit)
     {
-        CrossFadeIfExists(data != null ? data.FireStateName : null);
+        PlayFireAnimation();
         ShowBeam(origin, end);
     }
+
+    // 상체 레이어에서 발사 클립을 매 발 처음부터. 클립이 발사 간격보다 길면 그만큼 빨리 재생해 다음 발 전에 끝나게 한다.
+    private void PlayFireAnimation()
+    {
+        if (data == null || animator == null || animator.runtimeAnimatorController == null)
+            return;
+
+        int upper = UpperLayer();
+        int hash = Animator.StringToHash(data.FireStateName);
+        if (upper < 0 || !animator.HasState(upper, hash))
+            return;
+
+        animator.SetFloat(FireSpeedHash, FireSpeed());
+        animator.Play(hash, upper, 0f);
+    }
+
+    private float FireSpeed()
+    {
+        if (fireClipLength < 0f)
+        {
+            fireClipLength = 0f;
+            foreach (AnimationClip clip in animator.runtimeAnimatorController.animationClips)
+            {
+                if (clip != null && clip.name == data.FireClipName)
+                {
+                    fireClipLength = clip.length;
+                    break;
+                }
+            }
+        }
+
+        return fireClipLength > 0f ? Mathf.Max(1f, fireClipLength / data.FireInterval) : 1f;
+    }
+
+    private int UpperLayer() =>
+        animator != null && data != null ? animator.GetLayerIndex(data.UpperBodyLayerName) : -1;
 
     private void CrossFadeIfExists(string stateName)
     {
@@ -353,7 +409,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
 
         int hash = Animator.StringToHash(stateName);
         if (animator.HasState(0, hash))
-            animator.CrossFadeInFixedTime(hash, 0.03f);
+            animator.CrossFadeInFixedTime(hash, 0.1f, 0);
     }
 
     // 🔸 임시 연출 — 민경 VFX 가 들어오면 교체한다. 판정 확인용으로 발사선을 잠깐 그린다.

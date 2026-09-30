@@ -81,6 +81,129 @@ public static class GunnerShellAuthoring
         }
     }
 
+    const string UpperBodyMaskPath = ControllerFolder + "/GunnerUpperBody.mask";
+    // Auto-Rig Pro 컨트롤 리그라 상체가 한 서브트리에 모여 있지 않다(forearm.r/hand.r·head.x 가 c_traj 바로 아래).
+    // 그래서 "척추 아래 전부"가 아니라 "하체·골반·루트 계열을 뺀 전부"를 켠다.
+    static readonly Regex LowerBodyBone = new Regex(@"(?i)(thigh|leg|foot|toe|knee|root|^c_pos$|^c_traj$|^rig$)");
+    const string PelvisSegment = "/c_root.x";
+
+    /// <summary>
+    /// G0 이후 — gunner.fbx 클립을 컨트롤러에 연결한다(재실행 시 같은 이름 상태를 갱신).
+    /// Base: Idle·Walk·Gunner_Attack_Start(= Q_charge_loop — 기본 공격 준비 동작이자 연사 중 하체).
+    /// UpperBody(척추 이상 AvatarMask, Override): Empty(기본) · Gunner_Attack_Fire(= gunner_attack, 속도 = FireSpeed) → 끝나면 Empty.
+    /// </summary>
+    [MenuItem("Tools/Player/Gunner/애니메이터 구성 (G0 이후)")]
+    public static void BuildAnimator()
+    {
+        EnsureFolder(ControllerFolder);
+        AnimatorController controller = EnsureController();
+
+        var clips = new System.Collections.Generic.Dictionary<string, AnimationClip>();
+        foreach (Object asset in AssetDatabase.LoadAllAssetRepresentationsAtPath(ModelPath))
+        {
+            if (asset is AnimationClip clip && !clip.name.StartsWith("__preview__"))
+                clips[clip.name] = clip;
+        }
+
+        AnimationClip Clip(string name)
+        {
+            if (clips.TryGetValue(name, out AnimationClip clip))
+                return clip;
+            Debug.LogError($"[Gunner] {ModelPath} 에 클립 '{name}' 이 없다 — FBX 임포트 설정(G0) 확인");
+            return null;
+        }
+
+        if (System.Array.TrueForAll(controller.parameters, p => p.name != "FireSpeed"))
+            controller.AddParameter(new AnimatorControllerParameter
+            {
+                name = "FireSpeed",
+                type = AnimatorControllerParameterType.Float,
+                defaultFloat = 1f,
+            });
+
+        AnimatorStateMachine baseMachine = controller.layers[0].stateMachine;
+        EnsureState(baseMachine, "Idle").motion = Clip("gunner_idle");
+        EnsureState(baseMachine, "Walk").motion = Clip("gunner_walk");
+        EnsureState(baseMachine, "Gunner_Attack_Start").motion = Clip("gunner_skill_Q_charge_loop");
+
+        AvatarMask mask = EnsureUpperBodyMask();
+
+        AnimatorControllerLayer[] layers = controller.layers;
+        int upper = System.Array.FindIndex(layers, l => l.name == "UpperBody");
+        if (upper < 0)
+        {
+            controller.AddLayer("UpperBody");
+            layers = controller.layers;
+            upper = layers.Length - 1;
+        }
+        layers[upper].defaultWeight = 1f;
+        layers[upper].blendingMode = AnimatorLayerBlendingMode.Override;
+        layers[upper].avatarMask = mask;
+        controller.layers = layers; // 레이어는 복사본이라 되써야 반영된다
+
+        AnimatorStateMachine upperMachine = controller.layers[upper].stateMachine;
+        AnimatorState empty = EnsureState(upperMachine, "Empty");
+        upperMachine.defaultState = empty;
+
+        AnimatorState fire = EnsureState(upperMachine, "Gunner_Attack_Fire");
+        fire.motion = Clip("gunner_attack");
+        fire.speedParameterActive = true;
+        fire.speedParameter = "FireSpeed";
+        if (System.Array.TrueForAll(fire.transitions, t => t.destinationState != empty))
+        {
+            AnimatorStateTransition back = fire.AddTransition(empty);
+            back.hasExitTime = true;
+            back.exitTime = 1f;
+            back.duration = 0.1f;
+        }
+
+        EditorUtility.SetDirty(controller);
+        AssetDatabase.SaveAssets();
+        Debug.Log($"[Gunner] 애니메이터 구성 완료: {ControllerPath} (Base 3 상태, UpperBody 마스크 {mask.name})");
+    }
+
+    static AnimatorState EnsureState(AnimatorStateMachine machine, string name)
+    {
+        foreach (ChildAnimatorState child in machine.states)
+        {
+            if (child.state.name == name)
+                return child.state;
+        }
+        return machine.AddState(name);
+    }
+
+    // Generic 리그라 Humanoid 부위 대신 본 경로로 만든다. 모델 루트·하체·골반 서브트리는 끄고 나머지(척추·팔·손·머리)를 켠다.
+    static AvatarMask EnsureUpperBodyMask()
+    {
+        var model = AssetDatabase.LoadAssetAtPath<GameObject>(ModelPath);
+        Transform[] all = model.GetComponentsInChildren<Transform>(true);
+
+        var mask = AssetDatabase.LoadAssetAtPath<AvatarMask>(UpperBodyMaskPath);
+        if (mask == null)
+        {
+            mask = new AvatarMask();
+            AssetDatabase.CreateAsset(mask, UpperBodyMaskPath);
+        }
+
+        mask.transformCount = all.Length;
+        int active = 0;
+        for (int i = 0; i < all.Length; i++)
+        {
+            string path = AnimationUtility.CalculateTransformPath(all[i], model.transform);
+            bool on = all[i] != model.transform
+                && !LowerBodyBone.IsMatch(all[i].name)
+                && !("/" + path + "/").Contains(PelvisSegment + "/");
+            mask.SetTransformPath(i, path);
+            mask.SetTransformActive(i, on);
+            if (on)
+                active++;
+        }
+
+        EditorUtility.SetDirty(mask);
+        Debug.Log($"[Gunner] 상체 마스크: 하체·골반·루트 제외, 켠 본 {active}/{all.Length}");
+        return mask;
+    }
+
     static T EnsureAsset<T>(string path) where T : ScriptableObject
     {
         var asset = AssetDatabase.LoadAssetAtPath<T>(path);
