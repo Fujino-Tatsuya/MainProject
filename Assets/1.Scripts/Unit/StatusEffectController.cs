@@ -235,26 +235,14 @@ public class StatusEffectController : BaseNetworkBehaviour, IStatusEffectFacade
         int removed = 0;
         for (int i = effects.Count - 1; i >= 0; i--)
         {
-            if (!IsDebuff(effects[i]))
+            // 판정은 StatusEffectCategories 한 곳에서 한다(StatusEffectType.cs) — 새 타입은 그 표에 넣는다.
+            if (StatusEffectCategories.Of(effects[i]) != StatusEffectCategory.Debuff)
                 continue;
             effects.RemoveAt(i);
             removed++;
         }
 
         return removed;
-    }
-
-    // 디버프 판정: 차단류 6종은 항상 디버프, 슈퍼아머는 버프,
-    // 스탯 modifier 는 배율로 가른다(StatusEffectType 주석 — 버프 > 1, 디버프 < 1). 배율 1 은 중립이라 남긴다.
-    public static bool IsDebuff(StatusEffectInstance e)
-    {
-        const StatusEffectType Blocking =
-            StatusEffectType.Airborne | StatusEffectType.Stunned | StatusEffectType.Slowed |
-            StatusEffectType.Rooted | StatusEffectType.Silenced | StatusEffectType.Debilitated;
-
-        if ((e.type & Blocking) != 0) return true;
-        if (e.type == StatusEffectType.SuperArmor) return false;
-        return e.magnitude < 1f;
     }
 
     private int IndexOf(StatusEffectType type, ulong sourceId)

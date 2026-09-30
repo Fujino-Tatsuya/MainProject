@@ -24,7 +24,7 @@
 | **magnitude 로 판정** | 스탯 modifier 5종(`MoveSpeed/AttackDamage/AttackSpeed/Defense/MaxHpModifier`) — `>= 1` Buff, `< 1` Debuff |
 
 - 새 타입을 추가하면 **이 분류표(코드)에 반드시 넣는다** — 빠지면 경고 로그와 함께 Debuff 로 취급된다.
-- 보스 연출의 일괄 해제(`StatusEffectController.ClearAllServer`)는 **디버프만** 지우도록 바뀔 예정(경석) — 이 분류를 쓴다.
+- 보스 연출의 일괄 해제는 `StatusEffectController.ClearDebuffsServer()`(경석 09-29)가 한다 — **이 분류가 유일한 판정원**이다(2026-09-30 경석의 `IsDebuff` 를 여기로 병합).
 - HUD: 상태이상 슬롯에 아이콘 + 타입명·스택·남은시간. 아이콘은 타입별 표(`StatusEffectHUD.icons`)가 비면 공용 `white_512`.
 
 ## 설계 메모

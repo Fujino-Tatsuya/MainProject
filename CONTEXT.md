@@ -15,9 +15,10 @@ Update this file when a term becomes important enough that future agents or team
   구 `Paladin`·`TempPlayer_Armature` → `Player/Legacy/`, `Paladin_VFX` 는 `Player/Paladin/` 보관(스폰 안 됨). 🔴 **민경: VFX 작업은 `Player_Paladin.prefab` 에서.**
 - **패시브 = `PassiveCharge` 버프 모델** + 적중 전 훅(`IPlayerOnHitBonus`, 막타 합산) + 범용 적중 이벤트(`Player.ServerAttackLanded`, 현재 구독자 0 — 스택·빌드용). [PLAN-passive-onhit.md](PLAN-passive-onhit.md) §12·§13.
 - **죽은 대상은 피격·피해를 거절**(`Unit.ReceiveAttack`·`ApplyHealthDamage`) — 전 유닛 공통 동작 변경. **FloatingDamage = 방어 후·클램프 전 최종 피해(초과분 포함)**, 모든 피해 경로.
-- 경석 `ClearDebuffsServer()`(09-29) 와 합류 확인: `PassiveCharge`(배율 1)는 `IsDebuff` 가 false → 보스 연출에 **남는다**(PLAN R-1 해소, Play 재확인 필요).
+- 경석 `ClearDebuffsServer()`(09-29) 와 합류 확인: `PassiveCharge` 는 분류상 Buff → 보스 연출(`ClearDebuffsServer`)에 **남는다**(PLAN R-1 해소, Play 재확인 필요).
   아래 경석 09-29 항목의 "패시브는 상태효과를 안 쓴다" 는 이 머지로 **낡았다**.
-- ⏳ **후속**: 버프/디버프 판정이 두 벌 — 경석 `StatusEffectController.IsDebuff` 와 은희 `StatusEffectCategories.Of`(현재 모든 타입에서 결과 동일). 하나로 합칠 것(경석과 합의).
+- ✅ 버프/디버프 판정 일원화(2026-09-30): 경석 `IsDebuff` 삭제 → `ClearDebuffsServer` 가 `StatusEffectCategories.Of` 사용. 현 타입 결과 동일, 표에 없는 새 타입만 "경고 + Debuff" 로 바뀜.
+- ⏳ **후속**:
   캐릭터 선택 경로(§8.3) · 원거리 투사체 네트워크 스폰 · `Player.ReceiveAttack` 의 `shieldVfx` 결합 · `PlayerEncounterLockAuthoring` 의 `Paladin_VFX` 순회(경석 판단).
 
 ## ▶▶ 작업 세션 (2026-09-29 · **플레이어 프리팹 base + Variant 정리**, 브랜치 `fix/Player`) — ✅ 완료, 위 인수인계로 대체

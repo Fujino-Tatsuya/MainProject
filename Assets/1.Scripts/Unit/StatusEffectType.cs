@@ -52,6 +52,7 @@ public static class StatusEffectCategories
 
     public static StatusEffectCategory Of(StatusEffectType type, float magnitude)
     {
+        // 배율 1 은 사실상 중립이지만 Buff 로 둔다 — 일괄 해제(ClearDebuffsServer)가 지우지 않아야 하기 때문이다.
         if ((type & StatModifiers) != 0)
             return magnitude >= 1f ? StatusEffectCategory.Buff : StatusEffectCategory.Debuff;
 
