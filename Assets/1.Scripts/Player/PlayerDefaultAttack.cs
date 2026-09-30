@@ -256,10 +256,11 @@ public class PlayerDefaultAttack : BaseAttack
 
     private int? TakeOverlapOnHitBonus(Unit target, ref bool bonusTaken)
     {
-        if (bonusTaken || target == null)
+        // 죽은 Unit(시체 콜라이더)은 공격을 거절하므로 "맞은 대상"이 아니다 — 첫 대상 자리를 차지하지 않는다.
+        // 물리 쿼리 순서상 시체가 먼저 나와도 뒤의 살아 있는 첫 대상이 보너스를 받는다.
+        if (bonusTaken || target == null || target.CurrentHealth <= 0)
             return null;
 
-        // 첫 Unit 대상이 죽어 있어 보너스를 거절해도 다음 대상으로 넘기지 않는다.
         bonusTaken = true;
         int bonus = owner != null
             ? owner.ServerTakeOnHitBonus(currentStep != null && currentStep.TriggersOnHit, target)

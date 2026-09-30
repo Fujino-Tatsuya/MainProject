@@ -80,10 +80,11 @@ public class DefaultAttackProjectile : BaseAttack
 
     private int? TakeOnHitBonus(Unit target)
     {
-        if (onHitBonusTaken || target == null)
+        // 시체는 공격을 거절해 투사체가 관통한다 — 첫 대상 자리를 차지하지 않는다.
+        if (onHitBonusTaken || target == null || target.CurrentHealth <= 0)
             return null;
 
-        // 투사체 한 발 전체에서 첫 Unit 대상에게만 한 번 묻는다.
+        // 투사체 한 발 전체에서 살아 있는 첫 Unit 대상에게만 한 번 묻는다.
         onHitBonusTaken = true;
         int bonus = owner is Player player
             ? player.ServerTakeOnHitBonus(triggersOnHit, target)

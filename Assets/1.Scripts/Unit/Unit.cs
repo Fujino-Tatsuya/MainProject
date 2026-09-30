@@ -76,6 +76,10 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     {
         if (!IsServer || _health == null || damage <= 0) return;
 
+        // 죽은 대상은 피해를 받지 않는다 — ReceiveAttack 을 거치지 않는 직접·비율·추락 피해도 같은 규칙.
+        // 여기서 막지 않으면 HP 변화 없이 표시용 피해 RPC(ClientDamageDealtClientRpc)만 나가 시체에 숫자가 뜬다.
+        if (_health.CurrentHealth <= 0) return;
+
         // 진단 — 여기서 조용히 버려지는 피해가 "때려도 안 맞는다"로 보인다(2026-07-30).
         // ReceiveAttack 은 살아 있는 대상에게는 무조건 true 를 반환하므로 공격 측은 [Attack] … 적중 을 찍고,
         // 피해만 사라져서 로그상 성공처럼 보인다. 누가 무엇을 거부했는지 남긴다.

@@ -71,7 +71,9 @@ public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive, IPlayerOn
     private ulong ChargeSourceId => NetworkObjectId;
 
     /// <summary>버프 보유 여부. 상태이상 목록이 복제되므로 전 피어에서 유효.</summary>
-    private bool HasCharge => statusEffects != null && statusEffects.Has(StatusEffectType.PassiveCharge);
+    // 부여·소모와 같은 키(type, sourceId)로 본다 — 타입만 보면 다른 출처의 PassiveCharge 를 자기 것으로 오인해
+    // Remove 는 실패한 채 발동만 반복한다.
+    private bool HasCharge => statusEffects != null && statusEffects.GetStackCount(StatusEffectType.PassiveCharge, ChargeSourceId) > 0;
 
     public float CooldownTime => cooldownTime;
     public bool IsReady => HasCharge;

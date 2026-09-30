@@ -1612,8 +1612,8 @@ public class Player : Unit
     }
 
     /// <summary>
-    /// [서버] 공격 판정의 첫 Unit 대상에게 기본 피해를 넣기 직전, 적중 시 발동 제공자들의
-    /// 추가 피해를 소모해 합산한다. 죽은 첫 대상이면 다음 대상으로 넘기지 않는다.
+    /// [서버] 공격 판정의 살아 있는 첫 Unit 대상에게 기본 피해를 넣기 직전, 적중 시 발동 제공자들의
+    /// 추가 피해를 소모해 합산한다. 죽은 대상에는 0 — 호출자는 시체를 첫 대상으로 세지 않는다.
     /// </summary>
     public int ServerTakeOnHitBonus(bool triggersOnHit, Unit target)
     {
@@ -1627,7 +1627,8 @@ public class Player : Unit
         for (int i = 0; i < onHitBonuses.Length; i++)
         {
             IPlayerOnHitBonus provider = onHitBonuses[i];
-            if (provider == null)
+            // 꺼진 컴포넌트는 발동하지 않는다 — 인터페이스 직접 호출이라 enabled 가 저절로 걸러지지 않는다.
+            if (provider == null || (provider is Behaviour behaviour && !behaviour.isActiveAndEnabled))
                 continue;
 
             total += Mathf.Max(0, provider.ServerConsumeOnHitBonus(target));

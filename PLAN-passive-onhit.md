@@ -1,4 +1,4 @@
-# PLAN — 패시브 전면 수정 + 범용 "적중 시" 이벤트 (2026-09-29, ✅ §1~11 완료 · §12 구현 완료 — Play 검증 대기)
+# PLAN — 패시브 전면 수정 + 범용 "적중 시" 이벤트 (2026-09-30, ✅ §1~12 완료·검증 · §13 독립 리뷰 반영)
 
 > **승인 시 추가 결정 (2026-09-29 은희)**
 > - **상태이상에 Buff/Debuff 분류 enum 을 우리가 추가한다** → §4.6. (경석의 `ClearAllServer()` 디버프 한정화가 이 분류를 쓴다)
@@ -188,7 +188,7 @@
 | consider 3 문서 모순(네트워크 목록) | ✅ player-prefabs.md §0·§7·§9 — "스폰 대상 아님" 과 "NGO 자동 등록" 분리, 확인 명령에서 `DefaultNetworkPrefabs` 제외 |
 | consider 4 `PlayerEncounterLockAuthoring` 이 `Paladin_VFX` 순회 | ⏸ 경석(툴 작성자) 판단 대기 |
 
-## 12. 후속 — 초과 피해 표시 + 패시브 추가피해를 막타에 합산 (2026-09-29, ✅ 구현 완료 — Play 검증 대기)
+## 12. 후속 — 초과 피해 표시 + 패시브 추가피해를 막타에 합산 (2026-09-29, ✅ 구현 · 은희 Play 검증 완료 2026-09-30)
 
 ### 확정 사항 (grill, 은희)
 
@@ -245,3 +245,19 @@
 - **B `4f5d8433`** — `IPlayerOnHitBonus` + `Player.ServerTakeOnHitBonus`(서버·`triggersOnHit`·생존 대상만). 호출 6곳(평타 Overlap·Raycast·투사체, Q·우클릭·R) — 판정당 1회, 첫 Unit 대상이 죽었으면 다음으로 넘기지 않음.
   `FirstMeleePassive` 가 훅에서 소모·쿨타임·회복·연출 처리 후 추가 피해량 반환 → 원래 공격 피해에 합산(`overrideDamage`/`AttackInfo.damage`). 별도 추가타·`ServerAttackLanded` 구독 삭제(범용 이벤트는 유지).
 - 빌드: `dotnet build Assembly-CSharp-Editor` 오류 0(기존 경고 17). Unity 에디터 컴파일·Play 는 미확인.
+
+## 13. 독립 코드리뷰 반영 (2026-09-30, Codex 7e449670 — 기존 코드·의도 배제 조건)
+
+| 항목 | 판단 | 처리 |
+|------|------|------|
+| must-fix 1 시체가 "첫 대상" 자리를 차지 — 물리 쿼리 순서상 시체가 먼저 나오면 뒤의 생존 적에게 보너스 불발 | 버그 | ✅ 평타 Overlap·투사체·Q·우클릭 4곳에서 **살아 있는 첫 Unit** 만 첫 대상으로 센다 |
+| consider 1 `HasCharge` 는 타입만, `Remove` 는 (type, sourceId) | 잠재 버그 | ✅ `HasCharge` 를 `GetStackCount(PassiveCharge, 자기 id) > 0` 으로 |
+| consider 2 비활성 제공자도 호출됨 | 잠재 버그 | ✅ `isActiveAndEnabled` 검사 |
+| consider 3 `ServerAttackLanded` 구독자 0 | 사실 | ⏸ **유지(은희 결정)** — 범용 적중 이벤트(징크스 스택·빌드용) |
+| consider 4 `NetworkLoadingFlowController.cs.meta` 기본 참조가 base `Player.prefab` | 버그(새 컴포넌트·Reset 시 빈 base 스폰) | ✅ 기본 참조를 `Player_Paladin` 으로 |
+| consider 5a 표시값이 실제 HP 감소가 아니라 클램프 전 값 | 의도(§12 결정) | — |
+| consider 5b 직접·비율 피해 API 가 시체에 호출되면 HP 변화 없이 숫자만 뜸 | 버그 | ✅ `Unit.ApplyHealthDamage` 에 사망 가드 — 모든 피해 경로에서 "죽은 대상은 피해 거절" |
+| note `StatusEffectCategories` 호출자 0 | 의도 | — 경석 `ClearAllServer()` 수정용 API |
+| note `DefaultNetworkPrefabs` 에 base·Legacy 등록 | NGO 자동 생성 | — 무해(해시 상이) |
+
+빌드: `dotnet build Assembly-CSharp-Editor` 오류 0.

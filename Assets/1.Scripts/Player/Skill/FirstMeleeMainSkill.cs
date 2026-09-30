@@ -148,7 +148,8 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
             // 견인 속도 하한 = 전진 속도: 넉백이 전진보다 느리면 플레이어가 몹을 추월해 히트박스에서
             // 놓친다("한두 번 밀리고 끝"). 하한을 코드로 보장해 돌진 끝까지 방패 앞에 붙어 밀려가게 한다.
             int resolvedDamage = damageSnapshot;
-            if (!onHitBonusTaken && unit != null)
+            // 시체(공격 거절)는 첫 대상 자리를 차지하지 않는다 — 뒤의 살아 있는 첫 Unit 이 보너스를 받는다.
+            if (!onHitBonusTaken && unit != null && unit.CurrentHealth > 0)
             {
                 onHitBonusTaken = true;
                 int bonus = owner.ServerTakeOnHitBonus(data.TriggersOnHit, unit);

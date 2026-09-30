@@ -149,7 +149,8 @@ public class FirstMeleeInterruptSkill : PlayerInstantSkill
             // isInterruptAttack = 보스가 카운터 판정에 쓰는 유일한 근거.
             // 소비 방식은 맞는 쪽이 정한다 — 몬스터는 누적→그로기, No.23은 카운터 창 판정.
             int resolvedDamage = damageSnapshot;
-            if (!onHitBonusTaken && unit != null)
+            // 시체(공격 거절)는 첫 대상 자리를 차지하지 않는다 — 뒤의 살아 있는 첫 Unit 이 보너스를 받는다.
+            if (!onHitBonusTaken && unit != null && unit.CurrentHealth > 0)
             {
                 onHitBonusTaken = true;
                 int bonus = owner.ServerTakeOnHitBonus(Data != null && Data.TriggersOnHit, unit);
