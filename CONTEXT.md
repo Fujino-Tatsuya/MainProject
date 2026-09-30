@@ -10,7 +10,9 @@ Update this file when a term becomes important enough that future agents or team
 
 ## ▶▶ 작업 세션 (2026-09-30 · 은희(Claude) · **원거리 캐릭터 "거너" 기획 확정 + 구현 계획**, 브랜치 `feature/SecondCharacter`)
 
-grill 완료 → 기획 원본 [character_gunner.md](Docs/design/character/character_gunner.md), 구현 계획 [PLAN-gunner.md](PLAN-gunner.md)(**승인 대기**).
+grill 완료 → 기획 원본 [character_gunner.md](Docs/design/character/character_gunner.md), 구현 계획 [PLAN-gunner.md](PLAN-gunner.md)(✅ 승인, 진행은 §7).
+- ✅ G1 보호막 인스턴스화(`f1e2fe1c`, 전 유닛 공통 — 사망 시 전부 제거, `SetShield`/`IncreaseShield` 삭제) · G2 `IPlayerBasicAttack` + 콤보 공격을 `Player_Paladin` 으로 이관(`afdaadaf`) ·
+  G9 `Player_Gunner` 껍데기 + Dev Boot 캐릭터 메뉴(`73e6f1f1`) · G3 과열 + 연사 레이저(`f57078f6`). 다음 = G4(Q 정신 집중). 🔴 G0(gunner.fbx 클립 분할, SVN)은 은희 담당·미착수.
 **징크스(스택 폭발) 기획은 폐기** — 기존 원거리 슬롯·모델을 거너가 쓴다(아트 `Assets/50.Art/Char/gunner/`).
 수정 중(문서만): `Docs/design/character/character_gunner.md`(신규) · `character_jinx.md`(폐기 표시) · `Docs/design/players.md` · `PLAN-gunner.md`(신규).
 
