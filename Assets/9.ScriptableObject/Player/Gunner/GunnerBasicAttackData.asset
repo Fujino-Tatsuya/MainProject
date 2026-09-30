@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bfbae70bbede796489e27b24a4be09ea, type: 3}
+  m_Name: GunnerBasicAttackData
+  m_EditorClassIdentifier: Assembly-CSharp::GunnerBasicAttackData
+  windupDuration: 0.25
+  fireInterval: 0.35
+  shotRecovery: 0.2
+  range: 14
+  beamWidth: 0.6
+  muzzleHeight: 1
+  attackDamageMultiplier: 1
+  flatDamageBonus: 0
+  heatPerShot: 10
+  hittableLayers:
+    serializedVersion: 2
+    m_Bits: 17664
+  blockingLayers:
+    serializedVersion: 2
+    m_Bits: 2177
+  triggersOnHit: 1
+  windupStateName: Gunner_Attack_Start
+  fireStateName: Gunner_Attack_Fire
+  beamViewDuration: 0.08

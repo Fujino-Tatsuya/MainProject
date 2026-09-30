@@ -43,6 +43,62 @@ public static class GunnerShellAuthoring
         AssetDatabase.SaveAssets();
     }
 
+    const string DataFolder = "Assets/9.ScriptableObject/Player/Gunner";
+    const string HeatDataPath = DataFolder + "/GunnerHeatData.asset";
+    const string BasicAttackDataPath = DataFolder + "/GunnerBasicAttackData.asset";
+
+    /// <summary>
+    /// G3 — 과열·기본 공격 데이터 에셋을 만들고(있으면 재사용) Player_Gunner 루트에 GunnerHeat·GunnerBeamAttack·
+    /// GunnerBasicAttack·GunnerHeatHUD 를 붙인다(이미 있으면 데이터 참조만 채운다).
+    /// </summary>
+    [MenuItem("Tools/Player/Gunner/기본 공격·과열 부착 (G3)")]
+    public static void AttachBasicAttack()
+    {
+        if (AssetDatabase.LoadAssetAtPath<GameObject>(VariantPath) == null)
+        {
+            Debug.LogError($"[Gunner] Variant 가 없다 — 먼저 '껍데기 생성 (G9)' 실행: {VariantPath}");
+            return;
+        }
+
+        EnsureFolder(DataFolder);
+        var heatData = EnsureAsset<GunnerHeatData>(HeatDataPath);
+        var attackData = EnsureAsset<GunnerBasicAttackData>(BasicAttackDataPath);
+
+        GameObject root = PrefabUtility.LoadPrefabContents(VariantPath);
+        try
+        {
+            SetReference(EnsureComponent<GunnerHeat>(root), "data", heatData);
+            EnsureComponent<GunnerBeamAttack>(root);
+            SetReference(EnsureComponent<GunnerBasicAttack>(root), "data", attackData);
+            EnsureComponent<GunnerHeatHUD>(root);
+
+            PrefabUtility.SaveAsPrefabAsset(root, VariantPath);
+            Debug.Log($"[Gunner] 기본 공격·과열 부착 완료: {VariantPath}");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    static T EnsureAsset<T>(string path) where T : ScriptableObject
+    {
+        var asset = AssetDatabase.LoadAssetAtPath<T>(path);
+        if (asset != null)
+            return asset;
+
+        asset = ScriptableObject.CreateInstance<T>();
+        AssetDatabase.CreateAsset(asset, path);
+        Debug.Log($"[Gunner] 데이터 생성: {path}");
+        return asset;
+    }
+
+    static T EnsureComponent<T>(GameObject root) where T : Component
+    {
+        var component = root.GetComponent<T>();
+        return component != null ? component : root.AddComponent<T>();
+    }
+
     static AnimatorController EnsureController()
     {
         var existing = AssetDatabase.LoadAssetAtPath<AnimatorController>(ControllerPath);

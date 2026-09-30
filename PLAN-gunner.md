@@ -126,6 +126,15 @@ G1 은 G4 전까지 어느 때든. 문서 갱신(player-prefabs.md 거너 항목
 
 ## 7. 진행
 
+- ✅ **G3 완료 — 연사·과열·명중 Play 확인**(2026-09-30). 🔸 초기 버그: SphereCast 가 자기 콜라이더·맵 트리거(Default)에 시작점부터 막혀 길이 0 → 자기 계층 무시 + 지형은 비트리거만. `Player/Gunner/`:
+  - `GunnerHeatModel`(순수 계산 + `GunnerHeatState` 기준점), `GunnerHeatData` SO, `GunnerHeat`(NetworkVariable 기준점 1개 — 서버는 발사·E 때만 쓰고,
+    전 피어가 같은 함수로 현재값 계산 → 오너 HUD 즉시·매 프레임 복제 없음. 단계/과열 변화 이벤트 = VFX 훅).
+  - `GunnerBasicAttack : IPlayerBasicAttack` — 오너 시작 요청 → 서버 승인(준비 1회) → 오너가 간격마다 "한 발+조준" RPC → 서버가 간격(×0.75 허용)·과열·상태 검사 후 판정.
+    놓음/과열 → 마지막 발 후속 동작 뒤 종료. 오너 무응답(간격×3) 시 서버가 끝냄. **피해 단계 = 이번 발의 증가 전 단계.**
+  - `GunnerBeamAttack : BaseAttack` — SphereCast, 거리순 첫 유효 대상 1체, 지형(blocking) 먼저면 종료, 시체 건너뜀, `ServerAttackLanded` 발행.
+  - `GunnerHeatHUD`(임시 OnGUI 게이지), 임시 발사선(LineRenderer) — VFX 전까지.
+  - 부착 메뉴 `Tools/Player/Gunner/기본 공격·과열 부착 (G3)`(SO 2개 생성 + Variant 루트에 4 컴포넌트). EditMode `GunnerHeatModelTests` 5건.
+
 - ✅ **G9 껍데기 생성 — 스폰 확인**(2026-09-30). 메뉴 `Tools/Player/Gunner/껍데기 생성 (G9)`(`Player/Editor/GunnerShellAuthoring.cs`, 재실행 시 있는 건 건너뜀)로
   `4.Animations/Player/Gunner/GunnerAnimatorController.controller`(파라미터 5 + 빈 Idle/Walk), `2.Prefabs/Player/Gunner/Gunner_Armature.prefab`
   (gunner.fbx + Animator·NetworkTransform 회전만·NetworkAnimator 오너·릴레이 2, `hand.r` 에 laser_gun), `Player_Gunner.prefab`(Variant, **GlobalObjectIdHash 816596077**, `DefaultNetworkPrefabs` 자동 등록) 생성.
