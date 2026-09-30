@@ -44,7 +44,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         false,
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
-    float _counterVisualOffAt = -1f;   // 서버 Time.time. < 0 = 예약 없음
+    float _bossCounterVisualOffAt = -1f;   // 서버 Time.time. < 0 = 예약 없음
 
     // [G6] 인터럽트 성공 리액션이 **오른쪽인가**. 잡기는 항상 오른쪽, 돌진은 L·R 난수다(팀장 확정 R1).
     // 🔴 RPC 가 아니라 **상태 복제**로 보낸다 — 난수를 피어마다 뽑으면 화면이 갈리고,
@@ -5146,7 +5146,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     {
         if (!IsServer) return;
 
-        _counterVisualOffAt = open && windowDuration > 0f
+        _bossCounterVisualOffAt = open && windowDuration > 0f
             ? Time.time + Mathf.Max(0f, windowDuration - CounterVisualLeadSeconds)
             : -1f;
         if (_counterVisual.Value != open) _counterVisual.Value = open;
@@ -5159,13 +5159,13 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     void ScheduleCounterVisualOff(float remaining)
     {
         if (!IsServer || !_counterWindow.Value) return;
-        _counterVisualOffAt = Time.time + Mathf.Max(0f, remaining - CounterVisualLeadSeconds);
+        _bossCounterVisualOffAt = Time.time + Mathf.Max(0f, remaining - CounterVisualLeadSeconds);
     }
 
     void TickCounterVisual()
     {
-        if (_counterVisualOffAt < 0f || Time.time < _counterVisualOffAt) return;
-        _counterVisualOffAt = -1f;
+        if (_bossCounterVisualOffAt < 0f || Time.time < _bossCounterVisualOffAt) return;
+        _bossCounterVisualOffAt = -1f;
         if (_counterVisual.Value) _counterVisual.Value = false;
     }
 

@@ -1027,6 +1027,16 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DefaultAttack
   ShowTopMostFoldoutHeaderGroup: 1
+  slashHit:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  slashMiss:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
   animator: {fileID: 3980452584406513891}
   attackData: {fileID: 11400000, guid: 8d6735b7ed4fc9e49b360d6bbcb907a5, type: 2}
   playerDefaultAttack: {fileID: 4525831256458907740}
@@ -1142,6 +1152,11 @@ MonoBehaviour:
   hitCooldownReduction: 2
   bonusDamageMultiplier: 1
   bonusFlatDamage: 0
+  bladeGlow: {fileID: 0}
+  healBurst: {fileID: 0}
+  additionalHit: {fileID: 0}
+  additionalHitScale: 1
+  additionalHitFallbackOffset: {x: 0, y: 1, z: 0}
   minTargetThreshold: 5
   minHealPercent: 5
   perTargetHealPercent: 1
@@ -1159,6 +1174,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FirstMeleeMainSkill
   data: {fileID: 11400000, guid: 3f8c2b71d94a4e5f8b6a1c0d2e947a31, type: 2}
   hitboxAnchor: {fileID: 8532915693143272332}
+  smashLoop: {fileID: 0}
+  trailLoop: {fileID: 0}
 --- !u!114 &5233118834099021557
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1173,6 +1190,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FirstMeleeSubSkill
   data: {fileID: 11400000, guid: 40499745b22c405fb0781629e282229c, type: 2}
   hitboxAnchor: {fileID: 0}
+  shieldVfx: {fileID: 0}
 --- !u!114 &1111000000000000001
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1187,6 +1205,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FirstMeleeUltimateSkill
   data: {fileID: 11400000, guid: 3c9e1f7a2b8d4e6c9a0f5d1b7e2c4a68, type: 2}
   hitboxAnchor: {fileID: 0}
+  skillVfx: {fileID: 0}
+  superArmorOverlay: {fileID: 0}
 --- !u!114 &800000000000000020
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1382,6 +1402,7 @@ MonoBehaviour:
   occupancyRadius: 0.4
   probeUpDistance: 1.5
   probeDownDistance: 3
+  showSafePointMarkers: 1
   safePointMarkerPrefab: {fileID: 0}
 --- !u!114 &1111000000000000014
 MonoBehaviour:
@@ -1463,6 +1484,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FirstMeleeInterruptSkill
   data: {fileID: 11400000, guid: 617280762f0032c4096fd2b1967e3bf1, type: 2}
   hitboxAnchor: {fileID: 1961035993563742540}
+  shieldGlow: {fileID: 0}
+  glowLoop: {fileID: 0}
+  shieldVfx: {fileID: 0}
 --- !u!1 &8838956553020289695
 GameObject:
   m_ObjectHideFlags: 0
@@ -1692,6 +1716,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: c0fd9ee22dfa10a47a4e405a01c96195, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: fd9279ee31910144eaeb26b9fbcc5eb8, type: 2}
     - target: {fileID: 919132149155446097, guid: c0fd9ee22dfa10a47a4e405a01c96195, type: 3}
       propertyPath: m_Name
       value: SM_Wep_Shield_01
@@ -1730,6 +1758,18 @@ PrefabInstance:
       propertyPath: Target
       value: 
       objectReference: {fileID: 2987674488602214195}
+    - target: {fileID: 1249481466903978617, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: ea28e20153a82044bacec7bfc54d0a61, type: 2}
+    - target: {fileID: 1249481466903978617, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'm_Materials.Array.data[1]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 189a2083fd590ac4798ba2fe27d91f81, type: 2}
+    - target: {fileID: 1249481466903978617, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
+      propertyPath: 'm_Materials.Array.data[2]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 78e1dd0153c818043ba44f0363c6d620, type: 2}
     - target: {fileID: 1468457061137137243, guid: 8de5f51f34fe3cf4aab41eb2c59d402d, type: 3}
       propertyPath: Target
       value: 
@@ -2793,6 +2833,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: 427570d27af80cb4ba06edd11a7200f1, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 4faf80aacc8aadd4fa037543f41d22f3, type: 2}
     - target: {fileID: 919132149155446097, guid: 427570d27af80cb4ba06edd11a7200f1, type: 3}
       propertyPath: m_Name
       value: SM_Wep_Sword_03

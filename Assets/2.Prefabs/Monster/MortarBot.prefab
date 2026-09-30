@@ -402,6 +402,7 @@ MonoBehaviour:
   hitVFXCollider: {fileID: 3147570509364327094}
   hitVFXType: 1
   bodyCollider: {fileID: 2687977088537551207}
+  attackTelegraphMaterial: {fileID: 0}
 --- !u!114 &4671480735823204164
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -419,6 +420,8 @@ MonoBehaviour:
   particlePrefab: {fileID: 7019508933032447489, guid: 0e15d6fc561b43fa95fadff8ab04b5fd, type: 3}
   duration: 1.5
   despawnGrace: 0.5
+  leadBeforeClipEnd: 0.3
+  delayAfterClipEnd: 0
   renderers: []
 --- !u!114 &7264363400000000001
 MonoBehaviour:
@@ -524,6 +527,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 2391931280260005269, guid: 87dd4b3ba2b418340833ff1c4d33a222, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: dac00a92c06fae044b63a17fabd1c2c5, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

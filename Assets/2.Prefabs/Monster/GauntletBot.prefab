@@ -764,7 +764,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 919e60c44c070a94395ef754e623d853, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GauntletBot
-  attackTelegraphMaterial: {fileID: 2100000, guid: c3d3d2122c7238547b41939029544154, type: 2}
   ShowTopMostFoldoutHeaderGroup: 1
   data: {fileID: 11400000, guid: d37ecf884a2c8214fb495d739d050cd1, type: 2}
   agent: {fileID: 1121264044387697772}
@@ -779,6 +778,7 @@ MonoBehaviour:
   hitVFXCollider: {fileID: 2139675850464708597}
   hitVFXType: 1
   bodyCollider: {fileID: 8347798712471976537}
+  attackTelegraphMaterial: {fileID: 2100000, guid: c3d3d2122c7238547b41939029544154, type: 2}
   punch01Weight: 35
   punch02Weight: 35
   punch03Weight: 10
@@ -791,6 +791,8 @@ MonoBehaviour:
   smashDamageMultiplier: 1.5
   smashMaxHitCount: 8
   smashTelegraph: {fileID: 2123847881958745088}
+  punchTelegraphDuration: 0.5
+  sideLateralOffset: 0.95
   smashAnticipationState: Smash Anticipation
   punch01LState: Gauntlet_Punch01_L
   punch01RState: Gauntlet_Punch01_R
@@ -818,6 +820,8 @@ MonoBehaviour:
   particlePrefab: {fileID: 7019508933032447489, guid: 0e15d6fc561b43fa95fadff8ab04b5fd, type: 3}
   duration: 1.5
   despawnGrace: 0.5
+  leadBeforeClipEnd: 0.3
+  delayAfterClipEnd: 0
   renderers: []
 --- !u!114 &6550163185824853122
 MonoBehaviour:
@@ -1023,6 +1027,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 520775347813843714}
     m_Modifications:
+    - target: {fileID: 717627358412563016, guid: c887b0c600165d74094b8f2d53288dfe, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 84110f854c0396d4eb0d537841526b8b, type: 2}
     - target: {fileID: 1211426450854706982, guid: c887b0c600165d74094b8f2d53288dfe, type: 3}
       propertyPath: m_Name
       value: Model
@@ -1067,10 +1075,26 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 1784071060394352352, guid: c887b0c600165d74094b8f2d53288dfe, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 84110f854c0396d4eb0d537841526b8b, type: 2}
+    - target: {fileID: 2644400299153280391, guid: c887b0c600165d74094b8f2d53288dfe, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 84110f854c0396d4eb0d537841526b8b, type: 2}
+    - target: {fileID: 5201623425853151251, guid: c887b0c600165d74094b8f2d53288dfe, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 84110f854c0396d4eb0d537841526b8b, type: 2}
     - target: {fileID: 6958048089959097631, guid: c887b0c600165d74094b8f2d53288dfe, type: 3}
       propertyPath: m_Materials.Array.size
       value: 2
       objectReference: {fileID: 0}
+    - target: {fileID: 6958048089959097631, guid: c887b0c600165d74094b8f2d53288dfe, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 84110f854c0396d4eb0d537841526b8b, type: 2}
     - target: {fileID: 6958048089959097631, guid: c887b0c600165d74094b8f2d53288dfe, type: 3}
       propertyPath: 'm_Materials.Array.data[1]'
       value: 

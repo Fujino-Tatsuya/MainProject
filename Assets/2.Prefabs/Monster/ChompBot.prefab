@@ -734,6 +734,7 @@ MonoBehaviour:
   hitVFXCollider: {fileID: 3650362197745556948}
   hitVFXType: 1
   bodyCollider: {fileID: 6772621528324988158}
+  attackTelegraphMaterial: {fileID: 0}
 --- !u!114 &5117935030934790997
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -751,6 +752,8 @@ MonoBehaviour:
   particlePrefab: {fileID: 7019508933032447489, guid: 0e15d6fc561b43fa95fadff8ab04b5fd, type: 3}
   duration: 1.5
   despawnGrace: 0.5
+  leadBeforeClipEnd: 0.3
+  delayAfterClipEnd: 0
   renderers: []
 --- !u!114 &4980393420285267538
 MonoBehaviour:
@@ -1121,7 +1124,7 @@ SkinnedMeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 9d6651f06485a2d4285bfdcc07418062, type: 2}
+  - {fileID: 2100000, guid: f4b6bb01eb0f1a84589af74f713d0afa, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0

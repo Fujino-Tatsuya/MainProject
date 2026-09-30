@@ -449,6 +449,7 @@ MonoBehaviour:
   hitVFXCollider: {fileID: 138876035767613204}
   hitVFXType: 1
   bodyCollider: {fileID: 4040508410350868295}
+  attackTelegraphMaterial: {fileID: 0}
   shieldChance: 0.5
   shieldCooldown: 8
   dashDuration: 0.8
@@ -481,6 +482,8 @@ MonoBehaviour:
   particlePrefab: {fileID: 7019508933032447489, guid: 0e15d6fc561b43fa95fadff8ab04b5fd, type: 3}
   duration: 1.5
   despawnGrace: 0.5
+  leadBeforeClipEnd: 0.3
+  delayAfterClipEnd: 0
   renderers: []
 --- !u!114 &8513829195212904834
 MonoBehaviour:
@@ -654,6 +657,10 @@ PrefabInstance:
       propertyPath: m_Materials.Array.size
       value: 2
       objectReference: {fileID: 0}
+    - target: {fileID: 4747561266957906064, guid: c13e2c7cc6363c2448019a9d31ae6d95, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 5e570633d86e6e2489fddabf48aa1aba, type: 2}
     - target: {fileID: 4747561266957906064, guid: c13e2c7cc6363c2448019a9d31ae6d95, type: 3}
       propertyPath: 'm_Materials.Array.data[1]'
       value: 

@@ -21,6 +21,11 @@ WallTransparencyGroup 오브젝트를 선택하면 그 그룹만 또렷해진다
 - **다음 세션 = 전기장판 · 자폭드론** — 기획 문서 수령 대기(받으면 바로 착수). 자폭드론 자리: `TwentyThreeBoss.OnWellsAttackCycle`(Wells 공격 주기 — 현재 빈 자리 경고).
 - 09-29 반영: 취약 넉백(방 회전) · 넉백 종료 시 그로기·취약 종료 · 제압 그로기 루프 · 취약 중 돌진 · 어퍼 예고 0.5 · 차징 점프 착지 범위 공격 · 점프 체인 안 끊김 · 잡기 낚아채는 프레임 부착 · 점프 착지 경계/Warp 복구 · 보스방 NavMesh 여유 띠(실측 1.5m) · Start → 튜토리얼 스테이지([PLAN-tutorial-stage.md](PLAN-tutorial-stage.md)) · 차징 오라 데칼 제거 · 진입 연출 디버프만 해제 · Dev 공격 예약 단축키(F3/F4/F6/F9/F11, 대기열 8, Shift+F3 비우기).
   상세: [PLAN-boss-counter-vulnerable.md](PLAN-boss-counter-vulnerable.md) §7-2.
+- 🔴 **10-01 — Flat Kit 전환(캐릭터·물) · `feature/Boss23` 에만 푸시(development 미반영)**. 계획·기록 [PLAN-flatkit.md](PLAN-flatkit.md).
+  - 캐릭터: 몬스터 8종·23호·Wells·플레이어 → `FlatKit/Stylized Surface`(플레이어는 부드러운 법선 복제 셰이더). 룩 값 한 곳 `Assets/1.Scripts/Rendering/Editor/FlatKitCharacterLook.cs`(외곽선 0.4 = 1080p 1.08px). 메뉴 `Tools/Rendering/Flat Kit/`.
+  - 물: 보스방 `Water_BossRoom` + 존 11종 프리팹 `Water`(**`ZoneWater` = 존별 수면 높이 한 칸**, 재실행해도 유지). 머티리얼 `3.Materials/FlatKit/Water/FK_Water_Pool09.mat` 인스펙터로 조절(도구가 안 덮어씀).
+  - PC_Renderer: Flat Kit 외곽선 피처 추가 · MaskBlur 끔 · SSAO 값 조정 · 그림자 캐스케이드 2/35m · 데칼 50m · LOD Cross Fade·Terrain Holes·데이터 기반 렌즈 플레어 끔.
+  - 🔴 Flat Kit 데모 씬을 열면 URP 에셋이 데모용으로 바뀐다 → `Restore Project Pipeline`. `Assets/FlatKit/Demos` 는 git 제외.
 - 🔴 **09-30 — 23호 사망 타이밍**: 사망 클립 0.7배속 → 끝난 뒤 2초 → 디졸브 2초 → 결과 화면(대기 0). `DissolveDeath.delayAfterClipEnd` 신설(기본 0). 상세: [PLAN-boss-death-telegraph.md](PLAN-boss-death-telegraph.md) 끝. ✅ 팀장 Play 확인.
 - 🔴 **09-29 저녁 — 튜토리얼 스테이지 180° 회전 + 은희 투명화 존 머지**(`fix/stage_tutorial260929`). **SVN r340 필수**(구석 `walll_brick_cornerCOM_*`). 상세: [PLAN-tutorial-stage.md](PLAN-tutorial-stage.md) 끝. ✅ 팀장 Play 확인(문제없음). `d9519cbb` development 반영.
 - 🔴 **SVN r338 필수** — development 의 `WallTransparencyDither.hlsl`(은희)과 r338 `Generic_Standard.shadergraph` 가 짝. r336 이하면 화면 전체 분홍(`undeclared identifier WallTransparencyDither_float`). 핀 `art-svn.json` = 338.
