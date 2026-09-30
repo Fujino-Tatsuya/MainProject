@@ -6,6 +6,7 @@
 // 설계상 정해 둔 것:
 //  - 피킹은 `HandleUtility.PickGameObject` — 콜라이더가 없어도 렌더러 기준으로 잡힌다.
 //    벽에 콜라이더가 없는 경우가 있어 `Physics.Raycast` 는 쓸 수 없다.
+//  - 담기는 건 항상 **최하위 자식**이다(`PickLeaf`). 부모 프리팹이 섞이면 공통 컴포넌트 추출이 깨진다.
 //  - 마우스 이동 이벤트는 픽셀을 건너뛴다. 빠르게 그으면 중간이 빠지므로 **경로를 보간**한다.
 //  - 드래그 한 번이 Undo 한 번이다. 안 묶으면 Ctrl+Z 를 수십 번 눌러야 한다.
 //  - Alt 는 건드리지 않는다 — 씬 뷰 카메라 오비트라 빼앗으면 화면을 못 돌린다.
@@ -167,17 +168,48 @@ namespace VeyTrace.Rendering.Occlusion.Editor
 
         static void AddPick(Vector2 position, List<GameObject> into)
         {
-            // selectPrefabRoot: false — 눈에 보이는 그 오브젝트를 집는다.
-            // true 면 씬에서 존 프리팹 루트가 통째로 잡혀 벽 하나를 고를 수 없다.
-            var go = HandleUtility.PickGameObject(position, selectPrefabRoot: false);
+            var go = PickLeaf(position);
             if (go == null) return;
             if (!s_StrokeTouched.Add(go.GetInstanceID())) return;
             into.Add(go);
         }
 
+        /// <summary>
+        /// 커서 아래의 **최하위 자식** 렌더러 오브젝트를 집는다.
+        /// `selectPrefabRoot: false` 여도 부모 프리팹이 잡히는 경우가 있어(부모에도 렌더러가 있는 등)
+        /// 그대로 담으면 멤버 간 공통 컴포넌트가 안 맞는다. 그래서 잡힌 오브젝트의 자손 렌더러로만
+        /// 범위를 좁혀 다시 피킹하고, 더 내려갈 자식이 없을 때까지 반복한다.
+        /// 커서가 자식이 아닌 부모 자신의 메시 위에 있으면 부모를 그대로 돌려준다.
+        /// </summary>
+        static GameObject PickLeaf(Vector2 position)
+        {
+            var go = HandleUtility.PickGameObject(position, selectPrefabRoot: false);
+            while (go != null)
+            {
+                var descendants = DescendantRendererObjects(go);
+                if (descendants.Length == 0) break;
+
+                var child = HandleUtility.PickGameObject(position, false, null, descendants);
+                if (child == null || child == go) break;
+                go = child;
+            }
+            return go;
+        }
+
+        static GameObject[] DescendantRendererObjects(GameObject root)
+        {
+            var renderers = root.GetComponentsInChildren<Renderer>();
+            var result = new List<GameObject>(renderers.Length);
+            foreach (var renderer in renderers)
+            {
+                if (renderer.gameObject != root) result.Add(renderer.gameObject);
+            }
+            return result.ToArray();
+        }
+
         static void UpdateHover(Vector2 position, SceneView sceneView)
         {
-            var next = HandleUtility.PickGameObject(position, selectPrefabRoot: false);
+            var next = PickLeaf(position);
             if (ReferenceEquals(next, s_Hover)) return;
             s_Hover = next;
             sceneView.Repaint();
