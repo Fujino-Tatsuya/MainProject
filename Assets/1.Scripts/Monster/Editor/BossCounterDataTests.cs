@@ -37,9 +37,12 @@ public sealed class BossCounterDataTests
             Is.EquivalentTo(new[] { BossAttackId.Grab, BossAttackId.Dash }));
 
         // 전체 행동 불능 시간 — Hit 을 앞에 더하지 않으므로 이 값이 곧 체감 시간이다(설계 §3.3).
-        Assert.That(data.maxGroggyCount, Is.EqualTo(5));
-        Assert.That(data.groggyDuration, Is.EqualTo(0.5f));
-        Assert.That(data.breakDuration, Is.EqualTo(2f));
+        // ⚠️ 2026-09-28 팀 기획(간파·제압)으로 교체: 성공 횟수 → 게이지(20 × 5), 그로기 0.5 → 1.5, Break 2 → 제압 5.
+        Assert.That(data.counterGaugeStep, Is.EqualTo(20f));
+        Assert.That(data.environmentGaugeStep, Is.EqualTo(20f));
+        Assert.That(data.suppressDamageMultiplier, Is.EqualTo(1.2f));
+        Assert.That(data.groggyDuration, Is.EqualTo(1.5f));
+        Assert.That(data.breakDuration, Is.EqualTo(5f));
 
         // 송전기 전멸은 기믹을 깬 보상이라 일반 카운터(0.5)보다 길다.
         // 1.0 은 체감이 부족해 1.5 로 올렸다(팀장 Play 확정 2026-09-03).

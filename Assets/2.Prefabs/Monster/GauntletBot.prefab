@@ -366,7 +366,7 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 1.8, y: 1.8, z: 3.2}
+  m_Size: {x: 3.6, y: 1.8, z: 3.2}
   m_Center: {x: 0, y: 1, z: 1.6}
 --- !u!114 &2642644746604925287
 MonoBehaviour:
@@ -623,7 +623,7 @@ CapsuleCollider:
   m_LayerOverridePriority: 0
   m_IsTrigger: 0
   m_ProvidesContacts: 0
-  m_Enabled: 0
+  m_Enabled: 1
   serializedVersion: 2
   m_Radius: 0.5
   m_Height: 2
@@ -764,6 +764,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 919e60c44c070a94395ef754e623d853, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GauntletBot
+  attackTelegraphMaterial: {fileID: 2100000, guid: c3d3d2122c7238547b41939029544154, type: 2}
   ShowTopMostFoldoutHeaderGroup: 1
   data: {fileID: 11400000, guid: d37ecf884a2c8214fb495d739d050cd1, type: 2}
   agent: {fileID: 1121264044387697772}
@@ -830,7 +831,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 61349f523c460af499e8ba439023b8ff, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MonsterCounterWindow
-  windowDuration: 1.5
+  windowDuration: 2
   groggyDuration: 1
 --- !u!114 &3395086952124872704
 MonoBehaviour:
@@ -1133,8 +1134,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DissolveOverlay
   overlayMaterialIndex: 1
-  fadeInDuration: 0.8
-  fadeOutDuration: 0.4
+  fadeInDuration: 0
+  fadeOutDuration: 0
   shown: 0
 --- !u!4 &5208934837360812548 stripped
 Transform:

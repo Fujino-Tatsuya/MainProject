@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace VeyTrace.Rendering.Occlusion
 {
@@ -12,8 +13,18 @@ namespace VeyTrace.Rendering.Occlusion
     public sealed class WallTransparencyGroup : MonoBehaviour
     {
         private static readonly int OpacityId = Shader.PropertyToID("_WallOcclusionOpacity");
+
+        // 🔴 _WallOccBaseY / _WallOccFadeHeight 는 **상시 하단 그라데이션**이고 머티리얼에 박힌 값이다.
+        //    이 컴포넌트는 그것을 건드리지 않는다 — 건드리면 그룹에 들어간 벽만 상시 그라데이션을
+        //    잃는다(2026-09-29 분리 이전에 실제로 그랬다).
+        //    아래 둘은 **원본에서 인스턴스로 되읽어 맞추는 용도로만** 쓴다(SyncBottomGradientFromSource).
+        //    이 컴포넌트가 값을 만들어 내지 않는다.
         private static readonly int BaseYId = Shader.PropertyToID("_WallOccBaseY");
         private static readonly int FadeHeightId = Shader.PropertyToID("_WallOccFadeHeight");
+
+        //    여기서 쓰는 것은 구역 진입으로만 켜지는 **상단 그라데이션** 전용 프로퍼티다.
+        private static readonly int ZoneBaseYId = Shader.PropertyToID("_WallOccZoneBaseY");
+        private static readonly int ZoneFadeHeightId = Shader.PropertyToID("_WallOccZoneFadeHeight");
 
         // 이 그룹의 런타임 인스턴스에서만 켜는 셰이더 키워드.
         //
@@ -36,35 +47,51 @@ namespace VeyTrace.Rendering.Occlusion
         [SerializeField] private Renderer[] targetRenderers = Array.Empty<Renderer>();
 
         [Header("페이드")]
-        [Tooltip("구역에서 나온 뒤 원래 불투명도로 돌아오는 시간(초).")]
+        [Tooltip("구역에 들어갈 때 설정값1 → 설정값2 로 가는 시간(초).")]
         [Min(0f)]
         [SerializeField] private float fadeInDuration = 0.2f;
 
-        [Tooltip("구역에 들어간 뒤 목표 불투명도로 사라지는 시간(초).")]
+        [Tooltip("구역에서 나올 때 설정값2 → 설정값1 로 돌아오는 시간(초).")]
         [Min(0f)]
         [SerializeField] private float fadeOutDuration = 0.2f;
 
-        [Tooltip("투명화가 켜졌을 때 남길 불투명도. 기존 minimumOpacity와 같은 0.15를 권장한다.")]
-        [Range(0f, 1f)]
-        [SerializeField] private float targetOpacity = 0.15f;
+        // 구역 효과 = **상단 그라데이션 설정값을 설정값1 ↔ 설정값2 로 보간**하는 것이다.
+        // Opacity 는 쓰지 않는다 — 항상 1 이다.
+        //
+        // 상시 하단 그라데이션(_WallOccBaseY / _WallOccFadeHeight)은 머티리얼에 박힌 값이고
+        // 여기서 만들지 않는다. 원본에서 읽어 인스턴스에 맞추기만 한다.
+        //
+        // 🔴 두 설정값은 **보간해도 자연스러운 쌍**이어야 한다. FadeHeight 는 부호가 방향이고
+        //    0 이 "끔" 이라, 0 → -1 처럼 잡으면 시작 직후(-0.001 근처)에 BaseY 위가 통째로
+        //    사라졌다가 서서히 제자리를 찾는 "팝" 이 생긴다. 두 값의 **부호를 같게** 두고
+        //    BaseY 와 크기만 다르게 잡는 것이 안전하다.
+        [Header("구역 상단 그라데이션 — 설정값1(밖) ↔ 설정값2(안)")]
+        [Tooltip("설정값1 — 구역 밖일 때의 기준 높이 오프셋. 이 컴포넌트 위치의 Y에 더해진다.")]
+        [SerializeField] private float baseYOffsetOutside;
 
-        [Header("높이 그라데이션")]
-        [Tooltip("1층 벽 바닥의 월드 Y 오프셋. 이 컴포넌트 위치의 Y에 더해 기준 높이를 만든다. " +
-                 "여기가 가장 많이 사라지는 지점이다. 구역 오브젝트를 벽 바닥에 맞춰 두면 0이면 된다.")]
-        [SerializeField] private float baseYOffset;
+        [Tooltip("설정값1 — 구역 밖일 때의 높이차.\n" +
+                 "🔴 부호가 방향(음수: 위가 투명 / 양수: 아래가 투명). 0 은 그라데이션 끔.")]
+        [SerializeField] private float fadeHeightOutside;
 
-        [Tooltip("그라데이션이 끝나는 높이차. 아래가 사라지고 위가 남는 방향이다. " +
-                 "기준 높이에서 이만큼 올라가면 원래대로 돌아오고, 그보다 위는 전부 그대로다. " +
-                 "벽 한 층이 2.5이므로 2층에 걸쳐 복귀시키려면 5.")]
-        [Min(0.01f)]
-        [SerializeField] private float fadeHeight = WallLevelHeight * 2f;
+        [Tooltip("설정값2 — 구역 안일 때의 기준 높이 오프셋.")]
+        [FormerlySerializedAs("baseYOffset")]
+        [FormerlySerializedAs("zoneBaseYOffset")]
+        [SerializeField] private float baseYOffsetInside;
+
+        [Tooltip("설정값2 — 구역 안일 때의 높이차.\n" +
+                 "🔴 부호가 방향(음수: 위가 투명 / 양수: 아래가 투명). 0 은 그라데이션 끔.")]
+        [FormerlySerializedAs("fadeHeight")]
+        [FormerlySerializedAs("zoneFadeHeight")]
+        [SerializeField] private float fadeHeightInside = -1f;
 
         private readonly Dictionary<Material, Material> _instancesBySource =
             new Dictionary<Material, Material>();
         private readonly Dictionary<Material, Material> _sourceByInstance =
             new Dictionary<Material, Material>();
         private int _transparencyRequestCount;
-        private float _currentOpacity = 1f;
+
+        /// <summary>0 = 설정값1(구역 밖), 1 = 설정값2(구역 안). 그 사이를 fadeIn/fadeOut 으로 오간다.</summary>
+        private float _zoneBlend;
         private bool _initialized;
 
         private void Awake()
@@ -77,20 +104,18 @@ namespace VeyTrace.Rendering.Occlusion
             if (!_initialized || _instancesBySource.Count == 0)
                 return;
 
-            float desiredOpacity = _transparencyRequestCount > 0 ? targetOpacity : 1f;
-            if (Mathf.Approximately(_currentOpacity, desiredOpacity))
+            // 구역 안이면 설정값2(1) 쪽으로, 밖이면 설정값1(0) 쪽으로 간다.
+            // 거리는 항상 0~1 이라 duration 이 그대로 "끝까지 가는 데 걸리는 초" 가 된다.
+            float target = IsTransparencyActive ? 1f : 0f;
+            if (Mathf.Approximately(_zoneBlend, target))
                 return;
 
-            float duration = desiredOpacity < _currentOpacity ? fadeOutDuration : fadeInDuration;
-            float fullFadeDistance = Mathf.Abs(1f - targetOpacity);
-            _currentOpacity = duration <= 0f
-                ? desiredOpacity
-                : Mathf.MoveTowards(
-                    _currentOpacity,
-                    desiredOpacity,
-                    fullFadeDistance * Time.deltaTime / duration);
+            float duration = target > _zoneBlend ? fadeInDuration : fadeOutDuration;
+            _zoneBlend = duration <= 0f
+                ? target
+                : Mathf.MoveTowards(_zoneBlend, target, Time.deltaTime / duration);
 
-            ApplyOpacity(_currentOpacity);
+            ApplyHeightGradientToAll();
         }
 
         // 여러 구역이 같은 그룹을 공유할 수 있으므로 요청 수가 0에서 1이 될 때만 페이드 아웃한다.
@@ -126,7 +151,7 @@ namespace VeyTrace.Rendering.Occlusion
                 return;
 
             _initialized = true;
-            _currentOpacity = 1f;
+            _zoneBlend = 0f;
 
             if (targetRenderers == null)
                 return;
@@ -152,9 +177,10 @@ namespace VeyTrace.Rendering.Occlusion
                         instance.name = $"{source.name} (Wall Transparency Group)";
                         instance.SetFloat(OpacityId, 1f);
                         instance.EnableKeyword(DitherKeyword);
-                        ApplyHeightGradient(instance);
+                        // 사전에 먼저 넣어야 ApplyHeightGradient 안의 원본 역참조가 성립한다.
                         _instancesBySource.Add(source, instance);
                         _sourceByInstance.Add(instance, source);
+                        ApplyHeightGradient(instance);
                     }
 
                     materials[slot] = instance;
@@ -166,24 +192,57 @@ namespace VeyTrace.Rendering.Occlusion
             }
         }
 
-        private void ApplyOpacity(float opacity)
-        {
-            foreach (Material instance in _instancesBySource.Values)
-            {
-                if (instance != null)
-                    instance.SetFloat(OpacityId, opacity);
-            }
-        }
+        /// <summary>에디터 시각화(Group Painter 의 "벽 그룹" 표시)가 읽는다. 런타임은 쓰지 않는다.</summary>
+        public IReadOnlyList<Renderer> TargetRenderers => targetRenderers;
 
+        private bool IsTransparencyActive => _transparencyRequestCount > 0;
+
+        // 상단 그라데이션 = 설정값1 ↔ 설정값2 를 _zoneBlend 로 보간한 것.
+        // Opacity 는 항상 1 이다 — 구역 효과를 불투명도가 아니라 그라데이션으로 낸다.
+        //
         // 기준 높이는 월드 Y 라야 한다. 존 프리팹의 벽은 존 로컬 원점 기준 음수 좌표에
         // 놓이고 존은 런타임에 배치되므로, 셰이더에 절대값을 박을 수 없다.
         private void ApplyHeightGradient(Material instance)
         {
-            if (instance.HasProperty(BaseYId))
-                instance.SetFloat(BaseYId, transform.position.y + baseYOffset);
+            SyncBottomGradientFromSource(instance);
 
-            if (instance.HasProperty(FadeHeightId))
-                instance.SetFloat(FadeHeightId, fadeHeight);
+            if (instance.HasProperty(OpacityId))
+                instance.SetFloat(OpacityId, 1f);
+
+            float baseYOffset = Mathf.Lerp(baseYOffsetOutside, baseYOffsetInside, _zoneBlend);
+            float fadeHeight = Mathf.Lerp(fadeHeightOutside, fadeHeightInside, _zoneBlend);
+
+            if (instance.HasProperty(ZoneBaseYId))
+                instance.SetFloat(ZoneBaseYId, transform.position.y + baseYOffset);
+
+            if (instance.HasProperty(ZoneFadeHeightId))
+                instance.SetFloat(ZoneFadeHeightId, fadeHeight);
+        }
+
+        // 🔴 인스턴스는 Instantiate 로 뜬 원본의 **스냅샷**이라 상시 하단 값까지 복사해 간다.
+        //    그 뒤 원본(Generic_01_A 등)의 하단 값을 고쳐도 인스턴스는 따라오지 않는다.
+        //    그러면 **같은 벽인데 그룹에 든 것만 옛 값**으로 남아 화면이 뒤죽박죽 섞인다.
+        //    스냅샷 시점이 "플레이어가 그 구역에 처음 들어간 때" 라 그룹마다 제각각이기도 하다.
+        //    그래서 인스턴스를 만질 때마다 원본에서 다시 읽어 맞춘다.
+        private void SyncBottomGradientFromSource(Material instance)
+        {
+            if (!_sourceByInstance.TryGetValue(instance, out Material source) || source == null)
+                return;
+
+            if (instance.HasProperty(BaseYId) && source.HasProperty(BaseYId))
+                instance.SetFloat(BaseYId, source.GetFloat(BaseYId));
+
+            if (instance.HasProperty(FadeHeightId) && source.HasProperty(FadeHeightId))
+                instance.SetFloat(FadeHeightId, source.GetFloat(FadeHeightId));
+        }
+
+        private void ApplyHeightGradientToAll()
+        {
+            foreach (Material instance in _instancesBySource.Values)
+            {
+                if (instance != null)
+                    ApplyHeightGradient(instance);
+            }
         }
 
         private void OnDestroy()
@@ -227,10 +286,16 @@ namespace VeyTrace.Rendering.Occlusion
         {
             fadeInDuration = Mathf.Max(0f, fadeInDuration);
             fadeOutDuration = Mathf.Max(0f, fadeOutDuration);
-            targetOpacity = Mathf.Clamp01(targetOpacity);
-            fadeHeight = Mathf.Max(0.01f, fadeHeight);
+
+            // 높이차는 클램프하지 않는다 — 부호가 방향이고, 0 은 "끔" 이라
+            // 셋 다 의미 있는 값이다.
 
 #if UNITY_EDITOR
+            // 인스펙터에서 값을 바꾸면 즉시 반영한다. 이게 없으면 구역 진입/이탈 때만 써지므로
+            // "값을 바꿨는데 안 변한다 / 나갔다 와야 변한다" 로 보인다.
+            if (Application.isPlaying && _initialized)
+                ApplyHeightGradientToAll();
+
             if (targetRenderers == null)
                 return;
 

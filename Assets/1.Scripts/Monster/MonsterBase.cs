@@ -51,6 +51,20 @@ public class MonsterBase : Unit
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
+    // 간파(카운터) 창 **표시** 복제 — 판정(MonsterCounterWindow)과 따로 간다.
+    // ⚠️ 예전엔 ClientRpc 한 번이라 창 도중 합류한 클라는 표시를 못 받았다(09-28 전수조사 #10).
+    readonly NetworkVariable<bool> _counterVisual = new NetworkVariable<bool>(
+        false,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    /// <summary>
+    /// 간파 표시를 판정 창보다 **이만큼 먼저** 끈다(초). 간파 스킬은 서버에서 시작하고 이 시간 뒤에 판정되므로
+    /// (<c>FirstMeleeInterruptSkillData.hitDelay</c> 0.15) "보일 때 누르면 성공"이 보장된다 — 팀장 09-28: 유예 없음, 표시만 일찍.
+    /// </summary>
+    public const float CounterVisualLeadSeconds = 0.15f;
+    float _counterVisualOffAt = -1f;   // 서버 Time.time. < 0 = 예약 없음
+
     // 서버 전용 런타임 상태
     Vector3 _spawnPosition;
     Quaternion _spawnRotation;
@@ -143,6 +157,8 @@ public class MonsterBase : Unit
             animator.gameObject.AddComponent<MonsterAnimationEventRelay>();
 
         _state.OnValueChanged += OnStateChanged;
+        _counterVisual.OnValueChanged += OnCounterVisualChanged;
+        ApplyCounterWindowVisual(_counterVisual.Value);   // 늦게 합류한 클라도 지금 값으로
 
         if (IsServer)
         {
@@ -165,6 +181,7 @@ public class MonsterBase : Unit
     public override void OnNetworkDespawn()
     {
         _state.OnValueChanged -= OnStateChanged;
+        _counterVisual.OnValueChanged -= OnCounterVisualChanged;
         base.OnNetworkDespawn();
     }
 
@@ -206,7 +223,9 @@ public class MonsterBase : Unit
             agent.stoppingDistance = Mathf.Max(0f, data.attackRange * 0.8f);
             _defaultStoppingDistance = agent.stoppingDistance;
             // 부분 겹침: 회피 반경을 콜라이더보다 작게(데이터값). 물리 대신 회피로만 겹침량 조절(저비용).
-            agent.radius = Mathf.Max(0.01f, data.avoidanceRadius);
+            // ⚠️ 몸이 큰 몹(23호 — 캡슐 1.53)은 프리팹 반경을 지킨다. 0.3 으로 덮으면 좁은 통로에서 벽을 파고든다(09-28 전수조사).
+            if (!KeepPrefabAgentRadius)
+                agent.radius = Mathf.Max(0.01f, data.avoidanceRadius);
             agent.obstacleAvoidanceType = data.obstacleAvoidance;
         }
 
@@ -226,6 +245,13 @@ public class MonsterBase : Unit
         if (!IsServer || !_initialized || _isDead)
             return;
 
+        // 간파 표시 조기 소등 — 판정 창이 닫히기 CounterVisualLeadSeconds 전에 표시만 끈다.
+        if (_counterVisualOffAt >= 0f && Time.time >= _counterVisualOffAt)
+        {
+            _counterVisualOffAt = -1f;
+            SetCounterVisual(false);
+        }
+
         // 연출이 몸을 몰고 있는 동안에는 FSM 을 돌리지 않는다(SetServerLogicSuspended 주석 참조).
         if (_serverLogicSuspended)
         {
@@ -243,8 +269,16 @@ public class MonsterBase : Unit
     }
 
     #region 서버 FSM
+    /// <summary>
+    /// [서버] 매 틱 FSM **앞에서** 도는 파생 확장점(상태 무관). true 를 돌려주면 이번 틱 FSM 을 건너뛴다.
+    /// 23호 취약 넉백처럼 "어느 상태에서든 몸을 미는" 동작이 추격·공격 결정과 싸우지 않게 쓴다.
+    /// </summary>
+    protected virtual bool OnServerPreTick(float dt) => false;
+
     void TickServer(float dt)
     {
+        if (OnServerPreTick(dt)) return;
+
         // 이동 봉쇄 상태이상(에어본/기절/속박)이면 에이전트 정지.
         if (status != null && status.BlocksMovement)
             StopAgent();
@@ -466,7 +500,7 @@ public class MonsterBase : Unit
         {
             SetState(MonsterState.Chase);
             if (!movementBlocked)
-                MoveAgentTo(_target.position, data.chaseSpeed * ChaseSpeedMultiplier);
+                ChaseTarget(data.chaseSpeed * ChaseSpeedMultiplier);
         }
         else
         {
@@ -512,7 +546,7 @@ public class MonsterBase : Unit
 
         SetState(MonsterState.Chase);
         if (!movementBlocked)
-            MoveAgentTo(_target.position, data.chaseSpeed);
+            ChaseTarget(data.chaseSpeed);
         FaceTarget();
     }
 
@@ -606,7 +640,7 @@ public class MonsterBase : Unit
                 else if (dist > data.attackRange)
                 {
                     ClearReposition();
-                    MoveAgentTo(_target.position, data.chaseSpeed);
+                    ChaseTarget(data.chaseSpeed);
                     moving = true;
                 }
                 else if (data.repositionBetweenAttacks && !CooldownReady())
@@ -880,6 +914,97 @@ public class MonsterBase : Unit
     /// </summary>
     protected virtual bool FaceTargetDuringWindup => false;
 
+    #region 공격 예고 (중간보스 — 2026-09-28 팀장: "범위를 보여 준 뒤 공격")
+    [Header("공격 예고 (선택 — 중간보스)")]
+    [Tooltip("공격 예고 바닥 데칼 재질. 비우면 예고 없음(일반 몹 기본). 23호 표식과 같은 재질을 쓴다\n" +
+             "(23호는 자기 BossDirectionIndicator 가 재질을 대므로 여기를 비워 둔다)")]
+    [SerializeField] Material attackTelegraphMaterial;
+
+    BossAttackConeTelegraph _attackTelegraph;
+
+    /// <summary>예고를 쓰는 몹인가(재질이 물려 있는가). 파생이 예고 단계를 넣을지 이걸로 가른다.</summary>
+    protected bool HasAttackTelegraph => attackTelegraphMaterial != null;
+
+    /// <summary>
+    /// [서버] 판정 박스(<paramref name="hitbox"/>) **그대로** 바닥 예고를 띄운다. 채움이 <paramref name="growTime"/>
+    /// 동안 차오르고, 다 찬 순간이 곧 공격이다. 🔴 예고와 판정이 같은 콜라이더에서 나오므로 어긋날 수 없다.
+    /// </summary>
+    /// <param name="lateralShift">몸 기준 옆으로 미는 거리(m, + = 오른쪽). 좌/우 공격은 판정도 <see cref="MeleeHitShifted"/> 에 같은 값을 준다.</param>
+    protected void ShowHitboxTelegraph(ColliderInfo hitbox, float growTime, float extraLength = 0f, float lateralShift = 0f)
+    {
+        if (!IsServer || !HasAttackTelegraph || hitbox == null) return;
+        if (!TryMeasureBox(hitbox, out float halfWidth, out float length, out float forward, out float lateral)) return;
+        ShowBandTelegraphRpc(halfWidth, length + Mathf.Max(0f, extraLength), forward, lateral + lateralShift,
+                             Mathf.Max(0f, growTime));
+    }
+
+    /// <summary>
+    /// [서버] 근접 판정을 몸 기준 옆으로 <paramref name="lateralShift"/>(m) 옮겨서 한 번 낸다(좌/우 공격).
+    /// 판정 박스는 트랜스폼으로 계산되므로(<c>ColliderInfo</c>) 그 순간만 옮겼다가 되돌린다.
+    /// 🔴 예고(<see cref="ShowHitboxTelegraph"/>)에 **같은 값**을 줄 것 — 따로 적으면 예고가 판정에 대해 거짓말한다.
+    /// </summary>
+    protected int MeleeHitShifted(float lateralShift)
+    {
+        if (meleeAttack == null) return 0;
+        ColliderInfo info = meleeAttack.ColliderInfo;
+        if (info == null || Mathf.Approximately(lateralShift, 0f)) return meleeAttack.Hit();
+
+        Transform t = info.transform;
+        Vector3 original = t.position;
+        Vector3 right = transform.right;
+        right.y = 0f;
+        t.position = original + right.normalized * lateralShift;
+        try { return meleeAttack.Hit(); }
+        finally { t.position = original; }
+    }
+
+    /// <summary>[서버] 예고를 끈다. 공격 상태를 벗어나면 <see cref="OnStateChanged"/> 가 전 피어에서 자동으로 끈다.</summary>
+    protected void HideAttackTelegraph()
+    {
+        if (IsServer && HasAttackTelegraph) HideAttackTelegraphRpc();
+    }
+
+    // 박스 판정을 몸 기준 띠(반폭·길이·앞 오프셋·옆 오프셋)로 환산. 판정 박스는 몸과 같은 방향이라고 본다(요 회전 없음).
+    bool TryMeasureBox(ColliderInfo hitbox, out float halfWidth, out float length, out float forward, out float lateral)
+    {
+        halfWidth = length = forward = lateral = 0f;
+        BoxCollider box = hitbox.GetComponent<BoxCollider>();
+        if (box == null) return false;
+
+        Vector3 size = Vector3.Scale(box.size, box.transform.lossyScale);
+        Vector3 local = transform.InverseTransformPoint(box.transform.TransformPoint(box.center));
+        halfWidth = Mathf.Abs(size.x) * 0.5f;
+        length = Mathf.Abs(size.z);
+        forward = local.z - length * 0.5f;
+        lateral = local.x;
+        return halfWidth > 0f && length > 0f;
+    }
+
+    // 예고 표시는 순수 연출이지만 reliable — 빠지면 "예고 없이 맞는" 공격이 된다(이번 작업의 목적 자체가 깨진다).
+    [Rpc(SendTo.ClientsAndHost)]
+    void ShowBandTelegraphRpc(float halfWidth, float length, float forwardOffset, float lateralOffset, float growTime)
+    {
+        BossAttackConeTelegraph t = EnsureAttackTelegraph();
+        if (t != null) t.Show(0f, 0f, 0f, 0f, halfWidth, length, growTime, forwardOffset, lateralOffset);
+    }
+
+    [Rpc(SendTo.ClientsAndHost)]
+    void HideAttackTelegraphRpc()
+    {
+        if (_attackTelegraph != null) _attackTelegraph.Hide();
+    }
+
+    BossAttackConeTelegraph EnsureAttackTelegraph()
+    {
+        if (_attackTelegraph != null) return _attackTelegraph;
+        if (attackTelegraphMaterial == null) return null;
+        if (!TryGetComponent(out _attackTelegraph))
+            _attackTelegraph = gameObject.AddComponent<BossAttackConeTelegraph>();
+        _attackTelegraph.MaterialOverride = attackTelegraphMaterial;
+        return _attackTelegraph;
+    }
+    #endregion
+
     protected virtual void HandleAttack(float dt)
     {
         // 선딜(준비) 중 타깃이 사거리+여유를 벗어나면 공격 취소 → 추격 복귀.
@@ -1142,6 +1267,7 @@ public class MonsterBase : Unit
         // 서버틱 직접 이동과 충돌하지 않게 에이전트를 완전히 내려놓는다(off). 종료 시 재획득.
         ClearReposition();
         StopAgent();
+        _knockbackOrigin = transform.position;   // 종료 Warp 가 같은 섬인지 확인하는 기준(ExitKnockback)
         if (agent != null) agent.enabled = false;
         SetState(MonsterState.Knockback);
     }
@@ -1170,9 +1296,21 @@ public class MonsterBase : Unit
         if (agent != null)
         {
             agent.enabled = true;
-            if (!agent.isOnNavMesh &&
-                NavMesh.SamplePosition(transform.position, out NavMeshHit navHit, 2f, NavMesh.AllAreas))
-                agent.Warp(navHit.position);
+            // ⚠️ 09-28: 반경 2m → 1m + **같은 섬 확인.** 2m 면 틈 건너 플랫폼·소품 윗면 섬으로 순간이동했다(전수조사 4순위).
+            //    넉백 시작 자리(메시 위)에서 직선으로 막힘없이 닿는 점만 받는다. 아니면 시작 자리로 돌려놓는다.
+            if (!agent.isOnNavMesh)
+            {
+                bool placed = false;
+                if (NavMesh.SamplePosition(transform.position, out NavMeshHit navHit, 1f, NavMesh.AllAreas) &&
+                    NavMesh.SamplePosition(_knockbackOrigin, out NavMeshHit originHit, 1f, NavMesh.AllAreas) &&
+                    !NavMesh.Raycast(originHit.position, navHit.position, out _, NavMesh.AllAreas))
+                {
+                    agent.Warp(navHit.position);
+                    placed = true;
+                }
+                if (!placed && NavMesh.SamplePosition(_knockbackOrigin, out NavMeshHit back, 1f, NavMesh.AllAreas))
+                    agent.Warp(back.position);
+            }
         }
 
         if (_staggerAfterKnockback > 0f)
@@ -1292,6 +1430,10 @@ public class MonsterBase : Unit
         if (agent != null) agent.enabled = false;
         if (bodyCollider != null) bodyCollider.enabled = false;
 
+        // 간파 표시도 끈다 — 사망 후 Update 는 돌지 않아 조기 소등 예약이 남는다.
+        _counterVisualOffAt = -1f;
+        SetCounterVisual(false);
+
         SetState(MonsterState.Dead);
 
         // 드롭/보상 확장 훅 — 사망 단일 지점에서만 호출(은희가 채움).
@@ -1300,12 +1442,60 @@ public class MonsterBase : Unit
         // 세션 통계(처치 수)용 통보. 구독자가 없으면 아무 일도 하지 않는다.
         MonsterDeathEvents.RaiseServerMonsterDied(this);
 
-        // 디졸브 연출이 있으면 재생 후 디스폰, 없으면 지연 후 디스폰.
+        // 디졸브 연출이 있으면 **사망 클립이 끝난 뒤** 재생 → 디스폰, 없으면 지연 후 디스폰.
+        // (2026-09-28 팀장: 죽는 애니가 끝나고 나서 디졸브. 예전엔 클립 시작과 동시에 녹아 끝까지 못 봤다.)
         IDeathEffect fx = GetComponent<IDeathEffect>();
         if (fx != null)
-            fx.Play(DespawnNow);
+            StartCoroutine(PlayDeathEffectAfterClip(fx));
         else
             StartCoroutine(DespawnAfter(data != null ? data.despawnDelay : 2f));
+    }
+
+    /// <summary>
+    /// [서버] 사망 연출이 끝나 곧 디스폰되는 순간(디졸브·지연 모두 끝). 보스 격파 후 결과 화면 전환이 여기에 맞춘다
+    /// — <c>Died</c> 는 치명타 순간이라 그 기준 고정 타이머는 연출 길이가 바뀌면 어긋난다.
+    /// </summary>
+    public event System.Action ServerDeathSequenceCompleted;
+
+    // 사망 상태 진입을 기다리는 한도. AnyState→사망 전이는 0.05초라 몇 프레임이면 잡힌다.
+    const float DeathStateDetectTimeout = 0.5f;
+    // 루프 클립·잘못 저작된 긴 클립이 디졸브를 영원히 막지 않게.
+    const float MaxDeathClipHold = 5f;
+
+    IEnumerator PlayDeathEffectAfterClip(IDeathEffect fx)
+    {
+        float hold = 0f;
+        // 클립 없는 몹(deathTrigger 파라미터 없음)은 PlayStateAnimation 이 애니를 얼린다 → 기다릴 게 없다.
+        if (animator != null && data != null && HasParameter(animator, data.deathTrigger))
+        {
+            // 🔴 길이는 **실제 사망 상태에서 잰다** — 클립 이름·상태 이름이 몹마다 다르다(Death / Defeat).
+            //    트리거는 SetState 에서 이미 걸렸으므로 지금 상태는 아직 사망 전 상태다.
+            int before = animator.GetCurrentAnimatorStateInfo(0).fullPathHash;
+            float waited = 0f;
+            while (waited < DeathStateDetectTimeout)
+            {
+                yield return null;
+                waited += Time.deltaTime;
+                AnimatorStateInfo st;
+                if (animator.IsInTransition(0))
+                    st = animator.GetNextAnimatorStateInfo(0);
+                else
+                    st = animator.GetCurrentAnimatorStateInfo(0);
+                if (st.fullPathHash == before) continue;
+
+                // length 는 상태 속도가 반영된 초. 이미 흐른 만큼 뺀다. 루프 클립은 한 바퀴로 친다.
+                float remain = st.length * (1f - Mathf.Clamp01(st.normalizedTime));
+                hold = Mathf.Max(0f, Mathf.Min(remain, MaxDeathClipHold) - fx.LeadBeforeClipEnd) + fx.DelayAfterClipEnd;
+                // 사망은 몹당 한 번뿐인 사건이라 로그가 넘치지 않는다. "끝났는데 안 녹는다"를 숫자로 가리는 용도.
+                Debug.Log($"[Death] {name}: 사망 클립 남은 {remain:0.00}초 − 앞당김 {fx.LeadBeforeClipEnd:0.00}초 " +
+                          $"+ 끝난 뒤 대기 {fx.DelayAfterClipEnd:0.00}초 → {hold:0.00}초 뒤 디졸브", this);
+                break;
+            }
+        }
+
+        if (hold > 0f)
+            yield return new WaitForSeconds(hold);
+        fx.Play(DespawnNow);
     }
 
     // 드롭 아이템/보상/처치 카운트 등 사망 후처리 확장점(기본 no-op).
@@ -1320,6 +1510,7 @@ public class MonsterBase : Unit
     void DespawnNow()
     {
         if (!IsServer) return;
+        ServerDeathSequenceCompleted?.Invoke();
         NetworkObject netObj = NetworkObject;
         if (netObj != null && netObj.IsSpawned)
             netObj.Despawn();
@@ -1465,6 +1656,36 @@ public class MonsterBase : Unit
         return nearest;
     }
 
+    /// <summary>몸이 큰 몹은 true — 데이터의 회피 반경(0.3)으로 프리팹 에이전트 반경을 덮지 않는다.</summary>
+    protected virtual bool KeepPrefabAgentRadius => false;
+
+    Vector3 _knockbackOrigin;
+
+    // 추격 목적지를 NavMesh 위로 투영하는 반경. 플레이어가 가장자리 띠·소품 위에 있어도 그 아래 메시를 잡는 정도.
+    const float ChaseProjectRadius = 2f;
+
+    /// <summary>
+    /// 추격 이동(보스·근접·이동형 공통). 🔴 목적지를 플레이어 좌표 그대로 주면, 플레이어가 메시 밖(가장자리 띠·상자 위·
+    /// 끊긴 계단 너머)에 있을 때 **모든 몹이 가장 가까운 메시 점 — 낭떠러지·벽 가장자리의 같은 점으로 몰린다**
+    /// (09-28 NavMesh 전수조사 1순위). 그래서 ① 목적지를 메시 위로 투영하고 ② 경로가 끝까지 닿지 않으면(Partial·Invalid)
+    /// 가장자리로 몰려가지 않고 **그 자리에서 기다린다.** 복귀·재배치는 이 규칙을 타지 않는다(MoveAgentTo 직접).
+    /// </summary>
+    void ChaseTarget(float speed)
+    {
+        if (_target == null || agent == null || !agent.enabled || !agent.isOnNavMesh) return;
+
+        if (!NavMesh.SamplePosition(_target.position, out NavMeshHit onMesh, ChaseProjectRadius, NavMesh.AllAreas))
+        {
+            StopAgent();
+            return;
+        }
+
+        MoveAgentTo(onMesh.position, speed);
+
+        if (!agent.pathPending && agent.pathStatus != NavMeshPathStatus.PathComplete)
+            StopAgent();
+    }
+
     void MoveAgentTo(Vector3 destination, float speed)
     {
         if (agent == null || !agent.enabled || !agent.isOnNavMesh)
@@ -1568,6 +1789,12 @@ public class MonsterBase : Unit
         // 끊고 로코모션으로 강제 복귀. (공격 도중 리쉬 복귀 등으로 애니가 공격 클립에 눌러앉는 문제 해결.)
         if (IsActionAnimState(previous) && IsLocomotionAnimState(next))
             ResetToLocomotion();
+
+        // 🔴 예고 안전망 — 공격이 그로기·피격·사망·리쉬로 끊기면 "다 찼으니 끄라"는 신호가 안 온다.
+        //    이 콜백은 _state 복제를 타고 전 피어에서 돌므로 여기서 끄면 어느 경로로 빠져도 남지 않는다.
+        if (next != MonsterState.Attack && _attackTelegraph != null)
+            _attackTelegraph.Hide();
+
         PlayStateAnimation(next);
 
         OnMonsterStateChanged(previous, next);
@@ -1619,13 +1846,36 @@ public class MonsterBase : Unit
     //    자세 정지는 **그로기 클립이 없는 몹의 그로기 표현**에만 쓴다(Gauntlet).
 
     /// <summary>카운터 창 표현(텔레그래프)을 켜고 끈다. 서버에서 부른다.</summary>
-    protected void ServerSetCounterWindow(bool open)
+    /// <summary>
+    /// [서버] 간파 창 **표시**를 켜고 끈다. 판정은 <c>MonsterCounterWindow</c> 가 따로 한다.
+    /// </summary>
+    /// <param name="windowDuration">
+    /// 열 때 넘기면 판정 창이 닫히기 <see cref="CounterVisualLeadSeconds"/> 전에 표시가 먼저 꺼진다.
+    /// 0 이하 = 조기 소등 없음(닫을 때 끈다).
+    /// </param>
+    protected void ServerSetCounterWindow(bool open, float windowDuration = -1f)
     {
         if (!IsServer) return;
 
-        ApplyCounterWindowVisual(open);          // 호스트 자신
-        if (IsSpawned) SetCounterWindowClientRpc(open);
+        _counterVisualOffAt = open && windowDuration > 0f
+            ? Time.time + Mathf.Max(0f, windowDuration - CounterVisualLeadSeconds)
+            : -1f;
+        SetCounterVisual(open);
     }
+
+    void SetCounterVisual(bool open)
+    {
+        if (IsSpawned)
+        {
+            if (_counterVisual.Value != open) _counterVisual.Value = open;   // 호스트도 OnValueChanged 로 받는다
+        }
+        else
+        {
+            ApplyCounterWindowVisual(open);   // 네트워크 없는 테스트 씬
+        }
+    }
+
+    void OnCounterVisualChanged(bool previous, bool next) => ApplyCounterWindowVisual(next);
 
     /// <summary>
     /// 로코모션 첫 프레임 자세로 갈아탄 뒤 정지한다 — <b>그로기 클립이 없는 몹</b>의 그로기 표현.
@@ -1667,7 +1917,6 @@ public class MonsterBase : Unit
         if (IsSpawned) ReleaseActionPoseClientRpc();
     }
 
-    [ClientRpc] void SetCounterWindowClientRpc(bool open) => ApplyCounterWindowVisual(open);
     [ClientRpc] void FreezeAtLocomotionClientRpc() => ApplyLocomotionFreeze();
     [ClientRpc] void HoldActionPoseClientRpc(string stateName) => ApplyHoldAtClipEnd(stateName);
     [ClientRpc] void ReleaseActionPoseClientRpc() => ApplyReleaseActionPose();

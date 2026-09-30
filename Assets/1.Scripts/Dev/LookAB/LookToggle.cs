@@ -41,13 +41,9 @@ public sealed class LookToggle : MonoBehaviour
         B_DimOccluded = 1,  // 디밍 + 저채도 + 시야 차폐
     }
 
-    [Header("토글")]
-#if ENABLE_INPUT_SYSTEM
-    // F8 = ProfilerHUD, F10 = 디버그 부활, M = 맵 오버뷰, [ ] = 카메라 타겟 전환.
-    // F9 가 비어 있어 기본값으로 쓴다.
-    [Tooltip("룩 전환 키. F8(ProfilerHUD)·F10(디버그 부활)·M·[·] 는 이미 쓰인다.")]
-    [SerializeField] private Key toggleKey = Key.F9;
-#endif
+    // 🔴 F9 룩 토글 키는 뺐다(팀장 2026-09-29) — F9 는 23호 공격 예약(DevBossAttackHotkeys)이 쓴다.
+    //    Play 시작 룩 적용(startLook)은 그대로다 — 이 컴포넌트를 지우면 디밍·차폐 룩이 바뀐다. 전환은 Toggle() 로만.
+    //    씬에 남은 toggleKey 직렬화 줄은 무해하다(다음 저장 때 정리된다).
 
     [Tooltip("Play 시작 시의 룩. 기본은 A — 토글을 넣었다고 화면이 바뀌면 안 된다.")]
     [SerializeField] private Look startLook = Look.A_Current;
@@ -103,18 +99,6 @@ public sealed class LookToggle : MonoBehaviour
 
     private void OnDisable() => RestoreSnapshot();
 
-    private void Update()
-    {
-#if ENABLE_INPUT_SYSTEM
-        // Keyboard.current 는 키보드가 없거나 아직 초기화되지 않으면 null 이다.
-        if (Keyboard.current == null)
-            return;
-
-        if (Keyboard.current[toggleKey].wasPressedThisFrame)
-            Toggle();
-#endif
-    }
-
     public void Toggle() =>
         Apply(_current == Look.A_Current ? Look.B_DimOccluded : Look.A_Current, announce: true);
 
@@ -136,7 +120,7 @@ public sealed class LookToggle : MonoBehaviour
             _toastUntil = Time.unscaledTime + toastSeconds;
 
         // 콘솔에도 남긴다. Game View 를 안 띄운 채 검증할 때는 화면 토스트를 볼 수 없고,
-        // 나중에 "F9 를 눌렀는데 안 바뀐다"를 판정할 때 입력이 도달했는지부터 갈라야 한다.
+        // 나중에 "Toggle() 을 불렀는데 안 바뀐다"를 판정할 때 호출이 도달했는지부터 갈라야 한다.
         Debug.Log($"[LookToggle] {Describe(_current)}", this);
     }
 

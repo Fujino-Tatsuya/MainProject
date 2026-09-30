@@ -1,5 +1,9 @@
 # PLAN-boss-vulnerable.md — 인터럽트 성공 후 **취약 상태** (2026-09-21)
 
+> ⚠️ **폐기 (2026-09-28 팀장)** — 팀 기획 `Re_C_간파_시스템.md`·`Re_C_취약_및_제압_시스템.md` 로 대체.
+> 새 계획은 [PLAN-boss-counter-vulnerable.md](PLAN-boss-counter-vulnerable.md). 아래 내용(취약 5초·슈퍼아머 해제·경직/기절)은 **따르지 말 것**.
+> 조사 결과(§1 — CC 세 겹 차단, LinearKnockback 함정 등)는 새 계획이 참고한다.
+
 > 그릴 16문항으로 확정. **승인 후 구현.**
 > 상위 문서 — [PLAN.md](PLAN.md) · [PLAN-boss-backlog.md](PLAN-boss-backlog.md) · [CONTEXT.md](CONTEXT.md).
 

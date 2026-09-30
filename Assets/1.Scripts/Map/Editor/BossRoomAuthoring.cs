@@ -1,3 +1,4 @@
+using Unity.AI.Navigation;
 using Unity.Netcode;
 using Unity.Netcode.Components;
 using UnityEditor;
@@ -59,6 +60,7 @@ public static class BossRoomAuthoring
             BuildBoundaries(root, roomBounds, floorTopY, wallLayer);
             BuildReferencePoints(root, roomBounds, floorTopY);
             BuildBossArea(root, roomBounds, floorTopY);
+            BuildNavMeshMargin(root, floorTopY);
 
             PrefabUtility.SaveAsPrefabAsset(root, BossRoomPath);
             Debug.Log("[BossRoomAuthoring] 완료 — 경계·바닥 안전망·기준점 재생성 후 저장.");
@@ -483,6 +485,98 @@ public static class BossRoomAuthoring
 
         Debug.Log($"[BossRoomAuthoring] {BoundariesName} — 4면, 높이 {BoundaryHeight}, " +
                   $"레이어 {LayerMask.LayerToName(wallLayer)}");
+    }
+
+    // ─── NavMesh 여유 띠 (2026-09-29 경석 · 팀장 승인) ─────────────────────────────
+    // 맵 NavMesh 는 한 장(Humanoid 반경 0.5)이라 보스방 벽에서 0.5m 까지 보스 중심이 간다 → 23호 몸 캡슐(1.53)이
+    // 투명벽 밖으로 ~1m 돌출 → 벽-보스 사이 플레이어 끼임 · 손 소켓이 경계 밖으로 나가 잡기 해제가 벽 안.
+    // 보스방에는 보스 한 마리뿐이므로 **이 방만** 투명벽 안쪽에 Not Walkable 띠를 둘러 NavMesh 가장자리를 안쪽으로 민다.
+    // 🔴 띠 폭 상한: 취약 넉백 벽 판정 = "보스 중심 + 몸 반경(1.53) ≥ 벽 안쪽 면"(TwentyThreeBoss.HitsArenaWall).
+    //    가장자리가 벽에서 1.53 보다 멀어지면 벽 충돌이 **영영 성립하지 않는다.** 목표 가장자리 ≈ 1.5m.
+    // ⚠️ 베이크 침식(반경 0.5)이 띠 경계에도 추가로 적용되는지는 미확인 — 적용되면 가장자리 = 폭 + 0.5, 아니면 = 폭.
+    //    Play 시 `[23호] NavMesh 여유` 로그(보스 → 네 벽 방향 가장자리 거리)로 확인하고 폭을 맞춘다.
+    const string NavMarginName = "NavMeshMargin";
+    const float NavMarginWidth = 1.0f;
+    const float NavMarginHeight = 4f;
+
+    [MenuItem("Tools/Map/Authoring/Build Boss Room NavMesh Margin")]
+    public static void BuildBossRoomNavMeshMargin()
+    {
+        GameObject root = PrefabUtility.LoadPrefabContents(BossRoomPath);
+        try
+        {
+            if (!TryMeasure(root, out _, out float floorTopY))
+            {
+                Debug.LogError("[BossRoomAuthoring] 렌더러를 찾지 못해 바닥 높이를 계산할 수 없다.");
+                return;
+            }
+            if (!BuildNavMeshMargin(root, floorTopY)) return;
+            PrefabUtility.SaveAsPrefabAsset(root, BossRoomPath);
+            Debug.Log("[BossRoomAuthoring] NavMesh 여유 띠 저장 완료.");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    // 경계는 **저작된 InvisibleBoundaries 안쪽 면**에서 읽는다(재실측하지 않는다 — 벽 판정과 같은 원본).
+    static bool BuildNavMeshMargin(GameObject root, float floorTopY)
+    {
+        Transform boundaries = root.transform.Find(BoundariesName);
+        if (boundaries == null)
+        {
+            Debug.LogError($"[BossRoomAuthoring] {BoundariesName} 가 없다 — Rebuild Boss Room Bounds 를 먼저 돌릴 것.");
+            return false;
+        }
+
+        float minX = 0f, maxX = 0f, minZ = 0f, maxZ = 0f;
+        int found = 0;
+        foreach (BoxCollider b in boundaries.GetComponentsInChildren<BoxCollider>(true))
+        {
+            Vector3 c = root.transform.InverseTransformPoint(b.transform.TransformPoint(b.center));
+            Vector3 h = root.transform.InverseTransformVector(b.transform.TransformVector(b.size * 0.5f));
+            switch (b.name)
+            {
+                case "Boundary_XMin": minX = c.x + Mathf.Abs(h.x); found |= 1; break;
+                case "Boundary_XMax": maxX = c.x - Mathf.Abs(h.x); found |= 2; break;
+                case "Boundary_ZMin": minZ = c.z + Mathf.Abs(h.z); found |= 4; break;
+                case "Boundary_ZMax": maxZ = c.z - Mathf.Abs(h.z); found |= 8; break;
+            }
+        }
+        if (found != 15)
+        {
+            Debug.LogError("[BossRoomAuthoring] Boundary_XMin/XMax/ZMin/ZMax 가 다 있지 않다 — 여유 띠를 만들지 않는다.");
+            return false;
+        }
+
+        Transform stale = root.transform.Find(NavMarginName);
+        if (stale != null) Object.DestroyImmediate(stale.gameObject);
+
+        var parent = new GameObject(NavMarginName);
+        parent.transform.SetParent(root.transform, false);
+
+        int notWalkable = UnityEngine.AI.NavMesh.GetAreaFromName("Not Walkable");
+        float w = NavMarginWidth, y = floorTopY, lenX = maxX - minX, lenZ = maxZ - minZ;
+        float cx = (minX + maxX) * 0.5f, cz = (minZ + maxZ) * 0.5f;
+
+        AddNavMargin(parent, "Margin_XMin", new Vector3(minX + w * 0.5f, y, cz), new Vector3(w, NavMarginHeight, lenZ), notWalkable);
+        AddNavMargin(parent, "Margin_XMax", new Vector3(maxX - w * 0.5f, y, cz), new Vector3(w, NavMarginHeight, lenZ), notWalkable);
+        AddNavMargin(parent, "Margin_ZMin", new Vector3(cx, y, minZ + w * 0.5f), new Vector3(lenX, NavMarginHeight, w), notWalkable);
+        AddNavMargin(parent, "Margin_ZMax", new Vector3(cx, y, maxZ - w * 0.5f), new Vector3(lenX, NavMarginHeight, w), notWalkable);
+
+        Debug.Log($"[BossRoomAuthoring] {NavMarginName} — 폭 {w}m · 안쪽 경계 X {minX:F2}~{maxX:F2} / Z {minZ:F2}~{maxZ:F2} · area {notWalkable}");
+        return true;
+    }
+
+    static void AddNavMargin(GameObject parent, string name, Vector3 center, Vector3 size, int area)
+    {
+        var go = new GameObject(name);
+        go.transform.SetParent(parent.transform, false);
+        var vol = go.AddComponent<NavMeshModifierVolume>();
+        vol.center = center;
+        vol.size = size;
+        vol.area = area;
     }
 
     static void AddWall(GameObject parent, int layer, string name, Vector3 center, Vector3 size)

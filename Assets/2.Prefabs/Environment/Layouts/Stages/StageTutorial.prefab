@@ -1,0 +1,428 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &2493142803669167178
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5957770525296492148}
+  - component: {fileID: 5514436575758300415}
+  m_Layer: 0
+  m_Name: Slot_3_ZoneL_typeB
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &5957770525296492148
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2493142803669167178}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 10.630005, y: 0, z: -111.140015}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 7833847704280834159}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &5514436575758300415
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2493142803669167178}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a1c4e9b2d6f48a3b5c7e9f1a2b4c6d8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ZoneSlot
+  SlotID: 3
+  Size: 0
+  Footprint: {x: 40, y: 40}
+  IsQuestCandidate: 0
+  IsBossCandidate: 0
+  IsSpawnCandidate: 0
+  FixedPrefab: {fileID: 411843160232409271, guid: 6849fda9e44544b4984a260535e5337f, type: 3}
+  QuestPrefab: {fileID: 0}
+  Rotations:
+  - Prefab: {fileID: 411843160232409271, guid: 6849fda9e44544b4984a260535e5337f, type: 3}
+    YawSteps: 2
+    HasPosition: 1
+    Position: {x: 10.630005, y: 0, z: -111.140015}
+  AssignedRole: 0
+  IsFilled: 0
+--- !u!1 &3534189215017368504
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 3850559441968625962}
+  - component: {fileID: 2542097044500317600}
+  m_Layer: 0
+  m_Name: Slot_1_ZoneS_typeA
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &3850559441968625962
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3534189215017368504}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0.29999653, y: 0, z: -200.57}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 7833847704280834159}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2542097044500317600
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3534189215017368504}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a1c4e9b2d6f48a3b5c7e9f1a2b4c6d8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ZoneSlot
+  SlotID: 1
+  Size: 2
+  Footprint: {x: 20, y: 20}
+  IsQuestCandidate: 0
+  IsBossCandidate: 0
+  IsSpawnCandidate: 0
+  FixedPrefab: {fileID: 7716440855972029763, guid: 691f2e3d42b9b0540800bcae1bf123dd, type: 3}
+  QuestPrefab: {fileID: 0}
+  Rotations:
+  - Prefab: {fileID: 7716440855972029763, guid: 691f2e3d42b9b0540800bcae1bf123dd, type: 3}
+    YawSteps: 2
+    HasPosition: 1
+    Position: {x: 0.29999653, y: 0, z: -200.57}
+  AssignedRole: 0
+  IsFilled: 0
+--- !u!1 &4750119627183316947
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7833847704280834159}
+  m_Layer: 0
+  m_Name: Slots
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &7833847704280834159
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4750119627183316947}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 5623916806088115071}
+  - {fileID: 3850559441968625962}
+  - {fileID: 265195794406183419}
+  - {fileID: 5957770525296492148}
+  - {fileID: 1569051238123238594}
+  m_Father: {fileID: 1214701358959259822}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &5827012702510178230
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 265195794406183419}
+  - component: {fileID: 4380788717532805984}
+  m_Layer: 0
+  m_Name: Slot_2_ZoneM_typeA
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &265195794406183419
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5827012702510178230}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0.61999995, y: 0, z: -160.99}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 7833847704280834159}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &4380788717532805984
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5827012702510178230}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a1c4e9b2d6f48a3b5c7e9f1a2b4c6d8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ZoneSlot
+  SlotID: 2
+  Size: 1
+  Footprint: {x: 20, y: 40}
+  IsQuestCandidate: 0
+  IsBossCandidate: 0
+  IsSpawnCandidate: 0
+  FixedPrefab: {fileID: 2495213824890675942, guid: 4a1de22fa8709074eab35571fbc920be, type: 3}
+  QuestPrefab: {fileID: 0}
+  Rotations:
+  - Prefab: {fileID: 2495213824890675942, guid: 4a1de22fa8709074eab35571fbc920be, type: 3}
+    YawSteps: 2
+    HasPosition: 1
+    Position: {x: 0.61999995, y: 0, z: -160.99}
+  AssignedRole: 0
+  IsFilled: 0
+--- !u!1 &6474635608273419239
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5623916806088115071}
+  - component: {fileID: 6690787010136559465}
+  m_Layer: 0
+  m_Name: Slot_0_ZoneS_typeStart
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &5623916806088115071
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6474635608273419239}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 29.399996, y: 0, z: -200.40001}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 7833847704280834159}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &6690787010136559465
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6474635608273419239}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a1c4e9b2d6f48a3b5c7e9f1a2b4c6d8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ZoneSlot
+  SlotID: 0
+  Size: 2
+  Footprint: {x: 20, y: 20}
+  IsQuestCandidate: 0
+  IsBossCandidate: 0
+  IsSpawnCandidate: 1
+  FixedPrefab: {fileID: 8865995742018799504, guid: b0760a67dc21daf48bf92cb785979d38, type: 3}
+  QuestPrefab: {fileID: 0}
+  Rotations:
+  - Prefab: {fileID: 8865995742018799504, guid: b0760a67dc21daf48bf92cb785979d38, type: 3}
+    YawSteps: 2
+    HasPosition: 1
+    Position: {x: 29.399996, y: 0, z: -200.40001}
+  AssignedRole: 0
+  IsFilled: 0
+--- !u!1 &7470274809770081852
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1214701358959259822}
+  m_Layer: 0
+  m_Name: StageTutorial
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1214701358959259822
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7470274809770081852}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 5076845353650435298}
+  - {fileID: 7833847704280834159}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &8283673989847625966
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1569051238123238594}
+  - component: {fileID: 7836103212054554339}
+  m_Layer: 0
+  m_Name: Slot_4_ZoneS_typeBossEnter
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1569051238123238594
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8283673989847625966}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -29.599995, y: 0, z: -101.12001}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 7833847704280834159}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &7836103212054554339
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8283673989847625966}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a1c4e9b2d6f48a3b5c7e9f1a2b4c6d8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ZoneSlot
+  SlotID: 4
+  Size: 2
+  Footprint: {x: 20, y: 20}
+  IsQuestCandidate: 0
+  IsBossCandidate: 1
+  IsSpawnCandidate: 0
+  FixedPrefab: {fileID: 2400110006461124550, guid: 8c7389282a565a64eab74444c597f931, type: 3}
+  QuestPrefab: {fileID: 0}
+  Rotations:
+  - Prefab: {fileID: 2400110006461124550, guid: 8c7389282a565a64eab74444c597f931, type: 3}
+    YawSteps: 2
+    HasPosition: 1
+    Position: {x: -29.599995, y: 0, z: -101.12001}
+  AssignedRole: 0
+  IsFilled: 0
+--- !u!1001 &4553638645463657464
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 1214701358959259822}
+    m_Modifications:
+    - target: {fileID: 208860935775352049, guid: 3cb0e4648ca63544f9bef84412801916, type: 3}
+      propertyPath: m_Name
+      value: Level_wall_hallway
+      objectReference: {fileID: 0}
+    - target: {fileID: 8738484985062170394, guid: 3cb0e4648ca63544f9bef84412801916, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8738484985062170394, guid: 3cb0e4648ca63544f9bef84412801916, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8738484985062170394, guid: 3cb0e4648ca63544f9bef84412801916, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -160.6
+      objectReference: {fileID: 0}
+    - target: {fileID: 8738484985062170394, guid: 3cb0e4648ca63544f9bef84412801916, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: -0.00000004371139
+      objectReference: {fileID: 0}
+    - target: {fileID: 8738484985062170394, guid: 3cb0e4648ca63544f9bef84412801916, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8738484985062170394, guid: 3cb0e4648ca63544f9bef84412801916, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 8738484985062170394, guid: 3cb0e4648ca63544f9bef84412801916, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8738484985062170394, guid: 3cb0e4648ca63544f9bef84412801916, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8738484985062170394, guid: 3cb0e4648ca63544f9bef84412801916, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8738484985062170394, guid: 3cb0e4648ca63544f9bef84412801916, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 3cb0e4648ca63544f9bef84412801916, type: 3}
+--- !u!4 &5076845353650435298 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 8738484985062170394, guid: 3cb0e4648ca63544f9bef84412801916, type: 3}
+  m_PrefabInstance: {fileID: 4553638645463657464}
+  m_PrefabAsset: {fileID: 0}

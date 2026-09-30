@@ -103,17 +103,26 @@ public class MapNavMeshBaker : MonoBehaviour
                 continue;
             }
 
-            float drift = Vector3.Distance(agent.transform.position, hit.position);
+            // ⚠️ 2026-09-28: 거리를 **수평**으로 잰다. 스폰 레이캐스트가 벽·소품 윗면에 맞으면 몹은 그 위에 서는데,
+            //    바로 아래 바닥까지는 **거의 수직**(벽 높이 2.5m)이라 3D 거리로 재면 1.5m 를 넘어 그대로 굳었다
+            //    (NavMesh 전수조사 — 스폰 검증 부재 → 영구 정지). 틈 건너 순간이동은 **수평** 이동이므로
+            //    수평 1.5m 제한만으로 여전히 막힌다.
+            Vector3 offset = hit.position - agent.transform.position;
+            float drift = new Vector2(offset.x, offset.z).magnitude;
             if (drift > ReattachMaxDrift)
             {
                 Debug.LogError(
-                    $"[MapNavMeshBaker] '{agent.name}' 재부착을 건너뜁니다 — 가장 가까운 NavMesh가 {drift:F2}m " +
+                    $"[MapNavMeshBaker] '{agent.name}' 재부착을 건너뜁니다 — 가장 가까운 NavMesh가 수평 {drift:F2}m " +
                     $"떨어져 있어(허용 {ReattachMaxDrift}m) 옮기면 틈을 건너 다른 플랫폼으로 순간이동합니다. " +
                     "이 몹의 스폰 마커가 NavMesh 밖입니다(존 저작 확인).", agent);
                 continue;
             }
 
             agent.Warp(hit.position);
+
+            // 리쉬 복귀 목표도 메시 위로 — 스폰 좌표(메시 밖)를 그대로 두면 복귀가 거기로 간다.
+            if (agent.TryGetComponent(out MonsterBase monster))
+                monster.SetSpawnAnchor(hit.position);
         }
     }
 }

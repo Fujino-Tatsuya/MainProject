@@ -11,6 +11,8 @@ public abstract class NemoSceneManager : MonoBehaviour
     [SerializeField] protected Image blackImage;
     [SerializeField] protected float fadeDuration = 0.8f;
 
+    private const float MaxFadeStep = 1f / 30f;
+
     private Coroutine _fadeRoutine;
 
     protected bool IsTransitioning { get; private set; }
@@ -214,7 +216,9 @@ public abstract class NemoSceneManager : MonoBehaviour
 
         while (elapsed < duration)
         {
-            elapsed += Time.unscaledDeltaTime;
+            // 🔴 씬 로드 직후 첫 렌더 프레임이 0.35~0.8초 히치를 낸다(09-24 실측). unscaledDeltaTime 은
+            // maximumDeltaTime 제한을 안 받아 그 한 프레임에 페이드가 절반 가까이 소진됐다 → 프레임당 상한.
+            elapsed += Mathf.Min(Time.unscaledDeltaTime, MaxFadeStep);
             var alpha = Mathf.Lerp(startAlpha, targetAlpha, elapsed / duration);
             SetBlackAlpha(alpha);
             yield return null;

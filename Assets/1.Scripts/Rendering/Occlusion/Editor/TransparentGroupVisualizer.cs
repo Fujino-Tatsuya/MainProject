@@ -76,7 +76,7 @@ namespace VeyTrace.Rendering.Occlusion.Editor
         /// <summary>켜야 하는 상태면 훅을 걸고, 아니면 걷는다.</summary>
         static void Sync()
         {
-            var shouldRun = TransparentGroupSession.OverlayEnabled
+            var shouldRun = TransparentGroupSession.AnyOverlayEnabled
                             && !EditorApplication.isPlayingOrWillChangePlaymode;
 
             if (shouldRun == s_Hooked) return;
@@ -90,6 +90,7 @@ namespace VeyTrace.Rendering.Occlusion.Editor
             {
                 Debug.LogError($"[GroupPainter] 셰이더를 찾지 못했다: {k_ShaderName}. 오버레이를 켤 수 없다.");
                 TransparentGroupSession.OverlayEnabled = false;
+                TransparentGroupSession.ShowWallGroups = false;
                 return;
             }
 

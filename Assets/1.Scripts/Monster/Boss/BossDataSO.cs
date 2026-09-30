@@ -135,6 +135,10 @@ public class BossAttackEntry
              "0 이면 예고 없이 즉발(기존 동작). 확정 초기값 = 훅·어퍼 0.7.")]
     [Min(0f)] public float telegraphDuration = 0f;
 
+    [Tooltip("예고 채움이 **바깥 끝 → 보스 쪽**으로 차오른다(끌어당기는 공격 — 잡기). 끄면 보스 → 바깥(기본).\n" +
+             "부채꼴만 있는 예고에서만 쓰인다(띠·합집합은 무시). 2026-09-28 팀장 요청.")]
+    public bool telegraphFillInward;
+
     [Tooltip("[T5] 클립에 OnAttackHit **애니 이벤트가 없을 때** 이 정규화 시간(0~1)에 " +
              "도달하면 “준비됨”으로 본다. 0 이면 이벤트만 쓴다(기존 동작). " +
              "🔴 아트가 fbx 를 다시 올리면 .meta 의 이벤트 저작은 날아간다(SVN). " +
@@ -270,8 +274,38 @@ public class BossDataSO : MonsterDataSO
              "비우면 왼쪽 하나만 쓴다(기존 동작).")]
     public string hitReactionStateRight = "getowned_R";
 
-    [Tooltip("[S3] Break(그로기 카운트 최대 도달) 지속 시간(초). 일반 그로기는 base 의 groggyDuration 을 쓴다.")]
+    [Tooltip("**제압** 지속 시간(초) — 간파 게이지가 0 이 됐을 때(기획 `Re_C_취약_및_제압_시스템.md` §8, 임시 5초).\n" +
+             "필드 이름은 옛 Break 그대로(직렬화 유지). 간파 성공 그로기는 base 의 groggyDuration(1.5초)을 쓴다.")]
     [Min(0f)] public float breakDuration = 5f;
+
+    [Header("간파 게이지 · 제압 (팀 기획 09-28)")]
+    [Tooltip("간파 성공 한 번에 깎이는 간파 게이지(%). 100 에서 시작, 0 이면 제압. 임시 20(= 5회).")]
+    [Min(0f)] public float counterGaugeStep = 20f;
+
+    [Tooltip("환경 상호작용(취약 중 외곽 벽 충돌 · 증기 벤트) 한 번에 깎이는 간파 게이지(%). 임시 20.")]
+    [Min(0f)] public float environmentGaugeStep = 20f;
+
+    [Tooltip("제압 중 **플레이어가 주는** 최종 피해 배율. 벤트 등 환경 피해에는 적용하지 않는다. 임시 1.2.")]
+    [Min(0f)] public float suppressDamageMultiplier = 1.2f;
+
+    [Header("취약 (팀 기획 `Re_C_취약_및_제압_시스템.md` — 임시값)")]
+    [Tooltip("취약 지속(초). 간파 성공 **그로기 시작 시점부터** 센다(팀장 09-28) — 그로기 1.5초 포함.")]
+    [Min(0f)] public float vulnerableDuration = 4f;
+
+    [Tooltip("취약 중 간파 스킬 넉백 거리(m) — 공격자 반대 방향, 모든 캐릭터 공통.")]
+    [Min(0f)] public float vulnerableKnockbackDistance = 3f;
+
+    [Tooltip("취약 넉백 이동 시간(초).")]
+    [Min(0.01f)] public float vulnerableKnockbackTime = 0.35f;
+
+    [Tooltip("외곽 벽 충돌 성공 후 방 안쪽으로 되튕기는 거리(m).")]
+    [Min(0f)] public float wallReboundDistance = 0.5f;
+
+    [Tooltip("벽 반동 + 회복 시간(초).")]
+    [Min(0.01f)] public float wallReboundTime = 0.3f;
+
+    [Tooltip("취약 임시 표시 — 보스 몸 틴트(코드). 최종 VFX 는 민경.")]
+    public Color vulnerableTint = new Color(0.45f, 0.75f, 1f, 1f);
 
     [Tooltip("어그로 재선정 주기(초). 0 이면 끈다(= 처음 문 대상을 끝까지 문다). " +
              "🔴 base 의 락온은 사망·디스폰·리쉬로만 풀려서 3인전에서 한 명만 계속 물린다. " +

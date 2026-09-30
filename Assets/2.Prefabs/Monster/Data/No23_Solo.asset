@@ -41,7 +41,7 @@ MonoBehaviour:
   attackWindup: 0.35
   cancelWindupIfTargetLeavesRange: 0
   maxGroggyCount: 5
-  groggyDuration: 0.5
+  groggyDuration: 1.5
   startsWithSuperArmor: 1
   hasSuperArmorWhileAttacking: 0
   hitStunDuration: 0.4
@@ -121,7 +121,7 @@ MonoBehaviour:
     coneRadius: 4.08
     coneAngle: 180
     coneOffsetAngle: 0
-    telegraphDuration: 0.7
+    telegraphDuration: 0.5
     telegraphPoseNormalized: 0.15
     prepStateName: UppercutPrep
   - attackId: 3
@@ -189,7 +189,7 @@ MonoBehaviour:
   backAttackAngle: 60
   hitReactionState: getowned
   hitReactionStateRight: getowned_R
-  breakDuration: 2
+  breakDuration: 5
   aggroRetargetInterval: 8
   aggroAvoidsRepeatTarget: 0
   chargeClearGroggyDuration: 1.5
@@ -263,7 +263,7 @@ MonoBehaviour:
   chargeAuraKnockbackStrength: 8
   chargeAuraKnockbackDuration: 0.25
   chargeAuraStagger: 0
-  chargeAuraTelegraphPrefab: {fileID: 5997264177071607445, guid: a325fc2b60be455428b04ab67232fb24, type: 3}
+  chargeAuraTelegraphPrefab: {fileID: 0}
   fireZoneRadius: 0
   fireZoneMaxRadius: 0
   fireZoneLifetime: 0

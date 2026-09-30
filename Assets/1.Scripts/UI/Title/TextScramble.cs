@@ -33,6 +33,7 @@ public sealed class TextScramble : MonoBehaviour
     [SerializeField] private bool _playOnEnable = true;
 
     private TMP_Text _text;
+    private string _original; // 🔴 도중에 꺼졌다 켜지면 _text.text 는 뒤섞인 문장이다 — 목표는 이걸로
     private Coroutine _routine;
     private StringBuilder _builder;
 
@@ -45,12 +46,13 @@ public sealed class TextScramble : MonoBehaviour
     {
         _text = GetComponent<TMP_Text>();
         _builder = new StringBuilder();
+        _original = _text != null ? _text.text : null;
     }
 
     private void OnEnable()
     {
         if (_playOnEnable && _text != null)
-            Play(_text.text);
+            Play(_original);
     }
 
     private void OnDisable()
@@ -62,7 +64,7 @@ public sealed class TextScramble : MonoBehaviour
     public void Replay()
     {
         if (_text != null)
-            Play(_text.text);
+            Play(_original);
     }
 
     /// <summary>목표 문장으로 디코드 연출을 재생한다.</summary>

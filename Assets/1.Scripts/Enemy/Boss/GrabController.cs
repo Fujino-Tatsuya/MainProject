@@ -1,7 +1,6 @@
 using UnityEngine;
 using Unity.Netcode;
 using Unity.Behavior;
-using Unity.VisualScripting;
 
 public class GrabController : NetworkBehaviour
 {
@@ -10,13 +9,6 @@ public class GrabController : NetworkBehaviour
     [SerializeField] LayerMask targetMask;
     [SerializeField] BehaviorGraphAgent bt;
 
-    [Tooltip("grabSocket에서 아래로 바닥을 훑는 최대 거리(m). 소켓은 보스 손 높이라 이보다 멀면 바닥이 아니다")]
-    [SerializeField, Min(0f)] float groundProbeDistance = 30f;
-
-    // 바닥 탐색용 레이 버퍼. NonAlloc의 목적이 호출마다 배열을 새로 만들지 않는 것이므로 필드로 둔다.
-    // 크기 8: 소켓 아래에 겹칠 수 있는 바닥/슬래브 수를 넉넉히 잡은 값이다. 버퍼가 꽉 차면
-    // 유니티가 결과를 잘라내므로(정렬도 안 한다) 그 안에 최근접이 없을 수 있다 — 늘려야 하면 이 값을 키운다.
-    readonly RaycastHit[] _groundHits = new RaycastHit[8];
 
     int grabDamagePercentage;
     int holdDamagePercentage;

@@ -41,6 +41,12 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
 
     BossDirectionIndicator _indicator;   // 재질 출처
 
+    /// <summary>
+    /// 표식(<see cref="BossDirectionIndicator"/>)이 없는 몹(중간보스)이 재질을 직접 넘기는 창구.
+    /// 23호처럼 표식이 있으면 비워 둔다 — 표식 재질이 우선이다(셰이더·리시버 규약을 하나로).
+    /// </summary>
+    public Material MaterialOverride { get; set; }
+
     // 끝점 부채꼴
     Transform _coneRoot;
     DecalProjector _coneOutline, _coneFill;
@@ -63,6 +69,9 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
     const int UnionFillSteps = 24;
 
     bool _active;
+    bool _fillInward;              // 바깥 → 보스로 차오르기(잡기)
+    int _builtInwardStep = -1;
+    bool _coneFillIsRing;          // 채움 텍스처가 지금 고리(안쪽 비움)인가 — 일반 부채꼴 재사용 방지
     float _elapsed, _growTime;
     float _coneRadius, _coneOffsetAngle, _coneForwardOffset;
     float _pathRadius, _pathLength, _pathForwardOffset, _pathLateralOffset;
@@ -77,9 +86,19 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
     /// <param name="growTime">채움이 가득 차는 데 걸리는 시간(초). 0 이면 처음부터 가득.</param>
     public void Show(float coneRadius, float coneAngleDeg, float coneOffsetAngleDeg,
                      float coneForwardOffset, float pathRadius, float pathLength, float growTime,
-                     float pathForwardOffset = 0f, float pathLateralOffset = 0f)
+                     float pathForwardOffset = 0f, float pathLateralOffset = 0f, bool fillInward = false)
     {
         if (!EnsureBuilt()) return;
+
+        _fillInward = fillInward;
+        _builtInwardStep = -1;
+        // 🔴 잡기가 도중에 끊기면 채움 텍스처가 **반쯤 찬 고리**로 남는다 — 같은 각도의 일반 부채꼴이
+        //    그걸 재사용하지 않게 다시 굽게 한다.
+        if (_coneFillIsRing && !fillInward)
+        {
+            _builtConeHalfAngle = -1f;
+            _coneFillIsRing = false;
+        }
 
         _coneRadius = Mathf.Max(0f, coneRadius);
         _coneOffsetAngle = coneOffsetAngleDeg;
@@ -189,6 +208,21 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
 
         float t = FillT;
 
+        // 끌어당기는 공격(잡기) — 바깥 끝에서 보스 쪽으로 차오른다(2026-09-28 팀장).
+        // 채움 데칼은 전체 반경에 고정하고, 안쪽 반경이 1 → 0 으로 줄어드는 고리를 단계별로 다시 굽는다(합집합과 같은 방식).
+        bool coneOnly = _coneFill != null && _coneFill.enabled && !(_bandFill != null && _bandFill.enabled);
+        if (_fillInward && coneOnly)
+        {
+            int step = Mathf.Clamp(Mathf.RoundToInt(t * UnionFillSteps), 0, UnionFillSteps);
+            if (step != _builtInwardStep)
+            {
+                RebuildInwardConeFill(1f - (float)step / UnionFillSteps);
+                _builtInwardStep = step;
+            }
+            SetSquareSize(_coneFill, _coneRadius);
+            return;
+        }
+
         // 🔴 **띄와 끝점이 하나의 전선으로 채워진다**(팀장 확정 2026-09-18).
         //    이전에는 둘이 각자 0→최대로 자라 — 동시에 끝나긴 해도 띄는 앞으로,
         //    원은 반경으로 커져서 **따로 놓인 두 개**로 보였다.
@@ -282,6 +316,7 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
 
         if (_indicator == null) _indicator = GetComponentInChildren<BossDirectionIndicator>(true);
         Material source = _indicator != null ? _indicator.DecalMaterial : null;
+        if (source == null) source = MaterialOverride;
         if (source == null)
         {
             if (!_warnedNoMaterial)
@@ -388,6 +423,16 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
         Vector2 u = UnionExtent;
         _unionOutlineTex = BuildUnionTexture(OutlineColor, u, OutlineRimWorld, 0f, front: -1f);
         AssignTexture(_unionOutline, _unionOutlineTex);
+    }
+
+    // 안쪽 반경(정규화 0~1)만 비운 부채꼴 고리. inner 1 = 아직 빈 상태, 0 = 가득.
+    void RebuildInwardConeFill(float inner)
+    {
+        DestroyIf(_coneFillTex);
+        _coneFillTex = BossDirectionIndicator.BuildArcTexture(
+            FillColor, _builtConeHalfAngle, isBack: false, inner: Mathf.Clamp01(inner), outer: 1f, size: TextureSize);
+        AssignTexture(_coneFill, _coneFillTex);
+        _coneFillIsRing = true;
     }
 
     void RebuildUnionFill(float t)

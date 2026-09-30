@@ -412,6 +412,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BossHealthHUD
   barRoot: {fileID: 8487855152213422365}
   hpFill: {fileID: 5374113756952443419}
+  counterGaugeFill: {fileID: 293519024117429344}
   delayed:
     delayedFill: {fileID: 5666655772580648192}
     holdSeconds: 0.4

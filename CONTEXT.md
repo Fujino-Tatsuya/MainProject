@@ -8,7 +8,19 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 작업 세션 (2026-09-29 · **플레이어 프리팹 base + Variant 정리**, 브랜치 `fix/Player`)
+## ▶▶ 현재 인수인계 (2026-09-30 · 은희(Claude) · **플레이어 base+Variant + 패시브 버프 모델** → development 반영)
+
+`fix/Player` 를 development 에 **직접 머지·푸시**(은희 결정 — PR 리뷰 생략). 구조 원본 = [player-prefabs.md](Docs/tech/player-prefabs.md) §0·§7.
+- **스폰 = `Player_Paladin`**(`Player.prefab` 의 Variant). 역할 동작은 base, 가붕이 고유는 Variant, 몸체는 `Paladin/Paladin_Armature.prefab`.
+  구 `Paladin`·`TempPlayer_Armature` → `Player/Legacy/`, `Paladin_VFX` 는 `Player/Paladin/` 보관(스폰 안 됨). 🔴 **민경: VFX 작업은 `Player_Paladin.prefab` 에서.**
+- **패시브 = `PassiveCharge` 버프 모델** + 적중 전 훅(`IPlayerOnHitBonus`, 막타 합산) + 범용 적중 이벤트(`Player.ServerAttackLanded`, 현재 구독자 0 — 스택·빌드용). [PLAN-passive-onhit.md](PLAN-passive-onhit.md) §12·§13.
+- **죽은 대상은 피격·피해를 거절**(`Unit.ReceiveAttack`·`ApplyHealthDamage`) — 전 유닛 공통 동작 변경. **FloatingDamage = 방어 후·클램프 전 최종 피해(초과분 포함)**, 모든 피해 경로.
+- 경석 `ClearDebuffsServer()`(09-29) 와 합류 확인: `PassiveCharge`(배율 1)는 `IsDebuff` 가 false → 보스 연출에 **남는다**(PLAN R-1 해소, Play 재확인 필요).
+  아래 경석 09-29 항목의 "패시브는 상태효과를 안 쓴다" 는 이 머지로 **낡았다**.
+- ⏳ **후속**: 버프/디버프 판정이 두 벌 — 경석 `StatusEffectController.IsDebuff` 와 은희 `StatusEffectCategories.Of`(현재 모든 타입에서 결과 동일). 하나로 합칠 것(경석과 합의).
+  캐릭터 선택 경로(§8.3) · 원거리 투사체 네트워크 스폰 · `Player.ReceiveAttack` 의 `shieldVfx` 결합 · `PlayerEncounterLockAuthoring` 의 `Paladin_VFX` 순회(경석 판단).
+
+## ▶▶ 작업 세션 (2026-09-29 · **플레이어 프리팹 base + Variant 정리**, 브랜치 `fix/Player`) — ✅ 완료, 위 인수인계로 대체
 
 작업자: **은희(Claude, unity MCP 로 에디터 조작)**, 워크트리 `C:\UnityProject\MainProject`.
 승인 계획 = [PLAN-player-variants.md](PLAN-player-variants.md) (2026-09-29 개정·승인). 단계별 커밋 P0~P5, PR 1개.
@@ -22,6 +34,52 @@ Update this file when a term becomes important enough that future agents or team
 - 📋 **후속 계획 [PLAN-passive-onhit.md](PLAN-passive-onhit.md) — 패시브 버프 모델 + 범용 적중 이벤트 (2026-09-29, ✅ 구현·Play·MPPM 검증 완료 `f8a1ae5d`; §12 초과 피해 표시·막타 합산 `11d46701`·`4f5d8433` — 🔴 Play 검증 대기).** 남은 것 = 보스 입장 후 버프 유지 재검증(경석 수정 후). 🔴 보스 연출 `ClearAllServer()` 디버프 한정화는 경석 선행 작업.
 - **P0 스냅샷 기준점:** `Paladin_VFX.prefab` = `2e1ac271`. 이후 들어온 변경은 P4 직전에 재반영.
 - **진행:** P0 `d65e1610` · P1 `ee91cd4e`(Paladin_Armature 추출) · P2 `97d0a582`(Codex — base 정리, 끊긴 참조 0, Unity 임포트 OK). P3 = `Player_Paladin.prefab`(Variant, 해시 913233600). P4 = 스폰 전환(은희 Play·MPPM 통과). P5 = 구 프리팹 `Legacy/` 이동(`Paladin_VFX` 는 원위치 복구)·툴 4종·문서 갱신. **작업 완료 — PR 대기.** 남은 일 = 캐릭터 선택 경로(player-prefabs.md §8.3). 🔴 P2 의 "base 단독 Awake" 검증은 Play 가 필요해 **P4 Play 때 함께** 한다.
+## ▶▶ 작업 세션 (2026-09-29 · 은희(Claude) · **Group Painter "벽 그룹" 표시**, 브랜치 `feature/WallGroupVisualize`)
+
+Group Painter 툴바에 **`벽 그룹`** 토글 추가 — 씬(또는 열린 프리팹)의 `WallTransparencyGroup` 마다
+`targetRenderers` 를 팔레트 색 하나로 씬 뷰에 칠한다. 기존 ObjectId 오버레이를 그대로 쓰고 색 소스만 하나 늘렸다.
+WallTransparencyGroup 오브젝트를 선택하면 그 그룹만 또렷해진다. 둘 다 켜면 Painter 그룹 색이 위.
+수정: `WallTransparencyGroup.cs`(읽기 전용 `TargetRenderers` 만), `Editor/TransparentGroupSession.cs`·`Visualizer.cs`·`Window.cs`.
+상태: dotnet build 통과, **에디터 확인 대기**.
+
+## ▶▶ 현재 인수인계 (2026-09-29 · 경석 · `feature/Boss23` → development 반영)
+
+- **다음 세션 = 전기장판 · 자폭드론** — 기획 문서 수령 대기(받으면 바로 착수). 자폭드론 자리: `TwentyThreeBoss.OnWellsAttackCycle`(Wells 공격 주기 — 현재 빈 자리 경고).
+- 09-29 반영: 취약 넉백(방 회전) · 넉백 종료 시 그로기·취약 종료 · 제압 그로기 루프 · 취약 중 돌진 · 어퍼 예고 0.5 · 차징 점프 착지 범위 공격 · 점프 체인 안 끊김 · 잡기 낚아채는 프레임 부착 · 점프 착지 경계/Warp 복구 · 보스방 NavMesh 여유 띠(실측 1.5m) · Start → 튜토리얼 스테이지([PLAN-tutorial-stage.md](PLAN-tutorial-stage.md)) · 차징 오라 데칼 제거 · 진입 연출 디버프만 해제 · Dev 공격 예약 단축키(F3/F4/F6/F9/F11, 대기열 8, Shift+F3 비우기).
+  상세: [PLAN-boss-counter-vulnerable.md](PLAN-boss-counter-vulnerable.md) §7-2.
+- 🔴 **09-30 — 23호 사망 타이밍**: 사망 클립 0.7배속 → 끝난 뒤 2초 → 디졸브 2초 → 결과 화면(대기 0). `DissolveDeath.delayAfterClipEnd` 신설(기본 0). 상세: [PLAN-boss-death-telegraph.md](PLAN-boss-death-telegraph.md) 끝. ✅ 팀장 Play 확인.
+- 🔴 **09-29 저녁 — 튜토리얼 스테이지 180° 회전 + 은희 투명화 존 머지**(`fix/stage_tutorial260929`). **SVN r340 필수**(구석 `walll_brick_cornerCOM_*`). 상세: [PLAN-tutorial-stage.md](PLAN-tutorial-stage.md) 끝. ✅ 팀장 Play 확인(문제없음). `d9519cbb` development 반영.
+- 🔴 **SVN r338 필수** — development 의 `WallTransparencyDither.hlsl`(은희)과 r338 `Generic_Standard.shadergraph` 가 짝. r336 이하면 화면 전체 분홍(`undeclared identifier WallTransparencyDither_float`). 핀 `art-svn.json` = 338.
+- ⏳ 남은 것: 잡기 부착이 매번 `안전망` 으로 붙는다(클립 이벤트와 구간 타이머가 같은 순간 0.786s — 타이머가 Update 에서 먼저 닿음) → 짧은 유예로 이벤트 경로 우선 · 임시 진단 로그 3종 삭제(`[23호/점프진단]`·`[모터/끼임진단]`·`[23호] NavMesh 여유`) · 모터 EditMode 테스트 · 벤트 오브젝트(제작 중) 연동 확인 · 투명화는 **아트 쪽 작업**(튜토리얼·보스방 미적용).
+- ⚠️ 기존 버그(범위 밖): 결과 씬 `ResultSceneManager.cs:24` `AudioManager.Instance.StopBGM()` 널 참조(이 흐름에 AudioManager 없음) — 사운드 담당.
+
+- 사망 연출·중간보스 예고: [PLAN-boss-death-telegraph.md](PLAN-boss-death-telegraph.md) (팀장 확인 완료).
+- NavMesh(몬스터 쪽): 추격 목적지 투영 + 도달 불가 시 대기(`MonsterBase.ChaseTarget`) · 재부착 수평 거리 기준 + 리쉬 기준점 갱신(`MapNavMeshBaker`) ·
+  23호 에이전트 반경 유지 · 넉백 종료 Warp 1m + 같은 섬. **아트 쪽(FBX Read/Write · 누락 콜라이더 · 보행 불가 지정)은 미착수** —
+  Read/Write 꺼진 MeshCollider 는 베이크 때 AABB 박스가 돼 계단·코너벽·기둥이 틀어진다(`UnreadableMeshColliderBakeScope`), `wall_basic_square` 콜라이더 없음, 보스방 FBX 272개 콜라이더 없음.
+  ⚠️ SVN r333 새 벽 프리팹 5종(`Environment/Prefabs/Layouts/wall/`)도 **콜라이더 0 · Read/Write 꺼짐** — 보스방은 투명벽이 막아 무관, 다른 존에 쓰면 통과된다(지원 공유 필요).
+
+## ▶▶ 🔴 은희에게 — 플레이어 겹침 해소 요청 (2026-09-28 경석, `feature/Boss23`)
+
+- 보스·중간보스가 **플레이어를 막게** 했다: `PlayerGameRuleData.asset` obstacleMask 에 Enemy 추가(2185 → 2441),
+  GauntletBot·SpinnerBot 몸 캡슐 `m_Enabled: 1`. 상세·근거는 [PLAN-player-motor.md](PLAN-player-motor.md) Enemy 항목의 ⚠️ 정정.
+- **요청**: 이미 겹친 상태를 풀어 주는 처리. 서버가 움직이는 보스가 플레이어를 파고들면(추격·돌진·잡기 해제)
+  `PlayerMotionSweep` 의 CapsuleCast 가 시작 겹침을 거리 0 · 법선 = −이동방향으로 돌려줘 **전 방향이 막힌다**(끼임).
+  제안: 스윕 전에 `OverlapCapsule(obstacleMask 중 Enemy 비트)` → `Physics.ComputePenetration` 로 **수평만** 밀어내고,
+  그 변위도 정적 마스크 스윕을 거쳐 벽을 뚫지 않게. 서버·오너가 같은 모터를 돌리므로 한 곳에 넣으면 된다.
+  (모터 코드는 은희 담당이라 경석이 손대지 않았다.)
+- ⚠️ **09-28 추가 — 팀장 Play: 23호 돌진이 끝난 뒤 플레이어가 확실히 낀다.** 보스 쪽에서는 완전히 못 막는다:
+  ① 이 브랜치는 `ServerAuthoritativeMovement = false` — 돌진 캐리 중 오너가 **자기 화면의 보스 복제 위치**를 따라 움직이는데,
+     보스는 NetworkTransform 보간으로 뒤처져 있다가 돌진이 멈추면 **따라잡으며 콜라이더가 플레이어 안으로 들어온다**(정상 종료엔 분리 없음, 넉백은 벽 충돌 때만).
+  ② ~~23호 NavMeshAgent 반경이 런타임에 데이터 값 0.3 으로 덮인다~~ → 09-28 `KeepPrefabAgentRadius` 로 막음(0.85 유지).
+  ③ 서버가 미는 수단(넉백)도 같은 스윕을 타서 **겹친 뒤에는 빼내지 못한다.** → 겹침 해소는 모터에서만 풀린다(팀장 09-28: 은희에게 그대로 넘김).
+  경석 쪽 완화: 훅·어퍼 전진은 앞 플레이어에 닿으면 멈춤(`TwentyThreeBoss.PlayerBlocksLunge`).
+- 🔴 **09-29 경석 — `PlayerMotionSweep.cs` 동작 변경(팀장 승인: 진단으로 원인 확정 시 진행).** `TryCast` 가 **Enemy 레이어의 시작 겹침 히트**(distance 0 · point 0)를, 이동 방향이 `ComputePenetration` 분리 방향과 같은 쪽(내적 ≥ 0)일 때 무시한다(`IsEscapingEnemyOverlap`). 근거 실측: `[모터/끼임진단]` 거리 0 · 법선 −dir · 시작겹침 True · 관통 0.48m, 이동 방향 = 분리 방향인데도 막힘. 강제 밀어내기 없음(Codex 지적: 벽 사이·입력 경합 회피) — 더 파고드는 방향은 그대로 막힌다. 넉백(보스 바깥 방향)도 같은 이유로 막혔던 것으로 보고 함께 풀린다. ⚠️ 모터 EditMode 테스트 미실행.
+- ⚠️ 같은 파일에 **임시 진단 로그**(동작 무변경).
+- 🔴 **09-29 경석 — 코어 변경 알림(팀장 요청): 보스방 진입 연출이 디버프만 지운다.** `StatusEffectController.ClearDebuffsServer()` + `IsDebuff()` 추가, `PlayerEncounterLock.BeginCinematicServer` 가 `ClearAllServer` 대신 호출. 판정 = 차단류 6종(Airborne·Stunned·Slowed·Rooted·Silenced·Debilitated) 디버프 · SuperArmor 버프 · modifier 는 배율 <1 디버프 / >1 버프 / =1 중립. `ClearAllServer` 는 그대로(TrainingDummy 사용). ⚠️ 현 코드에서 플레이어 버프형 상태는 SuperArmor(메인·궁극기)뿐 — 패시브는 상태효과를 안 쓴다. 버프형 상태를 새로 걸 땐 배율 >1 규약을 지킬 것.
+- 🔴 **09-29 경석 → 은희 요청 2건 (팀장 09-29: 플레이어 쪽은 은희에게 넘긴다)**
+  1. **잡기 해제 위치**: Carry 구속 중 플레이어는 `GrabController.GrabSocket`(보스 손)을 그대로 따라간다(`PlayerStateController` 구속 상태 `TryGetTargetPose`). 보스가 방 가장자리에서 잡으면 손이 투명벽 밖이라 해제 위치가 **경계 밖·공중**이 된다 — 실측 (487.31, **1.42**, 14.23), 방 로컬 경계 ±14 초과, 이후 `Fence_MetalSheet`·`Boundary_XMax` 와 **정적 시작 겹침**으로 이동·대시 0m 고착(`[모터/끼임진단]` 시작겹침 True). 제안: 구속 종료 시 바닥 투영 + 정적 시작 겹침이면 안전 위치로(PhysX CCT 의 overlap recovery 와 같은 역할 — 정적 지오메트리 한정). 보스방 경계는 `InvisibleBoundaries/Boundary_*` 안쪽 면(방 로컬 축).
+  2. **모터 Enemy 시작 겹침 탈출 검토**: 위 `IsEscapingEnemyOverlap`(경석 09-29) 유지 여부·구석(벽 2개 + 보스)에서 탈출 각도(현재 내적 ≥ 0, −0.75 로 완화 검토) — 은희 판단. `Resolve` 를 `ResolveCore` + `LogIfBlockedByEnemy` 로 감쌌다 — 수평 이동이 요청의 10% 미만으로 막히고 원인이 Enemy 레이어일 때만 0.5초에 한 번 `[모터/끼임진단]` 을 찍는다(히트 콜라이더·거리·법선·시작 겹침 여부·ComputePenetration). 원인 확정 후 경석이 지운다. (밀어내기 안은 Codex "보완 후 가능"으로 기각 — 위 좁은 수정으로 대체.) 경석 쪽 추가: 취약 넉백도 앞 플레이어에서 멈춤.
 
 ## ▶▶ 현재 인수인계 (2026-09-28 · 투명화 그룹 편집 툴 **완료 조건 8/8 통과**, 브랜치 `feature/TransparentSettingTool`)
 
@@ -155,8 +213,16 @@ Update this file when a term becomes important enough that future agents or team
   `EnableKeyword("WALL_OCCLUSION_DITHER")` 를 한다. 그래서 벽 프리팹의 머티리얼을
   교체할 일이 없다. 🔴 그래프의 키워드는 **Multi Compile** 이어야 한다(Shader Feature 면
   빌드에서 변종이 잘려 에디터에서만 동작한다).
-- 높이 그라데이션: **아래가 사라지고 위가 남는다.** `baseY` 에서 알파 0 → `fadeHeight`
-  만큼 위에서 1. 벽 한 층 = 2.5 이므로 기본 `fadeHeight = 5`(2층).
+- 🔴 **투명화는 서로 독립된 두 기능이다** (2026-09-29 분리). 합성은 단순 곱.
+  - ① **상시 하단** `_WallOccBaseY` / `_WallOccFadeHeight` — **머티리얼**(`Generic_01_A.mat`)에
+    박힌 값. `WallTransparencyGroup` 은 읽기만 하고 만들지 않는다.
+  - ② **구역 상단** `_WallOccZoneBaseY` / `_WallOccZoneFadeHeight` — 그룹이 자기 머티리얼
+    인스턴스에만 쓴다. 구역 효과는 불투명도가 아니라 **설정값1(밖) ↔ 설정값2(안) 보간**이다.
+  - ③ `_WallOcclusionOpacity` 는 **항상 1**. 값으로는 죽었지만 C# 이 이 프로퍼티의 유무로
+    대상 머티리얼을 판별하므로 **지우면 안 된다.**
+  - `FadeHeight` 는 **부호가 방향**(양수: 아래가 투명 / 음수: 위가 투명), **0 은 끔**.
+    설정값1·2 의 부호를 같게 잡아야 보간 중 "팝" 이 없다.
+  - 함정과 근거 전부: [PLAN.md](PLAN.md) 「2026-09-29 — 투명화를 서로 독립된 두 기능으로 갈랐다」.
 
 **2026-09-21 결정(은희)** — `PLAN.md` 의 2026-09-14 「투명화 끄고 실루엣으로」(경석)에 대해,
 **실루엣은 그대로 두고 벽 투명화를 함께 간다.** 기존 투명화 시스템은 끄지도 지우지도 않는다.
@@ -258,6 +324,26 @@ Unity 창을 한 번 클릭하면 정리된다.
 ## ▶▶ 이전 인수인계 (2026-09-21 #2 · 입장 연출·차징 점프·돌진 사거리 — **전부 Play 검증 대기**)
 
 작업자: **경석(Claude)**. 브랜치 `feature/Boss23`. 컴파일 통과(에러 0).
+
+## 🔴 브랜치 주의 (2026-09-23) — development 의 `a8ebd7f2` 를 feature/Boss23 에 머지하지 말 것
+
+- `455c2a0b`(Boss23 ← development 머지)를 development 로 FF 푸시한 뒤, **development 에만** `a8ebd7f2` 를 올려
+  `1.TitleScene` 을 이전 평면 UI(`3810ed29` 판)로 되돌렸다 — 3D 오피스 타이틀은 메뉴가 모니터 뒤에 가려 **Start 불가**라서.
+- Boss23 에 development 를 다시 머지하면 이 복원이 딸려 와 **타이틀 작업이 통째로 되돌아간다.** 받아야 할 게 생기면
+  `a8ebd7f2` 를 제외하고 cherry-pick 하거나, 머지 후 `1.TitleScene` 을 Boss23 판으로 되돌릴 것.
+- 타이틀 완성 후 Boss23 → development 머지 때 `1.TitleScene` 충돌 → **Boss23 판 채택** + `1.TitleScene/` 라이팅 폴더 복구.
+- ✅ **09-28 development(`39879c1b`) → Boss23 머지 완료** — 위 절차대로 해결(타이틀 ours · 라이팅 폴더/`1.TitleScene.meta` 복구). SVN r331 과 짝(Paladin_VFX 의 `*_MaskUV.fbx`).
+  이제 Boss23 에는 `a8ebd7f2` 가 **머지된 상태**다 — 다음에 Boss23 → development 로 올리면 타이틀이 3D 판으로 올라간다(의도).
+  🔴 SVN r328: ChompBot `OnAttackHit` 0.400 → 0.357초(민경). 판정 타이밍 변경 — 의도 확인 필요.
+- 타이틀 진행 상태(09-24): 계획서 `PLAN-title-flow.md` §0.8~0.9. **팀장 Play 확인 완료** — PRESS ANY KEY CRT 룩 · 모니터 지직거림 ·
+  START/SETTING/EXIT(줌 없는 설정) · Start/Exit 전체 화면 꺼짐 · 벽 모니터 화면 반복 · 메인 모니터 로고 CRT.
+  ~~🟡 미결: 로비 진입 켜짐 연출~~ → **09-28 해소**: 원인은 연출 부재가 아니라 씬 로드 직후 히치 프레임이 페이드를 삼킨 것.
+  공용 `NemoSceneManager.FadeTo` 에 프레임당 1/30초 상한(**모든 씬 진입/퇴장 페이드에 적용**). 켜짐 연출은 안 넣는다(§0.10).
+  09-28 추가: 메뉴 색 통일(START 자동 선택 제거) · 설정창 모니터 꽉 채움(§0.11). 남은 단계: 8단계 도구 멱등·재진입.
+- 🔴 **기존 버그(범위 밖, 미수정)**: `AudioManager` 인스턴스가 **어느 씬에도 없다** — `16ec8ef0`(08-11 "테스트 환경 정리")에서
+  `0.BootStrapScene` 의 `AudioManager.prefab` 인스턴스가 빠졌다. 그래서 `LobbySceneManager.cs:89` · `VolumeSlider.cs:40` NRE, BGM 무음.
+- ⚠️ 09-23 밤 에디터를 켜 둔 채 Unity 내부 오디오 Assert(`Access version should be odd when acquiring lock`)가 무한 반복 →
+  로그 24.6GB → OOM 크래시(09-24 11:26). 우리 코드 무관. 다음 실행 때 "Recovering Scene Backups" 는 **No**(백업은 Play 진입 시 BootStrap 자동 백업).
 
 ## ▶▶ 현재 인수인계 (2026-09-23 #2 · 맵 룩 복구·미니맵 315°·**데칼 벽 타기 수정** — Play 검증 완료)
 

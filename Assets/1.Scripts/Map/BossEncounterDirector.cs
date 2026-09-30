@@ -58,8 +58,13 @@ public sealed class BossEncounterDirector : NetworkBehaviour
     [Tooltip("보스 격파 시 결과 화면으로 전환한다. 비어 있으면 씬에서 찾는다.")]
     [SerializeField] private MapSceneManager mapSceneManager;
 
-    [Tooltip("보스 격파 후 결과 화면 전환까지 대기 시간(초). 사망 연출 여유분.")]
-    [SerializeField, Min(0f)] private float defeatResultDelaySeconds = 3f;
+    // ⚠️ 예전 defeatResultDelaySeconds(치명타 순간부터 고정 3초)는 뺐다 — 사망 클립(23호 2.58초) + 디졸브(2초)
+    //    가 끝나기 전에 결과 화면으로 넘어갔다(2026-09-28). 씬에 남은 그 직렬화 줄은 무해하다.
+    [Tooltip("보스가 사라진 뒤(사망 클립 → 디졸브 → 디스폰) 결과 화면 전환까지 대기(초).")]
+    [SerializeField, Min(0f)] private float resultDelayAfterVanishSeconds = 1f;
+
+    [Tooltip("사라짐 신호가 안 와도 이 시간(초)이 지나면 결과 화면으로 간다. 치명타 순간 기준 — 안전망.")]
+    [SerializeField, Min(1f)] private float defeatResultTimeoutSeconds = 12f;
 
     private readonly NetworkVariable<BossEncounterPhase> phase =
         new NetworkVariable<BossEncounterPhase>(
@@ -669,12 +674,16 @@ public sealed class BossEncounterDirector : NetworkBehaviour
     {
         if (_bossUnit != null)
             _bossUnit.Died += HandleBossDefeated;
+        if (_bossUnit is MonsterBase monster)
+            monster.ServerDeathSequenceCompleted += HandleBossVanished;
     }
 
     private void UnsubscribeBossDeath()
     {
         if (_bossUnit != null)
             _bossUnit.Died -= HandleBossDefeated;
+        if (_bossUnit is MonsterBase monster)
+            monster.ServerDeathSequenceCompleted -= HandleBossVanished;
     }
 
     private void HandleBossDefeated()
@@ -687,8 +696,21 @@ public sealed class BossEncounterDirector : NetworkBehaviour
         // 결과 화면이 읽을 값을 씬 전환 전에 확정한다(전멸 경로는 PartyWipeWatcher가 false로 확정).
         SessionStatsTracker.Active?.Capture(cleared: true);
 
-        _resultTransitionAt = NetworkManager.ServerTime.Time + Mathf.Max(0f, defeatResultDelaySeconds);
-        Edit.Log("[BossEncounter] 보스 격파 — 클리어로 기록, 결과 화면 전환 예약.", this);
+        // 안전망만 먼저 건다. 실제 전환 시각은 HandleBossVanished 가 앞당긴다.
+        _resultTransitionAt = NetworkManager.ServerTime.Time + defeatResultTimeoutSeconds;
+        Edit.Log("[BossEncounter] 보스 격파 — 클리어로 기록, 사망 연출 끝을 기다린다.", this);
+    }
+
+    // [서버] 사망 클립 → 디졸브가 끝나 보스가 디스폰되는 순간.
+    private void HandleBossVanished()
+    {
+        if (!IsServer || !_defeatHandled)
+            return;
+
+        double at = NetworkManager.ServerTime.Time + Mathf.Max(0f, resultDelayAfterVanishSeconds);
+        if (_resultTransitionAt <= 0d || at < _resultTransitionAt)
+            _resultTransitionAt = at;
+        Edit.Log($"[BossEncounter] 보스 사라짐 — {resultDelayAfterVanishSeconds:0.##}초 뒤 결과 화면.", this);
     }
 
     private void TickResultTransition()
