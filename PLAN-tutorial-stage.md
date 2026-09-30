@@ -42,3 +42,4 @@
 - 툴 수정: ① 투명화 존(`WallTransparencyZone`, 기본 큐브 MeshFilter)을 벽에서 제외 — 안 빼면 존 자리가 보이지 않는 실체 벽이 된다. ② 구석 판정을 이름 + **모양**(가로·세로 둘 다 두께 1.5배 초과)으로 — `cornerCOM` 은 곧은 판 2(1×4m) + 기둥 1(1.5×1.5m)이라 ㄱ 자 0개.
 - 결과(배치모드): BoxCollider 333(이름만 corner 120 → 박스 1개) + 은희 트리거 9 유지 · 슬롯 5 YawSteps 2 · 바닥 지도 존 자리 5곳이 벽 윤곽과 일치, 복도 4곳 벽-바닥-벽. 회전 후 Start 존 서쪽 벽 없음 = 존 프리팹이 자기 벽을 가짐(회전 전과 같은 모양).
 - ✅ Play 확인(팀장 09-29 "문제없음"): 투명화 방향 · 스폰 Start · 런타임 NavMesh(`MapNavMeshBaker` 가 `MapGenerator.OnGenerated` 에서 굽는다) · BossEnter → 보스방.
+- 🔴 **09-29 밤 은희 `76dc5862`: 투명화 그룹 9개의 페이드 값(fadeIn/Out 0.3 · baseYOffset 2/15 · fadeHeight −2/−15)을 `4.MapScene` 의 `Stage1` 인스턴스 오버라이드로 넣었다.** ③번 메뉴(Swap MapScene)는 그 인스턴스를 **지우고 새로 만든다** → 다시 돌리면 이 값이 조용히 사라진다. 재실행 전에 값을 `Level_wall_hallway_tutorial.prefab` 으로 올리거나(Apply) 은희와 먼저 맞출 것.

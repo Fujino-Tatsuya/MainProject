@@ -1485,10 +1485,10 @@ public class MonsterBase : Unit
 
                 // length 는 상태 속도가 반영된 초. 이미 흐른 만큼 뺀다. 루프 클립은 한 바퀴로 친다.
                 float remain = st.length * (1f - Mathf.Clamp01(st.normalizedTime));
-                hold = Mathf.Max(0f, Mathf.Min(remain, MaxDeathClipHold) - fx.LeadBeforeClipEnd);
+                hold = Mathf.Max(0f, Mathf.Min(remain, MaxDeathClipHold) - fx.LeadBeforeClipEnd) + fx.DelayAfterClipEnd;
                 // 사망은 몹당 한 번뿐인 사건이라 로그가 넘치지 않는다. "끝났는데 안 녹는다"를 숫자로 가리는 용도.
-                Debug.Log($"[Death] {name}: 사망 클립 남은 {remain:0.00}초 − 앞당김 {fx.LeadBeforeClipEnd:0.00}초 → " +
-                          $"{hold:0.00}초 뒤 디졸브", this);
+                Debug.Log($"[Death] {name}: 사망 클립 남은 {remain:0.00}초 − 앞당김 {fx.LeadBeforeClipEnd:0.00}초 " +
+                          $"+ 끝난 뒤 대기 {fx.DelayAfterClipEnd:0.00}초 → {hold:0.00}초 뒤 디졸브", this);
                 break;
             }
         }

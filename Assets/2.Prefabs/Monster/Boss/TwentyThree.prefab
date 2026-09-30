@@ -1846,6 +1846,8 @@ MonoBehaviour:
   particlePrefab: {fileID: 7019508933032447489, guid: 0e15d6fc561b43fa95fadff8ab04b5fd, type: 3}
   duration: 2
   despawnGrace: 0.5
+  leadBeforeClipEnd: 0
+  delayAfterClipEnd: 2
   renderers: []
 --- !u!114 &288923889857305099
 MonoBehaviour:

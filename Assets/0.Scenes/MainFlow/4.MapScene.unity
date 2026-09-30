@@ -1028,7 +1028,7 @@ MonoBehaviour:
     m_RotationOrder: 4
   impactHoldSeconds: 0.9
   mapSceneManager: {fileID: 5251307742226833017}
-  resultDelayAfterVanishSeconds: 1
+  resultDelayAfterVanishSeconds: 0
   defeatResultTimeoutSeconds: 12
 --- !u!1 &303508341
 GameObject:

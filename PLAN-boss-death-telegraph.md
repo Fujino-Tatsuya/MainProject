@@ -48,3 +48,11 @@
 - 23호·Gauntlet 사망 클립 끝까지 → 디졸브 → 사라짐 → (23호) 1초 뒤 결과 화면. 클라이언트 화면에서도 디졸브.
 - 펀치·채찍·스핀 예고가 판정과 일치(예고 밖에서 맞지 않는가). 예고 중 회전 안 함.
 - 예고 중 그로기·사망 시 예고가 남지 않는가.
+
+## 2026-09-30 — 23호 사망 타이밍 (팀장)
+- 사망 클립(`Dead` 상태) **0.7배속** — `No23Controller` `Dead` m_Speed 0.7. 2.58초 → 약 3.69초. `MonsterBase` 가 `st.length`(상태 속도 반영)로 재므로 대기 시간은 자동으로 따라간다.
+- **클립이 다 끝난 뒤 2초 대기 → 디졸브.** `IDeathEffect.DelayAfterClipEnd` 신설(`DissolveDeath.delayAfterClipEnd`, 기본 0 — 일반 몹 무변경). 23호: `leadBeforeClipEnd 0` · `delayAfterClipEnd 2`. 사망 클립은 루프 아님(`Boss_23_.die` loopTime 0) → 대기 중 마지막 자세 유지.
+- **디졸브 끝나면 결과 화면** — `BossEncounterDirector.resultDelayAfterVanishSeconds` 1 → 0(`4.MapScene`). 디스폰 = 디졸브 2초 + `despawnGrace` 0.5초.
+- 치명타 → 결과 ≈ 3.69 + 2 + 2.5 = **약 8.2초**. 안전망 `defeatResultTimeoutSeconds` 12초 안.
+- ⚠️ `animator.speed` 가 1 이 아닌 채 죽으면(점프 이륙 배속·잡기 배수 중 사망) 0.7 에 곱해진다 — 기존부터 있던 경로, 이번에 안 건드림. Play 로그 `[Death] … 사망 클립 남은 3.69초` 가 아니면 여기다.
+- ✅ Play 확인(팀장 09-30 "문제없음").

@@ -13,6 +13,9 @@ public interface IDeathEffect
 
     // 사망 클립이 끝나기 이 시간(초) 전에 Play 를 시작한다(MonsterBase 가 읽는다). 0 = 클립 끝에 딱 맞춰.
     float LeadBeforeClipEnd { get; }
+
+    // 사망 클립이 끝난 뒤 이 시간(초)을 더 기다렸다가 Play 를 시작한다. LeadBeforeClipEnd 와 함께 쓰면 앞당김을 먼저 뺀다.
+    float DelayAfterClipEnd { get; }
 }
 
 /// <summary>
@@ -68,6 +71,12 @@ public class DissolveDeath : NetworkBehaviour, IDeathEffect
     [SerializeField, Min(0f)] float leadBeforeClipEnd = 0.3f;
 
     public float LeadBeforeClipEnd => leadBeforeClipEnd;
+
+    [Tooltip("사망 클립이 끝난 뒤 이 시간(초)을 더 기다렸다가 디졸브를 시작한다. 0 = 바로.\n" +
+             "보스처럼 쓰러진 자세를 잠깐 보여 줄 때 쓴다(23호 2초 — 2026-09-30 팀장). 이때 앞당김은 0 으로 둘 것.")]
+    [SerializeField, Min(0f)] float delayAfterClipEnd = 0f;
+
+    public float DelayAfterClipEnd => delayAfterClipEnd;
 
     [Tooltip("비우면 자식에서 자동 수집한다. 렌더러가 중첩 프리팹 안에 있어 보통 비워 둔다")]
     [SerializeField] Renderer[] renderers;
