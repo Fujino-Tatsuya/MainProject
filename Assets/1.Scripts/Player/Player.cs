@@ -8,7 +8,6 @@ using Unity.Netcode.Components;
 [RequireComponent(typeof(PlayerMovement))]
 [RequireComponent(typeof(PlayerMotor))]
 [RequireComponent(typeof(PlayerAimIndicator))]
-[RequireComponent(typeof(DefaultAttackController))]
 [RequireComponent(typeof(PlayerStateController))]
 [RequireComponent(typeof(StatusEffectController))]
 public class Player : Unit
@@ -63,7 +62,7 @@ public class Player : Unit
     [SerializeField] private float platformGroundCheckDistance = 0.6f;
 
     private PlayerStateController stateController;
-    private DefaultAttackController defaultAttack;
+    private IPlayerBasicAttack defaultAttack;
     private PlayerMotor motor;
     private PlayerGroundingSensor groundingSensor;
     private PlayerInvulnerability invulnerability;
@@ -187,7 +186,7 @@ public class Player : Unit
         if (stateController == null)
             stateController = gameObject.AddComponent<PlayerStateController>();
 
-        defaultAttack = GetComponent<DefaultAttackController>();
+        defaultAttack = GetComponent<IPlayerBasicAttack>();
         motor = GetComponent<PlayerMotor>();
         groundingSensor = GetComponent<PlayerGroundingSensor>();
         invulnerability = GetComponent<PlayerInvulnerability>();
@@ -416,17 +415,17 @@ public class Player : Unit
 
     public void EndDefaultAttack()
     {
-        defaultAttack.EndCurrentAttack();
+        defaultAttack?.EndCurrentAttack();
     }
 
     public void HitDefaultAttack()
     {
-        defaultAttack.HitCurrentAttack();
+        defaultAttack?.HitCurrentAttack();
     }
 
     public void HandleDefaultAttackEvent(DefaultAttackAnimationEventType eventType)
     {
-        defaultAttack.HandleAnimationEvent(eventType);
+        defaultAttack?.HandleAnimationEvent(eventType);
     }
 
     public void EndInterrupt()

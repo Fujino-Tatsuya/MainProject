@@ -2,7 +2,6 @@ using System;
 using UnityEngine;
 
 [RequireComponent(typeof(PlayerMovement))]
-[RequireComponent(typeof(DefaultAttackController))]
 public class PlayableCharacterVisual : MonoBehaviour
 {
     [SerializeField] private CharacterDefinition initialCharacter;
@@ -11,7 +10,7 @@ public class PlayableCharacterVisual : MonoBehaviour
 
     private GameObject currentVisual;
     private PlayerMovement movement;
-    private DefaultAttackController defaultAttack;
+    private IPlayerBasicAttack defaultAttack;
 
     public CharacterDefinition CurrentDefinition { get; private set; }
     public CharacterDefinition Definition =>
@@ -24,7 +23,7 @@ public class PlayableCharacterVisual : MonoBehaviour
     private void Awake()
     {
         movement = GetComponent<PlayerMovement>();
-        defaultAttack = GetComponent<DefaultAttackController>();
+        defaultAttack = GetComponent<IPlayerBasicAttack>();
 
         if (visualRoot == null)
             visualRoot = transform.Find("Armature") ?? transform;
@@ -51,8 +50,9 @@ public class PlayableCharacterVisual : MonoBehaviour
 
         BindVisual(animator);
 
-        if (definition.DefaultAttackData != null)
-            defaultAttack.ApplyData(definition.DefaultAttackData);
+        // DefaultAttackData 는 콤보 기본 공격(가붕이) 전용 데이터다 — 다른 구현이면 무시한다.
+        if (definition.DefaultAttackData != null && defaultAttack is DefaultAttackController combo)
+            combo.ApplyData(definition.DefaultAttackData);
 
         CharacterApplied?.Invoke(definition);
     }
@@ -85,7 +85,7 @@ public class PlayableCharacterVisual : MonoBehaviour
         if (!animator.TryGetComponent(out PlayerRootMotionRelay _))
             animator.gameObject.AddComponent<PlayerRootMotionRelay>();
 
-        defaultAttack.SetAnimator(animator);
+        defaultAttack?.SetAnimator(animator);
         movement.SetArmature(animator.transform);
     }
 

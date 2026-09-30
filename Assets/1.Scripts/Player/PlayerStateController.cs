@@ -6,7 +6,6 @@ using UnityEngine;
 [RequireComponent(typeof(PlayerMovement))]
 [RequireComponent(typeof(PlayerMotor))]
 [RequireComponent(typeof(PlayerAimIndicator))]
-[RequireComponent(typeof(DefaultAttackController))]
 [RequireComponent(typeof(StatusEffectController))]
 public class PlayerStateController : MonoBehaviour, IRestraintReceiver
 {
@@ -54,7 +53,7 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
             GetComponent<PlayerInputReader>(),
             GetComponent<PlayerMovement>(),
             GetComponent<PlayerAimIndicator>(),
-            GetComponent<DefaultAttackController>(),
+            GetComponent<IPlayerBasicAttack>(),
             statusEffects,
             GetComponent<PlayerMotor>(),
             GetComponentInChildren<Animator>(),
@@ -317,7 +316,7 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
 
         return nextState switch
         {
-            PlayerActionState.Attack => CanAttack && context.DefaultAttack.CanStartApprovedAttack,
+            PlayerActionState.Attack => CanAttack && context.DefaultAttack != null && context.DefaultAttack.CanStartApprovedAttack,
             PlayerActionState.Interrupt => CanInterrupt && PlayerInterruptState.CanStart(context),
             PlayerActionState.Skill => false, // 스킬 인스턴스가 필수라 BeginSkill(skill)으로만 진입
             PlayerActionState.Move => !context.StatusEffects.BlocksMovement,
@@ -446,7 +445,7 @@ public sealed class PlayerStateContext
         PlayerInputReader input,
         PlayerMovement movement,
         PlayerAimIndicator aim,
-        DefaultAttackController defaultAttack,
+        IPlayerBasicAttack defaultAttack,
         StatusEffectController statusEffects,
         PlayerMotor motor,
         Animator animator,
@@ -473,7 +472,8 @@ public sealed class PlayerStateContext
     public PlayerInputReader Input { get; }
     public PlayerMovement Movement { get; }
     public PlayerAimIndicator Aim { get; }
-    public DefaultAttackController DefaultAttack { get; }
+    // 기본 공격이 없는 프리팹(base 단독)에서는 null — 사용처는 null 허용으로 다룬다
+    public IPlayerBasicAttack DefaultAttack { get; }
     public StatusEffectController StatusEffects { get; }
     public PlayerMotor Motor { get; }
     public Animator Animator { get; }
@@ -540,7 +540,7 @@ public abstract class PlayerStateBase : IPlayerState
         // 공격 시작은 누른 프레임(press)에만 허용한다. 홀드 상태로는 시작되지 않으므로,
         // Once 정책에서 체인이 끝난 뒤 계속 누르고 있어도 재시작되지 않는다(릴리즈 요구).
         if (Context.Input.AttackPressed &&
-            Context.DefaultAttack.TryStart())
+            Context.DefaultAttack != null && Context.DefaultAttack.TryStart())
         {
             return true;
         }
@@ -640,24 +640,24 @@ public sealed class PlayerAttackState : PlayerStateBase
     public override void Enter(PlayerActionState previousState)
     {
         Context.Player.SetAnimatorMoving(false);
-        Context.DefaultAttack.BeginFromState();
+        Context.DefaultAttack?.BeginFromState();
     }
 
     public override void Tick()
     {
         Context.Player.SetAnimatorMoving(false);
-        Context.DefaultAttack.Tick();
+        Context.DefaultAttack?.Tick();
     }
 
     public override void FixedTick()
     {
-        Context.DefaultAttack.FixedTickMovement();
+        Context.DefaultAttack?.FixedTickMovement();
     }
 
     public override void Exit(PlayerActionState nextState)
     {
         if (nextState != PlayerActionState.Attack)
-            Context.DefaultAttack.CancelCurrentAttack();
+            Context.DefaultAttack?.CancelCurrentAttack();
     }
 }
 
@@ -780,7 +780,7 @@ public sealed class PlayerRestrainedState : PlayerStateBase
 
     public override void Enter(PlayerActionState previousState)
     {
-        Context.DefaultAttack.CancelCurrentAttack();
+        Context.DefaultAttack?.CancelCurrentAttack();
         Context.Player.SetAnimatorMoving(false);
 
         if (mode == RestraintMode.Carry)
@@ -889,7 +889,7 @@ public sealed class PlayerKnockbackState : PlayerStateBase
 
     public override void Enter(PlayerActionState previousState)
     {
-        Context.DefaultAttack.CancelCurrentAttack();
+        Context.DefaultAttack?.CancelCurrentAttack();
 
         Context.Player.SetAnimatorMoving(false);
 

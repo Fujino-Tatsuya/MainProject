@@ -50,7 +50,7 @@ public enum DefaultAttackHitType
 [RequireComponent(typeof(PlayerMotor))]
 [RequireComponent(typeof(PlayerAimIndicator))]
 [RequireComponent(typeof(PlayerDefaultAttack))]
-public class DefaultAttackController : BaseNetworkBehaviour
+public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
 {
     private static readonly int DefaultAttackHash = Animator.StringToHash("DefaultAttack");
     private static readonly int AttackIndexHash = Animator.StringToHash("AttackIndex");

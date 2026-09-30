@@ -133,3 +133,10 @@ G1 은 G4 전까지 어느 때든. 문서 갱신(player-prefabs.md 거너 항목
     **사망 시 모든 보호막 제거**(Cleared). `SetShield`·`IncreaseShield`·두 RPC 삭제(오너가 보호막을 직접 쓰던 창구).
   - `FirstMeleeSubSkill`: 만료 코루틴 삭제 → `AddShield(HolyShield, 자기 NetworkObjectId)` + 종료 통지로 연출(깨짐 = Depleted).
   - 🔸 동작 차이: 추락(`BreakShield`) 시 E 연출이 "깨짐" → **"걷힘"** 으로 바뀐다(피해 소진이 아니므로).
+  - HUD 보호막 바 = 남은 합 / 부여 합(`ShieldInstance.grantedAmount`). ✅ 은희 Play 확인 → `f1e2fe1c`.
+- ✅ **G2 완료 — 가붕이 기본 공격 Play 확인**(2026-09-30). `dotnet build` 오류 0.
+  - 신규 `Player/IPlayerBasicAttack.cs`. `DefaultAttackController` 가 구현. `RequireComponent(DefaultAttackController)` 3곳 제거,
+    `Player`·`PlayerStateController`(컨텍스트)·`PlayableCharacterVisual`·`PlayerEncounterLock`(직렬화 필드 → 런타임 조회)·애니/루트모션 릴레이가 인터페이스 사용, 전부 null 허용.
+    `ApplyData(DefaultAttackData)` 는 콤보 구현일 때만. `PlayerEncounterLockAuthoring` 의 defaultAttack 배선 제거.
+  - 프리팹(YAML): base `Player.prefab` 에서 `PlayerDefaultAttack`·`DefaultAttackController` 제거 →
+    `Player_Paladin` 에 추가 컴포넌트로 이관(fileID `7301928374650192837`·`…838`). 기존 오버라이드 13건(공격 데이터·히트박스·레이어·slash 소켓 8)은 새 컴포넌트 값으로 옮김. 참조 fileID 전수 존재 확인.
