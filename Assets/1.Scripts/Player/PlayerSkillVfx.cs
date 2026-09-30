@@ -3,8 +3,9 @@ using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// 스킬 연출 중 <b>한 피어만 아는 것</b>을 나머지 피어로 퍼뜨리는 창구. 지금은 최후의 심판(R) 전부를 맡는다 —
-/// 조준 순간 칼에 내리꽂히는 낙뢰, 그 뒤 칼날을 타고 흐르는 전기, 시전 확정 시 대상 발밑에 깔리는 표식.
+/// 플레이어 연출 중 <b>한 피어만 아는 것</b>을 나머지 피어로 퍼뜨리는 창구.
+/// 최후의 심판(R) 전부 — 조준 순간 칼에 내리꽂히는 낙뢰, 그 뒤 칼날을 타고 흐르는 전기,
+/// 시전 확정 시 대상 발밑에 깔리는 표식 — 그리고 <b>대시 잔상</b>을 맡는다.
 ///
 /// <b>방향이 둘이고, 아는 피어가 누구냐로 갈린다.</b>
 /// <list type="bullet">
@@ -57,11 +58,30 @@ public class PlayerSkillVfx : BaseNetworkBehaviour
     // 소켓 컴포넌트가 대신 들어 주지 않으므로 핸들을 직접 든다. 🔴 드는 쪽이 반드시 반납해야 한다.
     private EffectHandle _targetFloorHandle;
 
-    // 🔴 표식이 서 있는 자리. 마무리 낙뢰가 여기로 떨어진다.
-    // 좌표를 다시 보내지 않는 이유가 여기 있다 — 같은 트랜스폼에서 뽑아야 두 연출이 피어마다 어긋나지 않는다.
+    // 대시 잔상용. 셋 다 Awake 에서 찾는다 — 아래 Awake 주석 참고.
+    private Player _player;
+    private PlayerStateController _stateController;
+    private DashAfterimage _dashAfterimage;
+    private bool _dashWasActive;
+
+    // 🔴 표식이 서 있는 자리. 마무리 낙뢰도 여기로 떨어진다.
+    // 표식을 깔 때 한 번 뽑고 그 뒤로는 안 바꾼다 — 대상을 **추종하지 않는다**(아래 PlayTargetFloorLocal 참고).
     // 회수(StopTargetFloorLocal)해도 지우지 않는다: 낙뢰 RPC 와 종료 RPC 의 도착 순서를 믿지 않기 위해서다.
-    private Transform _targetFollow;
     private Vector3 _targetPosition;
+
+    private void Awake()
+    {
+        // Player 와 PlayerStateController 는 같은 루트에 있다
+        // (PlayerStateController 의 RequireComponent 가 Player 를 보장한다).
+        _player = GetComponent<Player>();
+        _stateController = GetComponent<PlayerStateController>();
+
+        // 🔴 잔상만 [SerializeField] 로 안 뺀 이유: 이 참조는 프리팹마다 다시 물려 줘야 하는데
+        //    빠뜨려도 에러가 안 나고 "대시해도 잔상이 없다"로만 나타난다 — 원인을 찾기 가장 나쁜 증상이다.
+        //    붙어 있으면 켜고 없으면 안 켠다. 끄고 싶으면 DashAfterimage 컴포넌트를 떼면 된다.
+        //    자식까지 뒤지는 건 캐릭터 교체(Player 밑 Armature 교체) 설계 때문이다.
+        _dashAfterimage = GetComponentInChildren<DashAfterimage>(true);
+    }
 
     /// <summary>
     /// [오너] 조준 연출을 켠다. 자기 화면은 즉시, 나머지 피어는 서버를 거쳐서.
@@ -114,9 +134,16 @@ public class PlayerSkillVfx : BaseNetworkBehaviour
     /// 그 RPC는 <c>slot / direction / aimPoint / hasAimPoint</c>만 보내고, SingleTarget 스킬은
     /// <c>aimPoint</c>를 쓰지 않아 <b>항상 0</b>이다. 그래서 리모트 클라는 대상을 알 방법이 없다.
     ///
-    /// <b>좌표가 아니라 대상을 보낸다.</b> 채널이 1.5초라 그 사이 몬스터가 걸어 나간다 —
-    /// 좌표를 박아 두면 표식만 뒤에 남는다. 각 피어가 참조로 자기 쪽 트랜스폼을 찾아 따라간다.
-    /// 참조가 풀리지 않으면(디스폰 등) 시전 시점 좌표에 고정하는 것으로 물러선다.
+    /// <b>대상 참조를 보내되 추종하지는 않는다.</b> 참조를 보내는 이유는 각 피어가
+    /// <b>자기가 지금 그리고 있는</b> 위치를 읽게 하려는 것이다 — 서버가 실어 보낸 좌표는
+    /// 보간 때문에 피어마다 어긋난다. 위치는 표식을 까는 순간 <b>한 번만</b> 뽑고 그 뒤로 고정이다.
+    /// 참조가 풀리면(디스폰 등) 시전 시점 좌표로 물러선다.
+    ///
+    /// 🔴 <b>추종을 끊은 이유</b>(2026-09-30). <c>EffectManager.UpdateFollow</c> 는 매 프레임
+    /// position 과 <b>rotation 을 같이</b> 베낀다. 그래서 몬스터가 제자리에서 돌기만 해도
+    /// 바닥 표식이 같이 돌았다. 회전만 빼는 옵션은 <c>EffectManager</c> 에 없다.
+    /// 트레이드오프: 채널 1.5초 동안 몬스터가 걸어 나가면 표식은 <b>시전 자리에 남는다</b>.
+    /// 마무리 낙뢰도 같은 자리에 떨어지므로 둘이 어긋나지는 않는다.
     /// </summary>
     public void ServerPlayTargetFloor(Unit target)
     {
@@ -152,19 +179,21 @@ public class PlayerSkillVfx : BaseNetworkBehaviour
     [Rpc(SendTo.ClientsAndHost)]
     private void PlayTargetFloorRpc(NetworkObjectReference targetRef, bool hasRef, Vector3 fallbackPosition)
     {
-        Transform follow = null;
+        // 트랜스폼을 찾아도 추종하지 않는다 — 위치를 한 번 읽는 용도다.
+        Transform target = null;
         if (hasRef && targetRef.TryGet(out NetworkObject targetObject))
-            follow = targetObject.transform;
+            target = targetObject.transform;
 
-        PlayTargetFloorLocal(follow, fallbackPosition);
+        PlayTargetFloorLocal(target, fallbackPosition);
     }
 
     /// <summary>
     /// [서버] 채널을 완주했다. <b>표식이 서 있는 그 자리</b>에 마무리 낙뢰를 내리꽂는다.
     ///
-    /// <b>좌표를 다시 보내지 않는다.</b> 각 피어는 표식을 깔 때 이미 대상 트랜스폼을 찾아 뒀다.
-    /// 거기서 위치를 뽑으면 표식과 낙뢰가 <b>정의상 같은 자리</b>다 — 좌표를 새로 실어 보내면
-    /// 서버가 본 위치와 그 피어가 보간으로 그리고 있는 위치가 달라 표식 옆에 떨어진다.
+    /// <b>좌표를 다시 보내지 않는다.</b> 각 피어는 표식을 깔 때 자리를 이미 고정해 뒀다
+    /// (<see cref="_targetPosition"/>). 그걸 그대로 쓰면 표식과 낙뢰가 <b>정의상 같은 자리</b>다 —
+    /// 좌표를 새로 실어 보내면 서버가 본 위치와 그 피어가 보간으로 그리고 있는 위치가 달라
+    /// 표식 옆에 떨어진다.
     /// </summary>
     public void ServerPlayTargetStrike()
     {
@@ -188,32 +217,103 @@ public class PlayerSkillVfx : BaseNetworkBehaviour
     {
         if (targetStrike == null || EffectManager.Instance == null) return;
 
-        // 대상이 이미 죽어 파괴됐으면(Unity null) 마지막으로 알던 자리에 떨어뜨린다.
-        Vector3 position = _targetFollow != null ? _targetFollow.position : _targetPosition;
-
-        // 원샷은 핸들이 없다 — 엔트리의 computedDuration(2.15s) 뒤에 매니저가 알아서 반납한다.
-        EffectManager.Instance.Play(targetStrike, position, Quaternion.identity, targetStrikeScale);
+        // 표식을 깔 때 고정해 둔 그 자리. 표식이 안 움직이므로 낙뢰도 따라 움직이면 안 된다 —
+        // 둘이 어긋나면 "표식 옆에 칼이 꽂히는" 그림이 된다.
+        // 원샷은 핸들이 없다 — 엔트리의 computedDuration 뒤에 매니저가 알아서 반납한다.
+        EffectManager.Instance.Play(targetStrike, _targetPosition, Quaternion.identity, targetStrikeScale);
     }
 
-    private void PlayTargetFloorLocal(Transform follow, Vector3 fallbackPosition)
+    private void PlayTargetFloorLocal(Transform target, Vector3 fallbackPosition)
     {
-        // 🔴 표식보다 먼저 자리를 기억한다. targetFloor 가 비어 있어도 마무리 낙뢰는 자리를 알아야 한다.
-        _targetFollow = follow;
-        _targetPosition = fallbackPosition;
+        // 🔴 자리를 **딱 한 번** 뽑아 고정한다. 표식도 마무리 낙뢰도 여기만 본다.
+        //    대상 트랜스폼을 찾았으면 그걸 쓴다 — 서버가 실어 보낸 좌표보다
+        //    "이 피어가 지금 그리고 있는 위치"에 가깝다(보간 차이를 안 탄다).
+        _targetPosition = target != null ? target.position : fallbackPosition;
 
         // 재시전으로 두 겹이 되지 않게 먼저 회수한다(EffectSocketPlayer.Play 와 같은 규칙).
         StopTargetFloorLocal();
 
         if (targetFloor == null || EffectManager.Instance == null) return;
 
-        _targetFloorHandle = follow != null
-            ? EffectManager.Instance.PlayLooping(targetFloor, follow, Vector3.zero, targetFloorScale)
-            : EffectManager.Instance.PlayLooping(targetFloor, fallbackPosition, Quaternion.identity, targetFloorScale);
+        // 🔴 추종 오버로드를 쓰지 않는다. EffectManager.UpdateFollow 는 매 프레임
+        //    position 과 **rotation 을 같이** 베끼므로, 몬스터가 제자리에서 돌면 바닥 표식도
+        //    같이 돈다(2026-09-30 반려 사유). 회전만 빼는 옵션은 EffectManager 에 없다.
+        _targetFloorHandle = EffectManager.Instance.PlayLooping(
+            targetFloor, _targetPosition, Quaternion.identity, targetFloorScale);
     }
 
     // 플레이어가 꺼지거나 파괴될 때(디스폰·씬 언로드) 마지막으로 회수한다.
     // 소켓 이펙트는 EffectSocketPlayer.OnDisable 이 알아서 하지만, 이 핸들은 내가 든 것이라 내가 놓아야 한다.
-    private void OnDisable() => StopTargetFloorLocal();
+    private void OnDisable()
+    {
+        StopTargetFloorLocal();
+
+        // 잔상 자체는 DashAfterimage.OnDisable 이 접는다. 여기서는 엣지 감지만 되돌린다 —
+        // 안 되돌리면 다시 켜졌을 때 "이미 대시 중"으로 읽어 시작 RPC 를 한 번 건너뛴다.
+        _dashWasActive = false;
+    }
+
+    // ── 대시 잔상 (이동 권한 → 전 피어) ─────────────────────────────
+
+    /// <summary>
+    /// [이동 권한] 대시 상태를 감시해 시작/종료를 전 피어에 알린다.
+    ///
+    /// 🔴 <b>왜 <c>PlayerDashState.Enter/Exit</c> 에 직접 걸지 않았나</b> (2026-09-29 조사).
+    /// 이 레포의 이동은 <b>서버 권한</b>이다(<see cref="Player.IsMotionAuthority"/>).
+    /// <c>PlayerDashController.TryBeginPredictedDash</c> 는 <c>!player.IsMotionAuthority</c> 면
+    /// <c>BeginDash</c> 를 <b>부르지 않고</b> 통과시키고, 승인 응답(<c>RespondDashClientRpc</c>)도
+    /// 대시를 시작시키지 않는다. 서버만 <c>BeginDash</c> 를 부른다.
+    /// 즉 <b><c>PlayerDashState</c> 는 서버에만 존재한다</b> — Enter/Exit 에 걸면
+    /// 호스트 화면에서만 잔상이 보이는, 이 레포가 여러 번 겪은 그 버그가 된다.
+    /// (동봉된 README 의 "Enter/Exit 에 걸어라"는 상태기가 전 피어에서 돈다는 전제였고, 그 전제가 틀렸다.)
+    ///
+    /// 🔴 <b>왜 이벤트가 아니라 폴링인가.</b>
+    /// <c>PlayerStateController</c> 에는 상태 전이 이벤트가 없고, 대시는 전용 애니메이터 상태도 없어서
+    /// (<c>PlayerAnimatorController</c> 에 dash 가 없다) <c>NetworkAnimator</c> 로도 못 받는다.
+    /// 남은 신호는 <c>CurrentState</c> 뿐이다. 매 프레임 enum 비교 한 번이고,
+    /// <b>은희 님 상태기를 한 줄도 건드리지 않는다.</b>
+    /// 덤으로 중단 경로(넉백·구속·연출 잠금·사망·서버 취소)를 하나도 빠뜨리지 않는다 —
+    /// 어느 경로로 끝나든 <c>CurrentState</c> 가 Dash 가 아니게 되기 때문이다.
+    /// </summary>
+    private void Update()
+    {
+        if (_dashAfterimage == null || _stateController == null) return;
+
+        // 대시 상태를 들고 있는 피어만 판정한다. 나머지는 아래 RPC 를 받아서 켠다.
+        // _player 가 없으면(비네트워크 테스트 씬) 내가 곧 권한이다.
+        if (_player != null && !_player.IsMotionAuthority) return;
+
+        bool active = _stateController.CurrentState == PlayerActionState.Dash;
+        if (active == _dashWasActive) return;
+        _dashWasActive = active;
+
+        // 오프라인(VFXScene·싱글 테스트)에서는 스폰되지 않아 RPC 가 예외다. 로컬만 켠다.
+        if (!IsNetworkActive)
+        {
+            if (active) _dashAfterimage.Play();
+            else _dashAfterimage.Stop();
+            return;
+        }
+
+        if (active) PlayDashAfterimageRpc();
+        else StopDashAfterimageRpc();
+    }
+
+    /// <summary>[전 피어] 각자 자기 화면에 잔상을 켠다. 속도선은 DashAfterimage 가 같이 끈다.</summary>
+    private void PlayDashAfterimageLocal() => _dashAfterimage?.Play();
+
+    /// <summary>[전 피어] 잔상 생성을 멈춘다. 이미 떠 있는 조각은 제 수명대로 사라진다.</summary>
+    private void StopDashAfterimageLocal() => _dashAfterimage?.Stop();
+
+    // 한 홉이다 — 대시의 진실은 서버가 들고 있으므로 오너를 거칠 이유가 없다.
+    // ClientsAndHost 라 호스트 자신도 여기서 켠다(위 최후의 심판처럼 로컬 선재생을 따로 두지 않는다).
+    // 🔴 둘 다 Reliable 이다. 끄기를 놓치면 잔상이 영영 남는다.
+    //    DashAfterimage.safetyTimeout(2초)은 그마저 샜을 때의 마지막 그물이지 대책이 아니다.
+    [Rpc(SendTo.ClientsAndHost)]
+    private void PlayDashAfterimageRpc() => PlayDashAfterimageLocal();
+
+    [Rpc(SendTo.ClientsAndHost)]
+    private void StopDashAfterimageRpc() => StopDashAfterimageLocal();
 
     // ── 오너 → 서버 → 오너를 뺀 전원 ────────────────────────────────
     // 두 홉인 이유: 클라는 다른 클라에게 직접 못 보낸다. 서버가 중계한다.
