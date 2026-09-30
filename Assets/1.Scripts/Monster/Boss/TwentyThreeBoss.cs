@@ -184,6 +184,49 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     [Tooltip("레이지 돌진 중 재생할 루프 연출(FX_Rage_Shield). 비워두면 연출만 빠진다")]
     [SerializeField] EffectSocketPlayer rageSmash;
     bool _warnedNoRageSmash;
+
+    // ─── 돌진 궤적(바닥) ──────────────────────────────────────────────
+    // 🔴 **일반 돌진과 레이지 돌진이 같은 연출을 공유한다.** 둘 다 "바닥을 긁으며 밀고 들어온다"는
+    //    같은 사건이고, 프리팹에도 소켓(GroundVFX_Socket)이 하나뿐이다. 레이지는 더 요란한
+    //    rageSmash 를 **겹쳐** 트는 구조라, 여기서 갈라 봐야 배선만 두 배가 된다.
+    // 🔴 애니메이션 이벤트로는 못 낸다 — 레이지는 일반 돌진과 **같은 클립**(Boss_23_dash)을 쓴다
+    //    (BeginRageDash 주석 참조). 클립에 심으면 끝나는 시점(거리 소진·벽 충돌·카운터)을
+    //    클립이 알 수 없어 궤적이 언제 꺼질지 정해지지 않는다. 그래서 코드가 켜고 끈다.
+    [Tooltip("돌진·레이지 돌진 동안 바닥에 깔리는 궤적 루프(FX_BossDash_Trail). 비워두면 연출만 빠진다")]
+    [SerializeField] EffectSocketPlayer dashTrail;
+    bool _warnedNoDashTrail;
+
+    // ─── 일반 돌진 보호막 ─────────────────────────────────────────────
+    // 🔴 **레이지에는 걸지 않는다.** 이 연출과 rageSmash(FX_Rage_Shield)는 프리팹에서
+    //    **같은 소켓(DashShieldSocket)** 을 쓴다 — 둘을 같이 틀면 같은 자리에 두 겹이 겹친다.
+    //    즉 일반 돌진 = NormalShield, 레이지 돌진 = rageSmash 로 **배타**다.
+    //    (바닥 궤적 dashTrail 은 반대로 둘이 공유한다 — 소켓이 GroundVFX_Socket 으로 따로다.)
+    [Tooltip("일반 돌진 동안 앞에 서는 보호막 루프(FX_NormalDash_Shield). 레이지는 rageSmash 가 대신한다. " +
+             "비워두면 연출만 빠진다")]
+    [SerializeField] EffectSocketPlayer normalShield;
+    bool _warnedNoNormalShield;
+
+    // ─── 돌진 벽 충돌 ────────────────────────────────────────────────
+    // 🔴 **원샷**이다 — 끄는 쪽이 없다. 벽에 닿는 사건은 순간이라 수명을 엔트리가 정하면 된다
+    //    (FX_Dash_Hit_Entry = 0.3초). 그래서 회수 책임도, AbortAttackChain 안전망도 필요 없다.
+    // 🔴 **일반 돌진과 레이지 돌진 둘 다** 쓴다. 벽에 처박는 사건 자체는 같고,
+    //    소켓도 프리팹에서 하나(DashShieldSocket)다.
+    [Tooltip("돌진이 벽에 처박히는 순간의 충돌 연출(FX_Dash_Hit). 일반·레이지 공용. " +
+             "비워두면 연출만 빠진다")]
+    [SerializeField] EffectSocketPlayer dashHit;
+    bool _warnedNoDashHit;
+
+    // ─── 붙잡힌 대상 전기 전이 ────────────────────────────────────────
+    // 🔴 **"잡혀 있다"는 상태는 복제되지 않는다.** `Player.BeginRestrainedByInstigator` 가 보내는
+    //    ClientRpc 는 오너 전용이고(`if (!IsOwner) return;`) FSM 자체도 복제 대상이 아니라,
+    //    남의 화면에서 그 플레이어는 계속 Idle 이다 → **각 피어가 스스로 판단할 수 없다.**
+    //    그래서 여기서 대상 참조를 실어 브로드캐스트한다.
+    // 🔴 좌표가 아니라 **참조**를 싣는다. 잡힌 플레이어는 리페어런팅되지 않고 루트가 그대로
+    //    NetworkTransform 이라, 각 피어가 자기 쪽 위치를 읽으면 어긋남이 0 이다
+    //    (`PlayGrabbedElectricClientRpc` 가 좌표를 안 싣는 것과 같은 이유의 다른 표현이다).
+    [Tooltip("붙잡은 대상으로 건너가는 전기(다리 + 감싸기)를 함께 모는 앵커. 비워두면 연출만 빠진다")]
+    [SerializeField] GrabbedEffectAnchor grabbedElectric;
+    bool _warnedNoGrabbedAnchor;
     GrabController _grabController;   // 그랩 소켓 보유자(레거시). 연출 좌표만 빌린다
     bool _warnedNoGrabSocket;
     bool _warnedNoGrabbedElectric;
@@ -204,6 +247,10 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     int _rageRemaining;
     Vector3 _rageDashDir;
     bool _rageDashing;                              // RageDash phase 안의 구간 구분(돌진 중 / 간격 대기)
+    // 🔴 레이지에는 원래 **벽 충돌이라는 개념이 없었다**(TickRage 는 타이머로만 끝난다).
+    //    연출만 얹기 위해 판정 결과를 들고 매 틱 들여다본다 — 돌진이 끝나는 시점은 건드리지 않는다.
+    bool _rageDashBlockedAhead;                     // 목적지가 보행면 끝에서 잘렸나(= 벽에 처박는다)
+    bool _rageDashHitPlayed;                        // 이번 돌진에서 충돌 연출을 이미 냈나(1회 제한)
 
     // ─── 돌진(S5) ─────────────────────────────────────────────────────
     // 🔴 끌고 가는 대상은 **1명뿐**이다(라인하르트 핀과 같은 규칙). 여러 명을 끌면 각자의
@@ -1537,6 +1584,120 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         if (rageSmash != null) rageSmash.Stop();   // 미배선은 시작 시점에 이미 1회 알렸다
     }
 
+    /// <summary>
+    /// 돌진 궤적 시작. 일반 돌진(<c>BeginDash</c>)과 레이지 돌진(<c>BeginRageDash</c>) 둘 다 여기로 온다.
+    /// 호출부가 서버 전용이라 RPC 여야 한다 — 직접 재생하면 <b>호스트에서만 보인다</b>
+    /// (<see cref="StartRageSmashClientRpc"/> 와 같은 이유).
+    ///
+    /// 레이지는 연타라 이 함수가 돌진 횟수만큼 불리는데, <see cref="EffectSocketPlayer.Play"/> 가
+    /// 재진입 시 먼저 회수하므로 핸들이 새지 않는다.
+    /// </summary>
+    [ClientRpc]
+    void StartDashTrailClientRpc()
+    {
+        if (dashTrail == null)
+        {
+            WarnNoDashTrailOnce();
+            return;
+        }
+
+        dashTrail.Play();
+    }
+
+    /// <summary>
+    /// 돌진 궤적 종료. 🔴 <b>Reliable 이어야 한다</b> — 유실되면 궤적이 보스 발밑에 영구히 붙는다.
+    /// 재생 중이 아니면 <see cref="EffectSocketPlayer.Stop"/> 이 조용한 no-op 이라
+    /// 여러 길목에서 불려도 안전하다.
+    /// </summary>
+    [ClientRpc]
+    void StopDashTrailClientRpc()
+    {
+        if (dashTrail != null) dashTrail.Stop();   // 미배선은 시작 시점에 이미 1회 알렸다
+    }
+
+    /// <summary>
+    /// 붙잡힌 대상 전기 전이 시작. 호출부(<c>AcquireGrab</c>)가 서버 전용이라 RPC 여야 한다.
+    ///
+    /// 🔴 <b>대상 참조를 싣는다.</b> 다른 그랩 연출들은 좌표도 참조도 안 싣고 각 피어가 자기 소켓을
+    /// 읽는데, 이것만 예외인 이유는 <b>붙을 곳이 보스가 아니라 플레이어</b>이고
+    /// <b>"잡혀 있다"가 복제되지 않기 때문</b>이다(필드 주석 참조). 참조를 주면 각 피어가 자기 쪽
+    /// <c>NetworkTransform</c> 위치를 읽으므로, 좌표를 박아 보낼 때 생기는 어긋남은 없다.
+    ///
+    /// 참조를 못 풀면(디스폰 타이밍) 조용히 넘긴다 — 종료 RPC 가 어차피 뒤따라온다.
+    /// </summary>
+    [ClientRpc]
+    void StartGrabbedElectricClientRpc(NetworkObjectReference target)
+    {
+        if (grabbedElectric == null)
+        {
+            WarnNoGrabbedAnchorOnce();
+            return;
+        }
+        if (!target.TryGet(out NetworkObject targetObject) || targetObject == null) return;
+
+        grabbedElectric.Play(targetObject.transform);
+    }
+
+    /// <summary>
+    /// 붙잡힌 대상 전기 전이 종료. 🔴 <b>Reliable 이어야 한다</b> — 유실되면 전기가
+    /// <b>플레이어 몸에 영구히 붙는다.</b> 보스에 남는 것보다 훨씬 눈에 띈다.
+    /// 재생 중이 아니면 조용한 no-op 이라 여러 길목에서 불려도 안전하다.
+    /// </summary>
+    [ClientRpc]
+    void StopGrabbedElectricClientRpc()
+    {
+        if (grabbedElectric != null) grabbedElectric.Stop();   // 미배선은 시작 시점에 1회 알렸다
+    }
+
+    /// <summary>
+    /// 일반 돌진 보호막 시작. 호출부(<c>BeginDash</c>)가 서버 전용이라 RPC 여야 한다 —
+    /// 직접 재생하면 호스트에서만 보인다.
+    ///
+    /// 🔴 <b>레이지에서는 부르지 않는다.</b> <see cref="StartRageSmashClientRpc"/> 와 소켓이 같아
+    /// 겹쳐 재생된다(필드 주석 참조).
+    /// </summary>
+    [ClientRpc]
+    void StartNormalShieldClientRpc()
+    {
+        if (normalShield == null)
+        {
+            WarnNoNormalShieldOnce();
+            return;
+        }
+
+        normalShield.Play();
+    }
+
+    /// <summary>
+    /// 일반 돌진 보호막 종료. 🔴 <b>Reliable 이어야 한다</b> — 유실되면 보호막이 보스에 영구히 붙는다.
+    /// 재생 중이 아니면 <see cref="EffectSocketPlayer.Stop"/> 이 조용한 no-op 이다.
+    /// </summary>
+    [ClientRpc]
+    void StopNormalShieldClientRpc()
+    {
+        if (normalShield != null) normalShield.Stop();   // 미배선은 시작 시점에 이미 1회 알렸다
+    }
+
+    /// <summary>
+    /// 돌진 벽 충돌 연출(원샷). 호출부가 서버 전용이라 RPC 여야 한다 —
+    /// 직접 재생하면 호스트에서만 보인다.
+    ///
+    /// 🔴 <b>Reliable 이다</b>(<see cref="PlayAttackHitEffectRpc"/> 는 Unreliable). 타격 연출은
+    /// 초당 여러 번 나가 한 대 분이 빠져도 묻히지만, 벽 충돌은 <b>돌진 한 번에 많아야 한 번</b>이라
+    /// 유실되면 그 사건이 통째로 사라진다. 빈도가 낮아 Reliable 비용도 무시할 만하다.
+    /// </summary>
+    [ClientRpc]
+    void PlayDashHitClientRpc()
+    {
+        if (dashHit == null)
+        {
+            WarnNoDashHitOnce();
+            return;
+        }
+
+        dashHit.PlayOnce();
+    }
+
     EffectSocketPlayer HitEffectFor(BossAttackId attackId)
     {
         switch (attackId)
@@ -1791,6 +1952,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
             // 헛잡기 — 복귀 경직만 지고 끝낸다(창에 실패 대가가 붙는 것과 대칭).
             // 🔴 전기는 StartAttack 에서 이미 켜졌다. 여기서 안 끄면 헛잡은 팔에 영영 남는다.
             StopGrabPulseClientRpc();
+            StopGrabbedElectricClientRpc();
             _grabbed = null;
             EnterPhase(BossAttackPhase.Recovery, GrabRecovery);
             return;
@@ -1798,6 +1960,10 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
 
         _grabbed = target;
         _grabTickTimer = 0f;
+
+        // 🔴 여기서 켠다 — 팔 전기(StartAttack)보다 늦다. 붙잡기에 **성공해야** 붙을 대상이 생긴다.
+        if (_grabbed.NetworkObject != null)
+            StartGrabbedElectricClientRpc(_grabbed.NetworkObject);
 
         // 🔴 [G6] **여기서 인터럽트 창이 열린다.** 끌어당기는 동안에는 못 끊고, 실제로 붙잡은
         //    뒤부터 3번째 내려치기 직전까지만 열려 있다(팀장 확정 C10).
@@ -1869,6 +2035,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         if (!IsGrabbedValid())
         {
             StopGrabPulseClientRpc();
+            StopGrabbedElectricClientRpc();
             _grabbed = null;
             EnterPhase(BossAttackPhase.Recovery, GrabRecovery);
             return;
@@ -1955,6 +2122,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
 
         // 손에서 대상이 떠나는 순간 전기도 끊는다.
         StopGrabPulseClientRpc();
+        StopGrabbedElectricClientRpc();
 
         _grabbed = null;
         CrossFadeGrabCycleStateClientRpc(GrabCycleState.End);
@@ -2021,6 +2189,12 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         //    네 갈래가 영영 흐른다(그랩 팔 전기가 남던 것과 같은 사고).
         if (IsSpawned) StopLimbElectricClientRpc();
 
+        // 🔴 돌진 연출 둘 다 **조기 반환 앞**이다. 레이지는 아래 StopRageDash 가 함께 회수하지만
+        //    **일반 돌진은 이 함수에서 StopDash 를 지나가는 길이 없다** — 히트 전에 카운터·그로기·
+        //    사망으로 끊기면 궤적과 보호막이 safetyTimeout(5초)까지 보스에 남는다.
+        if (IsSpawned) StopDashTrailClientRpc();
+        if (IsSpawned) StopNormalShieldClientRpc();
+
         // 자기장은 시작만 코드고 종료는 클립 이벤트다 — 여기는 그 종료 이벤트를
         // 지나가지 못한 경우(카운터·그로기·사망·타임아웃)의 비상 정지만 한다.
         // 이미 꺼져 있으면 무해한 no-op 이다(EffectSocketPlayer.Stop 이 핸들로 가드한다).
@@ -2056,7 +2230,9 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         // 🔴 Grab: 팔 전기 펄스는 그랩 애니가 나갈 때 켜진다(StartAttack). 정상 종료 경로 셋
         //    (던지기·헛잡기·대상 소멸)은 각자 끄지만, 카운터·그로기·사망으로 끊기면 그 셋을 다 건너뛴다
         //    → **팔에 전기가 영영 남는다.** 여기가 그 마지막 그물이다.
+        //    🔴 대상에 건너간 전기도 같은 그물에 건다 — 그쪽은 남으면 **플레이어 몸에** 붙는다.
         StopGrabPulseClientRpc();
+        StopGrabbedElectricClientRpc();
         // 🔴 점프가 착지 없이 끊기면 Wells 투척 억제가 **영구히 걸린 채** 남는다 → 폭탄이 영영 안 나온다.
         ReleaseWellsSuppression();
 
@@ -2691,10 +2867,14 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
             return;
         }
 
-        // 소켓이 없으면 보스 위치로 떨어뜨린다 — 이펙트가 통째로 사라지는 것보다 낫다
-        // (레거시 GrabController.PlayThrowLightningVFXClientRpc 와 같은 정책).
+        // 🔴 **도착점에서 터뜨린다**(2026-09-30). 예전엔 그랩 소켓 = 보스 손에서 터졌는데,
+        //    그러면 "누가 당하고 있는지"가 안 보였다 — 전기가 건너간 끝에서 터져야 인과가 완성된다.
+        //    타이밍·주기·엔트리는 그대로다. 바뀐 것은 좌표뿐이다.
+        //    앵커가 없거나 대상을 잃었으면 기존대로 소켓 → 보스 순으로 폴백한다.
         Transform socket = GrabSocket;
-        Vector3 point = socket != null ? socket.position : transform.position;
+        Vector3 point = grabbedElectric != null && grabbedElectric.HasTarget
+            ? grabbedElectric.ChestPoint
+            : (socket != null ? socket.position : transform.position);
 
         effects.Play(entry, point, Quaternion.identity);
     }
@@ -3056,6 +3236,49 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
             $"{name}: rageSmash 가 비어 있어 레이지 돌진 연출이 재생되지 않는다 — " +
             "보스가 그냥 빠르게 걸어오는 것처럼 보인다. " +
             "FX_Rage_Shield_Entry 를 물린 EffectSocketPlayer 를 이 필드에 연결할 것.", this);
+    }
+
+    void WarnNoDashTrailOnce()
+    {
+        if (_warnedNoDashTrail) return;
+        _warnedNoDashTrail = true;
+        Debug.LogWarning(
+            $"{name}: dashTrail 이 비어 있어 돌진 궤적이 재생되지 않는다 — " +
+            "일반 돌진도 레이지 돌진도 바닥 연출 없이 미끄러진다. " +
+            "프리팹의 DashTrail 오브젝트(FX_BossDash_Trail_Entry 를 문 EffectSocketPlayer)를 " +
+            "이 필드에 연결할 것.", this);
+    }
+
+    void WarnNoNormalShieldOnce()
+    {
+        if (_warnedNoNormalShield) return;
+        _warnedNoNormalShield = true;
+        Debug.LogWarning(
+            $"{name}: normalShield 가 비어 있어 일반 돌진 보호막이 재생되지 않는다 — " +
+            "레이지 돌진에만 보호막이 서고 일반 돌진은 맨몸으로 들어오는 것처럼 보인다. " +
+            "프리팹의 NormalShield 오브젝트(FX_NormalDash_Shield_Entry 를 문 EffectSocketPlayer)를 " +
+            "이 필드에 연결할 것.", this);
+    }
+
+    void WarnNoDashHitOnce()
+    {
+        if (_warnedNoDashHit) return;
+        _warnedNoDashHit = true;
+        Debug.LogWarning(
+            $"{name}: dashHit 이 비어 있어 돌진 벽 충돌 연출이 재생되지 않는다 — " +
+            "벽에 처박아도 아무 일도 안 일어난 것처럼 보인다(데미지·기절은 그대로 들어간다). " +
+            "프리팹의 DashHit 오브젝트(FX_Dash_Hit_Entry 를 문 EffectSocketPlayer)를 " +
+            "이 필드에 연결할 것.", this);
+    }
+
+    void WarnNoGrabbedAnchorOnce()
+    {
+        if (_warnedNoGrabbedAnchor) return;
+        _warnedNoGrabbedAnchor = true;
+        Debug.LogWarning(
+            $"{name}: grabbedElectric 이 비어 있어 붙잡힌 대상에게 전기가 건너가지 않는다 — " +
+            "지짐이가 보스 손에서만 터져서 누가 당하고 있는지 안 보인다. " +
+            "프리팹의 GrabbedElectric 오브젝트(GrabbedEffectAnchor)를 이 필드에 연결할 것.", this);
     }
 
     // 공격별로 나눠 세지 않는다 — 첫 한 번이 어느 공격인지 알려 주면 배선을 찾아가기에 충분하고,
@@ -3465,9 +3688,13 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         // 연출도 돌진과 수명을 맞춘다 — 매 회 새로 켜고 StopRageDash 가 끈다.
         // (Play 는 재진입 시 먼저 회수하므로 연타로 불려도 핸들이 새지 않는다)
         StartRageSmashClientRpc();
+        StartDashTrailClientRpc();     // 바닥 궤적은 일반 돌진과 공유한다
         meleeAttack?.BeginHitWindow(); // 경로상 유닛당 1회 보장(SpinnerBot 선례)
         ApplyRageDamageSnapshot();
-        StartDashMove(_rageDashDir, RageDashSpeedMul, RageDashMaxDistance);
+        // 🔴 반환값(벽에 잘렸나)을 **버리지 않는다.** 예전엔 버렸고, 그래서 레이지에는
+        //    벽 충돌이라는 개념이 없었다. 연출용으로만 쓴다 — 데미지·기절은 여전히 안 준다.
+        _rageDashHitPlayed = false;
+        _rageDashBlockedAhead = StartDashMove(_rageDashDir, RageDashSpeedMul, RageDashMaxDistance);
 
         EnterPhase(BossAttackPhase.RageDash, RageDashDuration);
     }
@@ -3479,6 +3706,17 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         if (_rageDashing)
         {
             meleeAttack?.Hit(); // 히트 윈도우가 중복 피격을 막는다
+
+            // 🔴 **닿는 프레임에** 낸다. 구간이 끝날 때 몰아서 내면, 0.3초에 벽에 닿고도
+            //    0.7초까지 서 있다가 뒤늦게 터진다. 판정만 읽을 뿐 돌진을 끊지는 않는다 —
+            //    레이지가 타이머로 끝난다는 규칙은 그대로다.
+            if (!_rageDashHitPlayed && _rageDashBlockedAhead
+                && DashDestinationReached(_rageDashDir))
+            {
+                _rageDashHitPlayed = true;
+                PlayDashHitClientRpc();
+            }
+
             if (_attackPhaseTimer > 0f) return;
 
             StopRageDash();
@@ -3505,6 +3743,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     {
         _rageDashing = false;
         StopRageSmashClientRpc();
+        StopDashTrailClientRpc();      // 연타 사이 간격은 서 있는 구간이라 궤적도 끊는다
         meleeAttack?.EndHitWindow();
         EndDashMove();
     }
@@ -3556,6 +3795,10 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         }
 
         _dashCarried = null;
+        // 선딜이 아니라 **실제로 움직이기 시작하는 지금**부터다 — 이 함수는 애니 히트
+        // 이벤트(클립 0.57)로 불린다. 그 앞은 제자리 선딜이라 바닥에 깔 궤적이 없다.
+        StartDashTrailClientRpc();
+        StartNormalShieldClientRpc();    // 레이지는 rageSmash 가 대신한다(같은 소켓)
         meleeAttack?.BeginHitWindow();   // 경로상 유닛당 1회 보장 — 스침 데미지가 중복되지 않는다
         ApplyDashDamageSnapshot();
 
@@ -3618,6 +3861,10 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
 
     void StopDash(bool hitWall)
     {
+        StopDashTrailClientRpc();
+        StopNormalShieldClientRpc();
+        // 벽에 처박았을 때만. 거리를 소진하고 멈춘 것은 충돌이 아니다(라인하르트 규칙 ②와 같은 기준).
+        if (hitWall) PlayDashHitClientRpc();
         meleeAttack?.EndHitWindow();
         EndDashMove();
         ReleaseDashCarry(applyImpact: hitWall);
@@ -3672,7 +3919,15 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         meleeAttack.SetDamageSnapshot(Mathf.Max(0, Mathf.RoundToInt(dmg * PhaseDamageMultiplier)));
     }
 
-    bool DashDestinationReached()
+    bool DashDestinationReached() => DashDestinationReached(_dashDir);
+
+    /// <summary>
+    /// 🔴 방향을 <b>인자로</b> 받는 오버로드. 레이지 돌진은 <c>_dashDir</c> 을 채우지 않고
+    /// <c>_rageDashDir</c> 만 쓰므로, 인자 없는 쪽을 그대로 부르면 **직전 일반 돌진의 낡은 방향**으로
+    /// 지나침을 판정한다(아래 Dot 검사). 목적지(<c>_dashDestination</c>)는 <c>StartDashMove</c> 가
+    /// 두 경로 모두에서 채우므로 공유해도 된다.
+    /// </summary>
+    bool DashDestinationReached(Vector3 dir)
     {
         Vector3 a = transform.position; a.y = 0f;
         Vector3 b = _dashDestination;   b.y = 0f;
@@ -3682,7 +3937,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         //    15m/s 면 60fps 에서 프레임당 0.25m 라 epsilon(0.35m) 안에 걸리지만, 30fps 면 0.5m 라
         //    목적지를 건너뛴다. 그러면 arrived 가 영원히 false 라 **벽 충돌 데미지·기절이 죽는다**
         //    (StopDash 의 hitWall 인자가 arrived 를 요구한다).
-        Vector3 flat = _dashDir; flat.y = 0f;
+        Vector3 flat = dir; flat.y = 0f;
         return Vector3.Dot(a - b, flat) > 0f;
     }
     #endregion
