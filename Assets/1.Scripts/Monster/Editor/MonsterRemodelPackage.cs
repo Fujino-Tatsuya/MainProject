@@ -11,7 +11,9 @@ public static class MonsterRemodelPackage
 {
     static readonly string[] Ids={"MortarBot","HumanoidBot","ChompBot","PeekABot","TeslaBot","GauntletBot","SpinnerBot","WallBot"};
     const string Root="Assets/50.Art/Char/Monster/Redesign";
-    internal static bool IsReviewPrefabPath(string path) => Ids.Any(id=>path==$"{Root}/{id}/{id}_DieselReview.prefab");
+    internal static bool IsReviewPrefabPath(string path) => Ids.Any(id=>
+        path==$"{Root}/{id}/{id}_DieselReview.prefab" ||
+        path==$"{Root}/SurfaceV1/{id}/{id}_SurfaceReview.prefab");
 
     [MenuItem("Tools/Monster Remodel/Exclude Review Prefabs From Network List")]
     public static void ExcludeReviewPrefabsFromNetworkList()
