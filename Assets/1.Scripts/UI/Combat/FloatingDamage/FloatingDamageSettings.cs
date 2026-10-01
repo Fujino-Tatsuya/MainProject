@@ -167,9 +167,9 @@ public sealed class FloatingDamageSettings : ScriptableObject
     [Header("강도별 모양")]
     [SerializeField] FloatingDamageTierLook[] tierLooks =
     {
-        new FloatingDamageTierLook(FloatingDamageTier.Low, new Color(1f, 0.85f, 0.2f, 1f), 0.9f, 0.9f, 0f, false, 0.65f),
+        new FloatingDamageTierLook(FloatingDamageTier.Low, new Color(1f, 0.85f, 0.2f, 1f), 0.5f, 0.5f, 0f, false, 0.65f),
         new FloatingDamageTierLook(FloatingDamageTier.Mid, new Color(1f, 0.55f, 0.1f, 1f), 1f, 1.1f, 0.08f, false, 0.75f),
-        new FloatingDamageTierLook(FloatingDamageTier.High, new Color(1f, 0.2f, 0.15f, 1f), 1.2f, 1.4f, 0.12f, true, 0.85f)
+        new FloatingDamageTierLook(FloatingDamageTier.High, new Color(1f, 0.2f, 0.15f, 1f), 1.4f, 1.63f, 0.12f, true, 0.85f)
     };
 
     [Header("글꼴")]
