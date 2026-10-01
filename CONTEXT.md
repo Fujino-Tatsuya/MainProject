@@ -10,7 +10,8 @@ Update this file when a term becomes important enough that future agents or team
 
 ## ▶▶ 작업 세션 (2026-10-01 밤 · 경석(Claude) · **몬스터 리디자인 머티리얼 Flat Kit 화 → 보스 전기장판·자폭드론**, 브랜치 `feature/Boss23`)
 
-수정 예정: `Assets/2.Prefabs/Monster/*.prefab`(8종 머티리얼 슬롯) · `Assets/3.Materials/FlatKit/Monster/` · Flat Kit 셰이더 확장(결정 대기) · 이후 보스방(23호·Wells) 패턴.
+✅ 몬스터 Flat Kit 전환 완료·푸시(`0e340f89`). **진행 중 = [PLAN-boss-electric-drone.md](PLAN-boss-electric-drone.md)(승인 10-02) S1~**.
+수정 예정: `Assets/1.Scripts/Monster/Boss/`(신규 `BossTileGrid`·`BossElectricFloor*`·`WellsDroneAttack`·`BossPauseCondition` + `TwentyThreeBoss.cs` 상태 알림 몇 줄) · `BossDataSO` · `TwentyThree.prefab` · 드론 연출 프리팹(신규).
 - development(`8c5117a9`, 이지원 최종 메쉬·SurfaceV1 머티리얼) + SVN r356(드론 `Char/Drone/`) 반영. 몬스터 프리팹 8종은 **아트판 그대로** 채택 — SurfaceV1 = URP Lit(BaseMap·Normal·MetallicGloss).
 - ✅ 결정(10-01): Flat Kit Stylized Surface 를 **그대로** 쓴다. 이 셰이더는 GI 를 metallic 0·smoothness 0 으로 고정 계산해
   금속성 맵·반사가 빠지지만 **아트팀이 문제없다고 확인**(팀장 전달). 셰이더 복제 확장 안 함. 전환 = `Tools/Rendering/Flat Kit/Convert Characters`.
