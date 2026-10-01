@@ -26,6 +26,9 @@ public enum StatusEffectType
     // 패시브 충전 — 소모될 때까지 유지되는 표식(duration 0). 캐릭터 무관 공용 1개(한 플레이어에 패시브는 하나).
     // 차단·스탯 테이블에 넣지 않는다. 소모 규칙은 각 패시브가 정한다(예: FirstMeleePassive).
     PassiveCharge = 1 << 12,
+
+    // 정신 집중 — 거너 Q 충전 중 표식(D5, HUD 아이콘). 차단·스탯 테이블에 넣지 않는다(감속은 MoveSpeedModifier 로 따로 건다).
+    Focus = 1 << 13,
 }
 
 // 상태 효과의 성격. 연출 일괄 해제처럼 "디버프만" 골라야 하는 곳이 쓴다.
@@ -42,7 +45,8 @@ public static class StatusEffectCategories
         StatusEffectType.MoveSpeedModifier | StatusEffectType.AttackDamageModifier |
         StatusEffectType.AttackSpeedModifier | StatusEffectType.DefenseModifier | StatusEffectType.MaxHpModifier;
 
-    private const StatusEffectType Buffs = StatusEffectType.SuperArmor | StatusEffectType.PassiveCharge;
+    private const StatusEffectType Buffs =
+        StatusEffectType.SuperArmor | StatusEffectType.PassiveCharge | StatusEffectType.Focus;
 
     private const StatusEffectType Debuffs =
         StatusEffectType.Airborne | StatusEffectType.Stunned | StatusEffectType.Slowed |

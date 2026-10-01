@@ -34,9 +34,8 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
     private PlayerAimIndicator aim;
     private GunnerHeat heat;
     private GunnerBeamAttack beam;
-    private LineRenderer beamView;
+    private GunnerBeamView beamView;
     private float fireClipLength = -1f;
-    private float beamViewHideTime;
 
     // 전 피어 공통 런타임
     private bool active;
@@ -66,6 +65,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
         aim = GetComponent<PlayerAimIndicator>();
         heat = GetComponent<GunnerHeat>();
         beam = GetComponent<GunnerBeamAttack>();
+        beamView = GetComponent<GunnerBeamView>();
 
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
@@ -210,7 +210,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
 
     private void StartServer(Vector3 direction)
     {
-        if (!player.BeginAttackState())
+        if (!player.BeginAttackReadyState())
         {
             isRequesting = false;
             return;
@@ -287,7 +287,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
     private void StartRpc(Vector3 direction)
     {
         isRequesting = false;
-        if (!player.BeginAttackState())
+        if (!player.BeginAttackReadyState())
         {
             ResetRuntime();
             return;
@@ -412,34 +412,21 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
             animator.CrossFadeInFixedTime(hash, 0.1f, 0);
     }
 
-    // 🔸 임시 연출 — 민경 VFX 가 들어오면 교체한다. 판정 확인용으로 발사선을 잠깐 그린다.
     private void ShowBeam(Vector3 origin, Vector3 end)
     {
-        if (data == null || data.BeamViewDuration <= 0f)
-            return;
-
-        if (beamView == null)
-        {
-            var go = new GameObject("GunnerBeamView(임시)");
-            go.transform.SetParent(transform, false);
-            beamView = go.AddComponent<LineRenderer>();
-            beamView.useWorldSpace = true;
-            beamView.positionCount = 2;
-            beamView.material = new Material(Shader.Find("Sprites/Default"));
-            beamView.startColor = beamView.endColor = new Color(0.6f, 0.9f, 1f, 0.9f);
-        }
-
-        beamView.startWidth = beamView.endWidth = data.BeamWidth;
-        beamView.SetPosition(0, origin);
-        beamView.SetPosition(1, end);
-        beamView.enabled = true;
-        beamViewHideTime = Time.time + data.BeamViewDuration;
+        if (beamView != null && data != null)
+            beamView.ShowLocal(GunnerBeamView.Kind.BasicAttack, origin, end, data.BeamWidth);
     }
 
-    private void LateUpdate()
+    // 준비 자세 → 연사. 상태기계는 오너·서버만 틱하므로 원격 프록시도 넘어가도록 Update 에서 각 피어가 시간으로 전환한다
+    // (상태는 복제하지 않는다 — 시작 RPC 기준 시각). 판정은 여전히 서버 시각으로 검증한다.
+    private void Update()
     {
-        if (beamView != null && beamView.enabled && Time.time >= beamViewHideTime)
-            beamView.enabled = false;
+        if (!active || data == null || player.CurrentState != PlayerActionState.AttackReady)
+            return;
+
+        if (Time.time >= startTime + data.WindupDuration)
+            player.BeginAttackState();
     }
 
     private Vector3 CurrentAim() => Flatten(aim != null ? aim.AimDirection : transform.forward);

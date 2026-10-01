@@ -20,6 +20,9 @@ public class PlayerSkillData : ScriptableObject
 
     [Header("수치")]
     [SerializeField, Min(0f)] private float cooldownTime = 1f;
+    // false(기본) = 승인 즉시 쿨타임 시작. true = 스킬이 실제 발동 시점에 PlayerSkillController.CommitCooldownServer 로 시작한다
+    // (거너 Q: 발사 순간부터 — 발사 없이 끝나면 쿨타임 없음).
+    [SerializeField] private bool commitCooldownManually = false;
     [SerializeField] private float attackDamageMultiplier = 1f;
     [SerializeField] private int flatDamageBonus;
     // 홀드/채널 지속시간이자 서버 강제 종료 안전망 기준. Press 스킬도 이 시간을 넘기면 강제 종료된다.
@@ -51,6 +54,7 @@ public class PlayerSkillData : ScriptableObject
 
     public PlayerSkillInputType InputType => inputType;
     public float CooldownTime => cooldownTime;
+    public bool CommitCooldownManually => commitCooldownManually;
     public float AttackDamageMultiplier => attackDamageMultiplier;
     public int FlatDamageBonus => flatDamageBonus;
     public float MaxActiveDuration => maxActiveDuration;

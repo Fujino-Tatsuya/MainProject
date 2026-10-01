@@ -289,19 +289,42 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
         Edit.Log($"[Dash] EndDash 무효: 현재 상태가 Dash가 아닙니다(={CurrentState}).", this);
     }
 
+    /// <summary>스킬 실행 상태 계열(Skill·Focus)인가. 스킬 수명은 이 계열 안에서는 유지된다.</summary>
+    public bool IsInSkillState => IsSkillState(CurrentState);
+
+    public static bool IsSkillState(PlayerActionState state) =>
+        state == PlayerActionState.Skill || state == PlayerActionState.Focus;
+
     // Skill 상태는 실행할 스킬 인스턴스가 필요해 BeginKnockback처럼 인스턴스 주입 경로로만 진입한다.
+    // 진입 상태는 스킬이 정한다(기본 Skill, 거너 Q = Focus).
     public bool BeginSkill(PlayerSkillBase skill)
     {
         if (skill == null || !CanUseSkill)
             return false;
 
-        SetState(new PlayerSkillState(context, skill));
+        SetState(new PlayerSkillState(context, skill, skill.EntryActionState));
+        return true;
+    }
+
+    /// <summary>
+    /// 같은 스킬을 유지한 채 스킬 상태 계열 안에서 단계만 바꾼다(Focus → Skill). 스킬은 취소되지 않는다.
+    /// 이미 그 단계면 아무것도 안 한다. 스킬 상태가 아니면 false.
+    /// </summary>
+    public bool ChangeSkillPhase(PlayerActionState phase)
+    {
+        if (!IsSkillState(phase) || !(currentState is PlayerSkillState skillState))
+            return false;
+
+        if (CurrentState == phase)
+            return true;
+
+        SetState(new PlayerSkillState(context, skillState.Skill, phase));
         return true;
     }
 
     public void EndSkill()
     {
-        if (CurrentState == PlayerActionState.Skill)
+        if (IsInSkillState)
             ChangeState(PlayerActionState.Idle);
     }
 
@@ -316,7 +339,11 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
 
         return nextState switch
         {
-            PlayerActionState.Attack => CanAttack && context.DefaultAttack != null && context.DefaultAttack.CanStartApprovedAttack,
+            // 준비 자세에서 연사로 넘어가는 것은 Idle/Move 조건과 무관하다(이미 승인된 같은 공격의 다음 단계).
+            PlayerActionState.Attack => (CanAttack || CurrentState == PlayerActionState.AttackReady) &&
+                                        context.DefaultAttack != null && context.DefaultAttack.CanStartApprovedAttack,
+            PlayerActionState.AttackReady => CanAttack && context.DefaultAttack != null && context.DefaultAttack.CanStartApprovedAttack,
+            PlayerActionState.Focus => false, // 스킬 인스턴스가 필수라 BeginSkill(skill)으로만 진입
             PlayerActionState.Interrupt => CanInterrupt && PlayerInterruptState.CanStart(context),
             PlayerActionState.Skill => false, // 스킬 인스턴스가 필수라 BeginSkill(skill)으로만 진입
             PlayerActionState.Move => !context.StatusEffects.BlocksMovement,
@@ -335,7 +362,8 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
         {
             PlayerActionState.Idle => new PlayerIdleState(context),
             PlayerActionState.Move => new PlayerMoveState(context),
-            PlayerActionState.Attack => new PlayerAttackState(context),
+            PlayerActionState.Attack => new PlayerAttackState(context, PlayerActionState.Attack),
+            PlayerActionState.AttackReady => new PlayerAttackState(context, PlayerActionState.AttackReady),
             PlayerActionState.Interrupt => new PlayerInterruptState(context),
             PlayerActionState.Restrained => new PlayerRestrainedState(context),
             PlayerActionState.Dead => new PlayerLockedState(context, PlayerActionState.Dead),
@@ -434,7 +462,15 @@ public enum PlayerActionState
     Dash,
 
     /// <summary>보스 등장 등 연출 잠금. 서버가 PlayerEncounterLock으로 진입·해제한다.</summary>
-    Cinematic
+    Cinematic,
+
+    // 🔸 아래 둘은 끝에 붙인다 — currentStateDebug 가 정수로 직렬화되므로 중간 삽입은 기존 값을 밀어낸다.
+
+    /// <summary>기본 공격 준비 자세(거너 — 연사 전 1회). 시간이 차면 Attack 으로 넘어간다. 행동 제한은 Attack 과 같다.</summary>
+    AttackReady,
+
+    /// <summary>정신 집중(거너 Q 충전). Skill 과 같은 스킬 상태 계열 — 발사하면 Skill 로 넘어간다(스킬은 끊기지 않는다).</summary>
+    Focus
 }
 
 public sealed class PlayerStateContext
@@ -630,11 +666,20 @@ public sealed class PlayerMoveState : PlayerStateBase
     }
 }
 
+/// <summary>
+/// 기본 공격 상태. Attack(공격 중)과 AttackReady(준비 자세 — 거너)가 같은 동작을 공유한다:
+/// 이동 없음, 기본 공격 컴포넌트 틱. AttackReady ↔ Attack 사이 전이는 공격을 끊지 않는다.
+/// </summary>
 public sealed class PlayerAttackState : PlayerStateBase
 {
-    public PlayerAttackState(PlayerStateContext context) : base(context) { }
+    private readonly PlayerActionState stateType;
 
-    public override PlayerActionState StateType => PlayerActionState.Attack;
+    public PlayerAttackState(PlayerStateContext context, PlayerActionState stateType) : base(context)
+    {
+        this.stateType = stateType;
+    }
+
+    public override PlayerActionState StateType => stateType;
     public override bool RequiresStateAuthorityTick => true;
 
     public override void Enter(PlayerActionState previousState)
@@ -656,7 +701,7 @@ public sealed class PlayerAttackState : PlayerStateBase
 
     public override void Exit(PlayerActionState nextState)
     {
-        if (nextState != PlayerActionState.Attack)
+        if (nextState != PlayerActionState.Attack && nextState != PlayerActionState.AttackReady)
             Context.DefaultAttack?.CancelCurrentAttack();
     }
 }

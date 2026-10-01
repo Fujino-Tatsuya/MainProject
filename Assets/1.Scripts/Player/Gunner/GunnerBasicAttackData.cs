@@ -50,9 +50,6 @@ public class GunnerBasicAttackData : ScriptableObject
     [Tooltip("발사 클립 이름 — 길이가 발사 간격보다 길면 그만큼 빨리 재생한다(FireSpeed 파라미터).")]
     [SerializeField] private string fireClipName = "gunner_attack";
 
-    [Header("임시 연출(민경 VFX 전까지)")]
-    [SerializeField, Min(0f)] private float beamViewDuration = 0.08f;
-
     public float WindupDuration => windupDuration;
     public float FireInterval => fireInterval;
     public float ShotRecovery => shotRecovery;
@@ -69,5 +66,4 @@ public class GunnerBasicAttackData : ScriptableObject
     public string FireStateName => fireStateName;
     public string UpperBodyLayerName => upperBodyLayerName;
     public string FireClipName => fireClipName;
-    public float BeamViewDuration => beamViewDuration;
 }

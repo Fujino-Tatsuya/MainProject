@@ -130,6 +130,22 @@ G1 은 G4 전까지 어느 때든. 문서 갱신(player-prefabs.md 거너 항목
 
 ## 7. 진행
 
+- ✅ **상태 분리 — Play 확인**(2026-10-01, 은희 결정: 목적 = 대시 규칙(G8)·외부 조회·구조 명확화).
+  `PlayerActionState` 끝에 **`AttackReady`**(거너 평타 준비 자세)·**`Focus`**(Q 정신 집중) 추가.
+  - `AttackReady` → 준비 시간이 차면 각 피어가 `Update` 에서 `Attack` 으로(상태 비복제, 서버는 시각으로 발사 검증). 준비 중 놓으면 `AttackReady → Idle`.
+    `PlayerAttackState` 가 두 상태를 공유(서로 전이 시 공격 취소 없음). `Player.BeginAttackReadyState`, `EndAttackState` 는 둘 다 받음.
+  - `Focus` = 스킬 상태 계열(`IsSkillState`). `PlayerSkillBase.EntryActionState`(기본 Skill, 거너 Q = Focus) 로 진입,
+    발사 RPC(`GunnerBeamView`, Reliable)에서 `ChangeSkillPhase(Skill)` — 같은 스킬 유지(Exit 가 스킬 상태 계열끼리면 취소 안 함).
+    `PlayerSkillController` 의 Skill 비교 3곳 → `IsInSkillState`. 가붕이는 두 상태에 들어가지 않는다.
+
+- ✅ **G4 완료 — Q Play 확인**(2026-09-30).
+  - 스킬 시스템 확장(기본값 = 기존 동작): `PlayerSkillData.commitCooldownManually` + `PlayerSkillController.CommitCooldownServer`(오너 HUD 미러 RPC),
+    `PlayerSkillBase.ConsumesPrimaryInput`/`OnPrimaryPressed`(실행 중 좌클릭 → 서버), `WantsAimUpdates`(기본 = Hold), `OnOwnerTick`.
+  - `StatusEffectType.Focus = 1<<13`(Buff) — 기존 `StatusEffectHUD` 가 이름·아이콘으로 표시(상태 아이콘 UI 는 이미 있었다 — §2 표 정정).
+  - `GunnerChargeLaserSkill`/`Data`: 시작 시 단계 저장·Focus·감속, 좌클릭/자동 발사, 집중 곡선 → 사거리·피해 보간, 지형 절단 관통 박스(적·오브젝트 피해 + 아군 보호막 합산, 시전자 제외), 발사 시 쿨.
+  - `GunnerBeamView`(NetworkBehaviour) — 임시 발사선 공용 + Q 발사 RPC(발사선·`Gunner_Q_Fire` 애니). 기본 공격 발사선도 여기로 이관.
+  - 메뉴 `Tools/Player/Gunner/Q 충전 레이저 부착 (G4)` — SO 생성(수동 쿨·마스크·애니 상태), 컴포넌트 부착, Q 슬롯 배선, Q 애니 상태(시작→집중/이동집중→발사→회복).
+
 - ✅ **G3 완료 — 연사·과열·명중 Play 확인**(2026-09-30). 🔸 초기 버그: SphereCast 가 자기 콜라이더·맵 트리거(Default)에 시작점부터 막혀 길이 0 → 자기 계층 무시 + 지형은 비트리거만. `Player/Gunner/`:
   - `GunnerHeatModel`(순수 계산 + `GunnerHeatState` 기준점), `GunnerHeatData` SO, `GunnerHeat`(NetworkVariable 기준점 1개 — 서버는 발사·E 때만 쓰고,
     전 피어가 같은 함수로 현재값 계산 → 오너 HUD 즉시·매 프레임 복제 없음. 단계/과열 변화 이벤트 = VFX 훅).

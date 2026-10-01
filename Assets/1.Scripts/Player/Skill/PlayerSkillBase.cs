@@ -58,6 +58,15 @@ public abstract class PlayerSkillBase : MonoBehaviour
     public virtual bool CanMoveWhileActive => false;
     public virtual bool CanMovementRotateWhileActive => CanMoveWhileActive;
 
+    // 시전 시 들어갈 상태기계 상태(스킬 상태 계열). 기본 Skill, 거너 Q = Focus(발사 시 Skill 로 넘어감).
+    public virtual PlayerActionState EntryActionState => PlayerActionState.Skill;
+
+    // 실행 중 좌클릭을 이 스킬이 받는가(거너 Q: 좌클릭 = 발사). true 면 컨트롤러가 오너의 좌클릭을 OnPrimaryPressed 로 넘긴다.
+    public virtual bool ConsumesPrimaryInput => false;
+
+    // 실행 중 오너 조준을 서버로 주기 전송할지. 기본은 홀드 스킬만(기존 동작).
+    public virtual bool WantsAimUpdates => data != null && data.InputType == PlayerSkillInputType.Hold;
+
     public virtual void Initialize(Player owner, PlayerSkillController controller)
     {
         this.owner = owner;
@@ -106,6 +115,12 @@ public abstract class PlayerSkillBase : MonoBehaviour
 
     // 서버 전용: 홀드 해제 통보
     public virtual void OnReleased() { }
+
+    // 서버 전용: 실행 중 좌클릭(ConsumesPrimaryInput 일 때만). direction = 누른 순간의 조준.
+    public virtual void OnPrimaryPressed(Vector3 direction) { }
+
+    // 오너 전용: 실행 중 매 프레임(조준 방향 회전 등 로컬 조작 반영).
+    public virtual void OnOwnerTick(Vector3 aimDirection) { }
 
     // 오너 전용: 조준 모드에 들어갔다(PlayerSkillTargeting.Begin). "시전했다"가 아니라 "조준을 켰다"는 신호다.
     // 🔴 오너에서만 돈다 — 여기서 연출을 바로 켜면 남의 화면에는 보이지 않는다. 전파는 NetworkBehaviour 창구의 몫이다.

@@ -81,6 +81,56 @@ public static class GunnerShellAuthoring
         }
     }
 
+    const string ChargeLaserDataPath = DataFolder + "/GunnerChargeLaserData.asset";
+
+    /// <summary>
+    /// G4 — Q 충전 레이저. 데이터(수동 쿨 커밋·대상 마스크·애니 상태) 생성, Player_Gunner 에 GunnerBeamView·GunnerChargeLaserSkill 부착,
+    /// PlayerSkillController 의 Q 슬롯 배선. 애니 상태는 "애니메이터 구성" 메뉴가 만든다(같이 한 번 더 돈다).
+    /// </summary>
+    [MenuItem("Tools/Player/Gunner/Q 충전 레이저 부착 (G4)")]
+    public static void AttachChargeLaser()
+    {
+        if (AssetDatabase.LoadAssetAtPath<GameObject>(VariantPath) == null)
+        {
+            Debug.LogError($"[Gunner] Variant 가 없다 — 먼저 '껍데기 생성 (G9)' 실행: {VariantPath}");
+            return;
+        }
+
+        EnsureFolder(DataFolder);
+        bool created = AssetDatabase.LoadAssetAtPath<GunnerChargeLaserData>(ChargeLaserDataPath) == null;
+        var data = EnsureAsset<GunnerChargeLaserData>(ChargeLaserDataPath);
+        if (created)
+        {
+            var so = new SerializedObject(data);
+            so.FindProperty("cooldownTime").floatValue = 6f;
+            so.FindProperty("commitCooldownManually").boolValue = true;
+            so.FindProperty("maxActiveDuration").floatValue = 5f;
+            so.FindProperty("hittableLayers").intValue = 17664; // Enemy·Projectile·EnemyHurtBox
+            so.FindProperty("animatorStateName").stringValue = "Gunner_Q_Start";
+            so.FindProperty("snapRotationOnStart").boolValue = true;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(data);
+        }
+
+        GameObject root = PrefabUtility.LoadPrefabContents(VariantPath);
+        try
+        {
+            EnsureComponent<GunnerBeamView>(root);
+            var skill = EnsureComponent<GunnerChargeLaserSkill>(root);
+            SetReference(skill, "data", data);
+            SetReference(root.GetComponent<PlayerSkillController>(), "mainSkill", skill);
+
+            PrefabUtility.SaveAsPrefabAsset(root, VariantPath);
+            Debug.Log($"[Gunner] Q 충전 레이저 부착 완료: {VariantPath}");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+
+        BuildAnimator();
+    }
+
     const string UpperBodyMaskPath = ControllerFolder + "/GunnerUpperBody.mask";
     // Auto-Rig Pro 컨트롤 리그라 상체가 한 서브트리에 모여 있지 않다(forearm.r/hand.r·head.x 가 c_traj 바로 아래).
     // 그래서 "척추 아래 전부"가 아니라 "하체·골반·루트 계열을 뺀 전부"를 켠다.
@@ -126,6 +176,25 @@ public static class GunnerShellAuthoring
         EnsureState(baseMachine, "Walk").motion = Clip("gunner_walk");
         EnsureState(baseMachine, "Gunner_Attack_Start").motion = Clip("gunner_skill_Q_charge_loop");
 
+        // Q: 시작 → 집중(정지/이동, IsMoving 으로 전환) → 발사(GunnerBeamView 가 튼다) → 회복 → Idle
+        AnimatorState idle = EnsureState(baseMachine, "Idle");
+        AnimatorState qStart = EnsureState(baseMachine, "Gunner_Q_Start");
+        qStart.motion = Clip("gunner_skill_Q_start");
+        AnimatorState qCharge = EnsureState(baseMachine, "Gunner_Q_Charge");
+        qCharge.motion = Clip("gunner_skill_Q_charge_loop");
+        AnimatorState qChargeMove = EnsureState(baseMachine, "Gunner_Q_ChargeMove");
+        qChargeMove.motion = Clip("gunner_skill_Q_charge_move_loop");
+        AnimatorState qFire = EnsureState(baseMachine, "Gunner_Q_Fire");
+        qFire.motion = Clip("gunner_skill_Q_fire");
+        AnimatorState qRecover = EnsureState(baseMachine, "Gunner_Q_Recover");
+        qRecover.motion = Clip("gunner_skill_Q_recover");
+
+        EnsureExitTimeTransition(qStart, qCharge);
+        EnsureConditionTransition(qCharge, qChargeMove, AnimatorConditionMode.If);
+        EnsureConditionTransition(qChargeMove, qCharge, AnimatorConditionMode.IfNot);
+        EnsureExitTimeTransition(qFire, qRecover);
+        EnsureExitTimeTransition(qRecover, idle);
+
         AvatarMask mask = EnsureUpperBodyMask();
 
         AnimatorControllerLayer[] layers = controller.layers;
@@ -160,6 +229,26 @@ public static class GunnerShellAuthoring
         EditorUtility.SetDirty(controller);
         AssetDatabase.SaveAssets();
         Debug.Log($"[Gunner] 애니메이터 구성 완료: {ControllerPath} (Base 3 상태, UpperBody 마스크 {mask.name})");
+    }
+
+    static void EnsureExitTimeTransition(AnimatorState from, AnimatorState to)
+    {
+        if (!System.Array.TrueForAll(from.transitions, t => t.destinationState != to))
+            return;
+        AnimatorStateTransition transition = from.AddTransition(to);
+        transition.hasExitTime = true;
+        transition.exitTime = 1f;
+        transition.duration = 0.1f;
+    }
+
+    static void EnsureConditionTransition(AnimatorState from, AnimatorState to, AnimatorConditionMode mode)
+    {
+        if (!System.Array.TrueForAll(from.transitions, t => t.destinationState != to))
+            return;
+        AnimatorStateTransition transition = from.AddTransition(to);
+        transition.hasExitTime = false;
+        transition.duration = 0.15f;
+        transition.AddCondition(mode, 0f, "IsMoving");
     }
 
     static AnimatorState EnsureState(AnimatorStateMachine machine, string name)

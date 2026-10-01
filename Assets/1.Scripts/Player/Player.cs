@@ -438,9 +438,16 @@ public class Player : Unit
         return stateController.ChangeState(PlayerActionState.Attack);
     }
 
+    /// <summary>기본 공격 준비 자세(거너). 끝나면 <see cref="BeginAttackState"/> 로 넘어간다.</summary>
+    public bool BeginAttackReadyState()
+    {
+        return stateController.ChangeState(PlayerActionState.AttackReady);
+    }
+
     public bool EndAttackState()
     {
-        if (stateController.CurrentState != PlayerActionState.Attack)
+        if (stateController.CurrentState != PlayerActionState.Attack &&
+            stateController.CurrentState != PlayerActionState.AttackReady)
             return false;
 
         return stateController.ChangeState(PlayerActionState.Idle);

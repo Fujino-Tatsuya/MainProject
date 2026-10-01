@@ -32,6 +32,7 @@ public class GunnerBeamAttack : BaseAttack
             return false;
 
         SetTargetLayer(hittable);
+        SetAttackType(AttackType.Default);
         SetDamageSnapshot(damageSnapshot);
 
         int count = Physics.SphereCastNonAlloc(origin, radius, direction, hits, range, hittable | blocking,
@@ -70,6 +71,117 @@ public class GunnerBeamAttack : BaseAttack
         }
 
         return false;
+    }
+
+    // ── 관통 판정(거너 Q) ─────────────────────────────────────────────────
+
+    private readonly Collider[] boxHits = new Collider[64];
+    private readonly HashSet<Unit> pierceUnits = new HashSet<Unit>();
+    private readonly HashSet<Hurtbox> pierceHurtboxes = new HashSet<Hurtbox>();
+    private readonly List<Unit> pierceLanded = new List<Unit>();
+
+    /// <summary>
+    /// 지형(비트리거 blocking)에 닿기까지의 거리. 굵은 직선(SphereCast)으로 잰다. 자기 콜라이더는 무시.
+    /// </summary>
+    public float CastLength(Vector3 origin, Vector3 direction, float range, float radius, LayerMask blocking)
+    {
+        int count = Physics.SphereCastNonAlloc(origin, radius, direction, hits, range, blocking, QueryTriggerInteraction.Ignore);
+        float length = range;
+        for (int i = 0; i < count; i++)
+        {
+            Collider col = hits[i].collider;
+            if (col == null || (owner != null && col.transform.IsChildOf(owner.transform)))
+                continue;
+            if (hits[i].distance > 0f && hits[i].distance < length)
+                length = hits[i].distance;
+        }
+        return length;
+    }
+
+    /// <summary>
+    /// [서버] 직육면체(시작점→length) 안의 모든 유효 대상에게 1회씩 피해(관통). 적·공격 가능한 오브젝트 모두.
+    /// </summary>
+    /// <returns>맞힌 대상 수(Unit 이 아닌 오브젝트 포함)</returns>
+    public int FirePiercing(Vector3 origin, Vector3 direction, float length, float width, float height,
+                            LayerMask hittable, int damageSnapshot, AttackType type, bool triggersOnHit)
+    {
+        if (!IsServer)
+            return 0;
+
+        SetTargetLayer(hittable);
+        SetAttackType(type);
+        SetDamageSnapshot(damageSnapshot);
+        pierceUnits.Clear();
+        pierceHurtboxes.Clear();
+        pierceLanded.Clear();
+
+        int count = OverlapBeamBox(origin, direction, length, width, height, hittable, QueryTriggerInteraction.Collide);
+        int resolved = 0;
+        for (int i = 0; i < count; i++)
+        {
+            Collider col = boxHits[i];
+            if (col == null || (owner != null && col.transform.IsChildOf(owner.transform)))
+                continue;
+
+            if (TryGetHurtbox(col, out Hurtbox hurtbox))
+            {
+                hurtbox.TryGetOwner(out Unit ownerUnit);
+                if (ownerUnit == owner || pierceHurtboxes.Contains(hurtbox) ||
+                    (ownerUnit != null && (pierceUnits.Contains(ownerUnit) || ownerUnit.CurrentHealth <= 0)))
+                    continue;
+
+                if (!TryResolveHit(hurtbox, col, OnHitDamage(ownerUnit, triggersOnHit)))
+                    continue;
+
+                resolved++;
+                pierceHurtboxes.Add(hurtbox);
+                if (ownerUnit != null && pierceUnits.Add(ownerUnit))
+                    pierceLanded.Add(ownerUnit);
+                continue;
+            }
+
+            if (!IsInTargetLayer(col))
+                continue;
+
+            Unit target = col.GetComponentInParent<Unit>();
+            if (target == null || target == owner || target.CurrentHealth <= 0 || pierceUnits.Contains(target))
+                continue;
+
+            if (!TryResolveHit(target, OnHitDamage(target, triggersOnHit)))
+                continue;
+
+            resolved++;
+            pierceUnits.Add(target);
+            pierceLanded.Add(target);
+        }
+
+        if (owner != null && pierceLanded.Count > 0)
+            owner.RaiseServerAttackLanded(attackType, triggersOnHit, pierceLanded, this);
+
+        return resolved;
+    }
+
+    /// <summary>같은 직육면체 안의 살아 있는 아군 플레이어(시전자 제외)를 모은다 — 보호막 대상.</summary>
+    public void CollectAllies(Vector3 origin, Vector3 direction, float length, float width, float height,
+                              LayerMask allyLayers, List<Player> result)
+    {
+        result.Clear();
+        int count = OverlapBeamBox(origin, direction, length, width, height, allyLayers, QueryTriggerInteraction.Collide);
+        for (int i = 0; i < count; i++)
+        {
+            Player ally = boxHits[i] != null ? boxHits[i].GetComponentInParent<Player>() : null;
+            if (ally == null || ally == owner || ally.CurrentHealth <= 0 || result.Contains(ally))
+                continue;
+            result.Add(ally);
+        }
+    }
+
+    private int OverlapBeamBox(Vector3 origin, Vector3 direction, float length, float width, float height,
+                               LayerMask mask, QueryTriggerInteraction triggers)
+    {
+        Vector3 center = origin + direction * (length * 0.5f);
+        var halfExtents = new Vector3(width * 0.5f, height * 0.5f, length * 0.5f);
+        return Physics.OverlapBoxNonAlloc(center, halfExtents, boxHits, Quaternion.LookRotation(direction), mask, triggers);
     }
 
     private bool TryHit(Collider col, bool triggersOnHit)
