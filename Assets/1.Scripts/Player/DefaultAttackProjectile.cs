@@ -30,6 +30,7 @@ public class DefaultAttackProjectile : BaseAttack
         SetDamageSnapshot(damage);
         SetTargetLayer(targetLayer);
         SetAttackType(AttackType.Default);
+        SetHitPattern(AttackHitPattern.Single);
     }
 
     private void Update()

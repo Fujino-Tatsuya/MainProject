@@ -402,7 +402,6 @@ MonoBehaviour:
   hitVFXCollider: {fileID: 3147570509364327094}
   hitVFXType: 1
   bodyCollider: {fileID: 2687977088537551207}
-  attackTelegraphMaterial: {fileID: 0}
 --- !u!114 &4671480735823204164
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -420,8 +419,6 @@ MonoBehaviour:
   particlePrefab: {fileID: 7019508933032447489, guid: 0e15d6fc561b43fa95fadff8ab04b5fd, type: 3}
   duration: 1.5
   despawnGrace: 0.5
-  leadBeforeClipEnd: 0.3
-  delayAfterClipEnd: 0
   renderers: []
 --- !u!114 &7264363400000000001
 MonoBehaviour:
@@ -528,36 +525,33 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2391931280260005269, guid: 87dd4b3ba2b418340833ff1c4d33a222, type: 3}
-      propertyPath: 'm_Materials.Array.data[0]'
-      value: 
-      objectReference: {fileID: 2100000, guid: dac00a92c06fae044b63a17fabd1c2c5, type: 2}
       propertyPath: m_Mesh
-      value: 
+      value:
       objectReference: {fileID: 4300000, guid: 99e0cb0be8993154989601c64627347c, type: 2}
     - target: {fileID: 2391931280260005269, guid: 87dd4b3ba2b418340833ff1c4d33a222, type: 3}
-      propertyPath: m_AABB.m_Center.x
-      value: 0.001386106
-      objectReference: {fileID: 0}
-    - target: {fileID: 2391931280260005269, guid: 87dd4b3ba2b418340833ff1c4d33a222, type: 3}
       propertyPath: m_AABB.m_Center.y
-      value: 1.314208
+      value: 0.4693855
       objectReference: {fileID: 0}
     - target: {fileID: 2391931280260005269, guid: 87dd4b3ba2b418340833ff1c4d33a222, type: 3}
       propertyPath: m_AABB.m_Center.z
-      value: -0.046267092
+      value: 0.06737816
       objectReference: {fileID: 0}
     - target: {fileID: 2391931280260005269, guid: 87dd4b3ba2b418340833ff1c4d33a222, type: 3}
       propertyPath: m_AABB.m_Extent.x
-      value: 0.7173056
+      value: 0.74500155
       objectReference: {fileID: 0}
     - target: {fileID: 2391931280260005269, guid: 87dd4b3ba2b418340833ff1c4d33a222, type: 3}
       propertyPath: m_AABB.m_Extent.y
-      value: 1.4381297
+      value: 1.3025843
       objectReference: {fileID: 0}
     - target: {fileID: 2391931280260005269, guid: 87dd4b3ba2b418340833ff1c4d33a222, type: 3}
       propertyPath: m_AABB.m_Extent.z
-      value: 0.73685545
+      value: 0.63630944
       objectReference: {fileID: 0}
+    - target: {fileID: 2391931280260005269, guid: 87dd4b3ba2b418340833ff1c4d33a222, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value:
+      objectReference: {fileID: 2100000, guid: c3f8013eb64a99c4881d06771bc78cd1, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

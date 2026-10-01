@@ -8,10 +8,24 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 작업 세션 (2026-10-01 · 경석(Claude) · **물 데모 룩 맞추기**, 브랜치 `feature/Boss23`)
+## ▶▶ 작업 세션 (2026-10-01 밤 · 경석(Claude) · **몬스터 리디자인 머티리얼 Flat Kit 화 → 보스 전기장판·자폭드론**, 브랜치 `feature/Boss23`)
 
-계획: [PLAN-flatkit.md](PLAN-flatkit.md) 9-b. 수정: `Assets/1.Scripts/Rendering/Editor/FlatKitWaterPatchAuthoring.cs` · `FK_Water_Pool09.mat` · 존 프리팹 11종(`Water` 자식만) · `3.Materials/FlatKit/Water/Meshes/`.
-상태: 커밋·푸시(10-01). 물 = M_A·M_B 구석 구덩이(각 2) · S_A 구덩이 4 — 존 안 물 덩어리마다 `WaterPart_N`(위치·크기 직접 조절, 재생성해도 유지). 벤트 밑·L_B·L_C·Start 물 없음. 물 앞 벽 디더 끔(`Generic_01_A_Wet` 변형). 깊이 3×3 최근접(디더 구멍). 열린 면 자르기는 `ClipOpenEdges=false`로 꺼 둠(존 회전 배치 때문에 프리팹 기준 방향 보정이 틀림 — PLAN-flatkit 9-b). **남은 것: 팀장이 WaterPart 로 모서리 물 다듬기 · Play/MPPM 확인.**
+수정 예정: `Assets/2.Prefabs/Monster/*.prefab`(8종 머티리얼 슬롯) · `Assets/3.Materials/FlatKit/Monster/` · Flat Kit 셰이더 확장(결정 대기) · 이후 보스방(23호·Wells) 패턴.
+- development(`8c5117a9`, 이지원 최종 메쉬·SurfaceV1 머티리얼) + SVN r356(드론 `Char/Drone/`) 반영. 몬스터 프리팹 8종은 **아트판 그대로** 채택 — SurfaceV1 = URP Lit(BaseMap·Normal·MetallicGloss).
+- 🔴 결정 대기: Flat Kit Stylized Surface 는 금속성 맵·환경 반사가 없다 → 아트 의도(금속 질감) 보존 방법(셰이더 복제 확장 등) 팀장·Codex 상의 중.
+- 물 작업(이전 세션)은 커밋·푸시 완료 — 남은 것: WaterPart 모서리 다듬기 · Play/MPPM. 상세 [PLAN-flatkit.md](PLAN-flatkit.md) 9-b.
+
+## ▶▶ 현재 인수인계 (2026-10-01 · 은희(Claude) · **데미지 숫자 Re:C v0.2 + 자체 이징 `EuniTween`**, 브랜치 `feature/DamagePopupTweening`, push 안 함)
+
+계획·결정 원본 = [PLAN-damage-popup.md](PLAN-damage-popup.md) (기획 원본은 레포 밖 `Re_C_데미지_숫자_표기.md`). 1·2단계 ✅ 구현, EditMode 122건 통과. Play 확인은 2단계까지 — 이후 이미지 글꼴·색·크기·더미 복귀는 🔴 Play 미확인.
+- **`EuniTween`**(별도 asmdef `Assets/1.Scripts/EuniTween/`): `Ease` 31종 + `Easing.Evaluate`·`Punch`. 트윈 라이브러리 도입 안 함. 러너 없음(필요해질 때).
+- **데이터**: `AttackType` 끝에 `SkillQ/E/R` · `AttackHitPattern{Single,Multi}`(Multi = 가붕이 Q·거너 R) · RPC 에 2바이트 · 누적 키 = 공격자+타입+대상.
+  `MonsterRank`(`MonsterDataSO.rank`, `Unit.Rank` virtual — 몬스터·더미가 덮어씀). 🔴 **경석에게 rank 필드 추가 알림 필요.**
+- **연출**: 오버레이 Canvas(1920×1080) · 단발 = 맞은 자리 고정 / 누적 = 대상 추적 · 이미지 글꼴(`FloatingDamageDigitSet`, `50.Art/UI/damage`).
+  🔴 **기획과 다른 은희 결정**: 누적 추적 · 강도별 채움 색(노랑/주황/빨강) · 누적 숫자의 크기·색 = 누적 합계 기준 · 크기 50/100/140% · "굵게" 없음(이미지). 기획자 공유 필요.
+- **더미**: `TrainingDummy`(일반, HP 100) · `_Elite`(MidBoss 300) · `_Boss`(Boss 2000) Variant, TrainingDummy 씬 배치. 안 맞으면 스폰 자리 복귀.
+- ⏳ 남은 것: 외곽선 PNG 가 회색(175)이라 흰 외곽선은 아트 교체 필요 · `50.Art/UI/damage/*.png.meta` 슬라이스 **SVN 커밋 확인** ·
+  `DefaultNetworkPrefabs` 에 SVN 검수 프리팹 8종 등록됨(`08f29f47`, SVN 없으면 빈 참조) · PR.
 
 ## ▶▶ 현재 인수인계 (2026-10-01 · 은희(Claude) · **원거리 캐릭터 "거너" G0~G9 구현 완료**, 브랜치 `feature/SecondCharacter`, push 안 함)
 

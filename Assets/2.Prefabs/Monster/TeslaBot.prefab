@@ -222,7 +222,6 @@ MonoBehaviour:
   hitVFXCollider: {fileID: 7921955671834298660}
   hitVFXType: 1
   bodyCollider: {fileID: 9162770441004439682}
-  attackTelegraphMaterial: {fileID: 0}
 --- !u!114 &6539856384967928028
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -240,8 +239,6 @@ MonoBehaviour:
   particlePrefab: {fileID: 7019508933032447489, guid: 0e15d6fc561b43fa95fadff8ab04b5fd, type: 3}
   duration: 1.5
   despawnGrace: 0.5
-  leadBeforeClipEnd: 0.3
-  delayAfterClipEnd: 0
   renderers: []
 --- !u!114 &7264363400000000001
 MonoBehaviour:
@@ -607,43 +604,44 @@ PrefabInstance:
     m_TransformParent: {fileID: 654984319113195925}
     m_Modifications:
     - target: {fileID: 1641520047319836445, guid: 5524f4bb89f16bc488f70aff8ae55fd4, type: 3}
-      propertyPath: 'm_Materials.Array.data[0]'
-      value: 
-      objectReference: {fileID: 2100000, guid: bb2c370cffd03fc409fd5ac91eb1029a, type: 2}
       propertyPath: m_Mesh
-      value: 
+      value:
       objectReference: {fileID: 4300000, guid: 21947edba613c9d4dbfcc4ed3bc8dbc2, type: 2}
     - target: {fileID: 1641520047319836445, guid: 5524f4bb89f16bc488f70aff8ae55fd4, type: 3}
       propertyPath: m_AABB.m_Center.x
-      value: 0.00000011920929
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1641520047319836445, guid: 5524f4bb89f16bc488f70aff8ae55fd4, type: 3}
       propertyPath: m_AABB.m_Center.y
-      value: 1.3095394
+      value: 0.012526727
       objectReference: {fileID: 0}
     - target: {fileID: 1641520047319836445, guid: 5524f4bb89f16bc488f70aff8ae55fd4, type: 3}
       propertyPath: m_AABB.m_Center.z
-      value: -0.09255952
+      value: -0.00076757837
       objectReference: {fileID: 0}
     - target: {fileID: 1641520047319836445, guid: 5524f4bb89f16bc488f70aff8ae55fd4, type: 3}
       propertyPath: m_AABB.m_Extent.x
-      value: 0.6079876
+      value: 0.006466866
       objectReference: {fileID: 0}
     - target: {fileID: 1641520047319836445, guid: 5524f4bb89f16bc488f70aff8ae55fd4, type: 3}
       propertyPath: m_AABB.m_Extent.y
-      value: 1.3548064
+      value: 0.013362019
       objectReference: {fileID: 0}
     - target: {fileID: 1641520047319836445, guid: 5524f4bb89f16bc488f70aff8ae55fd4, type: 3}
       propertyPath: m_AABB.m_Extent.z
-      value: 0.83476573
+      value: 0.008360148
       objectReference: {fileID: 0}
     - target: {fileID: 1641520047319836445, guid: 5524f4bb89f16bc488f70aff8ae55fd4, type: 3}
       propertyPath: m_Materials.Array.size
       value: 2
       objectReference: {fileID: 0}
     - target: {fileID: 1641520047319836445, guid: 5524f4bb89f16bc488f70aff8ae55fd4, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value:
+      objectReference: {fileID: 2100000, guid: fda3737d7650ae644993a004fbb46f74, type: 2}
+    - target: {fileID: 1641520047319836445, guid: 5524f4bb89f16bc488f70aff8ae55fd4, type: 3}
       propertyPath: 'm_Materials.Array.data[1]'
-      value: 
+      value:
       objectReference: {fileID: 2100000, guid: d07a3d68ea2cd65478403c7007c05065, type: 2}
     - target: {fileID: 3170371216191921136, guid: 5524f4bb89f16bc488f70aff8ae55fd4, type: 3}
       propertyPath: m_Name

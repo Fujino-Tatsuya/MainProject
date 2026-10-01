@@ -158,11 +158,12 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
                     : resolvedDamage + bonus;
             }
 
-            AttackInfo attackInfo = new AttackInfo(resolvedDamage, AttackType.Skill,
+            AttackInfo attackInfo = new AttackInfo(resolvedDamage, DamageAttackType,
                 knockbackStrength: Mathf.Max(data.KnockbackStrength, data.AdvanceSpeed),
                 knockbackDuration: data.KnockbackDuration,
                 staggerDuration: data.StaggerDuration,
-                knockbackDirection: heading);
+                knockbackDirection: heading,
+                hitPattern: DamageHitPattern);
             AttackHitContext hitContext = new AttackHitContext(owner.transform.position, owner.transform, hit, owner);
 
             bool resolved = hurtbox != null
@@ -179,7 +180,7 @@ public class FirstMeleeMainSkill : PlayerHoldSkill
             Edit.Log($"[Skill] 진격의 방패 틱 — {target.name} 피해 {attackInfo.damage} + 견인", this);
         }
 
-        owner.RaiseServerAttackLanded(AttackType.Skill, data.TriggersOnHit, tickLandedUnits, this);
+        owner.RaiseServerAttackLanded(DamageAttackType, data.TriggersOnHit, tickLandedUnits, this);
     }
 
     public override void OnEnd(SkillEndReason reason)

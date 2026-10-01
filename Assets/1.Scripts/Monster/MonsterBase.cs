@@ -19,6 +19,8 @@ public class MonsterBase : Unit
     [Header("데이터")]
     [SerializeField] protected MonsterDataSO data;
 
+    public override MonsterRank Rank => data != null ? data.rank : MonsterRank.Normal;
+
     [Header("컴포넌트 참조(비우면 자동 탐색)")]
     [SerializeField] protected NavMeshAgent agent;
     [SerializeField] protected Animator animator;

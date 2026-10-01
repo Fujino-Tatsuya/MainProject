@@ -30,31 +30,32 @@ public sealed class FloatingDamagePresenter : MonoBehaviour
         _unit.ClientDamagedAttributed -= HandleAttributedDamage;
     }
 
-    void HandleAttributedDamage(int amount, DamageChannel channel, ulong attackerClientId)
+    void HandleAttributedDamage(DamageDealtInfo damage)
     {
         FloatingDamageSpawner spawner = FloatingDamageSpawner.Instance;
         if (spawner == null || spawner.Settings == null)
             return;
 
         FloatingDamageDisplayFilter filter = spawner.Settings.DisplayFilter;
-        bool fromLocalPlayer = IsLocalAttacker(attackerClientId);
+        bool fromLocalPlayer = IsLocalAttacker(damage.attackerClientId);
         if (filter == FloatingDamageDisplayFilter.OwnDealtOnly && !fromLocalPlayer)
             return;
 
         // AllDamage는 공격자 귀속으로 거르지 않으며, 기존처럼 로컬 공격 강조도 적용하지 않는다.
-        Submit(spawner, amount, channel,
+        Submit(spawner, damage,
             filter != FloatingDamageDisplayFilter.AllDamage && fromLocalPlayer);
     }
 
-    void Submit(FloatingDamageSpawner spawner, int amount, DamageChannel channel, bool fromLocalPlayer)
+    void Submit(FloatingDamageSpawner spawner, DamageDealtInfo damage, bool fromLocalPlayer)
     {
-        if (amount <= 0 || IsLocalPlayerTarget())
+        if (damage.amount <= 0 || IsLocalPlayerTarget())
             return;
 
-        PopupKind kind = channel == DamageChannel.Shield
+        PopupKind kind = damage.channel == DamageChannel.Shield
             ? PopupKind.ShieldDamage
             : PopupKind.Damage;
-        spawner.Submit(new FloatingPopupRequest(_unit, kind, amount, fromLocalPlayer));
+        spawner.Submit(new FloatingPopupRequest(_unit, kind, damage.amount, fromLocalPlayer,
+            damage.attackerClientId, damage.attackType, damage.hitPattern));
     }
 
     bool IsLocalPlayerTarget()

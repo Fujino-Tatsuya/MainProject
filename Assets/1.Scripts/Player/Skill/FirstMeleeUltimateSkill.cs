@@ -106,13 +106,14 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
         int resolvedDamage = bonus >= int.MaxValue - damageSnapshot
             ? int.MaxValue
             : damageSnapshot + bonus;
-        AttackInfo attackInfo = new AttackInfo(resolvedDamage, AttackType.Skill);
+        AttackInfo attackInfo = new AttackInfo(resolvedDamage, DamageAttackType,
+            hitPattern: DamageHitPattern);
         AttackHitContext hitContext = new AttackHitContext(owner.transform.position, owner.transform, sourceUnit: owner);
         if (lockedTarget.ReceiveAttack(attackInfo, hitContext))
         {
             landedUnits.Clear();
             landedUnits.Add(lockedTarget);
-            owner.RaiseServerAttackLanded(AttackType.Skill, Data != null && Data.TriggersOnHit, landedUnits, this);
+            owner.RaiseServerAttackLanded(DamageAttackType, Data != null && Data.TriggersOnHit, landedUnits, this);
         }
 
         // 🔴 여기도 서버 전용이라 창구를 거친다(OnChannelCompleted 는 TickServer 경로다).

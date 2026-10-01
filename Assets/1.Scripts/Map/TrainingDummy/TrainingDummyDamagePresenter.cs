@@ -35,12 +35,12 @@ public sealed class TrainingDummyDamagePresenter : MonoBehaviour
             _dummy.NominalDamaged -= HandleNominalDamage;
     }
 
-    void HandleNominalDamage(int amount, ulong attackerClientId)
+    void HandleNominalDamage(DamageDealtInfo damage)
     {
-        if (amount <= 0)
+        if (damage.amount <= 0)
             return;
 
-        bool fromLocalPlayer = IsLocalAttacker(attackerClientId);
+        bool fromLocalPlayer = IsLocalAttacker(damage.attackerClientId);
 
         FloatingDamageSpawner spawner = FloatingDamageSpawner.Instance;
         if (spawner != null && spawner.Settings != null)
@@ -52,7 +52,8 @@ public sealed class TrainingDummyDamagePresenter : MonoBehaviour
                 !fromLocalPlayer;
 
             if (!suppressed)
-                spawner.Submit(new FloatingPopupRequest(_dummy, PopupKind.Damage, amount, fromLocalPlayer));
+                spawner.Submit(new FloatingPopupRequest(_dummy, PopupKind.Damage, damage.amount,
+                    fromLocalPlayer, damage.attackerClientId, damage.attackType, damage.hitPattern));
         }
 
         if (fromLocalPlayer)

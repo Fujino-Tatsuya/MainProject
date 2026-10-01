@@ -3,8 +3,8 @@ using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// 연습장 표적(허수아비). 죽지 않고, 맞으면 명목 피해를 띄우고, 잠시 안 맞으면 체력을 되돌리고,
-/// 제 자리에서 너무 멀어지면 돌아온다.
+/// 연습장 표적(허수아비). 죽지 않고, 맞으면 명목 피해를 띄우고, 잠시 안 맞으면 체력과 자리를 되돌리고,
+/// 제 자리에서 너무 멀어지면 즉시 돌아온다.
 ///
 /// 몬스터가 아니다 — MonsterBase / MonsterDataSO / MonsterStatusEffect / FSM / NavMeshAgent 를 쓰지 않는다.
 /// (MonsterBase 의 리쉬 복귀는 Revive() 로 체력을 최대로 되돌려 이 클래스의 회복 규칙과 정면 충돌한다.)
@@ -22,23 +22,30 @@ public sealed class TrainingDummy : Unit
     /// </summary>
     const int MinHealth = 1;
 
+    /// <summary>이보다 덜 밀려났으면 제자리로 본다(m). 물리 오차로 매번 순간이동하지 않게.</summary>
+    const float IdleReturnThreshold = 0.05f;
+
     [Header("스탯")]
-    [SerializeField, Min(1)] int maxHp = 500;
+    [SerializeField, Min(1)] int maxHp = 100;
     [SerializeField, Min(0)] int defense = 0;
+    [Tooltip("데미지 숫자 강도 구간. 일반/엘리트/보스 더미가 실제 몬스터와 같은 구간으로 보이게 한다.")]
+    [SerializeField] MonsterRank rank = MonsterRank.Normal;
+
+    public override MonsterRank Rank => rank;
 
     [Header("회복 — 이 시간 동안 안 맞으면 되돌아온다")]
     [SerializeField, Min(0f)] float regenDelay = 3f;
     [SerializeField, Min(0.01f)] float regenDuration = 1f;
 
-    [Header("자리 복귀 — 스폰 지점에서 이만큼 벗어나면 즉시 되돌아온다")]
+    [Header("자리 복귀 — 이만큼 벗어나면 즉시, 덜 벗어났으면 regenDelay 동안 안 맞을 때 되돌아온다")]
     [SerializeField, Min(0.1f)] float resetDistance = 5f;
 
     /// <summary>
-    /// 모든 피어에서 명목 피해(방어 경감 후, 체력 하한으로 잘리기 전 값)를 알린다.
-    /// 인자는 (피해량, 공격자 clientId). 공격자가 플레이어가 아니면 ulong.MaxValue.
+    /// 모든 피어에서 명목 피해(방어 경감 후, 체력 하한으로 잘리기 전 값)와 공격 메타데이터를 알린다.
+    /// 공격자가 플레이어가 아니면 attackerClientId는 ulong.MaxValue.
     /// TrainingDummyDamagePresenter 가 구독해 데미지 숫자와 타격 쉐이크를 낸다.
     /// </summary>
-    public event Action<int, ulong> NominalDamaged;
+    public event Action<DamageDealtInfo> NominalDamaged;
 
     TrainingDummyRegen _regen;
     Rigidbody _rigidbody;
@@ -90,17 +97,20 @@ public sealed class TrainingDummy : Unit
     {
         // Unit 의 기본 구현이 쓰는 귀속 RPC 경로는 타지 않는다 — 공격자 clientId 는
         // 허수아비 전용 RPC 가 직접 싣고, 그 소비자(UnitCameraFeedbackReporter)는 스폰 때 제거했다.
-        ApplyDummyDamage(attackInfo.damage, ResolveAttackerClientId(hitContext));
+        ApplyDummyDamage(attackInfo.damage, ResolveAttackerClientId(hitContext),
+            attackInfo.attackType, attackInfo.hitPattern);
         TryEnterKnockback(attackInfo, hitContext);
         return true;
     }
 
     public override void TakeDamage(AttackInfo attackInfo)
     {
-        ApplyDummyDamage(attackInfo.damage, ulong.MaxValue);
+        ApplyDummyDamage(attackInfo.damage, ulong.MaxValue,
+            attackInfo.attackType, attackInfo.hitPattern);
     }
 
-    void ApplyDummyDamage(int rawDamage, ulong attackerClientId)
+    void ApplyDummyDamage(int rawDamage, ulong attackerClientId,
+        AttackType attackType, AttackHitPattern hitPattern)
     {
         if (!IsServer || rawDamage <= 0)
             return;
@@ -117,7 +127,7 @@ public sealed class TrainingDummy : Unit
         _regen?.NotifyDamaged();
 
         // 표시는 실제 감소량이 아니라 명목 피해다 — 체력 1 에 붙어 있어도 계속 뜬다.
-        ShowNominalDamageRpc(nominal, attackerClientId);
+        ShowNominalDamageRpc(nominal, attackerClientId, (byte)attackType, (byte)hitPattern);
     }
 
     /// <summary>
@@ -146,9 +156,10 @@ public sealed class TrainingDummy : Unit
     }
 
     [Rpc(SendTo.ClientsAndHost)]
-    void ShowNominalDamageRpc(int amount, ulong attackerClientId)
+    void ShowNominalDamageRpc(int amount, ulong attackerClientId, byte attackType, byte hitPattern)
     {
-        NominalDamaged?.Invoke(amount, attackerClientId);
+        NominalDamaged?.Invoke(new DamageDealtInfo(amount, DamageChannel.Hp, attackerClientId,
+            (AttackType)attackType, (AttackHitPattern)hitPattern));
     }
     #endregion
 
@@ -226,7 +237,12 @@ public sealed class TrainingDummy : Unit
         // 밀어낸 뒤에 거리를 재야 같은 프레임에 이탈을 잡는다.
         TickKnockback(Time.deltaTime);
 
-        if ((transform.position - _anchorPosition).sqrMagnitude > resetDistance * resetDistance)
+        // 멀리 밀려나면 즉시, 조금 밀려났으면 회복과 같은 타이밍(마지막 피격 후 regenDelay)에 스폰 자리로 돌아간다.
+        float displacement = (transform.position - _anchorPosition).sqrMagnitude;
+        bool farAway = displacement > resetDistance * resetDistance;
+        bool idleAway = displacement > IdleReturnThreshold * IdleReturnThreshold &&
+                        _regen.IsIdle && _knockbackTimer <= 0f;
+        if (farAway || idleAway)
             ReturnToAnchor();
     }
 

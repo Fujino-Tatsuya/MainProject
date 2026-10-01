@@ -12,33 +12,74 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 01485e7f54864f0b8f55e44ed59347f1, type: 3}
   m_Name: FloatingDamageSettings
   m_EditorClassIdentifier: Assembly-CSharp::FloatingDamageSettings
-  displayFilter: 0
-  overheadWorldOffset: {x: 0.75, y: 2.2, z: 0}
-  stayTimeout: 0.3
-  animateDuration: 0.5
-  fadeDuration: 0.3
-  scatterAngle: 35
-  initialSpeed: 2.4
-  gravity: 4
-  fadeVelocityDamping: 5
-  activePunchScale: 1.2
-  activePunchDuration: 0.12
-  darkenMultiplier: 0.45
-  ownDamageScaleMultiplier: 1.25
+  displayFilter: 1
+  referenceResolution: {x: 1920, y: 1080}
+  canvasSortingOrder: 50
+  screenEdgePadding: {x: 60, y: 30}
+  spawnOffset: 20
+  spawnScatter: {x: 12, y: 6}
+  riseDuration: 0.2
+  riseDistance: 24
+  fallDistance: 12
+  fadeDuration: 0.25
+  accumulateHold: 0.5
+  riseEase: 8
+  fallEase: 3
+  spawnSettleEase: 23
+  updatePunchScale: 1.05
+  updatePunchDuration: 0.06
+  updatePunchMinInterval: 0.1
+  updatePunchEase: 5
+  highEmphasisInterval: 0.3
+  shakeDistance: 3
+  shakeDuration: 0.08
+  tierThresholds:
+  - rank: 0
+    midPercent: 15
+    highPercent: 50
+  - rank: 1
+    midPercent: 5
+    highPercent: 20
+  - rank: 2
+    midPercent: 0.75
+    highPercent: 3
+  tierLooks:
+  - tier: 0
+    fillColor: {r: 1, g: 0.85, b: 0.2, a: 1}
+    holdScale: 0.5
+    spawnScale: 0.5
+    spawnSettleDuration: 0
+    shake: 0
+    singleDuration: 0.65
+  - tier: 1
+    fillColor: {r: 1, g: 0.55, b: 0.1, a: 1}
+    holdScale: 1
+    spawnScale: 1.1
+    spawnSettleDuration: 0.08
+    shake: 0
+    singleDuration: 0.75
+  - tier: 2
+    fillColor: {r: 1, g: 0.2, b: 0.15, a: 1}
+    holdScale: 1.4
+    spawnScale: 1.63
+    spawnSettleDuration: 0.12
+    shake: 1
+    singleDuration: 0.85
+  digitSet: {fileID: 11400000, guid: a2624064d10794609e06551a8c30cdd6, type: 2}
   maxConcurrentPopups: 32
   popupStyles:
   - kind: 0
     color: {r: 1, g: 0.82, b: 0.18, a: 1}
-    fontSize: 42
+    height: 36
   - kind: 1
     color: {r: 0.28, g: 1, b: 0.38, a: 1}
-    fontSize: 42
+    height: 36
   - kind: 2
     color: {r: 0.3, g: 0.8, b: 1, a: 1}
-    fontSize: 38
+    height: 34
   - kind: 3
     color: {r: 0.85, g: 0.55, b: 1, a: 1}
-    fontSize: 34
+    height: 30
   - kind: 4
     color: {r: 1, g: 1, b: 1, a: 1}
-    fontSize: 34
+    height: 30

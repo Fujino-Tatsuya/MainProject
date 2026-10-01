@@ -369,6 +369,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 384ff11760cb52140a9d31743dd79682, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MonsterBase
+  attackTelegraphMaterial: {fileID: 2100000, guid: c3d3d2122c7238547b41939029544154, type: 2}
   ShowTopMostFoldoutHeaderGroup: 1
   data: {fileID: 11400000, guid: 4653eaa1707e0af4899593a87a70a451, type: 2}
   agent: {fileID: 3350840199952395654}
@@ -383,7 +384,6 @@ MonoBehaviour:
   hitVFXCollider: {fileID: 327031985263396855}
   hitVFXType: 1
   bodyCollider: {fileID: 6162152019073814685}
-  attackTelegraphMaterial: {fileID: 2100000, guid: c3d3d2122c7238547b41939029544154, type: 2}
   spinChance: 0.4
   spinCooldown: 6
   spinWindup: 1
@@ -391,8 +391,6 @@ MonoBehaviour:
   dashRepeatInterval: 0.5
   dashSpeedMultiplier: 15
   dashMaxDistance: 40
-  whipTelegraphDuration: 0.5
-  sideLateralOffset: 0.65
   spinStartState: Spin Attack Start
   spinLoopState: Spin Attack Loop
   whipStateR: Attack Whip R Start
@@ -416,8 +414,6 @@ MonoBehaviour:
   particlePrefab: {fileID: 7019508933032447489, guid: 0e15d6fc561b43fa95fadff8ab04b5fd, type: 3}
   duration: 1.5
   despawnGrace: 0.5
-  leadBeforeClipEnd: 0.3
-  delayAfterClipEnd: 0
   renderers:
   - {fileID: 9128745864370794678}
 --- !u!114 &7497952774599520461
@@ -536,7 +532,7 @@ SkinnedMeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 96dd5953d68bf4b4ea2391e25928206b, type: 2}
+  - {fileID: 2100000, guid: ae218afa46e907544b8fff37c551a977, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -979,27 +975,27 @@ PrefabInstance:
       objectReference: {fileID: 4300000, guid: 10dcb332b3116cb4f8ed720e062a6b03, type: 2}
     - target: {fileID: 1392109617937959807, guid: 3b73a8d629c6c5d499be6573d1d6e2bb, type: 3}
       propertyPath: m_AABB.m_Center.x
-      value: -0.0032582283
+      value: 0.005329132
       objectReference: {fileID: 0}
     - target: {fileID: 1392109617937959807, guid: 3b73a8d629c6c5d499be6573d1d6e2bb, type: 3}
       propertyPath: m_AABB.m_Center.y
-      value: 1.1395267
+      value: 0.6450927
       objectReference: {fileID: 0}
     - target: {fileID: 1392109617937959807, guid: 3b73a8d629c6c5d499be6573d1d6e2bb, type: 3}
       propertyPath: m_AABB.m_Center.z
-      value: 0.19309163
+      value: 0.06277704
       objectReference: {fileID: 0}
     - target: {fileID: 1392109617937959807, guid: 3b73a8d629c6c5d499be6573d1d6e2bb, type: 3}
       propertyPath: m_AABB.m_Extent.x
-      value: 3.1312091
+      value: 3.2397993
       objectReference: {fileID: 0}
     - target: {fileID: 1392109617937959807, guid: 3b73a8d629c6c5d499be6573d1d6e2bb, type: 3}
       propertyPath: m_AABB.m_Extent.y
-      value: 1.923469
+      value: 1.4270232
       objectReference: {fileID: 0}
     - target: {fileID: 1392109617937959807, guid: 3b73a8d629c6c5d499be6573d1d6e2bb, type: 3}
       propertyPath: m_AABB.m_Extent.z
-      value: 3.248653
+      value: 3.2423518
       objectReference: {fileID: 0}
     - target: {fileID: 1392109617937959807, guid: 3b73a8d629c6c5d499be6573d1d6e2bb, type: 3}
       propertyPath: m_Materials.Array.size
@@ -1008,7 +1004,7 @@ PrefabInstance:
     - target: {fileID: 1392109617937959807, guid: 3b73a8d629c6c5d499be6573d1d6e2bb, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 2100000, guid: 5a6233baf5135ef4e8244bdf89fec246, type: 2}
+      objectReference: {fileID: 2100000, guid: dcd88b6610283d645a1187fd19b99279, type: 2}
     - target: {fileID: 1392109617937959807, guid: 3b73a8d629c6c5d499be6573d1d6e2bb, type: 3}
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
