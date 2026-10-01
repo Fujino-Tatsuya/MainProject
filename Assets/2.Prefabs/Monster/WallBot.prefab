@@ -651,6 +651,34 @@ PrefabInstance:
       value: Model
       objectReference: {fileID: 0}
     - target: {fileID: 4747561266957906064, guid: c13e2c7cc6363c2448019a9d31ae6d95, type: 3}
+      propertyPath: m_Mesh
+      value: 
+      objectReference: {fileID: 4300000, guid: b235e4518b3877d48b6e5ec48fc4d778, type: 2}
+    - target: {fileID: 4747561266957906064, guid: c13e2c7cc6363c2448019a9d31ae6d95, type: 3}
+      propertyPath: m_AABB.m_Center.x
+      value: -0.04940772
+      objectReference: {fileID: 0}
+    - target: {fileID: 4747561266957906064, guid: c13e2c7cc6363c2448019a9d31ae6d95, type: 3}
+      propertyPath: m_AABB.m_Center.y
+      value: 1.5488881
+      objectReference: {fileID: 0}
+    - target: {fileID: 4747561266957906064, guid: c13e2c7cc6363c2448019a9d31ae6d95, type: 3}
+      propertyPath: m_AABB.m_Center.z
+      value: 1.2226186
+      objectReference: {fileID: 0}
+    - target: {fileID: 4747561266957906064, guid: c13e2c7cc6363c2448019a9d31ae6d95, type: 3}
+      propertyPath: m_AABB.m_Extent.x
+      value: 1.7853928
+      objectReference: {fileID: 0}
+    - target: {fileID: 4747561266957906064, guid: c13e2c7cc6363c2448019a9d31ae6d95, type: 3}
+      propertyPath: m_AABB.m_Extent.y
+      value: 1.7622286
+      objectReference: {fileID: 0}
+    - target: {fileID: 4747561266957906064, guid: c13e2c7cc6363c2448019a9d31ae6d95, type: 3}
+      propertyPath: m_AABB.m_Extent.z
+      value: 2.3955925
+      objectReference: {fileID: 0}
+    - target: {fileID: 4747561266957906064, guid: c13e2c7cc6363c2448019a9d31ae6d95, type: 3}
       propertyPath: m_Materials.Array.size
       value: 2
       objectReference: {fileID: 0}
