@@ -222,6 +222,7 @@ MonoBehaviour:
   hitVFXCollider: {fileID: 7921955671834298660}
   hitVFXType: 1
   bodyCollider: {fileID: 9162770441004439682}
+  attackTelegraphMaterial: {fileID: 0}
 --- !u!114 &6539856384967928028
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -239,6 +240,8 @@ MonoBehaviour:
   particlePrefab: {fileID: 7019508933032447489, guid: 0e15d6fc561b43fa95fadff8ab04b5fd, type: 3}
   duration: 1.5
   despawnGrace: 0.5
+  leadBeforeClipEnd: 0.3
+  delayAfterClipEnd: 0
   renderers: []
 --- !u!114 &7264363400000000001
 MonoBehaviour:
@@ -257,6 +260,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 64
   attackType: 0
+  hitPattern: 0
   projectilePrefab: {fileID: 0}
   muzzle: {fileID: 7565726370790595667}
   projectileSpeed: 12
@@ -379,6 +383,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 64
   attackType: 0
+  hitPattern: 0
   colliderInfo: {fileID: 4450623337231073202}
   maxHitCount: 16
   applyKnockback: 0
@@ -605,7 +610,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 1641520047319836445, guid: 5524f4bb89f16bc488f70aff8ae55fd4, type: 3}
       propertyPath: m_Mesh
-      value:
+      value: 
       objectReference: {fileID: 4300000, guid: 21947edba613c9d4dbfcc4ed3bc8dbc2, type: 2}
     - target: {fileID: 1641520047319836445, guid: 5524f4bb89f16bc488f70aff8ae55fd4, type: 3}
       propertyPath: m_AABB.m_Center.x
@@ -637,12 +642,12 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1641520047319836445, guid: 5524f4bb89f16bc488f70aff8ae55fd4, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
-      value:
-      objectReference: {fileID: 2100000, guid: fda3737d7650ae644993a004fbb46f74, type: 2}
+      value: 
+      objectReference: {fileID: 2100000, guid: 1d33ec560f992c541a73a64815b05b00, type: 2}
     - target: {fileID: 1641520047319836445, guid: 5524f4bb89f16bc488f70aff8ae55fd4, type: 3}
       propertyPath: 'm_Materials.Array.data[1]'
-      value:
-      objectReference: {fileID: 2100000, guid: d07a3d68ea2cd65478403c7007c05065, type: 2}
+      value: 
+      objectReference: {fileID: 2100000, guid: bb2c370cffd03fc409fd5ac91eb1029a, type: 2}
     - target: {fileID: 3170371216191921136, guid: 5524f4bb89f16bc488f70aff8ae55fd4, type: 3}
       propertyPath: m_Name
       value: Model

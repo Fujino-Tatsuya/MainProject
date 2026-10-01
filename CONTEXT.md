@@ -12,7 +12,8 @@ Update this file when a term becomes important enough that future agents or team
 
 수정 예정: `Assets/2.Prefabs/Monster/*.prefab`(8종 머티리얼 슬롯) · `Assets/3.Materials/FlatKit/Monster/` · Flat Kit 셰이더 확장(결정 대기) · 이후 보스방(23호·Wells) 패턴.
 - development(`8c5117a9`, 이지원 최종 메쉬·SurfaceV1 머티리얼) + SVN r356(드론 `Char/Drone/`) 반영. 몬스터 프리팹 8종은 **아트판 그대로** 채택 — SurfaceV1 = URP Lit(BaseMap·Normal·MetallicGloss).
-- 🔴 결정 대기: Flat Kit Stylized Surface 는 금속성 맵·환경 반사가 없다 → 아트 의도(금속 질감) 보존 방법(셰이더 복제 확장 등) 팀장·Codex 상의 중.
+- ✅ 결정(10-01): Flat Kit Stylized Surface 를 **그대로** 쓴다. 이 셰이더는 GI 를 metallic 0·smoothness 0 으로 고정 계산해
+  금속성 맵·반사가 빠지지만 **아트팀이 문제없다고 확인**(팀장 전달). 셰이더 복제 확장 안 함. 전환 = `Tools/Rendering/Flat Kit/Convert Characters`.
 - 물 작업(이전 세션)은 커밋·푸시 완료 — 남은 것: WaterPart 모서리 다듬기 · Play/MPPM. 상세 [PLAN-flatkit.md](PLAN-flatkit.md) 9-b.
 
 ## ▶▶ 현재 인수인계 (2026-10-01 · 은희(Claude) · **데미지 숫자 Re:C v0.2 + 자체 이징 `EuniTween`**, 브랜치 `feature/DamagePopupTweening`, push 안 함)
