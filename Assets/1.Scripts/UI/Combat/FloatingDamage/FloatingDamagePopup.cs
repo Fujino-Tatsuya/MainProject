@@ -40,6 +40,8 @@ public sealed class FloatingDamagePopup : MonoBehaviour
     float _singleDuration;
     int _amount;
     Color _styleColor;
+    int _baseMaxHp;
+    MonsterRank _rank;
     Color _baseColor;
     bool _releaseRequested;
 
@@ -102,7 +104,12 @@ public sealed class FloatingDamagePopup : MonoBehaviour
         _digitHeight = style.height;
         _alpha = _baseColor.a;
 
+        // 색 판정용 — 대상이 도중에 사라져도 같은 기준으로 판정하도록 생성 때 저장한다.
+        _baseMaxHp = request.target != null ? request.target.MaxHp : 0;
+        _rank = request.target != null ? request.target.Rank : MonsterRank.Normal;
+
         SetTier(tier);
+        UpdateFillColor();
         // 단발 숫자의 표시 시간은 생성 때의 구간으로 정한다(단발은 구간이 바뀌지 않는다).
         _singleDuration = Mathf.Max(_look.singleDuration, settings.RiseDuration + settings.FadeDuration);
 
@@ -122,6 +129,7 @@ public sealed class FloatingDamagePopup : MonoBehaviour
         _amount += amount;
         _lastHitAt = _elapsed;
         RefreshText();
+        UpdateFillColor();
 
         // 크기는 지금까지 받은 개별 타격 중 가장 높은 구간을 유지한다 — 누적액으로는 올리지 않는다.
         if (hitTier > _tier)
@@ -259,9 +267,27 @@ public sealed class FloatingDamagePopup : MonoBehaviour
     {
         _tier = tier;
         _look = _settings.GetLook(tier);
-        // HP 피해 숫자는 강도로 색을 바꾼다(낮음 노랑 · 중간 주황 · 높음 빨강). 보호막 등 다른 유형은 유형 색.
-        // 다음 ApplyLayout 의 SetAlpha 가 새 색을 입힌다.
-        _baseColor = _request.kind == PopupKind.Damage ? _look.fillColor : _styleColor;
+    }
+
+    // HP 피해 숫자의 채움 색(낮음 노랑 · 중간 주황 · 높음 빨강). 보호막 등 다른 유형은 유형 색.
+    // 누적 숫자는 **누적 합계**로 판정해 합산될수록 색이 올라간다(은희 2026-10-01).
+    // 크기·강조는 여전히 개별 타격 기준(_tier) — 색만 합계를 따른다.
+    // 다음 ApplyLayout 의 SetAlpha 가 새 색을 입힌다.
+    void UpdateFillColor()
+    {
+        if (_request.kind != PopupKind.Damage)
+        {
+            _baseColor = _styleColor;
+            return;
+        }
+
+        FloatingDamageTier colorTier = _accumulates
+            ? _settings.ClassifyTier(_amount, _baseMaxHp, _rank)
+            : _tier;
+        if (colorTier < _tier)
+            colorTier = _tier;
+
+        _baseColor = _settings.GetLook(colorTier).fillColor;
     }
 
     void StartSpawnPop()
