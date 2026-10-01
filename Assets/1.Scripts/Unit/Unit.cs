@@ -1,5 +1,7 @@
 using BaseNetCode;
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -45,7 +47,13 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     NetworkVariableReadPermission.Everyone,
     NetworkVariableWritePermission.Server
 );
+    // 보호막 인스턴스 목록 복제본(종류별 HUD 등 표시용). 합계는 _currentShield 가 따로 싣는다 —
+    // 기존 소비자(피격 연출·HUD)는 합계 변화만 보면 되므로 그대로 둔다.
+    readonly NetworkList<ShieldInstance> _replicatedShields = new NetworkList<ShieldInstance>();
+    readonly List<ShieldInstance> _shieldEventBuffer = new List<ShieldInstance>();
+    Coroutine _shieldExpiryRoutine;
     bool _deathNotified;
+    ulong _damageAttackerClientId = ulong.MaxValue;
 
     /// <summary>
     /// 서버에서 생존 상태의 체력이 0으로 전환될 때 한 번 발생한다.
@@ -75,8 +83,12 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     {
         if (!IsServer || _health == null || damage <= 0) return;
 
+        // 죽은 대상은 피해를 받지 않는다 — ReceiveAttack 을 거치지 않는 직접·비율·추락 피해도 같은 규칙.
+        // 여기서 막지 않으면 HP 변화 없이 표시용 피해 RPC(ClientDamageDealtClientRpc)만 나가 시체에 숫자가 뜬다.
+        if (_health.CurrentHealth <= 0) return;
+
         // 진단 — 여기서 조용히 버려지는 피해가 "때려도 안 맞는다"로 보인다(2026-07-30).
-        // ReceiveAttack 은 무조건 true 를 반환하므로 공격 측은 [Attack] … 적중 을 찍고,
+        // ReceiveAttack 은 살아 있는 대상에게는 무조건 true 를 반환하므로 공격 측은 [Attack] … 적중 을 찍고,
         // 피해만 사라져서 로그상 성공처럼 보인다. 누가 무엇을 거부했는지 남긴다.
         if (!CanApplyHealthDamage(damage))
         {
@@ -88,16 +100,25 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
 
         int previousHealth = _health.CurrentHealth;
 
+        int hpDealt;
+        int shieldDealt;
         if (ignoreDefenseAndShield)
         {
+            hpDealt = damage;
+            shieldDealt = 0;
             _health.TakeHpDamage(damage);
         }
         else
         {
-            ApplyMitigatedHealthDamage(damage);
+            ApplyMitigatedHealthDamage(damage, out hpDealt, out shieldDealt);
         }
 
         _currentHp.Value = _health.CurrentHealth;
+
+        // 표시용 피해량은 체력 클램프 전 최종값이다. NetworkVariable 변화량으로는 막타 초과분을
+        // 복원할 수 없으므로, 피해가 확정되는 이 지점에서 전 피어에 전달한다.
+        if (IsSpawned && (hpDealt > 0 || shieldDealt > 0))
+            ClientDamageDealtClientRpc(hpDealt, shieldDealt, _damageAttackerClientId);
 
         // 진단 — Health 의 기존 로그는 대상 이름이 없어서 누구의 체력이 줄었는지 알 수 없었다.
         // 요청값과 실제 감소량을 함께 남긴다(경감으로 1까지 깎이는 경우를 가른다).
@@ -108,28 +129,33 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         NotifyDeathTransition(previousHealth);
     }
 
-    void ApplyMitigatedHealthDamage(int damage)
+    void ApplyMitigatedHealthDamage(int damage, out int hpDealt, out int shieldDealt)
     {
         int remainingDamage = damage;
+        shieldDealt = 0;
 
         //// 방어력 경감률 적용: 최종 피해 = 피해 x 100 / (100 + 방어력), 방어력 100당 50% 경감
         remainingDamage = Mathf.RoundToInt(remainingDamage * 100f / (100f + _health.CurrentDefense));
 
-        // 쉴드가 있으면 쉴드로 피해를 처리하고 남은 데미지 계산
+        // 쉴드가 있으면 쉴드로 피해를 처리하고 남은 데미지 계산(만료가 가장 빠른 보호막부터)
         if (_health.HasShield)
         {
-            int shieldDamage = Mathf.Min(remainingDamage, _health.CurrentShield);
-            _health.TakeShieldDamage(shieldDamage);
+            _shieldEventBuffer.Clear();
+            shieldDealt = _health.TakeShieldDamage(remainingDamage, _shieldEventBuffer);
 
             UpdateNetworkShield();
+            RaiseShieldEnded(ShieldEndReason.Depleted);
 
-            remainingDamage -= shieldDamage;
+            remainingDamage -= shieldDealt;
         }
 
+        // Health.TakeHpDamage가 0으로 클램프하기 전의 최종 HP 피해량을 보존한다.
+        hpDealt = remainingDamage;
+
         // 남은 피해는 체력으로 처리
-        if (remainingDamage > 0)
+        if (hpDealt > 0)
         {
-            _health.TakeHpDamage(remainingDamage);
+            _health.TakeHpDamage(hpDealt);
         }
     }
 
@@ -139,6 +165,10 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
             return;
 
         _deathNotified = true;
+
+        // 죽으면 보호막은 모두 걷힌다(출처·종류 무관).
+        ClearShields(ShieldEndReason.Cleared);
+
         Died?.Invoke();
     }
 
@@ -147,21 +177,26 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         TakeDamage(attackInfo.damage);
     }
 
+    /// <returns>
+    /// 공격이 받아들여졌는가. <b>이미 죽은 대상은 거절한다(false)</b> — 피해·피격 연출·넉백·적중 통지가
+    /// 전부 이 값을 따른다. 같은 판정 안에서 막타 직후 들어오는 추가타(패시브 등)도 여기서 걸러진다.
+    /// </returns>
     public virtual bool ReceiveAttack(AttackInfo attackInfo, AttackHitContext hitContext)
     {
-        int previousHp = CurrentHealth;
-        int previousShield = CurrentShield;
+        if (CurrentHealth <= 0)
+            return false;
 
-        TakeDamage(attackInfo);
-
-        int hpDamage = Mathf.Max(0, previousHp - CurrentHealth);
-        int shieldDamage = Mathf.Max(0, previousShield - CurrentShield);
-        // 타격 쉐이크도 공격자 귀속값을 소비하므로 카메라 리그가 있으면 기존 RPC를 재사용한다.
-        if (IsServer && IsSpawned && (hpDamage > 0 || shieldDamage > 0) &&
-            (FloatingDamageSpawner.RequiresAttributedDamageRpc || CameraFeedback.RequiresAttributedDamageRpc))
+        // 공격자 귀속은 이 ReceiveAttack이 적용하는 피해에만 유효하다. 추락·비율·직접 피해처럼
+        // ApplyHealthDamage를 곧바로 타는 경로는 기본값(공격자 없음)을 유지한다.
+        ulong previousAttackerClientId = _damageAttackerClientId;
+        _damageAttackerClientId = ResolveAttackerClientId(hitContext);
+        try
         {
-            ulong attackerClientId = ResolveAttackerClientId(hitContext);
-            ClientDamagedAttributedClientRpc(hpDamage, shieldDamage, attackerClientId);
+            TakeDamage(attackInfo);
+        }
+        finally
+        {
+            _damageAttackerClientId = previousAttackerClientId;
         }
 
         return true;
@@ -211,8 +246,7 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     {
         if (!IsServer || _health == null) return;
 
-        _health.SetShield(0);
-        UpdateNetworkShield();
+        ClearShields(ShieldEndReason.Cleared);
     }
 
     /// <summary>
@@ -258,26 +292,118 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     }
 
     /// <summary>
-    /// shieldAmount만큼 쉴드를 회복시키는 함수
+    /// 서버에서 보호막 인스턴스가 사라질 때마다 발생한다(교체로 지워진 것은 제외).
+    /// 연출이 "깨짐(Depleted)"과 "걷힘(Expired·Cleared)"을 구분하는 데 쓴다.
     /// </summary>
-    /// <param name="shieldAmount">회복시킬 쉴드 양</param>
-    public void IncreaseShield(int shieldAmount)
-    {
-        if (!IsServer) return; // 서버에서만 쉴드 회복 처리
-        _health.IncreaseShield(shieldAmount);
-        UpdateNetworkShield();
-    }
+    public event Action<ShieldInstance, ShieldEndReason> ServerShieldEnded;
 
     /// <summary>
-    /// shieldValue만큼 쉴드를 설정하는 함수
+    /// 보호막 인스턴스를 추가한다(서버 전용). 같은 종류·출처의 재적용은 종류의 쌓임 규칙(<see cref="ShieldTypePolicies"/>)을 따른다.
     /// </summary>
-    /// <param name="shieldValue">설정할 쉴드 값</param>
-    public void SetShield(int shieldValue)
+    /// <param name="sourceId">출처(보통 부여자 NetworkObjectId). Replace 규칙은 같은 출처끼리만 교체한다</param>
+    /// <param name="duration">초. 0 이하면 시간 만료 없음</param>
+    public void AddShield(ShieldType type, ulong sourceId, int amount, float duration)
     {
-        if (!IsServer) return; // 서버에서만 쉴드 설정 처리
-        _health.SetShield(shieldValue);
+        if (!IsServer || _health == null || amount <= 0) return;
+
+        _health.AddShield(type, sourceId, amount, duration, ShieldNow());
         UpdateNetworkShield();
+
+        if (duration > 0f && _shieldExpiryRoutine == null)
+            _shieldExpiryRoutine = StartCoroutine(ShieldExpiryLoop());
     }
+
+    /// <summary>같은 종류·출처의 보호막을 지운다(서버 전용). 지운 것은 Cleared 로 통지한다.</summary>
+    public void RemoveShield(ShieldType type, ulong sourceId)
+    {
+        if (!IsServer || _health == null) return;
+
+        _shieldEventBuffer.Clear();
+        for (int i = 0; i < _health.Shields.Count; i++)
+        {
+            if (_health.Shields[i].type == type && _health.Shields[i].sourceId == sourceId)
+                _shieldEventBuffer.Add(_health.Shields[i]);
+        }
+
+        if (!_health.RemoveShield(type, sourceId))
+            return;
+
+        UpdateNetworkShield();
+        RaiseShieldEnded(ShieldEndReason.Cleared);
+    }
+
+    /// <summary>서버 전용. 같은 종류·출처의 보호막이 남아 있는가.</summary>
+    public bool ContainsShield(ShieldType type, ulong sourceId)
+    {
+        return _health != null && _health.ContainsShield(type, sourceId);
+    }
+
+    /// <summary>복제된 보호막 인스턴스 수(전 피어).</summary>
+    public int ShieldInstanceCount => _replicatedShields.Count;
+
+    /// <summary>복제된 보호막 인스턴스(전 피어). 종류별 HUD 표시용.</summary>
+    public ShieldInstance GetShieldInstance(int index) => _replicatedShields[index];
+
+    /// <summary>
+    /// 복제된 보호막 목록 기준 (남은 합, 부여 합) — 전 피어. HUD 보호막 바 비율용.
+    /// 두 값을 같은 목록에서 읽어 합계 변수(_currentShield)와의 복제 시점 차이로 비율이 튀지 않게 한다.
+    /// </summary>
+    public void GetReplicatedShieldTotals(out int remaining, out int granted)
+    {
+        long remainingSum = 0;
+        long grantedSum = 0;
+        for (int i = 0; i < _replicatedShields.Count; i++)
+        {
+            remainingSum += _replicatedShields[i].amount;
+            grantedSum += _replicatedShields[i].grantedAmount;
+        }
+        remaining = (int)Math.Min(remainingSum, int.MaxValue);
+        granted = (int)Math.Min(grantedSum, int.MaxValue);
+    }
+
+    void ClearShields(ShieldEndReason reason)
+    {
+        if (!IsServer || _health == null || !_health.HasShield) return;
+
+        _shieldEventBuffer.Clear();
+        _health.ClearShields(_shieldEventBuffer);
+        UpdateNetworkShield();
+        RaiseShieldEnded(reason);
+    }
+
+    IEnumerator ShieldExpiryLoop()
+    {
+        // Unit 파생(Player·MonsterBase)이 Update 를 따로 가져서 base 에 Update 를 두면 가려진다 — 코루틴으로 돈다.
+        while (_health != null && _health.HasShield)
+        {
+            _shieldEventBuffer.Clear();
+            if (_health.RemoveExpiredShields(ShieldNow(), _shieldEventBuffer))
+            {
+                UpdateNetworkShield();
+                RaiseShieldEnded(ShieldEndReason.Expired);
+            }
+            yield return null;
+        }
+        _shieldExpiryRoutine = null;
+    }
+
+    void RaiseShieldEnded(ShieldEndReason reason)
+    {
+        if (_shieldEventBuffer.Count == 0)
+            return;
+
+        // 핸들러가 다시 보호막을 건드려 버퍼를 재사용할 수 있으므로 복사본으로 돈다.
+        ShieldInstance[] ended = _shieldEventBuffer.ToArray();
+        _shieldEventBuffer.Clear();
+        for (int i = 0; i < ended.Length; i++)
+            ServerShieldEnded?.Invoke(ended[i], reason);
+    }
+
+    // 상태이상과 같은 시간 도메인(Pause-aware NetworkClock.GameNow, 없으면 ServerTime).
+    double ShieldNow()
+        => NetworkClock.Instance != null
+            ? NetworkClock.Instance.GameNow
+            : (NetworkManager != null ? NetworkManager.ServerTime.Time : 0.0);
 
     /// <summary>
     /// 쉴드 상태 갱신 함수
@@ -287,6 +413,13 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         if (!IsServer) return;
         _currentShield.Value = _health.CurrentShield;
         _hasShield.Value = _health.HasShield;
+
+        if (!IsSpawned)
+            return;
+
+        _replicatedShields.Clear();
+        for (int i = 0; i < _health.Shields.Count; i++)
+            _replicatedShields.Add(_health.Shields[i]);
     }
     #endregion
 
@@ -410,24 +543,6 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     }
 
     [Rpc(SendTo.Server)]
-    public void IncreaseShieldRpc(int shieldAmount, RpcParams rpcParams = default)
-    {
-        if (rpcParams.Receive.SenderClientId != OwnerClientId)
-            return;
-
-        IncreaseShield(shieldAmount);
-    }
-
-    [Rpc(SendTo.Server)]
-    public void SetShieldRpc(int shieldValue, RpcParams rpcParams = default)
-    {
-        if (rpcParams.Receive.SenderClientId != OwnerClientId)
-            return;
-
-        SetShield(shieldValue);
-    }
-
-    [Rpc(SendTo.Server)]
     public void ChangeMoveSpeedValueRpc(float newMoveSpeed, RpcParams rpcParams = default)
     {
         if (rpcParams.Receive.SenderClientId != OwnerClientId)
@@ -484,13 +599,13 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     /// 실드 감소는 여기서 나오지 않는다(ClientDamaged 참조).
     /// </summary>
     public event System.Action<int, int> ClientHpChanged;
-    /// 모든 피어에서 복제된 실제 감소량과 채널을 전달한다. 기본 AllDamage 표시에 사용하며
-    /// 기존 ClientDamaged 이벤트와 판정 경로는 변경하지 않는다.
+    /// 모든 피어에서 복제된 실제 감소량과 채널을 전달한다.
+    /// HitFlash·카메라의 피격 반응처럼 체력 클램프 뒤 변화량이 필요한 소비자가 사용한다.
     /// </summary>
     public event Action<int, DamageChannel> ClientDamagedAmount;
 
     /// <summary>
-    /// 공격자 구분 필터가 켜졌을 때만 서버가 보내는 실제 감소량이다.
+    /// 서버가 모든 피해 적용마다 보내는 방어 적용 후·체력 클램프 전 최종 피해량이다.
     /// attackerClientId가 ulong.MaxValue면 플레이어 공격자가 아닌 피해다.
     /// </summary>
     public event Action<int, DamageChannel, ulong> ClientDamagedAttributed;
@@ -545,7 +660,7 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     }
 
     [ClientRpc]
-    void ClientDamagedAttributedClientRpc(int hpDamage, int shieldDamage, ulong attackerClientId)
+    void ClientDamageDealtClientRpc(int hpDamage, int shieldDamage, ulong attackerClientId)
     {
         if (shieldDamage > 0)
             ClientDamagedAttributed?.Invoke(shieldDamage, DamageChannel.Shield, attackerClientId);

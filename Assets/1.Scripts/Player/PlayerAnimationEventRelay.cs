@@ -3,13 +3,13 @@
 public class PlayerAnimationEventRelay : MonoBehaviour
 {
     private Player player;
-    private DefaultAttackController defaultAttack;
+    private IPlayerBasicAttack defaultAttack;
     private PlayerSkillController skillController;
 
     private void Awake()
     {
         player = GetComponentInParent<Player>();
-        defaultAttack = GetComponentInParent<DefaultAttackController>();
+        defaultAttack = GetComponentInParent<IPlayerBasicAttack>();
         skillController = GetComponentInParent<PlayerSkillController>();
     }
 
@@ -26,7 +26,7 @@ public class PlayerAnimationEventRelay : MonoBehaviour
     public void HandleDefaultAttackEvent(int eventType)
     {
         if (defaultAttack == null)
-            defaultAttack = GetComponentInParent<DefaultAttackController>();
+            defaultAttack = GetComponentInParent<IPlayerBasicAttack>();
 
         defaultAttack?.HandleAnimationEvent((DefaultAttackAnimationEventType)eventType);
     }

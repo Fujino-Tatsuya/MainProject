@@ -5,7 +5,7 @@ using UnityEngine.Rendering.Universal;
 
 // 플레이어 실루엣의 배선 지점 세 곳을 한 번에 보장한다(멱등 — 몇 번 돌려도 안전).
 //   1) PC_Renderer 에 PlayerSilhouetteFeature 등록 + 셰이더 2개 물리기
-//   2) 플레이어 프리팹(Paladin)에 PlayerSilhouetteTag 부착
+//   2) 플레이어 base 프리팹(Player.prefab)에 PlayerSilhouetteTag 부착 — 캐릭터 무관한 역할 쪽이라 Variant 가 상속한다
 //   3) 씬의 WallOcclusionDriver 비활성 — 구 투명화와 실루엣이 같이 돌면 둘 다 이상해진다
 //
 // 구조는 PixelScanlineAuthoring 을 그대로 따랐다(서브에셋 등록 + ValidateRendererFeatures 리플렉션).
@@ -16,7 +16,7 @@ public static class PlayerSilhouetteAuthoring
         "Assets/1.Scripts/Rendering/Silhouette/Shaders/PlayerSilhouetteMask.shader";
     private const string CompositeShaderPath =
         "Assets/1.Scripts/Rendering/Silhouette/Shaders/PlayerSilhouetteComposite.shader";
-    private const string PlayerPrefabPath = "Assets/2.Prefabs/Player/Paladin/Paladin.prefab";
+    private const string PlayerPrefabPath = "Assets/2.Prefabs/Player/Player.prefab";
 
     [MenuItem("Tools/Rendering/Look/Wire Player Silhouette")]
     public static void Wire()

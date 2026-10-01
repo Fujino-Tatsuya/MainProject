@@ -20,6 +20,9 @@ public class PlayerSkillData : ScriptableObject
 
     [Header("수치")]
     [SerializeField, Min(0f)] private float cooldownTime = 1f;
+    // false(기본) = 승인 즉시 쿨타임 시작. true = 스킬이 실제 발동 시점에 PlayerSkillController.CommitCooldownServer 로 시작한다
+    // (거너 Q: 발사 순간부터 — 발사 없이 끝나면 쿨타임 없음).
+    [SerializeField] private bool commitCooldownManually = false;
     [SerializeField] private float attackDamageMultiplier = 1f;
     [SerializeField] private int flatDamageBonus;
     // 홀드/채널 지속시간이자 서버 강제 종료 안전망 기준. Press 스킬도 이 시간을 넘기면 강제 종료된다.
@@ -31,6 +34,8 @@ public class PlayerSkillData : ScriptableObject
     // 사망 상태에서도 시전 가능한 스킬만 true. 사망은 쿨타임을 초기화하지 않고 시전만 차단한다.
     [SerializeField] private bool usableWhileDead = false;
     [SerializeField] private LayerMask hittableLayers;
+    // 이 스킬의 적중이 "적중 시 발동" 효과(패시브 버프 등)를 소모할 수 있는가. 기본은 평타만 소모한다.
+    [SerializeField] private bool triggersOnHit = false;
 
     [Header("타겟팅")]
     // None이면 키 입력 즉시 시전(기존 동작). SingleTarget/GroundPoint면 조준 모드로 진입한다.
@@ -49,12 +54,14 @@ public class PlayerSkillData : ScriptableObject
 
     public PlayerSkillInputType InputType => inputType;
     public float CooldownTime => cooldownTime;
+    public bool CommitCooldownManually => commitCooldownManually;
     public float AttackDamageMultiplier => attackDamageMultiplier;
     public int FlatDamageBonus => flatDamageBonus;
     public float MaxActiveDuration => maxActiveDuration;
     public float TickInterval => tickInterval;
     public bool UsableWhileDead => usableWhileDead;
     public LayerMask HittableLayers => hittableLayers;
+    public bool TriggersOnHit => triggersOnHit;
     public SkillTargetingMode TargetingMode => targetingMode;
     public SkillConfirmMode ConfirmMode => confirmMode;
     public float CastRange => castRange;

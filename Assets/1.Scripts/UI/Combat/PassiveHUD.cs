@@ -3,8 +3,8 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// 패시브(불굴의 의지) HUD. 로컬 플레이어의 FirstMeleePassive를 바인딩해
-/// 쿨다운 진행도(fill)와 Ready 강조를 표시한다. 오너 전용 상태(readyServerTime)를 읽으므로
+/// 패시브 HUD. 로컬 플레이어의 패시브(IPlayerPassive — 캐릭터 무관)를 바인딩해
+/// 쿨다운 진행도(fill)와 Ready 강조를 표시한다. 오너 전용 상태(남은 쿨타임)를 읽으므로
 /// 로컬 플레이어에만 유효 — CombatHUD가 Player.LocalPlayer로 바인딩한다.
 /// </summary>
 public class PassiveHUD : MonoBehaviour
@@ -24,11 +24,11 @@ public class PassiveHUD : MonoBehaviour
     [SerializeField] private Color readyColor = Color.white;
     [SerializeField] private Color cooldownColor = new Color(1f, 1f, 1f, 0.4f);
 
-    private FirstMeleePassive passive;
+    private IPlayerPassive passive;
 
     public void Bind(Player player)
     {
-        passive = player != null ? player.GetComponent<FirstMeleePassive>() : null;
+        passive = player != null ? player.GetComponent<IPlayerPassive>() : null;
         Refresh();
     }
 

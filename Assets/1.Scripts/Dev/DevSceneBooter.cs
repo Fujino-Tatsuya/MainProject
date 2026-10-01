@@ -125,9 +125,20 @@ public class DevSceneBooter : MonoBehaviour
             yield break;
         }
 
-        if (playerPrefabOverride != null)
+        GameObject playerPrefab = playerPrefabOverride;
+#if UNITY_EDITOR
+        // 씬 필드가 비어 있으면 개인 선택(EditorPrefs)을 쓴다 — 공유 씬을 캐릭터 선택 때문에 고치지 않기 위함.
+        if (playerPrefab == null && !string.IsNullOrEmpty(DevBootTarget.PlayerPrefabPath))
         {
-            flow.SetDefaultPlayerPrefab(playerPrefabOverride);
+            playerPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(DevBootTarget.PlayerPrefabPath);
+            if (playerPrefab == null)
+                Debug.LogWarning($"[DevBoot] 선택한 플레이어 프리팹을 못 찾았다: {DevBootTarget.PlayerPrefabPath} — 기본값을 쓴다.", this);
+        }
+#endif
+        if (playerPrefab != null)
+        {
+            flow.SetDefaultPlayerPrefab(playerPrefab);
+            Debug.Log($"[DevBoot] 플레이어 프리팹 = {playerPrefab.name}");
         }
 
         // 기존 편집기 설정 API로 타겟과 표시 시간을 맞춘다. Dev 경로는 StartGameLoading을 호출하지 않으므로

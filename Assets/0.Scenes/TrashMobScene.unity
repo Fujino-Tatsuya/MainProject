@@ -487,7 +487,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e21afd08793ae0d449e707c61e86d36b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MonsterTestBootstrap
-  playerPrefab: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+  playerPrefab: {fileID: 7876615519038055782, guid: df27ec97b40aab24da03bb1fb7cb43ce, type: 3}
   playerSpawnPoint: {fileID: 749244850}
   fallbackSpawnPosition: {x: 0, y: 1, z: 3}
   autoStartHostOnPlay: 1
@@ -616,7 +616,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1408049361
+  GlobalObjectIdHash: 3841670022
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -1243,7 +1243,7 @@ MonoBehaviour:
   NetworkConfig:
     ProtocolVersion: 0
     NetworkTransport: {fileID: 1538840101}
-    PlayerPrefab: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+    PlayerPrefab: {fileID: 7876615519038055782, guid: df27ec97b40aab24da03bb1fb7cb43ce, type: 3}
     Prefabs:
       NetworkPrefabsLists:
       - {fileID: 11400000, guid: 28ca89dc34eff6547b550c9200caee32, type: 2}

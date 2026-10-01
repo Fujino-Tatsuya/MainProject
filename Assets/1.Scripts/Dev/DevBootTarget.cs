@@ -16,6 +16,17 @@ public static class DevBootTarget
     private static readonly string WorkspaceKey = ComputeWorkspaceKey(Application.dataPath);
     private static readonly string TargetScenePathKey = KeyPrefix + WorkspaceKey + ".TargetScenePath";
     private static readonly string RecentScenePathsKey = KeyPrefix + WorkspaceKey + ".RecentScenePaths";
+    private static readonly string PlayerPrefabPathKey = KeyPrefix + WorkspaceKey + ".PlayerPrefabPath";
+
+    /// <summary>
+    /// Dev Boot 가 스폰할 플레이어 프리팹 경로(개인 선택). 비어 있으면 NetworkManager 기본값.
+    /// 캐릭터 선택 UI 가 생기기 전까지의 개발용 경로다(메뉴 Dev/Dev Boot/캐릭터).
+    /// </summary>
+    public static string PlayerPrefabPath
+    {
+        get => EditorPrefs.GetString(PlayerPrefabPathKey, string.Empty);
+        set => EditorPrefs.SetString(PlayerPrefabPathKey, value ?? string.Empty);
+    }
 
     public static string ScenePath
     {

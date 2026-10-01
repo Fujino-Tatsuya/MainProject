@@ -31,10 +31,6 @@ public sealed class FloatingDamageSpawner : MonoBehaviour
     }
 
     public static FloatingDamageSpawner Instance { get; private set; }
-    public static bool RequiresAttributedDamageRpc =>
-        Instance != null &&
-        Instance.settings != null &&
-        Instance.settings.DisplayFilter != FloatingDamageDisplayFilter.AllDamage;
 
     [SerializeField] FloatingDamageSettings settings;
     [SerializeField] FloatingDamagePopup popupPrefab;

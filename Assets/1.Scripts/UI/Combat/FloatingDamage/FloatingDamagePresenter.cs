@@ -19,7 +19,6 @@ public sealed class FloatingDamagePresenter : MonoBehaviour
         if (_unit == null)
             return;
 
-        _unit.ClientDamagedAmount += HandleReplicatedDamage;
         _unit.ClientDamagedAttributed += HandleAttributedDamage;
     }
 
@@ -28,18 +27,7 @@ public sealed class FloatingDamagePresenter : MonoBehaviour
         if (_unit == null)
             return;
 
-        _unit.ClientDamagedAmount -= HandleReplicatedDamage;
         _unit.ClientDamagedAttributed -= HandleAttributedDamage;
-    }
-
-    void HandleReplicatedDamage(int amount, DamageChannel channel)
-    {
-        FloatingDamageSpawner spawner = FloatingDamageSpawner.Instance;
-        if (spawner == null || spawner.Settings == null ||
-            spawner.Settings.DisplayFilter != FloatingDamageDisplayFilter.AllDamage)
-            return;
-
-        Submit(spawner, amount, channel, false);
     }
 
     void HandleAttributedDamage(int amount, DamageChannel channel, ulong attackerClientId)
@@ -49,14 +37,13 @@ public sealed class FloatingDamagePresenter : MonoBehaviour
             return;
 
         FloatingDamageDisplayFilter filter = spawner.Settings.DisplayFilter;
-        if (filter == FloatingDamageDisplayFilter.AllDamage)
-            return;
-
         bool fromLocalPlayer = IsLocalAttacker(attackerClientId);
         if (filter == FloatingDamageDisplayFilter.OwnDealtOnly && !fromLocalPlayer)
             return;
 
-        Submit(spawner, amount, channel, fromLocalPlayer);
+        // AllDamage는 공격자 귀속으로 거르지 않으며, 기존처럼 로컬 공격 강조도 적용하지 않는다.
+        Submit(spawner, amount, channel,
+            filter != FloatingDamageDisplayFilter.AllDamage && fromLocalPlayer);
     }
 
     void Submit(FloatingDamageSpawner spawner, int amount, DamageChannel channel, bool fromLocalPlayer)

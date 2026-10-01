@@ -1198,8 +1198,8 @@ public class MonsterBase : Unit
 
         // 피격 이펙트는 판정이 아니라 연출이다 — 서버는 위치만 알리고 재생은 각 피어가 로컬로 한다.
         // ReceiveAttack은 서버에서만 불리므로(BaseAttack.TryResolveHit의 IsServer 게이트) 여기서
-        // 직접 Play하면 호스트에서만 보인다.
-        if (IsServer)
+        // 직접 Play하면 호스트에서만 보인다. 거절된 공격(이미 죽은 몹)에는 연출도 없다.
+        if (IsServer && resolved)
             PlayHitVFXRpc(hitContext.sourcePosition);
 
         return resolved;

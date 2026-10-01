@@ -8,13 +8,17 @@
 public sealed class PlayerSkillState : PlayerStateBase
 {
     private readonly PlayerSkillBase skill;
+    private readonly PlayerActionState phase;
 
-    public PlayerSkillState(PlayerStateContext context, PlayerSkillBase skill) : base(context)
+    /// <param name="phase">스킬 상태 계열의 단계 — Skill(기본) 또는 Focus(거너 Q 충전)</param>
+    public PlayerSkillState(PlayerStateContext context, PlayerSkillBase skill, PlayerActionState phase) : base(context)
     {
         this.skill = skill;
+        this.phase = phase;
     }
 
-    public override PlayerActionState StateType => PlayerActionState.Skill;
+    public PlayerSkillBase Skill => skill;
+    public override PlayerActionState StateType => phase;
     public override bool RequiresStateAuthorityTick => true;
 
     public bool AllowsMovement => skill != null && skill.CanMoveWhileActive;
@@ -32,8 +36,17 @@ public sealed class PlayerSkillState : PlayerStateBase
         Context.Skills?.Tick();
     }
 
+    public override void FixedTick()
+    {
+        Context.Skills?.FixedTick();
+    }
+
     public override void Exit(PlayerActionState nextState)
     {
+        // 같은 스킬의 단계 전환(Focus → Skill)은 스킬을 끝내지 않는다 — PlayerStateController.ChangeSkillPhase.
+        if (PlayerStateController.IsSkillState(nextState))
+            return;
+
         Context.Player.SetAnimatorMoving(false);
         Context.Skills?.HandleSkillStateExit(nextState);
     }

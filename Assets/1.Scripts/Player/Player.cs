@@ -8,7 +8,6 @@ using Unity.Netcode.Components;
 [RequireComponent(typeof(PlayerMovement))]
 [RequireComponent(typeof(PlayerMotor))]
 [RequireComponent(typeof(PlayerAimIndicator))]
-[RequireComponent(typeof(DefaultAttackController))]
 [RequireComponent(typeof(PlayerStateController))]
 [RequireComponent(typeof(StatusEffectController))]
 public class Player : Unit
@@ -63,12 +62,12 @@ public class Player : Unit
     [SerializeField] private float platformGroundCheckDistance = 0.6f;
 
     private PlayerStateController stateController;
-    private DefaultAttackController defaultAttack;
-    private FirstMeleePassive passive;
+    private IPlayerBasicAttack defaultAttack;
     private PlayerMotor motor;
     private PlayerGroundingSensor groundingSensor;
     private PlayerInvulnerability invulnerability;
     private PlayerShieldVfx shieldVfx;
+    private IPlayerOnHitBonus[] onHitBonuses;
     private PlayerInputReader inputReader;
     private PlayerSkillTargeting skillTargeting;
     private NetworkTransform networkTransform;
@@ -187,12 +186,12 @@ public class Player : Unit
         if (stateController == null)
             stateController = gameObject.AddComponent<PlayerStateController>();
 
-        defaultAttack = GetComponent<DefaultAttackController>();
-        passive = GetComponent<FirstMeleePassive>();
+        defaultAttack = GetComponent<IPlayerBasicAttack>();
         motor = GetComponent<PlayerMotor>();
         groundingSensor = GetComponent<PlayerGroundingSensor>();
         invulnerability = GetComponent<PlayerInvulnerability>();
         shieldVfx = GetComponent<PlayerShieldVfx>();
+        onHitBonuses = GetComponents<IPlayerOnHitBonus>();
         inputReader = GetComponent<PlayerInputReader>();
         skillTargeting = GetComponent<PlayerSkillTargeting>();
         networkTransform = GetComponent<NetworkTransform>();
@@ -416,17 +415,17 @@ public class Player : Unit
 
     public void EndDefaultAttack()
     {
-        defaultAttack.EndCurrentAttack();
+        defaultAttack?.EndCurrentAttack();
     }
 
     public void HitDefaultAttack()
     {
-        defaultAttack.HitCurrentAttack();
+        defaultAttack?.HitCurrentAttack();
     }
 
     public void HandleDefaultAttackEvent(DefaultAttackAnimationEventType eventType)
     {
-        defaultAttack.HandleAnimationEvent(eventType);
+        defaultAttack?.HandleAnimationEvent(eventType);
     }
 
     public void EndInterrupt()
@@ -439,9 +438,16 @@ public class Player : Unit
         return stateController.ChangeState(PlayerActionState.Attack);
     }
 
+    /// <summary>기본 공격 준비 자세(거너). 끝나면 <see cref="BeginAttackState"/> 로 넘어간다.</summary>
+    public bool BeginAttackReadyState()
+    {
+        return stateController.ChangeState(PlayerActionState.AttackReady);
+    }
+
     public bool EndAttackState()
     {
-        if (stateController.CurrentState != PlayerActionState.Attack)
+        if (stateController.CurrentState != PlayerActionState.Attack &&
+            stateController.CurrentState != PlayerActionState.AttackReady)
             return false;
 
         return stateController.ChangeState(PlayerActionState.Idle);
@@ -1589,7 +1595,56 @@ public class Player : Unit
         base.TakeDamage(attackInfo);
     }
 
-    // 피격당하면(데미지량 무관) 패시브(불굴의 의지) 쿨다운을 감소시킨다. 서버 권위에서만 유효.
+    // ── 전투 이벤트 (서버 전용) ─────────────────────────────────────
+    // base(Player)는 캐릭터 고유 컴포넌트(패시브 등)를 모른다 — 필요한 쪽이 구독한다.
+
+    /// <summary>[서버] 내 공격 1회 판정이 적을 맞혔다. 발행은 <see cref="RaiseServerAttackLanded"/>.</summary>
+    public event System.Action<PlayerAttackLanded> ServerAttackLanded;
+
+    /// <summary>[서버] 내가 공격을 받았다(데미지량 무관). 예: 불굴의 의지의 피격 쿨타임 감소.</summary>
+    public event System.Action<AttackInfo, AttackHitContext> ServerAttackReceived;
+
+    /// <summary>
+    /// [서버] 공격 판정 경로(평타·스킬·투사체)가 적중 대상 목록을 넘긴다. 대상이 없으면 발행하지 않는다.
+    /// 🔴 "효과가 만든 피해"(패시브 추가타 등)는 여기로 보내지 말 것 — 적중 효과가 자기 자신을 재발동시킨다.
+    /// </summary>
+    public void RaiseServerAttackLanded(AttackType attackType, bool triggersOnHit, IReadOnlyList<Unit> targets, Object source)
+    {
+        // 서버 전용 계약을 발행 지점에서 강제한다 — 오너 클라가 부르면 구독자가 로컬 전용 효과를 낸다.
+        if (!IsServer || targets == null || targets.Count == 0)
+            return;
+
+        ServerAttackLanded?.Invoke(new PlayerAttackLanded(attackType, triggersOnHit, targets, source));
+    }
+
+    /// <summary>
+    /// [서버] 공격 판정의 살아 있는 첫 Unit 대상에게 기본 피해를 넣기 직전, 적중 시 발동 제공자들의
+    /// 추가 피해를 소모해 합산한다. 죽은 대상에는 0 — 호출자는 시체를 첫 대상으로 세지 않는다.
+    /// </summary>
+    public int ServerTakeOnHitBonus(bool triggersOnHit, Unit target)
+    {
+        if (!IsServer || !triggersOnHit || target == null || target == this || target.CurrentHealth <= 0)
+            return 0;
+
+        if (onHitBonuses == null)
+            onHitBonuses = GetComponents<IPlayerOnHitBonus>();
+
+        long total = 0;
+        for (int i = 0; i < onHitBonuses.Length; i++)
+        {
+            IPlayerOnHitBonus provider = onHitBonuses[i];
+            // 꺼진 컴포넌트는 발동하지 않는다 — 인터페이스 직접 호출이라 enabled 가 저절로 걸러지지 않는다.
+            if (provider == null || (provider is Behaviour behaviour && !behaviour.isActiveAndEnabled))
+                continue;
+
+            total += Mathf.Max(0, provider.ServerConsumeOnHitBonus(target));
+            if (total >= int.MaxValue)
+                return int.MaxValue;
+        }
+
+        return (int)total;
+    }
+
     public override bool ReceiveAttack(AttackInfo attackInfo, AttackHitContext hitContext)
     {
         // 보호막 피격 파문(연출)은 "어느 방향에서 맞았나"가 필요한데, 그 정보는 AttackHitContext 에만
@@ -1598,7 +1653,10 @@ public class Player : Unit
         int shieldBefore = CurrentShield;
 
         bool result = base.ReceiveAttack(attackInfo, hitContext);
-        passive?.NotifyOwnerHit();
+        if (!result)
+            return false; // 이미 죽었다 — 피격 반응(패시브 쿨감·쉴드 파문)도 없다.
+
+        ServerAttackReceived?.Invoke(attackInfo, hitContext);
 
         if (CurrentShield < shieldBefore)
             shieldVfx?.ServerHit(hitContext.sourcePosition);

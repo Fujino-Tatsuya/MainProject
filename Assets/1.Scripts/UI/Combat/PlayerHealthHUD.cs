@@ -4,7 +4,7 @@ using UnityEngine.UI;
 
 /// <summary>
 /// 로컬 플레이어의 HP 바 + 실드 바(별도 바). Unit의 복제 스탯을 매 프레임 폴링한다.
-/// 실드는 상한(MaxShield) 개념이 없으므로 바 비율은 최대 HP 대비로 그리고, 수치는 절대량을 표시한다.
+/// 실드 바 비율 = 남은 실드 합 / 지금 걸린 실드들이 부여한 양의 합(Unit 복제 인스턴스 목록 기준), 수치는 절대량을 표시한다.
 /// 실드가 0이면 실드 바 전체를 숨긴다.
 /// </summary>
 public class PlayerHealthHUD : MonoBehaviour
@@ -109,8 +109,16 @@ public class PlayerHealthHUD : MonoBehaviour
         if (!hasShield)
             return;
 
+        // 비율 = 남은 보호막 합 / 지금 걸린 보호막들이 부여한 양의 합. 최대 HP 를 기준으로 두면 보호막이 HP 보다 클 때
+        // 바가 꽉 찬 채 멈춰 있다가 HP 아래로 내려와서야 줄기 시작한다. 새 보호막이 붙으면 분모도 함께 커진다.
         if (shieldFill != null)
-            shieldFill.fillAmount = maxHp > 0 ? Mathf.Clamp01((float)shield / maxHp) : 0f;
+        {
+            int remaining = 0;
+            int granted = 0;
+            if (player != null && !displayOverrideZero)
+                player.GetReplicatedShieldTotals(out remaining, out granted);
+            shieldFill.fillAmount = granted > 0 ? Mathf.Clamp01((float)remaining / granted) : 0f;
+        }
 
         if (shieldText != null)
             shieldText.text = shield.ToString();

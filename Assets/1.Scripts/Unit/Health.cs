@@ -1,4 +1,5 @@
-﻿using Unity.Netcode;
+﻿using System.Collections.Generic;
+using Unity.Netcode;
 using UnityEngine;
 
 public class Health
@@ -65,43 +66,131 @@ public class Health
     #endregion
 
     #region 쉴드
-    int _currentShield;
-    public int CurrentShield { get { return _currentShield; } }
-    bool _hasShield = false;
-    public bool HasShield { get { return _hasShield; } }
+    // 보호막은 종류·출처별 인스턴스 목록이다. 합계가 곧 "현재 쉴드"다.
+    // 피해는 만료가 가장 빠른 인스턴스부터 깎는다(만료 없는 것은 맨 뒤). 시간은 호출자가 넘긴다(순수 로직 — EditMode 테스트 대상).
+    readonly List<ShieldInstance> _shields = new List<ShieldInstance>();
+    public IReadOnlyList<ShieldInstance> Shields => _shields;
+
+    public int CurrentShield
+    {
+        get
+        {
+            long total = 0;
+            for (int i = 0; i < _shields.Count; i++)
+                total += _shields[i].amount;
+            return (int)Mathf.Min(total, int.MaxValue);
+        }
+    }
+    public bool HasShield => _shields.Count > 0;
 
     /// <summary>
-    /// damage만큼 쉴드를 감소시키고 쉴드가 0 이하로 떨어지지 않도록 보장하는 함수
+    /// 보호막 인스턴스를 추가한다. 종류의 쌓임 규칙이 Replace 면 같은 종류·출처의 기존 인스턴스를 먼저 지운다.
     /// </summary>
-    /// <param name="damage">감소시킬 쉴드 값</param>
-    public void TakeShieldDamage(int damage)
+    /// <param name="duration">0 이하면 시간 만료 없음</param>
+    public void AddShield(ShieldType type, ulong sourceId, int amount, float duration, double now)
     {
-        _currentShield -= damage;
-        _currentShield = Mathf.Max(_currentShield, 0); // 쉴드가 0 이하로 떨어지지 않도록 보장
-        _hasShield = (_currentShield > 0)? true : false;
-        Edit.Log($"[Unit] 쉴드 피해량: {damage}   /   현재 쉴드: {_currentShield}");
+        if (amount <= 0)
+            return;
+
+        if (ShieldTypePolicies.Of(type) == ShieldStackPolicy.Replace)
+            _shields.RemoveAll(s => s.type == type && s.sourceId == sourceId);
+
+        _shields.Add(new ShieldInstance
+        {
+            type = type,
+            sourceId = sourceId,
+            amount = amount,
+            grantedAmount = amount,
+            expireTime = duration > 0f ? now + duration : 0.0,
+        });
+    }
+
+    /// <returns>제거했는가</returns>
+    public bool RemoveShield(ShieldType type, ulong sourceId)
+    {
+        return _shields.RemoveAll(s => s.type == type && s.sourceId == sourceId) > 0;
+    }
+
+    public bool ContainsShield(ShieldType type, ulong sourceId)
+    {
+        for (int i = 0; i < _shields.Count; i++)
+        {
+            if (_shields[i].type == type && _shields[i].sourceId == sourceId)
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>모든 보호막을 지운다. 지운 인스턴스를 removed 에 담는다(null 허용).</summary>
+    public void ClearShields(List<ShieldInstance> removed)
+    {
+        removed?.AddRange(_shields);
+        _shields.Clear();
     }
 
     /// <summary>
-    /// shieldValue로 쉴드 값을 설정하고 쉴드 값이 0보다 크면 hasShield를 true로, 그렇지 않으면 false로 설정하는 함수
+    /// damage 만큼 보호막을 깎는다 — 만료가 가장 빠른 인스턴스부터. 0 이 된 인스턴스는 depleted 에 담고 제거한다.
     /// </summary>
-    /// <param name="shieldValue">설정할 쉴드 값</param>
-    public void SetShield(int shieldValue)
+    /// <returns>보호막이 실제로 흡수한 양</returns>
+    public int TakeShieldDamage(int damage, List<ShieldInstance> depleted)
     {
-        _currentShield = shieldValue;
-        _hasShield = (shieldValue > 0)? true : false;
+        int absorbed = 0;
+        while (damage > 0 && _shields.Count > 0)
+        {
+            int index = EarliestExpiryIndex();
+            ShieldInstance shield = _shields[index];
+
+            int take = Mathf.Min(damage, shield.amount);
+            shield.amount -= take;
+            damage -= take;
+            absorbed += take;
+
+            if (shield.amount <= 0)
+            {
+                _shields.RemoveAt(index);
+                depleted?.Add(shield);
+            }
+            else
+            {
+                _shields[index] = shield;
+            }
+        }
+
+        Edit.Log($"[Unit] 쉴드 피해량: {absorbed}   /   현재 쉴드: {CurrentShield}");
+        return absorbed;
     }
 
-    /// <summary>
-    /// shieldAmount만큼 쉴드 값을 증가시키고 쉴드 값이 0보다 크면 hasShield를 true로, 그렇지 않으면 false로 설정하는 함수
-    /// </summary>
-    /// <param name="shieldAmount">증가시킬 쉴드 값</param>
-    public void IncreaseShield(int shieldAmount)
+    /// <summary>now 기준으로 만료된 인스턴스를 제거해 expired 에 담는다.</summary>
+    /// <returns>하나라도 제거했는가</returns>
+    public bool RemoveExpiredShields(double now, List<ShieldInstance> expired)
     {
-        _currentShield += shieldAmount;
-        _hasShield = (_currentShield > 0)? true : false;
+        bool removedAny = false;
+        for (int i = _shields.Count - 1; i >= 0; i--)
+        {
+            if (_shields[i].HasExpiry && now >= _shields[i].expireTime)
+            {
+                expired?.Add(_shields[i]);
+                _shields.RemoveAt(i);
+                removedAny = true;
+            }
+        }
+        return removedAny;
+    }
 
-        Edit.Log($"[Unit] 쉴드 증가량: {shieldAmount}   /   현재 쉴드: {_currentShield}");
+    int EarliestExpiryIndex()
+    {
+        int best = 0;
+        for (int i = 1; i < _shields.Count; i++)
+        {
+            ShieldInstance candidate = _shields[i];
+            ShieldInstance current = _shields[best];
+            // 만료 없는 보호막은 가장 늦게 소모한다. 같으면 먼저 생긴 것(앞 인덱스)이 먼저.
+            if (!candidate.HasExpiry)
+                continue;
+            if (!current.HasExpiry || candidate.expireTime < current.expireTime)
+                best = i;
+        }
+        return best;
     }
     #endregion
 
@@ -110,7 +199,5 @@ public class Health
         _maxHp = maxHp;
         _currentHp = maxHp;
         _currentDefense = defense;
-        _currentShield = 0;
-        _hasShield = false;
     }
 }

@@ -13,6 +13,46 @@ Update this file when a term becomes important enough that future agents or team
 계획: [PLAN-flatkit.md](PLAN-flatkit.md) 9-b. 수정: `Assets/1.Scripts/Rendering/Editor/FlatKitWaterPatchAuthoring.cs` · `FK_Water_Pool09.mat` · 존 프리팹 11종(`Water` 자식만) · `3.Materials/FlatKit/Water/Meshes/`.
 상태: 커밋·푸시(10-01). 물 = M_A·M_B 구석 구덩이(각 2) · S_A 구덩이 4 — 존 안 물 덩어리마다 `WaterPart_N`(위치·크기 직접 조절, 재생성해도 유지). 벤트 밑·L_B·L_C·Start 물 없음. 물 앞 벽 디더 끔(`Generic_01_A_Wet` 변형). 깊이 3×3 최근접(디더 구멍). 열린 면 자르기는 `ClipOpenEdges=false`로 꺼 둠(존 회전 배치 때문에 프리팹 기준 방향 보정이 틀림 — PLAN-flatkit 9-b). **남은 것: 팀장이 WaterPart 로 모서리 물 다듬기 · Play/MPPM 확인.**
 
+## ▶▶ 현재 인수인계 (2026-10-01 · 은희(Claude) · **원거리 캐릭터 "거너" G0~G9 구현 완료**, 브랜치 `feature/SecondCharacter`, push 안 함)
+
+기획 원본 [character_gunner.md](Docs/design/character/character_gunner.md)(§0 확정 변경 D1~D15) · 계획·진행 [PLAN-gunner.md](PLAN-gunner.md) §7 · 프리팹 구조 [player-prefabs.md](Docs/tech/player-prefabs.md) §0.
+**징크스(스택 폭발) 기획은 폐기** — 기존 원거리 슬롯·모델을 거너가 쓴다(아트 `Assets/50.Art/Char/gunner/`, SVN 핀 **346**).
+- 🔴 **전 캐릭터 공통 코어 변경**(가붕이 Play 확인함): 보호막 = 종류·출처별 인스턴스(`ShieldType`, 사망 시 전부 제거, HUD = 남은 합/부여 합) ·
+  기본 공격 = `IPlayerBasicAttack`(base 에서 빠지고 Variant 가 얹음) · `PlayerActionState` 끝에 **`AttackReady`·`Focus`** ·
+  스킬 시스템 확장(수동 쿨 커밋·실행 중 좌클릭·`OnFixedTick`·`EntryActionState`·`CanBeCanceledByDash`) · `PlayerMotor` 일시 아군 차단/적 통과 ·
+  **대시 우선은 행동이 허락할 때만**(가붕이는 전부 아니오 = 기존과 같음).
+- 거너 조립 = 메뉴 `Tools/Player/Gunner/*`(재실행 안전). 스폰 = `Dev/Dev Boot/캐릭터/거너`(개인 EditorPrefs). 정식 캐릭터 선택은 미구현.
+- ⏳ **후속**: 임시 연출 교체(발사선·폭발선·추적 레이저 원기둥 → **민경 VFX**, 훅 = `GunnerBeamView`·`GunnerHeat.StageChanged/OverheatChanged`) ·
+  임시 과열 게이지(OnGUI) → CombatHUD 정식 UI · **R 대상 사망 후 재탐색 미검증** · 밸런스 수치(전부 SO) · 캐릭터 선택 경로(player-prefabs.md §8.3) · R 기본 잠금(빌드 시스템 몫, D15).
+
+## ▶▶ 현재 인수인계 (2026-09-30 · 은희(Claude) · **플레이어 base+Variant + 패시브 버프 모델** → development 반영)
+
+`fix/Player` 를 development 에 **직접 머지·푸시**(은희 결정 — PR 리뷰 생략). 구조 원본 = [player-prefabs.md](Docs/tech/player-prefabs.md) §0·§7.
+- **스폰 = `Player_Paladin`**(`Player.prefab` 의 Variant). 역할 동작은 base, 가붕이 고유는 Variant, 몸체는 `Paladin/Paladin_Armature.prefab`.
+  구 `Paladin`·`TempPlayer_Armature` → `Player/Legacy/`, `Paladin_VFX` 는 `Player/Paladin/` 보관(스폰 안 됨). 🔴 **민경: VFX 작업은 `Player_Paladin.prefab` 에서.**
+- **패시브 = `PassiveCharge` 버프 모델** + 적중 전 훅(`IPlayerOnHitBonus`, 막타 합산) + 범용 적중 이벤트(`Player.ServerAttackLanded`, 현재 구독자 0 — 스택·빌드용). [PLAN-passive-onhit.md](PLAN-passive-onhit.md) §12·§13.
+- **죽은 대상은 피격·피해를 거절**(`Unit.ReceiveAttack`·`ApplyHealthDamage`) — 전 유닛 공통 동작 변경. **FloatingDamage = 방어 후·클램프 전 최종 피해(초과분 포함)**, 모든 피해 경로.
+- 경석 `ClearDebuffsServer()`(09-29) 와 합류 확인: `PassiveCharge` 는 분류상 Buff → 보스 연출(`ClearDebuffsServer`)에 **남는다**(PLAN R-1 해소, Play 재확인 필요).
+  아래 경석 09-29 항목의 "패시브는 상태효과를 안 쓴다" 는 이 머지로 **낡았다**.
+- ✅ 버프/디버프 판정 일원화(2026-09-30): 경석 `IsDebuff` 삭제 → `ClearDebuffsServer` 가 `StatusEffectCategories.Of` 사용. 현 타입 결과 동일, 표에 없는 새 타입만 "경고 + Debuff" 로 바뀜.
+- ⏳ **후속**:
+  캐릭터 선택 경로(§8.3) · 원거리 투사체 네트워크 스폰 · `Player.ReceiveAttack` 의 `shieldVfx` 결합 · `PlayerEncounterLockAuthoring` 의 `Paladin_VFX` 순회(경석 판단).
+
+## ▶▶ 작업 세션 (2026-09-29 · **플레이어 프리팹 base + Variant 정리**, 브랜치 `fix/Player`) — ✅ 완료, 위 인수인계로 대체
+
+작업자: **은희(Claude, unity MCP 로 에디터 조작)**, 워크트리 `C:\UnityProject\MainProject`.
+승인 계획 = [PLAN-player-variants.md](PLAN-player-variants.md) (2026-09-29 개정·승인). 단계별 커밋 P0~P5, PR 1개.
+
+🔴 **수정 예정 파일 — 이 브랜치 밖에서 동시 수정 금지:** `Assets/2.Prefabs/Player/**`
+(특히 `Paladin/Paladin_VFX.prefab` — **민경**), `Assets/2.Prefabs/UI/CombatHUD.prefab`,
+`Assets/2.Prefabs/Network/NetworkManager.prefab`, `Assets/DefaultNetworkPrefabs.asset`,
+씬 7개(`0.BootStrapScene`·`Dev_Boot`·`BossScene`·`MonsterScene`·`PlayerDashTest`·`TrashMobScene`·`Debug/PlayerScene`).
+
+- **사실 갱신:** 정식 흐름이 스폰하는 것은 `Paladin_VFX.prefab` 이다([player-prefabs.md](Docs/tech/player-prefabs.md) §0 은 낡음 — P5 에서 갱신).
+- 📋 **후속 계획 [PLAN-passive-onhit.md](PLAN-passive-onhit.md) — 패시브 버프 모델 + 범용 적중 이벤트 (2026-09-29, ✅ 구현·Play·MPPM 검증 완료 `f8a1ae5d`; §12 초과 피해 표시·막타 합산 `11d46701`·`4f5d8433` — 🔴 Play 검증 대기).** 남은 것 = 보스 입장 후 버프 유지 재검증(경석 수정 후). 🔴 보스 연출 `ClearAllServer()` 디버프 한정화는 경석 선행 작업.
+- **P0 스냅샷 기준점:** `Paladin_VFX.prefab` = `2e1ac271`. 이후 들어온 변경은 P4 직전에 재반영.
+- **진행:** P0 `d65e1610` · P1 `ee91cd4e`(Paladin_Armature 추출) · P2 `97d0a582`(Codex — base 정리, 끊긴 참조 0, Unity 임포트 OK). P3 = `Player_Paladin.prefab`(Variant, 해시 913233600). P4 = 스폰 전환(은희 Play·MPPM 통과). P5 = 구 프리팹 `Legacy/` 이동(`Paladin_VFX` 는 원위치 복구)·툴 4종·문서 갱신. **작업 완료 — PR 대기.** 남은 일 = 캐릭터 선택 경로(player-prefabs.md §8.3). 🔴 P2 의 "base 단독 Awake" 검증은 Play 가 필요해 **P4 Play 때 함께** 한다.
+
 ## ▶▶ 작업 세션 (2026-09-29 · 은희(Claude) · **Group Painter "벽 그룹" 표시**, 브랜치 `feature/WallGroupVisualize`)
 
 Group Painter 툴바에 **`벽 그룹`** 토글 추가 — 씬(또는 열린 프리팹)의 `WallTransparencyGroup` 마다
