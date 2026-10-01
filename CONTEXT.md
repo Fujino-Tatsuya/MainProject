@@ -8,6 +8,16 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-10-01 · 은희(Claude) · **자체 트윈 `EuniTween` + 데미지 팝업 연출**, 브랜치 `feature/DamagePopupTweening`)
+
+- **결정:** 트윈 라이브러리(PrimeTween·DOTween·LitMotion) **도입 안 함** — 자체 `EuniTween`(별도 asmdef, `Assets/1.Scripts/EuniTween/`, 네임스페이스 `EuniTween`).
+- 현재 = 이징 함수만(`Ease` enum 31종 + `Easing.Evaluate`·`Easing.Punch`, 상태 없는 순수 함수). 트윈 러너(핸들·Sequence·대상 파괴 처리)는 **없음** — 필요해질 때 추가.
+  테스트 `Assets/Tests/EditMode/EuniTween/`. dotnet 단독 빌드·수치 검증 통과, **Unity 임포트·Test Runner 확인 대기**(.meta 미생성).
+- 승인 계획 = [PLAN-damage-popup.md](PLAN-damage-popup.md) (기획 Re:C 데미지 숫자 표기 v0.2). 1단계 데이터 → 2단계 연출.
+- **1단계 = Codex 위임 중**(handoff `eba580f4`, 2026-10-01): AttackType Q/E/R · AttackHitPattern · RPC · 누적 키 · `MonsterRank`.
+- 🔴 `MonsterDataSO.rank` 추가는 **경석 영역** — 합의 알림 필요. 기획 구간 재조정은 기획자에게 요청 필요(PLAN §5).
+- 수정 예정: PLAN §4 목록 + `Assets/1.Scripts/EuniTween/**`, `Assets/Tests/EditMode/EuniTween/**`.
+
 ## ▶▶ 현재 인수인계 (2026-10-01 · 은희(Claude) · **원거리 캐릭터 "거너" G0~G9 구현 완료**, 브랜치 `feature/SecondCharacter`, push 안 함)
 
 기획 원본 [character_gunner.md](Docs/design/character/character_gunner.md)(§0 확정 변경 D1~D15) · 계획·진행 [PLAN-gunner.md](PLAN-gunner.md) §7 · 프리팹 구조 [player-prefabs.md](Docs/tech/player-prefabs.md) §0.
