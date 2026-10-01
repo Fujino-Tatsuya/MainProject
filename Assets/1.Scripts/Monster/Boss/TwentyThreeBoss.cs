@@ -403,6 +403,11 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
             _wells.SetSuppressed(true);
         }
 
+        // 전기 장판·드론 정지 — 파괴하지 않는 디스폰(풀 재사용)에서도 타이머·연출이 남지 않게. 재스폰 때 Init 이 다시 세운다.
+        _fightActive = false;
+        if (_electricFloor != null) _electricFloor.ResetState();
+        if (_drone != null) _drone.ResetState();
+
         // 디스폰 시 잡고 있던 플레이어를 반드시 놓는다 — 안 놓으면 풀어 줄 주체가 사라져 영구 구속된다.
         // 체공 중이었다면 메시도 되살린다(꺼진 채 남으면 다음 스폰까지 투명하다).
         AbortAttackChain();
@@ -5394,8 +5399,12 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     /// <summary>[서버] 전투 진행 중(착지 완료 · 사망 전).</summary>
     public bool IsFightActive => _fightActive && State != MonsterState.Dead;
     public bool IsDead => State == MonsterState.Dead;
-    /// <summary>[서버] 이 플레이어를 <b>실제로 쥐고 있나</b>(끌어오는 중은 아니다 — 기획서 6.4).</summary>
-    public bool IsHolding(Player p) => p != null && _grabbed == p;
+    /// <summary>
+    /// [서버] 이 플레이어를 <b>실제로 쥐고 있나</b>(끌어오는 중은 아니다 — 기획서 6.4).
+    /// 🔴 `_grabbed` 만 보면 안 된다 — Acquire 시작에 채워지고(아직 Push), 손에 붙는 건 약 1.1초 뒤
+    ///    <see cref="AttachGrabbed"/> 가 `_grabAttachPending` 을 끌 때다(Codex 교차검증 10-02).
+    /// </summary>
+    public bool IsHolding(Player p) => p != null && _grabbed == p && !_grabAttachPending;
     /// <summary>[서버] 송전기 차징 대기 중(송전탑이 서 있고 제한시간이 도는 구간).</summary>
     public bool IsChargeGimmickActive =>
         State == MonsterState.Attack && _attackPhase == BossAttackPhase.ChargeWait &&
@@ -5407,6 +5416,23 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     /// </summary>
     public BossPauseCondition ActivePauseConditions =>
         State == MonsterState.Groggy || State == MonsterState.Hit ? _groggyKind : BossPauseCondition.None;
+
+    int _droneHitMask;
+
+    /// <summary>
+    /// [서버] 드론 폭발 겹침 판정 레이어 = 플레이어 레이어 + 23호 자기 콜라이더 레이어.
+    /// 전 레이어(~0)로 쏘면 지형·장식 콜라이더로 버퍼가 차 대상이 잘릴 수 있다(Codex 교차검증 10-02).
+    /// </summary>
+    internal int DroneHitMask
+    {
+        get
+        {
+            if (_droneHitMask != 0) return _droneHitMask;
+            int m = playerMask.value;
+            foreach (Collider c in GetComponentsInChildren<Collider>(true)) m |= 1 << c.gameObject.layer;
+            return _droneHitMask = m;
+        }
+    }
 
     BossTileGrid _tileGrid;
     bool _tileGridResolved;
@@ -5445,7 +5471,9 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     [ClientRpc]
     void DroneMarkClientRpc(NetworkObjectReference target, float trackTime)
     {
-        if (_drone != null && target.TryGet(out NetworkObject no)) _drone.ClientMark(no.transform, trackTime);
+        if (_drone == null) return;
+        if (target.TryGet(out NetworkObject no)) _drone.ClientMark(no.transform, trackTime);
+        else Debug.LogWarning($"[자폭드론] 표식 대상 NetworkObject 를 이 피어에서 못 찾았다 — 크로스헤어 생략(고정 원부터 보인다).", this);
     }
     [ClientRpc] void DroneLockClientRpc(Vector3 pos, float radius, float lockTime) { if (_drone != null) _drone.ClientLock(pos, radius, lockTime); }
     [ClientRpc] void DroneImpactClientRpc(Vector3 pos, float radius) { if (_drone != null) _drone.ClientImpact(pos, radius); }

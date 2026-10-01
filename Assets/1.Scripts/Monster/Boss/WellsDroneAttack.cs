@@ -13,6 +13,8 @@ using UnityEngine;
 /// <b>타이머</b>(§4 · §11): 첫 5초 → 공격/취소 <b>종료 후</b> 7초. 제압(pauseOn)·충전 기믹 중에는 멈추고 진행 중 공격은 제거,
 /// 끝나면 멈춘 타이머부터 이어서(최소 2초). 과충전·잡기·취약은 영향 없음.
 /// </summary>
+// 23호(MonsterBase.Update) 다음에 — 같은 프레임의 그로기·차징 진입을 먼저 보게(BossElectricFloor 와 같은 이유).
+[DefaultExecutionOrder(100)]
 [DisallowMultipleComponent]
 public sealed class WellsDroneAttack : MonoBehaviour
 {
@@ -30,12 +32,27 @@ public sealed class WellsDroneAttack : MonoBehaviour
     float _radius;
     readonly List<Player> _valid = new List<Player>(4);
     readonly HashSet<Unit> _hitOnce = new HashSet<Unit>();
-    readonly Collider[] _overlap = new Collider[32];
+    readonly Collider[] _overlap = new Collider[64];
+
+    WellsDroneDataSO _ownedDefaults;   // 데이터가 비어 직접 만든 기본값 — 우리가 지운다
 
     public void Init(TwentyThreeBoss boss, WellsDroneDataSO data)
     {
         _boss = boss;
-        _d = data != null ? data : ScriptableObject.CreateInstance<WellsDroneDataSO>();
+        if (data != null) _d = data;
+        else _d = _ownedDefaults != null ? _ownedDefaults : (_ownedDefaults = ScriptableObject.CreateInstance<WellsDroneDataSO>());
+        ResetState();
+    }
+
+    /// <summary>스폰/디스폰 경계 — 타이머·직전 대상·연출을 처음으로(풀 재사용 대비).</summary>
+    public void ResetState()
+    {
+        _phase = Phase.Idle;
+        _t = 0f;
+        _started = _paused = false;
+        _target = _lastTarget = null;
+        ClientCancel();
+        DestroyBoomVfx();
     }
 
     void Update()
@@ -74,13 +91,16 @@ public sealed class WellsDroneAttack : MonoBehaviour
             if (!_paused)
             {
                 _paused = true;
-                // 진행 중 공격 제거(§11.1·§11.2). 제거된 공격은 "취소 종료"로 보고 다음 대기를 7초로 잡는다 —
-                // 재개 때 아래에서 최소 2초를 보장한다. 대기 중이었다면 남은 시간이 그대로 얼어 있다.
+                // 진행 중 공격 제거(§11.1·§11.2). 공격이 이미 나간 뒤라 남은 대기는 0 으로 본다 →
+                // 재개 때 아래 최소 보정(2초)이 그대로 다음 대기가 된다("멈춘 타이머부터 이어서 · 2초 미만이면 2초").
+                // ⚠️ 7초(§4)는 "공격 종료 · 대상 무효 취소" 두 경우뿐이다 — 정지 취소에 7초를 쓰면 재개가 늦다
+                //    (Claude·Codex 교차검증 10-02 공통 지적으로 고쳤다).
+                // 대기 중이었다면 남은 시간이 그대로 얼어 있다.
                 if (_phase != Phase.Idle && _phase != Phase.WaitTarget)
                 {
                     CancelInProgress(_boss.IsChargeGimmickActive ? "충전 기믹 진입" : "제압 진입");
                     _phase = Phase.Idle;
-                    _t = _d.cooldown;
+                    _t = 0f;
                 }
             }
             return;   // 타이머 정지
@@ -175,7 +195,7 @@ public sealed class WellsDroneAttack : MonoBehaviour
 
         // 원(바닥) 판정을 세로 캡슐로 근사한다 — 캐릭터 콜라이더가 원 위 어디에 걸쳐도 잡히게.
         int n = Physics.OverlapCapsuleNonAlloc(_lockPos, _lockPos + Vector3.up * 3f, _radius, _overlap,
-                                               ~0, QueryTriggerInteraction.Collide);
+                                               _boss.DroneHitMask, QueryTriggerInteraction.Collide);
         _hitOnce.Clear();
         int players = 0;
         bool bossHit = false;
@@ -183,6 +203,9 @@ public sealed class WellsDroneAttack : MonoBehaviour
         {
             Collider c = _overlap[i];
             if (c == null) continue;
+            // "충돌 범위" = 몸(비트리거) 또는 피격용 Hurtbox. 몸 밖으로 뻗은 센서·무기 판정 트리거는 제외한다 —
+            // 그게 원에 걸쳐 맞으면 몸이 원 밖인데 피해가 들어간다(Claude·Codex 교차검증 10-02).
+            if (c.isTrigger && c.GetComponent<Hurtbox>() == null) continue;
 
             Player p = c.GetComponentInParent<Player>();
             if (p != null)
@@ -283,9 +306,10 @@ public sealed class WellsDroneAttack : MonoBehaviour
 
         if (_d.explosionVfxPrefab != null)
         {
+            // 참조를 쥐고 있는다 — 제압·사망 취소(ClientCancel)와 파괴에서 회수해야 한다(Codex 교차검증 10-02).
+            // 수명 = explosionDuration. 프리팹 파티클이 더 길면 데이터 값을 늘린다(서버 대기와 같은 기준).
+            DestroyBoomVfx();
             _boomVfx = Instantiate(_d.explosionVfxPrefab, new Vector3(pos.x, _vFloorY, pos.z), Quaternion.identity);
-            Destroy(_boomVfx, Mathf.Max(_vDur, 2f));
-            _boomVfx = null;   // 수명은 Destroy 가 맡는다 — 취소로 끊지 않는다(이미 터졌다)
         }
         else
         {
@@ -294,8 +318,20 @@ public sealed class WellsDroneAttack : MonoBehaviour
         }
     }
 
-    /// <summary>진행 중인 표식·원·드론을 지운다(취소 · 다음 단계 전환).</summary>
+    /// <summary>서버 취소 RPC — 진행 중 표식·원·드론에 더해 폭발 VFX 까지 거둔다.</summary>
     public void ClientCancel()
+    {
+        HideTemp();
+        DestroyBoomVfx();
+    }
+
+    void DestroyBoomVfx()
+    {
+        if (_boomVfx != null) { Destroy(_boomVfx); _boomVfx = null; }
+    }
+
+    // 단계 전환용 — 임시 판·드론만 지운다(폭발 VFX 는 자기 수명대로 둔다).
+    void HideTemp()
     {
         _view = View.None;
         _crossTarget = null;
@@ -383,7 +419,9 @@ public sealed class WellsDroneAttack : MonoBehaviour
     void OnDestroy()
     {
         if (_droneGo != null) Destroy(_droneGo);
+        DestroyBoomVfx();
         if (_viewRoot != null) Destroy(_viewRoot.gameObject);
+        if (_ownedDefaults != null) Destroy(_ownedDefaults);
     }
 
     #endregion

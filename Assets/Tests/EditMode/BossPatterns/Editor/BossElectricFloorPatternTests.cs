@@ -127,6 +127,43 @@ public sealed class BossElectricFloorPatternTests
         Assert.That(p.LastRow, Is.EqualTo(-1));
     }
 
+    // ── 리셋이 실제로 기록을 지우는가 — 결정적 검증(Codex 교차검증 10-02) ────
+    // 여러 시드에서 "양쪽이 다 나온다"만 보면 리셋을 지워도 통과한다(직전의 반대도 시드마다 무작위라서).
+    // 항상 0 을 돌려주는 난수로 첫 선택을 고정하고, 리셋 전후를 직접 비교한다.
+    sealed class ZeroRandom : System.Random
+    {
+        public override int Next(int maxValue) => 0;
+        public override int Next(int minValue, int maxValue) => minValue;
+    }
+
+    [Test]
+    public void ResetCharge_ClearsGroupHistory_Deterministic()
+    {
+        var p = new BossElectricFloorPatterns(new ZeroRandom());
+        Assert.That(p.NextGroup(), Is.EqualTo(BossElectricFloorPatterns.ChargeGroup.A), "Next(2)=0 → 첫 그룹 A");
+        Assert.That(p.NextGroup(), Is.EqualTo(BossElectricFloorPatterns.ChargeGroup.B), "교대");
+        Assert.That(p.NextGroup(), Is.EqualTo(BossElectricFloorPatterns.ChargeGroup.A));
+        p.ResetCharge();
+        // 리셋이 없으면 직전 A 의 반대인 B 가 나온다. 리셋됐으면 다시 첫 추첨 → A.
+        Assert.That(p.NextGroup(), Is.EqualTo(BossElectricFloorPatterns.ChargeGroup.A));
+    }
+
+    [Test]
+    public void ResetCharge_ClearsBDirection_Deterministic()
+    {
+        var p = new BossElectricFloorPatterns(new ZeroRandom());
+        p.NextBStage2(out bool first);
+        Assert.That(first, Is.True, "Next(2)=0 → 첫 방향 = 행");
+        p.NextBStage2(out bool second);
+        Assert.That(second, Is.False, "교대");
+        p.NextBStage2(out bool third);
+        Assert.That(third, Is.True, "교대 — 직전 = 행");
+        p.ResetCharge();
+        // 직전이 행이므로 리셋이 없으면 열이 나온다. 리셋됐으면 첫 추첨(Next(2)=0) → 행.
+        p.NextBStage2(out bool afterReset);
+        Assert.That(afterReset, Is.True, "리셋 뒤 첫 추첨");
+    }
+
     // ── 그리드: 방 로컬 · 회전 (PLAN §2) ───────────────────────
 
     [Test]

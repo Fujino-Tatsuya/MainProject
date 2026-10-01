@@ -79,19 +79,23 @@ public static class BossPatternVisuals
         r.SetPropertyBlock(_mpb);
     }
 
-    /// <summary>위쪽에서 아래로 쏴서 가장 낮은 바닥 면 높이. 못 찾으면 fallback.</summary>
+    /// <summary>
+    /// 기준 높이(fallback = 방 바닥 추정)에 <b>가장 가까운</b> 충돌면 높이. 못 찾으면 fallback.
+    /// 가장 낮은 면을 고르면 바닥 아래 기초 메시·Terrain 에 깔려 안 보일 수 있다(Codex 교차검증 10-02).
+    /// </summary>
     public static float SampleFloorY(Vector3 at, float fallback, float searchUp = 6f, float searchDown = 6f)
     {
         Vector3 origin = new Vector3(at.x, fallback + searchUp, at.z);
         RaycastHit[] hits = Physics.RaycastAll(origin, Vector3.down, searchUp + searchDown, ~0, QueryTriggerInteraction.Ignore);
-        float best = float.PositiveInfinity;
+        float best = fallback, bestGap = float.PositiveInfinity;
         foreach (RaycastHit h in hits)
         {
             // 캐릭터(플레이어·보스)·송전기 위에 깔리지 않게 리지드바디 붙은 것은 건너뛴다.
             if (h.rigidbody != null) continue;
-            if (h.point.y < best) best = h.point.y;
+            float gap = Mathf.Abs(h.point.y - fallback);
+            if (gap < bestGap) { bestGap = gap; best = h.point.y; }
         }
-        return float.IsPositiveInfinity(best) ? fallback : best;
+        return best;
     }
 
     // ── 절차 텍스처 ─────────────────────────────────────────────

@@ -16,6 +16,9 @@ using UnityEngine;
 /// 모드가 Charge/Paused 에서 Normal 로 돌아오면 첫 예고 대기(4초)부터 다시 센다(§8). 과충전 진입·종료는
 /// 모드 변화가 아니므로 주기·직전 줄 기록이 그대로 이어진다.
 /// </summary>
+// 🔴 23호(MonsterBase.Update — FSM·TickCharge) **다음에** 돈다. 마지막 송전탑이 부서진 프레임에 장판 예고도 끝나면,
+//    순서가 반대일 때 아직 ChargeWait 로 읽혀 취소돼야 할 공격이 나간다(Codex 교차검증 10-02 · 기획 §5.4).
+[DefaultExecutionOrder(100)]
 [DisallowMultipleComponent]
 public sealed class BossElectricFloor : MonoBehaviour
 {
@@ -38,11 +41,26 @@ public sealed class BossElectricFloor : MonoBehaviour
     /// <summary>[서버] 장판 1회 발동에서 실제로 맞은 인원(무적·잡힘·쓰러짐 제외, 보호막이 막아도 포함). 보스 고유 게이지(B6) 훅 — 지금 구독자 없음.</summary>
     public event Action<int> ServerFloorHit;
 
+    BossElectricFloorDataSO _ownedDefaults;   // 데이터가 비어 직접 만든 기본값 — 우리가 지운다
+
     public void Init(TwentyThreeBoss boss, BossElectricFloorDataSO data)
     {
         _boss = boss;
-        _d = data != null ? data : ScriptableObject.CreateInstance<BossElectricFloorDataSO>();
+        if (data != null) _d = data;
+        else _d = _ownedDefaults != null ? _ownedDefaults : (_ownedDefaults = ScriptableObject.CreateInstance<BossElectricFloorDataSO>());
         _patterns = new BossElectricFloorPatterns(new System.Random(Environment.TickCount ^ GetInstanceID()));
+        ResetState();
+    }
+
+    /// <summary>스폰/디스폰 경계 — 서버 진행 상태와 화면 연출을 처음으로(풀 재사용 대비).</summary>
+    public void ResetState()
+    {
+        _mode = Mode.Off;
+        _step = Step.Wait;
+        _t = 0f;
+        _shown = false;
+        _patterns?.ResetAll();
+        HideAllTiles();
     }
 
     void Update()
@@ -202,7 +220,9 @@ public sealed class BossElectricFloor : MonoBehaviour
             if (!grid.Contains(mask, BossPatternTargets.FootPosition(p))) continue;
             hit++;
             if (!BossPatternTargets.IsInvulnerable(p)) gauge++;
-            BossPatternTargets.Damage(p, _d.damage, _boss.transform.position, _boss.transform);
+            // 출처 = 발 위치(맞은 타일). 보스 위치를 넘기면 보호막 파문 등이 보스 쪽에서 맞은 것처럼 보인다.
+            Vector3 foot = BossPatternTargets.FootPosition(p);
+            BossPatternTargets.Damage(p, _d.damage, foot, _boss.transform);
         }
         ServerFloorHit?.Invoke(gauge);
         Debug.Log($"[전기장판] 발동 {_mode}{(_mode == Mode.Charge ? $"/{_group}{(_bStage > 0 ? _bStage.ToString() : "")}" : "")} — " +
@@ -225,6 +245,10 @@ public sealed class BossElectricFloor : MonoBehaviour
 
     #region 클라(전 피어) — 임시 연출
 
+    // 표시 = 판정 칸 그대로(1.0). 줄이면 경계 안쪽 몇 cm 가 "안 보이는데 맞는" 구역이 된다(Codex 교차검증 10-02, PLAN §8).
+    // 칸 구분은 텍스처 안쪽 테두리가 한다.
+    const float FullTile = 1f;
+
     MeshRenderer[] _outer, _fill;
     GameObject[] _vfx;
     float[] _tileY;
@@ -243,7 +267,7 @@ public sealed class BossElectricFloor : MonoBehaviour
         _viewFiring = false;
         ForEachTile(mask, (r, c, i) =>
         {
-            PlaceTile(_outer[i], r, c, i, 0.96f);
+            PlaceTile(_outer[i], r, c, i, FullTile);
             BossPatternVisuals.Paint(_outer[i], _d.warnOuterColor, BossPatternVisuals.SquareTexture);
             _outer[i].gameObject.SetActive(true);
             PlaceTile(_fill[i], r, c, i, 0f);
@@ -262,7 +286,7 @@ public sealed class BossElectricFloor : MonoBehaviour
         _viewFiring = true;
         ForEachTile(mask, (r, c, i) =>
         {
-            PlaceTile(_outer[i], r, c, i, 0.96f);
+            PlaceTile(_outer[i], r, c, i, FullTile);
             BossPatternVisuals.Paint(_outer[i], _d.electricColor, BossPatternVisuals.SquareTexture);
             _outer[i].gameObject.SetActive(true);
 
@@ -286,7 +310,7 @@ public sealed class BossElectricFloor : MonoBehaviour
 
         Color col = _d.electricColor;
         col.a *= 0.55f + 0.45f * Mathf.Sin(Time.time * 60f);   // 임시 전기 — 빠른 깜빡임
-        float s = 0.96f * Mathf.Clamp01(k);                      // 안쪽 진한 사각형이 중심에서 차오른다(§9-2)
+        float s = FullTile * Mathf.Clamp01(k);                      // 안쪽 진한 사각형이 중심에서 차오른다(§9-2)
 
         // 매 프레임 도는 곳이라 람다(ForEachTile) 대신 루프 — 할당 0.
         for (int r = 0; r < BossTileGrid.Size; r++)
@@ -329,6 +353,7 @@ public sealed class BossElectricFloor : MonoBehaviour
     void OnDestroy()
     {
         if (_viewRoot != null) Destroy(_viewRoot.gameObject);
+        if (_ownedDefaults != null) Destroy(_ownedDefaults);
     }
 
     void PlaceTile(MeshRenderer m, int r, int c, int i, float scale01)

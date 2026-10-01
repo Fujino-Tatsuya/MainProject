@@ -64,6 +64,12 @@
 
 ## 6. 단계 (각 단계 끝에 커밋)
 
+> 진행(10-02): S0 `8b4ca4cf` ✅ · S1 `2a2105a7` ✅(EditMode 8/8) · S2~S5 `9cfa5acb` ✅ 구현(컴파일만 확인) · S6 교차검증 → 팀장 Play/MPPM.
+> **구현 중 바뀐 점**: ① 두 컴포넌트는 NetworkBehaviour 가 아니라 23호가 스폰 때 `AddComponent` 하고 ClientRpc 를 중계(프리팹 NB 구성 불변).
+> ② 데이터 SO 는 `BossDataSO.electricFloor/wellsDrone` 에서 참조(비면 기본값). ③ 23호 상태 알림 대신 **매 프레임 폴링**
+> (`IsChargeGimmickActive` · `ActivePauseConditions` · `IsFightActive`) — 진입·이탈 지점을 23호에 흩뿌리지 않으려고.
+> ④ Flags 에 `CounterGroggy`(간파 성공 그로기, 기본 꺼짐 — 기획상 취약은 정상 작동) 추가. ⑤ 드론은 웰즈 주기(`OnWellsAttackCycle`)가 아닌 자기 타이머.
+
 - **S0** 기획서 2종 `Docs/design/` 복사 · 이 PLAN 승인 · CONTEXT 작업 세션 갱신.
 - **S1** `BossTileGrid` + `BossElectricFloorPatterns` + EditMode 테스트(교차 13칸 · 5×5=25 · 홀수 4줄=28 · A 2개 겹침 1회 · 직전 줄/조합 제외 · B 방향 교대).
 - **S2** 일반 장판: 스케줄러 · 발 위치 판정 · RPC · 임시 연출 · 방 Gizmo(타일 번호). Play 1인.
