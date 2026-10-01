@@ -8,6 +8,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 7722051468864962236}
     m_Modifications:
+    - target: {fileID: 2174947715702180877, guid: 372b8af8722841743a48ffcc3e9b3f06, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: 211
+      objectReference: {fileID: 0}
     - target: {fileID: 6236171600041082142, guid: 372b8af8722841743a48ffcc3e9b3f06, type: 3}
       propertyPath: m_Name
       value: GunnerHeatGauge
@@ -18,7 +22,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6907916267488969316, guid: 372b8af8722841743a48ffcc3e9b3f06, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0
+      value: -183
       objectReference: {fileID: 0}
     - target: {fileID: 6907916267488969316, guid: 372b8af8722841743a48ffcc3e9b3f06, type: 3}
       propertyPath: m_LocalPosition.z
