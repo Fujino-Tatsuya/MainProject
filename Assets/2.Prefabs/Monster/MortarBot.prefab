@@ -524,6 +524,34 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 2391931280260005269, guid: 87dd4b3ba2b418340833ff1c4d33a222, type: 3}
+      propertyPath: m_Mesh
+      value:
+      objectReference: {fileID: 4300000, guid: 99e0cb0be8993154989601c64627347c, type: 2}
+    - target: {fileID: 2391931280260005269, guid: 87dd4b3ba2b418340833ff1c4d33a222, type: 3}
+      propertyPath: m_AABB.m_Center.y
+      value: 0.4693855
+      objectReference: {fileID: 0}
+    - target: {fileID: 2391931280260005269, guid: 87dd4b3ba2b418340833ff1c4d33a222, type: 3}
+      propertyPath: m_AABB.m_Center.z
+      value: 0.06737816
+      objectReference: {fileID: 0}
+    - target: {fileID: 2391931280260005269, guid: 87dd4b3ba2b418340833ff1c4d33a222, type: 3}
+      propertyPath: m_AABB.m_Extent.x
+      value: 0.74500155
+      objectReference: {fileID: 0}
+    - target: {fileID: 2391931280260005269, guid: 87dd4b3ba2b418340833ff1c4d33a222, type: 3}
+      propertyPath: m_AABB.m_Extent.y
+      value: 1.3025843
+      objectReference: {fileID: 0}
+    - target: {fileID: 2391931280260005269, guid: 87dd4b3ba2b418340833ff1c4d33a222, type: 3}
+      propertyPath: m_AABB.m_Extent.z
+      value: 0.63630944
+      objectReference: {fileID: 0}
+    - target: {fileID: 2391931280260005269, guid: 87dd4b3ba2b418340833ff1c4d33a222, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value:
+      objectReference: {fileID: 2100000, guid: c3f8013eb64a99c4881d06771bc78cd1, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
