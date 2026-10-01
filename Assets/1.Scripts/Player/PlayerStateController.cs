@@ -78,12 +78,40 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
     private bool CurrentStateReadsActionInput =>
         CurrentState == PlayerActionState.Idle || CurrentState == PlayerActionState.Move;
 
+    /// <summary>
+    /// 지금 행동을 공용 대시로 끊을 수 있는가(대시 우선 — 거너 D1). 행동 쪽이 정한다:
+    /// 기본 공격 = <see cref="IPlayerBasicAttack.CanBeCanceledByDash"/>, 스킬 = <see cref="PlayerSkillBase.CanBeCanceledByDash"/>.
+    /// 가붕이는 둘 다 아니오라 기존과 같다(공격·스킬 중 대시 입력 무시).
+    /// </summary>
+    public bool CurrentActionAllowsDashCancel => CurrentState switch
+    {
+        PlayerActionState.AttackReady or PlayerActionState.Attack =>
+            context.DefaultAttack != null && context.DefaultAttack.CanBeCanceledByDash,
+        PlayerActionState.Skill or PlayerActionState.Focus =>
+            currentState is PlayerSkillState skillState && skillState.Skill != null &&
+            skillState.Skill.CanBeCanceledByDash(CurrentState),
+        _ => false,
+    };
+
+    /// <summary>행동을 끊는 대시의 이동 가능 조건 — 상태 제한(Idle/Move)만 빼고 CC·연출 잠금·사망은 그대로 막는다.</summary>
+    public bool CanDashFromAction =>
+        CurrentState != PlayerActionState.Dead && !cinematicLocked && !context.StatusEffects.BlocksMovement;
+
     public void Tick()
     {
+        // 대시 우선 — 행동이 허락하면 그 행동을 끊고 대시(BeginDash 가 현재 상태를 덮는다: 공격은 CancelCurrentAttack,
+        // 스킬은 HandleSkillStateExit(Dash) → SkillEndReason.DashCancelled).
+        bool dashHandled = false;
+        if (context.Input != null && context.Input.DashPressed && !CurrentStateReadsActionInput &&
+            CurrentActionAllowsDashCancel && context.Dash != null)
+        {
+            dashHandled = context.Dash.TryBeginPredictedDash(cancelsAction: true);
+        }
+
         // ⚠️ "대시가 됐다 말았다"의 가장 흔한 무증상 경로: 대시 입력이 상태 때문에 아예 읽히지 않는 경우.
         // 공격·스킬 모션 중 Shift를 누르면 TryBeginPredictedDash가 호출조차 되지 않아
         // 시작 로그도, 거부 로그도 남지 않는다(입력 1회당 한 줄이므로 스팸이 아니다).
-        if (context.Input != null && context.Input.DashPressed && !CurrentStateReadsActionInput)
+        if (!dashHandled && context.Input != null && context.Input.DashPressed && !CurrentStateReadsActionInput)
         {
             Edit.LogWarning(
                 $"[Dash] 입력 무시: 현재 상태 {CurrentState}는 액션 입력을 읽지 않습니다(Idle/Move에서만 대시 입력 처리). " +
@@ -552,6 +580,10 @@ public abstract class PlayerStateBase : IPlayerState
     {
         // 조준 모드 중에는 일반 액션 입력(공격/다른 스킬/인터럽트)을 억제한다.
         // 좌클릭 확정·Esc/재입력 취소는 PlayerSkillTargeting이 직접 처리한다.
+        // 대상 지정 중 대시 — 조준 중인 스킬이 허락하면(거너 R) 조준을 취소(쿨 없음)하고 아래 대시 경로로 넘어간다.
+        if (Context.Skills != null && Context.Input.DashPressed && Context.Skills.CanCancelTargetingByDash)
+            Context.Skills.CancelTargeting();
+
         if (Context.Skills != null && Context.Skills.IsChoosingTarget)
         {
             if (Context.Input.DashPressed)

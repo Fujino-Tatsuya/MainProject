@@ -130,6 +130,12 @@ G1 은 G4 전까지 어느 때든. 문서 갱신(player-prefabs.md 거너 항목
 
 ## 7. 진행
 
+- ✅ **G8 완료 — Play 확인**(2026-10-01). 대시 우선은 **행동이 허락할 때만**(가붕이 무변화):
+  `IPlayerBasicAttack.CanBeCanceledByDash`(가붕이 false·거너 true), `PlayerSkillBase.CanBeCanceledByDash(phase)`(거너 Q = Focus 만), `CanCancelAimByDash`(거너 R).
+  `PlayerStateController.Tick` 이 허락된 행동 중 대시 입력을 `TryBeginPredictedDash(cancelsAction: true)` 로 넘긴다(이동 조건 = `CanDashFromAction`: CC·연출·사망만 막음).
+  `BeginDash` 가 상태를 덮어 공격은 `CancelCurrentAttack`, 스킬은 `SkillEndReason.DashCancelled`(신규) — 거너 Q 는 이때 **쿨 커밋**(D2). 조준 중엔 `CancelTargeting`(쿨 없음) 후 대시.
+  서버 검증(`DashValidationPolicy`)은 행동 상태를 보지 않으므로 변경 없음.
+
 - ✅ **G7 완료 — Play 확인(🔸 대상 사망 후 재탐색은 미검증)**(2026-10-01). **첫 플레이어 생성 네트워크 오브젝트.**
   - `GunnerTrackingLaserSkill`(Ultimate, SingleTarget ClickToConfirm 재사용 — R 재입력 취소·빈 곳 무시·사거리 밖은 기존 자동 접근):
     승인 = 확정 순간 단계 저장, 대상 위치에 `GunnerTrackingLaser` 서버 `Spawn(destroyWithScene)`, 쿨 시작. `castDuration`(0.3s) 뒤 자유.

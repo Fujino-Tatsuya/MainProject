@@ -16,6 +16,9 @@ public class GunnerTrackingLaserSkill : PlayerSkillBase
     public override PlayerSkillSlot Slot => PlayerSkillSlot.Ultimate;
     public override bool CanMoveWhileActive => false;
 
+    // 대상 지정 중 공용 대시 = 조준 취소, 쿨타임 없음(D1·D2)
+    public override bool CanCancelAimByDash => true;
+
     private GunnerTrackingLaserData RData => Data as GunnerTrackingLaserData;
 
     public override void Initialize(Player owner, PlayerSkillController controller)

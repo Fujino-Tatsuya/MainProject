@@ -46,6 +46,21 @@ public class PlayerSkillController : BaseNetworkBehaviour
     public bool IsSkillActive => activeSkill != null;
     // 조준/자동이동/확정 직후 프레임 — FSM이 일반 액션 입력(공격/다른 스킬)을 억제하는 데 쓴다.
     public bool IsChoosingTarget => targeting != null && targeting.IsInterceptingInput;
+
+    // 조준 모드를 공용 대시로 끊을 수 있는가 — 조준 중인 스킬이 정한다(거너 R = 예, 기본 = 아니오).
+    public bool CanCancelTargetingByDash
+    {
+        get
+        {
+            if (targeting == null || !targeting.IsTargeting)
+                return false;
+            PlayerSkillBase skill = GetSkill(targeting.CurrentSlot);
+            return skill != null && skill.CanCancelAimByDash;
+        }
+    }
+
+    // [오너] 조준 모드 취소 — 시전하지 않았으므로 쿨타임 없음.
+    public void CancelTargeting() => targeting?.Cancel();
     private bool HasGameplayAuthority => !IsNetworkActive || IsServer;
 
     private void Awake()
@@ -221,9 +236,12 @@ public class PlayerSkillController : BaseNetworkBehaviour
         activeSkill = null;
         activeEndFallbackTime = 0f;
 
-        SkillEndReason reason = nextState == PlayerActionState.Dead
-            ? SkillEndReason.CasterDied
-            : SkillEndReason.Cancelled;
+        SkillEndReason reason = nextState switch
+        {
+            PlayerActionState.Dead => SkillEndReason.CasterDied,
+            PlayerActionState.Dash => SkillEndReason.DashCancelled,
+            _ => SkillEndReason.Cancelled,
+        };
         skill.OnEnd(reason);
 
         if (IsNetworkActive && IsServer)

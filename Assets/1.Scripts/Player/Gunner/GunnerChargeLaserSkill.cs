@@ -33,6 +33,9 @@ public class GunnerChargeLaserSkill : PlayerSkillBase
     public override bool ConsumesPrimaryInput => true;
     public override bool WantsAimUpdates => true; // 자동 발사도 "현재 조준 방향"
 
+    // 공용 대시는 정신 집중만 끊는다(D1). 발사 후 회복(Skill)은 끊지 않는다.
+    public override bool CanBeCanceledByDash(PlayerActionState phase) => phase == PlayerActionState.Focus;
+
     private GunnerChargeLaserData QData => Data as GunnerChargeLaserData;
     private ulong SourceId => owner != null ? owner.NetworkObjectId : 0;
     private bool HasAuthority => owner != null && (!owner.IsSpawned || owner.IsServer);
@@ -136,9 +139,17 @@ public class GunnerChargeLaserSkill : PlayerSkillBase
     {
         if (HasAuthority)
         {
-            // 발사 없이 끝남 = 쿨타임 없음(수동 커밋이라 자연히 안 돈다 — §6.6)
-            if (!fired)
+            if (!fired && reason == SkillEndReason.DashCancelled)
+            {
+                // 대시로 끊으면 쿨타임 적용(D2 — "Q 는 취소 불가" 의도를 지킨다)
+                controller.CommitCooldownServer(Slot);
+                Edit.Log("[Gunner/Q] 대시로 집중 취소 — 발사 없음, 쿨타임 적용", this);
+            }
+            else if (!fired)
+            {
+                // 쓰러짐·사망·조작 불가·피격 취소 = 쿨타임 없음(수동 커밋이라 자연히 안 돈다 — §6.6)
                 Edit.Log($"[Gunner/Q] 발사 없이 종료({reason}) — 쿨타임 없음", this);
+            }
             ClearStatus();
         }
 

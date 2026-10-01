@@ -126,6 +126,7 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
     public bool IsAttacking => player != null && player.CurrentState == PlayerActionState.Attack;
     public bool CanRequestStart => HasAttackSteps && CurrentStepDuration > 0f;
     public bool CanStartApprovedAttack => HasAttackSteps && CurrentStepDuration > 0f;
+    public bool CanBeCanceledByDash => false; // 콤보 중 대시 입력은 무시(기존 동작)
     private bool HasGameplayAuthority => !IsNetworkActive || IsServer;
 
     private void Awake()

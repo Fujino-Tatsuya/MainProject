@@ -212,7 +212,9 @@ public class PlayerDashController : NetworkBehaviour
     }
 
     /// <summary>Idle/Move 액션 입력에서 대시 우선으로 호출된다. 입력 주체는 요청하고 실제 대시 상태는 이동 결과 권위가 시작한다.</summary>
-    public bool TryBeginPredictedDash()
+    /// <param name="cancelsAction">진행 중 행동(공격·스킬)을 끊는 대시인가 — 그때는 Idle/Move 이동 조건 대신
+    /// <see cref="PlayerStateController.CanDashFromAction"/>(CC·연출 잠금·사망만 막음)으로 본다.</param>
+    public bool TryBeginPredictedDash(bool cancelsAction = false)
     {
         // ⚠️ 아래 5개 게이트는 전부 조용히 false를 돌려줬다. 그래서 "대시가 안 되는데 로그도 없다"가
         // 됐고, 원인을 서버 거부 쪽에서 찾다가 시간을 썼다. 실제로는 대시가 **시작조차 안 되는**
@@ -231,7 +233,7 @@ public class PlayerDashController : NetworkBehaviour
             return false;
         }
 
-        if (!player.CanMove)
+        if (cancelsAction ? !stateController.CanDashFromAction : !player.CanMove)
         {
             Edit.LogWarning($"[Dash] 시작 불가: CanMove=false (상태 {stateController?.CurrentState}). " +
                             "연출 잠금·CC·사망 게이트를 확인하세요.", this);

@@ -69,6 +69,8 @@ public class PlayerSkillTargeting : MonoBehaviour
     private float serverAutoApproachRange;
 
     public bool IsTargeting => isTargeting;
+    // 지금 조준 중인 스킬 슬롯(IsTargeting 일 때만 의미).
+    public PlayerSkillSlot CurrentSlot => currentSlot;
     // FSM이 조준 대기/확정 직후 프레임 동안만 일반 액션 입력을 억제한다.
     // 자동 이동(isMovingToCast)은 억제하지 않는다 — 다른 입력이 들어오면 그 행동이 수행되면서 자동 이동은 취소된다.
     public bool IsInterceptingInput => isTargeting || justHandledConfirm;

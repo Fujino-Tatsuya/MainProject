@@ -25,7 +25,8 @@ public enum SkillEndReason
     Released,           // 홀드 해제
     MaxDurationReached, // 서버 안전망 강제 종료
     Cancelled,          // 외부 요인 (넉백/그랩 등 상태 전환)
-    CasterDied          // 시전자 사망 — 쿨타임은 환불하지 않는다
+    CasterDied,         // 시전자 사망 — 쿨타임은 환불하지 않는다
+    DashCancelled       // 공용 대시로 끊김(CanBeCanceledByDash 인 단계에서만 일어난다)
 }
 
 /// <summary>
@@ -57,6 +58,13 @@ public abstract class PlayerSkillBase : MonoBehaviour
     // FSM(PlayerSkillState) 위임 질의 — E는 이동 자유, R은 완전 잠금 등 스킬이 결정한다.
     public virtual bool CanMoveWhileActive => false;
     public virtual bool CanMovementRotateWhileActive => CanMoveWhileActive;
+
+    // 공용 대시가 이 스킬을 끊을 수 있는가 — phase = 현재 스킬 상태(Skill/Focus). 기본 아니오(기존 동작: 스킬 중 대시 입력 무시).
+    // 끊기면 OnEnd(SkillEndReason.DashCancelled).
+    public virtual bool CanBeCanceledByDash(PlayerActionState phase) => false;
+
+    // 이 스킬의 조준 모드(SingleTarget/GroundPoint)를 공용 대시가 취소할 수 있는가. 기본 아니오(조준 중 대시 입력 무시).
+    public virtual bool CanCancelAimByDash => false;
 
     // 시전 시 들어갈 상태기계 상태(스킬 상태 계열). 기본 Skill, 거너 Q = Focus(발사 시 Skill 로 넘어감).
     public virtual PlayerActionState EntryActionState => PlayerActionState.Skill;
