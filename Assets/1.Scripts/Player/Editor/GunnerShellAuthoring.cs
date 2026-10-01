@@ -49,7 +49,7 @@ public static class GunnerShellAuthoring
 
     /// <summary>
     /// G3 — 과열·기본 공격 데이터 에셋을 만들고(있으면 재사용) Player_Gunner 루트에 GunnerHeat·GunnerBeamAttack·
-    /// GunnerBasicAttack·GunnerHeatHUD 를 붙인다(이미 있으면 데이터 참조만 채운다).
+    /// GunnerBasicAttack 을 붙인다(이미 있으면 데이터 참조만 채운다). 과열 게이지 UI 는 별도 메뉴(과열 게이지 프리팹)가 중첩한다.
     /// </summary>
     [MenuItem("Tools/Player/Gunner/기본 공격·과열 부착 (G3)")]
     public static void AttachBasicAttack()
@@ -70,7 +70,6 @@ public static class GunnerShellAuthoring
             SetReference(EnsureComponent<GunnerHeat>(root), "data", heatData);
             EnsureComponent<GunnerBeamAttack>(root);
             SetReference(EnsureComponent<GunnerBasicAttack>(root), "data", attackData);
-            EnsureComponent<GunnerHeatHUD>(root);
 
             PrefabUtility.SaveAsPrefabAsset(root, VariantPath);
             Debug.Log($"[Gunner] 기본 공격·과열 부착 완료: {VariantPath}");
@@ -539,6 +538,133 @@ public static class GunnerShellAuthoring
         EditorUtility.SetDirty(mask);
         Debug.Log($"[Gunner] 상체 마스크: 하체·골반·루트 제외, 켠 본 {active}/{all.Length}");
         return mask;
+    }
+
+    const string HeatGaugePrefabPath = Folder + "/GunnerHeatGauge.prefab";
+    const string HeatGaugeInstanceName = "GunnerHeatGauge";
+    const string KrFontPath = "Assets/Resources/NotoSansKR-VariableFont_wght SDF.asset";
+
+    /// <summary>
+    /// 임시 과열 게이지를 거너 고유 UI 프리팹으로 만들고 Player_Gunner 에 중첩한다(공용 CombatHUD 와 분리).
+    /// 예전 OnGUI 컴포넌트(GunnerHeatHUD — 스크립트 삭제됨)가 남긴 루트의 Missing Script 도 걷는다.
+    /// </summary>
+    [MenuItem("Tools/Player/Gunner/과열 게이지 프리팹 (임시 UI)")]
+    public static void AttachHeatGauge()
+    {
+        if (AssetDatabase.LoadAssetAtPath<GameObject>(VariantPath) == null)
+        {
+            Debug.LogError($"[Gunner] Variant 가 없다 — 먼저 '껍데기 생성 (G9)' 실행: {VariantPath}");
+            return;
+        }
+
+        GameObject gaugePrefab = EnsureHeatGaugePrefab();
+
+        GameObject root = PrefabUtility.LoadPrefabContents(VariantPath);
+        try
+        {
+            int removed = GameObjectUtility.RemoveMonoBehavioursWithMissingScript(root);
+            if (removed > 0)
+                Debug.Log($"[Gunner] 루트의 Missing Script {removed}개 제거(구 GunnerHeatHUD)");
+
+            if (root.transform.Find(HeatGaugeInstanceName) == null)
+            {
+                var gauge = (GameObject)PrefabUtility.InstantiatePrefab(gaugePrefab, root.transform);
+                gauge.name = HeatGaugeInstanceName;
+            }
+
+            PrefabUtility.SaveAsPrefabAsset(root, VariantPath);
+            Debug.Log($"[Gunner] 과열 게이지 중첩 완료: {VariantPath}/{HeatGaugeInstanceName}");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    static GameObject EnsureHeatGaugePrefab()
+    {
+        var existing = AssetDatabase.LoadAssetAtPath<GameObject>(HeatGaugePrefabPath);
+        if (existing != null)
+            return existing;
+
+        var root = new GameObject(HeatGaugeInstanceName);
+        try
+        {
+            var gauge = root.AddComponent<GunnerHeatGauge>();
+
+            var canvasGo = new GameObject("Canvas", typeof(RectTransform));
+            canvasGo.layer = LayerMask.NameToLayer("UI");
+            canvasGo.transform.SetParent(root.transform, false);
+            var canvas = canvasGo.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 10;
+            var scaler = canvasGo.AddComponent<UnityEngine.UI.CanvasScaler>();
+            scaler.uiScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+
+            // 화면 하단 중앙(예전 OnGUI 위치와 같음)
+            RectTransform bar = NewUiRect("Bar", canvasGo.transform);
+            bar.anchorMin = bar.anchorMax = new Vector2(0.5f, 0f);
+            bar.pivot = new Vector2(0.5f, 0f);
+            bar.anchoredPosition = new Vector2(0f, 170f);
+            bar.sizeDelta = new Vector2(320f, 14f);
+
+            RectTransform back = NewUiRect("Back", bar);
+            Stretch(back);
+            back.gameObject.AddComponent<UnityEngine.UI.Image>().color = new Color(0f, 0f, 0f, 0.6f);
+
+            RectTransform fill = NewUiRect("Fill", bar);
+            Stretch(fill);
+            fill.anchorMax = new Vector2(0f, 1f);
+            var fillImage = fill.gameObject.AddComponent<UnityEngine.UI.Image>();
+
+            RectTransform labelRect = NewUiRect("Label", bar);
+            labelRect.anchorMin = new Vector2(0f, 1f);
+            labelRect.anchorMax = new Vector2(1f, 1f);
+            labelRect.pivot = new Vector2(0.5f, 0f);
+            labelRect.anchoredPosition = new Vector2(0f, 2f);
+            labelRect.sizeDelta = new Vector2(0f, 20f);
+            var label = labelRect.gameObject.AddComponent<TMPro.TextMeshProUGUI>();
+            label.fontSize = 16f;
+            label.alignment = TMPro.TextAlignmentOptions.BottomLeft;
+            label.text = "과열 0단계";
+            var font = AssetDatabase.LoadAssetAtPath<TMPro.TMP_FontAsset>(KrFontPath);
+            if (font != null)
+                label.font = font;
+            else
+                Debug.LogWarning($"[Gunner] 한글 폰트가 없다({KrFontPath}) — 라벨이 깨질 수 있다");
+
+            var so = new SerializedObject(gauge);
+            so.FindProperty("canvas").objectReferenceValue = canvas;
+            so.FindProperty("fill").objectReferenceValue = fill;
+            so.FindProperty("fillImage").objectReferenceValue = fillImage;
+            so.FindProperty("label").objectReferenceValue = label;
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            PrefabUtility.SaveAsPrefabAsset(root, HeatGaugePrefabPath);
+            Debug.Log($"[Gunner] 과열 게이지 프리팹 생성: {HeatGaugePrefabPath}");
+        }
+        finally
+        {
+            Object.DestroyImmediate(root);
+        }
+
+        return AssetDatabase.LoadAssetAtPath<GameObject>(HeatGaugePrefabPath);
+    }
+
+    static RectTransform NewUiRect(string name, Transform parent)
+    {
+        var go = new GameObject(name, typeof(RectTransform));
+        go.layer = LayerMask.NameToLayer("UI");
+        go.transform.SetParent(parent, false);
+        return (RectTransform)go.transform;
+    }
+
+    static void Stretch(RectTransform rect)
+    {
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = rect.offsetMax = Vector2.zero;
     }
 
     static T EnsureAsset<T>(string path) where T : ScriptableObject

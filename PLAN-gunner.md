@@ -130,6 +130,10 @@ G1 은 G4 전까지 어느 때든. 문서 갱신(player-prefabs.md 거너 항목
 
 ## 7. 진행
 
+- ⏳ **과열 게이지 → 거너 고유 UI 프리팹**(2026-10-01, 은희 요청). OnGUI `GunnerHeatHUD` 삭제 →
+  `Gunner/GunnerHeatGauge.prefab`(Screen Space Overlay Canvas, 하단 중앙 막대 + 한글 TMP 라벨, `GunnerHeatGauge` 가 오너만 표시) 를 `Player_Gunner` 에 중첩.
+  공용 CombatHUD 와 분리(캐릭터 고유 자원 UI). 메뉴 `Tools/Player/Gunner/과열 게이지 프리팹 (임시 UI)` — 루트의 구 컴포넌트 Missing Script 도 제거.
+
 - ✅ **G8 완료 — Play 확인**(2026-10-01). 대시 우선은 **행동이 허락할 때만**(가붕이 무변화):
   `IPlayerBasicAttack.CanBeCanceledByDash`(가붕이 false·거너 true), `PlayerSkillBase.CanBeCanceledByDash(phase)`(거너 Q = Focus 만), `CanCancelAimByDash`(거너 R).
   `PlayerStateController.Tick` 이 허락된 행동 중 대시 입력을 `TryBeginPredictedDash(cancelsAction: true)` 로 넘긴다(이동 조건 = `CanDashFromAction`: CC·연출·사망만 막음).

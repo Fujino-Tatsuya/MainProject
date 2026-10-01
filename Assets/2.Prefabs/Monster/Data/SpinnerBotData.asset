@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: SpinnerBotData
   m_EditorClassIdentifier: 
   archetype: 0
+  rank: 1
   attackDamage: 14
   moveSpeed: 3
   chaseSpeed: 4

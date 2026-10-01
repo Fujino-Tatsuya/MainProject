@@ -159,7 +159,8 @@ public class FirstMeleeInterruptSkill : PlayerInstantSkill
                     : resolvedDamage + bonus;
             }
 
-            AttackInfo attackInfo = new AttackInfo(resolvedDamage, AttackType.Skill, isInterruptAttack: true);
+            AttackInfo attackInfo = new AttackInfo(resolvedDamage, DamageAttackType,
+                isInterruptAttack: true, hitPattern: DamageHitPattern);
             AttackHitContext hitContext =
                 new AttackHitContext(owner.transform.position, owner.transform, hit, owner);
 
@@ -183,6 +184,6 @@ public class FirstMeleeInterruptSkill : PlayerInstantSkill
         if (resolvedCount > 0)
             shieldVfx?.ServerInterruptWave();
 
-        owner.RaiseServerAttackLanded(AttackType.Skill, Data != null && Data.TriggersOnHit, landedUnits, this);
+        owner.RaiseServerAttackLanded(DamageAttackType, Data != null && Data.TriggersOnHit, landedUnits, this);
     }
 }

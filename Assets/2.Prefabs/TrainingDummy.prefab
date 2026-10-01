@@ -554,7 +554,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TrainingDummy
   ShowTopMostFoldoutHeaderGroup: 1
-  maxHp: 500
+  maxHp: 100
   defense: 0
   regenDelay: 3
   regenDuration: 1

@@ -121,7 +121,8 @@ public class GunnerChargeLaserSkill : PlayerSkillBase
         float length = beam.CastLength(origin, direction, range, data.BeamWidth * 0.5f, data.BlockingLayers);
 
         int hitCount = beam.FirePiercing(origin, direction, length, data.BeamWidth, data.BeamHeight,
-                                         data.HittableLayers, damage, AttackType.Skill, data.TriggersOnHit);
+                                         data.HittableLayers, damage, DamageAttackType,
+                                         DamageHitPattern, data.TriggersOnHit);
 
         beam.CollectAllies(origin, direction, length, data.BeamWidth, data.BeamHeight, data.AllyLayers, allies);
         for (int i = 0; i < allies.Count; i++)

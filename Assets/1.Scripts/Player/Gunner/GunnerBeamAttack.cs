@@ -33,6 +33,7 @@ public class GunnerBeamAttack : BaseAttack
 
         SetTargetLayer(hittable);
         SetAttackType(AttackType.Default);
+        SetHitPattern(AttackHitPattern.Single);
         SetDamageSnapshot(damageSnapshot);
 
         int count = Physics.SphereCastNonAlloc(origin, radius, direction, hits, range, hittable | blocking,
@@ -103,13 +104,15 @@ public class GunnerBeamAttack : BaseAttack
     /// </summary>
     /// <returns>맞힌 대상 수(Unit 이 아닌 오브젝트 포함)</returns>
     public int FirePiercing(Vector3 origin, Vector3 direction, float length, float width, float height,
-                            LayerMask hittable, int damageSnapshot, AttackType type, bool triggersOnHit)
+                            LayerMask hittable, int damageSnapshot, AttackType type,
+                            AttackHitPattern pattern, bool triggersOnHit)
     {
         if (!IsServer)
             return 0;
 
         SetTargetLayer(hittable);
         SetAttackType(type);
+        SetHitPattern(pattern);
         SetDamageSnapshot(damageSnapshot);
         pierceUnits.Clear();
         pierceHurtboxes.Clear();

@@ -55,6 +55,19 @@ public abstract class PlayerSkillBase : MonoBehaviour
 
     public abstract PlayerSkillSlot Slot { get; }
 
+    // 슬롯은 PlayerSkillController 바인딩과 각 구현의 Slot 계약으로 이미 검증된다.
+    // 우클릭 Interrupt는 Q/E/R 슬롯이 아니므로 범용 Skill로 남긴다.
+    protected AttackType DamageAttackType => Slot switch
+    {
+        PlayerSkillSlot.Main => AttackType.SkillQ,
+        PlayerSkillSlot.Sub => AttackType.SkillE,
+        PlayerSkillSlot.Ultimate => AttackType.SkillR,
+        _ => AttackType.Skill
+    };
+
+    protected AttackHitPattern DamageHitPattern =>
+        data != null ? data.HitPattern : AttackHitPattern.Single;
+
     // FSM(PlayerSkillState) 위임 질의 — E는 이동 자유, R은 완전 잠금 등 스킬이 결정한다.
     public virtual bool CanMoveWhileActive => false;
     public virtual bool CanMovementRotateWhileActive => CanMoveWhileActive;

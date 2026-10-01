@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: WallBotData
   m_EditorClassIdentifier: 
   archetype: 0
+  rank: 1
   attackDamage: 16
   moveSpeed: 2
   chaseSpeed: 3

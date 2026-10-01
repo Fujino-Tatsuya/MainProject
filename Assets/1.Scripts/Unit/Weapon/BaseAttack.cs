@@ -1,7 +1,8 @@
 using Unity.Netcode;
 using UnityEngine;
 
-// 공격의 출처 분류. 슬롯(Q/E/R)까지 나누지 않는다 — 구분해서 읽는 코드가 없었고,
+// 공격의 출처 분류. 플레이어 Q/E/R은 슬롯별로 나누며, Skill은 슬롯을 알 수 없거나
+// Q/E/R 슬롯이 아닌 스킬(현재 우클릭 인터럽트)에 사용한다.
 // "인터럽트인가"는 슬롯과 직교한 능력이라 AttackInfo.isInterruptAttack이 따로 싣는다.
 //
 // ⚠️ 값은 반드시 끝에만 추가할 것. BaseAttack.attackType과 Bomb.attackType이 [SerializeField]라
@@ -11,13 +12,23 @@ public enum AttackType
 {
     None,     // 미지정 (BaseAttack 기본값)
     Default,  // 평타
-    Skill     // 스킬 전반
+    Skill,    // 슬롯 미상 또는 Q/E/R 외 스킬
+    SkillQ,   // Q 슬롯 스킬
+    SkillE,   // E 슬롯 스킬
+    SkillR    // R 슬롯 스킬
+}
+
+public enum AttackHitPattern
+{
+    Single,
+    Multi
 }
 
 public struct AttackInfo
 {
     public int damage;
     public AttackType attackType;
+    public AttackHitPattern hitPattern;
 
     /// <summary>
     /// 이 히트가 인터럽트 공격인가. 공격자가 아는 사실만 싣는다 —
@@ -38,10 +49,11 @@ public struct AttackInfo
 
     public AttackInfo(int damage, AttackType attackType = AttackType.None, bool isInterruptAttack = false,
         float knockbackStrength = 0f, float knockbackDuration = 0f, float staggerDuration = 0f,
-        Vector3 knockbackDirection = default)
+        Vector3 knockbackDirection = default, AttackHitPattern hitPattern = AttackHitPattern.Single)
     {
         this.damage = Mathf.Max(0, damage);
         this.attackType = attackType;
+        this.hitPattern = hitPattern;
         this.isInterruptAttack = isInterruptAttack;
         this.knockbackStrength = Mathf.Max(0f, knockbackStrength);
         this.knockbackDuration = Mathf.Max(0f, knockbackDuration);
@@ -84,6 +96,9 @@ public class BaseAttack : MonoBehaviour, IDamageSettable
     [SerializeField] protected AttackType attackType = AttackType.None;
     public AttackType AttackType { get { return attackType; } }
 
+    [SerializeField] protected AttackHitPattern hitPattern = AttackHitPattern.Single;
+    public AttackHitPattern HitPattern { get { return hitPattern; } }
+
     protected AttackInfo _attackInfo;
 
     /// <summary>
@@ -99,7 +114,7 @@ public class BaseAttack : MonoBehaviour, IDamageSettable
 
     protected void InitializeAttackInfo()
     {
-        _attackInfo = new AttackInfo(damage, attackType);
+        _attackInfo = new AttackInfo(damage, attackType, hitPattern: hitPattern);
     }
 
     public void SetDamageSnapshot(int value)
@@ -124,6 +139,12 @@ public class BaseAttack : MonoBehaviour, IDamageSettable
     public void SetAttackType(AttackType value)
     {
         attackType = value;
+        InitializeAttackInfo();
+    }
+
+    public void SetHitPattern(AttackHitPattern value)
+    {
+        hitPattern = value;
         InitializeAttackInfo();
     }
 
@@ -226,7 +247,7 @@ public class BaseAttack : MonoBehaviour, IDamageSettable
     private AttackInfo CreateAttackInfo(int? overrideDamage)
     {
         return overrideDamage.HasValue
-            ? new AttackInfo(overrideDamage.Value, attackType)
+            ? new AttackInfo(overrideDamage.Value, attackType, hitPattern: hitPattern)
             : _attackInfo;
     }
 

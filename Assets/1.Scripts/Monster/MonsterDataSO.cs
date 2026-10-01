@@ -8,6 +8,7 @@ public class MonsterDataSO : ScriptableObject
 {
     [Header("아키타입")]
     public MonsterArchetype archetype = MonsterArchetype.Melee;
+    public MonsterRank rank = MonsterRank.Normal;
 
     [Header("스탯 (Unit.Initialize로 주입)")]
     public int attackDamage = 10;
