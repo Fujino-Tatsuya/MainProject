@@ -34,11 +34,11 @@ public sealed class TrainingDummy : Unit
     [SerializeField, Min(0.1f)] float resetDistance = 5f;
 
     /// <summary>
-    /// 모든 피어에서 명목 피해(방어 경감 후, 체력 하한으로 잘리기 전 값)를 알린다.
-    /// 인자는 (피해량, 공격자 clientId). 공격자가 플레이어가 아니면 ulong.MaxValue.
+    /// 모든 피어에서 명목 피해(방어 경감 후, 체력 하한으로 잘리기 전 값)와 공격 메타데이터를 알린다.
+    /// 공격자가 플레이어가 아니면 attackerClientId는 ulong.MaxValue.
     /// TrainingDummyDamagePresenter 가 구독해 데미지 숫자와 타격 쉐이크를 낸다.
     /// </summary>
-    public event Action<int, ulong> NominalDamaged;
+    public event Action<DamageDealtInfo> NominalDamaged;
 
     TrainingDummyRegen _regen;
     Rigidbody _rigidbody;
@@ -90,17 +90,20 @@ public sealed class TrainingDummy : Unit
     {
         // Unit 의 기본 구현이 쓰는 귀속 RPC 경로는 타지 않는다 — 공격자 clientId 는
         // 허수아비 전용 RPC 가 직접 싣고, 그 소비자(UnitCameraFeedbackReporter)는 스폰 때 제거했다.
-        ApplyDummyDamage(attackInfo.damage, ResolveAttackerClientId(hitContext));
+        ApplyDummyDamage(attackInfo.damage, ResolveAttackerClientId(hitContext),
+            attackInfo.attackType, attackInfo.hitPattern);
         TryEnterKnockback(attackInfo, hitContext);
         return true;
     }
 
     public override void TakeDamage(AttackInfo attackInfo)
     {
-        ApplyDummyDamage(attackInfo.damage, ulong.MaxValue);
+        ApplyDummyDamage(attackInfo.damage, ulong.MaxValue,
+            attackInfo.attackType, attackInfo.hitPattern);
     }
 
-    void ApplyDummyDamage(int rawDamage, ulong attackerClientId)
+    void ApplyDummyDamage(int rawDamage, ulong attackerClientId,
+        AttackType attackType, AttackHitPattern hitPattern)
     {
         if (!IsServer || rawDamage <= 0)
             return;
@@ -117,7 +120,7 @@ public sealed class TrainingDummy : Unit
         _regen?.NotifyDamaged();
 
         // 표시는 실제 감소량이 아니라 명목 피해다 — 체력 1 에 붙어 있어도 계속 뜬다.
-        ShowNominalDamageRpc(nominal, attackerClientId);
+        ShowNominalDamageRpc(nominal, attackerClientId, (byte)attackType, (byte)hitPattern);
     }
 
     /// <summary>
@@ -146,9 +149,10 @@ public sealed class TrainingDummy : Unit
     }
 
     [Rpc(SendTo.ClientsAndHost)]
-    void ShowNominalDamageRpc(int amount, ulong attackerClientId)
+    void ShowNominalDamageRpc(int amount, ulong attackerClientId, byte attackType, byte hitPattern)
     {
-        NominalDamaged?.Invoke(amount, attackerClientId);
+        NominalDamaged?.Invoke(new DamageDealtInfo(amount, DamageChannel.Hp, attackerClientId,
+            (AttackType)attackType, (AttackHitPattern)hitPattern));
     }
     #endregion
 

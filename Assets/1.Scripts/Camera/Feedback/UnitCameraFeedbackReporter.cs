@@ -40,9 +40,9 @@ public sealed class UnitCameraFeedbackReporter : MonoBehaviour
         CameraFeedback.Instance?.ReportLocalPlayerHit();
     }
 
-    void HandleAttributedDamage(int amount, DamageChannel channel, ulong attackerClientId)
+    void HandleAttributedDamage(DamageDealtInfo damage)
     {
-        if (amount <= 0 || IsLocalPlayerTarget() || !IsLocalAttacker(attackerClientId))
+        if (damage.amount <= 0 || IsLocalPlayerTarget() || !IsLocalAttacker(damage.attackerClientId))
             return;
 
         CameraFeedback.Instance?.ReportLocalPlayerDealtDamage();

@@ -94,7 +94,7 @@ public class TrainingDummyHitFlash : MonoBehaviour
     Color BaseColorOf(int index) => _hasBaseTint ? _baseTint : _originalColors[index];
 
     // HitFlash.OnDamaged 와 같은 본문. 인자는 쓰지 않는다 — 플래시는 피해량과 무관하다.
-    void OnNominalDamaged(int amount, ulong attackerClientId)
+    void OnNominalDamaged(DamageDealtInfo damage)
     {
         if (!isActiveAndEnabled) return;
         if (_renderers == null) CacheRenderers(); // 첫 피격 시 지연 수집(스폰 직후 모델 조립 순서 영향 최소화)

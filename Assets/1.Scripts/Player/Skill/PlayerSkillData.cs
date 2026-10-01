@@ -29,6 +29,7 @@ public class PlayerSkillData : ScriptableObject
     [SerializeField, Min(0.1f)] private float maxActiveDuration = 5f;
     // 홀드/채널 틱 주기. 0이면 틱 없음
     [SerializeField, Min(0f)] private float tickInterval = 0f;
+    [SerializeField] private AttackHitPattern hitPattern = AttackHitPattern.Single;
 
     [Header("조건")]
     // 사망 상태에서도 시전 가능한 스킬만 true. 사망은 쿨타임을 초기화하지 않고 시전만 차단한다.
@@ -59,6 +60,7 @@ public class PlayerSkillData : ScriptableObject
     public int FlatDamageBonus => flatDamageBonus;
     public float MaxActiveDuration => maxActiveDuration;
     public float TickInterval => tickInterval;
+    public AttackHitPattern HitPattern => hitPattern;
     public bool UsableWhileDead => usableWhileDead;
     public LayerMask HittableLayers => hittableLayers;
     public bool TriggersOnHit => triggersOnHit;

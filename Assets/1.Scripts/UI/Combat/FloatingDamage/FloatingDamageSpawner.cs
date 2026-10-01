@@ -5,37 +5,12 @@ using UnityEngine.Pool;
 [DisallowMultipleComponent]
 public sealed class FloatingDamageSpawner : MonoBehaviour
 {
-    readonly struct PopupKey
-    {
-        readonly int _targetId;
-        readonly PopupKind _kind;
-
-        public PopupKey(Unit target, PopupKind kind)
-        {
-            _targetId = target.GetInstanceID();
-            _kind = kind;
-        }
-
-        public override bool Equals(object obj)
-        {
-            return obj is PopupKey other && _targetId == other._targetId && _kind == other._kind;
-        }
-
-        public override int GetHashCode()
-        {
-            unchecked
-            {
-                return (_targetId * 397) ^ (int)_kind;
-            }
-        }
-    }
-
     public static FloatingDamageSpawner Instance { get; private set; }
 
     [SerializeField] FloatingDamageSettings settings;
     [SerializeField] FloatingDamagePopup popupPrefab;
 
-    readonly Dictionary<PopupKey, FloatingDamagePopup> _activeByTargetAndKind = new();
+    readonly Dictionary<FloatingDamageAccumulationKey, FloatingDamagePopup> _activeByKey = new();
     readonly List<FloatingDamagePopup> _livePopups = new();
     ObjectPool<FloatingDamagePopup> _pool;
 
@@ -73,8 +48,15 @@ public sealed class FloatingDamageSpawner : MonoBehaviour
             return;
         }
 
-        PopupKey key = new PopupKey(request.target, request.kind);
-        if (_activeByTargetAndKind.TryGetValue(key, out FloatingDamagePopup active) &&
+        bool canAccumulate = FloatingDamageAccumulationPolicy.TryCreateKey(
+            request.attackerClientId,
+            request.attackType,
+            request.target.GetInstanceID(),
+            request.kind,
+            request.hitPattern,
+            out FloatingDamageAccumulationKey key);
+
+        if (canAccumulate && _activeByKey.TryGetValue(key, out FloatingDamagePopup active) &&
             active != null && active.TryAccumulate(request.amount, request.fromLocalPlayer))
             return;
 
@@ -82,7 +64,8 @@ public sealed class FloatingDamageSpawner : MonoBehaviour
 
         FloatingDamagePopup popup = _pool.Get();
         _livePopups.Add(popup);
-        _activeByTargetAndKind[key] = popup;
+        if (canAccumulate)
+            _activeByKey[key] = popup;
         popup.Initialize(request, settings, style, ReleasePopup);
     }
 
@@ -110,9 +93,9 @@ public sealed class FloatingDamageSpawner : MonoBehaviour
         if (popup == null || !_livePopups.Remove(popup))
             return;
 
-        PopupKey keyToRemove = default;
+        FloatingDamageAccumulationKey keyToRemove = default;
         bool hasKeyToRemove = false;
-        foreach (KeyValuePair<PopupKey, FloatingDamagePopup> pair in _activeByTargetAndKind)
+        foreach (KeyValuePair<FloatingDamageAccumulationKey, FloatingDamagePopup> pair in _activeByKey)
         {
             if (pair.Value != popup)
                 continue;
@@ -123,7 +106,7 @@ public sealed class FloatingDamageSpawner : MonoBehaviour
         }
 
         if (hasKeyToRemove)
-            _activeByTargetAndKind.Remove(keyToRemove);
+            _activeByKey.Remove(keyToRemove);
 
         _pool.Release(popup);
     }

@@ -5,6 +5,25 @@ using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 
+public readonly struct DamageDealtInfo
+{
+    public readonly int amount;
+    public readonly DamageChannel channel;
+    public readonly ulong attackerClientId;
+    public readonly AttackType attackType;
+    public readonly AttackHitPattern hitPattern;
+
+    public DamageDealtInfo(int amount, DamageChannel channel, ulong attackerClientId,
+        AttackType attackType, AttackHitPattern hitPattern)
+    {
+        this.amount = amount;
+        this.channel = channel;
+        this.attackerClientId = attackerClientId;
+        this.attackType = attackType;
+        this.hitPattern = hitPattern;
+    }
+}
+
 public class Unit : BaseNetworkBehaviour, IAttackReceiver
 {
     #region 공격력
@@ -54,6 +73,8 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     Coroutine _shieldExpiryRoutine;
     bool _deathNotified;
     ulong _damageAttackerClientId = ulong.MaxValue;
+    AttackType _damageAttackType = AttackType.None;
+    AttackHitPattern _damageHitPattern = AttackHitPattern.Single;
 
     /// <summary>
     /// 서버에서 생존 상태의 체력이 0으로 전환될 때 한 번 발생한다.
@@ -118,7 +139,8 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         // 표시용 피해량은 체력 클램프 전 최종값이다. NetworkVariable 변화량으로는 막타 초과분을
         // 복원할 수 없으므로, 피해가 확정되는 이 지점에서 전 피어에 전달한다.
         if (IsSpawned && (hpDealt > 0 || shieldDealt > 0))
-            ClientDamageDealtClientRpc(hpDealt, shieldDealt, _damageAttackerClientId);
+            ClientDamageDealtClientRpc(hpDealt, shieldDealt, _damageAttackerClientId,
+                (byte)_damageAttackType, (byte)_damageHitPattern);
 
         // 진단 — Health 의 기존 로그는 대상 이름이 없어서 누구의 체력이 줄었는지 알 수 없었다.
         // 요청값과 실제 감소량을 함께 남긴다(경감으로 1까지 깎이는 경우를 가른다).
@@ -189,7 +211,11 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         // 공격자 귀속은 이 ReceiveAttack이 적용하는 피해에만 유효하다. 추락·비율·직접 피해처럼
         // ApplyHealthDamage를 곧바로 타는 경로는 기본값(공격자 없음)을 유지한다.
         ulong previousAttackerClientId = _damageAttackerClientId;
+        AttackType previousAttackType = _damageAttackType;
+        AttackHitPattern previousHitPattern = _damageHitPattern;
         _damageAttackerClientId = ResolveAttackerClientId(hitContext);
+        _damageAttackType = attackInfo.attackType;
+        _damageHitPattern = attackInfo.hitPattern;
         try
         {
             TakeDamage(attackInfo);
@@ -197,6 +223,8 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         finally
         {
             _damageAttackerClientId = previousAttackerClientId;
+            _damageAttackType = previousAttackType;
+            _damageHitPattern = previousHitPattern;
         }
 
         return true;
@@ -608,7 +636,7 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     /// 서버가 모든 피해 적용마다 보내는 방어 적용 후·체력 클램프 전 최종 피해량이다.
     /// attackerClientId가 ulong.MaxValue면 플레이어 공격자가 아닌 피해다.
     /// </summary>
-    public event Action<int, DamageChannel, ulong> ClientDamagedAttributed;
+    public event Action<DamageDealtInfo> ClientDamagedAttributed;
 
     public override void OnNetworkSpawn()
     {
@@ -660,13 +688,21 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     }
 
     [ClientRpc]
-    void ClientDamageDealtClientRpc(int hpDamage, int shieldDamage, ulong attackerClientId)
+    void ClientDamageDealtClientRpc(int hpDamage, int shieldDamage, ulong attackerClientId,
+        byte attackType, byte hitPattern)
     {
+        AttackType resolvedAttackType = (AttackType)attackType;
+        AttackHitPattern resolvedHitPattern = (AttackHitPattern)hitPattern;
+
         if (shieldDamage > 0)
-            ClientDamagedAttributed?.Invoke(shieldDamage, DamageChannel.Shield, attackerClientId);
+            ClientDamagedAttributed?.Invoke(new DamageDealtInfo(
+                shieldDamage, DamageChannel.Shield, attackerClientId,
+                resolvedAttackType, resolvedHitPattern));
 
         if (hpDamage > 0)
-            ClientDamagedAttributed?.Invoke(hpDamage, DamageChannel.Hp, attackerClientId);
+            ClientDamagedAttributed?.Invoke(new DamageDealtInfo(
+                hpDamage, DamageChannel.Hp, attackerClientId,
+                resolvedAttackType, resolvedHitPattern));
     }
     #endregion
 

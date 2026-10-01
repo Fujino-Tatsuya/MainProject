@@ -61,7 +61,7 @@ public class GunnerTrackingLaserSkill : PlayerSkillBase
 
         if (owner.IsSpawned)
             networkObject.Spawn(true); // destroyWithScene — 씬 전환 시 함께 제거(§9.6)
-        laser.ServerInitialize(owner, target, damage, data);
+        laser.ServerInitialize(owner, target, damage, data, DamageAttackType, DamageHitPattern);
 
         Edit.Log($"[Gunner/R] 추적 레이저 생성 — 대상 {target.name}, 틱 피해 {damage}, 저장 단계 {stage}", this);
     }

@@ -25,6 +25,7 @@ public class PlayerDefaultAttack : BaseAttack
     {
         owner = GetComponent<Player>();
         SetAttackType(AttackType.Default);
+        SetHitPattern(AttackHitPattern.Single);
     }
 
     public void Configure(ColliderInfo defaultHitbox, LayerMask hittableLayers, int maxHitResults = DefaultMaxHitResults)

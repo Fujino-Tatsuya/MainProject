@@ -30,13 +30,20 @@ public struct FloatingPopupRequest
     public PopupKind kind;
     public int amount;
     public bool fromLocalPlayer;
+    public ulong attackerClientId;
+    public AttackType attackType;
+    public AttackHitPattern hitPattern;
 
-    public FloatingPopupRequest(Unit target, PopupKind kind, int amount, bool fromLocalPlayer)
+    public FloatingPopupRequest(Unit target, PopupKind kind, int amount, bool fromLocalPlayer,
+        ulong attackerClientId, AttackType attackType, AttackHitPattern hitPattern)
     {
         this.target = target;
         this.kind = kind;
         this.amount = amount;
         this.fromLocalPlayer = fromLocalPlayer;
+        this.attackerClientId = attackerClientId;
+        this.attackType = attackType;
+        this.hitPattern = hitPattern;
     }
 }
 

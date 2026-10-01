@@ -131,7 +131,8 @@ public class GunnerInterruptSkill : PlayerInstantSkill
             }
 
             // isInterruptAttack = 보스가 간파 판정에 쓰는 유일한 근거(D11)
-            var attackInfo = new AttackInfo(damage, AttackType.Skill, isInterruptAttack: true);
+            var attackInfo = new AttackInfo(damage, DamageAttackType,
+                isInterruptAttack: true, hitPattern: DamageHitPattern);
             var context = new AttackHitContext(owner.transform.position, owner.transform, hit, owner);
             bool resolved = hurtbox != null ? hurtbox.ReceiveAttack(attackInfo, context) : unit.ReceiveAttack(attackInfo, context);
             if (!resolved)
@@ -142,7 +143,7 @@ public class GunnerInterruptSkill : PlayerInstantSkill
                 landedUnits.Add(unit);
         }
 
-        owner.RaiseServerAttackLanded(AttackType.Skill, Data.TriggersOnHit, landedUnits, this);
+        owner.RaiseServerAttackLanded(DamageAttackType, Data.TriggersOnHit, landedUnits, this);
 
         // 레이저·폭발 연출(임시) — 빗나가도 나간다(§8.6)
         Vector3 origin = owner.transform.position + Vector3.up;

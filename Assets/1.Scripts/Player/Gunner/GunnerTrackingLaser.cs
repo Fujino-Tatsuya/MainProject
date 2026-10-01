@@ -37,13 +37,16 @@ public class GunnerTrackingLaser : BaseNetworkBehaviour
     private float retargetInterval;
     private LayerMask enemyLayers;
     private bool triggersOnHit;
+    private AttackType attackType;
+    private AttackHitPattern hitPattern;
     private float expireTime;
     private float nextDamageTime;
     private float nextRetargetTime;
     private bool initialized;
 
     /// <summary>[서버] 스폰 직후 1회.</summary>
-    public void ServerInitialize(Player caster, Unit target, int damagePerTick, GunnerTrackingLaserData data)
+    public void ServerInitialize(Player caster, Unit target, int damagePerTick, GunnerTrackingLaserData data,
+                                 AttackType attackType, AttackHitPattern hitPattern)
     {
         this.caster = caster;
         casterClientId = caster != null ? caster.OwnerClientId : ulong.MaxValue;
@@ -56,6 +59,8 @@ public class GunnerTrackingLaser : BaseNetworkBehaviour
         retargetInterval = data.RetargetInterval;
         enemyLayers = data.HittableLayers;
         triggersOnHit = data.TriggersOnHit;
+        this.attackType = attackType;
+        this.hitPattern = hitPattern;
 
         // 생성 시점부터 지속시간(§9.3). 첫 피해는 생성 즉시.
         expireTime = Time.time + data.LaserDuration;
@@ -156,7 +161,7 @@ public class GunnerTrackingLaser : BaseNetworkBehaviour
             if (unit == null || unit is Player || unit.CurrentHealth <= 0 || !tickHits.Add(unit))
                 continue;
 
-            var info = new AttackInfo(damage, AttackType.Skill);
+            var info = new AttackInfo(damage, attackType, hitPattern: hitPattern);
             var context = new AttackHitContext(transform.position, transform, col, caster);
             bool resolved = hurtbox != null ? hurtbox.ReceiveAttack(info, context) : unit.ReceiveAttack(info, context);
             if (resolved)
@@ -164,7 +169,7 @@ public class GunnerTrackingLaser : BaseNetworkBehaviour
         }
 
         if (caster != null && landed.Count > 0)
-            caster.RaiseServerAttackLanded(AttackType.Skill, triggersOnHit, landed, this);
+            caster.RaiseServerAttackLanded(attackType, triggersOnHit, landed, this);
     }
 
     private Unit FindNearestEnemy(float range)

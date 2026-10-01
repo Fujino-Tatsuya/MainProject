@@ -18,6 +18,7 @@ MonoBehaviour:
   flatDamageBonus: 0
   maxActiveDuration: 3
   tickInterval: 0.25
+  hitPattern: 1
   usableWhileDead: 0
   hittableLayers:
     serializedVersion: 2
