@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9ab4b347435aa0042bf4c3051276f55d, type: 3}
+  m_Name: WellsDroneData
+  m_EditorClassIdentifier: Assembly-CSharp::WellsDroneDataSO
+  firstDelay: 5
+  trackTime: 3
+  lockTime: 1
+  cooldown: 7
+  resumeMinDelay: 2
+  diameterInTiles: 0.5
+  playerDamage: 25
+  bossDamage: 300
+  pauseOn: 3
+  droneModel: {fileID: 919132149155446097, guid: fcc07944700f48a419a0cbde4e5cf5d5, type: 3}
+  dropHeight: 12
+  fallTime: 0.6
+  explosionVfxPrefab: {fileID: 0}
+  explosionDuration: 0.5
+  crosshairSize: 2.4
+  crosshairColor: {r: 1, g: 0.2, b: 0.15, a: 0.95}
+  circleOuterColor: {r: 1, g: 0.15, b: 0.1, a: 0.3}
+  circleFillColor: {r: 1, g: 0.05, b: 0.02, a: 0.6}

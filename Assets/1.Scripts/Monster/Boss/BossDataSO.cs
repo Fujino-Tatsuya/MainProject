@@ -579,6 +579,12 @@ public class BossDataSO : MonsterDataSO
     //    마지막 저작값 35 — 🔴 폭탄 튜닝은 **BossBomb 프리팹 컴포넌트**로 이사했다(거기 SerializeField 12개).
     // [Range(0f, 80f)] public float bombThrowPitch = 35f;
 
+    [Header("전기 장판 · 자폭 드론 (PLAN-boss-electric-drone)")]
+    [Tooltip("23호 전기 장판 수치. 비우면 기획서 기본값(BossElectricFloorDataSO 의 초기값)으로 돈다.")]
+    public BossElectricFloorDataSO electricFloor;
+    [Tooltip("웰즈 자폭 드론 수치. 비우면 기획서 기본값으로 돈다. 🔴 이 드론 타이머가 웰즈 공격 주기를 대신한다 — bombThrowInterval 은 더 이상 공격을 내지 않는다.")]
+    public WellsDroneDataSO wellsDrone;
+
     // ─── 공격 간격 ────────────────────────────────────────────────────────
     //
     // 🔴 확정 스펙(2026-08-13): **다음 공격까지가 너무 빠르다.** 조절 가능해야 한다.

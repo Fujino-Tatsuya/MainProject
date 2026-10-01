@@ -25,6 +25,7 @@ MonoBehaviour:
   detectionHeightTolerance: 0
   attackRange: 3.4
   leashRadius: 15
+  retargetInterval: 0
   returnSpeedMultiplier: 5
   turnSpeed: 10
   avoidanceRadius: 0.3
@@ -41,13 +42,13 @@ MonoBehaviour:
   attackDuration: 0.9
   attackWindup: 0.35
   cancelWindupIfTargetLeavesRange: 0
+  engageAttackDelay: 0
   maxGroggyCount: 5
   groggyDuration: 1.5
   startsWithSuperArmor: 1
   hasSuperArmorWhileAttacking: 0
   hitStunDuration: 0.4
   despawnDelay: 2
-  isMidBoss: 0
   animSpeedParam: Speed
   attackTrigger: 
   attackFinishTrigger: 
@@ -55,6 +56,7 @@ MonoBehaviour:
   groggyBool: Groggy
   deathTrigger: Death
   locomotionState: Locomotion
+  animatorControllerOverride: {fileID: 0}
   attacks:
   - attackId: 0
     animatorStateName: LeftHook
@@ -76,9 +78,15 @@ MonoBehaviour:
     coneRadius: 4.42
     coneAngle: 120
     coneOffsetAngle: -30
+    boxWidth: 0
+    boxLength: 0
+    boxLateralOffset: 0
+    boxBackOffset: 0
     telegraphDuration: 0.7
-    telegraphPoseNormalized: 0.15
+    telegraphFillInward: 0
+    hitEventFallbackNormalized: 0
     prepStateName: LeftHookPrep
+    telegraphPoseNormalized: 0.15
   - attackId: 1
     animatorStateName: RightHook
     cooldown: 2.5
@@ -99,9 +107,15 @@ MonoBehaviour:
     coneRadius: 4.42
     coneAngle: 120
     coneOffsetAngle: 30
+    boxWidth: 0
+    boxLength: 0
+    boxLateralOffset: 0
+    boxBackOffset: 0
     telegraphDuration: 0.7
-    telegraphPoseNormalized: 0.15
+    telegraphFillInward: 0
+    hitEventFallbackNormalized: 0
     prepStateName: RightHookPrep
+    telegraphPoseNormalized: 0.15
   - attackId: 2
     animatorStateName: Uppercut
     cooldown: 3
@@ -122,9 +136,15 @@ MonoBehaviour:
     coneRadius: 4.08
     coneAngle: 180
     coneOffsetAngle: 0
+    boxWidth: 0
+    boxLength: 0
+    boxLateralOffset: 0
+    boxBackOffset: 0
     telegraphDuration: 0.5
-    telegraphPoseNormalized: 0.15
+    telegraphFillInward: 0
+    hitEventFallbackNormalized: 0
     prepStateName: UppercutPrep
+    telegraphPoseNormalized: 0.15
   - attackId: 3
     animatorStateName: MagneticGrab
     cooldown: 20
@@ -139,15 +159,23 @@ MonoBehaviour:
     counterWindowDuration: 1.3
     superArmor: 1
     hitboxAnchorName: Hand_R
+    lungeDistance: 0
+    lungeSpeedMultiplier: 5
+    lungePathRadius: 0
     coneRadius: 8
     coneAngle: 90
     coneOffsetAngle: 0
+    boxWidth: 0
+    boxLength: 0
+    boxLateralOffset: 0
+    boxBackOffset: 0
     telegraphDuration: 0.7
-    telegraphPoseNormalized: 0.15
+    telegraphFillInward: 0
+    hitEventFallbackNormalized: 0
     prepStateName: 
+    telegraphPoseNormalized: 0.15
   - attackId: 4
     animatorStateName: Leap
-    prepStateName: 
     cooldown: 10
     minDistance: 0
     maxDistance: 3
@@ -160,9 +188,23 @@ MonoBehaviour:
     counterWindowDuration: 0
     superArmor: 1
     hitboxAnchorName: 
+    lungeDistance: 0
+    lungeSpeedMultiplier: 5
+    lungePathRadius: 0
+    coneRadius: 0
+    coneAngle: 90
+    coneOffsetAngle: 0
+    boxWidth: 0
+    boxLength: 0
+    boxLateralOffset: 0
+    boxBackOffset: 0
+    telegraphDuration: 0
+    telegraphFillInward: 0
+    hitEventFallbackNormalized: 0
+    prepStateName: 
+    telegraphPoseNormalized: 0.15
   - attackId: 5
     animatorStateName: DashAttack
-    prepStateName: DashPrep
     cooldown: 5
     minDistance: 0
     maxDistance: 20
@@ -175,6 +217,21 @@ MonoBehaviour:
     counterWindowDuration: 1.5
     superArmor: 1
     hitboxAnchorName: DashBody
+    lungeDistance: 0
+    lungeSpeedMultiplier: 5
+    lungePathRadius: 0
+    coneRadius: 0
+    coneAngle: 90
+    coneOffsetAngle: 0
+    boxWidth: 0
+    boxLength: 0
+    boxLateralOffset: 0
+    boxBackOffset: 0
+    telegraphDuration: 0
+    telegraphFillInward: 0
+    hitEventFallbackNormalized: 0
+    prepStateName: DashPrep
+    telegraphPoseNormalized: 0.15
   repeatPenalty: 0.3
   repeatBlockAfter: 2
   phases:
@@ -191,6 +248,15 @@ MonoBehaviour:
   hitReactionState: getowned
   hitReactionStateRight: getowned_R
   breakDuration: 5
+  counterGaugeStep: 20
+  environmentGaugeStep: 20
+  suppressDamageMultiplier: 1.2
+  vulnerableDuration: 4
+  vulnerableKnockbackDistance: 3
+  vulnerableKnockbackTime: 0.35
+  wallReboundDistance: 0.5
+  wallReboundTime: 0.3
+  vulnerableTint: {r: 0.45, g: 0.75, b: 1, a: 1}
   aggroRetargetInterval: 8
   aggroAvoidsRepeatTarget: 0
   chargeClearGroggyDuration: 1.5
@@ -219,18 +285,15 @@ MonoBehaviour:
   jumpRecoveryDuration: 0.4
   jumpAoeRadius: 5.25
   jumpLandingDamage: 0
+  jumpTakeoffState: Leap
+  jumpTakeoffDuration: 0.633
   jumpHoverState: JumpHover
   jumpLandingState: JumpLanding
   silentLandingState: EntranceLanding
   jumpTelegraphPrefab: {fileID: 5997264177071607445, guid: a325fc2b60be455428b04ab67232fb24, type: 3}
   jumpLandSeparation: 1.2
   jumpKnockbackStrength: 9
-  jumpKnockbackDuration: 0.3
-  jumpKnockbackStagger: 0
-  jumpTelegraphOuterAlpha: 0.4
-  jumpTelegraphFillAlpha: 0.85
   chargeTimeLimit: 20
-  chargeShieldGainPerSec: 0
   chargeZonePrefab: {fileID: 0}
   chargePylonsSolo: 1
   chargePylonsDuo: 2
@@ -248,24 +311,14 @@ MonoBehaviour:
   dashCarryFrontOffset: 1.8
   dashStunDuration: 1
   dashKnockbackStrength: 12
-  dashKnockbackDuration: 0.3
   bombThrowInterval: 6
   bombPrefab: {fileID: 0}
-  throwImpulse: 8
   spreadAngle: 15
-  bombThrowPitch: 35
+  electricFloor: {fileID: 11400000, guid: 65fd41095973d204b8beea8d63957c90, type: 2}
+  wellsDrone: {fileID: 11400000, guid: 18b9ee564410be04a95d0ef34173cac3, type: 2}
   globalAttackInterval: 1.5
-  bombLandingMinDistance: 3
-  bombLandingMaxDistance: 9
-  bombWallMargin: 1.2
   chargeAuraRadius: 3.5
   chargeAuraInterval: 1
   chargeAuraDamage: 20
   chargeAuraKnockbackStrength: 8
-  chargeAuraKnockbackDuration: 0.25
-  chargeAuraStagger: 0
   chargeAuraTelegraphPrefab: {fileID: 0}
-  fireZoneRadius: 0
-  fireZoneMaxRadius: 0
-  fireZoneLifetime: 0
-  fireZoneRefreshLifetimeOnGrow: 0
