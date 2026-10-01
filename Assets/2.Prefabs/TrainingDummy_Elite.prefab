@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1001 &4183602957216645031
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 5939870581278475531, guid: 6b7103b4fdf7993479c2ac2fc217a919, type: 3}
+      propertyPath: m_Name
+      value: TrainingDummy_Elite
+      objectReference: {fileID: 0}
+    - target: {fileID: 6311859083166662073, guid: 6b7103b4fdf7993479c2ac2fc217a919, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 1.3
+      objectReference: {fileID: 0}
+    - target: {fileID: 6311859083166662073, guid: 6b7103b4fdf7993479c2ac2fc217a919, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 1.3
+      objectReference: {fileID: 0}
+    - target: {fileID: 6311859083166662073, guid: 6b7103b4fdf7993479c2ac2fc217a919, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 1.3
+      objectReference: {fileID: 0}
+    - target: {fileID: 3821680704275949548, guid: 6b7103b4fdf7993479c2ac2fc217a919, type: 3}
+      propertyPath: maxHp
+      value: 300
+      objectReference: {fileID: 0}
+    - target: {fileID: 3821680704275949548, guid: 6b7103b4fdf7993479c2ac2fc217a919, type: 3}
+      propertyPath: defense
+      value: 5
+      objectReference: {fileID: 0}
+    - target: {fileID: 3821680704275949548, guid: 6b7103b4fdf7993479c2ac2fc217a919, type: 3}
+      propertyPath: rank
+      value: 1
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 6b7103b4fdf7993479c2ac2fc217a919, type: 3}

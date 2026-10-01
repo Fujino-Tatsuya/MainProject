@@ -46,6 +46,10 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     public int CurrentHealth { get { return _health != null ? _health.CurrentHealth : _currentHp.Value; } }
     public int MaxHp { get { return _health != null ? _health.MaxHp : _maxHp.Value; } }
     public int CurrentShield { get { return _health != null ? _health.CurrentShield : _currentShield.Value; } }
+
+    /// <summary>표시용 등급(일반·중간보스·보스). 데미지 숫자 강도 구간 선택에 쓴다. 몬스터·허수아비가 덮어쓴다.</summary>
+    public virtual MonsterRank Rank => MonsterRank.Normal;
+
     protected NetworkVariable<int> _currentHp = new NetworkVariable<int>(
     0,
     NetworkVariableReadPermission.Everyone,

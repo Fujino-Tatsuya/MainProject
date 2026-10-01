@@ -23,8 +23,12 @@ public sealed class TrainingDummy : Unit
     const int MinHealth = 1;
 
     [Header("스탯")]
-    [SerializeField, Min(1)] int maxHp = 500;
+    [SerializeField, Min(1)] int maxHp = 100;
     [SerializeField, Min(0)] int defense = 0;
+    [Tooltip("데미지 숫자 강도 구간. 일반/엘리트/보스 더미가 실제 몬스터와 같은 구간으로 보이게 한다.")]
+    [SerializeField] MonsterRank rank = MonsterRank.Normal;
+
+    public override MonsterRank Rank => rank;
 
     [Header("회복 — 이 시간 동안 안 맞으면 되돌아온다")]
     [SerializeField, Min(0f)] float regenDelay = 3f;

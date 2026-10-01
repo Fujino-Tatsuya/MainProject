@@ -19,8 +19,7 @@ public class MonsterBase : Unit
     [Header("데이터")]
     [SerializeField] protected MonsterDataSO data;
 
-    /// <summary>표시용 등급(일반·중간보스·보스). 데미지 숫자 강도 구간 선택에 쓴다.</summary>
-    public MonsterRank Rank => data != null ? data.rank : MonsterRank.Normal;
+    public override MonsterRank Rank => data != null ? data.rank : MonsterRank.Normal;
 
     [Header("컴포넌트 참조(비우면 자동 탐색)")]
     [SerializeField] protected NavMeshAgent agent;

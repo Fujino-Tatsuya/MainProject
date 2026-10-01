@@ -60,7 +60,7 @@ public sealed class FloatingDamageSpawner : MonoBehaviour
             request.hitPattern,
             out FloatingDamageAccumulationKey key);
 
-        FloatingDamageTier tier = settings.ClassifyTier(request.amount, request.target.MaxHp, RankOf(request.target));
+        FloatingDamageTier tier = settings.ClassifyTier(request.amount, request.target.MaxHp, request.target.Rank);
 
         if (canAccumulate && _activeByKey.TryGetValue(key, out FloatingDamagePopup active) &&
             active != null && active.TryAccumulate(request.amount, tier))
@@ -131,11 +131,6 @@ public sealed class FloatingDamageSpawner : MonoBehaviour
             return body.bounds.center;
 
         return target.transform.position + Vector3.up;
-    }
-
-    static MonsterRank RankOf(Unit target)
-    {
-        return target is MonsterBase monster ? monster.Rank : MonsterRank.Normal;
     }
 
     void ReclaimOldestIfFull()
