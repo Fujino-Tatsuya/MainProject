@@ -27,6 +27,9 @@ public sealed class TrainingDummyRegen
     /// <summary>대기 시간을 넘겨 실제로 체력을 되돌리는 중인지.</summary>
     public bool IsRegenerating { get; private set; }
 
+    /// <summary>마지막 피격 후 대기 시간이 지났는지(만피 여부와 무관). 자리 복귀 시점에 쓴다.</summary>
+    public bool IsIdle => _sinceLastHit >= _delaySeconds;
+
     /// <summary>피격 알림. 대기 타이머를 리셋하고 진행 중인 회복을 중단한다.</summary>
     public void NotifyDamaged()
     {

@@ -3,8 +3,8 @@ using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// 연습장 표적(허수아비). 죽지 않고, 맞으면 명목 피해를 띄우고, 잠시 안 맞으면 체력을 되돌리고,
-/// 제 자리에서 너무 멀어지면 돌아온다.
+/// 연습장 표적(허수아비). 죽지 않고, 맞으면 명목 피해를 띄우고, 잠시 안 맞으면 체력과 자리를 되돌리고,
+/// 제 자리에서 너무 멀어지면 즉시 돌아온다.
 ///
 /// 몬스터가 아니다 — MonsterBase / MonsterDataSO / MonsterStatusEffect / FSM / NavMeshAgent 를 쓰지 않는다.
 /// (MonsterBase 의 리쉬 복귀는 Revive() 로 체력을 최대로 되돌려 이 클래스의 회복 규칙과 정면 충돌한다.)
@@ -22,6 +22,9 @@ public sealed class TrainingDummy : Unit
     /// </summary>
     const int MinHealth = 1;
 
+    /// <summary>이보다 덜 밀려났으면 제자리로 본다(m). 물리 오차로 매번 순간이동하지 않게.</summary>
+    const float IdleReturnThreshold = 0.05f;
+
     [Header("스탯")]
     [SerializeField, Min(1)] int maxHp = 100;
     [SerializeField, Min(0)] int defense = 0;
@@ -34,7 +37,7 @@ public sealed class TrainingDummy : Unit
     [SerializeField, Min(0f)] float regenDelay = 3f;
     [SerializeField, Min(0.01f)] float regenDuration = 1f;
 
-    [Header("자리 복귀 — 스폰 지점에서 이만큼 벗어나면 즉시 되돌아온다")]
+    [Header("자리 복귀 — 이만큼 벗어나면 즉시, 덜 벗어났으면 regenDelay 동안 안 맞을 때 되돌아온다")]
     [SerializeField, Min(0.1f)] float resetDistance = 5f;
 
     /// <summary>
@@ -234,7 +237,12 @@ public sealed class TrainingDummy : Unit
         // 밀어낸 뒤에 거리를 재야 같은 프레임에 이탈을 잡는다.
         TickKnockback(Time.deltaTime);
 
-        if ((transform.position - _anchorPosition).sqrMagnitude > resetDistance * resetDistance)
+        // 멀리 밀려나면 즉시, 조금 밀려났으면 회복과 같은 타이밍(마지막 피격 후 regenDelay)에 스폰 자리로 돌아간다.
+        float displacement = (transform.position - _anchorPosition).sqrMagnitude;
+        bool farAway = displacement > resetDistance * resetDistance;
+        bool idleAway = displacement > IdleReturnThreshold * IdleReturnThreshold &&
+                        _regen.IsIdle && _knockbackTimer <= 0f;
+        if (farAway || idleAway)
             ReturnToAnchor();
     }
 
