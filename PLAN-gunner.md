@@ -130,6 +130,12 @@ G1 은 G4 전까지 어느 때든. 문서 갱신(player-prefabs.md 거너 항목
 
 ## 7. 진행
 
+- ✅ **G5 완료 — Play 확인**(2026-10-01). `GunnerCoolBackstepSkill`/`Data`(Sub 슬롯, Skill 상태):
+  서버 시작 시 `GunnerHeat.ServerResetToZero`, 승인 조준의 정반대로 `distance/moveDuration` 속도 이동 — 시뮬레이션 피어가 `OnFixedTick` 에서
+  `AddGroundedDisplacement`(모터 스윕이 막힘 처리), **`PlayerMotor.BlockOtherPlayersOverride`** 로 동작 중만 아군 차단. 무적·피해 없음.
+  스킬 시스템: `PlayerSkillBase.OnFixedTick` + `PlayerSkillState.FixedTick → PlayerSkillController.FixedTick`(기본 no-op).
+  메뉴 `Tools/Player/Gunner/E 냉각 백스텝 부착 (G5)` + 애니 `Gunner_E_Backstep`.
+
 - ✅ **상태 분리 — Play 확인**(2026-10-01, 은희 결정: 목적 = 대시 규칙(G8)·외부 조회·구조 명확화).
   `PlayerActionState` 끝에 **`AttackReady`**(거너 평타 준비 자세)·**`Focus`**(Q 정신 집중) 추가.
   - `AttackReady` → 준비 시간이 차면 각 피어가 `Update` 에서 `Attack` 으로(상태 비복제, 서버는 시각으로 발사 검증). 준비 중 놓으면 `AttackReady → Idle`.

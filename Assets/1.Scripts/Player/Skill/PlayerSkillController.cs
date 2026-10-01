@@ -202,6 +202,12 @@ public class PlayerSkillController : BaseNetworkBehaviour
             TickServer();
     }
 
+    // PlayerSkillState.FixedTick에서 호출 (오너 + 서버만). 스킬 자체 이동(백스텝 등)용.
+    public void FixedTick()
+    {
+        activeSkill?.OnFixedTick();
+    }
+
     // FSM이 Skill 상태를 떠날 때 호출 — 정상 종료(EndActiveSkillServer)는 activeSkill을 먼저 비우므로
     // 여기 도달했는데 activeSkill이 남아 있으면 외부 요인(넉백/그랩/사망) 강제 이탈이다.
     public void HandleSkillStateExit(PlayerActionState nextState)

@@ -119,6 +119,9 @@ public abstract class PlayerSkillBase : MonoBehaviour
     // 서버 전용: 실행 중 좌클릭(ConsumesPrimaryInput 일 때만). direction = 누른 순간의 조준.
     public virtual void OnPrimaryPressed(Vector3 direction) { }
 
+    // 오너 + 서버(FSM 을 틱하는 피어): 실행 중 물리 틱. 스킬 자체 이동은 여기서 owner.IsSimulating 일 때만 모터에 제출한다.
+    public virtual void OnFixedTick() { }
+
     // 오너 전용: 실행 중 매 프레임(조준 방향 회전 등 로컬 조작 반영).
     public virtual void OnOwnerTick(Vector3 aimDirection) { }
 

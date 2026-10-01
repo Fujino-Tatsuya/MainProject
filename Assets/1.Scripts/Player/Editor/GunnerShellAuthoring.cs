@@ -131,6 +131,50 @@ public static class GunnerShellAuthoring
         BuildAnimator();
     }
 
+    const string CoolBackstepDataPath = DataFolder + "/GunnerCoolBackstepData.asset";
+
+    /// <summary>G5 — E 냉각 백스텝. 데이터 생성, GunnerCoolBackstepSkill 부착, E 슬롯 배선, 애니 상태.</summary>
+    [MenuItem("Tools/Player/Gunner/E 냉각 백스텝 부착 (G5)")]
+    public static void AttachCoolBackstep()
+    {
+        if (AssetDatabase.LoadAssetAtPath<GameObject>(VariantPath) == null)
+        {
+            Debug.LogError($"[Gunner] Variant 가 없다 — 먼저 '껍데기 생성 (G9)' 실행: {VariantPath}");
+            return;
+        }
+
+        EnsureFolder(DataFolder);
+        bool created = AssetDatabase.LoadAssetAtPath<GunnerCoolBackstepData>(CoolBackstepDataPath) == null;
+        var data = EnsureAsset<GunnerCoolBackstepData>(CoolBackstepDataPath);
+        if (created)
+        {
+            var so = new SerializedObject(data);
+            so.FindProperty("cooldownTime").floatValue = 5f;
+            so.FindProperty("maxActiveDuration").floatValue = 2f;
+            so.FindProperty("animatorStateName").stringValue = "Gunner_E_Backstep";
+            so.FindProperty("snapRotationOnStart").boolValue = true; // 조준(무기 전방)을 바라본 채 뒤로
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(data);
+        }
+
+        GameObject root = PrefabUtility.LoadPrefabContents(VariantPath);
+        try
+        {
+            var skill = EnsureComponent<GunnerCoolBackstepSkill>(root);
+            SetReference(skill, "data", data);
+            SetReference(root.GetComponent<PlayerSkillController>(), "subSkill", skill);
+
+            PrefabUtility.SaveAsPrefabAsset(root, VariantPath);
+            Debug.Log($"[Gunner] E 냉각 백스텝 부착 완료: {VariantPath}");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+
+        BuildAnimator();
+    }
+
     const string UpperBodyMaskPath = ControllerFolder + "/GunnerUpperBody.mask";
     // Auto-Rig Pro 컨트롤 리그라 상체가 한 서브트리에 모여 있지 않다(forearm.r/hand.r·head.x 가 c_traj 바로 아래).
     // 그래서 "척추 아래 전부"가 아니라 "하체·골반·루트 계열을 뺀 전부"를 켠다.
@@ -194,6 +238,11 @@ public static class GunnerShellAuthoring
         EnsureConditionTransition(qChargeMove, qCharge, AnimatorConditionMode.IfNot);
         EnsureExitTimeTransition(qFire, qRecover);
         EnsureExitTimeTransition(qRecover, idle);
+
+        // E: 백스텝 → Idle(스킬 종료 때 컨트롤러도 Idle 로 넘긴다)
+        AnimatorState eBackstep = EnsureState(baseMachine, "Gunner_E_Backstep");
+        eBackstep.motion = Clip("gunner_skill_E_cool_backstep");
+        EnsureExitTimeTransition(eBackstep, idle);
 
         AvatarMask mask = EnsureUpperBodyMask();
 

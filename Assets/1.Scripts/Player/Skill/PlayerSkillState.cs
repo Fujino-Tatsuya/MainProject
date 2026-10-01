@@ -36,6 +36,11 @@ public sealed class PlayerSkillState : PlayerStateBase
         Context.Skills?.Tick();
     }
 
+    public override void FixedTick()
+    {
+        Context.Skills?.FixedTick();
+    }
+
     public override void Exit(PlayerActionState nextState)
     {
         // 같은 스킬의 단계 전환(Focus → Skill)은 스킬을 끝내지 않는다 — PlayerStateController.ChangeSkillPhase.

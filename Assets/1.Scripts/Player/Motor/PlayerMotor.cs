@@ -88,6 +88,12 @@ public sealed class PlayerMotor : MonoBehaviour
         // 오너 권위 브랜치에서는 서버가 원격 플레이어를 시뮬레이션하지 않는다.
         Player.UsesServerAuthoritativeMovement;
 
+    /// <summary>
+    /// 일시적으로 다른 플레이어에게 막힌다(기본 규칙은 아군 통과). 거너 E 백스텝처럼 "아군도 통과 불가" 인 이동이
+    /// 동작하는 동안만 켠다. 시뮬레이션하는 피어(오너·서버 권위 시 서버)가 각자 로컬로 켜고 끈다 — 복제하지 않는다.
+    /// </summary>
+    public bool BlockOtherPlayersOverride { get; set; }
+
     /// <summary>이번 물리 틱에 적용할 월드 속도(m/s)를 더한다.</summary>
     public void AddVelocity(Vector3 worldVelocity)
     {
@@ -806,7 +812,7 @@ public sealed class PlayerMotor : MonoBehaviour
 
         mask &= ~playerBit;
         mask &= ~soulBit;
-        if (!isSoul && gameRule != null && gameRule.BlockOtherPlayers)
+        if (!isSoul && ((gameRule != null && gameRule.BlockOtherPlayers) || BlockOtherPlayersOverride))
             mask |= playerBit;
 
         return mask;
