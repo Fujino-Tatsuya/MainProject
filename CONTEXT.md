@@ -23,7 +23,7 @@ WallTransparencyGroup 오브젝트를 선택하면 그 그룹만 또렷해진다
   상세: [PLAN-boss-counter-vulnerable.md](PLAN-boss-counter-vulnerable.md) §7-2.
 - 🔴 **10-01 — Flat Kit 전환(캐릭터·물) · `feature/Boss23` 에만 푸시(development 미반영)**. 계획·기록 [PLAN-flatkit.md](PLAN-flatkit.md).
   - 캐릭터: 몬스터 8종·23호·Wells·플레이어 → `FlatKit/Stylized Surface`(플레이어는 부드러운 법선 복제 셰이더). 룩 값 한 곳 `Assets/1.Scripts/Rendering/Editor/FlatKitCharacterLook.cs`(외곽선 0.4 = 1080p 1.08px). 메뉴 `Tools/Rendering/Flat Kit/`.
-  - 물: 보스방 `Water_BossRoom` + 존 11종 프리팹 `Water`(**`ZoneWater` = 존별 수면 높이 한 칸**, 재실행해도 유지). 머티리얼 `3.Materials/FlatKit/Water/FK_Water_Pool09.mat` 인스펙터로 조절(도구가 안 덮어씀).
+  - 물: 보스방 `Water_BossRoom`(벤트 밑 −0.12) + 존 프리팹 `Water`(**`ZoneWater` = 존별 수면 높이 한 칸**, 기본 −4.43, 재실행해도 유지). 존 물은 **뚫린 곳(구덩이·벤트)에만** 깔린다(구덩이 벽 안쪽 면까지). 머티리얼 `FK_Water_Pool09` 은 월드 UV 복제 셰이더 — 인스펙터로 조절(도구가 안 덮어씀). 맵 330m 큰 쿼드는 팀장이 삭제.
   - PC_Renderer: Flat Kit 외곽선 피처 추가 · MaskBlur 끔 · SSAO 값 조정 · 그림자 캐스케이드 2/35m · 데칼 50m · LOD Cross Fade·Terrain Holes·데이터 기반 렌즈 플레어 끔.
   - 🔴 Flat Kit 데모 씬을 열면 URP 에셋이 데모용으로 바뀐다 → `Restore Project Pipeline`. `Assets/FlatKit/Demos` 는 git 제외.
 - 🔴 **09-30 — 23호 사망 타이밍**: 사망 클립 0.7배속 → 끝난 뒤 2초 → 디졸브 2초 → 결과 화면(대기 0). `DissolveDeath.delayAfterClipEnd` 신설(기본 0). 상세: [PLAN-boss-death-telegraph.md](PLAN-boss-death-telegraph.md) 끝. ✅ 팀장 Play 확인.

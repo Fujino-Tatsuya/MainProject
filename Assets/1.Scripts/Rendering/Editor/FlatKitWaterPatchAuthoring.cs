@@ -111,6 +111,56 @@ public static class FlatKitWaterPatchAuthoring
         }
     }
 
+    // [진단] 존마다 바닥 아래로 내려가는 지오메트리(구덩이 벽·바닥)의 높이 분포 — 존별 수면 높이를 정하려고.
+    [MenuItem("Tools/Rendering/Flat Kit/Water/0b. Probe Zone Pits")]
+    public static void ProbeZonePits()
+    {
+        var sb = new System.Text.StringBuilder("[WaterProbe] 존 구덩이\n");
+        foreach (string guid in AssetDatabase.FindAssets("t:Prefab", new[] { "Assets/2.Prefabs/Environment/Layouts/Zones" }))
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            GameObject root = PrefabUtility.LoadPrefabContents(path);
+            try
+            {
+                var rs = root.GetComponentsInChildren<MeshRenderer>(true)
+                    .Where(r => !r.transform.IsChildOf(root.transform.Find("Water") ?? root.transform) || root.transform.Find("Water") == null)
+                    .Where(r => r.name != "WaterWaves" && r.name != "WaterBed").ToList();
+                var below = rs.Where(r => r.bounds.min.y < -0.6f).ToList();
+                float minY = rs.Count > 0 ? rs.Min(r => r.bounds.min.y) : 0f;
+                // 바닥 아래 지오메트리 중 '넓은 수평면'(구덩이 바닥 후보): 높이 얇고 면적 큰 것
+                var floorsBelow = below.Where(r => r.bounds.size.y < 0.8f && r.bounds.size.x * r.bounds.size.z > 4f)
+                    .GroupBy(r => Mathf.Round(r.bounds.max.y * 10f) / 10f).OrderByDescending(g => g.Sum(r => r.bounds.size.x * r.bounds.size.z)).Take(3)
+                    .Select(g => $"{g.Key:0.0}({g.Count()}개)");
+                Transform w = root.transform.Find("Water");
+                string cur = w != null && w.TryGetComponent(out ZoneWater zw) ? zw.WaterHeight.ToString("0.##") : "-";
+                sb.Append($"  {System.IO.Path.GetFileNameWithoutExtension(path),-22} 최저 {minY:0.00} · 바닥 아래 렌더러 {below.Count} · 아래 수평면 [{string.Join(", ", floorsBelow)}] · 현재 수면 {cur}\n");
+            }
+            finally { PrefabUtility.UnloadPrefabContents(root); }
+        }
+        Debug.Log(sb.ToString());
+    }
+
+    // [진단] ZoneS_typeA 의 벽 렌더러 위치 — 벽 안쪽 면 기준을 잡으려고.
+    [MenuItem("Tools/Rendering/Flat Kit/Water/0c. Probe Zone Walls (S_A)")]
+    public static void ProbeZoneWalls()
+    {
+        string path = "Assets/2.Prefabs/Environment/Layouts/Zones/ZoneS_typeA.prefab";
+        GameObject root = PrefabUtility.LoadPrefabContents(path);
+        try
+        {
+            var sb = new System.Text.StringBuilder("[WaterProbe] ZoneS_typeA 렌더러(바닥 아래로 내려가는 것 · 이름별)\n");
+            foreach (var g in root.GetComponentsInChildren<MeshRenderer>(true)
+                         .Where(r => r.bounds.min.y < -1f && r.name != "WaterWaves" && r.name != "WaterBed")
+                         .GroupBy(r => System.Text.RegularExpressions.Regex.Replace(r.name, @"\s*\(\d+\)$", "")))
+            {
+                var bs = g.Select(r => r.bounds).ToList();
+                sb.Append($"  {g.Key,-40} ×{bs.Count} · x {bs.Min(b => b.min.x):0.0}~{bs.Max(b => b.max.x):0.0} · z {bs.Min(b => b.min.z):0.0}~{bs.Max(b => b.max.z):0.0} · y {bs.Min(b => b.min.y):0.0}~{bs.Max(b => b.max.y):0.0} · 한 개 크기 ({bs[0].size.x:0.0},{bs[0].size.y:0.0},{bs[0].size.z:0.0})\n");
+            }
+            Debug.Log(sb.ToString());
+        }
+        finally { PrefabUtility.UnloadPrefabContents(root); }
+    }
+
     [MenuItem("Tools/Rendering/Flat Kit/Water/1. Boss Room Patch")]
     public static void BuildBossRoomPatch()
     {
@@ -121,6 +171,7 @@ public static class FlatKitWaterPatchAuthoring
         if (mat == null || bedMat == null) { Debug.LogError("[WaterPatch] 물/바닥 머티리얼 없음"); return; }
         // 머티리얼 값(색·파도·거품)은 덮어쓰지 않는다 — 인스펙터에서 조절한 값이 유지돼야 한다(팀장 10-01).
         // 초기값으로 되돌리려면 '3. Reset Water Look (preset)'.
+        EnsureWorldUvShader(mat);
 
         // 이미 열려 있으면 닫지 않는다(팀장이 편집 중인 씬을 도구가 닫아 버리면 안 된다).
         bool wasLoaded = UnityEngine.SceneManagement.SceneManager.GetSceneByPath(MapScenePath).isLoaded;
@@ -211,7 +262,12 @@ public static class FlatKitWaterPatchAuthoring
 
     const string ZonesDir = "Assets/2.Prefabs/Environment/Layouts/Zones";
     const string ZoneRootName = "Water";          // ZoneWater(수면 높이) — 존별 높이는 여기서 조절
-    const float ZoneInset = 2f;                   // 존 물 크기 = 바닥 범위에서 변마다 이만큼 안쪽(m). 벽 끝 너머로 비치면 키운다
+    // ⚠️ 뒤집음(10-01): 2m 안쪽으로 줄였더니 구덩이 안에 물 가장자리가 드러나 그 너머(−19 쿼드)와 겹쳐 보였다.
+    //    벽 끝에 물이 비친 진짜 원인은 수면이 높아서(−0.62) — 내리면 아래층 벽(−10.5~−11 까지)이 가린다. → 0.
+    const float ZoneInset = 0f;                   // 존 물 크기 = 바닥 범위에서 변마다 이만큼 안쪽(m)
+    // 존 기본 수면 — 팀장이 ZoneS_typeA 에서 Play 로 맞춘 값(10-01). 존 구덩이는 아래층 벽이 −10.5~−11 까지 내려간다.
+    const float DefaultZoneWaterHeight = -4.43f;
+    const string WorldUvWaterShader = "Project/FlatKit Water (World UV)";
     const string ZoneWaterName = "WaterWaves";
     const string ZoneBedName = "WaterBed";
 
@@ -225,6 +281,7 @@ public static class FlatKitWaterPatchAuthoring
         var bedMat = AssetDatabase.LoadAssetAtPath<Material>(BedMaterialPath);
         if (mat == null || bedMat == null) { Debug.LogError("[WaterPatch] 물/바닥 머티리얼 없음"); return; }
         // 머티리얼 값은 덮어쓰지 않는다(인스펙터 조절 유지) — 초기값은 '3. Reset Water Look (preset)'.
+        EnsureWorldUvShader(mat);
 
         var log = new System.Text.StringBuilder("[WaterPatch] 존 물 조각\n");
         foreach (string guid in AssetDatabase.FindAssets("t:Prefab", new[] { ZonesDir }))
@@ -268,16 +325,29 @@ public static class FlatKitWaterPatchAuthoring
                 float waterY = grates.Count > 0
                     ? grates.GroupBy(r => Mathf.Round(toLocal.MultiplyPoint3x4(r.bounds.min).y * 100f) / 100f).OrderByDescending(g => g.Count()).First().Key - BelowGrateBottom
                     : top - BelowFloorTop;
-                if (keptHeight.HasValue) waterY = keptHeight.Value;
-                // 바닥 범위에 바깥 벽까지 들어가 물이 벽 끝 너머로 비쳤다(10-01 팀장) → 변마다 ZoneInset 만큼 안쪽으로.
-                float w = Mathf.Max(1f, lb.size.x - ZoneInset * 2f), d = Mathf.Max(1f, lb.size.z - ZoneInset * 2f);
+                // 존은 창살 규칙(−0.6 근처)이 너무 높았다(벽 끝에 비침) → 기본값 −4.43. 조절해 둔 값이 있으면 그것.
+                waterY = keptHeight ?? DefaultZoneWaterHeight;
+                // 🔴 물 범위 = **뚫린 곳(구덩이·벤트)만**(팀장 10-01 '벽 안쪽 기준'). 존 전체 사각형이면 구덩이 벽 뒤(바닥 밑)에도
+                //    물이 있어, 벽 투명화(디더) 때 벽에 물이 흐르는 것처럼 보였다. 존 가장자리에는 벽이 없다(S_A: 구덩이 벽만 ±6.8).
+                //    → 칸마다 위에 주 바닥 판(창살 제외)이 있으면 막힘, 없거나 창살이면 물. 바닥 타일은 4m 축 정렬이라 범위가 정확하다.
+                var solid = floors.Where(r => !r.gameObject.name.StartsWith("floor_metal_trenchcover", System.StringComparison.OrdinalIgnoreCase))
+                    .Select(r => { Bounds wb = r.bounds; return new Bounds(toLocal.MultiplyPoint3x4(wb.center), wb.size); })
+                    .Where(b => Mathf.Abs(b.max.y - top) < 0.6f).ToList();
+                // 구덩이 벽(바닥 아래로 내려가는 wall_*)이 차지하는 칸도 막힌 곳 — 물이 벽 두께만큼 벽 뒤로 들어가지 않게(정확히 벽 안쪽 면까지).
+                solid.AddRange(root.GetComponentsInChildren<MeshRenderer>(true)
+                    .Where(r => r.gameObject.name.IndexOf("wall", System.StringComparison.OrdinalIgnoreCase) >= 0 && r.bounds.min.y < top - 0.6f)
+                    .Select(r => { Bounds wb = r.bounds; return new Bounds(toLocal.MultiplyPoint3x4(wb.center), wb.size); }));
+                bool IsOpen(float x, float z) => !solid.Any(b => x > b.min.x && x < b.max.x && z > b.min.z && z < b.max.z);
+                float w = Mathf.Max(1f, lb.size.x), d = Mathf.Max(1f, lb.size.z);
 
                 // 존 루트 └ Water(ZoneWater: 수면 높이) ├ WaterWaves └ WaterBed
                 var water = new GameObject(ZoneRootName);
                 water.transform.SetParent(root.transform, false);
                 water.transform.localPosition = new Vector3(lb.center.x, waterY, lb.center.z);
                 water.AddComponent<ZoneWater>().WaterHeight = waterY;
-                Mesh grid = GetOrCreateGridMesh(w, d, Spacing);
+                Vector3 c0 = lb.center;
+                Mesh grid = CreateMaskedGridMesh(w, d, Spacing, $"{zoneName}", (lx, lz) => IsOpen(c0.x + lx, c0.z + lz));
+                if (grid == null) { log.Append($"  {zoneName,-22} 뚫린 곳 없음 — 물 없음\n"); Object.DestroyImmediate(water); PrefabUtility.SaveAsPrefabAsset(root, path); continue; }
                 AddChild(water, ZoneWaterName, Vector3.zero, grid, mat);
                 AddChild(water, ZoneBedName, Vector3.zero, CreateBedMesh(w, d, BedSpacing), bedMat);
 
@@ -291,6 +361,93 @@ public static class FlatKitWaterPatchAuthoring
         }
         AssetDatabase.SaveAssets();
         Debug.Log(log.ToString());
+    }
+
+    // 존 바닥 범위(lb, 루트 로컬)의 네 변마다, 그 변 근처(EdgeBand 이내)에 변을 따라 길게 놓인 벽 렌더러의
+    // **안쪽 면** 위치를 모아 중앙값을 쓴다. 벽이 없는 변(입구 등)은 바닥 범위 그대로. 반환 Rect 는 (x, z) 평면.
+    const float EdgeBand = 2.5f;
+    static Rect InnerWallRect(GameObject root, Matrix4x4 toLocal, Bounds lb)
+    {
+        var walls = root.GetComponentsInChildren<MeshRenderer>(true)
+            .Where(r => r.gameObject.name.IndexOf("wall", System.StringComparison.OrdinalIgnoreCase) >= 0)
+            .Select(r =>
+            {
+                Bounds wb = r.bounds;
+                Vector3 a = toLocal.MultiplyPoint3x4(wb.min), b = toLocal.MultiplyPoint3x4(wb.max);
+                return new Bounds((a + b) * 0.5f, new Vector3(Mathf.Abs(b.x - a.x), Mathf.Abs(b.y - a.y), Mathf.Abs(b.z - a.z)));
+            }).ToList();
+
+        float Median(System.Collections.Generic.List<float> v, float fallback)
+        {
+            if (v.Count == 0) return fallback;
+            v.Sort();
+            return v[v.Count / 2];
+        }
+
+        // +X 변: x 최대 근처, z 방향으로 긴 벽 → 안쪽 면 = 벽의 min.x
+        float xMax = Median(walls.Where(b => b.max.x >= lb.max.x - EdgeBand && b.size.z > b.size.x).Select(b => b.min.x).ToList(), lb.max.x);
+        float xMin = Median(walls.Where(b => b.min.x <= lb.min.x + EdgeBand && b.size.z > b.size.x).Select(b => b.max.x).ToList(), lb.min.x);
+        float zMax = Median(walls.Where(b => b.max.z >= lb.max.z - EdgeBand && b.size.x > b.size.z).Select(b => b.min.z).ToList(), lb.max.z);
+        float zMin = Median(walls.Where(b => b.min.z <= lb.min.z + EdgeBand && b.size.x > b.size.z).Select(b => b.max.z).ToList(), lb.min.z);
+        return Rect.MinMaxRect(xMin, zMin, xMax, zMax);
+    }
+
+    // 물 머티리얼을 월드 UV 복제 셰이더로(같은 이름 프로퍼티·키워드는 유지된다). 이미 바뀌었으면 아무것도 안 한다.
+    static void EnsureWorldUvShader(Material mat)
+    {
+        Shader s = Shader.Find(WorldUvWaterShader);
+        if (s == null) { Debug.LogError($"[WaterPatch] {WorldUvWaterShader} 없음"); return; }
+        if (mat.shader == s) return;
+        mat.shader = s;
+        EditorUtility.SetDirty(mat);
+        AssetDatabase.SaveAssets();
+    }
+
+    // 모든 존 수면을 기본값(DefaultZoneWaterHeight)으로 맞추고, 맵 큰 쿼드(Abyss/AbyssWater)도 같은 높이로 —
+    // 이웃 물(존 사이 틈으로 보이는 쿼드)과 높이가 달라 '위아래 물이 다른 상태'였다(10-01).
+    // 존별로 조절한 값을 **덮어쓰는** 메뉴라 2번 메뉴와 분리했다.
+    [MenuItem("Tools/Rendering/Flat Kit/Water/4. Set All Zones to Default Height (overwrites)")]
+    public static void SetAllZonesDefaultHeight()
+    {
+        if (EditorApplication.isPlaying) { Debug.LogError("[WaterPatch] Play 중에는 하지 않는다."); return; }
+        var mat = AssetDatabase.LoadAssetAtPath<Material>(WaterMaterialPath);
+        if (mat != null) EnsureWorldUvShader(mat);
+        int zones = 0;
+        foreach (string guid in AssetDatabase.FindAssets("t:Prefab", new[] { ZonesDir }))
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            GameObject root = PrefabUtility.LoadPrefabContents(path);
+            try
+            {
+                Transform w = root.transform.Find(ZoneRootName);
+                if (w == null || !w.TryGetComponent(out ZoneWater zw)) continue;
+                zw.WaterHeight = DefaultZoneWaterHeight;
+                PrefabUtility.SaveAsPrefabAsset(root, path);
+                zones++;
+            }
+            finally { PrefabUtility.UnloadPrefabContents(root); }
+        }
+
+        bool wasLoaded = UnityEngine.SceneManagement.SceneManager.GetSceneByPath(MapScenePath).isLoaded;
+        var scene = EditorSceneManager.OpenScene(MapScenePath, OpenSceneMode.Additive);
+        int quads = 0;
+        try
+        {
+            // 맵 큰 쿼드 = Abyss 밑 AbyssWater(330m). 보스방 쪽 쿼드(루트 AbyssWater)는 이미 꺼 둠.
+            foreach (Transform t in scene.GetRootGameObjects().Where(g => g.name == "Abyss").SelectMany(g => g.GetComponentsInChildren<Transform>(true)))
+            {
+                if (t.name != "AbyssWater") continue;
+                Vector3 p = t.position; p.y = DefaultZoneWaterHeight - 0.05f; t.position = p;   // 존 조각 바로 밑(겹치는 곳은 조각이 덮는다)
+                quads++;
+            }
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+        }
+        finally
+        {
+            if (!wasLoaded && UnityEngine.SceneManagement.SceneManager.loadedSceneCount > 1) EditorSceneManager.CloseScene(scene, true);
+        }
+        Debug.Log($"[WaterPatch] 존 {zones}개 수면 = {DefaultZoneWaterHeight} · 맵 큰 쿼드 {quads}개 = {DefaultZoneWaterHeight - 0.05f}");
     }
 
     static void AddChild(GameObject root, string name, Vector3 localPos, Mesh mesh, Material mat)
@@ -355,6 +512,46 @@ public static class FlatKitWaterPatchAuthoring
         if (v.Length > 65535) mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
         mesh.vertices = v; mesh.uv = uv; mesh.normals = nm; mesh.tangents = tg; mesh.triangles = GridTriangles(sx, sz);
         // 파도 진폭만큼 위아래로 여유 — 안 주면 가장자리에서 컬링으로 깜빡인다.
+        mesh.bounds = new Bounds(Vector3.zero, new Vector3(w, 2f, d));
+        return SaveMesh(mesh, path);
+    }
+
+    // 뚫린 칸에만 면을 만든 격자 물(존 전용 — 존마다 모양이 달라 존 이름으로 저장). 쓰지 않는 정점은 빼서 압축한다.
+    // open(lx, lz): 물 루트 기준 로컬 좌표의 칸 중심이 뚫렸는가. 뚫린 칸이 하나도 없으면 null.
+    static Mesh CreateMaskedGridMesh(float w, float d, float spacing, string zoneName, System.Func<float, float, bool> open)
+    {
+        int sx = Mathf.Max(1, Mathf.CeilToInt(w / spacing)), sz = Mathf.Max(1, Mathf.CeilToInt(d / spacing));
+        int nx = sx + 1;
+        var remap = new int[nx * (sz + 1)];
+        for (int i = 0; i < remap.Length; i++) remap[i] = -1;
+        var verts = new System.Collections.Generic.List<Vector3>();
+        var tris = new System.Collections.Generic.List<int>();
+        int V(int x, int z)
+        {
+            int i = z * nx + x;
+            if (remap[i] < 0) { remap[i] = verts.Count; verts.Add(new Vector3(-w * 0.5f + x / (float)sx * w, 0f, -d * 0.5f + z / (float)sz * d)); }
+            return remap[i];
+        }
+        for (int z = 0; z < sz; z++)
+            for (int x = 0; x < sx; x++)
+            {
+                float cx = -w * 0.5f + (x + 0.5f) / sx * w, cz = -d * 0.5f + (z + 0.5f) / sz * d;
+                if (!open(cx, cz)) continue;
+                int a = V(x, z), b = V(x, z + 1), c = V(x + 1, z), e = V(x + 1, z + 1);
+                tris.Add(a); tris.Add(b); tris.Add(c);
+                tris.Add(c); tris.Add(b); tris.Add(e);
+            }
+        if (tris.Count == 0) return null;
+
+        string path = $"{MeshDir}/WaterHoles_{zoneName}.asset";
+        if (!AssetDatabase.IsValidFolder(MeshDir)) AssetDatabase.CreateFolder("Assets/3.Materials/FlatKit/Water", "Meshes");
+        var mesh = new Mesh { name = System.IO.Path.GetFileNameWithoutExtension(path) };
+        if (verts.Count > 65535) mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+        mesh.SetVertices(verts);
+        mesh.SetNormals(Enumerable.Repeat(Vector3.up, verts.Count).ToList());
+        mesh.SetTangents(Enumerable.Repeat(new Vector4(1f, 0f, 0f, 1f), verts.Count).ToList());
+        mesh.SetUVs(0, verts.Select(p => new Vector2(p.x / UvWorldSize, p.z / UvWorldSize)).ToList());   // 셰이더는 월드 UV — 참고용
+        mesh.SetTriangles(tris, 0);
         mesh.bounds = new Bounds(Vector3.zero, new Vector3(w, 2f, d));
         return SaveMesh(mesh, path);
     }
