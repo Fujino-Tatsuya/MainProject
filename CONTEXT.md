@@ -14,7 +14,9 @@ Update this file when a term becomes important enough that future agents or team
 - 현재 = 이징 함수만(`Ease` enum 31종 + `Easing.Evaluate`·`Easing.Punch`, 상태 없는 순수 함수). 트윈 러너(핸들·Sequence·대상 파괴 처리)는 **없음** — 필요해질 때 추가.
   테스트 `Assets/Tests/EditMode/EuniTween/`. dotnet 단독 빌드·수치 검증 통과, **Unity 임포트·Test Runner 확인 대기**(.meta 미생성).
 - 승인 계획 = [PLAN-damage-popup.md](PLAN-damage-popup.md) (기획 Re:C 데미지 숫자 표기 v0.2). 1단계 데이터 → 2단계 연출.
-- **1단계 = Codex 위임 중**(handoff `eba580f4`, 2026-10-01): AttackType Q/E/R · AttackHitPattern · RPC · 누적 키 · `MonsterRank`.
+- **1단계 = ✅ 코드 완료 `d379a9ea`**(Codex, dotnet build 오류 0) — 🔴 **Test Runner·Play 검증 대기**.
+  슬롯 = `PlayerSkillBase.Slot` 에서 변환(Main→SkillQ·Sub→SkillE·Ultimate→SkillR·Interrupt→Skill). 패턴 = `PlayerSkillData.hitPattern`, Multi 는 가붕이 Q·거너 R 두 개뿐.
+  누적 키 = `FloatingDamageAccumulationPolicy`(Multi 만 키 생성, Single 은 항상 새 팝업).
 - 🔴 `MonsterDataSO.rank` 추가는 **경석 영역** — 합의 알림 필요. 기획 구간 재조정은 기획자에게 요청 필요(PLAN §5).
 - 수정 예정: PLAN §4 목록 + `Assets/1.Scripts/EuniTween/**`, `Assets/Tests/EditMode/EuniTween/**`.
 
