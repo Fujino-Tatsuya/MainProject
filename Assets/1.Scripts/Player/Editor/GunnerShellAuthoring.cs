@@ -256,6 +256,114 @@ public static class GunnerShellAuthoring
         BuildAnimator();
     }
 
+    const string TrackingLaserDataPath = DataFolder + "/GunnerTrackingLaserData.asset";
+    const string TrackingLaserPrefabPath = Folder + "/GunnerTrackingLaser.prefab";
+    const string TrackingLaserMaterialPath = Folder + "/GunnerTrackingLaser_Temp.mat";
+
+    /// <summary>
+    /// G7 — R 추적 레이저. 레이저 프리팹(NetworkObject + 서버 NetworkTransform + GunnerTrackingLaser + 임시 원기둥),
+    /// 데이터(SingleTarget 조준), GunnerTrackingLaserSkill 부착, R 슬롯 배선, 애니 상태.
+    /// 프리팹은 NGO 가 DefaultNetworkPrefabs 에 자동 등록한다.
+    /// </summary>
+    [MenuItem("Tools/Player/Gunner/R 추적 레이저 부착 (G7)")]
+    public static void AttachTrackingLaser()
+    {
+        if (AssetDatabase.LoadAssetAtPath<GameObject>(VariantPath) == null)
+        {
+            Debug.LogError($"[Gunner] Variant 가 없다 — 먼저 '껍데기 생성 (G9)' 실행: {VariantPath}");
+            return;
+        }
+
+        GameObject laserPrefab = EnsureTrackingLaserPrefab();
+
+        EnsureFolder(DataFolder);
+        bool created = AssetDatabase.LoadAssetAtPath<GunnerTrackingLaserData>(TrackingLaserDataPath) == null;
+        var data = EnsureAsset<GunnerTrackingLaserData>(TrackingLaserDataPath);
+        var so = new SerializedObject(data);
+        so.FindProperty("laserPrefab").objectReferenceValue = laserPrefab;
+        if (created)
+        {
+            so.FindProperty("cooldownTime").floatValue = 20f;
+            so.FindProperty("maxActiveDuration").floatValue = 2f;
+            so.FindProperty("attackDamageMultiplier").floatValue = 0.4f; // 틱당
+            so.FindProperty("hittableLayers").intValue = 16640;          // Enemy·EnemyHurtBox
+            so.FindProperty("targetingMode").enumValueIndex = (int)SkillTargetingMode.SingleTarget;
+            so.FindProperty("castRange").floatValue = 12f;
+            so.FindProperty("targetableLayers").intValue = 16640;
+            so.FindProperty("animatorStateName").stringValue = "Gunner_ULT_Cast";
+            so.FindProperty("snapRotationOnStart").boolValue = true;
+        }
+        so.ApplyModifiedPropertiesWithoutUndo();
+        EditorUtility.SetDirty(data);
+
+        GameObject root = PrefabUtility.LoadPrefabContents(VariantPath);
+        try
+        {
+            var skill = EnsureComponent<GunnerTrackingLaserSkill>(root);
+            SetReference(skill, "data", data);
+            SetReference(root.GetComponent<PlayerSkillController>(), "ultimateSkill", skill);
+
+            PrefabUtility.SaveAsPrefabAsset(root, VariantPath);
+            Debug.Log($"[Gunner] R 추적 레이저 부착 완료: {VariantPath}");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+
+        BuildAnimator();
+    }
+
+    static GameObject EnsureTrackingLaserPrefab()
+    {
+        var existing = AssetDatabase.LoadAssetAtPath<GameObject>(TrackingLaserPrefabPath);
+        if (existing != null)
+            return existing;
+
+        var material = AssetDatabase.LoadAssetAtPath<Material>(TrackingLaserMaterialPath);
+        if (material == null)
+        {
+            material = new Material(Shader.Find("Sprites/Default")) { color = new Color(1f, 0.85f, 0.3f, 0.35f) };
+            AssetDatabase.CreateAsset(material, TrackingLaserMaterialPath);
+        }
+
+        var root = new GameObject("GunnerTrackingLaser");
+        try
+        {
+            root.AddComponent<NetworkObject>();
+            var networkTransform = root.AddComponent<NetworkTransform>();
+            networkTransform.AuthorityMode = NetworkTransform.AuthorityModes.Server;
+            networkTransform.SyncRotAngleX = networkTransform.SyncRotAngleY = networkTransform.SyncRotAngleZ = false;
+            networkTransform.SyncScaleX = networkTransform.SyncScaleY = networkTransform.SyncScaleZ = false;
+            var laser = root.AddComponent<GunnerTrackingLaser>();
+
+            // 🔸 임시 표시 — 반투명 원기둥(높이 5m). 반경은 런타임에 데이터 값으로 스케일한다.
+            GameObject visual = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            visual.name = "Visual(임시)";
+            Object.DestroyImmediate(visual.GetComponent<Collider>());
+            visual.transform.SetParent(root.transform, false);
+            visual.transform.localPosition = new Vector3(0f, 2.5f, 0f);
+            visual.transform.localScale = new Vector3(2f, 2.5f, 2f);
+            visual.GetComponent<MeshRenderer>().sharedMaterial = material;
+            SetReference(laser, "visual", visual.transform);
+
+            PrefabUtility.SaveAsPrefabAsset(root, TrackingLaserPrefabPath);
+            Debug.Log($"[Gunner] 추적 레이저 프리팹 생성: {TrackingLaserPrefabPath}");
+        }
+        finally
+        {
+            Object.DestroyImmediate(root);
+        }
+
+        // GlobalObjectIdHash 실기록(Variant 와 같은 절차 — player-prefabs.md §0)
+        var saved = AssetDatabase.LoadAssetAtPath<GameObject>(TrackingLaserPrefabPath);
+        EditorUtility.SetDirty(saved.GetComponent<NetworkObject>());
+        AssetDatabase.SaveAssetIfDirty(saved);
+        uint hash = new SerializedObject(saved.GetComponent<NetworkObject>()).FindProperty("GlobalObjectIdHash").uintValue;
+        Debug.Log($"[Gunner] 추적 레이저 GlobalObjectIdHash = {hash}");
+        return saved;
+    }
+
     const string UpperBodyMaskPath = ControllerFolder + "/GunnerUpperBody.mask";
     // Auto-Rig Pro 컨트롤 리그라 상체가 한 서브트리에 모여 있지 않다(forearm.r/hand.r·head.x 가 c_traj 바로 아래).
     // 그래서 "척추 아래 전부"가 아니라 "하체·골반·루트 계열을 뺀 전부"를 켠다.
@@ -329,6 +437,11 @@ public static class GunnerShellAuthoring
         AnimatorState rmb = EnsureState(baseMachine, "Gunner_RMB_Interrupt");
         rmb.motion = Clip("gunner_skill_RMB_interrupt");
         EnsureExitTimeTransition(rmb, idle);
+
+        // R: 시전 → Idle
+        AnimatorState ult = EnsureState(baseMachine, "Gunner_ULT_Cast");
+        ult.motion = Clip("gunner_skill_ULT_cast");
+        EnsureExitTimeTransition(ult, idle);
 
         AvatarMask mask = EnsureUpperBodyMask();
 

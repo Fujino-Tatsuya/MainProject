@@ -1,0 +1,47 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: be4a9508f5874cc4a891e4af2de56b59, type: 3}
+  m_Name: GunnerTrackingLaserData
+  m_EditorClassIdentifier: Assembly-CSharp::GunnerTrackingLaserData
+  inputType: 0
+  cooldownTime: 20
+  commitCooldownManually: 0
+  attackDamageMultiplier: 0.4
+  flatDamageBonus: 0
+  maxActiveDuration: 2
+  tickInterval: 0
+  usableWhileDead: 0
+  hittableLayers:
+    serializedVersion: 2
+    m_Bits: 16640
+  triggersOnHit: 0
+  targetingMode: 1
+  confirmMode: 0
+  castRange: 12
+  targetableLayers:
+    serializedVersion: 2
+    m_Bits: 16640
+  animatorStateName: Gunner_ULT_Cast
+  snapRotationOnStart: 1
+  laserPrefab: {fileID: 1342867765130624444, guid: 9e31971307059c94682f238d5739d2a7, type: 3}
+  castDuration: 0.3
+  laserDuration: 6
+  moveSpeed: 4
+  radius: 2
+  damageInterval: 0.5
+  stageDamageMultipliers:
+  - 1
+  - 1.15
+  - 1.3
+  - 1.5
+  retargetRadius: 8
+  retargetInterval: 0.5

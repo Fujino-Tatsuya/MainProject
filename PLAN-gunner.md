@@ -130,6 +130,14 @@ G1 은 G4 전까지 어느 때든. 문서 갱신(player-prefabs.md 거너 항목
 
 ## 7. 진행
 
+- ✅ **G7 완료 — Play 확인(🔸 대상 사망 후 재탐색은 미검증)**(2026-10-01). **첫 플레이어 생성 네트워크 오브젝트.**
+  - `GunnerTrackingLaserSkill`(Ultimate, SingleTarget ClickToConfirm 재사용 — R 재입력 취소·빈 곳 무시·사거리 밖은 기존 자동 접근):
+    승인 = 확정 순간 단계 저장, 대상 위치에 `GunnerTrackingLaser` 서버 `Spawn(destroyWithScene)`, 쿨 시작. `castDuration`(0.3s) 뒤 자유.
+  - `GunnerTrackingLaser`(NetworkObject + 서버 NetworkTransform): 고정 속도 추적, 대상 무효 시 `retargetRadius` 최근접(동거리 = 먼저 확인), 없으면 주기 재탐색,
+    `damageInterval` 마다 원형 범위 적 1회(플레이어 제외, 시전자 명의), 지속시간 만료·**시전자 접속 종료** 시 Despawn. 반경은 NetworkVariable 로 임시 원기둥에 반영.
+  - 메뉴 `Tools/Player/Gunner/R 추적 레이저 부착 (G7)` — 프리팹(+해시 실기록)·임시 머티리얼·SO·R 슬롯·애니 `Gunner_ULT_Cast`.
+  - 🔸 기획 9.3 "생성 즉시 자유" vs 시전 모션: `castDuration` 0 이면 즉시 자유(모션은 잘림).
+
 - ✅ **G6 완료 — Play 확인**(2026-10-01). `GunnerInterruptSkill`/`Data`(Interrupt 슬롯, `PlayerInstantSkill`):
   HitDelay 또는 Hit 이벤트 1회 → 앵커(`Gunner_Armature/InterruptAttack` 박스) Overlap 에 `isInterruptAttack` 피해(보스가 판정 — 가붕이와 같은 계약).
   같은 시각부터 각 시뮬레이션 피어가 후폭풍(공격 반대, `recoilDistance/Duration`) — **`PlayerMotor.PassThroughEnemiesOverride`** 로 적 통과·벽만 막힘. 빗나가도 이동·쿨·연출.

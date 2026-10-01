@@ -142,6 +142,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 4305858880368545057}
     - target: {fileID: 4711829301158223401, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: ultimateSkill
+      value: 
+      objectReference: {fileID: 3214493021041571807}
+    - target: {fileID: 4711829301158223401, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       propertyPath: interruptSkill
       value: 
       objectReference: {fileID: 6691715782565875710}
@@ -180,6 +184,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       insertIndex: -1
       addedObject: {fileID: 6691715782565875710}
+    - targetCorrespondingSourceObject: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 3214493021041571807}
   m_SourcePrefab: {fileID: 100100000, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
 --- !u!1 &1006850121594653262 stripped
 GameObject:
@@ -309,6 +316,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GunnerInterruptSkill
   data: {fileID: 11400000, guid: e60875766cf84e644a1f0b7dae235261, type: 2}
   hitboxAnchor: {fileID: 3988724667065146670}
+--- !u!114 &3214493021041571807
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1006850121594653262}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8d4b9dc9f299c904ab5f9deb5b1a0cba, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GunnerTrackingLaserSkill
+  data: {fileID: 11400000, guid: 9c68330020ec71f48bef805a9fe0dda6, type: 2}
+  hitboxAnchor: {fileID: 0}
 --- !u!4 &7722051468864962236 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 1160318589990200604, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
