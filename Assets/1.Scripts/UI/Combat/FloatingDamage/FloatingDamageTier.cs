@@ -13,8 +13,8 @@ public enum FloatingDamageTier
 public static class FloatingDamageTierPolicy
 {
     /// <summary>
-    /// 피해 비율 = 개별 타격의 최종 피해 ÷ 기준 최대 체력 × 100. 경계값은 위 구간에 넣는다("이상").
-    /// 누적액이 아니라 **한 타격**으로 판정한다 — 누적 숫자의 크기는 이 결과의 최댓값을 유지한다.
+    /// 피해 비율 = 피해량 ÷ 기준 최대 체력 × 100. 경계값은 위 구간에 넣는다("이상").
+    /// 단발 숫자는 그 타격, 누적 숫자는 누적 합계를 넣는다.
     /// </summary>
     public static FloatingDamageTier Classify(int amount, int baseMaxHp, float midPercent, float highPercent)
     {

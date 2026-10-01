@@ -104,7 +104,7 @@ public sealed class FloatingDamagePopup : MonoBehaviour
         _digitHeight = style.height;
         _alpha = _baseColor.a;
 
-        // 색 판정용 — 대상이 도중에 사라져도 같은 기준으로 판정하도록 생성 때 저장한다.
+        // 누적 구간 판정용 — 대상이 도중에 사라져도 같은 기준으로 판정하도록 생성 때 저장한다.
         _baseMaxHp = request.target != null ? request.target.MaxHp : 0;
         _rank = request.target != null ? request.target.Rank : MonsterRank.Normal;
 
@@ -121,7 +121,7 @@ public sealed class FloatingDamagePopup : MonoBehaviour
     }
 
     /// <summary>같은 누적 단위의 추가 타격. 값은 항상 즉시 갱신하고, 연출만 간격 규칙을 따른다.</summary>
-    public bool TryAccumulate(int amount, FloatingDamageTier hitTier)
+    public bool TryAccumulate(int amount)
     {
         if (!IsAccumulating || amount <= 0)
             return false;
@@ -129,13 +129,16 @@ public sealed class FloatingDamagePopup : MonoBehaviour
         _amount += amount;
         _lastHitAt = _elapsed;
         RefreshText();
-        UpdateFillColor();
 
-        // 크기는 지금까지 받은 개별 타격 중 가장 높은 구간을 유지한다 — 누적액으로는 올리지 않는다.
-        if (hitTier > _tier)
+        // 누적 숫자의 크기·색은 **누적 합계**로 판정한다(은희 2026-10-01 — 기획 §5 "개별 타격 기준"과 다름).
+        // 합계는 줄지 않으므로 구간은 올라가기만 한다. 구간이 오를 때 그 구간의 등장 확대를 다시 보여 준다
+        // (높음은 강조 간격 규칙을 따른다).
+        FloatingDamageTier totalTier = _settings.ClassifyTier(_amount, _baseMaxHp, _rank);
+        if (totalTier > _tier)
         {
-            SetTier(hitTier);
-            if (hitTier == FloatingDamageTier.High && _look.HasSpawnPop && TryConsumeEmphasis())
+            SetTier(totalTier);
+            UpdateFillColor();
+            if (_look.HasSpawnPop && (totalTier != FloatingDamageTier.High || TryConsumeEmphasis()))
             {
                 StartSpawnPop();
                 return true;
@@ -269,25 +272,11 @@ public sealed class FloatingDamagePopup : MonoBehaviour
         _look = _settings.GetLook(tier);
     }
 
-    // HP 피해 숫자의 채움 색(낮음 노랑 · 중간 주황 · 높음 빨강). 보호막 등 다른 유형은 유형 색.
-    // 누적 숫자는 **누적 합계**로 판정해 합산될수록 색이 올라간다(은희 2026-10-01).
-    // 크기·강조는 여전히 개별 타격 기준(_tier) — 색만 합계를 따른다.
+    // HP 피해 숫자의 채움 색(낮음 노랑 · 중간 주황 · 높음 빨강) = 현재 구간. 보호막 등 다른 유형은 유형 색.
     // 다음 ApplyLayout 의 SetAlpha 가 새 색을 입힌다.
     void UpdateFillColor()
     {
-        if (_request.kind != PopupKind.Damage)
-        {
-            _baseColor = _styleColor;
-            return;
-        }
-
-        FloatingDamageTier colorTier = _accumulates
-            ? _settings.ClassifyTier(_amount, _baseMaxHp, _rank)
-            : _tier;
-        if (colorTier < _tier)
-            colorTier = _tier;
-
-        _baseColor = _settings.GetLook(colorTier).fillColor;
+        _baseColor = _request.kind == PopupKind.Damage ? _look.fillColor : _styleColor;
     }
 
     void StartSpawnPop()
