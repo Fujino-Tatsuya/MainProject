@@ -8,13 +8,17 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 작업 세션 (2026-09-30 · 은희(Claude) · **원거리 캐릭터 "거너" 기획 확정 + 구현 계획**, 브랜치 `feature/SecondCharacter`)
+## ▶▶ 현재 인수인계 (2026-10-01 · 은희(Claude) · **원거리 캐릭터 "거너" G0~G9 구현 완료**, 브랜치 `feature/SecondCharacter`, push 안 함)
 
-grill 완료 → 기획 원본 [character_gunner.md](Docs/design/character/character_gunner.md), 구현 계획 [PLAN-gunner.md](PLAN-gunner.md)(✅ 승인, 진행은 §7).
-- ✅ G1 보호막 인스턴스화(`f1e2fe1c`, 전 유닛 공통 — 사망 시 전부 제거, `SetShield`/`IncreaseShield` 삭제) · G2 `IPlayerBasicAttack` + 콤보 공격을 `Player_Paladin` 으로 이관(`afdaadaf`) ·
-  G9 `Player_Gunner` 껍데기 + Dev Boot 캐릭터 메뉴(`73e6f1f1`) · G3 과열 + 연사 레이저(`f57078f6`). 다음 = G4(Q 정신 집중). 🔴 G0(gunner.fbx 클립 분할, SVN)은 은희 담당·미착수.
-**징크스(스택 폭발) 기획은 폐기** — 기존 원거리 슬롯·모델을 거너가 쓴다(아트 `Assets/50.Art/Char/gunner/`).
-수정 중(문서만): `Docs/design/character/character_gunner.md`(신규) · `character_jinx.md`(폐기 표시) · `Docs/design/players.md` · `PLAN-gunner.md`(신규).
+기획 원본 [character_gunner.md](Docs/design/character/character_gunner.md)(§0 확정 변경 D1~D15) · 계획·진행 [PLAN-gunner.md](PLAN-gunner.md) §7 · 프리팹 구조 [player-prefabs.md](Docs/tech/player-prefabs.md) §0.
+**징크스(스택 폭발) 기획은 폐기** — 기존 원거리 슬롯·모델을 거너가 쓴다(아트 `Assets/50.Art/Char/gunner/`, SVN 핀 **346**).
+- 🔴 **전 캐릭터 공통 코어 변경**(가붕이 Play 확인함): 보호막 = 종류·출처별 인스턴스(`ShieldType`, 사망 시 전부 제거, HUD = 남은 합/부여 합) ·
+  기본 공격 = `IPlayerBasicAttack`(base 에서 빠지고 Variant 가 얹음) · `PlayerActionState` 끝에 **`AttackReady`·`Focus`** ·
+  스킬 시스템 확장(수동 쿨 커밋·실행 중 좌클릭·`OnFixedTick`·`EntryActionState`·`CanBeCanceledByDash`) · `PlayerMotor` 일시 아군 차단/적 통과 ·
+  **대시 우선은 행동이 허락할 때만**(가붕이는 전부 아니오 = 기존과 같음).
+- 거너 조립 = 메뉴 `Tools/Player/Gunner/*`(재실행 안전). 스폰 = `Dev/Dev Boot/캐릭터/거너`(개인 EditorPrefs). 정식 캐릭터 선택은 미구현.
+- ⏳ **후속**: 임시 연출 교체(발사선·폭발선·추적 레이저 원기둥 → **민경 VFX**, 훅 = `GunnerBeamView`·`GunnerHeat.StageChanged/OverheatChanged`) ·
+  임시 과열 게이지(OnGUI) → CombatHUD 정식 UI · **R 대상 사망 후 재탐색 미검증** · 밸런스 수치(전부 SO) · 캐릭터 선택 경로(player-prefabs.md §8.3) · R 기본 잠금(빌드 시스템 몫, D15).
 
 ## ▶▶ 현재 인수인계 (2026-09-30 · 은희(Claude) · **플레이어 base+Variant + 패시브 버프 모델** → development 반영)
 

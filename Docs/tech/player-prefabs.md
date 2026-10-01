@@ -16,16 +16,25 @@ Variant 가 `Armature`(캐릭터 몸체) · 스킬 · VFX · 무기 · 스탯 ·
 
 ```
 Player.prefab (base)            ← 네트워크·입력·이동·생명주기·상태이상·HUD·HurtBox·실루엣 태그·시각 보간
-└─ Player_Paladin.prefab (Variant)
-   ├─ Armature  = <중첩 Paladin/Paladin_Armature.prefab>  ← 모델·리그·Animator·히트박스·VFX 소켓
-   ├─ PlayerWaeponSlot/SM_Wep_Shield_01 · SM_Wep_Sword_03
-   ├─ VFX  (EffectSocketPlayer 들)
-   └─ 루트 추가: FirstMelee* 스킬 5종 · PlayerSkillVfx · PlayerShieldVfx · EffectAnimEvents
+│                                  🔴 기본 공격 없음(2026-09-30) — 캐릭터가 IPlayerBasicAttack 구현을 얹는다
+├─ Player_Paladin.prefab (Variant)
+│  ├─ Armature  = <중첩 Paladin/Paladin_Armature.prefab>  ← 모델·리그·Animator·히트박스·VFX 소켓
+│  ├─ PlayerWaeponSlot/SM_Wep_Shield_01 · SM_Wep_Sword_03
+│  ├─ VFX  (EffectSocketPlayer 들)
+│  └─ 루트 추가: PlayerDefaultAttack·DefaultAttackController(콤보) · FirstMelee* 스킬 5종 · PlayerSkillVfx · PlayerShieldVfx · EffectAnimEvents
+└─ Player_Gunner.prefab (Variant, 2026-09-30~10-01 — character_gunner.md / PLAN-gunner.md)
+   ├─ Armature  = <중첩 Gunner/Gunner_Armature.prefab>    ← gunner.fbx(Generic) · Animator(GunnerAnimatorController) · hand.r/LaserGun · InterruptAttack 앵커
+   └─ 루트 추가: GunnerHeat · GunnerBeamAttack · GunnerBasicAttack(연사) · GunnerHeatHUD(임시) · GunnerBeamView ·
+                 GunnerChargeLaserSkill(Q) · GunnerCoolBackstepSkill(E) · GunnerInterruptSkill(우클릭) · GunnerTrackingLaserSkill(R)
+   (+ 별도 네트워크 프리팹 Gunner/GunnerTrackingLaser.prefab — R 이 서버에서 스폰)
 ```
+
+**거너 조립은 손으로 하지 말고 메뉴로** — `Tools/Player/Gunner/` 아래 단계별 메뉴(`Player/Editor/GunnerShellAuthoring.cs`)가
+프리팹·데이터 SO·슬롯 배선·애니메이터를 만든다. 재실행해도 이미 있는 것은 건너뛴다(덮어쓰지 않음).
 
 | 질문 | 답 |
 |------|-----|
-| 지금 스폰되는 건? | **`Player_Paladin`** — 정식 흐름·테스트 씬 전부. 로그 이름 `Player_Paladin(Clone)` |
+| 지금 스폰되는 건? | **`Player_Paladin`** — 정식 흐름·테스트 씬 전부. 로그 이름 `Player_Paladin(Clone)`. 거너는 **Dev Boot 개인 선택**(메뉴 `Dev/Dev Boot/캐릭터/거너`, EditorPrefs)으로만 스폰된다 |
 | 전투·이동·UI 등 **역할** 동작을 바꾸려면? | **`Player.prefab`**(base). Variant 가 상속한다 |
 | 가붕이 **고유**(스킬·VFX·모델·히트박스·스탯)를 바꾸려면? | **`Player_Paladin.prefab`**, 몸체는 **`Paladin_Armature.prefab`** |
 | 새 캐릭터를 추가하려면? | base 의 Variant 를 새로 만들고 `DefaultNetworkPrefabs` 에 등록. 🔴 **`GlobalObjectIdHash` 가 YAML 에 기록됐는지 확인**(아래) |
@@ -37,7 +46,8 @@ Player.prefab (base)            ← 네트워크·입력·이동·생명주기·
 
 🔴 **Variant 해시 함정.** `SaveAsPrefabAsset` 만으로는 Variant 의 `NetworkObject.GlobalObjectIdHash` 오버라이드가
 YAML 에 **안 써져 base 해시를 상속**한다(에디터 메모리 값만 고유 → 빌드에서 충돌). 에셋의 NetworkObject 를
-`SetDirty` → `SaveAssetIfDirty` 해서 기록할 것. `Player_Paladin` = `913233600`, base = `1250559839`.
+`SetDirty` → `SaveAssetIfDirty` 해서 기록할 것. `Player_Paladin` = `913233600`, `Player_Gunner` = `816596077`,
+`GunnerTrackingLaser` = `4090968237`, base = `1250559839`.
 
 ---
 

@@ -1,4 +1,4 @@
-# PLAN — 원거리 캐릭터 "거너" 구현 (2026-09-30 승인)
+# PLAN — 원거리 캐릭터 "거너" 구현 (2026-09-30 승인 · 2026-10-01 G0~G9 완료)
 
 작성: 은희(Claude) / 브랜치: `feature/SecondCharacter`(= `development` `883fb34a` 에서 분기, 커밋 0)
 기획 원본: [character_gunner.md](Docs/design/character/character_gunner.md) — **§0 확정 변경(D1~D15)이 원본 본문보다 우선**
