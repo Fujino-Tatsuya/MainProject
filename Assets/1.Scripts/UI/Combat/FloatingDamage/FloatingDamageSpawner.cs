@@ -52,6 +52,12 @@ public sealed class FloatingDamageSpawner : MonoBehaviour
             return;
         }
 
+        if (settings.DigitSet == null)
+        {
+            Debug.LogError("[FloatingDamage] Settings 에 숫자 글꼴(DigitSet)이 없습니다.", settings);
+            return;
+        }
+
         bool canAccumulate = FloatingDamageAccumulationPolicy.TryCreateKey(
             request.attackerClientId,
             request.attackType,

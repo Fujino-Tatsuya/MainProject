@@ -1,6 +1,5 @@
 using System;
 using EuniTween;
-using TMPro;
 using UnityEngine;
 
 /// <summary>
@@ -14,13 +13,18 @@ using UnityEngine;
 /// - 단발(<see cref="AttackHitPattern.Single"/>): 상승 → 최고점에서 하강하며 끝 0.25s 동안 흐려짐 → 제거.
 /// - 누적(<see cref="AttackHitPattern.Multi"/>): 상승 후 유지. 타격마다 값 갱신 + 펀치.
 ///   마지막 타격 후 유지 → 하강하며 흐려짐. 흐려지는 중에 맞아도 누적한다(유지로 복귀).
+///
+/// 숫자는 이미지 글꼴(<see cref="FloatingDamageDigitSet"/>)로 그린다 — 글자 Image 는 <see cref="FloatingDamageNumberView"/> 가 만든다.
 /// </summary>
 [DisallowMultipleComponent]
+[RequireComponent(typeof(RectTransform))]
 public sealed class FloatingDamagePopup : MonoBehaviour
 {
-    [SerializeField] TMP_Text amountText;
-
     RectTransform _rect;
+    FloatingDamageNumberView _view;
+    FloatingDamageDigitSet _digitSet;
+    float _digitHeight;
+    float _alpha;
     Canvas _canvas;
     RectTransform _canvasRect;
     FloatingDamageSettings _settings;
@@ -51,6 +55,7 @@ public sealed class FloatingDamagePopup : MonoBehaviour
     void Awake()
     {
         _rect = (RectTransform)transform;
+        _view = new FloatingDamageNumberView(_rect);
     }
 
     public void Initialize(
@@ -91,11 +96,9 @@ public sealed class FloatingDamagePopup : MonoBehaviour
         _rect.anchorMax = Vector2.zero;
         _rect.pivot = new Vector2(0.5f, 0.5f);
 
-        if (amountText != null)
-        {
-            amountText.fontSize = style.fontSize;
-            amountText.color = _baseColor;
-        }
+        _digitSet = settings.DigitSet;
+        _digitHeight = style.height;
+        _alpha = _baseColor.a;
 
         SetTier(tier);
         // 단발 숫자의 표시 시간은 생성 때의 구간으로 정한다(단발은 구간이 바뀌지 않는다).
@@ -254,8 +257,6 @@ public sealed class FloatingDamagePopup : MonoBehaviour
     {
         _tier = tier;
         _look = _settings.GetLook(tier);
-        if (amountText != null)
-            amountText.fontStyle = _look.bold ? FontStyles.Bold : FontStyles.Normal;
     }
 
     void StartSpawnPop()
@@ -286,18 +287,19 @@ public sealed class FloatingDamagePopup : MonoBehaviour
 
     void SetAlpha(float alpha)
     {
-        if (amountText == null)
-            return;
+        _alpha = alpha;
 
-        Color color = _baseColor;
-        color.a = alpha;
-        amountText.color = color;
+        Color fill = _baseColor;
+        fill.a = alpha;
+        Color outline = _digitSet.OutlineColor;
+        outline.a *= alpha;
+        _view.SetColors(fill, outline);
     }
 
     void RefreshText()
     {
-        if (amountText != null)
-            amountText.SetText("{0}", _amount);
+        _view.SetValue(_amount, _digitSet, _digitHeight);
+        SetAlpha(_alpha); // 새로 만든 글자 Image 는 흰색이라 현재 색을 다시 입힌다.
     }
 
     void RequestRelease()

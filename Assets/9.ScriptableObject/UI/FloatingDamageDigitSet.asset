@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cfac4b3d00916a44ba92dbff633026d2, type: 3}
+  m_Name: FloatingDamageDigitSet
+  m_EditorClassIdentifier: Assembly-CSharp::FloatingDamageDigitSet
+  fill:
+  - {fileID: -845627521, guid: 097801dd638389d46a92ee8da371ce28, type: 3}
+  - {fileID: 288477758, guid: 097801dd638389d46a92ee8da371ce28, type: 3}
+  - {fileID: 601671300, guid: 097801dd638389d46a92ee8da371ce28, type: 3}
+  - {fileID: -1734041726, guid: 097801dd638389d46a92ee8da371ce28, type: 3}
+  - {fileID: -2094372311, guid: 097801dd638389d46a92ee8da371ce28, type: 3}
+  - {fileID: 1211438559, guid: 097801dd638389d46a92ee8da371ce28, type: 3}
+  - {fileID: 1061909793, guid: 097801dd638389d46a92ee8da371ce28, type: 3}
+  - {fileID: -1975269122, guid: 097801dd638389d46a92ee8da371ce28, type: 3}
+  - {fileID: 457100742, guid: 097801dd638389d46a92ee8da371ce28, type: 3}
+  - {fileID: -1248742153, guid: 097801dd638389d46a92ee8da371ce28, type: 3}
+  outline:
+  - {fileID: 1732864553, guid: a51f6dbf339215642a700e86fa71b3d0, type: 3}
+  - {fileID: 11551408, guid: a51f6dbf339215642a700e86fa71b3d0, type: 3}
+  - {fileID: 1206636927, guid: a51f6dbf339215642a700e86fa71b3d0, type: 3}
+  - {fileID: -1446927951, guid: a51f6dbf339215642a700e86fa71b3d0, type: 3}
+  - {fileID: 1025875597, guid: a51f6dbf339215642a700e86fa71b3d0, type: 3}
+  - {fileID: -419671673, guid: a51f6dbf339215642a700e86fa71b3d0, type: 3}
+  - {fileID: 1382880469, guid: a51f6dbf339215642a700e86fa71b3d0, type: 3}
+  - {fileID: -900863018, guid: a51f6dbf339215642a700e86fa71b3d0, type: 3}
+  - {fileID: 550951194, guid: a51f6dbf339215642a700e86fa71b3d0, type: 3}
+  - {fileID: -1681428197, guid: a51f6dbf339215642a700e86fa71b3d0, type: 3}
+  spacing: -12
+  outlineColor: {r: 1, g: 1, b: 1, a: 1}

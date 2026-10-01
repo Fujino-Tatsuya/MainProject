@@ -1,6 +1,7 @@
 using System;
 using EuniTween;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 public enum DamageChannel
 {
@@ -52,14 +53,16 @@ public struct FloatingPopupRequest
 public struct FloatingPopupStyle
 {
     public PopupKind kind;
+    [Tooltip("숫자 채움 색. 외곽선 색은 DigitSet 이 정한다.")]
     public Color color;
-    [Min(1f)] public float fontSize;
+    [Tooltip("100% 크기일 때 글자 높이(px, 1080p 기준).")]
+    [FormerlySerializedAs("fontSize"), Min(1f)] public float height;
 
-    public FloatingPopupStyle(PopupKind kind, Color color, float fontSize)
+    public FloatingPopupStyle(PopupKind kind, Color color, float height)
     {
         this.kind = kind;
         this.color = color;
-        this.fontSize = fontSize;
+        this.height = height;
     }
 }
 
@@ -79,7 +82,8 @@ public struct FloatingDamageTierThresholds
     }
 }
 
-// 피해 강도별 숫자 모양. 배율은 style.fontSize 를 100% 로 본 값이다.
+// 피해 강도별 숫자 모양. 배율은 style.height 를 100% 로 본 값이다.
+// 기획의 "높음 = 한 단계 굵게"는 이미지 글꼴이라 표현하지 않는다(굵기 변형 스프라이트가 없다).
 [Serializable]
 public struct FloatingDamageTierLook
 {
@@ -88,19 +92,17 @@ public struct FloatingDamageTierLook
     [Tooltip("최초 등장 확대 배율. holdScale 이하면 확대 없음.")]
     [Min(0.1f)] public float spawnScale;
     [Min(0f)] public float spawnSettleDuration;
-    public bool bold;
     public bool shake;
     [Tooltip("단발 공격의 전체 표시 시간(초).")]
     [Min(0.05f)] public float singleDuration;
 
     public FloatingDamageTierLook(FloatingDamageTier tier, float holdScale, float spawnScale,
-        float spawnSettleDuration, bool bold, bool shake, float singleDuration)
+        float spawnSettleDuration, bool shake, float singleDuration)
     {
         this.tier = tier;
         this.holdScale = holdScale;
         this.spawnScale = spawnScale;
         this.spawnSettleDuration = spawnSettleDuration;
-        this.bold = bold;
         this.shake = shake;
         this.singleDuration = singleDuration;
     }
@@ -162,10 +164,13 @@ public sealed class FloatingDamageSettings : ScriptableObject
     [Header("강도별 모양")]
     [SerializeField] FloatingDamageTierLook[] tierLooks =
     {
-        new FloatingDamageTierLook(FloatingDamageTier.Low, 0.9f, 0.9f, 0f, false, false, 0.65f),
-        new FloatingDamageTierLook(FloatingDamageTier.Mid, 1f, 1.1f, 0.08f, false, false, 0.75f),
-        new FloatingDamageTierLook(FloatingDamageTier.High, 1.2f, 1.4f, 0.12f, true, true, 0.85f)
+        new FloatingDamageTierLook(FloatingDamageTier.Low, 0.9f, 0.9f, 0f, false, 0.65f),
+        new FloatingDamageTierLook(FloatingDamageTier.Mid, 1f, 1.1f, 0.08f, false, 0.75f),
+        new FloatingDamageTierLook(FloatingDamageTier.High, 1.2f, 1.4f, 0.12f, true, 0.85f)
     };
+
+    [Header("글꼴")]
+    [SerializeField] FloatingDamageDigitSet digitSet;
 
     [Header("풀")]
     [SerializeField, Min(1)] int maxConcurrentPopups = 32;
@@ -202,6 +207,7 @@ public sealed class FloatingDamageSettings : ScriptableObject
     public float ShakeDistance => shakeDistance;
     public float ShakeDuration => shakeDuration;
     public int MaxConcurrentPopups => maxConcurrentPopups;
+    public FloatingDamageDigitSet DigitSet => digitSet;
 
     public bool TryGetStyle(PopupKind kind, out FloatingPopupStyle style)
     {
@@ -249,6 +255,6 @@ public sealed class FloatingDamageSettings : ScriptableObject
         }
 
         Debug.LogError($"[FloatingDamage] {tier} 모양이 Settings 에 없다 — 기본 크기로 표시한다.", this);
-        return new FloatingDamageTierLook(tier, 1f, 1f, 0f, false, false, 0.75f);
+        return new FloatingDamageTierLook(tier, 1f, 1f, 0f, false, 0.75f);
     }
 }
