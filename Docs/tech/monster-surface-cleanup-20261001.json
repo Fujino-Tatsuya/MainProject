@@ -1,0 +1,2007 @@
+{
+  "date": "2026-10-01",
+  "operation": "Moved to Windows Recycle Bin; no permanent deletion or commit",
+  "files": 5674,
+  "bytes": 5048186441,
+  "recycleEntries": 330,
+  "allRecycleEntriesConfirmed": true,
+  "externalReferencesToRemovedAssets": 0,
+  "finalAssetAndMetaHashesUnchanged": true,
+  "productionPrefabDependenciesUnchanged": true,
+  "nativeUnityVersion": "6000.3.16f1",
+  "verifiedClips": 51,
+  "verifiedAnimationSamples": 255,
+  "removed": [
+    {
+      "path": "C:\\MainProject-git\\Assets\\50.Art\\Char\\Monster\\Redesign\\WallBot",
+      "files": 11,
+      "bytes": 4345434,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\50.Art\\Char\\Monster\\Redesign\\GauntletBot",
+      "files": 15,
+      "bytes": 4702501,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\50.Art\\Char\\Monster\\Redesign\\SpinnerBot",
+      "files": 11,
+      "bytes": 4831085,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\50.Art\\Char\\Monster\\Redesign\\ChompBot",
+      "files": 11,
+      "bytes": 3595535,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\50.Art\\Char\\Monster\\Redesign\\HumanoidBot",
+      "files": 11,
+      "bytes": 4599015,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\50.Art\\Char\\Monster\\Redesign\\MortarBot",
+      "files": 11,
+      "bytes": 3717980,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\50.Art\\Char\\Monster\\Redesign\\PeekABot",
+      "files": 11,
+      "bytes": 3513734,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\50.Art\\Char\\Monster\\Redesign\\TeslaBot",
+      "files": 11,
+      "bytes": 4054864,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\50.Art\\Char\\Monster\\Redesign\\WallBot.meta",
+      "files": 1,
+      "bytes": 172,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\50.Art\\Char\\Monster\\Redesign\\GauntletBot.meta",
+      "files": 1,
+      "bytes": 172,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\50.Art\\Char\\Monster\\Redesign\\SpinnerBot.meta",
+      "files": 1,
+      "bytes": 172,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\50.Art\\Char\\Monster\\Redesign\\ChompBot.meta",
+      "files": 1,
+      "bytes": 172,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\50.Art\\Char\\Monster\\Redesign\\HumanoidBot.meta",
+      "files": 1,
+      "bytes": 172,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\50.Art\\Char\\Monster\\Redesign\\MortarBot.meta",
+      "files": 1,
+      "bytes": 172,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\50.Art\\Char\\Monster\\Redesign\\PeekABot.meta",
+      "files": 1,
+      "bytes": 172,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\50.Art\\Char\\Monster\\Redesign\\TeslaBot.meta",
+      "files": 1,
+      "bytes": 172,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\50.Art\\Char\\Monster\\Redesign\\SurfaceV1\\WallBot\\WallBot_SurfaceReview.prefab",
+      "files": 1,
+      "bytes": 3813,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\50.Art\\Char\\Monster\\Redesign\\SurfaceV1\\WallBot\\WallBot_SurfaceReview.prefab.meta",
+      "files": 1,
+      "bytes": 154,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\50.Art\\Char\\Monster\\Redesign\\SurfaceV1\\GauntletBot\\GauntletBot_SurfaceReview.prefab",
+      "files": 1,
+      "bytes": 6055,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\50.Art\\Char\\Monster\\Redesign\\SurfaceV1\\GauntletBot\\GauntletBot_SurfaceReview.prefab.meta",
+      "files": 1,
+      "bytes": 154,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\50.Art\\Char\\Monster\\Redesign\\SurfaceV1\\SpinnerBot\\SpinnerBot_SurfaceReview.prefab",
+      "files": 1,
+      "bytes": 3807,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\50.Art\\Char\\Monster\\Redesign\\SurfaceV1\\SpinnerBot\\SpinnerBot_SurfaceReview.prefab.meta",
+      "files": 1,
+      "bytes": 154,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\50.Art\\Char\\Monster\\Redesign\\SurfaceV1\\ChompBot\\ChompBot_SurfaceReview.prefab",
+      "files": 1,
+      "bytes": 3828,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\50.Art\\Char\\Monster\\Redesign\\SurfaceV1\\ChompBot\\ChompBot_SurfaceReview.prefab.meta",
+      "files": 1,
+      "bytes": 154,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\50.Art\\Char\\Monster\\Redesign\\SurfaceV1\\HumanoidBot\\HumanoidBot_SurfaceReview.prefab",
+      "files": 1,
+      "bytes": 3820,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\50.Art\\Char\\Monster\\Redesign\\SurfaceV1\\HumanoidBot\\HumanoidBot_SurfaceReview.prefab.meta",
+      "files": 1,
+      "bytes": 154,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\50.Art\\Char\\Monster\\Redesign\\SurfaceV1\\MortarBot\\MortarBot_SurfaceReview.prefab",
+      "files": 1,
+      "bytes": 3808,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\50.Art\\Char\\Monster\\Redesign\\SurfaceV1\\MortarBot\\MortarBot_SurfaceReview.prefab.meta",
+      "files": 1,
+      "bytes": 154,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\50.Art\\Char\\Monster\\Redesign\\SurfaceV1\\PeekABot\\PeekABot_SurfaceReview.prefab",
+      "files": 1,
+      "bytes": 4493,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\50.Art\\Char\\Monster\\Redesign\\SurfaceV1\\PeekABot\\PeekABot_SurfaceReview.prefab.meta",
+      "files": 1,
+      "bytes": 154,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\50.Art\\Char\\Monster\\Redesign\\SurfaceV1\\TeslaBot\\TeslaBot_SurfaceReview.prefab",
+      "files": 1,
+      "bytes": 4238,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\50.Art\\Char\\Monster\\Redesign\\SurfaceV1\\TeslaBot\\TeslaBot_SurfaceReview.prefab.meta",
+      "files": 1,
+      "bytes": 154,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\1.Scripts\\Monster\\Editor\\MonsterRemodelPackage.cs",
+      "files": 1,
+      "bytes": 15288,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\1.Scripts\\Monster\\Editor\\MonsterRemodelPackage.cs.meta",
+      "files": 1,
+      "bytes": 60,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\1.Scripts\\Monster\\Editor\\MonsterRemodelBatchPreview.cs",
+      "files": 1,
+      "bytes": 37187,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\1.Scripts\\Monster\\Editor\\MonsterRemodelBatchPreview.cs.meta",
+      "files": 1,
+      "bytes": 60,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\1.Scripts\\Monster\\Editor\\MonsterRemodelAudit.cs",
+      "files": 1,
+      "bytes": 19895,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\1.Scripts\\Monster\\Editor\\MonsterRemodelAudit.cs.meta",
+      "files": 1,
+      "bytes": 60,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\1.Scripts\\Monster\\Editor\\MortarRemodelPreview.cs",
+      "files": 1,
+      "bytes": 27965,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\1.Scripts\\Monster\\Editor\\MortarRemodelPreview.cs.meta",
+      "files": 1,
+      "bytes": 60,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\1.Scripts\\Monster\\Editor\\MortarVfxPreview.cs",
+      "files": 1,
+      "bytes": 18276,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\1.Scripts\\Monster\\Editor\\MortarVfxPreview.cs.meta",
+      "files": 1,
+      "bytes": 60,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\all-models-authoring-work.blend",
+      "files": 1,
+      "bytes": 20768761,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\all-models-authoring-work.blend1",
+      "files": 1,
+      "bytes": 20840482,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\all-original-rigs.blend",
+      "files": 1,
+      "bytes": 1653667,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\baseline",
+      "files": 9,
+      "bytes": 62306753,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\build_chomp.py",
+      "files": 1,
+      "bytes": 8162,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\build_gauntlet.py",
+      "files": 1,
+      "bytes": 42497,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\build_humanoid.py",
+      "files": 1,
+      "bytes": 27722,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\build_mortar.py",
+      "files": 1,
+      "bytes": 9213,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\build_peek.py",
+      "files": 1,
+      "bytes": 21675,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\build_spinner.py",
+      "files": 1,
+      "bytes": 5271,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\build_tesla.py",
+      "files": 1,
+      "bytes": 24526,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\build_wall.py",
+      "files": 1,
+      "bytes": 4159,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\check_review_registry.cjs",
+      "files": 1,
+      "bytes": 986,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\ChompBot",
+      "files": 325,
+      "bytes": 333687816,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\crash-recovery",
+      "files": 7,
+      "bytes": 4926553,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\delivery-manifest.json",
+      "files": 1,
+      "bytes": 4400,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\delivery-verification.json",
+      "files": 1,
+      "bytes": 3832,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\export_mesh.py",
+      "files": 1,
+      "bytes": 1986,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\finalize-report.cjs",
+      "files": 1,
+      "bytes": 3129,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\finalize_delivery.py",
+      "files": 1,
+      "bytes": 7011,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\gallery-data.json",
+      "files": 1,
+      "bytes": 97628,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\gallery-verification.json",
+      "files": 1,
+      "bytes": 170,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\GauntletBot",
+      "files": 425,
+      "bytes": 483333791,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\HumanoidBot",
+      "files": 302,
+      "bytes": 442015169,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\import_remaining.py",
+      "files": 1,
+      "bytes": 2733,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\index.html",
+      "files": 1,
+      "bytes": 17850,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\MortarBot",
+      "files": 324,
+      "bytes": 263623067,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\package-verification.json",
+      "files": 1,
+      "bytes": 5708,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\patch_peek_submesh.py",
+      "files": 1,
+      "bytes": 17401,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\PeekABot",
+      "files": 404,
+      "bytes": 443193998,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\qa-connection-fixes.json",
+      "files": 1,
+      "bytes": 2973,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\qa_connections.py",
+      "files": 1,
+      "bytes": 9349,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\README.md",
+      "files": 1,
+      "bytes": 18393,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\recover_peek_submesh.py",
+      "files": 1,
+      "bytes": 4155,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\references",
+      "files": 4,
+      "bytes": 51097,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\refine_mortar.py",
+      "files": 1,
+      "bytes": 4508,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\SpinnerBot",
+      "files": 450,
+      "bytes": 420526957,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\animation-review",
+      "files": 1475,
+      "bytes": 98464163,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\asset-config.json",
+      "files": 1,
+      "bytes": 22820,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\ChompBot",
+      "files": 41,
+      "bytes": 110210521,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\export_unity_surface.py",
+      "files": 1,
+      "bytes": 3048,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\gallery-proof.png",
+      "files": 1,
+      "bytes": 63308,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\GauntletBot",
+      "files": 84,
+      "bytes": 333117523,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\HumanoidBot",
+      "files": 41,
+      "bytes": 133399233,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\index.html",
+      "files": 1,
+      "bytes": 26961,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\inventory-notes.md",
+      "files": 1,
+      "bytes": 7627,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\apply.json",
+      "files": 1,
+      "bytes": 204,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\before-apply",
+      "files": 19,
+      "bytes": 17560899,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\ChompBot\\Attack.png",
+      "files": 1,
+      "bytes": 242364,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\ChompBot\\base-only-front.png",
+      "files": 1,
+      "bytes": 182014,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\ChompBot\\base-only-rear.png",
+      "files": 1,
+      "bytes": 178184,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\ChompBot\\base-only-top.png",
+      "files": 1,
+      "bytes": 201945,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\ChompBot\\current-front.png",
+      "files": 1,
+      "bytes": 169251,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\ChompBot\\current-rear.png",
+      "files": 1,
+      "bytes": 168040,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\ChompBot\\current-top.png",
+      "files": 1,
+      "bytes": 172883,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\ChompBot\\fixed-front.png",
+      "files": 1,
+      "bytes": 236104,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\ChompBot\\fixed-rear.png",
+      "files": 1,
+      "bytes": 225557,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\ChompBot\\fixed-top.png",
+      "files": 1,
+      "bytes": 252440,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\ChompBot\\gpu-fixed-front.png",
+      "files": 1,
+      "bytes": 193781,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\ChompBot\\gpu-fixed-rear.png",
+      "files": 1,
+      "bytes": 186972,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\ChompBot\\gpu-fixed-top.png",
+      "files": 1,
+      "bytes": 208769,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\ChompBot\\gpu-old-bounds-front.png",
+      "files": 1,
+      "bytes": 236011,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\ChompBot\\gpu-old-bounds-rear.png",
+      "files": 1,
+      "bytes": 225579,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\ChompBot\\gpu-old-bounds-top.png",
+      "files": 1,
+      "bytes": 252384,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\ChompBot\\Hit.png",
+      "files": 1,
+      "bytes": 204992,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\ChompBot\\Idle.png",
+      "files": 1,
+      "bytes": 230986,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\ChompBot\\report.json",
+      "files": 1,
+      "bytes": 2523,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\ChompBot\\Run.png",
+      "files": 1,
+      "bytes": 198989,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\ChompBot\\wrong-pair-front.png",
+      "files": 1,
+      "bytes": 173385,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\ChompBot\\wrong-pair-rear.png",
+      "files": 1,
+      "bytes": 164621,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\ChompBot\\wrong-pair-top.png",
+      "files": 1,
+      "bytes": 171367,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\display-uv-repair.json",
+      "files": 1,
+      "bytes": 1112,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\finalize_review.py",
+      "files": 1,
+      "bytes": 12503,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\GauntletBot\\base-only-front.png",
+      "files": 1,
+      "bytes": 138949,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\GauntletBot\\base-only-rear.png",
+      "files": 1,
+      "bytes": 120609,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\GauntletBot\\base-only-top.png",
+      "files": 1,
+      "bytes": 152046,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\GauntletBot\\current-front.png",
+      "files": 1,
+      "bytes": 155335,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\GauntletBot\\current-rear.png",
+      "files": 1,
+      "bytes": 144914,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\GauntletBot\\current-top.png",
+      "files": 1,
+      "bytes": 170390,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\GauntletBot\\fixed-front.png",
+      "files": 1,
+      "bytes": 166048,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\GauntletBot\\fixed-rear.png",
+      "files": 1,
+      "bytes": 145903,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\GauntletBot\\fixed-top.png",
+      "files": 1,
+      "bytes": 176563,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\GauntletBot\\Gauntlet_Anticipation_01.png",
+      "files": 1,
+      "bytes": 171882,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\GauntletBot\\Gauntlet_Anticipation_02.png",
+      "files": 1,
+      "bytes": 185345,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\GauntletBot\\Gauntlet_Anticipation_03.png",
+      "files": 1,
+      "bytes": 182993,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\GauntletBot\\Gauntlet_Defeat.png",
+      "files": 1,
+      "bytes": 284573,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\GauntletBot\\Gauntlet_Idle.png",
+      "files": 1,
+      "bytes": 265410,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\GauntletBot\\Gauntlet_Punch01_L.png",
+      "files": 1,
+      "bytes": 201871,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\GauntletBot\\Gauntlet_Punch01_R.png",
+      "files": 1,
+      "bytes": 174913,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\GauntletBot\\Gauntlet_Punch02_L.png",
+      "files": 1,
+      "bytes": 206486,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\GauntletBot\\Gauntlet_Punch02_R.png",
+      "files": 1,
+      "bytes": 192887,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\GauntletBot\\Gauntlet_Punch03_L.png",
+      "files": 1,
+      "bytes": 185960,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\GauntletBot\\Gauntlet_Punch03_R.png",
+      "files": 1,
+      "bytes": 176176,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\GauntletBot\\Gauntlet_Walk.png",
+      "files": 1,
+      "bytes": 267926,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\GauntletBot\\gpu-fixed-front.png",
+      "files": 1,
+      "bytes": 194744,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\GauntletBot\\gpu-fixed-rear.png",
+      "files": 1,
+      "bytes": 176883,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\GauntletBot\\gpu-fixed-top.png",
+      "files": 1,
+      "bytes": 171076,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\GauntletBot\\gpu-old-bounds-front.png",
+      "files": 1,
+      "bytes": 165989,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\GauntletBot\\gpu-old-bounds-rear.png",
+      "files": 1,
+      "bytes": 145903,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\GauntletBot\\gpu-old-bounds-top.png",
+      "files": 1,
+      "bytes": 176576,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\GauntletBot\\report.json",
+      "files": 1,
+      "bytes": 3550,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\GauntletBot\\Smash Anticipation.png",
+      "files": 1,
+      "bytes": 191404,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\GauntletBot\\Smash.png",
+      "files": 1,
+      "bytes": 248311,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\GauntletBot\\wrong-pair-front.png",
+      "files": 1,
+      "bytes": 164640,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\GauntletBot\\wrong-pair-rear.png",
+      "files": 1,
+      "bytes": 151046,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\GauntletBot\\wrong-pair-top.png",
+      "files": 1,
+      "bytes": 178828,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\HumanoidBot\\AttackAnticipation.png",
+      "files": 1,
+      "bytes": 144116,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\HumanoidBot\\AttackStrike.png",
+      "files": 1,
+      "bytes": 132063,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\HumanoidBot\\base-only-front.png",
+      "files": 1,
+      "bytes": 126296,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\HumanoidBot\\base-only-rear.png",
+      "files": 1,
+      "bytes": 113852,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\HumanoidBot\\base-only-top.png",
+      "files": 1,
+      "bytes": 113563,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\HumanoidBot\\current-front.png",
+      "files": 1,
+      "bytes": 121509,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\HumanoidBot\\current-rear.png",
+      "files": 1,
+      "bytes": 115848,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\HumanoidBot\\current-top.png",
+      "files": 1,
+      "bytes": 110306,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\HumanoidBot\\fixed-front.png",
+      "files": 1,
+      "bytes": 139478,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\HumanoidBot\\fixed-rear.png",
+      "files": 1,
+      "bytes": 129999,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\HumanoidBot\\fixed-top.png",
+      "files": 1,
+      "bytes": 124597,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\HumanoidBot\\gpu-fixed-front.png",
+      "files": 1,
+      "bytes": 160279,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\HumanoidBot\\gpu-fixed-rear.png",
+      "files": 1,
+      "bytes": 148485,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\HumanoidBot\\gpu-fixed-top.png",
+      "files": 1,
+      "bytes": 140860,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\HumanoidBot\\gpu-old-bounds-front.png",
+      "files": 1,
+      "bytes": 139508,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\HumanoidBot\\gpu-old-bounds-rear.png",
+      "files": 1,
+      "bytes": 130055,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\HumanoidBot\\gpu-old-bounds-top.png",
+      "files": 1,
+      "bytes": 124612,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\HumanoidBot\\Idle.png",
+      "files": 1,
+      "bytes": 155232,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\HumanoidBot\\report.json",
+      "files": 1,
+      "bytes": 2575,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\HumanoidBot\\Walk.png",
+      "files": 1,
+      "bytes": 150757,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\HumanoidBot\\wrong-pair-front.png",
+      "files": 1,
+      "bytes": 142817,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\HumanoidBot\\wrong-pair-rear.png",
+      "files": 1,
+      "bytes": 137448,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\HumanoidBot\\wrong-pair-top.png",
+      "files": 1,
+      "bytes": 129110,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\inspection.json",
+      "files": 1,
+      "bytes": 10917,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\MortarBot\\Alert.png",
+      "files": 1,
+      "bytes": 228458,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\MortarBot\\AttackLoop.png",
+      "files": 1,
+      "bytes": 269023,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\MortarBot\\AttackShoot.png",
+      "files": 1,
+      "bytes": 254592,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\MortarBot\\AttackStart.png",
+      "files": 1,
+      "bytes": 275432,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\MortarBot\\base-only-front.png",
+      "files": 1,
+      "bytes": 176640,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\MortarBot\\base-only-rear.png",
+      "files": 1,
+      "bytes": 200707,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\MortarBot\\base-only-top.png",
+      "files": 1,
+      "bytes": 215715,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\MortarBot\\current-front.png",
+      "files": 1,
+      "bytes": 156844,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\MortarBot\\current-rear.png",
+      "files": 1,
+      "bytes": 186993,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\MortarBot\\current-top.png",
+      "files": 1,
+      "bytes": 195426,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\MortarBot\\fixed-front.png",
+      "files": 1,
+      "bytes": 231640,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\MortarBot\\fixed-rear.png",
+      "files": 1,
+      "bytes": 250134,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\MortarBot\\fixed-top.png",
+      "files": 1,
+      "bytes": 265110,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\MortarBot\\gpu-fixed-front.png",
+      "files": 1,
+      "bytes": 198272,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\MortarBot\\gpu-fixed-rear.png",
+      "files": 1,
+      "bytes": 213592,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\MortarBot\\gpu-fixed-top.png",
+      "files": 1,
+      "bytes": 227608,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\MortarBot\\gpu-old-bounds-front.png",
+      "files": 1,
+      "bytes": 231597,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\MortarBot\\gpu-old-bounds-rear.png",
+      "files": 1,
+      "bytes": 250143,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\MortarBot\\gpu-old-bounds-top.png",
+      "files": 1,
+      "bytes": 265078,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\MortarBot\\Idle.png",
+      "files": 1,
+      "bytes": 251962,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\MortarBot\\report.json",
+      "files": 1,
+      "bytes": 2520,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\MortarBot\\Run.png",
+      "files": 1,
+      "bytes": 214302,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\MortarBot\\wrong-pair-front.png",
+      "files": 1,
+      "bytes": 176840,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\MortarBot\\wrong-pair-rear.png",
+      "files": 1,
+      "bytes": 196059,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\MortarBot\\wrong-pair-top.png",
+      "files": 1,
+      "bytes": 214547,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\PeekABot\\base-only-front.png",
+      "files": 1,
+      "bytes": 141763,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\PeekABot\\base-only-rear.png",
+      "files": 1,
+      "bytes": 132458,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\PeekABot\\base-only-top.png",
+      "files": 1,
+      "bytes": 157535,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\PeekABot\\current-front.png",
+      "files": 1,
+      "bytes": 124760,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\PeekABot\\current-rear.png",
+      "files": 1,
+      "bytes": 112911,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\PeekABot\\current-top.png",
+      "files": 1,
+      "bytes": 131429,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\PeekABot\\fixed-front.png",
+      "files": 1,
+      "bytes": 176021,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\PeekABot\\fixed-rear.png",
+      "files": 1,
+      "bytes": 163175,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\PeekABot\\fixed-top.png",
+      "files": 1,
+      "bytes": 186293,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\PeekABot\\gpu-fixed-front.png",
+      "files": 1,
+      "bytes": 176036,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\PeekABot\\gpu-fixed-rear.png",
+      "files": 1,
+      "bytes": 163167,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\PeekABot\\gpu-fixed-top.png",
+      "files": 1,
+      "bytes": 186325,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\PeekABot\\gpu-old-bounds-front.png",
+      "files": 1,
+      "bytes": 176036,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\PeekABot\\gpu-old-bounds-rear.png",
+      "files": 1,
+      "bytes": 163167,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\PeekABot\\gpu-old-bounds-top.png",
+      "files": 1,
+      "bytes": 186325,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\PeekABot\\Idle.png",
+      "files": 1,
+      "bytes": 182902,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\PeekABot\\report.json",
+      "files": 1,
+      "bytes": 2525,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\PeekABot\\Reveal.png",
+      "files": 1,
+      "bytes": 182902,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\PeekABot\\Shoot.png",
+      "files": 1,
+      "bytes": 182902,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\PeekABot\\wrong-pair-front.png",
+      "files": 1,
+      "bytes": 139965,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\PeekABot\\wrong-pair-rear.png",
+      "files": 1,
+      "bytes": 123208,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\PeekABot\\wrong-pair-top.png",
+      "files": 1,
+      "bytes": 150520,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\run_review.py",
+      "files": 1,
+      "bytes": 1019,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\server.stderr.log",
+      "files": 1,
+      "bytes": 123,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\server.stdout.log",
+      "files": 1,
+      "bytes": 0,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\SpinnerBot\\Attack Whip L End.png",
+      "files": 1,
+      "bytes": 171930,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\SpinnerBot\\Attack Whip L Loop.png",
+      "files": 1,
+      "bytes": 117860,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\SpinnerBot\\Attack Whip L Start.png",
+      "files": 1,
+      "bytes": 115260,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\SpinnerBot\\Attack Whip R End.png",
+      "files": 1,
+      "bytes": 172442,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\SpinnerBot\\Attack Whip R Loop.png",
+      "files": 1,
+      "bytes": 118203,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\SpinnerBot\\Attack Whip R Start.png",
+      "files": 1,
+      "bytes": 114694,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\SpinnerBot\\AttackLoop.png",
+      "files": 1,
+      "bytes": 76020,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\SpinnerBot\\AttackStart.png",
+      "files": 1,
+      "bytes": 76362,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\SpinnerBot\\base-only-front.png",
+      "files": 1,
+      "bytes": 70614,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\SpinnerBot\\base-only-rear.png",
+      "files": 1,
+      "bytes": 66091,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\SpinnerBot\\base-only-top.png",
+      "files": 1,
+      "bytes": 64342,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\SpinnerBot\\current-front.png",
+      "files": 1,
+      "bytes": 70034,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\SpinnerBot\\current-rear.png",
+      "files": 1,
+      "bytes": 69679,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\SpinnerBot\\current-top.png",
+      "files": 1,
+      "bytes": 65376,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\SpinnerBot\\Dizzy.png",
+      "files": 1,
+      "bytes": 180326,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\SpinnerBot\\fixed-front.png",
+      "files": 1,
+      "bytes": 79239,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\SpinnerBot\\fixed-rear.png",
+      "files": 1,
+      "bytes": 76137,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\SpinnerBot\\fixed-top.png",
+      "files": 1,
+      "bytes": 70713,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\SpinnerBot\\gpu-fixed-front.png",
+      "files": 1,
+      "bytes": 151966,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\SpinnerBot\\gpu-fixed-rear.png",
+      "files": 1,
+      "bytes": 140334,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\SpinnerBot\\gpu-fixed-top.png",
+      "files": 1,
+      "bytes": 131444,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\SpinnerBot\\gpu-old-bounds-front.png",
+      "files": 1,
+      "bytes": 79239,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\SpinnerBot\\gpu-old-bounds-rear.png",
+      "files": 1,
+      "bytes": 76140,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\SpinnerBot\\gpu-old-bounds-top.png",
+      "files": 1,
+      "bytes": 70711,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\SpinnerBot\\Idle.png",
+      "files": 1,
+      "bytes": 178585,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\SpinnerBot\\report.json",
+      "files": 1,
+      "bytes": 2556,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\SpinnerBot\\Run.png",
+      "files": 1,
+      "bytes": 151596,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\SpinnerBot\\wrong-pair-front.png",
+      "files": 1,
+      "bytes": 80033,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\SpinnerBot\\wrong-pair-rear.png",
+      "files": 1,
+      "bytes": 79672,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\SpinnerBot\\wrong-pair-top.png",
+      "files": 1,
+      "bytes": 74087,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\TeslaBot\\Alert.png",
+      "files": 1,
+      "bytes": 266096,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\TeslaBot\\base-only-front.png",
+      "files": 1,
+      "bytes": 195981,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\TeslaBot\\base-only-rear.png",
+      "files": 1,
+      "bytes": 149029,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\TeslaBot\\base-only-top.png",
+      "files": 1,
+      "bytes": 214534,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\TeslaBot\\Charge.png",
+      "files": 1,
+      "bytes": 239856,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\TeslaBot\\current-front.png",
+      "files": 1,
+      "bytes": 185302,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\TeslaBot\\current-rear.png",
+      "files": 1,
+      "bytes": 180330,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\TeslaBot\\current-top.png",
+      "files": 1,
+      "bytes": 187186,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\TeslaBot\\fixed-front.png",
+      "files": 1,
+      "bytes": 256979,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\TeslaBot\\fixed-rear.png",
+      "files": 1,
+      "bytes": 215816,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\TeslaBot\\fixed-top.png",
+      "files": 1,
+      "bytes": 263513,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\TeslaBot\\gpu-fixed-front.png",
+      "files": 1,
+      "bytes": 256992,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\TeslaBot\\gpu-fixed-rear.png",
+      "files": 1,
+      "bytes": 215845,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\TeslaBot\\gpu-fixed-top.png",
+      "files": 1,
+      "bytes": 263745,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\TeslaBot\\gpu-old-bounds-front.png",
+      "files": 1,
+      "bytes": 256992,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\TeslaBot\\gpu-old-bounds-rear.png",
+      "files": 1,
+      "bytes": 215845,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\TeslaBot\\gpu-old-bounds-top.png",
+      "files": 1,
+      "bytes": 263745,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\TeslaBot\\Idle.png",
+      "files": 1,
+      "bytes": 266096,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\TeslaBot\\report.json",
+      "files": 1,
+      "bytes": 2521,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\TeslaBot\\Shoot.png",
+      "files": 1,
+      "bytes": 266096,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\TeslaBot\\wrong-pair-front.png",
+      "files": 1,
+      "bytes": 198732,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\TeslaBot\\wrong-pair-rear.png",
+      "files": 1,
+      "bytes": 191450,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\TeslaBot\\wrong-pair-top.png",
+      "files": 1,
+      "bytes": 194807,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\WallBot\\AttackEnd.png",
+      "files": 1,
+      "bytes": 249126,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\WallBot\\AttackStart.png",
+      "files": 1,
+      "bytes": 198384,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\WallBot\\base-only-front.png",
+      "files": 1,
+      "bytes": 219758,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\WallBot\\base-only-rear.png",
+      "files": 1,
+      "bytes": 203976,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\WallBot\\base-only-top.png",
+      "files": 1,
+      "bytes": 204744,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\WallBot\\current-front.png",
+      "files": 1,
+      "bytes": 193526,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\WallBot\\current-rear.png",
+      "files": 1,
+      "bytes": 192645,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\WallBot\\current-top.png",
+      "files": 1,
+      "bytes": 183537,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\WallBot\\fixed-front.png",
+      "files": 1,
+      "bytes": 279302,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\WallBot\\fixed-rear.png",
+      "files": 1,
+      "bytes": 271120,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\WallBot\\fixed-top.png",
+      "files": 1,
+      "bytes": 251875,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\WallBot\\gpu-fixed-front.png",
+      "files": 1,
+      "bytes": 251607,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\WallBot\\gpu-fixed-rear.png",
+      "files": 1,
+      "bytes": 245194,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\WallBot\\gpu-fixed-top.png",
+      "files": 1,
+      "bytes": 227578,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\WallBot\\gpu-old-bounds-front.png",
+      "files": 1,
+      "bytes": 279345,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\WallBot\\gpu-old-bounds-rear.png",
+      "files": 1,
+      "bytes": 271135,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\WallBot\\gpu-old-bounds-top.png",
+      "files": 1,
+      "bytes": 251917,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\WallBot\\Hit.png",
+      "files": 1,
+      "bytes": 249126,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\WallBot\\Idle.png",
+      "files": 1,
+      "bytes": 256902,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\WallBot\\report.json",
+      "files": 1,
+      "bytes": 2494,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\WallBot\\Run.png",
+      "files": 1,
+      "bytes": 250140,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\WallBot\\wrong-pair-front.png",
+      "files": 1,
+      "bytes": 223842,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\WallBot\\wrong-pair-rear.png",
+      "files": 1,
+      "bytes": 206495,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\material-review\\WallBot\\wrong-pair-top.png",
+      "files": 1,
+      "bytes": 220605,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\MortarBot",
+      "files": 45,
+      "bytes": 119188721,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\PeekABot",
+      "files": 39,
+      "bytes": 114275398,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\pipeline.py",
+      "files": 1,
+      "bytes": 24956,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\README.md",
+      "files": 1,
+      "bytes": 5650,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\SpinnerBot",
+      "files": 63,
+      "bytes": 173253550,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\spinner_unity_combine.py",
+      "files": 1,
+      "bytes": 5369,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\surface_bake.py",
+      "files": 1,
+      "bytes": 22125,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\surface_delivery.py",
+      "files": 1,
+      "bytes": 23111,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\surface_materials.py",
+      "files": 1,
+      "bytes": 24941,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\surface_materials_notes.txt",
+      "files": 1,
+      "bytes": 8531,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\TeslaBot",
+      "files": 41,
+      "bytes": 99040561,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\texture-files-check.json",
+      "files": 1,
+      "bytes": 2767,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\unity-contact-sheet.png",
+      "files": 1,
+      "bytes": 319118,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\unity-material-hashes-before.json",
+      "files": 1,
+      "bytes": 50275,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\unity-prefab-backup",
+      "files": 16,
+      "bytes": 228062,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\unity-probe.json",
+      "files": 1,
+      "bytes": 995,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\unity-texture-review-editor.log",
+      "files": 1,
+      "bytes": 376497,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\unity-verification.json",
+      "files": 1,
+      "bytes": 1548,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\unity_rpc.py",
+      "files": 1,
+      "bytes": 1025,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\verify_surface_files.py",
+      "files": 1,
+      "bytes": 24960,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\WallBot",
+      "files": 293,
+      "bytes": 202904118,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\surface-v1\\__pycache__",
+      "files": 9,
+      "bytes": 269565,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\TeslaBot",
+      "files": 362,
+      "bytes": 499192475,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\texture_model.py",
+      "files": 1,
+      "bytes": 3287,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\texture_mortar.py",
+      "files": 1,
+      "bytes": 6989,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\texture_mortar_refine.py",
+      "files": 1,
+      "bytes": 5011,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-remodel-20260926\\WallBot",
+      "files": 233,
+      "bytes": 345981232,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-redesign-20260926",
+      "files": 171,
+      "bytes": 183760803,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Generated\\monster-snapshots-20260926",
+      "files": 103,
+      "bytes": 50227212,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\1.Scripts\\Monster\\Editor\\MonsterCleanupAuditTemp.cs",
+      "files": 1,
+      "bytes": 2732,
+      "confirmed": true
+    },
+    {
+      "path": "C:\\MainProject-git\\Assets\\1.Scripts\\Monster\\Editor\\MonsterCleanupAuditTemp.cs.meta",
+      "files": 1,
+      "bytes": 59,
+      "confirmed": true
+    }
+  ],
+  "preserved": [
+    "8 production prefabs",
+    "11 native meshes",
+    "8 final authoring FBX",
+    "11 materials",
+    "55 final PNG textures and metadata",
+    "Original rigs, avatars, controllers, clips and display/weapon/effect dependencies",
+    "8 packed Blender source files and approved concepts",
+    "Final GPU animation/texture review and read-only Unity review tool"
+  ],
+  "recycleBinContentsPresent": true
+}
