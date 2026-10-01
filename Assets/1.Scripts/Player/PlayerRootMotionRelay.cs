@@ -3,12 +3,12 @@ using UnityEngine;
 public class PlayerRootMotionRelay : MonoBehaviour
 {
     private Animator animator;
-    private DefaultAttackController defaultAttack;
+    private IPlayerBasicAttack defaultAttack;
 
     private void Awake()
     {
         animator = GetComponent<Animator>();
-        defaultAttack = GetComponentInParent<DefaultAttackController>();
+        defaultAttack = GetComponentInParent<IPlayerBasicAttack>();
     }
 
     private void OnAnimatorMove()
@@ -17,7 +17,7 @@ public class PlayerRootMotionRelay : MonoBehaviour
             animator = GetComponent<Animator>();
 
         if (defaultAttack == null)
-            defaultAttack = GetComponentInParent<DefaultAttackController>();
+            defaultAttack = GetComponentInParent<IPlayerBasicAttack>();
 
         if (animator == null || defaultAttack == null)
             return;

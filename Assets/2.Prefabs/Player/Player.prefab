@@ -365,8 +365,6 @@ GameObject:
   - component: {fileID: 4342448094249856294}
   - component: {fileID: 800000000000000031}
   - component: {fileID: 1216733944170950928}
-  - component: {fileID: 4525831256458907740}
-  - component: {fileID: 5274188098871446382}
   - component: {fileID: 8345678279683584363}
   - component: {fileID: 4237082408145735710}
   - component: {fileID: 4711829301158223401}
@@ -671,58 +669,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   maxSmoothedCorrection: 1
   decayTimeConstant: 0.08
---- !u!114 &4525831256458907740
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8559504096609571310}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3c80e0a77e704c04b9392e3b3b8e27d6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PlayerDefaultAttack
-  damage: 0
-  targetLayer:
-    serializedVersion: 2
-    m_Bits: 256
-  attackType: 1
-  muzzle: {fileID: 0}
---- !u!114 &5274188098871446382
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8559504096609571310}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5b5cf926c1f245db883140b58e5d6d0f, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::DefaultAttack
-  ShowTopMostFoldoutHeaderGroup: 1
-  slashHit:
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  slashMiss:
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  animator: {fileID: 0}
-  attackData: {fileID: 0}
-  playerDefaultAttack: {fileID: 4525831256458907740}
-  tailToMovementBlendSeconds: 0.12
-  chainPolicy: 0
-  attackSteps: []
-  defaultHitbox: {fileID: 0}
-  hittableLayers:
-    serializedVersion: 2
-    m_Bits: 256
-  endFallbackPadding: 0.1
 --- !u!114 &8345678279683584363
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1049,7 +995,6 @@ MonoBehaviour:
   stateController: {fileID: 4237082408145735710}
   invulnerability: {fileID: 1111000000000000010}
   statusEffects: {fileID: 8345678279683584363}
-  defaultAttack: {fileID: 5274188098871446382}
   skillController: {fileID: 4711829301158223401}
   body: {fileID: 3600963326377684433}
 --- !u!81 &1017407548875731560

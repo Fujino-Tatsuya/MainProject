@@ -46,6 +46,21 @@ public class PlayerSkillController : BaseNetworkBehaviour
     public bool IsSkillActive => activeSkill != null;
     // 조준/자동이동/확정 직후 프레임 — FSM이 일반 액션 입력(공격/다른 스킬)을 억제하는 데 쓴다.
     public bool IsChoosingTarget => targeting != null && targeting.IsInterceptingInput;
+
+    // 조준 모드를 공용 대시로 끊을 수 있는가 — 조준 중인 스킬이 정한다(거너 R = 예, 기본 = 아니오).
+    public bool CanCancelTargetingByDash
+    {
+        get
+        {
+            if (targeting == null || !targeting.IsTargeting)
+                return false;
+            PlayerSkillBase skill = GetSkill(targeting.CurrentSlot);
+            return skill != null && skill.CanCancelAimByDash;
+        }
+    }
+
+    // [오너] 조준 모드 취소 — 시전하지 않았으므로 쿨타임 없음.
+    public void CancelTargeting() => targeting?.Cancel();
     private bool HasGameplayAuthority => !IsNetworkActive || IsServer;
 
     private void Awake()
@@ -193,10 +208,19 @@ public class PlayerSkillController : BaseNetworkBehaviour
     public void Tick()
     {
         if (!IsNetworkActive || IsOwner)
+        {
+            TickOwnerSkillInput();
             TickOwnerHoldInput();
+        }
 
         if (HasGameplayAuthority)
             TickServer();
+    }
+
+    // PlayerSkillState.FixedTick에서 호출 (오너 + 서버만). 스킬 자체 이동(백스텝 등)용.
+    public void FixedTick()
+    {
+        activeSkill?.OnFixedTick();
     }
 
     // FSM이 Skill 상태를 떠날 때 호출 — 정상 종료(EndActiveSkillServer)는 activeSkill을 먼저 비우므로
@@ -212,9 +236,12 @@ public class PlayerSkillController : BaseNetworkBehaviour
         activeSkill = null;
         activeEndFallbackTime = 0f;
 
-        SkillEndReason reason = nextState == PlayerActionState.Dead
-            ? SkillEndReason.CasterDied
-            : SkillEndReason.Cancelled;
+        SkillEndReason reason = nextState switch
+        {
+            PlayerActionState.Dead => SkillEndReason.CasterDied,
+            PlayerActionState.Dash => SkillEndReason.DashCancelled,
+            _ => SkillEndReason.Cancelled,
+        };
         skill.OnEnd(reason);
 
         if (IsNetworkActive && IsServer)
@@ -235,7 +262,7 @@ public class PlayerSkillController : BaseNetworkBehaviour
 
         skill.OnEnd(reason);
 
-        if (stateController != null && stateController.CurrentState == PlayerActionState.Skill)
+        if (stateController != null && stateController.IsInSkillState)
             stateController.EndSkill();
 
         if (animator != null)
@@ -243,6 +270,23 @@ public class PlayerSkillController : BaseNetworkBehaviour
 
         if (IsNetworkActive)
             EndSkillClientRpc(skill.Slot, reason);
+    }
+
+    /// <summary>
+    /// [서버] 수동 커밋 스킬(<see cref="PlayerSkillData.CommitCooldownManually"/>)의 쿨타임을 지금부터 시작한다.
+    /// 오너 HUD 장부에도 미러한다. 자동 커밋 스킬에서 부르면 무시한다(이미 승인 때 시작됨).
+    /// </summary>
+    public void CommitCooldownServer(PlayerSkillSlot slot)
+    {
+        PlayerSkillBase skill = GetSkill(slot);
+        if (!HasGameplayAuthority || skill == null || skill.Data == null || !skill.Data.CommitCooldownManually)
+            return;
+
+        nextReadyTime[(int)slot] = Time.time + skill.Data.CooldownTime;
+        Edit.Log($"[Skill] {slot} 쿨타임 시작(수동 커밋) {skill.Data.CooldownTime}s", this);
+
+        if (IsNetworkActive && !IsOwner)
+            CommitCooldownClientRpc(slot, CreateOwnerClientRpcParams());
     }
 
     // 애니메이션 이벤트 (릴레이 경유). 판정은 서버만 처리한다.
@@ -272,8 +316,9 @@ public class PlayerSkillController : BaseNetworkBehaviour
         activeSkill = skill;
         activeEndFallbackTime = Time.time + skill.Data.MaxActiveDuration + Mathf.Max(0f, endFallbackPadding);
 
-        // 쿨타임은 승인 즉시 시작, 환불 없음
-        nextReadyTime[(int)slot] = Time.time + skill.Data.CooldownTime;
+        // 쿨타임은 승인 즉시 시작, 환불 없음 — 단 수동 커밋 스킬은 발동 시점에 스스로 시작한다(CommitCooldownServer)
+        if (!skill.Data.CommitCooldownManually)
+            nextReadyTime[(int)slot] = Time.time + skill.Data.CooldownTime;
 
         // 상태이상 modifier가 반영된 최종 공격력으로 스냅샷 (그릴 합의: SO 계수 × 최종 스탯)
         int damageSnapshot = Mathf.Max(0,
@@ -351,23 +396,44 @@ public class PlayerSkillController : BaseNetworkBehaviour
             EndActiveSkillServer(SkillEndReason.MaxDurationReached);
     }
 
+    // 오너: 실행 중 스킬의 조준 전송·좌클릭 전달·로컬 틱. 홀드 해제 판정은 TickOwnerHoldInput 이 따로 한다.
+    private void TickOwnerSkillInput()
+    {
+        if (activeSkill == null || activeSkill.Data == null)
+            return;
+
+        Vector3 aim = GetCurrentAimDirection();
+        activeSkill.OnOwnerTick(aim);
+
+        // 🔸 OnOwnerTick 안에서 끝났을 수 있다
+        if (activeSkill == null)
+            return;
+
+        if (activeSkill.WantsAimUpdates && Time.time >= nextAimSendTime)
+        {
+            nextAimSendTime = Time.time + AimSendInterval;
+
+            if (!IsNetworkActive)
+                activeSkill.OnAimUpdated(aim);
+            else
+                UpdateSkillAimRpc(aim);
+        }
+
+        if (activeSkill.ConsumesPrimaryInput && inputReader != null && inputReader.AttackPressed)
+        {
+            if (!IsNetworkActive)
+                activeSkill.OnPrimaryPressed(aim);
+            else
+                NotifySkillPrimaryRpc(aim);
+        }
+    }
+
     private void TickOwnerHoldInput()
     {
         if (activeSkill == null || activeSkill.Data == null ||
             activeSkill.Data.InputType != PlayerSkillInputType.Hold)
         {
             return;
-        }
-
-        if (Time.time >= nextAimSendTime)
-        {
-            nextAimSendTime = Time.time + AimSendInterval;
-            Vector3 direction = GetCurrentAimDirection();
-
-            if (!IsNetworkActive)
-                activeSkill.OnAimUpdated(direction);
-            else
-                UpdateSkillAimRpc(direction);
         }
 
         if (hasNotifiedRelease || inputReader == null || !ShouldEndHold())
@@ -432,7 +498,25 @@ public class PlayerSkillController : BaseNetworkBehaviour
         activeSkill?.OnReleased();
     }
 
+    [Rpc(SendTo.Server)]
+    private void NotifySkillPrimaryRpc(Vector3 direction, RpcParams rpcParams = default)
+    {
+        if (rpcParams.Receive.SenderClientId != OwnerClientId)
+            return;
+
+        if (activeSkill != null && activeSkill.ConsumesPrimaryInput)
+            activeSkill.OnPrimaryPressed(ResolveDirection(direction));
+    }
+
     // ── RPC (서버 → 클라) ──
+
+    [ClientRpc]
+    private void CommitCooldownClientRpc(PlayerSkillSlot slot, ClientRpcParams clientRpcParams = default)
+    {
+        PlayerSkillBase skill = GetSkill(slot);
+        if (IsOwner && skill != null && skill.Data != null)
+            nextReadyTime[(int)slot] = Time.time + skill.Data.CooldownTime;
+    }
 
     [ClientRpc]
     private void PlaySkillClientRpc(PlayerSkillSlot slot, Vector3 direction, Vector3 aimPoint, bool hasAimPoint)
@@ -450,11 +534,12 @@ public class PlayerSkillController : BaseNetworkBehaviour
 
         // 표시용 쿨타임 미러 — 이 RPC 수신 = 서버 승인이므로 오너도 장부를 기록한다.
         // 서버 시점과의 오차(전송 지연)는 HUD 표시용으로 허용, 검증은 여전히 서버 장부가 담당 (그릴 합의)
-        if (IsOwner && skill.Data != null)
+        // 수동 커밋 스킬은 CommitCooldownClientRpc 가 따로 미러한다.
+        if (IsOwner && skill.Data != null && !skill.Data.CommitCooldownManually)
             nextReadyTime[(int)slot] = Time.time + skill.Data.CooldownTime;
 
         if (stateController != null &&
-            stateController.CurrentState != PlayerActionState.Skill &&
+            !stateController.IsInSkillState &&
             !stateController.BeginSkill(skill))
         {
             return;
@@ -479,7 +564,7 @@ public class PlayerSkillController : BaseNetworkBehaviour
             skill.OnEnd(reason);
         }
 
-        if (stateController != null && stateController.CurrentState == PlayerActionState.Skill)
+        if (stateController != null && stateController.IsInSkillState)
             stateController.EndSkill();
 
         if (animator != null)

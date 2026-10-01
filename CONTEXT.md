@@ -8,6 +8,18 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 현재 인수인계 (2026-10-01 · 은희(Claude) · **원거리 캐릭터 "거너" G0~G9 구현 완료**, 브랜치 `feature/SecondCharacter`, push 안 함)
+
+기획 원본 [character_gunner.md](Docs/design/character/character_gunner.md)(§0 확정 변경 D1~D15) · 계획·진행 [PLAN-gunner.md](PLAN-gunner.md) §7 · 프리팹 구조 [player-prefabs.md](Docs/tech/player-prefabs.md) §0.
+**징크스(스택 폭발) 기획은 폐기** — 기존 원거리 슬롯·모델을 거너가 쓴다(아트 `Assets/50.Art/Char/gunner/`, SVN 핀 **346**).
+- 🔴 **전 캐릭터 공통 코어 변경**(가붕이 Play 확인함): 보호막 = 종류·출처별 인스턴스(`ShieldType`, 사망 시 전부 제거, HUD = 남은 합/부여 합) ·
+  기본 공격 = `IPlayerBasicAttack`(base 에서 빠지고 Variant 가 얹음) · `PlayerActionState` 끝에 **`AttackReady`·`Focus`** ·
+  스킬 시스템 확장(수동 쿨 커밋·실행 중 좌클릭·`OnFixedTick`·`EntryActionState`·`CanBeCanceledByDash`) · `PlayerMotor` 일시 아군 차단/적 통과 ·
+  **대시 우선은 행동이 허락할 때만**(가붕이는 전부 아니오 = 기존과 같음).
+- 거너 조립 = 메뉴 `Tools/Player/Gunner/*`(재실행 안전). 스폰 = `Dev/Dev Boot/캐릭터/거너`(개인 EditorPrefs). 정식 캐릭터 선택은 미구현.
+- ⏳ **후속**: 임시 연출 교체(발사선·폭발선·추적 레이저 원기둥 → **민경 VFX**, 훅 = `GunnerBeamView`·`GunnerHeat.StageChanged/OverheatChanged`) ·
+  임시 과열 게이지(OnGUI) → CombatHUD 정식 UI · **R 대상 사망 후 재탐색 미검증** · 밸런스 수치(전부 SO) · 캐릭터 선택 경로(player-prefabs.md §8.3) · R 기본 잠금(빌드 시스템 몫, D15).
+
 ## ▶▶ 현재 인수인계 (2026-09-30 · 은희(Claude) · **플레이어 base+Variant + 패시브 버프 모델** → development 반영)
 
 `fix/Player` 를 development 에 **직접 머지·푸시**(은희 결정 — PR 리뷰 생략). 구조 원본 = [player-prefabs.md](Docs/tech/player-prefabs.md) §0·§7.

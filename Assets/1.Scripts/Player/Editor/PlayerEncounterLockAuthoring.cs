@@ -89,8 +89,6 @@ public static class PlayerEncounterLockAuthoring
                               root.GetComponentInChildren<PlayerInvulnerability>(true), changes);
         changed |= SetIfEmpty(encounterLock, "statusEffects",
                               root.GetComponentInChildren<StatusEffectController>(true), changes);
-        changed |= SetIfEmpty(encounterLock, "defaultAttack",
-                              root.GetComponentInChildren<DefaultAttackController>(true), changes);
         changed |= SetIfEmpty(encounterLock, "skillController",
                               root.GetComponentInChildren<PlayerSkillController>(true), changes);
         changed |= SetIfEmpty(encounterLock, "body",

@@ -37,7 +37,7 @@ public sealed class PlayerEncounterLock : NetworkBehaviour
     [SerializeField] private PlayerStateController stateController;
     [SerializeField] private PlayerInvulnerability invulnerability;
     [SerializeField] private StatusEffectController statusEffects;
-    [SerializeField] private DefaultAttackController defaultAttack;
+    private IPlayerBasicAttack defaultAttack; // 인터페이스라 직렬화 불가 — ResolveReferences 에서 찾는다
     [SerializeField] private PlayerSkillController skillController;
     [SerializeField] private Rigidbody body;
 
@@ -189,7 +189,7 @@ public sealed class PlayerEncounterLock : NetworkBehaviour
             statusEffects = GetComponent<StatusEffectController>();
 
         if (defaultAttack == null)
-            defaultAttack = GetComponent<DefaultAttackController>();
+            defaultAttack = GetComponent<IPlayerBasicAttack>();
 
         if (skillController == null)
             skillController = GetComponent<PlayerSkillController>();

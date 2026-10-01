@@ -63,8 +63,8 @@ public class HolyShieldEffect : MonoBehaviour
     /// <summary>
     /// 지금 <b>피격 파문을 받아도 되는</b> 상태인가 — 등장·유지 중이면 true, 걷히는 중이거나 꺼져 있으면 false.
     ///
-    /// <b>왜 필요한가.</b> 보호막이 5초로 자연 만료될 때 <c>FirstMeleeSubSkill</c>이 부르는
-    /// <c>SetShield(0)</c> 도 <b>보호막 감소</b>라 <c>Unit.ClientDamagedAmount</c>가 똑같이 발화한다.
+    /// <b>왜 필요한가.</b> 보호막이 5초로 자연 만료될 때 Unit 이 만료로 부르는
+    /// 보호막 제거도 <b>보호막 감소</b>라 <c>Unit.ClientDamagedAmount</c>가 똑같이 발화한다.
     /// 그대로 두면 <b>조용히 걷혀야 할 순간에 파문이 한 번 뜬다.</b> 소멸이 시작된 뒤에는 거절한다.
     /// </summary>
     public bool AcceptsHits => _phase == Phase.Intro || _phase == Phase.Hold;

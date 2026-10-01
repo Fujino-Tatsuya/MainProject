@@ -50,7 +50,7 @@ public enum DefaultAttackHitType
 [RequireComponent(typeof(PlayerMotor))]
 [RequireComponent(typeof(PlayerAimIndicator))]
 [RequireComponent(typeof(PlayerDefaultAttack))]
-public class DefaultAttackController : BaseNetworkBehaviour
+public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
 {
     private static readonly int DefaultAttackHash = Animator.StringToHash("DefaultAttack");
     private static readonly int AttackIndexHash = Animator.StringToHash("AttackIndex");
@@ -126,6 +126,7 @@ public class DefaultAttackController : BaseNetworkBehaviour
     public bool IsAttacking => player != null && player.CurrentState == PlayerActionState.Attack;
     public bool CanRequestStart => HasAttackSteps && CurrentStepDuration > 0f;
     public bool CanStartApprovedAttack => HasAttackSteps && CurrentStepDuration > 0f;
+    public bool CanBeCanceledByDash => false; // 콤보 중 대시 입력은 무시(기존 동작)
     private bool HasGameplayAuthority => !IsNetworkActive || IsServer;
 
     private void Awake()

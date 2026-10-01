@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d905cdda987dd5e47bbefa3a5030d0fd, type: 3}
+  m_Name: GunnerCoolBackstepData
+  m_EditorClassIdentifier: Assembly-CSharp::GunnerCoolBackstepData
+  inputType: 0
+  cooldownTime: 5
+  commitCooldownManually: 0
+  attackDamageMultiplier: 1
+  flatDamageBonus: 0
+  maxActiveDuration: 2
+  tickInterval: 0
+  usableWhileDead: 0
+  hittableLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  triggersOnHit: 0
+  targetingMode: 0
+  confirmMode: 0
+  castRange: 8
+  targetableLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  animatorStateName: Gunner_E_Backstep
+  snapRotationOnStart: 1
+  distance: 3
+  moveDuration: 0.25
