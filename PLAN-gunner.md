@@ -130,6 +130,11 @@ G1 은 G4 전까지 어느 때든. 문서 갱신(player-prefabs.md 거너 항목
 
 ## 7. 진행
 
+- ✅ **G6 완료 — Play 확인**(2026-10-01). `GunnerInterruptSkill`/`Data`(Interrupt 슬롯, `PlayerInstantSkill`):
+  HitDelay 또는 Hit 이벤트 1회 → 앵커(`Gunner_Armature/InterruptAttack` 박스) Overlap 에 `isInterruptAttack` 피해(보스가 판정 — 가붕이와 같은 계약).
+  같은 시각부터 각 시뮬레이션 피어가 후폭풍(공격 반대, `recoilDistance/Duration`) — **`PlayerMotor.PassThroughEnemiesOverride`** 로 적 통과·벽만 막힘. 빗나가도 이동·쿨·연출.
+  임시 연출 = `GunnerBeamView.ServerInterruptBlast`(주황선). 메뉴 `Tools/Player/Gunner/우클릭 근접 간파 부착 (G6)` + 애니 `Gunner_RMB_Interrupt`.
+
 - ✅ **G5 완료 — Play 확인**(2026-10-01). `GunnerCoolBackstepSkill`/`Data`(Sub 슬롯, Skill 상태):
   서버 시작 시 `GunnerHeat.ServerResetToZero`, 승인 조준의 정반대로 `distance/moveDuration` 속도 이동 — 시뮬레이션 피어가 `OnFixedTick` 에서
   `AddGroundedDisplacement`(모터 스윕이 막힘 처리), **`PlayerMotor.BlockOtherPlayersOverride`** 로 동작 중만 아군 차단. 무적·피해 없음.

@@ -175,6 +175,87 @@ public static class GunnerShellAuthoring
         BuildAnimator();
     }
 
+    const string InterruptDataPath = DataFolder + "/GunnerInterruptData.asset";
+    const string InterruptAnchorName = "InterruptAttack";
+
+    /// <summary>
+    /// G6 — 우클릭 근접 간파. Gunner_Armature 에 판정 앵커(InterruptAttack: BoxCollider + ColliderInfo, 전방) 추가,
+    /// 데이터 생성, GunnerInterruptSkill 부착·앵커 배선, 우클릭 슬롯 배선, 애니 상태.
+    /// </summary>
+    [MenuItem("Tools/Player/Gunner/우클릭 근접 간파 부착 (G6)")]
+    public static void AttachInterrupt()
+    {
+        if (AssetDatabase.LoadAssetAtPath<GameObject>(VariantPath) == null)
+        {
+            Debug.LogError($"[Gunner] Variant 가 없다 — 먼저 '껍데기 생성 (G9)' 실행: {VariantPath}");
+            return;
+        }
+
+        // 1) 몸체 프리팹에 앵커 — Armature 루트 아래라 캐릭터 방향과 함께 돈다(가붕이 InterruptAttack 과 같은 위치 규칙)
+        GameObject armature = PrefabUtility.LoadPrefabContents(ArmaturePath);
+        try
+        {
+            if (armature.transform.Find(InterruptAnchorName) == null)
+            {
+                var anchor = new GameObject(InterruptAnchorName);
+                anchor.transform.SetParent(armature.transform, false);
+                var box = anchor.AddComponent<BoxCollider>();
+                box.isTrigger = true;
+                box.center = new Vector3(0f, 1f, 0.9f);
+                box.size = new Vector3(1.4f, 1.8f, 1.4f);
+                anchor.AddComponent<ColliderInfo>();
+                PrefabUtility.SaveAsPrefabAsset(armature, ArmaturePath);
+                Debug.Log($"[Gunner] 간파 앵커 추가: {ArmaturePath}/{InterruptAnchorName} (전방 0.9m, 1.4×1.8×1.4)");
+            }
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(armature);
+        }
+
+        // 2) 데이터
+        EnsureFolder(DataFolder);
+        bool created = AssetDatabase.LoadAssetAtPath<GunnerInterruptData>(InterruptDataPath) == null;
+        var data = EnsureAsset<GunnerInterruptData>(InterruptDataPath);
+        if (created)
+        {
+            var so = new SerializedObject(data);
+            so.FindProperty("cooldownTime").floatValue = 3f;
+            so.FindProperty("maxActiveDuration").floatValue = 2f;
+            so.FindProperty("hittableLayers").intValue = 17664;
+            so.FindProperty("animatorStateName").stringValue = "Gunner_RMB_Interrupt";
+            so.FindProperty("snapRotationOnStart").boolValue = true;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(data);
+        }
+
+        // 3) Variant — 스킬 부착·앵커·슬롯
+        GameObject root = PrefabUtility.LoadPrefabContents(VariantPath);
+        try
+        {
+            EnsureComponent<GunnerBeamView>(root);
+            var skill = EnsureComponent<GunnerInterruptSkill>(root);
+            SetReference(skill, "data", data);
+
+            Transform anchor = root.transform.Find("Armature/" + InterruptAnchorName);
+            if (anchor == null)
+                Debug.LogError("[Gunner] Armature/InterruptAttack 을 못 찾았다 — 앵커 미배선");
+            else
+                SetReference(skill, "hitboxAnchor", anchor.GetComponent<ColliderInfo>());
+
+            SetReference(root.GetComponent<PlayerSkillController>(), "interruptSkill", skill);
+
+            PrefabUtility.SaveAsPrefabAsset(root, VariantPath);
+            Debug.Log($"[Gunner] 우클릭 근접 간파 부착 완료: {VariantPath}");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+
+        BuildAnimator();
+    }
+
     const string UpperBodyMaskPath = ControllerFolder + "/GunnerUpperBody.mask";
     // Auto-Rig Pro 컨트롤 리그라 상체가 한 서브트리에 모여 있지 않다(forearm.r/hand.r·head.x 가 c_traj 바로 아래).
     // 그래서 "척추 아래 전부"가 아니라 "하체·골반·루트 계열을 뺀 전부"를 켠다.
@@ -243,6 +324,11 @@ public static class GunnerShellAuthoring
         AnimatorState eBackstep = EnsureState(baseMachine, "Gunner_E_Backstep");
         eBackstep.motion = Clip("gunner_skill_E_cool_backstep");
         EnsureExitTimeTransition(eBackstep, idle);
+
+        // 우클릭: 근접 간파 → Idle
+        AnimatorState rmb = EnsureState(baseMachine, "Gunner_RMB_Interrupt");
+        rmb.motion = Clip("gunner_skill_RMB_interrupt");
+        EnsureExitTimeTransition(rmb, idle);
 
         AvatarMask mask = EnsureUpperBodyMask();
 

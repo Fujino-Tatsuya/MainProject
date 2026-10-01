@@ -8,17 +8,19 @@ using UnityEngine;
 /// </summary>
 public class GunnerBeamView : BaseNetworkBehaviour
 {
-    public enum Kind { BasicAttack = 0, ChargeLaser = 1 }
+    public enum Kind { BasicAttack = 0, ChargeLaser = 1, Interrupt = 2 }
 
     [SerializeField] private float basicDuration = 0.08f;
     [SerializeField] private Color basicColor = new Color(0.6f, 0.9f, 1f, 0.9f);
     [SerializeField] private float chargeDuration = 0.25f;
     [SerializeField] private Color chargeColor = new Color(1f, 0.85f, 0.3f, 0.9f);
+    [SerializeField] private float interruptDuration = 0.15f;
+    [SerializeField] private Color interruptColor = new Color(1f, 0.45f, 0.1f, 0.95f);
     [Tooltip("Q 발사 시 Base 레이어에서 재생할 상태(없으면 건너뜀).")]
     [SerializeField] private string chargeFireStateName = "Gunner_Q_Fire";
 
-    private readonly LineRenderer[] lines = new LineRenderer[2];
-    private readonly float[] hideTimes = new float[2];
+    private readonly LineRenderer[] lines = new LineRenderer[3];
+    private readonly float[] hideTimes = new float[3];
     private Animator animator;
     private PlayerStateController stateController;
 
@@ -56,11 +58,28 @@ public class GunnerBeamView : BaseNetworkBehaviour
         }
     }
 
+    /// <summary>[서버] 우클릭 간파 — 전 피어에 짧은 폭발선(레이저·폭발 VFX 자리).</summary>
+    public void ServerInterruptBlast(Vector3 origin, Vector3 end)
+    {
+        if (IsNetworkActive)
+            InterruptBlastRpc(origin, end);
+        else
+            ShowLocal(Kind.Interrupt, origin, end, 1f);
+    }
+
+    [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
+    private void InterruptBlastRpc(Vector3 origin, Vector3 end) => ShowLocal(Kind.Interrupt, origin, end, 1f);
+
     /// <summary>[로컬] 발사선을 잠깐 그린다.</summary>
     public void ShowLocal(Kind kind, Vector3 origin, Vector3 end, float width)
     {
         int i = (int)kind;
-        float duration = kind == Kind.BasicAttack ? basicDuration : chargeDuration;
+        float duration = kind switch
+        {
+            Kind.BasicAttack => basicDuration,
+            Kind.ChargeLaser => chargeDuration,
+            _ => interruptDuration,
+        };
         if (duration <= 0f)
             return;
 
@@ -72,7 +91,12 @@ public class GunnerBeamView : BaseNetworkBehaviour
             line.useWorldSpace = true;
             line.positionCount = 2;
             line.material = new Material(Shader.Find("Sprites/Default"));
-            line.startColor = line.endColor = kind == Kind.BasicAttack ? basicColor : chargeColor;
+            line.startColor = line.endColor = kind switch
+            {
+                Kind.BasicAttack => basicColor,
+                Kind.ChargeLaser => chargeColor,
+                _ => interruptColor,
+            };
             lines[i] = line;
         }
 

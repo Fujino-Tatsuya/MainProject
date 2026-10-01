@@ -57,6 +57,17 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 6ed8ca7ac8393e14f8ceb99b28e25556, type: 3}
+--- !u!114 &3988724667065146670 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 1049441041909935397, guid: 6ed8ca7ac8393e14f8ceb99b28e25556, type: 3}
+  m_PrefabInstance: {fileID: 4164306706429407243}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 81c70da5a2e747148bf71f917743b5fd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ColliderInfo
 --- !u!4 &6235178363960518833 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 8020166898015606970, guid: 6ed8ca7ac8393e14f8ceb99b28e25556, type: 3}
@@ -130,6 +141,10 @@ PrefabInstance:
       propertyPath: mainSkill
       value: 
       objectReference: {fileID: 4305858880368545057}
+    - target: {fileID: 4711829301158223401, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: interruptSkill
+      value: 
+      objectReference: {fileID: 6691715782565875710}
     - target: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       propertyPath: m_Name
       value: Player_Gunner
@@ -162,6 +177,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       insertIndex: -1
       addedObject: {fileID: 99821651607719020}
+    - targetCorrespondingSourceObject: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 6691715782565875710}
   m_SourcePrefab: {fileID: 100100000, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
 --- !u!1 &1006850121594653262 stripped
 GameObject:
@@ -246,6 +264,8 @@ MonoBehaviour:
   basicColor: {r: 0.6, g: 0.9, b: 1, a: 0.9}
   chargeDuration: 0.25
   chargeColor: {r: 1, g: 0.85, b: 0.3, a: 0.9}
+  interruptDuration: 0.15
+  interruptColor: {r: 1, g: 0.45, b: 0.1, a: 0.95}
   chargeFireStateName: Gunner_Q_Fire
 --- !u!114 &4305858880368545057
 MonoBehaviour:
@@ -275,6 +295,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GunnerCoolBackstepSkill
   data: {fileID: 11400000, guid: 17aee94c5ce066b4b9c25de5d6e31de6, type: 2}
   hitboxAnchor: {fileID: 0}
+--- !u!114 &6691715782565875710
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1006850121594653262}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6489b7ff66f50b74f9e0740b9cd72f0f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GunnerInterruptSkill
+  data: {fileID: 11400000, guid: e60875766cf84e644a1f0b7dae235261, type: 2}
+  hitboxAnchor: {fileID: 3988724667065146670}
 --- !u!4 &7722051468864962236 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 1160318589990200604, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}

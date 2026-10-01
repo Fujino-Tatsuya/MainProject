@@ -94,6 +94,12 @@ public sealed class PlayerMotor : MonoBehaviour
     /// </summary>
     public bool BlockOtherPlayersOverride { get; set; }
 
+    /// <summary>
+    /// 일시적으로 적(Enemy 레이어)을 통과한다(기본 규칙은 적에 막힘). 거너 우클릭 후폭풍처럼 "벽·오브젝트에만 막히는" 이동이
+    /// 동작하는 동안만 켠다. 시뮬레이션하는 피어가 각자 로컬로 켜고 끈다 — 복제하지 않는다.
+    /// </summary>
+    public bool PassThroughEnemiesOverride { get; set; }
+
     /// <summary>이번 물리 틱에 적용할 월드 속도(m/s)를 더한다.</summary>
     public void AddVelocity(Vector3 worldVelocity)
     {
@@ -814,6 +820,8 @@ public sealed class PlayerMotor : MonoBehaviour
         mask &= ~soulBit;
         if (!isSoul && ((gameRule != null && gameRule.BlockOtherPlayers) || BlockOtherPlayersOverride))
             mask |= playerBit;
+        if (PassThroughEnemiesOverride)
+            mask &= ~LayerMask.GetMask("Enemy");
 
         return mask;
     }
