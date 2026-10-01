@@ -8,17 +8,17 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 작업 세션 (2026-10-01 · 은희(Claude) · **자체 트윈 `EuniTween` + 데미지 팝업 연출**, 브랜치 `feature/DamagePopupTweening`)
+## ▶▶ 현재 인수인계 (2026-10-01 · 은희(Claude) · **데미지 숫자 Re:C v0.2 + 자체 이징 `EuniTween`**, 브랜치 `feature/DamagePopupTweening`, push 안 함)
 
-- **결정:** 트윈 라이브러리(PrimeTween·DOTween·LitMotion) **도입 안 함** — 자체 `EuniTween`(별도 asmdef, `Assets/1.Scripts/EuniTween/`, 네임스페이스 `EuniTween`).
-- 현재 = 이징 함수만(`Ease` enum 31종 + `Easing.Evaluate`·`Easing.Punch`, 상태 없는 순수 함수). 트윈 러너(핸들·Sequence·대상 파괴 처리)는 **없음** — 필요해질 때 추가.
-  테스트 `Assets/Tests/EditMode/EuniTween/`. dotnet 단독 빌드·수치 검증 통과, **Unity 임포트·Test Runner 확인 대기**(.meta 미생성).
-- 승인 계획 = [PLAN-damage-popup.md](PLAN-damage-popup.md) (기획 Re:C 데미지 숫자 표기 v0.2). 1단계 데이터 → 2단계 연출.
-- **1단계 = ✅ 코드 완료 `d379a9ea`**(Codex, dotnet build 오류 0) — 🔴 **Test Runner·Play 검증 대기**.
-  슬롯 = `PlayerSkillBase.Slot` 에서 변환(Main→SkillQ·Sub→SkillE·Ultimate→SkillR·Interrupt→Skill). 패턴 = `PlayerSkillData.hitPattern`, Multi 는 가붕이 Q·거너 R 두 개뿐.
-  누적 키 = `FloatingDamageAccumulationPolicy`(Multi 만 키 생성, Single 은 항상 새 팝업).
-- 🔴 `MonsterDataSO.rank` 추가는 **경석 영역** — 합의 알림 필요. 기획 구간 재조정은 기획자에게 요청 필요(PLAN §5).
-- 수정 예정: PLAN §4 목록 + `Assets/1.Scripts/EuniTween/**`, `Assets/Tests/EditMode/EuniTween/**`.
+계획·결정 원본 = [PLAN-damage-popup.md](PLAN-damage-popup.md) (기획 원본은 레포 밖 `Re_C_데미지_숫자_표기.md`). 1·2단계 ✅ 구현, EditMode 122건 통과. Play 확인은 2단계까지 — 이후 이미지 글꼴·색·크기·더미 복귀는 🔴 Play 미확인.
+- **`EuniTween`**(별도 asmdef `Assets/1.Scripts/EuniTween/`): `Ease` 31종 + `Easing.Evaluate`·`Punch`. 트윈 라이브러리 도입 안 함. 러너 없음(필요해질 때).
+- **데이터**: `AttackType` 끝에 `SkillQ/E/R` · `AttackHitPattern{Single,Multi}`(Multi = 가붕이 Q·거너 R) · RPC 에 2바이트 · 누적 키 = 공격자+타입+대상.
+  `MonsterRank`(`MonsterDataSO.rank`, `Unit.Rank` virtual — 몬스터·더미가 덮어씀). 🔴 **경석에게 rank 필드 추가 알림 필요.**
+- **연출**: 오버레이 Canvas(1920×1080) · 단발 = 맞은 자리 고정 / 누적 = 대상 추적 · 이미지 글꼴(`FloatingDamageDigitSet`, `50.Art/UI/damage`).
+  🔴 **기획과 다른 은희 결정**: 누적 추적 · 강도별 채움 색(노랑/주황/빨강) · 누적 숫자의 크기·색 = 누적 합계 기준 · 크기 50/100/140% · "굵게" 없음(이미지). 기획자 공유 필요.
+- **더미**: `TrainingDummy`(일반, HP 100) · `_Elite`(MidBoss 300) · `_Boss`(Boss 2000) Variant, TrainingDummy 씬 배치. 안 맞으면 스폰 자리 복귀.
+- ⏳ 남은 것: 외곽선 PNG 가 회색(175)이라 흰 외곽선은 아트 교체 필요 · `50.Art/UI/damage/*.png.meta` 슬라이스 **SVN 커밋 확인** ·
+  `DefaultNetworkPrefabs` 에 SVN 검수 프리팹 8종 등록됨(`08f29f47`, SVN 없으면 빈 참조) · PR.
 
 ## ▶▶ 현재 인수인계 (2026-10-01 · 은희(Claude) · **원거리 캐릭터 "거너" G0~G9 구현 완료**, 브랜치 `feature/SecondCharacter`, push 안 함)
 
