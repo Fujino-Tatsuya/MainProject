@@ -88,6 +88,8 @@ public struct FloatingDamageTierThresholds
 public struct FloatingDamageTierLook
 {
     public FloatingDamageTier tier;
+    [Tooltip("HP 피해(PopupKind.Damage) 숫자의 채움 색. 다른 유형은 popupStyles 색을 쓴다.")]
+    public Color fillColor;
     [Min(0.1f)] public float holdScale;
     [Tooltip("최초 등장 확대 배율. holdScale 이하면 확대 없음.")]
     [Min(0.1f)] public float spawnScale;
@@ -96,10 +98,11 @@ public struct FloatingDamageTierLook
     [Tooltip("단발 공격의 전체 표시 시간(초).")]
     [Min(0.05f)] public float singleDuration;
 
-    public FloatingDamageTierLook(FloatingDamageTier tier, float holdScale, float spawnScale,
+    public FloatingDamageTierLook(FloatingDamageTier tier, Color fillColor, float holdScale, float spawnScale,
         float spawnSettleDuration, bool shake, float singleDuration)
     {
         this.tier = tier;
+        this.fillColor = fillColor;
         this.holdScale = holdScale;
         this.spawnScale = spawnScale;
         this.spawnSettleDuration = spawnSettleDuration;
@@ -164,9 +167,9 @@ public sealed class FloatingDamageSettings : ScriptableObject
     [Header("강도별 모양")]
     [SerializeField] FloatingDamageTierLook[] tierLooks =
     {
-        new FloatingDamageTierLook(FloatingDamageTier.Low, 0.9f, 0.9f, 0f, false, 0.65f),
-        new FloatingDamageTierLook(FloatingDamageTier.Mid, 1f, 1.1f, 0.08f, false, 0.75f),
-        new FloatingDamageTierLook(FloatingDamageTier.High, 1.2f, 1.4f, 0.12f, true, 0.85f)
+        new FloatingDamageTierLook(FloatingDamageTier.Low, new Color(1f, 0.85f, 0.2f, 1f), 0.9f, 0.9f, 0f, false, 0.65f),
+        new FloatingDamageTierLook(FloatingDamageTier.Mid, new Color(1f, 0.55f, 0.1f, 1f), 1f, 1.1f, 0.08f, false, 0.75f),
+        new FloatingDamageTierLook(FloatingDamageTier.High, new Color(1f, 0.2f, 0.15f, 1f), 1.2f, 1.4f, 0.12f, true, 0.85f)
     };
 
     [Header("글꼴")]
@@ -255,6 +258,6 @@ public sealed class FloatingDamageSettings : ScriptableObject
         }
 
         Debug.LogError($"[FloatingDamage] {tier} 모양이 Settings 에 없다 — 기본 크기로 표시한다.", this);
-        return new FloatingDamageTierLook(tier, 1f, 1f, 0f, false, 0.75f);
+        return new FloatingDamageTierLook(tier, Color.white, 1f, 1f, 0f, false, 0.75f);
     }
 }

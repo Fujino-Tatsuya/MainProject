@@ -45,18 +45,21 @@ MonoBehaviour:
     highPercent: 3
   tierLooks:
   - tier: 0
+    fillColor: {r: 1, g: 0.85, b: 0.2, a: 1}
     holdScale: 0.9
     spawnScale: 0.9
     spawnSettleDuration: 0
     shake: 0
     singleDuration: 0.65
   - tier: 1
+    fillColor: {r: 1, g: 0.55, b: 0.1, a: 1}
     holdScale: 1
     spawnScale: 1.1
     spawnSettleDuration: 0.08
     shake: 0
     singleDuration: 0.75
   - tier: 2
+    fillColor: {r: 1, g: 0.2, b: 0.15, a: 1}
     holdScale: 1.2
     spawnScale: 1.4
     spawnSettleDuration: 0.12

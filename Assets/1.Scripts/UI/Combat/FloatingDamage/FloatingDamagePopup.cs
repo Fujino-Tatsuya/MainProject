@@ -39,6 +39,7 @@ public sealed class FloatingDamagePopup : MonoBehaviour
     FloatingDamageTierLook _look;
     float _singleDuration;
     int _amount;
+    Color _styleColor;
     Color _baseColor;
     bool _releaseRequested;
 
@@ -77,6 +78,7 @@ public sealed class FloatingDamagePopup : MonoBehaviour
         _anchorWorld = anchorWorld;
         _accumulates = request.hitPattern == AttackHitPattern.Multi;
         _amount = Mathf.Max(0, request.amount);
+        _styleColor = style.color;
         _baseColor = style.color;
         _releaseRequested = false;
 
@@ -257,6 +259,9 @@ public sealed class FloatingDamagePopup : MonoBehaviour
     {
         _tier = tier;
         _look = _settings.GetLook(tier);
+        // HP 피해 숫자는 강도로 색을 바꾼다(낮음 노랑 · 중간 주황 · 높음 빨강). 보호막 등 다른 유형은 유형 색.
+        // 다음 ApplyLayout 의 SetAlpha 가 새 색을 입힌다.
+        _baseColor = _request.kind == PopupKind.Damage ? _look.fillColor : _styleColor;
     }
 
     void StartSpawnPop()

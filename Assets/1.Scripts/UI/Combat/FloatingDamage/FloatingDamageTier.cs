@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// 피해 강도. 숫자 크기와 움직임을 고른다(색은 피해 유형이 정한다 — 강도로 바꾸지 않는다).
+// 피해 강도. 숫자 크기·움직임과 HP 피해 숫자의 색을 고른다(은희 2026-10-01 — 기획 "색은 유형만"과 다름).
 // 순서가 곧 강도라 비교 연산(tier > current)에 쓴다. 값은 끝에만 추가.
 public enum FloatingDamageTier
 {
