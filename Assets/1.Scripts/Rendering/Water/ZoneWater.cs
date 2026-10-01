@@ -18,13 +18,47 @@ public sealed class ZoneWater : MonoBehaviour
              "Transform 의 Y 대신 이 값을 바꿀 것 — 에디터에서는 Transform Y 가 이 값으로 고정된다.")]
     [SerializeField] float waterHeight;
 
+    // 존 회전별 물·물 밑 바닥 메시(0·90·180·270°) — 열린 면이 있는 존만 저작 도구가 채운다(비어 있으면 아무것도 안 함).
+    // 🔴 같은 존 프리팹이 슬롯마다 90° 단위로 회전 배치되고(ZoneSlot.Rotations → MapContentSpawner Euler(0, 90·YawSteps, 0)),
+    //    카메라는 회전 고정이라 '카메라 쪽 변'이 회전마다 다르다 — 열린 면 물 가장자리를 회전마다 따로 잘라 둔 메시를 고른다(10-01).
+    [SerializeField, HideInInspector] Mesh[] waterByYaw = new Mesh[0];
+    [SerializeField, HideInInspector] Mesh[] bedByYaw = new Mesh[0];
+    const string WaterChild = "WaterWaves", BedChild = "WaterBed";   // FlatKitWaterPatchAuthoring 의 자식 이름과 같아야 한다
+
     public float WaterHeight
     {
         get => waterHeight;
         set { waterHeight = value; Apply(); }
     }
 
-    void OnEnable() => Apply();
+    public void SetYawMeshes(Mesh[] water, Mesh[] bed)
+    {
+        waterByYaw = water;
+        bedByYaw = bed;
+        ApplyYawMesh();
+    }
+
+    void OnEnable()
+    {
+        Apply();
+        ApplyYawMesh();   // Instantiate(prefab, pos, rot) 는 OnEnable 전에 회전이 들어가 있다
+    }
+
+    void ApplyYawMesh()
+    {
+        if (waterByYaw == null || waterByYaw.Length != 4) return;
+        int k = ((Mathf.RoundToInt(transform.eulerAngles.y / 90f) % 4) + 4) % 4;
+        SetChildMesh(WaterChild, waterByYaw[k]);
+        if (bedByYaw != null && bedByYaw.Length == 4) SetChildMesh(BedChild, bedByYaw[k]);
+    }
+
+    void SetChildMesh(string child, Mesh mesh)
+    {
+        Transform t = transform.Find(child);
+        if (t == null || !t.TryGetComponent(out MeshFilter mf)) return;
+        if (mf.sharedMesh != mesh) mf.sharedMesh = mesh;   // 같으면 건드리지 않는다(에디터에서 프리팹을 더럽히지 않게)
+        if (t.TryGetComponent(out MeshRenderer mr)) mr.enabled = mesh != null;   // 그 회전에선 물이 다 잘린 경우
+    }
 
 #if UNITY_EDITOR
     void OnValidate() => Apply();

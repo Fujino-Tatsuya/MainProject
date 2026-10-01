@@ -8,6 +8,11 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-10-01 · 경석(Claude) · **물 데모 룩 맞추기**, 브랜치 `feature/Boss23`)
+
+계획: [PLAN-flatkit.md](PLAN-flatkit.md) 9-b. 수정: `Assets/1.Scripts/Rendering/Editor/FlatKitWaterPatchAuthoring.cs` · `FK_Water_Pool09.mat` · 존 프리팹 11종(`Water` 자식만) · `3.Materials/FlatKit/Water/Meshes/`.
+상태: 커밋·푸시(10-01). 물 = M_A·M_B 구석 구덩이(각 2) · S_A 구덩이 4 — 존 안 물 덩어리마다 `WaterPart_N`(위치·크기 직접 조절, 재생성해도 유지). 벤트 밑·L_B·L_C·Start 물 없음. 물 앞 벽 디더 끔(`Generic_01_A_Wet` 변형). 깊이 3×3 최근접(디더 구멍). 열린 면 자르기는 `ClipOpenEdges=false`로 꺼 둠(존 회전 배치 때문에 프리팹 기준 방향 보정이 틀림 — PLAN-flatkit 9-b). **남은 것: 팀장이 WaterPart 로 모서리 물 다듬기 · Play/MPPM 확인.**
+
 ## ▶▶ 작업 세션 (2026-09-29 · 은희(Claude) · **Group Painter "벽 그룹" 표시**, 브랜치 `feature/WallGroupVisualize`)
 
 Group Painter 툴바에 **`벽 그룹`** 토글 추가 — 씬(또는 열린 프리팹)의 `WallTransparencyGroup` 마다

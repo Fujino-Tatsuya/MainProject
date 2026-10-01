@@ -1,7 +1,8 @@
 // ----------------------------------------------------------------------------
 //  FlatKit Water — 월드 UV 복제본 (PLAN-flatkit.md 9단계 · 2026-10-01)
 //  원본: Assets/FlatKit/[Render Pipeline] URP/Water/Shaders/Water.shader (에셋 스토어 — 직접 고치지 않는다).
-//  바뀐 곳은 정점 셰이더의 `o.uv` 한 줄: 메시 UV 대신 월드 XZ / 27.57.
+//  바뀐 곳 ① 정점 셰이더의 `o.uv` 한 줄: 메시 UV 대신 월드 XZ / 27.57.
+//          ② DepthFade 의 깊이 샘플 = 3×3 중 가장 가까운 값(SampleSceneDepthClosest) — 디더 벽이 깊이에 남긴 구멍 메우기.
 //  왜: 존 물 조각마다 메시 UV 가 0 부터 시작해 이웃 조각끼리 거품·굴절 무늬가 끊겼다(팀장 10-01 '위아래 물이 다른 상태').
 //      파도(정점 높이·마루)는 원래 월드 좌표라 높이만 같으면 이어진다.
 // ----------------------------------------------------------------------------
@@ -229,16 +230,37 @@ Shader "Project/FlatKit Water (World UV)"
                 return lerp(lerp(d00, d01, fp.y), lerp(d10, d11, fp.y), fp.x) + 0.5;
             }
 
+            // [프로젝트 수정 2] 3×3 중 **가장 가까운** 깊이. 맵 벽·기둥·파이프(Generic_01_A)는 바닥 아래로 갈수록 디더(알파 클립)로
+            //   사라지는데, 깊이 텍스처에도 구멍 난 채로 기록된다 → 수면 밑 벽이 비치는 곳에서 픽셀마다 '벽(얕음)/구멍 너머(아주 깊음)'가
+            //   번갈아 읽혀 물 색이 청록·검정 점무늬가 됐다(팀장 10-01 Play). 구멍 옆 픽셀은 대부분 채워져 있어 최솟값으로 메운다.
+            inline float SampleSceneDepthClosest(float2 uv)
+            {
+                const float2 t = _CameraDepthTexture_TexelSize.xy;
+                float d = SampleSceneDepth(uv);
+                [unroll] for (int y = -1; y <= 1; y++)
+                [unroll] for (int x = -1; x <= 1; x++)
+                {
+                    if (x == 0 && y == 0) continue;
+                    const float s = SampleSceneDepth(uv + float2(x, y) * t);
+                #if UNITY_REVERSED_Z
+                    d = max(d, s);
+                #else
+                    d = min(d, s);
+                #endif
+                }
+                return d;
+            }
+
             inline float DepthFade(float2 uv, VertexOutput i)
             {
                 const float is_ortho = unity_OrthoParams.w;
                 const float is_persp = 1.0 - unity_OrthoParams.w;
 
-                const float depth_packed = SampleSceneDepth(uv);
+                const float depth_packed = SampleSceneDepthClosest(uv);
 
                 // Separately handles orthographic and perspective cameras.
                 const float scene_depth = lerp(_ProjectionParams.z, _ProjectionParams.y, depth_packed) * is_ortho +
-                    LinearEyeDepth(SampleSceneDepth(uv), _ZBufferParams) * is_persp;
+                    LinearEyeDepth(depth_packed, _ZBufferParams) * is_persp;
                 const float surface_depth = lerp(_ProjectionParams.z, _ProjectionParams.y, i.screenPosition.z) *
                     is_ortho + i.screenPosition.w * is_persp;
 
