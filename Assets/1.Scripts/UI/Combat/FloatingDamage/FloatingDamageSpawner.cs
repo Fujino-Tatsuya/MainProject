@@ -121,8 +121,8 @@ public sealed class FloatingDamageSpawner : MonoBehaviour
         return popup;
     }
 
-    // 생성점 = 몸 중심. 저작된 앵커가 있으면 그것을 쓴다.
-    static Vector3 ResolveAnchor(Unit target)
+    // 생성점 = 몸 중심. 저작된 앵커가 있으면 그것을 쓴다. 누적 숫자가 대상을 따라갈 때도 같은 점을 쓴다.
+    internal static Vector3 ResolveAnchor(Unit target)
     {
         if (target.TryGetComponent(out FloatingDamageAnchor anchor))
             return anchor.WorldPosition;

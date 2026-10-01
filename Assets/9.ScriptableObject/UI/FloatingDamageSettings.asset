@@ -35,14 +35,14 @@ MonoBehaviour:
   shakeDuration: 0.08
   tierThresholds:
   - rank: 0
-    midPercent: 3
-    highPercent: 12
+    midPercent: 15
+    highPercent: 50
   - rank: 1
+    midPercent: 5
+    highPercent: 20
+  - rank: 2
     midPercent: 0.75
     highPercent: 3
-  - rank: 2
-    midPercent: 0.15
-    highPercent: 0.75
   tierLooks:
   - tier: 0
     holdScale: 0.9

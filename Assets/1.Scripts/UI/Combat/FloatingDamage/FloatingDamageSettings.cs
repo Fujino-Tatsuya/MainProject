@@ -154,9 +154,9 @@ public sealed class FloatingDamageSettings : ScriptableObject
     [Header("피해 구간 (%)")]
     [SerializeField] FloatingDamageTierThresholds[] tierThresholds =
     {
-        new FloatingDamageTierThresholds(MonsterRank.Normal, 3f, 12f),
-        new FloatingDamageTierThresholds(MonsterRank.MidBoss, 0.75f, 3f),
-        new FloatingDamageTierThresholds(MonsterRank.Boss, 0.15f, 0.75f)
+        new FloatingDamageTierThresholds(MonsterRank.Normal, 15f, 50f),
+        new FloatingDamageTierThresholds(MonsterRank.MidBoss, 5f, 20f),
+        new FloatingDamageTierThresholds(MonsterRank.Boss, 0.75f, 3f)
     };
 
     [Header("강도별 모양")]

@@ -6,7 +6,7 @@ using UnityEngine;
 /// <summary>
 /// 데미지 숫자 하나. 기획 "Re:C 데미지 숫자 표기" v0.2 §4·§5 의 흐름을 시간 함수로 계산한다.
 ///
-/// 좌표: 첫 타격 때의 **월드 위치에 고정**(몬스터 이동·넉백을 따라가지 않음)하고, 매 프레임
+/// 좌표: 단발은 첫 타격 때의 **월드 위치에 고정**(몬스터 이동·넉백을 따라가지 않음), 누적은 대상을 따라간다. 매 프레임
 /// 화면에 투영한 뒤 기획의 픽셀 오프셋을 더한다. 오버레이 Canvas(1920×1080 기준) 단위가 곧 기획 px 다.
 /// 위치 반영은 스포너가 <c>Canvas.willRenderCanvases</c> 에서 <see cref="ApplyLayout"/> 로 한다 —
 /// 카메라가 LateUpdate 에서 움직여도 한 프레임 밀리지 않게.
@@ -153,6 +153,11 @@ public sealed class FloatingDamagePopup : MonoBehaviour
     {
         if (_releaseRequested || _settings == null || _canvas == null)
             return;
+
+        // 누적 숫자는 대상을 따라간다(은희 2026-10-01 — 기획 §4 "따라가지 않음"과 다름, 단발만 고정).
+        // 대상이 사라지거나 꺼지면 마지막 위치에 남는다.
+        if (_accumulates && _request.target != null && _request.target.isActiveAndEnabled)
+            _anchorWorld = FloatingDamageSpawner.ResolveAnchor(_request.target);
 
         Camera camera = Camera.main;
         Vector3 screen = camera != null ? camera.WorldToScreenPoint(_anchorWorld) : Vector3.zero;
