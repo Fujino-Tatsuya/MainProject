@@ -309,7 +309,8 @@ public sealed class BossElectricFloor : MonoBehaviour
         if (k >= 1f && _viewFiring) { HideAllTiles(); return; }
 
         Color col = _d.electricColor;
-        col.a *= 0.55f + 0.45f * Mathf.Sin(Time.time * 60f);   // 임시 전기 — 빠른 깜빡임
+        if (_d.electricFlickerSpeed > 0f)
+            col.a *= 0.55f + 0.45f * Mathf.Sin(Time.time * _d.electricFlickerSpeed);   // 임시 전기 — 빠른 깜빡임
         float s = FullTile * Mathf.Clamp01(k);                      // 안쪽 진한 사각형이 중심에서 차오른다(§9-2)
 
         // 매 프레임 도는 곳이라 람다(ForEachTile) 대신 루프 — 할당 0.

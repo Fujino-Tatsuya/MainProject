@@ -35,6 +35,8 @@ public class BossElectricFloorDataSO : ScriptableObject
     public Color warnFillColor = new Color(1f, 0.05f, 0.02f, 0.55f);
     [Tooltip("임시 전기 표시 색.")]
     public Color electricColor = new Color(0.45f, 0.85f, 1f, 0.8f);
+    [Tooltip("임시 전기 깜빡임 속도(라디안/초). 0 = 깜빡임 없이 고정.")]
+    [Min(0f)] public float electricFlickerSpeed = 60f;
     [Tooltip("타일마다 발동 순간 생성할 전기 VFX(선택). 비우면 임시 색 타일만. vfxDuration 뒤 파괴.")]
     public GameObject electricVfxPrefab;
     [Tooltip("바닥 위 띄우는 높이(m) — Z 파이팅 방지.")]

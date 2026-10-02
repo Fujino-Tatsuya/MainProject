@@ -263,6 +263,7 @@ public sealed class WellsDroneAttack : MonoBehaviour
         _vStart = Time.time;
         _vDur = Mathf.Max(0.01f, trackTime);
         BossPatternVisuals.Paint(_cross, _d.crosshairColor, BossPatternVisuals.CrosshairTexture);
+        _cross.enabled = true;
         _cross.gameObject.SetActive(true);
     }
 
@@ -287,9 +288,12 @@ public sealed class WellsDroneAttack : MonoBehaviour
         if (_d.droneModel != null)
         {
             _droneGo = Instantiate(_d.droneModel, pos + Vector3.up * _d.dropHeight, Quaternion.identity);
+            _droneGo.transform.localScale *= _d.droneScale;
             // 연출 전용 — 혹시 프리팹에 콜라이더·리지드바디가 있어도 판정·물리에 끼지 않게 끈다(§8).
             foreach (Collider c in _droneGo.GetComponentsInChildren<Collider>(true)) c.enabled = false;
             foreach (Rigidbody rb in _droneGo.GetComponentsInChildren<Rigidbody>(true)) rb.isKinematic = true;
+            // 낙하 시작 전까지 숨긴다 — 크로스헤어가 사라진 "다음에" 드론이 나타나 내려온다(팀장 10-02).
+            _droneGo.SetActive(false);
         }
     }
 
@@ -313,7 +317,7 @@ public sealed class WellsDroneAttack : MonoBehaviour
         }
         else
         {
-            BossPatternVisuals.Paint(_boom, new Color(1f, 0.55f, 0.1f, 0.85f), BossPatternVisuals.DiscTexture);
+            BossPatternVisuals.Paint(_boom, _d.explosionColor, BossPatternVisuals.DiscTexture);
             _boom.gameObject.SetActive(true);
         }
     }
@@ -363,19 +367,23 @@ public sealed class WellsDroneAttack : MonoBehaviour
                     float f = fallStart >= 1f ? 1f : Mathf.Clamp01((k - fallStart) / (1f - fallStart));
                     float h = Mathf.Lerp(_d.dropHeight, 0f, f * f);   // 가속
                     _droneGo.transform.position = new Vector3(_vPos.x, _vFloorY + h, _vPos.z);
+                    if (f > 0f && !_droneGo.activeSelf) _droneGo.SetActive(true);
                 }
                 break;
 
             case View.Boom:
                 if (k >= 1f) { ClientCancel(); return; }
-                // 임시 폭발 — 원이 반경 → 2.5배로 퍼지며 사라진다.
-                PlaceDisc(_boom, Mathf.Lerp(_vRadius, _vRadius * 2.5f, k), 0.02f);
-                BossPatternVisuals.Paint(_boom, new Color(1f, 0.55f, 0.1f, 0.85f * (1f - k)), null);
+                // 임시 폭발 — 원이 반경 → explosionGrowScale 배로 퍼지며 사라진다.
+                PlaceDisc(_boom, Mathf.Lerp(_vRadius, _vRadius * _d.explosionGrowScale, k), 0.02f);
+                Color boom = _d.explosionColor;
+                boom.a *= 1f - k;
+                BossPatternVisuals.Paint(_boom, boom, null);
                 break;
         }
     }
 
-    // 크로스헤어: 대상 몸 중심을 따라가고, 크게 시작해 좁혀지며, 끝으로 갈수록 빨리 깜빡인다(§6.2).
+    // 크로스헤어: 대상 몸 중심을 따라가며 크게 시작해 줄어들고, 다 줄면 그 크기로 멈춰 있다가
+    // 위치 고정 순간(ClientLock) 사라진다. **점멸 없음**(팀장 10-02). 줄어드는 구간·배율은 SO 값.
     // 캐릭터에 가려지지 않게 카메라 쪽으로 조금 당겨 그린다(§6.1 "모델보다 앞") — 셰이더 ZTest 를 바꾸지 않는 임시 방법.
     void TickCrosshair(float k)
     {
@@ -383,17 +391,15 @@ public sealed class WellsDroneAttack : MonoBehaviour
         Vector3 center = BossPatternTargets.BodyCenter(_crossTarget);
         Vector3 toCam = cam != null ? -cam.transform.forward : Vector3.up;
         Transform t = _cross.transform;
-        t.position = center + toCam * 1.5f;
+        t.position = center + toCam * _d.crosshairTowardCamera;
         t.rotation = Quaternion.FromToRotation(Vector3.up, toCam);
 
-        float size = _d.crosshairSize * Mathf.Lerp(1.5f, 1f, k);
-        // 최소 표시 크기 — 카메라가 멀면 그만큼 키운다(기준 거리 20m).
-        if (cam != null) size *= Mathf.Max(1f, Vector3.Distance(cam.transform.position, center) / 20f);
+        float shrink = Mathf.Clamp01(k / Mathf.Max(0.01f, _d.crosshairShrinkPortion));
+        float size = _d.crosshairSize * Mathf.Lerp(_d.crosshairStartScale, _d.crosshairEndScale, shrink);
+        // 최소 표시 크기 — 카메라가 기준 거리보다 멀면 그만큼 키운다.
+        if (cam != null)
+            size *= Mathf.Max(1f, Vector3.Distance(cam.transform.position, center) / _d.crosshairReferenceDistance);
         t.localScale = new Vector3(size, 1f, size);
-
-        float hz = Mathf.Lerp(2f, 10f, k);
-        bool on = k < 0.4f || Mathf.Repeat((Time.time - _vStart) * hz, 1f) < 0.6f;
-        _cross.enabled = on;
     }
 
     void PlaceDisc(MeshRenderer m, float radius, float lift)

@@ -17,7 +17,7 @@ MonoBehaviour:
   lockTime: 1
   cooldown: 7
   resumeMinDelay: 2
-  diameterInTiles: 0.5
+  diameterInTiles: 1.25
   playerDamage: 25
   bossDamage: 300
   pauseOn: 3
