@@ -64,7 +64,7 @@ public class SkillCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
         }
     }
 
-    /// <summary>슬롯 프레임 안 아이콘 자식(<c>SkillIcon</c>)만 바꾼다 — 프레임 Image 는 건드리지 않는다. 아이콘 없으면 숨김.</summary>
+    /// <summary>슬롯 프레임 안 아이콘 자식(<c>Slot_*/Icon</c>)만 바꾼다 — 프레임 Image 는 건드리지 않는다. 아이콘 없으면 숨김.</summary>
     public static void SetSlotIcon(Image icon, ISkillTooltipSource source)
     {
         if (icon == null)

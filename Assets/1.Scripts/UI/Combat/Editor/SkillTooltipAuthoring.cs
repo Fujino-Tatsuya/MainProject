@@ -18,8 +18,7 @@ public static class SkillTooltipAuthoring
     private const string AttackSpritePath = GeneratedFolder + "/SkillTooltipAttackSprite.asset";
     private const string PaladinPrefabPath = "Assets/2.Prefabs/Player/Paladin/Player_Paladin.prefab";
     private const string SlotFramePath = "Assets/50.Art/UI/HUD/slot_skill.png";
-    private const string SlotIconName = "SkillIcon";
-    private const float SlotIconInset = 8f;
+    private const string SlotIconName = "Icon";
 
     private static readonly Dictionary<PlayerSkillSlot, string> PaladinData = new Dictionary<PlayerSkillSlot, string>
     {
@@ -80,7 +79,7 @@ public static class SkillTooltipAuthoring
                 SkillSlotHover hover = EnsureComponent<SkillSlotHover>(slotRoot.gameObject);
                 SetReference(hover, "tooltipView", view);
                 EnableFrameRaycast(slotRoot);
-                widget.FindPropertyRelative("icon").objectReferenceValue = EnsureSlotIcon(slotRoot);
+                widget.FindPropertyRelative("icon").objectReferenceValue = FindSlotIcon(slotRoot);
                 widget.FindPropertyRelative("hover").objectReferenceValue = hover;
             }
             skillSo.ApplyModifiedPropertiesWithoutUndo();
@@ -91,7 +90,7 @@ public static class SkillTooltipAuthoring
             {
                 passiveRoot.gameObject.SetActive(true);
                 EnableFrameRaycast(passiveRoot);
-                passiveSo.FindProperty("icon").objectReferenceValue = EnsureSlotIcon(passiveRoot);
+                passiveSo.FindProperty("icon").objectReferenceValue = FindSlotIcon(passiveRoot);
                 SkillSlotHover hover = EnsureComponent<SkillSlotHover>(passiveRoot.gameObject);
                 SetReference(hover, "tooltipView", view);
                 passiveSo.FindProperty("hover").objectReferenceValue = hover;
@@ -256,21 +255,15 @@ public static class SkillTooltipAuthoring
         return path == SlotFramePath || path.StartsWith(GeneratedFolder + "/", StringComparison.Ordinal);
     }
 
-    /// <summary>슬롯 프레임(루트 Image)은 그대로 두고, 그 안에 스킬 아이콘 전용 자식 Image 를 둔다.</summary>
-    private static Image EnsureSlotIcon(Transform slotRoot)
+    /// <summary>
+    /// 슬롯 안 아이콘 자식 <c>Slot_*/Icon</c>(프리팹에서 직접 만든 것)을 찾아 쓴다. 위치·크기·스프라이트는 건드리지 않는다.
+    /// 슬롯 루트 Image 는 프레임(slot_skill)이라 아이콘으로 쓰지 않는다.
+    /// </summary>
+    private static Image FindSlotIcon(Transform slotRoot)
     {
-        RectTransform rect = slotRoot.Find(SlotIconName) as RectTransform ?? NewUi(SlotIconName, slotRoot);
-        rect.SetSiblingIndex(0); // 프레임 위 · 쿨타임 Fill·키 글자 아래
-        rect.anchorMin = Vector2.zero;
-        rect.anchorMax = Vector2.one;
-        rect.pivot = new Vector2(0.5f, 0.5f);
-        rect.offsetMin = new Vector2(SlotIconInset, SlotIconInset);
-        rect.offsetMax = new Vector2(-SlotIconInset, -SlotIconInset);
-        Image image = EnsureComponent<Image>(rect.gameObject);
-        image.raycastTarget = false;
-        image.preserveAspect = true;
-        image.sprite = null;
-        image.enabled = false; // HUD Bind 가 출처 아이콘이 있을 때만 켠다
+        Image image = slotRoot.Find(SlotIconName)?.GetComponent<Image>();
+        if (image == null)
+            Debug.LogWarning($"[SkillTooltip] {slotRoot.name}/{SlotIconName} Image 가 없다 — 프리팹에 만들어 둘 것(아이콘 없이 진행).");
         return image;
     }
 
