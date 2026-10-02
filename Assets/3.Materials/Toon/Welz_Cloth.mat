@@ -13,6 +13,7 @@ Material:
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
   - _FIXEDLIGHT_ON
+  - _OUTLINE_SCREEN_ON
   m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
@@ -31,6 +32,15 @@ Material:
     m_Ints: []
     m_Floats:
     - _Brightness: 1.55
+    - _CharAmbient: 0.3
+    - _CharKeyIntensity: 1.15
+    - _CharLightBlend: 1
+    - _FaceBrightness: 1.12
+    - _FaceFlatten: 1
+    - _FaceLiftAmbient: 0.9
+    - _FaceLiftHeight: 1.42
+    - _FaceLiftOn: 0
+    - _FaceLiftSmooth: 0.1
     - _FixedLightOn: 1
     - _HairOn: 0
     - _HairShift: 0
@@ -38,12 +48,17 @@ Material:
     - _HairThreshold: 0.62
     - _MetalBandSmooth: 0.001
     - _MetalOn: 0
+    - _OutlineDarken: 0.25
+    - _OutlineMinLum: 0.14
+    - _OutlinePixels: 3
+    - _OutlineScreenOn: 1
     - _OutlineWidth: 0.005
     - _ReceiveShadowStrength: 0.311
     - _RimIntensity: 2.22
     - _RimLightAlign: 0.5
     - _RimPower: 4
     - _Saturation: 1.25
+    - _Shade2Level: 0.35
     - _Shade2Smooth: 0.001
     - _Shade2Threshold: 0.719
     - _ShadeAmbient: 0.18
@@ -54,6 +69,7 @@ Material:
     - _SpecThreshold: 0
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
+    - _CharKeyColor: {r: 1, g: 0.98, b: 0.94, a: 1}
     - _FixedLightDir: {r: 0.15, g: 1, b: 0.35, a: 0}
     - _HairSpecColor: {r: 1, g: 1, b: 1, a: 1}
     - _OutlineColor: {r: 0.2, g: 0.18, b: 0.24, a: 1}
