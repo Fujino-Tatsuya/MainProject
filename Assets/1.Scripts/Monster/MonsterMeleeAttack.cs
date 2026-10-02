@@ -11,7 +11,7 @@ using UnityEngine;
 //  - 그 외에 파생 클래스가 자기 틱에서 직접 부르는 경로가 있다(지속 판정용 —
 //    SpinnerBot 스핀, 23호 Dash/RageDash. BeginHitWindow 로 유닛당 1회를 보장한다).
 // 두 경로 모두 서버에서만 실효(BaseAttack.IsServer 가드 + TryResolveHit 내부 가드).
-[DataTableSheet]
+[DataTableSheet("Monster", Order = 1)]
 public class MonsterMeleeAttack : BaseAttack
 {
     [SerializeField] private ColliderInfo colliderInfo; // 오버랩 형태/크기(자식 콜라이더에서 추출)

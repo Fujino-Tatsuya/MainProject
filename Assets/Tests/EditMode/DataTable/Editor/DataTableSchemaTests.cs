@@ -44,6 +44,43 @@ public sealed class DataTableSchemaTests
     }
 
     [Test]
+    public void VerticalTable_SectionsWithOwnHeaders_CommentsAndDash()
+    {
+        // D7 세로 표 — 구역마다 머리글이 다시 나오고 대상(열)이 달라도 된다.
+        var issues = new DataTableIssues();
+        List<DataTableEntry> entries = Parse(Sheet("Player",
+            new[] { "#■ Player" },
+            new[] { "필드", "#설명", "Player", "Player_Gunner" },
+            new[] { "#  ─ 스탯" },
+            new[] { "maxHp", "최대 체력", "100", "50" },
+            new string[0],
+            new[] { "#■ PlayerDashData" },
+            new[] { "필드", "#설명", "PlayerDashData", "#메모" },
+            new[] { "dashSpeed", "", "20", "기획 메모" },
+            new[] { "#dashDuration", "", "0.3" },
+            new[] { "charge", "", "-" }), issues);
+
+        Assert.That(issues.Items, Is.Empty, string.Join("\n", issues.Items));
+        Assert.That(entries.Select(e => $"{e.AssetId}.{e.Field}={e.Value}"), Is.EqualTo(new[]
+        {
+            "Player.maxHp=100", "Player_Gunner.maxHp=50", "PlayerDashData.dashSpeed=20",
+        }));
+        Assert.That(entries[1].Location, Is.EqualTo("T.xlsx › Player!D4"));
+    }
+
+    [Test]
+    public void VerticalTable_EmptyValueAndValueBeforeHeader_AreErrors()
+    {
+        var issues = new DataTableIssues();
+        Parse(Sheet("S",
+            new[] { "maxHp", "", "1" },                 // 머리글 전
+            new[] { "필드", "#설명", "A", "B" },
+            new[] { "maxHp", "", "1", "" }), issues);   // B 빈 칸
+
+        Assert.That(issues.Items.Select(i => i.Location), Is.EquivalentTo(new[] { "T.xlsx › S!A1", "T.xlsx › S!D3" }));
+    }
+
+    [Test]
     public void RowTable_DashMeansNotApplicable_IsSkippedWithoutError()
     {
         var issues = new DataTableIssues();

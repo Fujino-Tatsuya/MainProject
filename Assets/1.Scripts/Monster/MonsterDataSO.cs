@@ -4,7 +4,7 @@ using UnityEngine.AI;
 // 몬스터 데이터 주도 설정. 스탯/인지/그로기/슈퍼아머/타이밍/애니 파라미터명을 한 곳에 모은다.
 // (프로젝트 원칙: 스킬/보스/몬스터 파라미터는 ScriptableObject로 — 머지 충돌 완화 + 튜닝 편의.)
 [CreateAssetMenu(fileName = "MonsterData", menuName = "Monster/Monster Data", order = 0)]
-[DataTableSheet]
+[DataTableSheet("Monster", Order = 0)]
 public class MonsterDataSO : ScriptableObject
 {
     [Header("아키타입")]

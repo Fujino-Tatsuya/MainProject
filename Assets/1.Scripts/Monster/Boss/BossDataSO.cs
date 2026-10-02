@@ -219,7 +219,7 @@ public class BossPhaseEntry
 //    공격별 minDistance/maxDistance 거리창 + base 의 attackRange(접근/정지 기준)가 그 역할을 이미
 //    전부 덮는다. 읽는 곳 없는 필드를 만드는 것이 이 문서가 경고하는 바로 그 실패 모드다.
 [CreateAssetMenu(fileName = "BossData", menuName = "Monster/Boss Data", order = 1)]
-[DataTableSheet]
+[DataTableSheet("Boss")]
 public class BossDataSO : MonsterDataSO
 {
     [Header("공격 테이블 — 배열 인덱스 = 쿨다운 슬롯 번호")]

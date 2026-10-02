@@ -46,7 +46,7 @@ public sealed class DataTableTemplateTests
     }
 
     [Test]
-    public void SingleAsset_KeyValueSheet_RoundTripsWithZeroDifferences()
+    public void SingleTarget_VerticalSheet_RoundTripsWithZeroDifferences()
     {
         DataTableTestData data = Make("Only");
         data.moveSpeed = 0.1f; // float 표기가 번지지 않는지
@@ -54,13 +54,14 @@ public sealed class DataTableTemplateTests
 
         List<DataTableDifference> differences = ExportImportDiff(new[] { data }, out DataTableIssues issues, out List<XlsxSheet> sheets);
 
-        Assert.That(sheets[0].Cell(0, 0), Is.EqualTo(DataTableSchema.AssetHeader));
+        Assert.That(sheets[0].Cell(0, 0), Is.EqualTo("#■ DataTableTestData"), "타입 구역 제목");
+        Assert.That(sheets[0].Rows[1], Is.EqualTo(new[] { DataTableSchema.VerticalFieldHeader, DataTableSchema.DescriptionHeader, "Only" }));
         Assert.That(issues.Items, Is.Empty, string.Join("\n", issues.Items));
         Assert.That(differences, Is.Empty, string.Join("\n", differences));
     }
 
     [Test]
-    public void ManyAssets_RowSheet_RoundTripsWithZeroDifferences()
+    public void ManyTargets_VerticalSheet_ColumnsAreTargets_RoundTripsWithZeroDifferences()
     {
         DataTableTestData a = Make("A");
         DataTableTestData b = Make("B");
@@ -69,15 +70,17 @@ public sealed class DataTableTemplateTests
 
         List<DataTableDifference> differences = ExportImportDiff(new[] { a, b }, out DataTableIssues issues, out List<XlsxSheet> sheets);
 
-        Assert.That(sheets[0].Cell(0, 0), Is.EqualTo(DataTableSchema.IdHeader));
+        Assert.That(sheets[0].Rows[1], Is.EqualTo(new[] { DataTableSchema.VerticalFieldHeader, DataTableSchema.DescriptionHeader, "A", "B" }));
+        string[] maxHp = sheets[0].Rows.First(r => r.Length > 0 && r[0] == "maxHp");
+        Assert.That(maxHp, Is.EqualTo(new[] { "maxHp", "최대 체력", "100", "300" }), "필드 | 설명(툴팁) | 대상 값들");
         Assert.That(issues.Items, Is.Empty, string.Join("\n", issues.Items));
         Assert.That(differences, Is.Empty, string.Join("\n", differences));
     }
 
     [Test]
-    public void RowSheet_ArrayLengthDiffers_KeepsEveryElement_MarksMissingWithDash()
+    public void VerticalSheet_ArrayLengthDiffers_KeepsEveryElement_MarksMissingWithDash()
     {
-        // 23호 No23(공격 8) / No23_Solo(공격 6) 같은 경우 — 한쪽에만 있는 원소도 열로 싣고 없는 쪽은 "-".
+        // 23호 No23(공격 8) / No23_Solo(공격 6) 같은 경우 — 한쪽에만 있는 원소도 행으로 싣고 없는 쪽은 "-".
         DataTableTestData a = Make("A");
         DataTableTestData b = Make("B");
         b.phases = new[] { 1, 2, 3 };
@@ -86,13 +89,25 @@ public sealed class DataTableTemplateTests
         List<XlsxWriteSheet> sheets = DataTableTemplate.BuildSheets(
             new[] { (typeof(DataTableTestData), Targets(a, b)) }, warnings);
 
-        object[] header = sheets[0].Rows[0];
-        int column = Array.IndexOf(header, "phases[2]");
-        Assert.That(column, Is.EqualTo(Array.IndexOf(header, "phases[1]") + 1), "phases[1] 바로 뒤");
-        Assert.That(sheets[0].Rows[2][column], Is.EqualTo(DataTableSchema.NotApplicable), "A 에는 없다");
-        Assert.That(sheets[0].Rows[3][column], Is.EqualTo(3L), "B 의 값");
+        List<object[]> rows = sheets[0].Rows;
+        int at = rows.FindIndex(r => r.Length > 0 && Equals(r[0], "phases[2]"));
+        Assert.That(rows[at - 1][0], Is.EqualTo("phases[1]"), "phases[1] 바로 아래");
+        Assert.That(rows[at][2], Is.EqualTo(DataTableSchema.NotApplicable), "A 에는 없다");
+        Assert.That(rows[at][3], Is.EqualTo(3L), "B 의 값");
         Assert.That(warnings, Is.Empty);
     }
+
+    [Test]
+    public void VerticalSheet_FrozenFieldColumn_BoldTitleAndHeader()
+    {
+        DataTableTestData a = Make("A");
+
+        XlsxWriteSheet sheet = DataTableTemplate.BuildSheets(new[] { (typeof(DataTableTestData), Targets(a)) }, new List<string>())[0];
+
+        Assert.That(sheet.FrozenColumns, Is.EqualTo(1));
+        Assert.That(sheet.BoldRowIndices, Is.EquivalentTo(new[] { 0, 1 }));
+    }
+
 
     [Test]
     public void RowSheet_ArrayLengthDiffers_RoundTripsWithZeroDifferences()

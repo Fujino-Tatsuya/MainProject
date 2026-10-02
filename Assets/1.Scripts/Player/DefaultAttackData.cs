@@ -1,7 +1,7 @@
 using UnityEngine;
 
 [CreateAssetMenu(menuName = "Combat/Default Attack Data")]
-[DataTableSheet("Paladin")]
+[DataTableSheet("Paladin", Order = 0)]
 public class DefaultAttackData : ScriptableObject
 {
     [SerializeField] private DefaultAttackChainPolicy chainPolicy = DefaultAttackChainPolicy.Loop;

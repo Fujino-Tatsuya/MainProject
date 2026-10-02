@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.AI;
 
 // Unit, Rigidbody/NavMeshAgent와 같은 최상단 오브젝트에 위치해 있어야 함
-[DataTableSheet]
+[DataTableSheet("Monster", Order = 2)]
 public class LinearKnockback : NetworkBehaviour, IKnockbackable
 {
     NavMeshAgent _navMeshAgent;

@@ -84,47 +84,4 @@ public sealed class DataTableSheetGroupTests
         Assert.That(issues.HasErrors, Is.True);
     }
 
-    [Test]
-    public void Merge_MovedSheets_CarryDesignerValuesIntoGroupSheet_AndDropOldSheets()
-    {
-        var existing = new[]
-        {
-            new XlsxSheet("FirstMeleeMainSkillData", new[]
-            {
-                new[] { "Asset", "Field", "Value" },
-                new[] { "FirstMeleeMainSkillData", "cooldownTime", "4.5" },   // 기획이 고친 값
-                new[] { "FirstMeleeMainSkillData", "removedField", "1" },     // 코드에서 사라짐
-            }),
-            new XlsxSheet("PlayerDashData", new[] { new[] { "Asset", "Field", "Value" }, new[] { "PlayerDashData", "dashSpeed", "20" } }),
-        };
-        var fresh = new[]
-        {
-            new XlsxWriteSheet("Paladin", new List<object[]>
-            {
-                new object[] { "Asset", "Field", "Value", "#설명" },
-                new object[] { "#── FirstMeleeMainSkillData ──" },
-                new object[] { "FirstMeleeMainSkillData", "cooldownTime", 8f, "" },
-                new object[] { "FirstMeleeMainSkillData", "advanceSpeed", 6f, "" },
-            }),
-            new XlsxWriteSheet("PlayerDashData", new List<object[]>
-            {
-                new object[] { "Asset", "Field", "Value" }, new object[] { "PlayerDashData", "dashSpeed", 20L },
-            }),
-        };
-        var moved = new Dictionary<string, string> { ["FirstMeleeMainSkillData"] = "Paladin" };
-        var report = new List<string>();
-
-        List<XlsxWriteSheet> merged = DataTableMerge.Merge(existing, fresh, report, moved);
-
-        var stream = new MemoryStream();
-        XlsxWriter.Write(stream, merged);
-        stream.Position = 0;
-        List<XlsxSheet> sheets = XlsxReader.Read(stream).ToList();
-
-        Assert.That(sheets.Select(s => s.Name), Is.EquivalentTo(new[] { "PlayerDashData", "Paladin" }), "옛 시트는 빠진다");
-        XlsxSheet paladin = sheets.Single(s => s.Name == "Paladin");
-        Assert.That(paladin.Rows[2].Take(3), Is.EqualTo(new[] { "FirstMeleeMainSkillData", "cooldownTime", "4.5" }), "기획 값 이동");
-        Assert.That(paladin.Cell(3, 2), Is.EqualTo("6"), "옛 시트에 없던 필드는 현재 값");
-        Assert.That(report.Any(r => r.Contains("1개는 코드에 그 필드가 없어")), Is.True, "사라진 필드는 보고");
-    }
 }

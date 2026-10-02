@@ -20,7 +20,7 @@ using UnityEngine;
 //  - Smash는 히트 프레임(OnAttackHit)에 텔레그래프 반경만큼 AoE 데미지(OverlapSphere)를 낸다.
 //    Punch01/02는 기존처럼 meleeAttack.Hit() 단타. Punch03(어퍼컷)은 데미지만 동일 경로로 내고,
 //    airborne CC는 은희의 상태이상 인터페이스 통합 전까지 훅(OnUppercutHit)만 남겨둔다.
-[DataTableSheet]
+[DataTableSheet("MidBoss", Order = 0)]
 public class GauntletBot : MonsterBase
 {
     // 공격 종류. Smash 1종 + 펀치 3종 × L/R = 총 7종.

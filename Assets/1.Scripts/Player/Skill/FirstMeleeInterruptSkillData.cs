@@ -5,7 +5,7 @@ using UnityEngine;
 /// 베이스(PlayerSkillData)의 InputType은 Press여야 한다.
 /// </summary>
 [CreateAssetMenu(menuName = "Combat/First Melee Interrupt Skill Data")]
-[DataTableSheet("Paladin")]
+[DataTableSheet("Paladin", Order = 4)]
 public class FirstMeleeInterruptSkillData : PlayerSkillData
 {
     [Header("판정 타이밍")]

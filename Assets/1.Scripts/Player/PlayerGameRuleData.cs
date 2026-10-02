@@ -7,7 +7,7 @@ using UnityEngine;
 /// Soul soulSpeed, 기본 LifeCount 등은 각 기능이 병합·안정화된 뒤 이 규칙으로 이관한다.
 /// </summary>
 [CreateAssetMenu(fileName = "PlayerGameRuleData", menuName = "BeaverLobby/Player/Game Rule Data", order = 0)]
-[DataTableSheet]
+[DataTableSheet("Player", Order = 6)]
 public sealed class PlayerGameRuleData : ScriptableObject
 {
     private const int DefaultObstacleMask = (1 << 0) | (1 << 3) | (1 << 7) | (1 << 11);

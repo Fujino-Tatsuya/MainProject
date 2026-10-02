@@ -10,7 +10,7 @@ using Unity.Netcode.Components;
 [RequireComponent(typeof(PlayerAimIndicator))]
 [RequireComponent(typeof(PlayerStateController))]
 [RequireComponent(typeof(StatusEffectController))]
-[DataTableSheet]
+[DataTableSheet("Player", Order = 0)]
 public class Player : Unit
 {
     private static readonly int IsMovingHash = Animator.StringToHash("IsMoving");

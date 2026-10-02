@@ -2,7 +2,7 @@ using UnityEngine;
 
 /// <summary>거너 E 냉각 백스텝 수치(character_gunner.md §7·§12.4). 베이스의 cooldownTime·animatorStateName 도 쓴다.</summary>
 [CreateAssetMenu(fileName = "GunnerCoolBackstepData", menuName = "Player/Gunner/Cool Backstep Data")]
-[DataTableSheet("Gunner")]
+[DataTableSheet("Gunner", Order = 3)]
 public class GunnerCoolBackstepData : PlayerSkillData
 {
     [Tooltip("이동 거리(m). 막히면 그 전에서 멈춘다.")]

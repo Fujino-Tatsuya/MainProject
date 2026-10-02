@@ -12,7 +12,7 @@ using UnityEngine;
 [DisallowMultipleComponent]
 [RequireComponent(typeof(Player))]
 [RequireComponent(typeof(PlayerMotor))]
-[DataTableSheet]
+[DataTableSheet("Player", Order = 3)]
 public sealed class PlayerFallRecovery : NetworkBehaviour
 {
     [SerializeField] private PlayerFallController fallController;

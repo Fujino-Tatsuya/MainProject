@@ -10,7 +10,7 @@ namespace BeaverLobby.Player.Dash
     /// v1에서 실제 소비되는 값만 노출한다. 이동/추락/공중 물리 값은 W3/W10에서 추가한다.
     /// </summary>
     [CreateAssetMenu(fileName = "PlayerDashData", menuName = "BeaverLobby/Player/Dash Data", order = 0)]
-    [DataTableSheet]
+    [DataTableSheet("Player", Order = 2)]
     public sealed class PlayerDashData : ScriptableObject
     {
         [Header("이동")]

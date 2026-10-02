@@ -78,6 +78,12 @@ public static class DataTableSchema
     public const string AssetHeader = "Asset";
     public const string FieldHeader = "Field";
     public const string ValueHeader = "Value";
+
+    /// <summary>세로 표(D7) 머리글 행의 첫 칸 — 이 행이 <c>필드 | #설명 | 대상…</c> 열 구성을 정한다.</summary>
+    public const string VerticalFieldHeader = "필드";
+
+    /// <summary>세로 표의 설명 열 머리글(# 이라 가져오기에서 무시).</summary>
+    public const string DescriptionHeader = "#설명";
     public const string CommentPrefix = "#";
 
     /// <summary>
@@ -116,10 +122,88 @@ public static class DataTableSchema
         {
             ParseKeyValueTable(fileName, sheetName, sheet, into, issues);
         }
+        else if (sheet.Rows.Any(r => r.Length > 0 && (r[0] ?? string.Empty).Trim() == VerticalFieldHeader))
+        {
+            ParseVerticalTable(fileName, sheetName, sheet, into, issues);
+        }
         else if (!IsEmptySheet(sheet))
         {
             issues.Error(Where(fileName, sheetName, 0, 0),
-                $"A1 이 '{IdHeader}'(행 테이블) 도 '{AssetHeader}'(키-값 테이블) 도 아니다. 메모 시트면 이름 앞에 '{CommentPrefix}' 를 붙일 것.");
+                $"형식을 모르겠다 — 세로 표는 '{VerticalFieldHeader}' 머리글 행, 옛 형식은 A1 이 '{IdHeader}'·'{AssetHeader}' 여야 한다. 메모 시트면 이름 앞에 '{CommentPrefix}'.");
+        }
+    }
+
+    /// <summary>
+    /// 세로 표(D7). <c>필드 | #설명 | 대상…</c> 머리글 행이 그 아래 행들의 열(대상)을 정한다 — 구역마다 머리글이 다시 나와도 된다.
+    /// 값 칸: 빈 칸 = 오류, <c>-</c> = 그 대상엔 없는 칸. A 열이 <c>#</c> 인 행·빈 행은 건너뛴다. 머리글 열 중 <c>#</c>·빈 칸은 무시.
+    /// </summary>
+    private static void ParseVerticalTable(string fileName, string sheetName, XlsxSheet sheet, List<DataTableEntry> into, DataTableIssues issues)
+    {
+        List<(int column, string id)> targets = null;
+        for (int row = 0; row < sheet.Rows.Count; row++)
+        {
+            string first = sheet.Cell(row, 0).Trim();
+            if (IsComment(first))
+            {
+                continue;
+            }
+
+            if (first == VerticalFieldHeader)
+            {
+                targets = new List<(int, string)>();
+                var seen = new HashSet<string>(StringComparer.Ordinal);
+                for (int column = 1; column < sheet.Rows[row].Length; column++)
+                {
+                    string id = sheet.Cell(row, column).Trim();
+                    if (id.Length == 0 || IsComment(id))
+                    {
+                        continue;
+                    }
+
+                    if (!seen.Add(id))
+                    {
+                        issues.Error(Where(fileName, sheetName, row, column), $"대상 '{id}' 가 이 머리글에 두 번 나온다.");
+                        continue;
+                    }
+
+                    targets.Add((column, id));
+                }
+
+                continue;
+            }
+
+            bool anyValue = targets != null && targets.Any(t => sheet.Cell(row, t.column).Trim().Length > 0);
+            if (first.Length == 0)
+            {
+                if (anyValue)
+                {
+                    issues.Error(Where(fileName, sheetName, row, 0), "필드 이름이 비어 있는데 값이 있다.");
+                }
+
+                continue;
+            }
+
+            if (targets == null)
+            {
+                issues.Error(Where(fileName, sheetName, row, 0), $"'{VerticalFieldHeader}' 머리글 행보다 먼저 값 행이 나왔다.");
+                continue;
+            }
+
+            foreach ((int column, string id) in targets)
+            {
+                string value = sheet.Cell(row, column).Trim();
+                string location = Where(fileName, sheetName, row, column);
+                if (value.Length == 0)
+                {
+                    issues.Error(location, $"'{id}.{first}' 값이 비어 있다(이 대상에 없는 칸이면 '{NotApplicable}').");
+                    continue;
+                }
+
+                if (value != NotApplicable)
+                {
+                    into.Add(new DataTableEntry(sheetName, id, first, value, location));
+                }
+            }
         }
     }
 
