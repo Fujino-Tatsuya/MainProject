@@ -56,9 +56,11 @@ Update this file when a term becomes important enough that future agents or team
   - 🔴 `Capture` 는 브로드캐스트보다 먼저 불려야 한다(현재 `PartyWipeWatcher`·`BossEncounterDirector` 모두 충족). ExitButton 경로는 `HasValue=false` → 호스트·클라 모두 대시.
   - ⚠️ 메시지 포맷 변경 — 구버전 빌드와 섞어 접속하면 읽기 실패.
 - 검증: 은희 MPPM 테스트 완료. ⏳ 경석에게 PR 없이 병합한 것 공유.
-## ▶▶ 현재 인수인계 (2026-10-02 · Claude · **벽 모듈 메시 정렬** — 작업 완료, 🔴 커밋 전 · Play 미확인)
+## ▶▶ 현재 인수인계 (2026-10-02 · Claude · **벽 모듈 메시 정렬** — ✅ 반영 완료(git `2ddf2838` → development `578569f6` · SVN r363), 🔴 Play 미확인)
 계획·결정·실측 = [PLAN-wall-modules.md](PLAN-wall-modules.md). 벽 메시 5종(피벗 중앙·4.000m, 이음새 실금 막으려 끝면을 살짝 겹치게 — 지상 ±2.001m · 지하 ±2.0005m)과 코너 조립(COM 피벗 = 벽 중심선 교차점)을 4m 그리드에 맞췄다.
 - 🔴 **SVN 8개(FBX 6 — 복도벽 포함 + `walll_brick_cornerCOM_*` 2)와 git 5개(`bossroom.prefab` · `Level_wall_hallway_tutorial.prefab` · `StageTutorial.prefab` · `TutorialStageAuthoring.cs` · `all_mesh.unity`)는 함께 반영해야 한다.** 한쪽만 들어가면 벽·콜라이더가 최대 1.9m 어긋난다. SVN 업데이트는 Unity 끄고(바이너리 FBX).
+  👉 **팀원 업데이트 순서**: Unity 끄기 → SVN 을 r363 이상으로 → git `development` 를 `578569f6` 이상으로 → Unity 열기.
+  둘 중 하나만 받으면 코너·복도가 벌어져 보인다(2026-10-02 실제로 발생 — 로컬 git 이 병합 전 커밋에 머물러 있었음).
 - bossroom: 방 안쪽 27.37 → **26.73m 정사각**, `InvisibleBoundaries` 안쪽 면 ±13.366, `NavMeshMargin` 재생성(±12.866). 🔴 Play 에서 `[23호] NavMesh 여유` ≈1.5 확인 필요(경석 영역).
 - 튜토리얼 hallway: 방 5개 변당 0.32m 축소(중심 ≤6cm 이동), 복도벽은 메시 몸통만 늘린 FBX(끝 맞물림 블록 유지, 스케일 1, 상단 빔 끝을 문 H빔까지 연장, 끝 블록은 방 벽 앞면에 맞춰 7.4mm 뒤로), 콜라이더는 `Tutorial/1. Add Wall Colliders` 로 재생성.
   **존 5개를 "존 바닥 끝 = 벽 중심선"으로 재정렬**(`StageTutorial` 슬롯·`TutorialStageAuthoring.Slots`·`all_mesh` 존 — 세 곳 일치) + 복도 바닥 ×1.005 → 문 바닥 구멍 0, 벽 밖 소품 28→1.
