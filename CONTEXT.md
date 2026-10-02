@@ -8,13 +8,22 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 작업 세션 (2026-10-01 밤 · 경석(Claude) · **몬스터 리디자인 머티리얼 Flat Kit 화 → 보스 전기장판·자폭드론**, 브랜치 `feature/Boss23`)
+## ▶▶ 작업 세션 (2026-10-01~02 · 경석(Claude) · **몬스터 리디자인 Flat Kit · 23호 전기 장판 · 웰즈 자폭 드론 · 터렛 조준선 · 차징 루프**, 브랜치 `feature/Boss23`, 푸시 `6d50defb`)
 
-✅ 몬스터 Flat Kit 전환 완료·푸시(`0e340f89`). **진행 중 = [PLAN-boss-electric-drone.md](PLAN-boss-electric-drone.md)(승인 10-02)** —
-S1 그리드·패턴 + EditMode 8/8(`2a2105a7`) · S2~S5 장판·드론 구현(`9cfa5acb`, 컴파일 0 에러, **Play/MPPM 미검증**) · 교차검증(Codex + Claude) 진행 → 팀장 전체 체크.
-데이터 = `2.Prefabs/Monster/Data/BossElectricFloorData` · `WellsDroneData`(No23·No23_Solo 연결). 연출은 임시 — 민경 VFX 는 두 SO 의 프리팹 슬롯.
-수정 예정: `Assets/1.Scripts/Monster/Boss/`(신규 `BossTileGrid`·`BossElectricFloor*`·`WellsDroneAttack`·`BossPauseCondition` + `TwentyThreeBoss.cs` 상태 알림 몇 줄) · `BossDataSO` · `TwentyThree.prefab` · 드론 연출 프리팹(신규).
+**상태: 구현·푸시 완료, 팀장 Play 확인하며 튜닝 중.** 다음 = SVN 업데이트 → development 머지 → 거너 포함 테스트(Unity 끄고).
+- **전기 장판·자폭 드론** — 계획·진행·피드백 이력 = [PLAN-boss-electric-drone.md](PLAN-boss-electric-drone.md) §6 · 기획 사본 [Docs/design/boss/](Docs/design/boss/).
+  컴포넌트 `BossElectricFloor` · `WellsDroneAttack`(NetworkBehaviour 아님 — 23호가 스폰 때 AddComponent, ClientRpc 중계). 23호 상태는 폴링
+  (`IsChargeJumpActive`·`IsChargeGimmickActive`·`ActivePauseConditions`·`IsFightActive`). 정지 조건 = `BossPauseCondition` Flags(SO `pauseOn`).
+  수치·연출 전부 SO: `2.Prefabs/Monster/Data/BossElectricFloorData` · `WellsDroneData`(No23·No23_Solo 연결, `Tools/Boss/전기 장판·자폭 드론 데이터 만들기·연결`).
+  교차검증(Codex + Claude) 반영 `c9fcfd95`. EditMode 10/10(`Tools/Tests/보스 패턴 EditMode 테스트 실행`). **MPPM 미검증.**
+  팀장 확정 튜닝: 드론 범위 1.25칸 · 드론 2배 · 23호 피해 120 · 송전기 시작 = 점프 출발 · 화면 좌/우하단 대각선 비행(DashStart→DashLoop, 느리게→급가속) ·
+  크로스헤어 초록→주황→빨강(점멸 없음). ⏸ 보류: 장판 패턴 모양 SO 편집(가능 확인만, 7×7 고정 — PLAN §6-2).
+- **터렛 조준선**(PeekABot·TeslaBot `TurretHeadAim`): 추적 앞 절반 초록 → 주황 → 고정 빨강 → 발사 순간 꺼짐. 색·전환점 프리팹 인스펙터.
+- **23호 차징 클립** `BossChargeClipLoop`: 처음 1회 f0~ → 이후 **f62~f125 반복**(자세·속도 이음매 최적). `BossDataSO.chargeLoopStart/EndFrame`. 차징 제한시간 **30초**.
+- 🔴 미커밋(내 것 아님): `BossPatternVisuals.cs` 가 `Resources/BossPatterns/WellsDroneCrosshair.png` 를 먼저 쓰도록 바뀜 + 그 텍스처 — 작성자 확인 후 커밋.
+- 로컬 전용(커밋 금지, `.git/info/exclude`): `Monster/Editor/BossClipMotionProbe.cs`(차징 클립 움직임·이음매 분석).
 - development(`8c5117a9`, 이지원 최종 메쉬·SurfaceV1 머티리얼) + SVN r356(드론 `Char/Drone/`) 반영. 몬스터 프리팹 8종은 **아트판 그대로** 채택 — SurfaceV1 = URP Lit(BaseMap·Normal·MetallicGloss).
+  미사용 예전 FK 4종 삭제(`7fa7d382`). 드론 모델 DRONE.fbx 는 아직 Flat Kit 아님.
 - ✅ 결정(10-01): Flat Kit Stylized Surface 를 **그대로** 쓴다. 이 셰이더는 GI 를 metallic 0·smoothness 0 으로 고정 계산해
   금속성 맵·반사가 빠지지만 **아트팀이 문제없다고 확인**(팀장 전달). 셰이더 복제 확장 안 함. 전환 = `Tools/Rendering/Flat Kit/Convert Characters`.
 - 물 작업(이전 세션)은 커밋·푸시 완료 — 남은 것: WaterPart 모서리 다듬기 · Play/MPPM. 상세 [PLAN-flatkit.md](PLAN-flatkit.md) 9-b.
