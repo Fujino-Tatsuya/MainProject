@@ -76,7 +76,11 @@
 - 게임 화면 구석에 `DATA: TABLE` / `DATA: INSPECTOR` 상시 표시(에디터 전용). Dev Boot 버튼 툴팁에도 현재 데이터 출처를 적는다.
 - 테이블 플레이 중 테이블 관리 SO 를 인스펙터에서 고치려 하면 경고(R8).
 
-### D1.6. 빌드 = 항상 테이블
+### D1.6. 빌드 = 항상 테이블 — ✅ 2026-10-02 구현 · EditMode 50건 · 🔴 실제 빌드 1회 확인 대기
+
+> 구현: `DataTableBuild` — `BuildPlayerWindow.RegisterBuildPlayerHandler` 로 **Build 버튼 자체를 감싼다**(전용 메뉴 대신: 팀이 Build Profiles 창으로 빌드하므로 메뉴를 따로 두면 안 거치는 빌드가 생긴다).
+> 빌드 전 **디스크 적용**(R9 — 빌드가 메모리/디스크 중 무엇을 읽든 테이블 값) → `try/finally` 로 **빌드 실패해도 원복**. 원복 파일이 원본과 바이트 동일함을 테스트로 고정.
+> xlsx 없음·테이블 오류 = `BuildFailedException`(개발자 값으로 빌드되는 것보다 낫다). R9 해소.
 - 빌드 전 디스크 적용 → 빌드 → 빌드 후 원래 값으로 복구. 🔴 빌드 파이프라인이 메모리 값을 쓰는지 디스크 값을 쓰는지 확인 후 방식 확정(R9).
 - 안전한 쪽: `IPreprocessBuildWithReport`/`IPostprocessBuildWithReport` 대신 **`Tools/Build/Build (Table)` 전용 메뉴**로 적용·빌드·복구를 한 함수에서 `try/finally` 로 묶는다.
 - 테이블 오류가 있으면 빌드 중단.

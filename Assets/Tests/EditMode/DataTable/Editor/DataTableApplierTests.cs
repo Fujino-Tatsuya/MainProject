@@ -155,6 +155,35 @@ public sealed class DataTableApplierTests
         Assert.That(differences[0].CurrentValue, Is.EqualTo("base"));
     }
 
+    [Test]
+    public void ApplyToDisk_ThenRestoreToDisk_FileIsByteIdentical()
+    {
+        // 빌드 훅(D1.6)이 빌드 후 git diff 0 을 지키는지 — 실제 에셋 파일로 확인한다.
+        const string path = "Assets/Tests/EditMode/DataTable/Editor/__DataTableDiskTemp.asset";
+        var data = ScriptableObject.CreateInstance<DataTableTestData>();
+        AssetDatabase.CreateAsset(data, path);
+        AssetDatabase.SaveAssets();
+        try
+        {
+            byte[] before = System.IO.File.ReadAllBytes(path);
+            var issues = new DataTableIssues();
+            List<DataTableWrite> writes = Bind(issues, new TestLookup(data),
+                Entry(data.name, "maxHp", "777"), Entry(data.name, "phases[1]", "3"));
+
+            DataTableSnapshot snapshot = DataTableApplier.ApplyToDisk(writes);
+            Assert.That(System.IO.File.ReadAllBytes(path), Is.Not.EqualTo(before), "디스크에 써져야 한다");
+
+            int missing = DataTableApplier.RestoreToDisk(snapshot);
+
+            Assert.That(missing, Is.Zero);
+            Assert.That(System.IO.File.ReadAllBytes(path), Is.EqualTo(before));
+        }
+        finally
+        {
+            AssetDatabase.DeleteAsset(path);
+        }
+    }
+
     [TestCase("phases[0]", "phases.Array.data[0]")]
     [TestCase("waves[2].enemies[10].hp", "waves.Array.data[2].enemies.Array.data[10].hp")]
     [TestCase("charge.speed", "charge.speed")]

@@ -163,17 +163,7 @@ public static class DataTableApplier
     /// </summary>
     public static DataTableSnapshot ApplyInMemory(IReadOnlyList<DataTableWrite> writes)
     {
-        var snapshot = new DataTableSnapshot();
-        foreach (ScriptableObject target in writes.Select(w => w.Target).Distinct())
-        {
-            snapshot.items.Add(new DataTableSnapshot.Item
-            {
-                instanceId = target.GetInstanceID(),
-                globalObjectId = GlobalObjectId.GetGlobalObjectIdSlow(target).ToString(),
-                json = EditorJsonUtility.ToJson(target),
-            });
-        }
-
+        DataTableSnapshot snapshot = TakeSnapshot(writes);
         foreach (IGrouping<ScriptableObject, DataTableWrite> group in writes.GroupBy(w => w.Target))
         {
             bool wasDirty = EditorUtility.IsDirty(group.Key);
@@ -229,9 +219,13 @@ public static class DataTableApplier
             : null;
     }
 
-    /// <summary>디스크의 SO 를 테이블 값으로 덮어쓰고 저장한다(빌드·수동 동기화용). Undo 가능.</summary>
-    public static void ApplyToDisk(IReadOnlyList<DataTableWrite> writes)
+    /// <summary>
+    /// 디스크의 SO 를 테이블 값으로 덮어쓰고 저장한다(빌드·수동 동기화용). Undo 가능.
+    /// 반환한 스냅샷을 <see cref="RestoreToDisk"/> 에 넘기면 적용 전 내용으로 다시 저장한다(빌드 후 원복).
+    /// </summary>
+    public static DataTableSnapshot ApplyToDisk(IReadOnlyList<DataTableWrite> writes)
     {
+        DataTableSnapshot snapshot = TakeSnapshot(writes);
         foreach (IGrouping<ScriptableObject, DataTableWrite> group in writes.GroupBy(w => w.Target))
         {
             var so = new SerializedObject(group.Key);
@@ -246,6 +240,45 @@ public static class DataTableApplier
                 AssetDatabase.SaveAssetIfDirty(group.Key);
             }
         }
+
+        return snapshot;
+    }
+
+    /// <summary><see cref="ApplyToDisk"/> 전 내용으로 되돌려 저장한다. 찾지 못한 에셋 수를 반환한다(0 이 정상).</summary>
+    public static int RestoreToDisk(DataTableSnapshot snapshot)
+    {
+        int missing = 0;
+        foreach (DataTableSnapshot.Item item in snapshot.items)
+        {
+            ScriptableObject target = FindSnapshotTarget(item);
+            if (target == null)
+            {
+                missing++;
+                continue;
+            }
+
+            EditorJsonUtility.FromJsonOverwrite(item.json, target);
+            EditorUtility.SetDirty(target);
+            AssetDatabase.SaveAssetIfDirty(target);
+        }
+
+        return missing;
+    }
+
+    private static DataTableSnapshot TakeSnapshot(IReadOnlyList<DataTableWrite> writes)
+    {
+        var snapshot = new DataTableSnapshot();
+        foreach (ScriptableObject target in writes.Select(w => w.Target).Distinct())
+        {
+            snapshot.items.Add(new DataTableSnapshot.Item
+            {
+                instanceId = target.GetInstanceID(),
+                globalObjectId = GlobalObjectId.GetGlobalObjectIdSlow(target).ToString(),
+                json = EditorJsonUtility.ToJson(target),
+            });
+        }
+
+        return snapshot;
     }
 
     /// <summary>SO 현재 값과 테이블 값이 다른 필드. 쓰지 않는다.</summary>
