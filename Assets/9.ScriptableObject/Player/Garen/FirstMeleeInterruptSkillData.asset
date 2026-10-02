@@ -12,16 +12,24 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8130f0c7b75804c4bbca2a9da664696e, type: 3}
   m_Name: FirstMeleeInterruptSkillData
   m_EditorClassIdentifier: Assembly-CSharp::FirstMeleeInterruptSkillData
+  tooltip:
+    displayName: "\uB2E8\uC8C4\uC758 \uBC29\uD328"
+    subtitle: "\uC6B0\uD074\uB9AD \uC2A4\uD0AC"
+    description: "TODO \uC801\uC744 \uAC04\uD30C\uD574 {dmg} \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4."
+    icon: {fileID: 430634957, guid: 55f3ebacbaadebb47bbca8062d546522, type: 3}
   inputType: 0
   cooldownTime: 8
+  commitCooldownManually: 0
   attackDamageMultiplier: 0.5
   flatDamageBonus: 0
   maxActiveDuration: 2
   tickInterval: 0
+  hitPattern: 0
   usableWhileDead: 0
   hittableLayers:
     serializedVersion: 2
     m_Bits: 17664
+  triggersOnHit: 0
   targetingMode: 0
   confirmMode: 0
   castRange: 8

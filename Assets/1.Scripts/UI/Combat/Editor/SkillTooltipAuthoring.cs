@@ -326,9 +326,14 @@ public static class SkillTooltipAuthoring
         var material = new Material(shader) { name = "SkillTooltipAttackSprite Material" };
         material.SetTexture("_MainTex", texture);
         asset.material = material;
-        asset.UpdateLookupTables();
         AssetDatabase.CreateAsset(asset, AttackSpritePath);
         AssetDatabase.AddObjectToAsset(material, asset);
+        // 새 인스턴스는 m_Version 이 비어 있어 UpdateLookupTables 가 레거시 업그레이드(spriteInfoList null → NRE)로 빠진다.
+        var serialized = new SerializedObject(asset);
+        serialized.FindProperty("m_Version").stringValue = "1.1.0";
+        serialized.ApplyModifiedPropertiesWithoutUndo();
+        asset.UpdateLookupTables();
+        EditorUtility.SetDirty(asset);
         return asset;
     }
 

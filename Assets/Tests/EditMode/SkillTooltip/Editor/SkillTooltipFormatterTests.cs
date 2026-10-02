@@ -39,7 +39,8 @@ public sealed class SkillTooltipFormatterTests
 
         Assert.That(hasDamage, Is.True);
         Assert.That(compact, Does.Contain("120~360"));
-        Assert.That(compact, Does.Not.Contain("="));
+        Assert.That(compact, Does.Not.Contain(" = (")); // <color=#…> 태그에도 '=' 가 있어 계산식 표기로 검사
+        Assert.That(detailed, Does.Contain(" = ("));
         Assert.That(detailed, Does.Contain("120~360"));
         Assert.That(detailed, Does.Contain("60%~270%"));
     }

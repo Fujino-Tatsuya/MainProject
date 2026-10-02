@@ -12,6 +12,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a504e6919a2e56c4693df19a438f7dcc, type: 3}
   m_Name: GunnerInterruptData
   m_EditorClassIdentifier: Assembly-CSharp::GunnerInterruptData
+  tooltip:
+    displayName: "\uADFC\uC811 \uAC04\uD30C"
+    subtitle: "\uC6B0\uD074\uB9AD \uC2A4\uD0AC"
+    description: "TODO \uADFC\uC811 \uACF5\uACA9\uC744 \uAC04\uD30C\uD574 {dmg} \uD53C\uD574\uB97C
+      \uC90D\uB2C8\uB2E4."
+    icon: {fileID: 5935260701576259673, guid: 228f5526be00c7e42b0a67b45f697007, type: 2}
   inputType: 0
   cooldownTime: 3
   commitCooldownManually: 0
@@ -19,6 +25,7 @@ MonoBehaviour:
   flatDamageBonus: 0
   maxActiveDuration: 2
   tickInterval: 0
+  hitPattern: 0
   usableWhileDead: 0
   hittableLayers:
     serializedVersion: 2

@@ -12,6 +12,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e62310b06ecf72941b179dd261000d90, type: 3}
   m_Name: GunnerChargeLaserData
   m_EditorClassIdentifier: Assembly-CSharp::GunnerChargeLaserData
+  tooltip:
+    displayName: "\uCDA9\uC804 \uB808\uC774\uC800"
+    subtitle: "Q \uC2A4\uD0AC"
+    description: "TODO \uC9D1\uC911\uB3C4\uC640 \uACFC\uC5F4 \uB2E8\uACC4\uC5D0 \uB530\uB77C
+      {dmg} \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4."
+    icon: {fileID: -5354681486279932123, guid: c999735e03780ee418b36b58fc137904, type: 2}
   inputType: 0
   cooldownTime: 6
   commitCooldownManually: 1
@@ -19,6 +25,7 @@ MonoBehaviour:
   flatDamageBonus: 0
   maxActiveDuration: 5
   tickInterval: 0
+  hitPattern: 0
   usableWhileDead: 0
   hittableLayers:
     serializedVersion: 2
