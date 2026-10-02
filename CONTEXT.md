@@ -8,6 +8,11 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-10-02 · 은희(Claude) · **플레이어블 공통 툰 머티리얼**, 브랜치 `feature/PlayableToonMaterial`) — ✅ 구현 · ✅ Play 확인(은희). 남은 것 = PR. 검·방패는 텍스처 없어 흰색(결정). `Paladin_VFX`·Legacy 는 부모 직참조라 흰 몸체(보관용, 수용)
+
+계획 = [PLAN-playable-toon-material.md](PLAN-playable-toon-material.md). `Paladin_Toon` → `PlayableCharacter_Toon` 부모 + 캐릭터·무기별 Material Variant(Base Map만 다름).
+🔴 **수정 예정 — 동시 수정 금지:** `Assets/3.Materials/Toon/Paladin*_Toon.mat`·신규 Variant, `Player/Paladin/Paladin_Armature.prefab`·`Player_Paladin.prefab`, `Player/Gunner/Gunner_Armature.prefab`.
+
 ## ▶▶ 현재 인수인계 (2026-10-02 · 은희(Claude) · **결과 화면 클라 표시 수정** → development 반영 `515b247a`, PR 없이 직접 병합)
 
 - 증상: ResultScene 에서 처치 수·생존 시간이 호스트에만 나오고 원격 클라는 `-`/`--:--`. 원인은 집계·`SessionResult.Capture` 가 서버 전용이고 static 이라 클라에 값이 안 감.

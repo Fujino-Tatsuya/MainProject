@@ -114,6 +114,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: -73.072
       objectReference: {fileID: 0}
+    - target: {fileID: -6153164148338462164, guid: f2b31415bb641c6408baa53d948bf931, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 2b9c358f7395b0441bb9e571cdbcf140, type: 2}
     - target: {fileID: 919132149155446097, guid: f2b31415bb641c6408baa53d948bf931, type: 3}
       propertyPath: m_Name
       value: LaserGun
@@ -180,6 +184,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Gunner_Armature
       objectReference: {fileID: 0}
+    - target: {fileID: 7298971555553874197, guid: 675c5b26f3e28aa488f89b54abf23c4b, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 64513097eee02e04c8f4b88df0f9674c, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects:
