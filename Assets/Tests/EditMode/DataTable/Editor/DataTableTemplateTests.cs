@@ -75,8 +75,9 @@ public sealed class DataTableTemplateTests
     }
 
     [Test]
-    public void RowSheet_ArrayLengthDiffers_DropsUncommonElementsWithWarning()
+    public void RowSheet_ArrayLengthDiffers_KeepsEveryElement_MarksMissingWithDash()
     {
+        // 23호 No23(공격 8) / No23_Solo(공격 6) 같은 경우 — 한쪽에만 있는 원소도 열로 싣고 없는 쪽은 "-".
         DataTableTestData a = Make("A");
         DataTableTestData b = Make("B");
         b.phases = new[] { 1, 2, 3 };
@@ -85,8 +86,25 @@ public sealed class DataTableTemplateTests
         List<XlsxWriteSheet> sheets = DataTableTemplate.BuildSheets(
             new[] { (typeof(DataTableTestData), Targets(a, b)) }, warnings);
 
-        Assert.That(sheets[0].Rows[0], Does.Not.Contain("phases[2]"));
-        Assert.That(warnings, Has.Count.EqualTo(1).And.Some.Contains("phases[2]"));
+        object[] header = sheets[0].Rows[0];
+        int column = Array.IndexOf(header, "phases[2]");
+        Assert.That(column, Is.EqualTo(Array.IndexOf(header, "phases[1]") + 1), "phases[1] 바로 뒤");
+        Assert.That(sheets[0].Rows[2][column], Is.EqualTo(DataTableSchema.NotApplicable), "A 에는 없다");
+        Assert.That(sheets[0].Rows[3][column], Is.EqualTo(3L), "B 의 값");
+        Assert.That(warnings, Is.Empty);
+    }
+
+    [Test]
+    public void RowSheet_ArrayLengthDiffers_RoundTripsWithZeroDifferences()
+    {
+        DataTableTestData a = Make("A");
+        DataTableTestData b = Make("B");
+        b.phases = new[] { 1, 2, 3 };
+
+        List<DataTableDifference> differences = ExportImportDiff(new[] { a, b }, out DataTableIssues issues, out _);
+
+        Assert.That(issues.Items, Is.Empty, string.Join("\n", issues.Items));
+        Assert.That(differences, Is.Empty, string.Join("\n", differences));
     }
 
     [TestCase("phases.Array.data[0]", "phases[0]")]

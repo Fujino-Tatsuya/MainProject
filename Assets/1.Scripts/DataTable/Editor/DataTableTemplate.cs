@@ -120,15 +120,29 @@ public static class DataTableTemplate
     {
         List<List<Field>> perAsset = assets.Select(a => CollectFields(a.target)).ToList();
 
-        // 모든 에셋에 있는 필드만 열로 — 빈 칸은 가져오기 오류라서. 배열 길이가 에셋마다 다르면 여기서 빠진다.
-        List<Field> columns = perAsset[0]
-            .Where(f => perAsset.All(fs => fs.Any(x => x.Path == f.Path)))
-            .ToList();
-        IEnumerable<string> dropped = perAsset.SelectMany(fs => fs.Select(f => f.Path)).Distinct()
-            .Where(p => columns.All(c => c.Path != p));
-        foreach (string path in dropped)
+        // 열 = 모든 대상의 필드 합집합(배열 길이가 대상마다 달라도 다 싣는다). 그 대상에 없는 칸은 "-"(DataTableSchema.NotApplicable).
+        // 순서: 첫 대상 순서를 따르고, 다른 대상에만 있는 필드는 그 대상에서 바로 앞 필드 뒤에 끼운다 — attacks[6].* 가 attacks[5].* 뒤에 오게.
+        var columns = new List<Field>();
+        var columnIndex = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (List<Field> fields in perAsset)
         {
-            warnings.Add($"{type.Name}.{path}: 일부 에셋에만 있다(배열 길이가 다름) — 템플릿에서 뺐다.");
+            int insertAt = 0;
+            foreach (Field field in fields)
+            {
+                if (columnIndex.TryGetValue(field.Path, out int existing))
+                {
+                    insertAt = existing + 1;
+                    continue;
+                }
+
+                columns.Insert(insertAt, field);
+                for (int c = 0; c < columns.Count; c++)
+                {
+                    columnIndex[columns[c].Path] = c;
+                }
+
+                insertAt++;
+            }
         }
 
         var rows = new List<object[]>
@@ -139,7 +153,9 @@ public static class DataTableTemplate
         for (int i = 0; i < assets.Count; i++)
         {
             Dictionary<string, object> values = perAsset[i].ToDictionary(f => f.Path, f => f.Value);
-            rows.Add(new object[] { assets[i].id }.Concat(columns.Select(c => values[c.Path])).ToArray());
+            rows.Add(new object[] { assets[i].id }
+                .Concat(columns.Select(c => values.TryGetValue(c.Path, out object v) ? v : DataTableSchema.NotApplicable))
+                .ToArray());
         }
 
         return new XlsxWriteSheet(type.Name, rows, frozenRows: 2, boldRows: 1);
