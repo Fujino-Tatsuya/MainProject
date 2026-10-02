@@ -28,6 +28,14 @@ Update this file when a term becomes important enough that future agents or team
   금속성 맵·반사가 빠지지만 **아트팀이 문제없다고 확인**(팀장 전달). 셰이더 복제 확장 안 함. 전환 = `Tools/Rendering/Flat Kit/Convert Characters`.
 - 물 작업(이전 세션)은 커밋·푸시 완료 — 남은 것: WaterPart 모서리 다듬기 · Play/MPPM. 상세 [PLAN-flatkit.md](PLAN-flatkit.md) 9-b.
 
+## ▶▶ 현재 인수인계 (2026-10-02 · 은희(Claude) · **결과 화면 클라 표시 수정** → development 반영 `515b247a`, PR 없이 직접 병합)
+
+- 증상: ResultScene 에서 처치 수·생존 시간이 호스트에만 나오고 원격 클라는 `-`/`--:--`. 원인은 집계·`SessionResult.Capture` 가 서버 전용이고 static 이라 클라에 값이 안 감.
+- 수정(`MapSceneManager`): 결과 전환 named message `MapScene.GoToResult` 의 더미 바이트 대신 `HasValue/Cleared/SurvivalSeconds/Kills` 를 실어 보내고, 클라 수신 핸들러가 `SessionResult.Capture` 후 전환한다. 전환 신호와 같은 메시지라 씬 언로드와의 경쟁 없음.
+  - 🔴 `Capture` 는 브로드캐스트보다 먼저 불려야 한다(현재 `PartyWipeWatcher`·`BossEncounterDirector` 모두 충족). ExitButton 경로는 `HasValue=false` → 호스트·클라 모두 대시.
+  - ⚠️ 메시지 포맷 변경 — 구버전 빌드와 섞어 접속하면 읽기 실패.
+- 검증: 은희 MPPM 테스트 완료. ⏳ 경석에게 PR 없이 병합한 것 공유.
+
 ## ▶▶ 현재 인수인계 (2026-10-01 · 은희(Claude) · **데미지 숫자 Re:C v0.2 + 자체 이징 `EuniTween`**, 브랜치 `feature/DamagePopupTweening`, push 안 함)
 
 계획·결정 원본 = [PLAN-damage-popup.md](PLAN-damage-popup.md) (기획 원본은 레포 밖 `Re_C_데미지_숫자_표기.md`). 1·2단계 ✅ 구현, EditMode 122건 통과. Play 확인은 2단계까지 — 이후 이미지 글꼴·색·크기·더미 복귀는 🔴 Play 미확인.
@@ -512,7 +520,9 @@ Unity 가 "not text-serialized YAML" 로 거부해서 발견했다. `.asset`·`.
 **로컬 잔재라 무시한다**(팀장 확정 2026-09-21). 보스 모델 수정분은 이미 development 에 들어가 있다.
 → 다음 세션에서 다시 꺼내지 말 것.
 
-### 🟡 은희에게 넘김 — **결과 화면이 호스트에서만 채워진다** (경석 진단 완료 · 팀장 확정 "지금은 둔다")
+### ✅ 해결됨 (2026-10-02 `515b247a`) — ~~결과 화면이 호스트에서만 채워진다~~ · 아래는 당시 진단 기록
+> 해결 방식은 맨 위 2026-10-02 인수인계 참고. 아래 "함정"의 NetworkVariable/네트워크 씬 안 대신 **전환 메시지 페이로드**로 풀었다.
+
 
 **증상**(2026-09-21 MPPM 실측) — 클리어 후 ResultScene 에서 호스트만
 `CLEAR / 생존 시간 04:35 / 처치 11` 이 나오고, **원격 클라는 `-` / `--:--` / `-`** 다.
