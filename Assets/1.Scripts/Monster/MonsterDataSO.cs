@@ -15,7 +15,8 @@ public class MonsterDataSO : ScriptableObject
     public int attackDamage = 10;
     public float moveSpeed = 2.5f;   // 배회/기본 이동 속도
     public float chaseSpeed = 4f;    // 추격 이동 속도
-    public float attackSpeed = 1f;   // 초당 공격 횟수. 공격 간격 = 1 / 이 값. (Unit.AttackSpeed로 주입 → 공격 쿨다운 산출)
+    [Tooltip("다음 공격까지의 쿨타임만 바뀜, 애니메이션 길이에 하한선")]
+    public float attackSpeed = 1f;   // 초당 공격 횟수. 공격 간격 = 1 / 이 값. (Unit.AttackSpeed로 주입 → 공격 쿨다운 산출) 실제 간격은 max(쿨, 공격 애니 길이).
     public int maxHp = 100;
     public int defense = 0;
     public int maxShield = 0;
