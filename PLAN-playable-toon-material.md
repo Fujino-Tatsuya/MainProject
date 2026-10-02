@@ -1,6 +1,6 @@
 # PLAN — 플레이어블 캐릭터 공통 툰 머티리얼
 
-> 2026-10-02 · 은희(Claude) · 브랜치 `feature/PlayableToonMaterial` · 상태: **✅ 구현 완료 — Play 눈확인 대기**
+> 2026-10-02 · 은희(Claude) · 브랜치 `feature/PlayableToonMaterial` · 상태: **✅ 구현 완료 · Play 확인 완료(은희 2026-10-02)**
 > 답변: Q1 부모 Base Map 비움 · Q2 거너 = `LaserGun_BaseColor_Toon.png` 맞음(총도 같은 텍스처) · Q3 검·방패 틴트 안 덮음 → **흰색 수용**
 
 ## 1. 목표
