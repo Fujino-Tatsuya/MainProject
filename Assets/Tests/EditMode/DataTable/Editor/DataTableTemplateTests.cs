@@ -40,6 +40,7 @@ public sealed class DataTableTemplateTests
         Assert.That(fields.Select(f => f.Path), Is.EqualTo(new[]
         {
             "maxHp", "moveSpeed", "smallCount", "charge.speed", "charge.damage", "phases[0]", "phases[1]", "cooldown",
+            "ratio", "count", "stages[0]", "stages[1]",
         }));
         Assert.That(fields[0].Description, Is.EqualTo("최대 체력"));
     }

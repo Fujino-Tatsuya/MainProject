@@ -275,6 +275,34 @@ public sealed class DataTableApplierTests
         }
     }
 
+    [TestCase("ratio", "1.5")]       // [Range(0,1)] 위
+    [TestCase("ratio", "-0.1")]      // [Range(0,1)] 아래
+    [TestCase("count", "-1")]        // [Min(0)]
+    [TestCase("stages[1]", "11")]    // 배열 필드의 [Range] 는 원소마다
+    public void Bind_OutsideInspectorRange_IsError(string field, string value)
+    {
+        DataTableTestData data = Make("A");
+        var issues = new DataTableIssues();
+
+        List<DataTableWrite> writes = Bind(issues, new TestLookup(data), Entry("A", field, value));
+
+        Assert.That(issues.HasErrors, Is.True);
+        Assert.That(writes, Is.Empty);
+    }
+
+    [Test]
+    public void Bind_InsideInspectorRange_IsAccepted()
+    {
+        DataTableTestData data = Make("A");
+        var issues = new DataTableIssues();
+
+        List<DataTableWrite> writes = Bind(issues, new TestLookup(data),
+            Entry("A", "ratio", "1"), Entry("A", "count", "0"), Entry("A", "stages[0]", "10"));
+
+        Assert.That(issues.Items, Is.Empty, string.Join("\n", issues.Items));
+        Assert.That(writes, Has.Count.EqualTo(3));
+    }
+
     [TestCase("phases[0]", "phases.Array.data[0]")]
     [TestCase("waves[2].enemies[10].hp", "waves.Array.data[2].enemies.Array.data[10].hp")]
     [TestCase("charge.speed", "charge.speed")]

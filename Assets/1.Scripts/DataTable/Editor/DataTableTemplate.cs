@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using UnityEditor;
-using Unity.Netcode;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -149,97 +148,13 @@ public static class DataTableTemplate
     /// <summary>"phases.Array.data[0].hp" → "phases[0].hp" (<see cref="DataTableApplier.ToPropertyPath"/> 의 반대).</summary>
     public static string ToTablePath(string propertyPath) => propertyPath.Replace(".Array.data[", "[");
 
-    // ── 필드 메타(무시 표시·툴팁) ───────────────────────────────
+    // ── 필드 메타(무시 표시·툴팁) — 경로 해석은 DataTableFields ───────────────
 
-    /// <summary>propertyPath 를 따라가 마지막 필드의 FieldInfo. 배열 원소면 배열 필드를 돌려준다.</summary>
-    private static FieldInfo ResolveField(Type root, string propertyPath)
-    {
-        FieldInfo last = null;
-        Type current = root;
-        string[] parts = propertyPath.Split('.');
-        for (int i = 0; i < parts.Length; i++)
-        {
-            if (parts[i] == "Array")
-            {
-                i++; // data[n]
-                current = ElementType(current);
-                continue;
-            }
+    private static FieldInfo ResolveField(Type root, string propertyPath) => DataTableFields.Resolve(root, propertyPath);
 
-            last = FindField(current, parts[i]);
-            if (last == null)
-            {
-                return null;
-            }
+    private static bool IsExcluded(FieldInfo field) => DataTableFields.IsExcluded(field);
 
-            current = last.FieldType;
-        }
-
-        return last;
-    }
-
-    /// <summary>기술 값 표시 또는 네트워크 상태(NetworkVariable·NetworkList — 인스펙터 초기값이 아니라 런타임 동기화 값).</summary>
-    private static bool IsExcluded(FieldInfo field) =>
-        field.IsDefined(typeof(DataTableIgnoreAttribute), false) || typeof(NetworkVariableBase).IsAssignableFrom(field.FieldType);
-
-    private static bool IsUnderIgnored(Type root, string propertyPath)
-    {
-        Type current = root;
-        string[] parts = propertyPath.Split('.');
-        for (int i = 0; i < parts.Length - 1; i++)
-        {
-            if (parts[i] == "Array")
-            {
-                i++;
-                current = ElementType(current);
-                continue;
-            }
-
-            FieldInfo field = FindField(current, parts[i]);
-            if (field == null)
-            {
-                return false;
-            }
-
-            if (IsExcluded(field))
-            {
-                return true;
-            }
-
-            current = field.FieldType;
-        }
-
-        return false;
-    }
-
-    private static FieldInfo FindField(Type type, string name)
-    {
-        for (Type t = type; t != null && t != typeof(object); t = t.BaseType)
-        {
-            FieldInfo field = t.GetField(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
-            if (field != null)
-            {
-                return field;
-            }
-        }
-
-        return null;
-    }
-
-    private static Type ElementType(Type collection)
-    {
-        if (collection == null)
-        {
-            return null;
-        }
-
-        if (collection.IsArray)
-        {
-            return collection.GetElementType();
-        }
-
-        return collection.IsGenericType ? collection.GetGenericArguments()[0] : null;
-    }
+    private static bool IsUnderIgnored(Type root, string propertyPath) => DataTableFields.IsUnderExcluded(root, propertyPath);
 
     private static string Describe(FieldInfo field, string propertyPath)
     {
@@ -361,6 +276,9 @@ public static class DataTableTemplate
         }
     }
 
+    /// <summary>쓰기 전 원본 xlsx 보관 위치(병합·덮어쓰기 모두). SVN 이력과 별개로 바로 되돌릴 수 있게.</summary>
+    public const string ExportBackupFolder = "Library/DataTableExportBackup";
+
     [MenuItem("Tools/Data/Export Template (현재 인스펙터 값 → xlsx)", priority = 30)]
     private static void Export()
     {
@@ -372,17 +290,59 @@ public static class DataTableTemplate
             return;
         }
 
-        // 기본 경로에 바로 쓴다. 이미 있으면 기획이 쓰던 파일일 수 있으니 그때만 확인 창.
         Directory.CreateDirectory(DataTableSource.Folder);
         string path = Path.Combine(DataTableSource.Folder, DefaultFileName);
-        if (File.Exists(path) && !EditorUtility.DisplayDialog("Export Template — 덮어쓰기",
-                $"{path} 가 이미 있다. 덮어쓰면 기획이 고친 값은 사라진다(SVN 이력에서만 되찾을 수 있다).",
-                "덮어쓰기", "취소"))
+        List<XlsxWriteSheet> sheets = BuildSheets(tables, warnings);
+        bool merged = false;
+
+        if (File.Exists(path))
         {
-            return;
+            // 0 = 병합, 1 = 취소, 2 = 덮어쓰기. 병합이 기본 — 기획이 쓰던 파일이 있으면 값을 지키는 쪽이 안전하다.
+            int choice = EditorUtility.DisplayDialogComplex("Export Template",
+                $"{path} 가 이미 있다.\n\n" +
+                "병합: 기획이 고친 값은 그대로, 새 시트·필드·대상만 현재 인스펙터 값으로 추가. 코드에서 사라진 칸은 #(메모)로.\n" +
+                "덮어쓰기: 전부 현재 인스펙터 값으로(기획 값 사라짐).\n\n" +
+                "어느 쪽이든 서식·수식·열 너비는 사라진다. 원본은 " + ExportBackupFolder + " 에 보관.",
+                "병합(기획 값 유지)", "취소", "덮어쓰기");
+            if (choice == 1)
+            {
+                return;
+            }
+
+            IReadOnlyList<XlsxSheet> existing;
+            try
+            {
+                existing = XlsxReader.Read(path);
+            }
+            catch (Exception e) when (e is IOException || e is InvalidDataException || e is System.Xml.XmlException)
+            {
+                EditorUtility.DisplayDialog("Export Template 실패", $"기존 xlsx 를 읽지 못했다:\n{e.Message}", "확인");
+                return;
+            }
+
+            Directory.CreateDirectory(ExportBackupFolder);
+            string backup = Path.Combine(ExportBackupFolder,
+                $"{Path.GetFileNameWithoutExtension(path)}_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx");
+            File.Copy(path, backup, overwrite: true);
+            Debug.Log($"{LogPrefix}Export 전 원본 보관: {backup}");
+
+            if (choice == 0)
+            {
+                var report = new List<string>();
+                sheets = DataTableMerge.Merge(existing, sheets, report);
+                merged = true;
+                foreach (string line in report)
+                {
+                    Debug.Log($"{LogPrefix}병합: {line}");
+                }
+
+                if (report.Count == 0)
+                {
+                    Debug.Log($"{LogPrefix}병합: 추가·변경 없음.");
+                }
+            }
         }
 
-        List<XlsxWriteSheet> sheets = BuildSheets(tables, warnings);
         try
         {
             XlsxWriter.Write(path, sheets);
@@ -398,7 +358,7 @@ public static class DataTableTemplate
             Debug.LogWarning(LogPrefix + warning);
         }
 
-        // 직후 Verify — 기준선(차이 0) 확인. 결과는 대화상자 대신 Console·알림(메뉴를 자동화로 눌러도 멈추지 않게).
+        // 직후 Verify. 새로 쓴 템플릿이면 차이 0 이 기준선, 병합이면 차이 = 기획이 고친 값(정상).
         DataTableSource.Result result = DataTableSource.Load();
         foreach (DataTableIssue issue in result.Issues.Items)
         {
@@ -406,18 +366,18 @@ public static class DataTableTemplate
         }
 
         int differences = result.Issues.HasErrors ? -1 : DataTableApplier.Diff(result.Writes).Count;
-        string summary = $"템플릿 {path} — 시트 {sheets.Count}개, 필드 {result.Writes.Count}개, 직후 Verify 차이 " +
-                         (differences < 0 ? "확인 불가(오류)" : differences.ToString()) +
-                         (differences == 0 ? " — 기준선 OK" : string.Empty);
-        if (differences == 0)
+        string summary = $"{(merged ? "병합" : "템플릿")} {path} — 시트 {sheets.Count}개, 필드 {result.Writes.Count}개, 직후 Verify 차이 " +
+                         (differences < 0 ? "확인 불가(오류 — 위 경고)" : differences.ToString());
+        if (differences < 0 || (!merged && differences != 0))
         {
-            Debug.Log(LogPrefix + summary);
+            Debug.LogError(LogPrefix + summary + (merged ? string.Empty : " — 새 템플릿은 0 이어야 한다."));
         }
         else
         {
-            Debug.LogError(LogPrefix + summary + " — 0 이어야 한다.");
+            Debug.Log(LogPrefix + summary + (merged ? " (차이 = 기획이 고친 값)" : " — 기준선 OK"));
         }
 
-        EditorWindow.focusedWindow?.ShowNotification(new GUIContent($"데이터 테이블 템플릿: 시트 {sheets.Count}개 · 차이 {(differences < 0 ? "오류" : differences.ToString())}"));
+        EditorWindow.focusedWindow?.ShowNotification(new GUIContent(
+            $"데이터 테이블 {(merged ? "병합" : "템플릿")}: 시트 {sheets.Count}개 · 차이 {(differences < 0 ? "오류" : differences.ToString())}"));
     }
 }

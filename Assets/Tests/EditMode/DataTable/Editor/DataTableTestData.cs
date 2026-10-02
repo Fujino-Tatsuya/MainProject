@@ -32,4 +32,8 @@ public sealed class DataTableTestData : ScriptableObject
 
     [SerializeField] private float cooldown = 1f;
     public float Cooldown => cooldown;
+
+    [Range(0f, 1f)] public float ratio = 0.5f;
+    [Min(0)] public int count = 1;
+    [Range(0f, 10f)] public float[] stages = { 1f, 2f };
 }

@@ -176,6 +176,17 @@ public static class DataTableApplier
                     continue;
                 }
 
+                if (value is long || value is double)
+                {
+                    string rangeError = DataTableFields.CheckRange(
+                        DataTableFields.Resolve(target.GetType(), path), Convert.ToDouble(value, CultureInfo.InvariantCulture));
+                    if (rangeError != null)
+                    {
+                        issues.Error(entry.Location, $"'{entry.AssetId}.{entry.Field}' = '{entry.Value}' — {rangeError}");
+                        continue;
+                    }
+                }
+
                 written[(target, path)] = entry;
                 writes.Add(new DataTableWrite(target, path, property.propertyType, value, entry));
             }

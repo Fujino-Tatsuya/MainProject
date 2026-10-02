@@ -7,7 +7,15 @@ using System.Linq;
 using System.Security;
 using System.Text;
 
-/// <summary>쓸 시트 하나. 셀 = string(글자) · int/long/float/double(숫자) · bool · null(빈 칸).</summary>
+/// <summary>이미 숫자 텍스트인 값(기존 xlsx 에서 읽은 칸) — 다시 쓸 때 표기를 바꾸지 않고 그대로 숫자 셀로 쓴다.</summary>
+public readonly struct XlsxNumber
+{
+    public XlsxNumber(string text) => Text = text;
+
+    public string Text { get; }
+}
+
+/// <summary>쓸 시트 하나. 셀 = string(글자) · int/long/float/double(숫자) · bool · null(빈 칸) · <see cref="XlsxNumber"/>(기존 숫자 텍스트).</summary>
 public sealed class XlsxWriteSheet
 {
     public XlsxWriteSheet(string name, List<object[]> rows, int frozenRows = 1, int boldRows = 1)
@@ -202,6 +210,7 @@ public static class XlsxWriter
     {
         switch (value)
         {
+            case XlsxNumber n: return n.Text;
             case float f: return f.ToString("R", CultureInfo.InvariantCulture);
             case double d: return d.ToString("R", CultureInfo.InvariantCulture);
             case IFormattable formattable: return formattable.ToString(null, CultureInfo.InvariantCulture);
