@@ -357,6 +357,23 @@ public static class DataTableApplier
     private static string ManifestPath => Path.Combine(BackupFolder, "manifest.json");
 
     /// <summary>대상(SO·프리팹 컴포넌트) 현재 값과 테이블 값이 다른 필드. 쓰지 않는다.</summary>
+    /// <summary>
+    /// <paramref name="current"/>(대상 그 자체 또는 그 대상의 씬 인스턴스)의 값이 테이블 값과 같은가. 인스펙터 표시(D6-5)용.
+    /// 필드를 못 찾으면 true(표시할 차이 없음).
+    /// </summary>
+    public static bool MatchesTable(SerializedObject current, DataTableWrite write, out string currentValue)
+    {
+        SerializedProperty property = current.FindProperty(write.PropertyPath);
+        if (property == null)
+        {
+            currentValue = null;
+            return true;
+        }
+
+        currentValue = Describe(property);
+        return Matches(property, write);
+    }
+
     public static List<DataTableDifference> Diff(IReadOnlyList<DataTableWrite> writes)
     {
         var differences = new List<DataTableDifference>();

@@ -246,7 +246,7 @@ public static class DataTableTemplate
     }
 
     /// <summary>게임에 스폰되지 않는 프리팹 — 레거시 폴더, SVN 아트 폴더(검수용 `*_Review` 프리팹 등).</summary>
-    private static bool IsExcludedPath(string path) =>
+    internal static bool IsExcludedPath(string path) =>
         path.IndexOf("legacy/", StringComparison.OrdinalIgnoreCase) >= 0 ||
         path.IndexOf("/Lagacy/", StringComparison.OrdinalIgnoreCase) >= 0 ||
         path.StartsWith("Assets/50.Art/", StringComparison.OrdinalIgnoreCase);

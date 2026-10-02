@@ -227,10 +227,18 @@ public static class DataTableMenu
             Debug.Log(LogPrefix + difference, difference.Write.Target);
         }
 
+        // 씬 인스턴스가 테이블 필드를 오버라이드하면 그 인스턴스엔 테이블 값이 안 닿는다(D6-4).
+        List<DataTableSceneOverrides.Finding> overrides = DataTableSceneOverrides.Find(result.Writes);
+        foreach (DataTableSceneOverrides.Finding finding in overrides)
+        {
+            Debug.LogWarning(LogPrefix + finding, AssetDatabase.LoadAssetAtPath<SceneAsset>(finding.ScenePath));
+        }
+
         // 결과는 대화상자 대신 Console·알림 — 자주 누르는 메뉴라 클릭 한 번 줄이고, 자동화로 눌러도 멈추지 않게.
-        string summary = differences.Count == 0
+        string summary = (differences.Count == 0
             ? $"Verify: 차이 없음 — 필드 {result.Writes.Count}개가 테이블과 같다."
-            : $"Verify: 인스펙터 값(SO·프리팹) 과 테이블 값이 다른 필드 {differences.Count}개 / 전체 {result.Writes.Count}개 — 목록은 위.";
+            : $"Verify: 인스펙터 값(SO·프리팹) 과 테이블 값이 다른 필드 {differences.Count}개 / 전체 {result.Writes.Count}개 — 목록은 위.") +
+            (overrides.Count > 0 ? $" ⚠️ 씬 오버라이드 {overrides.Count}개(테이블 값이 안 닿음)." : string.Empty);
         Debug.Log(LogPrefix + summary);
         EditorWindow.focusedWindow?.ShowNotification(new GUIContent(summary));
     }
