@@ -26,10 +26,13 @@ public class FlatKitSmoothNormalBaker : AssetPostprocessor
         "Assets/50.Art/TestAssets/TestPlayerAsset/Model/SM_Wep_Shield_01.fbx",
         "Assets/50.Art/TestAssets/TestPlayerAsset/Model/SM_Wep_Sword_03_MaskUV.fbx",
         "Assets/50.Art/TestAssets/TestPlayerAsset/Model/SM_Wep_Shield_01_MaskUV.fbx",
+        // 거너(10-02) — Flat Kit Variant 로 전환하며 외곽선을 켰다.
+        "Assets/50.Art/Char/gunner/gunner.fbx",
+        "Assets/50.Art/Char/gunner/laser_gun.fbx",
     };
 
     // 목록이나 굽는 방식을 바꾸면 올린다 — 대상 FBX 가 다시 임포트된다.
-    public override uint GetVersion() => 1;
+    public override uint GetVersion() => 2;
 
     [MenuItem("Tools/Rendering/Flat Kit/Reimport Smooth Normal Targets")]
     static void ReimportTargets()

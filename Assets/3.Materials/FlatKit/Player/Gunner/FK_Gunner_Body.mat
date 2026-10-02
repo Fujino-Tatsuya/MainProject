@@ -7,7 +7,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: FK_Paladin_Sword_Toon
+  m_Name: FK_Gunner_Body
   m_Shader: {fileID: 4800000, guid: 30486d95ac92ca545b3a1d7b04ebfc2a, type: 3}
   m_Parent: {fileID: 2100000, guid: fb66ffd6f43a8f543b0197f9f548c533, type: 2}
   m_ModifiedSerializedProperties: 0
@@ -34,12 +34,11 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _BaseMap:
-        m_Texture: {fileID: 0}
+        m_Texture: {fileID: 2800000, guid: e8db1ab59168fbd4aad6f2e339f1e0d4, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats: []
-    m_Colors:
-    - _BaseColor: {r: 0.72, g: 0.75, b: 0.82, a: 1}
+    m_Colors: []
   m_BuildTextureStacks: []
   m_AllowLocking: 1

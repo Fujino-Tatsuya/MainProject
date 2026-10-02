@@ -96,6 +96,9 @@ public static class FlatKitCharacterLook
             if (path.Contains("/Water/")) continue;   // 물은 캐릭터 룩이 아니다
             var m = AssetDatabase.LoadAssetAtPath<Material>(path);
             if (m == null || m.shader == null || (m.shader.name != "FlatKit/Stylized Surface" && m.shader.name != SkinnedOutlineShader)) continue;
+            // 🔴 Material Variant 는 건너뛴다 — 룩 값은 부모(FK_Paladin_Toon)에서 물려받는다. 여기서 값을 쓰면 전부 재정의로
+            //    굳어 부모를 고쳐도 안 따라온다(플레이어 Variant 구조, 팀장 10-02).
+            if (m.parent != null) continue;
             Apply(m);
             applied++;
         }
