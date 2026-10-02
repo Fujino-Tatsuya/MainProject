@@ -78,11 +78,34 @@ public static class DataTableTemplate
         return fields;
     }
 
-    /// <summary>타입별 에셋 → 시트. 시트 이름 = 타입 이름. 문제(이름 길이, 행 테이블에서 일부 에셋만 가진 배열 원소 등)는 warnings 로.</summary>
+    /// <summary>
+    /// 타입별 대상 → 시트. 시트 이름 = 타입 이름, 또는 <c>[DataTableSheet("묶음")]</c> 이면 그 이름으로 여러 타입을 한 시트(키-값)에.
+    /// 문제(이름 길이 등)는 warnings 로.
+    /// </summary>
     public static List<XlsxWriteSheet> BuildSheets(IEnumerable<(Type type, IReadOnlyList<(string id, Object target)> targets)> tables, List<string> warnings)
     {
         var sheets = new List<XlsxWriteSheet>();
-        foreach ((Type type, IReadOnlyList<(string id, Object target)> targets) in tables.OrderBy(t => t.type.Name, StringComparer.Ordinal))
+        var all = tables.ToList();
+
+        // 묶음 시트(시트 이름 ≠ 타입 이름) 먼저 — 캐릭터별 시트가 앞에 오게.
+        foreach (IGrouping<string, (Type type, IReadOnlyList<(string id, Object target)> targets)> group in all
+                     .Where(t => AssetDatabaseLookup.SheetNameOf(t.type) != t.type.Name)
+                     .GroupBy(t => AssetDatabaseLookup.SheetNameOf(t.type))
+                     .OrderBy(g => g.Key, StringComparer.Ordinal))
+        {
+            string nameError = XlsxWriter.ValidateSheetName(group.Key);
+            if (nameError != null)
+            {
+                warnings.Add($"{group.Key}: {nameError} — 건너뜀.");
+                continue;
+            }
+
+            sheets.Add(BuildGroupSheet(group.Key, group.OrderBy(t => t.type.Name, StringComparer.Ordinal).ToList()));
+        }
+
+        foreach ((Type type, IReadOnlyList<(string id, Object target)> targets) in all
+                     .Where(t => AssetDatabaseLookup.SheetNameOf(t.type) == t.type.Name)
+                     .OrderBy(t => t.type.Name, StringComparer.Ordinal))
         {
             string nameError = XlsxWriter.ValidateSheetName(type.Name);
             if (nameError != null)
@@ -104,6 +127,31 @@ public static class DataTableTemplate
         }
 
         return sheets;
+    }
+
+    /// <summary>묶음 시트 — 키-값 형식, 타입마다 "#── 타입 ──" 메모 행으로 구역을 나눈다(가져오기는 # 행을 무시).</summary>
+    private static XlsxWriteSheet BuildGroupSheet(string sheetName, List<(Type type, IReadOnlyList<(string id, Object target)> targets)> members)
+    {
+        var rows = new List<object[]>
+        {
+            new object[] { DataTableSchema.AssetHeader, DataTableSchema.FieldHeader, DataTableSchema.ValueHeader, "#설명" },
+        };
+
+        foreach ((Type type, IReadOnlyList<(string id, Object target)> targets) in members)
+        {
+            if (targets.Count == 0)
+            {
+                continue;
+            }
+
+            rows.Add(new object[] { $"{DataTableSchema.CommentPrefix}── {type.Name} ──" });
+            foreach ((string id, Object target) in targets.OrderBy(t => t.id, StringComparer.Ordinal))
+            {
+                rows.AddRange(CollectFields(target).Select(f => new[] { id, f.Path, f.Value, f.Description }));
+            }
+        }
+
+        return new XlsxWriteSheet(sheetName, rows, frozenRows: 1, boldRows: 1);
     }
 
     private static XlsxWriteSheet BuildKeyValueSheet(Type type, (string id, Object target) asset)
@@ -351,7 +399,12 @@ public static class DataTableTemplate
             if (choice == 0)
             {
                 var report = new List<string>();
-                sheets = DataTableMerge.Merge(existing, sheets, report);
+                // 묶음 시트로 옮긴 타입: 옛 "타입 이름" 시트 → 새 묶음 시트(값을 옮긴다).
+                Dictionary<string, string> moved = tables
+                    .Select(t => t.Item1)
+                    .Where(t => AssetDatabaseLookup.SheetNameOf(t) != t.Name)
+                    .ToDictionary(t => t.Name, AssetDatabaseLookup.SheetNameOf, StringComparer.Ordinal);
+                sheets = DataTableMerge.Merge(existing, sheets, report, moved);
                 merged = true;
                 foreach (string line in report)
                 {

@@ -20,7 +20,7 @@ using UnityEngine.Serialization;
 /// </summary>
 [RequireComponent(typeof(Player))]
 [RequireComponent(typeof(StatusEffectController))]
-[DataTableSheet]
+[DataTableSheet("Paladin")]
 public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive, IPlayerOnHitBonus
 {
     [Header("쿨다운")]

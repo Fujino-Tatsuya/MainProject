@@ -9,13 +9,14 @@ using UnityEngine;
 using Object = UnityEngine.Object;
 
 /// <summary>
-/// 시트 이름(= 타입 이름)과 Id 를 실제 대상으로 푼다. 대상 = SO 에셋 또는 <b>프리팹 안의 컴포넌트</b>.
+/// 시트 이름과 Id 를 실제 대상으로 푼다. 대상 = SO 에셋 또는 <b>프리팹 안의 컴포넌트</b>.
+/// 시트 하나 = 타입 하나(시트 이름 = 타입 이름) 또는 <b>묶음 시트</b>(<c>[DataTableSheet("Paladin")]</c> 를 준 타입 여럿).
 /// 테스트는 메모리 구현으로 바꿔 끼운다.
 /// </summary>
 public interface IDataTableAssetLookup
 {
-    /// <summary>시트 이름에 해당하는 타입(ScriptableObject 또는 Component). 없거나 여럿이면 null + 이유.</summary>
-    Type FindType(string sheetName, out string error);
+    /// <summary>시트 이름에 해당하는 타입들(ScriptableObject 또는 Component). 없으면 null + 이유.</summary>
+    IReadOnlyList<Type> FindTypes(string sheetName, out string error);
 
     /// <summary>
     /// 그 타입(정확히 같은 타입)의 대상 하나. SO = 에셋 파일 이름이 Id, 컴포넌트 = 그 컴포넌트를 가진 프리팹 파일 이름이 Id.
@@ -119,14 +120,15 @@ public static class DataTableApplier
         foreach (IGrouping<string, DataTableEntry> sheet in entries.GroupBy(e => e.Sheet, StringComparer.Ordinal))
         {
             DataTableEntry firstEntry = sheet.First();
-            Type type = lookup.FindType(sheet.Key, out string typeError);
-            if (type == null)
+            IReadOnlyList<Type> types = lookup.FindTypes(sheet.Key, out string typeError);
+            if (types == null || types.Count == 0)
             {
                 issues.Error(firstEntry.Location, typeError);
                 continue;
             }
 
-            var targets = new Dictionary<string, Object>(StringComparer.Ordinal);
+            string typeNames = string.Join("/", types.Select(t => t.Name));
+            var candidatesById = new Dictionary<string, List<Object>>(StringComparer.Ordinal);
             var failed = new HashSet<string>(StringComparer.Ordinal);
             foreach (DataTableEntry entry in sheet)
             {
@@ -135,32 +137,60 @@ public static class DataTableApplier
                     continue; // 대상 못 찾음은 Id 당 한 번만 보고
                 }
 
-                if (!targets.TryGetValue(entry.AssetId, out Object target))
+                if (!candidatesById.TryGetValue(entry.AssetId, out List<Object> candidates))
                 {
-                    target = lookup.FindTarget(type, entry.AssetId, out string targetError);
-                    if (target == null)
+                    candidates = new List<Object>();
+                    var errors = new List<string>();
+                    foreach (Type type in types)
                     {
-                        issues.Error(entry.Location, targetError);
+                        Object found = lookup.FindTarget(type, entry.AssetId, out string targetError);
+                        if (found != null)
+                        {
+                            candidates.Add(found);
+                        }
+                        else
+                        {
+                            errors.Add(targetError);
+                        }
+                    }
+
+                    if (candidates.Count == 0)
+                    {
+                        issues.Error(entry.Location, types.Count == 1 ? errors[0] : $"'{entry.AssetId}' 는 {typeNames} 어디에도 없다.");
                         failed.Add(entry.AssetId);
                         continue;
                     }
 
-                    targets[entry.AssetId] = target;
+                    candidatesById[entry.AssetId] = candidates;
                 }
 
-                if (!serialized.TryGetValue(target, out SerializedObject so))
+                // 묶음 시트에서 같은 Id(예: 프리팹 Player_Paladin)를 여러 타입이 가지면 그 필드를 실제로 가진 대상으로 좁힌다.
+                Object target = candidates[0];
+                if (candidates.Count > 1)
                 {
-                    so = new SerializedObject(target);
-                    serialized[target] = so;
+                    string candidatePath = ToPropertyPath(entry.Field);
+                    List<Object> withField = candidates.Where(c => SerializedFor(serialized, c).FindProperty(candidatePath) != null).ToList();
+                    if (withField.Count != 1)
+                    {
+                        issues.Error(entry.Location, withField.Count == 0
+                            ? $"'{entry.AssetId}' 의 {typeNames} 어디에도 필드 '{entry.Field}' 가 없다."
+                            : $"'{entry.AssetId}.{entry.Field}' 가 {string.Join("/", withField.Select(c => c.GetType().Name))} 에 다 있어 어느 쪽인지 모른다.");
+                        continue;
+                    }
+
+                    target = withField[0];
                 }
+
+                Type targetType = target.GetType();
+                SerializedObject so = SerializedFor(serialized, target);
 
                 string path = ToPropertyPath(entry.Field);
                 SerializedProperty property = so.FindProperty(path);
                 if (property == null)
                 {
                     issues.Error(entry.Location, path.Contains(".Array.data[")
-                        ? $"{type.Name}.{entry.Field} — 필드가 없거나 배열 범위를 벗어났다(테이블은 배열 크기를 바꾸지 않는다)."
-                        : $"{type.Name} 에 필드 '{entry.Field}' 가 없다(직렬화 필드 이름과 같아야 한다).");
+                        ? $"{targetType.Name}.{entry.Field} — 필드가 없거나 배열 범위를 벗어났다(테이블은 배열 크기를 바꾸지 않는다)."
+                        : $"{targetType.Name} 에 필드 '{entry.Field}' 가 없다(직렬화 필드 이름과 같아야 한다).");
                     continue;
                 }
 
@@ -191,10 +221,15 @@ public static class DataTableApplier
                 writes.Add(new DataTableWrite(target, path, property.propertyType, value, entry));
             }
 
-            IReadOnlyCollection<string> allIds = lookup.AllIds(type);
-            if (allIds != null)
+            foreach (Type type in types)
             {
-                foreach (string id in allIds.Where(id => !targets.ContainsKey(id) && !failed.Contains(id)))
+                IReadOnlyCollection<string> allIds = lookup.AllIds(type);
+                if (allIds == null)
+                {
+                    continue;
+                }
+
+                foreach (string id in allIds.Where(id => !candidatesById.ContainsKey(id) && !failed.Contains(id)))
                 {
                     issues.Warning(firstEntry.Location.Split('!')[0], $"{type.Name} '{id}' 의 행이 테이블에 없다.");
                 }
@@ -202,6 +237,17 @@ public static class DataTableApplier
         }
 
         return writes;
+    }
+
+    private static SerializedObject SerializedFor(Dictionary<Object, SerializedObject> cache, Object target)
+    {
+        if (!cache.TryGetValue(target, out SerializedObject so))
+        {
+            so = new SerializedObject(target);
+            cache[target] = so;
+        }
+
+        return so;
     }
 
     /// <summary>

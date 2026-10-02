@@ -1,13 +1,28 @@
 using System;
 
 /// <summary>
-/// 이 SO 타입을 데이터 테이블(xlsx) 시트로 내보낸다(<c>Tools/Data/Export Template</c>). 시트 이름 = 타입 이름.
-/// 가져오기(테이블 Play·Verify)는 이 표시와 무관하게 시트 이름으로 찾는다 — 이건 "어떤 SO 를 기획 테이블로 넘기는가" 의 목록이다.
-/// 하위 타입은 상속하지 않는다(시트는 정확히 같은 타입의 에셋만 담는다).
+/// 이 SO·컴포넌트 타입을 데이터 테이블(xlsx) 시트로 내보낸다(<c>Tools/Data/Export Template</c>).
+/// <list type="bullet">
+/// <item><c>[DataTableSheet]</c> — 시트 이름 = 타입 이름.</item>
+/// <item><c>[DataTableSheet("Paladin")]</c> — 같은 이름을 준 타입들이 <b>한 시트(키-값 형식)</b>를 함께 쓴다(캐릭터별 묶음).
+/// 이때 그 타입은 자기 타입 이름 시트로는 찾지 않는다(값이 두 곳에 있으면 안 되므로).</item>
+/// </list>
+/// 하위 타입은 상속하지 않는다(정확히 같은 타입의 대상만).
 /// </summary>
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
 public sealed class DataTableSheetAttribute : Attribute
 {
+    public DataTableSheetAttribute()
+    {
+    }
+
+    public DataTableSheetAttribute(string sheet)
+    {
+        Sheet = sheet;
+    }
+
+    /// <summary>묶음 시트 이름. null 이면 타입 이름.</summary>
+    public string Sheet { get; }
 }
 
 /// <summary>

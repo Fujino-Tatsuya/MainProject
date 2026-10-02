@@ -5,7 +5,7 @@ using UnityEngine;
 /// 🔴 베이스의 "Commit Cooldown Manually" 를 켜야 한다 — 쿨타임은 발사 순간부터(§6.1-7).
 /// </summary>
 [CreateAssetMenu(fileName = "GunnerChargeLaserData", menuName = "Player/Gunner/Charge Laser Data")]
-[DataTableSheet]
+[DataTableSheet("Gunner")]
 public class GunnerChargeLaserData : PlayerSkillData
 {
     [Header("정신 집중")]
