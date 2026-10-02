@@ -83,9 +83,10 @@ MonoBehaviour:
     boxLateralOffset: -1.07
     boxBackOffset: 2
     telegraphDuration: 0.7
+    telegraphFillInward: 0
     hitEventFallbackNormalized: 0
-    telegraphPoseNormalized: 0.15
     prepStateName: LeftHookPrep
+    telegraphPoseNormalized: 0.15
   - attackId: 1
     animatorStateName: RightHook
     cooldown: 2.5
@@ -111,9 +112,10 @@ MonoBehaviour:
     boxLateralOffset: 1.07
     boxBackOffset: 2
     telegraphDuration: 0.7
+    telegraphFillInward: 0
     hitEventFallbackNormalized: 0
-    telegraphPoseNormalized: 0.15
     prepStateName: RightHookPrep
+    telegraphPoseNormalized: 0.15
   - attackId: 2
     animatorStateName: Uppercut
     cooldown: 3
@@ -139,9 +141,10 @@ MonoBehaviour:
     boxLateralOffset: 0
     boxBackOffset: 0
     telegraphDuration: 0.5
+    telegraphFillInward: 0
     hitEventFallbackNormalized: 0
-    telegraphPoseNormalized: 0.15
     prepStateName: UppercutPrep
+    telegraphPoseNormalized: 0.15
   - attackId: 3
     animatorStateName: MagneticGrab
     cooldown: 20
@@ -169,8 +172,8 @@ MonoBehaviour:
     telegraphDuration: 0.7
     telegraphFillInward: 1
     hitEventFallbackNormalized: 0
-    telegraphPoseNormalized: 0.15
     prepStateName: 
+    telegraphPoseNormalized: 0.15
   - attackId: 4
     animatorStateName: Leap
     cooldown: 10
@@ -196,9 +199,10 @@ MonoBehaviour:
     boxLateralOffset: 0
     boxBackOffset: 0
     telegraphDuration: 0
+    telegraphFillInward: 0
     hitEventFallbackNormalized: 0
-    telegraphPoseNormalized: 0.15
     prepStateName: 
+    telegraphPoseNormalized: 0.15
   - attackId: 5
     animatorStateName: DashAttack
     cooldown: 5
@@ -224,9 +228,10 @@ MonoBehaviour:
     boxLateralOffset: 0
     boxBackOffset: 0
     telegraphDuration: 0
+    telegraphFillInward: 0
     hitEventFallbackNormalized: 0.57
-    telegraphPoseNormalized: 0.15
     prepStateName: DashPrep
+    telegraphPoseNormalized: 0.15
   - attackId: 6
     animatorStateName: Charging
     cooldown: 0
@@ -252,9 +257,10 @@ MonoBehaviour:
     boxLateralOffset: 0
     boxBackOffset: 0
     telegraphDuration: 0
+    telegraphFillInward: 0
     hitEventFallbackNormalized: 0
-    telegraphPoseNormalized: 0.15
     prepStateName: 
+    telegraphPoseNormalized: 0.15
   - attackId: 7
     animatorStateName: Rage
     cooldown: 0
@@ -280,9 +286,10 @@ MonoBehaviour:
     boxLateralOffset: 0
     boxBackOffset: 0
     telegraphDuration: 0
+    telegraphFillInward: 0
     hitEventFallbackNormalized: 0
-    telegraphPoseNormalized: 0.15
     prepStateName: 
+    telegraphPoseNormalized: 0.15
   repeatPenalty: 0.3
   repeatBlockAfter: 2
   phases:
@@ -299,6 +306,15 @@ MonoBehaviour:
   hitReactionState: getowned
   hitReactionStateRight: getowned_R
   breakDuration: 5
+  counterGaugeStep: 20
+  environmentGaugeStep: 20
+  suppressDamageMultiplier: 1.2
+  vulnerableDuration: 4
+  vulnerableKnockbackDistance: 3
+  vulnerableKnockbackTime: 0.35
+  wallReboundDistance: 0.5
+  wallReboundTime: 0.3
+  vulnerableTint: {r: 0.45, g: 0.75, b: 1, a: 1}
   aggroRetargetInterval: 8
   aggroAvoidsRepeatTarget: 1
   chargeClearGroggyDuration: 1.5
@@ -335,7 +351,9 @@ MonoBehaviour:
   jumpTelegraphPrefab: {fileID: 5997264177071607445, guid: a325fc2b60be455428b04ab67232fb24, type: 3}
   jumpLandSeparation: 1.2
   jumpKnockbackStrength: 5
-  chargeTimeLimit: 20
+  chargeTimeLimit: 30
+  chargeLoopStartFrame: 62
+  chargeLoopEndFrame: 125
   chargeZonePrefab: {fileID: 0}
   chargePylonsSolo: 1
   chargePylonsDuo: 2
@@ -356,6 +374,8 @@ MonoBehaviour:
   bombThrowInterval: 6
   bombPrefab: {fileID: 7643126938755057433, guid: ede00d4e6aaec7442abf1ed83b4a7234, type: 3}
   spreadAngle: 15
+  electricFloor: {fileID: 11400000, guid: 65fd41095973d204b8beea8d63957c90, type: 2}
+  wellsDrone: {fileID: 11400000, guid: 18b9ee564410be04a95d0ef34173cac3, type: 2}
   globalAttackInterval: 1.5
   chargeAuraRadius: 5.5
   chargeAuraInterval: 1

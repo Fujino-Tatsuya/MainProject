@@ -718,7 +718,7 @@ SkinnedMeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 49b3ffd597d90b64dbaa4f0648ddd976, type: 2}
+  - {fileID: 2100000, guid: fb66ffd6f43a8f543b0197f9f548c533, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -2337,7 +2337,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 7c1d4a9e3b2f45c48a6d0e1f92b73c50, type: 2}
+  - {fileID: 2100000, guid: eddec401335fb51449742f2c5ca48282, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -3404,6 +3404,16 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DefaultAttack
   ShowTopMostFoldoutHeaderGroup: 1
+  slashHit:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  slashMiss:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
   animator: {fileID: 0}
   attackData: {fileID: 11400000, guid: 8d6735b7ed4fc9e49b360d6bbcb907a5, type: 2}
   playerDefaultAttack: {fileID: 4335259357398649415}
@@ -3519,6 +3529,11 @@ MonoBehaviour:
   hitCooldownReduction: 2
   bonusDamageMultiplier: 1
   bonusFlatDamage: 0
+  bladeGlow: {fileID: 0}
+  healBurst: {fileID: 0}
+  additionalHit: {fileID: 0}
+  additionalHitScale: 1
+  additionalHitFallbackOffset: {x: 0, y: 1, z: 0}
   minTargetThreshold: 5
   minHealPercent: 5
   perTargetHealPercent: 1
@@ -3536,6 +3551,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FirstMeleeMainSkill
   data: {fileID: 11400000, guid: 3f8c2b71d94a4e5f8b6a1c0d2e947a31, type: 2}
   hitboxAnchor: {fileID: 2946404079340794649}
+  smashLoop: {fileID: 0}
+  trailLoop: {fileID: 0}
 --- !u!114 &2188207255195787144
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3550,6 +3567,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FirstMeleeSubSkill
   data: {fileID: 11400000, guid: 40499745b22c405fb0781629e282229c, type: 2}
   hitboxAnchor: {fileID: 0}
+  shieldVfx: {fileID: 0}
 --- !u!114 &1492765860989694546
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3564,6 +3582,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FirstMeleeUltimateSkill
   data: {fileID: 11400000, guid: 3c9e1f7a2b8d4e6c9a0f5d1b7e2c4a68, type: 2}
   hitboxAnchor: {fileID: 0}
+  skillVfx: {fileID: 0}
+  superArmorOverlay: {fileID: 0}
 --- !u!114 &6032877627005329180
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3841,6 +3861,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FirstMeleeInterruptSkill
   data: {fileID: 11400000, guid: 617280762f0032c4096fd2b1967e3bf1, type: 2}
   hitboxAnchor: {fileID: 2360924950670046369}
+  shieldGlow: {fileID: 0}
+  glowLoop: {fileID: 0}
+  shieldVfx: {fileID: 0}
 --- !u!114 &3350826167492650867
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4428,7 +4451,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 4e8b2f61d0a34cd7b95c81e2f6a4703d, type: 2}
+  - {fileID: 2100000, guid: 3ff16df6d6c98204d96fce5ee3044c34, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0

@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 64a2237a091b3704fbed97b79511df28, type: 3}
   m_Name: MaskBlurFeature
   m_EditorClassIdentifier: Assembly-CSharp::MaskBlurFeature
-  m_Active: 1
+  m_Active: 0
   _shader: {fileID: 4800000, guid: 361f8b51716b94b42ba09f8c105bdd2e, type: 3}
   _injectionPoint: 550
 --- !u!114 &-2294799603617760137
@@ -30,27 +30,12 @@ MonoBehaviour:
   m_Active: 1
   m_Settings:
     technique: 0
-    maxDrawDistance: 1000
+    maxDrawDistance: 50
     decalLayers: 1
     dBufferSettings:
       surfaceData: 2
     screenSpaceSettings:
       normalBlend: 0
---- !u!114 &6519473205289754683
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 949b9294f6a54970b4b8d4a18d11b837, type: 3}
-  m_Name: RetroCRTFeature
-  m_EditorClassIdentifier: Assembly-CSharp::RetroCRTFeature
-  m_Active: 1
-  _material: {fileID: 2100000, guid: 3f775673dfd7c9c4d9c625bb54e41080, type: 2}
-  _pixelScanlineShader: {fileID: 4800000, guid: 213505f4ae8f4088900604e1724311c4, type: 3}
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -82,6 +67,7 @@ MonoBehaviour:
   - {fileID: -8862228372950060840}
   - {fileID: 6519473205289754683}
   - {fileID: 785780402380302125}
+  - {fileID: 2594988839221908459}
   m_RendererFeatureMap: ad6b866f10d7b46c77fca73beb3b27e05335caa19a2eb322d870ecb73f0a03853b20f9ab56d2795a2d6757db1ca7e70a
   m_UseNativeRenderPass: 1
   xrSystemData: {fileID: 0}
@@ -146,6 +132,66 @@ MonoBehaviour:
   m_Active: 1
   _shader: {fileID: 4800000, guid: c91135b30a9f6b64a8a1538d43025786, type: 3}
   _injectionPoint: 450
+--- !u!114 &2594988839221908459
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 576f949be0794f548b825c9ce6f556db, type: 3}
+  m_Name: Flat Kit Per Object Outline
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::FlatKit.ObjectOutlineRendererFeature
+  m_Active: 1
+  settings:
+    passTag: RenderObjectsFeature
+    Event: 300
+    filterSettings:
+      RenderQueueType: 0
+      LayerMask:
+        serializedVersion: 2
+        m_Bits: 4294967295
+      PassNames:
+      - Outline
+    overrideMaterial: {fileID: 0}
+    overrideMaterialPassIndex: 0
+    overrideShader: {fileID: 0}
+    overrideShaderPassIndex: 0
+    overrideMode: 0
+    overrideDepthState: 0
+    depthCompareFunction: 4
+    enableWrite: 1
+    stencilSettings:
+      overrideStencilState: 0
+      stencilReference: 0
+      stencilCompareFunction: 8
+      passOperation: 0
+      failOperation: 0
+      zFailOperation: 0
+    cameraSettings:
+      overrideCamera: 0
+      restoreCamera: 1
+      offset: {x: 0, y: 0, z: 0, w: 0}
+      cameraFieldOfView: 60
+  materials: []
+  autoReferenceMaterials: 1
+--- !u!114 &6519473205289754683
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 949b9294f6a54970b4b8d4a18d11b837, type: 3}
+  m_Name: RetroCRTFeature
+  m_EditorClassIdentifier: Assembly-CSharp::RetroCRTFeature
+  m_Active: 1
+  _material: {fileID: 2100000, guid: 3f775673dfd7c9c4d9c625bb54e41080, type: 2}
+  _pixelScanlineShader: {fileID: 4800000, guid: 213505f4ae8f4088900604e1724311c4, type: 3}
 --- !u!114 &7833122117494664109
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -165,9 +211,9 @@ MonoBehaviour:
     AfterOpaque: 0
     Source: 1
     NormalSamples: 1
-    Intensity: 0.4
-    DirectLightingStrength: 0.25
-    Radius: 0.3
+    Intensity: 0.3
+    DirectLightingStrength: 0.1
+    Radius: 0.15
     Samples: 1
     BlurQuality: 0
     Falloff: 100

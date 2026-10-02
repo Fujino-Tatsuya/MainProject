@@ -1905,6 +1905,7 @@ MonoBehaviour:
   hitVFXCollider: {fileID: 0}
   hitVFXType: 0
   bodyCollider: {fileID: 5290444511566405505}
+  attackTelegraphMaterial: {fileID: 0}
   grabPulse: {fileID: 3436399163556755229}
   magneticPullEffectId: MagneticPull
   limbPulses:
@@ -3128,7 +3129,7 @@ PrefabInstance:
     - target: {fileID: -2150004216396664862, guid: cbdaae8bc76ee814d8a32d754976bdde, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 2100000, guid: 05140c2772297ca40b1428aeb4ed1c81, type: 2}
+      objectReference: {fileID: 2100000, guid: b43053f46da484b41ba77504f6fd2f63, type: 2}
     - target: {fileID: -2150004216396664862, guid: cbdaae8bc76ee814d8a32d754976bdde, type: 3}
       propertyPath: 'm_Materials.Array.data[1]'
       value: 

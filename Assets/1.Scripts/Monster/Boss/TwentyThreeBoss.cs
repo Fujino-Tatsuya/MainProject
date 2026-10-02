@@ -44,7 +44,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         false,
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
-    float _counterVisualOffAt = -1f;   // 서버 Time.time. < 0 = 예약 없음
+    float _bossCounterVisualOffAt = -1f;   // 서버 Time.time. < 0 = 예약 없음
 
     // [G6] 인터럽트 성공 리액션이 **오른쪽인가**. 잡기는 항상 오른쪽, 돌진은 L·R 난수다(팀장 확정 R1).
     // 🔴 RPC 가 아니라 **상태 복제**로 보낸다 — 난수를 피어마다 뽑으면 화면이 갈리고,
@@ -367,6 +367,21 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         if (_wells != null)
             _wells.PlayState(_wellsState.Value); // 늦게 접속한 클라도 현재 상태를 받는다
 
+        // 전기 장판 · 자폭 드론(PLAN-boss-electric-drone) — 전 피어에 붙인다(서버는 판정, 클라는 연출).
+        // NetworkBehaviour 가 아니라 프리팹 구성이 안 바뀐다. RPC 는 이 클래스가 대신 보낸다(SendFloor*/SendDrone*).
+        // ⚠️ `??` 금지 — 에디터의 GetComponent 는 없을 때 가짜 null 객체를 돌려줘 `??` 가 AddComponent 를 건너뛴다.
+        if (!TryGetComponent(out _electricFloor)) _electricFloor = gameObject.AddComponent<BossElectricFloor>();
+        _electricFloor.Init(this, _boss.electricFloor);
+        if (!TryGetComponent(out _drone)) _drone = gameObject.AddComponent<WellsDroneAttack>();
+        _drone.Init(this, _boss.wellsDrone);
+
+        // 차징 클립 구간 반복(팀장 10-02 — 팔 모으는 동작은 처음 1회만). 애니는 피어마다 로컬이라 전 피어에 붙인다.
+        if (!TryGetComponent(out BossChargeClipLoop chargeLoop)) chargeLoop = gameObject.AddComponent<BossChargeClipLoop>();
+        BossAttackEntry chargeEntry = AttackEntryOf(BossAttackId.ChargeSequence);
+        chargeLoop.Init(animator != null ? animator : GetComponentInChildren<Animator>(),
+                        chargeEntry != null ? chargeEntry.animatorStateName : null,
+                        _boss.chargeLoopStartFrame, _boss.chargeLoopEndFrame);
+
         if (!IsServer)
             return;
 
@@ -394,6 +409,11 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
             _wells.ThrowRequested = null;
             _wells.SetSuppressed(true);
         }
+
+        // 전기 장판·드론 정지 — 파괴하지 않는 디스폰(풀 재사용)에서도 타이머·연출이 남지 않게. 재스폰 때 Init 이 다시 세운다.
+        _fightActive = false;
+        if (_electricFloor != null) _electricFloor.ResetState();
+        if (_drone != null) _drone.ResetState();
 
         // 디스폰 시 잡고 있던 플레이어를 반드시 놓는다 — 안 놓으면 풀어 줄 주체가 사라져 영구 구속된다.
         // 체공 중이었다면 메시도 되살린다(꺼진 채 남으면 다음 스폰까지 투명하다).
@@ -730,6 +750,9 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         //    스냅을 끝낸 뒤 부르는 단일 전환점이라 "착지 완료 = 전투 시작"과 정확히 일치한다.
         //    안 하면 초기값 0 때문에 첫 틱에 재선정이 돌아 어그로가 착지하자마자 튄다.
         _lastRetargetTime = Time.time;
+
+        // 전기 장판·드론의 0초도 여기(기획: "전투 시작 후 4초/5초" = 착지 완료 기준).
+        _fightActive = true;
 
         // 연출 동안의 접촉 상태는 의미가 없다 — 전투가 새로 시작되므로 "안 붙은" 상태에서 출발한다.
         _inContactReach = false;
@@ -3619,25 +3642,11 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     //
     // ⚠️ 지웠던 폭탄 경로(착지점 추첨·탄도 역산·`IsInsideRoom`)는 이 변경 직전 커밋에 있다.
     //    드론이 "방 안에만 떨어진다" 같은 요구를 갖게 되면 거기서 되살리면 된다.
-    void OnWellsAttackCycle()
-    {
-        if (!IsServer || State == MonsterState.Dead) return;
-
-        WarnWellsAttackMissingOnce();
-    }
-
-    bool _warnedWellsAttackMissing;
-
-    // 🔴 조용히 아무 일도 안 하면 "웰즈가 왜 안 때리지"를 다음 사람이 처음부터 판다.
-    //    한 번만 찍어 "비어 있는 것이 의도"임을 남긴다(고빈도 로그는 정작 필요한 진단을 밀어낸다).
-    void WarnWellsAttackMissingOnce()
-    {
-        if (_warnedWellsAttackMissing) return;
-        _warnedWellsAttackMissing = true;
-        Debug.Log($"{name}: Wells 공격 주기가 돌았지만 **아직 공격이 없다** — " +
-                  "폭탄 투척은 제거됐고 자폭 드론은 미구현이다(의도된 공백). " +
-                  "드론 리소스가 들어오면 OnWellsAttackCycle 에 배선할 것.", this);
-    }
+    // 🔴 2026-10-02: 자폭 드론이 들어왔지만 **이 주기에 걸지 않았다.** 드론 기획(wells-suicide-drone.md §4·§11)의
+    //    타이머가 웰즈 주기(bombThrowInterval 고정 간격)와 다르다 — 첫 5초 · 공격/취소 **종료 후** 7초 ·
+    //    제압·충전 중 정지 후 이어서(최소 2초). 그래서 드론은 자기 타이머로 돈다(<see cref="WellsDroneAttack"/>).
+    //    이 콜백은 웰즈 애니 주기용으로만 남는다.
+    void OnWellsAttackCycle() { }
 
 
     // 23호 → Wells **단방향 푸시**. 🔴 Wells 가 23호를 폴링하면 순서 의존이 생긴다(정본 §10).
@@ -4988,6 +4997,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
             return;
         }
 
+        _groggyKind = BossPauseCondition.CounterGroggy;
         StunForCounter(outcome.Duration);
         Debug.Log($"[23호] 간파 성공 — 게이지 {outcome.NextGauge:0}% → 그로기 {outcome.Duration:0.#}초", this);
         StartVulnerable();   // 그로기 시작 시점부터 4초(D1)
@@ -4997,6 +5007,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     void EnterPylonGroggy(float duration)
     {
         if (!IsServer) return;
+        _groggyKind = BossPauseCondition.PylonGroggy;
         StunForCounter(Mathf.Max(0.05f, duration));
         Debug.Log($"[23호] 송전기 전멸 그로기 {duration:0.#}초 (게이지 {_counterGauge.Value:0}% 유지)", this);
     }
@@ -5025,6 +5036,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         _pendingSuppress = false;
         EndVulnerable("제압 진입");   // 취약이면 즉시 종료(기획 §8.2)
         _suppressed = true;
+        _groggyKind = BossPauseCondition.Suppress;
         StunForCounter(duration);
         Debug.Log($"[23호] 제압 진입 ({reason}) — {duration:0.#}초 · 받는 플레이어 피해 ×{SuppressDamageMultiplier:0.##}", this);
     }
@@ -5383,6 +5395,110 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     /// <summary>제압 중인가(서버). 받는 플레이어 피해 배율과 HUD 가 읽는다.</summary>
     public bool IsSuppressed => _suppressed;
 
+    #region 전기 장판 · 자폭 드론 연결 (PLAN-boss-electric-drone) — 판정은 각 컴포넌트, 여기는 상태 질의 + RPC 중계
+    BossElectricFloor _electricFloor;
+    WellsDroneAttack _drone;
+    bool _fightActive;   // 입장 연출 착지 뒤 true(OnServerLogicResumed) — 서버 전용 의미
+    // 지금 그로기가 어느 경로로 들어왔나. 진입 3곳(간파 성공 · 송전기 전멸 · 제압)이 StunForCounter 직전에 세운다.
+    // 그로기가 아닐 때는 읽지 않는다(ActivePauseConditions) — 그래서 이탈 때 지우지 않아도 된다.
+    BossPauseCondition _groggyKind;
+
+    /// <summary>[서버] 전투 진행 중(착지 완료 · 사망 전).</summary>
+    public bool IsFightActive => _fightActive && State != MonsterState.Dead;
+    public bool IsDead => State == MonsterState.Dead;
+    /// <summary>
+    /// [서버] 이 플레이어를 <b>실제로 쥐고 있나</b>(끌어오는 중은 아니다 — 기획서 6.4).
+    /// 🔴 `_grabbed` 만 보면 안 된다 — Acquire 시작에 채워지고(아직 Push), 손에 붙는 건 약 1.1초 뒤
+    ///    <see cref="AttachGrabbed"/> 가 `_grabAttachPending` 을 끌 때다(Codex 교차검증 10-02).
+    /// </summary>
+    public bool IsHolding(Player p) => p != null && _grabbed == p && !_grabAttachPending;
+    /// <summary>
+    /// [서버] 송전기 진입 **점프 이동 중**(BeginCharge → 착지). 아직 송전탑은 없다.
+    /// 팀장 10-02: 기믹 시작 = **점프 출발 순간** — 여기서 일반 장판·드론을 정리하고 멈춘다(A/B 는 착지 후 ChargeWait 부터).
+    /// `_chargeJump` 는 착지(case Land)와 체인 중단(AbortAttackChain)에서만 꺼진다 — 중단되면 바로 일반으로 돌아간다.
+    /// </summary>
+    public bool IsChargeJumpActive =>
+        State == MonsterState.Attack && _chargeJump &&
+        _currentEntry != null && _currentEntry.attackId == BossAttackId.ChargeSequence;
+
+    /// <summary>[서버] 송전기 기믹 전체(점프 이동 + 차징 대기) — 드론이 멈추는 구간.</summary>
+    public bool IsChargeSequenceActive => IsChargeJumpActive || IsChargeGimmickActive;
+
+    /// <summary>[서버] 송전기 차징 대기 중(송전탑이 서 있고 제한시간이 도는 구간) — A/B 장판 구간.</summary>
+    public bool IsChargeGimmickActive =>
+        State == MonsterState.Attack && _attackPhase == BossAttackPhase.ChargeWait &&
+        _currentEntry != null && _currentEntry.attackId == BossAttackId.ChargeSequence;
+
+    /// <summary>
+    /// [서버] 지금 걸려 있는 정지 조건 — 그로기(및 그 직전 Hit 리액션) 중일 때만 그 종류 비트.
+    /// 패턴 쪽은 자기 <c>pauseOn</c> 과 AND 해서 멈출지 정한다(체크형, 팀장 10-01).
+    /// </summary>
+    public BossPauseCondition ActivePauseConditions =>
+        State == MonsterState.Groggy || State == MonsterState.Hit ? _groggyKind : BossPauseCondition.None;
+
+    int _droneHitMask;
+
+    /// <summary>
+    /// [서버] 드론 폭발 겹침 판정 레이어 = 플레이어 레이어 + 23호 자기 콜라이더 레이어.
+    /// 전 레이어(~0)로 쏘면 지형·장식 콜라이더로 버퍼가 차 대상이 잘릴 수 있다(Codex 교차검증 10-02).
+    /// </summary>
+    internal int DroneHitMask
+    {
+        get
+        {
+            if (_droneHitMask != 0) return _droneHitMask;
+            int m = playerMask.value;
+            foreach (Collider c in GetComponentsInChildren<Collider>(true)) m |= 1 << c.gameObject.layer;
+            return _droneHitMask = m;
+        }
+    }
+
+    BossTileGrid _tileGrid;
+    bool _tileGridResolved;
+
+    /// <summary>보스방 7×7 타일(전 피어). 경계 = <see cref="ResolveArena"/> 와 같은 벽 안쪽 면 · 방 로컬.</summary>
+    public bool TryGetTileGrid(out BossTileGrid grid)
+    {
+        if (!_tileGridResolved && ResolveArena())
+        {
+            Transform landing = FindChargeLandingPoint();
+            float floorY = landing != null ? landing.position.y : _arenaRoot.position.y;
+            _tileGrid = new BossTileGrid(_arenaRoot, _arenaMinX, _arenaMaxX, _arenaMinZ, _arenaMaxZ,
+                                         _arenaRoot.InverseTransformPoint(new Vector3(0f, floorY, 0f)).y);
+            _tileGridResolved = true;
+            Debug.Log($"[23호] 전기 장판 타일 — 칸 {_tileGrid.TileExtent.x:0.##}×{_tileGrid.TileExtent.y:0.##}m", this);
+        }
+        grid = _tileGrid;
+        return _tileGridResolved;
+    }
+
+    // 🔴 연출은 반드시 RPC 로 — 서버에서 직접 그리면 호스트에서만 보인다(이 레포가 여러 번 겪은 버그).
+    internal void SendFloorWarn(ulong mask, float warnTime) => FloorWarnClientRpc(mask, warnTime);
+    internal void SendFloorFire(ulong mask, float vfxTime) => FloorFireClientRpc(mask, vfxTime);
+    internal void SendFloorClear() => FloorClearClientRpc();
+
+    // (`?.` 대신 `!= null` — 파괴된 컴포넌트는 Unity 의 == 만 null 로 본다)
+    [ClientRpc] void FloorWarnClientRpc(ulong mask, float warnTime) { if (_electricFloor != null) _electricFloor.ClientShowWarn(mask, warnTime); }
+    [ClientRpc] void FloorFireClientRpc(ulong mask, float vfxTime) { if (_electricFloor != null) _electricFloor.ClientFire(mask, vfxTime); }
+    [ClientRpc] void FloorClearClientRpc() { if (_electricFloor != null) _electricFloor.ClientClear(); }
+
+    internal void SendDroneMark(NetworkObject target, float trackTime) => DroneMarkClientRpc(target, trackTime);
+    internal void SendDroneLock(Vector3 pos, float radius, float lockTime, bool fromRight) => DroneLockClientRpc(pos, radius, lockTime, fromRight);
+    internal void SendDroneImpact(Vector3 pos, float radius) => DroneImpactClientRpc(pos, radius);
+    internal void SendDroneCancel() => DroneCancelClientRpc();
+
+    [ClientRpc]
+    void DroneMarkClientRpc(NetworkObjectReference target, float trackTime)
+    {
+        if (_drone == null) return;
+        if (target.TryGet(out NetworkObject no)) _drone.ClientMark(no.transform, trackTime);
+        else Debug.LogWarning($"[자폭드론] 표식 대상 NetworkObject 를 이 피어에서 못 찾았다 — 크로스헤어 생략(고정 원부터 보인다).", this);
+    }
+    [ClientRpc] void DroneLockClientRpc(Vector3 pos, float radius, float lockTime, bool fromRight) { if (_drone != null) _drone.ClientLock(pos, radius, lockTime, fromRight); }
+    [ClientRpc] void DroneImpactClientRpc(Vector3 pos, float radius) { if (_drone != null) _drone.ClientImpact(pos, radius); }
+    [ClientRpc] void DroneCancelClientRpc() { if (_drone != null) _drone.ClientCancel(); }
+    #endregion
+
     /// <summary>간파 게이지 0~1(전 피어 — 복제값). HUD 회색 바(`Detection_Fill`)가 읽는다.</summary>
     public float CounterGauge01 => Mathf.Clamp01(_counterGauge.Value / BossCounterProgress.GaugeMax);
 
@@ -5408,7 +5524,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     {
         if (!IsServer) return;
 
-        _counterVisualOffAt = open && windowDuration > 0f
+        _bossCounterVisualOffAt = open && windowDuration > 0f
             ? Time.time + Mathf.Max(0f, windowDuration - CounterVisualLeadSeconds)
             : -1f;
         if (_counterVisual.Value != open) _counterVisual.Value = open;
@@ -5421,13 +5537,13 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     void ScheduleCounterVisualOff(float remaining)
     {
         if (!IsServer || !_counterWindow.Value) return;
-        _counterVisualOffAt = Time.time + Mathf.Max(0f, remaining - CounterVisualLeadSeconds);
+        _bossCounterVisualOffAt = Time.time + Mathf.Max(0f, remaining - CounterVisualLeadSeconds);
     }
 
     void TickCounterVisual()
     {
-        if (_counterVisualOffAt < 0f || Time.time < _counterVisualOffAt) return;
-        _counterVisualOffAt = -1f;
+        if (_bossCounterVisualOffAt < 0f || Time.time < _bossCounterVisualOffAt) return;
+        _bossCounterVisualOffAt = -1f;
         if (_counterVisual.Value) _counterVisual.Value = false;
     }
 

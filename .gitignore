@@ -150,3 +150,9 @@ Docs/temp/
 
 # 접속 진단 로그 (NetworkDiagnosticsLog) — 실행할 때마다 덮어쓴다
 /network.log
+
+# Flat Kit(에셋 스토어) — 데모·매뉴얼은 로컬에만. 쓰는 물 프리셋은 3.Materials/FlatKit/Water 로 복사해 둠 (PLAN-flatkit.md)
+/Assets/FlatKit/Demos/
+/Assets/FlatKit/Demos.meta
+/Assets/FlatKit/FlatKit Manual.pdf
+/Assets/FlatKit/FlatKit Manual.pdf.meta

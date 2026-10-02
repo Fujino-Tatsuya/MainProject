@@ -179,6 +179,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 64
   attackType: 0
+  hitPattern: 0
   colliderInfo: {fileID: 7991457659650660422}
   maxHitCount: 16
   applyKnockback: 0
@@ -734,6 +735,7 @@ MonoBehaviour:
   hitVFXCollider: {fileID: 3650362197745556948}
   hitVFXType: 1
   bodyCollider: {fileID: 6772621528324988158}
+  attackTelegraphMaterial: {fileID: 0}
 --- !u!114 &5117935030934790997
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -751,6 +753,8 @@ MonoBehaviour:
   particlePrefab: {fileID: 7019508933032447489, guid: 0e15d6fc561b43fa95fadff8ab04b5fd, type: 3}
   duration: 1.5
   despawnGrace: 0.5
+  leadBeforeClipEnd: 0.3
+  delayAfterClipEnd: 0
   renderers: []
 --- !u!114 &4980393420285267538
 MonoBehaviour:
@@ -1121,7 +1125,7 @@ SkinnedMeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 06be5c0ee31a8cf4a9388acc46db3738, type: 2}
+  - {fileID: 2100000, guid: 7270ba245f22c3c45bb9bee5f116ccc3, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
