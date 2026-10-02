@@ -20,7 +20,8 @@ public static class BossPatternVisuals
 
     public static Texture2D SquareTexture => _square != null ? _square : (_square = BuildSquare(64, 0.1f));
     public static Texture2D DiscTexture => _disc != null ? _disc : (_disc = BuildDisc(128, 0.08f));
-    public static Texture2D CrosshairTexture => _crosshair != null ? _crosshair : (_crosshair = BuildCrosshair(128));
+    public static Texture2D CrosshairTexture => _crosshair != null ? _crosshair :
+        (_crosshair = Resources.Load<Texture2D>("BossPatterns/WellsDroneCrosshair") ?? BuildCrosshair(128));
 
     static Material Mat
     {
