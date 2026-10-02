@@ -12,7 +12,7 @@ using UnityEngine;
 [InitializeOnLoad]
 public static class DevBootToolbar
 {
-    private const string LaunchElementPath = "Dev/Dev Boot";
+    internal const string LaunchElementPath = "Dev/Dev Boot";
     private const string SceneElementPath = "Dev/Dev Boot Scene";
     private const string SceneRootPrefix = "Assets/0.Scenes/";
 
@@ -38,7 +38,7 @@ public static class DevBootToolbar
         var content = new MainToolbarContent(
             "Dev Boot",
             EditorGUIUtility.IconContent("PlayButton").image as Texture2D,
-            $"Dev_Boot를 통해 '{targetName}' 씬으로 Play한다. 씬은 오른쪽 드롭다운에서 고른다.");
+            $"Dev_Boot를 통해 '{targetName}' 씬으로 Play한다(데이터: {DataSourcePlayMode.Label(DataSourcePlayMode.Current)}). 씬은 오른쪽 드롭다운에서 고른다.");
         return new MainToolbarButton(content, () => DevBootLauncher.Launch(DevBootTarget.ScenePath))
         {
             enabled = DevBootLauncher.CanLaunch,

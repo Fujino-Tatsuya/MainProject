@@ -49,9 +49,23 @@ public static class DevBootTarget
             : path.Trim().Replace('\\', '/');
     }
 
-    private static string ComputeWorkspaceKey(string dataPath)
+    /// <summary>
+    /// 이 워크트리 전용 EditorPrefs 키. 다른 개인 설정(예: 데이터 테이블의 데이터 출처)도 같은 범위로 저장할 때 쓴다.
+    /// MPPM 가상 플레이어(클론)도 메인 에디터와 같은 키가 나온다.
+    /// </summary>
+    public static string ScopedKey(string name) => KeyPrefix + WorkspaceKey + "." + name;
+
+    public static string ComputeWorkspaceKey(string dataPath)
     {
         string normalized = (dataPath ?? string.Empty).Replace('\\', '/').ToLowerInvariant();
+
+        // MPPM 클론은 <메인>/Library/VP/<mppm…>/Assets(메인 Assets 로 가는 심볼릭 링크)에서 돈다.
+        // 클론이 메인과 다른 설정을 읽으면 호스트·클라이언트가 다른 조건으로 돌므로 메인 경로로 접는다.
+        int clone = normalized.IndexOf("/library/vp/", StringComparison.Ordinal);
+        if (clone >= 0)
+        {
+            normalized = normalized.Substring(0, clone) + "/assets";
+        }
 
         // string.GetHashCode는 런타임별 안정성이 보장되지 않는다. FNV-1a로 머신 내 워크트리 키를 고정한다.
         const ulong offset = 14695981039346656037UL;

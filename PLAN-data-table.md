@@ -63,7 +63,12 @@
 - **오류가 하나라도 있으면 아무 SO 도 쓰지 않는다**(전부 성공 또는 전부 실패). 테이블 플레이라면 **Play 진입을 막고** 오류 목록을 띄운다.
 - EditMode 테스트: 셀 타입 변환·빈 셀·주석 열·중복 Id·없는 필드·전부-또는-0 쓰기·메모리 적용 후 `Restore` 하면 원래 값.
 
-### D1.5. 데이터 출처 드롭다운 (플레이 시작 옵션)
+### D1.5. 데이터 출처 드롭다운 (플레이 시작 옵션) — ✅ 2026-10-02 구현 · EditMode 37건 · 🔴 Play·MPPM 수동 확인 대기
+
+> 구현: `DataSourcePlayMode`(적용 지점 = `ExitingEditMode` — 에디터 이벤트라 런타임 코드 없이 모든 Play 경로·MPPM 클론이 지난다. 계획의 `BeforeSceneLoad` 대신) ·
+> `DataSourceToolbar`(드롭다운, 모드별 색: 테이블 피치 · 인스펙터 연두) · `DataSourceBadge`(화면 표시, 에디터 전용 런타임 클래스).
+> **xlsx 가 하나도 없으면 막지 않고 SO 값으로 돈다**(표시 "TABLE (xlsx 없음)") — 테이블이 SVN 에 올라가기 전 팀원 Play 를 막지 않으려고.
+> R7: `DevBootTarget.ComputeWorkspaceKey` 가 클론 경로(`…/Library/VP/mppm…/Assets`)를 메인 경로로 접는다(테스트 3건).
 - 툴바 `[ 데이터: 테이블 ▾ ]` — `테이블(xlsx = 빌드와 같음)` / `인스펙터(SO·프리팹 값 그대로)`. Dev Boot 버튼·씬 드롭다운 옆.
 - 선택값 = 워크트리별 EditorPrefs(`DevBootTarget` 과 같은 저장소). 기본값 = **테이블**(빌드와 같은 조건이 기본이 안전하다).
 - **적용 지점은 1곳**: `[RuntimeInitializeOnLoadMethod(BeforeSceneLoad)]`(`#if UNITY_EDITOR`) — 어느 Play 경로든 첫 씬 로드 전에 메모리 적용.
