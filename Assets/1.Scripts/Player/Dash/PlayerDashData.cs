@@ -10,6 +10,7 @@ namespace BeaverLobby.Player.Dash
     /// v1에서 실제 소비되는 값만 노출한다. 이동/추락/공중 물리 값은 W3/W10에서 추가한다.
     /// </summary>
     [CreateAssetMenu(fileName = "PlayerDashData", menuName = "BeaverLobby/Player/Dash Data", order = 0)]
+    [DataTableSheet]
     public sealed class PlayerDashData : ScriptableObject
     {
         [Header("이동")]
@@ -21,8 +22,8 @@ namespace BeaverLobby.Player.Dash
         [SerializeField, Min(0f)] private float rechargeDuration = 2f;  // 소비 순간부터 순차 회복
 
         [Header("서버 검증")]
-        [SerializeField, Min(1)] private int snapshotCapacity = 32;                // 서버 과거 상태 Ring Buffer
-        [SerializeField, Min(0f)] private float snapshotFreshnessTolerance = 0.1f; // 요청시각과 Snapshot 최대 간격(초)
+        [SerializeField, Min(1), DataTableIgnore] private int snapshotCapacity = 32;                // 서버 과거 상태 Ring Buffer
+        [SerializeField, Min(0f), DataTableIgnore] private float snapshotFreshnessTolerance = 0.1f; // 요청시각과 Snapshot 최대 간격(초)
 
         public float DashSpeed => dashSpeed;
         public float DashDuration => dashDuration;

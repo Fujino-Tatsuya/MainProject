@@ -5,6 +5,7 @@
 /// 베이스(PlayerSkillData)의 InputType은 Hold, TickInterval은 0보다 커야 한다.
 /// </summary>
 [CreateAssetMenu(menuName = "Combat/First Melee Main Skill Data")]
+[DataTableSheet]
 public class FirstMeleeMainSkillData : PlayerSkillData
 {
     [Header("진격")]
@@ -18,7 +19,7 @@ public class FirstMeleeMainSkillData : PlayerSkillData
     [SerializeField, Min(0f)] private float knockbackDuration = 0.25f;
     // 마지막 틱의 넉백 종료 후 Stunned 경직(0.1~1 튜닝, PLAN C 스펙 기본 0.2).
     [SerializeField, Min(0f)] private float staggerDuration = 0.2f;
-    [SerializeField, Min(1)] private int maxHitResults = 16;
+    [SerializeField, Min(1), DataTableIgnore] private int maxHitResults = 16;
 
     public float AdvanceSpeed => advanceSpeed;
     public float SteerAnglePerTick => steerAnglePerTick;

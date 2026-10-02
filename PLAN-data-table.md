@@ -81,7 +81,14 @@
 - 안전한 쪽: `IPreprocessBuildWithReport`/`IPostprocessBuildWithReport` 대신 **`Tools/Build/Build (Table)` 전용 메뉴**로 적용·빌드·복구를 한 함수에서 `try/finally` 로 묶는다.
 - 테이블 오류가 있으면 빌드 중단.
 
-### D2. 이미 SO 인 Player 쪽 수치 연결 (은희 영역)
+### D2. 이미 SO 인 Player 쪽 수치 연결 (은희 영역) — ✅ 2026-10-02 Export Template · 시트 12 · 필드 149 · Verify 차이 0
+
+> 구현: `[DataTableSheet]`(내보낼 SO 표시) · `[DataTableIgnore]`(기술 값) — 어트리뷰트 전용 asmdef `MainProject.DataTable.Attributes`(Dash asmdef 가 참조).
+> `XlsxWriter`(의존성 0) · `DataTableTemplate`(정수·실수만, 구조체·배열 원소 포함, 에셋 1개 = 키-값 시트 / 여럿 = 행 테이블).
+> 표시 붙인 SO 12종: `PlayerDashData` · `DefaultAttackData` · `Gunner{Heat,BasicAttack,ChargeLaser,CoolBackstep,Interrupt,TrackingLaser}Data` · `FirstMelee{Interrupt,Main,Sub,Ultimate}SkillData`.
+> 기술 값 제외: 스냅샷 크기·허용오차(서버 검증) · `maxHitResults`(판정 버퍼) · `muzzleHeight`(연출 정렬). `PlayerGameRuleData`(물리 규칙)는 표시 안 함.
+> 검증: **실제 Excel 이 경고 없이 열고, Excel 로 다시 저장한 파일도 Verify 차이 0**(공유 문자열·테마 등 Excel 고유 형식 읽힘). EditMode 49건.
+> 🔴 `GameData.xlsx` 는 SVN 폴더에 생성만 됨 — **SVN add·커밋은 은희 판단**(git 에는 안 들어감).
 - `PlayerDashData` · `PlayerGameRuleData` · `DefaultAttackData` · `Gunner*Data` · `FirstMelee*SkillData`.
 - **첫 xlsx 는 현재 SO 값을 내보내서 만든다**(`Tools/Data/Export Template`) → 직후 `Verify` 결과 = **차이 0** 이 기준선.
 
@@ -193,9 +200,9 @@
 | # | 질문 | 추천 |
 |---|------|------|
 | Q1 | "모든 수치"의 범위 — 전투·성장·이동만? 연출 타이밍·맵 생성·UI 까지? | 전투·성장·이동·스킬·상태이상·몬스터. 맵 생성·연출은 나중 |
-| Q2 | xlsx 위치 — SVN(잠금 가능) / git / Google Drive? | **SVN + 잠금.** 기획이 이미 SVN 을 쓴다면 추가 도구 0 |
+| ~~Q2~~ | ~~xlsx 위치~~ | ✅ 10-02 은희 확정 — **SVN `Assets/50.Art/DataTable~/` + 잠금(lock)** |
 | ~~Q3~~ | ~~임포트와 SO 커밋은 누가?~~ | ✅ 10-02 해소 — 기획은 xlsx 만 SVN 커밋. 기획이 확인할 때는 Unity 에서 `데이터: 테이블` 로 Play |
-| Q4 | 파일 단위 — xlsx 1개(시트 여러 개) / 영역별 여러 개? | **영역별 파일**(`Player.xlsx`·`Monster.xlsx`…) — 잠금 충돌이 줄어든다 |
+| ~~Q4~~ | ~~파일 단위~~ | ✅ 10-02 은희 확정 — **`GameData.xlsx` 1개 + 시트 여러 개**(한 번에 한 명만 편집 = 잠금 충돌은 감수). 코드는 폴더의 xlsx 를 전부 읽으므로 나중에 쪼개도 비용 0 |
 | Q5 | 시점 — 지스타(11월 중순) 전? | D1·D2 는 지스타 전(작고 독립적). D3·D4 이전은 지스타 이후 권장 — 이전 중 값 유실 위험을 시연 직전에 지지 않는다 |
 | Q6 | 경석 합의 — 몬스터 테이블 연결·보스 수치 이전을 누가 하나? | `MonsterDataSO` 연결은 은희가 툴로(필드 변경 0), 보스 코드 이전은 경석 |
 

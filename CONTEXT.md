@@ -11,9 +11,11 @@ Update this file when a term becomes important enough that future agents or team
 ## ▶▶ 작업 세션 (2026-10-02 · 은희(Claude) · **데이터 테이블 xlsx → SO D1**, 브랜치 `feature/DataTable`)
 
 계획 = [PLAN-data-table.md](PLAN-data-table.md). 이번 세션 = **D1 테이블 적용기 코어**(툴만, 게임 코드 변경 0).
-🔴 **수정 예정 파일 — 동시 수정 금지:** `Assets/1.Scripts/DataTable/**`(신규) · `Assets/Tests/EditMode/DataTable/**`(신규) · `PLAN-data-table.md`.
+🔴 **수정 예정 파일 — 동시 수정 금지:** `Assets/1.Scripts/DataTable/**`(신규) · `Assets/Tests/EditMode/DataTable/**`(신규) · `PLAN-data-table.md` · Player SO 데이터 클래스 12개(어트리뷰트만) · `Assets/1.Scripts/Dev/**`.
 - §8 미확정 Q1·Q2·Q4·Q5·Q6 은 D1 에 영향 없음 → 추천안 가정으로 진행, D2 전에 확정.
-- 상태: ✅ D1·D1.5 커밋, EditMode 37건(메뉴 `Tools/Tests/데이터 테이블 EditMode 테스트 실행`). `feature/DevBootToolbar` 를 이 브랜치에 병합(PR 하나로, 은희 결정 B). 🔴 데이터 출처 Play·MPPM 수동 확인 대기. 다음 = D2(Export Template — 현재 SO 값으로 첫 xlsx 만들기).
+- 상태: ✅ D1·D1.5·D2 커밋, EditMode 49건(메뉴 `Tools/Tests/데이터 테이블 EditMode 테스트 실행`). `feature/DevBootToolbar` 병합(PR 하나로, 은희 결정 B).
+  Q2·Q4 확정(SVN `DataTable~` · `GameData.xlsx` 1개). Player SO 12종 → 시트 12 · 필드 149 · Verify 차이 0(Excel 재저장본도). 🔴 데이터 출처 Play·MPPM 수동 확인 대기 · `GameData.xlsx` SVN add 미정.
+  🔴 Player SO 클래스 12개에 `[DataTableSheet]`·`[DataTableIgnore]` 추가, Dash asmdef 에 어트리뷰트 asmdef 참조 추가(동작 변경 0).
   구현 중 변경 2건은 PLAN §4-2 에 기록(시트 이름 = SO 타입 이름 · 폴더 `Assets/50.Art/DataTable~`).
 - Dev Boot 툴바 분리·파스텔 배경(`63384b3c`)도 이 브랜치에 포함 — 🔴 에디터 확인 대기.
 

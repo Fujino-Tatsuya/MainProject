@@ -7,6 +7,7 @@
 /// 궁극 고유 추가 튜닝이 생기면 여기 필드를 추가한다.
 /// </summary>
 [CreateAssetMenu(menuName = "Combat/Skills/FirstMelee Ultimate Skill Data (최후의 심판)")]
+[DataTableSheet]
 public class FirstMeleeUltimateSkillData : PlayerSkillData
 {
 }

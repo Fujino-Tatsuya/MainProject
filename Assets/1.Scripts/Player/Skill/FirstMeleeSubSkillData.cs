@@ -4,6 +4,7 @@
 /// E 수호자의 의지 설계값. 보호막 수치/지속시간은 기획서 TBD — 에셋에서 조정한다.
 /// </summary>
 [CreateAssetMenu(menuName = "Combat/Skills/FirstMelee Sub Skill Data (수호자의 의지)")]
+[DataTableSheet]
 public class FirstMeleeSubSkillData : PlayerSkillData
 {
     [Header("수호자의 의지")]

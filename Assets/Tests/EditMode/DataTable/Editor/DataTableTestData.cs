@@ -17,7 +17,10 @@ public sealed class DataTableTestData : ScriptableObject
         public int damage;
     }
 
+    [Tooltip("최대 체력")]
     public int maxHp = 100;
+    [DataTableIgnore] public int bufferSize = 8;
+    [DataTableIgnore] public Charge ignoredCharge;
     public float moveSpeed = 2.5f;
     public bool canDash = true;
     public string title = "base";

@@ -5,6 +5,7 @@ using UnityEngine;
 /// targetableLayers·hittableLayers·attackDamageMultiplier(틱 피해 = 최종 공격력 × 이 배율)·animatorStateName 도 쓴다.
 /// </summary>
 [CreateAssetMenu(fileName = "GunnerTrackingLaserData", menuName = "Player/Gunner/Tracking Laser Data")]
+[DataTableSheet]
 public class GunnerTrackingLaserData : PlayerSkillData
 {
     [Tooltip("생성할 추적 레이저(NetworkObject 프리팹).")]

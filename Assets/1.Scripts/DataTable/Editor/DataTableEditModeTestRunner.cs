@@ -15,6 +15,8 @@ internal static class DataTableEditModeTestRunner
         "^DataTableSchemaTests$",
         "^DataTableApplierTests$",
         "^DataSourceKeyTests$",
+        "^XlsxWriterTests$",
+        "^DataTableTemplateTests$",
     };
 
     const string Tag = "[DataTableTests]";

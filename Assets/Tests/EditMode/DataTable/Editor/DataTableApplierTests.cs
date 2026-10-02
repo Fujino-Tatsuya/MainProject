@@ -7,28 +7,6 @@ using UnityEngine;
 
 public sealed class DataTableApplierTests
 {
-    private sealed class FakeLookup : IDataTableAssetLookup
-    {
-        private readonly Dictionary<string, ScriptableObject> assets;
-
-        public FakeLookup(params ScriptableObject[] assets)
-        {
-            this.assets = assets.ToDictionary(a => a.name);
-        }
-
-        public Type FindType(string sheetName, out string error)
-        {
-            error = sheetName == nameof(DataTableTestData) ? null : $"no type {sheetName}";
-            return error == null ? typeof(DataTableTestData) : null;
-        }
-
-        public IReadOnlyDictionary<string, ScriptableObject> AssetsOf(Type type, out IReadOnlyList<string> duplicateNames)
-        {
-            duplicateNames = Array.Empty<string>();
-            return assets;
-        }
-    }
-
     private readonly List<ScriptableObject> created = new List<ScriptableObject>();
 
     [TearDown]
@@ -62,7 +40,7 @@ public sealed class DataTableApplierTests
         DataTableTestData data = Make("A");
         var issues = new DataTableIssues();
 
-        List<DataTableWrite> writes = Bind(issues, new FakeLookup(data),
+        List<DataTableWrite> writes = Bind(issues, new TestLookup(data),
             Entry("A", "maxHp", "300"),
             Entry("A", "moveSpeed", "1.25"),
             Entry("A", "canDash", "FALSE"),
@@ -103,7 +81,7 @@ public sealed class DataTableApplierTests
         DataTableTestData data = Make("A");
         var issues = new DataTableIssues();
 
-        List<DataTableWrite> writes = Bind(issues, new FakeLookup(data), Entry("A", field, value));
+        List<DataTableWrite> writes = Bind(issues, new TestLookup(data), Entry("A", field, value));
 
         Assert.That(issues.HasErrors, Is.True);
         Assert.That(writes, Is.Empty);
@@ -116,7 +94,7 @@ public sealed class DataTableApplierTests
         DataTableTestData b = Make("B");
         var issues = new DataTableIssues();
 
-        Bind(issues, new FakeLookup(a, b),
+        Bind(issues, new TestLookup(a, b),
             Entry("A", "maxHp", "1"),
             Entry("A", "maxHp", "2"),            // 같은 필드를 두 번
             Entry("Ghost", "maxHp", "1"),        // 없는 에셋
@@ -131,7 +109,7 @@ public sealed class DataTableApplierTests
     {
         DataTableTestData data = Make("A");
         var issues = new DataTableIssues();
-        List<DataTableWrite> writes = Bind(issues, new FakeLookup(data),
+        List<DataTableWrite> writes = Bind(issues, new TestLookup(data),
             Entry("A", "maxHp", "1"), Entry("A", "charge.damage", "77"), Entry("A", "phases[0]", "5"));
 
         DataTableSnapshot snapshot = DataTableApplier.ApplyInMemory(writes);
@@ -153,7 +131,7 @@ public sealed class DataTableApplierTests
         DataTableTestData data = Make("A");
         EditorUtility.ClearDirty(data);
         var issues = new DataTableIssues();
-        List<DataTableWrite> writes = Bind(issues, new FakeLookup(data), Entry("A", "maxHp", "1"));
+        List<DataTableWrite> writes = Bind(issues, new TestLookup(data), Entry("A", "maxHp", "1"));
 
         DataTableApplier.ApplyInMemory(writes);
 
@@ -165,7 +143,7 @@ public sealed class DataTableApplierTests
     {
         DataTableTestData data = Make("A");
         var issues = new DataTableIssues();
-        List<DataTableWrite> writes = Bind(issues, new FakeLookup(data),
+        List<DataTableWrite> writes = Bind(issues, new TestLookup(data),
             Entry("A", "maxHp", "100"),      // 같음
             Entry("A", "moveSpeed", "2.5"),  // 같음(실수 정확 비교)
             Entry("A", "title", "다름"),

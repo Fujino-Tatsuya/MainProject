@@ -128,11 +128,12 @@ public static class DataTableMenu
             Debug.Log(LogPrefix + difference, difference.Write.Target);
         }
 
-        EditorUtility.DisplayDialog("데이터 테이블 Verify",
-            differences.Count == 0
-                ? $"차이 없음 — 필드 {result.Writes.Count}개가 테이블과 같다."
-                : $"SO(개발자 값) 와 테이블(기획 값) 이 다른 필드 {differences.Count}개 / 전체 {result.Writes.Count}개.\n목록은 Console.",
-            "확인");
+        // 결과는 대화상자 대신 Console·알림 — 자주 누르는 메뉴라 클릭 한 번 줄이고, 자동화로 눌러도 멈추지 않게.
+        string summary = differences.Count == 0
+            ? $"Verify: 차이 없음 — 필드 {result.Writes.Count}개가 테이블과 같다."
+            : $"Verify: SO(개발자 값) 와 테이블(기획 값) 이 다른 필드 {differences.Count}개 / 전체 {result.Writes.Count}개 — 목록은 위.";
+        Debug.Log(LogPrefix + summary);
+        EditorWindow.focusedWindow?.ShowNotification(new GUIContent(summary));
     }
 
     [MenuItem(Root + "SO 를 테이블 값으로 덮어쓰기", priority = 20)]
