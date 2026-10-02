@@ -1,25 +1,36 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEngine;
+using Object = UnityEngine.Object;
 
-/// <summary>시트 이름(= SO 타입 이름)과 Id(= 에셋 파일 이름)를 실제 SO 로 푼다. 테스트는 메모리 구현으로 바꿔 끼운다.</summary>
+/// <summary>
+/// 시트 이름(= 타입 이름)과 Id 를 실제 대상으로 푼다. 대상 = SO 에셋 또는 <b>프리팹 안의 컴포넌트</b>.
+/// 테스트는 메모리 구현으로 바꿔 끼운다.
+/// </summary>
 public interface IDataTableAssetLookup
 {
-    /// <summary>시트 이름에 해당하는 SO 타입. 없거나 여럿이면 null + 이유.</summary>
+    /// <summary>시트 이름에 해당하는 타입(ScriptableObject 또는 Component). 없거나 여럿이면 null + 이유.</summary>
     Type FindType(string sheetName, out string error);
 
-    /// <summary>그 타입(정확히 같은 타입)의 에셋 전부, 파일 이름 → 에셋. 같은 이름이 여럿이면 그 이름은 오류 목록으로.</summary>
-    IReadOnlyDictionary<string, ScriptableObject> AssetsOf(Type type, out IReadOnlyList<string> duplicateNames);
+    /// <summary>
+    /// 그 타입(정확히 같은 타입)의 대상 하나. SO = 에셋 파일 이름이 Id, 컴포넌트 = 그 컴포넌트를 가진 프리팹 파일 이름이 Id.
+    /// 없거나 여럿이면 null + 이유.
+    /// </summary>
+    Object FindTarget(Type type, string id, out string error);
+
+    /// <summary>그 타입 대상 전부의 Id — "테이블에 행이 없다" 경고용. 세기 비싸면 null(경고 생략).</summary>
+    IReadOnlyCollection<string> AllIds(Type type);
 }
 
-/// <summary>SO 필드 하나에 쓸 값. 변환·검증을 마친 상태.</summary>
+/// <summary>대상 필드 하나에 쓸 값. 변환·검증을 마친 상태.</summary>
 public sealed class DataTableWrite
 {
-    internal DataTableWrite(ScriptableObject target, string propertyPath, SerializedPropertyType kind, object value, DataTableEntry source)
+    internal DataTableWrite(Object target, string propertyPath, SerializedPropertyType kind, object value, DataTableEntry source)
     {
         Target = target;
         PropertyPath = propertyPath;
@@ -28,14 +39,16 @@ public sealed class DataTableWrite
         Source = source;
     }
 
-    public ScriptableObject Target { get; }
+    /// <summary>SO 에셋 또는 프리팹 에셋 안의 컴포넌트.</summary>
+    public Object Target { get; }
+
     public string PropertyPath { get; }
     public SerializedPropertyType Kind { get; }
     public object Value { get; }
     public DataTableEntry Source { get; }
 }
 
-/// <summary>Verify 결과 한 줄 — SO(개발자 값)와 테이블(기획 값)이 다른 필드.</summary>
+/// <summary>Verify 결과 한 줄 — 인스펙터 값(개발자)과 테이블 값(기획)이 다른 필드.</summary>
 public readonly struct DataTableDifference
 {
     public DataTableDifference(DataTableWrite write, string currentValue)
@@ -48,17 +61,17 @@ public readonly struct DataTableDifference
     public string CurrentValue { get; }
 
     public override string ToString() =>
-        $"{Write.Source.Location}: {Write.Target.name}.{Write.Source.Field} — SO {CurrentValue} / 테이블 {Write.Source.Value}";
+        $"{Write.Source.Location}: {Write.Source.AssetId}.{Write.Source.Field} — 인스펙터 {CurrentValue} / 테이블 {Write.Source.Value}";
 }
 
-/// <summary>메모리 적용 전 SO 상태. <see cref="DataTableApplier.Restore"/> 로 되돌린다. JsonUtility 로 SessionState 에 넣을 수 있다.</summary>
+/// <summary>메모리 적용 전 상태. <see cref="DataTableApplier.Restore"/> 로 되돌린다. JsonUtility 로 SessionState 에 넣을 수 있다.</summary>
 [Serializable]
 public sealed class DataTableSnapshot
 {
     [Serializable]
     public struct Item
     {
-        public int instanceId;          // 같은 에디터 세션 안에서는 이걸로 찾는다(에셋이 아닌 메모리 SO 도 됨).
+        public int instanceId;          // 같은 에디터 세션 안에서는 이걸로 찾는다(에셋이 아닌 메모리 객체도 됨).
         public string globalObjectId;   // 세션이 바뀌었으면(크래시 후 등) 이걸로.
         public string json;
     }
@@ -66,12 +79,26 @@ public sealed class DataTableSnapshot
     public List<Item> items = new List<Item>();
 }
 
+/// <summary>디스크 적용 전 파일 백업 — <see cref="DataTableApplier.RestoreFromBackup"/> 가 파일째 되돌린다(바이트 동일).</summary>
+[Serializable]
+public sealed class DataTableDiskBackup
+{
+    [Serializable]
+    public struct Entry
+    {
+        public string assetPath;
+        public string backupPath;
+    }
+
+    public List<Entry> files = new List<Entry>();
+}
+
 /// <summary>
-/// <see cref="DataTableEntry"/> → SO 필드 쓰기. 세 단계:
+/// <see cref="DataTableEntry"/> → 대상 필드 쓰기. 대상 = SO 또는 프리팹 컴포넌트(PLAN-data-table.md D3·D4 — 프리팹 값을 SO 로 옮기지 않는다).
 /// <list type="number">
-/// <item><see cref="Bind"/> — 타입·에셋·필드를 찾고 값을 변환한다. <b>쓰지 않는다.</b> 문제는 전부 issues 로.</item>
+/// <item><see cref="Bind"/> — 타입·대상·필드를 찾고 값을 변환한다. <b>쓰지 않는다.</b> 문제는 전부 issues 로.</item>
 /// <item><see cref="ApplyInMemory"/>/<see cref="ApplyToDisk"/> — Bind 에 오류가 없을 때만 호출한다(전부 또는 0).</item>
-/// <item><see cref="Diff"/> — 쓰지 않고 SO 현재 값과 비교(Verify).</item>
+/// <item><see cref="Diff"/> — 쓰지 않고 현재 값과 비교(Verify).</item>
 /// </list>
 /// 다루는 타입: 정수·실수·불리언·문자열·열거형(이름). 참조(프리팹·VFX 등)는 테이블 대상이 아니다 — 인스펙터에서 연결.
 /// 배열 원소는 기존 크기 안에서만 쓴다(테이블이 배열 크기를 바꾸지 않는다).
@@ -80,12 +107,14 @@ public static class DataTableApplier
 {
     private static readonly Regex ArrayIndex = new Regex(@"\[(\d+)\]", RegexOptions.Compiled);
 
+    /// <summary>빌드 중 크래시 대비 백업 위치 — Temp 는 에디터 종료 때 지워지므로 Library 에 둔다.</summary>
+    public const string BackupFolder = "Library/DataTableBuildBackup";
+
     public static List<DataTableWrite> Bind(IEnumerable<DataTableEntry> entries, IDataTableAssetLookup lookup, DataTableIssues issues)
     {
         var writes = new List<DataTableWrite>();
-        var serialized = new Dictionary<ScriptableObject, SerializedObject>();
-        var written = new Dictionary<(ScriptableObject, string), DataTableEntry>();
-        var mentioned = new HashSet<ScriptableObject>();
+        var serialized = new Dictionary<Object, SerializedObject>();
+        var written = new Dictionary<(Object, string), DataTableEntry>();
 
         foreach (IGrouping<string, DataTableEntry> sheet in entries.GroupBy(e => e.Sheet, StringComparer.Ordinal))
         {
@@ -97,25 +126,28 @@ public static class DataTableApplier
                 continue;
             }
 
-            IReadOnlyDictionary<string, ScriptableObject> assets = lookup.AssetsOf(type, out IReadOnlyList<string> duplicateNames);
-            var duplicates = new HashSet<string>(duplicateNames, StringComparer.Ordinal);
-
+            var targets = new Dictionary<string, Object>(StringComparer.Ordinal);
+            var failed = new HashSet<string>(StringComparer.Ordinal);
             foreach (DataTableEntry entry in sheet)
             {
-                if (duplicates.Contains(entry.AssetId))
+                if (failed.Contains(entry.AssetId))
                 {
-                    issues.Error(entry.Location, $"{type.Name} 에셋 '{entry.AssetId}' 가 여러 개다 — 파일 이름을 겹치지 않게 할 것.");
-                    continue;
+                    continue; // 대상 못 찾음은 Id 당 한 번만 보고
                 }
 
-                if (!assets.TryGetValue(entry.AssetId, out ScriptableObject target))
+                if (!targets.TryGetValue(entry.AssetId, out Object target))
                 {
-                    issues.Error(entry.Location,
-                        $"{type.Name} 에셋 '{entry.AssetId}' 가 없다. 새 항목이면 프로그래머가 SO 를 먼저 만들어야 한다(테이블은 SO 를 만들지 않는다).");
-                    continue;
+                    target = lookup.FindTarget(type, entry.AssetId, out string targetError);
+                    if (target == null)
+                    {
+                        issues.Error(entry.Location, targetError);
+                        failed.Add(entry.AssetId);
+                        continue;
+                    }
+
+                    targets[entry.AssetId] = target;
                 }
 
-                mentioned.Add(target);
                 if (!serialized.TryGetValue(target, out SerializedObject so))
                 {
                     so = new SerializedObject(target);
@@ -134,13 +166,13 @@ public static class DataTableApplier
 
                 if (written.TryGetValue((target, path), out DataTableEntry previous))
                 {
-                    issues.Error(entry.Location, $"'{target.name}.{entry.Field}' 를 {previous.Location} 에서도 쓴다.");
+                    issues.Error(entry.Location, $"'{entry.AssetId}.{entry.Field}' 를 {previous.Location} 에서도 쓴다.");
                     continue;
                 }
 
                 if (!TryConvert(property, entry.Value, out object value, out string convertError))
                 {
-                    issues.Error(entry.Location, $"'{target.name}.{entry.Field}' = '{entry.Value}' — {convertError}");
+                    issues.Error(entry.Location, $"'{entry.AssetId}.{entry.Field}' = '{entry.Value}' — {convertError}");
                     continue;
                 }
 
@@ -148,9 +180,13 @@ public static class DataTableApplier
                 writes.Add(new DataTableWrite(target, path, property.propertyType, value, entry));
             }
 
-            foreach (KeyValuePair<string, ScriptableObject> pair in assets.Where(p => !mentioned.Contains(p.Value)))
+            IReadOnlyCollection<string> allIds = lookup.AllIds(type);
+            if (allIds != null)
             {
-                issues.Warning($"{firstEntry.Location.Split('!')[0]}", $"{type.Name} 에셋 '{pair.Key}' 의 행이 테이블에 없다.");
+                foreach (string id in allIds.Where(id => !targets.ContainsKey(id) && !failed.Contains(id)))
+                {
+                    issues.Warning(firstEntry.Location.Split('!')[0], $"{type.Name} '{id}' 의 행이 테이블에 없다.");
+                }
             }
         }
 
@@ -159,12 +195,23 @@ public static class DataTableApplier
 
     /// <summary>
     /// 테이블 Play 용. 디스크에는 쓰지 않는다 — 적용 후 dirty 를 지워 저장 대상에서 뺀다.
+    /// 프리팹 컴포넌트도 메모리의 프리팹 에셋을 바꾸므로, 런타임에 Instantiate·네트워크 스폰되는 사본이 테이블 값을 받는다.
     /// 반환한 스냅샷으로 <see cref="Restore"/> 해야 원래 값으로 돌아온다.
     /// </summary>
     public static DataTableSnapshot ApplyInMemory(IReadOnlyList<DataTableWrite> writes)
     {
-        DataTableSnapshot snapshot = TakeSnapshot(writes);
-        foreach (IGrouping<ScriptableObject, DataTableWrite> group in writes.GroupBy(w => w.Target))
+        var snapshot = new DataTableSnapshot();
+        foreach (Object target in writes.Select(w => w.Target).Distinct())
+        {
+            snapshot.items.Add(new DataTableSnapshot.Item
+            {
+                instanceId = target.GetInstanceID(),
+                globalObjectId = GlobalObjectId.GetGlobalObjectIdSlow(target).ToString(),
+                json = EditorJsonUtility.ToJson(target),
+            });
+        }
+
+        foreach (IGrouping<Object, DataTableWrite> group in writes.GroupBy(w => w.Target))
         {
             bool wasDirty = EditorUtility.IsDirty(group.Key);
             var so = new SerializedObject(group.Key);
@@ -183,13 +230,13 @@ public static class DataTableApplier
         return snapshot;
     }
 
-    /// <summary>메모리 적용을 되돌린다. 찾지 못한 에셋 수를 반환한다(0 이 정상).</summary>
+    /// <summary>메모리 적용을 되돌린다. 찾지 못한 대상 수를 반환한다(0 이 정상).</summary>
     public static int Restore(DataTableSnapshot snapshot)
     {
         int missing = 0;
         foreach (DataTableSnapshot.Item item in snapshot.items)
         {
-            ScriptableObject target = FindSnapshotTarget(item);
+            Object target = FindSnapshotTarget(item);
             if (target == null)
             {
                 missing++;
@@ -207,26 +254,43 @@ public static class DataTableApplier
         return missing;
     }
 
-    private static ScriptableObject FindSnapshotTarget(DataTableSnapshot.Item item)
+    private static Object FindSnapshotTarget(DataTableSnapshot.Item item)
     {
-        if (EditorUtility.EntityIdToObject(item.instanceId) is ScriptableObject byInstance)
+        Object byInstance = EditorUtility.EntityIdToObject(item.instanceId);
+        if (byInstance != null)
         {
             return byInstance;
         }
 
         return GlobalObjectId.TryParse(item.globalObjectId, out GlobalObjectId id)
-            ? GlobalObjectId.GlobalObjectIdentifierToObjectSlow(id) as ScriptableObject
+            ? GlobalObjectId.GlobalObjectIdentifierToObjectSlow(id)
             : null;
     }
 
     /// <summary>
-    /// 디스크의 SO 를 테이블 값으로 덮어쓰고 저장한다(빌드·수동 동기화용). Undo 가능.
-    /// 반환한 스냅샷을 <see cref="RestoreToDisk"/> 에 넘기면 적용 전 내용으로 다시 저장한다(빌드 후 원복).
+    /// 디스크의 대상을 테이블 값으로 덮어쓰고 저장한다(빌드용). 쓰기 전에 대상 파일(.asset·.prefab)을 통째로 백업한다 —
+    /// 프리팹 Variant 의 오버라이드 목록까지 원래대로 돌리려면 값 되쓰기가 아니라 파일 복원이어야 바이트가 같다.
+    /// 반환한 백업을 <see cref="RestoreFromBackup"/> 에 넘겨 되돌린다. 백업 목록은 디스크에도 남겨 빌드 중 크래시 후 복구에 쓴다.
+    /// <paramref name="keepBackup"/> = false 는 되돌릴 생각이 없는 수동 덮어쓰기용(백업이 남으면 다음 에디터 시작 때 크래시 복구가 되돌려 버린다).
     /// </summary>
-    public static DataTableSnapshot ApplyToDisk(IReadOnlyList<DataTableWrite> writes)
+    public static DataTableDiskBackup ApplyToDisk(IReadOnlyList<DataTableWrite> writes, bool keepBackup = true)
     {
-        DataTableSnapshot snapshot = TakeSnapshot(writes);
-        foreach (IGrouping<ScriptableObject, DataTableWrite> group in writes.GroupBy(w => w.Target))
+        var backup = new DataTableDiskBackup();
+        string[] assetPaths = writes.Select(w => AssetDatabase.GetAssetPath(w.Target)).Distinct().ToArray();
+        if (keepBackup)
+        {
+            Directory.CreateDirectory(BackupFolder);
+            foreach (string assetPath in assetPaths)
+            {
+                string backupPath = Path.Combine(BackupFolder, AssetDatabase.AssetPathToGUID(assetPath) + Path.GetExtension(assetPath));
+                File.Copy(assetPath, backupPath, overwrite: true);
+                backup.files.Add(new DataTableDiskBackup.Entry { assetPath = assetPath, backupPath = backupPath });
+            }
+
+            File.WriteAllText(ManifestPath, JsonUtility.ToJson(backup, prettyPrint: true));
+        }
+
+        foreach (IGrouping<Object, DataTableWrite> group in writes.GroupBy(w => w.Target))
         {
             var so = new SerializedObject(group.Key);
             foreach (DataTableWrite write in group)
@@ -237,55 +301,55 @@ public static class DataTableApplier
             if (so.ApplyModifiedProperties())
             {
                 EditorUtility.SetDirty(group.Key);
-                AssetDatabase.SaveAssetIfDirty(group.Key);
             }
         }
 
-        return snapshot;
+        foreach (string assetPath in assetPaths)
+        {
+            AssetDatabase.SaveAssetIfDirty(AssetDatabase.GUIDFromAssetPath(assetPath));
+        }
+
+        return backup;
     }
 
-    /// <summary><see cref="ApplyToDisk"/> 전 내용으로 되돌려 저장한다. 찾지 못한 에셋 수를 반환한다(0 이 정상).</summary>
-    public static int RestoreToDisk(DataTableSnapshot snapshot)
+    /// <summary>백업 파일을 제자리로 복사하고 다시 임포트한다. 실패한 파일 수를 반환한다(0 이 정상). 다 되돌리면 백업을 지운다.</summary>
+    public static int RestoreFromBackup(DataTableDiskBackup backup)
     {
-        int missing = 0;
-        foreach (DataTableSnapshot.Item item in snapshot.items)
+        int failed = 0;
+        foreach (DataTableDiskBackup.Entry file in backup.files)
         {
-            ScriptableObject target = FindSnapshotTarget(item);
-            if (target == null)
+            try
             {
-                missing++;
-                continue;
+                File.Copy(file.backupPath, file.assetPath, overwrite: true);
+                AssetDatabase.ImportAsset(file.assetPath, ImportAssetOptions.ForceUpdate);
+                File.Delete(file.backupPath);
             }
-
-            EditorJsonUtility.FromJsonOverwrite(item.json, target);
-            EditorUtility.SetDirty(target);
-            AssetDatabase.SaveAssetIfDirty(target);
-        }
-
-        return missing;
-    }
-
-    private static DataTableSnapshot TakeSnapshot(IReadOnlyList<DataTableWrite> writes)
-    {
-        var snapshot = new DataTableSnapshot();
-        foreach (ScriptableObject target in writes.Select(w => w.Target).Distinct())
-        {
-            snapshot.items.Add(new DataTableSnapshot.Item
+            catch (IOException e)
             {
-                instanceId = target.GetInstanceID(),
-                globalObjectId = GlobalObjectId.GetGlobalObjectIdSlow(target).ToString(),
-                json = EditorJsonUtility.ToJson(target),
-            });
+                failed++;
+                Debug.LogError($"[DataTable] 원복 실패 {file.assetPath} — 백업 {file.backupPath} 을 직접 복사할 것. {e.Message}");
+            }
         }
 
-        return snapshot;
+        if (failed == 0 && File.Exists(ManifestPath))
+        {
+            File.Delete(ManifestPath);
+        }
+
+        return failed;
     }
 
-    /// <summary>SO 현재 값과 테이블 값이 다른 필드. 쓰지 않는다.</summary>
+    /// <summary>지난 빌드가 원복 전에 멈췄다면 남은 백업. 없으면 null.</summary>
+    public static DataTableDiskBackup PendingBackup() =>
+        File.Exists(ManifestPath) ? JsonUtility.FromJson<DataTableDiskBackup>(File.ReadAllText(ManifestPath)) : null;
+
+    private static string ManifestPath => Path.Combine(BackupFolder, "manifest.json");
+
+    /// <summary>대상(SO·프리팹 컴포넌트) 현재 값과 테이블 값이 다른 필드. 쓰지 않는다.</summary>
     public static List<DataTableDifference> Diff(IReadOnlyList<DataTableWrite> writes)
     {
         var differences = new List<DataTableDifference>();
-        foreach (IGrouping<ScriptableObject, DataTableWrite> group in writes.GroupBy(w => w.Target))
+        foreach (IGrouping<Object, DataTableWrite> group in writes.GroupBy(w => w.Target))
         {
             var so = new SerializedObject(group.Key);
             foreach (DataTableWrite write in group)

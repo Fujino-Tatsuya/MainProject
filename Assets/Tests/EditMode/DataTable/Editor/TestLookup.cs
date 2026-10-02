@@ -1,27 +1,36 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using UnityEngine;
+using Object = UnityEngine.Object;
 
-// 테스트용 에셋 조회 — 시트 이름 DataTableTestData 만 알고, 넘겨받은 메모리 SO 를 이름으로 찾는다.
+// 테스트용 대상 조회 — 넘겨받은 객체를 (타입 이름, Id) 로 찾는다. Id 를 안 주면 객체 이름.
 internal sealed class TestLookup : IDataTableAssetLookup
 {
-    private readonly Dictionary<string, ScriptableObject> assets;
+    private readonly Dictionary<string, Object> byId;
+    private readonly Type type;
 
-    public TestLookup(params ScriptableObject[] assets)
+    public TestLookup(params Object[] targets)
+        : this(targets.Select(t => (t.name, t)).ToArray())
     {
-        this.assets = assets.ToDictionary(a => a.name);
+    }
+
+    public TestLookup(params (string id, Object target)[] targets)
+    {
+        byId = targets.ToDictionary(t => t.id, t => t.target);
+        type = targets.Length > 0 ? targets[0].target.GetType() : typeof(DataTableTestData);
     }
 
     public Type FindType(string sheetName, out string error)
     {
-        error = sheetName == nameof(DataTableTestData) ? null : $"no type {sheetName}";
-        return error == null ? typeof(DataTableTestData) : null;
+        error = sheetName == type.Name ? null : $"no type {sheetName}";
+        return error == null ? type : null;
     }
 
-    public IReadOnlyDictionary<string, ScriptableObject> AssetsOf(Type type, out IReadOnlyList<string> duplicateNames)
+    public Object FindTarget(Type requested, string id, out string error)
     {
-        duplicateNames = Array.Empty<string>();
-        return assets;
+        error = byId.ContainsKey(id) ? null : $"no target {id}";
+        return error == null ? byId[id] : null;
     }
+
+    public IReadOnlyCollection<string> AllIds(Type requested) => byId.Keys;
 }

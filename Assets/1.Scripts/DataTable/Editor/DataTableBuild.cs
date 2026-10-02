@@ -23,6 +23,22 @@ public static class DataTableBuild
     static DataTableBuild()
     {
         BuildPlayerWindow.RegisterBuildPlayerHandler(Build);
+
+        // 지난 빌드가 원복 전에 멈췄다면(크래시·강제 종료) 에디터가 뜰 때 되돌린다.
+        // 도메인 리로드마다 불리지만 백업이 없으면 파일 존재 확인 한 번뿐이다.
+        EditorApplication.delayCall += RestorePendingBuildBackup;
+    }
+
+    private static void RestorePendingBuildBackup()
+    {
+        DataTableDiskBackup pending = DataTableApplier.PendingBackup();
+        if (pending == null || BuildPipeline.isBuildingPlayer)
+        {
+            return;
+        }
+
+        int failed = DataTableApplier.RestoreFromBackup(pending);
+        Debug.LogWarning($"{LogPrefix}지난 빌드가 원복 전에 멈췄다 — 백업 {pending.files.Count}개로 되돌렸다(실패 {failed}).");
     }
 
     private static void Build(BuildPlayerOptions options)
@@ -39,22 +55,22 @@ public static class DataTableBuild
             throw new BuildFailedException($"{LogPrefix}테이블 오류로 빌드를 멈췄다 — Console 확인.");
         }
 
-        DataTableSnapshot snapshot = DataTableApplier.ApplyToDisk(result.Writes);
-        Debug.Log($"{LogPrefix}빌드 — 테이블 필드 {result.Writes.Count}개를 SO 에 적용. 빌드 후 원복한다.");
+        DataTableDiskBackup backup = DataTableApplier.ApplyToDisk(result.Writes);
+        Debug.Log($"{LogPrefix}빌드 — 테이블 필드 {result.Writes.Count}개를 SO·프리팹 {backup.files.Count}개에 적용. 빌드 후 파일째 원복한다.");
         try
         {
             BuildPlayerWindow.DefaultBuildMethods.BuildPlayer(options);
         }
         finally
         {
-            int missing = DataTableApplier.RestoreToDisk(snapshot);
-            if (missing == 0)
+            int failed = DataTableApplier.RestoreFromBackup(backup);
+            if (failed == 0)
             {
-                Debug.Log($"{LogPrefix}빌드 후 SO 원복 완료.");
+                Debug.Log($"{LogPrefix}빌드 후 원복 완료.");
             }
             else
             {
-                Debug.LogError($"{LogPrefix}빌드 후 SO {missing}개를 원복하지 못했다 — git 으로 되돌릴 것(git status 로 .asset 확인).");
+                Debug.LogError($"{LogPrefix}빌드 후 {failed}개를 원복하지 못했다 — {DataTableApplier.BackupFolder} 의 백업을 쓰거나 git 으로 되돌릴 것.");
             }
         }
     }

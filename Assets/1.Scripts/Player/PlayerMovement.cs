@@ -2,6 +2,7 @@
 
 [RequireComponent(typeof(PlayerInputReader))]
 [RequireComponent(typeof(PlayerMotor))]
+[DataTableSheet]
 public class PlayerMovement : MonoBehaviour
 {
     private PlayerInputReader reader;
@@ -10,12 +11,12 @@ public class PlayerMovement : MonoBehaviour
     private PlayerMotor motor;
 
     [SerializeField] private Transform armature;
-    [SerializeField] private float rotate_Speed = 10f;
+    [DataTableIgnore] [SerializeField] private float rotate_Speed = 10f;
     [SerializeField] private float maxSpeed = 5f;
     [SerializeField] private float midSpeed = 3f;
     [SerializeField] private float acceleration = 80f;
-    [SerializeField] private float alignThreshold = 0.98f;
-    [SerializeField] private float viewYaw = -45f;
+    [DataTableIgnore] [SerializeField] private float alignThreshold = 0.98f;
+    [DataTableIgnore] [SerializeField] private float viewYaw = -45f;
 
     // 🔴 회전은 물리 틱에서 돈다 — 시각 효과가 아니라 **시뮬레이션 상태**이기 때문이다.
     // Move()의 속도 계산이 armature.forward에 의존한다(dot >= alignThreshold면 즉시 최고속,
@@ -38,11 +39,6 @@ public class PlayerMovement : MonoBehaviour
             armature = transform.Find("Armature");
 
         motor?.SynchronizeArmatureRotation(ArmatureRotation);
-    }
-
-    private void Start()
-    {
-        rotate_Speed = 10f;
     }
 
     /// <summary>오너 입력 장치에서 서버로 보낼 수 있는 raw 값만 캡처한다.</summary>
@@ -174,6 +170,8 @@ public class PlayerMovement : MonoBehaviour
     }
 
     /// <summary>자동 이동도 수동 이동과 같은 상태이상 속도 배율을 사용한다.</summary>
+    /// <summary>이동 최고속도 원본(버프 배율 적용 전). Unit 의 이동속도 스탯도 이 값이다.</summary>
+    internal float BaseMaxSpeed => maxSpeed;
     internal float MaxResolvedMoveSpeed => ResolveMoveSpeed(maxSpeed);
 
     /// <summary>자동 이동 회전은 일반 이동과 같은 보간 속도를 사용한다.</summary>

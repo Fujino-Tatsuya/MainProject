@@ -96,15 +96,56 @@
 - `PlayerDashData` · `PlayerGameRuleData` · `DefaultAttackData` · `Gunner*Data` · `FirstMelee*SkillData`.
 - **첫 xlsx 는 현재 SO 값을 내보내서 만든다**(`Tools/Data/Export Template`) → 직후 `Verify` 결과 = **차이 0** 이 기준선.
 
-### D3. Player 인라인 수치 → SO 이전 (은희 영역)
-- `Player.cs` · `PlayerMovement` · `DefaultAttackController` 등에서 **기획 수치만** 골라 SO 로 옮긴다(§4-5 분류 기준).
-- 캐릭터마다 다른 값 = 캐릭터 SO, 공통 값 = 역할 공통 SO.
-- **이전 툴이 Variant 의 현재 값을 읽어 SO 에 쓴다** → 손으로 옮겨 적지 않는다. 이전 전후로 값이 같은지 툴이 비교·보고.
+### D3·D4. 프리팹 인라인 수치 — **옮기지 않고 테이블이 프리팹을 직접 덮어쓴다** (✅ 2026-10-02 구현 · EditMode 54건)
 
-### D4. 몬스터·보스 (🔴 경석 합의 후)
-- `MonsterDataSO` 10개 연결은 **필드 변경 없이** 가능 — 테이블만 붙인다.
-- 보스 컨트롤러 인라인 수치(`ChargeController`·`JumpController` 등)의 SO 이전은 경석 코드라 **경석이 하거나 승인 후 진행.**
-- 보스 패턴 **흐름**(순서·분기)은 테이블로 안 옮긴다 — 각 단계의 **수치만** 키로 받는다(§4-3).
+> 🔴 **2026-10-02 설계 변경(은희)**: 초안의 "프리팹 값을 SO 로 옮기고 인라인 필드 삭제" 를 폐기했다.
+> 원칙 = **인스펙터 모드는 SO·프리팹 인스펙터 값만, 테이블 모드·빌드는 xlsx 만.** 프리팹 값을 SO 로 옮기면 인스펙터 모드에서 프리팹 값이 사라진다.
+> 그래서 테이블 대상에 **프리팹 안의 컴포넌트**를 더했다 — SO 와 똑같이 메모리 적용(테이블 Play)·디스크 적용 후 파일째 원복(빌드).
+
+**구조**
+- 시트 이름 = 컴포넌트 타입 이름(예: `GauntletBot`), **Id = 그 컴포넌트를 가진 프리팹 파일 이름**(Variant 도 각자 행 — `Player_Paladin`·`Player_Gunner`).
+- 프리팹 안(자식 포함)에 그 타입이 **정확히 하나**여야 한다(둘 이상이면 오류). 조회는 Id 로 프리팹 파일을 찾아 그 프리팹만 연다.
+- 템플릿·미리보기에서 **레거시 폴더·SVN 아트 폴더(`Assets/50.Art/` — 검수용 `*_Review` 프리팹) 제외**. `NetworkVariable` 안쪽(네트워크 상태)은 자동 제외.
+- 빌드 원복 = 값 되쓰기가 아니라 **파일 백업 복사**(Variant 오버라이드 목록까지 바이트 동일). 백업 목록은 `Library/DataTableBuildBackup` — 빌드 중 크래시면 다음 에디터 시작 때 자동 원복.
+- `Tools/Data/Export Template 필드 목록 보기 (파일 안 씀)` — 시트별로 나갈 필드를 Console 에. 기술 값이 섞였는지 점검용.
+
+**표시한 타입**(`[DataTableSheet]`) · 나가는 필드(미리보기 실측)
+
+| 영역 | 시트 | 대상 | 나가는 필드 |
+|---|---|---|---|
+| Player | `Player` | Player · Player_Paladin · Player_Gunner · Paladin_VFX | 인터럽트 2 · 공격력·공속·HP·방어 |
+| Player | `PlayerMovement` | 위 4 | maxSpeed · midSpeed · acceleration |
+| Player | `FirstMeleePassive` | Player_Paladin · Paladin_VFX | 쿨·적중 감소·추가 피해 배율/고정·회복% |
+| Player | `PlayerFallRecovery` · `PlayerLandingProtection` · `PlayerSoulController` | 위 4 | 낙하 입력잠금·무적 · 착지 보호 · 영혼 속도 |
+| Player | `PlayerGameRuleData`(SO) | 1 | **fallDamageRatio 만**(물리 값은 제외) |
+| 몬스터 | `MonsterDataSO`(SO) | 10 | 기본 수치 26 |
+| 몬스터 | `BossDataSO`(SO) | No23 · No23_Solo | 239 — 🔴 기술 값 판단은 경석 |
+| 몬스터 | `MonsterMeleeAttack` | 10 | knockbackStrength |
+| 몬스터 | `LinearKnockback` | 11(몬스터 8 + 더미 3) | maxDistance |
+| 몬스터 | `MonsterCounterWindow` | TwentyThree · 중간보스 3 | windowDuration · groggyDuration |
+| 몬스터 | `TurretHeadAim` | PeekABot · TeslaBot | 회전속도 · 최대 각 · 예고 · 조준 유지 |
+| 몬스터 | `GauntletBot` · `SpinnerBot` · `WallBot` | 각 1 | 패턴 수치 10 · 8 · 10 |
+
+**기술·애매 값 `[DataTableIgnore]`**: 판정 버퍼(`maxHitCount`·`maxDetectionResults`·`maxNearbyResults`·`smash/shockMaxHitCount`) · 연출 정렬(`sideLateralOffset`·`laserWidth`) ·
+네트워크(`yawSendThreshold`·`replicationSmoothing`) · 조작감·카메라(`rotate_Speed`·`alignThreshold`·`viewYaw`·`landedFollowCameraDelay`) ·
+물리(`PlayerGameRuleData` 경사·턱·낙하속도·넉백 4, `LinearKnockback` min/max 시간·정지속도) · 애니 타이밍(`DefaultAttackStep` motionDuration·trackRotationSpeed·loopBackEntryTime,
+`BossDataSO` hitEventFallbackNormalized·telegraphPoseNormalized) · 소유자가 덮어쓰는 값(`BaseAttack.damage`) · 기타(`MonsterDataSO` avoidanceRadius·attackWindup(미사용)·despawnDelay,
+`platformGroundCheckDistance`·`fallReturnDelay`·`airborneFailsafeSeconds`·`blinkInterval`·`additionalHitScale`, `TurretHeadAim` 복귀속도·재조준 지연).
+
+**같이 한 정리**
+- **Q7** `Player.moveSpeed` 삭제 — 이동 원본 = `PlayerMovement.maxSpeed`, `Unit` 이동속도 스탯도 이 값(플레이어 쪽 소비자 0 확인, 10 → 5 로 바뀌지만 읽는 곳 없음).
+- `fallDamageRatio` 씬별 `FallBoundarySettings` → `PlayerGameRuleData`(네 씬 모두 0.25). 씬에는 경계 높이만.
+- 🐞 `PlayerMovement.Start()` 의 `rotate_Speed = 10` 덮어쓰기 제거(프리팹 값 전부 10 — 동작 동일).
+
+**안 한 것**
+- `DefaultAttackProjectile.lifetime`(P5) — 어떤 프리팹·씬도 이 컴포넌트를 안 쓴다(참조 0).
+- `Temp_MultiGameRule.defaultLifeCount` — **씬 배치** 컴포넌트(테이블은 프리팹·SO 만). MapScene 3 · 디버그 PlayerBossTest 1. 🔴 §8 Q10.
+- **M6**(23호 폭탄·장판·송전기) — Q9, 경석 장판 작업 후.
+- 레거시 `Enemy/*` — 참조 0, 삭제 후보로 경석에게 보고.
+
+**제약**
+- **씬에 배치된 프리팹 인스턴스가 그 필드를 덮어쓰고 있으면** 테이블 값이 안 닿는다(플레이어·몬스터·보스는 런타임 스폰이라 해당 없음).
+- 메모리의 프리팹 에셋 값은 런타임 `Instantiate`·네트워크 스폰 사본에 들어간다 — 🔴 실제 테이블 Play 로 확인 필요(§10).
 
 ### D5. 나머지 (범위 확정 후)
 - 상태이상 수치(지속·배율 — 현재 코드에서 넘기는지 SO 인지 조사 필요) · 맵 생성(`MapGenConfigSO`) 등 §8 Q1 결과대로.
@@ -208,7 +249,11 @@
 | ~~Q3~~ | ~~임포트와 SO 커밋은 누가?~~ | ✅ 10-02 해소 — 기획은 xlsx 만 SVN 커밋. 기획이 확인할 때는 Unity 에서 `데이터: 테이블` 로 Play |
 | ~~Q4~~ | ~~파일 단위~~ | ✅ 10-02 은희 확정 — **`GameData.xlsx` 1개 + 시트 여러 개**(한 번에 한 명만 편집 = 잠금 충돌은 감수). 코드는 폴더의 xlsx 를 전부 읽으므로 나중에 쪼개도 비용 0 |
 | Q5 | 시점 — 지스타(11월 중순) 전? | D1·D2 는 지스타 전(작고 독립적). D3·D4 이전은 지스타 이후 권장 — 이전 중 값 유실 위험을 시연 직전에 지지 않는다 |
-| Q6 | 경석 합의 — 몬스터 테이블 연결·보스 수치 이전을 누가 하나? | `MonsterDataSO` 연결은 은희가 툴로(필드 변경 0), 보스 코드 이전은 경석 |
+| ~~Q6~~ | ~~경석 합의~~ | ✅ 10-02 은희 지시로 D4 진행(M1~M5). 🔴 경석에게 변경 공유 필요 |
+| ~~Q7~~ | ~~플레이어 이동속도 원본~~ | ✅ 10-02 은희 — **`PlayerMovement.maxSpeed` 로 일원화, `Player.moveSpeed` 삭제** |
+| ~~Q8~~ | ~~중간보스 패턴 SO 형태~~ | ~~하위 타입~~ → **불필요**(10-02 설계 변경 — 테이블이 `GauntletBot` 등 컴포넌트를 직접 덮어씀) |
+| ~~Q9~~ | ~~23호 M6 시점~~ | ✅ 10-02 은희 — **경석 장판 작업 후로 미룸**(이번엔 M1~M5) |
+| Q10 | 목숨 수 `Temp_MultiGameRule.defaultLifeCount` 는 씬 배치(MapScene 3 · 디버그 PlayerBossTest 1) — 테이블 대상으로 만들까 | **`PlayerGameRuleData` 로 통합**(낙하 비율과 같은 방식). 디버그 씬의 1 은 인스펙터 모드에서 씬 값으로 덮어쓰는 개발용 옵션으로 남기거나 버린다 |
 
 ## 9. 완료 조건
 

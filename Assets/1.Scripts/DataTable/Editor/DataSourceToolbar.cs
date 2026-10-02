@@ -43,8 +43,8 @@ public static class DataSourceToolbar
         AddItem(menu, DataSource.Table, "테이블 (xlsx · 빌드와 같음)");
         AddItem(menu, DataSource.Inspector, "인스펙터 (SO·프리팹 값 그대로)");
         menu.AddSeparator(string.Empty);
-        menu.AddItem(new GUIContent("Verify — SO 와 테이블 차이 보기"), false,
-            () => EditorApplication.ExecuteMenuItem("Tools/Data/Verify (SO 와 테이블 차이 보기)"));
+        menu.AddItem(new GUIContent("Verify — 인스펙터 값과 테이블 차이 보기"), false,
+            () => EditorApplication.ExecuteMenuItem("Tools/Data/Verify (인스펙터 값과 테이블 차이 보기)"));
         menu.DropDown(buttonRect);
     }
 

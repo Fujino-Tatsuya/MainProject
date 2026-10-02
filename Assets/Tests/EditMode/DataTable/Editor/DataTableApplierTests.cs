@@ -4,6 +4,7 @@ using System.Linq;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
+using Object = UnityEngine.Object;
 
 public sealed class DataTableApplierTests
 {
@@ -156,7 +157,7 @@ public sealed class DataTableApplierTests
     }
 
     [Test]
-    public void ApplyToDisk_ThenRestoreToDisk_FileIsByteIdentical()
+    public void ApplyToDisk_ThenRestoreFromBackup_ScriptableObjectFileIsByteIdentical()
     {
         // 빌드 훅(D1.6)이 빌드 후 git diff 0 을 지키는지 — 실제 에셋 파일로 확인한다.
         const string path = "Assets/Tests/EditMode/DataTable/Editor/__DataTableDiskTemp.asset";
@@ -170,13 +171,103 @@ public sealed class DataTableApplierTests
             List<DataTableWrite> writes = Bind(issues, new TestLookup(data),
                 Entry(data.name, "maxHp", "777"), Entry(data.name, "phases[1]", "3"));
 
-            DataTableSnapshot snapshot = DataTableApplier.ApplyToDisk(writes);
+            DataTableDiskBackup backup = DataTableApplier.ApplyToDisk(writes);
             Assert.That(System.IO.File.ReadAllBytes(path), Is.Not.EqualTo(before), "디스크에 써져야 한다");
+            Assert.That(DataTableApplier.PendingBackup(), Is.Not.Null, "빌드 중 크래시 대비 백업 목록이 디스크에 있어야 한다");
 
-            int missing = DataTableApplier.RestoreToDisk(snapshot);
+            int failed = DataTableApplier.RestoreFromBackup(backup);
 
-            Assert.That(missing, Is.Zero);
+            Assert.That(failed, Is.Zero);
             Assert.That(System.IO.File.ReadAllBytes(path), Is.EqualTo(before));
+            Assert.That(AssetDatabase.LoadAssetAtPath<DataTableTestData>(path).maxHp, Is.EqualTo(100), "메모리도 원래 값");
+            Assert.That(DataTableApplier.PendingBackup(), Is.Null, "다 되돌리면 백업 목록을 지운다");
+        }
+        finally
+        {
+            AssetDatabase.DeleteAsset(path);
+        }
+    }
+
+    [Test]
+    public void ApplyToDisk_WithoutBackup_LeavesNoPendingBackup()
+    {
+        // 수동 "인스펙터 값을 테이블 값으로 덮어쓰기" — 백업이 남으면 다음 에디터 시작 때 크래시 복구가 되돌려 버린다.
+        const string path = "Assets/Tests/EditMode/DataTable/Editor/__DataTableDiskTemp2.asset";
+        var data = ScriptableObject.CreateInstance<DataTableTestData>();
+        AssetDatabase.CreateAsset(data, path);
+        AssetDatabase.SaveAssets();
+        try
+        {
+            var issues = new DataTableIssues();
+            List<DataTableWrite> writes = Bind(issues, new TestLookup(data), Entry(data.name, "maxHp", "5"));
+
+            DataTableApplier.ApplyToDisk(writes, keepBackup: false);
+
+            Assert.That(DataTableApplier.PendingBackup(), Is.Null);
+            Assert.That(System.IO.File.ReadAllText(path), Does.Contain("maxHp: 5"));
+        }
+        finally
+        {
+            AssetDatabase.DeleteAsset(path);
+        }
+    }
+
+    [Test]
+    public void PrefabComponent_InMemoryApplyAndRestore()
+    {
+        var go = new GameObject("Bot");
+        var component = go.AddComponent<DataTableTestComponent>();
+        try
+        {
+            var issues = new DataTableIssues();
+            List<DataTableWrite> writes = DataTableApplier.Bind(
+                new[]
+                {
+                    Entry("BotPrefab", "speed", "8.5", nameof(DataTableTestComponent)),
+                    Entry("BotPrefab", "damage", "42", nameof(DataTableTestComponent)),
+                },
+                new TestLookup(("BotPrefab", (Object)component)), issues);
+            Assert.That(issues.Items, Is.Empty, string.Join("\n", issues.Items));
+
+            DataTableSnapshot snapshot = DataTableApplier.ApplyInMemory(writes);
+            Assert.That(component.speed, Is.EqualTo(8.5f));
+            Assert.That(component.damage, Is.EqualTo(42));
+
+            DataTableApplier.Restore(snapshot);
+            Assert.That(component.speed, Is.EqualTo(3f));
+            Assert.That(component.damage, Is.EqualTo(10));
+        }
+        finally
+        {
+            Object.DestroyImmediate(go);
+        }
+    }
+
+    [Test]
+    public void PrefabComponent_ApplyToDisk_ThenRestore_PrefabFileIsByteIdentical()
+    {
+        const string path = "Assets/Tests/EditMode/DataTable/Editor/__DataTablePrefabTemp.prefab";
+        var go = new GameObject("Bot");
+        go.AddComponent<DataTableTestComponent>();
+        GameObject prefab = PrefabUtility.SaveAsPrefabAsset(go, path);
+        Object.DestroyImmediate(go);
+        try
+        {
+            byte[] before = System.IO.File.ReadAllBytes(path);
+            var component = prefab.GetComponent<DataTableTestComponent>();
+            var issues = new DataTableIssues();
+            List<DataTableWrite> writes = DataTableApplier.Bind(
+                new[] { Entry("__DataTablePrefabTemp", "speed", "9", nameof(DataTableTestComponent)) },
+                new TestLookup(("__DataTablePrefabTemp", (Object)component)), issues);
+
+            DataTableDiskBackup backup = DataTableApplier.ApplyToDisk(writes);
+            Assert.That(System.IO.File.ReadAllText(path), Does.Contain("speed: 9"), "프리팹 파일에 써져야 한다");
+
+            int failed = DataTableApplier.RestoreFromBackup(backup);
+
+            Assert.That(failed, Is.Zero);
+            Assert.That(System.IO.File.ReadAllBytes(path), Is.EqualTo(before));
+            Assert.That(AssetDatabase.LoadAssetAtPath<GameObject>(path).GetComponent<DataTableTestComponent>().speed, Is.EqualTo(3f));
         }
         finally
         {

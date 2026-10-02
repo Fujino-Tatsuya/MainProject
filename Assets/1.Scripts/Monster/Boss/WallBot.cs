@@ -29,6 +29,7 @@ using UnityEngine.AI;
 // 🔴 base 의 히트 경로를 **창 동안 막는다**. `AttackStart` 의 `OnAttackHit` 는 정규화 0.4(≈0.33초)로
 //    창 한가운데에 있는데, 그대로 두면 모으는 도중에 근접 판정이 나가고 `AttackEnd` 트리거까지
 //    발동해 2단이 먼저 재생된다.
+[DataTableSheet]
 public class WallBot : MonsterBase
 {
     enum ShieldPhase { None, Gather, Dash, Shock }
@@ -74,7 +75,7 @@ public class WallBot : MonsterBase
     float shockKnockback = 6f;
     [SerializeField, Min(1)]
     [Tooltip("충격파 OverlapSphere 결과 버퍼 크기.")]
-    int shockMaxHitCount = 8;
+    [DataTableIgnore] int shockMaxHitCount = 8;
 
     [SerializeField, Min(0.1f)]
     [Tooltip("충격파(2단 클립) 구간 길이(초). A_WallBot_AttackEnd 는 17프레임(≈0.6초)이고 67%에서 " +

@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
+using Object = UnityEngine.Object;
 
 public sealed class DataTableTemplateTests
 {
@@ -14,7 +15,7 @@ public sealed class DataTableTemplateTests
     {
         foreach (ScriptableObject so in created)
         {
-            UnityEngine.Object.DestroyImmediate(so);
+            Object.DestroyImmediate(so);
         }
 
         created.Clear();
@@ -81,7 +82,7 @@ public sealed class DataTableTemplateTests
         var warnings = new List<string>();
 
         List<XlsxWriteSheet> sheets = DataTableTemplate.BuildSheets(
-            new[] { (typeof(DataTableTestData), (IReadOnlyList<ScriptableObject>)new ScriptableObject[] { a, b }) }, warnings);
+            new[] { (typeof(DataTableTestData), Targets(a, b)) }, warnings);
 
         Assert.That(sheets[0].Rows[0], Does.Not.Contain("phases[2]"));
         Assert.That(warnings, Has.Count.EqualTo(1).And.Some.Contains("phases[2]"));
@@ -95,12 +96,34 @@ public sealed class DataTableTemplateTests
         Assert.That(DataTableApplier.ToPropertyPath(tablePath), Is.EqualTo(propertyPath));
     }
 
+    private static IReadOnlyList<(string id, Object target)> Targets(params ScriptableObject[] assets) =>
+        assets.Select(a => (a.name, (Object)a)).ToList();
+
+    [Test]
+    public void CollectFields_Component_SkipsNetworkVariableAndIgnored()
+    {
+        var go = new GameObject("Bot");
+        try
+        {
+            var component = go.AddComponent<DataTableTestComponent>();
+
+            List<DataTableTemplate.Field> fields = DataTableTemplate.CollectFields(component);
+
+            // m_Enabled 같은 Unity 내부 값·[DataTableIgnore]·NetworkVariable 안쪽 없음.
+            Assert.That(fields.Select(f => f.Path), Is.EqualTo(new[] { "speed", "damage" }));
+        }
+        finally
+        {
+            Object.DestroyImmediate(go);
+        }
+    }
+
     private static List<DataTableDifference> ExportImportDiff(
         ScriptableObject[] assets, out DataTableIssues issues, out List<XlsxSheet> sheets)
     {
         var warnings = new List<string>();
         List<XlsxWriteSheet> written = DataTableTemplate.BuildSheets(
-            new[] { (typeof(DataTableTestData), (IReadOnlyList<ScriptableObject>)assets) }, warnings);
+            new[] { (typeof(DataTableTestData), Targets(assets)) }, warnings);
         Assert.That(warnings, Is.Empty);
 
         var stream = new MemoryStream();

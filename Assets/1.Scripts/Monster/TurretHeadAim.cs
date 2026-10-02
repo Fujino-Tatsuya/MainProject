@@ -29,6 +29,7 @@ using UnityEngine;
 /// </summary>
 [DisallowMultipleComponent]
 [RequireComponent(typeof(MonsterBase))]
+[DataTableSheet]
 public class TurretHeadAim : NetworkBehaviour, ITurretAimGate
 {
     [Header("머리 본")]
@@ -45,7 +46,7 @@ public class TurretHeadAim : NetworkBehaviour, ITurretAimGate
 
     [Header("복귀")]
     [Tooltip("타깃이 없을 때 정면(0도)으로 돌아오는 속도(도/초). 0 이면 그 자리에 멈춘다.")]
-    [SerializeField] private float returnDegreesPerSecond = 120f;
+    [DataTableIgnore] [SerializeField] private float returnDegreesPerSecond = 120f;
 
     [Header("조준 고정")]
     [Tooltip("공격 중에는 조준을 고정한다(영점 고정 → 발사 → 다시 조준). " +
@@ -54,7 +55,7 @@ public class TurretHeadAim : NetworkBehaviour, ITurretAimGate
 
     [Tooltip("공격이 끝난 뒤 다시 조준을 시작하기까지의 뜸(초). " +
              "0 이면 공격이 끝나는 즉시 머리가 돈다 — 붙어서 돌면 기계적으로 보인다(팀장 피드백).")]
-    [SerializeField] private float aimResumeDelay = 0.25f;
+    [DataTableIgnore] [SerializeField] private float aimResumeDelay = 0.25f;
 
     [Header("조준 예고선 (TrackingLaser)")]
     [Tooltip("비우면 이름으로 자동 탐색한다. 아트 프리팹에 딸려온 LineRenderer 로, 원래 비활성이다.")]
@@ -68,7 +69,7 @@ public class TurretHeadAim : NetworkBehaviour, ITurretAimGate
              "그 기본값은 내장 RP 의 Default-Line 이라 URP 에서 안 보인다.")]
     [SerializeField] private Material laserMaterial;
     [Tooltip("예고선 두께(m).")]
-    [SerializeField] private float laserWidth = 0.05f;
+    [DataTableIgnore] [SerializeField] private float laserWidth = 0.05f;
     [Tooltip("예고선이 나가는 지점. 비우면 Muzzle_Socket → Head → HeadRotator 순으로 자동 탐색한다. " +
              "예고선 오브젝트의 위치를 쓰지 않는 이유는, 그 오브젝트가 머리에 붙어 있지 않을 수도 있어서다.")]
     [SerializeField] private Transform laserOrigin;
@@ -85,11 +86,11 @@ public class TurretHeadAim : NetworkBehaviour, ITurretAimGate
     [Header("네트워크")]
     [Tooltip("서버가 조준각을 다시 보내는 최소 변화량(도). 이보다 작게 움직이면 보내지 않는다. " +
              "0 이면 추적하는 내내 매 틱 보낸다.")]
-    [SerializeField] private float yawSendThreshold = 0.5f;
+    [DataTableIgnore] [SerializeField] private float yawSendThreshold = 0.5f;
 
     [Tooltip("클라가 받은 조준각을 따라잡는 시간(초). 복제가 틱 단위(기본 30Hz)로 오므로 " +
              "그 간격을 메우는 값이다. 크면 머리가 늘어지고, 0 이면 계단처럼 튄다.")]
-    [SerializeField] private float replicationSmoothing = 0.08f;
+    [DataTableIgnore] [SerializeField] private float replicationSmoothing = 0.08f;
 
     [Header("진단")]
     [Tooltip("켜면 0.5초마다 상태·조준각·애니메이터 개입 여부를 콘솔에 찍는다. " +
