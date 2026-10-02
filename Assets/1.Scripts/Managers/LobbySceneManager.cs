@@ -28,6 +28,7 @@ public class LobbySceneManager : NemoSceneManager
     [SerializeField] private Button[] characterButtons = new Button[CharacterButtonCount];
     [SerializeField] private Color characterSelectedColor = new Color(1f, 0.85f, 0.3f, 1f);
     [SerializeField] private Color characterIdleColor = Color.white;
+    [SerializeField] private Color characterReadyColor = new Color(0.25f, 0.85f, 0.45f, 1f);
 
     [Header("Messages")]
     [SerializeField] private TMP_Text errorText;
@@ -378,12 +379,14 @@ public class LobbySceneManager : NemoSceneManager
                 continue;
             }
 
+            // Ready 잠금은 interactable 로 하지 않는다 — 비활성 틴트가 Ready 초록을 흐리게 덮는다. 클릭은 SelectCharacter 가 무시.
             var available = roster != null && roster.TryGetAvailableCharacter(i, out _);
-            button.interactable = listening && available && !locked;
+            button.interactable = listening && available;
 
             if (button.targetGraphic != null)
             {
-                button.targetGraphic.color = i == selectedId ? characterSelectedColor : characterIdleColor;
+                var selectedColor = locked ? characterReadyColor : characterSelectedColor;
+                button.targetGraphic.color = i == selectedId ? selectedColor : characterIdleColor;
             }
         }
     }
@@ -394,6 +397,12 @@ public class LobbySceneManager : NemoSceneManager
         if (controller == null)
         {
             WarnMissingReference(nameof(LobbyUIController));
+            return;
+        }
+
+        var isHost = _networkManager != null && _networkManager.IsHost;
+        if (!isHost && controller.IsLocalReady())
+        {
             return;
         }
 
