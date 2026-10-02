@@ -13,8 +13,10 @@ public class SkillCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
     private class SlotWidget
     {
         public PlayerSkillSlot slot;
+        public Image icon = null;
         public Image cooldownFill;   // Filled 타입 오버레이 — 남은 쿨타임 비율만큼 덮는다
         public TMP_Text remainingText;
+        public SkillSlotHover hover = null;
 
         [System.NonSerialized] public Graphic[] graphics;
         [System.NonSerialized] public Color[] normalColors;
@@ -34,8 +36,43 @@ public class SkillCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
     public void Bind(Player player)
     {
         skillController = player != null ? player.GetComponent<PlayerSkillController>() : null;
+        BindTooltipSlots(player);
         Refresh();
     }
+
+    private void BindTooltipSlots(Player player)
+    {
+        if (slots == null)
+            return;
+
+        foreach (SlotWidget widget in slots)
+        {
+            if (widget == null)
+                continue;
+
+            PlayerSkillData data = skillController != null ? skillController.GetSkill(widget.slot)?.Data : null;
+            ISkillTooltipSource source = data;
+            if (widget.icon != null && source != null && source.Tooltip.Icon != null)
+                widget.icon.sprite = source.Tooltip.Icon;
+
+            widget.hover?.Bind(
+                player,
+                source,
+                widget.slot,
+                acceptsLeftClick: true,
+                displayKey: KeyLabel(widget.slot),
+                cooldownSeconds: data != null ? data.CooldownTime : (float?)null);
+        }
+    }
+
+    private static string KeyLabel(PlayerSkillSlot slot) => slot switch
+    {
+        PlayerSkillSlot.Main => "Q",
+        PlayerSkillSlot.Sub => "E",
+        PlayerSkillSlot.Interrupt => "RMB",
+        PlayerSkillSlot.Ultimate => "R",
+        _ => string.Empty,
+    };
 
     /// <summary>
     /// 사용 불가 색상만 전환한다. Refresh는 계속 실행되므로 Cooldown Fill은 멈추지 않는다.

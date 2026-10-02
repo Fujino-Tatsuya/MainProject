@@ -52,6 +52,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
     private bool endingGracefully;
 
     public bool CanStartApprovedAttack => data != null && heat != null && !heat.IsOverheated;
+    public GunnerBasicAttackData Data => data;
 
     // 공용 대시 우선(D1·D2) — 준비 중 끊기면 발사·과열 없음, 발사 후면 이미 쏜 발은 그대로이고 후속 동작만 끊긴다.
     public bool CanBeCanceledByDash => true;

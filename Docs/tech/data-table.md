@@ -110,7 +110,38 @@ GameData.xlsx (SVN, 잠금)
 3. 필드에 `[Tooltip("…")]` — 테이블 설명 칸이 된다. 범위가 있으면 `[Range]`·`[Min]`(테이블도 검증).
 4. `Export Template 필드 목록 보기` 로 확인 → `Export Template` **병합** → SVN 커밋.
 
-- 내보내는 건 **정수·실수**만(구조체·배열 원소 포함). bool·enum·문자열은 가져오기는 되지만 템플릿엔 안 넣는다.
+- 내보내는 건 **정수·실수 + `[DataTableText]` 문자열**(구조체·배열 원소 포함). bool·enum·일반 문자열은 템플릿에 넣지 않는다.
+- 기획 문구 문자열에는 필드에 `[DataTableText]`를 붙인다. 이 특성이 없는 문자열(`animatorStateName` 등)은 Export·병합·Verify·적용에서 계속 제외된다.
 - `NetworkVariable` 안쪽은 자동 제외. 레거시 폴더·`Assets/50.Art/` 프리팹(검수용)은 템플릿 대상이 아니다.
 - 필드 이름을 바꾸면(`FormerlySerializedAs`) 시트 머리글도 같이 바꾼다 — 안 그러면 오류.
 - 테스트: `Tools/Tests/데이터 테이블 EditMode 테스트 실행`.
+
+## 9. 프로그래머·기획 — 툴팁 문구와 자리표시자
+
+`[DataTableText]` 문자열은 xlsx 셀의 줄바꿈을 그대로 왕복한다. Excel에서 `Alt+Enter`로 문단을 나누면 게임에서도 줄바꿈으로 표시된다.
+
+스킬 툴팁 `description`은 같은 대상의 직렬화 필드를 자리표시자로 읽는다.
+
+| 표기 | 의미 | 예 |
+|---|---|---|
+| `{필드}` | 숫자를 간결하게 표시 | `{cooldownTime}` → `8` |
+| `{필드:0.0}` | .NET 숫자 형식 적용 | `{shieldDuration:0.0}` → `2.5` |
+| `{필드:%}` | 0~1 비율을 백분율로 표시 | `{healPercent:%}` → `15%` |
+| `{dmg}` | 현재 최종 공격력으로 계산한 피해와 공격력 아이콘 | Shift를 누르면 계산식도 표시 |
+
+- 필드 경로는 A열 표기와 같다. 구조체는 `{charge.speed}`, 배열 원소는 `{stages[0]}`처럼 쓴다.
+- 다른 에셋의 값은 참조할 수 없다. 해당 행의 SO·프리팹 컴포넌트 안 필드만 쓴다.
+- 없는 필드, 잘못된 숫자 형식, 닫히지 않은 `{` 또는 `<style>` 태그는 Apply·Verify에서 셀 위치와 함께 오류가 난다. 오류가 하나라도 있으면 아무 값도 적용하지 않는다.
+- 테이블을 거치지 않는 인스펙터 모드에서는 잘못된 문구가 툴팁에 `[오류: …]`로 보이고 Console에 경고가 남는다.
+
+키워드 색은 TMP style 태그를 사용한다. 색상 값은 문구에 직접 쓰지 않고 공용 Style Sheet에서 관리한다.
+
+```text
+<style=stun>기절</style>
+<style=shield>보호막</style>
+<style=heal>회복</style>
+<style=overheat>과열</style>
+<style=slow>둔화</style>
+```
+
+여는 태그와 `</style>`을 반드시 짝지어 쓴다. 새 키워드 색이 필요하면 `Tools/UI/스킬 툴팁 구성`이 만드는 `SkillTooltipStyles.asset`에 스타일을 추가하고 문구에서는 그 이름만 사용한다.

@@ -113,6 +113,7 @@ public class GunnerChargeLaserSkill : PlayerSkillBase
 
         float factor = data.ChargeFactor(Time.time - chargeStartTime);
         float range = data.RangeAt(factor);
+        // 툴팁의 최소~최대 계산도 같은 집중·과열 배율을 쓰므로 판정 공식을 바꿀 때 같이 바꿀 것.
         int damage = Mathf.Max(0, Mathf.RoundToInt(
             damageSnapshot * data.DamageMultiplierAt(factor) * data.StageDamageMultiplier(storedStage)));
         int shield = Mathf.Max(0, Mathf.RoundToInt(data.ShieldAmount * data.StageShieldMultiplier(storedStage)));

@@ -21,8 +21,11 @@ using UnityEngine.Serialization;
 [RequireComponent(typeof(Player))]
 [RequireComponent(typeof(StatusEffectController))]
 [DataTableSheet("Paladin", Order = 1)]
-public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive, IPlayerOnHitBonus
+public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive, IPlayerOnHitBonus, ISkillTooltipSource
 {
+    [Header("툴팁")]
+    [SerializeField] private SkillTooltipText tooltip;
+
     [Header("쿨다운")]
     [SerializeField, Min(0f)] private float cooldownTime = 30f;
     // 피격 1회당 감소(초). 데미지량 무관. 쿨타임 중에만 의미가 있다.
@@ -80,6 +83,11 @@ public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive, IPlayerOn
     public bool IsReady => HasCharge;
     public float RemainingCooldown =>
         !HasCharge && CanReadCooldown ? Mathf.Max(0f, (float)(readyServerTime.Value - ServerNow)) : 0f;
+    public SkillTooltipText Tooltip => tooltip;
+    public UnityEngine.Object TooltipValueSource => this;
+
+    public SkillTooltipDamage GetTooltipDamage(Player player) =>
+        SkillTooltipDamage.FromLinear(player, bonusDamageMultiplier, bonusFlatDamage);
 
     private void Awake()
     {

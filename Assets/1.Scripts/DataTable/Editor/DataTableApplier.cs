@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEngine;
@@ -200,16 +201,31 @@ public static class DataTableApplier
                     continue;
                 }
 
+                FieldInfo resolvedField = DataTableFields.Resolve(targetType, path);
+                if (property.propertyType == SerializedPropertyType.String && !DataTableFields.IsTableText(resolvedField))
+                {
+                    issues.Error(entry.Location,
+                        $"{targetType.Name}.{entry.Field} — 문자열은 [DataTableText]가 붙은 필드만 테이블에서 다룬다.");
+                    continue;
+                }
+
                 if (!TryConvert(property, entry.Value, out object value, out string convertError))
                 {
                     issues.Error(entry.Location, $"'{entry.AssetId}.{entry.Field}' = '{entry.Value}' — {convertError}");
                     continue;
                 }
 
+                if (property.propertyType == SerializedPropertyType.String &&
+                    !SkillTooltipFormatter.TryValidate((string)value, target, out string tooltipError))
+                {
+                    issues.Error(entry.Location, $"'{entry.AssetId}.{entry.Field}' — {tooltipError}");
+                    continue;
+                }
+
                 if (value is long || value is double)
                 {
                     string rangeError = DataTableFields.CheckRange(
-                        DataTableFields.Resolve(target.GetType(), path), Convert.ToDouble(value, CultureInfo.InvariantCulture));
+                        resolvedField, Convert.ToDouble(value, CultureInfo.InvariantCulture));
                     if (rangeError != null)
                     {
                         issues.Error(entry.Location, $"'{entry.AssetId}.{entry.Field}' = '{entry.Value}' — {rangeError}");
