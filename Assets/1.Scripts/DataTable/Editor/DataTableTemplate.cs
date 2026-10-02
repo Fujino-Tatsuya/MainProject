@@ -120,15 +120,29 @@ public static class DataTableTemplate
     {
         List<List<Field>> perAsset = assets.Select(a => CollectFields(a.target)).ToList();
 
-        // 모든 에셋에 있는 필드만 열로 — 빈 칸은 가져오기 오류라서. 배열 길이가 에셋마다 다르면 여기서 빠진다.
-        List<Field> columns = perAsset[0]
-            .Where(f => perAsset.All(fs => fs.Any(x => x.Path == f.Path)))
-            .ToList();
-        IEnumerable<string> dropped = perAsset.SelectMany(fs => fs.Select(f => f.Path)).Distinct()
-            .Where(p => columns.All(c => c.Path != p));
-        foreach (string path in dropped)
+        // 열 = 모든 대상의 필드 합집합(배열 길이가 대상마다 달라도 다 싣는다). 그 대상에 없는 칸은 "-"(DataTableSchema.NotApplicable).
+        // 순서: 첫 대상 순서를 따르고, 다른 대상에만 있는 필드는 그 대상에서 바로 앞 필드 뒤에 끼운다 — attacks[6].* 가 attacks[5].* 뒤에 오게.
+        var columns = new List<Field>();
+        var columnIndex = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (List<Field> fields in perAsset)
         {
-            warnings.Add($"{type.Name}.{path}: 일부 에셋에만 있다(배열 길이가 다름) — 템플릿에서 뺐다.");
+            int insertAt = 0;
+            foreach (Field field in fields)
+            {
+                if (columnIndex.TryGetValue(field.Path, out int existing))
+                {
+                    insertAt = existing + 1;
+                    continue;
+                }
+
+                columns.Insert(insertAt, field);
+                for (int c = 0; c < columns.Count; c++)
+                {
+                    columnIndex[columns[c].Path] = c;
+                }
+
+                insertAt++;
+            }
         }
 
         var rows = new List<object[]>
@@ -139,7 +153,9 @@ public static class DataTableTemplate
         for (int i = 0; i < assets.Count; i++)
         {
             Dictionary<string, object> values = perAsset[i].ToDictionary(f => f.Path, f => f.Value);
-            rows.Add(new object[] { assets[i].id }.Concat(columns.Select(c => values[c.Path])).ToArray());
+            rows.Add(new object[] { assets[i].id }
+                .Concat(columns.Select(c => values.TryGetValue(c.Path, out object v) ? v : DataTableSchema.NotApplicable))
+                .ToArray());
         }
 
         return new XlsxWriteSheet(type.Name, rows, frozenRows: 2, boldRows: 1);
@@ -280,7 +296,13 @@ public static class DataTableTemplate
     public const string ExportBackupFolder = "Library/DataTableExportBackup";
 
     [MenuItem("Tools/Data/Export Template (현재 인스펙터 값 → xlsx)", priority = 30)]
-    private static void Export()
+    private static void Export() => Export(askWhenExists: true);
+
+    /// <summary>확인 창 없이 바로 병합 — 기존 값 보존·원본 백업이라 안전하다. 파일이 없으면 새로 만든다. 자동화(MCP)에서도 멈추지 않는다.</summary>
+    [MenuItem("Tools/Data/Export Template — 병합 (확인 없이)", priority = 32)]
+    private static void ExportMerge() => Export(askWhenExists: false);
+
+    private static void Export(bool askWhenExists)
     {
         var warnings = new List<string>();
         List<(Type, IReadOnlyList<(string id, Object target)>)> tables = CollectTargets(warnings);
@@ -298,7 +320,7 @@ public static class DataTableTemplate
         if (File.Exists(path))
         {
             // 0 = 병합, 1 = 취소, 2 = 덮어쓰기. 병합이 기본 — 기획이 쓰던 파일이 있으면 값을 지키는 쪽이 안전하다.
-            int choice = EditorUtility.DisplayDialogComplex("Export Template",
+            int choice = !askWhenExists ? 0 : EditorUtility.DisplayDialogComplex("Export Template",
                 $"{path} 가 이미 있다.\n\n" +
                 "병합: 기획이 고친 값은 그대로, 새 시트·필드·대상만 현재 인스펙터 값으로 추가. 코드에서 사라진 칸은 #(메모)로.\n" +
                 "덮어쓰기: 전부 현재 인스펙터 값으로(기획 값 사라짐).\n\n" +

@@ -44,6 +44,20 @@ public sealed class DataTableSchemaTests
     }
 
     [Test]
+    public void RowTable_DashMeansNotApplicable_IsSkippedWithoutError()
+    {
+        var issues = new DataTableIssues();
+        List<DataTableEntry> entries = Parse(Sheet("S",
+            new[] { "Id", "attacks[6].damage" },
+            new[] { "", "" },
+            new[] { "No23", "40" },
+            new[] { "No23_Solo", "-" }), issues);
+
+        Assert.That(issues.Items, Is.Empty);
+        Assert.That(entries.Select(e => e.AssetId), Is.EqualTo(new[] { "No23" }));
+    }
+
+    [Test]
     public void RowTable_DuplicateIdAndHeader_AreErrors()
     {
         var issues = new DataTableIssues();

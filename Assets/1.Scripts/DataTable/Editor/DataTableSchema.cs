@@ -80,6 +80,12 @@ public static class DataTableSchema
     public const string ValueHeader = "Value";
     public const string CommentPrefix = "#";
 
+    /// <summary>
+    /// 행 테이블에서 "이 대상에는 없는 칸"(예: 23호 Solo 는 공격이 6개라 attacks[6]·[7] 이 없다).
+    /// 빈 칸은 "채우는 걸 잊음" 이라 오류로 남기고, 없는 칸은 이 표시로 구분한다.
+    /// </summary>
+    public const string NotApplicable = "-";
+
     private const int RowTableFirstDataRow = 2; // 0: 필드 이름, 1: 설명
 
     public static List<DataTableEntry> Parse(string fileName, IEnumerable<XlsxSheet> sheets, DataTableIssues issues)
@@ -182,8 +188,13 @@ public static class DataTableSchema
                 string location = Where(fileName, sheetName, row, column);
                 if (value.Length == 0)
                 {
-                    issues.Error(location, $"'{id}.{name}' 값이 비어 있다.");
+                    issues.Error(location, $"'{id}.{name}' 값이 비어 있다(이 대상에 없는 칸이면 '{NotApplicable}').");
                     continue;
+                }
+
+                if (value == NotApplicable)
+                {
+                    continue; // 이 대상엔 없는 칸(배열 길이가 다름 등)
                 }
 
                 into.Add(new DataTableEntry(sheetName, id, name, value, location));
