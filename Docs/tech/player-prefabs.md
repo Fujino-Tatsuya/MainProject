@@ -2,7 +2,7 @@
 
 > **목적.** 이 프리팹들은 이름도 내용도 비슷해서 AI 에이전트와 사람이 반복해서 헷갈린다.
 > "무엇이 무슨 역할이냐", "지금 실제로 스폰되는 건 뭐냐", "어느 쪽을 고쳐야 하냐"의 **단일 사실 원본**이다.
-> 🟢 **§0 은 2026-09-29 `fix/Player` 의 base + Variant 전환 후 사실**이다([PLAN-player-variants.md](../../PLAN-player-variants.md)).
+> 🟢 **§0 은 2026-09-29 `fix/Player` 의 base + Variant 전환 후 사실**이다([PLAN-player-variants.md](../history/PLANS/PLAN-player-variants.md)).
 > 🟡 **§2~§6 은 전환 이전(통짜 복제본 시절, 2026-09-16) 기록**이다 — 사고 원인·함정 설명으로만 읽을 것.
 > 코드 주석·옛 문서를 믿지 말고 §9 의 확인 명령으로 다시 검증할 것.
 
@@ -38,7 +38,7 @@ Player.prefab (base)            ← 네트워크·입력·이동·생명주기·
 | 전투·이동·UI 등 **역할** 동작을 바꾸려면? | **`Player.prefab`**(base). Variant 가 상속한다 |
 | 가붕이 **고유**(스킬·VFX·모델·히트박스·스탯)를 바꾸려면? | **`Player_Paladin.prefab`**, 몸체는 **`Paladin_Armature.prefab`** |
 | 새 캐릭터를 추가하려면? | base 의 Variant 를 새로 만들고 `DefaultNetworkPrefabs` 에 등록. 🔴 **`GlobalObjectIdHash` 가 YAML 에 기록됐는지 확인**(아래) |
-| 새 캐릭터 패시브는? | Variant 루트에 **`IPlayerPassive`** 구현 컴포넌트를 붙인다(HUD 가 이것만 본다). 적중·피격 반응은 `Player.ServerAttackLanded` / `ServerAttackReceived` 구독 — base 는 구체 패시브를 모른다([PLAN-passive-onhit.md](../../PLAN-passive-onhit.md)) |
+| 새 캐릭터 패시브는? | Variant 루트에 **`IPlayerPassive`** 구현 컴포넌트를 붙인다(HUD 가 이것만 본다). 적중·피격 반응은 `Player.ServerAttackLanded` / `ServerAttackReceived` 구독 — base 는 구체 패시브를 모른다([PLAN-passive-onhit.md](../history/PLANS/PLAN-passive-onhit.md)) |
 | 자식 이름 규칙 | 몸체 인스턴스 이름은 반드시 **`Armature`** (`transform.Find("Armature")` 폴백 3곳, §1.4) |
 | 구 프리팹은? | `Paladin.prefab` · `TempPlayer_Armature.prefab` → **`Player/Legacy/`** 보관. `Paladin_VFX.prefab` 은 **원래 위치(`Player/Paladin/`)에 유지**(2026-09-29 사용자 결정). 셋 다 **스폰 대상이 아니다** — 고쳐도 게임에 반영되지 않는다. (NGO 자동 생성으로 `DefaultNetworkPrefabs` 에는 **등록돼 있다** — 아래 행) |
 | 네트워크 목록 | `DefaultNetworkPrefabs` 는 **NGO 가 자동 생성**한다(`ProjectSettings/NetcodeForGameObjects.asset` `GenerateDefaultNetworkPrefabs: 1`) — NetworkObject 가 붙은 프리팹은 base·Legacy 포함 **전부 다시 들어온다**. 손으로 빼지 말 것. 스폰되지 않는 프리팹이 목록에 있는 건 무해(해시가 전부 다르다) |
@@ -336,7 +336,7 @@ Paladin  (루트 컴포넌트 37개 — Player 와 동일 구성)
 5-1. **캐릭터·무기 머티리얼**(2026-10-02) → 셰이더 수치는 공통 부모 **`3.Materials/Toon/PlayableCharacter_Toon.mat`** 에서만 고친다.
    캐릭터·무기마다 그 **Material Variant**(`Paladin_Toon`·`Paladin_Sword/Shield_Toon`·`Gunner_Toon`·`LaserGun_Toon`)를 두고 **Base Map 만** 덮는다.
    새 캐릭터 = Variant 하나 추가. 정리 툴 `Tools/Player/Toon Material/공통 머티리얼 + Variant 정리`(`PlayableToonMaterialAuthoring.cs`, 재실행 안전 — 🔴 Variant 의 Base Map 외 오버라이드를 전부 되돌린다).
-   계획 원본 [PLAN-playable-toon-material.md](../../PLAN-playable-toon-material.md).
+   계획 원본 [PLAN-playable-toon-material.md](../history/PLANS/PLAN-playable-toon-material.md).
 6. **`Legacy/` 의 프리팹이나 `Paladin/Paladin_VFX.prefab` 을 고쳤다** → 게임에 반영되지 않는다. 어떤 씬·스폰 경로도 가리키지 않는다(`DefaultNetworkPrefabs` 자동 등록은 스폰과 무관).
 7. **역할/캐릭터 경계를 새로 긋는다** → §1.4 계약을 먼저 읽고 팀에 올린다.
 
@@ -353,7 +353,7 @@ Paladin  (루트 컴포넌트 37개 — Player 와 동일 구성)
 ## 8. 의도와 현재 데이터를 수렴시키기 — 남은 일
 
 > ✅ **8.0~8.2 완료(2026-09-29, `fix/Player`)** — base 정리·`Paladin_Armature` 추출·`Player_Paladin` Variant·스폰 전환·
-> 구 프리팹 `Legacy/` 이동. 경과와 판단은 [PLAN-player-variants.md](../../PLAN-player-variants.md) §3.
+> 구 프리팹 `Legacy/` 이동. 경과와 판단은 [PLAN-player-variants.md](../history/PLANS/PLAN-player-variants.md) §3.
 > **남은 것 = 8.3(캐릭터 선택 경로)** 과 스탯 소유자·`PlayableCharacterVisual`/`CharacterDefinition` 존폐 결정.
 > 아래 8.0~8.2 본문은 계획 당시 기록이다.
 
@@ -416,7 +416,7 @@ Prefab Variant 는 base 의 컴포넌트를 **추가**하긴 쉬워도 **제거*
 
 ### 8.4 계획서
 
-위 작업의 단계·검증·리스크는 **[PLAN-player-variants.md](../../PLAN-player-variants.md)** 에 있다(2026-09-29 완료).
+위 작업의 단계·검증·리스크는 **[PLAN-player-variants.md](../history/PLANS/PLAN-player-variants.md)** 에 있다(2026-09-29 완료).
 1차 범위는 **`Player_Paladin` Variant 까지**였고, 로비 선택 UI 와 징크스는 범위 밖이다.
 
 ---

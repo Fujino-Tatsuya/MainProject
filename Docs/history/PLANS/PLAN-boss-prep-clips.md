@@ -1,7 +1,7 @@
 # PLAN-boss-prep-clips.md — 예고 구간을 **prep 클립**으로 교체 (2026-09-23)
 
 > 그릴 4문항 확정. **승인 후 구현.** 구현에는 **에디터가 열려 있어야 한다**(저작 스크립트 + 컴파일).
-> 상위 문서 — [PLAN.md](PLAN.md) §G2 · [PLAN-boss-backlog.md](PLAN-boss-backlog.md) · [CONTEXT.md](CONTEXT.md).
+> 상위 문서 — [PLAN.md](PLAN-archive-2026-06_09-22.md) §G2 · [PLAN-boss-backlog.md](PLAN-boss-backlog.md) · [CONTEXT.md](../../../CONTEXT.md).
 
 ## 0. 한 줄
 

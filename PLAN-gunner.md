@@ -2,8 +2,8 @@
 
 작성: 은희(Claude) / 브랜치: `feature/SecondCharacter`(= `development` `883fb34a` 에서 분기, 커밋 0)
 기획 원본: [character_gunner.md](Docs/design/character/character_gunner.md) — **§0 확정 변경(D1~D15)이 원본 본문보다 우선**
-관련: [player-prefabs.md](Docs/tech/player-prefabs.md) · [PLAN-player-variants.md](PLAN-player-variants.md) ·
-[PLAN-passive-onhit.md](PLAN-passive-onhit.md) · [PLAN-boss-counter-vulnerable.md](PLAN-boss-counter-vulnerable.md)
+관련: [player-prefabs.md](Docs/tech/player-prefabs.md) · [PLAN-player-variants.md](Docs/history/PLANS/PLAN-player-variants.md) ·
+[PLAN-passive-onhit.md](Docs/history/PLANS/PLAN-passive-onhit.md) · [PLAN-boss-counter-vulnerable.md](PLAN-boss-counter-vulnerable.md)
 
 > ✅ **담당 = 은희**(Unit·Player 본인 영역). 보스·몬스터 코드(경석)는 **수정하지 않는다**.
 > VFX 는 이벤트 훅까지만 만들고 연출은 민경.

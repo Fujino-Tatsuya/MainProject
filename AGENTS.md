@@ -34,7 +34,7 @@
 
 - **은희**: 코어(UnitBase·상태이상·스탯/모디파이어) + 네트워크(NGO / IPv4 / SteamDatagramRelay / SceneManagement) + Player 제작.
 - **경석(팀장)**: **몬스터 전체 단독** — 일반 몬스터·중간보스·보스의 FSM·기믹·프리팹·데이터. PR 리뷰/머지.
-  - 진행: **일반 몬스터 ✅ / 중간보스 ✅ / 보스 = 남은 것**(재작성 중 — [PLAN-boss-fsm.md](PLAN-boss-fsm.md)).
+  - 진행: **일반 몬스터 ✅ / 중간보스 ✅ / 보스 = 남은 것**(재작성 중 — [PLAN-boss-fsm.md](Docs/history/PLANS/PLAN-boss-fsm.md)).
 - **민경**: **이펙트(VFX)**.
 
 ## 6. 문서 인덱스

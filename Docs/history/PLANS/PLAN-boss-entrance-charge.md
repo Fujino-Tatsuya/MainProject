@@ -1,7 +1,7 @@
 # PLAN-boss-entrance-charge.md — 입장 연출 애니 + 차징 점프 이동 (2026-09-21)
 
 > 그릴 7문항으로 확정. **승인 후 구현.**
-> 상위 문서 — [PLAN.md](PLAN.md)(1~8차 확정) · [PLAN-boss-backlog.md](PLAN-boss-backlog.md) · [CONTEXT.md](CONTEXT.md).
+> 상위 문서 — [PLAN.md](PLAN-archive-2026-06_09-22.md)(1~8차 확정) · [PLAN-boss-backlog.md](PLAN-boss-backlog.md) · [CONTEXT.md](../../../CONTEXT.md).
 
 ---
 
@@ -33,12 +33,12 @@
 
 | | 판정 | 근거 |
 |---|---|---|
-| **E1 전체 무효** (개정함, 아래 §2) | 🔴 틀림 | 돌진은 `ignoreDistanceWindow: 1` 이라 거리창을 통째로 건너뛴다([TwentyThreeBoss.cs:690](Assets/1.Scripts/Monster/Boss/TwentyThreeBoss.cs:690)). `dashMaxDistance` 도 `min(값, 지속시간×속도)` 에서 **지속시간이 먼저 물린다**([:1121](Assets/1.Scripts/Monster/Boss/TwentyThreeBoss.cs:1121)) |
-| **E2 전제 틀림** (개정함, 아래 §3) | 🔴 틀림 | `jumpSearchRadius` 참조 2곳은 `FindFarthestPlayer` 2개가 아니다 — [:2284](Assets/1.Scripts/Monster/Boss/TwentyThreeBoss.cs:2284) 타겟 탐색 + [:3785](Assets/1.Scripts/Monster/Boss/TwentyThreeBoss.cs:3785) **`CountAlivePlayers()` = 차징 송전탑 개수 결정** |
+| **E1 전체 무효** (개정함, 아래 §2) | 🔴 틀림 | 돌진은 `ignoreDistanceWindow: 1` 이라 거리창을 통째로 건너뛴다([TwentyThreeBoss.cs:690](../../../Assets/1.Scripts/Monster/Boss/TwentyThreeBoss.cs:690)). `dashMaxDistance` 도 `min(값, 지속시간×속도)` 에서 **지속시간이 먼저 물린다**([:1121](../../../Assets/1.Scripts/Monster/Boss/TwentyThreeBoss.cs:1121)) |
+| **E2 전제 틀림** (개정함, 아래 §3) | 🔴 틀림 | `jumpSearchRadius` 참조 2곳은 `FindFarthestPlayer` 2개가 아니다 — [:2284](../../../Assets/1.Scripts/Monster/Boss/TwentyThreeBoss.cs:2284) 타겟 탐색 + [:3785](../../../Assets/1.Scripts/Monster/Boss/TwentyThreeBoss.cs:3785) **`CountAlivePlayers()` = 차징 송전탑 개수 결정** |
 | C3 입장 데미지 차단 | ✅ 확인 (근거가 더 강함) | `SetServerLogicSuspended(true)` 는 Update 만 멈추는 게 아니라 **State 를 `Idle` 로 바꾼다** |
 | C4 `Land` 에서 `FinishChain()` 건너뛰기 | ✅ 확인 | 자원 정리 없이 다음 행동만 결정하는 함수 → 차징으로 이어갈 땐 안 부르는 게 맞다. **플래그 설계 유지** |
-| 잡기 내려치기 데미지원 | ✅ 정정 | `AttackDamage` 아님 — `grabSlamDamage > 0 ? grabSlamDamage : grabThrowDamage`(=20) ([:1763](Assets/1.Scripts/Monster/Boss/TwentyThreeBoss.cs:1763)) |
-| **입장 착지 애니가 자동으로 안 끊긴다** | 🔴 새 리스크 | 애니 교체 경로는 `OnStateChanged → PlayStateAnimation`([MonsterBase.cs:1571](Assets/1.Scripts/Monster/MonsterBase.cs:1571)) **뿐이다.** 전투 시작 후 보스가 Idle 에 머물면 상태 변화가 없어 착지 클립이 계속 돈다 → **E3 에 로코모션 복귀 진입점 추가**(§4) |
+| 잡기 내려치기 데미지원 | ✅ 정정 | `AttackDamage` 아님 — `grabSlamDamage > 0 ? grabSlamDamage : grabThrowDamage`(=20) ([:1763](../../../Assets/1.Scripts/Monster/Boss/TwentyThreeBoss.cs:1763)) |
+| **입장 착지 애니가 자동으로 안 끊긴다** | 🔴 새 리스크 | 애니 교체 경로는 `OnStateChanged → PlayStateAnimation`([MonsterBase.cs:1571](../../../Assets/1.Scripts/Monster/MonsterBase.cs:1571)) **뿐이다.** 전투 시작 후 보스가 Idle 에 머물면 상태 변화가 없어 착지 클립이 계속 돈다 → **E3 에 로코모션 복귀 진입점 추가**(§4) |
 | `chargeZonePrefab` 비어 있음 | ⚠️ 확인 | `{fileID: 0}` → E4 완료기준의 "전기 장판"은 **지금 데이터로 검증 불가**. 없는 걸 찾지 말 것 |
 
 **못 받은 것** (크레딧 소진으로 답이 안 나옴): C5(`EndDashMove` 무해성) · C7(`ChargeMove` 제거 시 남는 참조) ·
@@ -75,10 +75,10 @@ PLAN §5 는 거리값 2개를 올리자고 했는데 **둘 다 효과가 0 이�
 
 | 값 | 무효 사유 |
 |---|---|
-| 돌진 `maxDistance` 20→45 | DashAttack 은 `ignoreDistanceWindow: 1`. [TwentyThreeBoss.cs:690](Assets/1.Scripts/Monster/Boss/TwentyThreeBoss.cs:690) 의 `if (!e.ignoreDistanceWindow)` 가 거리창 자체를 건너뛴다 — **`minDistance`/`maxDistance` 를 아예 안 읽는다** |
+| 돌진 `maxDistance` 20→45 | DashAttack 은 `ignoreDistanceWindow: 1`. [TwentyThreeBoss.cs:690](../../../Assets/1.Scripts/Monster/Boss/TwentyThreeBoss.cs:690) 의 `if (!e.ignoreDistanceWindow)` 가 거리창 자체를 건너뛴다 — **`minDistance`/`maxDistance` 를 아예 안 읽는다** |
 | `dashMaxDistance` 16→30 | 실사거리 = `min(dashMaxDistance, dashDuration × moveSpeed × dashSpeedMultiplier)`. 현재 `min(16, 0.91×2.5×6 = **13.65**)` → **13.65m 가 상한**이다. 30 으로 올려도 그대로 |
 
-🔴 **코드 주석이 이미 말하고 있었다** ([:1117](Assets/1.Scripts/Monster/Boss/TwentyThreeBoss.cs:1117)):
+🔴 **코드 주석이 이미 말하고 있었다** ([:1117](../../../Assets/1.Scripts/Monster/Boss/TwentyThreeBoss.cs:1117)):
 *"`dashMaxDistance` 는 구속 조건이 아닌 경우가 많다 — 실측상 지속시간이 먼저 끝난다."*
 PLAN §5 가 이 주석보다 나중에 쓰였는데 반영되지 않았다. **다음에 SO 값을 올리기 전에
 그 값을 읽는 코드에 클램프가 있는지 먼저 본다.**
@@ -104,7 +104,7 @@ PLAN §5 가 이 주석보다 나중에 쓰였는데 반영되지 않았다. **�
 
 - **직선 예고** — `DashTelegraphReach()` 가 같은 식을 쓴다 → 예고도 29m 로 늘어난다.
   "예고가 판정에 대해 거짓말하지 않는다" 규약 유지.
-- **체인 예산** — [:831](Assets/1.Scripts/Monster/Boss/TwentyThreeBoss.cs:831) 이 `DashDuration` 프로퍼티를 읽으므로 자동 반영.
+- **체인 예산** — [:831](../../../Assets/1.Scripts/Monster/Boss/TwentyThreeBoss.cs:831) 이 `DashDuration` 프로퍼티를 읽으므로 자동 반영.
 - **벽 클램프** — `StartDashMove` 의 `NavMesh.Raycast` 가 방 밖으로 안 나가게 이미 자른다.
 
 ### 🔴 Play 에서 볼 것 (이 변경의 부작용 후보)
@@ -133,8 +133,8 @@ PLAN §5 가 이 주석보다 나중에 쓰였는데 반영되지 않았다. **�
 
 | 위치 | 용도 |
 |---|---|
-| [:2284](Assets/1.Scripts/Monster/Boss/TwentyThreeBoss.cs:2284) `FindFarthestPlayer()` | 점프·돌진 타겟 선정 |
-| [:3785](Assets/1.Scripts/Monster/Boss/TwentyThreeBoss.cs:3785) `CountAlivePlayers()` | **차징 송전탑 개수 결정** (1인 1 / 2인 2 / 3인+ 4) |
+| [:2284](../../../Assets/1.Scripts/Monster/Boss/TwentyThreeBoss.cs:2284) `FindFarthestPlayer()` | 점프·돌진 타겟 선정 |
+| [:3785](../../../Assets/1.Scripts/Monster/Boss/TwentyThreeBoss.cs:3785) `CountAlivePlayers()` | **차징 송전탑 개수 결정** (1인 1 / 2인 2 / 3인+ 4) |
 
 두 번째는 공격 탐색이 아니다 → `attackSearchRadius` 로 바꾸면 **더 틀린 이름**이 된다.
 **`playerScanRadius`** 로 간다 (팀장 확정).
@@ -169,7 +169,7 @@ PLAN §5 가 이 주석보다 나중에 쓰였는데 반영되지 않았다. **�
 
 🔴 **세 번째 줄이 Codex 교차검증에서 나온 것이다.** 원래 계획은 "착지 클립(1.92초)이
 `impactHoldSeconds`(0.9초) 에서 잘린다"고 전제했는데 **그 보장이 없다.** 애니를 바꾸는 경로는
-`OnStateChanged → PlayStateAnimation`([MonsterBase.cs:1571](Assets/1.Scripts/Monster/MonsterBase.cs:1571)) **뿐이고**, 전투가 시작돼도
+`OnStateChanged → PlayStateAnimation`([MonsterBase.cs:1571](../../../Assets/1.Scripts/Monster/MonsterBase.cs:1571)) **뿐이고**, 전투가 시작돼도
 보스가 `Idle` 에 머물면 **상태 변화가 없어 착지 클립이 계속 돈다.** 명시적으로 되돌린다.
 ⚠️ 순서 — **`SetServerLogicSuspended(false)` 보다 앞**이다. 뒤에 두면 FSM 이 고른 첫 애니를 덮는다.
 

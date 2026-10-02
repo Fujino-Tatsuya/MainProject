@@ -1,11 +1,11 @@
 # PLAN-boss-vulnerable.md — 인터럽트 성공 후 **취약 상태** (2026-09-21)
 
 > ⚠️ **폐기 (2026-09-28 팀장)** — 팀 기획 `Re_C_간파_시스템.md`·`Re_C_취약_및_제압_시스템.md` 로 대체.
-> 새 계획은 [PLAN-boss-counter-vulnerable.md](PLAN-boss-counter-vulnerable.md). 아래 내용(취약 5초·슈퍼아머 해제·경직/기절)은 **따르지 말 것**.
+> 새 계획은 [PLAN-boss-counter-vulnerable.md](../../../PLAN-boss-counter-vulnerable.md). 아래 내용(취약 5초·슈퍼아머 해제·경직/기절)은 **따르지 말 것**.
 > 조사 결과(§1 — CC 세 겹 차단, LinearKnockback 함정 등)는 새 계획이 참고한다.
 
 > 그릴 16문항으로 확정. **승인 후 구현.**
-> 상위 문서 — [PLAN.md](PLAN.md) · [PLAN-boss-backlog.md](PLAN-boss-backlog.md) · [CONTEXT.md](CONTEXT.md).
+> 상위 문서 — [PLAN.md](PLAN-archive-2026-06_09-22.md) · [PLAN-boss-backlog.md](PLAN-boss-backlog.md) · [CONTEXT.md](../../../CONTEXT.md).
 
 ## 0. 한 줄
 
@@ -22,7 +22,7 @@
 
 | # | 차단 | 위치 | 이번에 |
 |---|---|---|---|
-| 1 | `AutoHitReactions => false` — base 의 Hit경직·그로기누적·**넉백 진입**을 전부 끔 | [TwentyThreeBoss.cs:62](Assets/1.Scripts/Monster/Boss/TwentyThreeBoss.cs:62) | **그대로 둔다**(§1-2) |
+| 1 | `AutoHitReactions => false` — base 의 Hit경직·그로기누적·**넉백 진입**을 전부 끔 | [TwentyThreeBoss.cs:62](../../../Assets/1.Scripts/Monster/Boss/TwentyThreeBoss.cs:62) | **그대로 둔다**(§1-2) |
 | 2 | 슈퍼아머 — `ApplyStatus` 가 SA 외 모든 CC를 무시 | `MonsterStatusEffect:74` | 취약 중 해제 |
 | 3 | 프리팹에 **`LinearKnockback`(IKnockbackable) 없음** + Rigidbody `isKinematic:1` · `Constraints:126`(FreezeAll) | `TwentyThree.prefab` | **안 붙인다**(§1-3) |
 
@@ -33,7 +33,7 @@
 1. `TryEnterKnockback` 진입 — 그런데 그건 `SetState(MonsterState.Knockback)` 을 하고,
    `PlayStateAnimation(s != Attack)` 이 **`AbortAttackChain()` 을 부른다** →
    **팀장 확정("넉백은 패턴을 안 끊는다")과 정면으로 어긋난다.**
-2. **그로기 누적**([MonsterBase.cs:1213](Assets/1.Scripts/Monster/MonsterBase.cs:1213)) — 팀장 확정("CC는 누적 안 함")과 어긋난다.
+2. **그로기 누적**([MonsterBase.cs:1213](../../../Assets/1.Scripts/Monster/MonsterBase.cs:1213)) — 팀장 확정("CC는 누적 안 함")과 어긋난다.
 3. 피격 경직 `EnterHit` — 스킬 한 대마다 보스가 경직된다.
 
 → **보스 전용 경로를 따로 판다.** `AutoHitReactions` 는 `false` 로 유지한다.
@@ -52,7 +52,7 @@
 ### 1-4. ⚠️ 예고는 이미 보스를 따라간다 — 내 초기 우려는 과장이었다
 
 `BossAttackConeTelegraph` 는 런타임에 **보스 GameObject 본체에** `AddComponent` 되고
-([:1074](Assets/1.Scripts/Monster/Boss/TwentyThreeBoss.cs:1074)) `LateUpdate` 에서 자기 `transform` 기준으로 그린다 →
+([:1074](../../../Assets/1.Scripts/Monster/Boss/TwentyThreeBoss.cs:1074)) `LateUpdate` 에서 자기 `transform` 기준으로 그린다 →
 **밀리면 예고도 같이 움직이고 같이 돈다. RPC 재전송이 필요 없다.**
 게다가 돌진은 `PerformAttackHit` 이 `HideAttackConeClientRpc()` 를 부른 **다음 줄**에서
 `BeginDash()` 를 하므로 **돌진 중에는 예고가 아예 없다.**
@@ -132,7 +132,7 @@ public bool IsVulnerable => _vulnerableUntil.Value > NetworkManager.ServerTime.T
 
 - `InSuperArmorSequence` = 차징(`ChargeMove` 제거됐으므로 `_chargeJump` · `ChargeWait`) ·
   레이지(`RageDash`) 구간 (D4·D5)
-- **공격별 `ApplyStatus(SuperArmor, _stateTimer)` 2곳을 제거**한다([:843](Assets/1.Scripts/Monster/Boss/TwentyThreeBoss.cs:843) · [:1235](Assets/1.Scripts/Monster/Boss/TwentyThreeBoss.cs:1235)) —
+- **공격별 `ApplyStatus(SuperArmor, _stateTimer)` 2곳을 제거**한다([:843](../../../Assets/1.Scripts/Monster/Boss/TwentyThreeBoss.cs:843) · [:1235](../../../Assets/1.Scripts/Monster/Boss/TwentyThreeBoss.cs:1235)) —
   틱 소유자와 두 주인이 생기면 서로 덮어쓴다.
 - 🔴 `BossAttackEntry.superArmor` 필드가 **의미를 잃는다.** 지워야 하나, 다른 보스(GauntletBot 등)가
   같은 SO 구조를 쓰므로 **23호에서만 안 읽는다**는 주석을 단다(유령 필드 교훈).

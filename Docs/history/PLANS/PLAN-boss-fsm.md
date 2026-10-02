@@ -2,7 +2,7 @@
 
 > 작성 2026-08-06 · 경석(Claude) · 상태: **승인 대기**
 > `PLAN.md` 는 은희 님의 승인 대기 계획서(2026-08-03 개발 진입점 단일화)가 점유 중이라 별도 파일로 둔다.
-> 확정 설계 본문은 [Docs/tech/boss-fsm-design.md](Docs/tech/boss-fsm-design.md) — 이 파일은 **왜/무엇을/어디까지**만 담는다.
+> 확정 설계 본문은 [Docs/tech/boss-fsm-design.md](../../../Docs/tech/boss-fsm-design.md) — 이 파일은 **왜/무엇을/어디까지**만 담는다.
 
 ---
 
@@ -16,7 +16,7 @@ BT(`BehaviorGraphAgent`)로 돌고 있는 웰즈&23호를 **순수 코드 FSM**(
 ## 2. 현재 이해 (그릴 + 감사로 확정된 전제)
 
 🔴 **재작성의 이유는 "설계가 낡아서"가 아니라 "현행 구현이 계속 회귀를 만들어서"다.**
-Claude·Codex 독립 2개 레인으로 전수 감사했다 → [boss-current-problems-audit.md](Docs/tech/boss-current-problems-audit.md).
+Claude·Codex 독립 2개 레인으로 전수 감사했다 → [boss-current-problems-audit.md](../../../Docs/tech/boss-current-problems-audit.md).
 공통 뿌리는 **권위 상태의 부재** — BT 가 상태 머신이고 Animator·이벤트 채널·애니 이벤트·
 블랙보드가 상태를 나눠 갖는다. 그래서 부분 보수가 아니라 전면 재작성이다.
 
@@ -78,7 +78,7 @@ Claude·Codex 독립 2개 레인으로 전수 감사했다 → [boss-current-pro
 | **거리 조건** | Dash = 원거리만. **Jump = 거리 무관** + 타겟은 **최원거리 플레이어** | 쿨만이 게이트면 10초마다 기계적으로 나와 읽힌다 — 타겟 규칙이 의도를 만든다 |
 | **Dash 피격 결과** | **캐리-푸시** → 벽/맵 끝까지 → 플레이어 **스턴**, 보스는 패턴 복귀 | |
 | **카운터 창 표현** | `IBossTelegraph` 인터페이스로 분리. 지금은 노란색 틴트, 나중에 VFX 컴포넌트 스왑 | 함수 하나보다 인터페이스가 나은 이유: 창 **진행도**를 표현하고 싶어질 때 인터페이스만 넓히면 된다 |
-| **기존 기믹 컨트롤러** | 🔴 **재사용 안 함 — 전면 재작성** (2026-08-06 뒤집힘) | 초판은 "재사용"이었다. [감사](Docs/tech/boss-current-problems-audit.md) 결과 문제가 한 곳 고쳐서 닫히는 종류가 아니다 — **권위 상태 부재가 공통 뿌리**라 부분 보수는 회귀를 계속 만든다. `GroundProbe` 같은 순수 유틸만 선별 유지 |
+| **기존 기믹 컨트롤러** | 🔴 **재사용 안 함 — 전면 재작성** (2026-08-06 뒤집힘) | 초판은 "재사용"이었다. [감사](../../../Docs/tech/boss-current-problems-audit.md) 결과 문제가 한 곳 고쳐서 닫히는 종류가 아니다 — **권위 상태 부재가 공통 뿌리**라 부분 보수는 회귀를 계속 만든다. `GroundProbe` 같은 순수 유틸만 선별 유지 |
 | **폭탄 / 화염 장판** | 🔴 **분리** (신규 범위) | 지금은 `BombController` 하나가 투사체와 장판을 겸해 수명·크기·판정이 얽혀 있다. 폭발 시 장판을 **별도 스폰**하고 폭탄은 즉시 despawn |
 | **Wells 상태 복제** | **23호 NetworkObject 에 싣는다** | Wells 는 **스폰되지 않는 중첩 NetworkObject** 라 자기 `NetworkVariable` 을 가질 수 없다 (감사 §3.1) |
 
@@ -93,13 +93,13 @@ Claude·Codex 독립 2개 레인으로 전수 감사했다 → [boss-current-pro
    함께 결정**해야 한다. 몹은 현행 유지가 안전하다.
 
 2. **`HitFlash` 가 카운터 색을 덮어쓴다.**
-   [HitFlash.cs](Assets/1.Scripts/Unit/HitFlash.cs) 는 `_originalColors` 를 **초기화 시점의 sharedMaterial
+   [HitFlash.cs](../../../Assets/1.Scripts/Unit/HitFlash.cs) 는 `_originalColors` 를 **초기화 시점의 sharedMaterial
    색으로 캐시**하고 MaterialPropertyBlock 으로 복원한다. 카운터 노란색을 같은 경로로 칠하면
    **피격 한 번에 날아간다.** → `HitFlash` 에 베이스 틴트 오버라이드 진입점을 추가한다(카운터가 베이스를
    밀고, 피격 플래시는 그 위에서 Lerp). VFX 로 전환하면 이 진입점은 자동으로 안 쓰인다.
 
 3. **`PlayerGrabbedState` 를 돌진 캐리에 재사용하려면 일반화가 필요하다.**
-   [PlayerStateController.cs:700](Assets/1.Scripts/Player/PlayerStateController.cs:700) 이
+   [PlayerStateController.cs:700](../../../Assets/1.Scripts/Player/PlayerStateController.cs:700) 이
    `instigator.GetComponentInChildren<GrabController>()` → `GrabSocket` 으로 **하드코딩**돼 있다.
    이동 권한 회수·물리 위임·복원은 이미 다 돼 있다. 단 **인터페이스로 바꾸는 것만으로는 부족하다** —
    보스에 잡기·돌진 소켓이 **둘 다** 붙으므로 타입 조회는 먼저 걸리는 쪽을 집는다.
@@ -160,7 +160,7 @@ Claude·Codex 독립 2개 레인으로 전수 감사했다 → [boss-current-pro
 
 ## 5.2.1 🔴 은희 회신으로 뒤집힌 것 + R1·R2 종결 (2026-08-07 오후)
 
-수령 문서: `player-interrupt-restrained-handoff.md` / 회신: [handoff-boss-reply-interrupt-restrained.md](Docs/tech/handoff-boss-reply-interrupt-restrained.md)
+수령 문서: `player-interrupt-restrained-handoff.md` / 회신: [handoff-boss-reply-interrupt-restrained.md](../../../Docs/tech/handoff-boss-reply-interrupt-restrained.md)
 
 **R1 인터럽트 식별자 — ✅ 종결.** 단 형태가 바뀌었다: `AttackType` enum 값이 아니라
 **`AttackInfo.isInterruptAttack` 플래그**(기존 `isGroggyAttack` 개명)다.
@@ -632,7 +632,7 @@ Wells 는 자기 `NetworkVariable` 을 가질 수 없으므로 `TwentyThreeBoss`
 ## 결정 완료 (2026-08-06 팀장)
 
 R1·R2 **둘 다 은희 님께 요청 완료. 기한 = 2026-08-07(금) 17:00.**
-인계 문서: [handoff-player-carry-socket.md](Docs/tech/handoff-player-carry-socket.md)
+인계 문서: [handoff-player-carry-socket.md](../../../Docs/tech/handoff-player-carry-socket.md)
 
 - **R1 (인터럽트)** — 단죄의 방패 자체는 **이미 있고, 인터럽트 식별 정보만 없다.**
   `AttackType` 에 우클릭 슬롯에 해당하는 값이 없어서 보스가 판별할 수 없는 상태다. → 값 추가 요청.

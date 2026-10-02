@@ -1,8 +1,8 @@
 # PLAN — 플레이어 프리팹을 base + 캐릭터 Variant 구조로 정리 (초안 2026-09-16 · 개정 2026-09-29, 승인 대기)
 
 작성: Claude / 대상: `Assets/2.Prefabs/Player/**`, `Assets/DefaultNetworkPrefabs.asset`, 일부 씬
-관련: [Docs/tech/player-prefabs.md](Docs/tech/player-prefabs.md) (사실 원본) · [AGENTS.md](AGENTS.md) §3·§4 ·
-[CONTEXT.md](CONTEXT.md) · [AIRULE.md](AIRULE.md)
+관련: [Docs/tech/player-prefabs.md](../../../Docs/tech/player-prefabs.md) (사실 원본) · [AGENTS.md](../../../AGENTS.md) §3·§4 ·
+[CONTEXT.md](../../../CONTEXT.md) · [AIRULE.md](../../../AIRULE.md)
 
 > ✅ **담당 = 은희** (플레이어 계통 본인 영역, 2026-09-29 착수 결정).
 >
@@ -49,7 +49,7 @@
 
 ## 2. Current understanding
 
-근거는 전부 [player-prefabs.md](Docs/tech/player-prefabs.md) 에 있다. 여기서는 이 작업에 걸리는 것만 요약한다.
+근거는 전부 [player-prefabs.md](../../../Docs/tech/player-prefabs.md) 에 있다. 여기서는 이 작업에 걸리는 것만 요약한다.
 
 ### 2.1 출발점
 
@@ -71,9 +71,9 @@
 
 | 소비처 | 처리 |
 |--------|------|
-| `PlayerSkillController.InitializeSkill` ([:67](Assets/1.Scripts/Player/Skill/PlayerSkillController.cs:67)) | `if (skill == null) return;` |
-| `Player.passive` ([:175](Assets/1.Scripts/Player/Player.cs:175), [:1285](Assets/1.Scripts/Player/Player.cs:1285)) | `GetComponent` → null 허용, 호출부는 `passive?.` |
-| `PassiveHUD.Bind` ([:31](Assets/1.Scripts/UI/Combat/PassiveHUD.cs:31)) | `player != null ? GetComponent... : null` |
+| `PlayerSkillController.InitializeSkill` ([:67](../../../Assets/1.Scripts/Player/Skill/PlayerSkillController.cs:67)) | `if (skill == null) return;` |
+| `Player.passive` ([:175](../../../Assets/1.Scripts/Player/Player.cs:175), [:1285](../../../Assets/1.Scripts/Player/Player.cs:1285)) | `GetComponent` → null 허용, 호출부는 `passive?.` |
+| `PassiveHUD.Bind` ([:31](../../../Assets/1.Scripts/UI/Combat/PassiveHUD.cs:31)) | `player != null ? GetComponent... : null` |
 
 ⇒ **base 는 스킬 슬롯이 비어 있어도 정상 기동한다.** 이게 이 계획의 전제다.
 
@@ -100,9 +100,9 @@
 ### 2.5 🔴 이 작업에서 걸리는 지뢰
 
 1. **`transform.Find("Armature")` 이름 계약** — 폴백이 3곳이다
-   ([`PlayerMovement.cs:38`](Assets/1.Scripts/Player/PlayerMovement.cs:38),
-   [`PlayerSoulController.cs:175`](Assets/1.Scripts/Player/Soul/PlayerSoulController.cs:175),
-   [`PlayableCharacterVisual.cs:30`](Assets/1.Scripts/Player/PlayableCharacterVisual.cs:30)).
+   ([`PlayerMovement.cs:38`](../../../Assets/1.Scripts/Player/PlayerMovement.cs:38),
+   [`PlayerSoulController.cs:175`](../../../Assets/1.Scripts/Player/Soul/PlayerSoulController.cs:175),
+   [`PlayableCharacterVisual.cs:30`](../../../Assets/1.Scripts/Player/PlayableCharacterVisual.cs:30)).
    Variant 의 자식 이름은 **반드시 `Armature`** 로 한다. `Paladin_Armature` 로 두면 폴백이 전부 불발된다.
 2. **HUD 사본이 갈라져 있다** — Paladin 안의 `CombatHUD` 사본에만 `CombatPanel`·`ShieldBar`·`ProfilPanel` 이
    있다. base 가 `CombatHUD.prefab` 을 중첩으로 쓰려면 **갈라진 내용을 원본 프리팹으로 올려야** 한다.
@@ -112,7 +112,7 @@
    Variant 생성 후 **대상 목록을 갱신해야** 한다. 특히 인터럽트 스킬은 이제 base 가 아니라 Variant 대상이다.
 4. **`GlobalObjectIdHash` 는 프리팹마다 다르다** — Variant 는 **각각 NetworkPrefab 등록**이 필요하다.
    등록 누락 시 스폰이 조용히 실패한다.
-5. **프리팹은 GitHub 관리 대상**([AGENTS.md](AGENTS.md) §3) — 머지 충돌 시 GUID 파손 위험. 작은 PR 로 나눈다.
+5. **프리팹은 GitHub 관리 대상**([AGENTS.md](../../../AGENTS.md) §3) — 머지 충돌 시 GUID 파손 위험. 작은 PR 로 나눈다.
 
 ---
 
@@ -240,7 +240,7 @@
 2. `TempPlayer_Armature.prefab` 처리 결정 — 쓰이지 않으면 삭제
 3. 저작 툴 2종의 대상 목록 갱신 (§2.5-3)
 4. base 를 네트워크 목록에서 뺄지 결정 — base 는 스폰 대상이 아니다
-5. [player-prefabs.md](Docs/tech/player-prefabs.md) §0·§2·§3·§4·§8 갱신, [CONTEXT.md](CONTEXT.md) 인계 갱신
+5. [player-prefabs.md](../../../Docs/tech/player-prefabs.md) §0·§2·§3·§4·§8 갱신, [CONTEXT.md](../../../CONTEXT.md) 인계 갱신
 
 **P5 결과 (2026-09-29, Claude)**
 - `DefaultNetworkPrefabs`: `Player`(base)·`Paladin`·`Paladin_VFX` 3항목을 뺐으나 → 🔴 **NGO 자동 생성(`GenerateDefaultNetworkPrefabs: 1`)이 다음 Play 때 전부 되돌렸다.** 자동 등록을 받아들이고 되돌림을 커밋(무해 — 해시 전부 상이). 목록을 손으로 정리하지 않는다.
@@ -265,7 +265,7 @@
    HUD 6슬롯·HP·실드·상태이상·보스 체력바 표시 확인.
 3. **MPPM 2인** — 호스트/클라 양쪽에서 위를 반복. 특히 **Armature 회전 동기화**와 애니메이션 재생.
    🔴 Play 는 **사용자가 직접** 실행한다(MCP 로 Play 를 켜면 MPPM 이 깨진다).
-4. **회귀 확인** — [PLAN-player-motor.md](PLAN-player-motor.md) 의 이동 검증 항목이 그대로 통과하는지.
+4. **회귀 확인** — [PLAN-player-motor.md](../../../PLAN-player-motor.md) 의 이동 검증 항목이 그대로 통과하는지.
 
 ---
 
@@ -286,7 +286,7 @@
 | # | 리스크 | 완화 |
 |---|--------|------|
 | R-1 | **모터 작업과 같은 프리팹을 건드린다** | ✅ 브랜치 분리 완료 — `feature/player-variants` (`6c25ca60` 분기). 모터 쪽 프리팹 변경이 들어오면 **Variant 작업 중이라도 즉시 리베이스**해서 격차를 작게 유지한다 |
-| R-2 | **프리팹 머지 충돌 → GUID 파손** ([AGENTS.md](AGENTS.md) §3) | P1~P5 를 각각 작은 PR 로. 작업 중 플레이어 프리팹 동시 수정 금지를 CONTEXT 에 명시 |
+| R-2 | **프리팹 머지 충돌 → GUID 파손** ([AGENTS.md](../../../AGENTS.md) §3) | P1~P5 를 각각 작은 PR 로. 작업 중 플레이어 프리팹 동시 수정 금지를 CONTEXT 에 명시 |
 | R-3 | HUD 갈라짐을 못 올리고 base 로 내려가 **HUD 퇴행** | P2-4 를 독립 커밋으로 하고, 올리기 전후 HUD 스크린샷 대조 |
 | R-4 | Variant 배선 누락(`hitboxAnchor`·`defaultHitbox`)으로 **공격이 조용히 안 나감** | §4-1 기계적 대조 + 저작 툴 재실행 |
 | R-5 | `Armature` 이름 계약 위반 | P3-1 체크리스트 + 폴백 3곳을 아는 상태로 작업 |
@@ -305,7 +305,7 @@
 - [x] `Paladin` · `TempPlayer_Armature` 가 **`Legacy/` 로 이동**했다, `Paladin_VFX` 는 원위치 보관 (삭제 대신 보관 — 사용자 결정)
 - [x] §4 의 Play 1사이클과 MPPM 2인 검증을 **은희가** 통과시켰다 (2026-09-29, P4 직후)
 - [~] 저작 툴 **4종**의 대상 경로를 새 구조로 바꿨다 ✅ — ⚠️ **툴 재실행은 안 해봤다**(컴파일만 확인)
-- [x] [player-prefabs.md](Docs/tech/player-prefabs.md) 가 새 구조로 갱신됐다
+- [x] [player-prefabs.md](../../../Docs/tech/player-prefabs.md) 가 새 구조로 갱신됐다
 
 ---
 

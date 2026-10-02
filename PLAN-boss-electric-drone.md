@@ -2,7 +2,7 @@
 
 > 기획 원본: [boss-electric-floor.md](Docs/design/boss/boss-electric-floor.md) · [wells-suicide-drone.md](Docs/design/boss/wells-suicide-drone.md)
 > (레포 밖 `Re_C_*.md` 사본, 2026-09-30 협의 반영본. 도식 이미지는 없어 텍스트가 기준 — 팀장 OK).
-> 관련: [PLAN-boss-backlog.md](PLAN-boss-backlog.md) B5(드론)·B6(고유 게이지)·B7, [PLAN-boss-fsm.md](PLAN-boss-fsm.md).
+> 관련: [PLAN-boss-backlog.md](Docs/history/PLANS/PLAN-boss-backlog.md) B5(드론)·B6(고유 게이지)·B7, [PLAN-boss-fsm.md](Docs/history/PLANS/PLAN-boss-fsm.md).
 
 ## 1. 목표 / 완료 조건
 

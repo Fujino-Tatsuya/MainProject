@@ -1,7 +1,7 @@
 # 데이터 테이블 (xlsx → 게임 수치)
 
 > 기획이 게임 수치를 **xlsx 하나**에서 고치고, 빌드는 항상 그 값으로 나간다.
-> 설계·결정 원본: [PLAN-data-table.md](../../PLAN-data-table.md). 이 문서는 **쓰는 법**만 다룬다.
+> 설계·결정 원본: [PLAN-data-table.md](../history/PLANS/PLAN-data-table.md). 이 문서는 **쓰는 법**만 다룬다.
 
 ## 1. 한눈에
 

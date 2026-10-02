@@ -2,7 +2,7 @@
 
 > 상태: **승인 (팀장 09-28) · 구현 중** · 2026-09-28 · 작업자: 경석(Claude) · 브랜치 `feature/Boss23`
 > 원본 기획: `Re_C_간파_시스템.md` · `Re_C_취약_및_제압_시스템.md` (팀 기획, 09-28 수령)
-> 🔴 [PLAN-boss-vulnerable.md](PLAN-boss-vulnerable.md)(09-21, 취약 5초·슈퍼아머 해제)는 **폐기** — 이 문서가 대체한다.
+> 🔴 [PLAN-boss-vulnerable.md](Docs/history/PLANS/PLAN-boss-vulnerable.md)(09-21, 취약 5초·슈퍼아머 해제)는 **폐기** — 이 문서가 대체한다.
 
 ## 0. 용어 (혼동 금지)
 

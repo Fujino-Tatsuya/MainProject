@@ -7,8 +7,8 @@
 > - `ServerHitEnemiesResolved` 제거·일원화 **동의**.
 
 작성: Claude / 담당: **은희**(플레이어·코어 영역) / 브랜치: `fix/Player` (Variant 작업 위에 이어서)
-관련: [PLAN-player-variants.md](PLAN-player-variants.md) · [Docs/tech/player-prefabs.md](Docs/tech/player-prefabs.md) ·
-[Docs/temp/plan-passive-2026-07.md](Docs/temp/plan-passive-2026-07.md)(현행 불굴의 의지 원 설계)
+관련: [PLAN-player-variants.md](../../../Docs/history/PLANS/PLAN-player-variants.md) · [Docs/tech/player-prefabs.md](../../../Docs/tech/player-prefabs.md) ·
+[Docs/temp/plan-passive-2026-07.md](../../../Docs/temp/plan-passive-2026-07.md)(현행 불굴의 의지 원 설계)
 
 ---
 
@@ -112,9 +112,9 @@
 
 ### 4.5 문서
 
-- [Docs/temp/plan-passive-2026-07.md](Docs/temp/plan-passive-2026-07.md) 에 "2026-09-29 버프 모델로 대체" 표기 + 이 계획 링크.
-- [Docs/design/status-effects.md](Docs/design/status-effects.md) 에 `PassiveCharge`(버프) 추가 — 현재 디버프만 적혀 있다.
-- [Docs/tech/player-prefabs.md](Docs/tech/player-prefabs.md) §0 "빈 곳" 에서 패시브 결합 항목 해소 표기.
+- [Docs/temp/plan-passive-2026-07.md](../../../Docs/temp/plan-passive-2026-07.md) 에 "2026-09-29 버프 모델로 대체" 표기 + 이 계획 링크.
+- [Docs/design/status-effects.md](../../../Docs/design/status-effects.md) 에 `PassiveCharge`(버프) 추가 — 현재 디버프만 적혀 있다.
+- [Docs/tech/player-prefabs.md](../../../Docs/tech/player-prefabs.md) §0 "빈 곳" 에서 패시브 결합 항목 해소 표기.
 
 ## 5. 수정 파일
 

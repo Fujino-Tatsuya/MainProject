@@ -19,7 +19,7 @@
 
 | 분류 | 타입 |
 |------|------|
-| **Buff** | `SuperArmor` · `PassiveCharge`(패시브 충전 — 소모 전까지 유지, [PLAN-passive-onhit.md](../../PLAN-passive-onhit.md)) |
+| **Buff** | `SuperArmor` · `PassiveCharge`(패시브 충전 — 소모 전까지 유지, [PLAN-passive-onhit.md](../history/PLANS/PLAN-passive-onhit.md)) |
 | **Debuff** | `Airborne` · `Stunned` · `Slowed` · `Rooted` · `Silenced` · `Debilitated` |
 | **magnitude 로 판정** | 스탯 modifier 5종(`MoveSpeed/AttackDamage/AttackSpeed/Defense/MaxHpModifier`) — `>= 1` Buff, `< 1` Debuff |
 

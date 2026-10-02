@@ -2,7 +2,7 @@
 
 > 상태: **승인 대기** (2026-10-01 · 은희(Claude)) · 브랜치 `feature/DamagePopupTweening`
 > 기획 원본: `GA7thFinal_VeyTrace/2_Documents/20_Design/ReC/Re_C_데미지_숫자_표기.md` (v0.2, 레포 밖)
-> 기존 구조: [Docs/tech/floating-damage-design.md](Docs/tech/floating-damage-design.md) · 이징: `Assets/1.Scripts/EuniTween/`
+> 기존 구조: [Docs/tech/floating-damage-design.md](../../../Docs/tech/floating-damage-design.md) · 이징: `Assets/1.Scripts/EuniTween/`
 
 ## 1. 확정 결정
 

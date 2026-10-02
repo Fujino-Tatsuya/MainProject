@@ -1,7 +1,7 @@
 # PLAN — 데이터 테이블 파이프라인 xlsx → ScriptableObject (2026-10-01 초안 · 10-02 데이터 출처 모델 확정 · 🔴 승인 대기)
 
 작성: 은희(Claude) / 브랜치(예정): `feature/DataTable`(development 에서 분기)
-관련: [architecture.md](Docs/tech/architecture.md) · [player-prefabs.md](Docs/tech/player-prefabs.md)
+관련: [architecture.md](../../../Docs/tech/architecture.md) · [player-prefabs.md](../../../Docs/tech/player-prefabs.md)
 
 > **목표 한 줄**: 기획이 게임의 모든 기획 수치를 **xlsx 하나에서** 고치고, 버튼 한 번으로 게임에 반영한다.
 > ✅ 툴·Player 쪽 = 은희 영역. 🔴 몬스터·보스 테이블 연결과 보스 코드의 수치 이전은 **경석 합의 후**(§7 D4).
@@ -39,7 +39,7 @@
 | 값 읽는 시점 | `MonsterBase.cs:200` 이 스폰 때 `Initialize(data.attackDamage, …)` 로 **스냅샷** | 테이블 Play 는 진입 때 한 번 적용 → Play 중 xlsx 수정은 반영 안 됨. 즉시 반영은 범위 밖(§6) |
 | 테스트 | EditMode 테스트 폴더·asmdef 관례 있음(`Assets/Tests/EditMode/*`) | 파서·검증을 순수 클래스로 빼서 EditMode 테스트 |
 | Play 진입 경로 | 기본 Play · Dev Boot 버튼(`DevBootLauncher.Launch`) · Dev_Boot 씬에서 직접 Play(`PrepareDirectDevBootIfNeeded`) · MPPM 가상 플레이어 | 모드를 버튼에 붙이면 경로마다 빠뜨린다 → **적용 지점 1곳**(§4-7) |
-| 툴바 | Unity 6.3 `MainToolbarElement` 사용 중. 10-02 Dev Boot 를 `▶ Dev Boot` 버튼 + 씬 드롭다운으로 분리([DevBootToolbar.cs](Assets/1.Scripts/Dev/Editor/DevBootToolbar.cs), 🔴 에디터 확인 대기) | 데이터 출처 드롭다운을 같은 방식으로 옆에 둔다 |
+| 툴바 | Unity 6.3 `MainToolbarElement` 사용 중. 10-02 Dev Boot 를 `▶ Dev Boot` 버튼 + 씬 드롭다운으로 분리([DevBootToolbar.cs](../../../Assets/1.Scripts/Dev/Editor/DevBootToolbar.cs), 🔴 에디터 확인 대기) | 데이터 출처 드롭다운을 같은 방식으로 옆에 둔다 |
 | 개인 설정 저장 | `DevBootTarget` = **워크트리별 EditorPrefs**(키 = `Application.dataPath` 해시) | 데이터 출처도 같은 저장소. 🔴 MPPM 클론은 경로가 달라 키가 어긋날 수 있다(R7) |
 | Play 후 복구 패턴 | `DevBootLauncher` 가 빌드 씬 목록을 `SessionState` 스냅샷 → `EnteredEditMode` 에서 복원 | SO 메모리 복구에 같은 패턴 |
 
