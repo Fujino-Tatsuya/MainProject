@@ -17,7 +17,7 @@ MonoBehaviour:
     subtitle: 
     description: "TODO \uACFC\uC5F4 \uB2E8\uACC4\uC5D0 \uB530\uB77C \uAE30\uBCF8
       \uACF5\uACA9 \uD53C\uD574\uAC00 {dmg} \uBC94\uC704\uB85C \uAC15\uD654\uB429\uB2C8\uB2E4."
-    icon: {fileID: 1935617942197765806, guid: 56c99900c82ddc448a17df875b4eb356, type: 2}
+    icon: {fileID: 0}
   maxHeat: 100
   stageThresholds:
   - 25

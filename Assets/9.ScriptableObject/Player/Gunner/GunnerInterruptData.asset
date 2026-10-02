@@ -17,7 +17,7 @@ MonoBehaviour:
     subtitle: "\uC6B0\uD074\uB9AD \uC2A4\uD0AC"
     description: "TODO \uADFC\uC811 \uACF5\uACA9\uC744 \uAC04\uD30C\uD574 {dmg} \uD53C\uD574\uB97C
       \uC90D\uB2C8\uB2E4."
-    icon: {fileID: 5935260701576259673, guid: 228f5526be00c7e42b0a67b45f697007, type: 2}
+    icon: {fileID: 0}
   inputType: 0
   cooldownTime: 3
   commitCooldownManually: 0

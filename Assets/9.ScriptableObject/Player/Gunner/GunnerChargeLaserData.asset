@@ -17,7 +17,7 @@ MonoBehaviour:
     subtitle: "Q \uC2A4\uD0AC"
     description: "TODO \uC9D1\uC911\uB3C4\uC640 \uACFC\uC5F4 \uB2E8\uACC4\uC5D0 \uB530\uB77C
       {dmg} \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4."
-    icon: {fileID: -5354681486279932123, guid: c999735e03780ee418b36b58fc137904, type: 2}
+    icon: {fileID: 0}
   inputType: 0
   cooldownTime: 6
   commitCooldownManually: 1

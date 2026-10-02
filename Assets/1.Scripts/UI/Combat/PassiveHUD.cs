@@ -36,8 +36,7 @@ public class PassiveHUD : MonoBehaviour
         if (tooltipSource == null && player != null)
             tooltipSource = player.GetComponent<GunnerHeat>()?.Data;
 
-        if (icon != null && tooltipSource != null && tooltipSource.Tooltip.Icon != null)
-            icon.sprite = tooltipSource.Tooltip.Icon;
+        SkillCooldownHUD.SetSlotIcon(icon, tooltipSource);
 
         hover?.Bind(
             player,

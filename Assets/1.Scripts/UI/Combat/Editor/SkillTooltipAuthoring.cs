@@ -17,6 +17,9 @@ public static class SkillTooltipAuthoring
     private const string AttackTexturePath = GeneratedFolder + "/SkillTooltipAttackIcon.asset";
     private const string AttackSpritePath = GeneratedFolder + "/SkillTooltipAttackSprite.asset";
     private const string PaladinPrefabPath = "Assets/2.Prefabs/Player/Paladin/Player_Paladin.prefab";
+    private const string SlotFramePath = "Assets/50.Art/UI/HUD/slot_skill.png";
+    private const string SlotIconName = "SkillIcon";
+    private const float SlotIconInset = 8f;
 
     private static readonly Dictionary<PlayerSkillSlot, string> PaladinData = new Dictionary<PlayerSkillSlot, string>
     {
@@ -41,18 +44,15 @@ public static class SkillTooltipAuthoring
         TMP_StyleSheet styleSheet = EnsureStyleSheet();
         TMP_SpriteAsset attackSprite = EnsureAttackSpriteAsset();
         TMP_FontAsset font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontPath);
-        Dictionary<PlayerSkillSlot, Sprite> paladinIcons = ConfigureHud(styleSheet, attackSprite, font, out Sprite passiveIcon);
-        SeedTooltipSources(paladinIcons, passiveIcon);
+        ConfigureHud(styleSheet, attackSprite, font);
+        SeedTooltipSources();
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
         Debug.Log($"[SkillTooltip] 구성 완료 — {HudPath}. GameData.xlsx Export/병합은 별도로 실행할 것.");
     }
 
-    private static Dictionary<PlayerSkillSlot, Sprite> ConfigureHud(
-        TMP_StyleSheet styleSheet, TMP_SpriteAsset attackSprite, TMP_FontAsset font, out Sprite passiveIcon)
+    private static void ConfigureHud(TMP_StyleSheet styleSheet, TMP_SpriteAsset attackSprite, TMP_FontAsset font)
     {
-        var icons = new Dictionary<PlayerSkillSlot, Sprite>();
-        passiveIcon = null;
         GameObject root = PrefabUtility.LoadPrefabContents(HudPath);
         try
         {
@@ -79,33 +79,22 @@ public static class SkillTooltipAuthoring
 
                 SkillSlotHover hover = EnsureComponent<SkillSlotHover>(slotRoot.gameObject);
                 SetReference(hover, "tooltipView", view);
-                Image icon = FindIcon(slotRoot, fill);
-                if (icon != null)
-                    icon.raycastTarget = true;
-                widget.FindPropertyRelative("icon").objectReferenceValue = icon;
+                EnableFrameRaycast(slotRoot);
+                widget.FindPropertyRelative("icon").objectReferenceValue = EnsureSlotIcon(slotRoot);
                 widget.FindPropertyRelative("hover").objectReferenceValue = hover;
-                if (icon != null)
-                    icons[slot] = icon.sprite;
             }
             skillSo.ApplyModifiedPropertiesWithoutUndo();
 
             var passiveSo = new SerializedObject(passiveHud);
-            Image passiveImage = passiveSo.FindProperty("icon").objectReferenceValue as Image;
-            Transform passiveRoot = FindDeep(root.transform, "Slot_P")
-                ?? (passiveImage != null ? passiveImage.transform.parent : null);
+            Transform passiveRoot = FindDeep(root.transform, "Slot_P");
             if (passiveRoot != null)
             {
                 passiveRoot.gameObject.SetActive(true);
-                passiveImage ??= passiveRoot.GetComponent<Image>();
-                if (passiveImage != null)
-                {
-                    passiveImage.raycastTarget = true;
-                    passiveSo.FindProperty("icon").objectReferenceValue = passiveImage;
-                }
+                EnableFrameRaycast(passiveRoot);
+                passiveSo.FindProperty("icon").objectReferenceValue = EnsureSlotIcon(passiveRoot);
                 SkillSlotHover hover = EnsureComponent<SkillSlotHover>(passiveRoot.gameObject);
                 SetReference(hover, "tooltipView", view);
                 passiveSo.FindProperty("hover").objectReferenceValue = hover;
-                passiveIcon = passiveImage != null ? passiveImage.sprite : null;
             }
             passiveSo.ApplyModifiedPropertiesWithoutUndo();
 
@@ -121,7 +110,6 @@ public static class SkillTooltipAuthoring
             }
 
             PrefabUtility.SaveAsPrefabAsset(root, HudPath);
-            return icons;
         }
         finally
         {
@@ -185,9 +173,9 @@ public static class SkillTooltipAuthoring
         return view;
     }
 
-    private static void SeedTooltipSources(Dictionary<PlayerSkillSlot, Sprite> paladinIcons, Sprite passiveIcon)
+    private static void SeedTooltipSources()
     {
-        SeedSkills(PaladinData, paladinIcons, new Dictionary<PlayerSkillSlot, (string, string, string)>
+        SeedSkills(PaladinData, new Dictionary<PlayerSkillSlot, (string, string, string)>
         {
             { PlayerSkillSlot.Main, ("진격의 방패", "Q 스킬", "TODO 전진하며 적에게 {dmg} 피해를 줍니다.") },
             { PlayerSkillSlot.Sub, ("수호자의 의지", "E 스킬", "TODO {shieldAmount}의 보호막을 {shieldDuration:0.0}초 동안 얻습니다.") },
@@ -195,10 +183,7 @@ public static class SkillTooltipAuthoring
             { PlayerSkillSlot.Ultimate, ("최후의 심판", "궁극기", "TODO 대상을 심판해 {dmg} 피해를 줍니다.") },
         });
 
-        var gunnerIcons = new Dictionary<PlayerSkillSlot, Sprite>();
-        foreach (PlayerSkillSlot slot in Enum.GetValues(typeof(PlayerSkillSlot)))
-            gunnerIcons[slot] = EnsureTemporaryIcon("Gunner_" + slot, SlotColor(slot));
-        SeedSkills(GunnerData, gunnerIcons, new Dictionary<PlayerSkillSlot, (string, string, string)>
+        SeedSkills(GunnerData, new Dictionary<PlayerSkillSlot, (string, string, string)>
         {
             { PlayerSkillSlot.Main, ("충전 레이저", "Q 스킬", "TODO 집중도와 과열 단계에 따라 {dmg} 피해를 줍니다.") },
             { PlayerSkillSlot.Sub, ("냉각 백스텝", "E 스킬", "TODO 뒤로 {distance}m 이동하고 과열도를 초기화합니다.") },
@@ -212,7 +197,7 @@ public static class SkillTooltipAuthoring
             FirstMeleePassive passive = paladin.GetComponent<FirstMeleePassive>();
             if (passive != null)
                 SeedTooltip(passive, "불굴의 의지", string.Empty,
-                    "TODO 준비되면 다음 공격에 {dmg} 추가 피해를 주고 최대 체력의 {healPercent}%를 회복합니다.", passiveIcon);
+                    "TODO 준비되면 다음 공격에 {dmg} 추가 피해를 주고 최대 체력의 {healPercent}%를 회복합니다.");
             PrefabUtility.SaveAsPrefabAsset(paladin, PaladinPrefabPath);
         }
         finally
@@ -223,13 +208,11 @@ public static class SkillTooltipAuthoring
         GunnerHeatData heat = AssetDatabase.LoadAssetAtPath<GunnerHeatData>(
             "Assets/9.ScriptableObject/Player/Gunner/GunnerHeatData.asset");
         SeedTooltip(heat, "과열", string.Empty,
-            "TODO 과열 단계에 따라 기본 공격 피해가 {dmg} 범위로 강화됩니다.",
-            EnsureTemporaryIcon("Gunner_Passive", new Color(1f, 0.35f, 0.18f, 1f)));
+            "TODO 과열 단계에 따라 기본 공격 피해가 {dmg} 범위로 강화됩니다.");
     }
 
     private static void SeedSkills(
         Dictionary<PlayerSkillSlot, string> paths,
-        Dictionary<PlayerSkillSlot, Sprite> icons,
         Dictionary<PlayerSkillSlot, (string name, string subtitle, string description)> texts)
     {
         foreach (KeyValuePair<PlayerSkillSlot, string> pair in paths)
@@ -241,12 +224,12 @@ public static class SkillTooltipAuthoring
                 continue;
             }
             texts.TryGetValue(pair.Key, out (string name, string subtitle, string description) text);
-            icons.TryGetValue(pair.Key, out Sprite icon);
-            SeedTooltip(data, text.name, text.subtitle, text.description, icon);
+            SeedTooltip(data, text.name, text.subtitle, text.description);
         }
     }
 
-    private static void SeedTooltip(Object target, string name, string subtitle, string description, Sprite icon)
+    /// <summary>문구는 비어 있을 때만 채운다. 아이콘은 지정하지 않는다(스킬 아이콘 아트가 나오면 인스펙터에서).</summary>
+    private static void SeedTooltip(Object target, string name, string subtitle, string description)
     {
         if (target == null)
             return;
@@ -258,10 +241,44 @@ public static class SkillTooltipAuthoring
         SetIfEmpty(tooltip.FindPropertyRelative("subtitle"), subtitle);
         SetIfEmpty(tooltip.FindPropertyRelative("description"), description);
         SerializedProperty iconProperty = tooltip.FindPropertyRelative("icon");
-        if (iconProperty.objectReferenceValue == null && icon != null)
-            iconProperty.objectReferenceValue = icon;
+        if (IsNotSkillIcon(iconProperty.objectReferenceValue as Sprite))
+            iconProperty.objectReferenceValue = null;
         so.ApplyModifiedPropertiesWithoutUndo();
         EditorUtility.SetDirty(target);
+    }
+
+    // 이전 저작이 잘못 넣은 값 정리: 슬롯 프레임(slot_skill.png) · 임시 생성 아이콘은 스킬 아이콘이 아니다.
+    private static bool IsNotSkillIcon(Sprite sprite)
+    {
+        if (sprite == null)
+            return false;
+        string path = AssetDatabase.GetAssetPath(sprite);
+        return path == SlotFramePath || path.StartsWith(GeneratedFolder + "/", StringComparison.Ordinal);
+    }
+
+    /// <summary>슬롯 프레임(루트 Image)은 그대로 두고, 그 안에 스킬 아이콘 전용 자식 Image 를 둔다.</summary>
+    private static Image EnsureSlotIcon(Transform slotRoot)
+    {
+        RectTransform rect = slotRoot.Find(SlotIconName) as RectTransform ?? NewUi(SlotIconName, slotRoot);
+        rect.SetSiblingIndex(0); // 프레임 위 · 쿨타임 Fill·키 글자 아래
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.offsetMin = new Vector2(SlotIconInset, SlotIconInset);
+        rect.offsetMax = new Vector2(-SlotIconInset, -SlotIconInset);
+        Image image = EnsureComponent<Image>(rect.gameObject);
+        image.raycastTarget = false;
+        image.preserveAspect = true;
+        image.sprite = null;
+        image.enabled = false; // HUD Bind 가 출처 아이콘이 있을 때만 켠다
+        return image;
+    }
+
+    private static void EnableFrameRaycast(Transform slotRoot)
+    {
+        Image frame = slotRoot.GetComponent<Image>();
+        if (frame != null)
+            frame.raycastTarget = true;
     }
 
     private static TMP_StyleSheet EnsureStyleSheet()
@@ -337,16 +354,6 @@ public static class SkillTooltipAuthoring
         return asset;
     }
 
-    private static Sprite EnsureTemporaryIcon(string name, Color color)
-    {
-        string path = GeneratedFolder + "/" + name + ".asset";
-        EnsureTextureWithSprite(path, name, color, false);
-        foreach (Object asset in AssetDatabase.LoadAllAssetsAtPath(path))
-            if (asset is Sprite sprite)
-                return sprite;
-        return null;
-    }
-
     private static void EnsureTextureWithSprite(string path, string name, Color color, bool swordShape)
     {
         if (AssetDatabase.LoadAssetAtPath<Texture2D>(path) != null)
@@ -406,21 +413,6 @@ public static class SkillTooltipAuthoring
         rect.sizeDelta = size;
     }
 
-    private static Image FindIcon(Transform slotRoot, Image cooldownFill)
-    {
-        Image fallback = null;
-        foreach (Image candidate in slotRoot.GetComponentsInChildren<Image>(true))
-        {
-            if (candidate == cooldownFill)
-                continue;
-            if (candidate.name.IndexOf("icon", StringComparison.OrdinalIgnoreCase) >= 0)
-                return candidate;
-            if (fallback == null && candidate.sprite != null)
-                fallback = candidate;
-        }
-        return fallback;
-    }
-
     private static Transform FindDeep(Transform root, string name)
     {
         foreach (Transform child in root.GetComponentsInChildren<Transform>(true))
@@ -475,15 +467,6 @@ public static class SkillTooltipAuthoring
         if (property != null && string.IsNullOrEmpty(property.stringValue))
             property.stringValue = value ?? string.Empty;
     }
-
-    private static Color SlotColor(PlayerSkillSlot slot) => slot switch
-    {
-        PlayerSkillSlot.Main => new Color(0.2f, 0.75f, 1f, 1f),
-        PlayerSkillSlot.Sub => new Color(0.25f, 0.95f, 0.72f, 1f),
-        PlayerSkillSlot.Interrupt => new Color(1f, 0.65f, 0.25f, 1f),
-        PlayerSkillSlot.Ultimate => new Color(0.75f, 0.35f, 1f, 1f),
-        _ => Color.white,
-    };
 
     private static void EnsureFolder(string path)
     {

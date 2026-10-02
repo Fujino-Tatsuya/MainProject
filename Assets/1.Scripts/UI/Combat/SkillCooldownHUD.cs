@@ -52,8 +52,7 @@ public class SkillCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
 
             PlayerSkillData data = skillController != null ? skillController.GetSkill(widget.slot)?.Data : null;
             ISkillTooltipSource source = data;
-            if (widget.icon != null && source != null && source.Tooltip.Icon != null)
-                widget.icon.sprite = source.Tooltip.Icon;
+            SetSlotIcon(widget.icon, source);
 
             widget.hover?.Bind(
                 player,
@@ -63,6 +62,16 @@ public class SkillCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
                 displayKey: KeyLabel(widget.slot),
                 cooldownSeconds: data != null ? data.CooldownTime : (float?)null);
         }
+    }
+
+    /// <summary>슬롯 프레임 안 아이콘 자식(<c>SkillIcon</c>)만 바꾼다 — 프레임 Image 는 건드리지 않는다. 아이콘 없으면 숨김.</summary>
+    public static void SetSlotIcon(Image icon, ISkillTooltipSource source)
+    {
+        if (icon == null)
+            return;
+        Sprite sprite = source != null ? source.Tooltip.Icon : null;
+        icon.sprite = sprite;
+        icon.enabled = sprite != null;
     }
 
     private static string KeyLabel(PlayerSkillSlot slot) => slot switch
