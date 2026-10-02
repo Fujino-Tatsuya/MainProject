@@ -3,7 +3,7 @@ using UnityEngine;
 /// <summary>
 /// 한 판의 결과. MapScene에서 채우고 ResultScene이 읽는다.
 /// 씬 전환을 넘겨야 하는데 값이 몇 개뿐이라 정적 보관으로 둔다(리슨 서버 로컬 표시 기준).
-/// 원격 클라이언트에도 같은 값을 보여야 하면 서버 브로드캐스트를 얹어야 한다 — 지금은 미구현.
+/// 집계는 서버에서만 한다. 원격 클라이언트는 MapSceneManager의 GoToResult 메시지 페이로드로 같은 값을 받는다.
 /// </summary>
 public static class SessionResult
 {

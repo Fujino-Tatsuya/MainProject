@@ -202,6 +202,8 @@ public class MapSceneManager : NemoSceneManager
     }
 
     // 서버(호스트)만 호출. 자기 자신을 제외한 전 클라에게 전환 신호를 보낸다 (BroadcastState 패턴).
+    // 집계는 서버에서만 하므로 확정된 SessionResult를 페이로드로 실어 클라 결과 화면도 같은 값을 보이게 한다.
+    // 호출자(PartyWipeWatcher·BossEncounterDirector)가 이 호출 전에 SessionStatsTracker.Capture를 끝내야 한다.
     private void BroadcastGoToResultToClients()
     {
         if (_networkManager == null ||
@@ -218,8 +220,11 @@ public class MapSceneManager : NemoSceneManager
                 continue; // 호스트 자신은 로컬에서 직접 전환
             }
 
-            using var writer = new FastBufferWriter(sizeof(byte), Allocator.Temp);
-            writer.WriteValueSafe((byte)1);
+            using var writer = new FastBufferWriter(sizeof(bool) * 2 + sizeof(float) + sizeof(int), Allocator.Temp);
+            writer.WriteValueSafe(SessionResult.HasValue);
+            writer.WriteValueSafe(SessionResult.Cleared);
+            writer.WriteValueSafe(SessionResult.SurvivalSeconds);
+            writer.WriteValueSafe(SessionResult.Kills);
             _networkManager.CustomMessagingManager.SendNamedMessage(GoToResultMessageName, clientId, writer);
         }
 
@@ -247,7 +252,18 @@ public class MapSceneManager : NemoSceneManager
             return;
         }
 
-        Debug.Log($"[SceneFlow] MapSceneManager.HandleGoToResultMessage sender={senderClientId}");
+        reader.ReadValueSafe(out bool hasValue);
+        reader.ReadValueSafe(out bool cleared);
+        reader.ReadValueSafe(out float survivalSeconds);
+        reader.ReadValueSafe(out int kills);
+
+        // 결과 없이 나가는 경로(ExitButton)면 hasValue=false — 클라도 대시 표기로 둔다.
+        if (hasValue)
+        {
+            SessionResult.Capture(cleared, survivalSeconds, kills);
+        }
+
+        Debug.Log($"[SceneFlow] MapSceneManager.HandleGoToResultMessage sender={senderClientId} hasValue={hasValue}");
         PerformGoToResult();
     }
 
