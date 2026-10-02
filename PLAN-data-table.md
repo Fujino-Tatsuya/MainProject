@@ -139,7 +139,7 @@
 
 **안 한 것**
 - `DefaultAttackProjectile.lifetime`(P5) — 어떤 프리팹·씬도 이 컴포넌트를 안 쓴다(참조 0).
-- `Temp_MultiGameRule.defaultLifeCount` — **씬 배치** 컴포넌트(테이블은 프리팹·SO 만). MapScene 3 · 디버그 PlayerBossTest 1. 🔴 §8 Q10.
+- ~~`Temp_MultiGameRule.defaultLifeCount`~~ → 은희가 `GameRule.prefab` 으로 분리(Q10) → 시트 추가.
 - **M6**(23호 폭탄·장판·송전기) — Q9, 경석 장판 작업 후.
 - 레거시 `Enemy/*` — 참조 0, 삭제 후보로 경석에게 보고.
 
@@ -253,7 +253,7 @@
 | ~~Q7~~ | ~~플레이어 이동속도 원본~~ | ✅ 10-02 은희 — **`PlayerMovement.maxSpeed` 로 일원화, `Player.moveSpeed` 삭제** |
 | ~~Q8~~ | ~~중간보스 패턴 SO 형태~~ | ~~하위 타입~~ → **불필요**(10-02 설계 변경 — 테이블이 `GauntletBot` 등 컴포넌트를 직접 덮어씀) |
 | ~~Q9~~ | ~~23호 M6 시점~~ | ✅ 10-02 은희 — **경석 장판 작업 후로 미룸**(이번엔 M1~M5) |
-| Q10 | 목숨 수 `Temp_MultiGameRule.defaultLifeCount` 는 씬 배치(MapScene 3 · 디버그 PlayerBossTest 1) — 테이블 대상으로 만들까 | **`PlayerGameRuleData` 로 통합**(낙하 비율과 같은 방식). 디버그 씬의 1 은 인스펙터 모드에서 씬 값으로 덮어쓰는 개발용 옵션으로 남기거나 버린다 |
+| ~~Q10~~ | ~~목숨 수(씬 배치)~~ | ✅ 10-02 은희 — **`Assets/2.Prefabs/Player/GameRule.prefab` 으로 분리** → `Temp_MultiGameRule` 시트(Id `GameRule`, `defaultLifeCount`). 프리팹 인스턴스가 아닌 디버그 씬 오브젝트(PlayerBossTest 의 1)는 테이블이 안 건드려 두 모드 모두 씬 값 |
 
 ## 9. 완료 조건
 
