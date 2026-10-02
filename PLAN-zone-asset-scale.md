@@ -1,6 +1,6 @@
 # PLAN-zone-asset-scale.md — 존 원본 0.98 축소 (방이 줄어든 만큼 존 내용물도 줄이기)
 
-> 상태: **완료 — 커밋·PR 단계** (2026-10-02 · Claude, 사용자 승인·단계별 검수 10-02). 선행 작업: [PLAN-wall-modules.md](PLAN-wall-modules.md)(`2ddf2838`, SVN r363).
+> 상태: **완료** — SVN r371 · git `feature/ZoneAssetScale` PR (2026-10-02 · Claude, 사용자 승인·단계별 검수 10-02). 선행 작업: [PLAN-wall-modules.md](PLAN-wall-modules.md)(`2ddf2838`, SVN r363).
 > 브랜치 `feature/ZoneAssetScale`. 🔴 **SVN 커밋과 git 병합을 같이 받아야 한다**(아래 「팀원 업데이트 순서」).
 
 ## 문제
@@ -22,7 +22,7 @@
 9. **Stage1(절차 생성)은 범위 밖** — 깨지는 것만 목록으로 남긴다. **방 벽 모듈은 줄이지 않는다.**
 
 ## 바꾼 것
-### SVN (r364 기준, 99개 — 사용자가 커밋)
+### SVN **r371** (99개, 사용자 커밋 10-02)
 | 대상 | 수정 |
 |---|---|
 | FBX `.meta` 82개 (`50.Art/Environment/Models/**` — 바닥·존 안 벽·문·계단·컨베이어·기계·파이프·체인·컨테이너·조명) | `meshes:` 아래 `globalScale: 1` → `0.98` 한 줄. 휴머노이드 쪽 `globalScale` 은 그대로. Synty 구형 meta 18개 형식 유지 |
@@ -76,7 +76,8 @@
 - 🔴 한쪽만 받으면 깨진다.
   - SVN 만 받으면: 존 바닥 4m 마다 8cm 틈, 보스룸·복도가 2% 작아짐.
   - git 만 받으면: 존 바닥 4m 마다 8cm 겹침(깜빡임), 보스룸·복도 2% 커짐, 볼록 콜라이더 2% 큼.
-- ⚠️ SVN r366 은 은희 `feature/SkillTooltip` 용 GameData.xlsx(툴팁 필드)다. 핀을 그 뒤로 올리면 이 xlsx 도 같이 받는다(코드는 아직 development 에 없음).
+- 핀 = **r371**. ⚠️ 그 사이 r366~370 도 같이 받는다 — r366 은 은희 `feature/SkillTooltip` 용 GameData.xlsx(툴팁 필드, 코드는 아직 development 에 없음),
+  r367~368 팔라딘 스킬 아이콘, r369~370 어쌔신 패키지·애니 zip.
 
 ## 리스크·주의
 - **저작 도구 재실행**: `ZoneBridgeGateWiring`·물 기본 높이는 상수를 고쳐 안전. `BossRoomAuthoring` 의 `Rebuild Boss Room Bounds` 는 원래도 쓰지 않는다.

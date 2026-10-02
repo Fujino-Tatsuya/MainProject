@@ -13,7 +13,7 @@ Update this file when a term becomes important enough that future agents or team
 결정·범위·검증·팀원 업데이트 순서 = [PLAN-zone-asset-scale.md](PLAN-zone-asset-scale.md). 사용자 단계별 검수·Play 확인 완료(10-02).
 - 존이 쓰는 FBX 82개 Scale Factor 0.98(SVN `.meta`) + 원본 프리팹·존 11개 배치 0.98 + 존 밖(보스룸·복도·Stage1 복도벽)은 보정 스케일 1/0.98 로 **겉모습 그대로**.
   튜토리얼 문 8곳은 복도 바닥을 늘려 메움. 존 바닥은 벽 밑단 밑으로 20m 변 31cm · 40m 변 11cm.
-- 🔴 **SVN(FBX meta 82 · 볼록 충돌 16 · `floor_MV.prefab`)과 git 을 같이 받아야 한다** — 한쪽만 받으면 존 바닥 4m 마다 8cm 틈 / 콜라이더 2% 어긋남.
+- 🔴 **SVN r371(FBX meta 82 · 볼록 충돌 16 · `floor_MV.prefab`, 핀 371)과 git 을 같이 받아야 한다** — 한쪽만 받으면 존 바닥 4m 마다 8cm 틈/겹침. r366 GameData.xlsx(SkillTooltip)도 같이 딸려 온다.
 - 🔴 존 바닥이 벽까지 닿는지는 벽 바운드(0.634)가 아니라 **벽 밑단(중심선 ≈0.52)** 으로 잴 것(0.97 시도에서 이걸로 틀림). 소품·통로 한계는 그대로 콜라이더 안쪽 면(0.634).
 - Stage1 은 범위 밖: 문마다 0.2/0.4m 바닥 틈(목록만). 롤백·패치 스크립트는 이 PC `_backup/zone-asset-scale-20261002/`(git 제외).
 
