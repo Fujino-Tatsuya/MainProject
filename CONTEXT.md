@@ -8,6 +8,10 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-10-02 · 은희(Claude+Codex) · **캐릭터 선택 화면**, 브랜치 `feature/SelectCharactorUI`) — 계획 [PLAN-character-select.md](PLAN-character-select.md) 승인됨
+- 1단계 **Codex(코드)** 진행 중: `CharacterRoster`(신규) · 선택 static 홀더(신규) · `Lobby/LobbyUIController.cs` · `Lobby/LobbyPlayerSlotView.cs` · `Loading/NetworkLoadingFlowController.cs`
+- 2단계 **Claude(씬·에셋)** 대기: `3.LobbyScene` · `Managers/LobbySceneManager.cs` · `9.ScriptableObject/CharacterRoster.asset` · `NetworkManager.prefab`
+
 ## ▶▶ 현재 인수인계 (2026-10-02 · 은희(Claude) · **데이터 테이블 xlsx → 게임 수치 + Dev Boot 툴바** → development 반영)
 
 사용법 = [Docs/tech/data-table.md](Docs/tech/data-table.md) · 설계·결정 = [PLAN-data-table.md](Docs/history/PLANS/PLAN-data-table.md). 브랜치 `feature/DataTable`(+ `feature/DevBootToolbar` 병합).
