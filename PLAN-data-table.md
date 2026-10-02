@@ -96,7 +96,7 @@
 - `PlayerDashData` · `PlayerGameRuleData` · `DefaultAttackData` · `Gunner*Data` · `FirstMelee*SkillData`.
 - **첫 xlsx 는 현재 SO 값을 내보내서 만든다**(`Tools/Data/Export Template`) → 직후 `Verify` 결과 = **차이 0** 이 기준선.
 
-### D3·D4. 프리팹 인라인 수치 — **옮기지 않고 테이블이 프리팹을 직접 덮어쓴다** (✅ 2026-10-02 구현 · EditMode 54건)
+### D3·D4. 프리팹 인라인 수치 — **옮기지 않고 테이블이 프리팹을 직접 덮어쓴다** (✅ 2026-10-02 구현 · EditMode 54건 · ✅ 은희 Export → Verify 0)
 
 > 🔴 **2026-10-02 설계 변경(은희)**: 초안의 "프리팹 값을 SO 로 옮기고 인라인 필드 삭제" 를 폐기했다.
 > 원칙 = **인스펙터 모드는 SO·프리팹 인스펙터 값만, 테이블 모드·빌드는 xlsx 만.** 프리팹 값을 SO 로 옮기면 인스펙터 모드에서 프리팹 값이 사라진다.
