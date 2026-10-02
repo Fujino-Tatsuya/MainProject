@@ -95,7 +95,10 @@ public sealed class BossElectricFloor : MonoBehaviour
         }
         if (!_boss.IsFightActive) return;
 
-        Mode want = (_boss.ActivePauseConditions & _d.pauseOn) != 0 ? Mode.Paused
+        // 살아 있는 플레이어가 없으면(전원 유령 — 목숨은 남았지만 부활 입력 전) 멈춘다(팀장 10-02).
+        // 드론은 대상 선정에서 자연히 기다리지만 장판은 타이머만 보고 계속 나왔다. 부활하면 4초 대기부터 다시.
+        Mode want = !AnyPlayerAlive() ? Mode.Paused
+                  : (_boss.ActivePauseConditions & _d.pauseOn) != 0 ? Mode.Paused
                   : _boss.IsChargeGimmickActive ? Mode.Charge
                   : _boss.IsChargeJumpActive ? Mode.ChargePrep
                   : Mode.Normal;
@@ -103,6 +106,13 @@ public sealed class BossElectricFloor : MonoBehaviour
 
         if (_mode == Mode.Normal) TickNormal(dt);
         else if (_mode == Mode.Charge) TickCharge(dt);
+    }
+
+    static bool AnyPlayerAlive()
+    {
+        foreach (Player p in BossPatternTargets.AllPlayers())
+            if (BossPatternTargets.IsAlive(p)) return true;
+        return false;
     }
 
     void Transition(Mode to)
