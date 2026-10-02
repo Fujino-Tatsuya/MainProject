@@ -28,8 +28,6 @@ public class LobbySceneManager : NemoSceneManager
     [SerializeField] private Color characterSelectedColor = new Color(1f, 0.85f, 0.3f, 1f);
     [SerializeField] private Color characterIdleColor = Color.white;
     [SerializeField] private Color characterReadyColor = new Color(0.25f, 0.85f, 0.45f, 1f);
-    [SerializeField] private Color characterDisconnectedColor = new Color(0.45f, 0.45f, 0.45f, 1f);
-
     [Header("Messages")]
     [SerializeField] private TMP_Text errorText;
 
@@ -359,7 +357,7 @@ public class LobbySceneManager : NemoSceneManager
         ApplyCharacterSelectUi(listening, isHost, controller);
     }
 
-    // 미접속 = 회색, 접속 = 선택 강조, 클라 Ready = 선택 버튼 초록. 클라는 Ready 중 변경 불가(서버도 거부) — 호스트는 항상 Ready 라 잠그지 않는다.
+    // 선택 버튼 강조, 클라 Ready = 선택 버튼 초록. 클라는 Ready 중 변경 불가(서버도 거부) — 호스트는 항상 Ready 라 잠그지 않는다.
     private void ApplyCharacterSelectUi(bool listening, bool isHost, LobbyUIController controller)
     {
         var roster = controller != null ? controller.Roster : null;
@@ -381,8 +379,7 @@ public class LobbySceneManager : NemoSceneManager
             if (button.targetGraphic != null)
             {
                 var selectedColor = locked ? characterReadyColor : characterSelectedColor;
-                button.targetGraphic.color = !listening ? characterDisconnectedColor
-                    : i == selectedId ? selectedColor : characterIdleColor;
+                button.targetGraphic.color = i == selectedId ? selectedColor : characterIdleColor;
             }
         }
     }

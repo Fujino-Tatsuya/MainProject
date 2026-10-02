@@ -19,7 +19,7 @@ public class LobbyPlayerSlotView : MonoBehaviour
     {
         SetConnected(connected);
         SetReady(connected && ready);
-        SetPortrait(connected ? portrait : null);
+        SetPortrait(connected, connected ? portrait : null);
     }
 
     private void SetConnected(bool connected)
@@ -46,7 +46,8 @@ public class LobbyPlayerSlotView : MonoBehaviour
         readyImage.enabled = readyImage.sprite != null || readyImage.color.a > 0f;
     }
 
-    private void SetPortrait(Sprite portrait)
+    // 미접속 슬롯은 숨기지 않고 회색 칸으로 둔다 — IsConnect 아이콘 대신 접속 여부를 보여준다.
+    private void SetPortrait(bool connected, Sprite portrait)
     {
         if (portraitImage == null)
         {
@@ -54,6 +55,7 @@ public class LobbyPlayerSlotView : MonoBehaviour
         }
 
         portraitImage.sprite = portrait;
-        portraitImage.enabled = portrait != null;
+        portraitImage.color = connected ? Color.white : disconnectedColor;
+        portraitImage.enabled = true;
     }
 }
