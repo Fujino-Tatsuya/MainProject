@@ -69,15 +69,17 @@ public sealed class DataTableSchemaTests
     }
 
     [Test]
-    public void VerticalTable_EmptyValueAndValueBeforeHeader_AreErrors()
+    public void VerticalTable_ValueBeforeHeader_IsError_EmptyValuePassesToApplier()
     {
+        // 빈 칸 판정은 필드 타입을 아는 Applier 몫([DataTableText] 문자열만 빈 값 허용) — 스키마는 빈 값 그대로 넘긴다.
         var issues = new DataTableIssues();
-        Parse(Sheet("S",
+        List<DataTableEntry> entries = Parse(Sheet("S",
             new[] { "maxHp", "", "1" },                 // 머리글 전
             new[] { "필드", "#설명", "A", "B" },
             new[] { "maxHp", "", "1", "" }), issues);   // B 빈 칸
 
-        Assert.That(issues.Items.Select(i => i.Location), Is.EquivalentTo(new[] { "T.xlsx › S!A1", "T.xlsx › S!D3" }));
+        Assert.That(issues.Items.Select(i => i.Location), Is.EquivalentTo(new[] { "T.xlsx › S!A1" }));
+        Assert.That(entries.Select(e => $"{e.AssetId}.{e.Field}={e.Value}"), Is.EqualTo(new[] { "A.maxHp=1", "B.maxHp=" }));
     }
 
     [Test]

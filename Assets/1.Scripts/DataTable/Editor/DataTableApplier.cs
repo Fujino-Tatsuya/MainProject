@@ -209,6 +209,12 @@ public static class DataTableApplier
                     continue;
                 }
 
+                if (entry.Value.Length == 0 && property.propertyType != SerializedPropertyType.String)
+                {
+                    issues.Error(entry.Location, $"'{entry.AssetId}.{entry.Field}' 값이 비어 있다(이 대상에 없는 칸이면 '{DataTableSchema.NotApplicable}').");
+                    continue;
+                }
+
                 if (!TryConvert(property, entry.Value, out object value, out string convertError))
                 {
                     issues.Error(entry.Location, $"'{entry.AssetId}.{entry.Field}' = '{entry.Value}' — {convertError}");

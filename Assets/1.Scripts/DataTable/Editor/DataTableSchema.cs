@@ -193,12 +193,8 @@ public static class DataTableSchema
             {
                 string value = sheet.Cell(row, column).Trim();
                 string location = Where(fileName, sheetName, row, column);
-                if (value.Length == 0)
-                {
-                    issues.Error(location, $"'{id}.{first}' 값이 비어 있다(이 대상에 없는 칸이면 '{NotApplicable}').");
-                    continue;
-                }
-
+                // 빈 칸은 그대로 넘긴다 — 필드 타입을 아는 DataTableApplier.Bind 가 판정한다
+                // ([DataTableText] 문자열 = 빈 문자열 허용, 그 밖 = "값이 비어 있다" 오류).
                 if (value != NotApplicable)
                 {
                     into.Add(new DataTableEntry(sheetName, id, first, value, location));
