@@ -73,9 +73,14 @@ public class TurretHeadAim : NetworkBehaviour, ITurretAimGate
              "예고선 오브젝트의 위치를 쓰지 않는 이유는, 그 오브젝트가 머리에 붙어 있지 않을 수도 있어서다.")]
     [SerializeField] private Transform laserOrigin;
 
-    [Header("조준 예고선 색 (기획 피드백 10-02 — 조준이 언제 끝나는지 보이게)")]
-    [Tooltip("추적 중(telegraphSeconds) — 아직 따라오는 중.")]
+    [Header("조준 예고선 색 (기획 피드백 10-02 — 조준이 언제 끝나는지 보이게) — 초록 → 주황 → 빨강")]
+    [Tooltip("추적 앞부분 — 막 조준을 시작했다.")]
+    [SerializeField] private Color startColor = new Color(0.15f, 1f, 0.2f, 1f);
+    [Tooltip("추적 뒷부분 — 곧 고정된다.")]
     [SerializeField] private Color trackingColor = new Color(1f, 0.55f, 0.05f, 1f);
+    [Tooltip("추적 시간(telegraphSeconds) 중 초록 → 주황으로 바뀌는 지점(0~1). 0.5 = 추적의 절반.")]
+    [Range(0f, 1f)]
+    [SerializeField] private float trackingColorAt = 0.5f;
     [Tooltip("고정 중(aimHoldSeconds) — 방향이 굳었다, 곧 쏜다. 발사 순간 선이 꺼진다.")]
     [SerializeField] private Color lockedColor = new Color(1f, 0.05f, 0.03f, 1f);
 
@@ -424,11 +429,14 @@ public class TurretHeadAim : NetworkBehaviour, ITurretAimGate
             return;
         }
 
-        // 색: 추적 = 주황 → 고정 = 빨강(발사 순간 꺼짐). 고정 시점은 각 피어가 "선이 켜진 뒤 telegraphSeconds" 로 잰다 —
-        // 켜짐 신호와 고정 시점이 같은 지연을 겪으므로 간격은 서버와 같다. 고정 여부를 따로 복제하지 않는다.
+        // 색: 추적 앞부분 초록 → 추적 뒷부분 주황 → 고정(쏘기 전) 빨강 → 발사 순간 꺼짐. 단계마다 딱 바뀐다(타이밍이 읽히게).
+        // 시점은 각 피어가 "선이 켜진 뒤 경과"로 잰다 — 켜짐 신호와 같은 지연이라 간격이 서버와 같다. 따로 복제하지 않는다.
         if (_laserShownAt < 0f) _laserShownAt = Time.time;
-        bool locked = Time.time - _laserShownAt >= telegraphSeconds;
-        ApplyLaserColor(locked ? lockedColor : trackingColor);
+        float elapsed = Time.time - _laserShownAt;
+        Color c = elapsed >= telegraphSeconds ? lockedColor
+                : elapsed >= telegraphSeconds * trackingColorAt ? trackingColor
+                : startColor;
+        ApplyLaserColor(c);
 
         Vector3 origin = laserOrigin != null ? laserOrigin.position : headBone.position;
         Vector3 dir = AimDirection;
