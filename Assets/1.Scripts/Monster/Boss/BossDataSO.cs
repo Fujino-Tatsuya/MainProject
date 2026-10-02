@@ -147,7 +147,7 @@ public class BossAttackEntry
              "(2026-09-23). prep 을 재생하면 애니메이터가 공격 상태가 아니라 prep 상태라 " +
              "상태명 검사를 통과하지 못하므로, 준비 신호를 prep 시작과 함께 즉시 세운다. " +
              "대신 이 값은 **공격 클립을 이어서 재생할 지점**으로 쓰인다(돌진의 0.57 = 선딜 완료).")]
-    [DataTableIgnore] [Range(0f, 1f)] public float hitEventFallbackNormalized = 0f;
+    [Range(0f, 1f)] public float hitEventFallbackNormalized = 0f;
 
     // ─── [G2-P] 준비동작(prep) 클립 (2026-09-23, SVN r322 로 아트가 올림) ───────────
     // 예고 구간에 **공격 클립을 얼리는 대신 전용 준비동작을 재생**한다.
@@ -169,7 +169,7 @@ public class BossAttackEntry
              "**데미지가 나가지 않는다** — 훅·어퍼는 0.4 미만이어야 한다.\n" +
              "🔴 prep 을 넣었다고 이 값을 0 으로 내리지 말 것. 공격 클립의 앞부분이 그 클립 자체의 " +
              "준비동작이라 prep 과 겹치고, 무엇보다 **OnAttackHit 이 그만큼 늦게 나간다.**")]
-    [DataTableIgnore] [Range(0f, 0.95f)] public float telegraphPoseNormalized = 0.15f;
+    [Range(0f, 0.95f)] public float telegraphPoseNormalized = 0.15f;
 }
 
 // 공격이 노릴 대상. [S6]

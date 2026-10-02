@@ -46,7 +46,7 @@ public class MonsterDataSO : ScriptableObject
     [Header("회피 / 크라우드 (부분 겹침·성능)")]
     // NavMeshAgent 회피 반경. CapsuleCollider(히트박스)보다 작게 두면 몹끼리 '부분 겹침'이 허용된다(작을수록 더 겹침).
     // 물리(RB)로 밀어내지 않고 이 값만으로 겹침량을 조절 — 서버권한 crowd에서 가장 저렴. 콜라이더는 히트용으로 별도 유지.
-    [DataTableIgnore] public float avoidanceRadius = 0.3f;
+    public float avoidanceRadius = 0.3f;
     // 회피 품질 ↔ CPU 비용. 수십 마리 crowd면 Med(또는 Low) 권장. High는 과함.
     public ObstacleAvoidanceType obstacleAvoidance = ObstacleAvoidanceType.MedQualityObstacleAvoidance;
 
@@ -65,7 +65,7 @@ public class MonsterDataSO : ScriptableObject
 
     [Header("공격 타이밍")]
     public float attackDuration = 0.9f; // 공격 상태 지속(모션 길이 근사)
-    [DataTableIgnore] public float attackWindup = 0.35f;  // (이벤트 전환으로 base 미사용 — 서브클래스/폴백 참고용)
+    public float attackWindup = 0.35f;  // (이벤트 전환으로 base 미사용 — 서브클래스/폴백 참고용)
     public bool cancelWindupIfTargetLeavesRange = false; // 선딜(히트 발생 전) 중 타깃이 사거리+여유를 벗어나면 공격을 취소하고 추격 복귀(원거리 준비-취소 설계, MortarBot). 멜리 커밋 몹은 false 유지.
     // 사거리 안으로 들어온 순간부터 첫 공격까지 최소 지연(초). 0 = 기존 동작 — 사거리에 닿는 프레임에 바로 때린다.
     // 규칙과 구현 근거는 MonsterEngagePolicy 참조. 완전히 벗어났다 다시 들어오면 다시 걸린다.
@@ -81,7 +81,7 @@ public class MonsterDataSO : ScriptableObject
 
     [Header("피격 / 사망")]
     public float hitStunDuration = 0.4f; // 피격 경직 시간
-    [DataTableIgnore] public float despawnDelay = 2f;      // 사망 후 디스폰까지 지연(디졸브 폴백)
+    public float despawnDelay = 2f;      // 사망 후 디스폰까지 지연(디졸브 폴백)
 
     // ⚠️ 2026-09-21 SO 전수조사 — **유령 필드**라 주석 처리했다. 참조 0.
     //    에셋 12개가 값을 갖고 있었고 그중 3개가 true 였다
