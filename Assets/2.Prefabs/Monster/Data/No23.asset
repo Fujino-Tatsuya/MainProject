@@ -351,7 +351,9 @@ MonoBehaviour:
   jumpTelegraphPrefab: {fileID: 5997264177071607445, guid: a325fc2b60be455428b04ab67232fb24, type: 3}
   jumpLandSeparation: 1.2
   jumpKnockbackStrength: 5
-  chargeTimeLimit: 20
+  chargeTimeLimit: 30
+  chargeLoopStartFrame: 59
+  chargeLoopEndFrame: 125
   chargeZonePrefab: {fileID: 0}
   chargePylonsSolo: 1
   chargePylonsDuo: 2

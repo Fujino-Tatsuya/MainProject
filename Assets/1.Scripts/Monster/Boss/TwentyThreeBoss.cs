@@ -375,6 +375,13 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         if (!TryGetComponent(out _drone)) _drone = gameObject.AddComponent<WellsDroneAttack>();
         _drone.Init(this, _boss.wellsDrone);
 
+        // 차징 클립 구간 반복(팀장 10-02 — 팔 모으는 동작은 처음 1회만). 애니는 피어마다 로컬이라 전 피어에 붙인다.
+        if (!TryGetComponent(out BossChargeClipLoop chargeLoop)) chargeLoop = gameObject.AddComponent<BossChargeClipLoop>();
+        BossAttackEntry chargeEntry = AttackEntryOf(BossAttackId.ChargeSequence);
+        chargeLoop.Init(animator != null ? animator : GetComponentInChildren<Animator>(),
+                        chargeEntry != null ? chargeEntry.animatorStateName : null,
+                        _boss.chargeLoopStartFrame, _boss.chargeLoopEndFrame);
+
         if (!IsServer)
             return;
 

@@ -481,7 +481,13 @@ public class BossDataSO : MonsterDataSO
 
     [Header("송전기(차징) — 페이즈 진입 시퀀스")]
     [Tooltip("제한시간(초). 이 시간 안에 송전탑을 전부 부수지 못하면 레이지로 넘어간다.")]
-    [Min(1f)] public float chargeTimeLimit = 20f;
+    [Min(1f)] public float chargeTimeLimit = 30f;
+
+    [Tooltip("차징 클립 구간 반복 — 처음 1회는 0 프레임부터 재생하고, chargeLoopEndFrame 에 닿으면 chargeLoopStartFrame 으로 되돌려 " +
+             "그 구간만 반복한다(팔 모으는 동작은 처음에만, 팀장 10-02). 클립 프레임 기준. 시작 < 0 이면 끔(클립 자체 루프).\n" +
+             "기본 f59~f125 = 이음매 자세 차이가 가장 작은 쌍(본 회전 차 합 16°). 클립 끝 f158 → f46 은 982° 라 튄다.")]
+    public int chargeLoopStartFrame = 59;
+    public int chargeLoopEndFrame = 125;
 
     // ⚠️ 2026-09-21 SO 전수조사 — **유령 필드**(선언 파일 밖 참조 0)라 주석 처리했다.
     //    주석 처리하면 Unity 가 다음 직렬화에서 에셋의 값도 버리므로, 마지막 저작값을 여기 남긴다.
