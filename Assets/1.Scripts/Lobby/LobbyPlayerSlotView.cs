@@ -5,6 +5,7 @@ public class LobbyPlayerSlotView : MonoBehaviour
 {
     [SerializeField] private Image connectedImage;
     [SerializeField] private Image readyImage;
+    [SerializeField] private Image portraitImage;
     [SerializeField] private Sprite connectedSprite;
     [SerializeField] private Sprite disconnectedSprite;
     [SerializeField] private Sprite readySprite;
@@ -14,10 +15,11 @@ public class LobbyPlayerSlotView : MonoBehaviour
     [SerializeField] private Color readyColor = new Color(0.25f, 0.65f, 1f, 1f);
     [SerializeField] private Color notReadyColor = new Color(0.85f, 0.25f, 0.25f, 1f);
 
-    public void SetState(bool connected, bool ready)
+    public void SetState(bool connected, bool ready, Sprite portrait)
     {
         SetConnected(connected);
         SetReady(connected && ready);
+        SetPortrait(connected ? portrait : null);
     }
 
     private void SetConnected(bool connected)
@@ -42,5 +44,16 @@ public class LobbyPlayerSlotView : MonoBehaviour
         readyImage.sprite = ready ? readySprite : notReadySprite;
         readyImage.color = ready ? readyColor : notReadyColor;
         readyImage.enabled = readyImage.sprite != null || readyImage.color.a > 0f;
+    }
+
+    private void SetPortrait(Sprite portrait)
+    {
+        if (portraitImage == null)
+        {
+            return;
+        }
+
+        portraitImage.sprite = portrait;
+        portraitImage.enabled = portrait != null;
     }
 }
