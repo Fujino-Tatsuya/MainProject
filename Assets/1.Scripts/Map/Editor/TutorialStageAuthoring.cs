@@ -43,11 +43,11 @@ public static class TutorialStageAuthoring
 
     static readonly SlotSpec[] Slots =
     {
-        new SlotSpec { Zone = "ZoneS_typeStart",     Pos = new Vector3(-29.4f,  0f, -120.8f),  Size = ZoneSize.Small,  Spawn = true },
-        new SlotSpec { Zone = "ZoneS_typeA",         Pos = new Vector3(-0.3f,   0f, -120.63f), Size = ZoneSize.Small },
-        new SlotSpec { Zone = "ZoneM_typeA",         Pos = new Vector3(-0.62f,  0f, -160.21f), Size = ZoneSize.Medium },
-        new SlotSpec { Zone = "ZoneL_typeB",         Pos = new Vector3(-10.63f, 0f, -210.06f), Size = ZoneSize.Large },
-        new SlotSpec { Zone = "ZoneS_typeBossEnter", Pos = new Vector3(29.6f,   0f, -220.08f), Size = ZoneSize.Small,  Boss = true },
+        new SlotSpec { Zone = "ZoneS_typeStart",     Pos = new Vector3(-29.8257f, 0f, -120.7997f),  Size = ZoneSize.Small,  Spawn = true },
+        new SlotSpec { Zone = "ZoneS_typeA",         Pos = new Vector3(-0.1775f, 0f, -120.7997f), Size = ZoneSize.Small },
+        new SlotSpec { Zone = "ZoneM_typeA",         Pos = new Vector3(-0.1765f, 0f, -160.6469f), Size = ZoneSize.Medium },
+        new SlotSpec { Zone = "ZoneL_typeB",         Pos = new Vector3(-10.1745f, 0f, -210.2951f), Size = ZoneSize.Large },
+        new SlotSpec { Zone = "ZoneS_typeBossEnter", Pos = new Vector3(29.4707f, 0f, -220.0961f), Size = ZoneSize.Small,  Boss = true },
     };
 
     static Vector2 FootprintOf(ZoneSize s) => s switch
