@@ -329,7 +329,8 @@ public sealed class WellsDroneAttack : MonoBehaviour
         _vStart = Time.time;
         _vDur = Mathf.Max(0.01f, trackTime);
         _crossColor = _d.crosshairStartColor;
-        BossPatternVisuals.Paint(_cross, _crossColor, BossPatternVisuals.CrosshairTexture);
+        BossPatternVisuals.Paint(_cross, _crossColor,
+                                 _d.crosshairTexture != null ? _d.crosshairTexture : BossPatternVisuals.CrosshairTexture);
         _cross.enabled = true;
         _cross.gameObject.SetActive(true);
     }

@@ -29,6 +29,8 @@ MonoBehaviour:
   dashLoopClip: {fileID: -2281602620767728765, guid: fcc07944700f48a419a0cbde4e5cf5d5, type: 3}
   dropHeight: 8
   fallTime: 1
+  approachSlowTimePortion: 0.5
+  approachSlowDistancePortion: 0.15
   explosionVfxPrefab: {fileID: 0}
   explosionDuration: 0.5
   crosshairSize: 2.4
@@ -37,7 +39,11 @@ MonoBehaviour:
   crosshairShrinkPortion: 0.8
   crosshairReferenceDistance: 20
   crosshairTowardCamera: 1.5
+  crosshairTexture: {fileID: 2800000, guid: 1dcefdb6800d03f4fb5f252d816eda87, type: 3}
+  crosshairStartColor: {r: 0.15, g: 1, b: 0.2, a: 0.95}
+  crosshairMidColor: {r: 1, g: 0.55, b: 0.05, a: 0.95}
   crosshairColor: {r: 1, g: 0.2, b: 0.15, a: 0.95}
+  crosshairMidColorAt: 0.5
   circleOuterColor: {r: 1, g: 0.15, b: 0.1, a: 0.3}
   circleFillColor: {r: 1, g: 0.05, b: 0.02, a: 0.6}
   explosionColor: {r: 1, g: 0.55, b: 0.1, a: 0.85}

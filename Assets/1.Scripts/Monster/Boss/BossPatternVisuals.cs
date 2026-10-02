@@ -20,8 +20,8 @@ public static class BossPatternVisuals
 
     public static Texture2D SquareTexture => _square != null ? _square : (_square = BuildSquare(64, 0.1f));
     public static Texture2D DiscTexture => _disc != null ? _disc : (_disc = BuildDisc(128, 0.08f));
-    public static Texture2D CrosshairTexture => _crosshair != null ? _crosshair :
-        (_crosshair = Resources.Load<Texture2D>("BossPatterns/WellsDroneCrosshair") ?? BuildCrosshair(128));
+    /// <summary>코드로 그린 기본 크로스헤어 — 아트 텍스처는 <see cref="WellsDroneDataSO.crosshairTexture"/> 칸에 넣는다(비면 이것).</summary>
+    public static Texture2D CrosshairTexture => _crosshair != null ? _crosshair : (_crosshair = BuildCrosshair(128));
 
     static Material Mat
     {

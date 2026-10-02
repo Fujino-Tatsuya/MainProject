@@ -68,6 +68,8 @@ public class WellsDroneDataSO : ScriptableObject
     [Min(1f)] public float crosshairReferenceDistance = 20f;
     [Tooltip("캐릭터 모델에 가리지 않게 카메라 쪽으로 당겨 그리는 거리(m).")]
     [Min(0f)] public float crosshairTowardCamera = 1.5f;
+    [Tooltip("크로스헤어 그림. 비우면 코드로 그린 기본 모양. 흰색 그림을 넣으면 아래 색이 그대로 입혀진다(곱셈).")]
+    public Texture2D crosshairTexture;
     [Tooltip("색 흐름 — 터렛 조준선과 같은 경험(팀장 10-02): 초록(줄기 시작) → 주황 → 빨강(다 줄어 멈춤 = 곧 고정).")]
     public Color crosshairStartColor = new Color(0.15f, 1f, 0.2f, 0.95f);
     public Color crosshairMidColor = new Color(1f, 0.55f, 0.05f, 0.95f);

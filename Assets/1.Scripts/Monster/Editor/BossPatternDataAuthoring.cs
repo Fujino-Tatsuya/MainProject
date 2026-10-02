@@ -11,6 +11,7 @@ static class BossPatternDataAuthoring
     const string FloorPath = Dir + "/BossElectricFloorData.asset";
     const string DronePath = Dir + "/WellsDroneData.asset";
     const string DroneModelPath = "Assets/50.Art/Char/Drone/Models/DRONE.fbx";
+    const string CrosshairTexturePath = "Assets/3.Materials/BossPatterns/WellsDroneCrosshair.png";
     static readonly string[] BossData = { Dir + "/No23.asset", Dir + "/No23_Solo.asset" };
 
     [MenuItem("Tools/Boss/전기 장판·자폭 드론 데이터 만들기·연결")]
@@ -23,6 +24,13 @@ static class BossPatternDataAuthoring
         {
             drone.droneModel = AssetDatabase.LoadAssetAtPath<GameObject>(DroneModelPath);
             if (drone.droneModel == null) Debug.LogWarning($"[BossPatternData] 드론 모델이 없다(SVN 확인): {DroneModelPath}");
+            EditorUtility.SetDirty(drone);
+        }
+
+        if (drone.crosshairTexture == null)
+        {
+            drone.crosshairTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(CrosshairTexturePath);
+            Debug.Log($"[BossPatternData] 크로스헤어 텍스처 — {(drone.crosshairTexture ? drone.crosshairTexture.name : "없음(코드 기본 모양)")}");
             EditorUtility.SetDirty(drone);
         }
 
