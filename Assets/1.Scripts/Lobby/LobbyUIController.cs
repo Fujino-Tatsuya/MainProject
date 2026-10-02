@@ -16,6 +16,8 @@ public class LobbyUIController : MonoBehaviour
 
     public event System.Action StateChanged;
 
+    public CharacterRoster Roster => characterRoster;
+
     [SerializeField] private LobbyPlayerSlotView[] slots;
     [SerializeField] private CharacterRoster characterRoster;
     [SerializeField] private Image startButtonImage;

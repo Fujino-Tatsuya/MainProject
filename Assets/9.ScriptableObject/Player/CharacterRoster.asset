@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c1a5ec150d744f8b80effcfeae0066df, type: 3}
+  m_Name: CharacterRoster
+  m_EditorClassIdentifier: Assembly-CSharp::CharacterRoster
+  entries:
+  - displayName: "\uD314\uB77C\uB518"
+    playerPrefab: {fileID: 7876615519038055782, guid: df27ec97b40aab24da03bb1fb7cb43ce, type: 3}
+    portrait: {fileID: 21300000, guid: cdbe6b2792f1adc48a5656ea5fdb6527, type: 3}
+    available: 1
+  - displayName: "\uAC70\uB108"
+    playerPrefab: {fileID: 1006850121594653262, guid: 0fbb7232130df8540a013fe07a9f9977, type: 3}
+    portrait: {fileID: 21300000, guid: 48fcc0833eb62e840b204b0b8d22e4cb, type: 3}
+    available: 1
+  - displayName: "\uC900\uBE44 \uC911"
+    playerPrefab: {fileID: 0}
+    portrait: {fileID: 0}
+    available: 0

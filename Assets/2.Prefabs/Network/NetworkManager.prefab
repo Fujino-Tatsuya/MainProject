@@ -141,6 +141,7 @@ MonoBehaviour:
   readyMessageSeconds: 2.5
   requireLobbyReadyToStart: 1
   defaultPlayerPrefab: {fileID: 7876615519038055782, guid: df27ec97b40aab24da03bb1fb7cb43ce, type: 3}
+  characterRoster: {fileID: 11400000, guid: 040d4a8d1d7b29e40b40962b65eba5f4, type: 2}
   debugLogging: 1
   spawn_Offset: {x: 0, y: 10, z: 0}
 --- !u!114 &1111111111111111111

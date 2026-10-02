@@ -9,8 +9,9 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
 ## ▶▶ 작업 세션 (2026-10-02 · 은희(Claude+Codex) · **캐릭터 선택 화면**, 브랜치 `feature/SelectCharactorUI`) — 계획 [PLAN-character-select.md](PLAN-character-select.md) 승인됨
-- 1단계 **Codex(코드)** 진행 중: `CharacterRoster`(신규) · 선택 static 홀더(신규) · `Lobby/LobbyUIController.cs` · `Lobby/LobbyPlayerSlotView.cs` · `Loading/NetworkLoadingFlowController.cs`
-- 2단계 **Claude(씬·에셋)** 대기: `3.LobbyScene` · `Managers/LobbySceneManager.cs` · `9.ScriptableObject/CharacterRoster.asset` · `NetworkManager.prefab`
+- ✅ 1단계 Codex(코드) `09e9cc57` · ✅ 2단계 Claude(씬·에셋·`LobbySceneManager` 배선). 결과 요약 = [player-prefabs.md §8.3](Docs/tech/player-prefabs.md)
+- 🔴 남은 것: **은희 MPPM Play 확인**(호스트+클라2: 초상화·Ready 동기화 / Start 활성 / 고른 Variant 스폰) → PR. 레이아웃은 첫 배치라 Play 보고 조정 가능
+- 범위 밖: 전투 HUD 초상화 Paladin 고정(Gunner 도 Paladin 얼굴)
 
 ## ▶▶ 현재 인수인계 (2026-10-02 · 은희(Claude) · **데이터 테이블 xlsx → 게임 수치 + Dev Boot 툴바** → development 반영)
 

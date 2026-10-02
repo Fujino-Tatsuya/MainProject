@@ -7,6 +7,7 @@ using UnityEngine.UI;
 public class LobbySceneManager : NemoSceneManager
 {
     private const string DiagTag = "LobbySceneManager";
+    private const int CharacterButtonCount = 3;
 
     [Header("Connection Inputs")]
     [SerializeField] private TMP_InputField ipInputField;
@@ -21,6 +22,12 @@ public class LobbySceneManager : NemoSceneManager
 
     [Header("Panels")]
     [SerializeField] private GameObject sessionConnectPanel;
+
+    [Header("Character Select")]
+    [SerializeField] private GameObject characterSelectPanel;
+    [SerializeField] private Button[] characterButtons = new Button[CharacterButtonCount];
+    [SerializeField] private Color characterSelectedColor = new Color(1f, 0.85f, 0.3f, 1f);
+    [SerializeField] private Color characterIdleColor = Color.white;
 
     [Header("Messages")]
     [SerializeField] private TMP_Text errorText;
@@ -347,6 +354,50 @@ public class LobbySceneManager : NemoSceneManager
         {
             readyButton.gameObject.SetActive(!listening || !isHost);
         }
+
+        ApplyCharacterSelectUi(listening, isHost, controller);
+    }
+
+    // 접속 뒤에만 패널을 보인다. 클라는 Ready 중 변경 불가(서버도 거부) — 호스트는 항상 Ready 라 잠그지 않는다.
+    private void ApplyCharacterSelectUi(bool listening, bool isHost, LobbyUIController controller)
+    {
+        if (characterSelectPanel != null)
+        {
+            characterSelectPanel.SetActive(listening);
+        }
+
+        var roster = controller != null ? controller.Roster : null;
+        var locked = !isHost && controller != null && controller.IsLocalReady();
+        var selectedId = controller != null ? controller.GetLocalCharacterSelectionId() : -1;
+
+        for (var i = 0; i < characterButtons.Length; i++)
+        {
+            var button = characterButtons[i];
+            if (button == null)
+            {
+                continue;
+            }
+
+            var available = roster != null && roster.TryGetAvailableCharacter(i, out _);
+            button.interactable = listening && available && !locked;
+
+            if (button.targetGraphic != null)
+            {
+                button.targetGraphic.color = i == selectedId ? characterSelectedColor : characterIdleColor;
+            }
+        }
+    }
+
+    private void SelectCharacter(int characterId)
+    {
+        var controller = ResolveLobbyUIController();
+        if (controller == null)
+        {
+            WarnMissingReference(nameof(LobbyUIController));
+            return;
+        }
+
+        controller.RequestLocalCharacterSelection(characterId);
     }
 
     private void HandleClientConnected(ulong clientId)
@@ -662,6 +713,20 @@ public class LobbySceneManager : NemoSceneManager
             joinCodeDisplayText = target != null ? target.GetComponent<TMP_Text>() : null;
         }
 
+        characterSelectPanel ??= FindInActiveScene("Panel_CharacterSelect");
+        if (characterButtons == null || characterButtons.Length != CharacterButtonCount)
+        {
+            characterButtons = new Button[CharacterButtonCount];
+        }
+
+        for (var i = 0; i < characterButtons.Length; i++)
+        {
+            characterButtons[i] ??= FindButton($"Button_Character{i}");
+            WarnIfMissing(characterButtons[i], $"characterButtons[{i}]");
+        }
+
+        WarnIfMissing(characterSelectPanel, nameof(characterSelectPanel));
+
         _lobbyUIController ??= FindFirstObjectByType<LobbyUIController>();
 
         WarnIfMissing(startHostButton, nameof(startHostButton));
@@ -698,6 +763,12 @@ public class LobbySceneManager : NemoSceneManager
         BindButton(relayHostButton, StartRelayHost);
         BindButton(relayJoinButton, StartRelayJoin);
         BindButton(modeToggleButton, ToggleConnectionMode);
+
+        for (var i = 0; i < characterButtons.Length; i++)
+        {
+            var characterId = i;
+            BindButton(characterButtons[i], () => SelectCharacter(characterId));
+        }
     }
 
     private void ToggleConnectionMode()
