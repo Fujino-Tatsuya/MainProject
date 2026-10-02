@@ -45,7 +45,10 @@
 
 ## 3. 접근 — 단계별 (각 단계 = 커밋 1개 이상, `dotnet build` 통과 후)
 
-### D1. 테이블 적용기 코어 (툴만, 게임 코드 변경 0)
+### D1. 테이블 적용기 코어 (툴만, 게임 코드 변경 0) — ✅ 2026-10-02 구현 · EditMode 34건 통과(메뉴 `Tools/Tests/데이터 테이블 EditMode 테스트 실행`)
+
+> 구현 파일: `Assets/1.Scripts/DataTable/Editor/` — `XlsxReader` · `DataTableSchema` · `DataTableApplier`(Bind·메모리/디스크 적용·Restore·Diff) · `DataTableMenu`(`DataTableSource.Load` = 폴더 읽기→검증→연결 단일 진입점).
+> 테스트: `Assets/Tests/EditMode/DataTable/Editor/` — 리더·스키마·적용기. xlsx 픽스처는 바이너리 대신 코드로 만든다(`TestXlsx`).
 - `Assets/1.Scripts/DataTable/Editor/` (Editor 전용 asmdef)
   - `XlsxReader` — xlsx(zip+XML)를 `System.IO.Compression` + `XmlReader` 로 읽는다. 시트 → `string[,]`.
     수식 셀은 **Excel 이 저장해 둔 결과값**을 읽는다. 파일은 `FileShare.ReadWrite` 로 열어 **Excel 이 열고 있어도 읽힌다.**
@@ -114,7 +117,11 @@
 |-------|-------|------:|-------|
 | PlayerDashData | cooldown | 1.2 | 대시 쿨다운(초) |
 
-- 시트와 SO 타입 연결은 C# 등록표 한 곳(`DataTableRegistry`)에 둔다 — 시트 이름 → SO 타입 → 검색 폴더.
+- **시트 이름 = SO 타입 이름**(네임스페이스 없이, 예: `MonsterDataSO`). 에셋은 그 타입과 **정확히 같은 타입**만 `Assets/` 전체에서 찾는다(하위 타입 섞지 않음).
+  > 2026-10-02 구현 중 변경: 초안의 C# 등록표(`DataTableRegistry`)는 두지 않는다 — 관리할 곳이 하나 줄고, SO 를 새로 만들어도 등록 단계가 없다.
+  > 이름이 같은 SO 타입이 둘이거나 같은 이름의 에셋이 둘이면 오류로 알려 준다.
+- xlsx 폴더 = **`Assets/50.Art/DataTable~/`**(SVN, Q2 잠정). 이름 끝 `~` = Unity 가 임포트하지 않음 → Excel 잠금 파일 `~$*.xlsx` 에 `.meta` 가 안 생긴다.
+  위치는 `DataTableSource.Folder` 상수 하나.
 
 ### 4-3. 구조는 SO/코드, 수치는 테이블
 보스 패턴처럼 중첩·참조가 많은 데이터는 흐름을 테이블로 표현하지 않는다(시트 안에서 프로그래밍하게 된다).

@@ -8,6 +8,15 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-10-02 · 은희(Claude) · **데이터 테이블 xlsx → SO D1**, 브랜치 `feature/DataTable`)
+
+계획 = [PLAN-data-table.md](PLAN-data-table.md). 이번 세션 = **D1 테이블 적용기 코어**(툴만, 게임 코드 변경 0).
+🔴 **수정 예정 파일 — 동시 수정 금지:** `Assets/1.Scripts/DataTable/**`(신규) · `Assets/Tests/EditMode/DataTable/**`(신규) · `PLAN-data-table.md`.
+- §8 미확정 Q1·Q2·Q4·Q5·Q6 은 D1 에 영향 없음 → 추천안 가정으로 진행, D2 전에 확정.
+- 상태: ✅ D1 커밋. EditMode 34건 통과(메뉴 `Tools/Tests/데이터 테이블 EditMode 테스트 실행`). 다음 = D1.5 데이터 출처 드롭다운(Dev Boot 툴바 브랜치와 합류 방식 결정 필요).
+  구현 중 변경 2건은 PLAN §4-2 에 기록(시트 이름 = SO 타입 이름 · 폴더 `Assets/50.Art/DataTable~`).
+- 별도: Dev Boot 툴바 분리·파스텔 배경 = 브랜치 `feature/DevBootToolbar`(`63384b3c`, 🔴 에디터 확인 대기).
+
 ## ▶▶ 현재 인수인계 (2026-10-01 · 은희(Claude) · **데미지 숫자 Re:C v0.2 + 자체 이징 `EuniTween`**, 브랜치 `feature/DamagePopupTweening`, push 안 함)
 
 계획·결정 원본 = [PLAN-damage-popup.md](PLAN-damage-popup.md) (기획 원본은 레포 밖 `Re_C_데미지_숫자_표기.md`). 1·2단계 ✅ 구현, EditMode 122건 통과. Play 확인은 2단계까지 — 이후 이미지 글꼴·색·크기·더미 복귀는 🔴 Play 미확인.
