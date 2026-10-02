@@ -10,7 +10,10 @@ Update this file when a term becomes important enough that future agents or team
 
 ## ▶▶ 작업 세션 (2026-10-01~02 · 경석(Claude) · **몬스터 리디자인 Flat Kit · 23호 전기 장판 · 웰즈 자폭 드론 · 터렛 조준선 · 차징 루프**, 브랜치 `feature/Boss23`, 푸시 `6d50defb`)
 
-**상태: 구현·푸시 완료, 팀장 Play 확인하며 튜닝 중.** 다음 = SVN 업데이트 → development 머지 → 거너 포함 테스트(Unity 끄고).
+**상태: ✅ development 반영(10-02, 경석 직접 병합 `68730770`).** 팀장 Play·비주얼 확인 완료. 남은 것 = MPPM 2인 검증 · 장판 패턴 SO 편집(보류).
+- **플레이어 Flat Kit Variant**(10-02): 부모 = `FlatKit/Player/FK_Paladin_Toon`(가붕이 몸) · Variant = 검·방패 · `Gunner/FK_Gunner_Body`(4K) · `Gunner/FK_LaserGun`.
+  셰이더·외곽선·셀 값은 **부모에서만** 고친다. 재구성 = `Tools/Rendering/Flat Kit/플레이어 Variant 구성 (가붕이 부모)`. 은희 ToonLit Variant(`3.Materials/Toon/`)는 남겨 둠(미사용).
+- 전원 유령(부활 대기)이면 전기 장판 정지 — 드론은 대상 선정에서 원래 멈춤.
 - **전기 장판·자폭 드론** — 계획·진행·피드백 이력 = [PLAN-boss-electric-drone.md](PLAN-boss-electric-drone.md) §6 · 기획 사본 [Docs/design/boss/](Docs/design/boss/).
   컴포넌트 `BossElectricFloor` · `WellsDroneAttack`(NetworkBehaviour 아님 — 23호가 스폰 때 AddComponent, ClientRpc 중계). 23호 상태는 폴링
   (`IsChargeJumpActive`·`IsChargeGimmickActive`·`ActivePauseConditions`·`IsFightActive`). 정지 조건 = `BossPauseCondition` Flags(SO `pauseOn`).
