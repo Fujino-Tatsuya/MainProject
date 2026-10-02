@@ -280,7 +280,13 @@ public static class DataTableTemplate
     public const string ExportBackupFolder = "Library/DataTableExportBackup";
 
     [MenuItem("Tools/Data/Export Template (현재 인스펙터 값 → xlsx)", priority = 30)]
-    private static void Export()
+    private static void Export() => Export(askWhenExists: true);
+
+    /// <summary>확인 창 없이 바로 병합 — 기존 값 보존·원본 백업이라 안전하다. 파일이 없으면 새로 만든다. 자동화(MCP)에서도 멈추지 않는다.</summary>
+    [MenuItem("Tools/Data/Export Template — 병합 (확인 없이)", priority = 32)]
+    private static void ExportMerge() => Export(askWhenExists: false);
+
+    private static void Export(bool askWhenExists)
     {
         var warnings = new List<string>();
         List<(Type, IReadOnlyList<(string id, Object target)>)> tables = CollectTargets(warnings);
@@ -298,7 +304,7 @@ public static class DataTableTemplate
         if (File.Exists(path))
         {
             // 0 = 병합, 1 = 취소, 2 = 덮어쓰기. 병합이 기본 — 기획이 쓰던 파일이 있으면 값을 지키는 쪽이 안전하다.
-            int choice = EditorUtility.DisplayDialogComplex("Export Template",
+            int choice = !askWhenExists ? 0 : EditorUtility.DisplayDialogComplex("Export Template",
                 $"{path} 가 이미 있다.\n\n" +
                 "병합: 기획이 고친 값은 그대로, 새 시트·필드·대상만 현재 인스펙터 값으로 추가. 코드에서 사라진 칸은 #(메모)로.\n" +
                 "덮어쓰기: 전부 현재 인스펙터 값으로(기획 값 사라짐).\n\n" +
