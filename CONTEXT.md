@@ -17,5 +17,5 @@ Update this file when a term becomes important enough that future agents or team
   🔴 **D3·D4 설계 변경**: 프리팹 값을 SO 로 옮기지 않고 **테이블이 프리팹 컴포넌트를 직접 덮어쓴다**(시트 = 컴포넌트 타입, Id = 프리팹 파일 이름). 상세 PLAN §D3·D4.
   🔴 **게임 코드 변경(은희 지시)**: `Player.moveSpeed` 삭제(Unit 이동 스탯 = `PlayerMovement.maxSpeed`) · `fallDamageRatio` 씬 → `PlayerGameRuleData` · `PlayerMovement.Start()` 의 rotate_Speed 덮어쓰기 제거.
   🔴 **경석 영역 변경(은희 지시)**: `MonsterDataSO`·`BossDataSO`·`MonsterMeleeAttack`·`MonsterCounterWindow`·`TurretHeadAim`·`Gauntlet/Spinner/WallBot`·`MonsterBase` 에 어트리뷰트만(동작 변경 0) — 경석 공유 필요.
-  ✅ 은희 새 Export → Verify 0(10-02). Q10 = `GameRule.prefab` 분리(`d87eeeb7`).
+  ✅ 은희 새 Export → Verify 0(10-02). Q10 = `GameRule.prefab` 분리(`d87eeeb7`). ✅ D6 운영 보강(병합 Export·범위 검증·씬 오버라이드 경고·인스펙터 표시·가이드 `Docs/tech/data-table.md`), EditMode 64건.
   ⏳ 은희: 테이블/인스펙터 Play(몬스터 HP·목숨 수 — Dev Boot·씬 직접 Play 둘 다)·MPPM · 실제 빌드 1회(후 git status 0) · `GameData.xlsx` SVN.
