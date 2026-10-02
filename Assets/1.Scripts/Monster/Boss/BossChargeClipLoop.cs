@@ -49,7 +49,11 @@ public sealed class BossChargeClipLoop : MonoBehaviour
             if (t < endSec) return;
 
             // 넘친 만큼 이어 붙여 프레임 단위로 끊기지 않게 한다.
-            float overshoot = (t - endSec) % Mathf.Max(0.0001f, endSec - startSec);
+            // 🔴 + 이번 프레임 시간: Play 로 옮긴 프레임은 시간이 진행되지 않고 정확히 그 지점을 그린다. 그런데 이음매 두 프레임은
+            //    자세가 같게 고른 것이라(f125 ≈ f62), 진행 없이 그리면 "직전 프레임과 같은 자세"가 한 번 더 나와 한 프레임 멈춰 보인다
+            //    (팀장 Play 10-02). 한 프레임만큼 앞에서 시작해 직전 프레임의 다음 자세가 나오게 한다.
+            float loopLen = Mathf.Max(0.0001f, endSec - startSec);
+            float overshoot = (t - endSec + Time.deltaTime * Mathf.Max(0f, _animator.speed * info.speed)) % loopLen;
             _animator.Play(_stateHash, layer, (startSec + overshoot) / clip.length);
             return;
         }

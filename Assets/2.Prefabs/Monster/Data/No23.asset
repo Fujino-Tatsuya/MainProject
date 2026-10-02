@@ -352,7 +352,7 @@ MonoBehaviour:
   jumpLandSeparation: 1.2
   jumpKnockbackStrength: 5
   chargeTimeLimit: 30
-  chargeLoopStartFrame: 59
+  chargeLoopStartFrame: 62
   chargeLoopEndFrame: 125
   chargeZonePrefab: {fileID: 0}
   chargePylonsSolo: 1

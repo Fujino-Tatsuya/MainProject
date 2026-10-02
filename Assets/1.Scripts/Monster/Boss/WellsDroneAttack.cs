@@ -258,6 +258,22 @@ public sealed class WellsDroneAttack : MonoBehaviour
     GameObject _droneGo, _boomVfx;
     Transform _viewRoot;
     Vector3 _vFrom, _vTo;   // 드론 비행 출발점(대각선 위) → 충돌 지점
+    Color _crossColor;
+
+    /// <summary>
+    /// 비행 진행도(시간 0~1 → 거리 0~1) — 처음엔 천천히, 뒤에서 급가속(팀장 10-02 "보일 땐 느리고 갑자기 빨라지며 내려온다").
+    /// 느린 구간 = 등속(s 시간에 d 거리). 빠른 구간 = 그 속도에서 시작하는 가속(이음매에서 속도가 끊기지 않는다).
+    /// </summary>
+    static float ApproachProgress(float x, float s, float d)
+    {
+        if (x <= 0f) return 0f;
+        if (x >= 1f) return 1f;
+        if (x < s) return d * (x / s);
+        float u = (x - s) / (1f - s);          // 빠른 구간 0~1
+        float v0 = d / s * (1f - s);           // 이음매 속도를 빠른 구간 단위로 환산
+        float a = Mathf.Max(0f, 1f - d - v0);  // 남은 거리를 가속으로
+        return d + v0 * u + a * u * u;
+    }
 
     // 드론 애니 — FBX 에 Animator 컨트롤러가 없어 PlayableGraph 로 클립을 직접 튼다. DashStart 1회 → DashLoop 반복.
     PlayableGraph _droneGraph;
@@ -312,7 +328,8 @@ public sealed class WellsDroneAttack : MonoBehaviour
         _view = View.Mark;
         _vStart = Time.time;
         _vDur = Mathf.Max(0.01f, trackTime);
-        BossPatternVisuals.Paint(_cross, _d.crosshairColor, BossPatternVisuals.CrosshairTexture);
+        _crossColor = _d.crosshairStartColor;
+        BossPatternVisuals.Paint(_cross, _crossColor, BossPatternVisuals.CrosshairTexture);
         _cross.enabled = true;
         _cross.gameObject.SetActive(true);
     }
@@ -429,7 +446,8 @@ public sealed class WellsDroneAttack : MonoBehaviour
                     // lockTime 의 마지막 fallTime 동안 대각선 출발점 → 충돌 지점 직선 비행 — 끝 = 충돌 순간.
                     float fallStart = 1f - Mathf.Clamp01(_d.fallTime / _vDur);
                     float f = fallStart >= 1f ? 1f : Mathf.Clamp01((k - fallStart) / (1f - fallStart));
-                    _droneGo.transform.position = Vector3.Lerp(_vFrom, _vTo, f * f);   // 가속
+                    float p = ApproachProgress(f, _d.approachSlowTimePortion, _d.approachSlowDistancePortion);
+                    _droneGo.transform.position = Vector3.Lerp(_vFrom, _vTo, p);
                     if (f > 0f && !_droneGo.activeSelf)
                     {
                         _droneGo.SetActive(true);
@@ -463,6 +481,12 @@ public sealed class WellsDroneAttack : MonoBehaviour
         t.rotation = Quaternion.FromToRotation(Vector3.up, toCam);
 
         float shrink = Mathf.Clamp01(k / Mathf.Max(0.01f, _d.crosshairShrinkPortion));
+
+        // 색: 초록 → 주황 → 빨강(다 줄어 멈춤). 단계마다 딱 바뀐다 — 터렛 조준선과 같은 읽기(팀장 10-02).
+        Color col = shrink >= 1f ? _d.crosshairColor
+                  : shrink >= _d.crosshairMidColorAt ? _d.crosshairMidColor
+                  : _d.crosshairStartColor;
+        if (col != _crossColor) { _crossColor = col; BossPatternVisuals.Paint(_cross, col, null); }
         float size = _d.crosshairSize * Mathf.Lerp(_d.crosshairStartScale, _d.crosshairEndScale, shrink);
         // 최소 표시 크기 — 카메라가 기준 거리보다 멀면 그만큼 키운다.
         if (cam != null)

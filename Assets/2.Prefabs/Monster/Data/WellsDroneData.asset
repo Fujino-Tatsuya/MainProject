@@ -28,7 +28,7 @@ MonoBehaviour:
   dashStartClip: {fileID: 7866669278416069025, guid: fcc07944700f48a419a0cbde4e5cf5d5, type: 3}
   dashLoopClip: {fileID: -2281602620767728765, guid: fcc07944700f48a419a0cbde4e5cf5d5, type: 3}
   dropHeight: 8
-  fallTime: 0.6
+  fallTime: 1
   explosionVfxPrefab: {fileID: 0}
   explosionDuration: 0.5
   crosshairSize: 2.4

@@ -485,8 +485,9 @@ public class BossDataSO : MonsterDataSO
 
     [Tooltip("차징 클립 구간 반복 — 처음 1회는 0 프레임부터 재생하고, chargeLoopEndFrame 에 닿으면 chargeLoopStartFrame 으로 되돌려 " +
              "그 구간만 반복한다(팔 모으는 동작은 처음에만, 팀장 10-02). 클립 프레임 기준. 시작 < 0 이면 끔(클립 자체 루프).\n" +
-             "기본 f59~f125 = 이음매 자세 차이가 가장 작은 쌍(본 회전 차 합 16°). 클립 끝 f158 → f46 은 982° 라 튄다.")]
-    public int chargeLoopStartFrame = 59;
+             "기본 f62~f125 = 자세(18°)와 속도(차 0)가 함께 이어지는 쌍. 클립 끝 f158 → f46 은 982° 라 튄다.\n" +
+             "(f59 는 자세만 더 가깝고 속도가 달라 이음매에서 멈칫했다 — 팀장 Play 10-02)")]
+    public int chargeLoopStartFrame = 62;
     public int chargeLoopEndFrame = 125;
 
     // ⚠️ 2026-09-21 SO 전수조사 — **유령 필드**(선언 파일 밖 참조 0)라 주석 처리했다.

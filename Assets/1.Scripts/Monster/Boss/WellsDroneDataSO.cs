@@ -45,8 +45,12 @@ public class WellsDroneDataSO : ScriptableObject
     public AnimationClip dashLoopClip;
     [Tooltip("출발점 높이(m).")]
     [Min(0f)] public float dropHeight = 8f;
-    [Tooltip("lockTime 중 마지막 몇 초 동안 날아오는가(이 시간 동안만 보인다).")]
-    [Min(0.05f)] public float fallTime = 0.6f;
+    [Tooltip("lockTime 중 마지막 몇 초 동안 날아오는가(이 시간 동안만 보인다). lockTime 과 같으면 크로스헤어가 사라지자마자 나타난다.")]
+    [Min(0.05f)] public float fallTime = 1f;
+    [Tooltip("비행 시간 중 '느린 구간' 비율(0~1) — 화면에 처음 보일 때 천천히 온다(팀장 10-02).")]
+    [Range(0.05f, 0.95f)] public float approachSlowTimePortion = 0.5f;
+    [Tooltip("느린 구간 동안 이동하는 거리 비율(0~1). 나머지 거리를 뒤 구간에서 급가속해 내려온다.")]
+    [Range(0.01f, 0.9f)] public float approachSlowDistancePortion = 0.15f;
     [Tooltip("충돌 순간 생성할 폭발 VFX(선택). 비우면 임시 원 확산.")]
     public GameObject explosionVfxPrefab;
     [Tooltip("폭발 연출 유지(초) — 피해와 무관한 연출 값. 이게 끝난 뒤 쿨다운을 센다.")]
@@ -64,7 +68,13 @@ public class WellsDroneDataSO : ScriptableObject
     [Min(1f)] public float crosshairReferenceDistance = 20f;
     [Tooltip("캐릭터 모델에 가리지 않게 카메라 쪽으로 당겨 그리는 거리(m).")]
     [Min(0f)] public float crosshairTowardCamera = 1.5f;
+    [Tooltip("색 흐름 — 터렛 조준선과 같은 경험(팀장 10-02): 초록(줄기 시작) → 주황 → 빨강(다 줄어 멈춤 = 곧 고정).")]
+    public Color crosshairStartColor = new Color(0.15f, 1f, 0.2f, 0.95f);
+    public Color crosshairMidColor = new Color(1f, 0.55f, 0.05f, 0.95f);
+    [Tooltip("다 줄어든 뒤(멈춰 있는 동안)의 색.")]
     public Color crosshairColor = new Color(1f, 0.2f, 0.15f, 0.95f);
+    [Tooltip("줄어드는 구간 중 초록 → 주황으로 바뀌는 지점(0~1). 0.5 = 줄어드는 시간의 절반.")]
+    [Range(0f, 1f)] public float crosshairMidColorAt = 0.5f;
 
     [Header("바닥 원 · 폭발 색")]
     public Color circleOuterColor = new Color(1f, 0.15f, 0.1f, 0.3f);
