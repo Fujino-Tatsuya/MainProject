@@ -19,6 +19,7 @@ using UnityEngine;
 ///    (Gauntlet 의 <c>OnAttackHit</c> 는 이미 타격 시점이라 준비 신호로 쓸 수도 없다.)
 /// </summary>
 [DisallowMultipleComponent]
+[DataTableSheet]
 public class MonsterCounterWindow : MonoBehaviour
 {
     [Header("창")]

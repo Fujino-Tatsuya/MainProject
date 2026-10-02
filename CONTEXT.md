@@ -8,6 +8,17 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 현재 인수인계 (2026-10-02 · 은희(Claude) · **데이터 테이블 xlsx → 게임 수치 + Dev Boot 툴바** → development 반영)
+
+사용법 = [Docs/tech/data-table.md](Docs/tech/data-table.md) · 설계·결정 = [PLAN-data-table.md](PLAN-data-table.md). 브랜치 `feature/DataTable`(+ `feature/DevBootToolbar` 병합).
+- **원본 = `Assets/50.Art/DataTable~/GameData.xlsx`(SVN, 잠금)**. 툴바 `데이터: 테이블/인스펙터` = Play 출처(테이블은 메모리에서만 적용·종료 시 복구). **빌드는 항상 xlsx 값**(Build 버튼 훅, 빌드 후 파일째 원복).
+- 대상 = SO + **프리팹 컴포넌트**(시트 = 타입 이름, Id = 에셋/프리팹 파일 이름). 프리팹 값을 SO 로 옮기지 않았다. 노출 = `[DataTableSheet]`, 기술 값 = `[DataTableIgnore]`.
+- 🔴 **게임 코드 변경(은희 지시)**: `Player.moveSpeed` 삭제(Unit 이동 스탯 = `PlayerMovement.maxSpeed`) · `fallDamageRatio` 씬 → `PlayerGameRuleData` · `PlayerMovement.Start()` rotate_Speed 덮어쓰기 제거 · MapScene `Temp_MultiGameRule` → `GameRule.prefab`.
+- 🔴 **경석 영역(은희 지시, 어트리뷰트만 — 동작 변경 0)**: `MonsterDataSO`·`BossDataSO`·`MonsterMeleeAttack`·`MonsterCounterWindow`·`TurretHeadAim`·`Gauntlet/Spinner/WallBot`·`MonsterBase`·`LinearKnockback`. 보스 수치 239개의 기술 값 판단·23호 M6(폭탄·장판·송전기, 장판 작업 후)·레거시 `Enemy/*` 삭제 후보 — **경석 공유 필요**.
+- Dev Boot 툴바: `▶ Dev Boot` 버튼 + 씬 드롭다운 분리, 파스텔 배경(🔴 에디터 확인 대기).
+- 검증: EditMode 64건(`Tools/Tests/데이터 테이블 EditMode 테스트 실행`) · 은희 Export→Verify 0 · 체력 테이블 적용 Play 확인. ⏳ 공속(0.1 로 확인)·목숨 수(Dev Boot/씬 직접)·MPPM·실제 빌드 1회.
+- ⚠️ 이 브랜치의 `857c8454`~`84cd98a8` 은 CONTEXT.md 를 21줄로 잘랐다(정규식 실수) — `origin/development` 병합 때 원래 내용으로 복구됨.
+
 ## ▶▶ 작업 세션 (2026-10-01~02 · 경석(Claude) · **몬스터 리디자인 Flat Kit · 23호 전기 장판 · 웰즈 자폭 드론 · 터렛 조준선 · 차징 루프**, 브랜치 `feature/Boss23`, 푸시 `6d50defb`)
 
 **상태: ✅ development 반영(10-02, 경석 직접 병합 `68730770`).** 팀장 Play·비주얼 확인 완료. 남은 것 = MPPM 2인 검증 · 장판 패턴 SO 편집(보류).

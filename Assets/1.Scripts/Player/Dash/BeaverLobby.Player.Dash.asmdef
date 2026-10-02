@@ -1,7 +1,9 @@
 {
     "name": "BeaverLobby.Player.Dash",
     "rootNamespace": "BeaverLobby.Player.Dash",
-    "references": [],
+    "references": [
+        "MainProject.DataTable.Attributes"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,

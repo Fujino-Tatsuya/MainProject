@@ -30,7 +30,7 @@ public class MonsterBase : Unit
 
     [Header("타게팅")]
     [SerializeField] protected LayerMask playerMask;         // 인지 대상(플레이어) 레이어
-    [SerializeField] protected int maxDetectionResults = 16;
+    [DataTableIgnore] [SerializeField] protected int maxDetectionResults = 16;
 
     // hitPointMode는 여기 없다 — 전 유닛 공통이라 EffectManager로 올렸다(런타임 교체도 거기서).
     [Header("피격 이펙트 제어")]

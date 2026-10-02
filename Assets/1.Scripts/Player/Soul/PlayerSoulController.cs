@@ -2,6 +2,7 @@ using UnityEngine;
 
 [DisallowMultipleComponent]
 [RequireComponent(typeof(PlayerLifeCycleController))]
+[DataTableSheet]
 public sealed class PlayerSoulController : MonoBehaviour
 {
     private const string SoulLayerName = "Soul";

@@ -19,6 +19,7 @@ using UnityEngine.AI;
 //    그로기 애니는 이제 base 의 `groggyBool`(= 같은 `IsDizzy`) 경로가 담당한다.
 //
 // 애니는 상태복제가 아니라 ClientRpc로 확정(선택값 미복제 회피). Whip/Spin=CrossFade(트리거/Variation 배선 의존 X).
+[DataTableSheet]
 public class SpinnerBot : MonsterBase
 {
     enum SpinPhase { None, Window, Dash }
@@ -56,7 +57,7 @@ public class SpinnerBot : MonsterBase
     [SerializeField, Min(0f)]
     [Tooltip("좌/우 채찍의 판정·예고를 몸 기준 옆으로 미는 거리(m). L = 왼쪽, R = 오른쪽. 스핀은 정면 그대로.\n" +
              "23호 훅과 같은 비율(폭의 ≈26%) — 판정 박스 폭 2.5m 기준 0.65m. 0 = 정면 가운데.")]
-    float sideLateralOffset = 0.65f;
+    [DataTableIgnore] float sideLateralOffset = 0.65f;
 
     [Header("애니 상태 (컨트롤러 일치)")]
     [SerializeField] string spinStartState = "Spin Attack Start";

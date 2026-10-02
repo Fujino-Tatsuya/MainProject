@@ -12,6 +12,7 @@ using UnityEngine;
 [DisallowMultipleComponent]
 [RequireComponent(typeof(Player))]
 [RequireComponent(typeof(PlayerMotor))]
+[DataTableSheet]
 public sealed class PlayerFallRecovery : NetworkBehaviour
 {
     [SerializeField] private PlayerFallController fallController;
@@ -24,8 +25,8 @@ public sealed class PlayerFallRecovery : NetworkBehaviour
     [SerializeField] private PlayerMotor motor;
 
     [Header("Timing (PLAN §5)")]
-    [SerializeField, Min(0f)] private float fallReturnDelay = 0.75f;
-    [SerializeField, Min(0f)] private float landedFollowCameraDelay = 0.5f;
+    [DataTableIgnore] [SerializeField, Min(0f)] private float fallReturnDelay = 0.75f;
+    [DataTableIgnore] [SerializeField, Min(0f)] private float landedFollowCameraDelay = 0.5f;
     [SerializeField, Min(0f)] private float fallReturnInputLock = 0.5f;
     [SerializeField, Min(0f)] private float fallReturnInvulnerability = 1.5f;
 

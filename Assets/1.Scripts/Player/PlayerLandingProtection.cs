@@ -12,6 +12,7 @@ using UnityEngine;
 /// </summary>
 [DisallowMultipleComponent]
 [RequireComponent(typeof(PlayerInvulnerability))]
+[DataTableSheet]
 public sealed class PlayerLandingProtection : NetworkBehaviour
 {
     [SerializeField] private PlayerInvulnerability invulnerability;
@@ -20,12 +21,12 @@ public sealed class PlayerLandingProtection : NetworkBehaviour
 
     [Header("Landing Protection")]
     [SerializeField, Min(0f)] private float landingProtectionDuration = 1.0f;
-    [SerializeField, Min(0f)] private float airborneFailsafeSeconds = 3.0f;
+    [DataTableIgnore] [SerializeField, Min(0f)] private float airborneFailsafeSeconds = 3.0f;
 
     [Header("Blink")]
     [Tooltip("Blink 대상 Renderer 루트. 비어 있으면 자식 전체에서 찾는다.")]
     [SerializeField] private GameObject blinkVisualRoot;
-    [SerializeField, Min(0.02f)] private float blinkInterval = 0.1f;
+    [DataTableIgnore] [SerializeField, Min(0.02f)] private float blinkInterval = 0.1f;
 
     // 서버 권한 Blink 종료시각(GameNow). 전 피어가 이 시각까지 깜빡인다.
     private readonly NetworkVariable<double> _blinkUntil =

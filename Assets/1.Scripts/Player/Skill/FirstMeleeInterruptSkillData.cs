@@ -5,6 +5,7 @@ using UnityEngine;
 /// 베이스(PlayerSkillData)의 InputType은 Press여야 한다.
 /// </summary>
 [CreateAssetMenu(menuName = "Combat/First Melee Interrupt Skill Data")]
+[DataTableSheet]
 public class FirstMeleeInterruptSkillData : PlayerSkillData
 {
     [Header("판정 타이밍")]
@@ -15,7 +16,7 @@ public class FirstMeleeInterruptSkillData : PlayerSkillData
     [SerializeField, Min(0.05f)] private float skillDuration = 0.6f;
 
     [Header("판정")]
-    [SerializeField, Min(1)] private int maxHitResults = 8;
+    [SerializeField, Min(1), DataTableIgnore] private int maxHitResults = 8;
 
     public float HitDelay => hitDelay;
     public float SkillDuration => skillDuration;

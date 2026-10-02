@@ -84,7 +84,7 @@ public struct AttackHitContext
 
 public class BaseAttack : MonoBehaviour, IDamageSettable
 {
-    [SerializeField] protected int damage = 0;
+    [DataTableIgnore] [SerializeField] protected int damage = 0;
     public int Damage { get { return damage; } }
 
     // 인터럽트 여부는 여기서 저작하지 않는다. 현재 인터럽트를 거는 주체는 스킬(단죄의 방패)뿐이고
