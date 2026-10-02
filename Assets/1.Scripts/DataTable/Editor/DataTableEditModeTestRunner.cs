@@ -20,6 +20,7 @@ internal static class DataTableEditModeTestRunner
         "^DataTableMergeTests$",
         "^DataTableSceneOverridesTests$",
         "^DataTableSaveGuardTests$",
+        "^DataTableSheetGroupTests$",
     };
 
     const string Tag = "[DataTableTests]";

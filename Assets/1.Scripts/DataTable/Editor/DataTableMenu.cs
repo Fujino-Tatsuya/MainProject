@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using UnityEditor;
 using UnityEngine;
@@ -77,21 +78,42 @@ public sealed class AssetDatabaseLookup : IDataTableAssetLookup
     private readonly Dictionary<Type, Dictionary<string, List<string>>> scriptableObjectPaths = new Dictionary<Type, Dictionary<string, List<string>>>();
     private Dictionary<string, List<string>> prefabPaths;
 
-    public Type FindType(string sheetName, out string error)
+    /// <summary>타입이 테이블에서 쓰는 시트 이름 — <c>[DataTableSheet("Paladin")]</c> 면 그 이름, 아니면 타입 이름.</summary>
+    public static string SheetNameOf(Type type)
     {
-        Type[] matches = TypeCache.GetTypesDerivedFrom<ScriptableObject>()
+        string group = type.GetCustomAttribute<DataTableSheetAttribute>(false)?.Sheet;
+        return string.IsNullOrEmpty(group) ? type.Name : group;
+    }
+
+    public IReadOnlyList<Type> FindTypes(string sheetName, out string error)
+    {
+        Type[] candidates = TypeCache.GetTypesDerivedFrom<ScriptableObject>()
             .Concat(TypeCache.GetTypesDerivedFrom<MonoBehaviour>())
-            .Where(t => !t.IsAbstract && !t.IsGenericType && t.Name == sheetName)
+            .Where(t => !t.IsAbstract && !t.IsGenericType)
             .Distinct()
             .ToArray();
 
+        // 1) 묶음 시트: [DataTableSheet("이 이름")] 을 준 타입 전부.
+        Type[] grouped = candidates
+            .Where(t => t.GetCustomAttribute<DataTableSheetAttribute>(false)?.Sheet == sheetName)
+            .ToArray();
+        if (grouped.Length > 0)
+        {
+            error = null;
+            return grouped;
+        }
+
+        // 2) 타입 이름 시트. 다른 묶음 시트에 속한 타입은 제외 — 값이 두 곳에 있으면 안 된다.
+        Type[] matches = candidates.Where(t => t.Name == sheetName && SheetNameOf(t) == sheetName).ToArray();
         error = matches.Length switch
         {
-            0 => $"시트 이름 '{sheetName}' 과 같은 이름의 ScriptableObject·컴포넌트 타입이 없다(시트 이름 = 타입 이름).",
+            0 => candidates.Any(t => t.Name == sheetName)
+                ? $"'{sheetName}' 타입은 묶음 시트 '{SheetNameOf(candidates.First(t => t.Name == sheetName))}' 로 옮겼다 — 그 시트에 적을 것."
+                : $"시트 이름 '{sheetName}' 에 맞는 타입이 없다(시트 이름 = 타입 이름 또는 [DataTableSheet(\"묶음\")] 이름).",
             1 => null,
             _ => $"'{sheetName}' 이름의 타입이 여럿이다: {string.Join(", ", matches.Select(t => t.FullName))}",
         };
-        return matches.Length == 1 ? matches[0] : null;
+        return matches.Length == 1 ? matches : null;
     }
 
     public Object FindTarget(Type type, string id, out string error)

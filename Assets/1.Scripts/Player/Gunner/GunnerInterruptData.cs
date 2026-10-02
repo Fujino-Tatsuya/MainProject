@@ -5,7 +5,7 @@ using UnityEngine;
 /// 간파 유효 구간·전방 120도는 보스 쪽 데이터다(§12.5 끝) — 여기 없다.
 /// </summary>
 [CreateAssetMenu(fileName = "GunnerInterruptData", menuName = "Player/Gunner/Interrupt Data")]
-[DataTableSheet]
+[DataTableSheet("Gunner")]
 public class GunnerInterruptData : PlayerSkillData
 {
     [Header("판정 타이밍")]

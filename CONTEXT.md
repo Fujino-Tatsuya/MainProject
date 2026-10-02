@@ -17,7 +17,7 @@ Update this file when a term becomes important enough that future agents or team
 - 🔴 **경석 영역(은희 지시, 어트리뷰트만 — 동작 변경 0)**: `MonsterDataSO`·`BossDataSO`·`MonsterMeleeAttack`·`MonsterCounterWindow`·`TurretHeadAim`·`Gauntlet/Spinner/WallBot`·`MonsterBase`·`LinearKnockback`. 보스 수치 239개의 기술 값 판단·23호 M6(폭탄·장판·송전기, 장판 작업 후)·레거시 `Enemy/*` 삭제 후보 — **경석 공유 필요**.
 - Dev Boot 툴바: `▶ Dev Boot` 버튼 + 씬 드롭다운 분리, 파스텔 배경(🔴 에디터 확인 대기).
 - 검증: EditMode 68건(`Tools/Tests/데이터 테이블 EditMode 테스트 실행`) · Verify 0(1038 필드) · ✅ **은희 10-02 전부 확인**: 테이블/인스펙터 Play(체력·공속·목숨 수 — Dev Boot·씬 직접) · MPPM · 실제 빌드 · 레거시 정리 후 23호 잡기·보스방·장판 VFX.
-- **`GameData.xlsx` = SVN r360**(`art-svn.json` 핀 360). `DataTable~` 는 SVN 기본 무시 규칙(`*~`)에 걸려 `svn add --no-ignore` 로 추가했다 — 새 xlsx 를 더 만들면 같은 방법으로.
+- **`GameData.xlsx` = SVN r361**(`art-svn.json` 핀 361) — 10-02 캐릭터별 묶음 시트(`Paladin`·`Gunner`)로 정리. `DataTable~` 는 SVN 기본 무시 규칙(`*~`)에 걸려 `svn add --no-ignore` 로 추가했다 — 새 xlsx 를 더 만들면 같은 방법으로.
 - ⚠️ 이 브랜치의 `857c8454`~`84cd98a8` 은 CONTEXT.md 를 21줄로 잘랐다(정규식 실수) — `origin/development` 병합 때 원래 내용으로 복구됨.
 
 ## ▶▶ 작업 세션 (2026-10-01~02 · 경석(Claude) · **몬스터 리디자인 Flat Kit · 23호 전기 장판 · 웰즈 자폭 드론 · 터렛 조준선 · 차징 루프**, 브랜치 `feature/Boss23`, 푸시 `6d50defb`)

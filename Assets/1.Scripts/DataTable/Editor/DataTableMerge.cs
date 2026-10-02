@@ -17,12 +17,64 @@ public static class DataTableMerge
 {
     private const string Comment = DataTableSchema.CommentPrefix;
 
-    public static List<XlsxWriteSheet> Merge(IReadOnlyList<XlsxSheet> existing, IReadOnlyList<XlsxWriteSheet> fresh, List<string> report)
+    /// <param name="movedSheets">옛 시트 이름 → 새 묶음 시트 이름(타입을 <c>[DataTableSheet("묶음")]</c> 으로 옮긴 경우).
+    /// 옛 시트의 값을 새 시트의 같은 (Asset, Field) 칸으로 옮기고 옛 시트는 뺀다.</param>
+    public static List<XlsxWriteSheet> Merge(IReadOnlyList<XlsxSheet> existing, IReadOnlyList<XlsxWriteSheet> fresh, List<string> report,
+        IReadOnlyDictionary<string, string> movedSheets = null)
     {
         var freshByName = fresh.ToDictionary(s => s.Name, StringComparer.Ordinal);
         var result = new List<XlsxWriteSheet>();
 
-        foreach (XlsxSheet old in existing)
+        // 옮겨 갈 값 모으기: 새 시트 이름 → (Asset, Field) → 옛 칸 값.
+        var carried = new Dictionary<string, Dictionary<string, object>>(StringComparer.Ordinal);
+        var movedAway = new HashSet<string>(StringComparer.Ordinal);
+        if (movedSheets != null)
+        {
+            foreach (XlsxSheet old in existing)
+            {
+                if (movedSheets.TryGetValue(old.Name, out string target) && freshByName.ContainsKey(target) && !freshByName.ContainsKey(old.Name))
+                {
+                    if (!carried.TryGetValue(target, out Dictionary<string, object> values))
+                    {
+                        values = new Dictionary<string, object>(StringComparer.Ordinal);
+                        carried[target] = values;
+                    }
+
+                    int count = 0;
+                    foreach ((string asset, string field, string value) in Pairs(old))
+                    {
+                        values[Key(asset, field)] = ToCell(value);
+                        count++;
+                    }
+
+                    movedAway.Add(old.Name);
+                    report.Add($"{old.Name}: '{target}' 시트로 옮김(값 {count}개) — 옛 시트는 뺐다.");
+                }
+            }
+        }
+
+        // 옮겨 온 값을 새 묶음 시트(키-값)의 같은 칸에 덮는다 — 아래 병합에서 기존 시트가 없으면 이 값으로 추가된다.
+        foreach (KeyValuePair<string, Dictionary<string, object>> pair in carried)
+        {
+            XlsxWriteSheet target = freshByName[pair.Key];
+            int applied = 0;
+            foreach (object[] row in target.Rows.Skip(1))
+            {
+                if (row.Length >= 3 && pair.Value.TryGetValue(Key(row[0], row[1]), out object value))
+                {
+                    row[2] = value;
+                    applied++;
+                }
+            }
+
+            int lost = pair.Value.Count - applied;
+            if (lost > 0)
+            {
+                report.Add($"{pair.Key}: 옮긴 값 중 {lost}개는 코드에 그 필드가 없어 버려졌다(원본은 Export 백업에).");
+            }
+        }
+
+        foreach (XlsxSheet old in existing.Where(s => !movedAway.Contains(s.Name)))
         {
             if (!freshByName.TryGetValue(old.Name, out XlsxWriteSheet now))
             {
@@ -222,6 +274,48 @@ public static class DataTableMerge
         }
 
         return new XlsxWriteSheet(old.Name, rows, frozenRows: 2, boldRows: 1);
+    }
+
+    /// <summary>시트의 값 칸 전부(행 테이블·키-값 모두) — # 행·열, 빈 칸, "-" 는 뺀다.</summary>
+    private static IEnumerable<(string asset, string field, string value)> Pairs(XlsxSheet sheet)
+    {
+        string kind = sheet.Cell(0, 0).Trim();
+        if (kind == DataTableSchema.AssetHeader)
+        {
+            for (int r = 1; r < sheet.Rows.Count; r++)
+            {
+                string asset = sheet.Cell(r, 0).Trim();
+                string field = sheet.Cell(r, 1).Trim();
+                string value = sheet.Cell(r, 2).Trim();
+                if (asset.Length > 0 && !asset.StartsWith(Comment, StringComparison.Ordinal) && field.Length > 0 && value.Length > 0)
+                {
+                    yield return (asset, field, value);
+                }
+            }
+        }
+        else if (kind == DataTableSchema.IdHeader)
+        {
+            int width = sheet.Rows.Count == 0 ? 0 : sheet.Rows.Max(r => r.Length);
+            for (int r = 2; r < sheet.Rows.Count; r++)
+            {
+                string id = sheet.Cell(r, 0).Trim();
+                if (id.Length == 0 || id.StartsWith(Comment, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                for (int c = 1; c < width; c++)
+                {
+                    string field = sheet.Cell(0, c).Trim();
+                    string value = sheet.Cell(r, c).Trim();
+                    if (field.Length > 0 && !field.StartsWith(Comment, StringComparison.Ordinal)
+                        && value.Length > 0 && value != DataTableSchema.NotApplicable)
+                    {
+                        yield return (id, field, value);
+                    }
+                }
+            }
+        }
     }
 
     private static XlsxWriteSheet Copy(XlsxSheet old)

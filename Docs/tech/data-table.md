@@ -19,7 +19,11 @@ GameData.xlsx (SVN, 잠금)
 
 ## 2. 시트 형식
 
-**시트 이름 = 대상 타입 이름**(예: `MonsterDataSO`, `GauntletBot`). 바꾸면 못 찾는다.
+**시트 이름 = 대상 타입 이름**(예: `MonsterDataSO`, `GauntletBot`) — 또는 **캐릭터별 묶음 시트**(`Paladin`, `Gunner`). 바꾸면 못 찾는다.
+
+- **`Paladin`** = 가붕이 기본 공격(`DefaultAttackData`) · 스킬 SO 4종 · 패시브(`FirstMeleePassive`).
+- **`Gunner`** = 거너 기본 공격(`GunnerBasicAttackData`) · 과열(`GunnerHeatData`) · 스킬 SO 4종.
+- 묶음 시트는 키-값 형식이고 `#── 타입 이름 ──` 메모 행으로 구역이 나뉜다. 묶음에 들어간 타입은 옛 개별 시트(`FirstMeleeMainSkillData` 등)로는 못 쓴다.
 
 ### 행 테이블 — 대상이 여럿인 것 (몬스터 등)
 
@@ -97,7 +101,7 @@ GameData.xlsx (SVN, 잠금)
 
 ## 8. 프로그래머 — 새 수치를 테이블에 내보내기
 
-1. SO 또는 컴포넌트 클래스에 `[DataTableSheet]`.
+1. SO 또는 컴포넌트 클래스에 `[DataTableSheet]`(타입 이름 시트) 또는 `[DataTableSheet("Paladin")]`(묶음 시트 — 같은 이름을 준 타입들이 한 키-값 시트를 쓴다). 묶음으로 옮기면 병합 Export 가 옛 시트 값을 새 시트로 옮기고 옛 시트를 뺀다.
 2. 기술 값(버퍼 크기·네트워크 보정·연출 정렬·물리 상수 등)에 `[DataTableIgnore]`. 구조체·배열에 붙이면 그 아래 전부.
 3. 필드에 `[Tooltip("…")]` — 테이블 설명 칸이 된다. 범위가 있으면 `[Range]`·`[Min]`(테이블도 검증).
 4. `Export Template 필드 목록 보기` 로 확인 → `Export Template` **병합** → SVN 커밋.
