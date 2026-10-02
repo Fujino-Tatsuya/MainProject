@@ -8,6 +8,26 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-10-01~02 · 경석(Claude) · **몬스터 리디자인 Flat Kit · 23호 전기 장판 · 웰즈 자폭 드론 · 터렛 조준선 · 차징 루프**, 브랜치 `feature/Boss23`, 푸시 `6d50defb`)
+
+**상태: 구현·푸시 완료, 팀장 Play 확인하며 튜닝 중.** 다음 = SVN 업데이트 → development 머지 → 거너 포함 테스트(Unity 끄고).
+- **전기 장판·자폭 드론** — 계획·진행·피드백 이력 = [PLAN-boss-electric-drone.md](PLAN-boss-electric-drone.md) §6 · 기획 사본 [Docs/design/boss/](Docs/design/boss/).
+  컴포넌트 `BossElectricFloor` · `WellsDroneAttack`(NetworkBehaviour 아님 — 23호가 스폰 때 AddComponent, ClientRpc 중계). 23호 상태는 폴링
+  (`IsChargeJumpActive`·`IsChargeGimmickActive`·`ActivePauseConditions`·`IsFightActive`). 정지 조건 = `BossPauseCondition` Flags(SO `pauseOn`).
+  수치·연출 전부 SO: `2.Prefabs/Monster/Data/BossElectricFloorData` · `WellsDroneData`(No23·No23_Solo 연결, `Tools/Boss/전기 장판·자폭 드론 데이터 만들기·연결`).
+  교차검증(Codex + Claude) 반영 `c9fcfd95`. EditMode 10/10(`Tools/Tests/보스 패턴 EditMode 테스트 실행`). **MPPM 미검증.**
+  팀장 확정 튜닝: 드론 범위 1.25칸 · 드론 2배 · 23호 피해 120 · 송전기 시작 = 점프 출발 · 화면 좌/우하단 대각선 비행(DashStart→DashLoop, 느리게→급가속) ·
+  크로스헤어 초록→주황→빨강(점멸 없음). ⏸ 보류: 장판 패턴 모양 SO 편집(가능 확인만, 7×7 고정 — PLAN §6-2).
+- **터렛 조준선**(PeekABot·TeslaBot `TurretHeadAim`): 추적 앞 절반 초록 → 주황 → 고정 빨강 → 발사 순간 꺼짐. 색·전환점 프리팹 인스펙터.
+- **23호 차징 클립** `BossChargeClipLoop`: 처음 1회 f0~ → 이후 **f62~f125 반복**(자세·속도 이음매 최적). `BossDataSO.chargeLoopStart/EndFrame`. 차징 제한시간 **30초**.
+- 🔴 미커밋(내 것 아님): `BossPatternVisuals.cs` 가 `Resources/BossPatterns/WellsDroneCrosshair.png` 를 먼저 쓰도록 바뀜 + 그 텍스처 — 작성자 확인 후 커밋.
+- 로컬 전용(커밋 금지, `.git/info/exclude`): `Monster/Editor/BossClipMotionProbe.cs`(차징 클립 움직임·이음매 분석).
+- development(`8c5117a9`, 이지원 최종 메쉬·SurfaceV1 머티리얼) + SVN r356(드론 `Char/Drone/`) 반영. 몬스터 프리팹 8종은 **아트판 그대로** 채택 — SurfaceV1 = URP Lit(BaseMap·Normal·MetallicGloss).
+  미사용 예전 FK 4종 삭제(`7fa7d382`). 드론 모델 DRONE.fbx 는 아직 Flat Kit 아님.
+- ✅ 결정(10-01): Flat Kit Stylized Surface 를 **그대로** 쓴다. 이 셰이더는 GI 를 metallic 0·smoothness 0 으로 고정 계산해
+  금속성 맵·반사가 빠지지만 **아트팀이 문제없다고 확인**(팀장 전달). 셰이더 복제 확장 안 함. 전환 = `Tools/Rendering/Flat Kit/Convert Characters`.
+- 물 작업(이전 세션)은 커밋·푸시 완료 — 남은 것: WaterPart 모서리 다듬기 · Play/MPPM. 상세 [PLAN-flatkit.md](PLAN-flatkit.md) 9-b.
+
 ## ▶▶ 작업 세션 (2026-10-02 · 은희(Claude) · **플레이어블 공통 툰 머티리얼**, 브랜치 `feature/PlayableToonMaterial`) — ✅ 구현 · ✅ Play 확인(은희). 남은 것 = PR. 검·방패는 텍스처 없어 흰색(결정). `Paladin_VFX`·Legacy 는 부모 직참조라 흰 몸체(보관용, 수용)
 
 계획 = [PLAN-playable-toon-material.md](PLAN-playable-toon-material.md). `Paladin_Toon` → `PlayableCharacter_Toon` 부모 + 캐릭터·무기별 Material Variant(Base Map만 다름).
@@ -72,6 +92,7 @@ Update this file when a term becomes important enough that future agents or team
 - 📋 **후속 계획 [PLAN-passive-onhit.md](PLAN-passive-onhit.md) — 패시브 버프 모델 + 범용 적중 이벤트 (2026-09-29, ✅ 구현·Play·MPPM 검증 완료 `f8a1ae5d`; §12 초과 피해 표시·막타 합산 `11d46701`·`4f5d8433` — 🔴 Play 검증 대기).** 남은 것 = 보스 입장 후 버프 유지 재검증(경석 수정 후). 🔴 보스 연출 `ClearAllServer()` 디버프 한정화는 경석 선행 작업.
 - **P0 스냅샷 기준점:** `Paladin_VFX.prefab` = `2e1ac271`. 이후 들어온 변경은 P4 직전에 재반영.
 - **진행:** P0 `d65e1610` · P1 `ee91cd4e`(Paladin_Armature 추출) · P2 `97d0a582`(Codex — base 정리, 끊긴 참조 0, Unity 임포트 OK). P3 = `Player_Paladin.prefab`(Variant, 해시 913233600). P4 = 스폰 전환(은희 Play·MPPM 통과). P5 = 구 프리팹 `Legacy/` 이동(`Paladin_VFX` 는 원위치 복구)·툴 4종·문서 갱신. **작업 완료 — PR 대기.** 남은 일 = 캐릭터 선택 경로(player-prefabs.md §8.3). 🔴 P2 의 "base 단독 Awake" 검증은 Play 가 필요해 **P4 Play 때 함께** 한다.
+
 ## ▶▶ 작업 세션 (2026-09-29 · 은희(Claude) · **Group Painter "벽 그룹" 표시**, 브랜치 `feature/WallGroupVisualize`)
 
 Group Painter 툴바에 **`벽 그룹`** 토글 추가 — 씬(또는 열린 프리팹)의 `WallTransparencyGroup` 마다
@@ -85,6 +106,11 @@ WallTransparencyGroup 오브젝트를 선택하면 그 그룹만 또렷해진다
 - **다음 세션 = 전기장판 · 자폭드론** — 기획 문서 수령 대기(받으면 바로 착수). 자폭드론 자리: `TwentyThreeBoss.OnWellsAttackCycle`(Wells 공격 주기 — 현재 빈 자리 경고).
 - 09-29 반영: 취약 넉백(방 회전) · 넉백 종료 시 그로기·취약 종료 · 제압 그로기 루프 · 취약 중 돌진 · 어퍼 예고 0.5 · 차징 점프 착지 범위 공격 · 점프 체인 안 끊김 · 잡기 낚아채는 프레임 부착 · 점프 착지 경계/Warp 복구 · 보스방 NavMesh 여유 띠(실측 1.5m) · Start → 튜토리얼 스테이지([PLAN-tutorial-stage.md](PLAN-tutorial-stage.md)) · 차징 오라 데칼 제거 · 진입 연출 디버프만 해제 · Dev 공격 예약 단축키(F3/F4/F6/F9/F11, 대기열 8, Shift+F3 비우기).
   상세: [PLAN-boss-counter-vulnerable.md](PLAN-boss-counter-vulnerable.md) §7-2.
+- 🔴 **10-01 — Flat Kit 전환(캐릭터·물) · `feature/Boss23` 에만 푸시(development 미반영)**. 계획·기록 [PLAN-flatkit.md](PLAN-flatkit.md).
+  - 캐릭터: 몬스터 8종·23호·Wells·플레이어 → `FlatKit/Stylized Surface`(플레이어는 부드러운 법선 복제 셰이더). 룩 값 한 곳 `Assets/1.Scripts/Rendering/Editor/FlatKitCharacterLook.cs`(외곽선 0.4 = 1080p 1.08px). 메뉴 `Tools/Rendering/Flat Kit/`.
+  - 물: 보스방 `Water_BossRoom`(벤트 밑 −0.12) + 존 프리팹 `Water`(**`ZoneWater` = 존별 수면 높이 한 칸**, 기본 −4.43, 재실행해도 유지). 존 물은 **뚫린 곳(구덩이·벤트)에만** 깔린다(구덩이 벽 안쪽 면까지). 머티리얼 `FK_Water_Pool09` 은 월드 UV 복제 셰이더 — 인스펙터로 조절(도구가 안 덮어씀). 맵 330m 큰 쿼드는 팀장이 삭제.
+  - PC_Renderer: Flat Kit 외곽선 피처 추가 · MaskBlur 끔 · SSAO 값 조정 · 그림자 캐스케이드 2/35m · 데칼 50m · LOD Cross Fade·Terrain Holes·데이터 기반 렌즈 플레어 끔.
+  - 🔴 Flat Kit 데모 씬을 열면 URP 에셋이 데모용으로 바뀐다 → `Restore Project Pipeline`. `Assets/FlatKit/Demos` 는 git 제외.
 - 🔴 **09-30 — 23호 사망 타이밍**: 사망 클립 0.7배속 → 끝난 뒤 2초 → 디졸브 2초 → 결과 화면(대기 0). `DissolveDeath.delayAfterClipEnd` 신설(기본 0). 상세: [PLAN-boss-death-telegraph.md](PLAN-boss-death-telegraph.md) 끝. ✅ 팀장 Play 확인.
 - 🔴 **09-29 저녁 — 튜토리얼 스테이지 180° 회전 + 은희 투명화 존 머지**(`fix/stage_tutorial260929`). **SVN r340 필수**(구석 `walll_brick_cornerCOM_*`). 상세: [PLAN-tutorial-stage.md](PLAN-tutorial-stage.md) 끝. ✅ 팀장 Play 확인(문제없음). `d9519cbb` development 반영.
 - 🔴 **SVN r338 필수** — development 의 `WallTransparencyDither.hlsl`(은희)과 r338 `Generic_Standard.shadergraph` 가 짝. r336 이하면 화면 전체 분홍(`undeclared identifier WallTransparencyDither_float`). 핀 `art-svn.json` = 338.

@@ -481,7 +481,14 @@ public class BossDataSO : MonsterDataSO
 
     [Header("송전기(차징) — 페이즈 진입 시퀀스")]
     [Tooltip("제한시간(초). 이 시간 안에 송전탑을 전부 부수지 못하면 레이지로 넘어간다.")]
-    [Min(1f)] public float chargeTimeLimit = 20f;
+    [Min(1f)] public float chargeTimeLimit = 30f;
+
+    [Tooltip("차징 클립 구간 반복 — 처음 1회는 0 프레임부터 재생하고, chargeLoopEndFrame 에 닿으면 chargeLoopStartFrame 으로 되돌려 " +
+             "그 구간만 반복한다(팔 모으는 동작은 처음에만, 팀장 10-02). 클립 프레임 기준. 시작 < 0 이면 끔(클립 자체 루프).\n" +
+             "기본 f62~f125 = 자세(18°)와 속도(차 0)가 함께 이어지는 쌍. 클립 끝 f158 → f46 은 982° 라 튄다.\n" +
+             "(f59 는 자세만 더 가깝고 속도가 달라 이음매에서 멈칫했다 — 팀장 Play 10-02)")]
+    public int chargeLoopStartFrame = 62;
+    public int chargeLoopEndFrame = 125;
 
     // ⚠️ 2026-09-21 SO 전수조사 — **유령 필드**(선언 파일 밖 참조 0)라 주석 처리했다.
     //    주석 처리하면 Unity 가 다음 직렬화에서 에셋의 값도 버리므로, 마지막 저작값을 여기 남긴다.
@@ -578,6 +585,12 @@ public class BossDataSO : MonsterDataSO
     //    주석 처리하면 Unity 가 다음 직렬화에서 에셋의 값도 버리므로, 마지막 저작값을 여기 남긴다.
     //    마지막 저작값 35 — 🔴 폭탄 튜닝은 **BossBomb 프리팹 컴포넌트**로 이사했다(거기 SerializeField 12개).
     // [Range(0f, 80f)] public float bombThrowPitch = 35f;
+
+    [Header("전기 장판 · 자폭 드론 (PLAN-boss-electric-drone)")]
+    [Tooltip("23호 전기 장판 수치. 비우면 기획서 기본값(BossElectricFloorDataSO 의 초기값)으로 돈다.")]
+    public BossElectricFloorDataSO electricFloor;
+    [Tooltip("웰즈 자폭 드론 수치. 비우면 기획서 기본값으로 돈다. 🔴 이 드론 타이머가 웰즈 공격 주기를 대신한다 — bombThrowInterval 은 더 이상 공격을 내지 않는다.")]
+    public WellsDroneDataSO wellsDrone;
 
     // ─── 공격 간격 ────────────────────────────────────────────────────────
     //

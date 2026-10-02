@@ -73,6 +73,17 @@ public class TurretHeadAim : NetworkBehaviour, ITurretAimGate
              "예고선 오브젝트의 위치를 쓰지 않는 이유는, 그 오브젝트가 머리에 붙어 있지 않을 수도 있어서다.")]
     [SerializeField] private Transform laserOrigin;
 
+    [Header("조준 예고선 색 (기획 피드백 10-02 — 조준이 언제 끝나는지 보이게) — 초록 → 주황 → 빨강")]
+    [Tooltip("추적 앞부분 — 막 조준을 시작했다.")]
+    [SerializeField] private Color startColor = new Color(0.15f, 1f, 0.2f, 1f);
+    [Tooltip("추적 뒷부분 — 곧 고정된다.")]
+    [SerializeField] private Color trackingColor = new Color(1f, 0.55f, 0.05f, 1f);
+    [Tooltip("추적 시간(telegraphSeconds) 중 초록 → 주황으로 바뀌는 지점(0~1). 0.5 = 추적의 절반.")]
+    [Range(0f, 1f)]
+    [SerializeField] private float trackingColorAt = 0.5f;
+    [Tooltip("고정 중(aimHoldSeconds) — 방향이 굳었다, 곧 쏜다. 발사 순간 선이 꺼진다.")]
+    [SerializeField] private Color lockedColor = new Color(1f, 0.05f, 0.03f, 1f);
+
     [Header("조준 예고 시간")]
     [Tooltip("사거리 안에 들어온 뒤 조준선을 보이며 타깃을 따라가는 시간(초). " +
              "이 시간이 지나면 조준이 그 방향에 고정된다(팀장 확정: 0.5~1.0초).")]
@@ -414,8 +425,18 @@ public class TurretHeadAim : NetworkBehaviour, ITurretAimGate
         if (!showAimLaser || !_laserVisible)
         {
             if (aimLaser.gameObject.activeSelf) aimLaser.gameObject.SetActive(false);
+            _laserShownAt = -1f;
             return;
         }
+
+        // 색: 추적 앞부분 초록 → 추적 뒷부분 주황 → 고정(쏘기 전) 빨강 → 발사 순간 꺼짐. 단계마다 딱 바뀐다(타이밍이 읽히게).
+        // 시점은 각 피어가 "선이 켜진 뒤 경과"로 잰다 — 켜짐 신호와 같은 지연이라 간격이 서버와 같다. 따로 복제하지 않는다.
+        if (_laserShownAt < 0f) _laserShownAt = Time.time;
+        float elapsed = Time.time - _laserShownAt;
+        Color c = elapsed >= telegraphSeconds ? lockedColor
+                : elapsed >= telegraphSeconds * trackingColorAt ? trackingColor
+                : startColor;
+        ApplyLaserColor(c);
 
         Vector3 origin = laserOrigin != null ? laserOrigin.position : headBone.position;
         Vector3 dir = AimDirection;
@@ -432,6 +453,30 @@ public class TurretHeadAim : NetworkBehaviour, ITurretAimGate
         aimLaser.SetPosition(0, origin);
         aimLaser.SetPosition(1, origin + dir * range);
         if (!aimLaser.gameObject.activeSelf) aimLaser.gameObject.SetActive(true);
+    }
+
+    private float _laserShownAt = -1f;
+    private Color _laserColorApplied = new Color(-1f, -1f, -1f, -1f);
+    private MaterialPropertyBlock _laserMpb;
+    private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
+    private static readonly int ColorId = Shader.PropertyToID("_Color");
+
+    /// <summary>
+    /// 이 렌더러에만 색을 덮는다 — 머티리얼(<c>MA_TurretAimLaser</c>)은 PeekABot·TeslaBot 이 공유하므로
+    /// 에셋을 건드리지 않고 MaterialPropertyBlock 을 쓴다. 셰이더가 정점 색을 쓰는 경우도 있어 라인 색도 같이 바꾼다.
+    /// 바뀔 때만 쓴다.
+    /// </summary>
+    private void ApplyLaserColor(Color c)
+    {
+        if (c == _laserColorApplied) return;
+        _laserColorApplied = c;
+        aimLaser.startColor = c;
+        aimLaser.endColor = c;
+        _laserMpb ??= new MaterialPropertyBlock();
+        aimLaser.GetPropertyBlock(_laserMpb);
+        _laserMpb.SetColor(BaseColorId, c);
+        _laserMpb.SetColor(ColorId, c);
+        aimLaser.SetPropertyBlock(_laserMpb);
     }
 
 #if UNITY_EDITOR

@@ -1,0 +1,88 @@
+using UnityEngine;
+
+/// <summary>
+/// 웰즈 자폭 드론 수치. 기획: Docs/design/boss/wells-suicide-drone.md §4 · §13.
+/// <see cref="BossDataSO.wellsDrone"/> 가 비어 있으면 이 기본값으로 돈다.
+/// </summary>
+[CreateAssetMenu(menuName = "Monster/Boss/Wells Drone Data", fileName = "WellsDroneData")]
+public class WellsDroneDataSO : ScriptableObject
+{
+    [Header("시간 (§4)")]
+    [Min(0f)] public float firstDelay = 5f;
+    [Tooltip("크로스헤어 추적(확정 3초).")]
+    [Min(0.1f)] public float trackTime = 3f;
+    [Tooltip("위치 고정 → 충돌까지.")]
+    [Min(0.1f)] public float lockTime = 1f;
+    [Tooltip("공격(또는 취소) 종료 후 다음 대상 선정까지.")]
+    [Min(0f)] public float cooldown = 7f;
+    [Tooltip("제압·충전 기믹 종료 직후 보장 대기(남은 시간이 이보다 짧으면 이 값).")]
+    [Min(0f)] public float resumeMinDelay = 2f;
+
+    [Header("범위 · 피해 (§7 · §9)")]
+    [Tooltip("원 지름 = 보스방 타일 몇 칸. 기획서 원안 0.5 → 팀장 10-02 Play 확인 후 2.5배(1.25).\n" +
+             "피해 판정과 바닥 원이 이 값 하나를 같이 쓴다.")]
+    [Min(0.05f)] public float diameterInTiles = 1.25f;
+    [Min(0)] public int playerDamage = 25;
+    [Tooltip("23호에게 주는 피해(일반 보스 피해 — 간파·취약 판정 안 탐). 300 → 120(0.4배, 팀장 10-02 — 범위 2.5배로 맞히기 쉬워짐).")]
+    [Min(0)] public int bossDamage = 120;
+    [Tooltip("멈추는 그로기 종류(체크형). 기본 = 제압 + 송전기 전멸 그로기.")]
+    public BossPauseCondition pauseOn = BossPauseCondition.Suppress | BossPauseCondition.PylonGroggy;
+
+    [Header("드론 모델")]
+    [Tooltip("드론 모델(연출 전용 — NetworkObject 아님, 충돌·판정 없음). 비우면 원·폭발만.")]
+    public GameObject droneModel;
+    [Tooltip("드론 모델 크기 배율(모델 원본 = 1).")]
+    [Min(0.1f)] public float droneScale = 2f;
+
+    [Header("드론 비행 — 화면 좌하단/우하단 대각선에서 날아온다 (팀장 10-02, 좌우는 매번 무작위)")]
+    [Tooltip("출발점의 충돌 지점 기준 수평 거리(m). 화면 아래 + 좌/우 대각선 방향으로 이만큼 떨어진 곳에서 출발.")]
+    [Min(0f)] public float approachDistance = 10f;
+    [Tooltip("모델 회전 보정(도) — 기수가 비행 방향을 보도록. 모델 정면이 +Z 가 아니면 여기서 맞춘다.")]
+    public Vector3 droneRotationOffset = Vector3.zero;
+    [Tooltip("등장할 때 한 번 재생(FBX 테이크 DashStart).")]
+    public AnimationClip dashStartClip;
+    [Tooltip("날아오는 동안 반복(FBX 테이크 DashLoop).")]
+    public AnimationClip dashLoopClip;
+    [Tooltip("출발점 높이(m).")]
+    [Min(0f)] public float dropHeight = 8f;
+    [Tooltip("lockTime 중 마지막 몇 초 동안 날아오는가(이 시간 동안만 보인다). lockTime 과 같으면 크로스헤어가 사라지자마자 나타난다.")]
+    [Min(0.05f)] public float fallTime = 1f;
+    [Tooltip("비행 시간 중 '느린 구간' 비율(0~1) — 화면에 처음 보일 때 천천히 온다(팀장 10-02).")]
+    [Range(0.05f, 0.95f)] public float approachSlowTimePortion = 0.5f;
+    [Tooltip("느린 구간 동안 이동하는 거리 비율(0~1). 나머지 거리를 뒤 구간에서 급가속해 내려온다.")]
+    [Range(0.01f, 0.9f)] public float approachSlowDistancePortion = 0.15f;
+    [Tooltip("충돌 순간 생성할 폭발 VFX(선택). 비우면 임시 원 확산.")]
+    public GameObject explosionVfxPrefab;
+    [Tooltip("폭발 연출 유지(초) — 피해와 무관한 연출 값. 이게 끝난 뒤 쿨다운을 센다.")]
+    [Min(0f)] public float explosionDuration = 0.5f;
+    [Header("크로스헤어 (추적 단계)")]
+    [Tooltip("크로스헤어 기준 지름(m). 아래 시작/끝 배율이 여기에 곱해진다.")]
+    [Min(0.5f)] public float crosshairSize = 2.4f;
+    [Tooltip("추적 시작 때 크기 배율.")]
+    [Min(0.1f)] public float crosshairStartScale = 1.5f;
+    [Tooltip("다 줄어든 뒤 크기 배율 — 이 크기로 멈춰 있다가 위치 고정 순간 사라진다.")]
+    [Min(0.1f)] public float crosshairEndScale = 0.8f;
+    [Tooltip("추적 시간 중 줄어드는 구간 비율(0~1). 0.8 = 앞 80% 동안 줄고 남은 20% 는 작은 크기로 정지.")]
+    [Range(0.05f, 1f)] public float crosshairShrinkPortion = 0.8f;
+    [Tooltip("카메라가 이 거리(m)보다 멀면 그만큼 키운다 — 최소 표시 크기 보장(§6.1).")]
+    [Min(1f)] public float crosshairReferenceDistance = 20f;
+    [Tooltip("캐릭터 모델에 가리지 않게 카메라 쪽으로 당겨 그리는 거리(m).")]
+    [Min(0f)] public float crosshairTowardCamera = 1.5f;
+    [Tooltip("크로스헤어 그림. 비우면 코드로 그린 기본 모양. 흰색 그림을 넣으면 아래 색이 그대로 입혀진다(곱셈).")]
+    public Texture2D crosshairTexture;
+    [Tooltip("색 흐름 — 터렛 조준선과 같은 경험(팀장 10-02): 초록(줄기 시작) → 주황 → 빨강(다 줄어 멈춤 = 곧 고정).")]
+    public Color crosshairStartColor = new Color(0.15f, 1f, 0.2f, 0.95f);
+    public Color crosshairMidColor = new Color(1f, 0.55f, 0.05f, 0.95f);
+    [Tooltip("다 줄어든 뒤(멈춰 있는 동안)의 색.")]
+    public Color crosshairColor = new Color(1f, 0.2f, 0.15f, 0.95f);
+    [Tooltip("줄어드는 구간 중 초록 → 주황으로 바뀌는 지점(0~1). 0.5 = 줄어드는 시간의 절반.")]
+    [Range(0f, 1f)] public float crosshairMidColorAt = 0.5f;
+
+    [Header("바닥 원 · 폭발 색")]
+    public Color circleOuterColor = new Color(1f, 0.15f, 0.1f, 0.3f);
+    public Color circleFillColor = new Color(1f, 0.05f, 0.02f, 0.6f);
+    [Tooltip("임시 폭발 원 색(폭발 VFX 프리팹이 비었을 때).")]
+    public Color explosionColor = new Color(1f, 0.55f, 0.1f, 0.85f);
+    [Tooltip("임시 폭발 원이 범위 반경의 몇 배까지 퍼지는가.")]
+    [Min(1f)] public float explosionGrowScale = 2.5f;
+}

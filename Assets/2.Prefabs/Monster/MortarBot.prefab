@@ -154,6 +154,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 64
   attackType: 0
+  hitPattern: 0
   colliderInfo: {fileID: 2561563957976999454}
   maxHitCount: 16
   applyKnockback: 0
@@ -402,6 +403,7 @@ MonoBehaviour:
   hitVFXCollider: {fileID: 3147570509364327094}
   hitVFXType: 1
   bodyCollider: {fileID: 2687977088537551207}
+  attackTelegraphMaterial: {fileID: 0}
 --- !u!114 &4671480735823204164
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -419,6 +421,8 @@ MonoBehaviour:
   particlePrefab: {fileID: 7019508933032447489, guid: 0e15d6fc561b43fa95fadff8ab04b5fd, type: 3}
   duration: 1.5
   despawnGrace: 0.5
+  leadBeforeClipEnd: 0.3
+  delayAfterClipEnd: 0
   renderers: []
 --- !u!114 &7264363400000000001
 MonoBehaviour:
@@ -437,6 +441,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 64
   attackType: 0
+  hitPattern: 0
   projectilePrefab: {fileID: 0}
   muzzle: {fileID: 7264363400000000003}
   projectileSpeed: 12
@@ -526,7 +531,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2391931280260005269, guid: 87dd4b3ba2b418340833ff1c4d33a222, type: 3}
       propertyPath: m_Mesh
-      value:
+      value: 
       objectReference: {fileID: 4300000, guid: 99e0cb0be8993154989601c64627347c, type: 2}
     - target: {fileID: 2391931280260005269, guid: 87dd4b3ba2b418340833ff1c4d33a222, type: 3}
       propertyPath: m_AABB.m_Center.y
@@ -550,8 +555,8 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2391931280260005269, guid: 87dd4b3ba2b418340833ff1c4d33a222, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
-      value:
-      objectReference: {fileID: 2100000, guid: c3f8013eb64a99c4881d06771bc78cd1, type: 2}
+      value: 
+      objectReference: {fileID: 2100000, guid: d822a228b6a35d044b95c4dae8c49ee5, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

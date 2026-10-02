@@ -83,6 +83,30 @@ PrefabInstance:
       propertyPath: m_Name
       value: Wells
       objectReference: {fileID: 0}
+    - target: {fileID: 4853390165806183940, guid: 9fed67314ef11ca4cb85a6d61bfa1c0e, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 1e3cc458b96ca544b91b945aae0ed27a, type: 2}
+    - target: {fileID: 4853390165806183940, guid: 9fed67314ef11ca4cb85a6d61bfa1c0e, type: 3}
+      propertyPath: 'm_Materials.Array.data[1]'
+      value: 
+      objectReference: {fileID: 2100000, guid: fe0e21f32a8cf8340985a4dbe17a2165, type: 2}
+    - target: {fileID: 4853390165806183940, guid: 9fed67314ef11ca4cb85a6d61bfa1c0e, type: 3}
+      propertyPath: 'm_Materials.Array.data[2]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 5497b3d6afcbee84f80face718faf5b3, type: 2}
+    - target: {fileID: 4853390165806183940, guid: 9fed67314ef11ca4cb85a6d61bfa1c0e, type: 3}
+      propertyPath: 'm_Materials.Array.data[3]'
+      value: 
+      objectReference: {fileID: 2100000, guid: cfeecf5fc1b928042be2b5a3f6f0b29c, type: 2}
+    - target: {fileID: 4853390165806183940, guid: 9fed67314ef11ca4cb85a6d61bfa1c0e, type: 3}
+      propertyPath: 'm_Materials.Array.data[4]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 15151fdd0cc2e87488d1e7e54e5705c9, type: 2}
+    - target: {fileID: 4853390165806183940, guid: 9fed67314ef11ca4cb85a6d61bfa1c0e, type: 3}
+      propertyPath: 'm_Materials.Array.data[5]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 3f5218dec20232743a33b0a1909aa6d7, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects:
