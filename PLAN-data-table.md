@@ -141,7 +141,7 @@
 - `DefaultAttackProjectile.lifetime`(P5) — 어떤 프리팹·씬도 이 컴포넌트를 안 쓴다(참조 0).
 - ~~`Temp_MultiGameRule.defaultLifeCount`~~ → 은희가 `GameRule.prefab` 으로 분리(Q10) → 시트 추가.
 - **M6**(23호 폭탄·장판·송전기) — Q9, 경석 장판 작업 후.
-- 레거시 `Enemy/*` — 참조 0, 삭제 후보로 경석에게 보고.
+- ~~레거시 `Enemy/*`~~ → ✅ 10-02 은희 결정으로 삭제(죽은 스크립트 11 · `AttackTriggerRelay` · `ModularRobots_R1` 프리팹·네트워크 등록). 현역 4개는 이동: `GrabController`·`TwentyThreeArenaContext`·`ChargingObject` → `Monster/Boss/`, `FloorAreaEffect` → `Effects/`(GUID 유지).
 
 **제약**
 - **씬에 배치된 프리팹 인스턴스가 그 필드를 덮어쓰고 있으면** 테이블 값이 안 닿는다(플레이어·몬스터·보스는 런타임 스폰이라 해당 없음).
@@ -263,6 +263,7 @@
 | ~~Q7~~ | ~~플레이어 이동속도 원본~~ | ✅ 10-02 은희 — **`PlayerMovement.maxSpeed` 로 일원화, `Player.moveSpeed` 삭제** |
 | ~~Q8~~ | ~~중간보스 패턴 SO 형태~~ | ~~하위 타입~~ → **불필요**(10-02 설계 변경 — 테이블이 `GauntletBot` 등 컴포넌트를 직접 덮어씀) |
 | ~~Q9~~ | ~~23호 M6 시점~~ | ✅ 10-02 은희 — **경석 장판 작업 후로 미룸**(이번엔 M1~M5) |
+| Q11 | SO 의 기술 값도 테이블로? | ✅ 10-02 은희 — **몬스터 SO(`MonsterDataSO`·`BossDataSO`)는 `[DataTableIgnore]` 없이 전부 테이블로**(관리를 테이블로 넘긴다). 폭탄(`BossBomb`)은 버려진 코드라 대상 아님 |
 | ~~Q10~~ | ~~목숨 수(씬 배치)~~ | ✅ 10-02 은희 — **`Assets/2.Prefabs/Player/GameRule.prefab` 으로 분리** → `Temp_MultiGameRule` 시트(Id `GameRule`, `defaultLifeCount`). 프리팹 인스턴스가 아닌 디버그 씬 오브젝트(PlayerBossTest 의 1)는 테이블이 안 건드려 두 모드 모두 씬 값 |
 
 ## 9. 완료 조건
