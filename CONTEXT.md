@@ -8,11 +8,11 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 작업 세션 (2026-10-02 · 은희(Claude) · **플레이어블 스킬 툴팁 + 캐릭터별 아이콘**) — ✅ 승인 · 구현 Codex 위임 · 브랜치 `feature/SkillTooltip`
+## ▶▶ 작업 세션 (2026-10-02 · 은희(Claude) · **플레이어블 스킬 툴팁 + 캐릭터별 아이콘**) — ✅ 구현(Codex `a9fe968c` + Claude `3dbf7f13`) · EditMode 82/82 · Verify 0 · 🔴 xlsx Export 병합(SVN 잠금 대기)·Play·MPPM 남음 · 브랜치 `feature/SkillTooltip`
 
 계획·결정·남은 질문 = [PLAN-skill-tooltip.md](PLAN-skill-tooltip.md).
 - 확정: 문구 = 스킬 SO·패시브 컴포넌트의 `displayName`·`description` → 기존 `Paladin`/`Gunner` 시트 행 · 거너 패시브 = 과열(`GunnerHeat`) → `Slot_P` · 자리표시자 `{필드}`·`{필드:%}`·`{dmg}` · 피해 = **계수 + 실제 수치** · 아이콘 = 스폰된 캐릭터 Variant 데이터에서(캐릭터마다 다름).
-- 다음: Codex 가 PLAN §6 1~5·7(코드·저작 도구) → Claude 가 Unity 에서 저작 도구 실행·EditMode·Export 병합(SVN) → 은희 Play·MPPM. 칸 클릭 = 스킬 키(D18). 피해 = 계수+실제, 차지·과열은 최소~최대 범위 · Shift = 계산식 · 키워드 = TMP `<style>` 태그. 🔴 **수정 예정 — 동시 수정 금지(구현 시작 시)**: `Assets/1.Scripts/UI/Combat/*`·`CombatHUD.prefab`·`PlayerSkillData` 계열·`FirstMeleePassive`·`GunnerHeat`·`Assets/1.Scripts/DataTable/Editor/DataTableTemplate.cs`·`GameData.xlsx`(SVN 잠금).
+- 다음: 은희 `GameData.xlsx` Get Lock → Claude Export 병합(툴팁 30행, TODO 문구)·SVN 커밋·`art-svn.json` 핀 → 은희 Play·MPPM. 저작 메뉴 = `Tools/UI/스킬 툴팁 구성`(재실행 가능). 거너 아이콘 = 임시 원(`2.Prefabs/UI/SkillTooltipGenerated/Gunner_*`). 칸 클릭 = 스킬 키(D18). 피해 = 계수+실제, 차지·과열은 최소~최대 범위 · Shift = 계산식 · 키워드 = TMP `<style>` 태그. 🔴 **수정 예정 — 동시 수정 금지(구현 시작 시)**: `Assets/1.Scripts/UI/Combat/*`·`CombatHUD.prefab`·`PlayerSkillData` 계열·`FirstMeleePassive`·`GunnerHeat`·`Assets/1.Scripts/DataTable/Editor/DataTableTemplate.cs`·`GameData.xlsx`(SVN 잠금).
 
 ## ▶▶ 현재 인수인계 (2026-10-02 · 은희(Claude) · **데이터 테이블 xlsx → 게임 수치 + Dev Boot 툴바** → development 반영)
 
