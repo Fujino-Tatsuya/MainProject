@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.Animations;
+using UnityEngine.Playables;
 
 /// <summary>
 /// 웰즈 자폭 드론 — 표식(크로스헤어) 3초 추적 → 발 위치 고정 → 원형 범위 1초 → 드론 충돌 → 범위 피해(플레이어 + 23호).
@@ -150,7 +152,8 @@ public sealed class WellsDroneAttack : MonoBehaviour
                 _radius = Radius();
                 _phase = Phase.Lock;
                 _t = _d.lockTime;
-                _boss.SendDroneLock(_lockPos, _radius, _d.lockTime);
+                // 날아오는 쪽(화면 좌하단/우하단)은 서버가 정해 보낸다 — 피어마다 다르게 보이지 않게(팀장 10-02: 매번 무작위).
+                _boss.SendDroneLock(_lockPos, _radius, _d.lockTime, Random.value < 0.5f);
                 return;
 
             case Phase.Lock:
@@ -254,6 +257,52 @@ public sealed class WellsDroneAttack : MonoBehaviour
     View _view;
     GameObject _droneGo, _boomVfx;
     Transform _viewRoot;
+    Vector3 _vFrom, _vTo;   // 드론 비행 출발점(대각선 위) → 충돌 지점
+
+    // 드론 애니 — FBX 에 Animator 컨트롤러가 없어 PlayableGraph 로 클립을 직접 튼다. DashStart 1회 → DashLoop 반복.
+    PlayableGraph _droneGraph;
+    AnimationClipPlayable _droneClip;
+    bool _droneLooping;
+
+    void PlayDroneClips()
+    {
+        StopDroneClips();
+        AnimationClip first = _d.dashStartClip != null ? _d.dashStartClip : _d.dashLoopClip;
+        if (first == null || _droneGo == null) return;
+        Animator anim = _droneGo.GetComponentInChildren<Animator>(true);
+        if (anim == null) anim = _droneGo.AddComponent<Animator>();
+        anim.applyRootMotion = false;   // 위치는 비행 경로(Lerp)가 정한다 — 클립 루트 이동이 덮어쓰지 않게
+        _droneClip = AnimationPlayableUtilities.PlayClip(anim, first, out _droneGraph);
+        _droneLooping = first == _d.dashLoopClip;
+    }
+
+    void TickDroneClips()
+    {
+        if (!_droneGraph.IsValid() || !_droneClip.IsValid()) return;
+        AnimationClip cur = _droneClip.GetAnimationClip();
+        if (cur == null || cur.length <= 0f) return;
+        double t = _droneClip.GetTime();
+        if (_droneLooping)
+        {
+            if (t >= cur.length) _droneClip.SetTime(t % cur.length);   // 임포트 설정과 무관하게 반복
+        }
+        else if (t >= cur.length && _d.dashLoopClip != null)
+        {
+            // DashStart 끝 → DashLoop 로 갈아 끼운다.
+            _droneLooping = true;
+            var loop = AnimationClipPlayable.Create(_droneGraph, _d.dashLoopClip);
+            var output = _droneGraph.GetOutput(0);
+            _droneClip.Destroy();
+            _droneClip = loop;
+            output.SetSourcePlayable(loop);
+        }
+    }
+
+    void StopDroneClips()
+    {
+        if (_droneGraph.IsValid()) _droneGraph.Destroy();
+        _droneLooping = false;
+    }
 
     public void ClientMark(Transform target, float trackTime)
     {
@@ -268,7 +317,7 @@ public sealed class WellsDroneAttack : MonoBehaviour
         _cross.gameObject.SetActive(true);
     }
 
-    public void ClientLock(Vector3 pos, float radius, float lockTime)
+    public void ClientLock(Vector3 pos, float radius, float lockTime, bool fromRight)
     {
         EnsureView();
         ClientCancel();
@@ -288,7 +337,20 @@ public sealed class WellsDroneAttack : MonoBehaviour
 
         if (_d.droneModel != null)
         {
-            _droneGo = Instantiate(_d.droneModel, pos + Vector3.up * _d.dropHeight, Quaternion.identity);
+            // 출발점 = 화면 아래 + 좌/우 대각선(애니가 대각선 접근을 상정하고 만들어졌다 — 팀장 10-02).
+            // 화면 방향은 이 피어의 카메라로 잡는다(탑다운 카메라 — 화면 "아래" = 카메라 정면의 반대를 바닥에 눕힌 것).
+            Camera cam = Camera.main;
+            Vector3 fwd = cam != null ? Vector3.ProjectOnPlane(cam.transform.forward, Vector3.up) : Vector3.forward;
+            Vector3 right = cam != null ? Vector3.ProjectOnPlane(cam.transform.right, Vector3.up) : Vector3.right;
+            if (fwd.sqrMagnitude < 1e-4f) fwd = Vector3.forward;
+            if (right.sqrMagnitude < 1e-4f) right = Vector3.right;
+            Vector3 side = (-fwd.normalized + (fromRight ? right.normalized : -right.normalized)).normalized;
+            _vFrom = new Vector3(pos.x, _vFloorY, pos.z) + side * _d.approachDistance + Vector3.up * _d.dropHeight;
+            _vTo = new Vector3(pos.x, _vFloorY, pos.z);
+
+            Vector3 travel = _vTo - _vFrom;
+            Quaternion face = travel.sqrMagnitude > 1e-4f ? Quaternion.LookRotation(travel.normalized, Vector3.up) : Quaternion.identity;
+            _droneGo = Instantiate(_d.droneModel, _vFrom, face * Quaternion.Euler(_d.droneRotationOffset));
             _droneGo.transform.localScale *= _d.droneScale;
             // 연출 전용 — 혹시 프리팹에 콜라이더·리지드바디가 있어도 판정·물리에 끼지 않게 끈다(§8).
             foreach (Collider c in _droneGo.GetComponentsInChildren<Collider>(true)) c.enabled = false;
@@ -344,6 +406,7 @@ public sealed class WellsDroneAttack : MonoBehaviour
         if (_outer != null) _outer.gameObject.SetActive(false);
         if (_fill != null) _fill.gameObject.SetActive(false);
         if (_boom != null) _boom.gameObject.SetActive(false);
+        StopDroneClips();
         if (_droneGo != null) { Destroy(_droneGo); _droneGo = null; }
     }
 
@@ -363,12 +426,16 @@ public sealed class WellsDroneAttack : MonoBehaviour
                 PlaceDisc(_fill, _vRadius * k, 0.01f);   // 안쪽 진한 원이 1초 동안 차오른다(§7)
                 if (_droneGo != null)
                 {
-                    // lockTime 의 마지막 fallTime 동안 위에서 고정 위치로 내려온다 — 끝 = 충돌 순간.
+                    // lockTime 의 마지막 fallTime 동안 대각선 출발점 → 충돌 지점 직선 비행 — 끝 = 충돌 순간.
                     float fallStart = 1f - Mathf.Clamp01(_d.fallTime / _vDur);
                     float f = fallStart >= 1f ? 1f : Mathf.Clamp01((k - fallStart) / (1f - fallStart));
-                    float h = Mathf.Lerp(_d.dropHeight, 0f, f * f);   // 가속
-                    _droneGo.transform.position = new Vector3(_vPos.x, _vFloorY + h, _vPos.z);
-                    if (f > 0f && !_droneGo.activeSelf) _droneGo.SetActive(true);
+                    _droneGo.transform.position = Vector3.Lerp(_vFrom, _vTo, f * f);   // 가속
+                    if (f > 0f && !_droneGo.activeSelf)
+                    {
+                        _droneGo.SetActive(true);
+                        PlayDroneClips();
+                    }
+                    TickDroneClips();
                 }
                 break;
 
@@ -425,6 +492,7 @@ public sealed class WellsDroneAttack : MonoBehaviour
 
     void OnDestroy()
     {
+        StopDroneClips();
         if (_droneGo != null) Destroy(_droneGo);
         DestroyBoomVfx();
         if (_viewRoot != null) Destroy(_viewRoot.gameObject);

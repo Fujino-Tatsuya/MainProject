@@ -5476,7 +5476,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     [ClientRpc] void FloorClearClientRpc() { if (_electricFloor != null) _electricFloor.ClientClear(); }
 
     internal void SendDroneMark(NetworkObject target, float trackTime) => DroneMarkClientRpc(target, trackTime);
-    internal void SendDroneLock(Vector3 pos, float radius, float lockTime) => DroneLockClientRpc(pos, radius, lockTime);
+    internal void SendDroneLock(Vector3 pos, float radius, float lockTime, bool fromRight) => DroneLockClientRpc(pos, radius, lockTime, fromRight);
     internal void SendDroneImpact(Vector3 pos, float radius) => DroneImpactClientRpc(pos, radius);
     internal void SendDroneCancel() => DroneCancelClientRpc();
 
@@ -5487,7 +5487,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         if (target.TryGet(out NetworkObject no)) _drone.ClientMark(no.transform, trackTime);
         else Debug.LogWarning($"[자폭드론] 표식 대상 NetworkObject 를 이 피어에서 못 찾았다 — 크로스헤어 생략(고정 원부터 보인다).", this);
     }
-    [ClientRpc] void DroneLockClientRpc(Vector3 pos, float radius, float lockTime) { if (_drone != null) _drone.ClientLock(pos, radius, lockTime); }
+    [ClientRpc] void DroneLockClientRpc(Vector3 pos, float radius, float lockTime, bool fromRight) { if (_drone != null) _drone.ClientLock(pos, radius, lockTime, fromRight); }
     [ClientRpc] void DroneImpactClientRpc(Vector3 pos, float radius) { if (_drone != null) _drone.ClientImpact(pos, radius); }
     [ClientRpc] void DroneCancelClientRpc() { if (_drone != null) _drone.ClientCancel(); }
     #endregion

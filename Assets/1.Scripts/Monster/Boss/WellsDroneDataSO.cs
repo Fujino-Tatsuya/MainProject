@@ -33,9 +33,19 @@ public class WellsDroneDataSO : ScriptableObject
     public GameObject droneModel;
     [Tooltip("드론 모델 크기 배율(모델 원본 = 1).")]
     [Min(0.1f)] public float droneScale = 2f;
-    [Tooltip("낙하 시작 높이(m).")]
-    [Min(1f)] public float dropHeight = 12f;
-    [Tooltip("lockTime 중 마지막 몇 초 동안 내려오는가.")]
+
+    [Header("드론 비행 — 화면 좌하단/우하단 대각선에서 날아온다 (팀장 10-02, 좌우는 매번 무작위)")]
+    [Tooltip("출발점의 충돌 지점 기준 수평 거리(m). 화면 아래 + 좌/우 대각선 방향으로 이만큼 떨어진 곳에서 출발.")]
+    [Min(0f)] public float approachDistance = 10f;
+    [Tooltip("모델 회전 보정(도) — 기수가 비행 방향을 보도록. 모델 정면이 +Z 가 아니면 여기서 맞춘다.")]
+    public Vector3 droneRotationOffset = Vector3.zero;
+    [Tooltip("등장할 때 한 번 재생(FBX 테이크 DashStart).")]
+    public AnimationClip dashStartClip;
+    [Tooltip("날아오는 동안 반복(FBX 테이크 DashLoop).")]
+    public AnimationClip dashLoopClip;
+    [Tooltip("출발점 높이(m).")]
+    [Min(0f)] public float dropHeight = 8f;
+    [Tooltip("lockTime 중 마지막 몇 초 동안 날아오는가(이 시간 동안만 보인다).")]
     [Min(0.05f)] public float fallTime = 0.6f;
     [Tooltip("충돌 순간 생성할 폭발 VFX(선택). 비우면 임시 원 확산.")]
     public GameObject explosionVfxPrefab;

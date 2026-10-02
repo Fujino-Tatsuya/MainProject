@@ -26,6 +26,20 @@ static class BossPatternDataAuthoring
             EditorUtility.SetDirty(drone);
         }
 
+        // 비행 클립(팀장 10-02: DashStart → DashLoop) — FBX 테이크에서 이름으로 찾는다. 이미 채워진 칸은 두고.
+        if (drone.dashStartClip == null || drone.dashLoopClip == null)
+        {
+            foreach (Object o in AssetDatabase.LoadAllAssetsAtPath(DroneModelPath))
+            {
+                if (!(o is AnimationClip clip) || clip.name.StartsWith("__preview__")) continue;
+                if (drone.dashStartClip == null && clip.name.Contains("DashStart")) drone.dashStartClip = clip;
+                if (drone.dashLoopClip == null && clip.name.Contains("DashLoop")) drone.dashLoopClip = clip;
+            }
+            Debug.Log($"[BossPatternData] 드론 클립 — Start {(drone.dashStartClip ? drone.dashStartClip.name : "없음")} · " +
+                      $"Loop {(drone.dashLoopClip ? drone.dashLoopClip.name : "없음")}");
+            EditorUtility.SetDirty(drone);
+        }
+
         foreach (string path in BossData)
         {
             var so = AssetDatabase.LoadAssetAtPath<BossDataSO>(path);

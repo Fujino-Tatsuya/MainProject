@@ -22,11 +22,23 @@ MonoBehaviour:
   bossDamage: 120
   pauseOn: 3
   droneModel: {fileID: 919132149155446097, guid: fcc07944700f48a419a0cbde4e5cf5d5, type: 3}
-  dropHeight: 12
+  droneScale: 2
+  approachDistance: 10
+  droneRotationOffset: {x: 0, y: 0, z: 0}
+  dashStartClip: {fileID: 7866669278416069025, guid: fcc07944700f48a419a0cbde4e5cf5d5, type: 3}
+  dashLoopClip: {fileID: -2281602620767728765, guid: fcc07944700f48a419a0cbde4e5cf5d5, type: 3}
+  dropHeight: 8
   fallTime: 0.6
   explosionVfxPrefab: {fileID: 0}
   explosionDuration: 0.5
   crosshairSize: 2.4
+  crosshairStartScale: 1.5
+  crosshairEndScale: 0.8
+  crosshairShrinkPortion: 0.8
+  crosshairReferenceDistance: 20
+  crosshairTowardCamera: 1.5
   crosshairColor: {r: 1, g: 0.2, b: 0.15, a: 0.95}
   circleOuterColor: {r: 1, g: 0.15, b: 0.1, a: 0.3}
   circleFillColor: {r: 1, g: 0.05, b: 0.02, a: 0.6}
+  explosionColor: {r: 1, g: 0.55, b: 0.1, a: 0.85}
+  explosionGrowScale: 2.5
