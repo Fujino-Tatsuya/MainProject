@@ -8,26 +8,35 @@ using UnityEngine;
 using Object = UnityEngine.Object;
 
 /// <summary>
-/// 현재 인스펙터 값(SO·프리팹) → xlsx 템플릿(PLAN-data-table.md D2·D3·D4). 기획이 처음 받을 xlsx 를 만들고, 직후 Verify 차이 0 이 기준선이다.
+/// 현재 인스펙터 값(SO·프리팹) → xlsx 템플릿(PLAN-data-table.md D2·D3·D4·D7).
 /// <para>
 /// 내보내는 필드 = <b>정수·실수</b>만(구조체·배열 안쪽 포함, 배열은 원소마다 <c>phases[0]</c>).
-/// 레이어 마스크·문자열·곡선·참조·bool·enum 은 넣지 않는다 — 가져오기는 bool·enum 도 되므로 필요하면 기획이 행/열을 직접 추가한다.
+/// 레이어 마스크·문자열·곡선·참조·bool·enum 은 넣지 않는다 — 가져오기는 bool·enum 도 되므로 필요하면 기획이 행을 직접 추가한다.
 /// <see cref="DataTableIgnoreAttribute"/> 필드는 뺀다.
 /// </para>
-/// <para>대상이 하나뿐인 타입 = 키-값 시트(세로로 읽기 좋다), 여럿 = 행 테이블.</para>
+/// <para>
+/// 배치 = <b>세로 표</b>(D7): 행 = 필드, 열 = <c>필드 | #설명 | 대상…</c>. 타입마다 <c>#■ 타입</c> 구역,
+/// 코드의 <c>[Header]</c> 는 <c>#  ─ 제목</c>, 구조체 배열 원소는 <c>#  ▸ attacks[3] · 이름</c> 소구역. 가로 스크롤 없이 위아래로 읽는다.
+/// </para>
 /// </summary>
 public static class DataTableTemplate
 {
     public const string DefaultFileName = "GameData.xlsx";
     private const string LogPrefix = "[DataTable] ";
 
+    /// <summary>시트 순서 — 이 목록 순서대로, 나머지는 이름 순.</summary>
+    private static readonly string[] PreferredSheetOrder = { "Player", "Paladin", "Gunner", "Monster", "MidBoss", "Boss" };
+
     public readonly struct Field
     {
-        public Field(string path, object value, string description)
+        public Field(string path, object value, string description, string section = null, string element = null, string subSection = null)
         {
             Path = path;
             Value = value;
             Description = description;
+            Section = section;
+            Element = element;
+            SubSection = subSection;
         }
 
         /// <summary>테이블 표기 — "charge.speed", "phases[0]".</summary>
@@ -35,6 +44,15 @@ public static class DataTableTemplate
 
         public object Value { get; }
         public string Description { get; }
+
+        /// <summary>바깥 필드의 <c>[Header]</c>(앞 필드에서 이어짐). 없으면 null.</summary>
+        public string Section { get; }
+
+        /// <summary>구조체 배열 원소면 "attacks[3] · JumpAttack"(원소 첫 enum/string 필드가 이름표). 아니면 null.</summary>
+        public string Element { get; }
+
+        /// <summary>원소 안쪽 필드의 <c>[Header]</c>. 없으면 null.</summary>
+        public string SubSection { get; }
     }
 
     /// <summary>대상(SO·컴포넌트) 하나에서 템플릿에 들어갈 필드를 직렬화 순서대로. NetworkVariable 안쪽(네트워크 상태)은 뺀다.</summary>
@@ -45,6 +63,10 @@ public static class DataTableTemplate
         var so = new SerializedObject(asset);
         SerializedProperty it = so.GetIterator();
         bool enterChildren = true;
+        string section = null;
+        string elementKey = null;
+        string elementLabel = null;
+        string subSection = null;
         while (it.Next(enterChildren))
         {
             enterChildren = false;
@@ -55,43 +77,117 @@ public static class DataTableTemplate
             }
 
             FieldInfo field = ResolveField(type, path);
+
+            // [Header] 는 내보내지 않는 필드(레이어 마스크 등)에 붙어 있어도 구역을 연다.
+            if (field != null && path.IndexOf('.') < 0)
+            {
+                string header = field.GetCustomAttribute<HeaderAttribute>()?.header;
+                if (header != null)
+                {
+                    section = header;
+                }
+            }
+
             if (field == null || IsExcluded(field) || IsUnderIgnored(type, path))
             {
                 continue;
             }
 
-            switch (it.propertyType)
+            if (it.propertyType == SerializedPropertyType.Generic)
             {
-                case SerializedPropertyType.Generic:
-                    enterChildren = true; // 구조체·클래스·배열 안으로
-                    break;
-                case SerializedPropertyType.Integer:
-                    fields.Add(new Field(ToTablePath(path), it.longValue, Describe(field, path)));
-                    break;
-                case SerializedPropertyType.Float:
-                    object value = it.numericType == SerializedPropertyNumericType.Double ? (object)it.doubleValue : it.floatValue;
-                    fields.Add(new Field(ToTablePath(path), value, Describe(field, path)));
-                    break;
+                enterChildren = true; // 구조체·클래스·배열 안으로
+                continue;
             }
+
+            if (it.propertyType != SerializedPropertyType.Integer && it.propertyType != SerializedPropertyType.Float)
+            {
+                continue;
+            }
+
+            // 구조체 배열 원소(attacks.Array.data[3].cooldown) — 원소가 바뀌면 이름표·안쪽 구역을 새로.
+            string element = null;
+            string sub = null;
+            int arrayAt = path.IndexOf(".Array.data[", StringComparison.Ordinal);
+            int close = arrayAt < 0 ? -1 : path.IndexOf(']', arrayAt);
+            if (close > 0 && close + 1 < path.Length && path[close + 1] == '.')
+            {
+                string key = path.Substring(0, close + 1);
+                if (key != elementKey)
+                {
+                    elementKey = key;
+                    elementLabel = ElementLabel(so, key);
+                    subSection = null;
+                }
+
+                string leafHeader = DataTableFields.Resolve(type, path)?.GetCustomAttribute<HeaderAttribute>()?.header;
+                if (leafHeader != null)
+                {
+                    subSection = leafHeader;
+                }
+
+                element = elementLabel;
+                sub = subSection;
+            }
+
+            object value = it.propertyType == SerializedPropertyType.Integer
+                ? it.longValue
+                : it.numericType == SerializedPropertyNumericType.Double ? (object)it.doubleValue : it.floatValue;
+            fields.Add(new Field(ToTablePath(path), value, Describe(field, path), section, element, sub));
         }
 
         return fields;
     }
 
+    /// <summary>"attacks[3]" + 원소의 첫 enum·string 필드 값(예: "attacks[3] · JumpAttack").</summary>
+    private static string ElementLabel(SerializedObject so, string elementPropertyPath)
+    {
+        string label = ToTablePath(elementPropertyPath);
+        SerializedProperty element = so.FindProperty(elementPropertyPath);
+        if (element == null)
+        {
+            return label;
+        }
+
+        SerializedProperty child = element.Copy();
+        SerializedProperty end = element.GetEndProperty();
+        if (!child.NextVisible(true))
+        {
+            return label;
+        }
+
+        while (!SerializedProperty.EqualContents(child, end))
+        {
+            if (child.propertyType == SerializedPropertyType.Enum && child.enumValueIndex >= 0 && child.enumValueIndex < child.enumNames.Length)
+            {
+                return $"{label} · {child.enumNames[child.enumValueIndex]}";
+            }
+
+            if (child.propertyType == SerializedPropertyType.String && !string.IsNullOrEmpty(child.stringValue))
+            {
+                return $"{label} · {child.stringValue}";
+            }
+
+            if (!child.NextVisible(false))
+            {
+                break;
+            }
+        }
+
+        return label;
+    }
+
     /// <summary>
-    /// 타입별 대상 → 시트. 시트 이름 = 타입 이름, 또는 <c>[DataTableSheet("묶음")]</c> 이면 그 이름으로 여러 타입을 한 시트(키-값)에.
-    /// 문제(이름 길이 등)는 warnings 로.
+    /// 타입별 대상 → 시트. 시트 이름 = 타입 이름, 또는 <c>[DataTableSheet("묶음")]</c> 이름(여러 타입을 한 시트에, Order 순).
+    /// 모든 시트가 세로 표. 문제(이름 길이 등)는 warnings 로.
     /// </summary>
     public static List<XlsxWriteSheet> BuildSheets(IEnumerable<(Type type, IReadOnlyList<(string id, Object target)> targets)> tables, List<string> warnings)
     {
         var sheets = new List<XlsxWriteSheet>();
-        var all = tables.ToList();
-
-        // 묶음 시트(시트 이름 ≠ 타입 이름) 먼저 — 캐릭터별 시트가 앞에 오게.
-        foreach (IGrouping<string, (Type type, IReadOnlyList<(string id, Object target)> targets)> group in all
-                     .Where(t => AssetDatabaseLookup.SheetNameOf(t.type) != t.type.Name)
+        foreach (IGrouping<string, (Type type, IReadOnlyList<(string id, Object target)> targets)> group in tables
+                     .Where(t => t.targets.Count > 0)
                      .GroupBy(t => AssetDatabaseLookup.SheetNameOf(t.type))
-                     .OrderBy(g => g.Key, StringComparer.Ordinal))
+                     .OrderBy(g => SheetRank(g.Key))
+                     .ThenBy(g => g.Key, StringComparer.Ordinal))
         {
             string nameError = XlsxWriter.ValidateSheetName(group.Key);
             if (nameError != null)
@@ -100,113 +196,123 @@ public static class DataTableTemplate
                 continue;
             }
 
-            sheets.Add(BuildGroupSheet(group.Key, group.OrderBy(t => t.type.Name, StringComparer.Ordinal).ToList()));
-        }
-
-        foreach ((Type type, IReadOnlyList<(string id, Object target)> targets) in all
-                     .Where(t => AssetDatabaseLookup.SheetNameOf(t.type) == t.type.Name)
-                     .OrderBy(t => t.type.Name, StringComparer.Ordinal))
-        {
-            string nameError = XlsxWriter.ValidateSheetName(type.Name);
-            if (nameError != null)
-            {
-                warnings.Add($"{type.Name}: {nameError} — 건너뜀.");
-                continue;
-            }
-
-            List<(string id, Object target)> ordered = targets.OrderBy(t => t.id, StringComparer.Ordinal).ToList();
-            if (ordered.Count == 0)
-            {
-                warnings.Add($"{type.Name}: 대상(에셋·프리팹)이 없다 — 건너뜀.");
-                continue;
-            }
-
-            sheets.Add(ordered.Count == 1
-                ? BuildKeyValueSheet(type, ordered[0])
-                : BuildRowSheet(type, ordered, warnings));
+            sheets.Add(BuildVerticalSheet(group.Key, group
+                .OrderBy(t => t.type.GetCustomAttribute<DataTableSheetAttribute>(false)?.Order ?? 100)
+                .ThenBy(t => t.type.Name, StringComparer.Ordinal)
+                .ToList()));
         }
 
         return sheets;
     }
 
-    /// <summary>묶음 시트 — 키-값 형식, 타입마다 "#── 타입 ──" 메모 행으로 구역을 나눈다(가져오기는 # 행을 무시).</summary>
-    private static XlsxWriteSheet BuildGroupSheet(string sheetName, List<(Type type, IReadOnlyList<(string id, Object target)> targets)> members)
+    private static int SheetRank(string sheet)
     {
-        var rows = new List<object[]>
-        {
-            new object[] { DataTableSchema.AssetHeader, DataTableSchema.FieldHeader, DataTableSchema.ValueHeader, "#설명" },
-        };
+        int index = Array.IndexOf(PreferredSheetOrder, sheet);
+        return index < 0 ? PreferredSheetOrder.Length : index;
+    }
+
+    /// <summary>
+    /// 세로 표 한 장. 타입마다:
+    /// <code>
+    /// #■ 타입
+    /// 필드 | #설명 | 대상1 | 대상2 …      ← 머리글(굵게)
+    /// #  ─ [Header] 제목
+    /// #  ▸ attacks[3] · JumpAttack       ← 구조체 배열 원소
+    /// 필드경로 | 설명 | 값 | 값 …          ← 그 대상에 없는 칸은 "-"
+    /// (빈 행)
+    /// </code>
+    /// </summary>
+    private static XlsxWriteSheet BuildVerticalSheet(string sheetName, List<(Type type, IReadOnlyList<(string id, Object target)> targets)> members)
+    {
+        var rows = new List<object[]>();
+        var bold = new HashSet<int>();
 
         foreach ((Type type, IReadOnlyList<(string id, Object target)> targets) in members)
         {
-            if (targets.Count == 0)
+            List<(string id, Object target)> ordered = targets.OrderBy(t => t.id, StringComparer.Ordinal).ToList();
+            List<List<Field>> perTarget = ordered.Select(t => CollectFields(t.target)).ToList();
+            List<Field> columns = UnionInOrder(perTarget);
+            if (columns.Count == 0)
             {
                 continue;
             }
 
-            rows.Add(new object[] { $"{DataTableSchema.CommentPrefix}── {type.Name} ──" });
-            foreach ((string id, Object target) in targets.OrderBy(t => t.id, StringComparer.Ordinal))
+            bold.Add(rows.Count);
+            rows.Add(new object[] { $"{DataTableSchema.CommentPrefix}■ {type.Name}" });
+            bold.Add(rows.Count);
+            rows.Add(new object[] { DataTableSchema.VerticalFieldHeader, DataTableSchema.DescriptionHeader }
+                .Concat(ordered.Select(t => (object)t.id)).ToArray());
+
+            List<Dictionary<string, object>> values = perTarget.Select(fs => fs.ToDictionary(f => f.Path, f => f.Value)).ToList();
+            string section = null;
+            string element = null;
+            string sub = null;
+            foreach (Field field in columns)
             {
-                rows.AddRange(CollectFields(target).Select(f => new[] { id, f.Path, f.Value, f.Description }));
+                if (field.Section != null && field.Section != section)
+                {
+                    section = field.Section;
+                    element = null;
+                    rows.Add(new object[] { $"{DataTableSchema.CommentPrefix}  ─ {section}" });
+                }
+
+                if (field.Element != element)
+                {
+                    element = field.Element;
+                    sub = null;
+                    if (element != null)
+                    {
+                        rows.Add(new object[] { $"{DataTableSchema.CommentPrefix}  ▸ {element}" });
+                    }
+                }
+
+                if (field.SubSection != null && field.SubSection != sub)
+                {
+                    sub = field.SubSection;
+                    rows.Add(new object[] { $"{DataTableSchema.CommentPrefix}     · {sub}" });
+                }
+
+                rows.Add(new object[] { field.Path, field.Description }
+                    .Concat(values.Select(v => v.TryGetValue(field.Path, out object value) ? value : DataTableSchema.NotApplicable))
+                    .ToArray());
             }
+
+            rows.Add(Array.Empty<object>());
         }
 
-        return new XlsxWriteSheet(sheetName, rows, frozenRows: 1, boldRows: 1);
+        return new XlsxWriteSheet(sheetName, rows, frozenRows: 0, boldRows: 0, frozenColumns: 1, boldRowIndices: bold);
     }
 
-    private static XlsxWriteSheet BuildKeyValueSheet(Type type, (string id, Object target) asset)
+    /// <summary>
+    /// 대상들의 필드 합집합. 순서는 첫 대상을 따르고, 다른 대상에만 있는 필드는 그 대상에서 바로 앞 필드 뒤에 끼운다
+    /// (attacks[6].* 가 attacks[5].* 뒤에 오게). 구역 정보는 처음 본 대상의 것을 쓴다.
+    /// </summary>
+    private static List<Field> UnionInOrder(List<List<Field>> perTarget)
     {
-        var rows = new List<object[]>
-        {
-            new object[] { DataTableSchema.AssetHeader, DataTableSchema.FieldHeader, DataTableSchema.ValueHeader, "#설명" },
-        };
-        rows.AddRange(CollectFields(asset.target).Select(f => new[] { asset.id, f.Path, f.Value, f.Description }));
-        return new XlsxWriteSheet(type.Name, rows, frozenRows: 1, boldRows: 1);
-    }
-
-    private static XlsxWriteSheet BuildRowSheet(Type type, List<(string id, Object target)> assets, List<string> warnings)
-    {
-        List<List<Field>> perAsset = assets.Select(a => CollectFields(a.target)).ToList();
-
-        // 열 = 모든 대상의 필드 합집합(배열 길이가 대상마다 달라도 다 싣는다). 그 대상에 없는 칸은 "-"(DataTableSchema.NotApplicable).
-        // 순서: 첫 대상 순서를 따르고, 다른 대상에만 있는 필드는 그 대상에서 바로 앞 필드 뒤에 끼운다 — attacks[6].* 가 attacks[5].* 뒤에 오게.
         var columns = new List<Field>();
-        var columnIndex = new Dictionary<string, int>(StringComparer.Ordinal);
-        foreach (List<Field> fields in perAsset)
+        var index = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (List<Field> fields in perTarget)
         {
             int insertAt = 0;
             foreach (Field field in fields)
             {
-                if (columnIndex.TryGetValue(field.Path, out int existing))
+                if (index.TryGetValue(field.Path, out int existing))
                 {
                     insertAt = existing + 1;
                     continue;
                 }
 
                 columns.Insert(insertAt, field);
-                for (int c = 0; c < columns.Count; c++)
+                for (int c = insertAt; c < columns.Count; c++)
                 {
-                    columnIndex[columns[c].Path] = c;
+                    index[columns[c].Path] = c;
                 }
 
                 insertAt++;
             }
         }
 
-        var rows = new List<object[]>
-        {
-            new object[] { DataTableSchema.IdHeader }.Concat(columns.Select(c => (object)c.Path)).ToArray(),
-            new object[] { "설명 →" }.Concat(columns.Select(c => (object)c.Description)).ToArray(),
-        };
-        for (int i = 0; i < assets.Count; i++)
-        {
-            Dictionary<string, object> values = perAsset[i].ToDictionary(f => f.Path, f => f.Value);
-            rows.Add(new object[] { assets[i].id }
-                .Concat(columns.Select(c => values.TryGetValue(c.Path, out object v) ? v : DataTableSchema.NotApplicable))
-                .ToArray());
-        }
-
-        return new XlsxWriteSheet(type.Name, rows, frozenRows: 2, boldRows: 1);
+        return columns;
     }
 
     /// <summary>"phases.Array.data[0].hp" → "phases[0].hp" (<see cref="DataTableApplier.ToPropertyPath"/> 의 반대).</summary>
@@ -313,7 +419,13 @@ public static class DataTableTemplate
     internal static bool IsExcludedPath(string path) =>
         path.IndexOf("legacy/", StringComparison.OrdinalIgnoreCase) >= 0 ||
         path.IndexOf("/Lagacy/", StringComparison.OrdinalIgnoreCase) >= 0 ||
-        path.StartsWith("Assets/50.Art/", StringComparison.OrdinalIgnoreCase);
+        path.StartsWith("Assets/50.Art/", StringComparison.OrdinalIgnoreCase) ||
+        ArchivedPrefabs.Contains(Path.GetFileNameWithoutExtension(path));
+
+    /// <summary>
+    /// 보관만 하고 스폰하지 않는 프리팹(AGENTS.md — 2026-09-29 base+Variant 전환 뒤 참고용). 테이블 열로 나오면 헷갈린다(D7, 은희).
+    /// </summary>
+    private static readonly HashSet<string> ArchivedPrefabs = new HashSet<string>(StringComparer.Ordinal) { "Paladin_VFX" };
 
     /// <summary>파일을 쓰지 않고 시트별로 나갈 필드만 Console 에 — 기술 값이 섞였는지([DataTableIgnore] 빠짐) 점검용.</summary>
     [MenuItem("Tools/Data/Export Template 필드 목록 보기 (파일 안 씀)", priority = 31)]
@@ -399,12 +511,9 @@ public static class DataTableTemplate
             if (choice == 0)
             {
                 var report = new List<string>();
-                // 묶음 시트로 옮긴 타입: 옛 "타입 이름" 시트 → 새 묶음 시트(값을 옮긴다).
-                Dictionary<string, string> moved = tables
-                    .Select(t => t.Item1)
-                    .Where(t => AssetDatabaseLookup.SheetNameOf(t) != t.Name)
-                    .ToDictionary(t => t.Name, AssetDatabaseLookup.SheetNameOf, StringComparer.Ordinal);
-                sheets = DataTableMerge.Merge(existing, sheets, report, moved);
+                // 코드가 아는 시트 이름(타입 이름·묶음 이름) — 옛 배치의 이 시트들은 새 배치로 대체된다(값은 (대상, 필드) 로 따라간다).
+                var known = new HashSet<string>(tables.SelectMany(t => new[] { t.Item1.Name, AssetDatabaseLookup.SheetNameOf(t.Item1) }), StringComparer.Ordinal);
+                sheets = DataTableMerge.Merge(existing, sheets, report, known);
                 merged = true;
                 foreach (string line in report)
                 {

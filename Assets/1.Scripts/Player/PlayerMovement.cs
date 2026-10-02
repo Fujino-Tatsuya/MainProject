@@ -2,7 +2,7 @@
 
 [RequireComponent(typeof(PlayerInputReader))]
 [RequireComponent(typeof(PlayerMotor))]
-[DataTableSheet]
+[DataTableSheet("Player", Order = 1)]
 public class PlayerMovement : MonoBehaviour
 {
     private PlayerInputReader reader;

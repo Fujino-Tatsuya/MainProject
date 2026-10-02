@@ -29,7 +29,7 @@ using UnityEngine;
 /// </summary>
 [DisallowMultipleComponent]
 [RequireComponent(typeof(MonsterBase))]
-[DataTableSheet]
+[DataTableSheet("Monster", Order = 4)]
 public class TurretHeadAim : NetworkBehaviour, ITurretAimGate
 {
     [Header("머리 본")]

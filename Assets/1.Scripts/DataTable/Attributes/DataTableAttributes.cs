@@ -23,6 +23,9 @@ public sealed class DataTableSheetAttribute : Attribute
 
     /// <summary>묶음 시트 이름. null 이면 타입 이름.</summary>
     public string Sheet { get; }
+
+    /// <summary>묶음 시트 안에서의 구역 순서(작을수록 위). 같으면 타입 이름 순.</summary>
+    public int Order { get; set; } = 100;
 }
 
 /// <summary>

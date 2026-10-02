@@ -12,7 +12,7 @@ using UnityEngine;
 /// </summary>
 [DisallowMultipleComponent]
 [RequireComponent(typeof(PlayerInvulnerability))]
-[DataTableSheet]
+[DataTableSheet("Player", Order = 4)]
 public sealed class PlayerLandingProtection : NetworkBehaviour
 {
     [SerializeField] private PlayerInvulnerability invulnerability;

@@ -2,7 +2,7 @@ using UnityEngine;
 
 /// <summary>거너 기본 공격(연사 레이저) 수치(character_gunner.md §12.1). 값은 전부 플레이 테스트로 정한다.</summary>
 [CreateAssetMenu(fileName = "GunnerBasicAttackData", menuName = "Player/Gunner/Basic Attack Data")]
-[DataTableSheet("Gunner")]
+[DataTableSheet("Gunner", Order = 0)]
 public class GunnerBasicAttackData : ScriptableObject
 {
     [Header("타이밍")]

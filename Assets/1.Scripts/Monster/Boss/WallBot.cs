@@ -29,7 +29,7 @@ using UnityEngine.AI;
 // 🔴 base 의 히트 경로를 **창 동안 막는다**. `AttackStart` 의 `OnAttackHit` 는 정규화 0.4(≈0.33초)로
 //    창 한가운데에 있는데, 그대로 두면 모으는 도중에 근접 판정이 나가고 `AttackEnd` 트리거까지
 //    발동해 2단이 먼저 재생된다.
-[DataTableSheet]
+[DataTableSheet("MidBoss", Order = 2)]
 public class WallBot : MonsterBase
 {
     enum ShieldPhase { None, Gather, Dash, Shock }

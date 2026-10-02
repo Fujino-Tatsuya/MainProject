@@ -18,12 +18,14 @@ public readonly struct XlsxNumber
 /// <summary>쓸 시트 하나. 셀 = string(글자) · int/long/float/double(숫자) · bool · null(빈 칸) · <see cref="XlsxNumber"/>(기존 숫자 텍스트).</summary>
 public sealed class XlsxWriteSheet
 {
-    public XlsxWriteSheet(string name, List<object[]> rows, int frozenRows = 1, int boldRows = 1)
+    public XlsxWriteSheet(string name, List<object[]> rows, int frozenRows = 1, int boldRows = 1, int frozenColumns = 0, ISet<int> boldRowIndices = null)
     {
         Name = name;
         Rows = rows;
         FrozenRows = frozenRows;
         BoldRows = boldRows;
+        FrozenColumns = frozenColumns;
+        BoldRowIndices = boldRowIndices ?? new HashSet<int>();
     }
 
     public string Name { get; }
@@ -34,6 +36,12 @@ public sealed class XlsxWriteSheet
 
     /// <summary>굵게 칠할 위쪽 행 수.</summary>
     public int BoldRows { get; }
+
+    /// <summary>스크롤해도 고정되는 왼쪽 열 수(필드 이름 열).</summary>
+    public int FrozenColumns { get; }
+
+    /// <summary>위쪽 외에 따로 굵게 칠할 행 번호(0 기반) — 세로 표의 구역 제목·머리글 행.</summary>
+    public ISet<int> BoldRowIndices { get; }
 }
 
 /// <summary>
@@ -145,10 +153,13 @@ public static class XlsxWriter
 
         // 순서가 스키마로 정해져 있다: sheetViews → cols → sheetData.
         xml.Append("<sheetViews><sheetView workbookViewId=\"0\">");
-        if (sheet.FrozenRows > 0)
+        if (sheet.FrozenRows > 0 || sheet.FrozenColumns > 0)
         {
-            string topLeft = XlsxSheet.Address(sheet.FrozenRows, 0);
-            xml.Append($"<pane ySplit=\"{sheet.FrozenRows}\" topLeftCell=\"{topLeft}\" activePane=\"bottomLeft\" state=\"frozen\"/>");
+            string topLeft = XlsxSheet.Address(sheet.FrozenRows, sheet.FrozenColumns);
+            string split = (sheet.FrozenColumns > 0 ? $" xSplit=\"{sheet.FrozenColumns}\"" : string.Empty)
+                         + (sheet.FrozenRows > 0 ? $" ySplit=\"{sheet.FrozenRows}\"" : string.Empty);
+            string pane = sheet.FrozenRows > 0 && sheet.FrozenColumns > 0 ? "bottomRight" : sheet.FrozenRows > 0 ? "bottomLeft" : "topRight";
+            xml.Append($"<pane{split} topLeftCell=\"{topLeft}\" activePane=\"{pane}\" state=\"frozen\"/>");
         }
 
         xml.Append("</sheetView></sheetViews>");
@@ -172,7 +183,7 @@ public static class XlsxWriter
         {
             xml.Append($"<row r=\"{r + 1}\">");
             object[] cells = sheet.Rows[r];
-            string style = r < sheet.BoldRows ? " s=\"1\"" : string.Empty;
+            string style = r < sheet.BoldRows || sheet.BoldRowIndices.Contains(r) ? " s=\"1\"" : string.Empty;
             for (int c = 0; c < cells.Length; c++)
             {
                 AppendCell(xml, XlsxSheet.Address(r, c), cells[c], style);

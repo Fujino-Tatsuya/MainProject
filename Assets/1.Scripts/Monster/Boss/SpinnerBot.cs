@@ -19,7 +19,7 @@ using UnityEngine.AI;
 //    그로기 애니는 이제 base 의 `groggyBool`(= 같은 `IsDizzy`) 경로가 담당한다.
 //
 // 애니는 상태복제가 아니라 ClientRpc로 확정(선택값 미복제 회피). Whip/Spin=CrossFade(트리거/Variation 배선 의존 X).
-[DataTableSheet]
+[DataTableSheet("MidBoss", Order = 1)]
 public class SpinnerBot : MonsterBase
 {
     enum SpinPhase { None, Window, Dash }

@@ -5,7 +5,7 @@
 /// 베이스(PlayerSkillData)의 InputType은 Hold, TickInterval은 0보다 커야 한다.
 /// </summary>
 [CreateAssetMenu(menuName = "Combat/First Melee Main Skill Data")]
-[DataTableSheet("Paladin")]
+[DataTableSheet("Paladin", Order = 2)]
 public class FirstMeleeMainSkillData : PlayerSkillData
 {
     [Header("진격")]
