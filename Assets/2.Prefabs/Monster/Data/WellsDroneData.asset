@@ -19,7 +19,7 @@ MonoBehaviour:
   resumeMinDelay: 2
   diameterInTiles: 1.25
   playerDamage: 25
-  bossDamage: 300
+  bossDamage: 120
   pauseOn: 3
   droneModel: {fileID: 919132149155446097, guid: fcc07944700f48a419a0cbde4e5cf5d5, type: 3}
   dropHeight: 12

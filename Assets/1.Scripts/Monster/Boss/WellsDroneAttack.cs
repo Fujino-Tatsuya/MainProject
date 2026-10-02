@@ -85,7 +85,8 @@ public sealed class WellsDroneAttack : MonoBehaviour
             _t = _d.firstDelay;
         }
 
-        bool pause = (_boss.ActivePauseConditions & _d.pauseOn) != 0 || _boss.IsChargeGimmickActive;
+        // 송전기는 점프 출발 순간부터 멈춘다(팀장 10-02) — 점프 이동 + 차징 대기 전체.
+        bool pause = (_boss.ActivePauseConditions & _d.pauseOn) != 0 || _boss.IsChargeSequenceActive;
         if (pause)
         {
             if (!_paused)
@@ -98,7 +99,7 @@ public sealed class WellsDroneAttack : MonoBehaviour
                 // 대기 중이었다면 남은 시간이 그대로 얼어 있다.
                 if (_phase != Phase.Idle && _phase != Phase.WaitTarget)
                 {
-                    CancelInProgress(_boss.IsChargeGimmickActive ? "충전 기믹 진입" : "제압 진입");
+                    CancelInProgress(_boss.IsChargeSequenceActive ? "송전기 진입(점프 출발)" : "제압 진입");
                     _phase = Phase.Idle;
                     _t = 0f;
                 }

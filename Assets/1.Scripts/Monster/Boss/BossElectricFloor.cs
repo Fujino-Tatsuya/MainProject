@@ -11,7 +11,8 @@ using UnityEngine;
 ///
 /// <b>모드</b>(서버, 매 프레임 23호 상태에서 다시 계산 — 진입·이탈 지점을 23호에 흩뿌리지 않으려고 폴링한다):
 /// - Paused: 23호 그로기 종류가 <see cref="BossElectricFloorDataSO.pauseOn"/> 에 걸림 → 예고·VFX 제거, 멈춤.
-/// - Charge: 송전기 차징 대기 중 → 일반 장판 제거, A/B 교대.
+/// - ChargePrep: 송전기 진입 점프 출발 ~ 착지 → 일반 장판 제거, 아무것도 안 낸다(팀장 10-02: 기믹 시작 = 점프 출발).
+/// - Charge: 송전기 차징 대기 중(착지 후) → A/B 교대.
 /// - Normal: 그 밖(취약·과충전·잡기 포함 — §8) → 교차 장판.
 /// 모드가 Charge/Paused 에서 Normal 로 돌아오면 첫 예고 대기(4초)부터 다시 센다(§8). 과충전 진입·종료는
 /// 모드 변화가 아니므로 주기·직전 줄 기록이 그대로 이어진다.
@@ -22,7 +23,8 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public sealed class BossElectricFloor : MonoBehaviour
 {
-    enum Mode { Off, Normal, Charge, Paused }
+    // ChargePrep = 송전기 진입 점프 중(팀장 10-02: 기믹 시작 = 점프 출발) — 일반 장판을 정리하고 아무것도 안 낸다.
+    enum Mode { Off, Normal, ChargePrep, Charge, Paused }
     enum Step { Wait, Warn, Vfx }
 
     TwentyThreeBoss _boss;
@@ -95,6 +97,7 @@ public sealed class BossElectricFloor : MonoBehaviour
 
         Mode want = (_boss.ActivePauseConditions & _d.pauseOn) != 0 ? Mode.Paused
                   : _boss.IsChargeGimmickActive ? Mode.Charge
+                  : _boss.IsChargeJumpActive ? Mode.ChargePrep
                   : Mode.Normal;
         if (want != _mode) Transition(want);
 

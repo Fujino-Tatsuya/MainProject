@@ -5405,7 +5405,19 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     ///    <see cref="AttachGrabbed"/> 가 `_grabAttachPending` 을 끌 때다(Codex 교차검증 10-02).
     /// </summary>
     public bool IsHolding(Player p) => p != null && _grabbed == p && !_grabAttachPending;
-    /// <summary>[서버] 송전기 차징 대기 중(송전탑이 서 있고 제한시간이 도는 구간).</summary>
+    /// <summary>
+    /// [서버] 송전기 진입 **점프 이동 중**(BeginCharge → 착지). 아직 송전탑은 없다.
+    /// 팀장 10-02: 기믹 시작 = **점프 출발 순간** — 여기서 일반 장판·드론을 정리하고 멈춘다(A/B 는 착지 후 ChargeWait 부터).
+    /// `_chargeJump` 는 착지(case Land)와 체인 중단(AbortAttackChain)에서만 꺼진다 — 중단되면 바로 일반으로 돌아간다.
+    /// </summary>
+    public bool IsChargeJumpActive =>
+        State == MonsterState.Attack && _chargeJump &&
+        _currentEntry != null && _currentEntry.attackId == BossAttackId.ChargeSequence;
+
+    /// <summary>[서버] 송전기 기믹 전체(점프 이동 + 차징 대기) — 드론이 멈추는 구간.</summary>
+    public bool IsChargeSequenceActive => IsChargeJumpActive || IsChargeGimmickActive;
+
+    /// <summary>[서버] 송전기 차징 대기 중(송전탑이 서 있고 제한시간이 도는 구간) — A/B 장판 구간.</summary>
     public bool IsChargeGimmickActive =>
         State == MonsterState.Attack && _attackPhase == BossAttackPhase.ChargeWait &&
         _currentEntry != null && _currentEntry.attackId == BossAttackId.ChargeSequence;
