@@ -17,6 +17,7 @@ using UnityEngine;
 public sealed class PlayerFallController : NetworkBehaviour
 {
     private Player player;
+    private PlayerMotor motor;
     private PlayerEncounterLock encounterLock;
     private bool _fallHandled;
     private bool _warnedMissingBoundary;
@@ -30,6 +31,7 @@ public sealed class PlayerFallController : NetworkBehaviour
     private void Awake()
     {
         player = GetComponent<Player>();
+        motor = GetComponent<PlayerMotor>();
         encounterLock = GetComponent<PlayerEncounterLock>();
     }
 
@@ -76,7 +78,8 @@ public sealed class PlayerFallController : NetworkBehaviour
     {
         Vector3 fallPoint = transform.position;
 
-        player.ApplyFallDamage(boundary.FallDamageRatio); // BreakShield + 직접 피해(무적 우회)
+        // 비율은 씬이 아니라 게임 규칙(PlayerGameRuleData) — 2026-10-02 통합. 경계 높이만 씬별.
+        player.ApplyFallDamage(motor.GameRule.FallDamageRatio); // BreakShield + 직접 피해(무적 우회)
 
         if (player.CurrentHealth <= 0)
         {

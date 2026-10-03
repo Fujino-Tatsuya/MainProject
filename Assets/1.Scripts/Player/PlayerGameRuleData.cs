@@ -7,6 +7,7 @@ using UnityEngine;
 /// Soul soulSpeed, 기본 LifeCount 등은 각 기능이 병합·안정화된 뒤 이 규칙으로 이관한다.
 /// </summary>
 [CreateAssetMenu(fileName = "PlayerGameRuleData", menuName = "BeaverLobby/Player/Game Rule Data", order = 0)]
+[DataTableSheet("Player", Order = 6)]
 public sealed class PlayerGameRuleData : ScriptableObject
 {
     private const int DefaultObstacleMask = (1 << 0) | (1 << 3) | (1 << 7) | (1 << 11);
@@ -14,10 +15,10 @@ public sealed class PlayerGameRuleData : ScriptableObject
 
     [Header("이동")]
     [Tooltip("걸어 올라갈 수 있는 최대 경사각(도). 이 값을 넘는 경사는 벽으로 취급한다. 접지 판정과 대시 등판이 이 값을 공유한다.")]
-    [SerializeField, Range(1f, 89f)] private float maxWalkableSlopeAngle = 60f;
+    [DataTableIgnore] [SerializeField, Range(1f, 89f)] private float maxWalkableSlopeAngle = 60f;
 
     [Tooltip("접지 이동 중 올라갈 수 있는 낮은 턱의 최대 높이(m). 맵 계단 에셋이 들어오면 실제 치수에 맞춰 조정한다.")]
-    [SerializeField, Min(0f)] private float stepOffset = 0.3f;
+    [DataTableIgnore] [SerializeField, Min(0f)] private float stepOffset = 0.3f;
 
     [Tooltip("플레이어 이동을 막는 정적 지오메트리 레이어(Default | Ground | Wall | Env).")]
     [SerializeField] private LayerMask obstacleMask = DefaultObstacleMask;
@@ -30,15 +31,20 @@ public sealed class PlayerGameRuleData : ScriptableObject
 
     [Header("중력")]
     [Tooltip("Motor 수동 중력의 최대 낙하 속도(m/s).")]
-    [SerializeField, Min(0f)] private float maxFallSpeed = 30f;
+    [DataTableIgnore] [SerializeField, Min(0f)] private float maxFallSpeed = 30f;
+
+    [Header("추락")]
+    [Tooltip("추락 피해 = ceil(FinalMaxHp * 이 비율). 방어력·쉴드·일반 무적 무시. (2026-10-02 씬별 FallBoundarySettings 에서 이리로 통합 — 네 씬 모두 0.25 였다)")]
+    [SerializeField, Range(0f, 1f)] private float fallDamageRatio = 0.25f;
 
     [Header("넉백")]
-    [SerializeField, Min(0f)] private float minKnockbackTime = 0.15f;
-    [SerializeField, Min(0f)] private float maxKnockbackTime = 1.5f;
-    [SerializeField, Min(0f)] private float knockbackStopSpeed = 0.15f;
+    [DataTableIgnore] [SerializeField, Min(0f)] private float minKnockbackTime = 0.15f;
+    [DataTableIgnore] [SerializeField, Min(0f)] private float maxKnockbackTime = 1.5f;
+    [DataTableIgnore] [SerializeField, Min(0f)] private float knockbackStopSpeed = 0.15f;
     [Tooltip("넉백 속도의 선형 감속(m/s²). 6은 기존 PhysX 마찰 0.6 × 중력 9.81과 비슷한 감속이다.")]
-    [SerializeField, Min(0f)] private float knockbackDeceleration = 6f;
+    [DataTableIgnore] [SerializeField, Min(0f)] private float knockbackDeceleration = 6f;
 
+    public float FallDamageRatio => fallDamageRatio;
     public float MaxWalkableSlopeAngle => maxWalkableSlopeAngle;
     public float StepOffset => Mathf.Max(0f, stepOffset);
     public LayerMask ObstacleMask => obstacleMask;

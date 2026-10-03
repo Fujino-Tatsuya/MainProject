@@ -2,7 +2,7 @@
 
 > 대상: 아트팀 · 렌더링 룩을 눈으로 보고 값을 조절하는 사람.
 > 최종 갱신 2026-08-06 · 브랜치 `feature/maprendering` · 씬 `4.MapScene`
-> 코드/설계 배경은 [PLAN-vision.md](../../PLAN-vision.md) §8. 이 문서는 **쓰는 법만** 다룬다.
+> 코드/설계 배경은 [PLAN-vision.md](../history/PLANS/PLAN-vision.md) §8. 이 문서는 **쓰는 법만** 다룬다.
 
 ---
 

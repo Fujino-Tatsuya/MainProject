@@ -54,6 +54,7 @@ public struct PlayerLifeCountEntry :
 /// 임시 멀티플레이 규칙. 서버만 Client별 LifeCount를 등록/감소/제거하며,
 /// 복제된 NetworkList는 클라이언트 Debug UI가 읽기만 할 수 있다.
 /// </summary>
+[DataTableSheet("Player", Order = 7)]
 public class Temp_MultiGameRule : NetworkBehaviour
 {
     [Header("LifeCount")]

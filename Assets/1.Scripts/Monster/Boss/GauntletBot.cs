@@ -20,6 +20,7 @@ using UnityEngine;
 //  - Smash는 히트 프레임(OnAttackHit)에 텔레그래프 반경만큼 AoE 데미지(OverlapSphere)를 낸다.
 //    Punch01/02는 기존처럼 meleeAttack.Hit() 단타. Punch03(어퍼컷)은 데미지만 동일 경로로 내고,
 //    airborne CC는 은희의 상태이상 인터페이스 통합 전까지 훅(OnUppercutHit)만 남겨둔다.
+[DataTableSheet("MidBoss", Order = 0)]
 public class GauntletBot : MonsterBase
 {
     // 공격 종류. Smash 1종 + 펀치 3종 × L/R = 총 7종.
@@ -60,7 +61,7 @@ public class GauntletBot : MonsterBase
     float smashCountRadius = 4f;
     [SerializeField, Min(1)]
     [Tooltip("근접 플레이어 카운트 OverlapSphere 결과 버퍼 크기.")]
-    int maxNearbyResults = 8;
+    [DataTableIgnore] int maxNearbyResults = 8;
 
     [Header("스매시 — AoE 데미지 / 텔레그래프")]
     [SerializeField, Min(0.1f)]
@@ -71,7 +72,7 @@ public class GauntletBot : MonsterBase
     float smashDamageMultiplier = 1.5f;
     [SerializeField, Min(1)]
     [Tooltip("스매시 AoE OverlapSphere 결과 버퍼 크기.")]
-    int smashMaxHitCount = 8;
+    [DataTableIgnore] int smashMaxHitCount = 8;
     // 표시 지속시간 필드는 없앴다. 예전에는 telegraphDuration(1.2초) 하드코딩이었는데,
     // 애니메이션과 독립이라 스매시 클립을 손볼 때마다 장판이 히트보다 먼저 사라지거나 남았다.
     // 이제 시작·종료를 예비동작 클립의 애니메이션 이벤트가 정한다(StartEffect/StopEffect).
@@ -90,7 +91,7 @@ public class GauntletBot : MonsterBase
     [SerializeField, Min(0f)]
     [Tooltip("좌/우 펀치의 판정·예고를 몸 기준 옆으로 미는 거리(m). 왼손 = 왼쪽, 오른손 = 오른쪽.\n" +
              "23호 훅과 같은 비율(폭 4.1m 에 ±1.07m ≈ 26%) — 판정 박스 폭 3.6m 기준 0.95m. 0 = 정면 가운데.")]
-    float sideLateralOffset = 0.95f;
+    [DataTableIgnore] float sideLateralOffset = 0.95f;
 
     [Header("애니메이션 — CrossFade 대상 상태명(컨트롤러 상태명과 일치해야 함)")]
     [SerializeField]

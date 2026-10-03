@@ -2,7 +2,7 @@
 
 > 작성 2026-08-06 · 경석 · **구현 직전 스펙**. 주말 구현용.
 > [boss-fsm-design.md](boss-fsm-design.md) = *무엇을·왜* / **이 문서 = *어떻게*** (클래스·파라미터·이벤트·전이 전수).
-> 계획서 [PLAN-boss-fsm.md](../../PLAN-boss-fsm.md) · 플레이어 요청 [handoff-player-carry-socket.md](handoff-player-carry-socket.md)
+> 계획서 [PLAN-boss-fsm.md](../history/PLANS/PLAN-boss-fsm.md) · 플레이어 요청 [handoff-player-carry-socket.md](handoff-player-carry-socket.md)
 >
 > **§12 에 미확정 질문 6건**을 모아 뒀다(4건은 팀장 답변으로 닫힘). 그 6건 외에는 코드를 바로 칠 수 있는 수준으로 적었다.
 

@@ -1,7 +1,7 @@
 # 인계 — 플레이어 쪽 요청 2건 (보스 FSM 재작성 전제)
 
 > 받는 사람: **은희** · 보내는 사람: **경석** · 작성 2026-08-06 · **기한 2026-08-07(금) 17:00**
-> 배경 설계: [boss-fsm-design.md](boss-fsm-design.md) · [PLAN-boss-fsm.md](../../PLAN-boss-fsm.md)
+> 배경 설계: [boss-fsm-design.md](boss-fsm-design.md) · [PLAN-boss-fsm.md](../history/PLANS/PLAN-boss-fsm.md)
 >
 > 보스를 BT → 코드 FSM 으로 재작성하면서 **플레이어 쪽에 두 가지가 필요**해졌습니다.
 > 둘 다 **기존 동작을 바꾸지 않는 순수 추가**이고, 보스 쪽 작업은 제가 합니다.

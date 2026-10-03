@@ -1,7 +1,7 @@
 # ⛔ 폐기 — 보스 피격 / 차징 기둥 / 플레이어 공격력 (조사 완료)
 
 > **2026-08-06 폐기.** 증상 3건 모두 해결됐다(팀장 확인). 게다가 보스는 BT 를 버리고
-> 코드 FSM 으로 재작성하기로 확정되어([PLAN-boss-fsm.md](../../PLAN-boss-fsm.md)),
+> 코드 FSM 으로 재작성하기로 확정되어([PLAN-boss-fsm.md](../history/PLANS/PLAN-boss-fsm.md)),
 > 아래 BT 기준 진입점들은 더 이상 유효한 조사 경로가 아니다.
 >
 > **남겨 두는 이유**: ①`Enter`/`Exit` 비대칭을 의심하는 진단 순서 ②`ChargeController` 의

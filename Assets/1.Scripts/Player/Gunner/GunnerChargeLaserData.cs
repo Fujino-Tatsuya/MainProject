@@ -5,6 +5,7 @@ using UnityEngine;
 /// 🔴 베이스의 "Commit Cooldown Manually" 를 켜야 한다 — 쿨타임은 발사 순간부터(§6.1-7).
 /// </summary>
 [CreateAssetMenu(fileName = "GunnerChargeLaserData", menuName = "Player/Gunner/Charge Laser Data")]
+[DataTableSheet("Gunner", Order = 2)]
 public class GunnerChargeLaserData : PlayerSkillData
 {
     [Header("정신 집중")]
@@ -27,7 +28,7 @@ public class GunnerChargeLaserData : PlayerSkillData
     [SerializeField, Min(0.05f)] private float beamWidth = 1.2f;
     [Tooltip("판정 높이(m).")]
     [SerializeField, Min(0.05f)] private float beamHeight = 2f;
-    [SerializeField] private float muzzleHeight = 1.0f;
+    [SerializeField, DataTableIgnore] private float muzzleHeight = 1.0f;
     [Tooltip("지형 마스크 — 비트리거 콜라이더에 닿으면 그 지점에서 레이저가 끝난다.")]
     [SerializeField] private LayerMask blockingLayers = 2177;
     [Tooltip("아군(보호막 대상) 마스크 — 기본 Player 레이어.")]

@@ -4,6 +4,7 @@ using UnityEngine.AI;
 // 몬스터 데이터 주도 설정. 스탯/인지/그로기/슈퍼아머/타이밍/애니 파라미터명을 한 곳에 모은다.
 // (프로젝트 원칙: 스킬/보스/몬스터 파라미터는 ScriptableObject로 — 머지 충돌 완화 + 튜닝 편의.)
 [CreateAssetMenu(fileName = "MonsterData", menuName = "Monster/Monster Data", order = 0)]
+[DataTableSheet("Monster", Order = 0)]
 public class MonsterDataSO : ScriptableObject
 {
     [Header("아키타입")]
@@ -118,16 +119,16 @@ public class MonsterDataSO : ScriptableObject
     [Tooltip("이동 클립 고유 속도(m/s) = 재생 속도 1 일 때 발이 땅을 밀고 가는 속도. " +
              "이동 중 재생 속도 = 실제 이동 속도 ÷ 이 값 → 발 미끄러짐이 사라진다.\n" +
              "0 이면 맞추지 않는다(재생 속도 1 고정 = 예전 동작).")]
-    [Min(0f)] public float locomotionClipSpeed = 0f;
+    [DataTableIgnore] [Min(0f)] public float locomotionClipSpeed = 0f;   // 아트 측정값 — 테이블 밖(측정 도구가 SO 에 기록)
     [Tooltip("이동 블렌드에서 이동 클립 비중이 100% 가 되는 속도(m/s) = 블렌드 트리 마지막 자식의 임계값.\n" +
              "이보다 느리면 대기 클립과 섞여 발이 덜 나가므로 재생 속도를 그만큼 덜 줄인다: 재생 속도 = max(실제 속도, 이 값) ÷ 클립 고유 속도.\n" +
              "블렌드 트리는 런타임에 못 읽는다 — `Tools/Monster/이동 클립 고유 속도 측정 → SO 기록` 이 같이 채운다.")]
-    [Min(0f)] public float locomotionFullBlendSpeed = 0f;
+    [DataTableIgnore] [Min(0f)] public float locomotionFullBlendSpeed = 0f;   // 아트 측정값 — 테이블 밖(측정 도구가 SO 에 기록)
     [Tooltip("블렌드 대기 클립 한 주기(초, 블렌드 timeScale·상태 speed 반영). 1D 블렌드는 자식 클립 시간을 맞추므로 " +
              "대기 클립이 길수록 섞인 구간의 이동 클립이 느려진다 — 그 보정에 쓴다. 0 = 보정 생략. 측정 도구가 채운다.")]
-    [Min(0f)] public float locomotionIdleCycleSeconds = 0f;
+    [DataTableIgnore] [Min(0f)] public float locomotionIdleCycleSeconds = 0f;   // 아트 측정값 — 테이블 밖(측정 도구가 SO 에 기록)
     [Tooltip("블렌드 이동 클립 한 주기(초, 블렌드 timeScale·상태 speed 반영). 0 = 보정 생략. 측정 도구가 채운다.")]
-    [Min(0f)] public float locomotionMoveCycleSeconds = 0f;
+    [DataTableIgnore] [Min(0f)] public float locomotionMoveCycleSeconds = 0f;   // 아트 측정값 — 테이블 밖(측정 도구가 SO 에 기록)
     [Tooltip("움직이는 동안 이동 블렌드 값을 max(실제 속도, locomotionFullBlendSpeed) 로 보내 **이동 클립 100%** 로 재생한다.\n" +
              "블렌드 임계값이 이동 속도보다 높고 대기 클립이 긴 몹(ChompBot: th 4.5 · 대기 3.8초 vs 이동 0.4초)은 늘 섞인 구간에서 돌아 " +
              "이동 클립이 슬로모션이 된다 — 재생 속도로는 못 메운다(배회 9배 필요). 켜면 출발 순간 대기→이동 섞임이 사라진다(팀장 10-02 Chomp 만).")]

@@ -2,6 +2,7 @@ using UnityEngine;
 
 /// <summary>거너 과열 수치(character_gunner.md §12.2). 값은 전부 플레이 테스트로 정한다.</summary>
 [CreateAssetMenu(fileName = "GunnerHeatData", menuName = "Player/Gunner/Heat Data")]
+[DataTableSheet("Gunner", Order = 1)]
 public class GunnerHeatData : ScriptableObject
 {
     [Tooltip("과열도 최대치. 도달하면 과열 상태(기본 공격 잠김).")]

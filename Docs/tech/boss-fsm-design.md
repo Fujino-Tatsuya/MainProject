@@ -1,7 +1,7 @@
 # 보스 FSM 설계 — 웰즈 & 23호
 
 > **전면 재작성 2026-08-06** (초판 2026-07-20). BT → 순수 코드 FSM 전환 설계.
-> 계획서·승인 이력은 [PLAN-boss-fsm.md](../../PLAN-boss-fsm.md). 기획 원본은
+> 계획서·승인 이력은 [PLAN-boss-fsm.md](../history/PLANS/PLAN-boss-fsm.md). 기획 원본은
 > [Docs/design/boss-wells-and-no23.md](../design/boss-wells-and-no23.md).
 >
 > 초판과 달라진 점: **카운터(인터럽트) 시스템이 1급 개념으로 들어왔다.** 초판의 §8 GAP 8항목 중

@@ -11,11 +11,7 @@ public sealed class FallBoundarySettings : MonoBehaviour
     [Tooltip("이 월드 Y 아래로 내려가면 추락으로 판정한다.")]
     [SerializeField] private float fallThresholdY = -30f;
 
-    [Tooltip("추락 피해 = ceil(FinalMaxHp * 이 비율). 방어력·쉴드·일반 무적 무시.")]
-    [SerializeField, Range(0f, 1f)] private float fallDamageRatio = 0.25f;
-
     public float FallThresholdY => fallThresholdY;
-    public float FallDamageRatio => fallDamageRatio;
 
     private void Awake()
     {

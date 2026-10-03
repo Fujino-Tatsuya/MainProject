@@ -34,7 +34,7 @@
 
 - **은희**: 코어(UnitBase·상태이상·스탯/모디파이어) + 네트워크(NGO / IPv4 / SteamDatagramRelay / SceneManagement) + Player 제작.
 - **경석(팀장)**: **몬스터 전체 단독** — 일반 몬스터·중간보스·보스의 FSM·기믹·프리팹·데이터. PR 리뷰/머지.
-  - 진행: **일반 몬스터 ✅ / 중간보스 ✅ / 보스 = 남은 것**(재작성 중 — [PLAN-boss-fsm.md](PLAN-boss-fsm.md)).
+  - 진행: **일반 몬스터 ✅ / 중간보스 ✅ / 보스 = 남은 것**(재작성 중 — [PLAN-boss-fsm.md](Docs/history/PLANS/PLAN-boss-fsm.md)).
 - **민경**: **이펙트(VFX)**.
 
 ## 6. 문서 인덱스
@@ -45,6 +45,8 @@
   `Armature`·스킬·VFX 를 얹는다. 캐릭터는 스폰 전에 고른다.** 역할 동작은 base, 캐릭터 고유는 Variant 를 고친다.
   구 통짜 복제본은 스폰되지 않는다 — `Paladin` 은 `Player/Legacy/`, `Paladin_VFX` 는 `Player/Paladin/` 에 보관만 한다(2026-09-29).
   플레이어 프리팹·스폰·캐릭터 교체를 건드리기 전에 읽을 것.
+- **데이터 테이블**: [Docs/tech/data-table.md](Docs/tech/data-table.md) — 기획 수치는 `GameData.xlsx`(SVN)가 원본.
+  툴바 `데이터: 테이블/인스펙터` 로 Play 출처를 고르고, **빌드는 항상 xlsx 값**. 새 수치를 노출할 땐 `[DataTableSheet]`·`[DataTableIgnore]`.
 - 레포지토리 맵(자동생성): [Docs/tech/repo_map.md](Docs/tech/repo_map.md) — 클래스/인터페이스
   구조·상속·Facade 위임 관계 요약. 재생성은 `DevTools/RepoMap/`(`npm run generate`).
 - 일정: `Project_MT 일정.xlsx` (담당: 이지원) — 팀 지식베이스 Vault `Core/project-schedule-2026.md` 스냅샷 참조

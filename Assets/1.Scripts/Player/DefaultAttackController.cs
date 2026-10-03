@@ -822,11 +822,11 @@ public class DefaultAttackStep
     // 이 스텝(1타)의 모션 재생 길이. End 이벤트 누락 시 종료 fallback과
     // ScriptedForwardDistance 이동 속도 계산의 기준. 0이면 클립 길이를 사용.
     [FormerlySerializedAs("duration")]
-    [SerializeField] private float motionDuration = 0;
+    [DataTableIgnore] [SerializeField] private float motionDuration = 0;
     [SerializeField] private DefaultAttackMovementType movementType = DefaultAttackMovementType.ScriptedForwardDistance;
     [SerializeField] private float forwardDistance = 0.5f;
     [SerializeField] private DefaultAttackRotationType rotationType = DefaultAttackRotationType.SnapOnStart;
-    [SerializeField] private float trackRotationSpeed = 12f;
+    [DataTableIgnore] [SerializeField] private float trackRotationSpeed = 12f;
     [SerializeField] private DefaultAttackHitType hitType = DefaultAttackHitType.Overlap;
     [SerializeField] private ColliderInfo hitbox;
     [SerializeField] private GameObject projectilePrefab;
@@ -837,7 +837,7 @@ public class DefaultAttackStep
     // 이 스텝이 체인의 첫 스텝(0번)일 때만 의미가 있다: 마지막 스텝의 LoopCheck에서
     // 조기 루프백으로 들어올 때 처음(0초)이 아니라 여기서부터 재생해 윈드업을 건너뛴다.
     // 초 단위, 클립 원본(스케일 안 된) 타임라인 기준.
-    [SerializeField] private float loopBackEntryTime = 0f;
+    [DataTableIgnore] [SerializeField] private float loopBackEntryTime = 0f;
     // 이 스텝의 적중이 "적중 시 발동" 효과(패시브 버프 등)를 소모할 수 있는가. Player.ServerAttackLanded 에 실린다.
     [SerializeField] private bool triggersOnHit = true;
 

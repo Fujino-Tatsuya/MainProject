@@ -20,6 +20,7 @@ using UnityEngine.Serialization;
 /// </summary>
 [RequireComponent(typeof(Player))]
 [RequireComponent(typeof(StatusEffectController))]
+[DataTableSheet("Paladin", Order = 1)]
 public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive, IPlayerOnHitBonus
 {
     [Header("쿨다운")]
@@ -48,7 +49,7 @@ public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive, IPlayerOn
     [SerializeField] private EffectEntry additionalHit;
 
     [Tooltip("추가 피해 연출 배율")]
-    [SerializeField, Min(0.01f)] private float additionalHitScale = 1f;
+    [DataTableIgnore] [SerializeField, Min(0.01f)] private float additionalHitScale = 1f;
 
     [Tooltip("대상에게서 몸통 중심을 못 찾았을 때 쓸 발밑 기준 오프셋(미터)")]
     [SerializeField] private Vector3 additionalHitFallbackOffset = new Vector3(0f, 1f, 0f);

@@ -10,6 +10,7 @@ using Unity.Netcode.Components;
 [RequireComponent(typeof(PlayerAimIndicator))]
 [RequireComponent(typeof(PlayerStateController))]
 [RequireComponent(typeof(StatusEffectController))]
+[DataTableSheet("Player", Order = 0)]
 public class Player : Unit
 {
     private static readonly int IsMovingHash = Animator.StringToHash("IsMoving");
@@ -52,14 +53,13 @@ public class Player : Unit
 
     [Header("\n초기화 값")]
     [SerializeField] int attackDamage;
-    [SerializeField] float moveSpeed;
     [SerializeField] float attackSpeed;
     [SerializeField] int maxHp;
     [SerializeField] int defense;
 
     [Header("\n이동 플랫폼 캐리")]
     [Tooltip("발밑 검사 거리(m).")]
-    [SerializeField] private float platformGroundCheckDistance = 0.6f;
+    [DataTableIgnore] [SerializeField] private float platformGroundCheckDistance = 0.6f;
 
     private PlayerStateController stateController;
     private IPlayerBasicAttack defaultAttack;
@@ -238,7 +238,8 @@ public class Player : Unit
         }
 
         if (IsServer)
-            Initialize(attackDamage, moveSpeed, attackSpeed, maxHp, defense);
+            // 이동속도 원본 = PlayerMovement.maxSpeed(실제 이동). Unit 스탯은 그 값을 따라간다(2026-10-02 Player.moveSpeed 삭제).
+            Initialize(attackDamage, GetComponent<PlayerMovement>().BaseMaxSpeed, attackSpeed, maxHp, defense);
 
         ConfigureMovementAuthority("network-spawn");
 

@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.AI;
 
 // Unit, Rigidbody/NavMeshAgent와 같은 최상단 오브젝트에 위치해 있어야 함
+[DataTableSheet("Monster", Order = 2)]
 public class LinearKnockback : NetworkBehaviour, IKnockbackable
 {
     NavMeshAgent _navMeshAgent;
@@ -11,9 +12,9 @@ public class LinearKnockback : NetworkBehaviour, IKnockbackable
 
     [SerializeField] float maxDistance = 2f;
     [Header("넉백 종료 조건")]
-    [SerializeField] float minKnockbackTime = 0.15f;
-    [SerializeField] float maxKnockbackTime = 1.5f;
-    [SerializeField] float stopSpeed = 0.15f;
+    [DataTableIgnore] [SerializeField] float minKnockbackTime = 0.15f;
+    [DataTableIgnore] [SerializeField] float maxKnockbackTime = 1.5f;
+    [DataTableIgnore] [SerializeField] float stopSpeed = 0.15f;
 
     float _knockbackStartTime;
 
