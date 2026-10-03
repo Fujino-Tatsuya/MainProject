@@ -7,7 +7,7 @@ using UnityEngine;
 // 이동/추격/리쉬/피격/사망은 base 그대로. 히트/종료는 base와 동일하게 애니 이벤트(OnAttackHit/OnAttackEnd) 전용.
 //
 // ★ 스펙(팀장 확정, 콤보 가정 폐기):
-//  - 매 공격 cadence(attackCooldown)마다 서버가 가중치 룰렛으로 {Smash, Punch01, Punch02, Punch03} 중
+//  - 공격이 끝나고 attackCooldown(쉬는 시간)이 지나면 서버가 가중치 룰렛으로 {Smash, Punch01, Punch02, Punch03} 중
 //    하나를 고르고, 펀치면 L/R을 50:50으로 고른다. 콤보 체인 없음 — 클립 1개 = 공격 1회.
 //  - Smash 가중치는 근접 플레이어 수(1/2/3+)에 따라 커진다.
 //  - 선택 결과는 ClientRpc로 전 피어에 CrossFade 대상 상태명을 전달한다(콤보 선택값 미복제 문제 회피,

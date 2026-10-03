@@ -1899,7 +1899,9 @@ public class MonsterBase : Unit
         if (!IsServer) return;
 
         _counterVisualOffAt = open && windowDuration > 0f
-            ? Time.time + Mathf.Max(0f, windowDuration - AttackTime(CounterVisualLeadSeconds))
+            // 🔴 여유(0.15초)는 배율로 나누지 않는다 — 몬스터가 아니라 **플레이어 간파 스킬의 판정 지연**(hitDelay)을
+            //    보상하는 값이다. 나누면 공격속도 2 에서 "보일 때 눌렀는데 실패"가 생긴다(10-03 Codex 교차검증, 계획 뒤집음).
+            ? Time.time + Mathf.Max(0f, windowDuration - CounterVisualLeadSeconds)
             : -1f;
         SetCounterVisual(open);
     }
@@ -2184,15 +2186,18 @@ public class MonsterBase : Unit
         bool acting = false;
         for (int i = 1; i < count; i++)
         {
-            int hash = PlayingStateHash(i);
-            if (hash == 0) continue;
             if (_layerRestHash[i] == 0)
             {
-                // 공격 중에 처음 보면(공격 도중 합류한 클라) 그 상태를 평소로 오인한다 — 공격 밖에서만 기억한다.
-                if (State != MonsterState.Attack) _layerRestHash[i] = hash;
+                // 평소 상태 = 스폰 직후 이 레이어의 **현재** 상태(= 컨트롤러 기본 상태). 갓 스폰된 Animator 는
+                // 레이어마다 기본 상태에서 시작하고, 공격 트리거로 전이 중이어도 '현재'는 아직 기본 상태다.
+                // 🔴 로직 상태(State)로 거르지 않는다 — 공격 도중 합류한 클라가 영영 못 기억하거나(Codex),
+                //    로직은 Attack 을 벗어났는데 사격 클립이 남은 순간을 평소로 오인했다(Claude) — 10-03 교차검증.
+                int current = animator.GetCurrentAnimatorStateInfo(i).shortNameHash;
+                if (current != 0) _layerRestHash[i] = current;
                 continue;
             }
-            if (hash != _layerRestHash[i] && animator.GetLayerWeight(i) > 0f) acting = true;
+            int hash = PlayingStateHash(i);
+            if (hash != 0 && hash != _layerRestHash[i] && animator.GetLayerWeight(i) > 0f) acting = true;
         }
         return acting;
     }

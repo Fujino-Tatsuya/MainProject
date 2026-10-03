@@ -401,7 +401,7 @@ BossDataSO : MonsterDataSO
 [공격 테이블]   BossAttackEntry[] attacks
     attackId             BossAttackId   (LeftHook/RightHook/Upper/Grab/Jump/Dash)
     animatorStateName    string         ← ClientRpc CrossFade 대상
-    cooldown             float          ← 0 이면 base attackSpeed 폴백
+    cooldown             float          ← 0 이면 base attackCooldown 폴백(2026-10-02)
     minDistance          float
     maxDistance          float
     ignoreDistanceWindow bool           ← JumpAttack 전용(거리 무관)

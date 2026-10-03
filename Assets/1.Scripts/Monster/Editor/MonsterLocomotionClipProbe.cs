@@ -42,6 +42,12 @@ static class MonsterLocomotionClipProbe
 
     static void Run(bool write)
     {
+        // 🔴 Play 중엔 SO 가 데이터 테이블 값으로 메모리에서 덮여 있다 — 여기서 저장하면 그 값이 디스크에 박힌다(10-03 교차검증).
+        if (write && EditorApplication.isPlayingOrWillChangePlaymode)
+        {
+            Debug.LogError("[LocomotionProbe] Play 중에는 SO 에 기록하지 않는다 — Play 를 끄고 다시 실행할 것.");
+            return;
+        }
         var sb = new StringBuilder($"[LocomotionProbe] {(write ? "기록" : "보고만")}\n");
         foreach (string name in Prefabs)
         {
