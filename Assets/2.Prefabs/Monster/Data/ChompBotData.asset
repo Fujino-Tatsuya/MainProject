@@ -11,12 +11,14 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 576305eb4d78f0c4eb97b90edc8cae21, type: 3}
   m_Name: ChompBotData
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   archetype: 0
+  rank: 0
   attackDamage: 10
-  moveSpeed: 2.5
-  chaseSpeed: 4
-  attackSpeed: 0.5
+  moveSpeed: 2
+  chaseSpeed: 2.8
+  attackSpeed: 1
+  attackCooldown: 1.46
   maxHp: 100
   defense: 0
   maxShield: 0
@@ -24,19 +26,41 @@ MonoBehaviour:
   detectionHeightTolerance: 2
   attackRange: 2
   leashRadius: 15
+  retargetInterval: 0
   returnSpeedMultiplier: 5
   turnSpeed: 10
+  avoidanceRadius: 0.3
+  obstacleAvoidance: 2
+  projectilePrefab: {fileID: 0}
+  projectileSpeed: 12
+  projectileLifetime: 4
+  minStandoff: 4
+  projectileArcHeight: 0
+  projectileSplashRadius: 0
+  repositionBetweenAttacks: 0
+  retreatMinDuration: 1.2
+  repositionMinDuration: 1.2
   attackDuration: 1.6
   attackWindup: 0.35
+  cancelWindupIfTargetLeavesRange: 0
+  engageAttackDelay: 0
   maxGroggyCount: 0
   groggyDuration: 3
   startsWithSuperArmor: 0
   hasSuperArmorWhileAttacking: 0
   hitStunDuration: 0.4
   despawnDelay: 2
-  isMidBoss: 0
   animSpeedParam: RunBlend
   attackTrigger: Attack
+  attackFinishTrigger: 
   hitTrigger: Hit
   groggyBool: 
   deathTrigger: 
+  locomotionState: Movement
+  locomotionClipSpeed: 2.3630662
+  locomotionFullBlendSpeed: 4.5
+  locomotionIdleCycleSeconds: 3.8000002
+  locomotionMoveCycleSeconds: 0.4
+  locomotionFullBlendWhileMoving: 1
+  locomotionAnimSpeedRange: {x: 0.5, y: 2.5}
+  animatorControllerOverride: {fileID: 0}

@@ -160,7 +160,8 @@ public class WallBot : MonsterBase
         _dashDir = transform.forward;
 
         // 🔴 애니를 멈춰도 이 타이머는 줄어든다 — 창 + 돌진 + 2단 애니를 모두 덮어야 한다.
-        _stateTimer = Counter.WindowDuration + dashDuration + shockDuration;
+        // 창은 MonsterCounterWindow 가, 돌진·충격은 여기서 공격속도로 나눈다(AttackTime).
+        _stateTimer = Counter.WindowDuration + AttackTime(dashDuration) + AttackTime(shockDuration);
 
         // 🔴 슈퍼아머를 시퀀스 전체로 다시 건다. base 는 data.attackDuration(1.6초)으로만 걸어
         //    3.9초짜리 시퀀스의 t=1.6 이후(돌진 후반 + 충격파 전체)가 무방비였다 — 거기서 스킬을
@@ -201,7 +202,7 @@ public class WallBot : MonsterBase
                 if (Time.time >= _nextRepeatHitTime)
                 {
                     meleeAttack?.BeginHitWindow();
-                    _nextRepeatHitTime = Time.time + Mathf.Max(0.05f, dashRepeatInterval);
+                    _nextRepeatHitTime = Time.time + AttackTime(Mathf.Max(0.05f, dashRepeatInterval));
                 }
                 meleeAttack?.Hit();
 
@@ -227,7 +228,7 @@ public class WallBot : MonsterBase
         }
 
         _phase = ShieldPhase.Dash;
-        _phaseTimer = dashDuration;
+        _phaseTimer = AttackTime(dashDuration);
         _nextRepeatHitTime = 0f;   // 첫 틱에 바로 열린다
 
         // 돌진 판정만 좁은 박스로 갈아끼운다. 원본은 처음 한 번만 보관하고
@@ -251,7 +252,7 @@ public class WallBot : MonsterBase
             desired = hit.position;
 
         agent.isStopped = false;
-        agent.speed = Mathf.Max(0.1f, MoveSpeed * dashSpeedMultiplier);
+        ApplyAttackDashAgent(MoveSpeed * dashSpeedMultiplier);   // 속도·가속 × 공격속도 (시간 ÷ 와 짝)
         agent.SetDestination(desired);
     }
 
@@ -259,11 +260,11 @@ public class WallBot : MonsterBase
     void BeginShock()
     {
         meleeAttack?.EndHitWindow();
-        if (agent != null) agent.speed = MoveSpeed;
+        RestoreAttackDashAgent();
         HoldAgent();
 
         _phase = ShieldPhase.Shock;
-        _phaseTimer = shockDuration;
+        _phaseTimer = AttackTime(shockDuration);
 
         // 🔴 순서가 중요하다 — **자세를 먼저 풀고** 2단 트리거를 친다. 애니메이터 speed 가 0 인 채로
         //    트리거를 치면 전이가 진행되지 않아 모으기 자세에 눌러앉는다(base 의 ApplyLocomotionFreeze
@@ -275,15 +276,9 @@ public class WallBot : MonsterBase
         ApplyShockwave();
     }
 
-    // 2단 클립(AttackEnd) 재생을 전 피어에 건다. base 의 FireAttackHitOnce 경로는 서버에서만
-    // 트리거를 쳐서 클라 애니가 안 넘어간다 — 그 경로를 막았으므로 여기서 직접 옮긴다.
-    void ServerPlayFinishTrigger()
-    {
-        if (data == null || string.IsNullOrEmpty(data.attackFinishTrigger)) return;
-
-        SafeSetTrigger(data.attackFinishTrigger);           // 호스트 자신
-        if (IsSpawned) PlayFinishTriggerClientRpc();
-    }
+    // 2단 클립(AttackEnd) 재생을 전 피어에 건다 — 10-02 부터 base 가 같은 일을 한다(ServerSetFinishTrigger).
+    // 예전 자체 ClientRpc 는 호스트에서도 돌아 트리거를 두 번 쳤다 → base 하나로 합쳤다.
+    void ServerPlayFinishTrigger() => ServerSetFinishTrigger();
 
     void EndSequence()
     {
@@ -306,7 +301,7 @@ public class WallBot : MonsterBase
         ServerReleaseActionPose();
 
         meleeAttack?.EndHitWindow();
-        if (agent != null) agent.speed = MoveSpeed;
+        RestoreAttackDashAgent();
         status?.RemoveStatus(StatusEffectType.SuperArmor);
 
         // 돌진 히트박스를 평타용 원본으로 되돌린다. 안 되돌리면 **다음 평타가 좁은 박스로 나가** 헛스윙한다.
@@ -487,9 +482,6 @@ public class WallBot : MonsterBase
                 unit.Knockback(dir.normalized, shockKnockback);
         }
     }
-
-    [Unity.Netcode.ClientRpc]
-    void PlayFinishTriggerClientRpc() => SafeSetTrigger(data.attackFinishTrigger);
 
     // 진단 로그 — 단계가 **바뀔 때만** 찍는다(고빈도 로그는 정작 필요한 1회성 로그를 밀어낸다).
     void Log(string message)

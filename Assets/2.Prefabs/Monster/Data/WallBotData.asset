@@ -17,7 +17,8 @@ MonoBehaviour:
   attackDamage: 16
   moveSpeed: 2
   chaseSpeed: 3
-  attackSpeed: 0.5
+  attackSpeed: 1
+  attackCooldown: 0.83
   maxHp: 600
   defense: 8
   maxShield: 0
@@ -49,7 +50,6 @@ MonoBehaviour:
   hasSuperArmorWhileAttacking: 1
   hitStunDuration: 0.4
   despawnDelay: 2
-  isMidBoss: 1
   animSpeedParam: RunBlend
   attackTrigger: Attack
   attackFinishTrigger: AttackEnd
@@ -57,3 +57,9 @@ MonoBehaviour:
   groggyBool: 
   deathTrigger: 
   locomotionState: Movement
+  locomotionClipSpeed: 3.2418609
+  locomotionFullBlendSpeed: 2
+  locomotionIdleCycleSeconds: 3.966667
+  locomotionMoveCycleSeconds: 2.3000002
+  locomotionAnimSpeedRange: {x: 0.5, y: 2.5}
+  animatorControllerOverride: {fileID: 0}

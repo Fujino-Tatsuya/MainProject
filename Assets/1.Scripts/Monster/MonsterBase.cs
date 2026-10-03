@@ -80,7 +80,7 @@ public class MonsterBase : Unit
     // 일반 몬스터는 공격이 1종이라 슬롯 0 하나만 쓰고, 그 경우 동작은 단일 쿨다운 시절과 완전히 같다.
     // 보스처럼 공격이 여러 종류면 ConfigureAttackSlots(n)으로 슬롯을 늘리고 슬롯마다 쿨을 따로 돌린다.
     float[] _lastUsedByAttack = { -999f };
-    float[] _cooldownByAttack = { 0f };   // 0 이하면 base 쿨(1/AttackSpeed)로 폴백
+    float[] _cooldownByAttack = { 0f };   // 0 이하면 base 쿨(data.attackCooldown)로 폴백
 
     protected const int DefaultAttackSlot = 0;
     protected const int NoAttack = -1;     // SelectAttackSlot 반환값: "지금 쓸 공격이 없다"
@@ -222,6 +222,7 @@ public class MonsterBase : Unit
         {
             agent.enabled = true;
             agent.speed = data.moveSpeed;
+            _baseAgentAcceleration = agent.acceleration;   // 돌진 가속 배수의 기준(프리팹값)
             agent.stoppingDistance = Mathf.Max(0f, data.attackRange * 0.8f);
             _defaultStoppingDistance = agent.stoppingDistance;
             // 부분 겹침: 회피 반경을 콜라이더보다 작게(데이터값). 물리 대신 회피로만 겹침량 조절(저비용).
@@ -242,7 +243,13 @@ public class MonsterBase : Unit
     void Update()
     {
         // 애니메이션 이동 블렌드는 모든 피어에서 반영(복제된 _animSpeed).
-        SafeSetFloat(data != null ? data.animSpeedParam : null, _animSpeed.Value);
+        // (Chomp 처럼 fullBlendWhileMoving 이면 움직이는 동안 블렌드를 이동 클립 100% 로 보낸다 — LocomotionData 참조.)
+        if (data != null)
+            SafeSetFloat(data.animSpeedParam, MonsterAnimSpeedPolicy.BlendParam(_animSpeed.Value, LocomotionData));
+
+        // 애니 재생 속도 — 모든 피어, 이 한 곳에서만 쓴다(자세 홀드 중엔 홀드가 0 을 쥔다).
+        if (ManagesAnimatorSpeed && !_animatorHeldLocally && animator != null)
+            animator.speed = ManagedAnimatorSpeed();
 
         if (!IsServer || !_initialized || _isDead)
             return;
@@ -877,8 +884,9 @@ public class MonsterBase : Unit
         // 즉 공격이 1종인 몬스터는 단일 쿨다운 시절과 동작이 같다.
         int slot = Mathf.Clamp(CurrentAttackSlot, 0, _lastUsedByAttack.Length - 1);
         _lastUsedByAttack[slot] = Time.time;
+        _attackingSlot = slot;   // 종료 기준 쿨이면 Attack 을 빠져나갈 때 이 슬롯을 다시 찍는다(SetState)
 
-        _stateTimer = data.attackDuration;
+        _stateTimer = AttackTime(data.attackDuration);
         _attackFired = false;
         _commitFired = false;
         StopAgent();
@@ -886,7 +894,7 @@ public class MonsterBase : Unit
 
         // 공격 중 슈퍼아머(경직 무시) 옵션.
         if (data.hasSuperArmorWhileAttacking && status != null)
-            status.ApplyStatus(StatusEffectType.SuperArmor, data.attackDuration);
+            status.ApplyStatus(StatusEffectType.SuperArmor, AttackTime(data.attackDuration));
 
         SetState(MonsterState.Attack);
     }
@@ -1046,7 +1054,7 @@ public class MonsterBase : Unit
         // 단 커밋 이벤트(OnAttackCommit)가 이미 발동한 공격(예: MortarBot)은 재발동하지 않는다(트리거 재래치 방지).
         if (!_commitFired && data != null && !string.IsNullOrEmpty(data.attackFinishTrigger))
         {
-            SafeSetTrigger(data.attackFinishTrigger);
+            ServerSetFinishTrigger();
             _commitFired = true;
         }
         _attackFired = true;
@@ -1074,9 +1082,24 @@ public class MonsterBase : Unit
     {
         if (!IsServer || _state.Value != MonsterState.Attack || _commitFired) return;
         if (data == null || string.IsNullOrEmpty(data.attackFinishTrigger)) return;
-        SafeSetTrigger(data.attackFinishTrigger);
+        ServerSetFinishTrigger();
         _commitFired = true;
     }
+
+    /// <summary>
+    /// [서버] 다단계 공격 2단계 트리거(<c>attackFinishTrigger</c>)를 **전 피어**에 건다.
+    /// 🔴 예전엔 서버 로컬 Animator 에만 쳤다 — 몬스터에 NetworkAnimator 가 없어 원격 클라는
+    ///    Mortar 조준 루프에 머물고 WallBot 평타 2단이 안 나왔다(10-02 교차검증 공통 지적, 기존 버그).
+    /// </summary>
+    protected void ServerSetFinishTrigger()
+    {
+        if (!IsServer || data == null || string.IsNullOrEmpty(data.attackFinishTrigger)) return;
+        SafeSetTrigger(data.attackFinishTrigger);   // 서버(호스트) 자신
+        if (IsSpawned) SetFinishTriggerRpc();
+    }
+
+    [Rpc(SendTo.NotServer)]
+    void SetFinishTriggerRpc() => SafeSetTrigger(data != null ? data.attackFinishTrigger : null);
 
     // 공격 히트 실행(선딜 경과 시점). 아키타입에 따라 근접 오버랩 또는 투사체 발사로 분기.
     protected virtual void PerformAttackHit()
@@ -1521,8 +1544,8 @@ public class MonsterBase : Unit
 
     #region 유틸
     // 공격 슬롯의 쿨다운이 돌았는가.
-    // 슬롯 쿨(_cooldownByAttack)이 0 이하면 base 간격 = 1 / 공격속도로 폴백한다.
-    // (AttackSpeed = 초당 공격 횟수. 0.5 → 2초당 1회.)
+    // 슬롯 쿨(_cooldownByAttack)이 0 이하면 base 간격 = data.attackCooldown(초)으로 폴백한다.
+    // (AttackSpeed 는 2026-10-02 부터 공격 애니 재생 배율이라 간격과 무관하다.)
     // 인자를 안 주면 슬롯 0 — 공격이 1종인 일반 몬스터는 이 경로만 탄다.
     protected bool CooldownReady(int attackSlot = DefaultAttackSlot)
     {
@@ -1532,11 +1555,11 @@ public class MonsterBase : Unit
         return Time.time - _lastUsedByAttack[attackSlot] >= EffectiveCooldown(attackSlot);
     }
 
-    // 슬롯의 실제 쿨 길이. 저작값이 0 이하면 base 간격(1/공격속도)으로 폴백한다.
+    // 슬롯의 실제 쿨 길이. 저작값이 0 이하면 base 간격(data.attackCooldown)으로 폴백한다.
     float EffectiveCooldown(int attackSlot)
     {
         float cooldown = _cooldownByAttack[attackSlot];
-        return cooldown > 0f ? cooldown : 1f / Mathf.Max(0.01f, AttackSpeed);
+        return cooldown > 0f ? cooldown : Mathf.Max(0f, data.attackCooldown);
     }
 
     // 사거리 진입/이탈을 추적하고, **진입한 프레임에** 첫 공격 지연을 건다.
@@ -1588,7 +1611,7 @@ public class MonsterBase : Unit
             _lastUsedByAttack[i] = -999f;   // 스폰 직후 첫 공격이 쿨에 걸리지 않게
     }
 
-    /// <summary>슬롯별 쿨 길이(초)를 설정한다. 0 이하면 base 간격(1/AttackSpeed)을 쓴다.</summary>
+    /// <summary>슬롯별 쿨 길이(초)를 설정한다. 0 이하면 base 간격(data.attackCooldown)을 쓴다.</summary>
     /// <summary>
     /// 슬롯을 "방금 썼다"고 표시해 쿨다운을 지금부터 돌린다.
     ///
@@ -1773,8 +1796,24 @@ public class MonsterBase : Unit
     void SetState(MonsterState next)
     {
         if (!IsServer) return;
+
+        // 종료 기준 쿨 — Attack 을 **어느 경로로든** 빠져나가는 순간부터 센다(정상 종료·피격·그로기·리쉬).
+        // 상태 쓰기는 여기 한 곳뿐이라 경로별로 찍을 필요가 없다.
+        if (CooldownFromAttackEnd && _state.Value == MonsterState.Attack && next != MonsterState.Attack
+            && _attackingSlot >= 0 && _attackingSlot < _lastUsedByAttack.Length)
+            _lastUsedByAttack[_attackingSlot] = Time.time;
+
         _state.Value = next; // 같은 값이면 NGO가 콜백을 발생시키지 않음.
     }
+
+    int _attackingSlot = DefaultAttackSlot;
+
+    /// <summary>
+    /// 쿨다운을 공격이 <b>끝난</b> 시점부터 세는가. 기본 true — <c>attackCooldown</c> = 공격 후 쉬는 시간이라
+    /// 공격 길이(attackSpeed)를 바꿔도 쉬는 시간이 그대로다(팀장 10-02).
+    /// 🔴 23호는 false — 행별 쿨은 시작 기준으로 튜닝돼 있다(PLAN 범위 밖).
+    /// </summary>
+    protected virtual bool CooldownFromAttackEnd => true;
     #endregion
 
     #region 애니메이션(상태→Animator 매핑 단일 지점)
@@ -1860,6 +1899,8 @@ public class MonsterBase : Unit
         if (!IsServer) return;
 
         _counterVisualOffAt = open && windowDuration > 0f
+            // 🔴 여유(0.15초)는 배율로 나누지 않는다 — 몬스터가 아니라 **플레이어 간파 스킬의 판정 지연**(hitDelay)을
+            //    보상하는 값이다. 나누면 공격속도 2 에서 "보일 때 눌렀는데 실패"가 생긴다(10-03 Codex 교차검증, 계획 뒤집음).
             ? Time.time + Mathf.Max(0f, windowDuration - CounterVisualLeadSeconds)
             : -1f;
         SetCounterVisual(open);
@@ -2022,8 +2063,143 @@ public class MonsterBase : Unit
         }
 
         if (!_animatorHeldLocally) return;
-        animator.speed = _animatorResumeSpeed;
+        // 관리 대상이면 홀드 전 값이 아니라 **지금** 맞는 값으로 푼다(그사이 상태가 바뀌었을 수 있다).
+        animator.speed = ManagesAnimatorSpeed ? ManagedAnimatorSpeed() : _animatorResumeSpeed;
         _animatorHeldLocally = false;
+    }
+
+    /// <summary>
+    /// <c>animator.speed</c> 를 <see cref="MonsterAnimSpeedPolicy"/> 로 매 프레임 정하는가. 기본 true.
+    /// 🔴 23호는 false — 잡기·점프·카운터가 자체적으로 animator.speed 를 쓴다(PLAN 범위 밖).
+    /// </summary>
+    protected virtual bool ManagesAnimatorSpeed => true;
+
+    /// <summary>
+    /// 공격 중 <b>코드 타이머</b>(예고·지속·창·돌진 시간)를 몬스터 고유 공격속도로 나눈다.
+    /// 공격 애니가 attackSpeed 배로 재생되므로 타이머도 같이 줄어야 화면과 판정이 맞는다(PLAN S3).
+    /// 🔴 공격 중 시간값을 새로 쓸 때 이걸 빠뜨리면 그 공격만 배율 ≠ 1 에서 어긋난다.
+    /// </summary>
+    protected float AttackTime(float seconds) => seconds / AttackAnimSpeed;
+
+    /// <summary>공격 중 속도·가속 배수(= attackSpeed). 돌진 시간 ÷ 와 짝 — 거리가 그대로다.</summary>
+    protected float AttackRate => AttackAnimSpeed;
+
+    /// <summary>
+    /// 몬스터 고유 공격속도(공격 애니 재생 배율) — <b>SO 값을 직접 읽는다.</b>
+    /// 🔴 <c>Unit.AttackSpeed</c> 를 쓰면 안 된다: <c>Initialize</c> 가 서버에서만 불리고(ServerInitialize)
+    ///    그 필드는 복제되지 않아 원격 클라에선 0 이다 → 클라 화면의 공격 애니가 0.05배로 멈춘다.
+    ///    SO 는 전 피어가 같은 에셋을 가지므로 복제 없이 같은 값이 나온다.
+    /// </summary>
+    public float AttackAnimSpeed => data != null ? Mathf.Max(0.05f, data.attackSpeed) : 1f;
+
+    float _baseAgentAcceleration = 8f;
+
+    /// <summary>
+    /// [서버] 공격 돌진용 에이전트 속도·가속을 건다 — 속도 = 기준 × r, <b>가속 = 기준 × r²</b> (r = attackSpeed).
+    /// 같은 궤적을 시간만 1/r 로 압축하는 조건이다(x(t) → x(r·t) 를 두 번 미분하면 r²).
+    /// 🔴 r 만 곱하면 가속 구간 거리 ½aT² 가 1/r 로 줄어든다 — 가속 8 로는 최고속에 못 닿아 이 구간이 거리의 전부다
+    ///    (10-02 교차검증 Codex·Claude 공통 지적, 처음 계획은 ×r 이었다).
+    /// 끝나면 <see cref="RestoreAttackDashAgent"/> 로 되돌린다.
+    /// </summary>
+    protected void ApplyAttackDashAgent(float baseSpeed)
+    {
+        if (agent == null) return;
+        agent.speed = Mathf.Max(0.1f, baseSpeed * AttackRate);
+        agent.acceleration = _baseAgentAcceleration * AttackRate * AttackRate;
+    }
+
+    /// <summary>
+    /// [서버] 정지 → 가속(기준 가속·기준 최고속, 배율 1 기준)으로 <paramref name="seconds"/> 동안 가는 거리.
+    /// 배율 r 에선 속도 ×r · 가속 ×r² · 시간 ÷r 이라 같은 값이 나온다 — 그래서 배율 없는 저작값으로 계산한다.
+    /// 예고 길이를 실제 도달 거리에 맞추는 데 쓴다(SpinnerBot — 팀장 10-02: 예고를 실제에 맞춤).
+    /// </summary>
+    protected float AttackDashReach(float baseSpeed, float seconds)
+    {
+        float a = Mathf.Max(0.01f, _baseAgentAcceleration);
+        float v = Mathf.Max(0.1f, baseSpeed);
+        float tReach = v / a;                       // 최고속에 닿는 시각
+        return seconds <= tReach
+            ? 0.5f * a * seconds * seconds          // 끝까지 가속 중
+            : v * seconds - v * v / (2f * a);       // 가속 뒤 등속
+    }
+
+    /// <summary>[서버] 돌진 속도·가속을 평소 값(MoveSpeed · 프리팹 가속)으로 되돌린다. 멱등.</summary>
+    protected void RestoreAttackDashAgent()
+    {
+        if (agent == null) return;
+        agent.speed = MoveSpeed;
+        agent.acceleration = _baseAgentAcceleration;
+    }
+
+    int _locomotionHash;
+    string _locomotionHashOf;
+
+    // 지금 재생 중인 상태(전이 중이면 향하는 상태) 기준으로 재생 속도를 고른다.
+    float ManagedAnimatorSpeed()
+    {
+        if (data == null || animator == null || animator.runtimeAnimatorController == null)
+            return 1f;
+
+        if (!ReferenceEquals(_locomotionHashOf, data.locomotionState))
+        {
+            _locomotionHashOf = data.locomotionState;
+            _locomotionHash = Animator.StringToHash(data.locomotionState ?? "");
+        }
+
+        bool playingLocomotion = PlayingStateHash(0) == _locomotionHash && !UpperLayerActing();
+
+        return MonsterAnimSpeedPolicy.Resolve(
+            playingLocomotion, _animSpeed.Value, State == MonsterState.Attack, AttackAnimSpeed, LocomotionData);
+    }
+
+    // 블렌드 값과 재생 속도가 **같은** 측정값을 보게 한 곳에서 만든다(data != null 전제).
+    MonsterAnimSpeedPolicy.Locomotion LocomotionData => new MonsterAnimSpeedPolicy.Locomotion
+    {
+        clipSpeed = data.locomotionClipSpeed,
+        fullBlendSpeed = data.locomotionFullBlendSpeed,
+        idleCycle = data.locomotionIdleCycleSeconds,
+        moveCycle = data.locomotionMoveCycleSeconds,
+        range = data.locomotionAnimSpeedRange,
+        fullBlendWhileMoving = data.locomotionFullBlendWhileMoving,
+    };
+
+    int PlayingStateHash(int layer) => animator.IsInTransition(layer)
+        ? animator.GetNextAnimatorStateInfo(layer).shortNameHash
+        : animator.GetCurrentAnimatorStateInfo(layer).shortNameHash;
+
+    // 레이어 1 이상의 "평소 상태" 해시 — 공격이 아닐 때 처음 본 상태로 기억한다(컨트롤러 무수정).
+    int[] _layerRestHash;
+
+    /// <summary>
+    /// 0 번이 아닌 레이어가 평소 상태가 아닌 애니를 재생 중인가.
+    /// 🔴 Peek·Tesla 터렛은 0 번 레이어가 늘 Idle(= locomotionState)이고 사격은 1 번 레이어다 —
+    ///    0 번만 보면 사격 중에도 "이동 블렌드 재생 중"으로 읽혀 공격속도가 안 걸린다(Codex 교차검증 10-02).
+    /// </summary>
+    bool UpperLayerActing()
+    {
+        int count = animator.layerCount;
+        if (count <= 1) return false;
+
+        if (_layerRestHash == null || _layerRestHash.Length != count)
+            _layerRestHash = new int[count];
+
+        bool acting = false;
+        for (int i = 1; i < count; i++)
+        {
+            if (_layerRestHash[i] == 0)
+            {
+                // 평소 상태 = 스폰 직후 이 레이어의 **현재** 상태(= 컨트롤러 기본 상태). 갓 스폰된 Animator 는
+                // 레이어마다 기본 상태에서 시작하고, 공격 트리거로 전이 중이어도 '현재'는 아직 기본 상태다.
+                // 🔴 로직 상태(State)로 거르지 않는다 — 공격 도중 합류한 클라가 영영 못 기억하거나(Codex),
+                //    로직은 Attack 을 벗어났는데 사격 클립이 남은 순간을 평소로 오인했다(Claude) — 10-03 교차검증.
+                int current = animator.GetCurrentAnimatorStateInfo(i).shortNameHash;
+                if (current != 0) _layerRestHash[i] = current;
+                continue;
+            }
+            int hash = PlayingStateHash(i);
+            if (hash != 0 && hash != _layerRestHash[i] && animator.GetLayerWeight(i) > 0f) acting = true;
+        }
+        return acting;
     }
     #endregion
 

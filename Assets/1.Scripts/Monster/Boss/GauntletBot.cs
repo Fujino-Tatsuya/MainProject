@@ -7,7 +7,7 @@ using UnityEngine;
 // 이동/추격/리쉬/피격/사망은 base 그대로. 히트/종료는 base와 동일하게 애니 이벤트(OnAttackHit/OnAttackEnd) 전용.
 //
 // ★ 스펙(팀장 확정, 콤보 가정 폐기):
-//  - 매 공격 cadence(1/attackSpeed)마다 서버가 가중치 룰렛으로 {Smash, Punch01, Punch02, Punch03} 중
+//  - 공격이 끝나고 attackCooldown(쉬는 시간)이 지나면 서버가 가중치 룰렛으로 {Smash, Punch01, Punch02, Punch03} 중
 //    하나를 고르고, 펀치면 L/R을 50:50으로 고른다. 콤보 체인 없음 — 클립 1개 = 공격 1회.
 //  - Smash 가중치는 근접 플레이어 수(1/2/3+)에 따라 커진다.
 //  - 선택 결과는 ClientRpc로 전 피어에 CrossFade 대상 상태명을 전달한다(콤보 선택값 미복제 문제 회피,
@@ -149,11 +149,13 @@ public class GauntletBot : MonsterBase
             if (HasAttackTelegraph && punchTelegraphDuration > 0f && meleeAttack != null)
             {
                 // 예고 동안 모션을 보류한다. 안전망 타이머·슈퍼아머도 예고만큼 늘린다(안 늘리면 펀치 전에 Attack 이 끝난다).
-                _punchTelegraphTimer = punchTelegraphDuration;
-                _stateTimer += punchTelegraphDuration;
+                // 예고·안전망·슈퍼아머 모두 공격속도로 나눈다(AttackTime) — 펀치 클립이 그 배율로 재생된다.
+                float telegraph = AttackTime(punchTelegraphDuration);
+                _punchTelegraphTimer = telegraph;
+                _stateTimer += telegraph;
                 if (data != null && data.hasSuperArmorWhileAttacking && status != null)
-                    status.ApplyStatus(StatusEffectType.SuperArmor, data.attackDuration + punchTelegraphDuration);
-                ShowHitboxTelegraph(meleeAttack.ColliderInfo, punchTelegraphDuration, 0f, SideShift(_currentAttack));
+                    status.ApplyStatus(StatusEffectType.SuperArmor, AttackTime(data.attackDuration) + telegraph);
+                ShowHitboxTelegraph(meleeAttack.ColliderInfo, telegraph, 0f, SideShift(_currentAttack));
                 return;
             }
 
