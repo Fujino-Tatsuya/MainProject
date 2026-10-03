@@ -33,8 +33,21 @@ public class MonsterCounterWindow : MonoBehaviour
 
     readonly CounterWindow _window = new CounterWindow();
 
-    /// <summary>저작된 창 길이(초). 공격 상태 타이머에 이 값을 더해야 한다 — 애니를 멈춰도 타이머는 준다.</summary>
-    public float WindowDuration => windowDuration;
+    /// <summary>
+    /// 실제 창 길이(초) = 저작값 ÷ 몬스터 고유 공격속도. 공격 상태 타이머에 이 값을 더해야 한다 — 애니를 멈춰도 타이머는 준다.
+    /// 🔴 창은 예비동작 클립 안에서 열리고 그 클립은 공격속도로 재생된다 → 창도 같이 나눠야 화면과 판정이 맞는다.
+    /// </summary>
+    public float WindowDuration => windowDuration / OwnerAttackSpeed;
+
+    MonsterBase _owner;
+    float OwnerAttackSpeed
+    {
+        get
+        {
+            if (_owner == null) _owner = GetComponent<MonsterBase>();
+            return _owner != null ? _owner.AttackAnimSpeed : 1f;   // SO 값 — 전 피어 동일
+        }
+    }
 
     /// <summary>카운터 성공 시 그로기 길이(초).</summary>
     public float GroggyDuration => groggyDuration;
@@ -43,7 +56,7 @@ public class MonsterCounterWindow : MonoBehaviour
     public bool IsOpen => _window.IsOpen;
 
     /// <summary>저작된 길이로 창을 연다. 길이가 0 이면 열리지 않는다(카운터 없음).</summary>
-    public void Open() => _window.Open(windowDuration);
+    public void Open() => _window.Open(WindowDuration);
 
     /// <summary>시간을 흘린다. <b>이번 틱에 만료됐으면 true</b> — 호출측이 "실패 확정"을 한 번만 처리한다.</summary>
     public bool TickAndDetectExpiry(float deltaTime) => _window.TickAndDetectExpiry(deltaTime);

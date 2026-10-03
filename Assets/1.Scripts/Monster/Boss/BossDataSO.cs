@@ -17,7 +17,7 @@ public class BossAttackEntry
              "🔴 이름이 틀리면 애니가 조용히 안 나온다 → 스폰 시 HasState 로 검증해 LogError 를 남긴다.")]
     public string animatorStateName = "";
 
-    [Tooltip("재사용 대기(초). 0 이면 base 쿨(1 / attackSpeed)로 폴백한다. 확정값 = Jump 10 / Dash 5 / Grab 10 / 훅·어퍼 2~3.")]
+    [Tooltip("재사용 대기(초). 0 이면 base 쿨(MonsterDataSO.attackCooldown)로 폴백한다. 확정값 = Jump 10 / Dash 5 / Grab 10 / 훅·어퍼 2~3.")]
     [Min(0f)] public float cooldown = 0f;
 
     [Tooltip("이 공격이 열리는 최소 거리(m). 타깃이 이보다 가까우면 후보에서 빠진다.")]
@@ -597,7 +597,7 @@ public class BossDataSO : MonsterDataSO
     // 🔴 확정 스펙(2026-08-13): **다음 공격까지가 너무 빠르다.** 조절 가능해야 한다.
     //    원인: 쿨다운이 **공격 행마다 따로**라 훅L(2.5s)·훅R(2.5s)·어퍼(3s)를 번갈아 쓰면
     //    쉬는 구간이 0 이 된다 — "전역 간격"이라는 개념이 아예 없었다.
-    //    (`MonsterDataSO.attackSpeed` 는 행 쿨다운이 0 일 때만 쓰이는 폴백이라 보스에선 죽어 있다.)
+    //    (`MonsterDataSO.attackCooldown` 은 행 쿨다운이 0 일 때만 쓰이는 폴백이라 보스에선 죽어 있다.)
     [Header("공격 간격 — 전역")]
     [Tooltip("공격이 **끝난 뒤** 다음 공격을 고르기까지 최소로 쉬는 시간(초). " +
              "행별 쿨다운과 **별개로** 항상 적용된다. 0 이면 쉬지 않는다(이전 동작).\n" +

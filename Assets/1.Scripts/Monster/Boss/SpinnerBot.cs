@@ -125,7 +125,7 @@ public class SpinnerBot : MonsterBase
         if (_phase != SpinPhase.None)
         {
             meleeAttack?.EndHitWindow();
-            if (agent != null) agent.speed = MoveSpeed;
+            RestoreAttackDashAgent();
             _phase = SpinPhase.None;
         }
     }
@@ -135,8 +135,11 @@ public class SpinnerBot : MonsterBase
         _counter != null ? _counter : (_counter = GetComponent<MonsterCounterWindow>());
 
     // 준비 구간 길이 — 창이 저작돼 있으면 창 길이가 곧 준비 시간이다.
+    // 🔴 아래 세 값은 전부 공격속도로 나눈 실제 시간이다(창은 MonsterCounterWindow 가 이미 나눈다).
     float WindupDuration =>
-        Counter != null && Counter.WindowDuration > 0f ? Counter.WindowDuration : spinWindup;
+        Counter != null && Counter.WindowDuration > 0f ? Counter.WindowDuration : AttackTime(spinWindup);
+    float DashSeconds => AttackTime(dashDuration);
+    float RepeatSeconds => AttackTime(Mathf.Max(0.05f, dashRepeatInterval));
 
     protected override void StartAttack()
     {
@@ -152,11 +155,12 @@ public class SpinnerBot : MonsterBase
             if (HasAttackTelegraph && whipTelegraphDuration > 0f && meleeAttack != null)
             {
                 // 예고 동안 모션을 보류한다. 안전망 타이머·슈퍼아머도 예고만큼 늘린다.
-                _whipTelegraphTimer = whipTelegraphDuration;
-                _stateTimer += whipTelegraphDuration;
+                float telegraph = AttackTime(whipTelegraphDuration);
+                _whipTelegraphTimer = telegraph;
+                _stateTimer += telegraph;
                 if (data != null && data.hasSuperArmorWhileAttacking && status != null)
-                    status.ApplyStatus(StatusEffectType.SuperArmor, data.attackDuration + whipTelegraphDuration);
-                ShowHitboxTelegraph(meleeAttack.ColliderInfo, whipTelegraphDuration, 0f, WhipSideShift);
+                    status.ApplyStatus(StatusEffectType.SuperArmor, AttackTime(data.attackDuration) + telegraph);
+                ShowHitboxTelegraph(meleeAttack.ColliderInfo, telegraph, 0f, WhipSideShift);
                 return;
             }
             PlayWhipClientRpc(_whipUseR);   // 기본 Whip 애니(데미지는 base.HandleAttack가 처리)
@@ -169,11 +173,11 @@ public class SpinnerBot : MonsterBase
 
         // 🔴 base 의 attackDuration 을 스핀 전체 길이로 덮어쓴다. 애니를 멈춰도 이 타이머는 계속 줄기
         //    때문에(MonsterBase.HandleAttack) 창 길이를 반드시 더해야 한다 — 안 더하면 돌진 전에 Attack 이 끝난다.
-        _stateTimer = WindupDuration + dashDuration;
+        _stateTimer = WindupDuration + DashSeconds;
 
         // 준비+돌진 동안만 슈퍼아머(있으면). 종료 시 해제한다.
         if (data != null && data.hasSuperArmorWhileAttacking && status != null)
-            status.ApplyStatus(StatusEffectType.SuperArmor, WindupDuration + dashDuration);
+            status.ApplyStatus(StatusEffectType.SuperArmor, WindupDuration + DashSeconds);
 
         PlaySpinStartClientRpc();
 
@@ -185,7 +189,11 @@ public class SpinnerBot : MonsterBase
         {
             Vector3 flat = _dashTarget - transform.position;
             flat.y = 0f;
-            ShowHitboxTelegraph(meleeAttack.ColliderInfo, WindupDuration, flat.magnitude);
+            // 🔴 예고 길이 = **실제로 가는 거리**(가속 반영). 목적지(_dashTarget)는 일부러 멀리 둔다 —
+            //    목적지를 도달점에 두면 autoBraking 이 그 앞에서 감속해 더 못 간다.
+            //    예전엔 목적지 거리(최대 40m)를 그렸는데 가속 8 로는 1.2초에 ≈5.8m 만 갔다(10-02 교차검증, 팀장: 예고를 실제에 맞춤).
+            float reach = Mathf.Min(flat.magnitude, AttackDashReach(MoveSpeed * dashSpeedMultiplier, dashDuration));
+            ShowHitboxTelegraph(meleeAttack.ColliderInfo, WindupDuration, reach);
         }
 
         // 창이 저작돼 있으면 자세를 정지시켜 "끊을 수 있다"를 보여 준다. 없으면 예전처럼 그냥 회전한다.
@@ -235,7 +243,7 @@ public class SpinnerBot : MonsterBase
                 if (Time.time >= _nextRepeatHitTime)
                 {
                     meleeAttack?.BeginHitWindow();
-                    _nextRepeatHitTime = Time.time + Mathf.Max(0.05f, dashRepeatInterval);
+                    _nextRepeatHitTime = Time.time + RepeatSeconds;
                 }
                 meleeAttack?.Hit();
 
@@ -257,7 +265,7 @@ public class SpinnerBot : MonsterBase
         }
 
         _phase = SpinPhase.Dash;
-        _phaseTimer = dashDuration;
+        _phaseTimer = DashSeconds;
         _nextRepeatHitTime = 0f;    // 첫 틱에 바로 열린다
         HideAttackTelegraph();      // 다 찼다 = 지금 나간다. 띠가 몸을 따라 움직이지 않게 끈다
 
@@ -270,7 +278,7 @@ public class SpinnerBot : MonsterBase
     void EndSpin()
     {
         meleeAttack?.EndHitWindow();
-        if (agent != null) agent.speed = MoveSpeed;
+        RestoreAttackDashAgent();
         HoldAgent();
         status?.RemoveStatus(StatusEffectType.SuperArmor);
 
@@ -300,7 +308,7 @@ public class SpinnerBot : MonsterBase
         ServerSetCounterWindow(false);
 
         meleeAttack?.EndHitWindow();
-        if (agent != null) agent.speed = MoveSpeed;
+        RestoreAttackDashAgent();
         status?.RemoveStatus(StatusEffectType.SuperArmor);
 
         _phase = SpinPhase.None;
@@ -352,17 +360,19 @@ public class SpinnerBot : MonsterBase
         if (agent == null || !agent.enabled || !agent.isOnNavMesh) return;
 
         agent.isStopped = false;
-        agent.speed = Mathf.Max(0.1f, MoveSpeed * dashSpeedMultiplier);
+        ApplyAttackDashAgent(MoveSpeed * dashSpeedMultiplier);   // 속도·가속 × 공격속도 (시간 ÷ 와 짝)
         agent.SetDestination(_dashTarget);
     }
 
     /// <summary>
     /// 돌진 끝점. 🔴 <c>dashMaxDistance</c> 는 조용한 노브다 — 실제로 가는 거리는 속도 × 지속시간 쪽이 더 짧을 수
     /// 있다(교훈 #112). 예고가 과대 표시되지 않게 둘 중 짧은 쪽을 쓰고, navmesh 경계에서 한 번 더 자른다.
-    /// (가속 때문에 실제 도달은 이보다 조금 짧을 수 있다 — 예고는 과소보다 과대가 낫다.)
+    /// ⚠️ 이 점은 **에이전트 목적지**다. 가속 때문에 실제 도달은 훨씬 짧다(가속 8 → ≈5.8m) —
+    ///    바닥 예고 길이는 여기가 아니라 <see cref="MonsterBase.AttackDashReach"/> 로 따로 잡는다(10-02).
     /// </summary>
     Vector3 ResolveDashTarget(Vector3 origin)
     {
+        // 속도 × 공격속도 · 시간 ÷ 공격속도 라 곱은 저작값 그대로다 — 배율과 무관하게 같은 거리.
         float reach = Mathf.Min(dashMaxDistance, Mathf.Max(0.1f, MoveSpeed * dashSpeedMultiplier) * dashDuration);
         Vector3 desired = origin + _dashDir * reach;
         if (NavMesh.Raycast(origin, desired, out NavMeshHit hit, NavMesh.AllAreas))

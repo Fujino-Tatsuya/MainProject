@@ -8,6 +8,14 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-10-02~03 · 경석(Claude) · **몬스터 공격속도 = 애니 재생 배율 · 쿨다운 종료 기준 · 이동 애니 맞춤**, 브랜치 `feature/Boss23`) — ✅ development 반영(10-03) · 팀장 Play 1차(Chomp·Mortar) · ⏳ MPPM·배율 0.5/2 Play 미검증
+계획·결정·교차검증 이력 = [PLAN-monster-anim-speed.md](PLAN-monster-anim-speed.md) §3 · S4-b.
+- `attackSpeed` = 공격 애니 재생 배율(SO 직접 — `MonsterBase.AttackAnimSpeed`, Unit.AttackSpeed 는 클라에서 0) · 공격 중 코드 타이머 ÷ · 돌진 속도 ×r · 가속 ×r².
+- `attackCooldown` = 공격 **끝난 뒤** 쉬는 시간(23호만 시작 기준). `animator.speed` 는 `MonsterBase` 한 곳(23호 제외).
+- 이동 맞춤 = `Tools/Monster/이동 클립 고유 속도 측정 → SO 기록`. Chomp = 블렌드 100% + 임시 속도(배회 2.0 · 추격 2.8, 입 애니 때문 — 아트 클립 요청 여지).
+- 기존 버그 수정 동반: Mortar 발사·WallBot 평타 2단 트리거 클라 전파 · Spinner 예고 띠 = 실제 돌진 거리.
+- ⚠️ EditMode 기존 실패 2(`BossCounterDataTests` — No23 Dash 가 FarthestPlayer) 는 이 작업과 무관, 미결.
+
 ## ▶▶ 작업 세션 (2026-10-01~02 · 경석(Claude) · **몬스터 리디자인 Flat Kit · 23호 전기 장판 · 웰즈 자폭 드론 · 터렛 조준선 · 차징 루프**, 브랜치 `feature/Boss23`, 푸시 `6d50defb`)
 
 **상태: ✅ development 반영(10-02, 경석 직접 병합 `68730770`).** 팀장 Play·비주얼 확인 완료. 남은 것 = MPPM 2인 검증 · 장판 패턴 SO 편집(보류).

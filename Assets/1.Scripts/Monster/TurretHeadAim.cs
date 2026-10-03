@@ -148,7 +148,13 @@ public class TurretHeadAim : NetworkBehaviour, ITurretAimGate
     /// 추적이 끝나 <b>조준선이 최종 방향에 고정된</b> 구간인가.
     /// 「추적(<c>telegraphSeconds</c>) → 고정 유지(<c>aimHoldSeconds</c>) → 발사」의 가운데 구간이다.
     /// </summary>
-    private bool AimHolding => _telegraphing && TelegraphElapsed >= telegraphSeconds;
+    private bool AimHolding => _telegraphing && TelegraphElapsed >= TrackSeconds;
+
+    // 실제 예고 시간 = 저작값 ÷ 몬스터 고유 공격속도(PLAN-monster-anim-speed S3 — 팀장 10-02: 터렛 예고도 배율을 따른다).
+    // 색 전환점(trackingColorAt)은 비율이라 그대로 따라온다. SO 값이라 전 피어가 같은 시간을 쓴다.
+    private float AttackRate => _monster != null ? _monster.AttackAnimSpeed : 1f;
+    private float TrackSeconds => telegraphSeconds / AttackRate;
+    private float HoldSeconds => aimHoldSeconds / AttackRate;
 
     /// <summary>
     /// 조준을 <b>내가 계산하는가</b>. 서버이거나, 아직 스폰되지 않은(= 네트워크 밖) 상태면 그렇다.
@@ -169,7 +175,7 @@ public class TurretHeadAim : NetworkBehaviour, ITurretAimGate
     /// 예고로서 기능한다.
     /// </summary>
     public bool IsAimReady =>
-        !_telegraphing || TelegraphElapsed >= telegraphSeconds + aimHoldSeconds;
+        !_telegraphing || TelegraphElapsed >= TrackSeconds + HoldSeconds;
 
     /// <summary>
     /// 조준선과 <b>같은</b> 방향. 예고선도 이 방향으로 그리므로 선과 탄이 정확히 일치한다.
@@ -433,8 +439,8 @@ public class TurretHeadAim : NetworkBehaviour, ITurretAimGate
         // 시점은 각 피어가 "선이 켜진 뒤 경과"로 잰다 — 켜짐 신호와 같은 지연이라 간격이 서버와 같다. 따로 복제하지 않는다.
         if (_laserShownAt < 0f) _laserShownAt = Time.time;
         float elapsed = Time.time - _laserShownAt;
-        Color c = elapsed >= telegraphSeconds ? lockedColor
-                : elapsed >= telegraphSeconds * trackingColorAt ? trackingColor
+        Color c = elapsed >= TrackSeconds ? lockedColor
+                : elapsed >= TrackSeconds * trackingColorAt ? trackingColor
                 : startColor;
         ApplyLaserColor(c);
 

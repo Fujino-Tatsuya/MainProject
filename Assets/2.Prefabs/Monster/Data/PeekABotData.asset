@@ -13,10 +13,12 @@ MonoBehaviour:
   m_Name: PeekABotData
   m_EditorClassIdentifier: 
   archetype: 1
+  rank: 0
   attackDamage: 7
   moveSpeed: 1
   chaseSpeed: 1
-  attackSpeed: 0.8
+  attackSpeed: 1
+  attackCooldown: 0.97
   maxHp: 55
   defense: 0
   maxShield: 0
@@ -48,7 +50,6 @@ MonoBehaviour:
   hasSuperArmorWhileAttacking: 0
   hitStunDuration: 0.4
   despawnDelay: 2
-  isMidBoss: 0
   animSpeedParam: 
   attackTrigger: Shoot
   attackFinishTrigger: 
@@ -56,4 +57,6 @@ MonoBehaviour:
   groggyBool: 
   deathTrigger: 
   locomotionState: Idle
+  locomotionClipSpeed: 0
+  locomotionAnimSpeedRange: {x: 0.5, y: 2.5}
   animatorControllerOverride: {fileID: 9100000, guid: 292844ba7d1ca444ab742cb4631a182d, type: 2}

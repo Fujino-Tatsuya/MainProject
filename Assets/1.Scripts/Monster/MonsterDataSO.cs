@@ -14,7 +14,15 @@ public class MonsterDataSO : ScriptableObject
     public int attackDamage = 10;
     public float moveSpeed = 2.5f;   // 배회/기본 이동 속도
     public float chaseSpeed = 4f;    // 추격 이동 속도
-    public float attackSpeed = 1f;   // 초당 공격 횟수. 공격 간격 = 1 / 이 값. (Unit.AttackSpeed로 주입 → 공격 쿨다운 산출)
+    [Tooltip("몬스터 고유 공격속도 = 공격 애니 재생 배율. 1 = 원본, 2 = 두 배 빠르게, 0.5 = 절반.\n" +
+             "공격 판정·예고·지속 시간도 이 배율을 따른다. 공격 간격(쿨다운)과는 무관 — 그건 attackCooldown.\n" +
+             "(2026-10-02 의미 변경: 예전엔 '초당 공격 횟수'였다. 쿨다운은 attackCooldown 으로 분리됐고, 공격이 끝난 뒤부터 센다.)\n" +
+             "🔴 23호(BossDataSO)는 1 에서 바꾸지 말 것 — 애니 관리자에서 빠져 있어 타이머만 나뉘고 애니는 그대로다.")]
+    [Min(0.05f)] public float attackSpeed = 1f;   // Unit.AttackSpeed 로 주입
+    [Tooltip("공격 후 쉬는 시간(초) — 공격이 **끝난**(Attack 상태를 빠져나간) 뒤 다음 공격까지. " +
+             "attackSpeed 로 공격 길이를 바꿔도 이 값은 그대로다. 0 이면 끝나자마자 다시 공격한다(HumanoidBot = 의도된 0 — 10-02 이전 밸런스 유지).\n" +
+             "⚠️ 23호는 예외 — 시작 기준이고, 행 cooldown 이 0 인 행의 폴백으로만 쓰인다.")]
+    [Min(0f)] public float attackCooldown = 1f;
     public int maxHp = 100;
     public int defense = 0;
     public int maxShield = 0;
@@ -101,6 +109,31 @@ public class MonsterDataSO : ScriptableObject
     public string groggyBool = "Groggy";      // bool
     public string deathTrigger = "Death";     // trigger
     public string locomotionState = "Movement"; // 이동(로코모션) 상태명 — 액션 클립 강제 종료 후 복귀 CrossFade 대상
+
+    // 애니 재생 속도(animator.speed) — MonsterBase 가 한 곳에서 정한다(PLAN-monster-anim-speed S2).
+    //   locomotionState 재생 중 + 움직이는 중 → 실제 속도 ÷ locomotionClipSpeed (범위 제한)
+    //   그 밖 상태 + 로직 Attack            → attackSpeed
+    //   나머지(피격·그로기·사망·서 있음)     → 1
+    [Header("애니 재생 속도 — 이동 클립 맞춤")]
+    [Tooltip("이동 클립 고유 속도(m/s) = 재생 속도 1 일 때 발이 땅을 밀고 가는 속도. " +
+             "이동 중 재생 속도 = 실제 이동 속도 ÷ 이 값 → 발 미끄러짐이 사라진다.\n" +
+             "0 이면 맞추지 않는다(재생 속도 1 고정 = 예전 동작).")]
+    [Min(0f)] public float locomotionClipSpeed = 0f;
+    [Tooltip("이동 블렌드에서 이동 클립 비중이 100% 가 되는 속도(m/s) = 블렌드 트리 마지막 자식의 임계값.\n" +
+             "이보다 느리면 대기 클립과 섞여 발이 덜 나가므로 재생 속도를 그만큼 덜 줄인다: 재생 속도 = max(실제 속도, 이 값) ÷ 클립 고유 속도.\n" +
+             "블렌드 트리는 런타임에 못 읽는다 — `Tools/Monster/이동 클립 고유 속도 측정 → SO 기록` 이 같이 채운다.")]
+    [Min(0f)] public float locomotionFullBlendSpeed = 0f;
+    [Tooltip("블렌드 대기 클립 한 주기(초, 블렌드 timeScale·상태 speed 반영). 1D 블렌드는 자식 클립 시간을 맞추므로 " +
+             "대기 클립이 길수록 섞인 구간의 이동 클립이 느려진다 — 그 보정에 쓴다. 0 = 보정 생략. 측정 도구가 채운다.")]
+    [Min(0f)] public float locomotionIdleCycleSeconds = 0f;
+    [Tooltip("블렌드 이동 클립 한 주기(초, 블렌드 timeScale·상태 speed 반영). 0 = 보정 생략. 측정 도구가 채운다.")]
+    [Min(0f)] public float locomotionMoveCycleSeconds = 0f;
+    [Tooltip("움직이는 동안 이동 블렌드 값을 max(실제 속도, locomotionFullBlendSpeed) 로 보내 **이동 클립 100%** 로 재생한다.\n" +
+             "블렌드 임계값이 이동 속도보다 높고 대기 클립이 긴 몹(ChompBot: th 4.5 · 대기 3.8초 vs 이동 0.4초)은 늘 섞인 구간에서 돌아 " +
+             "이동 클립이 슬로모션이 된다 — 재생 속도로는 못 메운다(배회 9배 필요). 켜면 출발 순간 대기→이동 섞임이 사라진다(팀장 10-02 Chomp 만).")]
+    public bool locomotionFullBlendWhileMoving = false;
+    [Tooltip("이동 클립 재생 속도 범위. 너무 느리거나 빠르면 어색해서 자른다 — 범위 밖에선 다시 약간 미끄러진다.")]
+    public Vector2 locomotionAnimSpeedRange = new Vector2(0.5f, 2.5f);
 
     [Header("애니메이터 컨트롤러 교체 (선택)")]
     [Tooltip("비우면 프리팹/아트 프리팹에 배선된 컨트롤러를 그대로 쓴다. " +
