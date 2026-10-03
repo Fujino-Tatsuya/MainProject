@@ -49,8 +49,6 @@ public static class ZoneBridgeGateWiring
     };
 
     // 구 저작의 연출값(같은 커밋). AddComponent 기본값(1.2 / 0.12)과 다르므로 새로 붙일 때 복원한다.
-    const float LegacyRingRadius = 1.55f;
-    const float LegacyRingWidth = 0.2f;
 
     [MenuItem("Tools/Map/Authoring/Wire Zone Bridge Gate (ZoneL_typeB)")]
     public static void WireGate()
@@ -65,16 +63,6 @@ public static class ZoneBridgeGateWiring
 
             List<Transform> panels = Collect(root, PanelPrefix);
             List<Transform> bridges = Collect(root, BridgePrefixes);
-
-            // 새로 붙인 것이면 구 저작의 연출값을 복원한다. 컴포넌트 기본값과 다르므로
-            // 이걸 빼면 링이 눈에 띄게 작고 얇아진다(반지름 1.55→1.2 · 굵기 0.2→0.12).
-            if (added)
-            {
-                var soLook = new SerializedObject(gate);
-                soLook.FindProperty("ringRadius").floatValue = LegacyRingRadius;
-                soLook.FindProperty("ringWidth").floatValue = LegacyRingWidth;
-                soLook.ApplyModifiedPropertiesWithoutUndo();
-            }
 
             var log = new StringBuilder($"[BridgeGate] {(added ? "컴포넌트 추가" : "기존 컴포넌트 갱신")} — {ZonePath}\n");
 

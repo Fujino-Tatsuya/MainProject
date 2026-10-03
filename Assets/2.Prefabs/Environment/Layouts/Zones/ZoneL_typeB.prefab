@@ -589,11 +589,18 @@ MonoBehaviour:
     HasOpenPosition: 1
   openDuration: 1.5
   interactRadius: 2.5
-  ringRadius: 1.55
-  ringColor: {r: 0.45, g: 0.9, b: 1, a: 1}
-  ringWidth: 0.2
-  ringGroundLift: 0.05
-  ringPrefabOverride: {fileID: 0}
+  monitorScreenEnabled: 1
+  screenLocalPosition: {x: -0.219, y: 1.2047, z: 0.2227}
+  screenLocalEuler: {x: 45.6, y: 134.1, z: 0}
+  screenSize: {x: 0.64695, y: 0.64125}
+  screenMaterialSource: {fileID: 2100000, guid: 7977800ee2c1ad94fbc6c65a85404793, type: 2}
+  screenLogo: {fileID: 2800000, guid: 2b2fe2c43ac60f348bdc02c2c8f0a3f8, type: 3}
+  screenOnDuration: 0.9
+  screenLightColor: {r: 0.55, g: 0.85, b: 1, a: 1}
+  screenLightIntensity: 1.5
+  screenLightRange: 2.5
+  screenLightForward: 0.35
+  highlightOutlineMaterial: {fileID: 2100000, guid: 2d3c24cf8d0861f45a6796cf9caa43de, type: 2}
 --- !u!114 &1384667535510177199
 MonoBehaviour:
   m_ObjectHideFlags: 0

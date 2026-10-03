@@ -8,6 +8,9 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-10-03 · 경석(Claude) · **타이틀 시작 연출 · 존 게이트 패널 모니터 켜짐·외곽선**, 브랜치 `feature/Boss23`) — ✅ 팀장 Play OK(10-04) · 로컬 커밋(푸시 전). 게이트 활성 표시 = 모니터 화면(바닥 링 삭제). ⚠️ ZoneL_typeB 를 프리팹 모드로 열어 둔 채 파일을 바꾸면 Auto Save 가 덮어쓴다 — 값은 `Tools/Map/Authoring/Zone Monitor Screen/5` 로
+계획 = [PLAN-title-monitor.md](PLAN-title-monitor.md)(승인 10-03, Codex 설계 회의 반영). 🔴 **수정 예정 — 동시 수정 금지:** `UI/Title/*`(TitleFlowDirector·TitleMonitorDisplay·셰이더) · `Map/ZoneBridgeGate.cs`·`ZoneBridgeGateManager.cs` · `ZoneL_typeB.prefab`(게이트 값) · 신규 외곽선 셰이더.
+
 ## ▶▶ 작업 세션 (2026-10-02~03 · 경석(Claude) · **몬스터 공격속도 = 애니 재생 배율 · 쿨다운 종료 기준 · 이동 애니 맞춤**, 브랜치 `feature/Boss23`) — ✅ development 반영(10-03) · **SVN r372 같이 받을 것**(GameData.xlsx Monster attackSpeed→1 · Chomp 2/2.8, 핀 372) · 팀장 Play 1차(Chomp·Mortar) · ⏳ MPPM·배율 0.5/2 Play 미검증
 계획·결정·교차검증 이력 = [PLAN-monster-anim-speed.md](PLAN-monster-anim-speed.md) §3 · S4-b.
 - `attackSpeed` = 공격 애니 재생 배율(SO 직접 — `MonsterBase.AttackAnimSpeed`, Unit.AttackSpeed 는 클라에서 0) · 공격 중 코드 타이머 ÷ · 돌진 속도 ×r · 가속 ×r².

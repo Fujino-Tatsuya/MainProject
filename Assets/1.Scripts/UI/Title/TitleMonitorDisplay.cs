@@ -53,6 +53,9 @@ public sealed class TitleMonitorDisplay : MonoBehaviour
 
     public RenderTexture Texture => _rt;
 
+    /// <summary>중앙 화면 렌더러 — 시작 연출이 화면 중심(bounds)·방향을 잡는 데 쓴다. FBX 피벗은 메시 중심이 아니다.</summary>
+    public Renderer ScreenRenderer => _screenRenderer;
+
     /// <summary>화면에 실제로 쓰이는 인스턴스 — FX(TitleCrtFx)는 반드시 이걸 갱신한다.</summary>
     public Material ScreenMaterial => _uiMaterial;
     public Camera UICamera => _uiCamera;
@@ -74,6 +77,8 @@ public sealed class TitleMonitorDisplay : MonoBehaviour
 
         _uiMaterial = new Material(_uiMaterialSource) { name = "TitleMonitorUI (Instance)" };
         _uiMaterial.mainTexture = _rt;
+        _uiMaterial.SetFloat(IdPower, 1f);
+        _uiMaterial.SetFloat(IdScreenAspect, aspect);   // 꺼짐 연출(둥근 사각 실루엣) 비율 — 화면 메시 기준
         Vector2 scale = new(_flipX ? -1f : 1f, _flipY ? -1f : 1f);
         Vector2 offset = new(_flipX ? 1f : 0f, _flipY ? 1f : 0f);
         _uiMaterial.mainTextureScale = scale;
@@ -147,6 +152,33 @@ public sealed class TitleMonitorDisplay : MonoBehaviour
         ApplyScreenMaterial();
         _showingUI = true;
     }
+
+    /// <summary>
+    /// 게임 시작 — 화면을 **월드에서** CRT 처럼 끈다(<c>_Power</c> 1→0 = Title/CRTOff 와 같은 연출을 화면 메시 안에서, 끝 = 검정).
+    /// 시작하는 순간 화면 클릭을 막는다(<see cref="TryScreenToUIPixel"/> 은 Starting 을 모른다 — Codex 10-03).
+    /// 끝나면 불투명 검정이 남는다(깊이 기록 유지 — 카메라가 그 검은 화면으로 밀고 들어간다).
+    /// </summary>
+    public System.Collections.IEnumerator PowerOff(float duration)
+    {
+        if (!enabled || _uiMaterial == null) yield break;
+
+        _showingUI = false;
+        ApplyScreenMaterial();   // 로고 상태(원본 머티리얼)였어도 꺼짐 셰이더가 걸리게
+
+        float t = 0f;
+        duration = Mathf.Max(0.01f, duration);
+        while (t < duration)
+        {
+            t += Time.unscaledDeltaTime;
+            // 선형 — 원본 TitlePowerOff 와 같다(곡선은 셰이더 안 구간 이징이 만든다).
+            _uiMaterial.SetFloat(IdPower, 1f - Mathf.Clamp01(t / duration));
+            yield return null;
+        }
+        _uiMaterial.SetFloat(IdPower, 0f);
+    }
+
+    private static readonly int IdPower = Shader.PropertyToID("_Power");
+    private static readonly int IdScreenAspect = Shader.PropertyToID("_ScreenAspect");
 
     private void ApplyScreenMaterial()
     {
