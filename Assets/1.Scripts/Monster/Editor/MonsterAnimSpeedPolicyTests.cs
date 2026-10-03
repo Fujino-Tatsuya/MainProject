@@ -85,10 +85,23 @@ public sealed class MonsterAnimSpeedPolicyTests
         Assert.AreEqual(6f, MonsterAnimSpeedPolicy.BlendParam(6f, loco), 1e-5f);
         Assert.AreEqual(0f, MonsterAnimSpeedPolicy.BlendParam(0f, loco), 1e-5f);    // 서 있으면 대기 그대로
         Assert.AreEqual(1f, MonsterAnimSpeedPolicy.LocomotionSpeed(2.5f, loco), 1e-5f);  // 2.5 / 2.5
-        // 끄면 섞인 구간 슬로모션이 그대로 남아 상한에 걸린다.
+        // 끄면 섞인 구간 슬로모션 보정이 상한(2.5)에 걸리고, 그마저 비중 w=2.5/4.5 만큼만 건다 → 1 + 1.5·w.
         loco.fullBlendWhileMoving = false;
-        Assert.AreEqual(2.5f, MonsterAnimSpeedPolicy.LocomotionSpeed(2.5f, loco), 1e-5f);
+        Assert.AreEqual(1f + 1.5f * (2.5f / 4.5f), MonsterAnimSpeedPolicy.LocomotionSpeed(2.5f, loco), 1e-4f);
         Assert.AreEqual(2.5f, MonsterAnimSpeedPolicy.BlendParam(2.5f, loco), 1e-5f);
+    }
+
+    [Test]
+    public void 저속_대기_위주_블렌드는_보정을_비중만큼만_건다()
+    {
+        // Humanoid 형: W 2.49 · th 2 · 대기 6.33s · 이동 0.53s. v=1 이면 보정만으론 5.2배 → 상한 2.5.
+        var loco = Loco(2.49f, th: 2f, idle: 6.33f, move: 0.53f);
+        float atSlow = MonsterAnimSpeedPolicy.LocomotionSpeed(1f, loco);
+        Assert.AreEqual(1f + 1.5f * 0.5f, atSlow, 1e-4f);            // w = 0.5
+        // MovingThreshold 바로 위에서 1 근처 — 경계에서 튀지 않는다.
+        Assert.Less(MonsterAnimSpeedPolicy.LocomotionSpeed(0.11f, loco), 1.1f);
+        // 임계값 이상(w = 1)은 보정 그대로.
+        Assert.AreEqual(3f / 2.49f, MonsterAnimSpeedPolicy.LocomotionSpeed(3f, loco), 1e-4f);
     }
 
     [Test]

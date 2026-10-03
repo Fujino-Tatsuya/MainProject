@@ -145,8 +145,8 @@ Codex 는 시간 한도로 최종 보고 전에 멈췄고 중간 판정 4건을 
 | 🟡 터렛 레이어 '평소 상태' 기억이 공격 중 합류 클라·사격 꼬리에서 틀림 | 공통 | 스폰 직후 레이어 **현재** 상태(= 기본 상태)로 기억, 로직 상태로 거르지 않음 |
 | 🟡 `data-table.md` §6 · `boss-rebuild-standard.md:404` · Gauntlet 주석 · PLAN §4 옛 내용 | 공통 | 갱신 |
 | ⚪ 측정 도구가 Play 중 SO 기록 가능(테이블 값이 디스크에 박힘) | Claude | Play 중 기록 거부 |
-| 🟡 xlsx SVN 커밋 없이 git 만 나가면 테이블·빌드에서 공격 느림 · `art-svn.json` 핀 | Claude | SVN 커밋 → 핀 갱신을 **같은 푸시**에 |
-| 🟡 저속(0.1 < v < 블렌드 임계) 대기 위주 블렌드가 2.5배속·0.1 경계에서 1↔2.5 튐 | Claude | ⏳ 팀장 결정 대기 |
+| 🟡 xlsx SVN 커밋 없이 git 만 나가면 테이블·빌드에서 공격 느림 · `art-svn.json` 핀 | Claude | ✅ SVN **r372** 커밋 · `art-svn.json` 핀 372 · 같은 푸시 |
+| 🟡 저속(0.1 < v < 블렌드 임계) 대기 위주 블렌드가 2.5배속·0.1 경계에서 1↔2.5 튐 | Claude | **팀장 승인: 보정을 비중 w 만큼만** — 재생 = 1 + (보정 − 1)·w. 평소 이동(w=1)은 그대로 |
 | 🔴(기존) xlsx 빈 칸 `Paladin!C32`·`Gunner!C18` + 코드에 없는 `tooltip.*` 행(r366, `feature/SkillTooltip` 원격 없음) → 테이블 Play·빌드 차단 | 공통 | 이 작업 밖 — 은희 공유 |
 | 남김 | — | Spinner 벽 근처 autoBraking 으로 예고가 약간 김(과대 쪽) · `attackCooldown` 테이블 행 없음(규칙상 SO, 의도) |
 

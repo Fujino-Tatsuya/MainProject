@@ -81,6 +81,13 @@ public static class MonsterAnimSpeedPolicy
 
         float min = Mathf.Max(0.05f, Mathf.Min(loco.range.x, loco.range.y));
         float max = Mathf.Max(min, Mathf.Max(loco.range.x, loco.range.y));
-        return Mathf.Clamp(moveSpeed / foot, min, max);
+        float corrected = Mathf.Clamp(moveSpeed / foot, min, max);
+
+        // 보정은 이동 클립 비중 w 만큼만 건다: 1 + (보정 − 1)·w.
+        // 🔴 대기 클립이 섞인 저속 구간(출발 가속·도착 감속·군중 밀림)에서 대기 모션까지 상한(2.5)으로 돌고,
+        //    MovingThreshold 경계에서 1 ↔ 2.5 로 튀던 것을 막는다(10-03 교차검증 Claude, 팀장 승인).
+        //    평소 이동은 블렌드 임계값보다 빨라 w = 1 — 보정이 그대로 걸린다.
+        float w = loco.fullBlendSpeed > 0f ? Mathf.Clamp01(BlendParam(moveSpeed, loco) / loco.fullBlendSpeed) : 1f;
+        return 1f + (corrected - 1f) * w;
     }
 }
