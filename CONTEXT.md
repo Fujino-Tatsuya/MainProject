@@ -8,6 +8,32 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 다음 세션 인수인계 (2026-10-05 · 경석(Claude)) — 여기부터 읽을 것
+
+**이 세션에서 끝낸 것**: 몬스터 공격속도·쿨다운·이동 애니(development 반영 `4040189c`, SVN r372) · 타이틀 시작 연출 + 존 게이트 모니터 패널·외곽선(`feature/Boss23` `5e3e46fe`, development **미반영**) ·
+존 프리팹 NetworkObject 정리(아래 1번, **Unity 검증 대기**).
+
+**남은 일 (우선순위 순)**
+1. 🔴 **존 NetworkObject 정리 검증** — Unity 를 꺼 둔 채 YAML 로 했다: 존 7종(ZoneL_typeA/B/C · ZoneM_typeA/B · ZoneS_typeA · Zone_typeQuest01) 루트 NetworkObject 제거 ·
+   `DefaultNetworkPrefabs.asset` 항목 31 → 24 · 아트 씬 `all_mesh.unity` 의 고아 `GlobalObjectIdHash` 오버라이드 5건 제거 · 재감염 방지 테스트 `ZonePrefabNetworkRulesTests`(전투 EditMode 러너 등록).
+   → Unity 열고 **컴파일 · `Tools/Tests/전투 EditMode 테스트 실행`(신규 2건 통과 확인) · 튜토리얼 Play(존 생성·다리 게이트 F) · MPPM** 후 커밋. 원본 백업 = 이 PC 스크래치(세션 종료 시 사라짐) — 문제 시 `git checkout` 으로 되돌릴 것.
+   근거: 존은 `MapContentSpawner` 가 로컬 Instantiate(네트워크 Spawn 은 몬스터뿐), 7종에 NetworkBehaviour 없음 확인.
+2. 🔴 **데이터 테이블 Play·빌드 차단(기존 문제)** — SVN r366(은희)이 xlsx 에 `tooltip.*` 행을 넣었는데 코드(`feature/SkillTooltip`)가 git·SVN·GitHub 어디에도 없다(10-04 전수 확인).
+   테이블 모드 Play 가 오류 30개로 꺼진다(`DataSourcePlayMode.cs:103`). **은희에게 브랜치 푸시 요청**(팀장). 그동안 경석 PC 데이터 출처 = 인스펙터.
+   대안(공유 후에만): xlsx 툴팁 행 필드명 앞에 `#` — 값 보존, 되돌리기 쉬움.
+3. **development 반영** — `feature/Boss23` 의 타이틀·모니터 작업(`5e3e46fe` 이후). 팀장 결정 시.
+4. **bossroom NetworkObject 4개 용도 확인** — 루트가 아니라 중첩 프리팹 오브젝트에 붙어 있다(GlobalObjectIdHash 4130406446 · 3863298080 · 3199288331 · 3620266727). 정상 네트워크 오브젝트인지 감염인지 모름 → 확인 후 가드 테스트 `Excluded` 에서 빼기.
+5. 🆕 **안 쓰는 스크립트·파일·폴더 정리(팀장 10-05 요청)** — 큰 작업: grill → PLAN → 승인. 원칙 = 참조 0 을 guid grep 으로 증명 · git/SVN 소유 구분(아트·.meta 는 SVN) · **Unity 끄고**(디렉터리 이동·대량 삭제) · 지운 뒤 컴파일·테스트·Play.
+   알고 있는 후보(전부 확인 필요):
+   - `Assets/1.Scripts/Map/ZoneInteractRing.cs` — 10-04 부터 미사용. 단 Visual Scripting 생성 코드 `Assets/Unity.VisualScripting.Generated/.../AotStubs.cs` 가 참조 → **Node Library 재생성 후** 삭제.
+   - `TitlePowerOff` 의 시작 경로는 이제 폴백뿐(EXIT 는 사용 중 — 클래스는 유지).
+   - `Assets/2.Prefabs/Player/Legacy/`(구 Paladin·TempPlayer_Armature — 스폰 안 됨, player-prefabs.md) · `Assets/3.Materials/Environment/NotUsedInMap/` · 레거시 `MonsterTimeController`(Enemy 전용).
+   - 기존 감사 문서 `Docs/04-report/deadcode-audit-2026-09-09.md` 를 출발점으로 쓸 것.
+   - 이 세션의 1회성·진단 도구는 남겨 둠: `Tools/Monster/공격 클립 길이 보고`·`이동 클립 고유 속도 측정`, `Tools/Map/Authoring/Zone Monitor Screen/*` — 계속 쓸지 정리 때 판단.
+6. **미검증 Play** — 몬스터 `attackSpeed` 0.5/2 · MPPM(클라 공격 애니 속도·Mortar 발사·WallBot 평타 2단) · 모니터 패널 MPPM(다른 피어가 켠 패널).
+7. 기존 EditMode 실패 2(`BossCounterDataTests` — No23 Dash 가 FarthestPlayer): 데이터가 맞으면 테스트 수정, 실수면 데이터 원복 — 팀장 결정.
+8. `Assets/1.Scripts/Player/Fall/FallBoundarySettings.cs` 줄 끝(EOL)만 다른 변경이 계속 뜬다 — 내 것 아님, 커밋하지 않음.
+
 ## ▶▶ 작업 세션 (2026-10-03 · 경석(Claude) · **타이틀 시작 연출 · 존 게이트 패널 모니터 켜짐·외곽선**, 브랜치 `feature/Boss23`) — ✅ 팀장 Play OK(10-04) · `feature/Boss23` 푸시 `5e3e46fe`(development 미반영). 게이트 활성 표시 = 모니터 화면(바닥 링 삭제). ⚠️ ZoneL_typeB 를 프리팹 모드로 열어 둔 채 파일을 바꾸면 Auto Save 가 덮어쓴다 — 값은 `Tools/Map/Authoring/Zone Monitor Screen/5` 로
 계획 = [PLAN-title-monitor.md](PLAN-title-monitor.md)(승인 10-03, Codex 설계 회의 반영). 🔴 **수정 예정 — 동시 수정 금지:** `UI/Title/*`(TitleFlowDirector·TitleMonitorDisplay·셰이더) · `Map/ZoneBridgeGate.cs`·`ZoneBridgeGateManager.cs` · `ZoneL_typeB.prefab`(게이트 값) · 신규 외곽선 셰이더.
 
