@@ -5,6 +5,7 @@ using UnityEngine;
 /// <summary>
 /// 어쌔신 일반 평타. 추가 클릭은 예약하지 않고, 한 타가 끝나는 순간까지 처음 누른 좌클릭을 계속 유지한 경우에만 다음 타로 이어진다.
 /// 입력과 방향은 오너가 보내며 시작/연결 승인, 판정, 피해는 서버가 담당한다.
+/// 모드는 <see cref="AssassinState"/> 로 고른다 — 변신 중 = Speed_Attack_Loop 4타 묶음, 일반 E 강화 준비 = 강타 1회, 그 외 = 일반 4타.
 /// </summary>
 [RequireComponent(typeof(Player))]
 [RequireComponent(typeof(PlayerInputReader))]
@@ -20,6 +21,10 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
 
     private const float InputSyncInterval = 0.08f;
 
+    // Animator AttackIndex — 일반 0~3 뒤에 강타·변신 묶음 상태를 둔다(AssassinShellAuthoring 이 같은 값으로 전이를 만든다).
+    public const int EnhancedAnimatorIndex = 4;
+    public const int TransformedAnimatorIndex = 5;
+
     [SerializeField] private AssassinBasicAttackData data;
     [SerializeField] private Animator animator;
 
@@ -30,6 +35,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     private PlayerAimIndicator aim;
     private AssassinConeAttack coneAttack;
     private AssassinCombatIdle combatIdle;
+    private AssassinState assassinState;
     private AssassinComboModel combo;
 
     private bool active;
@@ -38,7 +44,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     private bool finishingTail;
     private bool releaseLatched;
     private bool serverContinueHeld;
-    private bool hitConsumed;
+    private int hitsFired;
     private int currentStepIndex;
     private AssassinBasicAttackMode currentMode;
     private Vector3 attackDirection;
@@ -63,6 +69,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         aim = GetComponent<PlayerAimIndicator>();
         coneAttack = GetComponent<AssassinConeAttack>();
         combatIdle = GetComponent<AssassinCombatIdle>();
+        assassinState = GetComponent<AssassinState>();
 
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
@@ -97,10 +104,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
 
         Vector3 direction = CurrentAimDirection();
         if (!IsNetworkActive)
-        {
-            StartServer(combo.Begin(Time.time), direction, SelectAttackMode());
-            return true;
-        }
+            return StartServerAttack(direction);
 
         if (!IsOwner)
             return false;
@@ -196,12 +200,40 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     }
 
     /// <summary>
-    /// A7은 강화 준비/변신 상태를 이 한 지점에서만 읽어 공격 모드를 고른다.
+    /// [서버] 강화 준비/변신 상태를 이 한 지점에서만 읽어 공격 모드를 고른다 — 변신 > 강화 > 일반.
     /// 시작 후에는 <see cref="currentMode"/>를 고정해 타 도중 상태 변화가 현재 판정을 바꾸지 않는다.
+    /// 변신 종료 대기 중(만료·수동 해제)에는 새 묶음을 시작하지 않는다(§6·§10.2).
     /// </summary>
-    private AssassinBasicAttackMode SelectAttackMode()
+    private bool TrySelectAttackMode(out AssassinBasicAttackMode mode)
     {
-        return AssassinBasicAttackMode.Normal;
+        mode = AssassinBasicAttackMode.Normal;
+        if (assassinState == null)
+            return true;
+
+        if (assassinState.IsTransformed)
+        {
+            mode = AssassinBasicAttackMode.Transformed;
+            return !assassinState.IsTransformEndPending;
+        }
+
+        if (assassinState.IsEnhancedReady)
+            mode = AssassinBasicAttackMode.Enhanced;
+
+        return true;
+    }
+
+    /// <summary>[서버] 모드를 골라 첫 타(또는 다음 타·다음 묶음)를 시작한다. 실패하면 오너 요청을 거절한다.</summary>
+    private bool StartServerAttack(Vector3 direction)
+    {
+        if (!TrySelectAttackMode(out AssassinBasicAttackMode mode))
+        {
+            RejectStartRpcIfNeeded();
+            return false;
+        }
+
+        // 강타·변신 묶음은 일반 4타 순서와 별개다.
+        int stepIndex = mode == AssassinBasicAttackMode.Normal ? combo.Begin(Time.time) : 0;
+        return StartServer(stepIndex, direction, mode);
     }
 
     private void TickInputSource()
@@ -238,7 +270,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             return;
         }
 
-        StartServer(combo.Begin(Time.time), direction, SelectAttackMode());
+        StartServerAttack(direction);
     }
 
     [Rpc(SendTo.Server)]
@@ -254,23 +286,32 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             serverNextDirection = Flatten(direction);
     }
 
-    private void StartServer(int stepIndex, Vector3 direction, AssassinBasicAttackMode mode)
+    private bool StartServer(int stepIndex, Vector3 direction, AssassinBasicAttackMode mode)
     {
         if (!TryGetStep(mode, stepIndex, out AssassinBasicAttackStepData step))
         {
             RejectStartRpcIfNeeded();
-            return;
+            return false;
         }
 
         if (!player.BeginAttackState())
         {
             RejectStartRpcIfNeeded();
-            return;
+            return false;
+        }
+
+        // 강타가 실제로 시작되는 순간에만 강화 소모 + 일반 E 쿨(§8.2). 무시된 입력은 위에서 이미 빠졌다.
+        // 강타 뒤 일반 평타는 1타부터(§5.1).
+        if (mode == AssassinBasicAttackMode.Enhanced)
+        {
+            combo.Reset();
+            assassinState?.ServerConsumeEnhancement();
         }
 
         BeginRuntime(stepIndex, direction, mode, step);
         if (IsNetworkActive)
             StartRpc(stepIndex, attackDirection, (byte)mode);
+        return true;
     }
 
     [Rpc(SendTo.NotServer)]
@@ -331,7 +372,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         requesting = false;
         releaseLatched = false;
         serverContinueHeld = true;
-        hitConsumed = false;
+        hitsFired = 0;
         currentStepIndex = stepIndex;
         currentMode = mode;
         attackDirection = Flatten(direction);
@@ -345,17 +386,26 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
 
         if (animator != null)
         {
-            animator.SetInteger(AttackIndexHash, currentStepIndex);
+            animator.SetInteger(AttackIndexHash, AnimatorIndexFor(mode, currentStepIndex));
             animator.SetTrigger(DefaultAttackHash);
         }
     }
 
+    private static int AnimatorIndexFor(AssassinBasicAttackMode mode, int stepIndex) => mode switch
+    {
+        AssassinBasicAttackMode.Enhanced => EnhancedAnimatorIndex,
+        AssassinBasicAttackMode.Transformed => TransformedAnimatorIndex,
+        _ => stepIndex,
+    };
+
+    // 타격마다 현재 범위를 다시 판정한다(§3.3). 변신 묶음은 Hit 이벤트 4번 = 4타.
     private void FireCurrentHit()
     {
-        if (!active || hitConsumed || !TryGetStep(currentMode, currentStepIndex, out AssassinBasicAttackStepData step))
+        if (!active || !TryGetStep(currentMode, currentStepIndex, out AssassinBasicAttackStepData step) ||
+            hitsFired >= step.HitCount)
             return;
 
-        hitConsumed = true;
+        hitsFired++;
         int damage = Mathf.Max(0, Mathf.RoundToInt(player.FinalAttackDamage * step.AttackDamageMultiplier));
         coneAttack.Fire(
             attackDirection,
@@ -363,6 +413,13 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             step.Angle,
             damage,
             data.TriggersOnHit);
+
+        // 강타가 보스·몹·송전기를 맞히면 대상 수와 무관하게 1스택(§4.2·§4.3). 변신 중 획득 없음은 모델이 막는다.
+        if (currentMode == AssassinBasicAttackMode.Enhanced && assassinState != null &&
+            AssassinHitTargets.ContainsRewardTarget(coneAttack.LastLandedUnits))
+        {
+            assassinState.ServerTryGainStack();
+        }
     }
 
     private void CompleteCurrentStep()
@@ -370,13 +427,12 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         if (!active || !HasGameplayAuthority)
             return;
 
-        combo.Complete(currentStepIndex, Time.time);
-        if (serverContinueHeld)
-        {
-            int next = combo.Begin(Time.time);
-            StartServer(next, serverNextDirection, SelectAttackMode());
+        if (currentMode == AssassinBasicAttackMode.Normal)
+            combo.Complete(currentStepIndex, Time.time);
+
+        // 계속 누르고 있으면 다음 타·다음 묶음. 변신 종료 대기면 시작하지 못하고 여기서 끝난다.
+        if (serverContinueHeld && StartServerAttack(serverNextDirection))
             return;
-        }
 
         EndServer();
     }
@@ -409,7 +465,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         requesting = false;
         releaseLatched = false;
         serverContinueHeld = false;
-        hitConsumed = false;
+        hitsFired = 0;
         fallbackEndTime = 0f;
     }
 
@@ -425,16 +481,19 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         int stepIndex,
         out AssassinBasicAttackStepData step)
     {
-        // A7은 이 switch에 Enhanced/Transformed 데이터 선택만 추가한다.
+        step = null;
+        if (data == null)
+            return false;
+
         switch (mode)
         {
             case AssassinBasicAttackMode.Normal:
-                if (data != null)
-                    return data.TryGetNormalStep(stepIndex, out step);
-                step = null;
-                return false;
+                return data.TryGetNormalStep(stepIndex, out step);
+            case AssassinBasicAttackMode.Enhanced:
+                return data.TryGetEnhancedStep(out step);
+            case AssassinBasicAttackMode.Transformed:
+                return data.TryGetTransformedStep(out step);
             default:
-                step = null;
                 return false;
         }
     }

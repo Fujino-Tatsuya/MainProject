@@ -14,6 +14,9 @@ public sealed class AssassinConeAttack : BaseAttack
 
     private Player owner;
 
+    /// <summary>[서버] 마지막 <see cref="Fire"/> 에서 맞은 Unit(상자 등 Unit 이 아닌 대상은 없다). 다음 Fire 전까지만 유효.</summary>
+    public IReadOnlyList<Unit> LastLandedUnits => landedUnits;
+
     private void Awake()
     {
         owner = GetComponent<Player>();

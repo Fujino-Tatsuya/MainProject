@@ -15,6 +15,7 @@ internal static class PlayerEditModeTestRunner
         "^PlayerSkillCooldownLedgerTests$", // PLAN-assassin A2 — 스킬 단위 쿨 장부·슬롯 교체
         "^PlayerGroundPointProjectionTests$", // PLAN-assassin A4 — 고정 거리 조준·서버 재투영
         "^AssassinComboModelTests$", // PLAN-assassin A6 — 평타 순서·0.8초 유예·스킬 리셋
+        "^AssassinStateModelTests$", // PLAN-assassin A7 — 스택·변신 지속·해제 2초·종료 대기·쓰러짐 정리
         "^HealthShieldTests$",
         "^GunnerHeatModelTests$",
     };

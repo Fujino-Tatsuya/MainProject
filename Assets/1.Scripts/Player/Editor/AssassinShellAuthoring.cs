@@ -8,7 +8,7 @@ using UnityEngine;
 using Object = UnityEngine.Object;
 
 /// <summary>
-/// PLAN-assassin A6 저작 메뉴. 모델/클립 원본은 건드리지 않고, 재실행 가능한 방식으로 컨트롤러·Armature·Variant·데이터 배선을 맞춘다.
+/// PLAN-assassin A6~A7 저작 메뉴. 모델/클립 원본은 건드리지 않고, 재실행 가능한 방식으로 컨트롤러·Armature·Variant·데이터 배선을 맞춘다.
 /// </summary>
 public static class AssassinShellAuthoring
 {
@@ -23,7 +23,18 @@ public static class AssassinShellAuthoring
     private const string ControllerPath = AnimationFolder + "/AssassinAnimatorController.controller";
     private const string DataFolder = "Assets/9.ScriptableObject/Player/Assassin";
     private const string BasicAttackDataPath = DataFolder + "/AssassinBasicAttackData.asset";
+    private const string StateDataPath = DataFolder + "/AssassinStateData.asset";
+    private const string EnhanceSkillDataPath = DataFolder + "/AssassinEnhanceSkillData.asset";
+    private const string TransformSkillDataPath = DataFolder + "/AssassinTransformSkillData.asset";
     private const string RosterPath = "Assets/9.ScriptableObject/Player/CharacterRoster.asset";
+
+    // A7 Animator 상태 — 스킬 데이터 animatorStateName 과 같은 이름이어야 CrossFade 가 맞는다.
+    private const string EnhancedAttackState = "Default_Attack_Enhanced";
+    private const string TransformedAttackState = "Default_Attack_Transformed";
+    private const string EnhanceSkillState = "Assassin_E_Buff";
+    private const string TransformSkillState = "Assassin_R_Transform";
+    private const float EnhanceBuffSpeed = 3f;   // §8.1 Buff 3배속 ≈ 0.5초
+    private const float TransformParrySpeed = 1f; // 🔸 기획 수치 없음 — Play 튜닝
 
     private static readonly string[] WaveClips =
     {
@@ -48,12 +59,13 @@ public static class AssassinShellAuthoring
         "Idle", "Idle_Combat", "Run_Combat_Fast_Loop",
     };
 
-    [MenuItem("Tools/Player/Assassin/A6 전체 구성")]
+    [MenuItem("Tools/Player/Assassin/전체 구성 (A6~A7)")]
     public static void BuildAll()
     {
         BuildShell();
         AttachBasicAttackAndIdle();
         StampClipEventsAndLoopSettings();
+        AttachStateAndSkills();
         AssetDatabase.SaveAssets();
         Debug.Log($"{Tag} 전체 구성 완료. 오류 로그가 없었는지 확인할 것.");
     }
@@ -181,6 +193,106 @@ public static class AssassinShellAuthoring
                   "Hit/End 정규화 시점은 임시값이므로 Play에서 타격 프레임을 튜닝할 것.");
     }
 
+    /// <summary>
+    /// A7 — AssassinState·일반 E 강화·R 변신 부착, 데이터 SO 생성, PlayerSkillController Sub/Ultimate 배선, Animator 상태.
+    /// 데이터는 처음 만들 때만 기본값을 쓰고 재실행 시 튜닝 값을 유지한다.
+    /// </summary>
+    [MenuItem("Tools/Player/Assassin/4. 상태·E 강화·R 변신 부착 + 데이터 (A7)")]
+    public static void AttachStateAndSkills()
+    {
+        if (AssetDatabase.LoadAssetAtPath<GameObject>(VariantPath) == null)
+        {
+            Debug.LogError($"{Tag} Variant가 없다. 먼저 1번 메뉴를 실행할 것: {VariantPath}");
+            return;
+        }
+
+        EnsureFolder(DataFolder);
+        AssassinStateData stateData = EnsureAsset<AssassinStateData>(StateDataPath, out _);
+
+        AssassinEnhanceSkillData enhanceData = EnsureAsset<AssassinEnhanceSkillData>(EnhanceSkillDataPath, out bool enhanceCreated);
+        if (enhanceCreated)
+        {
+            AnimationClip buff = LoadClip("Buff");
+            InitializeSkillData(enhanceData, cooldown: 6f, commitManually: true,
+                maxActiveDuration: ClipDuration(buff, EnhanceBuffSpeed) + 0.3f,
+                animatorStateName: EnhanceSkillState, snapRotation: false);
+        }
+
+        AssassinTransformSkillData transformData = EnsureAsset<AssassinTransformSkillData>(TransformSkillDataPath, out bool transformCreated);
+        if (transformCreated)
+        {
+            AnimationClip parry = LoadClip("Parry_R");
+            InitializeSkillData(transformData, cooldown: 8f, commitManually: true,
+                maxActiveDuration: ClipDuration(parry, TransformParrySpeed) + 0.3f,
+                animatorStateName: TransformSkillState, snapRotation: false);
+        }
+
+        GameObject root = PrefabUtility.LoadPrefabContents(VariantPath);
+        try
+        {
+            AssassinState state = EnsureComponent<AssassinState>(root);
+            AssassinEnhanceSkill enhance = EnsureComponent<AssassinEnhanceSkill>(root);
+            AssassinTransformSkill transform = EnsureComponent<AssassinTransformSkill>(root);
+
+            SetReference(state, "data", stateData);
+            SetReference(enhance, "data", enhanceData);
+            SetReference(transform, "data", transformData);
+
+            PlayerSkillController skills = root.GetComponent<PlayerSkillController>();
+            SetReference(skills, "subSkill", enhance);
+            SetReference(skills, "ultimateSkill", transform);
+
+            PrefabUtility.SaveAsPrefabAsset(root, VariantPath);
+            Debug.Log($"{Tag} A7 상태·E 강화·R 변신 부착/갱신: {VariantPath}");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+
+        // 강타·변신 묶음 스텝 데이터와 Animator 상태를 같은 메뉴에서 맞춘다(둘 다 재실행 안전).
+        EnsureBasicAttackData();
+        AnimatorController controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(ControllerPath);
+        if (controller != null)
+            BuildAnimator(controller);
+        else
+            Debug.LogError($"{Tag} Animator Controller가 없다. 먼저 1번 메뉴를 실행할 것: {ControllerPath}");
+
+        RecordAndValidateHash(AssetDatabase.LoadAssetAtPath<GameObject>(VariantPath));
+        AssetDatabase.SaveAssets();
+    }
+
+    private static void InitializeSkillData(
+        PlayerSkillData data, float cooldown, bool commitManually, float maxActiveDuration,
+        string animatorStateName, bool snapRotation)
+    {
+        SerializedObject so = new SerializedObject(data);
+        so.FindProperty("cooldownTime").floatValue = cooldown;
+        so.FindProperty("commitCooldownManually").boolValue = commitManually;
+        so.FindProperty("maxActiveDuration").floatValue = Mathf.Max(0.1f, maxActiveDuration);
+        so.FindProperty("animatorStateName").stringValue = animatorStateName;
+        so.FindProperty("snapRotationOnStart").boolValue = snapRotation;
+        so.ApplyModifiedPropertiesWithoutUndo();
+        EditorUtility.SetDirty(data);
+        Debug.Log($"{Tag} 스킬 데이터 기본값: {data.name} (쿨 {cooldown}s, 수동 커밋 {commitManually}, 안전망 {maxActiveDuration:F2}s, 상태 {animatorStateName})");
+    }
+
+    private static float ClipDuration(AnimationClip clip, float speed) =>
+        clip != null ? clip.length / Mathf.Max(0.01f, speed) : 1f;
+
+    private static T EnsureAsset<T>(string path, out bool created) where T : ScriptableObject
+    {
+        T asset = AssetDatabase.LoadAssetAtPath<T>(path);
+        created = asset == null;
+        if (!created)
+            return asset;
+
+        asset = ScriptableObject.CreateInstance<T>();
+        AssetDatabase.CreateAsset(asset, path);
+        Debug.Log($"{Tag} 데이터 생성: {path}");
+        return asset;
+    }
+
     private static AssassinBasicAttackData EnsureBasicAttackData()
     {
         AssassinBasicAttackData data = AssetDatabase.LoadAssetAtPath<AssassinBasicAttackData>(BasicAttackDataPath);
@@ -226,6 +338,11 @@ public static class AssassinShellAuthoring
             if (clip.objectReferenceValue == null)
                 clip.objectReferenceValue = LoadClip(WaveClips[i]);
 
+            // A7 에서 생긴 필드 — 기존 에셋은 0 으로 읽히므로 1타로 채운다.
+            SerializedProperty hitCount = step.FindPropertyRelative("hitCount");
+            if (hitCount.intValue < 1)
+                hitCount.intValue = 1;
+
             if (!created)
                 continue;
 
@@ -235,9 +352,35 @@ public static class AssassinShellAuthoring
             step.FindPropertyRelative("playbackSpeed").floatValue = speeds[i];
         }
 
+        // A7: 클립이 비어 있을 때(= 처음 채울 때)만 기본 수치까지 쓴다. 이후 재실행은 튜닝 값을 유지한다.
+        EnsureSpecialStep(so.FindProperty("enhancedStep"), "Combo_Attack_02_01", 2.5f, 1.8f, 120f, 2f, 1);
+        EnsureSpecialStep(so.FindProperty("transformedStep"), "Speed_Attack_Loop", 1.2f, 1.8f, 120f, 1.25f, 4);
+
         so.ApplyModifiedPropertiesWithoutUndo();
         EditorUtility.SetDirty(data);
         return data;
+    }
+
+    private static void EnsureSpecialStep(
+        SerializedProperty step, string clipName, float multiplier, float range, float angle, float speed, int hitCount)
+    {
+        if (step == null)
+        {
+            Debug.LogError($"{Tag} AssassinBasicAttackData 에서 {clipName} 스텝 필드를 찾지 못했다.");
+            return;
+        }
+
+        SerializedProperty clip = step.FindPropertyRelative("clip");
+        if (clip.objectReferenceValue != null)
+            return;
+
+        clip.objectReferenceValue = LoadClip(clipName);
+        step.FindPropertyRelative("attackDamageMultiplier").floatValue = multiplier;
+        step.FindPropertyRelative("range").floatValue = range;
+        step.FindPropertyRelative("angle").floatValue = angle;
+        step.FindPropertyRelative("playbackSpeed").floatValue = speed;
+        step.FindPropertyRelative("hitCount").intValue = hitCount;
+        Debug.Log($"{Tag} 평타 스텝 초기화: {step.name} = {clipName} (×{multiplier}, {range}m, {angle}°, {speed}배속, {hitCount}타)");
     }
 
     private static AnimatorController EnsureController()
@@ -297,9 +440,31 @@ public static class AssassinShellAuthoring
             EnsureAnyStateAttackTransition(sm, attack, i);
         }
 
+        // A7: 강타·변신 묶음(AttackIndex 4·5) — 재생 속도는 평타 데이터 값을 따른다.
+        AssassinBasicAttackData attackData = AssetDatabase.LoadAssetAtPath<AssassinBasicAttackData>(BasicAttackDataPath);
+        AnimatorState enhancedAttack = EnsureState(sm, EnhancedAttackState, LoadClip("Combo_Attack_02_01"));
+        enhancedAttack.speed = attackData != null && attackData.EnhancedStep != null ? attackData.EnhancedStep.PlaybackSpeed : 2f;
+        EnsureReturnToIdleTransitions(enhancedAttack, idle, combatIdle);
+        EnsureAnyStateAttackTransition(sm, enhancedAttack, AssassinBasicAttack.EnhancedAnimatorIndex);
+
+        AnimatorState transformedAttack = EnsureState(sm, TransformedAttackState, LoadClip("Speed_Attack_Loop"));
+        transformedAttack.speed = attackData != null && attackData.TransformedStep != null ? attackData.TransformedStep.PlaybackSpeed : 1.25f;
+        EnsureReturnToIdleTransitions(transformedAttack, idle, combatIdle);
+        // 유지 입력으로 묶음을 반복하면 같은 상태로 다시 들어가야 한다.
+        EnsureAnyStateAttackTransition(sm, transformedAttack, AssassinBasicAttack.TransformedAnimatorIndex, canTransitionToSelf: true);
+
+        // A7: 스킬 상태는 PlayerSkillController 가 animatorStateName 으로 CrossFade 한다(AnyState 전이 불필요).
+        AnimatorState enhanceSkill = EnsureState(sm, EnhanceSkillState, LoadClip("Buff"));
+        enhanceSkill.speed = EnhanceBuffSpeed;
+        EnsureReturnToIdleTransitions(enhanceSkill, idle, combatIdle);
+
+        AnimatorState transformSkill = EnsureState(sm, TransformSkillState, LoadClip("Parry_R"));
+        transformSkill.speed = TransformParrySpeed;
+        EnsureReturnToIdleTransitions(transformSkill, idle, combatIdle);
+
         EditorUtility.SetDirty(controller);
         AssetDatabase.SaveAssets();
-        Debug.Log($"{Tag} Animator 구성: Idle 2, Run Start/Loop/Stop, Dodge, Interrupt, Wave 4 상태");
+        Debug.Log($"{Tag} Animator 구성: Idle 2, Run Start/Loop/Stop, Dodge, Interrupt, Wave 4, 강타·변신 묶음, E Buff·R Parry 상태");
     }
 
     private static GameObject EnsureArmature(AnimatorController controller)
@@ -593,7 +758,8 @@ public static class AssassinShellAuthoring
         transition.AddCondition(mode, threshold, parameter);
     }
 
-    private static void EnsureAnyStateAttackTransition(AnimatorStateMachine machine, AnimatorState to, int attackIndex)
+    private static void EnsureAnyStateAttackTransition(
+        AnimatorStateMachine machine, AnimatorState to, int attackIndex, bool canTransitionToSelf = false)
     {
         foreach (AnimatorStateTransition existing in machine.anyStateTransitions)
         {
@@ -601,13 +767,16 @@ public static class AssassinShellAuthoring
             if (existing.destinationState == to && conditions.Length == 2 &&
                 HasCondition(conditions, "DefaultAttack", AnimatorConditionMode.If, 0f) &&
                 HasCondition(conditions, "AttackIndex", AnimatorConditionMode.Equals, attackIndex))
+            {
+                existing.canTransitionToSelf = canTransitionToSelf;
                 return;
+            }
         }
 
         AnimatorStateTransition transition = machine.AddAnyStateTransition(to);
         transition.hasExitTime = false;
         transition.duration = 0.04f;
-        transition.canTransitionToSelf = false;
+        transition.canTransitionToSelf = canTransitionToSelf;
         transition.AddCondition(AnimatorConditionMode.If, 0f, "DefaultAttack");
         transition.AddCondition(AnimatorConditionMode.Equals, attackIndex, "AttackIndex");
     }
