@@ -22,7 +22,7 @@ Update this file when a term becomes important enough that future agents or team
 - 수정: `MonsterBase.DisableBoneRigidbodyInterpolation`(OnNetworkSpawn, 하위 본 Rigidbody 보간 끔, 아트 SVN 무수정). MPPM 혼잡 핫스팟·2.5G 3판 연속 본 이상 0(1,300+ 샘플).
 - ⚠️ 철회한 가설: 로딩 씬과 함께 몬스터 삭제(실측: Loading→DDOL→Map 이동) · 접힌 바인드 포즈 · 컬링. "더 오래 기다리기"는 이 증상의 처방이 아니었음(굳은 자세가 25초간 유지).
 - 별건(유효): 클라가 `AsyncOperation.progress>=0.9` 에서 100% 보고(`NetworkLoadingFlowController.cs:681`) + 서버가 평균 100% 만으로 완료 → 준비 확인 후 시작으로 바꾸는 계획은 **은희 합의 후** 별도.
-- 재현 도구: 메뉴 `Dev/네트워크 지연 (MPPM)` · 툴바 `Dev/Network Lag`(MPPM 인스턴스별 Network Simulator) + `[LagDiag]`·`[LagDiag-Turret]` 진단 로그(각 인스턴스 `Library/VP/mppm*/Logs/Editor.log`). `Assets/1.Scripts/Dev/NetLag/DevNetworkLag.cs`.
+- 재현: MPPM(호스트 + 클라)에서 클라에만 Multiplayer Tools `NetworkSimulator` 로 지연(예: 400ms ±200 · 손실 5%)을 걸고 `0.BootStrapScene` 부터 정식 흐름으로(Dev Boot 은 로딩 씬을 건너뜀). 각 인스턴스 로그 = `Library/VP/mppm*/Logs/Editor.log`.
 배포용 빌드 = `../MainProjectBuilds/Windows/`(측정기·콘솔 없음 확인) · 측정용 = `../MainProjectBuilds/WindowsDev/`. 실측 표 = [PLAN-cleanup-optimization.md](PLAN-cleanup-optimization.md) §S6.
 
 **이번 세션 결과**
