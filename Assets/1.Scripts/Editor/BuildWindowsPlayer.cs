@@ -49,8 +49,8 @@ public static class BuildWindowsPlayer
     /// 측정용 개발 빌드(PLAN-cleanup-optimization §S6). ProfilerHUD·ZonePerfRecorder 는 DEVELOPMENT_BUILD 에서만 살아 있다.
     /// 프로파일러 자동 연결·딥 프로파일은 켜지 않는다 — 그 자체가 프레임 비용이라 측정을 오염시킨다.
     /// 출력 폴더를 릴리스와 분리해 덮어쓰지 않는다. 결과 CSV = exe 옆 <c>ZonePerf/</c>.
-    /// ⚠️ 이 메뉴(와 위 릴리스 메뉴)는 <c>BuildPipeline.BuildPlayer</c> 직접 호출이라 데이터 테이블 훅
-    /// (<c>DataTableBuild</c> — Build 버튼에만 걸림)을 거치지 않는다 → xlsx 가 아니라 **인스펙터 값**으로 빌드된다.
+    /// 두 메뉴 모두 <c>DataTableBuild.WithTableValues</c> 로 감싸 **xlsx 값**으로 빌드한다(10-07 — 전엔 Build 버튼 훅을
+    /// 안 거쳐 인스펙터 값으로 빌드됐다).
     /// </summary>
     [MenuItem("Build/Windows64 Player (MainFlow · 측정용 Development)")]
     public static void BuildWindows64DevFromMenu()
@@ -98,7 +98,9 @@ public static class BuildWindowsPlayer
             options = buildOptions,
         };
 
-        var report = BuildPipeline.BuildPlayer(options);
+        // 빌드 = 항상 테이블(xlsx) 값 — Build 버튼 훅과 같은 경로로 감싼다(10-07, 이전엔 인스펙터 값으로 빌드됐다).
+        UnityEditor.Build.Reporting.BuildReport report = null;
+        DataTableBuild.WithTableValues(() => report = BuildPipeline.BuildPlayer(options));
         var summary = report.summary;
 
         Debug.Log($"[Build] result={summary.result} errors={summary.totalErrors} warnings={summary.totalWarnings} " +
