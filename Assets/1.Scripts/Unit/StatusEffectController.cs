@@ -152,6 +152,11 @@ public class StatusEffectController : BaseNetworkBehaviour, IStatusEffectFacade
         if (encounterLock != null && encounterLock.IsCinematicLocked)
             return;
 
+        // 몬스터와 같은 SuperArmor 의미: 활성 중 새 차단류 CC만 거부한다.
+        // 이미 걸린 CC는 SuperArmor 적용 시 지우지 않고, 스탯 modifier/패시브 표식은 그대로 허용한다.
+        if (StatusEffectImmunityPolicy.ShouldIgnoreApplication(ActiveEffects, type))
+            return;
+
         int index = IndexOf(type, sourceId);
 
         int stackCount = 1;

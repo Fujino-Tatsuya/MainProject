@@ -471,8 +471,8 @@ public class Player : Unit
     /// 반환값이 곧 계약이다 — <b>false면 구속되지 않았다</b>. 시전자는 이 값으로 후처리를 갈라야 한다
     /// (예: 돌진이 벽에 닿았을 때 <b>실제로 밀린 대상만</b> 기절시킨다). 데미지는 이 값과 무관하게 별도 경로다.
     ///
-    /// Push는 시전자가 슈퍼아머 대상을 밀지 못한다(<see cref="Unit.Knockback"/>과 같은 규칙).
-    /// Carry는 슈퍼아머와 무관하게 걸린다 — 기존 보스 Grab 체인의 동작이다.
+    /// SuperArmor 대상은 Push(밀기)와 Carry(잡기)를 모두 거부한다.
+    /// 보스 Grab 체인 영향은 경석 확인 대기(은희가 직접 공유함).
     /// </summary>
     /// <param name="frontOffset">Push 전용. 시전자 정면으로 이만큼 앞에 붙는다.</param>
     public bool BeginRestrainedByInstigator(
