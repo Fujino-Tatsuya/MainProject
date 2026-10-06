@@ -29,6 +29,8 @@ public class FlatKitSmoothNormalBaker : AssetPostprocessor
         // 거너(10-02) — Flat Kit Variant 로 전환하며 외곽선을 켰다.
         "Assets/50.Art/Char/gunner/gunner.fbx",
         "Assets/50.Art/Char/gunner/laser_gun.fbx",
+        // 어쌔신(10-06, PLAN-assassin.md A0).
+        "Assets/50.Art/Char/assassin/Assassin.fbx",
     };
 
     // 목록이나 굽는 방식을 바꾸면 올린다 — 대상 FBX 가 다시 임포트된다.
