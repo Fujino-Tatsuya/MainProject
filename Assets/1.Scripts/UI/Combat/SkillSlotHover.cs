@@ -18,6 +18,8 @@ public sealed class SkillSlotHover : MonoBehaviour,
     private PlayerSkillController skillController;
     private SkillLineIndicator lineIndicator;
     private ISkillPreviewSource previewSource;
+    private PlayerSkillTargeting targeting;
+    private float rangePreviewRadius;
     private ISkillTooltipSource source;
     private PlayerSkillSlot slot;
     private bool clickable;
@@ -46,9 +48,13 @@ public sealed class SkillSlotHover : MonoBehaviour,
         lineIndicator = owner != null ? owner.GetComponentInChildren<SkillLineIndicator>(true) : null;
         source = tooltipSource;
         slot = inputSlot;
-        previewSource = skillController != null
-            ? skillController.GetSkill(slot) as ISkillPreviewSource
-            : null;
+        targeting = owner != null ? owner.GetComponent<PlayerSkillTargeting>() : null;
+        PlayerSkillBase skill = skillController != null ? skillController.GetSkill(slot) : null;
+        previewSource = skill as ISkillPreviewSource;
+        // 대상 지정 스킬(R 등)은 조준 때와 같은 사거리 원을 호버로 미리 보여준다.
+        rangePreviewRadius = skill != null && skill.Data != null && skill.Data.TargetingMode != SkillTargetingMode.None
+            ? skill.Data.CastRange
+            : 0f;
         clickable = acceptsLeftClick;
         keyLabel = displayKey;
         cooldown = cooldownSeconds;
@@ -116,12 +122,18 @@ public sealed class SkillSlotHover : MonoBehaviour,
     {
         if (previewSource != null)
             lineIndicator?.BeginPreview(previewSource);
+
+        if (rangePreviewRadius > 0f)
+            targeting?.BeginRangePreview(rangePreviewRadius);
     }
 
     private void EndSkillPreview()
     {
         if (previewSource != null)
             lineIndicator?.EndPreview(previewSource);
+
+        if (rangePreviewRadius > 0f)
+            targeting?.EndRangePreview();
     }
 
     private void ReleaseVirtualInput()

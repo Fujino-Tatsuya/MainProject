@@ -68,6 +68,9 @@ public class PlayerSkillTargeting : MonoBehaviour
     private bool serverAutoApproachActive;
     private float serverAutoApproachRange;
 
+    // HUD 슬롯 호버로 사거리 원을 빌려 쓰는 중인지. 조준이 시작되면 조준 쪽이 원을 이어받는다.
+    private bool rangePreviewActive;
+
     public bool IsTargeting => isTargeting;
     // 지금 조준 중인 스킬 슬롯(IsTargeting 일 때만 의미).
     public PlayerSkillSlot CurrentSlot => currentSlot;
@@ -104,6 +107,7 @@ public class PlayerSkillTargeting : MonoBehaviour
             return false;
 
         isTargeting = true;
+        rangePreviewActive = false; // 호버 미리보기 원은 조준이 이어받는다
         beganThisFrame = true;
         currentSlot = slot;
         currentData = skill.Data;
@@ -124,6 +128,31 @@ public class PlayerSkillTargeting : MonoBehaviour
         skill.OnOwnerAimStart();
 
         return true;
+    }
+
+    /// <summary>HUD 슬롯 호버 미리보기 — 조준 중이 아닐 때만 사거리 원을 띄운다.</summary>
+    public void BeginRangePreview(float radius)
+    {
+        if (isTargeting || rangeIndicator == null || radius <= 0f)
+            return;
+
+        rangePreviewActive = true;
+        rangeIndicator.gameObject.SetActive(true);
+        rangeIndicator.ShowRange(radius);
+    }
+
+    /// <summary>호버가 끝나면 미리보기 원만 끈다. 조준이 이어받은 원은 건드리지 않는다.</summary>
+    public void EndRangePreview()
+    {
+        if (!rangePreviewActive)
+            return;
+
+        rangePreviewActive = false;
+        if (isTargeting || rangeIndicator == null)
+            return;
+
+        rangeIndicator.HideAll();
+        rangeIndicator.gameObject.SetActive(false);
     }
 
     public void Cancel()
