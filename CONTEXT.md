@@ -21,6 +21,10 @@ Update this file when a term becomes important enough that future agents or team
 5. **미검증 Play** — MPPM(원격 애니·블렌드 고정) · GauntletBot 예고 · 23호 전기 장판 2회차 VFX · 피격 전이 블렌드 고정.
 6. 기존: `BossCounterDataTests` 실패 2(No23 Dash) 팀장 결정 · `TitleSceneManager.cs:53` BGM NRE · `SoulVisualPrefab` 미지정 경고(은희).
 
+## ▶▶ 작업 세션 (2026-10-06 2차 · 경석(Claude) · **S6 존별 실시간 측정 도구**, 브랜치 `feature/Boss23`) — ✅ 도구·에디터 검증·개발 빌드(미커밋) · ⏳ 팀장 빌드 측정 → 숫자 보고 다음 결정. 실행 = `Dev_Boot.unity` Play(MapScene 직접 Play ✗). 진행·실측 = PLAN §S6 진행
+계획 = [PLAN-cleanup-optimization.md](PLAN-cleanup-optimization.md) §S6(승인 10-06). 예산 = 이 PC 200fps(5.0ms) · 결정은 개발 빌드 숫자 · 이번 범위 = 측정 도구까지 · **존 진입/이탈 때 렌더 설정 전환 안 함**(근거 §S6).
+🔴 **수정 예정 — 동시 수정 금지:** `Dev/Profiler/ProfilerHUD.cs` · 신규 `Dev/Profiler/ZonePerfRecorder.cs` · `Editor/BuildWindowsPlayer.cs`(측정용 Development 메뉴 추가) · `0.Scenes/MainFlow/4.MapScene.unity`(컴포넌트 부착).
+
 ## ▶▶ 작업 세션 (2026-10-06 · 경석(Claude) · **전수조사 정리·최적화 S1~S5**, 브랜치 `feature/Boss23`) — ✅ S1~S5 커밋 · development 반영(10-06)
 계획 = [PLAN-cleanup-optimization.md](PLAN-cleanup-optimization.md)(팀장 결정 §4: 이번 라운드 S1+S2, 은희 영역은 목록만).
 🔴 **수정 예정 — 동시 수정 금지:** `Monster/MonsterBase.cs` · `Monster/Boss/TwentyThreeBoss.cs`·`GrabController.cs`·`BossChargeClipLoop.cs`·`BossPatternTargets.cs`·`BossElectricFloor.cs` ·

@@ -86,12 +86,13 @@ public sealed class ProfilerHUD : MonoBehaviour
     ProfilerRecorder _verts;          // Render, count
     ProfilerRecorder _gcAlloc;        // Memory, bytes/frame
     ProfilerRecorder _sysMem;         // Memory, bytes
+    ProfilerRecorder _shadowCasters;  // Render, count — 그림자 캐스터 정리(S4) 효과를 보는 숫자
 
     readonly List<ProfilerRecorder> _markerRecorders = new List<ProfilerRecorder>();
 
     // FrameTiming
     FrameTiming[] _frameTimings = new FrameTiming[1];
-    double _cpuMs, _gpuMs;
+    double _cpuMs, _gpuMs, _renderMs;
 
     // 그래프(총 프레임 ms 히스토리)
     const int kHistory = 120;
@@ -133,6 +134,7 @@ public sealed class ProfilerHUD : MonoBehaviour
         _verts      = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Vertices Count");
         _gcAlloc    = ProfilerRecorder.StartNew(ProfilerCategory.Memory, "GC Allocated In Frame");
         _sysMem     = ProfilerRecorder.StartNew(ProfilerCategory.Memory, "System Used Memory");
+        _shadowCasters = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Shadow Casters Count");
 
         for (int i = 0; i < customMarkers.Count; i++)
         {
@@ -165,6 +167,7 @@ public sealed class ProfilerHUD : MonoBehaviour
         _verts.Dispose();
         _gcAlloc.Dispose();
         _sysMem.Dispose();
+        _shadowCasters.Dispose();
         for (int i = 0; i < _markerRecorders.Count; i++)
         {
             var r = _markerRecorders[i];
@@ -201,6 +204,7 @@ public sealed class ProfilerHUD : MonoBehaviour
         {
             _cpuMs = _frameTimings[0].cpuFrameTime;
             _gpuMs = _frameTimings[0].gpuFrameTime;
+            _renderMs = _frameTimings[0].cpuRenderThreadFrameTime;
         }
 
         // 총 프레임 ms (FrameTiming 우선, 없으면 deltaTime)
@@ -222,9 +226,12 @@ public sealed class ProfilerHUD : MonoBehaviour
         double mainMs = NsToMs(_mainThread.Valid ? Average(_mainThread) : 0);
 
         _line1 = Fmt("FPS {0,5:0.0}  |  Frame {1,5:0.00} ms  (예산 {2:0.00})", fps, totalMs, _budgetMs);
-        _line2 = Fmt("CPU {0,5:0.00}  GPU {1,5:0.00}  Main {2,5:0.00} ms", _cpuMs, _gpuMs, mainMs);
-        _line3 = Fmt("Draw {0}  SetPass {1}  Tris {2}  GC {3:0.0} KB  Mem {4:0} MB",
-            _drawCalls.LastValue, _setPass.LastValue, _tris.LastValue,
+        // 렌더 스레드·그림자 캐스터는 플랫폼에 따라 안 나온다 — 0 대신 N/A(0 은 거짓 신호).
+        string renderMs = _renderMs > 0.0 ? _renderMs.ToString("0.00") : "N/A";
+        string shadow = _shadowCasters.Valid ? _shadowCasters.LastValue.ToString() : "N/A";
+        _line2 = Fmt("CPU {0,5:0.00}  GPU {1,5:0.00}  Main {2,5:0.00}  Render {3} ms", _cpuMs, _gpuMs, mainMs, renderMs);
+        _line3 = Fmt("Draw {0}  SetPass {1}  Tris {2}  Shadow {3}  GC {4:0.0} KB  Mem {5:0} MB",
+            _drawCalls.LastValue, _setPass.LastValue, _tris.LastValue, shadow,
             _gcAlloc.LastValue / 1024.0, _sysMem.LastValue / (1024.0 * 1024.0));
 
         _markerLines.Clear();
