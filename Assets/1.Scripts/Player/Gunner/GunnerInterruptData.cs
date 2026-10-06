@@ -6,7 +6,7 @@ using UnityEngine;
 /// </summary>
 [CreateAssetMenu(fileName = "GunnerInterruptData", menuName = "Player/Gunner/Interrupt Data")]
 [DataTableSheet("Gunner", Order = 4)]
-public class GunnerInterruptData : PlayerSkillData
+public class GunnerInterruptData : PlayerSkillData, IPlayerInterruptSkillData
 {
     [Header("판정 타이밍")]
     [Tooltip("시전 → 총구가 맞닿는 판정까지(초). 클립에 Hit 이벤트가 있으면 그쪽이 먼저.")]

@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -9,27 +8,15 @@ using UnityEngine;
 /// 그 순간부터 적중·간파 여부와 무관하게 후폭풍으로 공격 반대 방향으로 밀려난다 — 벽·오브젝트에만 막히고 유닛은 통과, 무적 없음.
 /// 쿨타임은 사용 시점(빗나가도 적용 — §8.6). 과열도와 무관.
 /// </summary>
-public class GunnerInterruptSkill : PlayerInstantSkill
+public class GunnerInterruptSkill : PlayerInterruptSkillBase
 {
     private PlayerMotor motor;
     private GunnerBeamView view;
-    private Collider[] hitResults;
-    private readonly HashSet<Object> hitTargets = new HashSet<Object>();
-    private readonly List<Unit> landedUnits = new List<Unit>();
-
-    // 서버
-    private float hitTime;
-    private float endTime;
-    private bool hasResolvedHit;
-
     // 시뮬레이션 피어(오너 + 서버 권위 시 서버)
     private Vector3 attackDirection;
     private float recoilStartTime;
     private float recoilRemaining;
     private float recoilSpeed;
-
-    public override PlayerSkillSlot Slot => PlayerSkillSlot.Interrupt;
-    public override bool CanMoveWhileActive => false;
 
     private GunnerInterruptData IData => Data as GunnerInterruptData;
 
@@ -41,18 +28,6 @@ public class GunnerInterruptSkill : PlayerInstantSkill
     }
 
     public override bool CanUse(Vector3 direction, Unit target) => IData != null && HitboxAnchor != null;
-
-    public override void OnServerStart(Vector3 direction, Unit target)
-    {
-        base.OnServerStart(direction, target);
-
-        GunnerInterruptData data = IData;
-        hasResolvedHit = false;
-        hitTime = Time.time + data.HitDelay;
-        endTime = Time.time + data.SkillDuration;
-        if (hitResults == null || hitResults.Length != data.MaxHitResults)
-            hitResults = new Collider[data.MaxHitResults];
-    }
 
     // 전 피어. 후폭풍은 판정 시각(시작 + HitDelay)에 각 시뮬레이션 피어가 스스로 시작한다(RPC 없이 같은 시각 규칙).
     public override void OnClientPlay(Vector3 direction)
@@ -76,22 +51,6 @@ public class GunnerInterruptSkill : PlayerInstantSkill
         motor.AddGroundedDisplacement(-attackDirection * step);
     }
 
-    public override void OnTick()
-    {
-        if (!hasResolvedHit && Time.time >= hitTime)
-            ResolveHit();
-
-        if (Time.time >= endTime)
-            EndSelf(SkillEndReason.Completed);
-    }
-
-    public override void OnAnimationEvent(SkillAnimationEventType eventType)
-    {
-        if (eventType == SkillAnimationEventType.Hit)
-            ResolveHit();
-        base.OnAnimationEvent(eventType);
-    }
-
     public override void OnEnd(SkillEndReason reason)
     {
         recoilRemaining = 0f;
@@ -100,51 +59,11 @@ public class GunnerInterruptSkill : PlayerInstantSkill
         base.OnEnd(reason);
     }
 
-    // 서버 전용. 애니 이벤트와 타이머가 겹쳐도 한 번만.
-    private void ResolveHit()
+    protected override bool ShouldSkipTarget(Unit unit) => unit != null && unit.CurrentHealth <= 0;
+    protected override bool ConsumeOnHitBonusOnce => false;
+
+    protected override void OnInterruptResolutionCompleted(int resolvedCount)
     {
-        if (hasResolvedHit)
-            return;
-        hasResolvedHit = true;
-
-        int hitCount = OverlapHitboxAnchor(hitResults);
-        hitTargets.Clear();
-        landedUnits.Clear();
-        int resolvedCount = 0;
-
-        for (int i = 0; i < hitCount; i++)
-        {
-            Collider hit = hitResults[i];
-            if (hit == null)
-                continue;
-
-            Unit unit = ResolveHitUnit(hit, out Hurtbox hurtbox);
-            Object key = unit != null ? (Object)unit : hurtbox;
-            if (key == null || unit == owner || (unit != null && unit.CurrentHealth <= 0) || !hitTargets.Add(key))
-                continue;
-
-            int damage = damageSnapshot;
-            if (unit != null)
-            {
-                int bonus = owner.ServerTakeOnHitBonus(Data.TriggersOnHit, unit);
-                damage = bonus >= int.MaxValue - damage ? int.MaxValue : damage + bonus;
-            }
-
-            // isInterruptAttack = 보스가 간파 판정에 쓰는 유일한 근거(D11)
-            var attackInfo = new AttackInfo(damage, DamageAttackType,
-                isInterruptAttack: true, hitPattern: DamageHitPattern);
-            var context = new AttackHitContext(owner.transform.position, owner.transform, hit, owner);
-            bool resolved = hurtbox != null ? hurtbox.ReceiveAttack(attackInfo, context) : unit.ReceiveAttack(attackInfo, context);
-            if (!resolved)
-                continue;
-
-            resolvedCount++;
-            if (unit != null)
-                landedUnits.Add(unit);
-        }
-
-        owner.RaiseServerAttackLanded(DamageAttackType, Data.TriggersOnHit, landedUnits, this);
-
         // 레이저·폭발 연출(임시) — 빗나가도 나간다(§8.6)
         Vector3 origin = owner.transform.position + Vector3.up;
         view?.ServerInterruptBlast(origin, origin + attackDirection * 1.5f);
