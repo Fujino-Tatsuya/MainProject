@@ -99,7 +99,9 @@ public class SkillCursorView : MonoBehaviour
         RenderTexture.active = rt;
 
         var result = new Texture2D(width, height, TextureFormat.RGBA32, false) { name = source.name + "_x" + cursorScale };
-        result.alphaIsTransparency = true;
+#if UNITY_EDITOR
+        result.alphaIsTransparency = true; // 에디터 전용 API — 플레이어 빌드에선 컴파일되지 않는다
+#endif
         result.ReadPixels(new Rect(0, 0, width, height), 0, 0);
         result.Apply(false, false);
 
