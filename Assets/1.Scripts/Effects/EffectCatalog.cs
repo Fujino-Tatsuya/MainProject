@@ -55,9 +55,17 @@ public class EffectCatalog : ScriptableObject
 
     [Header("플레이어 — 수호자의 의지(E)")]
     // Barrier 는 보호막이 떠 있는 동안의 루프, Break 는 피해로 깨질 때만 나가는 원샷이다.
-    // 시간 만료로 걷힐 때는 Break 가 나가지 않는다 — 그 구분이 PlayerShieldVfx.EndLocal 에 있다.
+    // 시간 만료로 걷힐 때는 Break 가 나가지 않는다 — 그 구분은 서버만 알고,
+    // PlayerShieldVfx 가 ShieldEndReason.Depleted 일 때만 Break 를 퍼뜨린다.
     [field: SerializeField] public EffectEntry HolyShield_Barrier { get; private set; }
     [field: SerializeField] public EffectEntry HolyShield_Break { get; private set; }
+
+    [Header("플레이어 — 남이 걸어 준 보호막(거너 Q 등)")]
+    // 위와 같은 물건의 흰색 판. 색만 출처를 말한다 — 금색 = 자기 E, 흰색 = 남이 걸어 준 것.
+    // 🔴 **모든 플레이어 캐릭터가 받을 수 있다**(거너 Q 는 자기 자신만 뺀다). 전투 내내 나가므로
+    //    프리워밍 대상이다. 배선은 `Tools/VFX/보호막 연출 배선` 이 같이 해 준다.
+    [field: SerializeField] public EffectEntry AllyShield_Barrier { get; private set; }
+    [field: SerializeField] public EffectEntry AllyShield_Break { get; private set; }
 
     [Header("플레이어 — 단죄의 방패(우클릭)")]
     // Glow 는 강타 동안의 루프, Wave 는 실제로 맞혔을 때만 터지는 원샷이다(허공 스윙은 조용하다).
