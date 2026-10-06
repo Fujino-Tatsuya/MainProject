@@ -12,6 +12,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d905cdda987dd5e47bbefa3a5030d0fd, type: 3}
   m_Name: GunnerCoolBackstepData
   m_EditorClassIdentifier: Assembly-CSharp::GunnerCoolBackstepData
+  tooltip:
+    displayName: "\uB0C9\uAC01 \uBC31\uC2A4\uD15D"
+    subtitle: "E \uC2A4\uD0AC"
+    description: "TODO \uB4A4\uB85C {distance}m \uC774\uB3D9\uD558\uACE0 \uACFC\uC5F4\uB3C4\uB97C
+      \uCD08\uAE30\uD654\uD569\uB2C8\uB2E4."
+    icon: {fileID: 21300000, guid: 1d10a847ec8143b4388febd599cd22cf, type: 3}
   inputType: 0
   cooldownTime: 5
   commitCooldownManually: 0
@@ -19,6 +25,7 @@ MonoBehaviour:
   flatDamageBonus: 0
   maxActiveDuration: 2
   tickInterval: 0
+  hitPattern: 0
   usableWhileDead: 0
   hittableLayers:
     serializedVersion: 2

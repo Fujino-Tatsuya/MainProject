@@ -89,6 +89,35 @@ public sealed class DataTableApplierTests
     }
 
     [Test]
+    public void Bind_UntaggedString_IsExcludedFromApplyAndVerify()
+    {
+        DataTableTestData data = Make("A");
+        var issues = new DataTableIssues();
+
+        List<DataTableWrite> writes = Bind(
+            issues, new TestLookup(data), Entry("A", "animatorStateName", "Attack"));
+
+        Assert.That(issues.HasErrors, Is.True);
+        Assert.That(writes, Is.Empty);
+        Assert.That(data.animatorStateName, Is.EqualTo("Run"));
+    }
+
+    [Test]
+    public void Bind_EmptyValue_IsErrorForNumber_ButEmptyStringForTableText()
+    {
+        DataTableTestData data = Make("A");
+        var issues = new DataTableIssues();
+
+        List<DataTableWrite> writes = Bind(issues, new TestLookup(data),
+            Entry("A", "maxHp", ""),
+            Entry("A", "title", ""));
+
+        Assert.That(issues.Items.Select(i => i.Location), Is.EqualTo(new[] { "T.xlsx › DataTableTestData!A.maxHp" }));
+        DataTableApplier.ApplyInMemory(writes);
+        Assert.That(data.title, Is.EqualTo(string.Empty));
+    }
+
+    [Test]
     public void Bind_UnknownSheetAssetAndDoubleWrite_AreErrors_UnmentionedAssetIsWarning()
     {
         DataTableTestData a = Make("A");

@@ -42,7 +42,7 @@ Player.prefab (base)            ← 네트워크·입력·이동·생명주기·
 | 자식 이름 규칙 | 몸체 인스턴스 이름은 반드시 **`Armature`** (`transform.Find("Armature")` 폴백 3곳, §1.4) |
 | 구 프리팹은? | `Paladin.prefab` · `TempPlayer_Armature.prefab` → **`Player/Legacy/`** 보관. `Paladin_VFX.prefab` 은 **원래 위치(`Player/Paladin/`)에 유지**(2026-09-29 사용자 결정). 셋 다 **스폰 대상이 아니다** — 고쳐도 게임에 반영되지 않는다. (NGO 자동 생성으로 `DefaultNetworkPrefabs` 에는 **등록돼 있다** — 아래 행) |
 | 네트워크 목록 | `DefaultNetworkPrefabs` 는 **NGO 가 자동 생성**한다(`ProjectSettings/NetcodeForGameObjects.asset` `GenerateDefaultNetworkPrefabs: 1`) — NetworkObject 가 붙은 프리팹은 base·Legacy 포함 **전부 다시 들어온다**. 손으로 빼지 말 것. 스폰되지 않는 프리팹이 목록에 있는 건 무해(해시가 전부 다르다) |
-| 캐릭터 선택 UI / `ResolvePlayerPrefabForClient` | **미구현**(범위 밖). 지금은 `defaultPlayerPrefab = Player_Paladin` |
+| 캐릭터 선택 UI / `ResolvePlayerPrefabForClient` | ✅ 2026-10-02 구현(§8.3). 로비 `Panel_CharacterSelect` → `CharacterRoster` id → Variant. 실패 시 `defaultPlayerPrefab` |
 
 🔴 **Variant 해시 함정.** `SaveAsPrefabAsset` 만으로는 Variant 의 `NetworkObject.GlobalObjectIdHash` 오버라이드가
 YAML 에 **안 써져 base 해시를 상속**한다(에디터 메모리 값만 고유 → 빌드에서 충돌). 에셋의 NetworkObject 를
@@ -102,7 +102,7 @@ Player                     ← 역할. 캐릭터가 뭐든 바뀌지 않는다
 |-----------|------|
 | `PlayableCharacterVisual` 이 붙은 프리팹/씬 | **0개** (GUID `32f7d2df…` 전수 검색) |
 | `CharacterDefinition` 에셋(.asset) | **0개** |
-| 스폰 경로의 캐릭터 선택 | 미구현 — `NetworkLoadingFlowController.ResolvePlayerPrefabForClient()` 는 `// TODO: Replace this with the client character selection lookup` 하나에 `defaultPlayerPrefab` 을 그대로 반환 |
+| 스폰 경로의 캐릭터 선택 | ✅ `ResolvePlayerPrefabForClient()` = `ServerCharacterSelectionStore` + `CharacterRoster`(§8.3) |
 | `CharacterDefinition` 의 기본 스탯(`maxHp`·`attackDamage`·`moveSpeed`·`defense`) | **아무도 읽지 않는다.** `ApplyCharacter` 는 비주얼·애니메이터·평타 데이터만 적용한다. 스탯은 여전히 프리팹의 `Player` 컴포넌트에 직렬화돼 있다 |
 
 ⇒ **의도(to-be)는 코드에 있고, 현재 데이터(as-is)는 "캐릭터마다 프리팹 통째 복제"다.**
@@ -406,13 +406,14 @@ Prefab Variant 는 base 의 컴포넌트를 **추가**하긴 쉬워도 **제거*
 
 ### 8.3 선택값을 스폰까지 나르기
 
-🔴 **현재 로비에 캐릭터 선택 UI 가 없다** — `LobbyPlayerSlotView` 는 연결·준비 상태만 다룬다.
-이 경로는 **처음부터 만들어야 한다.**
+✅ **2026-10-02 구현** ([PLAN-character-select.md](../../PLAN-character-select.md)). 아래는 결과 요약.
 
-- 로비에서 클라가 고른 캐릭터 id 를 **서버로 보내고**, 서버가 clientId → 캐릭터 id 로 들고 있는다.
-- `NetworkLoadingFlowController.ResolvePlayerPrefabForClient(clientId)` 의 TODO 를 구현 —
-  캐릭터 id → Variant 프리팹 매핑. **이 함수 하나가 (A) 방식의 유일한 분기점이다.**
-- 미선택·잘못된 id 의 폴백을 정한다(현재 `defaultPlayerPrefab` 이 그 자리를 대신하고 있다).
+- 목록 = `Assets/9.ScriptableObject/Player/CharacterRoster.asset` (배열 인덱스 = 캐릭터 id, 비활성 칸은 선택 불가). 로비 `LobbyUIController` 와 `NetworkManager.prefab` 의 `NetworkLoadingFlowController` 가 같은 에셋을 참조.
+- 로비: 클라 → 서버 `Lobby.CharacterRequest`, 서버가 검증(사용 가능·Ready 아님) 후 `Lobby.State` 에 클라별 id 를 실어 방송. 기본 0번, 중복 선택 허용.
+- Lobby 씬은 맵 로딩 때 언로드되므로 서버 맵은 static `ServerCharacterSelectionStore` 에 둔다(세션 시작·종료 시 비움, 퇴장 시 제거).
+- `NetworkLoadingFlowController.ResolvePlayerPrefabForClient(clientId)` = 캐릭터 id → Variant. **이 함수 하나가 (A) 방식의 유일한 분기점이다.**
+  미선택·잘못된 id·비활성 칸 → `defaultPlayerPrefab`(Paladin). Dev Boot 는 로비를 안 거치므로 이 폴백으로 지금처럼 동작.
+- 범위 밖으로 남긴 것: 전투 HUD 초상화(`CombatHUD.prefab` 에 Paladin 고정 — Gunner 도 Paladin 얼굴).
 
 ### 8.4 계획서
 

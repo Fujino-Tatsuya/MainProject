@@ -8,12 +8,12 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 작업 세션 (2026-10-06 · 경석(Claude) · **전수조사 정리·최적화 S1+S2**, 브랜치 `feature/Boss23`) — 진행 중
+## ▶▶ 작업 세션 (2026-10-06 · 경석(Claude) · **전수조사 정리·최적화 S1~S5**, 브랜치 `feature/Boss23`) — ✅ S1~S5 커밋 · development 반영(10-06)
 계획 = [PLAN-cleanup-optimization.md](PLAN-cleanup-optimization.md)(팀장 결정 §4: 이번 라운드 S1+S2, 은희 영역은 목록만).
 🔴 **수정 예정 — 동시 수정 금지:** `Monster/MonsterBase.cs` · `Monster/Boss/TwentyThreeBoss.cs`·`GrabController.cs`·`BossChargeClipLoop.cs`·`BossPatternTargets.cs`·`BossElectricFloor.cs` ·
 `Rendering/RetroCRT/RetroCRTFeature.cs` · `Rendering/Silhouette/PlayerSilhouetteFeature.cs` · `Rendering/Fog/FogRendererFeature.cs`·`FogManager.cs` · `Map/Minimap/MinimapController.cs`·`MinimapNetworkSync.cs` · `Map/SteamVent.cs` · 프레임 상한(부트스트랩 1곳).
 
-진행표·미검증 = PLAN §4 "진행 (10-06)". S1·S2 구현 완료(미커밋).
+진행표·실측·미검증 = PLAN §4 "진행 (10-06)"·S3·S4. S5 파일 정리 = 커밋 `4a9041d2`·`4f32f26d`(목록만 남긴 담당별 후보는 PLAN §2 S5). SVN r381 확인(Paladin_SkillIcon .meta 트리 충돌 6건 → SVN guid 로 해결).
 📮 **은희에게 넘길 목록(팀장 결정: 목록만)** — 근거·위치는 PLAN §2:
 `Player.cs:386`·`PlayerCorpseController.cs:248` `RaycastAll`→`RaycastNonAlloc` · `ToonLit.shader:137` 안 쓰는 SSAO·혼합그림자·ShadowMask multi_compile(변형 8배) ·
 HUD 매 프레임 문자열(`PlayerHealthHUD`·`StatusEffectHUD`·`SkillCooldownHUD`·`DashCooldownHUD`·`PassiveHUD`) · 참조 0 스크립트(`AttackElement`·`OverlapAttack`·`IKnockbackSettable`·`PlayerColorAssigner`) ·
@@ -41,7 +41,7 @@ HUD 매 프레임 문자열(`PlayerHealthHUD`·`StatusEffectHUD`·`SkillCooldown
    대안(공유 후에만): xlsx 툴팁 행 필드명 앞에 `#` — 값 보존, 되돌리기 쉬움.
 3. **development 반영** — `feature/Boss23` 의 타이틀·모니터 작업(`5e3e46fe` 이후). 팀장 결정 시.
 4. **bossroom NetworkObject 4개 용도 확인** — 루트가 아니라 중첩 프리팹 오브젝트에 붙어 있다(GlobalObjectIdHash 4130406446 · 3863298080 · 3199288331 · 3620266727). 정상 네트워크 오브젝트인지 감염인지 모름 → 확인 후 가드 테스트 `Excluded` 에서 빼기.
-5. 🆕 **안 쓰는 스크립트·파일·폴더 정리(팀장 10-05 요청)** — 큰 작업: grill → PLAN → 승인. 원칙 = 참조 0 을 guid grep 으로 증명 · git/SVN 소유 구분(아트·.meta 는 SVN) · **Unity 끄고**(디렉터리 이동·대량 삭제) · 지운 뒤 컴파일·테스트·Play.
+5. ✅(10-06 완료 — 위 작업 세션) ~~**안 쓰는 스크립트·파일·폴더 정리(팀장 10-05 요청)**~~ — 큰 작업: grill → PLAN → 승인. 원칙 = 참조 0 을 guid grep 으로 증명 · git/SVN 소유 구분(아트·.meta 는 SVN) · **Unity 끄고**(디렉터리 이동·대량 삭제) · 지운 뒤 컴파일·테스트·Play.
    알고 있는 후보(전부 확인 필요):
    - `Assets/1.Scripts/Map/ZoneInteractRing.cs` — 10-04 부터 미사용. 단 Visual Scripting 생성 코드 `Assets/Unity.VisualScripting.Generated/.../AotStubs.cs` 가 참조 → **Node Library 재생성 후** 삭제.
    - `TitlePowerOff` 의 시작 경로는 이제 폴백뿐(EXIT 는 사용 중 — 클래스는 유지).
@@ -54,6 +54,10 @@ HUD 매 프레임 문자열(`PlayerHealthHUD`·`StatusEffectHUD`·`SkillCooldown
 
 ## ▶▶ 작업 세션 (2026-10-03 · 경석(Claude) · **타이틀 시작 연출 · 존 게이트 패널 모니터 켜짐·외곽선**, 브랜치 `feature/Boss23`) — ✅ 팀장 Play OK(10-04) · `feature/Boss23` 푸시 `5e3e46fe`(development 미반영). 게이트 활성 표시 = 모니터 화면(바닥 링 삭제). ⚠️ ZoneL_typeB 를 프리팹 모드로 열어 둔 채 파일을 바꾸면 Auto Save 가 덮어쓴다 — 값은 `Tools/Map/Authoring/Zone Monitor Screen/5` 로
 계획 = [PLAN-title-monitor.md](Docs/history/PLANS/PLAN-title-monitor.md)(승인 10-03, Codex 설계 회의 반영). 🔴 **수정 예정 — 동시 수정 금지:** `UI/Title/*`(TitleFlowDirector·TitleMonitorDisplay·셰이더) · `Map/ZoneBridgeGate.cs`·`ZoneBridgeGateManager.cs` · `ZoneL_typeB.prefab`(게이트 값) · 신규 외곽선 셰이더.
+## ▶▶ 작업 세션 (2026-10-02 · 은희(Claude+Codex) · **캐릭터 선택 화면**, 브랜치 `feature/SelectCharactorUI`) — 계획 [PLAN-character-select.md](PLAN-character-select.md) 승인됨
+- ✅ 1단계 Codex(코드) `09e9cc57` · ✅ 2단계 Claude(씬·에셋·`LobbySceneManager` 배선). 결과 요약 = [player-prefabs.md §8.3](Docs/tech/player-prefabs.md)
+- 🔴 남은 것: **은희 MPPM Play 확인**(호스트+클라2: 초상화·Ready 동기화 / Start 활성 / 고른 Variant 스폰) → PR. 레이아웃은 첫 배치라 Play 보고 조정 가능
+- 범위 밖: 전투 HUD 초상화 Paladin 고정(Gunner 도 Paladin 얼굴)
 
 ## ▶▶ 작업 세션 (2026-10-02~03 · 경석(Claude) · **몬스터 공격속도 = 애니 재생 배율 · 쿨다운 종료 기준 · 이동 애니 맞춤**, 브랜치 `feature/Boss23`) — ✅ development 반영(10-03) · **SVN r372 같이 받을 것**(GameData.xlsx Monster attackSpeed→1 · Chomp 2/2.8, 핀 372) · 팀장 Play 1차(Chomp·Mortar) · ⏳ MPPM·배율 0.5/2 Play 미검증
 계획·결정·교차검증 이력 = [PLAN-monster-anim-speed.md](Docs/history/PLANS/PLAN-monster-anim-speed.md) §3 · S4-b.
@@ -62,7 +66,7 @@ HUD 매 프레임 문자열(`PlayerHealthHUD`·`StatusEffectHUD`·`SkillCooldown
 - 이동 맞춤 = `Tools/Monster/이동 클립 고유 속도 측정 → SO 기록`. Chomp = 블렌드 100% + 임시 속도(배회 2.0 · 추격 2.8, 입 애니 때문 — 아트 클립 요청 여지).
 - 기존 버그 수정 동반: Mortar 발사·WallBot 평타 2단 트리거 클라 전파 · Spinner 예고 띠 = 실제 돌진 거리.
 - 🔴 **데이터 테이블**: xlsx Monster 시트 `attackSpeed` 를 r372 에서 1 로 갱신(r371 이하를 받으면 테이블 모드·빌드에서 공격 애니가 0.5~0.8배). `attackCooldown`·이동 맞춤 값은 테이블에 행이 없어 SO 값(측정값 4개는 `[DataTableIgnore]`).
-- 🔴(기존, 은희 공유) r366 `tooltip.*` 행의 코드(`feature/SkillTooltip`)가 원격에 없음 + 빈 칸 `Paladin!C32`·`Gunner!C18` → 테이블 Play·빌드 차단.
+- (은희 공유) r366 `tooltip.*` 행의 코드(`feature/SkillTooltip`)는 10-06 development 반영 ✅. 빈 칸 `Paladin!C32`·`Gunner!C18` 은 `tooltip.*` 칸이면 빈 문자열로 통과, 아니면 여전히 테이블 Play·빌드 차단 — 미확인.
 - ⚠️ EditMode 기존 실패 2(`BossCounterDataTests` — No23 Dash 가 FarthestPlayer) 는 이 작업과 무관, 미결.
 
 ## ▶▶ 현재 인수인계 (2026-10-02 · Claude · **존 원본 0.98 축소** — 방이 줄어든 만큼 존 내용물도 줄임, 브랜치 `feature/ZoneAssetScale`)
@@ -73,6 +77,12 @@ HUD 매 프레임 문자열(`PlayerHealthHUD`·`StatusEffectHUD`·`SkillCooldown
 - 🔴 **SVN r371(FBX meta 82 · 볼록 충돌 16 · `floor_MV.prefab`, 핀 371)과 git 을 같이 받아야 한다** — 한쪽만 받으면 존 바닥 4m 마다 8cm 틈/겹침. r366 GameData.xlsx(SkillTooltip)도 같이 딸려 온다.
 - 🔴 존 바닥이 벽까지 닿는지는 벽 바운드(0.634)가 아니라 **벽 밑단(중심선 ≈0.52)** 으로 잴 것(0.97 시도에서 이걸로 틀림). 소품·통로 한계는 그대로 콜라이더 안쪽 면(0.634).
 - Stage1 은 범위 밖: 문마다 0.2/0.4m 바닥 틈(목록만). 롤백·패치 스크립트는 이 PC `_backup/zone-asset-scale-20261002/`(git 제외).
+
+## ▶▶ 작업 세션 (2026-10-02 · 은희(Claude) · **플레이어블 스킬 툴팁 + 캐릭터별 아이콘**) — ✅ 구현(Codex `a9fe968c` + Claude `3dbf7f13`) · EditMode 82/82 · Verify 0 · xlsx SVN r366(툴팁 30행 TODO 문구) · 🔴 Play·MPPM 남음 · 브랜치 `feature/SkillTooltip`
+
+계획·결정·남은 질문 = [PLAN-skill-tooltip.md](PLAN-skill-tooltip.md).
+- 확정: 문구 = 스킬 SO·패시브 컴포넌트의 `displayName`·`description` → 기존 `Paladin`/`Gunner` 시트 행 · 거너 패시브 = 과열(`GunnerHeat`) → `Slot_P` · 자리표시자 `{필드}`·`{필드:%}`·`{dmg}` · 피해 = **계수 + 실제 수치** · 아이콘 = 스폰된 캐릭터 Variant 데이터에서(캐릭터마다 다름).
+- 다음: 은희 Play·MPPM → 기획이 TODO 문구 교체(SVN 잠금). 🔴 xlsx r366 과 이 브랜치 코드는 같이 나가야 한다. 툴팁 칸(`tooltip.*`)만 빈 칸 = 빈 문자열(그 외 빈 칸 = 오류, 판정은 Applier 로 이동). 저작 메뉴 = `Tools/UI/스킬 툴팁 구성`(재실행 가능). 스킬 아이콘 = 각 출처 `tooltip.icon`(지금 전부 비어 있음 — 아트 대기) → 슬롯 프레임(`slot_skill`) 안 자식 `Slot_*/Icon`(은희 제작) 에만 들어간다. 프레임은 덮지 않는다. 저작 메뉴는 `Icon` 을 찾아 연결만 한다(만들거나 배치를 바꾸지 않음). 칸 클릭 = 스킬 키(D18). 피해 = 계수+실제, 차지·과열은 최소~최대 범위 · Shift = 계산식 · 키워드 = TMP `<style>` 태그. 🔴 **수정 예정 — 동시 수정 금지(구현 시작 시)**: `Assets/1.Scripts/UI/Combat/*`·`CombatHUD.prefab`·`PlayerSkillData` 계열·`FirstMeleePassive`·`GunnerHeat`·`Assets/1.Scripts/DataTable/Editor/DataTableTemplate.cs`·`GameData.xlsx`(SVN 잠금).
 
 ## ▶▶ 현재 인수인계 (2026-10-02 · 은희(Claude) · **데이터 테이블 xlsx → 게임 수치 + Dev Boot 툴바** → development 반영)
 

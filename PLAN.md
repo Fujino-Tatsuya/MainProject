@@ -1,6 +1,8 @@
 > 📁 09-22 이전 계획(23호 공격 재작업 G1~G7 · Dev Boot · 벽 투명화 1단계 · 보호막 VFX 등)과 끝난 `PLAN-*.md` 는
 > [Docs/history/PLANS/](Docs/history/PLANS/) 로 옮겼다. 옛 문서의 "PLAN.md §…" 참조는 [PLAN-archive-2026-06_09-22.md](Docs/history/PLANS/PLAN-archive-2026-06_09-22.md) 를 본다.
 
+> 🆕 2026-10-02 은희: **캐릭터 선택 화면** → [PLAN-character-select.md](PLAN-character-select.md) (구현 완료 · Play 확인 대기)
+
 # ▶▶▶ 진행 중 = **차징 구슬 외부 전기 유입** (2026-09-30 · 그릴 15문항 완료 · **구현 완료 ✅ · Play 검증 대기**)
 
 ## 별도 수정: 몬스터 메쉬·텍스처 연결 검증 (2026-10-01 · 완료)

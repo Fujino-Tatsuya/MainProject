@@ -35,6 +35,13 @@ public class NetworkSessionLauncher : MonoBehaviour
     private void Awake()
     {
         _networkManager = GetComponent<NetworkManager>();
+        if (_networkManager != null)
+        {
+            _networkManager.OnServerStopped += HandleSessionStopped;
+            _networkManager.OnClientStopped += HandleSessionStopped;
+            _networkManager.OnClientDisconnectCallback += HandleClientDisconnected;
+        }
+
         _loadingFlowController = GetComponent<NetworkLoadingFlowController>();
         if (verboseNetcodeLogging && _networkManager != null && _networkManager.LogLevel > LogLevel.Developer)
         {
@@ -153,6 +160,7 @@ public class NetworkSessionLauncher : MonoBehaviour
 
     private bool StartHostCore()
     {
+        ServerCharacterSelectionStore.Clear();
         Debug.Log($"[SceneFlow] NetworkSessionLauncher.StartHost before listening={_networkManager.IsListening}");
         LogTransportSnapshot("StartHost.before");
         if (_networkManager.StartHost())
@@ -169,6 +177,7 @@ public class NetworkSessionLauncher : MonoBehaviour
 
     private bool StartClientCore()
     {
+        ServerCharacterSelectionStore.Clear();
         Debug.Log($"[SceneFlow] NetworkSessionLauncher.StartClient before listening={_networkManager.IsListening}");
         LogTransportSnapshot("StartClient.before");
         if (_networkManager.StartClient())
@@ -185,6 +194,7 @@ public class NetworkSessionLauncher : MonoBehaviour
 
     private bool StartServerCore()
     {
+        ServerCharacterSelectionStore.Clear();
         Debug.Log($"[SceneFlow] NetworkSessionLauncher.StartServer before listening={_networkManager.IsListening}");
         LogTransportSnapshot("StartServer.before");
         if (_networkManager.StartServer())
@@ -445,5 +455,25 @@ public class NetworkSessionLauncher : MonoBehaviour
         // Shutdown 이 남기는 마지막 줄까지 담고 디스크에 밀어 넣는다.
         // 닫기는 프로세스 종료 시점의 NetworkDiagnosticsLog 가 알아서 한다.
         NetworkDiagnosticsLog.MarkSessionEnd();
+    }
+
+    private void OnDestroy()
+    {
+        if (_networkManager != null)
+        {
+            _networkManager.OnServerStopped -= HandleSessionStopped;
+            _networkManager.OnClientStopped -= HandleSessionStopped;
+            _networkManager.OnClientDisconnectCallback -= HandleClientDisconnected;
+        }
+    }
+
+    private void HandleSessionStopped(bool wasHost)
+    {
+        ServerCharacterSelectionStore.Clear();
+    }
+
+    private void HandleClientDisconnected(ulong clientId)
+    {
+        ServerCharacterSelectionStore.Remove(clientId);
     }
 }

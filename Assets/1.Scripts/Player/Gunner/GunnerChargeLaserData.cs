@@ -77,4 +77,15 @@ public class GunnerChargeLaserData : PlayerSkillData
             return 1f;
         return table[Mathf.Clamp(stage, 0, table.Length - 1)];
     }
+
+    protected override SkillTooltipDamage CalculateTooltipDamage(Player player)
+    {
+        if (player == null)
+            return default;
+
+        float minScale = DamageMultiplierAt(0f) * StageDamageMultiplier(0);
+        float maxScale = DamageMultiplierAt(1f) * StageDamageMultiplier(int.MaxValue);
+        return SkillTooltipDamage.FromScaledSnapshot(
+            player.FinalAttackDamage, AttackDamageMultiplier, FlatDamageBonus, minScale, maxScale);
+    }
 }

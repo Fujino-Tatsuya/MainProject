@@ -10,8 +10,8 @@ using Object = UnityEngine.Object;
 /// <summary>
 /// 현재 인스펙터 값(SO·프리팹) → xlsx 템플릿(PLAN-data-table.md D2·D3·D4·D7).
 /// <para>
-/// 내보내는 필드 = <b>정수·실수</b>만(구조체·배열 안쪽 포함, 배열은 원소마다 <c>phases[0]</c>).
-/// 레이어 마스크·문자열·곡선·참조·bool·enum 은 넣지 않는다 — 가져오기는 bool·enum 도 되므로 필요하면 기획이 행을 직접 추가한다.
+/// 내보내는 필드 = <b>정수·실수 + [DataTableText] 문자열</b>(구조체·배열 안쪽 포함, 배열은 원소마다 <c>phases[0]</c>).
+/// 다른 문자열·레이어 마스크·곡선·참조·bool·enum 은 넣지 않는다 — 가져오기는 bool·enum 도 되므로 필요하면 기획이 행을 직접 추가한다.
 /// <see cref="DataTableIgnoreAttribute"/> 필드는 뺀다.
 /// </para>
 /// <para>
@@ -99,7 +99,9 @@ public static class DataTableTemplate
                 continue;
             }
 
-            if (it.propertyType != SerializedPropertyType.Integer && it.propertyType != SerializedPropertyType.Float)
+            bool isNumber = it.propertyType == SerializedPropertyType.Integer || it.propertyType == SerializedPropertyType.Float;
+            bool isTableText = it.propertyType == SerializedPropertyType.String && DataTableFields.IsTableText(field);
+            if (!isNumber && !isTableText)
             {
                 continue;
             }
@@ -131,7 +133,9 @@ public static class DataTableTemplate
 
             object value = it.propertyType == SerializedPropertyType.Integer
                 ? it.longValue
-                : it.numericType == SerializedPropertyNumericType.Double ? (object)it.doubleValue : it.floatValue;
+                : it.propertyType == SerializedPropertyType.String
+                    ? it.stringValue
+                    : it.numericType == SerializedPropertyNumericType.Double ? (object)it.doubleValue : it.floatValue;
             fields.Add(new Field(ToTablePath(path), value, Describe(field, path), section, element, sub));
         }
 

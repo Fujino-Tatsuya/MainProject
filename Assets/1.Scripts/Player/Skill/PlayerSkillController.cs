@@ -321,6 +321,7 @@ public class PlayerSkillController : BaseNetworkBehaviour
             nextReadyTime[(int)slot] = Time.time + skill.Data.CooldownTime;
 
         // 상태이상 modifier가 반영된 최종 공격력으로 스냅샷 (그릴 합의: SO 계수 × 최종 스탯)
+        // 툴팁 계산식도 같은 계수·고정값을 쓰므로 판정 공식을 바꿀 때 SkillTooltipDamage 계산도 같이 바꿀 것.
         int damageSnapshot = Mathf.Max(0,
             Mathf.RoundToInt(player.FinalAttackDamage * skill.Data.AttackDamageMultiplier) + skill.Data.FlatDamageBonus);
         skill.SetDamageSnapshot(damageSnapshot);

@@ -36,10 +36,10 @@ public sealed class DataTableTemplateTests
 
         List<DataTableTemplate.Field> fields = DataTableTemplate.CollectFields(data);
 
-        // bool·string·enum·참조 없음, [DataTableIgnore] 필드와 그 하위 없음, 배열 크기 없음.
+        // bool·일반 string·enum·참조 없음. [DataTableText] 문자열만 포함하고, [DataTableIgnore]와 배열 크기는 제외.
         Assert.That(fields.Select(f => f.Path), Is.EqualTo(new[]
         {
-            "maxHp", "moveSpeed", "smallCount", "charge.speed", "charge.damage", "phases[0]", "phases[1]", "cooldown",
+            "maxHp", "moveSpeed", "title", "smallCount", "charge.speed", "charge.damage", "phases[0]", "phases[1]", "cooldown",
             "ratio", "count", "stages[0]", "stages[1]",
         }));
         Assert.That(fields[0].Description, Is.EqualTo("최대 체력"));
@@ -56,6 +56,21 @@ public sealed class DataTableTemplateTests
 
         Assert.That(sheets[0].Cell(0, 0), Is.EqualTo("#■ DataTableTestData"), "타입 구역 제목");
         Assert.That(sheets[0].Rows[1], Is.EqualTo(new[] { DataTableSchema.VerticalFieldHeader, DataTableSchema.DescriptionHeader, "Only" }));
+        Assert.That(issues.Items, Is.Empty, string.Join("\n", issues.Items));
+        Assert.That(differences, Is.Empty, string.Join("\n", differences));
+    }
+
+    [Test]
+    public void DataTableText_ExportImport_PreservesCellLineBreaks()
+    {
+        DataTableTestData data = Make("Only");
+        data.title = "첫 문단\n둘째 문단 {moveSpeed:0.0}";
+
+        List<DataTableDifference> differences = ExportImportDiff(
+            new[] { data }, out DataTableIssues issues, out List<XlsxSheet> sheets);
+
+        string[] row = sheets[0].Rows.First(r => r.Length > 0 && r[0] == "title");
+        Assert.That(row[2], Is.EqualTo(data.title));
         Assert.That(issues.Items, Is.Empty, string.Join("\n", issues.Items));
         Assert.That(differences, Is.Empty, string.Join("\n", differences));
     }

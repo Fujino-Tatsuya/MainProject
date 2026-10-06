@@ -1830,6 +1830,59 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
   m_PrefabInstance: {fileID: 1983320743223342216}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &7301928374650192837
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7876615519038055782}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3c80e0a77e704c04b9392e3b3b8e27d6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerDefaultAttack
+  damage: 0
+  targetLayer:
+    serializedVersion: 2
+    m_Bits: 17408
+  attackType: 1
+  hitPattern: 0
+  muzzle: {fileID: 0}
+--- !u!114 &7301928374650192838
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7876615519038055782}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5b5cf926c1f245db883140b58e5d6d0f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DefaultAttack
+  ShowTopMostFoldoutHeaderGroup: 1
+  slashHit:
+  - {fileID: 8697299220000449716}
+  - {fileID: 5448533595782122932}
+  - {fileID: 9079880727448516973}
+  - {fileID: 6950692555018112447}
+  slashMiss:
+  - {fileID: 838098801598080627}
+  - {fileID: 610104649023532361}
+  - {fileID: 750287358080963331}
+  - {fileID: 976863579111759955}
+  animator: {fileID: 0}
+  attackData: {fileID: 11400000, guid: 8d6735b7ed4fc9e49b360d6bbcb907a5, type: 2}
+  playerDefaultAttack: {fileID: 7301928374650192837}
+  tailToMovementBlendSeconds: 0.12
+  chainPolicy: 0
+  attackSteps: []
+  defaultHitbox: {fileID: 728051452282005925}
+  hittableLayers:
+    serializedVersion: 2
+    m_Bits: 17408
+  endFallbackPadding: 0.1
 --- !u!114 &1818988763459325341
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1843,6 +1896,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FirstMeleePassive
   ShowTopMostFoldoutHeaderGroup: 1
+  tooltip:
+    displayName: "\uBD88\uAD74\uC758 \uC758\uC9C0"
+    subtitle: 
+    description: "TODO \uC900\uBE44\uB418\uBA74 \uB2E4\uC74C \uACF5\uACA9\uC5D0 {dmg}
+      \uCD94\uAC00 \uD53C\uD574\uB97C \uC8FC\uACE0 \uCD5C\uB300 \uCCB4\uB825\uC758
+      {healPercent}%\uB97C \uD68C\uBCF5\uD569\uB2C8\uB2E4."
+    icon: {fileID: 21300000, guid: 2317ce8762a1d9e43a681b87ab0fdafb, type: 3}
   cooldownTime: 5
   hitCooldownReduction: 2
   bonusDamageMultiplier: 1
@@ -2015,6 +2075,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 1427997890299781827, guid: 4d396958704b054469ded4c24d36d9a1, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 5396818564317195527, guid: 4d396958704b054469ded4c24d36d9a1, type: 3}
       propertyPath: m_Name
       value: Armature
@@ -2123,55 +2187,3 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 3669984586683641257, guid: 4d396958704b054469ded4c24d36d9a1, type: 3}
   m_PrefabInstance: {fileID: 5683368051277706446}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &7301928374650192837
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7876615519038055782}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3c80e0a77e704c04b9392e3b3b8e27d6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PlayerDefaultAttack
-  damage: 0
-  targetLayer:
-    serializedVersion: 2
-    m_Bits: 17408
-  attackType: 1
-  muzzle: {fileID: 0}
---- !u!114 &7301928374650192838
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7876615519038055782}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5b5cf926c1f245db883140b58e5d6d0f, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::DefaultAttack
-  ShowTopMostFoldoutHeaderGroup: 1
-  slashHit:
-  - {fileID: 8697299220000449716}
-  - {fileID: 5448533595782122932}
-  - {fileID: 9079880727448516973}
-  - {fileID: 6950692555018112447}
-  slashMiss:
-  - {fileID: 838098801598080627}
-  - {fileID: 610104649023532361}
-  - {fileID: 750287358080963331}
-  - {fileID: 976863579111759955}
-  animator: {fileID: 0}
-  attackData: {fileID: 11400000, guid: 8d6735b7ed4fc9e49b360d6bbcb907a5, type: 2}
-  playerDefaultAttack: {fileID: 7301928374650192837}
-  tailToMovementBlendSeconds: 0.12
-  chainPolicy: 0
-  attackSteps: []
-  defaultHitbox: {fileID: 728051452282005925}
-  hittableLayers:
-    serializedVersion: 2
-    m_Bits: 17408
-  endFallbackPadding: 0.1
