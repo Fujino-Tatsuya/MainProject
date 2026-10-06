@@ -34,7 +34,7 @@ public class PassiveHUD : MonoBehaviour
         passive = player != null ? player.GetComponent<IPlayerPassive>() : null;
         tooltipSource = passive as ISkillTooltipSource;
         if (tooltipSource == null && player != null)
-            tooltipSource = player.GetComponent<GunnerHeat>()?.Data;
+            tooltipSource = player.GetComponentInChildren<IPassiveTooltipProvider>(true)?.PassiveTooltip;
 
         SkillCooldownHUD.SetSlotIcon(icon, tooltipSource);
 

@@ -189,3 +189,9 @@ Q22 `AssassinState` NetworkVariable · Q23·Q26 클립 git + 애니 이벤트(�
   보스 쪽 거부 처리 확인: 23호 `AttachGrabbed`·`GrabController.CallPlayerBeginGrab` 모두 거부 시 해제 → Recovery. ⏳ Play(가붕이 Q/R 중 23호 잡기·스턴).
 - ✅ A2(10-06): Codex `163c1ee7` — 스킬 인덱스 장부(`PlayerSkillCooldownLedger`) · `alternateSkills` + `SetSlotOverride` · `NetworkVariable<byte>` 마스크 · 실행 중 보류 · `ReduceCooldownServer`/`StartCooldownServer` · `SlotBindingChanged` → HUD·열린 툴팁 갱신. EditMode 32/0.
   🔴 NetworkBehaviour 스키마 변경 — 피어 전원 같은 커밋이어야 접속 호환. ⏳ Play: 가붕이·거너 쿨·아이콘·툴팁(거너 Q 수동 커밋 포함) 무변화.
+- ✅ A3(10-06): Codex `daabdbbb` — `PlayerInterruptSkillBase` + `IPlayerInterruptSkillData`(HitDelay·SkillDuration·MaxHitResults). 가붕이(충격파·글로우)·거너(반동·적 통과·후폭풍) 훅만 남김.
+- ✅ A4(10-06): Codex `da3447d9` — `PlayerSkillData.fixedDistance`·`aoeRadius`, `PlayerGroundPointProjection`(서버 재투영 허용 0.25m). 변신 E = castRange 1.5 · aoeRadius 2. EditMode 37/0.
+  ⏳ Play: 가붕이·거너 간파(Hit 이벤트·타이머 1회, 상자·다중, 거너 빗나감 후폭풍) 무변화.
+- ✅ A5(10-06, Claude): `IPassiveTooltipProvider`(GunnerHeat 구현) → `PassiveHUD` 하드코딩 제거 · `CharacterHudAuthoring.EnsureHudRoot` ·
+  거너 게이지 `Gunner_Armature/HUD` 로 이동(Variant 루트 인스턴스 제거, guid·해시 불변) · player-prefabs.md §7 5-2 규약. EditMode 37/0.
+  `SkillTooltipAuthoring` 어쌔신 경로는 A12 에서(에셋이 생긴 뒤). ⏳ Play: 거너 과열 게이지 오너만 표시 · 유령 중 숨김 · P 칸 툴팁.
