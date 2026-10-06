@@ -2,7 +2,8 @@
 
 /// <summary>
 /// 마우스 상태별 커서 아이콘 교체 훅. PlayerSkillTargeting이 상태 변화 시 ApplyState를 호출한다.
-/// 커서 텍스처 에셋이 아직 없어(기획 미정) 텍스처가 비면 no-op — 에셋이 들어오면 인스펙터 배선만으로 동작한다.
+/// 기본 커서는 캐릭터 Variant(Player_Paladin·Player_Gunner)가 defaultIcon을 오버라이드한다(50.Art/UI/Cursor).
+/// 텍스처가 빈 상태는 시스템 커서로 둔다.
 /// </summary>
 public class SkillCursorView : MonoBehaviour
 {
@@ -19,6 +20,39 @@ public class SkillCursorView : MonoBehaviour
     [SerializeField] private CursorIcon validTargetIcon;
     [SerializeField] private CursorIcon invalidTargetIcon;
     [SerializeField] private CursorIcon outOfRangeIcon;
+
+    private Player player;
+    private bool isLocal;
+
+    // 기본 커서는 캐릭터 Variant마다 다르다 — 조준을 한 번도 안 해도 로컬 플레이어가 되는 순간 적용하고,
+    // 로컬에서 빠지면(디스폰·캐릭터 교체 전 해제) 시스템 커서로 되돌린다.
+    private void Awake()
+    {
+        player = GetComponentInParent<Player>();
+        Player.LocalPlayerChanged += HandleLocalPlayerChanged;
+    }
+
+    private void OnDestroy()
+    {
+        Player.LocalPlayerChanged -= HandleLocalPlayerChanged;
+        if (isLocal)
+            Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
+    }
+
+    private void HandleLocalPlayerChanged(Player localPlayer)
+    {
+        if (player != null && localPlayer == player)
+        {
+            isLocal = true;
+            ApplyState(SkillCursorState.Default);
+        }
+        else if (isLocal)
+        {
+            isLocal = false;
+            if (localPlayer == null)
+                Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
+        }
+    }
 
     public void ApplyState(SkillCursorState state)
     {

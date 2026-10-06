@@ -151,6 +151,18 @@ PrefabInstance:
       propertyPath: soulVisualRoot
       value: 
       objectReference: {fileID: 6235178363960518833}
+    - target: {fileID: 1111000000000000003, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: defaultIcon.texture
+      value: 
+      objectReference: {fileID: 2800000, guid: 7fccd287e62b7282c93057fb6a0bf816, type: 3}
+    - target: {fileID: 1111000000000000003, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: defaultIcon.hotspot.x
+      value: 15
+      objectReference: {fileID: 0}
+    - target: {fileID: 1111000000000000003, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: defaultIcon.hotspot.y
+      value: 10
+      objectReference: {fileID: 0}
     - target: {fileID: 1160318589990200604, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0

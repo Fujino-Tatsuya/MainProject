@@ -1659,6 +1659,18 @@ PrefabInstance:
       propertyPath: soulVisualRoot
       value: 
       objectReference: {fileID: 836662554432917908}
+    - target: {fileID: 1111000000000000003, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: defaultIcon.texture
+      value: 
+      objectReference: {fileID: 2800000, guid: 554a04066aacc2668cd98899420e2927, type: 3}
+    - target: {fileID: 1111000000000000003, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: defaultIcon.hotspot.x
+      value: 15
+      objectReference: {fileID: 0}
+    - target: {fileID: 1111000000000000003, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: defaultIcon.hotspot.y
+      value: 10
+      objectReference: {fileID: 0}
     - target: {fileID: 1111000000000000013, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       propertyPath: showSafePointMarkers
       value: 0
