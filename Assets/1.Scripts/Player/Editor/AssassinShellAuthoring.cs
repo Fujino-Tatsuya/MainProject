@@ -19,6 +19,10 @@ public static class AssassinShellAuthoring
     private const string VariantPath = PrefabFolder + "/Player_Assassin.prefab";
     private const string ModelPath = "Assets/50.Art/Char/assassin/Assassin.fbx";
     private const string MaterialPath = "Assets/3.Materials/Toon/Assassin_Toon.mat";
+    // 단검(10-06 은희 추가, SVN) — 모델에 무기 본이 없어 Humanoid 손 본에 정적으로 붙인다.
+    // 클립의 Dagger_Weapon_* 커브는 원본(UE) 경로라 이 리그에 바인딩되지 않는다 — 손을 따라가기만 한다.
+    private const string DaggerLeftPath = "Assets/50.Art/Char/assassin/Dagger_Weapon_L.fbx";
+    private const string DaggerRightPath = "Assets/50.Art/Char/assassin/Dagger_Weapon_R.fbx";
     private const string AnimationFolder = "Assets/4.Animations/Player/Assassin";
     private const string ControllerPath = AnimationFolder + "/AssassinAnimatorController.controller";
     private const string DataFolder = "Assets/9.ScriptableObject/Player/Assassin";
@@ -1120,6 +1124,9 @@ public static class AssassinShellAuthoring
             else if (renderers.Length != 2)
                 Debug.LogWarning($"{Tag} 예상 메시 2개와 다르다({renderers.Length}개). 찾은 렌더러 모두 Assassin_Toon을 적용했다.", root);
 
+            EnsureDagger(root.transform, "LeftHand", DaggerLeftPath, material);
+            EnsureDagger(root.transform, "RightHand", DaggerRightPath, material);
+
             EnsureAnchor(root.transform, "DefaultAttack", new Vector3(0f, 1f, 0.85f), new Vector3(2f, 2f, 1.7f));
             EnsureAnchor(root.transform, "InterruptAttack", new Vector3(0f, 1f, 0.9f), new Vector3(1.4f, 1.8f, 1.4f));
 
@@ -1413,6 +1420,49 @@ public static class AssassinShellAuthoring
         if (anchor.GetComponent<ColliderInfo>() == null)
             anchor.gameObject.AddComponent<ColliderInfo>();
         return anchor;
+    }
+
+    // 손 본 아래에 단검 FBX 인스턴스를 붙인다(이미 있으면 그대로 — 손으로 맞춘 위치·회전 유지).
+    // FBX 루트의 회전은 원본 리그의 손 기준 자세라 그대로 두고 위치만 손에 맞춘다(Play 로 확인).
+    private static void EnsureDagger(Transform root, string handBoneName, string fbxPath, Material material)
+    {
+        GameObject fbx = AssetDatabase.LoadAssetAtPath<GameObject>(fbxPath);
+        if (fbx == null)
+        {
+            Debug.LogWarning($"{Tag} 단검 FBX 가 없다(SVN 확인): {fbxPath}");
+            return;
+        }
+
+        Transform hand = FindDeep(root, handBoneName);
+        if (hand == null)
+        {
+            Debug.LogError($"{Tag} 손 본 {handBoneName} 을 찾지 못해 단검을 붙이지 못했다.", root);
+            return;
+        }
+
+        if (hand.Find(fbx.name) != null)
+        {
+            Debug.Log($"{Tag} 단검 유지: {handBoneName}/{fbx.name}");
+            return;
+        }
+
+        var dagger = (GameObject)PrefabUtility.InstantiatePrefab(fbx, hand);
+        dagger.transform.localPosition = Vector3.zero;
+        dagger.transform.localRotation = fbx.transform.localRotation;
+        dagger.transform.localScale = Vector3.one;
+        foreach (Renderer renderer in dagger.GetComponentsInChildren<Renderer>(true))
+            renderer.sharedMaterial = material;
+        Debug.Log($"{Tag} 단검 부착: {handBoneName}/{fbx.name} (Assassin_Toon)");
+    }
+
+    private static Transform FindDeep(Transform parent, string name)
+    {
+        foreach (Transform child in parent.GetComponentsInChildren<Transform>(true))
+        {
+            if (child.name == name)
+                return child;
+        }
+        return null;
     }
 
     private static Transform EnsureChild(Transform parent, string name)
