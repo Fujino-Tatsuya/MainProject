@@ -25,6 +25,7 @@ public sealed class SkillLineIndicator : MonoBehaviour
     private MaterialPropertyBlock propertyBlock;
     private Player player;
     private PlayerSkillController skillController;
+    private PlayerMovement movement;
     private Renderer fillRenderer;
     private Renderer ghostRenderer;
     private Renderer arrowRenderer;
@@ -35,6 +36,7 @@ public sealed class SkillLineIndicator : MonoBehaviour
     {
         player = GetComponentInParent<Player>();
         skillController = player != null ? player.GetComponent<PlayerSkillController>() : null;
+        movement = player != null ? player.GetComponent<PlayerMovement>() : null;
         fillRenderer = ResolveRenderer(fillQuad);
         ghostRenderer = ResolveRenderer(ghostQuad);
         arrowRenderer = ResolveRenderer(arrowQuad);
@@ -65,7 +67,8 @@ public sealed class SkillLineIndicator : MonoBehaviour
             return;
         }
 
-        Vector3 forward = FlattenDirection(transform.forward);
+        // 플레이어 루트는 돌지 않는다 — 회전은 Armature 에 있다(PlayerMovement.CurrentFacing).
+        Vector3 forward = movement != null ? movement.CurrentFacing : FlattenDirection(transform.forward);
         if (!previewSource.TryGetPreview(transform.position, forward, out SkillPreviewShape shape))
         {
             HideVisuals();
