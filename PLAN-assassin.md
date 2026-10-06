@@ -187,3 +187,5 @@ Q22 `AssassinState` NetworkVariable · Q23·Q26 클립 git + 애니 이벤트(�
   🔸 FBX 재임포트 시 "Importer generated inconsistent result" 경고 1건 — A6 에서 재확인.
 - ✅ A1(10-06): Codex `05055211` — `StatusEffectImmunityPolicy`(차단류 6종 무시) · Carry 거부. EditMode `Tools/Tests/플레이어 EditMode 테스트 실행` 27/0.
   보스 쪽 거부 처리 확인: 23호 `AttachGrabbed`·`GrabController.CallPlayerBeginGrab` 모두 거부 시 해제 → Recovery. ⏳ Play(가붕이 Q/R 중 23호 잡기·스턴).
+- ✅ A2(10-06): Codex `163c1ee7` — 스킬 인덱스 장부(`PlayerSkillCooldownLedger`) · `alternateSkills` + `SetSlotOverride` · `NetworkVariable<byte>` 마스크 · 실행 중 보류 · `ReduceCooldownServer`/`StartCooldownServer` · `SlotBindingChanged` → HUD·열린 툴팁 갱신. EditMode 32/0.
+  🔴 NetworkBehaviour 스키마 변경 — 피어 전원 같은 커밋이어야 접속 호환. ⏳ Play: 가붕이·거너 쿨·아이콘·툴팁(거너 Q 수동 커밋 포함) 무변화.
