@@ -64,14 +64,15 @@ public class SkillCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
         }
     }
 
-    /// <summary>슬롯 프레임 안 아이콘 자식(<c>Slot_*/Icon</c>)만 바꾼다 — 프레임 Image 는 건드리지 않는다. 아이콘 없으면 숨김.</summary>
+    /// <summary>
+    /// 슬롯 프레임 안 마스크 밑 아이콘(<c>Slot_Q/Icon_mask/Icon_Q</c> 등)만 바꾼다 — 프레임 Image 는 건드리지 않는다.
+    /// 출처에 아이콘이 없으면 CombatHUD 에 설정된 값을 그대로 둔다(예: 우클릭 — 캐릭터 공용 아이콘).
+    /// </summary>
     public static void SetSlotIcon(Image icon, ISkillTooltipSource source)
     {
-        if (icon == null)
-            return;
         Sprite sprite = source != null ? source.Tooltip.Icon : null;
-        icon.sprite = sprite;
-        icon.enabled = sprite != null;
+        if (icon != null && sprite != null)
+            icon.sprite = sprite;
     }
 
     private static string KeyLabel(PlayerSkillSlot slot) => slot switch

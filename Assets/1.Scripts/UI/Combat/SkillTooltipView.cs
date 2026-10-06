@@ -95,6 +95,9 @@ public sealed class SkillTooltipView : MonoBehaviour
 
         RefreshContent(IsShiftHeld());
         Canvas.ForceUpdateCanvases();
+        // 패널 세로 = 내용 높이(VerticalLayoutGroup + ContentSizeFitter). 같은 프레임에 크기를 확정해야 화면 경계 보정이 맞는다.
+        if (rectTransform != null)
+            LayoutRebuilder.ForceRebuildLayoutImmediate(rectTransform);
         Reposition();
     }
 
@@ -149,7 +152,10 @@ public sealed class SkillTooltipView : MonoBehaviour
 
         if (shiftHint != null)
         {
-            shiftHint.gameObject.SetActive(ok && hasDamage && !detailed);
+            // 안내가 필요 없을 때({dmg} 없음·오류·Shift 누른 동안)도 글자만 투명 — 줄 자리는 항상 유지한다.
+            shiftHint.gameObject.SetActive(true);
+            bool showHint = ok && hasDamage && !detailed;
+            shiftHint.canvasRenderer.SetAlpha(showHint ? 1f : 0f); // 프리팹 색(알파 포함)은 건드리지 않는다
             shiftHint.text = "자세한 정보를 보려면 [Shift] 키를 누르세요";
         }
     }

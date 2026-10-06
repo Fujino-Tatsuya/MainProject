@@ -43,7 +43,7 @@ public class PassiveHUD : MonoBehaviour
             tooltipSource,
             PlayerSkillSlot.Main,
             acceptsLeftClick: false,
-            displayKey: string.Empty,
+            displayKey: "Passive",
             cooldownSeconds: passive != null ? passive.CooldownTime : (float?)null);
         Refresh();
     }

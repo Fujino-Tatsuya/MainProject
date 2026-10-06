@@ -18,7 +18,7 @@ public static class SkillTooltipAuthoring
     private const string AttackSpritePath = GeneratedFolder + "/SkillTooltipAttackSprite.asset";
     private const string PaladinPrefabPath = "Assets/2.Prefabs/Player/Paladin/Player_Paladin.prefab";
     private const string SlotFramePath = "Assets/50.Art/UI/HUD/slot_skill.png";
-    private const string SlotIconName = "Icon";
+    private const string PassiveIconPath = "Icon_mask/Icon_Passive";
 
     private static readonly Dictionary<PlayerSkillSlot, string> PaladinData = new Dictionary<PlayerSkillSlot, string>
     {
@@ -79,7 +79,7 @@ public static class SkillTooltipAuthoring
                 SkillSlotHover hover = EnsureComponent<SkillSlotHover>(slotRoot.gameObject);
                 SetReference(hover, "tooltipView", view);
                 EnableFrameRaycast(slotRoot);
-                widget.FindPropertyRelative("icon").objectReferenceValue = FindSlotIcon(slotRoot);
+                widget.FindPropertyRelative("icon").objectReferenceValue = FindSlotIcon(slotRoot, SlotIconPath(slot));
                 widget.FindPropertyRelative("hover").objectReferenceValue = hover;
             }
             skillSo.ApplyModifiedPropertiesWithoutUndo();
@@ -90,7 +90,7 @@ public static class SkillTooltipAuthoring
             {
                 passiveRoot.gameObject.SetActive(true);
                 EnableFrameRaycast(passiveRoot);
-                passiveSo.FindProperty("icon").objectReferenceValue = FindSlotIcon(passiveRoot);
+                passiveSo.FindProperty("icon").objectReferenceValue = FindSlotIcon(passiveRoot, PassiveIconPath);
                 SkillSlotHover hover = EnsureComponent<SkillSlotHover>(passiveRoot.gameObject);
                 SetReference(hover, "tooltipView", view);
                 passiveSo.FindProperty("hover").objectReferenceValue = hover;
@@ -139,6 +139,7 @@ public static class SkillTooltipAuthoring
             outline.effectDistance = new Vector2(1.5f, -1.5f);
         }
 
+        bool firstBuild = FindDeep(panel, "Description") == null;
         Image icon = EnsureImage(panel, "Icon", new Vector2(16f, -16f), new Vector2(64f, 64f));
         TMP_Text key = EnsureText(panel, "KeyBadge", font, 18f, FontStyles.Bold, TextAlignmentOptions.Center,
             new Vector2(88f, -18f), new Vector2(54f, 28f));
@@ -154,9 +155,14 @@ public static class SkillTooltipAuthoring
             new Vector2(16f, -230f), new Vector2(398f, 24f));
         body.styleSheet = styleSheet;
         body.spriteAsset = attackSprite;
-        body.textWrappingMode = TextWrappingModes.Normal;
-        hint.color = new Color(0.72f, 0.74f, 0.78f, 1f);
-        key.color = new Color(0.95f, 0.82f, 0.42f, 1f);
+        if (firstBuild)
+        {
+            body.textWrappingMode = TextWrappingModes.Normal;
+            hint.color = new Color(0.72f, 0.74f, 0.78f, 1f);
+            key.color = new Color(0.95f, 0.82f, 0.42f, 1f);
+        }
+        EnsureFlexibleHeight(panel, body, hint, icon.rectTransform, key.rectTransform, title.rectTransform,
+            subtitle.rectTransform, cooldown.rectTransform);
 
         var so = new SerializedObject(view);
         so.FindProperty("panel").objectReferenceValue = panel.gameObject;
@@ -170,6 +176,52 @@ public static class SkillTooltipAuthoring
         so.ApplyModifiedPropertiesWithoutUndo();
         panel.gameObject.SetActive(false);
         return view;
+    }
+
+    /// <summary>
+    /// 패널 세로 크기 = 내용 높이(가로 고정). 머리줄은 <c>Header</c> 로 묶어 배치를 그대로 두고, 설명·Shift 안내만 세로로 흐른다.
+    /// <c>Header</c> 가 없을 때 한 번만 지금 절대 배치를 Header 높이·TMP margin·아래 여백으로 옮긴다 — 이후 간격은 프리팹 인스펙터에서 고친다.
+    /// </summary>
+    private static void EnsureFlexibleHeight(RectTransform panel, TMP_Text body, TMP_Text hint, params RectTransform[] headerItems)
+    {
+        if (panel.Find("Header") != null)
+            return;
+
+        float width = panel.sizeDelta.x;
+        RectTransform bodyRect = body.rectTransform;
+        RectTransform hintRect = hint.rectTransform;
+        float bodyTop = -bodyRect.anchoredPosition.y;
+        float bodyBottom = bodyTop + bodyRect.sizeDelta.y;
+        float hintTop = -hintRect.anchoredPosition.y;
+        float hintBottom = hintTop + hintRect.sizeDelta.y;
+
+        RectTransform header = NewUi("Header", panel);
+        Place(header, Vector2.zero, new Vector2(width, bodyTop));
+        foreach (RectTransform item in headerItems)
+            item.SetParent(header, false); // Header 왼쪽 위 = Panel 왼쪽 위 → 머리줄 배치 그대로
+        LayoutElement headerLayout = header.gameObject.AddComponent<LayoutElement>();
+        headerLayout.minHeight = bodyTop;
+        headerLayout.preferredHeight = bodyTop;
+
+        // 레이아웃이 폭을 패널 전체로 잡으므로 지금 좌우 위치·간격은 margin(왼, 위, 오른, 아래)으로 옮긴다.
+        body.margin += new Vector4(bodyRect.anchoredPosition.x, 0f, width - bodyRect.anchoredPosition.x - bodyRect.sizeDelta.x, 0f);
+        hint.margin += new Vector4(hintRect.anchoredPosition.x, hintTop - bodyBottom, width - hintRect.anchoredPosition.x - hintRect.sizeDelta.x, 0f);
+        header.SetSiblingIndex(0);
+        bodyRect.SetSiblingIndex(1);
+        hintRect.SetSiblingIndex(2);
+
+        VerticalLayoutGroup group = panel.gameObject.AddComponent<VerticalLayoutGroup>();
+        group.padding = new RectOffset(0, 0, 0, Mathf.Max(0, Mathf.RoundToInt(panel.sizeDelta.y - hintBottom)));
+        group.spacing = 0f;
+        group.childAlignment = TextAnchor.UpperLeft;
+        group.childControlWidth = true;
+        group.childControlHeight = true;
+        group.childForceExpandWidth = true;
+        group.childForceExpandHeight = false;
+
+        ContentSizeFitter fitter = panel.gameObject.AddComponent<ContentSizeFitter>();
+        fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+        fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
     }
 
     private static void SeedTooltipSources()
@@ -256,16 +308,25 @@ public static class SkillTooltipAuthoring
     }
 
     /// <summary>
-    /// 슬롯 안 아이콘 자식 <c>Slot_*/Icon</c>(프리팹에서 직접 만든 것)을 찾아 쓴다. 위치·크기·스프라이트는 건드리지 않는다.
-    /// 슬롯 루트 Image 는 프레임(slot_skill)이라 아이콘으로 쓰지 않는다.
+    /// 슬롯 안 마스크 밑 아이콘 Image(프리팹에서 직접 만든 것 — <c>Slot_Q/Icon_mask/Icon_Q</c>, <c>Slot_P/Icon_mask/Icon_Passive</c>)를 찾아 쓴다.
+    /// 위치·크기·스프라이트는 건드리지 않는다. 슬롯 루트(프레임 slot_skill)·마스크 Image 는 아이콘으로 쓰지 않는다.
     /// </summary>
-    private static Image FindSlotIcon(Transform slotRoot)
+    private static Image FindSlotIcon(Transform slotRoot, string iconPath)
     {
-        Image image = slotRoot.Find(SlotIconName)?.GetComponent<Image>();
+        Image image = slotRoot.Find(iconPath)?.GetComponent<Image>();
         if (image == null)
-            Debug.LogWarning($"[SkillTooltip] {slotRoot.name}/{SlotIconName} Image 가 없다 — 프리팹에 만들어 둘 것(아이콘 없이 진행).");
+            Debug.LogWarning($"[SkillTooltip] {slotRoot.name}/{iconPath} Image 가 없다 — 프리팹에 만들어 둘 것(아이콘 없이 진행).");
         return image;
     }
+
+    private static string SlotIconPath(PlayerSkillSlot slot) => slot switch
+    {
+        PlayerSkillSlot.Main => "Icon_mask/Icon_Q",
+        PlayerSkillSlot.Sub => "Icon_mask/Icon_E",
+        PlayerSkillSlot.Interrupt => "Icon_mask/Icon_RMB",
+        PlayerSkillSlot.Ultimate => "Icon_mask/Icon_Ult",
+        _ => string.Empty,
+    };
 
     private static void EnableFrameRaycast(Transform slotRoot)
     {
@@ -371,9 +432,12 @@ public static class SkillTooltipAuthoring
         EditorUtility.SetDirty(texture);
     }
 
+    // 이미 있는 오브젝트는 배치·서식을 건드리지 않는다 — 프리팹에서 손본 값이 재실행에 덮이지 않게(새로 만들 때만 기본값).
     private static Image EnsureImage(RectTransform parent, string name, Vector2 position, Vector2 size)
     {
-        RectTransform rect = FindDeep(parent, name) as RectTransform ?? NewUi(name, parent);
+        if (FindDeep(parent, name) is RectTransform existing && existing.TryGetComponent(out Image found))
+            return found;
+        RectTransform rect = NewUi(name, parent);
         Place(rect, position, size);
         Image image = EnsureComponent<Image>(rect.gameObject);
         image.raycastTarget = false;
@@ -385,7 +449,9 @@ public static class SkillTooltipAuthoring
         RectTransform parent, string name, TMP_FontAsset font, float size, FontStyles style,
         TextAlignmentOptions alignment, Vector2 position, Vector2 dimensions)
     {
-        RectTransform rect = FindDeep(parent, name) as RectTransform ?? NewUi(name, parent);
+        if (FindDeep(parent, name) is RectTransform existing && existing.TryGetComponent(out TMP_Text found))
+            return found;
+        RectTransform rect = NewUi(name, parent);
         Place(rect, position, dimensions);
         TextMeshProUGUI text = EnsureComponent<TextMeshProUGUI>(rect.gameObject);
         if (font != null)
