@@ -217,3 +217,9 @@ Q22 `AssassinState` NetworkVariable · Q23·Q26 클립 git + 애니 이벤트(�
   `AssassinCircleStrikeSkill`(alternateSkills.sub = 변신 E, fixedDistance 1.5·aoeRadius 2, Hit 이벤트마다 원 재판정 5타 ×2.8, 쿨 12초) ·
   `AssassinCircleStrikeModel`(+테스트) · 🔴 코어: `InvulnerabilityCause.SkillAction`(enum 끝 추가 — 기존 값 불변). DataTable Order 4.
   ⏳ Play: 조준 원 회전·이동 중 조준·조준 중 변신 종료 시 쿨 없음 · 5타 무적·지형 무시 · 공격 중 만료/해제 시 5타 완료 후 종료 · 쓰러짐 즉시 중단.
+- ✅ A10(10-06): claude-alt `a41c7e25`(Unity 검증) — `AssassinInterruptSkill`(PlayerInterruptSkillBase, 훅 없음) + `AssassinInterruptSkillData`(Assassin 시트 Order 7, 가붕이 간파 22필드 값 복사). 메뉴 7.
+  🔸 가붕이 값 그대로라 hitDelay 0.15s 가 클립 Hit(0.60s)보다 먼저, skillDuration 0.6s 가 클립(1.5s)을 자름 — Play 튜닝.
+- ✅ A12(10-06): claude-alt 코드 `def430a8`(MCP 서버가 Refresh 후 재시도 소진으로 정지 → 메뉴 미실행) → 은희가 MCP Start 후 메인 Claude 가 `전체 구성 (A6~A12)` 실행(오류·경고 0, guid·해시 유지)·EditMode 95/0·에셋 커밋.
+  `AssassinHUD.prefab`(→ `Assassin_Armature/HUD`, 오너만, 하단 중앙 y=170 320×64 임시 — CombatHUD 미수정) · P 칸 툴팁(`AssassinState` = `IPassiveTooltipProvider`, `AssassinStateData` = `ISkillTooltipSource`) ·
+  `SkillTooltipAuthoring` 어쌔신 7개(TODO 문구, 메뉴 미실행) · 🔴 `AssassinSkillView`(NetworkBehaviour, RPC 1 — 피어 전원 같은 커밋).
+  임시 VFX(민경 교체 목록): 변신 루프 CharacterCirclePurple · 강화 준비 CharacterCircleYellow · Q 궤적 FX_Dash_Trail · 변신 E Burst_rings · 백어택 Burst_sharp(A11 이 호출해야 동작).

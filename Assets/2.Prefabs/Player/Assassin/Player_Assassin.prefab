@@ -57,9 +57,19 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 3a5f368447661b44592ccc55d5568854, type: 3}
+--- !u!4 &1163115333760412649 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 8207644594591380909, guid: 3a5f368447661b44592ccc55d5568854, type: 3}
+  m_PrefabInstance: {fileID: 7044578137847324228}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &2798426011539977253 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 5122105564311251553, guid: 3a5f368447661b44592ccc55d5568854, type: 3}
+  m_PrefabInstance: {fileID: 7044578137847324228}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &4076455800681530309 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 6435965534741421441, guid: 3a5f368447661b44592ccc55d5568854, type: 3}
   m_PrefabInstance: {fileID: 7044578137847324228}
   m_PrefabAsset: {fileID: 0}
 --- !u!95 &8085700165709622879 stripped
@@ -203,6 +213,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       insertIndex: -1
       addedObject: {fileID: 6164440143043952877}
+    - targetCorrespondingSourceObject: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 6606962425304540108}
   m_SourcePrefab: {fileID: 100100000, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
 --- !u!1 &768617275354264640 stripped
 GameObject:
@@ -354,6 +367,27 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AssassinInterruptSkill
   data: {fileID: 11400000, guid: 05cb7d246b9fd3744ac6801613bd159a, type: 2}
   hitboxAnchor: {fileID: 8465202442189913645}
+--- !u!114 &6606962425304540108
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 768617275354264640}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9535f0a835280684db843450275cc7af, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AssassinSkillView
+  ShowTopMostFoldoutHeaderGroup: 1
+  transformLoopPrefab: {fileID: 1597097068444350898, guid: a1daf7073cf07e7468eb75e9d2d5e967, type: 3}
+  enhancedReadyLoopPrefab: {fileID: 3220920230613450000, guid: 192fe42b654ad7144b59bf436410b8b6, type: 3}
+  dashTrailPrefab: {fileID: 8780727661788297695, guid: 6a288b836c116494bafe48246b12f73e, type: 3}
+  circleStrikePrefab: {fileID: 1475618779179179817, guid: 07799b25da23d9c4d97a417f6f0d0f31, type: 3}
+  backAttackHitPrefab: {fileID: 7634420434017284396, guid: b9ed127bfed05be4db493ca51e744a76, type: 3}
+  releaseLifetime: 2
+  transformSocket: {fileID: 4076455800681530309}
+  enhancedSocket: {fileID: 1163115333760412649}
 --- !u!4 &7816451711114395826 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 1160318589990200604, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}

@@ -12,6 +12,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: de24d85f9dbd66241a9f50a23eff5b4a, type: 3}
   m_Name: AssassinStateData
   m_EditorClassIdentifier: Assembly-CSharp::AssassinStateData
+  tooltip:
+    displayName: "\uBC31\uC5B4\uD0DD \xB7 R \uC2A4\uD0DD"
+    subtitle: 
+    description: "TODO \uBCF4\uC2A4 \uB4A4\uC5D0\uC11C \uACF5\uACA9\uD558\uBA74 \uD53C\uD574\uAC00
+      \uC99D\uAC00\uD569\uB2C8\uB2E4. \uAC15\uD0C0 \uC801\uC911\uC73C\uB85C R \uC2A4\uD0DD\uC744
+      \uCD5C\uB300 4\uAC1C\uAE4C\uC9C0 \uBAA8\uC74D\uB2C8\uB2E4. \uBCC0\uC2E0 \uC911\uC5D0\uB294
+      \uBAA8\uB4E0 \uACF5\uACA9\uC774 \uBC31\uC5B4\uD0DD\uC785\uB2C8\uB2E4."
+    icon: {fileID: 0}
   maxStacks: 4
   transformDurations:
   - 4
