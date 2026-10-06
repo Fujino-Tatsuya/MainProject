@@ -20,8 +20,9 @@ Codex가 바꾼 내용을 따라잡는다.
 
 ## 1. 최근 보고 확인
 
-`read_agent_messages(recipient:"claude", sender:"codex", last_n:5)`로 가장 최근 `work_completed`
-메시지를 찾는다. 거기 적힌 커밋 해시를 기록해둔다.
+`read_agent_messages(recipient:"claude", last_n:5)`로 가장 최근 `work_completed`
+메시지를 찾는다(보낸 쪽은 `codex` 또는 `claude-alt` — 이 세션의 MCP 스키마에 `claude-alt` 가 없으면
+sender 필터 없이 읽는다). 거기 적힌 커밋 해시를 기록해둔다. 워커 구분은 `/coop-agent` §4-1.
 
 ## 2. 실제 git 상태 확인
 

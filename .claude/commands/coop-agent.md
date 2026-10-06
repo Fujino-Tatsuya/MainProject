@@ -1,5 +1,5 @@
 ---
-description: Agent-Bridge로 Codex와 협업 시작 — 공용 컨텍스트/메시지 확인, 필요하면 작업 위임(handoff)
+description: Agent-Bridge로 Codex·claude-alt(다른 계정 Claude)와 협업 시작 — 공용 컨텍스트/메시지 확인, 필요하면 작업 위임(handoff)
 ---
 
 Codex와 협업하기 위한 시작 절차. Agent-Bridge MCP 도구
@@ -137,6 +137,34 @@ done
 - `git log`/`git status` — 커밋까지 갔는지
 
 프로세스가 살아 있고 파일이 최근에 바뀌었으면 **그냥 작업 중**이다.
+
+## 4-1. 워커 고르기 — `codex` 또는 `claude-alt` (2026-10-06 추가)
+
+브릿지 워커는 둘이다. 원본 설명 = 브릿지 [README.md](file:///C:/Users/user/Desktop/Co_Working_for_Agents/agent-context-bridge/README.md) 「다른 계정 Claude 워커」.
+
+| 워커 | 띄우는 것 | 할 수 있는 것 | 못 하는 것 |
+|---|---|---|---|
+| `codex` | `codex-watcher.ps1` | 코드·`dotnet build`·커밋 | Unity 실행 금지(우리 지시) → 메뉴 실행·EditMode·프리팹 생성은 메인 Claude 몫 |
+| `claude-alt` | `claude-alt-watcher.ps1` — **다른 계정**(CLI 기본 로그인)으로 `claude -p` 1회 | 편집·**Unity MCP(Refresh·컴파일·메뉴·EditMode)**·`git add/commit` | `dotnet` 등 허용 목록 밖 Bash, `git push/reset/stash/checkout/switch/merge/rebase`, Play 진입 |
+
+- **Codex 크레딧이 떨어지면**(watcher.log `ERROR: Your workspace is out of credits`, 2026-10-06 A6 도중 실제 발생) 남은 미커밋 파일을
+  메인 Claude 가 이어받아 검토·컴파일·커밋하고, 다음 위임은 `claude-alt` 로 돌린다. 어느 쪽으로 보낼지는 사용자에게 확인한다.
+- 🔴 **워처는 워커별로 따로 켠다**: `codex-lane.ps1 -Lane <LANE> -Worker claude-alt -Action start`.
+  `READY` 와 함께 로그의 `계정=`(실제 붙은 이메일)·`현재브랜치=` 를 확인한 뒤에만 handoff 를 보낸다.
+- 🔴 **보내기**: 이 세션의 브릿지 MCP 가 `claude-alt` 지원 이전에 떠 있으면 `send_agent_message` 의
+  recipient 에 `claude-alt` 가 없다(스키마 enum = claude/codex/all). 그럴 땐 브릿지 폴더에서
+  `node send-test.mjs <LANE> claude-alt "<내용>"` 로 넣는다 — 같은 `conversation.jsonl` 에 들어간다.
+  이 스크립트는 `files` 인자가 없으니 **관련 파일 경로는 본문에 적는다.** `all` 로 보내면 어떤 워커도 깨지 않는다.
+- 🔴 **같은 레인은 워커가 한 번에 하나**(`.worker.lock`). 그리고 claude-alt 는 같은 워크트리·같은 Unity(MCP 포트)를 쓴다 —
+  **위임 중에는 메인 세션이 그 워크트리 파일을 고치거나 Refresh 하지 않는다**(검토·대기만).
+- handoff 본문에 쓸 것: claude-alt 는 Unity MCP 를 쓸 수 있으니 "Refresh → 컴파일 확인 → `Tools/Tests/…` EditMode 실행 → 통과 수 보고"까지 시킨다.
+  Play/MPPM 은 여전히 사람 몫. `dotnet build` 는 허용 목록에 없으니 시키지 않는다.
+- **완료 감시(4번 스크립트) 바꿀 점**:
+  - 메시지 매칭을 `'"sender":"claude-alt"'` 로(또는 `codex` 와 둘 다).
+  - watcher.log 의 워커 출력 줄은 `[claude-alt] [alt] <원문>` 이다 — `grep -v '\[codex\]'` 대신 **`grep -v '\[alt\]'`** 로 거른다.
+    (워처 자신의 줄도 `[claude-alt]` 태그를 달고 있으니 `[claude-alt]` 로 거르면 신호까지 지워진다.)
+  - 종료 신호는 같다: `DONE id=` · `REPORTED ` · `[RELOAD]` · `ERROR:`. 처음 기동 대기는 `WAIT` 로그.
+- 생사 확인: `Get-Process claude` 의 시작 시각이 handoff 직후인지 + 워크트리 파일 수정 시각.
 
 ## 5. `$ARGUMENTS`가 없으면 — 상태 보고만
 
