@@ -223,3 +223,7 @@ Q22 `AssassinState` NetworkVariable · Q23·Q26 클립 git + 애니 이벤트(�
   `AssassinHUD.prefab`(→ `Assassin_Armature/HUD`, 오너만, 하단 중앙 y=170 320×64 임시 — CombatHUD 미수정) · P 칸 툴팁(`AssassinState` = `IPassiveTooltipProvider`, `AssassinStateData` = `ISkillTooltipSource`) ·
   `SkillTooltipAuthoring` 어쌔신 7개(TODO 문구, 메뉴 미실행) · 🔴 `AssassinSkillView`(NetworkBehaviour, RPC 1 — 피어 전원 같은 커밋).
   임시 VFX(민경 교체 목록): 변신 루프 CharacterCirclePurple · 강화 준비 CharacterCircleYellow · Q 궤적 FX_Dash_Trail · 변신 E Burst_rings · 백어택 Burst_sharp(A11 이 호출해야 동작).
+- 🔴 **단검(10-06 은희 Play 확인)**: 모델 FBX 에 단검 메시·본이 없어 맨손으로 보인다(클립의 `Dagger_Weapon_L/R`·`Dagger_Holder` 커브는 바인딩 대상 없음).
+  **은희가 직접 작업 중 — 임시 단검을 붙이지 말 것.** 그동안 `Assassin_Armature`·`Player_Assassin` 을 다시 저장하는 저작 메뉴 실행·위임 금지(작업 덮어씀).
+- ⏸ **임시 VFX 보강**(은희 단검 작업 끝난 뒤): 현재는 상태 루프 2 + Q 궤적 + 변신 E 1회뿐 — 평타 4타·강타·변신 묶음 베기, 일반 E 버프·R Parry_R·간파 시전 이펙트 없음.
+  `CharacterCircle*` 이 약 6초 뒤 꺼지는 파티클이면 변신(최대 10초) 중 사라짐 — 루프 유지 확인·보정. Play 에서 변신·강화 상태가 잘 안 보인다는 피드백(HUD·이펙트 약함).
