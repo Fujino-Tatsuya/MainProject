@@ -2037,6 +2037,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::DissolveDeath
   ShowTopMostFoldoutHeaderGroup: 1
   dissolveTemplate: {fileID: 2100000, guid: 2aa1c6b21e004e799e426acfd55ec726, type: 2}
+  stylizedDissolveShader: {fileID: 4800000, guid: 2e0fd796f9611bf4f8bdfccb6ef91d91, type: 3}
+  dissolveNoise: {fileID: 0}
+  dissolveNoiseTiling: 4
   particlePrefab: {fileID: 7019508933032447489, guid: 0e15d6fc561b43fa95fadff8ab04b5fd, type: 3}
   duration: 2
   despawnGrace: 0.5

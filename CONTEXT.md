@@ -110,6 +110,13 @@ HUD 매 프레임 문자열(`PlayerHealthHUD`·`StatusEffectHUD`·`SkillCooldown
 - ✅ 1단계 Codex(코드) `09e9cc57` · ✅ 2단계 Claude(씬·에셋·`LobbySceneManager` 배선). 결과 요약 = [player-prefabs.md §8.3](Docs/tech/player-prefabs.md)
 - 🔴 남은 것: **은희 MPPM Play 확인**(호스트+클라2: 초상화·Ready 동기화 / Start 활성 / 고른 Variant 스폰) → PR. 레이아웃은 첫 배치라 Play 보고 조정 가능
 - 범위 밖: 전투 HUD 초상화 Paladin 고정(Gunner 도 Paladin 얼굴)
+## ▶▶ 작업 세션 (2026-10-06 · 민경(Claude) · **23호 사망 디졸브 = FlatKit 디졸브 셰이더**, 브랜치 `feature/VFX`) — ✅ Play 확인(민경 10-06, 실루엣 자국 없음)
+- 23호(`TwentyThree.prefab`)는 부위 붕괴 대상이 아니라(팀장 지시 — 쓰러진 자세 2초) `DissolveDeath` 를 유지하되, 녹을 때 셰이더만 잡몹과 같은 **`VFX/Stylized Surface Dissolve`** 로 바꿨다. 기존 템플릿(DissolveFx, URP Lit 계열)은 갈아끼우는 순간 FlatKit 셀 음영·림·아웃라인이 빠져 질감이 바뀌었다.
+- `DissolveDeath.cs`: `stylizedDissolveShader` 필드 추가. 원본이 `FlatKit/Stylized Surface` 면 `new Material(원본)` + 셰이더 교체(룩 유지), 아니면 템플릿 경로. 노이즈는 템플릿의 `_NoiseTexture` 를 빌림. 진행 방향이 반대(`_DissolveAmount` 0→1 / `_Cutoff` 1→0)라 따로 보간. FlatKit 디졸브 슬롯이 있는 렌더러는 그림자 끔(ShadowCaster 가 깎기를 안 탐). 셰이더 필드가 비면 예전 동작 그대로.
+- `DissolveDeath` 사용처는 23호 하나뿐(본체 `FK_No23_Toon` + 탑승 웰즈 `FK_SK_welz_*` 전부 FlatKit). 인터럽트 오버레이 슬롯 건너뛰기는 그대로.
+- 🔴 **경석 공유**: `DissolveDeath.cs`, `TwentyThree.prefab`(필드 3줄 추가).
+- 🔴 **디졸브 후 실루엣 음영이 남던 문제**: `StylizedSurfaceDissolve.shader` 의 `DepthOnly`·`DepthNormals` 가 URP 기본 패스라 디졸브를 안 깎았다 → 색은 사라져도 깊이 버퍼에 원래 모양이 남고, 깊이를 읽는 `FogRendererFeature`(깊이 안개)·`DecalRendererFeature` 가 그 자리를 다르게 칠했다. URP 패스 사본 2개(`StylizedDissolveDepthOnlyPass.hlsl`·`StylizedDissolveDepthNormalsPass.hlsl`)에 `FlatKitDissolveClip` 을 넣어 교체. 잡몹 부위 붕괴 조각도 같은 셰이더라 같이 고쳐진다. 🔴 SVN add 2개 + `.meta`.
+
 ## ▶▶ 작업 세션 (2026-10-06 · 민경(Claude) · **아군 보호막 연출 = 받는 쪽이 주인**, 브랜치 `feature/VFX`) — 구현 완료 · 배선·Play 검증 대기
 계획·그릴 결과 = [PLAN.md](PLAN.md) 맨 위 항목.
 - 거너 Q 가 아군에게 보호막을 줄 때 띄우던 `FX_GunnerShieldGrant` 를 걷고, **아군 자신의 `PlayerShieldVfx` 배리어**로 바꿨다.
