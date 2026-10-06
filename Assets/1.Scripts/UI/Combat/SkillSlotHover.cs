@@ -15,6 +15,9 @@ public sealed class SkillSlotHover : MonoBehaviour,
 
     private Player player;
     private PlayerInputReader input;
+    private PlayerSkillController skillController;
+    private SkillLineIndicator lineIndicator;
+    private ISkillPreviewSource previewSource;
     private ISkillTooltipSource source;
     private PlayerSkillSlot slot;
     private bool clickable;
@@ -36,10 +39,16 @@ public sealed class SkillSlotHover : MonoBehaviour,
         string displayKey,
         float? cooldownSeconds)
     {
+        EndSkillPreview();
         player = owner;
         input = owner != null ? owner.GetComponent<PlayerInputReader>() : null;
+        skillController = owner != null ? owner.GetComponent<PlayerSkillController>() : null;
+        lineIndicator = owner != null ? owner.GetComponentInChildren<SkillLineIndicator>(true) : null;
         source = tooltipSource;
         slot = inputSlot;
+        previewSource = skillController != null
+            ? skillController.GetSkill(slot) as ISkillPreviewSource
+            : null;
         clickable = acceptsLeftClick;
         keyLabel = displayKey;
         cooldown = cooldownSeconds;
@@ -51,7 +60,10 @@ public sealed class SkillSlotHover : MonoBehaviour,
         }
 
         if (pointerInside)
+        {
             tooltipView?.BeginHover(this, source, player, (RectTransform)transform, keyLabel, cooldown);
+            BeginSkillPreview();
+        }
     }
 
     public void OnPointerEnter(PointerEventData eventData)
@@ -59,6 +71,7 @@ public sealed class SkillSlotHover : MonoBehaviour,
         pointerInside = true;
         Hovering.Add(GetInstanceID());
         tooltipView?.BeginHover(this, source, player, transform as RectTransform, keyLabel, cooldown);
+        BeginSkillPreview();
     }
 
     public void OnPointerExit(PointerEventData eventData)
@@ -66,6 +79,7 @@ public sealed class SkillSlotHover : MonoBehaviour,
         pointerInside = false;
         Hovering.Remove(GetInstanceID());
         tooltipView?.EndHover(this);
+        EndSkillPreview();
     }
 
     public void OnPointerDown(PointerEventData eventData)
@@ -94,7 +108,20 @@ public sealed class SkillSlotHover : MonoBehaviour,
         pointerInside = false;
         Hovering.Remove(GetInstanceID());
         tooltipView?.EndHover(this);
+        EndSkillPreview();
         ReleaseVirtualInput();
+    }
+
+    private void BeginSkillPreview()
+    {
+        if (previewSource != null)
+            lineIndicator?.BeginPreview(previewSource);
+    }
+
+    private void EndSkillPreview()
+    {
+        if (previewSource != null)
+            lineIndicator?.EndPreview(previewSource);
     }
 
     private void ReleaseVirtualInput()

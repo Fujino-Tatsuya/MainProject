@@ -8,7 +8,7 @@ using UnityEngine;
 /// (공용 대시는 아군 통과지만 E 는 모터의 일시 아군 차단을 켠다). 피해·상태이상·무적 없음.
 /// 동작 중에는 다른 행동 불가(Skill 상태), 끝나면 기본 공격 포함 모두 가능.
 /// </summary>
-public class GunnerCoolBackstepSkill : PlayerSkillBase
+public class GunnerCoolBackstepSkill : PlayerSkillBase, ISkillPreviewSource
 {
     private GunnerHeat heat;
     private PlayerMotor motor;
@@ -88,5 +88,29 @@ public class GunnerCoolBackstepSkill : PlayerSkillBase
         if (motor != null)
             motor.BlockOtherPlayersOverride = false;
         base.OnEnd(reason);
+    }
+
+    public bool TryGetPreview(Vector3 origin, Vector3 forward, out SkillPreviewShape shape)
+    {
+        GunnerCoolBackstepData data = EData;
+        if (data == null)
+        {
+            shape = default;
+            return false;
+        }
+
+        forward.y = 0f;
+        forward = forward.sqrMagnitude > 0.001f ? forward.normalized : Vector3.forward;
+        float clipped = motor != null
+            ? motor.GetGroundedPreviewDistance(
+                -forward * data.Distance,
+                blockOtherPlayers: true,
+                passThroughEnemies: false)
+            : data.Distance;
+        shape = SkillPreviewShapes.Arrow(
+            arrowDirection: -1f,
+            arrowLength: data.Distance,
+            clippedArrowLength: clipped);
+        return true;
     }
 }
