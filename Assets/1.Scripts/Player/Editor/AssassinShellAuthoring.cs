@@ -8,7 +8,7 @@ using UnityEngine;
 using Object = UnityEngine.Object;
 
 /// <summary>
-/// PLAN-assassin A6~A9 저작 메뉴. 모델/클립 원본은 건드리지 않고, 재실행 가능한 방식으로 컨트롤러·Armature·Variant·데이터 배선을 맞춘다.
+/// PLAN-assassin A6~A12 저작 메뉴. 모델/클립 원본은 건드리지 않고, 재실행 가능한 방식으로 컨트롤러·Armature·Variant·데이터 배선을 맞춘다.
 /// </summary>
 public static class AssassinShellAuthoring
 {
@@ -29,6 +29,10 @@ public static class AssassinShellAuthoring
     private const string DashStrikeDataPath = DataFolder + "/AssassinDashStrikeSkillData.asset";
     private const string TransformedDashStrikeDataPath = DataFolder + "/AssassinTransformedDashStrikeSkillData.asset";
     private const string CircleStrikeDataPath = DataFolder + "/AssassinCircleStrikeSkillData.asset";
+    private const string InterruptDataPath = DataFolder + "/AssassinInterruptSkillData.asset";
+    // A10 간파 수치 원본 — 암살자 전용 수치 없음(§11). 처음 만들 때만 값 복사.
+    private const string PaladinInterruptDataPath = "Assets/9.ScriptableObject/Player/Garen/FirstMeleeInterruptSkillData.asset";
+    private const string InterruptAnchorName = "InterruptAttack";
     private const string RosterPath = "Assets/9.ScriptableObject/Player/CharacterRoster.asset";
 
     // A7 Animator 상태 — 스킬 데이터 animatorStateName 과 같은 이름이어야 CrossFade 가 맞는다.
@@ -74,7 +78,7 @@ public static class AssassinShellAuthoring
         "Idle", "Idle_Combat", "Run_Combat_Fast_Loop",
     };
 
-    [MenuItem("Tools/Player/Assassin/전체 구성 (A6~A9)")]
+    [MenuItem("Tools/Player/Assassin/전체 구성 (A6~A12)")]
     public static void BuildAll()
     {
         BuildShell();
@@ -83,6 +87,7 @@ public static class AssassinShellAuthoring
         AttachStateAndSkills();
         AttachDashStrikeSkills();
         AttachCircleStrikeSkill();
+        AttachInterruptSkill();
         AssetDatabase.SaveAssets();
         Debug.Log($"{Tag} 전체 구성 완료. 오류 로그가 없었는지 확인할 것.");
     }
@@ -397,6 +402,91 @@ public static class AssassinShellAuthoring
 
         RecordAndValidateHash(AssetDatabase.LoadAssetAtPath<GameObject>(VariantPath));
         AssetDatabase.SaveAssets();
+    }
+
+    /// <summary>
+    /// A10 — 우클릭 간파 부착, 데이터 SO(가붕이 간파 값 복사), interruptSkill 배선, 앵커 = Armature/InterruptAttack.
+    /// 일반·변신 공통이라 대체 세트는 없다. Animator "Interrupt" 상태(Attack_Up_01)는 1번 메뉴가, Hit/End 이벤트는 3번 메뉴가 만든다.
+    /// 데이터는 처음 만들 때만 복사하고 재실행 시 튜닝 값을 유지한다.
+    /// </summary>
+    [MenuItem("Tools/Player/Assassin/7. 간파 부착 + 데이터 (A10)")]
+    public static void AttachInterruptSkill()
+    {
+        if (AssetDatabase.LoadAssetAtPath<GameObject>(VariantPath) == null)
+        {
+            Debug.LogError($"{Tag} Variant가 없다. 먼저 1번 메뉴를 실행할 것: {VariantPath}");
+            return;
+        }
+
+        EnsureFolder(DataFolder);
+        AssassinInterruptSkillData data = EnsureAsset<AssassinInterruptSkillData>(InterruptDataPath, out bool created);
+        if (created)
+            CopyInterruptValuesFromPaladin(data);
+
+        GameObject root = PrefabUtility.LoadPrefabContents(VariantPath);
+        try
+        {
+            AssassinInterruptSkill skill = EnsureComponent<AssassinInterruptSkill>(root);
+            SetReference(skill, "data", data);
+
+            Transform anchor = root.transform.Find("Armature/" + InterruptAnchorName);
+            ColliderInfo anchorInfo = anchor != null ? anchor.GetComponent<ColliderInfo>() : null;
+            if (anchorInfo == null)
+                Debug.LogError($"{Tag} Armature/{InterruptAnchorName} 앵커(ColliderInfo)를 찾지 못했다 — 1번 메뉴를 먼저 실행할 것.");
+            else
+                SetReference(skill, "hitboxAnchor", anchorInfo);
+
+            PlayerSkillController skills = root.GetComponent<PlayerSkillController>();
+            SetReference(skills, "interruptSkill", skill);
+
+            PrefabUtility.SaveAsPrefabAsset(root, VariantPath);
+            Debug.Log($"{Tag} A10 간파 부착/갱신: interruptSkill=AssassinInterruptSkill, 앵커 {InterruptAnchorName} ({VariantPath})");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+
+        AnimatorController controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(ControllerPath);
+        if (controller != null)
+        {
+            BuildAnimator(controller);
+            ValidateSkillState(controller, data);
+        }
+        else
+        {
+            Debug.LogError($"{Tag} Animator Controller가 없다. 먼저 1번 메뉴를 실행할 것: {ControllerPath}");
+        }
+
+        RecordAndValidateHash(AssetDatabase.LoadAssetAtPath<GameObject>(VariantPath));
+        AssetDatabase.SaveAssets();
+    }
+
+    // 가붕이 간파 SO 의 같은 이름 직렬화 필드를 값 복사한다(툴팁 문구는 어쌔신 것을 따로 쓴다).
+    private static void CopyInterruptValuesFromPaladin(AssassinInterruptSkillData data)
+    {
+        FirstMeleeInterruptSkillData source = AssetDatabase.LoadAssetAtPath<FirstMeleeInterruptSkillData>(PaladinInterruptDataPath);
+        if (source == null)
+        {
+            Debug.LogError($"{Tag} 가붕이 간파 데이터가 없어 기본값으로 둔다: {PaladinInterruptDataPath}");
+            return;
+        }
+
+        SerializedObject from = new SerializedObject(source);
+        SerializedObject to = new SerializedObject(data);
+        SerializedProperty property = from.GetIterator();
+        int copied = 0;
+        for (bool enter = true; property.NextVisible(enter); enter = false)
+        {
+            if (property.name == "m_Script" || property.name == "tooltip" || to.FindProperty(property.name) == null)
+                continue;
+            to.CopyFromSerializedProperty(property);
+            copied++;
+        }
+
+        to.ApplyModifiedPropertiesWithoutUndo();
+        EditorUtility.SetDirty(data);
+        Debug.Log($"{Tag} 간파 데이터 값 복사: {PaladinInterruptDataPath} → {InterruptDataPath} (필드 {copied}개, 쿨 {data.CooldownTime}s, ×{data.AttackDamageMultiplier})");
     }
 
     private static void InitializeCircleStrikeData(AssassinCircleStrikeSkillData data)

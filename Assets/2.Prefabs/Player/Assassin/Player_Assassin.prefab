@@ -67,6 +67,17 @@ Animator:
   m_CorrespondingSourceObject: {fileID: 1294066962840629275, guid: 3a5f368447661b44592ccc55d5568854, type: 3}
   m_PrefabInstance: {fileID: 7044578137847324228}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &8465202442189913645 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 1493276133697839209, guid: 3a5f368447661b44592ccc55d5568854, type: 3}
+  m_PrefabInstance: {fileID: 7044578137847324228}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 81c70da5a2e747148bf71f917743b5fd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ColliderInfo
 --- !u!1001 &8963248437157045678
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -140,6 +151,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 3500920581459072486}
     - target: {fileID: 4711829301158223401, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: interruptSkill
+      value: 
+      objectReference: {fileID: 6164440143043952877}
+    - target: {fileID: 4711829301158223401, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       propertyPath: alternateSkills.subSkill
       value: 
       objectReference: {fileID: 4755753809911062424}
@@ -185,6 +200,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       insertIndex: -1
       addedObject: {fileID: 4755753809911062424}
+    - targetCorrespondingSourceObject: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 6164440143043952877}
   m_SourcePrefab: {fileID: 100100000, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
 --- !u!1 &768617275354264640 stripped
 GameObject:
@@ -322,6 +340,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AssassinCircleStrikeSkill
   data: {fileID: 11400000, guid: 600453ab650b89243810def8cd5d48a2, type: 2}
   hitboxAnchor: {fileID: 0}
+--- !u!114 &6164440143043952877
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 768617275354264640}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1189ac7f471e25149a84bdcfd27e5d39, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AssassinInterruptSkill
+  data: {fileID: 11400000, guid: 05cb7d246b9fd3744ac6801613bd159a, type: 2}
+  hitboxAnchor: {fileID: 8465202442189913645}
 --- !u!4 &7816451711114395826 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 1160318589990200604, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
