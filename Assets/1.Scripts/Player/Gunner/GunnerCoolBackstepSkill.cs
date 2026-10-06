@@ -13,6 +13,9 @@ public class GunnerCoolBackstepSkill : PlayerSkillBase
     private GunnerHeat heat;
     private PlayerMotor motor;
 
+    // 연출 전담. 없을 수도 있으므로(테스트 프리팹) 전부 null 안전하게 쓴다.
+    private GunnerBeamView view;
+
     // 시뮬레이션 피어(오너 + 서버) 공통
     private Vector3 moveDirection;
     private float moveSpeed;
@@ -31,6 +34,7 @@ public class GunnerCoolBackstepSkill : PlayerSkillBase
         base.Initialize(owner, controller);
         heat = owner.GetComponent<GunnerHeat>();
         motor = owner.GetComponent<PlayerMotor>();
+        view = owner.GetComponent<GunnerBeamView>();
     }
 
     public override bool CanUse(Vector3 direction, Unit target) => EData != null;
@@ -56,6 +60,9 @@ public class GunnerCoolBackstepSkill : PlayerSkillBase
 
         if (motor != null)
             motor.BlockOtherPlayersOverride = true;
+
+        // 🔴 전방 냉기 + 과열 배기 + 이동 궤적. 여기는 이미 전 피어다.
+        view?.BeginBackstep(data != null ? data.MoveDuration : 0.25f);
     }
 
     public override void OnFixedTick()
@@ -77,6 +84,7 @@ public class GunnerCoolBackstepSkill : PlayerSkillBase
     public override void OnEnd(SkillEndReason reason)
     {
         remaining = 0f;
+        view?.EndBackstep();   // 🔴 전 피어. 여기서 빠뜨리면 클라에 냉기가 남는다
         if (motor != null)
             motor.BlockOtherPlayersOverride = false;
         base.OnEnd(reason);
