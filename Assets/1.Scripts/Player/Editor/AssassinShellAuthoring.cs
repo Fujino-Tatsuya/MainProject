@@ -33,6 +33,17 @@ public static class AssassinShellAuthoring
     // A10 간파 수치 원본 — 암살자 전용 수치 없음(§11). 처음 만들 때만 값 복사.
     private const string PaladinInterruptDataPath = "Assets/9.ScriptableObject/Player/Garen/FirstMeleeInterruptSkillData.asset";
     private const string InterruptAnchorName = "InterruptAttack";
+
+    // A12 HUD·임시 VFX. HUD 프리팹은 없을 때만 만든다(정식 UI 로 교체되면 그대로 둔다).
+    private const string HudPrefabPath = PrefabFolder + "/AssassinHUD.prefab";
+    private const string HudInstanceName = "AssassinHUD";
+    private const string KrFontPath = "Assets/Resources/NotoSansKR-VariableFont_wght SDF.asset";
+    // 🔸 임시 VFX — 프로젝트 공용 파티클. 민경 정식 VFX 로 교체 대상(필드가 비어 있을 때만 채우므로 교체값은 재실행에도 유지).
+    private const string TransformLoopVfxPath = "Assets/50.Art/VFX/Common/Combat/CharacterCircle/CharacterCirclePurple.prefab";
+    private const string EnhancedReadyVfxPath = "Assets/50.Art/VFX/Common/Combat/CharacterCircle/CharacterCircleYellow.prefab";
+    private const string DashTrailVfxPath = "Assets/50.Art/VFX/Common/Boss/Dash/FX_Dash_Trail.prefab";
+    private const string CircleStrikeVfxPath = "Assets/50.Art/VFX/Common/Burst/Burst_rings.prefab";
+    private const string BackAttackVfxPath = "Assets/50.Art/VFX/Common/Burst/Burst_sharp.prefab";
     private const string RosterPath = "Assets/9.ScriptableObject/Player/CharacterRoster.asset";
 
     // A7 Animator 상태 — 스킬 데이터 animatorStateName 과 같은 이름이어야 CrossFade 가 맞는다.
@@ -88,6 +99,7 @@ public static class AssassinShellAuthoring
         AttachDashStrikeSkills();
         AttachCircleStrikeSkill();
         AttachInterruptSkill();
+        AttachHudVfxAndTooltips();
         AssetDatabase.SaveAssets();
         Debug.Log($"{Tag} 전체 구성 완료. 오류 로그가 없었는지 확인할 것.");
     }
@@ -460,6 +472,232 @@ public static class AssassinShellAuthoring
 
         RecordAndValidateHash(AssetDatabase.LoadAssetAtPath<GameObject>(VariantPath));
         AssetDatabase.SaveAssets();
+    }
+
+    /// <summary>
+    /// A12 — 어쌔신 HUD 프리팹(없으면 생성)을 <c>Assassin_Armature/HUD</c> 에 중첩, Variant 루트에 AssassinSkillView 부착·임시 VFX 배선,
+    /// 어쌔신 스킬·패시브 SO 툴팁 임시 문구(비어 있을 때만). 공용 CombatHUD 는 건드리지 않는다. 재실행해도 결과가 같다.
+    /// </summary>
+    [MenuItem("Tools/Player/Assassin/8. HUD·VFX·툴팁 부착 (A12)")]
+    public static void AttachHudVfxAndTooltips()
+    {
+        if (AssetDatabase.LoadAssetAtPath<GameObject>(VariantPath) == null ||
+            AssetDatabase.LoadAssetAtPath<GameObject>(ArmaturePath) == null)
+        {
+            Debug.LogError($"{Tag} Variant/Armature가 없다. 먼저 1번 메뉴를 실행할 것: {VariantPath}");
+            return;
+        }
+
+        GameObject hudPrefab = EnsureHudPrefab();
+        if (hudPrefab == null)
+            return;
+
+        GameObject armature = PrefabUtility.LoadPrefabContents(ArmaturePath);
+        try
+        {
+            Transform hud = CharacterHudAuthoring.EnsureHudRoot(armature.transform);
+            if (hud.Find(HudInstanceName) == null)
+            {
+                GameObject instance = (GameObject)PrefabUtility.InstantiatePrefab(hudPrefab, hud);
+                instance.name = HudInstanceName;
+            }
+
+            PrefabUtility.SaveAsPrefabAsset(armature, ArmaturePath);
+            Debug.Log($"{Tag} A12 HUD 중첩: {ArmaturePath}/{CharacterHudAuthoring.HudRootName}/{HudInstanceName}");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(armature);
+        }
+
+        GameObject root = PrefabUtility.LoadPrefabContents(VariantPath);
+        try
+        {
+            AssassinSkillView view = EnsureComponent<AssassinSkillView>(root);
+            SerializedObject so = new SerializedObject(view);
+            SetIfEmpty(so, "transformLoopPrefab", TransformLoopVfxPath);
+            SetIfEmpty(so, "enhancedReadyLoopPrefab", EnhancedReadyVfxPath);
+            SetIfEmpty(so, "dashTrailPrefab", DashTrailVfxPath);
+            SetIfEmpty(so, "circleStrikePrefab", CircleStrikeVfxPath);
+            SetIfEmpty(so, "backAttackHitPrefab", BackAttackVfxPath);
+            so.FindProperty("transformSocket").objectReferenceValue = root.transform.Find("Armature/VFX/Transformation");
+            so.FindProperty("enhancedSocket").objectReferenceValue = root.transform.Find("Armature/VFX/EnhancedAttack");
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            PrefabUtility.SaveAsPrefabAsset(root, VariantPath);
+            Debug.Log($"{Tag} A12 AssassinSkillView 부착/갱신(임시 VFX — 민경 교체 대상): {VariantPath}");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+
+        // CombatHUD 를 건드리는 '스킬 툴팁 구성' 메뉴 대신 SO 문구만 채운다.
+        SkillTooltipAuthoring.SeedAssassinTooltips();
+
+        RecordAndValidateHash(AssetDatabase.LoadAssetAtPath<GameObject>(VariantPath));
+        AssetDatabase.SaveAssets();
+    }
+
+    private static void SetIfEmpty(SerializedObject so, string propertyName, string assetPath)
+    {
+        SerializedProperty property = so.FindProperty(propertyName);
+        if (property == null)
+        {
+            Debug.LogError($"{Tag} {so.targetObject.GetType().Name}.{propertyName} 직렬화 필드가 없다.");
+            return;
+        }
+        if (property.objectReferenceValue != null)
+            return;
+
+        GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(assetPath);
+        if (prefab == null)
+            Debug.LogWarning($"{Tag} 임시 VFX 프리팹이 없어 {propertyName} 을 비운다: {assetPath}");
+        property.objectReferenceValue = prefab;
+    }
+
+    // 임시 HUD — 화면 하단 중앙(거너 과열 게이지와 같은 높이대, 공용 CombatHUD 위). 스프라이트 없이 Image 색만 쓴다(구슬은 내장 Knob).
+    private static GameObject EnsureHudPrefab()
+    {
+        GameObject existing = AssetDatabase.LoadAssetAtPath<GameObject>(HudPrefabPath);
+        if (existing != null)
+            return existing;
+
+        GameObject root = new GameObject(HudInstanceName);
+        try
+        {
+            AssassinHUD hud = root.AddComponent<AssassinHUD>();
+
+            GameObject canvasGo = new GameObject("Canvas", typeof(RectTransform));
+            canvasGo.layer = LayerMask.NameToLayer("UI");
+            canvasGo.transform.SetParent(root.transform, false);
+            Canvas canvas = canvasGo.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 10;
+            UnityEngine.UI.CanvasScaler scaler = canvasGo.AddComponent<UnityEngine.UI.CanvasScaler>();
+            scaler.uiScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+
+            TMPro.TMP_FontAsset font = AssetDatabase.LoadAssetAtPath<TMPro.TMP_FontAsset>(KrFontPath);
+            if (font == null)
+                Debug.LogWarning($"{Tag} 한글 폰트가 없다({KrFontPath}) — 라벨이 깨질 수 있다");
+
+            RectTransform panel = NewUiRect("Panel", canvasGo.transform);
+            panel.anchorMin = panel.anchorMax = new Vector2(0.5f, 0f);
+            panel.pivot = new Vector2(0.5f, 0f);
+            panel.anchoredPosition = new Vector2(0f, 170f);
+            panel.sizeDelta = new Vector2(320f, 64f);
+
+            // R 스택 구슬 4 — 패널 위쪽 왼편
+            Sprite knob = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd");
+            UnityEngine.UI.Image[] orbs = new UnityEngine.UI.Image[4];
+            for (int i = 0; i < orbs.Length; i++)
+            {
+                RectTransform orb = NewUiRect($"Stack{i + 1}", panel);
+                orb.anchorMin = orb.anchorMax = new Vector2(0f, 1f);
+                orb.pivot = new Vector2(0f, 1f);
+                orb.anchoredPosition = new Vector2(i * 24f, 0f);
+                orb.sizeDelta = new Vector2(18f, 18f);
+                orbs[i] = orb.gameObject.AddComponent<UnityEngine.UI.Image>();
+                orbs[i].sprite = knob;
+            }
+
+            // 일반 E 강화 준비 — 구슬 오른쪽 글자
+            RectTransform enhanced = NewUiRect("EnhancedReady", panel);
+            enhanced.anchorMin = enhanced.anchorMax = new Vector2(0f, 1f);
+            enhanced.pivot = new Vector2(0f, 1f);
+            enhanced.anchoredPosition = new Vector2(110f, 2f);
+            enhanced.sizeDelta = new Vector2(200f, 22f);
+            NewLabel(enhanced, font, "E 강화 준비", new Color(1f, 0.85f, 0.25f), TMPro.TextAlignmentOptions.Left);
+            enhanced.gameObject.SetActive(false);
+
+            // 변신 남은 시간 — 패널 아래 바 + 라벨, 해제 가능 눈금
+            RectTransform transformRoot = NewUiRect("Transform", panel);
+            Stretch(transformRoot);
+
+            RectTransform bar = NewUiRect("Bar", transformRoot);
+            bar.anchorMin = new Vector2(0f, 0f);
+            bar.anchorMax = new Vector2(1f, 0f);
+            bar.pivot = new Vector2(0.5f, 0f);
+            bar.anchoredPosition = Vector2.zero;
+            bar.sizeDelta = new Vector2(0f, 12f);
+
+            RectTransform back = NewUiRect("Back", bar);
+            Stretch(back);
+            back.gameObject.AddComponent<UnityEngine.UI.Image>().color = new Color(0f, 0f, 0f, 0.6f);
+
+            RectTransform fill = NewUiRect("Fill", bar);
+            Stretch(fill);
+            UnityEngine.UI.Image fillImage = fill.gameObject.AddComponent<UnityEngine.UI.Image>();
+
+            RectTransform tick = NewUiRect("ReleaseTick", bar);
+            tick.anchorMin = new Vector2(1f, 0f);
+            tick.anchorMax = new Vector2(1f, 1f);
+            tick.pivot = new Vector2(0.5f, 0.5f);
+            tick.sizeDelta = new Vector2(3f, 6f);
+            tick.anchoredPosition = Vector2.zero;
+            tick.gameObject.AddComponent<UnityEngine.UI.Image>().color = Color.white;
+
+            RectTransform labelRect = NewUiRect("Label", transformRoot);
+            labelRect.anchorMin = new Vector2(0f, 0f);
+            labelRect.anchorMax = new Vector2(1f, 0f);
+            labelRect.pivot = new Vector2(0.5f, 0f);
+            labelRect.anchoredPosition = new Vector2(0f, 14f);
+            labelRect.sizeDelta = new Vector2(0f, 20f);
+            TMPro.TextMeshProUGUI label = NewLabel(labelRect, font, "변신", Color.white, TMPro.TextAlignmentOptions.BottomLeft);
+            transformRoot.gameObject.SetActive(false);
+
+            SerializedObject so = new SerializedObject(hud);
+            so.FindProperty("canvas").objectReferenceValue = canvas;
+            SerializedProperty orbProperty = so.FindProperty("stackOrbs");
+            orbProperty.arraySize = orbs.Length;
+            for (int i = 0; i < orbs.Length; i++)
+                orbProperty.GetArrayElementAtIndex(i).objectReferenceValue = orbs[i];
+            so.FindProperty("transformRoot").objectReferenceValue = transformRoot.gameObject;
+            so.FindProperty("transformFill").objectReferenceValue = fill;
+            so.FindProperty("transformFillImage").objectReferenceValue = fillImage;
+            so.FindProperty("releaseTick").objectReferenceValue = tick;
+            so.FindProperty("transformLabel").objectReferenceValue = label;
+            so.FindProperty("enhancedReadyRoot").objectReferenceValue = enhanced.gameObject;
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            PrefabUtility.SaveAsPrefabAsset(root, HudPrefabPath);
+            Debug.Log($"{Tag} A12 HUD 프리팹 생성(임시 배치 — 화면 하단 중앙 y=170): {HudPrefabPath}");
+        }
+        finally
+        {
+            Object.DestroyImmediate(root);
+        }
+
+        return AssetDatabase.LoadAssetAtPath<GameObject>(HudPrefabPath);
+    }
+
+    private static TMPro.TextMeshProUGUI NewLabel(
+        RectTransform rect, TMPro.TMP_FontAsset font, string text, Color color, TMPro.TextAlignmentOptions alignment)
+    {
+        TMPro.TextMeshProUGUI label = rect.gameObject.AddComponent<TMPro.TextMeshProUGUI>();
+        if (font != null)
+            label.font = font;
+        label.fontSize = 16f;
+        label.color = color;
+        label.alignment = alignment;
+        label.text = text;
+        return label;
+    }
+
+    private static RectTransform NewUiRect(string name, Transform parent)
+    {
+        GameObject go = new GameObject(name, typeof(RectTransform));
+        go.layer = LayerMask.NameToLayer("UI");
+        go.transform.SetParent(parent, false);
+        return (RectTransform)go.transform;
+    }
+
+    private static void Stretch(RectTransform rect)
+    {
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = rect.offsetMax = Vector2.zero;
     }
 
     // 가붕이 간파 SO 의 같은 이름 직렬화 필드를 값 복사한다(툴팁 문구는 어쌔신 것을 따로 쓴다).

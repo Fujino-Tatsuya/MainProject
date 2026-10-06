@@ -12,7 +12,7 @@ using UnityEngine;
 /// 슬롯을 원복한 뒤 R 쿨타임을 그 시점부터 시작한다(§10.2·§10.3). 쓰러짐·사망은 대기 없이 즉시 정리한다(§12.2).
 /// </summary>
 [RequireComponent(typeof(Player))]
-public sealed class AssassinState : BaseNetworkBehaviour
+public sealed class AssassinState : BaseNetworkBehaviour, IPassiveTooltipProvider
 {
     [SerializeField] private AssassinStateData data;
 
@@ -45,6 +45,9 @@ public sealed class AssassinState : BaseNetworkBehaviour
     public event Action<bool> EnhancedReadyChanged;
 
     public AssassinStateData Data => data;
+
+    /// <summary>P 칸 툴팁 출처(백어택 + R 스택 설명) — PassiveHUD 가 캐릭터 타입을 모르고 찾는다.</summary>
+    public ISkillTooltipSource PassiveTooltip => data;
     public AssassinStateSnapshot Snapshot => State;
     public int Stacks => State.stacks;
     public int MaxStacks => Rules.MaxStacks;

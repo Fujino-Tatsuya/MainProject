@@ -18,6 +18,7 @@ public sealed class AssassinCircleStrikeSkill : PlayerSkillBase
 {
     private AssassinState assassinState;
     private PlayerInvulnerability invulnerability;
+    private AssassinSkillView view;
     private Collider[] hitResults;
     private readonly AssassinCircleStrikeSequence sequence = new AssassinCircleStrikeSequence();
     private readonly List<Unit> strikeLandedUnits = new List<Unit>();
@@ -36,6 +37,7 @@ public sealed class AssassinCircleStrikeSkill : PlayerSkillBase
         base.Initialize(owner, controller);
         assassinState = owner != null ? owner.GetComponent<AssassinState>() : null;
         invulnerability = owner != null ? owner.GetComponent<PlayerInvulnerability>() : null;
+        view = owner != null ? owner.GetComponent<AssassinSkillView>() : null;
     }
 
     // 변신 중이고 종료 대기가 아닐 때만 — 종료 대기 중 새 공격은 시작하지 않는다(§10.2·§10.3).
@@ -75,7 +77,17 @@ public sealed class AssassinCircleStrikeSkill : PlayerSkillBase
         Edit.Log($"[Assassin/E변신] 공격 시작 — 중심 {areaCenter}, 반경 {data.AreaRadius:F1}m, {data.HitCount}타, 피해 {damageSnapshot}/타", this);
     }
 
-    public override void OnClientPlay(Vector3 direction) { }
+    // 전 피어 — 임시 원 연출. 클라는 서버 재투영 지점을 모르므로 승인 방향 × 중심 거리로 근사한다(같은 1.5m 고정 거리).
+    public override void OnClientPlay(Vector3 direction)
+    {
+        AssassinCircleStrikeSkillData data = StrikeData;
+        if (view == null || data == null || owner == null)
+            return;
+
+        direction.y = 0f;
+        Vector3 forward = direction.sqrMagnitude > 0.001f ? direction.normalized : owner.transform.forward;
+        view.PlayCircleStrike(owner.transform.position + forward * data.CenterDistance);
+    }
 
     public override void OnAnimationEvent(SkillAnimationEventType eventType)
     {

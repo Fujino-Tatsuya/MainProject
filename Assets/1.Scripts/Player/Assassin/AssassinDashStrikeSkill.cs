@@ -24,6 +24,7 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
 
     private PlayerMotor motor;
     private AssassinState assassinState;
+    private AssassinSkillView view;
     private Collider[] hitResults;
     private readonly AssassinDashHitLedger ledger = new AssassinDashHitLedger();
     private readonly List<Unit> tickLandedUnits = new List<Unit>();
@@ -54,6 +55,7 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
         base.Initialize(owner, controller);
         motor = owner != null ? owner.GetComponent<PlayerMotor>() : null;
         assassinState = owner != null ? owner.GetComponent<AssassinState>() : null;
+        view = owner != null ? owner.GetComponent<AssassinSkillView>() : null;
     }
 
     // 변신 종료 대기 중에는 새 Q 를 시작하지 않는다(§10.3 — 종료가 "현재 공격 완료"를 기다리는 중).
@@ -95,6 +97,7 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
     public override void OnClientPlay(Vector3 direction)
     {
         dashDirection = Flatten(direction);
+        view?.BeginDashTrail();
 
         AssassinDashStrikeSkillData data = DashData;
         if (data == null || motor == null || owner == null || !owner.IsSimulating)
@@ -167,6 +170,7 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
         // 사망·강제 종료면 아직 훑지 않은 경로의 타격은 버린다(§12.2-3).
         isServerSweeping = false;
         StopLocalDash();
+        view?.EndDashTrail();
         if (motor != null)
             motor.PassThroughEnemiesOverride = false;
 
