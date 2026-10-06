@@ -545,7 +545,14 @@ public static class AssassinShellAuthoring
             SetIfEmpty(so, "transformCastPrefab", TransformCastVfxPath);
             SetIfEmpty(so, "interruptCastPrefab", InterruptCastVfxPath);
             so.FindProperty("transformSocket").objectReferenceValue = root.transform.Find("Armature/VFX/Transformation");
-            so.FindProperty("enhancedSocket").objectReferenceValue = root.transform.Find("Armature/VFX/EnhancedAttack");
+            // 강화 준비 루프는 강타 베기 소켓(EnhancedAttack)과 분리 — 베기 위치를 옮겨도 발밑 원은 그대로.
+            so.FindProperty("enhancedSocket").objectReferenceValue = root.transform.Find("Armature/VFX/EnhancedReady");
+            SerializedProperty slashSockets = so.FindProperty("normalSlashSockets");
+            slashSockets.arraySize = 4;
+            for (int i = 0; i < 4; i++)
+                slashSockets.GetArrayElementAtIndex(i).objectReferenceValue = root.transform.Find($"Armature/VFX/BasicAttack0{i + 1}");
+            so.FindProperty("enhancedSlashSocket").objectReferenceValue = root.transform.Find("Armature/VFX/EnhancedAttack");
+            so.FindProperty("transformedSlashSocket").objectReferenceValue = root.transform.Find("Armature/VFX/TransformedAttack");
             so.ApplyModifiedPropertiesWithoutUndo();
 
             PrefabUtility.SaveAsPrefabAsset(root, VariantPath);
@@ -1138,6 +1145,8 @@ public static class AssassinShellAuthoring
             EnsureChild(vfx, "Transformation");
             EnsureChild(vfx, "EnhancedAttack");
             EnsureChild(vfx, "BackAttack");
+            EnsureChild(vfx, "TransformedAttack");
+            EnsureChild(vfx, "EnhancedReady");
             CharacterHudAuthoring.EnsureHudRoot(root.transform);
 
             PrefabUtility.SaveAsPrefabAsset(root, ArmaturePath);

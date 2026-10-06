@@ -41,6 +41,12 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
     [Header("소켓 (비우면 플레이어 루트)")]
     [SerializeField] private Transform transformSocket;
     [SerializeField] private Transform enhancedSocket;
+    [Tooltip("평타 베기 위치·회전 — Assassin_Armature/VFX/BasicAttack01~04. 소켓을 옮기면 그 타의 이펙트가 따라간다.")]
+    [SerializeField] private Transform[] normalSlashSockets = new Transform[4];
+    [Tooltip("강타 베기 — Armature/VFX/EnhancedAttack.")]
+    [SerializeField] private Transform enhancedSlashSocket;
+    [Tooltip("변신 평타 묶음 베기 — Armature/VFX/TransformedAttack.")]
+    [SerializeField] private Transform transformedSlashSocket;
 
     private AssassinState state;
     private GameObject transformLoop;
@@ -91,16 +97,22 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
     /// <summary>[전 피어] 평타 Hit 애니 이벤트 — 플레이어 루트에 붙여 바라보는 방향으로 벤다.</summary>
     public void PlayAttackSlash(AssassinBasicAttackMode mode, int stepIndex)
     {
-        GameObject prefab = mode switch
+        switch (mode)
         {
-            AssassinBasicAttackMode.Enhanced => enhancedSlashPrefab,
-            AssassinBasicAttackMode.Transformed => transformedSlashPrefab,
-            _ => normalSlashPrefabs != null && stepIndex >= 0 && stepIndex < normalSlashPrefabs.Length
-                ? normalSlashPrefabs[stepIndex]
-                : null,
-        };
-        PlayAttached(prefab);
+            case AssassinBasicAttackMode.Enhanced:
+                PlayAttached(enhancedSlashPrefab, enhancedSlashSocket);
+                break;
+            case AssassinBasicAttackMode.Transformed:
+                PlayAttached(transformedSlashPrefab, transformedSlashSocket);
+                break;
+            default:
+                PlayAttached(At(normalSlashPrefabs, stepIndex), At(normalSlashSockets, stepIndex));
+                break;
+        }
     }
+
+    private static T At<T>(T[] array, int index) where T : Object =>
+        array != null && index >= 0 && index < array.Length ? array[index] : null;
 
     /// <summary>[전 피어] 일반 E 버프 시전.</summary>
     public void PlayEnhanceCast() => PlayAttached(enhanceCastPrefab);
@@ -150,10 +162,10 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
         Destroy(instance, releaseLifetime);
     }
 
-    // 1회 연출을 플레이어 루트에 붙인다 — 시전·베기가 캐릭터를 따라가고 방향도 맞는다.
-    private void PlayAttached(GameObject prefab)
+    // 1회 연출을 소켓(없으면 플레이어 루트)에 붙인다 — 시전·베기가 캐릭터를 따라가고, 소켓 위치·회전으로 맞춘다.
+    private void PlayAttached(GameObject prefab, Transform socket = null)
     {
-        GameObject instance = Spawn(prefab, transform);
+        GameObject instance = Spawn(prefab, socket != null ? socket : transform);
         if (instance != null)
             Destroy(instance, releaseLifetime);
     }
