@@ -137,7 +137,7 @@ public sealed class SkillTooltipView : MonoBehaviour
     {
         SkillTooltipText tooltip = source.Tooltip;
         if (icon != null)
-            icon.sprite = tooltip.Icon;
+            icon.sprite = tooltip.Icon != null ? tooltip.Icon : owner.FallbackIcon; // 슬롯과 같은 그림(우클릭은 HUD 공용 아이콘)
 
         if (keyBadge != null)
         {

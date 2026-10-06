@@ -89,7 +89,8 @@ public class SkillCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
             widget.slot,
             acceptsLeftClick: true,
             displayKey: KeyLabel(widget.slot),
-            cooldownSeconds: data != null ? data.CooldownTime : (float?)null);
+            cooldownSeconds: data != null ? data.CooldownTime : (float?)null,
+            fallbackIcon: widget.icon != null ? widget.icon.sprite : null);
     }
 
     private void HandleSlotBindingChanged(PlayerSkillSlot slot)

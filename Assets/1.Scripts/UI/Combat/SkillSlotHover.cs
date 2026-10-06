@@ -28,6 +28,9 @@ public sealed class SkillSlotHover : MonoBehaviour,
     private float? cooldown;
     private string keyLabel;
 
+    /// <summary>출처 툴팁에 아이콘이 없을 때 툴팁이 쓸 아이콘 — 슬롯에 실제로 표시 중인 스프라이트(예: 우클릭 공용 아이콘).</summary>
+    public Sprite FallbackIcon { get; private set; }
+
     /// <summary>스킬 칸 위 좌클릭이 기본 공격·조준 확정으로 새는 것을 막는 전역 게이트.</summary>
     public static bool BlocksPrimaryInput => Hovering.Count > 0 || Pressing.Count > 0 || IsPointerInsideActiveSlot();
 
@@ -39,9 +42,11 @@ public sealed class SkillSlotHover : MonoBehaviour,
         PlayerSkillSlot inputSlot,
         bool acceptsLeftClick,
         string displayKey,
-        float? cooldownSeconds)
+        float? cooldownSeconds,
+        Sprite fallbackIcon = null)
     {
         EndSkillPreview();
+        FallbackIcon = fallbackIcon;
         player = owner;
         input = owner != null ? owner.GetComponent<PlayerInputReader>() : null;
         skillController = owner != null ? owner.GetComponent<PlayerSkillController>() : null;

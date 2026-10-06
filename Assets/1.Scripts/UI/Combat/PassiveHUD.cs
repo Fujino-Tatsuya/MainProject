@@ -44,7 +44,8 @@ public class PassiveHUD : MonoBehaviour
             PlayerSkillSlot.Main,
             acceptsLeftClick: false,
             displayKey: "Passive",
-            cooldownSeconds: passive != null ? passive.CooldownTime : (float?)null);
+            cooldownSeconds: passive != null ? passive.CooldownTime : (float?)null,
+            fallbackIcon: icon != null ? icon.sprite : null);
         Refresh();
     }
 
