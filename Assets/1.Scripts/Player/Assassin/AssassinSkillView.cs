@@ -7,7 +7,8 @@ using UnityEngine;
 /// 스킬(PlayerSkillBase)은 RPC 를 가질 수 없으므로 서버 판정 결과를 퍼뜨리는 창구도 여기 둔다.
 ///
 /// - 변신 중 루프 · 강화 준비 루프: <see cref="AssassinState"/> 의 전 피어 이벤트로 켜고 끈다(늦은 접속은 스폰 시 현재 상태로 맞춤).
-/// - Q 돌진 궤적 · 변신 E 원: 스킬의 OnClientPlay/OnEnd(전 피어)가 로컬로 부른다 — RPC 없음.
+/// - Q 돌진 궤적 · 변신 E 원 · E/R/간파 시전: 스킬의 OnClientPlay/OnEnd(전 피어)가 로컬로 부른다 — RPC 없음.
+/// - 평타 베기: 클립 Hit 애니 이벤트(전 피어에서 재생)마다 <see cref="AssassinBasicAttack"/> 가 부른다 — RPC 없음.
 /// - 백어택 적중: [서버] <see cref="ServerBackAttackHit"/> → 전 피어. 판정은 A11 이 붙인다(그 전까지 호출자 없음).
 /// 프리팹이 비어 있으면 해당 연출만 빠진다.
 /// </summary>
@@ -17,6 +18,18 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
     [Header("루프 — 상태가 켜진 동안")]
     [SerializeField] private GameObject transformLoopPrefab;
     [SerializeField] private GameObject enhancedReadyLoopPrefab;
+
+    [Header("평타 베기 — 클립 Hit 이벤트마다(전 피어)")]
+    [Tooltip("일반 4타 — 인덱스 = 타 순서(0~3). 비어 있는 칸은 연출 없음.")]
+    [SerializeField] private GameObject[] normalSlashPrefabs = new GameObject[4];
+    [SerializeField] private GameObject enhancedSlashPrefab;
+    [Tooltip("변신 평타 묶음 — Hit 4번마다 같은 프리팹.")]
+    [SerializeField] private GameObject transformedSlashPrefab;
+
+    [Header("시전 1회 — 스킬 OnClientPlay(전 피어)")]
+    [SerializeField] private GameObject enhanceCastPrefab;
+    [SerializeField] private GameObject transformCastPrefab;
+    [SerializeField] private GameObject interruptCastPrefab;
 
     [Header("1회·스킬 동안")]
     [SerializeField] private GameObject dashTrailPrefab;
@@ -65,6 +78,39 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
 
     // ── 스킬이 부르는 로컬 연출(전 피어) ──
 
+    /// <summary>스킬(PlayerSkillBase)이 시전자에게 붙은 창구를 찾아 연출을 부른다. 창구가 없으면 아무것도 안 한다.</summary>
+    public static void Play(Component owner, System.Action<AssassinSkillView> play)
+    {
+        if (owner == null)
+            return;
+        AssassinSkillView view = owner.GetComponent<AssassinSkillView>();
+        if (view != null)
+            play(view);
+    }
+
+    /// <summary>[전 피어] 평타 Hit 애니 이벤트 — 플레이어 루트에 붙여 바라보는 방향으로 벤다.</summary>
+    public void PlayAttackSlash(AssassinBasicAttackMode mode, int stepIndex)
+    {
+        GameObject prefab = mode switch
+        {
+            AssassinBasicAttackMode.Enhanced => enhancedSlashPrefab,
+            AssassinBasicAttackMode.Transformed => transformedSlashPrefab,
+            _ => normalSlashPrefabs != null && stepIndex >= 0 && stepIndex < normalSlashPrefabs.Length
+                ? normalSlashPrefabs[stepIndex]
+                : null,
+        };
+        PlayAttached(prefab);
+    }
+
+    /// <summary>[전 피어] 일반 E 버프 시전.</summary>
+    public void PlayEnhanceCast() => PlayAttached(enhanceCastPrefab);
+
+    /// <summary>[전 피어] R 변신 시전(Parry_R 시작).</summary>
+    public void PlayTransformCast() => PlayAttached(transformCastPrefab);
+
+    /// <summary>[전 피어] 우클릭 간파 시전.</summary>
+    public void PlayInterruptCast() => PlayAttached(interruptCastPrefab);
+
     /// <summary>[전 피어] Q 돌진 시작 — 궤적을 플레이어에 붙인다.</summary>
     public void BeginDashTrail()
     {
@@ -102,6 +148,14 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
             return;
         instance.transform.position = position;
         Destroy(instance, releaseLifetime);
+    }
+
+    // 1회 연출을 플레이어 루트에 붙인다 — 시전·베기가 캐릭터를 따라가고 방향도 맞는다.
+    private void PlayAttached(GameObject prefab)
+    {
+        GameObject instance = Spawn(prefab, transform);
+        if (instance != null)
+            Destroy(instance, releaseLifetime);
     }
 
     // ── 루프 ──

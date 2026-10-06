@@ -44,6 +44,20 @@ public static class AssassinShellAuthoring
     private const string DashTrailVfxPath = "Assets/50.Art/VFX/Common/Boss/Dash/FX_Dash_Trail.prefab";
     private const string CircleStrikeVfxPath = "Assets/50.Art/VFX/Common/Burst/Burst_rings.prefab";
     private const string BackAttackVfxPath = "Assets/50.Art/VFX/Common/Burst/Burst_sharp.prefab";
+    // 평타·시전 임시 VFX(10-06 은희 요청) — 가붕이 평타 베기·공용 연출 재사용. 민경 교체 대상.
+    private const string PlayerSlashFolder = "Assets/50.Art/VFX/Common/Players/Player1/DefaultAttack/";
+    private static readonly string[] NormalSlashVfxPaths =
+    {
+        PlayerSlashFolder + "FX_SingleSlash_O.prefab",
+        PlayerSlashFolder + "FX_SingleSlash_X.prefab",
+        PlayerSlashFolder + "FX_SingleSlash_O.prefab",
+        PlayerSlashFolder + "FX_DoubleSlash_X.prefab",
+    };
+    private const string EnhancedSlashVfxPath = PlayerSlashFolder + "FX_DoubleSlash_O.prefab";
+    private const string TransformedSlashVfxPath = "Assets/50.Art/VFX/Common/Monsters/FX_Mob_Slash.prefab";
+    private const string EnhanceCastVfxPath = "Assets/50.Art/VFX/Common/Burst/Flash_star.prefab";
+    private const string TransformCastVfxPath = "Assets/50.Art/VFX/Common/Burst/Poof_electric.prefab";
+    private const string InterruptCastVfxPath = "Assets/50.Art/VFX/Common/FX_Interrupt_Flash.prefab";
     private const string RosterPath = "Assets/9.ScriptableObject/Player/CharacterRoster.asset";
 
     // A7 Animator 상태 — 스킬 데이터 animatorStateName 과 같은 이름이어야 CrossFade 가 맞는다.
@@ -520,6 +534,12 @@ public static class AssassinShellAuthoring
             SetIfEmpty(so, "dashTrailPrefab", DashTrailVfxPath);
             SetIfEmpty(so, "circleStrikePrefab", CircleStrikeVfxPath);
             SetIfEmpty(so, "backAttackHitPrefab", BackAttackVfxPath);
+            SetArrayIfEmpty(so, "normalSlashPrefabs", NormalSlashVfxPaths);
+            SetIfEmpty(so, "enhancedSlashPrefab", EnhancedSlashVfxPath);
+            SetIfEmpty(so, "transformedSlashPrefab", TransformedSlashVfxPath);
+            SetIfEmpty(so, "enhanceCastPrefab", EnhanceCastVfxPath);
+            SetIfEmpty(so, "transformCastPrefab", TransformCastVfxPath);
+            SetIfEmpty(so, "interruptCastPrefab", InterruptCastVfxPath);
             so.FindProperty("transformSocket").objectReferenceValue = root.transform.Find("Armature/VFX/Transformation");
             so.FindProperty("enhancedSocket").objectReferenceValue = root.transform.Find("Armature/VFX/EnhancedAttack");
             so.ApplyModifiedPropertiesWithoutUndo();
@@ -554,6 +574,30 @@ public static class AssassinShellAuthoring
         if (prefab == null)
             Debug.LogWarning($"{Tag} 임시 VFX 프리팹이 없어 {propertyName} 을 비운다: {assetPath}");
         property.objectReferenceValue = prefab;
+    }
+
+    // 배열 칸마다 SetIfEmpty — 민경이 바꾼 칸은 유지한다.
+    private static void SetArrayIfEmpty(SerializedObject so, string propertyName, string[] assetPaths)
+    {
+        SerializedProperty array = so.FindProperty(propertyName);
+        if (array == null || !array.isArray)
+        {
+            Debug.LogError($"{Tag} {so.targetObject.GetType().Name}.{propertyName} 배열 필드가 없다.");
+            return;
+        }
+        if (array.arraySize < assetPaths.Length)
+            array.arraySize = assetPaths.Length;
+
+        for (int i = 0; i < assetPaths.Length; i++)
+        {
+            SerializedProperty element = array.GetArrayElementAtIndex(i);
+            if (element.objectReferenceValue != null)
+                continue;
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(assetPaths[i]);
+            if (prefab == null)
+                Debug.LogWarning($"{Tag} 임시 VFX 프리팹이 없어 {propertyName}[{i}] 를 비운다: {assetPaths[i]}");
+            element.objectReferenceValue = prefab;
+        }
     }
 
     // 임시 HUD — 화면 하단 중앙(거너 과열 게이지와 같은 높이대, 공용 CombatHUD 위). 스프라이트 없이 Image 색만 쓴다(구슬은 내장 Knob).

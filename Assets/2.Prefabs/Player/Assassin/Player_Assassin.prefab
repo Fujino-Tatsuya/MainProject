@@ -382,6 +382,16 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   transformLoopPrefab: {fileID: 1597097068444350898, guid: a1daf7073cf07e7468eb75e9d2d5e967, type: 3}
   enhancedReadyLoopPrefab: {fileID: 3220920230613450000, guid: 192fe42b654ad7144b59bf436410b8b6, type: 3}
+  normalSlashPrefabs:
+  - {fileID: 856368647163548680, guid: ae1f8ca5a160a2d41a2cf81398afbe10, type: 3}
+  - {fileID: 856368647163548680, guid: 4f857450797a5fa4fa012bb522d7a64b, type: 3}
+  - {fileID: 856368647163548680, guid: ae1f8ca5a160a2d41a2cf81398afbe10, type: 3}
+  - {fileID: 3600389243222657682, guid: 109adce48af00654ea67c594c4c779d2, type: 3}
+  enhancedSlashPrefab: {fileID: 3600389243222657682, guid: 37390631ea99cd1439f01ee21d9f89ad, type: 3}
+  transformedSlashPrefab: {fileID: 3724192508554018546, guid: d2ec27c39b8361e4c9cca2635b5fc285, type: 3}
+  enhanceCastPrefab: {fileID: 230651131596242121, guid: d8a8bbe703ee8174e9754da9050b17a9, type: 3}
+  transformCastPrefab: {fileID: 8307689965681055727, guid: 8050863a467fe9e46acb029a0fa570fc, type: 3}
+  interruptCastPrefab: {fileID: 1151845124054409814, guid: 7e930ada5a14bc3408374b04fce9d119, type: 3}
   dashTrailPrefab: {fileID: 8780727661788297695, guid: 6a288b836c116494bafe48246b12f73e, type: 3}
   circleStrikePrefab: {fileID: 1475618779179179817, guid: 07799b25da23d9c4d97a417f6f0d0f31, type: 3}
   backAttackHitPrefab: {fileID: 7634420434017284396, guid: b9ed127bfed05be4db493ca51e744a76, type: 3}

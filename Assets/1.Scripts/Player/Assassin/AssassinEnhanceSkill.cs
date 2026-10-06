@@ -37,5 +37,6 @@ public sealed class AssassinEnhanceSkill : PlayerInstantSkill
         assassinState.ServerTryPrepareEnhancement();
     }
 
-    public override void OnClientPlay(Vector3 direction) { }
+    public override void OnClientPlay(Vector3 direction) =>
+        AssassinSkillView.Play(owner, v => v.PlayEnhanceCast());
 }

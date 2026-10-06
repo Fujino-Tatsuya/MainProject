@@ -9,6 +9,7 @@ using UnityEngine;
 /// </summary>
 public sealed class AssassinInterruptSkill : PlayerInterruptSkillBase
 {
-    // 애니메이션은 PlayerSkillController 가 animatorStateName 으로 재생한다. 간파 고유 연출은 아직 없다(민경).
-    public override void OnClientPlay(Vector3 direction) { }
+    // 애니메이션은 PlayerSkillController 가 animatorStateName 으로 재생한다. 연출은 임시(AssassinSkillView — 민경 교체).
+    public override void OnClientPlay(Vector3 direction) =>
+        AssassinSkillView.Play(owner, v => v.PlayInterruptCast());
 }

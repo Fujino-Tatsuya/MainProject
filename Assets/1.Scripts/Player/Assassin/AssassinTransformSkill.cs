@@ -45,7 +45,8 @@ public sealed class AssassinTransformSkill : PlayerInstantSkill
             owner.StatusEffects.Apply(StatusEffectType.SuperArmor, Data.MaxActiveDuration, SourceId);
     }
 
-    public override void OnClientPlay(Vector3 direction) { }
+    public override void OnClientPlay(Vector3 direction) =>
+        AssassinSkillView.Play(owner, v => v.PlayTransformCast());
 
     public override void OnEnd(SkillEndReason reason)
     {

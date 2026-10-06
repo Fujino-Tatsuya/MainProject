@@ -36,6 +36,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     private AssassinConeAttack coneAttack;
     private AssassinCombatIdle combatIdle;
     private AssassinState assassinState;
+    private AssassinSkillView view;
     private AssassinComboModel combo;
 
     private bool active;
@@ -70,6 +71,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         coneAttack = GetComponent<AssassinConeAttack>();
         combatIdle = GetComponent<AssassinCombatIdle>();
         assassinState = GetComponent<AssassinState>();
+        view = GetComponent<AssassinSkillView>();
 
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
@@ -172,6 +174,10 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
 
     public void HandleAnimationEvent(DefaultAttackAnimationEventType eventType)
     {
+        // 베기 연출은 전 피어 — 클립 Hit 이벤트는 모든 피어에서 재생된다(판정은 아래 서버만).
+        if (eventType == DefaultAttackAnimationEventType.Hit && active && view != null)
+            view.PlayAttackSlash(currentMode, currentStepIndex);
+
         if (IsNetworkActive && !IsServer)
             return;
         if (!active)
