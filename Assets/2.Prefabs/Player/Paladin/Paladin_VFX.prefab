@@ -4335,6 +4335,8 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   barrierLoop: {fileID: 7601287734901230005}
   breakBurst: {fileID: 7601287734901230008}
+  allyBarrierLoop: {fileID: 7601287734901230022}
+  allyBreakBurst: {fileID: 7601287734901230025}
   minHitDistance: 0.15
   interruptWave: {fileID: 8089240168309625348}
 --- !u!114 &6909544522566629635
@@ -5673,6 +5675,8 @@ Transform:
   m_Children:
   - {fileID: 7601287734901230004}
   - {fileID: 7601287734901230007}
+  - {fileID: 7601287734901230021}
+  - {fileID: 7601287734901230024}
   m_Father: {fileID: 6673231844191270124}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &7601287734901230003
@@ -5724,7 +5728,7 @@ MonoBehaviour:
   socket: {fileID: 5953840363612247574}
   offset: {x: 0, y: 0, z: 0}
   scale: 0.5
-  safetyTimeout: 8
+  safetyTimeout: 15
 --- !u!1 &7601287734901230006
 GameObject:
   m_ObjectHideFlags: 0
@@ -6632,3 +6636,103 @@ RectTransform:
   m_CorrespondingSourceObject: {fileID: 101, guid: 34df118ba6f24cd2945c523d7569cb92, type: 3}
   m_PrefabInstance: {fileID: 7933433653779073782}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &7601287734901230020
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7601287734901230021}
+  - component: {fileID: 7601287734901230022}
+  m_Layer: 0
+  m_Name: AllyShield
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &7601287734901230021
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7601287734901230020}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 1, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 7601287734901230002}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &7601287734901230022
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7601287734901230020}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
+  id: 
+  effect: {fileID: 11400000, guid: 2d87b4f0c6e94a15933ad8e7b1420c6f, type: 2}
+  socket: {fileID: 5953840363612247574}
+  offset: {x: 0, y: 0, z: 0}
+  scale: 0.5
+  safetyTimeout: 15
+--- !u!1 &7601287734901230023
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7601287734901230024}
+  - component: {fileID: 7601287734901230025}
+  m_Layer: 0
+  m_Name: AllyShield_Break
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &7601287734901230024
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7601287734901230023}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 1, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 7601287734901230002}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &7601287734901230025
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7601287734901230023}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
+  id: 
+  effect: {fileID: 11400000, guid: 846ec0b35a1d47f29b70e4d1c83f5a27, type: 2}
+  socket: {fileID: 5953840363612247574}
+  offset: {x: 0, y: 0, z: 0}
+  scale: 0.5
+  safetyTimeout: 5

@@ -6074,7 +6074,6 @@ MonoBehaviour:
   chargeEndPlayer: {fileID: 4940442617651707173}
   chargeMonsterHitPlayer: {fileID: 2971052868576544898}
   chargeVentPlayer: {fileID: 1812556281934503046}
-  focusRingPlayer: {fileID: 1356002216986843363}
   ultCastPlayer: {fileID: 2713656083110433769}
   frostBlastPlayer: {fileID: 5466470429164739916}
   frostTrailPlayer: {fileID: 4392323114275172735}
