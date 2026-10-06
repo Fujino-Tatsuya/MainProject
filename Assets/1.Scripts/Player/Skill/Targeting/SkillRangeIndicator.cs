@@ -18,8 +18,12 @@ public class SkillRangeIndicator : MonoBehaviour
     [Tooltip("데칼 투영 깊이(size.z). 기존 값이 0 이하일 때만 이 값으로 채운다.")]
     [SerializeField, Min(0.01f)] private float decalDepth = 5f;
 
+    private Vector3 groundMarkerBaseSize;
+    private bool hasGroundMarkerBaseSize;
+
     private void Awake()
     {
+        CaptureGroundMarkerBaseSize();
         HideAll();
     }
 
@@ -40,13 +44,24 @@ public class SkillRangeIndicator : MonoBehaviour
     }
 
     // GroundPoint 확정 후보 지점 마커. show=false면 숨긴다.
-    public void SetGroundMarker(bool show, Vector3 worldPoint)
+    public void SetGroundMarker(bool show, Vector3 worldPoint, float effectRadius = 0f)
     {
         if (groundMarkerDecal == null)
             return;
 
         if (show)
         {
+            CaptureGroundMarkerBaseSize();
+            Vector3 size = groundMarkerBaseSize;
+            if (effectRadius > 0f)
+            {
+                size.x = effectRadius * 2f;
+                size.y = effectRadius * 2f;
+            }
+            if (size.z <= 0f)
+                size.z = decalDepth;
+            groundMarkerDecal.size = size;
+
             groundMarkerDecal.transform.position = worldPoint;
             groundMarkerDecal.enabled = true;
         }
@@ -63,5 +78,14 @@ public class SkillRangeIndicator : MonoBehaviour
 
         if (groundMarkerDecal != null)
             groundMarkerDecal.enabled = false;
+    }
+
+    private void CaptureGroundMarkerBaseSize()
+    {
+        if (hasGroundMarkerBaseSize || groundMarkerDecal == null)
+            return;
+
+        groundMarkerBaseSize = groundMarkerDecal.size;
+        hasGroundMarkerBaseSize = true;
     }
 }

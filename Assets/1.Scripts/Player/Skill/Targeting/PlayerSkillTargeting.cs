@@ -52,6 +52,8 @@ public class PlayerSkillTargeting : MonoBehaviour
     private bool hoveredInRange;
     private Vector3 candidateGroundPoint;
     private bool hasCandidateGroundPoint;
+    private Vector3 lastGroundPointDirection;
+    private bool hasLastGroundPointDirection;
 
     // 자동 이동 대기 시전 정보
     private Unit pendingTarget;
@@ -110,11 +112,17 @@ public class PlayerSkillTargeting : MonoBehaviour
         hoveredTarget = null;
         hoveredInRange = false;
         hasCandidateGroundPoint = false;
+        lastGroundPointDirection = Vector3.zero;
+        hasLastGroundPointDirection = false;
 
         if (rangeIndicator != null)
         {
             rangeIndicator.gameObject.SetActive(true);
-            rangeIndicator.ShowRange(currentData.CastRange);
+            rangeIndicator.HideAll();
+            bool usesFixedGroundPoint = currentData.TargetingMode == SkillTargetingMode.GroundPoint &&
+                currentData.FixedDistance;
+            if (!usesFixedGroundPoint)
+                rangeIndicator.ShowRange(currentData.CastRange);
         }
 
         SetCursorState(SkillCursorState.Targeting);
@@ -332,17 +340,37 @@ public class PlayerSkillTargeting : MonoBehaviour
         }
 
         Vector3 point = aimIndicator.AimGroundPoint;
-        bool inRange = IsWithinRange(point, currentData.CastRange);
+        bool inRange;
+        if (currentData.FixedDistance)
+        {
+            Vector3 cursorDirection = point - owner.transform.position;
+            if (PlayerGroundPointProjection.TryGetHorizontalDirection(cursorDirection, out Vector3 direction))
+            {
+                lastGroundPointDirection = direction;
+                hasLastGroundPointDirection = true;
+            }
 
-        // 사거리 밖이면 최대 사거리로 클램프 — GroundPoint는 항상 시전 가능(경계에 스냅)
-        if (!inRange)
-            point = ClampToRange(point, currentData.CastRange);
+            Vector3 fallbackDirection = hasLastGroundPointDirection
+                ? lastGroundPointDirection
+                : owner.transform.forward;
+            point = PlayerGroundPointProjection.ProjectFixedDistance(
+                owner.transform.position, point, currentData.CastRange, fallbackDirection);
+            inRange = true;
+        }
+        else
+        {
+            inRange = IsWithinRange(point, currentData.CastRange);
+
+            // 사거리 밖이면 최대 사거리로 클램프 — GroundPoint는 항상 시전 가능(경계에 스냅)
+            if (!inRange)
+                point = ClampToRange(point, currentData.CastRange);
+        }
 
         candidateGroundPoint = point;
         hasCandidateGroundPoint = true;
 
         if (rangeIndicator != null)
-            rangeIndicator.SetGroundMarker(true, point);
+            rangeIndicator.SetGroundMarker(true, point, currentData.AoeRadius);
 
         SetCursorState(inRange ? SkillCursorState.ValidTarget : SkillCursorState.OutOfRange);
     }

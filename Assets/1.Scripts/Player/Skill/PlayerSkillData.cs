@@ -48,6 +48,10 @@ public class PlayerSkillData : ScriptableObject, ISkillTooltipSource
     [SerializeField] private SkillConfirmMode confirmMode = SkillConfirmMode.ClickToConfirm;
     // 사거리(m). 사거리 링 반경이자 시전자 중심 대상/지점 유효 거리. targetingMode != None일 때만 의미.
     [SerializeField, Min(0f)] private float castRange = 8f;
+    // GroundPoint 전용. 커서까지의 거리와 무관하게 시전자에서 castRange만큼 떨어진 지점을 조준한다.
+    [SerializeField] private bool fixedDistance = false;
+    // GroundPoint 전용 효과 범위 반경. 0이면 기존 지점 마커 크기를 사용한다.
+    [SerializeField, Min(0f)] private float aoeRadius = 0f;
     // SingleTarget에서 레이캐스트로 맞출 대상 레이어(기본 Enemy). GroundPoint는 groundMask를 쓴다.
     [SerializeField] private LayerMask targetableLayers;
 
@@ -70,6 +74,8 @@ public class PlayerSkillData : ScriptableObject, ISkillTooltipSource
     public SkillTargetingMode TargetingMode => targetingMode;
     public SkillConfirmMode ConfirmMode => confirmMode;
     public float CastRange => castRange;
+    public bool FixedDistance => fixedDistance;
+    public float AoeRadius => aoeRadius;
     public LayerMask TargetableLayers => targetableLayers;
     public string AnimatorStateName => animatorStateName;
     public bool SnapRotationOnStart => snapRotationOnStart;

@@ -456,6 +456,15 @@ public class PlayerSkillController : BaseNetworkBehaviour
         if (!CanApproveSkill(slot, expectedSkillIndex, direction, target, out PlayerSkillBase skill, out bool isDead))
             return false;
 
+        if (hasAimPoint &&
+            skill.Data.TargetingMode == SkillTargetingMode.GroundPoint &&
+            skill.Data.FixedDistance)
+        {
+            aimPoint = PlayerGroundPointProjection.ReprojectServerFixedDistance(
+                transform.position, aimPoint, skill.Data.CastRange, transform.forward);
+            direction = aimPoint - transform.position;
+        }
+
         direction = ResolveDirection(direction);
 
         // 사망 중 허용 스킬(usableWhileDead)은 FSM 상태를 점유하지 않는다 — Dead 상태 유지
