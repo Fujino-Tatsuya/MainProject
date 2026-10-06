@@ -223,6 +223,10 @@ Q22 `AssassinState` NetworkVariable · Q23·Q26 클립 git + 애니 이벤트(�
   `AssassinHUD.prefab`(→ `Assassin_Armature/HUD`, 오너만, 하단 중앙 y=170 320×64 임시 — CombatHUD 미수정) · P 칸 툴팁(`AssassinState` = `IPassiveTooltipProvider`, `AssassinStateData` = `ISkillTooltipSource`) ·
   `SkillTooltipAuthoring` 어쌔신 7개(TODO 문구, 메뉴 미실행) · 🔴 `AssassinSkillView`(NetworkBehaviour, RPC 1 — 피어 전원 같은 커밋).
   임시 VFX(민경 교체 목록): 변신 루프 CharacterCirclePurple · 강화 준비 CharacterCircleYellow · Q 궤적 FX_Dash_Trail · 변신 E Burst_rings · 백어택 Burst_sharp(A11 이 호출해야 동작).
+- ✅ A11(10-07): claude-alt `d87ecc6f`(Unity 꺼져 미검증) → 메인 Claude 검증: 저작 메뉴 오류 0 · 플레이어 EditMode 109/0 · 전투 106/2(실패 2 = 기존 `BossCounterDataTests` — CONTEXT 에 적힌 무관 실패와 동일).
+  `BackAttackRules`(후방 = 보스 forward 와 공격자 방향 각 ≥ 180 − backAttackAngle) · `AttackInfo.backAttackMultiplier/forceBackAttack`(기본 1/false) · `MonsterBase.ReceiveAttack` 앞 배율 · `MonsterBase.IsBackAttackHit`(연출 질의) ·
+  어쌔신 전 경로 적용(`AssassinStateData.backAttackMultiplier` 1.2, 변신 = 강제). 23호 제압 ×1.2 와 곱해짐. 🔴 경석 공유 요약은 메인 보고 참조.
+- ⏳ A13: Codex `a18ad005`(`hittableLayers` DataTableIgnore — 어트리뷰트 점검 완료, Order 0~7 중복 없음). Export·SVN 은 메인 Claude 가 이어서.
 - 🔴 **단검(10-06 은희 Play 확인)**: 모델 FBX 에 단검 메시·본이 없어 맨손으로 보인다(클립의 `Dagger_Weapon_L/R`·`Dagger_Holder` 커브는 바인딩 대상 없음).
   **임시 단검을 붙이지 말 것(은희).** 단검 작업은 뒤로 미룸 — 은희가 다시 시작하면 그동안 `Assassin_Armature`·`Player_Assassin` 재저장 메뉴 실행·위임 금지.
 - ✅ **임시 VFX 보강**(10-06, 단검보다 먼저 — 은희): 평타 Hit 이벤트마다(전 피어) 일반 4타 `FX_SingleSlash_O/X/O`·`FX_DoubleSlash_X`, 강타 `FX_DoubleSlash_O`, 변신 묶음 `FX_Mob_Slash`,

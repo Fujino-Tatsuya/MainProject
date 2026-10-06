@@ -27,3 +27,4 @@ MonoBehaviour:
   - 8
   - 10
   releaseLockSeconds: 2
+  backAttackMultiplier: 1.2
