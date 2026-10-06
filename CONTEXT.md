@@ -8,6 +8,19 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 다음 세션 인수인계 (2026-10-06 · 경석(Claude)) — 여기부터 읽을 것
+
+**상태**: 전수조사 정리·최적화 S1~S5 끝 → `development` = `feature/Boss23` = **`661cf289`**(푸시). SVN **r381**(핀 381, check-environment 전부 통과).
+상세·실측 = [PLAN-cleanup-optimization.md](PLAN-cleanup-optimization.md) §4 · 정리 노트 = 노션 「개인포트폴리오 > 전수조사 기반 성능 최적화…」(VeyTrace 하위로 옮길 것 — 도구 권한상 직접 못 만듦).
+
+**남은 일 (다음 세션)**
+1. **ForProfile 빌드 · L존 측정** — GPU Resident Drawer 켜기 여부(에디터에선 드로우 486→193 인데 프레임 6.85→7.77ms) · 바닥 그림자 Off 효과. 켤 때 `m_BrgStripping` = **2**(1 은 전부 제거).
+2. **에디터 사전 메시 병합**(같은 메시 묶어 그리기) — Codex 권장안 PLAN §S4 아래. 큰 작업 → grill·PLAN.
+3. **xlsx Monster 시트 속도 반영** — Chomp 2.4/3.36 · Humanoid 2.5/3.5 · Mortar 1.75/2.1. 🔴 **r381 에서 기획(김태현)이 xlsx 를 고쳤다** → 반드시 r381 위에서 해당 칸만 수정, SVN 커밋 전 팀장 확인.
+4. **담당별 목록 전달** — 은희(CONTEXT 아래 📮 목록 + 레거시 Paladin 네트워크 등록·TempPlayer_Armature·Garen 컨트롤러·R1·ToonLit 레거시·벽 투명화 레거시) · 민경(INab Demo Assets — 이펙트 프리팹이 데모 메시 30곳 참조) · 아트(SVN `VFX/**/OldVersion`·`SurfaceV1` 원본·빈 아트 폴더 4).
+5. **미검증 Play** — MPPM(원격 애니·블렌드 고정) · GauntletBot 예고 · 23호 전기 장판 2회차 VFX · 피격 전이 블렌드 고정.
+6. 기존: `BossCounterDataTests` 실패 2(No23 Dash) 팀장 결정 · `TitleSceneManager.cs:53` BGM NRE · `SoulVisualPrefab` 미지정 경고(은희).
+
 ## ▶▶ 작업 세션 (2026-10-06 · 경석(Claude) · **전수조사 정리·최적화 S1~S5**, 브랜치 `feature/Boss23`) — ✅ S1~S5 커밋 · development 반영(10-06)
 계획 = [PLAN-cleanup-optimization.md](PLAN-cleanup-optimization.md)(팀장 결정 §4: 이번 라운드 S1+S2, 은희 영역은 목록만).
 🔴 **수정 예정 — 동시 수정 금지:** `Monster/MonsterBase.cs` · `Monster/Boss/TwentyThreeBoss.cs`·`GrabController.cs`·`BossChargeClipLoop.cs`·`BossPatternTargets.cs`·`BossElectricFloor.cs` ·
