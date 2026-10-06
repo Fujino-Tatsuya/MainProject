@@ -202,6 +202,18 @@ PrefabInstance:
       propertyPath: alternateSkills.mainSkill
       value: 
       objectReference: {fileID: 7536522311454551541}
+    - target: {fileID: 7612441094946270182, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: maxHp
+      value: 180
+      objectReference: {fileID: 0}
+    - target: {fileID: 7612441094946270182, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: attackDamage
+      value: 28
+      objectReference: {fileID: 0}
+    - target: {fileID: 7612441094946270182, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: defense
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       propertyPath: m_Name
       value: Player_Assassin
