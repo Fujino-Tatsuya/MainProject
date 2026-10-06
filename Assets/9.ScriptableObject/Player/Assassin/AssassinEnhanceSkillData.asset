@@ -40,5 +40,8 @@ MonoBehaviour:
   targetableLayers:
     serializedVersion: 2
     m_Bits: 0
+  groundPointOutOfRange: 0
+  groundMarkerRadius: 0
+  hoverMarkerDistance: 3
   animatorStateName: Assassin_E_Buff
   snapRotationOnStart: 0

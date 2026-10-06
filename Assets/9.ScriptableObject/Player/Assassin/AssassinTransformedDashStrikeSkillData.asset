@@ -40,6 +40,9 @@ MonoBehaviour:
   targetableLayers:
     serializedVersion: 2
     m_Bits: 0
+  groundPointOutOfRange: 0
+  groundMarkerRadius: 0
+  hoverMarkerDistance: 3
   animatorStateName: Assassin_Q_DashStrike_Transformed
   snapRotationOnStart: 1
   prepareDuration: 0.1
