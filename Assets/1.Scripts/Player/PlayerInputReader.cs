@@ -23,6 +23,10 @@ public class PlayerInputReader : BaseNetworkBehaviour
     private bool controlEnabled = true;
     private bool dashPressedLatched;
     private bool dashCallbackRegistered;
+    private readonly bool[] virtualSkillHeld = new bool[4];
+    private readonly bool[] virtualSkillPressed = new bool[4];
+    private readonly bool[] virtualSkillPressedObserved = new bool[4];
+    private readonly int[] virtualSkillPressedFrame = { -1, -1, -1, -1 };
 
     // [MoveDiag] 입력/게이트 엣지를 최대 초당 한 줄로 묶기 위한 관측 전용 상태.
     private bool inputDiagnosticInitialized;
@@ -38,9 +42,12 @@ public class PlayerInputReader : BaseNetworkBehaviour
 
     public Vector2 Direction { get; private set; }
     public bool HasMoveInput => Direction.sqrMagnitude > 0.01f;
-    public bool AttackPressed => CanReadCombatInput && attackAction != null && attackAction.WasPressedThisFrame();
-    public bool AttackHeld => CanReadCombatInput && attackAction != null && attackAction.IsPressed();
-    public bool InterruptPressed => CanReadCombatInput && interruptAction != null && interruptAction.WasPressedThisFrame();
+    public bool AttackPressed => CanReadCombatInput && !SkillSlotHover.BlocksPrimaryInput &&
+                                 attackAction != null && attackAction.WasPressedThisFrame();
+    public bool AttackHeld => CanReadCombatInput && !SkillSlotHover.BlocksPrimaryInput &&
+                              attackAction != null && attackAction.IsPressed();
+    public bool InterruptPressed => CanReadCombatInput && !SkillSlotHover.BlocksPrimaryInput &&
+                                    interruptAction != null && interruptAction.WasPressedThisFrame();
 
     // 대시 입력은 입력 에셋의 "Dash" 액션에서 읽는다(바인딩 = Space · Gamepad South · XR).
     // 키는 에셋에서만 바꾼다 — 예전처럼 코드에 키를 박으면 리바인딩이 불가능해진다.
@@ -117,6 +124,13 @@ public class PlayerInputReader : BaseNetworkBehaviour
         if (!CanReadCombatInput)
             return false;
 
+        int index = (int)slot;
+        if (index >= 0 && index < virtualSkillPressed.Length && virtualSkillPressed[index])
+        {
+            virtualSkillPressedObserved[index] = true;
+            return true;
+        }
+
         InputAction action = GetSkillAction(slot);
         return action != null && action.WasPressedThisFrame();
     }
@@ -126,8 +140,30 @@ public class PlayerInputReader : BaseNetworkBehaviour
         if (!CanReadCombatInput)
             return false;
 
+        int index = (int)slot;
+        bool virtualHeld = index >= 0 && index < virtualSkillHeld.Length && virtualSkillHeld[index];
         InputAction action = GetSkillAction(slot);
-        return action != null && action.IsPressed();
+        return virtualHeld || (action != null && action.IsPressed());
+    }
+
+    /// <summary>
+    /// HUD 칸 좌클릭을 실제 스킬 액션과 같은 조회 경로에 합성한다.
+    /// Press는 게임 로직이 관측할 때까지(늦어도 다음 프레임) 유지하고, Hold는 포인터를 놓을 때까지 유지한다.
+    /// </summary>
+    public void SetVirtualSkillInput(PlayerSkillSlot slot, bool held)
+    {
+        int index = (int)slot;
+        if (index < 0 || index >= virtualSkillHeld.Length || !CanUseLocalControl)
+            return;
+
+        if (held && !virtualSkillHeld[index])
+        {
+            virtualSkillPressed[index] = true;
+            virtualSkillPressedObserved[index] = false;
+            virtualSkillPressedFrame[index] = Time.frameCount;
+        }
+
+        virtualSkillHeld[index] = held;
     }
 
     private InputAction GetSkillAction(PlayerSkillSlot slot)
@@ -226,10 +262,34 @@ public class PlayerInputReader : BaseNetworkBehaviour
         ObserveInputDiagnosticEdges("reader-update");
     }
 
+    private void LateUpdate()
+    {
+        for (int i = 0; i < virtualSkillPressed.Length; i++)
+        {
+            if (!virtualSkillPressed[i])
+                continue;
+
+            // EventSystem이 플레이어 Update 뒤에 클릭을 보낸 경우 다음 프레임까지 한 번 보존한다.
+            if (virtualSkillPressedObserved[i] || Time.frameCount > virtualSkillPressedFrame[i])
+            {
+                virtualSkillPressed[i] = false;
+                virtualSkillPressedObserved[i] = false;
+                virtualSkillPressedFrame[i] = -1;
+            }
+        }
+    }
+
     private void OnDisable()
     {
         Direction = Vector2.zero;
         dashPressedLatched = false;
+        for (int i = 0; i < virtualSkillHeld.Length; i++)
+        {
+            virtualSkillHeld[i] = false;
+            virtualSkillPressed[i] = false;
+            virtualSkillPressedObserved[i] = false;
+            virtualSkillPressedFrame[i] = -1;
+        }
         UnregisterDashCallback();
         ObserveInputDiagnosticEdges("component-disable");
     }

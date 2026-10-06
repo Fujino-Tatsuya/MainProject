@@ -32,6 +32,12 @@ Update this file when a term becomes important enough that future agents or team
 - 🔴 존 바닥이 벽까지 닿는지는 벽 바운드(0.634)가 아니라 **벽 밑단(중심선 ≈0.52)** 으로 잴 것(0.97 시도에서 이걸로 틀림). 소품·통로 한계는 그대로 콜라이더 안쪽 면(0.634).
 - Stage1 은 범위 밖: 문마다 0.2/0.4m 바닥 틈(목록만). 롤백·패치 스크립트는 이 PC `_backup/zone-asset-scale-20261002/`(git 제외).
 
+## ▶▶ 작업 세션 (2026-10-02 · 은희(Claude) · **플레이어블 스킬 툴팁 + 캐릭터별 아이콘**) — ✅ 구현(Codex `a9fe968c` + Claude `3dbf7f13`) · EditMode 82/82 · Verify 0 · xlsx SVN r366(툴팁 30행 TODO 문구) · 🔴 Play·MPPM 남음 · 브랜치 `feature/SkillTooltip`
+
+계획·결정·남은 질문 = [PLAN-skill-tooltip.md](PLAN-skill-tooltip.md).
+- 확정: 문구 = 스킬 SO·패시브 컴포넌트의 `displayName`·`description` → 기존 `Paladin`/`Gunner` 시트 행 · 거너 패시브 = 과열(`GunnerHeat`) → `Slot_P` · 자리표시자 `{필드}`·`{필드:%}`·`{dmg}` · 피해 = **계수 + 실제 수치** · 아이콘 = 스폰된 캐릭터 Variant 데이터에서(캐릭터마다 다름).
+- 다음: 은희 Play·MPPM → 기획이 TODO 문구 교체(SVN 잠금). 🔴 xlsx r366 과 이 브랜치 코드는 같이 나가야 한다. 툴팁 칸(`tooltip.*`)만 빈 칸 = 빈 문자열(그 외 빈 칸 = 오류, 판정은 Applier 로 이동). 저작 메뉴 = `Tools/UI/스킬 툴팁 구성`(재실행 가능). 스킬 아이콘 = 각 출처 `tooltip.icon`(지금 전부 비어 있음 — 아트 대기) → 슬롯 프레임(`slot_skill`) 안 자식 `Slot_*/Icon`(은희 제작) 에만 들어간다. 프레임은 덮지 않는다. 저작 메뉴는 `Icon` 을 찾아 연결만 한다(만들거나 배치를 바꾸지 않음). 칸 클릭 = 스킬 키(D18). 피해 = 계수+실제, 차지·과열은 최소~최대 범위 · Shift = 계산식 · 키워드 = TMP `<style>` 태그. 🔴 **수정 예정 — 동시 수정 금지(구현 시작 시)**: `Assets/1.Scripts/UI/Combat/*`·`CombatHUD.prefab`·`PlayerSkillData` 계열·`FirstMeleePassive`·`GunnerHeat`·`Assets/1.Scripts/DataTable/Editor/DataTableTemplate.cs`·`GameData.xlsx`(SVN 잠금).
+
 ## ▶▶ 현재 인수인계 (2026-10-02 · 은희(Claude) · **데이터 테이블 xlsx → 게임 수치 + Dev Boot 툴바** → development 반영)
 
 사용법 = [Docs/tech/data-table.md](Docs/tech/data-table.md) · 설계·결정 = [PLAN-data-table.md](Docs/history/PLANS/PLAN-data-table.md). 브랜치 `feature/DataTable`(+ `feature/DevBootToolbar` 병합).

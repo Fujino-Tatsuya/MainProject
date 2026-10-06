@@ -12,6 +12,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: be4a9508f5874cc4a891e4af2de56b59, type: 3}
   m_Name: GunnerTrackingLaserData
   m_EditorClassIdentifier: Assembly-CSharp::GunnerTrackingLaserData
+  tooltip:
+    displayName: "\uCD94\uC801 \uB808\uC774\uC800"
+    subtitle: "\uAD81\uADF9\uAE30"
+    description: "TODO \uB300\uC0C1\uC744 \uCD94\uC801\uD558\uBA70 \uD2F1\uB9C8\uB2E4
+      {dmg} \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4."
+    icon: {fileID: 21300000, guid: fa393fbb9ff12cc4f8fcbc810bb5b4e4, type: 3}
   inputType: 0
   cooldownTime: 20
   commitCooldownManually: 0

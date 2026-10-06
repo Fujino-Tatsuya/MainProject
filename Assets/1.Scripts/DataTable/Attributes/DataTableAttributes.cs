@@ -36,3 +36,12 @@ public sealed class DataTableSheetAttribute : Attribute
 public sealed class DataTableIgnoreAttribute : Attribute
 {
 }
+
+/// <summary>
+/// 기획이 xlsx에서 편집하는 문자열. 문자열은 기본적으로 데이터 테이블 대상이 아니며,
+/// 이 특성이 붙은 필드만 Export·병합·Verify·적용 대상이 된다.
+/// </summary>
+[AttributeUsage(AttributeTargets.Field)]
+public sealed class DataTableTextAttribute : Attribute
+{
+}
