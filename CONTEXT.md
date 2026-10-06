@@ -20,7 +20,7 @@ Update this file when a term becomes important enough that future agents or team
 - 이동 맞춤 = `Tools/Monster/이동 클립 고유 속도 측정 → SO 기록`. Chomp = 블렌드 100% + 임시 속도(배회 2.0 · 추격 2.8, 입 애니 때문 — 아트 클립 요청 여지).
 - 기존 버그 수정 동반: Mortar 발사·WallBot 평타 2단 트리거 클라 전파 · Spinner 예고 띠 = 실제 돌진 거리.
 - 🔴 **데이터 테이블**: xlsx Monster 시트 `attackSpeed` 를 r372 에서 1 로 갱신(r371 이하를 받으면 테이블 모드·빌드에서 공격 애니가 0.5~0.8배). `attackCooldown`·이동 맞춤 값은 테이블에 행이 없어 SO 값(측정값 4개는 `[DataTableIgnore]`).
-- 🔴(기존, 은희 공유) r366 `tooltip.*` 행의 코드(`feature/SkillTooltip`)가 원격에 없음 + 빈 칸 `Paladin!C32`·`Gunner!C18` → 테이블 Play·빌드 차단.
+- (은희 공유) r366 `tooltip.*` 행의 코드(`feature/SkillTooltip`)는 10-06 development 반영 ✅. 빈 칸 `Paladin!C32`·`Gunner!C18` 은 `tooltip.*` 칸이면 빈 문자열로 통과, 아니면 여전히 테이블 Play·빌드 차단 — 미확인.
 - ⚠️ EditMode 기존 실패 2(`BossCounterDataTests` — No23 Dash 가 FarthestPlayer) 는 이 작업과 무관, 미결.
 
 ## ▶▶ 현재 인수인계 (2026-10-02 · Claude · **존 원본 0.98 축소** — 방이 줄어든 만큼 존 내용물도 줄임, 브랜치 `feature/ZoneAssetScale`)
