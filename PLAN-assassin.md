@@ -185,3 +185,5 @@ Q22 `AssassinState` NetworkVariable · Q23·Q26 클립 git + 애니 이벤트(�
 - ✅ A0(10-06): SVN **r383**(모델·BaseColor, 핀 383) + git 클립 18·`SDArmTwist`·`Assassin_Toon.mat`·SmoothNormal 목록. 메타·클립 바이트 원본 일치 확인.
   🔸 모델에 단검 본 없음(클립의 `Dagger_*` 커브는 바인딩 대상 없음) — 단검이 몸 메시에 스킨됐는지 A6 에서 확인, 없으면 아트 요청.
   🔸 FBX 재임포트 시 "Importer generated inconsistent result" 경고 1건 — A6 에서 재확인.
+- ✅ A1(10-06): Codex `05055211` — `StatusEffectImmunityPolicy`(차단류 6종 무시) · Carry 거부. EditMode `Tools/Tests/플레이어 EditMode 테스트 실행` 27/0.
+  보스 쪽 거부 처리 확인: 23호 `AttachGrabbed`·`GrabController.CallPlayerBeginGrab` 모두 거부 시 해제 → Recovery. ⏳ Play(가붕이 Q/R 중 23호 잡기·스턴).
