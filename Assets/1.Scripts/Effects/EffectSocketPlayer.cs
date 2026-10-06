@@ -42,6 +42,16 @@ public class EffectSocketPlayer : MonoBehaviour, IAnimEventEffect
     [Tooltip("소켓 기준 월드 단위 오프셋. 배율(scale)에 곱해지지 않는다")]
     [SerializeField] Vector3 offset;
 
+    /// <summary>
+    /// 이펙트가 따라가는 트랜스폼. 비어 있으면 이 오브젝트 자신이다.
+    ///
+    /// 🔴 <b>위치·회전이 저작 시점에 안 정해지는 연출</b>을 위해 연다. 거너 좌클릭 빔은
+    /// 매 발 조준 방향이 달라서 호출자가 소켓을 직접 돌려야 한다 —
+    /// <c>PlayLooping</c> 이 매 프레임 이 트랜스폼의 회전을 그대로 복사하므로,
+    /// 소켓을 돌리는 것이 곧 이펙트를 조준하는 것이다.
+    /// </summary>
+    public Transform Socket => socket != null ? socket : transform;
+
     [Tooltip("프리팹에 저작된 크기에 곱해지는 배율. 런타임에 바뀌는 값이면 SetScale로 밀어넣는다")]
     [SerializeField, Min(0.01f)] float scale = 1f;
 

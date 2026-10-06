@@ -13,8 +13,11 @@ public enum PlayerSkillInputType
 /// 런타임 스탯(공격력)은 여기 두지 않는다: 시전 시점에 서버가 스냅샷으로 결합한다.
 /// </summary>
 [CreateAssetMenu(menuName = "Combat/Player Skill Data")]
-public class PlayerSkillData : ScriptableObject
+public class PlayerSkillData : ScriptableObject, ISkillTooltipSource
 {
+    [Header("툴팁")]
+    [SerializeField] private SkillTooltipText tooltip;
+
     [Header("입력")]
     [SerializeField] private PlayerSkillInputType inputType = PlayerSkillInputType.Press;
 
@@ -70,4 +73,11 @@ public class PlayerSkillData : ScriptableObject
     public LayerMask TargetableLayers => targetableLayers;
     public string AnimatorStateName => animatorStateName;
     public bool SnapRotationOnStart => snapRotationOnStart;
+    public SkillTooltipText Tooltip => tooltip;
+    public Object TooltipValueSource => this;
+
+    public SkillTooltipDamage GetTooltipDamage(Player player) => CalculateTooltipDamage(player);
+
+    protected virtual SkillTooltipDamage CalculateTooltipDamage(Player player) =>
+        SkillTooltipDamage.FromLinear(player, attackDamageMultiplier, flatDamageBonus);
 }

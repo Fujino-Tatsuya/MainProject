@@ -104,6 +104,10 @@ public sealed class PlayerSilhouetteFeature : ScriptableRendererFeature
         if (_pass == null || _compositeMaterial == null || _maskLocalMaterial == null)
             return;
 
+        // 표시할 플레이어가 없으면(타이틀·로비·로딩·결과) 마스크 RT 2장 클리어와 합성을 통째로 건너뛴다.
+        if (PlayerSilhouetteTag.ActiveCount <= 0)
+            return;
+
         // 프리뷰·리플렉션·미니맵(targetTexture) 카메라에는 걸지 않는다.
         // 오버레이 카메라에 중복으로 걸리는 것도 막는다(PixelScanlineFeature 와 같은 이유).
         UniversalAdditionalCameraData camData = renderingData.cameraData.camera

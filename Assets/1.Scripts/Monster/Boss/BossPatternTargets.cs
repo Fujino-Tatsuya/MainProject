@@ -23,9 +23,11 @@ public static class BossPatternTargets
         NetworkManager nm = NetworkManager.Singleton;
         if (nm == null || !nm.IsServer) return _buffer;
 
-        foreach (NetworkClient client in nm.ConnectedClientsList)
+        // 인덱스 순회 — IReadOnlyList 를 foreach 하면 열거자가 박싱돼 서버 매 프레임 할당(PLAN-cleanup-optimization S1-9).
+        var clients = nm.ConnectedClientsList;
+        for (int i = 0; i < clients.Count; i++)
         {
-            NetworkObject po = client.PlayerObject;
+            NetworkObject po = clients[i].PlayerObject;
             if (po == null) continue;
             Player p = po.GetComponent<Player>();
             if (p == null) p = po.GetComponentInChildren<Player>();

@@ -19,6 +19,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
     [SerializeField] private float readyMessageSeconds = 2.5f;
     [SerializeField] private bool requireLobbyReadyToStart = true;
     [SerializeField] private GameObject defaultPlayerPrefab;
+    [SerializeField] private CharacterRoster characterRoster;
     [SerializeField] private bool debugLogging;
     [SerializeField] private Vector3 spawn_Offset = new Vector3(0, 10.0f, 0);
 
@@ -514,7 +515,14 @@ public class NetworkLoadingFlowController : MonoBehaviour
 
     private GameObject ResolvePlayerPrefabForClient(ulong clientId)
     {
-        // TODO: Replace this with the client character selection lookup.
+        if (ServerCharacterSelectionStore.TryGet(clientId, out var characterId) &&
+            characterRoster != null &&
+            characterRoster.TryGetAvailableCharacter(characterId, out var entry) &&
+            entry.PlayerPrefab != null)
+        {
+            return entry.PlayerPrefab;
+        }
+
         return defaultPlayerPrefab;
     }
 

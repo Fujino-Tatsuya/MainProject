@@ -11,6 +11,7 @@ using UnityEngine;
 public class GunnerTrackingLaserSkill : PlayerSkillBase
 {
     private GunnerHeat heat;
+    private GunnerBeamView view;
     private float endTime;
 
     public override PlayerSkillSlot Slot => PlayerSkillSlot.Ultimate;
@@ -25,6 +26,7 @@ public class GunnerTrackingLaserSkill : PlayerSkillBase
     {
         base.Initialize(owner, controller);
         heat = owner.GetComponent<GunnerHeat>();
+        view = owner.GetComponent<GunnerBeamView>();
     }
 
     // 서버 권위 시전 조건 — 살아 있는 적, 사거리 안(§9.2)
@@ -46,6 +48,7 @@ public class GunnerTrackingLaserSkill : PlayerSkillBase
         endTime = Time.time + data.CastDuration;
 
         int stage = heat != null ? heat.CaptureStage() : 0;
+        // 툴팁의 최소~최대 계산도 같은 과열 배율을 쓰므로 판정 공식을 바꿀 때 같이 바꿀 것.
         int damage = Mathf.RoundToInt(damageSnapshot * data.StageDamageMultiplier(stage));
 
         Vector3 position = target.transform.position;
@@ -66,7 +69,10 @@ public class GunnerTrackingLaserSkill : PlayerSkillBase
         Edit.Log($"[Gunner/R] 추적 레이저 생성 — 대상 {target.name}, 틱 피해 {damage}, 저장 단계 {stage}", this);
     }
 
-    public override void OnClientPlay(Vector3 direction) { } // 시전 모션은 Data.AnimatorStateName
+    // 시전 모션은 Data.AnimatorStateName 이 튼다. 여기서는 **총구 섬광**만.
+    // 🔴 전 피어에서 돈다(PlaySkillClientRpc → OnClientPlay). 서버 가드를 넣으면 호스트에서만 보인다.
+    //    레이저 본체는 GunnerTrackingLaser 프리팹이 스스로 들고 있다 — 여기서 띄우지 않는다.
+    public override void OnClientPlay(Vector3 direction) => view?.ShowUltCast();
 
     public override void OnTick()
     {

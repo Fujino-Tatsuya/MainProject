@@ -15,6 +15,8 @@ public class PassiveHUD : MonoBehaviour
     [Tooltip("패시브 아이콘. Ready 여부에 따라 색을 바꾼다.")]
     [SerializeField] private Image icon;
 
+    [SerializeField] private SkillSlotHover hover;
+
     [Tooltip("남은 쿨다운(초) 텍스트. 스킬 쿨타임 HUD와 동일 포맷. 선택.")]
     [SerializeField] private TMP_Text remainingText;
 
@@ -25,10 +27,24 @@ public class PassiveHUD : MonoBehaviour
     [SerializeField] private Color cooldownColor = new Color(1f, 1f, 1f, 0.4f);
 
     private IPlayerPassive passive;
+    private ISkillTooltipSource tooltipSource;
 
     public void Bind(Player player)
     {
         passive = player != null ? player.GetComponent<IPlayerPassive>() : null;
+        tooltipSource = passive as ISkillTooltipSource;
+        if (tooltipSource == null && player != null)
+            tooltipSource = player.GetComponent<GunnerHeat>()?.Data;
+
+        SkillCooldownHUD.SetSlotIcon(icon, tooltipSource);
+
+        hover?.Bind(
+            player,
+            tooltipSource,
+            PlayerSkillSlot.Main,
+            acceptsLeftClick: false,
+            displayKey: "Passive",
+            cooldownSeconds: passive != null ? passive.CooldownTime : (float?)null);
         Refresh();
     }
 
@@ -54,7 +70,9 @@ public class PassiveHUD : MonoBehaviour
             cooldownFill.fillAmount = total > 0f ? Mathf.Clamp01(remaining / total) : 0f;
 
         if (icon != null)
-            icon.color = ready ? readyColor : cooldownColor;
+            icon.color = passive == null && tooltipSource != null
+                ? readyColor
+                : ready ? readyColor : cooldownColor;
 
         if (remainingText != null)
         {

@@ -264,6 +264,7 @@ public sealed class BossElectricFloor : MonoBehaviour
 
     MeshRenderer[] _outer, _fill;
     GameObject[] _vfx;
+    GameObject _vfxSource;   // _vfx 인스턴스를 만든 프리팹 — 데이터가 바뀌면 다시 만든다
     float[] _tileY;
     BossTileGrid _viewGrid;
     ulong _viewMask;
@@ -297,6 +298,15 @@ public sealed class BossElectricFloor : MonoBehaviour
         _viewStart = Time.time;
         _viewDur = Mathf.Max(0.01f, vfxTime);
         _viewFiring = true;
+
+        // 데이터의 VFX 프리팹이 바뀌었으면(인스펙터 교체) 재사용 인스턴스를 버리고 다시 만든다.
+        if (_vfxSource != _d.electricVfxPrefab)
+        {
+            for (int k = 0; k < _vfx.Length; k++)
+                if (_vfx[k] != null) { Destroy(_vfx[k]); _vfx[k] = null; }
+            _vfxSource = _d.electricVfxPrefab;
+        }
+
         ForEachTile(mask, (r, c, i) =>
         {
             PlaceTile(_outer[i], r, c, i, FullTile);
@@ -305,8 +315,14 @@ public sealed class BossElectricFloor : MonoBehaviour
 
             if (_d.electricVfxPrefab != null)
             {
-                _vfx[i] = Instantiate(_d.electricVfxPrefab, _outer[i].transform.position, _viewGrid.Rotation);
-                Destroy(_vfx[i], _viewDur);
+                // 칸마다 인스턴스 하나를 만들어 두고 재사용한다 — 발동마다 최대 64개 Instantiate/Destroy 가
+                // 전 피어에서 한 프레임에 몰리던 것(PLAN-cleanup-optimization S1-10). 끝나면 HideAllTiles 가 끈다.
+                if (_vfx[i] == null)
+                    _vfx[i] = Instantiate(_d.electricVfxPrefab, _viewRoot);   // _viewRoot = 원점·스케일 1, 보스와 함께 정리
+                _vfx[i].transform.SetPositionAndRotation(_outer[i].transform.position, _viewGrid.Rotation);
+                // 끄고 켜서 처음부터 다시 재생(파티클 playOnAwake · VFX Graph 재초기화).
+                _vfx[i].SetActive(false);
+                _vfx[i].SetActive(true);
             }
         });
     }
@@ -388,7 +404,7 @@ public sealed class BossElectricFloor : MonoBehaviour
         {
             if (_outer[i] != null) _outer[i].gameObject.SetActive(false);
             if (_fill[i] != null) _fill[i].gameObject.SetActive(false);
-            if (_vfx[i] != null) { Destroy(_vfx[i]); _vfx[i] = null; }
+            if (_vfx[i] != null) _vfx[i].SetActive(false);   // 재사용 — 파괴하지 않는다
         }
     }
 

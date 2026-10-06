@@ -2,7 +2,7 @@
 //  FogRendererFeature.cs - URP RenderGraph 풀스크린 포그 렌더러 피처
 //
 //  Unity 6 (URP 17) RenderGraph 경로. 불투명 렌더 후 풀스크린 패스로
-//  씬색에 포그를 블렌딩한다. PC_Renderer / Mobile_Renderer 양쪽에 추가.
+//  씬색에 포그를 블렌딩한다. PC_Renderer 에 추가돼 있다(⚠️ 10-06 확인: Mobile_Renderer 에는 없다 — PC 빌드 무관).
 //
 //  RenderGraph 배선(ConfigureInput(Color|Depth), AddRasterRenderPass +
 //  Blitter.BlitTexture, 중간 텍스처 ping-pong)은 meryuhi/URPFog (MIT)의
@@ -127,17 +127,9 @@ public sealed class FogRendererFeature : ScriptableRendererFeature
                 });
             }
 
-            // 2) dest -> source (카메라 컬러로 복사)
-            using (var builder = renderGraph.AddRasterRenderPass<PassData>("FullScreenFog CopyBack", out PassData data))
-            {
-                data.source = dest;
-                builder.UseTexture(dest, AccessFlags.Read);
-                builder.SetRenderAttachment(source, 0, AccessFlags.Write);
-                builder.SetRenderFunc(static (PassData d, RasterGraphContext ctx) =>
-                {
-                    Blitter.BlitTexture(ctx.cmd, d.source, FullScreenScaleBias, 0f, false);
-                });
-            }
+            // 2) 결과를 카메라 컬러로 넘긴다 — 원본으로 되돌려 복사하던 풀스크린 패스(CopyBack)를 없앴다
+            //    (PLAN-cleanup-optimization S1-4, RetroCRTFeature 와 같은 방식). dest 는 MSAA 1 이고 PC RP 도 MSAA 꺼짐.
+            resourceData.cameraColor = dest;
         }
     }
 }

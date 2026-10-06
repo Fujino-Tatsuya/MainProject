@@ -135,6 +135,11 @@ public class MonsterDataSO : ScriptableObject
     public bool locomotionFullBlendWhileMoving = false;
     [Tooltip("이동 클립 재생 속도 범위. 너무 느리거나 빠르면 어색해서 자른다 — 범위 밖에선 다시 약간 미끄러진다.")]
     public Vector2 locomotionAnimSpeedRange = new Vector2(0.5f, 2.5f);
+    [Tooltip("발 맞춤으로 계산한 이동 애니 재생 속도에 곱하는 값. 1 = 발이 바닥에 정확히 맞는다(기본).\n" +
+             "1 보다 작으면 애니가 그만큼 느려지고 몸이 발보다 앞서 나간다(0.85 = 15% 미끄러짐). 보폭이 짧아 " +
+             "다리가 바빠 보이는 몹(ChompBot) 용 — 이동 속도는 그대로 두고 애니만 늦춘다.\n" +
+             "Play 중 인스펙터에서 바꾸면 바로 반영된다(매 프레임 읽음).")]
+    [DataTableIgnore] [Range(0.1f, 1.5f)] public float locomotionPlaybackScale = 1f;   // 팀장 눈 튜닝값(10-06) — 확정되면 테이블 노출 여부 결정
 
     [Header("애니메이터 컨트롤러 교체 (선택)")]
     [Tooltip("비우면 프리팹/아트 프리팹에 배선된 컨트롤러를 그대로 쓴다. " +

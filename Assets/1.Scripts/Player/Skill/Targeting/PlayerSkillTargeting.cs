@@ -267,7 +267,8 @@ public class PlayerSkillTargeting : MonoBehaviour
 
     private bool WasConfirmPressed()
     {
-        return Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame;
+        return !SkillSlotHover.BlocksPrimaryInput &&
+               Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame;
     }
 
     private void UpdatePreview()

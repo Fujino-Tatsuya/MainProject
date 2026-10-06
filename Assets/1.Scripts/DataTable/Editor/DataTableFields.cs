@@ -41,6 +41,10 @@ public static class DataTableFields
     public static bool IsExcluded(FieldInfo field) =>
         field.IsDefined(typeof(DataTableIgnoreAttribute), false) || typeof(NetworkVariableBase).IsAssignableFrom(field.FieldType);
 
+    /// <summary>문자열 중 데이터 테이블이 소유하는 필드인지.</summary>
+    public static bool IsTableText(FieldInfo field) =>
+        field != null && field.FieldType == typeof(string) && field.IsDefined(typeof(DataTableTextAttribute), false);
+
     /// <summary>경로의 조상(마지막 필드 제외) 중 제외 대상이 있으면 true — 구조체·배열에 붙인 [DataTableIgnore] 는 그 아래 전부.</summary>
     public static bool IsUnderExcluded(Type root, string propertyPath)
     {

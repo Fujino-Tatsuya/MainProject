@@ -59,6 +59,15 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
     private readonly HashSet<int> _navRebakeDone = new HashSet<int>();
     private bool _warnedNoKeyboard;
 
+    // 게이트별로 마지막에 화면에 그린 활성 마스크 — "새로 켜진 패널만 연출"의 기준(PLAN-title-monitor T2).
+    // 🔴 목록 변경 하나에도 ApplyAllStates 가 모든 게이트·패널의 true 를 다시 보낸다 → true 마다 연출하면 반복된다(Codex 10-03).
+    //    처음 그릴 때(등록·스폰·레이트 조인)는 연출 없이, 그 뒤엔 이전 대비 새 비트만 연출한다.
+    private readonly Dictionary<ZoneBridgeGate, int> _appliedMask = new Dictionary<ZoneBridgeGate, int>();
+
+    // 근접 외곽선 — 로컬 플레이어 기준 가장 가까운 미활성 패널 하나(PLAN-title-monitor T3).
+    private ZoneBridgeGate _highlightGate;
+    private int _highlightPanel = -1;
+
     private void Awake() => Instance = this;
 
     public override void OnDestroy()
@@ -139,7 +148,10 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
 
     public void UnregisterGate(ZoneBridgeGate gate)
     {
-        if (gate != null) _localGates.Remove(gate.SlotID);
+        if (gate == null) return;
+        _localGates.Remove(gate.SlotID);
+        _appliedMask.Remove(gate);
+        if (_highlightGate == gate) { _highlightGate = null; _highlightPanel = -1; }
     }
 
     // ── 입력 (각 피어 로컬) ────────────────────────────────────────────────
@@ -147,6 +159,7 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
     private void Update()
     {
         TickOpening();
+        UpdateHighlight();   // 🔴 키보드 검사 앞 — 외곽선은 F 와 무관하게 매 프레임(Codex 10-03)
 
         if (Keyboard.current == null)
         {
@@ -218,6 +231,37 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
 
         Edit.Log($"[BridgeGate] F: Slot {slotID} 패널 {panelIndex} 요청 (거리 {nearestDistance:F2}m).", this);
         RequestInteractServerRpc(slotID, panelIndex);
+    }
+
+    /// <summary>
+    /// 로컬 플레이어가 상호작용할 수 있는 패널(= F 를 누르면 켜질 패널)에만 외곽선을 켠다. F 판정과 같은 조건·같은 탐색을 쓴다.
+    /// 조건이 깨지면(스폰 전·플레이어 없음·사망/유령·연출 잠금·범위 이탈·이미 활성) 이전 외곽선을 반드시 끈다. 로그는 남기지 않는다(매 프레임).
+    /// </summary>
+    private void UpdateHighlight()
+    {
+        ZoneBridgeGate gate = null;
+        int panel = -1;
+
+        if (IsSpawned && _localGates.Count > 0 &&
+            TryGetLocalPlayer(out Transform player, out PlayerLifeCycleController life, out PlayerEncounterLock lockState) &&
+            (life == null || life.State == PlayerLifeState.Alive) &&
+            (lockState == null || !lockState.IsCinematicLocked) &&
+            TryFindNearestPanel(player.position, out int slotID, out int index, out _, out _) &&
+            _localGates.TryGetValue(slotID, out gate) && gate != null)
+        {
+            panel = index;
+        }
+        else
+        {
+            gate = null;
+        }
+
+        if (gate == _highlightGate && panel == _highlightPanel) return;
+
+        if (_highlightGate != null) _highlightGate.SetPanelHighlighted(_highlightPanel, false);
+        _highlightGate = gate;
+        _highlightPanel = panel;
+        if (gate != null) gate.SetPanelHighlighted(panel, true);
     }
 
     private bool TryFindNearestPanel(Vector3 from, out int slotID, out int panelIndex,
@@ -323,16 +367,23 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
             if (gate != null) ApplyState(gate);
     }
 
-    /// <summary>복제된 상태를 로컬 존에 그린다(링 표시 + 다리 진행도).</summary>
+    /// <summary>
+    /// 복제된 상태를 로컬 존에 그린다(모니터 화면 + 다리 진행도).
+    /// 이 게이트를 처음 그리면 연출 없이 현재 상태 그대로, 그 뒤엔 직전에 그린 마스크 대비 **새로 켜진 비트만** 연출한다.
+    /// </summary>
     private void ApplyState(ZoneBridgeGate gate)
     {
         int index = FindIndex(gate.SlotID);
         if (index < 0) return;
 
         GateState state = gates[index];
+        int mask = state.ActivatedMask;
+        bool firstApply = !_appliedMask.TryGetValue(gate, out int previous);
+        int newlyOn = firstApply ? 0 : mask & ~previous;
+        _appliedMask[gate] = mask;
 
         for (int i = 0; i < gate.PanelCount; i++)
-            gate.SetPanelActivatedVisual(i, (state.ActivatedMask & (1 << i)) != 0);
+            gate.SetPanelActivatedVisual(i, (mask & (1 << i)) != 0, animate: (newlyOn & (1 << i)) != 0);
 
         gate.ApplyOpenProgress(ProgressOf(state, gate));
     }

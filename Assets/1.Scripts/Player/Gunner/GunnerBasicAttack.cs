@@ -35,6 +35,12 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
     private GunnerHeat heat;
     private GunnerBeamAttack beam;
     private GunnerBeamView beamView;
+
+    // 🔴 판정선의 출발점이다 — 연출용이 아니다(2026-10-04).
+    //    비워 두면 예전대로 루트 + 위로 MuzzleHeight 를 쓴다. 그 자리는 **총이 아니라 몸통**이라
+    //    빔이 배에서 나가는 것처럼 보였고, 벽 뒤에서 쏠 때 판정 시작점도 실제 총구와 어긋났다.
+    [Tooltip("레이가 출발할 총구. 비우면 루트 + 위로 MuzzleHeight(예전 동작)")]
+    [SerializeField] private Transform muzzle;
     private float fireClipLength = -1f;
 
     // 전 피어 공통 런타임
@@ -52,6 +58,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
     private bool endingGracefully;
 
     public bool CanStartApprovedAttack => data != null && heat != null && !heat.IsOverheated;
+    public GunnerBasicAttackData Data => data;
 
     // 공용 대시 우선(D1·D2) — 준비 중 끊기면 발사·과열 없음, 발사 후면 이미 쏜 발은 그대로이고 후속 동작만 끊긴다.
     public bool CanBeCanceledByDash => true;
@@ -246,7 +253,9 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
         int baseDamage = Mathf.RoundToInt(player.FinalAttackDamage * data.AttackDamageMultiplier) + data.FlatDamageBonus;
         int damage = Mathf.Max(0, Mathf.RoundToInt(baseDamage * heat.StageDamageMultiplier(stage)));
 
-        Vector3 origin = transform.position + Vector3.up * data.MuzzleHeight;
+        Vector3 origin = muzzle != null
+            ? muzzle.position
+            : transform.position + Vector3.up * data.MuzzleHeight;
         bool hit = beam.Fire(origin, direction, data.Range, data.BeamWidth * 0.5f,
                              data.HittableLayers, data.BlockingLayers, damage, data.TriggersOnHit, out Vector3 end);
 
@@ -366,7 +375,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
     private void PlayShot(Vector3 origin, Vector3 end, bool hit)
     {
         PlayFireAnimation();
-        ShowBeam(origin, end);
+        ShowBeam(origin, end, hit);
     }
 
     // 상체 레이어에서 발사 클립을 매 발 처음부터. 클립이 발사 간격보다 길면 그만큼 빨리 재생해 다음 발 전에 끝나게 한다.
@@ -415,10 +424,21 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
             animator.CrossFadeInFixedTime(hash, 0.1f, 0);
     }
 
-    private void ShowBeam(Vector3 origin, Vector3 end)
+    /// <summary>
+    /// 🔴 <b><c>hit</c> 은 "유닛에 피해를 줬나" 지 "뭔가에 부딪혔나"가 아니다.</b>
+    /// <c>GunnerBeamAttack.Fire</c> 는 벽에 막히면 <c>end</c> 만 당기고 <b>false</b> 를 돌려준다.
+    /// 그래서 착탄 연출을 <c>hit</c> 으로 묶으면 <b>벽에서는 영원히 안 뜬다.</b>
+    ///
+    /// 착탄 판단은 <b>빔이 사거리 끝까지 못 갔는가</b>로 한다 — 유닛이든 벽이든 똑같이 잡힌다.
+    /// 아무것도 안 맞으면 <c>Fire</c> 가 <c>end = origin + dir * range</c> 를 그대로 두므로 거리가 딱 사거리다.
+    /// </summary>
+    private void ShowBeam(Vector3 origin, Vector3 end, bool hit)
     {
-        if (beamView != null && data != null)
-            beamView.ShowLocal(GunnerBeamView.Kind.BasicAttack, origin, end, data.BeamWidth);
+        if (beamView == null || data == null)
+            return;
+
+        bool stopped = hit || Vector3.Distance(origin, end) < data.Range - 0.01f;
+        beamView.ShowBasicShot(origin, end, stopped, hit, data.BeamWidth);
     }
 
     // 준비 자세 → 연사. 상태기계는 오너·서버만 틱하므로 원격 프록시도 넘어가도록 Update 에서 각 피어가 시간으로 전환한다

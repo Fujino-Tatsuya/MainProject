@@ -12,16 +12,24 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6cd9883059c546e68f5aeeda0b842aa8, type: 3}
   m_Name: FirstMeleeSubSkillData
   m_EditorClassIdentifier: 
+  tooltip:
+    displayName: "\uC218\uD638\uC790\uC758 \uC758\uC9C0"
+    subtitle: "E \uC2A4\uD0AC"
+    description: "TODO <style=shield><sprite name=\"shield\" color=#74C7EC>{shieldAmount}</style>\uC758 \uBCF4\uD638\uB9C9\uC744 {shieldDuration:0.0}\uCD08 \uB3D9\uC548 \uC5BB\uC2B5\uB2C8\uB2E4."
+    icon: {fileID: 21300000, guid: 95a8efb689b9bf24a85cfb8a36b366c9, type: 3}
   inputType: 0
   cooldownTime: 14
+  commitCooldownManually: 0
   attackDamageMultiplier: 0
   flatDamageBonus: 0
   maxActiveDuration: 0.5
   tickInterval: 0
+  hitPattern: 0
   usableWhileDead: 0
   hittableLayers:
     serializedVersion: 2
     m_Bits: 0
+  triggersOnHit: 0
   targetingMode: 0
   confirmMode: 0
   castRange: 8

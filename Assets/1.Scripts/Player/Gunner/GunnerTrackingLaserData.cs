@@ -42,4 +42,15 @@ public class GunnerTrackingLaserData : PlayerSkillData
             return 1f;
         return stageDamageMultipliers[Mathf.Clamp(stage, 0, stageDamageMultipliers.Length - 1)];
     }
+
+    protected override SkillTooltipDamage CalculateTooltipDamage(Player player)
+    {
+        if (player == null)
+            return default;
+
+        float minScale = StageDamageMultiplier(0);
+        float maxScale = StageDamageMultiplier(int.MaxValue);
+        return SkillTooltipDamage.FromScaledSnapshot(
+            player.FinalAttackDamage, AttackDamageMultiplier, FlatDamageBonus, minScale, maxScale);
+    }
 }

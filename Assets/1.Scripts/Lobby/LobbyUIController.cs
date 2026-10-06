@@ -7,20 +7,26 @@ using UnityEngine.UI;
 
 public class LobbyUIController : MonoBehaviour
 {
+    private const int DefaultCharacterId = 0;
     private const string ReadyRequestMessageName = "Lobby.ReadyRequest";
+    private const string CharacterRequestMessageName = "Lobby.CharacterRequest";
     private const string StateMessageName = "Lobby.State";
 
     public static LobbyUIController Active { get; private set; }
 
     public event System.Action StateChanged;
 
+    public CharacterRoster Roster => characterRoster;
+
     [SerializeField] private LobbyPlayerSlotView[] slots;
+    [SerializeField] private CharacterRoster characterRoster;
     [SerializeField] private Image startButtonImage;
     [SerializeField] private Color startAvailableColor = new Color(0.25f, 0.85f, 0.45f, 1f);
     [SerializeField] private Color startBlockedColor = new Color(0.35f, 0.35f, 0.35f, 1f);
     [SerializeField] private bool autoRegisterWhenNetworkStarts = true;
 
     private readonly Dictionary<ulong, bool> _readyStates = new Dictionary<ulong, bool>();
+    private readonly Dictionary<ulong, int> _characterSelections = new Dictionary<ulong, int>();
     private readonly List<ulong> _orderedClients = new List<ulong>();
     private readonly List<ulong> _clientsToRemove = new List<ulong>();
 
@@ -94,6 +100,48 @@ public class LobbyUIController : MonoBehaviour
         SendReadyRequest(ready);
     }
 
+    public void RequestLocalCharacterSelection(int characterId)
+    {
+        RegisterCallbacks();
+
+        if (_networkManager == null || !_networkManager.IsListening)
+        {
+            return;
+        }
+
+        if (IsServerActive)
+        {
+            ApplyCharacterSelectionRequest(_networkManager.LocalClientId, characterId);
+            return;
+        }
+
+        SendCharacterRequest(characterId);
+    }
+
+    public int GetLocalCharacterSelectionId()
+    {
+        if (_networkManager != null &&
+            _networkManager.IsListening &&
+            _characterSelections.TryGetValue(_networkManager.LocalClientId, out var characterId))
+        {
+            return characterId;
+        }
+
+        return DefaultCharacterId;
+    }
+
+    public bool IsLocalReady()
+    {
+        if (_networkManager != null &&
+            _networkManager.IsListening &&
+            _readyStates.TryGetValue(_networkManager.LocalClientId, out var ready))
+        {
+            return ready;
+        }
+
+        return _localReady;
+    }
+
     private IEnumerator RegisterWhenNetworkStarts()
     {
         while (true)
@@ -128,6 +176,7 @@ public class LobbyUIController : MonoBehaviour
         if (_networkManager.CustomMessagingManager != null)
         {
             _networkManager.CustomMessagingManager.RegisterNamedMessageHandler(ReadyRequestMessageName, HandleReadyRequestMessage);
+            _networkManager.CustomMessagingManager.RegisterNamedMessageHandler(CharacterRequestMessageName, HandleCharacterRequestMessage);
             _networkManager.CustomMessagingManager.RegisterNamedMessageHandler(StateMessageName, HandleStateMessage);
         }
 
@@ -153,6 +202,7 @@ public class LobbyUIController : MonoBehaviour
         if (_networkManager.CustomMessagingManager != null)
         {
             _networkManager.CustomMessagingManager.UnregisterNamedMessageHandler(ReadyRequestMessageName);
+            _networkManager.CustomMessagingManager.UnregisterNamedMessageHandler(CharacterRequestMessageName);
             _networkManager.CustomMessagingManager.UnregisterNamedMessageHandler(StateMessageName);
         }
 
@@ -171,6 +221,8 @@ public class LobbyUIController : MonoBehaviour
             _readyStates.Add(clientId, IsHostClient(clientId));
         }
 
+        EnsureDefaultCharacterSelection(clientId);
+
         BroadcastState();
         ApplyUi();
     }
@@ -183,8 +235,46 @@ public class LobbyUIController : MonoBehaviour
         }
 
         _readyStates.Remove(clientId);
+        _characterSelections.Remove(clientId);
+        ServerCharacterSelectionStore.Remove(clientId);
         BroadcastState();
         ApplyUi();
+    }
+
+    private void HandleCharacterRequestMessage(ulong senderClientId, FastBufferReader reader)
+    {
+        if (!IsServerActive)
+        {
+            return;
+        }
+
+        reader.ReadValueSafe(out int characterId);
+        ApplyCharacterSelectionRequest(senderClientId, characterId);
+    }
+
+    private void ApplyCharacterSelectionRequest(ulong clientId, int characterId)
+    {
+        SyncConnectedClientsFromServer();
+
+        if (!_readyStates.ContainsKey(clientId) ||
+            IsCharacterSelectionLocked(clientId) ||
+            characterRoster == null ||
+            !characterRoster.TryGetAvailableCharacter(characterId, out _))
+        {
+            return;
+        }
+
+        _characterSelections[clientId] = characterId;
+        ServerCharacterSelectionStore.Set(clientId, characterId);
+        BroadcastState();
+    }
+
+    // Host는 Ready 버튼이 없고 항상 준비 상태이므로, Ready 잠금은 토글 가능한 원격 클라이언트에만 적용한다.
+    private bool IsCharacterSelectionLocked(ulong clientId)
+    {
+        return !IsHostClient(clientId) &&
+               _readyStates.TryGetValue(clientId, out var ready) &&
+               ready;
     }
 
     private void HandleReadyRequestMessage(ulong senderClientId, FastBufferReader reader)
@@ -215,6 +305,21 @@ public class LobbyUIController : MonoBehaviour
         }
     }
 
+    private void SendCharacterRequest(int characterId)
+    {
+        var messagingManager = _networkManager.CustomMessagingManager;
+        if (messagingManager == null)
+        {
+            return;
+        }
+
+        using (var writer = new FastBufferWriter(sizeof(int), Allocator.Temp))
+        {
+            writer.WriteValueSafe(characterId);
+            messagingManager.SendNamedMessage(CharacterRequestMessageName, NetworkManager.ServerClientId, writer);
+        }
+    }
+
     private void BroadcastState()
     {
         if (!IsServerActive || _networkManager.CustomMessagingManager == null)
@@ -239,7 +344,7 @@ public class LobbyUIController : MonoBehaviour
     private void SendState(ulong clientId)
     {
         var count = _readyStates.Count;
-        var size = sizeof(int) + count * (sizeof(ulong) + sizeof(byte));
+        var size = sizeof(int) + count * (sizeof(ulong) + sizeof(byte) + sizeof(int));
 
         using (var writer = new FastBufferWriter(size, Allocator.Temp))
         {
@@ -248,6 +353,7 @@ public class LobbyUIController : MonoBehaviour
             {
                 writer.WriteValueSafe(pair.Key);
                 writer.WriteValueSafe(pair.Value);
+                writer.WriteValueSafe(GetCharacterSelectionOrDefault(pair.Key));
             }
 
             _networkManager.CustomMessagingManager.SendNamedMessage(StateMessageName, clientId, writer);
@@ -263,12 +369,15 @@ public class LobbyUIController : MonoBehaviour
 
         reader.ReadValueSafe(out int count);
         _readyStates.Clear();
+        _characterSelections.Clear();
 
         for (var i = 0; i < count; i++)
         {
             reader.ReadValueSafe(out ulong clientId);
             reader.ReadValueSafe(out bool ready);
+            reader.ReadValueSafe(out int characterId);
             _readyStates[clientId] = ready;
+            _characterSelections[clientId] = characterId;
         }
 
         if (_networkManager != null && _networkManager.IsListening)
@@ -294,6 +403,8 @@ public class LobbyUIController : MonoBehaviour
             {
                 _readyStates.Add(clientId, IsHostClient(clientId));
             }
+
+            EnsureDefaultCharacterSelection(clientId);
         }
 
         _clientsToRemove.Clear();
@@ -308,7 +419,33 @@ public class LobbyUIController : MonoBehaviour
         foreach (var clientId in _clientsToRemove)
         {
             _readyStates.Remove(clientId);
+            _characterSelections.Remove(clientId);
+            ServerCharacterSelectionStore.Remove(clientId);
         }
+    }
+
+    private void EnsureDefaultCharacterSelection(ulong clientId)
+    {
+        if (!_characterSelections.ContainsKey(clientId))
+        {
+            _characterSelections.Add(clientId, DefaultCharacterId);
+        }
+
+        ServerCharacterSelectionStore.Set(clientId, _characterSelections[clientId]);
+    }
+
+    private int GetCharacterSelectionOrDefault(ulong clientId)
+    {
+        return _characterSelections.TryGetValue(clientId, out var characterId)
+            ? characterId
+            : DefaultCharacterId;
+    }
+
+    private Sprite GetCharacterPortrait(int characterId)
+    {
+        return characterRoster != null && characterRoster.TryGetAvailableCharacter(characterId, out var entry)
+            ? entry.Portrait
+            : null;
     }
 
     private void ApplyUi()
@@ -331,13 +468,14 @@ public class LobbyUIController : MonoBehaviour
 
             if (i >= _orderedClients.Count)
             {
-                slot.SetState(false, false);
+                slot.SetState(false, false, null);
                 continue;
             }
 
             var clientId = _orderedClients[i];
             var ready = _readyStates.TryGetValue(clientId, out var isReady) && isReady;
-            slot.SetState(true, ready);
+            var characterId = GetCharacterSelectionOrDefault(clientId);
+            slot.SetState(true, ready, GetCharacterPortrait(characterId));
         }
 
         ApplyStartButtonState();

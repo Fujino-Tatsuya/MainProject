@@ -23,7 +23,8 @@ public sealed class DataTableTestData : ScriptableObject
     [DataTableIgnore] public Charge ignoredCharge;
     public float moveSpeed = 2.5f;
     public bool canDash = true;
-    public string title = "base";
+    [DataTableText] public string title = "base";
+    public string animatorStateName = "Run";
     public Mode mode = Mode.Walk;
     public byte smallCount = 1;
     public Charge charge = new Charge { speed = 3f, damage = 5 };
