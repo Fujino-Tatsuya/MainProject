@@ -21,14 +21,18 @@ public class SkillCursorView : MonoBehaviour
     [SerializeField] private CursorIcon invalidTargetIcon;
     [SerializeField] private CursorIcon outOfRangeIcon;
 
-    [Tooltip("커서 표시 배율(10-07 은희 — 1.5배). 원본 텍스처를 이 배율로 다시 그려 쓴다. 1 = 원본 그대로.")]
-    [SerializeField, Min(0.25f)] private float cursorScale = 1.5f;
+    [Tooltip("조준 커서 표시 배율(10-07 은희 — 1080 기준 1.2배). 원본 텍스처를 이 배율로 다시 그려 쓴다. 1 = 원본 그대로.")]
+    [SerializeField, Min(0.25f)] private float cursorScale = 1.2f;
 
     [Tooltip("화면 높이에 비례해 키운다 — 기준 높이(1080)에서 cursorScale, 1440 이면 ×1.33. 0 = 해상도 무관.")]
     [SerializeField, Min(0f)] private float referenceScreenHeight = 1080f;
 
-    [Tooltip("Windows 하드웨어 커서(Auto)는 텍스처를 시스템 커서 크기로 줄여 그려서 배율이 안 먹는다 — 소프트웨어 커서로 그린다.")]
-    [SerializeField] private CursorMode cursorMode = CursorMode.ForceSoftware;
+    // 절충(10-07 은희): 기본(idle) 커서 = 하드웨어(Auto) — 반응 즉시, 크기는 Windows 시스템 커서 크기.
+    // 조준 커서 = 소프트웨어 — 배율·해상도 비례가 먹지만 렌더 프레임만큼 늦게 따라온다(조준 중에만).
+    [Tooltip("기본(idle) 커서 모드. Auto = 하드웨어(지연 없음, 배율 무시).")]
+    [SerializeField] private CursorMode defaultCursorMode = CursorMode.Auto;
+    [Tooltip("조준 커서 모드. ForceSoftware = 배율 적용(렌더 지연 있음). Windows 하드웨어 커서(Auto)는 텍스처를 시스템 크기로 줄여 그린다.")]
+    [SerializeField] private CursorMode targetingCursorMode = CursorMode.ForceSoftware;
 
     private Player player;
     private bool isLocal;
@@ -94,21 +98,24 @@ public class SkillCursorView : MonoBehaviour
             return;
         }
 
-        float scale = EffectiveScale;
-        Cursor.SetCursor(Scaled(icon.texture, scale), icon.hotspot * scale, cursorMode);
+        CursorMode mode = state == SkillCursorState.Default ? defaultCursorMode : targetingCursorMode;
+        // 하드웨어 커서는 배율이 무시되므로 원본 그대로 넘긴다(확대본을 만들 이유가 없다).
+        float scale = mode == CursorMode.ForceSoftware ? EffectiveScale : 1f;
+        Cursor.SetCursor(Scaled(icon.texture, scale), icon.hotspot * scale, mode);
     }
 
     // 커서는 텍스처 픽셀 크기 그대로 그려진다 — 키우려면 큰 텍스처가 필요하다.
     // 원본이 읽기 불가(Cursor 임포트)여도 되도록 GPU 에서 RenderTexture 로 늘린 뒤 읽어 온다.
     private Texture2D Scaled(Texture2D source, float scale)
     {
+        // 하드웨어(배율 1)와 조준(배율 s)을 오가도 확대본 캐시는 유지 — 해상도가 바뀌어 s 가 달라질 때만 비운다.
+        if (Mathf.Approximately(scale, 1f))
+            return source;
         if (!Mathf.Approximately(scale, cachedScale))
         {
             ReleaseScaled();
             cachedScale = scale;
         }
-        if (Mathf.Approximately(scale, 1f))
-            return source;
         if (scaled.TryGetValue(source, out Texture2D cached) && cached != null)
             return cached;
 
