@@ -127,9 +127,29 @@ public class MonsterBase : Unit
     const int HoldAvoidancePriority = 20;
     const int MoveAvoidancePriority = 50;
 
+    /// <summary>
+    /// 🔴 (실험 10-06) 아트 팩(Robot Sentries) 프리팹의 **본마다 붙은 kinematic Rigidbody 의 보간/외삽을 끈다.**
+    /// 보간/외삽이 켜진 Rigidbody 의 Transform 은 물리가 관리한다. 클라(NGO)는 프리팹을 기본 위치에 만든 뒤 루트를
+    /// 스폰 위치로 옮기는데(NetworkSpawnManager), AutoSyncTransforms=0 이라 물리가 "옮기기 전" 자세를 본에 다시 써서
+    /// 본이 루트 높이 × (거치는 Rigidbody 수)만큼 아래로 굳는다 — MPPM 지연 재현에서 높은 곳 PeekABot 머리 −7.86
+    /// (예측 −7.85), 기둥 0.11(예측 0.11). 호스트는 처음부터 스폰 위치에 Instantiate 해서 안 생긴다.
+    /// 이 Rigidbody 들은 우리 코드가 쓰지 않는다(래그돌·피격 경로 없음, 붕괴 사망은 별도 조각을 만든다).
+    /// 아트 프리팹(SVN)은 그대로 두고 런타임에서만 끈다.
+    /// </summary>
+    void DisableBoneRigidbodyInterpolation()
+    {
+        foreach (var rb in GetComponentsInChildren<Rigidbody>(true))
+        {
+            if (rb.transform == transform || rb.interpolation == RigidbodyInterpolation.None) continue;
+            rb.interpolation = RigidbodyInterpolation.None;
+        }
+    }
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
+
+        DisableBoneRigidbodyInterpolation();
 
         // 참조 자동 보강(인스펙터 미할당 대비).
         if (agent == null) agent = GetComponent<NavMeshAgent>();
