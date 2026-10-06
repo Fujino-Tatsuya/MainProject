@@ -5,7 +5,7 @@ using UnityEngine;
 /// 판정과 무관한 전 피어 로컬 연출. 민경 VFX 가 오면 데이터 SO 의 프리팹 슬롯으로 갈아끼운다.
 ///
 /// 셰이더는 <c>Sprites/Default</c> — URP 에서 빌트인 Default-Material 은 자홍색으로 깨지고
-/// (이 프로젝트에서 이미 밟은 함정, <see cref="ZoneInteractRing"/>), 라이팅을 안 받아 어두운 방에서도 색이 그대로다.
+/// (이 프로젝트에서 이미 밟은 함정, 예전 존 바닥 링 ZoneInteractRing — 10-06 삭제), 라이팅을 안 받아 어두운 방에서도 색이 그대로다.
 /// 색·텍스처는 <see cref="MaterialPropertyBlock"/> 으로 렌더러별로 덮는다(머티리얼 한 장 공유).
 /// </summary>
 public static class BossPatternVisuals

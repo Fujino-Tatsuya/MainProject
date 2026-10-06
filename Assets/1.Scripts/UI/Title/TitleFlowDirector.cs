@@ -52,8 +52,11 @@ public sealed class TitleFlowDirector : MonoBehaviour
     [Tooltip("상시 CRT 시간·찢김·글리치 버스트 구동.")]
     [SerializeField] private TitleCrtFx _crtFx;
 
-    [Tooltip("Start/Exit 공통 전체 화면 CRT 꺼짐.")]
+    [Tooltip("Exit 의 전체 화면 CRT 꺼짐. Start 는 시작 연출(TitleStartDive)이 실패할 때만 쓴다.")]
     [SerializeField] private TitlePowerOff _powerOff;
+
+    [Tooltip("게임 시작 연출(모니터 꺼짐 → 검은 화면 속으로 → 페이드 → 로비). 비우면 이 오브젝트에 기본값으로 붙인다.")]
+    [SerializeField] private TitleStartDive _startDive;
 
     [Header("UI 루트")]
     [Tooltip("PRESS ANY KEY — 화면 앞 오버레이(모니터 안이 아니다).")]
@@ -118,6 +121,11 @@ public sealed class TitleFlowDirector : MonoBehaviour
     {
         EnterIdle();
     }
+
+    // 🔴 렌즈(FOV 등)의 원본은 VCam_Far/Near/Closeup 의 **Lens** 다. Main Camera 의 FOV 칸은 CinemachineBrain 이
+    //    에디트 모드에서도([ExecuteAlways]) 활성 vcam 값으로 덮어써서 바꿔도 안 먹는다 — 정상 동작.
+    //    (10-06 "시작 시 Main Camera → vcam 복사"를 넣었다가 되돌렸다: Main Camera 값이 이미 Far 라 Near·Closeup 을 덮었다.)
+    //    심도(F값·초점 거리·초점 길이)는 카메라가 아니라 볼륨의 Depth Of Field 가 정한다(URP 규칙).
 
     private void Update()
     {
@@ -294,9 +302,12 @@ public sealed class TitleFlowDirector : MonoBehaviour
         Burst(0.35f, 0.1f);
         Debug.Log("[TitleFlow] Starting");
 
-        // Start: 모니터처럼 딱 꺼짐 → (검은 화면에서) 페이드 없이 로비. 꺼짐이 없으면 기존 페이드 경로.
-        // (Flow 혜성 트레일은 넣었다가 뺐다 — 팀장 09-23 "무지개빛 말고 그냥 모니터처럼 딱 꺼지게")
-        PowerOffThenLobby();
+        // Start: 중앙 모니터가 월드에서 꺼지고 → 카메라가 그 검은 화면으로 천천히 들어가며 → 검정 페이드 → 로비(팀장 10-03).
+        // ⚠️ 09-23 "딱 꺼지게(페이드 없음)" 를 바꿨다. 시작 연출을 못 하면(참조 누락) 예전 전체 화면 꺼짐으로 간다.
+        if (_startDive == null) _startDive = GetComponent<TitleStartDive>();
+        if (_startDive == null) _startDive = gameObject.AddComponent<TitleStartDive>();   // ?? 금지 — 에디터의 가짜 null 을 못 거른다
+        if (!_startDive.TryPlay(_monitorDisplay, _brain, _sceneManager))
+            PowerOffThenLobby();
     }
 
     public void ExitGame()

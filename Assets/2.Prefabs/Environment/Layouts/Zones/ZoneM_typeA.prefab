@@ -220,7 +220,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4982696156970294461}
-  - component: {fileID: -7406368280586582671}
   - component: {fileID: 6647045405068635756}
   m_Layer: 0
   m_Name: ZoneM_typeA
@@ -378,31 +377,6 @@ Transform:
   - {fileID: 5425629847591399162}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &-7406368280586582671
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2495213824890675942}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 3632565183
-  InScenePlacedSourceGlobalObjectIdHash: 0
-  DeferredDespawnTick: 0
-  Ownership: 1
-  AlwaysReplicateAsRoot: 0
-  SynchronizeTransform: 1
-  ActiveSceneSynchronization: 0
-  SceneMigrationSynchronization: 1
-  SpawnWithObservers: 1
-  DontDestroyWithOwner: 0
-  AutoObjectParentSync: 1
-  SyncOwnerTransformWhenParented: 1
-  AllowOwnerToParent: 0
 --- !u!114 &6647045405068635756
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1928,6 +1902,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_bar_metal_001
       objectReference: {fileID: 0}
+    - target: {fileID: 6310655347078551935, guid: d171d3fbd9778224c9eb3e64a69db3a3, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -2117,6 +2095,10 @@ PrefabInstance:
     - target: {fileID: 3161172638463651485, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
       propertyPath: m_Name
       value: floor_stone_trench_105
+      objectReference: {fileID: 0}
+    - target: {fileID: 5469790226188622297, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -2700,6 +2682,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone_trench_052
       objectReference: {fileID: 0}
+    - target: {fileID: 5469790226188622297, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -2761,6 +2747,10 @@ PrefabInstance:
     - target: {fileID: 3161172638463651485, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
       propertyPath: m_Name
       value: floor_stone_trench_103
+      objectReference: {fileID: 0}
+    - target: {fileID: 5469790226188622297, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -2885,6 +2875,10 @@ PrefabInstance:
     - target: {fileID: 5517771467768920234, guid: d171d3fbd9778224c9eb3e64a69db3a3, type: 3}
       propertyPath: m_Name
       value: floor_bar_metal_006
+      objectReference: {fileID: 0}
+    - target: {fileID: 6310655347078551935, guid: d171d3fbd9778224c9eb3e64a69db3a3, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -3398,6 +3392,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone_trench_043
       objectReference: {fileID: 0}
+    - target: {fileID: 5469790226188622297, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -3909,6 +3907,10 @@ PrefabInstance:
     - target: {fileID: 7918671310875253532, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
       propertyPath: m_Name
       value: floor_stone (6)
+      objectReference: {fileID: 0}
+    - target: {fileID: 8567036068474682057, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -4426,6 +4428,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone_trench_100
       objectReference: {fileID: 0}
+    - target: {fileID: 5469790226188622297, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -4487,6 +4493,10 @@ PrefabInstance:
     - target: {fileID: 7918671310875253532, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
       propertyPath: m_Name
       value: floor_stone (12)
+      objectReference: {fileID: 0}
+    - target: {fileID: 8567036068474682057, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -5566,6 +5576,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone (21)
       objectReference: {fileID: 0}
+    - target: {fileID: 8567036068474682057, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -5628,6 +5642,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone_trench_050
       objectReference: {fileID: 0}
+    - target: {fileID: 5469790226188622297, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -5688,6 +5706,14 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1224157666100049182, guid: 4b133d6dd100ed341b9f1b51688f7436, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3114200926006689687, guid: 4b133d6dd100ed341b9f1b51688f7436, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8156516484211178549, guid: 4b133d6dd100ed341b9f1b51688f7436, type: 3}
+      propertyPath: m_CastShadows
       value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
@@ -5817,6 +5843,10 @@ PrefabInstance:
     - target: {fileID: 3161172638463651485, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
       propertyPath: m_Name
       value: floor_stone_trench_054
+      objectReference: {fileID: 0}
+    - target: {fileID: 5469790226188622297, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -6004,6 +6034,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_bar_metal_004
       objectReference: {fileID: 0}
+    - target: {fileID: 6310655347078551935, guid: d171d3fbd9778224c9eb3e64a69db3a3, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -6065,6 +6099,10 @@ PrefabInstance:
     - target: {fileID: 7918671310875253532, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
       propertyPath: m_Name
       value: floor_stone (25)
+      objectReference: {fileID: 0}
+    - target: {fileID: 8567036068474682057, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -6189,6 +6227,10 @@ PrefabInstance:
     - target: {fileID: 3161172638463651485, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
       propertyPath: m_Name
       value: floor_stone_trench_099
+      objectReference: {fileID: 0}
+    - target: {fileID: 5469790226188622297, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -6561,6 +6603,10 @@ PrefabInstance:
     - target: {fileID: 3161172638463651485, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
       propertyPath: m_Name
       value: floor_stone_trench_048
+      objectReference: {fileID: 0}
+    - target: {fileID: 5469790226188622297, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -7002,6 +7048,14 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1224157666100049182, guid: 4b133d6dd100ed341b9f1b51688f7436, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3114200926006689687, guid: 4b133d6dd100ed341b9f1b51688f7436, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8156516484211178549, guid: 4b133d6dd100ed341b9f1b51688f7436, type: 3}
+      propertyPath: m_CastShadows
       value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
@@ -7962,6 +8016,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone_trench_106
       objectReference: {fileID: 0}
+    - target: {fileID: 5469790226188622297, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -8155,6 +8213,10 @@ PrefabInstance:
     - target: {fileID: 3161172638463651485, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
       propertyPath: m_Name
       value: floor_stone_trench_049
+      objectReference: {fileID: 0}
+    - target: {fileID: 5469790226188622297, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -8594,6 +8656,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone (02)
       objectReference: {fileID: 0}
+    - target: {fileID: 8567036068474682057, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -8717,6 +8783,10 @@ PrefabInstance:
     - target: {fileID: 7918671310875253532, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
       propertyPath: m_Name
       value: floor_stone (27)
+      objectReference: {fileID: 0}
+    - target: {fileID: 8567036068474682057, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -9222,6 +9292,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone_trench_053
       objectReference: {fileID: 0}
+    - target: {fileID: 5469790226188622297, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -9602,6 +9676,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone_trench_051
       objectReference: {fileID: 0}
+    - target: {fileID: 5469790226188622297, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -9854,6 +9932,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_bar_metal
       objectReference: {fileID: 0}
+    - target: {fileID: 6310655347078551935, guid: d171d3fbd9778224c9eb3e64a69db3a3, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -9915,6 +9997,10 @@ PrefabInstance:
     - target: {fileID: 3161172638463651485, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
       propertyPath: m_Name
       value: floor_stone_trench_104
+      objectReference: {fileID: 0}
+    - target: {fileID: 5469790226188622297, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

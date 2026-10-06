@@ -184,7 +184,6 @@ GameObject:
   m_Component:
   - component: {fileID: 5484054633064661158}
   - component: {fileID: 7447756877851427495}
-  - component: {fileID: 1384667535510177199}
   - component: {fileID: 36589791585581894}
   m_Layer: 0
   m_Name: ZoneL_typeB
@@ -589,36 +588,18 @@ MonoBehaviour:
     HasOpenPosition: 1
   openDuration: 1.5
   interactRadius: 2.5
-  ringRadius: 1.55
-  ringColor: {r: 0.45, g: 0.9, b: 1, a: 1}
-  ringWidth: 0.2
-  ringGroundLift: 0.05
-  ringPrefabOverride: {fileID: 0}
---- !u!114 &1384667535510177199
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 411843160232409271}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 30542653
-  InScenePlacedSourceGlobalObjectIdHash: 0
-  DeferredDespawnTick: 0
-  Ownership: 1
-  AlwaysReplicateAsRoot: 0
-  SynchronizeTransform: 1
-  ActiveSceneSynchronization: 0
-  SceneMigrationSynchronization: 1
-  SpawnWithObservers: 1
-  DontDestroyWithOwner: 0
-  AutoObjectParentSync: 1
-  SyncOwnerTransformWhenParented: 1
-  AllowOwnerToParent: 0
+  monitorScreenEnabled: 1
+  screenLocalPosition: {x: -0.219, y: 1.2047, z: 0.2227}
+  screenLocalEuler: {x: 45.6, y: 134.1, z: 0}
+  screenSize: {x: 0.64695, y: 0.64125}
+  screenMaterialSource: {fileID: 2100000, guid: 7977800ee2c1ad94fbc6c65a85404793, type: 2}
+  screenLogo: {fileID: 2800000, guid: 2b2fe2c43ac60f348bdc02c2c8f0a3f8, type: 3}
+  screenOnDuration: 0.9
+  screenLightColor: {r: 0.55, g: 0.85, b: 1, a: 1}
+  screenLightIntensity: 1.5
+  screenLightRange: 2.5
+  screenLightForward: 0.35
+  highlightOutlineMaterial: {fileID: 2100000, guid: 2d3c24cf8d0861f45a6796cf9caa43de, type: 2}
 --- !u!114 &36589791585581894
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4466,6 +4447,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone_trench_068
       objectReference: {fileID: 0}
+    - target: {fileID: 5469790226188622297, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -4865,6 +4850,10 @@ PrefabInstance:
     - target: {fileID: 3161172638463651485, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
       propertyPath: m_Name
       value: floor_stone_trench_073
+      objectReference: {fileID: 0}
+    - target: {fileID: 5469790226188622297, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -6360,6 +6349,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone (36)
       objectReference: {fileID: 0}
+    - target: {fileID: 8567036068474682057, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -7440,6 +7433,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone (81)
       objectReference: {fileID: 0}
+    - target: {fileID: 8567036068474682057, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -7625,6 +7622,10 @@ PrefabInstance:
     - target: {fileID: 7918671310875253532, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
       propertyPath: m_Name
       value: floor_stone (61)
+      objectReference: {fileID: 0}
+    - target: {fileID: 8567036068474682057, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -7955,6 +7956,10 @@ PrefabInstance:
     - target: {fileID: 3161172638463651485, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
       propertyPath: m_Name
       value: floor_stone_trench_079
+      objectReference: {fileID: 0}
+    - target: {fileID: 5469790226188622297, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -8463,6 +8468,10 @@ PrefabInstance:
     - target: {fileID: 3161172638463651485, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
       propertyPath: m_Name
       value: floor_stone_trench_077
+      objectReference: {fileID: 0}
+    - target: {fileID: 5469790226188622297, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -9162,6 +9171,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone_trench_080
       objectReference: {fileID: 0}
+    - target: {fileID: 5469790226188622297, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -9285,6 +9298,10 @@ PrefabInstance:
     - target: {fileID: 7918671310875253532, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
       propertyPath: m_Name
       value: floor_stone (69)
+      objectReference: {fileID: 0}
+    - target: {fileID: 8567036068474682057, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -9541,6 +9558,10 @@ PrefabInstance:
     - target: {fileID: 3161172638463651485, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
       propertyPath: m_Name
       value: floor_stone_trench_074
+      objectReference: {fileID: 0}
+    - target: {fileID: 5469790226188622297, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -9853,6 +9874,10 @@ PrefabInstance:
     - target: {fileID: 7918671310875253532, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
       propertyPath: m_Name
       value: floor_stone (87)
+      objectReference: {fileID: 0}
+    - target: {fileID: 8567036068474682057, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -10900,9 +10925,25 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 5484054633064661158}
     m_Modifications:
+    - target: {fileID: 499993323692766968, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2462280635074482823, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3959018913558237367, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 4113930652156066955, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
       propertyPath: m_Name
       value: Floor_urethane01_002
+      objectReference: {fileID: 0}
+    - target: {fileID: 4192220379270025118, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7305054492310442018, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
       propertyPath: m_LocalPosition.x
@@ -11448,6 +11489,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone (37)
       objectReference: {fileID: 0}
+    - target: {fileID: 8567036068474682057, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -11786,9 +11831,25 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 5484054633064661158}
     m_Modifications:
+    - target: {fileID: 499993323692766968, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2462280635074482823, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3959018913558237367, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 4113930652156066955, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
       propertyPath: m_Name
       value: Floor_urethane01_003
+      objectReference: {fileID: 0}
+    - target: {fileID: 4192220379270025118, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7305054492310442018, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
       propertyPath: m_LocalPosition.x
@@ -12833,6 +12894,10 @@ PrefabInstance:
     - target: {fileID: 7918671310875253532, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
       propertyPath: m_Name
       value: floor_stone (86)
+      objectReference: {fileID: 0}
+    - target: {fileID: 8567036068474682057, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -14138,6 +14203,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone_trench_075
       objectReference: {fileID: 0}
+    - target: {fileID: 5469790226188622297, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -14327,6 +14396,10 @@ PrefabInstance:
     - target: {fileID: 3161172638463651485, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
       propertyPath: m_Name
       value: floor_stone_trench_076
+      objectReference: {fileID: 0}
+    - target: {fileID: 5469790226188622297, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -15771,6 +15844,10 @@ PrefabInstance:
     - target: {fileID: 3161172638463651485, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
       propertyPath: m_Name
       value: floor_stone_trench_069
+      objectReference: {fileID: 0}
+    - target: {fileID: 5469790226188622297, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -18994,6 +19071,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone (54)
       objectReference: {fileID: 0}
+    - target: {fileID: 8567036068474682057, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -19184,6 +19265,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone (46)
       objectReference: {fileID: 0}
+    - target: {fileID: 8567036068474682057, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -19312,6 +19397,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone (40)
       objectReference: {fileID: 0}
+    - target: {fileID: 8567036068474682057, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -19392,9 +19481,25 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 5484054633064661158}
     m_Modifications:
+    - target: {fileID: 499993323692766968, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2462280635074482823, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3959018913558237367, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 4113930652156066955, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
       propertyPath: m_Name
       value: Floor_urethane01_001
+      objectReference: {fileID: 0}
+    - target: {fileID: 4192220379270025118, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7305054492310442018, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
       propertyPath: m_LocalPosition.x
@@ -21380,6 +21485,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone (121)
       objectReference: {fileID: 0}
+    - target: {fileID: 8567036068474682057, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -21507,6 +21616,10 @@ PrefabInstance:
     - target: {fileID: 3161172638463651485, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
       propertyPath: m_Name
       value: floor_stone_trench_072
+      objectReference: {fileID: 0}
+    - target: {fileID: 5469790226188622297, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -21778,9 +21891,25 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 5484054633064661158}
     m_Modifications:
+    - target: {fileID: 499993323692766968, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2462280635074482823, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3959018913558237367, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 4113930652156066955, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
       propertyPath: m_Name
       value: Floor_urethane01
+      objectReference: {fileID: 0}
+    - target: {fileID: 4192220379270025118, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7305054492310442018, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
       propertyPath: m_LocalPosition.x
@@ -21949,6 +22078,10 @@ PrefabInstance:
     - target: {fileID: 3161172638463651485, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
       propertyPath: m_Name
       value: floor_stone_trench_078
+      objectReference: {fileID: 0}
+    - target: {fileID: 5469790226188622297, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -24204,6 +24337,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone (78)
       objectReference: {fileID: 0}
+    - target: {fileID: 8567036068474682057, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -24715,6 +24852,10 @@ PrefabInstance:
     - target: {fileID: 3161172638463651485, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
       propertyPath: m_Name
       value: floor_stone_trench_070
+      objectReference: {fileID: 0}
+    - target: {fileID: 5469790226188622297, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

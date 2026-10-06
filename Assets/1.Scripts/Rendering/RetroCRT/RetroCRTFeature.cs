@@ -84,6 +84,30 @@ public sealed class RetroCRTFeature : ScriptableRendererFeature
         private RetroCRTController _controller;
         private Material _validatedMaterial;
 
+        // 패스별 MPB 풀 — 매 프레임 new 하던 것(GC)을 없앤다.
+        // 🔴 하나만 재사용하면 안 된다: RenderGraph 는 기록과 실행이 분리돼, 한 프레임에 카메라가 여럿이면
+        //    (타이틀 3대) 마지막 카메라 값이 앞 카메라 패스까지 덮는다. 프레임마다 0 번부터 다시 쓴다.
+        private readonly System.Collections.Generic.List<MaterialPropertyBlock> _blockPool =
+            new System.Collections.Generic.List<MaterialPropertyBlock>();
+        private int _blockPoolFrame = -1;
+        private int _blockPoolUsed;
+        private const int MaxBlocksPerFrame = 8;   // 한 프레임 카메라 수 상한(넉넉히)
+
+        private MaterialPropertyBlock RentBlock()
+        {
+            // 에디트 모드에선 frameCount 가 멈춘 채 여러 번 그릴 수 있다 — 상한에서 되감아 풀이 끝없이 크지 않게.
+            if (_blockPoolFrame != Time.frameCount || _blockPoolUsed >= MaxBlocksPerFrame)
+            {
+                _blockPoolFrame = Time.frameCount;
+                _blockPoolUsed = 0;
+            }
+            if (_blockPoolUsed == _blockPool.Count)
+                _blockPool.Add(new MaterialPropertyBlock());
+            MaterialPropertyBlock block = _blockPool[_blockPoolUsed++];
+            block.Clear();
+            return block;
+        }
+
         public RetroCRTPass()
         {
             profilingSampler = new ProfilingSampler(PassName);
@@ -126,8 +150,8 @@ public sealed class RetroCRTFeature : ScriptableRendererFeature
             // ProceduralTriangle + _BlitTexture. 기존 HLSL용 Blitter 호출로 대체하지 않는다.
             var parameters = new RenderGraphUtils.BlitMaterialParameters(
                 source, destination, _material, 0);
-            // 패스별 값만 전달한다. 공유 머티리얼 에셋과 다른 카메라의 예약된 값은 변경하지 않는다.
-            var properties = new MaterialPropertyBlock();
+            // 패스별 값만 전달한다. 공유 머티리얼 에셋과 다른 카메라의 예약된 값은 변경하지 않는다(RentBlock 주석).
+            MaterialPropertyBlock properties = RentBlock();
 
             // 베젤은 기존대로 항상 컨트롤러 값을 따른다.
             properties.SetFloat(CrtParamInfo.IdOf(CrtParam.BezelSize), _controller.BezelSize);

@@ -15,8 +15,8 @@ MonoBehaviour:
   archetype: 2
   rank: 0
   attackDamage: 9
-  moveSpeed: 2.5
-  chaseSpeed: 3
+  moveSpeed: 1.75
+  chaseSpeed: 2.1
   attackSpeed: 1
   attackCooldown: 0.32
   maxHp: 60
@@ -62,4 +62,5 @@ MonoBehaviour:
   locomotionIdleCycleSeconds: 0.9666667
   locomotionMoveCycleSeconds: 0.5066667
   locomotionAnimSpeedRange: {x: 0.5, y: 2.5}
+  locomotionPlaybackScale: 0.43
   animatorControllerOverride: {fileID: 0}
