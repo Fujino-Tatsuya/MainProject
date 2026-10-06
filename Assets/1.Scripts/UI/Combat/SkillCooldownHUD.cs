@@ -20,24 +20,41 @@ public class SkillCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
 
         [System.NonSerialized] public Graphic[] graphics;
         [System.NonSerialized] public Color[] normalColors;
+        [System.NonSerialized] public Sprite defaultIcon;
+        [System.NonSerialized] public bool defaultIconCached;
     }
 
     [SerializeField] private SlotWidget[] slots;
     [SerializeField] private Color blockedColor = new Color(0.35f, 0.35f, 0.35f, 0.75f);
 
     private PlayerSkillController skillController;
+    private Player boundPlayer;
     private bool isBlocked;
 
     private void Awake()
     {
         CacheSlotColors();
+        CacheDefaultIcons();
     }
 
     public void Bind(Player player)
     {
+        if (skillController != null)
+            skillController.SlotBindingChanged -= HandleSlotBindingChanged;
+
+        boundPlayer = player;
         skillController = player != null ? player.GetComponent<PlayerSkillController>() : null;
+        if (skillController != null)
+            skillController.SlotBindingChanged += HandleSlotBindingChanged;
+
         BindTooltipSlots(player);
         Refresh();
+    }
+
+    private void OnDestroy()
+    {
+        if (skillController != null)
+            skillController.SlotBindingChanged -= HandleSlotBindingChanged;
     }
 
     private void BindTooltipSlots(Player player)
@@ -50,17 +67,40 @@ public class SkillCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
             if (widget == null)
                 continue;
 
-            PlayerSkillData data = skillController != null ? skillController.GetSkill(widget.slot)?.Data : null;
-            ISkillTooltipSource source = data;
-            SetSlotIcon(widget.icon, source);
+            BindTooltipSlot(widget, player);
+        }
+    }
 
-            widget.hover?.Bind(
-                player,
-                source,
-                widget.slot,
-                acceptsLeftClick: true,
-                displayKey: KeyLabel(widget.slot),
-                cooldownSeconds: data != null ? data.CooldownTime : (float?)null);
+    private void BindTooltipSlot(SlotWidget widget, Player player)
+    {
+        PlayerSkillData data = skillController != null ? skillController.GetSkill(widget.slot)?.Data : null;
+        ISkillTooltipSource source = data;
+        CacheDefaultIcon(widget);
+
+        if (widget.icon != null)
+        {
+            Sprite skillIcon = source != null ? source.Tooltip.Icon : null;
+            widget.icon.sprite = skillIcon != null ? skillIcon : widget.defaultIcon;
+        }
+
+        widget.hover?.Bind(
+            player,
+            source,
+            widget.slot,
+            acceptsLeftClick: true,
+            displayKey: KeyLabel(widget.slot),
+            cooldownSeconds: data != null ? data.CooldownTime : (float?)null);
+    }
+
+    private void HandleSlotBindingChanged(PlayerSkillSlot slot)
+    {
+        if (slots == null)
+            return;
+
+        foreach (SlotWidget widget in slots)
+        {
+            if (widget != null && widget.slot == slot)
+                BindTooltipSlot(widget, boundPlayer);
         }
     }
 
@@ -179,5 +219,23 @@ public class SkillCooldownHUD : MonoBehaviour, ICombatUiBlockedStateView
             for (int i = 0; i < widget.graphics.Length; i++)
                 widget.normalColors[i] = widget.graphics[i].color;
         }
+    }
+
+    private void CacheDefaultIcons()
+    {
+        if (slots == null)
+            return;
+
+        foreach (SlotWidget widget in slots)
+            CacheDefaultIcon(widget);
+    }
+
+    private static void CacheDefaultIcon(SlotWidget widget)
+    {
+        if (widget == null || widget.defaultIconCached)
+            return;
+
+        widget.defaultIcon = widget.icon != null ? widget.icon.sprite : null;
+        widget.defaultIconCached = true;
     }
 }

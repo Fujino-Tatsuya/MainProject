@@ -51,7 +51,7 @@ public sealed class SkillSlotHover : MonoBehaviour,
         }
 
         if (pointerInside)
-            tooltipView?.BeginHover(this, source, player, (RectTransform)transform, keyLabel, cooldown);
+            tooltipView?.RefreshHover(this, source, player, (RectTransform)transform, keyLabel, cooldown);
     }
 
     public void OnPointerEnter(PointerEventData eventData)

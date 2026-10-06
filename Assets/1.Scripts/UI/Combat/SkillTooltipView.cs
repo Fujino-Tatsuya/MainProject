@@ -78,6 +78,38 @@ public sealed class SkillTooltipView : MonoBehaviour
             panel.SetActive(false);
     }
 
+    /// <summary>열려 있거나 지연 대기 중인 같은 슬롯의 출처를 교체한다. 표시 지연/가시성은 유지한다.</summary>
+    public void RefreshHover(
+        SkillSlotHover hoverOwner,
+        ISkillTooltipSource tooltipSource,
+        Player tooltipPlayer,
+        RectTransform slotAnchor,
+        string key,
+        float? cooldownSeconds)
+    {
+        if (owner != hoverOwner)
+        {
+            BeginHover(hoverOwner, tooltipSource, tooltipPlayer, slotAnchor, key, cooldownSeconds);
+            return;
+        }
+
+        source = tooltipSource;
+        player = tooltipPlayer;
+        anchor = slotAnchor;
+        displayKey = key;
+        cooldown = cooldownSeconds;
+        loggedError = false;
+
+        if (source == null)
+        {
+            visible = false;
+            if (panel != null)
+                panel.SetActive(false);
+        }
+        else if (visible)
+            RefreshContent(IsShiftHeld());
+    }
+
     private void Update()
     {
         if (owner == null || source == null || anchor == null)
