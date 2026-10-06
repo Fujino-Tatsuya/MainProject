@@ -1006,6 +1006,7 @@ MonoBehaviour:
   groundMask:
     serializedVersion: 2
     m_Bits: 8
+  dashCooldownTint: {r: 0, g: 0.3673474, b: 0.5169811, a: 1}
 --- !u!114 &4342448094249856294
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1099,6 +1100,11 @@ MonoBehaviour:
   subSkill: {fileID: 0}
   interruptSkill: {fileID: 0}
   ultimateSkill: {fileID: 0}
+  alternateSkills:
+    mainSkill: {fileID: 0}
+    subSkill: {fileID: 0}
+    interruptSkill: {fileID: 0}
+    ultimateSkill: {fileID: 0}
   endFallbackPadding: 0.1
 --- !u!114 &1111000000000000002
 MonoBehaviour:
@@ -1141,6 +1147,10 @@ MonoBehaviour:
   outOfRangeIcon:
     texture: {fileID: 0}
     hotspot: {x: 0, y: 0}
+  cursorScale: 1.2
+  referenceScreenHeight: 1080
+  defaultCursorMode: 0
+  targetingCursorMode: 0
 --- !u!114 &800000000000000020
 MonoBehaviour:
   m_ObjectHideFlags: 0
