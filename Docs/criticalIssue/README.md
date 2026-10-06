@@ -14,4 +14,4 @@
 
 | 날짜 | 이슈 | 상태 |
 |---|---|---|
-| 2026-10-07 | [에디터 호스트 + 빌드 클라에서 MapScene 진입 시 플레이어 미스폰 — 씬 배치 NetworkObject hash 불일치](2026-10-07-ngo-inscene-hash-stale.md) | 원인 확정 · 미수정 |
+| 2026-10-07 | [에디터 호스트 + 빌드 클라에서 MapScene 진입 시 플레이어 미스폰 — 씬 배치 NetworkObject hash 불일치](2026-10-07-ngo-inscene-hash-stale.md) | 원인 확정 · 미수정 (전원 빌드 무영향 확인) |
