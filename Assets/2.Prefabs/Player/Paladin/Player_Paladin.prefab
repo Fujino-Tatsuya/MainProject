@@ -1902,7 +1902,7 @@ MonoBehaviour:
     description: "TODO \uC900\uBE44\uB418\uBA74 \uB2E4\uC74C \uACF5\uACA9\uC5D0 {dmg}
       \uCD94\uAC00 \uD53C\uD574\uB97C \uC8FC\uACE0 \uCD5C\uB300 \uCCB4\uB825\uC758
       {healPercent}%\uB97C \uD68C\uBCF5\uD569\uB2C8\uB2E4."
-    icon: {fileID: 0}
+    icon: {fileID: 21300000, guid: 2317ce8762a1d9e43a681b87ab0fdafb, type: 3}
   cooldownTime: 5
   hitCooldownReduction: 2
   bonusDamageMultiplier: 1
@@ -2074,6 +2074,10 @@ PrefabInstance:
     - target: {fileID: 1299189389224779458, guid: 4d396958704b054469ded4c24d36d9a1, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1427997890299781827, guid: 4d396958704b054469ded4c24d36d9a1, type: 3}
+      propertyPath: m_IsActive
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 5396818564317195527, guid: 4d396958704b054469ded4c24d36d9a1, type: 3}
       propertyPath: m_Name
