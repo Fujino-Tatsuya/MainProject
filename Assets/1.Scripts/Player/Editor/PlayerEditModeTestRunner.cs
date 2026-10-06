@@ -14,6 +14,7 @@ internal static class PlayerEditModeTestRunner
         "^StatusEffectImmunityTests$", // PLAN-assassin A1 — SuperArmor 의미 통일
         "^PlayerSkillCooldownLedgerTests$", // PLAN-assassin A2 — 스킬 단위 쿨 장부·슬롯 교체
         "^PlayerGroundPointProjectionTests$", // PLAN-assassin A4 — 고정 거리 조준·서버 재투영
+        "^AssassinComboModelTests$", // PLAN-assassin A6 — 평타 순서·0.8초 유예·스킬 리셋
         "^HealthShieldTests$",
         "^GunnerHeatModelTests$",
     };

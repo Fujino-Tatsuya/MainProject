@@ -195,3 +195,9 @@ Q22 `AssassinState` NetworkVariable · Q23·Q26 클립 git + 애니 이벤트(�
 - ✅ A5(10-06, Claude): `IPassiveTooltipProvider`(GunnerHeat 구현) → `PassiveHUD` 하드코딩 제거 · `CharacterHudAuthoring.EnsureHudRoot` ·
   거너 게이지 `Gunner_Armature/HUD` 로 이동(Variant 루트 인스턴스 제거, guid·해시 불변) · player-prefabs.md §7 5-2 규약. EditMode 37/0.
   `SkillTooltipAuthoring` 어쌔신 경로는 A12 에서(에셋이 생긴 뒤). ⏳ Play: 거너 과열 게이지 오너만 표시 · 유령 중 숨김 · P 칸 툴팁.
+- ✅ A6(10-06): Codex 가 코드 작성 중 **크레딧 소진으로 중단**(커밋 없음) → Claude 가 이어받아 리뷰·컴파일·EditMode 42/0·메뉴 실행·커밋.
+  `Tools/Player/Assassin/A6 전체 구성`(= 1 셸·Animator·Variant / 2 평타·전투 대기·데이터 / 3 클립 이벤트·Loop) — 오류 0.
+  `Player_Assassin`(해시 3304217410) · `Assassin_Armature`(SDArmTwist·Toon·앵커 DefaultAttack/InterruptAttack·VFX 소켓·HUD) ·
+  `AssassinAnimatorController`(Idle/Idle_Combat·Run 3·Dodge·Interrupt·Default_Attack0~3, `IsCombatIdle`) · `AssassinBasicAttack`(+`AssassinConeAttack`·`AssassinComboModel`) · `AssassinCombatIdle`.
+  CharacterRoster[2] "준비 중" 자리 → "어쌔신"(available=false). 클립 18개 Unity 재직렬화(serializedVersion 6→7, 1회성 diff).
+  🔸 이벤트 시점은 전부 임시값(평타 Hit 0.40/End 0.85) — Play 튜닝. 🔸 단검: 아틀라스에 칼날 조각 있음 → 메시에 스킨됐을 가능성, Play 에서 육안 확인.
