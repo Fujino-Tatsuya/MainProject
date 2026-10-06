@@ -8,7 +8,7 @@ using UnityEngine;
 /// 그 순간부터 적중·간파 여부와 무관하게 후폭풍으로 공격 반대 방향으로 밀려난다 — 벽·오브젝트에만 막히고 유닛은 통과, 무적 없음.
 /// 쿨타임은 사용 시점(빗나가도 적용 — §8.6). 과열도와 무관.
 /// </summary>
-public class GunnerInterruptSkill : PlayerInterruptSkillBase
+public class GunnerInterruptSkill : PlayerInterruptSkillBase, ISkillPreviewSource
 {
     private PlayerMotor motor;
     private GunnerBeamView view;
@@ -61,6 +61,33 @@ public class GunnerInterruptSkill : PlayerInterruptSkillBase
 
     protected override bool ShouldSkipTarget(Unit unit) => unit != null && unit.CurrentHealth <= 0;
     protected override bool ConsumeOnHitBonusOnce => false;
+
+    public bool TryGetPreview(Vector3 origin, Vector3 forward, out SkillPreviewShape shape)
+    {
+        GunnerInterruptData data = IData;
+        if (data == null || HitboxAnchor == null ||
+            !HitboxAnchor.TryGetLocalBox(out Vector3 center, out Vector3 size))
+        {
+            shape = default;
+            return false;
+        }
+
+        forward.y = 0f;
+        forward = forward.sqrMagnitude > 0.001f ? forward.normalized : Vector3.forward;
+        float clipped = motor != null
+            ? motor.GetGroundedPreviewDistance(
+                -forward * data.RecoilDistance,
+                blockOtherPlayers: false,
+                passThroughEnemies: true)
+            : data.RecoilDistance;
+        shape = SkillPreviewShapes.HitboxWithArrow(
+            center,
+            size,
+            arrowDirection: -1f,
+            arrowLength: data.RecoilDistance,
+            clippedArrowLength: clipped);
+        return true;
+    }
 
     protected override void OnInterruptResolutionCompleted(int resolvedCount)
     {

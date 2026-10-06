@@ -10,12 +10,13 @@ using UnityEngine;
 /// 쿨타임은 발사 순간부터(수동 커밋). 발사 없이 끝나면(쓰러짐·사망·조작 불가·피격 취소) 쿨타임 없음.
 /// Q 재입력은 취소가 아니다(§3.3 — 실행 중 같은 슬롯 시전은 컨트롤러가 거절). 과열도는 건드리지 않는다.
 /// </summary>
-public class GunnerChargeLaserSkill : PlayerSkillBase
+public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
 {
     private GunnerHeat heat;
     private GunnerBeamAttack beam;
     private GunnerBeamView view;
     private PlayerMovement movement;
+    private SkillLineIndicator lineIndicator;
     private readonly List<Player> allies = new List<Player>();
 
     // 서버 런타임
@@ -25,6 +26,7 @@ public class GunnerChargeLaserSkill : PlayerSkillBase
     private bool fired;
     private float endTime;
     private bool statusApplied;
+    private float ownerChargeStartTime;
 
     public override PlayerSkillSlot Slot => PlayerSkillSlot.Main;
     public override PlayerActionState EntryActionState => PlayerActionState.Focus; // 발사하면 Skill(GunnerBeamView)
@@ -47,6 +49,7 @@ public class GunnerChargeLaserSkill : PlayerSkillBase
         beam = owner.GetComponent<GunnerBeamAttack>();
         view = owner.GetComponent<GunnerBeamView>();
         movement = owner.GetComponent<PlayerMovement>();
+        lineIndicator = owner.GetComponentInChildren<SkillLineIndicator>(true);
     }
 
     public override bool CanUse(Vector3 direction, Unit target) => QData != null && beam != null;
@@ -73,11 +76,39 @@ public class GunnerChargeLaserSkill : PlayerSkillBase
         Edit.Log($"[Gunner/Q] 정신 집중 시작 — 저장 단계 {storedStage}", this);
     }
 
-    public override void OnClientPlay(Vector3 direction) { } // 집중 애니는 Data.AnimatorStateName 이 튼다
+    // 집중 애니는 Data.AnimatorStateName 이 튼다. 여기서는 **총구 충전 연출**만 켠다.
+    // 🔴 이건 전 피어에서 돈다(PlayerSkillController.PlaySkillClientRpc → OnClientPlay).
+    //    서버 가드를 넣으면 호스트에서만 보인다.
+    public override void OnClientPlay(Vector3 direction)
+    {
+        ownerChargeStartTime = Time.time;
+        if (QData != null)
+            view?.BeginCharge(QData.MaxChargeTime);
+    }
 
     public override void OnOwnerTick(Vector3 aimDirection)
     {
         movement?.RotateImmediately(aimDirection);
+
+        if (view == null || !view.IsCharging)
+        {
+            lineIndicator?.HideCharge();
+            return;
+        }
+
+        GunnerChargeLaserData data = QData;
+        if (data == null || beam == null || lineIndicator == null || owner == null)
+            return;
+
+        aimDirection.y = 0f;
+        aimDirection = aimDirection.sqrMagnitude > 0.001f
+            ? aimDirection.normalized
+            : owner.transform.forward;
+        float factor = data.ChargeFactor(Time.time - ownerChargeStartTime);
+        float range = data.RangeAt(factor);
+        Vector3 origin = owner.transform.position + Vector3.up * data.MuzzleHeight;
+        float length = beam.CastLength(origin, aimDirection, range, data.BeamWidth * 0.5f, data.BlockingLayers);
+        lineIndicator.ShowCharge(origin, aimDirection, 0f, length, data.BeamWidth);
     }
 
     public override void OnAimUpdated(Vector3 direction) => aim = direction;
@@ -103,6 +134,7 @@ public class GunnerChargeLaserSkill : PlayerSkillBase
     private void Fire(Vector3 direction)
     {
         GunnerChargeLaserData data = QData;
+        lineIndicator?.HideCharge();
         State = SkillState.Active;
         fired = true;
         endTime = Time.time + data.FireRecovery;
@@ -131,14 +163,55 @@ public class GunnerChargeLaserSkill : PlayerSkillBase
 
         controller.CommitCooldownServer(Slot);
         ClearStatus();
-        view?.ServerChargeLaserFired(origin, origin + direction * length, data.BeamWidth);
+
+        // 🔴 **지형에 막혔는지를 같이 보낸다.** 끝점 좌표만으로는 벽에 맞은 것과
+        //    최대 사거리까지 뻗어 허공에서 끝난 것을 구분할 수 없다 —
+        //    착탄 연출을 띄울지 말지가 여기서 갈린다(좌클릭의 stopped 와 같은 신호).
+        bool stopped = length < range - 0.01f;
+        // 보호막 연출은 안 싣는다 — 받은 아군의 PlayerShieldVfx 가 복제된 보호막 목록을 보고 띄운다.
+        view?.ServerChargeLaserFired(origin, origin + direction * length, data.BeamWidth,
+                                     stopped, BuildHitPoints(origin, direction, length));
 
         Edit.Log($"[Gunner/Q] 발사 — 집중 {factor:0.00}, 사거리 {length:0.0}/{range:0.0}, 피해 {damage} ×{hitCount}, " +
                  $"보호막 {shield} ×{allies.Count}, 저장 단계 {storedStage}", this);
     }
 
+    /// <summary>
+    /// 피해를 준 몹마다 <b>빔 위의 어디서 맞았는지</b>를 구해 전 피어에 보낸다.
+    ///
+    /// 🔴 몹의 위치를 그대로 쓰지 않고 <b>빔 축에 투영</b>한다. 판정은 폭 1.2m 직육면체라
+    /// 몹 중심이 빔에서 비껴 있을 수 있는데, 그 자리에 연출을 찍으면 레이저 옆 허공에서 터진다.
+    ///
+    /// 높이는 몹 중심을 쓴다 — 빔 축 높이(총구 1m)로 고정하면 큰 몹은 발치에서 터진다.
+    /// </summary>
+    private Vector3[] BuildHitPoints(Vector3 origin, Vector3 direction, float length)
+    {
+        IReadOnlyList<Unit> landed = beam != null ? beam.LastPierceLanded : null;
+        if (landed == null || landed.Count == 0)
+            return System.Array.Empty<Vector3>();
+
+        // 관통이라 이론상 제한이 없다. RPC 를 작게 유지하려고 자른다 —
+        // 한 발에 8곳이면 눈으로는 이미 "전부 맞았다"로 읽힌다.
+        int count = Mathf.Min(landed.Count, 8);
+        var points = new Vector3[count];
+        for (int i = 0; i < count; i++)
+        {
+            Vector3 center = landed[i].transform.position;
+            float along = Mathf.Clamp(Vector3.Dot(center - origin, direction), 0f, length);
+            Vector3 onBeam = origin + direction * along;
+            points[i] = new Vector3(onBeam.x, center.y + 1f, onBeam.z);
+        }
+        return points;
+    }
+
     public override void OnEnd(SkillEndReason reason)
     {
+        lineIndicator?.HideCharge();
+        // 🔴 **권한 가드 밖이다.** 발사 없이 끝나는 경로(대시 취소·피격·사망)에서도
+        //    전 피어가 충전 루프를 꺼야 한다. 안 그러면 그 피어에 총구 연출이 남는다.
+        //    (발사로 끝난 경우는 PlayChargeLaser 가 이미 껐고, Stop 은 두 번 불러도 무해하다.)
+        view?.EndCharge();
+
         if (HasAuthority)
         {
             if (!fired && reason == SkillEndReason.DashCancelled)
@@ -157,6 +230,30 @@ public class GunnerChargeLaserSkill : PlayerSkillBase
 
         fired = false;
         base.OnEnd(reason);
+    }
+
+    public bool TryGetPreview(Vector3 origin, Vector3 forward, out SkillPreviewShape shape)
+    {
+        GunnerChargeLaserData data = QData;
+        if (data == null || beam == null || owner == null)
+        {
+            shape = default;
+            return false;
+        }
+
+        forward.y = 0f;
+        forward = forward.sqrMagnitude > 0.001f ? forward.normalized : owner.transform.forward;
+        Vector3 castOrigin = owner.transform.position + Vector3.up * data.MuzzleHeight;
+        float radius = data.BeamWidth * 0.5f;
+        float clippedMin = beam.CastLength(castOrigin, forward, data.MinRange, radius, data.BlockingLayers);
+        float clippedMax = beam.CastLength(castOrigin, forward, data.MaxRange, radius, data.BlockingLayers);
+        shape = SkillPreviewShapes.ChargeLaser(
+            data.MinRange,
+            data.MaxRange,
+            data.BeamWidth,
+            clippedMin,
+            clippedMax);
+        return true;
     }
 
     private void ClearStatus()

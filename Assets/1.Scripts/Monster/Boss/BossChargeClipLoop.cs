@@ -13,6 +13,7 @@ public sealed class BossChargeClipLoop : MonoBehaviour
 {
     Animator _animator;
     int _stateHash;
+    readonly System.Collections.Generic.List<AnimatorClipInfo> _clipBuffer = new System.Collections.Generic.List<AnimatorClipInfo>(2);
     int _startFrame = -1, _endFrame = -1;
 
     public void Init(Animator animator, string stateName, int startFrame, int endFrame)
@@ -35,9 +36,10 @@ public sealed class BossChargeClipLoop : MonoBehaviour
             // 크로스페이드로 들어오는 중엔 손대지 않는다 — 전이가 끝난 뒤부터 센다.
             if (_animator.IsInTransition(layer)) return;
 
-            AnimatorClipInfo[] clips = _animator.GetCurrentAnimatorClipInfo(layer);
-            if (clips.Length == 0 || clips[0].clip == null) return;
-            AnimationClip clip = clips[0].clip;
+            // 리스트 오버로드 — 차징 동안 매 프레임 배열을 새로 만들던 것(PLAN-cleanup-optimization S1-9).
+            _animator.GetCurrentAnimatorClipInfo(layer, _clipBuffer);
+            if (_clipBuffer.Count == 0 || _clipBuffer[0].clip == null) return;
+            AnimationClip clip = _clipBuffer[0].clip;
             if (clip.length <= 0f) return;
 
             float fps = clip.frameRate > 0f ? clip.frameRate : 30f;

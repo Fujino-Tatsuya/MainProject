@@ -8,10 +8,13 @@ using UnityEngine;
 /// (공용 대시는 아군 통과지만 E 는 모터의 일시 아군 차단을 켠다). 피해·상태이상·무적 없음.
 /// 동작 중에는 다른 행동 불가(Skill 상태), 끝나면 기본 공격 포함 모두 가능.
 /// </summary>
-public class GunnerCoolBackstepSkill : PlayerSkillBase
+public class GunnerCoolBackstepSkill : PlayerSkillBase, ISkillPreviewSource
 {
     private GunnerHeat heat;
     private PlayerMotor motor;
+
+    // 연출 전담. 없을 수도 있으므로(테스트 프리팹) 전부 null 안전하게 쓴다.
+    private GunnerBeamView view;
 
     // 시뮬레이션 피어(오너 + 서버) 공통
     private Vector3 moveDirection;
@@ -31,6 +34,7 @@ public class GunnerCoolBackstepSkill : PlayerSkillBase
         base.Initialize(owner, controller);
         heat = owner.GetComponent<GunnerHeat>();
         motor = owner.GetComponent<PlayerMotor>();
+        view = owner.GetComponent<GunnerBeamView>();
     }
 
     public override bool CanUse(Vector3 direction, Unit target) => EData != null;
@@ -56,6 +60,9 @@ public class GunnerCoolBackstepSkill : PlayerSkillBase
 
         if (motor != null)
             motor.BlockOtherPlayersOverride = true;
+
+        // 🔴 전방 냉기 + 과열 배기 + 이동 궤적. 여기는 이미 전 피어다.
+        view?.BeginBackstep(data != null ? data.MoveDuration : 0.25f);
     }
 
     public override void OnFixedTick()
@@ -77,8 +84,33 @@ public class GunnerCoolBackstepSkill : PlayerSkillBase
     public override void OnEnd(SkillEndReason reason)
     {
         remaining = 0f;
+        view?.EndBackstep();   // 🔴 전 피어. 여기서 빠뜨리면 클라에 냉기가 남는다
         if (motor != null)
             motor.BlockOtherPlayersOverride = false;
         base.OnEnd(reason);
+    }
+
+    public bool TryGetPreview(Vector3 origin, Vector3 forward, out SkillPreviewShape shape)
+    {
+        GunnerCoolBackstepData data = EData;
+        if (data == null)
+        {
+            shape = default;
+            return false;
+        }
+
+        forward.y = 0f;
+        forward = forward.sqrMagnitude > 0.001f ? forward.normalized : Vector3.forward;
+        float clipped = motor != null
+            ? motor.GetGroundedPreviewDistance(
+                -forward * data.Distance,
+                blockOtherPlayers: true,
+                passThroughEnemies: false)
+            : data.Distance;
+        shape = SkillPreviewShapes.Arrow(
+            arrowDirection: -1f,
+            arrowLength: data.Distance,
+            clippedArrowLength: clipped);
+        return true;
     }
 }

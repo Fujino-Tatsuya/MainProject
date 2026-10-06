@@ -55,6 +55,14 @@ public class PlayerSkillData : ScriptableObject, ISkillTooltipSource
     // SingleTarget에서 레이캐스트로 맞출 대상 레이어(기본 Enemy). GroundPoint는 groundMask를 쓴다.
     [SerializeField] private LayerMask targetableLayers;
 
+    [Header("지점 지정(GroundPoint) 전용")]
+    [Tooltip("사거리 밖 클릭 처리. Clamp = 경계로 끌어당겨 바로 시전(기존), AutoApproach = 클릭 지점이 사거리에 들 때까지 걸어간 뒤 시전.")]
+    [SerializeField] private GroundPointOutOfRangeMode groundPointOutOfRange = GroundPointOutOfRangeMode.Clamp;
+    [Tooltip("조준 중 마우스를 따라오는 지점 원 반경(m). 0 이면 그리지 않는다.")]
+    [SerializeField, Min(0f), DataTableIgnore] private float groundMarkerRadius = 0f;
+    [Tooltip("HUD 호버 미리보기에서 지점 원을 캐릭터 정면 몇 m 앞에 그릴지.")]
+    [SerializeField, Min(0f), DataTableIgnore] private float hoverMarkerDistance = 3f;
+
     [Header("연출")]
     // 캐릭터 Animator Controller의 스킬 상태 이름 (CrossFade 대상). 비우면 애니메이션 전환 없음
     [SerializeField] private string animatorStateName = "";
@@ -77,6 +85,10 @@ public class PlayerSkillData : ScriptableObject, ISkillTooltipSource
     public bool FixedDistance => fixedDistance;
     public float AoeRadius => aoeRadius;
     public LayerMask TargetableLayers => targetableLayers;
+    public GroundPointOutOfRangeMode GroundPointOutOfRange => groundPointOutOfRange;
+    // 파생 SO 가 판정 반경에 맞춰 덮어쓸 수 있다(거너 R = 레이저 radius).
+    public virtual float GroundMarkerRadius => groundMarkerRadius;
+    public float HoverMarkerDistance => hoverMarkerDistance;
     public string AnimatorStateName => animatorStateName;
     public bool SnapRotationOnStart => snapRotationOnStart;
     public SkillTooltipText Tooltip => tooltip;

@@ -98,6 +98,10 @@ public class MinimapController : MonoBehaviour
     private readonly Dictionary<Component, Image> _dynMarkers = new Dictionary<Component, Image>();
     private readonly List<Component> _dynRemove = new List<Component>();
     private readonly List<Transform> _players = new List<Transform>(); // TODO: NetworkManager.ConnectedClients 기반으로 주기적 캐싱 구현 필요
+    private readonly HashSet<Transform> _localPlayers = new HashSet<Transform>(); // 스캔 때 판정 캐시(매 프레임 GetComponentInParent 제거)
+
+    /// <summary>탐사 그리드가 바뀔 때마다 증가. 동기화가 바뀌지 않은 그리드를 다시 패킹하지 않게 한다.</summary>
+    public int ExploredVersion { get; private set; }
     private float _playerScanTimer;
     private int _lastPlayerCount = -1;
     private Transform _corridorsRoot;
@@ -359,6 +363,7 @@ public class MinimapController : MonoBehaviour
         // 현재 시야(G)는 매 틱 다시 계산, 탐사(R)는 누적
         for (int i = 0; i < _maskPixels.Length; i++) { _maskPixels[i].g = 0; _maskPixels[i].r = _explored[i]; }
 
+        bool exploredChanged = false;
         foreach (var p in _players)
         {
             if (p == null) continue;
@@ -381,10 +386,11 @@ public class MinimapController : MonoBehaviour
                     byte v = (byte)Mathf.Clamp(Mathf.RoundToInt(Mathf.Min(1f, t / 0.3f) * 255f), 0, 255);
                     int idx = row + x;
                     if (v > _maskPixels[idx].g) _maskPixels[idx].g = v;
-                    if (v > _explored[idx]) { _explored[idx] = v; _maskPixels[idx].r = v; }
+                    if (v > _explored[idx]) { _explored[idx] = v; _maskPixels[idx].r = v; exploredChanged = true; }
                 }
             }
         }
+        if (exploredChanged) ExploredVersion++;
         _maskTex.SetPixels32(_maskPixels);
         _maskTex.Apply(false);
     }
@@ -736,11 +742,20 @@ public class MinimapController : MonoBehaviour
     private void ScanPlayers()
     {
         _players.Clear();
-        foreach (var no in FindObjectsByType<Unity.Netcode.NetworkObject>(FindObjectsSortMode.None))
-            if (no.IsPlayerObject) _players.Add(no.transform);
+        // 🔴 Player 컴포넌트로 좁힌다 — 예전엔 몬스터·기믹까지 모든 NetworkObject 를 매초 훑었다(PLAN-cleanup-optimization S1-6).
+        //    판정 기준(IsPlayerObject)은 그대로. 정적 플레이어 목록은 Player.cs(은희 영역)에 둘 일이라 여기선 안 만든다.
+        foreach (var pl in FindObjectsByType<Player>(FindObjectsSortMode.None))
+        {
+            var no = pl.GetComponent<Unity.Netcode.NetworkObject>();
+            if (no != null && no.IsPlayerObject) _players.Add(no.transform);
+        }
         if (_players.Count == 0)
             foreach (var pm in FindObjectsByType<PlayerMovement>(FindObjectsSortMode.None))
                 _players.Add(pm.transform);
+
+        _localPlayers.Clear();
+        foreach (var p in _players)
+            if (IsLocal(p)) _localPlayers.Add(p);
         if (_players.Count != _lastPlayerCount)
         {
             _lastPlayerCount = _players.Count;
@@ -754,7 +769,7 @@ public class MinimapController : MonoBehaviour
         foreach (var p in _players)
         {
             if (p == null) continue;
-            var img = GetOrCreateDyn(p, IsLocal(p) ? LocalPlayerColor : AllyColor, UnitDotSize);
+            var img = GetOrCreateDyn(p, _localPlayers.Contains(p) ? LocalPlayerColor : AllyColor, UnitDotSize);
             img.rectTransform.anchoredPosition = WorldToMap(p.position);
             img.enabled = true;
         }
@@ -818,9 +833,14 @@ public class MinimapController : MonoBehaviour
     public void MergeExploredBits(byte[] bits)
     {
         if (_explored == null || bits == null || bits.Length != _explored.Length / 8) return;
+        bool changed = false;
         for (int i = 0; i < _explored.Length; i++)
             if ((bits[i >> 3] & (1 << (i & 7))) != 0 && _explored[i] < 255)
+            {
                 _explored[i] = 255;
+                changed = true;
+            }
+        if (changed) ExploredVersion++;
     }
 
     private void OnDestroy()

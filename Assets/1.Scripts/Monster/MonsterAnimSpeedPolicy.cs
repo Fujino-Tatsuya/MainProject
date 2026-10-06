@@ -30,6 +30,7 @@ public static class MonsterAnimSpeedPolicy
         public float moveCycle;        // 이동 클립 한 주기(초, 블렌드 timeScale 반영). 0 = 모름
         public Vector2 range;          // 재생 속도 하한·상한
         public bool fullBlendWhileMoving; // 움직이는 동안 블렌드 값을 th 이상으로 보낸다 → 이동 클립 100%
+        public float playbackScale;       // 발 맞춤 결과에 곱함(1 = 정확히 맞춤). 0 이하 = 1 로 본다(구조체 기본값 보호)
     }
 
     /// <summary>
@@ -81,7 +82,9 @@ public static class MonsterAnimSpeedPolicy
 
         float min = Mathf.Max(0.05f, Mathf.Min(loco.range.x, loco.range.y));
         float max = Mathf.Max(min, Mathf.Max(loco.range.x, loco.range.y));
-        float corrected = Mathf.Clamp(moveSpeed / foot, min, max);
+        // playbackScale: 발 맞춤 값에 곱한 뒤 범위로 자른다. 아래 w 가중을 그대로 타므로 멈추는 순간(w→0) 1 로 이어진다.
+        float scale = loco.playbackScale > 0f ? loco.playbackScale : 1f;
+        float corrected = Mathf.Clamp(moveSpeed / foot * scale, min, max);
 
         // 보정은 이동 클립 비중 w 만큼만 건다: 1 + (보정 − 1)·w.
         // 🔴 대기 클립이 섞인 저속 구간(출발 가속·도착 감속·군중 밀림)에서 대기 모션까지 상한(2.5)으로 돌고,

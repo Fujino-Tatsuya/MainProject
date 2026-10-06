@@ -265,6 +265,18 @@ public class PlayerSkillController : BaseNetworkBehaviour
         return targeting != null && (!IsNetworkActive || IsOwner);
     }
 
+    /// <summary>
+    /// [오너] 지점 자동 접근(GroundPoint AutoApproach) 의도를 서버에 알린다 — Unit 대상은 Player.SubmitAutoApproachIntent.
+    /// 위치 권위가 서버라 서버도 같은 전진을 만들어야 한다. 슬롯과 지점만 보내고 사거리는 서버가 자기 데이터에서 읽는다.
+    /// </summary>
+    internal void SubmitPointApproachIntent(PlayerSkillSlot slot, Vector3 point, bool active)
+    {
+        if (!IsNetworkActive || !IsOwner || IsServer)
+            return;
+
+        SubmitPointApproachRpc(slot, point, active);
+    }
+
     // 같은 스킬키 재입력 여부 — 조준 취소 판별용(PlayerSkillTargeting에서 조회).
     public bool WasSkillRePressed(PlayerSkillSlot slot)
     {
@@ -474,16 +486,22 @@ public class PlayerSkillController : BaseNetworkBehaviour
     private bool StartSkillServer(
         PlayerSkillSlot slot, int expectedSkillIndex, Vector3 direction, Unit target, Vector3 aimPoint, bool hasAimPoint)
     {
-        if (!CanApproveSkill(slot, expectedSkillIndex, direction, target, out PlayerSkillBase skill, out bool isDead))
-            return false;
-
+        PlayerSkillBase requestedSkill = GetSkill(slot);
         if (hasAimPoint &&
-            skill.Data.TargetingMode == SkillTargetingMode.GroundPoint &&
-            skill.Data.FixedDistance)
+            requestedSkill != null && requestedSkill.Data != null &&
+            requestedSkill.Data.TargetingMode == SkillTargetingMode.GroundPoint &&
+            requestedSkill.Data.FixedDistance)
         {
             aimPoint = PlayerGroundPointProjection.ReprojectServerFixedDistance(
-                transform.position, aimPoint, skill.Data.CastRange, transform.forward);
+                transform.position, aimPoint, requestedSkill.Data.CastRange, transform.forward);
             direction = aimPoint - transform.position;
+        }
+
+        if (!CanApproveSkill(
+                slot, expectedSkillIndex, direction, target, aimPoint, hasAimPoint,
+                out PlayerSkillBase skill, out bool isDead))
+        {
+            return false;
         }
 
         direction = ResolveDirection(direction);
@@ -505,7 +523,7 @@ public class PlayerSkillController : BaseNetworkBehaviour
         int damageSnapshot = Mathf.Max(0,
             Mathf.RoundToInt(player.FinalAttackDamage * skill.Data.AttackDamageMultiplier) + skill.Data.FlatDamageBonus);
         skill.SetDamageSnapshot(damageSnapshot);
-        skill.SetAimPoint(aimPoint, hasAimPoint);
+        // 지점(AimPoint)은 CanApproveSkill 이 CanUse 직전에 이미 넣었다.
 
         Edit.Log($"[Skill] {slot} 시작 — 피해 스냅샷 {damageSnapshot}, 쿨타임 {skill.Data.CooldownTime}s", this);
 
@@ -520,6 +538,7 @@ public class PlayerSkillController : BaseNetworkBehaviour
 
     private bool CanApproveSkill(
         PlayerSkillSlot slot, int expectedSkillIndex, Vector3 direction, Unit target,
+        Vector3 aimPoint, bool hasAimPoint,
         out PlayerSkillBase skill, out bool isDead)
     {
         skill = GetSkill(slot);
@@ -563,6 +582,11 @@ public class PlayerSkillController : BaseNetworkBehaviour
             Edit.Log($"[Skill] {slot} 거부 — 상태 {stateController.CurrentState} 또는 차단 효과", this);
             return false;
         }
+
+        // 지점 기반 CanUse(거너 R 지점 지정 등)가 이번 요청의 지점을 보도록 CanUse 직전에 넣는다.
+        // 실행 중 스킬은 위에서 이미 거부됐으므로 진행 중인 스킬의 지점을 덮어쓰지 않는다.
+        // SingleTarget/None 은 hasAimPoint=false 라 HasAimPoint 도 false — 기존 판정 그대로.
+        skill.SetAimPoint(aimPoint, hasAimPoint);
 
         if (!skill.CanUse(direction, target))
         {
@@ -667,6 +691,37 @@ public class PlayerSkillController : BaseNetworkBehaviour
         Unit target = ResolveTarget(targetRef);
         if (!StartSkillServer(slot, expectedSkillIndex, direction, target, aimPoint, hasAimPoint))
             RejectSkillClientRpc(CreateOwnerClientRpcParams());
+    }
+
+    [Rpc(SendTo.Server)]
+    private void SubmitPointApproachRpc(PlayerSkillSlot slot, Vector3 point, bool active, RpcParams rpcParams = default)
+    {
+        if (rpcParams.Receive.SenderClientId != OwnerClientId || targeting == null)
+            return;
+
+        if (!active)
+        {
+            targeting.ApplyServerPointApproach(Vector3.zero, 0f, false);
+            return;
+        }
+
+        PlayerSkillBase skill = GetSkill(slot);
+        bool valid = skill != null && skill.Data != null &&
+                     skill.Data.TargetingMode == SkillTargetingMode.GroundPoint &&
+                     !skill.Data.FixedDistance &&
+                     skill.Data.GroundPointOutOfRange == GroundPointOutOfRangeMode.AutoApproach &&
+                     IsFinite(point);
+        if (!valid)
+        {
+            // 조용히 넘기면 "자동 접근이 가끔 안 먹는다"가 된다. 사유를 남긴다.
+            Edit.LogWarning(
+                $"[Skill] 지점 자동 접근 거부 — owner={OwnerClientId}, slot={slot}. 서버가 전진을 만들지 않는다.",
+                this);
+            targeting.ApplyServerPointApproach(Vector3.zero, 0f, false);
+            return;
+        }
+
+        targeting.ApplyServerPointApproach(point, skill.Data.CastRange, true);
     }
 
     [Rpc(SendTo.Server)]
@@ -859,6 +914,13 @@ public class PlayerSkillController : BaseNetworkBehaviour
             return ResolveDirection(aimIndicator.AimDirection);
 
         return ResolveDirection(transform.forward);
+    }
+
+    private static bool IsFinite(Vector3 value)
+    {
+        return !float.IsNaN(value.x) && !float.IsInfinity(value.x) &&
+               !float.IsNaN(value.y) && !float.IsInfinity(value.y) &&
+               !float.IsNaN(value.z) && !float.IsInfinity(value.z);
     }
 
     private Vector3 ResolveDirection(Vector3 direction)

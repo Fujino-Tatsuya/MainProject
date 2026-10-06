@@ -11,7 +11,7 @@ using UnityEngine;
 /// 클립의 Hit 애니메이션 이벤트(정밀) 또는 <see cref="FirstMeleeInterruptSkillData.HitDelay"/> 타이머(폴백).
 /// 클립은 아트/SVN 관할이라 이벤트 없이도 성립해야 한다.
 /// </summary>
-public class FirstMeleeInterruptSkill : PlayerInterruptSkillBase
+public class FirstMeleeInterruptSkill : PlayerInterruptSkillBase, ISkillPreviewSource
 {
     // 🔴 여기는 RPC 가 필요 없다 — OnClientPlay 와 OnEnd 는 둘 다 전 피어에서 돈다:
     //    시작 → 서버는 TryStartSkillServer 가, 클라는 PlaySkillClientRpc 가 PlaySkillPresentation 을 탄다
@@ -61,6 +61,19 @@ public class FirstMeleeInterruptSkill : PlayerInterruptSkillBase
     protected override void OnMissingHitboxAnchor()
     {
         Debug.LogError("[Player] 단죄의 방패에 판정 앵커(hitboxAnchor)가 배정되지 않았습니다.", this);
+    }
+
+    public bool TryGetPreview(Vector3 origin, Vector3 forward, out SkillPreviewShape shape)
+    {
+        if (HitboxAnchor == null ||
+            !HitboxAnchor.TryGetLocalBox(out Vector3 center, out Vector3 size))
+        {
+            shape = default;
+            return false;
+        }
+
+        shape = SkillPreviewShapes.Hitbox(center, size);
+        return true;
     }
 
     protected override void OnInterruptTargetResolved(Object target, AttackInfo attackInfo)

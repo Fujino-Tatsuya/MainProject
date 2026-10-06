@@ -14,6 +14,7 @@ public class MinimapNetworkSync : NetworkBehaviour
     private MinimapController _controller;
     private float _timer;
     private byte[] _lastSent;
+    private int _lastSentVersion = -1;
 
     private void Awake() => _controller = GetComponent<MinimapController>();
 
@@ -49,6 +50,11 @@ public class MinimapNetworkSync : NetworkBehaviour
         _timer -= Time.deltaTime;
         if (_timer > 0f) return;
         _timer = SyncInterval;
+
+        // 그리드가 안 바뀌었으면 패킹(byte[2048] 할당 + 16,384칸 순회)부터 건너뛴다(PLAN-cleanup-optimization S1-6).
+        // 비교(Same)는 그대로 둔다 — 128 미만 변화는 버전만 올리고 비트는 같을 수 있다.
+        if (_controller.ExploredVersion == _lastSentVersion) return;
+        _lastSentVersion = _controller.ExploredVersion;
 
         var bits = _controller.GetExploredBits();
         if (bits == null || Same(bits, _lastSent)) return;

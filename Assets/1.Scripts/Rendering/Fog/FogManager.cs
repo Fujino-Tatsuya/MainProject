@@ -35,6 +35,10 @@ public sealed class FogManager : MonoBehaviour
     [Range(0, 24)] public int losAngleBlur = 6;
     [Tooltip("시야맵 재빌드 간격(프레임). 정적 레이아웃이라 매프레임 불필요 — 2=30Hz(비용 절반), 3=20Hz, 1=매프레임. 에디트모드는 항상 재빌드.")]
     [Min(1)] public int losRebuildInterval = 2;
+    [Tooltip("플레이어가 이만큼(m) 움직였을 때만 시야맵을 다시 만든다. 서 있으면 레이캐스트 0회(PLAN-cleanup-optimization S1-5).")]
+    [Min(0f)] public float losRebuildMoveEpsilon = 0.05f;
+    [Tooltip("안 움직여도 이 간격(초)마다는 다시 만든다 — 다리 게이트·움직이는 발판 같은 동적 차폐 대비.")]
+    [Min(0.05f)] public float losForceRebuildSeconds = 0.5f;
     [Tooltip("시야가 닿는 최대 거리(m). 이 너머는 항상 가려진 것으로 본다.")]
     [Min(1f)] public float losMaxDist = 40f;
     [Tooltip("raycast 시작 높이(플레이어 발끝 위 오프셋, m). 벽 중간 높이를 맞추기 위함.")]
@@ -108,6 +112,9 @@ public sealed class FogManager : MonoBehaviour
     private readonly List<Vector4> _losNodes = new List<Vector4>(); // xyz=pos, w=radius
     private bool _losNodesCached;
     private int _losFrameCounter; // 재빌드 스로틀 카운터
+    private float[] _losBlurSrc;  // 각도 블러 원본 버퍼(재사용 — 재빌드마다 Clone 하던 것)
+    private Vector3 _losLastPos;  // 마지막 재빌드 위치
+    private float _losLastBuildTime = float.NegativeInfinity;
 
     // ----- shader property ids -----
     private static readonly int ID_GlobalEnabled = Shader.PropertyToID("_FogGlobalEnabled");
@@ -410,10 +417,18 @@ public sealed class FogManager : MonoBehaviour
 
         // 스로틀: 정적 레이아웃이라 매프레임 재빌드 불필요. N프레임마다만 재빌드(에디트모드는 항상).
         // 스킵 시 기존 _losTex 재사용 — 글로벌은 아래에서 매프레임 갱신(저렴).
+        // + 움직였을 때만(또는 강제 간격이 지났을 때만) — 서 있는 동안 2프레임마다 레이캐스트 360회가 돌던 것.
         if (_losTex == null || !Application.isPlaying || ++_losFrameCounter >= Mathf.Max(1, losRebuildInterval))
         {
-            BuildRadialMap(playerPos);
             _losFrameCounter = 0;
+            bool moved = (playerPos - _losLastPos).sqrMagnitude > losRebuildMoveEpsilon * losRebuildMoveEpsilon;
+            bool stale = Time.unscaledTime - _losLastBuildTime >= losForceRebuildSeconds;
+            if (_losTex == null || !Application.isPlaying || moved || stale)
+            {
+                BuildRadialMap(playerPos);
+                _losLastPos = playerPos;
+                _losLastBuildTime = Time.unscaledTime;
+            }
         }
 
         Shader.SetGlobalFloat(ID_LosEnabled, 1f);
@@ -489,20 +504,22 @@ public sealed class FogManager : MonoBehaviour
         }
 
         // (3) 각도 방향 블러 — 벽 모서리에서 occ 급변을 완화해 부채꼴 경계(삼각형/직선)를 부드럽게.
+        //     원형 이동 평균을 슬라이딩 합으로(O(n)) — 버퍼 재사용, 할당 0. 결과는 기존 이중 루프와 같은 창 평균.
         if (losAngleBlur > 0)
         {
-            float[] src = (float[])_losDist.Clone();
-            int r = losAngleBlur;
+            if (_losBlurSrc == null || _losBlurSrc.Length != n) _losBlurSrc = new float[n];
+            float[] src = _losBlurSrc;
+            System.Array.Copy(_losDist, src, n);
+            int r = Mathf.Min(losAngleBlur, (n - 1) / 2);   // 창이 원을 넘지 않게(n ≥ 64, r ≤ 24 라 실제로는 안 걸림)
             int win = 2 * r + 1;
+            float sum = 0f;
+            for (int k = -r; k <= r; k++)
+                sum += src[(k % n + n) % n];
             for (int i = 0; i < n; i++)
             {
-                float sum = 0f;
-                for (int k = -r; k <= r; k++)
-                {
-                    int bin = ((i + k) % n + n) % n;   // 각도 wrap
-                    sum += src[bin];
-                }
                 _losDist[i] = sum / win;
+                // 창을 한 칸 민다: (i - r) 를 빼고 (i + r + 1) 을 더한다(각도 wrap).
+                sum += src[(i + r + 1) % n] - src[((i - r) % n + n) % n];
             }
         }
 

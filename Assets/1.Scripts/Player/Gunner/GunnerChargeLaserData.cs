@@ -53,6 +53,8 @@ public class GunnerChargeLaserData : PlayerSkillData
     public float MaxChargeTime => maxChargeTime;
     public float AutoFireHoldTime => autoFireHoldTime;
     public float ChargeMoveSpeedMultiplier => chargeMoveSpeedMultiplier;
+    public float MinRange => minRange;
+    public float MaxRange => maxRange;
     public float BeamWidth => beamWidth;
     public float BeamHeight => beamHeight;
     public float MuzzleHeight => muzzleHeight;

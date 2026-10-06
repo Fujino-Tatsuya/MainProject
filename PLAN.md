@@ -1,3 +1,628 @@
+# ▶▶▶ 계획 = **지점 지정(GroundPoint) 확장 — 마우스 원 + 사거리 밖 자동 접근** (2026-10-07 · 그릴 Q24~Q28 · 승인 ✅ · 구현 = claude-alt)
+
+> 브랜치 `feature/GunnerSkillIndicatorUpgrade`. 결정: 은희. 아래 "스킬 직선 인디케이터" 작업의 후속.
+> 팔라딘 Q·E 미리보기는 **안 한다**(은희 결정).
+>
+> 🔴 **범위 확정(10-07 은희): 기능만 만들어 둔다. 거너 R 에셋은 기획서 §9 대로 `SingleTarget` 유지, 기획서도 안 고친다.**
+> → 아래 1·7 은 **하지 않는다.** 2~6 은 **데이터 옵션**으로 만들어, 나중에 에셋 값만 바꾸면 거너 R 이 지점 지정으로 동작하게 한다.
+> 옵션(안): `PlayerSkillData` 에 GroundPoint 전용 — 사거리 밖 처리 `Clamp`(기본, 기존 동작) / `AutoApproach`, 마우스 원 반경(0 = 안 그림), 호버 원 거리(기본 3).
+> 거너 R `OnServerStart` 는 `HasAimPoint` 면 지점·대상 없음, 아니면 기존 대상 경로 — 둘 다 지원.
+> 지금 게임에서 쓰는 스킬이 없으므로 검증은 EditMode + (선택) 로컬에서만 거너 R 에셋을 임시로 바꿔 Play — **에셋 변경은 커밋하지 않는다.**
+
+## 지금 (조사)
+- 거너 R `GunnerTrackingLaserSkill` = `SingleTarget`. 서버 `CanUse(direction, target)` 가 대상 사거리(12)를 보고, `OnServerStart` 가 **대상 위치**에 레이저를 띄워 `ServerInitialize(owner, target, …)`.
+- `GunnerTrackingLaser` 는 **대상이 없으면 이미** `retargetRadius`(8) 안 최근접 적을 찾는다(`FindNearestEnemy`, L145~148).
+- `GroundPoint` 조준은 있다(`PlayerSkillTargeting.UpdateGroundPointPreview`) — 단 **사거리 밖은 경계로 클램프해 바로 시전**, 자동 접근 없음.
+  지점 마커 데칼 슬롯 `SkillRangeIndicator.groundMarkerDecal` 은 **비어 있다**.
+- 자동 접근(`BeginMoveToCast`/`TickMoveToCast` + 서버 `ApplyServerAutoApproach`)은 **Unit 대상 전용**.
+- 🔴 서버 `StartSkillServer` 는 `CanApproveSkill`(→`CanUse`) **뒤에** `SetAimPoint` 한다 → 지금은 `CanUse` 가 지점을 못 본다.
+
+## 결정 (2026-10-07)
+| | 결정 |
+|---|---|
+| Q24 시전 | R → 조준 → **클릭**. 원 중심이 사거리 안이면 즉시 시전. **밖이면 클릭 지점을 저장 → 그 지점이 사거리에 들 때까지 직선 이동 → 자동 시전** |
+| Q25 레이저 | 저장 지점에 생성, **대상 없이** 시작 → 기존 재조준(반경 8 최근접 적). 없으면 제자리 |
+| Q26 마우스 원 | 반경 = 레이저 `radius`(2). 조준 중엔 **사거리 무관 마우스를 따라감**(클램프 안 함). **호버에도 표시** — 캐릭터 정면(`CurrentFacing`) **3m 앞**에 + 기존 사거리 원 |
+| Q27 사거리 밖 | 색 변화 **없음**(같은 모양). 커서 상태는 기존대로 |
+| Q28 문서 | `Docs/design/character/character_gunner.md` §9 를 지점 지정으로 갱신 (답 없음 → 권장안으로 진행) |
+
+## 만드는 것
+1. **데이터**: `GunnerTrackingLaserData.asset` `targetingMode` 1 → **2(GroundPoint)**.
+2. **조준(`PlayerSkillTargeting`)**: GroundPoint 를 **스킬별로 클램프/접근 선택** — 거너 R 은 "클램프 안 함 + 사거리 밖 클릭 = 지점 자동 접근".
+   (다른 GroundPoint 스킬은 현재 없음. 기존 클램프 동작은 기본값으로 남긴다 — 데이터 플래그 or 스킬 오버라이드 중 단순한 쪽.)
+3. **지점 자동 접근**: `pendingTarget`(Unit) 옆에 `pendingPoint` 경로 추가 — 오너 `TickMoveToCast` 정지식 = 기존과 동일(`castRange - RangeBuffer`),
+   도달 시 `ExecuteTargetedSkill(slot, null, point, true)`. 서버 쪽 `ApplyServerAutoApproach` 에 지점 버전(RPC 인자 추가). 취소 조건 = 기존과 동일(다른 입력·대시·사망).
+4. **서버 승인**: `StartSkillServer` 에서 `SetAimPoint` 를 `CanApproveSkill` **앞으로** 옮기거나 지점을 넘긴다. 거너 R `CanUse` = 지점이 사거리(+버퍼) 안.
+   `OnServerStart` = `AimPoint` 에 생성, `ServerInitialize(owner, null, …)`.
+5. **마우스 원 데칼**: `SkillRangeIndicator.groundMarkerDecal` 배선(저작 메뉴, 기존 사거리 원 머티리얼 재사용) + 반경 설정 API(`SetGroundMarker(show, point, radius)`).
+   반경은 `GunnerTrackingLaserData.Radius` 에서.
+6. **호버**: 대상 지정 스킬 호버 원(이미 있음) + 지점 스킬이면 마커 원을 `CurrentFacing * 3` 위치에.
+7. **문서**: `character_gunner.md` §9.
+
+## 리스크
+- 서버 승인 순서 변경(4)이 **팔라딘 R(SingleTarget)** 에 영향 없게 — SingleTarget 은 `HasAimPoint=false` 그대로.
+- 자동 접근 RPC 인자 추가 = 네트워크 계약 변경. 기존 Unit 경로 동작 동일해야 함.
+- 클릭 지점이 벽 너머/절벽이면 직선 이동이 막혀 영원히 못 닿을 수 있음 → 기존 Unit 접근과 같은 정책(막히면 그대로, 다른 입력으로 취소).
+
+## 검증
+- EditMode: 지점 사거리 판정·접근 정지식(순수 함수로 빼서).
+- Play(은희, MPPM): 사거리 안 클릭 즉시 시전 / 밖 클릭 → 직선 이동 후 자동 시전 / 이동 중 다른 입력·대시 취소 / 레이저가 지점에 생겨 반경 8 적 추적 / 마우스 원이 사거리 밖에서도 따라옴 / 호버 시 사거리 원 + 정면 3m 원 / **비호스트 클라에서도 동일** / 팔라딘 R 기존 동작 유지.
+
+---
+
+# ▶▶▶ 진행 중 = **스킬 직선 인디케이터 + HUD 호버 미리보기** (2026-10-06 · 그릴 21문항 완료 · 요약 승인 ✅ · 구현 = Codex 위임)
+
+> 브랜치: `feature/GunnerSkillIndicatorUpgrade` (워크트리 `MainProject-Worktree2`, origin/development `373ef5a6` 기준, 아트 r392).
+> 결정: **은희**. 그릴·계획: Claude. **구현: Codex.** 플레이어·UI 는 은희 영역이라 외부 승인 불필요.
+> 레퍼런스: 롤 **제라스 Q(Arcanopulse)** — 폭 일정 직사각형이 차지에 따라 길어진다(700→1450, 폭 145).
+
+## 지금 상태 (조사 결과)
+
+- 직사각형·직선 인디케이터는 **없다.** 있는 것: `PlayerAimIndicator`(방향 데칼, 크기 고정) ·
+  `SkillRangeIndicator`(원 데칼, ClickToConfirm 스킬만) · `SkillCursorView`(커서).
+- 거너 Q 는 **판정은 이미 제라스 Q 와 같다** — `GunnerChargeLaserData.RangeAt(ChargeFactor(t))` = Lerp(6,16), 폭 `BeamWidth` 1.2,
+  `maxChargeTime` 1.2, 벽은 `GunnerBeamAttack.CastLength(origin, dir, range, width/2, BlockingLayers)`(서버 가드 없음 → 오너가 매 프레임 호출 가능).
+  보이는 건 총구 차지 파티클뿐.
+- HUD 호버는 이미 있다 — `UI/Combat/SkillSlotHover.cs` 가 `OnPointerEnter/Exit/OnDisable` 로 `SkillTooltipView` 를 켜고 끈다.
+  `player`·`slot` 을 이미 들고 있다. 🔴 HUD 위에서도 `PlayerAimIndicator.AimDirection` 은 계속 갱신된다(화면 아래쪽 바닥을 가리킴) → 미리보기 방향으로 못 쓴다.
+- 판정 모양 실측:
+
+| 스킬 | 판정 | 크기 원본 | 벽 |
+|---|---|---|---|
+| 거너 Q `GunnerChargeLaserSkill` | 총구 직선 박스, 관통 | data `minRange 6`/`maxRange 16`/`beamWidth 1.2`/`muzzleHeight 1` | `CastLength` 로 잘림 |
+| 거너 RMB `GunnerInterruptSkill` | 정면 박스 + 반동 이동 `-aim` | 박스 = `Gunner_Armature.prefab` `InterruptAttack` BoxCollider(1.4×1.4, 앞 0.2~1.6m) / 반동 data `recoilDistance 1.5` | 박스 없음 / 반동은 모터 스윕(적 통과, 벽·오브젝트 정지) |
+| 팔라딘 RMB `FirstMeleeInterruptSkill` | 정면 박스 | `Paladin_Armature.prefab` `InterruptAttack` BoxCollider(1.6×1.6, 앞 0.1~1.7m) | 없음 |
+| 거너 E `GunnerCoolBackstepSkill` | 이동 `-aim` | data `distance 3` | 모터 스윕(적·아군·벽 정지, `BlockOtherPlayersOverride`) |
+
+  박스 크기는 SO 가 아니라 `PlayerSkillBase.HitboxAnchor`(`ColliderInfo`) 에 있다 — 런타임에 거기서 읽는다.
+
+## 그릴 결과 (2026-10-06)
+
+| | 결정 |
+|---|---|
+| 범위 | **공용 `SkillLineIndicator`** 를 base `Player.prefab` 에. 이번 연결 = 거너 Q·거너 RMB·팔라딘 RMB·거너 E |
+| 렌더링 | **Quad 메시**(데칼 아님). 발밑 +0.05, **깊이 테스트 켬**(가려진다) |
+| 벽 | **판정이 잘리면 표시도 잘린다.** 판정이 벽을 안 보면 표시도 안 자른다 (Q=`CastLength`, 화살표=모터 스윕, RMB 박스=안 자름) |
+| 차지 중 | **현재 길이만**. 최대 사거리 윤곽 없음 |
+| 가시성 | **오너 화면만.** 네트워크 추가 없음 |
+| 그림 | 임시 셰이더그래프(반투명 면 + 테두리), 색·알파·텍스처는 프로퍼티. 나중에 아트 교체 |
+| 호버 미리보기 | HUD 슬롯 호버 시. 방향 = **캐릭터 정면**(`transform.forward`), 화살표는 그 반대. **미리보기도 벽 자르기 적용** |
+| 프리팹 | `_forTip` 별도 프리팹 **안 만든다.** 한 인디케이터에 **진한 층(fill) · 연한 층(ghost, 알파 낮음) · 화살표** + 모드 2개 |
+| 화살표 | 몸통+삼각 머리, **박스와 다른 색**(흰 계열) — "이동" vs "공격 범위" 구분 |
+
+**스킬별 표시**
+
+| 스킬 | 차지 중 | 호버 미리보기 |
+|---|---|---|
+| 거너 Q | fill = 현재 길이(벽 클립), 폭 1.2 | fill = 최소 6 · ghost = 최대 16 (둘 다 벽 클립) |
+| 거너 RMB | — | fill = 정면 박스 + 화살표 뒤로 1.5(스윕 클립) |
+| 팔라딘 RMB | — | fill = 정면 박스 |
+| 거너 E | — | 화살표 뒤로 3(스윕 클립) |
+
+## 만드는 것
+
+**`Player/Skill/Targeting/SkillLineIndicator.cs`** (신규, MonoBehaviour, base `Player.prefab` 자식 `SkillLineIndicator`)
+- 오너 아니면 꺼 둔다 — `PlayerAimIndicator.OnNetworkSpawn` 패턴.
+- 자식 Quad 3개(fill / ghost / arrow). 피벗 = **시작점**(길이가 앞으로만 자라게).
+- API (안):
+  - `ShowCharge(Vector3 origin, Vector3 dir, float startOffset, float length, float width)` — 매 프레임 갱신
+  - `BeginPreview(ISkillPreviewSource src)` / `EndPreview(ISkillPreviewSource src)` — 호버 중엔 `LateUpdate` 에서 매 프레임 `src` 에 다시 물어 갱신(이동·회전 추종)
+  - `HideCharge()` / `HideAll()`
+  - 차지가 켜지면 미리보기는 숨긴다(우선순위: 차지 > 미리보기).
+- 테두리가 늘어나 보이지 않게 셰이더에 **월드 길이·폭을 프로퍼티로** 넘긴다(스케일만 쓰면 테두리가 늘어남).
+
+**`ISkillPreviewSource`** (신규 인터페이스) + **`SkillPreviewShape`** (struct, 순수 데이터)
+- `bool TryGetPreview(Vector3 origin, Vector3 forward, out SkillPreviewShape shape)`
+- `SkillPreviewShape` = fill(startOffset, length, width) · ghost(length, 유무) · arrow(방향 부호, length, 유무).
+- 형태 계산은 **순수 함수**로 빼서 EditMode 테스트가 물리 없이 돈다(클립 값은 인자로 받기).
+- 구현: `GunnerChargeLaserSkill` · `GunnerInterruptSkill` · `FirstMeleeInterruptSkill` · `GunnerCoolBackstepSkill`. 없는 스킬은 표시 안 함.
+
+**거너 Q 차지 연결** (`GunnerChargeLaserSkill`)
+- `OnOwnerTick` 에서 `elapsed` → `RangeAt(ChargeFactor(elapsed))` → `CastLength(...)` → `ShowCharge`.
+  origin 은 발사와 같게(`position + up*MuzzleHeight`), 그리기만 바닥 높이로.
+- 끄기: 오너 측 `OnEnd`(발사·취소·사망·대시 전부 지남) + 비서버 오너는 `GunnerBeamView.PlayChargeLaser → EndCharge` 경로도 확인.
+
+**RMB 박스** — `HitboxAnchor` 의 BoxCollider(center·size, Armature 로컬)를 바닥 사각형으로 변환. 미리보기는 캐릭터 정면 기준이므로 **Armature 현재 회전이 아니라 `forward` 로 다시 놓는다.**
+
+**화살표 클립** — `PlayerMotionSweep.Resolve(capsule, desiredDelta, ...)` 를 실제 이동과 **같은 마스크·옵션**으로 호출.
+RMB 반동(적 통과)과 E(적·아군 정지)의 마스크가 다르다 — `PlayerMotor` 의 `PassThroughEnemiesOverride`/`BlockOtherPlayersOverride` 처리 방식을 확인해 재현할 것.
+
+**HUD 연결** (`SkillSlotHover`)
+- `OnPointerEnter` → 로컬 플레이어 `SkillLineIndicator.BeginPreview(skillController.GetSkill(slot) as ISkillPreviewSource)`,
+  `OnPointerExit` / `OnDisable` → `EndPreview`. `Bind` 시 `pointerInside` 면 시작.
+- 호버 중 시전되면(슬롯 클릭·키 입력 → `PlayerSkillController.IsSkillActive`) 미리보기 숨김. Q 는 차지 표시로 넘어간다.
+
+**셰이더·머티리얼** — `Assets/3.Materials/Player/SkillLineIndicator/` 에 URP Unlit Transparent 셰이더그래프 1개 +
+머티리얼 2개(범위 = 기존 인디케이터 톤 / 화살표 = 흰 계열). 프로퍼티: `_Color`, `_Alpha`, `_BorderWidth`, `_WorldSize`.
+ghost 는 같은 머티리얼에 알파만 낮춘 MaterialPropertyBlock.
+
+## 범위 밖
+- 거너 R · 팔라딘 R(사거리 원 — `SkillRangeIndicator` 재활용, 다음 작업)
+- 아군에게 보여주기 · 아트 텍스처 · `SkillConfirmMode.HoldRelease`
+- 🟡 문서 불일치 메모: `Docs/design/players.md` 는 팔라딘 RMB 를 "정면 패링"이라 하는데 코드는 공격 박스. 이번엔 **코드(판정) 기준**으로 그린다.
+
+## 리스크
+- **비서버 오너의 차지 끝 신호** — `OnEnd` 가 `EndSkillClientRpc` 로 늦게 올 수 있다. 발사 순간엔 `GunnerBeamView.PlayChargeLaser` 에서도 끄는지 확인.
+- **`CastLength` 스크래치 버퍼 `hits`** 를 서버 `Fire` 와 공유 — 호스트에서 같은 프레임 호출 순서 문제 없는지(읽기 사이에 끼지 않는지) 확인.
+- **오너 차지 경과시간** — 오너는 자기 시계로 센다(`BeginCharge` 와 같은 방식). 서버 발사 길이와 몇 프레임 어긋나는 건 허용.
+- **Quad 깊이 테스트 + 경사로** — 발밑 +0.05 고정이라 큰 경사에서 묻힐 수 있다. 맵에 문제되는 경사 있으면 보고.
+- base `Player.prefab` 수정 → Variant(`Player_Paladin`·`Player_Gunner`) 오버라이드 충돌 없는지 확인.
+
+## 검증
+- **EditMode(에이전트가 직접 실행)**: `SkillPreviewShape` 계산 — Q fill 6/ghost 16, 클립 값 반영, RMB 박스 사각형 변환(1.4×1.4·앞 0.2~1.6 / 1.6×1.6·앞 0.1~1.7), 화살표 방향·길이.
+- **Play(은희가 직접 — MCP Play 금지, MPPM 깨짐)**:
+  1. Q 차지 중 직사각형 6→16 증가, 폭 1.2 가 실제 판정과 일치
+  2. 벽 앞에서 잘림(Q·화살표), RMB 박스는 안 잘림
+  3. 발사·취소·사망·스턴·대시로 끊기면 즉시 사라짐
+  4. HUD 호버 시 미리보기 표시 / 벗어나면 사라짐 / 호버 중 시전 → 미리보기 꺼지고 Q 는 차지 표시로
+  5. MPPM 다른 플레이어 화면엔 안 보임
+
+---
+
+# ▶▶▶ 진행 중 = **아군 보호막 연출 = 받는 쪽이 주인** (2026-10-06 · 그릴 4문항 완료 · 승인 ✅ · 구현 완료 · 배선·Play 검증 대기)
+
+> 작업 세션: **민경(Claude)**. 🔴 **은희 영역 파일 3개** — `PlayerShieldVfx.cs`,
+> `Player_Paladin.prefab`(safetyTimeout), `Player_Gunner.prefab`(컴포넌트 추가).
+> `Unit.cs`·`Player.cs`·`Health.cs` 는 **건드리지 않는다**.
+
+거너 Q 가 아군에게 보호막을 줄 때 `FX_GunnerShieldGrant` 를 띄우던 것을,
+**아군 자신의 `PlayerShieldVfx` 배리어**로 바꾼다.
+
+## 🔴 조사: 재생시간을 넘기면 안 된다
+
+처음 떠올린 두 안(①시전자가 지속시간을 넘긴다 ②시전자가 컴포넌트를 캐싱해 켜고 끈다)은 **둘 다 틀렸다.**
+
+```
+ShieldEndReason   Depleted(피해로 소진) / Expired(만료) / Cleared(사망·추락)
+                  -> 시간보다 먼저 끝나는 경로가 둘이다. 타이머는 그걸 못 센다.
+ShieldTypePolicies.Of(GunnerCharge) == Stack
+                  -> 같은 아군이 Q 를 두 번 맞으면 인스턴스가 2개. 각자 다른 시각에 끝난다.
+                     (팔라딘 E 는 Replace 라 1개뿐이어서 이 문제가 안 보였다)
+수명 주인          거너 Q 스킬은 FireRecovery 만에 끝나는데 보호막은 5초.
+                  거너가 죽거나 나가면 꺼 줄 주체가 사라진다.
+```
+
+**그리고 보호막은 이미 전 피어에 복제돼 있다.**
+
+```csharp
+Unit.cs:75   readonly NetworkList<ShieldInstance> _replicatedShields;
+Unit.cs:374  public int ShieldInstanceCount                      // public
+Unit.cs:377  public ShieldInstance GetShieldInstance(int index)  // public — type·sourceId 포함
+Unit.cs:330  public event Action<ShieldInstance, ShieldEndReason> ServerShieldEnded;  // public
+```
+
+각 피어가 **자기 눈앞의 아군 상태를 그대로 읽으면 된다.** 늦게 들어온 클라도 맞는다.
+끝난 **이유**만 서버가 아는데 그 이벤트도 public 이라 `PlayerShieldVfx` 가 직접 구독하면 된다.
+
+➡️ **보호막 연출의 주인은 아군 자신이다.** 거너는 아무것도 넘기지 않는다.
+
+## 그릴 결과 (2026-10-06)
+
+| | 결정 | 근거 |
+|---|---|---|
+| 1 | **배리어는 언제나 하나. 색만 출처로 가른다** — `HolyShield` = 금색(기존), 그 외 = **흰색** | 두 겹을 동시에 띄우면 지저분하다. 종류별 색 구분은 HUD 가 맡기로 이미 설계돼 있다(`ShieldType` 주석) |
+| 2 | 리그는 **`Player_Gunner.prefab` 에만 추가**. base `Player.prefab` 로 올리지 않는다 | `DisallowMultipleComponent` 라 팔라딘 것을 떼야 하고, `interruptWave`(단죄의 방패)는 거너에게 의미 없는 필드다. 대신 **배선 도구**로 묶어 캐릭터가 늘면 한 번 돌린다 |
+| 3 | `FX_GunnerShieldGrant` 는 **일단 뺀다**(프리팹은 남긴다) | 배리어에 **0.25초 FadeIn 이 이미 들어 있다**(`HolyShieldEffect.introDuration`, 드라이버가 대출 직후 `BeginIntro`). 생성 신호가 이미 있다. 플레이에서 부족하면 0.4초 한 방으로 되살린다 |
+| 4 | `HolyShield` 소켓 `safetyTimeout` 8 → **15** | 🔴 **기존 버그**: 팔라딘 `shieldDuration: 10` 인데 8초에 강제 회수 + 경고. `PlayerShieldVfx` 주석이 "보호막 지속시간보다 길어야 한다"고 못박아 둔 상황 그대로다 |
+
+### 이번에 같이 정한 것
+- **겹치면 금색이 이긴다.** 팔라딘이 자기 E 를 쓴 채 거너 Q 를 맞으면 금색만 띄운다 — 자기 핵심 스킬을 남의 연출이 덮으면 안 된다.
+- **흰색은 런타임 틴트가 아니라 에셋 복제.** `HolyShieldEffect` 가 `_ColorFactor` 기준값을 1회만 캐시하므로 런타임 틴트는 재사용마다 어긋날 위험이 있다. 이 레포 관례(룩마다 프리팹)도 복제 쪽이다.
+
+## 범위
+
+**신규 VFX 에셋** (`50.Art/VFX/Common/Players/Common/AllyShield/`, 🔴 SVN add)
+- `FX_AllyShield_Barrier.prefab` · `FX_AllyShield_Motes.prefab` · `FX_AllyShield_Entry.asset`
+- `FX_AllyShield_Break.prefab` · `FX_AllyShield_Break_Entry.asset`
+- 머티리얼 흰색 사본 — `Shader_IntegratedEffect` 의 색만 교체. 형태·FadeIn·파문은 금색판 그대로
+
+**`PlayerShieldVfx.cs`** (은희 영역)
+- 소켓 추가: `allyBarrierLoop` · `allyBreakBurst`
+- 자기 `Unit` 을 구독/폴링해 **스스로** 켜고 끈다
+  - 복제 목록(`ShieldInstanceCount` / `GetShieldInstance`)을 `LateUpdate` 에서 읽어 **어느 색을 띄울지** 판정
+    (금색 = `HolyShield` 가 하나라도 있음 / 흰색 = 그 외만 있음 / 없음 = 끔)
+  - `ServerShieldEnded` 를 구독해 **마지막 하나가 `Depleted` 로 끝났을 때만** Break 를 띄운다
+- `HitLocal` 이 두 소켓을 모두 훑도록
+- 🔴 `PlayLocal()` 은 **남긴다** — 팔라딘 `FirstMeleeSubSkill.OnClientPlay` 가 쓰고 있다.
+  복제 판정과 겹쳐도 `Play()` 가 재대출이라 두 겹이 되지 않는다
+
+**`GunnerChargeLaserSkill` / `GunnerBeamView`** (은희 영역)
+- `BuildShieldPoints()` · `shieldPoints` 인자 · `shieldGrantPlayer` 재생 제거
+- 🔴 `ChargeLaserFiredRpc` 의 **시그니처가 바뀐다**(`Vector3[] shieldPoints` 한 개 감소)
+
+**프리팹**
+- `Player_Gunner.prefab` — `PlayerShieldVfx` + 소켓 2개(🔴 NetworkBehaviour 목록 변경)
+- `Player_Paladin.prefab` — 흰색 소켓 2개 추가 + `safetyTimeout` 8 → 15
+
+**도구** — `Tools/VFX/보호막 연출 배선` (두 프리팹 공통, 캐릭터 추가 시 재실행)
+
+## 구현 중 바뀐 것 (2026-10-06)
+
+- 🔴 **`PlayLocal()` / `ServerEnd()` 를 "오프라인 전용 폴백" 으로 돌렸다.** 계획에서는 팔라딘 경로를
+  그대로 두려 했는데, 그러면 **두 주인이 생긴다** — `OnClientPlay` 가 켠 직후 복제 목록이 아직
+  도착하지 않은 피어에서 폴러가 "띄울 게 없다"고 판단해 **껐다 켰다 하는 깜빡임**이 난다.
+  두 메서드 안에서 `if (IsNetworkActive) return;` 으로 막았으므로
+  **`FirstMeleeSubSkill` 은 한 줄도 안 고쳐도 된다**(계속 불러도 안전하다).
+  대가: 팔라딘 자기 배리어가 **복제 도착 뒤에** 뜬다(호스트 ~1프레임, 리모트 ~RTT). 0.25초 FadeIn 이 가린다.
+- **소켓 앵커·배율은 금색 소켓에서 베낀다.** 팔라딘의 `HolyShield` 는 `socket` 이 본(Armature 안)이고
+  `scale 0.5` 다 — 흰색도 같은 자리·같은 크기여야 해서 도구가 그대로 복사한다.
+  거너는 베낄 것이 없어 루트 자식 `(0, 1, 0)` + `scale 0.5`.
+- **`EffectCatalog` 에 2종 등록을 도구가 같이 한다.** 프리워밍은 그 목록으로만 돌아서
+  빠지면 첫 재생에 한 프레임 튄다. 손으로 넣는 걸 잊기 좋은 자리다.
+- 🔴 **같이 고친 기존 버그**: `PlayChargeLaser` 의 `if (shieldPoints == null) return;` 이
+  **발사 애니메이션(`CrossFadeInFixedTime`) 앞**에 있었다 — 보호막 배열이 null 이면 Q 발사 모션이
+  통째로 건너뛰어졌다. 그 블록이 사라지면서 같이 풀렸다.
+
+## 리스크
+
+- 🔴 **`ChargeLaserFiredRpc` 시그니처 변경** = 네트워크 계약 변경. 전 피어가 같은 빌드를 써야 한다.
+- 🔴 **`Player_Gunner` 의 NetworkBehaviour 목록이 바뀐다.** 모든 피어가 같은 프리팹을 쓰므로 동작에는 문제없다.
+- 복제 목록 폴링은 `LateUpdate` 에서 `ShieldInstanceCount` 만 읽는다(보통 0). 할당 없음.
+- 흰색 배리어가 팔라딘 금색과 **같은 형태**라 2인 플레이에서 구분이 색뿐이다 — 플레이에서 확인.
+
+## 검증
+1. 솔로: 거너 Q → 아군 없음 → 아무 일도 없어야 한다
+2. MPPM 2인(거너+팔라딘): 빔이 아군을 스치면 **흰** 배리어 FadeIn → 5초 유지 → 조용히 걷힘
+3. 같은 아군에 Q 두 번(Stack) → 배리어는 하나, **늦게 끝나는 쪽** 기준으로 걷힘
+4. 보호막 30 을 몹 공격으로 소진 → **Break 연출**
+5. 팔라딘이 자기 E(금색) 중에 거너 Q 를 받음 → **금색 유지**, E 가 먼저 끝나면 흰색으로 전환
+6. 아군 사망 중 보호막 → `Cleared` 로 조용히 걷힘(Break 없음)
+7. 팔라딘 E 단독 10초 — **8초에 끊기지 않는지**(Q4 수정 확인)
+
+# ▶▶ 직전 작업 = **잡몹 사망 — 디졸브 → 부위별 붕괴** (2026-10-06 · 구현 완료 · Play 검증 대기)
+
+> 작업 세션: **민경(Claude)**. 🔴 **경석 영역 파일 1개**(`ChompBot.prefab` 의 사망 연출 컴포넌트 교체).
+> `MonsterBase` 는 건드리지 않는다 — `IDeathEffect` 구멍이 이미 있다.
+
+잡몹이 죽을 때 **디졸브로 녹는** 연출을 **원본 메시가 부위별로 무너지는** 연출로 바꾼다.
+상자(`MeshFragmentSet`)의 삼각형 산산조각과는 다른 물건이다 — 여기는 **부위 덩어리**가 주저앉는다.
+
+## 🔴 조사: 블렌더로 자를 필요가 없다
+
+`R_ChompBot_01.fbx` — 1,661 버텍스 / 2,922 삼각 / 본 10개
+
+```
+버텍스당 영향 본 수 분포   {1: 1661}    전부 단일 본 100%. 블렌딩 0
+본 경계를 가로지르는 폴리곤  0개          파츠가 서로 붙어 있지 않다
+```
+
+모델러가 **닫힌 껍데기 10개를 만들어 하나로 합친** 스킨 메시다. 본 인덱스로 삼각형을 가르면
+**원본 그대로, 구멍 없이** 10조각이 나온다. 잘린 단면이 없으므로 뚜껑도 필요 없다.
+
+```
+bone[0] 317폴리 Z 67cm  몸통      bone[8] 171폴리 폭65cm Z 78cm 턱(위)
+bone[1] 311폴리 Z125cm  머리      bone[9] 188폴리 폭66cm Z 51cm 턱(아래)
+bone[2,5] 184/179 허벅지   bone[3,6] 182/158 정강이   bone[4,7] 68/68 발
+```
+
+같은 팩의 다른 몹도 같다 — HumanoidBot 2779/2796(99.4%) · PeekABot 1143/1150(99.4%) 단일 본.
+섞인 몇 개(7~17개, 전부 이음매)는 우세 본으로 보낸다.
+
+### 왜 블렌더 수작업보다 나은가
+
+🔴 **미리 자른 스태틱 파츠는 바인드 포즈를 들고 있다.** 사망 애니메이션이 끝난 **그 자세**에서
+무너져야 하는데, 블렌더에서 잘라 낸 조각은 T포즈 모양이다. 본 분할은 조각마다 제 본의
+**사망 순간 월드 트랜스폼**을 그대로 받으므로 포즈가 공짜로 맞는다.
+덤으로 몹 8종 × (절단 + 뚜껑 + 리스킨 + FBX 재익스포트 + SVN) 가 통째로 사라진다.
+
+## 그릴에서 확정된 것
+
+| # | 항목 | 결정 |
+|---|---|---|
+| 1 | 분할 방식 | **본 기준 자동 분할**. 블렌더 0. 아쉬우면 나중에 몹별 수동 보정 |
+| 2 | 물리 | **해체형** — 폭발력 0, 중력 + 약한 랜덤 토크. 래그돌(`CharacterJoint`)은 같은 조각 데이터 위에 나중에 얹는다 |
+| 3 | 퇴장 | 바닥에 눕고 잠시 뒤 **디졸브로 녹인다**. 디졸브를 버리는 게 아니라 **퇴장 전담**으로 내린다 |
+| 4 | 범위 | ChompBot 먼저 → 잡몹 8종. **보스·중간보스 제외** (23호 `delayAfterClipEnd 2초` 는 팀장 지시 2026-09-30) |
+
+그 밖에 합의 없이 따르는 것:
+- 파편 충돌 = 상자와 **똑같은 규칙**. Effect(17) 레이어, `excludeLayers = ~(Default|Ground|Wall|Env)`,
+  `ContinuousSpeculative`. 🔴 Effect 자신이 마스크에서 빠지는 것이 핵심 — 조각이 맞닿은 채
+  시작하므로 서로 충돌시키면 관통을 푸는 힘으로 튀어 오른다.
+- 전파 = `DissolveDeath` 와 같은 구조. 서버가 `Rpc(SendTo.ClientsAndHost, Reliable)` 한 번,
+  각 피어가 자기 로컬에서 재생. 좌표는 싣지 않는다.
+
+## 🔴 조각을 제자리에 놓는 수식
+
+강체 가중치라 본 b 에 묶인 버텍스의 스킨 결과는 정확히
+
+```
+world = bones[b].localToWorldMatrix * bindposes[b] * v
+```
+
+그래서 굽는 쪽에서 버텍스를 `bindposes[b]` 로 미리 변환해 **본 로컬 공간**으로 옮겨 두면,
+런타임에는 조각 오브젝트를 **그 본의 월드 트랜스폼에 놓기만** 하면 사망 포즈가 정확히 재현된다.
+보간도 근사도 없다. (법선도 같은 행렬의 회전분으로 돌려 둔다.)
+
+조각 메시는 자기 무게중심 기준으로 다시 중심을 잡고, 그 무게중심을 본 로컬 오프셋으로 들고 있는다
+— 리지드바디의 회전 중심이 조각 한가운데여야 자연스럽게 구른다.
+
+## 🔴 풀링을 쓰지 않는 이유
+
+상자는 `EffectManager` 풀을 쓴다. 여기는 안 쓴다 — 드라이버(`FragmentBurstEffectSystem.Play`)가
+**대출 즉시 `Burst()`** 를 부르는 구조라, 포즈를 써 넣을 틈이 없다. 포즈는 죽을 때마다 다르다.
+
+대신 `DissolveDeath` 가 파티클을 `Instantiate` 하는 것과 같은 방식으로 디브리 루트를 하나 만든다.
+🔴 **몬스터의 자식으로 두지 않는다** — 상자가 겪었던 "수명을 소유한 객체가 먼저 죽는" 구조
+(`FragmentBurstEffect` 주석)를 그대로 밟게 된다. 루트는 떼어 놓고 제 수명을 제가 센다.
+몹 사망은 초당 몇 번 수준이라 조각 10개 Instantiate 는 감당된다. 모자라면 나중에 풀링한다.
+
+## 만드는 것
+
+```
+[git 신규]
+1.Scripts/Monster/Collapse/MonsterPartSet.cs          부위 조각 에셋(메시 = 서브에셋)
+1.Scripts/Monster/Collapse/Editor/MonsterPartSetEditor.cs   Bake — 스킨 메시를 본별로 가름
+1.Scripts/Monster/Collapse/MonsterCollapseDebris.cs   떼어 놓인 디브리 루트. 수명·퇴장 디졸브
+1.Scripts/Monster/Collapse/CollapseDeath.cs           IDeathEffect. DissolveDeath 자리에 들어간다
+
+[git 수정]
+2.Prefabs/Monster/ChompBot.prefab    DissolveDeath → CollapseDeath (🔴 경석 영역)
+
+[신규 에셋]
+2.Prefabs/Monster/Collapse/ChompBot_Parts.asset       Bake 결과
+```
+
+`DissolveDeath` 는 **지우지 않는다**. 보스가 계속 쓰고, 퇴장 디졸브가 같은 머티리얼 템플릿
+(`M_Dissolve_Template.mat`)·같은 셰이더를 재사용한다.
+
+## 8종 확장 — 실측과 도구 수정 (2026-10-06)
+
+ChompBot 하나로 끝날 줄 알았는데 아니었다. 잡몹 8종의 메시를 전부 재 봤다.
+
+| 몹 | 본 | 조각 | 경계 교차 | 걸린 것 |
+|---|---|---|---|---|
+| ChompBot | 10 | 10 | **0 (0.0%)** | — |
+| HumanoidBot | 23 | 23 | **0 (0.0%)** | 무기가 고정 메시 |
+| WallBot | 11 | 11 | 16 (0.8%) | — |
+| PeekABot | 9 | 9 | 12 (1.1%) | — |
+| TeslaBot | 8 | 7 | 13 (1.1%) | — |
+| MortarBot | 5 | 5 | 24 (1.9%) | 조각 5개뿐 |
+| SpinnerBot | 22 | 20 | **106 (4.6%)** | **스킨 렌더러 2개**(몸체·날) |
+| GauntletBot | 41 | **40** | **187 (5.5%)** | 건틀릿 2짝이 고정 메시 |
+
+🔴 **첫 도구는 세 군데서 틀렸다.**
+
+1. `GetComponentInChildren<SkinnedMeshRenderer>` 로 **첫 렌더러만** 갈랐다 —
+   SpinnerBot 의 날은 영영 안 무너진다. → 모든 스킨 렌더러를 훑는다.
+2. **고정 `MeshRenderer` 를 빼먹었다** — HumanoidBot 의 총, GauntletBot 의 건틀릿 두 짝
+   (각 2,886 폴리)은 스킨이 아니라 본에 매달린 평범한 메시다. 몸은 무너지는데 무기만
+   공중에서 증발한다. → 통째로 한 조각이 되어 같이 떨어진다.
+3. **조각 수 상한이 없었다** — GauntletBot 은 본이 41개라 그대로 가르면 40조각이고,
+   그건 "무너진다"가 아니라 "부품이 쏟아진다"다. → `maxParts`(기본 12)를 넘으면
+   작은 것부터 **부모 본으로 합친다**. 볼트가 그 팔뚝에 붙는 식이라 관절에서 떨어지고,
+   합치면 경계를 가로지르던 삼각형도 같이 사라져 **구멍 위험까지 준다**.
+
+데이터 구조도 바뀌었다 — `Part` 가 `followPath`/`followName`(따라갈 트랜스폼의 루트 기준 경로)과
+`materials`(렌더러마다 다르므로 조각이 직접 들고 있다), `isStaticMesh` 를 갖는다.
+런타임은 스킨/고정을 구분하지 않는다 — 둘 다 "제 트랜스폼의 로컬 공간에 담긴 메시"일 뿐이다.
+
+도구에 `Tools/Monster/부위 붕괴 — 잡몹 전부 설정` 을 더했다(8종 일괄, 보스 제외).
+
+## 개발용 즉사 키 (2026-10-06)
+
+`1.Scripts/Utility/DevMonsterKill.cs` — **F9** 가장 가까운 몹 / **Shift+F9** 전부.
+사망 연출을 반복해 보려면 필요하다(ChompBot 100HP vs 거너 평타 5 = 과열 대기 포함 9초).
+🔴 `#if UNITY_EDITOR || DEVELOPMENT_BUILD` · `RuntimeInitializeOnLoadMethod` 자가 설치라
+씬·프리팹을 안 건드린다 · 피해는 서버 권한이라 **호스트에서만** 듣는다.
+🔴 `ApplyDirectHealthDamage` 가 아니라 `TakeDamage(AttackInfo)` 를 쓴다 —
+사망 판정이 `MonsterBase.TakeDamage` 안에 있어 전자로는 `EnterDead` 가 안 불린다.
+
+## 검증 항목
+
+- [ ] Bake 결과 조각 10개 · 삼각형 합계 = 원본 2,922
+- [ ] 죽는 순간 조각이 **사망 포즈 그대로** 제자리에 뜬다 (한 프레임도 튀지 않아야 한다)
+- [ ] 조각이 바닥을 안 뚫는다 · 플레이어를 안 민다 · 서로 안 튄다
+- [ ] MPPM 2인 — 호스트·클라 **양쪽 다** 보인다 (🔴 이 레포가 반복해 밟은 함정)
+- [ ] 디스폰 타이밍 — 조각이 사라지기 전에 몹이 디스폰돼도 조각은 끝까지 산다
+- [ ] 히트스톱 중 사망 / 사망 직후 씬 전환에서 조각이 새지 않는다
+
+## 리스크
+
+- 조각이 10개뿐이라 "무너진다"가 아니라 "부품이 흩어진다"로 보일 수 있다 → 토크·대미를 낮추고
+  퇴장 디졸브를 빨리 걸어 본다. 그래도 아쉬우면 **래그돌(Q2 ②)** 로 올린다.
+- 발(68폴리)처럼 작은 조각은 바닥 충돌이 불안정할 수 있다 → 박스 콜라이더 + Speculative 로 시작.
+- `ChompBot.prefab` 은 경석 영역이다. 컴포넌트 교체만이고 `MonsterBase` 는 안 건드리지만 공유 필요.
+
+---
+
+# ▶▶▶ 진행 중 = **거너 좌클릭 빔 — 임시 LineRenderer 교체** (2026-10-04 · 그릴 6문항 완료 · 구현 완료 ✅ · 배선·검증 대기)
+
+> 작업 세션: **민경(Claude)**. 🔴 **은희 파일 2개 수정**(`GunnerBeamView.cs`·`GunnerBasicAttack.cs`).
+> 🔴 `50.Art` = **SVN**. 신규 4파일 + 에디터 스크립트.
+
+샌드박스에서 넘어온 `FX_GunnerBeam.prefab`(Hovl "Beam ray" 개조)을 실제로 붙이고 재생한다.
+인수인계 문서는 `50.Art/VFX/Common/Players/Player2/README.txt`.
+
+## 실측
+
+```
+fireInterval 0.35초 · range 14m · beamWidth 0.6 · muzzleHeight 1
+현재 연출  LineRenderer 0.08초 번쩍 (GunnerBeamView.basicDuration)
+프리팹     전 파티클 looping 0 · length 1초 · playOnAwake 0
+붙일 곳    GunnerBeamView·GunnerBasicAttack 둘 다 Player_Gunner.prefab 에 직접
+총구 소켓  없음
+```
+
+🔴 README 의 "Missing Script 제거" 는 **사실과 다르다.** `474bcb49…` 는 아직 Light 에 붙어 있고,
+`m_EditorClassIdentifier` 가 `UniversalAdditionalLightData` — **URP 정식 컴포넌트**다.
+패키지 안에 있어서 Assets 스캔에 안 잡혔을 뿐이다. 그대로 둔다.
+
+## 그릴에서 확정된 것
+
+| # | 항목 | 결정 |
+|---|---|---|
+| 1 | 발사 리듬 | 단발 연사. **프리팹 수명을 0.35초**(= 발사 간격)로 줄인다 |
+| 2 | 바닥 전용 자식 4종 | **`FX_LaserHit.prefab` 으로 분리**, 맞았을 때 `PlayOnce()` |
+| 3 | 길이 | 루트 `localScale.z = 거리 / beamUnitLength`(인스펙터) |
+| 4 | 시작 위치 | 총구 소켓 추가. 코드는 `EffectSocketPlayer` 를 SerializeField 로 받는다 |
+| 5 | 범위 | BasicAttack 만. Q·우클릭 LineRenderer 는 그대로, 미배선 시 폴백 |
+| 6 | `hit` | 2번으로 흡수 — 맞은 발만 피격 연출 |
+
+## 🔴 "EffectManager 는 못 쓴다" 를 뒤집은 지점
+
+README 는 균일 float 배율 때문에 포기했지만, 코드를 읽으면 길이 있다:
+
+```
+EffectPool.Rent        대출 시점에만 localScale = originalScale × scale, 반납 때 복원
+EffectManager.UpdateFollow  매 프레임 follow 의 position·rotation 만 복사 (scale 안 건드림)
+EffectSocketPlayer.GetInstances  Play() 루프의 인스턴스를 꺼내 준다
+```
+
+→ `Play()` 로 켜고 `GetInstances()` 로 받아 **`localScale.z` 만 덮으면** 비균일 길이가 된다.
+배율은 추종 루프가 안 건드리고 반납 때 저절로 복원된다. 조준은 **소켓을 돌려서** 한다
+(추종 루프가 소켓 회전을 복사하므로, 인스턴스를 직접 돌리면 다음 프레임에 지워진다).
+
+## 만든 것 / 고친 것
+
+```
+[SVN 신규]
+Player2/FX_LaserHit.prefab          GroundGlow·ParticlesGround·Rainbow·Shockwave 를 분리
+                                    중간 노드 Hit 이 Beam ray 와 같은 X+90·1.5 를 들고 있어
+                                    루트의 +Z 가 빔 진행 방향이 된다
+Player2/FX_GunnerBeam_Entry.asset   duration 0.35 / outro 0.35 · prewarm 1
+Player2/FX_LaserHit_Entry.asset     duration 0.5 · prewarm 4
+VFX/Scripts/Editor/GunnerBeamSetup.cs   Tools/VFX/거너 좌클릭 빔 배선
+
+[SVN 수정]
+Player2/FX_GunnerBeam.prefab        바닥 4종 제거 · lengthInSec 전부 0.35
+                                    수명 상한 0.35 (RayDark·EndSparks·Light·LaserCore,
+                                    랜덤 범위인 Particles·Sparks 는 min/max 둘 다)
+
+[git 수정]
+Effects/EffectSocketPlayer.cs       public Transform Socket 접근자 추가 (읽기 전용)
+Gunner/GunnerBeamView.cs            ShowBasicShot(origin, end, hit, width) 추가
+Gunner/GunnerBasicAttack.cs         ShowBeam 이 hit 를 넘기도록 (2줄)
+```
+
+🔴 **소켓은 플레이어 루트 자식**이다(본 자식 아님). `ServerFire` 가 쏘기 직전 루트를 조준 방향으로
+돌리므로 방향을 공짜로 따라가고, **반동 애니메이션에 흔들리지 않는다.**
+
+🔴 소켓이 비면 `Socket` 이 자기 트랜스폼으로 떨어진다 — 그게 플레이어 루트면
+`SetPositionAndRotation` 이 **플레이어를 순간이동시킨다.** 그래서 가드를 넣고 LineRenderer 로 떨어뜨린다.
+
+## 1차 검증에서 나온 것 (2026-10-04)
+
+| 증상 | 원인 | 처리 |
+|---|---|---|
+| 빔이 총이 아니라 **몸통**에서 나감 | `ServerFire` 의 `origin` 이 `루트 + up*MuzzleHeight` | 🔴 `GunnerBasicAttack.muzzle`(Transform) 추가 — **판정선 자체**를 총구로 옮겼다 |
+| 빔이 맞은 물체를 **뚫고** 지나감 → 피격 연출이 안 보임 | 늘이기가 한 번만 걸려, 지연 발화·풀 교체 시 배율 1로 남는다 | 켜 있는 동안 **매 프레임** 재적용 |
+
+🔴 **`muzzle` 은 연출이 아니라 판정이다.** 비우면 예전 동작으로 떨어진다. 은희 공유 항목.
+
+🔴 **빔 길이는 계산하지 말고 잴 것.** 계산으로는 24 m 가 나왔다 —
+메시(`CylinderFromGround` Y 0~2) × `size3D=1`·`startSizeY 8` × `Beam ray` 스케일 1.5.
+**씬에서 재니 8 m 였다.** 24/8 = 3 = 2 × 1.5 — 메시 높이도 `Beam ray` 스케일도
+파티클 길이에 곱해지지 않고 `startSizeY` 가 그대로 미터였다.
+`beamUnitLength` 기본값과 배선 툴의 `MeasuredBeamLength` 를 **8** 로 맞췄다.
+프리팹의 `startSizeY` 를 건드리면 **다시 재야 한다.**
+
+길이가 또 어긋나면 `Log Beam Length` 로 인스턴스 배율을 찍어 "상수 문제"인지 "늘이기가
+안 걸린 것"인지 가른다(인스턴스 z 가 거리에 따라 변하면 상수 문제).
+
+## 2차 검증 — 배선 도구 버그 (2026-10-04)
+
+"총구로 옮겼는데 빔이 계속 몸통에서 나간다" 의 원인은 **도구가 소켓을 두 개 만든 것**이었다.
+
+```
+BeamMuzzle   GO 875638587521706581   pos (0,0,0)            ← 손으로 본(bone) 밑에 단 진짜 소켓
+BeamMuzzle   GO 5809311226033411894  pos (0.25, 1, 0.35)    ← 도구가 루트에 새로 만든 중복
+GunnerBasicAttack.muzzle -> 331063376735999151              ← 중복 쪽을 물고 있었다
+beamUnitLength: 1                                           ← 빔이 거리의 8배로 뻗었다
+```
+
+🔴 `root.transform.Find(name)` 은 **직계 자식만** 본다. 소켓을 본 밑으로 옮기면 못 찾고
+루트에 같은 이름으로 하나 더 만든다. `GetComponentsInChildren<Transform>` 로 바꾸고,
+중복이 있으면 **가장 깊은 것만 남기고 지운다**(손으로 단 쪽이 깊다).
+
+`beamUnitLength` 는 이제 도구가 **항상** 실측값 8 로 되돌린다 — 1 이나 24 가 굳어 있으면
+빔 길이가 통째로 틀어지는데, 그게 눈으로는 "이펙트가 물체를 뚫는다"로만 보여 원인을 찾기 어렵다.
+
+`Dev_Boot.unity` 의 `defaultPlayerPrefab` 을 `Player_Paladin` → **`Player_Gunner`** 로 바꿨다
+(씬 경로는 `Assets/0.Scenes/Debug/Dev_Boot.unity`, 빌드 설정에는 없다).
+
+## 🔴 길이는 트랜스폼 스케일이 아니라 startSizeY 다 (2026-10-04, 3차)
+
+"어떤 건 스케일로 되고 어떤 건 3D start size 로 해야 한다" — 렌더 모드가 섞여 있어서다.
+
+| 렌더 모드 | 시스템 | 스케일로 늘이면 |
+|---|---|---|
+| Mesh (size3D 1) | RayDark · Beam ray · AirAura | 정상 |
+| Stretched (size3D 1) | LaserCore | 길이는 **속도 축**을 따라가서 두께만 찌그러진다 |
+| Stretched (size3D 0) | Particles · EndSparks · Flashes · Sparks | 불꽃이라 늘일 대상이 아니다 |
+| Billboard | StartFlare · Glow | 카메라를 향하므로 보는 각도마다 다르게 일그러진다 |
+
+🔴 **`size3D` 를 켜 둔 시스템이 정확히 "빔 몸통"이다.** 작성자가 이미 표시해 둔 셈이라
+코드가 목록을 따로 들 필요가 없다. 그래서 기준을 **`startSizeY` 배율 하나**로 통일했다:
+
+```
+main.startSize3D 가 true 인 것만  →  startSizeYMultiplier = 거리 / beamUnitLength
+트랜스폼 스케일은 전혀 건드리지 않는다 (localScale 참조 0곳)
+```
+
+프리팹이 **1 m 기준으로 정규화**돼 있으므로 `beamUnitLength` = 1 (이전 8에서 변경).
+
+⚠️ `startSizeYMultiplier` 는 **앞으로 방출될 입자에만** 걸린다. 그래서 `Play()` 직후,
+파티클 시뮬레이션이 돌기 전 같은 프레임에 걸어야 첫 발부터 맞는다.
+
+## 끝점 연출 — BeamEndAnchor (2026-10-04)
+
+`EndSparks` 를 빔 끝으로 옮겼다. 길이와 달리 끝점은 **늘이는 게 아니라 옮기는** 것이라
+`size3D` 같은 기존 플래그로는 구분할 수 없어 표시 컴포넌트를 하나 만들었다.
+
+```
+VFX/Scripts/BeamEndAnchor.cs   표시용 컴포넌트 + offsetAlongBeam(끝점 기준 추가 오프셋)
+FX_GunnerBeam.prefab           EndSparks 에 부착
+GunnerBeamView.StretchBeam     anchor.position = 루트 position + forward x (거리 + 오프셋)
+```
+
+컴포넌트를 떼면 그 자식은 총구에 남는다 — 되돌리기가 체크박스 하나다.
+
+⚠️ `EndSparks` 는 `startSpeed 8` · Cone 이고 콘이 **빔 진행 방향**을 본다 —
+벽에 맞으면 불꽃이 벽 **안쪽으로** 튄다. 쏜 사람 쪽으로 튀게 하려면 그 오브젝트를
+X 로 180도 돌리면 된다. 보고 정할 문제라 그대로 두었다.
+
+⚠️ `EndSparks` 는 Local 시뮬레이션 공간이다. 한 발 안에서 거리가 안 바뀌므로 문제없지만,
+거리가 매 프레임 변하는 연출에 재사용하면 이미 떠 있는 입자가 끌려온다.
+
+## 레이저 단면이 각져 보이던 것 (2026-10-04)
+
+`LaserCore` 텍스처(`t_trail07.psd`, 128²)의 알파를 재 보니 원인이 명확했다:
+
+```
+V(두께 축)  양 끝  0 → 1 → 2 → 3 ...      부드럽게 빠진다
+U(길이 축)  양 끝  255 ... 255            🔴 완전히 각진 단면
+```
+
+**트레일용 텍스처**라 길이 방향으로 이어 붙이는 전제다 — 양 끝을 일부러 꽉 채워 놨다.
+
+🔴 **텍스처 페이드도 메시 캡도 빔 길이에 비례해 늘어난다.** 끝을 10% 흐리면 2m 사격에선 20cm,
+14m 사격에선 1.4m 다. 메시로 둥근 끝을 모델링하면 14m 빔에 2m 짜리 원뿔 코가 달려 더 나쁘다.
+그래서 **고정 크기 끝 캡**(레이저 연출의 표준 구성)으로 갔다 — 거리가 변해도 캡은 그대로다.
+
+```
+[SVN 신규]
+Textures/FX_LaserCore.png     t_trail07 복제 + U 양끝 6px 페이드(알파·RGB 동시)
+                              왼쪽 알파 [5, 40, 96, 159, 215, 250, 254, 255]
+_Materials/FX_LaserCore.mat   AB_03 복제 — 원본은 FX_Throw_Mini 와 공유라 안 건드린다
+
+[수정]
+FX_GunnerBeam.prefab          LaserCore 머티리얼 교체 · EndGlow 추가
+                              (Glow 복제 + BeamEndAnchor → 빔 끝 고정 크기 캡)
+```
+
+끝 캡이 size3D 가 꺼져 있어 `StretchBeam` 이 안 건드린다 — 그게 "거리와 무관하게 일정"의 근거다.
+
+## 남은 일
+
+- [ ] **Tools ▸ VFX ▸ 거너 좌클릭 빔 배선** 다시 실행 (muzzle 배선이 추가됐다)
+- [ ] `BeamMuzzle` 을 실제 총구 위치로 (어림값 0.25, 1.0, 0.35)
+- [ ] `Beam Unit Length` 를 씬에서 재 보고 맞춤 (메시 계산으로는 24m 쯤)
+- [ ] 🔴 **MPPM 클라 창**에서 같게 보이는지
+- [ ] 🔴 SVN add 4파일(+meta) · 에디터 스크립트
+- [ ] 🔴 **은희에게 공유** — `GunnerBeamView.cs`·`GunnerBasicAttack.cs`
+- [ ] 🔴 `Assets/Hovl Studio/`·`Assets/GameVFX Buff Collection/` 이 **git·SVN 어느 쪽에도 없다**
+      (gitignore 는 `50.Art`·`51.Audio` 만 막는다). 대용량 아트는 SVN 규약 — 어디 둘지 확인 필요
+
 > 📁 09-22 이전 계획(23호 공격 재작업 G1~G7 · Dev Boot · 벽 투명화 1단계 · 보호막 VFX 등)과 끝난 `PLAN-*.md` 는
 > [Docs/history/PLANS/](Docs/history/PLANS/) 로 옮겼다. 옛 문서의 "PLAN.md §…" 참조는 [PLAN-archive-2026-06_09-22.md](Docs/history/PLANS/PLAN-archive-2026-06_09-22.md) 를 본다.
 

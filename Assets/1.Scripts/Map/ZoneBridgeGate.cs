@@ -51,22 +51,38 @@ public sealed class ZoneBridgeGate : MonoBehaviour
     [Tooltip("상호작용 가능 거리(m). 플레이어가 패널에서 이 안에 있어야 F가 먹는다.")]
     [SerializeField, Min(0.5f)] private float interactRadius = 2.5f;
 
-    [Header("활성 표시 링")]
-    [Tooltip("링 반지름(m).")]
-    [SerializeField, Min(0.2f)] private float ringRadius = 1.2f;
 
-    [Tooltip("링 색.")]
-    [SerializeField] private Color ringColor = new Color(0.45f, 0.9f, 1f, 1f);
+    [Header("모니터 화면 (옵트인 — 패널이 모니터인 존만, PLAN-title-monitor T2)")]
+    [Tooltip("켜면 패널마다 화면 판을 만들어, 활성화되면 CRT 켜짐 → 로고 + 라이트. 꺼 두면 활성 표시가 없다(판정·다리는 그대로).\n" +
+             "패널 프랍(object_panel)은 통짜 메시·공용 아틀라스라 화면만 켤 수 없어 판을 덧댄다.")]
+    [SerializeField] private bool monitorScreenEnabled;
 
-    [Tooltip("링 선 굵기(m).")]
-    [SerializeField, Min(0.01f)] private float ringWidth = 0.12f;
+    [Tooltip("화면 판의 패널 기준 로컬 위치·회전(오일러)·크기(m). 4개 패널이 같은 메시라 값 하나를 같이 쓴다.\n" +
+             "저작 도구 = Tools/Map/Authoring/Zone Monitor Screen — 메시에서 화면 면을 찾아 채운다.")]
+    [SerializeField] private Vector3 screenLocalPosition;
+    [SerializeField] private Vector3 screenLocalEuler;
+    [SerializeField] private Vector2 screenSize = new Vector2(0.5f, 0.4f);
 
-    [Tooltip("바닥에서 띄우는 높이(m). 너무 작으면 바닥과 Z-fighting으로 지글거린다.")]
-    [SerializeField, Min(0f)] private float ringGroundLift = 0.05f;
+    [Tooltip("화면 머티리얼 원본(Title/CRTScreen — 타이틀 모니터와 같은 CRT 룩). 런타임에 복제해 쓴다.")]
+    [SerializeField] private Material screenMaterialSource;
 
-    [Tooltip("비우면 절차 생성 원(LineRenderer)을 쓴다. 채우면 이 프리팹을 대신 쓴다 — " +
-             "전용 아트로 갈아끼우는 경로. 이 경우 위 반지름·색·굵기는 무시되고 프리팹이 스스로 정한다.")]
-    [SerializeField] private GameObject ringPrefabOverride;
+    [Tooltip("켜진 화면에 띄울 로고(Re:C — 타이틀과 같은 monitor_screen.png).")]
+    [SerializeField] private Texture screenLogo;
+
+    [Tooltip("CRT 켜짐(타이틀 꺼짐 연출 역재생) 시간(초).")]
+    [SerializeField, Min(0.05f)] private float screenOnDuration = 0.9f;
+
+    [Tooltip("켜지면 화면 앞에 다는 포인트 라이트. 세기 0 이면 라이트 없음.")]
+    [SerializeField] private Color screenLightColor = new Color(0.55f, 0.85f, 1f, 1f);
+    [SerializeField, Min(0f)] private float screenLightIntensity = 1.5f;
+    [SerializeField, Min(0.1f)] private float screenLightRange = 2.5f;
+    [Tooltip("라이트를 화면 판 앞(판 법선 방향)으로 띄우는 거리(m).")]
+    [SerializeField, Min(0f)] private float screenLightForward = 0.35f;
+
+    [Header("근접 외곽선 (PLAN-title-monitor T3)")]
+    [Tooltip("로컬 플레이어가 반경 안에 들면 가장 가까운 미활성 패널에 덧붙일 외곽선 머티리얼(Zone/InteractOutline — 'Outline' 패스만).\n" +
+             "기존 Flat Kit 외곽선 렌더러 피처가 그린다. 비우면 외곽선 없음.")]
+    [SerializeField] private Material highlightOutlineMaterial;
 
     public IReadOnlyList<Transform> Panels => panels;
     public int PanelCount => panels != null ? panels.Count : 0;
@@ -76,10 +92,7 @@ public sealed class ZoneBridgeGate : MonoBehaviour
     /// <summary>이 존이 놓인 슬롯 ID. 스폰 시 <see cref="GeneratedZoneIdentity"/>에서 받아 채운다.</summary>
     public int SlotID { get; private set; } = -1;
 
-    readonly List<ZoneInteractRing> _rings = new List<ZoneInteractRing>();
-
     float _openProgress;   // 0 = 닫힘, 1 = 열림
-    bool _ringsBuilt;
 
     public void SetSlotID(int slotID) => SlotID = slotID;
 
@@ -88,9 +101,128 @@ public sealed class ZoneBridgeGate : MonoBehaviour
 
     void Awake()
     {
-        BuildRings();
+        BuildMonitorScreens();
         BuildGapObstacle();
         ApplyOpenProgress(0f);
+    }
+
+    // ── 모니터 화면(옵트인) ──────────────────────────────────────────────
+
+    sealed class MonitorScreen
+    {
+        public Renderer Renderer;
+        public Material Material;
+        public Light Light;
+        public Coroutine Anim;
+        public bool On;
+    }
+
+    static readonly int IdPower = Shader.PropertyToID("_Power");
+    static readonly int IdScreenAspect = Shader.PropertyToID("_ScreenAspect");
+    readonly List<MonitorScreen> _screens = new List<MonitorScreen>();
+
+    /// <summary>
+    /// 패널마다 꺼진 화면 판을 만든다(로컬 연출 — 판정·복제와 무관). 패널 기준으로만 만든다.
+    /// </summary>
+    void BuildMonitorScreens()
+    {
+        if (!monitorScreenEnabled || _screens.Count > 0) return;
+        if (screenMaterialSource == null)
+        {
+            Debug.LogWarning($"[ZoneBridgeGate] {name}: 모니터 화면이 켜져 있는데 screenMaterialSource 가 비었다 — 화면 없이 진행.", this);
+            return;
+        }
+
+        for (int i = 0; i < PanelCount; i++)
+        {
+            Transform panel = panels[i];
+            if (panel == null) { _screens.Add(null); continue; }
+
+            var quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            quad.name = "MonitorScreen";
+            // 판정·NavMesh 에 끼지 않게(에디터 미리보기에서도 돌도록 즉시 파괴 분기)
+            if (Application.isPlaying) Destroy(quad.GetComponent<Collider>());
+            else DestroyImmediate(quad.GetComponent<Collider>());
+            quad.transform.SetParent(panel, false);
+            quad.transform.localPosition = screenLocalPosition;
+            quad.transform.localRotation = Quaternion.Euler(screenLocalEuler);
+            quad.transform.localScale = new Vector3(screenSize.x, screenSize.y, 1f);
+
+            var r = quad.GetComponent<Renderer>();
+            var mat = new Material(screenMaterialSource) { name = "ZoneMonitorScreen (Instance)" };
+            if (screenLogo != null) mat.mainTexture = screenLogo;
+            mat.mainTextureScale = Vector2.one;
+            mat.mainTextureOffset = Vector2.zero;
+            mat.SetFloat(IdPower, 0f);
+            mat.SetFloat(IdScreenAspect, screenSize.y > 1e-4f ? screenSize.x / screenSize.y : 1f);
+            r.sharedMaterial = mat;
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            r.enabled = false;   // 꺼진 동안은 원래 패널 화면(아틀라스) 그대로
+
+            Light light = null;
+            if (screenLightIntensity > 0f)
+            {
+                var lgo = new GameObject("MonitorScreenLight");
+                lgo.transform.SetParent(quad.transform.parent, false);
+                // 쿼드 법선 = -forward(Unity Quad 는 -Z 를 향한다)
+                lgo.transform.position = quad.transform.position - quad.transform.forward * screenLightForward;
+                light = lgo.AddComponent<Light>();
+                light.type = LightType.Point;
+                light.color = screenLightColor;
+                light.range = screenLightRange;
+                light.intensity = 0f;
+                light.shadows = LightShadows.None;
+                light.enabled = false;
+            }
+
+            _screens.Add(new MonitorScreen { Renderer = r, Material = mat, Light = light });
+        }
+    }
+
+    void OnDestroy()
+    {
+        if (_highlightedPanel >= 0) SetPanelHighlighted(_highlightedPanel, false);
+        foreach (MonitorScreen s in _screens)
+            if (s != null && s.Material != null) Destroy(s.Material);
+    }
+
+    void SetScreen(int index, bool on, bool animate)
+    {
+        if (index < 0 || index >= _screens.Count) return;
+        MonitorScreen s = _screens[index];
+        if (s == null || s.On == on) return;
+        s.On = on;
+
+        if (s.Anim != null) { StopCoroutine(s.Anim); s.Anim = null; }
+
+        s.Renderer.enabled = on;
+        if (s.Light != null) s.Light.enabled = on;
+
+        if (on && animate && isActiveAndEnabled)
+        {
+            s.Anim = StartCoroutine(PowerOn(s));
+            return;
+        }
+
+        s.Material.SetFloat(IdPower, on ? 1f : 0f);
+        if (s.Light != null) s.Light.intensity = on ? screenLightIntensity : 0f;
+    }
+
+    /// <summary>CRT 켜짐 — 타이틀 꺼짐 연출(_Power)을 거꾸로 돌린다: 검정 → 발광 가로선 → 펼쳐지며 화면. 라이트는 같이 차오른다.</summary>
+    System.Collections.IEnumerator PowerOn(MonitorScreen s)
+    {
+        float t = 0f;
+        while (t < screenOnDuration)
+        {
+            t += Time.deltaTime;
+            float k = Mathf.Clamp01(t / screenOnDuration);
+            s.Material.SetFloat(IdPower, k);   // 선형 — 곡선은 셰이더 구간 이징이 만든다
+            if (s.Light != null) s.Light.intensity = screenLightIntensity * k;
+            yield return null;
+        }
+        s.Material.SetFloat(IdPower, 1f);
+        if (s.Light != null) s.Light.intensity = screenLightIntensity;
+        s.Anim = null;
     }
 
     // ── NavMesh: 미리 굽고 카브로 막는다 ──────────────────────────────────
@@ -222,35 +354,54 @@ public sealed class ZoneBridgeGate : MonoBehaviour
     }
 
     /// <summary>
-    /// 패널 위치에 링 표시를 만든다(전 피어 로컬 연출). 아트가 따로 없으므로 <see cref="LineRenderer"/>로
-    /// 원을 그린다 — 존 프리팹에 의존물을 추가하지 않아도 되고, 색·반지름을 인스펙터로 조절할 수 있다.
+    /// 패널 i의 활성 표시를 켜고 끈다(로컬 연출 — 판정과 무관).
+    /// <paramref name="animate"/> = 이번에 **새로** 켜진 패널만 true(매니저가 판단). 등록·스폰·레이트 조인은 false — 연출 없이 켜진 상태.
     /// </summary>
-    void BuildRings()
+    public void SetPanelActivatedVisual(int index, bool activated, bool animate = false)
     {
-        if (_ringsBuilt) return;
-        _ringsBuilt = true;
-
-        for (int i = 0; i < PanelCount; i++)
-        {
-            Transform panel = panels[i];
-            if (panel == null)
-            {
-                _rings.Add(null);
-                continue;
-            }
-
-            _rings.Add(ZoneInteractRing.Create(panel, ringRadius, ringColor, ringWidth,
-                                               ringGroundLift, ringPrefabOverride));
-        }
+        // 활성 표시 = 모니터 화면 켜짐. 예전 바닥 링(ZoneInteractRing)은 임시였다 — 팀장 10-04 삭제
+        // (클래스 파일은 Visual Scripting 생성 코드 AotStubs 가 참조해 남겨 둔다).
+        SetScreen(index, activated, animate);
     }
 
-    /// <summary>패널 i의 활성 표시를 켜고 끈다(로컬 연출 — 판정과 무관).</summary>
-    public void SetPanelActivatedVisual(int index, bool activated)
-    {
-        if (index < 0 || index >= _rings.Count) return;
+    // ── 근접 외곽선(로컬 표시 — 매니저가 로컬 플레이어 기준으로 하나만 켠다) ──
 
-        ZoneInteractRing ring = _rings[index];
-        if (ring != null) ring.SetVisible(activated);
+    readonly Dictionary<Renderer, Material[]> _highlightOriginals = new Dictionary<Renderer, Material[]>();
+    int _highlightedPanel = -1;
+
+    /// <summary>
+    /// 패널 i 의 외곽선을 켜고 끈다. 렌더러 머티리얼 배열 끝에 외곽선 머티리얼을 덧붙이고, 끌 때 원래 배열로 되돌린다
+    /// (공용 머티리얼 무수정 — sharedMaterials 배열만 바꾼다). 화면 판(MonitorScreen)은 대상이 아니다.
+    /// </summary>
+    public void SetPanelHighlighted(int index, bool on)
+    {
+        if (highlightOutlineMaterial == null) return;
+
+        if (!on)
+        {
+            if (index != _highlightedPanel) return;
+            foreach (KeyValuePair<Renderer, Material[]> kv in _highlightOriginals)
+                if (kv.Key != null) kv.Key.sharedMaterials = kv.Value;
+            _highlightOriginals.Clear();
+            _highlightedPanel = -1;
+            return;
+        }
+
+        if (index == _highlightedPanel) return;
+        if (_highlightedPanel >= 0) SetPanelHighlighted(_highlightedPanel, false);
+        if (index < 0 || index >= PanelCount || panels[index] == null) return;
+
+        foreach (MeshRenderer r in panels[index].GetComponentsInChildren<MeshRenderer>())
+        {
+            if (r.gameObject.name == "MonitorScreen") continue;
+            Material[] original = r.sharedMaterials;
+            var withOutline = new Material[original.Length + 1];
+            original.CopyTo(withOutline, 0);
+            withOutline[original.Length] = highlightOutlineMaterial;
+            _highlightOriginals[r] = original;
+            r.sharedMaterials = withOutline;
+        }
+        _highlightedPanel = index;
     }
 
     /// <summary>패널 i의 월드 위치. 거리 판정에 쓴다.</summary>
@@ -309,7 +460,7 @@ public sealed class ZoneBridgeGate : MonoBehaviour
 
     void OnDrawGizmosSelected()
     {
-        Gizmos.color = ringColor;
+        Gizmos.color = new Color(0.45f, 0.9f, 1f, 1f);
         for (int i = 0; i < PanelCount; i++)
             if (panels[i] != null) Gizmos.DrawWireSphere(panels[i].position, interactRadius);
 

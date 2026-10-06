@@ -13,13 +13,166 @@ Update this file when a term becomes important enough that future agents or team
 - 🔴 코어 변경 포함: 플레이어 **SuperArmor = 몬스터와 같은 의미**(CC·잡기 거부) · 스킬 쿨 장부 스킬 단위 + 슬롯 교체 · 간파 베이스 추출 · 캐릭터 HUD = `<Char>_Armature/HUD`(거너 과열 게이지 이동).
 - 🔴 백어택은 **경석 공유 후**(PLAN §6 초안). 🔴 **수정 예정 — 동시 수정 금지**: `Player/Skill/*`(Controller·Base·Data·Targeting·Interrupt)·`Unit/StatusEffectController.cs`·`PlayerStateController.cs`·`UI/Combat/PassiveHUD.cs`·`SkillCooldownHUD.cs`·`Player/Gunner/*` HUD·`Player_Gunner`/`Gunner_Armature` 프리팹·`CharacterRoster.asset`.
 
+## ▶▶ 작업 세션 (2026-10-06~07 · 은희(Claude+Codex+claude-alt) · **스킬 직선 인디케이터 + HUD 호버 미리보기 + 지점 지정 확장**, 브랜치 `feature/GunnerSkillIndicatorUpgrade`) — ✅ 구현·배선 · EditMode 33/33 · ⏳ Play·MPPM 확인 · 미푸시
+- 계획·결정 = [PLAN.md](PLAN.md) 최상단(그릴 21문항, 레퍼런스 = 롤 제라스 Q). 대상 = 거너 Q(차지 중 직사각형 6→16) · 거너 RMB/팔라딘 RMB/거너 E(HUD 호버 미리보기). 거너 R·팔라딘 R(사거리 원)은 다음 작업.
+- 커밋 `85b6d6df`~`724ac4ba`. 배선 = `Tools/Player/Authoring/Wire Skill Line Indicator`(base `Player.prefab`, 멱등) · 테스트 = `Tools/Tests/스킬 직선 인디케이터 EditMode 테스트 실행`.
+- 계획 밖 변경: `PlayerMotor.GetGroundedPreviewDistance`(미리보기 화살표 클립용) · `PlayerMotionSweep.Resolve` 선택 인자 `logDiagnostics`(기본 true, 기존 호출 동일). 셰이더는 임시 HLSL `.shader`(아트 교체 예정).
+- 후속(10-07): 호버 방향 = `PlayerMovement.CurrentFacing`(루트는 안 돎) · 대상 지정 스킬 호버 = 사거리 원(팔라딘 R·거너 R).
+- 후속(10-07, claude-alt `c53d9fc6` + `2a7830a9`): **지점 지정(GroundPoint) 확장 = 기능만** — `PlayerSkillData` 옵션 `groundPointOutOfRange`(Clamp 기본/AutoApproach) · `groundMarkerRadius`(0=안 그림) · `hoverMarkerDistance`(3). 새 RPC `SubmitPointApproachRpc`. **거너 R 에셋은 기획서대로 SingleTarget 유지**(은희 결정) — 쓰려면 에셋 `targetingMode=GroundPoint`·`AutoApproach`. EditMode 33/33. 팔라딘 Q·E 미리보기는 안 함.
+- ⚠️ 이 워크트리에서 `Assets/Refresh` 뒤 도메인 리로드마다 Unity MCP(3003)가 안 돌아와 `Window > MCP Server` 수동 Start 가 필요했다(10-06~07 4회).
+- ⚠️ base `Player.prefab` 을 저작 메뉴로 고치면 Unity 가 Variant(`Player_Gunner`·`Player_Paladin`)를 재저장해 잡음 diff(오버라이드 재정렬·base 와 같은 값)를 남긴다 — 커밋 전에 확인하고 되돌릴 것.
+
+## ▶▶ 작업 세션 (2026-10-06 · 은희(Claude) · **스킬 툴팁 인라인 아이콘 + r381 툴팁 행 복구**, 브랜치 `feature/SkillTooltipIcons`) — ✅ 구현 · EditMode 83/83 · Verify 0 · **SVN r384** 같이 받을 것 · ⏳ Play 확인
+- 🔴 **SVN r381(밸런스)이 `tooltip.*` 30행 + `# ─ 툴팁` 10행을 날렸다** → r384 에서 Export 병합으로 복구(r381 수치 유지, 서식 초기화). Boss·Monster `attackCooldown` 행도 인스펙터 값으로 새로 생김. 아트 핀 381 → **384**. 경석 남은 일 3(xlsx Monster 속도)은 **r384 위에서** 고칠 것.
+- 인라인 아이콘 = `SkillTooltipGenerated/tooltipIcon_*.png` → 아틀라스 `SkillTooltipAttackIcon.asset`(guid 유지) · TMP `SkillTooltipAttackSprite`: `atk`·`shield`·`cooldown`. 재생성 = `Tools/UI/스킬 툴팁 인라인 아이콘 갱신`(⚠️ 인스펙터에서 바꾼 BX·BY·AD 를 덮어씀).
+- 표기 = 아이콘이 수치 **앞**, 색은 태그에 직접: `<sprite name="shield" color=#74C7EC>{shieldAmount}`. 🔴 속성이 붙으면 **이름에 따옴표 필수** — 없으면 EmojiOne 노란 `?` 로 깨진다(로그 없음). 칼 #F4B860(코드) · 쿨다운 #B8C4D6(코드, 머리줄 `⏱` 대체).
+
+## ▶▶ 다음 세션 인수인계 (2026-10-06 2차 · 경석(Claude)) — 여기부터 읽을 것
+
+**상태**: `development` = `feature/Boss23`(10-06 저녁 빨리 감기 푸시) — S6 측정 도구 + development 2회 병합(거너 연출·붕괴 사망·가렌 애니) + 아래 수정. SVN **r392**(핀 392, check-environment 통과). 전투 EditMode 108/2(기존 실패 2 동일).
+
+**🔴 클라에서 몬스터가 땅에 박혀 보이던 문제(핫스팟 3인 테스트 · PeekABot 받침대 고리만 보임·사격 안 보임) — 수정**
+- 원인: 아트 팩(Robot Sentries) 몬스터 **본마다 kinematic Rigidbody + 외삽(Interpolate=2)**. 클라(NGO)는 프리팹 기본 위치에 만든 뒤 루트를 옮기고 `AutoSyncTransforms=0` 이라 물리가 옮기기 전 자세를 본에 다시 씀 → 본이 **루트 높이 × 거치는 Rigidbody 수** 만큼 아래로 굳음(실측 머리 −7.86 / 예측 −7.85). 호스트는 제자리 생성이라 안 생김. 타이밍 의존이라 지연 환경에서 잦음.
+- 수정: `MonsterBase.DisableBoneRigidbodyInterpolation`(OnNetworkSpawn, 하위 본 Rigidbody 보간 끔, 아트 SVN 무수정). MPPM 혼잡 핫스팟·2.5G 3판 연속 본 이상 0(1,300+ 샘플).
+- ⚠️ 철회한 가설: 로딩 씬과 함께 몬스터 삭제(실측: Loading→DDOL→Map 이동) · 접힌 바인드 포즈 · 컬링. "더 오래 기다리기"는 이 증상의 처방이 아니었음(굳은 자세가 25초간 유지).
+- 별건(유효): 클라가 `AsyncOperation.progress>=0.9` 에서 100% 보고(`NetworkLoadingFlowController.cs:681`) + 서버가 평균 100% 만으로 완료 → 준비 확인 후 시작으로 바꾸는 계획은 **은희 합의 후** 별도.
+- 재현: MPPM(호스트 + 클라)에서 클라에만 Multiplayer Tools `NetworkSimulator` 로 지연(예: 400ms ±200 · 손실 5%)을 걸고 `0.BootStrapScene` 부터 정식 흐름으로(Dev Boot 은 로딩 씬을 건너뜀). 각 인스턴스 로그 = `Library/VP/mppm*/Logs/Editor.log`.
+배포용 빌드 = `../MainProjectBuilds/Windows/`(측정기·콘솔 없음 확인) · 측정용 = `../MainProjectBuilds/WindowsDev/`. 실측 표 = [PLAN-cleanup-optimization.md](PLAN-cleanup-optimization.md) §S6.
+
+**이번 세션 결과**
+- 🔴 **GPU 병목 = 4K 해상도.** 개발 빌드 일반 존 GPU: 1080p 2.2~2.5 · 1440p 2.7~3.3 · 4K 4.7~5.0ms(Main 0.4~1.2). → 기본 해상도 **1920×1080**(네이티브 끔, `6df20e8c`). 메시 병합·GRD(CPU 제출 절감)는 우선순위 뒤로.
+- 타이틀 마우스 클릭(빌드만) = `monitor_screen.fbx` Read/Write 꺼짐 → MeshCollider·`textureCoord` 실패. **SVN r392** 로 켬, 빌드 클릭 확인.
+- 로비 전투 HUD = `0.BootStrapScene` 의 `NetworkConfig.PlayerPrefab = Player_Gunner` 오버라이드(민경 `3121b04c`)가 NGO 접속 즉시 자동 생성 → 삭제(`65e3ae92`). 빌드 로비 생성 0건 확인.
+- `FloatingDamageAnchor.worldOffset` 추가 — 23호 머리 위 숫자 위치는 프리팹 `TwentyThree`/`_Solo` 에서 조정(값 미조정).
+
+**남은 일**
+1. 🔴 **시작 존·로딩 화면 GPU 2~3배**(1080p 4.2/5.1ms, 4K 13/15ms) — 해상도와 별개, 다음 최적화 1순위. 로딩 화면 뒤에서 맵이 드로우 528 로 계속 그려짐.
+2. **패스별 GPU 기록이 빈다**(`SystemInfo.supportsGpuRecorder` True 인데 값 0) — `ZonePerfRecorder.ScanPassesIfNeeded` 방식 재검토.
+3. 붕괴 사망(`MonsterCollapseDebris` — 죽을 때마다 조각 GO·Rigidbody·BoxCollider 생성, 풀링 없음) 다수 처치 순간 부하 측정.
+4. `defaultPlayerPrefab`(선택 없을 때 기본 캐릭터) 아직 **Player_Gunner** — 팀장 결정(팔라딘 복구 수정은 권한 거부로 미적용).
+5. 해상도 1080p 가 실제로 뜨는지 확인 — 레지스트리 `HKCU\Software\DefaultCompany\MainProject` 에 이전 4K 저장값 있음(Default 키 비교로 리셋될 것으로 예상, 미확인).
+6. 보류(팀장 10-06): Alt+Tab 처리. ⚠️ 현재 `runInBackground: 0` → 호스트가 Alt+Tab 하면 서버 정지, 30초 후 클라 끊김(`DisconnectTimeoutMS 30000`).
+7. 전달 — **민경**: development 핀 390 인데 거너 코드는 r391 필요(우리 쪽 392 로 해결, development 반영 전까지 깨짐) · `PlayerShieldVfx.OnDestroy` 가 `NetworkBehaviour.OnDestroy` 가림(CS0114) · 부트스트랩 오버라이드 건. **은희/사운드**: `VolumeSlider`·`TitleSceneManager:53` 이 8월에 흐름에서 빠진 `AudioManager` 를 찾아 NRE → 설정 화면 볼륨 슬라이더 미동작. **팀**: `Build/` 메뉴 빌드는 데이터 테이블 훅을 안 거침(인스펙터 값으로 빌드) · VisualSVN 서버 라이선스 만료 경고.
+8. `.claude/commands/coop-agent*.md` 가 development 에서 git 추적 해제되어 병합으로 지워짐 — 백업 = 이 PC 스크래치(세션 종료 시 사라짐). 쓰려면 `~/.claude/commands/` 로 복사.
+9. 이전 남은 일(아래 블록) 중 2·3·4·5·6 그대로.
+
+## ▶▶ 다음 세션 인수인계 (2026-10-06 · 경석(Claude))
+
+**상태**: 전수조사 정리·최적화 S1~S5 끝 → `development` = `feature/Boss23` = **`661cf289`**(푸시). SVN **r381**(핀 381, check-environment 전부 통과).
+상세·실측 = [PLAN-cleanup-optimization.md](PLAN-cleanup-optimization.md) §4 · 정리 노트 = 노션 「개인포트폴리오 > 전수조사 기반 성능 최적화…」(VeyTrace 하위로 옮길 것 — 도구 권한상 직접 못 만듦).
+
+**남은 일 (다음 세션)**
+1. **ForProfile 빌드 · L존 측정** — GPU Resident Drawer 켜기 여부(에디터에선 드로우 486→193 인데 프레임 6.85→7.77ms) · 바닥 그림자 Off 효과. 켤 때 `m_BrgStripping` = **2**(1 은 전부 제거).
+2. **에디터 사전 메시 병합**(같은 메시 묶어 그리기) — Codex 권장안 PLAN §S4 아래. 큰 작업 → grill·PLAN.
+3. **xlsx Monster 시트 속도 반영** — Chomp 2.4/3.36 · Humanoid 2.5/3.5 · Mortar 1.75/2.1. 🔴 **r381 에서 기획(김태현)이 xlsx 를 고쳤다** → 반드시 r381 위에서 해당 칸만 수정, SVN 커밋 전 팀장 확인.
+4. **담당별 목록 전달** — 은희(CONTEXT 아래 📮 목록 + 레거시 Paladin 네트워크 등록·TempPlayer_Armature·Garen 컨트롤러·R1·ToonLit 레거시·벽 투명화 레거시) · 민경(INab Demo Assets — 이펙트 프리팹이 데모 메시 30곳 참조) · 아트(SVN `VFX/**/OldVersion`·`SurfaceV1` 원본·빈 아트 폴더 4).
+5. **미검증 Play** — MPPM(원격 애니·블렌드 고정) · GauntletBot 예고 · 23호 전기 장판 2회차 VFX · 피격 전이 블렌드 고정.
+6. 기존: `BossCounterDataTests` 실패 2(No23 Dash) 팀장 결정 · `TitleSceneManager.cs:53` BGM NRE · `SoulVisualPrefab` 미지정 경고(은희).
+
+## ▶▶ 작업 세션 (2026-10-06 2차 · 경석(Claude) · **S6 존별 실시간 측정 도구**, 브랜치 `feature/Boss23`) — ✅ 완료·커밋(`c445a7bd`) · 빌드 측정 끝(위 인수인계). 실행 = `Dev_Boot.unity` Play(MapScene 직접 Play ✗). 진행·실측 = PLAN §S6 진행
+계획 = [PLAN-cleanup-optimization.md](PLAN-cleanup-optimization.md) §S6(승인 10-06). 예산 = 이 PC 200fps(5.0ms) · 결정은 개발 빌드 숫자 · 이번 범위 = 측정 도구까지 · **존 진입/이탈 때 렌더 설정 전환 안 함**(근거 §S6).
+🔴 **수정 예정 — 동시 수정 금지:** `Dev/Profiler/ProfilerHUD.cs` · 신규 `Dev/Profiler/ZonePerfRecorder.cs` · `Editor/BuildWindowsPlayer.cs`(측정용 Development 메뉴 추가) · `0.Scenes/MainFlow/4.MapScene.unity`(컴포넌트 부착).
+
+## ▶▶ 작업 세션 (2026-10-06 · 경석(Claude) · **전수조사 정리·최적화 S1~S5**, 브랜치 `feature/Boss23`) — ✅ S1~S5 커밋 · development 반영(10-06)
+계획 = [PLAN-cleanup-optimization.md](PLAN-cleanup-optimization.md)(팀장 결정 §4: 이번 라운드 S1+S2, 은희 영역은 목록만).
+🔴 **수정 예정 — 동시 수정 금지:** `Monster/MonsterBase.cs` · `Monster/Boss/TwentyThreeBoss.cs`·`GrabController.cs`·`BossChargeClipLoop.cs`·`BossPatternTargets.cs`·`BossElectricFloor.cs` ·
+`Rendering/RetroCRT/RetroCRTFeature.cs` · `Rendering/Silhouette/PlayerSilhouetteFeature.cs` · `Rendering/Fog/FogRendererFeature.cs`·`FogManager.cs` · `Map/Minimap/MinimapController.cs`·`MinimapNetworkSync.cs` · `Map/SteamVent.cs` · 프레임 상한(부트스트랩 1곳).
+
+진행표·실측·미검증 = PLAN §4 "진행 (10-06)"·S3·S4. S5 파일 정리 = 커밋 `4a9041d2`·`4f32f26d`(목록만 남긴 담당별 후보는 PLAN §2 S5). SVN r381 확인(Paladin_SkillIcon .meta 트리 충돌 6건 → SVN guid 로 해결).
+📮 **은희에게 넘길 목록(팀장 결정: 목록만)** — 근거·위치는 PLAN §2:
+`Player.cs:386`·`PlayerCorpseController.cs:248` `RaycastAll`→`RaycastNonAlloc` · `ToonLit.shader:137` 안 쓰는 SSAO·혼합그림자·ShadowMask multi_compile(변형 8배) ·
+HUD 매 프레임 문자열(`PlayerHealthHUD`·`StatusEffectHUD`·`SkillCooldownHUD`·`DashCooldownHUD`·`PassiveHUD`) · 참조 0 스크립트(`AttackElement`·`OverlapAttack`·`IKnockbackSettable`·`PlayerColorAssigner`) ·
+네트워크: `_animSpeed` 양자화 · 몬스터 투사체 NGO 풀 · NetworkTransform 38개 회전 X/Z·스케일·HalfFloat · 보호막 `NetworkList` 전체 재직렬화(`Unit.cs:452`) · 먼 몬스터 관찰자 관리 · 플레이어 정적 레지스트리(미니맵·PartyWipeWatcher 가 쓰게).
+
+**10-06 앞선 작업 — 걷는 몬스터 이동 애니(미커밋, 팀장 Play 확인)**
+- `MonsterDataSO.locomotionPlaybackScale`(기본 1, `[DataTableIgnore]`) — 발맞춤 재생 배율에 곱함, Play 중 인스펙터 실시간 반영. Chomp 0.85 · Humanoid 0.9 · Mortar 0.43.
+- 속도: Chomp 2.4/3.36(1.2배) · Humanoid 2.5/3.5(기본 몹, 걷기 클립뿐이라 절충) · Mortar 1.75/2.1(0.7배). 🔴 **xlsx Monster 시트는 아직 옛 값**(2/2.8 · 3/4.5 · 2.5/3) — 테이블 모드·빌드는 옛 속도. SVN 갱신 필요.
+- `MonsterBase`: 이동 블렌드 = 감쇠 0.12 + **이동→액션 전이 동안 고정**(공통) + **원거리 이동형 공격 종료 시 걷기 값 선세팅**(Mortar "앉는 프레임"). 원인 = 공격 종료 `ResetToLocomotion` 코드 CrossFade 가 속도 0 Movement 로 감. Host 실측 대기우세 0. ⏳ MPPM · Gauntlet 예고 · 피격 전이 Play.
+- `HasParameter` 매 프레임 `animator.parameters` 할당 → 컨트롤러별 해시 캐시.
+- Mortar 가 최소 거리 안에서 쏘는 것 = 팀장 OK(그대로).
+
+## ▶▶ 다음 세션 인수인계 (2026-10-05 · 경석(Claude)) — 여기부터 읽을 것
+
+**이 세션에서 끝낸 것**: 몬스터 공격속도·쿨다운·이동 애니(development 반영 `4040189c`, SVN r372) · 타이틀 시작 연출 + 존 게이트 모니터 패널·외곽선(`feature/Boss23` `5e3e46fe`, development **미반영**) ·
+존 프리팹 NetworkObject 정리(아래 1번, **Unity 검증 대기**).
+
+**남은 일 (우선순위 순)**
+1. 🔴 **존 NetworkObject 정리 검증** — Unity 를 꺼 둔 채 YAML 로 했다: 존 7종(ZoneL_typeA/B/C · ZoneM_typeA/B · ZoneS_typeA · Zone_typeQuest01) 루트 NetworkObject 제거 ·
+   `DefaultNetworkPrefabs.asset` 항목 31 → 24 · 아트 씬 `all_mesh.unity` 의 고아 `GlobalObjectIdHash` 오버라이드 5건 제거 · 재감염 방지 테스트 `ZonePrefabNetworkRulesTests`(전투 EditMode 러너 등록).
+   → Unity 열고 **컴파일 · `Tools/Tests/전투 EditMode 테스트 실행`(신규 2건 통과 확인) · 튜토리얼 Play(존 생성·다리 게이트 F) · MPPM** 후 커밋. 원본 백업 = 이 PC 스크래치(세션 종료 시 사라짐) — 문제 시 `git checkout` 으로 되돌릴 것.
+   근거: 존은 `MapContentSpawner` 가 로컬 Instantiate(네트워크 Spawn 은 몬스터뿐), 7종에 NetworkBehaviour 없음 확인.
+2. 🔴 **데이터 테이블 Play·빌드 차단(기존 문제)** — SVN r366(은희)이 xlsx 에 `tooltip.*` 행을 넣었는데 코드(`feature/SkillTooltip`)가 git·SVN·GitHub 어디에도 없다(10-04 전수 확인).
+   테이블 모드 Play 가 오류 30개로 꺼진다(`DataSourcePlayMode.cs:103`). **은희에게 브랜치 푸시 요청**(팀장). 그동안 경석 PC 데이터 출처 = 인스펙터.
+   대안(공유 후에만): xlsx 툴팁 행 필드명 앞에 `#` — 값 보존, 되돌리기 쉬움.
+3. **development 반영** — `feature/Boss23` 의 타이틀·모니터 작업(`5e3e46fe` 이후). 팀장 결정 시.
+4. **bossroom NetworkObject 4개 용도 확인** — 루트가 아니라 중첩 프리팹 오브젝트에 붙어 있다(GlobalObjectIdHash 4130406446 · 3863298080 · 3199288331 · 3620266727). 정상 네트워크 오브젝트인지 감염인지 모름 → 확인 후 가드 테스트 `Excluded` 에서 빼기.
+5. ✅(10-06 완료 — 위 작업 세션) ~~**안 쓰는 스크립트·파일·폴더 정리(팀장 10-05 요청)**~~ — 큰 작업: grill → PLAN → 승인. 원칙 = 참조 0 을 guid grep 으로 증명 · git/SVN 소유 구분(아트·.meta 는 SVN) · **Unity 끄고**(디렉터리 이동·대량 삭제) · 지운 뒤 컴파일·테스트·Play.
+   알고 있는 후보(전부 확인 필요):
+   - `Assets/1.Scripts/Map/ZoneInteractRing.cs` — 10-04 부터 미사용. 단 Visual Scripting 생성 코드 `Assets/Unity.VisualScripting.Generated/.../AotStubs.cs` 가 참조 → **Node Library 재생성 후** 삭제.
+   - `TitlePowerOff` 의 시작 경로는 이제 폴백뿐(EXIT 는 사용 중 — 클래스는 유지).
+   - `Assets/2.Prefabs/Player/Legacy/`(구 Paladin·TempPlayer_Armature — 스폰 안 됨, player-prefabs.md) · `Assets/3.Materials/Environment/NotUsedInMap/` · 레거시 `MonsterTimeController`(Enemy 전용).
+   - 기존 감사 문서 `Docs/04-report/deadcode-audit-2026-09-09.md` 를 출발점으로 쓸 것.
+   - 이 세션의 1회성·진단 도구는 남겨 둠: `Tools/Monster/공격 클립 길이 보고`·`이동 클립 고유 속도 측정`, `Tools/Map/Authoring/Zone Monitor Screen/*` — 계속 쓸지 정리 때 판단.
+6. **미검증 Play** — 몬스터 `attackSpeed` 0.5/2 · MPPM(클라 공격 애니 속도·Mortar 발사·WallBot 평타 2단) · 모니터 패널 MPPM(다른 피어가 켠 패널).
+7. 기존 EditMode 실패 2(`BossCounterDataTests` — No23 Dash 가 FarthestPlayer): 데이터가 맞으면 테스트 수정, 실수면 데이터 원복 — 팀장 결정.
+8. `Assets/1.Scripts/Player/Fall/FallBoundarySettings.cs` 줄 끝(EOL)만 다른 변경이 계속 뜬다 — 내 것 아님, 커밋하지 않음.
+
+## ▶▶ 작업 세션 (2026-10-03 · 경석(Claude) · **타이틀 시작 연출 · 존 게이트 패널 모니터 켜짐·외곽선**, 브랜치 `feature/Boss23`) — ✅ 팀장 Play OK(10-04) · `feature/Boss23` 푸시 `5e3e46fe`(development 미반영). 게이트 활성 표시 = 모니터 화면(바닥 링 삭제). ⚠️ ZoneL_typeB 를 프리팹 모드로 열어 둔 채 파일을 바꾸면 Auto Save 가 덮어쓴다 — 값은 `Tools/Map/Authoring/Zone Monitor Screen/5` 로
+계획 = [PLAN-title-monitor.md](Docs/history/PLANS/PLAN-title-monitor.md)(승인 10-03, Codex 설계 회의 반영). 🔴 **수정 예정 — 동시 수정 금지:** `UI/Title/*`(TitleFlowDirector·TitleMonitorDisplay·셰이더) · `Map/ZoneBridgeGate.cs`·`ZoneBridgeGateManager.cs` · `ZoneL_typeB.prefab`(게이트 값) · 신규 외곽선 셰이더.
+
 ## ▶▶ 작업 세션 (2026-10-02 · 은희(Claude+Codex) · **캐릭터 선택 화면**, 브랜치 `feature/SelectCharactorUI`) — 계획 [PLAN-character-select.md](PLAN-character-select.md) 승인됨
 - ✅ 1단계 Codex(코드) `09e9cc57` · ✅ 2단계 Claude(씬·에셋·`LobbySceneManager` 배선). 결과 요약 = [player-prefabs.md §8.3](Docs/tech/player-prefabs.md)
 - 🔴 남은 것: **은희 MPPM Play 확인**(호스트+클라2: 초상화·Ready 동기화 / Start 활성 / 고른 Variant 스폰) → PR. 레이아웃은 첫 배치라 Play 보고 조정 가능
 - 범위 밖: 전투 HUD 초상화 Paladin 고정(Gunner 도 Paladin 얼굴)
+## ▶▶ 작업 세션 (2026-10-06 · 민경(Claude) · **23호 사망 디졸브 = FlatKit 디졸브 셰이더**, 브랜치 `feature/VFX`) — ✅ Play 확인(민경 10-06, 실루엣 자국 없음)
+- 23호(`TwentyThree.prefab`)는 부위 붕괴 대상이 아니라(팀장 지시 — 쓰러진 자세 2초) `DissolveDeath` 를 유지하되, 녹을 때 셰이더만 잡몹과 같은 **`VFX/Stylized Surface Dissolve`** 로 바꿨다. 기존 템플릿(DissolveFx, URP Lit 계열)은 갈아끼우는 순간 FlatKit 셀 음영·림·아웃라인이 빠져 질감이 바뀌었다.
+- `DissolveDeath.cs`: `stylizedDissolveShader` 필드 추가. 원본이 `FlatKit/Stylized Surface` 면 `new Material(원본)` + 셰이더 교체(룩 유지), 아니면 템플릿 경로. 노이즈는 템플릿의 `_NoiseTexture` 를 빌림. 진행 방향이 반대(`_DissolveAmount` 0→1 / `_Cutoff` 1→0)라 따로 보간. FlatKit 디졸브 슬롯이 있는 렌더러는 그림자 끔(ShadowCaster 가 깎기를 안 탐). 셰이더 필드가 비면 예전 동작 그대로.
+- `DissolveDeath` 사용처는 23호 하나뿐(본체 `FK_No23_Toon` + 탑승 웰즈 `FK_SK_welz_*` 전부 FlatKit). 인터럽트 오버레이 슬롯 건너뛰기는 그대로.
+- 🔴 **경석 공유**: `DissolveDeath.cs`, `TwentyThree.prefab`(필드 3줄 추가).
+- 🔴 **디졸브 후 실루엣 음영이 남던 문제**: `StylizedSurfaceDissolve.shader` 의 `DepthOnly`·`DepthNormals` 가 URP 기본 패스라 디졸브를 안 깎았다 → 색은 사라져도 깊이 버퍼에 원래 모양이 남고, 깊이를 읽는 `FogRendererFeature`(깊이 안개)·`DecalRendererFeature` 가 그 자리를 다르게 칠했다. URP 패스 사본 2개(`StylizedDissolveDepthOnlyPass.hlsl`·`StylizedDissolveDepthNormalsPass.hlsl`)에 `FlatKitDissolveClip` 을 넣어 교체. 잡몹 부위 붕괴 조각도 같은 셰이더라 같이 고쳐진다. 🔴 SVN add 2개 + `.meta`.
+
+## ▶▶ 작업 세션 (2026-10-06 · 민경(Claude) · **아군 보호막 연출 = 받는 쪽이 주인**, 브랜치 `feature/VFX`) — 구현 완료 · 배선·Play 검증 대기
+계획·그릴 결과 = [PLAN.md](PLAN.md) 맨 위 항목.
+- 거너 Q 가 아군에게 보호막을 줄 때 띄우던 `FX_GunnerShieldGrant` 를 걷고, **아군 자신의 `PlayerShieldVfx` 배리어**로 바꿨다.
+- 🔴 **지속시간을 넘기지 않는다.** 보호막은 시간보다 먼저 깨지고(`Depleted`), `GunnerCharge` 는 `Stack` 이라 인스턴스가 여럿이며, 시전자(Q 스킬)가 보호막(5초)보다 먼저 끝난다. 셋 다 타이머로는 못 센다.
+- 🔴 **보호막은 이미 전 피어에 복제돼 있다** — `Unit._replicatedShields` + public `ShieldInstanceCount`/`GetShieldInstance`/`ServerShieldEnded`. `PlayerShieldVfx` 가 그걸 직접 읽어 켜고 끈다. **`Unit.cs`·`Player.cs`·`Health.cs` 무수정.**
+- 색은 출처로 가른다: `HolyShield` = 금색(기존) / 그 외 = **흰색**(신규 `50.Art/VFX/Common/Players/Shield/`). 겹치면 **금색 우선**, 배리어는 언제나 하나.
+- `PlayLocal()`·`ServerEnd()` 는 **오프라인 폴백**으로 바뀌었다(`IsNetworkActive` 면 no-op) — 덕분에 `FirstMeleeSubSkill` 무수정.
+- 🔴 **은희 공유 2건**: ① `ChargeLaserFiredRpc` 시그니처에서 `Vector3[] shieldPoints` 제거(네트워크 계약 변경) ② `Player_Gunner.prefab` 에 `PlayerShieldVfx` 추가(NetworkBehaviour 목록 변경).
+- 🔴 **같이 고친 기존 버그 2건**: 팔라딘 `HolyShield` 소켓 `safetyTimeout` 8 < 보호막 10초(8초에 강제 회수) → 15 / `PlayChargeLaser` 의 조기 `return` 이 Q 발사 애니를 건너뛸 수 있었다.
+- **배선**: `Tools/VFX/보호막 연출 배선` (두 프리팹 + EffectCatalog 프리워밍 등록까지 한 번에).
+- 🔴 **SVN add**: `Shield/` 폴더의 프리팹 3 + 엔트리 2, `_Materials/FX_AllyShield_*.mat` 4장, `PlayerShieldSetup.cs`, 각 `.meta`.
+- 🔴 **대쉬 잔상이 MPPM 에서 안 보이던 버그 수정**: 이동 권한이 2026-09-29 이후 **오너**로 뒤집혔는데(`Player.ServerAuthoritativeMovement == false`) `PlayerSkillVfx` 의 잔상 폴링이 여전히 "서버 권한" 전제로 `SendTo.ClientsAndHost`(서버 전용) RPC 를 쐈다 — **클라가 대쉬하면 아무에게도 안 간다**(호스트가 대쉬할 때만 보임). 최후의 심판과 같은 **오너 → 서버 → NotOwner 2홉**으로 교체. 🔴 **은희 공유**(`PlayerSkillVfx.cs`, RPC 목록 변경).
+- 🔴 **대쉬 잔상 2차(2026-10-06)**: `DashAfterimage` 의 잔상 루트를 Awake 시점 액티브 씬에 만들어서, 로비 흐름(MPPM)에서 그 씬(로딩·로비)이 언로드되면 루트째 파괴되고 다시 안 만들어졌다 → `EnsureGhostRoot()` + `DontDestroyOnLoad`, 파괴된 조각 정리. ✅ MPPM 확인 완료(민경 10-06), 진단 로그 삭제.
+- 🔴 **대쉬 잔상 실종의 확정 원인(Editor.log 스택으로 확인)**: `DashSpeedLines` 가 궤적을 Awake 시점 액티브 씬에 만들어 로비 흐름에서 씬 언로드와 함께 파괴됨 → `DashAfterimage.Play()` 가 **속도선부터** 켜다 `MissingReferenceException` 으로 빠져나가 잔상 0장 → 예외가 `PlayerSkillVfx.Update` 까지 올라가 RPC 전송도 건너뜀. 수정: 궤적 루트 `DontDestroyOnLoad` + 파괴 시 재생성, `Play()` 순서를 잔상 먼저·속도선 나중으로. 속도선 없는 E 백스텝 잔상은 처음부터 멀쩡했다.
+- MPPM 은 Dev Boot 가 아니라 **로비 흐름**이고, `0.BootStrapScene.unity` 에 커밋 안 된 로컬 오버라이드로 `defaultPlayerPrefab`·`NetworkConfig.PlayerPrefab` = **`Paladin_VFX`(구 통짜)** 가 들어가 있다.
+- **`FX_GunnerUltLaser` (B) 정규화**: `Shoot`·`UltLaser` 만 `scalingMode: Local` 이라 부모 1/9 와 **런타임 반경 배율(×2r)을 무시**하고 있었다 → Hierarchy 로 바꾸고 크기 재계산(UltLaser X/Z 9 · Shoot 5.5 · Y 6.255 유지). 런타임(r=2) 지름 4m / 2.44m, 길이 5.56m. 🔴 `UltLaser` 는 나머지 8개 시스템의 **부모**라 트랜스폼 스케일(0.1111)은 건드리면 안 된다. 메시는 내장 Cylinder(중심 피벗) — 길이의 절반이 바닥 아래.
+- ⚠️ **가붕이는 대쉬 잔상이 아예 없다**: `DashAfterimage` 가 `Paladin_VFX.prefab`(스폰 안 되는 보관용)에만 있고 `Player_Paladin.prefab` 에는 없다. 별건 — 배선 도구 필요.
+- **Q 집중 발밑 링(`FX_GunnerFocusRing`) 제거**(2026-10-06): 감속(×0.5)·조준고정은 조작감으로 읽히고, 그 연출의 화살표는 위로 솟아 "모인다"(충전) 기호라 묶여 있다는 신호와 반대였다. 에셋은 남기고 배선만 뺐다 — `QFocusRing` 소켓은 `Tools/VFX/거너 Q 스킬 배선` 이 지운다.
+- 🔴 **같이 고친 기존 버그 3번째**: `GunnerBeamView.EndCharge` 의 `if (chargeLoopPlayer == null) return;` 이 **과충전 루프 정지보다 앞**에 있었다 — 충전 소켓이 비면 과충전이 영영 안 꺼진다.
+
+## ▶▶ 작업 세션 (2026-10-06 · 민경(Claude) · **거너 VFX 미싱 머티리얼 복구**, 브랜치 `feature/VFX`) — 🔴 SVN add 필요
+- 증상 = Player2 이펙트 5종(`CoolVent`·`FocusRing`·`FrostBlast`·`FrostTrail`·`UltLaser`)의 파티클 머티리얼이 Missing.
+  원인 = 샌드박스(MyProject) 의 **Hovl Studio 팩이 MainProject 에 없고**, 포팅 때 이 5개가 빠졌다.
+- 해결 = 샌드박스에서 **`.meta` 를 통째로 복사해 guid 를 보존**(이 폴더의 기존 관례와 동일) →
+  `50.Art/VFX/_Materials/` 에 `Snowflake_Hovl`·`Arrow1`·`Flare`·`Mask1`·`TechCircle2`, `Textures/` 에 같은 이름 png 5장.
+  🔴 `Snowflake` 는 **이름 충돌**(기존 것은 Little Enchant 팩, 참조 0) 이라 `_Hovl` 접미사를 붙였다.
+- 🔴 같이 빠져 있던 것 = `Models/Cylinder.fbx`(Hovl). `FX_GunnerUltLaser` 의 Renderer **메시**가 이걸 가리킨다 — 없으면 레이저가 안 보인다.
+- 🔴 **SVN add**: 위 11개 파일 + 각 `.meta` (`Assets/50.Art` 는 git 무시).
+- `FX_GunnerOvercharge` 강화(Q 최대 충전 0.8초 창 연출이 1초에 1발·0.4유닛이라 안 보였다) → 주기 1.0→0.3s · 버스트 1→3 · 상시 10/s · 크기 ×1.5 · 스케일 0.1→0.2 · 색 HDR 청백. 샌드박스 사본도 같은 값.
+
+## ▶▶ 작업 세션 (2026-10-06 · 민경(Claude) · **잡몹 사망 = 디졸브 → 부위별 붕괴**, 브랜치 `feature/VFX`) — 구현 완료 · Bake·Play 검증 대기
+계획·조사 = [PLAN.md](PLAN.md) 맨 위 항목.
+- **부위 조각은 블렌더 없이 본으로 가른다.** 이 팩 로봇은 강체 리깅(ChompBot 1661/1661 단일 본)이고 본 경계를 가로지르는 폴리곤이 **0개** — 메시가 이미 닫힌 껍데기들의 합집합이라 가르면 단면이 안 생긴다.
+- 조각 정점은 `bindposes[본]` 을 먹여 **본 로컬 공간**에 담는다 → 런타임은 조각을 그 본의 월드 트랜스폼에 놓기만 하면 **사망 포즈가 근사 없이** 재현된다. 미리 잘라 둔 스태틱 파츠(바인드 포즈)로는 안 되는 지점.
+- 새 파일 = `1.Scripts/Monster/Collapse/` 의 `MonsterPartSet` · `MonsterCollapseDebris` · `CollapseDeath` (+ Editor 2). 도구 = `Tools/Monster/부위 붕괴 — ChompBot 설정` / `— 선택한 프리팹에 적용`.
+- 🔴 **경석 공유**: `ChompBot.prefab` 의 `DissolveDeath` → `CollapseDeath` 교체. `MonsterBase` 는 안 건드렸다(`IDeathEffect` 구멍 그대로). NetworkBehaviour 개수는 같지만 **목록 순서가 바뀐다**.
+- `DissolveDeath` 는 **남긴다** — 보스가 계속 쓰고, 붕괴 쪽도 조각 **퇴장**에 같은 템플릿을 재사용한다.
+- 파편 규칙은 상자(`FragmentBurstEffect`)와 동일: Effect(17) 레이어, 월드 지오메트리만 충돌, `ContinuousSpeculative`. 조각 루트는 **몬스터의 자식이 아니다**(디스폰과 함께 증발하는 구조 회피).
+- 범위: ChompBot → 잡몹 8종. **보스·중간보스 제외**(23호 `delayAfterClipEnd 2초` = 팀장 지시 2026-09-30).
 
 ## ▶▶ 작업 세션 (2026-10-02~03 · 경석(Claude) · **몬스터 공격속도 = 애니 재생 배율 · 쿨다운 종료 기준 · 이동 애니 맞춤**, 브랜치 `feature/Boss23`) — ✅ development 반영(10-03) · **SVN r372 같이 받을 것**(GameData.xlsx Monster attackSpeed→1 · Chomp 2/2.8, 핀 372) · 팀장 Play 1차(Chomp·Mortar) · ⏳ MPPM·배율 0.5/2 Play 미검증
-계획·결정·교차검증 이력 = [PLAN-monster-anim-speed.md](PLAN-monster-anim-speed.md) §3 · S4-b.
+계획·결정·교차검증 이력 = [PLAN-monster-anim-speed.md](Docs/history/PLANS/PLAN-monster-anim-speed.md) §3 · S4-b.
 - `attackSpeed` = 공격 애니 재생 배율(SO 직접 — `MonsterBase.AttackAnimSpeed`, Unit.AttackSpeed 는 클라에서 0) · 공격 중 코드 타이머 ÷ · 돌진 속도 ×r · 가속 ×r².
 - `attackCooldown` = 공격 **끝난 뒤** 쉬는 시간(23호만 시작 기준). `animator.speed` 는 `MonsterBase` 한 곳(23호 제외).
 - 이동 맞춤 = `Tools/Monster/이동 클립 고유 속도 측정 → SO 기록`. Chomp = 블렌드 100% + 임시 속도(배회 2.0 · 추격 2.8, 입 애니 때문 — 아트 클립 요청 여지).
@@ -30,7 +183,7 @@ Update this file when a term becomes important enough that future agents or team
 
 ## ▶▶ 현재 인수인계 (2026-10-02 · Claude · **존 원본 0.98 축소** — 방이 줄어든 만큼 존 내용물도 줄임, 브랜치 `feature/ZoneAssetScale`)
 
-결정·범위·검증·팀원 업데이트 순서 = [PLAN-zone-asset-scale.md](PLAN-zone-asset-scale.md). 사용자 단계별 검수·Play 확인 완료(10-02).
+결정·범위·검증·팀원 업데이트 순서 = [PLAN-zone-asset-scale.md](Docs/history/PLANS/PLAN-zone-asset-scale.md). 사용자 단계별 검수·Play 확인 완료(10-02).
 - 존이 쓰는 FBX 82개 Scale Factor 0.98(SVN `.meta`) + 원본 프리팹·존 11개 배치 0.98 + 존 밖(보스룸·복도·Stage1 복도벽)은 보정 스케일 1/0.98 로 **겉모습 그대로**.
   튜토리얼 문 8곳은 복도 바닥을 늘려 메움. 존 바닥은 벽 밑단 밑으로 20m 변 31cm · 40m 변 11cm.
 - 🔴 **SVN r371(FBX meta 82 · 볼록 충돌 16 · `floor_MV.prefab`, 핀 371)과 git 을 같이 받아야 한다** — 한쪽만 받으면 존 바닥 4m 마다 8cm 틈/겹침. r366 GameData.xlsx(SkillTooltip)도 같이 딸려 온다.
@@ -92,7 +245,7 @@ Update this file when a term becomes important enough that future agents or team
   - ⚠️ 메시지 포맷 변경 — 구버전 빌드와 섞어 접속하면 읽기 실패.
 - 검증: 은희 MPPM 테스트 완료. ⏳ 경석에게 PR 없이 병합한 것 공유.
 ## ▶▶ 현재 인수인계 (2026-10-02 · Claude · **벽 모듈 메시 정렬** — ✅ 반영 완료(git `2ddf2838` → development `578569f6` · SVN r363), 🔴 Play 미확인)
-계획·결정·실측 = [PLAN-wall-modules.md](PLAN-wall-modules.md). 벽 메시 5종(피벗 중앙·4.000m, 이음새 실금 막으려 끝면을 살짝 겹치게 — 지상 ±2.001m · 지하 ±2.0005m)과 코너 조립(COM 피벗 = 벽 중심선 교차점)을 4m 그리드에 맞췄다.
+계획·결정·실측 = [PLAN-wall-modules.md](Docs/history/PLANS/PLAN-wall-modules.md). 벽 메시 5종(피벗 중앙·4.000m, 이음새 실금 막으려 끝면을 살짝 겹치게 — 지상 ±2.001m · 지하 ±2.0005m)과 코너 조립(COM 피벗 = 벽 중심선 교차점)을 4m 그리드에 맞췄다.
 - 🔴 **SVN 8개(FBX 6 — 복도벽 포함 + `walll_brick_cornerCOM_*` 2)와 git 5개(`bossroom.prefab` · `Level_wall_hallway_tutorial.prefab` · `StageTutorial.prefab` · `TutorialStageAuthoring.cs` · `all_mesh.unity`)는 함께 반영해야 한다.** 한쪽만 들어가면 벽·콜라이더가 최대 1.9m 어긋난다. SVN 업데이트는 Unity 끄고(바이너리 FBX).
   👉 **팀원 업데이트 순서**: Unity 끄기 → SVN 을 r363 이상으로 → git `development` 를 `578569f6` 이상으로 → Unity 열기.
   둘 중 하나만 받으면 코너·복도가 벌어져 보인다(2026-10-02 실제로 발생 — 로컬 git 이 병합 전 커밋에 머물러 있었음).

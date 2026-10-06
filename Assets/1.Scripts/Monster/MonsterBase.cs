@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.AI;
@@ -126,9 +127,29 @@ public class MonsterBase : Unit
     const int HoldAvoidancePriority = 20;
     const int MoveAvoidancePriority = 50;
 
+    /// <summary>
+    /// 🔴 (실험 10-06) 아트 팩(Robot Sentries) 프리팹의 **본마다 붙은 kinematic Rigidbody 의 보간/외삽을 끈다.**
+    /// 보간/외삽이 켜진 Rigidbody 의 Transform 은 물리가 관리한다. 클라(NGO)는 프리팹을 기본 위치에 만든 뒤 루트를
+    /// 스폰 위치로 옮기는데(NetworkSpawnManager), AutoSyncTransforms=0 이라 물리가 "옮기기 전" 자세를 본에 다시 써서
+    /// 본이 루트 높이 × (거치는 Rigidbody 수)만큼 아래로 굳는다 — MPPM 지연 재현에서 높은 곳 PeekABot 머리 −7.86
+    /// (예측 −7.85), 기둥 0.11(예측 0.11). 호스트는 처음부터 스폰 위치에 Instantiate 해서 안 생긴다.
+    /// 이 Rigidbody 들은 우리 코드가 쓰지 않는다(래그돌·피격 경로 없음, 붕괴 사망은 별도 조각을 만든다).
+    /// 아트 프리팹(SVN)은 그대로 두고 런타임에서만 끈다.
+    /// </summary>
+    void DisableBoneRigidbodyInterpolation()
+    {
+        foreach (var rb in GetComponentsInChildren<Rigidbody>(true))
+        {
+            if (rb.transform == transform || rb.interpolation == RigidbodyInterpolation.None) continue;
+            rb.interpolation = RigidbodyInterpolation.None;
+        }
+    }
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
+
+        DisableBoneRigidbodyInterpolation();
 
         // 참조 자동 보강(인스펙터 미할당 대비).
         if (agent == null) agent = GetComponent<NavMeshAgent>();
@@ -244,8 +265,10 @@ public class MonsterBase : Unit
     {
         // 애니메이션 이동 블렌드는 모든 피어에서 반영(복제된 _animSpeed).
         // (Chomp 처럼 fullBlendWhileMoving 이면 움직이는 동안 블렌드를 이동 클립 100% 로 보낸다 — LocomotionData 참조.)
+        // 🔴 즉시 쓰지 않는다 — 공격 시작(StopAgent) 프레임에 블렌드가 0 으로 꺾여 전이 동안 출발 포즈가 **대기 자세**가
+        //    된다("달리다 Idle 한 번 찍고 공격", 팀장 10-06). 감쇠·전이 고정·복귀 준비는 WriteLocomotionBlend 참조.
         if (data != null)
-            SafeSetFloat(data.animSpeedParam, MonsterAnimSpeedPolicy.BlendParam(_animSpeed.Value, LocomotionData));
+            WriteLocomotionBlend();
 
         // 애니 재생 속도 — 모든 피어, 이 한 곳에서만 쓴다(자세 홀드 중엔 홀드가 0 을 쥔다).
         if (ManagesAnimatorSpeed && !_animatorHeldLocally && animator != null)
@@ -428,7 +451,11 @@ public class MonsterBase : Unit
 
         if (!IsTargetValid(_target))
         {
-            _target = FindNearestTarget();
+            // 빈손 탐색 주기 — 타깃 없는 몹 전부가 매 프레임 OverlapSphere 를 돌던 것(PLAN-cleanup-optimization S2-2).
+            // 첫 탐색·타깃을 잃은 직후는 즉시, **실패한 뒤에만** 간격을 둔다(몹마다 위상을 흩뜨린다). 어그로 지연 ≤ 0.25초.
+            _target = Time.time >= _nextAcquireTime ? FindNearestTarget() : null;
+            if (_target == null && Time.time >= _nextAcquireTime)
+                _nextAcquireTime = Time.time + AcquireRetryInterval + Random.Range(0f, AcquireRetryJitter);
 
             // 교전 시작 시각 = 주기 재선정 시계의 0 점. 여기서 세워야 첫 타깃을 잡은 틱에
             // 곧바로 재선정이 도는 것을 막는다.
@@ -1723,20 +1750,59 @@ public class MonsterBase : Unit
     /// (09-28 NavMesh 전수조사 1순위). 그래서 ① 목적지를 메시 위로 투영하고 ② 경로가 끝까지 닿지 않으면(Partial·Invalid)
     /// 가장자리로 몰려가지 않고 **그 자리에서 기다린다.** 복귀·재배치는 이 규칙을 타지 않는다(MoveAgentTo 직접).
     /// </summary>
+    // ── 주기 상수 (PLAN-cleanup-optimization S2) ────────────────────────────────────
+    const float AcquireRetryInterval = 0.2f;   // 빈손 재탐색 간격
+    const float AcquireRetryJitter = 0.05f;
+    const float ChaseRepathInterval = 0.2f;    // 추격 목적지 재계산 간격
+    const float ChaseRepathJitter = 0.05f;
+    const float ChaseRepathTargetMoveSq = 0.5f * 0.5f;   // 타깃이 이만큼 움직이면 주기 전이라도 즉시
+
+    float _nextAcquireTime;
+    float _chaseNextRepath;         // 다음 정기 재계산 시각
+    float _chaseRetryAt;            // 경로 실패(메시 밖·Partial)로 멈춘 뒤 재시도 시각
+    Vector3 _chaseLastTargetPos;
+    Vector3 _chaseLastGoal;
+
     void ChaseTarget(float speed)
     {
         if (_target == null || agent == null || !agent.enabled || !agent.isOnNavMesh) return;
 
-        if (!NavMesh.SamplePosition(_target.position, out NavMeshHit onMesh, ChaseProjectRadius, NavMesh.AllAreas))
+        // 🔴 매 프레임 SamplePosition + SetDestination 하던 것을 주기로(S2-1). 단 아래면 즉시 다시 잡는다:
+        //    타깃이 0.5m 넘게 움직임 · 다른 로직이 세웠거나(isStopped — 공격·재배치 뒤) 목적지를 바꿈.
+        //    경로 실패로 **내가** 세운 경우는 재시도 간격을 지킨다(실패 상태에서 매 프레임 재시도하지 않게).
+        Vector3 targetPos = _target.position;
+        bool stoppedByOther = agent.isStopped && Time.time >= _chaseRetryAt;
+        // 허용 오차 0.5m — destination 은 경로 계산 뒤 메시 위 점으로 살짝 보정될 수 있다(오차로 매 프레임 "바뀜" 판정 방지).
+        bool goalChanged = !agent.isStopped && (agent.destination - _chaseLastGoal).sqrMagnitude > 0.25f;
+        bool due = stoppedByOther || goalChanged
+                   || (Time.time >= _chaseNextRepath && Time.time >= _chaseRetryAt)
+                   || (targetPos - _chaseLastTargetPos).sqrMagnitude > ChaseRepathTargetMoveSq && Time.time >= _chaseRetryAt;
+
+        if (!due)
         {
-            StopAgent();
-            return;
+            if (!agent.isStopped) agent.speed = speed;   // 보스 페이즈 배수 등 속도는 매 틱 반영(MoveAgentTo 와 같게)
+        }
+        else
+        {
+            _chaseLastTargetPos = targetPos;
+            _chaseNextRepath = Time.time + ChaseRepathInterval + Random.Range(0f, ChaseRepathJitter);
+
+            if (!NavMesh.SamplePosition(targetPos, out NavMeshHit onMesh, ChaseProjectRadius, NavMesh.AllAreas))
+            {
+                StopAgent();
+                _chaseRetryAt = Time.time + ChaseRepathInterval;
+                return;
+            }
+
+            MoveAgentTo(onMesh.position, speed);
+            _chaseLastGoal = agent.destination;
         }
 
-        MoveAgentTo(onMesh.position, speed);
-
-        if (!agent.pathPending && agent.pathStatus != NavMeshPathStatus.PathComplete)
+        if (!agent.pathPending && !agent.isStopped && agent.pathStatus != NavMeshPathStatus.PathComplete)
+        {
             StopAgent();
+            _chaseRetryAt = Time.time + ChaseRepathInterval;
+        }
     }
 
     void MoveAgentTo(Vector3 destination, float speed)
@@ -1853,6 +1919,9 @@ public class MonsterBase : Unit
         //    상태를 빠져나간 뒤에 뒤늦게 애니메이터를 얼려 버린다.
         if (next != MonsterState.Groggy)
             ApplyReleaseActionPose();
+
+        // 블렌드 고정·준비는 CrossFade(ResetToLocomotion)·트리거(PlayStateAnimation)보다 먼저 정한다.
+        UpdateLocomotionBlendOnStateChange(previous, next);
 
         // 액션(공격/피격/그로기)에서 이동계열(대기/추격/복귀)로 전이 시, 진행 중이던 액션 클립을
         // 끊고 로코모션으로 강제 복귀. (공격 도중 리쉬 복귀 등으로 애니가 공격 클립에 눌러앉는 문제 해결.)
@@ -2189,6 +2258,7 @@ public class MonsterBase : Unit
         moveCycle = data.locomotionMoveCycleSeconds,
         range = data.locomotionAnimSpeedRange,
         fullBlendWhileMoving = data.locomotionFullBlendWhileMoving,
+        playbackScale = data.locomotionPlaybackScale,
     };
 
     int PlayingStateHash(int layer) => animator.IsInTransition(layer)
@@ -2302,14 +2372,127 @@ public class MonsterBase : Unit
         if (HasParameter(animator, param)) animator.SetFloat(param, value);
     }
 
-    static bool HasParameter(Animator anim, string param)
+    /// <summary>이동 블렌드 감쇠 시간(초) — 평소 출발·정지를 부드럽게. 전이 구간은 아래 고정·준비가 맡는다.</summary>
+    const float LocomotionBlendDamp = 0.12f;
+
+    // ── 이동 블렌드 전이 포즈 제어 (팀장 10-06 MortarBot "앉는 프레임", Codex 설계 회의 반영) ──────────────
+    // 블렌드 값(RunBlend)은 Movement 블렌드 트리 **안의** 대기↔이동 비중이다. 전이 중에도 출발/도착 쪽 Movement 가
+    // 이 값으로 그려지므로, 전이 순간 값이 0 이면 그 사이에 대기 자세(Mortar = 접어 앉기)가 보인다.
+    // 🔴 _animSpeed(복제 실제 속도)는 건드리지 않는다 — 발맞춤 재생 속도 계산도 같은 값을 쓴다.
+    //    판단은 전 피어에 복제되는 로직 상태 전이(OnStateChanged)로만 한다(원격엔 NavMeshAgent 가 없다).
+
+    /// <summary>진입 고정 상한(초). Cast 전이(0.15초)보다 넉넉히 — 전이가 끝나면 그 전에 풀린다.</summary>
+    const float AttackEntryBlendHoldMax = 0.3f;
+    /// <summary>복귀 준비 시간(초). 에이전트 가속(정지→걷기 ≈0.22초)을 덮는다.</summary>
+    const float ActionExitBlendPrimeSeconds = 0.25f;
+
+    float _blendHoldUntil = -1f;     // 이 시각까지 + Movement 에서 빠져나가는 중이면 블렌드 값을 고정
+    int _blendHoldStartFrame = -1;   // 트리거가 아직 소비 전(전이 시작 전)인 첫 프레임들도 고정
+    float _blendPrimeUntil = -1f;    // 이 시각까지 블렌드를 걷기 값 이상으로, 감쇠 없이
+
+    void WriteLocomotionBlend()
     {
-        if (anim == null || anim.runtimeAnimatorController == null || string.IsNullOrEmpty(param))
-            return false;
-        AnimatorControllerParameter[] ps = anim.parameters;
-        for (int i = 0; i < ps.Length; i++)
-            if (ps[i].name == param) return true;
-        return false;
+        if (animator == null || string.IsNullOrEmpty(data.animSpeedParam)) return;
+
+        // ① 진입 고정: 이동 → 공격 전이 동안 출발 포즈를 그대로 둔다.
+        //    GauntletBot 처럼 공격 클립 없이 Movement 에 머무는 몹은 전이가 없어 1~2 프레임만 고정된다.
+        if (Time.time < _blendHoldUntil)
+        {
+            bool leavingLocomotion = animator.IsInTransition(0)
+                && animator.GetCurrentAnimatorStateInfo(0).shortNameHash == LocomotionHash;
+            if (leavingLocomotion || Time.frameCount <= _blendHoldStartFrame + 1)
+                return;
+            _blendHoldUntil = -1f;
+        }
+
+        float target = MonsterAnimSpeedPolicy.BlendParam(_animSpeed.Value, LocomotionData);
+
+        // ② 복귀 준비: 공격이 끝나고 바로 걷는 몹은 처음부터 걷기 자세로 들어간다.
+        if (Time.time < _blendPrimeUntil)
+        {
+            if (HasParameter(animator, data.animSpeedParam))
+                animator.SetFloat(data.animSpeedParam, Mathf.Max(target, data.locomotionFullBlendSpeed));
+            return;
+        }
+
+        SafeSetFloatDamped(data.animSpeedParam, target, LocomotionBlendDamp);
+    }
+
+    /// <summary>전 피어. <see cref="OnStateChanged"/> 에서 액션 CrossFade·트리거보다 <b>먼저</b> 부른다.</summary>
+    void UpdateLocomotionBlendOnStateChange(MonsterState previous, MonsterState next)
+    {
+        if (data == null) return;
+
+        // 공격뿐 아니라 피격·넉백·그로기 진입도 같다(10-06 실측: 걷다 맞으면 Hit 전이 후반이 대기 자세).
+        if (IsActionAnimState(next) && IsLocomotionAnimState(previous))
+        {
+            _blendHoldUntil = Time.time + AttackEntryBlendHoldMax;
+            _blendHoldStartFrame = Time.frameCount;
+            _blendPrimeUntil = -1f;
+            return;
+        }
+
+        // 🔴 원거리 이동형만 — SeekMobile 은 "실제로 걸을 때만" Chase 를 쓰고 공격 쿨 동안 거의 항상 재배치로 걷는다.
+        //    근접(SeekMelee)은 사거리 안에서 서서 쿨을 기다리며 Chase 를 쓰므로 여기서 준비하면 제자리 걸음이 된다.
+        //    공격 뒤 실제로 안 걸으면 준비 시간이 끝나는 대로 평소 감쇠로 대기에 내려간다.
+        if (data.archetype == MonsterArchetype.RangedMobile
+            && previous == MonsterState.Attack && IsLocomotionAnimState(next) && next != MonsterState.Return)
+        {
+            _blendHoldUntil = -1f;
+            _blendPrimeUntil = Time.time + ActionExitBlendPrimeSeconds;
+            if (animator != null && HasParameter(animator, data.animSpeedParam))
+                animator.SetFloat(data.animSpeedParam, data.locomotionFullBlendSpeed);   // CrossFade 보다 먼저
+            return;
+        }
+
+        if (!IsLocomotionAnimState(next))
+        {
+            _blendHoldUntil = -1f;
+            _blendPrimeUntil = -1f;
+        }
+    }
+
+    int LocomotionHash
+    {
+        get
+        {
+            if (!ReferenceEquals(_locomotionHashOf, data.locomotionState))
+            {
+                _locomotionHashOf = data.locomotionState;
+                _locomotionHash = Animator.StringToHash(data.locomotionState ?? "");
+            }
+            return _locomotionHash;
+        }
+    }
+
+    // 매 프레임 불러야 감쇠가 진행된다(Animator.SetFloat damp 규약). 강제 정지(자세 고정 등)는 SafeSetFloat 로 즉시 쓴다.
+    void SafeSetFloatDamped(string param, float value, float dampTime)
+    {
+        if (HasParameter(animator, param)) animator.SetFloat(param, value, dampTime, Time.deltaTime);
+    }
+
+    // 🔴 `Animator.parameters` 는 호출마다 배열을 새로 할당한다 — Update 에서 매 프레임 불리므로(몬스터 수 × 피어 수)
+    //    컨트롤러별로 이름 해시 집합을 한 번만 만든다. 키가 **현재 컨트롤러**라 교체(OnNetworkSpawn 의
+    //    animatorControllerOverride 등)가 어느 경로로 일어나도 다음 호출에서 다시 만든다.
+    //    파라미터가 0개로 읽히면(초기화 전) 캐시를 확정하지 않고 다음에 다시 읽는다 — 예전 동작과 같게.
+    readonly HashSet<int> _animParamHashes = new HashSet<int>();
+    RuntimeAnimatorController _animParamCacheFor;
+
+    bool HasParameter(Animator anim, string param)
+    {
+        if (anim == null || string.IsNullOrEmpty(param)) return false;
+        RuntimeAnimatorController rac = anim.runtimeAnimatorController;
+        if (rac == null) return false;
+
+        if (!ReferenceEquals(rac, _animParamCacheFor))
+        {
+            _animParamHashes.Clear();
+            AnimatorControllerParameter[] ps = anim.parameters;
+            for (int i = 0; i < ps.Length; i++)
+                _animParamHashes.Add(ps[i].nameHash);
+            _animParamCacheFor = ps.Length > 0 ? rac : null;
+        }
+        return _animParamHashes.Contains(Animator.StringToHash(param));
     }
 
     // 임시 사망 표시: 디졸브 셰이더/Death 애니 도입 전, 각 피어에서 로컬로 재생.
