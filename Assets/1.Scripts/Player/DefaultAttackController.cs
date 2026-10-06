@@ -122,6 +122,12 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
     // "아직 이 클립이 실제로 재생 중인가"를 이걸로 따로 추적한다.
     private bool isFinishingAttackTail;
     private int finishingAttackIndex = -1;
+    private int[] attackStateHashes = Array.Empty<int>();
+    // 공격과 다른 상태를 섞으면 자세 차이도 deltaPosition에 들어온다.
+    // 전환이 끝난 첫 평가에도 그 변위가 남으므로 직전 평가를 함께 기억한다.
+    private bool wasBlendingWithNonAttackState;
+    private bool hasObservedAnimationState;
+    private bool wasInAttackAnimationState;
 
     public bool IsAttacking => player != null && player.CurrentState == PlayerActionState.Attack;
     public bool CanRequestStart => HasAttackSteps && CurrentStepDuration > 0f;
@@ -165,6 +171,14 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
     // 어긋나면 CrossFade가 조용히 실패하므로 초기화 시점에 에러로 드러낸다.
     private void ValidateAttackStates()
     {
+        int attackStateCount = attackSteps?.Length ?? 0;
+        if (attackStateHashes.Length != attackStateCount)
+        {
+            attackStateHashes = new int[attackStateCount];
+            for (int i = 0; i < attackStateCount; i++)
+                attackStateHashes[i] = GetAttackStateHash(i);
+        }
+
         if (animator == null || animator.runtimeAnimatorController == null || attackSteps == null)
             return;
 
@@ -252,6 +266,9 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
             return;
 
         animator = newAnimator;
+        wasBlendingWithNonAttackState = false;
+        hasObservedAnimationState = false;
+        wasInAttackAnimationState = false;
 
         if (!animator.TryGetComponent(out PlayerAnimationEventRelay _))
             animator.gameObject.AddComponent<PlayerAnimationEventRelay>();
@@ -450,6 +467,9 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
 
     public void HandleAnimatorMove(Vector3 deltaPosition, Vector3 animatorForward)
     {
+        // 공격 중이 아닐 때도 갱신해야 다음 공격에 이전 전환 기록이 남지 않는다.
+        bool suppressTransitionMotion = UpdateRootMotionTransitionGuard();
+
         // OnAnimatorMove는 Walk/Idle 중에도 매 프레임 호출되므로,
         // 공격 상태의 루트모션만 이동으로 변환한다.
         if (isFinishingAttackTail)
@@ -481,6 +501,9 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
         if (step.MovementType != DefaultAttackMovementType.AnimationRootMotionProjected)
             return;
 
+        if (suppressTransitionMotion)
+            return;
+
         animatorForward.y = 0f;
         if (animatorForward.sqrMagnitude < 0.001f)
             animatorForward = attackDirection;
@@ -490,6 +513,36 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
             return;
 
         motor.AddDisplacement(attackDirection * forwardDistance);
+    }
+
+    private bool UpdateRootMotionTransitionGuard()
+    {
+        bool hasAnimationState = animator != null && animator.runtimeAnimatorController != null;
+        bool isAttackState = hasAnimationState
+            && IsAttackAnimationState(animator.GetCurrentAnimatorStateInfo(0).shortNameHash);
+        bool isBlendingWithNonAttackState = hasAnimationState && animator.IsInTransition(0)
+            && (!isAttackState || !IsAttackAnimationState(animator.GetNextAnimatorStateInfo(0).shortNameHash));
+        // 낮은 프레임률에서 전환 전체가 한 평가 안에 끝나도 공격/비공격 경계는 잡는다.
+        bool crossedAttackBoundary = hasAnimationState && hasObservedAnimationState
+            && wasInAttackAnimationState != isAttackState;
+
+        bool suppress = isBlendingWithNonAttackState || wasBlendingWithNonAttackState
+            || crossedAttackBoundary;
+        wasBlendingWithNonAttackState = isBlendingWithNonAttackState;
+        wasInAttackAnimationState = isAttackState;
+        hasObservedAnimationState = hasAnimationState;
+        return suppress;
+    }
+
+    private bool IsAttackAnimationState(int stateHash)
+    {
+        for (int i = 0; i < attackStateHashes.Length; i++)
+        {
+            if (attackStateHashes[i] == stateHash)
+                return true;
+        }
+
+        return false;
     }
 
     [Rpc(SendTo.Server)]
