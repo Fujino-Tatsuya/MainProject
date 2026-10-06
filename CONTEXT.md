@@ -8,6 +8,11 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-10-06 · 은희(Claude) · **스킬 툴팁 인라인 아이콘 + r381 툴팁 행 복구**, 브랜치 `feature/SkillTooltipIcons`) — ✅ 구현 · EditMode 83/83 · Verify 0 · **SVN r384** 같이 받을 것 · ⏳ Play 확인
+- 🔴 **SVN r381(밸런스)이 `tooltip.*` 30행 + `# ─ 툴팁` 10행을 날렸다** → r384 에서 Export 병합으로 복구(r381 수치 유지, 서식 초기화). Boss·Monster `attackCooldown` 행도 인스펙터 값으로 새로 생김.
+- 인라인 아이콘 = `SkillTooltipGenerated/tooltipIcon_*.png` → 아틀라스 `SkillTooltipAttackIcon.asset`(guid 유지) · TMP `SkillTooltipAttackSprite`: `atk`·`shield`·`cooldown`. 재생성 = `Tools/UI/스킬 툴팁 인라인 아이콘 갱신`(⚠️ 인스펙터에서 바꾼 BX·BY·AD 를 덮어씀).
+- 표기 = 아이콘이 수치 **앞**, 색은 태그에 직접: `<sprite name="shield" color=#74C7EC>{shieldAmount}`. 🔴 속성이 붙으면 **이름에 따옴표 필수** — 없으면 EmojiOne 노란 `?` 로 깨진다(로그 없음). 칼 #F4B860(코드) · 쿨다운 #B8C4D6(코드, 머리줄 `⏱` 대체).
+
 ## ▶▶ 작업 세션 (2026-10-02 · 은희(Claude+Codex) · **캐릭터 선택 화면**, 브랜치 `feature/SelectCharactorUI`) — 계획 [PLAN-character-select.md](PLAN-character-select.md) 승인됨
 - ✅ 1단계 Codex(코드) `09e9cc57` · ✅ 2단계 Claude(씬·에셋·`LobbySceneManager` 배선). 결과 요약 = [player-prefabs.md §8.3](Docs/tech/player-prefabs.md)
 - 🔴 남은 것: **은희 MPPM Play 확인**(호스트+클라2: 초상화·Ready 동기화 / Start 활성 / 고른 Variant 스폰) → PR. 레이아웃은 첫 배치라 Play 보고 조정 가능

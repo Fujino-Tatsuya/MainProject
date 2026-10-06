@@ -14,8 +14,18 @@ public static class SkillTooltipAuthoring
     private const string GeneratedFolder = "Assets/2.Prefabs/UI/SkillTooltipGenerated";
     private const string FontPath = "Assets/Resources/NotoSansKR-VariableFont_wght SDF.asset";
     private const string StylePath = GeneratedFolder + "/SkillTooltipStyles.asset";
+    // 이름은 옛 공격력 임시 아이콘 그대로(guid 유지) — 지금은 인라인 아이콘 전부를 담은 아틀라스다.
     private const string AttackTexturePath = GeneratedFolder + "/SkillTooltipAttackIcon.asset";
     private const string AttackSpritePath = GeneratedFolder + "/SkillTooltipAttackSprite.asset";
+    private const int InlineIconSize = 64;
+
+    // 설명 문구의 <sprite name=…> 이름 ↔ 원본 PNG. atk 는 SkillTooltipFormatter 가 쓴다.
+    private static readonly (string name, string png)[] InlineIcons =
+    {
+        ("atk", GeneratedFolder + "/tooltipIcon_Sword.png"),
+        ("shield", GeneratedFolder + "/tooltipIcon_Shield.png"),
+        ("cooldown", GeneratedFolder + "/tooltipIcon_CoolDown.png"),
+    };
     private const string PaladinPrefabPath = "Assets/2.Prefabs/Player/Paladin/Player_Paladin.prefab";
     private const string SlotFramePath = "Assets/50.Art/UI/HUD/slot_skill.png";
     private const string PassiveIconPath = "Icon_mask/Icon_Passive";
@@ -155,6 +165,7 @@ public static class SkillTooltipAuthoring
             new Vector2(16f, -230f), new Vector2(398f, 24f));
         body.styleSheet = styleSheet;
         body.spriteAsset = attackSprite;
+        cooldown.spriteAsset = attackSprite; // 머리줄 <sprite name=cooldown>
         if (firstBuild)
         {
             body.textWrappingMode = TextWrappingModes.Normal;
@@ -365,32 +376,30 @@ public static class SkillTooltipAuthoring
         return sheet;
     }
 
+    [MenuItem("Tools/UI/스킬 툴팁 인라인 아이콘 갱신")]
+    public static void RebuildInlineIcons()
+    {
+        EnsureFolder(GeneratedFolder);
+        EnsureAttackSpriteAsset();
+        AssetDatabase.SaveAssets();
+        Debug.Log($"[SkillTooltip] 인라인 아이콘 갱신 — {string.Join(", ", Array.ConvertAll(InlineIcons, i => i.name))}");
+    }
+
     private static TMP_SpriteAsset EnsureAttackSpriteAsset()
     {
         TMP_SpriteAsset existing = AssetDatabase.LoadAssetAtPath<TMP_SpriteAsset>(AttackSpritePath);
         if (existing != null)
+        {
+            FillInlineIcons(existing);
             return existing;
-        EnsureTextureWithSprite(AttackTexturePath, "atk", new Color(0.96f, 0.69f, 0.25f, 1f), true);
+        }
+        if (AssetDatabase.LoadAssetAtPath<Texture2D>(AttackTexturePath) == null)
+            AssetDatabase.CreateAsset(new Texture2D(1, 1, TextureFormat.RGBA32, false), AttackTexturePath);
         Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(AttackTexturePath);
-        Sprite sprite = null;
-        foreach (Object child in AssetDatabase.LoadAllAssetsAtPath(AttackTexturePath))
-            if (child is Sprite found)
-                sprite = found;
-        if (texture == null || sprite == null)
-            throw new InvalidOperationException("임시 공격력 스프라이트 생성에 실패했다.");
 
         var asset = ScriptableObject.CreateInstance<TMP_SpriteAsset>();
         asset.name = "SkillTooltipAttackSprite";
         asset.spriteSheet = texture;
-        Rect rect = sprite.rect;
-        var metrics = new GlyphMetrics(rect.width, rect.height, 0f, rect.height, rect.width);
-        var glyphRect = new GlyphRect(
-            Mathf.RoundToInt(rect.x), Mathf.RoundToInt(rect.y),
-            Mathf.RoundToInt(rect.width), Mathf.RoundToInt(rect.height));
-        var glyph = new TMP_SpriteGlyph(0, metrics, glyphRect, 1f, 0, sprite);
-        var character = new TMP_SpriteCharacter(0xFFFE, glyph) { name = "atk" };
-        asset.spriteGlyphTable.Add(glyph);
-        asset.spriteCharacterTable.Add(character);
         Shader shader = Shader.Find("TextMeshPro/Sprite");
         if (shader == null)
             throw new InvalidOperationException("TextMeshPro/Sprite 셰이더를 찾지 못했다.");
@@ -403,33 +412,88 @@ public static class SkillTooltipAuthoring
         var serialized = new SerializedObject(asset);
         serialized.FindProperty("m_Version").stringValue = "1.1.0";
         serialized.ApplyModifiedPropertiesWithoutUndo();
-        asset.UpdateLookupTables();
-        EditorUtility.SetDirty(asset);
+        FillInlineIcons(asset);
         return asset;
     }
 
-    private static void EnsureTextureWithSprite(string path, string name, Color color, bool swordShape)
+    /// <summary>
+    /// <see cref="InlineIcons"/> PNG 를 한 줄 아틀라스로 줄여 텍스처 에셋을 제자리에서 다시 쓰고(guid 유지),
+    /// TMP 스프라이트 표를 그 칸들로 다시 만든다. 원본 PNG 는 임포트 설정과 무관하게 파일 바이트로 읽는다.
+    /// </summary>
+    private static void FillInlineIcons(TMP_SpriteAsset asset)
     {
-        if (AssetDatabase.LoadAssetAtPath<Texture2D>(path) != null)
-            return;
-        const int size = 32;
-        var texture = new Texture2D(size, size, TextureFormat.RGBA32, false) { name = name + "Texture" };
-        var pixels = new Color[size * size];
-        for (int y = 0; y < size; y++)
-        for (int x = 0; x < size; x++)
+        Texture2D atlas = AssetDatabase.LoadAssetAtPath<Texture2D>(AttackTexturePath);
+        if (atlas == null)
+            throw new InvalidOperationException($"{AttackTexturePath} 텍스처가 없다.");
+
+        const int size = InlineIconSize;
+        atlas.Reinitialize(size * InlineIcons.Length, size, TextureFormat.RGBA32, true);
+        atlas.filterMode = FilterMode.Bilinear;
+        atlas.wrapMode = TextureWrapMode.Clamp;
+        for (int i = 0; i < InlineIcons.Length; i++)
+            atlas.SetPixels32(i * size, 0, size, size, LoadDownscaled(InlineIcons[i].png, size));
+        atlas.Apply(true);
+
+        foreach (Object child in AssetDatabase.LoadAllAssetsAtPath(AttackTexturePath))
+            if (child is Sprite)
+                Object.DestroyImmediate(child, true);
+
+        asset.spriteSheet = atlas;
+        asset.material.SetTexture("_MainTex", atlas);
+        asset.spriteGlyphTable.Clear();
+        asset.spriteCharacterTable.Clear();
+        for (int i = 0; i < InlineIcons.Length; i++)
         {
-            bool filled = swordShape
-                ? (Mathf.Abs(x - y) <= 2 && x > 5 && x < 27) || (x >= 5 && x <= 12 && y >= 4 && y <= 11)
-                : Vector2.Distance(new Vector2(x, y), new Vector2(15.5f, 15.5f)) <= 12f;
-            pixels[y * size + x] = filled ? color : Color.clear;
+            var rect = new Rect(i * size, 0, size, size);
+            Sprite sprite = Sprite.Create(atlas, rect, new Vector2(0.5f, 0.5f), size);
+            sprite.name = InlineIcons[i].name;
+            AssetDatabase.AddObjectToAsset(sprite, atlas);
+
+            var metrics = new GlyphMetrics(size, size, 0f, size, size);
+            var glyph = new TMP_SpriteGlyph((uint)i, metrics, new GlyphRect(i * size, 0, size, size), 1f, 0, sprite);
+            asset.spriteGlyphTable.Add(glyph);
+            asset.spriteCharacterTable.Add(new TMP_SpriteCharacter(0xE000u + (uint)i, glyph) { name = InlineIcons[i].name });
         }
-        texture.SetPixels(pixels);
-        texture.Apply();
-        AssetDatabase.CreateAsset(texture, path);
-        Sprite sprite = Sprite.Create(texture, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
-        sprite.name = name;
-        AssetDatabase.AddObjectToAsset(sprite, texture);
-        EditorUtility.SetDirty(texture);
+        asset.UpdateLookupTables();
+        EditorUtility.SetDirty(atlas);
+        EditorUtility.SetDirty(asset.material);
+        EditorUtility.SetDirty(asset);
+    }
+
+    // 원본(1254px)을 칸 크기로 상자 평균 축소. 투명 가장자리 색이 번지지 않게 알파 가중 평균.
+    private static Color32[] LoadDownscaled(string pngPath, int size)
+    {
+        var source = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+        try
+        {
+            if (!source.LoadImage(System.IO.File.ReadAllBytes(pngPath)))
+                throw new InvalidOperationException($"PNG 를 읽지 못했다: {pngPath}");
+            Color32[] src = source.GetPixels32();
+            int sw = source.width, sh = source.height;
+            var result = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                int x0 = x * sw / size, x1 = Mathf.Max(x0 + 1, (x + 1) * sw / size);
+                int y0 = y * sh / size, y1 = Mathf.Max(y0 + 1, (y + 1) * sh / size);
+                double r = 0, g = 0, b = 0, a = 0;
+                for (int sy = y0; sy < y1; sy++)
+                for (int sx = x0; sx < x1; sx++)
+                {
+                    Color32 c = src[sy * sw + sx];
+                    r += c.r * c.a; g += c.g * c.a; b += c.b * c.a; a += c.a;
+                }
+                int count = (x1 - x0) * (y1 - y0);
+                result[y * size + x] = a <= 0
+                    ? new Color32(0, 0, 0, 0)
+                    : new Color32((byte)(r / a), (byte)(g / a), (byte)(b / a), (byte)Math.Round(a / count));
+            }
+            return result;
+        }
+        finally
+        {
+            Object.DestroyImmediate(source);
+        }
     }
 
     // 이미 있는 오브젝트는 배치·서식을 건드리지 않는다 — 프리팹에서 손본 값이 재실행에 덮이지 않게(새로 만들 때만 기본값).
