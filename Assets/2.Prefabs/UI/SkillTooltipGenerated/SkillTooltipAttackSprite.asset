@@ -39,27 +39,69 @@ MonoBehaviour:
   spriteSheet: {fileID: 2800000, guid: ed246170805c9c54a936ac1435175a2c, type: 2}
   m_SpriteCharacterTable:
   - m_ElementType: 2
-    m_Unicode: 65534
+    m_Unicode: 57344
     m_GlyphIndex: 0
     m_Scale: 1
     m_Name: atk
+  - m_ElementType: 2
+    m_Unicode: 57345
+    m_GlyphIndex: 1
+    m_Scale: 1
+    m_Name: shield
+  - m_ElementType: 2
+    m_Unicode: 57346
+    m_GlyphIndex: 2
+    m_Scale: 1
+    m_Name: cooldown
   m_GlyphTable:
   - m_Index: 0
     m_Metrics:
-      m_Width: 32
-      m_Height: 32
+      m_Width: 64
+      m_Height: 64
       m_HorizontalBearingX: 0
-      m_HorizontalBearingY: 32
-      m_HorizontalAdvance: 32
+      m_HorizontalBearingY: 54
+      m_HorizontalAdvance: 64
     m_GlyphRect:
       m_X: 0
       m_Y: 0
-      m_Width: 32
-      m_Height: 32
+      m_Width: 64
+      m_Height: 64
     m_Scale: 1
     m_AtlasIndex: 0
     m_ClassDefinitionType: 0
-    sprite: {fileID: 5534069994790775458, guid: ed246170805c9c54a936ac1435175a2c, type: 2}
+    sprite: {fileID: -2257833110529358097, guid: ed246170805c9c54a936ac1435175a2c, type: 2}
+  - m_Index: 1
+    m_Metrics:
+      m_Width: 64
+      m_Height: 64
+      m_HorizontalBearingX: 0
+      m_HorizontalBearingY: 49
+      m_HorizontalAdvance: 64
+    m_GlyphRect:
+      m_X: 64
+      m_Y: 0
+      m_Width: 64
+      m_Height: 64
+    m_Scale: 1.3
+    m_AtlasIndex: 0
+    m_ClassDefinitionType: 0
+    sprite: {fileID: -496141523768733680, guid: ed246170805c9c54a936ac1435175a2c, type: 2}
+  - m_Index: 2
+    m_Metrics:
+      m_Width: 64
+      m_Height: 64
+      m_HorizontalBearingX: 0
+      m_HorizontalBearingY: 54
+      m_HorizontalAdvance: 64
+    m_GlyphRect:
+      m_X: 128
+      m_Y: 0
+      m_Width: 64
+      m_Height: 64
+    m_Scale: 1
+    m_AtlasIndex: 0
+    m_ClassDefinitionType: 0
+    sprite: {fileID: -5068476013515613522, guid: ed246170805c9c54a936ac1435175a2c, type: 2}
   spriteInfoList: []
   fallbackSpriteAssets: []
 --- !u!21 &6223982909596675614

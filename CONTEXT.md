@@ -8,6 +8,11 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-10-06 · 은희(Claude) · **스킬 툴팁 인라인 아이콘 + r381 툴팁 행 복구**, 브랜치 `feature/SkillTooltipIcons`) — ✅ 구현 · EditMode 83/83 · Verify 0 · **SVN r384** 같이 받을 것 · ⏳ Play 확인
+- 🔴 **SVN r381(밸런스)이 `tooltip.*` 30행 + `# ─ 툴팁` 10행을 날렸다** → r384 에서 Export 병합으로 복구(r381 수치 유지, 서식 초기화). Boss·Monster `attackCooldown` 행도 인스펙터 값으로 새로 생김. 아트 핀 381 → **384**. 경석 남은 일 3(xlsx Monster 속도)은 **r384 위에서** 고칠 것.
+- 인라인 아이콘 = `SkillTooltipGenerated/tooltipIcon_*.png` → 아틀라스 `SkillTooltipAttackIcon.asset`(guid 유지) · TMP `SkillTooltipAttackSprite`: `atk`·`shield`·`cooldown`. 재생성 = `Tools/UI/스킬 툴팁 인라인 아이콘 갱신`(⚠️ 인스펙터에서 바꾼 BX·BY·AD 를 덮어씀).
+- 표기 = 아이콘이 수치 **앞**, 색은 태그에 직접: `<sprite name="shield" color=#74C7EC>{shieldAmount}`. 🔴 속성이 붙으면 **이름에 따옴표 필수** — 없으면 EmojiOne 노란 `?` 로 깨진다(로그 없음). 칼 #F4B860(코드) · 쿨다운 #B8C4D6(코드, 머리줄 `⏱` 대체).
+
 ## ▶▶ 다음 세션 인수인계 (2026-10-06 · 경석(Claude)) — 여기부터 읽을 것
 
 **상태**: 전수조사 정리·최적화 S1~S5 끝 → `development` = `feature/Boss23` = **`661cf289`**(푸시). SVN **r381**(핀 381, check-environment 전부 통과).
@@ -71,10 +76,50 @@ HUD 매 프레임 문자열(`PlayerHealthHUD`·`StatusEffectHUD`·`SkillCooldown
 
 ## ▶▶ 작업 세션 (2026-10-03 · 경석(Claude) · **타이틀 시작 연출 · 존 게이트 패널 모니터 켜짐·외곽선**, 브랜치 `feature/Boss23`) — ✅ 팀장 Play OK(10-04) · `feature/Boss23` 푸시 `5e3e46fe`(development 미반영). 게이트 활성 표시 = 모니터 화면(바닥 링 삭제). ⚠️ ZoneL_typeB 를 프리팹 모드로 열어 둔 채 파일을 바꾸면 Auto Save 가 덮어쓴다 — 값은 `Tools/Map/Authoring/Zone Monitor Screen/5` 로
 계획 = [PLAN-title-monitor.md](Docs/history/PLANS/PLAN-title-monitor.md)(승인 10-03, Codex 설계 회의 반영). 🔴 **수정 예정 — 동시 수정 금지:** `UI/Title/*`(TitleFlowDirector·TitleMonitorDisplay·셰이더) · `Map/ZoneBridgeGate.cs`·`ZoneBridgeGateManager.cs` · `ZoneL_typeB.prefab`(게이트 값) · 신규 외곽선 셰이더.
+
 ## ▶▶ 작업 세션 (2026-10-02 · 은희(Claude+Codex) · **캐릭터 선택 화면**, 브랜치 `feature/SelectCharactorUI`) — 계획 [PLAN-character-select.md](PLAN-character-select.md) 승인됨
 - ✅ 1단계 Codex(코드) `09e9cc57` · ✅ 2단계 Claude(씬·에셋·`LobbySceneManager` 배선). 결과 요약 = [player-prefabs.md §8.3](Docs/tech/player-prefabs.md)
 - 🔴 남은 것: **은희 MPPM Play 확인**(호스트+클라2: 초상화·Ready 동기화 / Start 활성 / 고른 Variant 스폰) → PR. 레이아웃은 첫 배치라 Play 보고 조정 가능
 - 범위 밖: 전투 HUD 초상화 Paladin 고정(Gunner 도 Paladin 얼굴)
+## ▶▶ 작업 세션 (2026-10-06 · 민경(Claude) · **아군 보호막 연출 = 받는 쪽이 주인**, 브랜치 `feature/VFX`) — 구현 완료 · 배선·Play 검증 대기
+계획·그릴 결과 = [PLAN.md](PLAN.md) 맨 위 항목.
+- 거너 Q 가 아군에게 보호막을 줄 때 띄우던 `FX_GunnerShieldGrant` 를 걷고, **아군 자신의 `PlayerShieldVfx` 배리어**로 바꿨다.
+- 🔴 **지속시간을 넘기지 않는다.** 보호막은 시간보다 먼저 깨지고(`Depleted`), `GunnerCharge` 는 `Stack` 이라 인스턴스가 여럿이며, 시전자(Q 스킬)가 보호막(5초)보다 먼저 끝난다. 셋 다 타이머로는 못 센다.
+- 🔴 **보호막은 이미 전 피어에 복제돼 있다** — `Unit._replicatedShields` + public `ShieldInstanceCount`/`GetShieldInstance`/`ServerShieldEnded`. `PlayerShieldVfx` 가 그걸 직접 읽어 켜고 끈다. **`Unit.cs`·`Player.cs`·`Health.cs` 무수정.**
+- 색은 출처로 가른다: `HolyShield` = 금색(기존) / 그 외 = **흰색**(신규 `50.Art/VFX/Common/Players/Shield/`). 겹치면 **금색 우선**, 배리어는 언제나 하나.
+- `PlayLocal()`·`ServerEnd()` 는 **오프라인 폴백**으로 바뀌었다(`IsNetworkActive` 면 no-op) — 덕분에 `FirstMeleeSubSkill` 무수정.
+- 🔴 **은희 공유 2건**: ① `ChargeLaserFiredRpc` 시그니처에서 `Vector3[] shieldPoints` 제거(네트워크 계약 변경) ② `Player_Gunner.prefab` 에 `PlayerShieldVfx` 추가(NetworkBehaviour 목록 변경).
+- 🔴 **같이 고친 기존 버그 2건**: 팔라딘 `HolyShield` 소켓 `safetyTimeout` 8 < 보호막 10초(8초에 강제 회수) → 15 / `PlayChargeLaser` 의 조기 `return` 이 Q 발사 애니를 건너뛸 수 있었다.
+- **배선**: `Tools/VFX/보호막 연출 배선` (두 프리팹 + EffectCatalog 프리워밍 등록까지 한 번에).
+- 🔴 **SVN add**: `Shield/` 폴더의 프리팹 3 + 엔트리 2, `_Materials/FX_AllyShield_*.mat` 4장, `PlayerShieldSetup.cs`, 각 `.meta`.
+- 🔴 **대쉬 잔상이 MPPM 에서 안 보이던 버그 수정**: 이동 권한이 2026-09-29 이후 **오너**로 뒤집혔는데(`Player.ServerAuthoritativeMovement == false`) `PlayerSkillVfx` 의 잔상 폴링이 여전히 "서버 권한" 전제로 `SendTo.ClientsAndHost`(서버 전용) RPC 를 쐈다 — **클라가 대쉬하면 아무에게도 안 간다**(호스트가 대쉬할 때만 보임). 최후의 심판과 같은 **오너 → 서버 → NotOwner 2홉**으로 교체. 🔴 **은희 공유**(`PlayerSkillVfx.cs`, RPC 목록 변경).
+- 🔴 **대쉬 잔상 2차(2026-10-06)**: `DashAfterimage` 의 잔상 루트를 Awake 시점 액티브 씬에 만들어서, 로비 흐름(MPPM)에서 그 씬(로딩·로비)이 언로드되면 루트째 파괴되고 다시 안 만들어졌다 → `EnsureGhostRoot()` + `DontDestroyOnLoad`, 파괴된 조각 정리. ✅ MPPM 확인 완료(민경 10-06), 진단 로그 삭제.
+- 🔴 **대쉬 잔상 실종의 확정 원인(Editor.log 스택으로 확인)**: `DashSpeedLines` 가 궤적을 Awake 시점 액티브 씬에 만들어 로비 흐름에서 씬 언로드와 함께 파괴됨 → `DashAfterimage.Play()` 가 **속도선부터** 켜다 `MissingReferenceException` 으로 빠져나가 잔상 0장 → 예외가 `PlayerSkillVfx.Update` 까지 올라가 RPC 전송도 건너뜀. 수정: 궤적 루트 `DontDestroyOnLoad` + 파괴 시 재생성, `Play()` 순서를 잔상 먼저·속도선 나중으로. 속도선 없는 E 백스텝 잔상은 처음부터 멀쩡했다.
+- MPPM 은 Dev Boot 가 아니라 **로비 흐름**이고, `0.BootStrapScene.unity` 에 커밋 안 된 로컬 오버라이드로 `defaultPlayerPrefab`·`NetworkConfig.PlayerPrefab` = **`Paladin_VFX`(구 통짜)** 가 들어가 있다.
+- **`FX_GunnerUltLaser` (B) 정규화**: `Shoot`·`UltLaser` 만 `scalingMode: Local` 이라 부모 1/9 와 **런타임 반경 배율(×2r)을 무시**하고 있었다 → Hierarchy 로 바꾸고 크기 재계산(UltLaser X/Z 9 · Shoot 5.5 · Y 6.255 유지). 런타임(r=2) 지름 4m / 2.44m, 길이 5.56m. 🔴 `UltLaser` 는 나머지 8개 시스템의 **부모**라 트랜스폼 스케일(0.1111)은 건드리면 안 된다. 메시는 내장 Cylinder(중심 피벗) — 길이의 절반이 바닥 아래.
+- ⚠️ **가붕이는 대쉬 잔상이 아예 없다**: `DashAfterimage` 가 `Paladin_VFX.prefab`(스폰 안 되는 보관용)에만 있고 `Player_Paladin.prefab` 에는 없다. 별건 — 배선 도구 필요.
+- **Q 집중 발밑 링(`FX_GunnerFocusRing`) 제거**(2026-10-06): 감속(×0.5)·조준고정은 조작감으로 읽히고, 그 연출의 화살표는 위로 솟아 "모인다"(충전) 기호라 묶여 있다는 신호와 반대였다. 에셋은 남기고 배선만 뺐다 — `QFocusRing` 소켓은 `Tools/VFX/거너 Q 스킬 배선` 이 지운다.
+- 🔴 **같이 고친 기존 버그 3번째**: `GunnerBeamView.EndCharge` 의 `if (chargeLoopPlayer == null) return;` 이 **과충전 루프 정지보다 앞**에 있었다 — 충전 소켓이 비면 과충전이 영영 안 꺼진다.
+
+## ▶▶ 작업 세션 (2026-10-06 · 민경(Claude) · **거너 VFX 미싱 머티리얼 복구**, 브랜치 `feature/VFX`) — 🔴 SVN add 필요
+- 증상 = Player2 이펙트 5종(`CoolVent`·`FocusRing`·`FrostBlast`·`FrostTrail`·`UltLaser`)의 파티클 머티리얼이 Missing.
+  원인 = 샌드박스(MyProject) 의 **Hovl Studio 팩이 MainProject 에 없고**, 포팅 때 이 5개가 빠졌다.
+- 해결 = 샌드박스에서 **`.meta` 를 통째로 복사해 guid 를 보존**(이 폴더의 기존 관례와 동일) →
+  `50.Art/VFX/_Materials/` 에 `Snowflake_Hovl`·`Arrow1`·`Flare`·`Mask1`·`TechCircle2`, `Textures/` 에 같은 이름 png 5장.
+  🔴 `Snowflake` 는 **이름 충돌**(기존 것은 Little Enchant 팩, 참조 0) 이라 `_Hovl` 접미사를 붙였다.
+- 🔴 같이 빠져 있던 것 = `Models/Cylinder.fbx`(Hovl). `FX_GunnerUltLaser` 의 Renderer **메시**가 이걸 가리킨다 — 없으면 레이저가 안 보인다.
+- 🔴 **SVN add**: 위 11개 파일 + 각 `.meta` (`Assets/50.Art` 는 git 무시).
+- `FX_GunnerOvercharge` 강화(Q 최대 충전 0.8초 창 연출이 1초에 1발·0.4유닛이라 안 보였다) → 주기 1.0→0.3s · 버스트 1→3 · 상시 10/s · 크기 ×1.5 · 스케일 0.1→0.2 · 색 HDR 청백. 샌드박스 사본도 같은 값.
+
+## ▶▶ 작업 세션 (2026-10-06 · 민경(Claude) · **잡몹 사망 = 디졸브 → 부위별 붕괴**, 브랜치 `feature/VFX`) — 구현 완료 · Bake·Play 검증 대기
+계획·조사 = [PLAN.md](PLAN.md) 맨 위 항목.
+- **부위 조각은 블렌더 없이 본으로 가른다.** 이 팩 로봇은 강체 리깅(ChompBot 1661/1661 단일 본)이고 본 경계를 가로지르는 폴리곤이 **0개** — 메시가 이미 닫힌 껍데기들의 합집합이라 가르면 단면이 안 생긴다.
+- 조각 정점은 `bindposes[본]` 을 먹여 **본 로컬 공간**에 담는다 → 런타임은 조각을 그 본의 월드 트랜스폼에 놓기만 하면 **사망 포즈가 근사 없이** 재현된다. 미리 잘라 둔 스태틱 파츠(바인드 포즈)로는 안 되는 지점.
+- 새 파일 = `1.Scripts/Monster/Collapse/` 의 `MonsterPartSet` · `MonsterCollapseDebris` · `CollapseDeath` (+ Editor 2). 도구 = `Tools/Monster/부위 붕괴 — ChompBot 설정` / `— 선택한 프리팹에 적용`.
+- 🔴 **경석 공유**: `ChompBot.prefab` 의 `DissolveDeath` → `CollapseDeath` 교체. `MonsterBase` 는 안 건드렸다(`IDeathEffect` 구멍 그대로). NetworkBehaviour 개수는 같지만 **목록 순서가 바뀐다**.
+- `DissolveDeath` 는 **남긴다** — 보스가 계속 쓰고, 붕괴 쪽도 조각 **퇴장**에 같은 템플릿을 재사용한다.
+- 파편 규칙은 상자(`FragmentBurstEffect`)와 동일: Effect(17) 레이어, 월드 지오메트리만 충돌, `ContinuousSpeculative`. 조각 루트는 **몬스터의 자식이 아니다**(디스폰과 함께 증발하는 구조 회피).
+- 범위: ChompBot → 잡몹 8종. **보스·중간보스 제외**(23호 `delayAfterClipEnd 2초` = 팀장 지시 2026-09-30).
 
 ## ▶▶ 작업 세션 (2026-10-02~03 · 경석(Claude) · **몬스터 공격속도 = 애니 재생 배율 · 쿨다운 종료 기준 · 이동 애니 맞춤**, 브랜치 `feature/Boss23`) — ✅ development 반영(10-03) · **SVN r372 같이 받을 것**(GameData.xlsx Monster attackSpeed→1 · Chomp 2/2.8, 핀 372) · 팀장 Play 1차(Chomp·Mortar) · ⏳ MPPM·배율 0.5/2 Play 미검증
 계획·결정·교차검증 이력 = [PLAN-monster-anim-speed.md](Docs/history/PLANS/PLAN-monster-anim-speed.md) §3 · S4-b.

@@ -16,8 +16,20 @@ using UnityEngine;
 [RequireComponent(typeof(NetworkObject))]
 public class GunnerTrackingLaser : BaseNetworkBehaviour
 {
-    [Tooltip("임시 표시 — 반경에 맞춰 스케일한다(민경 VFX 전까지).")]
+    [Tooltip("반경에 맞춰 스케일하는 연출 루트. 지름 1유닛으로 저작된 VFX 를 넣는다")]
     [SerializeField] private Transform visual;
+
+    // 🔴 피해 펄스는 **각 피어가 자기 타이머로** 돌린다. 틱마다 RPC 를 쏘면
+    //    6초에 12번, 인원수만큼 곱해진다 — 연출 하나에 쓸 대역이 아니다.
+    //    간격이 데이터로 고정돼 있고 스폰 시각이 같으므로 그림은 충분히 맞는다
+    //    (과열 단계를 각 피어가 계산하는 것과 같은 방식).
+    [Tooltip("피해 펄스 연출(FX_GunnerUltTick_Entry). 비우면 연출 없이 피해만 들어간다")]
+    [SerializeField] private EffectSocketPlayer tickPlayer;
+
+    [Tooltip("그 펄스 간격(초). 데이터의 damageInterval 과 맞출 것")]
+    [SerializeField, Min(0.05f)] private float tickVfxInterval = 0.5f;
+
+    private float nextTickVfxTime = -1f;
 
     private readonly NetworkVariable<float> replicatedRadius = new NetworkVariable<float>(1f);
 
@@ -93,10 +105,19 @@ public class GunnerTrackingLaser : BaseNetworkBehaviour
         base.OnNetworkDespawn();
     }
 
+    /// <summary>
+    /// 연출을 반경에 맞춘다. VFX 는 <b>지름 1유닛</b>으로 저작돼 있으므로 배율이 곧 지름이다.
+    ///
+    /// 🔴 <b>균일 배율이다</b>(2026-10-05). 예전에는 Y 를 그대로 두고 X·Z 만 늘였는데,
+    /// 파티클은 비균일 배율에서 깨진다 — 빌보드는 보는 각도마다 다르게 일그러지고
+    /// Stretched 는 두께가 찌그러진다. 기둥 높이가 반경을 따라 같이 커지는 편이
+    /// "넓은 존 = 굵은 기둥" 으로 읽혀 오히려 맞다.
+    /// (반경은 데이터에서 한 번 정해지고 런타임에 변하지 않는다.)
+    /// </summary>
     private void ApplyVisualRadius(float r)
     {
         if (visual != null)
-            visual.localScale = new Vector3(r * 2f, visual.localScale.y, r * 2f);
+            visual.localScale = Vector3.one * (r * 2f);
     }
 
     // 시전자가 게임을 나가면 즉시 제거(D12). 쓰러짐·사망은 해당하지 않는다.
@@ -108,6 +129,10 @@ public class GunnerTrackingLaser : BaseNetworkBehaviour
 
     private void Update()
     {
+        // 🔴 **권한 가드 위**다. 피해 펄스는 전 피어가 봐야 한다 —
+        //    여기 아래로 내리면 호스트에서만 보인다(이 레포가 여러 번 겪은 버그다).
+        UpdateTickVfx();
+
         if (!HasStateAuthority || !initialized)
             return;
 
@@ -136,6 +161,26 @@ public class GunnerTrackingLaser : BaseNetworkBehaviour
             nextDamageTime += damageInterval;
             DamageTick();
         }
+    }
+
+    /// <summary>
+    /// [전 피어] 피해 간격마다 펄스를 한 번 찍는다 — "지금 데미지가 들어갔다"는 신호다.
+    /// 지속 기둥만 있으면 틱 리듬이 안 보여서 장판이 그냥 켜져 있는 것처럼 보인다.
+    /// </summary>
+    private void UpdateTickVfx()
+    {
+        if (tickPlayer == null || tickVfxInterval <= 0f)
+            return;
+
+        // 첫 틱은 생성 즉시(서버의 nextDamageTime 과 같은 규칙).
+        if (nextTickVfxTime < 0f)
+            nextTickVfxTime = Time.time;
+
+        if (Time.time < nextTickVfxTime)
+            return;
+
+        nextTickVfxTime += tickVfxInterval;
+        tickPlayer.PlayOnce();
     }
 
     private void DamageTick()

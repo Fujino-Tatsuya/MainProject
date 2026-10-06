@@ -139,13 +139,13 @@ public static class SkillTooltipFormatter
     private static string FormatDamage(SkillTooltipDamage damage, bool showCalculation)
     {
         string value = damage.IsRange ? $"{damage.Minimum}~{damage.Maximum}" : damage.Minimum.ToString(CultureInfo.InvariantCulture);
-        string colored = $"<color={DamageColor}>{value}<sprite name=atk></color>";
+        string colored = $"<color={DamageColor}><sprite name=\"atk\" color={DamageColor}>{value}</color>";
         if (!showCalculation)
             return colored;
 
         string flat = FormatRange(damage.MinimumFlatBonus, damage.MaximumFlatBonus);
         string coefficient = FormatPercentRange(damage.MinimumCoefficient, damage.MaximumCoefficient);
-        return $"{colored} = ({flat} + {coefficient}<sprite name=atk>)";
+        return $"{colored} = ({flat} + <sprite name=\"atk\" color={DamageColor}>{coefficient})";
     }
 
     private static string FormatRange(int minimum, int maximum) =>

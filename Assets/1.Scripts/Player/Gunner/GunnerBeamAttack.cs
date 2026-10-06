@@ -82,6 +82,14 @@ public class GunnerBeamAttack : BaseAttack
     private readonly List<Unit> pierceLanded = new List<Unit>();
 
     /// <summary>
+    /// 직전 <see cref="FirePiercing"/> 에서 <b>실제로 피해가 들어간</b> 유닛들(중복 없음).
+    ///
+    /// 관통 연출용이다 — 끝점에서 한 번만 터뜨리면 여러 마리를 꿰뚫어도 한 마리만
+    /// 맞은 것처럼 보인다. 호출자는 <b>그 프레임 안에</b> 읽고 버릴 것(다음 발사에 덮어쓴다).
+    /// </summary>
+    public IReadOnlyList<Unit> LastPierceLanded => pierceLanded;
+
+    /// <summary>
     /// 지형(비트리거 blocking)에 닿기까지의 거리. 굵은 직선(SphereCast)으로 잰다. 자기 콜라이더는 무시.
     /// </summary>
     public float CastLength(Vector3 origin, Vector3 direction, float range, float radius, LayerMask blocking)

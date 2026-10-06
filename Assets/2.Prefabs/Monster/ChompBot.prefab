@@ -508,8 +508,8 @@ GameObject:
   - component: {fileID: 7157448083927998393}
   - component: {fileID: 60898105745225537}
   - component: {fileID: 7605792445230006449}
-  - component: {fileID: 5117935030934790997}
   - component: {fileID: 4980393420285267538}
+  - component: {fileID: 3145906165011328742}
   m_Layer: 8
   m_Name: ChompBot
   m_TagString: Untagged
@@ -598,7 +598,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1085786765
+  GlobalObjectIdHash: 3936025811
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -736,26 +736,6 @@ MonoBehaviour:
   hitVFXType: 1
   bodyCollider: {fileID: 6772621528324988158}
   attackTelegraphMaterial: {fileID: 0}
---- !u!114 &5117935030934790997
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5083357185944259280}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e59f6031be80d1c40ab161abf0873167, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::DissolveDeath
-  ShowTopMostFoldoutHeaderGroup: 1
-  dissolveTemplate: {fileID: 2100000, guid: 2aa1c6b21e004e799e426acfd55ec726, type: 2}
-  particlePrefab: {fileID: 7019508933032447489, guid: 0e15d6fc561b43fa95fadff8ab04b5fd, type: 3}
-  duration: 1.5
-  despawnGrace: 0.5
-  leadBeforeClipEnd: 0.3
-  delayAfterClipEnd: 0
-  renderers: []
 --- !u!114 &4980393420285267538
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -770,6 +750,33 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::EffectAnimEvents
   animator: {fileID: 4411660867951341482}
   effects: []
+--- !u!114 &3145906165011328742
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5083357185944259280}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 225bd2ebaa0aff641bf79e7b748d7129, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CollapseDeath
+  ShowTopMostFoldoutHeaderGroup: 1
+  partSet: {fileID: 11400000, guid: 304e7ccec2eccf24784a71c79b7c8776, type: 2}
+  exitMode: 0
+  stylizedDissolveShader: {fileID: 4800000, guid: 2e0fd796f9611bf4f8bdfccb6ef91d91, type: 3}
+  dissolveNoise: {fileID: 2800000, guid: 7006c928f27b40a489aa5208bfe5a43f, type: 3}
+  dissolveNoiseTiling: 4
+  dissolveTemplate: {fileID: 2100000, guid: 2aa1c6b21e004e799e426acfd55ec726, type: 2}
+  particlePrefab: {fileID: 7019508933032447489, guid: 0e15d6fc561b43fa95fadff8ab04b5fd, type: 3}
+  scatterSpeed: 0.5
+  spinRange: {x: 40, y: 160}
+  settleTime: 1.2
+  exitDuration: 0.6
+  despawnGrace: 0.3
+  leadBeforeClipEnd: 0.1
+  delayAfterClipEnd: 0
 --- !u!1 &5267482100630464192
 GameObject:
   m_ObjectHideFlags: 0

@@ -128,7 +128,7 @@ public sealed class SkillTooltipView : MonoBehaviour
         {
             bool hasCooldown = cooldown.HasValue;
             cooldownText.gameObject.SetActive(hasCooldown);
-            cooldownText.text = hasCooldown ? $"⏱ {cooldown.Value:0.#}초" : string.Empty;
+            cooldownText.text = hasCooldown ? $"<sprite name=\"cooldown\" color=#B8C4D6> {cooldown.Value:0.#}초" : string.Empty;
         }
 
         SkillTooltipDamage damage = source.GetTooltipDamage(player);
