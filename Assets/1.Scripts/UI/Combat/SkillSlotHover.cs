@@ -15,6 +15,11 @@ public sealed class SkillSlotHover : MonoBehaviour,
 
     private Player player;
     private PlayerInputReader input;
+    private PlayerSkillController skillController;
+    private SkillLineIndicator lineIndicator;
+    private ISkillPreviewSource previewSource;
+    private PlayerSkillTargeting targeting;
+    private PlayerSkillData rangePreviewData;
     private ISkillTooltipSource source;
     private PlayerSkillSlot slot;
     private bool clickable;
@@ -36,10 +41,21 @@ public sealed class SkillSlotHover : MonoBehaviour,
         string displayKey,
         float? cooldownSeconds)
     {
+        EndSkillPreview();
         player = owner;
         input = owner != null ? owner.GetComponent<PlayerInputReader>() : null;
+        skillController = owner != null ? owner.GetComponent<PlayerSkillController>() : null;
+        lineIndicator = owner != null ? owner.GetComponentInChildren<SkillLineIndicator>(true) : null;
         source = tooltipSource;
         slot = inputSlot;
+        targeting = owner != null ? owner.GetComponent<PlayerSkillTargeting>() : null;
+        PlayerSkillBase skill = skillController != null ? skillController.GetSkill(slot) : null;
+        previewSource = skill as ISkillPreviewSource;
+        // 대상 지정 스킬(R 등)은 조준 때와 같은 사거리 원을 호버로 미리 보여준다(지점 지정이면 지점 원도).
+        rangePreviewData = skill != null && skill.Data != null &&
+                           skill.Data.TargetingMode != SkillTargetingMode.None && skill.Data.CastRange > 0f
+            ? skill.Data
+            : null;
         clickable = acceptsLeftClick;
         keyLabel = displayKey;
         cooldown = cooldownSeconds;
@@ -51,7 +67,10 @@ public sealed class SkillSlotHover : MonoBehaviour,
         }
 
         if (pointerInside)
+        {
             tooltipView?.BeginHover(this, source, player, (RectTransform)transform, keyLabel, cooldown);
+            BeginSkillPreview();
+        }
     }
 
     public void OnPointerEnter(PointerEventData eventData)
@@ -59,6 +78,7 @@ public sealed class SkillSlotHover : MonoBehaviour,
         pointerInside = true;
         Hovering.Add(GetInstanceID());
         tooltipView?.BeginHover(this, source, player, transform as RectTransform, keyLabel, cooldown);
+        BeginSkillPreview();
     }
 
     public void OnPointerExit(PointerEventData eventData)
@@ -66,6 +86,7 @@ public sealed class SkillSlotHover : MonoBehaviour,
         pointerInside = false;
         Hovering.Remove(GetInstanceID());
         tooltipView?.EndHover(this);
+        EndSkillPreview();
     }
 
     public void OnPointerDown(PointerEventData eventData)
@@ -94,7 +115,26 @@ public sealed class SkillSlotHover : MonoBehaviour,
         pointerInside = false;
         Hovering.Remove(GetInstanceID());
         tooltipView?.EndHover(this);
+        EndSkillPreview();
         ReleaseVirtualInput();
+    }
+
+    private void BeginSkillPreview()
+    {
+        if (previewSource != null)
+            lineIndicator?.BeginPreview(previewSource);
+
+        if (rangePreviewData != null)
+            targeting?.BeginRangePreview(rangePreviewData);
+    }
+
+    private void EndSkillPreview()
+    {
+        if (previewSource != null)
+            lineIndicator?.EndPreview(previewSource);
+
+        if (rangePreviewData != null)
+            targeting?.EndRangePreview();
     }
 
     private void ReleaseVirtualInput()

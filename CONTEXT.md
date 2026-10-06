@@ -8,6 +8,15 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-10-06~07 · 은희(Claude+Codex+claude-alt) · **스킬 직선 인디케이터 + HUD 호버 미리보기 + 지점 지정 확장**, 브랜치 `feature/GunnerSkillIndicatorUpgrade`) — ✅ 구현·배선 · EditMode 33/33 · ⏳ Play·MPPM 확인 · 미푸시
+- 계획·결정 = [PLAN.md](PLAN.md) 최상단(그릴 21문항, 레퍼런스 = 롤 제라스 Q). 대상 = 거너 Q(차지 중 직사각형 6→16) · 거너 RMB/팔라딘 RMB/거너 E(HUD 호버 미리보기). 거너 R·팔라딘 R(사거리 원)은 다음 작업.
+- 커밋 `85b6d6df`~`724ac4ba`. 배선 = `Tools/Player/Authoring/Wire Skill Line Indicator`(base `Player.prefab`, 멱등) · 테스트 = `Tools/Tests/스킬 직선 인디케이터 EditMode 테스트 실행`.
+- 계획 밖 변경: `PlayerMotor.GetGroundedPreviewDistance`(미리보기 화살표 클립용) · `PlayerMotionSweep.Resolve` 선택 인자 `logDiagnostics`(기본 true, 기존 호출 동일). 셰이더는 임시 HLSL `.shader`(아트 교체 예정).
+- 후속(10-07): 호버 방향 = `PlayerMovement.CurrentFacing`(루트는 안 돎) · 대상 지정 스킬 호버 = 사거리 원(팔라딘 R·거너 R).
+- 후속(10-07, claude-alt `c53d9fc6` + `2a7830a9`): **지점 지정(GroundPoint) 확장 = 기능만** — `PlayerSkillData` 옵션 `groundPointOutOfRange`(Clamp 기본/AutoApproach) · `groundMarkerRadius`(0=안 그림) · `hoverMarkerDistance`(3). 새 RPC `SubmitPointApproachRpc`. **거너 R 에셋은 기획서대로 SingleTarget 유지**(은희 결정) — 쓰려면 에셋 `targetingMode=GroundPoint`·`AutoApproach`. EditMode 33/33. 팔라딘 Q·E 미리보기는 안 함.
+- ⚠️ 이 워크트리에서 `Assets/Refresh` 뒤 도메인 리로드마다 Unity MCP(3003)가 안 돌아와 `Window > MCP Server` 수동 Start 가 필요했다(10-06~07 4회).
+- ⚠️ base `Player.prefab` 을 저작 메뉴로 고치면 Unity 가 Variant(`Player_Gunner`·`Player_Paladin`)를 재저장해 잡음 diff(오버라이드 재정렬·base 와 같은 값)를 남긴다 — 커밋 전에 확인하고 되돌릴 것.
+
 ## ▶▶ 작업 세션 (2026-10-06 · 은희(Claude) · **스킬 툴팁 인라인 아이콘 + r381 툴팁 행 복구**, 브랜치 `feature/SkillTooltipIcons`) — ✅ 구현 · EditMode 83/83 · Verify 0 · **SVN r384** 같이 받을 것 · ⏳ Play 확인
 - 🔴 **SVN r381(밸런스)이 `tooltip.*` 30행 + `# ─ 툴팁` 10행을 날렸다** → r384 에서 Export 병합으로 복구(r381 수치 유지, 서식 초기화). Boss·Monster `attackCooldown` 행도 인스펙터 값으로 새로 생김. 아트 핀 381 → **384**. 경석 남은 일 3(xlsx Monster 속도)은 **r384 위에서** 고칠 것.
 - 인라인 아이콘 = `SkillTooltipGenerated/tooltipIcon_*.png` → 아틀라스 `SkillTooltipAttackIcon.asset`(guid 유지) · TMP `SkillTooltipAttackSprite`: `atk`·`shield`·`cooldown`. 재생성 = `Tools/UI/스킬 툴팁 인라인 아이콘 갱신`(⚠️ 인스펙터에서 바꾼 BX·BY·AD 를 덮어씀).

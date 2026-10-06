@@ -12,7 +12,7 @@ using UnityEngine;
 /// 클립의 Hit 애니메이션 이벤트(정밀) 또는 <see cref="FirstMeleeInterruptSkillData.HitDelay"/> 타이머(폴백).
 /// 클립은 아트/SVN 관할이라 이벤트 없이도 성립해야 한다.
 /// </summary>
-public class FirstMeleeInterruptSkill : PlayerInstantSkill
+public class FirstMeleeInterruptSkill : PlayerInstantSkill, ISkillPreviewSource
 {
     // 🔴 여기는 RPC 가 필요 없다 — OnClientPlay 와 OnEnd 는 둘 다 전 피어에서 돈다:
     //    시작 → 서버는 TryStartSkillServer 가, 클라는 PlaySkillClientRpc 가 PlaySkillPresentation 을 탄다
@@ -109,6 +109,19 @@ public class FirstMeleeInterruptSkill : PlayerInstantSkill
 
         // End 이벤트 → EndSelf
         base.OnAnimationEvent(eventType);
+    }
+
+    public bool TryGetPreview(Vector3 origin, Vector3 forward, out SkillPreviewShape shape)
+    {
+        if (HitboxAnchor == null ||
+            !HitboxAnchor.TryGetLocalBox(out Vector3 center, out Vector3 size))
+        {
+            shape = default;
+            return false;
+        }
+
+        shape = SkillPreviewShapes.Hitbox(center, size);
+        return true;
     }
 
     // 서버 전용. 래치가 있어 애니 이벤트와 타이머가 겹쳐도 한 번만 들어간다.

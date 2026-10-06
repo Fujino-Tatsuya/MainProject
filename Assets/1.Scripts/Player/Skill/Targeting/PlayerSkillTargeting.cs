@@ -12,6 +12,9 @@ using UnityEngine.InputSystem;
 ///     - 유효 타겟 없음 → 아무것도 안 함(취소)
 ///  3) Esc/스킬키 재입력 → 취소
 ///
+/// 흐름(GroundPoint): 좌클릭 지점이 사거리 안이면 즉시 시전. 밖이면 스킬 데이터의 GroundPointOutOfRange 대로
+///   Clamp(기본) = 경계 지점에 즉시 시전 / AutoApproach = 그 지점이 사거리에 들 때까지 걸어간 뒤 시전(취소 조건은 SingleTarget 과 같다).
+///
 /// FSM에는 진입하지 않는다 — 실제 시전 승인 시에만 Skill 상태로 들어간다. 조준/자동이동 동안 공격·다른 스킬 입력은
 /// 억제하되(IsInterceptingInput), 실제 시전은 controller.ExecuteTargetedSkill이 위임받아 서버가 CanUse로 재검증한다.
 /// </summary>
@@ -21,7 +24,7 @@ public class PlayerSkillTargeting : MonoBehaviour
 {
     private const float RaycastMaxDistance = 200f;
     // 자동 이동 시 사거리 경계보다 살짝 안쪽에서 시전(서버 위치 오차로 인한 CanUse 거부 방지).
-    private const float RangeBuffer = 0.3f;
+    private const float RangeBuffer = GroundPointTargeting.RangeBuffer;
 
     [SerializeField] private SkillRangeIndicator rangeIndicator;
     [SerializeField] private SkillCursorView cursorView;
@@ -53,10 +56,12 @@ public class PlayerSkillTargeting : MonoBehaviour
     private Vector3 candidateGroundPoint;
     private bool hasCandidateGroundPoint;
 
-    // 자동 이동 대기 시전 정보
+    // 자동 이동 대기 시전 정보. pendingUsesPoint 면 대상 대신 지면 지점(pendingPoint)으로 걸어간다(GroundPoint AutoApproach).
     private Unit pendingTarget;
     private PlayerSkillSlot pendingSlot;
     private float pendingCastRange;
+    private bool pendingUsesPoint;
+    private Vector3 pendingPoint;
 
     // 🔴 자동 접근의 **서버 전용** 상태. 오너 필드(isMovingToCast/pendingTarget)와 분리한다.
     // 이유 둘:
@@ -67,6 +72,13 @@ public class PlayerSkillTargeting : MonoBehaviour
     private Unit serverAutoApproachTarget;
     private bool serverAutoApproachActive;
     private float serverAutoApproachRange;
+    private bool serverAutoApproachUsesPoint;
+    private Vector3 serverAutoApproachPoint;
+
+    // HUD 슬롯 호버로 사거리 원을 빌려 쓰는 중인지. 조준이 시작되면 조준 쪽이 원을 이어받는다.
+    private bool rangePreviewActive;
+    // 호버 중인 지점 지정 스킬 — 지점 원을 정면 앞에 매 프레임 따라 그린다. 아니면 null.
+    private PlayerSkillData rangePreviewMarkerData;
 
     public bool IsTargeting => isTargeting;
     // 지금 조준 중인 스킬 슬롯(IsTargeting 일 때만 의미).
@@ -104,6 +116,8 @@ public class PlayerSkillTargeting : MonoBehaviour
             return false;
 
         isTargeting = true;
+        rangePreviewActive = false; // 호버 미리보기 원은 조준이 이어받는다
+        rangePreviewMarkerData = null;
         beganThisFrame = true;
         currentSlot = slot;
         currentData = skill.Data;
@@ -115,6 +129,7 @@ public class PlayerSkillTargeting : MonoBehaviour
         {
             rangeIndicator.gameObject.SetActive(true);
             rangeIndicator.ShowRange(currentData.CastRange);
+            rangeIndicator.SetGroundMarker(false, Vector3.zero, 0f); // 호버 지점 원은 조준 미리보기가 다시 그린다
         }
 
         SetCursorState(SkillCursorState.Targeting);
@@ -124,6 +139,50 @@ public class PlayerSkillTargeting : MonoBehaviour
         skill.OnOwnerAimStart();
 
         return true;
+    }
+
+    /// <summary>
+    /// HUD 슬롯 호버 미리보기 — 조준 중이 아닐 때만 사거리 원을 띄운다.
+    /// 지점 지정 스킬이면 지점 원도 캐릭터 정면 <see cref="PlayerSkillData.HoverMarkerDistance"/> 앞에 함께 그린다.
+    /// </summary>
+    public void BeginRangePreview(PlayerSkillData data)
+    {
+        if (isTargeting || rangeIndicator == null || data == null || data.CastRange <= 0f)
+            return;
+
+        rangePreviewActive = true;
+        rangePreviewMarkerData =
+            data.TargetingMode == SkillTargetingMode.GroundPoint && data.GroundMarkerRadius > 0f ? data : null;
+        rangeIndicator.gameObject.SetActive(true);
+        rangeIndicator.ShowRange(data.CastRange);
+        UpdateRangePreviewMarker();
+    }
+
+    /// <summary>호버가 끝나면 미리보기 원만 끈다. 조준이 이어받은 원은 건드리지 않는다.</summary>
+    public void EndRangePreview()
+    {
+        if (!rangePreviewActive)
+            return;
+
+        rangePreviewActive = false;
+        rangePreviewMarkerData = null;
+        if (isTargeting || rangeIndicator == null)
+            return;
+
+        rangeIndicator.HideAll();
+        rangeIndicator.gameObject.SetActive(false);
+    }
+
+    // 호버 지점 원 — 캐릭터가 돌거나 움직여도 정면 앞을 따라가도록 매 프레임 갱신한다.
+    private void UpdateRangePreviewMarker()
+    {
+        if (rangePreviewMarkerData == null || rangeIndicator == null || owner == null)
+            return;
+
+        Vector3 facing = movement != null ? movement.CurrentFacing : owner.transform.forward;
+        Vector3 point = GroundPointTargeting.HoverMarkerPoint(
+            owner.transform.position, facing, rangePreviewMarkerData.HoverMarkerDistance);
+        rangeIndicator.SetGroundMarker(true, point, rangePreviewMarkerData.GroundMarkerRadius);
     }
 
     public void Cancel()
@@ -152,6 +211,9 @@ public class PlayerSkillTargeting : MonoBehaviour
                 Cancel();
             return;
         }
+
+        if (rangePreviewActive && !isTargeting)
+            UpdateRangePreviewMarker();
 
         if (isMovingToCast)
         {
@@ -195,24 +257,31 @@ public class PlayerSkillTargeting : MonoBehaviour
         bool active;
         Unit target;
         float castRange;
+        bool usesPoint;
+        Vector3 point;
         if (owner.IsInputSource)
         {
             active = isMovingToCast;
             target = pendingTarget;
             castRange = pendingCastRange;
+            usesPoint = pendingUsesPoint;
+            point = pendingPoint;
         }
         else
         {
             active = serverAutoApproachActive;
             target = serverAutoApproachTarget;
             castRange = serverAutoApproachRange;
+            usesPoint = serverAutoApproachUsesPoint;
+            point = serverAutoApproachPoint;
         }
 
         if (!active)
             return;
 
         // 대상이 사라지면 서버가 스스로 멈춘다 — 정지 RPC가 유실돼도 영원히 밀지 않게.
-        if (target == null || target.CurrentHealth <= 0)
+        // 지점 접근은 사라질 대상이 없다 — 도달(아래 정지식) 또는 오너의 정지 RPC로 끝난다.
+        if (!usesPoint && (target == null || target.CurrentHealth <= 0))
         {
             if (!owner.IsInputSource)
                 ClearServerAutoApproach();
@@ -222,7 +291,8 @@ public class PlayerSkillTargeting : MonoBehaviour
         if (motor == null || movement == null)
             return;
 
-        Vector3 direction = target.transform.position - motor.Position;
+        Vector3 destination = usesPoint ? point : target.transform.position;
+        Vector3 direction = destination - motor.Position;
         direction.y = 0f;
         if (direction.sqrMagnitude < 0.0001f)
             return;
@@ -247,6 +317,18 @@ public class PlayerSkillTargeting : MonoBehaviour
         serverAutoApproachActive = active && target != null;
         serverAutoApproachTarget = active ? target : null;
         serverAutoApproachRange = castRange;
+        serverAutoApproachUsesPoint = false;
+        serverAutoApproachPoint = Vector3.zero;
+    }
+
+    /// <summary>지점 자동 접근(GroundPoint AutoApproach)의 서버 의도. Unit 경로와 같은 전진·정지식을 쓴다.</summary>
+    internal void ApplyServerPointApproach(Vector3 point, float castRange, bool active)
+    {
+        serverAutoApproachActive = active;
+        serverAutoApproachTarget = null;
+        serverAutoApproachRange = active ? castRange : 0f;
+        serverAutoApproachUsesPoint = active;
+        serverAutoApproachPoint = active ? point : Vector3.zero;
     }
 
     private void ClearServerAutoApproach()
@@ -254,6 +336,8 @@ public class PlayerSkillTargeting : MonoBehaviour
         serverAutoApproachActive = false;
         serverAutoApproachTarget = null;
         serverAutoApproachRange = 0f;
+        serverAutoApproachUsesPoint = false;
+        serverAutoApproachPoint = Vector3.zero;
     }
 
     private bool WasCancelPressed()
@@ -326,23 +410,25 @@ public class PlayerSkillTargeting : MonoBehaviour
         if (aimIndicator == null || !aimIndicator.HasAimGroundPoint)
         {
             if (rangeIndicator != null)
-                rangeIndicator.SetGroundMarker(false, Vector3.zero);
+                rangeIndicator.SetGroundMarker(false, Vector3.zero, 0f);
             SetCursorState(SkillCursorState.Targeting);
             return;
         }
 
+        // 후보는 마우스 지점 그대로 — 사거리 밖 처리(경계 클램프 / 자동 접근)는 확정 때 스킬 옵션대로 가른다.
         Vector3 point = aimIndicator.AimGroundPoint;
         bool inRange = IsWithinRange(point, currentData.CastRange);
-
-        // 사거리 밖이면 최대 사거리로 클램프 — GroundPoint는 항상 시전 가능(경계에 스냅)
-        if (!inRange)
-            point = ClampToRange(point, currentData.CastRange);
 
         candidateGroundPoint = point;
         hasCandidateGroundPoint = true;
 
+        // Clamp 는 시전될 경계 지점에, AutoApproach 는 사거리와 무관하게 마우스를 따라 같은 모양으로 그린다.
         if (rangeIndicator != null)
-            rangeIndicator.SetGroundMarker(true, point);
+        {
+            Vector3 markerPoint = GroundPointTargeting.PreviewMarkerPoint(
+                owner.transform.position, point, currentData.CastRange, currentData.GroundPointOutOfRange);
+            rangeIndicator.SetGroundMarker(true, markerPoint, currentData.GroundMarkerRadius);
+        }
 
         SetCursorState(inRange ? SkillCursorState.ValidTarget : SkillCursorState.OutOfRange);
     }
@@ -354,13 +440,7 @@ public class PlayerSkillTargeting : MonoBehaviour
 
         if (currentData.TargetingMode == SkillTargetingMode.GroundPoint)
         {
-            bool hasPoint = hasCandidateGroundPoint;
-            Vector3 point = candidateGroundPoint;
-            PlayerSkillSlot slot = currentSlot;
-            EndAimSession(hasPoint && controller != null);
-            ExitStandby();
-            if (hasPoint && controller != null)
-                controller.ExecuteTargetedSkill(slot, null, point, true);
+            HandleGroundPointConfirm();
             return;
         }
 
@@ -391,6 +471,38 @@ public class PlayerSkillTargeting : MonoBehaviour
         }
     }
 
+    // 지점 확정 — 사거리 안이면 바로, 밖이면 스킬 옵션대로 경계 지점에 바로 시전(Clamp)하거나 걸어간다(AutoApproach).
+    private void HandleGroundPointConfirm()
+    {
+        bool hasPoint = hasCandidateGroundPoint && controller != null;
+        PlayerSkillSlot slot = currentSlot;
+        float range = currentData.CastRange;
+        GroundPointConfirmAction action = GroundPointConfirmAction.CastNow;
+        Vector3 castPoint = candidateGroundPoint;
+        if (hasPoint)
+        {
+            action = GroundPointTargeting.ResolveConfirm(
+                owner.transform.position, candidateGroundPoint, range, currentData.GroundPointOutOfRange,
+                out castPoint);
+        }
+
+        // 접근으로 이어지면 세션을 닫지 않는다 — SingleTarget 의 사거리 밖 확정과 같다.
+        if (!hasPoint)
+            EndAimSession(false);
+        else if (action == GroundPointConfirmAction.CastNow)
+            EndAimSession(true);
+
+        ExitStandby();
+
+        if (!hasPoint)
+            return;
+
+        if (action == GroundPointConfirmAction.CastNow)
+            controller.ExecuteTargetedSkill(slot, null, castPoint, true);
+        else
+            BeginMoveToCastPoint(castPoint, slot, range);
+    }
+
     // ── 자동 이동(사거리 확보) ──
 
     private void BeginMoveToCast(Unit target, PlayerSkillSlot slot, float castRange)
@@ -398,14 +510,35 @@ public class PlayerSkillTargeting : MonoBehaviour
         pendingTarget = target;
         pendingSlot = slot;
         pendingCastRange = castRange;
+        pendingUsesPoint = false;
         isMovingToCast = true;
 
         // 서버도 같은 전진 의도를 만들어야 한다 — 위치 권위는 서버다.
         owner?.SubmitAutoApproachIntent(target, castRange, true);
     }
 
+    // 지점 자동 접근 — Unit 접근과 같은 틱·정지식·취소 조건을 쓰고, 도달하면 그 지점에 시전한다.
+    private void BeginMoveToCastPoint(Vector3 point, PlayerSkillSlot slot, float castRange)
+    {
+        pendingTarget = null;
+        pendingPoint = point;
+        pendingUsesPoint = true;
+        pendingSlot = slot;
+        pendingCastRange = castRange;
+        isMovingToCast = true;
+
+        // 사거리는 서버가 자기 스킬 데이터에서 다시 읽는다 — 슬롯과 지점만 보낸다.
+        controller?.SubmitPointApproachIntent(slot, point, true);
+    }
+
     private void TickMoveToCast()
     {
+        if (pendingUsesPoint)
+        {
+            TickMoveToCastPoint();
+            return;
+        }
+
         if (pendingTarget == null || pendingTarget.CurrentHealth <= 0)
         {
             StopMoveToCast();
@@ -442,6 +575,30 @@ public class PlayerSkillTargeting : MonoBehaviour
             owner.SetAnimatorMoving(true);
     }
 
+    private void TickMoveToCastPoint()
+    {
+        if (ShouldCancelAutoMove())
+        {
+            StopMoveToCast();
+            return;
+        }
+
+        if (GroundPointTargeting.HasReachedApproachStop(owner.transform.position, pendingPoint, pendingCastRange))
+        {
+            PlayerSkillSlot slot = pendingSlot;
+            Vector3 point = pendingPoint;
+            EndAimSession(true);
+            StopMoveToCast();
+            controller?.ExecuteTargetedSkill(slot, null, point, true);
+            return;
+        }
+
+        if (movement != null)
+            movement.RotateToward(pendingPoint - owner.transform.position, movement.AutoMoveRotationSpeed);
+
+        owner.SetAnimatorMoving(true);
+    }
+
     // 자동 이동 중 "다른 입력"이 들어왔는지. 대기 중인 스킬키 재입력은 제외(같은 스킬은 '다른 입력'이 아님).
     private bool ShouldCancelAutoMove()
     {
@@ -474,9 +631,14 @@ public class PlayerSkillTargeting : MonoBehaviour
 
         EndAimSession(false);
 
-        owner?.SubmitAutoApproachIntent(null, 0f, false);
+        // 시작한 경로로 멈춘다 — 서버 쪽 정지는 둘 다 Unit·지점 상태를 함께 지운다.
+        if (pendingUsesPoint)
+            controller?.SubmitPointApproachIntent(pendingSlot, Vector3.zero, false);
+        else
+            owner?.SubmitAutoApproachIntent(null, 0f, false);
         isMovingToCast = false;
         pendingTarget = null;
+        pendingUsesPoint = false;
 
         if (owner != null)
             owner.SetAnimatorMoving(false);
@@ -521,25 +683,7 @@ public class PlayerSkillTargeting : MonoBehaviour
     // 사거리는 수평 거리 기준 (y 무시)
     private bool IsWithinRange(Vector3 worldPoint, float range)
     {
-        if (range <= 0f)
-            return false;
-
-        Vector3 flat = worldPoint - owner.transform.position;
-        flat.y = 0f;
-        return flat.sqrMagnitude <= range * range;
-    }
-
-    private Vector3 ClampToRange(Vector3 worldPoint, float range)
-    {
-        Vector3 origin = owner.transform.position;
-        Vector3 flat = worldPoint - origin;
-        flat.y = 0f;
-        if (flat.sqrMagnitude < 0.0001f)
-            return worldPoint;
-
-        Vector3 clamped = origin + flat.normalized * range;
-        clamped.y = worldPoint.y;
-        return clamped;
+        return GroundPointTargeting.IsWithinRange(owner.transform.position, worldPoint, range);
     }
 
     private void SetCursorState(SkillCursorState state)

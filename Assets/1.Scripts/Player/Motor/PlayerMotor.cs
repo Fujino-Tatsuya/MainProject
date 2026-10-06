@@ -100,6 +100,41 @@ public sealed class PlayerMotor : MonoBehaviour
     /// </summary>
     public bool PassThroughEnemiesOverride { get; set; }
 
+    /// <summary>
+    /// 씬 상태를 바꾸지 않고 실제 모터와 같은 캡슐·경사·레이어 규칙으로 직선 이동 가능 거리를 계산한다.
+    /// 스킬 HUD 미리보기 전용이며, 일시 오버라이드는 인자로만 반영하고 런타임 상태에는 쓰지 않는다.
+    /// </summary>
+    public float GetGroundedPreviewDistance(
+        Vector3 desiredDelta,
+        bool blockOtherPlayers,
+        bool passThroughEnemies)
+    {
+        float requestedDistance = desiredDelta.magnitude;
+        if (capsule == null || requestedDistance <= 0.0001f)
+            return requestedDistance;
+
+        PlayerSimulationSettings settings = CaptureSimulationSettings(simulationState.IsSoul);
+        settings.ObstacleMask = ResolveObstacleMask(
+            simulationState.IsSoul,
+            blockOtherPlayers,
+            passThroughEnemies);
+
+        Vector3 resolved = PlayerMotionSweep.Resolve(
+            capsule,
+            desiredDelta,
+            desiredDelta,
+            simulationState.IsGrounded,
+            settings.StepOffset,
+            settings.MaxWalkableSlopeAngle,
+            settings.ObstacleMask,
+            settings.CollisionSkin,
+            settings.MaxSweepIterations,
+            castBuffer,
+            logDiagnostics: false);
+
+        return Mathf.Clamp(Vector3.Dot(resolved, desiredDelta / requestedDistance), 0f, requestedDistance);
+    }
+
     /// <summary>이번 물리 틱에 적용할 월드 속도(m/s)를 더한다.</summary>
     public void AddVelocity(Vector3 worldVelocity)
     {
@@ -810,6 +845,14 @@ public sealed class PlayerMotor : MonoBehaviour
 
     private LayerMask ResolveObstacleMask(bool isSoul)
     {
+        return ResolveObstacleMask(isSoul, BlockOtherPlayersOverride, PassThroughEnemiesOverride);
+    }
+
+    private LayerMask ResolveObstacleMask(
+        bool isSoul,
+        bool blockOtherPlayers,
+        bool passThroughEnemies)
+    {
         int mask = gameRule != null
             ? gameRule.ObstacleMask.value
             : LayerMask.GetMask("Default", "Ground", "Wall", "Env");
@@ -818,9 +861,9 @@ public sealed class PlayerMotor : MonoBehaviour
 
         mask &= ~playerBit;
         mask &= ~soulBit;
-        if (!isSoul && ((gameRule != null && gameRule.BlockOtherPlayers) || BlockOtherPlayersOverride))
+        if (!isSoul && ((gameRule != null && gameRule.BlockOtherPlayers) || blockOtherPlayers))
             mask |= playerBit;
-        if (PassThroughEnemiesOverride)
+        if (passThroughEnemies)
             mask &= ~LayerMask.GetMask("Enemy");
 
         return mask;
