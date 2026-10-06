@@ -18,21 +18,39 @@ MonoBehaviour:
     range: 1.5
     angle: 90
     playbackSpeed: 3
+    hitCount: 1
   - clip: {fileID: 7400000, guid: 1ca7a6b60353a274dacf546765f091f0, type: 2}
     attackDamageMultiplier: 1
     range: 1.5
     angle: 100
     playbackSpeed: 3
+    hitCount: 1
   - clip: {fileID: 7400000, guid: ff2fe3801b995ba43873937b01578e9a, type: 2}
     attackDamageMultiplier: 1
     range: 1.6
     angle: 100
     playbackSpeed: 3
+    hitCount: 1
   - clip: {fileID: 7400000, guid: ea72c7918b158e3408e3d1c4dda5e5c3, type: 2}
     attackDamageMultiplier: 1.3
     range: 1.7
     angle: 120
     playbackSpeed: 2.5
+    hitCount: 1
+  enhancedStep:
+    clip: {fileID: 7400000, guid: e2591c52e17a3aa4a94ca0b1bb90250e, type: 2}
+    attackDamageMultiplier: 2.5
+    range: 1.8
+    angle: 120
+    playbackSpeed: 2
+    hitCount: 1
+  transformedStep:
+    clip: {fileID: 7400000, guid: e332f4f2516cf3d4293a2ac5e7e1841f, type: 2}
+    attackDamageMultiplier: 1.2
+    range: 1.8
+    angle: 120
+    playbackSpeed: 1.25
+    hitCount: 4
   comboContinuationSeconds: 0.8
   hittableLayers:
     serializedVersion: 2

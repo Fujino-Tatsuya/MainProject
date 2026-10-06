@@ -201,3 +201,8 @@ Q22 `AssassinState` NetworkVariable · Q23·Q26 클립 git + 애니 이벤트(�
   `AssassinAnimatorController`(Idle/Idle_Combat·Run 3·Dodge·Interrupt·Default_Attack0~3, `IsCombatIdle`) · `AssassinBasicAttack`(+`AssassinConeAttack`·`AssassinComboModel`) · `AssassinCombatIdle`.
   CharacterRoster[2] "준비 중" 자리 → "어쌔신"(available=false). 클립 18개 Unity 재직렬화(serializedVersion 6→7, 1회성 diff).
   🔸 이벤트 시점은 전부 임시값(평타 Hit 0.40/End 0.85) — Play 튜닝. 🔸 단검: 아틀라스에 칼날 조각 있음 → 메시에 스킨됐을 가능성, Play 에서 육안 확인.
+- ✅ A7(10-06): **claude-alt**(다른 계정 Claude) 코드 `59832a23` — Unity 가 꺼져 있어 미검증 커밋 → 메인 Claude 가 에디터 재기동 후 검증·에셋 커밋.
+  `AssassinStateModel`(+테스트 21) · `AssassinState`(스냅샷 NetworkVariable, 사망 §12.2) · `AssassinTransformSkill`(R, Parry_R 중 SuperArmor) · `AssassinEnhanceSkill`(E) · `AssassinHitTargets`(MonsterBase·BossChargingPylon) ·
+  평타 Enhanced(강타)/Transformed(4타 묶음) 분기. 메뉴 `Tools/Player/Assassin/전체 구성 (A6~A7)`(A6 메뉴 이름 바뀜) + `4. 상태·E 강화·R 변신 부착 + 데이터 (A7)` — 오류 0, 해시 3304217410 유지. EditMode 63/0.
+  🔸 claude-alt 판단(Play 로 확인): **일반 E Buff 중 이동 불가**(기획 "공통 처리" — 가붕이 E 는 이동 가능) · **Parry_R 1배속**(기획 수치 없음).
+  🔸 변신 Q/E 대체 스킬은 A8/A9 — 지금은 `SetSlotOverride` 가 대체 없음으로 무시. 변신 종료 대기 중 Q/E 시작 차단은 A8/A9 스킬 쪽에서.
