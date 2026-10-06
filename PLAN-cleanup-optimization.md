@@ -135,5 +135,17 @@ S2: 1 추격 재경로 주기 · 2 인지 탐색 주기 · 3 타깃 컴포넌트
 - 타이틀 UI 카메라 2대 Depth/Opaque 끄기 — **보류**: 아트가 타이틀 씬 작업 중(충돌 회피), 효과도 타이틀 한정.
 - MapScene Vignette 0.2 새어 들어옴(Q5) — 팀장 확인 대기.
 
+### S4 (10-06) — 지면 바닥 Cast Shadows Off ✅
+- 도구 `Tools/Map/Authoring/지면 바닥 그림자 끄기 (보고만 / 적용)`(`Map/Editor/FloorShadowAuthoring.cs`, 멱등). 존 9종 **지면 350 Off · 높은 곳 90 유지**.
+  판정 = (Ground 레이어 또는 이름 floor/ground/tile) + 두께 &lt; 0.6m − 조명류, 지면 = 존 **최빈** 바닥 윗면 + 0.3m 이하. Quest01 은 최빈이 −2.9(꺼진 구역)라 0m 바닥 17개는 유지(아래로 그림자 보임).
+- 방식 = 존 프리팹 **배치별 오버라이드**(git, SVN 원본 무수정) — Codex 교차검증도 같은 권장(프리팹 일괄 ✗: `floor_stone` 이 지면 89·높은 곳 22 혼용 / 런타임 높이 판정 ✗: 다층·이동 플랫폼에 취약).
+- 검증: 9개 파일 오버라이드 집합 전후 비교 = `m_CastShadows` +350 외 추가·제거 0(보스룸 1/0.98 스케일 보정은 순서만 바뀜). StageTutorial 20줄은 float 표기(−110.904875→−110.90488).
+- 시작 방 측정: 캐스터 139→135(이 방은 큰 타일 몇 장 — 캐스터 대부분이 벽·소품). L존 효과는 이 시야로 안 잡힘 → 빌드 측정 때 같이.
+
+### 묶어 그리기 — Codex 권장(10-06, 미착수)
+**에디터 사전 메시 병합**(고정 소품·지면 타일을 재질·공간 단위로 합쳐 git `.asset` 저장, `MeshUtility.AcquireReadOnlyMeshData` 로 SVN Read/Write 변경 없이). 런타임 `StaticBatchingUtility.Combine` 은 Unity 6.3 도 Read/Write 필요 → 불가. GRD 는 빌드 측정 전 OFF 유지.
+주의: 병합 단위가 크면 일부만 보여도 통째로 그려진다(삼각형·그림자 GPU 증가 확인) · 이동 플랫폼·파괴 상자·게이트·컨베이어·MPB 대상·벽 투명화 그룹 제외 · 콜라이더·게임플레이 계층 유지.
+그 밖 캐스터 후보(중): 가는 파이프 부품 · 저폴리 그림자 프록시(ShadowsOnly). 작은 장식(하).
+
 ⏳ **Play 미검증**: 몬스터 추격·어그로 체감(S2) · 전기 장판 VFX 재발동 · 미니맵 탐사 동기화(MPPM) · 타이틀 CRT(카메라 3대) · Fog 시야 경계.
 🔎 발견(정리 후보): Visual Scripting `UnitOptions.db` 가 삭제된 타입(Enemy·ChargeController 등) 역직렬화 예외를 Play 마다 ~1500건 쏟는다 — S5 "VS 생성물 재생성/제거"와 같은 뿌리.
