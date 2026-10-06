@@ -206,3 +206,9 @@ Q22 `AssassinState` NetworkVariable · Q23·Q26 클립 git + 애니 이벤트(�
   평타 Enhanced(강타)/Transformed(4타 묶음) 분기. 메뉴 `Tools/Player/Assassin/전체 구성 (A6~A7)`(A6 메뉴 이름 바뀜) + `4. 상태·E 강화·R 변신 부착 + 데이터 (A7)` — 오류 0, 해시 3304217410 유지. EditMode 63/0.
   🔸 claude-alt 판단(Play 로 확인): **일반 E Buff 중 이동 불가**(기획 "공통 처리" — 가붕이 E 는 이동 가능) · **Parry_R 1배속**(기획 수치 없음).
   🔸 변신 Q/E 대체 스킬은 A8/A9 — 지금은 `SetSlotOverride` 가 대체 없음으로 무시. 변신 종료 대기 중 Q/E 시작 차단은 A8/A9 스킬 쪽에서.
+- ✅ A8(10-06): claude-alt `78f73955`(Unity 검증 포함, 메인 재확인 EditMode 78/0). `AssassinDashStrikeSkill` 1클래스 × 컴포넌트 2(mainSkill=일반 5초 / alternateSkills.main=변신 3초·적중 시 −1.5초 1회).
+  서버 = 시작 위치·방향·경과 시간×20m/s 로 경로 재구성, 틱마다 폭 1.2m OverlapBox, `AssassinDashHitLedger` 사용당 1회. 벽 조기 종료 = 오너가 보고한 실제 거리(0~4m 검증)로 상한만 줄임.
+  🔴 코어 추가: `PlayerSkillController.ReportOwnerSkillResult` + `NotifySkillOwnerResultRpc`, `PlayerSkillBase.OnOwnerResultReported`(virtual, 가붕이·거너 무영향) — RPC 추가라 피어 전원 같은 커밋.
+  메뉴 `전체 구성 (A6~A8)` + `5. Q 관통 돌진 부착 + 데이터 (A8)`. DataTable Order 2·6(4 는 변신 E 용 비움).
+  🔸 원격 오너는 보고 도착 전(왕복 지연×20m/s, LAN ~1.2m) 서버가 벽 너머 경로를 훑을 수 있음 → Play 에서 벽 뒤 적이 맞으면 서버 시작 시 벽 캐스트 추가 검토.
+  🔸 승인 직후 0m 로 끝나도 쿨 소모 · 서버 SuperArmor 꼬리 0.15초 · 애니 1/1.5배속 End 0.85 — Play 튜닝.
