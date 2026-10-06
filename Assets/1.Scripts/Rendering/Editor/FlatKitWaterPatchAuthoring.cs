@@ -363,7 +363,7 @@ public static class FlatKitWaterPatchAuthoring
     [MenuItem("Tools/Rendering/Flat Kit/Water/0f. Probe Off-Level Floors")]
     public static void ProbeOffLevelFloors()
     {
-        var sb = new System.Text.StringBuilder("[WaterProbe] 주 바닥 높이가 아닌 floor* (수면 −4.43 위)\n");
+        var sb = new System.Text.StringBuilder($"[WaterProbe] 주 바닥 높이가 아닌 floor* (수면 {DefaultZoneWaterHeight} 위)\n");
         foreach (string guid in AssetDatabase.FindAssets("t:Prefab", new[] { ZonesDir }))
         {
             string path = AssetDatabase.GUIDToAssetPath(guid);
@@ -492,7 +492,7 @@ public static class FlatKitWaterPatchAuthoring
     //    벽 끝에 물이 비친 진짜 원인은 수면이 높아서(−0.62) — 내리면 아래층 벽(−10.5~−11 까지)이 가린다. → 0.
     const float ZoneInset = 0f;                   // 존 물 크기 = 바닥 범위에서 변마다 이만큼 안쪽(m)
     // 존 기본 수면 — 팀장이 ZoneS_typeA 에서 Play 로 맞춘 값(10-01). 존 구덩이는 아래층 벽이 −10.5~−11 까지 내려간다.
-    const float DefaultZoneWaterHeight = -4.43f;
+    const float DefaultZoneWaterHeight = -4.3414f;   // 2026-10-02 존 0.98 축소로 −4.43 × 0.98 (PLAN-zone-asset-scale.md)
     // 구덩이가 있어도 물을 두지 않는 존(팀장 10-01 — 시작 존은 벤트 처리만 · L_C 는 안개 구역, '따로 추가 안 해도 됨').
     static readonly string[] NoWaterZones = { "ZoneS_typeStart", "ZoneL_typeC", "ZoneL_typeB" };   // L_B: 10-01 팀장 '제일 큰 존 물 없애기'
     // 존 가장자리로 이어진(= '바깥' 판정) 구덩이에도 물을 채우는 존 — 중간 크기 존 두 개의 구석 구덩이(팀장 10-01).
@@ -560,7 +560,7 @@ public static class FlatKitWaterPatchAuthoring
                 float waterY = grates.Count > 0
                     ? grates.GroupBy(r => Mathf.Round(toLocal.MultiplyPoint3x4(r.bounds.min).y * 100f) / 100f).OrderByDescending(g => g.Count()).First().Key - BelowGrateBottom
                     : top - BelowFloorTop;
-                // 존은 창살 규칙(−0.6 근처)이 너무 높았다(벽 끝에 비침) → 기본값 −4.43. 조절해 둔 값이 있으면 그것.
+                // 존은 창살 규칙(−0.6 근처)이 너무 높았다(벽 끝에 비침) → 기본값 DefaultZoneWaterHeight. 조절해 둔 값이 있으면 그것.
                 waterY = keptHeight ?? DefaultZoneWaterHeight;
                 // 🔴 물 범위 = **뚫린 곳(구덩이·벤트)만**(팀장 10-01 '벽 안쪽 기준'). 존 전체 사각형이면 구덩이 벽 뒤(바닥 밑)에도
                 //    물이 있어, 벽 투명화(디더) 때 벽에 물이 흐르는 것처럼 보였다. 존 가장자리에는 벽이 없다(S_A: 구덩이 벽만 ±6.8).

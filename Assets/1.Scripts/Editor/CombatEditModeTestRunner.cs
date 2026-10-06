@@ -21,6 +21,7 @@ internal static class CombatEditModeTestRunner
     {
         "^MonsterHitReactionPolicyTests",
         "^MonsterEngagePolicy",   // MonsterEngagePolicyTests — 사거리 진입 후 첫 공격 지연
+        "^MonsterAnimSpeedPolicy", // 공격 애니 재생 배율 · 이동 클립 맞춤(animator.speed)
         "^CounterWindow",         // CounterWindowTests — 중간보스 인터럽트 카운터 창
         "^MonsterPerceptionPolicy", // 인지 높이 제한 + 차징 방향(화면 남쪽)
         "^BossCounter",  // BossCounterWindupGateTests / BossCounterProgressTests / BossCounterDataTests

@@ -16,7 +16,8 @@ MonoBehaviour:
   attackDamage: 7
   moveSpeed: 3
   chaseSpeed: 3.5
-  attackSpeed: 0.7
+  attackSpeed: 1
+  attackCooldown: 1.4285715
   maxHp: 50
   defense: 0
   maxShield: 0
