@@ -19,6 +19,7 @@ public static class AssassinShellAuthoring
     private const string VariantPath = PrefabFolder + "/Player_Assassin.prefab";
     private const string ModelPath = "Assets/50.Art/Char/assassin/Assassin.fbx";
     private const string MaterialPath = "Assets/3.Materials/Toon/Assassin_Toon.mat";
+    private const string FaceMaterialPath = "Assets/3.Materials/Toon/Assassin_Face_Toon.mat";
     // 단검(10-06 은희 추가, SVN) — 모델에 무기 본이 없어 Humanoid 손 본에 정적으로 붙인다.
     // 클립의 Dagger_Weapon_* 커브는 원본(UE) 경로라 이 리그에 바인딩되지 않는다 — 손을 따라가기만 한다.
     private const string DaggerLeftPath = "Assets/50.Art/Char/assassin/Dagger_Weapon_L.fbx";
@@ -1124,8 +1125,28 @@ public static class AssassinShellAuthoring
                 Debug.LogError($"{Tag} SDArmTwist 팔 바인드 포즈 캡처 실패. FBX 본 이름(Left/RightLowerArm·Hand·ForearmTwist01/02)을 확인할 것.", root);
 
             SkinnedMeshRenderer[] renderers = root.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+            // 슬롯마다 — HeadNeck 메시는 서브메시가 여럿(Head·Face)이다. 0번만 바꾸면 Face 슬롯이 FBX 의
+            // 원래 재질(패키지의 Built-in Assassin_Face — 가져오지 않음)로 남아 깨진다(10-06 은희 Play).
+            // Face 는 같은 아틀라스지만 따로 조정할 수 있게 별도 Variant(Assassin_Face_Toon)를 쓴다.
+            // 🔸 FBX .meta 의 재질 remap 이 가져오지 않은 패키지 재질을 가리켜 원본 슬롯 이름이 비어 있다 — 이름으로 Face 를 못 가르면
+            //    기본 Toon 으로 채우고, 이미 채워진 슬롯(손으로 Assassin_Face_Toon 을 넣은 것 포함)은 건드리지 않는다.
+            Material faceMaterial = AssetDatabase.LoadAssetAtPath<Material>(FaceMaterialPath);
             foreach (SkinnedMeshRenderer renderer in renderers)
-                renderer.sharedMaterial = material;
+            {
+                var source = PrefabUtility.GetCorrespondingObjectFromOriginalSource(renderer);
+                Material[] current = renderer.sharedMaterials;
+                Material[] sourceSlots = source != null ? source.sharedMaterials : current;
+                var slots = new Material[sourceSlots.Length];
+                for (int i = 0; i < slots.Length; i++)
+                {
+                    Material existing = i < current.Length ? current[i] : null;
+                    string slotName = sourceSlots[i] != null ? sourceSlots[i].name : string.Empty;
+                    bool isFace = slotName.IndexOf("Face", StringComparison.OrdinalIgnoreCase) >= 0 && faceMaterial != null;
+                    slots[i] = existing != null && existing != sourceSlots[i] ? existing : isFace ? faceMaterial : material;
+                    Debug.Log($"{Tag} 재질 슬롯 {renderer.name}[{i}] 원본 '{slotName}' → {slots[i].name}");
+                }
+                renderer.sharedMaterials = slots;
+            }
             if (renderers.Length == 0)
                 Debug.LogError($"{Tag} SkinnedMeshRenderer를 찾지 못해 머티리얼을 적용하지 못했다.", root);
             else if (renderers.Length != 2)
