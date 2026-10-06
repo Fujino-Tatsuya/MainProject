@@ -1,3 +1,55 @@
+# ▶▶▶ 계획 = **지점 지정(GroundPoint) 확장 — 마우스 원 + 사거리 밖 자동 접근** (2026-10-07 · 그릴 Q24~Q28 · 승인 ✅ · 구현 = claude-alt)
+
+> 브랜치 `feature/GunnerSkillIndicatorUpgrade`. 결정: 은희. 아래 "스킬 직선 인디케이터" 작업의 후속.
+> 팔라딘 Q·E 미리보기는 **안 한다**(은희 결정).
+>
+> 🔴 **범위 확정(10-07 은희): 기능만 만들어 둔다. 거너 R 에셋은 기획서 §9 대로 `SingleTarget` 유지, 기획서도 안 고친다.**
+> → 아래 1·7 은 **하지 않는다.** 2~6 은 **데이터 옵션**으로 만들어, 나중에 에셋 값만 바꾸면 거너 R 이 지점 지정으로 동작하게 한다.
+> 옵션(안): `PlayerSkillData` 에 GroundPoint 전용 — 사거리 밖 처리 `Clamp`(기본, 기존 동작) / `AutoApproach`, 마우스 원 반경(0 = 안 그림), 호버 원 거리(기본 3).
+> 거너 R `OnServerStart` 는 `HasAimPoint` 면 지점·대상 없음, 아니면 기존 대상 경로 — 둘 다 지원.
+> 지금 게임에서 쓰는 스킬이 없으므로 검증은 EditMode + (선택) 로컬에서만 거너 R 에셋을 임시로 바꿔 Play — **에셋 변경은 커밋하지 않는다.**
+
+## 지금 (조사)
+- 거너 R `GunnerTrackingLaserSkill` = `SingleTarget`. 서버 `CanUse(direction, target)` 가 대상 사거리(12)를 보고, `OnServerStart` 가 **대상 위치**에 레이저를 띄워 `ServerInitialize(owner, target, …)`.
+- `GunnerTrackingLaser` 는 **대상이 없으면 이미** `retargetRadius`(8) 안 최근접 적을 찾는다(`FindNearestEnemy`, L145~148).
+- `GroundPoint` 조준은 있다(`PlayerSkillTargeting.UpdateGroundPointPreview`) — 단 **사거리 밖은 경계로 클램프해 바로 시전**, 자동 접근 없음.
+  지점 마커 데칼 슬롯 `SkillRangeIndicator.groundMarkerDecal` 은 **비어 있다**.
+- 자동 접근(`BeginMoveToCast`/`TickMoveToCast` + 서버 `ApplyServerAutoApproach`)은 **Unit 대상 전용**.
+- 🔴 서버 `StartSkillServer` 는 `CanApproveSkill`(→`CanUse`) **뒤에** `SetAimPoint` 한다 → 지금은 `CanUse` 가 지점을 못 본다.
+
+## 결정 (2026-10-07)
+| | 결정 |
+|---|---|
+| Q24 시전 | R → 조준 → **클릭**. 원 중심이 사거리 안이면 즉시 시전. **밖이면 클릭 지점을 저장 → 그 지점이 사거리에 들 때까지 직선 이동 → 자동 시전** |
+| Q25 레이저 | 저장 지점에 생성, **대상 없이** 시작 → 기존 재조준(반경 8 최근접 적). 없으면 제자리 |
+| Q26 마우스 원 | 반경 = 레이저 `radius`(2). 조준 중엔 **사거리 무관 마우스를 따라감**(클램프 안 함). **호버에도 표시** — 캐릭터 정면(`CurrentFacing`) **3m 앞**에 + 기존 사거리 원 |
+| Q27 사거리 밖 | 색 변화 **없음**(같은 모양). 커서 상태는 기존대로 |
+| Q28 문서 | `Docs/design/character/character_gunner.md` §9 를 지점 지정으로 갱신 (답 없음 → 권장안으로 진행) |
+
+## 만드는 것
+1. **데이터**: `GunnerTrackingLaserData.asset` `targetingMode` 1 → **2(GroundPoint)**.
+2. **조준(`PlayerSkillTargeting`)**: GroundPoint 를 **스킬별로 클램프/접근 선택** — 거너 R 은 "클램프 안 함 + 사거리 밖 클릭 = 지점 자동 접근".
+   (다른 GroundPoint 스킬은 현재 없음. 기존 클램프 동작은 기본값으로 남긴다 — 데이터 플래그 or 스킬 오버라이드 중 단순한 쪽.)
+3. **지점 자동 접근**: `pendingTarget`(Unit) 옆에 `pendingPoint` 경로 추가 — 오너 `TickMoveToCast` 정지식 = 기존과 동일(`castRange - RangeBuffer`),
+   도달 시 `ExecuteTargetedSkill(slot, null, point, true)`. 서버 쪽 `ApplyServerAutoApproach` 에 지점 버전(RPC 인자 추가). 취소 조건 = 기존과 동일(다른 입력·대시·사망).
+4. **서버 승인**: `StartSkillServer` 에서 `SetAimPoint` 를 `CanApproveSkill` **앞으로** 옮기거나 지점을 넘긴다. 거너 R `CanUse` = 지점이 사거리(+버퍼) 안.
+   `OnServerStart` = `AimPoint` 에 생성, `ServerInitialize(owner, null, …)`.
+5. **마우스 원 데칼**: `SkillRangeIndicator.groundMarkerDecal` 배선(저작 메뉴, 기존 사거리 원 머티리얼 재사용) + 반경 설정 API(`SetGroundMarker(show, point, radius)`).
+   반경은 `GunnerTrackingLaserData.Radius` 에서.
+6. **호버**: 대상 지정 스킬 호버 원(이미 있음) + 지점 스킬이면 마커 원을 `CurrentFacing * 3` 위치에.
+7. **문서**: `character_gunner.md` §9.
+
+## 리스크
+- 서버 승인 순서 변경(4)이 **팔라딘 R(SingleTarget)** 에 영향 없게 — SingleTarget 은 `HasAimPoint=false` 그대로.
+- 자동 접근 RPC 인자 추가 = 네트워크 계약 변경. 기존 Unit 경로 동작 동일해야 함.
+- 클릭 지점이 벽 너머/절벽이면 직선 이동이 막혀 영원히 못 닿을 수 있음 → 기존 Unit 접근과 같은 정책(막히면 그대로, 다른 입력으로 취소).
+
+## 검증
+- EditMode: 지점 사거리 판정·접근 정지식(순수 함수로 빼서).
+- Play(은희, MPPM): 사거리 안 클릭 즉시 시전 / 밖 클릭 → 직선 이동 후 자동 시전 / 이동 중 다른 입력·대시 취소 / 레이저가 지점에 생겨 반경 8 적 추적 / 마우스 원이 사거리 밖에서도 따라옴 / 호버 시 사거리 원 + 정면 3m 원 / **비호스트 클라에서도 동일** / 팔라딘 R 기존 동작 유지.
+
+---
+
 # ▶▶▶ 진행 중 = **스킬 직선 인디케이터 + HUD 호버 미리보기** (2026-10-06 · 그릴 21문항 완료 · 요약 승인 ✅ · 구현 = Codex 위임)
 
 > 브랜치: `feature/GunnerSkillIndicatorUpgrade` (워크트리 `MainProject-Worktree2`, origin/development `373ef5a6` 기준, 아트 r392).
