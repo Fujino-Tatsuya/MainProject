@@ -21,7 +21,8 @@ public sealed class SkillLineIndicator : MonoBehaviour
     [SerializeField, Range(0f, 1f)] private float ghostAlpha = 0.09f;
     [SerializeField, Range(0f, 1f)] private float arrowAlpha = 0.42f;
 
-    private readonly MaterialPropertyBlock propertyBlock = new MaterialPropertyBlock();
+    // 필드 초기화에서 만들면 MonoBehaviour 생성자에서 CreateImpl 예외 — 처음 쓸 때 만든다.
+    private MaterialPropertyBlock propertyBlock;
     private Player player;
     private PlayerSkillController skillController;
     private Renderer fillRenderer;
@@ -160,6 +161,7 @@ public sealed class SkillLineIndicator : MonoBehaviour
         quad.SetPositionAndRotation(center, Quaternion.LookRotation(Vector3.up, direction));
         quad.localScale = new Vector3(segment.Width, segment.Length, 1f);
 
+        propertyBlock ??= new MaterialPropertyBlock();
         propertyBlock.Clear();
         propertyBlock.SetFloat(AlphaId, alpha);
         propertyBlock.SetVector(WorldSizeId, new Vector4(segment.Width, segment.Length, 0f, 0f));
