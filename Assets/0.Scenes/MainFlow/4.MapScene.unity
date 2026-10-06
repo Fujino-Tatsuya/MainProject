@@ -2074,7 +2074,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BossTimerManager
   ShowTopMostFoldoutHeaderGroup: 1
-  limitSeconds: 300
+  limitSeconds: 600
   forceWarnSeconds: 3
   fillUpAsTimePasses: 1
 --- !u!1 &564278533
