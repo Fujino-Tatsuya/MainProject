@@ -192,6 +192,13 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
 
         GameObject instance = parent != null ? Instantiate(prefab, parent, false) : Instantiate(prefab);
         instance.name = prefab.name + "(임시)";
+
+        // 빌려 쓰는 프리팹 중 playOnAwake 가 꺼진 것이 있다(가붕이 FX_SingleSlash_* — 원래 쓰는 쪽이 Play() 를 직접 부름).
+        foreach (ParticleSystem particle in instance.GetComponentsInChildren<ParticleSystem>())
+        {
+            if (!particle.isPlaying)
+                particle.Play(false);
+        }
         return instance;
     }
 
