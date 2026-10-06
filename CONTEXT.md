@@ -8,6 +8,24 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-10-06 · 경석(Claude) · **전수조사 정리·최적화 S1+S2**, 브랜치 `feature/Boss23`) — 진행 중
+계획 = [PLAN-cleanup-optimization.md](PLAN-cleanup-optimization.md)(팀장 결정 §4: 이번 라운드 S1+S2, 은희 영역은 목록만).
+🔴 **수정 예정 — 동시 수정 금지:** `Monster/MonsterBase.cs` · `Monster/Boss/TwentyThreeBoss.cs`·`GrabController.cs`·`BossChargeClipLoop.cs`·`BossPatternTargets.cs`·`BossElectricFloor.cs` ·
+`Rendering/RetroCRT/RetroCRTFeature.cs` · `Rendering/Silhouette/PlayerSilhouetteFeature.cs` · `Rendering/Fog/FogRendererFeature.cs`·`FogManager.cs` · `Map/Minimap/MinimapController.cs`·`MinimapNetworkSync.cs` · `Map/SteamVent.cs` · 프레임 상한(부트스트랩 1곳).
+
+진행표·미검증 = PLAN §4 "진행 (10-06)". S1·S2 구현 완료(미커밋).
+📮 **은희에게 넘길 목록(팀장 결정: 목록만)** — 근거·위치는 PLAN §2:
+`Player.cs:386`·`PlayerCorpseController.cs:248` `RaycastAll`→`RaycastNonAlloc` · `ToonLit.shader:137` 안 쓰는 SSAO·혼합그림자·ShadowMask multi_compile(변형 8배) ·
+HUD 매 프레임 문자열(`PlayerHealthHUD`·`StatusEffectHUD`·`SkillCooldownHUD`·`DashCooldownHUD`·`PassiveHUD`) · 참조 0 스크립트(`AttackElement`·`OverlapAttack`·`IKnockbackSettable`·`PlayerColorAssigner`) ·
+네트워크: `_animSpeed` 양자화 · 몬스터 투사체 NGO 풀 · NetworkTransform 38개 회전 X/Z·스케일·HalfFloat · 보호막 `NetworkList` 전체 재직렬화(`Unit.cs:452`) · 먼 몬스터 관찰자 관리 · 플레이어 정적 레지스트리(미니맵·PartyWipeWatcher 가 쓰게).
+
+**10-06 앞선 작업 — 걷는 몬스터 이동 애니(미커밋, 팀장 Play 확인)**
+- `MonsterDataSO.locomotionPlaybackScale`(기본 1, `[DataTableIgnore]`) — 발맞춤 재생 배율에 곱함, Play 중 인스펙터 실시간 반영. Chomp 0.85 · Humanoid 0.9 · Mortar 0.43.
+- 속도: Chomp 2.4/3.36(1.2배) · Humanoid 2.5/3.5(기본 몹, 걷기 클립뿐이라 절충) · Mortar 1.75/2.1(0.7배). 🔴 **xlsx Monster 시트는 아직 옛 값**(2/2.8 · 3/4.5 · 2.5/3) — 테이블 모드·빌드는 옛 속도. SVN 갱신 필요.
+- `MonsterBase`: 이동 블렌드 = 감쇠 0.12 + **이동→액션 전이 동안 고정**(공통) + **원거리 이동형 공격 종료 시 걷기 값 선세팅**(Mortar "앉는 프레임"). 원인 = 공격 종료 `ResetToLocomotion` 코드 CrossFade 가 속도 0 Movement 로 감. Host 실측 대기우세 0. ⏳ MPPM · Gauntlet 예고 · 피격 전이 Play.
+- `HasParameter` 매 프레임 `animator.parameters` 할당 → 컨트롤러별 해시 캐시.
+- Mortar 가 최소 거리 안에서 쏘는 것 = 팀장 OK(그대로).
+
 ## ▶▶ 다음 세션 인수인계 (2026-10-05 · 경석(Claude)) — 여기부터 읽을 것
 
 **이 세션에서 끝낸 것**: 몬스터 공격속도·쿨다운·이동 애니(development 반영 `4040189c`, SVN r372) · 타이틀 시작 연출 + 존 게이트 모니터 패널·외곽선(`feature/Boss23` `5e3e46fe`, development **미반영**) ·

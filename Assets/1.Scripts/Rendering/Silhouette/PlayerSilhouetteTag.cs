@@ -24,9 +24,43 @@ public sealed class PlayerSilhouetteTag : NetworkBehaviour
 
     private GameObject Target => modelRoot != null ? modelRoot : gameObject;
 
-    public override void OnNetworkSpawn() => Retag();
+    /// <summary>
+    /// 스폰돼 있는 태그 수. 0 이면 <see cref="PlayerSilhouetteFeature"/> 가 패스를 넣지 않는다
+    /// (대상이 없어도 풀해상도 RT 2장 클리어 + 합성이 매 프레임 돌던 것 — PLAN-cleanup-optimization S1-3).
+    /// 렌더링 레이어 비트를 붙이는 곳은 이 컴포넌트뿐이다.
+    /// </summary>
+    public static int ActiveCount { get; private set; }
 
-    public override void OnNetworkDespawn() => PlayerSilhouetteLayers.Untag(Target);
+    // 도메인 리로드 없는 Play 진입에서도 0 부터 다시 센다.
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetCount() => ActiveCount = 0;
+
+    private bool _counted;
+
+    private void SetCounted(bool on)
+    {
+        if (_counted == on) return;
+        _counted = on;
+        ActiveCount += on ? 1 : -1;
+    }
+
+    public override void OnNetworkSpawn()
+    {
+        SetCounted(true);
+        Retag();
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        SetCounted(false);
+        PlayerSilhouetteLayers.Untag(Target);
+    }
+
+    public override void OnDestroy()
+    {
+        SetCounted(false);   // 디스폰 없이 파괴되는 경로(씬 언로드 등) 안전망
+        base.OnDestroy();
+    }
 
     /// <summary>
     /// 소유권이 바뀌면 색이 바뀌어야 한다 — 내 캐릭터였다가 남의 것이 되면 초록에서 파랑으로.

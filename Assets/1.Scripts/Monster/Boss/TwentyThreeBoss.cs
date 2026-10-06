@@ -118,7 +118,9 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     readonly System.Collections.Generic.List<Player> _pulledPlayers =
         new System.Collections.Generic.List<Player>();
     int _grabSlamsLeft;              // 남은 내려치기 횟수
-    Collider[] _grabBuffer;
+    // 🔴 잡기·돌진 캐리가 같이 쓴다. 예전엔 두 곳이 `??= new Collider[16]` / `[8]` 로 따로 만들어
+    //    **먼저 불린 쪽이 크기를 정했다**(8 이면 4인에서 잘릴 수 있음). 한 번에 16 으로 고정(PLAN-cleanup-optimization S1-8).
+    readonly Collider[] _grabBuffer = new Collider[16];
     bool _warnedThrowDisplacement;
 
     // ─── JumpAttack (서버 + 각 피어 연출) ─────────────────────────────
@@ -2039,7 +2041,6 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         BossAttackEntry e = _currentEntry;
         float radius = e != null && e.coneRadius > 0f ? e.coneRadius : GrabRadius;
 
-        if (_grabBuffer == null) _grabBuffer = new Collider[16];
         int count = Physics.OverlapSphereNonAlloc(
             transform.position, radius, _grabBuffer, playerMask, QueryTriggerInteraction.Collide);
 
@@ -4056,7 +4057,6 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     // 라인하르트 규칙 ① — 직접 충돌한 **첫 1명**만 끌고 간다. 나머지는 스침 데미지만 받는다.
     void TryCarryDashTarget()
     {
-        if (_grabBuffer == null) _grabBuffer = new Collider[8];
 
         Vector3 probe = transform.position + _dashDir * DashCarryFrontOffset;
         int count = Physics.OverlapSphereNonAlloc(

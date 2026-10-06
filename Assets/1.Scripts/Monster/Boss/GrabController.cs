@@ -28,8 +28,10 @@ public class GrabController : NetworkBehaviour
         holdAttackPeriod = Mathf.Max(0f, attackPeriod);
     }
 
-    const int _maxPlayer = 3;
-    Collider[] results = new Collider[_maxPlayer];
+    // 🔴 플레이어 수가 아니라 **콜라이더 버퍼**다 — 1인당 콜라이더가 여럿(몸통·허트박스)이라 3 이면 4인에서
+    //    OverlapNonAlloc 이 말없이 잘라 잡기 대상을 놓친다(PLAN-cleanup-optimization S1-8). 23호 _grabBuffer 와 같은 16.
+    const int ResultBufferSize = 16;
+    Collider[] results = new Collider[ResultBufferSize];
 
     int _resultCount;
 
