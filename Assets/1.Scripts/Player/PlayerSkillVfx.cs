@@ -259,13 +259,17 @@ public class PlayerSkillVfx : BaseNetworkBehaviour
     /// [이동 권한] 대시 상태를 감시해 시작/종료를 전 피어에 알린다.
     ///
     /// 🔴 <b>왜 <c>PlayerDashState.Enter/Exit</c> 에 직접 걸지 않았나</b> (2026-09-29 조사).
-    /// 이 레포의 이동은 <b>서버 권한</b>이다(<see cref="Player.IsMotionAuthority"/>).
     /// <c>PlayerDashController.TryBeginPredictedDash</c> 는 <c>!player.IsMotionAuthority</c> 면
-    /// <c>BeginDash</c> 를 <b>부르지 않고</b> 통과시키고, 승인 응답(<c>RespondDashClientRpc</c>)도
-    /// 대시를 시작시키지 않는다. 서버만 <c>BeginDash</c> 를 부른다.
-    /// 즉 <b><c>PlayerDashState</c> 는 서버에만 존재한다</b> — Enter/Exit 에 걸면
-    /// 호스트 화면에서만 잔상이 보이는, 이 레포가 여러 번 겪은 그 버그가 된다.
-    /// (동봉된 README 의 "Enter/Exit 에 걸어라"는 상태기가 전 피어에서 돈다는 전제였고, 그 전제가 틀렸다.)
+    /// <c>BeginDash</c> 를 <b>부르지 않고</b> 통과시킨다. 즉 <c>PlayerDashState</c> 는
+    /// <b>이동 권한을 가진 피어에만 존재한다</b> — Enter/Exit 에 걸면 그 피어 화면에서만
+    /// 잔상이 보이는, 이 레포가 여러 번 겪은 그 버그가 된다.
+    ///
+    /// 🔴 <b>그 권한이 2026-09-29 이후 뒤집혔다</b>(2026-10-06 발견).
+    /// <c>Player.ServerAuthoritativeMovement == false</c> 라 <c>IsMotionAuthority == IsOwner</c> 다.
+    /// 그래서 이 폴링은 <b>오너</b>에서 돌고, 오너는 클라일 수 있다 —
+    /// 클라는 <c>SendTo.ClientsAndHost</c>(서버 전용) RPC 를 <b>보낼 수 없다.</b>
+    /// 그걸 그대로 두면 <b>호스트가 대쉬할 때만 잔상이 보이고 클라가 대쉬하면 아무에게도 안 보인다</b>
+    /// (MPPM 에서만 드러나는 증상이다). 그래서 아래는 최후의 심판과 같은 <b>2홉</b>이다.
     ///
     /// 🔴 <b>왜 이벤트가 아니라 폴링인가.</b>
     /// <c>PlayerStateController</c> 에는 상태 전이 이벤트가 없고, 대시는 전용 애니메이터 상태도 없어서
@@ -287,16 +291,24 @@ public class PlayerSkillVfx : BaseNetworkBehaviour
         if (active == _dashWasActive) return;
         _dashWasActive = active;
 
-        // 오프라인(VFXScene·싱글 테스트)에서는 스폰되지 않아 RPC 가 예외다. 로컬만 켠다.
-        if (!IsNetworkActive)
+        // 내 화면은 즉시 — 아래 RPC 는 나를 뺀 전원에게만 간다.
+        // 오프라인(VFXScene·싱글 테스트)에서는 스폰되지 않아 RPC 가 예외라 여기서 끝난다.
+        if (active) _dashAfterimage.Play();
+        else _dashAfterimage.Stop();
+
+        if (!IsNetworkActive) return;
+
+        // 🔴 호스트가 오너면 바로 뿌리고, 클라가 오너면 서버를 한 번 거친다.
+        //    클라는 다른 클라에게 직접 못 보낸다.
+        if (IsServer)
         {
-            if (active) _dashAfterimage.Play();
-            else _dashAfterimage.Stop();
+            if (active) PlayDashAfterimageRpc();
+            else StopDashAfterimageRpc();
             return;
         }
 
-        if (active) PlayDashAfterimageRpc();
-        else StopDashAfterimageRpc();
+        if (active) RequestPlayDashRpc();
+        else RequestStopDashRpc();
     }
 
     /// <summary>[전 피어] 각자 자기 화면에 잔상을 켠다. 속도선은 DashAfterimage 가 같이 끈다.</summary>
@@ -305,14 +317,20 @@ public class PlayerSkillVfx : BaseNetworkBehaviour
     /// <summary>[전 피어] 잔상 생성을 멈춘다. 이미 떠 있는 조각은 제 수명대로 사라진다.</summary>
     private void StopDashAfterimageLocal() => _dashAfterimage?.Stop();
 
-    // 한 홉이다 — 대시의 진실은 서버가 들고 있으므로 오너를 거칠 이유가 없다.
-    // ClientsAndHost 라 호스트 자신도 여기서 켠다(위 최후의 심판처럼 로컬 선재생을 따로 두지 않는다).
+    // 오너 → 서버. RequireOwnership 기본값 true 라 오너만 부를 수 있다.
+    [Rpc(SendTo.Server)]
+    private void RequestPlayDashRpc() => PlayDashAfterimageRpc();
+
+    [Rpc(SendTo.Server)]
+    private void RequestStopDashRpc() => StopDashAfterimageRpc();
+
+    // 서버 → 오너를 뺀 전원. 오너는 위 Update 에서 이미 로컬로 켜고 껐다.
     // 🔴 둘 다 Reliable 이다. 끄기를 놓치면 잔상이 영영 남는다.
     //    DashAfterimage.safetyTimeout(2초)은 그마저 샜을 때의 마지막 그물이지 대책이 아니다.
-    [Rpc(SendTo.ClientsAndHost)]
+    [Rpc(SendTo.NotOwner)]
     private void PlayDashAfterimageRpc() => PlayDashAfterimageLocal();
 
-    [Rpc(SendTo.ClientsAndHost)]
+    [Rpc(SendTo.NotOwner)]
     private void StopDashAfterimageRpc() => StopDashAfterimageLocal();
 
     // ── 오너 → 서버 → 오너를 뺀 전원 ────────────────────────────────

@@ -27,6 +27,8 @@ MonoBehaviour:
   <ShieldDash_Smash>k__BackingField: {fileID: 11400000, guid: 58171c03394ee484fbd7b211a9ee6f42, type: 2}
   <HolyShield_Barrier>k__BackingField: {fileID: 11400000, guid: 55589f8e8b5bf68db05c619dd5ab540a, type: 2}
   <HolyShield_Break>k__BackingField: {fileID: 11400000, guid: 5d9491b166e58d4dcce879b6919626d2, type: 2}
+  <AllyShield_Barrier>k__BackingField: {fileID: 11400000, guid: 2d87b4f0c6e94a15933ad8e7b1420c6f, type: 2}
+  <AllyShield_Break>k__BackingField: {fileID: 11400000, guid: 846ec0b35a1d47f29b70e4d1c83f5a27, type: 2}
   <ShieldInterrupt_Glow>k__BackingField: {fileID: 11400000, guid: 5e95d0d8127eb044d81df1ccc25ac1af, type: 2}
   <ShieldInterrupt_Wave>k__BackingField: {fileID: 11400000, guid: 92585497e52e0e14e8ab6184e1541420, type: 2}
   <Ultimate_SwordLightning>k__BackingField: {fileID: 11400000, guid: 849db99045d14264b96849b4f78b186f, type: 2}
@@ -40,8 +42,6 @@ MonoBehaviour:
   <Drop_Charge_Indicator>k__BackingField: {fileID: 11400000, guid: 12f5c15d731222a4fb5899aa42423fc8, type: 2}
   <Drop_Collision>k__BackingField: {fileID: 11400000, guid: 257224bb915c8284b951f51f2c783638, type: 2}
   <Drop_JumpLanding>k__BackingField: {fileID: 11400000, guid: f90b7760a173d7e4eb570c3db0ca4909, type: 2}
-  <Dash_LimbElectric>k__BackingField: {fileID: 11400000, guid: 450273ae057d428b84b164f61c4680b4, type: 2}
-  <Rage_Shield>k__BackingField: {fileID: 11400000, guid: c201e9a39f93a3c46a80851faf12f0c6, type: 2}
   <Grab_Lightning>k__BackingField: {fileID: 11400000, guid: 6718432e9f0395642a71c720aa5181fd, type: 2}
   <Grab_ArmElectric>k__BackingField: {fileID: 11400000, guid: b0551a23e7c04f1d90c3a2b7e4d61f03, type: 2}
   <Grabbed_Electric>k__BackingField: {fileID: 11400000, guid: 4c27dd41039aaa44fbf590ac0a0c5b91, type: 2}
@@ -54,5 +54,7 @@ MonoBehaviour:
   <ChargeBall_Loop>k__BackingField: {fileID: 11400000, guid: bb39a066d0454af88683e332e64a3e59, type: 2}
   <ChargeBall_FadeOut>k__BackingField: {fileID: 11400000, guid: 5d28b04cd06644d7b77bb5c9505f3de8, type: 2}
   <ChargeBall_Break>k__BackingField: {fileID: 11400000, guid: 3c3031593b194504a7a6a779cf151ce4, type: 2}
+  <Dash_LimbElectric>k__BackingField: {fileID: 11400000, guid: 450273ae057d428b84b164f61c4680b4, type: 2}
+  <Rage_Shield>k__BackingField: {fileID: 11400000, guid: c201e9a39f93a3c46a80851faf12f0c6, type: 2}
   <Explosion_Basic>k__BackingField: {fileID: 11400000, guid: 2467c3b9b7e3cb5449c53e68811cc57f, type: 2}
   <Frag_Box_01>k__BackingField: {fileID: 11400000, guid: 2fbc4bb6d3c3c6a4b9cbc4cc7c73a276, type: 2}
