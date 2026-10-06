@@ -77,7 +77,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             animator = GetComponentInChildren<Animator>();
 
         int stepCount = data != null && data.NormalSteps != null ? data.NormalSteps.Length : 4;
-        combo = new AssassinComboModel(stepCount, data != null ? data.ComboContinuationSeconds : 0.8f);
+        combo = new AssassinComboModel(stepCount, data != null ? data.ComboContinuationSeconds : 0f);
         if (data != null)
             coneAttack.Configure(data.HittableLayers, data.MaxHitResults);
 

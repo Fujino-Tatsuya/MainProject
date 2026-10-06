@@ -51,7 +51,7 @@ MonoBehaviour:
     angle: 120
     playbackSpeed: 1.25
     hitCount: 4
-  comboContinuationSeconds: 0.8
+  comboContinuationSeconds: 0
   hittableLayers:
     serializedVersion: 2
     m_Bits: 17664

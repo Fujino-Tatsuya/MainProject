@@ -67,8 +67,9 @@ public sealed class AssassinBasicAttackData : ScriptableObject
         new AssassinBasicAttackStepData(1.2f, 1.8f, 120f, 1.25f, 4);
 
     [Header("연결")]
-    [Tooltip("마지막 타 종료 후 이 시간 안에 다시 누르면 다음 타부터 시작한다.")]
-    [SerializeField, Min(0f)] private float comboContinuationSeconds = 0.8f;
+    [Tooltip("마지막 타 종료 후 이 시간 안에 다시 누르면 다음 타부터 시작한다. " +
+             "0 = 타가 끝날 때 좌클릭을 누르고 있지 않으면 다음 입력은 항상 1타(10-06 은희 — 기획 0.8초에서 변경).")]
+    [SerializeField, Min(0f)] private float comboContinuationSeconds = 0f;
 
     [Header("판정")]
     [SerializeField] private LayerMask hittableLayers = 17664; // Enemy·Projectile·EnemyHurtBox
