@@ -1,3 +1,112 @@
+# ▶▶▶ 진행 중 = **스킬 직선 인디케이터 + HUD 호버 미리보기** (2026-10-06 · 그릴 21문항 완료 · 요약 승인 ✅ · 구현 = Codex 위임)
+
+> 브랜치: `feature/GunnerSkillIndicatorUpgrade` (워크트리 `MainProject-Worktree2`, origin/development `373ef5a6` 기준, 아트 r392).
+> 결정: **은희**. 그릴·계획: Claude. **구현: Codex.** 플레이어·UI 는 은희 영역이라 외부 승인 불필요.
+> 레퍼런스: 롤 **제라스 Q(Arcanopulse)** — 폭 일정 직사각형이 차지에 따라 길어진다(700→1450, 폭 145).
+
+## 지금 상태 (조사 결과)
+
+- 직사각형·직선 인디케이터는 **없다.** 있는 것: `PlayerAimIndicator`(방향 데칼, 크기 고정) ·
+  `SkillRangeIndicator`(원 데칼, ClickToConfirm 스킬만) · `SkillCursorView`(커서).
+- 거너 Q 는 **판정은 이미 제라스 Q 와 같다** — `GunnerChargeLaserData.RangeAt(ChargeFactor(t))` = Lerp(6,16), 폭 `BeamWidth` 1.2,
+  `maxChargeTime` 1.2, 벽은 `GunnerBeamAttack.CastLength(origin, dir, range, width/2, BlockingLayers)`(서버 가드 없음 → 오너가 매 프레임 호출 가능).
+  보이는 건 총구 차지 파티클뿐.
+- HUD 호버는 이미 있다 — `UI/Combat/SkillSlotHover.cs` 가 `OnPointerEnter/Exit/OnDisable` 로 `SkillTooltipView` 를 켜고 끈다.
+  `player`·`slot` 을 이미 들고 있다. 🔴 HUD 위에서도 `PlayerAimIndicator.AimDirection` 은 계속 갱신된다(화면 아래쪽 바닥을 가리킴) → 미리보기 방향으로 못 쓴다.
+- 판정 모양 실측:
+
+| 스킬 | 판정 | 크기 원본 | 벽 |
+|---|---|---|---|
+| 거너 Q `GunnerChargeLaserSkill` | 총구 직선 박스, 관통 | data `minRange 6`/`maxRange 16`/`beamWidth 1.2`/`muzzleHeight 1` | `CastLength` 로 잘림 |
+| 거너 RMB `GunnerInterruptSkill` | 정면 박스 + 반동 이동 `-aim` | 박스 = `Gunner_Armature.prefab` `InterruptAttack` BoxCollider(1.4×1.4, 앞 0.2~1.6m) / 반동 data `recoilDistance 1.5` | 박스 없음 / 반동은 모터 스윕(적 통과, 벽·오브젝트 정지) |
+| 팔라딘 RMB `FirstMeleeInterruptSkill` | 정면 박스 | `Paladin_Armature.prefab` `InterruptAttack` BoxCollider(1.6×1.6, 앞 0.1~1.7m) | 없음 |
+| 거너 E `GunnerCoolBackstepSkill` | 이동 `-aim` | data `distance 3` | 모터 스윕(적·아군·벽 정지, `BlockOtherPlayersOverride`) |
+
+  박스 크기는 SO 가 아니라 `PlayerSkillBase.HitboxAnchor`(`ColliderInfo`) 에 있다 — 런타임에 거기서 읽는다.
+
+## 그릴 결과 (2026-10-06)
+
+| | 결정 |
+|---|---|
+| 범위 | **공용 `SkillLineIndicator`** 를 base `Player.prefab` 에. 이번 연결 = 거너 Q·거너 RMB·팔라딘 RMB·거너 E |
+| 렌더링 | **Quad 메시**(데칼 아님). 발밑 +0.05, **깊이 테스트 켬**(가려진다) |
+| 벽 | **판정이 잘리면 표시도 잘린다.** 판정이 벽을 안 보면 표시도 안 자른다 (Q=`CastLength`, 화살표=모터 스윕, RMB 박스=안 자름) |
+| 차지 중 | **현재 길이만**. 최대 사거리 윤곽 없음 |
+| 가시성 | **오너 화면만.** 네트워크 추가 없음 |
+| 그림 | 임시 셰이더그래프(반투명 면 + 테두리), 색·알파·텍스처는 프로퍼티. 나중에 아트 교체 |
+| 호버 미리보기 | HUD 슬롯 호버 시. 방향 = **캐릭터 정면**(`transform.forward`), 화살표는 그 반대. **미리보기도 벽 자르기 적용** |
+| 프리팹 | `_forTip` 별도 프리팹 **안 만든다.** 한 인디케이터에 **진한 층(fill) · 연한 층(ghost, 알파 낮음) · 화살표** + 모드 2개 |
+| 화살표 | 몸통+삼각 머리, **박스와 다른 색**(흰 계열) — "이동" vs "공격 범위" 구분 |
+
+**스킬별 표시**
+
+| 스킬 | 차지 중 | 호버 미리보기 |
+|---|---|---|
+| 거너 Q | fill = 현재 길이(벽 클립), 폭 1.2 | fill = 최소 6 · ghost = 최대 16 (둘 다 벽 클립) |
+| 거너 RMB | — | fill = 정면 박스 + 화살표 뒤로 1.5(스윕 클립) |
+| 팔라딘 RMB | — | fill = 정면 박스 |
+| 거너 E | — | 화살표 뒤로 3(스윕 클립) |
+
+## 만드는 것
+
+**`Player/Skill/Targeting/SkillLineIndicator.cs`** (신규, MonoBehaviour, base `Player.prefab` 자식 `SkillLineIndicator`)
+- 오너 아니면 꺼 둔다 — `PlayerAimIndicator.OnNetworkSpawn` 패턴.
+- 자식 Quad 3개(fill / ghost / arrow). 피벗 = **시작점**(길이가 앞으로만 자라게).
+- API (안):
+  - `ShowCharge(Vector3 origin, Vector3 dir, float startOffset, float length, float width)` — 매 프레임 갱신
+  - `BeginPreview(ISkillPreviewSource src)` / `EndPreview(ISkillPreviewSource src)` — 호버 중엔 `LateUpdate` 에서 매 프레임 `src` 에 다시 물어 갱신(이동·회전 추종)
+  - `HideCharge()` / `HideAll()`
+  - 차지가 켜지면 미리보기는 숨긴다(우선순위: 차지 > 미리보기).
+- 테두리가 늘어나 보이지 않게 셰이더에 **월드 길이·폭을 프로퍼티로** 넘긴다(스케일만 쓰면 테두리가 늘어남).
+
+**`ISkillPreviewSource`** (신규 인터페이스) + **`SkillPreviewShape`** (struct, 순수 데이터)
+- `bool TryGetPreview(Vector3 origin, Vector3 forward, out SkillPreviewShape shape)`
+- `SkillPreviewShape` = fill(startOffset, length, width) · ghost(length, 유무) · arrow(방향 부호, length, 유무).
+- 형태 계산은 **순수 함수**로 빼서 EditMode 테스트가 물리 없이 돈다(클립 값은 인자로 받기).
+- 구현: `GunnerChargeLaserSkill` · `GunnerInterruptSkill` · `FirstMeleeInterruptSkill` · `GunnerCoolBackstepSkill`. 없는 스킬은 표시 안 함.
+
+**거너 Q 차지 연결** (`GunnerChargeLaserSkill`)
+- `OnOwnerTick` 에서 `elapsed` → `RangeAt(ChargeFactor(elapsed))` → `CastLength(...)` → `ShowCharge`.
+  origin 은 발사와 같게(`position + up*MuzzleHeight`), 그리기만 바닥 높이로.
+- 끄기: 오너 측 `OnEnd`(발사·취소·사망·대시 전부 지남) + 비서버 오너는 `GunnerBeamView.PlayChargeLaser → EndCharge` 경로도 확인.
+
+**RMB 박스** — `HitboxAnchor` 의 BoxCollider(center·size, Armature 로컬)를 바닥 사각형으로 변환. 미리보기는 캐릭터 정면 기준이므로 **Armature 현재 회전이 아니라 `forward` 로 다시 놓는다.**
+
+**화살표 클립** — `PlayerMotionSweep.Resolve(capsule, desiredDelta, ...)` 를 실제 이동과 **같은 마스크·옵션**으로 호출.
+RMB 반동(적 통과)과 E(적·아군 정지)의 마스크가 다르다 — `PlayerMotor` 의 `PassThroughEnemiesOverride`/`BlockOtherPlayersOverride` 처리 방식을 확인해 재현할 것.
+
+**HUD 연결** (`SkillSlotHover`)
+- `OnPointerEnter` → 로컬 플레이어 `SkillLineIndicator.BeginPreview(skillController.GetSkill(slot) as ISkillPreviewSource)`,
+  `OnPointerExit` / `OnDisable` → `EndPreview`. `Bind` 시 `pointerInside` 면 시작.
+- 호버 중 시전되면(슬롯 클릭·키 입력 → `PlayerSkillController.IsSkillActive`) 미리보기 숨김. Q 는 차지 표시로 넘어간다.
+
+**셰이더·머티리얼** — `Assets/3.Materials/Player/SkillLineIndicator/` 에 URP Unlit Transparent 셰이더그래프 1개 +
+머티리얼 2개(범위 = 기존 인디케이터 톤 / 화살표 = 흰 계열). 프로퍼티: `_Color`, `_Alpha`, `_BorderWidth`, `_WorldSize`.
+ghost 는 같은 머티리얼에 알파만 낮춘 MaterialPropertyBlock.
+
+## 범위 밖
+- 거너 R · 팔라딘 R(사거리 원 — `SkillRangeIndicator` 재활용, 다음 작업)
+- 아군에게 보여주기 · 아트 텍스처 · `SkillConfirmMode.HoldRelease`
+- 🟡 문서 불일치 메모: `Docs/design/players.md` 는 팔라딘 RMB 를 "정면 패링"이라 하는데 코드는 공격 박스. 이번엔 **코드(판정) 기준**으로 그린다.
+
+## 리스크
+- **비서버 오너의 차지 끝 신호** — `OnEnd` 가 `EndSkillClientRpc` 로 늦게 올 수 있다. 발사 순간엔 `GunnerBeamView.PlayChargeLaser` 에서도 끄는지 확인.
+- **`CastLength` 스크래치 버퍼 `hits`** 를 서버 `Fire` 와 공유 — 호스트에서 같은 프레임 호출 순서 문제 없는지(읽기 사이에 끼지 않는지) 확인.
+- **오너 차지 경과시간** — 오너는 자기 시계로 센다(`BeginCharge` 와 같은 방식). 서버 발사 길이와 몇 프레임 어긋나는 건 허용.
+- **Quad 깊이 테스트 + 경사로** — 발밑 +0.05 고정이라 큰 경사에서 묻힐 수 있다. 맵에 문제되는 경사 있으면 보고.
+- base `Player.prefab` 수정 → Variant(`Player_Paladin`·`Player_Gunner`) 오버라이드 충돌 없는지 확인.
+
+## 검증
+- **EditMode(에이전트가 직접 실행)**: `SkillPreviewShape` 계산 — Q fill 6/ghost 16, 클립 값 반영, RMB 박스 사각형 변환(1.4×1.4·앞 0.2~1.6 / 1.6×1.6·앞 0.1~1.7), 화살표 방향·길이.
+- **Play(은희가 직접 — MCP Play 금지, MPPM 깨짐)**:
+  1. Q 차지 중 직사각형 6→16 증가, 폭 1.2 가 실제 판정과 일치
+  2. 벽 앞에서 잘림(Q·화살표), RMB 박스는 안 잘림
+  3. 발사·취소·사망·스턴·대시로 끊기면 즉시 사라짐
+  4. HUD 호버 시 미리보기 표시 / 벗어나면 사라짐 / 호버 중 시전 → 미리보기 꺼지고 Q 는 차지 표시로
+  5. MPPM 다른 플레이어 화면엔 안 보임
+
+---
+
 # ▶▶▶ 진행 중 = **아군 보호막 연출 = 받는 쪽이 주인** (2026-10-06 · 그릴 4문항 완료 · 승인 ✅ · 구현 완료 · 배선·Play 검증 대기)
 
 > 작업 세션: **민경(Claude)**. 🔴 **은희 영역 파일 3개** — `PlayerShieldVfx.cs`,
