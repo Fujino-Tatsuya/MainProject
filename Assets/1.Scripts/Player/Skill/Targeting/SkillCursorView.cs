@@ -27,12 +27,12 @@ public class SkillCursorView : MonoBehaviour
     [Tooltip("화면 높이에 비례해 키운다 — 기준 높이(1080)에서 cursorScale, 1440 이면 ×1.33. 0 = 해상도 무관.")]
     [SerializeField, Min(0f)] private float referenceScreenHeight = 1080f;
 
-    // 절충(10-07 은희): 기본(idle) 커서 = 하드웨어(Auto) — 반응 즉시, 크기는 Windows 시스템 커서 크기.
-    // 조준 커서 = 소프트웨어 — 배율·해상도 비례가 먹지만 렌더 프레임만큼 늦게 따라온다(조준 중에만).
+    // 10-07 은희: 지금은 둘 다 하드웨어(Auto) — 반응 즉시, 크기는 Windows 시스템 커서 크기(배율 무시).
+    // 소프트웨어(ForceSoftware)로 바꾸면 배율·해상도 비례가 먹지만 렌더 프레임만큼 늦게 따라온다(에디터에서 특히 느림).
     [Tooltip("기본(idle) 커서 모드. Auto = 하드웨어(지연 없음, 배율 무시).")]
     [SerializeField] private CursorMode defaultCursorMode = CursorMode.Auto;
     [Tooltip("조준 커서 모드. ForceSoftware = 배율 적용(렌더 지연 있음). Windows 하드웨어 커서(Auto)는 텍스처를 시스템 크기로 줄여 그린다.")]
-    [SerializeField] private CursorMode targetingCursorMode = CursorMode.ForceSoftware;
+    [SerializeField] private CursorMode targetingCursorMode = CursorMode.Auto;
 
     private Player player;
     private bool isLocal;
