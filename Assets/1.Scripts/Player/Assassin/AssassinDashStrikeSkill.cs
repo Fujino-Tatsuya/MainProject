@@ -19,9 +19,6 @@ using UnityEngine;
 /// </summary>
 public sealed class AssassinDashStrikeSkill : PlayerSkillBase
 {
-    // 서버 재구성 돌진이 끝난 뒤에도 원격 오너의 실제 돌진(지연만큼 늦다)을 덮도록 슈퍼아머를 조금 더 둔다.
-    private const float SuperArmorTailSeconds = 0.15f;
-
     private PlayerMotor motor;
     private AssassinState assassinState;
     private AssassinSkillView view;
@@ -85,7 +82,7 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
         isServerSweeping = true;
         ledger.Begin();
 
-        // 서버 전용 쓰기. 돌진이 끝나면 OnTick 이, 강제 종료면 OnEnd 가 해제한다. 만료 안전망은 지속시간.
+        // 서버 전용 쓰기. 돌진이 끝나 스킬이 종료되면(OnTick → EndSelf) 또는 강제 종료면 OnEnd 가 해제한다. 만료 안전망은 지속시간.
         if (owner.StatusEffects != null)
         {
             owner.StatusEffects.Apply(StatusEffectType.SuperArmor, data.MaxActiveDuration, SourceId);
@@ -131,11 +128,12 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
         float elapsed = Time.time - serverStartTime;
         SweepServerTo(AssassinDashStrikeRules.TraveledAt(elapsed, data.DashSpeed, serverCap));
 
-        // 경로를 다 훑었고 돌진 시간이 지났다 — 이후는 회복 동작(판정·슈퍼아머 없음).
-        if (serverTraveled >= serverCap && elapsed >= serverCap / data.DashSpeed + SuperArmorTailSeconds)
+        // 경로를 다 훑었고 돌진 시간이 지났다(끝사거리 도착 또는 벽 보고로 줄어든 상한) — 회복 동작 없이 바로 끝낸다.
+        // 10-06 은희: 도착 후 클립 End 까지 서 있지 않고 곧바로 이동·다른 스킬 가능. 종료 시 컨트롤러가 Idle 로 크로스페이드한다.
+        if (serverTraveled >= serverCap && elapsed >= serverCap / data.DashSpeed)
         {
             isServerSweeping = false;
-            RemoveSuperArmor();
+            EndSelf(SkillEndReason.Completed);
         }
     }
 
@@ -158,7 +156,7 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
         if (eventType != SkillAnimationEventType.End)
             return;
 
-        // 클립 End 가 돌진보다 이르게 튜닝돼도 경로 판정은 끝까지 마친다.
+        // 보통은 돌진 종료(OnTick)가 먼저 끝낸다. 클립 End 가 돌진보다 이르게 튜닝돼도 경로 판정은 끝까지 마친다.
         if (isServerSweeping)
             SweepServerTo(serverCap);
 
