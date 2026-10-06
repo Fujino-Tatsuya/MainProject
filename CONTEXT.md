@@ -15,7 +15,14 @@ Update this file when a term becomes important enough that future agents or team
 
 ## ▶▶ 다음 세션 인수인계 (2026-10-06 2차 · 경석(Claude)) — 여기부터 읽을 것
 
-**상태**: `feature/Boss23` = **`6df20e8c`**(로컬, **미푸시**) — S6 측정 도구 + development 2회 병합(거너 연출·붕괴 사망·가렌 애니) + 아래 수정. SVN **r392**(핀 392, check-environment 통과). 전투 EditMode 108/2(기존 실패 2 동일).
+**상태**: `development` = `feature/Boss23`(10-06 저녁 빨리 감기 푸시) — S6 측정 도구 + development 2회 병합(거너 연출·붕괴 사망·가렌 애니) + 아래 수정. SVN **r392**(핀 392, check-environment 통과). 전투 EditMode 108/2(기존 실패 2 동일).
+
+**🔴 클라에서 몬스터가 땅에 박혀 보이던 문제(핫스팟 3인 테스트 · PeekABot 받침대 고리만 보임·사격 안 보임) — 수정**
+- 원인: 아트 팩(Robot Sentries) 몬스터 **본마다 kinematic Rigidbody + 외삽(Interpolate=2)**. 클라(NGO)는 프리팹 기본 위치에 만든 뒤 루트를 옮기고 `AutoSyncTransforms=0` 이라 물리가 옮기기 전 자세를 본에 다시 씀 → 본이 **루트 높이 × 거치는 Rigidbody 수** 만큼 아래로 굳음(실측 머리 −7.86 / 예측 −7.85). 호스트는 제자리 생성이라 안 생김. 타이밍 의존이라 지연 환경에서 잦음.
+- 수정: `MonsterBase.DisableBoneRigidbodyInterpolation`(OnNetworkSpawn, 하위 본 Rigidbody 보간 끔, 아트 SVN 무수정). MPPM 혼잡 핫스팟·2.5G 3판 연속 본 이상 0(1,300+ 샘플).
+- ⚠️ 철회한 가설: 로딩 씬과 함께 몬스터 삭제(실측: Loading→DDOL→Map 이동) · 접힌 바인드 포즈 · 컬링. "더 오래 기다리기"는 이 증상의 처방이 아니었음(굳은 자세가 25초간 유지).
+- 별건(유효): 클라가 `AsyncOperation.progress>=0.9` 에서 100% 보고(`NetworkLoadingFlowController.cs:681`) + 서버가 평균 100% 만으로 완료 → 준비 확인 후 시작으로 바꾸는 계획은 **은희 합의 후** 별도.
+- 재현 도구: 메뉴 `Dev/네트워크 지연 (MPPM)` · 툴바 `Dev/Network Lag`(MPPM 인스턴스별 Network Simulator) + `[LagDiag]`·`[LagDiag-Turret]` 진단 로그(각 인스턴스 `Library/VP/mppm*/Logs/Editor.log`). `Assets/1.Scripts/Dev/NetLag/DevNetworkLag.cs`.
 배포용 빌드 = `../MainProjectBuilds/Windows/`(측정기·콘솔 없음 확인) · 측정용 = `../MainProjectBuilds/WindowsDev/`. 실측 표 = [PLAN-cleanup-optimization.md](PLAN-cleanup-optimization.md) §S6.
 
 **이번 세션 결과**
