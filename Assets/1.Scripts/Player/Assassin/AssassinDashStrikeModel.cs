@@ -8,6 +8,16 @@ using System.Collections.Generic;
 /// </summary>
 public static class AssassinDashStrikeRules
 {
+    /// <summary>
+    /// 승인 후 <paramref name="sinceApproval"/> 초에 스킬을 끝낼지 — 준비 + 실제 돌진 시간(상한 거리 / 속도) + 종료.
+    /// 상한은 벽 조기 종료 보고로 줄어든다.
+    /// </summary>
+    public static bool IsFinished(float sinceApproval, float prepare, float cap, float speed, float end)
+    {
+        float dash = speed > 0f ? Math.Max(0f, cap) / speed : 0f;
+        return sinceApproval >= Math.Max(0f, prepare) + dash + Math.Max(0f, end);
+    }
+
     /// <summary>시작 후 <paramref name="elapsed"/> 초에 서버가 재구성한 경로의 진행 거리.</summary>
     public static float TraveledAt(float elapsed, float speed, float cap)
     {

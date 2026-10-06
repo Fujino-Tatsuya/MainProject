@@ -42,8 +42,10 @@ MonoBehaviour:
     m_Bits: 0
   animatorStateName: Assassin_Q_DashStrike_Transformed
   snapRotationOnStart: 1
-  dashDistance: 4.3
-  dashSpeed: 80
+  prepareDuration: 0.1
+  endDuration: 0.1
+  dashDistance: 5
+  dashSpeed: 60
   pathWidth: 1.2
   pathHeight: 2
   maxHitResults: 16

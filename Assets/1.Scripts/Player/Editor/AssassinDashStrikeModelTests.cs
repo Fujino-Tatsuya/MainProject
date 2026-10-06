@@ -149,4 +149,16 @@ public sealed class AssassinDashStrikeModelTests
         cooldowns.Reduce(0, 0.2f, 1.5f);
         Assert.That(cooldowns.GetRemaining(0, 0.2f), Is.EqualTo(0f));
     }
+
+    // 10-06 은희: 준비 0.1 → 돌진(5m/60m/s) → 종료 0.1. 벽 조기 종료로 상한이 줄면 그만큼 일찍 끝난다.
+    [Test]
+    public void Phases_PrepareDashEnd_FinishTime()
+    {
+        float full = 0.1f + 5f / 60f + 0.1f;
+        Assert.That(AssassinDashStrikeRules.IsFinished(full - 0.01f, 0.1f, 5f, 60f, 0.1f), Is.False);
+        Assert.That(AssassinDashStrikeRules.IsFinished(full + 0.001f, 0.1f, 5f, 60f, 0.1f), Is.True);
+
+        float walled = 0.1f + 1.2f / 60f + 0.1f;
+        Assert.That(AssassinDashStrikeRules.IsFinished(walled + 0.001f, 0.1f, 1.2f, 60f, 0.1f), Is.True);
+    }
 }

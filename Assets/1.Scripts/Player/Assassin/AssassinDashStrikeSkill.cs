@@ -30,7 +30,8 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
 
     // 서버
     private Vector3 serverOrigin;
-    private float serverStartTime;
+    private float serverApprovalTime;
+    private float serverStartTime;   // 실제 돌진 시작 = 승인 + 준비
     private float serverTraveled;
     private float serverCap;
     private bool isServerSweeping;
@@ -38,6 +39,7 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
 
     // 시뮬레이션 피어(오너, 서버 권위 이동이면 서버도)
     private bool isLocallyDashing;
+    private float localPrepareRemaining;
     private float localRemaining;
     private float localTraveled;
 
@@ -76,7 +78,8 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
 
         dashDirection = Flatten(direction);
         serverOrigin = owner.transform.position;
-        serverStartTime = Time.time;
+        serverApprovalTime = Time.time;
+        serverStartTime = Time.time + data.PrepareDuration;
         serverTraveled = 0f;
         serverCap = data.DashDistance;
         isServerSweeping = true;
@@ -100,6 +103,7 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
         if (data == null || motor == null || owner == null || !owner.IsSimulating)
             return;
 
+        localPrepareRemaining = data.PrepareDuration;
         localRemaining = data.DashDistance;
         localTraveled = 0f;
         isLocallyDashing = true;
@@ -113,6 +117,13 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
         AssassinDashStrikeSkillData data = DashData;
         if (!isLocallyDashing || localRemaining <= 0f || data == null || motor == null)
             return;
+
+        // 1단계 준비 — 제자리(웅크리기 애니 자리).
+        if (localPrepareRemaining > 0f)
+        {
+            localPrepareRemaining -= Time.fixedDeltaTime;
+            return;
+        }
 
         float step = Mathf.Min(data.DashSpeed * Time.fixedDeltaTime, localRemaining);
         localRemaining -= step;
@@ -128,9 +139,11 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
         float elapsed = Time.time - serverStartTime;
         SweepServerTo(AssassinDashStrikeRules.TraveledAt(elapsed, data.DashSpeed, serverCap));
 
-        // 경로를 다 훑었고 돌진 시간이 지났다(끝사거리 도착 또는 벽 보고로 줄어든 상한) — 회복 동작 없이 바로 끝낸다.
-        // 10-06 은희: 도착 후 클립 End 까지 서 있지 않고 곧바로 이동·다른 스킬 가능. 종료 시 컨트롤러가 Idle 로 크로스페이드한다.
-        if (serverTraveled >= serverCap && elapsed >= serverCap / data.DashSpeed)
+        // 준비 → 돌진 → 종료(10-06 은희). 경로를 다 훑고 종료 단계까지 지나면 끝낸다(클립 End 를 기다리지 않음).
+        // 종료 단계는 제자리 — 궤적 이펙트가 늦게 따라와 속도감을 준다. 끝나면 컨트롤러가 Idle 로 크로스페이드한다.
+        if (serverTraveled >= serverCap &&
+            AssassinDashStrikeRules.IsFinished(Time.time - serverApprovalTime, data.PrepareDuration,
+                serverCap, data.DashSpeed, data.EndDuration))
         {
             isServerSweeping = false;
             EndSelf(SkillEndReason.Completed);
