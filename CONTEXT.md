@@ -53,10 +53,10 @@ HUD 매 프레임 문자열(`PlayerHealthHUD`·`StatusEffectHUD`·`SkillCooldown
 8. `Assets/1.Scripts/Player/Fall/FallBoundarySettings.cs` 줄 끝(EOL)만 다른 변경이 계속 뜬다 — 내 것 아님, 커밋하지 않음.
 
 ## ▶▶ 작업 세션 (2026-10-03 · 경석(Claude) · **타이틀 시작 연출 · 존 게이트 패널 모니터 켜짐·외곽선**, 브랜치 `feature/Boss23`) — ✅ 팀장 Play OK(10-04) · `feature/Boss23` 푸시 `5e3e46fe`(development 미반영). 게이트 활성 표시 = 모니터 화면(바닥 링 삭제). ⚠️ ZoneL_typeB 를 프리팹 모드로 열어 둔 채 파일을 바꾸면 Auto Save 가 덮어쓴다 — 값은 `Tools/Map/Authoring/Zone Monitor Screen/5` 로
-계획 = [PLAN-title-monitor.md](PLAN-title-monitor.md)(승인 10-03, Codex 설계 회의 반영). 🔴 **수정 예정 — 동시 수정 금지:** `UI/Title/*`(TitleFlowDirector·TitleMonitorDisplay·셰이더) · `Map/ZoneBridgeGate.cs`·`ZoneBridgeGateManager.cs` · `ZoneL_typeB.prefab`(게이트 값) · 신규 외곽선 셰이더.
+계획 = [PLAN-title-monitor.md](Docs/history/PLANS/PLAN-title-monitor.md)(승인 10-03, Codex 설계 회의 반영). 🔴 **수정 예정 — 동시 수정 금지:** `UI/Title/*`(TitleFlowDirector·TitleMonitorDisplay·셰이더) · `Map/ZoneBridgeGate.cs`·`ZoneBridgeGateManager.cs` · `ZoneL_typeB.prefab`(게이트 값) · 신규 외곽선 셰이더.
 
 ## ▶▶ 작업 세션 (2026-10-02~03 · 경석(Claude) · **몬스터 공격속도 = 애니 재생 배율 · 쿨다운 종료 기준 · 이동 애니 맞춤**, 브랜치 `feature/Boss23`) — ✅ development 반영(10-03) · **SVN r372 같이 받을 것**(GameData.xlsx Monster attackSpeed→1 · Chomp 2/2.8, 핀 372) · 팀장 Play 1차(Chomp·Mortar) · ⏳ MPPM·배율 0.5/2 Play 미검증
-계획·결정·교차검증 이력 = [PLAN-monster-anim-speed.md](PLAN-monster-anim-speed.md) §3 · S4-b.
+계획·결정·교차검증 이력 = [PLAN-monster-anim-speed.md](Docs/history/PLANS/PLAN-monster-anim-speed.md) §3 · S4-b.
 - `attackSpeed` = 공격 애니 재생 배율(SO 직접 — `MonsterBase.AttackAnimSpeed`, Unit.AttackSpeed 는 클라에서 0) · 공격 중 코드 타이머 ÷ · 돌진 속도 ×r · 가속 ×r².
 - `attackCooldown` = 공격 **끝난 뒤** 쉬는 시간(23호만 시작 기준). `animator.speed` 는 `MonsterBase` 한 곳(23호 제외).
 - 이동 맞춤 = `Tools/Monster/이동 클립 고유 속도 측정 → SO 기록`. Chomp = 블렌드 100% + 임시 속도(배회 2.0 · 추격 2.8, 입 애니 때문 — 아트 클립 요청 여지).
@@ -67,7 +67,7 @@ HUD 매 프레임 문자열(`PlayerHealthHUD`·`StatusEffectHUD`·`SkillCooldown
 
 ## ▶▶ 현재 인수인계 (2026-10-02 · Claude · **존 원본 0.98 축소** — 방이 줄어든 만큼 존 내용물도 줄임, 브랜치 `feature/ZoneAssetScale`)
 
-결정·범위·검증·팀원 업데이트 순서 = [PLAN-zone-asset-scale.md](PLAN-zone-asset-scale.md). 사용자 단계별 검수·Play 확인 완료(10-02).
+결정·범위·검증·팀원 업데이트 순서 = [PLAN-zone-asset-scale.md](Docs/history/PLANS/PLAN-zone-asset-scale.md). 사용자 단계별 검수·Play 확인 완료(10-02).
 - 존이 쓰는 FBX 82개 Scale Factor 0.98(SVN `.meta`) + 원본 프리팹·존 11개 배치 0.98 + 존 밖(보스룸·복도·Stage1 복도벽)은 보정 스케일 1/0.98 로 **겉모습 그대로**.
   튜토리얼 문 8곳은 복도 바닥을 늘려 메움. 존 바닥은 벽 밑단 밑으로 20m 변 31cm · 40m 변 11cm.
 - 🔴 **SVN r371(FBX meta 82 · 볼록 충돌 16 · `floor_MV.prefab`, 핀 371)과 git 을 같이 받아야 한다** — 한쪽만 받으면 존 바닥 4m 마다 8cm 틈/겹침. r366 GameData.xlsx(SkillTooltip)도 같이 딸려 온다.
@@ -123,7 +123,7 @@ HUD 매 프레임 문자열(`PlayerHealthHUD`·`StatusEffectHUD`·`SkillCooldown
   - ⚠️ 메시지 포맷 변경 — 구버전 빌드와 섞어 접속하면 읽기 실패.
 - 검증: 은희 MPPM 테스트 완료. ⏳ 경석에게 PR 없이 병합한 것 공유.
 ## ▶▶ 현재 인수인계 (2026-10-02 · Claude · **벽 모듈 메시 정렬** — ✅ 반영 완료(git `2ddf2838` → development `578569f6` · SVN r363), 🔴 Play 미확인)
-계획·결정·실측 = [PLAN-wall-modules.md](PLAN-wall-modules.md). 벽 메시 5종(피벗 중앙·4.000m, 이음새 실금 막으려 끝면을 살짝 겹치게 — 지상 ±2.001m · 지하 ±2.0005m)과 코너 조립(COM 피벗 = 벽 중심선 교차점)을 4m 그리드에 맞췄다.
+계획·결정·실측 = [PLAN-wall-modules.md](Docs/history/PLANS/PLAN-wall-modules.md). 벽 메시 5종(피벗 중앙·4.000m, 이음새 실금 막으려 끝면을 살짝 겹치게 — 지상 ±2.001m · 지하 ±2.0005m)과 코너 조립(COM 피벗 = 벽 중심선 교차점)을 4m 그리드에 맞췄다.
 - 🔴 **SVN 8개(FBX 6 — 복도벽 포함 + `walll_brick_cornerCOM_*` 2)와 git 5개(`bossroom.prefab` · `Level_wall_hallway_tutorial.prefab` · `StageTutorial.prefab` · `TutorialStageAuthoring.cs` · `all_mesh.unity`)는 함께 반영해야 한다.** 한쪽만 들어가면 벽·콜라이더가 최대 1.9m 어긋난다. SVN 업데이트는 Unity 끄고(바이너리 FBX).
   👉 **팀원 업데이트 순서**: Unity 끄기 → SVN 을 r363 이상으로 → git `development` 를 `578569f6` 이상으로 → Unity 열기.
   둘 중 하나만 받으면 코너·복도가 벌어져 보인다(2026-10-02 실제로 발생 — 로컬 git 이 병합 전 커밋에 머물러 있었음).
