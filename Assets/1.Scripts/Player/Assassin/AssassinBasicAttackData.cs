@@ -72,7 +72,7 @@ public sealed class AssassinBasicAttackData : ScriptableObject
     [SerializeField, Min(0f)] private float comboContinuationSeconds = 0f;
 
     [Header("판정")]
-    [SerializeField] private LayerMask hittableLayers = 17664; // Enemy·Projectile·EnemyHurtBox
+    [SerializeField, DataTableIgnore] private LayerMask hittableLayers = 17664; // Enemy·Projectile·EnemyHurtBox
     [SerializeField] private bool triggersOnHit = true;
     [SerializeField, DataTableIgnore, Min(1)] private int maxHitResults = 32;
 
