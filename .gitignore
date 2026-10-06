@@ -133,8 +133,6 @@ Docs/temp/
 /AGENTS.md
 /CONTEXT.md
 /Tools/
-/.claude/commands/coop-agent.md
-/.claude/commands/coop-agent-reload.md
 
 # 개인 작업 노트 + Unity 자동생성물(커밋 금지)
 /IMPLEMENTATION_NOTES.md
