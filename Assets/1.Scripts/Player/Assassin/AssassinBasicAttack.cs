@@ -413,6 +413,9 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
 
         hitsFired++;
         int damage = Mathf.Max(0, Mathf.RoundToInt(player.FinalAttackDamage * step.AttackDamageMultiplier));
+        // 백어택(A11) — 일반·강타·변신 묶음 모두 배율을 싣고, 변신 중이면 위치 무관(타격 시점의 변신 여부).
+        if (assassinState != null)
+            coneAttack.SetBackAttack(assassinState.BackAttackMultiplier, assassinState.IsTransformed);
         coneAttack.Fire(
             attackDirection,
             step.Range,

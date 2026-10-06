@@ -76,9 +76,12 @@ public sealed class AssassinConeAttack : BaseAttack
                     continue;
 
                 int? resolvedDamage = TakeOnHitBonus(target, triggersOnHit, ref onHitBonusTaken);
+                bool backAttack = AssassinHitTargets.IsBackAttack(target, _attackInfo, CreateHitContext(hit));
                 if (!TryResolveHit(hurtbox, hit, resolvedDamage))
                     continue;
 
+                if (backAttack)
+                    AssassinHitTargets.NotifyBackAttackHit(owner, hit, target, CreateHitContext(hit));
                 anyResolved = true;
                 damagedHurtboxes.Add(hurtbox);
                 if (target != null)
@@ -95,9 +98,12 @@ public sealed class AssassinConeAttack : BaseAttack
                 continue;
 
             int? unitDamage = TakeOnHitBonus(unit, triggersOnHit, ref onHitBonusTaken);
+            bool unitBackAttack = AssassinHitTargets.IsBackAttack(unit, _attackInfo, CreateHitContext(null));
             if (!TryResolveHit(unit, unitDamage))
                 continue;
 
+            if (unitBackAttack)
+                AssassinHitTargets.NotifyBackAttackHit(owner, hit, unit, CreateHitContext(null));
             anyResolved = true;
             damagedUnits.Add(unit);
             landedUnits.Add(unit);

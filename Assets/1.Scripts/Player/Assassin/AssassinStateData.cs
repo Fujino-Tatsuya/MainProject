@@ -19,6 +19,11 @@ public sealed class AssassinStateData : ScriptableObject, ISkillTooltipSource
     [Tooltip("변신 시작 후 이 시간 동안 R 재입력(수동 해제)을 무시한다.")]
     [SerializeField, Min(0f)] private float releaseLockSeconds = 2f;
 
+    [Tooltip("백어택 피해 배율(§4.1, 임시값). 어쌔신 모든 타격에 실린다 — 적용 여부(보스 후방·변신 강제)는 MonsterBase 가 정한다.")]
+    [SerializeField, Min(1f)] private float backAttackMultiplier = 1.2f;
+
+    public float BackAttackMultiplier => backAttackMultiplier;
+
     public AssassinStateRules Rules => new AssassinStateRules(maxStacks, transformDurations, releaseLockSeconds);
 
     public SkillTooltipText Tooltip => tooltip;

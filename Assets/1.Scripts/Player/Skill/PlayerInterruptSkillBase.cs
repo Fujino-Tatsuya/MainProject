@@ -83,6 +83,9 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     protected virtual bool ConsumeOnHitBonusOnce => true;
     protected virtual bool CompleteBeforeAttackLanded => false;
 
+    /// <summary>수신 직전 캐릭터별 AttackInfo 가공 훅(어쌔신 백어택 배율 — PLAN-assassin A11). 기본 = 그대로.</summary>
+    protected virtual AttackInfo DecorateAttackInfo(AttackInfo attackInfo) => attackInfo;
+
     /// <summary>개별 적중이 실제 수신됐을 때의 캐릭터별 연출·로그 훅.</summary>
     protected virtual void OnInterruptTargetResolved(Object target, AttackInfo attackInfo) { }
 
@@ -133,8 +136,8 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
                     : resolvedDamage + bonus;
             }
 
-            AttackInfo attackInfo = new AttackInfo(resolvedDamage, DamageAttackType,
-                isInterruptAttack: true, hitPattern: DamageHitPattern);
+            AttackInfo attackInfo = DecorateAttackInfo(new AttackInfo(resolvedDamage, DamageAttackType,
+                isInterruptAttack: true, hitPattern: DamageHitPattern));
             AttackHitContext hitContext =
                 new AttackHitContext(owner.transform.position, owner.transform, hit, owner);
 

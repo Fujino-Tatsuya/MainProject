@@ -145,7 +145,10 @@ public sealed class AssassinCircleStrikeSkill : PlayerSkillBase
                 continue;
 
             AttackInfo attackInfo = new AttackInfo(damageSnapshot, DamageAttackType, hitPattern: DamageHitPattern);
+            if (assassinState != null)
+                attackInfo = assassinState.WithBackAttack(attackInfo);
             AttackHitContext hitContext = new AttackHitContext(owner.transform.position, owner.transform, hit, owner);
+            bool backAttack = AssassinHitTargets.IsBackAttack(unit, attackInfo, hitContext);
 
             bool resolved = hurtbox != null
                 ? hurtbox.ReceiveAttack(attackInfo, hitContext)
@@ -156,8 +159,10 @@ public sealed class AssassinCircleStrikeSkill : PlayerSkillBase
 
             if (unit != null)
                 strikeLandedUnits.Add(unit);
+            if (backAttack)
+                AssassinHitTargets.NotifyBackAttackHit(owner, hit, unit, hitContext);
 
-            Edit.Log($"[Assassin/E변신] {sequence.StrikesDone}타 적중 — {target.name} 피해 {attackInfo.damage}", this);
+            Edit.Log($"[Assassin/E변신] {sequence.StrikesDone}타 적중 — {target.name} 피해 {attackInfo.damage}{(backAttack ? " (백어택)" : "")}", this);
         }
 
         if (strikeLandedUnits.Count > 0)

@@ -18,6 +18,7 @@ internal static class PlayerEditModeTestRunner
         "^AssassinStateModelTests$", // PLAN-assassin A7 — 스택·변신 지속·해제 2초·종료 대기·쓰러짐 정리
         "^AssassinDashStrikeModelTests$", // PLAN-assassin A8 — Q 경로 대상 1회·쿨 차감 1회·보고 거리 상한
         "^AssassinCircleStrikeModelTests$", // PLAN-assassin A9 — 변신 E 원 판정·타당 1회·5타·무적 구간·종료 대기
+        "^BackAttackRulesTests$", // PLAN-assassin A11 — 보스 후방 판정·변신 강제·배율
         "^HealthShieldTests$",
         "^GunnerHeatModelTests$",
     };

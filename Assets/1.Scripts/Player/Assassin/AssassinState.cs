@@ -72,7 +72,18 @@ public sealed class AssassinState : BaseNetworkBehaviour, IPassiveTooltipProvide
     /// <summary>만료·수동 해제로 종료를 기다리는 중 — 새 공격·다음 묶음을 시작하지 않는다.</summary>
     public bool IsTransformEndPending => AssassinStateModel.IsEndPending(State, Now());
 
-    public bool CanBeginTransform => AssassinStateModel.CanBeginTransform(State);
+    /// <summary>백어택 배율(A11). 데이터가 없으면 1(백어택 없음).</summary>
+    public float BackAttackMultiplier => data != null ? data.BackAttackMultiplier : 1f;
+
+    /// <summary>[서버] 어쌔신 타격에 백어택 배율과 변신 중 강제 여부를 싣는다(A11). Q·변신 E·간파가 쓴다(평타는 BaseAttack.SetBackAttack 에 같은 두 값).</summary>
+    public AttackInfo WithBackAttack(AttackInfo attackInfo)
+    {
+        attackInfo.backAttackMultiplier = BackAttackMultiplier;
+        attackInfo.forceBackAttack = IsTransformed;
+        return attackInfo;
+    }
+
+    public bool CanBeginTransform =>AssassinStateModel.CanBeginTransform(State);
     public bool CanPrepareEnhancement => AssassinStateModel.CanPrepareEnhancement(State);
 
     private AssassinStateSnapshot State => IsNetworkActive ? state.Value : offlineState;
