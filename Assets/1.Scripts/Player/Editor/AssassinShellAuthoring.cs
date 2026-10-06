@@ -8,7 +8,7 @@ using UnityEngine;
 using Object = UnityEngine.Object;
 
 /// <summary>
-/// PLAN-assassin A6~A8 저작 메뉴. 모델/클립 원본은 건드리지 않고, 재실행 가능한 방식으로 컨트롤러·Armature·Variant·데이터 배선을 맞춘다.
+/// PLAN-assassin A6~A9 저작 메뉴. 모델/클립 원본은 건드리지 않고, 재실행 가능한 방식으로 컨트롤러·Armature·Variant·데이터 배선을 맞춘다.
 /// </summary>
 public static class AssassinShellAuthoring
 {
@@ -28,6 +28,7 @@ public static class AssassinShellAuthoring
     private const string TransformSkillDataPath = DataFolder + "/AssassinTransformSkillData.asset";
     private const string DashStrikeDataPath = DataFolder + "/AssassinDashStrikeSkillData.asset";
     private const string TransformedDashStrikeDataPath = DataFolder + "/AssassinTransformedDashStrikeSkillData.asset";
+    private const string CircleStrikeDataPath = DataFolder + "/AssassinCircleStrikeSkillData.asset";
     private const string RosterPath = "Assets/9.ScriptableObject/Player/CharacterRoster.asset";
 
     // A7 Animator 상태 — 스킬 데이터 animatorStateName 과 같은 이름이어야 CrossFade 가 맞는다.
@@ -44,6 +45,10 @@ public static class AssassinShellAuthoring
     private const string TransformedDashStrikeSkillState = "Assassin_Q_DashStrike_Transformed";
     private const float DashStrikeSpeed = 1f;
     private const float TransformedDashStrikeSpeed = 1.5f;
+
+    // A9 변신 E 원형 5타 — Skill_02_Move_000pct 1.5배속(≈1.22초, §9.3). 모델 이동은 연출(루트모션 꺼짐).
+    private const string CircleStrikeSkillState = "Assassin_E_CircleStrike_Transformed";
+    private const float CircleStrikeSpeed = 1.5f;
     private const int EnemyHittableLayers = 17664; // Enemy·Projectile·EnemyHurtBox — 가붕이 Q·어쌔신 평타와 같다
 
     private static readonly string[] WaveClips =
@@ -69,7 +74,7 @@ public static class AssassinShellAuthoring
         "Idle", "Idle_Combat", "Run_Combat_Fast_Loop",
     };
 
-    [MenuItem("Tools/Player/Assassin/전체 구성 (A6~A8)")]
+    [MenuItem("Tools/Player/Assassin/전체 구성 (A6~A9)")]
     public static void BuildAll()
     {
         BuildShell();
@@ -77,6 +82,7 @@ public static class AssassinShellAuthoring
         StampClipEventsAndLoopSettings();
         AttachStateAndSkills();
         AttachDashStrikeSkills();
+        AttachCircleStrikeSkill();
         AssetDatabase.SaveAssets();
         Debug.Log($"{Tag} 전체 구성 완료. 오류 로그가 없었는지 확인할 것.");
     }
@@ -342,6 +348,77 @@ public static class AssassinShellAuthoring
         AssetDatabase.SaveAssets();
     }
 
+    /// <summary>
+    /// A9 — 변신 E 원형 5타 부착, 데이터 SO, alternateSkills[Sub] 배선, Animator 상태.
+    /// 데이터는 처음 만들 때만 기본값을 쓰고 재실행 시 튜닝 값을 유지한다. 클립 Hit 5·End 이벤트는 3번 메뉴가 심는다.
+    /// </summary>
+    [MenuItem("Tools/Player/Assassin/6. 변신 E 부착 + 데이터 (A9)")]
+    public static void AttachCircleStrikeSkill()
+    {
+        if (AssetDatabase.LoadAssetAtPath<GameObject>(VariantPath) == null)
+        {
+            Debug.LogError($"{Tag} Variant가 없다. 먼저 1번 메뉴를 실행할 것: {VariantPath}");
+            return;
+        }
+
+        EnsureFolder(DataFolder);
+        AssassinCircleStrikeSkillData data =
+            EnsureAsset<AssassinCircleStrikeSkillData>(CircleStrikeDataPath, out bool created);
+        if (created)
+            InitializeCircleStrikeData(data);
+
+        GameObject root = PrefabUtility.LoadPrefabContents(VariantPath);
+        try
+        {
+            AssassinCircleStrikeSkill skill = EnsureComponent<AssassinCircleStrikeSkill>(root);
+            SetReference(skill, "data", data);
+
+            PlayerSkillController skills = root.GetComponent<PlayerSkillController>();
+            SetReference(skills, "alternateSkills.subSkill", skill);
+
+            PrefabUtility.SaveAsPrefabAsset(root, VariantPath);
+            Debug.Log($"{Tag} A9 변신 E 부착/갱신: alternateSkills.subSkill=원형 5타 ({VariantPath})");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+
+        AnimatorController controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(ControllerPath);
+        if (controller != null)
+        {
+            BuildAnimator(controller);
+            ValidateSkillState(controller, data);
+        }
+        else
+        {
+            Debug.LogError($"{Tag} Animator Controller가 없다. 먼저 1번 메뉴를 실행할 것: {ControllerPath}");
+        }
+
+        RecordAndValidateHash(AssetDatabase.LoadAssetAtPath<GameObject>(VariantPath));
+        AssetDatabase.SaveAssets();
+    }
+
+    private static void InitializeCircleStrikeData(AssassinCircleStrikeSkillData data)
+    {
+        // 쿨타임 = 확정(공격 시작) 순간 서버 승인 — 자동 커밋. 원 중심 쪽으로 즉시 돌아선다.
+        InitializeSkillData(data, cooldown: 12f, commitManually: false,
+            maxActiveDuration: ClipDuration(LoadClip("Skill_02_Move_000pct"), CircleStrikeSpeed) + 0.3f,
+            animatorStateName: CircleStrikeSkillState, snapRotation: true);
+
+        // 조준 = GroundPoint 고정 거리(A4): 중심 거리 1.5m, 효과 반경 2m, 좌클릭 확정.
+        SerializedObject so = new SerializedObject(data);
+        so.FindProperty("attackDamageMultiplier").floatValue = 2.8f;
+        so.FindProperty("hittableLayers").intValue = EnemyHittableLayers;
+        so.FindProperty("targetingMode").enumValueIndex = (int)SkillTargetingMode.GroundPoint;
+        so.FindProperty("confirmMode").enumValueIndex = (int)SkillConfirmMode.ClickToConfirm;
+        so.FindProperty("castRange").floatValue = 1.5f;
+        so.FindProperty("fixedDistance").boolValue = true;
+        so.FindProperty("aoeRadius").floatValue = 2f;
+        so.ApplyModifiedPropertiesWithoutUndo();
+        EditorUtility.SetDirty(data);
+    }
+
     // 컨트롤러는 animatorStateName 의 해시로 CrossFade 한다 — 같은 해시의 상태가 0층에 있어야 한다.
     private static void ValidateSkillState(AnimatorController controller, PlayerSkillData data)
     {
@@ -602,9 +679,14 @@ public static class AssassinShellAuthoring
         transformedDashStrike.speed = TransformedDashStrikeSpeed;
         EnsureReturnToIdleTransitions(transformedDashStrike, idle, combatIdle);
 
+        // A9: 변신 E 원형 5타 — 실제 좌표는 고정, 클립의 모델 이동은 연출(루트모션 꺼짐).
+        AnimatorState circleStrike = EnsureState(sm, CircleStrikeSkillState, LoadClip("Skill_02_Move_000pct"));
+        circleStrike.speed = CircleStrikeSpeed;
+        EnsureReturnToIdleTransitions(circleStrike, idle, combatIdle);
+
         EditorUtility.SetDirty(controller);
         AssetDatabase.SaveAssets();
-        Debug.Log($"{Tag} Animator 구성: Idle 2, Run Start/Loop/Stop, Dodge, Interrupt, Wave 4, 강타·변신 묶음, E Buff·R Parry·Q 돌진 2 상태");
+        Debug.Log($"{Tag} Animator 구성: Idle 2, Run Start/Loop/Stop, Dodge, Interrupt, Wave 4, 강타·변신 묶음, E Buff·R Parry·Q 돌진 2·변신 E 상태");
     }
 
     private static GameObject EnsureArmature(AnimatorController controller)

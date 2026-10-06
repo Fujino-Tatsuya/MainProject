@@ -212,3 +212,8 @@ Q22 `AssassinState` NetworkVariable · Q23·Q26 클립 git + 애니 이벤트(�
   메뉴 `전체 구성 (A6~A8)` + `5. Q 관통 돌진 부착 + 데이터 (A8)`. DataTable Order 2·6(4 는 변신 E 용 비움).
   🔸 원격 오너는 보고 도착 전(왕복 지연×20m/s, LAN ~1.2m) 서버가 벽 너머 경로를 훑을 수 있음 → Play 에서 벽 뒤 적이 맞으면 서버 시작 시 벽 캐스트 추가 검토.
   🔸 승인 직후 0m 로 끝나도 쿨 소모 · 서버 SuperArmor 꼬리 0.15초 · 애니 1/1.5배속 End 0.85 — Play 튜닝.
+- ✅ A9(10-06): claude-alt 가 코드·메뉴 작성 후 **`claude -p` 가 MCP 재연결을 백그라운드 sleep 으로 기다리다 턴 종료 → 보고·커밋 없이 종료**(87턴).
+  메인 Claude 가 이어받아 `전체 구성 (A6~A9)` 실행(오류·경고 0, guid·해시 3304217410 유지)·EditMode 95/0·커밋.
+  `AssassinCircleStrikeSkill`(alternateSkills.sub = 변신 E, fixedDistance 1.5·aoeRadius 2, Hit 이벤트마다 원 재판정 5타 ×2.8, 쿨 12초) ·
+  `AssassinCircleStrikeModel`(+테스트) · 🔴 코어: `InvulnerabilityCause.SkillAction`(enum 끝 추가 — 기존 값 불변). DataTable Order 4.
+  ⏳ Play: 조준 원 회전·이동 중 조준·조준 중 변신 종료 시 쿨 없음 · 5타 무적·지형 무시 · 공격 중 만료/해제 시 5타 완료 후 종료 · 쓰러짐 즉시 중단.
