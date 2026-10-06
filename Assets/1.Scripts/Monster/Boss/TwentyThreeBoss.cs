@@ -76,6 +76,11 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     //    보스는 밀리지 않는다. 데미지·사망 판정과 HitFlash(피격 색)는 그대로 돈다.
     protected override bool AutoHitReactions => false;
 
+    // 🔴 base 의 animator.speed 관리자에서 빠진다 — 잡기 사이클·카운터 홀드·점프가 자체적으로 쓴다
+    //    (PLAN-monster-anim-speed: 23호 제외). 켜면 매 프레임 그 값을 1 로 덮는다.
+    protected override bool ManagesAnimatorSpeed => false;
+    protected override bool CooldownFromAttackEnd => false;   // 행별 쿨은 시작 기준으로 튜닝돼 있다
+
     // 카운터 리액션(getowned) 길이. AutoHitReactions=false 라 base 의 hitStunDuration 은 보스에서
     // 달리 쓰이지 않으므로 그 값을 리액션 길이로 재사용한다(죽은 필드를 재사용한다).
     float HitReactionDuration => data != null ? Mathf.Max(0.05f, data.hitStunDuration) : 0.4f;
@@ -385,7 +390,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         if (!IsServer)
             return;
 
-        // 공격 슬롯 수 = 테이블 행 수. 행마다 쿨을 등록한다(0 이면 base 의 1/attackSpeed 로 폴백).
+        // 공격 슬롯 수 = 테이블 행 수. 행마다 쿨을 등록한다(0 이면 base 의 attackCooldown 으로 폴백).
         int count = _boss.attacks != null ? _boss.attacks.Length : 0;
         ConfigureAttackSlots(count);
         for (int i = 0; i < count; i++)

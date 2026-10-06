@@ -11,12 +11,14 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 576305eb4d78f0c4eb97b90edc8cae21, type: 3}
   m_Name: MortarBotData
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   archetype: 2
+  rank: 0
   attackDamage: 9
   moveSpeed: 2.5
   chaseSpeed: 3
-  attackSpeed: 0.5
+  attackSpeed: 1
+  attackCooldown: 0.32
   maxHp: 60
   defense: 0
   maxShield: 0
@@ -24,8 +26,11 @@ MonoBehaviour:
   detectionHeightTolerance: 2
   attackRange: 9
   leashRadius: 16
+  retargetInterval: 0
   returnSpeedMultiplier: 5
   turnSpeed: 10
+  avoidanceRadius: 0.3
+  obstacleAvoidance: 2
   projectilePrefab: {fileID: 8845096525963102658, guid: 54c0baf85e460bc478f1db5826ccde56, type: 3}
   projectileSpeed: 13
   projectileLifetime: 4
@@ -38,16 +43,23 @@ MonoBehaviour:
   attackDuration: 4
   attackWindup: 3.5
   cancelWindupIfTargetLeavesRange: 1
+  engageAttackDelay: 0
   maxGroggyCount: 0
   groggyDuration: 3
   startsWithSuperArmor: 0
   hasSuperArmorWhileAttacking: 0
   hitStunDuration: 0.4
   despawnDelay: 2
-  isMidBoss: 0
   animSpeedParam: RunBlend
   attackTrigger: Cast
   attackFinishTrigger: Attack
   hitTrigger: Hit
   groggyBool: 
   deathTrigger: 
+  locomotionState: Movement
+  locomotionClipSpeed: 1.1061218
+  locomotionFullBlendSpeed: 1.5
+  locomotionIdleCycleSeconds: 0.9666667
+  locomotionMoveCycleSeconds: 0.5066667
+  locomotionAnimSpeedRange: {x: 0.5, y: 2.5}
+  animatorControllerOverride: {fileID: 0}

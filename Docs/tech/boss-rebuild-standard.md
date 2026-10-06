@@ -363,7 +363,7 @@ protected const int NoAttack = -1;
 protected int  CurrentAttackSlot { get; set; }          // StartAttack 이 이 슬롯에 쿨 기록
 protected bool CooldownReady(int attackSlot = 0)
 protected void ConfigureAttackSlots(int count)          // 파생이 스폰 시 1회
-protected void SetAttackCooldown(int slot, float sec)   // 0 이하면 1/AttackSpeed 폴백
+protected void SetAttackCooldown(int slot, float sec)   // 0 이하면 MonsterDataSO.attackCooldown 폴백(2026-10-02 — 23호는 시작 기준)
 protected virtual int SelectAttackSlot(float dist)      // -1 = 지금 쓸 게 없다
 ```
 
@@ -401,7 +401,7 @@ BossDataSO : MonsterDataSO
 [공격 테이블]   BossAttackEntry[] attacks
     attackId             BossAttackId   (LeftHook/RightHook/Upper/Grab/Jump/Dash)
     animatorStateName    string         ← ClientRpc CrossFade 대상
-    cooldown             float          ← 0 이면 base attackSpeed 폴백
+    cooldown             float          ← 0 이면 base attackCooldown 폴백(2026-10-02)
     minDistance          float
     maxDistance          float
     ignoreDistanceWindow bool           ← JumpAttack 전용(거리 무관)

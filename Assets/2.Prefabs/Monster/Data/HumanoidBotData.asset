@@ -11,12 +11,14 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 576305eb4d78f0c4eb97b90edc8cae21, type: 3}
   m_Name: HumanoidBotData
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   archetype: 0
+  rank: 0
   attackDamage: 10
   moveSpeed: 3
   chaseSpeed: 4.5
-  attackSpeed: 0.7
+  attackSpeed: 1
+  attackCooldown: 0
   maxHp: 90
   defense: 0
   maxShield: 0
@@ -24,19 +26,40 @@ MonoBehaviour:
   detectionHeightTolerance: 2
   attackRange: 2
   leashRadius: 15
+  retargetInterval: 0
   returnSpeedMultiplier: 5
   turnSpeed: 10
+  avoidanceRadius: 0.3
+  obstacleAvoidance: 2
+  projectilePrefab: {fileID: 0}
+  projectileSpeed: 12
+  projectileLifetime: 4
+  minStandoff: 4
+  projectileArcHeight: 0
+  projectileSplashRadius: 0
+  repositionBetweenAttacks: 0
+  retreatMinDuration: 1.2
+  repositionMinDuration: 1.2
   attackDuration: 1.6
   attackWindup: 0.35
+  cancelWindupIfTargetLeavesRange: 0
+  engageAttackDelay: 0
   maxGroggyCount: 0
   groggyDuration: 3
   startsWithSuperArmor: 0
   hasSuperArmorWhileAttacking: 0
   hitStunDuration: 0.4
   despawnDelay: 2
-  isMidBoss: 0
   animSpeedParam: RunBlend
   attackTrigger: Attack
+  attackFinishTrigger: 
   hitTrigger: Hit
   groggyBool: 
   deathTrigger: 
+  locomotionState: Movement
+  locomotionClipSpeed: 2.4933813
+  locomotionFullBlendSpeed: 2
+  locomotionIdleCycleSeconds: 6.3333335
+  locomotionMoveCycleSeconds: 0.53333336
+  locomotionAnimSpeedRange: {x: 0.5, y: 2.5}
+  animatorControllerOverride: {fileID: 0}

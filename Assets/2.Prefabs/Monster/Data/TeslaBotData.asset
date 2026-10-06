@@ -13,10 +13,12 @@ MonoBehaviour:
   m_Name: TeslaBotData
   m_EditorClassIdentifier: 
   archetype: 1
+  rank: 0
   attackDamage: 8
   moveSpeed: 1
   chaseSpeed: 1
-  attackSpeed: 0.7
+  attackSpeed: 1
+  attackCooldown: 1.14
   maxHp: 55
   defense: 0
   maxShield: 0
@@ -48,7 +50,6 @@ MonoBehaviour:
   hasSuperArmorWhileAttacking: 0
   hitStunDuration: 0.4
   despawnDelay: 2
-  isMidBoss: 0
   animSpeedParam: 
   attackTrigger: Shoot
   attackFinishTrigger: 
@@ -56,4 +57,6 @@ MonoBehaviour:
   groggyBool: 
   deathTrigger: 
   locomotionState: Idle
+  locomotionClipSpeed: 0
+  locomotionAnimSpeedRange: {x: 0.5, y: 2.5}
   animatorControllerOverride: {fileID: 9100000, guid: 706af1a2c1121154f9c87dac8450ac4c, type: 2}
