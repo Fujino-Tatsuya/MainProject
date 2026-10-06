@@ -111,8 +111,6 @@ public sealed class TitleFlowDirector : MonoBehaviour
             _brain.DefaultBlend = blend;
         }
 
-        CopyMainCameraLensToVcamsOnce();
-
         if (_sceneManager == null)
             _sceneManager = FindAnyObjectByType<TitleSceneManager>();
 
@@ -124,24 +122,10 @@ public sealed class TitleFlowDirector : MonoBehaviour
         EnterIdle();
     }
 
-    /// <summary>
-    /// 렌즈(FOV·물리 카메라 값)의 원본 = <b>Main Camera 인스펙터</b>. 시작할 때 <b>한 번만</b> vcam 3대에 복사한다.
-    /// 🔴 왜(팀장 10-06): 메뉴 도착 전에는 CinemachineBrain 이 활성 vcam 의 Lens 를 매 프레임 Main Camera 에
-    ///    덮어써서, 아트가 Main Camera 를 바꿔도 안 먹었다. 복사는 시작 1회뿐이고 이후엔 아무것도 묶지 않는다
-    ///    (도착 후엔 _releaseCameraOnArrive 로 Brain 이 꺼져 Main Camera 를 그대로 만질 수 있다).
-    ///    Play 중 도착 전 구간의 렌즈를 바꾸려면 VCam_* 의 Lens 를, 다음 Play 부터는 Main Camera 를 고치면 된다.
-    /// ⚠️ DoF(F값·초점 거리·초점 길이)는 카메라가 아니라 볼륨의 Depth Of Field 가 정한다(URP 규칙).
-    /// </summary>
-    private void CopyMainCameraLensToVcamsOnce()
-    {
-        Camera cam = _brain != null ? _brain.GetComponent<Camera>() : Camera.main;
-        if (cam == null) return;
-
-        LensSettings lens = LensSettings.FromCamera(cam);
-        if (_vcamFar != null) _vcamFar.Lens = lens;
-        if (_vcamNear != null) _vcamNear.Lens = lens;
-        if (_vcamCloseup != null) _vcamCloseup.Lens = lens;
-    }
+    // 🔴 렌즈(FOV 등)의 원본은 VCam_Far/Near/Closeup 의 **Lens** 다. Main Camera 의 FOV 칸은 CinemachineBrain 이
+    //    에디트 모드에서도([ExecuteAlways]) 활성 vcam 값으로 덮어써서 바꿔도 안 먹는다 — 정상 동작.
+    //    (10-06 "시작 시 Main Camera → vcam 복사"를 넣었다가 되돌렸다: Main Camera 값이 이미 Far 라 Near·Closeup 을 덮었다.)
+    //    심도(F값·초점 거리·초점 길이)는 카메라가 아니라 볼륨의 Depth Of Field 가 정한다(URP 규칙).
 
     private void Update()
     {
