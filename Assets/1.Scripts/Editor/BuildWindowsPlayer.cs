@@ -37,21 +37,36 @@ public static class BuildWindowsPlayer
 
     private const string DefaultOutput = "../MainProjectBuilds/Windows/MainProject.exe";
 
+    private const string DevOutput = "../MainProjectBuilds/WindowsDev/MainProject.exe";
+
     [MenuItem("Build/Windows64 Player (MainFlow)")]
     public static void BuildWindows64FromMenu()
     {
-        Build(ResolveOutputPath(null));
+        Build(ResolveOutputPath(null), BuildOptions.None);
+    }
+
+    /// <summary>
+    /// 측정용 개발 빌드(PLAN-cleanup-optimization §S6). ProfilerHUD·ZonePerfRecorder 는 DEVELOPMENT_BUILD 에서만 살아 있다.
+    /// 프로파일러 자동 연결·딥 프로파일은 켜지 않는다 — 그 자체가 프레임 비용이라 측정을 오염시킨다.
+    /// 출력 폴더를 릴리스와 분리해 덮어쓰지 않는다. 결과 CSV = exe 옆 <c>ZonePerf/</c>.
+    /// ⚠️ 이 메뉴(와 위 릴리스 메뉴)는 <c>BuildPipeline.BuildPlayer</c> 직접 호출이라 데이터 테이블 훅
+    /// (<c>DataTableBuild</c> — Build 버튼에만 걸림)을 거치지 않는다 → xlsx 가 아니라 **인스펙터 값**으로 빌드된다.
+    /// </summary>
+    [MenuItem("Build/Windows64 Player (MainFlow · 측정용 Development)")]
+    public static void BuildWindows64DevFromMenu()
+    {
+        Build(Path.GetFullPath(DevOutput), BuildOptions.Development);
     }
 
     /// <summary>CLI -executeMethod 진입점. 성공 0, 실패 1로 종료한다.</summary>
     public static void BuildWindows64()
     {
         var output = ResolveOutputPath(GetCliArgument("-buildOutput"));
-        var ok = Build(output);
+        var ok = Build(output, BuildOptions.None);
         EditorApplication.Exit(ok ? 0 : 1);
     }
 
-    private static bool Build(string outputPath)
+    private static bool Build(string outputPath, BuildOptions buildOptions)
     {
         var scenes = EditorBuildSettings.scenes
             .Where(s => s.enabled)
@@ -71,7 +86,7 @@ public static class BuildWindowsPlayer
 
         // 활성 빌드 타겟 전환은 CLI의 -buildTarget Win64가 담당한다(에디터 API 의존 축소).
         Debug.Log($"[Build] activeBuildTarget={EditorUserBuildSettings.activeBuildTarget}");
-        Debug.Log($"[Build] output={outputPath}");
+        Debug.Log($"[Build] output={outputPath} options={buildOptions}");
         Debug.Log($"[Build] scenes({scenes.Length}):{Environment.NewLine}  {string.Join(Environment.NewLine + "  ", scenes)}");
 
         var options = new BuildPlayerOptions
@@ -79,8 +94,8 @@ public static class BuildWindowsPlayer
             target = BuildTarget.StandaloneWindows64,
             scenes = scenes,
             locationPathName = outputPath,
-            // 릴리즈 빌드: Development Build / script debugging 미포함.
-            options = BuildOptions.None,
+            // 릴리즈 = None. 측정용 = Development 만(script debugging·프로파일러 연결 미포함).
+            options = buildOptions,
         };
 
         var report = BuildPipeline.BuildPlayer(options);

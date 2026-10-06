@@ -13,7 +13,36 @@ Update this file when a term becomes important enough that future agents or team
 - 인라인 아이콘 = `SkillTooltipGenerated/tooltipIcon_*.png` → 아틀라스 `SkillTooltipAttackIcon.asset`(guid 유지) · TMP `SkillTooltipAttackSprite`: `atk`·`shield`·`cooldown`. 재생성 = `Tools/UI/스킬 툴팁 인라인 아이콘 갱신`(⚠️ 인스펙터에서 바꾼 BX·BY·AD 를 덮어씀).
 - 표기 = 아이콘이 수치 **앞**, 색은 태그에 직접: `<sprite name="shield" color=#74C7EC>{shieldAmount}`. 🔴 속성이 붙으면 **이름에 따옴표 필수** — 없으면 EmojiOne 노란 `?` 로 깨진다(로그 없음). 칼 #F4B860(코드) · 쿨다운 #B8C4D6(코드, 머리줄 `⏱` 대체).
 
-## ▶▶ 다음 세션 인수인계 (2026-10-06 · 경석(Claude)) — 여기부터 읽을 것
+## ▶▶ 다음 세션 인수인계 (2026-10-06 2차 · 경석(Claude)) — 여기부터 읽을 것
+
+**상태**: `development` = `feature/Boss23`(10-06 저녁 빨리 감기 푸시) — S6 측정 도구 + development 2회 병합(거너 연출·붕괴 사망·가렌 애니) + 아래 수정. SVN **r392**(핀 392, check-environment 통과). 전투 EditMode 108/2(기존 실패 2 동일).
+
+**🔴 클라에서 몬스터가 땅에 박혀 보이던 문제(핫스팟 3인 테스트 · PeekABot 받침대 고리만 보임·사격 안 보임) — 수정**
+- 원인: 아트 팩(Robot Sentries) 몬스터 **본마다 kinematic Rigidbody + 외삽(Interpolate=2)**. 클라(NGO)는 프리팹 기본 위치에 만든 뒤 루트를 옮기고 `AutoSyncTransforms=0` 이라 물리가 옮기기 전 자세를 본에 다시 씀 → 본이 **루트 높이 × 거치는 Rigidbody 수** 만큼 아래로 굳음(실측 머리 −7.86 / 예측 −7.85). 호스트는 제자리 생성이라 안 생김. 타이밍 의존이라 지연 환경에서 잦음.
+- 수정: `MonsterBase.DisableBoneRigidbodyInterpolation`(OnNetworkSpawn, 하위 본 Rigidbody 보간 끔, 아트 SVN 무수정). MPPM 혼잡 핫스팟·2.5G 3판 연속 본 이상 0(1,300+ 샘플).
+- ⚠️ 철회한 가설: 로딩 씬과 함께 몬스터 삭제(실측: Loading→DDOL→Map 이동) · 접힌 바인드 포즈 · 컬링. "더 오래 기다리기"는 이 증상의 처방이 아니었음(굳은 자세가 25초간 유지).
+- 별건(유효): 클라가 `AsyncOperation.progress>=0.9` 에서 100% 보고(`NetworkLoadingFlowController.cs:681`) + 서버가 평균 100% 만으로 완료 → 준비 확인 후 시작으로 바꾸는 계획은 **은희 합의 후** 별도.
+- 재현 도구: 메뉴 `Dev/네트워크 지연 (MPPM)` · 툴바 `Dev/Network Lag`(MPPM 인스턴스별 Network Simulator) + `[LagDiag]`·`[LagDiag-Turret]` 진단 로그(각 인스턴스 `Library/VP/mppm*/Logs/Editor.log`). `Assets/1.Scripts/Dev/NetLag/DevNetworkLag.cs`.
+배포용 빌드 = `../MainProjectBuilds/Windows/`(측정기·콘솔 없음 확인) · 측정용 = `../MainProjectBuilds/WindowsDev/`. 실측 표 = [PLAN-cleanup-optimization.md](PLAN-cleanup-optimization.md) §S6.
+
+**이번 세션 결과**
+- 🔴 **GPU 병목 = 4K 해상도.** 개발 빌드 일반 존 GPU: 1080p 2.2~2.5 · 1440p 2.7~3.3 · 4K 4.7~5.0ms(Main 0.4~1.2). → 기본 해상도 **1920×1080**(네이티브 끔, `6df20e8c`). 메시 병합·GRD(CPU 제출 절감)는 우선순위 뒤로.
+- 타이틀 마우스 클릭(빌드만) = `monitor_screen.fbx` Read/Write 꺼짐 → MeshCollider·`textureCoord` 실패. **SVN r392** 로 켬, 빌드 클릭 확인.
+- 로비 전투 HUD = `0.BootStrapScene` 의 `NetworkConfig.PlayerPrefab = Player_Gunner` 오버라이드(민경 `3121b04c`)가 NGO 접속 즉시 자동 생성 → 삭제(`65e3ae92`). 빌드 로비 생성 0건 확인.
+- `FloatingDamageAnchor.worldOffset` 추가 — 23호 머리 위 숫자 위치는 프리팹 `TwentyThree`/`_Solo` 에서 조정(값 미조정).
+
+**남은 일**
+1. 🔴 **시작 존·로딩 화면 GPU 2~3배**(1080p 4.2/5.1ms, 4K 13/15ms) — 해상도와 별개, 다음 최적화 1순위. 로딩 화면 뒤에서 맵이 드로우 528 로 계속 그려짐.
+2. **패스별 GPU 기록이 빈다**(`SystemInfo.supportsGpuRecorder` True 인데 값 0) — `ZonePerfRecorder.ScanPassesIfNeeded` 방식 재검토.
+3. 붕괴 사망(`MonsterCollapseDebris` — 죽을 때마다 조각 GO·Rigidbody·BoxCollider 생성, 풀링 없음) 다수 처치 순간 부하 측정.
+4. `defaultPlayerPrefab`(선택 없을 때 기본 캐릭터) 아직 **Player_Gunner** — 팀장 결정(팔라딘 복구 수정은 권한 거부로 미적용).
+5. 해상도 1080p 가 실제로 뜨는지 확인 — 레지스트리 `HKCU\Software\DefaultCompany\MainProject` 에 이전 4K 저장값 있음(Default 키 비교로 리셋될 것으로 예상, 미확인).
+6. 보류(팀장 10-06): Alt+Tab 처리. ⚠️ 현재 `runInBackground: 0` → 호스트가 Alt+Tab 하면 서버 정지, 30초 후 클라 끊김(`DisconnectTimeoutMS 30000`).
+7. 전달 — **민경**: development 핀 390 인데 거너 코드는 r391 필요(우리 쪽 392 로 해결, development 반영 전까지 깨짐) · `PlayerShieldVfx.OnDestroy` 가 `NetworkBehaviour.OnDestroy` 가림(CS0114) · 부트스트랩 오버라이드 건. **은희/사운드**: `VolumeSlider`·`TitleSceneManager:53` 이 8월에 흐름에서 빠진 `AudioManager` 를 찾아 NRE → 설정 화면 볼륨 슬라이더 미동작. **팀**: `Build/` 메뉴 빌드는 데이터 테이블 훅을 안 거침(인스펙터 값으로 빌드) · VisualSVN 서버 라이선스 만료 경고.
+8. `.claude/commands/coop-agent*.md` 가 development 에서 git 추적 해제되어 병합으로 지워짐 — 백업 = 이 PC 스크래치(세션 종료 시 사라짐). 쓰려면 `~/.claude/commands/` 로 복사.
+9. 이전 남은 일(아래 블록) 중 2·3·4·5·6 그대로.
+
+## ▶▶ 다음 세션 인수인계 (2026-10-06 · 경석(Claude))
 
 **상태**: 전수조사 정리·최적화 S1~S5 끝 → `development` = `feature/Boss23` = **`661cf289`**(푸시). SVN **r381**(핀 381, check-environment 전부 통과).
 상세·실측 = [PLAN-cleanup-optimization.md](PLAN-cleanup-optimization.md) §4 · 정리 노트 = 노션 「개인포트폴리오 > 전수조사 기반 성능 최적화…」(VeyTrace 하위로 옮길 것 — 도구 권한상 직접 못 만듦).
@@ -25,6 +54,10 @@ Update this file when a term becomes important enough that future agents or team
 4. **담당별 목록 전달** — 은희(CONTEXT 아래 📮 목록 + 레거시 Paladin 네트워크 등록·TempPlayer_Armature·Garen 컨트롤러·R1·ToonLit 레거시·벽 투명화 레거시) · 민경(INab Demo Assets — 이펙트 프리팹이 데모 메시 30곳 참조) · 아트(SVN `VFX/**/OldVersion`·`SurfaceV1` 원본·빈 아트 폴더 4).
 5. **미검증 Play** — MPPM(원격 애니·블렌드 고정) · GauntletBot 예고 · 23호 전기 장판 2회차 VFX · 피격 전이 블렌드 고정.
 6. 기존: `BossCounterDataTests` 실패 2(No23 Dash) 팀장 결정 · `TitleSceneManager.cs:53` BGM NRE · `SoulVisualPrefab` 미지정 경고(은희).
+
+## ▶▶ 작업 세션 (2026-10-06 2차 · 경석(Claude) · **S6 존별 실시간 측정 도구**, 브랜치 `feature/Boss23`) — ✅ 완료·커밋(`c445a7bd`) · 빌드 측정 끝(위 인수인계). 실행 = `Dev_Boot.unity` Play(MapScene 직접 Play ✗). 진행·실측 = PLAN §S6 진행
+계획 = [PLAN-cleanup-optimization.md](PLAN-cleanup-optimization.md) §S6(승인 10-06). 예산 = 이 PC 200fps(5.0ms) · 결정은 개발 빌드 숫자 · 이번 범위 = 측정 도구까지 · **존 진입/이탈 때 렌더 설정 전환 안 함**(근거 §S6).
+🔴 **수정 예정 — 동시 수정 금지:** `Dev/Profiler/ProfilerHUD.cs` · 신규 `Dev/Profiler/ZonePerfRecorder.cs` · `Editor/BuildWindowsPlayer.cs`(측정용 Development 메뉴 추가) · `0.Scenes/MainFlow/4.MapScene.unity`(컴포넌트 부착).
 
 ## ▶▶ 작업 세션 (2026-10-06 · 경석(Claude) · **전수조사 정리·최적화 S1~S5**, 브랜치 `feature/Boss23`) — ✅ S1~S5 커밋 · development 반영(10-06)
 계획 = [PLAN-cleanup-optimization.md](PLAN-cleanup-optimization.md)(팀장 결정 §4: 이번 라운드 S1+S2, 은희 영역은 목록만).

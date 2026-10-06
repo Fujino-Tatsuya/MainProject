@@ -3311,6 +3311,7 @@ GameObject:
   - component: {fileID: 882340004}
   - component: {fileID: 882340003}
   - component: {fileID: 1493541741}
+  - component: {fileID: 1493541742}
   m_Layer: 0
   m_Name: ProfilerHUD
   m_TagString: Untagged
@@ -3335,7 +3336,7 @@ MonoBehaviour:
   anchor: 0
   scale: 1
   refreshInterval: 0.2
-  targetFps: 120
+  targetFps: 200
   customMarkers:
   - label: Blur DownH
     markerName: MaskBlur DownH
@@ -4716,6 +4717,22 @@ MonoBehaviour:
   sampleFrames: 120
   alternations: 4
   switchSettleFrames: 30
+--- !u!114 &1493541742
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 882340002}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fb505cbfcda162849ac46d85be1974e6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ZonePerfRecorder
+  budgetFps: 200
+  measureUncapped: 1
+  warmupSeconds: 3
+  showOverlay: 1
 --- !u!1 &1495805556
 GameObject:
   m_ObjectHideFlags: 0
@@ -5202,6 +5219,8 @@ MonoBehaviour:
   losTexels: 360
   losAngleBlur: 24
   losRebuildInterval: 2
+  losRebuildMoveEpsilon: 0.05
+  losForceRebuildSeconds: 0.5
   losMaxDist: 4
   losRayHeight: 1
   losNodesBlock: 1
