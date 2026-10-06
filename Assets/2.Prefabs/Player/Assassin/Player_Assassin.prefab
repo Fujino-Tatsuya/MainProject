@@ -132,9 +132,17 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 8695707879428393118}
     - target: {fileID: 4711829301158223401, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: mainSkill
+      value: 
+      objectReference: {fileID: 298444540163121787}
+    - target: {fileID: 4711829301158223401, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       propertyPath: ultimateSkill
       value: 
       objectReference: {fileID: 3500920581459072486}
+    - target: {fileID: 4711829301158223401, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: alternateSkills.mainSkill
+      value: 
+      objectReference: {fileID: 7536522311454551541}
     - target: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       propertyPath: m_Name
       value: Player_Assassin
@@ -164,6 +172,12 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       insertIndex: -1
       addedObject: {fileID: 3500920581459072486}
+    - targetCorrespondingSourceObject: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 298444540163121787}
+    - targetCorrespondingSourceObject: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 7536522311454551541}
   m_SourcePrefab: {fileID: 100100000, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
 --- !u!1 &768617275354264640 stripped
 GameObject:
@@ -258,6 +272,34 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AssassinTransformSkill
   data: {fileID: 11400000, guid: 923644d9a27227941b696e60117a8aa9, type: 2}
+  hitboxAnchor: {fileID: 0}
+--- !u!114 &298444540163121787
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 768617275354264640}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8f5dfcaf9cf455545b0b9f1391757349, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AssassinDashStrikeSkill
+  data: {fileID: 11400000, guid: 4d2d25fcbaff64e4e9fc85c8e79c3bdf, type: 2}
+  hitboxAnchor: {fileID: 0}
+--- !u!114 &7536522311454551541
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 768617275354264640}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8f5dfcaf9cf455545b0b9f1391757349, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AssassinDashStrikeSkill
+  data: {fileID: 11400000, guid: a6907777c060cbf4fbe547debe6d82ce, type: 2}
   hitboxAnchor: {fileID: 0}
 --- !u!4 &7816451711114395826 stripped
 Transform:

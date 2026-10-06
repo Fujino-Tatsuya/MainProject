@@ -8,7 +8,7 @@ using UnityEngine;
 using Object = UnityEngine.Object;
 
 /// <summary>
-/// PLAN-assassin A6~A7 저작 메뉴. 모델/클립 원본은 건드리지 않고, 재실행 가능한 방식으로 컨트롤러·Armature·Variant·데이터 배선을 맞춘다.
+/// PLAN-assassin A6~A8 저작 메뉴. 모델/클립 원본은 건드리지 않고, 재실행 가능한 방식으로 컨트롤러·Armature·Variant·데이터 배선을 맞춘다.
 /// </summary>
 public static class AssassinShellAuthoring
 {
@@ -26,6 +26,8 @@ public static class AssassinShellAuthoring
     private const string StateDataPath = DataFolder + "/AssassinStateData.asset";
     private const string EnhanceSkillDataPath = DataFolder + "/AssassinEnhanceSkillData.asset";
     private const string TransformSkillDataPath = DataFolder + "/AssassinTransformSkillData.asset";
+    private const string DashStrikeDataPath = DataFolder + "/AssassinDashStrikeSkillData.asset";
+    private const string TransformedDashStrikeDataPath = DataFolder + "/AssassinTransformedDashStrikeSkillData.asset";
     private const string RosterPath = "Assets/9.ScriptableObject/Player/CharacterRoster.asset";
 
     // A7 Animator 상태 — 스킬 데이터 animatorStateName 과 같은 이름이어야 CrossFade 가 맞는다.
@@ -35,6 +37,14 @@ public static class AssassinShellAuthoring
     private const string TransformSkillState = "Assassin_R_Transform";
     private const float EnhanceBuffSpeed = 3f;   // §8.1 Buff 3배속 ≈ 0.5초
     private const float TransformParrySpeed = 1f; // 🔸 기획 수치 없음 — Play 튜닝
+
+    // A8 Q 관통 돌진. 실제 이동은 스킬(0.2초)이 하고 클립은 모양만 — 재생 속도는 기획 수치가 없어
+    // 두 Q 의 행동 종료 시점을 맞추는 값으로 둔다(Combo_Attack_03_04 1.92s ÷ 1.5 ≈ Combo_Attack_02_04 1.28s). 🔸 Play 튜닝.
+    private const string DashStrikeSkillState = "Assassin_Q_DashStrike";
+    private const string TransformedDashStrikeSkillState = "Assassin_Q_DashStrike_Transformed";
+    private const float DashStrikeSpeed = 1f;
+    private const float TransformedDashStrikeSpeed = 1.5f;
+    private const int EnemyHittableLayers = 17664; // Enemy·Projectile·EnemyHurtBox — 가붕이 Q·어쌔신 평타와 같다
 
     private static readonly string[] WaveClips =
     {
@@ -59,13 +69,14 @@ public static class AssassinShellAuthoring
         "Idle", "Idle_Combat", "Run_Combat_Fast_Loop",
     };
 
-    [MenuItem("Tools/Player/Assassin/전체 구성 (A6~A7)")]
+    [MenuItem("Tools/Player/Assassin/전체 구성 (A6~A8)")]
     public static void BuildAll()
     {
         BuildShell();
         AttachBasicAttackAndIdle();
         StampClipEventsAndLoopSettings();
         AttachStateAndSkills();
+        AttachDashStrikeSkills();
         AssetDatabase.SaveAssets();
         Debug.Log($"{Tag} 전체 구성 완료. 오류 로그가 없었는지 확인할 것.");
     }
@@ -260,6 +271,126 @@ public static class AssassinShellAuthoring
 
         RecordAndValidateHash(AssetDatabase.LoadAssetAtPath<GameObject>(VariantPath));
         AssetDatabase.SaveAssets();
+    }
+
+    /// <summary>
+    /// A8 — Q 관통 돌진 일반/변신 부착(같은 컴포넌트 2개, 데이터로 구분), 데이터 SO 2개, mainSkill·alternateSkills[Main] 배선, Animator 상태.
+    /// 데이터는 처음 만들 때만 기본값을 쓰고 재실행 시 튜닝 값을 유지한다. 컴포넌트는 데이터 참조로 찾아 다시 쓴다.
+    /// </summary>
+    [MenuItem("Tools/Player/Assassin/5. Q 관통 돌진 부착 + 데이터 (A8)")]
+    public static void AttachDashStrikeSkills()
+    {
+        if (AssetDatabase.LoadAssetAtPath<GameObject>(VariantPath) == null)
+        {
+            Debug.LogError($"{Tag} Variant가 없다. 먼저 1번 메뉴를 실행할 것: {VariantPath}");
+            return;
+        }
+
+        EnsureFolder(DataFolder);
+        AssassinDashStrikeSkillData normalData =
+            EnsureAsset<AssassinDashStrikeSkillData>(DashStrikeDataPath, out bool normalCreated);
+        if (normalCreated)
+            InitializeDashStrikeData(normalData, 5f, "Combo_Attack_02_04", DashStrikeSpeed, DashStrikeSkillState);
+
+        AssassinTransformedDashStrikeSkillData transformedData =
+            EnsureAsset<AssassinTransformedDashStrikeSkillData>(TransformedDashStrikeDataPath, out bool transformedCreated);
+        if (transformedCreated)
+            InitializeDashStrikeData(transformedData, 3f, "Combo_Attack_03_04", TransformedDashStrikeSpeed, TransformedDashStrikeSkillState);
+
+        GameObject root = PrefabUtility.LoadPrefabContents(VariantPath);
+        try
+        {
+            List<AssassinDashStrikeSkill> dashes = new List<AssassinDashStrikeSkill>(root.GetComponents<AssassinDashStrikeSkill>());
+            AssassinDashStrikeSkill normal = TakeDashWithData(dashes, normalData);
+            AssassinDashStrikeSkill transformed = TakeDashWithData(dashes, transformedData);
+            normal ??= TakeAnyDash(dashes) ?? root.AddComponent<AssassinDashStrikeSkill>();
+            transformed ??= TakeAnyDash(dashes) ?? root.AddComponent<AssassinDashStrikeSkill>();
+            foreach (AssassinDashStrikeSkill extra in dashes)
+            {
+                Debug.LogWarning($"{Tag} 남는 AssassinDashStrikeSkill 제거.", root);
+                Object.DestroyImmediate(extra, true);
+            }
+
+            SetReference(normal, "data", normalData);
+            SetReference(transformed, "data", transformedData);
+
+            PlayerSkillController skills = root.GetComponent<PlayerSkillController>();
+            SetReference(skills, "mainSkill", normal);
+            SetReference(skills, "alternateSkills.mainSkill", transformed);
+
+            PrefabUtility.SaveAsPrefabAsset(root, VariantPath);
+            Debug.Log($"{Tag} A8 Q 관통 돌진 부착/갱신: mainSkill=일반, alternateSkills.mainSkill=변신 ({VariantPath})");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+
+        AnimatorController controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(ControllerPath);
+        if (controller != null)
+        {
+            BuildAnimator(controller);
+            ValidateSkillState(controller, normalData);
+            ValidateSkillState(controller, transformedData);
+        }
+        else
+        {
+            Debug.LogError($"{Tag} Animator Controller가 없다. 먼저 1번 메뉴를 실행할 것: {ControllerPath}");
+        }
+
+        RecordAndValidateHash(AssetDatabase.LoadAssetAtPath<GameObject>(VariantPath));
+        AssetDatabase.SaveAssets();
+    }
+
+    // 컨트롤러는 animatorStateName 의 해시로 CrossFade 한다 — 같은 해시의 상태가 0층에 있어야 한다.
+    private static void ValidateSkillState(AnimatorController controller, PlayerSkillData data)
+    {
+        if (data == null)
+            return;
+
+        int hash = Animator.StringToHash(data.AnimatorStateName);
+        foreach (ChildAnimatorState child in controller.layers[0].stateMachine.states)
+        {
+            if (child.state.nameHash == hash)
+            {
+                Debug.Log($"{Tag} {data.name} → Animator 상태 '{data.AnimatorStateName}' 해시 {hash} 확인.");
+                return;
+            }
+        }
+
+        Debug.LogError($"{Tag} {data.name} 의 animatorStateName '{data.AnimatorStateName}' 상태가 컨트롤러에 없다.");
+    }
+
+    private static void InitializeDashStrikeData(
+        AssassinDashStrikeSkillData data, float cooldown, string clipName, float speed, string animatorStateName)
+    {
+        // 쿨타임 = 돌진 시작(서버 승인) — 자동 커밋. 회전은 입력 방향으로 즉시 맞춘다.
+        InitializeSkillData(data, cooldown, commitManually: false,
+            maxActiveDuration: ClipDuration(LoadClip(clipName), speed) + 0.3f,
+            animatorStateName: animatorStateName, snapRotation: true);
+
+        SerializedObject so = new SerializedObject(data);
+        so.FindProperty("attackDamageMultiplier").floatValue = 1.5f;
+        so.FindProperty("hittableLayers").intValue = EnemyHittableLayers;
+        so.ApplyModifiedPropertiesWithoutUndo();
+        EditorUtility.SetDirty(data);
+    }
+
+    private static AssassinDashStrikeSkill TakeDashWithData(List<AssassinDashStrikeSkill> dashes, PlayerSkillData data)
+    {
+        AssassinDashStrikeSkill found = dashes.Find(d => d.Data == data);
+        if (found != null)
+            dashes.Remove(found);
+        return found;
+    }
+
+    private static AssassinDashStrikeSkill TakeAnyDash(List<AssassinDashStrikeSkill> dashes)
+    {
+        if (dashes.Count == 0)
+            return null;
+        AssassinDashStrikeSkill first = dashes[0];
+        dashes.RemoveAt(0);
+        return first;
     }
 
     private static void InitializeSkillData(
@@ -462,9 +593,18 @@ public static class AssassinShellAuthoring
         transformSkill.speed = TransformParrySpeed;
         EnsureReturnToIdleTransitions(transformSkill, idle, combatIdle);
 
+        // A8: Q 관통 돌진 일반/변신 — 이동은 스킬이 하므로 클립은 모양만(루트모션 꺼짐).
+        AnimatorState dashStrike = EnsureState(sm, DashStrikeSkillState, LoadClip("Combo_Attack_02_04"));
+        dashStrike.speed = DashStrikeSpeed;
+        EnsureReturnToIdleTransitions(dashStrike, idle, combatIdle);
+
+        AnimatorState transformedDashStrike = EnsureState(sm, TransformedDashStrikeSkillState, LoadClip("Combo_Attack_03_04"));
+        transformedDashStrike.speed = TransformedDashStrikeSpeed;
+        EnsureReturnToIdleTransitions(transformedDashStrike, idle, combatIdle);
+
         EditorUtility.SetDirty(controller);
         AssetDatabase.SaveAssets();
-        Debug.Log($"{Tag} Animator 구성: Idle 2, Run Start/Loop/Stop, Dodge, Interrupt, Wave 4, 강타·변신 묶음, E Buff·R Parry 상태");
+        Debug.Log($"{Tag} Animator 구성: Idle 2, Run Start/Loop/Stop, Dodge, Interrupt, Wave 4, 강타·변신 묶음, E Buff·R Parry·Q 돌진 2 상태");
     }
 
     private static GameObject EnsureArmature(AnimatorController controller)

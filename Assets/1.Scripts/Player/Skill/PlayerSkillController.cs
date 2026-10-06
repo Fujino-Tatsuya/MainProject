@@ -439,6 +439,27 @@ public class PlayerSkillController : BaseNetworkBehaviour
         MirrorCooldownToOwner(skillIndex);
     }
 
+    /// <summary>
+    /// [시뮬레이션 피어] 실행 중 스킬의 오너 권위 결과(어쌔신 Q 의 벽 조기 종료 거리 등)를 서버에 보고한다.
+    /// 서버(호스트·오프라인)는 바로, 원격 오너는 RPC 로 넘긴다. 실행 중인 그 스킬에만 전달하고 값 검증은 스킬이 한다.
+    /// </summary>
+    public void ReportOwnerSkillResult(PlayerSkillBase skill, float value)
+    {
+        int skillIndex = GetSkillIndex(skill);
+        if (skillIndex == InvalidSkillIndex)
+            return;
+
+        if (HasGameplayAuthority)
+        {
+            if (activeSkill == skill)
+                skill.OnOwnerResultReported(value);
+            return;
+        }
+
+        if (IsOwner)
+            NotifySkillOwnerResultRpc(skillIndex, value);
+    }
+
     // 애니메이션 이벤트 (릴레이 경유). 판정은 서버만 처리한다.
     public void HandleAnimationEvent(SkillAnimationEventType eventType)
     {
@@ -674,6 +695,17 @@ public class PlayerSkillController : BaseNetworkBehaviour
 
         if (activeSkill != null && activeSkill.ConsumesPrimaryInput)
             activeSkill.OnPrimaryPressed(ResolveDirection(direction));
+    }
+
+    [Rpc(SendTo.Server)]
+    private void NotifySkillOwnerResultRpc(int skillIndex, float value, RpcParams rpcParams = default)
+    {
+        if (rpcParams.Receive.SenderClientId != OwnerClientId)
+            return;
+
+        PlayerSkillBase skill = GetSkillByIndex(skillIndex);
+        if (skill != null && skill == activeSkill)
+            skill.OnOwnerResultReported(value);
     }
 
     // ── RPC (서버 → 클라) ──
