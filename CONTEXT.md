@@ -8,6 +8,12 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-10-07 · 은희(Claude) · **은희 PC Unity MCP → 공식 MCP 전환**(개인 환경, 팀 파일 무변경), 브랜치 `feature/Assassin`) — ✅ 완료
+- 원인(Codex 분석): 경석 포크 `McpServer.OnAfterAssemblyReload()` 가 머신 전역 `EditorPrefs("MCP_Port")` 로 먼저 Start → 리로드마다 다른 워크트리 포트 선점·재시도 10회 소진 정지. 포크 수정은 경석 영역이라 미착수.
+- 은희 PC 4 워크트리에 `com.unity.ai.assistant`(2.20.0-pre.2) 임베디드(git exclude, `packages-lock.json` skip-worktree) · 각 `.mcp.json` `unity` = `relay_win.exe --mcp --project-path <워크트리>` · codex-watcher `-c` 로 레인 project-path · claude-alt 프롬프트 갱신. 도구 = `Unity_RunCommand`(C# 실행)·`Unity_GetConsoleLogs`.
+- 🔸 Codex/claude-alt: Refresh = `AssetDatabase.Refresh()`, 메뉴 = `EditorApplication.ExecuteMenuItem`, Play 진입 금지(도구 차단 없음). 리로드 중 "Unity not detected" 는 ~10초 뒤 재호출.
+- 같이 커밋: `99d99119` preloadedAssets 죽은 guid 제거 · `ba24ac2e` link.xml 부산물 제거.
+
 ## ▶▶ 작업 세션 (2026-10-07 · 은희(Claude) · **팔라딘 평타 전진 복구 + 공격속도 ×1.2 + 간파 선딜 0.25**, 브랜치 `fix/PaladinDAForward`) — 계획 [PLAN-paladin-da.md](PLAN-paladin-da.md) ✅ 승인 · ✅ C1~C4 구현(진행 = PLAN §7) · SVN **r404** 같이 받을 것 · ⏳ 은희 Play · 미푸시
 - 🔴 **수정 예정 — 동시 수정 금지**: `Player/DefaultAttackController.cs`·`DefaultAttackData.cs`·`4.Animations/Player/PlayerAnimatorController.controller`·`Garen_Default_Attack_1~4.anim`·`9.ScriptableObject/Player/Garen/PlayerDefaultAttackData.asset`·`FirstMeleeInterruptSkillData.asset`·`GameData.xlsx`(SVN 잠금).
 
