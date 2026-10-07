@@ -12,7 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 01485e7f54864f0b8f55e44ed59347f1, type: 3}
   m_Name: FloatingDamageSettings
   m_EditorClassIdentifier: Assembly-CSharp::FloatingDamageSettings
-  displayFilter: 1
+  displayFilter: 2
+  teammateScaleMultiplier: 0.75
+  teammateAlpha: 0.78431374
   referenceResolution: {x: 1920, y: 1080}
   canvasSortingOrder: 50
   screenEdgePadding: {x: 60, y: 30}
