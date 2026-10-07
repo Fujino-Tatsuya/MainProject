@@ -3,12 +3,15 @@
 ## 브랜치 전략
 - `main`(보호) ← `development` ← `feature/<area>-<요약>`
 - 현재 브랜치: `feature/Player`, `feature/Wells&No.23`(보스), `feature/Camera`, `Hotfix`, `development`
-- 작은 PR 권장. `development`에 모으고, 안정화 시점에 `main`으로.
+- 작업 단위는 작게. `development`에 모으고, 안정화 시점에 `main`으로.
 
-## PR 규칙
-- **팀장(경석)이 리뷰 후 머지.** 별도 템플릿 파일 없이, PR 설명에 아래만 적으면 충분:
-  - 목적/변경 요약, 테스트 방법(멀티면 MPPM 인원), 필요 시 스크린샷/영상
-  - 체크: 씬/프리팹 단독 편집 · 네트워크 권한 준수 · `Packages/` 변경 시 manifest+lock 포함 · 대용량 아트는 SVN
+## 병합 규칙 (PR 없음)
+- **PR 을 쓰지 않는다.** 각자 `feature/<area>` 에서 작업한 뒤 **본인이 직접 `development` 에 병합·푸시**한다.
+  - 병합 커밋 메시지: `Merge feature/<X> into development — <요약>` (기존 관례).
+  - 병합 전: `origin/development` 를 먼저 feature 에 병합해 충돌을 feature 쪽에서 해결 · 컴파일/EditMode 통과 확인.
+  - 체크: 씬/프리팹 단독 편집 · 네트워크 권한 준수 · `Packages/` 변경 시 manifest+lock 포함 · 대용량 아트는 SVN(핀 갱신 포함)
+- **다른 담당 영역을 건드렸으면 문서로 공유한다** — 리뷰 대신 `Docs/tech/handoff-<주제>.md`(받는 사람·바뀐 파일·바뀐 규칙)
+  + 관련 기술 문서(예: `boss-rebuild-standard.md`) 갱신. `CONTEXT.md` 작업 세션에도 한 줄.
 - 코어 인터페이스(UnitBase/상태이상/네트워크 권한) 변경은 **사전 합의**.
 
 ## Unity 협업 세팅 (필수)
