@@ -13,6 +13,7 @@ Update this file when a term becomes important enough that future agents or team
 - 은희 PC 4 워크트리에 `com.unity.ai.assistant`(2.20.0-pre.2) 임베디드(git exclude, `packages-lock.json` skip-worktree) · 각 `.mcp.json` `unity` = `relay_win.exe --mcp --project-path <워크트리>` · codex-watcher `-c` 로 레인 project-path · claude-alt 프롬프트 갱신. 도구 = `Unity_RunCommand`(C# 실행)·`Unity_GetConsoleLogs`.
 - 🔸 Codex/claude-alt: Refresh = `AssetDatabase.Refresh()`, 메뉴 = `EditorApplication.ExecuteMenuItem`, Play 진입 금지(도구 차단 없음). 리로드 중 "Unity not detected" 는 ~10초 뒤 재호출.
 - 같이 커밋: `99d99119` preloadedAssets 죽은 guid 제거 · `ba24ac2e` link.xml 부산물 제거.
+- ✅ 10-07 스모크 테스트(MainProject 레인, 읽기 전용): Codex(서버명 `unity_mcp`)·claude-alt(`unity`, 지연 로드 → ToolSearch) 둘 다 MainProject 에디터에 정확히 붙음 · Refresh·컴파일 상태·콘솔 OK. ⏳ 도메인 리로드 후 재연결은 미검증(변경 없어 리로드 안 일어남) — 첫 `.cs` 위임 때 확인.
 
 ## ▶▶ 작업 세션 (2026-10-07 · 은희(Claude) · **팔라딘 평타 전진 복구 + 공격속도 ×1.2 + 간파 선딜 0.25**, 브랜치 `fix/PaladinDAForward`) — 계획 [PLAN-paladin-da.md](PLAN-paladin-da.md) ✅ 승인 · ✅ C1~C4 구현(진행 = PLAN §7) · SVN **r404** 같이 받을 것 · ⏳ 은희 Play · 미푸시
 - 🔴 **수정 예정 — 동시 수정 금지**: `Player/DefaultAttackController.cs`·`DefaultAttackData.cs`·`4.Animations/Player/PlayerAnimatorController.controller`·`Garen_Default_Attack_1~4.anim`·`9.ScriptableObject/Player/Garen/PlayerDefaultAttackData.asset`·`FirstMeleeInterruptSkillData.asset`·`GameData.xlsx`(SVN 잠금).
