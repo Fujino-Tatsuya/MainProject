@@ -1279,11 +1279,11 @@ public static class AssassinShellAuthoring
         SerializedProperty targetEntry = entries.GetArrayElementAtIndex(target);
         targetEntry.FindPropertyRelative("displayName").stringValue = "어쌔신";
         targetEntry.FindPropertyRelative("playerPrefab").objectReferenceValue = variant;
-        targetEntry.FindPropertyRelative("portrait").objectReferenceValue = null;
-        targetEntry.FindPropertyRelative("available").boolValue = false;
+        // 10-07 로비 선택 노출(은희) — 다시 돌려도 선택 가능 상태·초상화를 되돌리지 않는다.
+        targetEntry.FindPropertyRelative("available").boolValue = true;
         so.ApplyModifiedPropertiesWithoutUndo();
         EditorUtility.SetDirty(roster);
-        Debug.Log($"{Tag} CharacterRoster[{target}] = 어쌔신, available=false: {RosterPath}");
+        Debug.Log($"{Tag} CharacterRoster[{target}] = 어쌔신, available=true: {RosterPath}");
     }
 
     private static void RecordAndValidateHash(GameObject variant)
