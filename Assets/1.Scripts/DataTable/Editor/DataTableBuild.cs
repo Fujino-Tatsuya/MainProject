@@ -77,7 +77,9 @@ public static class DataTableBuild
             }
             else
             {
-                Debug.LogError($"{LogPrefix}빌드 후 {failed}개를 원복하지 못했다 — {DataTableApplier.BackupFolder} 의 백업을 쓰거나 git 으로 되돌릴 것.");
+                // 빌드 직후엔 에디터가 파일을 쥐고 있어 실패하지만 다음 틱엔 풀린다 — 남은 백업으로 한 번 더 되돌린다.
+                Debug.LogWarning($"{LogPrefix}빌드 후 {failed}개를 원복하지 못했다 — 다음 에디터 틱에 다시 시도한다.");
+                EditorApplication.delayCall += RestorePendingBuildBackup;
             }
         }
     }
