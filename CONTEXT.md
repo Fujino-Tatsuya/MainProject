@@ -8,7 +8,7 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 작업 세션 (2026-10-07 · 은희(Claude+Codex+claude-alt) · **결과 화면 플레이어별 통계**, 브랜치 `feature/ResultStats`) — 계획 [PLAN-result-stats.md](PLAN-result-stats.md) ✅ 승인 · ✅ 1단계 코드·테스트·문서(claude-alt 재위임, 🔴 Unity 컴파일·EditMode 미실행 — MCP 없음) → ⏳ 2단계 ResultScene UI([result-stats-ui-setup.md](Docs/tech/result-stats-ui-setup.md))
+## ▶▶ 작업 세션 (2026-10-07 · 은희(Claude+Codex+claude-alt) · **결과 화면 플레이어별 통계**, 브랜치 `feature/ResultStats`) — 계획 [PLAN-result-stats.md](PLAN-result-stats.md) ✅ 승인 · ✅ 1단계 코드(`0c60bb7c`, 컴파일 에러 0 · EditMode 21/21) · ✅ 2단계 ResultScene UI(저작 메뉴 `Tools/UI/Authoring/Result Stats Rows`, 멱등 · 행 프리팹 `2.Prefabs/UI/Result/ResultPlayerRow.prefab`) → ⏳ 은희 MPPM 3인 Play(클리어/전멸/ExitButton) · 미푸시
 - 🔴 **수정 예정 — 동시 수정 금지**: `Managers/SessionStatsTracker.cs`·`SessionResult.cs`·`MapSceneManager.cs`·`UI/ResultStatsView.cs`·`Unit/Unit.cs`(ApplyHealthDamage 이벤트)·`Player/Life/PlayerLifeCycleController.cs`(서버 정적 통지)·`Boss/TwentyThreeBoss.cs`·`GauntletBot.cs`·`SpinnerBot.cs`·`WallBot.cs`(간파 성공 이벤트 1줄씩 — 경석 공유 = [handoff](Docs/tech/handoff-result-stats-monster-hooks.md))·`5.ResultScene.unity`(2단계). `MonsterBase.cs`·`PartyWipeWatcher.cs` 는 결국 안 바뀜(getter 는 `Unit`).
 - 신규: `Unit/CombatStatsEvents.cs`·`Managers/SessionStatsAggregator.cs`·`SessionResultPayload.cs`·`UI/ResultPlayerRowView.cs`·테스트 `Managers/Editor/*` + 러너 `Tools/Tests/결과 통계 EditMode 테스트 실행`.
 - 팀 규칙 변경(10-07 은희): **PR 없음** — 본인이 `development` 직접 병합, 타 영역 변경은 `Docs/tech/handoff-*.md` 로 공유([workflow.md](Docs/tech/workflow.md)).

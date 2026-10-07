@@ -2,6 +2,10 @@
 
 > 계획 = [PLAN-result-stats.md](../../PLAN-result-stats.md) 2단계. 1단계(코드)는 `feature/ResultStats` 에 들어가 있다.
 > 이 문서는 **`5.ResultScene.unity` 와 행 프리팹을 어떻게 만들지**만 적는다. 코드는 이미 이 이름·필드를 기대한다.
+>
+> ✅ **2026-10-07 적용됨** — 저작 메뉴 `Tools/UI/Authoring/Result Stats Rows`
+> (`Assets/1.Scripts/UI/Editor/ResultStatsRowsAuthoring.cs`, 두 번 돌려 프리팹·씬 바이트 동일 확인).
+> 열 폭·색·위치는 그 스크립트 상단 상수에서 고치고 메뉴를 다시 돌린다. 슬롯 열 제목은 비워 뒀다.
 
 ## 현재 씬 (2026-10-07 실측, `Assets/0.Scenes/MainFlow/5.ResultScene.unity`)
 `Canvas` 아래 `ResultStats`(= `ResultStatsView` 가 붙은 오브젝트로 추정 — 저작 메뉴에서 컴포넌트로 찾을 것)와
