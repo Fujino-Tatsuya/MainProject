@@ -8,6 +8,11 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ QA 워크트리 (2026-10-07 · 은희(Claude) · **결과 통계 ML-Agent QA**, 브랜치 `qa/ResultStats` = `feature/ResultStats` + QA 오버레이) — 이 브랜치는 development 로 병합하지 않는다
+- QA 오버레이 = `Assets/1.Scripts/QA/**` · `Assets/ML-Agents/**` · manifest `com.unity.ml-agents` 한 줄(옛 `MainProject-MLAgent` 브랜치 `7c2d3d70` 에서 가져옴, 옛 브랜치는 그대로 보존). 9월 `PlayerMovement` 진단 로그는 안 가져옴.
+- 🆕 `QAResultFlow` + 설정 `Tools/QA/Settings ▸ 결과 화면 경로 모드`: Play 시간 뒤 호스트가 판을 끝내 결과 화면까지 간다(사이클 1=중도 종료 `GoToResultButton`, 2=전멸 서버 강제 사망·Soul 부활 반복, 3=클리어 `ForceStartEncounter` → 호스트 명의로 보스 타격). 각 피어 리포트 폴더에 `result-stats.md`(SessionResult·화면 행·호스트 독립 집계 대조·QA 주입 피해/사망).
+- 권장 설정: 3인 · 반복 3 · Play 60초. Play 는 사람만(MPPM).
+
 ## ▶▶ 작업 세션 (2026-10-07 · 은희(Claude+Codex+claude-alt) · **결과 화면 플레이어별 통계**, 브랜치 `feature/ResultStats`) — 계획 [PLAN-result-stats.md](PLAN-result-stats.md) ✅ 승인 · ✅ 1단계 코드(`0c60bb7c`, 컴파일 에러 0 · EditMode 21/21) · ✅ 2단계 ResultScene UI(저작 메뉴 `Tools/UI/Authoring/Result Stats Rows`, 멱등 · 행 프리팹 `2.Prefabs/UI/Result/ResultPlayerRow.prefab`) → ⏳ 은희 MPPM 3인 Play(클리어/전멸/ExitButton) · 미푸시
 - 🔴 **수정 예정 — 동시 수정 금지**: `Managers/SessionStatsTracker.cs`·`SessionResult.cs`·`MapSceneManager.cs`·`UI/ResultStatsView.cs`·`Unit/Unit.cs`(ApplyHealthDamage 이벤트)·`Player/Life/PlayerLifeCycleController.cs`(서버 정적 통지)·`Boss/TwentyThreeBoss.cs`·`GauntletBot.cs`·`SpinnerBot.cs`·`WallBot.cs`(간파 성공 이벤트 1줄씩 — 경석 공유 = [handoff](Docs/tech/handoff-result-stats-monster-hooks.md))·`5.ResultScene.unity`(2단계). `MonsterBase.cs`·`PartyWipeWatcher.cs` 는 결국 안 바뀜(getter 는 `Unit`).
 - 신규: `Unit/CombatStatsEvents.cs`·`Managers/SessionStatsAggregator.cs`·`SessionResultPayload.cs`·`UI/ResultPlayerRowView.cs`·테스트 `Managers/Editor/*` + 러너 `Tools/Tests/결과 통계 EditMode 테스트 실행`.
