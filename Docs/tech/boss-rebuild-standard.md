@@ -148,6 +148,11 @@ OnAttackHit 누락  → 히트 없음.  폴백을 넣으면 이벤트 추가 후
 - AoE 는 `HashSet<Unit>` 으로 유닛당 1회 + 자기 자신 제외.
 - 서버: FSM·타게팅·이동·`AttackId`·`AttackPhase`·히트 판정·데미지·그로기·사망·투사체/장판 생성.
   클라: 애니·VFX·SFX만.
+- **간파(카운터) 성공 = 결과 화면 통계 이벤트 1줄** (2026-10-07). 간파 창을 쓰는 보스·중간보스는 **성공이 확정되는
+  분기에서만** `CombatStatsEvents.RaiseServerCounterSucceeded(this, 공격자 clientId)` 를 부른다 — 창 밖 인터럽트·
+  그로기 누적·송전기 전멸 같은 다른 그로기 경로에서는 부르지 않는다. 공격자는 `TakeDamage(AttackInfo)` 안이면
+  `DamageAttackerClientId`, `base.ReceiveAttack` 이 끝난 뒤면 `GetAttackerClientId(hitContext)`(23호 선례).
+  판정에는 관여하지 않는다. 상세: [handoff-result-stats-monster-hooks.md](handoff-result-stats-monster-hooks.md).
 
 #### 🔴 `Unit.TakeDamage(AttackInfo)` 는 CC 필드를 안 읽는다
 
@@ -305,6 +310,7 @@ OnAttackHit 누락  → 히트 없음.  폴백을 넣으면 이벤트 추가 후
 - [ ] 액션 상태 복귀 전이에 **exitTime 을 반드시 걸 것**
 - [ ] **`OnNetworkSpawn`** 애니메이터 계약 검증 → `LogError` (`Awake` 는 참조가 아직 없어 무효 — §3.2)
 - [ ] `NetworkManager` NetworkPrefabs 등록
+- [ ] 간파 창이 있으면 **성공 분기에** `CombatStatsEvents.RaiseServerCounterSucceeded` 1줄 (§3.4 — 없으면 결과 화면 간파 수가 0)
 
 **베낄 가치가 있는 플레이어 규약 2개**
 

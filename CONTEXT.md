@@ -8,8 +8,9 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 작업 세션 (2026-10-07 · 은희(Claude+Codex+claude-alt) · **결과 화면 플레이어별 통계**, 브랜치 `feature/ResultStats`) — 계획 [PLAN-result-stats.md](PLAN-result-stats.md) ✅ 승인 · ⏳ 1단계 Codex(코드·테스트·문서) → 2단계 claude-alt(ResultScene UI, MCP 3001)
-- 🔴 **수정 예정 — 동시 수정 금지**: `Managers/SessionStatsTracker.cs`·`SessionResult.cs`·`MapSceneManager.cs`·`PartyWipeWatcher.cs`·`UI/ResultStatsView.cs`·`Unit/Unit.cs`(ApplyHealthDamage 이벤트)·`Monster/MonsterBase.cs`·`Boss/TwentyThreeBoss.cs`·`GauntletBot.cs`·`SpinnerBot.cs`·`WallBot.cs`(간파 성공 이벤트 1줄씩 — 경석 공유 = handoff 문서)·`5.ResultScene.unity`(2단계).
+## ▶▶ 작업 세션 (2026-10-07 · 은희(Claude+Codex+claude-alt) · **결과 화면 플레이어별 통계**, 브랜치 `feature/ResultStats`) — 계획 [PLAN-result-stats.md](PLAN-result-stats.md) ✅ 승인 · ✅ 1단계 코드·테스트·문서(claude-alt 재위임, 🔴 Unity 컴파일·EditMode 미실행 — MCP 없음) → ⏳ 2단계 ResultScene UI([result-stats-ui-setup.md](Docs/tech/result-stats-ui-setup.md))
+- 🔴 **수정 예정 — 동시 수정 금지**: `Managers/SessionStatsTracker.cs`·`SessionResult.cs`·`MapSceneManager.cs`·`UI/ResultStatsView.cs`·`Unit/Unit.cs`(ApplyHealthDamage 이벤트)·`Player/Life/PlayerLifeCycleController.cs`(서버 정적 통지)·`Boss/TwentyThreeBoss.cs`·`GauntletBot.cs`·`SpinnerBot.cs`·`WallBot.cs`(간파 성공 이벤트 1줄씩 — 경석 공유 = [handoff](Docs/tech/handoff-result-stats-monster-hooks.md))·`5.ResultScene.unity`(2단계). `MonsterBase.cs`·`PartyWipeWatcher.cs` 는 결국 안 바뀜(getter 는 `Unit`).
+- 신규: `Unit/CombatStatsEvents.cs`·`Managers/SessionStatsAggregator.cs`·`SessionResultPayload.cs`·`UI/ResultPlayerRowView.cs`·테스트 `Managers/Editor/*` + 러너 `Tools/Tests/결과 통계 EditMode 테스트 실행`.
 - 팀 규칙 변경(10-07 은희): **PR 없음** — 본인이 `development` 직접 병합, 타 영역 변경은 `Docs/tech/handoff-*.md` 로 공유([workflow.md](Docs/tech/workflow.md)).
 
 ## ▶▶ 작업 세션 (2026-10-06 · 은희(Claude+Codex) · **3번째 캐릭터 어쌔신**, 브랜치 `feature/Assassin`) — 계획 [PLAN-assassin.md](PLAN-assassin.md) ✅ 승인 · ✅ A0~A10·A12(`0294cb47`, 진행 = PLAN §8) · ⏸ A11 백어택(경석 OK 대기) · ⏳ A13 xlsx · SVN **r403** 같이 받을 것(단검·GameData.xlsx Assassin 시트) · A7~ 은 claude-alt(다른 계정 Claude) 위임 · ⏳ 은희 Play 회귀(A1~A5) + 어쌔신 전 키트

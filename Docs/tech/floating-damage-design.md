@@ -35,6 +35,11 @@
   - 실드 우선 흡수 → 잔여만 HP로. 즉 **HP 감소량 ≠ AttackInfo.damage**
 - [Unit.cs:100](Assets/1.Scripts/Unit/Unit.cs:100) 결과를 `_currentHp.Value`(NetworkVariable, Write=Server)에 반영.
 - 특수 진입점: `ApplyDirectHealthDamage`(방어/실드 무시), `ApplyMaxHealthPercentDamage`, `ApplyCurrentHealthPercentDamage` — Vent 등 해저드가 사용.
+- (2026-10-07 결과 화면 통계) `ApplyHealthDamage` 는 체력 반영 뒤·사망 통지(`NotifyDeathTransition`) **전에**
+  서버 정적 이벤트 `CombatStatsEvents.ServerDamageApplied(대상, 공격자 clientId, HP+실드 실제 감소량, 체력 0 도달)` 를 낸다.
+  실제 감소량은 체력 클램프 **후** 값이라 막타 초과분이 빠진다(표시용 `ClientDamageDealtClientRpc` 는 클램프 전 값 — 둘은 다르다).
+  읽기 전용 발행이라 판정 무수정 원칙은 그대로다. 구독자가 없으면 null 검사 한 번(할당 0). 소비자 = `SessionStatsTracker`.
+  상세: [PLAN-result-stats.md](../../PLAN-result-stats.md), [handoff-result-stats-monster-hooks.md](handoff-result-stats-monster-hooks.md).
 
 **함의:** 클라이언트가 `AttackInfo.damage`로 숫자를 추정하면 방어력·실드 때문에 실제와 어긋난다. 숫자는 서버 결과에서 와야 한다.
 

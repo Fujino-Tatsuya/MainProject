@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
@@ -8,6 +9,9 @@ public class MapSceneManager : NemoSceneManager
 {
     // 호스트→클라 전환 신호. NetworkLoadingFlowController와 동일한 CustomMessaging 방식.
     private const string GoToResultMessageName = "MapScene.GoToResult";
+
+    // 수신 페이로드 행 버퍼(SessionResult.Capture 가 복사해 가므로 재사용한다).
+    private static readonly List<PlayerSessionStats> ReceivedPlayerRows = new List<PlayerSessionStats>();
 
     [Header("Buttons")]
     [SerializeField] private Button resultButton; // ExitButton — 호스트/오프라인만 GoToResult 개시
@@ -92,6 +96,10 @@ public class MapSceneManager : NemoSceneManager
             SetWarningPanel(true);
             return;
         }
+
+        // ExitButton(중도 종료)도 누른 시점까지의 집계값으로 확정한다. 전멸·클리어가 먼저 확정했으면
+        // 첫 확정이 이기므로 그 결과가 그대로 간다.
+        SessionStatsTracker.Active?.Capture(SessionOutcome.Aborted);
 
         BroadcastGoToResultToClients();
         PerformGoToResult();
@@ -203,7 +211,8 @@ public class MapSceneManager : NemoSceneManager
 
     // 서버(호스트)만 호출. 자기 자신을 제외한 전 클라에게 전환 신호를 보낸다 (BroadcastState 패턴).
     // 집계는 서버에서만 하므로 확정된 SessionResult를 페이로드로 실어 클라 결과 화면도 같은 값을 보이게 한다.
-    // 호출자(PartyWipeWatcher·BossEncounterDirector)가 이 호출 전에 SessionStatsTracker.Capture를 끝내야 한다.
+    // GoToResult 가 이 호출 전에 SessionStatsTracker.Capture 를 끝낸다(전멸·클리어는 그 호출자가 먼저 확정).
+    // 페이로드는 플레이어 수에 맞춘 가변 크기다(SessionResultPayload — 상한 초과 시 경고 후 자름).
     private void BroadcastGoToResultToClients()
     {
         if (_networkManager == null ||
@@ -213,6 +222,7 @@ public class MapSceneManager : NemoSceneManager
             return;
         }
 
+        int size = SessionResultPayload.GetSize(SessionResult.Players.Count);
         foreach (var clientId in _networkManager.ConnectedClientsIds)
         {
             if (clientId == _networkManager.LocalClientId)
@@ -220,11 +230,10 @@ public class MapSceneManager : NemoSceneManager
                 continue; // 호스트 자신은 로컬에서 직접 전환
             }
 
-            using var writer = new FastBufferWriter(sizeof(bool) * 2 + sizeof(float) + sizeof(int), Allocator.Temp);
-            writer.WriteValueSafe(SessionResult.HasValue);
-            writer.WriteValueSafe(SessionResult.Cleared);
-            writer.WriteValueSafe(SessionResult.SurvivalSeconds);
-            writer.WriteValueSafe(SessionResult.Kills);
+            using var writer = new FastBufferWriter(size, Allocator.Temp);
+            var payloadWriter = writer;
+            SessionResultPayload.Write(ref payloadWriter, SessionResult.HasValue, SessionResult.Outcome,
+                SessionResult.SurvivalSeconds, SessionResult.Players);
             _networkManager.CustomMessagingManager.SendNamedMessage(GoToResultMessageName, clientId, writer);
         }
 
@@ -252,15 +261,17 @@ public class MapSceneManager : NemoSceneManager
             return;
         }
 
-        reader.ReadValueSafe(out bool hasValue);
-        reader.ReadValueSafe(out bool cleared);
-        reader.ReadValueSafe(out float survivalSeconds);
-        reader.ReadValueSafe(out int kills);
+        // 형식이 깨졌으면 결과 없이(대시 표기) 전환만 한다 — 결과 화면에 못 가는 것보다 낫다.
+        if (!SessionResultPayload.TryRead(ref reader, out bool hasValue, out SessionOutcome outcome,
+                out float survivalSeconds, ReceivedPlayerRows))
+        {
+            Debug.LogWarning($"[SceneFlow] GoToResult 페이로드 형식이 올바르지 않아 결과 없이 전환합니다. sender={senderClientId}");
+        }
 
-        // 결과 없이 나가는 경로(ExitButton)면 hasValue=false — 클라도 대시 표기로 둔다.
+        // 서버에 SessionStatsTracker 가 없었다면 hasValue=false — 클라도 대시 표기로 둔다.
         if (hasValue)
         {
-            SessionResult.Capture(cleared, survivalSeconds, kills);
+            SessionResult.Capture(outcome, survivalSeconds, ReceivedPlayerRows);
         }
 
         Debug.Log($"[SceneFlow] MapSceneManager.HandleGoToResultMessage sender={senderClientId} hasValue={hasValue}");
