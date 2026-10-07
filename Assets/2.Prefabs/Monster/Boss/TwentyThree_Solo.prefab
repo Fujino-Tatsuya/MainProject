@@ -391,7 +391,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 3079088629
+  GlobalObjectIdHash: 987231244
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -552,6 +552,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 0
   attackType: 0
+  hitPattern: 0
   colliderInfo: {fileID: 673455989277597155}
   maxHitCount: 16
   applyKnockback: 0
@@ -591,6 +592,10 @@ MonoBehaviour:
   upperHit: {fileID: 0}
   interruptFlash: {fileID: 0}
   rageSmash: {fileID: 0}
+  dashTrail: {fileID: 0}
+  normalShield: {fileID: 0}
+  dashHit: {fileID: 0}
+  grabbedElectric: {fileID: 0}
   chargeBall: {fileID: 0}
 --- !u!114 &4143592804925233818
 MonoBehaviour:
@@ -659,6 +664,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FloatingDamageAnchor
   anchorTransform: {fileID: 6168542492047789391}
   localOffset: {x: 0, y: 0, z: 0}
+  worldOffset: {x: 0, y: 0, z: 0}
 --- !u!114 &6944182014026357477
 MonoBehaviour:
   m_ObjectHideFlags: 0
