@@ -1,53 +1,86 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
 using UnityEditor;
+using UnityEngine;
 
 /// <summary>
-/// Dev Boot 가 스폰할 캐릭터 선택(개인 EditorPrefs). 캐릭터 선택 UI 가 생기기 전까지의 개발용 경로.
-/// DevSceneBooter 의 씬 필드(playerPrefabOverride)가 채워져 있으면 그쪽이 우선한다.
+/// Dev Boot 캐릭터 드롭다운(<see cref="DevBootToolbar"/>)의 목록 원본 — 프로젝트의 <see cref="CharacterRoster"/> 에셋.
+/// 선택값은 프리팹 경로로 <see cref="DevBootTarget.PlayerPrefabPath"/> 에 저장된다(빈 문자열 = NetworkManager 기본값).
 /// </summary>
-public static class DevBootCharacterMenu
+public static class DevBootCharacterCatalog
 {
-    private const string MenuRoot = "Dev/Dev Boot/캐릭터/";
-    private const string PaladinPath = "Assets/2.Prefabs/Player/Paladin/Player_Paladin.prefab";
-    private const string GunnerPath = "Assets/2.Prefabs/Player/Gunner/Player_Gunner.prefab";
-    private const string AssassinPath = "Assets/2.Prefabs/Player/Assassin/Player_Assassin.prefab";
+    public const string DefaultLabel = "기본값";
 
-    [MenuItem(MenuRoot + "기본값 (NetworkManager)", priority = 0)]
-    private static void UseDefault() => DevBootTarget.PlayerPrefabPath = string.Empty;
-
-    [MenuItem(MenuRoot + "기본값 (NetworkManager)", true)]
-    private static bool UseDefaultValidate()
+    public readonly struct Character
     {
-        Menu.SetChecked(MenuRoot + "기본값 (NetworkManager)", string.IsNullOrEmpty(DevBootTarget.PlayerPrefabPath));
-        return true;
+        public Character(string displayName, string prefabPath, bool selectable)
+        {
+            DisplayName = displayName;
+            PrefabPath = prefabPath;
+            Selectable = selectable;
+        }
+
+        public string DisplayName { get; }
+
+        /// <summary>프리팹이 비어 있으면 빈 문자열.</summary>
+        public string PrefabPath { get; }
+
+        /// <summary>Available 이고 프리팹이 있어야 고를 수 있다.</summary>
+        public bool Selectable { get; }
     }
 
-    [MenuItem(MenuRoot + "가붕이", priority = 11)]
-    private static void UsePaladin() => DevBootTarget.PlayerPrefabPath = PaladinPath;
-
-    [MenuItem(MenuRoot + "가붕이", true)]
-    private static bool UsePaladinValidate()
+    /// <summary>roster 의 전체 항목(비활성 포함). roster 에셋이 없으면 빈 목록.</summary>
+    public static IReadOnlyList<Character> GetCharacters()
     {
-        Menu.SetChecked(MenuRoot + "가붕이", DevBootTarget.PlayerPrefabPath == PaladinPath);
-        return true;
+        var result = new List<Character>();
+        CharacterRoster roster = FindRoster();
+        if (roster == null)
+        {
+            return result;
+        }
+
+        foreach (CharacterRoster.Entry entry in roster.Entries)
+        {
+            if (entry == null)
+            {
+                continue;
+            }
+
+            string prefabPath = entry.PlayerPrefab != null ? AssetDatabase.GetAssetPath(entry.PlayerPrefab) : string.Empty;
+            string displayName = string.IsNullOrEmpty(entry.DisplayName)
+                ? Path.GetFileNameWithoutExtension(prefabPath)
+                : entry.DisplayName;
+            result.Add(new Character(displayName, prefabPath, entry.Available && !string.IsNullOrEmpty(prefabPath)));
+        }
+
+        return result;
     }
 
-    [MenuItem(MenuRoot + "거너", priority = 12)]
-    private static void UseGunner() => DevBootTarget.PlayerPrefabPath = GunnerPath;
-
-    [MenuItem(MenuRoot + "거너", true)]
-    private static bool UseGunnerValidate()
+    /// <summary>빈 경로 = "기본값", roster 에 있으면 DisplayName, 없으면 프리팹 파일 이름.</summary>
+    public static string GetDisplayName(string prefabPath)
     {
-        Menu.SetChecked(MenuRoot + "거너", DevBootTarget.PlayerPrefabPath == GunnerPath);
-        return AssetDatabase.LoadAssetAtPath<UnityEngine.GameObject>(GunnerPath) != null;
+        if (string.IsNullOrEmpty(prefabPath))
+        {
+            return DefaultLabel;
+        }
+
+        foreach (Character character in GetCharacters())
+        {
+            if (string.Equals(character.PrefabPath, prefabPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return character.DisplayName;
+            }
+        }
+
+        return Path.GetFileNameWithoutExtension(prefabPath);
     }
 
-    [MenuItem(MenuRoot + "어쌔신", priority = 13)]
-    private static void UseAssassin() => DevBootTarget.PlayerPrefabPath = AssassinPath;
-
-    [MenuItem(MenuRoot + "어쌔신", true)]
-    private static bool UseAssassinValidate()
+    private static CharacterRoster FindRoster()
     {
-        Menu.SetChecked(MenuRoot + "어쌔신", DevBootTarget.PlayerPrefabPath == AssassinPath);
-        return AssetDatabase.LoadAssetAtPath<UnityEngine.GameObject>(AssassinPath) != null;
+        string[] guids = AssetDatabase.FindAssets("t:" + nameof(CharacterRoster));
+        return guids.Length == 0
+            ? null
+            : AssetDatabase.LoadAssetAtPath<CharacterRoster>(AssetDatabase.GUIDToAssetPath(guids[0]));
     }
 }

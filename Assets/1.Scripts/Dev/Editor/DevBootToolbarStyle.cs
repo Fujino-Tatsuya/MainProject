@@ -8,7 +8,7 @@ using UnityEngine;
 using UnityEngine.UIElements;
 
 /// <summary>
-/// Dev Boot 툴바 요소(버튼·씬 드롭다운)와 데이터 출처 드롭다운에 Play 묶음과 같은 둥근 배경을 깔고 파스텔 색을 입힌다.
+/// Dev Boot 툴바 요소(버튼·씬·캐릭터 드롭다운)와 데이터 출처 드롭다운에 Play 묶음과 같은 둥근 배경을 깔고 파스텔 색을 입힌다.
 ///
 /// Play 묶음의 배경은 별도 오브젝트가 아니라 <see cref="EditorToolbarUtility.SetupChildrenAsButtonStrip"/> 가
 /// 요소에 붙이는 button-strip USS 클래스다. 우리 두 요소는 서로 다른 Overlay 라 부모가 달라 그 함수를 직접 못 쓰므로
@@ -29,6 +29,7 @@ public static class DevBootToolbarStyle
 
     private static readonly Color LaunchColor = new Color32(0xB5, 0xEA, 0xD7, 0xFF); // 민트
     private static readonly Color SceneColor = new Color32(0xC7, 0xCE, 0xEA, 0xFF);  // 라벤더
+    private static readonly Color CharacterColor = new Color32(0xFF, 0xDA, 0xC1, 0xFF); // 피치
     private static readonly Color TextColor = new Color32(0x26, 0x2A, 0x33, 0xFF);
     private const float HoverDarken = 0.88f;
 
@@ -61,6 +62,7 @@ public static class DevBootToolbarStyle
         {
             StyleNamed(root, DevBootToolbar.LaunchUssName, LaunchColor);
             StyleNamed(root, DevBootToolbar.SceneUssName, SceneColor);
+            StyleNamed(root, DevBootToolbar.CharacterUssName, CharacterColor);
             // 데이터 출처는 모드마다 색이 다르다. 선택을 바꾸면 툴바가 요소를 새로 만들므로 다음 스캔에 새 색이 입혀진다.
             StyleNamed(root, DataSourceToolbar.UssName,
                 DataSourcePlayMode.Current == DataSource.Table ? DataSourcePlayMode.TableColor : DataSourcePlayMode.InspectorColor);

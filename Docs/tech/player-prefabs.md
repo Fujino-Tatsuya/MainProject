@@ -34,7 +34,7 @@ Player.prefab (base)            ← 네트워크·입력·이동·생명주기·
 
 | 질문 | 답 |
 |------|-----|
-| 지금 스폰되는 건? | **`Player_Paladin`** — 정식 흐름·테스트 씬 전부. 로그 이름 `Player_Paladin(Clone)`. 거너는 **Dev Boot 개인 선택**(메뉴 `Dev/Dev Boot/캐릭터/거너`, EditorPrefs)으로만 스폰된다 |
+| 지금 스폰되는 건? | **`Player_Paladin`** — 정식 흐름·테스트 씬 전부. 로그 이름 `Player_Paladin(Clone)`. 거너는 **Dev Boot 개인 선택**(메인 툴바 Dev Boot 캐릭터 드롭다운 `캐릭터: …` — `CharacterRoster` 목록, EditorPrefs)으로만 스폰된다 |
 | 전투·이동·UI 등 **역할** 동작을 바꾸려면? | **`Player.prefab`**(base). Variant 가 상속한다 |
 | 가붕이 **고유**(스킬·VFX·모델·히트박스·스탯)를 바꾸려면? | **`Player_Paladin.prefab`**, 몸체는 **`Paladin_Armature.prefab`** |
 | 새 캐릭터를 추가하려면? | base 의 Variant 를 새로 만들고 `DefaultNetworkPrefabs` 에 등록. 🔴 **`GlobalObjectIdHash` 가 YAML 에 기록됐는지 확인**(아래) |
