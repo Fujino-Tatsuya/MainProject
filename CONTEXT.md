@@ -13,9 +13,17 @@ Update this file when a term becomes important enough that future agents or team
 - 인라인 아이콘 = `SkillTooltipGenerated/tooltipIcon_*.png` → 아틀라스 `SkillTooltipAttackIcon.asset`(guid 유지) · TMP `SkillTooltipAttackSprite`: `atk`·`shield`·`cooldown`. 재생성 = `Tools/UI/스킬 툴팁 인라인 아이콘 갱신`(⚠️ 인스펙터에서 바꾼 BX·BY·AD 를 덮어씀).
 - 표기 = 아이콘이 수치 **앞**, 색은 태그에 직접: `<sprite name="shield" color=#74C7EC>{shieldAmount}`. 🔴 속성이 붙으면 **이름에 따옴표 필수** — 없으면 EmojiOne 노란 `?` 로 깨진다(로그 없음). 칼 #F4B860(코드) · 쿨다운 #B8C4D6(코드, 머리줄 `⏱` 대체).
 
-## ▶▶ 다음 세션 인수인계 (2026-10-06 2차 · 경석(Claude)) — 여기부터 읽을 것
+## ▶▶ 다음 세션 인수인계 (2026-10-06~08 · 경석(Claude)) — 여기부터 읽을 것
 
-**상태**: `development` = `feature/Boss23`(10-06 저녁 빨리 감기 푸시) — S6 측정 도구 + development 2회 병합(거너 연출·붕괴 사망·가렌 애니) + 아래 수정. SVN **r392**(핀 392, check-environment 통과). 전투 EditMode 108/2(기존 실패 2 동일).
+**상태**: `feature/Boss23` = **`373ef5a6`**(원격 푸시 완료, 작업 트리 깨끗). 10-06 저녁 `development` 에 빨리 감기로 반영했고, 이후 development 는 다른 팀원 커밋으로 앞서 있음(`0d4accf7` — 다음 세션 시작 때 병합). SVN **r392**(핀 392, check-environment 통과). 전투 EditMode 108/2(기존 실패 2 = `BossCounterDataTests`).
+MPPM 네트워크 지연 도구·`[LagDiag]` 진단은 **경석 로컬 전용**(`Assets/1.Scripts/Dev/NetLag/`·`Dev/Editor/DevNetworkLagToolbar.cs`, `.git/info/exclude`) — 메뉴 `Dev/네트워크 지연 (MPPM)`.
+
+**확인한 것(체크 근거)**
+- 4K GPU 병목: 개발 빌드 해상도 3종 실측(CSV `../MainProjectBuilds/WindowsDev/ZonePerf/`, 표 = PLAN §S6). 측정기 본문이 개발 빌드 DLL 에 있고 **배포 빌드 DLL 에 없음** 문자열로 확인.
+- 타이틀 클릭: 빌드 Player.log `CollisionMeshData couldn't be created … monitor_screen` → r392 후 빌드에서 클릭 정상(팀장).
+- 로비 HUD: 빌드 로그 로비 구간 플레이어 생성 0건, 맵에서 선택 캐릭터 정상 생성.
+- 몬스터 본: MPPM 혼잡 핫스팟(400±200·5%)·모바일 2.5G(480±40·7%) 3판, 호스트·클라 2명 PeekABot 본 위치 이상 0 / 1,300+ 샘플(수정 전 매판 한 클라 발생, 머리 −7.86).
+- 빌드 부산물(PC_RPAsset 프리필터·URP Global rid·preloadedAssets·ScriptableBuildPipeline.json·link.xml)은 빌드마다 생김 → 매번 되돌림, 커밋 안 함.
 
 **🔴 클라에서 몬스터가 땅에 박혀 보이던 문제(핫스팟 3인 테스트 · PeekABot 받침대 고리만 보임·사격 안 보임) — 수정**
 - 원인: 아트 팩(Robot Sentries) 몬스터 **본마다 kinematic Rigidbody + 외삽(Interpolate=2)**. 클라(NGO)는 프리팹 기본 위치에 만든 뒤 루트를 옮기고 `AutoSyncTransforms=0` 이라 물리가 옮기기 전 자세를 본에 다시 씀 → 본이 **루트 높이 × 거치는 Rigidbody 수** 만큼 아래로 굳음(실측 머리 −7.86 / 예측 −7.85). 호스트는 제자리 생성이라 안 생김. 타이밍 의존이라 지연 환경에서 잦음.
@@ -38,9 +46,11 @@ Update this file when a term becomes important enough that future agents or team
 4. `defaultPlayerPrefab`(선택 없을 때 기본 캐릭터) 아직 **Player_Gunner** — 팀장 결정(팔라딘 복구 수정은 권한 거부로 미적용).
 5. 해상도 1080p 가 실제로 뜨는지 확인 — 레지스트리 `HKCU\Software\DefaultCompany\MainProject` 에 이전 4K 저장값 있음(Default 키 비교로 리셋될 것으로 예상, 미확인).
 6. 보류(팀장 10-06): Alt+Tab 처리. ⚠️ 현재 `runInBackground: 0` → 호스트가 Alt+Tab 하면 서버 정지, 30초 후 클라 끊김(`DisconnectTimeoutMS 30000`).
-7. 전달 — **민경**: development 핀 390 인데 거너 코드는 r391 필요(우리 쪽 392 로 해결, development 반영 전까지 깨짐) · `PlayerShieldVfx.OnDestroy` 가 `NetworkBehaviour.OnDestroy` 가림(CS0114) · 부트스트랩 오버라이드 건. **은희/사운드**: `VolumeSlider`·`TitleSceneManager:53` 이 8월에 흐름에서 빠진 `AudioManager` 를 찾아 NRE → 설정 화면 볼륨 슬라이더 미동작. **팀**: `Build/` 메뉴 빌드는 데이터 테이블 훅을 안 거침(인스펙터 값으로 빌드) · VisualSVN 서버 라이선스 만료 경고.
-8. `.claude/commands/coop-agent*.md` 가 development 에서 git 추적 해제되어 병합으로 지워짐 — 백업 = 이 PC 스크래치(세션 종료 시 사라짐). 쓰려면 `~/.claude/commands/` 로 복사.
-9. 이전 남은 일(아래 블록) 중 2·3·4·5·6 그대로.
+7. 전달 — **민경**: 핀 390 인데 거너 코드는 r391 필요했음(development 핀 392 로 해결됨 — 팀원은 SVN r392 받을 것) · `PlayerShieldVfx.OnDestroy` 가 `NetworkBehaviour.OnDestroy` 가림(CS0114) · 부트스트랩 오버라이드 건. **은희/사운드**: `VolumeSlider`·`TitleSceneManager:53` 이 8월에 흐름에서 빠진 `AudioManager` 를 찾아 NRE → 설정 화면 볼륨 슬라이더 미동작. **팀**: `Build/` 메뉴 빌드는 데이터 테이블 훅을 안 거침(인스펙터 값으로 빌드) · VisualSVN 서버 라이선스 만료 경고.
+8. `.claude/commands/coop-agent*.md` 가 development 에서 git 추적 해제되어 병합으로 지워짐 — 복원: `git show 99ffc63a~3:.claude/commands/coop-agent.md` 등을 `~/.claude/commands/` 로.
+9. **실제 핫스팟 빌드 3인으로 몬스터 본 수정 재확인**(MPPM 으로만 확인함). 다른 몬스터(Mortar·Chomp 등)가 높은 곳에서 땅에 박혀 보이는지도 함께.
+10. **로딩 흐름 개선**(클라 0.9 조기 100% 보고·서버가 LoadEventCompleted 안 기다림·진행률 매 프레임 전송) — 은희 합의 → PLAN. 이번 증상과는 별건이지만 실제 결함.
+11. 이전 남은 일(아래 블록) 중 2·3·4·5·6 그대로.
 
 ## ▶▶ 다음 세션 인수인계 (2026-10-06 · 경석(Claude))
 
