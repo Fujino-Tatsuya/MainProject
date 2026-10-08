@@ -26,6 +26,7 @@ public static class AssassinShellAuthoring
     private const string DaggerRightPath = "Assets/50.Art/Char/assassin/Dagger_Weapon_R.fbx";
     private const string AnimationFolder = "Assets/4.Animations/Player/Assassin";
     private const string ControllerPath = AnimationFolder + "/AssassinAnimatorController.controller";
+    private const string UpperBodyMaskPath = AnimationFolder + "/AssassinUpperBody.mask";
     private const string DataFolder = "Assets/9.ScriptableObject/Player/Assassin";
     private const string BasicAttackDataPath = DataFolder + "/AssassinBasicAttackData.asset";
     private const string StateDataPath = DataFolder + "/AssassinStateData.asset";
@@ -803,19 +804,23 @@ public static class AssassinShellAuthoring
         EditorUtility.SetDirty(data);
     }
 
-    // 컨트롤러는 animatorStateName 의 해시로 CrossFade 한다 — 같은 해시의 상태가 0층에 있어야 한다.
+    // 컨트롤러는 animatorStateName 의 해시로 레이어 지정 없이(-1) CrossFade 한다 — 그 해시를 가진 첫 레이어의 상태가 재생된다.
+    // 일반 E Buff 는 상체 레이어에 있다.
     private static void ValidateSkillState(AnimatorController controller, PlayerSkillData data)
     {
         if (data == null)
             return;
 
         int hash = Animator.StringToHash(data.AnimatorStateName);
-        foreach (ChildAnimatorState child in controller.layers[0].stateMachine.states)
+        foreach (AnimatorControllerLayer layer in controller.layers)
         {
-            if (child.state.nameHash == hash)
+            foreach (ChildAnimatorState child in layer.stateMachine.states)
             {
-                Debug.Log($"{Tag} {data.name} → Animator 상태 '{data.AnimatorStateName}' 해시 {hash} 확인.");
-                return;
+                if (child.state.nameHash == hash)
+                {
+                    Debug.Log($"{Tag} {data.name} → Animator 상태 '{data.AnimatorStateName}'({layer.name}) 해시 {hash} 확인.");
+                    return;
+                }
             }
         }
 
@@ -1046,9 +1051,8 @@ public static class AssassinShellAuthoring
         EnsureAnyStateAttackTransition(sm, transformedAttack, AssassinBasicAttack.TransformedAnimatorIndex, canTransitionToSelf: true);
 
         // A7: 스킬 상태는 PlayerSkillController 가 animatorStateName 으로 CrossFade 한다(AnyState 전이 불필요).
-        AnimatorState enhanceSkill = EnsureState(sm, EnhanceSkillState, LoadClip("Buff"));
-        enhanceSkill.speed = EnhanceBuffSpeed;
-        EnsureReturnToIdleTransitions(enhanceSkill, idle, combatIdle);
+        // 일반 E Buff 는 걸으며 쓰므로 0층이 아니라 상체 레이어에 둔다(EnsureUpperBodyLayer).
+        EnsureUpperBodyLayer(controller);
 
         AnimatorState transformSkill = EnsureState(sm, TransformSkillState, LoadClip("Parry_R"));
         transformSkill.speed = TransformParrySpeed;
@@ -1070,7 +1074,86 @@ public static class AssassinShellAuthoring
 
         EditorUtility.SetDirty(controller);
         AssetDatabase.SaveAssets();
-        Debug.Log($"{Tag} Animator 구성: Idle 2, Run Start/Loop/Stop, Dodge, Interrupt, Wave 4, 강타·변신 묶음, E Buff·R Parry·Q 돌진 2·변신 E 상태");
+        Debug.Log($"{Tag} Animator 구성: Idle 2, Run Start/Loop/Stop, Dodge, Interrupt, Wave 4, 강타·변신 묶음, R Parry·Q 돌진 2·변신 E 상태 + 상체 레이어 E Buff");
+    }
+
+    [MenuItem("Tools/Player/Assassin/9. 일반 E 상체 레이어 (걸으며 Buff)")]
+    public static void BuildUpperBodyLayer()
+    {
+        AnimatorController controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(ControllerPath);
+        if (controller == null)
+        {
+            Debug.LogError($"{Tag} Animator Controller가 없다. 먼저 1번 메뉴를 실행할 것: {ControllerPath}");
+            return;
+        }
+
+        EnsureUpperBodyLayer(controller);
+        EditorUtility.SetDirty(controller);
+        AssetDatabase.SaveAssets();
+        ValidateSkillState(controller, AssetDatabase.LoadAssetAtPath<PlayerSkillData>(EnhanceSkillDataPath));
+    }
+
+    // 일반 E Buff 를 상체 마스크 레이어(Override, 가중치 1)에서 재생한다 — 하체는 0층의 Idle/Run 이 그대로 움직인다.
+    // 평소엔 빈 상태(Write Defaults 끔)라 0층을 그대로 통과시킨다. Buff 가 끝나면 빈 상태로 돌아간다.
+    // 강제 종료(대시·피격·사망)는 AssassinEnhanceSkill.OnEnd 가 빈 상태로 CrossFade 한다.
+    private static void EnsureUpperBodyLayer(AnimatorController controller)
+    {
+        AnimatorStateMachine baseMachine = controller.layers[0].stateMachine;
+        foreach (ChildAnimatorState child in baseMachine.states)
+        {
+            if (child.state.name != EnhanceSkillState)
+                continue;
+            baseMachine.RemoveState(child.state);
+            break;
+        }
+
+        AvatarMask mask = EnsureUpperBodyMask();
+        AnimatorControllerLayer[] layers = controller.layers;
+        int layerIndex = Array.FindIndex(layers, l => l.name == AssassinEnhanceSkill.UpperBodyLayerName);
+        if (layerIndex < 0)
+        {
+            controller.AddLayer(AssassinEnhanceSkill.UpperBodyLayerName);
+            layers = controller.layers;
+            layerIndex = layers.Length - 1;
+        }
+
+        layers[layerIndex].avatarMask = mask;
+        layers[layerIndex].blendingMode = AnimatorLayerBlendingMode.Override;
+        layers[layerIndex].defaultWeight = 1f;
+        controller.layers = layers;
+
+        AnimatorStateMachine sm = controller.layers[layerIndex].stateMachine;
+        AnimatorState empty = EnsureState(sm, AssassinEnhanceSkill.UpperBodyEmptyState, null);
+        empty.writeDefaultValues = false;
+        sm.defaultState = empty;
+
+        AnimatorState buff = EnsureState(sm, EnhanceSkillState, LoadClip("Buff"));
+        buff.speed = EnhanceBuffSpeed;
+        buff.writeDefaultValues = false; // 한 레이어 안에서 Write Defaults 를 섞지 않는다
+        EnsureTransition(buff, empty, true, 0.98f, null, default, 0f);
+    }
+
+    // Humanoid 상체 — 몸통·머리·팔·손가락·손 IK. 루트·다리·발 IK 는 0층(걷기)을 따른다.
+    private static AvatarMask EnsureUpperBodyMask()
+    {
+        AvatarMask mask = AssetDatabase.LoadAssetAtPath<AvatarMask>(UpperBodyMaskPath);
+        if (mask == null)
+        {
+            mask = new AvatarMask();
+            AssetDatabase.CreateAsset(mask, UpperBodyMaskPath);
+        }
+
+        for (AvatarMaskBodyPart part = 0; part < AvatarMaskBodyPart.LastBodyPart; part++)
+        {
+            bool upper = part == AvatarMaskBodyPart.Body || part == AvatarMaskBodyPart.Head ||
+                part == AvatarMaskBodyPart.LeftArm || part == AvatarMaskBodyPart.RightArm ||
+                part == AvatarMaskBodyPart.LeftFingers || part == AvatarMaskBodyPart.RightFingers ||
+                part == AvatarMaskBodyPart.LeftHandIK || part == AvatarMaskBodyPart.RightHandIK;
+            mask.SetHumanoidBodyPartActive(part, upper);
+        }
+
+        EditorUtility.SetDirty(mask);
+        return mask;
     }
 
     private static GameObject EnsureArmature(AnimatorController controller)
