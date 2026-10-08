@@ -28,3 +28,4 @@ MonoBehaviour:
     _entity: {fileID: 11400000, guid: 14c673f85161ec243afda024dec1335a, type: 2}
     ID: 0
     <DebugObject>k__BackingField: {fileID: 0}
+  entries: []

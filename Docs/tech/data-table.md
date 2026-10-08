@@ -19,7 +19,7 @@ GameData.xlsx (SVN, 잠금)
 
 ## 2. 시트 형식
 
-**시트 6장 = 카테고리**(2026-10-02 개편). 한 장 안에 관련 타입이 구역으로 나뉘어 세로로 쌓인다 — 가로 이동은 대상 수만큼(최대 Monster 11열).
+**시트 7장 = 카테고리**(2026-10-08 기준). 한 장 안에 관련 타입이 구역으로 나뉘어 세로로 쌓인다 — 가로 이동은 대상 수만큼(최대 Monster 11열).
 
 | 시트 | 들어 있는 것 |
 |---|---|
@@ -29,6 +29,7 @@ GameData.xlsx (SVN, 잠금)
 | `Monster` | 몬스터 스탯 SO · 근접 공격 · 넉백 · 카운터 창 · 터렛 조준 |
 | `MidBoss` | Gauntlet · Spinner · Wall |
 | `Boss` | 23호(`BossDataSO`) |
+| `Sound` | 문자열 키별 사운드 재생 수치(`SoundCatalog`) — SoundID 연결은 인스펙터 전용 |
 
 ### 세로 표 — 행 = 필드, 열 = 대상
 
@@ -91,6 +92,13 @@ GameData.xlsx (SVN, 잠금)
 - 프리팹 하나에 같은 컴포넌트가 둘 이상이면 행 하나로 가리킬 수 없어 오류.
 - 씬 배치 오브젝트(프리팹 인스턴스 아님)는 테이블 대상이 아니다 — 필요하면 프리팹으로 분리(예: `GameRule.prefab`).
 - MPPM 클론도 같은 모드·같은 xlsx 를 쓴다.
+
+### 사운드 키
+
+- 새 키는 `SoundCatalog.asset`의 `entries` 배열에 먼저 추가하고 BroAudio `SoundID`를 연결한다. 테이블은 배열 크기와 에셋 참조를 바꾸지 못한다.
+- 호출은 2D `AudioManager.Instance.Play("키")`, 위치가 있는 3D `AudioManager.Instance.Play("키", worldPosition)`를 쓴다. 로컬 재생이며 사운드 전용 RPC는 없다.
+- `volumeMultiplier`·`pitchMultiplier`·`pitchRandomMin/Max`는 BroAudio 엔티티 값에 곱하는 배율이다(1 = 그대로). `is3D`는 `0 = 2D`, `1 = 3D`다.
+- 빈 키와 중복 키는 런타임 시작 시 경고하며, 중복이면 배열에서 먼저 나온 엔트리만 사용한다. 없는 키나 유효하지 않은 `SoundID`는 경고하고 재생하지 않는다.
 
 ## 7. 자주 나는 오류
 
