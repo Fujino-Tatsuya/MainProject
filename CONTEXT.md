@@ -11,6 +11,7 @@ Update this file when a term becomes important enough that future agents or team
 ## ▶▶ 작업 세션 (2026-10-08 · 은희(Claude) · **`feature/Assassin` → `development` 반영**) — ✅ 완료
 - development(FloatingDamageShare 포함) 를 Assassin 에 머지(`9bed0270`, 충돌 = `art-svn.json` 핀만 → r407) 후 development 빨리 감기. SVN **r407** 같이 받을 것.
 - 이번에 development 로 들어간 것: 어쌔신 로비 노출 · 옵션 "Hold Skill: Toggle" · 대시 재충전 중 AimIndicator 어둡게 · Dev Boot 캐릭터 드롭다운(`DevBootCharacterCatalog`) · 보스 제한 600초 · xlsx 밸런스(23호 HP 10000·팔라딘 220) · 데이터 테이블 빌드 원복 수정.
+- SVN 정리: 은희 PC 의 로컬 guid 재생성 `.meta` 6개 SVN 값으로 되돌림 · `Interrupt.png` guid 를 가로채던 미버전 복사본 `Common_Skill_Interrupt_Icon.png` 제거 · r405 에서 빠진 `Common_DashIcon`/`Common_DashSlotIcon` `.meta` 를 **r410** 커밋.
 
 ## ▶▶ 작업 세션 (2026-10-07 · 은희(Claude) · **은희 PC Unity MCP → 공식 MCP 전환**(개인 환경, 팀 파일 무변경), 브랜치 `feature/Assassin`) — ✅ 완료
 - 원인(Codex 분석): 경석 포크 `McpServer.OnAfterAssemblyReload()` 가 머신 전역 `EditorPrefs("MCP_Port")` 로 먼저 Start → 리로드마다 다른 워크트리 포트 선점·재시도 10회 소진 정지. 포크 수정은 경석 영역이라 미착수.
