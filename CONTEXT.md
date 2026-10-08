@@ -8,6 +8,9 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-10-08 · 은희(Claude+Codex) · **사운드 데이터 테이블**, 브랜치 `feature/SoundAssetDataTable`(development `37f97719` 기준, WorkTree2)) — 계획 = [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ⏳ Codex 구현
+- 🔴 **수정 예정 — 동시 수정 금지**: `9.ScriptableObject/Sound/SoundCatalog.cs`·`SoundCatalog.asset`·`1.Scripts/Sound/AudioManager.cs`·`1.Scripts/Sound/`(새 순수 클래스)·`Tests/EditMode/Sound/`·`Docs/tech/data-table.md`. `GameData.xlsx` 는 에이전트가 쓰지 않음(사람이 SVN 잠금 후 Export).
+
 ## ▶▶ 작업 세션 (2026-10-07 · 은희(Claude) · **팔라딘 평타 전진 복구 + 공격속도 ×1.2 + 간파 선딜 0.25**, 브랜치 `fix/PaladinDAForward`) — 계획 [PLAN-paladin-da.md](PLAN-paladin-da.md) ✅ 승인 · ✅ C1~C4 구현(진행 = PLAN §7) · SVN **r404** 같이 받을 것 · ⏳ 은희 Play · 미푸시
 - 🔴 **수정 예정 — 동시 수정 금지**: `Player/DefaultAttackController.cs`·`DefaultAttackData.cs`·`4.Animations/Player/PlayerAnimatorController.controller`·`Garen_Default_Attack_1~4.anim`·`9.ScriptableObject/Player/Garen/PlayerDefaultAttackData.asset`·`FirstMeleeInterruptSkillData.asset`·`GameData.xlsx`(SVN 잠금).
 

@@ -1,3 +1,44 @@
+# ▶▶▶ 계획 = **사운드 데이터 테이블 (SoundCatalog 키 엔트리 + GameData.xlsx `Sound` 시트)** (2026-10-08 · 승인 ✅ · 구현 = Codex)
+
+> 브랜치 `feature/SoundAssetDataTable` (development `37f97719` 기준). 결정: 은희.
+
+## 목표
+- 사운드를 **문자열 키**로 부를 수 있게 하고, 키별 재생 수치를 **기획이 `GameData.xlsx` 에서** 고친다.
+- 클립(에셋 참조)은 xlsx 에 못 넣으므로 **키 → BroAudio `SoundID` 연결은 SO(인스펙터)**, 수치는 xlsx.
+
+## 결정 (grill 2026-10-08)
+| 항목 | 결정 |
+|---|---|
+| 기존 구조와의 관계 | **`SoundCatalog` 확장.** 새 SO 를 따로 만들지 않는다. 기존 `UIClick`·`TitleBGM`·`LobbyBGM`·`InGameBGM` 프로퍼티와 호출부는 그대로 동작(호환 유지) |
+| 엔트리 | `SoundCatalog` 에 `entries` 배열 추가. 원소 = `key`(string) + `sound`(SoundID) + 아래 수치 |
+| xlsx 수치 | 볼륨·피치(랜덤 범위 포함) · 3D 여부와 최소/최대 거리 · 재생 제한(동시 재생 수, 재트리거 쿨다운) · 키 이름/설명 |
+| API | `AudioManager.Play(string key)` / `Play(string key, Vector3 pos)` — 키 조회 후 엔트리 수치를 적용해 재생. 없는 키·무효 SoundID 는 경고 후 null |
+| 네트워크 | **로컬 재생만.** 사운드 전용 RPC 없음. 호출 측이 이미 받는 이벤트·RPC 시점에서 로컬로 부른다 |
+| 범위 | 테이블 + API + EditMode 테스트까지. **실제 재생 지점 연결은 다음 작업** |
+
+## 접근
+1. `SoundCatalog` 에 직렬화 엔트리 구조체·배열 추가, `[DataTableSheet("Sound")]` 로 xlsx `Sound` 시트에 노출. `SoundID` 필드는 `[DataTableIgnore]`.
+2. 키 조회는 순수 클래스(딕셔너리 캐시, 중복 키·빈 키 검출)로 분리 → EditMode 테스트 대상.
+3. 재생 제한(동시 수·쿨다운)도 순수 판정 클래스로 분리(시간을 인자로 받음) → 테스트 대상.
+4. `AudioManager` 에 키 재생 메서드 추가. 볼륨·피치·3D 거리는 BroAudio 플레이어 API 로 적용(가능한 범위는 Codex 가 BroAudio 소스 확인 후 결정, 안 되는 항목은 보고).
+5. `Tools/Data/Export Template`(병합)로 `Sound` 시트 생성 확인 — **xlsx 는 SVN 이라 커밋은 사람이 잠금 후** 진행. 에이전트는 xlsx 를 쓰지 않고 "필드 목록 보기"로만 확인.
+6. `Docs/tech/data-table.md` 시트 표에 `Sound` 추가 + 사운드 사용법 짧게 문서화.
+
+## 리스크
+- **데이터 테이블은 배열 크기를 못 바꾼다** → 새 키(엔트리) 추가는 SO 인스펙터에서. xlsx 는 기존 엔트리의 수치·키 문자열만 바꾼다.
+- 키를 xlsx 에서 바꾸면 코드에서 부르는 키와 어긋날 수 있다 → 시작 시 중복·빈 키 검증 경고.
+- BroAudio 엔티티 자체에도 볼륨·피치가 있다 → 엔트리 값은 **곱(배율)** 로 적용할지 덮어쓸지 구현 시 확정해 문서화(기본안: 배율, 1 = 엔티티 값 그대로).
+- 기존 `SoundCatalog.asset` 직렬화가 바뀜 — 기존 SoundID 4개가 그대로 남는지 diff 확인.
+
+## 검증 (완료 조건)
+- Refresh 후 컴파일 에러 0.
+- EditMode: 키 조회(정상·없는 키·중복·빈 키), 재생 제한(동시 수·쿨다운 경계) 테스트 통과.
+- `Tools/Data/Export Template 필드 목록 보기` 에 `Sound` 시트 필드가 나온다.
+- `SoundCatalog.asset` 기존 4개 SoundID 유지.
+- 사람 확인(Play): 기존 BGM·UIClick 정상 / 테스트 키 재생 시 소리.
+
+---
+
 # 몬스터 배치 적용 (2026-10-07 · 배치도 수정 후 사용자 구현 승인)
 
 - 목표: 현재 `4.MapScene`의 전투 존에 총 **41마리**를 배치한다.
