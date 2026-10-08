@@ -1774,13 +1774,37 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 100, guid: 8c90edb86f91484993f438c98fa595ec, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 8233674947486575541}
   m_SourcePrefab: {fileID: 100100000, guid: 8c90edb86f91484993f438c98fa595ec, type: 3}
 --- !u!224 &6114957203948570910 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 101, guid: 8c90edb86f91484993f438c98fa595ec, type: 3}
   m_PrefabInstance: {fileID: 6114957203948571003}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &6114957203948570911 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 100, guid: 8c90edb86f91484993f438c98fa595ec, type: 3}
+  m_PrefabInstance: {fileID: 6114957203948571003}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &8233674947486575541
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6114957203948570911}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 89d4521e80aa62f4e909eb4d925623f4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerOverheadHealthBarRule
+  player: {fileID: 0}
+  localPlayerColor: {r: 0.2, g: 0.8, b: 0.25, a: 1}
+  partyMemberColor: {r: 0.25, g: 0.55, b: 1, a: 1}
+  labelFormat: P{0}
 --- !u!1001 &6267298663107183514
 PrefabInstance:
   m_ObjectHideFlags: 0
