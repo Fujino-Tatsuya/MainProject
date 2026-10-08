@@ -8,6 +8,10 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-10-08 · 은희(Claude+claude-alt) · **거너 기본 공격 홀드 연사 → 클릭 단발 + 입력 창**, 브랜치 `fix/GunnerDefaultAttack`) — ✅ 구현 `24aebc9d` · 컴파일 OK · development 반영 · ⏳ Play·MPPM 손맛 확인
+- 클릭 1회 = 준비 동작 → 1발. 직전 발사 + `comboWindowOpen~Close`(초, `GunnerBasicAttackData`) 안 재클릭 → 서버 예약 → `FireInterval` 후 준비 없이 다음 발. 창은 애니 이벤트가 아니라 데이터 시간 값(판정이 시간 기반·발사 클립 배속 재생). 상세 = [character_gunner.md](Docs/design/character/character_gunner.md) §4.
+- 새 수치 2개는 xlsx 미반영 — 병합 Export 전까지 SO 기본값(0.05/0.2).
+
 ## ▶▶ 작업 세션 (2026-10-08 · 은희(Claude) · **`feature/Assassin` → `development` 반영**) — ✅ 완료
 - development(FloatingDamageShare 포함) 를 Assassin 에 머지(`9bed0270`, 충돌 = `art-svn.json` 핀만 → r407) 후 development 빨리 감기. SVN **r407** 같이 받을 것.
 - 이번에 development 로 들어간 것: 어쌔신 로비 노출 · 옵션 "Hold Skill: Toggle" · 대시 재충전 중 AimIndicator 어둡게 · Dev Boot 캐릭터 드롭다운(`DevBootCharacterCatalog`) · 보스 제한 600초 · xlsx 밸런스(23호 HP 10000·팔라딘 220) · 데이터 테이블 빌드 원복 수정.
