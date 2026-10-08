@@ -6,6 +6,7 @@ using UnityEngine;
 ///
 /// 기존 타겟팅 궁극기와 같은 대상 지정 모드(SingleTarget, ClickToConfirm — R 재입력 취소, 빈 곳 무시, 취소 시 쿨 없음)를 쓴다.
 /// 확정 순간(서버 승인) 과열 단계를 저장하고 대상 위치에 <see cref="GunnerTrackingLaser"/> 를 서버가 생성한다 — 쿨타임도 이때부터.
+/// 데이터 targetingMode 를 GroundPoint 로 바꾸면 지점 지정으로도 동작한다 — 확정 지점에 대상 없이 생성되고 레이저가 재탐색으로 적을 찾는다.
 /// 이후 레이저는 독립적으로 움직이고, 플레이어는 짧은 시전 모션(CastDuration) 뒤 자유롭다. 과열도는 건드리지 않는다.
 /// </summary>
 public class GunnerTrackingLaserSkill : PlayerSkillBase
@@ -29,11 +30,18 @@ public class GunnerTrackingLaserSkill : PlayerSkillBase
         view = owner.GetComponent<GunnerBeamView>();
     }
 
-    // 서버 권위 시전 조건 — 살아 있는 적, 사거리 안(§9.2)
+    // 서버 권위 시전 조건 — 살아 있는 적, 사거리 안(§9.2).
+    // 지점 지정(targetingMode = GroundPoint)으로 시전되면 대상 대신 지점이 사거리(+위치 오차 버퍼) 안인지 본다.
     public override bool CanUse(Vector3 direction, Unit target)
     {
         GunnerTrackingLaserData data = RData;
-        if (data == null || data.LaserPrefab == null || target == null || target is Player || target.CurrentHealth <= 0)
+        if (data == null || data.LaserPrefab == null)
+            return false;
+
+        if (HasAimPoint)
+            return GroundPointTargeting.IsApprovableRange(owner.transform.position, AimPoint, data.CastRange);
+
+        if (target == null || target is Player || target.CurrentHealth <= 0)
             return false;
 
         Vector3 delta = target.transform.position - owner.transform.position;
@@ -51,7 +59,9 @@ public class GunnerTrackingLaserSkill : PlayerSkillBase
         // 툴팁의 최소~최대 계산도 같은 과열 배율을 쓰므로 판정 공식을 바꿀 때 같이 바꿀 것.
         int damage = Mathf.RoundToInt(damageSnapshot * data.StageDamageMultiplier(stage));
 
-        Vector3 position = target.transform.position;
+        // 지점 지정 = 그 지점에 대상 없이 생성 → 레이저가 retargetRadius 안 최근접 적을 스스로 찾는다.
+        Unit laserTarget = HasAimPoint ? null : target;
+        Vector3 position = HasAimPoint ? AimPoint : target.transform.position;
         GameObject instance = Instantiate(data.LaserPrefab, position, Quaternion.identity);
         var laser = instance.GetComponent<GunnerTrackingLaser>();
         var networkObject = instance.GetComponent<NetworkObject>();
@@ -64,9 +74,10 @@ public class GunnerTrackingLaserSkill : PlayerSkillBase
 
         if (owner.IsSpawned)
             networkObject.Spawn(true); // destroyWithScene — 씬 전환 시 함께 제거(§9.6)
-        laser.ServerInitialize(owner, target, damage, data, DamageAttackType, DamageHitPattern);
+        laser.ServerInitialize(owner, laserTarget, damage, data, DamageAttackType, DamageHitPattern);
 
-        Edit.Log($"[Gunner/R] 추적 레이저 생성 — 대상 {target.name}, 틱 피해 {damage}, 저장 단계 {stage}", this);
+        string origin = laserTarget != null ? $"대상 {laserTarget.name}" : $"지점 {position}";
+        Edit.Log($"[Gunner/R] 추적 레이저 생성 — {origin}, 틱 피해 {damage}, 저장 단계 {stage}", this);
     }
 
     // 시전 모션은 Data.AnimatorStateName 이 튼다. 여기서는 **총구 섬광**만.

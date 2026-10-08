@@ -545,19 +545,39 @@ public static class GunnerShellAuthoring
     const string KrFontPath = "Assets/Resources/NotoSansKR-VariableFont_wght SDF.asset";
 
     /// <summary>
-    /// 임시 과열 게이지를 거너 고유 UI 프리팹으로 만들고 Player_Gunner 에 중첩한다(공용 CombatHUD 와 분리).
-    /// 예전 OnGUI 컴포넌트(GunnerHeatHUD — 스크립트 삭제됨)가 남긴 루트의 Missing Script 도 걷는다.
+    /// 임시 과열 게이지를 거너 고유 UI 프리팹으로 만들고 <c>Gunner_Armature/HUD</c> 에 중첩한다(공용 CombatHUD 와 분리).
+    /// 캐릭터 고유 HUD 규약 = Armature/HUD(PLAN-assassin.md A5) — 유령 상태에서 Armature 와 함께 꺼진다.
+    /// 예전 위치(Variant 루트)의 게이지와 구 OnGUI 컴포넌트(GunnerHeatHUD)가 남긴 Missing Script 도 걷는다. 재실행해도 결과가 같다.
     /// </summary>
     [MenuItem("Tools/Player/Gunner/과열 게이지 프리팹 (임시 UI)")]
     public static void AttachHeatGauge()
     {
-        if (AssetDatabase.LoadAssetAtPath<GameObject>(VariantPath) == null)
+        if (AssetDatabase.LoadAssetAtPath<GameObject>(VariantPath) == null ||
+            AssetDatabase.LoadAssetAtPath<GameObject>(ArmaturePath) == null)
         {
-            Debug.LogError($"[Gunner] Variant 가 없다 — 먼저 '껍데기 생성 (G9)' 실행: {VariantPath}");
+            Debug.LogError($"[Gunner] Variant/Armature 가 없다 — 먼저 '껍데기 생성 (G9)' 실행: {VariantPath}");
             return;
         }
 
         GameObject gaugePrefab = EnsureHeatGaugePrefab();
+
+        GameObject armature = PrefabUtility.LoadPrefabContents(ArmaturePath);
+        try
+        {
+            Transform hud = CharacterHudAuthoring.EnsureHudRoot(armature.transform);
+            if (hud.Find(HeatGaugeInstanceName) == null)
+            {
+                var gauge = (GameObject)PrefabUtility.InstantiatePrefab(gaugePrefab, hud);
+                gauge.name = HeatGaugeInstanceName;
+            }
+
+            PrefabUtility.SaveAsPrefabAsset(armature, ArmaturePath);
+            Debug.Log($"[Gunner] 과열 게이지 중첩: {ArmaturePath}/{CharacterHudAuthoring.HudRootName}/{HeatGaugeInstanceName}");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(armature);
+        }
 
         GameObject root = PrefabUtility.LoadPrefabContents(VariantPath);
         try
@@ -566,14 +586,14 @@ public static class GunnerShellAuthoring
             if (removed > 0)
                 Debug.Log($"[Gunner] 루트의 Missing Script {removed}개 제거(구 GunnerHeatHUD)");
 
-            if (root.transform.Find(HeatGaugeInstanceName) == null)
+            Transform old = root.transform.Find(HeatGaugeInstanceName);
+            if (old != null)
             {
-                var gauge = (GameObject)PrefabUtility.InstantiatePrefab(gaugePrefab, root.transform);
-                gauge.name = HeatGaugeInstanceName;
+                Object.DestroyImmediate(old.gameObject);
+                Debug.Log($"[Gunner] Variant 루트의 예전 과열 게이지 제거: {VariantPath}/{HeatGaugeInstanceName}");
             }
 
             PrefabUtility.SaveAsPrefabAsset(root, VariantPath);
-            Debug.Log($"[Gunner] 과열 게이지 중첩 완료: {VariantPath}/{HeatGaugeInstanceName}");
         }
         finally
         {

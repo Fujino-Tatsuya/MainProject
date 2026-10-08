@@ -140,6 +140,9 @@ public abstract class PlayerSkillBase : MonoBehaviour
     // 서버 전용: 실행 중 좌클릭(ConsumesPrimaryInput 일 때만). direction = 누른 순간의 조준.
     public virtual void OnPrimaryPressed(Vector3 direction) { }
 
+    // 서버 전용: 오너 권위 결과 보고(PlayerSkillController.ReportOwnerSkillResult). 값 검증은 스킬 몫이다(어쌔신 Q: 실제 이동 거리).
+    public virtual void OnOwnerResultReported(float value) { }
+
     // 오너 + 서버(FSM 을 틱하는 피어): 실행 중 물리 틱. 스킬 자체 이동은 여기서 owner.IsSimulating 일 때만 모터에 제출한다.
     public virtual void OnFixedTick() { }
 

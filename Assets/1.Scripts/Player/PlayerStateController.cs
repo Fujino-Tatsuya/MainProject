@@ -183,9 +183,9 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
         // 슈퍼아머 거부는 서버 진입에서만 판정한다. 오너는 서버 결정(ApplyRestrainedFromServer)을
         // 그대로 따라야 하며, 복제 지연으로 상태이상 목록이 어긋난 순간에 각자 판단하면 상태가 갈린다.
         //
-        // Push만 거부하는 이유: Unit.Knockback과 같은 규칙(슈퍼아머면 안 밀린다)을 플레이어 쪽 한 곳에 둔다.
-        // Carry(잡기)는 원래 슈퍼아머와 무관하게 걸렸다 — 여기에 검사를 넣으면 보스 Grab 체인이 회귀한다.
-        if (restraintContext.Mode == RestraintMode.Push && context.Player.HasSuperArmor)
+        // Push(밀기)와 Carry(잡기) 모두 SuperArmor면 거부한다.
+        // 보스 Grab 체인 영향은 경석 확인 대기(은희가 직접 공유함).
+        if (PlayerRestraintPolicy.IsBlockedBySuperArmor(restraintContext.Mode, context.Player.HasSuperArmor))
             return false;
 
         return ApplyRestrained(restraintContext);
@@ -445,6 +445,18 @@ public enum RestraintMode : byte
 
     /// <summary>돌진 밀기 — 시전자 정면 offset 지점을 따라간다. 소켓이 필요 없다.</summary>
     Push = 1
+}
+
+/// <summary>서버 구속 진입 전에 사용하는 순수 SuperArmor 판정.</summary>
+public static class PlayerRestraintPolicy
+{
+    public static bool IsBlockedBySuperArmor(RestraintMode mode, bool hasSuperArmor)
+    {
+        if (!hasSuperArmor)
+            return false;
+
+        return mode == RestraintMode.Carry || mode == RestraintMode.Push;
+    }
 }
 
 public readonly struct RestraintContext

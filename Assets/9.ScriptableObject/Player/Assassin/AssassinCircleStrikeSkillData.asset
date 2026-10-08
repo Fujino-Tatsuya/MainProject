@@ -1,0 +1,49 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 50cf5a97efd625a4f90ea19be6c5f871, type: 3}
+  m_Name: AssassinCircleStrikeSkillData
+  m_EditorClassIdentifier: Assembly-CSharp::AssassinCircleStrikeSkillData
+  tooltip:
+    displayName: "\uC6D0\uD615 \uB09C\uACA9"
+    subtitle: "E \uC2A4\uD0AC \xB7 \uBCC0\uC2E0"
+    description: "TODO \uC9C0\uC815\uD55C \uC6D0 \uBC94\uC704\uC5D0 {dmg} \uD53C\uD574\uB97C
+      5\uBC88 \uC90D\uB2C8\uB2E4. \uACF5\uACA9 \uC911 \uBB34\uC801\uC785\uB2C8\uB2E4."
+    icon: {fileID: 0}
+  inputType: 0
+  cooldownTime: 12
+  commitCooldownManually: 0
+  attackDamageMultiplier: 2.8
+  flatDamageBonus: 0
+  maxActiveDuration: 1.5222223
+  tickInterval: 0
+  hitPattern: 0
+  usableWhileDead: 0
+  hittableLayers:
+    serializedVersion: 2
+    m_Bits: 17664
+  triggersOnHit: 0
+  targetingMode: 2
+  confirmMode: 0
+  castRange: 1.5
+  fixedDistance: 1
+  aoeRadius: 2
+  targetableLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  groundPointOutOfRange: 0
+  groundMarkerRadius: 0
+  hoverMarkerDistance: 3
+  animatorStateName: Assassin_E_CircleStrike_Transformed
+  snapRotationOnStart: 1
+  hitCount: 5
+  areaHeight: 3
+  maxHitResults: 32

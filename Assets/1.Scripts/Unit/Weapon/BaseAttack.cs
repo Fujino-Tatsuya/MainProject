@@ -47,10 +47,19 @@ public struct AttackInfo
     // 시전자가 대상을 따라잡는 순간 옆/뒤로 뒤집힌다.
     public Vector3 knockbackDirection;
 
+    // 백어택(PLAN-assassin A11) — 공격자는 배율과 강제 여부만 싣고, 적용 여부는 맞는 쪽(MonsterBase)이 정한다.
+    // 판정·적용 규칙은 BackAttackRules. 1 이하(기본값·default 구조체의 0 포함) = 백어택 없음.
+    public float backAttackMultiplier;
+    // 위치 무관 백어택(어쌔신 변신 중). MonsterBase 대상에만 의미가 있다.
+    public bool forceBackAttack;
+
     public AttackInfo(int damage, AttackType attackType = AttackType.None, bool isInterruptAttack = false,
         float knockbackStrength = 0f, float knockbackDuration = 0f, float staggerDuration = 0f,
-        Vector3 knockbackDirection = default, AttackHitPattern hitPattern = AttackHitPattern.Single)
+        Vector3 knockbackDirection = default, AttackHitPattern hitPattern = AttackHitPattern.Single,
+        float backAttackMultiplier = 1f, bool forceBackAttack = false)
     {
+        this.backAttackMultiplier = backAttackMultiplier;
+        this.forceBackAttack = forceBackAttack;
         this.damage = Mathf.Max(0, damage);
         this.attackType = attackType;
         this.hitPattern = hitPattern;
@@ -101,6 +110,10 @@ public class BaseAttack : MonoBehaviour, IDamageSettable
 
     protected AttackInfo _attackInfo;
 
+    // 백어택 배율·강제(PLAN-assassin A11). 기본 1/false — SetBackAttack 을 부르는 공격(어쌔신 평타)만 바뀐다.
+    float backAttackMultiplier = 1f;
+    bool forceBackAttack;
+
     /// <summary>
     /// 공격자 식별용 메타데이터. 플레이어 계층에서 분리되는 투사체는 owner로 재정의한다.
     /// 피해 판정에는 사용하지 않는다.
@@ -114,7 +127,15 @@ public class BaseAttack : MonoBehaviour, IDamageSettable
 
     protected void InitializeAttackInfo()
     {
-        _attackInfo = new AttackInfo(damage, attackType, hitPattern: hitPattern);
+        _attackInfo = new AttackInfo(damage, attackType, hitPattern: hitPattern,
+            backAttackMultiplier: backAttackMultiplier, forceBackAttack: forceBackAttack);
+    }
+
+    public void SetBackAttack(float multiplier, bool force)
+    {
+        backAttackMultiplier = multiplier;
+        forceBackAttack = force;
+        InitializeAttackInfo();
     }
 
     public void SetDamageSnapshot(int value)
@@ -247,11 +268,12 @@ public class BaseAttack : MonoBehaviour, IDamageSettable
     private AttackInfo CreateAttackInfo(int? overrideDamage)
     {
         return overrideDamage.HasValue
-            ? new AttackInfo(overrideDamage.Value, attackType, hitPattern: hitPattern)
+            ? new AttackInfo(overrideDamage.Value, attackType, hitPattern: hitPattern,
+                backAttackMultiplier: backAttackMultiplier, forceBackAttack: forceBackAttack)
             : _attackInfo;
     }
 
-    private AttackHitContext CreateHitContext(Collider hit)
+    protected AttackHitContext CreateHitContext(Collider hit)
     {
         return new AttackHitContext(transform.position, transform, hit, AttackSourceUnit);
     }

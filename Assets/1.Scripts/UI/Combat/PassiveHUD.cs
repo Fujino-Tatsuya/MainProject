@@ -34,7 +34,7 @@ public class PassiveHUD : MonoBehaviour
         passive = player != null ? player.GetComponent<IPlayerPassive>() : null;
         tooltipSource = passive as ISkillTooltipSource;
         if (tooltipSource == null && player != null)
-            tooltipSource = player.GetComponent<GunnerHeat>()?.Data;
+            tooltipSource = player.GetComponentInChildren<IPassiveTooltipProvider>(true)?.PassiveTooltip;
 
         SkillCooldownHUD.SetSlotIcon(icon, tooltipSource);
 
@@ -44,7 +44,8 @@ public class PassiveHUD : MonoBehaviour
             PlayerSkillSlot.Main,
             acceptsLeftClick: false,
             displayKey: "Passive",
-            cooldownSeconds: passive != null ? passive.CooldownTime : (float?)null);
+            cooldownSeconds: passive != null ? passive.CooldownTime : (float?)null,
+            fallbackIcon: icon != null ? icon.sprite : null);
         Refresh();
     }
 

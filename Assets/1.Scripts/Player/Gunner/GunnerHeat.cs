@@ -8,7 +8,7 @@ using UnityEngine;
 /// 현재 과열도·단계·과열 여부는 각 피어가 같은 함수로 계산한다 — 오너 HUD 가 매 프레임 복제 없이 즉시 움직인다.
 /// (character_gunner.md §5 · D7, PLAN-gunner.md G3)
 /// </summary>
-public class GunnerHeat : BaseNetworkBehaviour
+public class GunnerHeat : BaseNetworkBehaviour, IPassiveTooltipProvider
 {
     [SerializeField] private GunnerHeatData data;
 
@@ -30,6 +30,7 @@ public class GunnerHeat : BaseNetworkBehaviour
     public event Action<bool> OverheatChanged;
 
     public GunnerHeatData Data => data;
+    public ISkillTooltipSource PassiveTooltip => data;
     public float MaxHeat => data != null ? data.MaxHeat : 1f;
     public float CurrentHeat => data != null ? GunnerHeatModel.HeatAt(State, Now(), data) : 0f;
     public float Normalized => Mathf.Clamp01(CurrentHeat / MaxHeat);

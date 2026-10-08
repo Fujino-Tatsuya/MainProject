@@ -1227,7 +1227,18 @@ public class MonsterBase : Unit
     // 따라잡으면 옆/뒤로 뒤집히므로 이동형 공격에는 쓰지 않는다.
     public override bool ReceiveAttack(AttackInfo attackInfo, AttackHitContext hitContext)
     {
+        // 백어택(PLAN-assassin A11, 은희 지시(경석 공유)) — 피해에 배율만 곱한다. 배율 1(다른 모든 공격의 기본값)이면
+        // IsBackAttackHit 가 즉시 false 라 기존 경로와 동일하다. AttackInfo 는 값 복사라 이 지역 사본만 바뀐다.
+        bool backAttack = IsServer && CurrentHealth > 0 && IsBackAttackHit(attackInfo, hitContext);
+        int damageBeforeBackAttack = attackInfo.damage;
+        if (backAttack)
+            attackInfo.damage = BackAttackRules.ApplyMultiplier(attackInfo.damage, attackInfo.backAttackMultiplier);
+
         bool resolved = base.ReceiveAttack(attackInfo, hitContext);
+
+        if (backAttack && resolved)
+            Edit.Log($"[BackAttack] {name} 백어택 ×{attackInfo.backAttackMultiplier:0.##} " +
+                     $"({(attackInfo.forceBackAttack ? "강제" : "후방")}) — 피해 {damageBeforeBackAttack} → {attackInfo.damage}", this);
 
         if (IsServer && resolved && AutoHitReactions
             && attackInfo.knockbackStrength > 0f && attackInfo.knockbackDuration > 0f)
@@ -1255,6 +1266,23 @@ public class MonsterBase : Unit
             PlayHitVFXRpc(hitContext.sourcePosition);
 
         return resolved;
+    }
+
+    /// <summary>
+    /// 이 타격이 백어택인가(PLAN-assassin A11, 은희 지시(경석 공유)). 강제(어쌔신 변신 중)면 모든 몬스터,
+    /// 아니면 보스(BossDataSO)만 후방 ±backAttackAngle 판정 — 일반 몬스터·중간보스는 위치 백어택 없음.
+    /// 공격자도 적중 연출을 위해 같은 함수를 부른다(판정은 여기 한 곳).
+    /// </summary>
+    public bool IsBackAttackHit(AttackInfo attackInfo, AttackHitContext hitContext)
+    {
+        if (attackInfo.backAttackMultiplier <= 1f)
+            return false;
+
+        BossDataSO boss = data as BossDataSO;
+        bool behind = boss != null && BackAttackRules.IsBehind(
+            transform.forward, transform.position,
+            BackAttackRules.ResolveAttackerPosition(hitContext), boss.backAttackAngle);
+        return BackAttackRules.Applies(attackInfo.backAttackMultiplier, attackInfo.forceBackAttack, boss != null, behind);
     }
 
     // 서버가 보내는 것은 공격자 위치 하나뿐이다. 계산이 끝난 타격점(Pose)을 보내지 않는 이유:

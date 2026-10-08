@@ -42,9 +42,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
-  id: 
+  id:
   effect: {fileID: 11400000, guid: 6e5662d33b454b3b9d6cfb730b19b3ac, type: 2}
   socket: {fileID: 0}
   offset: {x: 0, y: 0, z: 0}
@@ -92,9 +92,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
-  id: 
+  id:
   effect: {fileID: 11400000, guid: 335ef95975e94f0296156e6fa8aafcba, type: 2}
   socket: {fileID: 0}
   offset: {x: 0, y: 0, z: 0}
@@ -183,9 +183,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
-  id: 
+  id:
   effect: {fileID: 11400000, guid: 72b4d6e038af41c59e0d8317fa26b95c, type: 2}
   socket: {fileID: 0}
   offset: {x: 0, y: 0, z: 0}
@@ -233,9 +233,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
-  id: 
+  id:
   effect: {fileID: 11400000, guid: 846ec0b35a1d47f29b70e4d1c83f5a27, type: 2}
   socket: {fileID: 0}
   offset: {x: 0, y: 0, z: 0}
@@ -283,9 +283,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
-  id: 
+  id:
   effect: {fileID: 11400000, guid: 89e215bef99a4bcf881ab7c6c1a5b4d5, type: 2}
   socket: {fileID: 0}
   offset: {x: 0, y: 0, z: 0}
@@ -333,9 +333,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
-  id: 
+  id:
   effect: {fileID: 11400000, guid: f3091d6ae5b2476cb84a1e7d025c9f38, type: 2}
   socket: {fileID: 0}
   offset: {x: 0, y: 0, z: 0}
@@ -383,9 +383,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
-  id: 
+  id:
   effect: {fileID: 11400000, guid: 71bc5e2049af4d8390c6a7f1e4b8d032, type: 2}
   socket: {fileID: 0}
   offset: {x: 0, y: 0, z: 0}
@@ -433,9 +433,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
-  id: 
+  id:
   effect: {fileID: 11400000, guid: 9b4a2e6cf0d1483e85a7c23b16f9de40, type: 2}
   socket: {fileID: 0}
   offset: {x: 0, y: 0, z: 0}
@@ -483,9 +483,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
-  id: 
+  id:
   effect: {fileID: 11400000, guid: 2f7a1c84e0b94d63905fa8e31c6b7d2a, type: 2}
   socket: {fileID: 0}
   offset: {x: 0, y: 0, z: 0}
@@ -533,9 +533,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
-  id: 
+  id:
   effect: {fileID: 11400000, guid: 0d6fa83b17c94e25ab40e9c1d73f2856, type: 2}
   socket: {fileID: 0}
   offset: {x: 0, y: 0, z: 0}
@@ -583,9 +583,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
-  id: 
+  id:
   effect: {fileID: 11400000, guid: b8e5c03a9f714d26b1a7d48f63c0e5b2, type: 2}
   socket: {fileID: 0}
   offset: {x: 0, y: 0, z: 0}
@@ -633,7 +633,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c7a41f60d2b84e6a9c15d380be720128, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::DashAfterimage
   modelRoot: {fileID: 6235178363960518833}
   includeStaticMeshes: 1
@@ -719,9 +719,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
-  id: 
+  id:
   effect: {fileID: 11400000, guid: 2d87b4f0c6e94a15933ad8e7b1420c6f, type: 2}
   socket: {fileID: 0}
   offset: {x: 0, y: 0, z: 0}
@@ -769,9 +769,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
-  id: 
+  id:
   effect: {fileID: 11400000, guid: 5c81a0b37e2d4f69b3074ac8125de6f0, type: 2}
   socket: {fileID: 0}
   offset: {x: 0, y: 0, z: 0}
@@ -819,9 +819,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
-  id: 
+  id:
   effect: {fileID: 11400000, guid: d4a7f1e3c2b84d9e8a56c0f71b3e2947, type: 2}
   socket: {fileID: 0}
   offset: {x: 0, y: 0, z: 0}
@@ -869,9 +869,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
-  id: 
+  id:
   effect: {fileID: 11400000, guid: 0728e9e7a7e4cc648adf807c0dbc5b8a, type: 2}
   socket: {fileID: 0}
   offset: {x: 0, y: 0, z: 0}
@@ -919,9 +919,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
-  id: 
+  id:
   effect: {fileID: 11400000, guid: c70f3a9db825416ea1d4e8bc0937f562, type: 2}
   socket: {fileID: 0}
   offset: {x: 0, y: 0, z: 0}
@@ -969,9 +969,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
-  id: 
+  id:
   effect: {fileID: 11400000, guid: 5ad28f61904b47c3bf0ea7d239516e8c, type: 2}
   socket: {fileID: 0}
   offset: {x: 0, y: 0, z: 0}
@@ -1019,80 +1019,14 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
-  id: 
+  id:
   effect: {fileID: 11400000, guid: ae2f70915c3b48d6827e1049bf35c7a8, type: 2}
   socket: {fileID: 0}
   offset: {x: 0, y: 0, z: 0}
   scale: 1
   safetyTimeout: 3
---- !u!1001 &2219848827736207785
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 7722051468864962236}
-    m_Modifications:
-    - target: {fileID: 2174947715702180877, guid: 372b8af8722841743a48ffcc3e9b3f06, type: 3}
-      propertyPath: m_AnchoredPosition.y
-      value: 211
-      objectReference: {fileID: 0}
-    - target: {fileID: 6236171600041082142, guid: 372b8af8722841743a48ffcc3e9b3f06, type: 3}
-      propertyPath: m_Name
-      value: GunnerHeatGauge
-      objectReference: {fileID: 0}
-    - target: {fileID: 6907916267488969316, guid: 372b8af8722841743a48ffcc3e9b3f06, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6907916267488969316, guid: 372b8af8722841743a48ffcc3e9b3f06, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: -183
-      objectReference: {fileID: 0}
-    - target: {fileID: 6907916267488969316, guid: 372b8af8722841743a48ffcc3e9b3f06, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6907916267488969316, guid: 372b8af8722841743a48ffcc3e9b3f06, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 6907916267488969316, guid: 372b8af8722841743a48ffcc3e9b3f06, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6907916267488969316, guid: 372b8af8722841743a48ffcc3e9b3f06, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6907916267488969316, guid: 372b8af8722841743a48ffcc3e9b3f06, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6907916267488969316, guid: 372b8af8722841743a48ffcc3e9b3f06, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6907916267488969316, guid: 372b8af8722841743a48ffcc3e9b3f06, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6907916267488969316, guid: 372b8af8722841743a48ffcc3e9b3f06, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: 372b8af8722841743a48ffcc3e9b3f06, type: 3}
---- !u!4 &4689273613673182157 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 6907916267488969316, guid: 372b8af8722841743a48ffcc3e9b3f06, type: 3}
-  m_PrefabInstance: {fileID: 2219848827736207785}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &4164306706429407243
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -5495,7 +5429,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8527612683272302704, guid: 6ed8ca7ac8393e14f8ceb99b28e25556, type: 3}
       propertyPath: 'm_Materials.Array.data[1]'
-      value: 
+      value:
       objectReference: {fileID: 2100000, guid: b3aeb4f9e72ea1748a21f48bd8d7be3e, type: 2}
     - target: {fileID: 8537635002139472156, guid: 6ed8ca7ac8393e14f8ceb99b28e25556, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
@@ -5788,7 +5722,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 81c70da5a2e747148bf71f917743b5fd, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::ColliderInfo
 --- !u!4 &5332974373326914122 stripped
 Transform:
@@ -5815,11 +5749,11 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 800000000000000021, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       propertyPath: soulVisualRoot
-      value: 
+      value:
       objectReference: {fileID: 6235178363960518833}
     - target: {fileID: 1111000000000000003, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       propertyPath: defaultIcon.texture
-      value: 
+      value:
       objectReference: {fileID: 2800000, guid: 7fccd287e62b7282c93057fb6a0bf816, type: 3}
     - target: {fileID: 1111000000000000003, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       propertyPath: defaultIcon.hotspot.x
@@ -5831,7 +5765,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1111000000000000003, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       propertyPath: targetingIcon.texture
-      value: 
+      value:
       objectReference: {fileID: 2800000, guid: dfef3c75029d5145a3531a2db5807385, type: 3}
     - target: {fileID: 1111000000000000003, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       propertyPath: targetingIcon.hotspot.x
@@ -5883,7 +5817,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1976202963046299133, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       propertyPath: m_Actions
-      value: 
+      value:
       objectReference: {fileID: -944628639613478452, guid: 009d7ad6ad2d76847b25fd96c90990a0, type: 3}
     - target: {fileID: 1976202963046299133, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       propertyPath: m_Enabled
@@ -5895,23 +5829,23 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4342448094249856294, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       propertyPath: armature
-      value: 
+      value:
       objectReference: {fileID: 6235178363960518833}
     - target: {fileID: 4711829301158223401, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       propertyPath: subSkill
-      value: 
+      value:
       objectReference: {fileID: 99821651607719020}
     - target: {fileID: 4711829301158223401, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       propertyPath: mainSkill
-      value: 
+      value:
       objectReference: {fileID: 4305858880368545057}
     - target: {fileID: 4711829301158223401, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       propertyPath: ultimateSkill
-      value: 
+      value:
       objectReference: {fileID: 3214493021041571807}
     - target: {fileID: 4711829301158223401, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       propertyPath: interruptSkill
-      value: 
+      value:
       objectReference: {fileID: 6691715782565875710}
     - target: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       propertyPath: m_Name
@@ -5923,9 +5857,6 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 1160318589990200604, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       insertIndex: 0
       addedObject: {fileID: 6235178363960518833}
-    - targetCorrespondingSourceObject: {fileID: 1160318589990200604, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 4689273613673182157}
     - targetCorrespondingSourceObject: {fileID: 1160318589990200604, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       insertIndex: -1
       addedObject: {fileID: 5023245360534601178}
@@ -6003,7 +5934,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 012900c5431d1de49a8b0a51e2071c5b, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::GunnerHeat
   ShowTopMostFoldoutHeaderGroup: 1
   data: {fileID: 11400000, guid: 85f39c655b3225042ba5dd34bd63f474, type: 2}
@@ -6017,7 +5948,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4e60271863ee80f4cb6844e795489762, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::GunnerBeamAttack
   damage: 0
   targetLayer:
@@ -6035,7 +5966,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 10924eef23bfcad41b493de167cc2a8d, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::GunnerBasicAttack
   ShowTopMostFoldoutHeaderGroup: 1
   data: {fileID: 11400000, guid: ae403bdf645464e46a2b3a35bb31473a, type: 2}
@@ -6051,7 +5982,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8fd3035dabed3ff45a7927da37663077, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::GunnerBeamView
   ShowTopMostFoldoutHeaderGroup: 1
   basicDuration: 0.08
@@ -6093,7 +6024,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9295f3f28ac16b149a210300574b3a52, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::GunnerChargeLaserSkill
   data: {fileID: 11400000, guid: 55be3b26a86e5a246a966cd414eb6a91, type: 2}
   hitboxAnchor: {fileID: 0}
@@ -6107,7 +6038,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8bee950356744634c8b1fe82cb6958b0, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::GunnerCoolBackstepSkill
   data: {fileID: 11400000, guid: 17aee94c5ce066b4b9c25de5d6e31de6, type: 2}
   hitboxAnchor: {fileID: 0}
@@ -6121,7 +6052,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6489b7ff66f50b74f9e0740b9cd72f0f, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::GunnerInterruptSkill
   data: {fileID: 11400000, guid: e60875766cf84e644a1f0b7dae235261, type: 2}
   hitboxAnchor: {fileID: 3988724667065146670}
@@ -6135,7 +6066,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8d4b9dc9f299c904ab5f9deb5b1a0cba, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::GunnerTrackingLaserSkill
   data: {fileID: 11400000, guid: 9c68330020ec71f48bef805a9fe0dda6, type: 2}
   hitboxAnchor: {fileID: 0}
@@ -6149,7 +6080,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0b58de5ab591cb64788c7db321a13891, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::GunnerHeatRim
   heat: {fileID: 8123358717657300425}
   gunRenderer: {fileID: 5733852461396902011}
@@ -6173,7 +6104,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c7a41f60d2b84e6a9c15d380be720131, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::DashSpeedLines
   emitters: []
   searchRoot: {fileID: 6235178363960518833}
@@ -6228,7 +6159,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c7a41f60d2b84e6a9c15d380be720128, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::DashAfterimage
   modelRoot: {fileID: 6235178363960518833}
   includeStaticMeshes: 1
@@ -6282,7 +6213,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5224ebf497674f95ae11b2874d37c9fb, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerSkillVfx
   ShowTopMostFoldoutHeaderGroup: 1
   swordLightning: {fileID: 0}
@@ -6301,7 +6232,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6d88b00b61fc48b304012b00d7abe7a6, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerShieldVfx
   ShowTopMostFoldoutHeaderGroup: 1
   barrierLoop: {fileID: 0}

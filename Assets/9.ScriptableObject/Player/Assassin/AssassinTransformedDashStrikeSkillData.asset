@@ -1,0 +1,55 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1a7fb2404155259418f65cdd543efda4, type: 3}
+  m_Name: AssassinTransformedDashStrikeSkillData
+  m_EditorClassIdentifier: Assembly-CSharp::AssassinTransformedDashStrikeSkillData
+  tooltip:
+    displayName: "\uAD00\uD1B5 \uB3CC\uC9C4 (\uBCC0\uC2E0)"
+    subtitle: "Q \uC2A4\uD0AC \xB7 \uBCC0\uC2E0"
+    description: "TODO \uB3CC\uC9C4\uD558\uBA70 \uACBD\uB85C\uC758 \uC801\uC5D0\uAC8C
+      {dmg} \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4. \uC801\uC911 \uC2DC \uCFE8\uD0C0\uC784\uC774
+      \uC904\uC5B4\uB4ED\uB2C8\uB2E4."
+    icon: {fileID: 0}
+  inputType: 0
+  cooldownTime: 3
+  commitCooldownManually: 0
+  attackDamageMultiplier: 1.5
+  flatDamageBonus: 0
+  maxActiveDuration: 1.5777779
+  tickInterval: 0
+  hitPattern: 0
+  usableWhileDead: 0
+  hittableLayers:
+    serializedVersion: 2
+    m_Bits: 17664
+  triggersOnHit: 0
+  targetingMode: 0
+  confirmMode: 0
+  castRange: 8
+  fixedDistance: 0
+  aoeRadius: 0
+  targetableLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  groundPointOutOfRange: 0
+  groundMarkerRadius: 0
+  hoverMarkerDistance: 3
+  animatorStateName: Assassin_Q_DashStrike_Transformed
+  snapRotationOnStart: 1
+  prepareDuration: 0.1
+  endDuration: 0.1
+  dashDistance: 5
+  dashSpeed: 60
+  pathWidth: 1.2
+  pathHeight: 2
+  maxHitResults: 16
+  hitCooldownReduction: 1.5

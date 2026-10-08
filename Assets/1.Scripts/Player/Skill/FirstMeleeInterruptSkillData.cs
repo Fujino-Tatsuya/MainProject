@@ -6,7 +6,7 @@ using UnityEngine;
 /// </summary>
 [CreateAssetMenu(menuName = "Combat/First Melee Interrupt Skill Data")]
 [DataTableSheet("Paladin", Order = 4)]
-public class FirstMeleeInterruptSkillData : PlayerSkillData
+public class FirstMeleeInterruptSkillData : PlayerSkillData, IPlayerInterruptSkillData
 {
     [Header("판정 타이밍")]
     // 시전 → 판정까지의 선딜(초). 클립에 Hit 애니메이션 이벤트를 심으면 그쪽이 우선한다.

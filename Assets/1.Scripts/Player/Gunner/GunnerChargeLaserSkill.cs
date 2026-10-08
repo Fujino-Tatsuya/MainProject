@@ -10,12 +10,13 @@ using UnityEngine;
 /// 쿨타임은 발사 순간부터(수동 커밋). 발사 없이 끝나면(쓰러짐·사망·조작 불가·피격 취소) 쿨타임 없음.
 /// Q 재입력은 취소가 아니다(§3.3 — 실행 중 같은 슬롯 시전은 컨트롤러가 거절). 과열도는 건드리지 않는다.
 /// </summary>
-public class GunnerChargeLaserSkill : PlayerSkillBase
+public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
 {
     private GunnerHeat heat;
     private GunnerBeamAttack beam;
     private GunnerBeamView view;
     private PlayerMovement movement;
+    private SkillLineIndicator lineIndicator;
     private readonly List<Player> allies = new List<Player>();
 
     // 서버 런타임
@@ -25,6 +26,7 @@ public class GunnerChargeLaserSkill : PlayerSkillBase
     private bool fired;
     private float endTime;
     private bool statusApplied;
+    private float ownerChargeStartTime;
 
     public override PlayerSkillSlot Slot => PlayerSkillSlot.Main;
     public override PlayerActionState EntryActionState => PlayerActionState.Focus; // 발사하면 Skill(GunnerBeamView)
@@ -47,6 +49,7 @@ public class GunnerChargeLaserSkill : PlayerSkillBase
         beam = owner.GetComponent<GunnerBeamAttack>();
         view = owner.GetComponent<GunnerBeamView>();
         movement = owner.GetComponent<PlayerMovement>();
+        lineIndicator = owner.GetComponentInChildren<SkillLineIndicator>(true);
     }
 
     public override bool CanUse(Vector3 direction, Unit target) => QData != null && beam != null;
@@ -78,6 +81,7 @@ public class GunnerChargeLaserSkill : PlayerSkillBase
     //    서버 가드를 넣으면 호스트에서만 보인다.
     public override void OnClientPlay(Vector3 direction)
     {
+        ownerChargeStartTime = Time.time;
         if (QData != null)
             view?.BeginCharge(QData.MaxChargeTime);
     }
@@ -85,6 +89,26 @@ public class GunnerChargeLaserSkill : PlayerSkillBase
     public override void OnOwnerTick(Vector3 aimDirection)
     {
         movement?.RotateImmediately(aimDirection);
+
+        if (view == null || !view.IsCharging)
+        {
+            lineIndicator?.HideCharge();
+            return;
+        }
+
+        GunnerChargeLaserData data = QData;
+        if (data == null || beam == null || lineIndicator == null || owner == null)
+            return;
+
+        aimDirection.y = 0f;
+        aimDirection = aimDirection.sqrMagnitude > 0.001f
+            ? aimDirection.normalized
+            : owner.transform.forward;
+        float factor = data.ChargeFactor(Time.time - ownerChargeStartTime);
+        float range = data.RangeAt(factor);
+        Vector3 origin = owner.transform.position + Vector3.up * data.MuzzleHeight;
+        float length = beam.CastLength(origin, aimDirection, range, data.BeamWidth * 0.5f, data.BlockingLayers);
+        lineIndicator.ShowCharge(origin, aimDirection, 0f, length, data.BeamWidth);
     }
 
     public override void OnAimUpdated(Vector3 direction) => aim = direction;
@@ -110,6 +134,7 @@ public class GunnerChargeLaserSkill : PlayerSkillBase
     private void Fire(Vector3 direction)
     {
         GunnerChargeLaserData data = QData;
+        lineIndicator?.HideCharge();
         State = SkillState.Active;
         fired = true;
         endTime = Time.time + data.FireRecovery;
@@ -181,6 +206,7 @@ public class GunnerChargeLaserSkill : PlayerSkillBase
 
     public override void OnEnd(SkillEndReason reason)
     {
+        lineIndicator?.HideCharge();
         // 🔴 **권한 가드 밖이다.** 발사 없이 끝나는 경로(대시 취소·피격·사망)에서도
         //    전 피어가 충전 루프를 꺼야 한다. 안 그러면 그 피어에 총구 연출이 남는다.
         //    (발사로 끝난 경우는 PlayChargeLaser 가 이미 껐고, Stop 은 두 번 불러도 무해하다.)
@@ -204,6 +230,30 @@ public class GunnerChargeLaserSkill : PlayerSkillBase
 
         fired = false;
         base.OnEnd(reason);
+    }
+
+    public bool TryGetPreview(Vector3 origin, Vector3 forward, out SkillPreviewShape shape)
+    {
+        GunnerChargeLaserData data = QData;
+        if (data == null || beam == null || owner == null)
+        {
+            shape = default;
+            return false;
+        }
+
+        forward.y = 0f;
+        forward = forward.sqrMagnitude > 0.001f ? forward.normalized : owner.transform.forward;
+        Vector3 castOrigin = owner.transform.position + Vector3.up * data.MuzzleHeight;
+        float radius = data.BeamWidth * 0.5f;
+        float clippedMin = beam.CastLength(castOrigin, forward, data.MinRange, radius, data.BlockingLayers);
+        float clippedMax = beam.CastLength(castOrigin, forward, data.MaxRange, radius, data.BlockingLayers);
+        shape = SkillPreviewShapes.ChargeLaser(
+            data.MinRange,
+            data.MaxRange,
+            data.BeamWidth,
+            clippedMin,
+            clippedMax);
+        return true;
     }
 
     private void ClearStatus()

@@ -166,15 +166,19 @@ public class GunnerBeamView : BaseNetworkBehaviour
     private float chargeMaxTime = 1.2f;
     private bool chargeFullPlayed;
 
+    public bool IsCharging => charging;
+
     private readonly LineRenderer[] lines = new LineRenderer[3];
     private readonly float[] hideTimes = new float[3];
     private Animator animator;
     private PlayerStateController stateController;
+    private SkillLineIndicator lineIndicator;
 
     private void Awake()
     {
         animator = GetComponentInChildren<Animator>();
         stateController = GetComponent<PlayerStateController>();
+        lineIndicator = GetComponentInChildren<SkillLineIndicator>(true);
     }
 
     /// <summary>
@@ -208,6 +212,7 @@ public class GunnerBeamView : BaseNetworkBehaviour
     public void EndCharge()
     {
         charging = false;
+        lineIndicator?.HideCharge();
 
         // 🔴 **Stop() 만으로는 즉시 안 사라진다.** Release 는 엔트리의 아웃트로(0.3초)를 돌리고,
         //    그 사이 **이미 방출된 입자는 자기 수명(0.75초)까지 살아 있다.**
