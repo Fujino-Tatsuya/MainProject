@@ -1,0 +1,23 @@
+﻿<Solution>
+  <Project Path="Assembly-CSharp-Editor.csproj" />
+  <Project Path="Assembly-CSharp.csproj" />
+  <Project Path="BroAudio.csproj" />
+  <Project Path="Unity.RenderPipelines.Universal.Runtime.csproj" />
+  <Project Path="BroAudioEditor.csproj" />
+  <Project Path="VeyTrace.Rendering.Occlusion.csproj" />
+  <Project Path="VeyTrace.Rendering.Occlusion.Editor.csproj" />
+  <Project Path="BeaverLobby.Player.Dash.csproj" />
+  <Project Path="ExternAttributes.Editor.csproj" />
+  <Project Path="VeyTrace.Rendering.Occlusion.EditModeTests.csproj" />
+  <Project Path="INabCommonEditor.csproj" />
+  <Project Path="WeaponTrail.csproj" />
+  <Project Path="VeyTrace.RuntimeSafety.csproj" />
+  <Project Path="FlatKit.Utils.Editor.csproj" />
+  <Project Path="EuniTween.csproj" />
+  <Project Path="MainProject.DataTable.Attributes.csproj" />
+  <Project Path="EuniTween.EditModeTests.csproj" />
+  <Project Path="BeaverLobby.Player.Dash.EditModeTests.csproj" />
+  <Project Path="INabCommon.csproj" />
+  <Project Path="VeyTrace.RuntimeSafety.EditModeTests.csproj" />
+  <Project Path="TrailsEditor.csproj" />
+</Solution>

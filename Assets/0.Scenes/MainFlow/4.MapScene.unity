@@ -4805,6 +4805,58 @@ PrefabInstance:
       propertyPath: m_IsActive
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 7656291525902327431, guid: 752c9377d228ec54f8c1b2bdcdd8e603, type: 3}
+      propertyPath: Rotations.Array.size
+      value: 4
+      objectReference: {fileID: 0}
+    - target: {fileID: 7656291525902327431, guid: 752c9377d228ec54f8c1b2bdcdd8e603, type: 3}
+      propertyPath: Rotations.Array.data[3].Prefab
+      value: 
+      objectReference: {fileID: 7718167059862872436, guid: 1b6898dd9b7a38340919a7081750f0c5, type: 3}
+    - target: {fileID: 7656291525902327431, guid: 752c9377d228ec54f8c1b2bdcdd8e603, type: 3}
+      propertyPath: Rotations.Array.data[3].YawSteps
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 7656291525902327431, guid: 752c9377d228ec54f8c1b2bdcdd8e603, type: 3}
+      propertyPath: Rotations.Array.data[3].Position.x
+      value: 13.334559
+      objectReference: {fileID: 0}
+    - target: {fileID: 7656291525902327431, guid: 752c9377d228ec54f8c1b2bdcdd8e603, type: 3}
+      propertyPath: Rotations.Array.data[3].Position.y
+      value: 0.000000834465
+      objectReference: {fileID: 0}
+    - target: {fileID: 7656291525902327431, guid: 752c9377d228ec54f8c1b2bdcdd8e603, type: 3}
+      propertyPath: Rotations.Array.data[3].Position.z
+      value: 39.89052
+      objectReference: {fileID: 0}
+    - target: {fileID: 7656291525902327431, guid: 752c9377d228ec54f8c1b2bdcdd8e603, type: 3}
+      propertyPath: Rotations.Array.data[3].HasPosition
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 9050525743128980267, guid: 752c9377d228ec54f8c1b2bdcdd8e603, type: 3}
+      propertyPath: Rotations.Array.size
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 9050525743128980267, guid: 752c9377d228ec54f8c1b2bdcdd8e603, type: 3}
+      propertyPath: Rotations.Array.data[2].Prefab
+      value: 
+      objectReference: {fileID: 411843160232409271, guid: 6849fda9e44544b4984a260535e5337f, type: 3}
+    - target: {fileID: 9050525743128980267, guid: 752c9377d228ec54f8c1b2bdcdd8e603, type: 3}
+      propertyPath: Rotations.Array.data[2].Position.x
+      value: -65.874504
+      objectReference: {fileID: 0}
+    - target: {fileID: 9050525743128980267, guid: 752c9377d228ec54f8c1b2bdcdd8e603, type: 3}
+      propertyPath: Rotations.Array.data[2].Position.y
+      value: 0.0035106242
+      objectReference: {fileID: 0}
+    - target: {fileID: 9050525743128980267, guid: 752c9377d228ec54f8c1b2bdcdd8e603, type: 3}
+      propertyPath: Rotations.Array.data[2].Position.z
+      value: -29.27327
+      objectReference: {fileID: 0}
+    - target: {fileID: 9050525743128980267, guid: 752c9377d228ec54f8c1b2bdcdd8e603, type: 3}
+      propertyPath: Rotations.Array.data[2].HasPosition
+      value: 1
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -6104,6 +6156,46 @@ PrefabInstance:
       propertyPath: baseYOffsetOutside
       value: 15
       objectReference: {fileID: 0}
+    - target: {fileID: 4380788717532805984, guid: 9209d28ce6e85444ab99db9358fa2eeb, type: 3}
+      propertyPath: FixedPrefab
+      value: 
+      objectReference: {fileID: 7718167059862872436, guid: 1b6898dd9b7a38340919a7081750f0c5, type: 3}
+    - target: {fileID: 4380788717532805984, guid: 9209d28ce6e85444ab99db9358fa2eeb, type: 3}
+      propertyPath: Rotations.Array.size
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 4380788717532805984, guid: 9209d28ce6e85444ab99db9358fa2eeb, type: 3}
+      propertyPath: Rotations.Array.data[1].Prefab
+      value: 
+      objectReference: {fileID: 7718167059862872436, guid: 1b6898dd9b7a38340919a7081750f0c5, type: 3}
+    - target: {fileID: 4380788717532805984, guid: 9209d28ce6e85444ab99db9358fa2eeb, type: 3}
+      propertyPath: Rotations.Array.data[0].YawSteps
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 4380788717532805984, guid: 9209d28ce6e85444ab99db9358fa2eeb, type: 3}
+      propertyPath: Rotations.Array.data[1].YawSteps
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 4380788717532805984, guid: 9209d28ce6e85444ab99db9358fa2eeb, type: 3}
+      propertyPath: Rotations.Array.data[0].Position.z
+      value: -175.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 4380788717532805984, guid: 9209d28ce6e85444ab99db9358fa2eeb, type: 3}
+      propertyPath: Rotations.Array.data[1].Position.x
+      value: 0.176525
+      objectReference: {fileID: 0}
+    - target: {fileID: 4380788717532805984, guid: 9209d28ce6e85444ab99db9358fa2eeb, type: 3}
+      propertyPath: Rotations.Array.data[1].Position.z
+      value: -160.94907
+      objectReference: {fileID: 0}
+    - target: {fileID: 4380788717532805984, guid: 9209d28ce6e85444ab99db9358fa2eeb, type: 3}
+      propertyPath: Rotations.Array.data[0].HasPosition
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4380788717532805984, guid: 9209d28ce6e85444ab99db9358fa2eeb, type: 3}
+      propertyPath: Rotations.Array.data[1].HasPosition
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 5056213955610136749, guid: 9209d28ce6e85444ab99db9358fa2eeb, type: 3}
       propertyPath: fadeInDuration
       value: 0.3
@@ -6364,7 +6456,6 @@ GameObject:
   - component: {fileID: 2131038974}
   - component: {fileID: 2131038973}
   - component: {fileID: 2131038972}
-  - component: {fileID: 2131038971}
   m_Layer: 0
   m_Name: Plane
   m_TagString: Untagged
@@ -6372,28 +6463,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!64 &2131038971
-MeshCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2131038970}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 5
-  m_Convex: 0
-  m_CookingOptions: 30
-  m_Mesh: {fileID: 10209, guid: 0000000000000000e000000000000000, type: 0}
 --- !u!23 &2131038972
 MeshRenderer:
   m_ObjectHideFlags: 0

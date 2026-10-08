@@ -18,6 +18,10 @@ Update this file when a term becomes important enough that future agents or team
 ## ▶▶ 작업 세션 (2026-10-07 · 은희(Claude) · **팔라딘 평타 전진 복구 + 공격속도 ×1.2 + 간파 선딜 0.25**, 브랜치 `fix/PaladinDAForward`) — 계획 [PLAN-paladin-da.md](PLAN-paladin-da.md) ✅ 승인 · ✅ C1~C4 구현(진행 = PLAN §7) · SVN **r404** 같이 받을 것 · ⏳ 은희 Play · 미푸시
 - 🔴 **수정 예정 — 동시 수정 금지**: `Player/DefaultAttackController.cs`·`DefaultAttackData.cs`·`4.Animations/Player/PlayerAnimatorController.controller`·`Garen_Default_Attack_1~4.anim`·`9.ScriptableObject/Player/Garen/PlayerDefaultAttackData.asset`·`FirstMeleeInterruptSkillData.asset`·`GameData.xlsx`(SVN 잠금).
 
+## ▶▶ 작업 세션 (2026-10-07 · 은희(Claude+Codex) · **데미지 플로팅 멀티 공유**, 브랜치 `feature/FloatingDamageShare`(development `3217a052` 기준, WorkTree2)) — ✅ 구현 `b2bdb73f`(Codex) · EditMode 23/23 · ✅ MPPM 2인 Play 확인(은희 10-07) · ✅ development 반영(10-08)
+- `FloatingDamageSettings.asset` 표시 필터 = `AllWithOwnEmphasis`: 전원 숫자 표시, **내 것 = 1.0배·알파 255 / 팀원 것 = 0.75배·알파 200**(SO `teammateScaleMultiplier`·`teammateAlpha`, `[DataTableIgnore]`). 판정 = 순수 `FloatingDamageDisplayPolicy`(일반·허수아비 경로 공용). RPC·권한·누적 키 변경 없음. 상세 = [floating-damage-design.md](Docs/tech/floating-damage-design.md).
+- Play 확인 항목(✅ 통과): 호스트·클라 각자 내 숫자 크고 진함 / 팀원 숫자 작고 반투명, 끝에 1.0배로 안 튐 / 공격자별 누적 안 섞임 / 내가 맞은 숫자 계속 미표시.
+
 ## ▶▶ 작업 세션 (2026-10-06 · 은희(Claude+Codex) · **3번째 캐릭터 어쌔신**, 브랜치 `feature/Assassin`) — 계획 [PLAN-assassin.md](PLAN-assassin.md) ✅ 승인 · ✅ A0~A10·A12(`0294cb47`, 진행 = PLAN §8) · ⏸ A11 백어택(경석 OK 대기) · ⏳ A13 xlsx · SVN **r403** 같이 받을 것(단검·GameData.xlsx Assassin 시트) · A7~ 은 claude-alt(다른 계정 Claude) 위임 · ⏳ 은희 Play 회귀(A1~A5) + 어쌔신 전 키트
 - 기획 사본 = [character_assassin.md](Docs/design/character/character_assassin.md)(맨 아래 「구현 결정」 우선). 아트 = SVN `50.Art/Char/assassin/` v16 · 클립은 git `4.Animations/Player/Assassin/` 로 이전.
 - 🔴 코어 변경 포함: 플레이어 **SuperArmor = 몬스터와 같은 의미**(CC·잡기 거부) · 스킬 쿨 장부 스킬 단위 + 슬롯 교체 · 간파 베이스 추출 · 캐릭터 HUD = `<Char>_Armature/HUD`(거너 과열 게이지 이동).

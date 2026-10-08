@@ -5,7 +5,7 @@ using UnityEngine;
 /// <summary>
 /// 데미지 숫자(EuniTween 이징 + 플로팅 데미지 누적 규칙) EditMode 테스트를 메뉴 한 번으로 돌리고 결과를 콘솔에 남긴다.
 ///
-/// EuniTween 테스트는 자기 asmdef 가 있어 어셈블리 이름으로, 누적 규칙 테스트는 asmdef 없는
+/// EuniTween 테스트는 자기 asmdef 가 있어 어셈블리 이름으로, 플로팅 데미지 정책 테스트는 asmdef 없는
 /// <c>Assembly-CSharp-Editor</c> 에 섞여 있어 풀네임 정규식으로 고른다. Filter 를 두 개 넘기면 합집합으로 돈다.
 ///
 /// 패턴은 <see cref="CombatEditModeTestRunner"/> 를 따랐다.
@@ -16,7 +16,7 @@ internal static class DamagePopupEditModeTestRunner
 
     static readonly string[] Fixtures =
     {
-        "^FloatingDamage" // FloatingDamageAccumulationPolicyTests — 누적 키 규칙
+        "^FloatingDamage" // 누적 키·표시 스타일 등 FloatingDamage* 정책
     };
 
     const string Tag = "[DamagePopupTests]";
