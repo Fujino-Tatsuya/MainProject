@@ -40,6 +40,8 @@ public sealed class FloatingDamagePopup : MonoBehaviour
     float _singleDuration;
     int _amount;
     Color _styleColor;
+    float _displayScaleMultiplier;
+    float _displayAlphaMultiplier;
     int _baseMaxHp;
     MonsterRank _rank;
     Color _baseColor;
@@ -102,7 +104,14 @@ public sealed class FloatingDamagePopup : MonoBehaviour
 
         _digitSet = settings.DigitSet;
         _digitHeight = style.height;
-        _alpha = _baseColor.a;
+        FloatingDamageDisplayDecision displayDecision = FloatingDamageDisplayPolicy.Evaluate(
+            settings.DisplayFilter,
+            request.fromLocalPlayer,
+            settings.TeammateScaleMultiplier,
+            settings.TeammateAlpha);
+        _displayScaleMultiplier = displayDecision.scaleMultiplier;
+        _displayAlphaMultiplier = displayDecision.alphaMultiplier;
+        _alpha = _baseColor.a * _displayAlphaMultiplier;
 
         // 누적 구간 판정용 — 대상이 도중에 사라져도 같은 기준으로 판정하도록 생성 때 저장한다.
         _baseMaxHp = request.target != null ? request.target.MaxHp : 0;
@@ -231,7 +240,7 @@ public sealed class FloatingDamagePopup : MonoBehaviour
     float CurrentAlpha()
     {
         float fade = (_elapsed - FadeStartTime()) / _settings.FadeDuration;
-        return _baseColor.a * (1f - Mathf.Clamp01(fade));
+        return _baseColor.a * _displayAlphaMultiplier * (1f - Mathf.Clamp01(fade));
     }
 
     float CurrentScale()
@@ -247,7 +256,7 @@ public sealed class FloatingDamagePopup : MonoBehaviour
         if (punch < 1f)
             scale *= 1f + (_settings.UpdatePunchScale - 1f) * Easing.Punch(_settings.UpdatePunchEase, punch);
 
-        return scale;
+        return scale * _displayScaleMultiplier;
     }
 
     // 좌우로 짧게 1회 — sin 한 주기라 +max → -max → 0 으로 끝난다. 숫자에만 적용(카메라 아님).

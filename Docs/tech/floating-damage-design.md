@@ -137,7 +137,11 @@ FloatingDamageSettings (SO: 색/폰트크기/체류·애니·페이드 시간/�
 - 그 외 대상에 대해 SO enum으로 전환:
   - `AllDamage` (기본) — 모든 유닛의 모든 피해. 복제 기반, RPC 없음
   - `OwnDealtOnly` — 내가 준 딜만. RPC 경로 사용
-  - `AllWithOwnEmphasis` — 전부 표시 + 내 딜만 색/크기 강조. RPC 경로 사용
+  - `AllWithOwnEmphasis` — 전부 표시 + 내 딜 강조. 내 숫자는 기존 크기·불투명도, 팀원 숫자는 SO의
+    `teammateScaleMultiplier`·`teammateAlpha`를 팝/펀치 스케일과 페이드 전체에 곱한다. RPC 경로 사용
+
+현재 기본 에셋은 `AllWithOwnEmphasis`, 팀원 크기 `0.75`, 최대 알파 `200/255`다. 공격자가 플레이어가
+아닌 피해도 로컬 공격이 아니므로 팀원 스타일을 사용한다. `AllDamage`는 로컬 여부와 무관하게 모두 같은 모양이다.
 
 ### 4-3. 추상화 수준 (확정)
 
