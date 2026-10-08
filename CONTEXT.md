@@ -8,6 +8,20 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-10-06 · 은희(Claude+Codex) · **3번째 캐릭터 어쌔신**, 브랜치 `feature/Assassin`) — 계획 [PLAN-assassin.md](PLAN-assassin.md) ✅ 승인 · ✅ A0~A10·A12(`0294cb47`, 진행 = PLAN §8) · ⏸ A11 백어택(경석 OK 대기) · ⏳ A13 xlsx · SVN **r403** 같이 받을 것(단검·GameData.xlsx Assassin 시트) · A7~ 은 claude-alt(다른 계정 Claude) 위임 · ⏳ 은희 Play 회귀(A1~A5) + 어쌔신 전 키트
+- 기획 사본 = [character_assassin.md](Docs/design/character/character_assassin.md)(맨 아래 「구현 결정」 우선). 아트 = SVN `50.Art/Char/assassin/` v16 · 클립은 git `4.Animations/Player/Assassin/` 로 이전.
+- 🔴 코어 변경 포함: 플레이어 **SuperArmor = 몬스터와 같은 의미**(CC·잡기 거부) · 스킬 쿨 장부 스킬 단위 + 슬롯 교체 · 간파 베이스 추출 · 캐릭터 HUD = `<Char>_Armature/HUD`(거너 과열 게이지 이동).
+- 🔴 백어택은 **경석 공유 후**(PLAN §6 초안). 🔴 **수정 예정 — 동시 수정 금지**: `Player/Skill/*`(Controller·Base·Data·Targeting·Interrupt)·`Unit/StatusEffectController.cs`·`PlayerStateController.cs`·`UI/Combat/PassiveHUD.cs`·`SkillCooldownHUD.cs`·`Player/Gunner/*` HUD·`Player_Gunner`/`Gunner_Armature` 프리팹·`CharacterRoster.asset`.
+
+## ▶▶ 작업 세션 (2026-10-06~07 · 은희(Claude+Codex+claude-alt) · **스킬 직선 인디케이터 + HUD 호버 미리보기 + 지점 지정 확장**, 브랜치 `feature/GunnerSkillIndicatorUpgrade`) — ✅ 구현·배선 · EditMode 33/33 · ⏳ Play·MPPM 확인 · 미푸시
+- 계획·결정 = [PLAN.md](PLAN.md) 최상단(그릴 21문항, 레퍼런스 = 롤 제라스 Q). 대상 = 거너 Q(차지 중 직사각형 6→16) · 거너 RMB/팔라딘 RMB/거너 E(HUD 호버 미리보기). 거너 R·팔라딘 R(사거리 원)은 다음 작업.
+- 커밋 `85b6d6df`~`724ac4ba`. 배선 = `Tools/Player/Authoring/Wire Skill Line Indicator`(base `Player.prefab`, 멱등) · 테스트 = `Tools/Tests/스킬 직선 인디케이터 EditMode 테스트 실행`.
+- 계획 밖 변경: `PlayerMotor.GetGroundedPreviewDistance`(미리보기 화살표 클립용) · `PlayerMotionSweep.Resolve` 선택 인자 `logDiagnostics`(기본 true, 기존 호출 동일). 셰이더는 임시 HLSL `.shader`(아트 교체 예정).
+- 후속(10-07): 호버 방향 = `PlayerMovement.CurrentFacing`(루트는 안 돎) · 대상 지정 스킬 호버 = 사거리 원(팔라딘 R·거너 R).
+- 후속(10-07, claude-alt `c53d9fc6` + `2a7830a9`): **지점 지정(GroundPoint) 확장 = 기능만** — `PlayerSkillData` 옵션 `groundPointOutOfRange`(Clamp 기본/AutoApproach) · `groundMarkerRadius`(0=안 그림) · `hoverMarkerDistance`(3). 새 RPC `SubmitPointApproachRpc`. **거너 R 에셋은 기획서대로 SingleTarget 유지**(은희 결정) — 쓰려면 에셋 `targetingMode=GroundPoint`·`AutoApproach`. EditMode 33/33. 팔라딘 Q·E 미리보기는 안 함.
+- ⚠️ 이 워크트리에서 `Assets/Refresh` 뒤 도메인 리로드마다 Unity MCP(3003)가 안 돌아와 `Window > MCP Server` 수동 Start 가 필요했다(10-06~07 4회).
+- ⚠️ base `Player.prefab` 을 저작 메뉴로 고치면 Unity 가 Variant(`Player_Gunner`·`Player_Paladin`)를 재저장해 잡음 diff(오버라이드 재정렬·base 와 같은 값)를 남긴다 — 커밋 전에 확인하고 되돌릴 것.
+
 ## ▶▶ 작업 세션 (2026-10-06 · 은희(Claude) · **스킬 툴팁 인라인 아이콘 + r381 툴팁 행 복구**, 브랜치 `feature/SkillTooltipIcons`) — ✅ 구현 · EditMode 83/83 · Verify 0 · **SVN r384** 같이 받을 것 · ⏳ Play 확인
 - 🔴 **SVN r381(밸런스)이 `tooltip.*` 30행 + `# ─ 툴팁` 10행을 날렸다** → r384 에서 Export 병합으로 복구(r381 수치 유지, 서식 초기화). Boss·Monster `attackCooldown` 행도 인스펙터 값으로 새로 생김. 아트 핀 381 → **384**. 경석 남은 일 3(xlsx Monster 속도)은 **r384 위에서** 고칠 것.
 - 인라인 아이콘 = `SkillTooltipGenerated/tooltipIcon_*.png` → 아틀라스 `SkillTooltipAttackIcon.asset`(guid 유지) · TMP `SkillTooltipAttackSprite`: `atk`·`shield`·`cooldown`. 재생성 = `Tools/UI/스킬 툴팁 인라인 아이콘 갱신`(⚠️ 인스펙터에서 바꾼 BX·BY·AD 를 덮어씀).
@@ -120,6 +134,13 @@ HUD 매 프레임 문자열(`PlayerHealthHUD`·`StatusEffectHUD`·`SkillCooldown
 - ✅ 1단계 Codex(코드) `09e9cc57` · ✅ 2단계 Claude(씬·에셋·`LobbySceneManager` 배선). 결과 요약 = [player-prefabs.md §8.3](Docs/tech/player-prefabs.md)
 - 🔴 남은 것: **은희 MPPM Play 확인**(호스트+클라2: 초상화·Ready 동기화 / Start 활성 / 고른 Variant 스폰) → PR. 레이아웃은 첫 배치라 Play 보고 조정 가능
 - 범위 밖: 전투 HUD 초상화 Paladin 고정(Gunner 도 Paladin 얼굴)
+## ▶▶ 작업 세션 (2026-10-06 · 민경(Claude) · **23호 사망 디졸브 = FlatKit 디졸브 셰이더**, 브랜치 `feature/VFX`) — ✅ Play 확인(민경 10-06, 실루엣 자국 없음)
+- 23호(`TwentyThree.prefab`)는 부위 붕괴 대상이 아니라(팀장 지시 — 쓰러진 자세 2초) `DissolveDeath` 를 유지하되, 녹을 때 셰이더만 잡몹과 같은 **`VFX/Stylized Surface Dissolve`** 로 바꿨다. 기존 템플릿(DissolveFx, URP Lit 계열)은 갈아끼우는 순간 FlatKit 셀 음영·림·아웃라인이 빠져 질감이 바뀌었다.
+- `DissolveDeath.cs`: `stylizedDissolveShader` 필드 추가. 원본이 `FlatKit/Stylized Surface` 면 `new Material(원본)` + 셰이더 교체(룩 유지), 아니면 템플릿 경로. 노이즈는 템플릿의 `_NoiseTexture` 를 빌림. 진행 방향이 반대(`_DissolveAmount` 0→1 / `_Cutoff` 1→0)라 따로 보간. FlatKit 디졸브 슬롯이 있는 렌더러는 그림자 끔(ShadowCaster 가 깎기를 안 탐). 셰이더 필드가 비면 예전 동작 그대로.
+- `DissolveDeath` 사용처는 23호 하나뿐(본체 `FK_No23_Toon` + 탑승 웰즈 `FK_SK_welz_*` 전부 FlatKit). 인터럽트 오버레이 슬롯 건너뛰기는 그대로.
+- 🔴 **경석 공유**: `DissolveDeath.cs`, `TwentyThree.prefab`(필드 3줄 추가).
+- 🔴 **디졸브 후 실루엣 음영이 남던 문제**: `StylizedSurfaceDissolve.shader` 의 `DepthOnly`·`DepthNormals` 가 URP 기본 패스라 디졸브를 안 깎았다 → 색은 사라져도 깊이 버퍼에 원래 모양이 남고, 깊이를 읽는 `FogRendererFeature`(깊이 안개)·`DecalRendererFeature` 가 그 자리를 다르게 칠했다. URP 패스 사본 2개(`StylizedDissolveDepthOnlyPass.hlsl`·`StylizedDissolveDepthNormalsPass.hlsl`)에 `FlatKitDissolveClip` 을 넣어 교체. 잡몹 부위 붕괴 조각도 같은 셰이더라 같이 고쳐진다. 🔴 SVN add 2개 + `.meta`.
+
 ## ▶▶ 작업 세션 (2026-10-06 · 민경(Claude) · **아군 보호막 연출 = 받는 쪽이 주인**, 브랜치 `feature/VFX`) — 구현 완료 · 배선·Play 검증 대기
 계획·그릴 결과 = [PLAN.md](PLAN.md) 맨 위 항목.
 - 거너 Q 가 아군에게 보호막을 줄 때 띄우던 `FX_GunnerShieldGrant` 를 걷고, **아군 자신의 `PlayerShieldVfx` 배리어**로 바꿨다.

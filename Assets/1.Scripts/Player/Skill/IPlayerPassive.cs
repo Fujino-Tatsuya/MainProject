@@ -15,6 +15,15 @@ public interface IPlayerPassive
 }
 
 /// <summary>
+/// P 칸 툴팁 출처. <see cref="IPlayerPassive"/> 가 없거나 툴팁을 직접 구현하지 않는 캐릭터 고유 자원(거너 과열 등)이
+/// 구현한다 — PassiveHUD 는 구체 타입을 모르고 이것만 찾는다(Player 하위 어디든).
+/// </summary>
+public interface IPassiveTooltipProvider
+{
+    ISkillTooltipSource PassiveTooltip { get; }
+}
+
+/// <summary>
 /// 서버가 공격 판정의 첫 Unit 대상에게 기본 피해를 적용하기 직전에 묻는 추가 피해 제공자.
 /// 구현체는 반환과 동시에 소모·쿨타임·회복·연출 같은 발동 상태를 확정한다.
 /// </summary>

@@ -46,6 +46,27 @@ public static class SkillTooltipAuthoring
         { PlayerSkillSlot.Ultimate, "Assets/9.ScriptableObject/Player/Gunner/GunnerTrackingLaserData.asset" },
     };
 
+    private const string AssassinDataFolder = "Assets/9.ScriptableObject/Player/Assassin/";
+
+    // 어쌔신 = 일반 4슬롯 + 변신 대체 Q/E + 패시브(AssassinStateData). 문구는 TODO 임시.
+    private static readonly (string path, string name, string subtitle, string description)[] AssassinTooltips =
+    {
+        (AssassinDataFolder + "AssassinDashStrikeSkillData.asset", "관통 돌진", "Q 스킬",
+            "TODO 바라보는 방향으로 돌진하며 경로의 적에게 {dmg} 피해를 줍니다."),
+        (AssassinDataFolder + "AssassinTransformedDashStrikeSkillData.asset", "관통 돌진 (변신)", "Q 스킬 · 변신",
+            "TODO 돌진하며 경로의 적에게 {dmg} 피해를 줍니다. 적중 시 쿨타임이 줄어듭니다."),
+        (AssassinDataFolder + "AssassinEnhanceSkillData.asset", "단검 강화", "E 스킬",
+            "TODO 다음 기본 공격이 강타로 바뀝니다. 강타가 적중하면 R 스택을 얻습니다."),
+        (AssassinDataFolder + "AssassinCircleStrikeSkillData.asset", "원형 난격", "E 스킬 · 변신",
+            "TODO 지정한 원 범위에 {dmg} 피해를 5번 줍니다. 공격 중 무적입니다."),
+        (AssassinDataFolder + "AssassinTransformSkillData.asset", "변신", "궁극기",
+            "TODO R 스택을 모두 소모해 변신합니다. 스택이 많을수록 오래 유지되며, 2초 뒤 다시 누르면 해제합니다."),
+        (AssassinDataFolder + "AssassinInterruptSkillData.asset", "간파", "우클릭 스킬",
+            "TODO 무기를 올려쳐 적을 간파하고 {dmg} 피해를 줍니다."),
+        (AssassinDataFolder + "AssassinStateData.asset", "백어택 · R 스택", string.Empty,
+            "TODO 보스 뒤에서 공격하면 피해가 증가합니다. 강타 적중으로 R 스택을 최대 4개까지 모읍니다. 변신 중에는 모든 공격이 백어택입니다."),
+    };
+
     [MenuItem("Tools/UI/스킬 툴팁 구성")]
     public static void Configure()
     {
@@ -271,6 +292,26 @@ public static class SkillTooltipAuthoring
             "Assets/9.ScriptableObject/Player/Gunner/GunnerHeatData.asset");
         SeedTooltip(heat, "과열", string.Empty,
             "TODO 과열 단계에 따라 기본 공격 피해가 {dmg} 범위로 강화됩니다.");
+
+        SeedAssassinTooltips();
+    }
+
+    /// <summary>
+    /// 어쌔신 스킬·패시브 툴팁 임시 문구(PLAN-assassin A12, 기획서 표현을 짧게). 변신 Q/E 는 대체 세트라 슬롯 사전 대신 경로로 직접 채운다.
+    /// 비어 있을 때만 채우므로 어쌔신 저작 메뉴(8번)도 CombatHUD 를 건드리지 않고 이것만 부른다.
+    /// </summary>
+    public static void SeedAssassinTooltips()
+    {
+        foreach ((string path, string name, string subtitle, string description) in AssassinTooltips)
+        {
+            Object data = AssetDatabase.LoadAssetAtPath<ScriptableObject>(path);
+            if (data == null)
+            {
+                Debug.LogWarning($"[SkillTooltip] 데이터 에셋 없음: {path}");
+                continue;
+            }
+            SeedTooltip(data, name, subtitle, description);
+        }
     }
 
     private static void SeedSkills(

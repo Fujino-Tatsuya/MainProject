@@ -89,6 +89,27 @@ public class ColliderInfo : MonoBehaviour
     }
 
     /// <summary>
+    /// BoxCollider의 로컬 저작값을 반환한다. 직선 미리보기는 Armature의 현재 회전 대신
+    /// 캐릭터 정면에 이 값을 다시 배치하므로 월드 변환 전 값이 필요하다.
+    /// </summary>
+    public bool TryGetLocalBox(out Vector3 center, out Vector3 size)
+    {
+        if (_boxCollider == null)
+            _boxCollider = GetComponent<BoxCollider>();
+
+        if (_boxCollider == null)
+        {
+            center = default;
+            size = default;
+            return false;
+        }
+
+        center = _boxCollider.center;
+        size = _boxCollider.size;
+        return true;
+    }
+
+    /// <summary>
     /// BoxCollider의 로컬 정보를 Physics.OverlapBoxNonAlloc에서 사용할 월드 기준 정보로 변환합니다.
     /// </summary>
     /// <param name="info">계산된 중심점, 반 크기, 회전값을 저장할 정보 구조체입니다.</param>

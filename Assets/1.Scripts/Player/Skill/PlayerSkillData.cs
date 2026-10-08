@@ -48,8 +48,20 @@ public class PlayerSkillData : ScriptableObject, ISkillTooltipSource
     [SerializeField] private SkillConfirmMode confirmMode = SkillConfirmMode.ClickToConfirm;
     // 사거리(m). 사거리 링 반경이자 시전자 중심 대상/지점 유효 거리. targetingMode != None일 때만 의미.
     [SerializeField, Min(0f)] private float castRange = 8f;
+    // GroundPoint 전용. 커서까지의 거리와 무관하게 시전자에서 castRange만큼 떨어진 지점을 조준한다.
+    [SerializeField] private bool fixedDistance = false;
+    // GroundPoint 전용 효과 범위 반경. 0이면 기존 지점 마커 크기를 사용한다.
+    [SerializeField, Min(0f)] private float aoeRadius = 0f;
     // SingleTarget에서 레이캐스트로 맞출 대상 레이어(기본 Enemy). GroundPoint는 groundMask를 쓴다.
     [SerializeField] private LayerMask targetableLayers;
+
+    [Header("지점 지정(GroundPoint) 전용")]
+    [Tooltip("사거리 밖 클릭 처리. Clamp = 경계로 끌어당겨 바로 시전(기존), AutoApproach = 클릭 지점이 사거리에 들 때까지 걸어간 뒤 시전.")]
+    [SerializeField] private GroundPointOutOfRangeMode groundPointOutOfRange = GroundPointOutOfRangeMode.Clamp;
+    [Tooltip("조준 중 마우스를 따라오는 지점 원 반경(m). 0 이면 그리지 않는다.")]
+    [SerializeField, Min(0f), DataTableIgnore] private float groundMarkerRadius = 0f;
+    [Tooltip("HUD 호버 미리보기에서 지점 원을 캐릭터 정면 몇 m 앞에 그릴지.")]
+    [SerializeField, Min(0f), DataTableIgnore] private float hoverMarkerDistance = 3f;
 
     [Header("연출")]
     // 캐릭터 Animator Controller의 스킬 상태 이름 (CrossFade 대상). 비우면 애니메이션 전환 없음
@@ -70,7 +82,13 @@ public class PlayerSkillData : ScriptableObject, ISkillTooltipSource
     public SkillTargetingMode TargetingMode => targetingMode;
     public SkillConfirmMode ConfirmMode => confirmMode;
     public float CastRange => castRange;
+    public bool FixedDistance => fixedDistance;
+    public float AoeRadius => aoeRadius;
     public LayerMask TargetableLayers => targetableLayers;
+    public GroundPointOutOfRangeMode GroundPointOutOfRange => groundPointOutOfRange;
+    // 파생 SO 가 판정 반경에 맞춰 덮어쓸 수 있다(거너 R = 레이저 radius).
+    public virtual float GroundMarkerRadius => groundMarkerRadius;
+    public float HoverMarkerDistance => hoverMarkerDistance;
     public string AnimatorStateName => animatorStateName;
     public bool SnapRotationOnStart => snapRotationOnStart;
     public SkillTooltipText Tooltip => tooltip;

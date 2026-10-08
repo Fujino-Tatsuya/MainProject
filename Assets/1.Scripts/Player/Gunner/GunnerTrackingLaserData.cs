@@ -36,6 +36,10 @@ public class GunnerTrackingLaserData : PlayerSkillData
     public float RetargetRadius => retargetRadius;
     public float RetargetInterval => retargetInterval;
 
+    // 지점 지정으로 쓸 때 마우스 원 = 레이저 판정 반경. 베이스 값을 따로 넣었으면 그 값을 쓴다.
+    // (지금 R 은 SingleTarget 이라 그려지지 않는다 — targetingMode 를 GroundPoint 로 바꾸면 이 반경으로 뜬다.)
+    public override float GroundMarkerRadius => base.GroundMarkerRadius > 0f ? base.GroundMarkerRadius : radius;
+
     public float StageDamageMultiplier(int stage)
     {
         if (stageDamageMultipliers == null || stageDamageMultipliers.Length == 0)

@@ -1,5 +1,37 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!1 &838410973291948120
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5031444152418763895}
+  m_Layer: 0
+  m_Name: HUD
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &5031444152418763895
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 838410973291948120}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 7915655610186045135}
+  m_Father: {fileID: 8020166898015606970}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &6581962245280537421
 GameObject:
   m_ObjectHideFlags: 0
@@ -66,6 +98,68 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 81c70da5a2e747148bf71f917743b5fd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ColliderInfo
+--- !u!1001 &3605087420122731691
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 5031444152418763895}
+    m_Modifications:
+    - target: {fileID: 6236171600041082142, guid: 372b8af8722841743a48ffcc3e9b3f06, type: 3}
+      propertyPath: m_Name
+      value: GunnerHeatGauge
+      objectReference: {fileID: 0}
+    - target: {fileID: 6907916267488969316, guid: 372b8af8722841743a48ffcc3e9b3f06, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6907916267488969316, guid: 372b8af8722841743a48ffcc3e9b3f06, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6907916267488969316, guid: 372b8af8722841743a48ffcc3e9b3f06, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6907916267488969316, guid: 372b8af8722841743a48ffcc3e9b3f06, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 6907916267488969316, guid: 372b8af8722841743a48ffcc3e9b3f06, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6907916267488969316, guid: 372b8af8722841743a48ffcc3e9b3f06, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6907916267488969316, guid: 372b8af8722841743a48ffcc3e9b3f06, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6907916267488969316, guid: 372b8af8722841743a48ffcc3e9b3f06, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6907916267488969316, guid: 372b8af8722841743a48ffcc3e9b3f06, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6907916267488969316, guid: 372b8af8722841743a48ffcc3e9b3f06, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 372b8af8722841743a48ffcc3e9b3f06, type: 3}
+--- !u!4 &7915655610186045135 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 6907916267488969316, guid: 372b8af8722841743a48ffcc3e9b3f06, type: 3}
+  m_PrefabInstance: {fileID: 3605087420122731691}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &6684392169275540060
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -194,6 +288,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: -8679921383154817045, guid: 675c5b26f3e28aa488f89b54abf23c4b, type: 3}
       insertIndex: -1
       addedObject: {fileID: 5031186172902569291}
+    - targetCorrespondingSourceObject: {fileID: -8679921383154817045, guid: 675c5b26f3e28aa488f89b54abf23c4b, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 5031444152418763895}
     - targetCorrespondingSourceObject: {fileID: 1312684383140622310, guid: 675c5b26f3e28aa488f89b54abf23c4b, type: 3}
       insertIndex: -1
       addedObject: {fileID: 6577791197332317623}

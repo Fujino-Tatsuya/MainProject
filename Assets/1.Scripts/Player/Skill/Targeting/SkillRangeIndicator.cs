@@ -39,14 +39,21 @@ public class SkillRangeIndicator : MonoBehaviour
         rangeDecal.enabled = true;
     }
 
-    // GroundPoint 확정 후보 지점 마커. show=false면 숨긴다.
-    public void SetGroundMarker(bool show, Vector3 worldPoint)
+    // GroundPoint 지점 원. radius(m) 반경으로 그린다. show=false 거나 radius 가 0 이하면 숨긴다.
+    public void SetGroundMarker(bool show, Vector3 worldPoint, float radius)
     {
         if (groundMarkerDecal == null)
             return;
 
-        if (show)
+        if (show && radius > 0f)
         {
+            Vector3 size = groundMarkerDecal.size;
+            size.x = radius * 2f;
+            size.y = radius * 2f;
+            if (size.z <= 0f)
+                size.z = decalDepth;
+            groundMarkerDecal.size = size;
+
             groundMarkerDecal.transform.position = worldPoint;
             groundMarkerDecal.enabled = true;
         }

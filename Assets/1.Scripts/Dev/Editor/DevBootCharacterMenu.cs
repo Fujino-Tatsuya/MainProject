@@ -9,6 +9,7 @@ public static class DevBootCharacterMenu
     private const string MenuRoot = "Dev/Dev Boot/캐릭터/";
     private const string PaladinPath = "Assets/2.Prefabs/Player/Paladin/Player_Paladin.prefab";
     private const string GunnerPath = "Assets/2.Prefabs/Player/Gunner/Player_Gunner.prefab";
+    private const string AssassinPath = "Assets/2.Prefabs/Player/Assassin/Player_Assassin.prefab";
 
     [MenuItem(MenuRoot + "기본값 (NetworkManager)", priority = 0)]
     private static void UseDefault() => DevBootTarget.PlayerPrefabPath = string.Empty;
@@ -38,5 +39,15 @@ public static class DevBootCharacterMenu
     {
         Menu.SetChecked(MenuRoot + "거너", DevBootTarget.PlayerPrefabPath == GunnerPath);
         return AssetDatabase.LoadAssetAtPath<UnityEngine.GameObject>(GunnerPath) != null;
+    }
+
+    [MenuItem(MenuRoot + "어쌔신", priority = 13)]
+    private static void UseAssassin() => DevBootTarget.PlayerPrefabPath = AssassinPath;
+
+    [MenuItem(MenuRoot + "어쌔신", true)]
+    private static bool UseAssassinValidate()
+    {
+        Menu.SetChecked(MenuRoot + "어쌔신", DevBootTarget.PlayerPrefabPath == AssassinPath);
+        return AssetDatabase.LoadAssetAtPath<UnityEngine.GameObject>(AssassinPath) != null;
     }
 }

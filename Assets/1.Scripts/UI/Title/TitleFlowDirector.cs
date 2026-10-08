@@ -299,6 +299,8 @@ public sealed class TitleFlowDirector : MonoBehaviour
 
         _state = TitleFlowState.Starting;
         ClearSelection();
+        if (_crtFx != null)
+            _crtFx.AmbientBursts = true; // 메뉴에서 끈 지직거림을 시작 연출 동안 되살린다 — 입력은 이미 잠겼다
         Burst(0.35f, 0.1f);
         Debug.Log("[TitleFlow] Starting");
 

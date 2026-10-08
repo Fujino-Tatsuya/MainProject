@@ -337,6 +337,10 @@ Paladin  (루트 컴포넌트 37개 — Player 와 동일 구성)
    캐릭터·무기마다 그 **Material Variant**(`Paladin_Toon`·`Paladin_Sword/Shield_Toon`·`Gunner_Toon`·`LaserGun_Toon`)를 두고 **Base Map 만** 덮는다.
    새 캐릭터 = Variant 하나 추가. 정리 툴 `Tools/Player/Toon Material/공통 머티리얼 + Variant 정리`(`PlayableToonMaterialAuthoring.cs`, 재실행 안전 — 🔴 Variant 의 Base Map 외 오버라이드를 전부 되돌린다).
    계획 원본 [PLAN-playable-toon-material.md](../history/PLANS/PLAN-playable-toon-material.md).
+5-2. **캐릭터 고유 HUD**(2026-10-06, [PLAN-assassin.md](../../PLAN-assassin.md) A5) → 공용 `CombatHUD` 에 넣지 않는다. 캐릭터 전용 UI 프리팹을
+   **`<Char>_Armature/HUD`** 아래에 중첩한다(자체 Canvas, 오너만 표시). 유령 상태에서 Armature 가 꺼지면 함께 숨는다.
+   예: 거너 과열 게이지 = `Gunner_Armature/HUD/GunnerHeatGauge`(`Tools/Player/Gunner/과열 게이지 프리팹 (임시 UI)`, 재실행 안전).
+   P 칸 툴팁 출처는 `IPlayerPassive`(툴팁 구현 시) → 없으면 하위의 `IPassiveTooltipProvider` — `PassiveHUD` 는 캐릭터 타입을 모른다.
 6. **`Legacy/` 의 프리팹이나 `Paladin/Paladin_VFX.prefab` 을 고쳤다** → 게임에 반영되지 않는다. 어떤 씬·스폰 경로도 가리키지 않는다(`DefaultNetworkPrefabs` 자동 등록은 스폰과 무관).
 7. **역할/캐릭터 경계를 새로 긋는다** → §1.4 계약을 먼저 읽고 팀에 올린다.
 

@@ -45,6 +45,11 @@ public class DissolveDeath : NetworkBehaviour, IDeathEffect
     // 원본(URP/Lit) 쪽 이름. _BaseColor는 양쪽 이름이 같다.
     static readonly int SourceBaseMapId = Shader.PropertyToID("_BaseMap");
     static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
+    // FlatKit 디졸브 셰이더(VFX/Stylized Surface Dissolve) 쪽 이름. 템플릿과 방향이 반대다(0 = 보임).
+    static readonly int DissolveAmountId = Shader.PropertyToID("_DissolveAmount");
+    static readonly int DissolveNoiseId = Shader.PropertyToID("_DissolveNoise");
+    static readonly int TemplateNoiseId = Shader.PropertyToID("_NoiseTexture");
+    const string FlatKitShaderName = "FlatKit/Stylized Surface";
 
     const float Visible = 1f;
     const float Dissolved = 0f;
@@ -52,6 +57,19 @@ public class DissolveDeath : NetworkBehaviour, IDeathEffect
     [Tooltip("DissolveFx 셰이더 머티리얼. 캐릭터별로 만들 필요 없다 — 원본 텍스처는 런타임에 복사한다.\n" +
              "여기서는 _NoiseTexture / _NoiseScale / _Edge_Size / _Edge_Color만 저작한다")]
     [SerializeField] Material dissolveTemplate;
+
+    // 🔴 템플릿(DissolveFx)은 URP Lit 계열이라 갈아끼우는 순간 FlatKit 의 셀 음영·림·아웃라인이 빠지고
+    //    질감이 확 바뀐다. 이 셰이더는 FlatKit 사본에 깎기만 더한 것이라 원본 머티리얼을 복제해
+    //    셰이더만 바꾸면 룩이 그대로 남는다 — 잡몹 부위 붕괴(CollapseDeath)와 같은 셰이더다(2026-10-06).
+    [Tooltip("FlatKit 머티리얼을 녹일 셰이더(VFX/Stylized Surface Dissolve).\n" +
+             "비우면 전부 위의 템플릿으로 녹인다(예전 동작). FlatKit 이 아닌 슬롯은 어차피 템플릿으로 간다")]
+    [SerializeField] Shader stylizedDissolveShader;
+
+    [Tooltip("FlatKit 디졸브의 노이즈. 비우면 템플릿의 _NoiseTexture 를 빌려 쓴다 — 같은 그림이어야 하니까")]
+    [SerializeField] Texture dissolveNoise;
+
+    [Tooltip("노이즈 반복 수. 크면 잘게, 작으면 뭉텅이로 녹는다")]
+    [SerializeField, Min(0.01f)] float dissolveNoiseTiling = 4f;
 
     [Tooltip("사망 시 생성할 파티클 프리팹. 미리 자식으로 두지 않는 이유는 두 가지다 — " +
              "스폰 시점부터 계층에 떠 있을 필요가 없고, 캐릭터 8종에 중첩 프리팹을 각각 " +
@@ -83,6 +101,8 @@ public class DissolveDeath : NetworkBehaviour, IDeathEffect
 
     // 우리가 new로 만든 인스턴스. 렌더러에 꽂아둔 것이라 직접 파괴해야 샌 게 아니다.
     readonly List<Material> _created = new List<Material>();
+    // 그중 FlatKit 디졸브로 만든 것. 진행 방향(_DissolveAmount 0 -> 1)이 템플릿(_Cutoff 1 -> 0)과 반대라 따로 든다.
+    readonly List<Material> _stylized = new List<Material>();
     ParticleSystem _particle;
     bool _played;
 
@@ -192,6 +212,7 @@ public class DissolveDeath : NetworkBehaviour, IDeathEffect
             Material[] sources = r.sharedMaterials;   // 읽기 전용. 여기서 인스턴스를 만들지 않는다
             var replaced = new Material[sources.Length];
 
+            int stylizedBefore = _stylized.Count;
             for (int s = 0; s < sources.Length; s++)
             {
                 // 건너뛴 슬롯은 원본(shared)을 그대로 돌려놓는다. 배열 대입은 복제하지 않으므로
@@ -200,12 +221,24 @@ public class DissolveDeath : NetworkBehaviour, IDeathEffect
             }
 
             r.materials = replaced;
+
+            // 🔴 FlatKit 디졸브의 ShadowCaster 는 URP 공용 패스라 깎기를 안 탄다.
+            //    그대로 두면 다 녹은 뒤에도 원래 모양 그림자가 바닥에 남는다.
+            if (_stylized.Count > stylizedBefore)
+                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         }
     }
 
-    /// <summary>템플릿을 복제하고 원본의 albedo·틴트만 옮겨 적는다.</summary>
+    /// <summary>
+    /// 디졸브 사본을 만든다. 원본이 FlatKit 이고 셰이더가 물려 있으면 <see cref="BuildStylizedDissolve"/>,
+    /// 아니면 템플릿을 복제하고 원본의 albedo·틴트만 옮겨 적는다.
+    /// </summary>
     Material BuildDissolveMaterial(Material source)
     {
+        if (stylizedDissolveShader != null && source != null && source.shader != null &&
+            source.shader.name == FlatKitShaderName)
+            return BuildStylizedDissolve(source);
+
         Material m = new Material(dissolveTemplate);
         _created.Add(m);
 
@@ -229,6 +262,35 @@ public class DissolveDeath : NetworkBehaviour, IDeathEffect
         if (m.HasProperty(CutoffId))
             m.SetFloat(CutoffId, Visible);
 
+        return m;
+    }
+
+    /// <summary>
+    /// FlatKit 원본을 통째로 복제하고 셰이더만 디졸브판으로 바꾼다.
+    ///
+    /// 디졸브 셰이더가 FlatKit 의 <b>상위집합</b>이라 가능한 수다 — <c>new Material(source)</c> 가
+    /// 프로퍼티·키워드를 전부 복제하고, <c>shader</c> 를 바꿔도 이름이 같은 프로퍼티는 살아남는다.
+    /// 셀 단계·림·아웃라인 설정을 하나씩 옮겨 적을 필요가 없다.
+    /// </summary>
+    Material BuildStylizedDissolve(Material source)
+    {
+        var m = new Material(source);
+        m.shader = stylizedDissolveShader;
+
+        Texture noise = dissolveNoise;
+        if (noise == null && dissolveTemplate != null && dissolveTemplate.HasProperty(TemplateNoiseId))
+            noise = dissolveTemplate.GetTexture(TemplateNoiseId);
+
+        if (noise != null)
+        {
+            m.SetTexture(DissolveNoiseId, noise);
+            m.SetTextureScale(DissolveNoiseId, Vector2.one * dissolveNoiseTiling);
+        }
+
+        m.SetFloat(DissolveAmountId, 0f);
+
+        _created.Add(m);
+        _stylized.Add(m);
         return m;
     }
 
@@ -294,19 +356,27 @@ public class DissolveDeath : NetworkBehaviour, IDeathEffect
         while (elapsed < safeDuration)
         {
             elapsed += Time.deltaTime;
-            ApplyCutoff(Mathf.Lerp(Visible, Dissolved, elapsed / safeDuration));
+            ApplyProgress(elapsed / safeDuration);
             yield return null;
         }
 
-        ApplyCutoff(Dissolved);
+        ApplyProgress(1f);
     }
 
-    void ApplyCutoff(float value)
+    /// <param name="t">0 = 멀쩡함, 1 = 다 녹음.</param>
+    void ApplyProgress(float t)
     {
+        t = Mathf.Clamp01(t);
+        float cutoff = Mathf.Lerp(Visible, Dissolved, t);
+
         for (int i = 0; i < _created.Count; i++)
         {
-            if (_created[i] != null)
-                _created[i].SetFloat(CutoffId, value);
+            Material m = _created[i];
+            if (m == null) continue;
+
+            // 두 셰이더의 방향이 반대다 — 템플릿 _Cutoff 1 -> 0, FlatKit 디졸브 _DissolveAmount 0 -> 1.
+            if (_stylized.Contains(m)) m.SetFloat(DissolveAmountId, t);
+            else m.SetFloat(CutoffId, cutoff);
         }
     }
 
@@ -324,6 +394,7 @@ public class DissolveDeath : NetworkBehaviour, IDeathEffect
         }
 
         _created.Clear();
+        _stylized.Clear();
         base.OnDestroy();
     }
 }

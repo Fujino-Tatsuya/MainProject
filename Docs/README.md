@@ -26,6 +26,9 @@
 - [tech/workflow.md](tech/workflow.md) — git 브랜치·PR, Unity 협업 세팅, SVN/Git 하이브리드
 - [tech/map-generation.md](tech/map-generation.md) — 절차적 맵 생성 흐름, 영역/티어 규칙, NGO 서버권한 생성+결과복제
 
+## 치명 이슈
+- [criticalIssue/](criticalIssue/README.md) — 진행을 막거나 특정 환경에서만 조용히 터진 이슈의 원인·확정 근거·재발 방지 기록
+
 ## 일정
 
 - 일정은 `Project_MT 일정.xlsx`(담당: 이지원)로 관리 — 팀 Vault `Core/project-schedule-2026.md`에 스냅샷. (구 `tasks/roadmap.md`는 폐기)

@@ -27,7 +27,8 @@ public static class PlayerMotionSweep
         LayerMask obstacleMask,
         float skin,
         int maxIterations,
-        RaycastHit[] buffer)
+        RaycastHit[] buffer,
+        bool logDiagnostics = true)
     {
         return Resolve(
             capsule,
@@ -40,7 +41,8 @@ public static class PlayerMotionSweep
             obstacleMask,
             skin,
             maxIterations,
-            buffer);
+            buffer,
+            logDiagnostics);
     }
 
     /// <summary>
@@ -57,7 +59,8 @@ public static class PlayerMotionSweep
         LayerMask obstacleMask,
         float skin,
         int maxIterations,
-        RaycastHit[] buffer)
+        RaycastHit[] buffer,
+        bool logDiagnostics = true)
     {
         if (capsule == null || buffer == null || desiredDelta.sqrMagnitude <= 1e-10f)
             return desiredDelta;
@@ -65,7 +68,8 @@ public static class PlayerMotionSweep
         Transform owner = capsule.transform;
         Vector3 resolved = ResolveCore(capsule, owner, originOffset, desiredDelta, horizontalStepDelta, isGrounded,
             stepOffset, maxWalkableAngle, obstacleMask, skin, maxIterations, buffer);
-        LogIfBlockedByEnemy(capsule, owner, originOffset, desiredDelta, resolved, obstacleMask, skin, buffer);
+        if (logDiagnostics)
+            LogIfBlockedByEnemy(capsule, owner, originOffset, desiredDelta, resolved, obstacleMask, skin, buffer);
         return resolved;
     }
 

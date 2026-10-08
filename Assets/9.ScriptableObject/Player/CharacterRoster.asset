@@ -21,7 +21,7 @@ MonoBehaviour:
     playerPrefab: {fileID: 1006850121594653262, guid: 0fbb7232130df8540a013fe07a9f9977, type: 3}
     portrait: {fileID: 21300000, guid: 48fcc0833eb62e840b204b0b8d22e4cb, type: 3}
     available: 1
-  - displayName: "\uC900\uBE44 \uC911"
-    playerPrefab: {fileID: 0}
+  - displayName: "\uC5B4\uC314\uC2E0"
+    playerPrefab: {fileID: 768617275354264640, guid: 09946a29a8149e944b20acf9967ee741, type: 3}
     portrait: {fileID: 0}
     available: 0

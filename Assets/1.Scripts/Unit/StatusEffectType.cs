@@ -14,7 +14,7 @@ public enum StatusEffectType
     Rooted = 1 << 3,         // 속박
     Silenced = 1 << 4,       // 침묵(스킬 봉인)
     Debilitated = 1 << 5,    // 약화(대쉬X, 둔화)
-    SuperArmor = 1 << 6,     // 슈퍼아머(넉백/공격 취소 무시)
+    SuperArmor = 1 << 6,     // 넉백·밀기·잡기·차단류 CC 무시(플레이어/몬스터 공통)
 
     // 스탯 modifier — 인스턴스의 magnitude(배율)가 곱으로 집계된다 (버프 > 1, 디버프 < 1)
     MoveSpeedModifier = 1 << 7,
@@ -29,6 +29,20 @@ public enum StatusEffectType
 
     // 정신 집중 — 거너 Q 충전 중 표식(D5, HUD 아이콘). 차단·스탯 테이블에 넣지 않는다(감속은 MoveSpeedModifier 로 따로 건다).
     Focus = 1 << 13,
+}
+
+/// <summary>SuperArmor가 신규 상태효과 적용을 거부하는 공통 판정.</summary>
+public static class StatusEffectImmunityPolicy
+{
+    public const StatusEffectType BlockedCrowdControl =
+        StatusEffectType.Airborne | StatusEffectType.Stunned | StatusEffectType.Slowed |
+        StatusEffectType.Rooted | StatusEffectType.Silenced | StatusEffectType.Debilitated;
+
+    public static bool ShouldIgnoreApplication(StatusEffectType activeEffects, StatusEffectType incomingType)
+    {
+        return (activeEffects & StatusEffectType.SuperArmor) != 0 &&
+            (incomingType & BlockedCrowdControl) != 0;
+    }
 }
 
 // 상태 효과의 성격. 연출 일괄 해제처럼 "디버프만" 골라야 하는 곳이 쓴다.

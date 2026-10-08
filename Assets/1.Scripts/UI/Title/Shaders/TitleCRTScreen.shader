@@ -153,8 +153,14 @@ Shader "Title/CRTScreen"
 
                 // ── 전원 꺼짐(월드 화면판). UI용 TitleCRTOff 는 투명·ZWrite Off 라 여기선 못 쓴다 —
                 //    같은 수식(PowerOffColor)을 불투명·깊이 기록 그대로 화면 메시 안에서 그린다. 끝 = 검정.
+                //    꺼지는 동안에도 노이즈(지터·찢김·글리치 + 스캔라인·그레인)는 켜진 화면과 같게 얹는다(은희 10-07).
                 if (_Power < 0.999)
-                    return half4(PowerOffColor(i.rawUv, 1.0 - saturate(_Power)), 1);
+                {
+                    half3 off = PowerOffColor(TitleCrtDistort(i.rawUv), 1.0 - saturate(_Power));
+                    off *= TitleCrtScan(i.rawUv.y * _ScanCount);
+                    off *= 1.0 + (TitleHash21(i.rawUv * 1024.0 + floor(_FxTime * 60.0)) - 0.5) * 2.0 * _Grain;
+                    return half4(off, 1);
+                }
 
                 float2 uv = TitleCrtDistort(i.uv);
 

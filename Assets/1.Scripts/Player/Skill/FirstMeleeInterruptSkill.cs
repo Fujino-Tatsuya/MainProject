@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -12,7 +11,7 @@ using UnityEngine;
 /// 클립의 Hit 애니메이션 이벤트(정밀) 또는 <see cref="FirstMeleeInterruptSkillData.HitDelay"/> 타이머(폴백).
 /// 클립은 아트/SVN 관할이라 이벤트 없이도 성립해야 한다.
 /// </summary>
-public class FirstMeleeInterruptSkill : PlayerInstantSkill
+public class FirstMeleeInterruptSkill : PlayerInterruptSkillBase, ISkillPreviewSource
 {
     // 🔴 여기는 RPC 가 필요 없다 — OnClientPlay 와 OnEnd 는 둘 다 전 피어에서 돈다:
     //    시작 → 서버는 TryStartSkillServer 가, 클라는 PlaySkillClientRpc 가 PlaySkillPresentation 을 탄다
@@ -31,44 +30,6 @@ public class FirstMeleeInterruptSkill : PlayerInstantSkill
     //    애니 이벤트=HandleAnimationEvent 의 IsServer 게이트) 이 클래스는 MonoBehaviour 라 RPC 를 못 단다.
     [Tooltip("적중 충격파 전파 창구. 플레이어 루트의 PlayerShieldVfx 를 물린다.\n비워두면 연출만 빠진다")]
     [SerializeField] private PlayerShieldVfx shieldVfx;
-
-    private Collider[] hitResults;
-    // 키가 Unit이 아니라 Object인 이유: 파괴 가능한 상자처럼 Unit이 아닌 IAttackReceiver도
-    // 피격 대상이다. 그런 대상은 Hurtbox를 키로 쓴다(아래 히트 루프 참조).
-    private readonly HashSet<Object> hitTargets = new HashSet<Object>();
-    // 이번 판정에 맞은 Unit (Player.ServerAttackLanded 통지용). Unit 이 아닌 대상(상자 등)은 빠진다.
-    private readonly List<Unit> landedUnits = new List<Unit>();
-
-    private float hitTime;
-    private float endTime;
-    private bool hasResolvedHit;
-
-    public override PlayerSkillSlot Slot => PlayerSkillSlot.Interrupt;
-
-    // 강타 중 이동 잠금 — 방향을 확정한 뒤 때린다
-    public override bool CanMoveWhileActive => false;
-
-    private FirstMeleeInterruptSkillData InterruptData => Data as FirstMeleeInterruptSkillData;
-
-    public override void OnServerStart(Vector3 direction, Unit target)
-    {
-        base.OnServerStart(direction, target);
-
-        FirstMeleeInterruptSkillData data = InterruptData;
-        if (data == null)
-        {
-            Debug.LogError("[Player] 단죄의 방패에는 FirstMeleeInterruptSkillData가 필요합니다.", this);
-            EndSelf(SkillEndReason.Completed);
-            return;
-        }
-
-        hasResolvedHit = false;
-        hitTime = Time.time + data.HitDelay;
-        endTime = Time.time + data.SkillDuration;
-
-        if (hitResults == null || hitResults.Length != data.MaxHitResults)
-            hitResults = new Collider[data.MaxHitResults];
-    }
 
     public override void OnClientPlay(Vector3 direction)
     {
@@ -92,98 +53,41 @@ public class FirstMeleeInterruptSkill : PlayerInstantSkill
         glowLoop?.Stop();
     }
 
-    public override void OnTick()
+    protected override void OnMissingInterruptData()
     {
-        if (!hasResolvedHit && Time.time >= hitTime)
-            ResolveHit();
-
-        // 종료 순서 주의: 같은 프레임에 둘 다 만족해도 판정이 먼저다
-        if (Time.time >= endTime)
-            EndSelf(SkillEndReason.Completed);
+        Debug.LogError("[Player] 단죄의 방패에는 FirstMeleeInterruptSkillData가 필요합니다.", this);
     }
 
-    public override void OnAnimationEvent(SkillAnimationEventType eventType)
+    protected override void OnMissingHitboxAnchor()
     {
-        if (eventType == SkillAnimationEventType.Hit)
-            ResolveHit();
-
-        // End 이벤트 → EndSelf
-        base.OnAnimationEvent(eventType);
+        Debug.LogError("[Player] 단죄의 방패에 판정 앵커(hitboxAnchor)가 배정되지 않았습니다.", this);
     }
 
-    // 서버 전용. 래치가 있어 애니 이벤트와 타이머가 겹쳐도 한 번만 들어간다.
-    private void ResolveHit()
+    public bool TryGetPreview(Vector3 origin, Vector3 forward, out SkillPreviewShape shape)
     {
-        if (hasResolvedHit)
-            return;
-
-        hasResolvedHit = true;
-
-        if (HitboxAnchor == null || owner == null)
+        if (HitboxAnchor == null ||
+            !HitboxAnchor.TryGetLocalBox(out Vector3 center, out Vector3 size))
         {
-            Debug.LogError("[Player] 단죄의 방패에 판정 앵커(hitboxAnchor)가 배정되지 않았습니다.", this);
-            return;
+            shape = default;
+            return false;
         }
 
-        int hitCount = OverlapHitboxAnchor(hitResults);
-        hitTargets.Clear();
-        landedUnits.Clear();
-        bool onHitBonusTaken = false;
+        shape = SkillPreviewShapes.Hitbox(center, size);
+        return true;
+    }
 
-        int resolvedCount = 0;
+    protected override void OnInterruptTargetResolved(Object target, AttackInfo attackInfo)
+    {
+        // Unit이 아닌 상자도 실제 수신 대상을 로그에 남긴다.
+        Edit.Log($"[Skill] 단죄의 방패 적중 — {target.name} 피해 {attackInfo.damage} (Interrupt)", this);
+    }
 
-        for (int i = 0; i < hitCount; i++)
-        {
-            Collider hit = hitResults[i];
-            if (hit == null)
-                continue;
+    protected override bool CompleteBeforeAttackLanded => true;
 
-            Unit unit = ResolveHitUnit(hit, out Hurtbox hurtbox);
-
-            // 파괴 가능한 상자처럼 Unit이 아닌 대상은 unit이 null이고 hurtbox만 잡힌다.
-            // unit으로 게이트하면 그런 대상이 통째로 걸러진다 — 중복 방지 키를 넓힌다.
-            Object target = unit != null ? (Object)unit : hurtbox;
-            if (target == null || unit == owner || !hitTargets.Add(target))
-                continue;
-
-            // isInterruptAttack = 보스가 카운터 판정에 쓰는 유일한 근거.
-            // 소비 방식은 맞는 쪽이 정한다 — 몬스터는 누적→그로기, No.23은 카운터 창 판정.
-            int resolvedDamage = damageSnapshot;
-            // 시체(공격 거절)는 첫 대상 자리를 차지하지 않는다 — 뒤의 살아 있는 첫 Unit 이 보너스를 받는다.
-            if (!onHitBonusTaken && unit != null && unit.CurrentHealth > 0)
-            {
-                onHitBonusTaken = true;
-                int bonus = owner.ServerTakeOnHitBonus(Data != null && Data.TriggersOnHit, unit);
-                resolvedDamage = bonus >= int.MaxValue - resolvedDamage
-                    ? int.MaxValue
-                    : resolvedDamage + bonus;
-            }
-
-            AttackInfo attackInfo = new AttackInfo(resolvedDamage, DamageAttackType,
-                isInterruptAttack: true, hitPattern: DamageHitPattern);
-            AttackHitContext hitContext =
-                new AttackHitContext(owner.transform.position, owner.transform, hit, owner);
-
-            bool resolved = hurtbox != null
-                ? hurtbox.ReceiveAttack(attackInfo, hitContext)
-                : unit.ReceiveAttack(attackInfo, hitContext);
-
-            if (resolved)
-            {
-                resolvedCount++;
-                if (unit != null)
-                    landedUnits.Add(unit);
-
-                // unit이 아니라 target을 찍는다 — Unit이 아닌 대상(상자 등)은 unit이 null이다.
-                Edit.Log($"[Skill] 단죄의 방패 적중 — {target.name} 피해 {attackInfo.damage} (Interrupt)", this);
-            }
-        }
-
-        // 하나라도 맞았을 때만 충격파. 허공 스윙은 조용히 지나간다.
-        // 대상 수와 무관하게 한 번만 터뜨린다 — 여럿 맞혔다고 겹쳐 재생하면 밝기만 배로 튄다.
+    protected override void OnInterruptResolutionCompleted(int resolvedCount)
+    {
+        // 하나라도 맞았을 때만, 대상 수와 관계없이 충격파를 한 번 재생한다.
         if (resolvedCount > 0)
             shieldVfx?.ServerInterruptWave();
-
-        owner.RaiseServerAttackLanded(DamageAttackType, Data != null && Data.TriggersOnHit, landedUnits, this);
     }
 }

@@ -41,7 +41,14 @@ public static class DataTableBuild
         Debug.LogWarning($"{LogPrefix}지난 빌드가 원복 전에 멈췄다 — 백업 {pending.files.Count}개로 되돌렸다(실패 {failed}).");
     }
 
-    private static void Build(BuildPlayerOptions options)
+    private static void Build(BuildPlayerOptions options) =>
+        WithTableValues(() => BuildPlayerWindow.DefaultBuildMethods.BuildPlayer(options));
+
+    /// <summary>
+    /// 테이블 값을 디스크에 쓰고 <paramref name="build"/> 를 돌린 뒤 원복한다. Build 버튼 훅과
+    /// 메뉴 빌드(<c>BuildWindowsPlayer</c> — BuildPipeline 직접 호출이라 훅을 안 거침)가 같이 쓴다.
+    /// </summary>
+    public static void WithTableValues(Action build)
     {
         DataTableSource.Result result = DataTableSource.Load();
         if (result.FileCount == 0)
@@ -59,7 +66,7 @@ public static class DataTableBuild
         Debug.Log($"{LogPrefix}빌드 — 테이블 필드 {result.Writes.Count}개를 SO·프리팹 {backup.files.Count}개에 적용. 빌드 후 파일째 원복한다.");
         try
         {
-            BuildPlayerWindow.DefaultBuildMethods.BuildPlayer(options);
+            build();
         }
         finally
         {

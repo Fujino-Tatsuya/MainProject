@@ -15,6 +15,11 @@ public sealed class SkillSlotHover : MonoBehaviour,
 
     private Player player;
     private PlayerInputReader input;
+    private PlayerSkillController skillController;
+    private SkillLineIndicator lineIndicator;
+    private ISkillPreviewSource previewSource;
+    private PlayerSkillTargeting targeting;
+    private PlayerSkillData rangePreviewData;
     private ISkillTooltipSource source;
     private PlayerSkillSlot slot;
     private bool clickable;
@@ -22,6 +27,9 @@ public sealed class SkillSlotHover : MonoBehaviour,
     private bool leftPressActive;
     private float? cooldown;
     private string keyLabel;
+
+    /// <summary>출처 툴팁에 아이콘이 없을 때 툴팁이 쓸 아이콘 — 슬롯에 실제로 표시 중인 스프라이트(예: 우클릭 공용 아이콘).</summary>
+    public Sprite FallbackIcon { get; private set; }
 
     /// <summary>스킬 칸 위 좌클릭이 기본 공격·조준 확정으로 새는 것을 막는 전역 게이트.</summary>
     public static bool BlocksPrimaryInput => Hovering.Count > 0 || Pressing.Count > 0 || IsPointerInsideActiveSlot();
@@ -34,12 +42,25 @@ public sealed class SkillSlotHover : MonoBehaviour,
         PlayerSkillSlot inputSlot,
         bool acceptsLeftClick,
         string displayKey,
-        float? cooldownSeconds)
+        float? cooldownSeconds,
+        Sprite fallbackIcon = null)
     {
+        EndSkillPreview();
+        FallbackIcon = fallbackIcon;
         player = owner;
         input = owner != null ? owner.GetComponent<PlayerInputReader>() : null;
+        skillController = owner != null ? owner.GetComponent<PlayerSkillController>() : null;
+        lineIndicator = owner != null ? owner.GetComponentInChildren<SkillLineIndicator>(true) : null;
         source = tooltipSource;
         slot = inputSlot;
+        targeting = owner != null ? owner.GetComponent<PlayerSkillTargeting>() : null;
+        PlayerSkillBase skill = skillController != null ? skillController.GetSkill(slot) : null;
+        previewSource = skill as ISkillPreviewSource;
+        // 대상 지정 스킬(R 등)은 조준 때와 같은 사거리 원을 호버로 미리 보여준다(지점 지정이면 지점 원도).
+        rangePreviewData = skill != null && skill.Data != null &&
+                           skill.Data.TargetingMode != SkillTargetingMode.None && skill.Data.CastRange > 0f
+            ? skill.Data
+            : null;
         clickable = acceptsLeftClick;
         keyLabel = displayKey;
         cooldown = cooldownSeconds;
@@ -51,7 +72,10 @@ public sealed class SkillSlotHover : MonoBehaviour,
         }
 
         if (pointerInside)
-            tooltipView?.BeginHover(this, source, player, (RectTransform)transform, keyLabel, cooldown);
+        {
+            tooltipView?.RefreshHover(this, source, player, (RectTransform)transform, keyLabel, cooldown);
+            BeginSkillPreview();
+        }
     }
 
     public void OnPointerEnter(PointerEventData eventData)
@@ -59,6 +83,7 @@ public sealed class SkillSlotHover : MonoBehaviour,
         pointerInside = true;
         Hovering.Add(GetInstanceID());
         tooltipView?.BeginHover(this, source, player, transform as RectTransform, keyLabel, cooldown);
+        BeginSkillPreview();
     }
 
     public void OnPointerExit(PointerEventData eventData)
@@ -66,6 +91,7 @@ public sealed class SkillSlotHover : MonoBehaviour,
         pointerInside = false;
         Hovering.Remove(GetInstanceID());
         tooltipView?.EndHover(this);
+        EndSkillPreview();
     }
 
     public void OnPointerDown(PointerEventData eventData)
@@ -94,7 +120,26 @@ public sealed class SkillSlotHover : MonoBehaviour,
         pointerInside = false;
         Hovering.Remove(GetInstanceID());
         tooltipView?.EndHover(this);
+        EndSkillPreview();
         ReleaseVirtualInput();
+    }
+
+    private void BeginSkillPreview()
+    {
+        if (previewSource != null)
+            lineIndicator?.BeginPreview(previewSource);
+
+        if (rangePreviewData != null)
+            targeting?.BeginRangePreview(rangePreviewData);
+    }
+
+    private void EndSkillPreview()
+    {
+        if (previewSource != null)
+            lineIndicator?.EndPreview(previewSource);
+
+        if (rangePreviewData != null)
+            targeting?.EndRangePreview();
     }
 
     private void ReleaseVirtualInput()
