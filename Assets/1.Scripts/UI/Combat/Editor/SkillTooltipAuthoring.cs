@@ -151,7 +151,9 @@ public static class SkillTooltipAuthoring
         Canvas canvas, TMP_StyleSheet styleSheet, TMP_SpriteAsset attackSprite, TMP_FontAsset font)
     {
         Transform found = FindDeep(canvas.transform, "SkillTooltipHost");
-        GameObject host = found != null ? found.gameObject : NewUi("SkillTooltipHost", canvas.transform).gameObject;
+        // 없으면 Combat 상태 레이어의 마지막 자식(가장 위에 그림)으로 만든다 — 레이어가 없던 옛 프리팹이면 루트.
+        Transform hostParent = FindDeep(canvas.transform, PlayerCombatUiLifecyclePolicy.CombatLayerName) ?? canvas.transform;
+        GameObject host = found != null ? found.gameObject : NewUi("SkillTooltipHost", hostParent).gameObject;
         Stretch((RectTransform)host.transform);
         SkillTooltipView view = EnsureComponent<SkillTooltipView>(host);
 

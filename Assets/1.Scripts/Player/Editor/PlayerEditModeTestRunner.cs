@@ -22,6 +22,7 @@ internal static class PlayerEditModeTestRunner
         "^HealthShieldTests$",
         "^GunnerHeatModelTests$",
         "^HealthVignetteModelTests$", // 로컬 체력 비네팅 — 시작 비율·맥동·피격 플래시 색·사망 어둡게
+        "^CombatHudLayerRulesTests$", // CombatHUD 상태 레이어 — 생명주기 상태별 표시 레이어
     };
 
     const string Tag = "[PlayerTests]";
