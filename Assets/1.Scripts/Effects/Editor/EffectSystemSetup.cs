@@ -1,85 +1,16 @@
-using System.IO;
 using UnityEditor;
-using UnityEngine;
 
 /// <summary>
-/// Effect System v1의 에디터 진입점 두 가지.
+/// Effect System 에디터 진입점 — 모든 <see cref="EffectEntry"/> 의 수명을 다시 계산해 저장한다.
 ///
-/// ① <b>기본 에셋 생성</b> — 엔트리 · 카탈로그 · 매니저 프리팹을 만든다. 멱등이라 이미 있으면 건드리지 않는다.
-/// ② <b>스모크 테스트</b> — 플레이 모드에서 배관을 자동 검증한다(<see cref="EffectSmokeTestRunner"/>).
-///    S6에서 드라이버를 추가한 뒤 이걸 다시 돌려 "어댑터 추가만으로 끝났는지"를 확인한다.
+/// 2026-10-07 — 쓸모가 없어진 메뉴 둘을 지웠다(민경).
+/// <list type="bullet">
+/// <item><c>v1 기본 에셋 생성</c>: 원본 폴더 <c>Assets/5.VFX</c> 가 SVN 이관(b1980d3)으로 사라져 에러만 냈다</item>
+/// <item><c>스모크 테스트 (Play Mode)</c>: 러너 호출이 주석이라 매니저만 띄우고 아무것도 검증하지 않았다</item>
+/// </list>
 /// </summary>
 public static class EffectSystemSetup
 {
-    // 🔴 이 폴더는 더 이상 없다. b1980d3 "VFX 에셋을 SVN(50.Art)으로 이관" 에서 Assets/5.VFX 가
-    // 통째로 사라졌다. 엔트리를 새로 만드는 경로(v1 기본 에셋 생성)는 그래서 지금 동작하지 않는다.
-    // 새 위치는 SVN 관리 영역(Assets/50.Art/VFX)이라 에디터 도구가 임의로 쓸 자리가 아니다 —
-    // 되살릴지 폐기할지는 VFX 담당(민경) 판단이 필요하다. 2026-08-18 확인.
-    private const string EntryFolder = "Assets/5.VFX/Common";
-    private const string CatalogFolder = "Assets/9.ScriptableObject/Effects";
-    private const string CatalogPath = CatalogFolder + "/EffectCatalog.asset";
-
-    // 같은 이관에서 매니저 프리팹만 git 쪽에 남았고 위치가 바뀌었다(구 Assets/5.VFX/EffectManager.prefab).
-    private const string ManagerPrefabPath = "Assets/2.Prefabs/Managers/EffectManager.prefab";
-
-    [MenuItem("Tools/Effects/v1 기본 에셋 생성")]
-    public static void Run()
-    {
-        EnsureFolder(CatalogFolder);
-
-        var sparkPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(EntryFolder + "/FX_Hit_Spark.prefab");
-        var bluntPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(EntryFolder + "/FX_Hit_Blunt Variant.prefab");
-
-        if (sparkPrefab == null || bluntPrefab == null)
-        {
-            Debug.LogError("[EffectSystemSetup] 기준 프리팹을 찾지 못했다. 경로를 확인할 것.");
-            return;
-        }
-
-        EffectEntry spark = CreateEntry(EntryFolder + "/FX_Hit_Spark_Entry.asset", entry =>
-        {
-            entry.duration = 0f;   // 0 = 프리팹에서 자동 계산
-            entry.prewarmCount = 8;
-            entry.maxActiveWarn = 32;
-            entry.parts = new[] { Part(sparkPrefab, Vector3.zero, 0f) };
-            entry.outroParts = new EffectPart[0];
-        });
-
-        EffectEntry blunt = CreateEntry(EntryFolder + "/FX_Hit_Blunt_Entry.asset", entry =>
-        {
-            entry.duration = 0f;   // 0 = 프리팹에서 자동 계산
-            entry.prewarmCount = 4;
-            entry.maxActiveWarn = 32;
-            // 한 호출로 두 파트가 delay 간격을 두고 순차 발화한다 (컴포지트 3막 검증용).
-            entry.parts = new[]
-            {
-                Part(bluntPrefab, Vector3.zero, 0f),
-                Part(sparkPrefab, new Vector3(0f, 0.3f, 0f), 0.15f),
-            };
-            entry.outroParts = new EffectPart[0];
-        });
-
-        EffectCatalog catalog = AssetDatabase.LoadAssetAtPath<EffectCatalog>(CatalogPath);
-        if (catalog == null)
-        {
-            catalog = ScriptableObject.CreateInstance<EffectCatalog>();
-            AssetDatabase.CreateAsset(catalog, CatalogPath);
-            Debug.Log($"[EffectSystemSetup] 생성: {CatalogPath}");
-        }
-
-        var serialized = new SerializedObject(catalog);
-        SetIfEmpty(serialized, "<HitSpark>k__BackingField", spark);
-        SetIfEmpty(serialized, "<HitBlunt>k__BackingField", blunt);
-        serialized.ApplyModifiedPropertiesWithoutUndo();
-        EditorUtility.SetDirty(catalog);
-
-        CreateManagerPrefab(catalog);
-
-        AssetDatabase.SaveAssets();
-        AssetDatabase.Refresh();
-        Debug.Log("[EffectSystemSetup] 완료.");
-    }
-
     [MenuItem("Tools/Effects/모든 엔트리 수명 재계산")]
     public static void RecomputeAll()
     {
@@ -96,89 +27,11 @@ public static class EffectSystemSetup
             // 메모리에만 있고 에셋 파일에는 없을 수 있는데, 그러면 빌드가 0을 들고 나간다.
             EditorUtility.SetDirty(entry);
 
-            Debug.Log($"[Effect] '{entry.name}' → duration {entry.ResolvedDuration:F2}s " +
-                      $"(계산 {entry.ComputedDuration:F2}s / 오버라이드 {entry.duration:F2}s)", entry);
+            UnityEngine.Debug.Log($"[Effect] '{entry.name}' → duration {entry.ResolvedDuration:F2}s " +
+                                  $"(계산 {entry.ComputedDuration:F2}s / 오버라이드 {entry.duration:F2}s)", entry);
         }
 
         AssetDatabase.SaveAssets();
-        Debug.Log($"[Effect] 엔트리 {guids.Length}개 갱신·저장.");
-    }
-
-    [MenuItem("Tools/Effects/스모크 테스트 (Play Mode)")]
-    public static void Smoke()
-    {
-        if (!Application.isPlaying)
-        {
-            Debug.LogWarning("[EffectSystemSetup] 플레이 모드에서만 실행할 수 있다.");
-            return;
-        }
-
-        if (EffectManager.Instance == null)
-        {
-            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(ManagerPrefabPath);
-            if (prefab == null)
-            {
-                Debug.LogError($"[EffectSystemSetup] {ManagerPrefabPath}를 찾지 못했다.");
-                return;
-            }
-            Object.Instantiate(prefab);
-        }
-
-        //EffectSmokeTestRunner.Launch();
-    }
-
-    private static void CreateManagerPrefab(EffectCatalog catalog)
-    {
-        if (AssetDatabase.LoadAssetAtPath<GameObject>(ManagerPrefabPath) != null) return;
-
-        var root = new GameObject("EffectManager");
-        var manager = root.AddComponent<EffectManager>();
-
-        var serialized = new SerializedObject(manager);
-        serialized.FindProperty("catalog").objectReferenceValue = catalog;
-        serialized.ApplyModifiedPropertiesWithoutUndo();
-
-        PrefabUtility.SaveAsPrefabAsset(root, ManagerPrefabPath);
-        Object.DestroyImmediate(root);
-        Debug.Log($"[EffectSystemSetup] 생성: {ManagerPrefabPath}");
-    }
-
-    private static EffectPart Part(GameObject prefab, Vector3 offset, float delay)
-    {
-        return new EffectPart { prefab = prefab, offset = offset, delay = delay };
-    }
-
-    private static EffectEntry CreateEntry(string path, System.Action<EffectEntry> configure)
-    {
-        var existing = AssetDatabase.LoadAssetAtPath<EffectEntry>(path);
-        if (existing != null) return existing;
-
-        var entry = ScriptableObject.CreateInstance<EffectEntry>();
-        configure(entry);
-        AssetDatabase.CreateAsset(entry, path);
-        Debug.Log($"[EffectSystemSetup] 생성: {path}");
-        return entry;
-    }
-
-    private static void SetIfEmpty(SerializedObject serialized, string propertyPath, Object value)
-    {
-        SerializedProperty property = serialized.FindProperty(propertyPath);
-        if (property == null)
-        {
-            Debug.LogError($"[EffectSystemSetup] 프로퍼티를 찾지 못했다: {propertyPath}");
-            return;
-        }
-
-        if (property.objectReferenceValue == null) property.objectReferenceValue = value;
-    }
-
-    private static void EnsureFolder(string folder)
-    {
-        if (AssetDatabase.IsValidFolder(folder)) return;
-
-        string parent = Path.GetDirectoryName(folder).Replace('\\', '/');
-        string leaf = Path.GetFileName(folder);
-        EnsureFolder(parent);
-        AssetDatabase.CreateFolder(parent, leaf);
+        UnityEngine.Debug.Log($"[Effect] 엔트리 {guids.Length}개 갱신·저장.");
     }
 }
