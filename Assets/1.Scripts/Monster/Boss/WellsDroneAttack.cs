@@ -54,7 +54,6 @@ public sealed class WellsDroneAttack : MonoBehaviour
         _started = _paused = false;
         _target = _lastTarget = null;
         ClientCancel();
-        DestroyBoomVfx();
     }
 
     void Update()
@@ -248,14 +247,14 @@ public sealed class WellsDroneAttack : MonoBehaviour
 
     #region 클라(전 피어) — 임시 연출
 
-    MeshRenderer _cross, _outer, _fill, _boom;
+    MeshRenderer _cross, _outer, _fill;
     Transform _crossTarget;
     float _vStart, _vDur;
     Vector3 _vPos;
     float _vRadius, _vFloorY;
-    enum View { None, Mark, Lock, Boom }
+    enum View { None, Mark, Lock }
     View _view;
-    GameObject _droneGo, _boomVfx;
+    GameObject _droneGo;
     Transform _viewRoot;
     Vector3 _vFrom, _vTo;   // 드론 비행 출발점(대각선 위) → 충돌 지점
     Color _crossColor;
@@ -381,49 +380,25 @@ public sealed class WellsDroneAttack : MonoBehaviour
     public void ClientImpact(Vector3 pos, float radius)
     {
         EnsureView();
-        ClientCancel();
-        _view = View.Boom;
-        _vStart = Time.time;
-        _vDur = Mathf.Max(0.01f, _d.explosionDuration);
-        _vPos = pos;
-        _vRadius = radius;
-        _vFloorY = BossPatternVisuals.SampleFloorY(pos, pos.y) + 0.08f;
+        ClientCancel();   // 예고 원·드론을 거둔다
 
-        if (_d.explosionVfxPrefab != null)
-        {
-            // 참조를 쥐고 있는다 — 제압·사망 취소(ClientCancel)와 파괴에서 회수해야 한다(Codex 교차검증 10-02).
-            // 수명 = explosionDuration. 프리팹 파티클이 더 길면 데이터 값을 늘린다(서버 대기와 같은 기준).
-            DestroyBoomVfx();
-            _boomVfx = Instantiate(_d.explosionVfxPrefab, new Vector3(pos.x, _vFloorY, pos.z), Quaternion.identity);
-        }
-        else
-        {
-            BossPatternVisuals.Paint(_boom, _d.explosionColor, BossPatternVisuals.DiscTexture);
-            _boom.gameObject.SetActive(true);
-        }
+        // 🔴 폭발은 EffectManager 일회 재생이다(2026-10-08 민경). 수명은 엔트리가 정하고 풀이 회수한다 —
+        //    핸들을 쥐지 않으므로 뒤이은 제압·사망 취소에도 끝까지 재생된다(이미 터진 폭발이라 맞다).
+        //    서버의 explosionDuration 은 쿨다운 시작 시점만 정하고 연출 길이와는 무관하다.
+        //    배율 = 폭발 반경(m) — 엔트리 프리팹이 반경 1m 로 저작돼 있다.
+        if (_d.explosionEffect == null || !EffectManager.TryGet(out EffectManager effects, this)) return;
+        float floorY = BossPatternVisuals.SampleFloorY(pos, pos.y) + 0.08f;
+        effects.Play(_d.explosionEffect, new Vector3(pos.x, floorY, pos.z), Quaternion.identity, radius);
     }
 
-    /// <summary>서버 취소 RPC — 진행 중 표식·원·드론에 더해 폭발 VFX 까지 거둔다.</summary>
+    /// <summary>서버 취소 RPC · 단계 전환 — 표식·예고 원·드론을 거둔다. 이미 터진 폭발 연출은 자기 수명대로 둔다.</summary>
     public void ClientCancel()
-    {
-        HideTemp();
-        DestroyBoomVfx();
-    }
-
-    void DestroyBoomVfx()
-    {
-        if (_boomVfx != null) { Destroy(_boomVfx); _boomVfx = null; }
-    }
-
-    // 단계 전환용 — 임시 판·드론만 지운다(폭발 VFX 는 자기 수명대로 둔다).
-    void HideTemp()
     {
         _view = View.None;
         _crossTarget = null;
         if (_cross != null) _cross.gameObject.SetActive(false);
         if (_outer != null) _outer.gameObject.SetActive(false);
         if (_fill != null) _fill.gameObject.SetActive(false);
-        if (_boom != null) _boom.gameObject.SetActive(false);
         StopDroneClips();
         if (_droneGo != null) { Destroy(_droneGo); _droneGo = null; }
     }
@@ -456,15 +431,6 @@ public sealed class WellsDroneAttack : MonoBehaviour
                     }
                     TickDroneClips();
                 }
-                break;
-
-            case View.Boom:
-                if (k >= 1f) { ClientCancel(); return; }
-                // 임시 폭발 — 원이 반경 → explosionGrowScale 배로 퍼지며 사라진다.
-                PlaceDisc(_boom, Mathf.Lerp(_vRadius, _vRadius * _d.explosionGrowScale, k), 0.02f);
-                Color boom = _d.explosionColor;
-                boom.a *= 1f - k;
-                BossPatternVisuals.Paint(_boom, boom, null);
                 break;
         }
     }
@@ -510,7 +476,6 @@ public sealed class WellsDroneAttack : MonoBehaviour
         _cross = BossPatternVisuals.CreateFlat("Crosshair", _viewRoot);
         _outer = BossPatternVisuals.CreateFlat("CircleOuter", _viewRoot);
         _fill = BossPatternVisuals.CreateFlat("CircleFill", _viewRoot);
-        _boom = BossPatternVisuals.CreateFlat("Explosion", _viewRoot);
     }
 
     void OnDisable() => ClientCancel();
@@ -519,7 +484,6 @@ public sealed class WellsDroneAttack : MonoBehaviour
     {
         StopDroneClips();
         if (_droneGo != null) Destroy(_droneGo);
-        DestroyBoomVfx();
         if (_viewRoot != null) Destroy(_viewRoot.gameObject);
         if (_ownedDefaults != null) Destroy(_ownedDefaults);
     }
