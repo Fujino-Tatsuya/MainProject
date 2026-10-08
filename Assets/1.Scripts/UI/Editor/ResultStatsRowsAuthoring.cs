@@ -10,7 +10,8 @@ using UnityEngine.UI;
 /// 결과 화면 플레이어별 통계(PLAN-result-stats 2단계) — 행 프리팹 <c>ResultPlayerRow.prefab</c> 을 만들고
 /// <c>5.ResultScene</c> 에 열 제목 행·<c>PlayerRows</c> 컨테이너를 만든 뒤 <see cref="ResultStatsView"/> 를 배선한다.
 ///
-/// 🔴 <b>멱등하다</b> — 이미 있는 오브젝트는 이름으로 찾아 재사용하고 값만 맞춘다. 배선이 끊기면 다시 돌린다.
+/// 🔴 <b>멱등하다</b> — 없는 것만 기본값으로 만들고, 이미 있는 오브젝트의 위치·크기·글자·프리팹은 건드리지 않는다
+/// (10-08 은희 수동 레이아웃 보호). 다시 돌려도 바뀌는 건 ResultStatsView 배선과 행 미리보기(RowPreview_P*)뿐이다.
 /// 계층·이름 = Docs/tech/result-stats-ui-setup.md (코드가 이름 폴백으로도 찾는다).
 /// </summary>
 public static class ResultStatsRowsAuthoring
@@ -86,7 +87,16 @@ public static class ResultStatsRowsAuthoring
             Debug.Log($"{Tag} 폴더 생성: {PrefabDir}");
         }
 
-        bool exists = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath) != null;
+        GameObject existing = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
+        if (existing != null && existing.GetComponent<ResultPlayerRowView>() != null)
+        {
+            // 🔴 이미 있으면 손대지 않는다 — 프리팹에서 손으로 맞춘 글꼴·폭·색을 덮어쓰지 않기 위해서다.
+            //    처음부터 다시 만들려면 프리팹을 지우고 메뉴를 돌린다.
+            Debug.Log($"{Tag} 행 프리팹 재사용(손대지 않음): {PrefabPath}");
+            return existing.GetComponent<ResultPlayerRowView>();
+        }
+
+        bool exists = existing != null;
         GameObject root = exists
             ? PrefabUtility.LoadPrefabContents(PrefabPath)
             : new GameObject("ResultPlayerRow", typeof(RectTransform));
@@ -123,9 +133,12 @@ public static class ResultStatsRowsAuthoring
             for (int i = 0; i < Columns.Length; i++)
             {
                 Column column = Columns[i];
-                RectTransform cell = GetOrCreateChild(root.transform, column.RowName);
-                cell.SetSiblingIndex(i + 1);
-                SetColumnWidth(cell.gameObject, column.Width, RowHeight);
+                RectTransform cell = GetOrCreateChild(root.transform, column.RowName, out bool cellCreated);
+                if (cellCreated)
+                {
+                    cell.SetSiblingIndex(i + 1);
+                    SetColumnWidth(cell.gameObject, column.Width, RowHeight);
+                }
 
                 if (column.IsImage)
                 {
@@ -138,7 +151,8 @@ public static class ResultStatsRowsAuthoring
                 else
                 {
                     TextMeshProUGUI text = GetOrAdd<TextMeshProUGUI>(cell.gameObject);
-                    ConfigureText(text, font, RowFontSize, column.Align, Color.white, "-");
+                    if (cellCreated) // 이미 있는 칸의 글꼴·크기·정렬은 손으로 맞춘 값을 유지
+                        ConfigureText(text, font, RowFontSize, column.Align, Color.white, "-");
                     refs[column.RowName] = text;
                 }
             }
@@ -194,26 +208,33 @@ public static class ResultStatsRowsAuthoring
             ResultStatsView view = views[0];
             Transform parent = view.transform;
 
+            // 🔴 이미 있는 오브젝트의 위치·크기·글자는 건드리지 않는다 — 은희가 씬에서 손으로 맞춘 레이아웃
+            //    (10-08 9b4bad7a)을 다시 돌릴 때 덮어쓰지 않기 위해서다. 새로 만들 때만 기본값을 넣는다.
+
             // 열 제목 행
             RectTransform header = GetOrCreateChild(parent, "PlayerRowsHeader", out bool headerCreated);
-            PlaceTopCenter(header, HeaderPos, new Vector2(RowWidth, HeaderHeight));
+            if (headerCreated)
+                PlaceTopCenter(header, HeaderPos, new Vector2(RowWidth, HeaderHeight));
             ConfigureRowLayout(GetOrAdd<HorizontalLayoutGroup>(header.gameObject));
             for (int i = 0; i < Columns.Length; i++)
             {
                 Column column = Columns[i];
                 string name = "Header_" + column.RowName.Substring(column.RowName.IndexOf('_') + 1);
-                RectTransform cell = GetOrCreateChild(header, name);
+                RectTransform cell = GetOrCreateChild(header, name, out bool cellCreated);
+                if (!cellCreated)
+                    continue;
                 cell.SetSiblingIndex(i);
                 SetColumnWidth(cell.gameObject, column.Width, HeaderHeight);
                 if (column.HeaderTitle != null)
                     ConfigureText(GetOrAdd<TextMeshProUGUI>(cell.gameObject), font, HeaderFontSize, column.Align,
                         HeaderColor, column.HeaderTitle);
             }
-            Debug.Log($"{Tag} 열 제목 행 {(headerCreated ? "생성" : "재사용")}: PlayerRowsHeader");
+            Debug.Log($"{Tag} 열 제목 행 {(headerCreated ? "생성" : "재사용(위치·글자 유지)")}: PlayerRowsHeader");
 
-            // 행 컨테이너 — 자식은 비운다(더미 행 금지, 문서 참조).
+            // 행 컨테이너 — 실제 행은 런타임에 복제된다. 자식은 배치 미리보기(RowPreview_P*, 런타임에 꺼짐)만 둔다.
             RectTransform rows = GetOrCreateChild(parent, "PlayerRows", out bool rowsCreated);
-            PlaceTopCenter(rows, RowsTopPos, new Vector2(RowWidth, RowHeight));
+            if (rowsCreated)
+                PlaceTopCenter(rows, RowsTopPos, new Vector2(RowWidth, RowHeight));
             VerticalLayoutGroup vertical = GetOrAdd<VerticalLayoutGroup>(rows.gameObject);
             vertical.spacing = RowSpacing;
             vertical.childAlignment = TextAnchor.UpperCenter;
@@ -224,9 +245,14 @@ public static class ResultStatsRowsAuthoring
             ContentSizeFitter fitter = GetOrAdd<ContentSizeFitter>(rows.gameObject);
             fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
             fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            if (rows.childCount > 0)
-                Debug.LogWarning($"{Tag} PlayerRows 아래에 자식 {rows.childCount} 개가 있다 — 런타임에 남으니 지울 것.");
-            Debug.Log($"{Tag} 행 컨테이너 {(rowsCreated ? "생성" : "재사용")}: PlayerRows");
+            EnsureRowPreviews(rows, rowPrefab);
+            int stray = 0;
+            foreach (Transform child in rows)
+                if (child.GetComponent<EditorPreviewOnly>() == null)
+                    stray++;
+            if (stray > 0)
+                Debug.LogWarning($"{Tag} PlayerRows 아래에 미리보기가 아닌 자식 {stray} 개가 있다 — 런타임에 남으니 지울 것.");
+            Debug.Log($"{Tag} 행 컨테이너 {(rowsCreated ? "생성" : "재사용(위치 유지)")}: PlayerRows");
 
             CharacterRoster roster = AssetDatabase.LoadAssetAtPath<CharacterRoster>(RosterPath);
             if (roster == null)
@@ -247,6 +273,87 @@ public static class ResultStatsRowsAuthoring
         {
             if (openedHere)
                 EditorSceneManager.CloseScene(scene, true);
+        }
+    }
+
+    // ── 배치 미리보기 ─────────────────────────────────────────
+
+    const int PreviewRowCount = 3; // 실사용 3인
+    static readonly Color PreviewColor = new Color(0.2f, 0.75f, 1f, 0.35f);
+
+    /// <summary>
+    /// 결과 화면 씬의 PlayerRows 아래에 행 미리보기만 만들거나 갱신한다(위치·배선은 안 건드림).
+    /// PlayerRows 를 옮기면 런타임 행이 미리보기 자리 그대로 뜬다.
+    /// </summary>
+    [MenuItem("Tools/UI/Authoring/Result Stats Row Preview")]
+    public static void BuildPreviewOnly()
+    {
+        if (EditorApplication.isPlayingOrWillChangePlaymode)
+        {
+            Debug.LogError($"{Tag} Play 중에는 실행하지 않는다 — 먼저 정지할 것.");
+            return;
+        }
+
+        Scene scene = SceneManager.GetSceneByPath(ScenePath);
+        bool openedHere = !scene.isLoaded;
+        if (openedHere)
+            scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Additive);
+
+        try
+        {
+            var views = new List<ResultStatsView>();
+            foreach (GameObject root in scene.GetRootGameObjects())
+                views.AddRange(root.GetComponentsInChildren<ResultStatsView>(true));
+            Transform rows = null;
+            if (views.Count == 1)
+                foreach (Transform t in views[0].GetComponentsInChildren<Transform>(true))
+                    if (t.name == "PlayerRows") { rows = t; break; }
+            if (rows == null)
+            {
+                Debug.LogError($"{Tag} ResultStatsView(1개)/PlayerRows 를 찾지 못했다 — 먼저 'Result Stats Rows' 를 돌릴 것.");
+                return;
+            }
+
+            EnsureRowPreviews((RectTransform)rows,
+                AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath)?.GetComponent<ResultPlayerRowView>());
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            Debug.Log($"{Tag} 씬 저장: {ScenePath}");
+        }
+        finally
+        {
+            if (openedHere)
+                EditorSceneManager.CloseScene(scene, true);
+        }
+    }
+
+    /// <summary>
+    /// RowPreview_P1..P3 — Image 만 있는 자리 표시. 태그 EditorOnly(빌드 제외) + EditorPreviewOnly(Play 시 꺼짐).
+    /// 높이는 행 프리팹 LayoutElement 를 따라가고, 폭·간격은 PlayerRows 의 VerticalLayoutGroup 이 정한다.
+    /// </summary>
+    static void EnsureRowPreviews(RectTransform rows, ResultPlayerRowView rowPrefab)
+    {
+        float height = RowHeight;
+        LayoutElement prefabElement = rowPrefab != null ? rowPrefab.GetComponent<LayoutElement>() : null;
+        if (prefabElement != null && prefabElement.preferredHeight > 0f)
+            height = prefabElement.preferredHeight;
+
+        for (int i = 0; i < PreviewRowCount; i++)
+        {
+            RectTransform preview = GetOrCreateChild(rows, $"RowPreview_P{i + 1}", out bool created);
+            preview.gameObject.tag = "EditorOnly";
+            GetOrAdd<EditorPreviewOnly>(preview.gameObject);
+
+            LayoutElement element = GetOrAdd<LayoutElement>(preview.gameObject);
+            element.minHeight = height;
+            element.preferredHeight = height;
+
+            Image image = GetOrAdd<Image>(preview.gameObject);
+            image.raycastTarget = false;
+            if (created)
+                image.color = PreviewColor;
+
+            Debug.Log($"{Tag} 행 미리보기 {(created ? "생성" : "갱신")}: {preview.name} (높이 {height})");
         }
     }
 

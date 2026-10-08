@@ -26,7 +26,10 @@
 - 행 프리팹·컨테이너가 비어 있으면 행을 그리지 않고 `LogWarning` 한 줄만 남긴다.
 - 행은 `SessionResult.Players` 순서(clientId 오름차순, P1 = 호스트)로 `Start` 에서 한 번 복제된다.
   이름은 `PlayerRow_P1`, `PlayerRow_P2`, …. 🔴 **`PlayerRows` 아래에 디자인용 더미 행을 두지 말 것** — 코드는 자기가
-  만든 행만 지우므로 더미가 그대로 남는다.
+  만든 행만 지우므로 더미가 그대로 남는다. 예외 = 배치 미리보기 `RowPreview_P1~P3`(아래).
+- 🆕 **배치 미리보기(10-08)**: `PlayerRows` 아래 `RowPreview_P1~P3` = Image 만 있는 자리 표시. 태그 `EditorOnly`(빌드 제외) +
+  `EditorPreviewOnly`(Play 시 스스로 꺼짐 → 레이아웃 그룹이 무시). **행 위치는 `PlayerRows` 의 위치·Spacing 으로 맞춘다** —
+  런타임 행이 미리보기 자리 그대로 뜬다. 높이는 행 프리팹 `LayoutElement` 를 따라간다. 다시 만들기 = `Tools/UI/Authoring/Result Stats Row Preview`.
 
 ### `ResultPlayerRowView` (`Assets/1.Scripts/UI/ResultPlayerRowView.cs`) — 행 프리팹 루트에 붙인다
 | 직렬화 필드 | 타입 | 이름으로 찾는 자식 | 내용 |
@@ -67,13 +70,15 @@ Canvas
    ├─ Text_Survival         (기존)
    ├─ Text_Kills            (기존 — 지우거나 그대로 두면 런타임에 숨김)
    ├─ PlayerRowsHeader      🆕 열 제목 행(Text: 슬롯·캐릭터·데미지·처치·간파·사망) — 행 프리팹과 같은 열 폭
-   └─ PlayerRows            🆕 RectTransform · VerticalLayoutGroup · (ContentSizeFitter 선택) — 자식 비움
+   └─ PlayerRows            🆕 RectTransform · VerticalLayoutGroup · (ContentSizeFitter 선택) — 자식 = RowPreview_P1~3 만(런타임에 꺼짐)
 ```
 - `ResultStatsView` 에 `playerRowContainer = PlayerRows`, `playerRowPrefab = ResultPlayerRow.prefab`,
   `characterRoster = CharacterRoster.asset` 를 꽂는다.
 - 최대 행 수 = `SessionResultPayload.MaxPlayers`(8). 실사용 3인 기준으로 배치하되 넘쳐도 깨지지 않게(레이아웃 그룹).
 
 ## 저작 메뉴 요구사항 (멱등)
+> 🔴 10-08 부터 **없는 것만 만든다** — 이미 있는 오브젝트·프리팹의 위치·크기·글자는 안 건드린다(은희 수동 레이아웃 보호).
+> 다시 돌려도 바뀌는 건 `ResultStatsView` 배선과 행 미리보기뿐.
 - 메뉴 예: `Tools/UI/Authoring/Result Stats Rows`. 에디터 스크립트는 `Assets/1.Scripts/UI/Editor/`.
 - **여러 번 눌러도 결과가 같아야 한다**: 이미 있는 오브젝트·프리팹은 이름으로 찾아 재사용하고 값만 맞춘다(중복 생성 금지).
 - 프리팹은 `PrefabUtility.SaveAsPrefabAsset`, 씬은 `EditorSceneManager.MarkSceneDirty` + `SaveScene`.
