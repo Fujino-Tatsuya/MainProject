@@ -17,6 +17,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 17664
   maxHitResults: 32
+  attackSpeed: 1.2
   attackSteps:
   - clip: {fileID: 7400000, guid: 39d36e6d9f0eb8c44b900cdf070eebfe, type: 2}
     motionDuration: 0

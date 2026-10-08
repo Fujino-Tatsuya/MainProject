@@ -54,6 +54,7 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
 {
     private static readonly int DefaultAttackHash = Animator.StringToHash("DefaultAttack");
     private static readonly int AttackIndexHash = Animator.StringToHash("AttackIndex");
+    private static readonly int AttackSpeedHash = Animator.StringToHash("AttackSpeed");
     private static readonly int IdleHash = Animator.StringToHash("Idle");
     private static readonly int MoveHash = Animator.StringToHash("Walk");
     private const float TailToMovementBlendSeconds = 0.05f;
@@ -632,7 +633,7 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
         currentAttackIndex = attackIndex;
         attackDirection = ResolveAttackDirection(direction);
         queuedAttackDirection = attackDirection;
-        attackEndFallbackTime = Time.time + step.MotionDuration + Mathf.Max(0f, endFallbackPadding);
+        attackEndFallbackTime = Time.time + GetPlaybackDuration(step) + Mathf.Max(0f, endFallbackPadding);
 
         int damageSnapshot = CalculateDamageSnapshot(step);
         playerDefaultAttack.PrepareStep(step, damageSnapshot, attackDirection);
@@ -659,7 +660,8 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
         moveRemaining = step.MovementType == DefaultAttackMovementType.ScriptedForwardDistance
             ? Mathf.Max(step.ForwardDistance, 0f)
             : 0f;
-        moveSpeed = step.MotionDuration > 0f ? moveRemaining / step.MotionDuration : 0f;
+        float playbackDuration = GetPlaybackDuration(step);
+        moveSpeed = playbackDuration > 0f ? moveRemaining / playbackDuration : 0f;
 
         if (step.RotationType == DefaultAttackRotationType.SnapOnStart)
             movement.RotateImmediately(attackDirection);
@@ -670,6 +672,7 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
             return;
 
         animator.SetInteger(AttackIndexHash, currentAttackIndex);
+        animator.SetFloat(AttackSpeedHash, AttackSpeed);
 
         if (triggerAttack)
             animator.SetTrigger(DefaultAttackHash);
@@ -866,6 +869,12 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
     }
 
     private float CurrentStepDuration => HasAttackStep(0) ? attackSteps[0].MotionDuration : 0f;
+
+    // 테이블 모드 Play 는 시작 때 SO 값을 덮어쓰므로 캐싱하지 않고 매번 읽는다.
+    private float AttackSpeed => attackData != null ? Mathf.Max(attackData.AttackSpeed, 0.1f) : 1f;
+
+    // MotionDuration 은 클립 타임라인 기준이라 실제 재생 시간은 공격속도로 나눈다.
+    private float GetPlaybackDuration(DefaultAttackStep step) => step.MotionDuration / AttackSpeed;
 }
 
 [Serializable]
