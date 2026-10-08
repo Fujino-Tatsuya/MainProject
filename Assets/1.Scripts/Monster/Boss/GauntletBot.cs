@@ -245,6 +245,7 @@ public class GauntletBot : MonsterBase
         }
 
         Edit.Log("[Gauntlet] 카운터 성공 — 스매시 취소, 그로기", this);
+        CombatStatsEvents.RaiseServerCounterSucceeded(this, DamageAttackerClientId); // 결과 화면 통계(판정 무관)
         CounterSucceeded();
     }
 

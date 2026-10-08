@@ -13,7 +13,7 @@ Use this workflow for:
 - Networking, authority, synchronization, scene flow, or save/load changes.
 - Boss, player ability, state abnormality, build, or data-table changes.
 - Refactors that affect shared interfaces or module boundaries.
-- Anything that could affect multiple teammates or PR review scope.
+- Anything that could affect multiple teammates or another owner's area (no PRs here — share via `Docs/tech/handoff-*.md`).
 
 For tiny fixes, typo changes, or obvious one-line edits, proceed directly but still explain what changed.
 

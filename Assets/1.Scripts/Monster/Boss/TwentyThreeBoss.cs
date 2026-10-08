@@ -4873,6 +4873,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         if (counter && resolved && State != MonsterState.Dead)
         {
             EnterCounterSuccess();
+            CombatStatsEvents.RaiseServerCounterSucceeded(this, GetAttackerClientId(hitContext)); // 결과 화면 통계(판정 무관)
 
             // 🔴 여기가 "인터럽트 성공"의 유일한 지점이다. EnterCounterGroggy 안에 넣지 않은 이유:
             //    그 메서드는 송전기 전멸(S7) 경로도 함께 쓰는데, 그건 플레이어가 끊어낸 게 아니라
