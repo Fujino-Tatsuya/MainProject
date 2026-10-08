@@ -25,7 +25,7 @@ public static class DataTableTemplate
     private const string LogPrefix = "[DataTable] ";
 
     /// <summary>시트 순서 — 이 목록 순서대로, 나머지는 이름 순.</summary>
-    private static readonly string[] PreferredSheetOrder = { "Player", "Paladin", "Gunner", "Monster", "MidBoss", "Boss" };
+    private static readonly string[] PreferredSheetOrder = { "Player", "Paladin", "Gunner", "Monster", "MidBoss", "Boss", "Sound" };
 
     public readonly struct Field
     {

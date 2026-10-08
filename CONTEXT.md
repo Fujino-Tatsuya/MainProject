@@ -8,6 +8,12 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-10-08 · 은희(Claude+Codex) · **사운드 데이터 테이블**, 브랜치 `feature/SoundAssetDataTable`(development `37f97719` 기준, WorkTree2)) — 계획 = [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ✅ 구현 `8637b802`(Codex) + 예시 키 `UI_Click`(Claude) · EditMode 9/9 · 필드 목록에 `entries[0].*` 11개 확인 · ✅ Play 청취(은희 10-08, BGM·UI_Click) · ⏳ xlsx Export(사람, SVN 잠금) · ✅ development 반영(10-08)
+- 사용법 = [Docs/tech/data-table.md](Docs/tech/data-table.md) Sound 항목. `AudioManager.Instance.Play("키")` / `Play("키", pos)`. 볼륨·피치 = BroAudio 엔티티 값에 곱하는 배율.
+- `UIClick`·`UI_Click` = BroAudio 엔티티 `SoundLibrary/LobbyLibrary/UI_Click_01`(UI 타입, 클립 `51.Audio/UI/temp_clickSound.mp3`) — `d8fb6fa5`. 클립 .meta 는 **SVN r412** 같이 받을 것(guid `c02d8e2d…`).
+- `AudioManager` 를 `0.BootStrapScene` 에 복구(catalog=SoundCatalog). 8월 씬 정리 때 빠지고 10-06 정리에서 고아 프리팹으로 삭제돼 메인 플로우에 없었다.
+- BGM 3종 엔티티 클립 재연결(Title=`Title_Scene_BGM_03 (2)`, Lobby=`Bureau Lobby`, InGame=`BGM_Factory_Stage_01`) + 그 .meta 를 **SVN r413** 에 등록. 🔴 `51.Audio` 의 .meta 대부분이 SVN 미등록이라 PC 마다 guid 가 달라 BroAudio 클립 참조가 끊긴다 — 새 사운드는 .meta 를 반드시 SVN 에 같이 커밋. 다른 PC 는 update 전 같은 이름 로컬 .meta 삭제. `Slash_01` 은 클립 파일이 없어 미연결.
+- 새 키 추가 = SO 인스펙터(배열 크기), 수치 = xlsx `Sound` 시트.
 ## ▶▶ 작업 세션 (2026-10-07 · 은희(Claude+Codex+claude-alt) · **결과 화면 플레이어별 통계**, 브랜치 `feature/ResultStats`) — 계획 [PLAN-result-stats.md](PLAN-result-stats.md) ✅ 승인 · ✅ 1단계 코드(`0c60bb7c`, 컴파일 에러 0 · EditMode 21/21) · ✅ 2단계 ResultScene UI(저작 메뉴 `Tools/UI/Authoring/Result Stats Rows`, 멱등 · 행 프리팹 `2.Prefabs/UI/Result/ResultPlayerRow.prefab`) · ✅ MPPM 3인 ML-Agent QA(10-08, `MainProject-MLAgent` 의 `qa/ResultStats`): 중도 종료·전멸·클리어 모두 3피어 값 동일·화면 행·"나" 일치·서버 독립 집계 일치. 간파(카운터)만 미검증 · 미푸시
 - 🔴 **수정 예정 — 동시 수정 금지**: `Managers/SessionStatsTracker.cs`·`SessionResult.cs`·`MapSceneManager.cs`·`UI/ResultStatsView.cs`·`Unit/Unit.cs`(ApplyHealthDamage 이벤트)·`Player/Life/PlayerLifeCycleController.cs`(서버 정적 통지)·`Boss/TwentyThreeBoss.cs`·`GauntletBot.cs`·`SpinnerBot.cs`·`WallBot.cs`(간파 성공 이벤트 1줄씩 — 경석 공유 = [handoff](Docs/tech/handoff-result-stats-monster-hooks.md))·`5.ResultScene.unity`(2단계). `MonsterBase.cs`·`PartyWipeWatcher.cs` 는 결국 안 바뀜(getter 는 `Unit`).
 - 신규: `Unit/CombatStatsEvents.cs`·`Managers/SessionStatsAggregator.cs`·`SessionResultPayload.cs`·`UI/ResultPlayerRowView.cs`·테스트 `Managers/Editor/*` + 러너 `Tools/Tests/결과 통계 EditMode 테스트 실행`.

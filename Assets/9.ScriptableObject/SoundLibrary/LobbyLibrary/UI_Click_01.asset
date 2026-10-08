@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ad670d1adcf8be84f891f82b894c08a5, type: 3}
-  m_Name: LobbyBGM_01
+  m_Name: UI_Click_01
   m_EditorClassIdentifier: BroAudio::Ami.BroAudio.Data.AudioEntity
   UseAddressables: 0
   <ID>k__BackingField: 0
@@ -23,7 +23,7 @@ MonoBehaviour:
       m_SubObjectType: 
       m_SubObjectGUID: 
       m_EditorAssetChanged: 0
-    AudioClip: {fileID: 8300000, guid: 00f50fa34b6fe5a44a886dd49328f687, type: 3}
+    AudioClip: {fileID: 8300000, guid: c02d8e2dc85ae7c4399ddcc0359b54b0, type: 3}
     Volume: 1
     Delay: 0
     StartPosition: 0
@@ -32,11 +32,11 @@ MonoBehaviour:
     FadeOut: 0
     Weight: 0
   <AudioAsset>k__BackingField: {fileID: 11400000, guid: 6f419839598820f429c81bd07d2b17ce, type: 2}
-  <AudioType>k__BackingField: 1
+  <AudioType>k__BackingField: 2
   <MasterVolume>k__BackingField: 1
   <Loop>k__BackingField: 0
-  <SeamlessLoop>k__BackingField: 1
-  <TransitionTime>k__BackingField: -1
+  <SeamlessLoop>k__BackingField: 0
+  <TransitionTime>k__BackingField: 0
   <SpatialSetting>k__BackingField: {fileID: 0}
   <Priority>k__BackingField: 128
   <Pitch>k__BackingField: 1
