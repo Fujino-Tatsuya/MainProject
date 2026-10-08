@@ -1915,15 +1915,15 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       insertIndex: -1
       addedObject: {fileID: 6735174628152974569}
-    - targetCorrespondingSourceObject: {fileID: 8229189883948102995, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 2600760496483148764}
     - targetCorrespondingSourceObject: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       insertIndex: -1
       addedObject: {fileID: 7301928374650192901}
     - targetCorrespondingSourceObject: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       insertIndex: -1
       addedObject: {fileID: 7301928374650192902}
+    - targetCorrespondingSourceObject: {fileID: 8229189883948102995, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2600760496483148764}
   m_SourcePrefab: {fileID: 100100000, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
 --- !u!4 &836662554432917908 stripped
 Transform:
@@ -2161,6 +2161,122 @@ MonoBehaviour:
   targetFloorScale: 1
   targetStrike: {fileID: 11400000, guid: 2b9663c3e821ab54b8c6254439c6befe, type: 2}
   targetStrikeScale: 1
+--- !u!114 &7301928374650192901
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7876615519038055782}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c7a41f60d2b84e6a9c15d380be720128, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DashAfterimage
+  modelRoot: {fileID: 0}
+  includeStaticMeshes: 1
+  ghostMaterial: {fileID: 2100000, guid: c7a41f60d2b84e6a9c15d380be720127, type: 2}
+  speedLines: {fileID: 7301928374650192902}
+  spawnInterval: 0
+  ghostLifetime: 0.2
+  fadeCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 0.5
+      value: 0.45
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  maxGhosts: 80
+  logDiagnostics: 1
+  safetyTimeout: 2
+--- !u!114 &7301928374650192902
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7876615519038055782}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c7a41f60d2b84e6a9c15d380be720131, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DashSpeedLines
+  emitters: []
+  searchRoot: {fileID: 0}
+  autoNameHints:
+  - head
+  - hand
+  - foot
+  - thigh
+  - shoulder
+  - arm
+  - forearm
+  - leg
+  - neck
+  - spine
+  autoPickLimit: 6
+  lineMaterial: {fileID: 2100000, guid: c7a41f60d2b84e6a9c15d380be720130, type: 2}
+  lineTime: 0.2
+  startWidth: 0.05
+  endWidth: 0
+  lineColor:
+    serializedVersion: 2
+    key0: {r: 1, g: 1, b: 1, a: 1}
+    key1: {r: 1, g: 1, b: 1, a: 0.7}
+    key2: {r: 0, g: 0, b: 0, a: 0}
+    key3: {r: 0, g: 0, b: 0, a: 0}
+    key4: {r: 0, g: 0, b: 0, a: 0}
+    key5: {r: 0, g: 0, b: 0, a: 0}
+    key6: {r: 0, g: 0, b: 0, a: 0}
+    key7: {r: 0, g: 0, b: 0, a: 0}
+    ctime0: 0
+    ctime1: 65535
+    ctime2: 0
+    ctime3: 0
+    ctime4: 0
+    ctime5: 0
+    ctime6: 0
+    ctime7: 0
+    atime0: 0
+    atime1: 19661
+    atime2: 65535
+    atime3: 0
+    atime4: 0
+    atime5: 0
+    atime6: 0
+    atime7: 0
+    m_Mode: 0
+    m_ColorSpace: -1
+    m_NumColorKeys: 2
+    m_NumAlphaKeys: 3
+  minVertexDistance: 0.02
+  logDiagnostics: 1
 --- !u!1001 &5683368051277706446
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -2321,119 +2437,3 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 3669984586683641257, guid: 4d396958704b054469ded4c24d36d9a1, type: 3}
   m_PrefabInstance: {fileID: 5683368051277706446}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &7301928374650192901
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7876615519038055782}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c7a41f60d2b84e6a9c15d380be720128, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::DashAfterimage
-  modelRoot: {fileID: 0}
-  includeStaticMeshes: 1
-  ghostMaterial: {fileID: 2100000, guid: c7a41f60d2b84e6a9c15d380be720127, type: 2}
-  speedLines: {fileID: 7301928374650192902}
-  spawnInterval: 0
-  ghostLifetime: 0.2
-  fadeCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    - serializedVersion: 3
-      time: 0.5
-      value: 0.45
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    - serializedVersion: 3
-      time: 1
-      value: 0
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
-  maxGhosts: 80
-  logDiagnostics: 1
-  safetyTimeout: 2
---- !u!114 &7301928374650192902
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7876615519038055782}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c7a41f60d2b84e6a9c15d380be720131, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::DashSpeedLines
-  emitters: []
-  searchRoot: {fileID: 0}
-  autoNameHints:
-  - head
-  - hand
-  - foot
-  - thigh
-  - shoulder
-  - arm
-  - forearm
-  - leg
-  - neck
-  - spine
-  autoPickLimit: 6
-  lineMaterial: {fileID: 2100000, guid: c7a41f60d2b84e6a9c15d380be720130, type: 2}
-  lineTime: 0.2
-  startWidth: 0.05
-  endWidth: 0
-  lineColor:
-    serializedVersion: 2
-    key0: {r: 1, g: 1, b: 1, a: 1}
-    key1: {r: 1, g: 1, b: 1, a: 0.7}
-    key2: {r: 0, g: 0, b: 0, a: 0}
-    key3: {r: 0, g: 0, b: 0, a: 0}
-    key4: {r: 0, g: 0, b: 0, a: 0}
-    key5: {r: 0, g: 0, b: 0, a: 0}
-    key6: {r: 0, g: 0, b: 0, a: 0}
-    key7: {r: 0, g: 0, b: 0, a: 0}
-    ctime0: 0
-    ctime1: 65535
-    ctime2: 0
-    ctime3: 0
-    ctime4: 0
-    ctime5: 0
-    ctime6: 0
-    ctime7: 0
-    atime0: 0
-    atime1: 19661
-    atime2: 65535
-    atime3: 0
-    atime4: 0
-    atime5: 0
-    atime6: 0
-    atime7: 0
-    m_Mode: 0
-    m_ColorSpace: -1
-    m_NumColorKeys: 2
-    m_NumAlphaKeys: 3
-  minVertexDistance: 0.02
-  logDiagnostics: 1

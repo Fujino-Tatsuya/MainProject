@@ -273,7 +273,8 @@ public static class DataTableApplier
     }
 
     /// <summary>
-    /// 테이블 Play 용. 디스크에는 쓰지 않는다 — 적용 후 dirty 를 지워 저장 대상에서 뺀다.
+    /// 테이블 Play 용. 디스크에는 쓰지 않는다 — 적용 후 dirty 를 지워 저장 대상에서 뺀다
+    /// (Variant 의 오버라이드 dirty 는 여기서 못 지운다 — Play 중엔 DataTableSaveGuard 가 막고, <see cref="Restore"/> 가 재임포트로 지운다).
     /// 프리팹 컴포넌트도 메모리의 프리팹 에셋을 바꾸므로, 런타임에 Instantiate·네트워크 스폰되는 사본이 테이블 값을 받는다.
     /// 반환한 스냅샷으로 <see cref="Restore"/> 해야 원래 값으로 돌아온다.
     /// </summary>
@@ -309,10 +310,19 @@ public static class DataTableApplier
         return snapshot;
     }
 
-    /// <summary>메모리 적용을 되돌린다. 찾지 못한 대상 수를 반환한다(0 이 정상).</summary>
+    /// <summary>
+    /// 메모리 적용을 되돌린다. 찾지 못한 대상 수를 반환한다(0 이 정상).
+    /// <para>
+    /// 🔴 프리팹 에셋 안의 대상은 값 되쓰기가 아니라 디스크에서 다시 임포트한다. Variant 컴포넌트에 쓰면 Unity 가
+    /// 숨은 PrefabInstance 에 오버라이드(maxHp 등)를 기록하고 그 객체를 dirty 로 만든다 — 값을 JSON 으로 되돌려도
+    /// 오버라이드와 dirty 는 남아, Play 뒤 첫 Save Project(Ctrl+S)가 Player_Gunner 에 maxHp/attackDamage 오버라이드를 써 넣었다(10-09 재현).
+    /// 디스크는 처음부터 바뀌지 않았으므로 다시 읽으면 오버라이드·dirty 까지 원래대로다.
+    /// </para>
+    /// </summary>
     public static int Restore(DataTableSnapshot snapshot)
     {
         int missing = 0;
+        var prefabPaths = new HashSet<string>(StringComparer.Ordinal);
         foreach (DataTableSnapshot.Item item in snapshot.items)
         {
             Object target = FindSnapshotTarget(item);
@@ -322,12 +332,24 @@ public static class DataTableApplier
                 continue;
             }
 
+            string assetPath = AssetDatabase.GetAssetPath(target);
+            if (assetPath.EndsWith(".prefab", StringComparison.OrdinalIgnoreCase))
+            {
+                prefabPaths.Add(assetPath);
+                continue;
+            }
+
             bool wasDirty = EditorUtility.IsDirty(target);
             EditorJsonUtility.FromJsonOverwrite(item.json, target);
             if (!wasDirty)
             {
                 EditorUtility.ClearDirty(target);
             }
+        }
+
+        foreach (string prefabPath in prefabPaths)
+        {
+            AssetDatabase.ImportAsset(prefabPath, ImportAssetOptions.ForceUpdate);
         }
 
         return missing;
