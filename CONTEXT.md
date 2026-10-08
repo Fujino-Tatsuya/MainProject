@@ -124,6 +124,13 @@ HUD 매 프레임 문자열(`PlayerHealthHUD`·`StatusEffectHUD`·`SkillCooldown
 - ✅ 1단계 Codex(코드) `09e9cc57` · ✅ 2단계 Claude(씬·에셋·`LobbySceneManager` 배선). 결과 요약 = [player-prefabs.md §8.3](Docs/tech/player-prefabs.md)
 - 🔴 남은 것: **은희 MPPM Play 확인**(호스트+클라2: 초상화·Ready 동기화 / Start 활성 / 고른 Variant 스폰) → PR. 레이아웃은 첫 배치라 Play 보고 조정 가능
 - 범위 밖: 전투 HUD 초상화 Paladin 고정(Gunner 도 Paladin 얼굴)
+## ▶▶ 작업 세션 (2026-10-07 · 민경(Claude) · **거너 VFX 폴더 스킬별 정리 + 미사용 연출 3종(UltTick·FocusRing·ShieldGrant) 제거**, 브랜치 `feature/VFX`) — 구현 완료 · ⏳ 민경 `Tools/VFX/거너 이펙트 폴더 정리` 실행
+- `Player2/` → `LeftClick_BasicAttack`·`RightClick_Interrupt`·`Q_ChargeLaser`·`R_TrackingLaser`·`E_FrostBackstep`. 이동은 도구(`GunnerVfxFolderSort.cs`, AssetDatabase.MoveAsset)로 — guid 유지. `README.txt`·`FX_OverHitting0`(미참조)은 루트에 남김.
+- 셋업 도구 경로 갱신: `GunnerBeamSetup`·`GunnerBackstepSetup`·`GunnerUltSetup`(TickFx 생성 → 남은 TickFx 제거로 바뀜).
+- 🔴 은희 공유: `GunnerTrackingLaser.cs` 에서 `tickPlayer`·`tickVfxInterval`·`UpdateTickVfx` 삭제(피해 로직 무관). `GunnerTrackingLaser.prefab` 의 `TickFx` 오브젝트 제거. `Player_Gunner.prefab` 에 남아 있던 `QFocusRing` 소켓(FocusRing 엔트리 참조) 제거. `GunnerBeamView.cs` 주석 1줄.
+- 🔴 SVN: 이동분은 delete+add 로 커밋(또는 TortoiseSVN Repair move). UltTick·FocusRing·ShieldGrant 프리팹+엔트리 6개는 도구가 OS 휴지통으로 보냄 → SVN delete.
+- ✅ 폴더 정리 실행·검증(guid 참조 누락 0). 이후 쓸모없는 도구 삭제: `GunnerVfxFolderSort.cs`·`CrackOverlaySetup.cs`(+.meta, SVN delete 필요), `EffectSystemSetup.cs` 의 `v1 기본 에셋 생성`·`스모크 테스트` 메뉴 제거(git, 은희 공유). 거너 배선 도구 8개는 플레이어 프리팹 재구성 대비로 유지.
+
 ## ▶▶ 작업 세션 (2026-10-06 · 민경(Claude) · **23호 사망 디졸브 = FlatKit 디졸브 셰이더**, 브랜치 `feature/VFX`) — ✅ Play 확인(민경 10-06, 실루엣 자국 없음)
 - 23호(`TwentyThree.prefab`)는 부위 붕괴 대상이 아니라(팀장 지시 — 쓰러진 자세 2초) `DissolveDeath` 를 유지하되, 녹을 때 셰이더만 잡몹과 같은 **`VFX/Stylized Surface Dissolve`** 로 바꿨다. 기존 템플릿(DissolveFx, URP Lit 계열)은 갈아끼우는 순간 FlatKit 셀 음영·림·아웃라인이 빠져 질감이 바뀌었다.
 - `DissolveDeath.cs`: `stylizedDissolveShader` 필드 추가. 원본이 `FlatKit/Stylized Surface` 면 `new Material(원본)` + 셰이더 교체(룩 유지), 아니면 템플릿 경로. 노이즈는 템플릿의 `_NoiseTexture` 를 빌림. 진행 방향이 반대(`_DissolveAmount` 0→1 / `_Cutoff` 1→0)라 따로 보간. FlatKit 디졸브 슬롯이 있는 렌더러는 그림자 끔(ShadowCaster 가 깎기를 안 탐). 셰이더 필드가 비면 예전 동작 그대로.
