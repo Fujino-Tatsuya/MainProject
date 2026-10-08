@@ -55,7 +55,8 @@ public sealed class QASessionController : MonoBehaviour
     private readonly QAResultFlow _resultFlow = new QAResultFlow();
 
     private const string ConnectIp = "127.0.0.1";
-    private const ushort ConnectPort = 7777;
+    // 7777 은 다른 워크트리 에디터·빌드와 겹친다(10-08 포트 중복으로 실패) — QA 는 7778 을 호스트·클라 모두 명시해 쓴다.
+    private const ushort ConnectPort = 7778;
 
     private readonly List<IQADetector> _detectors = new List<IQADetector>();
     private QARecorder _recorder;
@@ -325,6 +326,7 @@ public sealed class QASessionController : MonoBehaviour
     private IEnumerator RunHostLobby(NetworkSessionLauncher launcher)
     {
         Debug.Log("[QA][Host] → StartHost");
+        launcher.OnSetConnectionData(ConnectIp, ConnectPort); // 호스트도 QA 포트로 리슨(기본 7777 회피)
         launcher.StartHost();
         yield return WaitOrTimeout(
             () => NetworkManager.Singleton != null &&
@@ -433,6 +435,8 @@ public sealed class QASessionController : MonoBehaviour
         {
             string text = _resultFlow.Dump ?? "# 결과 화면에 도달하지 못함\n\n## 진행 로그\n\n" + _resultFlow.LogText;
             System.IO.File.WriteAllText(System.IO.Path.Combine(dir, "result-stats.md"), text);
+            if (QAResultFlow.InResultScene)
+                ScreenCapture.CaptureScreenshot(System.IO.Path.Combine(dir, "result.png"));
         }
 
         if (dir != null && _recorder.CountBySeverity(QASeverity.Critical) > 0)

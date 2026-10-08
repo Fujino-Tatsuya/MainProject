@@ -14,6 +14,7 @@ Update this file when a term becomes important enough that future agents or team
 - 권장 설정: 3인 · 반복 3 · Play 60초. 경로 순서는 `Tools/QA/Settings ▸ 경로 순서`(예 `Wiped,Cleared`).
 - 🆕 에이전트 실행(10-08): `Tools/QA/Activate Virtual Players (2,3)` → `Tools/QA/Play Active Scenario`(툴바 Play 와 같은 `PlayModeManager.TogglePlayingShortcut` — `isPlaying` 토글은 가상 플레이어가 안 붙는다). MCP 는 relay `--project-path C:/UnityProject/MainProject-MLAgent`.
 - ✅ 10-08 결과: 중도 종료·전멸·클리어 3경로 모두 3피어 값 동일 · 화면 행·"나" 일치 · 호스트 독립 집계 일치(리포트 `C:\UnityProject\QA\20261008_141725`·`145546`·`145720` + 클라 `_2`). 간파는 미검증(0).
+- QA 포트 = **7778**(호스트·클라 모두 명시 — 7777 은 다른 에디터·빌드와 겹쳐 10-08 실패). 결과 화면 레이아웃 검사(화면·패널 밖·겹침·글자 잘림) + 결과 화면 캡처(현재는 `end.png` 로 남음).
 - QA 함정: 부활은 `PlayerReviveController.TryCompleteReviveOnServer`(목숨 소비) — `PlayerLifeCycleController.TryCompleteRevive` 는 목숨을 안 깎는다. `ApplyFallDamage` 사망은 DeadPresentation 이 ~30초. 클라는 호스트가 세션을 닫을 때까지 기다린 뒤 재접속해야 한다.
 
 ## ▶▶ 작업 세션 (2026-10-07 · 은희(Claude+Codex+claude-alt) · **결과 화면 플레이어별 통계**, 브랜치 `feature/ResultStats`) — 계획 [PLAN-result-stats.md](PLAN-result-stats.md) ✅ 승인 · ✅ 1단계 코드(`0c60bb7c`, 컴파일 에러 0 · EditMode 21/21) · ✅ 2단계 ResultScene UI(저작 메뉴 `Tools/UI/Authoring/Result Stats Rows`, 멱등 · 행 프리팹 `2.Prefabs/UI/Result/ResultPlayerRow.prefab`) → ⏳ 은희 MPPM 3인 Play(클리어/전멸/ExitButton) · 미푸시

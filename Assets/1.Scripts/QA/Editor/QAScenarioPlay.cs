@@ -159,6 +159,24 @@ public static class QAScenarioPlay
         toggle.Invoke(null, null);
     }
 
+    /// <summary>Play 중이면 툴바 Stop 과 같은 경로로 멈춘다(가상 플레이어도 함께 정지).</summary>
+    [MenuItem("Tools/QA/Stop Active Scenario")]
+    public static void Stop()
+    {
+        if (!EditorApplication.isPlayingOrWillChangePlaymode)
+        {
+            Debug.Log("[QA] Play 중이 아니다.");
+            return;
+        }
+        Type managerType = FindType("Unity.PlayMode.Editor.PlayModeManager");
+        MethodInfo toggle = managerType?.GetMethod("TogglePlayingShortcut", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+        if (toggle != null)
+            toggle.Invoke(null, null);
+        else
+            EditorApplication.isPlaying = false;
+        Debug.Log("[QA] Play Mode Scenario 정지.");
+    }
+
     [MenuItem("Tools/QA/Debug/Dump MPPM API")]
     public static void Dump()
     {

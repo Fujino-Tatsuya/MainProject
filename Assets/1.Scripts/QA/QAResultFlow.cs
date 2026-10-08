@@ -398,7 +398,124 @@ public sealed class QAResultFlow
 
         if (uiRows != rows.Count)
             recorder.Add(QASeverity.Error, "ResultStats", $"화면 행 수 {uiRows} ≠ SessionResult 행 수 {rows.Count}");
+
+        AppendLayoutCheck(sb, recorder, view);
     }
+
+    /// <summary>
+    /// 결과 화면 레이아웃 — 행·열 제목이 화면/패널 안에 있고 서로·버튼과 겹치지 않는지, 글자가 넘치지 않는지.
+    /// 패널 = PlayerRows 의 조상 중 켜진 Image 가 있는 첫 오브젝트(없으면 ResultStatsView). 좌표는 화면 픽셀.
+    /// </summary>
+    private static void AppendLayoutCheck(StringBuilder sb, QARecorder recorder, ResultStatsView view)
+    {
+        sb.AppendLine("## 레이아웃 검사 (화면 픽셀)");
+        sb.AppendLine();
+
+        Canvas.ForceUpdateCanvases();
+        Transform rowsRoot = view.transform.Find("PlayerRows");
+        if (rowsRoot == null)
+            foreach (Transform t in view.GetComponentsInChildren<Transform>(true))
+                if (t.name == "PlayerRows") { rowsRoot = t; break; }
+        if (rowsRoot == null)
+        {
+            recorder.Add(QASeverity.Error, "ResultStats", "레이아웃: PlayerRows 없음");
+            return;
+        }
+
+        RectTransform panel = view.transform as RectTransform;
+        for (Transform t = rowsRoot.parent; t != null; t = t.parent)
+        {
+            UnityEngine.UI.Image img = t.GetComponent<UnityEngine.UI.Image>();
+            if (img != null && img.enabled && t.GetComponent<Canvas>() == null)
+            {
+                panel = (RectTransform)t;
+                break;
+            }
+        }
+
+        Rect screen = new Rect(0, 0, Screen.width, Screen.height);
+        Rect panelRect = ScreenRect(panel);
+        sb.AppendLine($"- 화면 {Screen.width}×{Screen.height} · 패널 '{panel.name}' {Fmt(panelRect)}");
+
+        var boxes = new List<KeyValuePair<string, Rect>>();
+        Transform header = rowsRoot.parent != null ? rowsRoot.parent.Find("PlayerRowsHeader") : null;
+        if (header != null)
+            boxes.Add(new KeyValuePair<string, Rect>(header.name, ScreenRect((RectTransform)header)));
+        foreach (Transform child in rowsRoot)
+            if (child.gameObject.activeInHierarchy && child.name.StartsWith("PlayerRow_P", StringComparison.Ordinal))
+                boxes.Add(new KeyValuePair<string, Rect>(child.name, ScreenRect((RectTransform)child)));
+
+        int problems = 0;
+        foreach (var box in boxes)
+        {
+            var issues = new List<string>();
+            if (!Contains(screen, box.Value)) issues.Add("화면 밖");
+            if (!Contains(panelRect, box.Value)) issues.Add($"패널 '{panel.name}' 밖");
+            sb.AppendLine($"- {box.Key} {Fmt(box.Value)} {(issues.Count == 0 ? "✅" : "❌ " + string.Join(", ", issues))}");
+            problems += issues.Count;
+        }
+
+        for (int i = 0; i < boxes.Count; i++)
+            for (int j = i + 1; j < boxes.Count; j++)
+                if (Overlap(boxes[i].Value, boxes[j].Value) > 1f)
+                {
+                    sb.AppendLine($"- ❌ 겹침: {boxes[i].Key} ↔ {boxes[j].Key}");
+                    problems++;
+                }
+
+        foreach (UnityEngine.UI.Button button in UnityEngine.Object.FindObjectsByType<UnityEngine.UI.Button>(FindObjectsSortMode.None))
+        {
+            Rect br = ScreenRect((RectTransform)button.transform);
+            foreach (var box in boxes)
+                if (Overlap(br, box.Value) > 1f)
+                {
+                    sb.AppendLine($"- ❌ 버튼 '{button.name}' 과 {box.Key} 겹침");
+                    problems++;
+                }
+        }
+
+        foreach (TMP_Text text in rowsRoot.parent.GetComponentsInChildren<TMP_Text>(false))
+        {
+            if (!(text.transform.IsChildOf(rowsRoot) || (header != null && text.transform.IsChildOf(header))))
+                continue;
+            text.ForceMeshUpdate();
+            if (text.isTextOverflowing || text.isTextTruncated)
+            {
+                sb.AppendLine($"- ❌ 글자 넘침/잘림: {text.transform.parent.name}/{text.name} '{text.text}' " +
+                              $"(폭 {text.rectTransform.rect.width:F0}, 필요 {text.preferredWidth:F0})");
+                problems++;
+            }
+        }
+
+        sb.AppendLine(problems == 0 ? "- 판정: ✅ 잘림·겹침 없음" : $"- 판정: ❌ 문제 {problems}건");
+        sb.AppendLine();
+        if (problems > 0)
+            recorder.Add(QASeverity.Error, "ResultStats", $"결과 화면 레이아웃 문제 {problems}건 (result-stats.md)");
+    }
+
+    private static Rect ScreenRect(RectTransform rt)
+    {
+        var c = new Vector3[4];
+        rt.GetWorldCorners(c);
+        Canvas canvas = rt.GetComponentInParent<Canvas>();
+        Camera cam = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay ? canvas.worldCamera : null;
+        Vector2 a = RectTransformUtility.WorldToScreenPoint(cam, c[0]);
+        Vector2 b = RectTransformUtility.WorldToScreenPoint(cam, c[2]);
+        return Rect.MinMaxRect(Mathf.Min(a.x, b.x), Mathf.Min(a.y, b.y), Mathf.Max(a.x, b.x), Mathf.Max(a.y, b.y));
+    }
+
+    private static bool Contains(Rect outer, Rect inner) =>
+        inner.xMin >= outer.xMin - 0.5f && inner.yMin >= outer.yMin - 0.5f &&
+        inner.xMax <= outer.xMax + 0.5f && inner.yMax <= outer.yMax + 0.5f;
+
+    private static float Overlap(Rect a, Rect b)
+    {
+        float w = Mathf.Min(a.xMax, b.xMax) - Mathf.Max(a.xMin, b.xMin);
+        float h = Mathf.Min(a.yMax, b.yMax) - Mathf.Max(a.yMin, b.yMin);
+        return w > 0 && h > 0 ? Mathf.Min(w, h) : 0f;
+    }
+
+    private static string Fmt(Rect r) => $"[{r.xMin:F0},{r.yMin:F0} ~ {r.xMax:F0},{r.yMax:F0}]";
 
     private static bool OutcomeMatches(QAResultPath path, SessionOutcome outcome)
     {
