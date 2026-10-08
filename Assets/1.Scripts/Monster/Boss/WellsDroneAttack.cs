@@ -382,13 +382,19 @@ public sealed class WellsDroneAttack : MonoBehaviour
         EnsureView();
         ClientCancel();   // 예고 원·드론을 거둔다
 
-        // 🔴 폭발은 EffectManager 일회 재생이다(2026-10-08 민경). 수명은 엔트리가 정하고 풀이 회수한다 —
-        //    핸들을 쥐지 않으므로 뒤이은 제압·사망 취소에도 끝까지 재생된다(이미 터진 폭발이라 맞다).
-        //    서버의 explosionDuration 은 쿨다운 시작 시점만 정하고 연출 길이와는 무관하다.
+        // 🔴 폭발은 EffectCatalog.Wells_Drone_Explosion 의 EffectManager 일회 재생이다(2026-10-08 민경).
+        //    수명은 엔트리가 정하고 풀이 회수한다 — 핸들을 쥐지 않으므로 뒤이은 제압·사망 취소에도
+        //    끝까지 재생된다(이미 터진 폭발이라 맞다). 서버의 explosionDuration 은 쿨다운 시작 시점만 정한다.
         //    배율 = 폭발 반경(m) — 엔트리 프리팹이 반경 1m 로 저작돼 있다.
-        if (_d.explosionEffect == null || !EffectManager.TryGet(out EffectManager effects, this)) return;
+        if (!EffectManager.TryGet(out EffectManager effects, this)) return;
+        EffectEntry entry = effects.Catalog.Wells_Drone_Explosion;
+        if (entry == null)
+        {
+            Edit.LogWarning("[웰즈 드론] EffectCatalog.Wells_Drone_Explosion 이 비어 폭발 연출을 건너뛴다.", this);
+            return;
+        }
         float floorY = BossPatternVisuals.SampleFloorY(pos, pos.y) + 0.08f;
-        effects.Play(_d.explosionEffect, new Vector3(pos.x, floorY, pos.z), Quaternion.identity, radius);
+        effects.Play(entry, new Vector3(pos.x, floorY, pos.z), Quaternion.identity, radius);
     }
 
     /// <summary>서버 취소 RPC · 단계 전환 — 표식·예고 원·드론을 거둔다. 이미 터진 폭발 연출은 자기 수명대로 둔다.</summary>

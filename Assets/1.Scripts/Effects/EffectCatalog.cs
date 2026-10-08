@@ -121,6 +121,11 @@ public class EffectCatalog : ScriptableObject
     // 이 엔트리는 그 위에 얹히는 그림이다 — 피해 판정은 여기에 들어 있지 않다.
     [field: SerializeField] public EffectEntry Bomb_Exploded { get; private set; }
 
+    [Header("보스 — 웰즈 자폭 드론")]
+    // 드론 충돌 순간 폭발 원샷(FX_Drone_Explosion). WellsDroneAttack.ClientImpact 가 폭발 반경(m)을 배율로 재생한다 —
+    // 프리팹은 반경 1m 로 저작한다. 피해 판정은 서버가 따로 한다.
+    [field: SerializeField] public EffectEntry Wells_Drone_Explosion { get; private set; }
+
     [Header("보스 — 차징 번개구슬 (4단계)")]
     // 한 엔트리에 파트로 몰지 않고 넷으로 나눈 이유: FadeOut과 Break가 서로 다른 종료 분기다.
     // 하나로 묶으면 "어느 쪽으로 끝났는지"를 데이터가 표현할 수 없다.

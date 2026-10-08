@@ -125,9 +125,9 @@ HUD 매 프레임 문자열(`PlayerHealthHUD`·`StatusEffectHUD`·`SkillCooldown
 - 🔴 남은 것: **은희 MPPM Play 확인**(호스트+클라2: 초상화·Ready 동기화 / Start 활성 / 고른 Variant 스폰) → PR. 레이아웃은 첫 배치라 Play 보고 조정 가능
 - 범위 밖: 전투 HUD 초상화 Paladin 고정(Gunner 도 Paladin 얼굴)
 ## ▶▶ 작업 세션 (2026-10-08 · 민경(Claude) · **웰즈 드론 폭발 = FX_Drone_Explosion_Entry 일회 재생**, 브랜치 `feature/VFX`) — 구현 완료 · ⏳ Play 확인 · 🔴 경석 공유
-- `WellsDroneDataSO`: `explosionVfxPrefab`(GameObject) → `explosionEffect`(EffectEntry), `explosionColor`·`explosionGrowScale` 삭제. 예고 원 색(`circleOuterColor`·`circleFillColor`)은 유지(결정).
+- `WellsDroneDataSO`: `explosionVfxPrefab`·`explosionColor`·`explosionGrowScale` 삭제(엔트리 칸 없음 — 카탈로그가 단일 출처). 예고 원 색(`circleOuterColor`·`circleFillColor`)은 유지(결정).
 - `WellsDroneAttack.ClientImpact`: 임시 폭발 원·Instantiate/Destroy 제거 → `EffectManager.Play(entry, 바닥, identity, scale = 폭발 반경 m)`. 프리팹이 반경 1m 저작 전제. 핸들 없음 → 취소돼도 터진 폭발은 끝까지 재생. `explosionDuration` 은 서버 쿨다운 대기만(연출 길이 무관).
-- `WellsDroneData.asset` 에 엔트리 바인딩.
+- 엔트리 = `EffectCatalog.Wells_Drone_Explosion`(헤더 '보스 — 웰즈 자폭 드론', `EffectCatalog.asset` 배선). 비면 경고 후 연출 생략.
 
 ## ▶▶ 작업 세션 (2026-10-07 · 민경(Claude) · **거너 VFX 폴더 스킬별 정리 + 미사용 연출 3종(UltTick·FocusRing·ShieldGrant) 제거**, 브랜치 `feature/VFX`) — 구현 완료 · ⏳ 민경 `Tools/VFX/거너 이펙트 폴더 정리` 실행
 - `Player2/` → `LeftClick_BasicAttack`·`RightClick_Interrupt`·`Q_ChargeLaser`·`R_TrackingLaser`·`E_FrostBackstep`. 이동은 도구(`GunnerVfxFolderSort.cs`, AssetDatabase.MoveAsset)로 — guid 유지. `README.txt`·`FX_OverHitting0`(미참조)은 루트에 남김.

@@ -51,10 +51,7 @@ public class WellsDroneDataSO : ScriptableObject
     [Range(0.05f, 0.95f)] public float approachSlowTimePortion = 0.5f;
     [Tooltip("느린 구간 동안 이동하는 거리 비율(0~1). 나머지 거리를 뒤 구간에서 급가속해 내려온다.")]
     [Range(0.01f, 0.9f)] public float approachSlowDistancePortion = 0.15f;
-    [Tooltip("충돌 순간 EffectManager 로 1회 재생할 폭발 연출(FX_Drone_Explosion_Entry). " +
-             "반경 1m 로 저작돼 있어 폭발 반경(m)을 그대로 배율로 쓴다. 비우면 폭발 연출 없음.")]
-    public EffectEntry explosionEffect;
-    [Tooltip("폭발 뒤 쿨다운을 세기 시작할 때까지(초) — 피해와 무관. 폭발 연출 길이는 엔트리 수명이 정한다(이 값과 무관).")]
+    [Tooltip("폭발 뒤 쿨다운을 세기 시작할 때까지(초) — 피해와 무관. 폭발 연출은 EffectCatalog.Wells_Drone_Explosion 이 정한다(이 값과 무관).")]
     [Min(0f)] public float explosionDuration = 0.5f;
     [Header("크로스헤어 (추적 단계)")]
     [Tooltip("크로스헤어 기준 지름(m). 아래 시작/끝 배율이 여기에 곱해진다.")]

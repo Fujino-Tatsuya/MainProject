@@ -31,7 +31,6 @@ MonoBehaviour:
   fallTime: 1
   approachSlowTimePortion: 0.5
   approachSlowDistancePortion: 0.15
-  explosionEffect: {fileID: 11400000, guid: 7c0157bf3c4f14b489590588998cc10f, type: 2}
   explosionDuration: 0.5
   crosshairSize: 2.4
   crosshairStartScale: 1.5
