@@ -386,7 +386,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         fallbackEndTime = Time.time + step.MotionDuration + data.EndFallbackPadding;
         nextInputSyncTime = Time.time;
 
-        movement.RotateImmediately(attackDirection);
+        movement.TurnToward(attackDirection);
         player.SetAnimatorMoving(false);
         combatIdle?.NotifyAttackStarted();
 

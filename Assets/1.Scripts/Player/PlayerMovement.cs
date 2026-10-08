@@ -18,6 +18,11 @@ public class PlayerMovement : MonoBehaviour
     [DataTableIgnore] [SerializeField] private float alignThreshold = 0.98f;
     [DataTableIgnore] [SerializeField] private float viewYaw = -45f;
 
+    // 공격 방향 전환 보간(TurnToward). 이 각도 이하로 바뀌면 즉시 맞추고(연속 조준 추적),
+    // 넘으면 turnDuration 동안 돈다 — 크게 꺾을 때 순간 스냅으로 끊겨 보이던 것을 막는다.
+    [DataTableIgnore] [SerializeField, Min(0f)] private float attackTurnDuration = 0.08f;
+    [DataTableIgnore] [SerializeField, Range(0f, 180f)] private float attackTurnSnapAngle = 30f;
+
     // 🔴 회전은 물리 틱에서 돈다 — 시각 효과가 아니라 **시뮬레이션 상태**이기 때문이다.
     // Move()의 속도 계산이 armature.forward에 의존한다(dot >= alignThreshold면 즉시 최고속,
     // 아니면 가속). 즉 회전이 이동 속도를 바꾸므로, 회전이 렌더 레이트로 돌면 같은 입력이
@@ -27,6 +32,10 @@ public class PlayerMovement : MonoBehaviour
     private Vector2 prevDir_for_Rotate = new Vector2(0f, -1f);
     private bool hasRotate = true;
     private float currentSpeed;
+
+    private bool isTurning;
+    private Quaternion turnTarget;
+    private float turnSpeed; // 도/초
 
     private void Awake()
     {
@@ -119,8 +128,68 @@ public class PlayerMovement : MonoBehaviour
         if (direction.sqrMagnitude < 0.001f)
             return;
 
+        isTurning = false;
         armature.rotation = Quaternion.LookRotation(direction.normalized);
         hasRotate = false;
+        motor?.SynchronizeArmatureRotation(armature.rotation, hasRotate);
+    }
+
+    /// <summary>
+    /// 공격 방향 전환용. 작은 변화는 즉시, 큰 변화는 <see cref="attackTurnDuration"/> 동안 빠르게 돈다.
+    /// 판정 방향은 호출자가 들고 있는 값이고 여기는 몸체 표시만 바꾼다.
+    ///
+    /// 회전 권한이 없는 피어(원격 프록시·클라 소유 플레이어의 서버 사본)는 Armature 를 NetworkTransform 이
+    /// 덮으므로 예전처럼 즉시 스냅만 한다 — 여러 프레임 쓰면 NT 보간과 다툰다. 원격 화면은 오너가 보간한
+    /// 회전을 NT 로 받는다.
+    /// </summary>
+    public void TurnToward(Vector3 direction)
+    {
+        if (armature == null)
+            return;
+
+        direction.y = 0f;
+
+        if (direction.sqrMagnitude < 0.001f)
+            return;
+
+        bool hasRotationAuthority = player == null || !player.IsSpawned || player.IsOwner;
+        Quaternion target = Quaternion.LookRotation(direction.normalized);
+        float angle = Quaternion.Angle(armature.rotation, target);
+
+        if (!hasRotationAuthority || attackTurnDuration <= 0f || angle <= attackTurnSnapAngle)
+        {
+            RotateImmediately(direction);
+            return;
+        }
+
+        // 같은 목표를 매 프레임 다시 불러도 처음 정한 속도를 유지해야 시간 안에 끝난다.
+        float requiredSpeed = angle / attackTurnDuration;
+        turnSpeed = isTurning ? Mathf.Max(turnSpeed, requiredSpeed) : requiredSpeed;
+        turnTarget = target;
+        isTurning = true;
+        hasRotate = false;
+        motor?.SynchronizeArmatureRotation(armature.rotation, hasRotate);
+    }
+
+    private void Update()
+    {
+        if (!isTurning)
+            return;
+
+        // 이동 회전이 다시 몸체를 잡으면(공격 종료 후 이동 입력 → 시뮬레이션이 hasRotate 를 켠다) 그쪽에 넘긴다.
+        if (armature == null || hasRotate)
+        {
+            isTurning = false;
+            return;
+        }
+
+        armature.rotation = Quaternion.RotateTowards(armature.rotation, turnTarget, turnSpeed * Time.deltaTime);
+        if (Quaternion.Angle(armature.rotation, turnTarget) <= 0.01f)
+        {
+            armature.rotation = turnTarget;
+            isTurning = false;
+        }
+
         motor?.SynchronizeArmatureRotation(armature.rotation, hasRotate);
     }
 
@@ -134,6 +203,7 @@ public class PlayerMovement : MonoBehaviour
         if (direction.sqrMagnitude < 0.001f)
             return;
 
+        isTurning = false;
         Quaternion targetRotation = Quaternion.LookRotation(direction.normalized);
         armature.rotation = Quaternion.Slerp(
             armature.rotation,
@@ -198,6 +268,7 @@ public class PlayerMovement : MonoBehaviour
             return;
 
         armature = newArmature;
+        isTurning = false;
         motor?.SynchronizeArmatureRotation(armature.rotation, hasRotate);
     }
 }

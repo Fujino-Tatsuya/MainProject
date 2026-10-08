@@ -162,8 +162,8 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
 
     private void TickOwner()
     {
-        // 조준 방향으로 즉시 회전(§2.1 — 회전 속도 없음)
-        movement.RotateImmediately(CurrentAim());
+        // 조준 방향으로 회전(§2.1) — 크게 꺾을 때만 짧게 보간(PlayerMovement.TurnToward)
+        movement.TurnToward(CurrentAim());
 
         // 첫 발 — 준비가 끝나면 그 순간의 조준으로 한 번만 요청한다(홀드해도 더 쏘지 않는다).
         if (!firstShotSent)
@@ -265,7 +265,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
             return;
 
         Vector3 direction = Flatten(requested);
-        movement.RotateImmediately(direction);
+        movement.TurnToward(direction);
 
         // 단계 배율은 이번 발의 증가 전 단계로 계산한다. 최대치에 닿는 발도 피해는 정상 적용(§4.4).
         int stage = heat.CurrentStage;
@@ -367,7 +367,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
         startTime = Time.time;
         lastShotTime = -1f;
 
-        movement.RotateImmediately(Flatten(direction));
+        movement.TurnToward(Flatten(direction));
         player.SetAnimatorMoving(false);
         CrossFadeIfExists(data.WindupStateName);
     }

@@ -664,7 +664,7 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
         moveSpeed = playbackDuration > 0f ? moveRemaining / playbackDuration : 0f;
 
         if (step.RotationType == DefaultAttackRotationType.SnapOnStart)
-            movement.RotateImmediately(attackDirection);
+            movement.TurnToward(attackDirection);
 
         player.SetAnimatorMoving(false);
 
