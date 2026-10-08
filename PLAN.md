@@ -1,4 +1,4 @@
-# ▶▶▶ 계획 = **사운드 데이터 테이블 (SoundCatalog 키 엔트리 + GameData.xlsx `Sound` 시트)** (2026-10-08 · 승인 ✅ · 구현 = Codex)
+# ▶▶▶ 계획 = **사운드 데이터 테이블 (SoundCatalog 키 엔트리 + GameData.xlsx `Sound` 시트)** (2026-10-08 · 승인 ✅ · ✅ 구현 완료 · Play 확인(10-08))
 
 > 브랜치 `feature/SoundAssetDataTable` (development `37f97719` 기준). 결정: 은희.
 
