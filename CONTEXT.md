@@ -8,6 +8,10 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-10-08 · 은희(Claude+claude-alt) · **거너 기본 공격 홀드 연사 → 클릭 단발 + 입력 창**, 브랜치 `fix/GunnerDefaultAttack`) — ✅ 구현 `24aebc9d` · 컴파일 OK · development 반영 · ⏳ Play·MPPM 손맛 확인
+- 클릭 1회 = 준비 동작 → 1발. 직전 발사 + `comboWindowOpen~Close`(초, `GunnerBasicAttackData`) 안 재클릭 → 서버 예약 → `FireInterval` 후 준비 없이 다음 발. 창은 애니 이벤트가 아니라 데이터 시간 값(판정이 시간 기반·발사 클립 배속 재생). 상세 = [character_gunner.md](Docs/design/character/character_gunner.md) §4.
+- 새 수치 2개는 xlsx 미반영 — 병합 Export 전까지 SO 기본값(0.05/0.2).
+
 ## ▶▶ 작업 세션 (2026-10-08 · 은희(Claude+Codex) · **사운드 데이터 테이블**, 브랜치 `feature/SoundAssetDataTable`(development `37f97719` 기준, WorkTree2)) — 계획 = [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ✅ 구현 `8637b802`(Codex) + 예시 키 `UI_Click`(Claude) · EditMode 9/9 · 필드 목록에 `entries[0].*` 11개 확인 · ✅ Play 청취(은희 10-08, BGM·UI_Click) · ✅ xlsx Sound 시트 **SVN r415**(병합 Export, r414 대비 기존 값 변경 0) · ✅ development 반영(10-08)
 - 사용법 = [Docs/tech/data-table.md](Docs/tech/data-table.md) Sound 항목. `AudioManager.Instance.Play("키")` / `Play("키", pos)`. 볼륨·피치 = BroAudio 엔티티 값에 곱하는 배율.
 - `UIClick`·`UI_Click` = BroAudio 엔티티 `SoundLibrary/LobbyLibrary/UI_Click_01`(UI 타입, 클립 `51.Audio/UI/temp_clickSound.mp3`) — `d8fb6fa5`. 클립 .meta 는 **SVN r412** 같이 받을 것(guid `c02d8e2d…`).
