@@ -33,6 +33,53 @@ Transform:
   - {fileID: 6746882315389318273}
   m_Father: {fileID: 7801964436231684861}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &543020901315621574
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7633554568097783291}
+  - component: {fileID: 4275452893022249454}
+  m_Layer: 0
+  m_Name: North_HumanoidBot
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &7633554568097783291
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 543020901315621574}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: -0.9953933, z: 0, w: 0.095876135}
+  m_LocalPosition: {x: 1.4, y: 0, z: 7.2}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 6970520088864091828}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &4275452893022249454
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 543020901315621574}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f494a3dfb3a07c438ce1300b3ecb257, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MonsterSpawnPoint
+  monsterPrefabOverride: {fileID: 2289540308195322763, guid: 959abbfa6214e0c42a0b997163c969f9, type: 3}
+  count: 1
+  scatterRadius: 0
 --- !u!1 &646247789534604418
 GameObject:
   m_ObjectHideFlags: 0
@@ -65,6 +112,53 @@ Transform:
   - {fileID: 8248279787014611215}
   m_Father: {fileID: 3314121580460178027}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &865495686427340307
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6556166479411618143}
+  - component: {fileID: 6296811169317612140}
+  m_Layer: 0
+  m_Name: Center_MortarBot
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &6556166479411618143
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 865495686427340307}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 6970520088864091828}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &6296811169317612140
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 865495686427340307}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f494a3dfb3a07c438ce1300b3ecb257, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MonsterSpawnPoint
+  monsterPrefabOverride: {fileID: 6303057502177232290, guid: 1f13e06cd8ea3c14eb063c61e7298d62, type: 3}
+  count: 1
+  scatterRadius: 0
 --- !u!1 &1184163312150894692
 GameObject:
   m_ObjectHideFlags: 0
@@ -192,6 +286,53 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
+--- !u!1 &1517665758858240711
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8173533899679933573}
+  - component: {fileID: 2435032739158926715}
+  m_Layer: 0
+  m_Name: West_HumanoidBot
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8173533899679933573
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1517665758858240711}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0.77164406, z: 0, w: 0.6360547}
+  m_LocalPosition: {x: -7.2, y: 0, z: 1.4}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 6970520088864091828}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2435032739158926715
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1517665758858240711}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f494a3dfb3a07c438ce1300b3ecb257, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MonsterSpawnPoint
+  monsterPrefabOverride: {fileID: 2289540308195322763, guid: 959abbfa6214e0c42a0b997163c969f9, type: 3}
+  count: 1
+  scatterRadius: 0
 --- !u!1 &1744422543957019165
 GameObject:
   m_ObjectHideFlags: 0
@@ -282,53 +423,6 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!1 &1748663194512174526
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 3013848627810269604}
-  - component: {fileID: 6371864598814646521}
-  m_Layer: 0
-  m_Name: Spawn_03
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &3013848627810269604
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1748663194512174526}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0.2939816, y: 0, z: 0.1960532}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 3314121580460178027}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &6371864598814646521
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1748663194512174526}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5f494a3dfb3a07c438ce1300b3ecb257, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::MonsterSpawnPoint
-  monsterPrefabOverride: {fileID: 0}
-  count: 2
-  scatterRadius: 2.303
 --- !u!1 &2282221474660164644
 GameObject:
   m_ObjectHideFlags: 0
@@ -509,53 +603,6 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!1 &3645656918797026694
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 704663455561274348}
-  - component: {fileID: 7474389742491799322}
-  m_Layer: 0
-  m_Name: Spawn_02
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &704663455561274348
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3645656918797026694}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -7.1638184, y: 0, z: -7.3107467}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 3314121580460178027}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &7474389742491799322
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3645656918797026694}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5f494a3dfb3a07c438ce1300b3ecb257, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::MonsterSpawnPoint
-  monsterPrefabOverride: {fileID: 0}
-  count: 1
-  scatterRadius: 1.8914
 --- !u!1 &4183335187520169383
 GameObject:
   m_ObjectHideFlags: 0
@@ -973,7 +1020,7 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!1 &5408818719897947686
+--- !u!1 &5487940682879044428
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -981,45 +1028,45 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 797151572177140667}
-  - component: {fileID: 1668509407889121675}
+  - component: {fileID: 6843161749234903158}
+  - component: {fileID: 4009800326416658549}
   m_Layer: 0
-  m_Name: Spawn_00
+  m_Name: East_HumanoidBot
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &797151572177140667
+--- !u!4 &6843161749234903158
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5408818719897947686}
+  m_GameObject: {fileID: 5487940682879044428}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 7.7125816, y: 0, z: -7.477347}
+  m_LocalRotation: {x: 0, y: -0.77164406, z: 0, w: 0.6360547}
+  m_LocalPosition: {x: 7.2, y: 0, z: 1.4}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 3314121580460178027}
+  m_Father: {fileID: 6970520088864091828}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1668509407889121675
+--- !u!114 &4009800326416658549
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5408818719897947686}
+  m_GameObject: {fileID: 5487940682879044428}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5f494a3dfb3a07c438ce1300b3ecb257, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MonsterSpawnPoint
-  monsterPrefabOverride: {fileID: 0}
+  monsterPrefabOverride: {fileID: 2289540308195322763, guid: 959abbfa6214e0c42a0b997163c969f9, type: 3}
   count: 1
-  scatterRadius: 2.058
+  scatterRadius: 0
 --- !u!1 &5522930334941438437
 GameObject:
   m_ObjectHideFlags: 0
@@ -1501,7 +1548,7 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!1 &7125006918758525227
+--- !u!1 &7430730177410594874
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -1509,45 +1556,38 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 6763140229808885598}
-  - component: {fileID: 4144112536452823631}
+  - component: {fileID: 6970520088864091828}
   m_Layer: 0
-  m_Name: Spawn_04
+  m_Name: MonsterSpawns
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &6763140229808885598
+--- !u!4 &6970520088864091828
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7125006918758525227}
+  m_GameObject: {fileID: 7430730177410594874}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -7.193218, y: -0.33516, z: 7.1344533}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 6261991128715643367}
+  - {fileID: 7633554568097783291}
+  - {fileID: 3935862139534832751}
+  - {fileID: 3160187482468399137}
+  - {fileID: 3744289618629029447}
+  - {fileID: 8173533899679933573}
+  - {fileID: 1115524188882630591}
+  - {fileID: 6843161749234903158}
+  - {fileID: 6556166479411618143}
   m_Father: {fileID: 3314121580460178027}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &4144112536452823631
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7125006918758525227}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5f494a3dfb3a07c438ce1300b3ecb257, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::MonsterSpawnPoint
-  monsterPrefabOverride: {fileID: 0}
-  count: 1
-  scatterRadius: 2.9302
 --- !u!1 &7512305719708500063
 GameObject:
   m_ObjectHideFlags: 0
@@ -1581,7 +1621,7 @@ Transform:
   - {fileID: 9112880605936385289}
   m_Father: {fileID: 7801964436231684861}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &7661346012374921609
+--- !u!1 &7589154693825525672
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -1589,45 +1629,45 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 8834017259636830597}
-  - component: {fileID: 7129820383408777779}
+  - component: {fileID: 3935862139534832751}
+  - component: {fileID: 4536785741013880537}
   m_Layer: 0
-  m_Name: Spawn_01
+  m_Name: South_ChompBot
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &8834017259636830597
+--- !u!4 &3935862139534832751
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7661346012374921609}
+  m_GameObject: {fileID: 7589154693825525672}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 7.2617817, y: 0, z: 6.6738534}
+  m_LocalRotation: {x: 0, y: 0.09587615, z: 0, w: 0.9953933}
+  m_LocalPosition: {x: -1.4, y: 0, z: -7.2}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 3314121580460178027}
+  m_Father: {fileID: 6970520088864091828}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &7129820383408777779
+--- !u!114 &4536785741013880537
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7661346012374921609}
+  m_GameObject: {fileID: 7589154693825525672}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5f494a3dfb3a07c438ce1300b3ecb257, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MonsterSpawnPoint
-  monsterPrefabOverride: {fileID: 0}
+  monsterPrefabOverride: {fileID: 5083357185944259280, guid: 7a0deecc1539ff543aa747158bacf514, type: 3}
   count: 1
-  scatterRadius: 1.7444
+  scatterRadius: 0
 --- !u!1 &7716440855972029763
 GameObject:
   m_ObjectHideFlags: 0
@@ -1658,11 +1698,6 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 797151572177140667}
-  - {fileID: 8834017259636830597}
-  - {fileID: 704663455561274348}
-  - {fileID: 3013848627810269604}
-  - {fileID: 6763140229808885598}
   - {fileID: 4785554332168545157}
   - {fileID: 40451690270664803}
   - {fileID: 6357765089932479056}
@@ -1731,6 +1766,7 @@ Transform:
   - {fileID: 6180988993068405663}
   - {fileID: 6173521950892796165}
   - {fileID: 75023775179574257}
+  - {fileID: 6970520088864091828}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &7298365747352330010
@@ -1745,8 +1781,102 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 666fbe07fb6f42d459700ccb6942060f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ZoneMonsterSpawnSet
-  defaultMonsterPrefab: {fileID: 5083357185944259280, guid: 7a0deecc1539ff543aa747158bacf514, type: 3}
+  defaultMonsterPrefab: {fileID: 0}
   spawnPoints: []
+--- !u!1 &8141611610882573713
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 3744289618629029447}
+  - component: {fileID: 8682556498408494897}
+  m_Layer: 0
+  m_Name: West_ChompBot
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &3744289618629029447
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8141611610882573713}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0.6360547, z: 0, w: 0.77164406}
+  m_LocalPosition: {x: -7.2, y: 0, z: -1.4}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 6970520088864091828}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &8682556498408494897
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8141611610882573713}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f494a3dfb3a07c438ce1300b3ecb257, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MonsterSpawnPoint
+  monsterPrefabOverride: {fileID: 5083357185944259280, guid: 7a0deecc1539ff543aa747158bacf514, type: 3}
+  count: 1
+  scatterRadius: 0
+--- !u!1 &8214879739241553210
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 3160187482468399137}
+  - component: {fileID: 7403095251805265928}
+  m_Layer: 0
+  m_Name: South_HumanoidBot
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &3160187482468399137
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8214879739241553210}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: -0.09587615, z: 0, w: 0.9953933}
+  m_LocalPosition: {x: 1.4, y: 0, z: -7.2}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 6970520088864091828}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &7403095251805265928
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8214879739241553210}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f494a3dfb3a07c438ce1300b3ecb257, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MonsterSpawnPoint
+  monsterPrefabOverride: {fileID: 2289540308195322763, guid: 959abbfa6214e0c42a0b997163c969f9, type: 3}
+  count: 1
+  scatterRadius: 0
 --- !u!1 &8264146495172548040
 GameObject:
   m_ObjectHideFlags: 0
@@ -1964,6 +2094,100 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!1 &8788898994211340988
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6261991128715643367}
+  - component: {fileID: 3996031767172522312}
+  m_Layer: 0
+  m_Name: North_ChompBot
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &6261991128715643367
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8788898994211340988}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0.9953933, z: 0, w: 0.095876135}
+  m_LocalPosition: {x: -1.4, y: 0, z: 7.2}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 6970520088864091828}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &3996031767172522312
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8788898994211340988}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f494a3dfb3a07c438ce1300b3ecb257, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MonsterSpawnPoint
+  monsterPrefabOverride: {fileID: 5083357185944259280, guid: 7a0deecc1539ff543aa747158bacf514, type: 3}
+  count: 1
+  scatterRadius: 0
+--- !u!1 &8800900039691812153
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1115524188882630591}
+  - component: {fileID: 750524361233851759}
+  m_Layer: 0
+  m_Name: East_ChompBot
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1115524188882630591
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8800900039691812153}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: -0.6360547, z: 0, w: 0.77164406}
+  m_LocalPosition: {x: 7.2, y: 0, z: -1.4}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 6970520088864091828}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &750524361233851759
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8800900039691812153}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f494a3dfb3a07c438ce1300b3ecb257, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MonsterSpawnPoint
+  monsterPrefabOverride: {fileID: 5083357185944259280, guid: 7a0deecc1539ff543aa747158bacf514, type: 3}
+  count: 1
+  scatterRadius: 0
 --- !u!1001 &73044501344328637
 PrefabInstance:
   m_ObjectHideFlags: 0
