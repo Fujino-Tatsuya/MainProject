@@ -40,6 +40,9 @@ public sealed class QAResultFlow
 
     public string Dump { get; private set; }
 
+    /// <summary>진행 로그(결과 씬에 못 갔을 때도 리포트에 남긴다).</summary>
+    public string LogText => _log.ToString();
+
     public void Begin()
     {
         _tally.Reset();
@@ -61,6 +64,8 @@ public sealed class QAResultFlow
 
     public IEnumerator DriveHost(QAResultPath path, QARecorder recorder)
     {
+        yield return InjectPlayerDamage(recorder);
+
         Note($"경로 강제 시작: {path}");
         switch (path)
         {
@@ -76,11 +81,71 @@ public sealed class QAResultFlow
         }
     }
 
+    /// <summary>
+    /// 무작위 플레이만으로는 몬스터를 거의 못 때린다(10-08 1차: 60초 전원 0). 판을 끝내기 전에
+    /// 플레이어 i(clientId 오름차순)가 살아 있는 일반 몬스터를 (i+1)회 때리게 해 행마다 다른 값이 나오게 한다.
+    /// 실제 피격 경로(ReceiveAttack → Unit.ApplyHealthDamage → CombatStatsEvents)를 탄다.
+    /// </summary>
+    private IEnumerator InjectPlayerDamage(QARecorder recorder)
+    {
+        var players = new List<Player>();
+        foreach (Player p in UnityEngine.Object.FindObjectsByType<Player>(FindObjectsSortMode.None))
+        {
+            if (p != null && p.IsSpawned)
+                players.Add(p);
+        }
+        players.Sort((a, b) => a.OwnerClientId.CompareTo(b.OwnerClientId));
+
+        for (int i = 0; i < players.Count; i++)
+        {
+            Player attacker = players[i];
+            for (int hitIndex = 0; hitIndex <= i; hitIndex++)
+            {
+                MonsterBase target = FindLivingMonster();
+                if (target == null)
+                {
+                    recorder.Add(QASeverity.Warning, "ResultStats", "피해 주입 대상(살아 있는 일반 몬스터) 없음 — 데미지 행 검증 약함");
+                    yield break;
+                }
+
+                int before = target.CurrentHealth;
+                var info = new AttackInfo { damage = 40 };
+                var context = new AttackHitContext(attacker.transform.position, attacker.transform, null, attacker);
+                target.ReceiveAttack(info, context);
+                int dealt = Mathf.Max(0, before - target.CurrentHealth);
+                Increment(_injectedDamage, attacker.OwnerClientId, dealt);
+                yield return new WaitForSeconds(0.2f);
+            }
+        }
+
+        var sb = new StringBuilder("피해 주입(HP 감소 기준):");
+        foreach (Player p in players)
+            sb.Append($" c{p.OwnerClientId}={Get(_injectedDamage, p.OwnerClientId)}");
+        Note(sb.ToString());
+    }
+
+    private static MonsterBase FindLivingMonster()
+    {
+        foreach (MonsterBase m in UnityEngine.Object.FindObjectsByType<MonsterBase>(FindObjectsSortMode.None))
+        {
+            if (m != null && m.IsSpawned && m.CurrentHealth > 0 && !(m is TwentyThreeBoss))
+                return m;
+        }
+        return null;
+    }
+
     private IEnumerator ForceWipe(QARecorder recorder)
     {
         float deadline = Time.time + WipeTimeout;
+        float nextDiag = 0f;
+        Temp_MultiGameRule rule = UnityEngine.Object.FindFirstObjectByType<Temp_MultiGameRule>();
         while (Time.time < deadline && !SessionResult.HasValue && !InResultScene)
         {
+            bool diag = Time.time >= nextDiag;
+            var sb = diag ? new StringBuilder("전멸 강제 상태:") : null;
+            if (diag)
+                nextDiag = Time.time + 5f;
+
             foreach (Player player in UnityEngine.Object.FindObjectsByType<Player>(FindObjectsSortMode.None))
             {
                 if (player == null || !player.IsSpawned)
@@ -90,23 +155,39 @@ public sealed class QAResultFlow
                 if (life == null)
                     continue;
 
+                if (diag)
+                {
+                    int lives = -1;
+                    rule?.TryGetLifeCount(player.OwnerClientId, out lives);
+                    PlayerInvulnerability inv = player.GetComponent<PlayerInvulnerability>();
+                    sb.Append($" c{player.OwnerClientId}[{life.State} hp={player.CurrentHealth} life={lives} " +
+                              $"inv={(inv != null && inv.IsServerInvulnerable)}]");
+                }
+
                 if (life.State == PlayerLifeState.Alive && player.CurrentHealth > 0)
                 {
+                    // 직접 피해(무적 중엔 거부 — 다음 틱 재시도). 추락 피해는 추락 사망 연출로 DeadPresentation 이
+                    // 30초 가까이 늘어져(10-08 3차) 쓰지 않는다.
                     player.ApplyDirectHealthDamage(player.CurrentHealth + 100000);
-                    Increment(_injectedDeaths, player.OwnerClientId);
+                    if (player.CurrentHealth <= 0)
+                        Increment(_injectedDeaths, player.OwnerClientId);
                 }
                 else if (life.State == PlayerLifeState.Soul)
                 {
-                    // 목숨이 남은 Soul 은 되살려 다시 죽인다 — 목숨이 다하면 PermanentDead 로 간다.
-                    life.TryCompleteRevive();
+                    // 목숨이 남은 Soul 은 게임의 부활 경로로 되살려 다시 죽인다(목숨 1 소비).
+                    // 🔴 PlayerLifeCycleController.TryCompleteRevive 는 목숨을 안 깎아 무한 루프가 된다(10-08 3차).
+                    player.GetComponent<PlayerReviveController>()?.TryCompleteReviveOnServer();
                 }
             }
 
+            if (diag)
+                Note(sb.ToString());
             yield return new WaitForSeconds(0.25f);
         }
 
         if (!SessionResult.HasValue && !InResultScene)
-            recorder.Add(QASeverity.Error, "ResultStats", $"전멸 강제 {WipeTimeout:F0}초 안에 결과가 확정되지 않음");
+            recorder.Add(QASeverity.Error, "ResultStats", $"전멸 강제 {WipeTimeout:F0}초 안에 결과가 확정되지 않음",
+                _log.ToString());
     }
 
     private IEnumerator ForceClear(QARecorder recorder)
@@ -165,14 +246,19 @@ public sealed class QAResultFlow
             int before = boss.CurrentHealth;
             var info = new AttackInfo { damage = hit };
             var context = new AttackHitContext(attacker.transform.position, attacker.transform, null, attacker);
-            boss.ReceiveAttack(info, context);
+            bool accepted = boss.ReceiveAttack(info, context);
             int dealt = Mathf.Max(0, before - boss.CurrentHealth);
             if (dealt > 0)
                 Increment(_injectedDamage, attacker.OwnerClientId, dealt);
+            Note($"보스 타격: accepted={accepted} HP {before}→{boss.CurrentHealth}/{boss.MaxHp} 상태={boss.State} " +
+                 $"결과확정={SessionResult.HasValue} 집계 처치(c{attacker.OwnerClientId})={_tally.Get(attacker.OwnerClientId).Kills}");
 
             yield return new WaitForSeconds(HitInterval);
         }
         Note($"보스 격파 — QA 주입 피해 {Get(_injectedDamage, attacker.OwnerClientId)} (attacker={attacker.OwnerClientId})");
+        int from = Mathf.Max(0, _tally.BossEvents.Count - 4);
+        for (int i = from; i < _tally.BossEvents.Count; i++)
+            Note($"보스 피해 이벤트[{i}]: {_tally.BossEvents[i]}");
     }
 
     // ── 모든 피어: 결과 화면 검증 ──────────────────────────────────
@@ -252,6 +338,9 @@ public sealed class QAResultFlow
                 recorder.Add(QASeverity.Error, "ResultStats",
                     $"clientId {r.ClientId} 집계 불일치: QA({t.Damage},{t.Kills},{t.Counters},{t.Deaths}) vs " +
                     $"결과({r.Damage},{r.Kills},{r.Counters},{r.Deaths})");
+            if (r.Damage < Get(_injectedDamage, r.ClientId))
+                recorder.Add(QASeverity.Error, "ResultStats",
+                    $"clientId {r.ClientId} 데미지 {r.Damage} < QA 주입 피해 {Get(_injectedDamage, r.ClientId)}");
             if (r.Deaths < Get(_injectedDeaths, r.ClientId))
                 recorder.Add(QASeverity.Error, "ResultStats",
                     $"clientId {r.ClientId} 사망 {r.Deaths} < QA 주입 사망 {Get(_injectedDeaths, r.ClientId)}");
@@ -358,7 +447,7 @@ public sealed class QAResultFlow
 
         private readonly Dictionary<ulong, Row> _rows = new Dictionary<ulong, Row>();
 
-        public void Reset() => _rows.Clear();
+        public void Reset() { _rows.Clear(); BossEvents.Clear(); }
 
         public Row Get(ulong clientId) => _rows.TryGetValue(clientId, out Row row) ? row : default;
 
@@ -381,8 +470,14 @@ public sealed class QAResultFlow
             SessionStatsTracker.Active != null && !SessionResult.HasValue &&
             NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer;
 
+        /// <summary>보스 대상 피해 이벤트 원문(게이트 무관) — 막타 처치 누락 진단용.</summary>
+        public readonly List<string> BossEvents = new List<string>();
+
         private void OnDamage(Unit target, ulong attacker, int amount, bool lethal)
         {
+            if (target is TwentyThreeBoss)
+                BossEvents.Add($"attacker={attacker} amount={amount} lethal={lethal} hp={target.CurrentHealth} " +
+                               $"counting={Counting} 확정={SessionResult.HasValue} tracker={(SessionStatsTracker.Active != null)}");
             if (!Counting || !(target is MonsterBase) || attacker == CombatStatsEvents.NoAttacker || amount <= 0)
                 return;
             Row row = Get(attacker);

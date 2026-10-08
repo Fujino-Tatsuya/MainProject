@@ -67,6 +67,23 @@ public sealed class QASessionController : MonoBehaviour
     private string _cycleSummary = "중단";
 
     /// <summary>부트스트랩이 활성화 전에 EditorPrefs 값으로 주입한다.</summary>
+    private QAResultPath[] _pathOrder = { QAResultPath.Aborted, QAResultPath.Wiped, QAResultPath.Cleared };
+
+    /// <summary>"Wiped,Cleared" 처럼 쉼표로 경로 순서를 준다. 비거나 못 읽으면 기본(중도 종료→전멸→클리어).</summary>
+    public void ConfigurePathOrder(string order)
+    {
+        var parsed = new List<QAResultPath>();
+        foreach (string token in (order ?? string.Empty).Split(','))
+        {
+            if (Enum.TryParse(token.Trim(), true, out QAResultPath p))
+                parsed.Add(p);
+        }
+        if (parsed.Count > 0)
+            _pathOrder = parsed.ToArray();
+    }
+
+    private QAResultPath PathForIteration(int iteration) => _pathOrder[(iteration - 1) % _pathOrder.Length];
+
     public void Configure(float sessionDurationSeconds, int repeats, int playerCount, bool resultPathsMode)
     {
         sessionDuration = Mathf.Max(5f, sessionDurationSeconds);
@@ -197,7 +214,7 @@ public sealed class QASessionController : MonoBehaviour
     private IEnumerator RunResultPhase()
     {
         bool host = IsHostRole();
-        QAResultPath path = (QAResultPath)((_iteration - 1) % 3);
+        QAResultPath path = PathForIteration(_iteration);
         QAResultPath? expected = host ? path : (QAResultPath?)null;
         Debug.Log($"[QA] 전투 씬 도달 — 결과 화면 경로 모드: {sessionDuration:F0}초 플레이 후 " +
                   (host ? $"{path} 로 종료." : "호스트의 종료를 기다린다."));
@@ -412,8 +429,11 @@ public sealed class QASessionController : MonoBehaviour
 
         string dir = QAReportWriter.Write(_recorder, $"사이클 {_iteration} — {summary}");
 
-        if (dir != null && resultPaths && _resultFlow.Dump != null)
-            System.IO.File.WriteAllText(System.IO.Path.Combine(dir, "result-stats.md"), _resultFlow.Dump);
+        if (dir != null && resultPaths)
+        {
+            string text = _resultFlow.Dump ?? "# 결과 화면에 도달하지 못함\n\n## 진행 로그\n\n" + _resultFlow.LogText;
+            System.IO.File.WriteAllText(System.IO.Path.Combine(dir, "result-stats.md"), text);
+        }
 
         if (dir != null && _recorder.CountBySeverity(QASeverity.Critical) > 0)
             ScreenCapture.CaptureScreenshot(System.IO.Path.Combine(dir, "end.png"));
@@ -428,6 +448,15 @@ public sealed class QASessionController : MonoBehaviour
     private IEnumerator ResetBetweenCycles()
     {
         _input?.SetTarget(null);
+
+        // 결과 화면 경로 모드의 클라: 호스트가 결과 씬에 머무는 동안(hostResultLingerSeconds) 먼저 끊고
+        // 재접속하면 끝나가는 세션에 다시 붙는다(10-08 1차 — 사이클 2·3 로비 소프트락). 호스트가 닫을 때까지 기다린다.
+        if (resultPaths && !IsHostRole())
+        {
+            yield return WaitOrTimeout(
+                () => NetworkManager.Singleton == null || !NetworkManager.Singleton.IsConnectedClient,
+                hostResultLingerSeconds + 30f);
+        }
 
         NetworkManager nm = NetworkManager.Singleton;
         if (nm != null && nm.IsListening)

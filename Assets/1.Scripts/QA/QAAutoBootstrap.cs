@@ -52,6 +52,7 @@ public static class QAAutoBootstrap
 
         var session = go.AddComponent<QASessionController>();
         session.Configure(QASettings.Duration, QASettings.RepeatCount, QASettings.PlayerCount, QASettings.ResultPaths);
+        session.ConfigurePathOrder(QASettings.ResultPathOrder);
 
         go.SetActive(true);
         Debug.Log($"[QA] Harness 생성 완료 — {QASettings.PlayerCount}인, 사이클당 {QASettings.Duration:F0}초, " +

@@ -46,6 +46,9 @@ public sealed class QASettingsWindow : EditorWindow
                 "켜면 Play 시간 뒤 호스트가 판을 끝내 결과 화면까지 간다. 사이클 1=중도 종료, 2=전멸, 3=클리어(반복 3 권장). " +
                 "각 피어가 result-stats.md 를 남긴다."),
             QASettings.ResultPaths);
+        QASettings.ResultPathOrder = EditorGUILayout.TextField(
+            new GUIContent("경로 순서", "쉼표 구분: Aborted,Wiped,Cleared. 비우면 이 기본 순서."),
+            QASettings.ResultPathOrder);
 
         EditorGUILayout.Space(10);
         EditorGUILayout.LabelField("리포트 저장 위치", EditorStyles.boldLabel);

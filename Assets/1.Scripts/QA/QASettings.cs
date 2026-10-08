@@ -17,6 +17,14 @@ public static class QASettings
     public const string PlayerCountKey = "QA.PlayerCount";
     public const string ReportRootKey = "QA.ReportRoot";
     public const string ResultPathsKey = "QA.ResultPaths";
+    public const string ResultPathOrderKey = "QA.ResultPathOrder";
+
+    /// <summary>결과 화면 경로 순서(쉼표 구분: Aborted,Wiped,Cleared). 비우면 기본 순서.</summary>
+    public static string ResultPathOrder
+    {
+        get => EditorPrefs.GetString(ResultPathOrderKey, string.Empty);
+        set => EditorPrefs.SetString(ResultPathOrderKey, value ?? string.Empty);
+    }
 
     /// <summary>
     /// 결과 화면 경로 모드. 켜면 각 사이클을 Play 시간 뒤 결과 화면까지 보낸다
