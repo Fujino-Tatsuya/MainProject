@@ -8,8 +8,10 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 작업 세션 (2026-10-08 · 은희(Claude+Codex) · **사운드 데이터 테이블**, 브랜치 `feature/SoundAssetDataTable`(development `37f97719` 기준, WorkTree2)) — 계획 = [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ⏳ Codex 구현
-- 🔴 **수정 예정 — 동시 수정 금지**: `9.ScriptableObject/Sound/SoundCatalog.cs`·`SoundCatalog.asset`·`1.Scripts/Sound/AudioManager.cs`·`1.Scripts/Sound/`(새 순수 클래스)·`Tests/EditMode/Sound/`·`Docs/tech/data-table.md`. `GameData.xlsx` 는 에이전트가 쓰지 않음(사람이 SVN 잠금 후 Export).
+## ▶▶ 작업 세션 (2026-10-08 · 은희(Claude+Codex) · **사운드 데이터 테이블**, 브랜치 `feature/SoundAssetDataTable`(development `37f97719` 기준, WorkTree2)) — 계획 = [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ✅ 구현 `8637b802`(Codex) + 예시 키 `UI_Click`(Claude) · EditMode 9/9 · 필드 목록에 `entries[0].*` 11개 확인 · ⏳ xlsx Export(사람, SVN 잠금) · ⏳ Play 청취 · 미푸시
+- 사용법 = [Docs/tech/data-table.md](Docs/tech/data-table.md) Sound 항목. `AudioManager.Instance.Play("키")` / `Play("키", pos)`. 볼륨·피치 = BroAudio 엔티티 값에 곱하는 배율.
+- ⚠️ `SoundCatalog.asset` 의 기존 `UIClick` SoundID 가 원래 비어 있다 → `UI_Click` 엔트리도 비어 있어 Play 하면 "SoundID 유효하지 않음" 경고. 인스펙터에서 사운드 연결 필요.
+- 새 키 추가 = SO 인스펙터(배열 크기), 수치 = xlsx `Sound` 시트.
 
 ## ▶▶ 작업 세션 (2026-10-07 · 은희(Claude) · **팔라딘 평타 전진 복구 + 공격속도 ×1.2 + 간파 선딜 0.25**, 브랜치 `fix/PaladinDAForward`) — 계획 [PLAN-paladin-da.md](PLAN-paladin-da.md) ✅ 승인 · ✅ C1~C4 구현(진행 = PLAN §7) · SVN **r404** 같이 받을 것 · ⏳ 은희 Play · 미푸시
 - 🔴 **수정 예정 — 동시 수정 금지**: `Player/DefaultAttackController.cs`·`DefaultAttackData.cs`·`4.Animations/Player/PlayerAnimatorController.controller`·`Garen_Default_Attack_1~4.anim`·`9.ScriptableObject/Player/Garen/PlayerDefaultAttackData.asset`·`FirstMeleeInterruptSkillData.asset`·`GameData.xlsx`(SVN 잠금).
