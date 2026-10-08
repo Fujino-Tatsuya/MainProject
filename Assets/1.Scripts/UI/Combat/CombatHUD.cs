@@ -11,6 +11,7 @@ public class CombatHUD : MonoBehaviour
     [SerializeField] private PassiveHUD passiveHUD;
     [SerializeField] private SkillCooldownHUD skillCooldownHUD;
     [SerializeField] private DashCooldownHUD dashCooldownHUD;
+    [SerializeField] private HealthVignetteHUD healthVignetteHUD;
 
 
     private void OnEnable()
@@ -40,5 +41,8 @@ public class CombatHUD : MonoBehaviour
 
         if (passiveHUD != null)
             passiveHUD.Bind(player);
+
+        if (healthVignetteHUD != null)
+            healthVignetteHUD.Bind(player);
     }
 }
