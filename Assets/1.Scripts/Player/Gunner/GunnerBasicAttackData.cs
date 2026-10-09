@@ -1,18 +1,18 @@
 using UnityEngine;
 
-/// <summary>거너 기본 공격(클릭 단발 레이저 + 입력 창 연속 공격) 수치(character_gunner.md §12.1). 값은 전부 플레이 테스트로 정한다.</summary>
+/// <summary>거너 기본 공격(홀드 연사 + 입력 창 연속 공격 레이저) 수치(character_gunner.md §12.1). 값은 전부 플레이 테스트로 정한다.</summary>
 [CreateAssetMenu(fileName = "GunnerBasicAttackData", menuName = "Player/Gunner/Basic Attack Data")]
 [DataTableSheet("Gunner", Order = 0)]
 public class GunnerBasicAttackData : ScriptableObject
 {
     [Header("타이밍")]
-    [Tooltip("공격 시작 시 1회 준비 동작(초). 끝나야 첫 발이 나간다. 입력 창으로 이어지는 발은 다시 거치지 않는다.")]
+    [Tooltip("공격 시작 시 1회 준비 동작(초). 끝나야 첫 발이 나간다. 홀드·입력 창으로 이어지는 발은 다시 거치지 않는다.")]
     [SerializeField, Min(0f)] private float windupDuration = 0.25f;
 
-    [Tooltip("이어지는 발 사이 최소 간격(초) — 창 안에서 클릭해도 직전 발 후 이만큼 지나야 나간다.")]
+    [Tooltip("이어지는 발 사이 간격(초) — 홀드 연사 간격이자, 창 안에서 클릭해도 직전 발 후 이만큼 지나야 나간다.")]
     [SerializeField, Min(0.05f)] private float fireInterval = 0.35f;
 
-    [Tooltip("발사 후 후속 동작(초). 창 안 클릭이 없으면 이만큼 마무리하고 끝난다(§4.3).")]
+    [Tooltip("발사 후 후속 동작(초). 버튼을 놓았고 창 안 클릭도 없으면 이만큼 마무리하고 끝난다(§4.3).")]
     [SerializeField, Min(0f)] private float shotRecovery = 0.2f;
 
     [Tooltip("입력 창 열림(초, 직전 발사 기준). 팔라딘 ComboWindowOpen 에 해당.")]

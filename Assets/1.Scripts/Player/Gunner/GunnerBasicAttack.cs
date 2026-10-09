@@ -3,14 +3,16 @@ using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// 거너 기본 공격 — 클릭 1회 = 준비 동작 → 레이저 1발, 입력 창 안 클릭으로 다음 발을 잇는다
-/// (character_gunner.md §4, PLAN-gunner.md G3). 홀드해도 연사하지 않는다.
+/// 거너 기본 공격 — 준비 동작 → 레이저 1발. 버튼을 누르고 있거나(홀드) 입력 창 안에서 클릭하면 다음 발을 잇는다
+/// (character_gunner.md §4, PLAN-gunner.md G3).
 ///
 /// 흐름: 오너가 시작 요청 → 서버 승인(준비 동작 1회) → 준비가 끝나면 오너가 "첫 발 + 조준"을 요청 →
 /// 서버가 간격·과열·상태를 검사해 판정(첫 대상 1체)·과열 증가 → 전 피어 연출.
-/// 이어 쏘기는 팔라딘 콤보(DefaultAttackController 의 ComboWindowOpen~Close)와 같은 구조다 — 오너가 클릭을
-/// 보내면 서버가 자기 시각으로 창(직전 발사 + ComboWindowOpen~Close) 안인지 보고 예약, 발사 간격이 차면
-/// 준비 동작 없이 다음 발을 쏜다. 예약이 없거나 과열되면 후속 동작(ShotRecovery)까지 마무리하고 끝난다.
+/// 이어지는 발은 서버가 직접 쏜다 — 조건은 둘 중 하나다(2026-10-09).
+///  · 홀드: 오너가 버튼 눌림/뗌과 조준을 서버에 알리고, 서버는 눌림 동안 직전 발사 + 발사 간격마다 쏜다.
+///  · 입력 창: 팔라딘 콤보(DefaultAttackController 의 ComboWindowOpen~Close)와 같은 구조 — 오너가 클릭을 보내면
+///    서버가 자기 시각으로 창(직전 발사 + ComboWindowOpen~Close) 안인지 보고 예약, 발사 간격이 차면 쏜다.
+/// 어느 쪽이든 준비 동작은 첫 발만이다. 둘 다 아니거나 과열되면 후속 동작(ShotRecovery)까지 마무리하고 끝난다.
 /// 창은 애니 이벤트가 아니라 데이터의 시간 값이다(판정도 시간 기반이라 한 곳에서 맞춘다).
 /// 공격 중 이동 불가, 조준은 즉시 회전. 다른 스킬 입력은 상태기계가 막는다(Attack 상태 — §3.2, 예약 없음).
 /// </summary>
@@ -25,9 +27,11 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
 
     // 오너 요청 간격이 네트워크 지터로 조금 당겨져 와도 받아 준다.
     private const float IntervalTolerance = 0.75f;
-    // 준비가 끝났는데 오너의 첫 발 요청이 안 올 때(연결 문제 등) 서버가 스스로 끝내는 여유(발사 간격 배수).
-    // 이어지는 발은 서버가 예약으로 직접 쏘므로 첫 발만 기다린다.
+    // 오너 신호가 끊겼을 때(연결 문제 등) 서버가 스스로 끝내는 여유(발사 간격 배수).
+    // 첫 발 요청이 안 오면 공격을 끝내고, 홀드 중 조준 갱신이 끊기면 뗀 것으로 본다.
     private const float StallIntervals = 3f;
+    // 홀드 중 오너가 조준을 보내는 주기(발사 간격 배수). 서버는 이걸 "아직 누르고 있다"는 신호로도 쓴다.
+    private const float HoldAimIntervals = 0.5f;
 
     [SerializeField] private GunnerBasicAttackData data;
     [SerializeField] private Animator animator;
@@ -56,10 +60,14 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
     // 오너
     private bool isRequesting;
     private bool firstShotSent;
+    private bool holdSent;         // 서버가 "누르고 있다"로 알고 있는가
+    private float nextHoldAimTime;
 
     // 서버
     private bool hasQueuedShot;
-    private Vector3 queuedDirection;
+    private bool held;
+    private float lastHoldSignalTime;
+    private Vector3 nextDirection;
     private bool endingGracefully;
 
     public bool CanStartApprovedAttack => data != null && heat != null && !heat.IsOverheated;
@@ -165,28 +173,57 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
         // 조준 방향으로 즉시 회전(§2.1 — 회전 속도 없음)
         movement.RotateImmediately(CurrentAim());
 
-        // 첫 발 — 준비가 끝나면 그 순간의 조준으로 한 번만 요청한다(홀드해도 더 쏘지 않는다).
+        // 홀드 상태는 바뀔 때만 알린다 — 뗌은 ReleaseRpc, 다시 누름은 아래 클릭 RPC 가 겸한다.
+        if (holdSent && !input.AttackHeld)
+        {
+            holdSent = false;
+            if (IsNetworkActive)
+                ReleaseRpc();
+            else
+                held = false;
+        }
+
+        // 클릭 — 누른 프레임만 보낸다. 창 안인지는 서버가 자기 시각으로 판단한다(팔라딘 RequestQueueNextAttackRpc 와 같음).
+        // 창 밖이어도 서버는 "누르고 있음"으로 받아 홀드가 이어진다.
+        if (input.AttackPressed)
+        {
+            holdSent = true;
+            nextHoldAimTime = Time.time + data.FireInterval * HoldAimIntervals;
+            if (IsNetworkActive)
+                RequestQueueShotRpc(CurrentAim());
+            else
+                ServerQueueShot(CurrentAim());
+        }
+
+        // 첫 발 — 준비가 끝나면 그 순간의 조준으로 한 번만 요청한다. 이어지는 발은 서버가 쏜다.
         if (!firstShotSent)
         {
             if (Time.time < startTime + data.WindupDuration || heat.IsOverheated)
                 return;
 
             firstShotSent = true;
+            nextHoldAimTime = Time.time + data.FireInterval * HoldAimIntervals;
             if (IsNetworkActive)
+            {
                 FireShotRpc(CurrentAim());
+            }
             else
+            {
+                lastHoldSignalTime = Time.time;
                 ServerFire(CurrentAim());
+            }
             return;
         }
 
-        // 이어 쏘기 — 누른 프레임만 보낸다. 창 안인지는 서버가 자기 시각으로 판단한다(팔라딘 RequestQueueNextAttackRpc 와 같음).
-        if (!input.AttackPressed)
+        // 홀드 중 조준 갱신 — 서버가 다음 발을 이 방향으로 쏘고, 끊기면 뗀 것으로 본다.
+        if (!holdSent || Time.time < nextHoldAimTime)
             return;
 
+        nextHoldAimTime = Time.time + data.FireInterval * HoldAimIntervals;
         if (IsNetworkActive)
-            RequestQueueShotRpc(CurrentAim());
+            HoldAimRpc(CurrentAim());
         else
-            ServerQueueShot(CurrentAim());
+            ServerHoldAim(CurrentAim());
     }
 
     // ── 서버 ─────────────────────────────────────────────────────────────
@@ -209,9 +246,10 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
     [Rpc(SendTo.Server)]
     private void FireShotRpc(Vector3 direction, RpcParams rpcParams = default)
     {
-        // 오너가 직접 요청하는 건 첫 발뿐이다 — 이어지는 발은 창 예약으로만 나간다(창 우회 방지).
+        // 오너가 직접 요청하는 건 첫 발뿐이다 — 이어지는 발은 서버가 홀드·창 예약으로만 쏜다(창 우회 방지).
         if (rpcParams.Receive.SenderClientId != OwnerClientId || lastShotTime >= 0f)
             return;
+        lastHoldSignalTime = Time.time;
         ServerFire(direction);
     }
 
@@ -223,10 +261,34 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
         ServerQueueShot(direction);
     }
 
-    // 창(직전 발사 + ComboWindowOpen~Close) 안의 클릭만 다음 발로 예약한다. 창 밖 클릭은 버린다 — 이월 없음.
+    [Rpc(SendTo.Server)]
+    private void ReleaseRpc(RpcParams rpcParams = default)
+    {
+        if (rpcParams.Receive.SenderClientId != OwnerClientId)
+            return;
+        held = false;
+    }
+
+    [Rpc(SendTo.Server)]
+    private void HoldAimRpc(Vector3 direction, RpcParams rpcParams = default)
+    {
+        if (rpcParams.Receive.SenderClientId != OwnerClientId)
+            return;
+        ServerHoldAim(direction);
+    }
+
+    // 클릭 = 버튼이 눌렸다 — 홀드를 (다시) 켠다. 다음 발 예약은 창(직전 발사 + ComboWindowOpen~Close) 안의 클릭만이다.
+    // 창 밖 클릭은 예약을 버린다 — 이월 없음. 그 뒤 계속 누르고 있으면 홀드로 이어진다.
     private void ServerQueueShot(Vector3 direction)
     {
-        if (!active || data == null || lastShotTime < 0f || hasQueuedShot || heat.IsOverheated)
+        if (!active || data == null)
+            return;
+
+        held = true;
+        lastHoldSignalTime = Time.time;
+        nextDirection = Flatten(direction);
+
+        if (lastShotTime < 0f || hasQueuedShot || heat.IsOverheated)
             return;
 
         float sinceShot = Time.time - lastShotTime;
@@ -234,7 +296,16 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
             return;
 
         hasQueuedShot = true;
-        queuedDirection = direction;
+    }
+
+    // 조준 갱신만 한다 — 홀드를 켜지는 않는다(뗀 뒤 늦게 온 갱신이 홀드를 되살리지 않게).
+    private void ServerHoldAim(Vector3 direction)
+    {
+        if (!active || !held)
+            return;
+
+        lastHoldSignalTime = Time.time;
+        nextDirection = Flatten(direction);
     }
 
     private void StartServer(Vector3 direction)
@@ -266,6 +337,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
 
         Vector3 direction = Flatten(requested);
         movement.RotateImmediately(direction);
+        nextDirection = direction;
 
         // 단계 배율은 이번 발의 증가 전 단계로 계산한다. 최대치에 닿는 발도 피해는 정상 적용(§4.4).
         int stage = heat.CurrentStage;
@@ -308,19 +380,28 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
             return;
         }
 
-        // 창 안에서 예약된 다음 발 — 발사 간격이 차면 준비 동작 없이 쏜다. 과열 등으로 거절되면 아래 마무리로 간다.
-        if (hasQueuedShot)
+        // 홀드 중 오너 신호가 끊기면 뗀 것으로 본다 — 아래 마무리로 끝난다.
+        if (held && now > lastHoldSignalTime + data.FireInterval * StallIntervals)
+        {
+            Edit.LogWarning("[Gunner] 오너 홀드 신호가 끊겼다 — 뗀 것으로 보고 기본 공격을 마무리한다.", this);
+            held = false;
+        }
+
+        // 다음 발 — 누르고 있거나 창 안에서 예약됐으면 발사 간격이 찰 때 준비 동작 없이 쏜다.
+        // 간격은 실제 직전 발사 기준이라 프레임이 길거나 뗌 신호가 늦어도 몰아 쏘지 않는다.
+        // 과열이면 기다리지 않고 이번 발의 후속 동작까지 마무리한다(§4.4). 거절되면 아래 마무리로 간다.
+        if ((held || hasQueuedShot) && !heat.IsOverheated)
         {
             if (now < lastShotTime + data.FireInterval)
                 return;
 
             hasQueuedShot = false;
-            ServerFire(queuedDirection);
+            ServerFire(nextDirection);
             if (lastShotTime >= now)
                 return;
         }
 
-        // 예약이 없으면(창 밖·과열 포함) 이번 발의 후속 동작까지 마무리하고 끝낸다(§4.3·§4.4).
+        // 홀드도 예약도 없으면(창 밖·과열 포함) 이번 발의 후속 동작까지 마무리하고 끝낸다(§4.3·§4.4).
         if (now >= lastShotTime + data.ShotRecovery)
             EndServer();
     }
@@ -366,6 +447,11 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
         hasQueuedShot = false;
         startTime = Time.time;
         lastShotTime = -1f;
+        // 시작 클릭 = 눌림. 오너가 이미 뗐으면 다음 틱에 ReleaseRpc 로 바로잡는다.
+        holdSent = true;
+        held = true;
+        lastHoldSignalTime = startTime;
+        nextDirection = Flatten(direction);
 
         movement.RotateImmediately(Flatten(direction));
         player.SetAnimatorMoving(false);
@@ -406,7 +492,9 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
         active = false;
         isRequesting = false;
         firstShotSent = false;
+        holdSent = false;
         hasQueuedShot = false;
+        held = false;
         lastShotTime = -1f;
     }
 
