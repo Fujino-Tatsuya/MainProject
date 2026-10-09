@@ -267,8 +267,12 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
         _highlightPanel = panel;
         if (gate != null) gate.SetPanelHighlighted(panel, true);
 
-        // F 프롬프트는 외곽선과 같은 선택을 따른다(별도 거리 판정 없음). 프롬프트 프리팹 참조·높이는 존 프리팹이 들고 있다.
-        if (gate != null) InteractPrompt.Show(this, gate.PromptPrefab, gate.Panels[panel], Vector3.up * gate.PromptHeightOffset);
+        // F 프롬프트는 외곽선과 같은 선택을 따른다(별도 거리 판정 없음). 뷰는 패널 자식 InteractPrompt 인스턴스 — 없으면 Show 가 경고한다.
+        if (gate != null)
+        {
+            gate.TryGetPromptView(panel, out InteractPromptView view);
+            InteractPrompt.Show(this, view);
+        }
         else InteractPrompt.Hide(this);
     }
 

@@ -1,13 +1,14 @@
 using UnityEngine;
 
 /// <summary>
-/// <see cref="InteractPrompt"/> 의 화면 표시. 독립 프리팹 <c>Assets/2.Prefabs/UI/InteractPrompt.prefab</c> 의
-/// Screen Space - Overlay Canvas 루트에 붙고, 아이콘 RectTransform 을 대상 월드 위치에 맞춰 매 프레임 Canvas 좌표로 옮긴다.
-/// 인스턴스는 <see cref="InteractPrompt"/> 가 프리팹마다 하나 만들어 재사용한다. 외형(스프라이트·크기·Canvas 설정)은 그 프리팹에서 직접 고친다. 배치 계산은 머리 위 체력바와 같은 <see cref="OverheadHealthBarScreenPlacement"/> 를 쓴다.
+/// <see cref="InteractPrompt"/> 의 화면 표시. <c>Assets/2.Prefabs/UI/InteractPrompt.prefab</c> 의 루트(일반 Transform)에 붙는다.
+/// 루트 = 월드 기준점 — 대상 오브젝트의 자식으로 두고 로컬 위치로 높이를 정한다. 그 아래 Screen Space - Overlay Canvas 의
+/// 아이콘 RectTransform 을 기준점의 화면 위치로 매 프레임 옮긴다(Overlay Canvas 루트 Transform 은 Unity 가 몰아서 기준점으로 못 쓴다).
+/// 외형(스프라이트·크기·Canvas 설정)은 그 프리팹에서 직접 고친다. 배치 계산은 머리 위 체력바와 같은 <see cref="OverheadHealthBarScreenPlacement"/> 를 쓴다.
 /// </summary>
 public sealed class InteractPromptView : MonoBehaviour
 {
-    [Tooltip("이 뷰의 Screen Space - Overlay Canvas. sortingOrder -5 = 머리 위 체력바(-10) 위, CombatHUD(0) 아래.")]
+    [Tooltip("자식 Screen Space - Overlay Canvas. sortingOrder -5 = 머리 위 체력바(-10) 위, CombatHUD(0) 아래.")]
     [SerializeField] private Canvas canvas;
 
     [Tooltip("키 아이콘(왼쪽 아래 앵커). 크기는 Canvas 단위 = 세로 1080 기준 픽셀이라 카메라 거리와 무관하게 일정하다.")]
@@ -37,10 +38,10 @@ public sealed class InteractPromptView : MonoBehaviour
 
         bool visible = false;
         Camera cam = Camera.main;
-        if (cam != null && InteractPrompt.TryGetWorldAnchor(this, out Vector3 anchor))
+        if (cam != null && InteractPrompt.IsDisplaying(this))
         {
             visible = OverheadHealthBarScreenPlacement.TryGetCanvasPosition(
-                cam.WorldToScreenPoint(anchor), new Vector2(Screen.width, Screen.height), canvas.scaleFactor,
+                cam.WorldToScreenPoint(transform.position), new Vector2(Screen.width, Screen.height), canvas.scaleFactor,
                 screenOffset, icon.sizeDelta * 0.5f, out Vector2 position);
             if (visible)
                 icon.anchoredPosition = position;

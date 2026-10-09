@@ -84,16 +84,7 @@ public sealed class ZoneBridgeGate : MonoBehaviour
              "기존 Flat Kit 외곽선 렌더러 피처가 그린다. 비우면 외곽선 없음.")]
     [SerializeField] private Material highlightOutlineMaterial;
 
-    [Header("F 키 프롬프트 (handoff-interact-prompt)")]
-    [Tooltip("외곽선이 켜진 패널 위에 띄울 프롬프트 프리팹(Assets/2.Prefabs/UI/InteractPrompt.prefab). 아이콘·Canvas 는 그 프리팹에서 고친다.")]
-    [SerializeField] private InteractPromptView promptPrefab;
-
-    [Tooltip("F 키 프롬프트를 띄울 높이(m). 외곽선이 켜진 패널 위치에서 월드 위쪽으로.")]
-    [SerializeField] private float promptHeightOffset = 1.8f;
-
     public IReadOnlyList<Transform> Panels => panels;
-    public InteractPromptView PromptPrefab => promptPrefab;
-    public float PromptHeightOffset => promptHeightOffset;
     public int PanelCount => panels != null ? panels.Count : 0;
     public float OpenDuration => openDuration;
     public float InteractRadius => interactRadius;
@@ -411,6 +402,26 @@ public sealed class ZoneBridgeGate : MonoBehaviour
             r.sharedMaterials = withOutline;
         }
         _highlightedPanel = index;
+    }
+
+    // ── F 키 프롬프트(handoff-interact-prompt) ──────────────────────────
+    // 패널마다 자식으로 InteractPrompt.prefab 인스턴스가 놓여 있다(높이 = 그 인스턴스의 로컬 위치).
+    // 별도 직렬화 리스트를 두면 panels 와 순서를 맞춰야 하므로 패널 자식에서 찾아 처음 한 번 캐시한다.
+
+    InteractPromptView[] _promptViews;
+
+    /// <summary>패널 i 위에 띄울 프롬프트 뷰(패널 자식). 없으면 false.</summary>
+    public bool TryGetPromptView(int index, out InteractPromptView view)
+    {
+        if (_promptViews == null)
+        {
+            _promptViews = new InteractPromptView[PanelCount];
+            for (int i = 0; i < PanelCount; i++)
+                if (panels[i] != null) _promptViews[i] = panels[i].GetComponentInChildren<InteractPromptView>(true);
+        }
+
+        view = index >= 0 && index < _promptViews.Length ? _promptViews[index] : null;
+        return view != null;
     }
 
     /// <summary>패널 i의 월드 위치. 거리 판정에 쓴다.</summary>
