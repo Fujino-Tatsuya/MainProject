@@ -40,7 +40,7 @@ public readonly struct TrainingDummyInterruptSuccess
 [DisallowMultipleComponent]
 [RequireComponent(typeof(TrainingDummy))]
 [DataTableSheet("Map", Order = 0)]
-public sealed class TrainingDummyInterrupt : NetworkBehaviour
+public sealed class TrainingDummyInterrupt : NetworkBehaviour, IInterruptSlowMotionTarget
 {
     [Header("순환")]
     [SerializeField, Min(0f), FormerlySerializedAs("groggyDuration")]
@@ -86,6 +86,12 @@ public sealed class TrainingDummyInterrupt : NetworkBehaviour
 
     /// <summary>[전 피어] 현재 상태.</summary>
     public TrainingDummyInterruptState State => _state.Value;
+
+    /// <summary>[서버] 슬로우 모션 예측 — 지금 인터럽트를 받는가. 순환 판정 원본(<see cref="TrainingDummyInterruptCycle"/>)을 직접 본다.</summary>
+    bool IInterruptSlowMotionTarget.ServerIsInterruptible => IsServer && _cycle != null && _cycle.IsInterruptible;
+
+    /// <summary>[서버] 슬로우 모션 성공 판별 — 타격 전후로 비교한다.</summary>
+    int IInterruptSlowMotionTarget.ServerInterruptSuccessCount => _cycle != null ? _cycle.SuccessCount : 0;
 
     /// <summary>[서버] 인터럽트 성공. 취약 진입 직후에 한 번 발화한다.</summary>
     public event Action<TrainingDummyInterruptSuccess> ServerInterruptSucceeded;

@@ -12,6 +12,7 @@ internal static class SlowMotionEditModeTestRunner
     {
         "^SlowMotionTimelineTests$",
         "^SlowMotionSessionTests$",
+        "^InterruptSlowMotionTrackerTests$",
     };
 
     const string Tag = "[SlowMotionTests]";
