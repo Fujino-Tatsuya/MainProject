@@ -3,16 +3,16 @@ using NUnit.Framework;
 /// <summary>
 /// 허수아비 인터럽트 순환 규칙.
 ///
-/// 🔴 여기서 고정하는 것은 값이 아니라 관계다 — 그로기 3초·idle 1초 같은 저작값은 튜닝 대상이라
+/// 🔴 여기서 고정하는 것은 값이 아니라 관계다 — 취약 3초·idle 1초 같은 저작값은 튜닝 대상이라
 ///    잠그지 않는다(CounterWindowTests 와 같은 원칙). 테스트 안의 길이는 임의값이다.
 /// </summary>
 public sealed class TrainingDummyInterruptCycleTests
 {
-    const float Groggy = 2f;
+    const float Vulnerable = 2f;
     const float Idle = 0.5f;
 
-    static TrainingDummyInterruptCycle NewCycle(float groggy = Groggy, float idle = Idle) =>
-        new TrainingDummyInterruptCycle(groggy, idle);
+    static TrainingDummyInterruptCycle NewCycle(float vulnerable = Vulnerable, float idle = Idle) =>
+        new TrainingDummyInterruptCycle(vulnerable, idle);
 
     // ─── 기본 상태 ─────────────────────────────────────────────────────
 
@@ -39,13 +39,13 @@ public sealed class TrainingDummyInterruptCycleTests
     // ─── 성공 ──────────────────────────────────────────────────────────
 
     [Test]
-    public void 인터럽트_성공하면_그로기로()
+    public void 인터럽트_성공하면_취약으로()
     {
         var c = NewCycle();
         Assert.IsTrue(c.TryInterrupt());
-        Assert.AreEqual(TrainingDummyInterruptState.Groggy, c.State);
+        Assert.AreEqual(TrainingDummyInterruptState.Vulnerable, c.State);
         Assert.IsFalse(c.IsInterruptible);
-        Assert.AreEqual(Groggy, c.Remaining, 1e-5f);
+        Assert.AreEqual(Vulnerable, c.Remaining, 1e-5f);
     }
 
     // 몬스터 카운터 창과 같은 1회 소비 — 두 명이 같은 프레임에 넣어도 성공은 하나다.
@@ -60,16 +60,16 @@ public sealed class TrainingDummyInterruptCycleTests
     // ─── 창 밖 ─────────────────────────────────────────────────────────
 
     [Test]
-    public void 그로기_중_인터럽트는_무효이고_타이머도_건드리지_않는다()
+    public void 취약_중_인터럽트는_무효이고_타이머도_건드리지_않는다()
     {
         var c = NewCycle();
         c.TryInterrupt();
-        c.Tick(Groggy * 0.5f);
+        c.Tick(Vulnerable * 0.5f);
         float before = c.Remaining;
 
         Assert.IsFalse(c.TryInterrupt());
-        Assert.AreEqual(TrainingDummyInterruptState.Groggy, c.State);
-        Assert.AreEqual(before, c.Remaining, 1e-5f, "창 밖 인터럽트가 그로기를 연장하면 안 된다");
+        Assert.AreEqual(TrainingDummyInterruptState.Vulnerable, c.State);
+        Assert.AreEqual(before, c.Remaining, 1e-5f, "창 밖 인터럽트가 취약을 연장하면 안 된다");
     }
 
     [Test]
@@ -77,7 +77,7 @@ public sealed class TrainingDummyInterruptCycleTests
     {
         var c = NewCycle();
         c.TryInterrupt();
-        c.Tick(Groggy + Idle * 0.5f);
+        c.Tick(Vulnerable + Idle * 0.5f);
         Assert.AreEqual(TrainingDummyInterruptState.Idle, c.State);
 
         Assert.IsFalse(c.TryInterrupt());
@@ -87,13 +87,13 @@ public sealed class TrainingDummyInterruptCycleTests
     // ─── 순환 ──────────────────────────────────────────────────────────
 
     [Test]
-    public void 그로기_끝나면_idle_그다음_인터럽트_가능()
+    public void 취약_끝나면_idle_그다음_인터럽트_가능()
     {
         var c = NewCycle();
         c.TryInterrupt();
 
-        Assert.IsFalse(c.Tick(Groggy * 0.9f), "그로기 도중엔 상태가 그대로");
-        Assert.IsTrue(c.Tick(Groggy * 0.2f), "그로기 만료 틱에서 상태 변화");
+        Assert.IsFalse(c.Tick(Vulnerable * 0.9f), "취약 도중엔 상태가 그대로");
+        Assert.IsTrue(c.Tick(Vulnerable * 0.2f), "취약 만료 틱에서 상태 변화");
         Assert.AreEqual(TrainingDummyInterruptState.Idle, c.State);
 
         Assert.IsTrue(c.Tick(Idle), "idle 만료 틱에서 상태 변화");
@@ -105,20 +105,20 @@ public sealed class TrainingDummyInterruptCycleTests
     {
         var c = NewCycle();
         c.TryInterrupt();
-        c.Tick(Groggy + Idle + 0.01f);
+        c.Tick(Vulnerable + Idle + 0.01f);
 
         Assert.IsTrue(c.IsInterruptible);
         Assert.IsTrue(c.TryInterrupt(), "새 창은 소비 이력을 물려받지 않는다");
-        Assert.AreEqual(TrainingDummyInterruptState.Groggy, c.State);
+        Assert.AreEqual(TrainingDummyInterruptState.Vulnerable, c.State);
     }
 
     // 큰 틱 하나가 여러 단계를 넘기면 남는 시간이 다음 단계로 넘어가 끝 상태로 수렴한다.
     [Test]
-    public void 큰_틱_하나로_그로기와_idle을_모두_넘긴다()
+    public void 큰_틱_하나로_취약과_idle을_모두_넘긴다()
     {
         var c = NewCycle();
         c.TryInterrupt();
-        Assert.IsTrue(c.Tick(Groggy + Idle));
+        Assert.IsTrue(c.Tick(Vulnerable + Idle));
         Assert.IsTrue(c.IsInterruptible);
     }
 
@@ -127,17 +127,17 @@ public sealed class TrainingDummyInterruptCycleTests
     {
         var c = NewCycle();
         c.TryInterrupt();
-        c.Tick(Groggy + Idle * 0.25f);
+        c.Tick(Vulnerable + Idle * 0.25f);
         Assert.AreEqual(TrainingDummyInterruptState.Idle, c.State);
         Assert.AreEqual(Idle * 0.75f, c.Remaining, 1e-4f);
     }
 
     [Test]
-    public void idle_0이면_그로기가_끝나자마자_인터럽트_가능()
+    public void idle_0이면_취약이_끝나자마자_인터럽트_가능()
     {
         var c = NewCycle(idle: 0f);
         c.TryInterrupt();
-        Assert.IsTrue(c.Tick(Groggy));
+        Assert.IsTrue(c.Tick(Vulnerable));
         Assert.IsTrue(c.IsInterruptible);
     }
 
@@ -147,7 +147,7 @@ public sealed class TrainingDummyInterruptCycleTests
         var c = NewCycle();
         c.TryInterrupt();
         c.Tick(-5f);
-        Assert.AreEqual(Groggy, c.Remaining, 1e-5f);
+        Assert.AreEqual(Vulnerable, c.Remaining, 1e-5f);
     }
 
     [Test]
@@ -158,5 +158,76 @@ public sealed class TrainingDummyInterruptCycleTests
         c.Reset();
         Assert.IsTrue(c.IsInterruptible);
         Assert.IsTrue(c.TryInterrupt());
+    }
+
+    // ─── CC 허용 — 취약일 때만 ─────────────────────────────────────────
+
+    [Test]
+    public void 인터럽트_가능_상태는_CC를_막는다()
+    {
+        var c = NewCycle();
+        Assert.IsFalse(c.AllowsCrowdControl);
+    }
+
+    [Test]
+    public void 취약_상태만_CC를_받는다()
+    {
+        var c = NewCycle();
+        c.TryInterrupt();
+        Assert.AreEqual(TrainingDummyInterruptState.Vulnerable, c.State);
+        Assert.IsTrue(c.AllowsCrowdControl);
+
+        c.Tick(Vulnerable * 0.5f);
+        Assert.IsTrue(c.AllowsCrowdControl, "취약 도중에도 계속 받는다");
+    }
+
+    [Test]
+    public void idle_상태는_CC를_막는다()
+    {
+        var c = NewCycle();
+        c.TryInterrupt();
+        c.Tick(Vulnerable + Idle * 0.5f);
+        Assert.AreEqual(TrainingDummyInterruptState.Idle, c.State);
+        Assert.IsFalse(c.AllowsCrowdControl);
+    }
+
+    [Test]
+    public void 한_바퀴_돌면_다시_CC를_막는다()
+    {
+        var c = NewCycle();
+        c.TryInterrupt();
+        c.Tick(Vulnerable + Idle + 0.01f);
+        Assert.IsTrue(c.IsInterruptible);
+        Assert.IsFalse(c.AllowsCrowdControl);
+    }
+
+    // idle 0 이면 취약 → 인터럽트 가능으로 바로 넘어간다 — 그 사이 CC 가 열린 채 남으면 안 된다.
+    [Test]
+    public void idle_0이어도_취약이_끝나면_CC를_막는다()
+    {
+        var c = NewCycle(idle: 0f);
+        c.TryInterrupt();
+        c.Tick(Vulnerable);
+        Assert.IsFalse(c.AllowsCrowdControl);
+    }
+
+    // 취약 0 이면 성공 순간 취약이지만 첫 틱에 바로 닫힌다.
+    [Test]
+    public void 취약_0이면_첫_틱에_CC가_닫힌다()
+    {
+        var c = NewCycle(vulnerable: 0f);
+        c.TryInterrupt();
+        Assert.IsTrue(c.AllowsCrowdControl);
+        Assert.IsTrue(c.Tick(0f));
+        Assert.IsFalse(c.AllowsCrowdControl);
+    }
+
+    [Test]
+    public void Reset하면_CC를_막는다()
+    {
+        var c = NewCycle();
+        c.TryInterrupt();
+        c.Reset();
+        Assert.IsFalse(c.AllowsCrowdControl);
     }
 }

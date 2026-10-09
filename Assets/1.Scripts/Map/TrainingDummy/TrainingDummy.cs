@@ -115,6 +115,7 @@ public sealed class TrainingDummy : Unit
     }
 
     // 데미지 뒤에 판정한다(중간보스와 같은 순서). 인터럽트 가능 상태가 아니면 데미지만 들어간 것으로 끝난다.
+    // 넉백(TryEnterKnockback)이 먼저라 인터럽트 성공 타격 자체의 넉백은 아직 슈퍼아머에 막힌다 — 취약은 다음 타격부터.
     // 🔴 CombatStatsEvents 간파 통계는 올리지 않는다 — SessionStatsTracker 가 허수아비를 집계에서 뺀다.
     void TryServerInterrupt(AttackInfo attackInfo, ulong attackerClientId, Unit sourceUnit)
     {
@@ -277,7 +278,10 @@ public sealed class TrainingDummy : Unit
         }
 
         // 상태이상을 남겨두면 복귀한 자리에서 계속 걸려 있는 것처럼 보인다.
+        // 인터럽트 연습의 CC 차단 슈퍼아머까지 지워지므로 현재 상태 기준으로 다시 건다(인터럽트 상태 자체는 그대로).
         StatusEffects?.ClearAllServer();
+        if (_interrupt != null)
+            _interrupt.ServerRefreshSuperArmor();
 
         transform.SetPositionAndRotation(_anchorPosition, _anchorRotation);
 
