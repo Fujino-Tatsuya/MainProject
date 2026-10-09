@@ -230,4 +230,34 @@ public sealed class TrainingDummyInterruptCycleTests
         c.Reset();
         Assert.IsFalse(c.AllowsCrowdControl);
     }
+
+    // ─── 성공 수 — 슬로우 모션이 한 타격의 전후 비교로 성공을 판별한다 ───
+
+    [Test]
+    public void 성공_수는_성공에만_오른다()
+    {
+        var c = NewCycle();
+        Assert.AreEqual(0, c.SuccessCount);
+
+        c.TryInterrupt();
+        Assert.AreEqual(1, c.SuccessCount);
+
+        Assert.IsFalse(c.TryInterrupt(), "취약 중 인터럽트는 무효");
+        c.Tick(Vulnerable + Idle * 0.5f);
+        Assert.IsFalse(c.TryInterrupt(), "idle 중 인터럽트는 무효");
+        Assert.AreEqual(1, c.SuccessCount, "무효 타격이 성공으로 잡히면 빗나간 슬로우가 유지된다");
+    }
+
+    [Test]
+    public void 성공_수는_순환과_Reset에도_줄지_않는다()
+    {
+        var c = NewCycle();
+        c.TryInterrupt();
+        c.Tick(Vulnerable + Idle + 0.01f);
+        c.TryInterrupt();
+        Assert.AreEqual(2, c.SuccessCount);
+
+        c.Reset();
+        Assert.AreEqual(2, c.SuccessCount);
+    }
 }

@@ -73,8 +73,8 @@ public class ShieldVignetteHUD : MonoBehaviour
 
     private void Update()
     {
-        // 히트스톱 등 timeScale 변화와 무관하게 UI 연출 속도를 유지한다.
-        Apply(Time.unscaledDeltaTime);
+        // 게임 시간으로 돈다 — 인터럽트 슬로우(전역 timeScale) 동안 비네팅 연출도 같이 느려진다(PLAN-interrupt-slowmo D9).
+        Apply(Time.deltaTime);
     }
 
     private void Apply(float deltaTime)

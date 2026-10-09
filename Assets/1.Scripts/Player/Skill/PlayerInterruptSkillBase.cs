@@ -12,6 +12,10 @@ public interface IPlayerInterruptSkillData
 /// <summary>
 /// 플레이어 간파 공용 베이스. Hit 애니메이션 이벤트와 HitDelay 타이머 중 먼저 온 경로에서
 /// 앵커 오버랩을 한 번만 판정하고, 모든 피해에 간파 공격 표식을 싣는다.
+///
+/// 인터럽트 슬로우 모션(PLAN-interrupt-slowmo S3): 승인 시점에 같은 앵커 오버랩으로 유효타를 예측해
+/// (<see cref="IInterruptSlowMotionTarget"/> 이고 지금 인터럽트 가능한 대상이 있으면) 전역 슬로우를 시작한다.
+/// 판정에서 그 인터럽트가 하나도 성공하지 않거나 판정 전에 스킬이 끝나면 실패 복귀시킨다.
 /// </summary>
 public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
 {
@@ -19,6 +23,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     // 상자처럼 Unit이 아닌 IAttackReceiver도 있으므로 Hurtbox까지 중복 방지 키로 쓴다.
     private readonly HashSet<Object> hitTargets = new HashSet<Object>();
     private readonly List<Unit> landedUnits = new List<Unit>();
+    private readonly InterruptSlowMotionTracker slowMotion = new InterruptSlowMotionTracker();
 
     private float hitTime;
     private float endTime;
@@ -32,6 +37,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     public override void OnServerStart(Vector3 direction, Unit target)
     {
         base.OnServerStart(direction, target);
+        slowMotion.Begin();
 
         IPlayerInterruptSkillData data = InterruptData;
         if (data == null)
@@ -47,6 +53,8 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
 
         if (hitResults == null || hitResults.Length != data.MaxHitResults)
             hitResults = new Collider[data.MaxHitResults];
+
+        TryStartSlowMotion();
     }
 
     public override void OnTick()
@@ -65,6 +73,13 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
             ResolveHit();
 
         base.OnAnimationEvent(eventType);
+    }
+
+    // 모든 피어에서 불리지만 발동 기록은 서버에만 있다. 판정 전 종료(완료·취소·사망)면 실패 복귀.
+    public override void OnEnd(SkillEndReason reason)
+    {
+        FailSlowMotion(slowMotion.Abort());
+        base.OnEnd(reason);
     }
 
     protected virtual void OnMissingInterruptData()
@@ -102,6 +117,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
 
         if (HitboxAnchor == null || owner == null)
         {
+            FailSlowMotion(slowMotion.Resolve(false));
             OnMissingHitboxAnchor();
             return;
         }
@@ -110,6 +126,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         hitTargets.Clear();
         landedUnits.Clear();
         bool onHitBonusTaken = false;
+        bool interruptLanded = false;
         int resolvedCount = 0;
 
         for (int i = 0; i < hitCount; i++)
@@ -141,9 +158,16 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
             AttackHitContext hitContext =
                 new AttackHitContext(owner.transform.position, owner.transform, hit, owner);
 
+            // 성공 수를 이 수신 호출 하나의 전후로 비교한다 — 다른 공격의 성공이 섞이지 않는다.
+            IInterruptSlowMotionTarget slowTarget = slowMotion.IsPending ? FindSlowMotionTarget(unit) : null;
+            int successBefore = slowTarget != null ? slowTarget.ServerInterruptSuccessCount : 0;
+
             bool resolved = hurtbox != null
                 ? hurtbox.ReceiveAttack(attackInfo, hitContext)
                 : unit.ReceiveAttack(attackInfo, hitContext);
+
+            if (slowTarget != null && slowTarget.ServerInterruptSuccessCount != successBefore)
+                interruptLanded = true;
 
             if (!resolved)
                 continue;
@@ -155,6 +179,8 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
             OnInterruptTargetResolved(target, attackInfo);
         }
 
+        FailSlowMotion(slowMotion.Resolve(interruptLanded));
+
         if (CompleteBeforeAttackLanded)
             OnInterruptResolutionCompleted(resolvedCount);
 
@@ -163,5 +189,53 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
 
         if (!CompleteBeforeAttackLanded)
             OnInterruptResolutionCompleted(resolvedCount);
+    }
+
+    // ── 인터럽트 슬로우 모션 (서버) ──
+
+    // 승인 시점 예측(D1·D2): 판정과 같은 앵커 오버랩을 한 번 돌려, 지금 인터럽트 가능한 예측 대상이 있으면 발동한다.
+    // 각도 검사는 따로 하지 않는다 — 앵커 형태가 곧 판정 범위다. 시간 레이어가 없는 씬(오프라인 테스트)은 건너뛴다.
+    private void TryStartSlowMotion()
+    {
+        GlobalTimeScale timeScale = GlobalTimeScale.Instance;
+        if (timeScale == null || HitboxAnchor == null || owner == null || !PredictsInterruptHit())
+            return;
+
+        slowMotion.Started(timeScale.ServerStart(timeScale.InterruptProfile, owner.OwnerClientId));
+    }
+
+    private bool PredictsInterruptHit()
+    {
+        int hitCount = OverlapHitboxAnchor(hitResults);
+        for (int i = 0; i < hitCount; i++)
+        {
+            Collider hit = hitResults[i];
+            if (hit == null)
+                continue;
+
+            Unit unit = ResolveHitUnit(hit, out _);
+            if (unit == null || unit == owner || ShouldSkipTarget(unit))
+                continue;
+
+            IInterruptSlowMotionTarget slowTarget = FindSlowMotionTarget(unit);
+            if (slowTarget != null && slowTarget.ServerIsInterruptible)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static IInterruptSlowMotionTarget FindSlowMotionTarget(Unit unit) =>
+        unit != null && unit.TryGetComponent(out IInterruptSlowMotionTarget slowTarget) ? slowTarget : null;
+
+    // ServerFail 은 현재 발동 번호일 때만 먹으므로 늦게 와도 남의 슬로우를 끊지 않는다.
+    private static void FailSlowMotion(uint triggerId)
+    {
+        if (triggerId == 0)
+            return;
+
+        GlobalTimeScale timeScale = GlobalTimeScale.Instance;
+        if (timeScale != null)
+            timeScale.ServerFail(triggerId);
     }
 }

@@ -51,6 +51,12 @@ public sealed class TrainingDummyInterruptCycle
     /// <summary>현재 상태의 남은 시간(초). 인터럽트 가능 상태는 무기한이라 0.</summary>
     public float Remaining => IsInterruptible ? 0f : Math.Max(0f, _remaining);
 
+    /// <summary>
+    /// 지금까지 성공한 인터럽트 수. <see cref="Reset"/> 으로도 줄지 않는다 — 한 타격의 전후 비교로
+    /// "이 타격이 성공했는가"를 묻는 슬로우 모션 예측(<see cref="IInterruptSlowMotionTarget"/>)이 쓴다.
+    /// </summary>
+    public int SuccessCount { get; private set; }
+
     /// <summary>인터럽트 가능 상태로 되돌린다(스폰 기본값).</summary>
     public void Reset()
     {
@@ -70,6 +76,7 @@ public sealed class TrainingDummyInterruptCycle
 
         State = TrainingDummyInterruptState.Vulnerable;
         _remaining = _vulnerableSeconds;
+        SuccessCount++;
         return true;
     }
 

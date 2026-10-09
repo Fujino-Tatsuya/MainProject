@@ -24,6 +24,8 @@ public class CameraTargetSwitcher : MonoBehaviour
     [SerializeField] private GameObject followCameraPrefab;
     [SerializeField, Min(0f)] private float toFloatBlendDuration = 0.2f;
     [SerializeField, Min(0f)] private float toFollowBlendDuration = 0.35f;
+    [Tooltip("내가 일으킨 인터럽트 슬로우의 유지 단계에서 플레이어 카메라 거리 배율. (0, 1] (PLAN-interrupt-slowmo D10)")]
+    [SerializeField] private float slowMotionZoomFactor = 0.85f;
 
     // 생성한 리그 인스턴스를 들고 있어야 EnsureCameraRig가 멱등해진다(중복 생성 방지).
     private GameObject mainCameraInstance;
@@ -37,6 +39,10 @@ public class CameraTargetSwitcher : MonoBehaviour
     private readonly List<Transform> cameraFollowTargets = new();
     private int currentTargetIndex = -1;
     private CinemachineFollow playerCameraFollow;
+    // 줌은 원래 오프셋에 배율을 곱해서 쓴다 — 매 프레임 현재 값에 곱하면 오차가 쌓인다.
+    private Vector3 basePlayerFollowOffset;
+    private float slowMotionZoomDepth;
+    private float appliedZoomMultiplier = 1f;
     private Quaternion fixedCameraRotation;
     private bool hasFixedCameraRotation;
     private PlayerLifeCycleController ownerLifeCycle;
@@ -203,6 +209,8 @@ public class CameraTargetSwitcher : MonoBehaviour
 
     private void Update()
     {
+        UpdateSlowMotionZoom();
+
         if (!IsSpectatorMode)
         {
             return;
@@ -224,6 +232,41 @@ public class CameraTargetSwitcher : MonoBehaviour
         {
             SwitchToNextTarget();
         }
+    }
+
+    // 오너 슬로우 줌인(D10). GlobalTimeScale(-100)이 이번 프레임 배율을 정한 뒤, Cinemachine(LateUpdate)보다 먼저 돈다.
+    private void UpdateSlowMotionZoom()
+    {
+        if (playerCameraFollow == null)
+        {
+            return;
+        }
+
+        GlobalTimeScale timeScale = GlobalTimeScale.Instance;
+        NetworkManager networkManager = NetworkManager.Singleton;
+        bool sessionRunning = timeScale != null && networkManager != null && networkManager.IsListening;
+        bool slowActive = sessionRunning && timeScale.IsActive;
+
+        float targetDepth = SlowMotionCameraZoom.TargetDepth(
+            slowActive,
+            slowActive && timeScale.CurrentTriggerClientId == networkManager.LocalClientId,
+            sessionRunning && !IsInFallView && !IsSpectatorMode,
+            slowActive ? timeScale.CurrentScale : 1f,
+            slowActive ? timeScale.InterruptProfile.ClampedScale : 1f);
+
+        // 감쇠는 실시간 — 슬로우 중에도 발동자 전환 줌아웃이 같은 속도로 끝난다.
+        slowMotionZoomDepth = SlowMotionCameraZoom.StepDepth(slowMotionZoomDepth, targetDepth, Time.unscaledDeltaTime);
+        float multiplier = SlowMotionCameraZoom.OffsetMultiplier(slowMotionZoomDepth, slowMotionZoomFactor);
+
+        // 정확 비교 — 근사 비교면 복귀 끝의 1 직전 값에서 멈춰 원래 오프셋으로 돌아오지 않는다.
+        if (multiplier == appliedZoomMultiplier)
+        {
+            return;
+        }
+
+        // 원래 오프셋에서 다시 계산한다 — 복귀가 끝나면(배율 1) 정확히 원래 값으로 돌아온다.
+        playerCameraFollow.FollowOffset = basePlayerFollowOffset * multiplier;
+        appliedZoomMultiplier = multiplier;
     }
 
     public void SwitchToNextTarget()
@@ -475,6 +518,11 @@ public class CameraTargetSwitcher : MonoBehaviour
         }
 
         playerCameraFollow = playerCamera.GetComponent<CinemachineFollow>();
+        if (playerCameraFollow != null)
+        {
+            basePlayerFollowOffset = playerCameraFollow.FollowOffset;
+        }
+
         if (playerCameraFollow != null && playerCameraFollow.FollowOffset.sqrMagnitude > Mathf.Epsilon)
         {
             fixedCameraRotation = Quaternion.LookRotation(-playerCameraFollow.FollowOffset.normalized, Vector3.up);
