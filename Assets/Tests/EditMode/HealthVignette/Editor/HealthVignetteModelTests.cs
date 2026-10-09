@@ -70,6 +70,44 @@ public sealed class HealthVignetteModelTests
     }
 
     [Test]
+    public void ActivePulseAmplitude_ZeroWhenNotAlive()
+    {
+        Assert.That(HealthVignetteModel.ActivePulseAmplitude(true, 0.2f), Is.EqualTo(0.2f));
+        Assert.That(HealthVignetteModel.ActivePulseAmplitude(false, 0.2f), Is.EqualTo(0f));
+    }
+
+    [Test]
+    public void VignetteAlpha_NotAliveHoldsStillAtMaxAlpha()
+    {
+        // 사망·Soul·관전 = 체력 0 취급(강도 1) + 진폭 0 → 위상과 무관하게 최대 알파로 고정.
+        float amplitude = HealthVignetteModel.ActivePulseAmplitude(false, 0.2f);
+
+        foreach (float phase in new[] { 0f, 0.25f, 0.5f, 0.75f })
+            Assert.That(HealthVignetteModel.VignetteAlpha(1f, 0.6f, amplitude, phase), Is.EqualTo(0.6f).Within(Tolerance));
+    }
+
+    [Test]
+    public void ActiveFlashAlpha_SuppressedWhenNotAliveAndRestoredOnRevive()
+    {
+        float peak = HealthVignetteModel.FlashAlpha(0f, 0.2f, 0.7f);
+
+        Assert.That(HealthVignetteModel.ActiveFlashAlpha(false, peak), Is.EqualTo(0f));
+        Assert.That(HealthVignetteModel.ActiveFlashAlpha(true, peak), Is.EqualTo(0.7f).Within(Tolerance));
+    }
+
+    [Test]
+    public void Compose_NotAliveKeepsBlackVignetteWithoutFlash()
+    {
+        float amplitude = HealthVignetteModel.ActivePulseAmplitude(false, 0.2f);
+        float vignetteAlpha = HealthVignetteModel.VignetteAlpha(1f, 0.6f, amplitude, 0.25f);
+        float flash = HealthVignetteModel.ActiveFlashAlpha(false, HealthVignetteModel.FlashAlpha(0f, 0.2f, 0.7f));
+
+        Color composed = HealthVignetteModel.Compose(Color.red, vignetteAlpha, Color.white, flash, 1f);
+
+        Assert.That(composed, Is.EqualTo(new Color(0f, 0f, 0f, 0.6f)));
+    }
+
+    [Test]
     public void FlashColor_WhiteAtOrAboveThresholdAndRedderBelow()
     {
         Color white = Color.white;

@@ -5,8 +5,9 @@ using UnityEngine.UI;
 /// 로컬 플레이어 화면 가장자리 체력 비네팅. 화면 전체를 덮는 UI Image 의 색·알파만 바꾼다(순수 클라 연출, 동기화 없음).
 /// - 체력 비율이 시작 비율 이하로 내려가면 빨간 비네팅이 켜지고, 낮을수록 진해지며 빠르고 크게 맥동한다.
 /// - 피격(ClientDamagedAmount, amount>0) 순간 짧게 번쩍인다 — 시작 비율 이상이면 흰색, 아래일수록 붉게.
-/// - 사망·Soul·관전(Alive 가 아닌 모든 상태)에선 색에 검은색을 곱해 서서히 검게 바꾼다.
+/// - 사망·Soul·관전(Alive 가 아닌 모든 상태)에선 색에 검은색을 곱해 서서히 검게 바꾸고, 맥동·피격 플래시는 끈다.
 /// 계산은 <see cref="HealthVignetteModel"/>. 카메라의 URP HP 비네트(<see cref="CameraFeedback"/>)와는 별개다.
+/// 실드 비네팅(<see cref="ShieldVignetteHUD"/>)은 별도 이미지라 여기서 섞지 않는다.
 /// </summary>
 public class HealthVignetteHUD : MonoBehaviour
 {
@@ -37,8 +38,20 @@ public class HealthVignetteHUD : MonoBehaviour
     [SerializeField] private Color flashDangerColor = Color.red;
 
     [Header("사망·Soul·관전")]
-    [Tooltip("검게 바뀌거나 돌아오는 데 걸리는 시간(초).")]
+    [Tooltip("검게 바뀌거나 돌아오는 데 걸리는 시간(초). 이 상태에선 맥동·피격 플래시가 꺼진다.")]
     [SerializeField, Min(0f)] private float darkenDuration = 0.5f;
+
+    [Header("임시 텍스처(스프라이트가 비었을 때)")]
+    [Tooltip("코드로 만드는 방사형 텍스처 한 변 픽셀 수.")]
+    [SerializeField, Min(2)] private int fallbackTextureSize = 128;
+    [Tooltip("이 거리까지 완전 투명(0 = 중앙, 1 = 변의 중점, √2 = 모서리).")]
+    [SerializeField, Min(0f)] private float fallbackInnerRadius = 0.45f;
+    [Tooltip("이 거리부터 완전 불투명.")]
+    [SerializeField, Min(0f)] private float fallbackOuterRadius = 1.2f;
+
+    [Header("표시")]
+    [Tooltip("최종 알파가 이 값 이하이면 이미지를 꺼서 전체 화면 투명 드로우를 생략한다.")]
+    [SerializeField, Range(0f, 0.1f)] private float visibleAlphaThreshold = 0.001f;
 
     private Player player;
     private PlayerLifeCycleController lifeCycle;
@@ -47,7 +60,6 @@ public class HealthVignetteHUD : MonoBehaviour
     private float flashElapsed = float.MaxValue;
     private float darken;
 
-    private Texture2D generatedTexture;
     private Sprite generatedSprite;
 
     public void Bind(Player boundPlayer)
@@ -77,7 +89,10 @@ public class HealthVignetteHUD : MonoBehaviour
             return;
 
         image.raycastTarget = false;
-        image.sprite = vignetteSprite != null ? vignetteSprite : CreateFallbackSprite();
+        if (vignetteSprite == null)
+            generatedSprite = VignetteSpriteFactory.CreateRadial(
+                "HealthVignette_Generated", fallbackTextureSize, fallbackInnerRadius, fallbackOuterRadius);
+        image.sprite = vignetteSprite != null ? vignetteSprite : generatedSprite;
     }
 
     private void OnEnable()
@@ -98,15 +113,13 @@ public class HealthVignetteHUD : MonoBehaviour
 
     private void OnDestroy()
     {
-        if (generatedSprite != null)
-            Destroy(generatedSprite);
-        if (generatedTexture != null)
-            Destroy(generatedTexture);
+        VignetteSpriteFactory.Destroy(generatedSprite);
     }
 
     private void HandleDamaged(int amount, DamageChannel channel)
     {
-        if (amount > 0)
+        // 사망·Soul·관전 중 피격은 무시 — 부활 직후 남은 플래시가 터지지 않게 시작 자체를 막는다.
+        if (amount > 0 && IsAlive())
             flashElapsed = 0f;
     }
 
@@ -137,17 +150,19 @@ public class HealthVignetteHUD : MonoBehaviour
 
         pulsePhase = Mathf.Repeat(
             pulsePhase + HealthVignetteModel.PulseSpeed(severity, minPulseSpeed, maxPulseSpeed) * deltaTime, 1f);
-        float vignetteAlpha = HealthVignetteModel.VignetteAlpha(severity, maxAlpha, pulseAmplitude, pulsePhase);
+        float vignetteAlpha = HealthVignetteModel.VignetteAlpha(
+            severity, maxAlpha, HealthVignetteModel.ActivePulseAmplitude(alive, pulseAmplitude), pulsePhase);
 
         if (flashElapsed < float.MaxValue)
             flashElapsed += deltaTime;
-        float currentFlashAlpha = HealthVignetteModel.FlashAlpha(flashElapsed, flashDuration, flashAlpha);
+        float currentFlashAlpha = HealthVignetteModel.ActiveFlashAlpha(
+            alive, HealthVignetteModel.FlashAlpha(flashElapsed, flashDuration, flashAlpha));
         Color currentFlashColor = HealthVignetteModel.FlashColor(ratio, startRatio, flashSafeColor, flashDangerColor);
 
         Color color = HealthVignetteModel.Compose(vignetteColor, vignetteAlpha, currentFlashColor, currentFlashAlpha, darken);
 
         // 알파 0 이면 전체 화면 투명 드로우를 아예 끈다.
-        bool visible = color.a > 0.001f;
+        bool visible = color.a > visibleAlphaThreshold;
         if (image.enabled != visible)
             image.enabled = visible;
         if (visible)
@@ -157,41 +172,5 @@ public class HealthVignetteHUD : MonoBehaviour
     private bool IsAlive()
     {
         return lifeCycle == null || lifeCycle.State == PlayerLifeState.Alive;
-    }
-
-    /// <summary>아트 스프라이트가 들어오기 전 임시 텍스처 — 중앙 투명, 가장자리로 갈수록 불투명한 흰색.</summary>
-    private Sprite CreateFallbackSprite()
-    {
-        const int size = 128;
-        generatedTexture = new Texture2D(size, size, TextureFormat.RGBA32, false)
-        {
-            name = "HealthVignette_Generated",
-            wrapMode = TextureWrapMode.Clamp,
-            filterMode = FilterMode.Bilinear,
-            hideFlags = HideFlags.DontSave
-        };
-
-        var pixels = new Color32[size * size];
-        float half = (size - 1) * 0.5f;
-        for (int y = 0; y < size; y++)
-        {
-            for (int x = 0; x < size; x++)
-            {
-                // 0 = 중앙, 1 = 변의 중점, √2 = 모서리.
-                float dx = (x - half) / half;
-                float dy = (y - half) / half;
-                float distance = Mathf.Sqrt(dx * dx + dy * dy);
-                float alpha = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.45f, 1.2f, distance));
-                pixels[y * size + x] = new Color32(255, 255, 255, (byte)Mathf.RoundToInt(alpha * 255f));
-            }
-        }
-
-        generatedTexture.SetPixels32(pixels);
-        generatedTexture.Apply(false, true);
-
-        generatedSprite = Sprite.Create(generatedTexture, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f));
-        generatedSprite.name = generatedTexture.name;
-        generatedSprite.hideFlags = HideFlags.DontSave;
-        return generatedSprite;
     }
 }

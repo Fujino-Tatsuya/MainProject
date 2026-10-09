@@ -2,6 +2,7 @@ using UnityEngine;
 
 /// <summary>
 /// 체력 비네팅의 순수 계산. 체력 비율 → 강도(severity) → 알파·맥동 속도, 피격 플래시 색·알파, 최종 합성색.
+/// 살아 있지 않으면 맥동·플래시는 끄고 검게 바뀌는 비네팅만 남긴다.
 /// MonoBehaviour(<see cref="HealthVignetteHUD"/>)는 시간·상태만 넘기고 값은 여기서 받는다 — EditMode 테스트 대상.
 /// </summary>
 public static class HealthVignetteModel
@@ -45,6 +46,18 @@ public static class HealthVignetteModel
         float s = Mathf.Clamp01(severity);
         float pulse = Mathf.Sin(pulsePhase * 2f * Mathf.PI) * pulseAmplitude * s;
         return Mathf.Clamp01(s * maxAlpha + pulse);
+    }
+
+    /// <summary>실제 적용할 맥동 진폭. 살아 있지 않으면(사망·Soul·관전) 0 — 비네팅 알파가 멈춘다.</summary>
+    public static float ActivePulseAmplitude(bool alive, float pulseAmplitude)
+    {
+        return alive ? pulseAmplitude : 0f;
+    }
+
+    /// <summary>실제 적용할 플래시 알파. 살아 있지 않으면 0 — 진행 중이던 플래시도 끊는다.</summary>
+    public static float ActiveFlashAlpha(bool alive, float flashAlpha)
+    {
+        return alive ? flashAlpha : 0f;
     }
 
     /// <summary>피격 플래시 색. 시작 비율 이상이면 안전색(흰색), 그 아래로 내려갈수록 위험색(빨강)으로 보간.</summary>
