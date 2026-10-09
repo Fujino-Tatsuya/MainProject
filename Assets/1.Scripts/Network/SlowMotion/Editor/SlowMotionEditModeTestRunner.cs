@@ -3,7 +3,7 @@ using UnityEditor.TestTools.TestRunner.Api;
 using UnityEngine;
 
 /// <summary>
-/// 슬로우 모션 산식 EditMode 테스트를 메뉴 한 번으로 돌리고 결과를 콘솔에 남긴다.
+/// 슬로우 모션 산식·전역 시간 레이어 규칙 EditMode 테스트를 메뉴 한 번으로 돌리고 결과를 콘솔에 남긴다.
 /// 패턴은 <see cref="TrainingDummyEditModeTestRunner"/> 를 따랐다.
 /// </summary>
 internal static class SlowMotionEditModeTestRunner
@@ -11,6 +11,7 @@ internal static class SlowMotionEditModeTestRunner
     static readonly string[] Fixtures =
     {
         "^SlowMotionTimelineTests$",
+        "^SlowMotionSessionTests$",
     };
 
     const string Tag = "[SlowMotionTests]";

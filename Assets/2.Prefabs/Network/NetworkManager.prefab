@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 384461437578062136}
   - component: {fileID: 7043847080119373261}
   - component: {fileID: 1111111111111111111}
+  - component: {fileID: 8945878156428303657}
   m_Layer: 0
   m_Name: NetworkManager
   m_TagString: Untagged
@@ -156,3 +157,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7b3e9f1a2c4d4e6f8a0b1c2d3e4f5a6b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!114 &8945878156428303657
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6557551295399345426}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dbb1e8385bd813646a2f31bcb2f0acf6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GlobalTimeScale
+  interruptProfile:
+    scale: 0.3
+    enterDuration: 0.05
+    holdDuration: 0.35
+    exitDuration: 0.25
+    failExitDuration: 0.1
