@@ -613,7 +613,7 @@ public static class AssassinShellAuthoring
         }
     }
 
-    // 임시 HUD — 화면 하단 중앙(거너 과열 게이지와 같은 높이대, 공용 CombatHUD 위). 스프라이트 없이 Image 색만 쓴다(구슬은 내장 Knob).
+    // 임시 HUD — 화면 하단 중앙(거너 과열 게이지와 같은 높이대, 공용 CombatHUD 위). 스프라이트 없이 Image 색만 쓴다.
     private static GameObject EnsureHudPrefab()
     {
         GameObject existing = AssetDatabase.LoadAssetAtPath<GameObject>(HudPrefabPath);
@@ -645,21 +645,10 @@ public static class AssassinShellAuthoring
             panel.anchoredPosition = new Vector2(0f, 170f);
             panel.sizeDelta = new Vector2(320f, 64f);
 
-            // R 스택 구슬 4 — 패널 위쪽 왼편
-            Sprite knob = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd");
-            UnityEngine.UI.Image[] orbs = new UnityEngine.UI.Image[4];
-            for (int i = 0; i < orbs.Length; i++)
-            {
-                RectTransform orb = NewUiRect($"Stack{i + 1}", panel);
-                orb.anchorMin = orb.anchorMax = new Vector2(0f, 1f);
-                orb.pivot = new Vector2(0f, 1f);
-                orb.anchoredPosition = new Vector2(i * 24f, 0f);
-                orb.sizeDelta = new Vector2(18f, 18f);
-                orbs[i] = orb.gameObject.AddComponent<UnityEngine.UI.Image>();
-                orbs[i].sprite = knob;
-            }
+            // 분노 게이지 — 패널 위쪽 왼편
+            BuildRageGauge(hud, panel, font);
 
-            // 일반 E 강화 준비 — 구슬 오른쪽 글자
+            // 일반 E 강화 준비 — 게이지 오른쪽 글자
             RectTransform enhanced = NewUiRect("EnhancedReady", panel);
             enhanced.anchorMin = enhanced.anchorMax = new Vector2(0f, 1f);
             enhanced.pivot = new Vector2(0f, 1f);
@@ -706,10 +695,6 @@ public static class AssassinShellAuthoring
 
             SerializedObject so = new SerializedObject(hud);
             so.FindProperty("canvas").objectReferenceValue = canvas;
-            SerializedProperty orbProperty = so.FindProperty("stackOrbs");
-            orbProperty.arraySize = orbs.Length;
-            for (int i = 0; i < orbs.Length; i++)
-                orbProperty.GetArrayElementAtIndex(i).objectReferenceValue = orbs[i];
             so.FindProperty("transformRoot").objectReferenceValue = transformRoot.gameObject;
             so.FindProperty("transformFill").objectReferenceValue = fill;
             so.FindProperty("transformFillImage").objectReferenceValue = fillImage;
@@ -727,6 +712,95 @@ public static class AssassinShellAuthoring
         }
 
         return AssetDatabase.LoadAssetAtPath<GameObject>(HudPrefabPath);
+    }
+
+    private const string RageGaugeName = "Rage";
+    private static readonly string[] LegacyStackOrbNames = { "Stack1", "Stack2", "Stack3", "Stack4" };
+
+    /// <summary>
+    /// 구 R 스택 구슬을 분노 게이지 바로 바꾼다(§4.2, 2026-10-09). 기존 HUD 프리팹만 고친다 — 다른 요소의 배치는 그대로.
+    /// 재실행해도 결과가 같다(이미 게이지가 있으면 배선만 다시 한다).
+    /// </summary>
+    [MenuItem("Tools/Player/Assassin/9. HUD 분노 게이지 갱신 (R 스택 대체)")]
+    public static void UpgradeHudToRageGauge()
+    {
+        if (AssetDatabase.LoadAssetAtPath<GameObject>(HudPrefabPath) == null)
+        {
+            Debug.LogError($"{Tag} HUD 프리팹이 없다. 8번 메뉴가 게이지 포함으로 새로 만든다: {HudPrefabPath}");
+            return;
+        }
+
+        GameObject root = PrefabUtility.LoadPrefabContents(HudPrefabPath);
+        try
+        {
+            AssassinHUD hud = root.GetComponent<AssassinHUD>();
+            Transform panel = root.transform.Find("Canvas/Panel");
+            if (hud == null || panel == null)
+            {
+                Debug.LogError($"{Tag} HUD 프리팹 구조가 다르다(AssassinHUD·Canvas/Panel) — 수동으로 고칠 것: {HudPrefabPath}");
+                return;
+            }
+
+            foreach (string orbName in LegacyStackOrbNames)
+            {
+                Transform orb = panel.Find(orbName);
+                if (orb != null)
+                    Object.DestroyImmediate(orb.gameObject);
+            }
+
+            Transform existing = panel.Find(RageGaugeName);
+            if (existing != null)
+                Object.DestroyImmediate(existing.gameObject);
+
+            BuildRageGauge(hud, (RectTransform)panel, AssetDatabase.LoadAssetAtPath<TMPro.TMP_FontAsset>(KrFontPath));
+
+            PrefabUtility.SaveAsPrefabAsset(root, HudPrefabPath);
+            Debug.Log($"{Tag} HUD 분노 게이지 갱신 — R 스택 구슬 제거, 게이지 바·최소 변신량 눈금 배선: {HudPrefabPath}");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    // 분노 게이지 — 패널 위쪽 왼편 가로 바(구 스택 구슬 자리) + 최소 변신량 눈금 + 바 안 수치.
+    private static void BuildRageGauge(AssassinHUD hud, RectTransform panel, TMPro.TMP_FontAsset font)
+    {
+        RectTransform bar = NewUiRect(RageGaugeName, panel);
+        bar.anchorMin = bar.anchorMax = new Vector2(0f, 1f);
+        bar.pivot = new Vector2(0f, 1f);
+        bar.anchoredPosition = new Vector2(0f, -3f);
+        bar.sizeDelta = new Vector2(100f, 14f);
+
+        RectTransform back = NewUiRect("Back", bar);
+        Stretch(back);
+        back.gameObject.AddComponent<UnityEngine.UI.Image>().color = new Color(0f, 0f, 0f, 0.6f);
+
+        RectTransform fill = NewUiRect("Fill", bar);
+        Stretch(fill);
+        fill.anchorMax = new Vector2(0f, 1f);
+        UnityEngine.UI.Image fillImage = fill.gameObject.AddComponent<UnityEngine.UI.Image>();
+
+        RectTransform tick = NewUiRect("MinTick", bar);
+        tick.anchorMin = new Vector2(0.4f, 0f);
+        tick.anchorMax = new Vector2(0.4f, 1f);
+        tick.pivot = new Vector2(0.5f, 0.5f);
+        tick.sizeDelta = new Vector2(2f, 4f);
+        tick.anchoredPosition = Vector2.zero;
+        tick.gameObject.AddComponent<UnityEngine.UI.Image>().color = Color.white;
+
+        RectTransform labelRect = NewUiRect("Label", bar);
+        Stretch(labelRect);
+        TMPro.TextMeshProUGUI label = NewLabel(labelRect, font, "0", Color.white, TMPro.TextAlignmentOptions.Center);
+        label.fontSize = 12f;
+        label.raycastTarget = false;
+
+        SerializedObject so = new SerializedObject(hud);
+        so.FindProperty("rageFill").objectReferenceValue = fill;
+        so.FindProperty("rageFillImage").objectReferenceValue = fillImage;
+        so.FindProperty("rageMinTick").objectReferenceValue = tick;
+        so.FindProperty("rageLabel").objectReferenceValue = label;
+        so.ApplyModifiedPropertiesWithoutUndo();
     }
 
     private static TMPro.TextMeshProUGUI NewLabel(
