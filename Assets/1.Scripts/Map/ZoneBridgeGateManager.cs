@@ -42,6 +42,9 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
     [Tooltip("상호작용 키. 플레이어는 이 키만 누르고, 판정은 서버가 한다.")]
     [SerializeField] private Key interactKey = Key.F;
 
+    [Tooltip("F 키 프롬프트를 띄울 높이(m). 외곽선이 켜진 패널 위치에서 월드 위쪽으로.")]
+    [SerializeField] private float promptHeightOffset = 1.8f;
+
     [Header("NavMesh")]
     [Tooltip("개통 완료 시 NavMesh 전체를 다시 굽는다. 기본은 끔 — 이 서피스는 맵 전체를 덮어 " +
              "재베이크가 수백 ms 멈추고, 그 멈춤을 서버에서 전원이 겪는다. 정상 경로는 " +
@@ -70,8 +73,11 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
 
     private void Awake() => Instance = this;
 
+    private void OnDisable() => InteractPrompt.Hide(this);
+
     public override void OnDestroy()
     {
+        InteractPrompt.Hide(this);
         if (Instance == this) Instance = null;
         base.OnDestroy();
     }
@@ -96,6 +102,7 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
     public override void OnNetworkDespawn()
     {
         gates.OnListChanged -= HandleGatesChanged;
+        InteractPrompt.Hide(this);
         base.OnNetworkDespawn();
     }
 
@@ -151,7 +158,7 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
         if (gate == null) return;
         _localGates.Remove(gate.SlotID);
         _appliedMask.Remove(gate);
-        if (_highlightGate == gate) { _highlightGate = null; _highlightPanel = -1; }
+        if (_highlightGate == gate) { _highlightGate = null; _highlightPanel = -1; InteractPrompt.Hide(this); }
     }
 
     // ── 입력 (각 피어 로컬) ────────────────────────────────────────────────
@@ -262,6 +269,10 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
         _highlightGate = gate;
         _highlightPanel = panel;
         if (gate != null) gate.SetPanelHighlighted(panel, true);
+
+        // F 프롬프트는 외곽선과 같은 선택을 따른다(별도 거리 판정 없음).
+        if (gate != null) InteractPrompt.Show(this, gate.Panels[panel], Vector3.up * promptHeightOffset);
+        else InteractPrompt.Hide(this);
     }
 
     private bool TryFindNearestPanel(Vector3 from, out int slotID, out int panelIndex,
