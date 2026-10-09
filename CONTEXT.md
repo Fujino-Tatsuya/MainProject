@@ -8,6 +8,10 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-10-09 · 은희(Claude) · **거너 레이저건 정렬 + 기본 공격 손 이탈**, 브랜치 `fix/GunnerGunAlign`(development `778bbb87` 기준)) — 계획 [PLAN-gunner-gun-align.md](PLAN-gunner-gun-align.md) ✅ 승인 · ✅ S1~S5 구현(미커밋) · ✅ 실제 Animator 레이어 합성 실측(총구 yaw 0°, 손–손잡이 ≤ 5cm) · 보고 영상 `Recordings/gunner_gun_align_report.mp4`(gitignore) · ⏳ Play·MPPM · ⏸ PLAN §6 판정 시작점
+- 원인(Unity 실측): 총은 이미 `rig/artillery` 본에 붙어 있는데 손으로 맞춘 오프셋(09-30)이 **총을 앞뒤로 뒤집어** 총구 yaw ≈174°. 애니는 `LaserGun_Mount` = `artillery` 프레임(오프셋 0)으로 저작됨 — 손 = `Grip_R`/`Grip_L`(Q 는 `Brace_R`) 좌표와 소수점 3자리 일치. + 기본 공격 상체 클립 `attack01` 은 `c_pos` 각도(180°)가 하체 `Q_charge_loop`(146.3°)와 달라, 마스크가 `c_pos` 를 빼므로 팔만 34° 돌아 손이 11~19cm 이탈.
+- 🔴 **수정 예정 — 동시 수정 금지**: `Gunner/Gunner_Armature.prefab` · `GunnerAnimatorController.controller` · `Player/Gunner/GunnerBasicAttack.cs`·`GunnerBasicAttackData.cs` · `GunnerBeamView.cs` · `Player/Editor/GunnerShellAuthoring.cs` · `Docs/tech/player-prefabs.md`.
+
 ## ▶▶ 작업 세션 (2026-10-08 · 은희(Claude+claude-alt) · **거너 기본 공격 홀드 연사 → 클릭 단발 + 입력 창**, 브랜치 `fix/GunnerDefaultAttack`) — ✅ 구현 `24aebc9d` · 컴파일 OK · development 반영 · ⏳ Play·MPPM 손맛 확인
 - 클릭 1회 = 준비 동작 → 1발. 직전 발사 + `comboWindowOpen~Close`(초, `GunnerBasicAttackData`) 안 재클릭 → 서버 예약 → `FireInterval` 후 준비 없이 다음 발. 창은 애니 이벤트가 아니라 데이터 시간 값(판정이 시간 기반·발사 클립 배속 재생). 상세 = [character_gunner.md](Docs/design/character/character_gunner.md) §4.
 - 새 수치 2개는 xlsx 미반영 — 병합 Export 전까지 SO 기본값(0.05/0.2).
