@@ -12,7 +12,7 @@ public interface IPlayerBasicAttack
 
     /// <summary>
     /// 공격 중(AttackReady·Attack) 공용 대시로 끊을 수 있는가 — 오너가 매 프레임 묻는다.
-    /// 세 캐릭터 공통: 지금 타(발)의 다음 평타 입력 창이 열리기 전이면 예, 열린 뒤엔 아니오(<see cref="BasicAttackDashCancel"/>).
+    /// 세 캐릭터 공통으로 항상 예(할 일 9) — 판정이 나갔으면 피해는 그대로, 남은 동작·예약만 <see cref="CancelCurrentAttack"/> 이 끊는다.
     /// </summary>
     bool CanBeCanceledByDash { get; }
 

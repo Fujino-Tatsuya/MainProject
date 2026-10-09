@@ -217,24 +217,19 @@ public static class AssassinShellAuthoring
         }
 
         // 일반 평타: 실제 타격 프레임 확인 전 기본값. Play에서 반드시 튜닝한다.
-        // ComboWindowOpen 은 대시 취소 경계로만 쓴다(그 전까지만 대시로 끊김, 할 일 9) — 다음 타 연결은 End 시점 홀드 그대로.
         foreach (string clipName in WaveClips)
             ReplaceEvents(clipName, DefaultAttackEvent(0.40f, DefaultAttackAnimationEventType.Hit),
-                DefaultAttackEvent(0.60f, DefaultAttackAnimationEventType.ComboWindowOpen),
                 DefaultAttackEvent(0.85f, DefaultAttackAnimationEventType.End));
 
         // A7 연결 자리까지 같은 메뉴가 준비한다. 실제 타격 프레임은 Play에서 튜닝한다.
         ReplaceEvents("Combo_Attack_02_01",
             DefaultAttackEvent(0.40f, DefaultAttackAnimationEventType.Hit),
-            DefaultAttackEvent(0.60f, DefaultAttackAnimationEventType.ComboWindowOpen),
             DefaultAttackEvent(0.85f, DefaultAttackAnimationEventType.End));
-        // 변신 묶음은 마지막 Hit(0.75) 뒤에 창을 연다 — 4타 묶음 전체가 대시로 끊길 수 있다.
         ReplaceEvents("Speed_Attack_Loop",
             DefaultAttackEvent(0.15f, DefaultAttackAnimationEventType.Hit),
             DefaultAttackEvent(0.35f, DefaultAttackAnimationEventType.Hit),
             DefaultAttackEvent(0.55f, DefaultAttackAnimationEventType.Hit),
             DefaultAttackEvent(0.75f, DefaultAttackAnimationEventType.Hit),
-            DefaultAttackEvent(0.80f, DefaultAttackAnimationEventType.ComboWindowOpen),
             DefaultAttackEvent(0.90f, DefaultAttackAnimationEventType.End));
 
         ReplaceEvents("Combo_Attack_02_04", SkillEvent(0.40f, SkillAnimationEventType.Hit), SkillEvent(0.85f, SkillAnimationEventType.End));

@@ -56,8 +56,6 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
     private bool active;
     private float startTime;
     private float lastShotTime = -1f;
-    // 이 피어가 발사 연출을 받은 시각(대시 취소 경계용). 서버 lastShotTime 과 달리 오너도 갖는다.
-    private float observedShotTime = -1f;
 
     // 오너
     private bool isRequesting;
@@ -76,9 +74,8 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
     public GunnerBasicAttackData Data => data;
 
     // 공용 대시 우선(D1·D2) — 준비 중 끊기면 발사·과열 없음, 발사 후면 이미 쏜 발은 그대로이고 후속 동작만 끊긴다.
-    // 단 직전 발사 + ComboWindowOpen 전까지만(할 일 9). 오너가 본 발사 시각 기준이다 — lastShotTime 은 서버만 안다.
-    public bool CanBeCanceledByDash =>
-        data == null || BasicAttackDashCancel.BeforeTimedComboWindow(Time.time, observedShotTime, data.ComboWindowOpen);
+    // 홀드 연사 중에도 언제든 끊는다(할 일 9).
+    public bool CanBeCanceledByDash => true;
 
     private bool HasGameplayAuthority => !IsNetworkActive || IsServer;
     private bool IsInputSource => !IsNetworkActive || IsOwner;
@@ -451,7 +448,6 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
         hasQueuedShot = false;
         startTime = Time.time;
         lastShotTime = -1f;
-        observedShotTime = -1f;
         // 시작 클릭 = 눌림. 오너가 이미 뗐으면 다음 틱에 ReleaseRpc 로 바로잡는다.
         holdSent = true;
         held = true;
@@ -501,14 +497,10 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
         hasQueuedShot = false;
         held = false;
         lastShotTime = -1f;
-        observedShotTime = -1f;
     }
 
     private void PlayShot(Vector3 origin, Vector3 end, bool hit)
     {
-        if (active)
-            observedShotTime = Time.time;
-
         PlayFireAnimation();
         ShowBeam(origin, end, hit);
     }

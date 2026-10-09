@@ -81,7 +81,7 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
     /// <summary>
     /// 지금 행동을 공용 대시로 끊을 수 있는가(대시 우선 — 거너 D1). 행동 쪽이 정한다:
     /// 기본 공격 = <see cref="IPlayerBasicAttack.CanBeCanceledByDash"/>, 스킬 = <see cref="PlayerSkillBase.CanBeCanceledByDash"/>.
-    /// 기본 공격은 세 캐릭터 모두 "다음 평타 입력 창이 열리기 전"까지만 예다(할 일 9).
+    /// 기본 공격은 세 캐릭터 모두 언제든 예다(할 일 9).
     /// </summary>
     public bool CurrentActionAllowsDashCancel => CurrentState switch
     {
