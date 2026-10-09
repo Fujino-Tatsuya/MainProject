@@ -20,13 +20,14 @@ using UnityEngine;
 /// </summary>
 [DefaultExecutionOrder(-100)]
 [RequireComponent(typeof(NetworkManager))]
+[DataTableSheet("SlowMotion", Order = 0)]
 public sealed class GlobalTimeScale : MonoBehaviour
 {
     public static GlobalTimeScale Instance { get; private set; }
 
     private const string EventMessageName = "GlobalTimeScale.Event";
 
-    [Tooltip("인터럽트 유효타 슬로우 모양. 수치 원본은 이후 GameData.xlsx(S6)")]
+    [Tooltip("인터럽트 유효타 슬로우 모양. 수치 원본 = GameData.xlsx SlowMotion 시트(S6)")]
     [SerializeField] private SlowMotionProfile interruptProfile = new SlowMotionProfile();
 
     private readonly SlowMotionSession _session = new SlowMotionSession();

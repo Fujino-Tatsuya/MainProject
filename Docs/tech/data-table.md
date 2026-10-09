@@ -19,17 +19,20 @@ GameData.xlsx (SVN, 잠금)
 
 ## 2. 시트 형식
 
-**시트 7장 = 카테고리**(2026-10-08 기준). 한 장 안에 관련 타입이 구역으로 나뉘어 세로로 쌓인다 — 가로 이동은 대상 수만큼(최대 Monster 11열).
+**시트 = 카테고리**(2026-10-09 코드 기준 10장 — xlsx 에는 병합 Export 한 시트만 있다). 한 장 안에 관련 타입이 구역으로 나뉘어 세로로 쌓인다 — 가로 이동은 대상 수만큼(최대 Monster 11열).
 
 | 시트 | 들어 있는 것 |
 |---|---|
 | `Player` | 스탯(`Player`) · 이동 · 대시 · 낙하 복귀 · 착지 보호 · 영혼 · 게임 규칙(낙하 비율) · 목숨 |
 | `Paladin` | 가붕이 기본 공격 · 패시브 · 스킬 SO 4종 |
 | `Gunner` | 거너 기본 공격 · 과열 · 스킬 SO 4종 |
+| `Assassin` | 어쌔신 기본 공격 · 상태 · 스킬 SO |
 | `Monster` | 몬스터 스탯 SO · 근접 공격 · 넉백 · 카운터 창 · 터렛 조준 |
 | `MidBoss` | Gauntlet · Spinner · Wall |
 | `Boss` | 23호(`BossDataSO`) |
 | `Sound` | 문자열 키별 사운드 재생 수치(`SoundCatalog`) — SoundID 연결은 인스펙터 전용 |
+| `Map` | 허수아비 인터럽트 순환(`TrainingDummyInterrupt`) |
+| `SlowMotion` | 인터럽트 슬로우 모양 `interruptProfile.*`(배율·진입·유지·복귀·실패 복귀 길이, 대상 `NetworkManager`) · 오너 줌 배율 `slowMotionZoomFactor`(대상 `CameraSwitcher`). 의미는 [PLAN-interrupt-slowmo.md](../../PLAN-interrupt-slowmo.md) |
 
 ### 세로 표 — 행 = 필드, 열 = 대상
 
