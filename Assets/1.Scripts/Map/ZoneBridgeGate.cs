@@ -84,7 +84,16 @@ public sealed class ZoneBridgeGate : MonoBehaviour
              "기존 Flat Kit 외곽선 렌더러 피처가 그린다. 비우면 외곽선 없음.")]
     [SerializeField] private Material highlightOutlineMaterial;
 
+    [Header("F 키 프롬프트 (handoff-interact-prompt)")]
+    [Tooltip("외곽선이 켜진 패널 위에 띄울 프롬프트 뷰 — 이 프리팹의 InteractPromptCanvas. 아이콘·Canvas 는 거기서 직접 고친다.")]
+    [SerializeField] private InteractPromptView promptView;
+
+    [Tooltip("F 키 프롬프트를 띄울 높이(m). 외곽선이 켜진 패널 위치에서 월드 위쪽으로.")]
+    [SerializeField] private float promptHeightOffset = 1.8f;
+
     public IReadOnlyList<Transform> Panels => panels;
+    public InteractPromptView PromptView => promptView;
+    public float PromptHeightOffset => promptHeightOffset;
     public int PanelCount => panels != null ? panels.Count : 0;
     public float OpenDuration => openDuration;
     public float InteractRadius => interactRadius;

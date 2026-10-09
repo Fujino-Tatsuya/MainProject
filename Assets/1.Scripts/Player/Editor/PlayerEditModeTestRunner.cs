@@ -24,6 +24,7 @@ internal static class PlayerEditModeTestRunner
         "^HealthVignetteModelTests$", // 로컬 체력 비네팅 — 시작 비율·맥동·피격 플래시 색·사망 어둡게(맥동·플래시 끔)
         "^ShieldVignetteModelTests$", // 로컬 실드 비네팅 — 표시 여부·고정 알파 페이드 인/아웃
         "^CombatHudLayerRulesTests$", // CombatHUD 상태 레이어 — 생명주기 상태별 표시 레이어
+        "^InteractPromptSlotTests$", // 상호작용 F 프롬프트 — 마지막 Show 우선·소유자만 Hide·뷰 교체·누락
     };
 
     const string Tag = "[PlayerTests]";
