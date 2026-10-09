@@ -48,6 +48,7 @@ public sealed class TrainingDummy : Unit
     public event Action<DamageDealtInfo> NominalDamaged;
 
     TrainingDummyRegen _regen;
+    TrainingDummyInterrupt _interrupt; // 없으면 인터럽트는 데미지만
     Rigidbody _rigidbody;
     bool _spawnKinematic;
     Vector3 _anchorPosition;
@@ -72,6 +73,7 @@ public sealed class TrainingDummy : Unit
 
         _rigidbody = GetComponent<Rigidbody>();
         _spawnKinematic = _rigidbody != null && _rigidbody.isKinematic;
+        _interrupt = GetComponent<TrainingDummyInterrupt>();
 
         if (!IsServer)
             return;
@@ -97,9 +99,11 @@ public sealed class TrainingDummy : Unit
     {
         // Unit 의 기본 구현이 쓰는 귀속 RPC 경로는 타지 않는다 — 공격자 clientId 는
         // 허수아비 전용 RPC 가 직접 싣고, 그 소비자(UnitCameraFeedbackReporter)는 스폰 때 제거했다.
-        ApplyDummyDamage(attackInfo.damage, ResolveAttackerClientId(hitContext),
+        ulong attackerClientId = ResolveAttackerClientId(hitContext);
+        ApplyDummyDamage(attackInfo.damage, attackerClientId,
             attackInfo.attackType, attackInfo.hitPattern);
         TryEnterKnockback(attackInfo, hitContext);
+        TryServerInterrupt(attackInfo, attackerClientId, hitContext.sourceUnit);
         return true;
     }
 
@@ -107,6 +111,17 @@ public sealed class TrainingDummy : Unit
     {
         ApplyDummyDamage(attackInfo.damage, ulong.MaxValue,
             attackInfo.attackType, attackInfo.hitPattern);
+        TryServerInterrupt(attackInfo, ulong.MaxValue, null);
+    }
+
+    // 데미지 뒤에 판정한다(중간보스와 같은 순서). 인터럽트 가능 상태가 아니면 데미지만 들어간 것으로 끝난다.
+    // 🔴 CombatStatsEvents 간파 통계는 올리지 않는다 — SessionStatsTracker 가 허수아비를 집계에서 뺀다.
+    void TryServerInterrupt(AttackInfo attackInfo, ulong attackerClientId, Unit sourceUnit)
+    {
+        if (!IsServer || !attackInfo.isInterruptAttack || _interrupt == null)
+            return;
+
+        _interrupt.ServerTryInterrupt(attackerClientId, sourceUnit);
     }
 
     void ApplyDummyDamage(int rawDamage, ulong attackerClientId,
