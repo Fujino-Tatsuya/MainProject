@@ -404,6 +404,26 @@ public sealed class ZoneBridgeGate : MonoBehaviour
         _highlightedPanel = index;
     }
 
+    // ── F 키 프롬프트(handoff-interact-prompt) ──────────────────────────
+    // 패널마다 자식으로 InteractPrompt.prefab 인스턴스가 놓여 있다(높이 = 그 인스턴스의 로컬 위치).
+    // 별도 직렬화 리스트를 두면 panels 와 순서를 맞춰야 하므로 패널 자식에서 찾아 처음 한 번 캐시한다.
+
+    InteractPromptView[] _promptViews;
+
+    /// <summary>패널 i 위에 띄울 프롬프트 뷰(패널 자식). 없으면 false.</summary>
+    public bool TryGetPromptView(int index, out InteractPromptView view)
+    {
+        if (_promptViews == null)
+        {
+            _promptViews = new InteractPromptView[PanelCount];
+            for (int i = 0; i < PanelCount; i++)
+                if (panels[i] != null) _promptViews[i] = panels[i].GetComponentInChildren<InteractPromptView>(true);
+        }
+
+        view = index >= 0 && index < _promptViews.Length ? _promptViews[index] : null;
+        return view != null;
+    }
+
     /// <summary>패널 i의 월드 위치. 거리 판정에 쓴다.</summary>
     public bool TryGetPanelPosition(int index, out Vector3 position)
     {
