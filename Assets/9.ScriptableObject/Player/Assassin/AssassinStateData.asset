@@ -13,18 +13,21 @@ MonoBehaviour:
   m_Name: AssassinStateData
   m_EditorClassIdentifier: Assembly-CSharp::AssassinStateData
   tooltip:
-    displayName: "\uBC31\uC5B4\uD0DD \xB7 R \uC2A4\uD0DD"
+    displayName: "\uBC31\uC5B4\uD0DD \xB7 \uBD84\uB178 \uAC8C\uC774\uC9C0"
     subtitle: 
     description: "TODO \uBCF4\uC2A4 \uB4A4\uC5D0\uC11C \uACF5\uACA9\uD558\uBA74 \uD53C\uD574\uAC00
-      \uC99D\uAC00\uD569\uB2C8\uB2E4. \uAC15\uD0C0 \uC801\uC911\uC73C\uB85C R \uC2A4\uD0DD\uC744
-      \uCD5C\uB300 4\uAC1C\uAE4C\uC9C0 \uBAA8\uC74D\uB2C8\uB2E4. \uBCC0\uC2E0 \uC911\uC5D0\uB294
-      \uBAA8\uB4E0 \uACF5\uACA9\uC774 \uBC31\uC5B4\uD0DD\uC785\uB2C8\uB2E4."
+      \uC99D\uAC00\uD569\uB2C8\uB2E4. \uAE30\uBCF8 \uACF5\uACA9\xB7Q\xB7\uAC15\uD0C0\uAC00
+      \uC801\uC5D0\uAC8C \uC801\uC911\uD558\uBA74 \uBD84\uB178 \uAC8C\uC774\uC9C0\uAC00
+      \uCC39\uB2C8\uB2E4(\uCD5C\uB300 {maxRage}). \uAC8C\uC774\uC9C0\uAC00 {minTransformRage}
+      \uC774\uC0C1\uC774\uBA74 R\uB85C \uBCC0\uC2E0\uD558\uACE0, \uBCC0\uC2E0 \uC911\uC5D0\uB294
+      \uCD08\uB2F9 {transformRageDecayPerSecond}\uC529 \uC904\uC5B4\uB4ED\uB2C8\uB2E4.
+      \uBCC0\uC2E0 \uC911\uC5D0\uB294 \uBAA8\uB4E0 \uACF5\uACA9\uC774 \uBC31\uC5B4\uD0DD\uC785\uB2C8\uB2E4."
     icon: {fileID: 0}
-  maxStacks: 4
-  transformDurations:
-  - 4
-  - 6
-  - 8
-  - 10
+  maxRage: 100
+  minTransformRage: 40
+  basicAttackRageGain: 3
+  dashStrikeRageGain: 5
+  enhancedStrikeRageGain: 15
+  transformRageDecayPerSecond: 10
   releaseLockSeconds: 2
   backAttackMultiplier: 1.2
