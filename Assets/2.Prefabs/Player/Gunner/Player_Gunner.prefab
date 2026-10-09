@@ -5918,6 +5918,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       insertIndex: -1
       addedObject: {fileID: 4546248764463195523}
+    - targetCorrespondingSourceObject: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1722392471722992986}
   m_SourcePrefab: {fileID: 100100000, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
 --- !u!1 &1006850121594653262 stripped
 GameObject:
@@ -6241,6 +6244,24 @@ MonoBehaviour:
   allyBreakBurst: {fileID: 4164761733980257203}
   minHitDistance: 0.15
   interruptWave: {fileID: 0}
+--- !u!114 &1722392471722992986
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1006850121594653262}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4cb3525e501607b4c903273d381252db, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GunnerOverheadTraitGauge
+  heat: {fileID: 0}
+  coolColor: {r: 0.95, g: 0.95, b: 0.95, a: 1}
+  warmColor: {r: 1, g: 0.55, b: 0.1, a: 1}
+  hotColor: {r: 1, g: 0.15, b: 0.1, a: 1}
+  overheatBlinkColor: {r: 1, g: 1, b: 1, a: 1}
+  overheatBlinkPeriod: 0.4
 --- !u!4 &7722051468864962236 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 1160318589990200604, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}

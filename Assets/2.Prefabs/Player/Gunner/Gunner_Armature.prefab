@@ -110,6 +110,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: GunnerHeatGauge
       objectReference: {fileID: 0}
+    - target: {fileID: 6236171600041082142, guid: 372b8af8722841743a48ffcc3e9b3f06, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 6907916267488969316, guid: 372b8af8722841743a48ffcc3e9b3f06, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0

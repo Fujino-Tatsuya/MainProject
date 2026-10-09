@@ -258,6 +258,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       insertIndex: -1
       addedObject: {fileID: 6606962425304540108}
+    - targetCorrespondingSourceObject: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 3845917299268068739}
   m_SourcePrefab: {fileID: 100100000, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
 --- !u!1 &768617275354264640 stripped
 GameObject:
@@ -447,6 +450,22 @@ MonoBehaviour:
   - {fileID: 1764771864387414799}
   enhancedSlashSocket: {fileID: 1163115333760412649}
   transformedSlashSocket: {fileID: 2231423892707552485}
+--- !u!114 &3845917299268068739
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 768617275354264640}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 222fc8a3afef4b2459951b6d702eeb10, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AssassinOverheadTraitGauge
+  state: {fileID: 0}
+  buildingColor: {r: 0.95, g: 0.95, b: 0.95, a: 1}
+  readyColor: {r: 0.3, g: 0.9, b: 0.35, a: 1}
+  transformedColor: {r: 0.65, g: 0.35, b: 1, a: 1}
 --- !u!4 &7816451711114395826 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 1160318589990200604, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}

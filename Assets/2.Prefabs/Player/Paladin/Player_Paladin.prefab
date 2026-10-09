@@ -1921,6 +1921,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       insertIndex: -1
       addedObject: {fileID: 7301928374650192902}
+    - targetCorrespondingSourceObject: {fileID: 8559504096609571310, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 4616517997317681720}
     - targetCorrespondingSourceObject: {fileID: 8229189883948102995, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       insertIndex: -1
       addedObject: {fileID: 2600760496483148764}
@@ -2277,6 +2280,21 @@ MonoBehaviour:
     m_NumAlphaKeys: 3
   minVertexDistance: 0.02
   logDiagnostics: 1
+--- !u!114 &4616517997317681720
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7876615519038055782}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2bb839ae98537e44ca6f5e52745a60b7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FirstMeleePassiveOverheadTraitGauge
+  passive: {fileID: 0}
+  chargingColor: {r: 0.95, g: 0.95, b: 0.95, a: 1}
+  chargedColor: {r: 1, g: 0.85, b: 0.2, a: 1}
 --- !u!1001 &5683368051277706446
 PrefabInstance:
   m_ObjectHideFlags: 0
