@@ -133,7 +133,8 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
     public bool IsAttacking => player != null && player.CurrentState == PlayerActionState.Attack;
     public bool CanRequestStart => HasAttackSteps && CurrentStepDuration > 0f;
     public bool CanStartApprovedAttack => HasAttackSteps && CurrentStepDuration > 0f;
-    public bool CanBeCanceledByDash => false; // 콤보 중 대시 입력은 무시(기존 동작)
+    // 콤보 중 언제든 대시로 끊는다(할 일 9). 판정이 나갔으면 피해는 그대로, 남은 동작·예약만 끊긴다(CancelCurrentAttack).
+    public bool CanBeCanceledByDash => true;
     private bool HasGameplayAuthority => !IsNetworkActive || IsServer;
 
     private void Awake()
@@ -656,6 +657,11 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
 
         DefaultAttackStep step = attackSteps[attackIndex];
         currentAttackIndex = attackIndex;
+        // 새 공격이 직전 공격의 꼬리를 대신한다. 꼬리 플래그가 남으면(같은 스텝 클립을 다시 틀면
+        // HandleAnimatorMove 가 영영 못 내린다) 이번 공격을 대시로 끊을 때 CancelCurrentAttack 이
+        // 정상 종료 캐스케이드로 오인해 Idle 전환·EndDefaultAttackClientRpc 를 건너뛴다.
+        isFinishingAttackTail = false;
+        finishingAttackIndex = -1;
         attackDirection = ResolveAttackDirection(direction);
         moveRemaining = step.MovementType == DefaultAttackMovementType.ScriptedForwardDistance
             ? Mathf.Max(step.ForwardDistance, 0f)

@@ -74,6 +74,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
     public GunnerBasicAttackData Data => data;
 
     // 공용 대시 우선(D1·D2) — 준비 중 끊기면 발사·과열 없음, 발사 후면 이미 쏜 발은 그대로이고 후속 동작만 끊긴다.
+    // 홀드 연사 중에도 언제든 끊는다(할 일 9).
     public bool CanBeCanceledByDash => true;
 
     private bool HasGameplayAuthority => !IsNetworkActive || IsServer;

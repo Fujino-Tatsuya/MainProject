@@ -57,6 +57,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     private PlayerActionState observedState;
 
     public bool CanStartApprovedAttack => data != null && data.TryGetNormalStep(0, out _);
+    // 일반 타·강타·변신 묶음 어디서든 대시로 끊는다(할 일 9). 나간 타격의 피해는 그대로, 남은 동작만 끊긴다.
     public bool CanBeCanceledByDash => true;
     public AssassinBasicAttackData Data => data;
 

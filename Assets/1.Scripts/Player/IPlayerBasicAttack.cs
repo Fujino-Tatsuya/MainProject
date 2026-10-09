@@ -10,7 +10,10 @@ public interface IPlayerBasicAttack
     /// <summary>서버가 승인한 공격을 지금 시작할 수 있는가(상태 전이 조건).</summary>
     bool CanStartApprovedAttack { get; }
 
-    /// <summary>공격 중(AttackReady·Attack) 공용 대시로 끊을 수 있는가. 가붕이 콤보 = 아니오(기존 동작), 거너 = 예(D1).</summary>
+    /// <summary>
+    /// 공격 중(AttackReady·Attack) 공용 대시로 끊을 수 있는가 — 오너가 매 프레임 묻는다.
+    /// 세 캐릭터 공통으로 항상 예(할 일 9) — 판정이 나갔으면 피해는 그대로, 남은 동작·예약만 <see cref="CancelCurrentAttack"/> 이 끊는다.
+    /// </summary>
     bool CanBeCanceledByDash { get; }
 
     /// <summary>오너 입력으로 공격 시작을 시도한다. 시작 요청이 나가면 true.</summary>
