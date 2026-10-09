@@ -85,14 +85,14 @@ public sealed class ZoneBridgeGate : MonoBehaviour
     [SerializeField] private Material highlightOutlineMaterial;
 
     [Header("F 키 프롬프트 (handoff-interact-prompt)")]
-    [Tooltip("외곽선이 켜진 패널 위에 띄울 프롬프트 뷰 — 이 프리팹의 InteractPromptCanvas. 아이콘·Canvas 는 거기서 직접 고친다.")]
-    [SerializeField] private InteractPromptView promptView;
+    [Tooltip("외곽선이 켜진 패널 위에 띄울 프롬프트 프리팹(Assets/2.Prefabs/UI/InteractPrompt.prefab). 아이콘·Canvas 는 그 프리팹에서 고친다.")]
+    [SerializeField] private InteractPromptView promptPrefab;
 
     [Tooltip("F 키 프롬프트를 띄울 높이(m). 외곽선이 켜진 패널 위치에서 월드 위쪽으로.")]
     [SerializeField] private float promptHeightOffset = 1.8f;
 
     public IReadOnlyList<Transform> Panels => panels;
-    public InteractPromptView PromptView => promptView;
+    public InteractPromptView PromptPrefab => promptPrefab;
     public float PromptHeightOffset => promptHeightOffset;
     public int PanelCount => panels != null ? panels.Count : 0;
     public float OpenDuration => openDuration;

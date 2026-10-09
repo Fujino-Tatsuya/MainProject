@@ -1,9 +1,9 @@
 using UnityEngine;
 
 /// <summary>
-/// <see cref="InteractPrompt"/> 의 화면 표시. 소유자 프리팹(예: ZoneL_typeB 의 <c>InteractPromptCanvas</c>)에 들어 있는
+/// <see cref="InteractPrompt"/> 의 화면 표시. 독립 프리팹 <c>Assets/2.Prefabs/UI/InteractPrompt.prefab</c> 의
 /// Screen Space - Overlay Canvas 루트에 붙고, 아이콘 RectTransform 을 대상 월드 위치에 맞춰 매 프레임 Canvas 좌표로 옮긴다.
-/// 외형(스프라이트·크기·Canvas 설정)은 프리팹에서 직접 고친다. 배치 계산은 머리 위 체력바와 같은 <see cref="OverheadHealthBarScreenPlacement"/> 를 쓴다.
+/// 인스턴스는 <see cref="InteractPrompt"/> 가 프리팹마다 하나 만들어 재사용한다. 외형(스프라이트·크기·Canvas 설정)은 그 프리팹에서 직접 고친다. 배치 계산은 머리 위 체력바와 같은 <see cref="OverheadHealthBarScreenPlacement"/> 를 쓴다.
 /// </summary>
 public sealed class InteractPromptView : MonoBehaviour
 {
