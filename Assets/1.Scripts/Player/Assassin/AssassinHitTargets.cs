@@ -2,14 +2,15 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 어쌔신 적중 보상 대상 분류(character_assassin.md §4.3). 보스·일반 몹(<see cref="MonsterBase"/>)과 송전기(<see cref="BossChargingPylon"/>)만.
+/// 어쌔신 적중 보상 대상 분류(character_assassin.md §4.3) — 분노 게이지 충전·변신 Q 쿨감 공용.
+/// 보스·일반 몹(<see cref="MonsterBase"/>)·송전기(<see cref="BossChargingPylon"/>)·허수아비(<see cref="TrainingDummy"/>)만.
 /// 상자(<c>BreakableCrate</c>)는 Unit 이 아니라 적중 목록에 들어오지 않는다. 다른 기믹은 해당 기믹이 따로 지정한다.
-/// 백어택(§4.1, A11)은 <see cref="MonsterBase"/> 만 — 송전기·기믹·상자는 MonsterBase 가 아니라 자연히 빠진다.
+/// 백어택(§4.1, A11)은 <see cref="MonsterBase"/> 만 — 송전기·허수아비·기믹·상자는 MonsterBase 가 아니라 자연히 빠진다.
 /// </summary>
 public static class AssassinHitTargets
 {
     public static bool IsRewardTarget(Unit unit) =>
-        unit != null && (unit is MonsterBase || unit is BossChargingPylon);
+        unit != null && (unit is MonsterBase || unit is BossChargingPylon || unit is TrainingDummy);
 
     public static bool ContainsRewardTarget(IReadOnlyList<Unit> units)
     {

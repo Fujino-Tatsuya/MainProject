@@ -56,15 +56,16 @@ public static class SkillTooltipAuthoring
         (AssassinDataFolder + "AssassinTransformedDashStrikeSkillData.asset", "관통 돌진 (변신)", "Q 스킬 · 변신",
             "TODO 돌진하며 경로의 적에게 {dmg} 피해를 줍니다. 적중 시 쿨타임이 줄어듭니다."),
         (AssassinDataFolder + "AssassinEnhanceSkillData.asset", "단검 강화", "E 스킬",
-            "TODO 다음 기본 공격이 강타로 바뀝니다. 강타가 적중하면 R 스택을 얻습니다."),
+            "TODO 다음 기본 공격이 강타로 바뀝니다. 강타가 적중하면 분노 게이지가 크게 찹니다."),
         (AssassinDataFolder + "AssassinCircleStrikeSkillData.asset", "원형 난격", "E 스킬 · 변신",
             "TODO 지정한 원 범위에 {dmg} 피해를 5번 줍니다. 공격 중 무적입니다."),
         (AssassinDataFolder + "AssassinTransformSkillData.asset", "변신", "궁극기",
-            "TODO R 스택을 모두 소모해 변신합니다. 스택이 많을수록 오래 유지되며, 2초 뒤 다시 누르면 해제합니다."),
+            "TODO 분노 게이지 전부를 연료로 변신합니다. 게이지가 0이 될 때까지 유지되며, 2초 뒤 다시 누르면 해제하고 남은 게이지를 보존합니다."),
         (AssassinDataFolder + "AssassinInterruptSkillData.asset", "간파", "우클릭 스킬",
             "TODO 무기를 올려쳐 적을 간파하고 {dmg} 피해를 줍니다."),
-        (AssassinDataFolder + "AssassinStateData.asset", "백어택 · R 스택", string.Empty,
-            "TODO 보스 뒤에서 공격하면 피해가 증가합니다. 강타 적중으로 R 스택을 최대 4개까지 모읍니다. 변신 중에는 모든 공격이 백어택입니다."),
+        (AssassinDataFolder + "AssassinStateData.asset", "백어택 · 분노 게이지", string.Empty,
+            "TODO 보스 뒤에서 공격하면 피해가 증가합니다. 기본 공격·Q·강타가 적에게 적중하면 분노 게이지가 찹니다(최대 {maxRage}). " +
+            "게이지가 {minTransformRage} 이상이면 R로 변신하고, 변신 중에는 초당 {transformRageDecayPerSecond}씩 줄어듭니다. 변신 중에는 모든 공격이 백어택입니다."),
     };
 
     [MenuItem("Tools/UI/스킬 툴팁 구성")]

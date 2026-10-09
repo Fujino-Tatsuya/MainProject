@@ -187,7 +187,7 @@ public sealed class AssassinCircleStrikeModelTests
     {
         // 공격 중(FSM Skill) 해제 요청 → 종료 대기, 새 변신 E 시작 불가. 스킬이 끝나야 변신이 끝난다.
         var rules = AssassinStateRules.Default;
-        var state = new AssassinStateSnapshot { stacks = 1 };
+        var state = new AssassinStateSnapshot { rage = 40f };
         Assert.That(AssassinStateModel.TryBeginTransform(ref state, 0.0, rules, out _), Is.True);
         Assert.That(AssassinStateModel.TryRequestRelease(ref state, 2.5, rules), Is.True);
 
@@ -202,8 +202,8 @@ public sealed class AssassinCircleStrikeModelTests
     public void ExpiryDuringStrikeWaitsForSkillToFinish()
     {
         var rules = AssassinStateRules.Default;
-        var state = new AssassinStateSnapshot { stacks = 1 };
-        AssassinStateModel.TryBeginTransform(ref state, 0.0, rules, out _); // 1스택 = 4초
+        var state = new AssassinStateSnapshot { rage = 40f };
+        AssassinStateModel.TryBeginTransform(ref state, 0.0, rules, out _); // 게이지 40 ÷ 10/초 = 4초
 
         Assert.That(AssassinStateModel.ShouldFinishTransform(state, 4.5, actionInProgress: true), Is.False);
         Assert.That(AssassinStateModel.ShouldFinishTransform(state, 5.2, actionInProgress: false), Is.True);

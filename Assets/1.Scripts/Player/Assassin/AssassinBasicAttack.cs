@@ -45,6 +45,8 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     private bool finishingTail;
     private bool releaseLatched;
     private bool serverContinueHeld;
+    // 이번 타(일반 1타·강타 1회)의 분노 게이지 충전을 이미 받았는가 — 타 하나에 1번(§4.2).
+    private bool rageClaimed;
     private int hitsFired;
     private int currentStepIndex;
     private AssassinBasicAttackMode currentMode;
@@ -378,6 +380,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         requesting = false;
         releaseLatched = false;
         serverContinueHeld = true;
+        rageClaimed = false;
         hitsFired = 0;
         currentStepIndex = stepIndex;
         currentMode = mode;
@@ -423,11 +426,14 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             damage,
             data.TriggersOnHit);
 
-        // 강타가 보스·몹·송전기를 맞히면 대상 수와 무관하게 1스택(§4.2·§4.3). 변신 중 획득 없음은 모델이 막는다.
-        if (currentMode == AssassinBasicAttackMode.Enhanced && assassinState != null &&
+        // 일반 1타·강타가 유효 대상(§4.3)을 맞히면 대상 수와 무관하게 1번 충전(§4.2). 변신 묶음은 충전 없음 — 모델도 막는다.
+        if (!rageClaimed && currentMode != AssassinBasicAttackMode.Transformed && assassinState != null &&
             AssassinHitTargets.ContainsRewardTarget(coneAttack.LastLandedUnits))
         {
-            assassinState.ServerTryGainStack();
+            rageClaimed = true;
+            assassinState.ServerTryGainRage(currentMode == AssassinBasicAttackMode.Enhanced
+                ? AssassinRageSource.EnhancedStrike
+                : AssassinRageSource.BasicAttack);
         }
     }
 

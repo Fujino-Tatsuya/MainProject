@@ -1,8 +1,8 @@
 using UnityEngine;
 
 /// <summary>
-/// R 변신 — Parry_R 시작과 동시에 스택 전부 소모·지속 시작(character_assassin.md §10.1).
-/// 조건 = 스택 1 이상 · R 쿨 종료 · 행동 가능(컨트롤러 승인). 쿨타임은 실제 변신 종료 시점부터라
+/// R 변신 — Parry_R 시작과 동시에 분노 게이지 전부를 연료로 감소 시작(character_assassin.md §10.1).
+/// 조건 = 게이지 ≥ 최소 변신량 · R 쿨 종료 · 행동 가능(컨트롤러 승인 — 서버 <see cref="CanUse"/> 가 최종 판정). 쿨타임은 실제 변신 종료 시점부터라
 /// 데이터 commitCooldownManually 로 두고 <see cref="AssassinState"/> 가 종료 때 시작한다.
 ///
 /// Parry_R 동안 이동·대시·평타·다른 스킬 불가(스킬 상태 + 이동 잠금). 일반 피격·경직으로 끊기지 않도록

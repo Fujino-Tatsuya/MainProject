@@ -964,6 +964,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: AssassinHUD
       objectReference: {fileID: 0}
+    - target: {fileID: 2663711092717689775, guid: de58196aa2cbc9b489a6b15808be4855, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

@@ -15,7 +15,7 @@ using UnityEngine;
 /// 🔸 원격 오너의 보고가 도착하기 전(≈왕복 지연 × 20m/s)만큼은 벽 너머 경로를 이미 훑었을 수 있다 — 호스트 본인은 0.
 ///
 /// 돌진 중 슈퍼아머(A1 — 넉백·밀기·스턴·잡기 거부), 무적 없음. 쿨타임은 승인 = 돌진 시작에 시작한다.
-/// E 강화를 소모하지 않고 스택도 주지 않는다. 평타 순서 초기화는 스킬 상태 진입으로 <see cref="AssassinBasicAttack"/> 가 한다.
+/// E 강화를 소모하지 않는다. 일반 Q 는 유효 대상 적중 시 분노 게이지를 1회 충전한다(§4.2). 평타 순서 초기화는 스킬 상태 진입으로 <see cref="AssassinBasicAttack"/> 가 한다.
 /// </summary>
 public sealed class AssassinDashStrikeSkill : PlayerSkillBase
 {
@@ -289,9 +289,14 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
 
         owner.RaiseServerAttackLanded(DamageAttackType, data.TriggersOnHit, tickLandedUnits, this);
 
-        // 변신 Q — 사용당 최초 유효 적중 1회만 쿨 차감(보스·몹·송전기, 상자 제외). 여러 대상이어도 1회.
-        if (data.HitCooldownReduction > 0f &&
-            ledger.TryClaimCooldownReward(AssassinHitTargets.ContainsRewardTarget(tickLandedUnits)))
+        bool landedRewardTarget = AssassinHitTargets.ContainsRewardTarget(tickLandedUnits);
+
+        // 일반 Q — 사용당 최초 유효 적중 1회만 분노 게이지 충전(§4.2). 변신 Q 는 충전 없음 — 모델도 막는다.
+        if (assassinState != null && !assassinState.IsTransformed && ledger.TryClaimRageReward(landedRewardTarget))
+            assassinState.ServerTryGainRage(AssassinRageSource.DashStrike);
+
+        // 변신 Q — 사용당 최초 유효 적중 1회만 쿨 차감(보스·몹·송전기·허수아비, 상자 제외). 여러 대상이어도 1회.
+        if (data.HitCooldownReduction > 0f && ledger.TryClaimCooldownReward(landedRewardTarget))
         {
             controller?.ReduceCooldownServer(this, data.HitCooldownReduction);
             Edit.Log($"[Assassin/Q] 변신 Q 적중 — 쿨타임 {data.HitCooldownReduction:F1}s 차감", this);
