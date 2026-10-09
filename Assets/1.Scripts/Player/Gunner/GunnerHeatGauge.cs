@@ -50,7 +50,7 @@ public class GunnerHeatGauge : MonoBehaviour
         if (fillImage != null && stageColors != null && stageColors.Length > 0)
         {
             Color color = stageColors[Mathf.Clamp(heat.CurrentStage, 0, stageColors.Length - 1)];
-            if (heat.IsOverheated && Mathf.Repeat(Time.unscaledTime, overheatBlinkPeriod) < overheatBlinkPeriod * 0.5f)
+            if (heat.IsOverheated && Mathf.Repeat(Time.time,overheatBlinkPeriod) < overheatBlinkPeriod * 0.5f)
                 color = overheatBlinkColor;
             fillImage.color = color;
         }
