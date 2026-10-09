@@ -3909,7 +3909,7 @@ MonoBehaviour:
   fadeInDuration: 0.25
   fadeOutDuration: 0.35
   fallbackTextureSize: 128
-  fallbackInnerRadius: 0.45
+  fallbackInnerRadius: 0.75
   fallbackOuterRadius: 1.2
   visibleAlphaThreshold: 0.001
 --- !u!1 &899491242949057484
@@ -4492,7 +4492,7 @@ MonoBehaviour:
   flashDangerColor: {r: 1, g: 0, b: 0, a: 1}
   darkenDuration: 0.5
   fallbackTextureSize: 128
-  fallbackInnerRadius: 0.45
+  fallbackInnerRadius: 0.75
   fallbackOuterRadius: 1.2
   visibleAlphaThreshold: 0.001
 --- !u!1 &2538338206906985416

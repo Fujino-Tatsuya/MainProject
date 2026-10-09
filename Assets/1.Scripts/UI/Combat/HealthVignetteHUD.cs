@@ -45,7 +45,7 @@ public class HealthVignetteHUD : MonoBehaviour
     [Tooltip("코드로 만드는 방사형 텍스처 한 변 픽셀 수.")]
     [SerializeField, Min(2)] private int fallbackTextureSize = 128;
     [Tooltip("이 거리까지 완전 투명(0 = 중앙, 1 = 변의 중점, √2 = 모서리).")]
-    [SerializeField, Min(0f)] private float fallbackInnerRadius = 0.45f;
+    [SerializeField, Min(0f)] private float fallbackInnerRadius = 0.75f;
     [Tooltip("이 거리부터 완전 불투명.")]
     [SerializeField, Min(0f)] private float fallbackOuterRadius = 1.2f;
 
