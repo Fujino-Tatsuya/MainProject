@@ -7,7 +7,13 @@
 | 바꿀 것 | 편집 위치 |
 |---|---|
 | 아이콘 이미지·크기·색, Canvas 정렬·스케일, 화면 오프셋 | `Assets/2.Prefabs/UI/InteractPrompt.prefab` (모든 대상에 반영) |
-| 패널 위 높이 | `ZoneL_typeB.prefab` 의 각 `PF_Prop_object_panel_00N/InteractPrompt` **인스턴스의 로컬 위치** |
+| 패널 위 높이 | `ZoneGatePanel.prefab` 의 `InteractPrompt` **로컬 위치** (모든 게이트 패널에 반영) |
+
+## 게이트 패널 프리팹 (`Assets/2.Prefabs/Environment/Machinery/PowerUnits/ZoneGatePanel.prefab`)
+- **게이트 패널 = `ZoneGatePanel.prefab`** — `object_panel.prefab` 의 Prefab Variant + 자식 `InteractPrompt` 중첩 인스턴스(로컬 (0, 1.8, 0)).
+- **새 게이트 존은 이 프리팹을 배치**하고 `ZoneBridgeGate.panels` 에 넣는다. 원본 `object_panel.prefab` 은 `ZoneL_typeC`·`Zone_typeQuest01`·
+  `all_mesh.unity` 에서 장식으로도 쓰므로 거기에 프롬프트를 붙이지 말 것.
+- `ZoneL_typeB` 의 `PF_Prop_object_panel_001~004` 는 이 Variant 의 인스턴스다(이름·Transform 은 인스턴스 오버라이드).
 
 ## 프롬프트 프리팹 (`Assets/2.Prefabs/UI/InteractPrompt.prefab`)
 F 아이콘 UI 는 프리팹 하나이고, **상호작용 대상 오브젝트의 자식으로 중첩 프리팹 인스턴스**를 놓아 쓴다. 코드는 만들지 않고 고르기만 한다.
@@ -29,7 +35,7 @@ InteractPrompt          일반 Transform(= 월드 기준점) + InteractPromptVie
 ## 게이트 변경점
 판정·RPC·외곽선 로직은 그대로다.
 
-- `ZoneL_typeB.prefab`: `PF_Prop_object_panel_001~004` 각각의 자식으로 `InteractPrompt` 인스턴스(로컬 위치 (0, 1.8, 0) — 패널 스케일 1·Y 회전만이라 월드로도 패널 위 1.8m).
+- `ZoneL_typeB.prefab`: `PF_Prop_object_panel_001~004` 가 `ZoneGatePanel` 인스턴스라 각각 자식 `InteractPrompt` 를 가진다(로컬 위치 (0, 1.8, 0) — 패널 스케일 1·Y 회전만이라 월드로도 패널 위 1.8m).
 - `ZoneBridgeGate.TryGetPromptView(panelIndex, out view)`: 패널 Transform 의 `GetComponentInChildren<InteractPromptView>(true)` 를 처음 한 번 캐시한다
   (별도 직렬화 리스트는 `panels` 와 순서를 맞춰야 해서 두지 않았다). 구 `promptPrefab`·`promptHeightOffset` 필드는 없다.
 - `ZoneBridgeGateManager.UpdateHighlight()` 끝: 외곽선 선택이 바뀔 때 `InteractPrompt.Show(this, 그 패널의 뷰)`, 선택이 없어지면 `Hide(this)`.
@@ -56,7 +62,7 @@ InteractPrompt.IsShownBy(owner);
 - 배치: 각 `InteractPromptView` 가 `Canvas.willRenderCanvases` 에서 자기가 표시 뷰일 때만 머리 위 체력바와 같은
   `OverheadHealthBarScreenPlacement` 로 위치를 잡는다 — 카메라 뒤·화면 밖·표시 뷰 아님이면 alpha 0.
 - 이력: `Resources/InteractPromptSettings` + 코드 생성 Canvas → `ZoneL_typeB` 안 `InteractPromptCanvas`(2a4976af)
-  → 독립 프리팹 + 런타임 Instantiate(ca2e965c) → 지금의 패널 자식 중첩 인스턴스. 런타임 생성 경로 없음.
+  → 독립 프리팹 + 런타임 Instantiate(ca2e965c) → 패널 자식 중첩 인스턴스(213b08c0) → 게이트 패널 Variant `ZoneGatePanel`. 런타임 생성 경로 없음.
 
 ## 테스트
 - EditMode `InteractPromptSlotTests`(메뉴 `Tools/Tests/플레이어 EditMode 테스트 실행`, 9건) — 소유권(마지막 Show 우선·소유자만 Hide)·
