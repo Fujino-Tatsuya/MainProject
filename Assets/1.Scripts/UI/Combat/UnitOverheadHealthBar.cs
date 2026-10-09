@@ -8,6 +8,7 @@ using UnityEngine.UI;
 /// IOverheadHealthBarRule 이 공급하고(플레이어 = PlayerOverheadHealthBarRule), 규칙이 없으면
 /// 항상 표시 + defaultFillColor + 라벨 없음.
 /// 게이지: 배경 → 잔상(trailFill) → 실드(shieldFill) → 체력(hpFill) 순으로 겹친다.
+/// 체력 바 아래 얇은 특성 게이지 줄(traitRoot)은 부모의 IOverheadTraitGauge 가 값·색·눈금을 공급하고, 없으면 숨긴다.
 /// LateUpdate에서 카메라 회전을 그대로 따라가는 화면 정렬 빌보드.
 /// </summary>
 public class UnitOverheadHealthBar : MonoBehaviour
@@ -21,6 +22,13 @@ public class UnitOverheadHealthBar : MonoBehaviour
     [Tooltip("규칙의 라벨(이름)을 띄울 텍스트. 비워도 동작한다.")]
     [SerializeField] private TMP_Text label;
 
+    [Header("특성 게이지 줄 (체력 바 아래)")]
+    [Tooltip("특성 게이지 줄 전체. 부모에 IOverheadTraitGauge 가 없으면 숨긴다. 비워도 동작한다.")]
+    [SerializeField] private GameObject traitRoot;
+    [SerializeField] private Image traitFill;
+    [Tooltip("눈금(예: 암살자 최소 변신량). 가로 앵커를 눈금 위치로 옮긴다. 비워도 동작한다.")]
+    [SerializeField] private RectTransform traitMarker;
+
     [Tooltip("규칙 컴포넌트가 없을 때의 체력 게이지 색")]
     [SerializeField] private Color defaultFillColor = new Color(0.2f, 0.8f, 0.25f, 1f);
     [Tooltip("체력이 줄어든 뒤 잔상이 머무는 시간(초)")]
@@ -30,12 +38,16 @@ public class UnitOverheadHealthBar : MonoBehaviour
 
     private Unit unit;
     private IOverheadHealthBarRule rule;
+    private IOverheadTraitGauge traitGauge;
     private readonly OverheadHealthTrail trail = new OverheadHealthTrail();
 
     private void Awake()
     {
         unit = GetComponentInParent<Unit>();
         rule = GetComponentInParent<IOverheadHealthBarRule>();
+        traitGauge = GetComponentInParent<IOverheadTraitGauge>();
+        if (traitRoot != null && traitGauge == null)
+            traitRoot.SetActive(false);
     }
 
     private void LateUpdate()
@@ -76,6 +88,35 @@ public class UnitOverheadHealthBar : MonoBehaviour
                 label.gameObject.SetActive(hasText);
             if (hasText && label.text != text)
                 label.text = text;
+        }
+
+        UpdateTraitGauge();
+    }
+
+    // 0 이어도 빈 줄로 항상 그린다.
+    private void UpdateTraitGauge()
+    {
+        if (traitGauge == null)
+            return;
+
+        if (traitFill != null)
+        {
+            traitFill.fillAmount = Mathf.Clamp01(traitGauge.Fill);
+            traitFill.color = traitGauge.FillColor;
+        }
+
+        if (traitMarker != null)
+        {
+            float marker = traitGauge.MarkerPosition;
+            bool showMarker = marker >= 0f;
+            if (traitMarker.gameObject.activeSelf != showMarker)
+                traitMarker.gameObject.SetActive(showMarker);
+            if (showMarker)
+            {
+                float x = Mathf.Clamp01(marker);
+                traitMarker.anchorMin = new Vector2(x, traitMarker.anchorMin.y);
+                traitMarker.anchorMax = new Vector2(x, traitMarker.anchorMax.y);
+            }
         }
     }
 }
