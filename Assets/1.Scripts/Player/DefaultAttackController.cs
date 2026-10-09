@@ -115,6 +115,9 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
     private float attackEndFallbackTime;
     private bool isRequestingAttack;
     private bool isComboWindowOpen;
+    // 대시 취소 경계 — 이번 타 클립의 ComboWindowOpen 이벤트를 받았는가. isComboWindowOpen(서버 전용 예약 판정)과 달리
+    // 오너도 자기 애니메이터 이벤트로 세운다. Close 로 내리지 않는다 — 한 번 열린 타는 끝까지 대시로 못 끊는다.
+    private bool comboWindowOpenedThisStep;
     private bool hasQueuedNextAttack;
     private bool hasStartedAttack;
     // End에서 콤보로 안 이어질 때, 입력은 바로 풀어주되(EndAttackState) 화면에 남은
@@ -133,7 +136,8 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
     public bool IsAttacking => player != null && player.CurrentState == PlayerActionState.Attack;
     public bool CanRequestStart => HasAttackSteps && CurrentStepDuration > 0f;
     public bool CanStartApprovedAttack => HasAttackSteps && CurrentStepDuration > 0f;
-    public bool CanBeCanceledByDash => false; // 콤보 중 대시 입력은 무시(기존 동작)
+    // 다음 평타 입력 창(ComboWindowOpen) 전까지만 대시로 끊는다(할 일 9). 열린 뒤엔 대시 입력 무시.
+    public bool CanBeCanceledByDash => BasicAttackDashCancel.BeforeComboWindowEvent(comboWindowOpenedThisStep);
     private bool HasGameplayAuthority => !IsNetworkActive || IsServer;
 
     private void Awake()
@@ -364,6 +368,10 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
 
     public void HandleAnimationEvent(DefaultAttackAnimationEventType eventType)
     {
+        // 대시 취소 경계는 오너가 판단하므로 서버 가드 앞에서 전 피어가 세운다. 판정·예약은 아래 서버 전용 그대로.
+        if (eventType == DefaultAttackAnimationEventType.ComboWindowOpen && IsAttacking)
+            comboWindowOpenedThisStep = true;
+
         if (IsNetworkActive && !IsServer)
             return;
 
@@ -656,6 +664,7 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
 
         DefaultAttackStep step = attackSteps[attackIndex];
         currentAttackIndex = attackIndex;
+        comboWindowOpenedThisStep = false;
         attackDirection = ResolveAttackDirection(direction);
         moveRemaining = step.MovementType == DefaultAttackMovementType.ScriptedForwardDistance
             ? Mathf.Max(step.ForwardDistance, 0f)
@@ -843,6 +852,7 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
         currentAttackIndex = 0;
         hasQueuedNextAttack = false;
         isComboWindowOpen = false;
+        comboWindowOpenedThisStep = false;
         hasStartedAttack = false;
         isRequestingAttack = false;
     }

@@ -47,6 +47,8 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     private bool serverContinueHeld;
     // 이번 타(일반 1타·강타 1회)의 분노 게이지 충전을 이미 받았는가 — 타 하나에 1번(§4.2).
     private bool rageClaimed;
+    // 대시 취소 경계 — 이번 타 클립의 ComboWindowOpen 이벤트를 받았는가. 전 피어가 자기 애니메이터 이벤트로 세운다.
+    private bool comboWindowOpenedThisStep;
     private int hitsFired;
     private int currentStepIndex;
     private AssassinBasicAttackMode currentMode;
@@ -57,7 +59,9 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     private PlayerActionState observedState;
 
     public bool CanStartApprovedAttack => data != null && data.TryGetNormalStep(0, out _);
-    public bool CanBeCanceledByDash => true;
+    // 이번 타(일반 1타·강타·변신 묶음) 클립의 ComboWindowOpen 전까지만 대시로 끊는다(할 일 9).
+    // 이 창은 대시 취소 경계로만 쓴다 — 다음 타 연결은 여전히 End 시점 serverContinueHeld 다.
+    public bool CanBeCanceledByDash => BasicAttackDashCancel.BeforeComboWindowEvent(comboWindowOpenedThisStep);
     public AssassinBasicAttackData Data => data;
 
     private bool HasGameplayAuthority => !IsNetworkActive || IsServer;
@@ -179,6 +183,10 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         // 베기 연출은 전 피어 — 클립 Hit 이벤트는 모든 피어에서 재생된다(판정은 아래 서버만).
         if (eventType == DefaultAttackAnimationEventType.Hit && active && view != null)
             view.PlayAttackSlash(currentMode, currentStepIndex);
+
+        // 대시 취소 경계는 오너가 판단하므로 서버 가드 앞에서 세운다.
+        if (eventType == DefaultAttackAnimationEventType.ComboWindowOpen && active)
+            comboWindowOpenedThisStep = true;
 
         if (IsNetworkActive && !IsServer)
             return;
@@ -381,6 +389,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         releaseLatched = false;
         serverContinueHeld = true;
         rageClaimed = false;
+        comboWindowOpenedThisStep = false;
         hitsFired = 0;
         currentStepIndex = stepIndex;
         currentMode = mode;
@@ -480,6 +489,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         requesting = false;
         releaseLatched = false;
         serverContinueHeld = false;
+        comboWindowOpenedThisStep = false;
         hitsFired = 0;
         fallbackEndTime = 0f;
     }
