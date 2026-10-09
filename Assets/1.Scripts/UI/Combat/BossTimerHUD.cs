@@ -42,7 +42,7 @@ public sealed class BossTimerHUD : MonoBehaviour
 
     private void Update()
     {
-        // 갱신 주기만 게임 시간으로 센다(D9). 남은 시간 자체는 BossTimerManager 가 ServerTime 으로 계산한다.
+        // 갱신 주기만 게임 시간으로 센다(D9). 남은 시간 자체는 BossTimerManager 가 GameNow(슬로우·일시정지 제외)로 계산한다.
         _timer -= Time.deltaTime;
         if (_timer > 0f) return;
 

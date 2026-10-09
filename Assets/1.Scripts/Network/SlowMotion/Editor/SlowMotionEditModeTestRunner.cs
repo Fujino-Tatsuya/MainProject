@@ -14,6 +14,7 @@ internal static class SlowMotionEditModeTestRunner
         "^SlowMotionSessionTests$",
         "^InterruptSlowMotionTrackerTests$",
         "^SlowMotionCameraZoomTests$",
+        "^BossTimerClockTests$",  // 보스 제한시간 GameNow 도메인(D16)
     };
 
     const string Tag = "[SlowMotionTests]";
