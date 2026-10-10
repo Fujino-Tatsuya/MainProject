@@ -99,7 +99,18 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
     public void PlayAttackSlash(AssassinBasicAttackMode mode, int stepIndex)
     {
         GameObject prefab = SlashPrefab(mode, stepIndex, out Transform socket);
+        if (mode == AssassinBasicAttackMode.Enhanced)
+            LogEnhancedSlash("붙임", socket != null ? socket.position : transform.position);
         PlayAttached(prefab, socket);
+    }
+
+    // 🔸 진단(할 일 19 피드백 2차) — 강타 베기 스폰 자리 vs 루트·Hips. 확인 뒤 지운다.
+    private void LogEnhancedSlash(string kind, Vector3 spawnPosition)
+    {
+        Animator animator = GetComponentInChildren<Animator>();
+        Transform hips = animator != null && animator.isHuman ? animator.GetBoneTransform(HumanBodyBones.Hips) : null;
+        Edit.Log($"[강타 베기] 스폰({kind}) t={Time.time:F3} root={transform.position:F2} socket={spawnPosition:F2} " +
+                 $"hips={(hips != null ? hips.position.ToString("F2") : "-")}", this);
     }
 
     /// <summary>
@@ -116,6 +127,8 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
         Quaternion turn = rootRotation * Quaternion.Inverse(transform.rotation);
         Vector3 position = rootPosition + turn * (anchor.position - transform.position);
         Quaternion rotation = turn * anchor.rotation * prefab.transform.localRotation;
+        if (mode == AssassinBasicAttackMode.Enhanced)
+            LogEnhancedSlash("보고 위치", position);
 
         GameObject instance = Spawn(prefab, null, position, rotation);
         if (instance != null)

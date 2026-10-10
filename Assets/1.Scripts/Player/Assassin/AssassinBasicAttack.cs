@@ -562,6 +562,9 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         }
 
         bool waitForLunge = player.IsSimulating ? lungeRunning : !hasLungeEnd;
+        // 🔸 진단(할 일 19 피드백 2차) — 강타 Hit 이 전진 중에 오는지·베기가 어디서 나는지 Play 로그로 판별. 확인 뒤 지운다.
+        Edit.Log($"[강타 베기] Hit t={Time.time:F3} simulating={player.IsSimulating} lungeRunning={lungeRunning} " +
+                 $"lungeRemaining={lungeRemaining:F2} hasLungeEnd={hasLungeEnd} wait={waitForLunge} root={transform.position:F2}", this);
         if (waitForLunge)
             enhancedSlashPending = true;
         else
