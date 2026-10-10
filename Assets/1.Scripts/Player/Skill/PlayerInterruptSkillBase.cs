@@ -20,6 +20,7 @@ public interface IPlayerInterruptSkillData
 public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
 {
     private Collider[] hitResults;
+    private Collider[] queryResults; // 오너 HUD 질의 전용(HasTargetInHitbox)
     // 상자처럼 Unit이 아닌 IAttackReceiver도 있으므로 Hurtbox까지 중복 방지 키로 쓴다.
     private readonly HashSet<Object> hitTargets = new HashSet<Object>();
     private readonly List<Unit> landedUnits = new List<Unit>();
@@ -204,12 +205,40 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         slowMotion.Started(timeScale.ServerStart(timeScale.InterruptProfile, owner.OwnerClientId));
     }
 
-    private bool PredictsInterruptHit()
+    private bool PredictsInterruptHit() => AnyTargetInHitbox(hitResults, IsServerInterruptible);
+
+    private static readonly System.Predicate<Unit> IsServerInterruptible = unit =>
     {
-        int hitCount = OverlapHitboxAnchor(hitResults);
+        IInterruptSlowMotionTarget slowTarget = FindSlowMotionTarget(unit);
+        return slowTarget != null && slowTarget.ServerIsInterruptible;
+    };
+
+    /// <summary>
+    /// [오너 HUD] 지금 판정 앵커 안에 <paramref name="match"/> 를 만족하는 대상 Unit 이 있는가.
+    /// 서버 슬로우 예측(<see cref="PredictsInterruptHit"/>)과 같은 형상·같은 대상 거르기 — 인터럽트 강조(할 일 5)의 사거리 기준.
+    /// 서버 판정 버퍼와 섞이지 않게 자기 버퍼를 쓴다.
+    /// </summary>
+    public bool HasTargetInHitbox(System.Predicate<Unit> match)
+    {
+        IPlayerInterruptSkillData data = InterruptData;
+        if (data == null || match == null)
+            return false;
+
+        if (queryResults == null || queryResults.Length != data.MaxHitResults)
+            queryResults = new Collider[data.MaxHitResults];
+
+        return AnyTargetInHitbox(queryResults, match);
+    }
+
+    private bool AnyTargetInHitbox(Collider[] buffer, System.Predicate<Unit> match)
+    {
+        if (HitboxAnchor == null || owner == null)
+            return false;
+
+        int hitCount = OverlapHitboxAnchor(buffer);
         for (int i = 0; i < hitCount; i++)
         {
-            Collider hit = hitResults[i];
+            Collider hit = buffer[i];
             if (hit == null)
                 continue;
 
@@ -217,8 +246,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
             if (unit == null || unit == owner || ShouldSkipTarget(unit))
                 continue;
 
-            IInterruptSlowMotionTarget slowTarget = FindSlowMotionTarget(unit);
-            if (slowTarget != null && slowTarget.ServerIsInterruptible)
+            if (match(unit))
                 return true;
         }
 
