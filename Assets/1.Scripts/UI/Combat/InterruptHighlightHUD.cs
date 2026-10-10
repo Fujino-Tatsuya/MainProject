@@ -8,8 +8,9 @@ using UnityEngine.UI;
 /// <item>각 클라가 자기 화면에서만 판단하는 순수 로컬 연출 — 네트워크 동기화 없음. 사거리 때문에 클라마다 다를 수 있다.</item>
 /// <item>대상 2종(복제값을 읽기만): 23호 <see cref="TwentyThreeBoss.CounterWindowOpen"/>,
 ///       허수아비 <see cref="TrainingDummyInterrupt.IsInterruptible"/>. 중간보스는 범위 밖.</item>
-/// <item>사거리 = 서버 슬로우 예측(PLAN-interrupt-slowmo D2)과 같은 판정 앵커 오버랩
-///       (<see cref="PlayerInterruptSkillBase.HasTargetInHitbox"/>).</item>
+/// <item>사거리 = 바라보는 방향과 상관없는 전방위 — 판정 앵커 형상을 내 캐릭터 중심으로 어느 방향으로 돌려도 닿는 거리
+///       (<see cref="PlayerInterruptSkillBase.HasTargetInOmniRange"/>). 대상이 뒤에 있어도 켜진다(돌아서 쓰면 맞는 거리).
+///       살아 있는 대상만.</item>
 /// <item>게임 시간(scaled)으로 돈다 — 인터럽트 슬로우 동안 같이 느려진다(D9).</item>
 /// <item>화면 가장자리 비네팅은 같은 조건으로 켤 수 있지만 기본 꺼짐(<see cref="showVignette"/>).</item>
 /// </list>
@@ -59,9 +60,10 @@ public class InterruptHighlightHUD : MonoBehaviour
     [Tooltip("알파가 이 값 이하이면 이미지를 꺼서 투명 드로우를 생략한다.")]
     [SerializeField, Range(0f, 0.1f)] private float visibleAlphaThreshold = 0.001f;
 
-    // 판정 앵커 오버랩에 잡힌 Unit 은 이미 사거리 안이다 — 창 열림만 더 보면 된다.
+    // 전방위 사거리 질의에 잡힌 Unit 은 이미 사거리 안이다 — 살아 있고 창이 열렸는지만 더 본다.
     private static readonly System.Predicate<Unit> IsHighlightTargetInRange =
-        unit => InterruptHighlightModel.IsHighlightTarget(IsCounterWindowOpen(unit), inInterruptRange: true);
+        unit => unit.CurrentHealth > 0 &&
+                InterruptHighlightModel.IsHighlightTarget(IsCounterWindowOpen(unit), inInterruptRange: true);
 
     private Player player;
     private PlayerLifeCycleController lifeCycle;
@@ -174,7 +176,7 @@ public class InterruptHighlightHUD : MonoBehaviour
     {
         PlayerInterruptSkillBase interrupt =
             skills != null ? skills.GetSkill(PlayerSkillSlot.Interrupt) as PlayerInterruptSkillBase : null;
-        return interrupt != null && interrupt.HasTargetInHitbox(IsHighlightTargetInRange);
+        return interrupt != null && interrupt.HasTargetInOmniRange(IsHighlightTargetInRange);
     }
 
     // 강조 대상 2종의 복제값만 읽는다(보스·허수아비 코드는 수정하지 않는다).
