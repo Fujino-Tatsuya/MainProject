@@ -62,6 +62,12 @@ public sealed class AssassinBasicAttackData : ScriptableObject
     [SerializeField] private AssassinBasicAttackStepData enhancedStep =
         new AssassinBasicAttackStepData(2.5f, 1.8f, 120f, 2f);
 
+    [Tooltip("강타가 시작될 때 조준 방향으로 전진하는 거리(m). 벽·몸 콜라이더 있는 적에 막힌다. 0 = 전진 없음.")]
+    [SerializeField, Min(0f)] private float enhancedLungeDistance = 1.2f;
+
+    [Tooltip("전진에 쓰는 시간(초). 강타 판정 프레임(2배속 기준 약 0.28초) 전에 끝나게 둔다.")]
+    [SerializeField, Min(0f)] private float enhancedLungeDuration = 0.2f;
+
     [Header("변신 평타 묶음 (Speed_Attack_Loop, 타당 계수)")]
     [SerializeField] private AssassinBasicAttackStepData transformedStep =
         new AssassinBasicAttackStepData(1.2f, 1.8f, 120f, 1.25f, 4);
@@ -86,6 +92,8 @@ public sealed class AssassinBasicAttackData : ScriptableObject
     public AssassinBasicAttackStepData[] NormalSteps => normalSteps;
     public AssassinBasicAttackStepData EnhancedStep => enhancedStep;
     public AssassinBasicAttackStepData TransformedStep => transformedStep;
+    public float EnhancedLungeDistance => enhancedLungeDistance;
+    public float EnhancedLungeDuration => enhancedLungeDuration;
     public float ComboContinuationSeconds => comboContinuationSeconds;
     public LayerMask HittableLayers => hittableLayers;
     public bool TriggersOnHit => triggersOnHit;
