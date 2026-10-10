@@ -57,7 +57,13 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     private PlayerActionState observedState;
     // 강타 전진 — 시뮬레이션 피어(오너, 서버 권위 이동이면 서버도)만 모터에 낸다. 끝·취소·막힘이면 0.
     private float lungeRemaining;
+    private bool lungeRunning;
     private PlayerMotor motor;
+    // 강타 베기는 전진이 끝난 자리에서 낸다(할 일 19 피드백). Hit 이 먼저 오면 미룬다 — 시뮬레이션 피어는 전진 종료까지,
+    // 원격 피어는 오너가 보고한 전진 끝 위치가 올 때까지(위치 복제가 늦어 Hit 시점의 자리는 아직 전진 전이다).
+    private bool enhancedSlashPending;
+    private bool hasLungeEnd;
+    private Vector3 lungeEndPosition;
 
     public bool CanStartApprovedAttack => data != null && data.TryGetNormalStep(0, out _);
     // 일반 타·강타·변신 묶음 어디서든 대시로 끊는다(할 일 9). 나간 타격의 피해는 그대로, 남은 동작만 끊긴다.
@@ -193,7 +199,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     {
         // 베기 연출은 전 피어 — 클립 Hit 이벤트는 모든 피어에서 재생된다(판정은 아래 서버만).
         if (eventType == DefaultAttackAnimationEventType.Hit && active && view != null)
-            view.PlayAttackSlash(currentMode, currentStepIndex);
+            PlayHitSlash();
 
         if (IsNetworkActive && !IsServer)
             return;
@@ -404,10 +410,15 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         fallbackEndTime = Time.time + step.MotionDuration + data.EndFallbackPadding;
         nextInputSyncTime = Time.time;
 
+        // 이어지는 다음 타가 앞 강타의 미룬 베기를 지우지 않게 먼저 낸다.
         StopLunge();
-        if (mode == AssassinBasicAttackMode.Enhanced && motor != null && player.IsSimulating)
+        FlushEnhancedSlash();
+        hasLungeEnd = false;
+        if (mode == AssassinBasicAttackMode.Enhanced && motor != null && player.IsSimulating &&
+            data.EnhancedLungeDistance > 0f)
         {
             lungeRemaining = data.EnhancedLungeDistance;
+            lungeRunning = true;
             motor.MovementResolved += HandleLungeMovementResolved;
         }
 
@@ -505,25 +516,93 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         hitsFired = 0;
         fallbackEndTime = 0f;
         StopLunge();
+        // 원격 피어에서 보고가 끝까지 안 오면 지금 자리에서라도 낸다.
+        FlushEnhancedSlash();
     }
 
     // 벽·적 몸에 막히면 남은 전진을 버린다 — 막힌 자리에서 옆으로 미끄러지지 않게(Q 돌진과 같은 규칙).
     private void HandleLungeMovementResolved(Vector3 requested, Vector3 resolved, bool wasBlocked)
     {
-        if (wasBlocked || lungeRemaining <= 0f)
-            StopLunge();
+        if (!wasBlocked && lungeRemaining > 0f)
+            return;
+
+        StopLunge();
+        FlushEnhancedSlash();
     }
 
+    // 전진이 실제로 돌던 중이면 끝난 자리를 다른 피어에 알린다(강타 베기 위치).
     private void StopLunge()
     {
         lungeRemaining = 0f;
         if (motor != null)
             motor.MovementResolved -= HandleLungeMovementResolved;
+
+        if (!lungeRunning)
+            return;
+
+        lungeRunning = false;
+        if (IsNetworkActive && IsSpawned && IsOwner)
+            ReportLungeEndRpc(transform.position);
     }
 
     private void OnDisable()
     {
+        enhancedSlashPending = false;
         StopLunge();
+    }
+
+    // ── 강타 베기 위치 ──
+
+    private void PlayHitSlash()
+    {
+        if (currentMode != AssassinBasicAttackMode.Enhanced)
+        {
+            view.PlayAttackSlash(currentMode, currentStepIndex);
+            return;
+        }
+
+        bool waitForLunge = player.IsSimulating ? lungeRunning : !hasLungeEnd;
+        if (waitForLunge)
+            enhancedSlashPending = true;
+        else
+            PlayEnhancedSlash();
+    }
+
+    private void FlushEnhancedSlash()
+    {
+        if (enhancedSlashPending)
+            PlayEnhancedSlash();
+    }
+
+    private void PlayEnhancedSlash()
+    {
+        enhancedSlashPending = false;
+        if (view == null)
+            return;
+
+        // 시뮬레이션 피어는 이미 전진을 마친 캐릭터의 소켓에 붙인다. 원격 피어는 보고된 끝 위치에 낸다 — 캐릭터는 곧 따라온다.
+        if (!player.IsSimulating && hasLungeEnd)
+            view.PlayAttackSlashAt(AssassinBasicAttackMode.Enhanced, 0, lungeEndPosition, Quaternion.LookRotation(attackDirection));
+        else
+            view.PlayAttackSlash(AssassinBasicAttackMode.Enhanced, 0);
+    }
+
+    // 연출 전용 — 판정에는 쓰지 않으므로 오너 확인만 한다.
+    [Rpc(SendTo.Server)]
+    private void ReportLungeEndRpc(Vector3 position, RpcParams rpcParams = default)
+    {
+        if (rpcParams.Receive.SenderClientId != OwnerClientId)
+            return;
+
+        LungeEndRpc(position);
+    }
+
+    [Rpc(SendTo.NotOwner)]
+    private void LungeEndRpc(Vector3 position)
+    {
+        hasLungeEnd = true;
+        lungeEndPosition = position;
+        FlushEnhancedSlash();
     }
 
     private void RejectStartRpcIfNeeded()

@@ -9,6 +9,7 @@ using UnityEngine;
 /// - 변신 중 루프 · 강화 준비 루프: <see cref="AssassinState"/> 의 전 피어 이벤트로 켜고 끈다(늦은 접속은 스폰 시 현재 상태로 맞춤).
 /// - Q 돌진 궤적 · 변신 E 원 · E/R/간파 시전: 스킬의 OnClientPlay/OnEnd(전 피어)가 로컬로 부른다 — RPC 없음.
 /// - 평타 베기: 클립 Hit 애니 이벤트(전 피어에서 재생)마다 <see cref="AssassinBasicAttack"/> 가 부른다 — RPC 없음.
+///   강타만 전진이 끝난 자리에서 낸다 — 원격 피어는 오너가 보고한 전진 끝 위치를 쓴다(<see cref="PlayAttackSlashAt"/>).
 /// - 백어택 적중: [서버] <see cref="ServerBackAttackHit"/> → 전 피어. 판정은 A11 이 붙인다(그 전까지 호출자 없음).
 /// 프리팹이 비어 있으면 해당 연출만 빠진다.
 /// </summary>
@@ -97,17 +98,43 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
     /// <summary>[전 피어] 평타 Hit 애니 이벤트 — 플레이어 루트에 붙여 바라보는 방향으로 벤다.</summary>
     public void PlayAttackSlash(AssassinBasicAttackMode mode, int stepIndex)
     {
+        GameObject prefab = SlashPrefab(mode, stepIndex, out Transform socket);
+        PlayAttached(prefab, socket);
+    }
+
+    /// <summary>
+    /// [원격 피어] 루트가 아직 따라오지 않은 자리(강타 전진 끝)에서 벤다 — 소켓의 루트 기준 자리를 주어진 루트 자세로 옮겨 월드에 낸다.
+    /// 캐릭터는 위치 복제로 곧 그 자리에 오므로 붙이지 않는다.
+    /// </summary>
+    public void PlayAttackSlashAt(AssassinBasicAttackMode mode, int stepIndex, Vector3 rootPosition, Quaternion rootRotation)
+    {
+        GameObject prefab = SlashPrefab(mode, stepIndex, out Transform socket);
+        if (prefab == null)
+            return;
+
+        Transform anchor = socket != null ? socket : transform;
+        Quaternion turn = rootRotation * Quaternion.Inverse(transform.rotation);
+        Vector3 position = rootPosition + turn * (anchor.position - transform.position);
+        Quaternion rotation = turn * anchor.rotation * prefab.transform.localRotation;
+
+        GameObject instance = Spawn(prefab, null, position, rotation);
+        if (instance != null)
+            Destroy(instance, releaseLifetime);
+    }
+
+    private GameObject SlashPrefab(AssassinBasicAttackMode mode, int stepIndex, out Transform socket)
+    {
         switch (mode)
         {
             case AssassinBasicAttackMode.Enhanced:
-                PlayAttached(enhancedSlashPrefab, enhancedSlashSocket);
-                break;
+                socket = enhancedSlashSocket;
+                return enhancedSlashPrefab;
             case AssassinBasicAttackMode.Transformed:
-                PlayAttached(transformedSlashPrefab, transformedSlashSocket);
-                break;
+                socket = transformedSlashSocket;
+                return transformedSlashPrefab;
             default:
-                PlayAttached(At(normalSlashPrefabs, stepIndex), At(normalSlashSockets, stepIndex));
-                break;
+                socket = At(normalSlashSockets, stepIndex);
+                return At(normalSlashPrefabs, stepIndex);
         }
     }
 
@@ -197,12 +224,17 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
         }
     }
 
-    private static GameObject Spawn(GameObject prefab, Transform parent)
+    private static GameObject Spawn(GameObject prefab, Transform parent) => Spawn(prefab, parent, null, null);
+
+    // 위치·회전을 주면 부모 없이 그 자세로 만든다 — 월드 시뮬레이션 입자가 첫 방출 전에 제자리에 있게 생성 시점에 정한다.
+    private static GameObject Spawn(GameObject prefab, Transform parent, Vector3? position, Quaternion? rotation)
     {
         if (prefab == null)
             return null;
 
-        GameObject instance = parent != null ? Instantiate(prefab, parent, false) : Instantiate(prefab);
+        GameObject instance = position.HasValue
+            ? Instantiate(prefab, position.Value, rotation ?? prefab.transform.rotation)
+            : parent != null ? Instantiate(prefab, parent, false) : Instantiate(prefab);
         instance.name = prefab.name + "(임시)";
 
         // 빌려 쓰는 프리팹 중 루트 위치가 0 이 아닌 것이 있다(CharacterCircleYellow/Purple — 씬 배치값이 저장됨).
