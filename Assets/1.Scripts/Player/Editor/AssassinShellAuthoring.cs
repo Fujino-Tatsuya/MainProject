@@ -1167,9 +1167,10 @@ public static class AssassinShellAuthoring
         ValidateSkillState(controller, AssetDatabase.LoadAssetAtPath<PlayerSkillData>(EnhanceSkillDataPath));
     }
 
-    // 일반 E Buff 를 상체 마스크 레이어(Override, 가중치 1)에서 재생한다 — 하체는 0층의 Idle/Run 이 그대로 움직인다.
-    // 평소엔 빈 상태(Write Defaults 끔)라 0층을 그대로 통과시킨다. Buff 가 끝나면 빈 상태로 돌아간다.
-    // 강제 종료(대시·피격·사망)는 AssassinEnhanceSkill.OnEnd 가 빈 상태로 CrossFade 한다.
+    // 일반 E Buff 를 상체 마스크 레이어(Override)에서 재생한다 — 하체는 0층의 Idle/Run 이 그대로 움직인다.
+    // 기본 가중치는 0 이다. Humanoid 에서 모션 없는 빈 상태는 가중치 1 이면 0층을 통과시키지 않고 상체를 한 자세로 굳힌다
+    // (3ef05ddf 회귀 — 평타·강타·변신 묶음의 상체가 멈춤). 가중치는 AssassinEnhanceSkill 이 Buff 동안만 올렸다 내린다.
+    // Buff 는 끝 프레임을 유지하고(나가는 전이 없음) 가중치가 0 이 되면 스킬이 빈 상태로 되돌린다.
     private static void EnsureUpperBodyLayer(AnimatorController controller)
     {
         AnimatorStateMachine baseMachine = controller.layers[0].stateMachine;
@@ -1193,7 +1194,7 @@ public static class AssassinShellAuthoring
 
         layers[layerIndex].avatarMask = mask;
         layers[layerIndex].blendingMode = AnimatorLayerBlendingMode.Override;
-        layers[layerIndex].defaultWeight = 1f;
+        layers[layerIndex].defaultWeight = 0f;
         controller.layers = layers;
 
         AnimatorStateMachine sm = controller.layers[layerIndex].stateMachine;
@@ -1204,7 +1205,9 @@ public static class AssassinShellAuthoring
         AnimatorState buff = EnsureState(sm, EnhanceSkillState, LoadClip("Buff"));
         buff.speed = EnhanceBuffSpeed;
         buff.writeDefaultValues = false; // 한 레이어 안에서 Write Defaults 를 섞지 않는다
-        EnsureTransition(buff, empty, true, 0.98f, null, default, 0f);
+        // 가중치 1 인 채로 빈 상태에 들어가면 상체가 굳는다 — 종료는 스킬의 가중치 페이드가 맡는다.
+        foreach (AnimatorStateTransition transition in buff.transitions)
+            buff.RemoveTransition(transition);
     }
 
     // Humanoid 상체 — 몸통·머리·팔·손가락·손 IK. 루트·다리·발 IK 는 0층(걷기)을 따른다.
