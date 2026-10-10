@@ -426,7 +426,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AssassinSkillView
   ShowTopMostFoldoutHeaderGroup: 1
   transformLoopPrefab: {fileID: 1597097068444350898, guid: a1daf7073cf07e7468eb75e9d2d5e967, type: 3}
-  enhancedReadyLoopPrefab: {fileID: 3220920230613450000, guid: 192fe42b654ad7144b59bf436410b8b6, type: 3}
   normalSlashPrefabs:
   - {fileID: 856368647163548680, guid: ae1f8ca5a160a2d41a2cf81398afbe10, type: 3}
   - {fileID: 856368647163548680, guid: 4f857450797a5fa4fa012bb522d7a64b, type: 3}
@@ -442,7 +441,6 @@ MonoBehaviour:
   backAttackHitPrefab: {fileID: 7634420434017284396, guid: b9ed127bfed05be4db493ca51e744a76, type: 3}
   releaseLifetime: 2
   transformSocket: {fileID: 4076455800681530309}
-  enhancedSocket: {fileID: 4618909188503218869}
   normalSlashSockets:
   - {fileID: 951801660152849883}
   - {fileID: 2799064500811683600}
