@@ -6,7 +6,7 @@ using UnityEngine;
 /// 🔸 어쌔신 임시 VFX 창구(PLAN-assassin A12) — 민경 정식 VFX 가 오면 프리팹 필드만 교체한다(거너 GunnerBeamView 선례).
 /// 스킬(PlayerSkillBase)은 RPC 를 가질 수 없으므로 서버 판정 결과를 퍼뜨리는 창구도 여기 둔다.
 ///
-/// - 변신 중 루프 · 강화 준비 루프: <see cref="AssassinState"/> 의 전 피어 이벤트로 켜고 끈다(늦은 접속은 스폰 시 현재 상태로 맞춤).
+/// - 변신 중 루프: <see cref="AssassinState"/> 의 전 피어 이벤트로 켜고 끈다(늦은 접속은 스폰 시 현재 상태로 맞춤).
 /// - Q 돌진 궤적 · 변신 E 원 · E/R/간파 시전: 스킬의 OnClientPlay/OnEnd(전 피어)가 로컬로 부른다 — RPC 없음.
 /// - 평타 베기: 클립 Hit 애니 이벤트(전 피어에서 재생)마다 <see cref="AssassinBasicAttack"/> 가 부른다 — RPC 없음.
 /// - 백어택 적중: [서버] <see cref="ServerBackAttackHit"/> → 전 피어. 판정은 A11 이 붙인다(그 전까지 호출자 없음).
@@ -17,7 +17,6 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
 {
     [Header("루프 — 상태가 켜진 동안")]
     [SerializeField] private GameObject transformLoopPrefab;
-    [SerializeField] private GameObject enhancedReadyLoopPrefab;
 
     [Header("평타 베기 — 클립 Hit 이벤트마다(전 피어)")]
     [Tooltip("일반 4타 — 인덱스 = 타 순서(0~3). 비어 있는 칸은 연출 없음.")]
@@ -40,7 +39,6 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
 
     [Header("소켓 (비우면 플레이어 루트)")]
     [SerializeField] private Transform transformSocket;
-    [SerializeField] private Transform enhancedSocket;
     [Tooltip("평타 베기 위치·회전 — Assassin_Armature/VFX/BasicAttack01~04. 소켓을 옮기면 그 타의 이펙트가 따라간다.")]
     [SerializeField] private Transform[] normalSlashSockets = new Transform[4];
     [Tooltip("강타 베기 — Armature/VFX/EnhancedAttack.")]
@@ -50,17 +48,13 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
 
     private AssassinState state;
     private GameObject transformLoop;
-    private GameObject enhancedLoop;
     private GameObject dashTrail;
 
     private void Awake()
     {
         state = GetComponent<AssassinState>();
         if (state != null)
-        {
             state.TransformChanged += HandleTransformChanged;
-            state.EnhancedReadyChanged += HandleEnhancedReadyChanged;
-        }
     }
 
     private void Start() => SyncLoops();
@@ -75,10 +69,7 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
     public override void OnDestroy()
     {
         if (state != null)
-        {
             state.TransformChanged -= HandleTransformChanged;
-            state.EnhancedReadyChanged -= HandleEnhancedReadyChanged;
-        }
         base.OnDestroy();
     }
 
@@ -174,14 +165,11 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
 
     private void HandleTransformChanged(bool on) => SetLoop(ref transformLoop, transformLoopPrefab, transformSocket, on);
 
-    private void HandleEnhancedReadyChanged(bool on) => SetLoop(ref enhancedLoop, enhancedReadyLoopPrefab, enhancedSocket, on);
-
     private void SyncLoops()
     {
         if (state == null)
             return;
         HandleTransformChanged(state.IsTransformed);
-        HandleEnhancedReadyChanged(state.IsEnhancedReady);
     }
 
     private void SetLoop(ref GameObject instance, GameObject prefab, Transform socket, bool on)
@@ -205,7 +193,7 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
         GameObject instance = parent != null ? Instantiate(prefab, parent, false) : Instantiate(prefab);
         instance.name = prefab.name + "(임시)";
 
-        // 빌려 쓰는 프리팹 중 루트 위치가 0 이 아닌 것이 있다(CharacterCircleYellow/Purple — 씬 배치값이 저장됨).
+        // 빌려 쓰는 프리팹 중 루트 위치가 0 이 아닌 것이 있다(CharacterCirclePurple —씬 배치값이 저장됨).
         // 붙일 때 그 값이 소켓 기준 오프셋이 되어 원이 몇 m 떨어져 생긴다 — 위치는 소켓이 정한다.
         if (parent != null)
             instance.transform.localPosition = Vector3.zero;
