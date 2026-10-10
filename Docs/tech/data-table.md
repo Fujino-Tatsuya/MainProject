@@ -94,6 +94,8 @@ GameData.xlsx (SVN, 잠금)
 - MPPM 클론도 같은 모드·같은 xlsx 를 쓴다.
 - 테이블 Play 가 끝나면 테이블 대상 **프리팹은 디스크에서 다시 임포트**해 되돌린다(SO 는 스냅샷 값으로). Variant 에 메모리로 쓴 값은 숨은 오버라이드·dirty 를 남겨,
   값만 되돌리면 다음 Save Project 가 `Player_Gunner` 에 `maxHp`/`attackDamage` 오버라이드를 써 넣었다(2026-10-09). 그래서 프리팹 에셋을 Prefab Mode 밖에서 고친 채 저장 안 하고 테이블 Play 하면 그 변경은 사라진다.
+- **저장 가드**(`DataTableSaveGuard`): 테이블 Play 준비(`ExitingEditMode`)에서 켜지고 Play 종료 후 스냅샷 복구(`EnteredEditMode`)가 끝나야 풀린다. 그 사이 어떤 저장(Ctrl+S·Save Project·다른 툴의 `SaveAssets`)도 테이블 대상 SO·프리팹은 쓰지 않는다(Console 경고). 기준은 Play 여부가 아니라 "복구 전" 이다 —
+  Play 여부로 막던 때, Play 종료 직후 `DevBootLauncher` 의 `SaveAssets` 가 복구보다 먼저 돌아 `Player_Gunner`·`Player_Paladin` 에 테이블 값이 저장됐다(2026-10-09 재발). 메뉴 덮어쓰기·빌드는 가드가 풀린 상태에서 돌므로 정상 저장된다.
 
 ### 사운드 키
 
