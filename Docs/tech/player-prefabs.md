@@ -23,7 +23,7 @@ Player.prefab (base)            ← 네트워크·입력·이동·생명주기·
 │  ├─ VFX  (EffectSocketPlayer 들)
 │  └─ 루트 추가: PlayerDefaultAttack·DefaultAttackController(콤보) · FirstMelee* 스킬 5종 · PlayerSkillVfx · PlayerShieldVfx · EffectAnimEvents
 └─ Player_Gunner.prefab (Variant, 2026-09-30~10-01 — character_gunner.md / PLAN-gunner.md)
-   ├─ Armature  = <중첩 Gunner/Gunner_Armature.prefab>    ← gunner.fbx(Generic) · Animator(GunnerAnimatorController) · hand.r/LaserGun · InterruptAttack 앵커
+   ├─ Armature  = <중첩 Gunner/Gunner_Armature.prefab>    ← gunner.fbx(Generic) · Animator(GunnerAnimatorController) · rig/artillery/LaserGun(오프셋 0 — Mount 회전만 상쇄) · InterruptAttack 앵커
    └─ 루트 추가: GunnerHeat · GunnerBeamAttack · GunnerBasicAttack(연사) · GunnerHeatHUD(임시) · GunnerBeamView ·
                  GunnerChargeLaserSkill(Q) · GunnerCoolBackstepSkill(E) · GunnerInterruptSkill(우클릭) · GunnerTrackingLaserSkill(R)
    (+ 별도 네트워크 프리팹 Gunner/GunnerTrackingLaser.prefab — R 이 서버에서 스폰)

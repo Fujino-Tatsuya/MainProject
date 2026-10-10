@@ -51,11 +51,9 @@ public class GunnerBasicAttackData : ScriptableObject
     [Header("애니메이터(없으면 건너뜀)")]
     [Tooltip("Base 레이어 — 준비 동작이자 공격 중 하체 자세(Q_charge_loop).")]
     [SerializeField] private string windupStateName = "Gunner_Attack_Start";
-    [Tooltip("상체 레이어 — 매 발 처음부터 재생.")]
+    [Tooltip("상체 레이어 — 매 발 처음부터 재생. 클립 길이는 이 상태가 실제로 트는 모션에서 읽는다(발사 간격보다 길면 FireSpeed 로 빨리).")]
     [SerializeField] private string fireStateName = "Gunner_Attack_Fire";
     [SerializeField] private string upperBodyLayerName = "UpperBody";
-    [Tooltip("발사 클립 이름 — 길이가 발사 간격보다 길면 그만큼 빨리 재생한다(FireSpeed 파라미터).")]
-    [SerializeField] private string fireClipName = "gunner_attack";
 
     public float WindupDuration => windupDuration;
     public float FireInterval => fireInterval;
@@ -74,5 +72,4 @@ public class GunnerBasicAttackData : ScriptableObject
     public string WindupStateName => windupStateName;
     public string FireStateName => fireStateName;
     public string UpperBodyLayerName => upperBodyLayerName;
-    public string FireClipName => fireClipName;
 }

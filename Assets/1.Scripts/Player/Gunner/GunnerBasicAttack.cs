@@ -50,6 +50,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
     //    빔이 배에서 나가는 것처럼 보였고, 벽 뒤에서 쏠 때 판정 시작점도 실제 총구와 어긋났다.
     [Tooltip("레이가 출발할 총구. 비우면 루트 + 위로 MuzzleHeight(예전 동작)")]
     [SerializeField] private Transform muzzle;
+    // 발사 상태가 실제로 트는 클립 길이. -1 = 아직 모름(상체가 발사 상태에 들어간 뒤 LateUpdate 가 읽는다), 0 = 클립 없음.
     private float fireClipLength = -1f;
 
     // 전 피어 공통 런타임
@@ -520,22 +521,25 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
         animator.Play(hash, upper, 0f);
     }
 
-    private float FireSpeed()
-    {
-        if (fireClipLength < 0f)
-        {
-            fireClipLength = 0f;
-            foreach (AnimationClip clip in animator.runtimeAnimatorController.animationClips)
-            {
-                if (clip != null && clip.name == data.FireClipName)
-                {
-                    fireClipLength = clip.length;
-                    break;
-                }
-            }
-        }
+    // 🔴 클립을 이름으로 찾지 않는다(2026-10-09). 상태의 모션만 바꾸면(8940e020: gunner_attack → gunner_attack01)
+    //    이름이 어긋나 길이를 못 찾고 속도가 조용히 1 로 떨어졌다 — 1.17초 클립의 앞 30%만 매 발 되풀이됐다.
+    private float FireSpeed() =>
+        fireClipLength > 0f ? Mathf.Max(1f, fireClipLength / data.FireInterval) : 1f;
 
-        return fireClipLength > 0f ? Mathf.Max(1f, fireClipLength / data.FireInterval) : 1f;
+    // Play() 는 다음 애니메이터 갱신에서 반영돼 같은 프레임엔 클립 정보를 못 읽는다.
+    // 애니메이터 갱신(Update 뒤) 이후인 LateUpdate 에서 한 번 읽고 곧바로 속도를 고친다 — 첫 발만 한 프레임 속도 1.
+    private void LateUpdate()
+    {
+        if (fireClipLength >= 0f || data == null || animator == null || animator.runtimeAnimatorController == null)
+            return;
+
+        int upper = UpperLayer();
+        if (upper < 0 || animator.GetCurrentAnimatorStateInfo(upper).shortNameHash != Animator.StringToHash(data.FireStateName))
+            return;
+
+        AnimatorClipInfo[] clips = animator.GetCurrentAnimatorClipInfo(upper);
+        fireClipLength = clips.Length > 0 && clips[0].clip != null ? clips[0].clip.length : 0f;
+        animator.SetFloat(FireSpeedHash, FireSpeed());
     }
 
     private int UpperLayer() =>

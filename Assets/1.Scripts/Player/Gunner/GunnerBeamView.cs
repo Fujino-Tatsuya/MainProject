@@ -172,12 +172,14 @@ public class GunnerBeamView : BaseNetworkBehaviour
     private readonly float[] hideTimes = new float[3];
     private Animator animator;
     private PlayerStateController stateController;
+    private PlayerMovement movement;
     private SkillLineIndicator lineIndicator;
 
     private void Awake()
     {
         animator = GetComponentInChildren<Animator>();
         stateController = GetComponent<PlayerStateController>();
+        movement = GetComponent<PlayerMovement>();
         lineIndicator = GetComponentInChildren<SkillLineIndicator>(true);
     }
 
@@ -323,16 +325,18 @@ public class GunnerBeamView : BaseNetworkBehaviour
     /// <summary>
     /// 소켓을 <b>플레이어가 보는 방향</b>으로 돌린다.
     ///
-    /// 🔴 <b>왜 필요한가</b>(2026-10-05, 회귀 수정). 이 소켓들은 <c>BeamMuzzle</c> 의 자식인데,
-    /// 좌클릭 빔이 발사할 때마다 <c>BeamMuzzle</c> 의 <b>월드 회전을 피격점 쪽으로 덮어쓰고
-    /// 되돌리지 않는다.</b> 그래서 회전을 직접 잡지 않는 자식(충전 연출·완료 플래시)은
-    /// <b>직전 좌클릭이 겨눈 방향</b>을 그대로 물려받아 엉뚱한 데를 보고 있었다.
+    /// 🔴 <b>왜 필요한가</b>(2026-10-05, 회귀 수정). 이 소켓들은 <c>BeamMuzzle</c> 의 자식이라
+    /// 그냥 두면 총 본 애니메이션의 회전을 물려받는다(<c>BeamMuzzle</c> 의 정면(Z)은 총열 방향이 아니다 — 총열은 Y).
+    /// 회전을 직접 잡지 않는 자식(충전 연출·완료 플래시)은 엉뚱한 데를 보고 있었다.
+    ///
+    /// 🔴 <b>루트 회전이 아니라 Armature 정면이다</b>(2026-10-09). 조준으로 도는 건 Armature 뿐이고
+    /// 루트는 스폰 방향 그대로라, 루트를 쓰면 방향 있는 연출(E 냉기·Q 배기)이 조준과 무관하게 나갔다.
     /// </summary>
     private void FaceForward(EffectSocketPlayer player)
     {
         Transform socket = player.Socket;
         if (socket != null && socket != transform)
-            socket.rotation = transform.rotation;
+            socket.rotation = movement != null ? Quaternion.LookRotation(movement.CurrentFacing) : transform.rotation;
     }
 
     /// <summary>충전 진행도에 맞춰 루프 크기를 키운다. 매 프레임(LateUpdate).</summary>
