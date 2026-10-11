@@ -35,7 +35,8 @@
 | Z3-7 | G5(카운터 3 → 디렉터 모델 자동) | `EnterRealMode()`(2초 정지) · `SetStepServer(Zone3Fight)` | `TUT_Z3_REAL` · 목표 `TUT_Z3_BOSS` · 강조 끔 · 체력바 빨강 |
 | Z3-8 | `ZoneCleared(Zone3)`(장부 — 스피너봇 처치) | G6 은 장부가 이미 연다(여기서 안 엶) | `TUT_ZONE_CLEAR` · G6 열림 → 존3 목표 지움 |
 
-- 자막 = 디렉터 `ShowSubtitleServer(id, onlyFor)`(전원 ClientRpc — `onlyFor` 캐릭터면 클라가 `TutorialLocalPlayerInfo` 로 거름) · `ShowSubtitleToClientServer(clientId, id)`(한 명). 지나가는 신호라 복제하지 않는다.
+- 자막 = 디렉터 `ShowSubtitleServer(id, args, targets)` 하나(S7~S9 공용). 개인 피드백은 `targets: { clientId }`, 거너 전용은 `targets: GetClientsOfCharacterServer(Gunner)`(서버가 접속 플레이어를 `TutorialLocalPlayerInfo` 로 판별). 지나가는 신호라 복제하지 않는다.
+- 강조는 디렉터 API 없이 흐름 파일(`TutorialZone3Guide`)이 클라에서 직접, 목표 패널도 클라가 복제 상태로 직접 그린다(목표용 디렉터 RPC 없음).
 - 목표·강조 = 각 피어가 복제 값(`Step`·`IsGateOpen(G6)`·`GetCounter(Zone3Interrupts)`)으로 다시 그린다 → 늦게 붙은 클라도 `StateChanged` 한 번으로 같다. 내가 띄운 목표(`TUT_Z3_*`)만 지운다.
 - 디버그로 G5 를 먼저 열면(연습 전) 휴면을 풀고 바로 본 모드. 본 모드 간파·놓침은 세지 않는다.
 
@@ -48,8 +49,8 @@
 ## 5. 추가한 디렉터 API (S9)
 | 쪽 | 시그니처 |
 |---|---|
-| 서버 | `void ShowSubtitleServer(string id, TutorialCharacter onlyFor = None)` · `void ShowSubtitleToClientServer(ulong clientId, string id)` |
-| 내부 | `[ClientRpc] ShowSubtitleClientRpc(string id, TutorialCharacter onlyFor, ClientRpcParams)` → `TutorialGuideUI.Instance?.ShowSubtitle(id)`(씬에 UI 없으면 로그만 — S12 배치 전) |
+| 서버 | `void ShowSubtitleServer(string id, string[] args = null, ulong[] targets = null)` — args = 키·값 번갈아 둔 평탄 배열(`{ "N","2" }`), targets null = 전원·빈 배열 = 안 보냄 · `ulong[] GetClientsOfCharacterServer(TutorialCharacter)` |
+| 내부 | `[ClientRpc] ShowSubtitleClientRpc(string id, SubtitleArgs args, ClientRpcParams)` → `TutorialGuideUI.Instance?.ShowSubtitle(id, args)`(씬에 UI 없으면 로그만 — S12 배치 전) |
 
 그 밖: `TutorialSpinnerPractice.SetPracticeRadius(float)`·`PracticeAnchor`·`PracticeRadius` · `MapContentSpawner.ServerMonsterPrefabOverride`(정적 훅).
 

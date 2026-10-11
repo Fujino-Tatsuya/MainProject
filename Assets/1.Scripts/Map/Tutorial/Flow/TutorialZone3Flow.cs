@@ -227,10 +227,10 @@ public sealed class TutorialZone3Flow : MonoBehaviour
         switch (_model.ClassifyInterrupt(hitCount, inZone3, succeeded, windowOpen, near))
         {
             case TutorialZone3Feedback.Miss:
-                _director.ShowSubtitleToClientServer(id, TutorialGuideIds.Z3Miss);
+                _director.ShowSubtitleServer(TutorialGuideIds.Z3Miss, targets: new[] { id });
                 break;
             case TutorialZone3Feedback.Early:
-                _director.ShowSubtitleToClientServer(id, TutorialGuideIds.Z3Early);
+                _director.ShowSubtitleServer(TutorialGuideIds.Z3Early, targets: new[] { id });
                 break;
         }
     }
@@ -251,7 +251,8 @@ public sealed class TutorialZone3Flow : MonoBehaviour
 
         _director.ShowSubtitleServer(TutorialGuideIds.Z3Intro);
         _director.ShowSubtitleServer(TutorialGuideIds.Z3PracticeNote);
-        _director.ShowSubtitleServer(TutorialGuideIds.Z3Gunner, TutorialCharacter.Gunner);
+        _director.ShowSubtitleServer(TutorialGuideIds.Z3Gunner,
+            targets: _director.GetClientsOfCharacterServer(TutorialCharacter.Gunner));
     }
 
     private void StartRealMode(bool skippedPractice)

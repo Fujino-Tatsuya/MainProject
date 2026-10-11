@@ -768,35 +768,75 @@ public sealed class TutorialDirector : NetworkBehaviour
     // 목표 패널·강조는 각 피어가 복제 상태(Step·게이트·카운터)로 다시 그린다(StateChanged).
 
     /// <summary>
-    /// [서버] 안내 자막을 모든 클라(호스트 포함)의 <see cref="TutorialGuideUI"/> 에 띄운다.
-    /// <paramref name="onlyFor"/> 가 None 이 아니면 그 캐릭터인 로컬 플레이어만 띄운다(클라가 <see cref="TutorialLocalPlayerInfo"/> 로 판별).
+    /// [서버] 안내 자막을 클라(호스트 포함)의 <see cref="TutorialGuideUI"/> 에 띄운다 — 존 흐름(S7~S9) 공용 단일 API.
+    /// <paramref name="args"/> = 자리표시자 키·값을 번갈아 둔 평탄 배열(<c>{ "N", "2", "M", "3" }</c>). {Q}{E}{P} 는 각 클라가 채운다.
+    /// <paramref name="targets"/> = 받을 클라 id. null 이면 전원, 빈 배열이면 아무도 안 보낸다.
     /// </summary>
-    public void ShowSubtitleServer(string id, TutorialCharacter onlyFor = TutorialCharacter.None)
+    public void ShowSubtitleServer(string id, string[] args = null, ulong[] targets = null)
     {
         if (!RequireServerActive(nameof(ShowSubtitleServer)) || string.IsNullOrEmpty(id)) return;
-        ShowSubtitleClientRpc(id, onlyFor);
+        if (targets != null && targets.Length == 0) return;
+
+        var payload = new SubtitleArgs { Pairs = args };
+        if (targets == null)
+        {
+            ShowSubtitleClientRpc(id, payload);
+            return;
+        }
+        var p = new ClientRpcParams { Send = new ClientRpcSendParams { TargetClientIds = targets } };
+        ShowSubtitleClientRpc(id, payload, p);
     }
 
-    /// <summary>[서버] 안내 자막을 한 클라에게만 띄운다(개인 피드백 — 빗나감 등).</summary>
-    public void ShowSubtitleToClientServer(ulong clientId, string id)
+    /// <summary>[서버] 지금 접속한 플레이어 중 그 캐릭터인 클라 id(캐릭터 전용 자막의 targets 용).</summary>
+    public ulong[] GetClientsOfCharacterServer(TutorialCharacter character)
     {
-        if (!RequireServerActive(nameof(ShowSubtitleToClientServer)) || string.IsNullOrEmpty(id)) return;
-        var p = new ClientRpcParams { Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } } };
-        ShowSubtitleClientRpc(id, TutorialCharacter.None, p);
+        var ids = new List<ulong>();
+        if (NetworkManager == null) return ids.ToArray();
+        foreach (NetworkClient client in NetworkManager.ConnectedClientsList)
+        {
+            Player player = client.PlayerObject != null ? client.PlayerObject.GetComponent<Player>() : null;
+            if (player != null && TutorialLocalPlayerInfo.ResolveCharacter(player) == character) ids.Add(client.ClientId);
+        }
+        return ids.ToArray();
+    }
+
+    /// <summary>자막 자리표시자 평탄 배열(키·값 번갈아) — RPC 직렬화용.</summary>
+    internal struct SubtitleArgs : INetworkSerializable
+    {
+        public string[] Pairs;
+
+        public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
+        {
+            int count = Pairs?.Length ?? 0;
+            serializer.SerializeValue(ref count);
+            if (serializer.IsReader) Pairs = count > 0 ? new string[count] : null;
+            for (int i = 0; i < count; i++)
+            {
+                string s = Pairs[i] ?? string.Empty;
+                serializer.SerializeValue(ref s);
+                Pairs[i] = s;
+            }
+        }
+
+        public Dictionary<string, string> ToDictionary()
+        {
+            if (Pairs == null || Pairs.Length < 2) return null;
+            var map = new Dictionary<string, string>();
+            for (int i = 0; i + 1 < Pairs.Length; i += 2) map[Pairs[i]] = Pairs[i + 1];
+            return map;
+        }
     }
 
     [ClientRpc]
-    private void ShowSubtitleClientRpc(string id, TutorialCharacter onlyFor, ClientRpcParams p = default)
+    private void ShowSubtitleClientRpc(string id, SubtitleArgs args, ClientRpcParams p = default)
     {
-        if (onlyFor != TutorialCharacter.None && TutorialLocalPlayerInfo.ResolveCharacter(Player.LocalPlayer) != onlyFor) return;
-
         TutorialGuideUI ui = TutorialGuideUI.Instance;
         if (ui == null)
         {
             Edit.Log($"[Tutorial] 자막 {id} — 씬에 TutorialGuideUI 가 없어 띄우지 않는다(S12 배치 전).", this);
             return;
         }
-        ui.ShowSubtitle(id);
+        ui.ShowSubtitle(id, args.ToDictionary());
     }
 
     // ─── 오너 → 서버 보고(초안 — S7 에서 사용) ───────────────────────────────
