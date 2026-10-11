@@ -16,6 +16,7 @@ using UnityEngine;
 ///  · 대시 = <see cref="PlayerDashController.ServerDashApproved"/> → <see cref="TutorialDirector.ReportCheckServer"/>(Dash)
 ///  · 적중 = <see cref="Player.ServerAttackLanded"/>(평타 <see cref="AttackType.Default"/>, 대상이 그 허수아비) → AttackHit(보고 1번 = 적중 1회)
 ///  · G1 열림 → 단계 Corridor1(<see cref="TutorialDirector.SetStepServer"/>, 다음 프레임 — 디렉터 Commit 안에서 다시 Commit 하지 않게)
+///  · G1 뒤 파티가 존1 을 떠나면 허수아비 디스폰(S12 — <see cref="TutorialZone1Rules.ShouldDespawnDummies"/>)
 /// 오너(로컬 플레이어):
 ///  · 이동 = XZ 누적(순간이동 제외) 5m → <see cref="TutorialDirector.ReportLocalMoveDistance"/>(서버 상한 검증)
 ///  · 패시브 = <see cref="SkillTooltipView.TooltipShown"/>("Passive") 가 1초 유지 → <see cref="TutorialDirector.ReportLocalCheck"/>(PassiveTooltip)
@@ -151,10 +152,11 @@ public sealed class TutorialZone1Flow : MonoBehaviour
             }
 
             _scanTimer -= Time.unscaledDeltaTime;
-            if (_scanTimer <= 0f && Zone1Running)
+            if (_scanTimer <= 0f)
             {
                 _scanTimer = PlayerScanInterval;
-                ScanPlayersServer();
+                if (Zone1Running) ScanPlayersServer();
+                else if (_dummies.Count > 0) TryDespawnDummiesServer();
             }
         }
 
@@ -212,6 +214,32 @@ public sealed class TutorialZone1Flow : MonoBehaviour
             player.ServerAttackLanded += handler;
             _attackSubs.Add(player, handler);
         }
+    }
+
+    // G1 이 열리고 파티가 존1 을 떠나면(살아 있는 사람이 존1 에 없음 · 또는 존2 단계) 허수아비를 거둔다(S12 정리) — 보는 앞에서 사라지지 않게.
+    private void TryDespawnDummiesServer()
+    {
+        bool anyInZone1 = false;
+        foreach (ulong id in _nm.ConnectedClientsIds)
+        {
+            if (_director.GetPlayerAreaServer(id) != TutorialArea.Zone1) continue;
+            anyInZone1 = true;
+            break;
+        }
+        if (!TutorialZone1Rules.ShouldDespawnDummies(_director.IsGateOpen(TutorialGate.G1_Corridor1Entry), anyInZone1, _director.Step))
+            return;
+
+        int n = 0;
+        foreach (Unit unit in _dummies)
+        {
+            if (unit == null) continue;
+            NetworkObject no = unit.NetworkObject;
+            if (no == null || !no.IsSpawned) continue;
+            no.Despawn(true);
+            n++;
+        }
+        _dummies.Clear();
+        Edit.Log($"[Tutorial] 존1 허수아비 {n}개 디스폰 — G1 열림 · 파티가 존1 을 떠남.", this);
     }
 
     private void HandleDashApprovedServer(Player player)

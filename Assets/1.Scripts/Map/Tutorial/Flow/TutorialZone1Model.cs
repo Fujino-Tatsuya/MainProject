@@ -42,6 +42,13 @@ public static class TutorialZone1Rules
         if (reportedMeters < requiredMeters) return false;
         return reportedMeters <= maxSpeed * elapsedSeconds + slackMeters;
     }
+
+    /// <summary>
+    /// 존1 허수아비를 거둘 때인가(S12) — G1 이 열렸고, 살아 있는 사람이 아무도 존1 에 없거나 파티가 이미 존2 단계로 넘어갔다.
+    /// G1 직후 존1 에 남은 사람 눈앞에서 사라지지 않게 떠난 뒤에 거둔다.
+    /// </summary>
+    public static bool ShouldDespawnDummies(bool g1Open, bool anyAlivePlayerInZone1, TutorialStep step) =>
+        g1Open && (!anyAlivePlayerInZone1 || step >= TutorialStep.Zone2);
 }
 
 /// <summary>

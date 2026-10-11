@@ -188,6 +188,47 @@ public sealed class TutorialDeathRulesTests
     }
 
     [Test]
+    public void 지금_단계_구간은_디렉터_단계_기준_배리어가_상한()
+    {
+        // 출구 게이트만 열리고 아직 아무도 다음 존에 안 들어감 — 배리어로는 다음 존이지만 단계는 복도.
+        Assert.That(TutorialRevivePointRules.ResolveStageArea(TutorialStep.Corridor1, MaskUpTo(TutorialGate.G2_Zone2Entry)), Is.EqualTo(TutorialArea.Corridor1));
+        Assert.That(TutorialRevivePointRules.ResolveStageArea(TutorialStep.Zone2, MaskUpTo(TutorialGate.G2_Zone2Entry)), Is.EqualTo(TutorialArea.Zone2));
+        Assert.That(TutorialRevivePointRules.ResolveStageArea(TutorialStep.Corridor2, MaskUpTo(TutorialGate.G4_Zone3Entry)), Is.EqualTo(TutorialArea.Corridor2));
+        Assert.That(TutorialRevivePointRules.ResolveStageArea(TutorialStep.Zone3Fight, MaskUpTo(TutorialGate.G5_SpinnerRealMode)), Is.EqualTo(TutorialArea.Zone3));
+        Assert.That(TutorialRevivePointRules.ResolveStageArea(TutorialStep.Corridor3, MaskUpTo(TutorialGate.G7_Zone4Entry)), Is.EqualTo(TutorialArea.Corridor3));
+        Assert.That(TutorialRevivePointRules.ResolveStageArea(TutorialStep.Zone4Combat, MaskUpTo(TutorialGate.G8_TimerStart)), Is.EqualTo(TutorialArea.Zone4));
+        // 입구 게이트와 같이 바뀌는 구간은 두 기준이 같다.
+        Assert.That(TutorialRevivePointRules.ResolveStageArea(TutorialStep.Corridor2, MaskUpTo(TutorialGate.G3_Corridor2Entry)), Is.EqualTo(TutorialArea.Corridor2));
+        // 보스 진입·종료 = 복도4(패드 존 제외).
+        Assert.That(TutorialRevivePointRules.ResolveStageArea(TutorialStep.BossEnter, MaskUpTo(TutorialGate.G10_BossEnterAndPad)), Is.EqualTo(TutorialArea.Corridor4));
+        Assert.That(TutorialRevivePointRules.ResolveStageArea(TutorialStep.Finished, MaskUpTo(TutorialGate.G10_BossEnterAndPad)), Is.EqualTo(TutorialArea.Corridor4));
+        // 단계가 배리어보다 앞서도(디버그 단계 변경 등) 닫힌 구간으로 넘지 않는다.
+        Assert.That(TutorialRevivePointRules.ResolveStageArea(TutorialStep.Zone2, Mask(TutorialGate.G1_Corridor1Entry)), Is.EqualTo(TutorialArea.Corridor1));
+        Assert.That(TutorialRevivePointRules.ResolveStageArea(TutorialStep.None, 0), Is.EqualTo(TutorialArea.Zone1));
+    }
+
+    [Test]
+    public void 단계_기준_선택은_출구만_열린_다음_존에서_되살리지_않는다()
+    {
+        int mask = MaskUpTo(TutorialGate.G2_Zone2Entry);
+        var c = new List<TutorialRevivePoint>
+        {
+            new TutorialRevivePoint(25f, 0f, TutorialArea.Zone2),
+            new TutorialRevivePoint(12f, 0f, TutorialArea.Corridor1),
+        };
+
+        Assert.That(TutorialRevivePointRules.TrySelect(c, null, TutorialStep.Corridor1, mask, 25f, 0f, out int i, out bool safe), Is.True);
+        Assert.That(i, Is.EqualTo(1), "단계 Corridor1 — 존2 는 아직 지금 단계 구간이 아니다");
+        Assert.That(safe, Is.True);
+
+        Assert.That(TutorialRevivePointRules.TrySelect(c, null, TutorialStep.Zone2, mask, 25f, 0f, out i, out _), Is.True);
+        Assert.That(i, Is.EqualTo(0), "파티가 존2 에 들어간 뒤엔 존2");
+
+        Assert.That(TutorialRevivePointRules.AreaOrder(TutorialStep.Corridor1, mask),
+            Is.EqualTo(new[] { TutorialArea.Corridor1, TutorialArea.Zone1 }));
+    }
+
+    [Test]
     public void 찾는_순서는_지금_구간부터_거꾸로()
     {
         List<TutorialArea> order = TutorialRevivePointRules.AreaOrder(MaskUpTo(TutorialGate.G2_Zone2Entry));

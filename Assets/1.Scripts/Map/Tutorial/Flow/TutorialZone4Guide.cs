@@ -103,17 +103,28 @@ public sealed class TutorialZone4Guide : MonoBehaviour
 
     private void ApplyObjective(TutorialGuideUI ui, string id, int n, int total)
     {
+        string current = ui.CaptureState().ObjectiveId;
         if (id == null)
         {
             // 내가 띄운 목표가 아직 떠 있을 때만 지운다(다른 단계가 띄운 목표는 그대로).
-            if (_shownObjectiveId != null && TutorialZone4Display.IsZone4Objective(ui.CaptureState().ObjectiveId))
+            if (_shownObjectiveId != null && TutorialZone4Display.IsZone4Objective(current))
+                ui.SetObjective(null);
+            // 존4 첫 진입(설정 자막)엔 목표 줄이 없다 — 복도3 의 "다음 구역으로"가 남아 있으면 지운다.
+            else if (TutorialZone4Display.ShouldClearStaleCorridorObjective(_director.Step, current))
                 ui.SetObjective(null);
             _shownObjectiveId = null;
             return;
         }
 
+        // 복도4(G9 뒤) — 복도 흐름이 고르기·대기·발판 목표를 띄웠으면 "보스방으로"로 덮지 않는다(0.5초 재시도가 서로 덮어쓰는 것 방지).
+        if (TutorialZone4Display.YieldsToCorridor(id, current))
+        {
+            _shownObjectiveId = null;
+            return;
+        }
+
         if (id == _shownObjectiveId && n == _shownCount && total == _shownTotal
-            && ui.CaptureState().ObjectiveId == id) return;
+            && current == id) return;
 
         Dictionary<string, string> args = id == TutorialGuideIds.Z4PanelGoal
             ? new Dictionary<string, string> { { "n", n.ToString() }, { "total", total.ToString() } }

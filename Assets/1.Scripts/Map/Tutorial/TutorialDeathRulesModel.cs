@@ -193,7 +193,7 @@ public readonly struct TutorialThreat
 /// <summary>
 /// 자동 부활 지점 규칙 — "지금 단계 구간의 안전한 지점(몬스터 인지 범위 밖, 배리어 안쪽)"(§2.5).
 ///
-///  · 지금 단계 구간 = 열린 게이트로 들어갈 수 있는 가장 앞 구간(존1 ~ 복도4, S3 배리어 열림 기준).
+///  · 지금 단계 구간 = 디렉터 단계(<see cref="TutorialStep"/>)의 구간(S12). 단 열린 게이트로 들어갈 수 있는 가장 앞 구간을 넘지 않는다.
 ///    <b>보스 진입 존은 뺀다</b> — 진입 패드가 있어 거기서 되살아나면 그 순간 보스방 카운트다운이 시작될 수 있다(G10 뒤엔 복도4).
 ///  · 찾는 순서 = 지금 단계 구간 → 앞 구간들(거꾸로). 그 구간에 안전한 후보가 있으면 사망 지점에 가장 가까운 것.
 ///  · 어디에도 안전한 후보가 없으면 위협에서 가장 먼 후보(여유가 같으면 앞 순서 구간).
@@ -204,7 +204,7 @@ public static class TutorialRevivePointRules
     public const float DefaultSpacing = 1.5f;
     public const float DefaultInset = 1f;
 
-    /// <summary>지금 단계 구간(존1 ~ 복도4).</summary>
+    /// <summary>열린 배리어로 들어갈 수 있는 가장 앞 구간(존1 ~ 복도4) — 지금 단계 구간의 상한.</summary>
     public static TutorialArea ResolveStageArea(int openedGateMask)
     {
         TutorialArea stage = TutorialArea.Zone1;
@@ -216,11 +216,43 @@ public static class TutorialRevivePointRules
         return stage;
     }
 
-    /// <summary>찾는 순서 — 지금 단계 구간부터 존1 까지 거꾸로.</summary>
-    public static List<TutorialArea> AreaOrder(int openedGateMask)
+    /// <summary>
+    /// 디렉터 단계의 구간(S12 — 단계가 존·복도 진행에 맞게 갱신된다). 보스 진입·종료는 복도4(패드 존 제외).
+    /// 존 단계는 그 존에 파티가 처음 들어갈 때 걸리므로, 출구 게이트가 열렸어도 아직 아무도 다음 존에 안 들어갔으면 앞 구간이다.
+    /// </summary>
+    public static TutorialArea StepArea(TutorialStep step) => step switch
+    {
+        TutorialStep.Corridor1 => TutorialArea.Corridor1,
+        TutorialStep.Zone2 => TutorialArea.Zone2,
+        TutorialStep.Corridor2 => TutorialArea.Corridor2,
+        TutorialStep.Zone3Practice or TutorialStep.Zone3Fight => TutorialArea.Zone3,
+        TutorialStep.Corridor3 => TutorialArea.Corridor3,
+        TutorialStep.Zone4Lore or TutorialStep.Zone4Combat => TutorialArea.Zone4,
+        TutorialStep.Corridor4 or TutorialStep.BossEnter or TutorialStep.Finished => TutorialArea.Corridor4,
+        _ => TutorialArea.Zone1,
+    };
+
+    /// <summary>
+    /// 지금 단계 구간 = 디렉터 단계 구간. 단 배리어로 들어갈 수 없는 구간이면 들어갈 수 있는 가장 앞 구간으로 내린다(둘 중 앞쪽).
+    /// 배리어 기준만 쓰면 출구 게이트가 열린 순간(아직 아무도 다음 존에 안 들어감) 다음 존에서 되살아나 그 존 첫 진입·기상을 앞당긴다.
+    /// </summary>
+    public static TutorialArea ResolveStageArea(TutorialStep step, int openedGateMask)
+    {
+        TutorialArea byStep = StepArea(step);
+        TutorialArea byBarrier = ResolveStageArea(openedGateMask);
+        return byStep < byBarrier ? byStep : byBarrier;
+    }
+
+    /// <summary>찾는 순서 — 배리어 기준 상한부터 존1 까지 거꾸로.</summary>
+    public static List<TutorialArea> AreaOrder(int openedGateMask) => AreaOrderFrom(ResolveStageArea(openedGateMask));
+
+    /// <summary>찾는 순서 — 지금 단계 구간(단계 기준, <see cref="ResolveStageArea(TutorialStep, int)"/>)부터 존1 까지 거꾸로.</summary>
+    public static List<TutorialArea> AreaOrder(TutorialStep step, int openedGateMask) => AreaOrderFrom(ResolveStageArea(step, openedGateMask));
+
+    private static List<TutorialArea> AreaOrderFrom(TutorialArea stage)
     {
         var order = new List<TutorialArea>();
-        for (TutorialArea a = ResolveStageArea(openedGateMask); a >= TutorialArea.Zone1; a--)
+        for (TutorialArea a = stage; a >= TutorialArea.Zone1; a--)
             order.Add(a);
         return order;
     }
@@ -269,13 +301,20 @@ public static class TutorialRevivePointRules
     /// <paramref name="safe"/> = 위협 반경 밖인가(false 면 '가장 먼 후보' 폴백).
     /// </summary>
     public static bool TrySelect(IReadOnlyList<TutorialRevivePoint> candidates, IReadOnlyList<TutorialThreat> threats,
-                                 int openedGateMask, float deathX, float deathZ, out int index, out bool safe)
+                                 int openedGateMask, float deathX, float deathZ, out int index, out bool safe) =>
+        TrySelect(candidates, threats, AreaOrder(openedGateMask), deathX, deathZ, out index, out safe);
+
+    /// <summary>단계 기준(<see cref="AreaOrder(TutorialStep, int)"/>)으로 고른다 — 런타임(<see cref="TutorialDeathRules"/>)이 쓴다.</summary>
+    public static bool TrySelect(IReadOnlyList<TutorialRevivePoint> candidates, IReadOnlyList<TutorialThreat> threats,
+                                 TutorialStep step, int openedGateMask, float deathX, float deathZ, out int index, out bool safe) =>
+        TrySelect(candidates, threats, AreaOrder(step, openedGateMask), deathX, deathZ, out index, out safe);
+
+    private static bool TrySelect(IReadOnlyList<TutorialRevivePoint> candidates, IReadOnlyList<TutorialThreat> threats,
+                                  List<TutorialArea> order, float deathX, float deathZ, out int index, out bool safe)
     {
         index = -1;
         safe = false;
         if (candidates == null || candidates.Count == 0) return false;
-
-        List<TutorialArea> order = AreaOrder(openedGateMask);
 
         foreach (TutorialArea area in order)
         {

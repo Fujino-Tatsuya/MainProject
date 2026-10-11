@@ -209,4 +209,15 @@ public sealed class TutorialZone1ModelTests
         Assert.AreEqual(mask, done.CheckMask & mask);
         Assert.AreEqual(TutorialZone1Task.Go, TutorialZone1Progress.Resolve(done, false).Task);
     }
+
+    // ─── 허수아비 정리 (S12) ────────────────────────────────────────────────
+
+    [Test]
+    public void 허수아비는_G1_뒤_파티가_존1_을_떠나면_거둔다()
+    {
+        Assert.IsFalse(TutorialZone1Rules.ShouldDespawnDummies(false, false, TutorialStep.Zone1), "G1 전엔 연습 중");
+        Assert.IsFalse(TutorialZone1Rules.ShouldDespawnDummies(true, true, TutorialStep.Corridor1), "아직 존1 에 남은 사람 눈앞에서 지우지 않는다");
+        Assert.IsTrue(TutorialZone1Rules.ShouldDespawnDummies(true, false, TutorialStep.Corridor1));
+        Assert.IsTrue(TutorialZone1Rules.ShouldDespawnDummies(true, true, TutorialStep.Zone2), "파티가 존2 로 넘어갔으면 낙오자가 있어도 거둔다");
+    }
 }

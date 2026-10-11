@@ -121,6 +121,14 @@ public sealed class TutorialZone4Flow : MonoBehaviour
         if (_model == null || _director == null || !_director.IsTutorialActive) return;
         double now = Now;
 
+        // 보스방 도착(Finished) 뒤엔 23호 팁만 남긴다 — 설정 자막→G8·기상 시계·만료/패드 자막은 돌리지 않는다(S12 정리, 휴면 몬스터는 휴면 그대로).
+        if (_director.IsFinished)
+        {
+            if (_model.ShouldShowBossTip(now))
+                _director.ShowSubtitleServer(TutorialGuideIds.BBossFrontTip);
+            return;
+        }
+
         if (_model.ShouldStartTimer(now))
         {
             // G8 열림 → HandleGateOpened → StartCombat. 거부(G7 닫힘 — 정상 흐름에서는 없음)면 로그만 남긴다.

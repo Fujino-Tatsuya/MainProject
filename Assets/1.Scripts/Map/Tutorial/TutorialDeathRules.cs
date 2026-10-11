@@ -318,10 +318,11 @@ public sealed class TutorialDeathRules : MonoBehaviour
         TutorialStageMarker stage = TutorialStageMarker.Active;
         float floorY = stage != null ? stage.transform.position.y : deathPos.y;
         int mask = OpenedGateMask();
+        TutorialStep step = _director.Step;   // 지금 단계 구간 = 단계 기준(배리어 기준이 상한) — S12
 
         _candidates.Clear();
         _candidateY.Clear();
-        foreach (TutorialArea a in TutorialRevivePointRules.AreaOrder(mask))
+        foreach (TutorialArea a in TutorialRevivePointRules.AreaOrder(step, mask))
         {
             if (!_areas.TryGetArea(a, out TutorialRect rect)) continue;
             _grid.Clear();
@@ -335,7 +336,7 @@ public sealed class TutorialDeathRules : MonoBehaviour
         }
 
         CollectThreats();
-        if (!TutorialRevivePointRules.TrySelect(_candidates, _threats, mask, deathPos.x, deathPos.z, out int index, out safe))
+        if (!TutorialRevivePointRules.TrySelect(_candidates, _threats, step, mask, deathPos.x, deathPos.z, out int index, out safe))
             return false;
 
         TutorialRevivePoint chosen = _candidates[index];

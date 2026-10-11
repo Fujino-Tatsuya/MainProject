@@ -234,6 +234,19 @@ public static class TutorialZone4Display
         return TutorialZone4Highlight.None;
     }
 
+    /// <summary>
+    /// 존4 목표가 "보스방으로"(G9 뒤 — 플레이어는 복도4)인데 복도 흐름이 고르기·대기·발판 목표를 띄웠으면 존4 가 양보한다(S12).
+    /// "다음 구역으로"(낡은 복도3 목표)에는 양보하지 않는다.
+    /// </summary>
+    public static bool YieldsToCorridor(string zone4ObjectiveId, string currentObjectiveId) =>
+        zone4ObjectiveId == TutorialGuideIds.Z4GoBoss
+        && currentObjectiveId != TutorialCorridorFlow.NextId
+        && TutorialCorridorRules.IsCorridorObjective(currentObjectiveId);
+
+    /// <summary>존4 설정 자막 단계(목표 줄 없음)에 복도3 출구 목표 "다음 구역으로"가 남아 있으면 지운다(S12 — 존 첫 진입 정리).</summary>
+    public static bool ShouldClearStaleCorridorObjective(TutorialStep step, string currentObjectiveId) =>
+        step == TutorialStep.Zone4Lore && currentObjectiveId == TutorialCorridorFlow.NextId;
+
     /// <summary>이 목표 id 가 존4 흐름이 띄운 것인가 — 존4 를 벗어날 때 남의 목표는 지우지 않는다.</summary>
     public static bool IsZone4Objective(string id) =>
         id == TutorialGuideIds.Z4PanelGoal || id == TutorialGuideIds.Z4Midboss || id == TutorialGuideIds.Z4GoBoss;

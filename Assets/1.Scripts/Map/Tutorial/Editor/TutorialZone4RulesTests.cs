@@ -235,4 +235,26 @@ public class TutorialZone4RulesTests
         Assert.IsFalse(TutorialZone4Display.IsZone4Objective(TutorialGuideIds.Z3Boss));
         Assert.IsFalse(TutorialZone4Display.IsZone4Objective(null));
     }
+
+    // ─── 복도 흐름과 목표 순서 (S12) ────────────────────────────────────────
+
+    [Test]
+    public void 보스방으로_목표는_복도4_고르기_대기_발판_목표를_덮지_않는다()
+    {
+        string goBoss = TutorialGuideIds.Z4GoBoss;
+        Assert.IsTrue(TutorialZone4Display.YieldsToCorridor(goBoss, TutorialCorridorFlow.PickId));
+        Assert.IsTrue(TutorialZone4Display.YieldsToCorridor(goBoss, TutorialCorridorFlow.WaitId));
+        Assert.IsTrue(TutorialZone4Display.YieldsToCorridor(goBoss, TutorialCorridorFlow.GoPadId));
+        Assert.IsFalse(TutorialZone4Display.YieldsToCorridor(goBoss, TutorialCorridorFlow.NextId), "낡은 복도3 목표는 덮는다");
+        Assert.IsFalse(TutorialZone4Display.YieldsToCorridor(goBoss, TutorialGuideIds.Z4Midboss));
+        Assert.IsFalse(TutorialZone4Display.YieldsToCorridor(TutorialGuideIds.Z4PanelGoal, TutorialCorridorFlow.PickId));
+    }
+
+    [Test]
+    public void 설정_자막_단계엔_남은_다음_구역으로_목표를_지운다()
+    {
+        Assert.IsTrue(TutorialZone4Display.ShouldClearStaleCorridorObjective(TutorialStep.Zone4Lore, TutorialCorridorFlow.NextId));
+        Assert.IsFalse(TutorialZone4Display.ShouldClearStaleCorridorObjective(TutorialStep.Corridor3, TutorialCorridorFlow.NextId), "복도3 안에선 그대로");
+        Assert.IsFalse(TutorialZone4Display.ShouldClearStaleCorridorObjective(TutorialStep.Zone4Lore, TutorialCorridorFlow.WaitId));
+    }
 }

@@ -94,7 +94,8 @@ public sealed class TutorialZone2Flow : MonoBehaviour
     {
         if (_director == null) return;
 
-        if (_isServer && _director.IsTutorialActive)
+        // 보스방 도착(Finished) 뒤엔 남은 기상 시계를 돌리지 않는다 — 휴면 몬스터는 휴면 그대로(S12 정리).
+        if (_isServer && _director.IsTutorialActive && !_director.IsFinished)
         {
             if (_pendingStep)
             {
