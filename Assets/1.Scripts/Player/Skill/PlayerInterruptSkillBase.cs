@@ -108,6 +108,22 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     /// <summary>한 번의 판정이 끝난 뒤의 캐릭터별 후폭풍·RPC 훅. 빗나가도 호출된다.</summary>
     protected virtual void OnInterruptResolutionCompleted(int resolvedCount) { }
 
+    /// <summary>
+    /// [서버] 간파 판정 1회가 끝났다. 인자 = 시전자, 수신이 받아들여진 대상 수(0 = 빗나감, 상자 같은 비 Unit 수신자 포함).
+    /// <see cref="OnInterruptResolutionCompleted"/> 바로 뒤에 난다. 판정 앵커 누락으로 판정을 못 한 경우는 나지 않는다. 튜토리얼 판정 훅.
+    /// </summary>
+    public static event System.Action<Player, int> ServerInterruptResolved;
+
+    // 도메인 리로드를 끈 Play 진입에서도 이전 세션 구독자가 남지 않게 비운다.
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStaticEvents() => ServerInterruptResolved = null;
+
+    private void CompleteResolution(int resolvedCount)
+    {
+        OnInterruptResolutionCompleted(resolvedCount);
+        ServerInterruptResolved?.Invoke(owner, resolvedCount);
+    }
+
     // 서버 전용. 애니메이션 이벤트와 타이머가 겹쳐도 래치 때문에 한 번만 실행된다.
     private void ResolveHit()
     {
@@ -183,13 +199,13 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         FailSlowMotion(slowMotion.Resolve(interruptLanded));
 
         if (CompleteBeforeAttackLanded)
-            OnInterruptResolutionCompleted(resolvedCount);
+            CompleteResolution(resolvedCount);
 
         owner.RaiseServerAttackLanded(
             DamageAttackType, Data != null && Data.TriggersOnHit, landedUnits, this);
 
         if (!CompleteBeforeAttackLanded)
-            OnInterruptResolutionCompleted(resolvedCount);
+            CompleteResolution(resolvedCount);
     }
 
     // ── 인터럽트 슬로우 모션 (서버) ──

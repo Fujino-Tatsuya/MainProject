@@ -35,6 +35,36 @@ public sealed class SkillTooltipView : MonoBehaviour
     private bool visible;
     private bool loggedError;
 
+    /// <summary>
+    /// [오너 로컬] 툴팁이 지연 뒤 실제로 떴다. 인자 = 그 슬롯의 키 표기(displayKey) —
+    /// Q·E·R·RMB(SkillCooldownHUD), 패시브 칸은 "Passive"(PassiveHUD). 튜토리얼 판정 훅.
+    /// </summary>
+    public static event System.Action<string> TooltipShown;
+
+    /// <summary>[오너 로컬] 떠 있던 툴팁이 닫혔다(호버 종료·다른 슬롯으로 이동·출처 없음).</summary>
+    public static event System.Action TooltipHidden;
+
+    // 도메인 리로드를 끈 Play 진입에서도 이전 세션 구독자가 남지 않게 비운다.
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStaticEvents()
+    {
+        TooltipShown = null;
+        TooltipHidden = null;
+    }
+
+    // visible 의 유일한 쓰기 창구 — 바뀔 때만 이벤트를 낸다.
+    private void SetVisible(bool value)
+    {
+        if (visible == value)
+            return;
+
+        visible = value;
+        if (value)
+            TooltipShown?.Invoke(displayKey);
+        else
+            TooltipHidden?.Invoke();
+    }
+
     private void Awake()
     {
         rectTransform = panel != null ? panel.transform as RectTransform : transform as RectTransform;
@@ -59,7 +89,7 @@ public sealed class SkillTooltipView : MonoBehaviour
         displayKey = key;
         cooldown = cooldownSeconds;
         hoverStartedAt = Time.unscaledTime;
-        visible = false;
+        SetVisible(false);
         loggedError = false;
         if (panel != null)
             panel.SetActive(false);
@@ -73,7 +103,7 @@ public sealed class SkillTooltipView : MonoBehaviour
         owner = null;
         source = null;
         anchor = null;
-        visible = false;
+        SetVisible(false);
         if (panel != null)
             panel.SetActive(false);
     }
@@ -102,7 +132,7 @@ public sealed class SkillTooltipView : MonoBehaviour
 
         if (source == null)
         {
-            visible = false;
+            SetVisible(false);
             if (panel != null)
                 panel.SetActive(false);
         }
@@ -120,7 +150,7 @@ public sealed class SkillTooltipView : MonoBehaviour
             if (Time.unscaledTime - hoverStartedAt < showDelay)
                 return;
 
-            visible = true;
+            SetVisible(true);
             if (panel != null)
                 panel.SetActive(true);
         }

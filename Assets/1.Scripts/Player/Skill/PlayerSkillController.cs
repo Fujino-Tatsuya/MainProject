@@ -76,6 +76,17 @@ public class PlayerSkillController : BaseNetworkBehaviour
     public PlayerSkillBase ActiveSkill => activeSkill;
     public bool IsSkillActive => activeSkill != null;
     public event Action<PlayerSkillSlot> SlotBindingChanged;
+
+    /// <summary>
+    /// [서버] 스킬 시전을 승인해 시작했다(Q·E·R·우클릭 공통, 쿨타임 시작 지점). 인자 = 시전자, 슬롯.
+    /// 수동 커밋 스킬(거너 Q 등 <see cref="PlayerSkillData.CommitCooldownManually"/>)도 쿨이 아니라 이 승인 시점에 난다.
+    /// 오프라인(비네트워크)에서는 권한을 가진 로컬에서 난다. 튜토리얼 판정 훅.
+    /// </summary>
+    public static event Action<Player, PlayerSkillSlot> ServerSkillUsed;
+
+    // 도메인 리로드를 끈 Play 진입에서도 이전 세션 구독자가 남지 않게 비운다.
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStaticEvents() => ServerSkillUsed = null;
     // 조준/자동이동/확정 직후 프레임 — FSM이 일반 액션 입력(공격/다른 스킬)을 억제하는 데 쓴다.
     public bool IsChoosingTarget => targeting != null && targeting.IsInterceptingInput;
 
@@ -533,6 +544,7 @@ public class PlayerSkillController : BaseNetworkBehaviour
         if (IsNetworkActive)
             PlaySkillClientRpc(expectedSkillIndex, direction, aimPoint, hasAimPoint);
 
+        ServerSkillUsed?.Invoke(player, slot);
         return true;
     }
 
