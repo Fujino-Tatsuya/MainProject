@@ -20,6 +20,7 @@ public interface IPlayerInterruptSkillData
 public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
 {
     private Collider[] hitResults;
+    private Collider[] queryResults; // 오너 HUD 질의 전용(HasTargetInOmniRange)
     // 상자처럼 Unit이 아닌 IAttackReceiver도 있으므로 Hurtbox까지 중복 방지 키로 쓴다.
     private readonly HashSet<Object> hitTargets = new HashSet<Object>();
     private readonly List<Unit> landedUnits = new List<Unit>();
@@ -223,6 +224,86 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         }
 
         return false;
+    }
+
+    // ── 인터럽트 강조 사거리 (오너 HUD, 할 일 5) ──
+
+    /// <summary>
+    /// [오너 HUD] 바라보는 방향과 상관없이(전방위) 인터럽트 사거리 안에 <paramref name="match"/> 를 만족하는 대상 Unit 이 있는가.
+    /// 사거리 = 판정 앵커 형상을 플레이어 중심 수직축으로 어느 방향으로 돌려도 닿는 최대 수평 거리,
+    /// 대상까지 거리 = 대상 콜라이더 표면까지 수평 거리(<see cref="InterruptOmniRangeModel"/>).
+    /// 후보는 판정 형상의 높이 띠 × 사거리 반경 캡슐로 모은다. 서버 판정·슬로우 예측과는 버퍼도 경로도 따로다.
+    /// </summary>
+    public bool HasTargetInOmniRange(System.Predicate<Unit> match)
+    {
+        IPlayerInterruptSkillData data = InterruptData;
+        if (data == null || match == null || HitboxAnchor == null || owner == null)
+            return false;
+
+        Vector3 pivot = owner.transform.position;
+        if (!TryGetOmniReach(pivot, out float reach, out float minY, out float maxY))
+            return false;
+
+        if (queryResults == null || queryResults.Length != data.MaxHitResults)
+            queryResults = new Collider[data.MaxHitResults];
+
+        int hitCount = Physics.OverlapCapsuleNonAlloc(
+            new Vector3(pivot.x, minY, pivot.z), new Vector3(pivot.x, maxY, pivot.z), reach, queryResults,
+            Data.HittableLayers, QueryTriggerInteraction.Collide);
+        for (int i = 0; i < hitCount; i++)
+        {
+            Collider hit = queryResults[i];
+            if (hit == null || !InterruptOmniRangeModel.IsInReach(pivot, hit.bounds, reach))
+                continue;
+
+            Unit unit = ResolveHitUnit(hit, out _);
+            if (unit == null || unit == owner || ShouldSkipTarget(unit))
+                continue;
+
+            if (match(unit))
+                return true;
+        }
+
+        return false;
+    }
+
+    // 판정 앵커의 지금 월드 형상에서 전방위 사거리와 높이 띠를 구한다.
+    private bool TryGetOmniReach(Vector3 pivot, out float reach, out float minY, out float maxY)
+    {
+        switch (HitboxAnchor.OverlapCollider)
+        {
+            case OverlapCollider.Box:
+                BoxColliderInfo box = default;
+                HitboxAnchor.GetBoxColliderInfo(ref box);
+                reach = InterruptOmniRangeModel.BoxReach(pivot, box.center, box.halfExtents, box.orientation);
+                Vector3 h = box.halfExtents;
+                float halfHeight = Mathf.Abs((box.orientation * Vector3.right).y) * h.x +
+                                   Mathf.Abs((box.orientation * Vector3.up).y) * h.y +
+                                   Mathf.Abs((box.orientation * Vector3.forward).y) * h.z;
+                minY = box.center.y - halfHeight;
+                maxY = box.center.y + halfHeight;
+                return reach > 0f;
+
+            case OverlapCollider.Sphere:
+                SphereColliderInfo sphere = default;
+                HitboxAnchor.GetSphereColliderInfo(ref sphere);
+                reach = InterruptOmniRangeModel.SphereReach(pivot, sphere.center, sphere.radius);
+                minY = sphere.center.y - sphere.radius;
+                maxY = sphere.center.y + sphere.radius;
+                return reach > 0f;
+
+            case OverlapCollider.Capsule:
+                CapsuleColliderInfo capsule = default;
+                HitboxAnchor.GetCapsuleColliderInfo(ref capsule);
+                reach = InterruptOmniRangeModel.CapsuleReach(pivot, capsule.point0, capsule.point1, capsule.radius);
+                minY = Mathf.Min(capsule.point0.y, capsule.point1.y) - capsule.radius;
+                maxY = Mathf.Max(capsule.point0.y, capsule.point1.y) + capsule.radius;
+                return reach > 0f;
+
+            default:
+                reach = minY = maxY = 0f;
+                return false;
+        }
     }
 
     private static IInterruptSlowMotionTarget FindSlowMotionTarget(Unit unit) =>

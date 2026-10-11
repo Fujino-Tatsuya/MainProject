@@ -7,6 +7,7 @@ using VeyTrace.RuntimeSafety;
 
 // MapScene camera manager. It creates one render camera and two identical
 // Cinemachine cameras, then switches their priorities for normal/fall views.
+[DataTableSheet("SlowMotion", Order = 1)]
 public class CameraTargetSwitcher : MonoBehaviour
 {
     public static CameraTargetSwitcher Active { get; private set; }
@@ -22,10 +23,13 @@ public class CameraTargetSwitcher : MonoBehaviour
 
     [SerializeField] private GameObject mainCameraPrefab;
     [SerializeField] private GameObject followCameraPrefab;
+    // 블렌드 길이는 카메라 연출 정렬 값이라 테이블에 내지 않는다 — 이 컴포넌트가 내는 건 슬로우 줌 배율뿐.
+    [DataTableIgnore]
     [SerializeField, Min(0f)] private float toFloatBlendDuration = 0.2f;
+    [DataTableIgnore]
     [SerializeField, Min(0f)] private float toFollowBlendDuration = 0.35f;
-    [Tooltip("내가 일으킨 인터럽트 슬로우의 유지 단계에서 플레이어 카메라 거리 배율. (0, 1] (PLAN-interrupt-slowmo D10)")]
-    [SerializeField] private float slowMotionZoomFactor = 0.85f;
+    [Tooltip("내가 일으킨 인터럽트 슬로우의 유지 단계에서 플레이어 카메라 거리 배율. [0.1, 1] — 1 이면 줌 없음 (PLAN-interrupt-slowmo D10)")]
+    [SerializeField, Range(SlowMotionCameraZoom.MinZoomFactor, 1f)] private float slowMotionZoomFactor = 0.85f;
 
     // 생성한 리그 인스턴스를 들고 있어야 EnsureCameraRig가 멱등해진다(중복 생성 방지).
     private GameObject mainCameraInstance;

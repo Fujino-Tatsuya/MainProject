@@ -25,6 +25,8 @@ internal static class PlayerEditModeTestRunner
         "^HealthVignetteModelTests$", // 로컬 체력 비네팅 — 시작 비율·맥동·피격 플래시 색·사망 어둡게(맥동·플래시 끔)
         "^ShieldVignetteModelTests$", // 로컬 실드 비네팅 — 표시 여부·고정 알파 페이드 인/아웃
         "^CombatHudLayerRulesTests$", // CombatHUD 상태 레이어 — 생명주기 상태별 표시 레이어
+        "^InterruptHighlightModelTests$", // 인터럽트 강조(할 일 5) — 창 열림 × 사거리 → RMB 슬롯 발광·페이드·맥동
+        "^InterruptOmniRangeModelTests$", // 인터럽트 강조 사거리 — 방향 무관 판정 형상 도달 거리 × 대상 콜라이더 표면 거리
         "^InteractPromptSlotTests$", // 상호작용 F 프롬프트 — 마지막 Show 우선·소유자만 Hide·다른 뷰로 Show 시 이전 뷰 숨김·누락·파괴 정리
     };
 

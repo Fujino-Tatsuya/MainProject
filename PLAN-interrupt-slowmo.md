@@ -1,6 +1,6 @@
 # PLAN — 인터럽트 슬로우 모션 (할 일 6)
 
-> 상태: **승인 대기** · 브랜치 `feature/InterruptSlowMotion`(development `778bbb87` 기준) · 담당 은희
+> 상태: **S1~S4 병합(`b662c148`), S6·보스타이머 진행** — 브랜치 `feature/SlowMotionData` · 담당 은희
 > grill: 2026-10-09 (사용자 확정). 구현 = claude-alt 에 커밋 단위 handoff, Play/MPPM 확인 = 사용자.
 
 ## 1. 목표
@@ -41,6 +41,7 @@
 | D13 | 사운드 피치 = **별도 브랜치·별도 커밋**(BroAudio/AudioManager, 은희 영역 밖). |
 | D14 | 수치는 최종 `GameData.xlsx` — `[DataTableSheet]` 로 노출. |
 | D15 | 몬스터(경석 영역)는 이번 범위 밖. 권한이 넘어오면 진행, 아니면 `Docs/tech/handoff-interrupt-slowmo.md` 로 전달. |
+| D16 | **보스 제한시간도 `GameNow` 기준** — 슬로우(·솔로 일시정지) 동안 덜 흐른다. `BossTimerManager` 의 만료 시각·판정·남은 시간이 한 도메인(세션 시계 없으면 `ServerTime` 폴백). 클라 표시는 슬로우 Start 수신 지연만큼 잠깐 어긋날 수 있다(허용). |
 
 ## 4. 기본 수치 (xlsx 이전 초안)
 | 단계 | 배율 | 길이(실시간) | 곡선 |
@@ -61,7 +62,7 @@
    통과 시 트리거 / `ResolveHit` 에서 빗나가면 실패 복귀. `TrainingDummyInterrupt` 가 상태 응답 구현.
 4. **S4 연출 scaled 전환 + 오너 카메라 줌** — D9 대상 전환, `CameraTargetSwitcher` 의 `CinemachineFollow` 거리 배율(오너·내 발동일 때만).
 5. **S5 (별도 브랜치) 사운드 피치** — 전역 배율을 피치에 반영.
-6. **S6 데이터·문서** — 수치 `[DataTableSheet]` 노출 + xlsx 열 추가, `Docs/tech/networking.md` Network Time Management 절 갱신
+6. **S6 데이터·문서** — 수치 `[DataTableSheet("SlowMotion")]` 노출(`GlobalTimeScale.interruptProfile.*` 5개 @ `NetworkManager`, `slowMotionZoomFactor` @ `CameraSwitcher`) + xlsx 행 추가(병합 Export, SVN — 미완), `Docs/tech/networking.md` Network Time Management 절 갱신
    (GameTime 은 일시정지 + 슬로우로 덜 흐른다), 필요 시 몬스터 handoff 문서.
 
 ## 6. 네트워크 권한

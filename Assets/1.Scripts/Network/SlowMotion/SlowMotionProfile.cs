@@ -16,19 +16,25 @@ public sealed class SlowMotionProfile
     /// <summary>배율 하한. 0 은 일시정지와 구분이 안 되고, 복귀 곡선이 0 에서 출발하면 의미가 없어 막는다.</summary>
     public const float MinScale = 0.01f;
 
-    [Tooltip("유지 단계의 시간 배율. (0, 1] — 1 이면 느려지지 않는다")]
+    // 범위 속성은 인스펙터·데이터 테이블 검증용. 코드 경로는 아래 Clamped* 가 따로 지킨다.
+    [Tooltip("유지 단계의 시간 배율. [0.01, 1] — 1 이면 느려지지 않는다")]
+    [Range(MinScale, 1f)]
     public float scale = 0.3f;
 
     [Tooltip("진입 단계 길이(실시간 초). 현재 배율 → scale, linear")]
+    [Min(0f)]
     public float enterDuration = 0.05f;
 
     [Tooltip("유지 단계 길이(실시간 초). scale 고정")]
+    [Min(0f)]
     public float holdDuration = 0.35f;
 
     [Tooltip("복귀 단계 길이(실시간 초). scale → 1, ease-out")]
+    [Min(0f)]
     public float exitDuration = 0.25f;
 
     [Tooltip("실패 복귀 길이(실시간 초). 빗나갔을 때 현재 배율 → 1, ease-out")]
+    [Min(0f)]
     public float failExitDuration = 0.1f;
 
     public float ClampedScale => float.IsNaN(scale) ? 1f : Mathf.Clamp(scale, MinScale, 1f);
