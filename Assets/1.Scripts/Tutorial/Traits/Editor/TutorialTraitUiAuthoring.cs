@@ -13,6 +13,7 @@ public static class TutorialTraitUiAuthoring
     private const string Folder = "Assets/2.Prefabs/UI/Tutorial";
     private const string PrefabPath = Folder + "/TutorialTraitUI.prefab";
     private const string FontPath = "Assets/Resources/NotoSansKR-VariableFont_wght SDF.asset";
+    private const string TextTablePath = "Assets/9.ScriptableObject/Tutorial/Traits/TutorialTraitTexts.asset";
     private const int SortingOrder = 60; // CombatHUD(0) 위
 
     private static readonly Color PanelColor = new Color(0.035f, 0.045f, 0.065f, 0.97f);
@@ -26,6 +27,7 @@ public static class TutorialTraitUiAuthoring
         EnsureFolder(Folder);
         TMP_FontAsset font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontPath);
         Sprite placeholder = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd");
+        TutorialTraitTextTable texts = EnsureTextTable();
 
         var root = new GameObject("TutorialTraitUI", typeof(RectTransform));
         try
@@ -165,6 +167,7 @@ public static class TutorialTraitUiAuthoring
             so.FindProperty("tooltipName").objectReferenceValue = tooltipName;
             so.FindProperty("tooltipDescription").objectReferenceValue = tooltipDescription;
             so.FindProperty("placeholderIcon").objectReferenceValue = placeholder;
+            so.FindProperty("texts").objectReferenceValue = texts;
             so.ApplyModifiedPropertiesWithoutUndo();
 
             // 기본 꺼짐 — 창(UiModalBlocker)이 켜진 채 저장되면 씬에 두는 순간 입력이 막힌다.
@@ -251,6 +254,20 @@ public static class TutorialTraitUiAuthoring
         var so = new SerializedObject(target);
         so.FindProperty(property).objectReferenceValue = value;
         so.ApplyModifiedPropertiesWithoutUndo();
+    }
+
+    /// <summary>문구 테이블 에셋(T3) — 없으면 상수 기본값으로 만든다. 있으면 그대로 쓴다(기획이 고친 문구 보존).</summary>
+    public static TutorialTraitTextTable EnsureTextTable()
+    {
+        var table = AssetDatabase.LoadAssetAtPath<TutorialTraitTextTable>(TextTablePath);
+        if (table != null)
+            return table;
+
+        EnsureFolder(System.IO.Path.GetDirectoryName(TextTablePath).Replace('\\', '/'));
+        table = ScriptableObject.CreateInstance<TutorialTraitTextTable>();
+        AssetDatabase.CreateAsset(table, TextTablePath);
+        AssetDatabase.SaveAssets();
+        return table;
     }
 
     private static void EnsureFolder(string path)

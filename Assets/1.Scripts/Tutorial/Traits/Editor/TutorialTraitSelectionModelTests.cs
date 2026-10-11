@@ -183,4 +183,68 @@ public sealed class TutorialTraitSelectionModelTests
         Assert.That(model.GetOffered(Client1), Is.Empty);
         Assert.That(model.TryChoose(Client1, 0), Is.EqualTo(TutorialTraitChoiceResult.NoOffer));
     }
+
+    // ── 선택 창 무적 계획(T3) ──
+
+    [Test]
+    public void Shields_AcquireForPendingNotYetShielded()
+    {
+        var model = new TutorialTraitSelectionModel(6);
+        model.StartRound(new[] { Host, Client1 }, 3, First);
+        var release = new List<ulong>();
+        var acquire = new List<ulong>();
+
+        // 제시 순간 Client1 은 플레이어 오브젝트가 없어 Host 만 걸렸다.
+        model.PlanSelectionShields(new HashSet<ulong> { Host }, release, acquire);
+
+        Assert.That(release, Is.Empty);
+        Assert.That(acquire, Is.EqualTo(new[] { Client1 }), "스폰 뒤 재시도 = 아직 미선택인 Client1 만");
+    }
+
+    [Test]
+    public void Shields_NotAcquiredAfterChoosing()
+    {
+        var model = new TutorialTraitSelectionModel(6);
+        model.StartRound(new[] { Host, Client1 }, 3, First);
+        model.TryChoose(Client1, model.GetOffered(Client1)[0]);
+        var release = new List<ulong>();
+        var acquire = new List<ulong>();
+
+        // Client1 이 고른 뒤에야 준비됐다 — 걸지 않는다.
+        model.PlanSelectionShields(new HashSet<ulong> { Host }, release, acquire);
+
+        Assert.That(acquire, Is.Empty);
+        Assert.That(release, Is.Empty);
+    }
+
+    [Test]
+    public void Shields_ReleaseChosenAndDisconnected()
+    {
+        var model = new TutorialTraitSelectionModel(6);
+        model.StartRound(new[] { Host, Client1 }, 3, First);
+        model.TryChoose(Host, model.GetOffered(Host)[0]);
+        model.RemovePlayer(Client1);
+        var release = new List<ulong>();
+        var acquire = new List<ulong>();
+
+        model.PlanSelectionShields(new HashSet<ulong> { Host, Client1 }, release, acquire);
+
+        Assert.That(release, Is.EquivalentTo(new[] { Host, Client1 }));
+        Assert.That(acquire, Is.Empty);
+    }
+
+    [Test]
+    public void Shields_ZeroOfferParticipantNeverShielded()
+    {
+        var model = new TutorialTraitSelectionModel(1);
+        model.StartRound(new[] { Host }, 3, First);
+        model.TryChoose(Host, 0);
+        model.StartRound(new[] { Host }, 3, First); // 풀 소진 → 0장
+        var release = new List<ulong>();
+        var acquire = new List<ulong>();
+
+        model.PlanSelectionShields(new HashSet<ulong>(), release, acquire);
+
+        Assert.That(acquire, Is.Empty);
+    }
 }

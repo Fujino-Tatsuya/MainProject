@@ -126,4 +126,34 @@ public sealed class TutorialTraitWindowModelTests
         string picked = TutorialTraitTexts.FormatPicked(TutorialTraitTexts.Get(TutorialTraitTexts.PickedId), "화면 왼쪽 위");
         Assert.That(picked, Is.EqualTo("특성을 얻었습니다. 획득한 특성은 화면 왼쪽 위에서 다시 볼 수 있습니다."));
     }
+
+    [Test]
+    public void TextTable_DefaultsMatchConstants_AndFallsBackWithoutAssetOrRow()
+    {
+        var table = UnityEngine.ScriptableObject.CreateInstance<TutorialTraitTextTable>();
+        try
+        {
+            Assert.That(table.Entries.Count, Is.EqualTo(TutorialTraitTexts.AllIds.Length), "새 에셋 = 모든 ID 행");
+            foreach (string id in TutorialTraitTexts.AllIds)
+                Assert.That(TutorialTraitTextTable.Resolve(table, id), Is.EqualTo(TutorialTraitTexts.Get(id)), id);
+
+            Assert.That(TutorialTraitTextTable.Resolve(null, TutorialTraitTexts.PickedLocationId), Is.EqualTo("화면 왼쪽 위"),
+                "에셋 없음 → 상수");
+
+            var so = new UnityEditor.SerializedObject(table);
+            UnityEditor.SerializedProperty entries = so.FindProperty("entries");
+            entries.GetArrayElementAtIndex(0).FindPropertyRelative("text").stringValue = "바뀐 제목";
+            entries.DeleteArrayElementAtIndex(entries.arraySize - 1); // PICKED_LOCATION 행 삭제
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            Assert.That(TutorialTraitTextTable.Resolve(table, TutorialTraitTexts.TitleId), Is.EqualTo("바뀐 제목"), "에셋 값 우선");
+            Assert.That(TutorialTraitTextTable.Resolve(table, TutorialTraitTexts.PickedLocationId), Is.EqualTo("화면 왼쪽 위"),
+                "행 없음 → 상수");
+            Assert.That(TutorialTraitTextTable.Resolve(table, "UNKNOWN"), Is.Empty);
+        }
+        finally
+        {
+            UnityEngine.Object.DestroyImmediate(table);
+        }
+    }
 }

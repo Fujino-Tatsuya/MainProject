@@ -36,10 +36,10 @@ public sealed class TutorialTraitSelectionView : MonoBehaviour
     [SerializeField] private GameObject tooltip;
     [SerializeField] private TMP_Text tooltipName;
     [SerializeField] private TMP_Text tooltipDescription;
-    [Tooltip("획득 토스트의 {location} 자리에 들어갈 다시 보기 UI 위치 문구.")]
-    [SerializeField] private string acquiredLocationText = "화면 왼쪽 위";
 
     [Header("공용")]
+    [Tooltip("문구 테이블(TutorialTraitTexts.asset). 비어 있거나 ID 행이 없으면 코드 상수 기본값.")]
+    [SerializeField] private TutorialTraitTextTable texts;
     [Tooltip("특성 아이콘이 비었을 때 쓸 그림. 비어 있으면 빈 칸(흰 사각형).")]
     [SerializeField] private Sprite placeholderIcon;
 
@@ -160,7 +160,7 @@ public sealed class TutorialTraitSelectionView : MonoBehaviour
         }
 
         if (title != null)
-            title.text = TutorialTraitTexts.Get(TutorialTraitTexts.TitleId);
+            title.text = TextOf(TutorialTraitTexts.TitleId);
         nextRequestAt = 0f;
         SetActive(window, true);
     }
@@ -178,10 +178,12 @@ public sealed class TutorialTraitSelectionView : MonoBehaviour
         SetActive(introRoot, showIntro);
         SetActive(lastNoticeRoot, showLast);
         if (showIntro && introText != null)
-            introText.text = TutorialTraitTexts.Get(TutorialTraitTexts.IntroId);
+            introText.text = TextOf(TutorialTraitTexts.IntroId);
         if (showLast && lastNoticeText != null)
-            lastNoticeText.text = TutorialTraitTexts.Get(TutorialTraitTexts.LastNoticeId);
+            lastNoticeText.text = TextOf(TutorialTraitTexts.LastNoticeId);
     }
+
+    private string TextOf(string id) => TutorialTraitTextTable.Resolve(texts, id);
 
     private void HandleCardClicked(int traitIndex)
     {
@@ -212,7 +214,7 @@ public sealed class TutorialTraitSelectionView : MonoBehaviour
 
         if (toastText != null)
             toastText.text = TutorialTraitTexts.FormatPicked(
-                TutorialTraitTexts.Get(TutorialTraitTexts.PickedId), acquiredLocationText);
+                TextOf(TutorialTraitTexts.PickedId), TextOf(TutorialTraitTexts.PickedLocationId));
         toastHideAt = Time.unscaledTime + toastSeconds;
         toast.SetActive(true);
     }

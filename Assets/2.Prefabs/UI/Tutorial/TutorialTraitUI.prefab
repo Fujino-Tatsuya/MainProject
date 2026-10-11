@@ -1810,7 +1810,7 @@ MonoBehaviour:
   tooltip: {fileID: 4559036892113255017}
   tooltipName: {fileID: 902067480872474199}
   tooltipDescription: {fileID: 6495544317894355609}
-  acquiredLocationText: "\uD654\uBA74 \uC67C\uCABD \uC704"
+  texts: {fileID: 11400000, guid: d627a1a2780b77844b362dca6091b069, type: 2}
   placeholderIcon: {fileID: 10913, guid: 0000000000000000f000000000000000, type: 0}
 --- !u!1 &4943032505396108700
 GameObject:

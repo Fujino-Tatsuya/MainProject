@@ -174,6 +174,31 @@ public sealed class TutorialTraitSelectionModel
         }
     }
 
+    /// <summary>
+    /// 선택 창 무적 동기화 계획. <paramref name="shielded"/> = 지금 토큰을 건 플레이어.
+    /// 해제 = 걸려 있는데 더는 미선택이 아니다(골랐음·자동 획득·이탈). 걸기 = 미선택인데 아직 안 걸렸다 —
+    /// 제시 순간 플레이어 오브젝트가 없어 못 건 사람도 여기로 다시 나온다(고른 뒤엔 안 나온다).
+    /// </summary>
+    public void PlanSelectionShields(ICollection<ulong> shielded, List<ulong> release, List<ulong> acquire)
+    {
+        release.Clear();
+        acquire.Clear();
+        if (shielded != null)
+        {
+            foreach (ulong clientId in shielded)
+            {
+                if (!HasPendingChoice(clientId))
+                    release.Add(clientId);
+            }
+        }
+
+        foreach (KeyValuePair<ulong, PlayerState> pair in players)
+        {
+            if (pair.Value.InRound && !pair.Value.Chosen && (shielded == null || !shielded.Contains(pair.Key)))
+                acquire.Add(pair.Key);
+        }
+    }
+
     /// <summary>접속 종료 — 라운드 참가에서 빼서 전원 완료 판단을 막지 않게 한다. 획득 목록도 지운다.</summary>
     public void RemovePlayer(ulong clientId)
     {

@@ -34,6 +34,7 @@ public readonly struct TutorialTraitChosen
 /// 효과: 배율 특성 = 영구(duration 0) 상태이상, 특성마다 다른 출처 id 라 서로 곱해진다.
 /// 쿨감 특성 = 그 플레이어의 <see cref="Player.ServerAttackLanded"/> 를 구독한다.
 /// 선택 창 무적(T2): 제시받고 아직 안 고른 플레이어에게 <see cref="InvulnerabilityCause.TraitSelection"/> 토큰을 건다.
+/// 제시 순간 플레이어 오브젝트가 없었으면 그 플레이어가 스폰될 때(<see cref="PlayerLifeCycleController.ServerLifeStateChanged"/>) 아직 미선택이면 다시 건다(T3).
 /// 이 컴포넌트를 씬에 두지 않으면 아무 일도 하지 않는다(튜토리얼 외 영향 없음).
 /// </summary>
 [DisallowMultipleComponent]
@@ -95,6 +96,8 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
     // 선택 창 무적(InvulnerabilityCause.TraitSelection) 토큰을 건 플레이어 — 모델의 "아직 안 고름"과 맞춘다.
     private readonly HashSet<ulong> shieldedClients = new HashSet<ulong>();
     private readonly List<ulong> shieldScratch = new List<ulong>();
+    private readonly List<ulong> shieldAcquireScratch = new List<ulong>();
+    private bool shieldRetryRequested;
 
     public static TutorialTraitDirector Instance { get; private set; }
 
@@ -139,6 +142,7 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
         model = new TutorialTraitSelectionModel(pool != null ? pool.Count : 0, CollectUnusableIndices());
         random = new System.Random();
         NetworkManager.OnClientDisconnectCallback += HandleClientDisconnected;
+        PlayerLifeCycleController.ServerLifeStateChanged += HandleServerLifeStateChanged;
     }
 
     public override void OnNetworkDespawn()
@@ -151,7 +155,11 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
             NetworkManager.OnClientDisconnectCallback -= HandleClientDisconnected;
 
         if (IsServer)
+        {
+            PlayerLifeCycleController.ServerLifeStateChanged -= HandleServerLifeStateChanged;
+            shieldRetryRequested = false;
             ReleaseAllSelectionShields();
+        }
 
         for (int i = 0; i < cooldownHooks.Count; i++)
         {
@@ -353,26 +361,36 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
         if (model == null)
             return;
 
-        shieldScratch.Clear();
-        foreach (ulong clientId in shieldedClients)
-        {
-            if (!model.HasPendingChoice(clientId))
-                shieldScratch.Add(clientId);
-        }
-
+        model.PlanSelectionShields(shieldedClients, shieldScratch, shieldAcquireScratch);
         for (int i = 0; i < shieldScratch.Count; i++)
         {
             SetSelectionShield(shieldScratch[i], false);
             shieldedClients.Remove(shieldScratch[i]);
         }
 
-        model.GetPendingClients(shieldScratch);
-        for (int i = 0; i < shieldScratch.Count; i++)
+        for (int i = 0; i < shieldAcquireScratch.Count; i++)
         {
-            ulong clientId = shieldScratch[i];
-            if (!shieldedClients.Contains(clientId) && SetSelectionShield(clientId, true))
+            ulong clientId = shieldAcquireScratch[i];
+            if (SetSelectionShield(clientId, true))
                 shieldedClients.Add(clientId);
         }
+    }
+
+    // 제시 순간 플레이어 오브젝트가 없던(스폰 전·준비 전) 미선택자 재시도. 스폰 초기 통지(s,s)는 그 플레이어의
+    // OnNetworkSpawn 안에서 오는데, NGO 는 그 뒤에야 NetworkClient.PlayerObject 를 채운다 — 그래서 바로 걸지 않고 다음 Update 로 미룬다.
+    private void HandleServerLifeStateChanged(ulong clientId, PlayerLifeState previous, PlayerLifeState current)
+    {
+        if (model != null && model.HasPendingChoice(clientId) && !shieldedClients.Contains(clientId))
+            shieldRetryRequested = true;
+    }
+
+    private void Update()
+    {
+        if (!shieldRetryRequested)
+            return;
+
+        shieldRetryRequested = false;
+        SyncSelectionShields();
     }
 
     private void ReleaseAllSelectionShields()

@@ -48,6 +48,7 @@
   플레이어 프리팹·스폰·캐릭터 교체를 건드리기 전에 읽을 것.
 - **데이터 테이블**: [Docs/tech/data-table.md](Docs/tech/data-table.md) — 기획 수치는 `GameData.xlsx`(SVN)가 원본.
   툴바 `데이터: 테이블/인스펙터` 로 Play 출처를 고르고, **빌드는 항상 xlsx 값**. 새 수치를 노출할 땐 `[DataTableSheet]`·`[DataTableIgnore]`.
+- **튜토리얼 특성 선택**: [Docs/tech/tutorial-traits.md](Docs/tech/tutorial-traits.md) — 디렉터 API·S12 배치 순서·placeholder 특성·알려진 제약.
 - 레포지토리 맵(자동생성): [Docs/tech/repo_map.md](Docs/tech/repo_map.md) — 클래스/인터페이스
   구조·상속·Facade 위임 관계 요약. 재생성은 `DevTools/RepoMap/`(`npm run generate`).
 - 일정: `Project_MT 일정.xlsx` (담당: 이지원) — 팀 지식베이스 Vault `Core/project-schedule-2026.md` 스냅샷 참조
