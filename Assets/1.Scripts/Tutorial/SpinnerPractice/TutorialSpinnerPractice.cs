@@ -12,11 +12,13 @@ using UnityEngine.AI;
 ///
 /// 모드(<see cref="SpinnerPracticeMode"/>, 규칙은 <see cref="SpinnerPracticeModeModel"/>):
 /// <list type="bullet">
-/// <item><b>휴면</b> — 서버 FSM 정지(<see cref="MonsterBase.SetServerLogicSuspended"/>) + 무한 슈퍼아머 + 체력 잠금.</item>
 /// <item><b>연습</b> — 체력 잠금 · 스핀만 · 창 간격 <see cref="windowInterval"/> · 돌진 피해 0(밀쳐내기만) · 스폰 반경 클램프.</item>
-/// <item><b>전환 대기</b> — <see cref="realModeDelay"/> 초 FSM 정지(체력 잠금 유지).</item>
+/// <item><b>전환 대기</b> — <see cref="realModeDelay"/> 초 FSM 정지(<see cref="MonsterBase.SetServerLogicSuspended"/>, 체력 잠금 유지).</item>
 /// <item><b>본 모드</b> — 주입을 전부 끈다 = 원래 스피너봇.</item>
 /// </list>
+/// 휴면은 여기 없다 — 모든 몬스터 공통 <see cref="MonsterBase.SetDormantServer"/>(FSM 정지 + 무적·넉백/CC 무시)를
+/// 디렉터(<c>TutorialMonsterZones</c> / <c>TutorialDirector.SetMonsterDormantServer</c>)가 건다. 휴면 중에는 전환 대기 타이머가 흐르지 않는다.
+/// S9 순서: <c>SetMonsterDormantServer(spinner, false)</c> → <see cref="EnterPractice"/> → <see cref="EnterRealMode"/>.
 /// 집계는 새로 세지 않는다 — 간파 성공은 SpinnerBot 이 원래대로 <see cref="CombatStatsEvents.ServerCounterSucceeded"/> 를 낸다.
 /// 여기 이벤트는 그 통보와 <see cref="MonsterCounterWindow.IsOpen"/> 관찰로 만든 튜토리얼용 파생 신호다.
 ///
@@ -27,18 +29,13 @@ using UnityEngine.AI;
 [RequireComponent(typeof(SpinnerBot))]
 public sealed class TutorialSpinnerPractice : NetworkBehaviour, ISpinnerBotOverride
 {
-    [Header("시작")]
-    [SerializeField]
-    [Tooltip("휴면으로 시작한다. 끄면 스폰 즉시 연습 모드다.")]
-    bool startDormant = true;
-
     [Header("연습 모드")]
     [SerializeField, Min(0f)]
     [Tooltip("간파 창 사이 간격(초) — 창이 열린 시각부터 다음 창을 열 수 있는 시각까지. 원래 확률 40%·쿨 6초 대신 쓴다.")]
     float windowInterval = 9f;
 
     [SerializeField, Min(0f)]
-    [Tooltip("스폰 지점(또는 SetPracticeAnchor) 중심 이동 반경(m). 밖으로 밀리거나 돌진해 나가지 못한다. 휴면·연습·전환 대기에만 건다.")]
+    [Tooltip("스폰 지점(또는 SetPracticeAnchor) 중심 이동 반경(m). 밖으로 밀리거나 돌진해 나가지 못한다. 연습·전환 대기에만 건다.")]
     float practiceRadius = 6f;
 
     [SerializeField, Min(0f)]
@@ -55,13 +52,12 @@ public sealed class TutorialSpinnerPractice : NetworkBehaviour, ISpinnerBotOverr
     float realModeDelay = 2f;
 
     readonly NetworkVariable<SpinnerPracticeMode> _mode = new NetworkVariable<SpinnerPracticeMode>(
-        SpinnerPracticeMode.Dormant,
+        SpinnerPracticeMode.Practice,
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
     SpinnerBot _bot;
     MonsterCounterWindow _counter;
-    MonsterStatusEffect _status;
     NavMeshAgent _agent;
 
     SpinnerPracticeModeModel _model;
@@ -71,7 +67,6 @@ public sealed class TutorialSpinnerPractice : NetworkBehaviour, ISpinnerBotOverr
 
     Vector3 _anchor;
     bool? _appliedSuspended;    // 마지막으로 MonsterBase 에 건 FSM 정지 값(null = 아직 안 걺)
-    bool _appliedSuperArmor;    // 휴면 슈퍼아머를 이 컴포넌트가 걸어 두었는가
     bool _subscribed;
 
     #region 공개 상태 (전 피어)
@@ -79,7 +74,7 @@ public sealed class TutorialSpinnerPractice : NetworkBehaviour, ISpinnerBotOverr
     public SpinnerPracticeMode Mode => _mode.Value;
 
     /// <summary>
-    /// 체력 바 회색·잠금 표시용 — 본 모드 전(휴면·연습·전환 대기)이면 true. 전 피어에서 읽는다.
+    /// 체력 바 회색·잠금 표시용 — 본 모드 전(연습·전환 대기)이면 true. 전 피어에서 읽는다.
     /// 표시는 튜토리얼 안내 UI 몫이다(여기서 UI 를 만들지 않는다).
     /// </summary>
     public bool IsHealthLocked => _mode.Value != SpinnerPracticeMode.Real;
@@ -105,18 +100,14 @@ public sealed class TutorialSpinnerPractice : NetworkBehaviour, ISpinnerBotOverr
     #endregion
 
     #region 공개 API (서버)
-    /// <summary>[서버] 휴면을 걸거나 푼다. 풀면 휴면 전 모드(처음이면 연습)로 돌아간다.</summary>
-    public void SetDormant(bool dormant)
-    {
-        if (!RequireServer(nameof(SetDormant))) return;
-        _model.SetDormant(dormant);
-        ApplyMode();
-    }
-
-    /// <summary>[서버] 연습 모드로 들어간다(휴면도 푼다). 창 스케줄·연속 놓침을 처음으로 돌린다 — 첫 창은 바로 열 수 있다.</summary>
+    /// <summary>
+    /// [서버] 연습 모드로 들어간다. 창 스케줄·연속 놓침을 처음으로 돌린다 — 첫 창은 바로 열 수 있다.
+    /// 휴면은 풀지 않는다 — 먼저 디렉터가 base 휴면을 푼다(휴면 중이면 경고만 남기고 모드는 바꾼다).
+    /// </summary>
     public void EnterPractice()
     {
         if (!RequireServer(nameof(EnterPractice))) return;
+        WarnIfDormant(nameof(EnterPractice));
         _model.EnterPractice();
         _schedule.Reset();
         _tracker.ResetCounts();
@@ -127,6 +118,7 @@ public sealed class TutorialSpinnerPractice : NetworkBehaviour, ISpinnerBotOverr
     public void EnterRealMode()
     {
         if (!RequireServer(nameof(EnterRealMode))) return;
+        WarnIfDormant(nameof(EnterRealMode));
         _model.EnterRealMode();
         ApplyMode();
     }
@@ -143,9 +135,8 @@ public sealed class TutorialSpinnerPractice : NetworkBehaviour, ISpinnerBotOverr
     {
         _bot = GetComponent<SpinnerBot>();
         _counter = GetComponent<MonsterCounterWindow>();
-        _status = GetComponent<MonsterStatusEffect>();
         _agent = GetComponent<NavMeshAgent>();
-        _model = new SpinnerPracticeModeModel(realModeDelay, startDormant);
+        _model = new SpinnerPracticeModeModel(realModeDelay);
         _schedule = new SpinnerPracticeWindowSchedule(windowInterval);
     }
 
@@ -155,8 +146,8 @@ public sealed class TutorialSpinnerPractice : NetworkBehaviour, ISpinnerBotOverr
 
         _anchor = transform.position;
         _mode.Value = _model.Mode;
-        // 🔴 FSM 정지·슈퍼아머는 여기서 걸지 않는다 — MonsterBase 초기화 순서와 엇갈리지 않게 첫 Update 에서 건다.
-        //    그 사이 한 틱은 OverridesAttack(본 모드 외 true) + TryBeginSpin(연습만 true)이 원래 공격을 막는다.
+        // 🔴 FSM 정지는 여기서 걸지 않는다 — MonsterBase 초기화 순서와 엇갈리지 않게 첫 Update 에서 건다.
+        //    휴면은 디렉터가 base 에 건다(이 컴포넌트는 연습 모드로 시작). 연습 공격은 피해 0 이라 휴면 전 틈에도 안전하다.
 
         CombatStatsEvents.ServerCounterSucceeded += OnServerCounterSucceeded;
         _subscribed = true;
@@ -187,7 +178,8 @@ public sealed class TutorialSpinnerPractice : NetworkBehaviour, ISpinnerBotOverr
     {
         if (!IsServer || !IsSpawned) return;
 
-        _model.Tick(Time.deltaTime);
+        // base 휴면 중에는 전환 대기 타이머를 세우고 FSM 정지는 base 에 맡긴다(이중으로 걸지 않는다).
+        if (!_bot.IsDormant) _model.Tick(Time.deltaTime);
         ApplyMode();
 
         if (_counter != null) Emit(_tracker.Observe(_counter.IsOpen));
@@ -207,7 +199,7 @@ public sealed class TutorialSpinnerPractice : NetworkBehaviour, ISpinnerBotOverr
         else transform.position = clamped;
     }
 
-    // 모델 → 복제 모드 · FSM 정지 · 휴면 슈퍼아머. 바뀐 것만 건다.
+    // 모델 → 복제 모드 · 전환 대기 FSM 정지. 바뀐 것만 건다.
     void ApplyMode()
     {
         if (!IsSpawned) return;
@@ -225,15 +217,12 @@ public sealed class TutorialSpinnerPractice : NetworkBehaviour, ISpinnerBotOverr
             _bot.SetServerLogicSuspended(suspend);
             _appliedSuspended = suspend;
         }
+    }
 
-        bool armor = _model.BlocksKnockbackAndCc;
-        if (armor != _appliedSuperArmor && _status != null)
-        {
-            // 0 = 무한. 스피너봇은 스폰 슈퍼아머가 없어(startsWithSuperArmor 0) 해제해도 원래 상태로 돌아간다.
-            if (armor) _status.ApplyStatus(StatusEffectType.SuperArmor, 0f);
-            else _status.RemoveStatus(StatusEffectType.SuperArmor);
-            _appliedSuperArmor = armor;
-        }
+    void WarnIfDormant(string api)
+    {
+        if (_bot.IsDormant)
+            Debug.LogWarning($"{name}: {api} — 아직 휴면이다. 디렉터 SetMonsterDormantServer(false) 를 먼저 부를 것(휴면 동안은 움직이지 않는다).", this);
     }
 
     void OnServerCounterSucceeded(Unit target, ulong attackerClientId)

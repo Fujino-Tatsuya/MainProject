@@ -8,28 +8,15 @@ using UnityEngine;
 public sealed class SpinnerPracticeModelTests
 {
     #region 모드
-    [Test]
-    public void Mode_StartsDormant_AndLocksEverything()
-    {
-        var m = new SpinnerPracticeModeModel(2f, startDormant: true);
-
-        Assert.That(m.Mode, Is.EqualTo(SpinnerPracticeMode.Dormant));
-        Assert.That(m.SuspendsServerLogic, Is.True);
-        Assert.That(m.BlocksKnockbackAndCc, Is.True);
-        Assert.That(m.BlocksHealthDamage, Is.True);
-        Assert.That(m.OverridesAttack, Is.True);
-        Assert.That(m.AllowsSpin, Is.False);
-    }
+    // 휴면은 모델에 없다 — MonsterBase.SetDormantServer 하나(handoff-tutorial.md §2).
 
     [Test]
-    public void Mode_Practice_RunsLogic_AllowsHitReactions_ButLocksHealth()
+    public void Mode_StartsPractice_RunsLogic_AllowsHitReactions_ButLocksHealth()
     {
-        var m = new SpinnerPracticeModeModel(2f, startDormant: true);
-        m.EnterPractice();
+        var m = new SpinnerPracticeModeModel(2f);
 
         Assert.That(m.Mode, Is.EqualTo(SpinnerPracticeMode.Practice));
         Assert.That(m.SuspendsServerLogic, Is.False);
-        Assert.That(m.BlocksKnockbackAndCc, Is.False);
         Assert.That(m.BlocksHealthDamage, Is.True);
         Assert.That(m.OverridesAttack, Is.True);
         Assert.That(m.AllowsSpin, Is.True);
@@ -37,31 +24,26 @@ public sealed class SpinnerPracticeModelTests
     }
 
     [Test]
-    public void Mode_StartNotDormant_IsPractice()
+    public void Mode_HasNoDormantValue()
     {
-        var m = new SpinnerPracticeModeModel(2f, startDormant: false);
-        Assert.That(m.Mode, Is.EqualTo(SpinnerPracticeMode.Practice));
+        Assert.That(System.Enum.GetNames(typeof(SpinnerPracticeMode)),
+            Is.EquivalentTo(new[] { "Practice", "Transition", "Real" }));
     }
 
     [Test]
-    public void Mode_DormantIsOrthogonal_ReleasingReturnsToPreviousPhase()
+    public void Transition_NotTicked_TimerHolds()
     {
-        var m = new SpinnerPracticeModeModel(0f, startDormant: false);
-        m.SetDormant(true);
-        Assert.That(m.Mode, Is.EqualTo(SpinnerPracticeMode.Dormant));
-        m.SetDormant(false);
-        Assert.That(m.Mode, Is.EqualTo(SpinnerPracticeMode.Practice));
-
+        // 컴포넌트는 base 휴면 중 Tick 을 부르지 않는다 — 부르지 않는 동안 남은 시간이 그대로다.
+        var m = new SpinnerPracticeModeModel(2f);
         m.EnterRealMode();
-        m.SetDormant(true);
-        m.SetDormant(false);
-        Assert.That(m.Mode, Is.EqualTo(SpinnerPracticeMode.Real));
+        Assert.That(m.Mode, Is.EqualTo(SpinnerPracticeMode.Transition));
+        Assert.That(m.TransitionRemaining, Is.EqualTo(2f).Within(1e-5f));
     }
 
     [Test]
     public void RealMode_WaitsTransition_ThenUnlocksEverything()
     {
-        var m = new SpinnerPracticeModeModel(2f, startDormant: false);
+        var m = new SpinnerPracticeModeModel(2f);
         m.EnterRealMode();
 
         Assert.That(m.Mode, Is.EqualTo(SpinnerPracticeMode.Transition));
@@ -76,7 +58,6 @@ public sealed class SpinnerPracticeModelTests
         Assert.That(m.Mode, Is.EqualTo(SpinnerPracticeMode.Real));
         Assert.That(m.SuspendsServerLogic, Is.False);
         Assert.That(m.BlocksHealthDamage, Is.False);
-        Assert.That(m.BlocksKnockbackAndCc, Is.False);
         Assert.That(m.OverridesAttack, Is.False);
         Assert.That(m.ClampsPosition, Is.False);
         Assert.That(m.Tick(1f), Is.False);   // 진입 신호는 한 번만
@@ -85,7 +66,7 @@ public sealed class SpinnerPracticeModelTests
     [Test]
     public void RealMode_CalledAgain_DoesNotRestartTimer()
     {
-        var m = new SpinnerPracticeModeModel(2f, startDormant: false);
+        var m = new SpinnerPracticeModeModel(2f);
         m.EnterRealMode();
         m.Tick(1.5f);
         m.EnterRealMode();
@@ -93,29 +74,20 @@ public sealed class SpinnerPracticeModelTests
     }
 
     [Test]
-    public void RealMode_FromDormant_ReleasesDormancy()
+    public void Transition_SuspendsLogic_OnlyThere()
     {
-        var m = new SpinnerPracticeModeModel(2f, startDormant: true);
+        var m = new SpinnerPracticeModeModel(2f);
+        Assert.That(m.SuspendsServerLogic, Is.False);
         m.EnterRealMode();
-        Assert.That(m.Mode, Is.EqualTo(SpinnerPracticeMode.Transition));
-    }
-
-    [Test]
-    public void Transition_TimerFreezesWhileDormant()
-    {
-        var m = new SpinnerPracticeModeModel(2f, startDormant: false);
-        m.EnterRealMode();
-        m.SetDormant(true);
-        Assert.That(m.Tick(5f), Is.False);
-        m.SetDormant(false);
-        Assert.That(m.Mode, Is.EqualTo(SpinnerPracticeMode.Transition));
-        Assert.That(m.TransitionRemaining, Is.EqualTo(2f).Within(1e-5f));
+        Assert.That(m.SuspendsServerLogic, Is.True);
+        m.Tick(2f);
+        Assert.That(m.SuspendsServerLogic, Is.False);
     }
 
     [Test]
     public void RealMode_ZeroDelay_IsImmediate()
     {
-        var m = new SpinnerPracticeModeModel(0f, startDormant: false);
+        var m = new SpinnerPracticeModeModel(0f);
         m.EnterRealMode();
         Assert.That(m.Mode, Is.EqualTo(SpinnerPracticeMode.Real));
     }
@@ -123,7 +95,7 @@ public sealed class SpinnerPracticeModelTests
     [Test]
     public void EnterPractice_FromReal_GoesBackToPractice()
     {
-        var m = new SpinnerPracticeModeModel(0f, startDormant: false);
+        var m = new SpinnerPracticeModeModel(0f);
         m.EnterRealMode();
         m.EnterPractice();
         Assert.That(m.Mode, Is.EqualTo(SpinnerPracticeMode.Practice));

@@ -17,7 +17,7 @@
 | 프리팹 | `Assets/2.Prefabs/UI/Tutorial/TutorialGuideUI.prefab` |
 | 문구 SO | `Assets/9.ScriptableObject/Tutorial/Guide/TutorialGuideTexts.asset` |
 
-테스트는 임시로 `PlayerEditModeTestRunner` 의 `Fixtures` 에 들어 있다(`^TutorialGuide(Text|SubtitleQueue|Model)Tests$`) — **S12 에서 튜토리얼 러너로 옮길 것.**
+테스트는 `TutorialEditModeTestRunner`(`Tools/Tests/튜토리얼 EditMode 테스트 실행`)의 `Fixtures` 에 있다(`^TutorialGuide(Text|SubtitleQueue|Model)Tests$`, I0 에서 플레이어 러너에서 이동).
 
 ## 접근 방식
 

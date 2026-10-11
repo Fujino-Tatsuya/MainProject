@@ -16,6 +16,10 @@ internal static class TutorialEditModeTestRunner
         "^TutorialMonsterLedgerTests$",
         "^TutorialBossPathRulesTests$",
         "^TutorialDeathRulesTests$",
+        "^TutorialTraitSelectionModelTests$", // 특성(T1) — 후보 뽑기·중복 제외·선택 검증·자동 획득·라운드 완료
+        "^TutorialTraitWindowModelTests$", // 특성 창(T2) — 열림·닫힘·닫힌 라운드 재표시 금지·획득 토스트·문구
+        "^TutorialGuide(Text|SubtitleQueue|Model)Tests$", // 안내 UI(S6) — 문구 변형·치환·대기 포맷·자막 큐·RebuildFromState
+        "^SpinnerPracticeModelTests$", // 스피너봇 연습(S9) — 모드·창 간격·연속 놓침·스폰 반경 클램프
     };
 
     const string Tag = "[TutorialTests]";

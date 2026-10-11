@@ -226,7 +226,7 @@ S2~S5 에서 늘어난 API 전체 목록은 §10.1.
 - **튜토리얼 판별은 `TutorialStageMarker` 하나**(경석 코드는 `TutorialBossPath` 경유). 디렉터 `_active` 복제를 기다리는 판정은 스폰 전에 false 라 늦다.
 - **게이트 순서·보류**: G1→G10 순서만. `TryOpenGateServer` 는 차례가 아니면 거부, 존 클리어처럼 조건이 이미 충족된 것은 `RequestGateServer`(보류 → 앞 게이트 열리는 `Evaluate` 에서 연다).
   G8 이 열리면 보류된 G9 가 같이 열린다(중간보스를 타이머 전에 잡은 경우). 게이트 이벤트로 일을 붙일 때 **어느 경로로 열려도** 오는 `HandleModelGateOpened`(서버)·`GateOpened` 에 붙일 것.
-- **휴면 훅 병합**: 휴면은 `MonsterBase.SetDormantServer` 하나 — 스피너봇 레인의 `SpinnerBot.SetDormant` 는 병합 때 base 로 합친다(handoff-tutorial.md §2).
+- **휴면은 `MonsterBase.SetDormantServer` 하나**(I0 에서 통합 완료) — 스피너봇 연습 컴포넌트에는 휴면이 없고 연습/전환 대기/본 모드만 있다(handoff-tutorial.md §2).
 - **씬 hash**: `4.MapScene` 의 `TutorialDirector` NetworkObject `GlobalObjectIdHash 114710176`. development 재반영·씬 머지 때 이 값이 0/중복이 되면 스폰이 깨진다 — 머지 뒤 확인.
   씬 상주 NetworkBehaviour 에 NetworkVariable 을 더하는 것(이번 `_timerHudShown`·`_limitOverride`)은 hash 와 무관하지만 모든 피어가 같은 빌드여야 한다.
 - **Stage1 = 모든 판**(Start → 항상 튜토리얼). 튜토리얼 규칙(타이머 지연·패드 잠금·휴면)이 사실상 본게임 규칙이 된다 → D1 팀장 합의 전 development 병합 금지.
@@ -259,3 +259,5 @@ S2~S5 에서 늘어난 API 전체 목록은 §10.1.
   튜토리얼 구간 밖(보스방)에 있는 Soul 은 늘 그 자리. 도착(`AlivePlayersArrived`/`ArrivalAborted`) 또는 단계 Finished 뒤 사망은 일반 규칙.
 - 연출 잠금(`PlayerEncounterLock`) 중이면 보류 + 경고 1회, 풀리면 다음 프레임 부활(사망 연출 해소도 잠금 해제 뒤 진행).
 - 추락 생존 복구는 그대로. 추락 사망은 기존대로 안전지점에 Soul 로 옮겨진 뒤 같은 규칙으로 부활.
+- **TODO(S7~S10)**: '지금 단계 구간'(부활 지점의 기준 구간)은 **배리어 기준 임시 구현**이다 — 열린 배리어로 들어갈 수 있는 가장 앞 구간을
+  '지금 단계'로 본다(`TutorialRevivePointRules`). S7~S10 에서 디렉터 `Step` 이 존·복도 진행에 맞게 갱신되면 Step 기준으로 바꿀지 **재확인**할 것(코드는 I0 에서 그대로 둠).

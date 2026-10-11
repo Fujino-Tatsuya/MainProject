@@ -2,7 +2,7 @@
 
 > 할 일 15 / `feature/TutorialStage`. 몬스터는 경석 영역이라 **최소 훅**만 넣고 여기에 무엇을·왜·어디를 바꿨는지 남긴다.
 > 튜토리얼 쪽 설계: [tutorial-director.md](tutorial-director.md) §8 · 시나리오 [../design/tutorial-scenario.md](../design/tutorial-scenario.md) §2.2·§4.
-> 스피너봇 연습/본 모드(`feature/TutorialSpinnerPractice`)는 별도 문서 `handoff-tutorial-spinner.md` — 이 문서와 겹치는 지점은 §2.
+> 스피너봇 연습/본 모드는 별도 문서 `handoff-tutorial-spinner.md` — 휴면 통합 결과는 §2.
 
 ## 1. S4 — 몬스터 휴면 (`MonsterBase`)
 
@@ -21,7 +21,7 @@
 | `CanApplyHealthDamage` override (신규) | `!_dormant && base` — `ReceiveAttack` 을 안 타는 직접·비율 피해, `DevMonsterKill`(F9)의 `TakeDamage` 직접 호출도 막는다 |
 | `OnKnockback` override (신규) | 휴면이면 무시 — `Unit.Knockback` → `LinearKnockback` 임펄스 경로 |
 
-**영향 범위**: 호출처는 `TutorialMonsterZones`/`TutorialDirector` 뿐이고, 디렉터는 `TutorialStageMarker` 가 있는 스테이지(튜토리얼)에서만 켜진다.
+**영향 범위**: 호출처는 `TutorialMonsterZones`/`TutorialDirector` 뿐이고(스피너봇 연습 컴포넌트는 `IsDormant` 를 읽기만 한다), 디렉터는 `TutorialStageMarker` 가 있는 스테이지(튜토리얼)에서만 켜진다.
 절차 맵·Debug 씬·다른 스테이지의 몬스터는 `_dormant` 가 영원히 false 라 동작이 같다(추가된 분기 3개가 모두 false 로 지나간다).
 `SetServerLogicSuspended`(보스 연출 정지 — 무적 아님)와는 플래그가 따로라 서로를 풀지 않는다.
 
@@ -31,14 +31,16 @@
 - `ReceiveAttack` 이 false 를 돌려주므로 "죽은 대상이면 관통"하는 공격이 있다면 휴면 몬스터도 관통한다(의도 — 무적 대상이 탄을 먹지 않음).
 - 상태이상: 몬스터 CC 는 전부 `ReceiveAttack`(AttackInfo 의 경직·넉백·인터럽트)과 `Unit.Knockback` 으로만 들어온다(`MonsterStatusEffect.ApplyStatus` 는 몬스터 자기 코드만 부른다) → 둘 다 막힘. 휴면 진입 때 기존 상태(스폰 슈퍼아머 등)는 지우지 않는다.
 
-## 2. 🔴 스피너봇 레인과 병합 때 정리할 지점
+## 2. 스피너봇 연습 모드와의 휴면 통합 (할 일 15 I0 — 완료)
 
-- 이 브랜치: **`MonsterBase.SetDormantServer(bool)` / `MonsterBase.IsDormant`** — 모든 몬스터 공통 휴면(존 장부가 존3 스피너봇에도 건다).
-- `feature/TutorialSpinnerPractice`: `SpinnerBot.SetDormant` / `EnterPractice` / `EnterRealMode`(진행 중).
-- 정리 방향(제안): 스피너봇의 휴면은 base 의 `SetDormantServer` 로 합치고(`SpinnerBot.SetDormant` → base 호출 또는 삭제), 연습/본 모드만 스피너봇에 남긴다.
-  이름이 겹치면(`IsDormant` 를 스피너봇도 선언) CS0108 경고 — base 쪽 하나로 정리.
+- **휴면 = `MonsterBase.SetDormantServer(bool)` / `MonsterBase.IsDormant` 하나.** 모든 몬스터 공통(존 장부가 존3 스피너봇에도 건다).
+- 스피너봇 연습 컴포넌트(`Tutorial/SpinnerPractice/TutorialSpinnerPractice`)의 `SetDormant`·`startDormant`·모델의 휴면 깃발·`SpinnerPracticeMode.Dormant` 는 **삭제**했다.
+  남은 모드 = 연습 / 전환 대기 / 본 모드(연습으로 시작). 스피너가 휴면용으로 걸던 `SetServerLogicSuspended(true)`·무한 SuperArmor 도 삭제 —
+  휴면 중 정지·무적·넉백/CC 무시는 base 휴면이 한다. `SetServerLogicSuspended` 는 이제 **전환 대기(기본 2초)에만** 쓴다(base 휴면과 플래그가 따로라 겹쳐도 서로를 풀지 않는다).
+- base 휴면 중에는 컴포넌트가 전환 대기 타이머를 흘리지 않는다(기존 "휴면 중 타이머 정지" 유지). `EnterPractice`/`EnterRealMode` 는 휴면을 **풀지 않는다** — 휴면 중 부르면 경고 1줄.
 - 존3 순서(S9): 활성 때 존 장부가 스피너봇을 휴면 → 존3 첫 진입 때 `SetMonsterDormantServer(spinner, false)` 후 `EnterPractice` → G5 → `EnterRealMode` → 처치 = G6(장부가 자동).
-  연습 모드의 "죽지 않음"은 스피너봇 레인 몫이다(휴면 무적과 별개 — 연습 모드는 간파가 맞아야 하므로 휴면을 풀고 들어가야 한다).
+  연습 모드의 "죽지 않음"(체력 피해 0)은 스피너 컴포넌트 몫이다(휴면 무적과 별개 — 연습 모드는 간파가 맞아야 하므로 휴면을 풀고 들어간다).
+- 스피너봇 쪽 상세: [handoff-tutorial-spinner.md](handoff-tutorial-spinner.md).
 
 ## 3. S5 — 보스 타이머 · 보스 진입 패드 · 타이머 HUD
 
