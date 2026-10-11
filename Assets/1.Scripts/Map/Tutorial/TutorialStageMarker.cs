@@ -45,12 +45,15 @@ public sealed class TutorialStageMarker : MonoBehaviour
         if (s_active == this) s_active = null;
     }
 
-    // 배리어(S3)는 Play 중에만, 이 스테이지 루트에 붙인다 — 프리팹·씬에는 저장되지 않는다(공용 존 프리팹에도 없다).
-    // 실제 생성은 디렉터가 튜토리얼을 켠 뒤(모든 피어)다.
+    // 배리어(S3)·엘리베이터 문(S5)은 Play 중에만, 이 스테이지 루트에 붙인다 — 프리팹·씬에는 저장되지 않는다(공용 존 프리팹에도 없다).
+    // 실제 동작은 디렉터가 튜토리얼을 켠 뒤(모든 피어)다.
     private void Start()
     {
-        if (!Application.isPlaying || GetComponent<TutorialBarriers>() != null) return;
-        gameObject.AddComponent<TutorialBarriers>().SetMaterial(barrierMaterial);
+        if (!Application.isPlaying) return;
+        if (GetComponent<TutorialBarriers>() == null)
+            gameObject.AddComponent<TutorialBarriers>().SetMaterial(barrierMaterial);
+        if (GetComponent<TutorialElevatorDoor>() == null)
+            gameObject.AddComponent<TutorialElevatorDoor>();
     }
 
 #if UNITY_EDITOR

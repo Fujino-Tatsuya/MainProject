@@ -14,6 +14,7 @@ internal static class TutorialEditModeTestRunner
         "^TutorialAreaTrackerTests$",
         "^TutorialBarrierRulesTests$",
         "^TutorialMonsterLedgerTests$",
+        "^TutorialBossPathRulesTests$",
     };
 
     const string Tag = "[TutorialTests]";

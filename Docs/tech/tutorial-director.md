@@ -3,7 +3,7 @@
 > 할 일 15 / S1 (2026-10-11). 원본 시나리오: [../design/tutorial-scenario.md](../design/tutorial-scenario.md) §2.1·§4 · 계획: [../../PLAN-tutorial.md](../../PLAN-tutorial.md).
 > 코드: `Assets/1.Scripts/Map/Tutorial/` — `TutorialFlowModel`(순수 규칙) · `TutorialDirector`(서버 소유·복제) · `TutorialStageMarker`(판별).
 > 테스트: 메뉴 `Tools/Tests/튜토리얼 EditMode 테스트 실행`(`TutorialFlowModelTests` · `TutorialAreaTrackerTests`). 튜토리얼 단계의 새 픽스처는 이 러너에 넣는다.
-> S2 구간 감지는 §6. S3 배리어는 §7. S4 존 장부·몬스터 휴면은 §8.
+> S2 구간 감지는 §6. S3 배리어는 §7. S4 존 장부·몬스터 휴면은 §8. S5 타이머·보스 길은 §9. **다음 레인 인계는 §10.**
 
 ## 1. 판별 — 한 곳
 - `StageTutorial.prefab` 루트에 `TutorialStageMarker`(비네트워크). 저작 메뉴 `2. Build StageTutorial Prefab` 도 붙인다.
@@ -44,6 +44,8 @@
 | 오너 클라 | `ReportLocalCheck(Move / PassiveTooltip)` → `ReportOwnerCheckServerRpc`(서버 재검증: 항목·G1 전·PlayerObject·이동은 Alive) — **초안, S7 에서 사용** |
 | 모두 읽기 | `IsTutorialActive` · `Step` · `IsGateOpen` · `WasGateAutoOpened` · `GetCounter`/`GetCounterTarget` · `TryGetPlayerProgress` · `TryGetWait` |
 | 이벤트(정적) | `StepChanged` · `GateOpened(gate, reason)` — 서버는 실제 이유, 클라는 Timeout/Manual 만 · `StateChanged`(아무 복제 변화 + 스폰 직후 1회 — 다시 그리기 신호) |
+
+S2~S5 에서 늘어난 API 전체 목록은 §10.1.
 
 다음 단계가 붙일 자리는 `TutorialDirector` 클래스 주석(S3 배리어 → `GateOpened`/`IsGateOpen`, S4 → G3·Zone2Kills, S9 → Zone3Interrupts, S12 → Timeout 열림 시 특성 자동 획득).
 
@@ -156,3 +158,90 @@
 
 **디버그(Play 중 호스트, `Tools/Tutorial/Debug/`)**: 장부 로그 · 존2 기상 · 존3 기상 · 존4 기상(중간보스 제외) · 존4 중간보스 기상 · 존2~4 전부 휴면 ·
 존2 전멸(깨워서 처치) · 존3 핵심 처치 · 존4 핵심 처치. F9(DevMonsterKill)는 휴면 몬스터를 못 죽인다(무적) — 먼저 깨울 것.
+
+## 9. 보스 타이머 · 보스 길 (S5)
+> 코드: `TutorialBossPathRules`(순수) · `TutorialBossPath`(판별 한 곳 — 경석 코드가 묻는 곳) · `TutorialElevatorDoor`(모든 피어) · `TutorialDirector`(G8·HUD·도착) ·
+> 경석 코드 훅(`BossTimerManager`·`BossTimerHUD`·`BossEnterTrigger`·`BossEnterZoneVisual`) — 무엇을 왜는 [handoff-tutorial.md](handoff-tutorial.md) §3.
+> 테스트: `TutorialBossPathRulesTests`(튜토리얼 러너). 회귀: `BossTimerClockTests`(슬로우 모션 러너). 디버그: `Tools/Tutorial/Debug/` 보스 길 5개.
+
+**판별**: `TutorialBossPath.IsTutorialStage` = `TutorialStageMarker.IsActive` && 씬에 `TutorialDirector`. 둘 다 씬 로드(OnEnable·Awake) 때 정해져
+`MapGenerator.OnGenerated`·NetworkObject 스폰 순서와 무관하다 → 타이머는 디렉터 활성 전에도 **한 프레임도 자동 시작하지 않는다**. 디렉터가 씬에 없으면 잠금도 없다(교착 방지).
+
+| 항목 | 튜토리얼 | 비튜토리얼(절차 맵) |
+|---|---|---|
+| 타이머 시작 | 맵 생성 자동 시작 없음(Idle) → **G8 열림 = `BossTimerManager.StartTimerServer(420)`** | 맵 생성 직후 자동(씬 600 · 코드 300) — 그대로 |
+| 제한시간 | 디렉터 인스펙터 `bossTimerLimitSeconds` 420(D6). `_limitOverride` 로 복제 → 클라 게이지 같은 길이 | 인스펙터 값 |
+| HUD | Idle + `IsTimerHudShown` 꺼짐 = 숨김(알파 0). `ShowTimerHudServer()`(Z4-0) = 빈 게이지로 등장. G8 이면 자동 표시 | Idle 에도 빈 틀(기존) |
+| 패드 | G10 전 잠김 — 서 있어도 점유 false(카운트다운·색 전환 없음), 테두리 숨김. G10 순간 이미 서 있던 사람으로 카운트다운 | 처음부터 활성 |
+| 엘리베이터 문 | G10 과 함께 `Animator.Play("Open")`(늦은 클라 = 끝 프레임) | 손대지 않음(기본 Closed) |
+| 만료 | 3초 경고 → Soul 강제 부활 → 전원 이동 — **게이트·배리어·패드 무관**(잠긴 패드는 '진행 중'을 만들 수 없다) | 같음 |
+| 도착 | 타이머 Stopped·게이지 0(기존) + 디렉터 단계 `Finished` + `BossRoomArrived` | 기존 |
+
+- **G8 과 타이머 시작은 하나다**: 타이머를 직접 켜는 API 는 디렉터에 없다 — `StartBossTimerServer()` = `TryOpenGateServer(G8)`, 실제 시작은 G8 열림 처리 한 곳.
+  '타이머 전/후'(S11 목숨 차감, S10 존4 기상)는 **`IsBossTimerStarted`(= G8 열림, 모든 피어)** 하나로 본다. `BossTimerManager.State` 는 만료·도착(Stopped)으로 바뀌어 기준이 못 된다.
+- 엘리베이터 문 컨트롤러(`4.Animations/.../MV_BossroomEnter_Doors.controller`)에는 파라미터·전이가 없다(Closed 기본, Open·Close 고립 상태). 애셋을 고치지 않고 상태를 직접 재생한다.
+  문을 다시 닫는 연출(보스방 이동 때 Close 등)은 없다 — 필요하면 같은 방식으로 `Close`.
+- 도착 = `BossTeleportManager.AlivePlayersArrived`(서버, 패드·강제 공통). 판 전체 1번. ACK 실패(`ArrivalAborted`)는 도착이 아니다.
+
+## 10. 인계 (S0~S5 레인 마무리 — S6~S12 가 읽을 것)
+
+### 10.1 공개 API · 이벤트 전체
+**`TutorialDirector`** (씬 상주 NetworkObject, `Instance`)
+
+| 쪽 | 시그니처 |
+|---|---|
+| 읽기(모든 피어) | `bool IsTutorialActive` · `TutorialStep Step` · `bool IsGateOpen(TutorialGate)` · `bool WasGateAutoOpened(TutorialGate)` · `int GetCounter(TutorialCounter)` · `int GetCounterTarget(TutorialCounter)` · `bool TryGetPlayerProgress(ulong, out TutorialPlayerProgress)` · `bool TryGetWait(out TutorialGate, out int done, out int total, out float autoAdvanceRemaining)` · `bool IsTimerHudShown` · `bool IsBossTimerStarted`(= G8) · `bool IsFinished`(단계 Finished) · `float BossTimerLimitSeconds` · `float AreaEnterMargin/AreaExitMargin` |
+| 서버 쓰기 | `bool ReportCheckServer(ulong, TutorialCheck)` · `bool AddCounterServer(TutorialCounter, int = 1)` · `bool TryOpenGateServer(TutorialGate, TutorialGateOpenReason = Manual)`(순서 어기면 거부) · `bool RequestGateServer(TutorialGate)`(차례 전이면 보류) · `bool SetStepServer(TutorialStep)`(앞으로만) · `void ShowTimerHudServer()` · `bool StartBossTimerServer()`(= G8) |
+| 서버 몬스터 | `int SetZoneDormantServer(TutorialArea, bool, TutorialMonsterFilter = All)` · `int WakeZoneServer(TutorialArea, filter = All)` · `bool SetMonsterDormantServer(MonsterBase, bool)` · `void GetZoneMonstersServer(TutorialArea, filter, List<MonsterBase>)` · `bool TryGetZoneMonsterCountServer(zone, filter, out total, out alive)` · `bool IsZoneClearedServer(TutorialArea)` · `string DescribeMonsterZonesServer()` |
+| 서버 구간 | `TutorialArea GetPlayerAreaServer(ulong)` · `bool HasPartyEnteredServer(TutorialArea)` · `bool HasReachedCorridorMidServer(ulong, int)` |
+| 오너 클라 | `void ReportLocalCheck(TutorialCheck)`(Move·PassiveTooltip만 → ServerRpc, 서버 재검증) · `static bool IsOwnerReportable(TutorialCheck)` |
+| 정적 이벤트 — 양쪽 | `StepChanged(TutorialStep from, to)` · `GateOpened(TutorialGate, TutorialGateOpenReason)`(클라 이유 = Timeout/Manual 만) · `StateChanged()`(아무 복제 변화 + 스폰 직후 1회) |
+| 정적 이벤트 — 서버만 | `AreaFirstEntered(TutorialArea, ulong)` · `CorridorMidReached(ulong, int corridor)` · `ZoneCleared(TutorialArea)` · `BossRoomArrived(IReadOnlyList<ulong>)` |
+
+**그 밖의 컴포넌트**
+- `TutorialStageMarker` — `static bool IsActive` · `static TutorialStageMarker Active` · `static bool OwnsGeneratedMap(MapGenerator)` · `Material BarrierMaterial`. Play 중 `Start` 에서 `TutorialBarriers`·`TutorialElevatorDoor` 를 붙인다.
+- `TutorialBossPath`(모든 피어) — `IsTutorialStage` · `ShouldAutoStartTimer` · `ShouldHideTimerHud(TimerState)` · `IsBossPadEnabled`.
+- `TutorialBarriers`(모든 피어) — `static Active` · `bool IsBuilt` · `bool IsBarrierClosed(TutorialGate)` · `bool IsReturnPointAllowed(Vector3)`(서버 추락 복구 필터).
+- `TutorialElevatorDoor`(모든 피어) — `bool IsOpened`.
+- `BossTimerManager`(경석) — `bool StartTimerServer(float limitSecondsOverride = 0f)` · `TimerState State` · `float LimitSeconds` · `float RemainingSeconds` · `float Fill01`.
+- 순수: `TutorialFlowModel` · `TutorialAreaTracker`/`TutorialAreaLayout` · `TutorialBarrierRules` · `TutorialMonsterLedger` · `TutorialBossPathRules`.
+- 열거형: `TutorialStep`(None·Zone1·Corridor1·Zone2·Corridor2·Zone3Practice·Zone3Fight·Corridor3·Zone4Lore·Zone4Combat·Corridor4·BossEnter·Finished) ·
+  `TutorialGate`(G1~G10) · `TutorialCheck`(Move·Dash·AttackHit·PassiveTooltip·SkillQ·SkillE·TraitCorridor1~4) · `TutorialCounter`(Zone2Kills·Zone3Interrupts·Zone4Panels) ·
+  `TutorialArea`(None·Zone1~4·Corridor1~4·BossEnter) · `TutorialMonsterFilter`(All·NormalOnly·KeyOnly) · `TutorialGateOpenReason`(Manual·AllDone·Timeout·CounterReached).
+
+### 10.2 S6~S12 가 붙일 자리
+| 단계 | 자리 | 할 일 |
+|---|---|---|
+| S6 안내 UI | `TutorialDirector.HandleAreaFirstEntered` `TODO(S6)` · `HandleModelGateOpened` `TODO(S6)`(G10 → `TUT_B_PAD_WARN` 전원) | 단계 갱신 규칙(`SetStepServer` — 아직 아무도 안 부른다: 활성 때 Zone1, 도착 때 Finished 뿐) · 목표 패널·자막(늦은 클라 = `StateChanged` 로 재구성) |
+| S7 존1 | `ReportOwnerCheckServerRpc` `TODO(S7)`(이동 거리 검증) | Dash·AttackHit = `ReportCheckServer` · Move·PassiveTooltip = `ReportLocalCheck` |
+| S8 존2·복도 | `HandleCorridorMidReached` `TODO(S8/S12)` · `AreaFirstEntered(Zone2)` | 존2 안내 4초 뒤 `WakeZoneServer(Zone2)` · 특성 창 → `ReportCheckServer(TraitCorridorN)` |
+| S9 존3 | `AreaFirstEntered(Zone3)` · handoff-tutorial.md §2 | 스피너봇 휴면 해제 → 연습 모드 → `AddCounterServer(Zone3Interrupts)` → G5 자동 → 본 모드 |
+| S10 존4 | `AreaFirstEntered(Zone4)` | Z4-0 `ShowTimerHudServer()` + 자막 → 끝나면 `StartBossTimerServer()`(G8) → 3초 뒤 `WakeZoneServer(Zone4, NormalOnly)` · 다리 개통 `KeyOnly` · 패널 `AddCounterServer(Zone4Panels)` · 만료 문구 = `BossTimerManager.State == Expired` |
+| S11 사망 | — | 목숨 차감 기준 `IsBossTimerStarted` · 패드/강제 이동 시작(`BossTeleportManager.IsCountdownActive`) 때 대기 부활 취소·즉시 부활 |
+| S12 통합 | `HandleBossRoomArrived` `TODO(S12)` | 안내 종료(`BossRoomArrived`/`IsFinished`) · 개인 게이트 `Timeout` 열림 → 미선택자 자동 획득 · 만료 시 열린 특성 창 닫기 |
+
+### 10.3 함정
+- **스폰 순서**: `MapGenerator.OnGenerated` 가 디렉터·타이머 스폰보다 먼저 올 수 있다 — 서버는 보류 후 `OnNetworkSpawn` 에서 적용. 스폰 전 NetworkVariable/NetworkList 쓰기는 버려진다.
+  스폰 전에는 `NetworkManager`(NetworkBehaviour 프로퍼티)가 null → `NetworkManager.Singleton` 으로 판정. 클라의 존 스폰(맵 생성)과 디렉터 스폰도 순서가 없다 — 존 오브젝트를 찾는 클라 코드는 재시도(엘리베이터 문처럼).
+- **튜토리얼 판별은 `TutorialStageMarker` 하나**(경석 코드는 `TutorialBossPath` 경유). 디렉터 `_active` 복제를 기다리는 판정은 스폰 전에 false 라 늦다.
+- **게이트 순서·보류**: G1→G10 순서만. `TryOpenGateServer` 는 차례가 아니면 거부, 존 클리어처럼 조건이 이미 충족된 것은 `RequestGateServer`(보류 → 앞 게이트 열리는 `Evaluate` 에서 연다).
+  G8 이 열리면 보류된 G9 가 같이 열린다(중간보스를 타이머 전에 잡은 경우). 게이트 이벤트로 일을 붙일 때 **어느 경로로 열려도** 오는 `HandleModelGateOpened`(서버)·`GateOpened` 에 붙일 것.
+- **휴면 훅 병합**: 휴면은 `MonsterBase.SetDormantServer` 하나 — 스피너봇 레인의 `SpinnerBot.SetDormant` 는 병합 때 base 로 합친다(handoff-tutorial.md §2).
+- **씬 hash**: `4.MapScene` 의 `TutorialDirector` NetworkObject `GlobalObjectIdHash 114710176`. development 재반영·씬 머지 때 이 값이 0/중복이 되면 스폰이 깨진다 — 머지 뒤 확인.
+  씬 상주 NetworkBehaviour 에 NetworkVariable 을 더하는 것(이번 `_timerHudShown`·`_limitOverride`)은 hash 와 무관하지만 모든 피어가 같은 빌드여야 한다.
+- **Stage1 = 모든 판**(Start → 항상 튜토리얼). 튜토리얼 규칙(타이머 지연·패드 잠금·휴면)이 사실상 본게임 규칙이 된다 → D1 팀장 합의 전 development 병합 금지.
+  절차 맵(`Stage1_Procedural`)에서 기존 동작이 그대로인지는 마커 유무 하나로 갈린다.
+- 서버 전용 이벤트(`AreaFirstEntered`·`CorridorMidReached`·`ZoneCleared`·`BossRoomArrived`)는 클라에서 안 온다 — 클라 표시는 복제 값(`Step`·`IsGateOpen`·카운터·`StateChanged`)으로.
+- 네트워크 없이 단독 실행하면 디렉터·타이머가 스폰되지 않아 아무것도 돌지 않는다 — 확인은 호스트(MPPM).
+
+### 10.4 Play 확인 대기 (S0~S5 누적 — 사람이 MPPM 에서)
+- **S0**: 존3 `ZoneM_typeC` 배치·벽 투명화 페이드가 StageTutorial 에서 보인다.
+- **S1**: 호스트 로그 `[Tutorial] 튜토리얼 시작 — 참가자 n명` · 클라 로그 `디렉터 스폰 (서버:False) — 활성:True` · 늦게 붙은 클라도 같은 상태.
+- **S2**: 존 첫 진입·복도 중간 지점 로그(존1 은 착지 직후) · 영혼·사망 중에는 판정 없음.
+- **S3**: 배리어 8개가 모든 피어에서 걷기·대시·이동 스킬·넉백을 막는다 · 몬스터가 못 지나간다 · 열릴 때 페이드 · 추락 복구가 배리어 너머로 안 간다 · 거너 빔이 배리어에 막힌다.
+- **S4**: 존 장부 로그 1줄(존2 9 · 존3 1 · 존4 31) · 휴면 몬스터가 안 움직이고 피해·넉백·피해 숫자가 없다 · 깨우면 정상 · 존 클리어 → G3/G6/G9(보류 포함).
+- **S5**: 존1~4 동안 타이머 HUD 가 안 보인다(빈 틀도 없음) · `[BossTimer] 튜토리얼 스테이지 — 맵 생성 자동 시작을 건너뛴다` 로그 ·
+  디버그 `타이머 HUD 표시` → 빈 게이지 등장(클라 포함) · `타이머 시작 (G8)` → 420초로 차오름(클라 게이지 같은 속도) ·
+  G10 전 패드 위에 서도 카운트다운·테두리 없음 → `G10 열기` 순간 테두리 표시·엘리베이터 문 열림(클라 포함, 늦은 클라 = 열린 채) · 패드 3초 → 도착 → `[Tutorial] 보스방 도착` + 타이머 정지·게이지 0 ·
+  G10 전 타이머 만료(인스펙터 `bossTimerLimitSeconds` 를 짧게) → 3초 경고 → 전원 강제 이동(배리어·패드 잠금 무관) → 도착 로그 ·
+  🔴 절차 맵(`Stage1_Procedural`)에서 타이머가 맵 생성 직후 자동 시작·HUD 빈 틀·패드 즉시 활성·문 Closed 로 **기존과 같다**.

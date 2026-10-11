@@ -22,7 +22,11 @@ using UnityEngine;
 ///  · S3 배리어 ✅ → <see cref="TutorialBarriers"/>(모든 피어)가 <see cref="StateChanged"/>·<see cref="GateOpened"/> 를 받아 <see cref="IsGateOpen"/> 으로 적용
 ///  · S4 존 장부 ✅ → <see cref="TutorialMonsterZones"/>: 활성 때 존2~4 휴면, 존 클리어 → <see cref="RequestGateServer"/>(G3·G6·G9, 차례 전이면 보류),
 ///    존2 처치 → Zone2Kills(목표 = 장부 수). 기상 = <see cref="SetZoneDormantServer"/>(S8·S9·S10 이 부른다)
-///  · S5 타이머 → G8 열림에서 타이머 시작, 판별은 <see cref="TutorialStageMarker.IsActive"/>
+///  · S5 타이머·보스 길 ✅ → <b>G8 열림 = 타이머 시작</b>(<see cref="StartBossTimerServer"/>, 420초 — 단일 기준 <see cref="IsBossTimerStarted"/>),
+///    타이머 HUD 표시(<see cref="ShowTimerHudServer"/> — S10 Z4-0 이 부른다), G10 → 패드·엘리베이터 문(<see cref="TutorialBossPath"/>·<see cref="TutorialElevatorDoor"/>),
+///    보스방 도착(패드·만료 강제 이동 모두) → 단계 Finished + <see cref="BossRoomArrived"/>(S12 안내 종료)
+///  · S10 존4 → Z4-0 <see cref="ShowTimerHudServer"/> · 설정 자막 끝 <see cref="StartBossTimerServer"/>(= G8) · 만료 문구는 BossTimerManager.State == Expired
+///  · S11 사망 규칙 → 목숨 차감 기준 = <see cref="IsBossTimerStarted"/>(G8 열림, 모든 피어)
 ///  · S7 존1 → <see cref="ReportCheckServer"/>(Dash·AttackHit — 서버 관측) / <see cref="ReportLocalCheck"/>(Move·PassiveTooltip — 오너 보고)
 ///  · S9 존3 → <see cref="AddCounterServer"/>(Zone3Interrupts) — 목표 도달 시 G5 자동 개방
 ///  · S12 특성 → 개인 게이트가 <see cref="TutorialGateOpenReason.Timeout"/> 으로 열리면 미선택자 자동 획득
@@ -86,6 +90,10 @@ public sealed class TutorialDirector : NetworkBehaviour
     [SerializeField, Min(1)] private int zone3InterruptTarget = 3;
     [SerializeField, Min(1)] private int zone4PanelTarget = 4;
 
+    [Header("보스 타이머 (S5)")]
+    [Tooltip("튜토리얼 제한시간(게임 시간 초, D6). G8 에서 BossTimerManager 를 이 값으로 시작한다 — 씬의 BossTimerManager 값(비튜토리얼)은 그대로.")]
+    [SerializeField, Min(5f)] private float bossTimerLimitSeconds = TutorialBossPathRules.DefaultTutorialTimerLimitSeconds;
+
     [Header("구간 감지 (S2)")]
     [Tooltip("플레이어 위치로 구간을 판정하는 간격(초, 서버). 매 프레임일 필요는 없다.")]
     [SerializeField, Range(0.02f, 1f)] private float areaPollInterval = 0.15f;
@@ -111,6 +119,9 @@ public sealed class TutorialDirector : NetworkBehaviour
         default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
     private readonly NetworkList<int> _counters = new NetworkList<int>(
         default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    // 타이머 HUD 표시(S5) — 튜토리얼에서 Idle 동안 숨긴 HUD 를 켠다(Z4-0). 타이머가 시작되면(G8) 이 값과 무관하게 보인다.
+    private readonly NetworkVariable<bool> _timerHudShown = new NetworkVariable<bool>(
+        false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     public static TutorialDirector Instance { get; private set; }
 
@@ -139,6 +150,13 @@ public sealed class TutorialDirector : NetworkBehaviour
     /// </summary>
     public static event Action<ulong, int> CorridorMidReached;
 
+    /// <summary>
+    /// [서버] 보스방 도착(도착한 clientId 목록) — 패드든 타이머 만료 강제 이동이든 <see cref="BossTeleportManager.AlivePlayersArrived"/> 한 곳. 판 전체 1번.
+    /// 이때 단계가 <see cref="TutorialStep.Finished"/> 로 바뀐다(복제 — 클라·늦은 클라는 <see cref="IsFinished"/>·StepChanged 로 본다).
+    /// 붙일 자리: S12 안내 종료(목표 패널 정리), D19 23호 정면 간파 팁.
+    /// </summary>
+    public static event Action<IReadOnlyList<ulong>> BossRoomArrived;
+
     // 서버 전용
     private TutorialFlowModel _model;
     private TutorialAreaTracker _areas;
@@ -146,6 +164,8 @@ public sealed class TutorialDirector : NetworkBehaviour
     private float _areaPollTimer;
     private bool _pendingActivate;
     private NetworkManager _subscribedNm;
+    private BossTeleportManager _teleport;
+    private bool _bossArrived;
 
     // ─── 읽기(모든 피어) ─────────────────────────────────────────────────
 
@@ -212,6 +232,20 @@ public sealed class TutorialDirector : NetworkBehaviour
         return true;
     }
 
+    /// <summary>타이머 HUD 표시가 켜졌는가(Z4-0 · G8). 튜토리얼 Idle 동안 HUD 숨김을 푼다(<see cref="TutorialBossPath.ShouldHideTimerHud"/>).</summary>
+    public bool IsTimerHudShown => IsSpawned && _timerHudShown.Value;
+
+    /// <summary>
+    /// 보스 타이머가 시작됐는가 = <b>G8 열림</b>(모든 피어). 튜토리얼 '타이머 전/후' 판단(S11 목숨 차감·존4 기상)은 이 값 하나만 본다 —
+    /// BossTimerManager.State 는 도착(Stopped)·만료로 바뀌므로 기준으로 쓰지 않는다.
+    /// </summary>
+    public bool IsBossTimerStarted => IsGateOpen(TutorialGate.G8_TimerStart);
+
+    /// <summary>보스방에 도착해 튜토리얼 안내가 끝났는가(단계 Finished, 모든 피어).</summary>
+    public bool IsFinished => Step == TutorialStep.Finished;
+
+    public float BossTimerLimitSeconds => bossTimerLimitSeconds;
+
     public float AreaEnterMargin => areaEnterMargin;
     public float AreaExitMargin => areaExitMargin;
 
@@ -261,6 +295,7 @@ public sealed class TutorialDirector : NetworkBehaviour
         _wait.OnValueChanged += HandleWaitChanged;
         _players.OnListChanged += HandlePlayersChanged;
         _counters.OnListChanged += HandleCountersChanged;
+        _timerHudShown.OnValueChanged += HandleBoolChanged;
 
         // 🔴 스폰 순서가 보장되지 않는다 — 맵 생성(MapNetworkSync.OnNetworkSpawn 이 시작)이 이 스폰보다 먼저일 수 있다.
         //    그때 받은 생성 이벤트는 보류해 뒀다가 여기서 한 번만 적용한다(스폰 전 NetworkList 쓰기는 조용히 버려진다).
@@ -279,6 +314,7 @@ public sealed class TutorialDirector : NetworkBehaviour
         _wait.OnValueChanged -= HandleWaitChanged;
         _players.OnListChanged -= HandlePlayersChanged;
         _counters.OnListChanged -= HandleCountersChanged;
+        _timerHudShown.OnValueChanged -= HandleBoolChanged;
         UnsubscribeServer();
         base.OnNetworkDespawn();
     }
@@ -340,6 +376,7 @@ public sealed class TutorialDirector : NetworkBehaviour
         _subscribedNm.OnClientConnectedCallback += HandleClientConnected;
         _subscribedNm.OnClientDisconnectCallback += HandleClientDisconnected;
         PlayerLifeCycleController.ServerLifeStateChanged += HandleServerLifeStateChanged;
+        SubscribeBossPath();
 
         // [0, CounterCount) = 값, [CounterCount, 2·CounterCount) = 목표(존2 목표가 장부 수라 클라도 알아야 한다).
         _counters.Clear();
@@ -362,6 +399,11 @@ public sealed class TutorialDirector : NetworkBehaviour
             _subscribedNm = null;
         }
         PlayerLifeCycleController.ServerLifeStateChanged -= HandleServerLifeStateChanged;
+        if (_teleport != null)
+        {
+            _teleport.AlivePlayersArrived -= HandleBossRoomArrived;
+            _teleport = null;
+        }
         if (_model != null)
         {
             _model.GateOpened -= HandleModelGateOpened;
@@ -556,6 +598,67 @@ public sealed class TutorialDirector : NetworkBehaviour
 
     /// <summary>[서버] 장부 요약 문자열(디버그).</summary>
     public string DescribeMonsterZonesServer() => _monsterZones != null ? _monsterZones.Describe() : "(장부 없음 — 튜토리얼 비활성)";
+
+    // ─── 보스 타이머 · 보스 길(서버, S5) ─────────────────────────────────────
+    // 타이머 자동 시작 끔·HUD 숨김·패드 잠금은 경석 코드가 TutorialBossPath 로 묻는다(Docs/tech/handoff-tutorial.md §3).
+    // 여기서는 G8 = 타이머 시작, HUD 표시, 보스방 도착만 배선한다. 만료 강제 이동은 BossTimerManager 그대로(게이트·배리어·패드 무관).
+
+    private void SubscribeBossPath()
+    {
+        BossTimerManager timer = BossTimerManager.Instance;
+        if (timer == null)
+            Edit.LogError("[Tutorial] BossTimerManager 가 없다 — G8 에서 타이머를 시작할 수 없다.", this);
+        else if (timer.State != BossTimerManager.TimerState.Idle)
+            Edit.LogError($"[Tutorial] 활성화 때 보스 타이머가 이미 {timer.State} — 자동 시작이 걸렸다(TutorialBossPath 판별 확인).", this);
+
+        _teleport = BossTeleportManager.Instance;
+        if (_teleport != null) _teleport.AlivePlayersArrived += HandleBossRoomArrived;
+        else Edit.LogError("[Tutorial] BossTeleportManager 가 없다 — 보스방 도착(안내 종료)을 받을 수 없다.", this);
+    }
+
+    /// <summary>
+    /// [서버] 타이머 HUD 를 보이게 한다(S10 Z4-0 — 첫 플레이어 존4 진입). 아직 Idle 이면 빈 게이지로 보인다. 복제 — 늦은 클라도 보인다.
+    /// 펄스 강조는 S6/S10 몫.
+    /// </summary>
+    public void ShowTimerHudServer()
+    {
+        if (!RequireServerActive(nameof(ShowTimerHudServer)) || _timerHudShown.Value) return;
+        _timerHudShown.Value = true;
+        Edit.Log("[Tutorial] 타이머 HUD 표시.", this);
+    }
+
+    /// <summary>
+    /// [서버] 보스 타이머 시작 = <b>G8 열기</b>(단일 기준 — <see cref="IsBossTimerStarted"/>). S10 이 존4 설정 자막이 끝날 때 부른다.
+    /// 앞 게이트(G7)가 닫혀 있으면 거부(false). 실제 시작은 G8 열림 처리(<see cref="HandleModelGateOpened"/>)에서 — 다른 경로로 G8 이 열려도 같다.
+    /// </summary>
+    public bool StartBossTimerServer() => TryOpenGateServer(TutorialGate.G8_TimerStart);
+
+    // G8 이 어떤 경로로 열리든(TryOpenGate·보류 RequestGate·디버그) 여기서 한 번 타이머를 시작한다.
+    private void OnTimerGateOpened()
+    {
+        if (!_timerHudShown.Value) _timerHudShown.Value = true;
+
+        BossTimerManager timer = BossTimerManager.Instance;
+        if (timer == null)
+        {
+            Edit.LogError("[Tutorial] G8 열림 — BossTimerManager 가 없어 타이머를 시작하지 못했다.", this);
+            return;
+        }
+        if (timer.StartTimerServer(bossTimerLimitSeconds))
+            Edit.Log($"[Tutorial] G8 → 보스 타이머 시작 {bossTimerLimitSeconds:0}초.", this);
+    }
+
+    private void HandleBossRoomArrived(IReadOnlyList<ulong> arrived)
+    {
+        if (_model == null || !IsServer || !IsSpawned || _bossArrived) return;
+        _bossArrived = true;
+
+        Edit.Log($"[Tutorial] 보스방 도착 {arrived.Count}명 — 튜토리얼 안내 종료(단계 Finished).", this);
+        // TODO(S12): 안내 종료(목표 패널 정리)·D19 23호 정면 간파 팁 — BossRoomArrived / IsFinished 를 구독.
+        _model.SetStep(TutorialStep.Finished);
+        Commit();
+        BossRoomArrived?.Invoke(arrived);
+    }
 
     // ─── 인원(서버) ──────────────────────────────────────────────────────
 
@@ -756,6 +859,9 @@ public sealed class TutorialDirector : NetworkBehaviour
     private void HandleModelGateOpened(TutorialGate gate, TutorialGateOpenReason reason)
     {
         Edit.Log($"[Tutorial] 게이트 {gate} 열림 — {reason}.", this);
+        if (gate == TutorialGate.G8_TimerStart) OnTimerGateOpened();
+        // G10(패드·엘리베이터 문)은 각 피어가 IsGateOpen 으로 본다 — TutorialBossPath·TutorialElevatorDoor.
+        // TODO(S6): G10 열림 → TUT_B_PAD_WARN 파티 전원(D17).
         GateOpened?.Invoke(gate, reason);
     }
 
@@ -769,6 +875,7 @@ public sealed class TutorialDirector : NetworkBehaviour
     // 서버는 모델 이벤트로 이미 알렸으니 GateOpened·StepChanged 는 클라에서만 낸다. StateChanged 는 양쪽.
 
     private void HandleActiveChanged(bool _, bool __) => StateChanged?.Invoke();
+    private void HandleBoolChanged(bool _, bool __) => StateChanged?.Invoke();
     private void HandleIntChanged(int _, int __) => StateChanged?.Invoke();
     private void HandleWaitChanged(WaitState _, WaitState __) => StateChanged?.Invoke();
     private void HandlePlayersChanged(NetworkListEvent<PlayerState> _) => StateChanged?.Invoke();
