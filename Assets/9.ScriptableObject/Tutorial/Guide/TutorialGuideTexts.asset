@@ -1,0 +1,228 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 93839f1dcd98f8043adf3e51450ccdd2, type: 3}
+  m_Name: TutorialGuideTexts
+  m_EditorClassIdentifier: Assembly-CSharp::TutorialGuideTextTable
+  rows:
+  - id: TUT_S0_WELCOME
+    text: "\uC791\uC804 \uAD6C\uC5ED\uC5D0 \uC9C4\uC785\uD588\uC2B5\uB2C8\uB2E4.
+      \uAE30\uBCF8 \uC870\uC791\uBD80\uD130 \uC810\uAC80\uD569\uB2C8\uB2E4."
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_ZONE_CLEAR
+    text: "\uAD6C\uC5ED \uD655\uBCF4. \uB2E4\uC74C \uBCF5\uB3C4\uAC00 \uC5F4\uB838\uC2B5\uB2C8\uB2E4."
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_TIP_R_CANCEL
+    text: "R(\uAD81\uADF9\uAE30)\uC740 \uB300\uC0C1\uC744 \uC9C0\uC815\uD558\uB294
+      \uB3D9\uC548 \uC88C\uD074\uB9AD\uC73C\uB85C \uD655\uC815\uD569\uB2C8\uB2E4.
+      \uCDE8\uC18C\uB294 R \uC744 \uB2E4\uC2DC \uB204\uB974\uAC70\uB098 \uC6B0\uD074\uB9AD."
+    durationSeconds: 8
+    sfx: {fileID: 0}
+  - id: TUT_TIMER_EXPIRED
+    text: "\uC2DC\uAC04\uC774 \uB2E4 \uB418\uC5C8\uC2B5\uB2C8\uB2E4 \u2014 \uC6D0\uD749\uC774
+      \uAE30\uB2E4\uB9BD\uB2C8\uB2E4."
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_WAIT_PARTY
+    text: "\uB3D9\uB8CC\uB97C \uAE30\uB2E4\uB9AC\uB294 \uC911 ({n}/{total}) \xB7
+      {mm:ss} \uD6C4 \uC790\uB3D9 \uC9C4\uD589"
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_MOVE
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_DASH
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_DASH_SUB
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_ATTACK
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_ATTACK_GUNNER
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_PASSIVE
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_PASSIVE_PALADIN
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_PASSIVE_GUNNER
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_PASSIVE_ASSASSIN
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_GO
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z2_INTRO
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z2_GOAL
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z2_NUDGE
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z2_Q
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z2_Q_PALADIN
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z2_Q_GUNNER
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z2_Q_ASSASSIN
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z2_E
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z2_E_PALADIN
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z2_E_GUNNER
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z2_E_ASSASSIN
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z3_INTRO
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z3_PRACTICE_NOTE
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z3_GOAL
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z3_GUNNER
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z3_MISS
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z3_EARLY
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z3_FIRST_SUCCESS
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z3_HINT
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z3_REAL
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z3_BOSS
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z4_LORE
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z4_TIMER_HINT
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z4_START
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z4_PANEL_INTRO
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z4_PANEL_GOAL
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z4_PANEL_FIRST
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z4_BRIDGE
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z4_MIDBOSS
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z4_COUNTER_REMIND
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z4_ULT
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z4_ULT_ASSASSIN
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z4_CLEAR
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z4_GO_BOSS
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_B_PAD_WARN
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_B_PAD_COUNT
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_B_BOSS_FRONT_TIP
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}

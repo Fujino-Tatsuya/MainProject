@@ -30,6 +30,7 @@ internal static class PlayerEditModeTestRunner
         "^InteractPromptSlotTests$", // 상호작용 F 프롬프트 — 마지막 Show 우선·소유자만 Hide·다른 뷰로 Show 시 이전 뷰 숨김·누락·파괴 정리
         "^TutorialTraitSelectionModelTests$", // 튜토리얼 특성(할 일 15 T1) — 후보 뽑기·중복 제외·선택 검증·자동 획득·라운드 완료
         "^TutorialTraitWindowModelTests$", // 튜토리얼 특성 창(할 일 15 T2) — 열림·닫힘·닫힌 라운드 재표시 금지·획득 토스트·문구
+        "^TutorialGuide(Text|SubtitleQueue|Model)Tests$", // 할 일 15 S6 — S12 에서 튜토리얼 러너로 이동. 문구 변형·치환·대기 포맷·자막 큐·RebuildFromState
     };
 
     const string Tag = "[PlayerTests]";
