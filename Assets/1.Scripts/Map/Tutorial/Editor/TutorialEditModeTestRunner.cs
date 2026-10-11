@@ -11,6 +11,7 @@ internal static class TutorialEditModeTestRunner
     static readonly string[] Fixtures =
     {
         "^TutorialFlowModelTests$",
+        "^TutorialAreaTrackerTests$",
     };
 
     const string Tag = "[TutorialTests]";

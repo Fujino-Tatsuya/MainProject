@@ -2,7 +2,8 @@
 
 > 할 일 15 / S1 (2026-10-11). 원본 시나리오: [../design/tutorial-scenario.md](../design/tutorial-scenario.md) §2.1·§4 · 계획: [../../PLAN-tutorial.md](../../PLAN-tutorial.md).
 > 코드: `Assets/1.Scripts/Map/Tutorial/` — `TutorialFlowModel`(순수 규칙) · `TutorialDirector`(서버 소유·복제) · `TutorialStageMarker`(판별).
-> 테스트: 메뉴 `Tools/Tests/튜토리얼 EditMode 테스트 실행`(`TutorialFlowModelTests`). 튜토리얼 단계의 새 픽스처는 이 러너에 넣는다.
+> 테스트: 메뉴 `Tools/Tests/튜토리얼 EditMode 테스트 실행`(`TutorialFlowModelTests` · `TutorialAreaTrackerTests`). 튜토리얼 단계의 새 픽스처는 이 러너에 넣는다.
+> S2 구간 감지는 §6.
 
 ## 1. 판별 — 한 곳
 - `StageTutorial.prefab` 루트에 `TutorialStageMarker`(비네트워크). 저작 메뉴 `2. Build StageTutorial Prefab` 도 붙인다.
@@ -44,4 +45,51 @@
 | 모두 읽기 | `IsTutorialActive` · `Step` · `IsGateOpen` · `WasGateAutoOpened` · `GetCounter`/`GetCounterTarget` · `TryGetPlayerProgress` · `TryGetWait` |
 | 이벤트(정적) | `StepChanged` · `GateOpened(gate, reason)` — 서버는 실제 이유, 클라는 Timeout/Manual 만 · `StateChanged`(아무 복제 변화 + 스폰 직후 1회 — 다시 그리기 신호) |
 
-다음 단계가 붙일 자리는 `TutorialDirector` 클래스 주석(S2 구간 → `SetStepServer`, S3 배리어 → `GateOpened`/`IsGateOpen`, S4 → G3·Zone2Kills, S9 → Zone3Interrupts, S12 → Timeout 열림 시 특성 자동 획득).
+다음 단계가 붙일 자리는 `TutorialDirector` 클래스 주석(S3 배리어 → `GateOpened`/`IsGateOpen`, S4 → G3·Zone2Kills, S9 → Zone3Interrupts, S12 → Timeout 열림 시 특성 자동 획득).
+
+## 6. 구간 감지 (S2)
+> 코드: `TutorialAreaTracker`(순수 규칙 · `TutorialRect` · `TutorialCorridorGeometry`) · `TutorialAreaLayout`(저작 데이터 → 모양, 기즈모) · `TutorialDirector`(서버 폴링·이벤트).
+> 테스트: `TutorialAreaTrackerTests`(튜토리얼 러너).
+
+**구간 모양 — 저작 데이터에서 계산(하드코딩 좌표 없음)**
+- 존 = `StageTutorial` 슬롯 `SlotID` 0~3 → 존1~4, 4 → 보스 진입. 사각형 = 슬롯 `transform.position` · `Footprint` · 슬롯 Y 회전.
+  스테이지 180° 회전은 저작 메뉴(`RotateAroundWalls`)가 슬롯 위치에 이미 구워 넣었다.
+  존 프리팹 스폰 위치가 아니라 **슬롯 위치**를 쓴다 — 복도 문턱이 슬롯 사각형 경계에 맞춰 저작돼 있다(존3 M_typeC 는 피벗 때문에 스폰 위치가 z 0.4m 어긋남).
+- 복도 n = 존n ↔ 존n+1(복도4 = 존4 ↔ 보스 진입) 사각형 사이 틈(길이) × 그 틈 가운데 절반에 놓인 실제 복도 바닥 콜라이더의 가로 범위(너비 4m).
+  바닥 = 슬롯 밖, 비트리거, 두께 ≤ 1m, 윗면 ≤ 스테이지 높이 +0.5m(창틀 캡 제외). 못 찾으면 가운데 ±2m + 경고.
+- 복도 중간 지점 = 복도 한가운데 선 → 다음 존 쪽 끝(뒤쪽 절반 전체 — 폴링 간격·대시로 얇은 띠를 건너뛰지 않게).
+- 높이는 보지 않는다(XZ 평면). 벽 투명화 트리거(`Occlusion_zone_*`)는 연출용 크기라 쓰지 않는다(건드리지도 않음).
+
+2026-10-11 `StageTutorial.prefab` 계산값(시나리오 §1.1 대조):
+
+| 구간 | 계산(월드 XZ) | §1.1 |
+|---|---|---|
+| 존1 | 중심 (29.83, −200.4) 20×20 | (29.8, −200.4) |
+| 복도1 | x 10.18~19.83, z −202.4~−198.4 · 중간 x 10.18~15.0 | x 10.1~19.9 |
+| 존2 | (0.18, −200.4) 20×20 | (0.18, −200.4) |
+| 복도2 | z −190.4~−180.55, x −1.82~2.18 · 중간 z −185.48~−180.55 | z −190.5~−180.7 |
+| 존3 | (0.18, −160.55) 20×40 | (0.18, −160.95) — 스폰 위치(피벗) |
+| 복도3 | z −140.55~−130.9 · 중간 z −135.73~−130.9 | z −140.9~−131.0 |
+| 존4 | (10.17, −110.9) 40×40 | (10.17, −110.9) |
+| 복도4 | x −19.47~−9.83, z −103.11~−99.11 · 중간 x −19.47~−14.65 | x −9.7~−19.6 |
+| 보스 진입 | (−29.47, −101.1) 20×20 | (−29.5, −101.1) |
+
+**판정 규칙**
+- 서버만, 튜토리얼 활성(`TutorialStageMarker` 있음 → 디렉터 활성)일 때만. 주기 `areaPollInterval`(기본 0.15초, 실제 시간 — 슬로우모션 무관).
+- 위치 = 서버가 보는 `PlayerObject.transform`. 원격 플레이어는 오너 권한 이동의 NetworkTransform 복제값이라 늦고 흔들린다 → 히스테리시스:
+  새 구간은 경계에서 **안쪽 `areaEnterMargin`(기본 0.5m)** 까지 들어와야 진입, 지금 구간은 **바깥 `areaExitMargin`(기본 1.0m)** 을 넘어야 이탈. 둘 다 인스펙터 값.
+- 🔴 **판정 대상 = `PlayerLifeState.Alive` 뿐.** 사망 연출·영혼(Soul)·완전 사망(PermanentDead)은 판정하지 않는다 — 현재 구간 None,
+  존 첫 진입·복도 중간 지점 이벤트 모두 만들지 않는다. 되살아나면 그 자리부터 다시 판정(안 지나간 중간 지점이면 그때 발행).
+  (게이트 '전원' 판정(§4)은 Soul 을 포함한다 — 둘은 다른 규칙이다.)
+- 이탈한 플레이어는 현재 구간만 지운다(개인 1회 기록은 유지 — 재접속 없음).
+
+**이벤트 · API (서버)**
+| | |
+|---|---|
+| `TutorialDirector.AreaFirstEntered(area, clientId)` | 파티 첫 진입 — 존1~4·보스 진입 각각 판 전체 1번(복도는 없음). 존1 은 스폰 착지 직후 나온다 |
+| `TutorialDirector.CorridorMidReached(clientId, corridor 1~4)` | 개인 첫 복도 중간 지점 — 플레이어마다 복도마다 1번, 왕복해도 재발행 없음 |
+| `GetPlayerAreaServer(clientId)` · `HasPartyEnteredServer(area)` · `HasReachedCorridorMidServer(clientId, n)` | 조회 |
+
+이벤트만 낸다. 단계 갱신(`SetStepServer`)·안내(S6)·존2/3/4 시작(S8~S10)·특성 창(S8/S12)은 구독해서 붙인다. 복제 상태는 아직 없다(늦은 클라는 `Step` 으로 그린다).
+
+**디버그**: 씬에서 `Stage1`(StageTutorial 루트, `TutorialStageMarker`)을 선택하면 존(하늘색)·복도(노랑)·안쪽/바깥 여유(옅은 선)·복도 중간 지점(분홍) 기즈모.

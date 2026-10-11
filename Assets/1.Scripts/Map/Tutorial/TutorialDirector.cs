@@ -16,7 +16,8 @@ using UnityEngine;
 /// 시간: 교착 방지는 <b>서버 실제 시간</b>(<c>ServerTime</c>) — 간파 슬로우모션·솔로 일시정지 영향 없음(§2.1).
 ///
 /// S2 이후가 붙일 자리:
-///  · S2 구간 감지 → <see cref="SetStepServer"/> · 존 첫 진입 이벤트(별도 컴포넌트에서 이 API 호출)
+///  · S2 구간 감지 ✅ → <see cref="AreaFirstEntered"/>(파티 첫 진입)·<see cref="CorridorMidReached"/>(개인 복도 중간)·
+///    <see cref="GetPlayerAreaServer"/>. 단계 갱신(<see cref="SetStepServer"/>)은 아직 안 한다(S6 에서 게이트와 함께)
 ///  · S3 배리어 → <see cref="GateOpened"/> 구독 + 늦은 클라는 <see cref="IsGateOpen"/> 으로 재적용
 ///  · S4 존 장부 → 존2 전멸 <see cref="TryOpenGateServer"/>(G3), 처치 수 <see cref="AddCounterServer"/>(Zone2Kills)
 ///  · S5 타이머 → G8 열림에서 타이머 시작, 판별은 <see cref="TutorialStageMarker.IsActive"/>
@@ -82,6 +83,14 @@ public sealed class TutorialDirector : NetworkBehaviour
     [SerializeField, Min(1)] private int zone3InterruptTarget = 3;
     [SerializeField, Min(1)] private int zone4PanelTarget = 4;
 
+    [Header("구간 감지 (S2)")]
+    [Tooltip("플레이어 위치로 구간을 판정하는 간격(초, 서버). 매 프레임일 필요는 없다.")]
+    [SerializeField, Range(0.02f, 1f)] private float areaPollInterval = 0.15f;
+    [Tooltip("새 구간에 들어갈 때 경계에서 안쪽으로 이만큼 더 들어와야 한다(m). 원격 위치는 NetworkTransform 복제 지연·보간으로 흔들린다.")]
+    [SerializeField, Min(0f)] private float areaEnterMargin = TutorialAreaTracker.DefaultEnterMargin;
+    [Tooltip("지금 구간을 떠날 때 경계 바깥으로 이만큼 더 나가야 한다(m). 들어갈 때 여유보다 크게 — 경계 왕복 깜빡임 방지.")]
+    [SerializeField, Min(0f)] private float areaExitMargin = TutorialAreaTracker.DefaultExitMargin;
+
     // 🔴 선언 순서 = 같은 틱 안의 클라 반영 순서로 기대한다 — 교착 방지 마스크를 열림 마스크보다 먼저 둬서
     //    클라 GateOpened 가 이유(Timeout)를 읽을 수 있게 한다(보장은 아님 — 이유는 표시 보조용).
     private readonly NetworkVariable<bool> _active = new NetworkVariable<bool>(
@@ -114,8 +123,23 @@ public sealed class TutorialDirector : NetworkBehaviour
     /// <summary>복제 상태 중 무엇이든 바뀌었다(스폰 직후 1회 포함) — UI 를 통째로 다시 그리는 신호.</summary>
     public static event Action StateChanged;
 
+    /// <summary>
+    /// [서버] 파티 첫 진입(구간, 처음 들어온 client) — 존1~4·보스 진입 각각 판 전체 1번. 살아 있는 플레이어만 센다.
+    /// 붙일 자리: S8 존2 안내 → 기상 · S9 존3 연습 모드 시작 · S10 존4 설정 자막(Z4-0) · S6 단계/안내 갱신.
+    /// </summary>
+    public static event Action<TutorialArea, ulong> AreaFirstEntered;
+
+    /// <summary>
+    /// [서버] 개인 첫 복도 중간 지점(client, 복도 번호 1~4) — 플레이어마다 복도마다 1번, 왕복해도 다시 안 낸다. 살아 있는 플레이어만.
+    /// 붙일 자리: S8/S12 특성 선택 창(OpenSelection(clientId, corridor, showIntro: corridor == 1)) — 게이트가 이미 열렸거나
+    /// 자동 획득을 받은 플레이어는 창을 띄우지 않는 판단(§3.2)은 소비처 몫.
+    /// </summary>
+    public static event Action<ulong, int> CorridorMidReached;
+
     // 서버 전용
     private TutorialFlowModel _model;
+    private TutorialAreaTracker _areas;
+    private float _areaPollTimer;
     private bool _pendingActivate;
     private NetworkManager _subscribedNm;
 
@@ -177,6 +201,23 @@ public sealed class TutorialDirector : NetworkBehaviour
             autoAdvanceRemaining = Mathf.Max(0f, (float)(w.AutoAdvanceAtServerTime - NetworkManager.ServerTime.Time));
         return true;
     }
+
+    public float AreaEnterMargin => areaEnterMargin;
+    public float AreaExitMargin => areaExitMargin;
+
+    /// <summary>
+    /// [서버] 플레이어의 지금 구간(히스테리시스 적용). 튜토리얼 비활성·모르는 id·살아 있지 않음(영혼·사망 연출·완전 사망) = None.
+    /// 판정 주기(<c>areaPollInterval</c>)만큼 늦을 수 있다.
+    /// </summary>
+    public TutorialArea GetPlayerAreaServer(ulong clientId) =>
+        _areas != null ? _areas.GetCurrentArea(clientId) : TutorialArea.None;
+
+    /// <summary>[서버] 파티가 이 존에 들어간 적이 있는가.</summary>
+    public bool HasPartyEnteredServer(TutorialArea area) => _areas != null && _areas.HasPartyEntered(area);
+
+    /// <summary>[서버] 이 플레이어가 복도 n(1~4) 중간 지점에 닿은 적이 있는가.</summary>
+    public bool HasReachedCorridorMidServer(ulong clientId, int corridor) =>
+        _areas != null && _areas.HasReachedCorridorMid(clientId, corridor);
 
     // ─── 생명주기 ────────────────────────────────────────────────────────
 
@@ -293,6 +334,8 @@ public sealed class TutorialDirector : NetworkBehaviour
         _model.SetStep(TutorialStep.Zone1);
         Commit();
 
+        BuildAreas();
+
         Edit.Log($"[Tutorial] 튜토리얼 시작 — 참가자 {_model.ParticipantCount}명, 교착 방지 {deadlockSeconds:0}초.", this);
     }
 
@@ -310,12 +353,69 @@ public sealed class TutorialDirector : NetworkBehaviour
             _model.GateOpened -= HandleModelGateOpened;
             _model.StepChanged -= HandleModelStepChanged;
         }
+        if (_areas != null)
+        {
+            _areas.PartyFirstEntered -= HandleAreaFirstEntered;
+            _areas.CorridorMidReached -= HandleCorridorMidReached;
+        }
     }
 
     private void Update()
     {
         if (_model == null || !IsServer || !IsSpawned) return;
         Commit();   // 교착 방지 시계 — 매 프레임 재판정(바뀐 값만 복제)
+        PollAreas();
+    }
+
+    // ─── 구간 감지(서버, S2) ──────────────────────────────────────────────
+    // 규칙은 순수 TutorialAreaTracker, 모양은 TutorialAreaLayout(StageTutorial 슬롯·복도 바닥). 이벤트만 낸다 —
+    // 게이트 개방·안내·특성 창은 이후 단계가 AreaFirstEntered / CorridorMidReached 를 구독해 붙인다.
+    // 위치 = 서버가 보는 PlayerObject.transform(원격 = 오너 권한 NetworkTransform 복제값, 지연 있음 → 여유 경계).
+
+    private void BuildAreas()
+    {
+        TutorialStageMarker stage = TutorialStageMarker.Active;
+        _areas = new TutorialAreaTracker(areaEnterMargin, areaExitMargin);
+        if (!TutorialAreaLayout.TryBuild(stage != null ? stage.transform : null, _areas, out string error))
+            Edit.LogWarning($"[Tutorial] 구간 계산 실패 — {error}. 계산된 구간만 판정한다.", this);
+        else if (error != null)
+            Edit.LogWarning($"[Tutorial] 구간 계산 경고 — {error}.", this);
+
+        _areas.PartyFirstEntered += HandleAreaFirstEntered;
+        _areas.CorridorMidReached += HandleCorridorMidReached;
+        _areaPollTimer = 0f;
+    }
+
+    private void PollAreas()
+    {
+        if (_areas == null) return;
+        _areaPollTimer -= Time.unscaledDeltaTime;   // 슬로우모션 무관(§2.1)
+        if (_areaPollTimer > 0f) return;
+        _areaPollTimer = areaPollInterval;
+
+        foreach (NetworkClient client in _subscribedNm.ConnectedClientsList)
+        {
+            NetworkObject po = client.PlayerObject;
+            if (po == null) continue;
+            var life = po.GetComponent<PlayerLifeCycleController>();
+            PlayerLifeState state = life != null ? life.State : PlayerLifeState.Alive;
+            Vector3 p = po.transform.position;
+            _areas.UpdatePlayer(client.ClientId, p.x, p.z, state);
+        }
+    }
+
+    private void HandleAreaFirstEntered(TutorialArea area, ulong clientId)
+    {
+        Edit.Log($"[Tutorial] 파티 첫 진입 {area} — client {clientId}.", this);
+        // TODO(S6): 단계 갱신(SetStepServer)·안내 — 단계 전환 규칙은 게이트와 함께 정한다.
+        AreaFirstEntered?.Invoke(area, clientId);
+    }
+
+    private void HandleCorridorMidReached(ulong clientId, int corridor)
+    {
+        Edit.Log($"[Tutorial] client {clientId} 복도{corridor} 중간 지점 도착(개인 1회).", this);
+        // TODO(S8/S12): 특성 선택 창 열기 → 선택 완료 시 ReportCheckServer(clientId, TraitCorridor{n}).
+        CorridorMidReached?.Invoke(clientId, corridor);
     }
 
     // ─── 인원(서버) ──────────────────────────────────────────────────────
@@ -345,6 +445,7 @@ public sealed class TutorialDirector : NetworkBehaviour
         if (_model == null || !IsSpawned) return;
         if (_model.MarkDisconnected(clientId))
             Edit.Log($"[Tutorial] client {clientId} 이탈 — 남은 참가자 {_model.ParticipantCount}명 기준으로 재판정.", this);
+        _areas?.RemovePlayer(clientId);
         Commit();
     }
 
