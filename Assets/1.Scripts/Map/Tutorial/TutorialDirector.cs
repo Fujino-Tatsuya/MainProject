@@ -29,6 +29,7 @@ using UnityEngine;
 ///  · S11 사망 규칙 → 목숨 차감 기준 = <see cref="IsBossTimerStarted"/>(G8 열림, 모든 피어)
 ///  · S7 존1 ✅ → TutorialZone1Flow: <see cref="ReportCheckServer"/>(Dash·AttackHit — 서버 관측) / <see cref="ReportLocalMoveDistance"/>(Move — 오너 누적 거리, 서버 상한 검증) /
 ///    <see cref="ReportLocalCheck"/>(PassiveTooltip — 오너 보고)
+///  · 서버 → 클라 자막 → <see cref="ShowSubtitleServer"/>(id, 키·값 인자, 대상 null = 전원). 강조·목표 패널은 흐름 파일이 클라에서 직접
 ///  · S9 존3 → <see cref="AddCounterServer"/>(Zone3Interrupts) — 목표 도달 시 G5 자동 개방
 ///  · S12 특성 → 개인 게이트가 <see cref="TutorialGateOpenReason.Timeout"/> 으로 열리면 미선택자 자동 획득
 /// </summary>
@@ -748,6 +749,62 @@ public sealed class TutorialDirector : NetworkBehaviour
         bool changed = _model.SetStep(step);
         if (changed) Commit();
         return changed;
+    }
+
+    /// <summary>
+    /// [서버] 자막 한 줄을 클라들에 띄운다 — 각 클라가 <see cref="TutorialGuideUI.ShowSubtitle"/> 로 자기 캐릭터 기준 문구를 고른다.
+    /// <paramref name="args"/> = 자리표시자 키·값 교대 배열(<c>{ "n", "3", "name", "…" }</c>, 홀수 길이면 마지막 키는 버린다).
+    /// <paramref name="targets"/> = 받을 clientId(null = 전원). 복제 상태가 아니라 늦은 클라는 받지 않는다.
+    /// 강조·목표 패널은 여기로 보내지 않는다 — 흐름 파일이 클라에서 복제 상태를 보고 직접 건다.
+    /// </summary>
+    public void ShowSubtitleServer(string id, string[] args = null, ulong[] targets = null)
+    {
+        if (!RequireServerActive(nameof(ShowSubtitleServer)) || string.IsNullOrEmpty(id)) return;
+        var payload = new SubtitleArgs { Values = args ?? Array.Empty<string>() };
+        if (targets == null)
+            ShowSubtitleClientRpc(id, payload);
+        else if (targets.Length > 0)
+            ShowSubtitleClientRpc(id, payload, new ClientRpcParams { Send = new ClientRpcSendParams { TargetClientIds = targets } });
+    }
+
+    [ClientRpc]
+    private void ShowSubtitleClientRpc(string id, SubtitleArgs args, ClientRpcParams p = default)
+    {
+        TutorialGuideUI ui = TutorialGuideUI.Instance;
+        if (ui == null)
+        {
+            Edit.LogWarning($"[Tutorial] 자막 {id} — TutorialGuideUI 가 없어 생략.", this);
+            return;
+        }
+
+        Dictionary<string, string> dict = null;
+        string[] v = args.Values;
+        if (v != null && v.Length >= 2)
+        {
+            dict = new Dictionary<string, string>();
+            for (int i = 0; i + 1 < v.Length; i += 2)
+                if (!string.IsNullOrEmpty(v[i])) dict[v[i]] = v[i + 1];
+        }
+        ui.ShowSubtitle(id, dict);
+    }
+
+    /// <summary>자막 인자 배열 — RPC 배열 직렬화 지원에 기대지 않고 길이 + 문자열로 직접 쓴다.</summary>
+    private struct SubtitleArgs : INetworkSerializable
+    {
+        public string[] Values;
+
+        public void NetworkSerialize<T>(BufferSerializer<T> s) where T : IReaderWriter
+        {
+            int n = Values?.Length ?? 0;
+            s.SerializeValue(ref n);
+            if (s.IsReader) Values = new string[n];
+            for (int i = 0; i < n; i++)
+            {
+                string value = Values[i] ?? string.Empty;
+                s.SerializeValue(ref value);
+                if (s.IsReader) Values[i] = value;
+            }
+        }
     }
 
     private bool RequireServerActive(string api)
