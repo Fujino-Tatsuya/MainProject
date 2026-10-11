@@ -21,6 +21,8 @@ internal static class TutorialEditModeTestRunner
         "^TutorialGuide(Text|SubtitleQueue|Model)Tests$", // 안내 UI(S6) — 문구 변형·치환·대기 포맷·자막 큐·RebuildFromState
         "^SpinnerPracticeModelTests$", // 스피너봇 연습(S9) — 모드·창 간격·연속 놓침·스폰 반경 클램프
         "^TutorialZone1ModelTests$", // 존1(S7) — 이동 보고 상한·이동 누적·툴팁 1초·착지·목표 순서·대기 줄
+        "^TutorialCorridorModelTests$", // 복도(S8) — 게이트 매핑·복도당 라운드 1번·진행 중 복도·목표 장면
+        "^TutorialZone2ModelTests$", // 존2(S8) — 기상 지연·E 안내·Q/E 넛지·목표 줄
     };
 
     const string Tag = "[TutorialTests]";
