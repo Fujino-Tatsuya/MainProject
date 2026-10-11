@@ -54,6 +54,15 @@ public sealed class PlayerReviveController : NetworkBehaviour
     /// </summary>
     public bool TryCompleteReviveOnServer()
     {
+        return TryCompleteReviveOnServer(consumeLife: true);
+    }
+
+    /// <summary>
+    /// <paramref name="consumeLife"/> = false 면 목숨 검사·차감 없이 부활시킨다
+    /// (튜토리얼 교육 단계 자동 부활 — <c>TutorialDeathRules</c>). true 는 위 진입점과 같다.
+    /// </summary>
+    public bool TryCompleteReviveOnServer(bool consumeLife)
+    {
         if (!IsSpawned || !IsServer)
             return false;
 
@@ -61,6 +70,18 @@ public sealed class PlayerReviveController : NetworkBehaviour
         ResolveGameRuleReference();
         if (lifeCycle == null || lifeCycle.State != PlayerLifeState.Soul)
             return false;
+
+        if (!consumeLife)
+        {
+            if (!lifeCycle.TryCompleteRevive())
+                return false;
+
+            int lifeCount = 0;
+            if (gameRule != null)
+                gameRule.TryGetLifeCount(OwnerClientId, out lifeCount);
+            ServerReviveCompleted?.Invoke(lifeCount);
+            return true;
+        }
 
         if (gameRule == null ||
             !gameRule.TryRegisterClient(OwnerClientId) ||

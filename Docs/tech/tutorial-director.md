@@ -118,3 +118,18 @@
 - 추락 복구: 서버 `ResolveReturnPoint` 가 기준점·Ring 후보마다 `ReturnPointFilter` 를 부른다 → `TutorialBarrierRules.IsPointReachable` —
   점을 품은 구간이 모두 '아직 못 들어가는 구간'(들어가는 배리어가 닫힘)이면 거부. 튜토리얼 구간 밖(보스방)은 허용. 스폰 폴백은 거르지 않는다(존1).
 - 타이머 만료·패드 이동은 `BossTeleportManager` 순간이동이라 배리어와 무관(§4 "만료 강제 이동은 G9·G10 과 무관").
+
+## 8. 사망 규칙 (S11)
+> 코드: `TutorialDeathRulesModel`·`TutorialRevivePointRules`(순수) · `TutorialDeathRules`(서버, 디렉터에 런타임 부착). 테스트: `TutorialDeathRulesTests`(튜토리얼 러너).
+> 훅(기본값 = 기존 동작): `PlayerLifeCycleController.ServerDeathKeepsSoul` · `PlayerReviveController.TryCompleteReviveOnServer(bool consumeLife)` · `PlayerFallRecovery.RelocateServer`.
+
+- 부착: 서버에서 `StateChanged` 때 `IsTutorialActive` 면 디렉터 GameObject 에 `AddComponent`(씬·프리팹 저장 없음). 비튜토리얼은 안 붙는다.
+- 사망(Alive → DeadPresentation) → 3초 뒤 자동 부활 + 2초 무적(`InvulnerabilityCause.Revive`). 차감 = **사망 시점** `IsGateOpen(G8)`(단계 기준, 위치 무관).
+  G8 전은 목숨 수와 무관하게 Soul(훅), 부활 시 차감 없음. G8 뒤는 기존 규칙(목숨 0 → PermanentDead → 전원이면 PartyWipeWatcher).
+- 부활 지점 = 열린 배리어로 들어갈 수 있는 가장 앞 구간(존1~복도4, **보스 진입 제외 — 패드**) → 앞 구간 순. 구간 안쪽 1m·1.5m 격자 중
+  1층 바닥(스테이지 높이 ±1m)·점유 없음(Wall 포함)·살아 있는 `MonsterBase` 에서 10m(고정 — 몬스터 인지 반경 공개 API 없음) 밖, 사망 지점에 가장 가까운 점.
+  안전한 곳이 없으면 몬스터에서 가장 먼 후보, 후보가 없으면 그 자리.
+- 보스방 이동: `BossTeleportManager.IsCountdownActive`(패드·만료 강제 공통)가 켜지면 대기 부활 전부 '즉시·그 자리'(Soul 이 되는 대로). 이동 중 사망도 같다.
+  튜토리얼 구간 밖(보스방)에 있는 Soul 은 늘 그 자리. 도착(`AlivePlayersArrived`/`ArrivalAborted`) 또는 단계 Finished 뒤 사망은 일반 규칙.
+- 연출 잠금(`PlayerEncounterLock`) 중이면 보류 + 경고 1회, 풀리면 다음 프레임 부활(사망 연출 해소도 잠금 해제 뒤 진행).
+- 추락 생존 복구는 그대로. 추락 사망은 기존대로 안전지점에 Soul 로 옮겨진 뒤 같은 규칙으로 부활.
