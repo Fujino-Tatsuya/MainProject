@@ -33,6 +33,7 @@ public readonly struct TutorialTraitChosen
 ///
 /// 효과: 배율 특성 = 영구(duration 0) 상태이상, 특성마다 다른 출처 id 라 서로 곱해진다.
 /// 쿨감 특성 = 그 플레이어의 <see cref="Player.ServerAttackLanded"/> 를 구독한다.
+/// 선택 창 무적(T2): 제시받고 아직 안 고른 플레이어에게 <see cref="InvulnerabilityCause.TraitSelection"/> 토큰을 건다.
 /// 이 컴포넌트를 씬에 두지 않으면 아무 일도 하지 않는다(튜토리얼 외 영향 없음).
 /// </summary>
 [DisallowMultipleComponent]
@@ -80,6 +81,10 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
     private readonly NetworkVariable<int> round = new NetworkVariable<int>(
         0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
+    // TutorialTraitRoundDisplay 플래그(byte) — 현재 라운드의 창 표시 옵션.
+    private readonly NetworkVariable<byte> roundDisplay = new NetworkVariable<byte>(
+        0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
     // 서버 전용
     private TutorialTraitSelectionModel model;
     private System.Random random;
@@ -87,12 +92,19 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
     private readonly List<ulong> clientScratch = new List<ulong>();
     private bool roundCompletionRaised = true;
 
+    // 선택 창 무적(InvulnerabilityCause.TraitSelection) 토큰을 건 플레이어 — 모델의 "아직 안 고름"과 맞춘다.
+    private readonly HashSet<ulong> shieldedClients = new HashSet<ulong>();
+    private readonly List<ulong> shieldScratch = new List<ulong>();
+
     public static TutorialTraitDirector Instance { get; private set; }
 
     public TutorialTraitPool Pool => pool;
 
     /// <summary>[전 피어] 현재 제시 라운드 번호(0 = 아직 없음).</summary>
     public int Round => round.Value;
+
+    /// <summary>[전 피어] 현재 라운드의 창 표시 옵션(상단 설명·아래 한 줄).</summary>
+    public TutorialTraitRoundDisplay RoundDisplay => (TutorialTraitRoundDisplay)roundDisplay.Value;
 
     /// <summary>[서버] 특성 1장 획득(수동·자동).</summary>
     public event Action<TutorialTraitChosen> ServerTraitChosen;
@@ -116,6 +128,7 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
         base.OnNetworkSpawn();
         entries.OnListChanged += HandleEntriesChanged;
         round.OnValueChanged += HandleRoundChanged;
+        roundDisplay.OnValueChanged += HandleRoundDisplayChanged;
 
         if (!IsServer)
             return;
@@ -132,9 +145,13 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
     {
         entries.OnListChanged -= HandleEntriesChanged;
         round.OnValueChanged -= HandleRoundChanged;
+        roundDisplay.OnValueChanged -= HandleRoundDisplayChanged;
 
         if (IsServer && NetworkManager != null)
             NetworkManager.OnClientDisconnectCallback -= HandleClientDisconnected;
+
+        if (IsServer)
+            ReleaseAllSelectionShields();
 
         for (int i = 0; i < cooldownHooks.Count; i++)
         {
@@ -155,7 +172,10 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
     /// [서버] 접속 중인 전원에게 새 라운드 후보를 제시한다. 이미 얻은 특성은 빠지고, 남은 후보가 적으면 남은 만큼만.
     /// false = 아무에게도 1장도 제시하지 못했다(풀 소진·미스폰) → 호출자는 선택 단계를 건너뛴다.
     /// </summary>
-    public bool StartOfferRoundServer()
+    public bool StartOfferRoundServer() => StartOfferRoundServer(TutorialTraitRoundDisplay.None);
+
+    /// <summary>[서버] 접속 중인 전원에게 제시 — 창 표시 옵션(상단 설명·아래 한 줄)을 같이 정한다. 반환값은 위와 같다.</summary>
+    public bool StartOfferRoundServer(TutorialTraitRoundDisplay display)
     {
         if (!CanServe)
             return false;
@@ -164,11 +184,15 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
         foreach (ulong clientId in NetworkManager.ConnectedClientsIds)
             clientScratch.Add(clientId);
 
-        return StartOfferRoundServer(clientScratch);
+        return StartOfferRoundServer(clientScratch, display);
     }
 
     /// <summary>[서버] 지정한 플레이어들에게 새 라운드 후보를 제시한다. 반환값은 위와 같다.</summary>
-    public bool StartOfferRoundServer(IEnumerable<ulong> clientIds)
+    public bool StartOfferRoundServer(IEnumerable<ulong> clientIds) =>
+        StartOfferRoundServer(clientIds, TutorialTraitRoundDisplay.None);
+
+    /// <summary>[서버] 지정한 플레이어들에게 제시 + 창 표시 옵션. 반환값은 위와 같다.</summary>
+    public bool StartOfferRoundServer(IEnumerable<ulong> clientIds, TutorialTraitRoundDisplay display)
     {
         if (!CanServe)
         {
@@ -178,9 +202,12 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
 
         int offerCount = pool != null ? pool.OfferCount : 0;
         bool anyOffered = model.StartRound(clientIds, offerCount, random.Next);
+        // 옵션을 행보다 먼저 쓴다 — 클라 UI 는 같은 프레임 변경을 모아 한 번에 평가한다.
+        roundDisplay.Value = (byte)display;
         round.Value = model.Round;
         roundCompletionRaised = false;
         RebuildEntries();
+        SyncSelectionShields();
 
         Edit.Log($"{Tag} 라운드 {model.Round} 제시 — 1장 이상 받은 플레이어 {(anyOffered ? "있음" : "없음(건너뜀)")}.", this);
         CheckRoundCompleted();
@@ -283,6 +310,7 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
         TutorialTraitDefinition trait = pool != null ? pool.Get(traitIndex) : null;
         ApplyEffect(clientId, traitIndex, trait);
         RebuildEntries();
+        SyncSelectionShields();
 
         Edit.Log($"{Tag} client {clientId} 특성 획득 '{trait?.Id}'({traitIndex}) {(auto ? "자동" : "수동")} — 라운드 {model.Round}.", this);
         ServerTraitChosen?.Invoke(new TutorialTraitChosen(clientId, traitIndex, trait, auto, model.Round));
@@ -312,7 +340,66 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
         }
 
         RebuildEntries();
+        SyncSelectionShields();
         CheckRoundCompleted();
+    }
+
+    // ── 선택 창 무적 ───────────────────────────────────────────────────────
+
+    // 기존 원인별 토큰 경로(PlayerInvulnerability)를 쓴다 — 원인이 다르면 서로의 토큰을 지우지 않으므로
+    // 대시·연출·착지 보호 무적과 겹쳐도 어느 한쪽 해제가 다른 쪽을 풀지 않는다.
+    private void SyncSelectionShields()
+    {
+        if (model == null)
+            return;
+
+        shieldScratch.Clear();
+        foreach (ulong clientId in shieldedClients)
+        {
+            if (!model.HasPendingChoice(clientId))
+                shieldScratch.Add(clientId);
+        }
+
+        for (int i = 0; i < shieldScratch.Count; i++)
+        {
+            SetSelectionShield(shieldScratch[i], false);
+            shieldedClients.Remove(shieldScratch[i]);
+        }
+
+        model.GetPendingClients(shieldScratch);
+        for (int i = 0; i < shieldScratch.Count; i++)
+        {
+            ulong clientId = shieldScratch[i];
+            if (!shieldedClients.Contains(clientId) && SetSelectionShield(clientId, true))
+                shieldedClients.Add(clientId);
+        }
+    }
+
+    private void ReleaseAllSelectionShields()
+    {
+        foreach (ulong clientId in shieldedClients)
+            SetSelectionShield(clientId, false);
+
+        shieldedClients.Clear();
+    }
+
+    private bool SetSelectionShield(ulong clientId, bool shielded)
+    {
+        Player player = FindPlayer(clientId);
+        PlayerInvulnerability invulnerability = player != null ? player.GetComponent<PlayerInvulnerability>() : null;
+        if (invulnerability == null)
+        {
+            if (shielded)
+                Edit.LogWarning($"{Tag} client {clientId} 의 PlayerInvulnerability 를 못 찾았다 — 선택 중 무적 없음.", this);
+            return false;
+        }
+
+        // 무기한 토큰 — 선택·자동 획득·이탈·디스폰이 SyncSelectionShields/ReleaseAllSelectionShields 로 해제한다.
+        if (shielded)
+            invulnerability.AddServerToken(InvulnerabilityCause.TraitSelection, 0.0);
+        else
+            invulnerability.RemoveServerToken(InvulnerabilityCause.TraitSelection);
+        return true;
     }
 
     // ── 효과 ───────────────────────────────────────────────────────────────
@@ -427,6 +514,8 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
     private void HandleEntriesChanged(NetworkListEvent<Entry> _) => ClientStateChanged?.Invoke();
 
     private void HandleRoundChanged(int previous, int current) => ClientStateChanged?.Invoke();
+
+    private void HandleRoundDisplayChanged(byte previous, byte current) => ClientStateChanged?.Invoke();
 
     // ── 조회 ───────────────────────────────────────────────────────────────
 
