@@ -67,6 +67,32 @@ public static class PlayerMotionSweep
     }
 
     /// <summary>
+    /// dir 로 distance 만큼 갈 때 가장 먼저 막는 것이 유닛(Enemy 또는 다른 플레이어 몸)인가. 벽·지형이 먼저면 false.
+    /// 같은 캡슐·필터(<see cref="TryCast"/>)를 쓰므로 실제 이동 스윕과 판정이 어긋나지 않는다.
+    /// </summary>
+    public static bool IsBlockedByUnitFirst(
+        CapsuleCollider capsule,
+        Vector3 originOffset,
+        Vector3 dir,
+        float distance,
+        float maxWalkableAngle,
+        LayerMask obstacleMask,
+        float skin,
+        RaycastHit[] buffer)
+    {
+        if (capsule == null || buffer == null || distance <= 0f || dir.sqrMagnitude <= 1e-8f)
+            return false;
+
+        if (!TryCast(capsule, capsule.transform, originOffset, dir.normalized, distance, maxWalkableAngle,
+                obstacleMask, skin, buffer, out RaycastHit hit, out _))
+        {
+            return false;
+        }
+
+        return IsUnitLayer(hit.collider.gameObject.layer);
+    }
+
+    /// <summary>
     /// 이미 겹친 유닛(Enemy·Player 몸)에서 빠져나갈 수평 관통 벡터의 합. 겹침이 없으면 0.
     /// 길이 제한·벽 스윕은 호출자가 한다(<see cref="PlayerUnitCollisionRules.ComputeSeparationStep"/>).
     /// </summary>

@@ -12,6 +12,7 @@ public sealed class PlayerUnitPenetrationTests
 
     private readonly List<GameObject> createdObjects = new List<GameObject>();
     private readonly Collider[] overlapBuffer = new Collider[8];
+    private readonly RaycastHit[] castBuffer = new RaycastHit[8];
 
     [TearDown]
     public void TearDown()
@@ -72,6 +73,63 @@ public sealed class PlayerUnitPenetrationTests
         Vector3 penetration = PlayerMotionSweep.ComputeUnitPenetration(player, Vector3.zero, 1 << playerLayer, overlapBuffer);
 
         Assert.That(penetration, Is.EqualTo(Vector3.zero));
+    }
+
+    [Test]
+    public void EnemyAhead_IsUnitBlockFirst()
+    {
+        int enemyLayer = LayerMask.NameToLayer("Enemy");
+        Assume.That(enemyLayer, Is.GreaterThanOrEqualTo(0));
+
+        CapsuleCollider player = CreateCapsule("Player", new Vector3(0f, TestY, 0f), 0);
+        CreateCapsule("Enemy", new Vector3(1.2f, TestY, 0f), enemyLayer);
+        Physics.SyncTransforms();
+
+        bool blocked = PlayerMotionSweep.IsBlockedByUnitFirst(
+            player, Vector3.zero, Vector3.right, 0.5f, 45f, (1 << 0) | (1 << enemyLayer), 0.02f, castBuffer);
+
+        Assert.That(blocked, Is.True);
+    }
+
+    [Test]
+    public void WallBeforeEnemy_IsNotUnitBlock()
+    {
+        int enemyLayer = LayerMask.NameToLayer("Enemy");
+        Assume.That(enemyLayer, Is.GreaterThanOrEqualTo(0));
+
+        CapsuleCollider player = CreateCapsule("Player", new Vector3(0f, TestY, 0f), 0);
+        CreateBox("Wall", new Vector3(0.8f, TestY, 0f), new Vector3(0.2f, 3f, 3f));
+        CreateCapsule("Enemy", new Vector3(1.6f, TestY, 0f), enemyLayer);
+        Physics.SyncTransforms();
+
+        bool blocked = PlayerMotionSweep.IsBlockedByUnitFirst(
+            player, Vector3.zero, Vector3.right, 1.5f, 45f, (1 << 0) | (1 << enemyLayer), 0.02f, castBuffer);
+
+        Assert.That(blocked, Is.False);
+    }
+
+    [Test]
+    public void NothingWithinDistance_IsNotUnitBlock()
+    {
+        int enemyLayer = LayerMask.NameToLayer("Enemy");
+        Assume.That(enemyLayer, Is.GreaterThanOrEqualTo(0));
+
+        CapsuleCollider player = CreateCapsule("Player", new Vector3(0f, TestY, 0f), 0);
+        CreateCapsule("Enemy", new Vector3(3f, TestY, 0f), enemyLayer);
+        Physics.SyncTransforms();
+
+        bool blocked = PlayerMotionSweep.IsBlockedByUnitFirst(
+            player, Vector3.zero, Vector3.right, 0.5f, 45f, (1 << 0) | (1 << enemyLayer), 0.02f, castBuffer);
+
+        Assert.That(blocked, Is.False);
+    }
+
+    private void CreateBox(string name, Vector3 position, Vector3 size)
+    {
+        GameObject gameObject = new GameObject(name);
+        createdObjects.Add(gameObject);
+        gameObject.transform.position = position;
+        gameObject.AddComponent<BoxCollider>().size = size;
     }
 
     private CapsuleCollider CreateCapsule(string name, Vector3 position, int layer)

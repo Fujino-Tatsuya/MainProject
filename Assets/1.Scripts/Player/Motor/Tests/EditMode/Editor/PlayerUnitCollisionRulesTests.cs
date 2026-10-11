@@ -122,6 +122,33 @@ public sealed class PlayerUnitCollisionRulesTests
     }
 
     [Test]
+    public void DashEnds_WhenCutShortByUnit()
+    {
+        Assert.That(PlayerUnitCollisionRules.ShouldEndDashOnUnitBlock(0.4f, 0.15f, unitBlocksRemaining: true), Is.True);
+        Assert.That(PlayerUnitCollisionRules.ShouldEndDashOnUnitBlock(0.4f, 0f, unitBlocksRemaining: true), Is.True);
+    }
+
+    [Test]
+    public void DashContinues_WhenCutShortByWall()
+    {
+        Assert.That(PlayerUnitCollisionRules.ShouldEndDashOnUnitBlock(0.4f, 0f, unitBlocksRemaining: false), Is.False);
+    }
+
+    [Test]
+    public void DashContinues_WhenFullMoveApplied()
+    {
+        Assert.That(PlayerUnitCollisionRules.ShouldEndDashOnUnitBlock(0.4f, 0.4f, unitBlocksRemaining: true), Is.False);
+        Assert.That(PlayerUnitCollisionRules.ShouldEndDashOnUnitBlock(
+            0.4f, 0.4f - PlayerUnitCollisionRules.DashBlockedTolerance * 0.5f, unitBlocksRemaining: true), Is.False);
+    }
+
+    [Test]
+    public void DashContinues_WhenNothingRequested()
+    {
+        Assert.That(PlayerUnitCollisionRules.ShouldEndDashOnUnitBlock(0f, 0f, unitBlocksRemaining: true), Is.False);
+    }
+
+    [Test]
     public void SeparationStep_ZeroSpeedOrDelta_DoesNothing()
     {
         Vector3 penetration = new Vector3(0.3f, 0f, 0f);

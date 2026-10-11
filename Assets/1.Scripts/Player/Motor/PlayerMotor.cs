@@ -147,6 +147,29 @@ public sealed class PlayerMotor : MonoBehaviour
         return Mathf.Clamp(Vector3.Dot(resolved, desiredDelta / requestedDistance), 0f, requestedDistance);
     }
 
+    /// <summary>
+    /// 마지막 시뮬레이션 위치에서 direction 으로 distance 만큼 갈 때 가장 먼저 막는 것이 유닛(몬스터·다른 플레이어 몸)인가.
+    /// 현재 장애물 규칙(오버라이드 포함)을 그대로 쓴다. 일반 대시의 "유닛 직전 정지" 판정용(벽이면 false).
+    /// </summary>
+    public bool IsUnitBlockingAhead(Vector3 direction, float distance)
+    {
+        if (capsule == null)
+            return false;
+
+        direction.y = 0f;
+        PlayerSimulationSettings settings = CaptureSimulationSettings(simulationState.IsSoul);
+        Vector3 currentPosition = playerRigidbody != null ? playerRigidbody.position : transform.position;
+        return PlayerMotionSweep.IsBlockedByUnitFirst(
+            capsule,
+            simulationState.Position - currentPosition,
+            direction,
+            distance + settings.CollisionSkin * 2f,
+            settings.MaxWalkableSlopeAngle,
+            settings.ObstacleMask,
+            settings.CollisionSkin,
+            castBuffer);
+    }
+
     /// <summary>이번 물리 틱에 적용할 월드 속도(m/s)를 더한다.</summary>
     public void AddVelocity(Vector3 worldVelocity)
     {
