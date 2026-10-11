@@ -50,7 +50,7 @@
 | 쪽 | 시그니처 |
 |---|---|
 | 서버 | `void ShowSubtitleServer(string id, string[] args = null, ulong[] targets = null)` — args = 키·값 번갈아 둔 평탄 배열(`{ "N","2" }`), targets null = 전원·빈 배열 = 안 보냄 · `ulong[] GetClientsOfCharacterServer(TutorialCharacter)` |
-| 내부 | `[ClientRpc] ShowSubtitleClientRpc(string id, SubtitleArgs args, ClientRpcParams)` → `TutorialGuideUI.Instance?.ShowSubtitle(id, args)`(씬에 UI 없으면 로그만 — S12 배치 전) |
+| 내부 | `[ClientRpc] ShowSubtitleClientRpc(string id, SubtitleArgs args, ClientRpcParams)` → `TutorialGuideUI.Instance?.ShowSubtitle(id, args)`(씬에 UI 없으면 경고 로그만 — `TutorialGuideUI.prefab` 은 S7 에서 `4.MapScene` 에 이미 놓았다) |
 
 그 밖: `TutorialSpinnerPractice.SetPracticeRadius(float)`·`PracticeAnchor`·`PracticeRadius` · `MapContentSpawner.ServerMonsterPrefabOverride`(정적 훅).
 

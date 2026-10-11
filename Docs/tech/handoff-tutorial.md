@@ -70,4 +70,6 @@ Soul 강제 부활 → 전원 이동)·도착 시 `Stopped` + 게이지 0·`Boss
 
 ## 4. 그 밖에 몬스터 쪽은 안 바꿨다
 - `MonsterDeathEvents.ServerMonsterDied` 는 구독만 한다(세션 통계와 같은 채널).
-- `MapContentSpawner`·존 프리팹·몬스터 프리팹·데이터 무수정. 존 배정은 스폰 뒤 위치로 튜토리얼 쪽이 계산한다.
+- 존 프리팹·원본 몬스터 프리팹·데이터 무수정. 존 배정은 스폰 뒤 위치로 튜토리얼 쪽이 계산한다.
+- (S9 정정) `MapContentSpawner` 에는 **스폰 치환 훅** `ServerMonsterPrefabOverride`(기본 null)를 넣었다 — 튜토리얼일 때만 존3 SpinnerBot → `SpinnerBot_Tutorial` Variant. [handoff-tutorial-spinner.md](handoff-tutorial-spinner.md) §6.
+- (S10) `ZoneBridgeGateManager` 에 읽기 전용 정적 이벤트 2개(`ServerPanelActivated`·`ServerBridgeOpened`, 구독자 없으면 무동작) — [tutorial-zone4.md](tutorial-zone4.md) §4. 다리 재베이크 끊김·고정 조각 에러 로그 권고는 같은 문서 §6.

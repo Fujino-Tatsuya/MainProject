@@ -1,7 +1,8 @@
 # 튜토리얼 안내 UI (할 일 15 · S6)
 
 > 클라 로컬 안내 UI 모듈 — **목표 패널 · 안내 자막 · 강조 표시**. 네트워크 없음.
-> 서버 튜토리얼 상태를 읽어 이 API 를 부르는 연결은 S7~S10(메인), 씬 배치는 S12(메인).
+> 서버 튜토리얼 상태를 읽어 이 API 를 부르는 연결은 S7~S10 흐름 컴포넌트([tutorial-director.md](tutorial-director.md) §10.1 단계별 문서).
+> 씬 배치는 **S7 에서 끝났다**(`4.MapScene` 루트 `TutorialGuideUI` 인스턴스 1개, 추가만). 서버 자막은 디렉터 `ShowSubtitleServer` → ClientRpc → `ShowSubtitle` 하나로 온다.
 
 ## 파일
 
@@ -63,11 +64,11 @@ DontDestroyOnLoad 하지 않는다 — 튜토리얼 씬에 속한다. 부르는 
 - 우측 하단(타이머·미니맵·키가이드)은 쓰지 않는다.
 - 폰트 = `Assets/Resources/NotoSansKR-VariableFont_wght SDF.asset`(스킬 툴팁과 같음). 정적 아틀라스에 ☐/☑ 가 없어 **□/■** 를 쓴다(인스펙터 `uncheckedMark`/`checkedMark`).
 
-## S12 배치 방법
+## 배치 방법 (1·3 은 완료 — S7·I0)
 
-1. 튜토리얼 씬에 `TutorialGuideUI.prefab` 을 하나 놓는다(씬 상주, 네트워크 오브젝트 아님).
-2. 필요하면 인스펙터 `stepChangeClip`(단계 전환 효과음)을 채운다. 행별 효과음은 문구 SO 의 `sfx`.
-3. 테스트 픽스처를 튜토리얼 러너로 옮긴다.
+1. ✅ 튜토리얼 씬에 `TutorialGuideUI.prefab` 을 하나 놓는다(씬 상주, 네트워크 오브젝트 아님) — S7 에서 `4.MapScene` 에 놓았다.
+2. 필요하면 인스펙터 `stepChangeClip`(단계 전환 효과음)을 채운다. 행별 효과음은 문구 SO 의 `sfx`. (아직 비어 있음 — 사운드 결정 대기)
+3. ✅ 테스트 픽스처를 튜토리얼 러너로 옮긴다 — I0.
 4. 프리팹 구조를 바꾸려면 `TutorialGuideUIAuthoring` 을 고치고 메뉴를 다시 돌린다(프리팹은 통째로 다시 만든다, 문구 SO 는 빠진 행만 추가).
 
 ## ⚠️ 데이터 테이블([DataTableText]) 이관 주의

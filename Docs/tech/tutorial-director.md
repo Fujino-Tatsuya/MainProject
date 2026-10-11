@@ -3,7 +3,8 @@
 > 할 일 15 / S1 (2026-10-11). 원본 시나리오: [../design/tutorial-scenario.md](../design/tutorial-scenario.md) §2.1·§4 · 계획: [../../PLAN-tutorial.md](../../PLAN-tutorial.md).
 > 코드: `Assets/1.Scripts/Map/Tutorial/` — `TutorialFlowModel`(순수 규칙) · `TutorialDirector`(서버 소유·복제) · `TutorialStageMarker`(판별).
 > 테스트: 메뉴 `Tools/Tests/튜토리얼 EditMode 테스트 실행`(`TutorialFlowModelTests` · `TutorialAreaTrackerTests`). 튜토리얼 단계의 새 픽스처는 이 러너에 넣는다.
-> S2 구간 감지는 §6. S3 배리어는 §7. S4 존 장부·몬스터 휴면은 §8. S5 타이머·보스 길은 §9. **다음 레인 인계는 §10.**
+> S2 구간 감지는 §6. S3 배리어는 §7. S4 존 장부·몬스터 휴면은 §8. S5 타이머·보스 길은 §9. **단계별 문서·handoff 목록·API 전체는 §10.1.** S11 사망 규칙은 §11.
+> **Play 검증 체크리스트(S0~S12 전 단계·MPPM·회귀·병합 전 확인)**: [tutorial-qa.md](tutorial-qa.md).
 
 ## 1. 판별 — 한 곳
 - `StageTutorial.prefab` 루트에 `TutorialStageMarker`(비네트워크). 저작 메뉴 `2. Build StageTutorial Prefab` 도 붙인다.
@@ -41,13 +42,14 @@
 | 쪽 | API |
 |---|---|
 | 서버 | `ReportCheckServer(clientId, TutorialCheck)` · `AddCounterServer(counter, n)` · `TryOpenGateServer(gate)` · `SetStepServer(step)` |
-| 오너 클라 | `ReportLocalCheck(Move / PassiveTooltip)` → `ReportOwnerCheckServerRpc`(서버 재검증: 항목·G1 전·PlayerObject·이동은 Alive) — **초안, S7 에서 사용** |
+| 오너 클라 | `ReportLocalCheck(PassiveTooltip)` → `ReportOwnerCheckServerRpc`(서버 재검증: 항목·G1 전·PlayerObject) · 이동은 **`ReportLocalMoveDistance(m)`** → `ReportOwnerMoveServerRpc`(Alive·거리 상한 검증, S7). 거리 없는 `ReportLocalCheck(Move)` 는 서버가 거부한다 — [tutorial-zone1.md](tutorial-zone1.md) |
 | 모두 읽기 | `IsTutorialActive` · `Step` · `IsGateOpen` · `WasGateAutoOpened` · `GetCounter`/`GetCounterTarget` · `TryGetPlayerProgress` · `TryGetWait` |
 | 이벤트(정적) | `StepChanged` · `GateOpened(gate, reason)` — 서버는 실제 이유, 클라는 Timeout/Manual 만 · `StateChanged`(아무 복제 변화 + 스폰 직후 1회 — 다시 그리기 신호) |
 
 S2~S5 에서 늘어난 API 전체 목록은 §10.1.
 
 다음 단계가 붙일 자리는 `TutorialDirector` 클래스 주석(S3 배리어 → `GateOpened`/`IsGateOpen`, S4 → G3·Zone2Kills, S9 → Zone3Interrupts, S12 → Timeout 열림 시 특성 자동 획득).
+S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 남은 `TODO(S6/S8/S12)` 주석은 낡은 표시다).
 
 ## 6. 구간 감지 (S2)
 > 코드: `TutorialAreaTracker`(순수 규칙 · `TutorialRect` · `TutorialCorridorGeometry`) · `TutorialAreaLayout`(저작 데이터 → 모양, 기즈모) · `TutorialDirector`(서버 폴링·이벤트).
@@ -185,16 +187,35 @@ S2~S5 에서 늘어난 API 전체 목록은 §10.1.
 
 ## 10. 인계 (S0~S5 레인 마무리 — S6~S12 가 읽을 것)
 
-### 10.1 공개 API · 이벤트 전체
+### 10.1 단계별 문서 · handoff · 공개 API 전체
+
+**단계별 문서** (원본 시나리오 [../design/tutorial-scenario.md](../design/tutorial-scenario.md) — 이 문서는 S0~S5 코어 + S11)
+| 단계 | 문서 | 담는 것 |
+|---|---|---|
+| S6 안내 UI | [tutorial-guide-ui.md](tutorial-guide-ui.md) | 목표 패널·자막·강조 API, 문구 변형·치환 규칙, 화면 배치 |
+| 훅 | [tutorial-player-hooks.md](tutorial-player-hooks.md) | 대시 승인·툴팁 표시/숨김·간파 판정·스킬 사용·과열·조준 시작 이벤트 |
+| S0·S7 존1 | [tutorial-zone1.md](tutorial-zone1.md) | 착지 환영·이동 5m·대시·허수아비 적중 5·패시브 1초·G1·허수아비 디스폰 |
+| S8 복도1~4·존2 | [tutorial-corridors-zone2.md](tutorial-corridors-zone2.md) | 개인 도착 특성 라운드·출구 게이트·자동 획득·G10 패드 경고 · 존2 기상 4초·Q/E 안내·넛지 |
+| S9 존3 | [tutorial-zone3.md](tutorial-zone3.md) | 스피너봇 Variant 스폰 치환·연습 반경·간파 3번 → G5 → 본 모드 → G6 |
+| S10 존4·보스 진입 | [tutorial-zone4.md](tutorial-zone4.md) | 설정 자막 10초 → G8 → 패널·다리·중간보스 → G9 · 만료·패드·도착 정리 · 재베이크/고정 조각 조사 |
+| 특성 | [tutorial-traits.md](tutorial-traits.md) | 특성 디렉터 API·라운드·무적 토큰·placeholder 6종·xlsx 이관 메모 |
+| S11 사망 | 이 문서 §11 | 자동 부활·목숨 차감(G8)·부활 지점(단계 구간) |
+| QA | [tutorial-qa.md](tutorial-qa.md) | 사람이 위에서부터 따라 하는 Play/MPPM 체크리스트 · 알려진 한계 · 병합 전 확인 |
+
+**handoff (다른 담당 코드에 넣은 훅 — 경석 공유)**
+- [handoff-tutorial.md](handoff-tutorial.md) — `MonsterBase` 휴면(`SetDormantServer`), 스피너봇 휴면 통합(I0), 보스 타이머 지연 시작·HUD 숨김·패드 잠금(`TutorialBossPath` 한 곳 판별).
+- [handoff-tutorial-spinner.md](handoff-tutorial-spinner.md) — `SpinnerBot` 주입 인터페이스(`ISpinnerBotOverride`)·연습/전환 대기/본 모드, `MapContentSpawner.ServerMonsterPrefabOverride` 스폰 치환 훅.
+- 존3/4 레인 별도 handoff 는 없다 — 존4 의 `ZoneBridgeGateManager` 정적 이벤트 2개(`ServerPanelActivated`·`ServerBridgeOpened`)와 재베이크·고정 조각 조사는 [tutorial-zone4.md](tutorial-zone4.md) §4·§6 에 있다.
+
 **`TutorialDirector`** (씬 상주 NetworkObject, `Instance`)
 
 | 쪽 | 시그니처 |
 |---|---|
 | 읽기(모든 피어) | `bool IsTutorialActive` · `TutorialStep Step` · `bool IsGateOpen(TutorialGate)` · `bool WasGateAutoOpened(TutorialGate)` · `int GetCounter(TutorialCounter)` · `int GetCounterTarget(TutorialCounter)` · `bool TryGetPlayerProgress(ulong, out TutorialPlayerProgress)` · `bool TryGetWait(out TutorialGate, out int done, out int total, out float autoAdvanceRemaining)` · `bool IsTimerHudShown` · `bool IsBossTimerStarted`(= G8) · `bool IsFinished`(단계 Finished) · `float BossTimerLimitSeconds` · `float AreaEnterMargin/AreaExitMargin` |
-| 서버 쓰기 | `bool ReportCheckServer(ulong, TutorialCheck)` · `bool AddCounterServer(TutorialCounter, int = 1)` · `bool TryOpenGateServer(TutorialGate, TutorialGateOpenReason = Manual)`(순서 어기면 거부) · `bool RequestGateServer(TutorialGate)`(차례 전이면 보류) · `bool SetStepServer(TutorialStep)`(앞으로만) · `void ShowTimerHudServer()` · `bool StartBossTimerServer()`(= G8) |
+| 서버 쓰기 | `bool ReportCheckServer(ulong, TutorialCheck)` · `bool AddCounterServer(TutorialCounter, int = 1)` · `bool TryOpenGateServer(TutorialGate, TutorialGateOpenReason = Manual)`(순서 어기면 거부) · `bool RequestGateServer(TutorialGate)`(차례 전이면 보류) · `bool SetStepServer(TutorialStep)`(앞으로만) · `void ShowTimerHudServer()` · `bool StartBossTimerServer()`(= G8) · `void ShowSubtitleServer(string id, string[] args = null, ulong[] targets = null)`(S9 — 자막 RPC 하나, targets null = 전원) · `ulong[] GetClientsOfCharacterServer(TutorialCharacter)` |
 | 서버 몬스터 | `int SetZoneDormantServer(TutorialArea, bool, TutorialMonsterFilter = All)` · `int WakeZoneServer(TutorialArea, filter = All)` · `bool SetMonsterDormantServer(MonsterBase, bool)` · `void GetZoneMonstersServer(TutorialArea, filter, List<MonsterBase>)` · `bool TryGetZoneMonsterCountServer(zone, filter, out total, out alive)` · `bool IsZoneClearedServer(TutorialArea)` · `string DescribeMonsterZonesServer()` |
 | 서버 구간 | `TutorialArea GetPlayerAreaServer(ulong)` · `bool HasPartyEnteredServer(TutorialArea)` · `bool HasReachedCorridorMidServer(ulong, int)` |
-| 오너 클라 | `void ReportLocalCheck(TutorialCheck)`(Move·PassiveTooltip만 → ServerRpc, 서버 재검증) · `static bool IsOwnerReportable(TutorialCheck)` |
+| 오너 클라 | `void ReportLocalCheck(TutorialCheck)`(PassiveTooltip — Move 는 거리 없이 보내면 서버 거부) · `void ReportLocalMoveDistance(float meters)`(S7, 서버 상한 검증) · `static bool IsOwnerReportable(TutorialCheck)` |
 | 정적 이벤트 — 양쪽 | `StepChanged(TutorialStep from, to)` · `GateOpened(TutorialGate, TutorialGateOpenReason)`(클라 이유 = Timeout/Manual 만) · `StateChanged()`(아무 복제 변화 + 스폰 직후 1회) |
 | 정적 이벤트 — 서버만 | `AreaFirstEntered(TutorialArea, ulong)` · `CorridorMidReached(ulong, int corridor)` · `ZoneCleared(TutorialArea)` · `BossRoomArrived(IReadOnlyList<ulong>)` |
 
@@ -210,6 +231,11 @@ S2~S5 에서 늘어난 API 전체 목록은 §10.1.
   `TutorialArea`(None·Zone1~4·Corridor1~4·BossEnter) · `TutorialMonsterFilter`(All·NormalOnly·KeyOnly) · `TutorialGateOpenReason`(Manual·AllDone·Timeout·CounterReached).
 
 ### 10.2 S6~S12 가 붙일 자리
+> ✅ **모두 붙었다(S12 기준).** 실제 구현은 디렉터 본문이 아니라 디렉터 GameObject 에 런타임 `AddComponent` 되는 흐름 컴포넌트다 —
+> `TutorialZone1Flow`(S7) · `TutorialCorridorFlow`·`TutorialZone2Flow`(S8 — G10 `TUT_B_PAD_WARN` 포함) · `TutorialZone3Flow`/`Guide`(S9) · `TutorialZone4Flow`/`Guide`(S10 — 보스방 도착 정리·23호 팁 포함) · `TutorialDeathRules`(S11).
+> 단계 갱신(`SetStepServer`)도 각 흐름이 부른다. 디렉터 코드에 남은 `TODO(S6)`·`TODO(S8/S12)`·`TODO(S12)` 주석 4곳은 **낡은 표시**다(동작은 이벤트 구독 쪽에 있음 — 코드 정리 때 지울 것).
+> 아래 표는 처음 계획(이력)이다.
+
 | 단계 | 자리 | 할 일 |
 |---|---|---|
 | S6 안내 UI | `TutorialDirector.HandleAreaFirstEntered` `TODO(S6)` · `HandleModelGateOpened` `TODO(S6)`(G10 → `TUT_B_PAD_WARN` 전원) | 단계 갱신 규칙(`SetStepServer` — 아직 아무도 안 부른다: 활성 때 Zone1, 도착 때 Finished 뿐) · 목표 패널·자막(늦은 클라 = `StateChanged` 로 재구성) |
@@ -235,6 +261,7 @@ S2~S5 에서 늘어난 API 전체 목록은 §10.1.
 - 네트워크 없이 단독 실행하면 디렉터·타이머가 스폰되지 않아 아무것도 돌지 않는다 — 확인은 호스트(MPPM).
 
 ### 10.4 Play 확인 대기 (S0~S5 누적 — 사람이 MPPM 에서)
+> 전 단계 통합 순서표는 [tutorial-qa.md](tutorial-qa.md) — 아래 항목도 거기에 흡수했다.
 - **S0**: 존3 `ZoneM_typeC` 배치·벽 투명화 페이드가 StageTutorial 에서 보인다.
 - **S1**: 호스트 로그 `[Tutorial] 튜토리얼 시작 — 참가자 n명` · 클라 로그 `디렉터 스폰 (서버:False) — 활성:True` · 늦게 붙은 클라도 같은 상태.
 - **S2**: 존 첫 진입·복도 중간 지점 로그(존1 은 착지 직후) · 영혼·사망 중에는 판정 없음.
@@ -252,7 +279,7 @@ S2~S5 에서 늘어난 API 전체 목록은 §10.1.
 - 부착: 서버에서 `StateChanged` 때 `IsTutorialActive` 면 디렉터 GameObject 에 `AddComponent`(씬·프리팹 저장 없음). 비튜토리얼은 안 붙는다.
 - 사망(Alive → DeadPresentation) → 3초 뒤 자동 부활 + 2초 무적(`InvulnerabilityCause.Revive`). 차감 = **사망 시점** `IsGateOpen(G8)`(단계 기준, 위치 무관).
   G8 전은 목숨 수와 무관하게 Soul(훅), 부활 시 차감 없음. G8 뒤는 기존 규칙(목숨 0 → PermanentDead → 전원이면 PartyWipeWatcher).
-- 부활 지점 = 열린 배리어로 들어갈 수 있는 가장 앞 구간(존1~복도4, **보스 진입 제외 — 패드**) → 앞 구간 순. 구간 안쪽 1m·1.5m 격자 중
+- 부활 지점 = **지금 단계 구간**(디렉터 `Step` 의 구간 — 열린 배리어로 들어갈 수 있는 가장 앞 구간을 넘지 않음, 아래 S12 항목)(존1~복도4, **보스 진입 제외 — 패드**) → 앞 구간 순. 구간 안쪽 1m·1.5m 격자 중
   1층 바닥(스테이지 높이 ±1m)·점유 없음(Wall 포함)·살아 있는 `MonsterBase` 에서 10m(고정 — 몬스터 인지 반경 공개 API 없음) 밖, 사망 지점에 가장 가까운 점.
   안전한 곳이 없으면 몬스터에서 가장 먼 후보, 후보가 없으면 그 자리.
 - 보스방 이동: `BossTeleportManager.IsCountdownActive`(패드·만료 강제 공통)가 켜지면 대기 부활 전부 '즉시·그 자리'(Soul 이 되는 대로). 이동 중 사망도 같다.

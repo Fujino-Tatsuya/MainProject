@@ -12,7 +12,8 @@
 | 표시 | `Map/Tutorial/Flow/TutorialZone4Guide.cs`(목표·강조·도착 정리) | 모든 피어 |
 
 부착: 존3 과 같다 — `TutorialDirector.StateChanged` 에서 `IsTutorialActive` 일 때 디렉터 GameObject 에 런타임 `AddComponent`(씬 무수정).
-보스 진입 안내는 존4 파일에 둔다(별도 `TutorialBossEnterFlow` 없음). 디렉터의 `HandleBossRoomArrived` `TODO(S12)` 본문은 그대로 — `BossRoomArrived` 이벤트만 구독한다.
+보스 진입 안내는 존4 파일에 둔다(별도 `TutorialBossEnterFlow` 없음). 디렉터의 `HandleBossRoomArrived` 는 단계 Finished 만 정하고(남은 `TODO(S12)` 주석은 낡은 표시) — 안내 정리·23호 팁은 이 흐름이 `BossRoomArrived`·`IsFinished` 를 구독해 한다.
+S12-2 B: 보스방 도착(Finished) 뒤에는 존4 설정·기상·만료·패드 시계가 멈춘다(23호 팁만). 복도4 고르기·대기·발판 목표를 존4 "보스방으로" 목표가 덮어쓰지 않는다.
 
 ## 2. 흐름 (서버 판단 → 복제/RPC 표시)
 | 순서 | 트리거 | 서버 | 표시 |
@@ -61,7 +62,7 @@
 ## 7. 판단(보수적으로 고른 것)
 - `TUT_Z4_ULT`·`TUT_Z4_ULT_ASSASSIN` 은 문구만 채우고 띄우지 않는다(조건 — 궁극기 준비·분노 게이지 — 이 명확하지 않음).
 - `TUT_Z4_MIDBOSS` 문구는 `{이름}` 자리표시자 없이 "중앙 섬의 중간보스를 처치하세요"(클라가 이름을 채울 경로가 없음).
-- `TUT_B_PAD_WARN`(G10, D17)은 디렉터 `HandleModelGateOpened` 의 `TODO(S6)` 자리로 **아직 아무도 띄우지 않는다** — 문구만 채웠다(배선은 메인 판단).
+- `TUT_B_PAD_WARN`(G10, D17)은 이 흐름이 아니라 복도 흐름(`TutorialCorridorFlow`, S8)이 G10 열림 때 전원에게 띄운다 — [tutorial-corridors-zone2.md](tutorial-corridors-zone2.md). 디렉터 `HandleModelGateOpened` 의 `TODO(S6)` 주석은 낡은 표시다.
 - 도착 정리는 클라가 복제 `IsFinished` 로 `Clear()`(자막 포함). 23호 팁은 RPC 라 정리보다 먼저 도착하면 지워진다 → 서버가 1초 늦게 보낸다.
 - 단계는 Zone4Lore·Zone4Combat 만 올린다(Corridor4·BossEnter 는 다음 단계 몫).
 

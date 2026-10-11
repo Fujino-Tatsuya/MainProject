@@ -79,14 +79,17 @@ false 일 때 `ServerRoundCompleted` 는 같은 호출 안에서 이미 불렸�
 3. 서버: RPC 검증 → 효과 적용 → 행 재작성(제시 행 삭제·획득 행 추가) → 토큰 해제 → `ServerTraitChosen`.
 4. 전원 완료 시 `ServerRoundCompleted(round)`. 교착이면 서버가 `AutoChooseAllPendingServer()` 로 마무리(3과 같은 경로, `Auto = true`).
 
-## 3. S12 배치 순서
+## 3. 배치 순서 (1·2 는 S8 에서 완료 — 실제 배선은 [tutorial-corridors-zone2.md](tutorial-corridors-zone2.md))
 
-1. 복도 씬에 빈 오브젝트 + `NetworkObject` + `TutorialTraitDirector` — `pool` 에 `TutorialTraitPool.asset` 연결.
-2. `TutorialTraitUI.prefab` 인스턴스 **1개**. 씬에 `EventSystem` 이 있어야 카드 클릭이 된다.
+1. ✅ 씬에 빈 오브젝트 + `NetworkObject` + `TutorialTraitDirector` — `pool` 에 `TutorialTraitPool.asset` 연결(`4.MapScene` 루트, hash 3847683974).
+2. ✅ `TutorialTraitUI.prefab` 인스턴스 **1개**. 씬에 `EventSystem` 이 있어야 카드 클릭이 된다(부트스트랩 `PersistentEventSystem`).
 3. 복도 트리거(서버)가 **라운드당 1번만** `StartOfferRoundServer` 를 부른다(S12: 첫 도착자만 지정, 이후 도착자는 `AddParticipantServer`):
    - 복도1 = `TutorialTraitRoundDisplay.Intro`, 복도4 = `TutorialTraitRoundDisplay.LastNotice`, 복도2·3 = `None`.
-4. 반환 **false** → 게이트 즉시 개방. **true** → `ServerRoundCompleted` 에서 개방.
-5. 교착 방지 60초·타이머 만료 시 `AutoChooseAllPendingServer()` — 🔴 **반드시 강제 이동·연출 잠금(`PlayerEncounterLock.IsCinematicLocked`) 전에** 호출한다.
+4. 출구 게이트(G2·G4·G7·G10)는 **특성 디렉터가 아니라 튜토리얼 디렉터 모델**이 연다 — 복도 흐름이 `ServerTraitChosen`(수동·자동)마다
+   `ReportCheckServer(TraitCorridorN)` 을 보내고, 모델이 '전원 체크 / 첫 완료자 뒤 60초'로 연다. 0장 받은 사람(`Empty`)·특성 디렉터 없음은 도착 순간 바로 체크한다.
+   `ServerRoundCompleted` 는 게이트에 쓰지 않는다(완전 사망자가 라운드 완료를 막아도 게이트는 열리게).
+5. 교착 방지 60초(출구가 어떤 이유로든 열림)·타이머 만료·보스방 도착 때 미도착자를 `AddParticipantServer` 로 넣고 `AutoChooseAllPendingServer()` —
+   🔴 **반드시 강제 이동·연출 잠금(`PlayerEncounterLock.IsCinematicLocked`) 전에** 호출한다(만료는 `Expired` 로 바뀐 프레임에 처리 — 강제 이동은 3초 경고 뒤라 그보다 먼저).
    잠금 중엔 상태이상 `Apply` 가 거부돼 배율 특성이 획득만 되고 효과가 빠진다(경고 로그).
 
 ## 4. placeholder 특성 6종

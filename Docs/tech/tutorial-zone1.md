@@ -59,5 +59,5 @@
 - 사망·관전 중에도 목표 패널이 보인다(안내 UI 캔버스).
 
 ## 남은 것
-- 복도1 이후 목표 패널·대기 줄(G2)은 S8. G1 뒤 단계 Corridor1 에서 S8 이 목표를 덮어쓴다.
-- 허수아비는 G1 뒤에도 남아 있다(존1 에서만 보임 — 치워야 하면 S12).
+- (S8 해결) 복도1 이후 목표 패널·대기 줄(G2)은 복도 흐름 — [tutorial-corridors-zone2.md](tutorial-corridors-zone2.md). G1 뒤 단계 Corridor1 에서 복도 흐름이 목표를 덮어쓴다.
+- (S12-2 B 해결) 허수아비 디스폰: G1 이 열리고 **살아 있는 플레이어가 존1 에 아무도 없거나 단계가 Zone2 이상**이면 서버가 디스폰한다(`TutorialZone1Rules.ShouldDespawnDummies`) · 로그 `[Tutorial] 존1 허수아비 n개 디스폰 — G1 열림 · 파티가 존1 을 떠남.`
