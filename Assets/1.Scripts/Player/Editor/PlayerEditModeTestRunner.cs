@@ -28,6 +28,8 @@ internal static class PlayerEditModeTestRunner
         "^InterruptHighlightModelTests$", // 인터럽트 강조(할 일 5) — 창 열림 × 사거리 → RMB 슬롯 발광·페이드·맥동
         "^InterruptOmniRangeModelTests$", // 인터럽트 강조 사거리 — 방향 무관 판정 형상 도달 거리 × 대상 콜라이더 표면 거리
         "^InteractPromptSlotTests$", // 상호작용 F 프롬프트 — 마지막 Show 우선·소유자만 Hide·다른 뷰로 Show 시 이전 뷰 숨김·누락·파괴 정리
+        "^TutorialTraitSelectionModelTests$", // 튜토리얼 특성(할 일 15 T1) — 후보 뽑기·중복 제외·선택 검증·자동 획득·라운드 완료
+        "^TutorialTraitWindowModelTests$", // 튜토리얼 특성 창(할 일 15 T2) — 열림·닫힘·닫힌 라운드 재표시 금지·획득 토스트·문구
     };
 
     const string Tag = "[PlayerTests]";
