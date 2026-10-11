@@ -2,7 +2,7 @@
 
 > 튜토리얼 복도에서 구역을 돌파할 때마다 특성 1장을 고른다. 특성은 **이번 작전 동안만** 유지된다.
 > 코드 폴더: `Assets/1.Scripts/Tutorial/Traits/` · 데이터: `Assets/9.ScriptableObject/Tutorial/Traits/` · UI 프리팹: `Assets/2.Prefabs/UI/Tutorial/TutorialTraitUI.prefab`.
-> 씬 배치는 아직 없다(S12). 디렉터를 씬에 두지 않으면 아무 일도 일어나지 않는다.
+> 씬 배치: S8 에서 `4.MapScene` 루트에 `TutorialTraitDirector`·`TutorialTraitUI` 를 놓았다. 복도 트리거는 `TutorialCorridorFlow`([tutorial-corridors-zone2.md](tutorial-corridors-zone2.md)). 디렉터를 씬에 두지 않으면 아무 일도 일어나지 않는다.
 
 ## 1. 구조
 
