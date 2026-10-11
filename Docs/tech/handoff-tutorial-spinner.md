@@ -81,8 +81,28 @@
   본 모드에서는 걸지 않는다(원래 스피너봇 = 원래 리쉬 18m). 출구 배리어가 반경 6m 밖이 아니면 인스펙터로 줄일 것.
 - (I0) 스폰 후 디렉터가 휴면을 걸기 전 틈에는 연습 모드로 돈다 — 연습 공격은 피해 0·체력 잠금이라 안전하다고 보고 별도 대기 모드를 두지 않았다.
 
+## 4-1. S9 연결 결과 (2026-10-11 · `feature/TutorialZone34`)
+
+- §3-1 "미리 붙인다" = **튜토리얼 전용 Variant** `Assets/2.Prefabs/Monster/Tutorial/SpinnerBot_Tutorial.prefab` 로 했다. 원본 `SpinnerBot.prefab`·공용 `ZoneM_typeC` 는 무수정. 자세한 건 §6 · [tutorial-zone3.md](tutorial-zone3.md).
+- `practiceRadius` 는 존3 흐름이 G6 배리어 위치로 다시 계산해 `SetPracticeRadius` 로 넣는다(StageTutorial 실측 4.4m).
+
 ## 5. 검증
 
 - 컴파일 에러 0. `SpinnerPracticeModelTests` 는 I0 이후 `Tools/Tests/튜토리얼 EditMode 테스트 실행` 에서 돈다(22건).
 - 🔴 **Play 검증 안 함**(사람이 Play/MPPM 으로 확인 필요): base 휴면 중 스피너봇 무적·정지 · 휴면 해제 후 `EnterPractice` · 9초 주기 창 · 놓침 시 피해 0 밀쳐내기 ·
   간파 성공 그로기 · 반경 클램프 · 본 모드 전환 후 원래 패턴 · 클라 창에서 `Mode` 복제.
+
+## 6. 스폰 치환 훅 — `MapContentSpawner` (경석·맵 담당 공유, S9)
+
+**왜**: `TutorialSpinnerPractice` 는 NetworkBehaviour 라 런타임에 붙일 수 없고, 존3 스피너봇은 공용 `ZoneM_typeC` 의 스폰 지점 Override(`SpinnerBot.prefab`)에서 나온다.
+공용 존·원본 프리팹을 고치면 절차 맵 스피너봇에도 퍼지므로, 튜토리얼일 때만 스폰할 프리팹을 Variant 로 바꾼다.
+
+| 파일 | 바뀐 것 |
+|---|---|
+| `Map/MapContentSpawner.cs` | `public static Func<GameObject, GameObject> ServerMonsterPrefabOverride`(기본 null) + `SpawnMonsterInstance` 첫 2줄(돌려준 값이 null 이 아니면 그 프리팹으로 Instantiate) |
+| `Tutorial/SpinnerPractice/TutorialSpinnerSpawnOverride.cs`(신규) | 훅 설치(SubsystemRegistration). `TutorialStageMarker.IsActive` ∧ SpinnerBot(연습 컴포넌트 없음)일 때만 → NetworkPrefabs 목록에서 `TutorialSpinnerPractice` 가 붙은 SpinnerBot(=Variant)을 찾아 돌려준다 |
+| `Assets/DefaultNetworkPrefabs.asset` | Variant 1줄 등록(NGO 자동 등록) |
+
+- 영향: 훅은 마커가 없으면 늘 null 을 돌려준다 → 절차 맵·Debug 씬·다른 몬스터는 그대로. 두 스폰 경로(마커·`ZoneMonsterSpawnSet`)가 모두 `SpawnMonsterInstance` 를 지나 같이 적용된다.
+- Variant = SpinnerBot.prefab + `TutorialSpinnerPractice` + 머리 위 체력바(`UI/OverheadHealthBar.prefab`, 로컬 y 0.5) + `TutorialSpinnerHealthBarRule`. NetworkObject hash 1723163300(오버라이드 저장).
+  원본 SpinnerBot 을 고치면(경석) Variant 도 따라간다 — 원본 루트에 같은 이름 컴포넌트를 추가하는 변경만 피하면 된다.

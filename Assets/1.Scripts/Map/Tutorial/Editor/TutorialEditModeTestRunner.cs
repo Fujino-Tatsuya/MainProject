@@ -23,6 +23,8 @@ internal static class TutorialEditModeTestRunner
         "^TutorialZone1ModelTests$", // 존1(S7) — 이동 보고 상한·이동 누적·툴팁 1초·착지·목표 순서·대기 줄
         "^TutorialCorridorModelTests$", // 복도(S8) — 게이트 매핑·복도당 라운드 1번·진행 중 복도·목표 장면
         "^TutorialZone2ModelTests$", // 존2(S8) — 기상 지연·E 안내·Q/E 넛지·목표 줄
+        "^TutorialZone3RulesTests$", // 존3 흐름(S9) — 시작 조건·간파 집계·빗나감/이른 간파/힌트·목표·연습 반경
+        "^TutorialZone4RulesTests$", // 존4·보스 진입(S10) — 설정 자막→G8·기상 지연·패널/다리/간파 리마인드·만료·패드·도착 팁·목표/강조
     };
 
     const string Tag = "[TutorialTests]";
