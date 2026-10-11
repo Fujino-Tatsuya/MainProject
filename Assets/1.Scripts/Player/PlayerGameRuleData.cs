@@ -26,8 +26,10 @@ public sealed class PlayerGameRuleData : ScriptableObject
     [SerializeField] private LayerMask groundMask = DefaultGroundMask;
     [Tooltip("Soul 상태에서 접지로 인정하는 레이어. Player/Soul/전투 판정 레이어는 넣지 않는다.")]
     [SerializeField] private LayerMask soulGroundMask = DefaultGroundMask;
-    [Tooltip("켜면 생존 플레이어끼리 이동을 막는다. Soul은 이 값과 무관하게 Player를 통과한다.")]
+    [Tooltip("켜면 생존 플레이어끼리 이동을 막는다. Soul은 이 값과 무관하게 Player를 통과한다. (기획 10-11: 켬)")]
     [SerializeField] private bool blockOtherPlayers;
+    [Tooltip("몬스터·다른 플레이어와 겹쳤을 때 플레이어를 빈 자리로 밀어내는 최대 속도(m/s). 몬스터는 움직이지 않는다. 0이면 밀어내지 않는다.")]
+    [DataTableIgnore] [SerializeField, Min(0f)] private float unitSeparationSpeed = 5f;
 
     [Header("중력")]
     [Tooltip("Motor 수동 중력의 최대 낙하 속도(m/s).")]
@@ -51,6 +53,7 @@ public sealed class PlayerGameRuleData : ScriptableObject
     public LayerMask GroundMask => groundMask;
     public LayerMask SoulGroundMask => soulGroundMask;
     public bool BlockOtherPlayers => blockOtherPlayers;
+    public float UnitSeparationSpeed => Mathf.Max(0f, unitSeparationSpeed);
     public float MaxFallSpeed => Mathf.Max(0f, maxFallSpeed);
     public float MinKnockbackTime => Mathf.Max(0f, minKnockbackTime);
     public float MaxKnockbackTime => Mathf.Max(MinKnockbackTime, maxKnockbackTime);

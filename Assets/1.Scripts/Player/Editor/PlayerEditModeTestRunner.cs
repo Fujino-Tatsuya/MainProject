@@ -28,6 +28,9 @@ internal static class PlayerEditModeTestRunner
         "^InterruptHighlightModelTests$", // 인터럽트 강조(할 일 5) — 창 열림 × 사거리 → RMB 슬롯 발광·페이드·맥동
         "^InterruptOmniRangeModelTests$", // 인터럽트 강조 사거리 — 방향 무관 판정 형상 도달 거리 × 대상 콜라이더 표면 거리
         "^InteractPromptSlotTests$", // 상호작용 F 프롬프트 — 마지막 Show 우선·소유자만 Hide·다른 뷰로 Show 시 이전 뷰 숨김·누락·파괴 정리
+        "^PlayerMotionSweepStepTests$", // 모터 스윕 — 단차·급경사·낙하 착지(실제 CapsuleCast)
+        "^PlayerUnitCollisionRulesTests$", // 할 일 11 — 유닛 장애물 마스크(Soul·유닛 통과)·겹침 밀어내기 상한
+        "^PlayerUnitPenetrationTests$", // 할 일 11 — 겹친 유닛 관통 수집(실제 ComputePenetration)·비몸체 Player 콜라이더 무시
     };
 
     const string Tag = "[PlayerTests]";

@@ -23,7 +23,8 @@ MonoBehaviour:
   soulGroundMask:
     serializedVersion: 2
     m_Bits: 2057
-  blockOtherPlayers: 0
+  blockOtherPlayers: 1
+  unitSeparationSpeed: 5
   maxFallSpeed: 30
   minKnockbackTime: 0.15
   maxKnockbackTime: 1.5
