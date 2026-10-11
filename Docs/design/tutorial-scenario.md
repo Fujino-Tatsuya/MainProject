@@ -409,6 +409,19 @@
 | 문구 데이터화 | `[DataTableText]` + `[DataTableSheet]` → GameData.xlsx |
 | 서버 상태 복제 선례 | 씬 상주 NetworkObject(`ZoneBridgeGateManager`·`BossTimerManager`) — 스폰 순서 함정 2건 문서화돼 있음 |
 
+#### 7.1 정정 메모 (S0 코드 대조, 2026-10-11 `feature/TutorialStage`)
+위 표 중 실제 코드와 다른 8건. 표는 원문 그대로 두고 여기서 바로잡는다.
+1. 패시브 툴팁 "표시됨" — `visible` 은 `PassiveHUD` 가 아니라 `SkillTooltipView.cs:35` 의 private 필드다. displayKey `Passive` 는 슬롯 저작값이 아니라 `PassiveHUD.cs:46` 코드에서 Bind 한다.
+2. `Player.ServerAttackLanded` 의 `AttackType` 에는 Default/SkillQ/SkillE/SkillR 외에 **None·Skill** 도 있다.
+3. `CombatStatsEvents.ServerCounterSucceeded` 는 중간보스 3종 외에 **WallBot** 도 발행한다. 23호는 이 이벤트가 아니라 `ReceiveAttack` 자체 경로다.
+4. 간파 "맞힌 수" 를 밖에서 받을 **공개 훅이 없다** — `PlayerInterruptSkillBase.OnInterruptResolutionCompleted` 는 protected(빗나감 문구 S9 는 훅 추가 필요).
+5. `TrainingDummy.prefab` 은 `TrainingDummyInterrupt` + 내부 순수 `TrainingDummyInterruptCycle` 구조이고 `_Elite`·`_Boss` 변형이 있다(존1 용 "사이클 없는 변형"은 새로 만든다).
+6. 보스 진입 패드 크기 — **씬 값 15×15**, 코드 기본값은 6×6.
+7. 로컬 입력 차단은 `UiInputGateManager` 에서 끝나지 않는다 — 실제로 막는 곳은 `PlayerUiInputPolicy`(`BlockedChanged` 구독) → `PlayerInputReader.SetUiInputSuppressed`. 전체 사슬 = `UiModalBlocker` → `UiInputGateManager` → `PlayerUiInputPolicy` → `PlayerInputReader`.
+8. `InteractPrompt`(패널 F 프롬프트)는 development 전용이 아니라 **이 브랜치에 이미 있다**.
+
+> 진행 상태 코어(§7.2-1)는 S1 에서 구현 — [../tech/tutorial-director.md](../tech/tutorial-director.md) (`TutorialDirector`·`TutorialFlowModel`·`TutorialStageMarker`).
+
 ### 7.2 새로 필요한 것
 1. **튜토리얼 진행 상태**(서버 소유, 복제) — 단계·개인 체크리스트·게이트 상태. 존 프리팹은 비네트워크라 씬 상주 객체가 필요.
 2. **구간 진입 감지**(존1~4, 복도1~4 중간) — 기존 벽 투명화 트리거는 클라 로컬 연출용이고 옆 존까지 덮어서 그대로 못 쓴다.

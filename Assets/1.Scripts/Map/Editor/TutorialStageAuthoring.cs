@@ -212,6 +212,9 @@ public static class TutorialStageAuthoring
         var root = new GameObject("StageTutorial");
         try
         {
+            // 튜토리얼 판별 마커 — 진행 상태(TutorialDirector)·타이머·패드 등 튜토리얼 전용 규칙이 이것만 본다.
+            root.AddComponent<TutorialStageMarker>();
+
             var wallsInst = (GameObject)PrefabUtility.InstantiatePrefab(walls, root.transform);
             if (wallOverrides != null) PrefabUtility.SetPropertyModifications(wallsInst, wallOverrides);
             wallsInst.name = CorridorName;
