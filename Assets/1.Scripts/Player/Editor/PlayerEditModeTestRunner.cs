@@ -28,6 +28,7 @@ internal static class PlayerEditModeTestRunner
         "^InterruptHighlightModelTests$", // 인터럽트 강조(할 일 5) — 창 열림 × 사거리 → RMB 슬롯 발광·페이드·맥동
         "^InterruptOmniRangeModelTests$", // 인터럽트 강조 사거리 — 방향 무관 판정 형상 도달 거리 × 대상 콜라이더 표면 거리
         "^InteractPromptSlotTests$", // 상호작용 F 프롬프트 — 마지막 Show 우선·소유자만 Hide·다른 뷰로 Show 시 이전 뷰 숨김·누락·파괴 정리
+        "^TutorialGuide(Text|SubtitleQueue|Model)Tests$", // 할 일 15 S6 — S12 에서 튜토리얼 러너로 이동. 문구 변형·치환·대기 포맷·자막 큐·RebuildFromState
     };
 
     const string Tag = "[PlayerTests]";
