@@ -31,6 +31,7 @@ internal static class PlayerEditModeTestRunner
         "^TutorialTraitSelectionModelTests$", // 튜토리얼 특성(할 일 15 T1) — 후보 뽑기·중복 제외·선택 검증·자동 획득·라운드 완료
         "^TutorialTraitWindowModelTests$", // 튜토리얼 특성 창(할 일 15 T2) — 열림·닫힘·닫힌 라운드 재표시 금지·획득 토스트·문구
         "^TutorialGuide(Text|SubtitleQueue|Model)Tests$", // 할 일 15 S6 — S12 에서 튜토리얼 러너로 이동. 문구 변형·치환·대기 포맷·자막 큐·RebuildFromState
+        "^SpinnerPracticeModelTests$", // 튜토리얼 스피너봇 연습(할 일 15 S9) — 모드·창 간격·연속 놓침·스폰 반경 클램프(튜토리얼 러너로 옮길 예정)
     };
 
     const string Tag = "[PlayerTests]";
