@@ -52,6 +52,12 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
     /// </summary>
     public static event Action<ulong, PlayerLifeState, PlayerLifeState> ServerLifeStateChanged;
 
+    /// <summary>
+    /// [서버] 사망 목적지 훅(전역, 인자 = OwnerClientId). true 면 목숨 수와 무관하게 Soul 로 보낸다.
+    /// 튜토리얼 교육 단계의 차감 없는 자동 부활(<c>TutorialDeathRules</c>)이 건다. null = 기존 규칙(목숨 0 → PermanentDead).
+    /// </summary>
+    public static Func<ulong, bool> ServerDeathKeepsSoul;
+
     private bool CanWriteLifeState => IsSpawned && IsServer && !IsCinematicLocked;
     private bool deathResolutionPending;
     private double deathResolutionDeadlineServerTime;
@@ -262,6 +268,9 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
 
     private PlayerLifeState ResolveDeathDestination()
     {
+        if (ServerDeathKeepsSoul != null && ServerDeathKeepsSoul(OwnerClientId))
+            return PlayerLifeState.Soul;
+
         ResolveGameRuleReference();
         if (gameRule != null &&
             gameRule.TryRegisterClient(OwnerClientId) &&
