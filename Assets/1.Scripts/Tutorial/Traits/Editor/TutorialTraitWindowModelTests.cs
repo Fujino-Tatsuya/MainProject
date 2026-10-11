@@ -108,6 +108,35 @@ public sealed class TutorialTraitWindowModelTests
     }
 
     [Test]
+    public void AutoChosenWithoutWindow_ShowsToastOnce()
+    {
+        // 복도 미도착자 — 같은 틱에 참가자 추가 → 자동 획득이라 제시 행을 못 보고 획득 수만 는다(S12).
+        var model = new TutorialTraitWindowModel();
+        model.Evaluate(1, false, 1);
+        TutorialTraitWindowUpdate update = model.Evaluate(2, false, 2);
+
+        Assert.That(update.Opened || update.Closed, Is.False);
+        Assert.That(update.ShowPickedToast, Is.True);
+        Assert.That(model.Evaluate(2, false, 2).ShowPickedToast, Is.False, "한 번만");
+    }
+
+    [Test]
+    public void FirstEvaluate_OnlySetsBaseline()
+    {
+        var model = new TutorialTraitWindowModel();
+        Assert.That(model.Evaluate(2, false, 2).ShowPickedToast, Is.False, "늦게 붙은 UI 는 기존 획득에 토스트를 띄우지 않는다");
+    }
+
+    [Test]
+    public void ToastNotDoubled_WhenWindowClosesByPick()
+    {
+        var model = new TutorialTraitWindowModel();
+        model.Evaluate(1, true, 0);
+        Assert.That(model.Evaluate(1, false, 1).ShowPickedToast, Is.True);
+        Assert.That(model.Evaluate(1, false, 1).ShowPickedToast, Is.False);
+    }
+
+    [Test]
     public void LateJoinAfterChoosing_DoesNothing()
     {
         var model = new TutorialTraitWindowModel();

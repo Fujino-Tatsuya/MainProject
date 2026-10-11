@@ -19,12 +19,12 @@
 ## 복도 1~4
 | 항목 | 피어 | 방법 |
 |---|---|---|
-| 라운드 시작 | 서버 | `CorridorMidReached(client, n)` 첫 번째 → `StartOfferRoundServer(display)`(복도1 Intro · 복도4 LastNotice · 2·3 None). **복도당 1번** — 두 번째 도착자·왕복·출구 열린 뒤·타이머 만료 뒤엔 안 연다 |
-| 제시 대상 | 서버 | **접속 중인 전원에게 한 번에**(특성 디렉터 규칙 — 새 라운드는 이전 제시를 지운다). 아직 중간 지점에 안 온 사람도 그 순간 창이 뜬다(아래 판단 1) |
-| 개인 체크 | 서버 | `ServerTraitChosen`(수동·자동) → `ReportCheckServer(TraitCorridorN)`. 0장 받은 사람·특성 디렉터 없음 = 시작 순간 바로 체크 |
+| 라운드 시작 | 서버 | `CorridorMidReached(client, n)` 첫 번째 → `StartOfferRoundServer({client}, display)`(복도1 Intro · 복도4 LastNotice · 2·3 None). **복도당 1번** — 출구 열린 뒤·타이머 만료 뒤엔 안 연다 |
+| 제시 대상 | 서버 | **중간 지점에 온 사람에게만**(S12 판단 1). 이후 도착자는 `AddParticipantServer(client)` — 같은 라운드, 기존 제시·선택 보존, 이미 참가자면 무시. 앞 존에 있는 사람에겐 창이 안 뜬다 |
+| 개인 체크 | 서버 | `ServerTraitChosen`(수동·자동) → `ReportCheckServer(TraitCorridorN)`. 0장 받은 사람·특성 디렉터 없음 = 도착 순간 바로 체크 |
 | 출구 게이트 | 서버 | 디렉터 모델 그대로(전원 체크 / 첫 완료자 뒤 60초) — G2·G4·G7·G10 |
-| 자동 획득 | 서버 | 출구가 **어떤 이유로든** 열리면 다음 Update 에 `AutoChooseAllPendingServer()`(창 닫힘·토스트·무적 해제). 그 복도 라운드가 지금 라운드일 때만 |
-| 타이머 만료 | 서버 | `BossTimerManager.State` 가 Expired 로 바뀐 프레임에 `AutoChooseAllPendingServer()` — 강제 이동은 3초 경고 뒤라 연출 잠금보다 먼저 |
+| 자동 획득 | 서버 | 출구가 **어떤 이유로든** 열리면 다음 Update 에 미도착 접속자를 `AddParticipantServer` 로 넣고 `AutoChooseAllPendingServer()`(창 닫힘·토스트·무적 해제). 그 복도 라운드가 지금 라운드일 때만 |
+| 타이머 만료·보스방 도착 | 서버 | `BossTimerManager.State` 가 Expired 로 바뀐 프레임·`BossRoomArrived` 에 진행 중 복도 라운드를 같은 방식(미도착자 포함)으로 자동 획득 — 강제 이동은 3초 경고 뒤라 연출 잠금보다 먼저 |
 | G10 | 서버 | `ShowSubtitleServer(TUT_B_PAD_WARN)` 전원 · 단계 BossEnter |
 | 단계 | 서버 | 입구 G3/G6/G9 → Corridor2/3/4(Corridor1 은 존1 흐름). 게이트 이벤트는 디렉터 Commit 안이라 다음 Update 에서 |
 | 목표 | 로컬 | 창이 떠 있으면 `TUT_C_PICK`, 골랐으면 `TUT_C_WAIT` + 대기 줄(`TUT_WAIT_PARTY`, 지금 차례 게이트가 이 복도 출구일 때). 라운드 전엔 앞 존 흐름의 "복도로" 유지 |
@@ -53,8 +53,8 @@
 - 창 안 문구(`TUT_C1_TRAIT_INTRO`·`TUT_C4_TRAIT_LAST`·획득 토스트)는 특성 쪽 `TutorialTraitTexts.asset` 그대로.
 
 ## 판단
-1. **라운드 = 첫 도착 때 전원 제시.** 시나리오 §3.2 는 "그 플레이어가 중간 지점에 왔을 때"지만, 특성 디렉터의 `StartOfferRoundServer` 는 새 라운드가 이전 제시를 지워 플레이어별로 나눠 열 수 없다.
-   위임 지시(라운드당 1번)와 특성 문서 §3 대로 했다. 늦은 사람은 앞 존 어디에 있든 창이 뜨지만 선택 중 무적(`TraitSelection`)이라 맞지 않는다. 플레이어별로 열려면 특성 모델에 "현재 라운드에 참가자 추가" API 가 필요하다.
+1. **(S12 결정) 창 = 본인이 중간 지점에 왔을 때**(시나리오 §3.2). 라운드는 복도 첫 도착 때 그 사람만으로 열고, 이후 도착자는 특성 디렉터 `AddParticipantServer` 로 같은 라운드에 참가한다.
+   교착 60초·타이머 만료·보스방 도착의 자동 획득은 미도착자도 참가자로 넣은 뒤 처리한다(창을 못 본 채 획득하면 창 판정 모델이 토스트만 띄운다).
 2. 게이트용 개인 체크는 `ServerRoundCompleted` 가 아니라 `ServerTraitChosen` 에서 건다 — 대기 줄(n/total)이 한 명씩 오르고, 완전 사망자(디렉터 '전원'에서 빠짐)가 라운드 완료를 막아도 게이트는 열린다.
 3. 출구가 열린 뒤 자동 획득은 열린 이유와 무관(전원 완료면 대상 0명).
 4. 만료 뒤 복도4 중간 지점 도착은 라운드를 열지 않고 체크도 하지 않는다(강제 이동 중 G10·패드 경고 소음 방지).
@@ -71,6 +71,5 @@
 - 늦게 붙은 클라(복도·존2 도중)도 목표가 현재 상태로 보인다.
 
 ## 남은 것
-- 복도 낙오자 창 위치 문제(판단 1) — 특성 모델 API 추가 여부는 메인/특성 레인 결정.
-- `TUT_B_PAD_COUNT`(패드 카운트다운 중) · 보스방 도착 안내 정리는 S12.
+- (S12 해결) 복도 낙오자 창 위치(판단 1) · 출구 목표(`TUT_C_NEXT`)는 다음 존 단계가 이미 보이면 쓰지 않는다(`TutorialCorridorRules.ShouldShowExitObjective`) · 복도4 에서 존4 "보스방으로"가 복도 목표를 덮지 않는다 · 단계 Finished 뒤 복도 안내 중지.
 - 문구는 초안 — 기획 확정 필요(특히 `TUT_C_*` 새 id).

@@ -247,4 +247,135 @@ public sealed class TutorialTraitSelectionModelTests
 
         Assert.That(acquire, Is.Empty);
     }
+
+    // ── 늦은 도착 참가자 추가 (S12 판단 1) ─────────────────────────────────
+
+    const ulong Client2 = 2;
+
+    [Test]
+    public void AddParticipant_LateArrivalGetsOffer_ExistingChoiceKept()
+    {
+        var model = new TutorialTraitSelectionModel(6);
+        model.StartRound(new[] { Host }, 3, First);
+        model.TryChoose(Host, 1);
+
+        Assert.That(model.IsInRound(Client1), Is.False, "아직 도착 안 한 사람은 제시받지 않는다");
+        Assert.That(model.IsRoundComplete(), Is.True);
+
+        TutorialTraitJoinResult result = model.AddParticipant(Client1, First);
+
+        Assert.That(result, Is.EqualTo(TutorialTraitJoinResult.Offered));
+        Assert.That(model.Round, Is.EqualTo(1), "같은 라운드 — 새 라운드를 열지 않는다");
+        Assert.That(model.GetOffered(Client1), Is.EqualTo(new[] { 0, 1, 2 }), "라운드 시작 때와 같은 장 수");
+        Assert.That(model.HasPendingChoice(Client1), Is.True);
+        Assert.That(model.HasPendingChoice(Host), Is.False, "이미 고른 사람은 그대로");
+        Assert.That(model.GetAcquired(Host), Is.EqualTo(new[] { 1 }));
+        Assert.That(model.TryChoose(Host, 0), Is.EqualTo(TutorialTraitChoiceResult.AlreadyChosen));
+        Assert.That(model.IsRoundComplete(), Is.False, "늦은 참가자가 고를 때까지 미완료");
+
+        Assert.That(model.TryChoose(Client1, 2), Is.EqualTo(TutorialTraitChoiceResult.Accepted));
+        Assert.That(model.IsRoundComplete(), Is.True);
+    }
+
+    [Test]
+    public void AddParticipant_KeepsPendingOffersOfOthers()
+    {
+        var model = new TutorialTraitSelectionModel(6);
+        model.StartRound(new[] { Host }, 2, Sequence(3, 0));
+        var hostOffer = new List<int>(model.GetOffered(Host));
+
+        model.AddParticipant(Client1, First);
+
+        Assert.That(model.GetOffered(Host), Is.EqualTo(hostOffer), "먼저 제시받은 사람의 후보는 다시 뽑지 않는다");
+        Assert.That(model.HasPendingChoice(Host), Is.True);
+        Assert.That(model.GetOffered(Client1).Count, Is.EqualTo(2));
+    }
+
+    [Test]
+    public void AddParticipant_DuplicateIgnored()
+    {
+        var model = new TutorialTraitSelectionModel(6);
+        model.StartRound(new[] { Host }, 3, First);
+        Assert.That(model.AddParticipant(Host, First), Is.EqualTo(TutorialTraitJoinResult.AlreadyInRound), "첫 도착자 자신");
+
+        model.AddParticipant(Client1, Sequence(2, 0, 0));
+        var offered = new List<int>(model.GetOffered(Client1));
+        Assert.That(model.AddParticipant(Client1, First), Is.EqualTo(TutorialTraitJoinResult.AlreadyInRound));
+        Assert.That(model.GetOffered(Client1), Is.EqualTo(offered), "다시 뽑지 않는다");
+
+        model.TryChoose(Client1, offered[0]);
+        Assert.That(model.AddParticipant(Client1, First), Is.EqualTo(TutorialTraitJoinResult.AlreadyInRound), "고른 뒤 왕복해도 창 없음");
+        Assert.That(model.HasPendingChoice(Client1), Is.False);
+    }
+
+    [Test]
+    public void AddParticipant_NoRoundOrEmptyPool()
+    {
+        var model = new TutorialTraitSelectionModel(1);
+        Assert.That(model.AddParticipant(Host, First), Is.EqualTo(TutorialTraitJoinResult.NoRound));
+        Assert.That(model.IsInRound(Host), Is.False);
+
+        // Client1 은 이미 유일한 특성을 가졌다 → 다음 라운드 늦은 참가 = 0장 → 바로 완료.
+        model.StartRound(new[] { Client1 }, 3, First);
+        model.TryChoose(Client1, 0);
+        model.StartRound(new[] { Host }, 3, First);
+        Assert.That(model.AddParticipant(Client1, First), Is.EqualTo(TutorialTraitJoinResult.Empty));
+        Assert.That(model.IsInRound(Client1), Is.True);
+        Assert.That(model.HasPendingChoice(Client1), Is.False);
+        Assert.That(model.TryChoose(Client1, 0), Is.EqualTo(TutorialTraitChoiceResult.NoOffer));
+    }
+
+    [Test]
+    public void AutoChoose_IncludesAbsentAfterAddingThem()
+    {
+        // 교착 60초·타이머 만료: 미도착자도 참가자로 넣은 뒤 미선택 전원 자동 획득 → 라운드 완료.
+        var model = new TutorialTraitSelectionModel(6);
+        model.StartRound(new[] { Host }, 3, First);
+        model.TryChoose(Host, 0);
+        model.AddParticipant(Client1, First);   // 도착했지만 안 고름
+        Assert.That(model.IsRoundComplete(), Is.False);
+
+        model.AddParticipant(Client2, First);   // 미도착
+        var pending = new List<ulong>();
+        model.GetPendingClients(pending);
+        Assert.That(pending, Is.EquivalentTo(new[] { Client1, Client2 }), "고른 Host 는 빠지고 미도착자는 들어간다");
+
+        foreach (ulong id in pending)
+        {
+            int pick = model.PickAutoChoice(id, First);
+            Assert.That(pick, Is.GreaterThanOrEqualTo(0));
+            Assert.That(model.TryChoose(id, pick), Is.EqualTo(TutorialTraitChoiceResult.Accepted));
+        }
+
+        Assert.That(model.IsRoundComplete(), Is.True);
+        Assert.That(model.GetAcquired(Client2).Count, Is.EqualTo(1));
+        Assert.That(model.GetAcquired(Host), Is.EqualTo(new[] { 0 }), "이미 고른 사람은 추가 획득 없음");
+    }
+
+    [Test]
+    public void AddParticipant_ShieldsOnlyNewPending()
+    {
+        var model = new TutorialTraitSelectionModel(6);
+        model.StartRound(new[] { Host }, 3, First);
+        model.TryChoose(Host, 0);
+        model.AddParticipant(Client1, First);
+        var release = new List<ulong>();
+        var acquire = new List<ulong>();
+
+        model.PlanSelectionShields(new HashSet<ulong>(), release, acquire);
+
+        Assert.That(acquire, Is.EqualTo(new[] { Client1 }), "늦게 도착해 창이 뜬 사람만 무적");
+    }
+
+    [Test]
+    public void NewRoundAfterLateJoin_ResetsParticipants()
+    {
+        var model = new TutorialTraitSelectionModel(6);
+        model.StartRound(new[] { Host }, 3, First);
+        model.AddParticipant(Client1, First);
+        model.StartRound(new[] { Client1 }, 3, First);
+
+        Assert.That(model.IsInRound(Host), Is.False, "다음 복도 라운드는 그 복도 첫 도착자만");
+        Assert.That(model.AddParticipant(Host, First), Is.EqualTo(TutorialTraitJoinResult.Offered));
+    }
 }

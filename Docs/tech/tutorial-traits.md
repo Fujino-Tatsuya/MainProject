@@ -21,7 +21,7 @@ TutorialTraitDirector (씬 상주 NetworkBehaviour, 서버 권한) ──Network
 | `TutorialTraitDefinition` | 특성 1장 — `id`·`displayName`·`description`·`icon`·`effectKind`·`value`·`triggerAttackType`·`cooldownSlot`. 배율은 1 이상만(1 미만이면 1로 올림) |
 | `TutorialTraitPool` | 후보 배열 + `offerCount`(제시 장 수, 기본 3). **배열 인덱스 = 런타임 특성 id** — 세션 도중 순서를 바꾸지 않는다 |
 | `TutorialTraitSelectionModel` | Unity 비의존 규칙. 후보 뽑기(획득 특성 제외·남은 만큼만)·선택 검증·자동 획득 대상·라운드 완료·이탈자 제외·선택 창 무적 계획(`PlanSelectionShields`) |
-| `TutorialTraitWindowModel` | Unity 비의존 창 판정. 제시 있음 → 열기, 제시 사라짐·라운드 바뀜 → 닫기, 한 번 닫힌 라운드 재표시 금지, 획득 수 증가 → 토스트 |
+| `TutorialTraitWindowModel` | Unity 비의존 창 판정. 제시 있음 → 열기, 제시 사라짐·라운드 바뀜 → 닫기, 한 번 닫힌 라운드 재표시 금지, 획득 수 증가 → 토스트(창을 못 본 채 자동 획득돼도 — S12) |
 | `TutorialTraitDirector` | 상태 소유자. 라운드 제시·선택 RPC 검증·효과 적용·무적 토큰. 플레이어별 제시/획득 행을 `NetworkList<Entry>` 로, 라운드 번호·표시 옵션을 `NetworkVariable` 로 복제 |
 | `TutorialTraitSelectionView` | 로컬 플레이어 UI. 중앙 모달(창 루트 `UiModalBlocker` → 로컬 이동·대시·공격 차단, 일시정지 없음) · 카드 클릭 → `RequestChoose` · 획득 토스트 · 좌상단 획득 아이콘 줄 + 호버 패널 |
 | `TutorialTraitUI.prefab` | 별도 Screen Space Overlay 캔버스(sort 60, CombatHUD 와 무관). 저작 메뉴 `Tools/Tutorial/특성 선택 UI 프리팹 생성` — 다시 돌리면 덮어쓴다 |
@@ -46,6 +46,8 @@ TutorialTraitDirector (씬 상주 NetworkBehaviour, 서버 권한) ──Network
 | `bool StartOfferRoundServer(IEnumerable<ulong> clientIds)` | 지정한 플레이어에게만 제시, None |
 | `bool StartOfferRoundServer(IEnumerable<ulong> clientIds, TutorialTraitRoundDisplay display)` | 지정 + 표시 옵션 |
 | `bool AutoChooseServer(ulong clientId)` | 그 플레이어의 제시 후보 중 무작위 1장 자동 획득. 대상 아님(이미 고름·제시 없음) = false |
+| `TutorialTraitJoinResult AddParticipantServer(ulong clientId)` | (S12) 지금 라운드에 참가자 1명 추가 — 그 사람에게만 제시, 기존 제시·선택 보존. `Offered`·`Empty`(0장)·`AlreadyInRound`(무시)·`NoRound`. 새 미선택자가 생기면 `ServerRoundCompleted` 가 같은 라운드에 다시 날 수 있다 |
+| `bool IsInRoundServer(ulong clientId)` | (S12) 지금 라운드 참가자인가(제시 중·고름·0장) |
 | `int AutoChooseAllPendingServer()` | 이번 라운드 미선택 전원 자동 획득. 처리 인원 수 반환 |
 | `bool IsRoundCompleteServer` | 이번 라운드 참가자 전원이 골랐나(라운드 없음 = true) |
 | `bool HasPendingChoiceServer(ulong clientId)` | 그 플레이어가 아직 안 골랐나 |
@@ -81,7 +83,7 @@ false 일 때 `ServerRoundCompleted` 는 같은 호출 안에서 이미 불렸�
 
 1. 복도 씬에 빈 오브젝트 + `NetworkObject` + `TutorialTraitDirector` — `pool` 에 `TutorialTraitPool.asset` 연결.
 2. `TutorialTraitUI.prefab` 인스턴스 **1개**. 씬에 `EventSystem` 이 있어야 카드 클릭이 된다.
-3. 복도 트리거(서버)가 **라운드당 1번만** `StartOfferRoundServer` 를 부른다:
+3. 복도 트리거(서버)가 **라운드당 1번만** `StartOfferRoundServer` 를 부른다(S12: 첫 도착자만 지정, 이후 도착자는 `AddParticipantServer`):
    - 복도1 = `TutorialTraitRoundDisplay.Intro`, 복도4 = `TutorialTraitRoundDisplay.LastNotice`, 복도2·3 = `None`.
 4. 반환 **false** → 게이트 즉시 개방. **true** → `ServerRoundCompleted` 에서 개방.
 5. 교착 방지 60초·타이머 만료 시 `AutoChooseAllPendingServer()` — 🔴 **반드시 강제 이동·연출 잠금(`PlayerEncounterLock.IsCinematicLocked`) 전에** 호출한다.

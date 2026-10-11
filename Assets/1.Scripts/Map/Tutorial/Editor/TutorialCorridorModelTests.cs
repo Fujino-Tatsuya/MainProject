@@ -55,16 +55,33 @@ public sealed class TutorialCorridorModelTests
     // ─── 라운드 1회 ─────────────────────────────────────────────────────
 
     [Test]
-    public void 라운드는_복도당_한번만_연다()
+    public void 라운드는_복도당_한번만_열고_늦은_도착자는_참가()
     {
         var r = new TutorialCorridorRounds();
         Assert.AreEqual(TutorialCorridorRoundDecision.Start, r.Decide(1, false, false));
-        r.MarkHandled(1, 1);
-        // 두 번째 도착자·왕복 — 다시 열지 않는다.
-        Assert.AreEqual(TutorialCorridorRoundDecision.AlreadyHandled, r.Decide(1, false, false));
-        Assert.AreEqual(TutorialCorridorRoundDecision.AlreadyHandled, r.Decide(1, true, true));
+        r.MarkStarted(1, 1);
+        // 두 번째 도착자·왕복 — 새로 열지 않고 같은 라운드에 참가(이미 참가자면 특성 디렉터가 무시).
+        Assert.AreEqual(TutorialCorridorRoundDecision.Join, r.Decide(1, false, false));
+        Assert.IsTrue(r.IsStarted(1));
+        // 출구가 열린 뒤·만료 뒤 도착은 창 없음(§3.2).
+        Assert.AreEqual(TutorialCorridorRoundDecision.AlreadyHandled, r.Decide(1, true, false));
+        Assert.AreEqual(TutorialCorridorRoundDecision.AlreadyHandled, r.Decide(1, false, true));
         // 다른 복도는 따로.
         Assert.AreEqual(TutorialCorridorRoundDecision.Start, r.Decide(2, false, false));
+    }
+
+    [Test]
+    public void 건너뛴_복도는_늦은_도착자도_참가하지_않는다()
+    {
+        var r = new TutorialCorridorRounds();
+        r.MarkHandled(2, 0);   // 출구가 이미 열림·만료로 건너뜀
+        Assert.AreEqual(TutorialCorridorRoundDecision.AlreadyHandled, r.Decide(2, false, false));
+        Assert.IsFalse(r.IsStarted(2));
+
+        // 특성 디렉터 없이 연 복도(라운드 0)도 참가 판정은 Join — 흐름이 도착자마다 바로 체크한다.
+        r.MarkStarted(3, 0);
+        Assert.AreEqual(TutorialCorridorRoundDecision.Join, r.Decide(3, false, false));
+        Assert.AreEqual(0, r.RoundOf(3));
     }
 
     [Test]
@@ -81,9 +98,9 @@ public sealed class TutorialCorridorModelTests
     public void 라운드_번호로_복도를_찾는다_건너뛴_복도는_라운드_없음()
     {
         var r = new TutorialCorridorRounds();
-        r.MarkHandled(1, 1);
-        r.MarkHandled(2, 0);   // 제시 실패(건너뜀)
-        r.MarkHandled(3, 2);
+        r.MarkStarted(1, 1);
+        r.MarkHandled(2, 0);   // 건너뜀
+        r.MarkStarted(3, 2);
         Assert.AreEqual(1, r.CorridorOfRound(1));
         Assert.AreEqual(3, r.CorridorOfRound(2));
         Assert.AreEqual(0, r.CorridorOfRound(0));
@@ -150,5 +167,33 @@ public sealed class TutorialCorridorModelTests
         Assert.IsFalse(TutorialCorridorProgress.Resolve(0, true, Progress(TutorialCheck.TraitCorridor1), true, TutorialGate.G2_Zone2Entry).OwnsObjective);
         // 앞 복도 체크는 이 복도와 무관.
         Assert.IsFalse(TutorialCorridorProgress.Resolve(2, false, Progress(TutorialCheck.TraitCorridor1), false, TutorialGate.G4_Zone3Entry).OwnsObjective);
+    }
+
+    // ─── 출구 목표와 존 첫 진입 목표 순서 (S12) ──────────────────────────────
+
+    [Test]
+    public void 출구_목표는_다음_존_단계가_보이기_전에만_쓴다()
+    {
+        Assert.IsTrue(TutorialCorridorRules.ShouldShowExitObjective(1, TutorialStep.Corridor1));
+        Assert.IsFalse(TutorialCorridorRules.ShouldShowExitObjective(1, TutorialStep.Zone2), "같은 틱에 존2 단계가 먼저 반영 — 존2 목표를 덮지 않는다");
+        Assert.IsTrue(TutorialCorridorRules.ShouldShowExitObjective(2, TutorialStep.Corridor2));
+        Assert.IsFalse(TutorialCorridorRules.ShouldShowExitObjective(2, TutorialStep.Zone3Practice));
+        Assert.IsTrue(TutorialCorridorRules.ShouldShowExitObjective(3, TutorialStep.Corridor3));
+        Assert.IsFalse(TutorialCorridorRules.ShouldShowExitObjective(3, TutorialStep.Zone4Lore));
+        // 복도4 는 G10 다음 프레임에 BossEnter 가 걸린다 — 발판 목표는 보스방 도착 전까지 쓴다.
+        Assert.IsTrue(TutorialCorridorRules.ShouldShowExitObjective(4, TutorialStep.BossEnter));
+        Assert.IsFalse(TutorialCorridorRules.ShouldShowExitObjective(4, TutorialStep.Finished));
+        Assert.IsFalse(TutorialCorridorRules.ShouldShowExitObjective(0, TutorialStep.Zone1));
+    }
+
+    [Test]
+    public void 복도_목표_id_판별()
+    {
+        Assert.IsTrue(TutorialCorridorRules.IsCorridorObjective(TutorialCorridorFlow.PickId));
+        Assert.IsTrue(TutorialCorridorRules.IsCorridorObjective(TutorialCorridorFlow.WaitId));
+        Assert.IsTrue(TutorialCorridorRules.IsCorridorObjective(TutorialCorridorFlow.NextId));
+        Assert.IsTrue(TutorialCorridorRules.IsCorridorObjective(TutorialCorridorFlow.GoPadId));
+        Assert.IsFalse(TutorialCorridorRules.IsCorridorObjective(TutorialGuideIds.Z4GoBoss));
+        Assert.IsFalse(TutorialCorridorRules.IsCorridorObjective(null));
     }
 }

@@ -10,17 +10,20 @@ using UnityEngine;
 /// 붙는 곳: <see cref="TutorialZone1Flow"/> 와 같다 — 디렉터가 튜토리얼을 켠 것이 보이는 순간 디렉터 GameObject 에 런타임 부착(모든 피어).
 ///
 /// 서버:
-///  · <see cref="TutorialDirector.CorridorMidReached"/>(개인 첫 도착) → 그 복도 라운드가 아직이면 <see cref="TutorialTraitDirector.StartOfferRoundServer(TutorialTraitRoundDisplay)"/>
-///    — <b>접속 중인 전원에게 한 번에</b> 제시(특성 디렉터 라운드 규칙: 새 라운드는 이전 제시를 지운다). 출구가 이미 열렸거나 타이머 만료면 열지 않는다.
-///  · 제시를 못 받은 사람(0장·디렉터 없음)은 바로 체크 → 게이트가 그 사람을 기다리지 않는다.
+///  · <see cref="TutorialDirector.CorridorMidReached"/>(개인 첫 도착) → <b>그 사람에게만</b> 제시(S12 판단 1 — §3.2 "그 플레이어가 중간 지점에 왔을 때").
+///    복도 첫 도착이면 <see cref="TutorialTraitDirector.StartOfferRoundServer(IEnumerable{ulong}, TutorialTraitRoundDisplay)"/> 로 라운드를 열고,
+///    이후 도착자는 <see cref="TutorialTraitDirector.AddParticipantServer"/>(같은 라운드 — 기존 제시·선택 보존). 앞 존에 있는 사람에게는 창을 띄우지 않는다.
+///    출구가 이미 열렸거나 타이머 만료 뒤 도착이면 창을 띄우지 않는다.
+///  · 제시를 못 받은 사람(0장·디렉터 없음)은 도착 때 바로 체크 → 게이트가 그 사람을 기다리지 않는다.
 ///  · <see cref="TutorialTraitDirector.ServerTraitChosen"/>(수동·자동) → <see cref="TutorialDirector.ReportCheckServer"/>(TraitCorridorN) → 디렉터 모델이 전원/60초로 출구를 연다.
-///  · 출구가 열리면(어떤 이유든) 미선택자 <see cref="TutorialTraitDirector.AutoChooseAllPendingServer"/> — 창 닫힘·토스트·무적 해제(§3.2 D14).
-///  · 보스 타이머 만료(Expired) → 즉시 자동 획득 — 강제 이동(3초 경고 뒤)·연출 잠금보다 먼저(tutorial-traits.md §3-5).
+///  · 출구가 열리면(어떤 이유든) <b>미도착자도 참가자로 넣고</b> 미선택 전원 <see cref="TutorialTraitDirector.AutoChooseAllPendingServer"/> — 창 닫힘·토스트·무적 해제(§3.2 D14 · §3.8).
+///  · 보스 타이머 만료(Expired)·보스방 도착 → 진행 중 복도 라운드를 같은 방식으로 즉시 자동 획득 — 강제 이동(3초 경고 뒤)·연출 잠금보다 먼저(tutorial-traits.md §3-5).
 ///  · G10 → <see cref="TutorialGuideIds.BPadWarn"/> 전원(D17). 단계: 입구 G3/G6/G9 → Corridor2~4, G10 → BossEnter(Corridor1 은 존1 흐름).
 ///  디렉터 Commit 안(게이트 이벤트)에서 다시 Commit 하지 않게 게이트 후속 처리는 다음 Update 로 미룬다.
 /// 모든 피어(로컬 플레이어):
 ///  · 목표 = 창이 떠 있으면 "특성 고르기", 골랐으면 "동료 대기" + 대기 줄(TUT_WAIT_PARTY). 중간 지점 전에는 앞 존 흐름의 "복도로" 를 건드리지 않는다.
-///  · 출구가 열리면 이 흐름이 쓰던 목표를 "다음 구역으로"(복도4 = 엘리베이터 발판으로) 바꾸고 손을 뗀다. 존 첫 진입 안내는 각 존 흐름 몫.
+///  · 출구가 열리면 이 흐름이 쓰던 목표를 "다음 구역으로"(복도4 = 엘리베이터 발판으로) 바꾸고 손을 뗀다. 존 첫 진입 안내는 각 존 흐름 몫 —
+///    다음 존 단계가 이미 보이면(같은 틱 반영) 그 존 목표를 덮지 않는다(<see cref="TutorialCorridorRules.ShouldShowExitObjective"/>). 단계 Finished 뒤엔 그리지 않는다.
 ///  · 처음 그릴 때 안내 UI 가 비어 있으면(늦은 클라) <see cref="TutorialGuideUI.RebuildFromState"/>.
 /// </summary>
 [DisallowMultipleComponent]
@@ -78,7 +81,10 @@ public sealed class TutorialCorridorFlow : MonoBehaviour
 
         _isServer = _nm.IsServer;
         if (_isServer)
+        {
             TutorialDirector.CorridorMidReached += HandleCorridorMidReachedServer;
+            TutorialDirector.BossRoomArrived += HandleBossRoomArrivedServer;
+        }
 
         TutorialDirector.StateChanged += Render;
         TutorialDirector.GateOpened += HandleGateOpened;
@@ -94,6 +100,7 @@ public sealed class TutorialCorridorFlow : MonoBehaviour
     private void OnDisable()
     {
         TutorialDirector.CorridorMidReached -= HandleCorridorMidReachedServer;
+        TutorialDirector.BossRoomArrived -= HandleBossRoomArrivedServer;
         TutorialDirector.StateChanged -= Render;
         TutorialDirector.GateOpened -= HandleGateOpened;
         BindTraits(null);
@@ -143,7 +150,7 @@ public sealed class TutorialCorridorFlow : MonoBehaviour
 
     private void HandleCorridorMidReachedServer(ulong clientId, int corridor)
     {
-        if (!_director.IsTutorialActive) return;
+        if (!_director.IsTutorialActive || _director.IsFinished) return;
 
         TutorialCorridorRoundDecision decision = _rounds.Decide(corridor,
             _director.IsGateOpen(TutorialCorridorRules.ExitGate(corridor)), IsTimerExpired);
@@ -151,6 +158,9 @@ public sealed class TutorialCorridorFlow : MonoBehaviour
         {
             case TutorialCorridorRoundDecision.Start:
                 StartRoundServer(corridor, clientId);
+                break;
+            case TutorialCorridorRoundDecision.Join:
+                JoinRoundServer(corridor, clientId);
                 break;
             case TutorialCorridorRoundDecision.GateAlreadyOpen:
             case TutorialCorridorRoundDecision.TimerExpired:
@@ -160,33 +170,66 @@ public sealed class TutorialCorridorFlow : MonoBehaviour
         }
     }
 
+    // 첫 도착자에게만 제시하며 라운드를 연다(§3.2 판단 1) — 아직 앞 존에 있는 사람에게는 창을 띄우지 않는다.
     private void StartRoundServer(int corridor, ulong firstClientId)
     {
         TutorialCheck check = TutorialCorridorRules.CheckOf(corridor);
         if (_traits == null || !_traits.IsSpawned)
         {
-            _rounds.MarkHandled(corridor, 0);
-            ReportConnectedServer(check, onlyWithoutPending: false);
-            Edit.LogWarning($"[Tutorial] 복도{corridor}: 특성 디렉터가 없다 — 선택 없이 전원 체크(게이트 {TutorialCorridorRules.ExitGate(corridor)}).", this);
+            _rounds.MarkStarted(corridor, 0);
+            _director.ReportCheckServer(firstClientId, check);
+            Edit.LogWarning($"[Tutorial] 복도{corridor}: 특성 디렉터가 없다 — 선택 없이 도착자마다 체크(게이트 {TutorialCorridorRules.ExitGate(corridor)}).", this);
             return;
         }
 
-        bool offered = _traits.StartOfferRoundServer(TutorialCorridorRules.DisplayOf(corridor));
-        _rounds.MarkHandled(corridor, offered ? _traits.Round : 0);
-        // 0장 받은 사람(풀 소진)·제시 실패 = 고를 게 없다 → 바로 체크.
-        ReportConnectedServer(check, onlyWithoutPending: offered);
-        Edit.Log($"[Tutorial] 복도{corridor} 특성 라운드 {(offered ? $"{_traits.Round} 시작" : "제시 없음(건너뜀)")} — 첫 도착 client {firstClientId}.", this);
+        int before = _traits.Round;
+        _clientScratch.Clear();
+        _clientScratch.Add(firstClientId);
+        bool offered = _traits.StartOfferRoundServer(_clientScratch, TutorialCorridorRules.DisplayOf(corridor));
+        int round = _traits.Round != before ? _traits.Round : 0;   // 서버 준비 전이면 라운드가 안 바뀐다
+        _rounds.MarkStarted(corridor, round);
+        // 0장(풀 소진)·제시 실패 = 고를 게 없다 → 바로 체크.
+        if (!offered) _director.ReportCheckServer(firstClientId, check);
+        Edit.Log($"[Tutorial] 복도{corridor} 특성 라운드 {(round > 0 ? $"{round} 시작" : "없음")} — 첫 도착 client {firstClientId} " +
+                 $"{(offered ? "제시" : "제시 없음(바로 체크)")}.", this);
     }
 
-    private void ReportConnectedServer(TutorialCheck check, bool onlyWithoutPending)
+    // 같은 라운드에 늦게 도착한 사람 — 그 사람에게만 제시한다. 이미 고른 사람·기존 제시는 그대로.
+    private void JoinRoundServer(int corridor, ulong clientId)
+    {
+        TutorialCheck check = TutorialCorridorRules.CheckOf(corridor);
+        int round = _rounds.RoundOf(corridor);
+        if (_traits == null || !_traits.IsSpawned || round == 0 || _traits.Round != round)
+        {
+            // 고를 창이 없는 복도(특성 디렉터 없음·라운드 못 엶) — 도착만으로 체크.
+            _director.ReportCheckServer(clientId, check);
+            return;
+        }
+
+        TutorialTraitJoinResult result = _traits.AddParticipantServer(clientId);
+        if (result == TutorialTraitJoinResult.Empty || result == TutorialTraitJoinResult.NoRound)
+            _director.ReportCheckServer(clientId, check);
+        Edit.Log($"[Tutorial] 복도{corridor} 늦은 도착 client {clientId} — 라운드 {round} 참가 {result}.", this);
+    }
+
+    // 아직 라운드에 없는(중간 지점 미도착) 접속자를 참가자로 넣는다 — 바로 뒤의 자동 획득 대상이 되게(§3.8 "존4 에 남아 있던 플레이어").
+    // 0장이면 고를 게 없으니 바로 체크한다. 넣은 인원 수.
+    private int AddAbsentParticipantsServer(int corridor)
     {
         _clientScratch.Clear();
         foreach (ulong id in _nm.ConnectedClientsIds) _clientScratch.Add(id);
+
+        int added = 0;
         foreach (ulong id in _clientScratch)
         {
-            if (onlyWithoutPending && _traits != null && _traits.HasPendingChoiceServer(id)) continue;
-            _director.ReportCheckServer(id, check);
+            if (_traits.IsInRoundServer(id)) continue;
+            TutorialTraitJoinResult result = _traits.AddParticipantServer(id);
+            if (result == TutorialTraitJoinResult.Empty)
+                _director.ReportCheckServer(id, TutorialCorridorRules.CheckOf(corridor));
+            if (result == TutorialTraitJoinResult.Offered || result == TutorialTraitJoinResult.Empty)
+                added++;
         }
+        return added;
     }
 
     private void HandleTraitChosenServer(TutorialTraitChosen chosen)
@@ -196,13 +239,28 @@ public sealed class TutorialCorridorFlow : MonoBehaviour
         _director.ReportCheckServer(chosen.ClientId, TutorialCorridorRules.CheckOf(corridor));
     }
 
-    // 출구가 열렸는데 아직 안 고른 사람 → 자동 획득(창 닫힘). 그 복도 라운드가 지금 라운드일 때만.
-    private void AutoChoosePendingServer(int corridor, string reason)
+    /// <summary>그 복도 라운드가 특성 디렉터의 지금 라운드인가.</summary>
+    private bool IsCurrentRound(int corridor)
     {
         int round = _rounds.RoundOf(corridor);
-        if (_traits == null || round == 0 || _traits.Round != round) return;
+        return _traits != null && _traits.IsSpawned && round > 0 && _traits.Round == round;
+    }
+
+    // 미도착자까지 참가자로 넣고 미선택 전원 자동 획득(창 닫힘·토스트·무적 해제). 그 복도 라운드가 지금 라운드일 때만.
+    private void AutoChooseRoundServer(int corridor, string reason)
+    {
+        if (!IsCurrentRound(corridor)) return;
+        int absent = AddAbsentParticipantsServer(corridor);
         int n = _traits.AutoChooseAllPendingServer();
-        if (n > 0) Edit.Log($"[Tutorial] 복도{corridor} 미선택 {n}명 자동 획득 — {reason}.", this);
+        if (n > 0 || absent > 0) Edit.Log($"[Tutorial] 복도{corridor} 자동 획득 {n}명(미도착 {absent}명 포함) — {reason}.", this);
+    }
+
+    // 지금 진행 중(출구 닫힘)인 복도 라운드 — 없으면 0.
+    private int OpenRoundCorridor()
+    {
+        if (_traits == null) return 0;
+        int corridor = _rounds.CorridorOfRound(_traits.Round);
+        return corridor > 0 && !_director.IsGateOpen(TutorialCorridorRules.ExitGate(corridor)) ? corridor : 0;
     }
 
     private void FlushOpenedGatesServer()
@@ -216,8 +274,8 @@ public sealed class TutorialCorridorFlow : MonoBehaviour
             int exit = TutorialCorridorRules.CorridorOfExitGate(gate);
             if (exit > 0)
             {
-                AutoChoosePendingServer(exit, $"{gate} 열림");
-                if (exit == 4)
+                AutoChooseRoundServer(exit, $"{gate} 열림");
+                if (exit == 4 && !_director.IsFinished)
                 {
                     _director.ShowSubtitleServer(TutorialGuideIds.BPadWarn);
                     _director.SetStepServer(TutorialStep.BossEnter);
@@ -238,8 +296,21 @@ public sealed class TutorialCorridorFlow : MonoBehaviour
         _lastTimerState = state;
         if (state != BossTimerManager.TimerState.Expired || _traits == null) return;
 
+        // 진행 중인 복도 라운드면 미도착자까지 넣어 전원 자동 획득. 아니면 남은 미선택자만.
+        int corridor = OpenRoundCorridor();
+        if (corridor > 0) AutoChooseRoundServer(corridor, "보스 타이머 만료(강제 이동 전)");
         int n = _traits.AutoChooseAllPendingServer();
-        Edit.Log($"[Tutorial] 보스 타이머 만료 — 열린 특성 창 {n}명 자동 획득(강제 이동 전).", this);
+        Edit.Log($"[Tutorial] 보스 타이머 만료 — 열린 특성 창 정리(복도{corridor} · 추가 자동 획득 {n}명).", this);
+    }
+
+    // 보스방 도착(패드·만료 강제 이동) = 튜토리얼 안내 끝(§3.9) — 열린 특성 창을 남기지 않는다(자동 획득 → 창 닫힘·무적 해제).
+    private void HandleBossRoomArrivedServer(IReadOnlyList<ulong> arrived)
+    {
+        if (_traits == null) return;
+        int corridor = OpenRoundCorridor();
+        if (corridor > 0) AutoChooseRoundServer(corridor, "보스방 도착");
+        int n = _traits.AutoChooseAllPendingServer();
+        if (corridor > 0 || n > 0) Edit.Log($"[Tutorial] 보스방 도착 — 특성 창 정리(복도{corridor} · 추가 자동 획득 {n}명).", this);
     }
 
     // ─── 게이트(모든 피어) ─────────────────────────────────────────────────
@@ -252,12 +323,14 @@ public sealed class TutorialCorridorFlow : MonoBehaviour
         if (exit > 0 && exit == _ownedCorridor)
         {
             // 이 흐름이 목표를 쓰던 복도만 — 다음 존 흐름이 첫 진입 때 덮어쓴다.
+            // 같은 틱에 다음 존 단계가 먼저 반영됐으면(존 흐름이 이미 첫 진입 목표를 썼으면) 덮지 않는다.
             _ownedCorridor = 0;
             TutorialGuideUI ui = TutorialGuideUI.Instance;
-            if (ui != null)
+            if (ui != null && !_director.IsFinished)
             {
                 ui.ClearWait();
-                ui.SetObjective(exit == 4 ? GoPadId : NextId);
+                if (TutorialCorridorRules.ShouldShowExitObjective(exit, _director.Step))
+                    ui.SetObjective(exit == 4 ? GoPadId : NextId);
             }
         }
         Render();
@@ -267,7 +340,8 @@ public sealed class TutorialCorridorFlow : MonoBehaviour
 
     private void Render()
     {
-        if (_director == null || _nm == null || !_director.IsTutorialActive) return;
+        // 보스방 도착(만료 강제 이동이면 복도4 출구가 닫힌 채일 수 있다) 뒤에는 안내를 다시 그리지 않는다 — 정리는 존4 안내 몫.
+        if (_director == null || _nm == null || !_director.IsTutorialActive || _director.IsFinished) return;
         TutorialGuideUI ui = TutorialGuideUI.Instance;
         if (ui == null) return;
 

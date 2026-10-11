@@ -13,6 +13,19 @@ public enum TutorialTraitChoiceResult
     NotOffered,
 }
 
+/// <summary>라운드 참가자 추가(늦은 도착) 결과.</summary>
+public enum TutorialTraitJoinResult
+{
+    /// <summary>1장 이상 제시했다 — 고를 때까지 미선택.</summary>
+    Offered,
+    /// <summary>참가자로 넣었지만 0장(풀 소진) — 고를 것이 없어 바로 완료로 친다.</summary>
+    Empty,
+    /// <summary>이미 이번 라운드 참가자다(제시 중·고름·자동 획득 모두) — 아무것도 바꾸지 않는다.</summary>
+    AlreadyInRound,
+    /// <summary>시작한 라운드가 없다(또는 서버 준비 전).</summary>
+    NoRound,
+}
+
 /// <summary>
 /// 튜토리얼 특성 선택의 순수 규칙(할 일 15 T1) — Unity·NGO 비의존, EditMode 테스트 대상.
 /// 플레이어(clientId)별로 이번 라운드 제시 후보·선택 완료 여부·획득 목록을 가진다.
@@ -32,6 +45,7 @@ public sealed class TutorialTraitSelectionModel
     private readonly HashSet<int> unusable;
     private readonly Dictionary<ulong, PlayerState> players = new Dictionary<ulong, PlayerState>();
     private readonly List<int> candidateScratch = new List<int>();
+    private int roundOfferCount;
 
     /// <param name="poolSize">풀 크기.</param>
     /// <param name="unusableIndices">제시하면 안 되는 인덱스(빈 칸 등). null 가능.</param>
@@ -82,6 +96,7 @@ public sealed class TutorialTraitSelectionModel
     public bool StartRound(IEnumerable<ulong> clientIds, int offerCount, Func<int, int> next)
     {
         Round++;
+        roundOfferCount = offerCount;
         foreach (PlayerState state in players.Values)
         {
             state.InRound = false;
@@ -107,6 +122,30 @@ public sealed class TutorialTraitSelectionModel
         }
 
         return anyOffered;
+    }
+
+    /// <summary>
+    /// 지금 라운드에 참가자 1명을 더한다(복도 중간 지점에 늦게 도착 · 자동 획득 직전의 미도착자).
+    /// 그 사람에게만 라운드 시작 때와 같은 장 수로 후보를 뽑고, 이미 참가한 사람의 제시·선택은 건드리지 않는다.
+    /// 이미 참가자면(고른 뒤 왕복 포함) 무시한다 — 한 라운드에 창은 한 번만.
+    /// </summary>
+    public TutorialTraitJoinResult AddParticipant(ulong clientId, Func<int, int> next)
+    {
+        if (next == null)
+            throw new ArgumentNullException(nameof(next));
+        if (Round == 0)
+            return TutorialTraitJoinResult.NoRound;
+
+        PlayerState state = GetOrCreate(clientId);
+        if (state.InRound)
+            return TutorialTraitJoinResult.AlreadyInRound;
+
+        state.InRound = true;
+        state.Offered.Clear();
+        PickCandidates(poolSize, state.Acquired, unusable, roundOfferCount, next, candidateScratch);
+        state.Offered.AddRange(candidateScratch);
+        state.Chosen = state.Offered.Count == 0;
+        return state.Chosen ? TutorialTraitJoinResult.Empty : TutorialTraitJoinResult.Offered;
     }
 
     /// <summary>선택 판정. Accepted 면 획득 목록에 넣고 이번 라운드를 완료 처리한다.</summary>

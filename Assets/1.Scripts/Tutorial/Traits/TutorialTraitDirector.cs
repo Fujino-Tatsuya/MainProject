@@ -223,6 +223,34 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
     }
 
     /// <summary>
+    /// [서버] 지금 라운드에 참가자 1명을 더한다 — 복도 중간 지점에 늦게 도착한 사람에게만 제시한다(할 일 15 S12).
+    /// 이미 참가한 사람의 제시·선택은 그대로 둔다. 이미 참가자면 <see cref="TutorialTraitJoinResult.AlreadyInRound"/>(변경 없음).
+    /// <see cref="TutorialTraitJoinResult.Empty"/> = 0장(고를 것 없음 — 호출자가 바로 다음 단계로).
+    /// 라운드가 이미 완료로 알려졌어도 새 미선택자가 생기면 그 사람이 고를 때 <see cref="ServerRoundCompleted"/> 가 다시 난다.
+    /// </summary>
+    public TutorialTraitJoinResult AddParticipantServer(ulong clientId)
+    {
+        if (!CanServe)
+            return TutorialTraitJoinResult.NoRound;
+
+        TutorialTraitJoinResult result = model.AddParticipant(clientId, random.Next);
+        if (result != TutorialTraitJoinResult.Offered && result != TutorialTraitJoinResult.Empty)
+            return result;
+
+        if (result == TutorialTraitJoinResult.Offered)
+            roundCompletionRaised = false;
+        RebuildEntries();
+        SyncSelectionShields();
+
+        Edit.Log($"{Tag} 라운드 {model.Round} 참가자 추가 client {clientId} — {result}.", this);
+        CheckRoundCompleted();
+        return result;
+    }
+
+    /// <summary>[서버] 그 플레이어가 지금 라운드 참가자인가(제시 중·고름·0장 모두).</summary>
+    public bool IsInRoundServer(ulong clientId) => model != null && model.IsInRound(clientId);
+
+    /// <summary>
     /// [서버] 아직 안 고른 플레이어에게 제시된 후보 중 무작위 1장을 대신 고른다(교착 방지 60초·타이머 만료용).
     /// 대상이 아니면(이미 골랐음·제시 없음) false.
     /// </summary>

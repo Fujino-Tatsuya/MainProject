@@ -31,12 +31,14 @@ public readonly struct TutorialTraitWindowUpdate
 ///
 /// 규칙: 제시가 있고 아직 닫힌 적 없는 라운드면 연다. 열린 라운드의 제시가 사라지거나 라운드가 바뀌면 닫는다.
 /// 한 번 닫힌 라운드는 제시 행이 다시 보여도 다시 열지 않는다. 획득 수가 열 때보다 늘었으면 획득 토스트.
+/// 창이 열리지 않은 채(같은 틱에 제시 → 자동 획득) 획득 수가 늘어도 토스트.
 /// </summary>
 public sealed class TutorialTraitWindowModel
 {
     private readonly HashSet<int> closedRounds = new HashSet<int>();
     private int openRound;
     private int acquiredAtOpen;
+    private int lastAcquired = -1;
 
     public bool IsOpen => openRound > 0;
 
@@ -48,7 +50,10 @@ public sealed class TutorialTraitWindowModel
     public TutorialTraitWindowUpdate Evaluate(int round, bool hasOffer, int acquiredCount)
     {
         bool closed = false;
-        bool toast = false;
+        // 창이 닫힌 채로 획득 수가 늘었다 = 창을 보기 전에 자동 획득됐다(복도 미도착자 — S12). 그래도 토스트로 알린다.
+        // 첫 평가는 기준만 잡는다(늦게 붙은 UI 가 기존 획득을 새 획득으로 착각하지 않게).
+        bool toast = !IsOpen && lastAcquired >= 0 && round > 0 && acquiredCount > lastAcquired;
+        lastAcquired = acquiredCount;
         if (IsOpen && (openRound != round || !hasOffer))
         {
             toast = acquiredCount > acquiredAtOpen;
