@@ -63,7 +63,7 @@ public enum TutorialCheck : byte
 /// <summary>파티 집계 카운터(범용). 목표값은 모델 생성 때 정한다.</summary>
 public enum TutorialCounter : byte
 {
-    /// <summary>존2 처치 n/9 — 표시용. G3(전멸) 판정은 S4 존 장부가 한다.</summary>
+    /// <summary>존2 처치 n/목표(목표 = 존 장부의 존2 수, 기본 9) — 표시용. G3(전멸) 판정은 S4 존 장부가 한다.</summary>
     Zone2Kills = 0,
     /// <summary>존3 스피너봇 간파 파티 합계 n/3 — 목표 도달 = G5(D2-1).</summary>
     Zone3Interrupts = 1,
@@ -141,6 +141,11 @@ public sealed class TutorialFlowModel
     public int OpenedGateMask { get; private set; }
     /// <summary>교착 방지로 열린 게이트(bit = <see cref="TutorialGate"/>) — 자동 획득 대상 판단용.</summary>
     public int TimeoutGateMask { get; private set; }
+    /// <summary>
+    /// 열기 요청이 왔지만 앞 게이트가 닫혀 있어 <b>보류 중</b>인 게이트(bit = <see cref="TutorialGate"/>).
+    /// 차례가 오면 <see cref="Evaluate"/> 가 연다(<see cref="RequestGate"/>).
+    /// </summary>
+    public int RequestedGateMask { get; private set; }
 
     public event Action<TutorialStep, TutorialStep> StepChanged;
     public event Action<TutorialGate, TutorialGateOpenReason> GateOpened;
@@ -268,10 +273,27 @@ public sealed class TutorialFlowModel
         if (IsGateOpen(g) || !IsGateEligible(g)) return false;
 
         OpenedGateMask |= 1 << (int)g;
+        RequestedGateMask &= ~(1 << (int)g);
         if (reason == TutorialGateOpenReason.Timeout) TimeoutGateMask |= 1 << (int)g;
         GateOpened?.Invoke(g, reason);
         return true;
     }
+
+    /// <summary>
+    /// 조건이 이미 충족된 게이트를 <b>열거나, 차례가 아니면 보류</b>한다(존 클리어 — S4).
+    /// 차례(앞 게이트 열림)면 즉시 <see cref="TryOpenGate"/>(Manual), 아니면 <see cref="RequestedGateMask"/> 에 남겨
+    /// 앞 게이트가 열리는 <see cref="Evaluate"/> 에서 연다 — 조건은 다시 보지 않는다(처치는 되돌릴 수 없다).
+    /// 반환: 지금 열었으면 true, 보류했거나 이미 열림/이미 보류면 false.
+    /// </summary>
+    public bool RequestGate(TutorialGate g)
+    {
+        if (IsGateOpen(g)) return false;
+        if (TryOpenGate(g)) return true;
+        RequestedGateMask |= 1 << (int)g;
+        return false;
+    }
+
+    public bool IsGateRequested(TutorialGate g) => (RequestedGateMask & (1 << (int)g)) != 0;
 
     /// <summary>
     /// 개인·카운터 게이트를 재판정한다. 보고·인원 변화 직후와 주기적으로(교착 방지 시계) 부른다.
@@ -284,6 +306,9 @@ public sealed class TutorialFlowModel
             var g = (TutorialGate)i;
             if (IsGateOpen(g)) continue;
             if (!IsGateEligible(g)) return;   // 순서 — 이 뒤는 볼 필요가 없다
+
+            // 보류된 요청(존 클리어가 차례보다 먼저 옴) — 차례가 왔으니 연다. 게이트 종류와 무관.
+            if (IsGateRequested(g)) { TryOpenGate(g); continue; }
 
             if (TryGetGateCounter(g, out TutorialCounter counter))
             {

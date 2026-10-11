@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -19,7 +20,8 @@ using UnityEngine;
 ///  · S2 구간 감지 ✅ → <see cref="AreaFirstEntered"/>(파티 첫 진입)·<see cref="CorridorMidReached"/>(개인 복도 중간)·
 ///    <see cref="GetPlayerAreaServer"/>. 단계 갱신(<see cref="SetStepServer"/>)은 아직 안 한다(S6 에서 게이트와 함께)
 ///  · S3 배리어 ✅ → <see cref="TutorialBarriers"/>(모든 피어)가 <see cref="StateChanged"/>·<see cref="GateOpened"/> 를 받아 <see cref="IsGateOpen"/> 으로 적용
-///  · S4 존 장부 → 존2 전멸 <see cref="TryOpenGateServer"/>(G3), 처치 수 <see cref="AddCounterServer"/>(Zone2Kills)
+///  · S4 존 장부 ✅ → <see cref="TutorialMonsterZones"/>: 활성 때 존2~4 휴면, 존 클리어 → <see cref="RequestGateServer"/>(G3·G6·G9, 차례 전이면 보류),
+///    존2 처치 → Zone2Kills(목표 = 장부 수). 기상 = <see cref="SetZoneDormantServer"/>(S8·S9·S10 이 부른다)
 ///  · S5 타이머 → G8 열림에서 타이머 시작, 판별은 <see cref="TutorialStageMarker.IsActive"/>
 ///  · S7 존1 → <see cref="ReportCheckServer"/>(Dash·AttackHit — 서버 관측) / <see cref="ReportLocalCheck"/>(Move·PassiveTooltip — 오너 보고)
 ///  · S9 존3 → <see cref="AddCounterServer"/>(Zone3Interrupts) — 목표 도달 시 G5 자동 개방
@@ -79,6 +81,7 @@ public sealed class TutorialDirector : NetworkBehaviour
     [SerializeField, Min(1f)] private float deadlockSeconds = (float)TutorialFlowModel.DefaultDeadlockSeconds;
 
     [Header("파티 카운터 목표")]
+    [Tooltip("존2 처치 목표 — 존 장부(S4)가 존2 몬스터를 1마리 이상 찾으면 그 수가 우선한다. 이 값은 장부가 비었을 때만 쓴다.")]
     [SerializeField, Min(1)] private int zone2KillTarget = 9;
     [SerializeField, Min(1)] private int zone3InterruptTarget = 3;
     [SerializeField, Min(1)] private int zone4PanelTarget = 4;
@@ -139,6 +142,7 @@ public sealed class TutorialDirector : NetworkBehaviour
     // 서버 전용
     private TutorialFlowModel _model;
     private TutorialAreaTracker _areas;
+    private TutorialMonsterZones _monsterZones;
     private float _areaPollTimer;
     private bool _pendingActivate;
     private NetworkManager _subscribedNm;
@@ -156,12 +160,18 @@ public sealed class TutorialDirector : NetworkBehaviour
         return IsSpawned && i < _counters.Count ? _counters[i] : 0;
     }
 
-    public int GetCounterTarget(TutorialCounter c) => c switch
+    /// <summary>카운터 목표. 활성 뒤에는 복제값(존2 처치 = 존 장부의 실제 수), 그 전에는 인스펙터 값.</summary>
+    public int GetCounterTarget(TutorialCounter c)
     {
-        TutorialCounter.Zone2Kills => zone2KillTarget,
-        TutorialCounter.Zone3Interrupts => zone3InterruptTarget,
-        _ => zone4PanelTarget,
-    };
+        int i = TutorialFlowModel.CounterCount + (int)c;
+        if (IsSpawned && i < _counters.Count) return _counters[i];
+        return c switch
+        {
+            TutorialCounter.Zone2Kills => zone2KillTarget,
+            TutorialCounter.Zone3Interrupts => zone3InterruptTarget,
+            _ => zone4PanelTarget,
+        };
+    }
 
     public bool TryGetPlayerProgress(ulong clientId, out TutorialPlayerProgress progress)
     {
@@ -316,7 +326,11 @@ public sealed class TutorialDirector : NetworkBehaviour
             return;
         }
 
-        _model = new TutorialFlowModel(deadlockSeconds, zone2KillTarget, zone3InterruptTarget, zone4PanelTarget);
+        // 구간 → 존 장부 → 모델 순서: 존2 처치 목표를 장부의 실제 수로 맞춘다(S4).
+        BuildAreas();
+        int zone2Target = BuildMonsterZones();
+
+        _model = new TutorialFlowModel(deadlockSeconds, zone2Target, zone3InterruptTarget, zone4PanelTarget);
         _model.GateOpened += HandleModelGateOpened;
         _model.StepChanged += HandleModelStepChanged;
 
@@ -327,14 +341,14 @@ public sealed class TutorialDirector : NetworkBehaviour
         _subscribedNm.OnClientDisconnectCallback += HandleClientDisconnected;
         PlayerLifeCycleController.ServerLifeStateChanged += HandleServerLifeStateChanged;
 
+        // [0, CounterCount) = 값, [CounterCount, 2·CounterCount) = 목표(존2 목표가 장부 수라 클라도 알아야 한다).
         _counters.Clear();
         for (int i = 0; i < TutorialFlowModel.CounterCount; i++) _counters.Add(0);
+        for (int i = 0; i < TutorialFlowModel.CounterCount; i++) _counters.Add(_model.GetCounterTarget((TutorialCounter)i));
 
         _active.Value = true;
         _model.SetStep(TutorialStep.Zone1);
         Commit();
-
-        BuildAreas();
 
         Edit.Log($"[Tutorial] 튜토리얼 시작 — 참가자 {_model.ParticipantCount}명, 교착 방지 {deadlockSeconds:0}초.", this);
     }
@@ -357,6 +371,12 @@ public sealed class TutorialDirector : NetworkBehaviour
         {
             _areas.PartyFirstEntered -= HandleAreaFirstEntered;
             _areas.CorridorMidReached -= HandleCorridorMidReached;
+        }
+        if (_monsterZones != null)
+        {
+            _monsterZones.ZoneCleared -= HandleZoneCleared;
+            _monsterZones.MemberDied -= HandleZoneMemberDied;
+            _monsterZones.Dispose();
         }
     }
 
@@ -417,6 +437,125 @@ public sealed class TutorialDirector : NetworkBehaviour
         // TODO(S8/S12): 특성 선택 창 열기 → 선택 완료 시 ReportCheckServer(clientId, TraitCorridor{n}).
         CorridorMidReached?.Invoke(clientId, corridor);
     }
+
+    // ─── 존 장부 · 몬스터 휴면(서버, S4) ───────────────────────────────────
+    // 규칙은 순수 TutorialMonsterLedger, 배선은 TutorialMonsterZones. 몬스터 쪽 훅은 MonsterBase.SetDormantServer 하나
+    // (Docs/tech/handoff-tutorial.md). 활성 = 존2·존3·존4 전부 휴면(존1 은 몬스터 0 — 있으면 깨워 둔 채로 둔다).
+    // 실제 기상 호출은 S8(존2)·S9(존3 — 스피너봇 레인과 정리)·S10(존4 일반 → 다리 개통 때 중간보스).
+
+    /// <returns>존2 처치 목표(장부 수, 비었으면 인스펙터 값).</returns>
+    private int BuildMonsterZones()
+    {
+        _monsterZones = new TutorialMonsterZones();
+        _monsterZones.Build(_areas);
+        _monsterZones.ZoneCleared += HandleZoneCleared;
+        _monsterZones.MemberDied += HandleZoneMemberDied;
+
+        int slept = 0;
+        slept += _monsterZones.SetZoneDormant(TutorialArea.Zone2, true, TutorialMonsterFilter.All);
+        slept += _monsterZones.SetZoneDormant(TutorialArea.Zone3, true, TutorialMonsterFilter.All);
+        slept += _monsterZones.SetZoneDormant(TutorialArea.Zone4, true, TutorialMonsterFilter.All);
+
+        int zone2 = _monsterZones.Ledger.Count(TutorialArea.Zone2);
+        Edit.Log($"[Tutorial] 존 장부 — {_monsterZones.Describe()} · 휴면 시작 {slept}마리.", this);
+        if (_monsterZones.Ledger.Count(TutorialArea.Zone1) > 0)
+            Edit.LogWarning("[Tutorial] 존 장부: 존1 에 몬스터가 있다(시나리오는 0) — 휴면시키지 않는다.", this);
+        if (zone2 == 0)
+            Edit.LogWarning($"[Tutorial] 존 장부: 존2 몬스터 0 — 존2 클리어(G3) 판정이 없다. 처치 목표는 인스펙터 값 {zone2KillTarget}.", this);
+        if (_monsterZones.Ledger.Count(TutorialArea.Zone3, TutorialMonsterFilter.KeyOnly) == 0
+            || _monsterZones.Ledger.Count(TutorialArea.Zone4, TutorialMonsterFilter.KeyOnly) == 0)
+            Edit.LogWarning("[Tutorial] 존 장부: 존3/존4 핵심 몬스터(중간보스급)가 없다 — 그 존은 전멸로 클리어를 판정한다.", this);
+
+        return zone2 > 0 ? zone2 : zone2KillTarget;
+    }
+
+    private void HandleZoneMemberDied(ulong id, TutorialArea zone, bool key)
+    {
+        if (zone == TutorialArea.Zone2 && _model != null && _model.AddCounter(TutorialCounter.Zone2Kills)) Commit();
+    }
+
+    private void HandleZoneCleared(TutorialArea zone)
+    {
+        TutorialGate gate;
+        switch (zone)
+        {
+            case TutorialArea.Zone2: gate = TutorialGate.G3_Corridor2Entry; break;
+            case TutorialArea.Zone3: gate = TutorialGate.G6_Corridor3Entry; break;
+            case TutorialArea.Zone4: gate = TutorialGate.G9_Corridor4Entry; break;
+            default: return;
+        }
+
+        Edit.Log($"[Tutorial] {zone} 클리어 → {gate}.", this);
+        ZoneCleared?.Invoke(zone);
+        RequestGateServer(gate);
+    }
+
+    /// <summary>
+    /// [서버] 존 클리어(존마다 1번) — 존2 전멸 / 존3 스피너봇 처치 / 존4 중간보스 처치. 게이트(G3·G6·G9)는 디렉터가 이미 연다(차례가 아니면 보류).
+    /// 붙일 자리: S6 안내(`TUT_ZONE_CLEAR`·`TUT_Z4_CLEAR`).
+    /// </summary>
+    public static event Action<TutorialArea> ZoneCleared;
+
+    /// <summary>
+    /// [서버] 게이트를 열거나, 앞 게이트가 닫혀 있으면 <b>보류</b>했다가 차례가 오면 연다(<see cref="TutorialFlowModel.RequestGate"/>).
+    /// 존 클리어처럼 "조건은 이미 충족, 순서만 기다림"인 경우에 쓴다. 지금 열었으면 true.
+    /// </summary>
+    public bool RequestGateServer(TutorialGate gate)
+    {
+        if (!RequireServerActive(nameof(RequestGateServer))) return false;
+        if (_model.IsGateOpen(gate)) return false;
+
+        bool opened = _model.RequestGate(gate);
+        if (!opened)
+            Edit.Log($"[Tutorial] {gate} 보류 — 앞 게이트가 아직 닫혀 있다. 차례가 오면 연다.", this);
+        Commit();
+        return opened;
+    }
+
+    /// <summary>
+    /// [서버] 존 몬스터(살아 있는 것) 휴면/기상. 바뀐 수. 존4 기상은 <see cref="TutorialMonsterFilter.NormalOnly"/>(중간보스 제외),
+    /// 다리 개통 때 <see cref="TutorialMonsterFilter.KeyOnly"/> 로 중간보스만.
+    /// </summary>
+    public int SetZoneDormantServer(TutorialArea zone, bool dormant, TutorialMonsterFilter filter = TutorialMonsterFilter.All)
+    {
+        if (!RequireServerActive(nameof(SetZoneDormantServer)) || _monsterZones == null) return 0;
+        int n = _monsterZones.SetZoneDormant(zone, dormant, filter);
+        Edit.Log($"[Tutorial] {zone} {filter} {(dormant ? "휴면" : "기상")} {n}마리 — {_monsterZones.Describe()}", this);
+        return n;
+    }
+
+    public int WakeZoneServer(TutorialArea zone, TutorialMonsterFilter filter = TutorialMonsterFilter.All) =>
+        SetZoneDormantServer(zone, false, filter);
+
+    /// <summary>[서버] 몬스터 하나 휴면/기상(장부 밖이어도 된다). 바뀌었으면 true.</summary>
+    public bool SetMonsterDormantServer(MonsterBase monster, bool dormant)
+    {
+        if (!RequireServerActive(nameof(SetMonsterDormantServer)) || monster == null || monster.IsDormant == dormant) return false;
+        monster.SetDormantServer(dormant);
+        return true;
+    }
+
+    /// <summary>[서버] 존의 살아 있는 몬스터(등록 순서). 장부가 없으면 비운다.</summary>
+    public void GetZoneMonstersServer(TutorialArea zone, TutorialMonsterFilter filter, List<MonsterBase> result)
+    {
+        if (_monsterZones == null) { result.Clear(); return; }
+        _monsterZones.GetAliveMonsters(zone, filter, result);
+    }
+
+    /// <summary>[서버] 몬스터 수(전체/생존). 장부가 없으면 false.</summary>
+    public bool TryGetZoneMonsterCountServer(TutorialArea zone, TutorialMonsterFilter filter, out int total, out int alive)
+    {
+        total = alive = 0;
+        if (_monsterZones == null) return false;
+        total = _monsterZones.Ledger.Count(zone, filter);
+        alive = _monsterZones.Ledger.Count(zone, filter, true);
+        return true;
+    }
+
+    public bool IsZoneClearedServer(TutorialArea zone) => _monsterZones != null && _monsterZones.Ledger.IsZoneCleared(zone);
+
+    /// <summary>[서버] 장부 요약 문자열(디버그).</summary>
+    public string DescribeMonsterZonesServer() => _monsterZones != null ? _monsterZones.Describe() : "(장부 없음 — 튜토리얼 비활성)";
 
     // ─── 인원(서버) ──────────────────────────────────────────────────────
 

@@ -3,7 +3,7 @@
 > 할 일 15 / S1 (2026-10-11). 원본 시나리오: [../design/tutorial-scenario.md](../design/tutorial-scenario.md) §2.1·§4 · 계획: [../../PLAN-tutorial.md](../../PLAN-tutorial.md).
 > 코드: `Assets/1.Scripts/Map/Tutorial/` — `TutorialFlowModel`(순수 규칙) · `TutorialDirector`(서버 소유·복제) · `TutorialStageMarker`(판별).
 > 테스트: 메뉴 `Tools/Tests/튜토리얼 EditMode 테스트 실행`(`TutorialFlowModelTests` · `TutorialAreaTrackerTests`). 튜토리얼 단계의 새 픽스처는 이 러너에 넣는다.
-> S2 구간 감지는 §6. S3 배리어는 §7.
+> S2 구간 감지는 §6. S3 배리어는 §7. S4 존 장부·몬스터 휴면은 §8.
 
 ## 1. 판별 — 한 곳
 - `StageTutorial.prefab` 루트에 `TutorialStageMarker`(비네트워크). 저작 메뉴 `2. Build StageTutorial Prefab` 도 붙인다.
@@ -118,3 +118,41 @@
 - 추락 복구: 서버 `ResolveReturnPoint` 가 기준점·Ring 후보마다 `ReturnPointFilter` 를 부른다 → `TutorialBarrierRules.IsPointReachable` —
   점을 품은 구간이 모두 '아직 못 들어가는 구간'(들어가는 배리어가 닫힘)이면 거부. 튜토리얼 구간 밖(보스방)은 허용. 스폰 폴백은 거르지 않는다(존1).
 - 타이머 만료·패드 이동은 `BossTeleportManager` 순간이동이라 배리어와 무관(§4 "만료 강제 이동은 G9·G10 과 무관").
+
+## 8. 존 장부 · 몬스터 휴면 (S4)
+> 코드: `TutorialMonsterLedger`(순수 — 존 배정·클리어 규칙·필터) · `TutorialMonsterZones`(서버 — MonsterBase 참조·휴면 적용·사망 구독) · `TutorialDirector`(배선·API) ·
+> 몬스터 훅 `MonsterBase.SetDormantServer` — 무엇을 왜 바꿨는지는 [handoff-tutorial.md](handoff-tutorial.md).
+> 테스트: `TutorialMonsterLedgerTests`(튜토리얼 러너 — 장부 + 게이트 보류). 디버그 메뉴: `Tools/Tutorial/Debug/*`(Play 중 호스트).
+
+**장부 만들기 — 활성화 순간(서버)**
+- `MapGenerator.OnGenerated` 는 `MapContentSpawner.SpawnPlacements`(몬스터 `Spawn()` 동기 완료) **뒤**에 온다 → 디렉터 활성(그 이벤트 또는 그 뒤 자기 스폰)에서 몬스터가 이미 다 있다.
+- 순서: 구간(§6) → 장부 → 모델. 스폰된 살아 있는 `MonsterBase` 전부를 **그 순간 위치(XZ)가 든 존 사각형**(§6 슬롯 사각형, 여유 없음)으로 배정. 어느 존에도 없으면 장부 밖(경고 로그).
+  핵심 몬스터 = `Rank != Normal`(중간보스급 — 존3 SpinnerBot, 존4 GauntletBot).
+- 서버 로그 1줄: `[Tutorial] 존 장부 — Zone1 0/0 · Zone2 9/9 휴면 9 · Zone3 1/1 (핵심 SpinnerBot…) · Zone4 31/31 (핵심 GauntletBot…) · 장부 밖 0 · 휴면 시작 41마리`.
+- 2026-10-11 프리팹 집계(스폰 지점 × count): 존2 `ZoneS_typeA` **9**(Chomp 4·Humanoid 4·Mortar 1) · 존3 `ZoneM_typeC` **1**(SpinnerBot) ·
+  존4 `ZoneL_typeB` **31**(PeekABot 4·Chomp 12·Humanoid 10·Mortar 4·GauntletBot 1). 모든 지점이 존 발자국 안(최대 |x|,|z| = 7.2 / 15 / 17.8m). 바닥을 못 찾은 지점은 스폰되지 않으니 실제 수는 로그로 본다.
+
+**휴면**
+- 활성 때 존2·존3·존4 **전부** 휴면(핵심 포함). 존1 은 0마리(있으면 깨워 둔 채로 두고 경고).
+- 휴면 = FSM 정지(인지·추격·공격) + 무적(피해·넉백·경직·CC·피격 이펙트·피해 숫자 없음). 복제하지 않는다(클라 연출에 필요해지면 그때 NetworkVariable).
+- 기상 API(서버): `SetZoneDormantServer(zone, dormant, filter)` · `WakeZoneServer(zone, filter)` · `SetMonsterDormantServer(monster, dormant)` · `GetZoneMonstersServer` ·
+  `TryGetZoneMonsterCountServer` · `DescribeMonsterZonesServer`. filter = `All` / `NormalOnly`(존4 기상 — 중간보스 제외) / `KeyOnly`(다리 개통 — 중간보스만).
+- 부를 곳: S8 존2(진입 안내 4초 뒤 `WakeZoneServer(Zone2)`) · S9 존3(스피너봇 — 스피너봇 레인과 정리, handoff §2) · S10 존4(G8 3초 뒤 `NormalOnly`, 다리 개통 때 `KeyOnly`).
+
+**클리어 판정**
+| 존 | 규칙 | 게이트 |
+|---|---|---|
+| 존2 | 전멸(`AllDead`) | G3 |
+| 존3 | 핵심 처치(`KeyDead` — 스피너봇) | G6 |
+| 존4 | 핵심 처치(`KeyDead` — 중간보스, 일반 몹 남아도 됨 D4) | G9 |
+- 핵심이 없는 존은 전멸로 본다. 판정은 사망 때만 — 0마리 존은 클리어되지 않는다. 존마다 1번(`TutorialDirector.ZoneCleared` 정적 이벤트, 서버).
+- 사망 = `MonsterDeathEvents.ServerMonsterDied`. 존2 사망마다 `Zone2Kills` +1. **처치 목표 = 장부의 존2 수**(0 이면 인스펙터 `zone2KillTarget`).
+  목표는 `_counters` 뒤쪽 절반으로 복제한다(`GetCounterTarget` — 클라도 실제 수를 본다).
+
+**게이트 보류** — `TutorialFlowModel.RequestGate` / `TutorialDirector.RequestGateServer`
+- 존 클리어 = "조건은 이미 충족, 순서만 기다림". 차례(앞 게이트 열림)면 즉시 열고, 아니면 `RequestedGateMask` 에 남겨 **앞 게이트가 열리는 그 `Evaluate` 에서** 연다(조건 재확인 없음 — 처치는 되돌릴 수 없다).
+- 예: 디버그로 존2 를 G2 전에 정리 → G3 보류 → 복도1 특성 전원 선택으로 G2 가 열리는 순간 G3 도 열림. 중간보스를 G8(타이머 시작) 전에 잡음 → G8 열릴 때 G9.
+- `TryOpenGateServer` 는 그대로(순서가 안 맞으면 거부) — 보류가 필요한 쪽만 `RequestGateServer` 를 쓴다.
+
+**디버그(Play 중 호스트, `Tools/Tutorial/Debug/`)**: 장부 로그 · 존2 기상 · 존3 기상 · 존4 기상(중간보스 제외) · 존4 중간보스 기상 · 존2~4 전부 휴면 ·
+존2 전멸(깨워서 처치) · 존3 핵심 처치 · 존4 핵심 처치. F9(DevMonsterKill)는 휴면 몬스터를 못 죽인다(무적) — 먼저 깨울 것.
