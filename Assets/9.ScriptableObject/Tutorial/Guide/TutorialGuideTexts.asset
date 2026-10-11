@@ -123,43 +123,56 @@ MonoBehaviour:
     durationSeconds: 6
     sfx: {fileID: 0}
   - id: TUT_Z3_INTRO
-    text: 
+    text: "<b>\uAC04\uD30C(\uC778\uD130\uB7FD\uD2B8)</b> \u2014 \uC2A4\uD53C\uB108\uBD07\uC774
+      \uD68C\uC804\uD558\uAE30 \uC9C1\uC804 <b>\uB178\uB797\uAC8C \uBE5B\uB098\uB294
+      \uC21C\uAC04</b>, <b>\uBC14\uC9DD \uBD99\uC5B4</b> \uB9C8\uC6B0\uC2A4\uB97C
+      \uC2A4\uD53C\uB108\uBD07\uC5D0 \uB450\uACE0 <b>\uC6B0\uD074\uB9AD</b> \uD558\uC138\uC694."
     durationSeconds: 6
     sfx: {fileID: 0}
   - id: TUT_Z3_PRACTICE_NOTE
-    text: 
+    text: "\uAC04\uD30C\uB97C \uC138 \uBC88 \uC131\uACF5\uD560 \uB54C\uAE4C\uC9C0
+      \uC2A4\uD53C\uB108\uBD07\uC740 \uC4F0\uB7EC\uC9C0\uC9C0 \uC54A\uACE0, \uD68C\uC804
+      \uACF5\uACA9\uB3C4 \uD53C\uD574\uB97C \uC8FC\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."
     durationSeconds: 6
     sfx: {fileID: 0}
   - id: TUT_Z3_GOAL
-    text: 
+    text: "\uC2A4\uD53C\uB108\uBD07\uC744 \uAC04\uD30C\uD558\uC138\uC694 ({n}/{total})"
     durationSeconds: 6
     sfx: {fileID: 0}
   - id: TUT_Z3_GUNNER
-    text: 
+    text: "\uAC70\uB108\uC758 \uAC04\uD30C\uB294 \uCD1D\uAD6C\uB85C \uCC0C\uB974\uB294
+      \uADFC\uC811\uAE30\uC785\uB2C8\uB2E4. \uC4F0\uACE0 \uB098\uBA74 \uC0B4\uC9DD
+      \uBC00\uB824\uB098\uB2C8 \uB2E4\uC2DC \uBD99\uC73C\uC138\uC694."
     durationSeconds: 6
     sfx: {fileID: 0}
   - id: TUT_Z3_MISS
-    text: 
+    text: "\uBE57\uB098\uAC14\uC2B5\uB2C8\uB2E4 \u2014 \uB354 \uAC00\uAE4C\uC774,
+      \uC2A4\uD53C\uB108\uBD07\uC744 \uD5A5\uD574."
     durationSeconds: 6
     sfx: {fileID: 0}
   - id: TUT_Z3_EARLY
-    text: 
+    text: "\uC544\uC9C1\uC785\uB2C8\uB2E4 \u2014 \uB178\uB797\uAC8C \uBE5B\uB0A0
+      \uB54C\uB9CC \uAC04\uD30C\uB429\uB2C8\uB2E4."
     durationSeconds: 6
     sfx: {fileID: 0}
   - id: TUT_Z3_FIRST_SUCCESS
-    text: 
+    text: "\uAC04\uD30C \uC131\uACF5! \uC801\uC774 \uC7A0\uC2DC \uBE44\uD2C0\uAC70\uB9BD\uB2C8\uB2E4
+      \u2014 \uC774\uB54C \uBAB0\uC544\uCE58\uC138\uC694."
     durationSeconds: 6
     sfx: {fileID: 0}
   - id: TUT_Z3_HINT
-    text: 
+    text: "\uC694\uB839: \uB178\uB780\uBE5B\uC774 \uBCF4\uC774\uBA74 \uBC14\uB85C
+      \uBD99\uC5B4\uC11C \uC6B0\uD074\uB9AD. \uAC04\uD30C\uB294 \uB2E4\uC2DC \uC4F0\uAE30\uAE4C\uC9C0
+      \uBA87 \uCD08 \uAC78\uB9BD\uB2C8\uB2E4."
     durationSeconds: 6
     sfx: {fileID: 0}
   - id: TUT_Z3_REAL
-    text: 
+    text: "\uC5F0\uC2B5 \uB05D. \uC774\uC81C \uC9C4\uC9DC\uC785\uB2C8\uB2E4! \uB178\uB780\uBE5B\uC774
+      \uBCF4\uC774\uBA74 \uC5B8\uC81C\uB4E0 \uAC04\uD30C\uD558\uC138\uC694."
     durationSeconds: 6
     sfx: {fileID: 0}
   - id: TUT_Z3_BOSS
-    text: 
+    text: "[\uC2A4\uD53C\uB108\uBD07] \uC744 \uCC98\uCE58\uD558\uC138\uC694"
     durationSeconds: 6
     sfx: {fileID: 0}
   - id: TUT_Z4_LORE

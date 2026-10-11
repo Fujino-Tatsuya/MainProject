@@ -129,6 +129,18 @@ public sealed class TutorialSpinnerPractice : NetworkBehaviour, ISpinnerBotOverr
         if (!RequireServer(nameof(SetPracticeAnchor))) return;
         _anchor = worldPosition;
     }
+
+    /// <summary>[서버] 이동 반경(m)을 바꾼다 — 존3 흐름이 출구 배리어(G6) 위치에서 계산해 넣는다. 0 = 기준점 고정.</summary>
+    public void SetPracticeRadius(float radius)
+    {
+        if (!RequireServer(nameof(SetPracticeRadius))) return;
+        practiceRadius = Mathf.Max(0f, radius);
+    }
+
+    /// <summary>[서버] 지금 이동 반경 중심(기본 = 서버 스폰 위치).</summary>
+    public Vector3 PracticeAnchor => _anchor;
+
+    public float PracticeRadius => practiceRadius;
     #endregion
 
     void Awake()

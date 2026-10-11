@@ -763,6 +763,42 @@ public sealed class TutorialDirector : NetworkBehaviour
         return true;
     }
 
+    // ─── 안내 자막(서버 → 클라, S9~) ──────────────────────────────────────
+    // 자막은 지나가는 신호라 복제 상태에 넣지 않는다 — 늦게 붙은 클라는 지난 자막을 못 받는다(안내 UI 규칙과 같음).
+    // 목표 패널·강조는 각 피어가 복제 상태(Step·게이트·카운터)로 다시 그린다(StateChanged).
+
+    /// <summary>
+    /// [서버] 안내 자막을 모든 클라(호스트 포함)의 <see cref="TutorialGuideUI"/> 에 띄운다.
+    /// <paramref name="onlyFor"/> 가 None 이 아니면 그 캐릭터인 로컬 플레이어만 띄운다(클라가 <see cref="TutorialLocalPlayerInfo"/> 로 판별).
+    /// </summary>
+    public void ShowSubtitleServer(string id, TutorialCharacter onlyFor = TutorialCharacter.None)
+    {
+        if (!RequireServerActive(nameof(ShowSubtitleServer)) || string.IsNullOrEmpty(id)) return;
+        ShowSubtitleClientRpc(id, onlyFor);
+    }
+
+    /// <summary>[서버] 안내 자막을 한 클라에게만 띄운다(개인 피드백 — 빗나감 등).</summary>
+    public void ShowSubtitleToClientServer(ulong clientId, string id)
+    {
+        if (!RequireServerActive(nameof(ShowSubtitleToClientServer)) || string.IsNullOrEmpty(id)) return;
+        var p = new ClientRpcParams { Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } } };
+        ShowSubtitleClientRpc(id, TutorialCharacter.None, p);
+    }
+
+    [ClientRpc]
+    private void ShowSubtitleClientRpc(string id, TutorialCharacter onlyFor, ClientRpcParams p = default)
+    {
+        if (onlyFor != TutorialCharacter.None && TutorialLocalPlayerInfo.ResolveCharacter(Player.LocalPlayer) != onlyFor) return;
+
+        TutorialGuideUI ui = TutorialGuideUI.Instance;
+        if (ui == null)
+        {
+            Edit.Log($"[Tutorial] 자막 {id} — 씬에 TutorialGuideUI 가 없어 띄우지 않는다(S12 배치 전).", this);
+            return;
+        }
+        ui.ShowSubtitle(id);
+    }
+
     // ─── 오너 → 서버 보고(초안 — S7 에서 사용) ───────────────────────────────
 
     /// <summary>
