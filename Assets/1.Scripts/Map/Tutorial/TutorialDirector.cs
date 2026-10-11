@@ -27,7 +27,8 @@ using UnityEngine;
 ///    보스방 도착(패드·만료 강제 이동 모두) → 단계 Finished + <see cref="BossRoomArrived"/>(S12 안내 종료)
 ///  · S10 존4 → Z4-0 <see cref="ShowTimerHudServer"/> · 설정 자막 끝 <see cref="StartBossTimerServer"/>(= G8) · 만료 문구는 BossTimerManager.State == Expired
 ///  · S11 사망 규칙 → 목숨 차감 기준 = <see cref="IsBossTimerStarted"/>(G8 열림, 모든 피어)
-///  · S7 존1 → <see cref="ReportCheckServer"/>(Dash·AttackHit — 서버 관측) / <see cref="ReportLocalCheck"/>(Move·PassiveTooltip — 오너 보고)
+///  · S7 존1 ✅ → TutorialZone1Flow: <see cref="ReportCheckServer"/>(Dash·AttackHit — 서버 관측) / <see cref="ReportLocalMoveDistance"/>(Move — 오너 누적 거리, 서버 상한 검증) /
+///    <see cref="ReportLocalCheck"/>(PassiveTooltip — 오너 보고)
 ///  · S9 존3 → <see cref="AddCounterServer"/>(Zone3Interrupts) — 목표 도달 시 G5 자동 개방
 ///  · S12 특성 → 개인 게이트가 <see cref="TutorialGateOpenReason.Timeout"/> 으로 열리면 미선택자 자동 획득
 /// </summary>
@@ -166,6 +167,7 @@ public sealed class TutorialDirector : NetworkBehaviour
     private NetworkManager _subscribedNm;
     private BossTeleportManager _teleport;
     private bool _bossArrived;
+    private double _activatedServerTime = -1d;
 
     // ─── 읽기(모든 피어) ─────────────────────────────────────────────────
 
@@ -383,6 +385,7 @@ public sealed class TutorialDirector : NetworkBehaviour
         for (int i = 0; i < TutorialFlowModel.CounterCount; i++) _counters.Add(0);
         for (int i = 0; i < TutorialFlowModel.CounterCount; i++) _counters.Add(_model.GetCounterTarget((TutorialCounter)i));
 
+        _activatedServerTime = NetworkManager.ServerTime.Time;   // S7 이동 보고 상한 검증의 기준
         _active.Value = true;
         _model.SetStep(TutorialStep.Zone1);
         Commit();
@@ -813,9 +816,59 @@ public sealed class TutorialDirector : NetworkBehaviour
             Edit.Log($"[Tutorial] 서버 무시: client {sender} 이동 보고 — 상태 {life.State}(Alive 만).", this);
             return;
         }
-        // TODO(S7): 이동 거리 타당성(서버가 본 위치 변화) 등 추가 검증.
+        // S7: 이동은 거리가 실린 보고(ReportOwnerMoveServerRpc)로만 받는다 — 여기엔 상한을 검증할 값이 없다.
+        if (check == TutorialCheck.Move)
+        {
+            Edit.LogWarning($"[Tutorial] 서버 거부: client {sender} 이동 보고에 거리가 없다 — ReportLocalMoveDistance 를 쓴다.", this);
+            return;
+        }
 
         if (_model.ReportCheck(sender, check)) Commit();
+    }
+
+    /// <summary>
+    /// [오너 클라] 존1 이동 누적 거리(m)를 보고한다(S7 Z1-1). 서버가 상한을 검증한다
+    /// (<see cref="TutorialZone1Rules.IsMoveReportPlausible"/> — 목표 이상 · 튜토리얼 시작 뒤 최대 속도 × 경과 + 여유 이하).
+    /// 이미 완료면 보내지 않는다. 거부되면 체크가 안 켜지니 오너가 나중에 다시 보내도 된다.
+    /// </summary>
+    public void ReportLocalMoveDistance(float meters)
+    {
+        if (!IsSpawned || !_active.Value) return;
+        if (TryGetPlayerProgress(NetworkManager.LocalClientId, out TutorialPlayerProgress p) && p.Has(TutorialCheck.Move)) return;
+        ReportOwnerMoveServerRpc(meters);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void ReportOwnerMoveServerRpc(float meters, ServerRpcParams p = default)
+    {
+        ulong sender = p.Receive.SenderClientId;
+        if (_model == null) return;
+
+        if (_model.IsGateOpen(TutorialGate.G1_Corridor1Entry))
+        {
+            Edit.Log($"[Tutorial] 서버 무시: client {sender} 이동 {meters:0.0}m — G1 이미 열림.", this);
+            return;
+        }
+        if (!NetworkManager.ConnectedClients.TryGetValue(sender, out NetworkClient client) || client.PlayerObject == null)
+        {
+            Edit.LogWarning($"[Tutorial] 서버 거부: client {sender} 의 PlayerObject 가 없다.", this);
+            return;
+        }
+        var life = client.PlayerObject.GetComponent<PlayerLifeCycleController>();
+        if (life != null && life.State != PlayerLifeState.Alive)
+        {
+            Edit.Log($"[Tutorial] 서버 무시: client {sender} 이동 보고 — 상태 {life.State}(Alive 만).", this);
+            return;
+        }
+
+        double elapsed = NetworkManager.ServerTime.Time - _activatedServerTime;
+        if (!TutorialZone1Rules.IsMoveReportPlausible(meters, elapsed))
+        {
+            Edit.LogWarning($"[Tutorial] 서버 거부: client {sender} 이동 {meters:0.0}m — 시작 뒤 {elapsed:0.0}초로는 불가능하거나 목표 미만.", this);
+            return;
+        }
+
+        if (_model.ReportCheck(sender, TutorialCheck.Move)) Commit();
     }
 
     // ─── 모델 → 복제 ──────────────────────────────────────────────────────

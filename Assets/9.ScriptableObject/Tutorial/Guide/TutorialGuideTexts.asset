@@ -39,19 +39,21 @@ MonoBehaviour:
     durationSeconds: 6
     sfx: {fileID: 0}
   - id: TUT_Z1_MOVE
-    text: 
+    text: "<b>WASD</b> \uB85C \uC774\uB3D9\uD558\uC138\uC694"
     durationSeconds: 6
     sfx: {fileID: 0}
   - id: TUT_Z1_DASH
-    text: 
+    text: "<b>Space</b> \uB85C \uB300\uC2DC\uD558\uC138\uC694"
     durationSeconds: 6
     sfx: {fileID: 0}
   - id: TUT_Z1_DASH_SUB
-    text: 
+    text: "\uB300\uC2DC\uD558\uB294 \uC21C\uAC04\uC5D0\uB294 \uD53C\uD574\uB97C \uBC1B\uC9C0
+      \uC54A\uC2B5\uB2C8\uB2E4."
     durationSeconds: 6
     sfx: {fileID: 0}
   - id: TUT_Z1_ATTACK
-    text: 
+    text: "<b>\uC88C\uD074\uB9AD</b> \uC73C\uB85C \uD5C8\uC218\uC544\uBE44\uB97C
+      \uACF5\uACA9\uD558\uC138\uC694 ({n}/5)"
     durationSeconds: 6
     sfx: {fileID: 0}
   - id: TUT_Z1_ATTACK_GUNNER
@@ -59,7 +61,8 @@ MonoBehaviour:
     durationSeconds: 6
     sfx: {fileID: 0}
   - id: TUT_Z1_PASSIVE
-    text: 
+    text: "\uD654\uBA74 \uC544\uB798 \uC2A4\uD0AC\uBC14 <b>\uB9E8 \uC67C\uCABD \uC544\uC774\uCF58(P)</b>
+      \uC5D0 \uB9C8\uC6B0\uC2A4\uB97C \uC62C\uB824 \uD328\uC2DC\uBE0C\uB97C \uD655\uC778\uD558\uC138\uC694"
     durationSeconds: 6
     sfx: {fileID: 0}
   - id: TUT_Z1_PASSIVE_PALADIN
@@ -75,7 +78,7 @@ MonoBehaviour:
     durationSeconds: 6
     sfx: {fileID: 0}
   - id: TUT_Z1_GO
-    text: 
+    text: "\uBCF5\uB3C4\uB85C \uC774\uB3D9\uD558\uC138\uC694"
     durationSeconds: 6
     sfx: {fileID: 0}
   - id: TUT_Z2_INTRO
@@ -224,5 +227,44 @@ MonoBehaviour:
     sfx: {fileID: 0}
   - id: TUT_B_BOSS_FRONT_TIP
     text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_ATTACK_HEAT
+    text: "\uACC4\uC18D \uC3D8\uBA74 \uACFC\uC5F4\uC774 \uC313\uC785\uB2C8\uB2E4.
+      \uAC00\uB4DD \uCC28\uBA74 \uC7A0\uC2DC \uACF5\uACA9\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4."
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_PASSIVE_INFO_PALADIN
+    text: "\uBC29\uAE08 \uCCAB \uACF5\uACA9\uC774 \uB354 \uAC15\uD558\uAC8C \uB4E4\uC5B4\uAC04
+      \uAC83\uC774 \uD328\uC2DC\uBE0C [{P}] \uC785\uB2C8\uB2E4. \uC801\uC5D0\uAC8C
+      \uB9DE\uC744\uC218\uB85D \uB354 \uBE68\uB9AC \uB2E4\uC2DC \uC900\uBE44\uB429\uB2C8\uB2E4."
+    durationSeconds: 8
+    sfx: {fileID: 0}
+  - id: TUT_Z1_PASSIVE_INFO_GUNNER
+    text: "[{P}] \uC3E0\uC218\uB85D \uACFC\uC5F4 \uB2E8\uACC4\uAC00 \uC624\uB974\uACE0
+      \uACF5\uACA9\uC774 \uAC15\uD574\uC9C0\uC9C0\uB9CC, \uAC00\uB4DD \uCC28\uBA74
+      \uACF5\uACA9\uC774 \uC7A0\uAE41\uB2C8\uB2E4."
+    durationSeconds: 8
+    sfx: {fileID: 0}
+  - id: TUT_Z1_PASSIVE_INFO_ASSASSIN
+    text: "[{P}] \uACF5\uACA9\uC744 \uB9DE\uD790\uC218\uB85D \uBD84\uB178\uAC00 \uCC28\uACE0,
+      \uCDA9\uBD84\uD788 \uCC28\uBA74 <b>R</b> \uB85C \uBCC0\uC2E0\uD569\uB2C8\uB2E4.
+      \uBCF4\uC2A4\uB294 \uB4F1 \uB4A4\uB97C \uCE58\uBA74 \uB354 \uC544\uD515\uB2C8\uB2E4."
+    durationSeconds: 8
+    sfx: {fileID: 0}
+  - id: TUT_Z1_CHECK_MOVE
+    text: "\uC774\uB3D9"
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_CHECK_DASH
+    text: "\uB300\uC2DC"
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_CHECK_ATTACK
+    text: "\uAE30\uBCF8 \uACF5\uACA9"
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_CHECK_PASSIVE
+    text: "\uD328\uC2DC\uBE0C \uD655\uC778"
     durationSeconds: 6
     sfx: {fileID: 0}
