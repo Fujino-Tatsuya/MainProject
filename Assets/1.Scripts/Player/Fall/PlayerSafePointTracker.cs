@@ -44,6 +44,12 @@ public sealed class PlayerSafePointTracker : NetworkBehaviour
     [SerializeField] private bool showSafePointMarkers = true;
     [SerializeField] private GameObject safePointMarkerPrefab;
 
+    /// <summary>
+    /// [서버] 복귀 지점 추가 거름(전역). false 를 돌려준 지점은 기준점·Ring 후보 모두 버린다 — 스폰 폴백은 거르지 않는다.
+    /// 튜토리얼 배리어(<c>TutorialBarriers</c>)가 닫힌 배리어 너머 구간을 빼려고 건다. 없으면 모두 허용.
+    /// </summary>
+    public static System.Func<Vector3, bool> ReturnPointFilter;
+
     private readonly Queue<Vector3> _safePointQueue = new Queue<Vector3>();
     private readonly List<GameObject> _markerInstances = new List<GameObject>();
     private Vector3 _spawnPoint;
@@ -183,7 +189,7 @@ public sealed class PlayerSafePointTracker : NetworkBehaviour
                 $"[Fall/진단] 복귀 지점 후보 {rank}/{candidates.Length} — 기준점={basePoint}, " +
                 $"낙하지점={fallPoint}, 기준점이 설 수 있는가={IsFreeStanding(basePoint)}", this);
 
-            if (IsFreeStanding(basePoint))
+            if (IsFreeStanding(basePoint) && IsAllowedByFilter(basePoint))
                 return basePoint;
 
             if (TryFindRingCandidate(basePoint, fallPoint, out Vector3 resolved))
@@ -207,7 +213,7 @@ public sealed class PlayerSafePointTracker : NetworkBehaviour
             {
                 Vector3 dir = Quaternion.Euler(0f, 45f * d, 0f) * away;
                 Vector3 candidate = basePoint + dir * ringRadii[r];
-                if (TryResolveFlatUnoccupied(candidate, basePoint.y, out resolved))
+                if (TryResolveFlatUnoccupied(candidate, basePoint.y, out resolved) && IsAllowedByFilter(resolved))
                     return true;
             }
         }
@@ -215,6 +221,8 @@ public sealed class PlayerSafePointTracker : NetworkBehaviour
         resolved = basePoint;
         return false;
     }
+
+    private static bool IsAllowedByFilter(Vector3 point) => ReturnPointFilter == null || ReturnPointFilter(point);
 
     // 지점이 비어 있고(점유 X) 발밑에 지면이 있는지.
     private bool IsFreeStanding(Vector3 point)

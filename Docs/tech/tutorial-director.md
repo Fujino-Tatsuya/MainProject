@@ -3,7 +3,7 @@
 > 할 일 15 / S1 (2026-10-11). 원본 시나리오: [../design/tutorial-scenario.md](../design/tutorial-scenario.md) §2.1·§4 · 계획: [../../PLAN-tutorial.md](../../PLAN-tutorial.md).
 > 코드: `Assets/1.Scripts/Map/Tutorial/` — `TutorialFlowModel`(순수 규칙) · `TutorialDirector`(서버 소유·복제) · `TutorialStageMarker`(판별).
 > 테스트: 메뉴 `Tools/Tests/튜토리얼 EditMode 테스트 실행`(`TutorialFlowModelTests` · `TutorialAreaTrackerTests`). 튜토리얼 단계의 새 픽스처는 이 러너에 넣는다.
-> S2 구간 감지는 §6.
+> S2 구간 감지는 §6. S3 배리어는 §7.
 
 ## 1. 판별 — 한 곳
 - `StageTutorial.prefab` 루트에 `TutorialStageMarker`(비네트워크). 저작 메뉴 `2. Build StageTutorial Prefab` 도 붙인다.
@@ -93,3 +93,28 @@
 이벤트만 낸다. 단계 갱신(`SetStepServer`)·안내(S6)·존2/3/4 시작(S8~S10)·특성 창(S8/S12)은 구독해서 붙인다. 복제 상태는 아직 없다(늦은 클라는 `Step` 으로 그린다).
 
 **디버그**: 씬에서 `Stage1`(StageTutorial 루트, `TutorialStageMarker`)을 선택하면 존(하늘색)·복도(노랑)·안쪽/바깥 여유(옅은 선)·복도 중간 지점(분홍) 기즈모.
+
+## 7. 배리어 (S3)
+> 코드: `TutorialBarrierRules`(순수 — 매핑·모양·진입 가능·추락 후보) · `TutorialBarriers`(런타임, 모든 피어) · `PlayerSafePointTracker.ReturnPointFilter`(훅).
+> 테스트: `TutorialBarrierRulesTests`(튜토리얼 러너). 저작 메뉴: `Tools/Map/Authoring/Tutorial/5. Preview Barriers`(열린 씬, 저장 안 됨) · `6. Clear Barrier Preview` · `7. Check Barriers (StageTutorial Prefab)`.
+
+**8개 = 복도 n 입구(앞 존 쪽)·출구(다음 존 쪽)**: 복도1 G1/G2 · 복도2 G3/G4 · 복도3 G6/G7 · 복도4 G9/G10. G5·G8 은 배리어 없음.
+- 모양 = §6 복도 사각형의 양 끝에서 **복도 안쪽으로** 두께 0.4m(존 사각형을 침범하지 않음), 가로 = 복도 너비 + 양옆 0.3m(복도 벽 안으로 파고듦), 높이 3m.
+  2026-10-11 프리팹 점검: 8개 모두 양옆 벽 안쪽 면 ±1.38m, 벽 바깥 면 ±2.63m(배리어 반폭 2.3m — 벽 밖으로 안 나옴).
+- 어디에: Play 중에만 `TutorialStageMarker.Start` 가 StageTutorial 루트에 `TutorialBarriers` 를 붙이고, 그것이 루트 아래 `TutorialBarriers/Barrier_G*` 를 만든다.
+  🔴 공용 존 프리팹(Zones/*)·씬에는 아무것도 저장하지 않는다. 프리팹에 저장된 것은 마커의 머티리얼 참조 한 줄뿐.
+
+**언제 · 어떻게 여나**
+- 디렉터가 튜토리얼을 켠 것(`IsTutorialActive`)이 그 피어에서 처음 보일 때 만든다(`StateChanged`). 튜토리얼이 아니면 만들지 않는다.
+- 이미 열린 게이트는 만들 때 바로 끈다(늦은 클라 = 스폰 직후 `StateChanged` 로 현재 상태). 이후 `IsGateOpen` 이 켜지면 콜라이더·카브를 **즉시** 끄고
+  0.35초 페이드(실제 시간, 높이·알파) 뒤 비활성. 다시 닫히는 일은 없다(게이트는 앞으로만).
+
+**막기**
+- 플레이어: **Wall 레이어** 비트리거 BoxCollider. 플레이어 모터 스윕 마스크(`PlayerGameRuleData.obstacleMask` = Default|Ground|Wall|Enemy|Env)가 본다.
+  걷기·대시·이동 스킬(어쌔신 Q 돌진·평타 전진, 거너 E 백스텝·우클릭 반동, 팔라딘 전진)·넉백이 모두 같은 스윕(`PlayerMovementSimulation`)이라 막힌다.
+  스윕을 안 타는 것 = 순간이동(`TeleportAuthoritative` — 스폰·추락 복구·보스방 이동)과 23호 잡기/밀기(`PlayerRestrainedState` — 보스방 전용).
+  Wall 은 거너 평타·차지 레이저 차단 레이어에도 있어 배리어 너머로는 거너 빔이 막힌다.
+- 몬스터: NavMeshObstacle 카브(Box, `carveOnlyStationary` 끔, 위아래 +2m — `ZoneBridgeGate` 와 같은 설정). Wall 은 NavMesh 베이크 수집(Default·Ground)에 안 들어가 다리 재베이크에 섞이지 않는다.
+- 추락 복구: 서버 `ResolveReturnPoint` 가 기준점·Ring 후보마다 `ReturnPointFilter` 를 부른다 → `TutorialBarrierRules.IsPointReachable` —
+  점을 품은 구간이 모두 '아직 못 들어가는 구간'(들어가는 배리어가 닫힘)이면 거부. 튜토리얼 구간 밖(보스방)은 허용. 스폰 폴백은 거르지 않는다(존1).
+- 타이머 만료·패드 이동은 `BossTeleportManager` 순간이동이라 배리어와 무관(§4 "만료 강제 이동은 G9·G10 과 무관").

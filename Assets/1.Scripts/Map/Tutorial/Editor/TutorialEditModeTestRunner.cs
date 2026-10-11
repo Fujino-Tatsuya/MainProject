@@ -12,6 +12,7 @@ internal static class TutorialEditModeTestRunner
     {
         "^TutorialFlowModelTests$",
         "^TutorialAreaTrackerTests$",
+        "^TutorialBarrierRulesTests$",
     };
 
     const string Tag = "[TutorialTests]";

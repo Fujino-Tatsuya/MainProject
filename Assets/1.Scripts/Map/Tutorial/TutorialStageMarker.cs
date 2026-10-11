@@ -15,6 +15,11 @@ public sealed class TutorialStageMarker : MonoBehaviour
 {
     private static TutorialStageMarker s_active;
 
+    [Tooltip("튜토리얼 배리어(S3) 머티리얼 — 반투명 기존 머티리얼 재사용(색은 코드가 PropertyBlock 으로 입힌다).")]
+    [SerializeField] private Material barrierMaterial;
+
+    public Material BarrierMaterial => barrierMaterial;
+
     /// <summary>지금 켜진 스테이지가 튜토리얼인가. 씬 로드 직후(OnEnable 뒤)부터 유효 — 맵 생성 이벤트 시점엔 확정돼 있다.</summary>
     public static bool IsActive => s_active != null;
 
@@ -38,6 +43,14 @@ public sealed class TutorialStageMarker : MonoBehaviour
     private void OnDisable()
     {
         if (s_active == this) s_active = null;
+    }
+
+    // 배리어(S3)는 Play 중에만, 이 스테이지 루트에 붙인다 — 프리팹·씬에는 저장되지 않는다(공용 존 프리팹에도 없다).
+    // 실제 생성은 디렉터가 튜토리얼을 켠 뒤(모든 피어)다.
+    private void Start()
+    {
+        if (!Application.isPlaying || GetComponent<TutorialBarriers>() != null) return;
+        gameObject.AddComponent<TutorialBarriers>().SetMaterial(barrierMaterial);
     }
 
 #if UNITY_EDITOR

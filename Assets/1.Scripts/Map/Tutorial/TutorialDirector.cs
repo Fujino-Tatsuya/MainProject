@@ -18,7 +18,7 @@ using UnityEngine;
 /// S2 이후가 붙일 자리:
 ///  · S2 구간 감지 ✅ → <see cref="AreaFirstEntered"/>(파티 첫 진입)·<see cref="CorridorMidReached"/>(개인 복도 중간)·
 ///    <see cref="GetPlayerAreaServer"/>. 단계 갱신(<see cref="SetStepServer"/>)은 아직 안 한다(S6 에서 게이트와 함께)
-///  · S3 배리어 → <see cref="GateOpened"/> 구독 + 늦은 클라는 <see cref="IsGateOpen"/> 으로 재적용
+///  · S3 배리어 ✅ → <see cref="TutorialBarriers"/>(모든 피어)가 <see cref="StateChanged"/>·<see cref="GateOpened"/> 를 받아 <see cref="IsGateOpen"/> 으로 적용
 ///  · S4 존 장부 → 존2 전멸 <see cref="TryOpenGateServer"/>(G3), 처치 수 <see cref="AddCounterServer"/>(Zone2Kills)
 ///  · S5 타이머 → G8 열림에서 타이머 시작, 판별은 <see cref="TutorialStageMarker.IsActive"/>
 ///  · S7 존1 → <see cref="ReportCheckServer"/>(Dash·AttackHit — 서버 관측) / <see cref="ReportLocalCheck"/>(Move·PassiveTooltip — 오너 보고)

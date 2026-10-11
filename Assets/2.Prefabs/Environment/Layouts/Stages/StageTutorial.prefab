@@ -322,6 +322,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7a7d0f8b753d3d343b7ac19ed9a8029e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TutorialStageMarker
+  barrierMaterial: {fileID: 2100000, guid: 7b27a57664d778945a9e71ec8a5b3021, type: 2}
 --- !u!1 &8283673989847625966
 GameObject:
   m_ObjectHideFlags: 0

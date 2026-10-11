@@ -20,6 +20,7 @@ public static class TutorialStageAuthoring
     const string MapScenePath = "Assets/0.Scenes/MainFlow/4.MapScene.unity";
     const string Stage1PrefabPath = "Assets/2.Prefabs/Environment/Layouts/Stages/Stage1.prefab";
     const string ZonesDir = "Assets/2.Prefabs/Environment/Layouts/Zones/";
+    const string BarrierMaterialPath = "Assets/3.Materials/MA_AoeTelegraph_Red.mat";
 
     // 이름으로 찾는 코드(MinimapController · MapOverviewUI · WallOcclusionDriver)가 기대하는 이름.
     const string StageRootName = "Stage1";
@@ -213,7 +214,11 @@ public static class TutorialStageAuthoring
         try
         {
             // 튜토리얼 판별 마커 — 진행 상태(TutorialDirector)·타이머·패드 등 튜토리얼 전용 규칙이 이것만 본다.
-            root.AddComponent<TutorialStageMarker>();
+            var marker = root.AddComponent<TutorialStageMarker>();
+            // 배리어(S3) 머티리얼 — 기존 반투명 머티리얼 재사용(새 아트 없음)
+            var markerSo = new SerializedObject(marker);
+            markerSo.FindProperty("barrierMaterial").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Material>(BarrierMaterialPath);
+            markerSo.ApplyModifiedPropertiesWithoutUndo();
 
             var wallsInst = (GameObject)PrefabUtility.InstantiatePrefab(walls, root.transform);
             if (wallOverrides != null) PrefabUtility.SetPropertyModifications(wallsInst, wallOverrides);
