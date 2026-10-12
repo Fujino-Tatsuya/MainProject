@@ -51,9 +51,7 @@ public class WellsDroneDataSO : ScriptableObject
     [Range(0.05f, 0.95f)] public float approachSlowTimePortion = 0.5f;
     [Tooltip("느린 구간 동안 이동하는 거리 비율(0~1). 나머지 거리를 뒤 구간에서 급가속해 내려온다.")]
     [Range(0.01f, 0.9f)] public float approachSlowDistancePortion = 0.15f;
-    [Tooltip("충돌 순간 생성할 폭발 VFX(선택). 비우면 임시 원 확산.")]
-    public GameObject explosionVfxPrefab;
-    [Tooltip("폭발 연출 유지(초) — 피해와 무관한 연출 값. 이게 끝난 뒤 쿨다운을 센다.")]
+    [Tooltip("폭발 뒤 쿨다운을 세기 시작할 때까지(초) — 피해와 무관. 폭발 연출은 EffectCatalog.Wells_Drone_Explosion 이 정한다(이 값과 무관).")]
     [Min(0f)] public float explosionDuration = 0.5f;
     [Header("크로스헤어 (추적 단계)")]
     [Tooltip("크로스헤어 기준 지름(m). 아래 시작/끝 배율이 여기에 곱해진다.")]
@@ -78,11 +76,7 @@ public class WellsDroneDataSO : ScriptableObject
     [Tooltip("줄어드는 구간 중 초록 → 주황으로 바뀌는 지점(0~1). 0.5 = 줄어드는 시간의 절반.")]
     [Range(0f, 1f)] public float crosshairMidColorAt = 0.5f;
 
-    [Header("바닥 원 · 폭발 색")]
+    [Header("바닥 예고 원 색")]
     public Color circleOuterColor = new Color(1f, 0.15f, 0.1f, 0.3f);
     public Color circleFillColor = new Color(1f, 0.05f, 0.02f, 0.6f);
-    [Tooltip("임시 폭발 원 색(폭발 VFX 프리팹이 비었을 때).")]
-    public Color explosionColor = new Color(1f, 0.55f, 0.1f, 0.85f);
-    [Tooltip("임시 폭발 원이 범위 반경의 몇 배까지 퍼지는가.")]
-    [Min(1f)] public float explosionGrowScale = 2.5f;
 }

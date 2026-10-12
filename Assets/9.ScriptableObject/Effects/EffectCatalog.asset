@@ -38,6 +38,7 @@ MonoBehaviour:
   <Ultimate_Strike>k__BackingField: {fileID: 11400000, guid: 2b9663c3e821ab54b8c6254439c6befe, type: 2}
   <Mob_Slash>k__BackingField: {fileID: 11400000, guid: d57f39897b08b004c84a995edbd7fde8, type: 2}
   <Mob_Bite>k__BackingField: {fileID: 11400000, guid: 711a910e150b32743ba079fc5ff9ed42, type: 2}
+  <Interrupt_Flash>k__BackingField: {fileID: 11400000, guid: e6dad2ab1b7d86d49b816729fc8526c2, type: 2}
   <Drop_Charge_Boundary>k__BackingField: {fileID: 11400000, guid: a250c4956ae6d604195af8c0ef58fe0f, type: 2}
   <Drop_Charge_Indicator>k__BackingField: {fileID: 11400000, guid: 12f5c15d731222a4fb5899aa42423fc8, type: 2}
   <Drop_Collision>k__BackingField: {fileID: 11400000, guid: 257224bb915c8284b951f51f2c783638, type: 2}
@@ -50,6 +51,7 @@ MonoBehaviour:
   <Wells_Bomb_Trail>k__BackingField: {fileID: 11400000, guid: d64d9b6f106204e468d0364e3216f54e, type: 2}
   <Bomb_Explode>k__BackingField: {fileID: 11400000, guid: 8078106485e08b34f997de3fe7ee4147, type: 2}
   <Bomb_Exploded>k__BackingField: {fileID: 11400000, guid: 107075cc61c064b4c9f979d41cfed66d, type: 2}
+  <Wells_Drone_Explosion>k__BackingField: {fileID: 11400000, guid: 7c0157bf3c4f14b489590588998cc10f, type: 2}
   <ChargeBall_Grow>k__BackingField: {fileID: 11400000, guid: f3693d35287b49f7b7ba750c52cb6840, type: 2}
   <ChargeBall_Loop>k__BackingField: {fileID: 11400000, guid: bb39a066d0454af88683e332e64a3e59, type: 2}
   <ChargeBall_FadeOut>k__BackingField: {fileID: 11400000, guid: 5d28b04cd06644d7b77bb5c9505f3de8, type: 2}

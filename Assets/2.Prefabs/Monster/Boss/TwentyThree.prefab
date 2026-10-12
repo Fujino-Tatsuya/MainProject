@@ -159,9 +159,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
   id: 
   effect: {fileID: 11400000, guid: e6dad2ab1b7d86d49b816729fc8526c2, type: 2}
-  socket: {fileID: 6853948509657572636}
+  socket: {fileID: 0}
   offset: {x: 0, y: 0, z: 0}
-  scale: 1.2
+  scale: 1.6
   safetyTimeout: 5
 --- !u!1 &577059972838044950
 GameObject:

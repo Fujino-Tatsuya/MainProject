@@ -121,6 +121,34 @@ public class EffectSocketPlayer : MonoBehaviour, IAnimEventEffect
     }
 
     /// <summary>
+    /// <b>원샷</b>을 소켓 대신 <paramref name="surface"/> 표면에서 재생한다 — 피격 이펙트의
+    /// <see cref="EffectHitPoint.HitPointMode.CameraDir"/> 와 같은 계산이다(표면에서 카메라에 가장 가까운 점,
+    /// 카메라 → 대상 방향). 몸통 안쪽 소켓에서 터지면 몸에 묻히는 연출(카운터 성공 섬광 등)용.
+    ///
+    /// 각 피어가 <b>자기 카메라</b>로 계산하므로 반드시 전 피어 경로(RPC 수신부)에서 부를 것.
+    /// 배율은 이 컴포넌트의 <c>scale</c> 을 쓰고 <c>offset</c> 은 쓰지 않는다.
+    /// 표면을 못 쓰면(null·꺼짐·카메라 없음) 소켓 위치의 <see cref="PlayOnce"/> 로 물러난다.
+    /// </summary>
+    public void PlayOnceOnSurface(Collider surface)
+    {
+        if (surface == null || !surface.enabled || !surface.gameObject.activeInHierarchy || Camera.main == null)
+        {
+            PlayOnce();
+            return;
+        }
+        if (effect == null)
+        {
+            Edit.LogWarning($"[EffectSocketPlayer] '{name}'에 EffectEntry가 연결되지 않았다.", this);
+            return;
+        }
+        if (EffectManager.Instance == null) return;
+
+        var info = new EffectHitPoint.HitPointInfo(surface.bounds.center, surface, surface.transform);
+        Pose pose = EffectHitPoint.Resolve(EffectHitPoint.HitPointMode.CameraDir, info);
+        EffectManager.Instance.Play(effect, pose.position, pose.rotation, scale);
+    }
+
+    /// <summary>
     /// 지금 재생 중인 파트 인스턴스들을 <paramref name="buffer"/>에 채운다. 반환값은 채운 개수다.
     ///
     /// 재생 도중 인스턴스에 무언가를 알려야 하는 연출용이다(보호막 피격 파문 등).

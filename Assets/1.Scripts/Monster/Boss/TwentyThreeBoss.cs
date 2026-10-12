@@ -138,12 +138,12 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     bool _warnedNoIndicatorEntry;
     bool _warnedNoImpactEntry;
 
-    [Header("이펙트 재생기")]
     // ─── Grab 팔 전기 펄스 ────────────────────────────────────────────
     // 🔴 켜고 끄는 것은 **이 코드**다(애니 클립 이벤트가 아니다). 그랩 체인이 카운터·그로기·사망으로
     //    끊기는 경로가 여럿이라, 끄는 책임을 클립에 맡기면 하나만 빠져도 팔에 전기가 영영 남는다
     //    (SpinnerBot 에서 실제로 겪은 함정 — 컴파일도 테스트도 안 깨진다).
     //    그래서 시작·종료를 그랩 상태 전이와 **같은 자리**에 둔다.
+    [Header("VFX — Grab 팔 전기 펄스")]
     [Tooltip("Grab 동안 팔(어깨→팔꿈치→손)을 훑는 전기 펄스. 비워두면 연출만 빠지고 나머지는 그대로 돈다")]
     [SerializeField] EffectPathPlayer grabPulse;
     bool _warnedNoGrabPulse;
@@ -161,6 +161,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     //    telegraphDuration(0.7)보다 길어 카운터 창이 끌어당김 구간으로 0.6초 넘어온다.
     //    거기서 끊기면 클립이 getowned 로 잘려 종료 이벤트를 못 지나간다
     //    — 자기장이 safetyTimeout(5초)까지 남는다. 그로기·사망도 같다 → AbortAttackChain.
+    [Header("VFX — Grab 끌어당김 자기장")]
     [Tooltip("끌어당김 자기장의 id. 클립 이벤트 문자열(Boss_23_magneticgrab 의 StopEffect data)과 " +
              "프리팹 EffectSocketPlayer.Id 가 쓰는 그 값이다. 아트가 바꾸면 여기도 고칠 것")]
     [SerializeField] string magneticPullEffectId = "MagneticPull";
@@ -172,6 +173,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     //    타임아웃) 뿐이라, 한 쌍이 두 공격을 다 덮는다. 그랩처럼 경로마다 흩뿌릴 필요가 없다.
     // 배열인 이유: 갈래가 팔·다리 넷인데 EffectPathPlayer 는 경로를 **하나만** 받는다(분기 불가).
     //    경로는 Tools/Effects/23호 팔다리 전기 경로 채우기 가 본 이름으로 채운다.
+    [Header("VFX — 돌진 팔다리 전기 펄스")]
     [Tooltip("돌진·레이지 동안 몸통→손발을 훑는 전기 펄스 4갈래. 비워두면 연출만 빠진다")]
     [SerializeField] EffectPathPlayer[] limbPulses;
     bool _warnedNoLimbPulses;
@@ -184,6 +186,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     // ─── 근접 명중 타격 연출 ──────────────────────────────────────────
     // 🔴 **맞았을 때만** 나온다. 헛스윙에는 안 나온다 — 애니 이벤트로는 못 가른다(클립은 맞았는지 모른다).
     //    손마다 소켓이 다르므로 공격별로 따로 문다. 어퍼가 어느 손이면 그 손 것을 그대로 물리면 된다.
+    [Header("VFX — 근접 명중 타격")]
     [Tooltip("좌훅 명중 시 타격 연출(왼손 소켓)")]
     [SerializeField] EffectSocketPlayer leftHookHit;
     [Tooltip("우훅 명중 시 타격 연출(오른손 소켓)")]
@@ -196,6 +199,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     // 🔴 애니메이션 이벤트로는 못 낸다. 카운터 성공은 클립이 아니라 **플레이어의 인터럽트 공격**이
     //    만드는 사건이라, 어느 프레임에 일어날지 클립이 알 수 없다 — 코드가 직접 몬다
     //    (중간보스 3종과 같은 규약).
+    [Header("VFX — 카운터 성공 섬광")]
     [Tooltip("카운터(인터럽트) 성공 순간의 섬광. 비워두면 연출만 빠진다")]
     [SerializeField] EffectSocketPlayer interruptFlash;
     bool _warnedNoInterruptFlash;
@@ -203,6 +207,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     // ─── 레이지 돌진 루프 연출 ────────────────────────────────────────
     // 🔴 명중과 무관하다 — 헛돌진에도 나온다. **돌진 1회 단위**로 켜고 끈다:
     //    레이지는 rageDashCount 번 연타인데, 연타 사이 간격은 서 있는 구간이라 연출도 끊긴다.
+    [Header("VFX — 레이지 돌진 루프")]
     [Tooltip("레이지 돌진 중 재생할 루프 연출(FX_Rage_Shield). 비워두면 연출만 빠진다")]
     [SerializeField] EffectSocketPlayer rageSmash;
     bool _warnedNoRageSmash;
@@ -214,6 +219,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     // 🔴 애니메이션 이벤트로는 못 낸다 — 레이지는 일반 돌진과 **같은 클립**(Boss_23_dash)을 쓴다
     //    (BeginRageDash 주석 참조). 클립에 심으면 끝나는 시점(거리 소진·벽 충돌·카운터)을
     //    클립이 알 수 없어 궤적이 언제 꺼질지 정해지지 않는다. 그래서 코드가 켜고 끈다.
+    [Header("VFX — 돌진 궤적(바닥)")]
     [Tooltip("돌진·레이지 돌진 동안 바닥에 깔리는 궤적 루프(FX_BossDash_Trail). 비워두면 연출만 빠진다")]
     [SerializeField] EffectSocketPlayer dashTrail;
     bool _warnedNoDashTrail;
@@ -223,6 +229,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     //    **같은 소켓(DashShieldSocket)** 을 쓴다 — 둘을 같이 틀면 같은 자리에 두 겹이 겹친다.
     //    즉 일반 돌진 = NormalShield, 레이지 돌진 = rageSmash 로 **배타**다.
     //    (바닥 궤적 dashTrail 은 반대로 둘이 공유한다 — 소켓이 GroundVFX_Socket 으로 따로다.)
+    [Header("VFX — 일반 돌진 보호막")]
     [Tooltip("일반 돌진 동안 앞에 서는 보호막 루프(FX_NormalDash_Shield). 레이지는 rageSmash 가 대신한다. " +
              "비워두면 연출만 빠진다")]
     [SerializeField] EffectSocketPlayer normalShield;
@@ -233,6 +240,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     //    (FX_Dash_Hit_Entry = 0.3초). 그래서 회수 책임도, AbortAttackChain 안전망도 필요 없다.
     // 🔴 **일반 돌진과 레이지 돌진 둘 다** 쓴다. 벽에 처박는 사건 자체는 같고,
     //    소켓도 프리팹에서 하나(DashShieldSocket)다.
+    [Header("VFX — 돌진 벽 충돌")]
     [Tooltip("돌진이 벽에 처박히는 순간의 충돌 연출(FX_Dash_Hit). 일반·레이지 공용. " +
              "비워두면 연출만 빠진다")]
     [SerializeField] EffectSocketPlayer dashHit;
@@ -246,6 +254,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     // 🔴 좌표가 아니라 **참조**를 싣는다. 잡힌 플레이어는 리페어런팅되지 않고 루트가 그대로
     //    NetworkTransform 이라, 각 피어가 자기 쪽 위치를 읽으면 어긋남이 0 이다
     //    (`PlayGrabbedElectricClientRpc` 가 좌표를 안 싣는 것과 같은 이유의 다른 표현이다).
+    [Header("VFX — 붙잡힌 대상 전기 전이")]
     [Tooltip("붙잡은 대상으로 건너가는 전기(다리 + 감싸기)를 함께 모는 앵커. 비워두면 연출만 빠진다")]
     [SerializeField] GrabbedEffectAnchor grabbedElectric;
     bool _warnedNoGrabbedAnchor;
@@ -263,6 +272,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     // 차징 번개구슬(인트로 → 지속 → 사그라짐/깨짐). 🔴 보스가 아니라 이 컴포넌트가 단계를 몬다 —
     // MonsterBase.Update 가 서버에서만 돌아(`if (!IsServer) return`) 인트로→지속 전환 타이머를
     // 보스 안에 둘 수 없다. 여기서는 시작·종료만 RPC 로 알린다.
+    [Header("VFX — 페이즈 시퀀스(송전기 / 레이지)")]
     [Tooltip("송전기 차징 번개구슬. 비워두면 연출만 빠지고 차징 자체는 그대로 돈다")]
     [SerializeField] EffectStagePlayer chargeBall;
     bool _warnedNoChargeBall;
@@ -4912,7 +4922,8 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
             return;
         }
 
-        interruptFlash.PlayOnce();
+        // 소켓이 아니라 몸 표면의 카메라 쪽 면에서 — 피격 이펙트 CameraDir 와 같은 방식(2026-10-12 민경).
+        interruptFlash.PlayOnceOnSurface(EffectSurfaceCollider);
     }
 
     void WarnNoInterruptFlashOnce()
