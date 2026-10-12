@@ -505,29 +505,18 @@ public class PlayerDashController : NetworkBehaviour
             predictedLedger.ForceReset(1, OwnerNow());
     }
 
-    // 대시는 커서 방향으로 나간다(모든 캐릭터 공통). 조준은 오너 로컬에서만 갱신되므로 이 값은
-    // 오너가 계산해 요청 RPC로 서버에 보낸다. 대시 상태 진입 시 캐릭터도 이 방향으로 즉시 돌아선다.
-    // 조준이 아직 없을 때(카메라 미준비 등)만 이동 입력 → 정면 순으로 폴백한다.
+    // 대시 방향은 옵션(UserInputConfig.DashDirection, 기본 = 캐릭터 정면)을 따른다(모든 캐릭터 공통,
+    // 공격·스킬 캔슬 대시 포함). 캐릭터 정면 = 이동 입력 → 현재 정면, 마우스 방향 = 조준 → 이동 입력 → 정면.
+    // 조준·옵션은 오너 로컬 값이므로 이 방향은 오너가 계산해 요청 RPC로 서버에 보낸다.
+    // 대시 상태 진입 시 캐릭터도 이 방향으로 즉시 돌아선다. 선택 규칙 = DashDirectionRules.
     private Vector3 ResolveDashDirection()
     {
-        if (aim != null)
-        {
-            Vector3 aimDir = aim.AimDirection;
-            aimDir.y = 0f;
-            if (aimDir.sqrMagnitude > 0.0001f)
-                return aimDir.normalized;
-        }
-
-        if (movement != null)
-        {
-            Vector3 inputDir = movement.GetInputWorldDirection();
-            if (inputDir.sqrMagnitude > 0.0001f)
-                return inputDir;
-            return movement.CurrentFacing;
-        }
-
-        Vector3 forward = transform.forward;
-        forward.y = 0f;
-        return forward.sqrMagnitude > 0.0001f ? forward.normalized : Vector3.forward;
+        DashDirectionMode mode = UserInputConfig.DashDirection;
+        return DashDirectionRules.Resolve(
+            mode,
+            mode == DashDirectionMode.Cursor && aim != null ? aim.AimDirection : Vector3.zero,
+            movement != null ? movement.GetInputWorldDirection() : Vector3.zero,
+            movement != null ? movement.CurrentFacing : Vector3.zero,
+            transform.forward);
     }
 }
