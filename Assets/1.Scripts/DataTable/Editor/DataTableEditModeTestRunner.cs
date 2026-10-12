@@ -27,6 +27,10 @@ internal static class DataTableEditModeTestRunner
         "^ErrorCodesSheetTests$", // 로컬라이징 L1 — ErrorCodes 시트 읽기·검증·Export
         "^LocTests$", // 로컬라이징 L1 — Loc 조회·'#key' 폴백·Format·GetError
         "^UserLanguageConfigTests$", // 로컬라이징 L1 — 언어 기본값·저장
+        "^LocKeyTests$", // 로컬라이징 L2 — 자동 키(주인ID/필드경로)
+        "^DataTableTextKeysTests$", // 로컬라이징 L2 — [DataTableText] Strings 수집·제외
+        "^CharacterRosterStringKeysTests$", // 로컬라이징 L2 — 캐릭터 이름 키
+        "^LocTextRuleTests$", // 로컬라이징 L2 — 시트 검증·툴팁 포매터 공용 문법·자리표시자 규칙
     };
 
     const string Tag = "[DataTableTests]";

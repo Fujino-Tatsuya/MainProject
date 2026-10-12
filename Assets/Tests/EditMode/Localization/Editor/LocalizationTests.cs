@@ -400,6 +400,87 @@ public sealed class LocTests
     }
 
     [Test]
+    public void GetWithFallback_PresentKey_ReturnsCurrentLanguage()
+    {
+        Loc.Current = GameLanguage.En;
+        Assert.That(Loc.Get("UI.Lobby.Ready", "인라인"), Is.EqualTo("Ready"));
+        Assert.That(Loc.Get("UI.KoOnly", "인라인"), Is.EqualTo("한국어만"), "en 빈 칸은 ko — 폴백이 아니다");
+    }
+
+    [Test]
+    public void GetWithFallback_MissingOrEmptyKey_ReturnsFallback_NotHashKey()
+    {
+        Assert.That(Loc.Get("UI.Nope", "인라인"), Is.EqualTo("인라인"));
+        Assert.That(Loc.Get(null, "인라인"), Is.EqualTo("인라인"));
+        Assert.That(Loc.Get("", "인라인"), Is.EqualTo("인라인"));
+    }
+
+    [Test]
+    public void SkillTooltipText_Keyed_UsesTable_ThenInline()
+    {
+        var data = ScriptableObject.CreateInstance<LocalizedTextTestData>();
+        data.name = "SkillA";
+        try
+        {
+            var so = new UnityEditor.SerializedObject(data);
+            so.FindProperty("tooltip.displayName").stringValue = "검격";
+            so.FindProperty("tooltip.description").stringValue = "인라인 설명";
+            so.ApplyModifiedPropertiesWithoutUndo();
+            _table.SetEntries(new[] { new StringTable.Entry("SkillA/tooltip.displayName", "검격(표)", "Slash") });
+
+            SkillTooltipText keyed = data.tooltip.Keyed(data, nameof(LocalizedTextTestData.tooltip));
+            Loc.Current = GameLanguage.En;
+            Assert.That(keyed.DisplayName, Is.EqualTo("Slash"));
+            Assert.That(keyed.Description, Is.EqualTo("인라인 설명"), "표에 없으면 '#키' 가 아니라 인라인 ko");
+            Assert.That(keyed.Subtitle, Is.EqualTo(string.Empty));
+
+            Loc.Current = GameLanguage.Ko;
+            Assert.That(keyed.DisplayName, Is.EqualTo("검격(표)"));
+            Assert.That(data.tooltip.DisplayName, Is.EqualTo("검격"), "키를 안 붙인 값은 인라인 그대로");
+        }
+        finally
+        {
+            Object.DestroyImmediate(data);
+        }
+    }
+
+    [Test]
+    public void CharacterRosterEntry_DisplayName_UsesNameKey_ThenInline()
+    {
+        var roster = ScriptableObject.CreateInstance<CharacterRoster>();
+        var prefab = new GameObject("Player_Test");
+        try
+        {
+            var so = new UnityEditor.SerializedObject(roster);
+            SetRosterEntries(so, prefab);
+            _table.SetEntries(new[] { new StringTable.Entry("Character.Player_Test.Name", "테스터", "Tester") });
+
+            Loc.Current = GameLanguage.En;
+            Assert.That(roster.Entries[0].DisplayName, Is.EqualTo("Tester"));
+            Assert.That(roster.Entries[1].DisplayName, Is.EqualTo("프리팹 없음"), "키 없음 → 인라인");
+
+            _table.SetEntries(new StringTable.Entry[0]);
+            Assert.That(roster.Entries[0].DisplayName, Is.EqualTo("테스트"), "표에 행 없음 → 인라인");
+        }
+        finally
+        {
+            Object.DestroyImmediate(prefab);
+            Object.DestroyImmediate(roster);
+        }
+    }
+
+    // [0] = 프리팹 있음(키 있음), [1] = 프리팹 없음(키 없음).
+    private static void SetRosterEntries(UnityEditor.SerializedObject so, GameObject prefab)
+    {
+        UnityEditor.SerializedProperty entries = so.FindProperty("entries");
+        entries.arraySize = 2;
+        entries.GetArrayElementAtIndex(0).FindPropertyRelative("displayName").stringValue = "테스트";
+        entries.GetArrayElementAtIndex(0).FindPropertyRelative("playerPrefab").objectReferenceValue = prefab;
+        entries.GetArrayElementAtIndex(1).FindPropertyRelative("displayName").stringValue = "프리팹 없음";
+        so.ApplyModifiedPropertiesWithoutUndo();
+    }
+
+    [Test]
     public void Format_FillsPlaceholders_LeavesUnknown()
     {
         Loc.Current = GameLanguage.En;
