@@ -29,7 +29,7 @@
 | Z3-1 | G4 열림 ∧ `AreaFirstEntered(Zone3)`(순서 무관) | 휴면 해제 → `EnterPractice()` · `SetStepServer(Zone3Practice)` | 자막 INTRO → PRACTICE_NOTE(공통만) |
 | Z3-2 | 준비·간파(`ComboPhase.Ready`) | 원래 연습 루프(창 9초 간격·스핀만·돌진 피해 0) | 목표 `TUT_Z3_COUNTER_GOAL` + 진행도 n/3 · 강조 스피너봇 + 우클릭 칸 |
 | Z3-3 | 준비 단계 간파 판정 | — | 빗나감 `TUT_Z3_MISS` · 이른 간파 `TUT_Z3_EARLY`(시전자만) · 연속 놓침 4·8… `TUT_Z3_HINT` |
-| Z3-4 | 간파 성공(준비 단계) = `ServerComboCounterAccepted` | **파티 전원 우클릭 쿨 1회 초기화**(등록된 기본·대체 우클릭 스킬, `TutorialCooldownReset`) · 스피너봇 = 원래 그로기(기절) → **취약 유지** | 첫 성공만 `TUT_Z3_FIRST_SUCCESS` · `TUT_Z3_PUSH_INTRO` · 목표 `TUT_Z3_PUSH_GOAL` · 강조 **유효 벽(화살표)** + 스피너봇 + 우클릭 칸 |
+| Z3-4 | 간파 성공(준비 단계) = `PlayerInterruptSkillBase.ServerInterruptSucceeded`(연습 중 · 시전자 존3 안 · 스피너봇 연습 컴포넌트 있음) | **파티 전원 우클릭 쿨 1회 초기화**(등록된 기본·대체 우클릭 스킬, `TutorialCooldownReset`) · 스피너봇 = 원래 그로기(기절) → **취약 유지** | 첫 성공만 `TUT_Z3_FIRST_SUCCESS` · `TUT_Z3_PUSH_INTRO` · 목표 `TUT_Z3_PUSH_GOAL` · 강조 **유효 벽(화살표)** + 스피너봇 + 우클릭 칸 |
 | Z3-5 | 밀치기가 벽에 안 닿고 끝남(`PushEndedNoWall`) | 취약 유지 | `TUT_Z3_PUSH_HINT`(5초에 1번까지) |
 | Z3-6 | 취약 중 우클릭 밀치기로 유효 벽 충돌(`WallHit`) | `AddCounterServer(Zone3Interrupts)` · 취약 종료 → 회복 | `TUT_Z3_WALL_SUCCESS` ({n}/{total}) |
 | Z3-7 | 회복 끝(`ReturnStarted`) | 원위치 복귀(무적·밀치기 무시·플레이어 몸 무시) | 3회째 전이면 `TUT_Z3_RETURN` · 목표 `TUT_Z3_GOAL`(연계 n/3) · 강조 없음 |
@@ -65,15 +65,19 @@
 - 본 전투 전환(`EnterRealMode`) 때 `SpinnerComboModel.Finish()` — 정지·슈퍼 아머·취약 유지·복귀를 모두 끈다. 본 전투의 간파 성공은 원래 그로기(1초)뿐(우클릭 쿨 초기화 없음).
 
 ## 5. 우클릭 쿨 초기화 — 다른 레인과의 관계
-- 쿨 장부(`PlayerSkillController`)는 **고치지 않았다**. `ReduceCooldownServer(skill, GetCooldownRemaining(skill) + 0.05)` 로 0 을 만든다(장부가 0 아래로 내리지 않음, 오너 HUD 미러는 장부가 보냄).
-- 대상 = 그 플레이어에 등록된 스킬 중 Slot == Interrupt 전부(`GetSkillIndex` ≥ 0 — 기본·대체). 다른 레인의 '모든 상황 인터럽트 성공 시 우클릭 쿨 80% 감소'가 먼저/나중에 와도 결과는 0.
+- 쿨 장부(`PlayerSkillController`)는 **고치지 않았다**. 할 일 26 의 공개 API `ResetCooldownServer(skill)` 로 0 을 만든다(이미 준비된 스킬은 건너뜀, 오너 HUD 미러는 장부가 보냄).
+- 대상 = 그 플레이어에 등록된 스킬 중 Slot == Interrupt 전부(`GetSkillIndex` ≥ 0 — 기본·대체).
+- **순서**(할 일 26 의존): 같은 판정(`ResolveHit`) 안에서 스피너봇 `ServerCounterSucceeded`(→ 연계 시작 `ServerComboCounterAccepted`) → 26 의 시전자 쿨 감소 → `ServerInterruptSucceeded`(→ 여기서 파티 초기화) → `ServerInterruptResolved`(→ 빗나감·이른 간파 피드백).
+  초기화를 감소 **뒤** 이벤트에서 하므로 시전자도 결과는 0. 이른 간파 판정의 '이번 판정 성공' = 같은 호출 안에서 `ServerInterruptSucceeded` 로 받은 시전자(`ServerInterruptResolved` 에서 소비 — 프레임 비교 없음).
+  `ServerComboCounterAccepted` 는 존3 흐름이 더 구독하지 않는다(감소 전에 나서 초기화 시점으로 맞지 않음).
+- 존3 의 카운터 대상은 스피너봇뿐이고 간파 창은 연계 준비 단계에서만 열리므로, 연습 중 존3 안 시전자의 간파 성공 = 연계 시작으로 본다.
 - 파티 전원 = 접속 중 PlayerObject 가 있는 모두(영혼 포함 — 쿨만 0 이 된다).
 
 ## 6. 추가한 API
 | 쪽 | 시그니처 |
 |---|---|
 | 디렉터(S9) | `ShowSubtitleServer(id, args, targets)` · `GetClientsOfCharacterServer(TutorialCharacter)` |
-| 스피너봇(v8, 서버) | `SetPracticeWall(Vector3 pointOnWall, Vector3 inwardNormal, float bodyRadius)` · `bool RelocateAnchor(Vector3)` · 이벤트 `ServerComboCounterAccepted(practice, clientId)` · `ServerComboEvent(practice, SpinnerComboEvent, successes)` · `ComboSuccesses` · `ComboTarget` |
+| 스피너봇(v8, 서버) | `SetPracticeWall(Vector3 pointOnWall, Vector3 inwardNormal, float bodyRadius)` · `bool RelocateAnchor(Vector3)` · 이벤트 `ServerComboCounterAccepted(practice, clientId)`(현재 구독자 없음) · `ServerComboEvent(practice, SpinnerComboEvent, successes)` · `ComboSuccesses` · `ComboTarget` |
 | 스피너봇(v8, 모든 피어) | `SpinnerComboPhase ComboPhase` · `bool TryGetWallPoint(out Vector3)` |
 | SpinnerBot(경석 — handoff) | `ISpinnerBotOverride.NotifyInterruptHit(ulong attackerClientId)` |
 | 그 밖 | `SpinnerPracticeWindowSchedule.DelayUntil(float)` · `TutorialSpinnerPractice.SetPracticeRadius`·`PracticeAnchor`·`PracticeRadius` |

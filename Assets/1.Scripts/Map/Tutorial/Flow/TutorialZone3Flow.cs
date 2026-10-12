@@ -16,8 +16,9 @@ using UnityEngine.AI;
 ///    (휴면 중), 연습 반경 = 그 위치 → 출구 배리어(G6) 거리 − 몸 반경 − 여유.
 ///  · G4 열림 ∧ 존3 파티 첫 진입 → 스피너봇 휴면 해제 → <see cref="TutorialSpinnerPractice.EnterPractice"/> · 단계 Zone3Practice ·
 ///    자막 TUT_Z3_INTRO → TUT_Z3_PRACTICE_NOTE(공통 — 캐릭터별 간파 설명 없음, §2.4).
-///  · 간파 성공(준비 단계) = <see cref="TutorialSpinnerPractice.ServerComboCounterAccepted"/> → <b>파티 전원 우클릭 쿨 1회 초기화</b>
-///    (<see cref="TutorialCooldownReset"/> — 쿨 장부 공개 API, 다른 레인의 '간파 성공 시 우클릭 쿨 감소' 위에 덮는다) ·
+///  · 간파 성공(준비 단계) = <see cref="PlayerInterruptSkillBase.ServerInterruptSucceeded"/>(연습 중 · 시전자 존3 안 — 존3 의 카운터 대상은
+///    스피너봇뿐이고, 간파 창은 연계 준비 단계에서만 열리므로 이 성공 = 연계 시작) → <b>파티 전원 우클릭 쿨 1회 초기화</b>
+///    (<see cref="TutorialCooldownReset"/> — 시전자 쿨 감소(할 일 26)를 적용한 <b>뒤</b> 나는 이벤트라 그 위에 0 으로 덮는다) ·
 ///    첫 성공만 TUT_Z3_FIRST_SUCCESS · TUT_Z3_PUSH_INTRO. 간파 횟수는 세지 않는다.
 ///  · 연계 일(<see cref="TutorialSpinnerPractice.ServerComboEvent"/>): 벽 충돌 → Zone3Interrupts +1 · TUT_Z3_WALL_SUCCESS({n}/3) ·
 ///    밀치기 빗나감 → TUT_Z3_PUSH_HINT(5초 간격) · 복귀 시작 → TUT_Z3_RETURN · 다시 준비 → TUT_Z3_COUNTER_GOAL ·
@@ -52,9 +53,8 @@ public sealed class TutorialZone3Flow : MonoBehaviour
     private MonsterCounterWindow _window;
     private bool _subscribed;
 
-    // 간파 성공(ServerCounterSucceeded)은 같은 판정(ResolveHit) 안에서 ServerInterruptResolved 보다 먼저 온다 — 같은 프레임·같은 시전자면 성공 판정.
-    private int _successFrame = -1;
-    private ulong _successClientId;
+    // ServerInterruptSucceeded 는 같은 판정(ResolveHit) 호출 안에서 ServerInterruptResolved 바로 앞에 난다 — 그 사이에만 들고 있다(이른 간파 판정용).
+    private Player _succeededCaster;
 
     private readonly List<MonsterBase> _buffer = new List<MonsterBase>();
 
@@ -106,7 +106,7 @@ public sealed class TutorialZone3Flow : MonoBehaviour
         TutorialDirector.AreaFirstEntered += HandleAreaFirstEntered;
         TutorialDirector.GateOpened += HandleGateOpened;
         TutorialDirector.ZoneCleared += HandleZoneCleared;
-        CombatStatsEvents.ServerCounterSucceeded += HandleCounterSucceeded;
+        PlayerInterruptSkillBase.ServerInterruptSucceeded += HandleInterruptSucceeded;
         PlayerInterruptSkillBase.ServerInterruptResolved += HandleInterruptResolved;
         _subscribed = true;
     }
@@ -117,14 +117,14 @@ public sealed class TutorialZone3Flow : MonoBehaviour
         TutorialDirector.AreaFirstEntered -= HandleAreaFirstEntered;
         TutorialDirector.GateOpened -= HandleGateOpened;
         TutorialDirector.ZoneCleared -= HandleZoneCleared;
-        CombatStatsEvents.ServerCounterSucceeded -= HandleCounterSucceeded;
+        PlayerInterruptSkillBase.ServerInterruptSucceeded -= HandleInterruptSucceeded;
         PlayerInterruptSkillBase.ServerInterruptResolved -= HandleInterruptResolved;
         if (_practice != null)
         {
             _practice.ServerWindowMissed -= HandleWindowMissed;
-            _practice.ServerComboCounterAccepted -= HandleComboCounterAccepted;
             _practice.ServerComboEvent -= HandleComboEvent;
         }
+        _succeededCaster = null;
         _subscribed = false;
     }
 
@@ -151,7 +151,6 @@ public sealed class TutorialZone3Flow : MonoBehaviour
         }
 
         _practice.ServerWindowMissed += HandleWindowMissed;
-        _practice.ServerComboCounterAccepted += HandleComboCounterAccepted;
         _practice.ServerComboEvent += HandleComboEvent;
         ApplyPracticeLayout();
     }
@@ -241,17 +240,15 @@ public sealed class TutorialZone3Flow : MonoBehaviour
         _director.ShowSubtitleServer(TutorialGuideIds.ZoneClear);
     }
 
-    // 같은 판정 안의 성공 표시(이른 간파 판정용)만 — 집계·쿨 초기화는 연계 시작 이벤트(HandleComboCounterAccepted)가 한다.
-    private void HandleCounterSucceeded(Unit target, ulong attackerClientId)
-    {
-        if (_spinner == null || target != _spinner) return;
-        _successFrame = Time.frameCount;
-        _successClientId = attackerClientId;
-    }
-
     // v8 Z3-4 — 간파 성공(준비 단계)마다 파티 전원 우클릭 쿨 1회 초기화. 간파 횟수는 세지 않는다(연계 = 벽 충돌).
-    private void HandleComboCounterAccepted(TutorialSpinnerPractice practice, ulong attackerClientId)
+    // 26 이 시전자 우클릭 쿨을 줄인 뒤 나는 이벤트라 여기서 0 으로 덮는다. 연습 모드 없는 스피너봇(Variant 미치환)은 연계가 없어 초기화하지 않는다.
+    private void HandleInterruptSucceeded(Player caster, PlayerInterruptSkillBase skill)
     {
+        if (caster == null) return;
+        _succeededCaster = caster;
+
+        ulong attackerClientId = caster.OwnerClientId;
+        if (_practice == null || _director.GetPlayerAreaServer(attackerClientId) != TutorialArea.Zone3) return;
         if (!_model.NotifyCounterSucceeded(out bool first)) return;
 
         int players = 0, skills = 0;
@@ -294,12 +291,13 @@ public sealed class TutorialZone3Flow : MonoBehaviour
 
     private void HandleInterruptResolved(Player caster, int hitCount)
     {
+        bool succeeded = caster != null && _succeededCaster == caster;
+        _succeededCaster = null;
         if (caster == null || _spinner == null || _model.Phase != TutorialZone3Phase.Practice) return;
         bool comboReady = _practice == null || _practice.ComboPhase == SpinnerComboPhase.Ready;
 
         ulong id = caster.OwnerClientId;
         bool inZone3 = _director.GetPlayerAreaServer(id) == TutorialArea.Zone3;
-        bool succeeded = _successFrame == Time.frameCount && _successClientId == id;
         bool windowOpen = _window != null && _window.IsOpen;
         Vector3 d = caster.transform.position - _spinner.transform.position;
         d.y = 0f;
