@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!1001 &336041107725733667
+--- !u!1001 &714400472677250292
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
@@ -12,17 +12,21 @@ PrefabInstance:
       propertyPath: m_Name
       value: FX_Smoke_2
       objectReference: {fileID: 0}
+    - target: {fileID: 4318940320840401929, guid: 6c0559e9fc94955489d279a7db9f6c43, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 8419178667490943989, guid: 6c0559e9fc94955489d279a7db9f6c43, type: 3}
       propertyPath: m_LocalScale.x
-      value: 2.5
+      value: 2
       objectReference: {fileID: 0}
     - target: {fileID: 8419178667490943989, guid: 6c0559e9fc94955489d279a7db9f6c43, type: 3}
       propertyPath: m_LocalScale.y
-      value: 2.5
+      value: 2
       objectReference: {fileID: 0}
     - target: {fileID: 8419178667490943989, guid: 6c0559e9fc94955489d279a7db9f6c43, type: 3}
       propertyPath: m_LocalScale.z
-      value: 2.5
+      value: 2
       objectReference: {fileID: 0}
     - target: {fileID: 8419178667490943989, guid: 6c0559e9fc94955489d279a7db9f6c43, type: 3}
       propertyPath: m_LocalPosition.x
@@ -73,10 +77,10 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 6c0559e9fc94955489d279a7db9f6c43, type: 3}
---- !u!4 &8106257225094524118 stripped
+--- !u!4 &9024335237161965313 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 8419178667490943989, guid: 6c0559e9fc94955489d279a7db9f6c43, type: 3}
-  m_PrefabInstance: {fileID: 336041107725733667}
+  m_PrefabInstance: {fileID: 714400472677250292}
   m_PrefabAsset: {fileID: 0}
 --- !u!1001 &5367506781549647886
 PrefabInstance:
@@ -143,7 +147,7 @@ PrefabInstance:
     m_AddedGameObjects:
     - targetCorrespondingSourceObject: {fileID: -8679921383154817045, guid: 8d015d2148269504cb6ae5a0e912f826, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 8106257225094524118}
+      addedObject: {fileID: 9024335237161965313}
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 8d015d2148269504cb6ae5a0e912f826, type: 3}
       insertIndex: -1

@@ -30,7 +30,6 @@ MonoBehaviour:
   fallTime: 1
   approachSlowTimePortion: 0.5
   approachSlowDistancePortion: 0.15
-  explosionVfxPrefab: {fileID: 0}
   explosionDuration: 0.5
   crosshairSize: 2.4
   crosshairStartScale: 1.5
@@ -45,5 +44,3 @@ MonoBehaviour:
   crosshairMidColorAt: 0.5
   circleOuterColor: {r: 1, g: 0.15, b: 0.1, a: 0.3}
   circleFillColor: {r: 1, g: 0.05, b: 0.02, a: 0.6}
-  explosionColor: {r: 1, g: 0.55, b: 0.1, a: 0.85}
-  explosionGrowScale: 2.5
