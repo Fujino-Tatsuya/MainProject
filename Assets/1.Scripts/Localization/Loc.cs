@@ -84,6 +84,13 @@ public static class Loc
         TutorialGuideText.Fill(Get(key), args);
 
     /// <summary>
+    /// <see cref="Get(string, string)"/> + <c>{이름}</c> 치환 — 시트에 행이 없으면 <paramref name="fallback"/>(코드·직렬화 ko 원문)을 채운다.
+    /// 코드 키(<see cref="UiString"/>)용: 행이 생기기 전에도 <c>#키</c> 가 안 나온다.
+    /// </summary>
+    public static string Format(string key, string fallback, IReadOnlyDictionary<string, string> args) =>
+        TutorialGuideText.Fill(Get(key, fallback), args);
+
+    /// <summary>
     /// 로비·네트워크 오류 문구(ErrorCodes 시트). 코드가 없으면 <c>#코드</c> — <see cref="Get"/> 과 같은 규칙.
     /// args 가 있으면 <see cref="Format"/> 처럼 <c>{이름}</c> 을 채운다.
     /// </summary>

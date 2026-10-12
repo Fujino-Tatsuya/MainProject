@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Globalization;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -151,13 +150,13 @@ public sealed class AssassinHUD : MonoBehaviour
     private void OnDisable() => Loc.Changed -= ForceRelabel;
     private void ForceRelabel() => shownTransform = int.MinValue;
 
-    /// <summary>변신 라벨 문구 — 종료 대기 / 해제 가능 / 남은 시간({sec} = 소수 한 자리 초).</summary>
+    /// <summary>변신 라벨 문구 — 종료 대기 / 해제 가능 / 남은 시간({time} = <see cref="UiStrings.Seconds"/>, 소수 한 자리).</summary>
     public static string TransformLabelText(float remaining, bool endPending, bool releasable)
     {
         if (endPending)
             return UiStrings.AssassinTransformEndPending.Text;
 
-        var args = new Dictionary<string, string> { ["sec"] = remaining.ToString("0.0", CultureInfo.InvariantCulture) };
+        var args = new Dictionary<string, string> { ["time"] = UiStrings.Seconds(remaining, "0.0") };
         return (releasable ? UiStrings.AssassinTransformReleasable : UiStrings.AssassinTransformRemaining).Format(args);
     }
 }
