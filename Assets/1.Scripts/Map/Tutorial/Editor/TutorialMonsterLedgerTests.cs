@@ -227,10 +227,7 @@ public sealed class TutorialMonsterLedgerTests
         Assert.IsFalse(m.IsGateOpen(TutorialGate.G3_Corridor2Entry));
 
         // G1(개인)·G2(개인)가 차례로 열리는 같은 Evaluate 에서 G3 도 연다.
-        m.ReportCheck(0, TutorialCheck.Move);
-        m.ReportCheck(0, TutorialCheck.Dash);
-        for (int i = 0; i < TutorialFlowModel.AttackHitsRequired; i++) m.ReportCheck(0, TutorialCheck.AttackHit);
-        m.ReportCheck(0, TutorialCheck.PassiveTooltip);
+        foreach (TutorialCheck c in TutorialZone1Progress.ChecklistOrder) m.ReportCheck(0, c);   // v8 G1 여덟 항목
         m.ReportCheck(0, TutorialCheck.TraitCorridor1);
         m.Evaluate(2d);
 

@@ -52,8 +52,8 @@ MonoBehaviour:
     durationSeconds: 6
     sfx: {fileID: 0}
   - id: TUT_Z1_ATTACK
-    text: "<b>\uC88C\uD074\uB9AD</b> \uC73C\uB85C \uD5C8\uC218\uC544\uBE44\uB97C
-      \uACF5\uACA9\uD558\uC138\uC694 ({n}/5)"
+    text: "<b>\uC88C\uD074\uB9AD</b>\uC73C\uB85C \uAE30\uBCF8 \uACF5\uACA9\uC744
+      \uC0AC\uC6A9\uD558\uC138\uC694 ({n}/1)"
     durationSeconds: 6
     sfx: {fileID: 0}
   - id: TUT_Z1_ATTACK_GUNNER
@@ -323,5 +323,66 @@ MonoBehaviour:
   - id: TUT_C4_GO_PAD
     text: "\uBCF4\uC2A4\uBC29 \uC5D8\uB9AC\uBCA0\uC774\uD130 \uBC1C\uD310\uC73C\uB85C
       \uC774\uB3D9\uD558\uC138\uC694 (\uBBF8\uB2C8\uB9F5 \uBCF4\uC2A4 \uC544\uC774\uCF58)"
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_WAIT_PARTY_NOAUTO
+    text: "\uB3D9\uB8CC\uB97C \uAE30\uB2E4\uB9AC\uB294 \uC911 ({n}/{total})"
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_Q
+    text: "<b>Q</b> \uC2A4\uD0AC [{Q}]\uC744 \uC0AC\uC6A9\uD558\uC138\uC694 ({n}/1)"
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_Q_GUNNER
+    text: "<b>Q</b>\uB85C \uCDA9\uC804\uC744 \uC2DC\uC791\uD558\uACE0 <b>\uC88C\uD074\uB9AD</b>\uC73C\uB85C
+      \uBC1C\uC0AC\uD558\uC138\uC694."
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_E
+    text: "<b>E</b> \uC2A4\uD0AC [{E}]\uC744 \uC0AC\uC6A9\uD558\uC138\uC694 ({n}/1)"
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_E_PALADIN
+    text: "<b>E</b>\uB85C \uBC29\uC5B4 \uC790\uC138\uB97C \uCDE8\uD558\uC138\uC694.
+      \uACF5\uACA9\uC744 \uB9C9\uC73C\uBA74 \uBC18\uACA9\uD569\uB2C8\uB2E4."
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_E_GUNNER
+    text: "<b>E</b>\uB85C \uB4A4\uB85C \uBB3C\uB7EC\uB098\uBA70 \uACFC\uC5F4\uC744
+      \uC2DD\uD600 \uBCF4\uC138\uC694."
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_E_ASSASSIN
+    text: "<b>E</b>\uB85C \uB2E4\uC74C \uAE30\uBCF8 \uACF5\uACA9\uC744 \uAC15\uD654\uD558\uC138\uC694."
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_RMB
+    text: "<b>\uC6B0\uD074\uB9AD</b> \uC2A4\uD0AC\uC744 \uC0AC\uC6A9\uD558\uC138\uC694
+      ({n}/1)"
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_R
+    text: "<b>R</b> \uAD81\uADF9\uAE30\uB97C \uC0AC\uC6A9\uD558\uC138\uC694 ({n}/1)"
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_R_ASSASSIN
+    text: "\uD5C8\uC218\uC544\uBE44\uB97C \uACF5\uACA9\uD574 \uBD84\uB178\uB97C \uBAA8\uC740
+      \uB4A4 <b>R</b>\uB85C \uBCC0\uC2E0\uD558\uC138\uC694."
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_CHECK_Q
+    text: "Q \uC2A4\uD0AC"
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_CHECK_E
+    text: "E \uC2A4\uD0AC"
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_CHECK_RMB
+    text: "\uC6B0\uD074\uB9AD \uC2A4\uD0AC"
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_CHECK_R
+    text: "R \uAD81\uADF9\uAE30"
     durationSeconds: 6
     sfx: {fileID: 0}

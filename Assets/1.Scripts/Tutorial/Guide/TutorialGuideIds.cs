@@ -6,6 +6,8 @@
 public static class TutorialGuideIds
 {
     public const string WaitParty = "TUT_WAIT_PARTY";
+    /// <summary>자동 진행이 없는 대기 줄(G1 — v8 §2.1 교착 방지 제외). 카운트다운 없이 동료 n/total 만.</summary>
+    public const string WaitPartyNoAuto = "TUT_WAIT_PARTY_NOAUTO";
 
     public const string S0Welcome = "TUT_S0_WELCOME";
     public const string ZoneClear = "TUT_ZONE_CLEAR";
@@ -17,6 +19,11 @@ public static class TutorialGuideIds
     public const string Z1DashSub = "TUT_Z1_DASH_SUB";
     public const string Z1Attack = "TUT_Z1_ATTACK";
     public const string Z1Passive = "TUT_Z1_PASSIVE";
+    /// <summary>v8 Z1-5~Z1-8 목표 줄. 캐릭터별 힌트(§5 TUT_Z1_Q_GUNNER 등)는 이 id 의 변형 행 = 그 캐릭터의 목표 줄.</summary>
+    public const string Z1Q = "TUT_Z1_Q";
+    public const string Z1E = "TUT_Z1_E";
+    public const string Z1Rmb = "TUT_Z1_RMB";
+    public const string Z1R = "TUT_Z1_R";
     public const string Z1Go = "TUT_Z1_GO";
 
     public const string Z2Intro = "TUT_Z2_INTRO";
@@ -59,9 +66,11 @@ public static class TutorialGuideIds
     /// </summary>
     public static readonly string[] All =
     {
-        S0Welcome, ZoneClear, TipRCancel, TimerExpired, WaitParty,
+        S0Welcome, ZoneClear, TipRCancel, TimerExpired, WaitParty, WaitPartyNoAuto,
         Z1Move, Z1Dash, Z1DashSub, Z1Attack, Z1Attack + "_GUNNER",
-        Z1Passive, Z1Passive + "_PALADIN", Z1Passive + "_GUNNER", Z1Passive + "_ASSASSIN", Z1Go,
+        Z1Passive, Z1Passive + "_PALADIN", Z1Passive + "_GUNNER", Z1Passive + "_ASSASSIN",
+        Z1Q, Z1Q + "_GUNNER", Z1E, Z1E + "_PALADIN", Z1E + "_GUNNER", Z1E + "_ASSASSIN",
+        Z1Rmb, Z1R, Z1R + "_ASSASSIN", Z1Go,
         Z2Intro, Z2Goal, Z2Nudge,
         Z2Q, Z2Q + "_PALADIN", Z2Q + "_GUNNER", Z2Q + "_ASSASSIN",
         Z2E, Z2E + "_PALADIN", Z2E + "_GUNNER", Z2E + "_ASSASSIN",

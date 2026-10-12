@@ -275,7 +275,8 @@ public sealed class TutorialGuideUI : MonoBehaviour
                     { "total", wait.Total.ToString() },
                     { "mm:ss", TutorialGuideText.FormatWait(wait.SecondsLeft) },
                 };
-                waitText.text = ResolveLine(TutorialGuideIds.WaitParty, args);
+                waitText.text = ResolveLine(
+                    wait.HasCountdown ? TutorialGuideIds.WaitParty : TutorialGuideIds.WaitPartyNoAuto, args);
             }
             else
             {

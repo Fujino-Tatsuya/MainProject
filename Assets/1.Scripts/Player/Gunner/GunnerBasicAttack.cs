@@ -354,6 +354,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
 
         heat.ServerAddShot(data.HeatPerShot); // 허공이어도 증가(§4.2)
         lastShotTime = now;
+        player.RaiseServerBasicAttackStarted();   // 튜토리얼 훅 — 한 발 발사(적중 무관)
         if (IsNetworkActive)
             ShotRpc(origin, end, hit);
         else

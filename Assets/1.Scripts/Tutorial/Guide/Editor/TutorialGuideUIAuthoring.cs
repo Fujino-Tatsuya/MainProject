@@ -33,6 +33,49 @@ public static class TutorialGuideUIAuthoring
         { TutorialGuideIds.WaitParty, ("동료를 기다리는 중 ({n}/{total}) · {mm:ss} 후 자동 진행", DefaultSeconds) },
     };
 
+    // v8 시나리오(Docs/design/tutorial-scenario.md §5) 문구 — 메뉴 "튜토리얼 안내 문구 v8 적용" 이 덮어쓴다(행이 없으면 추가).
+    // 🔴 빈 행 규칙: 목표 줄 변형과 이름이 겹치는 TUT_Z1_ATTACK_GUNNER · TUT_Z1_PASSIVE_{캐릭터} 는 여기서 채우지 않는다
+    //    (채우면 그 캐릭터의 목표 줄이 자막 문구로 바뀐다 — 자막은 TUT_Z1_ATTACK_HEAT · TUT_Z1_PASSIVE_INFO_* 행). Docs/tech/tutorial-zone1.md.
+    //    반대로 TUT_Z1_Q_GUNNER · TUT_Z1_E_* · TUT_Z1_R_ASSASSIN 은 일부러 채운다 — 그 캐릭터의 Q/E/R 목표 줄을 힌트로 바꾸는 것이 의도(v8 캐릭터별 힌트).
+    internal static readonly (string id, string text, float seconds)[] V8Texts =
+    {
+        (TutorialGuideIds.WaitPartyNoAuto, "동료를 기다리는 중 ({n}/{total})", DefaultSeconds),
+        (TutorialGuideIds.Z1Attack, "<b>좌클릭</b>으로 기본 공격을 사용하세요 ({n}/1)", DefaultSeconds),
+        (TutorialGuideIds.Z1Q, "<b>Q</b> 스킬 [{Q}]을 사용하세요 ({n}/1)", DefaultSeconds),
+        (TutorialGuideIds.Z1E, "<b>E</b> 스킬 [{E}]을 사용하세요 ({n}/1)", DefaultSeconds),
+        (TutorialGuideIds.Z1Rmb, "<b>우클릭</b> 스킬을 사용하세요 ({n}/1)", DefaultSeconds),
+        (TutorialGuideIds.Z1R, "<b>R</b> 궁극기를 사용하세요 ({n}/1)", DefaultSeconds),
+        (TutorialGuideIds.Z1R + "_ASSASSIN", "허수아비를 공격해 분노를 모은 뒤 <b>R</b>로 변신하세요.", DefaultSeconds),
+        (TutorialGuideIds.Z1Q + "_GUNNER", "<b>Q</b>로 충전을 시작하고 <b>좌클릭</b>으로 발사하세요.", DefaultSeconds),
+        (TutorialGuideIds.Z1E + "_PALADIN", "<b>E</b>로 방어 자세를 취하세요. 공격을 막으면 반격합니다.", DefaultSeconds),
+        (TutorialGuideIds.Z1E + "_GUNNER", "<b>E</b>로 뒤로 물러나며 과열을 식혀 보세요.", DefaultSeconds),
+        (TutorialGuideIds.Z1E + "_ASSASSIN", "<b>E</b>로 다음 기본 공격을 강화하세요.", DefaultSeconds),
+        ("TUT_Z1_CHECK_ATTACK", "기본 공격", DefaultSeconds),
+        ("TUT_Z1_CHECK_Q", "Q 스킬", DefaultSeconds),
+        ("TUT_Z1_CHECK_E", "E 스킬", DefaultSeconds),
+        ("TUT_Z1_CHECK_RMB", "우클릭 스킬", DefaultSeconds),
+        ("TUT_Z1_CHECK_R", "R 궁극기", DefaultSeconds),
+    };
+
+    [MenuItem("Tools/UI/튜토리얼 안내 문구 v8 적용")]
+    public static void ApplyV8Texts()
+    {
+        TutorialGuideTextTable table = EnsureTextTable();
+        int changed = 0;
+        foreach ((string id, string text, float seconds) in V8Texts)
+        {
+            if (table.SetRowText(id, text, seconds))
+                changed++;
+        }
+
+        if (changed > 0)
+        {
+            EditorUtility.SetDirty(table);
+            AssetDatabase.SaveAssets();
+        }
+        Debug.Log($"[TutorialGuide] v8 문구 적용 — {changed}행 바뀜(전체 {V8Texts.Length}행).");
+    }
+
     [MenuItem("Tools/UI/튜토리얼 안내 UI 구성")]
     public static void Configure()
     {

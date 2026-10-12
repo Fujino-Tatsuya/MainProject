@@ -50,7 +50,10 @@ public struct TutorialWaitState
     public bool Active;
     public int Ready;
     public int Total;
+    /// <summary>자동 진행까지 남은 초. 음수 = 자동 진행 없음(G1 — 카운트다운 없이 동료 n/total 만, TUT_WAIT_PARTY_NOAUTO).</summary>
     public float SecondsLeft;
+
+    public bool HasCountdown => SecondsLeft >= 0f;
 }
 
 public enum TutorialHighlightStyle
@@ -140,10 +143,13 @@ public sealed class TutorialGuideModel
 
     public void ClearWait() => Wait = default;
 
-    /// <summary>대기 카운트다운을 로컬에서 줄인다(0 아래로 안 간다). 서버 값은 SetWait 재호출로 다시 맞춘다.</summary>
+    /// <summary>
+    /// 대기 카운트다운을 로컬에서 줄인다(0 아래로 안 간다). 서버 값은 SetWait 재호출로 다시 맞춘다.
+    /// 음수(= 자동 진행 없음, <see cref="TutorialWaitState.HasCountdown"/> false)는 그대로 둔다.
+    /// </summary>
     public void TickWait(float deltaSeconds)
     {
-        if (!Wait.Active || deltaSeconds <= 0f)
+        if (!Wait.Active || !Wait.HasCountdown || deltaSeconds <= 0f)
             return;
 
         TutorialWaitState wait = Wait;
