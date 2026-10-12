@@ -82,6 +82,9 @@ public class PlayerSkillTargeting : MonoBehaviour
     // 호버 중인 지점 지정 스킬 — 지점 원을 정면 앞에 매 프레임 따라 그린다. 아니면 null.
     private PlayerSkillData rangePreviewMarkerData;
 
+    /// <summary>[오너 로컬] 조준 모드에 들어갔다(<see cref="Begin"/> 성공). 인자 = 조준 중인 슬롯. 시전 여부와 무관. 튜토리얼 판정 훅.</summary>
+    public event System.Action<PlayerSkillSlot> TargetingStarted;
+
     public bool IsTargeting => isTargeting;
     // 지금 조준 중인 스킬 슬롯(IsTargeting 일 때만 의미).
     public PlayerSkillSlot CurrentSlot => currentSlot;
@@ -144,6 +147,7 @@ public class PlayerSkillTargeting : MonoBehaviour
         aimSessionActive = true;
         aimSessionSlot = slot;
         skill.OnOwnerAimStart();
+        TargetingStarted?.Invoke(slot);
 
         return true;
     }

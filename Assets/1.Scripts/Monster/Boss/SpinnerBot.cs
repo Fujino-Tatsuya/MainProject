@@ -111,6 +111,19 @@ public class SpinnerBot : MonsterBase
     MonsterCounterWindow _counter;
     EffectAnimEvents _effects;
 
+    // 튜토리얼 주입 지점(handoff-tutorial-spinner.md). 구현체가 없으면 null — 모든 분기가 원래 경로다.
+    ISpinnerBotOverride _override;
+    bool _overrideResolved;
+    ISpinnerBotOverride _harmlessSpin;   // 이번 스핀이 주입 아래서 시작됐으면 그 구현체(돌진 피해 없음)
+    ISpinnerBotOverride Override
+    {
+        get
+        {
+            if (!_overrideResolved) { _override = GetComponent<ISpinnerBotOverride>(); _overrideResolved = true; }
+            return _override;
+        }
+    }
+
     bool SpinReady => Time.time - _lastSpinTime >= spinCooldown;
 
     /// <summary>
@@ -148,7 +161,16 @@ public class SpinnerBot : MonsterBase
 
     protected override void StartAttack()
     {
-        bool doSpin = SpinReady && Random.value < spinChance;
+        // 튜토리얼 주입(ISpinnerBotOverride) — 없으면 else 가 원래 선택 그대로다.
+        ISpinnerBotOverride ov = Override != null && Override.OverridesAttack ? Override : null;
+        bool doSpin;
+        if (ov != null)
+        {
+            if (Counter == null || !ov.TryBeginSpin()) return;   // 다음 창 전 = 공격하지 않고 기다린다
+            doSpin = true;
+        }
+        else doSpin = SpinReady && Random.value < spinChance;
+        _harmlessSpin = ov;
 
         base.StartAttack(); // StopAgent + FaceTarget + (옵션)슈퍼아머 + SetState(Attack)
 
@@ -175,6 +197,7 @@ public class SpinnerBot : MonsterBase
         _lastSpinTime = Time.time;
         _dashDir = transform.forward;   // FaceTarget 후 전방 = 돌진 방향(고정)
         _dashTarget = ResolveDashTarget(transform.position);
+        if (ov != null) _dashTarget = ov.ClampDashTarget(_dashTarget);
 
         // 🔴 base 의 attackDuration 을 스핀 전체 길이로 덮어쓴다. 애니를 멈춰도 이 타이머는 계속 줄기
         //    때문에(MonsterBase.HandleAttack) 창 길이를 반드시 더해야 한다 — 안 더하면 돌진 전에 Attack 이 끝난다.
@@ -248,15 +271,22 @@ public class SpinnerBot : MonsterBase
                 break;
 
             case SpinPhase.Dash:
-                // 반복 히트: BeginHitWindow 가 "유닛당 1회" 집합을 비우므로 주기마다 다시 부르면 재히트가 된다.
-                // ⚠️ 유닛별 0.5초 쿨다운이 아니라 **집합 리셋 경계**다 — 경계 직전/직후에 연속 2히트가 가능하다.
-                if (Time.time >= _nextRepeatHitTime)
+                if (_harmlessSpin != null)
                 {
-                    meleeAttack?.BeginHitWindow();
-                    _nextRepeatHitTime = Time.time + RepeatSeconds;
+                    _harmlessSpin.TickHarmlessDash();   // 튜토리얼 연습 — 피해 없이 밀쳐내기만(구현체 몫)
                 }
-                // 🔴 폭은 칼날 회전 반경 — 박스(채찍용 2.5m) 그대로면 칼날 끝에 걸쳐도 안 맞았다(팀장 10-12). 예고와 같은 값.
-                MeleeHitWithHalfWidth(dashHalfWidth);
+                else
+                {
+                    // 반복 히트: BeginHitWindow 가 "유닛당 1회" 집합을 비우므로 주기마다 다시 부르면 재히트가 된다.
+                    // ⚠️ 유닛별 0.5초 쿨다운이 아니라 **집합 리셋 경계**다 — 경계 직전/직후에 연속 2히트가 가능하다.
+                    if (Time.time >= _nextRepeatHitTime)
+                    {
+                        meleeAttack?.BeginHitWindow();
+                        _nextRepeatHitTime = Time.time + RepeatSeconds;
+                    }
+                    // 🔴 폭은 칼날 회전 반경 — 박스(채찍용 2.5m) 그대로면 칼날 끝에 걸쳐도 안 맞았다(팀장 10-12). 예고와 같은 값.
+                    MeleeHitWithHalfWidth(dashHalfWidth);
+                }
 
                 if (_phaseTimer <= 0f) EndSpin();
                 break;
@@ -304,6 +334,7 @@ public class SpinnerBot : MonsterBase
     /// </summary>
     public override void TakeDamage(AttackInfo attackInfo)
     {
+        if (IsServer && Override != null && Override.BlocksHealthDamage) attackInfo.damage = 0;   // 튜토리얼 — 체력만 잠금
         base.TakeDamage(attackInfo);
 
         if (!IsServer || !attackInfo.isInterruptAttack || Counter == null) return;
@@ -426,4 +457,27 @@ public class SpinnerBot : MonsterBase
     [ClientRpc] void PlaySpinStartClientRpc() => SafeCrossFade(spinStartState);
     [ClientRpc] void PlaySpinLoopClientRpc() => SafeCrossFade(spinLoopState);
     [ClientRpc] void PlayWhipClientRpc(bool useR) => SafeCrossFade(useR ? whipStateR : whipStateL);
+}
+
+/// <summary>
+/// SpinnerBot 동작을 같은 오브젝트의 다른 컴포넌트가 덮어쓰는 주입 지점 — 튜토리얼 스피너봇 연습 모드
+/// (<c>TutorialSpinnerPractice</c>, Docs/tech/handoff-tutorial-spinner.md).
+/// 🔴 구현체가 붙어 있지 않으면 SpinnerBot 은 이전과 똑같이 돈다. 전부 서버에서만 묻는다.
+/// </summary>
+public interface ISpinnerBotOverride
+{
+    /// <summary>true 면 공격 선택을 덮어쓴다 — 채찍 없이 스핀만, 확률·쿨 대신 <see cref="TryBeginSpin"/>.</summary>
+    bool OverridesAttack { get; }
+
+    /// <summary>true 면 받는 공격의 체력 피해를 0 으로 만든다(피격 반응·간파 판정은 그대로).</summary>
+    bool BlocksHealthDamage { get; }
+
+    /// <summary>지금 스핀(간파 창)을 시작해도 되는가. true 를 돌려주면 시작한 것으로 센다. false 면 공격하지 않는다.</summary>
+    bool TryBeginSpin();
+
+    /// <summary>덮어쓴 스핀의 돌진 끝점 보정(이동 범위 제한).</summary>
+    Vector3 ClampDashTarget(Vector3 target);
+
+    /// <summary>덮어쓴 스핀의 돌진 틱. 이 돌진은 피해를 주지 않는다 — 밀쳐내기는 구현체 몫.</summary>
+    void TickHarmlessDash();
 }

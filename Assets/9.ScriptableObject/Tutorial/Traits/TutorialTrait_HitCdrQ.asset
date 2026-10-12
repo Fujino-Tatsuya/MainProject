@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 54ef2b52b1c7a134fa28e55f1b3dd53c, type: 3}
+  m_Name: TutorialTrait_HitCdrQ
+  m_EditorClassIdentifier: Assembly-CSharp::TutorialTraitDefinition
+  id: trait_hit_cdr_q
+  displayName: "(\uC784\uC2DC) \uC5F0\uACC4 \uC219\uB828"
+  description: "\uAE30\uBCF8 \uACF5\uACA9\uC774 \uC801\uC911\uD558\uBA74 Q \uC2A4\uD0AC
+    \uC7AC\uC0AC\uC6A9 \uB300\uAE30\uC2DC\uAC04\uC774 0.5\uCD08 \uAC10\uC18C\uD55C\uB2E4."
+  icon: {fileID: 0}
+  effectKind: 2
+  value: 0.5
+  triggerAttackType: 1
+  cooldownSlot: 0

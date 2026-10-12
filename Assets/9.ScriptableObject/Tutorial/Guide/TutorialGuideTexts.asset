@@ -1,0 +1,327 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 93839f1dcd98f8043adf3e51450ccdd2, type: 3}
+  m_Name: TutorialGuideTexts
+  m_EditorClassIdentifier: Assembly-CSharp::TutorialGuideTextTable
+  rows:
+  - id: TUT_S0_WELCOME
+    text: "\uC791\uC804 \uAD6C\uC5ED\uC5D0 \uC9C4\uC785\uD588\uC2B5\uB2C8\uB2E4.
+      \uAE30\uBCF8 \uC870\uC791\uBD80\uD130 \uC810\uAC80\uD569\uB2C8\uB2E4."
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_ZONE_CLEAR
+    text: "\uAD6C\uC5ED \uD655\uBCF4. \uB2E4\uC74C \uBCF5\uB3C4\uAC00 \uC5F4\uB838\uC2B5\uB2C8\uB2E4."
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_TIP_R_CANCEL
+    text: "R(\uAD81\uADF9\uAE30)\uC740 \uB300\uC0C1\uC744 \uC9C0\uC815\uD558\uB294
+      \uB3D9\uC548 \uC88C\uD074\uB9AD\uC73C\uB85C \uD655\uC815\uD569\uB2C8\uB2E4.
+      \uCDE8\uC18C\uB294 R \uC744 \uB2E4\uC2DC \uB204\uB974\uAC70\uB098 \uC6B0\uD074\uB9AD."
+    durationSeconds: 8
+    sfx: {fileID: 0}
+  - id: TUT_TIMER_EXPIRED
+    text: "\uC2DC\uAC04\uC774 \uB2E4 \uB418\uC5C8\uC2B5\uB2C8\uB2E4 \u2014 \uC6D0\uD749\uC774
+      \uAE30\uB2E4\uB9BD\uB2C8\uB2E4."
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_WAIT_PARTY
+    text: "\uB3D9\uB8CC\uB97C \uAE30\uB2E4\uB9AC\uB294 \uC911 ({n}/{total}) \xB7
+      {mm:ss} \uD6C4 \uC790\uB3D9 \uC9C4\uD589"
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_MOVE
+    text: "<b>WASD</b> \uB85C \uC774\uB3D9\uD558\uC138\uC694"
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_DASH
+    text: "<b>Space</b> \uB85C \uB300\uC2DC\uD558\uC138\uC694"
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_DASH_SUB
+    text: "\uB300\uC2DC\uD558\uB294 \uC21C\uAC04\uC5D0\uB294 \uD53C\uD574\uB97C \uBC1B\uC9C0
+      \uC54A\uC2B5\uB2C8\uB2E4."
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_ATTACK
+    text: "<b>\uC88C\uD074\uB9AD</b> \uC73C\uB85C \uD5C8\uC218\uC544\uBE44\uB97C
+      \uACF5\uACA9\uD558\uC138\uC694 ({n}/5)"
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_ATTACK_GUNNER
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_PASSIVE
+    text: "\uD654\uBA74 \uC544\uB798 \uC2A4\uD0AC\uBC14 <b>\uB9E8 \uC67C\uCABD \uC544\uC774\uCF58(P)</b>
+      \uC5D0 \uB9C8\uC6B0\uC2A4\uB97C \uC62C\uB824 \uD328\uC2DC\uBE0C\uB97C \uD655\uC778\uD558\uC138\uC694"
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_PASSIVE_PALADIN
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_PASSIVE_GUNNER
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_PASSIVE_ASSASSIN
+    text: 
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_GO
+    text: "\uBCF5\uB3C4\uB85C \uC774\uB3D9\uD558\uC138\uC694"
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z2_INTRO
+    text: "\uC801\uC774 \uAE68\uC5B4\uB0A9\uB2C8\uB2E4! <b>Q \xB7 E</b> \uC2A4\uD0AC\uB85C
+      \uC801\uC744 \uC18C\uD0D5\uD558\uC138\uC694."
+    durationSeconds: 4
+    sfx: {fileID: 0}
+  - id: TUT_Z2_GOAL
+    text: "Q \uC0AC\uC6A9 {q} \xB7 E \uC0AC\uC6A9 {e} \xB7 \uC801 \uCC98\uCE58 {n}/{total}"
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z2_NUDGE
+    text: "<b>{\uD0A4}</b> \uB97C \uC544\uC9C1 \uC4F0\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4
+      \u2014 [{\uC2A4\uD0AC\uBA85}]"
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z2_Q
+    text: "<b>Q</b> [{Q}] \uC2A4\uD0AC\uC744 \uC368 \uBCF4\uC138\uC694."
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z2_Q_PALADIN
+    text: "<b>Q</b> [{Q}] \uB204\uB974\uACE0 \uC788\uB294 \uB3D9\uC548 \uBC29\uD328\uB97C
+      \uB4E4\uACE0 \uC804\uC9C4\uD569\uB2C8\uB2E4. \uB9C8\uC6B0\uC2A4\uB85C \uBC29\uD5A5\uC744
+      \uBC14\uAFC9\uB2C8\uB2E4. (\uD640\uB4DC \uD1A0\uAE00 \uC635\uC158\uC744 \uCF30\uB2E4\uBA74
+      \uD55C \uBC88 \uB20C\uB7EC \uCF1C\uACE0, \uB2E4\uC2DC \uB20C\uB7EC \uB055\uB2C8\uB2E4)"
+    durationSeconds: 8
+    sfx: {fileID: 0}
+  - id: TUT_Z2_Q_GUNNER
+    text: "<b>Q</b> [{Q}] \uC815\uC2E0\uC744 \uC9D1\uC911\uD558\uACE0 \uC88C\uD074\uB9AD\uC73C\uB85C
+      \uBC1C\uC0AC\uD569\uB2C8\uB2E4. \uC624\uB798 \uC9D1\uC911\uD560\uC218\uB85D
+      \uBA40\uB9AC, \uAC15\uD558\uAC8C."
+    durationSeconds: 7
+    sfx: {fileID: 0}
+  - id: TUT_Z2_Q_ASSASSIN
+    text: "<b>Q</b> [{Q}] \uC801\uC744 \uAFF0\uB6AB\uC73C\uBA70 \uB3CC\uC9C4\uD569\uB2C8\uB2E4."
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z2_E
+    text: "<b>E</b> [{E}] \uC2A4\uD0AC\uB3C4 \uC368 \uBCF4\uC138\uC694."
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z2_E_PALADIN
+    text: "<b>E</b> [{E}] \uC790\uC2E0\uC5D0\uAC8C \uBCF4\uD638\uB9C9\uC744 \uC50C\uC6C1\uB2C8\uB2E4."
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z2_E_GUNNER
+    text: "<b>E</b> [{E}] \uB4A4\uB85C \uBB3C\uB7EC\uB098\uBA70 \uACFC\uC5F4\uC744
+      \uBAA8\uB450 \uC2DD\uD799\uB2C8\uB2E4."
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z2_E_ASSASSIN
+    text: "<b>E</b> [{E}] \uB2E4\uC74C \uAE30\uBCF8 \uACF5\uACA9\uC774 \uAC15\uD0C0\uAC00
+      \uB429\uB2C8\uB2E4."
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z3_INTRO
+    text: "<b>\uAC04\uD30C(\uC778\uD130\uB7FD\uD2B8)</b> \u2014 \uC2A4\uD53C\uB108\uBD07\uC774
+      \uD68C\uC804\uD558\uAE30 \uC9C1\uC804 <b>\uB178\uB797\uAC8C \uBE5B\uB098\uB294
+      \uC21C\uAC04</b>, <b>\uBC14\uC9DD \uBD99\uC5B4</b> \uB9C8\uC6B0\uC2A4\uB97C
+      \uC2A4\uD53C\uB108\uBD07\uC5D0 \uB450\uACE0 <b>\uC6B0\uD074\uB9AD</b> \uD558\uC138\uC694."
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z3_PRACTICE_NOTE
+    text: "\uAC04\uD30C\uB97C \uC138 \uBC88 \uC131\uACF5\uD560 \uB54C\uAE4C\uC9C0
+      \uC2A4\uD53C\uB108\uBD07\uC740 \uC4F0\uB7EC\uC9C0\uC9C0 \uC54A\uACE0, \uD68C\uC804
+      \uACF5\uACA9\uB3C4 \uD53C\uD574\uB97C \uC8FC\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z3_GOAL
+    text: "\uC2A4\uD53C\uB108\uBD07\uC744 \uAC04\uD30C\uD558\uC138\uC694 ({n}/{total})"
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z3_GUNNER
+    text: "\uAC70\uB108\uC758 \uAC04\uD30C\uB294 \uCD1D\uAD6C\uB85C \uCC0C\uB974\uB294
+      \uADFC\uC811\uAE30\uC785\uB2C8\uB2E4. \uC4F0\uACE0 \uB098\uBA74 \uC0B4\uC9DD
+      \uBC00\uB824\uB098\uB2C8 \uB2E4\uC2DC \uBD99\uC73C\uC138\uC694."
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z3_MISS
+    text: "\uBE57\uB098\uAC14\uC2B5\uB2C8\uB2E4 \u2014 \uB354 \uAC00\uAE4C\uC774,
+      \uC2A4\uD53C\uB108\uBD07\uC744 \uD5A5\uD574."
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z3_EARLY
+    text: "\uC544\uC9C1\uC785\uB2C8\uB2E4 \u2014 \uB178\uB797\uAC8C \uBE5B\uB0A0
+      \uB54C\uB9CC \uAC04\uD30C\uB429\uB2C8\uB2E4."
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z3_FIRST_SUCCESS
+    text: "\uAC04\uD30C \uC131\uACF5! \uC801\uC774 \uC7A0\uC2DC \uBE44\uD2C0\uAC70\uB9BD\uB2C8\uB2E4
+      \u2014 \uC774\uB54C \uBAB0\uC544\uCE58\uC138\uC694."
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z3_HINT
+    text: "\uC694\uB839: \uB178\uB780\uBE5B\uC774 \uBCF4\uC774\uBA74 \uBC14\uB85C
+      \uBD99\uC5B4\uC11C \uC6B0\uD074\uB9AD. \uAC04\uD30C\uB294 \uB2E4\uC2DC \uC4F0\uAE30\uAE4C\uC9C0
+      \uBA87 \uCD08 \uAC78\uB9BD\uB2C8\uB2E4."
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z3_REAL
+    text: "\uC5F0\uC2B5 \uB05D. \uC774\uC81C \uC9C4\uC9DC\uC785\uB2C8\uB2E4! \uB178\uB780\uBE5B\uC774
+      \uBCF4\uC774\uBA74 \uC5B8\uC81C\uB4E0 \uAC04\uD30C\uD558\uC138\uC694."
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z3_BOSS
+    text: "[\uC2A4\uD53C\uB108\uBD07] \uC744 \uCC98\uCE58\uD558\uC138\uC694"
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z4_LORE
+    text: "[\uACBD\uACE0] \uC624\uB978\uCABD \uC544\uB798 \uAC8C\uC774\uC9C0\uAC00
+      \uAC00\uB4DD \uCC28\uBA74, \uC784\uBB34\uC758 \uC131\uD328\uC640 \uAD00\uACC4\uC5C6\uC774
+      <b>\uC138\uACC4\uC120\uC744 \uC5C9\uB9DD\uC73C\uB85C \uB9CC\uB4E0 \uC6D0\uD749</b>\uACFC
+      \uC2F8\uC6B0\uAC8C \uB429\uB2C8\uB2E4."
+    durationSeconds: 5
+    sfx: {fileID: 0}
+  - id: TUT_Z4_TIMER_HINT
+    text: "\uAC8C\uC774\uC9C0\uAC00 \uB2E4 \uCC28\uAE30 \uC804\uC5D0 \uBCF4\uC2A4\uBC29
+      \uC5D8\uB9AC\uBCA0\uC774\uD130\uC5D0 \uC624\uB974\uBA74 \uAC8C\uC774\uC9C0\uAC00
+      \uBA48\uCDA5\uB2C8\uB2E4. \uBCF4\uC2A4\uBC29\uC73C\uB85C \uAC00\uB294 \uAE38\uC740
+      \uC911\uAC04\uBCF4\uC2A4\uB97C \uC4F0\uB7EC\uB728\uB9AC\uBA74 \uC5F4\uB9BD\uB2C8\uB2E4."
+    durationSeconds: 5
+    sfx: {fileID: 0}
+  - id: TUT_Z4_START
+    text: "\uAC8C\uC774\uC9C0\uAC00 \uCC28\uC624\uB974\uAE30 \uC2DC\uC791\uD588\uC2B5\uB2C8\uB2E4."
+    durationSeconds: 3
+    sfx: {fileID: 0}
+  - id: TUT_Z4_PANEL_INTRO
+    text: "\uAD6C\uC5ED <b>\uB124 \uADC0\uD241\uC774\uC758 \uC81C\uC5B4 \uD328\uB110</b>\uC744
+      \uAC00\uB3D9(<b>F</b>)\uD558\uBA74 \uC911\uC559 \uC12C\uC73C\uB85C \uAC00\uB294
+      \uB2E4\uB9AC\uAC00 \uC5F4\uB9BD\uB2C8\uB2E4."
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z4_PANEL_GOAL
+    text: "\uC81C\uC5B4 \uD328\uB110 \uAC00\uB3D9 ({n}/{total})"
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z4_PANEL_FIRST
+    text: "\uD328\uB110 \uAC00\uB3D9! \uD328\uB110\uC740 \uB3D9\uB8CC\uC640 \uACF5\uC720\uB429\uB2C8\uB2E4."
+    durationSeconds: 4
+    sfx: {fileID: 0}
+  - id: TUT_Z4_BRIDGE
+    text: "\uB2E4\uB9AC\uAC00 \uC5F4\uB838\uC2B5\uB2C8\uB2E4. <b>\uACC4\uB2E8\uC73C\uB85C
+      2\uCE35\uC5D0 \uC62C\uB77C</b> \uB2E4\uB9AC\uB97C \uAC74\uB108 \uC911\uC559
+      \uC12C\uC73C\uB85C \uAC00\uC138\uC694."
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z4_MIDBOSS
+    text: "\uC911\uC559 \uC12C\uC758 \uC911\uAC04\uBCF4\uC2A4\uB97C \uCC98\uCE58\uD558\uC138\uC694"
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z4_COUNTER_REMIND
+    text: "\uB178\uB797\uAC8C \uBE5B\uB098\uBA74 \uAC04\uD30C \uAE30\uD68C\uC785\uB2C8\uB2E4."
+    durationSeconds: 4
+    sfx: {fileID: 0}
+  - id: TUT_Z4_ULT
+    text: "<b>R</b> \u2014 \uAD81\uADF9\uAE30\uB97C \uC368 \uBCF4\uC138\uC694."
+    durationSeconds: 4
+    sfx: {fileID: 0}
+  - id: TUT_Z4_ULT_ASSASSIN
+    text: "\uBD84\uB178\uAC00 \uCDA9\uBD84\uD788 \uCC3C\uB2E4\uBA74 <b>R</b> \uB85C
+      \uBCC0\uC2E0\uD574 \uBCF4\uC138\uC694."
+    durationSeconds: 4
+    sfx: {fileID: 0}
+  - id: TUT_Z4_CLEAR
+    text: "\uAE38\uC774 \uC5F4\uB838\uC2B5\uB2C8\uB2E4."
+    durationSeconds: 3
+    sfx: {fileID: 0}
+  - id: TUT_Z4_GO_BOSS
+    text: "\uBCF5\uB3C4\uC5D0\uC11C \uB9C8\uC9C0\uB9C9 \uD2B9\uC131\uC744 \uACE0\uB978
+      \uB4A4 \uBCF4\uC2A4\uBC29 \uC5D8\uB9AC\uBCA0\uC774\uD130\uB85C \uC774\uB3D9\uD558\uC138\uC694
+      (\uBBF8\uB2C8\uB9F5 \uBCF4\uC2A4 \uC544\uC774\uCF58)"
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_B_PAD_WARN
+    text: "\uC5D8\uB9AC\uBCA0\uC774\uD130 \uBC1C\uD310\uC5D0 <b>\uB204\uAD6C\uB4E0</b>
+      \uC62C\uB77C\uC11C\uBA74 3\uCD08 \uB4A4 <b>\uD30C\uD2F0 \uC804\uC6D0</b>\uC774
+      \uBCF4\uC2A4\uBC29\uC73C\uB85C \uC774\uB3D9\uD569\uB2C8\uB2E4."
+    durationSeconds: 8
+    sfx: {fileID: 0}
+  - id: TUT_B_PAD_COUNT
+    text: "\uBCF4\uC2A4\uBC29\uC73C\uB85C \uC774\uB3D9\uD569\uB2C8\uB2E4 \u2014 \uBC1C\uD310
+      \uBC16\uC73C\uB85C \uB098\uAC00\uBA74 \uCDE8\uC18C\uB429\uB2C8\uB2E4."
+    durationSeconds: 3
+    sfx: {fileID: 0}
+  - id: TUT_B_BOSS_FRONT_TIP
+    text: "\uC6D0\uD749(23\uD638)\uC740 <b>\uC815\uBA74</b>\uC5D0\uC11C\uB9CC \uAC04\uD30C\uB429\uB2C8\uB2E4
+      \u2014 \uB178\uB780\uBE5B\uC774 \uBCF4\uC774\uBA74 \uC55E\uC73C\uB85C \uB3CC\uC544\uAC00
+      \uC6B0\uD074\uB9AD\uD558\uC138\uC694."
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_ATTACK_HEAT
+    text: "\uACC4\uC18D \uC3D8\uBA74 \uACFC\uC5F4\uC774 \uC313\uC785\uB2C8\uB2E4.
+      \uAC00\uB4DD \uCC28\uBA74 \uC7A0\uC2DC \uACF5\uACA9\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4."
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_PASSIVE_INFO_PALADIN
+    text: "\uBC29\uAE08 \uCCAB \uACF5\uACA9\uC774 \uB354 \uAC15\uD558\uAC8C \uB4E4\uC5B4\uAC04
+      \uAC83\uC774 \uD328\uC2DC\uBE0C [{P}] \uC785\uB2C8\uB2E4. \uC801\uC5D0\uAC8C
+      \uB9DE\uC744\uC218\uB85D \uB354 \uBE68\uB9AC \uB2E4\uC2DC \uC900\uBE44\uB429\uB2C8\uB2E4."
+    durationSeconds: 8
+    sfx: {fileID: 0}
+  - id: TUT_Z1_PASSIVE_INFO_GUNNER
+    text: "[{P}] \uC3E0\uC218\uB85D \uACFC\uC5F4 \uB2E8\uACC4\uAC00 \uC624\uB974\uACE0
+      \uACF5\uACA9\uC774 \uAC15\uD574\uC9C0\uC9C0\uB9CC, \uAC00\uB4DD \uCC28\uBA74
+      \uACF5\uACA9\uC774 \uC7A0\uAE41\uB2C8\uB2E4."
+    durationSeconds: 8
+    sfx: {fileID: 0}
+  - id: TUT_Z1_PASSIVE_INFO_ASSASSIN
+    text: "[{P}] \uACF5\uACA9\uC744 \uB9DE\uD790\uC218\uB85D \uBD84\uB178\uAC00 \uCC28\uACE0,
+      \uCDA9\uBD84\uD788 \uCC28\uBA74 <b>R</b> \uB85C \uBCC0\uC2E0\uD569\uB2C8\uB2E4.
+      \uBCF4\uC2A4\uB294 \uB4F1 \uB4A4\uB97C \uCE58\uBA74 \uB354 \uC544\uD515\uB2C8\uB2E4."
+    durationSeconds: 8
+    sfx: {fileID: 0}
+  - id: TUT_Z1_CHECK_MOVE
+    text: "\uC774\uB3D9"
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_CHECK_DASH
+    text: "\uB300\uC2DC"
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_CHECK_ATTACK
+    text: "\uAE30\uBCF8 \uACF5\uACA9"
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_Z1_CHECK_PASSIVE
+    text: "\uD328\uC2DC\uBE0C \uD655\uC778"
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_C_PICK
+    text: "\uD2B9\uC131\uC744 \uD558\uB098 \uACE0\uB974\uC138\uC694"
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_C_WAIT
+    text: "\uD2B9\uC131 \uC120\uD0DD \uC644\uB8CC \u2014 \uB3D9\uB8CC\uB97C \uAE30\uB2E4\uB9BD\uB2C8\uB2E4"
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_C_NEXT
+    text: "\uB2E4\uC74C \uAD6C\uC5ED\uC73C\uB85C \uC774\uB3D9\uD558\uC138\uC694"
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: TUT_C4_GO_PAD
+    text: "\uBCF4\uC2A4\uBC29 \uC5D8\uB9AC\uBCA0\uC774\uD130 \uBC1C\uD310\uC73C\uB85C
+      \uC774\uB3D9\uD558\uC138\uC694 (\uBBF8\uB2C8\uB9F5 \uBCF4\uC2A4 \uC544\uC774\uCF58)"
+    durationSeconds: 6
+    sfx: {fileID: 0}

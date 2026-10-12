@@ -122,6 +122,7 @@ public class MonsterBase : Unit
     Coroutine _actionPoseHoldRoutine; // 클립 끝에서 자세를 잡으려고 대기 중인 예약(피어 로컬)
     IBossTelegraph _telegraph;     // 카운터 창 표현(있으면). 지연 해석 — 런타임 부착일 수 있다
     bool _serverLogicSuspended;    // 연출 구간 게이트(SetServerLogicSuspended). true 면 서버 FSM 이 안 돈다
+    bool _dormant;                 // 휴면(SetDormantServer) — FSM 정지 + 무적. 서버 전용, 기본 false
     Coroutine _deathFxRoutine;              // 임시 사망 표시 코루틴(모든 피어)
     const float DeathPlaceholderDuration = 1f; // 임시 사망 표시 지속(디졸브/애니 도입 시 제거)
     // 사거리 이탈 판정에 더하는 여유(m). 경계에서 진입/이탈이 깜빡이는 것을 막는다.
@@ -291,7 +292,8 @@ public class MonsterBase : Unit
         }
 
         // 연출이 몸을 몰고 있는 동안에는 FSM 을 돌리지 않는다(SetServerLogicSuspended 주석 참조).
-        if (_serverLogicSuspended)
+        // 휴면(SetDormantServer)도 같다 — 인지·추격·공격·넉백 이동(HandleKnockback Warp)이 모두 TickServer 안이다.
+        if (_serverLogicSuspended || _dormant)
         {
             if (!Mathf.Approximately(0f, _animSpeed.Value))
                 _animSpeed.Value = 0f;
@@ -407,6 +409,46 @@ public class MonsterBase : Unit
     /// (정지로 들어갈 때는 불리지 않는다 — 그쪽은 위에서 이미 정리한다.)
     /// </summary>
     protected virtual void OnServerLogicResumed() { }
+
+    /// <summary>[서버] 휴면 중인가(<see cref="SetDormantServer"/>). 클라에는 복제하지 않는다 — 클라에서는 항상 false.</summary>
+    public bool IsDormant => _dormant;
+
+    /// <summary>
+    /// [서버] <b>휴면</b> 켜기/끄기. 휴면 = 인지·추격·공격 정지(FSM 정지) <b>+ 무적</b>:
+    /// 피격(<see cref="ReceiveAttack"/> 거절 → 피해·피격 연출·넉백·경직·인터럽트 누적·간파 소비·피해 숫자 없음),
+    /// 직접·비율 피해(<see cref="CanApplyHealthDamage"/>), <c>Unit.Knockback</c>(<see cref="OnKnockback"/> → LinearKnockback) 모두 무시.
+    ///
+    /// 쓰는 곳: 튜토리얼 존 장부(<c>TutorialMonsterZones</c>) — "자기 차례가 올 때까지 휴면"(tutorial-scenario §2.2).
+    /// 기본값 false 라 호출처가 없는 절차 맵·다른 스테이지의 몬스터 동작은 그대로다.
+    /// <see cref="SetServerLogicSuspended"/>(보스 연출 정지, 무적 아님)와 플래그가 따로다 — 둘이 서로를 풀지 않는다.
+    ///
+    /// 튜토리얼 스피너봇 연습 모드(<c>TutorialSpinnerPractice</c>)도 휴면은 이것 하나를 쓴다(Docs/tech/handoff-tutorial.md §2).
+    /// </summary>
+    public void SetDormantServer(bool dormant)
+    {
+        if (!IsServer || _dormant == dormant) return;
+        _dormant = dormant;
+
+        if (dormant && !_isDead)
+        {
+            // 진행 중이던 이동·공격·넉백을 정리하고 대기 자세로 — 깨어날 때 반쯤 진행된 공격 체인이 되살아나지 않게.
+            // 넉백 중이면 에이전트가 꺼져 있다(TryEnterKnockback) → 켜서 돌려놓는다(ExitKnockback 을 건너뛰므로).
+            if (agent != null && !agent.enabled)
+            {
+                agent.enabled = true;
+                if (!agent.isOnNavMesh && NavMesh.SamplePosition(transform.position, out NavMeshHit hit, 1f, NavMesh.AllAreas))
+                    agent.Warp(hit.position);
+            }
+            ClearReposition();
+            StopAgent();
+            _target = null;
+            _counterVisualOffAt = -1f;
+            SetCounterVisual(false);
+            SetState(MonsterState.Idle);
+        }
+
+        Edit.Log($"[Monster] {name} {(dormant ? "휴면 — FSM 정지 + 무적" : "기상")}", this);
+    }
 
     public void SetSpawnAnchor(Vector3 worldPosition)
     {
@@ -1259,6 +1301,11 @@ public class MonsterBase : Unit
     // 따라잡으면 옆/뒤로 뒤집히므로 이동형 공격에는 쓰지 않는다.
     public override bool ReceiveAttack(AttackInfo attackInfo, AttackHitContext hitContext)
     {
+        // 휴면(SetDormantServer) = 무적 — 죽은 대상처럼 거절한다. 반환값을 따르는 피해·피격 연출(PlayHitVFXRpc)·
+        // 넉백·경직·간파 소비(파생 TakeDamage)·피해 숫자(ClientDamageDealtClientRpc)·공격자 적중 통지가 전부 빠진다.
+        if (_dormant)
+            return false;
+
         // 백어택(PLAN-assassin A11, 은희 지시(경석 공유)) — 피해에 배율만 곱한다. 배율 1(다른 모든 공격의 기본값)이면
         // IsBackAttackHit 가 즉시 false 라 기존 경로와 동일하다. AttackInfo 는 값 복사라 이 지역 사본만 바뀐다.
         bool backAttack = IsServer && CurrentHealth > 0 && IsBackAttackHit(attackInfo, hitContext);
@@ -1335,6 +1382,16 @@ public class MonsterBase : Unit
     void PlayHitVFXRpc(Vector3 sourcePosition)
     {
         HitVFXPlayback.Play(this, hitVFXCollider, hitVFXType, sourcePosition);
+    }
+
+    // 휴면 = 무적 — ReceiveAttack 을 거치지 않는 직접·비율 피해(ApplyDirectHealthDamage 등)도 막는다.
+    protected override bool CanApplyHealthDamage(int damage) => !_dormant && base.CanApplyHealthDamage(damage);
+
+    // 휴면 = 넉백 무시 — Unit.Knockback(방향, 세기) → IKnockbackable(LinearKnockback) 임펄스 경로.
+    protected override void OnKnockback(Vector3 direction, float strength)
+    {
+        if (_dormant) return;
+        base.OnKnockback(direction, strength);
     }
 
     // 넉백 진입/갱신. 슈퍼아머·사망·그로기·복귀 중에는 무시(기존 CC 무시 규칙 일관).
