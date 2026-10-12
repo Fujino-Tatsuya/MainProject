@@ -2915,6 +2915,7 @@ MonoBehaviour:
   defense: 0
   riseHeight: 1
   moveSpeed: 1
+  outlineMaterial: {fileID: 2100000, guid: 6fd5501f7419e464ebc7530b5fac6112, type: 2}
 --- !u!4 &985995061862146011 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
@@ -3287,6 +3288,7 @@ MonoBehaviour:
   defense: 0
   riseHeight: 1
   moveSpeed: 1
+  outlineMaterial: {fileID: 2100000, guid: 6fd5501f7419e464ebc7530b5fac6112, type: 2}
 --- !u!4 &885060816906195001 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
@@ -8132,6 +8134,7 @@ MonoBehaviour:
   defense: 0
   riseHeight: 1
   moveSpeed: 1
+  outlineMaterial: {fileID: 2100000, guid: 6fd5501f7419e464ebc7530b5fac6112, type: 2}
 --- !u!4 &5427120997204487538 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 8a95e0e391e8deb44a03739f8a4dd0fd, type: 3}
@@ -10795,6 +10798,7 @@ MonoBehaviour:
   defense: 0
   riseHeight: 1
   moveSpeed: 1
+  outlineMaterial: {fileID: 2100000, guid: 6fd5501f7419e464ebc7530b5fac6112, type: 2}
 --- !u!1001 &7343172837201687197
 PrefabInstance:
   m_ObjectHideFlags: 0

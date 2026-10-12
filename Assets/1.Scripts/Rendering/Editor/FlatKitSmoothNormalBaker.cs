@@ -33,10 +33,12 @@ public class FlatKitSmoothNormalBaker : AssetPostprocessor
         "Assets/50.Art/Char/assassin/Assassin.fbx",
         "Assets/50.Art/Char/assassin/Dagger_Weapon_L.fbx",
         "Assets/50.Art/Char/assassin/Dagger_Weapon_R.fbx",
+        // 송전기(10-12, PLAN-boss-1012.md §A) — 아웃라인 전용 자식 렌더러가 각진 모서리에서 끊기지 않게.
+        "Assets/50.Art/Environment/Models/Machinery/PowerUnits/Env_Mv_bosscharger_upper.fbx",
     };
 
     // 목록이나 굽는 방식을 바꾸면 올린다 — 대상 FBX 가 다시 임포트된다.
-    public override uint GetVersion() => 2;
+    public override uint GetVersion() => 3;
 
     [MenuItem("Tools/Rendering/Flat Kit/Reimport Smooth Normal Targets")]
     static void ReimportTargets()

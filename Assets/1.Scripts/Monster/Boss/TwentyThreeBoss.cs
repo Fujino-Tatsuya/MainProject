@@ -5248,15 +5248,25 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
             FinishVulnerableKnockback(_kbRebound ? "벽 반동 종료" : "넉백 종료");
     }
 
-    // 🔴 넉백이 끝나면 **그로기·취약을 함께 끝낸다**(팀장 09-29 — PLAN §3-3 "취약 4초 유지"의 뒤집기).
-    //    그로기 중 다른 플레이어의 간파로 다시 밀려도 CC 는 합산·연장 없이 시간이 흐르다가, 넉백 종료 시점에 전부 끝난다.
+    // 🔴 **벽에 부딪힌 넉백만** 끝날 때 그로기·취약을 함께 끝낸다(팀장 10-12, PLAN-boss-1012 §B).
+    //    벽에 안 닿고 끝난 넉백(거리 소진·플레이어에 막힘)은 **아무것도 끝내지 않는다** — 취약·그로기는
+    //    각자 타이머대로 흐르고, 남은 취약 시간 동안 다시 밀어 벽에 박을 수 있다.
+    //    ⚠️ 뒤집음: 09-29 결정("넉백이 끝나면 그로기·취약을 함께 끝낸다")을 벽 충돌 경로로만 좁혔다.
+    //    벽 경로에서 취약 종료는 이미 ApplyEnvironmentInteraction 이 했다 — 여기선 반동 종료 뒤 그로기를 푼다(EndVulnerable 은 멱등).
     //    넉백 중 재적중은 StartVulnerableKnockback 이 새 방향 3m 로 다시 시작하므로 여기 오지 않는다.
     //    ⚠️ 제압(벽 충돌로 게이지 0)으로 넘어갔으면 제압이 따로 5초를 가진다 — 건드리지 않는다.
     void FinishVulnerableKnockback(string why)
     {
+        bool hitWall = _kbRebound;   // 반동 = 벽 충돌 뒤에만 들어간다(TickVulnerableKnockback)
         _kbActive = false;
         _kbRebound = false;
         if (!IsServer || State == MonsterState.Dead || _suppressed) return;
+
+        if (!hitWall)
+        {
+            Debug.Log($"[23호] {why} — 벽 아님, 취약·그로기 유지", this);
+            return;
+        }
 
         EndVulnerable(why);
         if (State == MonsterState.Groggy)
