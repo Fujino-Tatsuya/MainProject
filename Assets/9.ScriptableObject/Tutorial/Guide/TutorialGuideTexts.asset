@@ -386,3 +386,8 @@ MonoBehaviour:
     text: "R \uAD81\uADF9\uAE30"
     durationSeconds: 6
     sfx: {fileID: 0}
+  - id: TUT_C1_COOLDOWN_RESET
+    text: "\uBAA8\uB4E0 \uC2A4\uD0AC\uC758 \uC7AC\uC0AC\uC6A9 \uB300\uAE30\uC2DC\uAC04\uC774
+      \uCD08\uAE30\uD654\uB418\uC5C8\uC2B5\uB2C8\uB2E4."
+    durationSeconds: 5
+    sfx: {fileID: 0}

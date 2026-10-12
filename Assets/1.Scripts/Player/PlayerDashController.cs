@@ -522,6 +522,23 @@ public class PlayerDashController : NetworkBehaviour
             predictedLedger.ForceReset(1, OwnerNow());
     }
 
+    /// <summary>
+    /// 서버 권한 충전을 가득 채운다(튜토리얼 복도1 첫 진입 쿨타임 초기화 — v8 C1-0). 오너 예측은 <see cref="OwnerResetChargeToFull"/> 로 짝을 맞춘다
+    /// (<see cref="ServerResetChargeToOne"/>/<see cref="OwnerResetChargeToOne"/> 과 같은 방식). 장부가 최대치로 자른다.
+    /// </summary>
+    public void ServerResetChargeToFull()
+    {
+        if (IsServer && PlayerDashValidationManager.Instance != null)
+            PlayerDashValidationManager.Instance.ForceReset(NetworkObjectId, int.MaxValue, ServerNow());
+    }
+
+    /// <summary>오너 예측 충전을 가득 채운다(<see cref="ServerResetChargeToFull"/> 의 오너 짝).</summary>
+    public void OwnerResetChargeToFull()
+    {
+        if (player != null && player.IsInputSource && predictedLedger != null)
+            predictedLedger.ForceReset(int.MaxValue, OwnerNow());
+    }
+
     // 대시는 커서 방향으로 나간다(모든 캐릭터 공통). 조준은 오너 로컬에서만 갱신되므로 이 값은
     // 오너가 계산해 요청 RPC로 서버에 보낸다. 대시 상태 진입 시 캐릭터도 이 방향으로 즉시 돌아선다.
     // 조준이 아직 없을 때(카메라 미준비 등)만 이동 입력 → 정면 순으로 폴백한다.

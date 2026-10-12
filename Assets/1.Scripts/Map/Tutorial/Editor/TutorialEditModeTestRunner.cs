@@ -23,7 +23,8 @@ internal static class TutorialEditModeTestRunner
         "^TutorialGuide(Text|SubtitleQueue|Model)Tests$", // 안내 UI(S6) — 문구 변형·치환·대기 포맷·자막 큐·RebuildFromState
         "^TutorialCharacterLookupTests$", // 캐릭터 판별(15 후속) — PrefabIdHash 로스터 역조회·실패 시 폴백 판정
         "^SpinnerPracticeModelTests$", // 스피너봇 연습(S9) — 모드·창 간격·연속 놓침·스폰 반경 클램프
-        "^TutorialZone1ModelTests$", // 존1(S7) — 이동 보고 상한·이동 누적·툴팁 1초·착지·목표 순서·대기 줄
+        "^TutorialZone1ModelTests$", // 존1(S7·v8) — 이동 보고 상한·이동 누적·툴팁 1초·착지·목표 순서·대기 줄·공격/스킬 사용 판정
+        "^TutorialCooldownResetModelTests$", // 복도1 첫 진입 쿨타임 초기화(v8 C1-0) — 플레이어별 1회·예약·범위
         "^TutorialCorridorModelTests$", // 복도(S8) — 게이트 매핑·복도당 라운드 1번·진행 중 복도·목표 장면
         "^TutorialZone2ModelTests$", // 존2(S8) — 기상 지연·E 안내·Q/E 넛지·목표 줄
         "^TutorialZone3RulesTests$", // 존3 흐름(S9) — 시작 조건·간파 집계·빗나감/이른 간파/힌트·목표·연습 반경
