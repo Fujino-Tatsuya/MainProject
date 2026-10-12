@@ -45,6 +45,10 @@ public static class DataTableFields
     public static bool IsTableText(FieldInfo field) =>
         field != null && field.FieldType == typeof(string) && field.IsDefined(typeof(DataTableTextAttribute), false);
 
+    /// <summary>테이블 문자열 중 Strings 시트에 자동 키로 모을 문구인지(<c>[DataTableText(Localize = false)]</c> 는 아님).</summary>
+    public static bool IsLocalizedText(FieldInfo field) =>
+        IsTableText(field) && field.GetCustomAttribute<DataTableTextAttribute>(false).Localize;
+
     /// <summary>경로의 조상(마지막 필드 제외) 중 제외 대상이 있으면 true — 구조체·배열에 붙인 [DataTableIgnore] 는 그 아래 전부.</summary>
     public static bool IsUnderExcluded(Type root, string propertyPath)
     {

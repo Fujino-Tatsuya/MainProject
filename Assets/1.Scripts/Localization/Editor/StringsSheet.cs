@@ -18,8 +18,9 @@ public readonly struct StringKeyInfo
 }
 
 /// <summary>
-/// Export 가 Strings 시트에 넣을 키를 모으는 곳. L1 에는 등록된 공급자가 없다 — 시트는 머리글만 생기고,
-/// 기획이 직접 적은 행은 병합 Export 가 그대로 남긴다. 코드에서 키를 내보내야 하면 <c>[InitializeOnLoad]</c> 에서 <see cref="Register"/>.
+/// Export 가 Strings 시트에 넣을 키를 모으는 곳(<c>[DataTableText]</c> 자동 키는 <see cref="DataTableTextKeys"/> 가 따로 모은다).
+/// 기획이 직접 적은 행은 병합 Export 가 그대로 남긴다. 코드에서 키를 내보내야 하면 <c>[InitializeOnLoad]</c> 에서 <see cref="Register"/>
+/// (예: <c>CharacterRosterStringKeys</c> — 캐릭터 이름).
 /// </summary>
 public static class StringKeyRegistry
 {

@@ -513,7 +513,7 @@ public static class DataTableTemplate
             Debug.Log($"{LogPrefix}Export 전 원본 보관: {backup}");
 
             // 문자열 시트는 인스펙터 값이 아니라 기획이 쓴 문구 — 병합·덮어쓰기 모두 기존 행을 그대로 옮긴다.
-            sheets.AddRange(BuildStringsSheets(existing));
+            sheets.AddRange(BuildStringsSheets(existing, tables, warnings));
 
             if (choice == 0)
             {
@@ -535,7 +535,7 @@ public static class DataTableTemplate
         }
         else
         {
-            sheets.AddRange(BuildStringsSheets(Array.Empty<XlsxSheet>()));
+            sheets.AddRange(BuildStringsSheets(Array.Empty<XlsxSheet>(), tables, warnings));
         }
 
         try
@@ -578,14 +578,19 @@ public static class DataTableTemplate
 
     /// <summary>
     /// 문자열 시트(<see cref="StringsSheet.All"/> — Strings·ErrorCodes) — 기존 행 유지 + 등록된 키 중 없는 것 추가. 키가 없어도 머리글만 있는 시트를 만든다.
-    /// Strings 의 키는 <see cref="StringKeyRegistry"/>, ErrorCodes 는 아직 등록 키가 없다(오류 코드 목록은 L4).
+    /// Strings 의 키 = 대상들의 <c>[DataTableText]</c> 자동 키(<see cref="DataTableTextKeys"/>) + <see cref="StringKeyRegistry"/>.
+    /// ErrorCodes 는 아직 등록 키가 없다(오류 코드 목록은 L4).
     /// </summary>
-    private static List<XlsxWriteSheet> BuildStringsSheets(IReadOnlyList<XlsxSheet> existing)
+    private static List<XlsxWriteSheet> BuildStringsSheets(IReadOnlyList<XlsxSheet> existing,
+        List<(Type, IReadOnlyList<(string id, Object target)>)> tables, List<string> warnings)
     {
         var report = new List<string>();
+        List<StringKeyInfo> stringKeys = DataTableTextKeys.Collect(tables.SelectMany(t => t.Item2), warnings)
+            .Concat(StringKeyRegistry.Collect())
+            .ToList();
         var sheets = StringsSheet.All
             .Select(spec => spec.BuildSheet(existing.FirstOrDefault(s => spec.Is(s.Name)),
-                spec == StringsSheet.Strings ? StringKeyRegistry.Collect() : Enumerable.Empty<StringKeyInfo>(), report))
+                spec == StringsSheet.Strings ? stringKeys : Enumerable.Empty<StringKeyInfo>(), report))
             .ToList();
         foreach (string line in report)
         {
