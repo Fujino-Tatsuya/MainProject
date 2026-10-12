@@ -31,6 +31,8 @@ internal static class DataTableEditModeTestRunner
         "^DataTableTextKeysTests$", // 로컬라이징 L2 — [DataTableText] Strings 수집·제외
         "^CharacterRosterStringKeysTests$", // 로컬라이징 L2 — 캐릭터 이름 키
         "^LocTextRuleTests$", // 로컬라이징 L2 — 시트 검증·툴팁 포매터 공용 문법·자리표시자 규칙
+        "^TableTextMigrationTests$", // 툴팁 문구 단일 원본 — 옛 수치 시트 문구 칸 → Strings 이관
+        "^StringOwnerFieldTests$", // 툴팁 자동 키 행 ko·en {필드} 주인 검사
         "^UiStringsTests$", // 로컬라이징 L3 — UI 문구 키 목록·Export 등록
         "^UiStringsFormatTests$", // 로컬라이징 L3 — 과열 단계·변신·머리 위 이름 포맷·LocalizedText 폴백
         "^UiStringsAuthoringTests$", // 로컬라이징 L3 — 라벨 키 부착 멱등
