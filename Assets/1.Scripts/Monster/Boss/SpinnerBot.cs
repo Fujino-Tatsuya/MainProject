@@ -194,7 +194,10 @@ public class SpinnerBot : MonsterBase
             //    목적지를 도달점에 두면 autoBraking 이 그 앞에서 감속해 더 못 간다.
             //    예전엔 목적지 거리(최대 40m)를 그렸는데 가속 8 로는 1.2초에 ≈5.8m 만 갔다(10-02 교차검증, 팀장: 예고를 실제에 맞춤).
             float reach = Mathf.Min(flat.magnitude, AttackDashReach(MoveSpeed * dashSpeedMultiplier, dashDuration));
-            ShowHitboxTelegraph(meleeAttack.ColliderInfo, WindupDuration, reach);
+            // 🔴 간파 창이 열리는 공격이면 **파랑**(인터럽트 색) — 채찍(빨강)과 구분된다(팀장 10-12, 23호 돌진과 같은 규약).
+            //    아래 Counter.Open() 은 조건 없이 창을 열므로 Counter 유무가 곧 "간파 가능"이다.
+            var palette = Counter != null ? BossAttackConeTelegraph.Palette.Interrupt : BossAttackConeTelegraph.Palette.Attack;
+            ShowHitboxTelegraph(meleeAttack.ColliderInfo, WindupDuration, reach, palette: palette);
         }
 
         // 창이 저작돼 있으면 자세를 정지시켜 "끊을 수 있다"를 보여 준다. 없으면 예전처럼 그냥 회전한다.

@@ -46,6 +46,11 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
     static readonly Color InterruptOutlineColor = new Color(0.021842957f, 0f, 1f, 0.85f);
     static readonly Color InterruptFillColor = new Color(0.021842957f, 0f, 1f, 0.55f);
 
+    /// <summary>
+    /// 인터럽트 예고 RGB(알파 1). 이 컴포넌트를 안 쓰는 간파 예고(건틀렛 스매시의 바닥 원 등)도 여기서 가져간다
+    /// — 값이 두 곳으로 갈라지지 않게.
+    /// </summary>
+    public static Color InterruptRgb => new Color(InterruptFillColor.r, InterruptFillColor.g, InterruptFillColor.b, 1f);
     Palette _palette = Palette.Attack;
     Color OutlineColor => _palette == Palette.Interrupt ? InterruptOutlineColor : AttackOutlineColor;
     Color FillColor => _palette == Palette.Interrupt ? InterruptFillColor : AttackFillColor;

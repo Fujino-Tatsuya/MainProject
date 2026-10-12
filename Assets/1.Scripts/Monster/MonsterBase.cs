@@ -967,12 +967,14 @@ public class MonsterBase : Unit
     /// 동안 차오르고, 다 찬 순간이 곧 공격이다. 🔴 예고와 판정이 같은 콜라이더에서 나오므로 어긋날 수 없다.
     /// </summary>
     /// <param name="lateralShift">몸 기준 옆으로 미는 거리(m, + = 오른쪽). 좌/우 공격은 판정도 <see cref="MeleeHitShifted"/> 에 같은 값을 준다.</param>
-    protected void ShowHitboxTelegraph(ColliderInfo hitbox, float growTime, float extraLength = 0f, float lateralShift = 0f)
+    /// <param name="palette">예고 색. 간파(카운터 창)가 열리는 공격은 <c>Interrupt</c>(파랑) — 23호 돌진과 같은 규약(10-12).</param>
+    protected void ShowHitboxTelegraph(ColliderInfo hitbox, float growTime, float extraLength = 0f, float lateralShift = 0f,
+                                       BossAttackConeTelegraph.Palette palette = BossAttackConeTelegraph.Palette.Attack)
     {
         if (!IsServer || !HasAttackTelegraph || hitbox == null) return;
         if (!TryMeasureBox(hitbox, out float halfWidth, out float length, out float forward, out float lateral)) return;
         ShowBandTelegraphRpc(halfWidth, length + Mathf.Max(0f, extraLength), forward, lateral + lateralShift,
-                             Mathf.Max(0f, growTime));
+                             Mathf.Max(0f, growTime), palette);
     }
 
     /// <summary>
@@ -1019,10 +1021,11 @@ public class MonsterBase : Unit
 
     // 예고 표시는 순수 연출이지만 reliable — 빠지면 "예고 없이 맞는" 공격이 된다(이번 작업의 목적 자체가 깨진다).
     [Rpc(SendTo.ClientsAndHost)]
-    void ShowBandTelegraphRpc(float halfWidth, float length, float forwardOffset, float lateralOffset, float growTime)
+    void ShowBandTelegraphRpc(float halfWidth, float length, float forwardOffset, float lateralOffset, float growTime,
+                              BossAttackConeTelegraph.Palette palette)
     {
         BossAttackConeTelegraph t = EnsureAttackTelegraph();
-        if (t != null) t.Show(0f, 0f, 0f, 0f, halfWidth, length, growTime, forwardOffset, lateralOffset);
+        if (t != null) t.Show(0f, 0f, 0f, 0f, halfWidth, length, growTime, forwardOffset, lateralOffset, palette: palette);
     }
 
     [Rpc(SendTo.ClientsAndHost)]
