@@ -73,12 +73,15 @@ Strings·ErrorCodes 두 시트에 똑같이 적용한다(시트마다 따로 검
 | `<style=…>` / `</style>` 짝이 안 맞음, `<style=>`(이름 없음) | **오류**(언어마다 따로 검사) |
 | 중괄호 문법 — 짝 없는 `}`, 닫히지 않은 `{`, 빈 `{}` | **오류**(언어마다 따로 검사) |
 | key 가 빈데 문구가 있음 | **오류** |
+| 툴팁 자동 키 행(`주인ID/필드경로`)의 `{필드}` 가 그 주인(SO·컴포넌트)에 없음·형식이 틀림 | **오류** — ko·en **각각**(en 이 비면 ko 만). 규칙은 [data-table.md §9](data-table.md#9-프로그래머기획--툴팁-문구와-자리표시자) |
+| 툴팁 자동 키의 주인·문구 필드를 못 찾음(이름이 바뀐 고아 행) | 경고 — `{필드}` 검사를 못 한다. key 를 고칠 것 |
 
 - 오류가 있으면 **테이블 모드 Play·빌드는 시작 전에 멈춘다**(수치 테이블 오류와 같은 창·Console).
 - **인스펙터 모드 Play** 도 문구는 xlsx 를 읽는다(문구엔 인스펙터 값이 없다). 오류면 막지 않고 Console 오류 + 지난 표로 돈다.
 - 키워드 색 `<style=stun>기절</style>` 은 [data-table.md §9](data-table.md#9-프로그래머기획--툴팁-문구와-자리표시자) 와 같은 Style Sheet 를 쓴다.
 - 문법·자리표시자 규칙은 코드 한 곳(`LocText` — `StyleTagError`·`BraceError`·`SamePlaceholders`)이다. 스킬 툴팁 포매터(`SkillTooltipFormatter`)도 같은 함수로 검사하고,
-  그 위에 "필드가 실제로 있는가·형식이 맞는가" 만 더 본다.
+  그 위에 "필드가 실제로 있는가·형식이 맞는가" 만 더 본다 — 표 검증도 자동 키 행에 이 포매터를 그대로 쓴다(`StringTableValidator.Validate(rows, issues, ownerOf)`).
+  주인 찾기는 `StringKeyOwners`: 수치 시트가 찾은 대상 → `[DataTableSheet]` SO 이름 → 컴포넌트는 그 스크립트를 가진 프리팹(레거시·아트 제외) 중 첫 것.
 
 ### Export Template 과의 관계
 
@@ -151,7 +154,9 @@ Loc.Changed += Redraw;           // OnEnable 에서 구독, OnDisable 에서 꼭
 | `Assets/1.Scripts/Localization/LocText.cs` | 언어 코드·자리표시자·style 짝 검사(순수) |
 | `Assets/1.Scripts/Localization/LocalizedText.cs` · `LocalizedImage.cs` | 컴포넌트 |
 | `Assets/1.Scripts/Localization/Editor/StringsSheet.cs` | 문자열 시트 설정(`StringsSheet.Strings`·`StringsSheet.ErrorCodes` — 시트 이름·키 열·메모 열) · 읽기·Export 시트 · 키 등록(`StringKeyRegistry`) |
-| `Assets/1.Scripts/Localization/Editor/StringTableValidator.cs` | 검증(순수) |
+| `Assets/1.Scripts/Localization/Editor/StringTableValidator.cs` | 검증(순수) — 자동 키 행은 `ownerOf` 로 주인 필드 검사 |
+| `Assets/1.Scripts/Localization/Editor/StringKeyOwners.cs` | 자동 키 주인 ID → SO·컴포넌트(검증용) |
+| `Assets/1.Scripts/Localization/Editor/TableTextMigration.cs` | 병합 Export 때 옛 수치 시트 문구 칸 → Strings 행 이관 계획(순수) |
 | `Assets/1.Scripts/Localization/Editor/StringTableBuild.cs` | 표 에셋 생성·빌드 Preload·수동 갱신 메뉴 |
 | `Assets/1.Scripts/UI/Title/LanguageOption.cs` · `Editor/LanguageOptionAuthoring.cs` | 옵션 언어 선택 · 배치 메뉴 `Tools/UI/Title/옵션 Gameplay — 언어 선택 배치` |
 | `Assets/1.Scripts/Localization/UiStrings.cs` | L3·L4b UI 문구 키 목록(`UiString` = 키 + ko 폴백 + 쓰는 곳) · 초 단위 `UiStrings.Seconds` · 상태이상 이름 키 |
@@ -163,7 +168,7 @@ Loc.Changed += Redraw;           // OnEnable 에서 구독, OnDisable 에서 꼭
 | [`Docs/tech/localization-en-draft.md`](localization-en-draft.md) | L2~L4b 전 키(Strings 100 · ErrorCodes 35)의 **en 번역 초안**·용어집·기획 결정 목록 — 병합 뒤 Export 때 시트 en 칸으로 옮긴다 |
 
 - 테스트: `Tools/Tests/데이터 테이블 EditMode 테스트 실행`(픽스처 `StringTableValidatorTests`·`StringsSheetTests`·`ErrorCodesSheetTests`·`LocTests`·`UserLanguageConfigTests`,
-  L2 `LocKeyTests`·`DataTableTextKeysTests`·`CharacterRosterStringKeysTests`·`LocTextRuleTests`, L3 `UiStringsTests`·`UiStringsFormatTests`·`UiStringsAuthoringTests`,
+  L2 `LocKeyTests`·`DataTableTextKeysTests`·`CharacterRosterStringKeysTests`·`LocTextRuleTests`, 단일 원본 `TableTextMigrationTests`·`StringOwnerFieldTests`, L3 `UiStringsTests`·`UiStringsFormatTests`·`UiStringsAuthoringTests`,
   L4 `ErrorCatalogTests`·`ErrorDisplayTests`, L4b `UiStringsL4bTests`·`UiStringsL4bFormatTests`).
 
 ## 5. L2 — SO 문구 자동 키
@@ -191,12 +196,13 @@ SO·프리팹에 인라인으로 적힌 문구(스킬 툴팁·캐릭터 이름)�
   `Keyed` 없이 struct 를 그대로 읽으면 인라인 값만 나온다.
 - 캐릭터 이름 `CharacterRoster.Entry.DisplayName` = `Loc.Get("Character.<플레이어 프리팹 이름>.Name", displayName)`(예 `Character.Player_Paladin.Name`).
   배열 순서가 아니라 프리팹 이름 기준이라 칸을 옮겨도 번역이 따라간다. 프리팹이 비어 있으면 인라인 이름. 결과 화면(`ResultPlayerRowView`) 등 `DisplayName` 을 쓰는 UI 는 그대로 번역된다.
-- 툴팁 en 문구도 툴팁 포매터를 거친다 — `{필드}` 는 en·ko 가 같은 집합이어야 한다(위 검증 규칙). 필드가 실제로 있는지는 화면에 띄울 때 포매터가 보고, 틀리면 경고 로그.
+- 툴팁 en 문구도 툴팁 포매터를 거친다 — `{필드}` 는 en·ko 가 같은 집합이어야 하고, **각 언어의 `{필드}` 가 키 주인의 실제 필드인지 표 생성 단계에서 검사한다**(오류면 테이블 Play·빌드 중단, [§2 검증 규칙](#검증-규칙)).
+  인스펙터 모드 Play 는 오류면 막지 않고 지난 표로 돈다 — 화면에서 틀린 문구는 `[오류: …]` + 경고 로그.
 
 ### Export 수집
 
 - 대상 = 데이터 테이블 대상(`[DataTableSheet]` SO·프리팹 컴포넌트)의 `[DataTableText]` 문자열 + `StringKeyRegistry`(캐릭터 이름).
-- 새 키만 Strings 시트 뒤에 붙는다: **ko = 지금 SO 값, en = 빈 칸, `#설명` = `대상 · 필드경로`**(컴포넌트면 `Player_Paladin › FirstMeleePassive · tooltip.description`).
+- 새 키만 Strings 시트 뒤에 붙는다: **ko = 지금 SO 값(옛 수치 시트에 그 칸이 있으면 그 xlsx 값 — [단일 원본](#단일-원본--strings)), en = 빈 칸, `#설명` = `대상 · 필드경로`**(컴포넌트면 `Player_Paladin › FirstMeleePassive · tooltip.description`).
   이미 있는 키는 건드리지 않는다 — 기획이 고친 ko·en 이 Export 로 덮이지 않는다.
 - 빈 값은 모으지 않는다(ko 빈 칸은 시트 오류라서). 런타임도 빈 인라인 값 그대로.
 
@@ -206,10 +212,13 @@ SO·프리팹에 인라인으로 적힌 문구(스킬 툴팁·캐릭터 이름)�
   지금: `SoundEntry.key`(코드 ID)·`SoundEntry.description`(기획 메모).
 - 튜토리얼 문구(`TutorialGuideTextTable`·`TutorialTraitTextTable`)는 아직 `[DataTableText]` 가 없어 수집되지 않는다(별도 레인).
 
-### 두 원본 주의
+### 단일 원본 — Strings
 
-- 툴팁 문구는 L2 뒤에도 수치 시트(`Paladin`·`Gunner` 등)의 `tooltip.*` 칸으로 SO 에 적용된다. **Strings 에 행이 있으면 화면은 Strings 가 이긴다**(ko 포함).
-  수치 시트 칸은 Strings 행이 없을 때의 폴백 값이 된다 — 문구는 Strings 시트에서 고친다.
+- 툴팁 문구(`[DataTableText]`)의 원본은 **Strings 시트 하나**다. 수치 시트(`Paladin`·`Gunner` 등)에는 `tooltip.*` 칸을 내보내지 않고, 옛 xlsx 에 남은 칸은 적용·Verify 하지 않는다(시트마다 경고 한 줄).
+  판정은 수집과 같은 규칙 하나 — `DataTableFields.IsLocalizedText`(`[DataTableText]` 이고 `Localize = false` 가 아님).
+- 화면 = Strings 행 → 없으면 SO·컴포넌트 인라인 값(폴백). 인라인 값은 git 에 남은 ko 원문일 뿐, 테이블이 덮어쓰지 않는다.
+- 옛 수치 시트 칸은 **병합 Export 가 Strings 로 옮긴 뒤에만** 뺀다 — Strings 에 행이 없으면 xlsx 값으로 새 행, 있으면 Strings 유지 + 다르면 경고, 못 옮기면 Export 중단.
+  상세: [data-table.md §9](data-table.md#9-프로그래머기획--툴팁-문구와-자리표시자).
 - 인스펙터 모드 Play 에서도 문구는 xlsx Strings 를 읽는다 — 인스펙터에서 고친 툴팁은 Strings 행이 있으면 안 보인다.
 
 ## 6. L3 — 씬·프리팹 라벨
