@@ -476,14 +476,23 @@ grep -n "AuthorityMode" Assets/2.Prefabs/Player/Player.prefab Assets/2.Prefabs/P
 - 막는 것: 이동 입력 회전(시뮬레이션 입력 `CanRotate`)·`RotateToward`(추적 회전).
   **`RotateImmediately` 는 막지 않는다** — 대시 진입·낙하 복귀처럼 행동이 직접 내리는 회전이다.
   잠금을 건 행동이 끊기면 `PlayerAttackState.Exit` 가 다음 상태 `Enter` 보다 먼저 돌아 잠금이 먼저 풀린다.
-- 현재 사용처: 거너 기본 공격(`GunnerBasicAttack`, 규칙은 `GunnerAttackFacingModel`).
-  - 잠금 시작 = 공격 시작(`BeginRuntime`, 준비 동작 진입) 순간의 조준. 첫 발·홀드·입력 창 발 모두 이 방향이다.
-  - 해제 = 공격 런타임 종료(`ResetRuntime`). **'사격 끝' = `TickServer` 의 마무리 분기(마지막 발 + `ShotRecovery`) → `EndServer`/`EndRpc`**.
-    후딜 시작이 아닌 이유: 후딜 안의 입력 창 클릭이 다음 발을 같은 방향으로 이어 쏠 수 있다.
-    대시·넉백·구속·사망 등 상태 전이로 끊기면 `CancelCurrentAttack` → `ResetRuntime` 으로 즉시 풀린다.
-  - ⚠️ 스턴(상태이상)은 상태 전이가 아니라 거너 평타를 끊지 않는다(기존 동작) — 그동안은 `BlocksMovement` 로 어차피 회전하지 않는다.
-  - 원격: 모든 피어가 시작 RPC 의 같은 방향으로 잠근다. 몸 회전은 오너 권한 `Armature` NetworkTransform 으로 복제되고,
-    빔은 서버가 준 끝점(고정 방향)으로 총구 소켓을 매 프레임 다시 겨누므로(`GunnerBeamView.UpdateBeam`) 몸과 빔이 어긋나지 않는다.
+- 현재 사용처: 거너 기본 공격(`GunnerBasicAttack`, 규칙은 `GunnerAttackFacingModel`). 2026-10-12 후속으로 **발 단위**로 좁혔다.
+  - **토큰(공격 잠금)** = 공격 런타임 전체(`BeginRuntime` ~ `ResetRuntime`). 이동 입력 회전·`RotateToward` 를 공격 내내 막는다.
+    해제 = 마무리 분기(마지막 발 + `ShotRecovery`) → `EndServer`/`EndRpc`, 또는 대시·넉백·구속·사망 등 상태 전이 → `CancelCurrentAttack`.
+  - **발 잠금** = 각 발의 준비 시작 ~ 그 발 사격 끝. 이 동안은 커서로도 돌지 않는다.
+    - 첫 발: 준비 시작 = 공격 시작 순간의 **조준**(커서로 즉시 돌아봄), 준비 동작(`WindupDuration`) 내내 잠김.
+    - 이어지는 발(홀드·입력 창): 준비 동작이 없어 준비 시작 = 오너가 발사를 요청하는 순간. 그때의 **몸 방향**으로 잠근다 — 덜 돌았으면 덜 돈 방향.
+    - 사격 끝 = 그 발이 이 피어에서 나간 때(`PlayShot`). 원격 오너는 왕복 지연만큼 잠긴다. `ShotRpc`(신뢰성 없음)가 빠지면 다음 발 시각에 풀린다.
+  - **발 사이**(홀드 연사 간격·창으로 이은 다음 발 전·후딜) = 오너가 커서 쪽으로 `GunnerBasicAttackData.betweenShotTurnSpeed`(도/초)로 돈다
+    (`TickOwner` → `RotateImmediately` — 토큰이 막지 않는 행동 회전). 0 = 사이에도 고정(이어지는 발이 전부 시작 방향).
+  - 이동 입력은 공격 중 회전에 쓰이지 않는다 — Attack 상태는 `CanMovementRotate=false`(평타 중 이동 불가)이고 토큰도 막는다. 커서 회전만 있다.
+  - ⚠️ 스턴(상태이상)은 상태 전이가 아니라 거너 평타를 끊지 않는다(기존 동작).
+  - **네트워크**: 이어지는 발의 허락은 서버(눌림·창 예약·간격·과열), **요청 시점과 방향은 오너**다. 오너가 `FireShotRpc(direction)` 에
+    잠근 몸 방향을 실어 보내고 서버는 그 방향으로 판정한다(몸 회전이 오너 권한이라 오너 몸이 기준). 서버는 눌림·예약이 없으면 요청을 버린다(창 우회 방지).
+    창 예약을 받았는데 요청이 `FireInterval × 3` 안에 안 오면 예약을 버리고 마무리한다.
+  - **원격 일치**: 오너 화면은 발 잠금이 `PlayShot` 까지라 몸=빔. 다른 피어는 몸(`Armature` NetworkTransform)과 빔(`ShotRpc`)이 같은 경로(오너→서버→피어)로
+    오므로 같은 오너 시각을 보여 준다. 다만 이어지는 발은 발사 직전에 몸이 돌고 있었으므로, 보간 버퍼만큼(≈ 회전 속도 × 보간 지연) 몸이 늦게 따라와
+    잠깐 어긋났다가 맞는다 — 빔은 서버 끝점을 매 프레임 다시 겨누므로(`GunnerBeamView.UpdateBeam`) 끝점은 정확하다.
 - 테스트: `GunnerAttackFacingModelTests`(플레이어 EditMode 러너).
 
 ---

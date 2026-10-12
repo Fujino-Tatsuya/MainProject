@@ -21,6 +21,11 @@ public class GunnerBasicAttackData : ScriptableObject
     [Tooltip("입력 창 닫힘(초, 직전 발사 기준). 팔라딘 ComboWindowClose 에 해당. 후속 동작(shotRecovery)보다 길면 그 끝에서 닫힌다.")]
     [SerializeField, Min(0f)] private float comboWindowClose = 0.2f;
 
+    [Header("회전")]
+    [Tooltip("발과 발 사이(홀드 연사 간격·입력 창으로 이은 다음 발 전·후딜)에 커서 쪽으로 도는 속도(도/초). " +
+             "각 발의 준비~사격 끝에는 돌지 않고, 다음 발은 그 발 준비 시작 순간의 몸 방향으로 나간다. 0 = 사이에도 고정.")]
+    [SerializeField, Min(0f)] private float betweenShotTurnSpeed = 360f;
+
     [Header("판정")]
     [Tooltip("사거리(m).")]
     [SerializeField, Min(0.1f)] private float range = 14f;
@@ -60,6 +65,7 @@ public class GunnerBasicAttackData : ScriptableObject
     public float ShotRecovery => shotRecovery;
     public float ComboWindowOpen => comboWindowOpen;
     public float ComboWindowClose => comboWindowClose;
+    public float BetweenShotTurnSpeed => betweenShotTurnSpeed;
     public float Range => range;
     public float BeamWidth => beamWidth;
     public float MuzzleHeight => muzzleHeight;
