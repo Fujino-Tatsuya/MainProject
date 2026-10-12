@@ -377,6 +377,7 @@ Transform:
   - {fileID: 8087399270387521218}
   - {fileID: 6168542492047789391}
   - {fileID: 2166731060762440659}
+  - {fileID: 4552160193384752002}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &2338841984620960063
@@ -589,7 +590,7 @@ MonoBehaviour:
   leftHookHit: {fileID: 0}
   rightHookHit: {fileID: 0}
   upperHit: {fileID: 0}
-  interruptFlash: {fileID: 0}
+  interruptFlash: {fileID: 4552160193384752003}
   rageSmash: {fileID: 0}
   chargeBall: {fileID: 0}
 --- !u!114 &4143592804925233818
@@ -838,3 +839,53 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 8825124791861564085, guid: cbdaae8bc76ee814d8a32d754976bdde, type: 3}
   m_PrefabInstance: {fileID: 1567392425763977719}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &4552160193384752001
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 4552160193384752002}
+  - component: {fileID: 4552160193384752003}
+  m_Layer: 0
+  m_Name: InterruptFlash
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &4552160193384752002
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4552160193384752001}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 2.06, z: 1.328}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 8530868094991501261}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &4552160193384752003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4552160193384752001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
+  id: 
+  effect: {fileID: 11400000, guid: e6dad2ab1b7d86d49b816729fc8526c2, type: 2}
+  socket: {fileID: 0}
+  offset: {x: 0, y: 0, z: 0}
+  scale: 1.2
+  safetyTimeout: 5

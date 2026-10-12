@@ -88,6 +88,11 @@ public class EffectCatalog : ScriptableObject
     [field: SerializeField] public EffectEntry Mob_Slash { get; private set; }
     [field: SerializeField] public EffectEntry Mob_Bite { get; private set; }
 
+    // 인터럽트(카운터) 성공 섬광. 터뜨리는 주체가 플레이어가 아니라 **맞는 쪽**이라 여기 둔다 —
+    // 23호 본체와 건틀릿·스피너·월봇이 같은 엔트리를 쓴다(각 프리팹의 interruptFlash 소켓).
+    // 창이 실제로 열려 있을 때만 난다(CounterWindow.TryConsumeInterrupt). 팔라딘·거너 공용이다.
+    [field: SerializeField] public EffectEntry Interrupt_Flash { get; private set; }
+
     // ── 보스 ────────────────────────────────────────────────────────────
 
     [Header("보스 — 23호 낙하")]

@@ -38,6 +38,7 @@ MonoBehaviour:
   <Ultimate_Strike>k__BackingField: {fileID: 11400000, guid: 2b9663c3e821ab54b8c6254439c6befe, type: 2}
   <Mob_Slash>k__BackingField: {fileID: 11400000, guid: d57f39897b08b004c84a995edbd7fde8, type: 2}
   <Mob_Bite>k__BackingField: {fileID: 11400000, guid: 711a910e150b32743ba079fc5ff9ed42, type: 2}
+  <Interrupt_Flash>k__BackingField: {fileID: 11400000, guid: e6dad2ab1b7d86d49b816729fc8526c2, type: 2}
   <Drop_Charge_Boundary>k__BackingField: {fileID: 11400000, guid: a250c4956ae6d604195af8c0ef58fe0f, type: 2}
   <Drop_Charge_Indicator>k__BackingField: {fileID: 11400000, guid: 12f5c15d731222a4fb5899aa42423fc8, type: 2}
   <Drop_Collision>k__BackingField: {fileID: 11400000, guid: 257224bb915c8284b951f51f2c783638, type: 2}
