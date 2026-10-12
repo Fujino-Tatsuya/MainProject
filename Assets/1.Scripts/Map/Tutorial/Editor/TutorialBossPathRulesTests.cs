@@ -22,20 +22,20 @@ public sealed class TutorialBossPathRulesTests
     {
         Assert.AreEqual(600f, TutorialBossPathRules.EffectiveLimitSeconds(0f, 600f), "비튜토리얼 = 씬 값 그대로");
         Assert.AreEqual(300f, TutorialBossPathRules.EffectiveLimitSeconds(0f, 300f), "코드 기본값도 그대로");
-        Assert.AreEqual(90f, TutorialBossPathRules.EffectiveLimitSeconds(90f, 600f), "튜토리얼 시작 API 가 덮어씀");
+        Assert.AreEqual(420f, TutorialBossPathRules.EffectiveLimitSeconds(420f, 600f), "튜토리얼 시작 API 가 덮어씀");
         Assert.AreEqual(600f, TutorialBossPathRules.EffectiveLimitSeconds(-1f, 600f), "음수 = 덮어쓰지 않음");
-        Assert.AreEqual(90f, TutorialBossPathRules.DefaultTutorialTimerLimitSeconds, "D6");
+        Assert.AreEqual(420f, TutorialBossPathRules.DefaultTutorialTimerLimitSeconds, "D6");
     }
 
     [Test]
-    public void TutorialLimit_ExpiresAt90_InTimerDomain()
+    public void TutorialLimit_ExpiresAt420_InTimerDomain()
     {
         // 시작 시각 + 덮어쓴 제한시간 = 만료 시각. 시간 도메인(GameNow)·만료 판정은 기존 순수 계산 그대로.
         double start = 1000.0;
-        double expiresAt = start + TutorialBossPathRules.EffectiveLimitSeconds(90f, 600f);
-        Assert.AreEqual(90.0, BossTimerManager.RemainingAt(expiresAt, start), Eps);
-        Assert.IsFalse(BossTimerManager.IsExpiredAt(expiresAt, start + 89.9));
-        Assert.IsTrue(BossTimerManager.IsExpiredAt(expiresAt, start + 90.0));
+        double expiresAt = start + TutorialBossPathRules.EffectiveLimitSeconds(420f, 600f);
+        Assert.AreEqual(420.0, BossTimerManager.RemainingAt(expiresAt, start), Eps);
+        Assert.IsFalse(BossTimerManager.IsExpiredAt(expiresAt, start + 419.9));
+        Assert.IsTrue(BossTimerManager.IsExpiredAt(expiresAt, start + 420.0));
     }
 
     // ─── HUD ──────────────────────────────────────────────────────────────

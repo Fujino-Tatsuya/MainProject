@@ -19,7 +19,7 @@ S12-2 B: 보스방 도착(Finished) 뒤에는 존4 설정·기상·만료·패�
 | 순서 | 트리거 | 서버 | 표시 |
 |---|---|---|---|
 | Z4-0 | G7 열림 ∧ `AreaFirstEntered(Zone4)`(순서 무관) | `SetStepServer(Zone4Lore)` · `ShowTimerHudServer()` · 존4 휴면 유지 | 자막 `TUT_Z4_LORE` → `TUT_Z4_TIMER_HINT`(전원) · 타이머 칸 펄스 |
-| Z4-1 | 설정 자막 시작 + **10초** | `StartBossTimerServer()`(= G8 → 90초) | — |
+| Z4-1 | 설정 자막 시작 + **10초** | `StartBossTimerServer()`(= G8 → 420초) | — |
 | Z4-1/2 | G8 열림(어느 경로든 — `GateOpened`) | `SetStepServer(Zone4Combat)` · 3초 뒤 `WakeZoneServer(Zone4, NormalOnly)` | `TUT_Z4_START` → `TUT_Z4_PANEL_INTRO` · 목표 `TUT_Z4_PANEL_GOAL` ({n}/{total}) · 펄스 끔 |
 | Z4-3 | `ZoneBridgeGateManager.ServerPanelActivated` | `AddCounterServer(Zone4Panels)` | 첫 1번 `TUT_Z4_PANEL_FIRST` · 목표 n 갱신 |
 | Z4-4 | `ZoneBridgeGateManager.ServerBridgeOpened`(다리 진행도 1) | `WakeZoneServer(Zone4, KeyOnly)`(중간보스) | `TUT_Z4_BRIDGE` · 목표 `TUT_Z4_MIDBOSS`(패널 다 켠 순간부터) · 강조 가장 가까운 계단 + 중간보스 |
@@ -68,7 +68,7 @@ S12-2 B: 보스방 도착(Finished) 뒤에는 존4 설정·기상·만료·패�
 
 ## 8. Play 확인 대기 (사람이 MPPM 에서)
 - 존4 첫 진입 → 타이머 빈 게이지 등장 + 펄스 · 자막 2줄 전원 · 몬스터 안 움직임 · 로그 `존4 설정 자막 시작 — 10초 뒤 G8`.
-- 10초 뒤 게이지 차오름(90초) · START → PANEL_INTRO · 목표 0/4 · 3초 뒤 일반 몹 기상(중간보스는 그대로).
+- 10초 뒤 게이지 차오름(420초) · START → PANEL_INTRO · 목표 0/4 · 3초 뒤 일반 몹 기상(중간보스는 그대로).
 - 패널 F → 목표 1/4…(누가 켜도) · 첫 패널만 PANEL_FIRST · 4/4 → 목표 MIDBOSS · 1.5초 뒤 BRIDGE + 중간보스 기상 · 계단(가까운 것)·중간보스 강조 · 호스트 끊김 체감.
 - 중간보스 첫 노란빛 → COUNTER_REMIND 1번 · 처치 → CLEAR → GO_BOSS · 목표 GO_BOSS · 미니맵 보스 아이콘 펄스 · G9 개방.
 - 패드 카운트다운 → PAD_COUNT(들락거려도 8초 안엔 1번) · 도착 → 목표·강조·자막 사라짐 → 1초 뒤 23호 정면 팁.
