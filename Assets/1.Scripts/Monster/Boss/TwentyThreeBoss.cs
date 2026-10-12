@@ -1443,12 +1443,18 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     }
 
     /// <summary>돌진 경로 띠. 길이·폭은 서버가 실측해 실어 보낸다(각 피어가 따로 계산하면 갈라진다).</summary>
+    /// <remarks>
+    /// 색은 <b>인터럽트(파랑)</b> — 돌진은 카운터 창을 여는 공격이라 일반 공격과 같은 빨강이면 간파 신호로
+    /// 안 읽힌다(팀장 2026-10-12). ⚠️ 잡기도 카운터 공격이지만 **이번엔 돌진만**(팀장 결정).
+    /// 레이지 돌진은 이 RPC 를 안 탄다(카운터 창 없음).
+    /// </remarks>
     [ClientRpc]
     void ShowDashTelegraphClientRpc(float length, float halfWidth, float growTime)
     {
         AttackCone.Show(coneRadius: 0f, coneAngleDeg: 0f, coneOffsetAngleDeg: 0f,
                         coneForwardOffset: 0f,
-                        pathRadius: halfWidth, pathLength: length, growTime: growTime);
+                        pathRadius: halfWidth, pathLength: length, growTime: growTime,
+                        palette: BossAttackConeTelegraph.Palette.Interrupt);
     }
 
     // ─── [G2] 예고 구간 ──────────────────────────────────────────────

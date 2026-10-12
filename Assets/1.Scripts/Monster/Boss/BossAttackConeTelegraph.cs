@@ -29,9 +29,26 @@ using UnityEngine.Rendering.Universal;
 [DisallowMultipleComponent]
 public sealed class BossAttackConeTelegraph : MonoBehaviour
 {
+    /// <summary>예고 색 묶음. 모양·채움 규약은 같고 색만 다르다.</summary>
+    public enum Palette
+    {
+        Attack,     // 빨강 — 일반 공격
+        Interrupt,  // 파랑 — 간파(인터럽트)가 통하는 공격
+    }
+
     // 예고 색 — **빨강**. 장판 규약에서 빨강은 "여기가 곧 맞는다"의 관례색이다.
-    static readonly Color OutlineColor = new Color(1f, 0.12f, 0.08f, 0.85f);  // 윤곽선 — "어디에"
-    static readonly Color FillColor = new Color(1f, 0.10f, 0.05f, 0.55f);     // 채움 — "언제"
+    static readonly Color AttackOutlineColor = new Color(1f, 0.12f, 0.08f, 0.85f);  // 윤곽선 — "어디에"
+    static readonly Color AttackFillColor = new Color(1f, 0.10f, 0.05f, 0.55f);     // 채움 — "언제"
+
+    // 인터럽트 예고 — 간파 창 몸 오버레이(`50.Art/VFX/_Materials/Interrupt.mat` 의 `_Color`)와 **같은 RGB**.
+    // 빨강 예고와 같으면 "간파할 수 있는 공격"으로 안 읽힌다(팀장 피드백 2026-10-12). 알파는 빨강 예고와 같게.
+    // ⚠️ 재질은 SVN 이라 값이 바뀌면 여기도 같이 맞출 것.
+    static readonly Color InterruptOutlineColor = new Color(0.021842957f, 0f, 1f, 0.85f);
+    static readonly Color InterruptFillColor = new Color(0.021842957f, 0f, 1f, 0.55f);
+
+    Palette _palette = Palette.Attack;
+    Color OutlineColor => _palette == Palette.Interrupt ? InterruptOutlineColor : AttackOutlineColor;
+    Color FillColor => _palette == Palette.Interrupt ? InterruptFillColor : AttackFillColor;
 
     const int TextureSize = 256;
     const float ProjectionDepth = 6f;   // 표식과 같은 정도 — 경사면에서도 투영되게 넉넉히
@@ -84,11 +101,24 @@ public sealed class BossAttackConeTelegraph : MonoBehaviour
     /// <param name="pathRadius">경로 띠 반폭(m) = 경로 판정 반경. 0 이면 띠를 안 그린다.</param>
     /// <param name="pathLength">경로 띠 길이(m) = 전진 거리.</param>
     /// <param name="growTime">채움이 가득 차는 데 걸리는 시간(초). 0 이면 처음부터 가득.</param>
+    /// <param name="palette">예고 색. 기본 = 빨강(일반 공격).</param>
     public void Show(float coneRadius, float coneAngleDeg, float coneOffsetAngleDeg,
                      float coneForwardOffset, float pathRadius, float pathLength, float growTime,
-                     float pathForwardOffset = 0f, float pathLateralOffset = 0f, bool fillInward = false)
+                     float pathForwardOffset = 0f, float pathLateralOffset = 0f, bool fillInward = false,
+                     Palette palette = Palette.Attack)
     {
         if (!EnsureBuilt()) return;
+
+        // 🔴 색은 텍스처에 구워진다. 캐시는 **모양**으로만 판단하므로, 색이 바뀌면 같은 모양이어도
+        //    전부 다시 굽게 무효화한다 — 안 하면 직전 공격의 색이 남는다(돌진 뒤 훅이 파랗게 나온다).
+        if (palette != _palette)
+        {
+            _palette = palette;
+            _builtConeHalfAngle = -1f;
+            _builtBandAspect = -1f;
+            _builtUnionKey = -1f;
+            _builtUnionFillStep = -1;
+        }
 
         _fillInward = fillInward;
         _builtInwardStep = -1;
