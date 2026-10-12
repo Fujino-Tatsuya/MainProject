@@ -27,4 +27,20 @@ public static class LocKey
         string.IsNullOrEmpty(ownerId) || string.IsNullOrEmpty(fieldPath) ? null : ownerId + OwnerSeparator + fieldPath;
 
     public static string ForField(Object owner, string fieldPath) => ForField(OwnerId(owner), fieldPath);
+
+    /// <summary>자동 키(<c>주인ID/필드경로</c>)면 둘로 나눈다. 다른 키(<c>UI.Lobby.Ready</c> 등 — 구분자 없음)면 false.</summary>
+    public static bool TrySplit(string key, out string ownerId, out string fieldPath)
+    {
+        int at = string.IsNullOrEmpty(key) ? -1 : key.IndexOf(OwnerSeparator);
+        if (at <= 0 || at == key.Length - 1)
+        {
+            ownerId = null;
+            fieldPath = null;
+            return false;
+        }
+
+        ownerId = key.Substring(0, at);
+        fieldPath = key.Substring(at + 1);
+        return true;
+    }
 }

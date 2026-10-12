@@ -72,7 +72,7 @@ public static class StringTableBuild
         }
 
         errorCodes = StringTableValidator.Validate(errorRows, issues);
-        return StringTableValidator.Validate(rows, issues);
+        return StringTableValidator.Validate(rows, issues, StringKeyOwners.Resolver(null));
     }
 
     /// <summary>인스펙터 Play — 수치는 xlsx 를 무시하지만 문구는 xlsx 가 유일한 원본이라 갱신한다. 오류면 기존 표를 그대로 쓴다.</summary>

@@ -77,9 +77,11 @@ public static class DataTableSource
             }
         }
 
-        List<LocalizedString> strings = StringTableValidator.Validate(stringRows, issues);
-        List<LocalizedString> errorCodes = StringTableValidator.Validate(errorRows, issues);
         List<DataTableWrite> writes = DataTableApplier.Bind(entries, new AssetDatabaseLookup(), issues);
+        // 툴팁 자동 키 행의 {필드} 는 그 주인의 필드로 검사 — 주인은 먼저 수치 시트가 찾은 대상에서.
+        List<LocalizedString> strings = StringTableValidator.Validate(stringRows, issues,
+            StringKeyOwners.Resolver(writes.Select(w => w.Target).Distinct()));
+        List<LocalizedString> errorCodes = StringTableValidator.Validate(errorRows, issues);
         return new Result(writes, issues, files.Length, strings, errorCodes);
     }
 }
