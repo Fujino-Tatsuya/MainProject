@@ -138,4 +138,20 @@ false 일 때 `ServerRoundCompleted` 는 같은 호출 안에서 이미 불렸�
 
 ## 7. 테스트
 
-`Tools/Tests/튜토리얼 EditMode 테스트 실행` 에 등록(I0 에서 플레이어 러너에서 이동): `TutorialTraitSelectionModelTests`(규칙·무적 계획) · `TutorialTraitWindowModelTests`(창 판정·문구 테이블 폴백).
+`Tools/Tests/튜토리얼 EditMode 테스트 실행` 에 등록(I0 에서 플레이어 러너에서 이동): `TutorialTraitSelectionModelTests`(규칙·무적 계획) · `TutorialTraitWindowModelTests`(창 판정·문구 테이블 폴백) ·
+`TutorialTraitDeadlineModelTests`(교착 방지 게이지 — 비율·10초 강조·로컬 감소·재동기화). 게이지 표시 조건은 `TutorialCorridorModelTests`.
+
+## 8. 교착 방지 게이지 (할 일 15 후속)
+
+선택 창 패널 맨 아래(`Window/Panel/Deadline`) — 가로 게이지 + `n초 뒤 자동 선택` + `선택 완료 n/전체`. 기본 꺼짐이라 안 보일 땐 창 레이아웃이 전과 같다.
+
+- **표시 조건**: 기다리는 개인 게이트가 진행 중 복도의 출구(G2/G4/G7/G10)이고 첫 완료자 뒤(자동 진행 시각이 정해짐)일 때만 —
+  `TutorialCorridorRules.ShouldShowTraitDeadline`. 첫 완료자 전·솔로 즉시 완료엔 숨김. 게이지는 창 안이라 창이 닫힌(이미 고른) 사람에겐 안 보인다.
+- **값**: `TutorialDirector.TryGetWait`(복제 대기 상태 — done/total·자동 진행까지 남은 초) · 분모 = `TutorialDirector.DeadlockSeconds`(인스펙터 `deadlockSeconds`).
+- **의존 방향**: 특성 모듈(`Assets/1.Scripts/Tutorial/Traits/**`)은 튜토리얼 디렉터를 모른다. 복도 흐름(`TutorialCorridorFlow`, **모든 피어**에 붙음)이
+  `Render`(디렉터 `StateChanged`·특성 `ClientStateChanged`) 때마다 `TutorialTraitSelectionView.Instance.SetDeadline(visible, remaining, total, done, count)` 로 넣는다.
+  창이 늦게 깨어나면 흐름 `Update` 가 다시 넣는다.
+- **시간**: 창이 `Time.unscaledDeltaTime` 으로 로컬 감소(0 에서 멈춤 — 만료 처리는 서버), 다음 `SetDeadline` 이 서버 시각 기준 값으로 다시 맞춘다.
+  남은 `TutorialTraitDeadlineModel.UrgentSeconds`(10초) 이하면 게이지·초 텍스트가 `deadlineUrgentColor`.
+- 순수 계산 = `TutorialTraitDeadlineModel`(Unity 비의존). 문구는 아직 문구 테이블(`TutorialTraitTexts.AllIds`)에 넣지 않고 모델 상수(`SecondsFormat`·`DoneFormat`) — 테이블 행 추가는 데이터 테이블 이관(§5) 때 함께.
+- 프리팹은 `Tools/Tutorial/특성 선택 UI 프리팹 생성` 으로 재생성(루트 GameObject·RectTransform fileID 보존 → `4.MapScene` 인스턴스 오버라이드 유지).

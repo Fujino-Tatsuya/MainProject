@@ -83,6 +83,13 @@ public static class TutorialCorridorRules
         return 0;
     }
 
+    /// <summary>
+    /// 특성 창 교착 방지 게이지를 보이는가 — 기다리는 개인 게이트가 진행 중 복도의 출구(G2/G4/G7/G10)이고
+    /// 첫 완료자 뒤라 자동 진행 시각이 정해졌을 때(<paramref name="autoAdvanceRemaining"/> &gt;= 0)만. 첫 완료자 전·솔로 즉시 완료엔 숨김.
+    /// </summary>
+    public static bool ShouldShowTraitDeadline(int activeCorridor, bool hasWait, TutorialGate waitGate, float autoAdvanceRemaining) =>
+        IsValid(activeCorridor) && hasWait && waitGate == ExitGate(activeCorridor) && autoAdvanceRemaining >= 0f;
+
     /// <summary>지금 진행 중인 복도 = 입구가 열리고 출구가 아직 닫힌 복도(게이트는 순서대로만 열려 많아야 하나). 없으면 0.</summary>
     public static int ActiveCorridor(Func<TutorialGate, bool> isGateOpen)
     {

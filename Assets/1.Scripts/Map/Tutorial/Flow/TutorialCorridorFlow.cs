@@ -25,6 +25,8 @@ using UnityEngine;
 ///  · 출구가 열리면 이 흐름이 쓰던 목표를 "다음 구역으로"(복도4 = 엘리베이터 발판으로) 바꾸고 손을 뗀다. 존 첫 진입 안내는 각 존 흐름 몫 —
 ///    다음 존 단계가 이미 보이면(같은 틱 반영) 그 존 목표를 덮지 않는다(<see cref="TutorialCorridorRules.ShouldShowExitObjective"/>). 단계 Finished 뒤엔 그리지 않는다.
 ///  · 처음 그릴 때 안내 UI 가 비어 있으면(늦은 클라) <see cref="TutorialGuideUI.RebuildFromState"/>.
+///  · 특성 창 교착 방지 게이지 — 복제 대기 상태(<see cref="TutorialDirector.TryGetWait"/>)를 <see cref="TutorialTraitSelectionView.SetDeadline"/> 으로 넣는다
+///    (표시 = <see cref="TutorialCorridorRules.ShouldShowTraitDeadline"/>). 특성 모듈은 디렉터를 모른다 — 의존은 이 흐름 → 특성 뷰 한 방향.
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class TutorialCorridorFlow : MonoBehaviour
@@ -49,6 +51,7 @@ public sealed class TutorialCorridorFlow : MonoBehaviour
     // 로컬
     private TutorialGuideUI _ui;
     private int _ownedCorridor;
+    private TutorialTraitSelectionView _traitView;
 
     // ─── 부착(모든 피어) ───────────────────────────────────────────────────
 
@@ -104,6 +107,8 @@ public sealed class TutorialCorridorFlow : MonoBehaviour
         TutorialDirector.StateChanged -= Render;
         TutorialDirector.GateOpened -= HandleGateOpened;
         BindTraits(null);
+        if (_traitView != null) _traitView.SetDeadline(false, 0f, 0f, 0, 0);
+        _traitView = null;
     }
 
     private void BindTraits(TutorialTraitDirector traits)
@@ -142,6 +147,9 @@ public sealed class TutorialCorridorFlow : MonoBehaviour
             _ui = TutorialGuideUI.Instance;
             Render();
         }
+
+        // 특성 창이 늦게 깨어나면 게이지 값을 다시 넣는다.
+        if (TutorialTraitSelectionView.Instance != _traitView) PushTraitDeadline();
     }
 
     // ─── 서버: 라운드 ──────────────────────────────────────────────────────
@@ -340,6 +348,8 @@ public sealed class TutorialCorridorFlow : MonoBehaviour
 
     private void Render()
     {
+        PushTraitDeadline();
+
         // 보스방 도착(만료 강제 이동이면 복도4 출구가 닫힌 채일 수 있다) 뒤에는 안내를 다시 그리지 않는다 — 정리는 존4 안내 몫.
         if (_director == null || _nm == null || !_director.IsTutorialActive || _director.IsFinished) return;
         TutorialGuideUI ui = TutorialGuideUI.Instance;
@@ -375,6 +385,26 @@ public sealed class TutorialCorridorFlow : MonoBehaviour
             else ui.ClearWait();
         }
         _ownedCorridor = corridor;
+    }
+
+    // ─── 특성 창 교착 방지 게이지(모든 피어) ────────────────────────────────
+
+    // 복제 대기 상태가 바뀔 때마다(StateChanged·특성 복제 변경 → Render) 서버 시각 기준 남은 초로 다시 맞춘다. 사이 감소는 창이 한다.
+    private void PushTraitDeadline()
+    {
+        _traitView = TutorialTraitSelectionView.Instance;
+        if (_traitView == null || _director == null) return;
+
+        bool show = false;
+        int done = 0, total = 0;
+        float remaining = -1f;
+        if (_director.IsTutorialActive && !_director.IsFinished)
+        {
+            bool hasWait = _director.TryGetWait(out TutorialGate waitGate, out done, out total, out remaining);
+            int corridor = TutorialCorridorRules.ActiveCorridor(_director.IsGateOpen);
+            show = TutorialCorridorRules.ShouldShowTraitDeadline(corridor, hasWait, waitGate, remaining);
+        }
+        _traitView.SetDeadline(show, remaining, _director.DeadlockSeconds, done, total);
     }
 }
 

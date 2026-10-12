@@ -235,6 +235,9 @@ public sealed class TutorialDirector : NetworkBehaviour
         return true;
     }
 
+    /// <summary>교착 방지 길이(초, 인스펙터 값 — 모든 피어 같은 씬 값). 특성 창 게이지 분모.</summary>
+    public float DeadlockSeconds => deadlockSeconds;
+
     /// <summary>타이머 HUD 표시가 켜졌는가(Z4-0 · G8). 튜토리얼 Idle 동안 HUD 숨김을 푼다(<see cref="TutorialBossPath.ShouldHideTimerHud"/>).</summary>
     public bool IsTimerHudShown => IsSpawned && _timerHudShown.Value;
 

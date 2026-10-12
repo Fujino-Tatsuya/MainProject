@@ -2,12 +2,14 @@ using System.Collections.Generic;
 using TMPro;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.UI;
 
 /// <summary>
 /// 튜토리얼 특성 선택 UI(할 일 15 T2) — 로컬 플레이어 전용 표시. 상태는 <see cref="TutorialTraitDirector"/> 복제값만 읽는다.
 /// - 선택 창: 중앙 모달. 창 루트의 <see cref="UiModalBlocker"/> 가 켜져 있는 동안 로컬 Player 입력(이동·대시 포함)이 막힌다. 일시정지 없음.
 /// - 열림/닫힘 판정은 <see cref="TutorialTraitWindowModel"/>(한 번 닫힌 라운드 재표시 금지·획득 토스트 판정).
 /// - 획득 특성 다시 보기: 좌상단 아이콘 줄 + 호버 툴팁.
+/// - 교착 방지 게이지(창 안): 값은 바깥(복도 흐름)이 <see cref="SetDeadline"/> 으로 넣는다 — 이 뷰는 튜토리얼 디렉터를 모른다.
 /// 씬에 하나 두면 된다(별도 캔버스 — CombatHUD 와 무관). 디렉터가 없으면 아무것도 보이지 않는다.
 /// </summary>
 [DisallowMultipleComponent]
@@ -24,6 +26,17 @@ public sealed class TutorialTraitSelectionView : MonoBehaviour
     [SerializeField] private TutorialTraitCardView cardTemplate;
     [Tooltip("같은 창에서 연속 클릭을 무시하는 시간(초). 서버가 거부하면 이 시간 뒤 다시 고를 수 있다.")]
     [SerializeField, Min(0f)] private float requestCooldown = 1f;
+
+    [Header("교착 방지 게이지 (창 안 — 값은 바깥이 SetDeadline 으로 넣는다)")]
+    [SerializeField] private GameObject deadlineRoot;
+    [Tooltip("Filled·Horizontal Image — fillAmount = 남은 / 교착 방지 전체 초.")]
+    [SerializeField] private Image deadlineFill;
+    [SerializeField] private TMP_Text deadlineSecondsText;
+    [SerializeField] private TMP_Text deadlineDoneText;
+    [SerializeField] private Color deadlineColor = new Color(0.95f, 0.82f, 0.42f, 1f);
+    [SerializeField] private Color deadlineTextColor = Color.white;
+    [Tooltip("남은 시간이 TutorialTraitDeadlineModel.UrgentSeconds 이하일 때 게이지·텍스트 색.")]
+    [SerializeField] private Color deadlineUrgentColor = new Color(1f, 0.36f, 0.30f, 1f);
 
     [Header("획득 토스트")]
     [SerializeField] private GameObject toast;
@@ -43,7 +56,11 @@ public sealed class TutorialTraitSelectionView : MonoBehaviour
     [Tooltip("특성 아이콘이 비었을 때 쓸 그림. 비어 있으면 빈 칸(흰 사각형).")]
     [SerializeField] private Sprite placeholderIcon;
 
+    /// <summary>씬의 창(하나). 게이지 값을 넣는 쪽(복도 흐름)이 찾는다.</summary>
+    public static TutorialTraitSelectionView Instance { get; private set; }
+
     private readonly TutorialTraitWindowModel model = new TutorialTraitWindowModel();
+    private readonly TutorialTraitDeadlineModel deadline = new TutorialTraitDeadlineModel();
     private readonly List<int> offered = new List<int>();
     private readonly List<int> acquired = new List<int>();
     private readonly List<int> shownAcquired = new List<int>();
@@ -55,6 +72,10 @@ public sealed class TutorialTraitSelectionView : MonoBehaviour
     private float nextRequestAt;
     private float toastHideAt;
     private TutorialTraitIconView hoveredIcon;
+    private int shownDeadlineSeconds = -1;
+    private int shownDeadlineDone = -1;
+    private int shownDeadlineCount = -1;
+    private bool shownDeadlineUrgent;
 
     private void Awake()
     {
@@ -65,13 +86,32 @@ public sealed class TutorialTraitSelectionView : MonoBehaviour
         SetActive(window, false);
         SetActive(toast, false);
         SetActive(tooltip, false);
+        SetActive(deadlineRoot, false);
+    }
+
+    private void OnEnable()
+    {
+        Instance = this;
     }
 
     private void OnDisable()
     {
+        if (Instance == this)
+            Instance = null;
         Bind(null);
         CloseWindow();
         SetActive(toast, false);
+        SetDeadline(false, 0f, 0f, 0, 0);
+    }
+
+    /// <summary>
+    /// 교착 방지 게이지 입력(할 일 15 후속) — 바깥(복도 흐름)이 대기 상태가 바뀔 때마다 서버 값으로 넣는다.
+    /// 사이에는 실제 시간으로 로컬 감소한다. 게이지는 창 안에 있어 창이 닫혀 있으면 보이지 않는다.
+    /// </summary>
+    public void SetDeadline(bool visible, float remaining, float total, int done, int count)
+    {
+        deadline.Sync(visible, remaining, total, done, count);
+        RefreshDeadline(force: true);
     }
 
     private void Update()
@@ -91,6 +131,12 @@ public sealed class TutorialTraitSelectionView : MonoBehaviour
 
         if (toast != null && toast.activeSelf && Time.unscaledTime >= toastHideAt)
             toast.SetActive(false);
+
+        if (deadline.Visible)
+        {
+            deadline.Tick(Time.unscaledDeltaTime);
+            RefreshDeadline(force: false);
+        }
     }
 
     private void Bind(TutorialTraitDirector next)
@@ -203,6 +249,42 @@ public sealed class TutorialTraitSelectionView : MonoBehaviour
         }
 
         cards.Clear();
+    }
+
+    // ── 교착 방지 게이지 ───────────────────────────────────────────────────
+
+    // 게이지는 매 프레임, 텍스트·색은 표시값이 바뀔 때만.
+    private void RefreshDeadline(bool force)
+    {
+        SetActive(deadlineRoot, deadline.Visible);
+        if (!deadline.Visible)
+        {
+            shownDeadlineSeconds = shownDeadlineDone = shownDeadlineCount = -1;
+            return;
+        }
+
+        bool urgent = deadline.IsUrgent;
+        if (deadlineFill != null)
+            deadlineFill.fillAmount = deadline.Fill;
+
+        if (!force && urgent == shownDeadlineUrgent && deadline.DisplaySeconds == shownDeadlineSeconds
+            && deadline.Done == shownDeadlineDone && deadline.Count == shownDeadlineCount)
+            return;
+
+        shownDeadlineUrgent = urgent;
+        shownDeadlineSeconds = deadline.DisplaySeconds;
+        shownDeadlineDone = deadline.Done;
+        shownDeadlineCount = deadline.Count;
+
+        if (deadlineFill != null)
+            deadlineFill.color = urgent ? deadlineUrgentColor : deadlineColor;
+        if (deadlineSecondsText != null)
+        {
+            deadlineSecondsText.text = deadline.FormatSeconds();
+            deadlineSecondsText.color = urgent ? deadlineUrgentColor : deadlineTextColor;
+        }
+        if (deadlineDoneText != null)
+            deadlineDoneText.text = deadline.FormatDone();
     }
 
     // ── 토스트 ─────────────────────────────────────────────────────────────

@@ -138,6 +138,36 @@ public static class TutorialTraitUiAuthoring
             TMP_Text lastNotice = NewText("LastNotice", panel, font, 20f, FontStyles.Italic, TextAlignmentOptions.Center, AccentColor);
             lastNotice.text = TutorialTraitTexts.LastNotice;
 
+            // ── 교착 방지 게이지(창 아래 — 첫 완료자 뒤에만 켜진다, 기본 꺼짐이라 꺼져 있을 땐 레이아웃 변화 없음) ──
+            RectTransform deadline = NewUi("Deadline", panel);
+            VerticalLayoutGroup deadlineLayout = AddVertical(deadline.gameObject, 0, 6f);
+            deadlineLayout.childAlignment = TextAnchor.UpperCenter;
+
+            RectTransform bar = NewUi("Bar", deadline);
+            Image barBackground = bar.gameObject.AddComponent<Image>();
+            barBackground.color = new Color(0.09f, 0.11f, 0.15f, 1f);
+            barBackground.raycastTarget = false;
+            LayoutElement barElement = bar.gameObject.AddComponent<LayoutElement>();
+            barElement.preferredHeight = barElement.minHeight = 14f;
+            RectTransform fillRect = NewUi("Fill", bar);
+            Stretch(fillRect, 2f);
+            Image fill = fillRect.gameObject.AddComponent<Image>();
+            fill.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+            fill.type = Image.Type.Filled;
+            fill.fillMethod = Image.FillMethod.Horizontal;
+            fill.fillOrigin = (int)Image.OriginHorizontal.Left;
+            fill.fillAmount = 1f;
+            fill.color = AccentColor;
+            fill.raycastTarget = false;
+
+            RectTransform deadlineRow = NewUi("Row", deadline);
+            HorizontalLayoutGroup rowLayout = deadlineRow.gameObject.AddComponent<HorizontalLayoutGroup>();
+            rowLayout.childControlWidth = rowLayout.childControlHeight = true;
+            rowLayout.childForceExpandWidth = true;
+            rowLayout.childForceExpandHeight = false;
+            TMP_Text deadlineSeconds = NewText("Seconds", deadlineRow, font, 20f, FontStyles.Bold, TextAlignmentOptions.Left, Color.white);
+            TMP_Text deadlineDone = NewText("Done", deadlineRow, font, 20f, FontStyles.Normal, TextAlignmentOptions.Right, SubtleColor);
+
             // ── 획득 토스트(화면 위쪽 가운데 — 우측 하단·하단 스킬 줄을 피한다) ──
             RectTransform toast = NewUi("Toast", root.transform);
             toast.anchorMin = toast.anchorMax = new Vector2(0.5f, 0.8f);
@@ -159,6 +189,12 @@ public static class TutorialTraitUiAuthoring
             so.FindProperty("lastNoticeText").objectReferenceValue = lastNotice;
             so.FindProperty("cardContainer").objectReferenceValue = cards;
             so.FindProperty("cardTemplate").objectReferenceValue = cardView;
+            so.FindProperty("deadlineRoot").objectReferenceValue = deadline.gameObject;
+            so.FindProperty("deadlineFill").objectReferenceValue = fill;
+            so.FindProperty("deadlineSecondsText").objectReferenceValue = deadlineSeconds;
+            so.FindProperty("deadlineDoneText").objectReferenceValue = deadlineDone;
+            so.FindProperty("deadlineColor").colorValue = AccentColor;
+            so.FindProperty("deadlineTextColor").colorValue = Color.white;
             so.FindProperty("toast").objectReferenceValue = toast.gameObject;
             so.FindProperty("toastText").objectReferenceValue = toastText;
             so.FindProperty("acquiredContainer").objectReferenceValue = list;
@@ -175,6 +211,7 @@ public static class TutorialTraitUiAuthoring
             iconTemplate.gameObject.SetActive(false);
             tooltip.gameObject.SetActive(false);
             toast.gameObject.SetActive(false);
+            deadline.gameObject.SetActive(false);
             window.gameObject.SetActive(false);
 
             PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);

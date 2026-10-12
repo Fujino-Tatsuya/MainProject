@@ -196,4 +196,18 @@ public sealed class TutorialCorridorModelTests
         Assert.IsFalse(TutorialCorridorRules.IsCorridorObjective(TutorialGuideIds.Z4GoBoss));
         Assert.IsFalse(TutorialCorridorRules.IsCorridorObjective(null));
     }
+
+    [Test]
+    public void 특성_게이지는_진행_중_복도_출구를_첫_완료자_뒤_기다릴_때만_보인다()
+    {
+        for (int c = 1; c <= TutorialCorridorRules.CorridorCount; c++)
+            Assert.IsTrue(TutorialCorridorRules.ShouldShowTraitDeadline(c, true, TutorialCorridorRules.ExitGate(c), 42f), $"복도{c}");
+
+        Assert.IsTrue(TutorialCorridorRules.ShouldShowTraitDeadline(2, true, TutorialGate.G4_Zone3Entry, 0f), "0초(만료 직전)도 보인다");
+        Assert.IsFalse(TutorialCorridorRules.ShouldShowTraitDeadline(2, true, TutorialGate.G4_Zone3Entry, -1f), "첫 완료자 전");
+        Assert.IsFalse(TutorialCorridorRules.ShouldShowTraitDeadline(2, false, TutorialGate.G4_Zone3Entry, 30f), "대기 없음(솔로 즉시 완료 등)");
+        Assert.IsFalse(TutorialCorridorRules.ShouldShowTraitDeadline(2, true, TutorialGate.G2_Zone2Entry, 30f), "다른 복도 출구");
+        Assert.IsFalse(TutorialCorridorRules.ShouldShowTraitDeadline(1, true, TutorialGate.G1_Corridor1Entry, 30f), "복도 출구가 아닌 개인 게이트(G1)");
+        Assert.IsFalse(TutorialCorridorRules.ShouldShowTraitDeadline(0, true, TutorialGate.G2_Zone2Entry, 30f), "복도 밖");
+    }
 }
