@@ -8,6 +8,44 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-10-09 · 은희(Claude) · **거너 레이저건 정렬 + 기본 공격 손 이탈**, 브랜치 `fix/GunnerGunAlign`(development `778bbb87` 기준)) — 계획 [PLAN-gunner-gun-align.md](PLAN-gunner-gun-align.md) ✅ 승인 · ✅ S1~S5 구현(미커밋) · ✅ 실제 Animator 레이어 합성 실측(총구 yaw 0°, 손–손잡이 ≤ 5cm) · 보고 영상 `Recordings/gunner_gun_align_report.mp4`(gitignore) · ⏳ Play·MPPM · ⏸ PLAN §6 판정 시작점
+- 원인(Unity 실측): 총은 이미 `rig/artillery` 본에 붙어 있는데 손으로 맞춘 오프셋(09-30)이 **총을 앞뒤로 뒤집어** 총구 yaw ≈174°. 애니는 `LaserGun_Mount` = `artillery` 프레임(오프셋 0)으로 저작됨 — 손 = `Grip_R`/`Grip_L`(Q 는 `Brace_R`) 좌표와 소수점 3자리 일치. + 기본 공격 상체 클립 `attack01` 은 `c_pos` 각도(180°)가 하체 `Q_charge_loop`(146.3°)와 달라, 마스크가 `c_pos` 를 빼므로 팔만 34° 돌아 손이 11~19cm 이탈.
+- 🔴 **수정 예정 — 동시 수정 금지**: `Gunner/Gunner_Armature.prefab` · `GunnerAnimatorController.controller` · `Player/Gunner/GunnerBasicAttack.cs`·`GunnerBasicAttackData.cs` · `GunnerBeamView.cs` · `Player/Editor/GunnerShellAuthoring.cs` · `Docs/tech/player-prefabs.md`.
+
+## ▶▶ 작업 세션 (2026-10-08 · 은희(Claude+claude-alt) · **거너 기본 공격 홀드 연사 → 클릭 단발 + 입력 창**, 브랜치 `fix/GunnerDefaultAttack`) — ✅ 구현 `24aebc9d` · 컴파일 OK · development 반영 · ⏳ Play·MPPM 손맛 확인
+- 클릭 1회 = 준비 동작 → 1발. 직전 발사 + `comboWindowOpen~Close`(초, `GunnerBasicAttackData`) 안 재클릭 → 서버 예약 → `FireInterval` 후 준비 없이 다음 발. 창은 애니 이벤트가 아니라 데이터 시간 값(판정이 시간 기반·발사 클립 배속 재생). 상세 = [character_gunner.md](Docs/design/character/character_gunner.md) §4.
+- 새 수치 2개는 xlsx 미반영 — 병합 Export 전까지 SO 기본값(0.05/0.2).
+
+## ▶▶ 작업 세션 (2026-10-08 · 은희(Claude+Codex) · **사운드 데이터 테이블**, 브랜치 `feature/SoundAssetDataTable`(development `37f97719` 기준, WorkTree2)) — 계획 = [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · ✅ 구현 `8637b802`(Codex) + 예시 키 `UI_Click`(Claude) · EditMode 9/9 · 필드 목록에 `entries[0].*` 11개 확인 · ✅ Play 청취(은희 10-08, BGM·UI_Click) · ✅ xlsx Sound 시트 **SVN r415**(병합 Export, r414 대비 기존 값 변경 0) · ✅ development 반영(10-08)
+- 사용법 = [Docs/tech/data-table.md](Docs/tech/data-table.md) Sound 항목. `AudioManager.Instance.Play("키")` / `Play("키", pos)`. 볼륨·피치 = BroAudio 엔티티 값에 곱하는 배율.
+- `UIClick`·`UI_Click` = BroAudio 엔티티 `SoundLibrary/LobbyLibrary/UI_Click_01`(UI 타입, 클립 `51.Audio/UI/temp_clickSound.mp3`) — `d8fb6fa5`. 클립 .meta 는 **SVN r412** 같이 받을 것(guid `c02d8e2d…`).
+- `AudioManager` 를 `0.BootStrapScene` 에 복구(catalog=SoundCatalog). 8월 씬 정리 때 빠지고 10-06 정리에서 고아 프리팹으로 삭제돼 메인 플로우에 없었다.
+- BGM 3종 엔티티 클립 재연결(Title=`Title_Scene_BGM_03 (2)`, Lobby=`Bureau Lobby`, InGame=`BGM_Factory_Stage_01`) + 그 .meta 를 **SVN r413** 에 등록. 🔴 `51.Audio` 의 .meta 대부분이 SVN 미등록이라 PC 마다 guid 가 달라 BroAudio 클립 참조가 끊긴다 — 새 사운드는 .meta 를 반드시 SVN 에 같이 커밋. 다른 PC 는 update 전 같은 이름 로컬 .meta 삭제. `Slash_01` 은 클립 파일이 없어 미연결.
+- 새 키 추가 = SO 인스펙터(배열 크기), 수치 = xlsx `Sound` 시트.
+## ▶▶ 작업 세션 (2026-10-07 · 은희(Claude+Codex+claude-alt) · **결과 화면 플레이어별 통계**, 브랜치 `feature/ResultStats`) — 계획 [PLAN-result-stats.md](PLAN-result-stats.md) ✅ 승인 · ✅ 1단계 코드(`0c60bb7c`, 컴파일 에러 0 · EditMode 21/21) · ✅ 2단계 ResultScene UI(저작 메뉴 `Tools/UI/Authoring/Result Stats Rows`, 멱등 · 행 프리팹 `2.Prefabs/UI/Result/ResultPlayerRow.prefab`) · ✅ MPPM 3인 ML-Agent QA(10-08, `MainProject-MLAgent` 의 `qa/ResultStats`): 중도 종료·전멸·클리어 모두 3피어 값 동일·화면 행·"나" 일치·서버 독립 집계 일치. 간파(카운터)만 미검증 · 미푸시
+- 🔴 **수정 예정 — 동시 수정 금지**: `Managers/SessionStatsTracker.cs`·`SessionResult.cs`·`MapSceneManager.cs`·`UI/ResultStatsView.cs`·`Unit/Unit.cs`(ApplyHealthDamage 이벤트)·`Player/Life/PlayerLifeCycleController.cs`(서버 정적 통지)·`Boss/TwentyThreeBoss.cs`·`GauntletBot.cs`·`SpinnerBot.cs`·`WallBot.cs`(간파 성공 이벤트 1줄씩 — 경석 공유 = [handoff](Docs/tech/handoff-result-stats-monster-hooks.md))·`5.ResultScene.unity`(2단계). `MonsterBase.cs`·`PartyWipeWatcher.cs` 는 결국 안 바뀜(getter 는 `Unit`).
+- 신규: `Unit/CombatStatsEvents.cs`·`Managers/SessionStatsAggregator.cs`·`SessionResultPayload.cs`·`UI/ResultPlayerRowView.cs`·테스트 `Managers/Editor/*` + 러너 `Tools/Tests/결과 통계 EditMode 테스트 실행`.
+- 팀 규칙 변경(10-07 은희): **PR 없음** — 본인이 `development` 직접 병합, 타 영역 변경은 `Docs/tech/handoff-*.md` 로 공유([workflow.md](Docs/tech/workflow.md)).
+
+## ▶▶ 작업 세션 (2026-10-08 · 은희(Claude) · **`feature/Assassin` → `development` 반영**) — ✅ 완료
+- development(FloatingDamageShare 포함) 를 Assassin 에 머지(`9bed0270`, 충돌 = `art-svn.json` 핀만 → r407) 후 development 빨리 감기. SVN **r407** 같이 받을 것.
+- 이번에 development 로 들어간 것: 어쌔신 로비 노출 · 옵션 "Hold Skill: Toggle" · 대시 재충전 중 AimIndicator 어둡게 · Dev Boot 캐릭터 드롭다운(`DevBootCharacterCatalog`) · 보스 제한 600초 · xlsx 밸런스(23호 HP 10000·팔라딘 220) · 데이터 테이블 빌드 원복 수정.
+- SVN 정리: 은희 PC 의 로컬 guid 재생성 `.meta` 6개 SVN 값으로 되돌림 · `Interrupt.png` guid 를 가로채던 미버전 복사본 `Common_Skill_Interrupt_Icon.png` 제거 · r405 에서 빠진 `Common_DashIcon`/`Common_DashSlotIcon` `.meta` 를 **r410** 커밋.
+
+## ▶▶ 작업 세션 (2026-10-07 · 은희(Claude) · **은희 PC Unity MCP → 공식 MCP 전환**(개인 환경, 팀 파일 무변경), 브랜치 `feature/Assassin`) — ✅ 완료
+- 원인(Codex 분석): 경석 포크 `McpServer.OnAfterAssemblyReload()` 가 머신 전역 `EditorPrefs("MCP_Port")` 로 먼저 Start → 리로드마다 다른 워크트리 포트 선점·재시도 10회 소진 정지. 포크 수정은 경석 영역이라 미착수.
+- 은희 PC 4 워크트리에 `com.unity.ai.assistant`(2.20.0-pre.2) 임베디드(git exclude, `packages-lock.json` skip-worktree) · 각 `.mcp.json` `unity` = `relay_win.exe --mcp --project-path <워크트리>` · codex-watcher `-c` 로 레인 project-path · claude-alt 프롬프트 갱신. 도구 = `Unity_RunCommand`(C# 실행)·`Unity_GetConsoleLogs`.
+- 🔸 Codex/claude-alt: Refresh = `AssetDatabase.Refresh()`, 메뉴 = `EditorApplication.ExecuteMenuItem`, Play 진입 금지(도구 차단 없음). 리로드 중 "Unity not detected" 는 ~10초 뒤 재호출.
+- 같이 커밋: `99d99119` preloadedAssets 죽은 guid 제거 · `ba24ac2e` link.xml 부산물 제거.
+- ✅ 10-07 스모크 테스트(MainProject 레인, 읽기 전용): Codex(서버명 `unity_mcp`)·claude-alt(`unity`, 지연 로드 → ToolSearch) 둘 다 MainProject 에디터에 정확히 붙음 · Refresh·컴파일 상태·콘솔 OK. ⏳ 도메인 리로드 후 재연결은 미검증(변경 없어 리로드 안 일어남) — 첫 `.cs` 위임 때 확인.
+
+## ▶▶ 작업 세션 (2026-10-07 · 은희(Claude) · **팔라딘 평타 전진 복구 + 공격속도 ×1.2 + 간파 선딜 0.25**, 브랜치 `fix/PaladinDAForward`) — 계획 [PLAN-paladin-da.md](PLAN-paladin-da.md) ✅ 승인 · ✅ C1~C4 구현(진행 = PLAN §7) · SVN **r404** 같이 받을 것 · ⏳ 은희 Play · 미푸시
+- 🔴 **수정 예정 — 동시 수정 금지**: `Player/DefaultAttackController.cs`·`DefaultAttackData.cs`·`4.Animations/Player/PlayerAnimatorController.controller`·`Garen_Default_Attack_1~4.anim`·`9.ScriptableObject/Player/Garen/PlayerDefaultAttackData.asset`·`FirstMeleeInterruptSkillData.asset`·`GameData.xlsx`(SVN 잠금).
+
+## ▶▶ 작업 세션 (2026-10-07 · 은희(Claude+Codex) · **데미지 플로팅 멀티 공유**, 브랜치 `feature/FloatingDamageShare`(development `3217a052` 기준, WorkTree2)) — ✅ 구현 `b2bdb73f`(Codex) · EditMode 23/23 · ✅ MPPM 2인 Play 확인(은희 10-07) · ✅ development 반영(10-08)
+- `FloatingDamageSettings.asset` 표시 필터 = `AllWithOwnEmphasis`: 전원 숫자 표시, **내 것 = 1.0배·알파 255 / 팀원 것 = 0.75배·알파 200**(SO `teammateScaleMultiplier`·`teammateAlpha`, `[DataTableIgnore]`). 판정 = 순수 `FloatingDamageDisplayPolicy`(일반·허수아비 경로 공용). RPC·권한·누적 키 변경 없음. 상세 = [floating-damage-design.md](Docs/tech/floating-damage-design.md).
+- Play 확인 항목(✅ 통과): 호스트·클라 각자 내 숫자 크고 진함 / 팀원 숫자 작고 반투명, 끝에 1.0배로 안 튐 / 공격자별 누적 안 섞임 / 내가 맞은 숫자 계속 미표시.
+
 ## ▶▶ 작업 세션 (2026-10-06 · 은희(Claude+Codex) · **3번째 캐릭터 어쌔신**, 브랜치 `feature/Assassin`) — 계획 [PLAN-assassin.md](PLAN-assassin.md) ✅ 승인 · ✅ A0~A10·A12(`0294cb47`, 진행 = PLAN §8) · ⏸ A11 백어택(경석 OK 대기) · ⏳ A13 xlsx · SVN **r403** 같이 받을 것(단검·GameData.xlsx Assassin 시트) · A7~ 은 claude-alt(다른 계정 Claude) 위임 · ⏳ 은희 Play 회귀(A1~A5) + 어쌔신 전 키트
 - 기획 사본 = [character_assassin.md](Docs/design/character/character_assassin.md)(맨 아래 「구현 결정」 우선). 아트 = SVN `50.Art/Char/assassin/` v16 · 클립은 git `4.Animations/Player/Assassin/` 로 이전.
 - 🔴 코어 변경 포함: 플레이어 **SuperArmor = 몬스터와 같은 의미**(CC·잡기 거부) · 스킬 쿨 장부 스킬 단위 + 슬롯 교체 · 간파 베이스 추출 · 캐릭터 HUD = `<Char>_Armature/HUD`(거너 과열 게이지 이동).

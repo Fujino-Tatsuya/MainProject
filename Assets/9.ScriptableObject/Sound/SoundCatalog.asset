@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: SoundCatalog
   m_EditorClassIdentifier: Assembly-CSharp::SoundCatalog
   <UIClick>k__BackingField:
-    _entity: {fileID: 0}
+    _entity: {fileID: 11400000, guid: 78cd41f7b31014f489c031a2fcc66c12, type: 2}
     ID: 0
     <DebugObject>k__BackingField: {fileID: 0}
   <TitleBGM>k__BackingField:
@@ -28,3 +28,19 @@ MonoBehaviour:
     _entity: {fileID: 11400000, guid: 14c673f85161ec243afda024dec1335a, type: 2}
     ID: 0
     <DebugObject>k__BackingField: {fileID: 0}
+  entries:
+  - key: UI_Click
+    sound:
+      _entity: {fileID: 11400000, guid: 78cd41f7b31014f489c031a2fcc66c12, type: 2}
+      ID: 0
+      <DebugObject>k__BackingField: {fileID: 0}
+    volumeMultiplier: 1
+    pitchMultiplier: 1
+    pitchRandomMin: 1
+    pitchRandomMax: 1
+    is3D: 0
+    minDistance: 1
+    maxDistance: 500
+    maxSimultaneous: 0
+    retriggerCooldown: 0
+    description: "UI \uD074\uB9AD(\uC608\uC2DC\xB7\uAC80\uC99D\uC6A9)"

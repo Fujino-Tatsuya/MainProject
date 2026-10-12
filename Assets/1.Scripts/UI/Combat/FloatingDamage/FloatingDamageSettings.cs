@@ -25,6 +25,48 @@ public enum FloatingDamageDisplayFilter
     AllWithOwnEmphasis
 }
 
+public readonly struct FloatingDamageDisplayDecision
+{
+    public readonly bool shouldDisplay;
+    public readonly float scaleMultiplier;
+    public readonly float alphaMultiplier;
+
+    public FloatingDamageDisplayDecision(bool shouldDisplay, float scaleMultiplier, float alphaMultiplier)
+    {
+        this.shouldDisplay = shouldDisplay;
+        this.scaleMultiplier = scaleMultiplier;
+        this.alphaMultiplier = alphaMultiplier;
+    }
+}
+
+/// <summary>표시 필터와 로컬 공격 여부만으로 팝업 표시·강조 스타일을 정한다.</summary>
+public static class FloatingDamageDisplayPolicy
+{
+    public static FloatingDamageDisplayDecision Evaluate(
+        FloatingDamageDisplayFilter filter,
+        bool fromLocalPlayer,
+        float teammateScaleMultiplier,
+        float teammateAlpha)
+    {
+        switch (filter)
+        {
+            case FloatingDamageDisplayFilter.OwnDealtOnly:
+                return new FloatingDamageDisplayDecision(fromLocalPlayer, 1f, 1f);
+
+            case FloatingDamageDisplayFilter.AllWithOwnEmphasis:
+                return fromLocalPlayer
+                    ? new FloatingDamageDisplayDecision(true, 1f, 1f)
+                    : new FloatingDamageDisplayDecision(
+                        true,
+                        Mathf.Max(0f, teammateScaleMultiplier),
+                        Mathf.Clamp01(teammateAlpha));
+
+            default:
+                return new FloatingDamageDisplayDecision(true, 1f, 1f);
+        }
+    }
+}
+
 [Serializable]
 public struct FloatingPopupRequest
 {
@@ -121,6 +163,12 @@ public sealed class FloatingDamageSettings : ScriptableObject
     [Header("표시 필터")]
     [SerializeField] FloatingDamageDisplayFilter displayFilter = FloatingDamageDisplayFilter.OwnDealtOnly;
 
+    [Header("팀원 스타일 (내 데미지 강조 필터)")]
+    [Tooltip("AllWithOwnEmphasis에서 팀원 데미지 숫자에 곱할 크기 배율.")]
+    [SerializeField, Min(0f), DataTableIgnore] float teammateScaleMultiplier = 0.75f;
+    [Tooltip("AllWithOwnEmphasis에서 팀원 데미지 숫자의 최대 알파. 페이드 전체에 곱한다.")]
+    [SerializeField, Range(0f, 1f), DataTableIgnore] float teammateAlpha = 200f / 255f;
+
     [Header("화면")]
     [SerializeField] Vector2 referenceResolution = new Vector2(1920f, 1080f);
     [SerializeField] int canvasSortingOrder = 50;
@@ -189,6 +237,8 @@ public sealed class FloatingDamageSettings : ScriptableObject
     };
 
     public FloatingDamageDisplayFilter DisplayFilter => displayFilter;
+    public float TeammateScaleMultiplier => teammateScaleMultiplier;
+    public float TeammateAlpha => teammateAlpha;
     public Vector2 ReferenceResolution => referenceResolution;
     public int CanvasSortingOrder => canvasSortingOrder;
     public Vector2 ScreenEdgePadding => screenEdgePadding;

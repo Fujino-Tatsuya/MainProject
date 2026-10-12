@@ -58,7 +58,7 @@ Alive
 - 사망 직후 특정 연출시간 동안 유지.
 - 모든 게임플레이 입력 차단.
 - Hurtbox Collider 비활성.
-- CombatUI 숨김.
+- CombatUI는 Persistent 레이어(체력 비네팅, 검게)만 표시 — Combat·BossInfo 숨김.
 - 임시 상태/무적 Token/Blink 제거.
 - 전투 사망은 원위치, 추락 사망은 Float Camera 상태에서 계속 낙하 가능.
 
@@ -74,7 +74,8 @@ Alive
 
 ### PermanentDead
 
-- CombatUI 숨김.
+- CombatUI는 Persistent + BossInfo(보스 HP) + Spectate 레이어만 표시 — Combat(내 HP·스킬바 등) 숨김.
+  레이어 규칙: `CombatHudLayerRules`, 적용: `PlayerCombatUiLifecyclePolicy`(CanvasGroup).
 - 모든 게임플레이 입력 차단.
 - `CameraTargetSwitcher`의 `[`/`]` 관전 입력 활성화.
 - Alive/Soul Player만 관전 후보.

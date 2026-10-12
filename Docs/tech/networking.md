@@ -112,13 +112,19 @@
 - Client UI displays remaining gameplay time as `expiresAtGameTime - synchronizedGameTime`.
 - If a Client UI timer reaches 0 before receiving the server-confirmed gameplay event, only the UI display reaches 0.
 - Actual gameplay state changes occur only when confirmed by the server.
-- `GameTime` is not synchronized every frame. Clients calculate display-only `GameTime` from synchronized baseline values and pause/resume state.
+- `GameTime` is not synchronized every frame. Clients calculate display-only `GameTime` from synchronized baseline values, pause/resume state, and slow-motion events.
 - Solo host-only play uses the same clock manager after `StartHost()` succeeds.
 - In Solo host-only play, opening the option panel with `Esc` pauses `GameTime`.
 - In multiplayer, pressing `Esc` opens only the local option panel and does not pause `GameTime`.
 - While a multiplayer option panel is open, that player's gameplay input is blocked, but the character remains in the world and can still be hit by server-authoritative gameplay.
 - When `GameTime` is paused, gameplay objects, Ability flow, gameplay UI timers, combat animations/VFX, cooldowns, status effects, bombs, area effects, projectiles, boss patterns, and phase timings are paused.
-- NetworkManager time, transport timeouts, connection state, menu UI input, option panel UI, loading spinners, and other non-gameplay UI continue using real time.
+- `GameTime` also runs slower during an interrupt slow motion (session-wide, not per player). In code, `GameTime` = `NetworkClock.GameNow` = `ServerTime` − paused total − time lost to slow motion.
+  - Only the server triggers or fails a slow motion (when it approves an interrupt predicted to hit). It applies the event to its own timeline and sends it to all clients. Each peer then sets `Time.timeScale` through the global `GlobalTimeScale` layer (NetworkManager prefab), using the same closed-form timeline.
+  - Gameplay that reads `GameNow` or scaled `Time.deltaTime` slows together: cooldowns, status effects, the boss time limit (`BossTimerManager`), combat VFX/animation, and combat HUD effects.
+  - Clients receive the start event one-way-latency late. `GameNow` is clamped so it never runs backward, so client display may differ from the server briefly. This is accepted.
+  - Cutscene locks and scene transitions refuse slow motion or reset it to 1.0 immediately. Session end restores `Time.timeScale` = 1.
+  - Details, values, and the commit plan are in [PLAN-interrupt-slowmo.md](../../PLAN-interrupt-slowmo.md). Tuning values are in the `SlowMotion` sheet of the data table ([data-table.md](data-table.md)).
+- NetworkManager time, transport timeouts, connection state, menu UI input, option panel UI, loading spinners, and other non-gameplay UI continue using real time. They are unaffected by both pause and slow motion (use `Time.unscaledDeltaTime` / `ServerTime`).
 - The project does not use a generic individual timer pause system.
 - Special mechanics that stop their own countdown, such as bomb fuse timing while flying, are handled as object-specific state rules instead of generic timer pause.
 - Lobby countdowns are separate from combat `GameTime`.

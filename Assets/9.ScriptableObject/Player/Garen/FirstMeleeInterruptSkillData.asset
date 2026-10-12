@@ -38,6 +38,6 @@ MonoBehaviour:
     m_Bits: 0
   animatorStateName: Interrupt
   snapRotationOnStart: 1
-  hitDelay: 0.15
+  hitDelay: 0.25
   skillDuration: 0.6
   maxHitResults: 8

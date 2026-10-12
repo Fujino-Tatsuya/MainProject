@@ -45,15 +45,17 @@ public sealed class TrainingDummyDamagePresenter : MonoBehaviour
         FloatingDamageSpawner spawner = FloatingDamageSpawner.Instance;
         if (spawner != null && spawner.Settings != null)
         {
-            // 전용 경로라 필터를 직접 존중한다. AllDamage·AllWithOwnEmphasis 는 전부 띄우고,
-            // OwnDealtOnly 는 내가 때린 것만 띄운다.
-            bool suppressed =
-                spawner.Settings.DisplayFilter == FloatingDamageDisplayFilter.OwnDealtOnly &&
-                !fromLocalPlayer;
+            FloatingDamageDisplayFilter filter = spawner.Settings.DisplayFilter;
+            FloatingDamageDisplayDecision decision = FloatingDamageDisplayPolicy.Evaluate(
+                filter,
+                fromLocalPlayer,
+                spawner.Settings.TeammateScaleMultiplier,
+                spawner.Settings.TeammateAlpha);
 
-            if (!suppressed)
+            if (decision.shouldDisplay)
                 spawner.Submit(new FloatingPopupRequest(_dummy, PopupKind.Damage, damage.amount,
-                    fromLocalPlayer, damage.attackerClientId, damage.attackType, damage.hitPattern));
+                    filter != FloatingDamageDisplayFilter.AllDamage && fromLocalPlayer,
+                    damage.attackerClientId, damage.attackType, damage.hitPattern));
         }
 
         if (fromLocalPlayer)

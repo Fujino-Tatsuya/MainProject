@@ -337,6 +337,7 @@ public class WallBot : MonsterBase
         if (!IsServer || !attackInfo.isInterruptAttack || Counter == null) return;
         if (!Counter.TryConsumeInterrupt()) return;
 
+        CombatStatsEvents.RaiseServerCounterSucceeded(this, DamageAttackerClientId); // 결과 화면 통계(판정 무관)
         CounterSucceeded();
     }
 

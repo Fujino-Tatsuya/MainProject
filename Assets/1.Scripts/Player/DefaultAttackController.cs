@@ -54,6 +54,7 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
 {
     private static readonly int DefaultAttackHash = Animator.StringToHash("DefaultAttack");
     private static readonly int AttackIndexHash = Animator.StringToHash("AttackIndex");
+    private static readonly int AttackSpeedHash = Animator.StringToHash("AttackSpeed");
     private static readonly int IdleHash = Animator.StringToHash("Idle");
     private static readonly int MoveHash = Animator.StringToHash("Walk");
     private const float TailToMovementBlendSeconds = 0.05f;
@@ -132,7 +133,8 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
     public bool IsAttacking => player != null && player.CurrentState == PlayerActionState.Attack;
     public bool CanRequestStart => HasAttackSteps && CurrentStepDuration > 0f;
     public bool CanStartApprovedAttack => HasAttackSteps && CurrentStepDuration > 0f;
-    public bool CanBeCanceledByDash => false; // 콤보 중 대시 입력은 무시(기존 동작)
+    // 콤보 중 언제든 대시로 끊는다(할 일 9). 판정이 나갔으면 피해는 그대로, 남은 동작·예약만 끊긴다(CancelCurrentAttack).
+    public bool CanBeCanceledByDash => true;
     private bool HasGameplayAuthority => !IsNetworkActive || IsServer;
 
     private void Awake()
@@ -632,7 +634,7 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
         currentAttackIndex = attackIndex;
         attackDirection = ResolveAttackDirection(direction);
         queuedAttackDirection = attackDirection;
-        attackEndFallbackTime = Time.time + step.MotionDuration + Mathf.Max(0f, endFallbackPadding);
+        attackEndFallbackTime = Time.time + GetPlaybackDuration(step) + Mathf.Max(0f, endFallbackPadding);
 
         int damageSnapshot = CalculateDamageSnapshot(step);
         playerDefaultAttack.PrepareStep(step, damageSnapshot, attackDirection);
@@ -655,11 +657,17 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
 
         DefaultAttackStep step = attackSteps[attackIndex];
         currentAttackIndex = attackIndex;
+        // 새 공격이 직전 공격의 꼬리를 대신한다. 꼬리 플래그가 남으면(같은 스텝 클립을 다시 틀면
+        // HandleAnimatorMove 가 영영 못 내린다) 이번 공격을 대시로 끊을 때 CancelCurrentAttack 이
+        // 정상 종료 캐스케이드로 오인해 Idle 전환·EndDefaultAttackClientRpc 를 건너뛴다.
+        isFinishingAttackTail = false;
+        finishingAttackIndex = -1;
         attackDirection = ResolveAttackDirection(direction);
         moveRemaining = step.MovementType == DefaultAttackMovementType.ScriptedForwardDistance
             ? Mathf.Max(step.ForwardDistance, 0f)
             : 0f;
-        moveSpeed = step.MotionDuration > 0f ? moveRemaining / step.MotionDuration : 0f;
+        float playbackDuration = GetPlaybackDuration(step);
+        moveSpeed = playbackDuration > 0f ? moveRemaining / playbackDuration : 0f;
 
         if (step.RotationType == DefaultAttackRotationType.SnapOnStart)
             movement.RotateImmediately(attackDirection);
@@ -670,6 +678,7 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
             return;
 
         animator.SetInteger(AttackIndexHash, currentAttackIndex);
+        animator.SetFloat(AttackSpeedHash, AttackSpeed);
 
         if (triggerAttack)
             animator.SetTrigger(DefaultAttackHash);
@@ -866,6 +875,12 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
     }
 
     private float CurrentStepDuration => HasAttackStep(0) ? attackSteps[0].MotionDuration : 0f;
+
+    // 테이블 모드 Play 는 시작 때 SO 값을 덮어쓰므로 캐싱하지 않고 매번 읽는다.
+    private float AttackSpeed => attackData != null ? Mathf.Max(attackData.AttackSpeed, 0.1f) : 1f;
+
+    // MotionDuration 은 클립 타임라인 기준이라 실제 재생 시간은 공격속도로 나눈다.
+    private float GetPlaybackDuration(DefaultAttackStep step) => step.MotionDuration / AttackSpeed;
 }
 
 [Serializable]

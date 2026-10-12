@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
 using UnityEngine.InputSystem;
 using Unity.Netcode;
+using UnityEngine.Rendering.Universal;
 
 public class PlayerAimIndicator : NetworkBehaviour
 {
@@ -8,6 +9,16 @@ public class PlayerAimIndicator : NetworkBehaviour
     [SerializeField] private float indicator_rot_offset;
     [SerializeField] private Camera targetCamera;
     [SerializeField] private LayerMask groundMask;
+
+    [Tooltip("대시 재충전 중 인디케이터 원래 색에 곱하는 색. 충전되면 원래 색으로 돌아간다.")]
+    [SerializeField] private Color dashCooldownTint = new Color(0.3f, 0.3f, 0.3f, 1f);
+
+    private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
+
+    private PlayerDashController dash;
+    private Material indicatorMaterial; // 인스턴스 — 프리팹 애셋 오염 금지
+    private Color indicatorBaseColor;
+    private bool? lastDashReady;
 
     public Vector3 AimDirection { get; private set; }
 
@@ -27,6 +38,17 @@ public class PlayerAimIndicator : NetworkBehaviour
             targetCamera = Camera.main;
 
         indicator_rot_offset = 90.0f;
+
+        dash = GetComponent<PlayerDashController>();
+        CacheIndicatorMaterial();
+    }
+
+    public override void OnDestroy()
+    {
+        if (indicatorMaterial != null)
+            Destroy(indicatorMaterial);
+
+        base.OnDestroy();
     }
 
     public override void OnNetworkSpawn()
@@ -43,6 +65,33 @@ public class PlayerAimIndicator : NetworkBehaviour
             return;
 
         UpdateAimDirection();
+        UpdateDashTint();
+    }
+
+    private void CacheIndicatorMaterial()
+    {
+        if (indicator == null || !indicator.TryGetComponent(out DecalProjector projector) || projector.material == null)
+            return;
+
+        indicatorMaterial = new Material(projector.material);
+        projector.material = indicatorMaterial;
+        indicatorBaseColor = indicatorMaterial.HasProperty(BaseColorId)
+            ? indicatorMaterial.GetColor(BaseColorId)
+            : Color.white;
+    }
+
+    // 대시 재충전 중엔 어둡게, 충전되면 원래 색. 오너 예측 장부 기준이라 로컬 플레이어에만 의미가 있다.
+    private void UpdateDashTint()
+    {
+        if (indicatorMaterial == null || dash == null)
+            return;
+
+        bool ready = dash.IsReady;
+        if (lastDashReady == ready)
+            return;
+
+        lastDashReady = ready;
+        indicatorMaterial.SetColor(BaseColorId, ready ? indicatorBaseColor : indicatorBaseColor * dashCooldownTint);
     }
 
     private void UpdateAimDirection()

@@ -151,7 +151,7 @@ YAML 기준 MapScene에는 총 10개의 씬 배치 `NetworkObject`가 존재한�
 | Map 생성 | 씬 배치 `MapNetworkSync.OnNetworkSpawn` | 같은 seed로 각 피어 로컬 존 생성, 서버만 몬스터 spawn (`MapNetworkSync.cs:35-56`, `MapContentSpawner.cs:16-110`) | 생성이 NGO 씬 배치 spawn 루프 안에서 재진입한다. 생성 오류를 로딩 실패로 승격하지 않음. |
 | 플레이어 생성 | target `LoadEventCompleted` | 서버가 client별 prefab instantiate 후 `SpawnAsPlayerObject` (`NetworkLoadingFlowController.cs:439-514`) | 트리거가 단일 이벤트에 결박됨. late join 경로 없음. |
 | Map → Boss | 별도 씬 전환 없음 | MapScene 내부 `BossTeleportManager`, `BossEncounterDirector` | 보스는 동일 씬의 상태 전환이다. |
-| Boss/전멸 → Result | 서버 `MapSceneManager.GoToResult` | named message 송신 후 각 피어 로컬 Single (`MapSceneManager.cs:82-98`, `:140-150`, `:207-268`) | NGO가 관리하던 MapScene을 NGO 밖에서 제거한다. |
+| Boss/전멸/ExitButton → Result | 서버 `MapSceneManager.GoToResult` | 결과 확정(`SessionStatsTracker.Capture` — 전멸·클리어는 호출자가 먼저, ExitButton 은 `GoToResult` 가 `Aborted` 로) → named message(`SessionResultPayload` 가변 페이로드: 결과 종류·플레이 시간·플레이어별 행, 상한 8행) 송신 후 각 피어 로컬 Single (`MapSceneManager.cs:86-106`, `:149-159`, `:216-279`) | NGO가 관리하던 MapScene을 NGO 밖에서 제거한다. 통계는 전환 전에 확정해 페이로드로 보낸다(Result 시점엔 플레이어 NetworkObject 가 없다). |
 | Result → Lobby | Result 버튼 → `GameManager.GoToLobby` | 각 피어 로컬 Single (`ResultSceneManager.cs:27-...`, `GameManager.cs:171-177`) | 세션 종료/유지 정책과 동기화 barrier가 없다. |
 
 ## 7. 로딩 성공/실패 판정 결함

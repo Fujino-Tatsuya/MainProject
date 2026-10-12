@@ -106,9 +106,8 @@ public static class DataSourcePlayMode
 
         DataTableSnapshot snapshot = DataTableApplier.ApplyInMemory(result.Writes);
         SessionState.SetString(SnapshotSessionKey, JsonUtility.ToJson(snapshot));
-        // 테이블 Play 중엔 이 에셋들의 저장을 막는다(DataTableSaveGuard) — 메모리의 테이블 값이 디스크로 새는 걸 막는다.
-        SessionState.SetString(GuardedPathsSessionKey, string.Join("\n",
-            result.Writes.Select(w => AssetDatabase.GetAssetPath(w.Target)).Where(p => p.Length > 0).Distinct()));
+        // 복구 전까지 이 에셋들의 저장을 막는다(DataTableSaveGuard) — 메모리의 테이블 값이 디스크로 새는 걸 막는다.
+        SetGuardedPaths(result.Writes.Select(w => AssetDatabase.GetAssetPath(w.Target)));
         SessionState.SetString(BadgeSessionKey, "DATA: TABLE");
         snapshotTargets = null;
         warnedTargets.Clear();
@@ -136,7 +135,7 @@ public static class DataSourcePlayMode
         snapshotTargets = null;
         DataTableSnapshot snapshot = JsonUtility.FromJson<DataTableSnapshot>(json);
         int missing = snapshot == null ? -1 : DataTableApplier.Restore(snapshot);
-        SessionState.EraseString(GuardedPathsSessionKey); // 원래 값으로 돌아왔으니 저장해도 된다
+        SetGuardedPaths(null); // 원래 값으로 돌아왔으니 저장해도 된다
         if (missing != 0)
         {
             Debug.LogError($"{LogPrefix}테이블 Play 복구 중 SO {(missing < 0 ? "스냅샷을 읽지 못함" : missing + "개를 찾지 못함")} — " +
@@ -190,7 +189,20 @@ public static class DataSourcePlayMode
         return blocked.Length == 0 ? paths : paths.Where(p => !guarded.Contains(p)).ToArray();
     }
 
-    /// <summary>지금 저장을 막아야 하는 에셋 경로(테이블 Play 중일 때만 채워져 있다).</summary>
+    /// <summary>저장을 막을 에셋 경로를 정한다. null·빈 목록이면 가드를 푼다.</summary>
+    internal static void SetGuardedPaths(IEnumerable<string> paths)
+    {
+        string joined = paths == null ? string.Empty : string.Join("\n", paths.Where(p => !string.IsNullOrEmpty(p)).Distinct());
+        if (joined.Length == 0)
+        {
+            SessionState.EraseString(GuardedPathsSessionKey);
+            return;
+        }
+
+        SessionState.SetString(GuardedPathsSessionKey, joined);
+    }
+
+    /// <summary>지금 저장을 막아야 하는 에셋 경로(테이블 Play 준비부터 복구가 끝날 때까지만 채워져 있다).</summary>
     internal static HashSet<string> GuardedPaths()
     {
         string joined = SessionState.GetString(GuardedPathsSessionKey, string.Empty);
@@ -201,23 +213,23 @@ public static class DataSourcePlayMode
 }
 
 /// <summary>
-/// 테이블 Play 중 저장(Save Project·Ctrl+S·다른 툴의 SaveAssets)이 테이블이 덮어쓴 SO·프리팹을 디스크에 쓰지 못하게 막는다.
+/// 테이블 값이 메모리에 있는 동안 저장(Save Project·Ctrl+S·다른 툴의 SaveAssets)이 테이블이 덮어쓴 SO·프리팹을 디스크에 쓰지 못하게 막는다.
 /// 막지 않으면 메모리에만 있어야 할 테이블 값이 에셋 파일에 저장된다 — 2026-10-02 `Player_Gunner.prefab` maxHp 9999 가 이렇게 새어 나왔다.
+/// <para>
+/// 🔴 켜고 끄는 기준은 Play 여부가 아니라 <see cref="DataSourcePlayMode.GuardedPaths"/>(스냅샷 복구 전까지 채워져 있음)다.
+/// Play 가 끝난 직후(EnteredEditMode)엔 isPlaying 이 false 인데 복구는 아직일 수 있다 — 핸들러 순서가 정해져 있지 않아
+/// DevBootLauncher 의 SaveAssets 가 먼저 돌면 Player_Gunner·Player_Paladin 에 테이블 값이 저장됐다(10-09 재발).
+/// </para>
 /// 그 에셋을 정말 고쳐야 하면 Play 를 끝내고(값이 원래대로 돌아온 뒤) 저장한다.
 /// </summary>
 internal sealed class DataTableSaveGuard : AssetModificationProcessor
 {
     private static string[] OnWillSaveAssets(string[] paths)
     {
-        if (!EditorApplication.isPlayingOrWillChangePlaymode)
-        {
-            return paths;
-        }
-
         string[] allowed = DataSourcePlayMode.FilterSaves(paths, DataSourcePlayMode.GuardedPaths(), out string[] blocked);
         if (blocked.Length > 0)
         {
-            Debug.LogWarning("[DataTable] 테이블 Play 중이라 테이블이 덮어쓴 에셋은 저장하지 않았다(메모리의 테이블 값이 파일로 새지 않게): " +
+            Debug.LogWarning("[DataTable] 테이블 Play 값이 아직 복구되지 않아 테이블이 덮어쓴 에셋은 저장하지 않았다(메모리의 테이블 값이 파일로 새지 않게): " +
                              string.Join(", ", blocked) + " — 고쳐야 하면 Play 를 끝내고 저장할 것.");
         }
 

@@ -70,8 +70,11 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
 
     private void Awake() => Instance = this;
 
+    private void OnDisable() => InteractPrompt.Hide(this);
+
     public override void OnDestroy()
     {
+        InteractPrompt.Hide(this);
         if (Instance == this) Instance = null;
         base.OnDestroy();
     }
@@ -96,6 +99,7 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
     public override void OnNetworkDespawn()
     {
         gates.OnListChanged -= HandleGatesChanged;
+        InteractPrompt.Hide(this);
         base.OnNetworkDespawn();
     }
 
@@ -151,7 +155,7 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
         if (gate == null) return;
         _localGates.Remove(gate.SlotID);
         _appliedMask.Remove(gate);
-        if (_highlightGate == gate) { _highlightGate = null; _highlightPanel = -1; }
+        if (_highlightGate == gate) { _highlightGate = null; _highlightPanel = -1; InteractPrompt.Hide(this); }
     }
 
     // ── 입력 (각 피어 로컬) ────────────────────────────────────────────────
@@ -262,6 +266,14 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
         _highlightGate = gate;
         _highlightPanel = panel;
         if (gate != null) gate.SetPanelHighlighted(panel, true);
+
+        // F 프롬프트는 외곽선과 같은 선택을 따른다(별도 거리 판정 없음). 뷰는 패널 자식 InteractPrompt 인스턴스 — 없으면 Show 가 경고한다.
+        if (gate != null)
+        {
+            gate.TryGetPromptView(panel, out InteractPromptView view);
+            InteractPrompt.Show(this, view);
+        }
+        else InteractPrompt.Hide(this);
     }
 
     private bool TryFindNearestPanel(Vector3 from, out int slotID, out int panelIndex,

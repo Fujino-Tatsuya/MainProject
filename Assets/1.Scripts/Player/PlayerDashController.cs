@@ -24,6 +24,7 @@ public class PlayerDashController : NetworkBehaviour
     private PlayerInputReader input;
     private PlayerStateController stateController;
     private PlayerMovement movement;
+    private PlayerAimIndicator aim;
     private StatusEffectController statusEffects;
     private PlayerInvulnerability invulnerability;
     private PlayerEncounterLock encounterLock;
@@ -80,6 +81,7 @@ public class PlayerDashController : NetworkBehaviour
         input = GetComponent<PlayerInputReader>();
         stateController = GetComponent<PlayerStateController>();
         movement = GetComponent<PlayerMovement>();
+        aim = GetComponent<PlayerAimIndicator>();
         statusEffects = GetComponent<StatusEffectController>();
         invulnerability = GetComponent<PlayerInvulnerability>();
         encounterLock = GetComponent<PlayerEncounterLock>();
@@ -503,8 +505,19 @@ public class PlayerDashController : NetworkBehaviour
             predictedLedger.ForceReset(1, OwnerNow());
     }
 
+    // 대시는 커서 방향으로 나간다(모든 캐릭터 공통). 조준은 오너 로컬에서만 갱신되므로 이 값은
+    // 오너가 계산해 요청 RPC로 서버에 보낸다. 대시 상태 진입 시 캐릭터도 이 방향으로 즉시 돌아선다.
+    // 조준이 아직 없을 때(카메라 미준비 등)만 이동 입력 → 정면 순으로 폴백한다.
     private Vector3 ResolveDashDirection()
     {
+        if (aim != null)
+        {
+            Vector3 aimDir = aim.AimDirection;
+            aimDir.y = 0f;
+            if (aimDir.sqrMagnitude > 0.0001f)
+                return aimDir.normalized;
+        }
+
         if (movement != null)
         {
             Vector3 inputDir = movement.GetInputWorldDirection();

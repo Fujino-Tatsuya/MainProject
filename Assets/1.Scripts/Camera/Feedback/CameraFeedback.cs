@@ -171,7 +171,8 @@ public sealed class CameraFeedback : MonoBehaviour
         if (!isActiveAndEnabled || source == null || amplitude <= 0f)
             return;
 
-        float now = Time.unscaledTime;
+        // 게임 시간 — 쉐이크(Cinemachine Impulse)도 scaled 로 돌아 슬로우 동안 간격·흔들림이 같이 늘어난다(D9).
+        float now = Time.time;
         if (now - lastTriggeredTime < minInterval)
             return;
 

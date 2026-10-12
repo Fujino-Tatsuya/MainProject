@@ -19,16 +19,20 @@ GameData.xlsx (SVN, 잠금)
 
 ## 2. 시트 형식
 
-**시트 6장 = 카테고리**(2026-10-02 개편). 한 장 안에 관련 타입이 구역으로 나뉘어 세로로 쌓인다 — 가로 이동은 대상 수만큼(최대 Monster 11열).
+**시트 = 카테고리**(2026-10-09 코드 기준 10장 — xlsx 에는 병합 Export 한 시트만 있다). 한 장 안에 관련 타입이 구역으로 나뉘어 세로로 쌓인다 — 가로 이동은 대상 수만큼(최대 Monster 11열).
 
 | 시트 | 들어 있는 것 |
 |---|---|
 | `Player` | 스탯(`Player`) · 이동 · 대시 · 낙하 복귀 · 착지 보호 · 영혼 · 게임 규칙(낙하 비율) · 목숨 |
 | `Paladin` | 가붕이 기본 공격 · 패시브 · 스킬 SO 4종 |
 | `Gunner` | 거너 기본 공격 · 과열 · 스킬 SO 4종 |
+| `Assassin` | 어쌔신 기본 공격 · 상태 · 스킬 SO |
 | `Monster` | 몬스터 스탯 SO · 근접 공격 · 넉백 · 카운터 창 · 터렛 조준 |
 | `MidBoss` | Gauntlet · Spinner · Wall |
 | `Boss` | 23호(`BossDataSO`) |
+| `Sound` | 문자열 키별 사운드 재생 수치(`SoundCatalog`) — SoundID 연결은 인스펙터 전용 |
+| `Map` | 허수아비 인터럽트 순환(`TrainingDummyInterrupt`) |
+| `SlowMotion` | 인터럽트 슬로우 모양 `interruptProfile.*`(배율·진입·유지·복귀·실패 복귀 길이, 대상 `NetworkManager`) · 오너 줌 배율 `slowMotionZoomFactor`(대상 `CameraSwitcher`). 의미는 [PLAN-interrupt-slowmo.md](../../PLAN-interrupt-slowmo.md) |
 
 ### 세로 표 — 행 = 필드, 열 = 대상
 
@@ -91,6 +95,17 @@ GameData.xlsx (SVN, 잠금)
 - 프리팹 하나에 같은 컴포넌트가 둘 이상이면 행 하나로 가리킬 수 없어 오류.
 - 씬 배치 오브젝트(프리팹 인스턴스 아님)는 테이블 대상이 아니다 — 필요하면 프리팹으로 분리(예: `GameRule.prefab`).
 - MPPM 클론도 같은 모드·같은 xlsx 를 쓴다.
+- 테이블 Play 가 끝나면 테이블 대상 **프리팹은 디스크에서 다시 임포트**해 되돌린다(SO 는 스냅샷 값으로). Variant 에 메모리로 쓴 값은 숨은 오버라이드·dirty 를 남겨,
+  값만 되돌리면 다음 Save Project 가 `Player_Gunner` 에 `maxHp`/`attackDamage` 오버라이드를 써 넣었다(2026-10-09). 그래서 프리팹 에셋을 Prefab Mode 밖에서 고친 채 저장 안 하고 테이블 Play 하면 그 변경은 사라진다.
+- **저장 가드**(`DataTableSaveGuard`): 테이블 Play 준비(`ExitingEditMode`)에서 켜지고 Play 종료 후 스냅샷 복구(`EnteredEditMode`)가 끝나야 풀린다. 그 사이 어떤 저장(Ctrl+S·Save Project·다른 툴의 `SaveAssets`)도 테이블 대상 SO·프리팹은 쓰지 않는다(Console 경고). 기준은 Play 여부가 아니라 "복구 전" 이다 —
+  Play 여부로 막던 때, Play 종료 직후 `DevBootLauncher` 의 `SaveAssets` 가 복구보다 먼저 돌아 `Player_Gunner`·`Player_Paladin` 에 테이블 값이 저장됐다(2026-10-09 재발). 메뉴 덮어쓰기·빌드는 가드가 풀린 상태에서 돌므로 정상 저장된다.
+
+### 사운드 키
+
+- 새 키는 `SoundCatalog.asset`의 `entries` 배열에 먼저 추가하고 BroAudio `SoundID`를 연결한다. 테이블은 배열 크기와 에셋 참조를 바꾸지 못한다.
+- 호출은 2D `AudioManager.Instance.Play("키")`, 위치가 있는 3D `AudioManager.Instance.Play("키", worldPosition)`를 쓴다. 로컬 재생이며 사운드 전용 RPC는 없다.
+- `volumeMultiplier`·`pitchMultiplier`·`pitchRandomMin/Max`는 BroAudio 엔티티 값에 곱하는 배율이다(1 = 그대로). `is3D`는 `0 = 2D`, `1 = 3D`다.
+- 빈 키와 중복 키는 런타임 시작 시 경고하며, 중복이면 배열에서 먼저 나온 엔트리만 사용한다. 없는 키나 유효하지 않은 `SoundID`는 경고하고 재생하지 않는다.
 
 ## 7. 자주 나는 오류
 

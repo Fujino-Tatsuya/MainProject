@@ -10,14 +10,24 @@ public interface ICombatUiBlockedStateView
 }
 
 /// <summary>
-/// 로컬 Player의 복제된 생명주기 상태를 CombatUI 표현으로 변환한다.
-/// HUD GameObject는 이벤트 구독을 유지하고 Canvas만 숨기므로
-/// DeadPresentation 이후 Soul 진입 시 다시 표시할 수 있다.
+/// 로컬 Player의 복제된 생명주기 상태를 CombatHUD 레이어 표시로 변환하는 상태머신.
+/// 상태 → 레이어 규칙은 <see cref="CombatHudLayerRules"/>.
+/// 🔴 레이어는 CanvasGroup 으로만 숨긴다 — SetActive 는 하위 위젯의 OnEnable/OnDisable(구독·Bind·잔상)을 흔든다.
+///    위젯은 계속 이벤트를 받으므로 DeadPresentation 이후 Soul 진입 시 그대로 다시 보인다.
 /// </summary>
-[RequireComponent(typeof(Canvas))]
 public class PlayerCombatUiLifecyclePolicy : MonoBehaviour
 {
-    private Canvas hudCanvas;
+    // 저작 스크립트(CombatHudSlotAuthoring·SkillTooltipAuthoring)가 새 슬롯을 놓을 레이어 이름.
+    public const string PersistentLayerName = "Layer_Persistent";
+    public const string CombatLayerName = "Layer_Combat";
+    public const string BossInfoLayerName = "Layer_BossInfo";
+    public const string SpectateLayerName = "Layer_Spectate";
+
+    [SerializeField] private CanvasGroup persistentLayer;
+    [SerializeField] private CanvasGroup combatLayer;
+    [SerializeField] private CanvasGroup bossInfoLayer;
+    [SerializeField] private CanvasGroup spectateLayer;
+
     private PlayerHealthHUD playerHealthHUD;
     private ICombatUiBlockedStateView[] blockedStateViews;
     private PlayerLifeCycleController lifeCycle;
@@ -41,7 +51,6 @@ public class PlayerCombatUiLifecyclePolicy : MonoBehaviour
 
     private void CacheViews()
     {
-        hudCanvas = GetComponent<Canvas>();
         playerHealthHUD = GetComponentInChildren<PlayerHealthHUD>(true);
 
         MonoBehaviour[] behaviours = GetComponentsInChildren<MonoBehaviour>(true);
@@ -70,7 +79,10 @@ public class PlayerCombatUiLifecyclePolicy : MonoBehaviour
         if (lifeCycle != null)
             lifeCycle.LifeStateChanged += HandleLifeStateChanged;
 
-        ApplyState(ResolveDisplayState(player));
+        ApplyState(CombatHudLayerRules.ResolveDisplayState(
+            player != null,
+            lifeCycle != null,
+            lifeCycle != null ? lifeCycle.State : PlayerLifeState.Alive));
     }
 
     private void UnbindLifeCycle()
@@ -95,34 +107,35 @@ public class PlayerCombatUiLifecyclePolicy : MonoBehaviour
             : null;
     }
 
-    private PlayerLifeState ResolveDisplayState(Player player)
-    {
-        if (player == null)
-            return PlayerLifeState.PermanentDead;
-
-        return lifeCycle != null
-            ? lifeCycle.State
-            : PlayerLifeState.Alive;
-    }
-
     private void ApplyState(PlayerLifeState state)
     {
-        bool isSoul = state == PlayerLifeState.Soul;
-        bool shouldShow =
-            state == PlayerLifeState.Alive ||
-            state == PlayerLifeState.Soul;
+        bool soulOverrides = CombatHudLayerRules.ShowsSoulOverrides(state);
 
         // 실제 Player HP/Shield NetworkVariable은 건드리지 않고 표시값만 덮는다.
         if (playerHealthHUD != null)
-            playerHealthHUD.SetDisplayOverrideZero(isSoul);
+            playerHealthHUD.SetDisplayOverrideZero(soulOverrides);
 
         if (blockedStateViews != null)
         {
             for (int i = 0; i < blockedStateViews.Length; i++)
-                blockedStateViews[i].SetBlocked(isSoul);
+                blockedStateViews[i].SetBlocked(soulOverrides);
         }
 
-        if (hudCanvas != null)
-            hudCanvas.enabled = shouldShow;
+        CombatHudLayers visible = CombatHudLayerRules.VisibleLayers(state);
+        SetLayerVisible(persistentLayer, (visible & CombatHudLayers.Persistent) != 0);
+        SetLayerVisible(combatLayer, (visible & CombatHudLayers.Combat) != 0);
+        SetLayerVisible(bossInfoLayer, (visible & CombatHudLayers.BossInfo) != 0);
+        SetLayerVisible(spectateLayer, (visible & CombatHudLayers.Spectate) != 0);
+    }
+
+    // BossHealthHUD 의 중첩 Canvas 도 부모 CanvasGroup 알파를 상속한다(ignoreParentGroups=false).
+    private static void SetLayerVisible(CanvasGroup layer, bool visible)
+    {
+        if (layer == null)
+            return;
+
+        layer.alpha = visible ? 1f : 0f;
+        layer.interactable = visible;
+        layer.blocksRaycasts = visible;
     }
 }

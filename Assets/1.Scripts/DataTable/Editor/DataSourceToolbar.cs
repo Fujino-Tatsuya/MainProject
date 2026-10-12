@@ -18,8 +18,8 @@ public static class DataSourceToolbar
     [MainToolbarElement(
         ElementPath,
         defaultDockPosition = MainToolbarDockPosition.Middle,
-        defaultDockIndex = 12,
-        menuPriority = 102,
+        defaultDockIndex = 13,
+        menuPriority = 103,
         ussName = UssName)]
     private static MainToolbarElement CreateDropdown()
     {

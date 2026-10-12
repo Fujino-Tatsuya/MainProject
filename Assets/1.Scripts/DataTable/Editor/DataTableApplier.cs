@@ -273,7 +273,8 @@ public static class DataTableApplier
     }
 
     /// <summary>
-    /// 테이블 Play 용. 디스크에는 쓰지 않는다 — 적용 후 dirty 를 지워 저장 대상에서 뺀다.
+    /// 테이블 Play 용. 디스크에는 쓰지 않는다 — 적용 후 dirty 를 지워 저장 대상에서 뺀다
+    /// (Variant 의 오버라이드 dirty 는 여기서 못 지운다 — Play 중엔 DataTableSaveGuard 가 막고, <see cref="Restore"/> 가 재임포트로 지운다).
     /// 프리팹 컴포넌트도 메모리의 프리팹 에셋을 바꾸므로, 런타임에 Instantiate·네트워크 스폰되는 사본이 테이블 값을 받는다.
     /// 반환한 스냅샷으로 <see cref="Restore"/> 해야 원래 값으로 돌아온다.
     /// </summary>
@@ -309,10 +310,19 @@ public static class DataTableApplier
         return snapshot;
     }
 
-    /// <summary>메모리 적용을 되돌린다. 찾지 못한 대상 수를 반환한다(0 이 정상).</summary>
+    /// <summary>
+    /// 메모리 적용을 되돌린다. 찾지 못한 대상 수를 반환한다(0 이 정상).
+    /// <para>
+    /// 🔴 프리팹 에셋 안의 대상은 값 되쓰기가 아니라 디스크에서 다시 임포트한다. Variant 컴포넌트에 쓰면 Unity 가
+    /// 숨은 PrefabInstance 에 오버라이드(maxHp 등)를 기록하고 그 객체를 dirty 로 만든다 — 값을 JSON 으로 되돌려도
+    /// 오버라이드와 dirty 는 남아, Play 뒤 첫 Save Project(Ctrl+S)가 Player_Gunner 에 maxHp/attackDamage 오버라이드를 써 넣었다(10-09 재현).
+    /// 디스크는 처음부터 바뀌지 않았으므로 다시 읽으면 오버라이드·dirty 까지 원래대로다.
+    /// </para>
+    /// </summary>
     public static int Restore(DataTableSnapshot snapshot)
     {
         int missing = 0;
+        var prefabPaths = new HashSet<string>(StringComparer.Ordinal);
         foreach (DataTableSnapshot.Item item in snapshot.items)
         {
             Object target = FindSnapshotTarget(item);
@@ -322,12 +332,24 @@ public static class DataTableApplier
                 continue;
             }
 
+            string assetPath = AssetDatabase.GetAssetPath(target);
+            if (assetPath.EndsWith(".prefab", StringComparison.OrdinalIgnoreCase))
+            {
+                prefabPaths.Add(assetPath);
+                continue;
+            }
+
             bool wasDirty = EditorUtility.IsDirty(target);
             EditorJsonUtility.FromJsonOverwrite(item.json, target);
             if (!wasDirty)
             {
                 EditorUtility.ClearDirty(target);
             }
+        }
+
+        foreach (string prefabPath in prefabPaths)
+        {
+            AssetDatabase.ImportAsset(prefabPath, ImportAssetOptions.ForceUpdate);
         }
 
         return missing;
@@ -369,32 +391,65 @@ public static class DataTableApplier
             File.WriteAllText(ManifestPath, JsonUtility.ToJson(backup, prettyPrint: true));
         }
 
-        foreach (IGrouping<Object, DataTableWrite> group in writes.GroupBy(w => w.Target))
+        // 🔴 프리팹은 SaveAssetIfDirty 로 저장되지 않는다(10-07 실측 — Player_Gunner 에 maxHp 오버라이드가 안 써져 빌드가 base 50 으로 나갔다).
+        //    SavePrefabAsset 이 파일 쓰기 + 재임포트를 한다. base 를 먼저 저장해야 한다 — base 재임포트가 Variant 를
+        //    다시 읽으므로, Variant 에 먼저 쓴 값은 저장 전에 날아간다. 그래서 Variant 깊이 순으로 적용·저장한다.
+        foreach (IGrouping<int, IGrouping<string, DataTableWrite>> depth in writes
+                     .GroupBy(w => AssetDatabase.GetAssetPath(w.Target))
+                     .GroupBy(file => PrefabVariantDepth(file.Key))
+                     .OrderBy(d => d.Key))
         {
-            var so = new SerializedObject(group.Key);
-            foreach (DataTableWrite write in group)
+            foreach (IGrouping<string, DataTableWrite> file in depth)
             {
-                Assign(so.FindProperty(write.PropertyPath), write);
-            }
+                foreach (IGrouping<Object, DataTableWrite> group in file.GroupBy(w => w.Target))
+                {
+                    var so = new SerializedObject(group.Key);
+                    foreach (DataTableWrite write in group)
+                    {
+                        Assign(so.FindProperty(write.PropertyPath), write);
+                    }
 
-            if (so.ApplyModifiedProperties())
-            {
-                EditorUtility.SetDirty(group.Key);
-            }
-        }
+                    if (so.ApplyModifiedProperties())
+                    {
+                        EditorUtility.SetDirty(group.Key);
+                    }
+                }
 
-        foreach (string assetPath in assetPaths)
-        {
-            AssetDatabase.SaveAssetIfDirty(AssetDatabase.GUIDFromAssetPath(assetPath));
+                if (file.Key.EndsWith(".prefab", StringComparison.OrdinalIgnoreCase))
+                {
+                    PrefabUtility.SavePrefabAsset(AssetDatabase.LoadAssetAtPath<GameObject>(file.Key));
+                }
+                else
+                {
+                    AssetDatabase.SaveAssetIfDirty(AssetDatabase.GUIDFromAssetPath(file.Key));
+                }
+            }
         }
 
         return backup;
     }
 
+    // 0 = 프리팹이 아니거나 일반 프리팹, n = base 까지 Variant 단계 수.
+    private static int PrefabVariantDepth(string assetPath)
+    {
+        int depth = 0;
+        GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(assetPath);
+        while (prefab != null && PrefabUtility.GetPrefabAssetType(prefab) == PrefabAssetType.Variant)
+        {
+            depth++;
+            prefab = PrefabUtility.GetCorrespondingObjectFromSource(prefab);
+        }
+
+        return depth;
+    }
+
     /// <summary>백업 파일을 제자리로 복사하고 다시 임포트한다. 실패한 파일 수를 반환한다(0 이 정상). 다 되돌리면 백업을 지운다.</summary>
     public static int RestoreFromBackup(DataTableDiskBackup backup)
     {
-        int failed = 0;
+        // 에디터가 에셋 파일을 메모리 매핑으로 쥐고 있으면 덮어쓰기가 IOException 으로 실패한다(10-07 빌드마다 2~12개).
+        AssetDatabase.ReleaseCachedFileHandles();
+
+        var remaining = new DataTableDiskBackup();
         foreach (DataTableDiskBackup.Entry file in backup.files)
         {
             try
@@ -405,17 +460,22 @@ public static class DataTableApplier
             }
             catch (IOException e)
             {
-                failed++;
+                remaining.files.Add(file);
                 Debug.LogError($"[DataTable] 원복 실패 {file.assetPath} — 백업 {file.backupPath} 을 직접 복사할 것. {e.Message}");
             }
         }
 
-        if (failed == 0 && File.Exists(ManifestPath))
+        // 남은 것만 기록한다 — 통째로 남기면 다음 크래시 복구가 이미 지운 백업까지 찾다가 실패를 쏟아낸다.
+        if (remaining.files.Count > 0)
+        {
+            File.WriteAllText(ManifestPath, JsonUtility.ToJson(remaining, prettyPrint: true));
+        }
+        else if (File.Exists(ManifestPath))
         {
             File.Delete(ManifestPath);
         }
 
-        return failed;
+        return remaining.files.Count;
     }
 
     /// <summary>지난 빌드가 원복 전에 멈췄다면 남은 백업. 없으면 null.</summary>

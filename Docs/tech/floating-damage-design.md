@@ -35,6 +35,11 @@
   - 실드 우선 흡수 → 잔여만 HP로. 즉 **HP 감소량 ≠ AttackInfo.damage**
 - [Unit.cs:100](Assets/1.Scripts/Unit/Unit.cs:100) 결과를 `_currentHp.Value`(NetworkVariable, Write=Server)에 반영.
 - 특수 진입점: `ApplyDirectHealthDamage`(방어/실드 무시), `ApplyMaxHealthPercentDamage`, `ApplyCurrentHealthPercentDamage` — Vent 등 해저드가 사용.
+- (2026-10-07 결과 화면 통계) `ApplyHealthDamage` 는 체력 반영 뒤·사망 통지(`NotifyDeathTransition`) **전에**
+  서버 정적 이벤트 `CombatStatsEvents.ServerDamageApplied(대상, 공격자 clientId, HP+실드 실제 감소량, 체력 0 도달)` 를 낸다.
+  실제 감소량은 체력 클램프 **후** 값이라 막타 초과분이 빠진다(표시용 `ClientDamageDealtClientRpc` 는 클램프 전 값 — 둘은 다르다).
+  읽기 전용 발행이라 판정 무수정 원칙은 그대로다. 구독자가 없으면 null 검사 한 번(할당 0). 소비자 = `SessionStatsTracker`.
+  상세: [PLAN-result-stats.md](../../PLAN-result-stats.md), [handoff-result-stats-monster-hooks.md](handoff-result-stats-monster-hooks.md).
 
 **함의:** 클라이언트가 `AttackInfo.damage`로 숫자를 추정하면 방어력·실드 때문에 실제와 어긋난다. 숫자는 서버 결과에서 와야 한다.
 
@@ -137,7 +142,11 @@ FloatingDamageSettings (SO: 색/폰트크기/체류·애니·페이드 시간/�
 - 그 외 대상에 대해 SO enum으로 전환:
   - `AllDamage` (기본) — 모든 유닛의 모든 피해. 복제 기반, RPC 없음
   - `OwnDealtOnly` — 내가 준 딜만. RPC 경로 사용
-  - `AllWithOwnEmphasis` — 전부 표시 + 내 딜만 색/크기 강조. RPC 경로 사용
+  - `AllWithOwnEmphasis` — 전부 표시 + 내 딜 강조. 내 숫자는 기존 크기·불투명도, 팀원 숫자는 SO의
+    `teammateScaleMultiplier`·`teammateAlpha`를 팝/펀치 스케일과 페이드 전체에 곱한다. RPC 경로 사용
+
+현재 기본 에셋은 `AllWithOwnEmphasis`, 팀원 크기 `0.75`, 최대 알파 `200/255`다. 공격자가 플레이어가
+아닌 피해도 로컬 공격이 아니므로 팀원 스타일을 사용한다. `AllDamage`는 로컬 여부와 무관하게 모두 같은 모양이다.
 
 ### 4-3. 추상화 수준 (확정)
 

@@ -273,6 +273,45 @@ public sealed class DataTableApplierTests
     }
 
     [Test]
+    public void PrefabVariantComponent_InMemoryApplyAndRestore_LeavesNoOverrideOrDirty()
+    {
+        // 테이블 Play 뒤 Save Project 가 Variant 에 오버라이드를 써 넣던 회귀(Player_Gunner maxHp/attackDamage, 10-09).
+        const string basePath = "Assets/Tests/EditMode/DataTable/Editor/__DataTableBaseTemp.prefab";
+        const string variantPath = "Assets/Tests/EditMode/DataTable/Editor/__DataTableVariantTemp.prefab";
+        var go = new GameObject("Bot");
+        go.AddComponent<DataTableTestComponent>();
+        GameObject basePrefab = PrefabUtility.SaveAsPrefabAsset(go, basePath);
+        Object.DestroyImmediate(go);
+        var instance = (GameObject)PrefabUtility.InstantiatePrefab(basePrefab);
+        GameObject variant = PrefabUtility.SaveAsPrefabAsset(instance, variantPath);
+        Object.DestroyImmediate(instance);
+        try
+        {
+            var component = variant.GetComponent<DataTableTestComponent>();
+            var issues = new DataTableIssues();
+            List<DataTableWrite> writes = DataTableApplier.Bind(
+                new[] { Entry("__DataTableVariantTemp", "damage", "42", nameof(DataTableTestComponent)) },
+                new TestLookup(("__DataTableVariantTemp", (Object)component)), issues);
+
+            DataTableSnapshot snapshot = DataTableApplier.ApplyInMemory(writes);
+            Assert.That(component.damage, Is.EqualTo(42));
+
+            DataTableApplier.Restore(snapshot);
+
+            GameObject reloaded = AssetDatabase.LoadAssetAtPath<GameObject>(variantPath);
+            Assert.That(reloaded.GetComponent<DataTableTestComponent>().damage, Is.EqualTo(10));
+            Assert.That(PrefabUtility.GetPropertyModifications(reloaded).Any(m => m.propertyPath == "damage"), Is.False,
+                "Variant 에 테이블 오버라이드가 남으면 다음 저장 때 파일에 써진다");
+            Assert.That(AssetDatabase.LoadAllAssetsAtPath(variantPath).Where(o => o != null).Any(EditorUtility.IsDirty), Is.False);
+        }
+        finally
+        {
+            AssetDatabase.DeleteAsset(variantPath);
+            AssetDatabase.DeleteAsset(basePath);
+        }
+    }
+
+    [Test]
     public void PrefabComponent_ApplyToDisk_ThenRestore_PrefabFileIsByteIdentical()
     {
         const string path = "Assets/Tests/EditMode/DataTable/Editor/__DataTablePrefabTemp.prefab";

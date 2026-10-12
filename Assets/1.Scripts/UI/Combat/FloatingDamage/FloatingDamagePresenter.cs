@@ -38,7 +38,12 @@ public sealed class FloatingDamagePresenter : MonoBehaviour
 
         FloatingDamageDisplayFilter filter = spawner.Settings.DisplayFilter;
         bool fromLocalPlayer = IsLocalAttacker(damage.attackerClientId);
-        if (filter == FloatingDamageDisplayFilter.OwnDealtOnly && !fromLocalPlayer)
+        FloatingDamageDisplayDecision decision = FloatingDamageDisplayPolicy.Evaluate(
+            filter,
+            fromLocalPlayer,
+            spawner.Settings.TeammateScaleMultiplier,
+            spawner.Settings.TeammateAlpha);
+        if (!decision.shouldDisplay)
             return;
 
         // AllDamage는 공격자 귀속으로 거르지 않으며, 기존처럼 로컬 공격 강조도 적용하지 않는다.

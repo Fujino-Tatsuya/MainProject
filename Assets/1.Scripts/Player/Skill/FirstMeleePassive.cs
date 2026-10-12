@@ -13,7 +13,7 @@ using UnityEngine.Serialization;
 /// ③ 소모되면 쿨타임(기본 30초)이 시작된다. 쿨타임 중 피격당할 때마다 고정 감소(데미지량 무관).
 ///
 /// 버프는 <see cref="StatusEffectController"/> 가 들고 전 피어에 복제한다 — 칼날 발광은 이걸 본다.
-/// 쿨타임은 "끝나는 서버 시각(readyServerTime)" 하나로 표현하고 오너만 읽는다(HUD fill).
+/// 쿨타임은 "끝나는 서버 시각(readyServerTime)" 하나로 표현하고 전 피어가 읽는다(오너 HUD fill·머리 위 특성 게이지).
 ///
 /// 🔴 버프 부여는 서버 Update 가 "쿨타임 끝 + 버프 없음" 을 볼 때마다 한다. 이 한 줄이 스폰 직후 부여와,
 ///    보스 연출이 상태이상을 걷어낸 뒤(연출 중엔 Apply 거부) 다시 붙는 것까지 같이 처리한다.
@@ -57,9 +57,10 @@ public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive, IPlayerOn
     [Tooltip("대상에게서 몸통 중심을 못 찾았을 때 쓸 발밑 기준 오프셋(미터)")]
     [SerializeField] private Vector3 additionalHitFallbackOffset = new Vector3(0f, 1f, 0f);
 
-    // 쿨타임이 끝나는 서버 시각(GameTime). 서버만 쓰고 오너만 읽는다(HUD fill). 버프 보유 중에는 과거 시각이다.
+    // 쿨타임이 끝나는 서버 시각(ServerTime). 서버만 쓰고 전 피어가 읽는다 — 원격 플레이어의 머리 위 특성 게이지도 그린다.
+    // 버프 보유 중에는 과거 시각이다. 클라도 같은 NetworkManager.ServerTime 으로 남은 시간을 계산한다.
     private readonly NetworkVariable<double> readyServerTime = new NetworkVariable<double>(
-        0d, NetworkVariableReadPermission.Owner, NetworkVariableWritePermission.Server);
+        0d, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     private Player owner;
     private StatusEffectController statusEffects;
@@ -70,8 +71,6 @@ public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive, IPlayerOn
     private double ServerNow => IsNetworkActive && NetworkManager != null
         ? NetworkManager.ServerTime.Time
         : Time.timeAsDouble;
-    // 오너/서버만 readyServerTime을 읽을 수 있다(권한).
-    private bool CanReadCooldown => IsOwner || IsServer;
     private ulong ChargeSourceId => NetworkObjectId;
 
     /// <summary>버프 보유 여부. 상태이상 목록이 복제되므로 전 피어에서 유효.</summary>
@@ -82,7 +81,7 @@ public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive, IPlayerOn
     public float CooldownTime => cooldownTime;
     public bool IsReady => HasCharge;
     public float RemainingCooldown =>
-        !HasCharge && CanReadCooldown ? Mathf.Max(0f, (float)(readyServerTime.Value - ServerNow)) : 0f;
+        !HasCharge ? Mathf.Max(0f, (float)(readyServerTime.Value - ServerNow)) : 0f;
     public SkillTooltipText Tooltip => tooltip;
     public UnityEngine.Object TooltipValueSource => this;
 

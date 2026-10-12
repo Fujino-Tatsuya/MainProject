@@ -8,6 +8,22 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 1605594336166664510, guid: 6b7103b4fdf7993479c2ac2fc217a919, type: 3}
+      propertyPath: GlobalObjectIdHash
+      value: 544124145
+      objectReference: {fileID: 0}
+    - target: {fileID: 3821680704275949548, guid: 6b7103b4fdf7993479c2ac2fc217a919, type: 3}
+      propertyPath: rank
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 3821680704275949548, guid: 6b7103b4fdf7993479c2ac2fc217a919, type: 3}
+      propertyPath: maxHp
+      value: 2000
+      objectReference: {fileID: 0}
+    - target: {fileID: 3821680704275949548, guid: 6b7103b4fdf7993479c2ac2fc217a919, type: 3}
+      propertyPath: defense
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 5939870581278475531, guid: 6b7103b4fdf7993479c2ac2fc217a919, type: 3}
       propertyPath: m_Name
       value: TrainingDummy_Boss
@@ -23,18 +39,6 @@ PrefabInstance:
     - target: {fileID: 6311859083166662073, guid: 6b7103b4fdf7993479c2ac2fc217a919, type: 3}
       propertyPath: m_LocalScale.z
       value: 1.8
-      objectReference: {fileID: 0}
-    - target: {fileID: 3821680704275949548, guid: 6b7103b4fdf7993479c2ac2fc217a919, type: 3}
-      propertyPath: maxHp
-      value: 2000
-      objectReference: {fileID: 0}
-    - target: {fileID: 3821680704275949548, guid: 6b7103b4fdf7993479c2ac2fc217a919, type: 3}
-      propertyPath: defense
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 3821680704275949548, guid: 6b7103b4fdf7993479c2ac2fc217a919, type: 3}
-      propertyPath: rank
-      value: 2
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

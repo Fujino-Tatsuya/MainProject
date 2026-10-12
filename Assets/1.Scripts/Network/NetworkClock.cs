@@ -5,12 +5,15 @@ using UnityEngine;
 /// <summary>
 /// 세션 전역 공유 시계. NetworkManager.prefab에 부착한다.
 /// - <see cref="ServerNow"/>   : NGO ServerTime raw (피어 간 시계차 대응용)
-/// - <see cref="GameNow"/>      : 일시정지 제외 게임시간 (솔로 host 일시정지 반영)
+/// - <see cref="GameNow"/>      : 일시정지·슬로우 모션 제외 게임시간 (솔로 host 일시정지 + <see cref="GlobalTimeScale"/> 반영)
 /// - <see cref="MainGameElapsed"/> : MainGame 시작 이후 경과 (결정론 모션의 시간 기준)
 ///
 /// 타임스탬프(세션 구성/ MainGame 시작 시각)는 서버가 정하고 CustomMessaging으로 전원에 배포한다.
 /// late joiner/재접속은 없음(v1) → 최초 배포 + 접속 시 1회 전송으로 충분.
+///
+/// 실행 순서를 앞당긴 이유: <see cref="GlobalTimeScale"/>(-100)가 이 시계 다음, 게임플레이보다 먼저 배율을 정한다.
 /// </summary>
+[DefaultExecutionOrder(-200)]
 [RequireComponent(typeof(NetworkManager))]
 public class NetworkClock : MonoBehaviour
 {
@@ -32,19 +35,33 @@ public class NetworkClock : MonoBehaviour
     private double _sessionFormedAt = double.NaN;
     private double _mainGameStartedAt = double.NaN;
 
+    // 슬로우 모션 보정. 클라는 Start 를 늦게 받아 손실이 소급되므로 각 시계를 따로 단조 클램프한다(PLAN-interrupt-slowmo R4).
+    private GlobalTimeScale _globalTimeScale;
+    private MonotonicTime _gameNowGuard;
+    private MonotonicTime _gameLocalNowGuard;
+
     /// <summary>NGO ServerTime raw. 세션 미가동 시 0.</summary>
     public double ServerNow =>
         _networkManager != null && _networkManager.IsListening ? _networkManager.ServerTime.Time : 0.0;
 
-    /// <summary>일시정지 시간을 제외한 게임시간.</summary>
-    public double GameNow => ServerNow - CurrentPausedAccum();
+    /// <summary>
+    /// 일시정지만 제외한 게임시간 — 슬로우 보정 전. <see cref="GlobalTimeScale"/> 타임라인의 시간 도메인이다
+    /// (일시정지 중엔 이 값이 멈추므로 슬로우도 그대로 멈춘다).
+    /// </summary>
+    public double UnslowedGameNow => ServerNow - CurrentPausedAccum();
+
+    /// <summary>일시정지·슬로우 모션으로 덜 흐른 시간을 제외한 게임시간. 단조 비감소.</summary>
+    public double GameNow => ApplySlowMotion(UnslowedGameNow, ref _gameNowGuard);
 
     /// <summary>이 클라이언트의 NGO LocalTime(서버보다 편도지연만큼 앞섬). 대시 RTT 보정 요청에 사용. (PLAN §9)</summary>
     public double LocalNow =>
         _networkManager != null && _networkManager.IsListening ? _networkManager.LocalTime.Time : 0.0;
 
-    /// <summary>일시정지를 제외한 클라이언트 로컬 게임시간.</summary>
-    public double GameLocalNow => LocalNow - CurrentPausedAccum();
+    /// <summary>일시정지만 제외한 클라이언트 로컬 게임시간 — 슬로우 보정 전.</summary>
+    public double UnslowedGameLocalNow => LocalNow - CurrentPausedAccum();
+
+    /// <summary>일시정지·슬로우 모션을 제외한 클라이언트 로컬 게임시간. 단조 비감소.</summary>
+    public double GameLocalNow => ApplySlowMotion(UnslowedGameLocalNow, ref _gameLocalNowGuard);
 
     /// <summary>
     /// 세션이 실제로 돌고 있는지. false면 <see cref="ServerNow"/>/<see cref="LocalNow"/>는
@@ -83,6 +100,7 @@ public class NetworkClock : MonoBehaviour
 
         Instance = this;
         _networkManager = GetComponent<NetworkManager>();
+        _globalTimeScale = GetComponent<GlobalTimeScale>();
     }
 
     private void OnDestroy()
@@ -161,10 +179,23 @@ public class NetworkClock : MonoBehaviour
     private double CurrentPausedAccum() =>
         _paused ? _pausedAccum + (ServerNow - _pauseStartedServerTime) : _pausedAccum;
 
+    // 슬로우 레이어가 없거나 세션이 안 돌면 기존 값 그대로(클램프도 안 한다).
+    private double ApplySlowMotion(double unslowed, ref MonotonicTime guard)
+    {
+        if (_globalTimeScale == null || !IsRunning)
+        {
+            return unslowed;
+        }
+
+        return guard.Next(unslowed - _globalTimeScale.LostTimeUntil(unslowed));
+    }
+
     private void ResetState()
     {
         _paused = false;
         _pausedAccum = 0.0;
+        _gameNowGuard.Reset();
+        _gameLocalNowGuard.Reset();
         _sessionFormedAt = double.NaN;
         _mainGameStartedAt = double.NaN;
     }

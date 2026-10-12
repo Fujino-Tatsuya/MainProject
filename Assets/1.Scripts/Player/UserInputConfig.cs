@@ -3,8 +3,8 @@
 /// <summary>
 /// 로컬 유저의 조작 취향 설정. 네트워크에 실리지 않는다 — 각 클라가 자기 값만 읽고,
 /// 서버는 이 설정의 존재를 모른다(종료 신호는 기존 릴리즈 경로로 동일하게 도착한다).
-/// 저장은 PlayerPrefs. 옵션 UI(TitleOptionsPanel의 Controls 탭)는 아직 비어 있고,
-/// 붙일 때 이 프로퍼티만 읽고 쓰면 된다 — 설정의 단일 창구다.
+/// 저장은 PlayerPrefs. 옵션 UI = TitleOptionsPanel Controls 탭의 HoldSkillToggleOption.
+/// 이 프로퍼티가 설정의 단일 창구다.
 /// </summary>
 public static class UserInputConfig
 {

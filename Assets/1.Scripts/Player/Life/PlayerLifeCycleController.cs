@@ -45,6 +45,13 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
     public event Action<PlayerLifeState, PlayerLifeState> LifeStateChanged;
     public event Action<PlayerLifeGameplayAccess> GameplayAccessChanged;
 
+    /// <summary>
+    /// 서버에서만 발생하는 전 플레이어 생명주기 통지. 인자 = (OwnerClientId, previous, current).
+    /// 스폰 때 (s,s) 초기 통지도 그대로 나온다 — 결과 화면 통계(SessionStatsTracker)가
+    /// 플레이어 행 등록에 쓰고, 사망 횟수는 Alive→DeadPresentation 전이만 센다.
+    /// </summary>
+    public static event Action<ulong, PlayerLifeState, PlayerLifeState> ServerLifeStateChanged;
+
     private bool CanWriteLifeState => IsSpawned && IsServer && !IsCinematicLocked;
     private bool deathResolutionPending;
     private double deathResolutionDeadlineServerTime;
@@ -378,5 +385,8 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
 
         LifeStateChanged?.Invoke(previousState, currentState);
         GameplayAccessChanged?.Invoke(access);
+
+        if (IsServer)
+            ServerLifeStateChanged?.Invoke(OwnerClientId, previousState, currentState);
     }
 }

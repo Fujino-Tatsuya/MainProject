@@ -9,7 +9,7 @@ using UnityEngine;
 /// 거너 껍데기 생성 (PLAN-gunner.md G9). 메뉴 한 번으로 아래 셋을 만든다 — 이미 있으면 건너뛴다(덮어쓰지 않음).
 /// 1) 애니메이터 컨트롤러: 코드가 쓰는 파라미터(DefaultAttack·Interrupt·IsMoving·AttackIndex·IsGrabbed)와 Idle/Walk 빈 상태.
 ///    클립은 G0(gunner.fbx 클립 분할, SVN) 이후 G3 에서 채운다.
-/// 2) Gunner_Armature.prefab: gunner.fbx + Animator·NetworkTransform(회전만, 오너)·NetworkAnimator(오너)·애니 이벤트 릴레이, 손에 laser_gun.
+/// 2) Gunner_Armature.prefab: gunner.fbx + Animator·NetworkTransform(회전만, 오너)·NetworkAnimator(오너)·애니 이벤트 릴레이, artillery 본에 laser_gun.
 ///    Paladin_Armature 루트 구성과 같다.
 /// 3) Player_Gunner.prefab: Player.prefab Variant + 자식 "Armature"(이름 규칙 — player-prefabs.md §1.4),
 ///    PlayerMovement.armature·PlayerSoulController.soulVisualRoot 배선, 🔴 GlobalObjectIdHash 실기록(SetDirty → SaveAssetIfDirty).
@@ -25,8 +25,9 @@ public static class GunnerShellAuthoring
     const string ControllerFolder = "Assets/4.Animations/Player/Gunner";
     const string ControllerPath = ControllerFolder + "/GunnerAnimatorController.controller";
 
-    // 오른손 본 추정 — 리그 이름 규칙을 모르므로 후보를 넓게 잡고, 못 찾으면 루트에 두고 경고한다.
-    static readonly Regex RightHandBone = new Regex(@"(?i)^(c_)?(hand|wrist)([._ ]?(r|right))$|^(right|r)[._ ]?hand$");
+    // 총을 들고 다니는 본. 애니는 laser_gun 의 LaserGun_Mount 프레임 = 이 본 프레임(오프셋 0)으로 저작됐다 —
+    // 손(Grip_R·Grip_L·Brace_R)이 이 본 기준으로 그 기준점 좌표와 일치한다(2026-10-09 실측).
+    const string GunBoneName = "artillery";
 
     [MenuItem("Tools/Player/Gunner/껍데기 생성 (G9)")]
     public static void CreateShell()
@@ -372,7 +373,7 @@ public static class GunnerShellAuthoring
     /// <summary>
     /// G0 이후 — gunner.fbx 클립을 컨트롤러에 연결한다(재실행 시 같은 이름 상태를 갱신).
     /// Base: Idle·Walk·Gunner_Attack_Start(= Q_charge_loop — 기본 공격 준비 동작이자 연사 중 하체).
-    /// UpperBody(척추 이상 AvatarMask, Override): Empty(기본) · Gunner_Attack_Fire(= gunner_attack, 속도 = FireSpeed) → 끝나면 Empty.
+    /// UpperBody(척추 이상 AvatarMask, Override): Empty(기본) · Gunner_Attack_Fire(= gunner_attack_weapon_v05, 속도 = FireSpeed) → 끝나면 Empty.
     /// </summary>
     [MenuItem("Tools/Player/Gunner/애니메이터 구성 (G0 이후)")]
     public static void BuildAnimator()
@@ -462,7 +463,9 @@ public static class GunnerShellAuthoring
         upperMachine.defaultState = empty;
 
         AnimatorState fire = EnsureState(upperMachine, "Gunner_Attack_Fire");
-        fire.motion = Clip("gunner_attack");
+        // 🔴 발사 클립은 루트 컨트롤 c_pos 각도가 하체(Q_charge_loop, 146.3°)와 같아야 한다(2026-10-09).
+        //    상체 마스크가 rig/c_pos 를 빼고 그 아래 팔만 가져오므로, 다르면(attack·attack01 = 180°) 팔만 돌아 손이 총에서 떨어진다.
+        fire.motion = Clip("gunner_attack_weapon_v05");
         fire.speedParameterActive = true;
         fire.speedParameter = "FireSpeed";
         if (System.Array.TrueForAll(fire.transitions, t => t.destinationState != empty))
@@ -802,24 +805,27 @@ public static class GunnerShellAuthoring
             return;
         }
 
-        Transform hand = null;
+        Transform bone = null;
         foreach (Transform t in armatureRoot.GetComponentsInChildren<Transform>(true))
         {
-            if (RightHandBone.IsMatch(t.name))
+            if (t.name == GunBoneName)
             {
-                hand = t;
+                bone = t;
                 break;
             }
         }
 
-        if (hand == null)
-            Debug.LogWarning("[Gunner] 오른손 본을 못 찾았다 — laser_gun 을 Armature 루트에 둔다. 손 위치는 수동으로 옮길 것.");
+        if (bone == null)
+            Debug.LogWarning($"[Gunner] '{GunBoneName}' 본을 못 찾았다 — laser_gun 을 Armature 루트에 둔다. 위치는 수동으로 옮길 것.");
 
-        var gun = (GameObject)PrefabUtility.InstantiatePrefab(gunModel, hand != null ? hand : armatureRoot);
+        var gun = (GameObject)PrefabUtility.InstantiatePrefab(gunModel, bone != null ? bone : armatureRoot);
         gun.name = "LaserGun";
+        // 🔴 손으로 맞추지 말 것. Mount 의 임포트 회전(-90°X)만 상쇄해 Mount 프레임 = 본 프레임으로 둔다.
+        //    09-30 손 조정값은 총을 앞뒤로 뒤집어 총구가 뒤를 보고 손이 그립에서 떨어졌다.
+        Transform mount = gun.transform.Find("LaserGun_Mount");
         gun.transform.localPosition = Vector3.zero;
-        gun.transform.localRotation = Quaternion.identity;
-        Debug.Log($"[Gunner] laser_gun 부착: {(hand != null ? hand.name : "(루트)")}");
+        gun.transform.localRotation = mount != null ? Quaternion.Inverse(mount.localRotation) : Quaternion.identity;
+        Debug.Log($"[Gunner] laser_gun 부착: {(bone != null ? bone.name : "(루트)")}");
     }
 
     static void EnsureVariant(GameObject armaturePrefab)

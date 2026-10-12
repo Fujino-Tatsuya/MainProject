@@ -152,6 +152,13 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
             $"[Unit/진단] {name} 피해 적용 — 요청 {damage}, 실제 감소 {previousHealth - _health.CurrentHealth}, " +
             $"체력 {previousHealth} → {_health.CurrentHealth}/{FinalMaxHp}", this);
 
+        // 결과 화면 통계 — 실제 감소량(막타 초과분 제외)만 알린다. 사망 통지보다 먼저 내야
+        // 막타가 보스 격파(Died → 결과 확정)보다 앞서 집계된다. 판정에는 관여하지 않는다.
+        int healthLost = previousHealth - _health.CurrentHealth;
+        if (healthLost > 0 || shieldDealt > 0)
+            CombatStatsEvents.RaiseServerDamageApplied(this, _damageAttackerClientId,
+                healthLost + shieldDealt, _health.CurrentHealth <= 0);
+
         NotifyDeathTransition(previousHealth);
     }
 
@@ -232,6 +239,22 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// 지금 적용 중인 피해의 공격자 clientId. <see cref="ReceiveAttack"/> 이 <see cref="TakeDamage(AttackInfo)"/> 를
+    /// 부르는 동안에만 유효하고, 그 밖(추락·비율·직접 피해 등)에서는 공격자 없음(ulong.MaxValue)이다.
+    /// 파생 몬스터가 간파 성공 통계(<see cref="CombatStatsEvents"/>)를 낼 때 읽는다.
+    /// </summary>
+    protected ulong DamageAttackerClientId => _damageAttackerClientId;
+
+    /// <summary>
+    /// 피격 문맥의 공격자 clientId(플레이어가 아니면 ulong.MaxValue). <see cref="ReceiveAttack"/> 이 끝난 뒤처럼
+    /// <see cref="DamageAttackerClientId"/> 가 이미 되돌려진 시점에 파생 클래스가 쓴다(23호 카운터 성공 통계).
+    /// </summary>
+    protected static ulong GetAttackerClientId(AttackHitContext hitContext)
+    {
+        return ResolveAttackerClientId(hitContext);
     }
 
     static ulong ResolveAttackerClientId(AttackHitContext hitContext)

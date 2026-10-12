@@ -20,7 +20,7 @@ public static class DevBootTarget
 
     /// <summary>
     /// Dev Boot 가 스폰할 플레이어 프리팹 경로(개인 선택). 비어 있으면 NetworkManager 기본값.
-    /// 캐릭터 선택 UI 가 생기기 전까지의 개발용 경로다(메뉴 Dev/Dev Boot/캐릭터).
+    /// 메인 툴바의 Dev Boot 캐릭터 드롭다운(DevBootToolbar, CharacterRoster 목록)에서 고른다.
     /// </summary>
     public static string PlayerPrefabPath
     {
