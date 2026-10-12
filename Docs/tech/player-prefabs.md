@@ -467,6 +467,27 @@ grep -n "AuthorityMode" Assets/2.Prefabs/Player/Player.prefab Assets/2.Prefabs/P
 
 ---
 
+## 10. 회전 잠금 — `PlayerFacingLock` (할 일 27, 2026-10-12)
+
+몸(`Armature`) 회전을 행동이 잠시 묶어 둘 때 쓰는 **원인별 토큰**이다. `PlayerMovement` 가 하나 들고 있다.
+
+- `AcquireFacingLock(cause, direction)` — 그 방향을 보고 잠근다. `ReleaseFacingLock(cause)` — **그 원인만** 푼다.
+  원인이 하나라도 남으면 잠겨 있다. 다른 기능(어쌔신 등)이 잠금을 써도 서로 풀지 않는다.
+- 막는 것: 이동 입력 회전(시뮬레이션 입력 `CanRotate`)·`RotateToward`(추적 회전).
+  **`RotateImmediately` 는 막지 않는다** — 대시 진입·낙하 복귀처럼 행동이 직접 내리는 회전이다.
+  잠금을 건 행동이 끊기면 `PlayerAttackState.Exit` 가 다음 상태 `Enter` 보다 먼저 돌아 잠금이 먼저 풀린다.
+- 현재 사용처: 거너 기본 공격(`GunnerBasicAttack`, 규칙은 `GunnerAttackFacingModel`).
+  - 잠금 시작 = 공격 시작(`BeginRuntime`, 준비 동작 진입) 순간의 조준. 첫 발·홀드·입력 창 발 모두 이 방향이다.
+  - 해제 = 공격 런타임 종료(`ResetRuntime`). **'사격 끝' = `TickServer` 의 마무리 분기(마지막 발 + `ShotRecovery`) → `EndServer`/`EndRpc`**.
+    후딜 시작이 아닌 이유: 후딜 안의 입력 창 클릭이 다음 발을 같은 방향으로 이어 쏠 수 있다.
+    대시·넉백·구속·사망 등 상태 전이로 끊기면 `CancelCurrentAttack` → `ResetRuntime` 으로 즉시 풀린다.
+  - ⚠️ 스턴(상태이상)은 상태 전이가 아니라 거너 평타를 끊지 않는다(기존 동작) — 그동안은 `BlocksMovement` 로 어차피 회전하지 않는다.
+  - 원격: 모든 피어가 시작 RPC 의 같은 방향으로 잠근다. 몸 회전은 오너 권한 `Armature` NetworkTransform 으로 복제되고,
+    빔은 서버가 준 끝점(고정 방향)으로 총구 소켓을 매 프레임 다시 겨누므로(`GunnerBeamView.UpdateBeam`) 몸과 빔이 어긋나지 않는다.
+- 테스트: `GunnerAttackFacingModelTests`(플레이어 EditMode 러너).
+
+---
+
 ## 관련 문서
 
 - [game-structure-uml.md](game-structure-uml.md) — 전체 구조 (§6 의 정정 사항 주의)
