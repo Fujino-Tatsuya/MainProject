@@ -1,7 +1,7 @@
 # 로컬라이징 (한/영)
 
 > 게임에 보이는 문구는 `GameData.xlsx` 의 **`Strings` 시트**, 로비·네트워크 오류 문구는 **`ErrorCodes` 시트**가 원본이다. 코드는 키·오류 코드로만 찾는다.
-> L1(기반) + L2(SO 문구 — 스킬 툴팁·캐릭터 이름 자동 키, [§5](#5-l2--so-문구-자동-키)) + L3(씬·프리팹 라벨·HUD 포맷 문구, [§6](#6-l3--씬프리팹-라벨)) 기준 문서.
+> L1(기반) + L2(SO 문구 — 스킬 툴팁·캐릭터 이름 자동 키, [§5](#5-l2--so-문구-자동-키)) + L3(씬·프리팹 라벨·HUD 포맷 문구, [§6](#6-l3--씬프리팹-라벨)) + L4a(로비·네트워크 오류 코드, [§7](#7-l4--로비네트워크-오류-코드)) 기준 문서.
 > 수치 테이블 쓰는 법은 [data-table.md](data-table.md).
 
 ## 1. 한눈에
@@ -45,7 +45,8 @@ QA·CS 는 화면의 문구나 로그의 코드로 이 시트를 찾아 원인·
 | LOBBY_FULL | 로비 | 호스트 인원 상한 도달 | 다른 방 참가 안내. 반복되면 호스트 인원 설정 확인 | 방이 가득 찼습니다 | The lobby is full |
 | NET_TIMEOUT | 연결 | 핸드셰이크 {sec}초 안에 응답 없음 | 방화벽·IP 확인 후 재시도 | {sec}초 동안 응답이 없습니다 | No response for {sec}s |
 
-> 위 행은 예시다. **실제 오류 코드 목록은 아직 없다**(L4 에서 SessionStartResult 등을 코드화하며 채운다). 지금 시트는 머리글만 있다.
+> 위 행은 열 쓰는 법 예시다(`LOBBY_FULL`·`NET_TIMEOUT` 은 코드에 없다). 실제 코드 목록은 [§7](#7-l4--로비네트워크-오류-코드).
+> 코드 목록은 `ErrorCatalog`(코드) 한 곳이고, Export 가 시트에 없는 코드만 뒤에 붙인다.
 
 | 열 | 누가 | 뜻 |
 |---|---|---|
@@ -84,7 +85,9 @@ Strings·ErrorCodes 두 시트에 똑같이 적용한다(시트마다 따로 검
 - `Tools/Data/Export Template` 은 `Strings`·`ErrorCodes` 시트를 **항상** 만든다 — 키가 하나도 없어도 머리글만 있는 시트가 생긴다.
 - 기존 행(메모 행·`#` 메모 열 포함)은 **병합·덮어쓰기 어느 쪽이든 그대로** 옮긴다. 코드가 등록한 키 중 시트에 없는 것만 뒤에 붙는다(en 은 빈 칸).
   머리글에 없는 열은 Export 때 사라진다(원본은 Export 백업).
-- 코드가 등록하는 Strings 키 = `[DataTableText]` 자동 키 + 캐릭터 이름([§5](#5-l2--so-문구-자동-키)) + L3 UI 문구(`UiStrings`, [§6](#6-l3--씬프리팹-라벨)). 그 밖의 새 키·ErrorCodes 코드는 시트에 직접 행을 추가한다.
+- 코드가 등록하는 Strings 키 = `[DataTableText]` 자동 키 + 캐릭터 이름([§5](#5-l2--so-문구-자동-키)) + L3 UI 문구(`UiStrings`, [§6](#6-l3--씬프리팹-라벨)). 그 밖의 새 Strings 키는 시트에 직접 행을 추가한다.
+- ErrorCodes 코드 = `ErrorCatalog.All`([§7](#7-l4--로비네트워크-오류-코드)). 새 코드는 `ko`·`#분류`·`#원인`·`#조치` 가 채워진 채 붙는다(en 빈 칸).
+  **시트에만 있고 `ErrorCatalog` 에 없는 행은 경고**(오류 아님, 행은 남긴다) — 안 쓰는 코드면 지우거나 `#` 를 붙인다.
 - 🔴 Export 는 xlsx 를 새로 쓴다(서식·열 너비 사라짐) — [data-table.md §4](data-table.md#4-메뉴-toolsdata).
 
 ## 3. 프로그래머 — API
@@ -108,6 +111,7 @@ Loc.Changed += Redraw;           // OnEnable 에서 구독, OnDisable 에서 꼭
 | `Loc.Get(key, fallback)` | 같지만 키가 없거나(빈 키·표 없음 포함) 시트에 행이 없으면 `fallback` — `#key` 를 내지 않는다. SO 인라인 ko 가 있는 자동 키용 |
 | `Loc.Format(key, args)` | `Get` + `{이름}` 치환 — 규칙은 `TutorialGuideText.Fill` 과 같다 |
 | `Loc.GetError(code, args = null)` | ErrorCodes 시트 문구. 폴백은 `Get` 과 같다(코드가 없으면 `#code`, en 이 비면 ko). args 가 있으면 `Format` 처럼 치환 |
+| `Loc.GetError(code, fallback, args)` | 같지만 시트에 행이 없으면 `#code` 대신 `fallback`(코드의 ko 원문)에 args 를 채운다. `ErrorCode.Message` 가 쓴다 |
 | `UserLanguageConfig.Language` | 저장값 직접 접근(이벤트 없음). UI 에서는 `Loc.Current` 를 쓴다 |
 
 - 문구는 **로컬 표시 전용**이다. 네트워크로 문구를 보내지 말고 키(또는 키 + 인자)를 보낸다 — 클라마다 언어가 다를 수 있다. 오류도 마찬가지로 코드만 보낸다.
@@ -152,9 +156,13 @@ Loc.Changed += Redraw;           // OnEnable 에서 구독, OnDisable 에서 꼭
 | `Assets/1.Scripts/Localization/UiStrings.cs` | L3 UI 문구 키 목록(`UiString` = 키 + ko 폴백 + 쓰는 곳) |
 | `Assets/1.Scripts/Localization/Editor/UiStringKeys.cs` | Export 때 `UiStrings.All` 을 Strings 키로 등록(`StringKeyRegistry`) |
 | `Assets/1.Scripts/Localization/Editor/UiStringsAuthoring.cs` | L3 저작 메뉴 `Tools/Localization/L3 — 씬·프리팹 라벨 키 부착` |
+| `Assets/1.Scripts/Localization/ErrorCatalog.cs` | L4 오류 코드 목록(`ErrorCode` = 코드 + 분류·원인·조치 + ko) · 화면 표기(`ErrorDisplay`) |
+| `Assets/1.Scripts/Localization/Editor/ErrorCodeKeys.cs` | Export 때 `ErrorCatalog.All` 을 ErrorCodes 시트로 등록(`StringKeyRegistry.RegisterErrorCodes`) |
+| `Assets/1.Scripts/Network/Session/SessionStartResult.cs` | `SessionError`(코드 + 인자 + 상세) · `SessionStartResult` |
 
 - 테스트: `Tools/Tests/데이터 테이블 EditMode 테스트 실행`(픽스처 `StringTableValidatorTests`·`StringsSheetTests`·`ErrorCodesSheetTests`·`LocTests`·`UserLanguageConfigTests`,
-  L2 `LocKeyTests`·`DataTableTextKeysTests`·`CharacterRosterStringKeysTests`·`LocTextRuleTests`, L3 `UiStringsTests`·`UiStringsFormatTests`·`UiStringsAuthoringTests`).
+  L2 `LocKeyTests`·`DataTableTextKeysTests`·`CharacterRosterStringKeysTests`·`LocTextRuleTests`, L3 `UiStringsTests`·`UiStringsFormatTests`·`UiStringsAuthoringTests`,
+  L4 `ErrorCatalogTests`·`ErrorDisplayTests`).
 
 ## 5. L2 — SO 문구 자동 키
 
@@ -239,3 +247,61 @@ SO·프리팹에 인라인으로 적힌 문구(스킬 툴팁·캐릭터 이름)�
 - 🔴 `UI.Overhead.PlayerLabel` 은 `Player.prefab` 의 직렬화 `labelFormat`(`P{0}`)을 **고치지 않고** 옮겼다 — 시트에 행이 있으면 시트가 이기고, 없으면 `labelFormat` 폴백.
   자리표시자 이름이 다르다(시트 `{n}`, 프리팹 `{0}`). 시트 행이 생기면 `labelFormat` 은 쓰이지 않는다.
 - 새 L3 키는 `UiStrings` 에 필드를 만들고 `All` 에 넣는다. 정적 라벨이면 `UiStringsAuthoring` 대상 표에도 넣고 메뉴를 돌린다.
+
+## 7. L4 — 로비·네트워크 오류 코드
+
+로비 연결·세션 시작이 실패하면 문구 대신 **오류 코드**가 오간다. 코드 목록은 `ErrorCatalog`(코드) 한 곳이고,
+Export 가 ErrorCodes 시트에 없는 코드를 **ko = 지금 문구, `#분류`·`#원인`·`#조치` = 코드에 적힌 메모, en = 빈 칸** 으로 붙인다(이미 있는 행은 안 건드림).
+시트에 행이 생기기 전에도 화면은 ko 원문이다(`#코드` 가 안 나온다).
+
+### 흐름
+
+- `SessionStartResult.Failed(ErrorCode, args, detail)` — 실패 = **코드 + 이름 있는 인자(`{ip}` 등) + 상세**. 프로바이더의 `IsAvailable(out SessionError)` 도 같은 `SessionError` 를 준다.
+- **상세(`Detail`)** = 예외 메시지·Relay `reason`/`status`·NGO `DisconnectReason` 같은 기술 정보. **화면에 안 나온다** — 로그(`SessionError.LogText` = `CODE 인자=값 detail='…'`)에만.
+- 화면 = `SessionError.DisplayText` = 현재 언어 문구 + 줄바꿈 + 작은 글씨 `[CODE]`(`ErrorDisplay.Compose` — `<size=70%>`). 로비는 `LobbySceneManager.ShowError` 하나로 띄우고 같은 줄을 Console·network.log 에 남긴다.
+- 진행 상태 문구(`Relay 방 생성 중...`·`서버 접속 시도 중... (cfg=…)`·`Host 시작됨`·`연결 대상 설정`·조인코드 표시)는 오류가 아니라 **코드화하지 않았다**(개발용 로비 라벨, L3 와 같은 판단).
+- 언어를 바꿔도 이미 떠 있는 오류 문구는 다시 그리지 않는다(다음 오류부터 새 언어).
+
+### 코드 목록
+
+| 코드 | 분류 | 원인 | ko |
+|---|---|---|---|
+| `LOBBY_LAUNCHER_MISSING` | 로비 | NetworkSessionLauncher 배선 없음 | 네트워크 세션 런처를 찾을 수 없습니다. |
+| `LOBBY_UI_MISSING` | 로비 | LobbyUIController 배선 없음(준비 버튼) | 로비 UI 컨트롤러를 찾을 수 없습니다. |
+| `LOBBY_NOT_ALL_READY` | 로비 | 준비 안 된 플레이어가 있는데 시작 | 모든 플레이어가 준비되지 않았습니다. |
+| `NET_IP_EMPTY` | 연결 | IP 입력칸이 빔(로비·IPv4 프로바이더) | IP를 입력하세요. |
+| `NET_IP_INVALID` | 연결 | 로비 — IP 파싱 실패 | IP 형식이 올바르지 않습니다: {ip} |
+| `NET_IPV4_INVALID` | 연결 | IPv4 프로바이더 — IPv4 아님 | IPv4 형식이 올바르지 않습니다: {ip} |
+| `NET_PORT_INVALID` | 연결 | Port 숫자 아님·범위 밖 | Port는 1~65535 범위의 숫자여야 합니다: {port} |
+| `NET_PROVIDER_MISSING` | 연결 | 연결 방식 프로바이더 없음(UnityTransport 없음) | {mode} 연결 방식의 프로바이더가 등록되지 않았습니다. |
+| `NET_START_CANCELED` | 연결 | 준비 중 취소 | 세션 시작이 취소되었습니다. |
+| `NET_PREPARE_FAILED` | 연결 | 프로바이더 준비 중 예상 못 한 예외(상세 = 예외) | 세션 연결 준비에 실패했습니다. |
+| `NET_START_EXCEPTION` | 연결 | 세션 시작 중 예외(상세 = 예외) | 세션 시작 중 예외가 발생했습니다. |
+| `NET_START_FAILED` | 연결 | 코드 없이 실패가 들어옴(개발 문제 — 기본값) | 세션 시작에 실패했습니다. |
+| `NET_HOST_START_FAILED` | 연결 | `StartHost()` false — 대개 포트 점유 | Host 시작에 실패했습니다. 포트가 이미 사용 중인지 확인하세요. |
+| `NET_CLIENT_START_FAILED` | 연결 | `StartClient()` false | Client 시작에 실패했습니다. |
+| `NET_CONNECT_FAILED` | 연결 | 접속 시도 중 끊김(거절 아님) | 서버 접속에 실패했습니다. IP/Port와 Host 상태를 확인하세요. |
+| `NET_REJECTED_BY_HOST` | 연결 | 호스트가 끊음 — 대개 NetworkConfig 해시 불일치 | 호스트가 접속을 거절했습니다. 양쪽 빌드가 같은 버전인지 확인하세요. (내 {cfg}) |
+| `NET_DISCONNECTED` | 연결 | 접속 뒤 내 연결이 끊김 | 서버와의 연결이 끊어졌습니다. |
+| `NET_PLAYER_DISCONNECTED` | 연결 | 호스트 화면 — 다른 플레이어 끊김 | 플레이어(ClientId={clientId})의 연결이 끊어졌습니다. |
+| `NET_TRANSPORT_FAILURE` | 연결 | `OnTransportFailure` | 네트워크 전송 오류가 발생했습니다. |
+| `RELAY_TRANSPORT_MISSING` | Relay | UnityTransport 없음 | Relay 연결에 필요한 UnityTransport를 찾을 수 없습니다. |
+| `RELAY_JOIN_CODE_EMPTY` | Relay | 조인코드 입력칸이 빔 | Relay 조인코드를 입력하세요. |
+| `RELAY_JOIN_CODE_INVALID` | Relay | JoinCodeNotFound·AllocationNotFound·EntityNotFound | Relay 조인코드가 잘못되었거나 만료되었습니다. |
+| `RELAY_INACTIVE_PROJECT` | Relay | InactiveProject | Unity Dashboard에서 이 프로젝트의 Relay 서비스를 활성화하세요. |
+| `RELAY_UNAUTHORIZED` | Relay | Unauthorized·Forbidden | Relay 인증 또는 프로젝트 접근 권한이 없습니다. |
+| `RELAY_PAYMENT_REQUIRED` | Relay | PaymentRequired | Relay 사용 한도 또는 결제 설정을 확인하세요. |
+| `RELAY_RATE_LIMITED` | Relay | RateLimited | Relay 요청 한도를 초과했습니다. 잠시 후 다시 시도하세요. |
+| `RELAY_UNAVAILABLE` | Relay | NoSuitableRelay·ServiceUnavailable·GatewayTimeout | 사용 가능한 Relay 서버가 없습니다. 잠시 후 다시 시도하세요. |
+| `RELAY_JOIN_REJECTED` | Relay | 참가 중 InvalidRequest·Conflict(정원 초과 등) | Relay 방에 참가할 수 없습니다. 조인코드와 방 정원을 확인하세요. |
+| `RELAY_HOST_FAILED` | Relay | 방 생성 중 그 밖의 예외 | Relay 방 생성에 실패했습니다. |
+| `RELAY_JOIN_FAILED` | Relay | 참가 중 그 밖의 예외 | Relay 방 참가에 실패했습니다. |
+| `UGS_PROJECT_NOT_LINKED` | Unity Services | `cloudProjectId` 빔 | Unity Services 프로젝트 연결(cloudProjectId)이 설정되지 않았습니다. |
+| `UGS_INIT_FAILED` | Unity Services | 초기화·익명 로그인 예외(상세 = 예외) | Unity Services 초기화 또는 익명 로그인에 실패했습니다. |
+| `UGS_NOT_INITIALIZED` | Unity Services | 초기화 안 됨 | Unity Services가 초기화되지 않았습니다. |
+| `UGS_INITIALIZING` | Unity Services | 초기화 진행 중 | Unity Services 초기화 중입니다. 잠시 후 다시 시도하세요. |
+| `UGS_NOT_SIGNED_IN` | Unity Services | 익명 로그인 안 됨 | Unity Services 익명 로그인이 완료되지 않았습니다. |
+
+- `#조치` 칸 원문은 `ErrorCatalog.cs` 에 있다(Export 가 시트로 옮긴다). 위 표는 요약이다 — 원문은 코드.
+- 예전 문구에 붙던 예외 메시지(`세션 연결 준비에 실패했습니다: …`·`Relay 방 참가에 실패했습니다: …`)는 상세로 옮겼다 — 화면엔 문구 + 코드만.
+- 새 코드: `ErrorCatalog` 에 필드를 만들고 `All` 에 넣는다(`영역_이름` 대문자, 한 번 정한 코드는 의미를 바꾸지 않는다). 테스트가 `All` 누락·중복·이름 규칙을 잡는다.
