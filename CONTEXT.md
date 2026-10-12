@@ -124,10 +124,13 @@ HUD 매 프레임 문자열(`PlayerHealthHUD`·`StatusEffectHUD`·`SkillCooldown
 - ✅ 1단계 Codex(코드) `09e9cc57` · ✅ 2단계 Claude(씬·에셋·`LobbySceneManager` 배선). 결과 요약 = [player-prefabs.md §8.3](Docs/tech/player-prefabs.md)
 - 🔴 남은 것: **은희 MPPM Play 확인**(호스트+클라2: 초상화·Ready 동기화 / Start 활성 / 고른 Variant 스폰) → PR. 레이아웃은 첫 배치라 Play 보고 조정 가능
 - 범위 밖: 전투 HUD 초상화 Paladin 고정(Gunner 도 Paladin 얼굴)
-## ▶▶ 작업 세션 (2026-10-12 · 민경(Claude) · **카운터 성공 섬광 = 몸 표면 CameraDir 재생**, 브랜치 `feature/VFX`) — 구현 완료 · ⏳ Play·MPPM 확인 · 🔴 경석 공유
+## ▶▶ 작업 세션 (2026-10-12 · 민경(Claude) · **카운터 성공 섬광 = 몸 표면 CameraDir 재생**, 브랜치 `feature/VFX`) — ✅ Play 확인(민경 10-12, 4종 모두) · ⏳ **MPPM 2인 남음** · 🔴 경석 공유
 - `EffectSocketPlayer.PlayOnceOnSurface(Collider)` 추가 — `EffectHitPoint.Resolve(CameraDir)` 로 위치·회전, 배율은 소켓 플레이어 `scale`. 표면 못 쓰면 `PlayOnce`(소켓) 폴백.
 - `MonsterBase.EffectSurfaceCollider` = `hitVFXCollider ?? bodyCollider` (23호는 hitVFXCollider 비어 있음 → 몸 캡슐).
-- Gauntlet·Spinner·Wall·23호 `PlayInterruptFlashRpc` → `interruptFlash.PlayOnceOnSurface(EffectSurfaceCollider)`. 전역 `EffectManager.HitPointMode` 와 무관하게 항상 CameraDir. 프리팹 변경 없음.
+- Gauntlet·Spinner·Wall·23호 `PlayInterruptFlashRpc` → `interruptFlash.PlayOnceOnSurface(EffectSurfaceCollider)`. 전역 `EffectManager.HitPointMode` 와 무관하게 항상 CameraDir.
+- 프리팹: `TwentyThree` 는 소켓을 비우고 배율 1.2 → 1.6(표면이 위치를 정하므로), `TwentyThree_Solo` 는 비어 있던 `interruptFlash` 를 새로 배선. 봇 3종은 소켓을 폴백으로 남겨 뒀다.
+- 🔴 **Play 에서 건틀릿·월봇만 섬광이 낮게 떴다** — Hurtbox 캡슐이 높이 2 로 몸보다 짧아 표면 점이 아래에 찍혔다. 몸 높이에 맞춰 키움(`107f8912`). **피격 판정도 같이 커지므로 경석 확인 요망.** 스피너·23호는 원래 맞았다.
+- ⏳ 남은 것: **MPPM 2인 확인**. CameraDir 는 각 피어가 자기 카메라로 계산하므로 1인 Play 로는 검증되지 않는다. `Camera.main` 이 null 이면 **에러 없이** 소켓 폴백으로 떨어진다.
 
 ## ▶▶ 작업 세션 (2026-10-08 · 민경(Claude) · **웰즈 드론 폭발 = FX_Drone_Explosion_Entry 일회 재생**, 브랜치 `feature/VFX`) — 구현 완료 · ⏳ Play 확인 · 🔴 경석 공유
 - `WellsDroneDataSO`: `explosionVfxPrefab`·`explosionColor`·`explosionGrowScale` 삭제(엔트리 칸 없음 — 카탈로그가 단일 출처). 예고 원 색(`circleOuterColor`·`circleFillColor`)은 유지(결정).
