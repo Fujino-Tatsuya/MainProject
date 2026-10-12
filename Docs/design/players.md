@@ -9,7 +9,7 @@
 - **대쉬 시 무적** (무적 윈도우 동안 피격 무효 — 서버가 판정).
 - **간파 성공 = 우클릭 쿨 감소** (할 일 26): 열린 카운터 창(23호·중간보스 3종·허수아비, 튜토리얼 스피너봇 포함)을 맞혀
   소비하면 그 간파 스킬의 남은 쿨에서 **전체 쿨 × 0.8** 을 뺀다(0 미만은 0). 한 번의 시전에서 여러 대상이 성공해도 1회.
-  빗나감·창 안 열린 대상 적중·일반몹(그로기 누적식)은 해당 없음. 대체 슬롯(어쌔신 변신 우클릭)도 같은 규칙.
+  빗나감·창 안 열린 대상 적중은 해당 없음. **일반 몹은 간파 창이 없어 대상 아님(사용자 결정 10-12)** — 그로기 누적식이라 창 성공 신호가 없다. 대체 슬롯(어쌔신 변신 우클릭)도 같은 규칙.
   비율 = `PlayerGameRuleData.interruptSuccessCooldownReduction`. 구현: `PlayerInterruptSkillBase`(서버 판정) →
   `PlayerSkillController.ReduceCooldownServer` → 오너 HUD 미러. 훅: [tutorial-player-hooks.md](../tech/tutorial-player-hooks.md) `ServerInterruptSucceeded`.
 
