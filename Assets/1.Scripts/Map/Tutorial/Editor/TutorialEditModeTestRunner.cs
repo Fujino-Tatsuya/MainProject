@@ -20,6 +20,7 @@ internal static class TutorialEditModeTestRunner
         "^TutorialTraitWindowModelTests$", // 특성 창(T2) — 열림·닫힘·닫힌 라운드 재표시 금지·획득 토스트·문구
         "^TutorialTraitDeadlineModelTests$", // 특성 창 교착 방지 게이지(15 후속) — 비율·10초 강조·로컬 감소·재동기화
         "^TutorialGuide(Text|SubtitleQueue|Model)Tests$", // 안내 UI(S6) — 문구 변형·치환·대기 포맷·자막 큐·RebuildFromState
+        "^TutorialCharacterLookupTests$", // 캐릭터 판별(15 후속) — PrefabIdHash 로스터 역조회·실패 시 폴백 판정
         "^SpinnerPracticeModelTests$", // 스피너봇 연습(S9) — 모드·창 간격·연속 놓침·스폰 반경 클램프
         "^TutorialZone1ModelTests$", // 존1(S7) — 이동 보고 상한·이동 누적·툴팁 1초·착지·목표 순서·대기 줄
         "^TutorialCorridorModelTests$", // 복도(S8) — 게이트 매핑·복도당 라운드 1번·진행 중 복도·목표 장면

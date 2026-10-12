@@ -11,10 +11,10 @@
 | 파사드(MonoBehaviour) | `Assets/1.Scripts/Tutorial/Guide/TutorialGuideUI.cs` |
 | 순수 로직 | `TutorialGuideText.cs`(변형·치환·mm:ss) · `TutorialSubtitleQueue.cs` · `TutorialGuideModel.cs`(상태·RebuildFromState) |
 | 문구 테이블 타입 / ID 상수 | `TutorialGuideTextTable.cs` / `TutorialGuideIds.cs` |
-| 로컬 플레이어 읽기 | `TutorialLocalPlayerInfo.cs`(캐릭터 식별 · {Q}{E}{P}) |
+| 로컬 플레이어 읽기 | `TutorialLocalPlayerInfo.cs`(캐릭터 식별 · {Q}{E}{P}) · `TutorialCharacterLookup.cs`(로스터 역조회 순수 판정) |
 | HUD 강조 대상 | `TutorialHudTarget.cs`(enum + CombatHUD 경로) · `TutorialHighlightMarker.cs` |
 | 저작 메뉴 | `Editor/TutorialGuideUIAuthoring.cs` — **Tools/UI/튜토리얼 안내 UI 구성** (멱등) |
-| 테스트 | `Editor/TutorialGuideTextTests.cs` · `Editor/TutorialGuideModelTests.cs` |
+| 테스트 | `Editor/TutorialGuideTextTests.cs` · `Editor/TutorialGuideModelTests.cs` · `Editor/TutorialCharacterLookupTests.cs` |
 | 프리팹 | `Assets/2.Prefabs/UI/Tutorial/TutorialGuideUI.prefab` |
 | 문구 SO | `Assets/9.ScriptableObject/Tutorial/Guide/TutorialGuideTexts.asset` |
 
@@ -46,8 +46,16 @@ DontDestroyOnLoad 하지 않는다 — 튜토리얼 씬에 속한다. 부르는 
 
 - **변형**: `id + _PALADIN/_GUNNER/_ASSASSIN` 행이 있고 **문구가 비어 있지 않으면** 그 행, 아니면 기본 id.
   빈 변형 행은 "아직 안 채운 자리" 로 보고 기본으로 내려간다.
-- **캐릭터 식별**: 로스터 id 는 클라에 복제되지 않아 로컬 Player 의 고유 컴포넌트로 본다 —
-  `GunnerHeat` = 거너, `AssassinState` = 어쌔신, `FirstMeleePassive` = 팔라딘. 새 캐릭터가 오면 `TutorialLocalPlayerInfo` 에 한 줄 추가.
+- **캐릭터 식별**(15 후속): 스폰된 Player 의 `NetworkObject.PrefabIdHash` 를 스폰 로스터 항목 `PlayerPrefab` 의 해시와
+  역조회해 로스터 id 를 얻고, 그 항목의 `tutorialCharacter` 필드(`CharacterRoster.asset`, 데이터)로 변형을 고른다.
+  로스터는 스폰과 같은 것 — `NetworkManager` 의 `NetworkLoadingFlowController.CharacterRoster`. 씬 참조 추가 없음.
+  - 해시는 Variant 마다 다르다(Player_Paladin 913233600 · Player_Gunner 816596077 · Player_Assassin 3304217410, 2026-10-12 프리팹 확인)
+    `Instantiate` 가 값을 복사하고 클라는 같은 해시의 프리팹으로 만든다(NetworkPrefab 오버라이드 없음) → **모든 피어가 같은 결과, 복제 불필요.**
+  - 서버 `TutorialDirector.GetClientsOfCharacterServer` 와 클라 `TutorialGuideUI` 문구 변형이 같은 `ResolveCharacter` 를 쓴다.
+  - 역조회 실패(로스터 없음 · 해시 불일치 · `tutorialCharacter` = None)면 경고 1회(상태·해시별) 후 고유 컴포넌트로 폴백 —
+    `GunnerHeat` = 거너, `AssassinState` = 어쌔신, `FirstMeleePassive` = 팔라딘.
+  - 순수 판정 `TutorialCharacterLookup`(테스트 `Editor/TutorialCharacterLookupTests.cs`). 로스터 해시 표는 로스터가 같으면 캐시한다.
+  - 새 캐릭터: `TutorialCharacter` 에 값 추가 + 로스터 항목 `tutorialCharacter` 지정(+ 변형 접미사). 코드 분기 추가 없음.
 - **치환**: `{Q}` `{E}` = 슬롯 스킬 Data 의 툴팁 DisplayName, `{P}` = 패시브 툴팁(IPlayerPassive → IPassiveTooltipProvider, PassiveHUD 와 같은 경로).
   그 밖 `{n}` `{total}` `{mm:ss}` `{키}` `{스킬명}` … 은 호출자 args. 호출자 args 가 {Q}{E}{P} 보다 우선.
   **모르는 자리표시자는 그대로 남기고 경고 없이 통과**(테스트로 고정).

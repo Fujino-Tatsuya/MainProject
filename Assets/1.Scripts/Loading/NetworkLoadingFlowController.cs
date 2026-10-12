@@ -513,6 +513,9 @@ public class NetworkLoadingFlowController : MonoBehaviour
             $"position={spawnPose.position}.");
     }
 
+    /// <summary>스폰에 쓰는 캐릭터 로스터(튜토리얼 캐릭터 판별이 PrefabIdHash 역조회에 쓴다).</summary>
+    public CharacterRoster CharacterRoster => characterRoster;
+
     private GameObject ResolvePlayerPrefabForClient(ulong clientId)
     {
         if (ServerCharacterSelectionStore.TryGet(clientId, out var characterId) &&
