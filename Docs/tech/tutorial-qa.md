@@ -29,7 +29,7 @@
 | `[TutorialTrait]` | 특성 디렉터 | 배율 < 1 경고(나오면 안 됨) |
 | `[TutorialGuide]` | 안내 UI | 문구 행 없음 경고(나오면 안 됨) |
 | `[TutorialBarrier]` | 배리어 | 생성·열림 |
-| `[BossTimer]` | 타이머(경석) | `튜토리얼 스테이지 — 맵 생성 자동 시작을 건너뛴다` · `제한시간 시작 — 420초` · `보스방 도착 — 제한시간 종료` |
+| `[BossTimer]` | 타이머(경석) | `튜토리얼 스테이지 — 맵 생성 자동 시작을 건너뛴다` · `제한시간 시작 — 90초` · `보스방 도착 — 제한시간 종료` |
 | `[TutorialDebug]` | 디버그 메뉴 | 강제 개방·장부 |
 | `[BridgeGate]` | 다리(경석) | 고정 조각 에러 1줄(알려진 거짓 경보 — §4) |
 
@@ -103,7 +103,8 @@
 
 ### 존4 — S10 (→ tutorial-zone4, tutorial-director §9)
 - [ ] 첫 진입 → 단계 Zone4Lore · **타이머 빈 게이지 처음 등장 + 펄스** · 자막 `TUT_Z4_LORE` → `TUT_Z4_TIMER_HINT` · 몬스터 안 움직임 · 로그 `존4 설정 자막 시작 — 10초 뒤 G8`.
-- [ ] 10초 뒤 **G8** · 로그 `[Tutorial] G8 → 보스 타이머 시작 420초` · `[BossTimer] 제한시간 시작 — 420초` · 게이지 차오름 · 단계 Zone4Combat · `TUT_Z4_START` → `TUT_Z4_PANEL_INTRO` · 목표 `TUT_Z4_PANEL_GOAL` 0/4 · 펄스 끔.
+- [ ] 10초 뒤 **G8** · 로그 `[Tutorial] G8 → 보스 타이머 시작 90초` · `[BossTimer] 제한시간 시작 — 90초` · 게이지 차오름 · 단계 Zone4Combat · `TUT_Z4_START` → `TUT_Z4_PANEL_INTRO` · 목표 `TUT_Z4_PANEL_GOAL` 0/4 · 펄스 끔.
+- [ ] **보스 타이머 90초로 시작**(D6, 10-12 420→90) — G8 로그 숫자가 90 · 게이지가 약 90초에 다 찬다. 420 이 보이면 씬 디렉터 `bossTimerLimitSeconds` 오버라이드 확인.
 - [ ] G8 **3초 뒤** 일반 몹 기상(중간보스는 그대로 휴면).
 - [ ] 패널 F(반경 2.5m) → 목표 1/4… · 첫 패널만 `TUT_Z4_PANEL_FIRST`.
 - [ ] 4/4 → 목표 `TUT_Z4_MIDBOSS` · 1.5초 뒤 다리 개통 · `TUT_Z4_BRIDGE` · **중간보스 기상** · 가장 가까운 계단 + 중간보스 강조. 다리 전엔 원거리로 중간보스를 못 잡는다(무적).
@@ -165,7 +166,7 @@
 ### 파티 공통 진행
 - [ ] 존2 기상·처치 n/9 가 양쪽에 같다.
 - [ ] 존3 간파 합계가 **파티 공통**(누가 성공해도 1칸), 한 창에 두 명이 동시에 눌러도 1번만.
-- [ ] 존4 설정 자막이 **전원 동시** · 타이머 게이지 같은 속도(420초) · 패널은 누가 켜도 공유 · 다리 개통·중간보스 기상 동기.
+- [ ] 존4 설정 자막이 **전원 동시** · 타이머 게이지 같은 속도(90초) · 패널은 누가 켜도 공유 · 다리 개통·중간보스 기상 동기.
 - [ ] G10 → `TUT_B_PAD_WARN` **모든 피어** · 한 명이 패드를 밟으면 3초 뒤 **완전 사망이 아닌 전원(영혼 포함)** 이동.
 - [ ] 엘리베이터 문 열림이 패드 활성과 맞는다(클라 포함).
 
@@ -249,6 +250,6 @@
   - 특성 문구 `TutorialTraitTextTable.entries[]` — `id` · `text`(`[DataTableText]`, `{location}` 표기 변경 필요).
   - 특성 `TutorialTraitDefinition` — `id`·`displayName`·`description`(`[DataTableText]`)·`value`(+ enum `effectKind`·`triggerAttackType`·`cooldownSlot` 은 int 열 또는 인스펙터 유지 결정).
   - 특성 풀 `TutorialTraitPool.offerCount`.
-  - 그 밖 튜닝값 후보(지금은 인스펙터): 디렉터 `deadlockSeconds` 60 · `bossTimerLimitSeconds` 420 · 사망 `reviveDelaySeconds` 3 · 존4 `loreSeconds` 10 · 스피너 `windowInterval` 9.
+  - 그 밖 튜닝값 후보(지금은 인스펙터): 디렉터 `deadlockSeconds` 60 · `bossTimerLimitSeconds` 90 · 사망 `reviveDelaySeconds` 3 · 존4 `loreSeconds` 10 · 스피너 `windowInterval` 9.
 - [ ] D1 팀장 합의 완료(§4).
 - [ ] 이 문서 1~3부 사람 확인 완료.

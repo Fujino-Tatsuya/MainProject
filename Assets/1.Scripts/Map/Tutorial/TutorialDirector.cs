@@ -22,7 +22,7 @@ using UnityEngine;
 ///  · S3 배리어 ✅ → <see cref="TutorialBarriers"/>(모든 피어)가 <see cref="StateChanged"/>·<see cref="GateOpened"/> 를 받아 <see cref="IsGateOpen"/> 으로 적용
 ///  · S4 존 장부 ✅ → <see cref="TutorialMonsterZones"/>: 활성 때 존2~4 휴면, 존 클리어 → <see cref="RequestGateServer"/>(G3·G6·G9, 차례 전이면 보류),
 ///    존2 처치 → Zone2Kills(목표 = 장부 수). 기상 = <see cref="SetZoneDormantServer"/>(S8·S9·S10 이 부른다)
-///  · S5 타이머·보스 길 ✅ → <b>G8 열림 = 타이머 시작</b>(<see cref="StartBossTimerServer"/>, 420초 — 단일 기준 <see cref="IsBossTimerStarted"/>),
+///  · S5 타이머·보스 길 ✅ → <b>G8 열림 = 타이머 시작</b>(<see cref="StartBossTimerServer"/>, 90초 —단일 기준 <see cref="IsBossTimerStarted"/>),
 ///    타이머 HUD 표시(<see cref="ShowTimerHudServer"/> — S10 Z4-0 이 부른다), G10 → 패드·엘리베이터 문(<see cref="TutorialBossPath"/>·<see cref="TutorialElevatorDoor"/>),
 ///    보스방 도착(패드·만료 강제 이동 모두) → 단계 Finished + <see cref="BossRoomArrived"/>(S12 안내 종료)
 ///  · S10 존4 → Z4-0 <see cref="ShowTimerHudServer"/> · 설정 자막 끝 <see cref="StartBossTimerServer"/>(= G8) · 만료 문구는 BossTimerManager.State == Expired

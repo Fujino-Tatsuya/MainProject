@@ -20,7 +20,7 @@ using UnityEngine;
 ///    (하나의 NetworkObject 에 NetworkBehaviour 가 여럿인 것은 정상이다.)
 ///
 /// 튜토리얼(할 일 15 S5 — Docs/tech/handoff-tutorial.md §3): <see cref="TutorialBossPath.ShouldAutoStartTimer"/> 가 false 면
-/// 1) 의 자동 시작을 건너뛰고 Idle 로 둔다 → 디렉터가 G8 에서 <see cref="StartTimerServer"/>(420초)로 시작한다.
+/// 1) 의 자동 시작을 건너뛰고 Idle 로 둔다 → 디렉터가 G8 에서 <see cref="StartTimerServer"/>(90초)로 시작한다.
 /// 만료·도착 계약(3·4)은 그대로다.
 /// </summary>
 [DisallowMultipleComponent]

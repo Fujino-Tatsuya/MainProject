@@ -8,8 +8,8 @@
 /// </summary>
 public static class TutorialBossPathRules
 {
-    /// <summary>튜토리얼 제한시간(D6) — 존4 처치량·이동·복도4 특성 선택 추정 250~330초 + 여유.</summary>
-    public const float DefaultTutorialTimerLimitSeconds = 420f;
+    /// <summary>튜토리얼 제한시간(D6) — 90초(10-12 420초에서 단축). 씬 디렉터 인스펙터 <c>bossTimerLimitSeconds</c> 와 같은 값.</summary>
+    public const float DefaultTutorialTimerLimitSeconds = 90f;
 
     /// <summary>맵 생성 직후 타이머를 자동으로 시작하는가. 튜토리얼이면 끈다 — G8(존4 설정 자막 뒤)에서 서버가 시작한다(D1).</summary>
     public static bool ShouldAutoStartTimer(bool isTutorial) => !isTutorial;

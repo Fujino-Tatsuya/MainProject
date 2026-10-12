@@ -5350,7 +5350,7 @@ MonoBehaviour:
   zone2KillTarget: 9
   zone3InterruptTarget: 3
   zone4PanelTarget: 4
-  bossTimerLimitSeconds: 420
+  bossTimerLimitSeconds: 90
   areaPollInterval: 0.15
   areaEnterMargin: 0.5
   areaExitMargin: 1
