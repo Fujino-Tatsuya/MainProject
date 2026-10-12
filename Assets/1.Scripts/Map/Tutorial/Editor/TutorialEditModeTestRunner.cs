@@ -16,7 +16,7 @@ internal static class TutorialEditModeTestRunner
         "^TutorialBackBarrierRulesTests$", // 개인 뒤 배리어(15 후속) — 지남 판정·마스크 유지·로컬 콜라이더 목록
         "^TutorialMonsterLedgerTests$",
         "^TutorialBossPathRulesTests$",
-        "^TutorialDeathRulesTests$",
+        "^TutorialDeathRulesTests$", // 사망 규칙(S11) + 부활 지점 — 뒤 배리어 예외(C2)·보스 진입 패드 제외·G10 앞 폴백(C3)
         "^TutorialTraitSelectionModelTests$", // 특성(T1) — 후보 뽑기·중복 제외·선택 검증·자동 획득·라운드 완료
         "^TutorialTraitWindowModelTests$", // 특성 창(T2) — 열림·닫힘·닫힌 라운드 재표시 금지·획득 토스트·문구
         "^TutorialTraitDeadlineModelTests$", // 특성 창 교착 방지 게이지(15 후속) — 비율·10초 강조·로컬 감소·재동기화

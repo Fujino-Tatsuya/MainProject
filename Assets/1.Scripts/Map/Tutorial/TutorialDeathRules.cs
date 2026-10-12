@@ -19,6 +19,8 @@ using UnityEngine;
 ///  · 부활 지점 = 지금 단계 구간의 안전한 지점(<see cref="TutorialRevivePointRules"/>) — 격자 후보를 바닥·점유 검사로 거른 뒤 고른다.
 ///    그 플레이어의 뒤 배리어 너머(지나온 최전방 구간보다 뒤 · 지난 배리어 앞면에서 여유 미만)는 빼고, 단계 구간이 그보다 뒤면 올린다(C2).
 ///  · 추락 복구의 스폰 폴백(존1)이 그 플레이어의 뒤 배리어 너머면 같은 규칙의 안전 지점을 대신 준다(<see cref="PlayerSafePointTracker.ReturnPointFallback"/>).
+///  · 보스 진입 패드 범위 + 1m 안은 부활·추락 복구 지점에서 뺀다(C3 — <see cref="ServerPadAreas"/>). G10 을 지난 사람의 보스 진입 존 후보가
+///    전부 빠지면 G10 배리어 바로 앞(보스 진입 존 쪽, 패드 밖)으로. 추락 복구 거름(<see cref="TutorialBarriers.IsReturnPointAllowed"/>)도 같은 범위를 뺀다.
 ///  · 보스방 이동 카운트다운(<see cref="BossTeleportManager.IsCountdownActive"/> — 패드·타이머 만료 강제 이동 공통)이 보이면
 ///    대기 부활을 즉시·그 자리로 바꾼다. 튜토리얼 구간 밖(보스방)에 있는 사람도 그 자리에서 되살린다(옛 구간으로 끌고 가지 않음).
 ///  · 보스방 도착(<see cref="BossTeleportManager.AlivePlayersArrived"/>/<see cref="BossTeleportManager.ArrivalAborted"/>) 또는
@@ -365,13 +367,75 @@ public sealed class TutorialDeathRules : MonoBehaviour
         }
 
         CollectThreats();
-        if (!TutorialRevivePointRules.TrySelect(_candidates, _threats, step, mask, passed, deathPos.x, deathPos.z, out int index, out safe))
-            return false;
+        IReadOnlyList<TutorialPadArea> pads = ServerPadAreas();
+        if (TutorialRevivePointRules.TrySelect(_candidates, _threats, step, mask, passed, deathPos.x, deathPos.z,
+                                               pads, TutorialRevivePointRules.DefaultPadMargin, out int index, out safe))
+        {
+            TutorialRevivePoint chosen = _candidates[index];
+            point = new Vector3(chosen.X, _candidateY[index], chosen.Z);
+            area = chosen.Area;
+            return true;
+        }
 
-        TutorialRevivePoint chosen = _candidates[index];
-        point = new Vector3(chosen.X, _candidateY[index], chosen.Z);
-        area = chosen.Area;
-        return true;
+        // 패드 제외(C3)로 남는 후보가 없다 — G10 을 지난 사람(보스 진입 존 차례)만 G10 배리어 바로 앞으로.
+        if (pads.Count == 0 || TutorialBackBarrierRules.FrontmostPassedArea(passed) != TutorialArea.BossEnter) return false;
+        return TryPadFallback(pads, floorY, clearance, out point, out safe, out area);
+    }
+
+    private bool TryPadFallback(IReadOnlyList<TutorialPadArea> pads, float floorY, float clearance,
+                                out Vector3 point, out bool safe, out TutorialArea area)
+    {
+        point = default;
+        safe = false;
+        area = TutorialArea.None;
+        if (_barrierSpecs == null) return false;
+        foreach (TutorialBarrierSpec s in _barrierSpecs)
+        {
+            if (s.Gate != TutorialGate.G10_BossEnterAndPad) continue;
+            _grid.Clear();
+            TutorialRevivePointRules.PadFallbackCandidates(s, pads, TutorialRevivePointRules.DefaultPadMargin,
+                                                           TutorialRevivePointRules.DefaultPadFallbackDistance, clearance, _grid);
+            foreach ((float x, float z) in _grid)
+            {
+                if (!TryResolveStandPoint(x, z, floorY, out float y)) continue;
+                point = new Vector3(x, y, z);
+                safe = TutorialRevivePointRules.Clearance(x, z, _threats) >= 0f;
+                area = TutorialArea.BossEnter;
+                Edit.Log($"[Tutorial] 부활 지점 — 보스 진입 존 후보가 모두 패드 범위라 G10 배리어 앞 {point} 으로.", this);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // ─── 보스 진입 패드 범위(C3) ─────────────────────────────────────────
+
+    private static readonly List<TutorialPadArea> PadAreas = new List<TutorialPadArea>();
+    private static readonly List<Collider> PadColliders = new List<Collider>();
+    private static int _padAreasFrame = -1;
+
+    /// <summary>
+    /// [서버] 씬의 보스 진입 패드(<see cref="BossEnterTrigger"/> — 서버에만 붙는다) 트리거 콜라이더 범위를 XZ 로 투영한 목록(여러 패드면 전부).
+    /// 박스·메시 = bounds 사각형, 구·캡슐 = bounds 중심 원. 패드가 없으면(클라·비튜토리얼·아직 스폰 전) 빈 목록. 프레임당 한 번 다시 읽는다.
+    /// </summary>
+    public static IReadOnlyList<TutorialPadArea> ServerPadAreas()
+    {
+        if (_padAreasFrame == Time.frameCount) return PadAreas;
+        _padAreasFrame = Time.frameCount;
+        PadAreas.Clear();
+        foreach (BossEnterTrigger t in FindObjectsByType<BossEnterTrigger>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+        {
+            t.GetComponents(PadColliders);
+            foreach (Collider c in PadColliders)
+            {
+                if (c == null || !c.enabled || !c.isTrigger) continue;
+                Bounds b = c.bounds;
+                PadAreas.Add(c is SphereCollider || c is CapsuleCollider
+                    ? TutorialPadArea.Circle(b.center.x, b.center.z, Mathf.Max(b.extents.x, b.extents.z))
+                    : TutorialPadArea.Box(b.min.x, b.min.z, b.max.x, b.max.z));
+            }
+        }
+        return PadAreas;
     }
 
     // 1층 평평한 바닥이 있고 서 있을 자리가 비었는가(벽·배리어(Wall)·소품 점유 제외).

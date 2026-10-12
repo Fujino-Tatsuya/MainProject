@@ -239,4 +239,29 @@ public sealed class TutorialBackBarrierRulesTests
         Assert.IsTrue(TutorialBackBarrierRules.IsReturnPointAllowed(t, s, 15f, 0f, opened, 0, Clear), "뒤에 남은 동료(마스크 0)는 복도1 허용");
         Assert.IsTrue(TutorialBackBarrierRules.IsReturnPointAllowed(null, s, 5f, 0f, opened, passed, Clear), "구간 없음 — 막지 않는다");
     }
+
+    [Test]
+    public void 추락_복구는_보스_진입_패드와_여유_1m_안을_거부한다()
+    {
+        TutorialAreaTracker t = NewStage();
+        List<TutorialBarrierSpec> s = Specs(t);
+        int opened = 0;
+        for (int g = 0; g <= (int)TutorialGate.G10_BossEnterAndPad; g++) opened |= 1 << g;
+        int passed = opened & TutorialBackBarrierRules.AllBarrierMask;   // G10 을 지난 사람
+        var box = new List<TutorialPadArea> { TutorialPadArea.Box(-17f, 18f, -13f, 22f) };
+        var circle = new List<TutorialPadArea> { TutorialPadArea.Circle(-15f, 20f, 2f) };
+
+        Assert.IsTrue(TutorialBackBarrierRules.IsReturnPointAllowed(t, s, -15f, 20f, opened, passed, Clear), "패드 정보 없음 — 기존 허용");
+        Assert.IsTrue(TutorialBackBarrierRules.IsReturnPointAllowed(t, s, -15f, 20f, opened, passed, Clear, new List<TutorialPadArea>()));
+
+        foreach (List<TutorialPadArea> pads in new[] { box, circle })
+        {
+            Assert.IsFalse(TutorialBackBarrierRules.IsReturnPointAllowed(t, s, -15f, 20f, opened, passed, Clear, pads), "패드 위");
+            Assert.IsFalse(TutorialBackBarrierRules.IsReturnPointAllowed(t, s, -12.5f, 20f, opened, passed, Clear, pads), "여유 1m 안");
+            Assert.IsTrue(TutorialBackBarrierRules.IsReturnPointAllowed(t, s, -11.5f, 20f, opened, passed, Clear, pads), "여유 밖");
+            Assert.IsFalse(TutorialBackBarrierRules.IsReturnPointAllowed(t, s, -15f, 20f, opened, 0, Clear, pads), "G10 을 안 지난 사람도 패드는 거부");
+        }
+        Assert.IsTrue(TutorialBackBarrierRules.IsReturnPointAllowed(t, s, -11.5f, 20f, opened, passed, Clear, box), "패드 밖 규칙은 그대로");
+        Assert.IsFalse(TutorialBackBarrierRules.IsReturnPointAllowed(t, s, -5f, 20f, opened, passed, Clear, box), "복도4 는 여전히 뒤 배리어 너머");
+    }
 }

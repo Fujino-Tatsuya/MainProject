@@ -82,10 +82,15 @@ public static class TutorialBackBarrierRules
     /// [서버, 추락 복구] 그 플레이어 기준 복귀 후보 허용 — 점을 품은 구간 중 하나라도 (들어갈 수 있고 · 뒤 배리어 너머가 아니고 ·
     /// 지난 배리어 앞면에서 <paramref name="clearance"/> 이상)이면 허용. 품은 구간이 없으면(보스방 등) 허용.
     /// <paramref name="passedMask"/> = 0 이면 <see cref="TutorialBarrierRules.IsPointReachable"/> 과 같다.
+    /// 보스 진입 패드(C3): <paramref name="pads"/> 범위 + <paramref name="padMargin"/> 안이면 누구든 거부한다(복귀만으로 카운트다운 시작 방지).
+    /// 패드 정보가 없으면(null·빈 목록) 기존 동작.
     /// </summary>
     public static bool IsReturnPointAllowed(TutorialAreaTracker areas, IReadOnlyList<TutorialBarrierSpec> specs, float x, float z,
-                                            int openedGateMask, int passedMask, float clearance)
+                                            int openedGateMask, int passedMask, float clearance,
+                                            IReadOnlyList<TutorialPadArea> pads = null,
+                                            float padMargin = TutorialRevivePointRules.DefaultPadMargin)
     {
+        if (TutorialRevivePointRules.IsOnPad(pads, x, z, padMargin)) return false;
         if (areas == null) return true;
         TutorialArea front = FrontmostPassedArea(passedMask);
         bool inAny = false;

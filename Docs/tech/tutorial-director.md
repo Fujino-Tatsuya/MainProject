@@ -156,7 +156,8 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
   옮긴 자리는 지난 배리어 앞면에서 여유(0.75m) 이상 + 부활 격자 inset 1m 라 로컬 뒤 배리어와 겹치지 않는다. 혹시 겹쳐도 C1 의 '켤 때 겹치면 다음 프레임' 재시도가 그대로 있다
   (이미 켜진 콜라이더는 옮긴 뒤에도 끄지 않는다 — 갇힐 자리로는 애초에 안 보낸다).
 - 타이머 만료·패드 강제 이동·초기 스폰은 바뀐 것 없음(위 마스크 0·튜토리얼 밖 근거).
-- ⚠️ G10 을 지난 사람이 보스 진입 존에서 부활할 때 격자점이 패드 위일 수 있다(카운트다운 조건은 기존 패드 규칙 — 이 변경으로 달라지지 않음). Play 확인 항목.
+- 보스 진입 패드 제외(C3, 2026-10-12): 부활·추락 복구 지점은 패드 범위 + 1m 밖만 — G10 을 지난 사람이 보스 진입 존에서 부활·추락 복구해도 패드 위에 내리지 않아
+  카운트다운이 시작되지 않는다. 상세 §11 '보스 진입 패드 제외'.
 
 ## 8. 존 장부 · 몬스터 휴면 (S4)
 > 코드: `TutorialMonsterLedger`(순수 — 존 배정·클리어 규칙·필터) · `TutorialMonsterZones`(서버 — MonsterBase 참조·휴면 적용·사망 구독) · `TutorialDirector`(배선·API) ·
@@ -330,3 +331,12 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
 - **개인 뒤 배리어(C2, §7)**: 부활 지점은 그 플레이어(clientId)가 지나온 최전방 구간 이상 — 단계 구간이 그보다 뒤면 올린다(`ResolveStageArea(step, mask, passed)`·`AreaOrder(step, mask, passed)`).
   지난 배리어 앞면 여유(`BackBarrierClearance`) 안 격자점은 버린다. G10 을 지난 사람은 예외로 보스 진입 존. 마스크 0(뒤에 남은 동료)은 위 규칙 그대로.
   같은 탐색이 추락 복구 스폰 폴백의 대체 지점(`PlayerSafePointTracker.ReturnPointFallback`)도 준다. 테스트: `TutorialDeathRulesTests` 의 뒤 배리어 4건.
+- **보스 진입 패드 제외(C3, 2026-10-12)**: G10 을 지난 사람은 보스 진입 존에서 부활하므로, 부활 격자점이 진입 패드 위면 부활만으로 보스방 카운트다운이 시작될 수 있었다.
+  - 패드 범위 = 서버 씬의 모든 `BossEnterTrigger` GameObject 의 켜진 **트리거** 콜라이더 bounds 를 XZ 로 투영(`TutorialDeathRules.ServerPadAreas()` — 박스·메시 = 사각형, 구·캡슐 = 원, 프레임당 1회 갱신).
+    트리거는 서버에만 붙으므로 클라·비튜토리얼·스폰 전이면 빈 목록 = 기존 동작.
+  - 순수 규칙 `TutorialPadArea`·`TutorialRevivePointRules.IsOnPad`·`TrySelect(…, pads, padMargin, …)`: 패드 범위 + `DefaultPadMargin`(1m) 안 후보는 안전 후보·'가장 먼 후보' 폴백 모두에서 뺀다.
+  - 빼고 나서 후보가 없고 그 사람이 G10 을 지났으면 폴백 = `PadFallbackCandidates` — G10 배리어 앞면에서 보스 진입 존 쪽 1m·가로 가운데.
+    그 점이 패드 여유 안이면 더 안쪽(패드 쪽)으로 가지 않고 ① 배리어 쪽 `BackBarrierClearance`(0.75m) 지점 ② 배리어를 따라 옆으로 0.5m 간격(배리어 박스 가로 끝 1m 안쪽까지).
+    배리어 앞면 0.75m 미만으로는 붙이지 않는다(개인 뒤 배리어 콜라이더 끼임 방지). 바닥·점유 검사를 통과한 첫 점. 그래도 없으면 기존대로 그 자리.
+  - 추락 복구: 거름(`TutorialBackBarrierRules.IsReturnPointAllowed(…, pads)` — `TutorialBarriers.IsReturnPointAllowed` 가 넘김)이 패드 범위 + 1m 를 **누구에게나** 거부하고,
+    스폰 폴백 대체(`ReturnPointFallback`)는 위 부활 탐색을 그대로 쓴다. 테스트: `TutorialDeathRulesTests` 패드 5건 · `TutorialBackBarrierRulesTests` 패드 1건.

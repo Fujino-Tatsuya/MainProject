@@ -220,7 +220,7 @@ public sealed class TutorialBarriers : MonoBehaviour
 
     /// <summary>
     /// [서버, 추락 복구] 닫힌 배리어 너머(아직 못 들어가는 구간)의 점이거나, <paramref name="clientId"/> 의 뒤 배리어 너머
-    /// (지나온 최전방 구간보다 뒤 · 지난 배리어 앞면에서 여유 미만)면 false. 튜토리얼 구간 밖은 true.
+    /// (지나온 최전방 구간보다 뒤 · 지난 배리어 앞면에서 여유 미만)면 false. 보스 진입 패드 범위 + 1m 안도 false(C3). 그 밖의 튜토리얼 구간 밖은 true.
     /// 마스크는 그 클라이언트의 서버 원본(<see cref="TutorialDirector.GetBackBarrierMaskServer"/>) — 호스트 로컬 플레이어 값이 아니다.
     /// </summary>
     public bool IsReturnPointAllowed(ulong clientId, Vector3 p)
@@ -232,7 +232,8 @@ public sealed class TutorialBarriers : MonoBehaviour
         for (int g = 0; g < TutorialFlowModel.GateCount; g++)
             if (d.IsGateOpen((TutorialGate)g)) mask |= 1 << g;
         return TutorialBackBarrierRules.IsReturnPointAllowed(_areas, _specs, p.x, p.z, mask,
-                                                             d.GetBackBarrierMaskServer(clientId), d.BackBarrierClearance);
+                                                             d.GetBackBarrierMaskServer(clientId), d.BackBarrierClearance,
+                                                             TutorialDeathRules.ServerPadAreas());
     }
 
     // ─── 생성(런타임·에디터 미리보기 공용) ─────────────────────────────────

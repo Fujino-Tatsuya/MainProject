@@ -418,4 +418,130 @@ public sealed class TutorialDeathRulesTests
         Assert.That(TutorialRevivePointRules.TrySelect(c, null, TutorialStep.BossEnter, mask, passedToCorridor4, -15f, 20f, out i, out _), Is.True);
         Assert.That(i, Is.EqualTo(0), "G10 을 안 지났으면 기존대로 보스 진입 존 제외(복도4)");
     }
+
+    // ─── 보스 진입 패드 제외(15 후속 C3) ─────────────────────────────────
+
+    const float PadMargin = TutorialRevivePointRules.DefaultPadMargin;
+    const float Clear = TutorialBackBarrierRules.DefaultClearance;
+
+    static int AllOpen => MaskUpTo(TutorialGate.G10_BossEnterAndPad);
+    static int PassedG10 => MaskUpTo(TutorialGate.G10_BossEnterAndPad) & TutorialBackBarrierRules.AllBarrierMask;
+
+    // 보스 진입 존 후보 — 패드 위 · 패드 여유(1m) 안 · 여유 밖
+    static List<TutorialRevivePoint> BossEnterCandidates() => new List<TutorialRevivePoint>
+    {
+        new TutorialRevivePoint(-15f, 20f, TutorialArea.BossEnter),
+        new TutorialRevivePoint(-12.5f, 20f, TutorialArea.BossEnter),
+        new TutorialRevivePoint(-11.5f, 20f, TutorialArea.BossEnter),
+    };
+
+    // TutorialBackBarrierRulesTests 와 같은 스테이지 — 복도4 x −10~0(−x 진행) → 보스 진입 x −20~−10. G10 앞면 x −10.
+    static TutorialBarrierSpec G10Spec()
+    {
+        var t = new TutorialAreaTracker();
+        t.SetArea(TutorialArea.Zone1, TutorialRect.FromMinMax(0f, -5f, 10f, 5f));
+        t.SetArea(TutorialArea.Corridor1, TutorialRect.FromMinMax(10f, -2f, 20f, 2f));
+        t.SetArea(TutorialArea.Zone2, TutorialRect.FromMinMax(20f, -5f, 30f, 5f));
+        t.SetArea(TutorialArea.Corridor2, TutorialRect.FromMinMax(23f, 5f, 27f, 15f));
+        t.SetArea(TutorialArea.Zone3, TutorialRect.FromMinMax(20f, 15f, 30f, 25f));
+        t.SetArea(TutorialArea.Corridor3, TutorialRect.FromMinMax(10f, 18f, 20f, 22f));
+        t.SetArea(TutorialArea.Zone4, TutorialRect.FromMinMax(0f, 15f, 10f, 25f));
+        t.SetArea(TutorialArea.Corridor4, TutorialRect.FromMinMax(-10f, 18f, 0f, 22f));
+        t.SetArea(TutorialArea.BossEnter, TutorialRect.FromMinMax(-20f, 15f, -10f, 25f));
+        foreach (TutorialBarrierSpec s in TutorialBarrierRules.BuildSpecs(t, TutorialBarrierRules.DefaultThickness,
+                                                                         TutorialBarrierRules.DefaultSideOverlap, out _))
+            if (s.Gate == TutorialGate.G10_BossEnterAndPad) return s;
+        Assert.Fail("G10 배리어 없음");
+        return default;
+    }
+
+    [Test]
+    public void 패드_사각형_여유안_후보는_빼고_밖_후보는_쓴다()
+    {
+        var pads = new List<TutorialPadArea> { TutorialPadArea.Box(-17f, 18f, -13f, 22f) };   // 4×4, 가장자리 x −13
+        Assert.That(TutorialRevivePointRules.TrySelect(BossEnterCandidates(), null, TutorialStep.BossEnter, AllOpen, PassedG10, -15f, 20f,
+                                                       pads, PadMargin, out int i, out bool safe), Is.True);
+        Assert.That(i, Is.EqualTo(2), "패드 위(−15)·여유 1m 안(−12.5) 제외 — 여유 밖(−11.5)");
+        Assert.That(safe, Is.True);
+    }
+
+    [Test]
+    public void 패드_원_여유안_후보는_빼고_밖_후보는_쓴다()
+    {
+        var pads = new List<TutorialPadArea> { TutorialPadArea.Circle(-15f, 20f, 2f) };   // 반경 2 + 여유 1 = 3
+        Assert.That(TutorialRevivePointRules.TrySelect(BossEnterCandidates(), null, TutorialStep.BossEnter, AllOpen, PassedG10, -15f, 20f,
+                                                       pads, PadMargin, out int i, out _), Is.True);
+        Assert.That(i, Is.EqualTo(2), "거리 2.5 는 제외, 3.5 는 사용");
+
+        Assert.That(TutorialRevivePointRules.IsOnPad(pads, -15f, 22.9f, PadMargin), Is.True);
+        Assert.That(TutorialRevivePointRules.IsOnPad(pads, -15f, 23.1f, PadMargin), Is.False);
+    }
+
+    [Test]
+    public void 패드_후보는_가장_먼_후보_폴백에서도_쓰지_않는다()
+    {
+        var pads = new List<TutorialPadArea> { TutorialPadArea.Box(-17f, 18f, -13f, 22f) };
+        var threats = new List<TutorialThreat> { new TutorialThreat(-11.5f, 20f, 100f) };   // 전부 위험 — 패드 위가 가장 멀다
+        Assert.That(TutorialRevivePointRules.TrySelect(BossEnterCandidates(), threats, TutorialStep.BossEnter, AllOpen, PassedG10, -15f, 20f,
+                                                       pads, PadMargin, out int i, out bool safe), Is.True);
+        Assert.That(i, Is.EqualTo(2));
+        Assert.That(safe, Is.False);
+    }
+
+    [Test]
+    public void 후보가_전부_패드면_실패하고_폴백은_G10_앞_패드밖_여유밖()
+    {
+        var pads = new List<TutorialPadArea> { TutorialPadArea.Box(-17f, 17f, -11.9f, 23f) };   // + 여유 1 → x −18~−10.9 (후보 전부 · 1m 지점 x −11 포함)
+        Assert.That(TutorialRevivePointRules.TrySelect(BossEnterCandidates(), null, TutorialStep.BossEnter, AllOpen, PassedG10, -15f, 20f,
+                                                       pads, PadMargin, out _, out _), Is.False);
+
+        TutorialBarrierSpec g10 = G10Spec();
+        var none = new List<(float x, float z)>();
+        TutorialRevivePointRules.PadFallbackCandidates(g10, null, PadMargin, TutorialRevivePointRules.DefaultPadFallbackDistance, Clear, none);
+        Assert.That(none[0].x, Is.EqualTo(-11f).Within(1e-4), "기본 = G10 앞면(x −10)에서 보스 진입 쪽 1m, 가운데");
+        Assert.That(none[0].z, Is.EqualTo(20f).Within(1e-4));
+
+        // 1m 지점(x −11)은 패드 여유 안 → 배리어 쪽 여유 0.75m 지점(x −10.75)
+        var pts = new List<(float x, float z)>();
+        TutorialRevivePointRules.PadFallbackCandidates(g10, pads, PadMargin, TutorialRevivePointRules.DefaultPadFallbackDistance, Clear, pts);
+        Assert.That(pts.Count, Is.GreaterThan(0));
+        Assert.That(pts[0].x, Is.EqualTo(-10.75f).Within(1e-4));
+        AssertFallbackPoints(g10, pads, pts);
+
+        // 앞 두 지점이 모두 패드 여유 안 → 배리어를 따라 옆으로
+        var side = new List<TutorialPadArea> { TutorialPadArea.Box(-14f, 18.6f, -10.5f, 19.6f) };   // + 여유 → x −15~−9.5 · z 17.6~20.6
+        pts.Clear();
+        TutorialRevivePointRules.PadFallbackCandidates(g10, side, PadMargin, TutorialRevivePointRules.DefaultPadFallbackDistance, Clear, pts);
+        Assert.That(pts.Count, Is.GreaterThan(0), "가로 여유(±1.3m) 안에 패드 밖 점이 있다");
+        Assert.That(pts[0].x, Is.EqualTo(-11f).Within(1e-4));
+        Assert.That(pts[0].z, Is.EqualTo(21f).Within(1e-4), "가운데·±0.5m 는 패드 여유 안 → +1m 옆");
+        AssertFallbackPoints(g10, side, pts);
+    }
+
+    static void AssertFallbackPoints(TutorialBarrierSpec g10, List<TutorialPadArea> pads, List<(float x, float z)> pts)
+    {
+        foreach ((float x, float z) in pts)
+        {
+            Assert.That(TutorialRevivePointRules.IsOnPad(pads, x, z, PadMargin), Is.False, $"({x},{z}) 패드 밖");
+            Assert.That(TutorialBackBarrierRules.DistancePastFace(g10, x, z), Is.GreaterThanOrEqualTo(Clear - 1e-4f), $"({x},{z}) 뒤 배리어 여유 밖");
+            Assert.That(x, Is.LessThan(-10f), "보스 진입 존 쪽");
+        }
+    }
+
+    [Test]
+    public void 패드_정보가_없으면_기존_선택과_같다()
+    {
+        List<TutorialRevivePoint> c = BossEnterCandidates();
+        var threats = new List<TutorialThreat> { new TutorialThreat(-11.5f, 20f, 1f) };
+        Assert.That(TutorialRevivePointRules.TrySelect(c, threats, TutorialStep.BossEnter, AllOpen, PassedG10, -12f, 20f, out int expected, out bool expectedSafe), Is.True);
+
+        foreach (List<TutorialPadArea> pads in new[] { null, new List<TutorialPadArea>() })
+        {
+            Assert.That(TutorialRevivePointRules.TrySelect(c, threats, TutorialStep.BossEnter, AllOpen, PassedG10, -12f, 20f,
+                                                           pads, PadMargin, out int i, out bool safe), Is.True);
+            Assert.That(i, Is.EqualTo(expected));
+            Assert.That(safe, Is.EqualTo(expectedSafe));
+        }
+        Assert.That(TutorialRevivePointRules.IsOnPad(null, 0f, 0f, PadMargin), Is.False);
+    }
 }

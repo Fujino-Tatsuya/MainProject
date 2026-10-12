@@ -198,6 +198,44 @@ public readonly struct TutorialThreat
 }
 
 /// <summary>
+/// 보스 진입 패드 범위(월드 XZ 투영) — 축 정렬 사각형(박스 콜라이더) 또는 원(구·캡슐). 런타임은 서버의 BossEnterTrigger 트리거 콜라이더 bounds 에서 만든다.
+/// </summary>
+public readonly struct TutorialPadArea
+{
+    public readonly float CenterX, CenterZ, HalfX, HalfZ, Radius;
+    public readonly bool IsCircle;
+
+    TutorialPadArea(float cx, float cz, float halfX, float halfZ, float radius, bool circle)
+    {
+        CenterX = cx; CenterZ = cz;
+        HalfX = Math.Abs(halfX); HalfZ = Math.Abs(halfZ); Radius = Math.Abs(radius);
+        IsCircle = circle;
+    }
+
+    public static TutorialPadArea Box(float minX, float minZ, float maxX, float maxZ) =>
+        new TutorialPadArea((minX + maxX) * 0.5f, (minZ + maxZ) * 0.5f, (maxX - minX) * 0.5f, (maxZ - minZ) * 0.5f, 0f, false);
+
+    public static TutorialPadArea Circle(float centerX, float centerZ, float radius) =>
+        new TutorialPadArea(centerX, centerZ, 0f, 0f, radius, true);
+
+    /// <summary>점이 범위를 <paramref name="margin"/> 만큼 넓힌 영역 안인가(사각형은 모서리도 직각으로 넓힌다 — 보수적).</summary>
+    public bool Contains(float x, float z, float margin)
+    {
+        float dx = x - CenterX, dz = z - CenterZ;
+        if (IsCircle)
+        {
+            float r = Radius + margin;
+            return dx * dx + dz * dz <= r * r;
+        }
+        return Math.Abs(dx) <= HalfX + margin && Math.Abs(dz) <= HalfZ + margin;
+    }
+
+    public override string ToString() => IsCircle
+        ? $"원 ({CenterX:0.##}, {CenterZ:0.##}) r {Radius:0.##}"
+        : $"사각 ({CenterX:0.##}, {CenterZ:0.##}) {HalfX * 2f:0.##}×{HalfZ * 2f:0.##}";
+}
+
+/// <summary>
 /// 자동 부활 지점 규칙 — "지금 단계 구간의 안전한 지점(몬스터 인지 범위 밖, 배리어 안쪽)"(§2.5).
 ///
 ///  · 지금 단계 구간 = 디렉터 단계(<see cref="TutorialStep"/>)의 구간(S12). 단 열린 게이트로 들어갈 수 있는 가장 앞 구간을 넘지 않는다.
@@ -207,11 +245,21 @@ public readonly struct TutorialThreat
 ///  · 찾는 순서 = 지금 단계 구간 → 앞 구간들(거꾸로). 그 구간에 안전한 후보가 있으면 사망 지점에 가장 가까운 것.
 ///  · 어디에도 안전한 후보가 없으면 위협에서 가장 먼 후보(여유가 같으면 앞 순서 구간).
 ///  · 닫힌 구간·보스 진입 후보는 쓰지 않는다. 후보가 없으면 실패(호출자가 그 자리 부활로 물러선다).
+///  · 보스 진입 패드 제외(15 후속 C3): 패드 범위 + <see cref="DefaultPadMargin"/> 안의 후보는 안전해도 '가장 먼 후보' 폴백에서도 쓰지 않는다
+///    (부활·추락 복구만으로 보스방 카운트다운이 시작되지 않게). 그래서 남는 후보가 없으면 호출자가 <see cref="PadFallbackCandidates"/>
+///    (복도4 출구 배리어 G10 바로 앞, 보스 진입 존 쪽)를 쓴다. 패드 정보가 없으면(비튜토리얼·패드 미발견) 기존 동작.
 /// </summary>
 public static class TutorialRevivePointRules
 {
     public const float DefaultSpacing = 1.5f;
     public const float DefaultInset = 1f;
+    /// <summary>패드 범위 밖으로 더 두는 여유(m).</summary>
+    public const float DefaultPadMargin = 1f;
+    /// <summary>패드 폴백 — G10 배리어 앞면에서 보스 진입 존 쪽으로 이만큼(m). 개인 뒤 배리어 여유보다 작으면 여유를 쓴다.</summary>
+    public const float DefaultPadFallbackDistance = 1f;
+    /// <summary>패드 폴백 — 앞 지점이 패드 영역이면 배리어를 따라 옆으로 옮겨 보는 간격(m)·배리어 박스 가로 끝에서 남길 여유(m).</summary>
+    public const float PadFallbackLateralStep = 0.5f;
+    public const float PadFallbackLateralInset = 1f;
 
     /// <summary>열린 배리어로 들어갈 수 있는 가장 앞 구간(존1 ~ 복도4) — 지금 단계 구간의 상한.</summary>
     public static TutorialArea ResolveStageArea(int openedGateMask)
@@ -345,10 +393,69 @@ public static class TutorialRevivePointRules
     public static bool TrySelect(IReadOnlyList<TutorialRevivePoint> candidates, IReadOnlyList<TutorialThreat> threats,
                                  TutorialStep step, int openedGateMask, int passedMask, float deathX, float deathZ,
                                  out int index, out bool safe) =>
-        TrySelect(candidates, threats, AreaOrder(step, openedGateMask, passedMask), deathX, deathZ, out index, out safe);
+        TrySelect(candidates, threats, AreaOrder(step, openedGateMask, passedMask), deathX, deathZ, null, 0f, out index, out safe);
+
+    /// <summary>
+    /// 그 플레이어 기준 + 보스 진입 패드 제외(C3) — 패드 범위 + <paramref name="padMargin"/> 안의 후보는 어떤 단계에서도 쓰지 않는다.
+    /// <paramref name="pads"/> 가 null·빈 목록이면 패드 없는 오버로드와 같다. 실패하면 호출자가 <see cref="PadFallbackCandidates"/> 를 쓴다.
+    /// </summary>
+    public static bool TrySelect(IReadOnlyList<TutorialRevivePoint> candidates, IReadOnlyList<TutorialThreat> threats,
+                                 TutorialStep step, int openedGateMask, int passedMask, float deathX, float deathZ,
+                                 IReadOnlyList<TutorialPadArea> pads, float padMargin, out int index, out bool safe) =>
+        TrySelect(candidates, threats, AreaOrder(step, openedGateMask, passedMask), deathX, deathZ, pads, padMargin, out index, out safe);
+
+    /// <summary>점이 어느 패드 범위 + <paramref name="margin"/> 안인가. 패드 정보가 없으면 false.</summary>
+    public static bool IsOnPad(IReadOnlyList<TutorialPadArea> pads, float x, float z, float margin)
+    {
+        if (pads == null) return false;
+        for (int i = 0; i < pads.Count; i++)
+            if (pads[i].Contains(x, z, margin)) return true;
+        return false;
+    }
+
+    /// <summary>
+    /// 패드 제외 뒤 후보가 없을 때의 안전 폴백 — 복도4 출구 배리어(<paramref name="g10"/>) 앞면에서 보스 진입 존 쪽으로
+    /// max(<paramref name="distance"/>, <paramref name="clearance"/>) 인 가운데 지점부터. 그 지점이 패드 영역이면 더 안쪽(패드 쪽)으로 가지 않고
+    /// ① 배리어 쪽으로 붙여(앞면에서 <paramref name="clearance"/> — 개인 뒤 배리어 콜라이더와 겹치지 않는 최소) 보고
+    /// ② 배리어를 따라 옆으로(<see cref="PadFallbackLateralStep"/> 간격, 배리어 박스 가로 끝에서 <see cref="PadFallbackLateralInset"/> 안쪽까지) 옮긴다.
+    /// 패드 영역 밖인 점만 선호 순서대로 <paramref name="into"/> 에 넣는다(호출자가 바닥·점유 검사로 첫 통과 점을 쓴다). 하나도 없으면 비어 있다.
+    /// </summary>
+    public static void PadFallbackCandidates(TutorialBarrierSpec g10, IReadOnlyList<TutorialPadArea> pads, float padMargin,
+                                             float distance, float clearance, List<(float x, float z)> into)
+    {
+        clearance = Math.Max(0f, clearance);
+        float far = Math.Max(distance, clearance);
+        g10.Rect.GetWorldBounds(out float minX, out float minZ, out float maxX, out float maxZ);
+        float face = g10.AlongX ? (g10.Forward > 0f ? maxX : minX) : (g10.Forward > 0f ? maxZ : minZ);
+        float crossMin = g10.AlongX ? minZ : minX, crossMax = g10.AlongX ? maxZ : maxX;
+        float crossMid = (crossMin + crossMax) * 0.5f;
+        float lateralLimit = Math.Max(0f, (crossMax - crossMin) * 0.5f - PadFallbackLateralInset);
+        int steps = (int)Math.Floor(lateralLimit / PadFallbackLateralStep);
+
+        for (int k = 0; k <= 2 * steps; k++)
+        {
+            // 0, +1, −1, +2, −2 … 칸
+            int n = (k + 1) / 2;
+            float cross = crossMid + (k % 2 == 1 ? n : -n) * PadFallbackLateralStep;
+            AddIfOffPad(g10, face + g10.Forward * far, cross, pads, padMargin, into);
+            if (clearance < far) AddIfOffPad(g10, face + g10.Forward * clearance, cross, pads, padMargin, into);
+        }
+    }
+
+    private static void AddIfOffPad(TutorialBarrierSpec spec, float along, float cross, IReadOnlyList<TutorialPadArea> pads, float padMargin,
+                                    List<(float x, float z)> into)
+    {
+        float x = spec.AlongX ? along : cross, z = spec.AlongX ? cross : along;
+        if (!IsOnPad(pads, x, z, padMargin)) into.Add((x, z));
+    }
 
     private static bool TrySelect(IReadOnlyList<TutorialRevivePoint> candidates, IReadOnlyList<TutorialThreat> threats,
-                                  List<TutorialArea> order, float deathX, float deathZ, out int index, out bool safe)
+                                  List<TutorialArea> order, float deathX, float deathZ, out int index, out bool safe) =>
+        TrySelect(candidates, threats, order, deathX, deathZ, null, 0f, out index, out safe);
+
+    private static bool TrySelect(IReadOnlyList<TutorialRevivePoint> candidates, IReadOnlyList<TutorialThreat> threats,
+                                  List<TutorialArea> order, float deathX, float deathZ,
+                                  IReadOnlyList<TutorialPadArea> pads, float padMargin, out int index, out bool safe)
     {
         index = -1;
         safe = false;
@@ -360,7 +467,7 @@ public static class TutorialRevivePointRules
             for (int i = 0; i < candidates.Count; i++)
             {
                 TutorialRevivePoint p = candidates[i];
-                if (p.Area != area || Clearance(p.X, p.Z, threats) < 0f) continue;
+                if (p.Area != area || Clearance(p.X, p.Z, threats) < 0f || IsOnPad(pads, p.X, p.Z, padMargin)) continue;
                 float dx = p.X - deathX, dz = p.Z - deathZ;
                 float d = dx * dx + dz * dz;
                 if (d < bestDist) { bestDist = d; index = i; }
@@ -373,7 +480,7 @@ public static class TutorialRevivePointRules
         for (int i = 0; i < candidates.Count; i++)
         {
             int rank = order.IndexOf(candidates[i].Area);
-            if (rank < 0) continue;
+            if (rank < 0 || IsOnPad(pads, candidates[i].X, candidates[i].Z, padMargin)) continue;
             float clear = Clearance(candidates[i].X, candidates[i].Z, threats);
             if (clear > bestClear || (clear == bestClear && rank < bestRank))
             {
