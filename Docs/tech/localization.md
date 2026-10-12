@@ -1,7 +1,7 @@
 # 로컬라이징 (한/영)
 
 > 게임에 보이는 문구는 `GameData.xlsx` 의 **`Strings` 시트**, 로비·네트워크 오류 문구는 **`ErrorCodes` 시트**가 원본이다. 코드는 키·오류 코드로만 찾는다.
-> L1(기반) + L2(SO 문구 — 스킬 툴팁·캐릭터 이름 자동 키, [§5](#5-l2--so-문구-자동-키)) + L3(씬·프리팹 라벨·HUD 포맷 문구, [§6](#6-l3--씬프리팹-라벨)) + L4a(로비·네트워크 오류 코드, [§7](#7-l4--로비네트워크-오류-코드)) 기준 문서.
+> L1(기반) + L2(SO 문구 — 스킬 툴팁·캐릭터 이름 자동 키, [§5](#5-l2--so-문구-자동-키)) + L3(씬·프리팹 라벨·HUD 포맷 문구, [§6](#6-l3--씬프리팹-라벨)) + L4a(로비·네트워크 오류 코드, [§7](#7-l4--로비네트워크-오류-코드)) + L4b(코드에 박힌 UI 문구·초 단위·조작 키 토큰 규칙, [§8](#8-l4b--코드에-박힌-ui-문구)) 기준 문서.
 > 수치 테이블 쓰는 법은 [data-table.md](data-table.md).
 
 ## 1. 한눈에
@@ -85,7 +85,7 @@ Strings·ErrorCodes 두 시트에 똑같이 적용한다(시트마다 따로 검
 - `Tools/Data/Export Template` 은 `Strings`·`ErrorCodes` 시트를 **항상** 만든다 — 키가 하나도 없어도 머리글만 있는 시트가 생긴다.
 - 기존 행(메모 행·`#` 메모 열 포함)은 **병합·덮어쓰기 어느 쪽이든 그대로** 옮긴다. 코드가 등록한 키 중 시트에 없는 것만 뒤에 붙는다(en 은 빈 칸).
   머리글에 없는 열은 Export 때 사라진다(원본은 Export 백업).
-- 코드가 등록하는 Strings 키 = `[DataTableText]` 자동 키 + 캐릭터 이름([§5](#5-l2--so-문구-자동-키)) + L3 UI 문구(`UiStrings`, [§6](#6-l3--씬프리팹-라벨)). 그 밖의 새 Strings 키는 시트에 직접 행을 추가한다.
+- 코드가 등록하는 Strings 키 = `[DataTableText]` 자동 키 + 캐릭터 이름([§5](#5-l2--so-문구-자동-키)) + L3·L4b UI 문구(`UiStrings`, [§6](#6-l3--씬프리팹-라벨)·[§8](#8-l4b--코드에-박힌-ui-문구)). 그 밖의 새 Strings 키는 시트에 직접 행을 추가한다.
 - ErrorCodes 코드 = `ErrorCatalog.All`([§7](#7-l4--로비네트워크-오류-코드)). 새 코드는 `ko`·`#분류`·`#원인`·`#조치` 가 채워진 채 붙는다(en 빈 칸).
   **시트에만 있고 `ErrorCatalog` 에 없는 행은 경고**(오류 아님, 행은 남긴다) — 안 쓰는 코드면 지우거나 `#` 를 붙인다.
 - 🔴 Export 는 xlsx 를 새로 쓴다(서식·열 너비 사라짐) — [data-table.md §4](data-table.md#4-메뉴-toolsdata).
@@ -110,6 +110,7 @@ Loc.Changed += Redraw;           // OnEnable 에서 구독, OnDisable 에서 꼭
 | `Loc.Get(key)` | 현재 언어 문구. en 이 비면 ko. 키가 없거나 빈 키면 `#key` |
 | `Loc.Get(key, fallback)` | 같지만 키가 없거나(빈 키·표 없음 포함) 시트에 행이 없으면 `fallback` — `#key` 를 내지 않는다. SO 인라인 ko 가 있는 자동 키용 |
 | `Loc.Format(key, args)` | `Get` + `{이름}` 치환 — 규칙은 `TutorialGuideText.Fill` 과 같다 |
+| `Loc.Format(key, fallback, args)` | `Get(key, fallback)` + 치환 — 시트에 행이 없으면 fallback(코드·직렬화 ko)을 채운다. `UiString.Format`·`FormatOr` 가 쓴다 |
 | `Loc.GetError(code, args = null)` | ErrorCodes 시트 문구. 폴백은 `Get` 과 같다(코드가 없으면 `#code`, en 이 비면 ko). args 가 있으면 `Format` 처럼 치환 |
 | `Loc.GetError(code, fallback, args)` | 같지만 시트에 행이 없으면 `#code` 대신 `fallback`(코드의 ko 원문)에 args 를 채운다. `ErrorCode.Message` 가 쓴다 |
 | `UserLanguageConfig.Language` | 저장값 직접 접근(이벤트 없음). UI 에서는 `Loc.Current` 를 쓴다 |
@@ -153,7 +154,7 @@ Loc.Changed += Redraw;           // OnEnable 에서 구독, OnDisable 에서 꼭
 | `Assets/1.Scripts/Localization/Editor/StringTableValidator.cs` | 검증(순수) |
 | `Assets/1.Scripts/Localization/Editor/StringTableBuild.cs` | 표 에셋 생성·빌드 Preload·수동 갱신 메뉴 |
 | `Assets/1.Scripts/UI/Title/LanguageOption.cs` · `Editor/LanguageOptionAuthoring.cs` | 옵션 언어 선택 · 배치 메뉴 `Tools/UI/Title/옵션 Gameplay — 언어 선택 배치` |
-| `Assets/1.Scripts/Localization/UiStrings.cs` | L3 UI 문구 키 목록(`UiString` = 키 + ko 폴백 + 쓰는 곳) |
+| `Assets/1.Scripts/Localization/UiStrings.cs` | L3·L4b UI 문구 키 목록(`UiString` = 키 + ko 폴백 + 쓰는 곳) · 초 단위 `UiStrings.Seconds` · 상태이상 이름 키 |
 | `Assets/1.Scripts/Localization/Editor/UiStringKeys.cs` | Export 때 `UiStrings.All` 을 Strings 키로 등록(`StringKeyRegistry`) |
 | `Assets/1.Scripts/Localization/Editor/UiStringsAuthoring.cs` | L3 저작 메뉴 `Tools/Localization/L3 — 씬·프리팹 라벨 키 부착` |
 | `Assets/1.Scripts/Localization/ErrorCatalog.cs` | L4 오류 코드 목록(`ErrorCode` = 코드 + 분류·원인·조치 + ko) · 화면 표기(`ErrorDisplay`) |
@@ -162,7 +163,7 @@ Loc.Changed += Redraw;           // OnEnable 에서 구독, OnDisable 에서 꼭
 
 - 테스트: `Tools/Tests/데이터 테이블 EditMode 테스트 실행`(픽스처 `StringTableValidatorTests`·`StringsSheetTests`·`ErrorCodesSheetTests`·`LocTests`·`UserLanguageConfigTests`,
   L2 `LocKeyTests`·`DataTableTextKeysTests`·`CharacterRosterStringKeysTests`·`LocTextRuleTests`, L3 `UiStringsTests`·`UiStringsFormatTests`·`UiStringsAuthoringTests`,
-  L4 `ErrorCatalogTests`·`ErrorDisplayTests`).
+  L4 `ErrorCatalogTests`·`ErrorDisplayTests`, L4b `UiStringsL4bTests`·`UiStringsL4bFormatTests`).
 
 ## 5. L2 — SO 문구 자동 키
 
@@ -239,8 +240,8 @@ SO·프리팹에 인라인으로 적힌 문구(스킬 툴팁·캐릭터 이름)�
 |---|---|---|---|
 | `UI.GunnerHeat.Stage` | 과열 {stage}단계 | `{stage}` = 0부터 세는 과열 단계 | `GunnerHeatGauge.LabelText` |
 | `UI.GunnerHeat.Overheated` | 과열! | | 〃 |
-| `UI.AssassinHUD.TransformRemaining` | 변신 {sec}초 | `{sec}` = 남은 초(소수 한 자리) | `AssassinHUD.TransformLabelText` |
-| `UI.AssassinHUD.TransformReleasable` | 변신 {sec}초 · R 해제 가능 | 〃 | 〃 |
+| `UI.AssassinHUD.TransformRemaining` | 변신 {time} | `{time}` = 남은 시간(`UI.Unit.Seconds`, 소수 한 자리 — [§8](#8-l4b--코드에-박힌-ui-문구)) | `AssassinHUD.TransformLabelText` |
+| `UI.AssassinHUD.TransformReleasable` | 변신 {time} · R 해제 가능 | 〃 | 〃 |
 | `UI.AssassinHUD.TransformEndPending` | 변신 종료 대기 | | 〃 |
 | `UI.Overhead.PlayerLabel` | P{n} | `{n}` = 1부터 세는 플레이어 번호 | `PlayerOverheadHealthBarRule.LabelText` |
 
@@ -305,3 +306,68 @@ Export 가 ErrorCodes 시트에 없는 코드를 **ko = 지금 문구, `#분류`
 - `#조치` 칸 원문은 `ErrorCatalog.cs` 에 있다(Export 가 시트로 옮긴다). 위 표는 요약이다 — 원문은 코드.
 - 예전 문구에 붙던 예외 메시지(`세션 연결 준비에 실패했습니다: …`·`Relay 방 참가에 실패했습니다: …`)는 상세로 옮겼다 — 화면엔 문구 + 코드만.
 - 새 코드: `ErrorCatalog` 에 필드를 만들고 `All` 에 넣는다(`영역_이름` 대문자, 한 번 정한 코드는 의미를 바꾸지 않는다). 테스트가 `All` 누락·중복·이름 규칙을 잡는다.
+
+## 8. L4b — 코드에 박힌 UI 문구
+
+코드가 직접 쓰던 문구(로딩·스킬 툴팁·상태이상·결과 화면·허수아비)를 L3 와 같은 **코드 키**(`UiStrings`)로 옮겼다. Export 등록·폴백 규칙은 §6 과 같다.
+프리팹·씬은 고치지 않았다 — 직렬화 라벨이 있는 곳은 **시트에 행이 없으면 직렬화 값**이 보인다(`UiString.TextOr`·`FormatOr` = `Loc.Get(key, fallback)`·`Loc.Format(key, fallback, args)`).
+치환은 `Loc.Format` 한 곳이다(UI 코드는 튜토리얼 `TutorialGuideText.Fill` 을 직접 부르지 않는다).
+
+### 초 단위 — `UI.Unit.Seconds`
+
+| 키 | ko | 자리표시자 |
+|---|---|---|
+| `UI.Unit.Seconds` | {sec}초 | `{sec}` = 숫자만(소수 자릿수는 쓰는 곳이 정함, 소수점은 항상 `.`) |
+
+- 초를 보여 주는 문구는 `UiStrings.Seconds(값, 숫자형식)` 으로 "3.5초" 를 만든 뒤 자기 문구의 `{time}` 에 넣는다 — 문구마다 `초`·`s` 를 따로 들지 않는다(테스트가 잡는다).
+- 쓰는 곳: 스킬 툴팁 쿨타임(`0.#`) · 상태이상 남은 시간(`F1`) · 어쌔신 변신(`0.0`).
+- 🔸 어쌔신 변신 키 `UI.AssassinHUD.TransformRemaining`·`TransformReleasable` 의 ko 를 `변신 {sec}초` → **`변신 {time}`** 로 바꿨다(시트 행이 아직 없을 때라 키는 유지). 화면 글자는 그대로.
+- 🔸 상태이상 남은 시간은 예전 `3.2s` → **`3.2초`**(ko 폴백 기준). en 행이 생기면 `{sec}s` 로 돌아간다.
+
+### 키 목록
+
+| 키 | ko(폴백) | 자리표시자 | 쓰는 곳 |
+|---|---|---|---|
+| `UI.Loading.Preparing` · `Loading` · `WaitingForPlayers` · `Activating` · `StandBy` | Preparing... · Loading... · Waiting for players... · Starting... · Stand by... | | `NetworkLoadingScreenView.PhaseText` |
+| `UI.Loading.Tip1`~`Tip3` | 으아ㅏㅏㅏㅏ · 커피ㅣㅣㅣㅣ · 밥 뭐 먹지.... | | `2.LoadingScene` `tooltipTable[0~2]` — 행이 없으면 씬 값 |
+| `UI.Loading.Ready1`~`Ready3` | Enter... · All players are ready. · Starting... | | `readyMessages[0~2]` — 〃 |
+| `UI.SkillTooltip.ShiftHint` | 자세한 정보를 보려면 [Shift] 키를 누르세요 | | `SkillTooltipView` |
+| `UI.SkillTooltip.Error` | [오류: {error}] | `{error}` = 포매터 오류(개발용, 번역 안 함) | 〃 `ErrorText` |
+| `UI.SkillTooltip.PassiveBadge` | Passive | | 〃 `KeyBadgeText` — 패시브 칸 키 배지만 |
+| `UI.StatusEffect.<enum 이름>` | enum 이름에서 `Modifier` 뺀 것(`Stunned`·`MoveSpeed`…) | | `StatusEffectHUD.DisplayName` — `None` 빼고 enum 전부 |
+| `UI.Result.Cleared` · `Failed` · `Aborted` | CLEAR · FAILED · ABORTED | | `ResultStatsView.OutcomeText` — 행이 없으면 씬 `clearedLabel` 등 |
+| `UI.Result.Survival` | 생존 시간  {time} | `{time}` = mm:ss | 〃 `SurvivalText` — 행이 없으면 씬 `survivalPrefix` + 시간 |
+| `UI.Result.PlayerSlot` | P{n} | `{n}` = 1부터 | `ResultPlayerRowView.SlotText` — 행이 없으면 프리팹 `slotFormat`(`P{0}`) |
+| `UI.TrainingDummy.Hp` | {hp} / {max} | `{hp}`·`{max}` | `TrainingDummyHealthBar.HpText` — 행이 없으면 프리팹 `textFormat`(`{0} / {1}`) |
+
+- 상태이상 키는 enum 이 바뀌면 자동으로 따라간다(`UiStrings.TryGetStatusEffect`). enum 이름을 바꾸면 키가 바뀐다 — §5 자동 키와 같은 주의. 조합 값(플래그 여럿)은 키 없이 enum 이름.
+  `#설명` 에 한국어 뜻(기절·둔화…)을 같이 적어 두었다 — ko 칸을 한국어로 채울지는 기획이 정한다.
+- 패시브 배지는 화면 글자만 번역한다. 툴팁 이벤트 인자(`PassiveHUD.DisplayKey` = `Passive`)는 튜토리얼 판정 키라 그대로다.
+- 언어가 바뀌면 로딩 화면·허수아비는 다시 그린다(`Loc.Changed`). 스킬 툴팁·상태이상은 매 프레임 그린다. 결과 화면은 다음 표시부터.
+
+### 옮기지 않은 것
+
+| 문구 | 이유 |
+|---|---|
+| 스킬 칸 키 라벨 `Q`·`E`·`R`·`RMB`(`SkillCooldownHUD.KeyLabel`) | 키보드 기호라 언어와 무관하다. 바뀔 일은 **리바인딩**이고, 그건 아래 조작 키 토큰(현재 바인딩 표시)으로 풀 일이다. `RMB` 를 `우클릭` 으로 보일지는 그때 바인딩 표시 이름에서 정한다 |
+| 쿨타임 숫자(`3`·`0.5`) · 퍼센트(`42%`) · 스택(`x2`) · 빈 값 `-`·`--:--` | 숫자·기호뿐 |
+| 로딩 `tooltipTable` 코드 기본값(`Loading game data...` 등) | 씬 값이 덮어써 화면에 안 나온다 |
+
+### 조작 키 토큰 — `{key:액션}` (규칙만, 적용은 해당 문구를 키화할 때)
+
+`[Shift]`·`R 해제 가능` 처럼 **조작 키 이름이 박힌 문구**는 리바인딩·패드에서 틀린다. 이런 문구는 키 이름 대신 `{key:액션}` 토큰을 쓴다.
+
+```
+ko: 자세한 정보를 보려면 {key:Detail} 키를 누르세요
+en: Hold {key:Detail} for details
+```
+
+- **L2 자리표시자 규칙 그대로다** — 중괄호 안 전체(`key:Detail`)가 이름이다. ko·en 이 같은 `{key:…}` 집합을 가져야 하고(`SamePlaceholders`), `{key:Dash}` ≠ `{key:dash}` ≠ `{key}`.
+  `{x:%}` 와 마찬가지로 `:` 뒤까지 이름의 일부일 뿐, 시트 검증에 새 규칙은 없다.
+- 이름 앞부분 **`key:` 는 예약**이다 — 일반 자리표시자 이름으로 쓰지 않는다. `액션` = Input System 액션 이름(PascalCase, 예 `Dash`·`Interact`·`Detail`).
+- 채우는 쪽: 코드가 `Loc.Format` 인자에 `["key:Dash"] = 현재 바인딩 표시 문자열` 을 넣는다(전용 헬퍼를 만들 때 문구에서 `{key:…}` 이름을 모아 바인딩을 찾는다). 없는 액션이면 토큰이 그대로 남아 눈에 띈다.
+- 🔴 **스킬 툴팁 설명(`[DataTableText]` 툴팁)** 은 `SkillTooltipFormatter` 가 `{필드:형식}` 으로 읽는다 — `{key:Dash}` 를 필드 `key` 로 보고 오류를 낸다.
+  툴팁에 키 토큰을 쓰게 되면 **포매터보다 먼저** 키 토큰을 치환하거나 포매터가 `key:` 를 건너뛰게 해야 한다(그때 결정).
+- 지금 이 토큰을 쓰는 문구는 없다. 후보: `UI.SkillTooltip.ShiftHint`(`[Shift]`) · `UI.AssassinHUD.TransformReleasable`(`R`) · `UI.AssassinHUD.EnhancedReady`(`E`) · 튜토리얼 안내(별도 레인).
+
+- 테스트: `UiStringsL4bTests`(상태이상 enum→키 전수·조합 값·로딩 칸 순서·초 단위 한 곳) · `UiStringsL4bFormatTests`(초 단위·툴팁·상태이상·결과·허수아비·로딩 — 행 없음 폴백 = 예전 글자 / 행 있으면 시트).
