@@ -2,43 +2,63 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-/// <summary>Export 때 문자열 시트에 넣을 키 하나 — 새 키면 이 ko·설명(첫 메모 열)으로 행을 만든다.</summary>
+/// <summary>Export 때 문자열 시트에 넣을 키 하나 — 새 키면 이 ko·메모 열로 행을 만든다.</summary>
 public readonly struct StringKeyInfo
 {
     public StringKeyInfo(string key, string description, string ko)
+        : this(key, new[] { description }, ko)
+    {
+    }
+
+    /// <summary>메모 열이 여럿인 시트용(ErrorCodes — <c>#분류 | #원인 | #조치</c>). 순서는 <see cref="StringsSheet.MemoHeaders"/> 와 같다.</summary>
+    public StringKeyInfo(string key, IReadOnlyList<string> memos, string ko)
     {
         Key = key;
-        Description = description;
+        Memos = memos ?? Array.Empty<string>();
         Ko = ko;
     }
 
     public string Key { get; }
-    public string Description { get; }
+
+    /// <summary>첫 메모 열(Strings 의 <c>#설명</c>, ErrorCodes 의 <c>#분류</c>).</summary>
+    public string Description => Memos.Count > 0 ? Memos[0] : null;
+
+    public IReadOnlyList<string> Memos { get; }
     public string Ko { get; }
 }
 
 /// <summary>
-/// Export 가 Strings 시트에 넣을 키를 모으는 곳(<c>[DataTableText]</c> 자동 키는 <see cref="DataTableTextKeys"/> 가 따로 모은다).
-/// 기획이 직접 적은 행은 병합 Export 가 그대로 남긴다. 코드에서 키를 내보내야 하면 <c>[InitializeOnLoad]</c> 에서 <see cref="Register"/>
-/// (예: <c>CharacterRosterStringKeys</c> — 캐릭터 이름).
+/// Export 가 문자열 시트에 넣을 키를 모으는 곳(<c>[DataTableText]</c> 자동 키는 <see cref="DataTableTextKeys"/> 가 따로 모은다).
+/// 기획이 직접 적은 행은 병합 Export 가 그대로 남긴다. 코드에서 키를 내보내야 하면 <c>[InitializeOnLoad]</c> 에서
+/// Strings 는 <see cref="Register"/>(예: <c>CharacterRosterStringKeys</c> — 캐릭터 이름), ErrorCodes 는 <see cref="RegisterErrorCodes"/>(<c>ErrorCodeKeys</c>).
 /// </summary>
 public static class StringKeyRegistry
 {
     private static readonly List<Func<IEnumerable<StringKeyInfo>>> providers = new List<Func<IEnumerable<StringKeyInfo>>>();
+    private static readonly List<Func<IEnumerable<StringKeyInfo>>> errorCodeProviders = new List<Func<IEnumerable<StringKeyInfo>>>();
 
-    public static void Register(Func<IEnumerable<StringKeyInfo>> provider)
+    public static void Register(Func<IEnumerable<StringKeyInfo>> provider) => Add(providers, provider);
+
+    public static void RegisterErrorCodes(Func<IEnumerable<StringKeyInfo>> provider) => Add(errorCodeProviders, provider);
+
+    /// <summary>등록된 Strings 키 전부(같은 키는 처음 것만).</summary>
+    public static List<StringKeyInfo> Collect() => Collect(providers);
+
+    /// <summary>등록된 ErrorCodes 코드 전부(같은 코드는 처음 것만).</summary>
+    public static List<StringKeyInfo> CollectErrorCodes() => Collect(errorCodeProviders);
+
+    private static void Add(List<Func<IEnumerable<StringKeyInfo>>> list, Func<IEnumerable<StringKeyInfo>> provider)
     {
-        if (provider != null && !providers.Contains(provider))
+        if (provider != null && !list.Contains(provider))
         {
-            providers.Add(provider);
+            list.Add(provider);
         }
     }
 
-    /// <summary>등록된 키 전부(같은 키는 처음 것만).</summary>
-    public static List<StringKeyInfo> Collect()
+    private static List<StringKeyInfo> Collect(List<Func<IEnumerable<StringKeyInfo>>> list)
     {
         var seen = new HashSet<string>(StringComparer.Ordinal);
-        return providers.SelectMany(p => p() ?? Enumerable.Empty<StringKeyInfo>())
+        return list.SelectMany(p => p() ?? Enumerable.Empty<StringKeyInfo>())
             .Where(k => !string.IsNullOrEmpty(k.Key) && seen.Add(k.Key))
             .ToList();
     }
@@ -185,7 +205,11 @@ public sealed class StringsSheet
             {
                 var row = new object[headers.Length];
                 row[0] = info.Key;
-                row[1] = Cell(info.Description);
+                for (int memo = 0; memo < MemoHeaders.Count && memo < info.Memos.Count; memo++)
+                {
+                    row[1 + memo] = Cell(info.Memos[memo]);
+                }
+
                 row[headers.Length - 2] = Cell(info.Ko);
                 rows.Add(row);
                 added++;
@@ -194,6 +218,37 @@ public sealed class StringsSheet
 
         report?.Add($"{Name}: 기존 행 {rows.Count - 1 - added}개 유지, 새 키 {added}개 추가.");
         return new XlsxWriteSheet(Name, rows, frozenRows: 1, boldRows: 1, frozenColumns: 1);
+    }
+
+    /// <summary>
+    /// 기존 시트에만 있고 등록 목록에 없는 키(<c>#</c> 메모 행·빈 키 제외, 시트 순서). ErrorCodes 는 이걸 경고로 알린다 —
+    /// 코드가 더 이상 내지 않는 오류 행이거나 코드 이름 오타일 수 있다(행은 지우지 않는다).
+    /// </summary>
+    public List<string> UnregisteredKeys(XlsxSheet existing, IEnumerable<StringKeyInfo> registered)
+    {
+        var result = new List<string>();
+        if (existing == null || existing.Rows.Count == 0)
+        {
+            return result;
+        }
+
+        int keyColumn = FindHeader(existing, KeyHeader);
+        if (keyColumn < 0)
+        {
+            return result;
+        }
+
+        var known = new HashSet<string>((registered ?? Enumerable.Empty<StringKeyInfo>()).Select(k => k.Key), StringComparer.Ordinal);
+        for (int row = 1; row < existing.Rows.Count; row++)
+        {
+            string key = existing.Cell(row, keyColumn).Trim();
+            if (key.Length > 0 && !key.StartsWith(DataTableSchema.CommentPrefix, StringComparison.Ordinal) && !known.Contains(key))
+            {
+                result.Add(key);
+            }
+        }
+
+        return result;
     }
 
     private static object Cell(string text) => string.IsNullOrEmpty(text) ? null : text;

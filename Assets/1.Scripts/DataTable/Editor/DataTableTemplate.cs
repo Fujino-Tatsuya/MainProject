@@ -579,7 +579,7 @@ public static class DataTableTemplate
     /// <summary>
     /// 문자열 시트(<see cref="StringsSheet.All"/> — Strings·ErrorCodes) — 기존 행 유지 + 등록된 키 중 없는 것 추가. 키가 없어도 머리글만 있는 시트를 만든다.
     /// Strings 의 키 = 대상들의 <c>[DataTableText]</c> 자동 키(<see cref="DataTableTextKeys"/>) + <see cref="StringKeyRegistry"/>.
-    /// ErrorCodes 는 아직 등록 키가 없다(오류 코드 목록은 L4).
+    /// ErrorCodes 의 코드 = <see cref="StringKeyRegistry.CollectErrorCodes"/>(<c>ErrorCatalog</c>). 시트에만 있는 오류 행은 경고(행은 유지).
     /// </summary>
     private static List<XlsxWriteSheet> BuildStringsSheets(IReadOnlyList<XlsxSheet> existing,
         List<(Type, IReadOnlyList<(string id, Object target)>)> tables, List<string> warnings)
@@ -588,9 +588,16 @@ public static class DataTableTemplate
         List<StringKeyInfo> stringKeys = DataTableTextKeys.Collect(tables.SelectMany(t => t.Item2), warnings)
             .Concat(StringKeyRegistry.Collect())
             .ToList();
+        List<StringKeyInfo> errorCodes = StringKeyRegistry.CollectErrorCodes();
+        XlsxSheet existingErrors = existing.FirstOrDefault(s => StringsSheet.ErrorCodes.Is(s.Name));
+        foreach (string code in StringsSheet.ErrorCodes.UnregisteredKeys(existingErrors, errorCodes))
+        {
+            warnings.Add($"{StringsSheet.ErrorCodes.Name}: '{code}' 는 코드 목록(ErrorCatalog)에 없다 — 행은 남긴다. 안 쓰는 코드면 지우거나 # 를 붙일 것.");
+        }
+
         var sheets = StringsSheet.All
             .Select(spec => spec.BuildSheet(existing.FirstOrDefault(s => spec.Is(s.Name)),
-                spec == StringsSheet.Strings ? stringKeys : Enumerable.Empty<StringKeyInfo>(), report))
+                spec == StringsSheet.Strings ? stringKeys : errorCodes, report))
             .ToList();
         foreach (string line in report)
         {
