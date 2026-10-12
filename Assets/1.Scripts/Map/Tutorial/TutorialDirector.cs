@@ -24,9 +24,9 @@ using UnityEngine;
 ///    존2 처치 → Zone2Kills(목표 = 장부 수). 기상 = <see cref="SetZoneDormantServer"/>(S8·S9·S10 이 부른다)
 ///  · S5 타이머·보스 길 ✅ → <b>G8 열림 = 타이머 시작</b>(<see cref="StartBossTimerServer"/>, 90초 —단일 기준 <see cref="IsBossTimerStarted"/>),
 ///    타이머 HUD 표시(<see cref="ShowTimerHudServer"/> — S10 Z4-0 이 부른다), G10 → 패드·엘리베이터 문(<see cref="TutorialBossPath"/>·<see cref="TutorialElevatorDoor"/>),
-///    보스방 도착(패드·만료 강제 이동 모두) → 단계 Finished + <see cref="BossRoomArrived"/>(S12 안내 종료)
+///    보스방 도착(패드·만료 강제 이동 모두) → G11(G10 뒤일 때만) + 단계 Finished + <see cref="BossRoomArrived"/>(S12 안내 종료)
 ///  · S10 존4 → Z4-0 <see cref="ShowTimerHudServer"/> · 설정 자막 끝 <see cref="StartBossTimerServer"/>(= G8) · 만료 문구는 BossTimerManager.State == Expired
-///  · S11 사망 규칙 → 목숨 차감 기준 = <see cref="IsBossTimerStarted"/>(G8 열림, 모든 피어)
+///  · S11 사망 규칙 → 목숨 차감 기준 = G11(보스방 도착) 열림 — G8(타이머 시작)과 무관
 ///  · S7 존1 ✅ → TutorialZone1Flow: <see cref="ReportCheckServer"/>(Dash·AttackHit — 서버 관측) / <see cref="ReportLocalMoveDistance"/>(Move — 오너 누적 거리, 서버 상한 검증) /
 ///    <see cref="ReportLocalCheck"/>(PassiveTooltip — 오너 보고)
 ///  · 서버 → 클라 자막 → <see cref="ShowSubtitleServer"/>(id, 키·값 인자, 대상 null = 전원 — 캐릭터 전용은 <see cref="GetClientsOfCharacterServer"/>). 강조·목표 패널은 흐름 파일이 클라에서 직접
@@ -239,7 +239,8 @@ public sealed class TutorialDirector : NetworkBehaviour
     public bool IsTimerHudShown => IsSpawned && _timerHudShown.Value;
 
     /// <summary>
-    /// 보스 타이머가 시작됐는가 = <b>G8 열림</b>(모든 피어). 튜토리얼 '타이머 전/후' 판단(S11 목숨 차감·존4 기상)은 이 값 하나만 본다 —
+    /// 보스 타이머가 시작됐는가 = <b>G8 열림</b>(모든 피어). 튜토리얼 '타이머 전/후' 판단(존4 기상 등)은 이 값 하나만 본다 —
+    /// 목숨 차감(S11)은 이 값이 아니라 G11(보스방 도착)이 기준이다.
     /// BossTimerManager.State 는 도착(Stopped)·만료로 바뀌므로 기준으로 쓰지 않는다.
     /// </summary>
     public bool IsBossTimerStarted => IsGateOpen(TutorialGate.G8_TimerStart);
@@ -658,7 +659,10 @@ public sealed class TutorialDirector : NetworkBehaviour
         _bossArrived = true;
 
         Edit.Log($"[Tutorial] 보스방 도착 {arrived.Count}명 — 튜토리얼 안내 종료(단계 Finished).", this);
-        // TODO(S12): 안내 종료(목표 패널 정리)·D19 23호 정면 간파 팁 — BossRoomArrived / IsFinished 를 구독.
+        // G11(보스방 도착 = 목숨 차감 기준)을 Finished 보다 먼저 연다. 만료 강제 이동으로 G10 전에 도착하면 순서 규칙상 닫힌 채로 둔다 —
+        // 사망 규칙은 도착·Finished 로 이미 끝나 이후 사망은 일반 규칙이다(TutorialDeathRules).
+        if (_model.IsGateEligible(TutorialGate.G11_BossRoom)) _model.TryOpenGate(TutorialGate.G11_BossRoom);
+        else Edit.Log("[Tutorial] 보스방 도착 — G10 전(타이머 만료 강제 이동)이라 G11 은 닫힌 채로 둔다.", this);
         _model.SetStep(TutorialStep.Finished);
         Commit();
         BossRoomArrived?.Invoke(arrived);
@@ -727,7 +731,7 @@ public sealed class TutorialDirector : NetworkBehaviour
         return changed;
     }
 
-    /// <summary>게이트를 연다(G3·G6·G8·G9 등 서버 판정). 앞 게이트가 닫혀 있으면 거부(false + 경고).</summary>
+    /// <summary>게이트를 연다(G3·G6·G8·G9·G11 등 서버 판정). 앞 게이트가 닫혀 있으면 거부(false + 경고).</summary>
     public bool TryOpenGateServer(TutorialGate gate, TutorialGateOpenReason reason = TutorialGateOpenReason.Manual)
     {
         if (!RequireServerActive(nameof(TryOpenGateServer))) return false;
@@ -987,6 +991,7 @@ public sealed class TutorialDirector : NetworkBehaviour
         Edit.Log($"[Tutorial] 게이트 {gate} 열림 — {reason}.", this);
         if (gate == TutorialGate.G8_TimerStart) OnTimerGateOpened();
         // G10(패드·엘리베이터 문)은 각 피어가 IsGateOpen 으로 본다 — TutorialBossPath·TutorialElevatorDoor.
+        // G11(보스방 도착)은 사망 규칙이 사망 시점에 IsGateOpen 으로 본다 — 여기서 할 일 없음.
         // TODO(S6): G10 열림 → TUT_B_PAD_WARN 파티 전원(D17).
         GateOpened?.Invoke(gate, reason);
     }

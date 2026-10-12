@@ -55,10 +55,12 @@ public sealed class TutorialBarrierRulesTests
     }
 
     [Test]
-    public void G5_G8_은_배리어가_없다()
+    public void G5_G8_G11_은_배리어가_없다()
     {
         Assert.IsFalse(TutorialBarrierRules.HasBarrier(TutorialGate.G5_SpinnerRealMode));
         Assert.IsFalse(TutorialBarrierRules.HasBarrier(TutorialGate.G8_TimerStart));
+        Assert.IsFalse(TutorialBarrierRules.HasBarrier(TutorialGate.G11_BossRoom));
+        Assert.AreEqual(0, TutorialCorridorRules.CorridorOfExitGate(TutorialGate.G11_BossRoom), "복도 출구 기본값(G10)에 흡수되지 않는다");
         Assert.IsTrue(TutorialBarrierRules.HasBarrier(TutorialGate.G1_Corridor1Entry));
         Assert.IsTrue(TutorialBarrierRules.HasBarrier(TutorialGate.G10_BossEnterAndPad));
     }

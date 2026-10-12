@@ -21,6 +21,7 @@ internal static class TutorialBossPathDebugMenu
     [MenuItem(Root + "타이머 시작 (G8 — 앞 게이트 강제)", true)]
     [MenuItem(Root + "G9 열기 (앞 게이트 강제)", true)]
     [MenuItem(Root + "G10 열기 (앞 게이트 강제 — 패드·엘리베이터 문)", true)]
+    [MenuItem(Root + "G11 열기 (앞 게이트 강제 — 보스방 도착 = 목숨 차감 시작, 이동·Finished 없음)", true)]
     static bool Validate() => Ready();
 
     [MenuItem(Root + "보스 길 상태 로그", false, 80)]
@@ -31,6 +32,7 @@ internal static class TutorialBossPathDebugMenu
         string timer = t != null ? $"{t.State} 남은 {t.RemainingSeconds:0.0}/{t.LimitSeconds:0}초" : "(BossTimerManager 없음)";
         Debug.Log($"[TutorialDebug] 보스 길 — 타이머 {timer} · HUD 표시 {d.IsTimerHudShown} · G8 {d.IsBossTimerStarted} · " +
                   $"G9 {d.IsGateOpen(TutorialGate.G9_Corridor4Entry)} · G10 {d.IsGateOpen(TutorialGate.G10_BossEnterAndPad)} · " +
+                  $"G11 {d.IsGateOpen(TutorialGate.G11_BossRoom)} · " +
                   $"패드 {(TutorialBossPath.IsBossPadEnabled ? "활성" : "잠김")} · 단계 {d.Step}");
     }
 
@@ -45,6 +47,9 @@ internal static class TutorialBossPathDebugMenu
 
     [MenuItem(Root + "G10 열기 (앞 게이트 강제 — 패드·엘리베이터 문)", false, 84)]
     static void OpenG10() => OpenThrough(TutorialGate.G10_BossEnterAndPad);
+
+    [MenuItem(Root + "G11 열기 (앞 게이트 강제 — 보스방 도착 = 목숨 차감 시작, 이동·Finished 없음)", false, 85)]
+    static void OpenG11() => OpenThrough(TutorialGate.G11_BossRoom);
 
     static void OpenThrough(TutorialGate target)
     {

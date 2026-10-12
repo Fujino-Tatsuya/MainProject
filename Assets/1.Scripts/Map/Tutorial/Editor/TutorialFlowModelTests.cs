@@ -257,6 +257,29 @@ public sealed class TutorialFlowModelTests
     }
 
     [Test]
+    public void G11_보스방_도착은_G10_전에는_열리지_않는_수동_게이트다()
+    {
+        Assert.AreEqual(11, TutorialFlowModel.GateCount, "G11 이 마지막 게이트");
+        Assert.IsFalse(TutorialFlowModel.IsPersonalGate(TutorialGate.G11_BossRoom), "개인 체크 게이트 아님");
+        Assert.IsFalse(TutorialFlowModel.TryGetGateCounter(TutorialGate.G11_BossRoom, out _), "카운터 게이트 아님");
+
+        var m = NewModel(A);
+        for (int i = 0; i < (int)TutorialGate.G10_BossEnterAndPad; i++) Assert.IsTrue(m.TryOpenGate((TutorialGate)i));
+        Assert.IsFalse(m.IsGateEligible(TutorialGate.G11_BossRoom));
+        Assert.IsFalse(m.TryOpenGate(TutorialGate.G11_BossRoom), "G10 전(타이머 만료 강제 이동 도착) = 거부");
+
+        Assert.IsTrue(m.TryOpenGate(TutorialGate.G10_BossEnterAndPad));
+        m.Evaluate(1d);
+        Assert.IsFalse(m.IsGateOpen(TutorialGate.G11_BossRoom), "수동 게이트 — Evaluate 가 자동으로 열지 않는다");
+        Assert.IsFalse(m.TryGetPendingPersonalGate(out _, out _, out _, out _), "G10 뒤 대기 표시 없음");
+
+        var log = Record(m);
+        Assert.IsTrue(m.TryOpenGate(TutorialGate.G11_BossRoom));
+        Assert.IsTrue(m.IsGateOpen(TutorialGate.G11_BossRoom));
+        CollectionAssert.AreEqual(new[] { (TutorialGate.G11_BossRoom, TutorialGateOpenReason.Manual) }, log);
+    }
+
+    [Test]
     public void 간파_합계가_목표에_닿으면_G5_가_열린다()
     {
         var m = NewModel(A);

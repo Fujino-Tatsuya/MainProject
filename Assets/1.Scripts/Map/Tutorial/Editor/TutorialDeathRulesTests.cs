@@ -31,12 +31,12 @@ public sealed class TutorialDeathRulesTests
     // ─── 차감 여부 · 대기 ────────────────────────────────────────────────
 
     [Test]
-    public void G8전_사망은_3초뒤_차감없이_안전지점_부활()
+    public void G11전_사망은_3초뒤_차감없이_안전지점_부활()
     {
         var m = new TutorialDeathRulesModel();
-        m.RecordDeath(A, 10d, timerStarted: false);
+        m.RecordDeath(A, 10d, bossRoomReached: false);
 
-        Assert.That(m.IsPenaltyFree(A), Is.True, "G8 전 = 목숨 수와 무관하게 Soul");
+        Assert.That(m.IsPenaltyFree(A), Is.True, "G11 전 = 목숨 수와 무관하게 Soul");
         Assert.That(Eval(m, A, 12.9d, PlayerLifeState.Soul, false, out _), Is.EqualTo(TutorialReviveVerdict.Waiting));
         Assert.That(Eval(m, A, 13d, PlayerLifeState.Soul, false, out TutorialReviveOrder o), Is.EqualTo(TutorialReviveVerdict.Revive));
         Assert.That(o.ConsumeLife, Is.False);
@@ -45,22 +45,49 @@ public sealed class TutorialDeathRulesTests
     }
 
     [Test]
-    public void G8뒤_사망은_목숨1개_차감()
+    public void G11뒤_사망은_기존규칙_목숨1개_차감()
     {
-        var m = new TutorialDeathRulesModel();
-        m.RecordDeath(A, 0d, timerStarted: true);
+        int mask = MaskUpTo(TutorialGate.G11_BossRoom);
+        Assert.That(TutorialDeathRulesModel.IsLifeChargedAt(mask), Is.True, "G11(보스방 도착) 뒤 = 차감");
 
-        Assert.That(m.IsPenaltyFree(A), Is.False, "G8 뒤 = 기존 목적지 규칙(목숨 0 → 완전 사망)");
+        var m = new TutorialDeathRulesModel();
+        m.RecordDeath(A, 0d, bossRoomReached: TutorialDeathRulesModel.IsLifeChargedAt(mask));
+
+        Assert.That(m.IsPenaltyFree(A), Is.False, "G11 뒤 = 기존 목적지 규칙(목숨 0 → 완전 사망)");
         Assert.That(Eval(m, A, 3d, PlayerLifeState.Soul, false, out TutorialReviveOrder o), Is.EqualTo(TutorialReviveVerdict.Revive));
         Assert.That(o.ConsumeLife, Is.True);
     }
 
     [Test]
+    public void G8뒤_G11전_사망은_차감없이_Soul_유지()
+    {
+        // 존4 전투·복도4·패드 대기(G10)·타이머 만료 강제 이동 중 — 타이머가 돌고 있어도 보스방 도착 전이면 차감 없음.
+        foreach (TutorialGate last in new[] { TutorialGate.G8_TimerStart, TutorialGate.G9_Corridor4Entry, TutorialGate.G10_BossEnterAndPad })
+            Assert.That(TutorialDeathRulesModel.IsLifeChargedAt(MaskUpTo(last)), Is.False, $"{last} 까지 열림 = G11 전");
+        Assert.That(TutorialDeathRulesModel.IsLifeChargedAt(0), Is.False, "아무 게이트도 안 열림");
+
+        var m = new TutorialDeathRulesModel();
+        m.RecordDeath(A, 0d, bossRoomReached: TutorialDeathRulesModel.IsLifeChargedAt(MaskUpTo(TutorialGate.G10_BossEnterAndPad)));
+        Assert.That(m.IsPenaltyFree(A), Is.True, "목숨 수와 무관하게 Soul");
+
+        // 타이머 만료 강제 이동 중 사망도 같다(그 자리 즉시 부활, 차감 없음).
+        m.BeginMove();
+        m.RecordDeath(B, 0d, bossRoomReached: TutorialDeathRulesModel.IsLifeChargedAt(MaskUpTo(TutorialGate.G8_TimerStart)));
+        Assert.That(m.IsPenaltyFree(B), Is.True);
+        Assert.That(Eval(m, B, 0.1d, PlayerLifeState.Soul, false, out TutorialReviveOrder b), Is.EqualTo(TutorialReviveVerdict.Revive));
+        Assert.That(b.ConsumeLife, Is.False);
+        Assert.That(b.InPlace, Is.True);
+
+        Assert.That(Eval(m, A, 3d, PlayerLifeState.Soul, false, out TutorialReviveOrder a), Is.EqualTo(TutorialReviveVerdict.Revive));
+        Assert.That(a.ConsumeLife, Is.False);
+    }
+
+    [Test]
     public void 차감여부는_사망시점_단계로_고정된다()
     {
-        // 대기 중에 G8 이 열려도 G8 전 사망은 차감 없음 — 위치는 아예 입력이 아니다(단계 기준).
+        // 대기 중에 G11 이 열려도 G11 전 사망은 차감 없음 — 위치는 아예 입력이 아니다(단계 기준).
         var m = new TutorialDeathRulesModel();
-        m.RecordDeath(A, 0d, timerStarted: false);
+        m.RecordDeath(A, 0d, bossRoomReached: false);
         Assert.That(Eval(m, A, 3d, PlayerLifeState.Soul, false, out TutorialReviveOrder o), Is.EqualTo(TutorialReviveVerdict.Revive));
         Assert.That(o.ConsumeLife, Is.False);
     }
@@ -103,8 +130,8 @@ public sealed class TutorialDeathRulesTests
     public void 이동_시작하면_대기부활을_취소하고_즉시_그자리_부활()
     {
         var m = new TutorialDeathRulesModel();
-        m.RecordDeath(A, 0d, timerStarted: false);
-        m.RecordDeath(B, 0d, timerStarted: true);
+        m.RecordDeath(A, 0d, bossRoomReached: false);
+        m.RecordDeath(B, 0d, bossRoomReached: true);
 
         Assert.That(m.BeginMove(), Is.EqualTo(2));
         Assert.That(m.BeginMove(), Is.Zero, "이미 진행 중이면 다시 바꾸지 않는다");
@@ -112,7 +139,7 @@ public sealed class TutorialDeathRulesTests
         // 3초 전이어도 Soul 이면 바로.
         Assert.That(Eval(m, A, 1.6d, PlayerLifeState.Soul, false, out TutorialReviveOrder a), Is.EqualTo(TutorialReviveVerdict.Revive));
         Assert.That(a.InPlace, Is.True);
-        Assert.That(a.ConsumeLife, Is.False, "G8 전 사망이면 이동 중 즉시 부활도 차감 없음");
+        Assert.That(a.ConsumeLife, Is.False, "G11 전 사망이면 이동 중 즉시 부활도 차감 없음");
 
         // 아직 사망 연출이면 Soul 을 기다린다(대기 3초는 무시).
         Assert.That(Eval(m, B, 0.5d, PlayerLifeState.DeadPresentation, false, out _), Is.EqualTo(TutorialReviveVerdict.WaitingForSoul));

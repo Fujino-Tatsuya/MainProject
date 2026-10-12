@@ -27,7 +27,7 @@ public readonly struct TutorialBarrierSpec
 /// 게이트 → 배리어 매핑 · 배리어 모양 · 열림 판정 · 추락 복구 후보 허용 판정.
 ///
 /// 배리어 8개 = 복도 n 의 입구(존n 쪽)·출구(존n+1 쪽):
-///   복도1 G1/G2 · 복도2 G3/G4 · 복도3 G6/G7 · 복도4 G9/G10. G5(스피너봇 본 모드)·G8(타이머 시작)은 배리어가 없다.
+///   복도1 G1/G2 · 복도2 G3/G4 · 복도3 G6/G7 · 복도4 G9/G10. G5(스피너봇 본 모드)·G8(타이머 시작)·G11(보스방 도착)은 배리어가 없다.
 /// 배리어 박스는 복도 사각형 끝 경계에서 <b>복도 안쪽</b>으로 두께만큼(존 사각형을 침범하지 않게 — 존 진입 판정과 겹치지 않는다),
 /// 가로는 복도 너비 + 양옆 겹침(복도 벽에 파고들게 — 틈 방지).
 /// </summary>
@@ -57,7 +57,7 @@ public static class TutorialBarrierRules
         return atEntry ? EntryGates[corridor - 1] : ExitGates[corridor - 1];
     }
 
-    /// <summary>이 게이트에 배리어가 있는가(G5·G8 은 없다).</summary>
+    /// <summary>이 게이트에 배리어가 있는가(G5·G8·G11 은 없다).</summary>
     public static bool HasBarrier(TutorialGate gate) =>
         Array.IndexOf(EntryGates, gate) >= 0 || Array.IndexOf(ExitGates, gate) >= 0;
 

@@ -40,6 +40,8 @@ public enum TutorialGate : byte
     G9_Corridor4Entry = 8,
     /// <summary>보스 진입 존 입구 + 패드 활성.</summary>
     G10_BossEnterAndPad = 9,
+    /// <summary>보스방 도착(패드·만료 강제 이동 공통) — 서버 판정 게이트, 배리어 없음. 목숨 차감 기준(S11 — 이 전 사망은 차감 없음).</summary>
+    G11_BossRoom = 10,
 }
 
 /// <summary>개인 체크리스트 항목(§2.1). 값 = 비트 위치.</summary>
@@ -114,7 +116,7 @@ public struct TutorialPlayerProgress
 /// </summary>
 public sealed class TutorialFlowModel
 {
-    public const int GateCount = 10;
+    public const int GateCount = 11;
     public const int CounterCount = 3;
     public const int AttackHitsRequired = 5;
     public const double DefaultDeadlockSeconds = 60d;
@@ -265,7 +267,7 @@ public sealed class TutorialFlowModel
     }
 
     /// <summary>
-    /// 서버가 직접 여는 게이트(G3·G6·G8·G9 — 존 클리어·자막 종료 등). 개인·카운터 게이트도 강제로 열 수 있다
+    /// 서버가 직접 여는 게이트(G3·G6·G8·G9·G11 — 존 클리어·자막 종료·보스방 도착 등). 개인·카운터 게이트도 강제로 열 수 있다
     /// (타이머 만료 자동 획득 같은 예외 경로). 순서가 안 맞으면(앞 게이트 닫힘) false.
     /// </summary>
     public bool TryOpenGate(TutorialGate g, TutorialGateOpenReason reason = TutorialGateOpenReason.Manual)

@@ -12,9 +12,10 @@ using UnityEngine;
 /// 절차 맵·비튜토리얼은 디렉터가 켜지지 않아 붙지 않는다(기존 규칙 그대로).
 ///
 /// 흐름:
-///  · 사망(Alive → DeadPresentation) → 3초 뒤 자동 부활 + 2초 무적. 차감 여부 = 사망 시점 G8(타이머 시작) 열림.
-///    G8 전 사망은 목숨 수와 무관하게 Soul 로 가게 <see cref="PlayerLifeCycleController.ServerDeathKeepsSoul"/> 를 건다.
-///    G8 뒤는 기존 규칙 — 목숨 0 이면 PermanentDead(관전), 전원이면 PartyWipeWatcher 결과 화면.
+///  · 사망(Alive → DeadPresentation) → 3초 뒤 자동 부활 + 2초 무적. 차감 여부 = 사망 시점 G11(보스방 도착) 열림.
+///    G11 전 사망(존1~복도4·패드 대기·타이머 만료 강제 이동 중 — G8 타이머 시작 뒤 포함)은 목숨 수와 무관하게 Soul 로 가게
+///    <see cref="PlayerLifeCycleController.ServerDeathKeepsSoul"/> 를 건다.
+///    G11 뒤는 기존 규칙 — 목숨 0 이면 PermanentDead(관전), 전원이면 PartyWipeWatcher 결과 화면.
 ///  · 부활 지점 = 지금 단계 구간의 안전한 지점(<see cref="TutorialRevivePointRules"/>) — 격자 후보를 바닥·점유 검사로 거른 뒤 고른다.
 ///  · 보스방 이동 카운트다운(<see cref="BossTeleportManager.IsCountdownActive"/> — 패드·타이머 만료 강제 이동 공통)이 보이면
 ///    대기 부활을 즉시·그 자리로 바꾼다. 튜토리얼 구간 밖(보스방)에 있는 사람도 그 자리에서 되살린다(옛 구간으로 끌고 가지 않음).
@@ -103,7 +104,7 @@ public sealed class TutorialDeathRules : MonoBehaviour
 
         BuildAreas();
         Edit.Log($"[Tutorial] 사망 규칙 켜짐 — {reviveDelaySeconds:0.#}초 뒤 자동 부활 · 무적 {reviveInvulnerabilitySeconds:0.#}초 · " +
-                 "G8 전 차감 없음 / 뒤 1개 차감.", this);
+                 "G11(보스방 도착) 전 차감 없음 / 뒤 1개 차감.", this);
     }
 
     private void OnDisable()
@@ -152,11 +153,11 @@ public sealed class TutorialDeathRules : MonoBehaviour
     {
         if (from != PlayerLifeState.Alive || to != PlayerLifeState.DeadPresentation || !RulesActive) return;
 
-        bool timerStarted = _director.IsGateOpen(TutorialGate.G8_TimerStart);
-        _model.RecordDeath(clientId, _nm.ServerTime.Time, timerStarted);
+        bool bossRoomReached = TutorialDeathRulesModel.IsLifeChargedAt(OpenedGateMask());
+        _model.RecordDeath(clientId, _nm.ServerTime.Time, bossRoomReached);
         Edit.Log($"[Tutorial] client {clientId} 사망 — " +
                  (_model.IsMoveInProgress ? "보스방 이동 중이라 Soul 이 되는 즉시 그 자리에서" : $"{reviveDelaySeconds:0.#}초 뒤") +
-                 $" 자동 부활(목숨 차감 {(timerStarted ? "1개 — G8 뒤" : "없음 — G8 전")}).", this);
+                 $" 자동 부활(목숨 차감 {(bossRoomReached ? "1개 — G11 뒤" : "없음 — G11 전")}).", this);
     }
 
     private void HandleClientDisconnected(ulong clientId)

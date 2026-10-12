@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 
 // 튜토리얼 사망 규칙의 순수 규칙(Unity·NGO 비의존 — EditMode 테스트 대상).
-// 원본: Docs/design/tutorial-scenario.md §2.5(D5)·§4 G8, PLAN-tutorial.md S11. 배선은 TutorialDeathRules(서버)가 한다.
+// 원본: Docs/design/tutorial-scenario.md §2.5(D5)·§4 G11, PLAN-tutorial.md S11. 배선은 TutorialDeathRules(서버)가 한다.
 // 🔴 시간은 전부 인자로 받는다(서버 시간 = ServerTime).
 
 /// <summary>대기 중인 자동 부활 판정 결과.</summary>
@@ -25,7 +25,7 @@ public enum TutorialReviveVerdict : byte
 /// <summary>부활 방법.</summary>
 public struct TutorialReviveOrder
 {
-    /// <summary>목숨 1개 차감(G8 뒤 사망).</summary>
+    /// <summary>목숨 1개 차감(G11 뒤 사망).</summary>
     public bool ConsumeLife;
     /// <summary>그 자리에서 부활(보스방 이동 중) — 안전 지점으로 옮기지 않는다.</summary>
     public bool InPlace;
@@ -38,8 +38,9 @@ public struct TutorialReviveOrder
 ///
 /// 규칙(§2.5):
 ///  · 사망(Alive → DeadPresentation)마다 <see cref="ReviveDelaySeconds"/>(3초) 뒤 자동 부활을 예약한다.
-///  · 목숨 차감 여부는 <b>사망 시점의 단계</b>로 정한다 — G8(타이머 시작)이 열렸으면 1개 차감, 아니면 없음.
-///    위치는 보지 않는다(존4 몹을 복도3 으로 끌고 와도 차감). 대기 중 G8 이 열려도 바뀌지 않는다.
+///  · 목숨 차감 여부는 <b>사망 시점의 단계</b>로 정한다 — G11(보스방 도착)이 열렸으면 1개 차감, 아니면 없음.
+///    G8(타이머 시작) 뒤라도 G11 전(존4·복도4·패드 대기·타이머 만료 강제 이동 중)이면 차감 없음.
+///    위치는 보지 않는다. 대기 중 G11 이 열려도 바뀌지 않는다.
 ///  · 보스방 이동(패드·타이머 만료 강제 이동)이 시작되면 대기 중인 부활을 전부 '즉시·그 자리'로 바꾼다.
 ///    이동 중 새로 죽은 사람도 같다. 이동이 끝나도(취소 포함) 이미 바뀐 기록은 되돌리지 않는다 —
 ///    이동 뒤 옛 구간 지점으로 끌려가면 안 된다.
@@ -76,6 +77,12 @@ public sealed class TutorialDeathRulesModel
 
     public bool HasPending(ulong clientId) => _pending.ContainsKey(clientId);
 
+    /// <summary>
+    /// 이 열린 게이트 상태(bit = <see cref="TutorialGate"/>)에서 죽으면 목숨이 차감되는가 = G11(보스방 도착) 열림.
+    /// G8(타이머 시작)은 보지 않는다. 결과를 <see cref="RecordDeath"/> 의 bossRoomReached 로 넘긴다.
+    /// </summary>
+    public static bool IsLifeChargedAt(int openedGateMask) => (openedGateMask & (1 << (int)TutorialGate.G11_BossRoom)) != 0;
+
     /// <summary>대기 중인 client 목록(복사본 — 순회 중 기록이 지워져도 안전).</summary>
     public IReadOnlyList<ulong> PendingIds
     {
@@ -88,14 +95,14 @@ public sealed class TutorialDeathRulesModel
     }
 
     /// <summary>
-    /// 사망 기록. <paramref name="timerStarted"/> = G8 이 열렸는가(단계 기준). 같은 client 가 다시 죽으면 새 기록으로 덮는다.
+    /// 사망 기록. <paramref name="bossRoomReached"/> = G11(보스방 도착)이 열렸는가(단계 기준). 같은 client 가 다시 죽으면 새 기록으로 덮는다.
     /// </summary>
-    public void RecordDeath(ulong clientId, double now, bool timerStarted)
+    public void RecordDeath(ulong clientId, double now, bool bossRoomReached)
     {
         _pending[clientId] = new Pending
         {
             DueAt = now + ReviveDelaySeconds,
-            Free = !timerStarted,
+            Free = !bossRoomReached,
             InPlace = IsMoveInProgress,
         };
     }
