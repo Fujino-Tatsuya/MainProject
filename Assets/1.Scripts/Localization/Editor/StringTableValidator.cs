@@ -49,7 +49,9 @@ public readonly struct LocalizedString
 /// <item>en 빈 칸 = 경고 + ko 로 채움</item>
 /// <item>ko·en 의 자리표시자(<c>{이름}</c>) 집합이 다르면 오류</item>
 /// <item><c>&lt;style=…&gt;</c>·<c>&lt;/style&gt;</c> 짝이 안 맞으면 오류(언어마다)</item>
+/// <item>중괄호 문법(짝 없는 <c>}</c>·닫히지 않은 <c>{</c>·빈 <c>{}</c>)이 틀리면 오류(언어마다)</item>
 /// </list>
+/// 문법·자리표시자 규칙은 <see cref="LocText"/> — 스킬 툴팁(<see cref="SkillTooltipFormatter"/>)과 같은 것이다.
 /// </summary>
 public static class StringTableValidator
 {
@@ -78,7 +80,7 @@ public static class StringTableValidator
                 ok = false;
             }
 
-            ok &= CheckStyle(ko, row.KoLocation, row.Key, issues);
+            ok &= CheckSyntax(ko, row.KoLocation, row.Key, issues);
 
             if (en.Length == 0)
             {
@@ -91,14 +93,12 @@ public static class StringTableValidator
             }
             else
             {
-                ok &= CheckStyle(en, row.EnLocation, row.Key, issues);
+                ok &= CheckSyntax(en, row.EnLocation, row.Key, issues);
 
-                HashSet<string> koNames = LocText.Placeholders(ko);
-                HashSet<string> enNames = LocText.Placeholders(en);
-                if (!koNames.SetEquals(enNames))
+                if (!LocText.SamePlaceholders(ko, en))
                 {
                     issues.Error(row.EnLocation,
-                        $"'{row.Key}' 의 자리표시자가 언어마다 다르다 — ko {Describe(koNames)} / en {Describe(enNames)}.");
+                        $"'{row.Key}' 의 자리표시자가 언어마다 다르다 — ko {Describe(LocText.Placeholders(ko))} / en {Describe(LocText.Placeholders(en))}.");
                     ok = false;
                 }
             }
@@ -112,9 +112,10 @@ public static class StringTableValidator
         return result;
     }
 
-    private static bool CheckStyle(string text, string location, string key, DataTableIssues issues)
+    // 문법 규칙은 SkillTooltipFormatter 와 같은 LocText 하나 — style 짝·중괄호.
+    private static bool CheckSyntax(string text, string location, string key, DataTableIssues issues)
     {
-        string error = LocText.StyleTagError(text);
+        string error = LocText.StyleTagError(text) ?? LocText.BraceError(text);
         if (error == null)
         {
             return true;
