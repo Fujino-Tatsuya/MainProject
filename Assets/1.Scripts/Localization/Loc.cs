@@ -97,6 +97,17 @@ public static class Loc
         return TutorialGuideText.Fill(text, args);
     }
 
+    /// <summary>
+    /// <see cref="GetError(string, IReadOnlyDictionary{string, string})"/> 와 같지만 코드가 없으면(빈 코드·표 없음 포함)
+    /// <c>#코드</c> 대신 <paramref name="fallback"/>(코드에 적힌 ko 원문)에 args 를 채운다 — 시트에 행이 생기기 전에도 화면이 안 깨진다.
+    /// </summary>
+    public static string GetError(string code, string fallback, IReadOnlyDictionary<string, string> args)
+    {
+        StringTable current = string.IsNullOrEmpty(code) ? null : Table;
+        string text = current != null && current.TryGetError(code, Current, out string found) ? found : fallback;
+        return TutorialGuideText.Fill(text, args);
+    }
+
     // 도메인 리로드 없는 Play 진입에서 지난 세션 구독자가 남지 않게. 표는 에셋 참조라 그대로 둔다.
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetSubscribers()

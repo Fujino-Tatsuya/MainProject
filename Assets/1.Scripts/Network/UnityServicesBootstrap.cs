@@ -11,7 +11,7 @@ public static class UnityServicesBootstrap
     private const string DiagTag = "UnityServicesBootstrap";
 
     private static Task _initializationTask;
-    private static string _failureReason = string.Empty;
+    private static SessionError _failure;
 
     public static bool IsReady =>
         UnityServices.State == ServicesInitializationState.Initialized &&
@@ -23,41 +23,40 @@ public static class UnityServicesBootstrap
         _initializationTask = InitializeAsync();
     }
 
-    public static bool IsAvailable(out string unavailableReason)
+    public static bool IsAvailable(out SessionError unavailable)
     {
         if (string.IsNullOrWhiteSpace(Application.cloudProjectId))
         {
-            unavailableReason =
-                "Unity Services 프로젝트 연결(cloudProjectId)이 설정되지 않았습니다.";
+            unavailable = new SessionError(ErrorCatalog.UgsProjectNotLinked);
             return false;
         }
 
-        if (!string.IsNullOrEmpty(_failureReason))
+        if (!_failure.IsNone)
         {
-            unavailableReason = _failureReason;
+            unavailable = _failure;
             return false;
         }
 
         if (UnityServices.State == ServicesInitializationState.Uninitialized)
         {
-            unavailableReason = "Unity Services가 초기화되지 않았습니다.";
+            unavailable = new SessionError(ErrorCatalog.UgsNotInitialized);
             return false;
         }
 
         if (UnityServices.State == ServicesInitializationState.Initializing ||
             (_initializationTask != null && !_initializationTask.IsCompleted))
         {
-            unavailableReason = "Unity Services 초기화 중입니다. 잠시 후 다시 시도하세요.";
+            unavailable = new SessionError(ErrorCatalog.UgsInitializing);
             return false;
         }
 
         if (!AuthenticationService.Instance.IsSignedIn)
         {
-            unavailableReason = "Unity Services 익명 로그인이 완료되지 않았습니다.";
+            unavailable = new SessionError(ErrorCatalog.UgsNotSignedIn);
             return false;
         }
 
-        unavailableReason = string.Empty;
+        unavailable = default;
         return true;
     }
 
@@ -67,9 +66,8 @@ public static class UnityServicesBootstrap
         {
             if (string.IsNullOrWhiteSpace(Application.cloudProjectId))
             {
-                _failureReason =
-                    "Unity Services 프로젝트 연결(cloudProjectId)이 설정되지 않았습니다.";
-                Debug.LogError($"[Relay] {_failureReason}");
+                _failure = new SessionError(ErrorCatalog.UgsProjectNotLinked);
+                Debug.LogError($"[Relay] {_failure.LogText}");
                 return;
             }
 
@@ -88,7 +86,7 @@ public static class UnityServicesBootstrap
                     $"[Relay] Unity Services 익명 로그인 완료 profile={profile} playerId={authentication.PlayerId}");
             }
 
-            _failureReason = string.Empty;
+            _failure = default;
             NetworkDiagnosticsLog.Log(
                 $"{DiagTag}.InitializeAsync",
                 $"완료 state={UnityServices.State} signedIn={authentication.IsSignedIn} " +
@@ -97,8 +95,8 @@ public static class UnityServicesBootstrap
         }
         catch (Exception exception)
         {
-            _failureReason = $"Unity Services 초기화 또는 익명 로그인에 실패했습니다: {exception.Message}";
-            Debug.LogError($"[Relay] {_failureReason}\n{exception}");
+            _failure = new SessionError(ErrorCatalog.UgsInitFailed, detail: exception.Message);
+            Debug.LogError($"[Relay] {_failure.LogText}\n{exception}");
             NetworkDiagnosticsLog.LogError($"{DiagTag}.InitializeAsync", exception.ToString());
         }
     }

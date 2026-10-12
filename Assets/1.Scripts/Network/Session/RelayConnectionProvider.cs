@@ -20,18 +20,18 @@ public sealed class RelayConnectionProvider : ISessionConnectionProvider
 
     public SessionConnectionMode Mode => SessionConnectionMode.UnityRelay;
 
-    public bool IsAvailable(out string unavailableReason)
+    public bool IsAvailable(out SessionError unavailable)
     {
         if (_transport == null)
         {
-            unavailableReason = "Relay 연결에 필요한 UnityTransport를 찾을 수 없습니다.";
-            NetworkDiagnosticsLog.LogWarning($"{DiagTag}.IsAvailable", unavailableReason);
+            unavailable = new SessionError(ErrorCatalog.RelayTransportMissing);
+            NetworkDiagnosticsLog.LogWarning($"{DiagTag}.IsAvailable", unavailable.LogText);
             return false;
         }
 
-        var available = UnityServicesBootstrap.IsAvailable(out unavailableReason);
+        var available = UnityServicesBootstrap.IsAvailable(out unavailable);
         NetworkDiagnosticsLog.Log(
-            $"{DiagTag}.IsAvailable", $"available={available} reason='{unavailableReason}'");
+            $"{DiagTag}.IsAvailable", $"available={available} error='{unavailable.LogText}'");
         return available;
     }
 
@@ -63,7 +63,7 @@ public sealed class RelayConnectionProvider : ISessionConnectionProvider
             NetworkDiagnosticsLog.LogError(
                 $"{DiagTag}.PrepareHostAsync",
                 $"RelayServiceException reason={exception.Reason} status={exception.ErrorCode} {exception.Message}");
-            return SessionStartResult.Failed(BuildRelayFailureReason(exception, false));
+            return SessionStartResult.Failed(BuildRelayFailure(exception, false));
         }
     }
 
@@ -78,7 +78,7 @@ public sealed class RelayConnectionProvider : ISessionConnectionProvider
         if (string.IsNullOrEmpty(joinCode))
         {
             NetworkDiagnosticsLog.LogWarning($"{DiagTag}.PrepareClientAsync", "조인코드가 비어 있습니다.");
-            return SessionStartResult.Failed("Relay 조인코드를 입력하세요.");
+            return SessionStartResult.Failed(ErrorCatalog.RelayJoinCodeEmpty);
         }
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -99,7 +99,7 @@ public sealed class RelayConnectionProvider : ISessionConnectionProvider
             NetworkDiagnosticsLog.LogError(
                 $"{DiagTag}.PrepareClientAsync",
                 $"RelayServiceException reason={exception.Reason} status={exception.ErrorCode} {exception.Message}");
-            return SessionStartResult.Failed(BuildRelayFailureReason(exception, true));
+            return SessionStartResult.Failed(BuildRelayFailure(exception, true));
         }
     }
 
@@ -132,33 +132,27 @@ public sealed class RelayConnectionProvider : ISessionConnectionProvider
         NetworkDiagnosticsLog.LogBlock($"{DiagTag}.{context} Allocation", lines);
     }
 
-    private static string BuildRelayFailureReason(RelayServiceException exception, bool joining)
+    /// <summary>예외 사유 → 오류 코드. 예외 메시지는 화면 문구가 아니라 상세(로그)로만 남긴다.</summary>
+    private static SessionError BuildRelayFailure(RelayServiceException exception, bool joining)
     {
-        switch (exception.Reason)
+        var detail = $"reason={exception.Reason} status={exception.ErrorCode} {exception.Message}";
+        var code = exception.Reason switch
         {
-            case RelayExceptionReason.JoinCodeNotFound:
-            case RelayExceptionReason.AllocationNotFound:
-            case RelayExceptionReason.EntityNotFound:
-                return "Relay 조인코드가 잘못되었거나 만료되었습니다.";
-            case RelayExceptionReason.InactiveProject:
-                return "Unity Dashboard에서 이 프로젝트의 Relay 서비스를 활성화하세요.";
-            case RelayExceptionReason.Unauthorized:
-            case RelayExceptionReason.Forbidden:
-                return "Relay 인증 또는 프로젝트 접근 권한이 없습니다.";
-            case RelayExceptionReason.PaymentRequired:
-                return "Relay 사용 한도 또는 결제 설정을 확인하세요.";
-            case RelayExceptionReason.RateLimited:
-                return "Relay 요청 한도를 초과했습니다. 잠시 후 다시 시도하세요.";
-            case RelayExceptionReason.NoSuitableRelay:
-            case RelayExceptionReason.ServiceUnavailable:
-            case RelayExceptionReason.GatewayTimeout:
-                return "사용 가능한 Relay 서버가 없습니다. 잠시 후 다시 시도하세요.";
-            case RelayExceptionReason.InvalidRequest when joining:
-            case RelayExceptionReason.Conflict when joining:
-                return $"Relay 방에 참가할 수 없습니다. 조인코드와 방 정원을 확인하세요. ({exception.Message})";
-            default:
-                var action = joining ? "참가" : "생성";
-                return $"Relay 방 {action}에 실패했습니다: {exception.Message}";
-        }
+            RelayExceptionReason.JoinCodeNotFound or
+            RelayExceptionReason.AllocationNotFound or
+            RelayExceptionReason.EntityNotFound => ErrorCatalog.RelayJoinCodeInvalid,
+            RelayExceptionReason.InactiveProject => ErrorCatalog.RelayInactiveProject,
+            RelayExceptionReason.Unauthorized or
+            RelayExceptionReason.Forbidden => ErrorCatalog.RelayUnauthorized,
+            RelayExceptionReason.PaymentRequired => ErrorCatalog.RelayPaymentRequired,
+            RelayExceptionReason.RateLimited => ErrorCatalog.RelayRateLimited,
+            RelayExceptionReason.NoSuitableRelay or
+            RelayExceptionReason.ServiceUnavailable or
+            RelayExceptionReason.GatewayTimeout => ErrorCatalog.RelayUnavailable,
+            RelayExceptionReason.InvalidRequest or
+            RelayExceptionReason.Conflict when joining => ErrorCatalog.RelayJoinRejected,
+            _ => joining ? ErrorCatalog.RelayJoinFailed : ErrorCatalog.RelayHostFailed,
+        };
+        return new SessionError(code, detail: detail);
     }
 }
