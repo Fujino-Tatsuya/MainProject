@@ -1,7 +1,7 @@
 # 로컬라이징 (한/영)
 
 > 게임에 보이는 문구는 `GameData.xlsx` 의 **`Strings` 시트**, 로비·네트워크 오류 문구는 **`ErrorCodes` 시트**가 원본이다. 코드는 키·오류 코드로만 찾는다.
-> L1(기반) + L2(SO 문구 — 스킬 툴팁·캐릭터 이름 자동 키, [§5](#5-l2--so-문구-자동-키)) 기준 문서. 씬·프리팹 문구 교체(L3)는 아직 없다.
+> L1(기반) + L2(SO 문구 — 스킬 툴팁·캐릭터 이름 자동 키, [§5](#5-l2--so-문구-자동-키)) + L3(씬·프리팹 라벨·HUD 포맷 문구, [§6](#6-l3--씬프리팹-라벨)) 기준 문서.
 > 수치 테이블 쓰는 법은 [data-table.md](data-table.md).
 
 ## 1. 한눈에
@@ -84,7 +84,7 @@ Strings·ErrorCodes 두 시트에 똑같이 적용한다(시트마다 따로 검
 - `Tools/Data/Export Template` 은 `Strings`·`ErrorCodes` 시트를 **항상** 만든다 — 키가 하나도 없어도 머리글만 있는 시트가 생긴다.
 - 기존 행(메모 행·`#` 메모 열 포함)은 **병합·덮어쓰기 어느 쪽이든 그대로** 옮긴다. 코드가 등록한 키 중 시트에 없는 것만 뒤에 붙는다(en 은 빈 칸).
   머리글에 없는 열은 Export 때 사라진다(원본은 Export 백업).
-- 코드가 등록하는 Strings 키 = `[DataTableText]` 자동 키 + 캐릭터 이름([§5](#5-l2--so-문구-자동-키)). 그 밖의 새 키·ErrorCodes 코드는 시트에 직접 행을 추가한다.
+- 코드가 등록하는 Strings 키 = `[DataTableText]` 자동 키 + 캐릭터 이름([§5](#5-l2--so-문구-자동-키)) + L3 UI 문구(`UiStrings`, [§6](#6-l3--씬프리팹-라벨)). 그 밖의 새 키·ErrorCodes 코드는 시트에 직접 행을 추가한다.
 - 🔴 Export 는 xlsx 를 새로 쓴다(서식·열 너비 사라짐) — [data-table.md §4](data-table.md#4-메뉴-toolsdata).
 
 ## 3. 프로그래머 — API
@@ -112,7 +112,7 @@ Loc.Changed += Redraw;           // OnEnable 에서 구독, OnDisable 에서 꼭
 
 - 문구는 **로컬 표시 전용**이다. 네트워크로 문구를 보내지 말고 키(또는 키 + 인자)를 보낸다 — 클라마다 언어가 다를 수 있다. 오류도 마찬가지로 코드만 보낸다.
 - 오류 로그에는 문구가 아니라 **코드**를 남긴다 — QA·CS 가 ErrorCodes 시트에서 원인·조치를 찾는 열쇠다.
-- 키가 화면에 `#UI.…` 로 보이면 시트에 행이 없거나 `#` 로 빠진 것이다.
+- 키가 화면에 `#UI.…` 로 보이면 시트에 행이 없거나 `#` 로 빠진 것이다(`Loc.Get(key)` 직접 호출일 때. 폴백이 있는 `LocalizedText`·`UiString`·`Loc.Get(key, fallback)` 은 원문이 보인다).
 
 ### 키 규칙
 
@@ -124,7 +124,7 @@ Loc.Changed += Redraw;           // OnEnable 에서 구독, OnDisable 에서 꼭
 
 | 컴포넌트 | 쓰는 법 |
 |---|---|
-| `LocalizedText` | TMP_Text 옆에 붙이고 `key` 를 적는다. 켜질 때와 언어가 바뀔 때 텍스트를 바꾼다. 자리표시자가 있는 문구는 이 컴포넌트 대신 코드에서 `Loc.Format` |
+| `LocalizedText` | TMP_Text 옆에 붙이고 `key` 를 적는다. 켜질 때와 언어가 바뀔 때 텍스트를 바꾼다. 시트에 행이 없으면 **저작된 글자(ko 원문)를 그대로 둔다** — 저작 글자가 비었을 때만 `#key`. 자리표시자가 있는 문구는 이 컴포넌트 대신 코드에서 `Loc.Format` |
 | `LocalizedImage` | Image 옆에 붙이고 `ko`·`en` Sprite 를 넣는다. en 이 없으면 ko 를 쓰고 경고를 한 번 남긴다 |
 
 ### 표가 런타임에 들어가는 길
@@ -149,9 +149,12 @@ Loc.Changed += Redraw;           // OnEnable 에서 구독, OnDisable 에서 꼭
 | `Assets/1.Scripts/Localization/Editor/StringTableValidator.cs` | 검증(순수) |
 | `Assets/1.Scripts/Localization/Editor/StringTableBuild.cs` | 표 에셋 생성·빌드 Preload·수동 갱신 메뉴 |
 | `Assets/1.Scripts/UI/Title/LanguageOption.cs` · `Editor/LanguageOptionAuthoring.cs` | 옵션 언어 선택 · 배치 메뉴 `Tools/UI/Title/옵션 Gameplay — 언어 선택 배치` |
+| `Assets/1.Scripts/Localization/UiStrings.cs` | L3 UI 문구 키 목록(`UiString` = 키 + ko 폴백 + 쓰는 곳) |
+| `Assets/1.Scripts/Localization/Editor/UiStringKeys.cs` | Export 때 `UiStrings.All` 을 Strings 키로 등록(`StringKeyRegistry`) |
+| `Assets/1.Scripts/Localization/Editor/UiStringsAuthoring.cs` | L3 저작 메뉴 `Tools/Localization/L3 — 씬·프리팹 라벨 키 부착` |
 
 - 테스트: `Tools/Tests/데이터 테이블 EditMode 테스트 실행`(픽스처 `StringTableValidatorTests`·`StringsSheetTests`·`ErrorCodesSheetTests`·`LocTests`·`UserLanguageConfigTests`,
-  L2 `LocKeyTests`·`DataTableTextKeysTests`·`CharacterRosterStringKeysTests`·`LocTextRuleTests`).
+  L2 `LocKeyTests`·`DataTableTextKeysTests`·`CharacterRosterStringKeysTests`·`LocTextRuleTests`, L3 `UiStringsTests`·`UiStringsFormatTests`·`UiStringsAuthoringTests`).
 
 ## 5. L2 — SO 문구 자동 키
 
@@ -198,3 +201,41 @@ SO·프리팹에 인라인으로 적힌 문구(스킬 툴팁·캐릭터 이름)�
 - 툴팁 문구는 L2 뒤에도 수치 시트(`Paladin`·`Gunner` 등)의 `tooltip.*` 칸으로 SO 에 적용된다. **Strings 에 행이 있으면 화면은 Strings 가 이긴다**(ko 포함).
   수치 시트 칸은 Strings 행이 없을 때의 폴백 값이 된다 — 문구는 Strings 시트에서 고친다.
 - 인스펙터 모드 Play 에서도 문구는 xlsx Strings 를 읽는다 — 인스펙터에서 고친 툴팁은 Strings 행이 있으면 안 보인다.
+
+## 6. L3 — 씬·프리팹 라벨
+
+씬·프리팹에 박힌 한국어 라벨 중 **필요한 것만** 키로 옮겼다. 영어 메뉴(타이틀·맵 옵션 등)·개발용 로비 라벨은 대상이 아니다.
+키·ko 원문은 `UiStrings`(코드) 한 곳에 있고, Export 가 Strings 시트에 **ko = 지금 문구, `#설명` = 쓰는 곳** 으로 새 행을 붙인다(이미 있는 키는 안 건드림).
+시트에 행이 생기기 전에도 화면은 ko 원문 그대로다(`#키` 가 안 나온다).
+
+### 정적 라벨 — `LocalizedText`
+
+| 키 | ko | 위치 |
+|---|---|---|
+| `UI.Result.Character` · `Damage` · `Kills` · `Counters` · `Deaths` | 캐릭터 · 데미지 · 처치 · 간파 · 사망 | `5.ResultScene` › `PlayerRowsHeader/Header_*` |
+| `UI.AssassinHUD.EnhancedReady` | E 강화 준비 | `AssassinHUD.prefab` › `EnhancedReady` |
+| `UI.Interact.Prompt` | 상호 작용 | `InteractPrompt.prefab` › `InteractText` |
+| `UI.Options.Language` | Language | `1.TitleScene` › `LanguageOption/LanguageLabel` |
+
+- 붙이는 법: **`Tools/Localization/L3 — 씬·프리팹 라벨 키 부착`**. 멱등 — 키가 이미 맞으면 저장하지 않는다(두 번 돌려도 diff 없음). 글자·위치·글꼴은 안 건드린다.
+  씬·프리팹 글자가 `UiStrings` 의 ko 와 다르면 경고만 남긴다(시트 행이 없으면 저작 글자가 보인다).
+- 새로 배치하는 타이틀 Language 행은 `LanguageOptionAuthoring` 이 라벨에 키를 같이 붙인다.
+- `UI.Options.Language` 의 ko 는 지금 문구인 `Language` 다 — 타이틀 옵션은 영어 메뉴라 바꾸지 않았다. 한국어로 보일지는 기획이 시트 ko 칸으로 정한다.
+
+### 코드가 쓰는 문구 — 코드 키
+
+런타임에 값을 넣어 매 프레임 쓰는 라벨은 프리팹에 컴포넌트를 붙이지 않고 코드가 `UiString.Format` 으로 만든다(프리팹의 `과열 0단계`·`변신` 글자는 화면에 안 나오는 자리 글자다).
+언어가 바뀌면(`Loc.Changed`) 다시 그린다.
+
+| 키 | ko | 자리표시자 | 쓰는 곳 |
+|---|---|---|---|
+| `UI.GunnerHeat.Stage` | 과열 {stage}단계 | `{stage}` = 0부터 세는 과열 단계 | `GunnerHeatGauge.LabelText` |
+| `UI.GunnerHeat.Overheated` | 과열! | | 〃 |
+| `UI.AssassinHUD.TransformRemaining` | 변신 {sec}초 | `{sec}` = 남은 초(소수 한 자리) | `AssassinHUD.TransformLabelText` |
+| `UI.AssassinHUD.TransformReleasable` | 변신 {sec}초 · R 해제 가능 | 〃 | 〃 |
+| `UI.AssassinHUD.TransformEndPending` | 변신 종료 대기 | | 〃 |
+| `UI.Overhead.PlayerLabel` | P{n} | `{n}` = 1부터 세는 플레이어 번호 | `PlayerOverheadHealthBarRule.LabelText` |
+
+- 🔴 `UI.Overhead.PlayerLabel` 은 `Player.prefab` 의 직렬화 `labelFormat`(`P{0}`)을 **고치지 않고** 옮겼다 — 시트에 행이 있으면 시트가 이기고, 없으면 `labelFormat` 폴백.
+  자리표시자 이름이 다르다(시트 `{n}`, 프리팹 `{0}`). 시트 행이 생기면 `labelFormat` 은 쓰이지 않는다.
+- 새 L3 키는 `UiStrings` 에 필드를 만들고 `All` 에 넣는다. 정적 라벨이면 `UiStringsAuthoring` 대상 표에도 넣고 메뉴를 돌린다.
