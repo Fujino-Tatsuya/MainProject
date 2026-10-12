@@ -1,6 +1,7 @@
 # 튜토리얼 진행 상태 — TutorialDirector
 
-> 할 일 15 / S1 (2026-10-11). 원본 시나리오: [../design/tutorial-scenario.md](../design/tutorial-scenario.md) §2.1·§4 · 계획: [../../PLAN-tutorial.md](../../PLAN-tutorial.md).
+> 할 일 15 / S1 (2026-10-11). 원본 시나리오: [../design/tutorial-scenario.md](../design/tutorial-scenario.md) §2.1·§4(**v8**, 2026-10-12 — 반영 계획 PLAN-tutorial §3-1) · 계획: [../../PLAN-tutorial.md](../../PLAN-tutorial.md).
+> v8 에서 바뀐 디렉터 규칙: G1 = 여덟 항목·교착 방지 제외 · G5 = 수동(연계 3회 + 마지막 복귀) · 체크 항목 SkillR·SkillInterrupt·Corridor1CooldownReset 추가 · `AttackHits` 삭제. 목숨 차감 기준 G11 은 그대로(사용자 확정, §11).
 > 코드: `Assets/1.Scripts/Map/Tutorial/` — `TutorialFlowModel`(순수 규칙) · `TutorialDirector`(서버 소유·복제) · `TutorialStageMarker`(판별).
 > 테스트: 메뉴 `Tools/Tests/튜토리얼 EditMode 테스트 실행`(`TutorialFlowModelTests` · `TutorialAreaTrackerTests`). 튜토리얼 단계의 새 픽스처는 이 러너에 넣는다.
 > S2 구간 감지는 §6. S3 배리어는 §7. S4 존 장부·몬스터 휴면은 §8. S5 타이머·보스 길은 §9. **단계별 문서·handoff 목록·API 전체는 §10.1.** S11 사망 규칙은 §11.
@@ -24,21 +25,23 @@
 | `_active` | 튜토리얼 활성 |
 | `_step` (`TutorialStep`) | 현재 단계 — 앞으로만 |
 | `_openedGates` / `_timeoutGates` | 게이트 G1~G11 열림 비트 / 그중 교착 방지로 열린 것 (G5 = 스피너봇 본 모드, G8 = 타이머 시작, G11 = 보스방 도착 — 목숨 차감 기준) |
-| `_players` (NetworkList) | 개인 진행: 체크 마스크(이동·대시·평타 적중 n/5·패시브 툴팁·Q·E·특성 복도1~4) · 접속 · 완전 사망 · 지난 배리어 마스크(개인 뒤 배리어 — §7) |
-| `_counters` (NetworkList) | 파티 카운터: 존2 처치 n/9 · 존3 간파 n/3 · 존4 패널 n/4 |
+| `_players` (NetworkList) | 개인 진행: 체크 마스크(이동·대시·기본 공격·패시브 툴팁·Q·E·R·우클릭·특성 복도1~4·복도1 쿨 초기화 기록 — v8) · 접속 · 완전 사망 · 지난 배리어 마스크(개인 뒤 배리어 — §7). v8 에서 적중 횟수(`AttackHits`) 삭제 |
+| `_counters` (NetworkList) | 파티 카운터: 존2 처치 n/9 · 존3 **연계**(간파 → 취약 밀치기 → 벽 충돌) n/3 · 존4 패널 n/4 |
 | `_wait` | 대기 표시: 지금 열 차례인 개인 게이트 · 완료 n · 전원 수 · 자동 진행 시각(ServerTime, 첫 완료자 전 -1) |
 
 늦은 클라는 이 값만으로 다시 그린다(이벤트 재생 없음).
 
 ## 4. 규칙 (`TutorialFlowModel`)
 - 게이트는 **G1 → G11 순서로만** 열린다(앞이 닫혀 있으면 뒤는 거부).
-- 개인 게이트 G1(이동·대시·적중 5·패시브 툴팁)·G2/G4/G7/G10(복도1~4 특성) = 참가자 **전원 완료**, 또는 **첫 완료자 후 60초**(서버 실제 시간 = `ServerTime` — 슬로우모션·솔로 일시정지 무관, 인스펙터 `deadlockSeconds`).
-  시계는 그 게이트가 열 차례가 된 뒤부터 잰다. 첫 완료자가 나가도 시계는 계속 간다. Q·E 는 안내용(게이트 아님, D13).
-- 카운터 게이트 G5 = 존3 간파 합계가 목표(3)에 닿으면 자동. 나머지(G3·G6·G8·G9)는 서버가 `TryOpenGateServer` 로 연다.
+- 개인 게이트 G1(v8: 이동·대시·패시브 툴팁 + **기본 공격·Q·E·R·우클릭 각 1회** = `TutorialFlowModel.G1Mask`)·G2/G4/G7/G10(복도1~4 특성) = 참가자 **전원 완료**.
+  특성 게이트(G2/G4/G7/G10)만 **첫 완료자 후 60초** 자동 진행(서버 실제 시간 = `ServerTime` — 슬로우모션·솔로 일시정지 무관, 인스펙터 `deadlockSeconds`) —
+  **G1 은 교착 방지 제외**(v8 §2.1, `HasDeadlockTimeout(G1) == false` — 대기 표시의 자동 진행 시각도 -1). 시계는 그 게이트가 열 차례가 된 뒤부터 잰다. 첫 완료자가 나가도 시계는 계속 간다.
+- v8: **카운터로 자동 열리는 게이트는 없다**(`TryGetGateCounter` 항상 false). G5(스피너봇 본 모드) = 연계 3회 + 마지막 원위치 복귀 뒤 존3 흐름이 `RequestGateServer(G5)`. 나머지(G3·G6·G8·G9)는 서버가 `TryOpenGateServer`/`RequestGateServer` 로 연다.
+- 개인 체크는 한 번 켜지면 끄지 않는다(사망·부활 무관). `Corridor1CooldownReset`(v8 복도1 첫 진입 쿨 초기화 기록)은 체크 마스크에 있지만 게이트 조건이 아니다.
 - G11(보스방 도착) = 서버 판정 게이트(개인·카운터 아님, 배리어 없음). 디렉터 `HandleBossRoomArrived`(패드·만료 강제 이동 공통 `AlivePlayersArrived`)가
   단계 Finished **전에** 연다. 순서 규칙 그대로라 **G10 전에 도착(타이머 만료 강제 이동)하면 닫힌 채로 남는다** — 사망 규칙은 도착·Finished 로 이미 끝나므로 목숨 규칙엔 영향 없음.
 - '전원' = 접속 중 + PermanentDead 아님(Soul·사망 연출은 포함). 이탈·완전 사망 시 즉시 재판정. **참가자 0명이면 자동으로 아무것도 열지 않는다**(세션 종료·결과 화면이 처리).
-- 같은 보고 중복·모르는 clientId 는 무시. 적중은 5에서, 카운터는 목표에서 멈춘다. 이탈한 id 는 다시 등록되지 않는다(재접속 없음).
+- 같은 보고 중복·모르는 clientId 는 무시. 카운터는 목표에서 멈춘다. 이탈한 id 는 다시 등록되지 않는다(재접속 없음).
 
 ## 5. API
 | 쪽 | API |
@@ -229,10 +232,10 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
 | 단계 | 문서 | 담는 것 |
 |---|---|---|
 | S6 안내 UI | [tutorial-guide-ui.md](tutorial-guide-ui.md) | 목표 패널·자막·강조 API, 문구 변형·치환 규칙, 화면 배치 |
-| 훅 | [tutorial-player-hooks.md](tutorial-player-hooks.md) | 대시 승인·툴팁 표시/숨김·간파 판정·스킬 사용·과열·조준 시작 이벤트 |
-| S0·S7 존1 | [tutorial-zone1.md](tutorial-zone1.md) | 착지 환영·이동 5m·대시·허수아비 적중 5·패시브 1초·G1·허수아비 디스폰 |
-| S8 복도1~4·존2 | [tutorial-corridors-zone2.md](tutorial-corridors-zone2.md) | 개인 도착 특성 라운드·출구 게이트·자동 획득·G10 패드 경고 · 존2 기상 4초·Q/E 안내·넛지 |
-| S9 존3 | [tutorial-zone3.md](tutorial-zone3.md) | 스피너봇 Variant 스폰 치환·연습 반경·간파 3번 → G5 → 본 모드 → G6 |
+| 훅 | [tutorial-player-hooks.md](tutorial-player-hooks.md) | 대시 승인·툴팁 표시/숨김·간파 판정·스킬 사용·과열·조준 시작 이벤트 · v8 기본 공격 시작·거너 Q 발사 |
+| S0·S7 존1(v8) | [tutorial-zone1.md](tutorial-zone1.md) | 착지 환영·이동 5m·대시·**기본 공격·Q·E·R·우클릭 각 1회**·패시브 1초·G1(교착 방지 없음)·캐릭터별 힌트·허수아비 디스폰 |
+| S8 복도1~4·존2(v8) | [tutorial-corridors-zone2.md](tutorial-corridors-zone2.md) | 개인 도착 특성 라운드·출구 게이트·자동 획득·G10 패드 경고 · **복도1 첫 진입 쿨 초기화** · 존2 기상 4초·**전멸만** |
+| S9 존3(v8) | [tutorial-zone3.md](tutorial-zone3.md) | 스피너봇 Variant 스폰 치환·유효 벽·연습 위치·**간파 → 취약 밀치기 → 벽 충돌 → 복귀 연계 3회** → G5 → 본 모드 → G6 |
 | S10 존4·보스 진입 | [tutorial-zone4.md](tutorial-zone4.md) | 설정 자막 10초 → G8 → 패널·다리·중간보스 → G9 · 만료·패드·도착 정리 · 재베이크/고정 조각 조사 |
 | 특성 | [tutorial-traits.md](tutorial-traits.md) | 특성 디렉터 API·라운드·무적 토큰·placeholder 6종·xlsx 이관 메모 |
 | S11 사망 | 이 문서 §11 | 자동 부활·목숨 차감(G11 보스방 도착)·부활 지점(단계 구간) |
@@ -263,7 +266,7 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
 - `BossTimerManager`(경석) — `bool StartTimerServer(float limitSecondsOverride = 0f)` · `TimerState State` · `float LimitSeconds` · `float RemainingSeconds` · `float Fill01`.
 - 순수: `TutorialFlowModel` · `TutorialAreaTracker`/`TutorialAreaLayout` · `TutorialBarrierRules` · `TutorialMonsterLedger` · `TutorialBossPathRules`.
 - 열거형: `TutorialStep`(None·Zone1·Corridor1·Zone2·Corridor2·Zone3Practice·Zone3Fight·Corridor3·Zone4Lore·Zone4Combat·Corridor4·BossEnter·Finished) ·
-  `TutorialGate`(G1~G11) · `TutorialCheck`(Move·Dash·AttackHit·PassiveTooltip·SkillQ·SkillE·TraitCorridor1~4) · `TutorialCounter`(Zone2Kills·Zone3Interrupts·Zone4Panels) ·
+  `TutorialGate`(G1~G11) · `TutorialCheck`(Move·Dash·BasicAttack·PassiveTooltip·SkillQ·SkillE·TraitCorridor1~4·SkillR·SkillInterrupt·Corridor1CooldownReset — v8) · `TutorialCounter`(Zone2Kills·Zone3Interrupts(= v8 연계)·Zone4Panels) ·
   `TutorialArea`(None·Zone1~4·Corridor1~4·BossEnter) · `TutorialMonsterFilter`(All·NormalOnly·KeyOnly) · `TutorialGateOpenReason`(Manual·AllDone·Timeout·CounterReached).
 
 ### 10.2 S6~S12 가 붙일 자리
