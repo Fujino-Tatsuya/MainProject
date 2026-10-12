@@ -27,7 +27,26 @@ Update this file when a term becomes important enough that future agents or team
 - 인라인 아이콘 = `SkillTooltipGenerated/tooltipIcon_*.png` → 아틀라스 `SkillTooltipAttackIcon.asset`(guid 유지) · TMP `SkillTooltipAttackSprite`: `atk`·`shield`·`cooldown`. 재생성 = `Tools/UI/스킬 툴팁 인라인 아이콘 갱신`(⚠️ 인스펙터에서 바꾼 BX·BY·AD 를 덮어씀).
 - 표기 = 아이콘이 수치 **앞**, 색은 태그에 직접: `<sprite name="shield" color=#74C7EC>{shieldAmount}`. 🔴 속성이 붙으면 **이름에 따옴표 필수** — 없으면 EmojiOne 노란 `?` 로 깨진다(로그 없음). 칼 #F4B860(코드) · 쿨다운 #B8C4D6(코드, 머리줄 `⏱` 대체).
 
-## ▶▶ 다음 세션 인수인계 (2026-10-06~08 · 경석(Claude)) — 여기부터 읽을 것
+## ▶▶ 다음 세션 인수인계 (2026-10-08~12 · 경석(Claude)) — 최신. 여기부터 읽을 것
+
+**상태**: `feature/Boss23` = `origin/development`(`0d4accf7`) 병합(`0168192f`, 충돌 0, **미푸시**). SVN **r407**(핀 407, check-environment 전부 통과). 컴파일 `error CS` 0.
+- 안 받은 것(경석 판단, 보스 작업에 무관): SVN **r408~r410**(xlsx 팔라딘 공속 · `Common_Dash*Icon.png.meta`) · development 이후 41커밋(`b2acda63`, 결과 통계 등).
+  ⚠️ r410 받을 때 `Common_DashIcon/DashSlotIcon.png.meta` 가 로컬 미버전 파일(10-08 Unity 생성, guid 다름)과 트리 충돌 — **서버 쪽으로**(git 참조 0건 확인).
+- r407 업데이트 때 `.meta` 4개(어쌔신 폴더·unitypackage·zip) 트리 충돌 → 서버 guid 로 통일(git 참조 0건).
+
+**🟡 최적화 = 중단(경석 10-12). 빌드·측정은 하지 않기로.** 찾은 것만 기록(아래 남은 일 1·2·3·5 대체):
+1. **로딩 화면 GPU** — 원인 후보: 맵 씬이 Additive 로 올라오는 동안 로딩 씬 카메라 + 맵 카메라가 둘 다 그림(로딩 UI 는 불투명 Overlay). 미측정.
+   **시작 존 GPU** — 원인 미확인(로딩 씬은 완료 후 언로드 확인 → 별건). 존 프리팹 중첩이라 정적 비교로 안 보임 → 아래 2 고친 뒤 패스별 측정으로.
+2. **패스별 GPU 기록 0 = 원인 확인(미수정)**: `ZonePerfRecorder.ScanPassesIfNeeded` 가 `new ProfilerRecorder(handle, 1, Default | GpuRecorder)` 로 만들기만 하고 시작 안 함 — `Default` = `SumAllSamplesInFrame | WrapAround`(**`StartImmediately` 없음**, 엔진 XML 문서 확인). 수정 = 옵션에 `StartImmediately` 추가.
+3. **붕괴 조각** — 사망당 5~16조각(GO + MeshFilter·MeshRenderer·BoxCollider·Rigidbody), 소멸 때 슬롯마다 `new Material`, Rpc `ClientsAndHost` 라 전 피어가 같은 비용. 미측정.
+4. 🔴 **기본 해상도 1080p 가 빌드에서 안 뜬다** — 레지스트리는 1920×1080 으로 정상화됐지만 `DisplayResolutionBoot`(은희 `c44ced45`, 10-07)가 실행마다 **2560×1440 강제**. 1440p 실측 = 일반 존 GPU 2.7~3.3 · **시작 존 6.5 · 로딩 7.8ms**(예산 5.0). 커서 배율도 1440 기준 → **팀장·은희 결정 필요.**
+5. GRD·바닥 그림자 효과 — 미측정(바닥 Cast Shadows Off 는 S4 에서 적용 완료). 병목이 GPU 라 GRD 기대 낮음.
+- Codex 교차검증: v0.162 에서 샌드박스가 안 떠 실패 → **Codex 데스크톱 앱을 끄면 동작**(10-12 확인, 절차 = 경석 로컬 규칙).
+- ⚠️ 에디터 `Unexpected error in Burst compilation … Library\BurstCache\JIT\*.dll, error code 4551` = **Windows Smart App Control 이 서명 없는 Burst JIT DLL 차단**(코드 무결성 로그 3077, 경석 PC 09-18~ 9개). 코드 문제 아님 — 해당 잡만 Burst 대신 일반 C# 으로 돈다(에디터 성능만 영향). 끄려면 Windows 보안에서 Smart App Control 해제(⚠️ 한 번 끄면 OS 재설치 전엔 다시 못 켬).
+
+**다음**: 보스 수정사항(경석).
+
+## ▶▶ 이전 인수인계 (2026-10-06~08 · 경석(Claude))
 
 **상태**: `feature/Boss23` = **`373ef5a6`**(원격 푸시 완료, 작업 트리 깨끗). 10-06 저녁 `development` 에 빨리 감기로 반영했고, 이후 development 는 다른 팀원 커밋으로 앞서 있음(`0d4accf7` — 다음 세션 시작 때 병합). SVN **r392**(핀 392, check-environment 통과). 전투 EditMode 108/2(기존 실패 2 = `BossCounterDataTests`).
 MPPM 네트워크 지연 도구·`[LagDiag]` 진단은 **경석 로컬 전용**(`Assets/1.Scripts/Dev/NetLag/`·`Dev/Editor/DevNetworkLagToolbar.cs`, `.git/info/exclude`) — 메뉴 `Dev/네트워크 지연 (MPPM)`.
