@@ -15,3 +15,4 @@
 | 날짜 | 이슈 | 상태 |
 |---|---|---|
 | 2026-10-07 | [에디터 호스트 + 빌드 클라에서 MapScene 진입 시 플레이어 미스폰 — 씬 배치 NetworkObject hash 불일치](2026-10-07-ngo-inscene-hash-stale.md) | 원인 확정 · 미수정 (전원 빌드 무영향 확인) |
+| 2026-10-12 | [프리팹 에셋의 `GlobalObjectIdHash` 가 불안정하다 — 씬 타입 오염 · 0 · 재현 불가](2026-10-12-ngo-prefab-hash-unstable.md) | 원인 확정 · 미수정 (프리팹 8개 미처리) |

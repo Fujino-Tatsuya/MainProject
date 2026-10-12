@@ -341,56 +341,6 @@ MonoBehaviour:
   offset: {x: 0, y: 0, z: 0}
   scale: 1
   safetyTimeout: 1
---- !u!1 &3995725844583897862
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 6418677873620748537}
-  - component: {fileID: 1356002216986843363}
-  m_Layer: 0
-  m_Name: QFocusRing
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &6418677873620748537
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3995725844583897862}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 7722051468864962236}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1356002216986843363
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3995725844583897862}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
-  id: 
-  effect: {fileID: 11400000, guid: 71bc5e2049af4d8390c6a7f1e4b8d032, type: 2}
-  socket: {fileID: 0}
-  offset: {x: 0, y: 0, z: 0}
-  scale: 1
-  safetyTimeout: 3
 --- !u!1 &4039536592737909260
 GameObject:
   m_ObjectHideFlags: 0
@@ -5863,9 +5813,6 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 1160318589990200604, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       insertIndex: -1
       addedObject: {fileID: 735127163777420212}
-    - targetCorrespondingSourceObject: {fileID: 1160318589990200604, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 6418677873620748537}
     - targetCorrespondingSourceObject: {fileID: 1160318589990200604, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       insertIndex: -1
       addedObject: {fileID: 4493115883574014019}
