@@ -192,7 +192,8 @@ public sealed class WellsDroneAttack : MonoBehaviour
         return tile * _d.diameterInTiles * 0.5f;
     }
 
-    // §9: 충돌 순간 1회 · 대상당 1회 · 충돌 범위와 원이 겹치면 적중 · 플레이어와 23호 각각 독립.
+    // §9: 충돌 순간 1회 · 대상당 1회 · 충돌 범위와 원이 겹치면 적중.
+    // 🔴 **플레이어만 맞는다** — 23호 자기 피해는 제거(팀장 10-12). 기획 §9.3「23호 피격」은 폐기됐다(기획서 ⚠️ 정정).
     void Impact()
     {
         _boss.SendDroneImpact(_lockPos, _radius);
@@ -202,7 +203,6 @@ public sealed class WellsDroneAttack : MonoBehaviour
                                                _boss.DroneHitMask, QueryTriggerInteraction.Collide);
         _hitOnce.Clear();
         int players = 0;
-        bool bossHit = false;
         for (int i = 0; i < n; i++)
         {
             Collider c = _overlap[i];
@@ -218,20 +218,11 @@ public sealed class WellsDroneAttack : MonoBehaviour
                 if (!BossPatternTargets.IsValid(p, _boss) || !_hitOnce.Add(p)) continue;
                 BossPatternTargets.Damage(p, _d.playerDamage, _lockPos, _boss.transform);
                 players++;
-                continue;
-            }
-
-            TwentyThreeBoss b = c.GetComponentInParent<TwentyThreeBoss>();
-            if (b == _boss && _hitOnce.Add(b))
-            {
-                // 일반 보스 피해 — 인터럽트 아님(간파·취약 판정 안 탐), 출처가 플레이어가 아니라 제압 ×1.2 도 없다.
-                BossPatternTargets.Damage(b, _d.bossDamage, _lockPos, _boss.transform);
-                bossHit = true;
             }
         }
         if (n == _overlap.Length)
             Debug.LogWarning("[자폭드론] 겹침 버퍼가 찼다 — 일부 대상이 잘렸을 수 있다(버퍼 확대 필요).", this);
-        Debug.Log($"[자폭드론] 충돌 — 플레이어 {players}명{(bossHit ? " + 23호" : "")} 적중 (반경 {_radius:0.##}m)", this);
+        Debug.Log($"[자폭드론] 충돌 — 플레이어 {players}명 적중 (반경 {_radius:0.##}m)", this);
     }
 
     void CancelInProgress(string why)

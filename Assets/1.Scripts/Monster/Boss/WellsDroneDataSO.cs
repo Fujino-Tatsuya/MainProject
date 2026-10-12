@@ -23,8 +23,7 @@ public class WellsDroneDataSO : ScriptableObject
              "피해 판정과 바닥 원이 이 값 하나를 같이 쓴다.")]
     [Min(0.05f)] public float diameterInTiles = 1.25f;
     [Min(0)] public int playerDamage = 25;
-    [Tooltip("23호에게 주는 피해(일반 보스 피해 — 간파·취약 판정 안 탐). 300 → 120(0.4배, 팀장 10-02 — 범위 2.5배로 맞히기 쉬워짐).")]
-    [Min(0)] public int bossDamage = 120;
+    // ⚠️ bossDamage(23호 자기 피해, 마지막 값 120) 는 제거(팀장 10-12) — 드론은 플레이어만 맞는다.
     [Tooltip("멈추는 그로기 종류(체크형). 기본 = 제압 + 송전기 전멸 그로기.")]
     public BossPauseCondition pauseOn = BossPauseCondition.Suppress | BossPauseCondition.PylonGroggy;
 

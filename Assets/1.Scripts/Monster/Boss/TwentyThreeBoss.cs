@@ -5461,7 +5461,8 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     int _droneHitMask;
 
     /// <summary>
-    /// [서버] 드론 폭발 겹침 판정 레이어 = 플레이어 레이어 + 23호 자기 콜라이더 레이어.
+    /// [서버] 드론 폭발 겹침 판정 레이어 = **플레이어 레이어만**.
+    /// 23호 자기 레이어는 뺐다 — 드론이 23호를 맞히던 기획이 폐기됐다(팀장 10-12, <see cref="WellsDroneAttack"/>).
     /// 전 레이어(~0)로 쏘면 지형·장식 콜라이더로 버퍼가 차 대상이 잘릴 수 있다(Codex 교차검증 10-02).
     /// </summary>
     internal int DroneHitMask
@@ -5469,9 +5470,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         get
         {
             if (_droneHitMask != 0) return _droneHitMask;
-            int m = playerMask.value;
-            foreach (Collider c in GetComponentsInChildren<Collider>(true)) m |= 1 << c.gameObject.layer;
-            return _droneHitMask = m;
+            return _droneHitMask = playerMask.value;
         }
     }
 
