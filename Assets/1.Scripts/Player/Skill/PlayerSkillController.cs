@@ -462,6 +462,27 @@ public class PlayerSkillController : BaseNetworkBehaviour
         MirrorCooldownToOwner(skillIndex);
     }
 
+    /// <summary>[서버] 슬롯에 지금 바인딩된 스킬(대체 슬롯 포함)의 남은 쿨타임을 감소시킨다.</summary>
+    public void ReduceCooldownServer(PlayerSkillSlot slot, float seconds) =>
+        ReduceCooldownServer(GetSkill(slot), seconds);
+
+    /// <summary>[서버] 등록된 특정 스킬의 쿨타임을 즉시 끝낸다(남은 0초). 오너 HUD 장부에도 미러한다.</summary>
+    public void ResetCooldownServer(PlayerSkillBase skill)
+    {
+        int skillIndex = GetSkillIndex(skill);
+        if (!HasGameplayAuthority || skillIndex == InvalidSkillIndex ||
+            cooldownLedger.IsReady(skillIndex, Time.time))
+        {
+            return;
+        }
+
+        cooldownLedger.SetRemaining(skillIndex, Time.time, 0f);
+        MirrorCooldownToOwner(skillIndex);
+    }
+
+    /// <summary>[서버] 슬롯에 지금 바인딩된 스킬(대체 슬롯 포함)의 쿨타임을 즉시 끝낸다.</summary>
+    public void ResetCooldownServer(PlayerSkillSlot slot) => ResetCooldownServer(GetSkill(slot));
+
     /// <summary>
     /// [시뮬레이션 피어] 실행 중 스킬의 오너 권위 결과(어쌔신 Q 의 벽 조기 종료 거리 등)를 서버에 보고한다.
     /// 서버(호스트·오프라인)는 바로, 원격 오너는 RPC 로 넘긴다. 실행 중인 그 스킬에만 전달하고 값 검증은 스킬이 한다.
