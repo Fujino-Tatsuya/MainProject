@@ -23,35 +23,46 @@ public static class DataTableSource
 
     public sealed class Result
     {
-        public Result(List<DataTableWrite> writes, DataTableIssues issues, int fileCount)
+        public Result(List<DataTableWrite> writes, DataTableIssues issues, int fileCount, List<LocalizedString> strings = null)
         {
             Writes = writes;
             Issues = issues;
             FileCount = fileCount;
+            Strings = strings ?? new List<LocalizedString>();
         }
 
         public List<DataTableWrite> Writes { get; }
         public DataTableIssues Issues { get; }
         public int FileCount { get; }
+
+        /// <summary>Strings 시트(검증 통과분) — SO 가 아니라 StringTable 로 간다(StringTableBuild). 오류는 <see cref="Issues"/> 에 같이 있다.</summary>
+        public List<LocalizedString> Strings { get; }
     }
 
-    public static Result Load()
-    {
-        var issues = new DataTableIssues();
-        var entries = new List<DataTableEntry>();
-        string[] files = Directory.Exists(Folder)
+    /// <summary>폴더의 xlsx(Excel 잠금 파일 <c>~$</c> 제외), 이름 순.</summary>
+    public static string[] Files() =>
+        Directory.Exists(Folder)
             ? Directory.GetFiles(Folder, "*.xlsx", SearchOption.TopDirectoryOnly)
                 .Where(f => !Path.GetFileName(f).StartsWith("~$", StringComparison.Ordinal))
                 .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
                 .ToArray()
             : Array.Empty<string>();
 
+    public static Result Load()
+    {
+        var issues = new DataTableIssues();
+        var entries = new List<DataTableEntry>();
+        var stringRows = new List<StringRow>();
+        string[] files = Files();
+
         foreach (string file in files)
         {
             string fileName = Path.GetFileName(file);
             try
             {
-                entries.AddRange(DataTableSchema.Parse(fileName, XlsxReader.Read(file), issues));
+                IReadOnlyList<XlsxSheet> sheets = XlsxReader.Read(file);
+                entries.AddRange(DataTableSchema.Parse(fileName, sheets, issues));
+                stringRows.AddRange(StringsSheet.Parse(fileName, sheets, issues));
             }
             catch (Exception e) when (e is IOException || e is InvalidDataException || e is System.Xml.XmlException)
             {
@@ -59,8 +70,9 @@ public static class DataTableSource
             }
         }
 
+        List<LocalizedString> strings = StringTableValidator.Validate(stringRows, issues);
         List<DataTableWrite> writes = DataTableApplier.Bind(entries, new AssetDatabaseLookup(), issues);
-        return new Result(writes, issues, files.Length);
+        return new Result(writes, issues, files.Length, strings);
     }
 }
 

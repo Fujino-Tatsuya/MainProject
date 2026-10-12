@@ -108,9 +108,9 @@ public static class DataTableSchema
     public static void Parse(string fileName, XlsxSheet sheet, List<DataTableEntry> into, DataTableIssues issues)
     {
         string sheetName = sheet.Name?.Trim() ?? string.Empty;
-        if (IsComment(sheetName))
+        if (IsComment(sheetName) || StringsSheet.IsStringsSheet(sheetName))
         {
-            return;
+            return; // Strings 시트는 SO 값이 아니라 문구 표 — StringsSheet 가 읽는다.
         }
 
         string first = sheet.Cell(0, 0).Trim();

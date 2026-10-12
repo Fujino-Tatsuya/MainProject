@@ -22,6 +22,10 @@ internal static class DataTableEditModeTestRunner
         "^DataTableSaveGuardTests$",
         "^DataTableSheetGroupTests$",
         "^SkillTooltipFormatterTests$",
+        "^StringTableValidatorTests$", // 로컬라이징 L1 — Strings 시트 검증
+        "^StringsSheetTests$", // 로컬라이징 L1 — Strings 시트 읽기·Export
+        "^LocTests$", // 로컬라이징 L1 — Loc 조회·'#key' 폴백·Format
+        "^UserLanguageConfigTests$", // 로컬라이징 L1 — 언어 기본값·저장
     };
 
     const string Tag = "[DataTableTests]";

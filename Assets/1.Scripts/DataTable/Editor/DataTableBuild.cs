@@ -62,11 +62,13 @@ public static class DataTableBuild
             throw new BuildFailedException($"{LogPrefix}테이블 오류로 빌드를 멈췄다 — Console 확인.");
         }
 
+        // 문구 표는 원복하지 않는다 — xlsx 가 원본이고, 바뀌었으면 git 에 남아야 할 생성물이다.
+        StringTableBuild.Write(result.Strings);
         DataTableDiskBackup backup = DataTableApplier.ApplyToDisk(result.Writes);
         Debug.Log($"{LogPrefix}빌드 — 테이블 필드 {result.Writes.Count}개를 SO·프리팹 {backup.files.Count}개에 적용. 빌드 후 파일째 원복한다.");
         try
         {
-            build();
+            StringTableBuild.WithPreloadedTable(build);
         }
         finally
         {
