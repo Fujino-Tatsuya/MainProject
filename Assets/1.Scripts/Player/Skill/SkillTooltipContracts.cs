@@ -2,6 +2,11 @@ using System;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
+/// <summary>
+/// 스킬 툴팁 문구. 인라인 값은 ko 원문이자 폴백 — 주인이 <see cref="Keyed"/> 로 키를 붙여 내보내면 getter 가
+/// <c>Loc.Get(주인ID/필드.displayName, 인라인)</c> 을 돌려준다(Strings 시트에 행이 없으면 인라인 그대로).
+/// 키 규칙은 <see cref="LocKey"/>, 상세는 Docs/tech/localization.md §5.
+/// </summary>
 [Serializable]
 public struct SkillTooltipText
 {
@@ -10,10 +15,27 @@ public struct SkillTooltipText
     [DataTableText, TextArea(3, 10), SerializeField] private string description;
     [SerializeField] private Sprite icon;
 
-    public string DisplayName => displayName ?? string.Empty;
-    public string Subtitle => subtitle ?? string.Empty;
-    public string Description => description ?? string.Empty;
+    // 주인ID/필드경로(예 "FirstMeleeMainSkillData/tooltip"). 직렬화하지 않는다 — 주인이 getter 에서 매번 붙인다.
+    [NonSerialized] private string keyPrefix;
+
+    public string DisplayName => Localize(nameof(displayName), displayName);
+    public string Subtitle => Localize(nameof(subtitle), subtitle);
+    public string Description => Localize(nameof(description), description);
     public Sprite Icon => icon;
+
+    /// <summary>키를 붙인 사본. 주인은 <c>Tooltip => tooltip.Keyed(this, nameof(tooltip))</c> 로 내보낸다.</summary>
+    public SkillTooltipText Keyed(UnityEngine.Object owner, string fieldPath)
+    {
+        SkillTooltipText copy = this;
+        copy.keyPrefix = LocKey.ForField(owner, fieldPath);
+        return copy;
+    }
+
+    private string Localize(string field, string inline)
+    {
+        inline ??= string.Empty;
+        return keyPrefix == null ? inline : Loc.Get(keyPrefix + "." + field, inline);
+    }
 }
 
 /// <summary>툴팁 피해의 실제 결과와 Shift 계산식에 표시할 항.</summary>

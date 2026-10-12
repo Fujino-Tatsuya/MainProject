@@ -66,6 +66,19 @@ public static class Loc
         return current != null && current.TryGet(key, Current, out string text) ? text : MissingPrefix + key;
     }
 
+    /// <summary>
+    /// 표에 키가 있으면 현재 언어 문구, 없으면(빈 키·표 없음 포함) <paramref name="fallback"/> — <c>#키</c> 를 내지 않는다.
+    /// SO 에 인라인 ko 문구가 있는 자동 키(<see cref="LocKey"/>)용: 시트에 행이 아직 없어도 화면이 깨지지 않는다.
+    /// </summary>
+    public static string Get(string key, string fallback)
+    {
+        if (string.IsNullOrEmpty(key))
+            return fallback;
+
+        StringTable current = Table;
+        return current != null && current.TryGet(key, Current, out string text) ? text : fallback;
+    }
+
     /// <summary><c>{이름}</c> 자리표시자를 args 로 채운다. 치환 규칙은 <see cref="TutorialGuideText.Fill"/>(없는 이름은 그대로 남김).</summary>
     public static string Format(string key, IReadOnlyDictionary<string, string> args) =>
         TutorialGuideText.Fill(Get(key), args);

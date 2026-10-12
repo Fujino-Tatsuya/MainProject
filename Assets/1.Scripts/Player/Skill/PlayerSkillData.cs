@@ -91,7 +91,7 @@ public class PlayerSkillData : ScriptableObject, ISkillTooltipSource
     public float HoverMarkerDistance => hoverMarkerDistance;
     public string AnimatorStateName => animatorStateName;
     public bool SnapRotationOnStart => snapRotationOnStart;
-    public SkillTooltipText Tooltip => tooltip;
+    public SkillTooltipText Tooltip => tooltip.Keyed(this, nameof(tooltip));
     public Object TooltipValueSource => this;
 
     public SkillTooltipDamage GetTooltipDamage(Player player) => CalculateTooltipDamage(player);
