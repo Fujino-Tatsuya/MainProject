@@ -24,7 +24,7 @@
 | `_active` | 튜토리얼 활성 |
 | `_step` (`TutorialStep`) | 현재 단계 — 앞으로만 |
 | `_openedGates` / `_timeoutGates` | 게이트 G1~G11 열림 비트 / 그중 교착 방지로 열린 것 (G5 = 스피너봇 본 모드, G8 = 타이머 시작, G11 = 보스방 도착 — 목숨 차감 기준) |
-| `_players` (NetworkList) | 개인 진행: 체크 마스크(이동·대시·평타 적중 n/5·패시브 툴팁·Q·E·특성 복도1~4) · 접속 · 완전 사망 |
+| `_players` (NetworkList) | 개인 진행: 체크 마스크(이동·대시·평타 적중 n/5·패시브 툴팁·Q·E·특성 복도1~4) · 접속 · 완전 사망 · 지난 배리어 마스크(개인 뒤 배리어 — §7) |
 | `_counters` (NetworkList) | 파티 카운터: 존2 처치 n/9 · 존3 간파 n/3 · 존4 패널 n/4 |
 | `_wait` | 대기 표시: 지금 열 차례인 개인 게이트 · 완료 n · 전원 수 · 자동 진행 시각(ServerTime, 첫 완료자 전 -1) |
 
@@ -124,6 +124,21 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
 - 추락 복구: 서버 `ResolveReturnPoint` 가 기준점·Ring 후보마다 `ReturnPointFilter` 를 부른다 → `TutorialBarrierRules.IsPointReachable` —
   점을 품은 구간이 모두 '아직 못 들어가는 구간'(들어가는 배리어가 닫힘)이면 거부. 튜토리얼 구간 밖(보스방)은 허용. 스폰 폴백은 거르지 않는다(존1).
 - 타이머 만료·패드 이동은 `BossTeleportManager` 순간이동이라 배리어와 무관(§4 "만료 강제 이동은 G9·G10 과 무관").
+
+**개인 뒤 배리어 (15 후속 C1, 2026-10-12)** — 배리어를 지나 앞 구간으로 넘어간 플레이어 **본인만** 뒤로 못 돌아간다. 뒤에 남은 동료의 전진은 막지 않는다.
+> 코드: `TutorialBackBarrierRules`(순수 — 지남 판정·마스크 갱신·로컬 콜라이더 목록) · `TutorialDirector`(서버 판정·복제) · `TutorialBarriers`(각 피어 로컬 콜라이더).
+> 테스트: `TutorialBackBarrierRulesTests`(튜토리얼 러너). 디버그: `Tools/Tutorial/Debug/뒤 배리어 마스크 로그 (클라별)`.
+- **복제 필드**: `_players[i].BackBarrierMask`(int, `PlayerState`) — 지난 배리어, bit = `1 << (int)TutorialGate`(게이트 열림 마스크와 같은 배치). 한 번 켜지면 끄지 않는다.
+  읽기 = `GetBackBarrierMask(clientId)`(모든 피어, 복제값) · `GetBackBarrierMaskServer(clientId)`(서버 원본 — 스폰·부활·추락 복구·순간이동 예외(C2)가 쓸 조회 API).
+- **지남 판정(서버, `PollAreas` 주기)**: 게이트가 **열린** 배리어만. 배리어 박스의 진행 방향 쪽 면에서 `backBarrierClearance`(기본 0.75m — 플레이어 캡슐 반경 이상, 인스펙터) 이상 나아갔고
+  너머 구간(입구 G1/G3/G6/G9 = 복도 n, 출구 G2/G4/G7/G10 = 다음 존·보스 진입) 사각형 안에 있을 때. 진행 방향은 `TutorialBarrierSpec.AlongX`·`Forward`.
+  `Alive` 만 판정, 단계 Finished 뒤엔 판정 안 함. 새로 지나면 서버 로그 `[TutorialBarrier] 뒤 배리어 G* 닫힘 — client n`.
+- **막기(각 피어, 로컬 플레이어 기준)**: `TutorialBarriers` 가 자기 `LocalClientId` 의 복제 마스크로 `지난 ∧ 열린 게이트`(닫힌 배리어는 일반 배리어가 막으니 중복 생성 안 함)를
+  같은 자리의 `TutorialBarriers/BackBarrier_G*` 로 켠다 — Wall 레이어 BoxCollider + 같은 머티리얼, **NavMeshObstacle 없음**(몬스터는 안 막음).
+  이동이 오너 권한·오너 로컬 스윕이라 이 피어의 콜라이더는 이 피어의 로컬 플레이어만 막는다(남의 플레이어는 복제 위치라 무관). 늦은 클라는 스폰 직후 `StateChanged` 로 같은 결과.
+  켤 때 로컬 플레이어 콜라이더 bounds 와 겹치면 켜지 않고 다음 프레임(`Update`)에 다시 시도(끼임 방지).
+- 사망(Soul) 중에도 유지. 튜토리얼 비활성(비튜토리얼 스테이지)이면 안 만들고, 단계 Finished 면 끈다.
+- 🔴 아직 안 한 것(C2): 스폰·부활·추락 복구·순간이동 위치가 뒤 배리어 뒤쪽이 되는 경우의 예외 처리. 추락 복구 필터(`ReturnPointFilter`)는 여전히 '닫힌 게이트'만 본다.
 
 ## 8. 존 장부 · 몬스터 휴면 (S4)
 > 코드: `TutorialMonsterLedger`(순수 — 존 배정·클리어 규칙·필터) · `TutorialMonsterZones`(서버 — MonsterBase 참조·휴면 적용·사망 구독) · `TutorialDirector`(배선·API) ·

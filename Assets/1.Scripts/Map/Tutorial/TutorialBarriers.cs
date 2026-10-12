@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -17,6 +18,9 @@ using UnityEngine.AI;
 ///   재베이크(다리)에 섞이지 않는다.
 /// · 열기: 콜라이더·카브를 즉시 끄고 짧게 페이드(실제 시간 — 슬로우모션 무관) 뒤 비활성.
 /// · 추락 복구: <see cref="PlayerSafePointTracker.ReturnPointFilter"/> 에 닫힌 배리어 너머 구간 제외를 건다(서버가 부른다).
+/// · 개인 뒤 배리어: 서버가 판정해 복제한 '지난 배리어' 마스크(<see cref="TutorialDirector.GetBackBarrierMask"/>)를 <b>로컬 플레이어</b> 값으로 읽어
+///   같은 자리에 Wall 콜라이더(카브 없음 — 몬스터는 안 막음)를 이 피어에서만 켠다. 이동이 오너 권한·오너 로컬 스윕이라 남의 플레이어엔 영향 없다.
+///   켤 때 로컬 플레이어와 겹치면 다음 프레임까지 미룬다. 튜토리얼 Finished 면 끈다(<see cref="TutorialBackBarrierRules"/>).
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class TutorialBarriers : MonoBehaviour
@@ -36,12 +40,15 @@ public sealed class TutorialBarriers : MonoBehaviour
         public TutorialBarrierSpec Spec;
         public GameObject Go;
         public bool Opened;
+        public GameObject BackGo;   // 개인 뒤 배리어(로컬 전용, 처음 켤 때 만든다)
     }
 
     readonly List<Entry> _entries = new List<Entry>();
     TutorialAreaTracker _areas;
     Material _material;
     bool _built;
+    int _backWanted;   // 켜야 할 뒤 배리어(게이트 비트)
+    int _backActive;   // 실제로 켜진 뒤 배리어
 
     public static TutorialBarriers Active { get; private set; }
 
@@ -85,6 +92,71 @@ public sealed class TutorialBarriers : MonoBehaviour
 
         foreach (Entry e in _entries)
             if (!e.Opened && d.IsGateOpen(e.Spec.Gate)) Open(e, fade: true);
+
+        RefreshBackBarriers(d);
+    }
+
+    void Update()
+    {
+        // 겹쳐서 미룬 뒤 배리어만 매 프레임 다시 시도한다.
+        if (TutorialBackBarrierRules.ToEnable(_backWanted, _backActive) != 0) ApplyBackBarriers();
+    }
+
+    // ─── 개인 뒤 배리어(로컬 플레이어 기준, 각 피어) ──────────────────────────
+
+    void RefreshBackBarriers(TutorialDirector d)
+    {
+        NetworkManager nm = NetworkManager.Singleton;
+        int opened = 0;
+        for (int g = 0; g < TutorialFlowModel.GateCount; g++)
+            if (d.IsGateOpen((TutorialGate)g)) opened |= 1 << g;
+        int passed = nm != null ? d.GetBackBarrierMask(nm.LocalClientId) : 0;
+        _backWanted = TutorialBackBarrierRules.LocalColliderMask(passed, opened, d.IsTutorialActive && !d.IsFinished);
+        ApplyBackBarriers();
+    }
+
+    void ApplyBackBarriers()
+    {
+        int off = TutorialBackBarrierRules.ToDisable(_backWanted, _backActive);
+        int on = TutorialBackBarrierRules.ToEnable(_backWanted, _backActive);
+        if (off == 0 && on == 0) return;
+
+        Transform root = transform.Find(RootName);
+        foreach (Entry e in _entries)
+        {
+            int bit = TutorialBackBarrierRules.Bit(e.Spec.Gate);
+            if ((off & bit) != 0)
+            {
+                if (e.BackGo != null) e.BackGo.SetActive(false);
+                _backActive &= ~bit;
+            }
+            else if ((on & bit) != 0)
+            {
+                if (OverlapsLocalPlayer(e.Spec)) continue;   // 끼임 방지 — 다음 프레임(Update)에 다시
+                if (e.BackGo == null)
+                {
+                    e.BackGo = CreateBarrierObject(e.Spec, root != null ? root : transform, transform.position.y, DefaultHeight,
+                                                   _material, DefaultColor, carve: false);
+                    e.BackGo.name = $"BackBarrier_{e.Spec.Gate}";
+                }
+                e.BackGo.SetActive(true);
+                _backActive |= bit;
+            }
+        }
+    }
+
+    bool OverlapsLocalPlayer(TutorialBarrierSpec spec)
+    {
+        NetworkObject po = NetworkManager.Singleton != null ? NetworkManager.Singleton.LocalClient?.PlayerObject : null;
+        if (po == null) return false;
+
+        spec.Rect.GetWorldBounds(out float minX, out float minZ, out float maxX, out float maxZ);
+        float y = transform.position.y;
+        var box = new Bounds();
+        box.SetMinMax(new Vector3(minX, y, minZ), new Vector3(maxX, y + DefaultHeight, maxZ));
+        foreach (Collider c in po.GetComponentsInChildren<Collider>())
+            if (c.enabled && !c.isTrigger && c.bounds.Intersects(box)) return true;
+        return false;
     }
 
     void Build(TutorialDirector d)
@@ -162,10 +234,10 @@ public sealed class TutorialBarriers : MonoBehaviour
 
     /// <summary>
     /// 배리어 오브젝트 하나 — Wall 레이어 큐브(BoxCollider 비트리거) + 카브 NavMeshObstacle + 반투명 머티리얼(색은 PropertyBlock).
-    /// 바닥 높이 <paramref name="baseY"/> 에서 <paramref name="height"/> 만큼.
+    /// 바닥 높이 <paramref name="baseY"/> 에서 <paramref name="height"/> 만큼. <paramref name="carve"/> = false 면 NavMeshObstacle 없음(개인 뒤 배리어).
     /// </summary>
     public static GameObject CreateBarrierObject(TutorialBarrierSpec spec, Transform parent, float baseY, float height,
-                                                 Material material, Color color)
+                                                 Material material, Color color, bool carve = true)
     {
         GameObject go = GameObject.CreatePrimitive(PrimitiveType.Cube);
         go.name = $"Barrier_{spec.Gate}";
@@ -182,6 +254,7 @@ public sealed class TutorialBarriers : MonoBehaviour
         r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         r.receiveShadows = false;
         SetColor(r, new MaterialPropertyBlock(), color);
+        if (!carve) return go;
 
         var obstacle = go.AddComponent<NavMeshObstacle>();
         obstacle.shape = NavMeshObstacleShape.Box;

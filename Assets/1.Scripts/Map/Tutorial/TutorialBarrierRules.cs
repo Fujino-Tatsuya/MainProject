@@ -14,10 +14,15 @@ public readonly struct TutorialBarrierSpec
     /// <summary>true = 복도 입구(앞 존 쪽), false = 복도 출구(다음 존 쪽).</summary>
     public readonly bool AtEntry;
     public readonly TutorialRect Rect;
+    /// <summary>진행 방향 축 — true = 월드 X, false = 월드 Z.</summary>
+    public readonly bool AlongX;
+    /// <summary>진행 방향 부호(+1 = 축의 + 쪽으로 나아간다, −1 = − 쪽). 개인 뒤 배리어의 '지남' 판정에 쓴다.</summary>
+    public readonly float Forward;
 
-    public TutorialBarrierSpec(TutorialGate gate, int corridor, bool atEntry, TutorialRect rect)
+    public TutorialBarrierSpec(TutorialGate gate, int corridor, bool atEntry, TutorialRect rect, bool alongX = true, float forward = 1f)
     {
         Gate = gate; Corridor = corridor; AtEntry = atEntry; Rect = rect;
+        AlongX = alongX; Forward = forward < 0f ? -1f : 1f;
     }
 
     public override string ToString() => $"{Gate} 복도{Corridor} {(AtEntry ? "입구" : "출구")} {Rect}";
@@ -136,19 +141,19 @@ public static class TutorialBarrierRules
             float exitEdge = towardMax ? lenMax : lenMin;
             float inward = towardMax ? 1f : -1f;
 
-            list.Add(Make(GateOf(c, true), c, true, alongX, entryEdge, entryEdge + inward * t, crossMin, crossMax));
-            list.Add(Make(GateOf(c, false), c, false, alongX, exitEdge, exitEdge - inward * t, crossMin, crossMax));
+            list.Add(Make(GateOf(c, true), c, true, alongX, inward, entryEdge, entryEdge + inward * t, crossMin, crossMax));
+            list.Add(Make(GateOf(c, false), c, false, alongX, inward, exitEdge, exitEdge - inward * t, crossMin, crossMax));
         }
         return list;
     }
 
-    static TutorialBarrierSpec Make(TutorialGate gate, int corridor, bool atEntry, bool alongX,
+    static TutorialBarrierSpec Make(TutorialGate gate, int corridor, bool atEntry, bool alongX, float forward,
                                     float a, float b, float crossMin, float crossMax)
     {
         float lo = Math.Min(a, b), hi = Math.Max(a, b);
         TutorialRect r = alongX
             ? TutorialRect.FromMinMax(lo, crossMin, hi, crossMax)
             : TutorialRect.FromMinMax(crossMin, lo, crossMax, hi);
-        return new TutorialBarrierSpec(gate, corridor, atEntry, r);
+        return new TutorialBarrierSpec(gate, corridor, atEntry, r, alongX, forward);
     }
 }

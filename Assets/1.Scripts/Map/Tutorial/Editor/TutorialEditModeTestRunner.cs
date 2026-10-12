@@ -13,6 +13,7 @@ internal static class TutorialEditModeTestRunner
         "^TutorialFlowModelTests$",
         "^TutorialAreaTrackerTests$",
         "^TutorialBarrierRulesTests$",
+        "^TutorialBackBarrierRulesTests$", // 개인 뒤 배리어(15 후속) — 지남 판정·마스크 유지·로컬 콜라이더 목록
         "^TutorialMonsterLedgerTests$",
         "^TutorialBossPathRulesTests$",
         "^TutorialDeathRulesTests$",

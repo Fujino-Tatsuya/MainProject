@@ -44,6 +44,8 @@ public sealed class TutorialDirector : NetworkBehaviour
         public byte AttackHits;
         public bool Connected;
         public bool PermanentDead;
+        /// <summary>지난 배리어(개인 뒤 배리어) — bit = 1 &lt;&lt; (int)TutorialGate. <see cref="TutorialBackBarrierRules"/>.</summary>
+        public int BackBarrierMask;
 
         public void NetworkSerialize<T>(BufferSerializer<T> s) where T : IReaderWriter
         {
@@ -52,11 +54,12 @@ public sealed class TutorialDirector : NetworkBehaviour
             s.SerializeValue(ref AttackHits);
             s.SerializeValue(ref Connected);
             s.SerializeValue(ref PermanentDead);
+            s.SerializeValue(ref BackBarrierMask);
         }
 
         public bool Equals(PlayerState o)
             => ClientId == o.ClientId && CheckMask == o.CheckMask && AttackHits == o.AttackHits
-               && Connected == o.Connected && PermanentDead == o.PermanentDead;
+               && Connected == o.Connected && PermanentDead == o.PermanentDead && BackBarrierMask == o.BackBarrierMask;
     }
 
     /// <summary>복제되는 대기 표시 — 지금 열 차례인 개인 게이트(없으면 Gate = <see cref="NoGate"/>).</summary>
@@ -103,6 +106,8 @@ public sealed class TutorialDirector : NetworkBehaviour
     [SerializeField, Min(0f)] private float areaEnterMargin = TutorialAreaTracker.DefaultEnterMargin;
     [Tooltip("지금 구간을 떠날 때 경계 바깥으로 이만큼 더 나가야 한다(m). 들어갈 때 여유보다 크게 — 경계 왕복 깜빡임 방지.")]
     [SerializeField, Min(0f)] private float areaExitMargin = TutorialAreaTracker.DefaultExitMargin;
+    [Tooltip("개인 뒤 배리어 — 열린 배리어 앞면에서 이만큼(m, 플레이어 반경 이상) 넘어가 너머 구간 안에 들어가면 '지남'으로 본다.")]
+    [SerializeField, Min(0.1f)] private float backBarrierClearance = TutorialBackBarrierRules.DefaultClearance;
 
     // 🔴 선언 순서 = 같은 틱 안의 클라 반영 순서로 기대한다 — 교착 방지 마스크를 열림 마스크보다 먼저 둬서
     //    클라 GateOpened 가 이유(Timeout)를 읽을 수 있게 한다(보장은 아님 — 이유는 표시 보조용).
@@ -162,6 +167,8 @@ public sealed class TutorialDirector : NetworkBehaviour
     // 서버 전용
     private TutorialFlowModel _model;
     private TutorialAreaTracker _areas;
+    private List<TutorialBarrierSpec> _barrierSpecs;
+    private readonly Dictionary<ulong, int> _backBarrierMasks = new Dictionary<ulong, int>();
     private TutorialMonsterZones _monsterZones;
     private float _areaPollTimer;
     private bool _pendingActivate;
@@ -214,6 +221,25 @@ public sealed class TutorialDirector : NetworkBehaviour
         }
         return false;
     }
+
+    /// <summary>
+    /// 이 플레이어가 지난 배리어 마스크(복제값, 모든 피어 — bit = 1 &lt;&lt; (int)TutorialGate). 모르는 id 면 0.
+    /// 각 피어의 <see cref="TutorialBarriers"/> 가 로컬 플레이어 값으로 개인 뒤 배리어를 켠다.
+    /// </summary>
+    public int GetBackBarrierMask(ulong clientId)
+    {
+        if (!IsSpawned) return 0;
+        for (int i = 0; i < _players.Count; i++)
+            if (_players[i].ClientId == clientId) return _players[i].BackBarrierMask;
+        return 0;
+    }
+
+    /// <summary>
+    /// [서버] 이 플레이어가 지난 배리어 마스크(복제 전 원본 — 판정 직후 값). 스폰·부활·추락 복구·순간이동 예외(C2)가 쓴다.
+    /// 튜토리얼 비활성·모르는 id 면 0.
+    /// </summary>
+    public int GetBackBarrierMaskServer(ulong clientId) =>
+        _backBarrierMasks.TryGetValue(clientId, out int m) ? m : 0;
 
     /// <summary>
     /// "동료 대기 중 (done/total) · 자동 진행 mm:ss" 표시용. 열 차례인 개인 게이트가 없으면 false.
@@ -454,6 +480,10 @@ public sealed class TutorialDirector : NetworkBehaviour
         _areas.PartyFirstEntered += HandleAreaFirstEntered;
         _areas.CorridorMidReached += HandleCorridorMidReached;
         _areaPollTimer = 0f;
+
+        // 개인 뒤 배리어 판정용 — 모든 피어의 TutorialBarriers 와 같은 구간·같은 규칙이라 같은 모양이다.
+        _barrierSpecs = TutorialBarrierRules.BuildSpecs(
+            _areas, TutorialBarrierRules.DefaultThickness, TutorialBarrierRules.DefaultSideOverlap, out _);
     }
 
     private void PollAreas()
@@ -463,6 +493,7 @@ public sealed class TutorialDirector : NetworkBehaviour
         if (_areaPollTimer > 0f) return;
         _areaPollTimer = areaPollInterval;
 
+        bool backChanged = false;
         foreach (NetworkClient client in _subscribedNm.ConnectedClientsList)
         {
             NetworkObject po = client.PlayerObject;
@@ -471,7 +502,25 @@ public sealed class TutorialDirector : NetworkBehaviour
             PlayerLifeState state = life != null ? life.State : PlayerLifeState.Alive;
             Vector3 p = po.transform.position;
             _areas.UpdatePlayer(client.ClientId, p.x, p.z, state);
+            backChanged |= UpdateBackBarriers(client.ClientId, p, state);
         }
+        if (backChanged) Commit();
+    }
+
+    // 개인 뒤 배리어(서버 판정 → _players[i].BackBarrierMask 복제). 살아 있는 플레이어만, Finished 뒤엔 안 본다.
+    // 스폰·부활·추락 복구·순간이동 예외는 아직 없다(C2) — 그쪽은 GetBackBarrierMaskServer 로 조회한다.
+    private bool UpdateBackBarriers(ulong clientId, Vector3 p, PlayerLifeState state)
+    {
+        if (_barrierSpecs == null || !TutorialAreaTracker.IsEligible(state) || _model.Step == TutorialStep.Finished) return false;
+
+        _backBarrierMasks.TryGetValue(clientId, out int old);
+        int mask = TutorialBackBarrierRules.UpdatePassedMask(old, _areas, _barrierSpecs, p.x, p.z,
+                                                             _model.OpenedGateMask, backBarrierClearance, out int newly);
+        if (newly == 0) return false;
+
+        _backBarrierMasks[clientId] = mask;
+        Edit.Log($"[TutorialBarrier] 뒤 배리어 {TutorialBackBarrierRules.Describe(newly)} 닫힘 — client {clientId}", this);
+        return true;
     }
 
     private void HandleAreaFirstEntered(TutorialArea area, ulong clientId)
@@ -978,6 +1027,7 @@ public sealed class TutorialDirector : NetworkBehaviour
             {
                 ClientId = m.ClientId, CheckMask = m.CheckMask, AttackHits = (byte)Math.Min(255, m.AttackHits),
                 Connected = m.Connected, PermanentDead = m.PermanentDead,
+                BackBarrierMask = GetBackBarrierMaskServer(m.ClientId),
             };
             if (i < _players.Count) { if (!_players[i].Equals(s)) _players[i] = s; }
             else _players.Add(s);
