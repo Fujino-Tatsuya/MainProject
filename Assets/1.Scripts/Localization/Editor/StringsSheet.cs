@@ -251,6 +251,37 @@ public sealed class StringsSheet
         return result;
     }
 
+    /// <summary>
+    /// 기존 시트의 키 → ko(앞뒤 공백 제거, 시트 순서상 처음 행). 시트가 없거나 비면 빈 사전.
+    /// 내용이 있는데 머리글(키·ko 열)을 못 읽으면 null — <see cref="BuildSheet"/> 가 행을 옮기지 못하는 경우와 같다.
+    /// </summary>
+    public Dictionary<string, string> ReadKo(XlsxSheet existing)
+    {
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (existing == null || !existing.Rows.Any(r => r.Any(c => !string.IsNullOrWhiteSpace(c))))
+        {
+            return result;
+        }
+
+        int keyColumn = FindHeader(existing, KeyHeader);
+        int koColumn = FindHeader(existing, KoHeader);
+        if (keyColumn < 0 || koColumn < 0)
+        {
+            return null;
+        }
+
+        for (int row = 1; row < existing.Rows.Count; row++)
+        {
+            string key = existing.Cell(row, keyColumn).Trim();
+            if (key.Length > 0 && !result.ContainsKey(key))
+            {
+                result[key] = existing.Cell(row, koColumn).Trim();
+            }
+        }
+
+        return result;
+    }
+
     private static object Cell(string text) => string.IsNullOrEmpty(text) ? null : text;
 
     private static int FindHeader(XlsxSheet sheet, string header)

@@ -55,8 +55,16 @@ public static class DataTableTemplate
         public string SubSection { get; }
     }
 
-    /// <summary>대상(SO·컴포넌트) 하나에서 템플릿에 들어갈 필드를 직렬화 순서대로. NetworkVariable 안쪽(네트워크 상태)은 뺀다.</summary>
-    public static List<Field> CollectFields(Object asset)
+    /// <summary>
+    /// 대상(SO·컴포넌트) 하나에서 템플릿에 들어갈 필드를 직렬화 순서대로. NetworkVariable 안쪽(네트워크 상태)은 뺀다.
+    /// 번역 문구(<see cref="DataTableFields.IsLocalizedText"/> — 툴팁 등)는 Strings 시트가 원본이라 넣지 않는다(<see cref="CollectLocalizedTexts"/>).
+    /// </summary>
+    public static List<Field> CollectFields(Object asset) => Collect(asset, localizedText: false);
+
+    /// <summary>대상 하나의 번역 문구 필드(<c>[DataTableText]</c>, Localize = false 제외)만 — Strings 자동 키 수집(<see cref="DataTableTextKeys"/>)용.</summary>
+    public static List<Field> CollectLocalizedTexts(Object asset) => Collect(asset, localizedText: true);
+
+    private static List<Field> Collect(Object asset, bool localizedText)
     {
         var fields = new List<Field>();
         Type type = asset.GetType();
@@ -102,6 +110,12 @@ public static class DataTableTemplate
             bool isNumber = it.propertyType == SerializedPropertyType.Integer || it.propertyType == SerializedPropertyType.Float;
             bool isTableText = it.propertyType == SerializedPropertyType.String && DataTableFields.IsTableText(field);
             if (!isNumber && !isTableText)
+            {
+                continue;
+            }
+
+            // 숫자 시트와 Strings 시트는 한 규칙으로 갈린다 — 번역 문구는 Strings 에만.
+            if (localizedText != (isTableText && DataTableFields.IsLocalizedText(field)))
             {
                 continue;
             }
@@ -506,6 +520,22 @@ public static class DataTableTemplate
                 return;
             }
 
+            // 옛 수치 시트의 문구 칸(tooltip.*) → Strings 행. 옮기지 못하면 파일을 쓰지 않는다(수치 시트 칸이 그대로 남는다).
+            // 병합·덮어쓰기 모두 — 문구 원본은 Strings 이고, Strings 는 덮어쓰기에서도 유지된다.
+            TableTextMigration migration = TableTextMigration.Plan(existing, DataTableTextKeys.Slots(tables.SelectMany(t => t.Item2)));
+            if (!migration.Ok)
+            {
+                Debug.LogError(LogPrefix + migration.Error);
+                EditorUtility.DisplayDialog("Export Template 실패", migration.Error + "\n\n파일은 바뀌지 않았다.", "확인");
+                return;
+            }
+
+            warnings.AddRange(migration.Warnings);
+            if (migration.Rows.Count > 0)
+            {
+                Debug.Log($"{LogPrefix}Export: 수치 시트 문구 {migration.Rows.Count}개를 {StringsSheet.Strings.Name} 새 행으로 옮겼다.");
+            }
+
             Directory.CreateDirectory(ExportBackupFolder);
             string backup = Path.Combine(ExportBackupFolder,
                 $"{Path.GetFileNameWithoutExtension(path)}_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx");
@@ -513,14 +543,14 @@ public static class DataTableTemplate
             Debug.Log($"{LogPrefix}Export 전 원본 보관: {backup}");
 
             // 문자열 시트는 인스펙터 값이 아니라 기획이 쓴 문구 — 병합·덮어쓰기 모두 기존 행을 그대로 옮긴다.
-            sheets.AddRange(BuildStringsSheets(existing, tables, warnings));
+            sheets.AddRange(BuildStringsSheets(existing, tables, warnings, migration.Rows));
 
             if (choice == 0)
             {
                 var report = new List<string>();
                 // 코드가 아는 시트 이름(타입 이름·묶음 이름) — 옛 배치의 이 시트들은 새 배치로 대체된다(값은 (대상, 필드) 로 따라간다).
                 var known = new HashSet<string>(tables.SelectMany(t => new[] { t.Item1.Name, AssetDatabaseLookup.SheetNameOf(t.Item1) }), StringComparer.Ordinal);
-                sheets = DataTableMerge.Merge(existing, sheets, report, known);
+                sheets = DataTableMerge.Merge(existing, sheets, report, known, migration.Moved);
                 merged = true;
                 foreach (string line in report)
                 {
@@ -535,7 +565,7 @@ public static class DataTableTemplate
         }
         else
         {
-            sheets.AddRange(BuildStringsSheets(Array.Empty<XlsxSheet>(), tables, warnings));
+            sheets.AddRange(BuildStringsSheets(Array.Empty<XlsxSheet>(), tables, warnings, null));
         }
 
         try
@@ -580,12 +610,14 @@ public static class DataTableTemplate
     /// 문자열 시트(<see cref="StringsSheet.All"/> — Strings·ErrorCodes) — 기존 행 유지 + 등록된 키 중 없는 것 추가. 키가 없어도 머리글만 있는 시트를 만든다.
     /// Strings 의 키 = 대상들의 <c>[DataTableText]</c> 자동 키(<see cref="DataTableTextKeys"/>) + <see cref="StringKeyRegistry"/>.
     /// ErrorCodes 의 코드 = <see cref="StringKeyRegistry.CollectErrorCodes"/>(<c>ErrorCatalog</c>). 시트에만 있는 오류 행은 경고(행은 유지).
+    /// <paramref name="migrated"/>(옛 수치 시트에서 옮긴 문구, <see cref="TableTextMigration"/>)는 같은 키의 인라인 값보다 먼저 들어간다.
     /// </summary>
     private static List<XlsxWriteSheet> BuildStringsSheets(IReadOnlyList<XlsxSheet> existing,
-        List<(Type, IReadOnlyList<(string id, Object target)>)> tables, List<string> warnings)
+        List<(Type, IReadOnlyList<(string id, Object target)>)> tables, List<string> warnings, IEnumerable<StringKeyInfo> migrated)
     {
         var report = new List<string>();
-        List<StringKeyInfo> stringKeys = DataTableTextKeys.Collect(tables.SelectMany(t => t.Item2), warnings)
+        List<StringKeyInfo> stringKeys = (migrated ?? Enumerable.Empty<StringKeyInfo>())
+            .Concat(DataTableTextKeys.Collect(tables.SelectMany(t => t.Item2), warnings))
             .Concat(StringKeyRegistry.Collect())
             .ToList();
         List<StringKeyInfo> errorCodes = StringKeyRegistry.CollectErrorCodes();
