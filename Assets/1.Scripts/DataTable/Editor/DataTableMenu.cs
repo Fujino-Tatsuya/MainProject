@@ -23,12 +23,14 @@ public static class DataTableSource
 
     public sealed class Result
     {
-        public Result(List<DataTableWrite> writes, DataTableIssues issues, int fileCount, List<LocalizedString> strings = null)
+        public Result(List<DataTableWrite> writes, DataTableIssues issues, int fileCount,
+            List<LocalizedString> strings = null, List<LocalizedString> errorCodes = null)
         {
             Writes = writes;
             Issues = issues;
             FileCount = fileCount;
             Strings = strings ?? new List<LocalizedString>();
+            ErrorCodes = errorCodes ?? new List<LocalizedString>();
         }
 
         public List<DataTableWrite> Writes { get; }
@@ -37,6 +39,9 @@ public static class DataTableSource
 
         /// <summary>Strings 시트(검증 통과분) — SO 가 아니라 StringTable 로 간다(StringTableBuild). 오류는 <see cref="Issues"/> 에 같이 있다.</summary>
         public List<LocalizedString> Strings { get; }
+
+        /// <summary>ErrorCodes 시트(검증 통과분) — StringTable 의 오류 문구 칸으로 간다.</summary>
+        public List<LocalizedString> ErrorCodes { get; }
     }
 
     /// <summary>폴더의 xlsx(Excel 잠금 파일 <c>~$</c> 제외), 이름 순.</summary>
@@ -53,6 +58,7 @@ public static class DataTableSource
         var issues = new DataTableIssues();
         var entries = new List<DataTableEntry>();
         var stringRows = new List<StringRow>();
+        var errorRows = new List<StringRow>();
         string[] files = Files();
 
         foreach (string file in files)
@@ -62,7 +68,8 @@ public static class DataTableSource
             {
                 IReadOnlyList<XlsxSheet> sheets = XlsxReader.Read(file);
                 entries.AddRange(DataTableSchema.Parse(fileName, sheets, issues));
-                stringRows.AddRange(StringsSheet.Parse(fileName, sheets, issues));
+                stringRows.AddRange(StringsSheet.Strings.Parse(fileName, sheets, issues));
+                errorRows.AddRange(StringsSheet.ErrorCodes.Parse(fileName, sheets, issues));
             }
             catch (Exception e) when (e is IOException || e is InvalidDataException || e is System.Xml.XmlException)
             {
@@ -71,8 +78,9 @@ public static class DataTableSource
         }
 
         List<LocalizedString> strings = StringTableValidator.Validate(stringRows, issues);
+        List<LocalizedString> errorCodes = StringTableValidator.Validate(errorRows, issues);
         List<DataTableWrite> writes = DataTableApplier.Bind(entries, new AssetDatabaseLookup(), issues);
-        return new Result(writes, issues, files.Length, strings);
+        return new Result(writes, issues, files.Length, strings, errorCodes);
     }
 }
 

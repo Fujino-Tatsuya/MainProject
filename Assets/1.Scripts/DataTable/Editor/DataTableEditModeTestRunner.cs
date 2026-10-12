@@ -24,7 +24,8 @@ internal static class DataTableEditModeTestRunner
         "^SkillTooltipFormatterTests$",
         "^StringTableValidatorTests$", // 로컬라이징 L1 — Strings 시트 검증
         "^StringsSheetTests$", // 로컬라이징 L1 — Strings 시트 읽기·Export
-        "^LocTests$", // 로컬라이징 L1 — Loc 조회·'#key' 폴백·Format
+        "^ErrorCodesSheetTests$", // 로컬라이징 L1 — ErrorCodes 시트 읽기·검증·Export
+        "^LocTests$", // 로컬라이징 L1 — Loc 조회·'#key' 폴백·Format·GetError
         "^UserLanguageConfigTests$", // 로컬라이징 L1 — 언어 기본값·저장
     };
 

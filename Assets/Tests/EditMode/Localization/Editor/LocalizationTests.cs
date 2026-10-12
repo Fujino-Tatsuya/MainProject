@@ -115,7 +115,7 @@ public sealed class StringsSheetTests
             new[] { "UI.Lobby.Start", "", "시작" },
         });
         var issues = new DataTableIssues();
-        List<StringRow> rows = StringsSheet.Parse("GameData.xlsx", new[] { sheet }, issues);
+        List<StringRow> rows = StringsSheet.Strings.Parse("GameData.xlsx", new[] { sheet }, issues);
 
         Assert.That(issues.Items, Is.Empty);
         Assert.That(rows.Select(r => r.Key), Is.EqualTo(new[] { "UI.Lobby.Ready", "UI.Lobby.Start" }));
@@ -128,7 +128,7 @@ public sealed class StringsSheetTests
     {
         var sheet = new XlsxSheet("Strings", new[] { new[] { "key", "#설명", "ko", "en" }, new[] { "", "", "고아", "" } });
         var issues = new DataTableIssues();
-        StringsSheet.Parse("T", new[] { sheet }, issues);
+        StringsSheet.Strings.Parse("T", new[] { sheet }, issues);
 
         Assert.That(issues.HasErrors, Is.True);
     }
@@ -138,7 +138,7 @@ public sealed class StringsSheetTests
     {
         var sheet = new XlsxSheet("Strings", new[] { new[] { "id", "ko" }, new[] { "A", "가" } });
         var issues = new DataTableIssues();
-        StringsSheet.Parse("T", new[] { sheet }, issues);
+        StringsSheet.Strings.Parse("T", new[] { sheet }, issues);
 
         Assert.That(issues.HasErrors, Is.True);
     }
@@ -157,7 +157,7 @@ public sealed class StringsSheetTests
     [Test]
     public void BuildSheet_NoExisting_NoKeys_HeaderOnly()
     {
-        XlsxWriteSheet sheet = StringsSheet.BuildSheet(null, new StringKeyInfo[0], new List<string>());
+        XlsxWriteSheet sheet = StringsSheet.Strings.BuildSheet(null, new StringKeyInfo[0], new List<string>());
 
         Assert.That(sheet.Name, Is.EqualTo("Strings"));
         Assert.That(sheet.Rows.Count, Is.EqualTo(1));
@@ -173,7 +173,7 @@ public sealed class StringsSheetTests
             new[] { "A", "설명", "가", "a" },
             new[] { "#메모 행" },
         });
-        XlsxWriteSheet sheet = StringsSheet.BuildSheet(existing,
+        XlsxWriteSheet sheet = StringsSheet.Strings.BuildSheet(existing,
             new[] { new StringKeyInfo("A", "새 설명", "덮으면 안 됨"), new StringKeyInfo("B", "", "나") }, new List<string>());
 
         Assert.That(sheet.Rows.Count, Is.EqualTo(4));
@@ -186,16 +186,154 @@ public sealed class StringsSheetTests
     public void BuildSheet_RoundTripsThroughWriterAndReader()
     {
         var existing = new XlsxSheet("Strings", new[] { new[] { "key", "#설명", "ko", "en" }, new[] { "A", "", "첫 줄\n둘째 줄", "line" } });
-        XlsxWriteSheet written = StringsSheet.BuildSheet(existing, new StringKeyInfo[0], new List<string>());
+        XlsxWriteSheet written = StringsSheet.Strings.BuildSheet(existing, new StringKeyInfo[0], new List<string>());
 
         using var stream = new System.IO.MemoryStream();
         XlsxWriter.Write(stream, new[] { written });
         stream.Position = 0;
         var issues = new DataTableIssues();
-        List<StringRow> rows = StringsSheet.Parse("T", XlsxReader.Read(stream), issues);
+        List<StringRow> rows = StringsSheet.Strings.Parse("T", XlsxReader.Read(stream), issues);
 
         Assert.That(issues.Items, Is.Empty);
         Assert.That(rows.Single().Ko, Is.EqualTo("첫 줄\n둘째 줄"));
+    }
+}
+
+public sealed class ErrorCodesSheetTests
+{
+    private static readonly string[] Header = { "code", "#분류", "#원인(개발자용)", "#조치(QA·CS용)", "ko", "en" };
+
+    private static List<LocalizedString> ParseAndValidate(XlsxSheet sheet, DataTableIssues issues) =>
+        StringTableValidator.Validate(StringsSheet.ErrorCodes.Parse("GameData.xlsx", new[] { sheet }, issues), issues);
+
+    [Test]
+    public void EmptySheet_HeaderOnly_Passes()
+    {
+        var issues = new DataTableIssues();
+        List<LocalizedString> result = ParseAndValidate(new XlsxSheet("ErrorCodes", new[] { Header }), issues);
+
+        Assert.That(issues.Items, Is.Empty);
+        Assert.That(result, Is.Empty);
+    }
+
+    [Test]
+    public void Parse_ReadsCodeAndText_IgnoresMemoColumns()
+    {
+        var issues = new DataTableIssues();
+        List<LocalizedString> result = ParseAndValidate(new XlsxSheet("ErrorCodes", new[]
+        {
+            Header,
+            new[] { "LOBBY_FULL", "로비", "인원 초과", "재시도 안내", "방이 가득 찼다", "Lobby is full" },
+            new[] { "#메모", "", "", "", "무시", "" },
+        }), issues);
+
+        Assert.That(issues.Items, Is.Empty);
+        Assert.That(result.Single().Key, Is.EqualTo("LOBBY_FULL"));
+        Assert.That(result.Single().En, Is.EqualTo("Lobby is full"));
+    }
+
+    [Test]
+    public void DuplicateCode_IsError()
+    {
+        var issues = new DataTableIssues();
+        List<LocalizedString> result = ParseAndValidate(new XlsxSheet("ErrorCodes", new[]
+        {
+            Header,
+            new[] { "NET_TIMEOUT", "", "", "", "시간 초과", "Timed out" },
+            new[] { "NET_TIMEOUT", "", "", "", "또", "Again" },
+        }), issues);
+
+        Assert.That(issues.HasErrors, Is.True);
+        Assert.That(issues.Items.Single().Location, Is.EqualTo("GameData.xlsx › ErrorCodes!A3"));
+        Assert.That(result.Single().Ko, Is.EqualTo("시간 초과"));
+    }
+
+    [Test]
+    public void EmptyEn_FallsBackToKo_WithWarning()
+    {
+        var issues = new DataTableIssues();
+        List<LocalizedString> result = ParseAndValidate(new XlsxSheet("ErrorCodes", new[]
+        {
+            Header,
+            new[] { "NET_TIMEOUT", "", "", "", "시간 초과", "" },
+        }), issues);
+
+        Assert.That(issues.HasErrors, Is.False);
+        Assert.That(issues.Items.Single().Location, Is.EqualTo("GameData.xlsx › ErrorCodes!F2"));
+        Assert.That(result.Single().En, Is.EqualTo("시간 초과"));
+    }
+
+    [Test]
+    public void SameRulesAsStrings_PlaceholderMismatchAndEmptyKo()
+    {
+        var issues = new DataTableIssues();
+        ParseAndValidate(new XlsxSheet("ErrorCodes", new[]
+        {
+            Header,
+            new[] { "A", "", "", "", "{n}초 뒤", "in {sec}s" },
+            new[] { "B", "", "", "", "", "only en" },
+        }), issues);
+
+        Assert.That(issues.Items.Count(i => i.Kind == DataTableIssueKind.Error), Is.EqualTo(2));
+    }
+
+    [Test]
+    public void SheetsAreSeparate()
+    {
+        var strings = new XlsxSheet("Strings", new[] { new[] { "key", "#설명", "ko", "en" }, new[] { "A", "", "가", "a" } });
+        var errors = new XlsxSheet("ErrorCodes", new[] { Header, new[] { "A", "", "", "", "오류", "error" } });
+        var issues = new DataTableIssues();
+
+        Assert.That(StringsSheet.ErrorCodes.Parse("T", new[] { strings, errors }, issues).Single().Ko, Is.EqualTo("오류"));
+        Assert.That(StringsSheet.Strings.Parse("T", new[] { strings, errors }, issues).Single().Ko, Is.EqualTo("가"));
+        Assert.That(DataTableSchema.Parse("T", new[] { strings, errors }, issues), Is.Empty);
+        Assert.That(issues.Items, Is.Empty);
+    }
+
+    [Test]
+    public void BuildSheet_NoExisting_HeaderOnly()
+    {
+        XlsxWriteSheet sheet = StringsSheet.ErrorCodes.BuildSheet(null, new StringKeyInfo[0], new List<string>());
+
+        Assert.That(sheet.Name, Is.EqualTo("ErrorCodes"));
+        Assert.That(sheet.Rows.Count, Is.EqualTo(1));
+        Assert.That(sheet.Rows[0], Is.EqualTo(Header));
+    }
+
+    [Test]
+    public void BuildSheet_KeepsMemoColumns_RoundTrips()
+    {
+        var existing = new XlsxSheet("ErrorCodes", new[]
+        {
+            new[] { "code", "ko", "en", "#조치(QA·CS용)" }, // 열 순서가 달라도 이름으로 찾는다
+            new[] { "LOBBY_FULL", "가득 참", "", "다른 방 안내" },
+        });
+        XlsxWriteSheet written = StringsSheet.ErrorCodes.BuildSheet(existing, new StringKeyInfo[0], new List<string>());
+
+        Assert.That(written.Rows[1], Is.EqualTo(new object[] { "LOBBY_FULL", null, null, "다른 방 안내", "가득 참", null }));
+
+        using var stream = new System.IO.MemoryStream();
+        XlsxWriter.Write(stream, new[] { written });
+        stream.Position = 0;
+        var issues = new DataTableIssues();
+        List<StringRow> rows = StringsSheet.ErrorCodes.Parse("T", XlsxReader.Read(stream), issues);
+
+        Assert.That(issues.Items, Is.Empty);
+        Assert.That(rows.Single().Ko, Is.EqualTo("가득 참"));
+    }
+
+    [Test]
+    public void ExportedEmptySheet_ReadsBackClean()
+    {
+        XlsxWriteSheet written = StringsSheet.ErrorCodes.BuildSheet(null, new StringKeyInfo[0], new List<string>());
+
+        using var stream = new System.IO.MemoryStream();
+        XlsxWriter.Write(stream, new[] { written });
+        stream.Position = 0;
+        var issues = new DataTableIssues();
+
+        Assert.That(ParseAndValidate(XlsxReader.Read(stream).Single(), issues), Is.Empty);
+        Assert.That(issues.Items, Is.Empty);
     }
 }
 
@@ -216,6 +354,11 @@ public sealed class LocTests
             new StringTable.Entry("UI.Lobby.Ready", "준비", "Ready"),
             new StringTable.Entry("UI.Wait", "{n}명 대기 — {time}", "{n} waiting — {time}"),
             new StringTable.Entry("UI.KoOnly", "한국어만", ""),
+        });
+        _table.SetErrors(new[]
+        {
+            new StringTable.Entry("NET_TIMEOUT", "{sec}초 동안 응답이 없다", "No response for {sec}s"),
+            new StringTable.Entry("UI.Lobby.Ready", "오류 칸", "error slot"),
         });
         Loc.SetTable(_table);
     }
@@ -269,6 +412,35 @@ public sealed class LocTests
     public void Format_MissingKey_ReturnsHashKey()
     {
         Assert.That(Loc.Format("UI.Nope", new Dictionary<string, string> { ["n"] = "2" }), Is.EqualTo("#UI.Nope"));
+    }
+
+    [Test]
+    public void GetError_FillsPlaceholders_InCurrentLanguage()
+    {
+        var args = new Dictionary<string, string> { ["sec"] = "10" };
+        Loc.Current = GameLanguage.Ko;
+        Assert.That(Loc.GetError("NET_TIMEOUT", args), Is.EqualTo("10초 동안 응답이 없다"));
+
+        Loc.Current = GameLanguage.En;
+        Assert.That(Loc.GetError("NET_TIMEOUT", args), Is.EqualTo("No response for 10s"));
+        Assert.That(Loc.GetError("NET_TIMEOUT"), Is.EqualTo("No response for {sec}s"));
+    }
+
+    [Test]
+    public void GetError_MissingCode_ReturnsHashCode()
+    {
+        Assert.That(Loc.GetError("NET_NOPE"), Is.EqualTo("#NET_NOPE"));
+        Assert.That(Loc.GetError("NET_NOPE", new Dictionary<string, string> { ["sec"] = "1" }), Is.EqualTo("#NET_NOPE"));
+        Assert.That(Loc.GetError(""), Is.EqualTo("#"));
+    }
+
+    [Test]
+    public void GetError_AndGet_UseSeparateSheets()
+    {
+        Loc.Current = GameLanguage.Ko;
+        Assert.That(Loc.Get("UI.Lobby.Ready"), Is.EqualTo("준비"));
+        Assert.That(Loc.GetError("UI.Lobby.Ready"), Is.EqualTo("오류 칸"));
+        Assert.That(Loc.Get("NET_TIMEOUT"), Is.EqualTo("#NET_TIMEOUT"));
     }
 
     [Test]

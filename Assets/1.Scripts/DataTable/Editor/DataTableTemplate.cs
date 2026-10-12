@@ -512,8 +512,8 @@ public static class DataTableTemplate
             File.Copy(path, backup, overwrite: true);
             Debug.Log($"{LogPrefix}Export 전 원본 보관: {backup}");
 
-            // Strings 시트는 인스펙터 값이 아니라 기획이 쓴 문구 — 병합·덮어쓰기 모두 기존 행을 그대로 옮긴다.
-            sheets.Add(BuildStringsSheet(existing.FirstOrDefault(s => StringsSheet.IsStringsSheet(s.Name))));
+            // 문자열 시트는 인스펙터 값이 아니라 기획이 쓴 문구 — 병합·덮어쓰기 모두 기존 행을 그대로 옮긴다.
+            sheets.AddRange(BuildStringsSheets(existing));
 
             if (choice == 0)
             {
@@ -535,7 +535,7 @@ public static class DataTableTemplate
         }
         else
         {
-            sheets.Add(BuildStringsSheet(null));
+            sheets.AddRange(BuildStringsSheets(Array.Empty<XlsxSheet>()));
         }
 
         try
@@ -576,16 +576,22 @@ public static class DataTableTemplate
             $"데이터 테이블 {(merged ? "병합" : "템플릿")}: 시트 {sheets.Count}개 · 차이 {(differences < 0 ? "오류" : differences.ToString())}"));
     }
 
-    /// <summary>문구 시트(<see cref="StringsSheet"/>) — 기존 행 유지 + 등록된 키(<see cref="StringKeyRegistry"/>) 중 없는 것 추가. 키가 없어도 머리글만 있는 시트를 만든다.</summary>
-    private static XlsxWriteSheet BuildStringsSheet(XlsxSheet existing)
+    /// <summary>
+    /// 문자열 시트(<see cref="StringsSheet.All"/> — Strings·ErrorCodes) — 기존 행 유지 + 등록된 키 중 없는 것 추가. 키가 없어도 머리글만 있는 시트를 만든다.
+    /// Strings 의 키는 <see cref="StringKeyRegistry"/>, ErrorCodes 는 아직 등록 키가 없다(오류 코드 목록은 L4).
+    /// </summary>
+    private static List<XlsxWriteSheet> BuildStringsSheets(IReadOnlyList<XlsxSheet> existing)
     {
         var report = new List<string>();
-        XlsxWriteSheet sheet = StringsSheet.BuildSheet(existing, StringKeyRegistry.Collect(), report);
+        var sheets = StringsSheet.All
+            .Select(spec => spec.BuildSheet(existing.FirstOrDefault(s => spec.Is(s.Name)),
+                spec == StringsSheet.Strings ? StringKeyRegistry.Collect() : Enumerable.Empty<StringKeyInfo>(), report))
+            .ToList();
         foreach (string line in report)
         {
             Debug.Log($"{LogPrefix}Export: {line}");
         }
 
-        return sheet;
+        return sheets;
     }
 }

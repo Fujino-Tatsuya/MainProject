@@ -105,7 +105,7 @@ public static class DataSourcePlayMode
             return;
         }
 
-        StringTableBuild.Write(result.Strings); // 문구 표는 디스크 에셋(내용이 바뀌었을 때만 씀) — 스냅샷 대상 아님
+        StringTableBuild.Write(result.Strings, result.ErrorCodes); // 문구 표는 디스크 에셋(내용이 바뀌었을 때만 씀) — 스냅샷 대상 아님
         DataTableSnapshot snapshot = DataTableApplier.ApplyInMemory(result.Writes);
         SessionState.SetString(SnapshotSessionKey, JsonUtility.ToJson(snapshot));
         // 복구 전까지 이 에셋들의 저장을 막는다(DataTableSaveGuard) — 메모리의 테이블 값이 디스크로 새는 걸 막는다.

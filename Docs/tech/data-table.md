@@ -33,6 +33,7 @@ GameData.xlsx (SVN, 잠금)
 | `Sound` | 문자열 키별 사운드 재생 수치(`SoundCatalog`) — SoundID 연결은 인스펙터 전용 |
 | `Map` | 허수아비 인터럽트 순환(`TrainingDummyInterrupt`) |
 | `Strings` | **게임 문구(한/영)** — 열 `key` · `#설명` · `ko` · `en`, 세로 표가 아니다. SO 에 쓰지 않고 `StringTable` 로 간다. 쓰는 법·검증 규칙은 [localization.md](localization.md) |
+| `ErrorCodes` | **로비·네트워크 오류 문구(한/영)** — 열 `code` · `#분류` · `#원인(개발자용)` · `#조치(QA·CS용)` · `ko` · `en`. `Strings` 와 같은 규칙으로 `StringTable` 로 간다. [localization.md §2](localization.md) |
 | `SlowMotion` | 인터럽트 슬로우 모양 `interruptProfile.*`(배율·진입·유지·복귀·실패 복귀 길이, 대상 `NetworkManager`) · 오너 줌 배율 `slowMotionZoomFactor`(대상 `CameraSwitcher`). 의미는 [PLAN-interrupt-slowmo.md](../../PLAN-interrupt-slowmo.md) |
 
 ### 세로 표 — 행 = 필드, 열 = 대상
@@ -77,11 +78,11 @@ GameData.xlsx (SVN, 잠금)
 | **Export Template** | 현재 인스펙터 값으로 xlsx 를 만든다. 파일이 있으면 **병합**(배치는 새로 짜고 기획 값은 (대상, 필드) 로 유지 — 시트에 직접 넣은 `#` 메모 행·열은 남지 않는다, `#` 메모 시트는 유지) / **덮어쓰기** 선택. 원본은 `Library/DataTableExportBackup` 에 보관 |
 | Export Template 필드 목록 보기 | 파일을 안 쓰고 시트별로 나갈 필드만 Console 에 |
 | 인스펙터 값을 테이블 값으로 덮어쓰기 | 디스크의 SO·프리팹을 테이블 값으로 바꾼다(되돌릴 생각이 없을 때만, Undo 가능) |
-| StringTable 갱신 (Strings 시트 → 에셋) | `Strings` 시트만 읽어 검증하고 `StringTable.asset` 을 갱신([localization.md](localization.md)) |
+| StringTable 갱신 (Strings·ErrorCodes 시트 → 에셋) | `Strings`·`ErrorCodes` 시트만 읽어 검증하고 `StringTable.asset` 을 갱신([localization.md](localization.md)) |
 | 테이블 폴더 열기 | 탐색기로 연다 |
 
 🔴 Export 는 xlsx 를 새로 쓴다 — **서식·색·열 너비·수식은 사라진다**(수식은 결과값으로 남는다). 병합이어도 같다.
-`Strings` 시트는 예외로 병합·덮어쓰기 모두 기존 행을 그대로 옮긴다(문구는 인스펙터 값이 없다) — [localization.md §2](localization.md).
+`Strings`·`ErrorCodes` 시트는 예외로 병합·덮어쓰기 모두 기존 행을 그대로 옮긴다(문구는 인스펙터 값이 없다) — [localization.md §2](localization.md).
 
 ## 5. 인스펙터에서 보이는 것
 

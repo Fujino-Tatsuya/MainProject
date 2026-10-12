@@ -70,6 +70,20 @@ public static class Loc
     public static string Format(string key, IReadOnlyDictionary<string, string> args) =>
         TutorialGuideText.Fill(Get(key), args);
 
+    /// <summary>
+    /// 로비·네트워크 오류 문구(ErrorCodes 시트). 코드가 없으면 <c>#코드</c> — <see cref="Get"/> 과 같은 규칙.
+    /// args 가 있으면 <see cref="Format"/> 처럼 <c>{이름}</c> 을 채운다.
+    /// </summary>
+    public static string GetError(string code, IReadOnlyDictionary<string, string> args = null)
+    {
+        if (string.IsNullOrEmpty(code))
+            return MissingPrefix;
+
+        StringTable current = Table;
+        string text = current != null && current.TryGetError(code, Current, out string found) ? found : MissingPrefix + code;
+        return TutorialGuideText.Fill(text, args);
+    }
+
     // 도메인 리로드 없는 Play 진입에서 지난 세션 구독자가 남지 않게. 표는 에셋 참조라 그대로 둔다.
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetSubscribers()

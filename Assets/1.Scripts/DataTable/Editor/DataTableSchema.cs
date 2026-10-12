@@ -110,7 +110,7 @@ public static class DataTableSchema
         string sheetName = sheet.Name?.Trim() ?? string.Empty;
         if (IsComment(sheetName) || StringsSheet.IsStringsSheet(sheetName))
         {
-            return; // Strings 시트는 SO 값이 아니라 문구 표 — StringsSheet 가 읽는다.
+            return; // Strings·ErrorCodes 시트는 SO 값이 아니라 문구 표 — StringsSheet 가 읽는다.
         }
 
         string first = sheet.Cell(0, 0).Trim();

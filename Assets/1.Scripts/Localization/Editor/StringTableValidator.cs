@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 
-/// <summary>Strings 시트의 값 행 하나(아직 검증 전). 위치는 오류 표시용 "GameData.xlsx › Strings!C3".</summary>
+/// <summary>문자열 시트(Strings·ErrorCodes)의 값 행 하나(아직 검증 전). 위치는 오류 표시용 "GameData.xlsx › Strings!C3".</summary>
 public readonly struct StringRow
 {
     public StringRow(string key, string description, string ko, string en, string keyLocation, string koLocation, string enLocation)
@@ -41,7 +41,8 @@ public readonly struct LocalizedString
 }
 
 /// <summary>
-/// Strings 시트 검증(순수 함수, Unity 의존 없음). 오류가 하나라도 있으면 호출자는 표를 갱신하지 않는다.
+/// 문자열 시트 검증(순수 함수, Unity 의존 없음) — Strings·ErrorCodes 둘 다 같은 규칙, 시트마다 따로 부른다(키 공간이 따로).
+/// 오류가 하나라도 있으면 호출자는 표를 갱신하지 않는다.
 /// <list type="bullet">
 /// <item>키 중복 = 오류(첫 행만 남긴다)</item>
 /// <item>ko 빈 칸 = 오류</item>

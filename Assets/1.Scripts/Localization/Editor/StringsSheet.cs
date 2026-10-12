@@ -1,8 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
-/// <summary>Export 때 Strings 시트에 넣을 키 하나 — 새 키면 이 ko·설명으로 행을 만든다.</summary>
+/// <summary>Export 때 문자열 시트에 넣을 키 하나 — 새 키면 이 ko·설명(첫 메모 열)으로 행을 만든다.</summary>
 public readonly struct StringKeyInfo
 {
     public StringKeyInfo(string key, string description, string ko)
@@ -44,25 +44,51 @@ public static class StringKeyRegistry
 }
 
 /// <summary>
-/// xlsx <c>Strings</c> 시트 — 1행 머리글 <c>key | #설명 | ko | en</c>, 2행부터 키 하나에 한 행.
+/// xlsx 문자열 시트 — 1행 머리글 <c>키 | #메모… | ko | en</c>, 2행부터 키 하나에 한 행. 시트는 두 개다.
+/// <list type="bullet">
+/// <item><see cref="Strings"/> — <c>key | #설명 | ko | en</c>. UI·안내 문구.</item>
+/// <item><see cref="ErrorCodes"/> — <c>code | #분류 | #원인(개발자용) | #조치(QA·CS용) | ko | en</c>. 로비·네트워크 오류 문구.</item>
+/// </list>
+/// 읽기·검증(<see cref="StringTableValidator"/>)·생성은 둘이 같다 — 시트 이름·키 열 이름·메모 열만 다르다.
 /// <c>#</c> 로 시작하는 키 행은 메모, 완전히 빈 행은 건너뛴다. 머리글 열은 이름으로 찾는다(순서가 바뀌어도 된다).
 /// 다른 시트와 달리 SO 에 쓰지 않고 <see cref="StringTable"/> 로 간다(<see cref="StringTableBuild"/>).
 /// </summary>
-public static class StringsSheet
+public sealed class StringsSheet
 {
-    public const string SheetName = "Strings";
-    public const string KeyHeader = "key";
-    public const string DescriptionHeader = DataTableSchema.DescriptionHeader;
     public const string KoHeader = "ko";
     public const string EnHeader = "en";
 
-    public static bool IsStringsSheet(string sheetName) =>
-        string.Equals(sheetName?.Trim(), SheetName, StringComparison.Ordinal);
+    public static readonly StringsSheet Strings = new StringsSheet("Strings", "key", DataTableSchema.DescriptionHeader);
 
-    public static List<StringRow> Parse(string fileName, IEnumerable<XlsxSheet> sheets, DataTableIssues issues)
+    public static readonly StringsSheet ErrorCodes = new StringsSheet("ErrorCodes", "code", "#분류", "#원인(개발자용)", "#조치(QA·CS용)");
+
+    public static readonly IReadOnlyList<StringsSheet> All = new[] { Strings, ErrorCodes };
+
+    private StringsSheet(string name, string keyHeader, params string[] memoHeaders)
+    {
+        Name = name;
+        KeyHeader = keyHeader;
+        MemoHeaders = memoHeaders;
+    }
+
+    public string Name { get; }
+    public string KeyHeader { get; }
+
+    /// <summary>런타임에 안 들어가는 <c>#</c> 열. 첫 열이 <see cref="StringRow.Description"/>·<see cref="StringKeyInfo.Description"/> 자리.</summary>
+    public IReadOnlyList<string> MemoHeaders { get; }
+
+    /// <summary>Export 가 쓰는 머리글 순서.</summary>
+    public string[] Headers => new[] { KeyHeader }.Concat(MemoHeaders).Concat(new[] { KoHeader, EnHeader }).ToArray();
+
+    /// <summary>문자열 시트(어느 쪽이든)면 true — 수치 시트 파서가 건너뛴다.</summary>
+    public static bool IsStringsSheet(string sheetName) => All.Any(s => s.Is(sheetName));
+
+    public bool Is(string sheetName) => string.Equals(sheetName?.Trim(), Name, StringComparison.Ordinal);
+
+    public List<StringRow> Parse(string fileName, IEnumerable<XlsxSheet> sheets, DataTableIssues issues)
     {
         var rows = new List<StringRow>();
-        foreach (XlsxSheet sheet in sheets.Where(s => IsStringsSheet(s.Name)))
+        foreach (XlsxSheet sheet in sheets.Where(s => Is(s.Name)))
         {
             Parse(fileName, sheet, rows, issues);
         }
@@ -70,7 +96,7 @@ public static class StringsSheet
         return rows;
     }
 
-    public static void Parse(string fileName, XlsxSheet sheet, List<StringRow> into, DataTableIssues issues)
+    public void Parse(string fileName, XlsxSheet sheet, List<StringRow> into, DataTableIssues issues)
     {
         if (sheet.Rows.Count == 0 || sheet.Rows.All(r => r.All(string.IsNullOrWhiteSpace)))
         {
@@ -78,12 +104,12 @@ public static class StringsSheet
         }
 
         int keyColumn = FindHeader(sheet, KeyHeader);
-        int descriptionColumn = FindHeader(sheet, DescriptionHeader);
+        int descriptionColumn = FindHeader(sheet, MemoHeaders[0]);
         int koColumn = FindHeader(sheet, KoHeader);
         int enColumn = FindHeader(sheet, EnHeader);
         if (keyColumn < 0 || koColumn < 0 || enColumn < 0)
         {
-            issues.Error(Where(fileName, 0, 0), $"머리글은 '{KeyHeader} | {DescriptionHeader} | {KoHeader} | {EnHeader}' 여야 한다(1행).");
+            issues.Error(Where(fileName, 0, 0), $"머리글은 '{string.Join(" | ", Headers)}' 여야 한다(1행).");
             return;
         }
 
@@ -101,7 +127,7 @@ public static class StringsSheet
             {
                 if (ko.Length > 0 || en.Length > 0)
                 {
-                    issues.Error(Where(fileName, row, keyColumn), "key 가 비어 있는데 문구가 있다.");
+                    issues.Error(Where(fileName, row, keyColumn), $"{KeyHeader} 가 비어 있는데 문구가 있다.");
                 }
 
                 continue;
@@ -115,39 +141,38 @@ public static class StringsSheet
 
     /// <summary>
     /// Export 용 시트. 기존 시트의 행(메모 행 포함)은 순서·문구 그대로 두고, 등록된 키 중 없는 것만 뒤에 붙인다
-    /// (ko = 공급자가 준 값, en 은 빈 칸). 기존 시트가 없으면 머리글만 있는 시트가 된다.
+    /// (ko = 공급자가 준 값, en 은 빈 칸). 기존 시트가 없거나 비어 있으면 머리글만 있는 시트가 된다.
     /// </summary>
-    public static XlsxWriteSheet BuildSheet(XlsxSheet existing, IEnumerable<StringKeyInfo> registered, List<string> report)
+    public XlsxWriteSheet BuildSheet(XlsxSheet existing, IEnumerable<StringKeyInfo> registered, List<string> report)
     {
-        var rows = new List<object[]> { new object[] { KeyHeader, DescriptionHeader, KoHeader, EnHeader } };
+        string[] headers = Headers;
+        var rows = new List<object[]> { headers.Cast<object>().ToArray() };
         var present = new HashSet<string>(StringComparer.Ordinal);
+        bool hasContent = existing != null && existing.Rows.Any(r => r.Any(c => !string.IsNullOrWhiteSpace(c)));
 
-        if (existing != null)
+        if (hasContent)
         {
-            int keyColumn = FindHeader(existing, KeyHeader);
-            int descriptionColumn = FindHeader(existing, DescriptionHeader);
-            int koColumn = FindHeader(existing, KoHeader);
-            int enColumn = FindHeader(existing, EnHeader);
+            int[] columns = headers.Select(h => FindHeader(existing, h)).ToArray();
+            int keyColumn = columns[0];
+            int koColumn = columns[headers.Length - 2];
+            int enColumn = columns[headers.Length - 1];
             if (keyColumn < 0 || koColumn < 0 || enColumn < 0)
             {
                 // 머리글을 못 읽으면 내용을 옮길 수 없다 — 원본은 Export 백업에 있다.
-                report?.Add($"{SheetName}: 기존 시트 머리글을 읽지 못해 행을 옮기지 못했다 — 원본은 Export 백업에.");
+                report?.Add($"{Name}: 기존 시트 머리글을 읽지 못해 행을 옮기지 못했다 — 원본은 Export 백업에.");
             }
             else
             {
                 for (int row = 1; row < existing.Rows.Count; row++)
                 {
-                    string key = existing.Cell(row, keyColumn);
-                    string description = descriptionColumn < 0 ? string.Empty : existing.Cell(row, descriptionColumn);
-                    string ko = existing.Cell(row, koColumn);
-                    string en = existing.Cell(row, enColumn);
-                    if (key.Length == 0 && description.Length == 0 && ko.Length == 0 && en.Length == 0)
+                    string[] values = columns.Select(c => c < 0 ? string.Empty : existing.Cell(row, c)).ToArray();
+                    if (values.All(v => v.Length == 0))
                     {
                         continue;
                     }
 
-                    present.Add(key.Trim());
-                    rows.Add(new object[] { Cell(key), Cell(description), Cell(ko), Cell(en) });
+                    present.Add(values[0].Trim());
+                    rows.Add(values.Select(Cell).ToArray());
                 }
             }
         }
@@ -157,13 +182,17 @@ public static class StringsSheet
         {
             if (present.Add(info.Key))
             {
-                rows.Add(new object[] { info.Key, Cell(info.Description), Cell(info.Ko), null });
+                var row = new object[headers.Length];
+                row[0] = info.Key;
+                row[1] = Cell(info.Description);
+                row[headers.Length - 2] = Cell(info.Ko);
+                rows.Add(row);
                 added++;
             }
         }
 
-        report?.Add($"{SheetName}: 기존 행 {rows.Count - 1 - added}개 유지, 새 키 {added}개 추가.");
-        return new XlsxWriteSheet(SheetName, rows, frozenRows: 1, boldRows: 1, frozenColumns: 1);
+        report?.Add($"{Name}: 기존 행 {rows.Count - 1 - added}개 유지, 새 키 {added}개 추가.");
+        return new XlsxWriteSheet(Name, rows, frozenRows: 1, boldRows: 1, frozenColumns: 1);
     }
 
     private static object Cell(string text) => string.IsNullOrEmpty(text) ? null : text;
@@ -182,6 +211,6 @@ public static class StringsSheet
         return -1;
     }
 
-    private static string Where(string fileName, int row, int column) =>
-        $"{fileName} › {SheetName}!{XlsxSheet.Address(row, column)}";
+    private string Where(string fileName, int row, int column) =>
+        $"{fileName} › {Name}!{XlsxSheet.Address(row, column)}";
 }
