@@ -160,6 +160,7 @@ Loc.Changed += Redraw;           // OnEnable 에서 구독, OnDisable 에서 꼭
 | `Assets/1.Scripts/Localization/ErrorCatalog.cs` | L4 오류 코드 목록(`ErrorCode` = 코드 + 분류·원인·조치 + ko) · 화면 표기(`ErrorDisplay`) |
 | `Assets/1.Scripts/Localization/Editor/ErrorCodeKeys.cs` | Export 때 `ErrorCatalog.All` 을 ErrorCodes 시트로 등록(`StringKeyRegistry.RegisterErrorCodes`) |
 | `Assets/1.Scripts/Network/Session/SessionStartResult.cs` | `SessionError`(코드 + 인자 + 상세) · `SessionStartResult` |
+| [`Docs/tech/localization-en-draft.md`](localization-en-draft.md) | L2~L4b 전 키(Strings 100 · ErrorCodes 35)의 **en 번역 초안**·용어집·기획 결정 목록 — 병합 뒤 Export 때 시트 en 칸으로 옮긴다 |
 
 - 테스트: `Tools/Tests/데이터 테이블 EditMode 테스트 실행`(픽스처 `StringTableValidatorTests`·`StringsSheetTests`·`ErrorCodesSheetTests`·`LocTests`·`UserLanguageConfigTests`,
   L2 `LocKeyTests`·`DataTableTextKeysTests`·`CharacterRosterStringKeysTests`·`LocTextRuleTests`, L3 `UiStringsTests`·`UiStringsFormatTests`·`UiStringsAuthoringTests`,
