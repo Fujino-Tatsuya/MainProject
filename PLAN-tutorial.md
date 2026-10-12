@@ -80,7 +80,11 @@
 - **23호 간파 게이지·제압·취약·벽 충돌은 재사용하지 않는다.** 전부 `TwentyThreeBoss` private(벽 = 보스방 `InvisibleBoundaries` 사각형 수학, 밀치기 = 보스 `ReceiveAttack` 안 자체 이동, 이벤트 없음). 같은 **방식**(공격자 반대 방향 고정 거리·시간 밀치기 + 벽 면 거리 수학 판정)만 튜토리얼 스피너봇 쪽에 순수 모델로 새로 둔다.
 - **플레이어 우클릭은 원래 몬스터를 밀지 않는다**(23호만 자기 코드에서 밀린다). 튜토리얼 스피너봇이 취약일 때 간파 적중(`AttackInfo.isInterruptAttack`)을 받으면 튜토리얼 컴포넌트가 민다 → `ISpinnerBotOverride` 에 멤버 1개(`NotifyInterruptHit`) + `SpinnerBot.TakeDamage` 호출 1줄. Q 넉백·일반 피해는 이 경로를 안 타서 연계로 안 센다.
 - 쿨 초기화는 **기존 공개 API 만** 쓴다: 스킬 = `PlayerSkillController.ReduceCooldownServer(skill, GetCooldownRemaining(skill))`(등록된 기본·대체 스킬 전부 — `GetSkillIndex` ≥ 0), 대시 = 새 `PlayerDashController.ServerResetChargeToFull`/`OwnerResetChargeToFull`(기존 `ResetChargeToOne` 짝). `PlayerSkillController` 는 고치지 않는다(80% 레인과 충돌 없음).
-- 유효 벽 = 존3 슬롯 사각형의 긴 변 중 스피너봇 스폰에 가까운 쪽(연습용 지정 벽). 연습 위치 = 스폰의 벽 방향 좌표만 벽에서 `몸 반경 + 4m`(밀치기 3m × 1~2회) 로 옮긴 점. 밀치기 거리·시간·접촉 여유는 인스펙터(D26 튜닝).
+- 유효 벽 = 존3 슬롯 사각형의 긴 변 중 스피너봇 스폰에 가까운 쪽(연습용 지정 벽). 연습 위치 = 스폰의 벽 방향 좌표만 벽에서 `몸 반경 + 4m`(밀치기 3m × 1~2회) 로 옮긴 점(존 끝에서 8m 안쪽). 밀치기 거리·시간·접촉 여유는 인스펙터(D26 튜닝).
+- 캐릭터별 힌트(`TUT_Z1_Q_GUNNER`·`TUT_Z1_E_*`·`TUT_Z1_R_ASSASSIN`)는 목표 줄 변형 행으로 채운다(그 캐릭터의 Q/E/R 목표 줄이 힌트가 됨). `TUT_Z1_ATTACK_GUNNER`·`TUT_Z1_PASSIVE_*` 는 기존대로 빈 행.
+- G1 대기 줄은 카운트다운 없는 새 행 `TUT_WAIT_PARTY_NOAUTO`(시나리오 §5 에 없음).
+
+**진행(2026-10-12)**: V0 `0af4cac4` · V1 `c3f6f295` · V2 `348376fc` · V3 `3ab36055` · V4 `dda9ca7b` · V5 문서 `3ff996b6`. Play 확인 순서 = Docs/tech/tutorial-qa.md(v8 반영).
 
 ## 4. 리스크
 - 몬스터·타이머·보스 진입 훅은 경석 영역 — 최소 침습 + handoff 문서, 병합 전 경석 공유.
