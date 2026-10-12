@@ -25,6 +25,8 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     private readonly HashSet<Object> hitTargets = new HashSet<Object>();
     private readonly List<Unit> landedUnits = new List<Unit>();
     private readonly InterruptSlowMotionTracker slowMotion = new InterruptSlowMotionTracker();
+    private readonly InterruptSuccessCooldownModel successCooldown = new InterruptSuccessCooldownModel();
+    private System.Action<Unit, ulong> counterSucceededHandler;
 
     private float hitTime;
     private float endTime;
@@ -39,6 +41,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     {
         base.OnServerStart(direction, target);
         slowMotion.Begin();
+        successCooldown.BeginCast();
 
         IPlayerInterruptSkillData data = InterruptData;
         if (data == null)
@@ -114,9 +117,21 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
     /// </summary>
     public static event System.Action<Player, int> ServerInterruptResolved;
 
+    /// <summary>
+    /// [서버] 간파 시전 하나가 열린 카운터 창을 맞혀 소비했다(23호·중간보스 <see cref="CombatStatsEvents.ServerCounterSucceeded"/>,
+    /// 허수아비 인터럽트 성공). 여러 대상이 성공해도 시전당 1회. 인자 = 시전자, 그 간파 스킬 인스턴스(대체 슬롯 포함).
+    /// 시전자 본인의 쿨 감소(<see cref="PlayerGameRuleData.InterruptSuccessCooldownReduction"/>)를 적용한 뒤,
+    /// <see cref="ServerInterruptResolved"/> 보다 먼저 난다.
+    /// </summary>
+    public static event System.Action<Player, PlayerInterruptSkillBase> ServerInterruptSucceeded;
+
     // 도메인 리로드를 끈 Play 진입에서도 이전 세션 구독자가 남지 않게 비운다.
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    private static void ResetStaticEvents() => ServerInterruptResolved = null;
+    private static void ResetStaticEvents()
+    {
+        ServerInterruptResolved = null;
+        ServerInterruptSucceeded = null;
+    }
 
     private void CompleteResolution(int resolvedCount)
     {
@@ -176,15 +191,18 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
                 new AttackHitContext(owner.transform.position, owner.transform, hit, owner);
 
             // 성공 수를 이 수신 호출 하나의 전후로 비교한다 — 다른 공격의 성공이 섞이지 않는다.
-            IInterruptSlowMotionTarget slowTarget = slowMotion.IsPending ? FindSlowMotionTarget(unit) : null;
+            // 슬로우 모션 판별과 간파 성공 쿨 감소(허수아비)가 같은 비교를 쓴다.
+            IInterruptSlowMotionTarget slowTarget = FindSlowMotionTarget(unit);
             int successBefore = slowTarget != null ? slowTarget.ServerInterruptSuccessCount : 0;
 
-            bool resolved = hurtbox != null
-                ? hurtbox.ReceiveAttack(attackInfo, hitContext)
-                : unit.ReceiveAttack(attackInfo, hitContext);
+            bool resolved = ReceiveListeningForCounter(hurtbox, unit, attackInfo, hitContext);
 
             if (slowTarget != null && slowTarget.ServerInterruptSuccessCount != successBefore)
-                interruptLanded = true;
+            {
+                successCooldown.NotifySuccess();
+                if (slowMotion.IsPending)
+                    interruptLanded = true;
+            }
 
             if (!resolved)
                 continue;
@@ -197,6 +215,7 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
         }
 
         FailSlowMotion(slowMotion.Resolve(interruptLanded));
+        ApplySuccessCooldownReduction();
 
         if (CompleteBeforeAttackLanded)
             CompleteResolution(resolvedCount);
@@ -206,6 +225,48 @@ public abstract class PlayerInterruptSkillBase : PlayerInstantSkill
 
         if (!CompleteBeforeAttackLanded)
             CompleteResolution(resolvedCount);
+    }
+
+    // ── 간파 성공 쿨 감소 (서버, 할 일 26) ──
+
+    // 23호·중간보스는 카운터 창 소비 성공을 피격 처리(ReceiveAttack) 안에서 동기로 발행한다.
+    // 이 수신 호출 동안만 들으면 들어온 성공은 전부 이 타격의 것이라 공격자 clientId → 시전자 매핑이 필요 없다(호스트·오프라인 동일).
+    private bool ReceiveListeningForCounter(Hurtbox hurtbox, Unit unit, AttackInfo attackInfo, AttackHitContext hitContext)
+    {
+        counterSucceededHandler ??= HandleCounterSucceeded;
+        CombatStatsEvents.ServerCounterSucceeded += counterSucceededHandler;
+        try
+        {
+            return hurtbox != null
+                ? hurtbox.ReceiveAttack(attackInfo, hitContext)
+                : unit.ReceiveAttack(attackInfo, hitContext);
+        }
+        finally
+        {
+            CombatStatsEvents.ServerCounterSucceeded -= counterSucceededHandler;
+        }
+    }
+
+    private void HandleCounterSucceeded(Unit target, ulong attackerClientId) => successCooldown.NotifySuccess();
+
+    // 판정 1회 = 시전 1회라 여러 대상이 성공해도 감소는 한 번이다. 대체 슬롯이면 그 대체 스킬 인스턴스의 장부가 준다.
+    private void ApplySuccessCooldownReduction()
+    {
+        if (!successCooldown.HasSucceeded)
+            return;
+
+        float ratio = owner.TryGetComponent(out PlayerMotor motor) && motor.GameRule != null
+            ? motor.GameRule.InterruptSuccessCooldownReduction
+            : InterruptSuccessCooldownModel.DefaultReductionRatio;
+        float fullCooldown = Data != null ? Data.CooldownTime : 0f;
+
+        if (successCooldown.TryClaimReduction(fullCooldown, ratio, out float seconds) && controller != null)
+        {
+            controller.ReduceCooldownServer(this, seconds);
+            Edit.Log($"[Skill] 간파 성공 — 쿨 {seconds:0.##}s 감소(전체 {fullCooldown:0.##}s × {ratio:0.##})", this);
+        }
+
+        ServerInterruptSucceeded?.Invoke(owner, this);
     }
 
     // ── 인터럽트 슬로우 모션 (서버) ──

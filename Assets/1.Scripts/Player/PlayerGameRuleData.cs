@@ -44,7 +44,13 @@ public sealed class PlayerGameRuleData : ScriptableObject
     [Tooltip("넉백 속도의 선형 감속(m/s²). 6은 기존 PhysX 마찰 0.6 × 중력 9.81과 비슷한 감속이다.")]
     [DataTableIgnore] [SerializeField, Min(0f)] private float knockbackDeceleration = 6f;
 
+    [Header("간파")]
+    [Tooltip("간파(우클릭) 성공 시 그 간파 스킬의 남은 쿨에서 '전체 쿨타임 × 이 비율' 만큼 뺀다(0 미만은 0). " +
+             "성공 = 열린 카운터 창(23호·중간보스·허수아비)을 맞혀 소비한 경우만. 한 번의 시전에서 여러 대상이 성공해도 1회.")]
+    [SerializeField, Range(0f, 1f)] private float interruptSuccessCooldownReduction = InterruptSuccessCooldownModel.DefaultReductionRatio;
+
     public float FallDamageRatio => fallDamageRatio;
+    public float InterruptSuccessCooldownReduction => Mathf.Clamp01(interruptSuccessCooldownReduction);
     public float MaxWalkableSlopeAngle => maxWalkableSlopeAngle;
     public float StepOffset => Mathf.Max(0f, stepOffset);
     public LayerMask ObstacleMask => obstacleMask;
