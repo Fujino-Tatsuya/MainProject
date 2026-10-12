@@ -10,7 +10,9 @@ public class PlayerAimIndicator : NetworkBehaviour
     [SerializeField] private Camera targetCamera;
     [SerializeField] private LayerMask groundMask;
 
-    [Tooltip("대시 재충전 중 인디케이터 원래 색에 곱하는 색. 충전되면 원래 색으로 돌아간다.")]
+    [Tooltip("켜면 대시 재충전 중 인디케이터를 dashCooldownTint 로 어둡게 한다. 기본 꺼짐 — 대시 상태는 머리 위 대시 아이콘이 보여 준다.")]
+    [SerializeField] private bool tintOnDashCooldown;
+    [Tooltip("대시 재충전 중 인디케이터 원래 색에 곱하는 색. 충전되면 원래 색으로 돌아간다. tintOnDashCooldown 이 켜졌을 때만 쓴다.")]
     [SerializeField] private Color dashCooldownTint = new Color(0.3f, 0.3f, 0.3f, 1f);
 
     private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
@@ -18,7 +20,7 @@ public class PlayerAimIndicator : NetworkBehaviour
     private PlayerDashController dash;
     private Material indicatorMaterial; // 인스턴스 — 프리팹 애셋 오염 금지
     private Color indicatorBaseColor;
-    private bool? lastDashReady;
+    private bool? lastDashDimmed;
 
     public Vector3 AimDirection { get; private set; }
 
@@ -80,18 +82,22 @@ public class PlayerAimIndicator : NetworkBehaviour
             : Color.white;
     }
 
-    // 대시 재충전 중엔 어둡게, 충전되면 원래 색. 오너 예측 장부 기준이라 로컬 플레이어에만 의미가 있다.
+    /// <summary>인디케이터를 어둡게 칠할지 — 틴트가 켜졌고 대시 재충전 중일 때만.</summary>
+    public static bool IsDashTintDimmed(bool tintOnDashCooldown, bool dashReady) => tintOnDashCooldown && !dashReady;
+
+    // 재충전 중엔 어둡게, 충전되면 원래 색. 오너 예측 장부 기준이라 로컬 플레이어에만 의미가 있다.
+    // 틴트를 끄면 어두운 상태가 남지 않도록 원래 색으로 되돌린다.
     private void UpdateDashTint()
     {
         if (indicatorMaterial == null || dash == null)
             return;
 
-        bool ready = dash.IsReady;
-        if (lastDashReady == ready)
+        bool dimmed = IsDashTintDimmed(tintOnDashCooldown, dash.IsReady);
+        if (lastDashDimmed == dimmed)
             return;
 
-        lastDashReady = ready;
-        indicatorMaterial.SetColor(BaseColorId, ready ? indicatorBaseColor : indicatorBaseColor * dashCooldownTint);
+        lastDashDimmed = dimmed;
+        indicatorMaterial.SetColor(BaseColorId, dimmed ? indicatorBaseColor * dashCooldownTint : indicatorBaseColor);
     }
 
     private void UpdateAimDirection()
