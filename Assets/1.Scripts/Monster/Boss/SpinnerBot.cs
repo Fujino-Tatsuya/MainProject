@@ -48,6 +48,10 @@ public class SpinnerBot : MonsterBase
     [SerializeField, Min(0.1f)]
     [Tooltip("돌진 최대 거리(m). navmesh 경계에서 잘림(낙하 방지).")]
     float dashMaxDistance = 16f;
+    [SerializeField, Min(0.1f)]
+    [Tooltip("돌진(회전) 판정·예고의 **반폭**(m) = 칼날 회전 반경. 채찍은 MeleeHitbox 박스 폭(2.5m) 그대로.\n" +
+             "실측 3.12m(본체 메시 칼날 팔 끝 — 회전축에서 가장 먼 정점, 10-12). 박스 폭 그대로면 칼날 끝에 걸쳐도 안 맞았다.")]
+    [DataTableIgnore] float dashHalfWidth = 3.1f;   // 아트 형상에 묶인 값 — 밸런스 시트에 안 올린다(sideLateralOffset 과 같은 판단)
     [Header("예고 (2026-09-28 팀장: 범위를 보여 준 뒤 공격)")]
     [SerializeField, Min(0f)]
     [Tooltip("채찍을 고른 뒤 판정 박스를 바닥에 채우는 시간(초). 다 차면 채찍이 나간다. 0 = 예고 없음(예전).\n" +
@@ -197,7 +201,9 @@ public class SpinnerBot : MonsterBase
             // 🔴 간파 창이 열리는 공격이면 **파랑**(인터럽트 색) — 채찍(빨강)과 구분된다(팀장 10-12, 23호 돌진과 같은 규약).
             //    아래 Counter.Open() 은 조건 없이 창을 열므로 Counter 유무가 곧 "간파 가능"이다.
             var palette = Counter != null ? BossAttackConeTelegraph.Palette.Interrupt : BossAttackConeTelegraph.Palette.Attack;
-            ShowHitboxTelegraph(meleeAttack.ColliderInfo, WindupDuration, reach, palette: palette);
+            // 폭 = 칼날 회전 반경(dashHalfWidth) — 판정(MeleeHitWithHalfWidth)과 같은 값.
+            ShowHitboxTelegraph(meleeAttack.ColliderInfo, WindupDuration, reach, palette: palette,
+                                halfWidthOverride: dashHalfWidth);
         }
 
         // 창이 저작돼 있으면 자세를 정지시켜 "끊을 수 있다"를 보여 준다. 없으면 예전처럼 그냥 회전한다.
@@ -249,7 +255,8 @@ public class SpinnerBot : MonsterBase
                     meleeAttack?.BeginHitWindow();
                     _nextRepeatHitTime = Time.time + RepeatSeconds;
                 }
-                meleeAttack?.Hit();
+                // 🔴 폭은 칼날 회전 반경 — 박스(채찍용 2.5m) 그대로면 칼날 끝에 걸쳐도 안 맞았다(팀장 10-12). 예고와 같은 값.
+                MeleeHitWithHalfWidth(dashHalfWidth);
 
                 if (_phaseTimer <= 0f) EndSpin();
                 break;

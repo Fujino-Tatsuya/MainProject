@@ -968,11 +968,14 @@ public class MonsterBase : Unit
     /// </summary>
     /// <param name="lateralShift">몸 기준 옆으로 미는 거리(m, + = 오른쪽). 좌/우 공격은 판정도 <see cref="MeleeHitShifted"/> 에 같은 값을 준다.</param>
     /// <param name="palette">예고 색. 간파(카운터 창)가 열리는 공격은 <c>Interrupt</c>(파랑) — 23호 돌진과 같은 규약(10-12).</param>
+    /// <param name="halfWidthOverride">0 보다 크면 박스 폭 대신 이 반폭(m)으로 그린다. 판정도 <see cref="MeleeHitWithHalfWidth"/> 에 **같은 값**을 줄 것.</param>
     protected void ShowHitboxTelegraph(ColliderInfo hitbox, float growTime, float extraLength = 0f, float lateralShift = 0f,
-                                       BossAttackConeTelegraph.Palette palette = BossAttackConeTelegraph.Palette.Attack)
+                                       BossAttackConeTelegraph.Palette palette = BossAttackConeTelegraph.Palette.Attack,
+                                       float halfWidthOverride = 0f)
     {
         if (!IsServer || !HasAttackTelegraph || hitbox == null) return;
         if (!TryMeasureBox(hitbox, out float halfWidth, out float length, out float forward, out float lateral)) return;
+        if (halfWidthOverride > 0f) halfWidth = halfWidthOverride;
         ShowBandTelegraphRpc(halfWidth, length + Mathf.Max(0f, extraLength), forward, lateral + lateralShift,
                              Mathf.Max(0f, growTime), palette);
     }
@@ -995,6 +998,26 @@ public class MonsterBase : Unit
         t.position = original + right.normalized * lateralShift;
         try { return meleeAttack.Hit(); }
         finally { t.position = original; }
+    }
+
+    /// <summary>
+    /// [서버] 근접 판정 박스의 **폭만** <paramref name="halfWidth"/>(m, 반폭)로 바꿔 한 번 낸다.
+    /// 한 박스를 공격마다 다른 폭으로 쓸 때(스피너: 채찍 = 박스 그대로, 회전 돌진 = 칼날 회전 반경).
+    /// <see cref="MeleeHitShifted"/> 와 같은 방식 — 판정은 호출마다 콜라이더 크기를 새로 읽으므로 그 순간만 바꿨다가 되돌린다.
+    /// 🔴 예고(<see cref="ShowHitboxTelegraph"/> 의 halfWidthOverride)에 **같은 값**을 줄 것.
+    /// </summary>
+    protected int MeleeHitWithHalfWidth(float halfWidth)
+    {
+        if (meleeAttack == null) return 0;
+        ColliderInfo info = meleeAttack.ColliderInfo;
+        BoxCollider box = info != null ? info.GetComponent<BoxCollider>() : null;
+        if (box == null || halfWidth <= 0f) return meleeAttack.Hit();
+
+        Vector3 original = box.size;
+        float scaleX = Mathf.Max(0.0001f, Mathf.Abs(box.transform.lossyScale.x));
+        box.size = new Vector3(halfWidth * 2f / scaleX, original.y, original.z);
+        try { return meleeAttack.Hit(); }
+        finally { box.size = original; }
     }
 
     /// <summary>[서버] 예고를 끈다. 공격 상태를 벗어나면 <see cref="OnStateChanged"/> 가 전 피어에서 자동으로 끈다.</summary>
