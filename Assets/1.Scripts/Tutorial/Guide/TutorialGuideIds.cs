@@ -33,7 +33,19 @@ public static class TutorialGuideIds
     public const string Z3Intro = "TUT_Z3_INTRO";
     public const string Z3PracticeNote = "TUT_Z3_PRACTICE_NOTE";
     public const string Z3Goal = "TUT_Z3_GOAL";
-    public const string Z3Gunner = "TUT_Z3_GUNNER";
+    // v8: TUT_Z3_GUNNER(거너 간파 설명)는 호출하지 않는다 — 존3 캐릭터별 간파 설명 제거(§2.4). 문구 SO 행은 남긴다.
+    /// <summary>v8 Z3-2 준비·간파 목표(연습 단계 목표 줄).</summary>
+    public const string Z3CounterGoal = "TUT_Z3_COUNTER_GOAL";
+    /// <summary>v8 Z3-4 간파 성공 뒤 밀치기 안내 자막.</summary>
+    public const string Z3PushIntro = "TUT_Z3_PUSH_INTRO";
+    /// <summary>v8 Z3-4 취약 밀치기 목표.</summary>
+    public const string Z3PushGoal = "TUT_Z3_PUSH_GOAL";
+    /// <summary>v8 Z3-5 밀치기가 벽에 닿지 않음.</summary>
+    public const string Z3PushHint = "TUT_Z3_PUSH_HINT";
+    /// <summary>v8 Z3-6 벽 충돌 — 연계 {n}/3.</summary>
+    public const string Z3WallSuccess = "TUT_Z3_WALL_SUCCESS";
+    /// <summary>v8 Z3-7 복귀.</summary>
+    public const string Z3Return = "TUT_Z3_RETURN";
     public const string Z3Miss = "TUT_Z3_MISS";
     public const string Z3Early = "TUT_Z3_EARLY";
     public const string Z3FirstSuccess = "TUT_Z3_FIRST_SUCCESS";
@@ -70,7 +82,8 @@ public static class TutorialGuideIds
         Z1Q, Z1Q + "_GUNNER", Z1E, Z1E + "_PALADIN", Z1E + "_GUNNER", Z1E + "_ASSASSIN",
         Z1Rmb, Z1R, Z1R + "_ASSASSIN", Z1Go,
         Z2Intro, Z2Goal,
-        Z3Intro, Z3PracticeNote, Z3Goal, Z3Gunner, Z3Miss, Z3Early, Z3FirstSuccess, Z3Hint, Z3Real, Z3Boss,
+        Z3Intro, Z3PracticeNote, Z3Goal, Z3CounterGoal, Z3Miss, Z3Early, Z3FirstSuccess,
+        Z3PushIntro, Z3PushGoal, Z3PushHint, Z3WallSuccess, Z3Return, Z3Hint, Z3Real, Z3Boss,
         Z4Lore, Z4TimerHint, Z4Start, Z4PanelIntro, Z4PanelGoal, Z4PanelFirst, Z4Bridge, Z4Midboss,
         Z4CounterRemind, Z4Ult, Z4Ult + "_ASSASSIN", Z4Clear, Z4GoBoss,
         BPadWarn, BPadCount, BBossFrontTip,

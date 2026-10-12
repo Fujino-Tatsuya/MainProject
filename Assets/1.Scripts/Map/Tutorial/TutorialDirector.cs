@@ -30,7 +30,7 @@ using UnityEngine;
 ///  · S7 존1 ✅(v8 갱신) → TutorialZone1Flow: <see cref="ReportCheckServer"/>(Dash·BasicAttack·SkillQ/E/R/Interrupt — 서버 관측) / <see cref="ReportLocalMoveDistance"/>(Move — 오너 누적 거리, 서버 상한 검증) /
 ///    <see cref="ReportLocalCheck"/>(PassiveTooltip — 오너 보고)
 ///  · 서버 → 클라 자막 → <see cref="ShowSubtitleServer"/>(id, 키·값 인자, 대상 null = 전원 — 캐릭터 전용은 <see cref="GetClientsOfCharacterServer"/>). 강조·목표 패널은 흐름 파일이 클라에서 직접
-///  · S9 존3 → <see cref="AddCounterServer"/>(Zone3Interrupts) — 목표 도달 시 G5 자동 개방
+///  · S9 존3(v8) → <see cref="AddCounterServer"/>(Zone3Interrupts = 연계 벽 충돌) · 마지막 원위치 복귀 뒤 <see cref="RequestGateServer"/>(G5)
 ///  · S12 특성 → 개인 게이트가 <see cref="TutorialGateOpenReason.Timeout"/> 으로 열리면 미선택자 자동 획득
 /// </summary>
 [DisallowMultipleComponent]
@@ -775,7 +775,7 @@ public sealed class TutorialDirector : NetworkBehaviour
         return changed;
     }
 
-    /// <summary>파티 카운터 증가(목표에서 멈춤). Zone3Interrupts 가 목표에 닿으면 G5 가 자동으로 열린다.</summary>
+    /// <summary>파티 카운터 증가(목표에서 멈춤). v8: Zone3Interrupts(연계)는 목표에 닿아도 G5 를 열지 않는다 — 마지막 복귀 뒤 존3 흐름이 연다.</summary>
     public bool AddCounterServer(TutorialCounter counter, int amount = 1)
     {
         if (!RequireServerActive(nameof(AddCounterServer))) return false;
