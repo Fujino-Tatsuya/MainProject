@@ -124,6 +124,11 @@ HUD 매 프레임 문자열(`PlayerHealthHUD`·`StatusEffectHUD`·`SkillCooldown
 - ✅ 1단계 Codex(코드) `09e9cc57` · ✅ 2단계 Claude(씬·에셋·`LobbySceneManager` 배선). 결과 요약 = [player-prefabs.md §8.3](Docs/tech/player-prefabs.md)
 - 🔴 남은 것: **은희 MPPM Play 확인**(호스트+클라2: 초상화·Ready 동기화 / Start 활성 / 고른 Variant 스폰) → PR. 레이아웃은 첫 배치라 Play 보고 조정 가능
 - 범위 밖: 전투 HUD 초상화 Paladin 고정(Gunner 도 Paladin 얼굴)
+## ▶▶ 작업 세션 (2026-10-12 · 민경(Claude) · **카운터 성공 섬광 = 몸 표면 CameraDir 재생**, 브랜치 `feature/VFX`) — 구현 완료 · ⏳ Play·MPPM 확인 · 🔴 경석 공유
+- `EffectSocketPlayer.PlayOnceOnSurface(Collider)` 추가 — `EffectHitPoint.Resolve(CameraDir)` 로 위치·회전, 배율은 소켓 플레이어 `scale`. 표면 못 쓰면 `PlayOnce`(소켓) 폴백.
+- `MonsterBase.EffectSurfaceCollider` = `hitVFXCollider ?? bodyCollider` (23호는 hitVFXCollider 비어 있음 → 몸 캡슐).
+- Gauntlet·Spinner·Wall·23호 `PlayInterruptFlashRpc` → `interruptFlash.PlayOnceOnSurface(EffectSurfaceCollider)`. 전역 `EffectManager.HitPointMode` 와 무관하게 항상 CameraDir. 프리팹 변경 없음.
+
 ## ▶▶ 작업 세션 (2026-10-08 · 민경(Claude) · **웰즈 드론 폭발 = FX_Drone_Explosion_Entry 일회 재생**, 브랜치 `feature/VFX`) — 구현 완료 · ⏳ Play 확인 · 🔴 경석 공유
 - `WellsDroneDataSO`: `explosionVfxPrefab`·`explosionColor`·`explosionGrowScale` 삭제(엔트리 칸 없음 — 카탈로그가 단일 출처). 예고 원 색(`circleOuterColor`·`circleFillColor`)은 유지(결정).
 - `WellsDroneAttack.ClientImpact`: 임시 폭발 원·Instantiate/Destroy 제거 → `EffectManager.Play(entry, 바닥, identity, scale = 폭발 반경 m)`. 프리팹이 반경 1m 저작 전제. 핸들 없음 → 취소돼도 터진 폭발은 끝까지 재생. `explosionDuration` 은 서버 쿨다운 대기만(연출 길이 무관).
