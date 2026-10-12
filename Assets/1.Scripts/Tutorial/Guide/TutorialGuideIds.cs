@@ -28,9 +28,7 @@ public static class TutorialGuideIds
 
     public const string Z2Intro = "TUT_Z2_INTRO";
     public const string Z2Goal = "TUT_Z2_GOAL";
-    public const string Z2Nudge = "TUT_Z2_NUDGE";
-    public const string Z2Q = "TUT_Z2_Q";
-    public const string Z2E = "TUT_Z2_E";
+    // v8: TUT_Z2_Q_* · TUT_Z2_E_* · TUT_Z2_NUDGE 는 호출하지 않는다(§2.4·§7.2-7 — 존2 캐릭터별 Q/E 안내 제거). 문구 SO 에 남은 행은 지우지 않는다.
 
     public const string Z3Intro = "TUT_Z3_INTRO";
     public const string Z3PracticeNote = "TUT_Z3_PRACTICE_NOTE";
@@ -71,9 +69,7 @@ public static class TutorialGuideIds
         Z1Passive, Z1Passive + "_PALADIN", Z1Passive + "_GUNNER", Z1Passive + "_ASSASSIN",
         Z1Q, Z1Q + "_GUNNER", Z1E, Z1E + "_PALADIN", Z1E + "_GUNNER", Z1E + "_ASSASSIN",
         Z1Rmb, Z1R, Z1R + "_ASSASSIN", Z1Go,
-        Z2Intro, Z2Goal, Z2Nudge,
-        Z2Q, Z2Q + "_PALADIN", Z2Q + "_GUNNER", Z2Q + "_ASSASSIN",
-        Z2E, Z2E + "_PALADIN", Z2E + "_GUNNER", Z2E + "_ASSASSIN",
+        Z2Intro, Z2Goal,
         Z3Intro, Z3PracticeNote, Z3Goal, Z3Gunner, Z3Miss, Z3Early, Z3FirstSuccess, Z3Hint, Z3Real, Z3Boss,
         Z4Lore, Z4TimerHint, Z4Start, Z4PanelIntro, Z4PanelGoal, Z4PanelFirst, Z4Bridge, Z4Midboss,
         Z4CounterRemind, Z4Ult, Z4Ult + "_ASSASSIN", Z4Clear, Z4GoBoss,

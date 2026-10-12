@@ -82,12 +82,12 @@ MonoBehaviour:
     durationSeconds: 6
     sfx: {fileID: 0}
   - id: TUT_Z2_INTRO
-    text: "\uC801\uC774 \uAE68\uC5B4\uB0A9\uB2C8\uB2E4! <b>Q \xB7 E</b> \uC2A4\uD0AC\uB85C
-      \uC801\uC744 \uC18C\uD0D5\uD558\uC138\uC694."
+    text: "\uC801\uC774 \uAE68\uC5B4\uB0A9\uB2C8\uB2E4! \uBAA8\uB4E0 \uC801\uC744
+      \uCC98\uCE58\uD558\uC138\uC694."
     durationSeconds: 4
     sfx: {fileID: 0}
   - id: TUT_Z2_GOAL
-    text: "Q \uC0AC\uC6A9 {q} \xB7 E \uC0AC\uC6A9 {e} \xB7 \uC801 \uCC98\uCE58 {n}/{total}"
+    text: "\uC801 \uCC98\uCE58 {n}/{total}"
     durationSeconds: 6
     sfx: {fileID: 0}
   - id: TUT_Z2_NUDGE

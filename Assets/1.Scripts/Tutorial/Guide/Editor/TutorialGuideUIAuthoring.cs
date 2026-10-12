@@ -56,6 +56,8 @@ public static class TutorialGuideUIAuthoring
         ("TUT_Z1_CHECK_RMB", "우클릭 스킬", DefaultSeconds),
         ("TUT_Z1_CHECK_R", "R 궁극기", DefaultSeconds),
         (TutorialCorridor1CooldownFlow.CooldownResetId, "모든 스킬의 재사용 대기시간이 초기화되었습니다.", 5f),
+        (TutorialGuideIds.Z2Intro, "적이 깨어납니다! 모든 적을 처치하세요.", 4f),
+        (TutorialGuideIds.Z2Goal, "적 처치 {n}/{total}", DefaultSeconds),
     };
 
     [MenuItem("Tools/UI/튜토리얼 안내 문구 v8 적용")]
