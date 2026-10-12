@@ -85,7 +85,9 @@ Update this file when a term becomes important enough that future agents or team
 - Codex 교차검증: v0.162 에서 샌드박스가 안 떠 실패 → **Codex 데스크톱 앱을 끄면 동작**(10-12 확인, 절차 = 경석 로컬 규칙).
 - ⚠️ 에디터 `Unexpected error in Burst compilation … Library\BurstCache\JIT\*.dll, error code 4551` = **Windows Smart App Control 이 서명 없는 Burst JIT DLL 차단**(코드 무결성 로그 3077, 경석 PC 09-18~ 9개). 코드 문제 아님 — 해당 잡만 Burst 대신 일반 C# 으로 돈다(에디터 성능만 영향). 끄려면 Windows 보안에서 Smart App Control 해제(⚠️ 한 번 끄면 OS 재설치 전엔 다시 못 켬).
 
-**다음**: 보스 수정사항(경석).
+**10-12 추가**: 보스 수정 3건 완료·푸시(돌진 예고 파랑 `de2df265` · 송전기 노랑 아웃라인 + 벽 아니면 취약 유지 `4fabedb3`, [PLAN-boss-1012.md](PLAN-boss-1012.md)). 이어서 `origin/development`(`25723503`, 123커밋) 병합 + SVN **r420** · 핀 415 → **420**(dev 코드가 r416 `F_KeyIcon`·r420 `SlowMotion` 시트를 요구 — dev 핀 415 는 부족했다). r410 대시 아이콘 `.meta` 2개 트리 충돌 → 서버 guid. Codex 머지 전 교차검증 "진행해도 됨". 컴파일 error CS 0 · 전투 EditMode 108/2(기존 실패 2).
+- ⚠️ dev 데이터로 23호 **취약 4 → 8초**(HP 2,000 → 10,000 · 공격력 10 → 45). 「벽 아니면 취약 유지」와 합쳐져 취약이 최대 8초 — Play 체감 확인 필요.
+- ⚠️ `TwentyThree_Solo.prefab` `GlobalObjectIdHash` 변경 — 머지 전 빌드와 섞어 멀티 테스트 금지.
 
 ## ▶▶ 이전 인수인계 (2026-10-06~08 · 경석(Claude))
 
