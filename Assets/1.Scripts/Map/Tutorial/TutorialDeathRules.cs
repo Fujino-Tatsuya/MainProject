@@ -17,6 +17,8 @@ using UnityEngine;
 ///    <see cref="PlayerLifeCycleController.ServerDeathKeepsSoul"/> 를 건다.
 ///    G11 뒤는 기존 규칙 — 목숨 0 이면 PermanentDead(관전), 전원이면 PartyWipeWatcher 결과 화면.
 ///  · 부활 지점 = 지금 단계 구간의 안전한 지점(<see cref="TutorialRevivePointRules"/>) — 격자 후보를 바닥·점유 검사로 거른 뒤 고른다.
+///    그 플레이어의 뒤 배리어 너머(지나온 최전방 구간보다 뒤 · 지난 배리어 앞면에서 여유 미만)는 빼고, 단계 구간이 그보다 뒤면 올린다(C2).
+///  · 추락 복구의 스폰 폴백(존1)이 그 플레이어의 뒤 배리어 너머면 같은 규칙의 안전 지점을 대신 준다(<see cref="PlayerSafePointTracker.ReturnPointFallback"/>).
 ///  · 보스방 이동 카운트다운(<see cref="BossTeleportManager.IsCountdownActive"/> — 패드·타이머 만료 강제 이동 공통)이 보이면
 ///    대기 부활을 즉시·그 자리로 바꾼다. 튜토리얼 구간 밖(보스방)에 있는 사람도 그 자리에서 되살린다(옛 구간으로 끌고 가지 않음).
 ///  · 보스방 도착(<see cref="BossTeleportManager.AlivePlayersArrived"/>/<see cref="BossTeleportManager.ArrivalAborted"/>) 또는
@@ -47,9 +49,11 @@ public sealed class TutorialDeathRules : MonoBehaviour
     private TutorialDirector _director;
     private TutorialDeathRulesModel _model;
     private TutorialAreaTracker _areas;
+    private List<TutorialBarrierSpec> _barrierSpecs;
     private BossTeleportManager _teleport;
     private NetworkManager _nm;
     private System.Func<ulong, bool> _keepsSoul;
+    private System.Func<ulong, Vector3, Vector3?> _fallFallback;
     private bool _finished;
     private int _groundMask;
     private int _obstacleMask;
@@ -101,6 +105,8 @@ public sealed class TutorialDeathRules : MonoBehaviour
             Edit.LogWarning("[Tutorial] 사망 목적지 훅이 이미 걸려 있다 — 튜토리얼 규칙으로 덮는다.", this);
         _keepsSoul = KeepsSoul;
         PlayerLifeCycleController.ServerDeathKeepsSoul = _keepsSoul;
+        _fallFallback = FallReturnFallback;
+        PlayerSafePointTracker.ReturnPointFallback = _fallFallback;
 
         BuildAreas();
         Edit.Log($"[Tutorial] 사망 규칙 켜짐 — {reviveDelaySeconds:0.#}초 뒤 자동 부활 · 무적 {reviveInvulnerabilitySeconds:0.#}초 · " +
@@ -114,6 +120,9 @@ public sealed class TutorialDeathRules : MonoBehaviour
         if (_keepsSoul != null && PlayerLifeCycleController.ServerDeathKeepsSoul == _keepsSoul)
             PlayerLifeCycleController.ServerDeathKeepsSoul = null;
         _keepsSoul = null;
+        if (_fallFallback != null && PlayerSafePointTracker.ReturnPointFallback == _fallFallback)
+            PlayerSafePointTracker.ReturnPointFallback = null;
+        _fallFallback = null;
         BindTeleport(null);
     }
 
@@ -123,6 +132,21 @@ public sealed class TutorialDeathRules : MonoBehaviour
         _areas = new TutorialAreaTracker();
         if (!TutorialAreaLayout.TryBuild(stage != null ? stage.transform : null, _areas, out string error))
             Edit.LogWarning($"[Tutorial] 사망 규칙: 구간 계산 실패 — {error}. 안전 지점을 못 찾으면 그 자리에서 부활한다.", this);
+        // 개인 뒤 배리어 앞면 여유 판정용 — 디렉터·TutorialBarriers 와 같은 구간·같은 규칙이라 같은 모양.
+        _barrierSpecs = TutorialBarrierRules.BuildSpecs(
+            _areas, TutorialBarrierRules.DefaultThickness, TutorialBarrierRules.DefaultSideOverlap, out _);
+    }
+
+    /// <summary>
+    /// [서버, 추락 복구 스폰 폴백 대체] 안전지점 큐가 모두 실패했고 스폰(존1)이 그 플레이어의 뒤 배리어 너머일 때 —
+    /// 부활 지점과 같은 규칙으로 그 플레이어 기준 지금 단계 구간의 안전 지점을 준다. 못 찾으면 null(스폰 위치).
+    /// </summary>
+    private Vector3? FallReturnFallback(ulong clientId, Vector3 fallPoint)
+    {
+        if (_finished || _director == null || !_director.IsTutorialActive) return null;
+        if (!TryFindRevivePoint(clientId, fallPoint, out Vector3 point, out _, out TutorialArea area)) return null;
+        Edit.Log($"[Tutorial] client {clientId} 추락 복구 — 스폰이 뒤 배리어 너머라 {area} 안전 지점 {point} 으로.", this);
+        return point;
     }
 
     /// <summary>튜토리얼 규칙으로 새 사망을 받는가.</summary>
@@ -260,7 +284,7 @@ public sealed class TutorialDeathRules : MonoBehaviour
         string where = "그 자리";
         if (!inPlace)
         {
-            if (TryFindRevivePoint(here, out target, out bool safe, out TutorialArea area))
+            if (TryFindRevivePoint(clientId, here, out target, out bool safe, out TutorialArea area))
                 where = $"{area} {(safe ? "안전 지점" : "안전 지점 없음 → 몬스터에서 가장 먼 지점")} {target}";
             else
             {
@@ -309,7 +333,7 @@ public sealed class TutorialDeathRules : MonoBehaviour
         return mask;
     }
 
-    private bool TryFindRevivePoint(Vector3 deathPos, out Vector3 point, out bool safe, out TutorialArea area)
+    private bool TryFindRevivePoint(ulong clientId, Vector3 deathPos, out Vector3 point, out bool safe, out TutorialArea area)
     {
         point = deathPos;
         safe = false;
@@ -320,16 +344,20 @@ public sealed class TutorialDeathRules : MonoBehaviour
         float floorY = stage != null ? stage.transform.position.y : deathPos.y;
         int mask = OpenedGateMask();
         TutorialStep step = _director.Step;   // 지금 단계 구간 = 단계 기준(배리어 기준이 상한) — S12
+        // 개인 뒤 배리어(C2) — 그 플레이어가 지나온 최전방 구간 이상만, 지난 배리어 앞면에서 여유 이상만(로컬 콜라이더 끼임 방지).
+        int passed = _director.GetBackBarrierMaskServer(clientId);
+        float clearance = _director.BackBarrierClearance;
 
         _candidates.Clear();
         _candidateY.Clear();
-        foreach (TutorialArea a in TutorialRevivePointRules.AreaOrder(step, mask))
+        foreach (TutorialArea a in TutorialRevivePointRules.AreaOrder(step, mask, passed))
         {
             if (!_areas.TryGetArea(a, out TutorialRect rect)) continue;
             _grid.Clear();
             TutorialRevivePointRules.SampleGrid(rect, candidateSpacing, candidateInset, _grid);
             foreach ((float x, float z) in _grid)
             {
+                if (TutorialBackBarrierRules.IsNearPassedFace(_barrierSpecs, a, x, z, passed, clearance)) continue;
                 if (!TryResolveStandPoint(x, z, floorY, out float y)) continue;
                 _candidates.Add(new TutorialRevivePoint(x, z, a));
                 _candidateY.Add(y);
@@ -337,7 +365,7 @@ public sealed class TutorialDeathRules : MonoBehaviour
         }
 
         CollectThreats();
-        if (!TutorialRevivePointRules.TrySelect(_candidates, _threats, step, mask, deathPos.x, deathPos.z, out int index, out safe))
+        if (!TutorialRevivePointRules.TrySelect(_candidates, _threats, step, mask, passed, deathPos.x, deathPos.z, out int index, out safe))
             return false;
 
         TutorialRevivePoint chosen = _candidates[index];

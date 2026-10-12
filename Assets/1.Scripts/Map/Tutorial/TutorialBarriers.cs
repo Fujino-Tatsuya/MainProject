@@ -17,7 +17,7 @@ using UnityEngine.AI;
 ///   몬스터 = NavMeshObstacle 카브(ZoneBridgeGate 와 같은 설정). Wall 은 NavMesh 베이크 수집 레이어(Default·Ground)가 아니라
 ///   재베이크(다리)에 섞이지 않는다.
 /// · 열기: 콜라이더·카브를 즉시 끄고 짧게 페이드(실제 시간 — 슬로우모션 무관) 뒤 비활성.
-/// · 추락 복구: <see cref="PlayerSafePointTracker.ReturnPointFilter"/> 에 닫힌 배리어 너머 구간 제외를 건다(서버가 부른다).
+/// · 추락 복구: <see cref="PlayerSafePointTracker.ReturnPointFilter"/> 에 닫힌 배리어 너머 구간 · 그 클라이언트의 뒤 배리어 너머 제외를 건다(서버가 부른다).
 /// · 개인 뒤 배리어: 서버가 판정해 복제한 '지난 배리어' 마스크(<see cref="TutorialDirector.GetBackBarrierMask"/>)를 <b>로컬 플레이어</b> 값으로 읽어
 ///   같은 자리에 Wall 콜라이더(카브 없음 — 몬스터는 안 막음)를 이 피어에서만 켠다. 이동이 오너 권한·오너 로컬 스윕이라 남의 플레이어엔 영향 없다.
 ///   켤 때 로컬 플레이어와 겹치면 다음 프레임까지 미룬다. 튜토리얼 Finished 면 끈다(<see cref="TutorialBackBarrierRules"/>).
@@ -45,6 +45,7 @@ public sealed class TutorialBarriers : MonoBehaviour
 
     readonly List<Entry> _entries = new List<Entry>();
     TutorialAreaTracker _areas;
+    List<TutorialBarrierSpec> _specs;
     Material _material;
     bool _built;
     int _backWanted;   // 켜야 할 뒤 배리어(게이트 비트)
@@ -77,7 +78,7 @@ public sealed class TutorialBarriers : MonoBehaviour
     {
         TutorialDirector.StateChanged -= Refresh;
         TutorialDirector.GateOpened -= HandleGateOpened;
-        if (PlayerSafePointTracker.ReturnPointFilter == (System.Func<Vector3, bool>)IsReturnPointAllowed)
+        if (PlayerSafePointTracker.ReturnPointFilter == (System.Func<ulong, Vector3, bool>)IsReturnPointAllowed)
             PlayerSafePointTracker.ReturnPointFilter = null;
         if (Active == this) Active = null;
     }
@@ -175,6 +176,7 @@ public sealed class TutorialBarriers : MonoBehaviour
         var root = new GameObject(RootName).transform;
         root.SetParent(transform, false);
 
+        _specs = specs;
         int openedAtBuild = 0;
         foreach (TutorialBarrierSpec s in specs)
         {
@@ -217,9 +219,11 @@ public sealed class TutorialBarriers : MonoBehaviour
     }
 
     /// <summary>
-    /// [서버, 추락 복구] 닫힌 배리어 너머(아직 못 들어가는 구간)의 점이면 false. 튜토리얼 구간 밖은 true.
+    /// [서버, 추락 복구] 닫힌 배리어 너머(아직 못 들어가는 구간)의 점이거나, <paramref name="clientId"/> 의 뒤 배리어 너머
+    /// (지나온 최전방 구간보다 뒤 · 지난 배리어 앞면에서 여유 미만)면 false. 튜토리얼 구간 밖은 true.
+    /// 마스크는 그 클라이언트의 서버 원본(<see cref="TutorialDirector.GetBackBarrierMaskServer"/>) — 호스트 로컬 플레이어 값이 아니다.
     /// </summary>
-    public bool IsReturnPointAllowed(Vector3 p)
+    public bool IsReturnPointAllowed(ulong clientId, Vector3 p)
     {
         TutorialDirector d = TutorialDirector.Instance;
         if (!_built || d == null || !d.IsTutorialActive) return true;
@@ -227,7 +231,8 @@ public sealed class TutorialBarriers : MonoBehaviour
         int mask = 0;
         for (int g = 0; g < TutorialFlowModel.GateCount; g++)
             if (d.IsGateOpen((TutorialGate)g)) mask |= 1 << g;
-        return TutorialBarrierRules.IsPointReachable(_areas, p.x, p.z, mask);
+        return TutorialBackBarrierRules.IsReturnPointAllowed(_areas, _specs, p.x, p.z, mask,
+                                                             d.GetBackBarrierMaskServer(clientId), d.BackBarrierClearance);
     }
 
     // ─── 생성(런타임·에디터 미리보기 공용) ─────────────────────────────────

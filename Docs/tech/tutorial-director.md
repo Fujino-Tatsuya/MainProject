@@ -122,14 +122,15 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
   Wall 은 거너 평타·차지 레이저 차단 레이어에도 있어 배리어 너머로는 거너 빔이 막힌다.
 - 몬스터: NavMeshObstacle 카브(Box, `carveOnlyStationary` 끔, 위아래 +2m — `ZoneBridgeGate` 와 같은 설정). Wall 은 NavMesh 베이크 수집(Default·Ground)에 안 들어가 다리 재베이크에 섞이지 않는다.
 - 추락 복구: 서버 `ResolveReturnPoint` 가 기준점·Ring 후보마다 `ReturnPointFilter` 를 부른다 → `TutorialBarrierRules.IsPointReachable` —
-  점을 품은 구간이 모두 '아직 못 들어가는 구간'(들어가는 배리어가 닫힘)이면 거부. 튜토리얼 구간 밖(보스방)은 허용. 스폰 폴백은 거르지 않는다(존1).
+  점을 품은 구간이 모두 '아직 못 들어가는 구간'(들어가는 배리어가 닫힘)이면 거부. 튜토리얼 구간 밖(보스방)은 허용. 스폰 폴백(존1)은 원래 거르지 않았다 —
+  C2 부터는 그 사람의 뒤 배리어 너머면 대체 지점을 쓴다(아래 '뒤 배리어 예외').
 - 타이머 만료·패드 이동은 `BossTeleportManager` 순간이동이라 배리어와 무관(§4 "만료 강제 이동은 G9·G10 과 무관").
 
 **개인 뒤 배리어 (15 후속 C1, 2026-10-12)** — 배리어를 지나 앞 구간으로 넘어간 플레이어 **본인만** 뒤로 못 돌아간다. 뒤에 남은 동료의 전진은 막지 않는다.
 > 코드: `TutorialBackBarrierRules`(순수 — 지남 판정·마스크 갱신·로컬 콜라이더 목록) · `TutorialDirector`(서버 판정·복제) · `TutorialBarriers`(각 피어 로컬 콜라이더).
 > 테스트: `TutorialBackBarrierRulesTests`(튜토리얼 러너). 디버그: `Tools/Tutorial/Debug/뒤 배리어 마스크 로그 (클라별)`.
 - **복제 필드**: `_players[i].BackBarrierMask`(int, `PlayerState`) — 지난 배리어, bit = `1 << (int)TutorialGate`(게이트 열림 마스크와 같은 배치). 한 번 켜지면 끄지 않는다.
-  읽기 = `GetBackBarrierMask(clientId)`(모든 피어, 복제값) · `GetBackBarrierMaskServer(clientId)`(서버 원본 — 스폰·부활·추락 복구·순간이동 예외(C2)가 쓸 조회 API).
+  읽기 = `GetBackBarrierMask(clientId)`(모든 피어, 복제값) · `GetBackBarrierMaskServer(clientId)`(서버 원본 — 부활·추락 복구 예외(C2, 아래)가 쓴다) · `BackBarrierClearance`.
 - **지남 판정(서버, `PollAreas` 주기)**: 게이트가 **열린** 배리어만. 배리어 박스의 진행 방향 쪽 면에서 `backBarrierClearance`(기본 0.75m — 플레이어 캡슐 반경 이상, 인스펙터) 이상 나아갔고
   너머 구간(입구 G1/G3/G6/G9 = 복도 n, 출구 G2/G4/G7/G10 = 다음 존·보스 진입) 사각형 안에 있을 때. 진행 방향은 `TutorialBarrierSpec.AlongX`·`Forward`.
   `Alive` 만 판정, 단계 Finished 뒤엔 판정 안 함. 새로 지나면 서버 로그 `[TutorialBarrier] 뒤 배리어 G* 닫힘 — client n`.
@@ -137,8 +138,25 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
   같은 자리의 `TutorialBarriers/BackBarrier_G*` 로 켠다 — Wall 레이어 BoxCollider + 같은 머티리얼, **NavMeshObstacle 없음**(몬스터는 안 막음).
   이동이 오너 권한·오너 로컬 스윕이라 이 피어의 콜라이더는 이 피어의 로컬 플레이어만 막는다(남의 플레이어는 복제 위치라 무관). 늦은 클라는 스폰 직후 `StateChanged` 로 같은 결과.
   켤 때 로컬 플레이어 콜라이더 bounds 와 겹치면 켜지 않고 다음 프레임(`Update`)에 다시 시도(끼임 방지).
-- 사망(Soul) 중에도 유지. 튜토리얼 비활성(비튜토리얼 스테이지)이면 안 만들고, 단계 Finished 면 끈다.
-- 🔴 아직 안 한 것(C2): 스폰·부활·추락 복구·순간이동 위치가 뒤 배리어 뒤쪽이 되는 경우의 예외 처리. 추락 복구 필터(`ReturnPointFilter`)는 여전히 '닫힌 게이트'만 본다.
+- 사망(Soul) 중에도 유지(Soul 도 같은 모터 스윕 — `PlayerMotor.ResolveObstacleMask` 가 Soul 에서도 Wall 을 남긴다). 튜토리얼 비활성(비튜토리얼 스테이지)이면 안 만들고, 단계 Finished 면 끈다.
+
+**뒤 배리어 예외 — 스폰·부활·추락 복구·순간이동 (15 후속 C2, 2026-10-12)** — 서버가 그 플레이어를 자기 뒤 배리어 너머로 옮기지 않는다. 기준은 늘 **그 clientId 의 서버 마스크**(`GetBackBarrierMaskServer`)다(호스트 로컬 값 아님).
+> 순수: `TutorialBackBarrierRules.FrontmostPassedArea`(지나온 최전방 구간 = 지난 배리어 중 가장 앞 것의 너머 구간, 없으면 존1) · `IsAreaBehind` ·
+> `IsNearPassedFace`(지난 배리어 너머 구간이면서 앞면에서 `BackBarrierClearance` 미만 — 로컬 콜라이더와 겹칠 자리) · `IsReturnPointAllowed`(추락 복구 후보).
+> 테스트: `TutorialBackBarrierRulesTests`·`TutorialDeathRulesTests`(튜토리얼 러너).
+- **자동 부활**(§11): 지금 단계 구간이 그 플레이어의 최전방 구간보다 뒤면 최전방 구간으로 올리고, 찾는 순서도 최전방 구간에서 멈춘다(`TutorialRevivePointRules.AreaOrder(step, mask, passed)`).
+  '가장 먼 후보' 폴백도 같은 순서 안에서만. 지난 배리어 앞면 여유 안 격자점은 버린다. G10 을 지난 사람만 보스 진입 존에서 부활(복도4 가 그 사람의 뒤 배리어 너머 — 갇힘 방지).
+  후보가 없으면 그 자리(사망 지점은 이미 그 사람이 서 있던 곳이라 뒤 배리어 앞쪽).
+- **추락 복구**: `PlayerSafePointTracker.ReturnPointFilter` 가 `Func<ulong, Vector3, bool>`(OwnerClientId, 후보)로 바뀌었다(null = 모두 허용, 기존과 같음).
+  `TutorialBarriers.IsReturnPointAllowed(clientId, p)` → `TutorialBackBarrierRules.IsReturnPointAllowed` — 닫힌 배리어 너머 + 그 사람의 뒤 배리어 너머 + 지난 배리어 앞면 여유 안을 거부. 마스크 0 이면 기존 `IsPointReachable` 과 같다.
+  스폰 폴백(존1)이 필터에 거부되면 `PlayerSafePointTracker.ReturnPointFallback`(서버, `TutorialDeathRules` 가 건다)이 부활과 같은 규칙의 안전 지점을 준다 — 못 찾으면 기존대로 스폰.
+  추락 사망(Soul 로 옮기기)도 같은 `ResolveReturnPoint` 라 함께 적용된다.
+- **순간이동 점검**: `TeleportAuthoritative` 경로 = 추락 복구(위 필터)·부활 재배치(`RelocateServer` — 위 부활 규칙)·스폰 포즈(`Player.PlaceOwnerAtSpawnClientRpc` — 최초 스폰 존1, 그때 마스크 0)·
+  보스방 이동(`BossTeleportManager` — 목적지가 튜토리얼 구간 밖이라 지남 판정·뒤 배리어와 무관, Finished 에서 끈다). 뒤 배리어 너머로 옮기는 경로는 없다.
+  옮긴 자리는 지난 배리어 앞면에서 여유(0.75m) 이상 + 부활 격자 inset 1m 라 로컬 뒤 배리어와 겹치지 않는다. 혹시 겹쳐도 C1 의 '켤 때 겹치면 다음 프레임' 재시도가 그대로 있다
+  (이미 켜진 콜라이더는 옮긴 뒤에도 끄지 않는다 — 갇힐 자리로는 애초에 안 보낸다).
+- 타이머 만료·패드 강제 이동·초기 스폰은 바뀐 것 없음(위 마스크 0·튜토리얼 밖 근거).
+- ⚠️ G10 을 지난 사람이 보스 진입 존에서 부활할 때 격자점이 패드 위일 수 있다(카운트다운 조건은 기존 패드 규칙 — 이 변경으로 달라지지 않음). Play 확인 항목.
 
 ## 8. 존 장부 · 몬스터 휴면 (S4)
 > 코드: `TutorialMonsterLedger`(순수 — 존 배정·클리어 규칙·필터) · `TutorialMonsterZones`(서버 — MonsterBase 참조·휴면 적용·사망 구독) · `TutorialDirector`(배선·API) ·
@@ -309,3 +327,6 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
   배리어 기준(열린 배리어로 들어갈 수 있는 가장 앞 구간)은 **상한**으로만 쓴다(둘 중 앞쪽). 두 기준이 어긋나던 구간 = 복도 출구(G2·G4·G7)가 열렸지만
   아직 아무도 다음 존에 안 들어간 동안(단계는 복도) — 배리어 기준이면 다음 존에서 되살아나 그 존 첫 진입·기상을 앞당겼다. 보스 진입·종료 단계는 복도4.
   테스트: `TutorialDeathRulesTests` 의 단계 기준 2건.
+- **개인 뒤 배리어(C2, §7)**: 부활 지점은 그 플레이어(clientId)가 지나온 최전방 구간 이상 — 단계 구간이 그보다 뒤면 올린다(`ResolveStageArea(step, mask, passed)`·`AreaOrder(step, mask, passed)`).
+  지난 배리어 앞면 여유(`BackBarrierClearance`) 안 격자점은 버린다. G10 을 지난 사람은 예외로 보스 진입 존. 마스크 0(뒤에 남은 동료)은 위 규칙 그대로.
+  같은 탐색이 추락 복구 스폰 폴백의 대체 지점(`PlayerSafePointTracker.ReturnPointFallback`)도 준다. 테스트: `TutorialDeathRulesTests` 의 뒤 배리어 4건.

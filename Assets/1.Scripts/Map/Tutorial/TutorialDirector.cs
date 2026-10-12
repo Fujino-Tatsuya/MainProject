@@ -241,6 +241,9 @@ public sealed class TutorialDirector : NetworkBehaviour
     public int GetBackBarrierMaskServer(ulong clientId) =>
         _backBarrierMasks.TryGetValue(clientId, out int m) ? m : 0;
 
+    /// <summary>개인 뒤 배리어 '지남' 여유(m) — 부활·추락 복구 후보도 지난 배리어 앞면에서 이만큼 떨어진 곳만 쓴다(로컬 콜라이더 끼임 방지).</summary>
+    public float BackBarrierClearance => backBarrierClearance;
+
     /// <summary>
     /// "동료 대기 중 (done/total) · 자동 진행 mm:ss" 표시용. 열 차례인 개인 게이트가 없으면 false.
     /// <paramref name="autoAdvanceRemaining"/> = 자동 진행까지 남은 초(첫 완료자 전이면 -1).
@@ -508,7 +511,7 @@ public sealed class TutorialDirector : NetworkBehaviour
     }
 
     // 개인 뒤 배리어(서버 판정 → _players[i].BackBarrierMask 복제). 살아 있는 플레이어만, Finished 뒤엔 안 본다.
-    // 스폰·부활·추락 복구·순간이동 예외는 아직 없다(C2) — 그쪽은 GetBackBarrierMaskServer 로 조회한다.
+    // 부활(TutorialDeathRules)·추락 복구(TutorialBarriers 필터)는 GetBackBarrierMaskServer 로 조회해 뒤 배리어 너머를 뺀다(C2).
     private bool UpdateBackBarriers(ulong clientId, Vector3 p, PlayerLifeState state)
     {
         if (_barrierSpecs == null || !TutorialAreaTracker.IsEligible(state) || _model.Step == TutorialStep.Finished) return false;

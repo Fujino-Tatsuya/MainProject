@@ -32,12 +32,72 @@ public static class TutorialBackBarrierRules
     public static bool Has(int mask, TutorialGate gate) => (mask & Bit(gate)) != 0;
 
     /// <summary>배리어 너머 구간 — 입구 = 복도 n, 출구 = 존 n+1(복도4 출구 = 보스 진입).</summary>
-    public static TutorialArea AreaBeyond(TutorialBarrierSpec spec)
+    public static TutorialArea AreaBeyond(TutorialBarrierSpec spec) => AreaBeyond(spec.Corridor, spec.AtEntry);
+
+    static TutorialArea AreaBeyond(int c, bool atEntry)
     {
-        int c = spec.Corridor;
         if (c < 1 || c > TutorialAreaTracker.CorridorCount) return TutorialArea.None;
         // 동선 순서: 존n = 2c−1, 복도n = 2c, 존n+1 = 2c+1
-        return (TutorialArea)(spec.AtEntry ? 2 * c : 2 * c + 1);
+        return (TutorialArea)(atEntry ? 2 * c : 2 * c + 1);
+    }
+
+    // ─── 스폰·부활·추락 복구 예외(C2) — 그 플레이어를 뒤 배리어 너머로 옮기지 않는다 ─────────
+
+    /// <summary>
+    /// 이 플레이어가 지나온 최전방 구간 = 지난 배리어 중 가장 앞 것의 너머 구간. 지난 배리어가 없으면 존1.
+    /// 이보다 뒤 구간은 그 플레이어에게 '뒤 배리어 너머'다.
+    /// </summary>
+    public static TutorialArea FrontmostPassedArea(int passedMask)
+    {
+        TutorialArea front = TutorialArea.Zone1;
+        for (int c = 1; c <= TutorialAreaTracker.CorridorCount; c++)
+        {
+            if (Has(passedMask, TutorialBarrierRules.GateOf(c, true)) && AreaBeyond(c, true) > front) front = AreaBeyond(c, true);
+            if (Has(passedMask, TutorialBarrierRules.GateOf(c, false)) && AreaBeyond(c, false) > front) front = AreaBeyond(c, false);
+        }
+        return front;
+    }
+
+    /// <summary>이 구간이 그 플레이어의 뒤 배리어 너머(지나온 최전방 구간보다 뒤)인가. 튜토리얼 밖(None)은 false.</summary>
+    public static bool IsAreaBehind(TutorialArea area, int passedMask) =>
+        area != TutorialArea.None && area < FrontmostPassedArea(passedMask);
+
+    /// <summary>
+    /// 이 점(<paramref name="area"/> 안)이 지난 배리어 앞면에 너무 가까운가 — 그 배리어의 너머 구간이면서 앞면에서 <paramref name="clearance"/> 미만.
+    /// 거기로 옮기면 그 플레이어의 로컬 뒤 배리어 콜라이더와 겹친다(끼임).
+    /// </summary>
+    public static bool IsNearPassedFace(IReadOnlyList<TutorialBarrierSpec> specs, TutorialArea area, float x, float z,
+                                        int passedMask, float clearance)
+    {
+        if (specs == null || passedMask == 0) return false;
+        for (int i = 0; i < specs.Count; i++)
+        {
+            TutorialBarrierSpec s = specs[i];
+            if (Has(passedMask, s.Gate) && AreaBeyond(s) == area && DistancePastFace(s, x, z) < clearance) return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// [서버, 추락 복구] 그 플레이어 기준 복귀 후보 허용 — 점을 품은 구간 중 하나라도 (들어갈 수 있고 · 뒤 배리어 너머가 아니고 ·
+    /// 지난 배리어 앞면에서 <paramref name="clearance"/> 이상)이면 허용. 품은 구간이 없으면(보스방 등) 허용.
+    /// <paramref name="passedMask"/> = 0 이면 <see cref="TutorialBarrierRules.IsPointReachable"/> 과 같다.
+    /// </summary>
+    public static bool IsReturnPointAllowed(TutorialAreaTracker areas, IReadOnlyList<TutorialBarrierSpec> specs, float x, float z,
+                                            int openedGateMask, int passedMask, float clearance)
+    {
+        if (areas == null) return true;
+        TutorialArea front = FrontmostPassedArea(passedMask);
+        bool inAny = false;
+        for (var a = TutorialArea.Zone1; a <= TutorialArea.BossEnter; a++)
+        {
+            if (!areas.TryGetArea(a, out TutorialRect r) || !r.Contains(x, z)) continue;
+            inAny = true;
+            if (a < front || !TutorialBarrierRules.IsAreaReachable(a, openedGateMask)) continue;
+            if (IsNearPassedFace(specs, a, x, z, passedMask, clearance)) continue;
+            return true;
+        }
+        return !inAny;
     }
 
     /// <summary>배리어 박스의 진행 방향 쪽 면에서 진행 방향으로 잰 거리(m). 면 뒤(돌아오는 쪽)면 음수.</summary>

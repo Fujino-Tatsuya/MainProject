@@ -349,4 +349,73 @@ public sealed class TutorialDeathRulesTests
 
         Assert.That(TutorialRevivePointRules.TrySelect(new List<TutorialRevivePoint>(), null, mask, 0f, 0f, out _, out _), Is.False);
     }
+
+    // ─── 개인 뒤 배리어 예외(15 후속 C2) ──────────────────────────────────
+
+    [Test]
+    public void 뒤배리어_없으면_기존_단계_기준과_같다()
+    {
+        int mask = MaskUpTo(TutorialGate.G2_Zone2Entry);
+        Assert.That(TutorialRevivePointRules.AreaOrder(TutorialStep.Corridor1, mask, 0),
+            Is.EqualTo(TutorialRevivePointRules.AreaOrder(TutorialStep.Corridor1, mask)));
+        Assert.That(TutorialRevivePointRules.ResolveStageArea(TutorialStep.Zone2, mask, 0), Is.EqualTo(TutorialArea.Zone2));
+    }
+
+    [Test]
+    public void 앞서간_사람은_지나온_최전방_구간_이상에서_부활()
+    {
+        int mask = MaskUpTo(TutorialGate.G3_Corridor2Entry);   // 파티 단계는 아직 Corridor1
+        int passed = Mask(TutorialGate.G1_Corridor1Entry, TutorialGate.G2_Zone2Entry);   // A 혼자 존2 까지
+        Assert.That(TutorialRevivePointRules.ResolveStageArea(TutorialStep.Corridor1, mask, passed), Is.EqualTo(TutorialArea.Zone2),
+            "단계 구간(복도1)이 뒤 배리어 너머 → 존2 로 올린다");
+        Assert.That(TutorialRevivePointRules.AreaOrder(TutorialStep.Corridor1, mask, passed), Is.EqualTo(new[] { TutorialArea.Zone2 }),
+            "복도1·존1 은 그 사람의 뒤 배리어 너머 — 찾지 않는다");
+
+        Assert.That(TutorialRevivePointRules.AreaOrder(TutorialStep.Zone3Fight, MaskUpTo(TutorialGate.G4_Zone3Entry), passed),
+            Is.EqualTo(new[] { TutorialArea.Zone3, TutorialArea.Corridor2, TutorialArea.Zone2 }), "단계가 더 앞이면 단계 기준 — 최전방 구간에서 멈춘다");
+    }
+
+    [Test]
+    public void 뒤배리어_너머_후보는_폴백에서도_쓰지_않는다()
+    {
+        int mask = MaskUpTo(TutorialGate.G2_Zone2Entry);
+        int passed = Mask(TutorialGate.G1_Corridor1Entry, TutorialGate.G2_Zone2Entry);
+        var c = new List<TutorialRevivePoint>
+        {
+            new TutorialRevivePoint(12f, 0f, TutorialArea.Corridor1),   // 사망 지점 옆이지만 뒤 배리어 너머
+            new TutorialRevivePoint(0f, 0f, TutorialArea.Zone1),
+            new TutorialRevivePoint(25f, 0f, TutorialArea.Zone2),       // 몬스터 반경 안
+        };
+        var threats = new List<TutorialThreat> { new TutorialThreat(25f, 0f, 100f) };
+
+        Assert.That(TutorialRevivePointRules.TrySelect(c, threats, TutorialStep.Corridor1, mask, passed, 12f, 0f, out int i, out bool safe), Is.True);
+        Assert.That(i, Is.EqualTo(2), "안전한 곳이 뒤에만 있어도 뒤로 보내지 않는다 — 최전방 구간에서 가장 먼 후보");
+        Assert.That(safe, Is.False);
+
+        c.RemoveAt(2);
+        Assert.That(TutorialRevivePointRules.TrySelect(c, null, TutorialStep.Corridor1, mask, passed, 12f, 0f, out _, out _), Is.False,
+            "최전방 구간 후보가 없으면 실패 → 호출자가 그 자리 부활");
+
+        Assert.That(TutorialRevivePointRules.TrySelect(c, null, TutorialStep.Corridor1, mask, 0, 12f, 0f, out i, out _), Is.True);
+        Assert.That(i, Is.EqualTo(0), "뒤에 남은 동료(마스크 0)는 기존대로 복도1");
+    }
+
+    [Test]
+    public void G10을_지난_사람만_보스진입에서_부활()
+    {
+        int mask = MaskUpTo(TutorialGate.G10_BossEnterAndPad);
+        int passed = MaskUpTo(TutorialGate.G10_BossEnterAndPad) & TutorialBackBarrierRules.AllBarrierMask;
+        var c = new List<TutorialRevivePoint>
+        {
+            new TutorialRevivePoint(-5f, 20f, TutorialArea.Corridor4),
+            new TutorialRevivePoint(-15f, 20f, TutorialArea.BossEnter),
+        };
+
+        Assert.That(TutorialRevivePointRules.TrySelect(c, null, TutorialStep.BossEnter, mask, passed, -15f, 20f, out int i, out _), Is.True);
+        Assert.That(i, Is.EqualTo(1), "복도4 는 그 사람의 G10 뒤 배리어 너머");
+
+        int passedToCorridor4 = passed & ~Mask(TutorialGate.G10_BossEnterAndPad);
+        Assert.That(TutorialRevivePointRules.TrySelect(c, null, TutorialStep.BossEnter, mask, passedToCorridor4, -15f, 20f, out i, out _), Is.True);
+        Assert.That(i, Is.EqualTo(0), "G10 을 안 지났으면 기존대로 보스 진입 존 제외(복도4)");
+    }
 }

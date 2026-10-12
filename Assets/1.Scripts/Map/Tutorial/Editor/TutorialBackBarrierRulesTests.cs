@@ -174,4 +174,69 @@ public sealed class TutorialBackBarrierRulesTests
         Assert.AreEqual(TutorialBarrierRules.BarrierCount, count);
         Assert.AreEqual("G1,G2", TutorialBackBarrierRules.Describe(Mask(TutorialGate.G1_Corridor1Entry, TutorialGate.G2_Zone2Entry)));
     }
+
+    // ─── 스폰·부활·추락 복구 예외(C2) ─────────────────────────────────────
+
+    [Test]
+    public void 지나온_최전방_구간()
+    {
+        Assert.AreEqual(TutorialArea.Zone1, TutorialBackBarrierRules.FrontmostPassedArea(0));
+        Assert.AreEqual(TutorialArea.Corridor1, TutorialBackBarrierRules.FrontmostPassedArea(Mask(TutorialGate.G1_Corridor1Entry)));
+        Assert.AreEqual(TutorialArea.Zone2, TutorialBackBarrierRules.FrontmostPassedArea(Mask(TutorialGate.G1_Corridor1Entry, TutorialGate.G2_Zone2Entry)));
+        Assert.AreEqual(TutorialArea.Zone4, TutorialBackBarrierRules.FrontmostPassedArea(Mask(TutorialGate.G7_Zone4Entry, TutorialGate.G1_Corridor1Entry)));
+        Assert.AreEqual(TutorialArea.BossEnter, TutorialBackBarrierRules.FrontmostPassedArea(Mask(TutorialGate.G10_BossEnterAndPad)));
+        Assert.AreEqual(TutorialArea.Zone1, TutorialBackBarrierRules.FrontmostPassedArea(Mask(TutorialGate.G8_TimerStart)), "배리어 없는 게이트 비트는 무시");
+
+        int passed = Mask(TutorialGate.G1_Corridor1Entry);
+        Assert.IsTrue(TutorialBackBarrierRules.IsAreaBehind(TutorialArea.Zone1, passed));
+        Assert.IsFalse(TutorialBackBarrierRules.IsAreaBehind(TutorialArea.Corridor1, passed));
+        Assert.IsFalse(TutorialBackBarrierRules.IsAreaBehind(TutorialArea.Zone2, passed));
+        Assert.IsFalse(TutorialBackBarrierRules.IsAreaBehind(TutorialArea.None, passed), "튜토리얼 밖(보스방)");
+    }
+
+    [Test]
+    public void 지난_배리어_앞면_여유_안이면_가깝다()
+    {
+        List<TutorialBarrierSpec> s = Specs(NewStage());
+        int g1 = Mask(TutorialGate.G1_Corridor1Entry);   // 앞면 x 10.4
+        Assert.IsTrue(TutorialBackBarrierRules.IsNearPassedFace(s, TutorialArea.Corridor1, 10.9f, 0f, g1, Clear));
+        Assert.IsFalse(TutorialBackBarrierRules.IsNearPassedFace(s, TutorialArea.Corridor1, 11.5f, 0f, g1, Clear));
+        Assert.IsFalse(TutorialBackBarrierRules.IsNearPassedFace(s, TutorialArea.Corridor1, 10.9f, 0f, 0, Clear), "안 지났으면 무관");
+        Assert.IsFalse(TutorialBackBarrierRules.IsNearPassedFace(s, TutorialArea.Zone2, 20.3f, 0f, g1, Clear), "G2 는 안 지남");
+        Assert.IsTrue(TutorialBackBarrierRules.IsNearPassedFace(s, TutorialArea.Zone2, 20.3f, 0f,
+                                                               g1 | Mask(TutorialGate.G2_Zone2Entry), Clear));
+    }
+
+    [Test]
+    public void 추락_복구_마스크_0이면_기존_허용과_같다()
+    {
+        TutorialAreaTracker t = NewStage();
+        List<TutorialBarrierSpec> s = Specs(t);
+        int opened = Mask(TutorialGate.G1_Corridor1Entry);
+        float[][] pts = { new[] { 5f, 0f }, new[] { 15f, 0f }, new[] { 20f, 0f }, new[] { 25f, 0f }, new[] { 100f, 100f } };
+        foreach (float[] p in pts)
+            Assert.AreEqual(TutorialBarrierRules.IsPointReachable(t, p[0], p[1], opened),
+                            TutorialBackBarrierRules.IsReturnPointAllowed(t, s, p[0], p[1], opened, 0, Clear), $"({p[0]},{p[1]})");
+    }
+
+    [Test]
+    public void 추락_복구는_그_사람의_뒤_배리어_너머를_거부한다()
+    {
+        TutorialAreaTracker t = NewStage();
+        List<TutorialBarrierSpec> s = Specs(t);
+        int opened = Mask(TutorialGate.G1_Corridor1Entry, TutorialGate.G2_Zone2Entry, TutorialGate.G3_Corridor2Entry);
+        int passed = Mask(TutorialGate.G1_Corridor1Entry, TutorialGate.G2_Zone2Entry);   // 존2 까지 간 사람
+
+        Assert.IsFalse(TutorialBackBarrierRules.IsReturnPointAllowed(t, s, 5f, 0f, opened, passed, Clear), "존1");
+        Assert.IsFalse(TutorialBackBarrierRules.IsReturnPointAllowed(t, s, 15f, 0f, opened, passed, Clear), "복도1");
+        Assert.IsFalse(TutorialBackBarrierRules.IsReturnPointAllowed(t, s, 20f, 0f, opened, passed, Clear), "복도1·존2 경계 — 앞면 위");
+        Assert.IsFalse(TutorialBackBarrierRules.IsReturnPointAllowed(t, s, 20.3f, 0f, opened, passed, Clear), "존2 지만 G2 앞면 여유 안(끼임)");
+        Assert.IsTrue(TutorialBackBarrierRules.IsReturnPointAllowed(t, s, 21f, 0f, opened, passed, Clear), "존2 여유 밖");
+        Assert.IsTrue(TutorialBackBarrierRules.IsReturnPointAllowed(t, s, 25f, 8f, opened, passed, Clear), "더 앞(복도2, 열림)");
+        Assert.IsFalse(TutorialBackBarrierRules.IsReturnPointAllowed(t, s, 25f, 20f, opened, passed, Clear), "닫힌 존3 은 그대로 거부");
+        Assert.IsTrue(TutorialBackBarrierRules.IsReturnPointAllowed(t, s, 100f, 100f, opened, passed, Clear), "튜토리얼 밖");
+
+        Assert.IsTrue(TutorialBackBarrierRules.IsReturnPointAllowed(t, s, 15f, 0f, opened, 0, Clear), "뒤에 남은 동료(마스크 0)는 복도1 허용");
+        Assert.IsTrue(TutorialBackBarrierRules.IsReturnPointAllowed(null, s, 5f, 0f, opened, passed, Clear), "구간 없음 — 막지 않는다");
+    }
 }

@@ -45,10 +45,16 @@ public sealed class PlayerSafePointTracker : NetworkBehaviour
     [SerializeField] private GameObject safePointMarkerPrefab;
 
     /// <summary>
-    /// [서버] 복귀 지점 추가 거름(전역). false 를 돌려준 지점은 기준점·Ring 후보 모두 버린다 — 스폰 폴백은 거르지 않는다.
-    /// 튜토리얼 배리어(<c>TutorialBarriers</c>)가 닫힌 배리어 너머 구간을 빼려고 건다. 없으면 모두 허용.
+    /// [서버] 복귀 지점 추가 거름(전역). 인자 = (복귀할 플레이어의 OwnerClientId, 후보 지점). false 를 돌려준 지점은 기준점·Ring 후보 모두 버린다.
+    /// 튜토리얼 배리어(<c>TutorialBarriers</c>)가 닫힌 배리어 너머·그 플레이어의 뒤 배리어 너머 구간을 빼려고 건다. 없으면 모두 허용.
     /// </summary>
-    public static System.Func<Vector3, bool> ReturnPointFilter;
+    public static System.Func<ulong, Vector3, bool> ReturnPointFilter;
+
+    /// <summary>
+    /// [서버] 스폰 폴백 대체(전역). 큐의 후보가 모두 실패했는데 스폰 위치마저 <see cref="ReturnPointFilter"/> 가 거부할 때만 묻는다
+    /// (인자 = OwnerClientId, 낙하 지점). null 을 돌려주거나 없으면 스폰 위치. 튜토리얼 사망 규칙(<c>TutorialDeathRules</c>)이 건다.
+    /// </summary>
+    public static System.Func<ulong, Vector3, Vector3?> ReturnPointFallback;
 
     private readonly Queue<Vector3> _safePointQueue = new Queue<Vector3>();
     private readonly List<GameObject> _markerInstances = new List<GameObject>();
@@ -196,6 +202,12 @@ public sealed class PlayerSafePointTracker : NetworkBehaviour
                 return resolved;
         }
 
+        if (!IsAllowedByFilter(_spawnPoint) && ReturnPointFallback?.Invoke(OwnerClientId, fallPoint) is Vector3 alt)
+        {
+            Edit.Log($"[Fall/진단] 큐의 모든 안전지점이 막혔고 스폰포인트도 거부돼 대체 지점으로 — {alt}", this);
+            return alt;
+        }
+
         Edit.Log($"[Fall/진단] 큐의 모든 안전지점이 막혀 스폰포인트로 폴백 — {_spawnPoint}", this);
         return _spawnPoint;
     }
@@ -222,7 +234,7 @@ public sealed class PlayerSafePointTracker : NetworkBehaviour
         return false;
     }
 
-    private static bool IsAllowedByFilter(Vector3 point) => ReturnPointFilter == null || ReturnPointFilter(point);
+    private bool IsAllowedByFilter(Vector3 point) => ReturnPointFilter == null || ReturnPointFilter(OwnerClientId, point);
 
     // 지점이 비어 있고(점유 X) 발밑에 지면이 있는지.
     private bool IsFreeStanding(Vector3 point)

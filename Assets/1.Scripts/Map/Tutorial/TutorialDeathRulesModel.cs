@@ -202,6 +202,8 @@ public readonly struct TutorialThreat
 ///
 ///  · 지금 단계 구간 = 디렉터 단계(<see cref="TutorialStep"/>)의 구간(S12). 단 열린 게이트로 들어갈 수 있는 가장 앞 구간을 넘지 않는다.
 ///    <b>보스 진입 존은 뺀다</b> — 진입 패드가 있어 거기서 되살아나면 그 순간 보스방 카운트다운이 시작될 수 있다(G10 뒤엔 복도4).
+///  · 개인 뒤 배리어(15 후속 C2): 그 플레이어가 지나온 최전방 구간보다 뒤로는 보내지 않는다 — 단계 구간이 그보다 뒤면 그 구간으로 올리고,
+///    찾는 순서도 거기서 멈춘다. G10 을 지난 플레이어만 예외로 보스 진입 존에서 되살아난다(복도4 는 그 플레이어의 뒤 배리어 너머).
 ///  · 찾는 순서 = 지금 단계 구간 → 앞 구간들(거꾸로). 그 구간에 안전한 후보가 있으면 사망 지점에 가장 가까운 것.
 ///  · 어디에도 안전한 후보가 없으면 위협에서 가장 먼 후보(여유가 같으면 앞 순서 구간).
 ///  · 닫힌 구간·보스 진입 후보는 쓰지 않는다. 후보가 없으면 실패(호출자가 그 자리 부활로 물러선다).
@@ -250,16 +252,36 @@ public static class TutorialRevivePointRules
         return byStep < byBarrier ? byStep : byBarrier;
     }
 
+    /// <summary>
+    /// 그 플레이어 기준 지금 단계 구간 — 단계 구간(<see cref="ResolveStageArea(TutorialStep, int)"/>)이 그 플레이어가 지나온 최전방 구간
+    /// (<see cref="TutorialBackBarrierRules.FrontmostPassedArea"/>)보다 뒤면 그 구간으로 올린다(뒤 배리어 너머에서 되살아나 갇히지 않게).
+    /// G10 을 지난 플레이어는 보스 진입 존이 된다(복도4 로 내리면 자기 뒤 배리어에 갇힌다).
+    /// </summary>
+    public static TutorialArea ResolveStageArea(TutorialStep step, int openedGateMask, int passedMask)
+    {
+        TutorialArea stage = ResolveStageArea(step, openedGateMask);
+        TutorialArea front = TutorialBackBarrierRules.FrontmostPassedArea(passedMask);
+        return front > stage ? front : stage;
+    }
+
     /// <summary>찾는 순서 — 배리어 기준 상한부터 존1 까지 거꾸로.</summary>
-    public static List<TutorialArea> AreaOrder(int openedGateMask) => AreaOrderFrom(ResolveStageArea(openedGateMask));
+    public static List<TutorialArea> AreaOrder(int openedGateMask) => AreaOrderFrom(ResolveStageArea(openedGateMask), TutorialArea.Zone1);
 
     /// <summary>찾는 순서 — 지금 단계 구간(단계 기준, <see cref="ResolveStageArea(TutorialStep, int)"/>)부터 존1 까지 거꾸로.</summary>
-    public static List<TutorialArea> AreaOrder(TutorialStep step, int openedGateMask) => AreaOrderFrom(ResolveStageArea(step, openedGateMask));
+    public static List<TutorialArea> AreaOrder(TutorialStep step, int openedGateMask) =>
+        AreaOrderFrom(ResolveStageArea(step, openedGateMask), TutorialArea.Zone1);
 
-    private static List<TutorialArea> AreaOrderFrom(TutorialArea stage)
+    /// <summary>
+    /// 찾는 순서(그 플레이어 기준) — <see cref="ResolveStageArea(TutorialStep, int, int)"/> 부터 그 플레이어가 지나온 최전방 구간까지 거꾸로.
+    /// 뒤 배리어 너머 구간은 넣지 않는다. <paramref name="passedMask"/> = 0 이면 <see cref="AreaOrder(TutorialStep, int)"/> 와 같다.
+    /// </summary>
+    public static List<TutorialArea> AreaOrder(TutorialStep step, int openedGateMask, int passedMask) =>
+        AreaOrderFrom(ResolveStageArea(step, openedGateMask, passedMask), TutorialBackBarrierRules.FrontmostPassedArea(passedMask));
+
+    private static List<TutorialArea> AreaOrderFrom(TutorialArea stage, TutorialArea floor)
     {
         var order = new List<TutorialArea>();
-        for (TutorialArea a = stage; a >= TutorialArea.Zone1; a--)
+        for (TutorialArea a = stage; a >= floor && a >= TutorialArea.Zone1; a--)
             order.Add(a);
         return order;
     }
@@ -315,6 +337,15 @@ public static class TutorialRevivePointRules
     public static bool TrySelect(IReadOnlyList<TutorialRevivePoint> candidates, IReadOnlyList<TutorialThreat> threats,
                                  TutorialStep step, int openedGateMask, float deathX, float deathZ, out int index, out bool safe) =>
         TrySelect(candidates, threats, AreaOrder(step, openedGateMask), deathX, deathZ, out index, out safe);
+
+    /// <summary>
+    /// 그 플레이어 기준(<see cref="AreaOrder(TutorialStep, int, int)"/>)으로 고른다 — 런타임(<see cref="TutorialDeathRules"/>)이 쓴다.
+    /// 뒤 배리어 너머 구간의 후보는 안전해도 '가장 먼 후보' 폴백에서도 쓰지 않는다.
+    /// </summary>
+    public static bool TrySelect(IReadOnlyList<TutorialRevivePoint> candidates, IReadOnlyList<TutorialThreat> threats,
+                                 TutorialStep step, int openedGateMask, int passedMask, float deathX, float deathZ,
+                                 out int index, out bool safe) =>
+        TrySelect(candidates, threats, AreaOrder(step, openedGateMask, passedMask), deathX, deathZ, out index, out safe);
 
     private static bool TrySelect(IReadOnlyList<TutorialRevivePoint> candidates, IReadOnlyList<TutorialThreat> threats,
                                   List<TutorialArea> order, float deathX, float deathZ, out int index, out bool safe)
