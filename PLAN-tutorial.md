@@ -60,6 +60,28 @@
 | **T2** UI | 특성 선택 창(모달 — `UiModalBlocker`, 그 플레이어만 입력 차단), 상단 설명 옵션, 창 아래 한 줄 옵션, 선택/자동 닫힘, 획득 특성 다시 보기(간단 목록) |
 | **T3** 마무리 | 외부 호출 인터페이스(`OpenSelection(clientId, corridorIndex, showIntro)`, `AutoPickAll()`, 선택 완료 이벤트) 확정·문서화 → S12 에서 연결 |
 
+## 3-1. v8 시나리오 반영 (브랜치 `feature/TutorialV8`, 2026-10-12)
+
+> 원본: `Docs/design/tutorial-scenario.md` v8(커밋 f58d7c8e). 사용자가 v8 문서로 사양을 확정 → 승인 대기 없이 진행(위임 지시). 레인 = claude-alt.
+> **사용자 확정(문서보다 우선)**: 목숨 차감 기준 G11 유지(문서 §2.5·§4·D5·§9 를 G11 로 고침) · 타이머 420초 유지 · Spawn Point 예외 새 작업 없음 ·
+> 존3 '간파 성공 → 파티 우클릭 쿨 초기화'는 튜토리얼 전용으로, 다른 레인의 '인터럽트 성공 시 우클릭 쿨 80% 감소' 위에 덮는다(쿨 장부 공개 API 사용).
+> 🔴 GameData.xlsx·SVN 무수정. Play 검증은 사람.
+
+| 단위 | 내용 | 완료 조건 |
+|---|---|---|
+| **V0** 문서 | 이 절 + 시나리오 G11 문구 정정 | 커밋 |
+| **V1** 존1 | 개인 항목 = 이동·대시·패시브 + **기본 공격·Q·E·R·우클릭 각각 실제 사용 1회**(적중 불필요, 허수아비 적중 5회 제거). 존1 전에 쓴 것도 인정, 사망으로 안 되돌림, 조준 취소·거부 제외. **G1 은 60초 교착 방지 제외**. 목표 패널 체크리스트(8줄)·동료 진행도(카운트다운 없음)·캐릭터별 힌트(§5 ID). 판정 훅: 기본 공격 = 각 기본 공격 서버 시작(새 `Player.ServerBasicAttackStarted`), Q·E·R·우클릭 = `ServerSkillUsed`(승인 = 실제 발동; R 은 대상 확정 뒤 승인), **거너 Q = 발사**(새 `GunnerChargeLaserSkill.ServerFired`) | 컴파일 0 · EditMode |
+| **V2** 복도1 쿨 초기화 | G1 뒤 각 플레이어의 **복도1 첫 진입**(구간 판정) 때 그 사람의 Q·E·R·우클릭(기본+대체 스킬 전부)·대시 충전 초기화 + 자막 `TUT_C1_COOLDOWN_RESET`(그 사람). 플레이어별 1회. 진행 중 행동(실행 중 스킬·어쌔신 변신·E 강화 대기)이 있으면 끝날 때까지 **초기화 예약 유지** 후 한 번 더 | 컴파일 0 · EditMode |
+| **V3** 존2 | 전멸만. Q·E 체크·Q/E 자막·슬롯 강조·넛지 제거, 목표 = 처치 n/total | 컴파일 0 · EditMode |
+| **V4** 존3 연계 | [간파 성공 → 취약(시간 종료 없음, 자율 이동·공격 정지) → 우클릭 밀치기 → 연습용 지정 벽 충돌 → 원위치 복귀] 파티 합계 3회, 마지막 복귀 완료 = G5 → 본 전투. 간파 성공마다 파티 전원 우클릭 쿨 1회 초기화. 복귀 중 무적·공격 없음·밀치기 무시·플레이어 몸 무시. 본 전투 전환 때 교육 제한 해제. 거너 전용 간파 자막 제거 | 컴파일 0 · EditMode |
+| **V5** 문구·문서 | `TutorialGuideIds`·시드·v8 문구 갱신 메뉴(빈 변형 행 규칙 유지), tutorial-zone1·zone3·corridors-zone2·director·qa·handoff-tutorial-spinner 갱신 | 커밋 · push |
+
+**결정(조사 결과 — 보고에도 적음)**
+- **23호 간파 게이지·제압·취약·벽 충돌은 재사용하지 않는다.** 전부 `TwentyThreeBoss` private(벽 = 보스방 `InvisibleBoundaries` 사각형 수학, 밀치기 = 보스 `ReceiveAttack` 안 자체 이동, 이벤트 없음). 같은 **방식**(공격자 반대 방향 고정 거리·시간 밀치기 + 벽 면 거리 수학 판정)만 튜토리얼 스피너봇 쪽에 순수 모델로 새로 둔다.
+- **플레이어 우클릭은 원래 몬스터를 밀지 않는다**(23호만 자기 코드에서 밀린다). 튜토리얼 스피너봇이 취약일 때 간파 적중(`AttackInfo.isInterruptAttack`)을 받으면 튜토리얼 컴포넌트가 민다 → `ISpinnerBotOverride` 에 멤버 1개(`NotifyInterruptHit`) + `SpinnerBot.TakeDamage` 호출 1줄. Q 넉백·일반 피해는 이 경로를 안 타서 연계로 안 센다.
+- 쿨 초기화는 **기존 공개 API 만** 쓴다: 스킬 = `PlayerSkillController.ReduceCooldownServer(skill, GetCooldownRemaining(skill))`(등록된 기본·대체 스킬 전부 — `GetSkillIndex` ≥ 0), 대시 = 새 `PlayerDashController.ServerResetChargeToFull`/`OwnerResetChargeToFull`(기존 `ResetChargeToOne` 짝). `PlayerSkillController` 는 고치지 않는다(80% 레인과 충돌 없음).
+- 유효 벽 = 존3 슬롯 사각형의 긴 변 중 스피너봇 스폰에 가까운 쪽(연습용 지정 벽). 연습 위치 = 스폰의 벽 방향 좌표만 벽에서 `몸 반경 + 4m`(밀치기 3m × 1~2회) 로 옮긴 점. 밀치기 거리·시간·접촉 여유는 인스펙터(D26 튜닝).
+
 ## 4. 리스크
 - 몬스터·타이머·보스 진입 훅은 경석 영역 — 최소 침습 + handoff 문서, 병합 전 경석 공유.
 - 4.MapScene·StageTutorial 프리팹 대량 변경 → 다른 사람 씬 변경과 충돌 가능. 브랜치에서만, 병합 전 development 재반영.
