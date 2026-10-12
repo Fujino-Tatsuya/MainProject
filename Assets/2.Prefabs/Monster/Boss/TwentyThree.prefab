@@ -341,37 +341,6 @@ MonoBehaviour:
   offset: {x: 0, y: 0, z: 0.3}
   scale: 1
   safetyTimeout: 5
---- !u!1 &1333707105081270622
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 5039377809358301124}
-  m_Layer: 0
-  m_Name: InterruptFlashVFX_Socket
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &5039377809358301124
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1333707105081270622}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 2.5, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1310215990090119965}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1395401825351531000
 GameObject:
   m_ObjectHideFlags: 0
@@ -1648,7 +1617,6 @@ Transform:
   - {fileID: 8255450641500357180}
   - {fileID: 1779754264015302644}
   - {fileID: 6822614871550549647}
-  - {fileID: 5039377809358301124}
   m_Father: {fileID: 1318083983018417692}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &6910924248356842902
