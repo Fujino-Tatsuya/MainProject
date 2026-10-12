@@ -36,6 +36,8 @@ internal static class DataTableEditModeTestRunner
         "^UiStringsAuthoringTests$", // 로컬라이징 L3 — 라벨 키 부착 멱등
         "^ErrorCatalogTests$", // 로컬라이징 L4 — 오류 코드 목록·ErrorCodes Export·시트 전용 행 경고
         "^ErrorDisplayTests$", // 로컬라이징 L4 — 오류 표시 형식·인자 치환·SessionError
+        "^UiStringsL4bTests$", // 로컬라이징 L4b — 상태이상 enum→키 전수·로딩 칸 순서·초 단위 한 곳
+        "^UiStringsL4bFormatTests$", // 로컬라이징 L4b — 로딩·툴팁·상태이상·결과·허수아비 포맷·폴백
     };
 
     const string Tag = "[DataTableTests]";

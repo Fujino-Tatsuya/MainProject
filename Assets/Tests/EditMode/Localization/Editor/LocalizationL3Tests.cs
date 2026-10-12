@@ -47,8 +47,8 @@ public sealed class UiStringsTests
     public void FormattedKeys_DeclareTheirPlaceholders()
     {
         Assert.That(UiStrings.GunnerHeatStage.Ko, Does.Contain("{stage}"));
-        Assert.That(UiStrings.AssassinTransformRemaining.Ko, Does.Contain("{sec}"));
-        Assert.That(UiStrings.AssassinTransformReleasable.Ko, Does.Contain("{sec}"));
+        Assert.That(UiStrings.AssassinTransformRemaining.Ko, Does.Contain("{time}"));
+        Assert.That(UiStrings.AssassinTransformReleasable.Ko, Does.Contain("{time}"));
         Assert.That(UiStrings.OverheadPlayerLabel.Ko, Does.Contain("{n}"));
     }
 }
@@ -115,7 +115,8 @@ public sealed class UiStringsFormatTests
     [Test]
     public void AssassinTransform_Row_FormatsSecondsInCurrentLanguage()
     {
-        UseRows(new StringTable.Entry("UI.AssassinHUD.TransformRemaining", "변신 {sec}초", "Form {sec}s"));
+        UseRows(new StringTable.Entry("UI.AssassinHUD.TransformRemaining", "변신 {time}", "Form {time}"),
+            new StringTable.Entry("UI.Unit.Seconds", "{sec}초", "{sec}s"));
         Loc.Current = GameLanguage.En;
 
         Assert.That(AssassinHUD.TransformLabelText(1.5f, false, false), Is.EqualTo("Form 1.5s"));
