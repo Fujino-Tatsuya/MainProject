@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using System.Collections.Generic;
+using System.Net;
 using TMPro;
 using Unity.Netcode;
 using UnityEngine;
@@ -115,7 +116,7 @@ public class LobbySceneManager : NemoSceneManager
         if (_sessionLauncher == null)
         {
             WarnMissingReference(nameof(NetworkSessionLauncher));
-            SetErrorMessage("네트워크 세션 런처를 찾을 수 없습니다.");
+            ShowError(ErrorCatalog.LobbyLauncherMissing);
             return;
         }
 
@@ -134,7 +135,7 @@ public class LobbySceneManager : NemoSceneManager
         else
         {
             Debug.Log("[SceneFlow] LobbySceneManager.StartHost failed");
-            SetErrorMessage("Host 시작에 실패했습니다. 포트가 이미 사용 중인지 확인하세요.");
+            ShowError(ErrorCatalog.NetHostStartFailed);
         }
     }
 
@@ -145,7 +146,7 @@ public class LobbySceneManager : NemoSceneManager
         if (_sessionLauncher == null)
         {
             WarnMissingReference(nameof(NetworkSessionLauncher));
-            SetErrorMessage("네트워크 세션 런처를 찾을 수 없습니다.");
+            ShowError(ErrorCatalog.LobbyLauncherMissing);
             return;
         }
 
@@ -164,7 +165,7 @@ public class LobbySceneManager : NemoSceneManager
         else
         {
             Debug.Log("[SceneFlow] LobbySceneManager.StartClient failed");
-            SetErrorMessage("Client 시작에 실패했습니다.");
+            ShowError(ErrorCatalog.NetClientStartFailed);
         }
     }
 
@@ -221,7 +222,7 @@ public class LobbySceneManager : NemoSceneManager
 
         if (string.IsNullOrWhiteSpace(joinCode))
         {
-            SetErrorMessage("Relay 조인코드를 입력하세요.");
+            ShowError(ErrorCatalog.RelayJoinCodeEmpty);
             return;
         }
 
@@ -242,7 +243,7 @@ public class LobbySceneManager : NemoSceneManager
         if (controller == null)
         {
             WarnMissingReference(nameof(LobbyUIController));
-            SetErrorMessage("로비 UI 컨트롤러를 찾을 수 없습니다.");
+            ShowError(ErrorCatalog.LobbyUiMissing);
             return;
         }
 
@@ -260,14 +261,14 @@ public class LobbySceneManager : NemoSceneManager
         if (_sessionLauncher == null)
         {
             WarnMissingReference(nameof(NetworkSessionLauncher));
-            SetErrorMessage("네트워크 세션 런처를 찾을 수 없습니다.");
+            ShowError(ErrorCatalog.LobbyLauncherMissing);
             return;
         }
 
         var controller = ResolveLobbyUIController();
         if (controller != null && !controller.CanStartGame)
         {
-            SetErrorMessage("모든 플레이어가 준비되지 않았습니다.");
+            ShowError(ErrorCatalog.LobbyNotAllReady);
             return;
         }
 
@@ -293,26 +294,26 @@ public class LobbySceneManager : NemoSceneManager
 
         if (string.IsNullOrEmpty(ipText))
         {
-            SetErrorMessage("IP를 입력하세요.");
+            ShowError(ErrorCatalog.NetIpEmpty);
             return false;
         }
 
         if (!IPAddress.TryParse(ipText, out _))
         {
-            SetErrorMessage($"IP 형식이 올바르지 않습니다: {ipText}");
+            ShowError(ErrorCatalog.NetIpInvalid, ErrorDisplay.Arg("ip", ipText));
             return false;
         }
 
         if (!ushort.TryParse(portText, out var port) || port == 0)
         {
-            SetErrorMessage($"Port는 1~65535 범위의 숫자여야 합니다: {portText}");
+            ShowError(ErrorCatalog.NetPortInvalid, ErrorDisplay.Arg("port", portText));
             return false;
         }
 
         if (_sessionLauncher == null)
         {
             WarnMissingReference(nameof(NetworkSessionLauncher));
-            SetErrorMessage("네트워크 세션 런처를 찾을 수 없습니다.");
+            ShowError(ErrorCatalog.LobbyLauncherMissing);
             return false;
         }
 
@@ -448,7 +449,7 @@ public class LobbySceneManager : NemoSceneManager
         {
             if (clientId != _networkManager.LocalClientId)
             {
-                SetErrorMessage($"플레이어(ClientId={clientId})의 연결이 끊어졌습니다.");
+                ShowError(ErrorCatalog.NetPlayerDisconnected, ErrorDisplay.Arg("clientId", clientId.ToString()));
             }
 
             return;
@@ -467,14 +468,16 @@ public class LobbySceneManager : NemoSceneManager
 
         if (rejectedByHost)
         {
-            SetErrorMessage(
-                $"호스트가 접속을 거절했습니다. 양쪽 빌드가 같은 버전인지 확인하세요. (내 {DescribeConfigHash()})");
+            ShowError(new SessionError(
+                ErrorCatalog.NetRejectedByHost,
+                ErrorDisplay.Arg("cfg", DescribeConfigHash()),
+                _networkManager.DisconnectReason));
         }
         else
         {
-            SetErrorMessage(_clientConnectPending
-                ? "서버 접속에 실패했습니다. IP/Port와 Host 상태를 확인하세요."
-                : "서버와의 연결이 끊어졌습니다.");
+            ShowError(new SessionError(
+                _clientConnectPending ? ErrorCatalog.NetConnectFailed : ErrorCatalog.NetDisconnected,
+                detail: _networkManager.DisconnectReason));
         }
         _clientConnectPending = false;
         SetSessionConnectPanel(true);
@@ -489,7 +492,7 @@ public class LobbySceneManager : NemoSceneManager
         NetworkDiagnosticsLog.LogError(
             $"{DiagTag}.HandleTransportFailure",
             $"connectPending={_clientConnectPending} relayPending={_relayStartPending}");
-        SetErrorMessage("네트워크 전송 오류가 발생했습니다.");
+        ShowError(ErrorCatalog.NetTransportFailure);
         _clientConnectPending = false;
         SetSessionConnectPanel(true);
         SetConnectControlsInteractable(true);
@@ -502,7 +505,7 @@ public class LobbySceneManager : NemoSceneManager
         if (_sessionLauncher == null)
         {
             WarnMissingReference(nameof(NetworkSessionLauncher));
-            SetErrorMessage("네트워크 세션 런처를 찾을 수 없습니다.");
+            ShowError(ErrorCatalog.LobbyLauncherMissing);
             return false;
         }
 
@@ -547,7 +550,7 @@ public class LobbySceneManager : NemoSceneManager
     {
         NetworkDiagnosticsLog.Log(
             $"{DiagTag}.HandleSessionStartCompleted",
-            $"success={result.Success} shareCode='{result.ShareCode}' reason='{result.FailureReason}' " +
+            $"success={result.Success} shareCode='{result.ShareCode}' error='{result.Error.LogText}' " +
             $"relayPending={_relayStartPending} hostPending={_relayHostPending}");
 
         if (!_relayStartPending)
@@ -561,7 +564,7 @@ public class LobbySceneManager : NemoSceneManager
 
         if (!result.Success)
         {
-            SetErrorMessage(result.FailureReason);
+            ShowError(result.Error);
             SetConnectControlsInteractable(true);
             SetRelayControlsInteractable(true);
             return;
@@ -870,6 +873,23 @@ public class LobbySceneManager : NemoSceneManager
         {
             Debug.Log($"[SceneFlow] LobbySceneManager.SetErrorMessage message={message}");
         }
+    }
+
+    /// <summary>오류 — 화면은 현재 언어 문구 + 작은 코드 표기, 로그는 코드 + 인자 + 상세(ErrorCodes 시트를 찾는 열쇠).</summary>
+    private void ShowError(SessionError error)
+    {
+        if (errorText != null)
+        {
+            errorText.text = error.DisplayText;
+        }
+
+        Debug.Log($"[SceneFlow] LobbySceneManager.ShowError {error.LogText}");
+        NetworkDiagnosticsLog.Log($"{DiagTag}.ShowError", error.LogText);
+    }
+
+    private void ShowError(ErrorCode code, IReadOnlyDictionary<string, string> args = null)
+    {
+        ShowError(new SessionError(code, args));
     }
 
     private void WarnIfMissing(Object reference, string referenceName)

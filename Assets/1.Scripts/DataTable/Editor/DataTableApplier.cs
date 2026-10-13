@@ -131,6 +131,7 @@ public static class DataTableApplier
             string typeNames = string.Join("/", types.Select(t => t.Name));
             var candidatesById = new Dictionary<string, List<Object>>(StringComparer.Ordinal);
             var failed = new HashSet<string>(StringComparer.Ordinal);
+            var localizedSkipped = new List<DataTableEntry>();
             foreach (DataTableEntry entry in sheet)
             {
                 if (failed.Contains(entry.AssetId))
@@ -195,13 +196,19 @@ public static class DataTableApplier
                     continue;
                 }
 
+                FieldInfo resolvedField = DataTableFields.Resolve(targetType, path);
+                if (property.propertyType == SerializedPropertyType.String && DataTableFields.IsLocalizedText(resolvedField))
+                {
+                    localizedSkipped.Add(entry); // 번역 문구는 Strings 시트가 원본 — 수치 시트 칸은 적용하지 않는다(병합 Export 가 옮긴다).
+                    continue;
+                }
+
                 if (written.TryGetValue((target, path), out DataTableEntry previous))
                 {
                     issues.Error(entry.Location, $"'{entry.AssetId}.{entry.Field}' 를 {previous.Location} 에서도 쓴다.");
                     continue;
                 }
 
-                FieldInfo resolvedField = DataTableFields.Resolve(targetType, path);
                 if (property.propertyType == SerializedPropertyType.String && !DataTableFields.IsTableText(resolvedField))
                 {
                     issues.Error(entry.Location,
@@ -241,6 +248,13 @@ public static class DataTableApplier
 
                 written[(target, path)] = entry;
                 writes.Add(new DataTableWrite(target, path, property.propertyType, value, entry));
+            }
+
+            if (localizedSkipped.Count > 0)
+            {
+                issues.Warning(localizedSkipped[0].Location,
+                    $"{sheet.Key}: 번역 문구 칸 {localizedSkipped.Count}개(예: {string.Join(", ", localizedSkipped.Take(3).Select(e => $"{e.AssetId}.{e.Field}"))})는 " +
+                    "Strings 시트가 원본이라 적용하지 않는다 — 병합 Export 가 Strings 로 옮기고 이 칸을 뺀다.");
             }
 
             foreach (Type type in types)

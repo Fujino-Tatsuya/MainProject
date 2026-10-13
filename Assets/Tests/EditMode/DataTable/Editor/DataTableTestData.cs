@@ -23,7 +23,8 @@ public sealed class DataTableTestData : ScriptableObject
     [DataTableIgnore] public Charge ignoredCharge;
     public float moveSpeed = 2.5f;
     public bool canDash = true;
-    [DataTableText] public string title = "base";
+    [DataTableText(Localize = false)] public string title = "base"; // 수치 시트 문자열 칸(번역 대상 아님)
+    [DataTableText] public string caption = "문구"; // 번역 문구 — Strings 전용, 수치 시트 템플릿·적용 밖
     public string animatorStateName = "Run";
     public Mode mode = Mode.Walk;
     public byte smallCount = 1;
