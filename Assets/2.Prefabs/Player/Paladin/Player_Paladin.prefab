@@ -2178,7 +2178,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::DashAfterimage
   modelRoot: {fileID: 0}
   includeStaticMeshes: 1
-  ghostMaterial: {fileID: 2100000, guid: c7a41f60d2b84e6a9c15d380be720127, type: 2}
+  ghostMaterial: {fileID: 2100000, guid: 208a59c6d2ce0228db962b8b26735bd2, type: 2}
   speedLines: {fileID: 7301928374650192902}
   spawnInterval: 0.05
   ghostLifetime: 0.5

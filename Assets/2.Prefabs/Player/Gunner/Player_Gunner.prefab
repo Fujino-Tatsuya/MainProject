@@ -6113,7 +6113,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::DashAfterimage
   modelRoot: {fileID: 6235178363960518833}
   includeStaticMeshes: 1
-  ghostMaterial: {fileID: 2100000, guid: 3b8f06d25a1e49c7ae04f31b96d2057c, type: 2}
+  ghostMaterial: {fileID: 2100000, guid: 219f7bf9b603e4e1e04a7774133b2f82, type: 2}
   speedLines: {fileID: 807663423485243698}
   spawnInterval: 0.05
   ghostLifetime: 0.5
