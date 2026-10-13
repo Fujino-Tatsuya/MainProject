@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 /// <summary>
 /// 튜토리얼 존1 흐름(S7) — 스폰 환영 · 이동 5m · 대시 · 허수아비 적중 5회 · 패시브 툴팁 1초 → 개인 체크 → G1.
@@ -188,6 +189,9 @@ public sealed class TutorialZone1Flow : MonoBehaviour
         foreach (Transform spot in _spots)
         {
             GameObject go = Instantiate(spots.DummyPrefab, spot.position, spot.rotation);
+            // OnEnable 시점은 맵 씬이 Additive 로 막 올라온 로딩 중이라 활성 씬 = LoadingScene 이다.
+            // 그대로 두면 로딩 씬 언로드 때 Spawn(true) 허수아비가 같이 파괴된다 → 자리(StageTutorial)의 씬으로 옮긴다.
+            SceneManager.MoveGameObjectToScene(go, spots.gameObject.scene);
             go.name = $"{spots.DummyPrefab.name}_{_dummies.Count}";
             var no = go.GetComponent<NetworkObject>();
             var unit = go.GetComponent<Unit>();
