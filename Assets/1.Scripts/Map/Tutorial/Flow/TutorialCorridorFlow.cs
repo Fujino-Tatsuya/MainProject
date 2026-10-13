@@ -265,11 +265,13 @@ public sealed class TutorialCorridorFlow : MonoBehaviour
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
     /// <summary>
-    /// [서버, 디버그 구간 스킵 — <see cref="TutorialSkipController"/>] 건너뛰는 복도의 특성 라운드를 정식 자동 획득 경로로 끝낸다:
-    /// 라운드를 아직 안 열었으면 접속자 전원에게 열고(<see cref="TutorialTraitDirector.StartOfferRoundServer(IEnumerable{ulong}, TutorialTraitRoundDisplay)"/>),
-    /// 미선택 전원 무작위 자동 획득(<see cref="AutoChooseRoundServer"/> → <see cref="TutorialTraitDirector.AutoChooseServer"/>) →
-    /// <see cref="HandleTraitChosenServer"/> 가 특성 체크를 보고한다. 고를 게 없던 사람(0장·특성 디렉터 없음)은 정식 흐름처럼 바로 체크한다.
-    /// 출구 게이트는 디렉터 모델이 전원 완료로 연다. 이 복도 체크가 켜진 인원 수가 아니라 자동 획득 수를 돌려준다.
+    /// [서버, 디버그 구간 스킵 — <see cref="TutorialSkipController"/>] 건너뛰는 복도의 특성 라운드를 <b>창 없이</b> 끝낸다:
+    /// 라운드를 아직 안 열었으면 제시 없이 열고(<see cref="TutorialTraitDirector.StartRoundWithoutOfferServer"/>), 아직 참가하지 않은 접속자는
+    /// 제시 없이 바로 무작위 1장 획득(<see cref="TutorialTraitDirector.GrantParticipantServer"/>) — 제시 번호가 안 올라 클라 창이 열렸다 닫히며 깜빡이지 않는다.
+    /// 이미 중간 지점에 도착해 창을 보고 있던 사람만 정식 자동 획득(<see cref="TutorialTraitDirector.AutoChooseAllPendingServer"/>)으로 창이 닫힌다.
+    /// 어느 쪽이든 <see cref="TutorialTraitDirector.ServerTraitChosen"/> → <see cref="HandleTraitChosenServer"/> 가 특성 체크를 보고한다.
+    /// 고를 게 없던 사람(0장·특성 디렉터 없음)은 정식 흐름처럼 바로 체크한다.
+    /// 출구 게이트는 디렉터 모델이 전원 완료로 연다. 이 복도 체크가 켜진 인원 수가 아니라 획득 수를 돌려준다.
     /// </summary>
     public int SkipRoundServer(int corridor)
     {
@@ -281,16 +283,19 @@ public sealed class TutorialCorridorFlow : MonoBehaviour
         {
             if (!_rounds.IsHandled(corridor))
             {
-                _clientScratch.Clear();
-                foreach (ulong id in _nm.ConnectedClientsIds) _clientScratch.Add(id);
+                // 라운드 번호를 복도에 먼저 묶는다 — 바로 뒤 획득 통지(HandleTraitChosenServer)가 이 복도로 체크를 보고하게.
                 int before = _traits.Round;
-                _traits.StartOfferRoundServer(_clientScratch, TutorialCorridorRules.DisplayOf(corridor));
+                _traits.StartRoundWithoutOfferServer(TutorialCorridorRules.DisplayOf(corridor));
                 _rounds.MarkStarted(corridor, _traits.Round != before ? _traits.Round : 0);
             }
             if (IsCurrentRound(corridor))
             {
-                AddAbsentParticipantsServer(corridor);
-                auto = _traits.AutoChooseAllPendingServer();
+                _clientScratch.Clear();
+                foreach (ulong id in _nm.ConnectedClientsIds) _clientScratch.Add(id);
+                foreach (ulong id in _clientScratch)
+                    if (!_traits.IsInRoundServer(id) && _traits.GrantParticipantServer(id) == TutorialTraitJoinResult.Granted)
+                        auto++;
+                auto += _traits.AutoChooseAllPendingServer();
             }
         }
         else

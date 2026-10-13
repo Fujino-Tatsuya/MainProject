@@ -321,7 +321,8 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
 - **권한**: 각 피어의 컨트롤러가 Alt+숫자를 읽는다. 호스트가 아니면 "호스트만" 토스트로 끝. 호스트는 `RequestSkip` → `RequestSkipServerRpc` — 서버가 보낸 사람 = 서버 자신(호스트)인지 다시 검증.
 - **판정**: 지금 구간 = 디렉터 `Step` 의 구간(`CurrentOf`). 목적 < 지금 = 뒤로 → 거부(토스트·로그). Finished = 거부. 같은 구간 = 게이트 없이 다시 옮기기만(Alt+0 은 존1 에서만 이 경우). 이전 스킵이 진행 중이면 거부.
 - **계획**(`TutorialSkipPlan.Build`): 목적 구간 입구 게이트(복도 n = G1/G3/G6/G9, 다음 존 = G2/G4/G7, 보스 진입·보스방 = G10)까지 **닫힌 게이트만** G1 부터 순서대로, 게이트마다 정식 경로 하나:
-  G1 = 접속자 전원 `ReportCheckServer`(G1Mask 전 항목) · G2/G4/G7/G10 = `TutorialCorridorFlow.SkipRoundServer`(라운드를 접속자 전원에게 열고 `AutoChooseAllPendingServer` 무작위 자동 획득 → 특성 체크 → 전원 완료) ·
+  G1 = 접속자 전원 `ReportCheckServer`(G1Mask 전 항목) · G2/G4/G7/G10 = `TutorialCorridorFlow.SkipRoundServer`(**제시 없이** 라운드를 열고(`StartRoundWithoutOfferServer`) 아직 참가하지 않은 접속자마다 `GrantParticipantServer` = 바로 무작위 1장 획득 → `ServerTraitChosen`(Auto) → 특성 체크 → 전원 완료.
+  제시 행·플레이어별 제시 번호(OfferSeq)가 생기지 않아 **클라 특성 창이 열리지 않는다**. 이미 중간 지점에 도착해 창을 보던 사람만 `AutoChooseAllPendingServer` 로 창이 닫힌다) ·
   G3/G6/G9 = 그 존 살아 있는 몬스터 전부 깨워 처치(`TutorialDebugActions.KillZoneMonsters` — 장부 클리어 → `RequestGateServer`, 0마리면 직접 요청) ·
   G5 = 연계 카운터를 목표까지 + `RequestGateServer(G5)`(존3 흐름이 '연습 없이' 본 모드로) · G8 = `StartBossTimerServer`(존4 흐름이 '설정 자막 없이' 전투 시작 + 420초 타이머).
   존3 규칙 파일은 고치지 않는다 — 디렉터·흐름의 기존 공개 API 만 부른다.
@@ -332,7 +333,8 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
 - **보스방(Alt+9)**: 보스 진입과 같은 계획·이동 뒤 `BossTeleportManager.ForceStartEncounter(3)` — 패드 이동 경로 그대로(카운트다운 → 산개 → 도착 ACK → `AlivePlayersArrived` → G11·Finished).
 - **화면**: Alt 를 **누르고 있는 동안만** 호스트 화면 오른쪽 위에 버튼 10개(지금 구간 ▶ · 뒤 구간·진행 중 비활성). 토글이 아닌 이유 — 단축키가 이미 Alt 조합이라 쓰려는 순간에만 보이고, 켜 둔 채 잊어 캡처·녹화에 남지 않는다.
 - **로그**: `[TutorialSkip] 시작 → X (단계 …) — 할 일 G1(…) → …` · `[TutorialSkip] → 구간 X (열린 게이트 G1·G2… · 특성 자동 획득 복도 1·2 · 이동 n명 · 단계 …)`.
-- **알려진 한계**: 건너뛴 복도1 첫 진입 쿨 초기화(체크리스트 아님)는 없다. 존4 패널·다리는 건너뛴다(카운터 0/4 그대로 — 중간보스는 다리 없이 처치). 건너뛴 복도의 특성 창은 같은 틱에 열렸다 닫혀 토스트만 보일 수 있다.
+- **알려진 한계**: 건너뛴 복도1 첫 진입 쿨 초기화(체크리스트 아님)는 없다. 존4 패널·다리는 건너뛴다(카운터 0/4 그대로 — 중간보스는 다리 없이 처치).
+  건너뛴 복도의 획득 토스트는 그 플레이어가 전에 제시받은 적이 있을 때만 뜬다(창 모델 규칙 — 제시 번호 0 이면 토스트 없음). 획득 아이콘은 항상 갱신된다.
   이동 지점은 몬스터 거리를 보지 않는다(전멸 리스폰과 같음 — 목적 존 몬스터는 아직 휴면).
 
 ## 11. 사망 규칙 (S11)
