@@ -12,4 +12,688 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 68a562a3113328847ae19c58e2cf3a27, type: 3}
   m_Name: StringTable
   m_EditorClassIdentifier: Assembly-CSharp::StringTable
-  entries: []
+  entries:
+  - key: FirstMeleePassive/tooltip.displayName
+    ko: "\uBD88\uAD74\uC758 \uC758\uC9C0"
+    en: Indomitable Will
+  - key: FirstMeleePassive/tooltip.description
+    ko: "{cooldownTime}\uCD08\uB9C8\uB2E4 \uB2E4\uC74C \uACF5\uACA9\uC774 {dmg}\uC758
+      \uCD94\uAC00 \uD53C\uD574\uB97C \uC785\uD788\uACE0 \uCD5C\uB300 \uCCB4\uB825\uC758
+      {healPercent}%\uB97C <style=heal>\uD68C\uBCF5</style>\uD569\uB2C8\uB2E4. \uC801\uC911
+      \uC2DC \uC7AC\uC0AC\uC6A9 \uB300\uAE30\uC2DC\uAC04\uC774 {hitCooldownReduction}\uCD08
+      \uAC10\uC18C\uD569\uB2C8\uB2E4."
+    en: Every {cooldownTime}s, your next attack deals {dmg} bonus damage and <style=heal>restores</style>
+      {healPercent}% of max HP. On hit, the cooldown is reduced by {hitCooldownReduction}s.
+  - key: FirstMeleeMainSkillData/tooltip.displayName
+    ko: "\uC9C4\uACA9\uC758 \uBC29\uD328"
+    en: Advancing Shield
+  - key: FirstMeleeMainSkillData/tooltip.subtitle
+    ko: "Q \uC2A4\uD0AC"
+    en: Q Skill
+  - key: FirstMeleeMainSkillData/tooltip.description
+    ko: "\uCD5C\uB300 {maxActiveDuration}\uCD08 \uB3D9\uC548 \uB3CC\uC9C4\uD558\uBA70
+      \uC801\uC744 \uBC00\uC5B4\uB0B4\uACE0, {tickInterval}\uCD08\uB9C8\uB2E4 {dmg}\uC758
+      \uD53C\uD574\uB97C \uC785\uD799\uB2C8\uB2E4."
+    en: Charge for up to {maxActiveDuration}s, pushing enemies back and dealing {dmg}
+      damage every {tickInterval}s.
+  - key: FirstMeleeSubSkillData/tooltip.displayName
+    ko: "\uC218\uD638\uC790\uC758 \uC758\uC9C0"
+    en: Guardian's Will
+  - key: FirstMeleeSubSkillData/tooltip.subtitle
+    ko: "E \uC2A4\uD0AC"
+    en: E Skill
+  - key: FirstMeleeSubSkillData/tooltip.description
+    ko: "\uC804\uBC29\uC758 \uACF5\uACA9\uC744 \uB9C9\uC73C\uBA74 \uBC18\uACA9\uD558\uC5EC
+      {dmg}\uC758 \uD53C\uD574\uB97C \uC785\uD799\uB2C8\uB2E4. \uBC18\uACA9 \uC911\uC5D0\uB294
+      \uD53C\uD574\uB97C \uBB34\uC2DC\uD569\uB2C8\uB2E4."
+    en: Blocking a frontal attack triggers a counterattack that deals {dmg} damage.
+      You ignore damage while counterattacking.
+  - key: FirstMeleeInterruptSkillData/tooltip.displayName
+    ko: "\uB2E8\uC8C4\uC758 \uBC29\uD328"
+    en: Shield of Condemnation
+  - key: FirstMeleeInterruptSkillData/tooltip.subtitle
+    ko: "\uC6B0\uD074\uB9AD \uC2A4\uD0AC"
+    en: Right-Click Skill
+  - key: FirstMeleeInterruptSkillData/tooltip.description
+    ko: "\uC804\uBC29\uC5D0 {dmg}\uC758 \uD53C\uD574\uB97C \uC785\uD799\uB2C8\uB2E4.
+      \uAC04\uD30C \uC131\uACF5 \uC2DC \uACF5\uACA9\uC744 \uB04A\uACE0 \uCDE8\uC57D
+      \uC0C1\uD0DC\uB85C \uB9CC\uB4E4\uBA70, \uCDE8\uC57D\uD55C \uC801\uC740 \uB4A4\uB85C
+      \uBC00\uC5B4\uB0C5\uB2C8\uB2E4."
+    en: Deals {dmg} damage in front of you. A successful Interrupt cancels the enemy's
+      attack and leaves it Vulnerable; Vulnerable enemies are knocked back.
+  - key: FirstMeleeUltimateSkillData/tooltip.displayName
+    ko: "\uCD5C\uD6C4\uC758 \uC2EC\uD310"
+    en: Final Judgment
+  - key: FirstMeleeUltimateSkillData/tooltip.subtitle
+    ko: "\uAD81\uADF9\uAE30"
+    en: Ultimate
+  - key: FirstMeleeUltimateSkillData/tooltip.description
+    ko: "\uC9C0\uC815\uD55C \uC704\uCE58\uC5D0 \uC2EC\uD310\uC758 \uC77C\uACA9\uC744
+      \uB0B4\uB824\uCCD0 {dmg}\uC758 \uAD11\uC5ED \uD53C\uD574\uB97C \uC785\uD799\uB2C8\uB2E4."
+    en: Bring down a strike of judgment on the target location, dealing {dmg} area
+      damage.
+  - key: GunnerHeatData/tooltip.displayName
+    ko: "\uC784\uACC4 \uCD9C\uB825"
+    en: Critical Output
+  - key: GunnerHeatData/tooltip.description
+    ko: "\uAE30\uBCF8 \uACF5\uACA9\uC73C\uB85C \uC5F4\uAE30\uAC00 \uC313\uC5EC \uD53C\uD574\uAC00
+      \uC99D\uAC00\uD569\uB2C8\uB2E4. \uC5F4\uAE30\uAC00 {maxHeat}\uC5D0 \uB3C4\uB2EC\uD558\uBA74
+      <style=overheat>\uACFC\uC5F4</style>\uB418\uC5B4 \uAE30\uBCF8 \uACF5\uACA9\uC774
+      \uC7A0\uAE41\uB2C8\uB2E4.\n\n\uAE30\uBCF8 \uACF5\uACA9\uC744 \uBA48\uCD94\uBA74
+      {coolDelay}\uCD08 \uD6C4 \uB0C9\uAC01\uB429\uB2C8\uB2E4. \uACFC\uC5F4\uC740
+      \uC5F4\uAE30\uAC00 \uBAA8\uB450 \uC2DD\uC73C\uBA74 \uD574\uC81C\uB429\uB2C8\uB2E4."
+    en: 'Basic attacks build Heat, increasing damage. At {maxHeat} Heat you <style=overheat>Overheat</style>
+      and basic attacks are locked.
+
+
+      Stop basic attacks to start cooling after
+      {coolDelay}s. Overheat ends once all Heat has cooled.'
+  - key: GunnerChargeLaserData/tooltip.displayName
+    ko: "\uC9D1\uC18D \uD3EC\uACA9"
+    en: Focused Blast
+  - key: GunnerChargeLaserData/tooltip.subtitle
+    ko: "Q \uC2A4\uD0AC"
+    en: Q Skill
+  - key: GunnerChargeLaserData/tooltip.description
+    ko: "\uC801\uC744 \uAD00\uD1B5\uD558\uB294 \uB808\uC774\uC800\uB85C {dmg}\uC758
+      \uD53C\uD574\uB97C \uC785\uD799\uB2C8\uB2E4. \uCDA9\uC804\uD560\uC218\uB85D
+      \uD53C\uD574\uC640 \uC0AC\uAC70\uB9AC\uAC00 \uC99D\uAC00\uD569\uB2C8\uB2E4.\n\n\uACBD\uB85C\uC0C1\uC758
+      \uC544\uAD70\uC5D0\uAC8C {shieldDuration}\uCD08\uAC04 \uAE30\uBCF8 {shieldAmount}\uC758
+      <style=shield>\uBCF4\uD638\uB9C9</style>\uC744 \uBD80\uC5EC\uD569\uB2C8\uB2E4.
+      \uACFC\uC5F4 \uB2E8\uACC4\uC5D0 \uB530\uB77C \uD53C\uD574\uC640 \uBCF4\uD638\uB9C9\uB7C9\uC774
+      \uC99D\uAC00\uD569\uB2C8\uB2E4."
+    en: 'Fire a piercing laser that deals {dmg} damage. Charging longer increases
+      damage and range.
+
+
+      Allies in its path gain a base {shieldAmount} <style=shield>shield</style>
+      for {shieldDuration}s. Damage and shield amount increase with your Overheat
+      stage.'
+  - key: GunnerCoolBackstepData/tooltip.displayName
+    ko: "\uAE34\uAE09 \uB0C9\uAC01"
+    en: Emergency Cooling
+  - key: GunnerCoolBackstepData/tooltip.subtitle
+    ko: "E \uC2A4\uD0AC"
+    en: E Skill
+  - key: GunnerCoolBackstepData/tooltip.description
+    ko: "\uB4A4\uB85C {distance}m \uB3C4\uC57D\uD558\uBA70 \uC5F4\uAE30\uB97C \uBAA8\uB450
+      \uC81C\uAC70\uD558\uACE0 <style=overheat>\uACFC\uC5F4</style>\uC744 \uD574\uC81C\uD569\uB2C8\uB2E4."
+    en: Leap back {distance}m, clearing all Heat and ending <style=overheat>Overheat</style>.
+  - key: GunnerInterruptData/tooltip.displayName
+    ko: "\uCDA9\uACA9 \uBC29\uCD9C"
+    en: Shock Burst
+  - key: GunnerInterruptData/tooltip.subtitle
+    ko: "\uC6B0\uD074\uB9AD \uC2A4\uD0AC"
+    en: Right-Click Skill
+  - key: GunnerInterruptData/tooltip.description
+    ko: "\uC804\uBC29\uC5D0 {dmg}\uC758 \uD53C\uD574\uB97C \uC785\uD788\uACE0 \uB4A4\uB85C
+      \uBB3C\uB7EC\uB0A9\uB2C8\uB2E4. \uAC04\uD30C \uC131\uACF5 \uC2DC \uACF5\uACA9\uC744
+      \uB04A\uACE0 \uCDE8\uC57D \uC0C1\uD0DC\uB85C \uB9CC\uB4E4\uBA70, \uCDE8\uC57D\uD55C
+      \uC801\uC740 \uB4A4\uB85C \uBC00\uC5B4\uB0C5\uB2C8\uB2E4."
+    en: Deals {dmg} damage in front of you and steps back. A successful Interrupt
+      cancels the enemy's attack and leaves it Vulnerable; Vulnerable enemies are
+      knocked back.
+  - key: GunnerTrackingLaserData/tooltip.displayName
+    ko: "\uADA4\uB3C4 \uCD94\uC801\uD3EC"
+    en: Orbital Tracker
+  - key: GunnerTrackingLaserData/tooltip.subtitle
+    ko: "\uAD81\uADF9\uAE30"
+    en: Ultimate
+  - key: GunnerTrackingLaserData/tooltip.description
+    ko: "{laserDuration}\uCD08\uAC04 \uC801\uC744 \uCD94\uC801\uD558\uB294 \uB808\uC774\uC800\uB85C
+      {damageInterval}\uCD08\uB9C8\uB2E4 {dmg}\uC758 \uAD11\uC5ED \uD53C\uD574\uB97C
+      \uC785\uD799\uB2C8\uB2E4. \uACFC\uC5F4 \uB2E8\uACC4\uC5D0 \uB530\uB77C \uD53C\uD574\uAC00
+      \uC99D\uAC00\uD558\uBA70, \uB300\uC0C1 \uC0AC\uB9DD \uC2DC \uB2E4\uB978 \uC801\uC744
+      \uCD94\uC801\uD569\uB2C8\uB2E4."
+    en: Fire a laser that tracks enemies for {laserDuration}s, dealing {dmg} area
+      damage every {damageInterval}s. Damage increases with your Overheat stage,
+      and it retargets another enemy when the target dies.
+  - key: AssassinStateData/tooltip.displayName
+    ko: "\uC0AC\uB0E5 \uBCF8\uB2A5"
+    en: Hunter's Instinct
+  - key: AssassinStateData/tooltip.description
+    ko: "\uD6C4\uBC29 \uACF5\uACA9\uC758 \uD53C\uD574\uAC00 \uC99D\uAC00\uD569\uB2C8\uB2E4.
+      \uC77C\uBC18 \uC0C1\uD0DC\uC5D0\uC11C \uAE30\uBCF8 \uACF5\uACA9\xB7Q\xB7\uAC15\uD0C0
+      \uC801\uC911 \uC2DC \uBD84\uB178\uB97C \uC5BB\uC73C\uBA70, \uBD84\uB178 {minTransformRage}
+      \uC774\uC0C1\uC774\uBA74 \uBCC0\uC2E0\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.\n\n\uBCC0\uC2E0
+      \uC911\uC5D0\uB294 \uBD84\uB178\uB97C \uC18C\uBAA8\uD558\uACE0 \uBAA8\uB4E0
+      \uACF5\uACA9\uC5D0 \uBC31\uC5B4\uD0DD \uD6A8\uACFC\uAC00 \uC801\uC6A9\uB429\uB2C8\uB2E4."
+    en: 'Attacks from behind deal more damage. In normal form, landing basic attacks,
+      Q, or Power Strikes grants Rage; at {minTransformRage}+ Rage you can transform.
+
+
+      While
+      transformed, Rage drains and every attack counts as a Back Attack.'
+  - key: AssassinDashStrikeSkillData/tooltip.displayName
+    ko: "\uADF8\uB9BC\uC790 \uB3CC\uD30C"
+    en: Shadow Breach
+  - key: AssassinDashStrikeSkillData/tooltip.subtitle
+    ko: "Q \uC2A4\uD0AC"
+    en: Q Skill
+  - key: AssassinDashStrikeSkillData/tooltip.description
+    ko: "{dashDistance}m \uB3CC\uC9C4\uD558\uBA70 \uACBD\uB85C\uC0C1\uC758 \uC801\uC5D0\uAC8C
+      {dmg}\uC758 \uD53C\uD574\uB97C \uC785\uD799\uB2C8\uB2E4. \uC801\uC744 \uD1B5\uACFC\uD558\uBA70
+      \uB3CC\uC9C4 \uC911 \uC800\uC9C0\uBD88\uAC00 \uC0C1\uD0DC\uAC00 \uB429\uB2C8\uB2E4."
+    en: Dash {dashDistance}m, dealing {dmg} damage to enemies in your path. You pass
+      through enemies and are Unstoppable while dashing.
+  - key: AssassinEnhanceSkillData/tooltip.displayName
+    ko: "\uC0AC\uB0E5\uAFBC\uC758 \uCE7C\uB0A0"
+    en: Hunter's Blade
+  - key: AssassinEnhanceSkillData/tooltip.subtitle
+    ko: "E \uC2A4\uD0AC"
+    en: E Skill
+  - key: AssassinEnhanceSkillData/tooltip.description
+    ko: "\uB2E4\uC74C \uAE30\uBCF8 \uACF5\uACA9\uC744 \uAC15\uD654\uD574 {dmg}\uC758
+      \uD53C\uD574\uB97C \uC785\uD799\uB2C8\uB2E4. \uC801\uC911 \uC2DC \uB354 \uB9CE\uC740
+      \uBD84\uB178\uB97C \uC5BB\uC2B5\uB2C8\uB2E4."
+    en: Empower your next basic attack to deal {dmg} damage. Landing it grants extra
+      Rage.
+  - key: AssassinCircleStrikeSkillData/tooltip.displayName
+    ko: "\uCE7C\uB0A0 \uD3ED\uD48D"
+    en: Blade Storm
+  - key: AssassinCircleStrikeSkillData/tooltip.subtitle
+    ko: "E \uC2A4\uD0AC \xB7 \uBCC0\uC2E0"
+    en: "E Skill \xB7 Transformed"
+  - key: AssassinCircleStrikeSkillData/tooltip.description
+    ko: "\uC6D0\uD615 \uBC94\uC704\uC758 \uC801\uC744 {hitCount}\uD68C \uBCA0\uC5B4
+      \uD0C0\uACA9\uB9C8\uB2E4 {dmg}\uC758 \uD53C\uD574\uB97C \uC785\uD799\uB2C8\uB2E4.
+      \uACF5\uACA9 \uC911 \uBB34\uC801 \uC0C1\uD0DC\uAC00 \uB429\uB2C8\uB2E4."
+    en: Slash enemies in a circular area {hitCount} times, dealing {dmg} damage per
+      hit. You are invulnerable while attacking.
+  - key: AssassinTransformSkillData/tooltip.displayName
+    ko: "\uD574\uBC29\uB41C \uBCF8\uB2A5"
+    en: Unleashed Instinct
+  - key: AssassinTransformSkillData/tooltip.subtitle
+    ko: "\uAD81\uADF9\uAE30"
+    en: Ultimate
+  - key: AssassinTransformSkillData/tooltip.description
+    ko: "\uBD84\uB178\uB97C \uC18C\uBAA8\uD558\uBA70 \uBCC0\uC2E0\uD574 \uAE30\uBCF8
+      \uACF5\uACA9\uACFC Q\xB7E\uB97C \uAC15\uD654\uD569\uB2C8\uB2E4. \uBD84\uB178\uAC00
+      \uC18C\uC9C4\uB418\uBA74 \uD574\uC81C\uB418\uBA70, \uC7AC\uC0AC\uC6A9\uD574
+      \uD574\uC81C\uD558\uBA74 \uB0A8\uC740 \uBD84\uB178\uB97C \uBCF4\uC874\uD569\uB2C8\uB2E4."
+    en: Transform by consuming Rage, empowering your basic attack, Q, and E. Ends
+      when Rage runs out; reactivate to revert early and keep your remaining Rage.
+  - key: AssassinTransformedDashStrikeSkillData/tooltip.displayName
+    ko: "\uAD11\uB780\uC758 \uB3CC\uD30C"
+    en: Frenzied Breach
+  - key: AssassinTransformedDashStrikeSkillData/tooltip.subtitle
+    ko: "Q \uC2A4\uD0AC \xB7 \uBCC0\uC2E0"
+    en: "Q Skill \xB7 Transformed"
+  - key: AssassinTransformedDashStrikeSkillData/tooltip.description
+    ko: "{dashDistance}m \uB3CC\uC9C4\uD558\uBA70 \uACBD\uB85C\uC0C1\uC758 \uC801\uC5D0\uAC8C
+      {dmg}\uC758 \uD53C\uD574\uB97C \uC785\uD799\uB2C8\uB2E4. \uC801\uC744 \uD1B5\uACFC\uD558\uBA70
+      \uB3CC\uC9C4 \uC911 \uC800\uC9C0\uBD88\uAC00 \uC0C1\uD0DC\uAC00 \uB429\uB2C8\uB2E4.
+      \uC801\uC911 \uC2DC \uC7AC\uC0AC\uC6A9 \uB300\uAE30\uC2DC\uAC04\uC774 {hitCooldownReduction}\uCD08
+      \uAC10\uC18C\uD569\uB2C8\uB2E4."
+    en: Dash {dashDistance}m, dealing {dmg} damage to enemies in your path. You pass
+      through enemies and are Unstoppable while dashing. On hit, the cooldown is
+      reduced by {hitCooldownReduction}s.
+  - key: AssassinInterruptSkillData/tooltip.displayName
+    ko: "\uD30C\uACE0\uB4DC\uB294 \uCE7C\uB0A0"
+    en: Piercing Blade
+  - key: AssassinInterruptSkillData/tooltip.subtitle
+    ko: "\uC6B0\uD074\uB9AD \uC2A4\uD0AC"
+    en: Right-Click Skill
+  - key: AssassinInterruptSkillData/tooltip.description
+    ko: "\uC804\uBC29\uC5D0 {dmg}\uC758 \uD53C\uD574\uB97C \uC785\uD799\uB2C8\uB2E4.
+      \uAC04\uD30C \uC131\uACF5 \uC2DC \uACF5\uACA9\uC744 \uB04A\uACE0 \uCDE8\uC57D
+      \uC0C1\uD0DC\uB85C \uB9CC\uB4E4\uBA70, \uCDE8\uC57D\uD55C \uC801\uC740 \uB4A4\uB85C
+      \uBC00\uC5B4\uB0C5\uB2C8\uB2E4."
+    en: Deals {dmg} damage in front of you. A successful Interrupt cancels the enemy's
+      attack and leaves it Vulnerable; Vulnerable enemies are knocked back.
+  - key: UI.Result.Character
+    ko: "\uCE90\uB9AD\uD130"
+    en: Character
+  - key: UI.Result.Damage
+    ko: "\uB370\uBBF8\uC9C0"
+    en: Damage
+  - key: UI.Result.Kills
+    ko: "\uCC98\uCE58"
+    en: Kills
+  - key: UI.Result.Counters
+    ko: "\uAC04\uD30C"
+    en: Interrupts
+  - key: UI.Result.Deaths
+    ko: "\uC0AC\uB9DD"
+    en: Deaths
+  - key: UI.AssassinHUD.EnhancedReady
+    ko: "E \uAC15\uD654 \uC900\uBE44"
+    en: E Ready
+  - key: UI.AssassinHUD.TransformRemaining
+    ko: "\uBCC0\uC2E0 {time}"
+    en: Transform {time}
+  - key: UI.AssassinHUD.TransformReleasable
+    ko: "\uBCC0\uC2E0 {time} \xB7 R \uD574\uC81C \uAC00\uB2A5"
+    en: "Transform {time} \xB7 R to Revert"
+  - key: UI.AssassinHUD.TransformEndPending
+    ko: "\uBCC0\uC2E0 \uC885\uB8CC \uB300\uAE30"
+    en: Transform Ending
+  - key: UI.GunnerHeat.Stage
+    ko: "\uACFC\uC5F4 {stage}\uB2E8\uACC4"
+    en: Heat Lv.{stage}
+  - key: UI.GunnerHeat.Overheated
+    ko: "\uACFC\uC5F4!"
+    en: Overheated!
+  - key: UI.Interact.Prompt
+    ko: "\uC0C1\uD638 \uC791\uC6A9"
+    en: Interact
+  - key: UI.Overhead.PlayerLabel
+    ko: P{n}
+    en: P{n}
+  - key: UI.Unit.Seconds
+    ko: "{sec}\uCD08"
+    en: '{sec}s'
+  - key: UI.Loading.Preparing
+    ko: Preparing...
+    en: Preparing...
+  - key: UI.Loading.Loading
+    ko: Loading...
+    en: Loading...
+  - key: UI.Loading.WaitingForPlayers
+    ko: Waiting for players...
+    en: Waiting for players...
+  - key: UI.Loading.Activating
+    ko: Starting...
+    en: Starting...
+  - key: UI.Loading.StandBy
+    ko: Stand by...
+    en: Stand by...
+  - key: UI.SkillTooltip.ShiftHint
+    ko: "\uC790\uC138\uD55C \uC815\uBCF4\uB97C \uBCF4\uB824\uBA74 [Shift] \uD0A4\uB97C
+      \uB204\uB974\uC138\uC694"
+    en: Press [Shift] for details
+  - key: UI.SkillTooltip.Error
+    ko: "[\uC624\uB958: {error}]"
+    en: '[Error: {error}]'
+  - key: UI.SkillTooltip.PassiveBadge
+    ko: Passive
+    en: Passive
+  - key: UI.Result.Cleared
+    ko: CLEAR
+    en: CLEAR
+  - key: UI.Result.Failed
+    ko: FAILED
+    en: FAILED
+  - key: UI.Result.Aborted
+    ko: ABORTED
+    en: ABORTED
+  - key: UI.Result.Survival
+    ko: "\uC0DD\uC874 \uC2DC\uAC04  {time}"
+    en: Survival Time  {time}
+  - key: UI.Result.PlayerSlot
+    ko: P{n}
+    en: P{n}
+  - key: UI.TrainingDummy.Hp
+    ko: '{hp} / {max}'
+    en: '{hp} / {max}'
+  - key: UI.Loading.Tip1
+    ko: "\uC73C\uC544\u314F\u314F\u314F\u314F"
+    en: Waaaaaah
+  - key: UI.Loading.Tip2
+    ko: "\uCEE4\uD53C\u3163\u3163\u3163\u3163"
+    en: Coffeeeee
+  - key: UI.Loading.Tip3
+    ko: "\uBC25 \uBB50 \uBA39\uC9C0...."
+    en: What's for lunch....
+  - key: UI.Loading.Ready1
+    ko: Enter...
+    en: Enter...
+  - key: UI.Loading.Ready2
+    ko: All players are ready.
+    en: All players are ready.
+  - key: UI.Loading.Ready3
+    ko: Starting...
+    en: Starting...
+  - key: UI.StatusEffect.Airborne
+    ko: Airborne
+    en: Airborne
+  - key: UI.StatusEffect.Stunned
+    ko: Stunned
+    en: Stunned
+  - key: UI.StatusEffect.Slowed
+    ko: Slowed
+    en: Slowed
+  - key: UI.StatusEffect.Rooted
+    ko: Rooted
+    en: Rooted
+  - key: UI.StatusEffect.Silenced
+    ko: Silenced
+    en: Silenced
+  - key: UI.StatusEffect.Debilitated
+    ko: Debilitated
+    en: Debilitated
+  - key: UI.StatusEffect.SuperArmor
+    ko: SuperArmor
+    en: SuperArmor
+  - key: UI.StatusEffect.MoveSpeedModifier
+    ko: MoveSpeed
+    en: MoveSpeed
+  - key: UI.StatusEffect.AttackDamageModifier
+    ko: AttackDamage
+    en: AttackDamage
+  - key: UI.StatusEffect.AttackSpeedModifier
+    ko: AttackSpeed
+    en: AttackSpeed
+  - key: UI.StatusEffect.DefenseModifier
+    ko: Defense
+    en: Defense
+  - key: UI.StatusEffect.MaxHpModifier
+    ko: MaxHp
+    en: MaxHp
+  - key: UI.StatusEffect.PassiveCharge
+    ko: PassiveCharge
+    en: PassiveCharge
+  - key: UI.StatusEffect.Focus
+    ko: Focus
+    en: Focus
+  - key: UI.Settings.Common.Off
+    ko: "\uB044\uAE30"
+    en: Off
+  - key: UI.Settings.Tab.Gameplay
+    ko: "\uAC8C\uC784\uD50C\uB808\uC774"
+    en: Gameplay
+  - key: UI.Settings.Tab.Graphics
+    ko: "\uADF8\uB798\uD53D"
+    en: Graphics
+  - key: UI.Settings.Tab.Controls
+    ko: "\uC870\uC791"
+    en: Controls
+  - key: UI.Settings.Tab.Audio
+    ko: "\uC624\uB514\uC624"
+    en: Audio
+  - key: UI.Settings.Gameplay.DamageNumbers
+    ko: "\uB370\uBBF8\uC9C0 \uC22B\uC790"
+    en: Damage Numbers
+  - key: UI.Settings.Gameplay.DamageNumbers.All
+    ko: "\uC804\uCCB4"
+    en: All
+  - key: UI.Settings.Gameplay.DamageNumbers.Mine
+    ko: "\uB0B4 \uAC83\uB9CC"
+    en: Mine Only
+  - key: UI.Settings.Gameplay.DamageNumbers.AllEmphasized
+    ko: "\uC804\uCCB4 (\uB0B4 \uAC83 \uAC15\uC870)"
+    en: All (Mine Emphasized)
+  - key: UI.Settings.Gameplay.ScreenShake
+    ko: "\uD654\uBA74 \uD754\uB4E4\uB9BC"
+    en: Screen Shake
+  - key: UI.Settings.Gameplay.Language
+    ko: "\uC5B8\uC5B4 (Language)"
+    en: Language
+  - key: UI.Settings.Gameplay.Performance
+    ko: "\uC131\uB2A5 \uD45C\uC2DC"
+    en: Performance Info
+  - key: UI.Settings.Gameplay.Performance.Fps
+    ko: FPS
+    en: FPS
+  - key: UI.Settings.Gameplay.Performance.FpsPing
+    ko: "FPS + \uD551"
+    en: FPS + Ping
+  - key: UI.Settings.Graphics.Resolution
+    ko: "\uD574\uC0C1\uB3C4"
+    en: Resolution
+  - key: UI.Settings.Graphics.Resolution.Recommended1440
+    ko: "2560 x 1440 (\uAD8C\uC7A5)"
+    en: 2560 x 1440 (Recommended)
+  - key: UI.Settings.Graphics.Resolution.Recommended1080
+    ko: "1920 x 1080 (\uAD8C\uC7A5)"
+    en: 1920 x 1080 (Recommended)
+  - key: UI.Settings.Graphics.Resolution.MonitorNative
+    ko: "\uBAA8\uB2C8\uD130 \uAE30\uBCF8 ({width} x {height})"
+    en: Monitor Default ({width} x {height})
+  - key: UI.Settings.Graphics.WindowMode
+    ko: "\uCC3D \uBAA8\uB4DC"
+    en: Window Mode
+  - key: UI.Settings.Graphics.WindowMode.Fullscreen
+    ko: "\uC804\uCCB4 \uD654\uBA74"
+    en: Fullscreen
+  - key: UI.Settings.Graphics.WindowMode.Borderless
+    ko: "\uD14C\uB450\uB9AC \uC5C6\uB294 \uCC3D"
+    en: Borderless Window
+  - key: UI.Settings.Graphics.WindowMode.Windowed
+    ko: "\uCC3D"
+    en: Windowed
+  - key: UI.Settings.Graphics.Apply
+    ko: "\uC801\uC6A9"
+    en: Apply
+  - key: UI.Settings.Graphics.FrameLimit
+    ko: "\uD504\uB808\uC784 \uC81C\uD55C"
+    en: Frame Limit
+  - key: UI.Settings.Graphics.FrameLimit.Unlimited
+    ko: "\uBB34\uC81C\uD55C"
+    en: Unlimited
+  - key: UI.Settings.Graphics.VSync
+    ko: "\uC218\uC9C1 \uB3D9\uAE30\uD654 (VSync)"
+    en: VSync
+  - key: UI.Settings.Graphics.Confirm
+    ko: "\uC774 \uD654\uBA74 \uC124\uC815\uC744 \uC720\uC9C0\uD560\uAE4C\uC694?\n{time}
+      \uB4A4 \uB418\uB3CC\uB9BD\uB2C8\uB2E4"
+    en: 'Keep these display settings?
+
+      Reverting in {time}'
+  - key: UI.Settings.Graphics.Keep
+    ko: "\uC720\uC9C0"
+    en: Keep
+  - key: UI.Settings.Graphics.Revert
+    ko: "\uB418\uB3CC\uB9AC\uAE30"
+    en: Revert
+  - key: UI.Settings.Graphics.Preset
+    ko: "\uD488\uC9C8 \uD504\uB9AC\uC14B"
+    en: Quality Preset
+  - key: UI.Settings.Graphics.Preset.Low
+    ko: "\uB0AE\uC74C"
+    en: Low
+  - key: UI.Settings.Graphics.Preset.Medium
+    ko: "\uC911\uAC04"
+    en: Medium
+  - key: UI.Settings.Graphics.Preset.High
+    ko: "\uB192\uC74C"
+    en: High
+  - key: UI.Settings.Graphics.Preset.Custom
+    ko: "\uC0AC\uC6A9\uC790 \uC9C0\uC815"
+    en: Custom
+  - key: UI.Settings.Graphics.RenderScale
+    ko: "\uB80C\uB354 \uC2A4\uCF00\uC77C"
+    en: Render Scale
+  - key: UI.Settings.Graphics.Shadows
+    ko: "\uADF8\uB9BC\uC790"
+    en: Shadows
+  - key: UI.Settings.Graphics.AntiAliasing
+    ko: "\uC548\uD2F0\uC568\uB9AC\uC5B4\uC2F1"
+    en: Anti-Aliasing
+  - key: UI.Settings.Graphics.PostEffects
+    ko: "\uBE14\uB8F8\xB7\uC0C9\uC218\uCC28"
+    en: Bloom & Chromatic Aberration
+  - key: UI.Settings.Graphics.VignetteSize
+    ko: "\uBE44\uB124\uD2B8 \uD06C\uAE30"
+    en: Vignette Size
+  - key: UI.Settings.Graphics.VignetteEdge
+    ko: "\uBE44\uB124\uD2B8 \uACBD\uACC4"
+    en: Vignette Edge
+  - key: UI.Settings.Controls.HoldSkillToggle
+    ko: "\uD640\uB4DC \uC2A4\uD0AC: \uD1A0\uAE00 \uBC29\uC2DD"
+    en: 'Hold Skill: Toggle'
+  - key: UI.Settings.Controls.DashMouse
+    ko: "\uB300\uC2DC: \uB9C8\uC6B0\uC2A4 \uBC29\uD5A5"
+    en: 'Dash: Mouse Direction'
+  - key: UI.Settings.Controls.Attack
+    ko: "\uAE30\uBCF8 \uACF5\uACA9"
+    en: Attack
+  - key: UI.Settings.Controls.Interrupt
+    ko: "\uAC04\uD30C"
+    en: Interrupt
+  - key: UI.Settings.Controls.SkillMain
+    ko: "\uC2A4\uD0AC 1 (\uBA54\uC778)"
+    en: Skill 1 (Main)
+  - key: UI.Settings.Controls.SkillSub
+    ko: "\uC2A4\uD0AC 2 (\uC11C\uBE0C)"
+    en: Skill 2 (Sub)
+  - key: UI.Settings.Controls.SkillUltimate
+    ko: "\uAD81\uADF9\uAE30"
+    en: Ultimate
+  - key: UI.Settings.Controls.Dash
+    ko: "\uB300\uC2DC"
+    en: Dash
+  - key: UI.Settings.Controls.Interact
+    ko: "\uC0C1\uD638\uC791\uC6A9"
+    en: Interact
+  - key: UI.Settings.Controls.ResetKeys
+    ko: "\uD0A4 \uAE30\uBCF8\uAC12\uC73C\uB85C \uCD08\uAE30\uD654"
+    en: Reset Keys to Default
+  - key: UI.Settings.Controls.PressKey
+    ko: "\uD0A4\uB97C \uB204\uB974\uC138\uC694... (Esc: \uCDE8\uC18C)"
+    en: 'Press a key... (Esc: cancel)'
+  - key: UI.Settings.Controls.Swapped
+    ko: "{action}\uC640(\uACFC) \uD0A4\uB97C \uB9DE\uBC14\uAFE8\uC2B5\uB2C8\uB2E4"
+    en: Swapped with {action}
+  - key: UI.Settings.Controls.ResetDone
+    ko: "\uD0A4\uB97C \uAE30\uBCF8\uAC12\uC73C\uB85C \uB418\uB3CC\uB838\uC2B5\uB2C8\uB2E4"
+    en: Keys reset to default
+  - key: UI.Settings.Audio.Master
+    ko: "\uC804\uCCB4"
+    en: Master
+  - key: UI.Settings.Audio.Bgm
+    ko: "\uBC30\uACBD\uC74C"
+    en: BGM
+  - key: UI.Settings.Audio.Sfx
+    ko: "\uD6A8\uACFC\uC74C"
+    en: SFX
+  - key: UI.Settings.Audio.MuteUnfocused
+    ko: "\uCC3D \uBE44\uD65C\uC131 \uC2DC \uC74C\uC18C\uAC70"
+    en: Mute When Unfocused
+  - key: Character.Player_Paladin.Name
+    ko: "\uD314\uB77C\uB518"
+    en: Paladin
+  - key: Character.Player_Gunner.Name
+    ko: "\uAC70\uB108"
+    en: Gunner
+  - key: Character.Player_Assassin.Name
+    ko: "\uC5B4\uC314\uC2E0"
+    en: Assassin
+  errors:
+  - key: LOBBY_LAUNCHER_MISSING
+    ko: "\uB124\uD2B8\uC6CC\uD06C \uC138\uC158 \uB7F0\uCC98\uB97C \uCC3E\uC744 \uC218
+      \uC5C6\uC2B5\uB2C8\uB2E4."
+    en: Network session launcher not found.
+  - key: LOBBY_UI_MISSING
+    ko: "\uB85C\uBE44 UI \uCEE8\uD2B8\uB864\uB7EC\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4."
+    en: Lobby UI controller not found.
+  - key: LOBBY_NOT_ALL_READY
+    ko: "\uBAA8\uB4E0 \uD50C\uB808\uC774\uC5B4\uAC00 \uC900\uBE44\uB418\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4."
+    en: Not all players are ready.
+  - key: NET_IP_EMPTY
+    ko: "IP\uB97C \uC785\uB825\uD558\uC138\uC694."
+    en: Enter an IP address.
+  - key: NET_IP_INVALID
+    ko: "IP \uD615\uC2DD\uC774 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4:
+      {ip}"
+    en: 'Invalid IP format: {ip}'
+  - key: NET_IPV4_INVALID
+    ko: "IPv4 \uD615\uC2DD\uC774 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4:
+      {ip}"
+    en: 'Invalid IPv4 format: {ip}'
+  - key: NET_PORT_INVALID
+    ko: "Port\uB294 1~65535 \uBC94\uC704\uC758 \uC22B\uC790\uC5EC\uC57C \uD569\uB2C8\uB2E4:
+      {port}"
+    en: 'Port must be a number from 1 to 65535: {port}'
+  - key: NET_PROVIDER_MISSING
+    ko: "{mode} \uC5F0\uACB0 \uBC29\uC2DD\uC758 \uD504\uB85C\uBC14\uC774\uB354\uAC00
+      \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4."
+    en: No provider is registered for the {mode} connection mode.
+  - key: NET_START_CANCELED
+    ko: "\uC138\uC158 \uC2DC\uC791\uC774 \uCDE8\uC18C\uB418\uC5C8\uC2B5\uB2C8\uB2E4."
+    en: Session start was canceled.
+  - key: NET_PREPARE_FAILED
+    ko: "\uC138\uC158 \uC5F0\uACB0 \uC900\uBE44\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4."
+    en: Failed to prepare the session connection.
+  - key: NET_START_EXCEPTION
+    ko: "\uC138\uC158 \uC2DC\uC791 \uC911 \uC608\uC678\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4."
+    en: An error occurred while starting the session.
+  - key: NET_START_FAILED
+    ko: "\uC138\uC158 \uC2DC\uC791\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4."
+    en: Failed to start the session.
+  - key: NET_HOST_START_FAILED
+    ko: "Host \uC2DC\uC791\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4. \uD3EC\uD2B8\uAC00
+      \uC774\uBBF8 \uC0AC\uC6A9 \uC911\uC778\uC9C0 \uD655\uC778\uD558\uC138\uC694."
+    en: Failed to start host. Check whether the port is already in use.
+  - key: NET_CLIENT_START_FAILED
+    ko: "Client \uC2DC\uC791\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4."
+    en: Failed to start client.
+  - key: NET_CONNECT_FAILED
+    ko: "\uC11C\uBC84 \uC811\uC18D\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4. IP/Port\uC640
+      Host \uC0C1\uD0DC\uB97C \uD655\uC778\uD558\uC138\uC694."
+    en: Failed to connect to the server. Check the IP/Port and host status.
+  - key: NET_REJECTED_BY_HOST
+    ko: "\uD638\uC2A4\uD2B8\uAC00 \uC811\uC18D\uC744 \uAC70\uC808\uD588\uC2B5\uB2C8\uB2E4.
+      \uC591\uCABD \uBE4C\uB4DC\uAC00 \uAC19\uC740 \uBC84\uC804\uC778\uC9C0 \uD655\uC778\uD558\uC138\uC694.
+      (\uB0B4 {cfg})"
+    en: 'The host rejected the connection. Make sure both builds are the same version.
+      (mine: {cfg})'
+  - key: NET_DISCONNECTED
+    ko: "\uC11C\uBC84\uC640\uC758 \uC5F0\uACB0\uC774 \uB04A\uC5B4\uC84C\uC2B5\uB2C8\uB2E4."
+    en: Disconnected from the server.
+  - key: NET_PLAYER_DISCONNECTED
+    ko: "\uD50C\uB808\uC774\uC5B4(ClientId={clientId})\uC758 \uC5F0\uACB0\uC774 \uB04A\uC5B4\uC84C\uC2B5\uB2C8\uB2E4."
+    en: Player (ClientId={clientId}) disconnected.
+  - key: NET_TRANSPORT_FAILURE
+    ko: "\uB124\uD2B8\uC6CC\uD06C \uC804\uC1A1 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4."
+    en: A network transport error occurred.
+  - key: RELAY_TRANSPORT_MISSING
+    ko: "Relay \uC5F0\uACB0\uC5D0 \uD544\uC694\uD55C UnityTransport\uB97C \uCC3E\uC744
+      \uC218 \uC5C6\uC2B5\uB2C8\uB2E4."
+    en: UnityTransport, required for Relay, was not found.
+  - key: RELAY_JOIN_CODE_EMPTY
+    ko: "Relay \uC870\uC778\uCF54\uB4DC\uB97C \uC785\uB825\uD558\uC138\uC694."
+    en: Enter a Relay join code.
+  - key: RELAY_JOIN_CODE_INVALID
+    ko: "Relay \uC870\uC778\uCF54\uB4DC\uAC00 \uC798\uBABB\uB418\uC5C8\uAC70\uB098
+      \uB9CC\uB8CC\uB418\uC5C8\uC2B5\uB2C8\uB2E4."
+    en: The Relay join code is invalid or has expired.
+  - key: RELAY_INACTIVE_PROJECT
+    ko: "Unity Dashboard\uC5D0\uC11C \uC774 \uD504\uB85C\uC81D\uD2B8\uC758 Relay
+      \uC11C\uBE44\uC2A4\uB97C \uD65C\uC131\uD654\uD558\uC138\uC694."
+    en: Enable the Relay service for this project in the Unity Dashboard.
+  - key: RELAY_UNAUTHORIZED
+    ko: "Relay \uC778\uC99D \uB610\uB294 \uD504\uB85C\uC81D\uD2B8 \uC811\uADFC \uAD8C\uD55C\uC774
+      \uC5C6\uC2B5\uB2C8\uB2E4."
+    en: No Relay authorization or project access.
+  - key: RELAY_PAYMENT_REQUIRED
+    ko: "Relay \uC0AC\uC6A9 \uD55C\uB3C4 \uB610\uB294 \uACB0\uC81C \uC124\uC815\uC744
+      \uD655\uC778\uD558\uC138\uC694."
+    en: Check your Relay usage limit or billing settings.
+  - key: RELAY_RATE_LIMITED
+    ko: "Relay \uC694\uCCAD \uD55C\uB3C4\uB97C \uCD08\uACFC\uD588\uC2B5\uB2C8\uB2E4.
+      \uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD558\uC138\uC694."
+    en: Too many Relay requests. Please try again shortly.
+  - key: RELAY_UNAVAILABLE
+    ko: "\uC0AC\uC6A9 \uAC00\uB2A5\uD55C Relay \uC11C\uBC84\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.
+      \uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD558\uC138\uC694."
+    en: No Relay server is available. Please try again shortly.
+  - key: RELAY_JOIN_REJECTED
+    ko: "Relay \uBC29\uC5D0 \uCC38\uAC00\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uC870\uC778\uCF54\uB4DC\uC640
+      \uBC29 \uC815\uC6D0\uC744 \uD655\uC778\uD558\uC138\uC694."
+    en: Cannot join the Relay room. Check the join code and room capacity.
+  - key: RELAY_HOST_FAILED
+    ko: "Relay \uBC29 \uC0DD\uC131\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4."
+    en: Failed to create a Relay room.
+  - key: RELAY_JOIN_FAILED
+    ko: "Relay \uBC29 \uCC38\uAC00\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4."
+    en: Failed to join the Relay room.
+  - key: UGS_PROJECT_NOT_LINKED
+    ko: "Unity Services \uD504\uB85C\uC81D\uD2B8 \uC5F0\uACB0(cloudProjectId)\uC774
+      \uC124\uC815\uB418\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4."
+    en: The Unity Services project link (cloudProjectId) is not set.
+  - key: UGS_INIT_FAILED
+    ko: "Unity Services \uCD08\uAE30\uD654 \uB610\uB294 \uC775\uBA85 \uB85C\uADF8\uC778\uC5D0
+      \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4."
+    en: Failed to initialize Unity Services or sign in anonymously.
+  - key: UGS_NOT_INITIALIZED
+    ko: "Unity Services\uAC00 \uCD08\uAE30\uD654\uB418\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4."
+    en: Unity Services is not initialized.
+  - key: UGS_INITIALIZING
+    ko: "Unity Services \uCD08\uAE30\uD654 \uC911\uC785\uB2C8\uB2E4. \uC7A0\uC2DC
+      \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD558\uC138\uC694."
+    en: Unity Services is initializing. Please try again shortly.
+  - key: UGS_NOT_SIGNED_IN
+    ko: "Unity Services \uC775\uBA85 \uB85C\uADF8\uC778\uC774 \uC644\uB8CC\uB418\uC9C0
+      \uC54A\uC558\uC2B5\uB2C8\uB2E4."
+    en: Unity Services anonymous sign-in has not completed.
