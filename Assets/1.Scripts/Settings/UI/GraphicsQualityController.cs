@@ -27,16 +27,17 @@ public sealed class GraphicsQualityController : MonoBehaviour
     void Awake()
     {
         Range(renderScaleSlider, GraphicsQualityConfig.MinRenderScale, 1f);
-        Range(vignetteSizeSlider, GraphicsQualityConfig.MinVignetteSize, GraphicsQualityConfig.MaxVignetteSize);
-        Range(vignetteFadeSlider, GraphicsQualityConfig.MinVignetteFade, GraphicsQualityConfig.MaxVignetteFade);
+        // 비네트는 화면에 0~100(50 = 기본)으로 보인다 — 슬라이더는 0~1, 배율 변환은 GraphicsQualityConfig(팀장 10-13).
+        Range(vignetteSizeSlider, 0f, 1f);
+        Range(vignetteFadeSlider, 0f, 1f);
 
         if (presetDropdown != null) presetDropdown.onValueChanged.AddListener(OnPreset);
         if (renderScaleSlider != null) renderScaleSlider.onValueChanged.AddListener(v => Change(b => b.q.renderScale = Snap(v)));
         if (shadowDropdown != null) shadowDropdown.onValueChanged.AddListener(i => Change(b => b.q.shadows = (ShadowSetting)i));
         if (antiAliasingDropdown != null) antiAliasingDropdown.onValueChanged.AddListener(i => Change(b => b.q.antiAliasing = (AntiAliasingSetting)i));
         if (postEffectsToggle != null) postEffectsToggle.onValueChanged.AddListener(on => Change(b => b.q.postEffects = on));
-        if (vignetteSizeSlider != null) vignetteSizeSlider.onValueChanged.AddListener(v => Change(b => b.q.vignetteSize = v));
-        if (vignetteFadeSlider != null) vignetteFadeSlider.onValueChanged.AddListener(v => Change(b => b.q.vignetteFade = v));
+        if (vignetteSizeSlider != null) vignetteSizeSlider.onValueChanged.AddListener(v => Change(b => b.q.vignetteSize = GraphicsQualityConfig.VignetteSizeFromSlider(Step(v))));
+        if (vignetteFadeSlider != null) vignetteFadeSlider.onValueChanged.AddListener(v => Change(b => b.q.vignetteFade = GraphicsQualityConfig.VignetteFadeFromSlider(Step(v))));
     }
 
     void OnEnable()
@@ -92,17 +93,21 @@ public sealed class GraphicsQualityController : MonoBehaviour
         if (shadowDropdown != null) shadowDropdown.SetValueWithoutNotify((int)q.shadows);
         if (antiAliasingDropdown != null) antiAliasingDropdown.SetValueWithoutNotify((int)q.antiAliasing);
         if (postEffectsToggle != null) postEffectsToggle.SetIsOnWithoutNotify(q.postEffects);
-        if (vignetteSizeSlider != null) vignetteSizeSlider.SetValueWithoutNotify(q.vignetteSize);
-        if (vignetteFadeSlider != null) vignetteFadeSlider.SetValueWithoutNotify(q.vignetteFade);
+        float sizeSlider = GraphicsQualityConfig.VignetteSizeToSlider(q.vignetteSize);
+        float fadeSlider = GraphicsQualityConfig.VignetteFadeToSlider(q.vignetteFade);
+        if (vignetteSizeSlider != null) vignetteSizeSlider.SetValueWithoutNotify(sizeSlider);
+        if (vignetteFadeSlider != null) vignetteFadeSlider.SetValueWithoutNotify(fadeSlider);
         SetText(renderScaleValue, Percent(q.renderScale));
-        SetText(vignetteSizeValue, Percent(q.vignetteSize));
-        SetText(vignetteFadeValue, Percent(q.vignetteFade));
+        SetText(vignetteSizeValue, Mathf.RoundToInt(sizeSlider * 100f).ToString());
+        SetText(vignetteFadeValue, Mathf.RoundToInt(fadeSlider * 100f).ToString());
         _refreshing = false;
     }
 
     // 렌더 스케일은 5% 단위 — 프리셋 판정(정확히 같음)이 슬라이더 미세값에 흔들리지 않게.
     static float Snap(float v) => Mathf.Round(v * 20f) / 20f;
     static string Percent(float v) => $"{Mathf.RoundToInt(v * 100f)}%";
+    // 0~100 정수 단위로 끊는다 — 표시 숫자와 저장값이 어긋나지 않게.
+    static float Step(float s01) => Mathf.Round(s01 * 100f) / 100f;
 
     static void SetText(TMP_Text t, string s) { if (t != null) t.text = s; }
 

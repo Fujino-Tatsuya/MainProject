@@ -96,7 +96,8 @@ public class HealthVignetteHUD : MonoBehaviour
     }
 
     // 설정창 그래픽 탭 "비네트 크기/경계"(팀장 10-13 — 안개 시야 디밍과 같이 조절). 코드로 만든 텍스처일 때만 적용된다.
-    // 크기 = 투명 영역 반경 배율(클수록 가운데가 넓게 보임 — 안개 시야와 같은 방향), 경계 = 투명→불투명 폭 배율.
+    // 크기 = 어두운 테두리 크기(클수록 테두리가 안쪽까지 — 투명 반경 × 1/크기, 안개 시야와 같은 방향), 경계 = 투명→불투명 폭 배율.
+    // ⚠️ 10-13 정정: 처음엔 투명 반경에 크기를 그대로 곱해 "줄이면 테두리가 커지는" 반대 방향이었다.
     private float appliedSizeScale = -1f;
     private float appliedFadeScale = -1f;
 
@@ -105,15 +106,14 @@ public class HealthVignetteHUD : MonoBehaviour
         if (vignetteSprite != null || image == null)
             return;
 
-        float size = GraphicsQualityConfig.VignetteSizeScale;
+        float size = GraphicsQualityConfig.VignetteOpenScale;
         float fade = GraphicsQualityConfig.VignetteFadeScale;
         if (generatedSprite != null && Mathf.Approximately(size, appliedSizeScale) && Mathf.Approximately(fade, appliedFadeScale))
             return;
 
         appliedSizeScale = size;
         appliedFadeScale = fade;
-        float inner = fallbackInnerRadius * size;
-        float outer = inner + Mathf.Max(0.01f, fallbackOuterRadius - fallbackInnerRadius) * fade;
+        VignetteSpriteFactory.ApplySettings(fallbackInnerRadius, fallbackOuterRadius, out float inner, out float outer);
         VignetteSpriteFactory.Destroy(generatedSprite);
         generatedSprite = VignetteSpriteFactory.CreateRadial("HealthVignette_Generated", fallbackTextureSize, inner, outer);
         image.sprite = generatedSprite;

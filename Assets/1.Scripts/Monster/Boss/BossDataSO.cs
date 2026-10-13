@@ -30,7 +30,7 @@ public class BossAttackEntry
     public bool ignoreDistanceWindow = false;
 
     [Tooltip("[S6] 이 공격이 노릴 대상. AggroTarget = 지금 어그로가 물린 대상, " +
-             "FarthestPlayer = 최원거리 플레이어(Jump 전용). " +
+             "FarthestPlayer = 최원거리 플레이어(Jump · Dash — 거리창을 끈 행에만, ignoreDistanceWindow). " +
              "🔴 '누가 맞는가'는 이걸로 안 정해진다 — 실제 피해는 히트박스·반경 판정이 따로 고른다. " +
              "이 값이 정하는 것은 보스가 어디를 노리고 어디로 가느냐다.")]
     public BossAttackTargeting attackTargeting = BossAttackTargeting.AggroTarget;
@@ -180,7 +180,7 @@ public class BossAttackEntry
 public enum BossAttackTargeting
 {
     AggroTarget,     // 지금 어그로가 물린 대상(base 의 _target)
-    FarthestPlayer,  // 최원거리 플레이어 — Jump 전용. 후열이 안전하게 딜하는 것을 응징한다
+    FarthestPlayer,  // 최원거리 플레이어 — Jump · Dash(G3). 후열이 안전하게 딜하는 것을 응징한다. 거리창을 끈 행에만
 }
 
 // 페이즈 진입 시 실행할 고정 시퀀스. [S7]

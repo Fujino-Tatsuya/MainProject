@@ -60,10 +60,33 @@ public class ShieldVignetteHUD : MonoBehaviour
             return;
 
         image.raycastTarget = false;
-        if (vignetteSprite == null)
-            generatedSprite = VignetteSpriteFactory.CreateRadial(
-                "ShieldVignette_Generated", fallbackTextureSize, fallbackInnerRadius, fallbackOuterRadius);
-        image.sprite = vignetteSprite != null ? vignetteSprite : generatedSprite;
+        if (vignetteSprite != null)
+            image.sprite = vignetteSprite;
+        else
+            RefreshGeneratedSprite();
+    }
+
+    // 설정 "비네트 크기/경계"(팀장 10-13 — 저체력 비네트·안개 시야와 같이 조절). 코드로 만든 텍스처일 때만.
+    // ⚠️ 10-13: 처음엔 저체력 비네트만 연결해 실드 비네트는 설정을 바꿔도 그대로였다(팀장 지적).
+    private float appliedOpenScale = -1f;
+    private float appliedFadeScale = -1f;
+
+    private void RefreshGeneratedSprite()
+    {
+        if (vignetteSprite != null || image == null)
+            return;
+
+        float open = GraphicsQualityConfig.VignetteOpenScale;
+        float fade = GraphicsQualityConfig.VignetteFadeScale;
+        if (generatedSprite != null && Mathf.Approximately(open, appliedOpenScale) && Mathf.Approximately(fade, appliedFadeScale))
+            return;
+
+        appliedOpenScale = open;
+        appliedFadeScale = fade;
+        VignetteSpriteFactory.ApplySettings(fallbackInnerRadius, fallbackOuterRadius, out float inner, out float outer);
+        VignetteSpriteFactory.Destroy(generatedSprite);
+        generatedSprite = VignetteSpriteFactory.CreateRadial("ShieldVignette_Generated", fallbackTextureSize, inner, outer);
+        image.sprite = generatedSprite;
     }
 
     private void OnDestroy()
@@ -73,6 +96,7 @@ public class ShieldVignetteHUD : MonoBehaviour
 
     private void Update()
     {
+        RefreshGeneratedSprite();   // 설정값이 바뀐 프레임에만 다시 만든다
         // 게임 시간으로 돈다 — 인터럽트 슬로우(전역 timeScale) 동안 비네팅 연출도 같이 느려진다(PLAN-interrupt-slowmo D9).
         Apply(Time.deltaTime);
     }

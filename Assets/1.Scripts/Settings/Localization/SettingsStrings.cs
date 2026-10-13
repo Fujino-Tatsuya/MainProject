@@ -74,7 +74,8 @@ public static class SettingsStrings
         new Entry("settings.graphics.renderScale", "Render Scale", "렌더 스케일"),
         new Entry("settings.graphics.shadows", "Shadows", "그림자"),
         new Entry("settings.graphics.antiAliasing", "Anti-Aliasing", "안티앨리어싱"),
-        new Entry("settings.graphics.postEffects", "Post Effects (Bloom etc.)", "후처리 (블룸 등)"),
+        // 10-13 팀장: "후처리"는 플레이어가 모른다 → 실제로 끄는 두 효과의 게임 표준 이름으로(블룸 = 빛 번짐, 색수차 = 가장자리 색 갈라짐).
+        new Entry("settings.graphics.postEffects", "Bloom & Chromatic Aberration", "블룸·색수차"),
         new Entry("settings.graphics.vignetteSize", "Vignette Size", "비네트 크기"),
         new Entry("settings.graphics.vignetteEdge", "Vignette Edge", "비네트 경계"),
 

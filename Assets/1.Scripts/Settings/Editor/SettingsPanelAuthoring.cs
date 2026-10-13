@@ -140,7 +140,7 @@ public static class SettingsPanelAuthoring
         Slider renderScale = SliderRow(rows, "RenderScale", "Render Scale", out TMP_Text renderScaleValue);
         TMP_Dropdown shadows = DropdownRow(rows, "Shadows", "Shadows");
         TMP_Dropdown aa = DropdownRow(rows, "AntiAliasing", "Anti-Aliasing");
-        Toggle post = ToggleRow(rows, "PostEffects", "Post Effects (Bloom etc.)");
+        Toggle post = ToggleRow(rows, "PostEffects", "Bloom & Chromatic Aberration");
         Slider vSize = SliderRow(rows, "VignetteSize", "Vignette Size", out TMP_Text vSizeValue);
         Slider vFade = SliderRow(rows, "VignetteEdge", "Vignette Edge", out TMP_Text vFadeValue);
         var qso = new SerializedObject(qc);

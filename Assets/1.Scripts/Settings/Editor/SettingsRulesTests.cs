@@ -179,6 +179,24 @@ public sealed class SettingsRulesTests
         Assert.IsNull(SettingsStrings.FindKeyByEnglish("100%"));
     }
 
+    // 비네트 슬라이더 0~100(팀장 10-13): 50 = 기본(배율 1 = 지금 화면), 0 = 최소, 100 = 최대, 왕복 일치.
+    [Test]
+    public void VignetteSlider_MidIsDefault_EndsAreLimits_RoundTrips()
+    {
+        Assert.AreEqual(1f, GraphicsQualityConfig.VignetteSizeFromSlider(0.5f), 1e-5f);
+        Assert.AreEqual(1f, GraphicsQualityConfig.VignetteFadeFromSlider(0.5f), 1e-5f);
+        Assert.AreEqual(GraphicsQualityConfig.MinVignetteSize, GraphicsQualityConfig.VignetteSizeFromSlider(0f), 1e-5f);
+        Assert.AreEqual(GraphicsQualityConfig.MaxVignetteSize, GraphicsQualityConfig.VignetteSizeFromSlider(1f), 1e-5f);
+        Assert.AreEqual(GraphicsQualityConfig.MinVignetteFade, GraphicsQualityConfig.VignetteFadeFromSlider(0f), 1e-5f);
+        Assert.AreEqual(GraphicsQualityConfig.MaxVignetteFade, GraphicsQualityConfig.VignetteFadeFromSlider(1f), 1e-5f);
+        foreach (float s in new[] { 0f, 0.13f, 0.5f, 0.77f, 1f })
+        {
+            Assert.AreEqual(s, GraphicsQualityConfig.VignetteSizeToSlider(GraphicsQualityConfig.VignetteSizeFromSlider(s)), 1e-4f);
+            Assert.AreEqual(s, GraphicsQualityConfig.VignetteFadeToSlider(GraphicsQualityConfig.VignetteFadeFromSlider(s)), 1e-4f);
+        }
+        Assert.AreEqual(0.5f, GraphicsQualityConfig.VignetteSizeToSlider(1f), 1e-5f);   // 기존 저장값 1 → 50 으로 보인다
+    }
+
     [Test]
     public void PerformanceDisplay_KeepsDropdownOrder_S17()
     {

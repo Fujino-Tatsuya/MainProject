@@ -115,3 +115,6 @@
 3. 마우스 감도(보류 — 소프트웨어 커서 vs OS 커서 보정, 그래픽 확인 뒤).
 4. 예외(나중): 키 가이드 HUD(이미지) · runInBackground(호스트 Alt+Tab 서버 정지).
 5. 커밋 범위 결정: `feature/Settings`(10-12 작업 전부 미커밋) → Boss23·development 반영 여부. 은희 튜토리얼 브랜치가 `4.MapScene` OptionPanel 을 건드렸는지 머지 때 확인. 은희 `feature/DashDirectionOption` 은 흡수함(따로 머지 금지 — 공유 필요).
+- ⚠️ 정정(10-13 빌드 · 팀장): "비네트 크기"를 줄였더니 오히려 크게 그려짐 — 값을 **보이는 범위 배율**로 곱해 방향이 반대였다(안개 시야 반경·저체력 비네트 투명 반경 둘 다). → `GraphicsQualityConfig.VignetteOpenScale = 1 / vignetteSize` 로 뒤집음(크기 ↑ = 어두운 테두리 ↑). 기본 100% 화면 동일. ⏳ 팀장 확인.
+- 팀장 후속(10-13): 실드 비네트(`ShieldVignetteHUD`)도 같은 설정을 따르게 연결 — 처음엔 저체력만 연결해 실드는 그대로였다. 계산 공용화 `VignetteSpriteFactory.ApplySettings`. 최소 크기에서 경고 비네트가 통째로 사라지던 것 → 투명 반경 상한 1.05(화면 모서리에 남음).
+- 팀장 후속(10-13): 비네트 슬라이더 표시 70~150% / 50~200% → **0~100(50 = 기본)**. 아래 반 = 최소~1, 위 반 = 1~최대(`GraphicsQualityConfig.Vignette*FromSlider/ToSlider`, 저장값은 배율 그대로 — 기존 설정 유지). "후처리 (블룸 등)" → **"블룸·색수차" / "Bloom & Chromatic Aberration"**(실제로 끄는 두 효과의 게임 표준 이름). 설정 EditMode 26/26.

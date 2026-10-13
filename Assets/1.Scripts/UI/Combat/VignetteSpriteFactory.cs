@@ -81,6 +81,20 @@ public static class VignetteSpriteFactory
         return sprite;
     }
 
+    /// <summary>
+    /// 설정 "비네트 크기/경계"를 저작 반경에 적용한다(저체력·실드 비네트 공용 — 팀장 10-13).
+    /// 투명 반경 × 보이는 범위 배율(<see cref="GraphicsQualityConfig.VignetteOpenScale"/> = 1/크기), 테두리 폭 × 경계 배율.
+    /// 🔴 투명 반경 상한 <see cref="MaxInnerRadius"/> — 최소 크기에서 투명 반경이 화면 모서리(√2)를 넘으면 경고 비네트가
+    ///    통째로 사라졌다(팀장 10-13). 상태 경고라 최소값에서도 모서리에 남겨 둔다.
+    /// </summary>
+    public const float MaxInnerRadius = 1.05f;
+
+    public static void ApplySettings(float authoredInner, float authoredOuter, out float inner, out float outer)
+    {
+        inner = Mathf.Min(authoredInner * GraphicsQualityConfig.VignetteOpenScale, MaxInnerRadius);
+        outer = inner + Mathf.Max(0.01f, authoredOuter - authoredInner) * GraphicsQualityConfig.VignetteFadeScale;
+    }
+
     /// <summary><see cref="CreateRadial"/> 로 만든 스프라이트와 텍스처를 함께 파괴한다.</summary>
     public static void Destroy(Sprite generated)
     {

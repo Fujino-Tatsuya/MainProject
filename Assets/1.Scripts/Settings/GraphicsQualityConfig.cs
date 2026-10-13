@@ -120,8 +120,29 @@ public static class GraphicsQualityConfig
         Apply(_current);
     }
 
-    /// <summary>시야 디밍 반경 배율(<see cref="FogManager"/> 가 매 프레임 읽는다).</summary>
-    public static float VignetteSizeScale => Current.vignetteSize;
+    /// <summary>
+    /// 비네트 안쪽 **보이는 범위** 배율 = 1 / 비네트 크기. 안개 시야 반경(<see cref="FogManager"/>)·저체력 비네트 투명 반경이 곱한다.
+    /// 🔴 설정 "비네트 크기"는 **어두운 테두리의 크기**다 — 줄이면 테두리가 작아져야 한다(팀장 10-13 빌드: 줄였더니 오히려 커졌다).
+    ///    처음엔 이 값을 보이는 범위에 그대로 곱해서 방향이 반대였다. 기본 1 은 그대로라 기본 화면은 같다.
+    /// </summary>
+    // ─── 비네트 슬라이더 0~100(팀장 10-13 — "70%~150%" 는 플레이어가 이해하기 어렵다) ────
+    // 화면 표시 = 0~100, **50 = 기본(배율 1, 지금 화면)**. 아래 반은 최소~1, 위 반은 1~최대로 따로 잇는다 —
+    // 한 줄로 이으면 기본값이 37 같은 어중간한 숫자가 된다. 저장값은 그대로 배율이라 기존 설정이 유지된다.
+    public static float VignetteSizeFromSlider(float s01) => FromSlider(s01, MinVignetteSize, MaxVignetteSize);
+    public static float VignetteSizeToSlider(float size) => ToSlider(size, MinVignetteSize, MaxVignetteSize);
+    public static float VignetteFadeFromSlider(float s01) => FromSlider(s01, MinVignetteFade, MaxVignetteFade);
+    public static float VignetteFadeToSlider(float fade) => ToSlider(fade, MinVignetteFade, MaxVignetteFade);
+
+    static float FromSlider(float s01, float min, float max)
+    {
+        s01 = Mathf.Clamp01(s01);
+        return s01 <= 0.5f ? Mathf.Lerp(min, 1f, s01 * 2f) : Mathf.Lerp(1f, max, (s01 - 0.5f) * 2f);
+    }
+
+    static float ToSlider(float v, float min, float max) =>
+        v <= 1f ? Mathf.InverseLerp(min, 1f, v) * 0.5f : 0.5f + Mathf.InverseLerp(1f, max, v) * 0.5f;
+
+    public static float VignetteOpenScale => 1f / Mathf.Max(0.01f, Current.vignetteSize);
     /// <summary>시야 디밍 경계 페이드 배율.</summary>
     public static float VignetteFadeScale => Current.vignetteFade;
 

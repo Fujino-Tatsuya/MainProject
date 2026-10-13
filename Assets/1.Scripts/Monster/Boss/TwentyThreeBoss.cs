@@ -475,17 +475,17 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
             return;
         }
 
-        // 타겟 규칙 계약 — FarthestPlayer 는 Jump 전용이다(확정 스펙).
-        // 🔴 다른 행에 켜면 그 공격이 조용히 후열을 노리게 되는데, 거리창까지 함께 보므로
-        //    "가까운 사람만 후보인데 먼 사람을 노린다"는 앞뒤 안 맞는 조합이 된다.
+        // 타겟 규칙 계약 — FarthestPlayer 는 **거리창을 끈 행**(ignoreDistanceWindow)에만 쓴다. 지금 = Jump · Dash(G3, 09-17).
+        // 🔴 거리창을 쓰는 행에 켜면 "가까운 사람만 후보인데 먼 사람을 노린다"는 앞뒤 안 맞는 조합이 된다 — 그게 이 검사가 막는 것.
+        //    ⚠️ 10-13 정정: 예전엔 "Jump 전용"으로 검사해서, 09-17 에 돌진을 최원거리로 바꾼 뒤로 매 스폰마다 오류를 냈다(실제 모순 아님).
         foreach (BossAttackEntry e in _boss.attacks)
         {
             if (e == null || e.attackTargeting != BossAttackTargeting.FarthestPlayer) continue;
-            if (e.attackId == BossAttackId.Jump) continue;
+            if (e.ignoreDistanceWindow) continue;
 
             Debug.LogError(
-                $"{name}: {e.attackId} 행의 attackTargeting 이 FarthestPlayer 다 — 최원거리 타겟은 " +
-                "Jump 전용이다(확정 스펙). 거리창을 쓰는 공격과 조합하면 앞뒤가 안 맞는다.", this);
+                $"{name}: {e.attackId} 행이 FarthestPlayer 인데 거리창을 쓴다(ignoreDistanceWindow 꺼짐) — " +
+                "가까운 사람만 후보로 보면서 먼 사람을 노리게 된다. 거리창을 끄거나 AggroTarget 으로.", this);
         }
 
         // 카운터 창 계약 — 창을 여는 행은 Grab·Dash 뿐이고, 길이는 (0, 2] 여야 한다.
