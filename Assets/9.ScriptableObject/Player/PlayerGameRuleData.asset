@@ -29,3 +29,5 @@ MonoBehaviour:
   maxKnockbackTime: 1.5
   knockbackStopSpeed: 0.15
   knockbackDeceleration: 6
+  regenDelaySeconds: 5
+  regenPercentPerSecond: 0.02

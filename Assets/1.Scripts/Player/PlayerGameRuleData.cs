@@ -50,7 +50,15 @@ public sealed class PlayerGameRuleData : ScriptableObject
              "성공 = 열린 카운터 창(23호·중간보스·허수아비)을 맞혀 소비한 경우만. 한 번의 시전에서 여러 대상이 성공해도 1회.")]
     [SerializeField, Range(0f, 1f)] private float interruptSuccessCooldownReduction = InterruptSuccessCooldownModel.DefaultReductionRatio;
 
+    [Header("체력 재생")]
+    [Tooltip("마지막 피격 후 이 시간(초)이 지나야 체력 재생이 시작된다. 피격 = 체력이나 보호막이 실제로 깎인 피해(추락 포함). 다시 맞으면 처음부터 센다.")]
+    [SerializeField, Min(0f)] private float regenDelaySeconds = PlayerHealthRegenModel.DefaultDelaySeconds;
+    [Tooltip("재생 중 초당 회복량 = 최종 최대 체력 × 이 비율. 최대 체력에서 멈춘다. 0 이면 재생 없음.")]
+    [SerializeField, Range(0f, 1f)] private float regenPercentPerSecond = PlayerHealthRegenModel.DefaultPercentPerSecond;
+
     public float FallDamageRatio => fallDamageRatio;
+    public float HealthRegenDelaySeconds => Mathf.Max(0f, regenDelaySeconds);
+    public float HealthRegenPercentPerSecond => Mathf.Clamp01(regenPercentPerSecond);
     public float InterruptSuccessCooldownReduction => Mathf.Clamp01(interruptSuccessCooldownReduction);
     public float MaxWalkableSlopeAngle => maxWalkableSlopeAngle;
     public float StepOffset => Mathf.Max(0f, stepOffset);
