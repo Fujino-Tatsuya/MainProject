@@ -160,7 +160,7 @@ public class TutorialZone3RulesTests
         Assert.AreEqual(TutorialGuideIds.Z3CounterGoal, TutorialZone3Display.ObjectiveFor(P, false, SpinnerComboPhase.Ready), "Z3-2");
         Assert.AreEqual(TutorialGuideIds.Z3PushGoal, TutorialZone3Display.ObjectiveFor(P, false, SpinnerComboPhase.Stunned), "Z3-4");
         Assert.AreEqual(TutorialGuideIds.Z3PushGoal, TutorialZone3Display.ObjectiveFor(P, false, SpinnerComboPhase.Vulnerable));
-        Assert.AreEqual(TutorialGuideIds.Z3Goal, TutorialZone3Display.ObjectiveFor(P, false, SpinnerComboPhase.Returning), "Z3-7");
+        Assert.AreEqual(TutorialGuideIds.Z3Goal, TutorialZone3Display.ObjectiveFor(P, false, SpinnerComboPhase.Recovering), "Z3-7");
         Assert.AreEqual(TutorialGuideIds.Z3Goal, TutorialZone3Display.ObjectiveFor(P, false, SpinnerComboPhase.Done));
     }
 
@@ -172,7 +172,7 @@ public class TutorialZone3RulesTests
         Assert.AreEqual(TutorialZone3Highlight.Wall | TutorialZone3Highlight.Spinner | TutorialZone3Highlight.RmbSlot,
             TutorialZone3Display.HighlightsFor(TutorialStep.Zone3Practice, false, SpinnerComboPhase.Vulnerable), "유효 벽 강조");
         Assert.AreEqual(TutorialZone3Highlight.None,
-            TutorialZone3Display.HighlightsFor(TutorialStep.Zone3Practice, false, SpinnerComboPhase.Returning));
+            TutorialZone3Display.HighlightsFor(TutorialStep.Zone3Practice, false, SpinnerComboPhase.Recovering));
         Assert.AreEqual(TutorialZone3Highlight.None, TutorialZone3Display.HighlightsFor(TutorialStep.Zone3Fight, false));
         Assert.AreEqual(TutorialZone3Highlight.None, TutorialZone3Display.HighlightsFor(TutorialStep.Zone3Practice, true));
         Assert.IsTrue(TutorialZone3Display.IsZone3Objective(TutorialGuideIds.Z3Goal));
@@ -188,7 +188,7 @@ public class TutorialZone3RulesTests
         m.NotifyEntryGateOpen();
         m.NotifyPartyEntered();
         Assert.AreEqual(TutorialZone3Feedback.None, m.ClassifyInterrupt(0, true, false, false, true, comboReady: false),
-            "취약 밀치기·복귀 중 우클릭은 빗나감 안내 대신 밀치기 안내");
+            "취약 밀치기·회복 중 우클릭은 빗나감 안내 대신 밀치기 안내");
         Assert.AreEqual(TutorialZone3Feedback.Miss, m.ClassifyInterrupt(0, true, false, false, true, comboReady: true));
     }
 

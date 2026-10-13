@@ -264,10 +264,10 @@ public sealed class TutorialMonsterLedgerTests
         m.RequestGate(TutorialGate.G6_Corridor3Entry);
         m.AddCounter(TutorialCounter.Zone3Interrupts, 3);
         m.Evaluate(1d);
-        Assert.IsFalse(m.IsGateOpen(TutorialGate.G5_SpinnerRealMode), "v8 — 연계 3회만으로는 G5 아님(마지막 복귀 대기)");
+        Assert.IsFalse(m.IsGateOpen(TutorialGate.G5_SpinnerRealMode), "v8 — 연계 3회만으로는 G5 아님(마지막 회복 대기)");
         Assert.IsFalse(m.IsGateOpen(TutorialGate.G6_Corridor3Entry));
 
-        m.RequestGate(TutorialGate.G5_SpinnerRealMode);   // 존3 흐름 — 마지막 원위치 복귀 완료
+        m.RequestGate(TutorialGate.G5_SpinnerRealMode);   // 존3 흐름 — 마지막 회복 끝
         m.Evaluate(2d);
         Assert.IsTrue(m.IsGateOpen(TutorialGate.G5_SpinnerRealMode));
         Assert.IsTrue(m.IsGateOpen(TutorialGate.G6_Corridor3Entry));

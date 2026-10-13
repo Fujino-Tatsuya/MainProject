@@ -5,7 +5,7 @@ using UnityEngine;
 /// 튜토리얼 존3 목표 패널·강조(S9 → v8) — <b>모든 피어</b>(호스트 포함) 로컬 표시. 판단은 서버(<see cref="TutorialZone3Flow"/>)가 하고 결과는 복제 상태
 /// (단계 Zone3Practice/Zone3Fight · G6 · Zone3Interrupts(연계) 카운터 · 스피너봇 <see cref="TutorialSpinnerPractice.ComboPhase"/>·유효 벽 지점)로 온다 —
 /// 여기서는 그 값만 읽어 <see cref="TutorialGuideUI"/> 를 맞춘다. 준비·간파 = 간파 목표 + 스피너봇·우클릭 칸 · 취약 = 밀치기 목표 + 유효 벽(화살표)·스피너봇·우클릭 칸 ·
-/// 회복/복귀 = 연계 n/3 목표만.
+/// 회복 = 연계 n/3 목표만.
 /// 늦게 붙은 클라도 <see cref="TutorialDirector.StateChanged"/>(스폰 직후 1회 포함) 한 번으로 같은 화면이 된다. 자막은 디렉터 ClientRpc 가 띄운다.
 ///
 /// 붙는 곳: 각 피어에서 디렉터가 튜토리얼 활성으로 보일 때 디렉터 GameObject 에 런타임으로 붙는다(일반 MonoBehaviour — 씬 무수정).

@@ -4,7 +4,7 @@
 > 원본: 시나리오 [../design/tutorial-scenario.md](../design/tutorial-scenario.md) §9 완료 기준 전부 + 단계 문서의 Play 확인 항목 전부(중복은 합침).
 > 단계 문서·handoff 목록: [tutorial-director.md](tutorial-director.md) §10.1. 각 항목 끝 `(→ 문서)` 는 실패했을 때 볼 곳.
 > 기준: `feature/TutorialStage` S12-2 B(`3aae2805`) 이후 + **v8 시나리오 반영(`feature/TutorialV8`, 2026-10-12 — 존1·복도1·존2·존3 갱신)**. AI 레인은 Play 를 하지 않았다 — **이 문서 전부가 사람 확인 대기**다.
-> v8 에서 바뀐 곳: 존1(공격·스킬 5종 각 1회, G1 시간 자동 진행 없음) · 복도1(첫 진입 쿨타임 초기화) · 존2(전멸만) · 존3(간파 → 취약 밀치기 → 벽 충돌 → 복귀 연계 3회). 목숨 차감 기준은 그대로 G11(사용자 확정).
+> v8 에서 바뀐 곳: 존1(공격·스킬 5종 각 1회, G1 시간 자동 진행 없음) · 복도1(첫 진입 쿨타임 초기화) · 존2(전멸만) · 존3(간파 → 취약 밀치기 → 벽 충돌 → 회복 연계 3회 — 원위치 복귀 없음, 사용자 변경). 목숨 차감 기준은 그대로 G11(사용자 확정).
 
 ---
 
@@ -111,13 +111,14 @@
 - [ ] 그로기가 끝나도 스피너봇이 **움직이거나 추격·공격하지 않는다**(취약 유지 — 아무리 기다려도 시간으로 안 풀린다). 새 노란빛 예고도 없다.
 - [ ] 취약 중 **벽 반대편에서 스피너봇을 향해 우클릭** → 스피너봇이 공격자 반대로 약 3m 밀린다(로그 `취약 밀치기(client n)`). 1~2번이면 벽에 닿는다.
 - [ ] 벽에 못 닿고 밀치기가 끝나면 `TUT_Z3_PUSH_HINT`(5초에 1번까지) — 취약 그대로, 정상 우클릭 쿨 뒤 다시 밀 수 있다(밀치기 실패로는 쿨 초기화 없음).
-- [ ] **유효 벽 충돌** → `TUT_Z3_WALL_SUCCESS` 1/3 · 목표 진행도 1/3 · 취약 종료 → 잠깐 회복 → `TUT_Z3_RETURN` → **연습 위치로 걸어서 복귀**(순간이동 아님).
-  복귀 중 때리거나 밀어도 반응 없음(무적·밀치기 무시), 플레이어가 길을 막아도 **통과해 돌아간다**, 5초 넘으면 원위치로 옮겨진다.
-- [ ] 복귀 도착 → 몇 초 뒤 다시 노란빛 예고 · 자막 `TUT_Z3_COUNTER_GOAL` · 강조가 간파용으로 돌아온다.
-- [ ] **세지 않는 것**: Q 넉백·일반 피해로 벽에 붙임(간파 성공 뒤에는 슈퍼 아머라 넉백 자체가 안 먹힘) · 스피너봇 자기 돌진 · 복귀 이동 · 벽에 붙은 채 벽과 나란히/반대로 밀기 ·
+- [ ] **유효 벽 충돌** → `TUT_Z3_WALL_SUCCESS` 1/3 · 목표 진행도 1/3 · 취약 종료 → 잠깐(약 0.6초) 회복 → **원위치로 돌아가지 않는다**(사용자 변경) · `TUT_Z3_RETURN` 자막 없음.
+  회복 중 때리거나 밀어도 밀리지 않는다.
+- [ ] 회복 끝 → **벽 앞 그 자리에서** 몇 초 뒤 다시 노란빛 예고 · 자막 `TUT_Z3_COUNTER_GOAL` · 강조가 간파용으로 돌아온다. 그 자리에서 순간이동(반경 가장자리로 옮겨짐)이 보이면 메모(옆으로 많이 밀린 경우만 예상).
+- [ ] (메모만) 벽에 붙은 채 시작하는 2·3회째 연계가 너무 쉬운지 — 벽 판정 방식 논의 자료.
+- [ ] **세지 않는 것**: Q 넉백·일반 피해로 벽에 붙임(간파 성공 뒤에는 슈퍼 아머라 넉백 자체가 안 먹힘) · 스피너봇 자기 돌진 · 벽에 붙은 채 벽과 나란히/반대로 밀기 ·
   상자·플레이어·출구 배리어에 막힘. 둘이 동시에 밀어도·벽에 여러 번 비벼도 그 연계는 1회.
-- [ ] 3번째 벽 충돌 → 회복 → 복귀 **완료 뒤에야** **G5**(로그 `존3 연계 3회 + 마지막 원위치 복귀 완료 → G5`) → 약 2초 정지 → 본 모드(빨강 체력바·체력 감소·원래 패턴: 채찍+회전, 창 40%·쿨 6초) ·
-  `TUT_Z3_REAL` · 목표 `TUT_Z3_BOSS` · 강조 꺼짐 · 단계 Zone3Fight. 본 전투에선 간파 성공해도 우클릭 쿨 초기화·취약 유지·복귀가 **없다**(원래 그로기 1초).
+- [ ] 3번째 벽 충돌 → 회복 **끝난 뒤에야**(복귀 없이 그 자리) **G5**(로그 `존3 연계 3회 + 마지막 회복 끝 → G5`) → 약 2초 정지 → 본 모드(빨강 체력바·체력 감소·원래 패턴: 채찍+회전, 창 40%·쿨 6초) ·
+  `TUT_Z3_REAL` · 목표 `TUT_Z3_BOSS` · 강조 꺼짐 · 단계 Zone3Fight. 본 전투에선 간파 성공해도 우클릭 쿨 초기화·취약 유지가 **없다**(원래 그로기 1초).
 - [ ] 스피너봇이 연습 중 G6 배리어 너머로 밀려나가지 않는다(NavMesh·배리어 카브). 죽지 않는다.
 - [ ] 처치 → `TUT_ZONE_CLEAR` · **G6** · 존3 목표 지워짐. 본 모드 돌진·넉백으로도 복도3 으로 안 넘어간다.
 - [ ] 간파 슬로우모션은 스피너봇에 걸리지 않는다(D18).
@@ -275,7 +276,7 @@
 | xlsx Export | 튜토리얼 문구·특성 SO 는 `[DataTableText]` 미연결 — **development 병합 뒤 Main 에서** Export(자리표시자 `{…}` 표기 변경 필요) | [data-table.md](data-table.md) §8 |
 | G8 시점 | 설정 자막 10초는 고정값 — 존4 진입 때 다른 자막이 큐에 남아 있으면 화면상 설정 자막이 G8 보다 늦게 끝난다 | [tutorial-zone4.md](tutorial-zone4.md) §3 |
 | 존3 이른 간파 | 추정 판정(존3 수신자 = 스피너봇뿐 전제 — 상자가 생기면 오판) | [tutorial-zone3.md](tutorial-zone3.md) §6 |
-| 존3 연계 튜닝(D26) | 유효 벽(존3 긴 변 — 실제 벽 면이 슬롯 경계에서 안쪽이면 '막힘 접촉 1.6m' 로 인정) · 연습 위치(벽 4m·끝 8m) · 밀치기 3m/0.35초 · 회복 0.6초 · 복귀 6m/s · 다음 창 4초 — 전부 인스펙터. 벽 앞 장애물·NavMesh 모양에 따라 Play 로 조정 | [tutorial-zone3.md](tutorial-zone3.md) §4 |
+| 존3 연계 튜닝(D26) | 유효 벽(존3 긴 변 — 실제 벽 면이 슬롯 경계에서 안쪽이면 '막힘 접촉 1.6m' 로 인정) · 연습 위치(벽 4m·끝 8m) · 밀치기 3m/0.35초 · 회복 0.6초 · 다음 창 4초 — 전부 인스펙터. 벽 앞 장애물·NavMesh 모양에 따라 Play 로 조정. 원위치 복귀 없음(사용자 변경) → 2·3회째는 벽에 붙은 채 시작해 쉬울 수 있음(벽 판정 방식 논의 중) | [tutorial-zone3.md](tutorial-zone3.md) §4 |
 | 존3 취약 표시 | 취약 유지 중 스피너봇 자체의 '취약' 색·연출은 없다(23호 틴트 같은 것) — 안내 UI 목표·유효 벽 화살표로만 구분. 그로기 끝나면 Idle 자세 | 아트/연출 결정 |
 | 복도1 대시 | 서버·오너 대시 충전을 따로 가득 채운다(추락 복구 ResetChargeToOne 과 같은 방식) — 복제 지연 동안 오너 예측이 잠깐 어긋날 수 있다 | [tutorial-corridors-zone2.md](tutorial-corridors-zone2.md) |
 | 디렉터 낡은 주석 | `TutorialDirector` 의 `TODO(S6)`×2·`TODO(S8/S12)`·`TODO(S12)` 주석 — 동작은 흐름 컴포넌트에 있음. 코드 정리 때 삭제 | [tutorial-director.md](tutorial-director.md) §10.2 |
@@ -300,10 +301,10 @@
   - 특성 `TutorialTraitDefinition` — `id`·`displayName`·`description`(`[DataTableText]`)·`value`(+ enum `effectKind`·`triggerAttackType`·`cooldownSlot` 은 int 열 또는 인스펙터 유지 결정).
   - 특성 풀 `TutorialTraitPool.offerCount`.
   - 그 밖 튜닝값 후보(지금은 인스펙터): 디렉터 `deadlockSeconds` 60 · `bossTimerLimitSeconds` 420 · 사망 `reviveDelaySeconds` 3 · 존4 `loreSeconds` 10 · 스피너 `windowInterval` 9 ·
-    v8 연계 `comboTarget` 3 · `comboPushDistance` 3 · `comboPushSeconds` 0.35 · `comboContactSlack` 0.4 · `comboBlockedContactSlack` 1.6 · `comboRecoverSeconds` 0.6 · `comboReturnSpeed` 6 · `comboReturnTimeout` 5 · `comboReadyDelay` 4 ·
+    v8 연계 `comboTarget` 3 · `comboPushDistance` 3 · `comboPushSeconds` 0.35 · `comboContactSlack` 0.4 · `comboBlockedContactSlack` 1.6 · `comboRecoverSeconds` 0.6 · `comboReadyDelay` 4 ·
     존3 흐름 `practiceWallGap` 4 · `practiceEndClearance` 8.
   - v8 문구 행(안내 문구 표 — 위 `rows[]` 에 같이 들어감): 새 id `TUT_WAIT_PARTY_NOAUTO`(시나리오 §5 에 없음, G1 대기 줄) · `TUT_Z1_Q/E/RMB/R` · `TUT_Z1_Q_GUNNER` · `TUT_Z1_E_PALADIN/_GUNNER/_ASSASSIN` · `TUT_Z1_R_ASSASSIN` ·
-    `TUT_Z1_CHECK_Q/E/RMB/R`(시나리오 §5 에 없음, 체크리스트 줄) · `TUT_Z3_COUNTER_GOAL/PUSH_INTRO/PUSH_GOAL/PUSH_HINT/WALL_SUCCESS/RETURN`.
-    더 이상 호출하지 않는 행(SO 에 남아 있음 — Export 때 빼도 됨): `TUT_Z2_Q*`·`TUT_Z2_E*`·`TUT_Z2_NUDGE`·`TUT_Z3_GUNNER`·`TUT_C1_COOLDOWN_RESET`(사용자 변경).
+    `TUT_Z1_CHECK_Q/E/RMB/R`(시나리오 §5 에 없음, 체크리스트 줄) · `TUT_Z3_COUNTER_GOAL/PUSH_INTRO/PUSH_GOAL/PUSH_HINT/WALL_SUCCESS`.
+    더 이상 호출하지 않는 행(SO 에 남아 있음 — Export 때 빼도 됨): `TUT_Z2_Q*`·`TUT_Z2_E*`·`TUT_Z2_NUDGE`·`TUT_Z3_GUNNER`·`TUT_C1_COOLDOWN_RESET`·`TUT_Z3_RETURN`(사용자 변경).
 - [ ] D1 팀장 합의 완료(§4).
 - [ ] 이 문서 1~3부 사람 확인 완료.

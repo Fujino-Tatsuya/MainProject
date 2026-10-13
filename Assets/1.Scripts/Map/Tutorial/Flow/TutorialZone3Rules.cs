@@ -115,7 +115,7 @@ public sealed class TutorialZone3Model
     public TutorialZone3Feedback ClassifyInterrupt(int hitCount, bool casterInZone3, bool succeededThisResolution,
                                                    bool windowOpen, bool casterNearSpinner, bool comboReady = true)
     {
-        // v8: 빗나감·이른 간파 안내는 준비·간파 단계만 — 취약 밀치기·복귀 중 우클릭은 밀치기 안내(TUT_Z3_PUSH_HINT)가 맡는다.
+        // v8: 빗나감·이른 간파 안내는 준비·간파 단계만 — 취약 밀치기·회복 중 우클릭은 밀치기 안내(TUT_Z3_PUSH_HINT)가 맡는다.
         if (Phase != TutorialZone3Phase.Practice || !casterInZone3 || !comboReady) return TutorialZone3Feedback.None;
         if (hitCount <= 0) return TutorialZone3Feedback.Miss;
         if (succeededThisResolution || windowOpen || !casterNearSpinner) return TutorialZone3Feedback.None;
@@ -159,7 +159,7 @@ public static class TutorialZone3Display
 {
     /// <summary>
     /// 지금 띄울 존3 목표 id. 존3 단계가 아니거나 G6(복도3 입구)가 열렸으면 null.
-    /// 연습 중에는 연계 단계별(v8 Z3-2·Z3-4·Z3-7): 준비·간파 = TUT_Z3_COUNTER_GOAL · 기절/취약 = TUT_Z3_PUSH_GOAL · 회복/복귀/완료 = TUT_Z3_GOAL.
+    /// 연습 중에는 연계 단계별(v8 Z3-2·Z3-4·Z3-7): 준비·간파 = TUT_Z3_COUNTER_GOAL · 기절/취약 = TUT_Z3_PUSH_GOAL · 회복/완료 = TUT_Z3_GOAL.
     /// 연계 n/3 은 목표 진행도로 함께 보인다.
     /// </summary>
     public static string ObjectiveFor(TutorialStep step, bool corridor3EntryOpen, SpinnerComboPhase combo = SpinnerComboPhase.Ready)
@@ -182,7 +182,7 @@ public static class TutorialZone3Display
 
     /// <summary>
     /// 강조 — 연습 중에만(본 모드 전환 G5 에서 끈다). 준비·간파 = 스피너봇 + 우클릭 칸(Z3-2) · 기절/취약 = 유효 벽 + 스피너봇 + 우클릭 칸(Z3-4) ·
-    /// 회복/복귀 = 없음(Z3-7).
+    /// 회복 = 없음(Z3-7).
     /// </summary>
     public static TutorialZone3Highlight HighlightsFor(TutorialStep step, bool corridor3EntryOpen,
                                                        SpinnerComboPhase combo = SpinnerComboPhase.Ready)

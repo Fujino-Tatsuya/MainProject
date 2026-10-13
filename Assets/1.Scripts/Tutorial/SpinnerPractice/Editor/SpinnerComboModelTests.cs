@@ -1,7 +1,8 @@
 using NUnit.Framework;
 
 /// <summary>
-/// 튜토리얼 스피너봇 연계 연습(v8 §3.5) — 간파 → 기절 → 취약 유지 → 우클릭 밀치기 → 유효 벽 충돌 → 회복 → 원위치 복귀 × 3.
+/// 튜토리얼 스피너봇 연계 연습(v8 §3.5) — 간파 → 기절 → 취약 유지 → 우클릭 밀치기 → 유효 벽 충돌 → 회복 × 3.
+/// 회복 끝 = 그 자리에서 다시 준비·간파(사용자 변경 — 원위치 복귀 없음), 3회째 회복 끝 = 완료.
 /// </summary>
 public sealed class SpinnerComboModelTests
 {
@@ -36,7 +37,7 @@ public sealed class SpinnerComboModelTests
         Assert.IsTrue(m.NotifyCounterSucceeded());
         Assert.AreEqual(SpinnerComboPhase.Stunned, m.Phase);
         Assert.IsFalse(m.NotifyCounterSucceeded(), "취약 중 중복 간파 없음");
-        Assert.IsFalse(m.AllowsSpin, "취약·복귀 중 새 간파 공격 예고 없음");
+        Assert.IsFalse(m.AllowsSpin, "취약·회복 중 새 간파 공격 예고 없음");
         Assert.IsFalse(m.SuspendsFsm, "기절 동안은 원래 그로기");
         Assert.IsTrue(m.BlocksExternalKnockback);
 
@@ -60,7 +61,7 @@ public sealed class SpinnerComboModelTests
     }
 
     [Test]
-    public void 밀치기_한_번이_벽에_닿으면_연계_1회_회복_복귀()
+    public void 밀치기_한_번이_벽에_닿으면_연계_1회_회복_뒤_그_자리에서_다시_준비()
     {
         var m = New();
         ToVulnerable(m);
@@ -72,17 +73,17 @@ public sealed class SpinnerComboModelTests
         Assert.AreEqual(SpinnerComboPhase.Recovering, m.Phase);
         Assert.IsFalse(m.IsVulnerable, "충돌로 취약 종료");
         Assert.IsFalse(m.TryBeginPush(1f, 0f), "회복 중 외부 밀치기 없음");
-
-        Assert.AreEqual(SpinnerComboEvent.ReturnStarted, m.Tick(0.6f));
-        Assert.AreEqual(SpinnerComboPhase.Returning, m.Phase);
-        Assert.IsFalse(m.TryBeginPush(1f, 0f), "복귀 중 외부 밀치기 없음");
-        Assert.IsFalse(m.NotifyCounterSucceeded());
+        Assert.IsFalse(m.NotifyCounterSucceeded(), "회복 중 간파 없음");
+        Assert.IsTrue(m.SuspendsFsm, "회복 중 스스로 움직이지 않는다");
         Assert.IsFalse(m.ClampsToPracticeRadius);
 
-        Assert.AreEqual(SpinnerComboEvent.ReadyAgain, m.NotifyReturnArrived());
+        Assert.AreEqual(SpinnerComboEvent.None, m.Tick(0.3f), "회복 중");
+        Assert.AreEqual(SpinnerComboEvent.ReadyAgain, m.Tick(0.3f), "회복 끝 = 복귀 단계 없이 바로 다시 준비");
         Assert.AreEqual(SpinnerComboPhase.Ready, m.Phase);
         Assert.IsTrue(m.AllowsSpin);
+        Assert.IsFalse(m.SuspendsFsm);
         Assert.IsFalse(m.BlocksExternalKnockback);
+        Assert.IsTrue(m.NotifyCounterSucceeded(), "그 자리에서 다음 간파");
     }
 
     [Test]
@@ -150,7 +151,7 @@ public sealed class SpinnerComboModelTests
     }
 
     [Test]
-    public void 세_번째_연계_뒤_마지막_복귀가_끝나야_완료()
+    public void 세_번째_연계_뒤_마지막_회복이_끝나야_완료()
     {
         var m = New();
         for (int i = 1; i <= 3; i++)
@@ -159,10 +160,9 @@ public sealed class SpinnerComboModelTests
             float gap = 1f;
             m.TryBeginPush(1f, 0f);
             Assert.AreEqual(SpinnerComboEvent.WallHit, PushAll(m, ref gap));
-            m.Tick(1f);
-            Assert.AreEqual(SpinnerComboPhase.Returning, m.Phase, $"{i}회째도 원위치 복귀");
-            SpinnerComboEvent arrived = m.NotifyReturnArrived();
-            Assert.AreEqual(i < 3 ? SpinnerComboEvent.ReadyAgain : SpinnerComboEvent.Completed, arrived, $"{i}회째");
+            Assert.AreEqual(SpinnerComboPhase.Recovering, m.Phase, $"{i}회째 회복(3회째도 충돌 순간은 아직 완료 아님)");
+            SpinnerComboEvent recovered = m.Tick(1f);
+            Assert.AreEqual(i < 3 ? SpinnerComboEvent.ReadyAgain : SpinnerComboEvent.Completed, recovered, $"{i}회째");
         }
         Assert.AreEqual(SpinnerComboPhase.Done, m.Phase);
         Assert.AreEqual(3, m.Successes);

@@ -30,7 +30,7 @@ public sealed class SpinnerPracticeWindowSchedule
         return true;
     }
 
-    /// <summary>다음 창을 적어도 <paramref name="time"/> 까지 미룬다(이미 더 늦으면 그대로) — 연계 복귀 직후 우클릭이 준비될 틈(v8 §3.5).</summary>
+    /// <summary>다음 창을 적어도 <paramref name="time"/> 까지 미룬다(이미 더 늦으면 그대로) — 연계 회복 직후 우클릭이 준비될 틈(v8 §3.5).</summary>
     public void DelayUntil(float time)
     {
         if (time > _nextAllowedAt) _nextAllowedAt = time;

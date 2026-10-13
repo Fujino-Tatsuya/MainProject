@@ -103,10 +103,10 @@ v8 시나리오 §3.5 가 존3 을 "간파 3회"에서 **[간파 → 취약 유�
 MonsterBase · TwentyThreeBoss · MonsterCounterWindow · 데이터는 무수정.
 
 **튜토리얼 쪽(`Tutorial/SpinnerPractice/`)**
-- `SpinnerComboModel.cs`(순수, EditMode `SpinnerComboModelTests`) — 단계 Ready → Stunned(원래 그로기) → Vulnerable(시간 종료 없음) → Recovering → Returning → (Ready | Done). 벽 충돌 = 몸 가장자리 ↔ 유효 벽 면 ≤ 0.4m,
+- `SpinnerComboModel.cs`(순수, EditMode `SpinnerComboModelTests`) — 단계 Ready → Stunned(원래 그로기) → Vulnerable(시간 종료 없음) → Recovering → (그 자리에서 Ready | Done) — 원위치 복귀(Returning) 단계는 사용자 변경(2026-10-13)으로 없앴다. 벽 충돌 = 몸 가장자리 ↔ 유효 벽 면 ≤ 0.4m,
   또는 NavMesh 가장자리에 막혔고 ≤ 1.6m(NavMesh 가 벽에서 에이전트 반경만큼 안쪽에서 끝나서). 벽 쪽으로 민 것만(법선 내적). 한 연계 1회.
-- `TutorialSpinnerPractice` — 위 모델을 돌린다. 취약 유지·회복·복귀 = `MonsterBase.SetServerLogicSuspended(true)`(공개 API, 전환 대기와 같은 것) + `MonsterStatusEffect.ApplyStatus(SuperArmor, 0)`(외부 넉백 무시) ·
-  밀치기·복귀 이동 = `NavMeshAgent.Move`(NavMesh·배리어 카브 밖으로 못 나감, 플레이어 콜라이더 무시) · 복귀 5초 넘으면 원위치 `Warp`. 본 전투(`EnterRealMode`) 때 모두 해제.
+- `TutorialSpinnerPractice` — 위 모델을 돌린다. 취약 유지·회복 = `MonsterBase.SetServerLogicSuspended(true)`(공개 API, 전환 대기와 같은 것) + `MonsterStatusEffect.ApplyStatus(SuperArmor, 0)`(외부 넉백 무시) ·
+  밀치기 이동 = `NavMeshAgent.Move`(NavMesh·배리어 카브 밖으로 못 나감, 플레이어 콜라이더 무시). 본 전투(`EnterRealMode`) 때 모두 해제.
   새 복제 변수 3개(`_comboPhase`·`_wallPoint`·`_hasWall` — Variant NetworkBehaviour, hash 무관). 새 서버 이벤트 `ServerComboCounterAccepted`·`ServerComboEvent`. 새 서버 API `SetPracticeWall`·`RelocateAnchor`.
 - 유효 벽·연습 위치는 존3 흐름이 존3 슬롯 사각형의 긴 변에서 정한다(`TutorialZone3Geometry.ChoosePracticeLayout` — 벽 면에서 몸 가장자리 4m, 존 끝에서 8m 안쪽). 튜닝은 인스펙터(D26).
 - 간파 성공마다 파티 우클릭 쿨 초기화는 플레이어 쿨 장부 **공개 API**(`ReduceCooldownServer`·`GetCooldownRemaining`)만 쓴다 — 다른 레인의 '간파 성공 시 우클릭 쿨 80% 감소'와 겹쳐도 결과는 0.

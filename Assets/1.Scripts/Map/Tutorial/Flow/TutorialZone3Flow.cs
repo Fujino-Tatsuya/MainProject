@@ -11,7 +11,7 @@ using UnityEngine.AI;
 /// 붙는 곳: 서버에서 디렉터가 튜토리얼을 켠 순간(<see cref="TutorialDirector.StateChanged"/> ∧ <see cref="TutorialDirector.IsTutorialActive"/>)
 /// 디렉터 GameObject 에 런타임으로 붙는다(<see cref="TutorialDeathRules"/> 와 같은 방식 — 씬·프리팹 저장 없음).
 ///
-/// 흐름(v8 §3.5 — 간파 → 취약 밀치기 → 벽 충돌 → 원위치 복귀, 연계 파티 합계 3회 → 본 전투):
+/// 흐름(v8 §3.5 — 간파 → 취약 밀치기 → 벽 충돌 → 회복 → 그 자리에서 다음 준비(원위치 복귀 없음 — 사용자 변경), 연계 파티 합계 3회 → 본 전투):
 ///  · 활성 순간: 연습용 유효 벽·연습 위치(<see cref="TutorialZone3Geometry.ChoosePracticeLayout"/> — 존3 긴 변)를 정해 스피너봇을 옮기고
 ///    (휴면 중), 연습 반경 = 그 위치 → 출구 배리어(G6) 거리 − 몸 반경 − 여유.
 ///  · G4 열림 ∧ 존3 파티 첫 진입 → 스피너봇 휴면 해제 → <see cref="TutorialSpinnerPractice.EnterPractice"/> · 단계 Zone3Practice ·
@@ -21,8 +21,8 @@ using UnityEngine.AI;
 ///    (<see cref="TutorialCooldownReset"/> — 시전자 쿨 감소(할 일 26)를 적용한 <b>뒤</b> 나는 이벤트라 그 위에 0 으로 덮는다) ·
 ///    첫 성공만 TUT_Z3_FIRST_SUCCESS · TUT_Z3_PUSH_INTRO. 간파 횟수는 세지 않는다.
 ///  · 연계 일(<see cref="TutorialSpinnerPractice.ServerComboEvent"/>): 벽 충돌 → Zone3Interrupts +1 · TUT_Z3_WALL_SUCCESS({n}/3) ·
-///    밀치기 빗나감 → TUT_Z3_PUSH_HINT(5초 간격) · 복귀 시작 → TUT_Z3_RETURN · 다시 준비 → TUT_Z3_COUNTER_GOAL ·
-///    완료(3회 + 마지막 복귀) → <b>G5</b>(<see cref="TutorialDirector.RequestGateServer"/>) → <see cref="TutorialSpinnerPractice.EnterRealMode"/>
+///    밀치기 빗나감 → TUT_Z3_PUSH_HINT(5초 간격) · 회복 끝(다시 준비) → TUT_Z3_COUNTER_GOAL ·
+///    완료(3회째 회복 끝) → <b>G5</b>(<see cref="TutorialDirector.RequestGateServer"/>) → <see cref="TutorialSpinnerPractice.EnterRealMode"/>
 ///    (교육 제한 해제 + 2초 정지) · 단계 Zone3Fight · TUT_Z3_REAL.
 ///  · 준비·간파 단계 개인 피드백: 빗나감(적중 0) TUT_Z3_MISS · 노랑 아닐 때 스피너봇 적중 TUT_Z3_EARLY — 그 시전자에게만. 연속 놓침 4·8… → TUT_Z3_HINT(전원).
 ///  · 처치 = 존 장부의 존3 클리어(<see cref="TutorialDirector.ZoneCleared"/>) → TUT_ZONE_CLEAR. G6 은 장부가 이미 연다(여기서 열지 않는다).
@@ -278,13 +278,11 @@ public sealed class TutorialZone3Flow : MonoBehaviour
         }
         if ((events & SpinnerComboEvent.PushEndedNoWall) != 0 && _model.TryPushHint(Time.unscaledTimeAsDouble))
             _director.ShowSubtitleServer(TutorialGuideIds.Z3PushHint);
-        if ((events & SpinnerComboEvent.ReturnStarted) != 0 && successes < practice.ComboTarget)
-            _director.ShowSubtitleServer(TutorialGuideIds.Z3Return);
         if ((events & SpinnerComboEvent.ReadyAgain) != 0)
             _director.ShowSubtitleServer(TutorialGuideIds.Z3CounterGoal);
         if ((events & SpinnerComboEvent.Completed) != 0)
         {
-            Edit.Log($"[Tutorial] 존3 연계 {successes}회 + 마지막 원위치 복귀 완료 → G5.", this);
+            Edit.Log($"[Tutorial] 존3 연계 {successes}회 + 마지막 회복 끝 → G5.", this);
             _director.RequestGateServer(TutorialGate.G5_SpinnerRealMode);   // → HandleGateOpened → 본 전투
         }
     }

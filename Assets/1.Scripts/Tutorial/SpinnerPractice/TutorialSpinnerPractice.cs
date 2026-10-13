@@ -15,7 +15,8 @@ using UnityEngine.AI;
 /// <item><b>연습</b> — 체력 잠금 · 스핀만 · 창 간격 <see cref="windowInterval"/> · 돌진 피해 0(밀쳐내기만) · 스폰 반경 클램프.
 ///   v8 연계 연습(<see cref="SpinnerComboModel"/>): 간파 성공 → 기절 → <b>취약 유지</b>(시간 종료 없음 · FSM 정지 · 슈퍼 아머) →
 ///   취약 중 우클릭 간파 적중(<see cref="ISpinnerBotOverride.NotifyInterruptHit"/>)이 공격자 반대로 밀친다 → 유효 벽(<see cref="SetPracticeWall"/>) 충돌 =
-///   연계 1회 → 회복 → 원위치(<see cref="RelocateAnchor"/>) 복귀(피해·밀치기 무시, 플레이어 몸 무시) → 목표 전이면 다시 준비·간파. 23호 취약 밀치기와 같은 방식(공격자 반대 고정 거리)이지만 코드는 따로다(23호 것은 TwentyThreeBoss 전용).</item>
+///   연계 1회 → 회복 → <b>그 자리에서</b> 목표 전이면 다시 준비·간파, 3회째면 완료(사용자 변경 — 원위치 복귀 없음).
+///   23호 취약 밀치기와 같은 방식(공격자 반대 고정 거리)이지만 코드는 따로다(23호 것은 TwentyThreeBoss 전용).</item>
 /// <item><b>전환 대기</b> — <see cref="realModeDelay"/> 초 FSM 정지(<see cref="MonsterBase.SetServerLogicSuspended"/>, 체력 잠금 유지).</item>
 /// <item><b>본 모드</b> — 주입을 전부 끈다 = 원래 스피너봇.</item>
 /// </list>
@@ -54,7 +55,7 @@ public sealed class TutorialSpinnerPractice : NetworkBehaviour, ISpinnerBotOverr
     [Tooltip("EnterRealMode 후 원래 스피너봇으로 돌아가기 전 정지 시간(초).")]
     float realModeDelay = 2f;
 
-    [Header("연계 연습 (v8 §3.5 — 간파 → 취약 밀치기 → 벽 충돌 → 복귀)")]
+    [Header("연계 연습 (v8 §3.5 — 간파 → 취약 밀치기 → 벽 충돌 → 회복)")]
     [SerializeField, Min(1)]
     [Tooltip("본 전투 전 연계 성공 목표(파티 합계).")]
     int comboTarget = SpinnerComboModel.DefaultTarget;
@@ -76,19 +77,11 @@ public sealed class TutorialSpinnerPractice : NetworkBehaviour, ISpinnerBotOverr
     float comboBlockedContactSlack = 1.6f;
 
     [SerializeField, Min(0f)]
-    [Tooltip("벽 충돌 뒤 복귀 전 회복 시간(초).")]
+    [Tooltip("벽 충돌 뒤 회복 시간(초) — 끝나면 그 자리에서 다시 준비·간파(3회째면 완료).")]
     float comboRecoverSeconds = 0.6f;
 
-    [SerializeField, Min(0.5f)]
-    [Tooltip("원위치 복귀 속도(m/s).")]
-    float comboReturnSpeed = 6f;
-
-    [SerializeField, Min(0.5f)]
-    [Tooltip("복귀가 이 시간(초) 안에 안 끝나면 원위치로 옮긴다(막힘 방지).")]
-    float comboReturnTimeout = 5f;
-
     [SerializeField, Min(0f)]
-    [Tooltip("복귀 완료 뒤 다음 간파 창까지 최소 대기(초) — 밀치기에 쓴 우클릭이 다시 준비될 틈. 원래 창 간격(9초)이 더 늦으면 그쪽.")]
+    [Tooltip("회복 끝 뒤 다음 간파 창까지 최소 대기(초) — 밀치기에 쓴 우클릭이 다시 준비될 틈. 원래 창 간격(9초)이 더 늦으면 그쪽.")]
     float comboReadyDelay = 4f;
 
     readonly NetworkVariable<SpinnerPracticeMode> _mode = new NetworkVariable<SpinnerPracticeMode>(
@@ -119,7 +112,6 @@ public sealed class TutorialSpinnerPractice : NetworkBehaviour, ISpinnerBotOverr
     Vector3 _anchor;
     Vector3 _wallNormal;        // 유효 벽 면의 방 안쪽 법선(수평 단위)
     float _bodyRadius = 0.5f;
-    float _returnElapsed;
     bool? _appliedSuspended;    // 마지막으로 MonsterBase 에 건 FSM 정지 값(null = 아직 안 걺)
     bool _appliedSuperArmor;
     bool _subscribed;
@@ -136,7 +128,7 @@ public sealed class TutorialSpinnerPractice : NetworkBehaviour, ISpinnerBotOverr
 
     public SpinnerBot Bot => _bot;
 
-    /// <summary>연계 연습 단계(전 피어 복제) — 준비·간파 / 기절·취약 / 회복·복귀 / 완료.</summary>
+    /// <summary>연계 연습 단계(전 피어 복제) — 준비·간파 / 기절·취약 / 회복 / 완료.</summary>
     public SpinnerComboPhase ComboPhase => _comboPhase.Value;
 
     /// <summary>유효 벽(연습용 지정 벽) 표시 지점(전 피어). 아직 정하지 않았으면 false.</summary>
@@ -164,12 +156,12 @@ public sealed class TutorialSpinnerPractice : NetworkBehaviour, ISpinnerBotOverr
     public event Action<TutorialSpinnerPractice, SpinnerPracticeMode> ServerModeChanged;
 
     /// <summary>
-    /// [서버] 연습 중 간파 성공을 연계 시작으로 받아들였다(준비·간파 단계에서만 — 취약·복귀 중 성공은 없다). 인자 = 간파한 clientId.
+    /// [서버] 연습 중 간파 성공을 연계 시작으로 받아들였다(준비·간파 단계에서만 — 취약·회복 중 성공은 없다). 인자 = 간파한 clientId.
     /// 시전자 쿨 감소(할 일 26) <b>전</b>에 난다 — 그래서 존3 흐름의 파티 우클릭 쿨 초기화는 여기가 아니라 <see cref="PlayerInterruptSkillBase.ServerInterruptSucceeded"/> 에서 한다.
     /// </summary>
     public event Action<TutorialSpinnerPractice, ulong> ServerComboCounterAccepted;
 
-    /// <summary>[서버] 연계 진행 일(벽 충돌·밀치기 빗나감·복귀 시작·다시 준비·완료). 세 번째 인자 = 지금까지 연계 성공 수.</summary>
+    /// <summary>[서버] 연계 진행 일(벽 충돌·밀치기 빗나감·다시 준비·완료). 세 번째 인자 = 지금까지 연계 성공 수.</summary>
     public event Action<TutorialSpinnerPractice, SpinnerComboEvent, int> ServerComboEvent;
 
     /// <summary>[서버] 연계 성공 수(벽 충돌 — 사망·이탈로 줄지 않는다).</summary>
@@ -199,7 +191,7 @@ public sealed class TutorialSpinnerPractice : NetworkBehaviour, ISpinnerBotOverr
     {
         if (!RequireServer(nameof(EnterRealMode))) return;
         WarnIfDormant(nameof(EnterRealMode));
-        _combo.Finish();   // 교육용 취약 유지·정지·슈퍼 아머·복귀를 모두 끈다(v8 Z3-9)
+        _combo.Finish();   // 교육용 취약 유지·정지·슈퍼 아머를 모두 끈다(v8 Z3-9)
         _model.EnterRealMode();
         ApplyMode();
     }
@@ -318,7 +310,7 @@ public sealed class TutorialSpinnerPractice : NetworkBehaviour, ISpinnerBotOverr
         if (_counter != null) Emit(_tracker.Observe(_counter.IsOpen));
     }
 
-    // ─── 연계 연습(v8 §3.5) — 밀치기·복귀 이동은 FSM 을 세운 채 여기서 직접 한다 ───────────────────
+    // ─── 연계 연습(v8 §3.5) — 밀치기 이동은 FSM 을 세운 채 여기서 직접 한다 ───────────────────
 
     void TickCombo(float dt)
     {
@@ -342,28 +334,6 @@ public sealed class TutorialSpinnerPractice : NetworkBehaviour, ISpinnerBotOverr
                 toward = SpinnerComboGeometry.IsTowardWall(dir.x, dir.z, _wallNormal.x, _wallNormal.z);
             }
             events |= _combo.ReportPushMoved(step, moved, gap, toward);
-        }
-
-        if ((events & SpinnerComboEvent.ReturnStarted) != 0) _returnElapsed = 0f;
-
-        if (_combo.Phase == SpinnerComboPhase.Returning)
-        {
-            _returnElapsed += dt;
-            Vector3 pos = transform.position;
-            Vector3 to = _anchor - pos;
-            to.y = 0f;
-            float dist = to.magnitude;
-            float step = comboReturnSpeed * dt;
-            // 플레이어 몸에 막히지 않게 — NavMeshAgent.Move 는 콜라이더와 부딪히지 않는다. 그래도 늦으면 원위치로 옮긴다.
-            if (dist <= Mathf.Max(0.15f, step) || _returnElapsed >= comboReturnTimeout)
-            {
-                MoveTo(_anchor, warp: true);
-                events |= _combo.NotifyReturnArrived();
-            }
-            else
-            {
-                MoveTo(pos + to / dist * step, warp: false);
-            }
         }
 
         if ((events & SpinnerComboEvent.ReadyAgain) != 0)
@@ -397,7 +367,8 @@ public sealed class TutorialSpinnerPractice : NetworkBehaviour, ISpinnerBotOverr
     void LateUpdate()
     {
         if (!IsServer || !IsSpawned || !_model.ClampsPosition) return;
-        // 연계 밀치기·복귀 중에는 반경을 걸지 않는다 — 벽까지·원위치까지 움직여야 한다(배리어·NavMesh 가 막는다).
+        // 연계 취약·회복 중에는 반경을 걸지 않는다 — 벽까지 움직여야 한다(배리어·NavMesh 가 막는다).
+        // 다시 준비·간파가 되면 반경이 다시 걸린다 — 벽 앞(연습 위치에서 약 4m)은 보통 반경 안이라 그 자리에 남는다.
         if (_model.Mode == SpinnerPracticeMode.Practice && !_combo.ClampsToPracticeRadius) return;
 
         Vector3 position = transform.position;
@@ -424,7 +395,7 @@ public sealed class TutorialSpinnerPractice : NetworkBehaviour, ISpinnerBotOverr
         bool practicing = mode == SpinnerPracticeMode.Practice;
         if (_comboPhase.Value != _combo.Phase) _comboPhase.Value = _combo.Phase;
 
-        // 전환 대기 + 연계의 취약 유지·회복·복귀 = 스스로 이동·추격·공격하지 않는다(밀치기·복귀 이동은 TickCombo 가 직접).
+        // 전환 대기 + 연계의 취약 유지·회복 = 스스로 이동·추격·공격하지 않는다(밀치기 이동은 TickCombo 가 직접).
         bool suspend = _model.SuspendsServerLogic || (practicing && _combo.SuspendsFsm);
         if (_appliedSuspended != suspend)
         {
@@ -432,7 +403,7 @@ public sealed class TutorialSpinnerPractice : NetworkBehaviour, ISpinnerBotOverr
             _appliedSuspended = suspend;
         }
 
-        // 간파 성공 뒤 복귀 끝까지 외부 넉백(Q 넉백 등) 무시 — 우클릭 밀치기만 움직인다. 본 전투 전환 때 푼다.
+        // 간파 성공 뒤 회복 끝까지 외부 넉백(Q 넉백 등) 무시 — 우클릭 밀치기만 움직인다. 본 전투 전환 때 푼다.
         bool armor = practicing && _combo.BlocksExternalKnockback;
         if (_status != null && _appliedSuperArmor != armor)
         {
@@ -461,7 +432,7 @@ public sealed class TutorialSpinnerPractice : NetworkBehaviour, ISpinnerBotOverr
         }
     }
 
-    // 취약 중 우클릭 간파 적중 = 밀치기(공격자 → 스피너봇 방향). 준비·복귀 중에는 무시(외부 밀치기 없음).
+    // 취약 중 우클릭 간파 적중 = 밀치기(공격자 → 스피너봇 방향). 준비·회복 중에는 무시(외부 밀치기 없음).
     void ISpinnerBotOverride.NotifyInterruptHit(ulong attackerClientId)
     {
         if (_model == null || _model.Mode != SpinnerPracticeMode.Practice || !_combo.IsVulnerable || NetworkManager == null) return;

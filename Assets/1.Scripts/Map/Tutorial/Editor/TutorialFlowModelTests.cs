@@ -324,7 +324,7 @@ public sealed class TutorialFlowModelTests
     }
 
     [Test]
-    public void 연계_합계가_목표에_닿아도_G5_는_복귀_완료_때_흐름이_연다()
+    public void 연계_합계가_목표에_닿아도_G5_는_마지막_회복_끝에_흐름이_연다()
     {
         var m = NewModel(A);
         var log = Record(m);
@@ -333,10 +333,10 @@ public sealed class TutorialFlowModelTests
         m.AddCounter(TutorialCounter.Zone3Interrupts, 3);
         m.Evaluate(2d);
         Assert.AreEqual(3, m.GetCounter(TutorialCounter.Zone3Interrupts));
-        Assert.IsFalse(m.IsGateOpen(TutorialGate.G5_SpinnerRealMode), "v8 — 마지막 원위치 복귀 전");
+        Assert.IsFalse(m.IsGateOpen(TutorialGate.G5_SpinnerRealMode), "v8 — 마지막 회복 끝 전");
         Assert.IsFalse(TutorialFlowModel.TryGetGateCounter(TutorialGate.G5_SpinnerRealMode, out _));
 
-        Assert.IsTrue(m.RequestGate(TutorialGate.G5_SpinnerRealMode), "복귀 완료 → 존3 흐름이 연다");
+        Assert.IsTrue(m.RequestGate(TutorialGate.G5_SpinnerRealMode), "마지막 회복 끝 → 존3 흐름이 연다");
         Assert.AreEqual((TutorialGate.G5_SpinnerRealMode, TutorialGateOpenReason.Manual), log[log.Count - 1]);
     }
 

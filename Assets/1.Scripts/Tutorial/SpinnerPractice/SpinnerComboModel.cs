@@ -12,12 +12,10 @@ public enum SpinnerComboPhase : byte
     Stunned = 1,
     /// <summary>취약 유지 — 벽 충돌 전까지 시간으로 끝나지 않는다. 스스로 이동·추격·공격하지 않는다(밀치기 이동만).</summary>
     Vulnerable = 2,
-    /// <summary>벽 충돌 성공 뒤 짧은 회복.</summary>
+    /// <summary>벽 충돌 성공 뒤 짧은 회복 — 끝나면 그 자리에서 다시 준비·간파(원위치 복귀 없음 — 사용자 변경).</summary>
     Recovering = 3,
-    /// <summary>원위치 복귀 — 공격 없음·피해/밀치기 무시·플레이어 몸 무시.</summary>
-    Returning = 4,
-    /// <summary>연계 목표(3회) 달성 + 마지막 복귀 완료 — 본 전투(G5) 대기.</summary>
-    Done = 5,
+    /// <summary>연계 목표(3회) 달성 + 마지막 회복 끝 — 본 전투(G5) 대기.</summary>
+    Done = 4,
 }
 
 /// <summary><see cref="SpinnerComboModel"/> 이 한 번의 호출에서 낸 일(여러 개가 겹칠 수 있다).</summary>
@@ -31,23 +29,22 @@ public enum SpinnerComboEvent : byte
     WallHit = 1 << 1,
     /// <summary>밀치기가 벽에 닿지 않고 끝났다(거리 소진·벽 아닌 곳에 막힘) — 취약은 유지.</summary>
     PushEndedNoWall = 1 << 2,
-    /// <summary>회복이 끝나 복귀 이동 시작.</summary>
-    ReturnStarted = 1 << 3,
-    /// <summary>복귀 완료 — 목표 전이면 다시 준비·간파.</summary>
-    ReadyAgain = 1 << 4,
-    /// <summary>복귀 완료 + 목표 달성 — 본 전투로(G5).</summary>
-    Completed = 1 << 5,
+    /// <summary>회복 끝 — 목표 전이면 그 자리에서 다시 준비·간파.</summary>
+    ReadyAgain = 1 << 3,
+    /// <summary>회복 끝 + 목표 달성 — 본 전투로(G5).</summary>
+    Completed = 1 << 4,
 }
 
 /// <summary>
 /// 튜토리얼 스피너봇 연계 연습 상태 기계(순수 C# — EditMode 로 고정). v8 §3.5:
-/// [간파 성공 → 기절 → 취약 유지(시간 종료 없음) → 우클릭 밀치기 → 유효 벽 충돌 → 회복 → 원위치 복귀] × 목표(3).
+/// [간파 성공 → 기절 → 취약 유지(시간 종료 없음) → 우클릭 밀치기 → 유효 벽 충돌 → 회복] × 목표(3).
+/// 회복이 끝나면 그 자리에서 다음 준비·간파(사용자 변경 — 원위치 복귀 없음). 3회째 회복 끝 = 완료.
 /// <list type="bullet">
 /// <item>간파 성공은 <see cref="SpinnerComboPhase.Ready"/> 에서만 받는다(하나의 간파 창 = 성공 1번은 창 쪽이 이미 보장).</item>
 /// <item>밀치기는 기절·취약 중 우클릭 간파 적중만(호출자가 거른다). 진행 중 밀치기에 새 밀치기가 오면 방향·거리를 새로 잡는다.</item>
 /// <item>벽 충돌 = 밀치기 이동 뒤 몸 가장자리 ↔ 유효 벽 면 거리가 <see cref="ContactSlack"/> 이하,
 ///   또는 이동이 막혔는데(NavMesh 가장자리) 그 거리가 <see cref="BlockedContactSlack"/> 이하. 한 연계에 1번만 센다.</item>
-/// <item>복귀 중·회복 중에는 밀치기·간파를 받지 않는다. 사망·이탈로 성공 횟수를 되돌리지 않는다.</item>
+/// <item>회복 중에는 밀치기·간파를 받지 않는다. 사망·이탈로 성공 횟수를 되돌리지 않는다.</item>
 /// </list>
 /// 이동 자체(NavMeshAgent.Move)·벽 거리 계산은 호출자(<c>TutorialSpinnerPractice</c>) 몫 — 여기는 규칙만.
 /// </summary>
@@ -89,17 +86,17 @@ public sealed class SpinnerComboModel
     /// <summary>취약(기절 포함) — 우클릭 밀치기를 받는 구간.</summary>
     public bool IsVulnerable => Phase == SpinnerComboPhase.Stunned || Phase == SpinnerComboPhase.Vulnerable;
 
-    /// <summary>서버 FSM 을 세워 두는가 — 기절 뒤 취약 유지·회복·복귀(기절 동안은 원래 그로기가 돈다). 완료 뒤는 본 모드 전환이 맡는다.</summary>
+    /// <summary>서버 FSM 을 세워 두는가 — 기절 뒤 취약 유지·회복(기절 동안은 원래 그로기가 돈다). 완료 뒤는 본 모드 전환이 맡는다.</summary>
     public bool SuspendsFsm =>
-        Phase == SpinnerComboPhase.Vulnerable || Phase == SpinnerComboPhase.Recovering || Phase == SpinnerComboPhase.Returning;
+        Phase == SpinnerComboPhase.Vulnerable || Phase == SpinnerComboPhase.Recovering;
 
-    /// <summary>외부 넉백을 막아 두는가(슈퍼 아머) — 간파 성공 뒤 복귀 끝까지. 밀치기 이동은 이 모델이 직접 한다.</summary>
+    /// <summary>외부 넉백을 막아 두는가(슈퍼 아머) — 간파 성공 뒤 회복 끝까지. 밀치기 이동은 이 모델이 직접 한다.</summary>
     public bool BlocksExternalKnockback => Phase != SpinnerComboPhase.Ready && Phase != SpinnerComboPhase.Done;
 
-    /// <summary>원래 연습 루프(스핀·간파 창)를 돌리는가 — 준비·간파 단계만. 취약·복귀 중에는 새 간파 공격을 예고하지 않는다.</summary>
+    /// <summary>원래 연습 루프(스핀·간파 창)를 돌리는가 — 준비·간파 단계만. 취약·회복 중에는 새 간파 공격을 예고하지 않는다.</summary>
     public bool AllowsSpin => Phase == SpinnerComboPhase.Ready;
 
-    /// <summary>스폰 반경 클램프를 거는가 — 준비·간파 단계만(밀치기·복귀는 벽·원위치까지 움직여야 한다).</summary>
+    /// <summary>스폰 반경 클램프를 거는가 — 준비·간파 단계만(밀치기는 벽까지 움직여야 한다).</summary>
     public bool ClampsToPracticeRadius => Phase == SpinnerComboPhase.Ready;
 
     /// <summary>간파 성공(이 스피너봇). 준비 단계면 기절로 가고 true — 호출자는 파티 우클릭 쿨을 1회 초기화한다.</summary>
@@ -164,7 +161,10 @@ public sealed class SpinnerComboModel
         return SpinnerComboEvent.None;
     }
 
-    /// <summary>시간 진행(기절 → 취약 유지, 회복 → 복귀). 취약 유지는 시간으로 끝나지 않는다.</summary>
+    /// <summary>
+    /// 시간 진행(기절 → 취약 유지, 회복 → 그 자리에서 준비·간파 또는 완료). 취약 유지는 시간으로 끝나지 않는다.
+    /// 회복 끝: 목표 전이면 <see cref="SpinnerComboEvent.ReadyAgain"/>, 달성이면 <see cref="SpinnerComboEvent.Completed"/>.
+    /// </summary>
     public SpinnerComboEvent Tick(float deltaSeconds)
     {
         float dt = Math.Max(0f, deltaSeconds);
@@ -179,25 +179,17 @@ public sealed class SpinnerComboModel
             case SpinnerComboPhase.Recovering:
                 _timer -= dt;
                 if (_timer > 0f) return SpinnerComboEvent.None;
-                Phase = SpinnerComboPhase.Returning;
-                return SpinnerComboEvent.ReturnStarted;
+                if (Successes >= Target)
+                {
+                    Phase = SpinnerComboPhase.Done;
+                    return SpinnerComboEvent.Completed;
+                }
+                Phase = SpinnerComboPhase.Ready;
+                return SpinnerComboEvent.ReadyAgain;
 
             default:
                 return SpinnerComboEvent.None;
         }
-    }
-
-    /// <summary>원위치 도착. 목표 전이면 준비·간파로(<see cref="SpinnerComboEvent.ReadyAgain"/>), 달성이면 완료(<see cref="SpinnerComboEvent.Completed"/>).</summary>
-    public SpinnerComboEvent NotifyReturnArrived()
-    {
-        if (Phase != SpinnerComboPhase.Returning) return SpinnerComboEvent.None;
-        if (Successes >= Target)
-        {
-            Phase = SpinnerComboPhase.Done;
-            return SpinnerComboEvent.Completed;
-        }
-        Phase = SpinnerComboPhase.Ready;
-        return SpinnerComboEvent.ReadyAgain;
     }
 
     /// <summary>본 전투 전환(G5 — 디버그로 일찍 열린 경우 포함). 교육용 규칙을 모두 끈다.</summary>

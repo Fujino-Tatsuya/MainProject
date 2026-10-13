@@ -87,6 +87,9 @@
 **진행(2026-10-12)**: V0 `0af4cac4` · V1 `c3f6f295` · V2 `348376fc` · V3 `3ab36055` · V4 `dda9ca7b` · V5 문서 `3ff996b6`. Play 확인 순서 = Docs/tech/tutorial-qa.md(v8 반영).
 - 26(`feature/InterruptSuccessCooldown`) 병합 `df299c3a` 뒤 정리: 존3 간파 성공 판정 = `PlayerInterruptSkillBase.ServerInterruptSucceeded`(26 의 시전자 쿨 감소 **뒤** 발생 → 파티 우클릭 쿨 0 으로 덮음), `ServerCounterSucceeded`↔`ServerInterruptResolved` 같은 프레임 짝짓기 제거.
   `TutorialCooldownReset` = `PlayerSkillController.ResetCooldownServer(skill)`(위 '기존 공개 API' 결정의 `ReduceCooldownServer(…)` 를 대체). 🔴 **V8 은 26 에 의존 — 26 을 먼저 development 에 병합할 것.** 상세: Docs/tech/tutorial-zone3.md §5.
+- **사용자 변경(2026-10-13) — V4 원위치 복귀 없음**: 유효 벽 충돌 → 회복(`comboRecoverSeconds`) → **그 자리에서** 다음 준비·간파. 3회째는 회복 끝에 그 자리에서 G5 → 본 전투.
+  `SpinnerComboPhase.Returning`·`ReturnStarted`·복귀 무적/관통·5초 Warp·`TUT_Z3_RETURN` 호출 제거(SO 행·상수는 남김). 벽 판정(`SpinnerComboGeometry`·유효 벽·연습 위치)은 사용자 논의 중이라 그대로 —
+  벽에 붙은 채 시작하는 2·3회째가 너무 쉬울 수 있음(대응 안 함). 위 V4 행의 '원위치 복귀'·'복귀 중 …' 은 이 결정으로 대체된다.
 - **사용자 변경(2026-10-13) — V2 자막 없음**: 복도1 첫 진입 쿨 초기화 때 `TUT_C1_COOLDOWN_RESET` 을 띄우지 않는다(호출만 제거, SO 행은 남김). 초기화 동작(플레이어별 1회·대시·예약)은 그대로.
 
 ## 4. 리스크

@@ -44,7 +44,7 @@ public static class TutorialGuideIds
     public const string Z3PushHint = "TUT_Z3_PUSH_HINT";
     /// <summary>v8 Z3-6 벽 충돌 — 연계 {n}/3.</summary>
     public const string Z3WallSuccess = "TUT_Z3_WALL_SUCCESS";
-    /// <summary>v8 Z3-7 복귀.</summary>
+    /// <summary>v8 Z3-7 복귀 — 더 이상 호출하지 않는다(사용자 변경: 원위치 복귀 없음). 시드 행만 남긴다.</summary>
     public const string Z3Return = "TUT_Z3_RETURN";
     public const string Z3Miss = "TUT_Z3_MISS";
     public const string Z3Early = "TUT_Z3_EARLY";

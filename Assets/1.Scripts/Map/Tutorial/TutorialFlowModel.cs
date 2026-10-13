@@ -31,7 +31,7 @@ public enum TutorialGate : byte
     G2_Zone2Entry = 1,
     G3_Corridor2Entry = 2,
     G4_Zone3Entry = 3,
-    /// <summary>스피너봇 연습 모드 → 본 모드(v8: 연계 3회 + 마지막 원위치 복귀 완료 — 존3 흐름이 연다).</summary>
+    /// <summary>스피너봇 연습 모드 → 본 모드(v8: 연계 3회 + 마지막 회복 끝 — 존3 흐름이 연다).</summary>
     G5_SpinnerRealMode = 4,
     G6_Corridor3Entry = 5,
     G7_Zone4Entry = 6,
@@ -75,7 +75,7 @@ public enum TutorialCounter : byte
     Zone2Kills = 0,
     /// <summary>
     /// 존3 연계(간파 → 취약 밀치기 → 유효 벽 충돌) 파티 합계 n/3(v8 D2·D2-1 — 이름은 이전 판 그대로). 목표 도달만으로는 G5 를 열지 않는다 —
-    /// 마지막 원위치 복귀가 끝나야 존3 흐름이 G5 를 연다(v8 Z3-9).
+    /// 마지막 벽 충돌 뒤 회복이 끝나야 존3 흐름이 G5 를 연다(v8 Z3-9 · 원위치 복귀 없음 — 사용자 변경).
     /// </summary>
     Zone3Interrupts = 1,
     /// <summary>존4 제어 패널 n/4 — 표시용(다리는 ZoneBridgeGateManager 가 연다).</summary>
@@ -185,7 +185,7 @@ public sealed class TutorialFlowModel
     public static bool HasDeadlockTimeout(TutorialGate g) => IsPersonalGate(g) && g != TutorialGate.G1_Corridor1Entry;
 
     /// <summary>
-    /// 카운터로 <b>자동으로</b> 열리는 게이트면 그 카운터. v8 부터 없다 — G5 는 연계 3회 뒤 <b>마지막 원위치 복귀</b>까지 기다려야 해서
+    /// 카운터로 <b>자동으로</b> 열리는 게이트면 그 카운터. v8 부터 없다 — G5 는 연계 3회 뒤 <b>마지막 회복</b>까지 기다려야 해서
     /// 존3 흐름이 직접 연다(<see cref="RequestGate"/>). 카운터 게이트 자리는 확장용으로 남긴다.
     /// </summary>
     public static bool TryGetGateCounter(TutorialGate g, out TutorialCounter counter)
