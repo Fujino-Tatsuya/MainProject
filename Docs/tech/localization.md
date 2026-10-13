@@ -18,8 +18,8 @@ Loc.GetError("LOBBY_FULL") → 현재 언어 오류 문구
 ```
 
 - 지원 언어: **ko**(기본·필수) · **en**.
-- 언어 설정은 타이틀 **옵션 → Gameplay → Language**(한국어 / English). 저장 = PlayerPrefs `Settings.Language`.
-  처음 실행(저장값 없음)이면 OS 언어가 한국어면 ko, 아니면 en.
+- 언어 설정은 **설정창(SettingsBody) → 게임플레이 → 언어** 버튼(한국어 ↔ English). 저장 = PlayerPrefs `Settings.Language`.
+  처음 실행(저장값 없음)이면 OS 언어가 한국어면 ko, 아니면 en. 설정창 문구 키는 [§9](#9-설정창-통합).
 
 ## 2. 기획 — Strings 시트 쓰는 법
 
@@ -124,7 +124,7 @@ Loc.Changed += Redraw;           // OnEnable 에서 구독, OnDisable 에서 꼭
 
 ### 키 규칙
 
-- `영역.화면.이름` 점 구분 PascalCase — `UI.Lobby.Ready`, `UI.Options.Language`, `Tutorial.S3.Dash`, `Skill.Paladin.Q.Name`.
+- `영역.화면.이름` 점 구분 PascalCase — `UI.Lobby.Ready`, `UI.Settings.Graphics.Resolution`, `Tutorial.S3.Dash`, `Skill.Paladin.Q.Name`.
 - 한 번 쓴 키의 의미를 바꾸지 않는다 — 문구가 크게 바뀌면 새 키를 만든다(번역이 조용히 어긋나지 않게).
 - 같은 단어라도 화면이 다르면 키를 나눈다(언어마다 길이·어순이 달라진다).
 
@@ -158,7 +158,7 @@ Loc.Changed += Redraw;           // OnEnable 에서 구독, OnDisable 에서 꼭
 | `Assets/1.Scripts/Localization/Editor/StringKeyOwners.cs` | 자동 키 주인 ID → SO·컴포넌트(검증용) |
 | `Assets/1.Scripts/Localization/Editor/TableTextMigration.cs` | 병합 Export 때 옛 수치 시트 문구 칸 → Strings 행 이관 계획(순수) |
 | `Assets/1.Scripts/Localization/Editor/StringTableBuild.cs` | 표 에셋 생성·빌드 Preload·수동 갱신 메뉴 |
-| `Assets/1.Scripts/UI/Title/LanguageOption.cs` · `Editor/LanguageOptionAuthoring.cs` | 옵션 언어 선택 · 배치 메뉴 `Tools/UI/Title/옵션 Gameplay — 언어 선택 배치` |
+| `Assets/1.Scripts/Settings/SettingsUiStrings.cs` · `Settings/Editor/SettingsLocalizationLinker.cs` | 설정창 문구 키(`UI.Settings.*`) · 설정 라벨 키 연결 메뉴 — [§9](#9-설정창-통합) |
 | `Assets/1.Scripts/Localization/UiStrings.cs` | L3·L4b UI 문구 키 목록(`UiString` = 키 + ko 폴백 + 쓰는 곳) · 초 단위 `UiStrings.Seconds` · 상태이상 이름 키 |
 | `Assets/1.Scripts/Localization/Editor/UiStringKeys.cs` | Export 때 `UiStrings.All` 을 Strings 키로 등록(`StringKeyRegistry`) |
 | `Assets/1.Scripts/Localization/Editor/UiStringsAuthoring.cs` | L3 저작 메뉴 `Tools/Localization/L3 — 씬·프리팹 라벨 키 부착` |
@@ -234,12 +234,12 @@ SO·프리팹에 인라인으로 적힌 문구(스킬 툴팁·캐릭터 이름)�
 | `UI.Result.Character` · `Damage` · `Kills` · `Counters` · `Deaths` | 캐릭터 · 데미지 · 처치 · 간파 · 사망 | `5.ResultScene` › `PlayerRowsHeader/Header_*` |
 | `UI.AssassinHUD.EnhancedReady` | E 강화 준비 | `AssassinHUD.prefab` › `EnhancedReady` |
 | `UI.Interact.Prompt` | 상호 작용 | `InteractPrompt.prefab` › `InteractText` |
-| `UI.Options.Language` | Language | `1.TitleScene` › `LanguageOption/LanguageLabel` |
 
 - 붙이는 법: **`Tools/Localization/L3 — 씬·프리팹 라벨 키 부착`**. 멱등 — 키가 이미 맞으면 저장하지 않는다(두 번 돌려도 diff 없음). 글자·위치·글꼴은 안 건드린다.
   씬·프리팹 글자가 `UiStrings` 의 ko 와 다르면 경고만 남긴다(시트 행이 없으면 저작 글자가 보인다).
-- 새로 배치하는 타이틀 Language 행은 `LanguageOptionAuthoring` 이 라벨에 키를 같이 붙인다.
-- `UI.Options.Language` 의 ko 는 지금 문구인 `Language` 다 — 타이틀 옵션은 영어 메뉴라 바꾸지 않았다. 한국어로 보일지는 기획이 시트 ko 칸으로 정한다.
+- 🔸 예전 타이틀 옵션 `UI.Options.Language`(`LanguageOption/LanguageLabel`)는 **없앴다**(할 일 38) — 타이틀 옵션 패널이 설정창 프리팹으로 바뀌어 대상이 사라졌고,
+  언어 선택은 설정창 게임플레이 탭 버튼 하나다(`UI.Settings.Gameplay.Language`, [§9](#9-설정창-통합)). 시트에 옛 행이 남아 있으면 지우거나 `#` 를 붙인다.
+- 설정창(`SettingsBody.prefab`) 라벨은 이 메뉴가 아니라 설정 쪽 메뉴가 붙인다([§9](#9-설정창-통합)).
 
 ### 코드가 쓰는 문구 — 코드 키
 
@@ -381,3 +381,51 @@ en: Hold {key:Detail} for details
 - 지금 이 토큰을 쓰는 문구는 없다. 후보: `UI.SkillTooltip.ShiftHint`(`[Shift]`) · `UI.AssassinHUD.TransformReleasable`(`R`) · `UI.AssassinHUD.EnhancedReady`(`E`) · 튜토리얼 안내(별도 레인).
 
 - 테스트: `UiStringsL4bTests`(상태이상 enum→키 전수·조합 값·로딩 칸 순서·초 단위 한 곳) · `UiStringsL4bFormatTests`(초 단위·툴팁·상태이상·결과·허수아비·로딩 — 행 없음 폴백 = 예전 글자 / 행 있으면 시트).
+
+## 9. 설정창 통합
+
+설정창(PLAN-settings S15·S16)은 처음엔 자체 언어 시스템(`SettingsStrings`·`LanguageConfig`·설정 전용 `LocalizedText`)이었다. 할 일 38 에서 **이 문서의 시스템 하나로 합쳤다** — 경석 공유용 요약은 [handoff-settings-localization.md](handoff-settings-localization.md).
+
+### 키 — `UI.Settings.*`
+
+| 접두사 | 개수 | 예 |
+|---|---|---|
+| `UI.Settings.Common.*` | 1 | `Off` |
+| `UI.Settings.Tab.*` | 4 | `Gameplay` · `Graphics` · `Controls` · `Audio` |
+| `UI.Settings.Gameplay.*` | 9 | `DamageNumbers(.All/.Mine/.AllEmphasized)` · `ScreenShake` · `Language` · `Performance(.Fps/.FpsPing)` |
+| `UI.Settings.Graphics.*` | 26 | `Resolution(.Recommended1440/.Recommended1080/.MonitorNative)` · `WindowMode(.…)` · `Apply` · `FrameLimit(.Unlimited)` · `VSync` · `Confirm` · `Keep` · `Revert` · `Preset(.Low/.Medium/.High/.Custom)` · `RenderScale` · `Shadows` · `AntiAliasing` · `PostEffects` · `VignetteSize` · `VignetteEdge` |
+| `UI.Settings.Controls.*` | 13 | `HoldSkillToggle` · `DashMouse` · `<입력 액션 이름>`(Attack·Interrupt·SkillMain·SkillSub·SkillUltimate·Dash·Interact) · `ResetKeys` · `PressKey` · `Swapped` · `ResetDone` |
+| `UI.Settings.Audio.*` | 4 | `Master` · `Bgm` · `Sfx` · `MuteUnfocused` |
+
+- 목록 = `SettingsUiStrings`(코드 한 곳, 57개). `UiStrings.All` 이 그대로 모아 Export 가 Strings 시트에 붙인다(§6 과 같은 규칙 — ko = 코드 ko, `#설명` = 쓰는 곳, en 빈 칸).
+- `UI.Settings.Controls.<액션>` 은 입력 액션 이름 그대로다 — 키 맞바꿈 알림(`KeyRebindRow.ActionLabel`)이 액션 이름으로 찾는다. 키가 없으면 액션 이름이 보인다.
+- 자리표시자: `Graphics.Resolution.MonitorNative` = `{width}`·`{height}`, `Controls.Swapped` = `{action}`, `Graphics.Confirm` = `{time}`(`UI.Unit.Seconds` 로 만든 남은 초 — §8 초 단위 규칙).
+
+### 정적 라벨 — `SettingsBody.prefab`
+
+- 고정 라벨 39개에 `LocalizedText`(이 문서 §3 컴포넌트)가 붙어 있다. **저작 글자 = 그 키의 ko**(행이 없을 때 폴백).
+- 붙이는 법: **`Tools/UI/Settings/설정 패널 문구 키 연결 (멱등)`**(`SettingsLocalizationLinker`). 항목 배치 메뉴(`설정 패널 항목 배치`)가 끝에 자동으로 부른다.
+  아직 키가 없는 라벨은 글자로 키를 찾는다 — **영어 저작 원문**(`SettingsUiStrings.AuthoredEnglish`, 배치 메뉴가 라벨을 영어로 만든다) → 없으면 한 키에만 있는 ko.
+  키가 붙은 라벨은 글자를 ko 로 맞춘다. 이미 맞으면 저장하지 않는다.
+- 드롭다운 항목·값 표시(`100%`)·확인 창 문구·키 이름은 컨트롤러가 코드에서 채운다(`UiString.Text`/`Format`) — `Loc.Changed` 때 다시 채운다.
+
+### 문구 추가하는 법
+
+1. `SettingsUiStrings` 에 `S("영역.이름", ko, 영어 원문, 쓰는 곳)` 한 줄(키 = `UI.Settings.` + 이름, 각 칸 대문자 시작).
+2. 정적 라벨이면 배치 메뉴로 라벨을 만들고(영어 원문 글자) 키 연결 메뉴가 붙게 한다. 코드 문구면 `SettingsUiStrings.X.Text`/`Format`.
+3. `Tools/Data/Export Template` → Strings 시트에 새 행(en 빈 칸) → **en 칸은 기획이 채운다**(영어 원문을 옮겨도 된다). Play 를 다시 시작하면 반영.
+- 🔴 `AuthoredEnglish` 는 라벨 역조회·en 초안일 뿐이다. 화면 en 의 원본은 **시트 en 칸** — 코드 영어만 고쳐서는 화면이 안 바뀐다.
+
+### 언어 저장 — PlayerPrefs 이관
+
+- 저장은 `UserLanguageConfig` 한 곳, PlayerPrefs `Settings.Language` = **문자열 `ko`/`en`**.
+- 옛 설정창은 같은 키에 **정수**(0 = English, 1 = 한국어)로 저장했다. 처음 읽을 때 문자열이 아니면 정수로 읽어 0→en, 1→ko 로 바꾸고 **문자열로 다시 저장**한다(한 번). 그 밖의 정수면 OS 기본.
+- 첫 실행 기본(저장값 없음) = OS 언어가 한국어면 ko, 아니면 en — 두 시스템 규칙이 같아 바뀐 것 없다.
+
+### 언어 이름은 번역하지 않는다
+
+- 설정창 언어 버튼 글자는 **지금 언어 이름을 그 언어로**(`한국어` / `English`) — `LocText.NativeName`. 시트 키가 없다(번역 대상 아님).
+  못 읽는 언어로 바뀌어도 자기 언어 이름을 보고 돌아올 수 있게 하는 규칙(경석 S15).
+- 버튼 한 번 = 다음 언어(`LocText.Next` — 한국어 ↔ English), `Loc.Current` 로 바꾼다(`Loc.Changed` → 라벨·컨트롤러가 다시 그림).
+
+- 테스트: `SettingsRulesTests`(언어 기본·전환·이름 비번역, 57키·영어 원문 중복·자리표시자, 라벨 역조회, 액션 이름) · `UiStringsFormatTests`(확인 창 초 단위·액션 이름 언어 전환) · `UiStringsAuthoringTests`(Linker 멱등·ko 폴백) · `UserLanguageConfigTests`(정수 저장값 이관).
