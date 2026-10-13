@@ -36,6 +36,11 @@ public class MonsterProjectileEffects : NetworkBehaviour
 
     EffectHandle _trailHandle = EffectHandle.None;
 
+    // 읽기 전용 — 수직 낙하 포격(MonsterSkyStrike)이 투사체 없이 같은 폭발을 재생할 때 쓴다(PLAN-monster-tells).
+    public EffectEntry Explode => explode;
+    public Vector3 ExplodeOffset => explodeOffset;
+    public float Scale => scale;
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();

@@ -75,7 +75,11 @@ public class WellsDroneDataSO : ScriptableObject
     [Tooltip("줄어드는 구간 중 초록 → 주황으로 바뀌는 지점(0~1). 0.5 = 줄어드는 시간의 절반.")]
     [Range(0f, 1f)] public float crosshairMidColorAt = 0.5f;
 
-    [Header("바닥 예고 원 색")]
-    public Color circleOuterColor = new Color(1f, 0.15f, 0.1f, 0.3f);
-    public Color circleFillColor = new Color(1f, 0.05f, 0.02f, 0.6f);
+    // ⚠️ 10-13 — 착탄 원 색은 23호 데이터의 telegraphStyle(TelegraphStyleSO.circle)로 옮겼다(PLAN-telegraph-style).
+    //    아래 두 칸은 **아무도 읽지 않는다**. 저작값 보존을 위해 지우지 않고 남겨 둔다(값 = 기본 스타일과 같음).
+    [Header("⚠️ 미사용 — 색은 TelegraphStyle(circle)")]
+    [Tooltip("⚠️ 미사용. 착탄 원 색은 23호 데이터(No23)의 Telegraph Style → circle 에서 고친다.")]
+    [System.Obsolete("TelegraphStyleSO.circle.outline 을 쓴다")] public Color circleOuterColor = new Color(1f, 0.15f, 0.1f, 0.3f);
+    [Tooltip("⚠️ 미사용. 착탄 원 색은 23호 데이터(No23)의 Telegraph Style → circle 에서 고친다.")]
+    [System.Obsolete("TelegraphStyleSO.circle.fill 을 쓴다")] public Color circleFillColor = new Color(1f, 0.05f, 0.02f, 0.6f);
 }

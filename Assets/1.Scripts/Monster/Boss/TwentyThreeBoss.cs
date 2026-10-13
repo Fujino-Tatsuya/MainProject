@@ -4558,6 +4558,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         // 차징은 최대 chargeTimeLimit 초 유지된다 — 그동안 계속 보여야 하므로 넉넉히 잡고,
         // 실제 종료는 HideChargeAuraClientRpc 가 한다.
         _chargeAuraTelegraph.Show(radius, ChargeTimeLimit + 2f);
+        _chargeAuraTelegraph.ApplyStyle(TelegraphStyleSO.For(this).circle.fill);   // 원형 판 스타일(재질이 예고 셰이더일 때만 먹는다)
     }
 
     [ClientRpc]

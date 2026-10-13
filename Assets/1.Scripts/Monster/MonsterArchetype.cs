@@ -13,3 +13,14 @@ public enum MonsterArchetype
     RangedMobile,
     Boss,
 }
+
+/// <summary>
+/// 원거리(RangedMobile) 공격 방식(PLAN-monster-tells M4). 🔴 값 추가는 끝에만(정수 직렬화).
+/// - Projectile: 투사체를 쏜다(직선·포물선 — 기존).
+/// - SkyStrike: 타깃 발밑에 원형 예고 → 하늘에서 수직 낙하(코그모 궁). 시야가 있을 때만 쏜다.
+/// </summary>
+public enum MonsterRangedStyle
+{
+    Projectile,
+    SkyStrike,
+}

@@ -282,12 +282,28 @@ public sealed class BossElectricFloor : MonoBehaviour
         ForEachTile(mask, (r, c, i) =>
         {
             PlaceTile(_outer[i], r, c, i, FullTile);
-            BossPatternVisuals.Paint(_outer[i], _d.warnOuterColor, BossPatternVisuals.SquareTexture);
             _outer[i].gameObject.SetActive(true);
             PlaceTile(_fill[i], r, c, i, 0f);
-            BossPatternVisuals.Paint(_fill[i], _d.warnFillColor, BossPatternVisuals.SquareTexture);
             _fill[i].gameObject.SetActive(true);
+            PaintWarnTile(r, c, i);
         });
+        _paintedStyleVersion = TelegraphStyleSO.Version;
+    }
+
+    int _paintedStyleVersion = -1;
+
+    // 경고 칸 색·마스크 = 23호(소유 몬스터) 스타일의 floorTile(PLAN-telegraph-style). 예전 _d.warnOuter/FillColor 는 기본 스타일로 옮겨졌다.
+    // 마스크 기준점 = 칸 중심, 축 = 격자 회전, 늘이기 = 칸 하나에 한 장. 채움 판이 커져도 기준은 칸 중심이라 패턴이 제자리다.
+    void PaintWarnTile(int r, int c, int i)
+    {
+        TelegraphPlateStyle s = TelegraphStyleSO.For(this).floorTile;
+        Texture2D square = BossPatternVisuals.SquareTextureFor(s.rimRatio);
+        Vector3 center = _viewGrid.TileCenter(r, c);
+        Vector3 right = _viewGrid.Rotation * Vector3.right;
+        Vector3 fwd = _viewGrid.Rotation * Vector3.forward;
+        Vector2 extent = _viewGrid.TileExtent;
+        BossPatternVisuals.PaintStyled(_outer[i], s.outline, square, center, right, fwd, extent);
+        BossPatternVisuals.PaintStyled(_fill[i], s.fill, square, center, right, fwd, extent);
     }
 
     public void ClientFire(ulong mask, float vfxTime)
@@ -341,6 +357,9 @@ public sealed class BossElectricFloor : MonoBehaviour
         if (_d.electricFlickerSpeed > 0f)
             col.a *= 0.55f + 0.45f * Mathf.Sin(Time.time * _d.electricFlickerSpeed);   // 임시 전기 — 빠른 깜빡임
         float s = FullTile * Mathf.Clamp01(k);                      // 안쪽 진한 사각형이 중심에서 차오른다(§9-2)
+        // Play 중 스타일 조절 — 경고 칸만 다시 칠한다(진행은 그대로).
+        bool repaint = !_viewFiring && _paintedStyleVersion != TelegraphStyleSO.Version;
+        if (repaint) _paintedStyleVersion = TelegraphStyleSO.Version;
 
         // 매 프레임 도는 곳이라 람다(ForEachTile) 대신 루프 — 할당 0.
         for (int r = 0; r < BossTileGrid.Size; r++)
@@ -349,7 +368,11 @@ public sealed class BossElectricFloor : MonoBehaviour
                 if (!BossTileGrid.Has(_viewMask, r, c)) continue;
                 int i = BossTileGrid.Bit(r, c);
                 if (_viewFiring) BossPatternVisuals.Paint(_outer[i], col, null);
-                else PlaceTile(_fill[i], r, c, i, s);
+                else
+                {
+                    if (repaint) PaintWarnTile(r, c, i);
+                    PlaceTile(_fill[i], r, c, i, s);
+                }
             }
     }
 

@@ -21,6 +21,8 @@ public class MonsterBase : Unit
     [SerializeField] protected MonsterDataSO data;
 
     public override MonsterRank Rank => data != null ? data.rank : MonsterRank.Normal;
+    /// <summary>몬스터 데이터(읽기 전용). 예고 스타일 등 표시 쪽이 모든 피어에서 읽는다.</summary>
+    public MonsterDataSO MonsterData => data;
 
     [Header("컴포넌트 참조(비우면 자동 탐색)")]
     [SerializeField] protected NavMeshAgent agent;
@@ -716,6 +718,18 @@ public class MonsterBase : Unit
         // 커밋 이동 중에는 공격을 미룬다(이동을 최소 시간만큼 완결 → 어색한 찔끔 이동 방지).
         if (!committed && dist <= data.attackRange && !attackBlocked && CooldownReady())
         {
+            // 수직 낙하 포격은 시야가 있을 때만 쏜다(M5) — 막혔으면 자리를 옮긴다(재배치 지점, 없으면 타깃 쪽으로).
+            if (UsesSkyStrike && !HasStrikeLineOfSight() && !movementBlocked)
+            {
+                PickRepositionDest(dist);
+                if (_hasRepositionDest)
+                    StartCombatMove(_repositionDest, MoveSpeed, data.repositionMinDuration, repick: false);
+                else
+                    ChaseTarget(data.chaseSpeed);
+                SetState(MonsterState.Chase);
+                return;
+            }
+
             ClearReposition();
             StartAttack();
             return;
@@ -1177,7 +1191,9 @@ public class MonsterBase : Unit
                 break;
 
             case MonsterArchetype.RangedMobile:
-                if (rangedAttack != null && _target != null)
+                if (UsesSkyStrike)
+                    ServerBeginSkyStrike();   // 수직 낙하 포격(PLAN-monster-tells) — 공용 투사체 경로는 안 탄다
+                else if (rangedAttack != null && _target != null)
                     rangedAttack.Fire(_target.position + Vector3.up * 0.8f);
                 break;
             default:
@@ -1185,6 +1201,74 @@ public class MonsterBase : Unit
                 break;
         }
     }
+
+    #region 수직 낙하 포격 (SkyStrike — MortarBot, PLAN-monster-tells M4~M8)
+    /// <summary>
+    /// 원거리 이동형이고 데이터가 SkyStrike 면 투사체 대신 수직 낙하 포격을 쓴다.
+    /// 🔴 <c>projectileArcHeight</c> 를 "수직 낙하"로 재해석하지 않는다 — 다른 포물선 몹이 생기면 같이 바뀐다(Codex 10-13). 명시적 칸으로 고른다.
+    /// </summary>
+    protected bool UsesSkyStrike =>
+        data != null && data.archetype == MonsterArchetype.RangedMobile && data.rangedStyle == MonsterRangedStyle.SkyStrike;
+
+    /// <summary>
+    /// 머즐 → 타깃 몸통 사이에 지형(벽·바닥 — <c>skyStrikeLosBlockMask</c>)이 있으면 false(M5 — 벽 = 엄폐물 유지).
+    /// 몬스터·플레이어(Unit) 콜라이더와 트리거는 막지 않는다. 인지·추격은 그대로 — 쏘는 조건에만 쓴다.
+    /// </summary>
+    protected bool HasStrikeLineOfSight()
+    {
+        if (_target == null) return false;
+        Vector3 from = rangedAttack != null ? rangedAttack.Muzzle.position : transform.position + Vector3.up * 1.5f;
+        Vector3 to = _target.position + Vector3.up * 1f;
+        Vector3 d = to - from;
+        float len = d.magnitude;
+        if (len < 0.01f) return true;
+        RaycastHit[] hits = Physics.RaycastAll(from, d / len, len, data.skyStrikeLosBlockMask, QueryTriggerInteraction.Ignore);
+        foreach (RaycastHit h in hits)
+        {
+            if (h.collider == null || h.collider.GetComponentInParent<Unit>() != null) continue;
+            return false;
+        }
+        return true;
+    }
+
+    // 서버 — 발사 순간(OnAttackHit). 타깃 **발밑**에 고정(투사체의 +0.8m 조준 보정은 안 쓴다), 바닥 높이 확정,
+    // 서버 착탄 시각을 실어 모든 피어에 알리고, 같은 시각에 판정을 예약한다.
+    void ServerBeginSkyStrike()
+    {
+        if (!IsServer || _target == null) return;
+        // 발사 순간 다시 확인 — 공격 동작(≈1.45초) 사이에 벽 뒤로 숨었으면 쏘지 않는다.
+        if (!HasStrikeLineOfSight())
+        {
+            Debug.Log($"[SkyStrike] {name}: 발사 순간 시야 막힘 — 쏘지 않는다.", this);
+            return;
+        }
+
+        Vector3 feet = _target.position;
+        float floorY = BossPatternVisuals.SampleFloorY(feet, feet.y);
+        var point = new Vector3(feet.x, floorY, feet.z);
+        float radius = Mathf.Max(0.1f, data.projectileSplashRadius);
+        float duration = AttackTime(data.skyStrikeTelegraphTime);
+        double impact = NetworkManager.ServerTime.Time + duration;
+
+        int damage = rangedAttack != null ? rangedAttack.Damage : data.attackDamage;
+        LayerMask mask = rangedAttack != null ? rangedAttack.TargetLayer : playerMask;
+        MonsterSkyStrike.Instance.ServerSchedule(point, radius, data.skyStrikeFloorTolerance, impact, damage, mask, this);
+
+        SkyStrikeShowRpc(point, radius, impact, duration);
+    }
+
+    // 모든 피어(호스트 포함) — 원형 예고 + 마지막 구간 낙하 + 착탄 시각에 폭발. 진행은 서버 시각 기준이라 지연만큼 늦게 받아도 끝이 맞는다.
+    [Rpc(SendTo.ClientsAndHost)]
+    void SkyStrikeShowRpc(Vector3 point, float radius, double impactTime, float duration)
+    {
+        GameObject prefab = rangedAttack != null && rangedAttack.ProjectilePrefab != null
+            ? rangedAttack.ProjectilePrefab
+            : data != null ? data.projectilePrefab : null;
+        MonsterSkyStrike.Instance.Show(point, radius, impactTime, duration,
+            data != null ? data.skyStrikeFallTime : 0.35f,
+            TelegraphStyleSO.For(this).circle, prefab);
+    }
+    #endregion
 
     void HandleTimedResume(float dt)
     {

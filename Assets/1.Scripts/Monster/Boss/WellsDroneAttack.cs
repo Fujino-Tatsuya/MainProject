@@ -337,11 +337,10 @@ public sealed class WellsDroneAttack : MonoBehaviour
         _vFloorY = BossPatternVisuals.SampleFloorY(pos, pos.y) + 0.07f;
 
         PlaceDisc(_outer, radius, 0f);
-        BossPatternVisuals.Paint(_outer, _d.circleOuterColor, BossPatternVisuals.DiscTexture);
         _outer.gameObject.SetActive(true);
         PlaceDisc(_fill, 0.01f, 0.01f);
-        BossPatternVisuals.Paint(_fill, _d.circleFillColor, BossPatternVisuals.DiscTexture);
         _fill.gameObject.SetActive(true);
+        PaintLockCircle();
 
         if (_d.droneModel != null)
         {
@@ -400,6 +399,20 @@ public sealed class WellsDroneAttack : MonoBehaviour
         if (_droneGo != null) { Destroy(_droneGo); _droneGo = null; }
     }
 
+    int _paintedStyleVersion = -1;
+
+    // 착탄 원 색·마스크 = 23호(소유 몬스터) 스타일의 circle(PLAN-telegraph-style). 예전 _d.circleOuter/FillColor 는 기본 스타일로 옮겨졌다.
+    // 마스크 기준점 = 착탄 중심(채움 판이 커져도 패턴은 제자리), 축 = 월드(원이라 방향이 없다).
+    void PaintLockCircle()
+    {
+        TelegraphPlateStyle s = TelegraphStyleSO.For(this).circle;
+        Texture2D disc = BossPatternVisuals.DiscTextureFor(s.rimRatio);
+        var extent = new Vector2(_vRadius * 2f, _vRadius * 2f);
+        BossPatternVisuals.PaintStyled(_outer, s.outline, disc, _vPos, Vector3.right, Vector3.forward, extent);
+        BossPatternVisuals.PaintStyled(_fill, s.fill, disc, _vPos, Vector3.right, Vector3.forward, extent);
+        _paintedStyleVersion = TelegraphStyleSO.Version;
+    }
+
     void ClientTick()
     {
         if (_view == View.None) return;
@@ -413,6 +426,7 @@ public sealed class WellsDroneAttack : MonoBehaviour
                 break;
 
             case View.Lock:
+                if (_paintedStyleVersion != TelegraphStyleSO.Version) PaintLockCircle();   // Play 중 스타일 조절 — 진행은 그대로
                 PlaceDisc(_fill, _vRadius * k, 0.01f);   // 안쪽 진한 원이 1초 동안 차오른다(§7)
                 if (_droneGo != null)
                 {

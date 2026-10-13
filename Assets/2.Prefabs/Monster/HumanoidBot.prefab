@@ -89,6 +89,7 @@ GameObject:
   - component: {fileID: 6868425966318957232}
   - component: {fileID: 4462577184190413312}
   - component: {fileID: 1224503490409932759}
+  - component: {fileID: 5777226671637676846}
   m_Layer: 8
   m_Name: HumanoidBot
   m_TagString: Untagged
@@ -355,6 +356,28 @@ MonoBehaviour:
   despawnGrace: 0.3
   leadBeforeClipEnd: 0.1
   delayAfterClipEnd: 0
+--- !u!114 &5777226671637676846
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2289540308195322763}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: eef89930257eb8b4a846a61f980d5079, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MonsterAttackTell
+  target: {fileID: 0}
+  targetName: G_SlendertBot_Weapon
+  warnColor: {r: 2.2, g: 0.92399997, b: 0.044, a: 2.2}
+  dangerColor: {r: 2.6, g: 0.103999995, b: 0.051999997, a: 2.6}
+  fill: 0.45
+  rimPower: 2
+  anticipationState: AttackAnticipation
+  strikeState: AttackStrike
+  redAt: 0.65
+  hitNormalizedTime: 0.102
 --- !u!1 &8136740581150105276
 GameObject:
   m_ObjectHideFlags: 0

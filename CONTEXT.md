@@ -8,6 +8,11 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-10-13 · 경석(Claude) · **공격 예고 색·마스크 + 일반 몹 예고(Chomp·Humanoid·Mortar)**, 브랜치 `feature/Boss23`) — 계획 [PLAN-telegraph-style.md](PLAN-telegraph-style.md) · [PLAN-monster-tells.md](PLAN-monster-tells.md) ✅ 완료·팀장 확인 · 커밋·푸시(동시 수정 잠금 해제) · SVN 커밋
+- 아트 전달 = [Docs/tech/telegraph-style.md](Docs/tech/telegraph-style.md). 예고 색·마스크 정본 = `2.Prefabs/Monster/Data/TelegraphStyle_Default.asset`(몬스터 데이터 12개 연결).
+- Mortar = 수직 낙하 포격(`rangedStyle` SkyStrike). 🔴 `skyStrike*` 칸은 xlsx 미반영([DataTableIgnore]) — 테이블로 옮기려면 병합 Export.
+- 남은 일: 기존 테스트 실패 2건(`BossCounterDataTests` — 23호 카운터 대상 Jump 기대 vs 실제 Jump·Dash, 10-12 돌진 인터럽트 추가 뒤 미갱신).
+
 ## ▶▶ 작업 세션 (2026-10-09 · 은희(Claude) · **거너 레이저건 정렬 + 기본 공격 손 이탈**, 브랜치 `fix/GunnerGunAlign`(development `778bbb87` 기준)) — 계획 [PLAN-gunner-gun-align.md](PLAN-gunner-gun-align.md) ✅ 승인 · ✅ S1~S5 구현(미커밋) · ✅ 실제 Animator 레이어 합성 실측(총구 yaw 0°, 손–손잡이 ≤ 5cm) · 보고 영상 `Recordings/gunner_gun_align_report.mp4`(gitignore) · ⏳ Play·MPPM · ⏸ PLAN §6 판정 시작점
 - 원인(Unity 실측): 총은 이미 `rig/artillery` 본에 붙어 있는데 손으로 맞춘 오프셋(09-30)이 **총을 앞뒤로 뒤집어** 총구 yaw ≈174°. 애니는 `LaserGun_Mount` = `artillery` 프레임(오프셋 0)으로 저작됨 — 손 = `Grip_R`/`Grip_L`(Q 는 `Brace_R`) 좌표와 소수점 3자리 일치. + 기본 공격 상체 클립 `attack01` 은 `c_pos` 각도(180°)가 하체 `Q_charge_loop`(146.3°)와 달라, 마스크가 `c_pos` 를 빼므로 팔만 34° 돌아 손이 11~19cm 이탈.
 - 🔴 **수정 예정 — 동시 수정 금지**: `Gunner/Gunner_Armature.prefab` · `GunnerAnimatorController.controller` · `Player/Gunner/GunnerBasicAttack.cs`·`GunnerBasicAttackData.cs` · `GunnerBeamView.cs` · `Player/Editor/GunnerShellAuthoring.cs` · `Docs/tech/player-prefabs.md`.

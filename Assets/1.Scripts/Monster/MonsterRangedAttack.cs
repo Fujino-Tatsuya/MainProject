@@ -21,6 +21,13 @@ public class MonsterRangedAttack : BaseAttack
         _ownerUnit = GetComponentInParent<Unit>();
     }
 
+    /// <summary>발사 원점(비어 있으면 자기 transform). 수직 낙하 포격의 시야 검사 원점으로도 쓴다.</summary>
+    public Transform Muzzle => muzzle != null ? muzzle : transform;
+    /// <summary>피해 대상 레이어(MonsterBase 가 playerMask 로 주입).</summary>
+    public LayerMask TargetLayer => targetLayer;
+    /// <summary>투사체 프리팹 — 수직 낙하 포격이 떨어지는 폭탄 모양·폭발 이펙트를 여기서 빌린다.</summary>
+    public GameObject ProjectilePrefab => projectilePrefab;
+
     // 데이터 주도 설정 주입(MonsterBase.ServerInitialize에서 호출). 인스펙터 값이 있으면 그대로 두고,
     // data 쪽 값이 유효할 때만 덮어쓴다.
     public void ConfigureProjectile(GameObject prefab, float speed, float lifetime, float arcHeight = 0f, float splashRadius = 0f)
