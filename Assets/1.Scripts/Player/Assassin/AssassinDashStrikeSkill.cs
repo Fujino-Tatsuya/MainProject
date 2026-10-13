@@ -6,7 +6,7 @@ using UnityEngine;
 /// 둘의 차이는 데이터뿐이다: 쿨타임·애니 상태 + 변신 데이터(<see cref="AssassinTransformedDashStrikeSkillData"/>)의 적중 쿨 차감.
 ///
 /// 이동 = 오너 권위. 서버 승인 시점의 조준 방향으로 고정하고, 시뮬레이션 피어가 <see cref="PlayerMotor.AddGroundedDisplacement"/> 로
-/// 20m/s × 4m 를 낸다(루트모션 끔 — Armature Animator applyRootMotion=false). 적은 통과(<see cref="PlayerMotor.PassThroughEnemiesOverride"/>),
+/// 20m/s × 4m 를 낸다(루트모션 끔 — Armature Animator applyRootMotion=false). 적·아군은 통과(<see cref="PlayerMotor.PassThroughUnitsOverride"/>),
 /// 벽·지형에 막히면(<c>MovementResolved</c> wasBlocked) 그 자리에서 돌진을 끝내고 실제 이동 거리를 서버에 보고한다.
 ///
 /// 판정 = 서버. 시작 위치·방향·경과 시간으로 경로를 재구성해 매 틱 새로 나아간 구간을 폭 1.2m 상자로 훑는다
@@ -107,7 +107,7 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
         localRemaining = data.DashDistance;
         localTraveled = 0f;
         isLocallyDashing = true;
-        motor.PassThroughEnemiesOverride = true;
+        motor.PassThroughUnitsOverride = true;
         motor.MovementResolved -= HandleMovementResolved;
         motor.MovementResolved += HandleMovementResolved;
     }
@@ -183,7 +183,7 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
         StopLocalDash();
         view?.EndDashTrail();
         if (motor != null)
-            motor.PassThroughEnemiesOverride = false;
+            motor.PassThroughUnitsOverride = false;
 
         RemoveSuperArmor();
         base.OnEnd(reason);
