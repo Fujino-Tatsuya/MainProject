@@ -43,6 +43,8 @@ public class NetworkLoadingFlowController : MonoBehaviour
     private NetworkSceneManager _registeredSceneManager;
     private CustomMessagingManager _registeredMessagingManager;
     private bool _playersSpawnedForCurrentTargetScene;
+    // 타깃 씬 LoadEventCompleted 를 받았는가 — 완료 루틴이 로딩 씬 언로드 전에 기다린다(CompleteAfterMinimumVisibleTime 주석).
+    private bool _targetLoadEventCompleted;
     private uint _flowId;
     private float _averageProgress;
     private float _minimumTimerStartedAt;
@@ -543,6 +545,8 @@ public class NetworkLoadingFlowController : MonoBehaviour
             return;
         }
 
+        _targetLoadEventCompleted = true;
+
         foreach (var clientId in sceneEvent.ClientsThatCompleted)
         {
             _trackedClients.Add(clientId);
@@ -707,6 +711,8 @@ public class NetworkLoadingFlowController : MonoBehaviour
             if (stale.IsValid() && stale.isLoaded)
             {
                 // 언로드 실패 복구 — 남은 판에 플레이어만 다시 세우고 로딩을 닫는다(같은 씬을 겹쳐 올리지 않는다).
+                // 타깃 로드 이벤트가 없는 경로라 완료 루틴이 기다리지 않게 표시한다.
+                _targetLoadEventCompleted = true;
                 SpawnAllPlayersOnce();
                 _targetLoadRoutine = null;
                 _completionRoutine = StartCoroutine(CompleteAfterMinimumVisibleTime());
@@ -755,6 +761,15 @@ public class NetworkLoadingFlowController : MonoBehaviour
         LogDebug("All tracked clients reached 100%. Waiting for minimum visible time.");
         ApplyViewState();
         BroadcastState();
+
+        // 🔴 이 루틴은 로컬 진행률 0.9(= AsyncOperation 이 활성화 직전) 에서 시작된다. 표시 시간이 0 이면
+        // (DevSceneBooter.SetEditorDefaults(...,0,0) — Dev 부팅의 판 재시작) 타깃 씬 NGO 로드 이벤트가 닫히기 전에
+        // 로딩 씬 언로드를 요청해 NGO 가 SceneEventInProgress 로 거절했다 → 로딩 씬이 활성 씬인 채 남고,
+        // 그 사이 Instantiate 된 몬스터도 로딩 씬에 남았다(할 일 34 후속 4). 로드 이벤트 완료를 먼저 기다린다.
+        while (!_targetLoadEventCompleted)
+        {
+            yield return null;
+        }
 
         var elapsed = Time.unscaledTime - _minimumTimerStartedAt;
         var remaining = minimumVisibleSeconds - elapsed;
@@ -1096,6 +1111,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
         _timedOutClients.Clear();
         _clientProgress.Clear();
         _playersSpawnedForCurrentTargetScene = false;
+        _targetLoadEventCompleted = false;
         _averageProgress = 0f;
         _sourceSceneName = string.Empty;
         _restartingTargetScene = false;

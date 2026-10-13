@@ -327,6 +327,7 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
   `4.MapScene` 네트워크 언로드 → 다시 Additive 로드 → `SpawnAllPlayers`(10m 낙하) → MainGameReady → 로딩 씬 언로드. 씬 배치 객체(디렉터·게이트·특성·몬스터·공용 목숨·보스 타이머·`SessionStatsTracker`)는
   씬과 함께 새로 생긴다. 유지: `ServerCharacterSelectionStore`(세션 정적) · NetworkManager·GameManager 등 DDOL 매니저(`GameState` 가 Loading → MainGame 으로 돌아 MainGameReady 가 다시 발행되고, `NetworkClock.MarkMainGameStart` 재스탬프).
   Dev_Boot(Single 로드) 경로에서도 같은 흐름. 이 컴포넌트는 맵과 함께 사라지므로 재시작은 NetworkManager 쪽이 끝까지 진행한다. 거부 = 로딩 흐름 진행 중·타깃 씬 미로드·로딩 씬 로드 실패(판 그대로).
+  - **수정(후속 4)**: Dev_Boot 재시작에서 로딩 씬이 안 내려가고 몬스터가 로딩 씬에 남던 버그 — 표시 시간 0(`SetEditorDefaults(...,0,0)`)이라 완료 루틴이 진행률 0.9(활성화 전)에서 바로 로딩 씬 언로드를 요청 → NGO `SceneEventInProgress` 거절(재시도 없음) → 로딩 씬이 활성 씬으로 남고 그 안에 Instantiate 된 몬스터도 남음. 완료 루틴이 타깃 `LoadEventCompleted` 를 먼저 기다린다([scene-flow-audit.md §8](scene-flow-audit.md)).
 - **계획**(`TutorialSkipPlan.Build`): 목적 구간 입구 게이트(복도 n = G1/G3/G6/G9, 다음 존 = G2/G4/G7, 보스 진입·보스방 = G10)까지 **닫힌 게이트만** G1 부터 순서대로, 게이트마다 정식 경로 하나:
   G1 = 접속자 전원 `ReportCheckServer`(G1Mask 전 항목) · G2/G4/G7/G10 = `TutorialCorridorFlow.SkipRoundServer`(**제시 없이** 라운드를 열고(`StartRoundWithoutOfferServer`) 아직 참가하지 않은 접속자마다 `GrantParticipantServer` = 바로 무작위 1장 획득 → `ServerTraitChosen`(Auto) → 특성 체크 → 전원 완료.
   제시 행·플레이어별 제시 번호(OfferSeq)가 생기지 않아 **클라 특성 창이 열리지 않는다**. 이미 중간 지점에 도착해 창을 보던 사람만 `AutoChooseAllPendingServer` 로 창이 닫힌다) ·
