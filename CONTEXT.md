@@ -65,6 +65,14 @@ Update this file when a term becomes important enough that future agents or team
 - 인라인 아이콘 = `SkillTooltipGenerated/tooltipIcon_*.png` → 아틀라스 `SkillTooltipAttackIcon.asset`(guid 유지) · TMP `SkillTooltipAttackSprite`: `atk`·`shield`·`cooldown`. 재생성 = `Tools/UI/스킬 툴팁 인라인 아이콘 갱신`(⚠️ 인스펙터에서 바꾼 BX·BY·AD 를 덮어씀).
 - 표기 = 아이콘이 수치 **앞**, 색은 태그에 직접: `<sprite name="shield" color=#74C7EC>{shieldAmount}`. 🔴 속성이 붙으면 **이름에 따옴표 필수** — 없으면 EmojiOne 노란 `?` 로 깨진다(로그 없음). 칼 #F4B860(코드) · 쿨다운 #B8C4D6(코드, 머리줄 `⏱` 대체).
 
+## ▶▶ 작업 세션 (2026-10-12 · 경석(Claude) · **설정창**, 브랜치 `feature/Settings`) — 계획 [PLAN-settings.md](PLAN-settings.md) · 1~3단계 + CRT 가독성 + 그래픽 확장 구현 ✅ · ✅ **10-13 커밋 + `feature/Boss23` 에 병합**(빨리 감기) · 남은 일 = PLAN 「다음 세션」(마우스 감도 보류 등)
+- 통합 패널 `Assets/2.Prefabs/UI/SettingsBody.prefab` 을 타이틀·맵 ESC 가 같이 씀. 항목 수정 = `Tools/UI/Settings/설정 패널 항목 배치 (멱등)`(프리팹 원본을 연다).
+- 팀장 Play 확인: 드롭다운·오디오·프레임 제한·키 변경. 해상도·창 모드·그래픽 품질·비네트·Alt+Tab 음소거는 빌드에서 확인 예정.
+- 은희 `feature/DashDirectionOption`(대시 방향 옵션) **흡수함** — 따로 머지하지 말 것. 기본값은 **캐릭터 정면**(팀장 10-12).
+- 10-13(경석 Claude): 설정창 한국어(PLAN S15·S16) + FPS/핑 표시(S17) + 타이틀 설정창 가독성(1.4배·어두운 컨트롤·타이틀 동안 렌더 스케일 100%) + 타이틀 CRT 값 인스펙터 노출 ✅ · 빌드 성공(10:55) · 팀장 빌드 확인 후 Alt+Enter·커서 가두기·AA(FXAA/SMAA) 추가 · 커밋됨. 추가 수정 파일: 신규 `Settings/Localization/*`·`Settings/UI/PerformanceOverlay.cs`·`Settings/Editor/SettingsDarkTheme.cs`·`SettingsLocalizationLinker.cs`, `Settings/UI/*` 컨트롤러, `GameplayConfig.cs`·`GraphicsQualityConfig.cs`, `UI/Title/TitleMonitorDisplay.cs`·`TitleFlowDirector.cs`·`TitleCrtFx.cs`, `SettingsBody.prefab`.
+- 🔴 타이틀 CRT 값의 정본이 `MA_TitleMonitorUI.mat` → **`TitleMonitorDisplay` 인스펙터**로 옮겨졌다(머티리얼 값을 고쳐도 화면이 안 바뀐다).
+🔴 **수정 예정 — 동시 수정 금지:** 신규 `GameSettings`·설정 패널 프리팹 · `Managers/DisplayResolutionBoot.cs`·`FrameRateCap.cs`·`TitleOptionsPanel.cs`·`MapSceneManager.cs`(옵션 패널 부분) · `Sound/VolumeSlider.cs` · `Player/UserInputConfig.cs`·`PlayerDashController.cs`(방향) · `InputSystem_Actions.inputactions`(Interact E→F) · `Map/ZoneBridgeGateManager.cs`(입력) · `UI/Interact/*`(키 표기) · `UI/Combat/FloatingDamage/*`(표시 필터) · `Camera/Feedback/CameraFeedback.cs`(배율). 씬(`1.TitleScene`·`4.MapScene`)은 튜토리얼 브랜치 머지 뒤.
+
 ## ▶▶ 작업 세션 (2026-10-12 · 경석(Claude) · **송전기 노랑 아웃라인 + 간파 넉백 후 취약 유지**, 브랜치 `feature/Boss23`) — 계획 [PLAN-boss-1012.md](PLAN-boss-1012.md) ✅ 완료 · 팀장 Play 확인 · 커밋·푸시(동시 수정 잠금 해제)
 🔴 **수정 예정 — 동시 수정 금지:** `Monster/Boss/BossChargingPylon.cs` · `Monster/Boss/TwentyThreeBoss.cs`(`FinishVulnerableKnockback`) · `Rendering/Editor/FlatKitSmoothNormalBaker.cs` · 신규 `Rendering/Toon/Shaders/OutlineOnly.shader`·`3.Materials/MA_PylonOutline.mat` · `2.Prefabs/Environment/Layouts/Zones/bossroom.prefab`(송전기 4개 필드).
 

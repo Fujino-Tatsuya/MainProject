@@ -64,7 +64,8 @@ public class TitleSceneManager : NemoSceneManager
         }
 
         // ESC로 옵션창 토글 (열려있으면 닫고, 닫혀있으면 연다)
-        if (Keyboard.current?.escapeKey.wasPressedThisFrame == true && !IsTransitioning)
+        // 키 변경 중 Esc = 변경 취소(설정창 KeyRebindRow) — 옵션창을 닫지 않는다.
+        if (Keyboard.current?.escapeKey.wasPressedThisFrame == true && !IsTransitioning && !KeyRebindRow.IsRebinding)
         {
             ToggleOption();
         }

@@ -45,6 +45,7 @@ public class AudioManager : MonoBehaviour
         DontDestroyOnLoad(gameObject);
 
         InitVolumes();
+        SoundConfig.ApplyTo(this);   // 저장된 설정 볼륨(없으면 원음 그대로) — PLAN-settings
 
         if (catalog == null)
         {

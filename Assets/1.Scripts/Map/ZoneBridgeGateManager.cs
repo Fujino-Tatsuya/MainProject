@@ -38,9 +38,11 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
                && OpenStartServerTime.Equals(o.OpenStartServerTime);
     }
 
-    [Header("입력")]
-    [Tooltip("상호작용 키. 플레이어는 이 키만 누르고, 판정은 서버가 한다.")]
-    [SerializeField] private Key interactKey = Key.F;
+    // 입력 — 상호작용 키는 설정창 리바인드를 따른다(입력 에셋 Player/Interact, 기본 F — PLAN-settings S14, 10-12).
+    // 예전엔 인스펙터 Key(F)를 직접 읽어 에셋의 Interact(E)와 따로 놀았다(에셋 쪽은 사용처 0).
+    // 플레이어는 이 키만 누르고, 판정은 서버가 한다.
+    private const string InteractActionPath = "Player/Interact";
+    private InputAction _interactAction;
 
     [Header("NavMesh")]
     [Tooltip("개통 완료 시 NavMesh 전체를 다시 굽는다. 기본은 끔 — 이 서피스는 맵 전체를 덮어 " +
@@ -70,13 +72,43 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
 
     private void Awake() => Instance = this;
 
-    private void OnDisable() => InteractPrompt.Hide(this);
+    private void OnEnable() => KeyBindingConfig.Changed += RebuildInteractAction;
+
+    private void OnDisable()
+    {
+        InteractPrompt.Hide(this);
+        KeyBindingConfig.Changed -= RebuildInteractAction;
+        DisposeInteractAction();
+    }
 
     public override void OnDestroy()
     {
         InteractPrompt.Hide(this);
+        DisposeInteractAction();
         if (Instance == this) Instance = null;
         base.OnDestroy();
+    }
+
+    // 설정창 키를 그대로 쓰는 독립 액션. 플레이어 PlayerInput 과 무관하게(게이트는 씬 매니저) 이 키만 듣는다.
+    private bool InteractPressedThisFrame()
+    {
+        if (_interactAction == null)
+        {
+            string path = KeyBindingConfig.EffectivePath(InteractActionPath) ?? "<Keyboard>/f";
+            _interactAction = new InputAction("BridgeInteract", InputActionType.Button, path);
+            _interactAction.Enable();
+        }
+        return _interactAction.WasPressedThisFrame();
+    }
+
+    private void RebuildInteractAction() => DisposeInteractAction();   // 다음 프레임에 새 키로 다시 만든다
+
+    private void DisposeInteractAction()
+    {
+        if (_interactAction == null) return;
+        _interactAction.Disable();
+        _interactAction.Dispose();
+        _interactAction = null;
     }
 
     public override void OnNetworkSpawn()
@@ -177,7 +209,7 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
             return;
         }
 
-        if (!Keyboard.current[interactKey].wasPressedThisFrame) return;
+        if (!InteractPressedThisFrame()) return;
 
         // ⚠️ 키를 눌렀는데 아무 일도 안 일어나는 상태를 조용히 두지 않는다. 조기 반환이 6가지라
         // 로그가 없으면 어디서 막혔는지 알 방법이 없다(F가 안 먹는다는 보고의 원인).

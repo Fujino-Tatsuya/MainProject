@@ -20,10 +20,37 @@ public sealed class InteractPromptView : MonoBehaviour
     [Tooltip("월드 기준점에서 화면상 추가 오프셋(Canvas 단위, 위 = +y).")]
     [SerializeField] private Vector2 screenOffset = Vector2.zero;
 
-    private void OnEnable() => Canvas.willRenderCanvases += ApplyScreenPosition;
+    [Header("키 표기 (설정창 리바인드 — PLAN-settings S14)")]
+    [Tooltip("F 아이콘 그림. 상호작용 키가 F 일 때만 보인다.")]
+    [SerializeField] private UnityEngine.UI.Image keyIconImage;
+    [Tooltip("F 가 아닌 키일 때 키 이름을 쓰는 텍스트(아이콘 위). 비어 있으면 키가 바뀌어도 F 그림 그대로다.")]
+    [SerializeField] private TMPro.TMP_Text keyLabel;
+
+    private void OnEnable()
+    {
+        Canvas.willRenderCanvases += ApplyScreenPosition;
+        KeyBindingConfig.Changed += RefreshKeyGlyph;
+        RefreshKeyGlyph();
+    }
+
+    // 기본 키(F)면 기존 그림, 다른 키로 바꿨으면 그림을 끄고 키 이름을 쓴다.
+    private void RefreshKeyGlyph()
+    {
+        if (keyLabel == null)
+            return;
+
+        string path = KeyBindingConfig.EffectivePath("Player/Interact");
+        bool isDefaultF = string.IsNullOrEmpty(path) || string.Equals(path, "<Keyboard>/f", System.StringComparison.OrdinalIgnoreCase);
+        if (keyIconImage != null)
+            keyIconImage.enabled = isDefaultF;
+        keyLabel.gameObject.SetActive(!isDefaultF);
+        if (!isDefaultF)
+            keyLabel.text = KeyBindingConfig.DisplayName("Player/Interact");
+    }
 
     private void OnDisable()
     {
+        KeyBindingConfig.Changed -= RefreshKeyGlyph;
         Canvas.willRenderCanvases -= ApplyScreenPosition;
         if (group != null)
             group.alpha = 0f;

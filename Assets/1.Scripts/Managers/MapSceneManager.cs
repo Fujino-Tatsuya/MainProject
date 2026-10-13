@@ -43,7 +43,8 @@ public class MapSceneManager : NemoSceneManager
 
     private void Update()
     {
-        if (Keyboard.current?.escapeKey.wasPressedThisFrame == true)
+        // 키 변경 중 Esc = 변경 취소(설정창 KeyRebindRow) — 옵션창을 닫지 않는다.
+        if (Keyboard.current?.escapeKey.wasPressedThisFrame == true && !KeyRebindRow.IsRebinding)
         {
             ToggleOptionPanel();
         }
