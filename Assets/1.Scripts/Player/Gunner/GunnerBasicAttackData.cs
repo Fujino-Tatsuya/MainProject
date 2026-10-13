@@ -25,6 +25,10 @@ public class GunnerBasicAttackData : ScriptableObject
     [Tooltip("발과 발 사이(홀드 연사 간격·입력 창으로 이은 다음 발 전·후딜)에 커서 쪽으로 도는 속도(도/초). " +
              "각 발의 준비~사격 끝에는 돌지 않고, 다음 발은 그 발 준비 시작 순간의 몸 방향으로 나간다. 0 = 사이에도 고정.")]
     [SerializeField, Min(0f)] private float betweenShotTurnSpeed = 360f;
+    [Tooltip("이어지는 발: 발사 몇 초 전부터 몸 방향을 잠그는가(초, 오너 시계). 첫 발은 공격 시작부터 잠긴다.")]
+    [SerializeField, Min(0f)] private float shotLockLead = 0.1f;
+    [Tooltip("각 발 발사 요청 뒤 몇 초 더 잠가 두는가(초, 오너 시계). 서버 왕복을 기다리지 않는다.")]
+    [SerializeField, Min(0f)] private float shotLockTail = 0.1f;
 
     [Header("판정")]
     [Tooltip("사거리(m).")]
@@ -66,6 +70,8 @@ public class GunnerBasicAttackData : ScriptableObject
     public float ComboWindowOpen => comboWindowOpen;
     public float ComboWindowClose => comboWindowClose;
     public float BetweenShotTurnSpeed => betweenShotTurnSpeed;
+    public float ShotLockLead => shotLockLead;
+    public float ShotLockTail => shotLockTail;
     public float Range => range;
     public float BeamWidth => beamWidth;
     public float MuzzleHeight => muzzleHeight;

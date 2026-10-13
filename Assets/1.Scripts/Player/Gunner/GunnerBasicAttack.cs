@@ -16,9 +16,10 @@ using UnityEngine;
 /// 어느 쪽이든 준비 동작은 첫 발만이다. 둘 다 아니거나 과열되면 후속 동작(ShotRecovery)까지 마무리하고 끝난다.
 /// 창은 애니 이벤트가 아니라 데이터의 시간 값이다(판정도 시간 기반이라 한 곳에서 맞춘다).
 /// 공격 중 이동 불가. 다른 스킬 입력은 상태기계가 막는다(Attack 상태 — §3.2, 예약 없음).
-/// 방향(할 일 27, <see cref="GunnerAttackFacingModel"/>): 각 발의 준비~사격 끝에는 몸이 돌지 않고, 발 사이에는 커서 쪽으로
-/// <see cref="GunnerBasicAttackData.BetweenShotTurnSpeed"/> 로 돈다. 첫 발 = 시작 조준, 이어지는 발 = 요청 순간의 몸 방향 —
-/// 오너가 그 방향을 발사 요청에 실어 보내고 서버는 그대로 쏜다(몸 회전이 오너 권한이라 오너 몸이 기준이다).
+/// 방향(할 일 27, <see cref="GunnerAttackFacingModel"/>): 발 잠금 중에는 몸이 돌지 않고, 그 밖에는 커서 쪽으로
+/// <see cref="GunnerBasicAttackData.BetweenShotTurnSpeed"/> 로 돈다. 발 잠금 = 첫 발은 공격 시작 ~ 발사 + ShotLockTail,
+/// 이어지는 발은 발사 − ShotLockLead ~ 발사 + ShotLockTail(잠근 순간의 몸 방향). 🔴 잠금은 오너 시계만으로 돈다 —
+/// 오너가 방향을 발사 요청에 실어 보내고 서버는 그대로 쏘기만 한다(서버는 몸을 돌리거나 잠금을 검증하지 않는다, 2026-10-13).
 /// </summary>
 [RequireComponent(typeof(Player))]
 [RequireComponent(typeof(GunnerHeat))]
@@ -70,6 +71,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
     private float nextHoldSignalTime;
     private float ownerLastShotTime = -1f; // 오너가 마지막 발을 요청한 시각(오너 시계)
     private bool ownerQueued;              // 오너 쪽 입력 창 예약 — 서버 예약과 같은 규칙
+    private bool ownerPreLocked;           // 다음 발을 위해 발사 전에 미리 잠갔는가(오너 시계)
 
     // 서버
     private bool hasQueuedShot;
@@ -178,10 +180,18 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
 
     private void TickOwner()
     {
-        // 발 사이 — 커서 쪽으로 제한 속도로 돈다(즉시 스냅 아님). 발 잠금(준비~사격 끝) 중에는 돌지 않는다(할 일 27).
-        // 사격 끝 = 이 피어의 PlayShot. 신뢰성 없는 ShotRpc 가 빠지거나 서버가 거절해도 다음 발 시각엔 풀어 준다.
-        if (facing.IsShotLocked && firstShotSent && Time.time >= ownerLastShotTime + data.FireInterval)
+        // 발 잠금은 오너 시계만으로 돈다(2026-10-13, 서버 왕복·검증 없음): 발사 요청 뒤 ShotLockTail 이 지나면 풀고,
+        // 다음 발을 이어 쏠 거면 발사 ShotLockLead 전에 그 순간 몸 방향으로 다시 잠근다. 그 사이는 커서 쪽으로 제한 속도 회전.
+        if (ownerPreLocked && !input.AttackHeld && !ownerQueued)
+            ownerPreLocked = false; // 미리 잠근 뒤 손을 뗐다 — 다음 발이 없으니 잠금도 푼다
+        if (facing.IsShotLocked && firstShotSent && !ownerPreLocked && Time.time >= ownerLastShotTime + data.ShotLockTail)
             facing.EndShot();
+        if (firstShotSent && !ownerPreLocked && (input.AttackHeld || ownerQueued) && !heat.IsOverheated
+            && Time.time >= ownerLastShotTime + data.FireInterval - data.ShotLockLead)
+        {
+            facing.BeginShot(movement.CurrentFacing);
+            ownerPreLocked = true;
+        }
         if (!facing.IsShotLocked)
             movement.RotateImmediately(facing.TurnBetweenShots(
                 movement.CurrentFacing, CurrentAim(), data.BetweenShotTurnSpeed, Time.deltaTime));
@@ -226,12 +236,14 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
         }
 
         // 이어지는 발 — 누르고 있거나 창 안에서 예약했으면 발사 간격이 찰 때 요청한다.
-        // 이 순간이 그 발의 준비 시작이다 — 지금 몸 방향으로 잠그고 그 방향을 보낸다(덜 돌았으면 덜 돈 방향).
+        // 방향 = 발사 ShotLockLead 전에 잠근 몸 방향(덜 돌았으면 덜 돈 방향). 그 사이에 눌러 미리 못 잠갔으면 지금 몸 방향.
         if ((input.AttackHeld || ownerQueued) && !heat.IsOverheated
             && Time.time >= ownerLastShotTime + data.FireInterval)
         {
             ownerQueued = false;
-            RequestShot(facing.BeginShot(movement.CurrentFacing));
+            Vector3 shotDirection = ownerPreLocked ? facing.Direction : facing.BeginShot(movement.CurrentFacing);
+            ownerPreLocked = false;
+            RequestShot(shotDirection);
             return;
         }
 
@@ -374,9 +386,8 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
         if (heat.IsOverheated)
             return false;
 
-        // 오너가 그 발 준비 시작에 잠근 방향(할 일 27). 호스트·오프라인 오너면 몸이 이미 이 방향이라 그대로다.
+        // 오너가 잠근 방향으로 쏘기만 한다(할 일 27). 몸 회전·잠금은 오너 권한 — 서버는 돌리거나 검증하지 않는다(2026-10-13).
         Vector3 direction = GunnerAttackFacingModel.Flatten(requested, movement.CurrentFacing);
-        movement.RotateImmediately(direction);
 
         // 단계 배율은 이번 발의 증가 전 단계로 계산한다. 최대치에 닿는 발도 피해는 정상 적용(§4.4).
         int stage = heat.CurrentStage;
@@ -486,6 +497,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
         firstShotSent = false;
         hasQueuedShot = false;
         ownerQueued = false;
+        ownerPreLocked = false;
         startTime = Time.time;
         lastShotTime = -1f;
         ownerLastShotTime = -1f;
@@ -538,6 +550,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
         holdSent = false;
         hasQueuedShot = false;
         ownerQueued = false;
+        ownerPreLocked = false;
         held = false;
         lastShotTime = -1f;
         ownerLastShotTime = -1f;
@@ -549,8 +562,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
 
     private void PlayShot(Vector3 origin, Vector3 end, bool hit)
     {
-        // 그 발 사격 끝 — 오너는 여기부터 다음 발 준비 전까지 커서 쪽으로 돈다(원격 오너는 왕복 지연만큼 잠겨 있었다).
-        facing.EndShot();
+        // 회전 잠금 해제는 여기서 하지 않는다 — 오너 시계(ShotLockTail)로만 푼다(서버 왕복 없음, 2026-10-13).
         PlayFireAnimation();
         ShowBeam(origin, end, hit);
     }
