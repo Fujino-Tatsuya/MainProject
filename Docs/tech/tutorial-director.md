@@ -346,3 +346,7 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
   - 되감기 `TutorialDirector.RewindForBossRetryServer`(순수 `TutorialFlowModel.RewindForBossRetry`) — **단계·게이트 '앞으로만' 규칙의 유일한 예외**: Finished → BossEnter, G11 닫기, 도착 래치 해제. G1~G10·장부·카운터 그대로.
   - 개인 뒤 배리어 `ResetBackBarrierMaskServer(clientId, Corridor4)` = `TutorialBackBarrierRules.MaskWithFrontmost(Corridor4)`(G1~G9, G10 제외) — **되감기보다 먼저** 쓴다(되감기로 진행 중이 되는 순간 G10 뒤 배리어가 앞길을 막지 않게).
   - 사망 규칙 `TutorialDeathRules.ResumeForBossRetry` — `_finished` 해제·대기 기록 비움. **보스방 재도착 전 사망 = 차감 없음**(복도4 자동 부활), **재도착(G11 다시 열림) 뒤 사망 = 다시 차감**(사양 그대로). 테스트: `TutorialBossRetryTests`.
+- **리스폰 뒤 특성 초기화 · 재선택(할 일 30 (3), 2026-10-13)** — 상세 [party-lives-respawn.md §4](party-lives-respawn.md#4-특성-초기화--재선택-3단계--구현됨) · [tutorial-traits.md §9](tutorial-traits.md#9-전멸-리스폰-뒤-특성-초기화--재선택-할-일-30-3단계).
+  - 리스폰 직후 각자 "특성을 초기화하고 다시 선택할까요?" 팝업(`TutorialTraitDirector` — `PartyWipeRespawned` 구독, 튜토리얼일 때만). 예 = 그 플레이어 특성 효과만 원복 + 혼자 4라운드(3장 중 1장, 고른 것 제외, 선택 중 무적). 아니오 = 유지.
+  - 🔴 **팝업·재선택 중인 사람이 있으면 보스 진입 패드가 잠긴다**(`TutorialBossPath.IsBossPadEnabled` — G10 전 잠금과 같은 경로·테두리 숨김). 패드는 한 명만 서도 전원을 끌고 가기 때문(D3).
+    끝나면 이미 서 있던 사람으로 카운트다운. 사망 규칙·뒤 배리어·되감기는 건드리지 않는다. 마감 게이지·자동 선택 없음(진행 중 복도가 없음).

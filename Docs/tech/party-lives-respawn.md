@@ -1,7 +1,7 @@
 # 파티 공용 목숨 · 전멸 리스폰 · 특성 재선택 (할 일 30)
 
 > 사양 확정: 2026-10-13(사용자). 담당: 은희(코어·네트워크·Player). 보스 리셋 훅은 경석 영역 — 최소 훅 + [handoff-boss-encounter-reset.md](handoff-boss-encounter-reset.md).
-> 진행: **1단계(이 문서 + 공용 목숨 풀) ✅ 구현** · **2단계(전멸 → 복도4 리스폰 · 보스 리셋) ✅ 구현(Play 확인 전)** · 3단계(특성 초기화 팝업·재선택).
+> 진행: **1단계(이 문서 + 공용 목숨 풀) ✅ 구현** · **2단계(전멸 → 복도4 리스폰 · 보스 리셋) ✅ 구현(Play 확인 전)** · **3단계(특성 초기화 팝업·재선택) ✅ 구현(Play 확인 전)**.
 > 관련: [tutorial-director.md §11](tutorial-director.md#11-사망-규칙-s11)(사망 규칙) · §7(배리어) · §9(타이머·보스 길) · [tutorial-traits.md](tutorial-traits.md) · [data-table.md](data-table.md).
 
 ## 1. 사양 요약
@@ -129,18 +129,58 @@
   ③ 재가동하려면 Idle 복귀 API 가 필요하다(경석 영역 확대). 보스방에 도착했던 판이면 이미 Stopped 라 바뀌는 게 없고, 만료(Expired) 상태였으면 강제 이동 재시도가 리스폰 직후 끌고 가지 않게 멈춘다.
   절차 맵에서 보스 도착 전 전멸이면 Running 이던 타이머도 멈춘다(리스폰 지점이 패드 옆).
 
-## 4. 특성 초기화 · 재선택 (3단계 — 설계)
+## 4. 특성 초기화 · 재선택 (3단계 — 구현됨)
 
-- 팝업: 리스폰 완료 신호로 각자 뷰가 연다. **서버 훅 = `PartyWipeRespawner.PartyWipeRespawned(IReadOnlyList<ulong>)`(2단계에서 남김)** — 받아서 리스폰 세대값(NetworkVariable)을 올리거나 대상 `ClientRpc`.
-  문구는 `TutorialTraitTexts` 에 ID 추가(`ResetPromptTitle`·`ResetPromptYes`·`ResetPromptNo` — 기본값은 코드, 테이블 `TutorialTraitTexts.asset`). 루트에 `UiModalBlocker`.
-- 응답: `[Rpc(SendTo.Server)] RequestTraitResetRpc(bool reset)` — 서버가 발신자 = 그 플레이어 소유자·리스폰 세대 일치·아직 응답 안 함을 검증(중복·지연 응답 무시).
-- 예:
-  1. 원복 — 스탯 특성은 `SourceIdOf(index)` 로 붙인 영구 상태이상 제거, 쿨다운 특성은 `cooldownHooks` 구독 해제. **현재 훅이 특성별 키가 아니다** → 특성 index 별로 보관하게 바꾼다.
-  2. 모델 — `TutorialTraitSelectionModel` 에 `ResetPlayer(clientId)`(획득·제시 행 비우기, `RemovePlayer` 와 달리 등록 유지).
-  3. 4라운드 연속 — 복도 흐름(`TutorialCorridorFlow`)과 별개로 그 플레이어만 라운드 4개를 차례로 연다(후보 3장·획득 제외 기존 규칙). 다른 사람은 기다리지 않는다.
-  4. 선택 중 무적 `InvulnerabilityCause.TraitSelection` 토큰 — 기존 `SyncSelectionShields` 그대로.
-- 아니오: 아무 것도 안 한다(팝업만 닫힘).
-- 보스 진입 패드는 그동안 열려 있다 — 다른 사람이 먼저 패드에 서면 카운트다운이 시작될 수 있다(§6 열린 결정 D3).
+| 무엇 | 어디 |
+|---|---|
+| 순수 규칙 | `TutorialTraitResetModel`(`Tutorial/Traits/`) — 팝업 대기(세대)·응답 검증·재선택 남은 라운드(4)·이탈·재전멸 · `TutorialTraitEffectLedger<T>` — 플레이어별 원복 장부 |
+| 선택 모델 추가 | `TutorialTraitSelectionModel.StartPersonalRound`·`ResetPlayer`·`CancelOffer` |
+| 서버 | `TutorialTraitDirector` — `PartyWipeRespawned` 구독 · `AnswerResetPromptServerRpc` · `RevertEffects` · `ContinueReselect` |
+| 복제 | `NetworkList<Entry>` 에 `EntryKind.ResetPrompt` 행(`TraitIndex` = 세대) · `NetworkVariable<bool> traitResetBusy`(패드 잠금) |
+| 뷰 | `TutorialTraitSelectionView` — 팝업 런타임 생성(루트 `UiModalBlocker`), 문구 `TutorialTraitTexts.ResetPrompt*Id` |
+| 패드 | `TutorialBossPath.IsBossPadEnabled` → `TutorialBossPathRules.IsPadEnabled(isTutorial, g10Open, traitResetInProgress)` |
+| 테스트 | `TutorialTraitResetModelTests`·`TutorialBossPathRulesTests.Pad_LockedWhileTraitResetInProgress`(튜토리얼 러너) |
+| API·구조 상세 | [tutorial-traits.md §9](tutorial-traits.md#9-전멸-리스폰-뒤-특성-초기화--재선택-할-일-30-3단계) |
+
+### 4.1 흐름
+
+```
+[서버] PartyWipeRespawned(clientIds)  ─ 튜토리얼이 아니면 무시(D4)
+ → resetModel.BeginPrompts(clientIds) = 새 세대. 재선택 도중이던 사람은 열린 제시를 거둔다(CancelOffer, 고른 것은 유지)
+ → 각자 ResetPrompt 행(세대) 복제 · traitResetBusy = true(패드 잠금)
+[클라] 내 행이 있고 아직 답하지 않은 세대 → 팝업(UiModalBlocker = 이동·대시·공격 차단) → [예]/[아니오] → AnswerResetPromptServerRpc(세대, 예/아니오)
+[서버] 보낸 사람(SenderClientId) 기준 Answer — 대기 중·세대 일치만 받는다(대상 아님·중복·지난 세대 = 거부 + 경고 로그)
+ · 아니오: 상태 비움(특성 유지, 팝업 닫힘)
+ · 예: RevertEffects(그 플레이어 장부만 — 배율 상태이상 Remove(type, SourceIdOf(index)) · ServerAttackLanded 구독 해제)
+       → selection.ResetPlayer → ContinueReselect: 남은 라운드 1 빼고 StartPersonalRound(후보 = 풀 OfferCount(3)장, 획득 제외) — 0장이면 다음 라운드
+       → 고를 때마다(CommitChoice) 다음 라운드를 열고, 4라운드를 다 쓰면 재선택 끝
+ → 행·무적(TraitSelection 토큰 — 기존 SyncSelectionShields)·traitResetBusy 동기화. 아무도 대기·재선택 중이 아니면 패드가 다시 열린다
+```
+
+- 다른 사람은 기다리지 않는다 — 각자 따로 팝업·라운드. 라운드 번호는 전역이라 둘이 동시에 재선택하면 상대 창이 한 번 깜빡인다(tutorial-traits.md §9).
+- 아니오 = 효과·획득 행 그대로. 예 = 획득 아이콘 줄이 비었다가 고를 때마다 다시 찬다(획득 토스트도 난다).
+- **팝업 중 무적은 없다**(사양 = 선택 중만) — 보스는 디스폰·패드는 잠겨 있고 복도4 몬스터는 이미 정리돼 맞을 일이 없다.
+
+### 4.2 결정
+
+- **D3 — 패드 잠금(구현)**: 패드는 "살아 있는 전원이 패드 위" 가 아니라 **한 명만 서도 카운트다운 → 전원 이동**(`BossEnterTrigger`·`BossTeleportManager.SetOccupied`, 로아식).
+  그래서 선택 중인 사람이 입력이 막혀도 다른 사람이 패드에 서면 끌려간다 → **팝업·재선택 중인 사람이 있는 동안 패드를 잠근다**(최소 처리 — 기존 G10 잠금과 같은 경로).
+  `TutorialBossPath.IsBossPadEnabled` 에 복제값 `IsTraitResetInProgress` 를 더했다. 잠긴 동안은 서 있어도 빈 패드로 보고되고 테두리가 숨는다(G10 전과 같은 모습).
+  풀리는 순간 이미 서 있던 사람으로 카운트다운이 시작된다(`BossEnterTrigger.Update` 가 잠금 변화를 다시 알림). 경석 영역(`BossTeleportManager`·`BossEnterTrigger`)은 수정하지 않았다.
+- **D4 — 절차 맵(구현)**: 특성은 튜토리얼에만 있다 → 절차 맵 리스폰엔 팝업 없음. 특성 디렉터가 씬에 없으면 구독 자체가 없고, 있어도 튜토리얼이 아니면 무시한다.
+- **마감 게이지**: 기존 복도 규칙대로 — 게이지는 진행 중 복도의 출구 게이트(G2/G4/G7/G10)를 기다릴 때만 보이는데, 리스폰은 G10 뒤라 진행 중 복도가 없다 →
+  재선택 창에 게이지·자동 선택 없음(시간 제한 없이 직접 고른다). 타이머도 멈춰 있다(§3.8).
+- **팝업 전달 = 복제 행**(위임 문구의 개인 `ClientRpc` 대신): 행이 상태라 늦게 붙은 UI·재전멸(새 세대로 교체)·서버 처리 뒤 닫힘이 같은 경로로 맞는다(R6). 행은 대상 clientId 로만 읽힌다.
+
+### 4.3 엣지
+
+| 경우 | 처리 |
+|---|---|
+| 팝업·재선택 중 연결 끊김 | `HandleClientDisconnected` → `resetModel.Remove`·장부에서 제거(원복 없이 — 오브젝트가 사라진다)·패드 잠금 재계산 |
+| 팝업 중 다시 전멸 | 새 세대로 전원 팝업 다시 — 지난 세대 응답은 `StaleGeneration` 으로 버린다 |
+| 재선택 중 다시 전멸 | 재선택을 끊고 열린 제시를 거둔다(그때까지 고른 특성은 유지) → 새 팝업. 실제로는 선택 중 무적이라 그 사람이 살아 있어 전멸이 잘 나지 않는다 |
+| 같은 세대에 두 번 응답 | 클라는 세대당 한 번만 보내고, 서버도 두 번째를 `NotPrompted` 로 거부 |
+| 풀이 모자람(후보 0장) | 그 라운드를 건너뛰고 다음 라운드 — 남은 라운드를 다 쓰면 끝 |
 
 ## 5. 리스크
 
@@ -151,7 +191,7 @@
 | R3 | 보스 리셋 훅이 경석 코드에 들어감 | 기존 경로 무변경 + handoff 문서. 결과 전환 예약 뒤(보스 사망)는 리셋 거부 |
 | R4 | 튜토리얼 단계 되감기 — 단계·게이트는 앞으로만이라는 가정이 여러 곳에 있다(Corridor flow 의 자동 완료, 사망 규칙 `_finished`) | 되감기는 Finished → BossEnter 한 칸, G11 하나만. `StepChanged` 외부 구독자 0(2026-10-13 grep), `IsFinished` 소비자는 안내 UI·뒤 배리어·사망 규칙 — Play 확인 |
 | R5 | 리스폰과 사망 연출 타이밍 경합(DeadPresentation 예약이 리스폰 뒤 PermanentDead 로 덮음) | `TryRespawnAfterWipeOnServer` 가 예약을 지운다 |
-| R6 | MPPM 늦은 클라·NetworkList 복제 순서(특성 행) | 팝업 열림은 리스폰 세대값으로 — 늦게 받아도 한 번만 |
+| R6 | MPPM 늦은 클라·NetworkList 복제 순서(특성 행) | 팝업 = 세대를 담은 복제 행(§4.2) — 늦게 받아도 행이 있으면 열고, 답한 세대는 다시 열지 않는다 |
 | R7 | 데이터 테이블 행 없음 | 프리팹 값 5 로 동작. 병합 Export 때 `partyLifeCount` 행 추가 |
 | R8 | 보스방에 남은 폭탄(`BossBomb`, 웰즈가 던진 것)·드론 잔여물 | 보스 디스폰 정리가 장판·드론·웰즈를 멈춘다. 이미 던진 폭탄은 5초 퓨즈로 터지고 사라진다 — 리스폰 지점(복도4)은 보스방 밖이라 무해. Play 확인 |
 
@@ -159,8 +199,8 @@
 
 - **D1 — 갇힌 Soul 처리**: 지금 = Soul 유지 + 전멸 판정에서 탈락(2단계 리스폰이 전원 살린다). 대안 = 풀이 0 이 되는 순간 남은 Soul 을 PermanentDead(관전)로. 사용자 확인 권장.
 - **D2 — 타이머 재가동**: ✅ 결정 = 재가동 안 함(§3.8).
-- **D3 — 재선택 중 패드**: 한 명이 재선택 중일 때 다른 사람이 패드에 서면 카운트다운 시작 — 막을지(모두 응답할 때까지 패드 잠금) 둘지.
-- **D4 — 절차 맵 리스폰**: 사양 = 보스 진입 존 패드 밖(구현). 절차 맵엔 튜토리얼 특성이 없으므로 팝업도 없음(추천).
+- **D3 — 재선택 중 패드**: ✅ 결정 = 팝업·재선택 중인 사람이 있는 동안 패드 잠금(§4.2 — 패드는 한 명만 서도 전원을 끌고 간다).
+- **D4 — 절차 맵 리스폰**: ✅ 결정 = 사양대로 보스 진입 존 패드 밖(구현), 특성이 없으므로 팝업 없음(§4.2).
 - **D5 — 강제 개시 부활 순서**: 공용 풀이 모자랄 때 `ConnectedClientsList` 순회 순서(기존 코드) — 그대로 둠.
 - **D6 — 옛 `defaultLifeCount` 필드**: 병합 Export 로 xlsx 행 정리 후 삭제.
 
@@ -169,11 +209,12 @@
 - **EditMode(자동)**: 1단계 `PartyLivesRulesTests`(11건 — 목적지·차감·재충전·전멸·갇힌 Soul·차감 없는 Soul).
   2단계 `PartyWipeRespawnRulesTests`(11건, 플레이어 러너 — 결과/리스폰 분기·조건·보스 격파 거부·재충전 5·지점 선택 패드/여유/간격/폴백/실패·패드 둘레) ·
   `TutorialBossRetryTests`(8건, 튜토리얼 러너 — 되감기·재도착 뒤 차감 재개·G10 전 거부·멱등·마스크 복도4 최전방·로컬 콜라이더 G10 없음·부활 구간 복도4·존1).
-  3단계: 특성 원복 모델·재선택 4라운드·응답 검증.
+  3단계 `TutorialTraitResetModelTests`(13건, 튜토리얼 러너 — 팝업 대상·예/아니오·중복·대상 아님·지난 세대·재전멸 중단·이탈 패드 해제·원복 장부 그 플레이어만 비움·
+  4라운드 재선택(3장·고른 것 제외·4회 후 종료)·개인 라운드가 남의 제시를 안 건드림·ResetPlayer/CancelOffer·풀 부족 시 건너뜀) + `TutorialBossPathRulesTests.Pad_LockedWhileTraitResetInProgress`.
 - **Play(사람)**:
   - 1단계: 솔로 — F10 부활로 공용 목숨이 5 → 4 … 0, 0 에서 사망 → PermanentDead → 결과 화면. MPPM 2인 — A 부활이 B 의 남은 목숨도 줄인다,
     풀 1 에서 둘 다 Soul → A 부활 → A 사망 → B(갇힌 Soul) 남은 채로 결과 화면. 튜토리얼 G11 전 사망은 풀이 줄지 않는다.
     ⚠️ 2단계 뒤로는 보스전 전멸이 결과 화면 대신 리스폰이다 — 결과 화면 확인은 보스 클리어·나가기로.
   - 2단계: 보스전 전멸 → 복도4 리스폰(겹치지 않음)·보스 처음부터(등장 연출 다시)·목숨 5·체력 가득·시체 없음·관전 카메라 해제·뒤 배리어에 안 갇힘(패드 쪽 진행 가능, 복도4 뒤로 못 감) /
     리스폰 뒤 보스방 재도착 전 사망 = 차감 없이 복도4 부활, 재도착 뒤 사망 = 차감 / 패드 다시 사용 가능 / 타이머 HUD 0 유지 / 보스 클리어·나가기 = 결과 화면 / MPPM 클라 화면도 같은지.
-  - 3단계: 예/아니오 각각, 2인 중 한 명만 예.
+  - 3단계: 예/아니오 각각, 2인 중 한 명만 예 — 순서표는 [tutorial-qa.md](tutorial-qa.md) "전멸 리스폰 · 특성 재선택(할 일 30)".

@@ -35,6 +35,9 @@ public readonly struct TutorialTraitChosen
 /// 쿨감 특성 = 그 플레이어의 <see cref="Player.ServerAttackLanded"/> 를 구독한다.
 /// 선택 창 무적(T2): 제시받고 아직 안 고른 플레이어에게 <see cref="InvulnerabilityCause.TraitSelection"/> 토큰을 건다.
 /// 제시 순간 플레이어 오브젝트가 없었으면 그 플레이어가 스폰될 때(<see cref="PlayerLifeCycleController.ServerLifeStateChanged"/>) 아직 미선택이면 다시 건다(T3).
+/// 특성 초기화(할 일 30 3단계): <see cref="PartyWipeRespawner.PartyWipeRespawned"/> → 리스폰한 각자에게 팝업 행(<see cref="EntryKind.ResetPrompt"/>) →
+/// 응답 RPC 를 서버가 <see cref="TutorialTraitResetModel"/> 로 검증 → [예] = 그 플레이어 효과만 원복 + 혼자만의 라운드 4번(<see cref="TutorialTraitSelectionModel.StartPersonalRound"/>).
+/// 팝업·재선택 중인 사람이 있으면 <see cref="IsTraitResetInProgress"/> 가 보스 진입 패드를 잠근다(D3). 원본: Docs/tech/party-lives-respawn.md §4.
 /// 이 컴포넌트를 씬에 두지 않으면 아무 일도 하지 않는다(튜토리얼 외 영향 없음).
 /// </summary>
 [DisallowMultipleComponent]
@@ -49,6 +52,8 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
     {
         Offered = 0,
         Acquired = 1,
+        /// <summary>특성 초기화 팝업 대기(할 일 30) — <see cref="Entry.TraitIndex"/> 자리에 팝업 세대를 담는다.</summary>
+        ResetPrompt = 2,
     }
 
     /// <summary>복제 행 하나 = (플레이어, 특성 인덱스, 제시/획득).</summary>
@@ -68,9 +73,11 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
         public bool Equals(Entry o) => ClientId == o.ClientId && TraitIndex == o.TraitIndex && Kind == o.Kind;
     }
 
-    private sealed class CooldownHook
+    // 적용한 효과 하나 — 원복에 필요한 것만. 배율 특성 = 상태이상 타입(출처는 SourceIdOf(index)), 쿨감 특성 = 구독한 핸들러.
+    private sealed class AppliedEffect
     {
         public Player Player;
+        public StatusEffectType StatType;
         public Action<PlayerAttackLanded> Handler;
     }
 
@@ -86,10 +93,16 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
     private readonly NetworkVariable<byte> roundDisplay = new NetworkVariable<byte>(
         0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
+    // 팝업·재선택 중인 사람이 있다(할 일 30 D3) — 보스 진입 패드 잠금·테두리 숨김을 모든 피어가 같은 값으로 읽는다.
+    private readonly NetworkVariable<bool> traitResetBusy = new NetworkVariable<bool>(
+        false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
     // 서버 전용
     private TutorialTraitSelectionModel model;
+    private TutorialTraitResetModel resetModel;
     private System.Random random;
-    private readonly List<CooldownHook> cooldownHooks = new List<CooldownHook>();
+    private readonly TutorialTraitEffectLedger<AppliedEffect> appliedEffects = new TutorialTraitEffectLedger<AppliedEffect>();
+    private readonly List<TutorialTraitEffectLedger<AppliedEffect>.Record> revertScratch = new List<TutorialTraitEffectLedger<AppliedEffect>.Record>();
     private readonly List<ulong> clientScratch = new List<ulong>();
     private bool roundCompletionRaised = true;
 
@@ -108,6 +121,9 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
 
     /// <summary>[전 피어] 현재 라운드의 창 표시 옵션(상단 설명·아래 한 줄).</summary>
     public TutorialTraitRoundDisplay RoundDisplay => (TutorialTraitRoundDisplay)roundDisplay.Value;
+
+    /// <summary>[전 피어] 누군가 특성 초기화 팝업 대기 또는 재선택 중이다 — 보스 진입 패드가 잠긴다(<see cref="TutorialBossPath.IsBossPadEnabled"/>).</summary>
+    public bool IsTraitResetInProgress => IsSpawned && traitResetBusy.Value;
 
     /// <summary>[서버] 특성 1장 획득(수동·자동).</summary>
     public event Action<TutorialTraitChosen> ServerTraitChosen;
@@ -140,9 +156,11 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
             Edit.LogError($"{Tag} 특성 풀이 비었다 — 제시가 동작하지 않는다.", this);
 
         model = new TutorialTraitSelectionModel(pool != null ? pool.Count : 0, CollectUnusableIndices());
+        resetModel = new TutorialTraitResetModel();
         random = new System.Random();
         NetworkManager.OnClientDisconnectCallback += HandleClientDisconnected;
         PlayerLifeCycleController.ServerLifeStateChanged += HandleServerLifeStateChanged;
+        PartyWipeRespawner.PartyWipeRespawned += HandlePartyWipeRespawnedServer;
     }
 
     public override void OnNetworkDespawn()
@@ -157,18 +175,23 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
         if (IsServer)
         {
             PlayerLifeCycleController.ServerLifeStateChanged -= HandleServerLifeStateChanged;
+            PartyWipeRespawner.PartyWipeRespawned -= HandlePartyWipeRespawnedServer;
             shieldRetryRequested = false;
             ReleaseAllSelectionShields();
         }
 
-        for (int i = 0; i < cooldownHooks.Count; i++)
+        // 쿨감 구독만 푼다 — 배율 상태이상은 디스폰 뒤 플레이어에 남아도 예전처럼 둔다(씬 종료와 함께 사라진다).
+        IReadOnlyList<TutorialTraitEffectLedger<AppliedEffect>.Record> applied = appliedEffects.All;
+        for (int i = 0; i < applied.Count; i++)
         {
-            if (cooldownHooks[i].Player != null)
-                cooldownHooks[i].Player.ServerAttackLanded -= cooldownHooks[i].Handler;
+            AppliedEffect effect = applied[i].Handle;
+            if (effect.Handler != null && effect.Player != null)
+                effect.Player.ServerAttackLanded -= effect.Handler;
         }
 
-        cooldownHooks.Clear();
+        appliedEffects.Clear();
         model = null;
+        resetModel = null;
         base.OnNetworkDespawn();
     }
 
@@ -323,6 +346,146 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
         return false;
     }
 
+    /// <summary>[전 피어] 그 플레이어가 특성 초기화 팝업에 답해야 하면 true + 팝업 세대.</summary>
+    public bool TryGetResetPrompt(ulong clientId, out int generation)
+    {
+        generation = 0;
+        if (!IsSpawned)
+            return false;
+
+        for (int i = 0; i < entries.Count; i++)
+        {
+            if (entries[i].ClientId == clientId && entries[i].Kind == EntryKind.ResetPrompt)
+            {
+                generation = entries[i].TraitIndex;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>[로컬 플레이어] 특성 초기화 팝업 응답(예 = 초기화 후 재선택). 판정은 서버가 한다.</summary>
+    public void RequestResetAnswer(int generation, bool reset)
+    {
+        if (!IsSpawned)
+        {
+            Edit.LogWarning($"{Tag} 초기화 응답 무시 — 아직 네트워크 스폰 전이다.", this);
+            return;
+        }
+
+        AnswerResetPromptServerRpc(generation, reset);
+    }
+
+    // ── 특성 초기화(할 일 30 3단계) ─────────────────────────────────────────
+
+    // D4: 튜토리얼일 때만 — 절차 맵에는 특성이 없다(이 컴포넌트도 보통 없다).
+    private void HandlePartyWipeRespawnedServer(IReadOnlyList<ulong> clientIds)
+    {
+        if (!CanServe || resetModel == null)
+            return;
+
+        TutorialDirector tutorial = TutorialDirector.Instance;
+        if (tutorial == null || !tutorial.IsTutorialActive)
+        {
+            Edit.Log($"{Tag} 전멸 리스폰 — 튜토리얼이 아니라 특성 초기화 팝업 없음.", this);
+            return;
+        }
+
+        // 다시 전멸 — 지난 팝업은 새 세대로 덮고, 재선택 도중이던 사람의 열린 제시는 거둔다(고른 것은 유지).
+        int generation = resetModel.BeginPrompts(clientIds, clientScratch);
+        for (int i = 0; i < clientScratch.Count; i++)
+            model.CancelOffer(clientScratch[i]);
+
+        RebuildEntries();
+        SyncSelectionShields();
+        SyncResetBusy();
+        Edit.Log($"{Tag} 전멸 리스폰 — 특성 초기화 팝업 세대 {generation}, 대상 {clientIds?.Count ?? 0}명" +
+                 $"{(clientScratch.Count > 0 ? $"(재선택 중단 {clientScratch.Count}명)" : "")}.", this);
+    }
+
+    // 씬 상주 오브젝트라 오너가 없다 — 누구나 호출하고 보낸 사람은 SenderClientId 로 가린다(자기 팝업에만 답할 수 있다).
+    [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
+    private void AnswerResetPromptServerRpc(int generation, bool reset, RpcParams p = default)
+    {
+        if (resetModel != null)
+            CommitResetAnswer(p.Receive.SenderClientId, generation, reset);
+    }
+
+    private void CommitResetAnswer(ulong clientId, int generation, bool reset)
+    {
+        TutorialTraitResetAnswer result = resetModel.Answer(clientId, generation, reset);
+        if (result == TutorialTraitResetAnswer.NotPrompted || result == TutorialTraitResetAnswer.StaleGeneration)
+        {
+            Edit.LogWarning($"{Tag} 초기화 응답 거부: client {clientId} 세대 {generation} — {result}.", this);
+            return;
+        }
+
+        if (result == TutorialTraitResetAnswer.Reset)
+        {
+            int reverted = RevertEffects(clientId);
+            model.ResetPlayer(clientId);
+            bool opened = ContinueReselect(clientId);
+            Edit.Log($"{Tag} client {clientId} 특성 초기화 — 효과 {reverted}개 원복, 재선택 {(opened ? $"라운드 {model.Round} 제시" : "후보 없음(종료)")}.", this);
+        }
+        else
+        {
+            Edit.Log($"{Tag} client {clientId} 특성 유지(아니오).", this);
+        }
+
+        RebuildEntries();
+        SyncSelectionShields();
+        SyncResetBusy();
+    }
+
+    // 재선택 다음 라운드 — 그 플레이어 혼자 받는다(다른 사람의 제시·선택·라운드 완료와 무관). 0장 라운드는 건너뛴다.
+    // 라운드를 열었으면 true, 남은 라운드가 없어 재선택이 끝났으면 false.
+    private bool ContinueReselect(ulong clientId)
+    {
+        int offerCount = pool != null ? pool.OfferCount : 0;
+        bool opened = false;
+        while (resetModel.TryTakeReselectRound(clientId))
+        {
+            if (model.StartPersonalRound(clientId, offerCount, random.Next))
+            {
+                opened = true;
+                break;
+            }
+        }
+
+        // 재선택 창엔 복도 안내 문구(소개·마지막)를 붙이지 않는다. 옵션을 라운드보다 먼저 쓴다(StartOfferRoundServer 와 같은 순서).
+        roundDisplay.Value = (byte)TutorialTraitRoundDisplay.None;
+        round.Value = model.Round;
+        return opened;
+    }
+
+    // 그 플레이어에게 이 디렉터가 건 효과만 되돌린다 — 배율 상태이상(출처 = 특성별 id) 제거·쿨감 구독 해제. 되돌린 수.
+    private int RevertEffects(ulong clientId)
+    {
+        int count = appliedEffects.TakeAll(clientId, revertScratch);
+        for (int i = 0; i < revertScratch.Count; i++)
+        {
+            AppliedEffect effect = revertScratch[i].Handle;
+            if (effect.Player == null)
+                continue;
+
+            if (effect.Handler != null)
+                effect.Player.ServerAttackLanded -= effect.Handler;
+            else if (effect.Player.StatusEffects != null)
+                effect.Player.StatusEffects.Remove(effect.StatType, SourceIdOf(revertScratch[i].TraitIndex));
+        }
+
+        revertScratch.Clear();
+        return count;
+    }
+
+    private void SyncResetBusy()
+    {
+        bool busy = resetModel != null && resetModel.IsBusy;
+        if (IsSpawned && IsServer && traitResetBusy.Value != busy)
+            traitResetBusy.Value = busy;
+    }
+
     // ── 선택 ───────────────────────────────────────────────────────────────
 
     // 씬 상주 오브젝트라 오너가 없다 — 누구나 호출하고 보낸 사람은 SenderClientId 로 가린다.
@@ -343,13 +506,23 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
             return false;
         }
 
+        int chosenRound = model.Round;
         TutorialTraitDefinition trait = pool != null ? pool.Get(traitIndex) : null;
         ApplyEffect(clientId, traitIndex, trait);
+
+        // 재선택 중이면 다음 라운드를 바로 연다 — 무적 토큰을 풀었다 다시 걸지 않게 행·무적 동기화보다 먼저.
+        bool reselecting = resetModel != null && resetModel.IsReselecting(clientId);
+        if (reselecting)
+            ContinueReselect(clientId);
+
         RebuildEntries();
         SyncSelectionShields();
+        if (reselecting)
+            SyncResetBusy();
 
-        Edit.Log($"{Tag} client {clientId} 특성 획득 '{trait?.Id}'({traitIndex}) {(auto ? "자동" : "수동")} — 라운드 {model.Round}.", this);
-        ServerTraitChosen?.Invoke(new TutorialTraitChosen(clientId, traitIndex, trait, auto, model.Round));
+        Edit.Log($"{Tag} client {clientId} 특성 획득 '{trait?.Id}'({traitIndex}) {(auto ? "자동" : "수동")} — 라운드 {chosenRound}" +
+                 $"{(reselecting ? $" (재선택, 남은 {resetModel.RoundsLeft(clientId)})" : "")}.", this);
+        ServerTraitChosen?.Invoke(new TutorialTraitChosen(clientId, traitIndex, trait, auto, chosenRound));
         CheckRoundCompleted();
         return true;
     }
@@ -369,14 +542,14 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
             return;
 
         model.RemovePlayer(clientId);
-        for (int i = cooldownHooks.Count - 1; i >= 0; i--)
-        {
-            if (cooldownHooks[i].Player == null)
-                cooldownHooks.RemoveAt(i);
-        }
+        resetModel?.Remove(clientId); // 팝업·재선택 대기가 패드 잠금으로 남지 않게
+        // 떠난 플레이어 오브젝트는 곧 사라진다 — 원복 없이 장부에서만 뺀다.
+        appliedEffects.TakeAll(clientId, revertScratch);
+        revertScratch.Clear();
 
         RebuildEntries();
         SyncSelectionShields();
+        SyncResetBusy();
         CheckRoundCompleted();
     }
 
@@ -468,18 +641,18 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
         switch (trait.EffectKind)
         {
             case TutorialTraitEffectKind.AttackDamageMultiplier:
-                ApplyStatModifier(player, StatusEffectType.AttackDamageModifier, trait, traitIndex);
+                ApplyStatModifier(clientId, player, StatusEffectType.AttackDamageModifier, trait, traitIndex);
                 break;
             case TutorialTraitEffectKind.MoveSpeedMultiplier:
-                ApplyStatModifier(player, StatusEffectType.MoveSpeedModifier, trait, traitIndex);
+                ApplyStatModifier(clientId, player, StatusEffectType.MoveSpeedModifier, trait, traitIndex);
                 break;
             case TutorialTraitEffectKind.CooldownReductionOnHit:
-                HookCooldownReduction(player, trait);
+                HookCooldownReduction(clientId, player, trait, traitIndex);
                 break;
         }
     }
 
-    private void ApplyStatModifier(Player player, StatusEffectType type, TutorialTraitDefinition trait, int traitIndex)
+    private void ApplyStatModifier(ulong clientId, Player player, StatusEffectType type, TutorialTraitDefinition trait, int traitIndex)
     {
         StatusEffectController effects = player.StatusEffects;
         if (effects == null)
@@ -493,9 +666,11 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
         effects.Apply(type, trait.StatMultiplier, 0f, sourceId);
         if (effects.GetStackCount(type, sourceId) == 0)
             Edit.LogWarning($"{Tag} '{trait.Id}' 상태이상이 거부됐다(연출 잠금 중 등) — 효과가 없다.", player);
+        else
+            appliedEffects.Add(clientId, traitIndex, new AppliedEffect { Player = player, StatType = type });
     }
 
-    private void HookCooldownReduction(Player player, TutorialTraitDefinition trait)
+    private void HookCooldownReduction(ulong clientId, Player player, TutorialTraitDefinition trait, int traitIndex)
     {
         PlayerSkillController skills = player.GetComponent<PlayerSkillController>();
         if (skills == null)
@@ -518,7 +693,7 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
         };
 
         player.ServerAttackLanded += handler;
-        cooldownHooks.Add(new CooldownHook { Player = player, Handler = handler });
+        appliedEffects.Add(clientId, traitIndex, new AppliedEffect { Player = player, Handler = handler });
     }
 
     // ── 동기화 ─────────────────────────────────────────────────────────────
@@ -535,6 +710,8 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
             if (model.HasPendingChoice(clientId))
                 AddRows(clientId, model.GetOffered(clientId), EntryKind.Offered);
             AddRows(clientId, model.GetAcquired(clientId), EntryKind.Acquired);
+            if (resetModel != null && resetModel.TryGetPrompt(clientId, out int generation))
+                entries.Add(new Entry { ClientId = clientId, TraitIndex = generation, Kind = EntryKind.ResetPrompt });
         }
     }
 

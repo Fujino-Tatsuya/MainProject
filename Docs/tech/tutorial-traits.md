@@ -155,3 +155,34 @@ false 일 때 `ServerRoundCompleted` 는 같은 호출 안에서 이미 불렸�
   남은 `TutorialTraitDeadlineModel.UrgentSeconds`(10초) 이하면 게이지·초 텍스트가 `deadlineUrgentColor`.
 - 순수 계산 = `TutorialTraitDeadlineModel`(Unity 비의존). 문구는 아직 문구 테이블(`TutorialTraitTexts.AllIds`)에 넣지 않고 모델 상수(`SecondsFormat`·`DoneFormat`) — 테이블 행 추가는 데이터 테이블 이관(§5) 때 함께.
 - 프리팹은 `Tools/Tutorial/특성 선택 UI 프리팹 생성` 으로 재생성(루트 GameObject·RectTransform fileID 보존 → `4.MapScene` 인스턴스 오버라이드 유지).
+
+## 9. 전멸 리스폰 뒤 특성 초기화 · 재선택 (할 일 30 3단계)
+
+> 사양·흐름 원본: [party-lives-respawn.md §4](party-lives-respawn.md#4-특성-초기화--재선택-3단계--구현됨). 여기는 특성 모듈 쪽 API·구조만.
+
+| 조각 | 역할 |
+|---|---|
+| `TutorialTraitResetModel`(순수) | 플레이어별 없음 → 팝업 대기(세대) → (예) 재선택 중(남은 라운드, `ReselectRounds` = 4) → 없음. 응답 검증 `Answer(clientId, generation, reset)` = `Kept`·`Reset`·`NotPrompted`(대상 아님·중복·재선택 중)·`StaleGeneration`(다시 전멸 전 팝업). `IsBusy` = 패드 잠금 |
+| `TutorialTraitEffectLedger<T>`(순수) | (플레이어, 특성 인덱스) → 원복 핸들 장부. `TakeAll(clientId)` 가 그 플레이어 몫만 꺼낸다 — 다른 플레이어 것은 남는다 |
+| `TutorialTraitSelectionModel` 추가 | `StartPersonalRound(clientId, offerCount, next)`(그 사람만 — 라운드 번호는 올리고 남의 제시·선택은 그대로) · `ResetPlayer`(획득·제시 비움, 등록 유지) · `CancelOffer`(열린 제시 거둠) |
+| `TutorialTraitDirector` 추가 | `PartyWipeRespawner.PartyWipeRespawned` 구독(서버, 튜토리얼일 때만) · 복제 행 `EntryKind.ResetPrompt`(`TraitIndex` = 세대) · `NetworkVariable<bool> traitResetBusy` |
+| `TutorialTraitSelectionView` 추가 | 팝업을 창과 같은 캔버스에 **런타임 생성**(프리팹·저작 메뉴 무수정) — 루트 `UiModalBlocker` + 딤 + 질문 + [예]/[아니오] |
+
+API:
+
+| 시그니처 | 의미 |
+|---|---|
+| `bool TryGetResetPrompt(ulong clientId, out int generation)` | [전 피어] 그 플레이어가 팝업에 답해야 하나 + 세대 |
+| `void RequestResetAnswer(int generation, bool reset)` | [로컬 플레이어] 응답 → `AnswerResetPromptServerRpc`(`SendTo.Server`, 보낸 사람 = `SenderClientId`) |
+| `bool IsTraitResetInProgress` | [전 피어] 누군가 팝업 대기·재선택 중 — `TutorialBossPath.IsBossPadEnabled` 가 패드를 잠근다 |
+
+- **효과 원복**: 효과를 걸 때 장부에 남긴다 — 배율 특성 = 상태이상 타입(출처 `SourceIdOf(index)` → `StatusEffectController.Remove(type, source)`),
+  쿨감 특성 = 구독한 핸들러(`Player.ServerAttackLanded -=`). 거부된 배율(연출 잠금 중)은 장부에 없다(원복할 것 없음). 기존 `cooldownHooks` 목록을 이 장부로 바꿨다.
+- **재선택 라운드**: `ContinueReselect` — 남은 라운드를 하나 빼고 `StartPersonalRound`(0장이면 다음 라운드로 넘어감). 고를 때(`CommitChoice`) 재선택 중이면
+  행·무적 동기화 **전에** 다음 라운드를 열어 무적 토큰을 풀었다 다시 걸지 않는다. 표시 옵션은 `None`(소개·마지막 문구 없음).
+  재선택 라운드 번호는 복도 라운드 표(`TutorialCorridorRounds`)에 없어 복도 흐름의 체크 보고·자동 획득이 반응하지 않는다. `ServerRoundCompleted` 도 다시 나지 않는다(완료 플래그를 건드리지 않음).
+- **창 열림**: 창 판정(`TutorialTraitWindowModel`)이 전역 라운드 번호로 열고 닫으므로, 두 사람이 동시에 재선택하면 한 사람이 라운드를 열 때 다른 사람 창이 한 번 닫혔다
+  같은 후보로 다시 열린다(깜빡임 — 기능 영향 없음).
+- **문구**: `TUT_TRAIT_RESET_PROMPT`("특성을 초기화하고 다시 선택할까요?") · `TUT_TRAIT_RESET_YES`("예") · `TUT_TRAIT_RESET_NO`("아니오") — `TutorialTraitTexts` 상수 + `AllIds`.
+  `TutorialTraitTexts.asset` 에는 행을 넣지 않았다(행 없음 = 상수 폴백, 로컬라이징 브랜치와 에셋 충돌 회피) — 기획이 문구를 바꿀 때 행을 추가한다.
+- 테스트: `TutorialTraitResetModelTests`(튜토리얼 러너).

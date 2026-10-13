@@ -22,13 +22,18 @@ public static class TutorialBossPath
         return TutorialBossPathRules.ShouldHideTimerHud(IsTutorialStage, state, d != null && d.IsTimerHudShown);
     }
 
-    /// <summary>보스 진입 패드가 켜져 있는가(모든 피어) — 판정은 서버 트리거, 표시는 각 피어의 범위 테두리.</summary>
+    /// <summary>
+    /// 보스 진입 패드가 켜져 있는가(모든 피어) — 판정은 서버 트리거, 표시는 각 피어의 범위 테두리.
+    /// 전멸 리스폰 뒤 특성 초기화 팝업·재선택 중인 사람이 있으면 잠긴다(할 일 30 D3, 복제값).
+    /// </summary>
     public static bool IsBossPadEnabled
     {
         get
         {
             TutorialDirector d = TutorialDirector.Instance;
-            return TutorialBossPathRules.IsPadEnabled(IsTutorialStage, d != null && d.IsGateOpen(TutorialGate.G10_BossEnterAndPad));
+            TutorialTraitDirector traits = TutorialTraitDirector.Instance;
+            return TutorialBossPathRules.IsPadEnabled(IsTutorialStage, d != null && d.IsGateOpen(TutorialGate.G10_BossEnterAndPad),
+                traits != null && traits.IsTraitResetInProgress);
         }
     }
 }
