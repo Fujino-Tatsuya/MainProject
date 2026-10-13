@@ -7,7 +7,7 @@ using UnityEngine;
 /// 판정은 <see cref="PartyLivesRules.IsPartyWiped"/> — 전원이 <see cref="PlayerLifeState.PermanentDead"/>이거나
 /// <b>파티 공용 목숨이 0이라 부활할 수 없는 Soul</b>이면 전멸이다(할 일 30 — 공용 풀이면 목숨이 남을 때 Soul 이 된 사람이
 /// 다른 사람의 부활로 풀이 비어 Soul 에 갇힐 수 있다). 공용 목숨이 남은 Soul·차감 없는 부활 대기 Soul(튜토리얼 G11 전)은 전멸이 아니다.
-/// Temp_MultiGameRule 이 없으면 예전 규칙(전원 PermanentDead).
+/// MultiGameRule 이 없으면 예전 규칙(전원 PermanentDead).
 ///
 /// 전멸 상태가 유예시간 동안 유지되면 먼저 <see cref="PartyWipeRespawner.TryRespawnServer"/>(할 일 30 (2) — 보스 재도전 리스폰)를 부르고,
 /// 리스폰 대상이 아니면 <see cref="MapSceneManager.GoToResult"/>를 한 번 호출한다. 보스 클리어·나가기는 GoToResult 를 직접 부르므로 여기를 거치지 않는다. 클라 브로드캐스트와 씬 전환은 MapSceneManager가 이미 소유하므로 여기서는
@@ -26,7 +26,7 @@ public sealed class PartyWipeWatcher : MonoBehaviour
     private float _checkTimer;
     private float _wipeElapsed;
     private bool _fired;
-    private Temp_MultiGameRule _gameRule;
+    private MultiGameRule _gameRule;
     private readonly System.Collections.Generic.List<PartyMemberLife> _members =
         new System.Collections.Generic.List<PartyMemberLife>();
 
@@ -92,7 +92,7 @@ public sealed class PartyWipeWatcher : MonoBehaviour
             FindObjectsInactive.Exclude, FindObjectsSortMode.None);
 
         if (_gameRule == null)
-            _gameRule = FindFirstObjectByType<Temp_MultiGameRule>();
+            _gameRule = FindFirstObjectByType<MultiGameRule>();
         // 규칙이 없으면 Soul 을 '부활 가능'으로 본다 = 예전 규칙(전원 PermanentDead 만 전멸).
         int partyLives = _gameRule != null && _gameRule.IsSpawned ? _gameRule.PartyLives : 1;
 

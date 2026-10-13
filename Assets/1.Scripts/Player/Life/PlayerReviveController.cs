@@ -13,7 +13,7 @@ public sealed class PlayerReviveController : NetworkBehaviour
 {
     [Header("Revive")]
     [SerializeField] private PlayerLifeCycleController lifeCycle;
-    [SerializeField] private Temp_MultiGameRule gameRule;
+    [SerializeField] private MultiGameRule gameRule;
     [Tooltip("실제 부활 조건으로 교체하기 전까지 사용하는 로컬 오너 디버그 입력입니다.")]
     [SerializeField] private Key debugReviveKey = Key.F10;
 
@@ -89,7 +89,7 @@ public sealed class PlayerReviveController : NetworkBehaviour
         {
             Debug.LogWarning(
                 $"[SoulAlert] {OwnerClientId}번 Player의 부활을 거부했습니다. " +
-                "Temp_MultiGameRule이 없거나 공용 목숨이 0입니다.",
+                "MultiGameRule이 없거나 공용 목숨이 0입니다.",
                 this);
             return false;
         }
@@ -128,7 +128,7 @@ public sealed class PlayerReviveController : NetworkBehaviour
     private void ResolveGameRuleReference()
     {
         if (gameRule == null)
-            gameRule = FindFirstObjectByType<Temp_MultiGameRule>();
+            gameRule = FindFirstObjectByType<MultiGameRule>();
     }
 
     private bool CanRequestDebugRevive()

@@ -25262,7 +25262,7 @@
       ]
     },
     {
-      "file": "Assets/1.Scripts/Player/Life/Temp_MultiGameRule.cs",
+      "file": "Assets/1.Scripts/Player/Life/MultiGameRule.cs",
       "decls": [
         {
           "kind": "interface",
@@ -25349,7 +25349,7 @@
         },
         {
           "kind": "class",
-          "name": "Temp_MultiGameRule",
+          "name": "MultiGameRule",
           "namespace": "",
           "bases": [
             "NetworkBehaviour"
