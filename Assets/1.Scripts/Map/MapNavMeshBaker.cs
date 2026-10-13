@@ -27,9 +27,11 @@ public class MapNavMeshBaker : MonoBehaviour
         //    맵의 벽은 Wall(7)이 아니라 Default(0)에 있다. Default 만 수집하면 남는 건 벽과 소품뿐이라
         //    바닥이 하나도 안 들어가고 NavMesh 가 빈 채로 구워진다(몬스터·보스가 전혀 못 움직인다).
         //    Default ∪ Ground = 이관 이전의 Default 와 같은 집합이다.
+        //  - Wall(할 일 32): 벽을 Default → Wall 로 옮겨도 베이크에서 빠지지 않게(빠지면 벽 자리에 NavMesh 가 깔린다).
+        //    Barrier 는 넣지 않는다 — 배리어는 NavMeshObstacle 카브로 막고, 열리면 사라져야 한다.
         surface.useGeometry = NavMeshCollectGeometry.PhysicsColliders;
         surface.collectObjects = CollectObjects.All;
-        surface.layerMask = LayerMask.GetMask("Default", "Ground");
+        surface.layerMask = LayerMask.GetMask("Default", "Ground", "Wall");
     }
 
     private void OnEnable() { MapGenerator.OnGenerated += HandleGenerated; }

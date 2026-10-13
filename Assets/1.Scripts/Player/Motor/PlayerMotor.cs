@@ -855,7 +855,7 @@ public sealed class PlayerMotor : MonoBehaviour
     {
         int mask = gameRule != null
             ? gameRule.ObstacleMask.value
-            : LayerMask.GetMask("Default", "Ground", "Wall", "Env");
+            : LayerMask.GetMask("Default", "Ground", "Wall", "Env", "Barrier");
         int playerBit = LayerMask.GetMask("Player");
         int soulBit = LayerMask.GetMask("Soul");
 
