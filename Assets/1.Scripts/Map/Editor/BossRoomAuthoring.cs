@@ -11,6 +11,16 @@ using UnityEngine;
 // 스폰 지점까지 튕겨 나간다. 그래서 보이지 않는 경계와 바닥 안전망을 명시적으로 만든다.
 //
 // 크기는 렌더러 바운즈에서 실측한다 — 아트가 교체돼도 다시 돌리면 맞는다(하드코딩 금지).
+//
+// 2026-10-13 개정(은희 요청 — 현재 bossroom 구조·값을 그대로 재현):
+//  · 경계 안쪽 면 = **보이는 지상층 벽 메시의 안쪽 면**(변마다 1mm 최빈값). 예전처럼 방 전체 렌더러(파이프·체인 포함)
+//    바운즈를 쓰지 않는다 — 그 방식은 Z 벽이 0.49m 치우치고 바닥·BossArea 가 벽 밖으로 삐져나왔다.
+//  · 사용자가 묶은 그룹(Boss/·TwentyThreeCharger/·Environment/)을 존중한다 — 기존 오브젝트는 **어디에 있든**(깊이 무관)
+//    찾아 그 자리에서 갱신하고, 없을 때만 새로 만든다(새로 만들 땐 Boss/ 그룹이 있으면 그 아래). 중복 생성 금지.
+//  · 손으로 배치한 PlayerArrivalPoints/자식·BossLandingPoint 는 있으면 건드리지 않는다.
+//  · 벽 = Wall 태그+레이어, 바닥 안전망 = Ground 태그+레이어(Docs/tech/wall-concept.md).
+//  · 🔴 23호 보스는 GameObject.Find("InvisibleBoundaries") + 자식 이름 Boundary_XMin/XMax/ZMin/ZMax 의 안쪽 면으로
+//    아레나를 잡는다(TwentyThreeBoss.ResolveArena) — 이름·구성을 바꾸지 말 것.
 public static class BossRoomAuthoring
 {
     const string BossRoomPath = "Assets/2.Prefabs/Environment/Layouts/Zones/bossroom.prefab";
@@ -19,8 +29,12 @@ public static class BossRoomAuthoring
     const string BoundariesName = "InvisibleBoundaries";
     const string ArrivalRootName = "PlayerArrivalPoints";
     const string BossLandingName = "BossLandingPoint";
+    const string BossGroupName = "Boss";
 
     const string WallLayerName = "Wall";
+    const string WallTag = "Wall";
+    const string GroundLayerName = "Ground";
+    const string GroundTag = "Ground";
 
     // 경계 벽 두께·높이. 대시(속도 20 · 0.25초)와 넉백으로 넘어가지 못할 높이를 준다.
     const float BoundaryThickness = 1f;
@@ -39,27 +53,34 @@ public static class BossRoomAuthoring
 
         try
         {
-            if (!TryMeasure(root, out Bounds roomBounds, out float floorTopY))
+            if (!TryMeasure(root, out _, out float floorTopY))
             {
                 Debug.LogError("[BossRoomAuthoring] 렌더러를 찾지 못해 바운즈를 계산할 수 없다.");
                 return;
             }
 
-            Debug.Log($"[BossRoomAuthoring] 실측 — X {roomBounds.min.x:F1}~{roomBounds.max.x:F1} / " +
-                      $"Z {roomBounds.min.z:F1}~{roomBounds.max.z:F1} / " +
-                      $"Y {roomBounds.min.y:F1}~{roomBounds.max.y:F1}, 바닥 상단 Y={floorTopY:F2}");
-
-            int wallLayer = LayerMask.NameToLayer(WallLayerName);
-            if (wallLayer < 0)
+            // 아레나 = 보이는 벽 안쪽 면으로 둘러싼 사각형(방 로컬 XZ). 경계·바닥·BossArea·착지점이 모두 이것을 기준으로 한다.
+            if (!TryMeasureWallInnerFaces(root, floorTopY, out Bounds arena))
             {
-                Debug.LogError($"[BossRoomAuthoring] '{WallLayerName}' 레이어가 없다.");
+                Debug.LogError("[BossRoomAuthoring] 벽 메시 안쪽 면을 네 변 모두 찾지 못했다 — 저장하지 않는다.");
                 return;
             }
 
-            BuildFloorNet(root, roomBounds, floorTopY);
-            BuildBoundaries(root, roomBounds, floorTopY, wallLayer);
-            BuildReferencePoints(root, roomBounds, floorTopY);
-            BuildBossArea(root, roomBounds, floorTopY);
+            Debug.Log($"[BossRoomAuthoring] 실측 — 벽 안쪽 면 X {arena.min.x:F3}~{arena.max.x:F3} / " +
+                      $"Z {arena.min.z:F3}~{arena.max.z:F3}, 바닥 상단 Y={floorTopY:F2}");
+
+            int wallLayer = LayerMask.NameToLayer(WallLayerName);
+            int groundLayer = LayerMask.NameToLayer(GroundLayerName);
+            if (wallLayer < 0 || groundLayer < 0)
+            {
+                Debug.LogError($"[BossRoomAuthoring] '{WallLayerName}'/'{GroundLayerName}' 레이어가 없다.");
+                return;
+            }
+
+            BuildFloorNet(root, arena, floorTopY, groundLayer);
+            BuildBoundaries(root, arena, floorTopY, wallLayer);
+            BuildReferencePoints(root, arena, floorTopY);
+            BuildBossArea(root, arena, floorTopY);
             BuildNavMeshMargin(root, floorTopY);
 
             PrefabUtility.SaveAsPrefabAsset(root, BossRoomPath);
@@ -90,22 +111,20 @@ public static class BossRoomAuthoring
     /// 붙이지 않는다 — MapScene의 스폰 소유자는 <c>BossEncounterDirector</c> 하나이고, 붙이면 보스가
     /// 두 번 스폰된다.
     /// </summary>
-    static void BuildBossArea(GameObject root, Bounds roomBounds, float floorTopY)
+    static void BuildBossArea(GameObject root, Bounds arena, float floorTopY)
     {
-        Transform stale = root.transform.Find(BossAreaName);
-        if (stale != null)
-            Object.DestroyImmediate(stale.gameObject);
-
-        var go = new GameObject(BossAreaName);
-        go.transform.SetParent(root.transform, false);
-        go.transform.localPosition = new Vector3(roomBounds.center.x, floorTopY, roomBounds.center.z);
+        // 있으면 그 자리(부모 유지)에서 갱신, 없으면 Boss/ 그룹(없으면 루트) 아래에 만든다.
+        GameObject go = GetOrCreate(root, BossAreaName, out bool created);
         go.tag = BossAreaTag;
+        SetRootLocalPosition(root, go.transform, new Vector3(arena.center.x, floorTopY, arena.center.z));
 
-        var box = go.AddComponent<BoxCollider>();
+        var box = go.GetComponent<BoxCollider>();
+        if (box == null) box = go.AddComponent<BoxCollider>();
         box.isTrigger = true;
         box.center = new Vector3(0f, BossAreaHeight * 0.5f, 0f);
-        // 방 전체를 덮는다 — KMK의 10×10은 그쪽 아레나 크기 기준이라 이 방(실측)에 맞춰 넓힌다.
-        box.size = new Vector3(roomBounds.size.x, BossAreaHeight, roomBounds.size.z);
+        // 아레나(벽 안쪽 면) 전체를 덮는다 — 벽 밖으로 삐져나가지 않게.
+        box.size = new Vector3(arena.size.x, BossAreaHeight, arena.size.z);
+        if (created) Debug.Log($"[BossRoomAuthoring] {BossAreaName} 새로 만듦 — {go.transform.parent.name} 아래");
 
         Debug.Log(
             $"[BossRoomAuthoring] {BossAreaName} — tag {BossAreaTag}, 중앙 {go.transform.localPosition}, " +
@@ -114,7 +133,9 @@ public static class BossRoomAuthoring
 
     // ── 충전 발판 콜라이더 (2026-08-13, 팀장 Play 관찰) ───────────────────
 
-    const string ChargeFloorName = "Env_Floor_bosscharger (1)";
+    // 2026-10-13 bossroom 정리에서 "Env_Floor_bosscharger (1)" → "Env_Floor_bosscharger" 로 이름이 바뀌었다(둘 다 찾는다).
+    const string ChargeFloorName = "Env_Floor_bosscharger";
+    const string ChargeFloorLegacyName = "Env_Floor_bosscharger (1)";
 
     /// <summary>
     /// 충전 발판(<c>Env_Floor_bosscharger (1)</c>)에 <b>MeshCollider 를 붙인다.</b>
@@ -140,7 +161,7 @@ public static class BossRoomAuthoring
         GameObject root = PrefabUtility.LoadPrefabContents(BossRoomPath);
         try
         {
-            Transform floor = FindChild(root.transform, ChargeFloorName);
+            Transform floor = FindChild(root.transform, ChargeFloorName) ?? FindChild(root.transform, ChargeFloorLegacyName);
             if (floor == null)
             {
                 Debug.LogError($"[BossRoom] '{ChargeFloorName}' 을 못 찾았다 — 이름이 바뀌었는지 확인할 것.");
@@ -279,37 +300,33 @@ public static class BossRoomAuthoring
             networkTransform.InLocalSpace = true;
         }
 
-        // 피격 판정용 콜라이더. 렌더러 실측으로 맞추고, 활성 여부는 ChargingObject가 제어한다.
+        // 피격 판정용 콜라이더. 이미 있으면 크기를 다시 재지 않는다(튜닝값 보존). 없을 때만 렌더러 실측으로 만든다.
+        // 활성 여부는 BossChargingPylon 이 제어한다.
         BoxCollider box = go.GetComponent<BoxCollider>();
         if (box == null)
+        {
             box = go.AddComponent<BoxCollider>();
-
-        Renderer renderer = go.GetComponent<Renderer>();
-        if (renderer != null)
-        {
-            Bounds local = ToRootLocalBounds(pillar, renderer.bounds);
-            box.center = local.center;
-            box.size = local.size;
+            Renderer renderer = go.GetComponent<Renderer>();
+            if (renderer != null)
+            {
+                Bounds local = ToRootLocalBounds(pillar, renderer.bounds);
+                box.center = local.center;
+                box.size = local.size;
+            }
+            else
+            {
+                Debug.LogWarning($"[BossRoomAuthoring] {go.name}[{index}]에 Renderer가 없어 콜라이더 크기를 실측하지 못했다.", go);
+            }
+            box.isTrigger = false;
+            box.enabled = false; // 평상시 통행 방해 금지 — 상승 완료 시 BossChargingPylon 이 켠다
         }
-        else
-        {
-            Debug.LogWarning($"[BossRoomAuthoring] {go.name}[{index}]에 Renderer가 없어 콜라이더 크기를 실측하지 못했다.", go);
-        }
 
-        box.isTrigger = false;
-        box.enabled = false; // 평상시 통행 방해 금지 — 상승 완료 시 ChargingObject가 켠다
-
-        ChargingObject charging = go.GetComponent<ChargingObject>();
-        if (charging == null)
-            charging = go.AddComponent<ChargingObject>();
-
-        // 인스펙터 값이 이미 튜닝돼 있으면 덮지 않는다(재실행 안전).
-        SerializedObject serialized = new SerializedObject(charging);
-        SerializedProperty maxHp = serialized.FindProperty("maxHp");
-        SerializedProperty defense = serialized.FindProperty("defense");
-        if (maxHp != null && maxHp.intValue <= 0) maxHp.intValue = PillarMaxHp;
-        if (defense != null && defense.intValue < 0) defense.intValue = PillarDefense;
-        serialized.ApplyModifiedPropertiesWithoutUndo();
+        // 🔴 2026-10-13: 레거시 ChargingObject(Unit) 는 더 이상 붙이지 않는다 — 현재 기둥은 BossChargingPylon(Unit)이고,
+        //    둘을 한 오브젝트에 붙이면 Unit 이 둘이 된다. BossChargingPylon 이 없으면 수동 부착하도록 알리기만 한다.
+        if (go.GetComponent<BossChargingPylon>() == null)
+            Debug.LogWarning($"[BossRoomAuthoring] {go.name}[{index}] 에 BossChargingPylon 이 없다 — 인스펙터에서 붙이고 outlineMaterial 을 지정할 것.", go);
+        if (go.GetComponent<ChargingObject>() != null)
+            Debug.LogWarning($"[BossRoomAuthoring] {go.name}[{index}] 에 레거시 ChargingObject 가 남아 있다 — BossChargingPylon 과 함께 두면 안 된다.", go);
 
         Debug.Log(
             $"[BossRoomAuthoring] 기둥 {index} 구성 — {go.name} @ local {pillar.localPosition}, " +
@@ -428,63 +445,212 @@ public static class BossRoomAuthoring
         return false;
     }
 
-    /// <summary>바닥 아트에 틈이 있어도 빠지지 않게 하는 안전망. 상단면을 바닥 표면에 맞춘다.</summary>
-    static void BuildFloorNet(GameObject root, Bounds roomBounds, float floorTopY)
+    /// <summary>
+    /// 바닥 아트에 틈이 있어도 빠지지 않게 하는 안전망 = 보스방의 실제 보행 콜라이더(바닥 타일은 콜라이더가 빠져 있다).
+    /// 상단면을 바닥 표면에 맞추고, 경계 벽 바깥 면까지 덮는다. 있으면 그 자리(부모 유지 — 현재 Boss/ 아래)에서 갱신한다.
+    /// </summary>
+    static void BuildFloorNet(GameObject root, Bounds arena, float floorTopY, int groundLayer)
     {
-        Transform existing = root.transform.Find(FloorColliderName);
-        if (existing != null)
-            Object.DestroyImmediate(existing.gameObject);
+        GameObject go = GetOrCreate(root, FloorColliderName, out bool created);
+        go.layer = groundLayer;   // Ground — NavMesh 수집·GroundProbe·플레이어 접지 대상
+        go.tag = GroundTag;
+        SetRootLocalPosition(root, go.transform, Vector3.zero);
 
-        var go = new GameObject(FloorColliderName);
-        go.transform.SetParent(root.transform, false);
-        go.layer = root.layer; // 바닥은 Default(=walkable) 유지 — NavMesh 수집 대상이 된다
+        // 같은 이름 BoxCollider 를 여럿 두지 않는다(첫 것만 쓰고 나머지는 지운다).
+        BoxCollider[] boxes = go.GetComponents<BoxCollider>();
+        BoxCollider box = boxes.Length > 0 ? boxes[0] : go.AddComponent<BoxCollider>();
+        for (int i = 1; i < boxes.Length; i++) Object.DestroyImmediate(boxes[i]);
 
-        var box = go.AddComponent<BoxCollider>();
-        box.center = new Vector3(
-            roomBounds.center.x,
-            floorTopY - FloorNetThickness * 0.5f,
-            roomBounds.center.z);
-        box.size = new Vector3(roomBounds.size.x, FloorNetThickness, roomBounds.size.z);
+        box.isTrigger = false;
+        box.center = new Vector3(arena.center.x, floorTopY - FloorNetThickness * 0.5f, arena.center.z);
+        box.size = new Vector3(arena.size.x + BoundaryThickness * 2f, FloorNetThickness, arena.size.z + BoundaryThickness * 2f);
 
-        Debug.Log($"[BossRoomAuthoring] {FloorColliderName} — size {box.size}, top Y={floorTopY:F2}");
+        Debug.Log($"[BossRoomAuthoring] {FloorColliderName}{(created ? " (새로 만듦)" : "")} — size {box.size}, " +
+                  $"top Y={floorTopY:F2}, 부모 {go.transform.parent.name}");
     }
 
-    /// <summary>네 변을 막는 보이지 않는 경계. 렌더러·트리거 없이 Wall 레이어 BoxCollider만 둔다.</summary>
-    static void BuildBoundaries(GameObject root, Bounds roomBounds, float floorTopY, int wallLayer)
+    /// <summary>
+    /// 네 변을 막는 보이지 않는 경계. 렌더러·트리거 없이 Wall 태그+레이어 BoxCollider만 둔다.
+    /// 안쪽 면 = 보이는 벽 안쪽 면(<paramref name="arena"/>). 모서리는 두께만큼 겹친다.
+    /// 오브젝트는 지우지 않고 갱신한다(이름 Boundary_XMin/XMax/ZMin/ZMax 고정 — 23호가 이 이름을 읽는다).
+    /// </summary>
+    static void BuildBoundaries(GameObject root, Bounds arena, float floorTopY, int wallLayer)
     {
-        Transform existing = root.transform.Find(BoundariesName);
-        if (existing != null)
-            Object.DestroyImmediate(existing.gameObject);
-
-        var parent = new GameObject(BoundariesName);
-        parent.transform.SetParent(root.transform, false);
-        parent.layer = wallLayer;
+        Transform parent = FindDeep(root.transform, BoundariesName);
+        if (parent == null)
+        {
+            parent = new GameObject(BoundariesName).transform;
+            parent.SetParent(root.transform, false);
+        }
+        parent.gameObject.layer = wallLayer;
+        parent.gameObject.tag = WallTag;
+        parent.localPosition = Vector3.zero;
+        parent.localRotation = Quaternion.identity;
+        parent.localScale = Vector3.one;
 
         float centerY = floorTopY + BoundaryHeight * 0.5f;
-        float halfX = roomBounds.size.x * 0.5f;
-        float halfZ = roomBounds.size.z * 0.5f;
-        float half = BoundaryThickness * 0.5f;
+        float t = BoundaryThickness;
+        float half = t * 0.5f;
+        float lenX = arena.size.x + t * 2f;   // Z 벽 길이 — 모서리 겹침
+        float lenZ = arena.size.z + t * 2f;   // X 벽 길이 — 모서리 겹침
 
-        // 두께의 절반만큼 바깥으로 밀어 벽 안쪽 면이 방 경계와 일치하게 한다.
-        // 모서리는 X 벽을 Z 두께만큼 늘려 겹치게 만들어 틈을 없앤다.
-        AddWall(parent, wallLayer, "Boundary_XMin",
-            new Vector3(roomBounds.center.x - halfX - half, centerY, roomBounds.center.z),
-            new Vector3(BoundaryThickness, BoundaryHeight, roomBounds.size.z + BoundaryThickness * 2f));
+        SetWall(parent, wallLayer, "Boundary_XMin", new Vector3(arena.min.x - half, centerY, arena.center.z), new Vector3(t, BoundaryHeight, lenZ));
+        SetWall(parent, wallLayer, "Boundary_XMax", new Vector3(arena.max.x + half, centerY, arena.center.z), new Vector3(t, BoundaryHeight, lenZ));
+        SetWall(parent, wallLayer, "Boundary_ZMin", new Vector3(arena.center.x, centerY, arena.min.z - half), new Vector3(lenX, BoundaryHeight, t));
+        SetWall(parent, wallLayer, "Boundary_ZMax", new Vector3(arena.center.x, centerY, arena.max.z + half), new Vector3(lenX, BoundaryHeight, t));
 
-        AddWall(parent, wallLayer, "Boundary_XMax",
-            new Vector3(roomBounds.center.x + halfX + half, centerY, roomBounds.center.z),
-            new Vector3(BoundaryThickness, BoundaryHeight, roomBounds.size.z + BoundaryThickness * 2f));
+        // 규칙 밖 자식(예전 수동 조각 등)은 지운다 — 23호는 정확히 네 이름만 읽는다.
+        for (int i = parent.childCount - 1; i >= 0; i--)
+        {
+            string n = parent.GetChild(i).name;
+            if (n != "Boundary_XMin" && n != "Boundary_XMax" && n != "Boundary_ZMin" && n != "Boundary_ZMax")
+                Object.DestroyImmediate(parent.GetChild(i).gameObject);
+        }
 
-        AddWall(parent, wallLayer, "Boundary_ZMin",
-            new Vector3(roomBounds.center.x, centerY, roomBounds.center.z - halfZ - half),
-            new Vector3(roomBounds.size.x, BoundaryHeight, BoundaryThickness));
+        Debug.Log($"[BossRoomAuthoring] {BoundariesName} — 4면, 안쪽 면 X {arena.min.x:F3}~{arena.max.x:F3} / " +
+                  $"Z {arena.min.z:F3}~{arena.max.z:F3}, 높이 {BoundaryHeight}, 태그·레이어 {WallTag}/{LayerMask.LayerToName(wallLayer)}");
+    }
 
-        AddWall(parent, wallLayer, "Boundary_ZMax",
-            new Vector3(roomBounds.center.x, centerY, roomBounds.center.z + halfZ + half),
-            new Vector3(roomBounds.size.x, BoundaryHeight, BoundaryThickness));
+    // ── 벽 안쪽 면 실측 ──────────────────────────────────────────────────
 
-        Debug.Log($"[BossRoomAuthoring] {BoundariesName} — 4면, 높이 {BoundaryHeight}, " +
-                  $"레이어 {LayerMask.LayerToName(wallLayer)}");
+    /// <summary>
+    /// 보이는 지상층 벽 메시(이름에 wall — WallTransparency 제외)의 안쪽 면을 변마다 1mm 최빈값으로 잡는다.
+    /// 얇은 축이 X 인 벽 = X 변(XMin/XMax), 얇은 축이 Z 인 벽 = Z 변. 모서리처럼 정사각에 가까운 조각은 투표에서 뺀다.
+    /// 지하층 벽(바닥 아래)은 보행 경계가 아니라서 뺀다. 방 중심은 바닥 렌더러 바운즈 중심(없으면 벽 바운즈 중심).
+    /// </summary>
+    static bool TryMeasureWallInnerFaces(GameObject root, float floorTopY, out Bounds arena)
+    {
+        arena = default;
+        var walls = new System.Collections.Generic.List<Bounds>();
+        Bounds floorUnion = default, wallUnion = default;
+        bool hasFloor = false, hasWall = false;
+
+        foreach (Renderer r in root.GetComponentsInChildren<Renderer>(true))
+        {
+            Bounds b = ToRootLocalBounds(root.transform, r.bounds);
+            if (LooksLikeWall(r.transform, root.transform))
+            {
+                if (b.max.y < floorTopY + 1f || b.min.y < floorTopY - 0.5f) continue;   // 지상층만
+                walls.Add(b);
+                if (!hasWall) { wallUnion = b; hasWall = true; } else wallUnion.Encapsulate(b);
+            }
+            else if (LooksLikeFloor(r))
+            {
+                if (!hasFloor) { floorUnion = b; hasFloor = true; } else floorUnion.Encapsulate(b);
+            }
+        }
+        if (!hasWall) return false;
+        Vector3 c = hasFloor ? floorUnion.center : wallUnion.center;
+
+        var votes = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<int, int>>
+        {
+            ["XMin"] = new(), ["XMax"] = new(), ["ZMin"] = new(), ["ZMax"] = new(),
+        };
+        foreach (Bounds b in walls)
+        {
+            if (Mathf.Abs(b.size.x - b.size.z) < 0.5f) continue;   // 모서리·기둥
+            if (b.size.x < b.size.z)
+            {
+                if (b.center.x < c.x) Vote(votes["XMin"], b.max.x); else Vote(votes["XMax"], b.min.x);
+            }
+            else
+            {
+                if (b.center.z < c.z) Vote(votes["ZMin"], b.max.z); else Vote(votes["ZMax"], b.min.z);
+            }
+        }
+
+        if (!TryMode(votes["XMin"], out float minX) || !TryMode(votes["XMax"], out float maxX) ||
+            !TryMode(votes["ZMin"], out float minZ) || !TryMode(votes["ZMax"], out float maxZ))
+            return false;
+
+        arena = new Bounds();
+        arena.SetMinMax(new Vector3(minX, floorTopY, minZ), new Vector3(maxX, floorTopY, maxZ));
+        return true;
+    }
+
+    static void Vote(System.Collections.Generic.Dictionary<int, int> table, float value)
+    {
+        int bucket = Mathf.RoundToInt(value * 1000f);   // 1mm 단위(현재 값 ±13.366 을 그대로 재현)
+        table.TryGetValue(bucket, out int n);
+        table[bucket] = n + 1;
+    }
+
+    static bool TryMode(System.Collections.Generic.Dictionary<int, int> table, out float value)
+    {
+        value = 0f;
+        int best = int.MinValue, bestVotes = -1;
+        foreach (var pair in table)
+            if (pair.Value > bestVotes || (pair.Value == bestVotes && Mathf.Abs(pair.Key) < Mathf.Abs(best)))
+            {
+                bestVotes = pair.Value;
+                best = pair.Key;
+            }
+        if (bestVotes < 0) return false;
+        value = best / 1000f;
+        return true;
+    }
+
+    static bool LooksLikeWall(Transform t, Transform root)
+    {
+        for (; t != null && t != root; t = t.parent)
+        {
+            string n = t.name.ToLowerInvariant();
+            if (n.Contains("walltransparency")) return false;
+            if (n.StartsWith("wall")) return true;   // wall_brick_* · walll_brick_corner* · Environment/Wall
+        }
+        return false;
+    }
+
+    // ── 찾기·만들기 (사용자 그룹 존중 — 깊이 무관, 중복 생성 금지) ─────────────────
+
+    static Transform FindDeep(Transform root, string name)
+    {
+        foreach (Transform t in root.GetComponentsInChildren<Transform>(true))
+            if (t != root && t.name == name) return t;
+        return null;
+    }
+
+    /// <summary>이름으로 깊이 무관하게 찾고, 없으면 Boss/ 그룹(없으면 루트) 아래에 만든다.</summary>
+    static GameObject GetOrCreate(GameObject root, string name, out bool created)
+    {
+        Transform found = FindDeep(root.transform, name);
+        created = found == null;
+        if (found != null) return found.gameObject;
+
+        Transform group = FindDeep(root.transform, BossGroupName);
+        var go = new GameObject(name);
+        go.transform.SetParent(group != null ? group : root.transform, false);
+        return go;
+    }
+
+    /// <summary>부모가 무엇이든 루트 로컬 좌표로 위치를 맞춘다(그룹이 원점이 아니어도 결과가 같게).</summary>
+    static void SetRootLocalPosition(GameObject root, Transform t, Vector3 rootLocal)
+    {
+        t.position = root.transform.TransformPoint(rootLocal);
+        t.localRotation = Quaternion.identity;
+    }
+
+    static void SetWall(Transform parent, int layer, string name, Vector3 rootLocalCenter, Vector3 size)
+    {
+        Transform child = parent.Find(name);
+        GameObject go = child != null ? child.gameObject : new GameObject(name);
+        if (child == null) go.transform.SetParent(parent, false);
+        go.transform.localPosition = Vector3.zero;
+        go.transform.localRotation = Quaternion.identity;
+        go.transform.localScale = Vector3.one;
+        go.layer = layer;
+        go.tag = WallTag;
+
+        foreach (Component comp in go.GetComponents<Component>())
+            if (comp is Renderer || comp is MeshFilter) Object.DestroyImmediate(comp);
+
+        BoxCollider[] boxes = go.GetComponents<BoxCollider>();
+        BoxCollider box = boxes.Length > 0 ? boxes[0] : go.AddComponent<BoxCollider>();
+        for (int i = 1; i < boxes.Length; i++) Object.DestroyImmediate(boxes[i]);
+        box.isTrigger = false;
+        // InvisibleBoundaries 가 루트 원점·항등이므로 center = 루트 로컬 좌표.
+        box.center = parent.InverseTransformPoint(parent.root.TransformPoint(rootLocalCenter));
+        box.size = size;
     }
 
     // ─── NavMesh 여유 띠 (2026-09-29 경석 · 팀장 승인) ─────────────────────────────
@@ -523,7 +689,7 @@ public static class BossRoomAuthoring
     // 경계는 **저작된 InvisibleBoundaries 안쪽 면**에서 읽는다(재실측하지 않는다 — 벽 판정과 같은 원본).
     static bool BuildNavMeshMargin(GameObject root, float floorTopY)
     {
-        Transform boundaries = root.transform.Find(BoundariesName);
+        Transform boundaries = FindDeep(root.transform, BoundariesName);
         if (boundaries == null)
         {
             Debug.LogError($"[BossRoomAuthoring] {BoundariesName} 가 없다 — Rebuild Boss Room Bounds 를 먼저 돌릴 것.");
@@ -550,7 +716,7 @@ public static class BossRoomAuthoring
             return false;
         }
 
-        Transform stale = root.transform.Find(NavMarginName);
+        Transform stale = FindDeep(root.transform, NavMarginName);
         if (stale != null) Object.DestroyImmediate(stale.gameObject);
 
         var parent = new GameObject(NavMarginName);
@@ -579,57 +745,44 @@ public static class BossRoomAuthoring
         vol.area = area;
     }
 
-    static void AddWall(GameObject parent, int layer, string name, Vector3 center, Vector3 size)
-    {
-        var go = new GameObject(name);
-        go.transform.SetParent(parent.transform, false);
-        go.layer = layer;
-
-        var box = go.AddComponent<BoxCollider>();
-        box.center = center;
-        box.size = size;
-    }
-
     /// <summary>
     /// 텔레포트 도착 지점 3개와 보스 착지 지점. (승인 계획 Task 1)
-    /// 방 중심 기준 삼각 배치로 서로 캡슐 지름 이상 벌리고, 경계에서도 떨어뜨린다.
-    /// 실제 위치는 플레이 테스트 후 프리팹에서 수동 조정할 수 있다.
+    /// 🔴 2026-10-13: **이미 있으면 건드리지 않는다**(손으로 배치한 PlayerArrivePos1~3·Boss/BossLandingPoint 보존 —
+    ///    예전엔 지우고 Player1~3 부채꼴로 다시 만들어 수동 배치가 사라졌고, BossLandingPoint 가 Boss/ 아래로 옮겨진 뒤엔
+    ///    직속 Find 로 못 찾아 착지점이 둘이 됐다). 없을 때만 방 중심 기준으로 만든다.
     /// </summary>
-    static void BuildReferencePoints(GameObject root, Bounds roomBounds, float floorTopY)
+    static void BuildReferencePoints(GameObject root, Bounds arena, float floorTopY)
     {
-        Transform staleArrival = root.transform.Find(ArrivalRootName);
-        if (staleArrival != null)
-            Object.DestroyImmediate(staleArrival.gameObject);
+        Vector3 floorCenter = new Vector3(arena.center.x, floorTopY, arena.center.z);
 
-        Transform staleLanding = root.transform.Find(BossLandingName);
-        if (staleLanding != null)
-            Object.DestroyImmediate(staleLanding.gameObject);
-
-        Vector3 floorCenter = new Vector3(roomBounds.center.x, floorTopY, roomBounds.center.z);
-
-        var arrivalRoot = new GameObject(ArrivalRootName);
-        arrivalRoot.transform.SetParent(root.transform, false);
-        arrivalRoot.transform.localPosition = floorCenter;
-
-        // 보스 착지점을 중심에 두고, 플레이어는 보스 쪽을 바라보도록 반대편에 배치한다.
-        for (int i = 0; i < 3; i++)
+        if (FindDeep(root.transform, ArrivalRootName) == null)
         {
-            float angle = 210f + i * 60f; // 중심 아래쪽(-Z)에 부채꼴로 벌린다
-            float rad = angle * Mathf.Deg2Rad;
-            var point = new GameObject($"Player{i + 1}");
-            point.transform.SetParent(arrivalRoot.transform, false);
-            point.transform.localPosition = new Vector3(
-                Mathf.Cos(rad) * ArrivalRingRadius,
-                0f,
-                Mathf.Sin(rad) * ArrivalRingRadius);
-            point.transform.localRotation = Quaternion.LookRotation(
-                -point.transform.localPosition.normalized, Vector3.up);
+            var arrivalRoot = new GameObject(ArrivalRootName);
+            arrivalRoot.transform.SetParent(root.transform, false);
+            arrivalRoot.transform.localPosition = floorCenter;
+
+            // 보스 착지점을 중심에 두고, 플레이어는 보스 쪽을 바라보도록 반대편에 배치한다.
+            for (int i = 0; i < 3; i++)
+            {
+                float angle = 210f + i * 60f; // 중심 아래쪽(-Z)에 부채꼴로 벌린다
+                float rad = angle * Mathf.Deg2Rad;
+                var point = new GameObject($"Player{i + 1}");
+                point.transform.SetParent(arrivalRoot.transform, false);
+                point.transform.localPosition = new Vector3(
+                    Mathf.Cos(rad) * ArrivalRingRadius,
+                    0f,
+                    Mathf.Sin(rad) * ArrivalRingRadius);
+                point.transform.localRotation = Quaternion.LookRotation(
+                    -point.transform.localPosition.normalized, Vector3.up);
+            }
+            Debug.Log($"[BossRoomAuthoring] {ArrivalRootName} 새로 만듦 — 중심 {floorCenter}");
         }
 
-        var landing = new GameObject(BossLandingName);
-        landing.transform.SetParent(root.transform, false);
-        landing.transform.localPosition = floorCenter;
-
-        Debug.Log($"[BossRoomAuthoring] {ArrivalRootName} 3개 + {BossLandingName} — 중심 {floorCenter}");
+        if (FindDeep(root.transform, BossLandingName) == null)
+        {
+            GameObject landing = GetOrCreate(root, BossLandingName, out _);
+            SetRootLocalPosition(root, landing.transform, floorCenter);
+            Debug.Log($"[BossRoomAuthoring] {BossLandingName} 새로 만듦 — 중심 {floorCenter}, 부모 {landing.transform.parent.name}");
+        }
     }
 }

@@ -7,7 +7,7 @@ using UnityEngine;
 
 // 존·복도 경계 벽 저작 도구 (할 일 32 세팅 — Docs/tech/wall-concept.md).
 //
-// 벽 아트의 콜라이더를 지운 뒤로 이동을 막는 것은 InvisibleBoundaries/Boundary_* 박스뿐이다.
+// 벽 아트의 콜라이더를 지운 뒤로 이동을 막는 것은 ZoneBoundaries/ZoneBoundary_* 박스뿐이다.
 // 이 메뉴는 그 박스를 존 프리팹과 복도 바닥 프리팹에 만든다. 다시 돌리면 같은 결과(멱등) — 이미 맞으면 저장하지 않는다.
 //
 //  · 존 = Zones/*.prefab(bossroom 제외 — BossRoomAuthoring 이 관리) 중 **StageTutorial.prefab 의 ZoneSlot 에 놓이는 존**.
@@ -22,7 +22,7 @@ using UnityEngine;
 //    한 번 넣으면 모든 복도 인스턴스에 들어간다(섹션·스테이지 프리팹은 바뀌지 않는다).
 //
 // 건너뛰는 존(로그로 보고): StageTutorial 에 없음(열지 않는다) · 바닥 없음(주 바닥도 Ground 레이어 콜라이더도 없음) ·
-// 주 바닥 밖으로 이어진 바닥이 있는데 Ground 없음 · 복도가 닿지 않음 · InvisibleBoundaries 가 회전/스케일됨 ·
+// 주 바닥 밖으로 이어진 바닥이 있는데 Ground 없음 · 복도가 닿지 않음 · ZoneBoundaries 가 회전/스케일됨 ·
 // 프리팹 모드에서 저장 안 된 수정이 있음 · 호출자가 넘긴 제외 목록.
 public static class BoundaryWallAuthoring
 {
@@ -31,8 +31,10 @@ public static class BoundaryWallAuthoring
     const string BossRoomPath = ZonesFolder + "/bossroom.prefab";
     const string HallwayFloorPath = "Assets/2.Prefabs/Environment/Architecture/Floors/floor_hallway 1.prefab";
 
-    const string BoundariesName = "InvisibleBoundaries";
-    const string BoundaryPrefix = "Boundary_";
+    // 🔴 이름을 "InvisibleBoundaries"/"Boundary_" 로 쓰지 말 것 — 23호 보스(TwentyThreeBoss.ResolveArena)가 GameObject.Find("InvisibleBoundaries") 로
+    //    씬에서 처음 찾은 것을 보스방 경계로 쓴다. 존에 같은 이름이 생기면 엉뚱한 방을 잡는다(2026-10-13).
+    const string BoundariesName = "ZoneBoundaries";
+    const string BoundaryPrefix = "ZoneBoundary_";
     const string Tag = "[BoundaryWall]";
 
     // 두께 0.5m · 높이 8m(보스방 경계 높이 — 대시·넉백으로 넘지 못하게). 벽 안쪽 면 = 바닥 변.
@@ -381,7 +383,7 @@ public static class BoundaryWallAuthoring
         return specs;
     }
 
-    /// <summary>변 [from, to] 에서 문 구간을 뺀 조각마다 벽 하나. 조각이 하나면 Boundary_{변}, 여럿이면 _A, _B …(축 오름차순).</summary>
+    /// <summary>변 [from, to] 에서 문 구간을 뺀 조각마다 벽 하나. 조각이 하나면 ZoneBoundary_{변}, 여럿이면 _A, _B …(축 오름차순).</summary>
     static void AddSide(List<WallSpec> specs, Side side, float from, float to, List<Vector2> doors,
                         System.Func<float, float, (Vector3 center, Vector3 size)> make)
     {
@@ -471,9 +473,9 @@ public static class BoundaryWallAuthoring
     // ─── 적용(멱등) ────────────────────────────────────────────────────────
 
     /// <summary>
-    /// InvisibleBoundaries 아래 Boundary_* 를 사양과 같게 맞춘다. 이미 같으면 false(저장 안 함).
-    /// 사양에 없는 Boundary_* 는 지우고, 남는 오브젝트는 Transform + BoxCollider 만 둔다(렌더러·필터 제거).
-    /// InvisibleBoundaries 의 기존 위치 오프셋은 보존하고 center 로 보정한다.
+    /// ZoneBoundaries 아래 ZoneBoundary_* 를 사양과 같게 맞춘다. 이미 같으면 false(저장 안 함).
+    /// 사양에 없는 ZoneBoundary_* 는 지우고, 남는 오브젝트는 Transform + BoxCollider 만 둔다(렌더러·필터 제거).
+    /// ZoneBoundaries 의 기존 위치 오프셋은 보존하고 center 로 보정한다.
     /// </summary>
     static bool Apply(GameObject root, List<WallSpec> specs, int wallLayer, out string error)
     {
