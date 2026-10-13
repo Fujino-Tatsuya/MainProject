@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 
 // 파티 공용 목숨 풀의 순수 규칙(Unity·NGO 비의존 — EditMode 테스트 대상).
-// 원본: Docs/tech/party-lives-respawn.md §2. 배선은 Temp_MultiGameRule(서버 쓰기)·PartyWipeWatcher(판정)가 한다.
+// 원본: Docs/tech/party-lives-respawn.md §2. 배선은 MultiGameRule(서버 쓰기)·PartyWipeWatcher(판정)가 한다.
 
 /// <summary>전멸 판정에 넣는 한 플레이어의 생명 상태.</summary>
 public readonly struct PartyMemberLife
