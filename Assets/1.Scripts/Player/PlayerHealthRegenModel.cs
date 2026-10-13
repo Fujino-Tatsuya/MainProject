@@ -5,7 +5,8 @@ using System;
 /// 원본: Docs/tech/party-lives-respawn.md §8. 배선은 <c>Player</c>(서버 Update·피격 훅)가 한다.
 ///
 ///  · 마지막 피격 후 delay 초가 지나면 초당 rateBaseHp(FinalMaxHp) × percentPerSecond 를 회복한다. 상한(maxHp)에서 멈춘다.
-///  · 피격(<see cref="NotifyHit"/>) = 지연을 처음부터 다시 센다. 쌓아 둔 소수 회복량도 버린다.
+///  · 피격(<see cref="NotifyDamage"/>) = 체력 피해 &gt; 0 또는 추락 피해. 지연을 처음부터 다시 센다. 쌓아 둔 소수 회복량도 버린다.
+///    보호막만 깎인 피격은 재생을 멈추지 않는다(사용자 결정 10-13).
 ///  · 차단(사망·Soul·PermanentDead·연출 잠금·체력 0) 중에는 회복하지 않고, 차단이 풀린 시점부터 지연을 다시 센다
 ///    — 부활·리스폰 직후가 곧 "지연부터 시작" 이다.
 ///  · 체력이 정수라 틱마다 소수 회복량을 누적기에 모았다가 정수 부분만 내준다(작은 비율·짧은 틱에서도 손실 없음).
@@ -24,6 +25,19 @@ public sealed class PlayerHealthRegenModel
 
     /// <summary>지금까지 모은 소수 회복량(0 이상 1 미만). 테스트·진단용.</summary>
     public double PendingFraction => _fraction;
+
+    /// <summary>
+    /// 서버에 실제로 적용된 피해를 알린다(사용자 결정 10-13). 체력이 깎였거나 추락 피해면 <see cref="NotifyHit"/>,
+    /// 보호막만 깎인 피해는 무시한다(재생 지속). 리셋했으면 true.
+    /// </summary>
+    public bool NotifyDamage(double now, int healthLost, bool isFallDamage)
+    {
+        if (healthLost <= 0 && !isFallDamage)
+            return false;
+
+        NotifyHit(now);
+        return true;
+    }
 
     /// <summary>피격 — 회복을 즉시 멈추고 지연을 now 부터 다시 센다.</summary>
     public void NotifyHit(double now)

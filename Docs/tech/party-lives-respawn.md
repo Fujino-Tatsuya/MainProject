@@ -231,14 +231,19 @@
 | 항목 | 결정 |
 |---|---|
 | 수치 | `PlayerGameRuleData`(Player 시트) `regenDelaySeconds`(`[Min 0]`)·`regenPercentPerSecond`(`[Range 0~1]`). xlsx 행은 병합 Export 때 추가 — 그 전엔 SO 값(5 / 0.02) |
-| 피격 = | 체력 **또는 보호막**이 실제로 깎인 피해(`Unit.OnServerHealthDamageApplied` — 결과 통계 발행과 같은 조건). 보호막만 깎여도 "전투 중" 이므로 리셋한다. **추락 피해 포함**(실제 체력 피해). 무적으로 막힌 피해·경감 후 0 은 리셋하지 않는다 |
+| 피격 = | **실제 체력 피해 &gt; 0 또는 추락 피해**(`Unit.OnServerHealthDamageApplied` → `PlayerHealthRegenModel.NotifyDamage`). **보호막만 깎인 피격은 리셋하지 않는다(재생 지속)**. 무적으로 막힌 피해·경감 후 0 도 리셋하지 않는다 — 사용자 결정 10-13 |
 | 권한 | 서버만 틱(`Player.Update` → `TickServerHealthRegen`), 오너 예측 없음. 회복은 `Unit.HealHp` → 기존 `_currentHp` 복제로 HUD 반영 |
 | 시간 | `NetworkClock.GameNow`(상태이상·보호막과 같은 도메인) — 일시정지 중 멈추고 슬로모션 중 느려진다 |
 | 정수 체력 | 틱마다 소수 회복량을 누적기에 모아 정수 부분만 회복(손실 없음). 피격·가득 참·차단 때 누적분을 버린다 |
 | 차단 | `PlayerLifeState != Alive`(DeadPresentation·Soul·PermanentDead)·연출 잠금(`PlayerEncounterLock`)·체력 0. 차단이 풀린 시점부터 지연을 다시 센다 — 부활·전멸 리스폰 직후는 지연부터 |
 | 상한 | 회복 속도는 `FinalMaxHp` 기준, 상한은 `min(MaxHp, FinalMaxHp)`(`Health.HealHp` 가 base `MaxHp` 로 클램프하므로) |
-| 결과 통계 | 집계 안 됨 — `Unit.HealHp` 는 통계 이벤트를 내지 않고 `CombatStatsEvents` 에 회복 채널이 없다. 나중에 '회복' 통계를 `HealHp` 에 붙이면 재생도 섞이므로 그때 재생 전용 경로로 가른다 |
+| 결과 통계 | **집계하지 않는다** — 재생은 `Unit.HealHp(amount, countInStats: false)` 로 회복해 `CombatStatsEvents.ServerHealApplied`(통계 대상 회복 채널)를 타지 않는다. 일반 `HealHp(amount)` 는 실제 회복량 &gt; 0 일 때 발행한다(현재 구독자 없음 — 회복량 통계는 이 채널을 구독하면 된다) — 사용자 결정 10-13 |
 
-- 계산: `PlayerHealthRegenModel`(순수) — 테스트 `PlayerHealthRegenModelTests`(플레이어 러너).
-- **Play(사람)**: 맞고 5초 뒤 초당 2% 회복·가득에서 멈춤 / 회복 중 피격(보호막만 깎이는 피격 포함) 시 즉시 멈춤 / 추락 뒤 지연 / Soul·관전 중 안 참, 부활 직후 5초 대기 /
+- 계산: `PlayerHealthRegenModel`(순수) — 테스트 `PlayerHealthRegenModelTests`(플레이어 러너). 결정 10-13 고정: `ShieldOnlyHit_DoesNotStopRegen`·`HealthDamage_ResetsDelay`·`FallDamage_ResetsDelay`·`NaturalRegenHeal_IsNotReportedToStats`.
+**사용자 결정 10-13** (앞 추천안 "보호막만 깎여도 리셋" 을 뒤집음):
+1. 보호막만 깎인 피격은 재생을 멈추지 않는다(재생 지속). 실제 체력 피해 &gt; 0 일 때만 멈추고 지연을 다시 센다.
+2. 추락 피해는 재생을 멈춘다(체력 피해로 취급, 지연 재시작) — `Player.ApplyFallDamage` 중(`_fallDamageBypass`)이면 체력 감소량과 무관하게 리셋.
+3. 자연 회복은 결과 통계(회복량)에 잡지 않는다 — 위 '결과 통계' 행.
+
+- **Play(사람)**: 맞고 5초 뒤 초당 2% 회복·가득에서 멈춤 / 회복 중 체력 피격 시 즉시 멈춤 / **보호막만 깎이는 피격은 회복 계속** / 추락 뒤 지연 / Soul·관전 중 안 참, 부활 직후 5초 대기 /
   보스 등장 연출 중 안 참 / Esc 일시정지(솔로) 중 안 참 / MPPM 클라 HUD 에도 같은 체력 / 결과 화면 통계 변화 없음.

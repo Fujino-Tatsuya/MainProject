@@ -1708,14 +1708,15 @@ public class Player : Unit
         }
     }
 
-    // 피격 = 체력이든 보호막이든 실제로 깎인 피해(추락 포함). 무적으로 막힌 피해·내가 때린 것은 오지 않는다.
+    // 재생 리셋 = 체력 피해 > 0 또는 추락 피해. 보호막만 깎인 피격은 재생을 멈추지 않는다(사용자 결정 10-13).
+    // 무적으로 막힌 피해·내가 때린 것은 오지 않는다.
     protected override void OnServerHealthDamageApplied(int healthLost, int shieldLost)
     {
-        healthRegen.NotifyHit(GameplayNow());
+        healthRegen.NotifyDamage(GameplayNow(), healthLost, _fallDamageBypass);
     }
 
     /// <summary>
-    /// [서버] 기본 체력 재생(할 일 31). 회복은 Unit.HealHp → 기존 _currentHp 복제로 HUD 에 반영된다(오너 예측 없음).
+    /// [서버] 기본 체력 재생(할 일 31). 회복은 Unit.HealHp(통계 비집계) → 기존 _currentHp 복제로 HUD 에 반영된다(오너 예측 없음).
     /// 사망·Soul·PermanentDead·연출 잠금 중에는 막히고, 풀린 시점부터 지연을 다시 센다.
     /// </summary>
     private void TickServerHealthRegen()
@@ -1740,8 +1741,9 @@ public class Player : Unit
             FinalMaxHp,
             rule.HealthRegenDelaySeconds,
             rule.HealthRegenPercentPerSecond);
+        // 자연 회복은 결과 통계(회복량)에 잡지 않는다(사용자 결정 10-13).
         if (heal > 0)
-            HealHp(heal);
+            HealHp(heal, countInStats: false);
     }
 
     // 상태이상·보호막과 같은 시간 도메인(일시정지·슬로모션 반영 GameNow, 없으면 ServerTime).

@@ -1,6 +1,6 @@
 using NUnit.Framework;
 
-/// <summary>플레이어 기본 체력 재생(할 일 31) — 지연·틱·상한·피격 리셋·누적기·차단. 원본: Docs/tech/party-lives-respawn.md §8.</summary>
+/// <summary>플레이어 기본 체력 재생(할 일 31) — 지연·틱·상한·피격 리셋·누적기·차단·사용자 결정 10-13(보호막만·추락·통계). 원본: Docs/tech/party-lives-respawn.md §8.</summary>
 public sealed class PlayerHealthRegenModelTests
 {
     const float Delay = 5f;
@@ -129,6 +129,70 @@ public sealed class PlayerHealthRegenModelTests
         var model = new PlayerHealthRegenModel();
         model.Tick(0.0, false, 50, Max, Max, Delay, 0f);
         Assert.AreEqual(0, model.Tick(100.0, false, 50, Max, Max, Delay, 0f));
+    }
+
+    // ─── 사용자 결정 10-13 ───────────────────────────────────────────
+
+    [Test]
+    public void ShieldOnlyHit_DoesNotStopRegen()
+    {
+        var model = Started(0.0);
+        Assert.AreEqual(1, Tick(model, 5.75, 50)); // 1.5HP → 1, 0.5 남음
+
+        Assert.IsFalse(model.NotifyDamage(6.0, 0, false)); // 보호막만 깎임
+        Assert.Greater(model.PendingFraction, 0.0);
+        Assert.AreEqual(2, Tick(model, 6.75, 51)); // 0.5 + 1.5 → 2, 지연 없이 계속
+    }
+
+    [Test]
+    public void HealthDamage_ResetsDelay()
+    {
+        var model = Started(0.0);
+        Assert.AreEqual(1, Tick(model, 5.75, 50));
+
+        Assert.IsTrue(model.NotifyDamage(6.0, 3, false));
+        Assert.AreEqual(0.0, model.PendingFraction);
+        Assert.AreEqual(0, Tick(model, 11.0, 47));
+        Assert.AreEqual(2, Tick(model, 12.0, 47));
+    }
+
+    [Test]
+    public void FallDamage_ResetsDelay()
+    {
+        var model = Started(0.0);
+        Assert.AreEqual(1, Tick(model, 5.75, 50));
+
+        // 추락 = 체력 피해로 취급. 체력 감소량이 0 으로 들어와도(경계) 추락이면 리셋한다.
+        Assert.IsTrue(model.NotifyDamage(6.0, 10, true));
+        Assert.AreEqual(0, Tick(model, 11.0, 40));
+        Assert.IsTrue(model.NotifyDamage(11.5, 0, true));
+        Assert.AreEqual(0, Tick(model, 16.0, 40));
+        Assert.AreEqual(2, Tick(model, 17.5, 40));
+    }
+
+    [Test]
+    public void NaturalRegenHeal_IsNotReportedToStats()
+    {
+        int raised = 0;
+        int lastAmount = 0;
+        System.Action<Unit, int> handler = (_, amount) => { raised++; lastAmount = amount; };
+        CombatStatsEvents.ServerHealApplied += handler;
+        try
+        {
+            Unit.ReportServerHeal(null, 5, countInStats: false); // 자연 회복 경로
+            Assert.AreEqual(0, raised);
+
+            Unit.ReportServerHeal(null, 0, countInStats: true); // 가득 차 실제 회복 0
+            Assert.AreEqual(0, raised);
+
+            Unit.ReportServerHeal(null, 7, countInStats: true); // 일반 회복(스킬 등)
+            Assert.AreEqual(1, raised);
+            Assert.AreEqual(7, lastAmount);
+        }
+        finally
+        {
+            CombatStatsEvents.ServerHealApplied -= handler;
+        }
     }
 
     [Test]
