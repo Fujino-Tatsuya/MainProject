@@ -482,9 +482,9 @@ grep -n "AuthorityMode" Assets/2.Prefabs/Player/Player.prefab Assets/2.Prefabs/P
 | 테스트 | `UI/Combat/Editor/OverheadDashIconRulesTests` — `Tools/Tests/플레이어 EditMode 테스트 실행` 에 등록(UI 픽스처도 이 러너가 돌린다) |
 
 **에임 대시 틴트** — `PlayerAimIndicator.tintOnDashCooldown`(기본 **꺼짐**). 켜면 예전처럼 재충전 중 인디케이터를
-`dashCooldownTint` 로 어둡게 한다(쿼드 머티리얼 **인스턴스**의 `_BaseColor` — §11). 꺼져 있으면 항상 원래 색이고, 어두운 상태에서 끄면 원래 색으로 되돌린다.
+`dashCooldownTint` 로 어둡게 한다(쿼드 머티리얼 **인스턴스**의 `_BaseColor` — §12). 꺼져 있으면 항상 원래 색이고, 어두운 상태에서 끄면 원래 색으로 되돌린다.
 base·Variant 모두 이 값을 오버라이드하지 않는다(2026-10-12 확인) — 다시 켜려면 base `Player.prefab` 에서 켠다.
-## 10. 회전 잠금 — `PlayerFacingLock` (할 일 27, 2026-10-12)
+## 11. 회전 잠금 — `PlayerFacingLock` (할 일 27, 2026-10-12)
 
 몸(`Armature`) 회전을 행동이 잠시 묶어 둘 때 쓰는 **원인별 토큰**이다. `PlayerMovement` 가 하나 들고 있다.
 
@@ -514,7 +514,7 @@ base·Variant 모두 이 값을 오버라이드하지 않는다(2026-10-12 확�
 
 ---
 
-## 11. 에임 인디케이터 — 3D 쿼드 (2026-10-13, 할 일 33)
+## 12. 에임 인디케이터 — 3D 쿼드 (2026-10-13, 할 일 33)
 
 URP 데칼(`DecalProjector`)을 버리고 **바닥에서 띄운 얇은 쿼드**로 바꿨다. 데칼은 지형·벽에 투영돼 경사·단차에서 늘어지고
 캐릭터 몸에도 찍혔다. 쿼드는 발밑 높이에 **수평으로 눕힌 채 조준 방향으로 Y축만** 돈다.
