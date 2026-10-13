@@ -29,8 +29,17 @@ public static class TutorialTraitTexts
     /// <summary>획득 토스트 <see cref="LocationToken"/> 자리에 들어갈 "다시 보기 위치" 문구.</summary>
     public const string PickedLocationId = "TUT_C1_TRAIT_PICKED_LOCATION";
 
+    /// <summary>전멸 리스폰 뒤 특성 초기화 팝업(할 일 30) — 질문·[예]·[아니오].</summary>
+    public const string ResetPromptTitleId = "TUT_TRAIT_RESET_PROMPT";
+    public const string ResetPromptYesId = "TUT_TRAIT_RESET_YES";
+    public const string ResetPromptNoId = "TUT_TRAIT_RESET_NO";
+
     /// <summary>모든 문구 ID(문구 테이블 기본 행 순서).</summary>
-    public static readonly string[] AllIds = { TitleId, IntroId, LastNoticeId, PickedId, PickedLocationId };
+    public static readonly string[] AllIds =
+    {
+        TitleId, IntroId, LastNoticeId, PickedId, PickedLocationId,
+        ResetPromptTitleId, ResetPromptYesId, ResetPromptNoId,
+    };
 
     /// <summary><see cref="PickedId"/> 문구 안에서 다시 보기 UI 위치 문구로 바뀌는 자리.</summary>
     public const string LocationToken = "{location}";
@@ -47,6 +56,10 @@ public static class TutorialTraitTexts
 
     public const string PickedLocation = "화면 왼쪽 위";
 
+    public const string ResetPromptTitle = "특성을 초기화하고 다시 선택할까요?";
+    public const string ResetPromptYes = "예";
+    public const string ResetPromptNo = "아니오";
+
     /// <summary>문구 ID → 기본 문구. 모르는 ID 는 빈 문자열.</summary>
     public static string Get(string id)
     {
@@ -57,6 +70,9 @@ public static class TutorialTraitTexts
             case LastNoticeId: return LastNotice;
             case PickedId: return Picked;
             case PickedLocationId: return PickedLocation;
+            case ResetPromptTitleId: return ResetPromptTitle;
+            case ResetPromptYesId: return ResetPromptYes;
+            case ResetPromptNoId: return ResetPromptNo;
             default: return string.Empty;
         }
     }

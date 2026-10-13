@@ -18,6 +18,33 @@ public sealed class TutorialTraitSelectionModelTests
     }
 
     [Test]
+    public void OfferSeq_ChangesOnlyForThePlayerWhoGetsANewOffer()
+    {
+        // 할 일 30 4단계 — 창은 이 번호로 열고 닫는다. 다른 사람의 제시·선택·재선택에는 변하지 않는다.
+        var model = new TutorialTraitSelectionModel(12);
+        Assert.That(model.GetOfferSeq(Host), Is.EqualTo(0), "제시받은 적 없음");
+
+        model.StartRound(new[] { Host }, 3, First);
+        int hostSeq = model.GetOfferSeq(Host);
+        Assert.That(hostSeq, Is.GreaterThan(0));
+
+        model.AddParticipant(Client1, First);
+        Assert.That(model.GetOfferSeq(Host), Is.EqualTo(hostSeq), "늦은 참가자 추가");
+        model.TryChoose(Client1, model.GetOffered(Client1)[0]);
+        model.StartPersonalRound(Client1, 3, First);
+        Assert.That(model.GetOfferSeq(Host), Is.EqualTo(hostSeq), "다른 사람의 선택·재선택");
+        Assert.That(model.Round, Is.EqualTo(1), "개인 라운드는 전역 라운드를 올리지 않는다");
+
+        model.TryChoose(Host, model.GetOffered(Host)[0]);
+        Assert.That(model.GetOfferSeq(Host), Is.EqualTo(hostSeq), "고른 뒤에도 번호는 남는다(창 닫힘은 제시 행으로)");
+
+        model.StartRound(new[] { Host, Client1 }, 3, First);
+        Assert.That(model.GetOfferSeq(Host), Is.GreaterThan(hostSeq), "새 복도 라운드 = 새 제시");
+        Assert.That(model.GetOfferSeq(Client1), Is.Not.EqualTo(model.GetOfferSeq(Host)), "번호는 모델 전체에서 단조 증가");
+        Assert.IsFalse(model.IsPersonalRound(Client1), "복도 라운드가 재선택 표시를 지운다");
+    }
+
+    [Test]
     public void PickCandidates_TakesCount_WithoutDuplicates()
     {
         var result = new List<int>();

@@ -723,6 +723,46 @@ public sealed class TutorialDirector : NetworkBehaviour
         BossRoomArrived?.Invoke(arrived);
     }
 
+    // ─── 전멸 리스폰(서버, 할 일 30 (2)) — Docs/tech/party-lives-respawn.md §3.5·§3.6 ─────────
+
+    /// <summary>
+    /// [서버] 보스 재도전 되감기 — 단계 Finished → BossEnter, G11(보스방 도착) 닫기, 도착 래치 해제(<see cref="TutorialFlowModel.RewindForBossRetry"/>).
+    /// G10 이 열려 있어야 한다(아니면 false). G1~G10·존 장부·카운터는 그대로. 다음 보스방 도착 때 G11·Finished·<see cref="BossRoomArrived"/> 가 다시 난다.
+    /// 🔴 개인 뒤 배리어 마스크(<see cref="ResetBackBarrierMaskServer"/>)를 <b>먼저</b> 되돌린 뒤 부른다 — 되감기로 튜토리얼이 다시 '진행 중'이 되는 순간
+    ///    G10 비트가 남아 있으면 복도4 에 선 사람 앞을 G10 뒤 배리어가 막는다.
+    /// </summary>
+    public bool RewindForBossRetryServer()
+    {
+        if (!RequireServerActive(nameof(RewindForBossRetryServer))) return false;
+        if (!_model.IsGateOpen(TutorialGate.G10_BossEnterAndPad))
+        {
+            Edit.LogWarning("[Tutorial] 보스 재도전 되감기 거부 — G10 이 아직 닫혀 있다.", this);
+            return false;
+        }
+
+        _bossArrived = false;
+        _model.RewindForBossRetry();
+        Commit();
+        Edit.Log($"[Tutorial] 보스 재도전 되감기 — 단계 {_model.Step}, G11 닫힘(다음 보스방 도착부터 다시 목숨 차감).", this);
+        return true;
+    }
+
+    /// <summary>
+    /// [서버] 그 플레이어의 지난 배리어 마스크를 '최전방 = <paramref name="front"/>' 로 다시 쓴다(<see cref="TutorialBackBarrierRules.MaskWithFrontmost"/>).
+    /// 일반 갱신은 비트를 더하기만 한다 — 이건 전멸 리스폰 전용 예외. 복제는 같은 틱 Commit 으로.
+    /// </summary>
+    public void ResetBackBarrierMaskServer(ulong clientId, TutorialArea front)
+    {
+        if (!RequireServerActive(nameof(ResetBackBarrierMaskServer))) return;
+        int mask = TutorialBackBarrierRules.MaskWithFrontmost(front);
+        _backBarrierMasks.TryGetValue(clientId, out int old);
+        _backBarrierMasks[clientId] = mask;
+        Commit();
+        if (old != mask)
+            Edit.Log($"[TutorialBarrier] 뒤 배리어 재계산(전멸 리스폰) — client {clientId} {TutorialBackBarrierRules.Describe(old)} → " +
+                     $"{TutorialBackBarrierRules.Describe(mask)} (최전방 {front}).", this);
+    }
+
     // ─── 인원(서버) ──────────────────────────────────────────────────────
 
     private void AddPlayer(ulong clientId)

@@ -321,6 +321,25 @@ public sealed class BossTimerManager : NetworkBehaviour
         Edit.Log("[BossTimer] 보스방 도착 — 제한시간 종료.", this);
     }
 
+    /// <summary>
+    /// [서버] 전멸 리스폰(할 일 30 (2) — Docs/tech/handoff-boss-encounter-reset.md)용 — 타이머를 <b>재가동하지 않고</b> Stopped(게이지 0)로 둔다.
+    /// 보스방에 도착했던 판이면 이미 Stopped 라 그대로. 만료(Expired) 상태였으면 만료 재시도도 지운다 — 안 지우면 리스폰 직후 강제 이동이 걸린다.
+    /// <b>이 메서드를 부를 때만</b> 동작한다(기존 자동 시작·G8 시작·만료·도착 계약은 그대로).
+    /// </summary>
+    public void StopForRetryServer()
+    {
+        if (!IsServer || !IsSpawned)
+            return;
+
+        _expired = false;
+        if (_state.Value == TimerState.Stopped)
+            return;
+
+        _state.Value = TimerState.Stopped;
+        _expiresAt.Value = 0d;
+        Edit.Log("[BossTimer] 재도전 리셋 — 제한시간을 재가동하지 않는다(Stopped).", this);
+    }
+
     // 만료는 한 번만 판정하고, **강제 개시에 성공할 때까지 사실을 유지**한다.
     private bool _expired;
 

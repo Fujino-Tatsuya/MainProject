@@ -1,8 +1,92 @@
 using NUnit.Framework;
 
-/// <summary>튜토리얼 특성 선택 창 판정 고정 (할 일 15 T2) — 열림·닫힘·닫힌 라운드 재표시 금지·획득 토스트·문구.</summary>
+/// <summary>
+/// 튜토리얼 특성 선택 창 판정 고정 (할 일 15 T2) — 열림·닫힘·닫힌 제시 재표시 금지·획득 토스트·문구.
+/// 첫 인자는 로컬 플레이어의 제시 번호(OfferSeq — 할 일 30 4단계부터 전역 라운드 대신).
+/// </summary>
 public sealed class TutorialTraitWindowModelTests
 {
+    private const ulong Host = 0;
+    private const ulong Client1 = 1;
+
+    private static int First(int maxExclusive) => 0;
+
+    // 클라 뷰가 하는 일과 같다 — 내 제시 번호·제시 유무·획득 수만 넘긴다.
+    private static TutorialTraitWindowUpdate EvaluateFor(TutorialTraitWindowModel window, TutorialTraitSelectionModel selection, ulong clientId)
+    {
+        return window.Evaluate(selection.GetOfferSeq(clientId), selection.HasPendingChoice(clientId), selection.GetAcquired(clientId).Count);
+    }
+
+    [Test]
+    public void OthersPersonalRounds_KeepMyWindowOpen()
+    {
+        // 둘이 동시에 재선택(할 일 30) — Client1 이 고르고 다음 라운드를 받아도 Host 창은 닫혔다 다시 열리지 않는다.
+        var selection = new TutorialTraitSelectionModel(12);
+        var hostWindow = new TutorialTraitWindowModel();
+        var clientWindow = new TutorialTraitWindowModel();
+        selection.StartPersonalRound(Host, 3, First);
+        selection.StartPersonalRound(Client1, 3, First);
+        Assert.That(EvaluateFor(hostWindow, selection, Host).Opened, Is.True);
+        Assert.That(EvaluateFor(clientWindow, selection, Client1).Opened, Is.True);
+        int hostSeq = hostWindow.OpenOfferSeq;
+
+        for (int r = 0; r < 3; r++)
+        {
+            selection.TryChoose(Client1, selection.GetOffered(Client1)[0]);
+            selection.StartPersonalRound(Client1, 3, First);
+
+            TutorialTraitWindowUpdate host = EvaluateFor(hostWindow, selection, Host);
+            Assert.That(host.Opened || host.Closed || host.ShowPickedToast, Is.False, $"Client1 재선택 {r + 1}번째 — Host 창 그대로");
+            Assert.That(hostWindow.OpenOfferSeq, Is.EqualTo(hostSeq));
+
+            TutorialTraitWindowUpdate client = EvaluateFor(clientWindow, selection, Client1);
+            Assert.That(client.Closed && client.Opened, Is.True, "Client1 은 자기 다음 제시로 새 창");
+            Assert.That(client.ShowPickedToast, Is.True);
+        }
+    }
+
+    [Test]
+    public void OpensOnlyWhenMyOfferSeqChanges()
+    {
+        // 복도 라운드에서 Host 가 고른 뒤 늦게 온 Client1 추가·Client1 재선택 — Host 번호는 그대로라 창이 안 열린다.
+        var selection = new TutorialTraitSelectionModel(12);
+        var hostWindow = new TutorialTraitWindowModel();
+        selection.StartRound(new[] { Host }, 3, First);
+        EvaluateFor(hostWindow, selection, Host);
+        selection.TryChoose(Host, selection.GetOffered(Host)[0]);
+        EvaluateFor(hostWindow, selection, Host);
+        int hostSeq = selection.GetOfferSeq(Host);
+
+        selection.AddParticipant(Client1, First);
+        selection.StartPersonalRound(Client1, 3, First);
+        Assert.That(selection.GetOfferSeq(Host), Is.EqualTo(hostSeq), "다른 사람 제시는 내 번호를 안 바꾼다");
+        TutorialTraitWindowUpdate unchanged = EvaluateFor(hostWindow, selection, Host);
+        Assert.That(unchanged.Opened || unchanged.Closed, Is.False);
+
+        selection.StartPersonalRound(Host, 3, First);
+        Assert.That(selection.GetOfferSeq(Host), Is.GreaterThan(hostSeq));
+        Assert.That(EvaluateFor(hostWindow, selection, Host).Opened, Is.True, "내 번호가 올라가면 새 창");
+    }
+
+    [Test]
+    public void ClosedOfferNeverReopens_EvenAfterOthersOffers()
+    {
+        var selection = new TutorialTraitSelectionModel(12);
+        var hostWindow = new TutorialTraitWindowModel();
+        selection.StartRound(new[] { Host, Client1 }, 3, First);
+        EvaluateFor(hostWindow, selection, Host);
+        int closedSeq = hostWindow.OpenOfferSeq;
+        Assert.That(hostWindow.ForceClose(), Is.True, "디렉터를 잠깐 놓쳤다 — 이 제시는 닫힌 것으로 친다");
+
+        selection.TryChoose(Client1, selection.GetOffered(Client1)[0]);
+        selection.StartPersonalRound(Client1, 3, First);
+        TutorialTraitWindowUpdate update = EvaluateFor(hostWindow, selection, Host);
+
+        Assert.That(selection.HasPendingChoice(Host), Is.True, "Host 제시 행은 아직 있다");
+        Assert.That(update.Opened, Is.False, "닫힌 제시는 다른 사람 변화로 다시 열리지 않는다");
+        Assert.That(hostWindow.WasClosed(closedSeq), Is.True);
+    }
+
     [Test]
     public void OpensWhenOffered()
     {
@@ -11,7 +95,7 @@ public sealed class TutorialTraitWindowModelTests
 
         Assert.That(update.Opened, Is.True);
         Assert.That(update.Closed, Is.False);
-        Assert.That(model.OpenRound, Is.EqualTo(1));
+        Assert.That(model.OpenOfferSeq, Is.EqualTo(1));
     }
 
     [Test]
@@ -79,7 +163,7 @@ public sealed class TutorialTraitWindowModelTests
         TutorialTraitWindowUpdate update = model.Evaluate(2, true, 1);
 
         Assert.That(update.Opened, Is.True);
-        Assert.That(update.Round, Is.EqualTo(2));
+        Assert.That(update.OfferSeq, Is.EqualTo(2));
     }
 
     [Test]
@@ -93,7 +177,7 @@ public sealed class TutorialTraitWindowModelTests
         Assert.That(update.Opened, Is.True);
         Assert.That(update.ShowPickedToast, Is.False);
         Assert.That(model.WasClosed(1), Is.True);
-        Assert.That(model.OpenRound, Is.EqualTo(2));
+        Assert.That(model.OpenOfferSeq, Is.EqualTo(2));
     }
 
     [Test]
