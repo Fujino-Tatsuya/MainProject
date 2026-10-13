@@ -482,8 +482,30 @@ grep -n "AuthorityMode" Assets/2.Prefabs/Player/Player.prefab Assets/2.Prefabs/P
 | 테스트 | `UI/Combat/Editor/OverheadDashIconRulesTests` — `Tools/Tests/플레이어 EditMode 테스트 실행` 에 등록(UI 픽스처도 이 러너가 돌린다) |
 
 **에임 대시 틴트** — `PlayerAimIndicator.tintOnDashCooldown`(기본 **꺼짐**). 켜면 예전처럼 재충전 중 인디케이터를
-`dashCooldownTint` 로 어둡게 한다. 꺼져 있으면 항상 원래 색이고, 어두운 상태에서 끄면 원래 색으로 되돌린다.
+`dashCooldownTint` 로 어둡게 한다(쿼드 머티리얼 **인스턴스**의 `_BaseColor` — §11). 꺼져 있으면 항상 원래 색이고, 어두운 상태에서 끄면 원래 색으로 되돌린다.
 base·Variant 모두 이 값을 오버라이드하지 않는다(2026-10-12 확인) — 다시 켜려면 base `Player.prefab` 에서 켠다.
+
+---
+
+## 11. 에임 인디케이터 — 3D 쿼드 (2026-10-13, 할 일 33)
+
+URP 데칼(`DecalProjector`)을 버리고 **바닥에서 띄운 얇은 쿼드**로 바꿨다. 데칼은 지형·벽에 투영돼 경사·단차에서 늘어지고
+캐릭터 몸에도 찍혔다. 쿼드는 발밑 높이에 **수평으로 눕힌 채 조준 방향으로 Y축만** 돈다.
+
+| 항목 | 내용 |
+|------|------|
+| 구조 | base `Player.prefab` → `AimIndicator`(게임오브젝트·Transform fileID 유지 — Variant 오버라이드 보존). 컴포넌트 = `MeshFilter`(내장 Quad) + `MeshRenderer`. **콜라이더 없음**. 같은 프리팹의 다른 데칼(`SkillRangeIndicator` 등)은 그대로 데칼 |
+| 머티리얼 | `3.Materials/Player/AimIndicator/AimIndicator3D.mat` — URP `Unlit`, Transparent·Alpha 블렌드, 텍스처 = 옛 데칼 머티리얼(`AimIndicator.mat`)의 화살표. 옛 `AimIndicator.mat`·`.shadergraph` 는 참조만 끊겼고 남아 있다 |
+| 깊이·그림자 | ZTest LEqual(벽·지형에 **가려진다**), ZWrite Off, 렌더 큐 Transparent(3000), 그림자 캐스트·수신 끔, 라이트/반사 프로브 끔 |
+| 높이 | 캐릭터 위치 0.5m 위에서 아래로 `groundMask` 레이(3.5m) → 맞으면 그 Y, 아니면 캐릭터 Y. 여기에 `heightOffset` 을 더한다. 조준점(마우스) 높이가 아니라 **발밑** 기준이라 계단·단차에서 파묻히지 않는다 |
+| 회전·위치 | `AimIndicatorPlacement`(순수 계산) — yaw = `atan2(x, z)`, 회전 = `Euler(90, yaw + indicator_rot_offset(90), 0)`, 중심 = 발밑 + 조준 방향 × `arrowForwardOffset`. **월드 값을 매 프레임 `LateUpdate` 에서 다시 넣어** 부모(플레이어) 회전과 무관하다. 크기는 부모 스케일을 상쇄한다 |
+| 인스펙터 (`PlayerAimIndicator`) | `heightOffset` 0.08m · `arrowScale` 1.2m(쿼드 한 변) · `arrowForwardOffset` 0.6m. 옛 데칼(2×2m, 중심 1m 앞 = 발밑~2m) 대비 **60%** — 발밑~1.2m |
+| 오너 전용 | 기존 규칙 그대로 — 네트워크 중 비오너는 `OnNetworkSpawn` 에서 인디케이터를 끄고 `Update`·`LateUpdate` 를 건너뛴다 |
+| 대시 틴트 | §10 — `MeshRenderer` 의 머티리얼을 `Awake` 에서 인스턴스로 복제해 `_BaseColor` 를 바꾼다(프리팹 애셋 오염 없음) |
+| 저작 | `Tools/Player/Authoring/Aim Indicator 3D Quad`(`AimIndicatorAuthoring`, 멱등) — 머티리얼 생성/갱신 + 데칼 제거 + 쿼드 배선 |
+| 테스트 | `Player/Editor/AimIndicatorPlacementTests` — `Tools/Tests/플레이어 EditMode 테스트 실행` 에 등록 |
+
+화살표 텍스처를 작은 것으로 바꾸려면 `AimIndicator3D.mat` 의 `_BaseMap` 만 갈면 된다(화살표가 텍스처 **왼쪽(-U)** 을 가리키는 방향 규칙 유지).
 
 ---
 
