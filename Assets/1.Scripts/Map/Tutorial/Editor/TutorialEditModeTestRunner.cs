@@ -17,9 +17,11 @@ internal static class TutorialEditModeTestRunner
         "^TutorialMonsterLedgerTests$",
         "^TutorialBossPathRulesTests$",
         "^TutorialDeathRulesTests$", // 사망 규칙(S11) + 부활 지점 — 뒤 배리어 예외(C2)·보스 진입 패드 제외·G10 앞 폴백(C3)
+        "^TutorialBossRetryTests$", // 할 일 30 (2) 전멸 리스폰 — 보스 재도전 되감기(G11 닫기·BossEnter)·뒤 배리어 마스크 재계산(복도4 최전방)
         "^TutorialTraitSelectionModelTests$", // 특성(T1) — 후보 뽑기·중복 제외·선택 검증·자동 획득·라운드 완료
-        "^TutorialTraitWindowModelTests$", // 특성 창(T2) — 열림·닫힘·닫힌 라운드 재표시 금지·획득 토스트·문구
+        "^TutorialTraitWindowModelTests$", // 특성 창(T2) — 내 제시 번호(OfferSeq)로 열림·닫힘·닫힌 제시 재표시 금지·다른 사람 재선택에 안 닫힘·획득 토스트·문구
         "^TutorialTraitDeadlineModelTests$", // 특성 창 교착 방지 게이지(15 후속) — 비율·10초 강조·로컬 감소·재동기화
+        "^TutorialTraitResetModelTests$", // 할 일 30 (3) 전멸 리스폰 뒤 특성 초기화 — 팝업 응답 검증·원복 장부·4라운드 재선택·재전멸·이탈
         "^TutorialGuide(Text|SubtitleQueue|Model)Tests$", // 안내 UI(S6) — 문구 변형·치환·대기 포맷·자막 큐·RebuildFromState
         "^TutorialCharacterLookupTests$", // 캐릭터 판별(15 후속) — PrefabIdHash 로스터 역조회·실패 시 폴백 판정
         "^SpinnerPracticeModelTests$", // 스피너봇 연습(S9) — 모드·창 간격·연속 놓침·스폰 반경 클램프

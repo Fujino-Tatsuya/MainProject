@@ -15,7 +15,8 @@ using UnityEngine;
 ///  · 사망(Alive → DeadPresentation) → 3초 뒤 자동 부활 + 2초 무적. 차감 여부 = 사망 시점 G11(보스방 도착) 열림.
 ///    G11 전 사망(존1~복도4·패드 대기·타이머 만료 강제 이동 중 — G8 타이머 시작 뒤 포함)은 목숨 수와 무관하게 Soul 로 가게
 ///    <see cref="PlayerLifeCycleController.ServerDeathKeepsSoul"/> 를 건다.
-///    G11 뒤는 기존 규칙 — 목숨 0 이면 PermanentDead(관전), 전원이면 PartyWipeWatcher 결과 화면.
+///    G11 뒤는 기존 규칙 — 파티 공용 목숨(할 일 30, Temp_MultiGameRule) 0 이면 PermanentDead(관전), 전멸이면 PartyWipeWatcher.
+///    차감 부활 시점에 공용 목숨이 이미 0 이면(다른 사람 부활로 비었다) 부활이 거부되고 Soul 로 남는다 — 전멸 판정은 그 Soul 을 탈락으로 센다.
 ///  · 부활 지점 = 지금 단계 구간의 안전한 지점(<see cref="TutorialRevivePointRules"/>) — 격자 후보를 바닥·점유 검사로 거른 뒤 고른다.
 ///    그 플레이어의 뒤 배리어 너머(지나온 최전방 구간보다 뒤 · 지난 배리어 앞면에서 여유 미만)는 빼고, 단계 구간이 그보다 뒤면 올린다(C2).
 ///  · 추락 복구의 스폰 폴백(존1)이 그 플레이어의 뒤 배리어 너머면 같은 규칙의 안전 지점을 대신 준다(<see cref="PlayerSafePointTracker.ReturnPointFallback"/>).
@@ -236,6 +237,57 @@ public sealed class TutorialDeathRules : MonoBehaviour
                  (n > 0 ? $"(안전 지점 → 그 자리 {n}건)." : "."), this);
     }
 
+    // ─── 전멸 리스폰(할 일 30 (2)) ────────────────────────────────────────
+
+    /// <summary>
+    /// [서버] 보스 재도전 되감기(<see cref="TutorialDirector.RewindForBossRetryServer"/>) 뒤 사망 규칙을 다시 켠다 — 보스방에 다시 도착(G11)하기 전 사망은
+    /// 차감 없이 복도4 에서 자동 부활, 도착 뒤는 다시 일반 규칙. 남은 대기 기록은 버린다(리스폰이 전원을 살렸다).
+    /// </summary>
+    public void ResumeForBossRetry()
+    {
+        if (_model == null) return;
+        foreach (ulong id in _model.PendingIds) _model.Forget(id);
+        _model.EndMove();
+        _finished = false;
+        Edit.Log("[Tutorial] 사망 규칙 다시 켜짐(보스 재도전) — G11 전 사망은 차감 없음.", this);
+    }
+
+    /// <summary>
+    /// [서버] 전멸 리스폰 지점 <paramref name="count"/> 개 — 복도4 격자(<see cref="TutorialRevivePointRules.SampleGrid"/>)를
+    /// 최전방 = 복도4 마스크(<see cref="TutorialBackBarrierRules.MaskWithFrontmost"/>)의 G9 앞면 여유·바닥·점유로 거른 뒤
+    /// 패드 범위 + 1m 밖에서 서로 떨어지게 고른다(<see cref="PartyWipeRespawnRules.TrySelectSpread"/>). 복도4 가 비면 false.
+    /// </summary>
+    public bool TryFindWipeRespawnPoints(int count, List<Vector3> into)
+    {
+        into.Clear();
+        if (_areas == null || !_areas.TryGetArea(TutorialArea.Corridor4, out TutorialRect rect)) return false;
+
+        TutorialStageMarker stage = TutorialStageMarker.Active;
+        float floorY = stage != null ? stage.transform.position.y : 0f;
+        int passed = TutorialBackBarrierRules.MaskWithFrontmost(TutorialArea.Corridor4);
+        float clearance = _director != null ? _director.BackBarrierClearance : TutorialBackBarrierRules.DefaultClearance;
+
+        _grid.Clear();
+        TutorialRevivePointRules.SampleGrid(rect, candidateSpacing, candidateInset, _grid);
+        var points = new List<(float x, float z)>();
+        var ys = new List<float>();
+        foreach ((float x, float z) in _grid)
+        {
+            if (TutorialBackBarrierRules.IsNearPassedFace(_barrierSpecs, TutorialArea.Corridor4, x, z, passed, clearance)) continue;
+            if (!TryResolveStandPoint(x, z, floorY, out float y)) continue;
+            points.Add((x, z));
+            ys.Add(y);
+        }
+
+        var chosen = new List<int>();
+        if (!PartyWipeRespawnRules.TrySelectSpread(points, count, rect.CenterX, rect.CenterZ, PartyWipeRespawnRules.DefaultSpacing,
+                                                    ServerPadAreas(), TutorialRevivePointRules.DefaultPadMargin, chosen))
+            return false;
+
+        foreach (int i in chosen) into.Add(new Vector3(points[i].x, ys[i], points[i].z));
+        return true;
+    }
+
     // ─── 판정 → 실행 ─────────────────────────────────────────────────────
 
     private void Tick(ulong clientId, double now)
@@ -298,6 +350,11 @@ public sealed class TutorialDeathRules : MonoBehaviour
 
         if (!revive.TryCompleteReviveOnServer(order.ConsumeLife))
         {
+            if (order.ConsumeLife)
+            {
+                Edit.LogWarning($"[Tutorial] client {clientId} 자동 부활 거부 — 파티 공용 목숨이 없다(또는 상태 {po.GetComponent<PlayerLifeCycleController>()?.State}). Soul 로 남는다.", this);
+                return;
+            }
             Debug.LogError($"[Tutorial] client {clientId} 자동 부활 실패 — 상태 {po.GetComponent<PlayerLifeCycleController>()?.State}, " +
                            $"목숨 차감 {order.ConsumeLife}. Soul 로 남는다.", this);
             return;

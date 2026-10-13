@@ -146,11 +146,21 @@ public sealed class PlayerCorpseController : NetworkBehaviour
         PlayerLifeState previousState,
         PlayerLifeState currentState)
     {
-        if (!IsSpawned || !IsServer ||
-            currentState != PlayerLifeState.PermanentDead)
+        if (!IsSpawned || !IsServer)
+            return;
+
+        // 전멸 리스폰(할 일 30 (2))이 PermanentDead 에서 되살렸다 — 시체를 거둔다. 다음 완전 사망 때 다시 놓을 수 있게 제거 래치도 푼다.
+        if (previousState == PlayerLifeState.PermanentDead && currentState != PlayerLifeState.PermanentDead)
         {
+            permanentlyRemoved = false;
+            corpseVisible.Value = false;
+            ApplyPresentation(false);
+            ConfigurePhysics(false);
             return;
         }
+
+        if (currentState != PlayerLifeState.PermanentDead)
+            return;
 
         ResolvePermanentDeath(lifeCycle.LastDeathCause);
     }

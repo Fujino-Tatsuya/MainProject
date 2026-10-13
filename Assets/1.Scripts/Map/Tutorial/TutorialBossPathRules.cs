@@ -31,6 +31,13 @@ public static class TutorialBossPathRules
     /// <summary>보스 진입 패드가 켜져 있는가. 튜토리얼이면 G10(복도4 특성 전원 선택)이 열린 뒤만(D3·D17).</summary>
     public static bool IsPadEnabled(bool isTutorial, bool g10Open) => !isTutorial || g10Open;
 
+    /// <summary>
+    /// 위 규칙 + 전멸 리스폰 뒤 특성 초기화 팝업·재선택 중인 사람이 있으면 잠근다(할 일 30 D3 — 패드는 한 명만 서도 전원을 끌고 간다).
+    /// 끝나는 순간 이미 서 있던 사람으로 카운트다운이 시작된다(G10 잠금과 같은 경로).
+    /// </summary>
+    public static bool IsPadEnabled(bool isTutorial, bool g10Open, bool traitResetInProgress) =>
+        IsPadEnabled(isTutorial, g10Open) && !traitResetInProgress;
+
     /// <summary>패드 점유로 보고할 값 — 잠긴 패드는 사람이 서 있어도 비어 있는 것으로 본다(카운트다운·색 전환 없음).</summary>
     public static bool PadOccupied(bool anyoneInside, bool padEnabled) => anyoneInside && padEnabled;
 
