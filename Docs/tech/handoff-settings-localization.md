@@ -44,8 +44,10 @@ S15 의 "나중에 버튼 하나로 SO/xlsx 로 옮긴다"를 지금 Loc 으로 
      설정창 라벨을 새로 배치했다면 병합 뒤 **`Tools/UI/Settings/설정 패널 문구 키 연결 (멱등)`** 을 한 번 돌리면 키·ko 가 맞춰진다.
 3. Unity 를 켜고 컴파일 0 확인 → `Tools/Tests/데이터 테이블 EditMode 테스트 실행`·설정 EditMode 테스트.
 4. GameData.xlsx(SVN)의 Strings 시트에 `UI.Settings.*` 행이 있어야 en 이 나온다. 없으면 화면은 ko 폴백이다 — `Tools/Data/Export Template` 로 행을 붙이고 en 칸을 채운다([data-table.md](data-table.md)).
+   - 2026-10-13: Export 병합 + en 채움을 마친 xlsx(Strings 156 · ErrorCodes 35, en 빈 칸 0)가 은희 로컬에 있다 — **SVN 커밋 전**. 커밋되면 `svn update` 만 하면 된다.
+     내용·재번역 29행: [localization-en-draft.md › xlsx 반영](localization-en-draft.md#xlsx-반영-2026-10-13-할-일-38-③). 런타임 표 `StringTable.asset` 은 git 에 같이 갱신돼 있다.
 5. Play: 설정창 → 게임플레이 → 언어 버튼으로 한국어 ↔ English, 라벨·드롭다운·확인 창·키 맞바꿈 알림이 바뀌는지.
-   팀장 PC 는 옛 정수 저장값이 있으면 그 언어로 시작해야 한다(자동 이관).
+   팀장 PC 는 옛 정수 저장값이 있으면 그 언어로 시작해야 한다(자동 이관 — Windows 에디터 PlayerPrefs 로 0→en·1→ko 재저장까지 확인함, 2026-10-13).
 
 ## 4. 앞으로 설정창 문구를 더할 때
 

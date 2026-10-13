@@ -420,6 +420,7 @@ en: Hold {key:Detail} for details
 
 - 저장은 `UserLanguageConfig` 한 곳, PlayerPrefs `Settings.Language` = **문자열 `ko`/`en`**.
 - 옛 설정창은 같은 키에 **정수**(0 = English, 1 = 한국어)로 저장했다. 처음 읽을 때 문자열이 아니면 정수로 읽어 0→en, 1→ko 로 바꾸고 **문자열로 다시 저장**한다(한 번). 그 밖의 정수면 OS 기본.
+  - Windows(레지스트리 PlayerPrefs)에서 확인(2026-10-13, 에디터): 정수 키에 `GetString` = 기본값, `SetString` 이 정수 값을 덮어써 그 뒤 `GetInt` = 기본값 — 이관 뒤 다시 읽어도 같은 언어.
 - 첫 실행 기본(저장값 없음) = OS 언어가 한국어면 ko, 아니면 en — 두 시스템 규칙이 같아 바뀐 것 없다.
 
 ### 언어 이름은 번역하지 않는다

@@ -26,6 +26,50 @@
 **Strings 100 · ErrorCodes 35 — 문제 0건.**
 스킬 툴팁의 "필드가 실제로 있는가"(`SkillTooltipFormatter`)는 ko 와 자리표시자 집합이 같아 ko 결과를 따른다.
 
+## xlsx 반영 (2026-10-13, 할 일 38 ③)
+
+로컬 `GameData.xlsx` 에 Export 병합 → en 칸을 채웠다(**SVN 미커밋** — 사본 `C:\UnityProject\_lane-artifacts\MainProject\GameData_38.xlsx`).
+
+- Strings 156행 = 이 표 70행(ko 일치) + 설정창 57행(`SettingsUiStrings.AuthoredEnglish`) + **아래 29행 재번역**. ErrorCodes 35행 = 이 표 그대로. en 빈 칸 0.
+- `UI.Options.Language` 는 키가 삭제돼(할 일 38 ②) 시트에 행이 없다 — 이 표의 그 행은 무시.
+- 🔸 **스킬 툴팁 29행은 이 표의 ko 와 달랐다** — 병합 Export 가 옛 수치 시트(`Paladin`·`Gunner`·`Assassin`)에서 기획이 고친 ko 를 Strings 로 옮겼기 때문([localization.md 단일 원본](localization.md#단일-원본--strings)).
+  이 표 위쪽 스킬 툴팁의 ko·en 은 옛 값이다. 시트에 넣은 en 은 아래(지금 시트 ko 기준 AI 초안, 기획 검수 전). `\n` = 줄바꿈(ko·en 수 같음).
+
+| key | ko(시트) | en(시트에 넣음) |
+|---|---|---|
+| `FirstMeleePassive/tooltip.description` | `{cooldownTime}초마다 다음 공격이 {dmg}의 추가 피해를 입히고 최대 체력의 {healPercent}%를 <style=heal>회복</style>합니다. 적중 시 재사용 대기시간이 {hitCooldownReduction}초 감소합니다.` | `Every {cooldownTime}s, your next attack deals {dmg} bonus damage and <style=heal>restores</style> {healPercent}% of max HP. On hit, the cooldown is reduced by {hitCooldownReduction}s.` |
+| `FirstMeleeMainSkillData/tooltip.description` | `최대 {maxActiveDuration}초 동안 돌진하며 적을 밀어내고, {tickInterval}초마다 {dmg}의 피해를 입힙니다.` | `Charge for up to {maxActiveDuration}s, pushing enemies back and dealing {dmg} damage every {tickInterval}s.` |
+| `FirstMeleeSubSkillData/tooltip.description` | `전방의 공격을 막으면 반격하여 {dmg}의 피해를 입힙니다. 반격 중에는 피해를 무시합니다.` | `Blocking a frontal attack triggers a counterattack that deals {dmg} damage. You ignore damage while counterattacking.` |
+| `FirstMeleeInterruptSkillData/tooltip.description` | `전방에 {dmg}의 피해를 입힙니다. 간파 성공 시 공격을 끊고 취약 상태로 만들며, 취약한 적은 뒤로 밀어냅니다.` | `Deals {dmg} damage in front of you. A successful Interrupt cancels the enemy's attack and leaves it Vulnerable; Vulnerable enemies are knocked back.` |
+| `FirstMeleeUltimateSkillData/tooltip.description` | `지정한 위치에 심판의 일격을 내려쳐 {dmg}의 광역 피해를 입힙니다.` | `Bring down a strike of judgment on the target location, dealing {dmg} area damage.` |
+| `GunnerHeatData/tooltip.displayName` | `임계 출력` | `Critical Output` |
+| `GunnerHeatData/tooltip.description` | `기본 공격으로 열기가 쌓여 피해가 증가합니다. 열기가 {maxHeat}에 도달하면 <style=overheat>과열</style>되어 기본 공격이 잠깁니다.\n\n기본 공격을 멈추면 {coolDelay}초 후 냉각됩니다. 과열은 열기가 모두 식으면 해제됩니다.` | `Basic attacks build Heat, increasing damage. At {maxHeat} Heat you <style=overheat>Overheat</style> and basic attacks are locked.\n\nStop basic attacks to start cooling after {coolDelay}s. Overheat ends once all Heat has cooled.` |
+| `GunnerChargeLaserData/tooltip.displayName` | `집속 포격` | `Focused Blast` |
+| `GunnerChargeLaserData/tooltip.description` | `적을 관통하는 레이저로 {dmg}의 피해를 입힙니다. 충전할수록 피해와 사거리가 증가합니다.\n\n경로상의 아군에게 {shieldDuration}초간 기본 {shieldAmount}의 <style=shield>보호막</style>을 부여합니다. 과열 단계에 따라 피해와 보호막량이 증가합니다.` | `Fire a piercing laser that deals {dmg} damage. Charging longer increases damage and range.\n\nAllies in its path gain a base {shieldAmount} <style=shield>shield</style> for {shieldDuration}s. Damage and shield amount increase with your Overheat stage.` |
+| `GunnerCoolBackstepData/tooltip.displayName` | `긴급 냉각` | `Emergency Cooling` |
+| `GunnerCoolBackstepData/tooltip.description` | `뒤로 {distance}m 도약하며 열기를 모두 제거하고 <style=overheat>과열</style>을 해제합니다.` | `Leap back {distance}m, clearing all Heat and ending <style=overheat>Overheat</style>.` |
+| `GunnerInterruptData/tooltip.displayName` | `충격 방출` | `Shock Burst` |
+| `GunnerInterruptData/tooltip.description` | `전방에 {dmg}의 피해를 입히고 뒤로 물러납니다. 간파 성공 시 공격을 끊고 취약 상태로 만들며, 취약한 적은 뒤로 밀어냅니다.` | `Deals {dmg} damage in front of you and steps back. A successful Interrupt cancels the enemy's attack and leaves it Vulnerable; Vulnerable enemies are knocked back.` |
+| `GunnerTrackingLaserData/tooltip.displayName` | `궤도 추적포` | `Orbital Tracker` |
+| `GunnerTrackingLaserData/tooltip.description` | `{laserDuration}초간 적을 추적하는 레이저로 {damageInterval}초마다 {dmg}의 광역 피해를 입힙니다. 과열 단계에 따라 피해가 증가하며, 대상 사망 시 다른 적을 추적합니다.` | `Fire a laser that tracks enemies for {laserDuration}s, dealing {dmg} area damage every {damageInterval}s. Damage increases with your Overheat stage, and it retargets another enemy when the target dies.` |
+| `AssassinStateData/tooltip.displayName` | `사냥 본능` | `Hunter's Instinct` |
+| `AssassinStateData/tooltip.description` | `후방 공격의 피해가 증가합니다. 일반 상태에서 기본 공격·Q·강타 적중 시 분노를 얻으며, 분노 {minTransformRage} 이상이면 변신할 수 있습니다.\n\n변신 중에는 분노를 소모하고 모든 공격에 백어택 효과가 적용됩니다.` | `Attacks from behind deal more damage. In normal form, landing basic attacks, Q, or Power Strikes grants Rage; at {minTransformRage}+ Rage you can transform.\n\nWhile transformed, Rage drains and every attack counts as a Back Attack.` |
+| `AssassinDashStrikeSkillData/tooltip.displayName` | `그림자 돌파` | `Shadow Breach` |
+| `AssassinDashStrikeSkillData/tooltip.description` | `{dashDistance}m 돌진하며 경로상의 적에게 {dmg}의 피해를 입힙니다. 적을 통과하며 돌진 중 저지불가 상태가 됩니다.` | `Dash {dashDistance}m, dealing {dmg} damage to enemies in your path. You pass through enemies and are Unstoppable while dashing.` |
+| `AssassinEnhanceSkillData/tooltip.displayName` | `사냥꾼의 칼날` | `Hunter's Blade` |
+| `AssassinEnhanceSkillData/tooltip.description` | `다음 기본 공격을 강화해 {dmg}의 피해를 입힙니다. 적중 시 더 많은 분노를 얻습니다.` | `Empower your next basic attack to deal {dmg} damage. Landing it grants extra Rage.` |
+| `AssassinCircleStrikeSkillData/tooltip.displayName` | `칼날 폭풍` | `Blade Storm` |
+| `AssassinCircleStrikeSkillData/tooltip.description` | `원형 범위의 적을 {hitCount}회 베어 타격마다 {dmg}의 피해를 입힙니다. 공격 중 무적 상태가 됩니다.` | `Slash enemies in a circular area {hitCount} times, dealing {dmg} damage per hit. You are invulnerable while attacking.` |
+| `AssassinTransformSkillData/tooltip.displayName` | `해방된 본능` | `Unleashed Instinct` |
+| `AssassinTransformSkillData/tooltip.description` | `분노를 소모하며 변신해 기본 공격과 Q·E를 강화합니다. 분노가 소진되면 해제되며, 재사용해 해제하면 남은 분노를 보존합니다.` | `Transform by consuming Rage, empowering your basic attack, Q, and E. Ends when Rage runs out; reactivate to revert early and keep your remaining Rage.` |
+| `AssassinTransformedDashStrikeSkillData/tooltip.displayName` | `광란의 돌파` | `Frenzied Breach` |
+| `AssassinTransformedDashStrikeSkillData/tooltip.description` | `{dashDistance}m 돌진하며 경로상의 적에게 {dmg}의 피해를 입힙니다. 적을 통과하며 돌진 중 저지불가 상태가 됩니다. 적중 시 재사용 대기시간이 {hitCooldownReduction}초 감소합니다.` | `Dash {dashDistance}m, dealing {dmg} damage to enemies in your path. You pass through enemies and are Unstoppable while dashing. On hit, the cooldown is reduced by {hitCooldownReduction}s.` |
+| `AssassinInterruptSkillData/tooltip.displayName` | `파고드는 칼날` | `Piercing Blade` |
+| `AssassinInterruptSkillData/tooltip.description` | `전방에 {dmg}의 피해를 입힙니다. 간파 성공 시 공격을 끊고 취약 상태로 만들며, 취약한 적은 뒤로 밀어냅니다.` | `Deals {dmg} damage in front of you. A successful Interrupt cancels the enemy's attack and leaves it Vulnerable; Vulnerable enemies are knocked back.` |
+
+- 용어: `취약` = **Vulnerable**, `저지불가` = **Unstoppable**, `열기` = **Heat**(HUD `Heat Lv.` 와 같은 단어), `반격`(팔라딘 E) = counterattack — 간파(Interrupt)와 다른 동작이라 단어를 나눴다.
+- 반영 뒤 `StringTable 갱신`: 키 156 · 오류 코드 35, 오류·경고 0. `Verify`: 오류·경고 0(수치 차이 정보 로그만).
+
 ## 용어집
 
 | ko | en | 근거·메모 |
