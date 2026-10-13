@@ -173,8 +173,11 @@ public sealed class TutorialTraitResetModelTests
         while (reset.TryTakeReselectRound(Host))
         {
             int roundBefore = selection.Round;
+            int seqBefore = selection.GetOfferSeq(Host);
             Assert.IsTrue(selection.StartPersonalRound(Host, 3, First));
-            Assert.That(selection.Round, Is.EqualTo(roundBefore + 1), "라운드마다 새 창");
+            Assert.That(selection.GetOfferSeq(Host), Is.GreaterThan(seqBefore), "라운드마다 새 창(내 제시 번호)");
+            Assert.That(selection.Round, Is.EqualTo(roundBefore), "전역(복도) 라운드 번호는 그대로");
+            Assert.IsTrue(selection.IsPersonalRound(Host));
             IReadOnlyList<int> offered = selection.GetOffered(Host);
             Assert.That(offered.Count, Is.EqualTo(3), "후보 3장");
             Assert.That(offered, Is.Unique);
@@ -200,9 +203,13 @@ public sealed class TutorialTraitResetModelTests
         var selection = new TutorialTraitSelectionModel(8);
         selection.StartRound(new[] { Host, Client1 }, 3, First);
         selection.TryChoose(Client1, selection.GetOffered(Client1)[0]);
+        int hostSeq = selection.GetOfferSeq(Host);
         selection.StartPersonalRound(Client1, 3, First);    // Client1 재선택 1라운드 — Host 는 아직 복도 라운드 고르는 중
 
         Assert.IsTrue(selection.HasPendingChoice(Host), "다른 사람의 제시는 그대로");
+        Assert.That(selection.GetOfferSeq(Host), Is.EqualTo(hostSeq), "다른 사람의 제시 번호도 그대로(창이 안 닫힌다)");
+        Assert.IsFalse(selection.IsPersonalRound(Host), "Host 는 복도 라운드 참가");
+        Assert.IsTrue(selection.IsPersonalRound(Client1));
         Assert.That(selection.GetOffered(Host).Count, Is.EqualTo(3));
         Assert.IsTrue(selection.HasPendingChoice(Client1));
         Assert.That(selection.GetOffered(Client1), Has.No.Member(selection.GetAcquired(Client1)[0]));

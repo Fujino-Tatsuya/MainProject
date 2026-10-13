@@ -11,6 +11,7 @@ public readonly struct TutorialTraitChosen
     public readonly TutorialTraitDefinition Trait;
     /// <summary>true = 교착 방지·타이머 만료로 서버가 대신 골랐다. false = 플레이어가 직접 골랐다.</summary>
     public readonly bool Auto;
+    /// <summary>복도 라운드 번호. 0 = 재선택(개인 라운드, 할 일 30) 획득 — 복도 라운드가 아니다.</summary>
     public readonly int Round;
 
     public TutorialTraitChosen(ulong clientId, int traitIndex, TutorialTraitDefinition trait, bool auto, int round)
@@ -56,21 +57,24 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
         ResetPrompt = 2,
     }
 
-    /// <summary>복제 행 하나 = (플레이어, 특성 인덱스, 제시/획득).</summary>
+    /// <summary>복제 행 하나 = (플레이어, 특성 인덱스, 제시/획득, 그 플레이어의 제시 번호).</summary>
     public struct Entry : INetworkSerializable, IEquatable<Entry>
     {
         public ulong ClientId;
         public int TraitIndex;
         public EntryKind Kind;
+        /// <summary>제시·획득 행 = 그 플레이어의 <see cref="TutorialTraitSelectionModel.GetOfferSeq"/>(창 판정용). 팝업 행 = 0.</summary>
+        public int OfferSeq;
 
         public void NetworkSerialize<T>(BufferSerializer<T> s) where T : IReaderWriter
         {
             s.SerializeValue(ref ClientId);
             s.SerializeValue(ref TraitIndex);
             s.SerializeValue(ref Kind);
+            s.SerializeValue(ref OfferSeq);
         }
 
-        public bool Equals(Entry o) => ClientId == o.ClientId && TraitIndex == o.TraitIndex && Kind == o.Kind;
+        public bool Equals(Entry o) => ClientId == o.ClientId && TraitIndex == o.TraitIndex && Kind == o.Kind && OfferSeq == o.OfferSeq;
     }
 
     // 적용한 효과 하나 — 원복에 필요한 것만. 배율 특성 = 상태이상 타입(출처는 SourceIdOf(index)), 쿨감 특성 = 구독한 핸들러.
@@ -116,7 +120,7 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
 
     public TutorialTraitPool Pool => pool;
 
-    /// <summary>[전 피어] 현재 제시 라운드 번호(0 = 아직 없음).</summary>
+    /// <summary>[전 피어] 현재 복도 제시 라운드 번호(0 = 아직 없음). 재선택(개인 라운드)은 올리지 않는다 — 창 판정은 <see cref="GetOfferSeq"/>.</summary>
     public int Round => round.Value;
 
     /// <summary>[전 피어] 현재 라운드의 창 표시 옵션(상단 설명·아래 한 줄).</summary>
@@ -331,6 +335,25 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
     /// <summary>[전 피어] 그 플레이어가 얻은 특성(획득 순서).</summary>
     public void GetAcquired(ulong clientId, List<int> result) => CollectRows(clientId, EntryKind.Acquired, result);
 
+    /// <summary>
+    /// [전 피어] 그 플레이어의 제시 번호(0 = 제시·획득 행 없음). 그 플레이어에게 새 제시가 들어갈 때만 바뀐다 —
+    /// 다른 사람의 재선택·참가 추가로는 변하지 않으므로 선택 창은 이 값으로 열고 닫는다.
+    /// </summary>
+    public int GetOfferSeq(ulong clientId)
+    {
+        int seq = 0;
+        if (!IsSpawned)
+            return seq;
+
+        for (int i = 0; i < entries.Count; i++)
+        {
+            if (entries[i].ClientId == clientId && entries[i].OfferSeq > seq)
+                seq = entries[i].OfferSeq;
+        }
+
+        return seq;
+    }
+
     /// <summary>[전 피어] 그 플레이어가 지금 골라야 하는가(제시 행이 있다).</summary>
     public bool HasPendingChoice(ulong clientId)
     {
@@ -426,7 +449,7 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
             int reverted = RevertEffects(clientId);
             model.ResetPlayer(clientId);
             bool opened = ContinueReselect(clientId);
-            Edit.Log($"{Tag} client {clientId} 특성 초기화 — 효과 {reverted}개 원복, 재선택 {(opened ? $"라운드 {model.Round} 제시" : "후보 없음(종료)")}.", this);
+            Edit.Log($"{Tag} client {clientId} 특성 초기화 — 효과 {reverted}개 원복, 재선택 {(opened ? $"제시 {model.GetOfferSeq(clientId)}" : "후보 없음(종료)")}.", this);
         }
         else
         {
@@ -453,9 +476,9 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
             }
         }
 
-        // 재선택 창엔 복도 안내 문구(소개·마지막)를 붙이지 않는다. 옵션을 라운드보다 먼저 쓴다(StartOfferRoundServer 와 같은 순서).
+        // 재선택 창엔 복도 안내 문구(소개·마지막)를 붙이지 않는다. 옵션을 행보다 먼저 쓴다(StartOfferRoundServer 와 같은 순서).
+        // 전역 라운드 번호는 그대로 — 창은 그 플레이어의 제시 번호로 열리므로 다른 사람 창이 닫히지 않는다.
         roundDisplay.Value = (byte)TutorialTraitRoundDisplay.None;
-        round.Value = model.Round;
         return opened;
     }
 
@@ -499,6 +522,8 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
     // 선택 검증(제시된 후보인가·이미 골랐나)은 모델이 한다. 위반은 무시하고 로그만 남긴다.
     private bool CommitChoice(ulong clientId, int traitIndex, bool auto)
     {
+        // 재선택(개인 라운드) 획득은 복도 라운드가 아니다 — 0 으로 알려 복도 체크(TutorialCorridorFlow)가 반응하지 않게 한다.
+        int chosenRound = model.IsPersonalRound(clientId) ? 0 : model.Round;
         TutorialTraitChoiceResult result = model.TryChoose(clientId, traitIndex);
         if (result != TutorialTraitChoiceResult.Accepted)
         {
@@ -506,7 +531,6 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
             return false;
         }
 
-        int chosenRound = model.Round;
         TutorialTraitDefinition trait = pool != null ? pool.Get(traitIndex) : null;
         ApplyEffect(clientId, traitIndex, trait);
 
@@ -707,18 +731,20 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
         entries.Clear();
         foreach (ulong clientId in NetworkManager.ConnectedClientsIds)
         {
+            // 제시 번호는 획득 행에도 싣는다 — 고른 뒤(제시 행 없음)에도 번호가 남아야 같은 틱 자동 획득 토스트가 뜬다.
+            int offerSeq = model.GetOfferSeq(clientId);
             if (model.HasPendingChoice(clientId))
-                AddRows(clientId, model.GetOffered(clientId), EntryKind.Offered);
-            AddRows(clientId, model.GetAcquired(clientId), EntryKind.Acquired);
+                AddRows(clientId, model.GetOffered(clientId), EntryKind.Offered, offerSeq);
+            AddRows(clientId, model.GetAcquired(clientId), EntryKind.Acquired, offerSeq);
             if (resetModel != null && resetModel.TryGetPrompt(clientId, out int generation))
                 entries.Add(new Entry { ClientId = clientId, TraitIndex = generation, Kind = EntryKind.ResetPrompt });
         }
     }
 
-    private void AddRows(ulong clientId, IReadOnlyList<int> traitIndices, EntryKind kind)
+    private void AddRows(ulong clientId, IReadOnlyList<int> traitIndices, EntryKind kind, int offerSeq)
     {
         for (int i = 0; i < traitIndices.Count; i++)
-            entries.Add(new Entry { ClientId = clientId, TraitIndex = traitIndices[i], Kind = kind });
+            entries.Add(new Entry { ClientId = clientId, TraitIndex = traitIndices[i], Kind = kind, OfferSeq = offerSeq });
     }
 
     private void CollectRows(ulong clientId, EntryKind kind, List<int> result)

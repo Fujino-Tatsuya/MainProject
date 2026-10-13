@@ -7,7 +7,7 @@ using UnityEngine.UI;
 /// <summary>
 /// 튜토리얼 특성 선택 UI(할 일 15 T2) — 로컬 플레이어 전용 표시. 상태는 <see cref="TutorialTraitDirector"/> 복제값만 읽는다.
 /// - 선택 창: 중앙 모달. 창 루트의 <see cref="UiModalBlocker"/> 가 켜져 있는 동안 로컬 Player 입력(이동·대시 포함)이 막힌다. 일시정지 없음.
-/// - 열림/닫힘 판정은 <see cref="TutorialTraitWindowModel"/>(한 번 닫힌 라운드 재표시 금지·획득 토스트 판정).
+/// - 열림/닫힘 판정은 <see cref="TutorialTraitWindowModel"/>(내 제시 번호 기준 — 한 번 닫힌 제시 재표시 금지·획득 토스트 판정).
 /// - 획득 특성 다시 보기: 좌상단 아이콘 줄 + 호버 툴팁.
 /// - 교착 방지 게이지(창 안): 값은 바깥(복도 흐름)이 <see cref="SetDeadline"/> 으로 넣는다 — 이 뷰는 튜토리얼 디렉터를 모른다.
 /// - 특성 초기화 팝업(할 일 30): 내 팝업 행(<see cref="TutorialTraitDirector.TryGetResetPrompt"/>)이 있으면 연다. 질문 + [예]/[아니오], 루트에 <see cref="UiModalBlocker"/>.
@@ -187,7 +187,8 @@ public sealed class TutorialTraitSelectionView : MonoBehaviour
         director.GetOffered(localId, offered);
         director.GetAcquired(localId, acquired);
 
-        TutorialTraitWindowUpdate update = model.Evaluate(director.Round, offered.Count > 0, acquired.Count);
+        // 전역 라운드가 아니라 내 제시 번호로 판정한다 — 다른 사람의 재선택 라운드가 내 창을 닫지 않게(할 일 30).
+        TutorialTraitWindowUpdate update = model.Evaluate(director.GetOfferSeq(localId), offered.Count > 0, acquired.Count);
         if (update.Closed && !update.Opened)
             CloseWindow();
         if (update.Opened)

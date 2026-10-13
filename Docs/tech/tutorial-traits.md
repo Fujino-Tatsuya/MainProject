@@ -21,7 +21,7 @@ TutorialTraitDirector (씬 상주 NetworkBehaviour, 서버 권한) ──Network
 | `TutorialTraitDefinition` | 특성 1장 — `id`·`displayName`·`description`·`icon`·`effectKind`·`value`·`triggerAttackType`·`cooldownSlot`. 배율은 1 이상만(1 미만이면 1로 올림) |
 | `TutorialTraitPool` | 후보 배열 + `offerCount`(제시 장 수, 기본 3). **배열 인덱스 = 런타임 특성 id** — 세션 도중 순서를 바꾸지 않는다 |
 | `TutorialTraitSelectionModel` | Unity 비의존 규칙. 후보 뽑기(획득 특성 제외·남은 만큼만)·선택 검증·자동 획득 대상·라운드 완료·이탈자 제외·선택 창 무적 계획(`PlanSelectionShields`) |
-| `TutorialTraitWindowModel` | Unity 비의존 창 판정. 제시 있음 → 열기, 제시 사라짐·라운드 바뀜 → 닫기, 한 번 닫힌 라운드 재표시 금지, 획득 수 증가 → 토스트(창을 못 본 채 자동 획득돼도 — S12) |
+| `TutorialTraitWindowModel` | Unity 비의존 창 판정. 입력은 **내** 제시 번호(`OfferSeq` — §9). 제시 있음 → 열기, 제시 사라짐·내 제시 번호 바뀜 → 닫기, 한 번 닫힌 제시 재표시 금지, 획득 수 증가 → 토스트(창을 못 본 채 자동 획득돼도 — S12) |
 | `TutorialTraitDirector` | 상태 소유자. 라운드 제시·선택 RPC 검증·효과 적용·무적 토큰. 플레이어별 제시/획득 행을 `NetworkList<Entry>` 로, 라운드 번호·표시 옵션을 `NetworkVariable` 로 복제 |
 | `TutorialTraitSelectionView` | 로컬 플레이어 UI. 중앙 모달(창 루트 `UiModalBlocker` → 로컬 이동·대시·공격 차단, 일시정지 없음) · 카드 클릭 → `RequestChoose` · 획득 토스트 · 좌상단 획득 아이콘 줄 + 호버 패널 |
 | `TutorialTraitUI.prefab` | 별도 Screen Space Overlay 캔버스(sort 60, CombatHUD 와 무관). 저작 메뉴 `Tools/Tutorial/특성 선택 UI 프리팹 생성` — 다시 돌리면 덮어쓴다 |
@@ -164,7 +164,7 @@ false 일 때 `ServerRoundCompleted` 는 같은 호출 안에서 이미 불렸�
 |---|---|
 | `TutorialTraitResetModel`(순수) | 플레이어별 없음 → 팝업 대기(세대) → (예) 재선택 중(남은 라운드, `ReselectRounds` = 4) → 없음. 응답 검증 `Answer(clientId, generation, reset)` = `Kept`·`Reset`·`NotPrompted`(대상 아님·중복·재선택 중)·`StaleGeneration`(다시 전멸 전 팝업). `IsBusy` = 패드 잠금 |
 | `TutorialTraitEffectLedger<T>`(순수) | (플레이어, 특성 인덱스) → 원복 핸들 장부. `TakeAll(clientId)` 가 그 플레이어 몫만 꺼낸다 — 다른 플레이어 것은 남는다 |
-| `TutorialTraitSelectionModel` 추가 | `StartPersonalRound(clientId, offerCount, next)`(그 사람만 — 라운드 번호는 올리고 남의 제시·선택은 그대로) · `ResetPlayer`(획득·제시 비움, 등록 유지) · `CancelOffer`(열린 제시 거둠) |
+| `TutorialTraitSelectionModel` 추가 | `StartPersonalRound(clientId, offerCount, next)`(그 사람만 — 전역 라운드 번호는 그대로, 그 사람 `OfferSeq` 만 올라감, 남의 제시·선택은 그대로) · `GetOfferSeq` · `IsPersonalRound` · `ResetPlayer`(획득·제시 비움, 등록 유지) · `CancelOffer`(열린 제시 거둠) |
 | `TutorialTraitDirector` 추가 | `PartyWipeRespawner.PartyWipeRespawned` 구독(서버, 튜토리얼일 때만) · 복제 행 `EntryKind.ResetPrompt`(`TraitIndex` = 세대) · `NetworkVariable<bool> traitResetBusy` |
 | `TutorialTraitSelectionView` 추가 | 팝업을 창과 같은 캔버스에 **런타임 생성**(프리팹·저작 메뉴 무수정) — 루트 `UiModalBlocker` + 딤 + 질문 + [예]/[아니오] |
 
@@ -180,9 +180,9 @@ API:
   쿨감 특성 = 구독한 핸들러(`Player.ServerAttackLanded -=`). 거부된 배율(연출 잠금 중)은 장부에 없다(원복할 것 없음). 기존 `cooldownHooks` 목록을 이 장부로 바꿨다.
 - **재선택 라운드**: `ContinueReselect` — 남은 라운드를 하나 빼고 `StartPersonalRound`(0장이면 다음 라운드로 넘어감). 고를 때(`CommitChoice`) 재선택 중이면
   행·무적 동기화 **전에** 다음 라운드를 열어 무적 토큰을 풀었다 다시 걸지 않는다. 표시 옵션은 `None`(소개·마지막 문구 없음).
-  재선택 라운드 번호는 복도 라운드 표(`TutorialCorridorRounds`)에 없어 복도 흐름의 체크 보고·자동 획득이 반응하지 않는다. `ServerRoundCompleted` 도 다시 나지 않는다(완료 플래그를 건드리지 않음).
-- **창 열림**: 창 판정(`TutorialTraitWindowModel`)이 전역 라운드 번호로 열고 닫으므로, 두 사람이 동시에 재선택하면 한 사람이 라운드를 열 때 다른 사람 창이 한 번 닫혔다
-  같은 후보로 다시 열린다(깜빡임 — 기능 영향 없음).
+  재선택은 전역 라운드 번호(`Round`)를 올리지 않고, 그 획득 통지(`TutorialTraitChosen.Round`)는 **0** 이라 복도 흐름의 체크 보고·자동 획득이 반응하지 않는다(`IsPersonalRound`). `ServerRoundCompleted` 도 다시 나지 않는다(완료 플래그를 건드리지 않음).
+- **창 열림 = 내 제시 번호(OfferSeq)**: 플레이어별 `OfferSeq` 는 그 플레이어에게 새 제시가 들어갈 때만(복도 라운드·늦은 참가·재선택) 모델 전체 단조 증가 값으로 바뀌고,
+  제시·획득 행(`Entry.OfferSeq`)에 실려 복제된다(`GetOfferSeq(clientId)`). 창 판정은 전역 라운드가 아니라 이 번호로 열고 닫으므로 다른 사람의 재선택이 내 창을 닫지 않는다.
 - **문구**: `TUT_TRAIT_RESET_PROMPT`("특성을 초기화하고 다시 선택할까요?") · `TUT_TRAIT_RESET_YES`("예") · `TUT_TRAIT_RESET_NO`("아니오") — `TutorialTraitTexts` 상수 + `AllIds`.
   `TutorialTraitTexts.asset` 에는 행을 넣지 않았다(행 없음 = 상수 폴백, 로컬라이징 브랜치와 에셋 충돌 회피) — 기획이 문구를 바꿀 때 행을 추가한다.
 - 테스트: `TutorialTraitResetModelTests`(튜토리얼 러너).
