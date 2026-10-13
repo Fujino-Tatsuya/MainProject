@@ -46,6 +46,7 @@ Zone 로컬 조명(`Lighting_Target_CombatLevel`), `FogProfile.asset`, URP 에�
 | Ambient Sky | (0.471, 0.604, 0.710) | **(0.26, 0.30, 0.40)** |
 | Ambient Equator | (0.314, 0.420, 0.514) | **(0.16, 0.18, 0.24)** |
 | Ambient Ground | (0.149, 0.216, 0.275) | **(0.07, 0.07, 0.10)** |
+| 2차(환경광 ×1.4) · Sky / Equator / Ground | (0.26, 0.30, 0.40) / (0.16, 0.18, 0.24) / (0.07, 0.07, 0.10) | **(0.36, 0.42, 0.56) / (0.22, 0.25, 0.34) / (0.10, 0.10, 0.14)** |
 | Ambient Intensity | 1.15 | **1** (Gradient 에선 쓰이지 않음) |
 | Reflection Intensity | 0.6 | **0.4** |
 | Directional Light 색 | (0.991, 0.885, 0.780) | **(1.0, 0.86, 0.68)** |
