@@ -469,13 +469,13 @@ grep -n "AuthorityMode" Assets/2.Prefabs/Player/Player.prefab Assets/2.Prefabs/P
 
 ## 10. 머리 위 대시 아이콘 · 에임 대시 틴트 (2026-10-12, 할 일 29)
 
-**대시 아이콘** — 로컬(오너) 플레이어 머리 위 체력바 **왼쪽**에 대시 슬롯 아이콘을 띄운다. 준비/미준비 두 상태만(채움·숫자 없음).
+**대시 아이콘** — 로컬(오너) 플레이어 머리 위 체력바 **오른쪽**에 대시 슬롯 아이콘을 띄운다. 준비/미준비 두 상태만(채움·숫자 없음).
 
 | 항목 | 내용 |
 |------|------|
 | 위치 | `2.Prefabs/UI/OverheadHealthBar.prefab` → `Bar/DashIcon`(`Slot` = `Common_DashSlotIcon` 테두리, `Icon` = `Common_DashIcon`, 같은 1254² 캔버스라 둘 다 꽉 채움). `Player.prefab` 은 이 프리팹을 중첩하므로 **모든 Variant 가 오버라이드 없이 상속**한다 |
-| 배치값 | 앵커 = Bar 왼쪽 가운데, 피벗 (1, 0.5), 위치 (-4, -3), 크기 22×22. Bar(14) + 아래 특성 게이지 줄(6) = 20 높이를 덮도록 세로 중심을 -3 으로 내렸다. 크기·간격은 `DashIcon` RectTransform 에서 조절 |
-| 왼쪽인 이유 | 특성 게이지 줄은 Bar 아래 전체 폭이라 좌우 어느 쪽과도 겹치지 않는다. 게이지들이 왼→오로 차서 실드·잔상·게이지 만충(거너 과열 빨강·암살자 눈금)이 **오른쪽 끝**에 몰리므로 반대쪽에 둔다. 옛 캐릭터 HUD(`GunnerHeatGauge`·`AssassinHUD`)는 비활성 |
+| 배치값 | 앵커 = Bar 오른쪽 가운데, 피벗 (1, 0.5), 위치 (40, -2), 크기 40×40, 스케일 1.05(아이콘) — 2026-10-13 사용자 Play 검증에서 조정. 크기·간격은 `DashIcon` RectTransform 에서 조절 |
+| 위치 | 처음엔 게이지 만충 표시(오른쪽 끝)를 피해 왼쪽(22×22)에 뒀으나, 사용자 Play 검증에서 오른쪽·40×40 으로 옮겼다(10-13). 옛 캐릭터 HUD(`GunnerHeatGauge`·`AssassinHUD`)는 비활성 |
 | 표시 규칙 | `OverheadDashIconRules.ShouldShow` — **로컬 플레이어 + `PlayerLifeState.Alive`** 일 때만. 원격 플레이어 머리 위엔 없다(예측 충전은 오너만 진행). 사망 연출·Soul(대시 금지)·영구 사망(관전)은 숨긴다 — 체력바 자체는 이때도 보인다. 체력바가 숨으면 자식이라 같이 숨는다 |
 | 준비 판정 | `PlayerDashController.IsReady`(예측 충전 > 0). 공급자 = `PlayerOverheadHealthBarRule`(`IOverheadDashIndicator`). 공급자가 없는 바(스피너봇 등)는 아이콘을 숨긴다 |
 | 인스펙터 | `UnitOverheadHealthBar` 「대시 아이콘」: `dashIconRoot` · `dashIconGraphics`(색을 곱할 Slot·Icon) · `dashReadyColor`(흰색) · `dashNotReadyColor`(0.35 회색, 알파로 흐리게도 가능) |
