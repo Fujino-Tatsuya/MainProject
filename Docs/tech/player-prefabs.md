@@ -482,7 +482,7 @@ grep -n "AuthorityMode" Assets/2.Prefabs/Player/Player.prefab Assets/2.Prefabs/P
 | 테스트 | `UI/Combat/Editor/OverheadDashIconRulesTests` — `Tools/Tests/플레이어 EditMode 테스트 실행` 에 등록(UI 픽스처도 이 러너가 돌린다) |
 
 **에임 대시 틴트** — `PlayerAimIndicator.tintOnDashCooldown`(기본 **꺼짐**). 켜면 예전처럼 재충전 중 인디케이터를
-`dashCooldownTint` 로 어둡게 한다. 꺼져 있으면 항상 원래 색이고, 어두운 상태에서 끄면 원래 색으로 되돌린다.
+`dashCooldownTint` 로 어둡게 한다(쿼드 머티리얼 **인스턴스**의 `_BaseColor` — §11). 꺼져 있으면 항상 원래 색이고, 어두운 상태에서 끄면 원래 색으로 되돌린다.
 base·Variant 모두 이 값을 오버라이드하지 않는다(2026-10-12 확인) — 다시 켜려면 base `Player.prefab` 에서 켠다.
 ## 10. 회전 잠금 — `PlayerFacingLock` (할 일 27, 2026-10-12)
 
@@ -511,6 +511,28 @@ base·Variant 모두 이 값을 오버라이드하지 않는다(2026-10-12 확�
     오므로 같은 오너 시각을 보여 준다. 다만 이어지는 발은 발사 직전에 몸이 돌고 있었으므로, 보간 버퍼만큼(≈ 회전 속도 × 보간 지연) 몸이 늦게 따라와
     잠깐 어긋났다가 맞는다 — 빔은 서버 끝점을 매 프레임 다시 겨누므로(`GunnerBeamView.UpdateBeam`) 끝점은 정확하다.
 - 테스트: `GunnerAttackFacingModelTests`(플레이어 EditMode 러너).
+
+---
+
+## 11. 에임 인디케이터 — 3D 쿼드 (2026-10-13, 할 일 33)
+
+URP 데칼(`DecalProjector`)을 버리고 **바닥에서 띄운 얇은 쿼드**로 바꿨다. 데칼은 지형·벽에 투영돼 경사·단차에서 늘어지고
+캐릭터 몸에도 찍혔다. 쿼드는 발밑 높이에 **수평으로 눕힌 채 조준 방향으로 Y축만** 돈다.
+
+| 항목 | 내용 |
+|------|------|
+| 구조 | base `Player.prefab` → `AimIndicator`(게임오브젝트·Transform fileID 유지 — Variant 오버라이드 보존). 컴포넌트 = `MeshFilter`(내장 Quad) + `MeshRenderer`. **콜라이더 없음**. 같은 프리팹의 다른 데칼(`SkillRangeIndicator` 등)은 그대로 데칼 |
+| 머티리얼 | `3.Materials/Player/AimIndicator/AimIndicator3D.mat` — URP `Lit`(2026-10-13 Unlit → Lit), Transparent·Alpha 블렌드, Receive Shadows·Specular Highlights·Environment Reflections 끔, Smoothness·Metallic 0(번들거림 방지), 텍스처 = 옛 데칼 머티리얼(`AimIndicator.mat`)의 화살표. 옛 `AimIndicator.mat`·`.shadergraph` 는 참조만 끊겼고 남아 있다 |
+| 깊이·그림자 | ZTest LEqual(벽·지형에 **가려진다**), ZWrite Off, 렌더 큐 Transparent(3000), 그림자 캐스트·수신 끔, 라이트/반사 프로브 끔 |
+| 높이 | 캐릭터 위치 0.5m 위에서 아래로 `groundMask` 레이(3.5m) → 맞으면 그 Y, 아니면 캐릭터 Y. 여기에 `heightOffset` 을 더한다. 조준점(마우스) 높이가 아니라 **발밑** 기준이라 계단·단차에서 파묻히지 않는다 |
+| 회전·위치 | `AimIndicatorPlacement`(순수 계산) — yaw = `atan2(x, z)`, 회전 = `Euler(90, yaw + indicator_rot_offset(90), 0)`, 중심 = 발밑 + 조준 방향 × `arrowForwardOffset`. **월드 값을 매 프레임 `LateUpdate` 에서 다시 넣어** 부모(플레이어) 회전과 무관하다. 크기는 부모 스케일을 상쇄한다 |
+| 인스펙터 (`PlayerAimIndicator`) | `heightOffset` 0.08m · `arrowScale` 1.2m(쿼드 한 변) · `arrowForwardOffset` 0.6m. 옛 데칼(2×2m, 중심 1m 앞 = 발밑~2m) 대비 **60%** — 발밑~1.2m |
+| 오너 전용 | 기존 규칙 그대로 — 네트워크 중 비오너는 `OnNetworkSpawn` 에서 인디케이터를 끄고 `Update`·`LateUpdate` 를 건너뛴다 |
+| 대시 틴트 | §10 — `MeshRenderer` 의 머티리얼을 `Awake` 에서 인스턴스로 복제해 `_BaseColor` 를 바꾼다(프리팹 애셋 오염 없음) |
+| 저작 | `Tools/Player/Authoring/Aim Indicator 3D Quad`(`AimIndicatorAuthoring`, 멱등) — 머티리얼 생성/갱신(셰이더를 Lit 로 맞추고 인스펙터와 같은 `BaseShaderGUI.SetMaterialKeywords(…, LitGUI.SetMaterialKeywords)` 로 키워드 재설정) + 데칼 제거 + 쿼드 배선 |
+| 테스트 | `Player/Editor/AimIndicatorPlacementTests` — `Tools/Tests/플레이어 EditMode 테스트 실행` 에 등록 |
+
+**화살표 이미지 교체** — `3.Materials/Player/AimIndicator/AimIndicator3D.mat` 의 `_BaseMap`(인스펙터 **Base Map**) 슬롯 하나에 새 텍스처를 넣으면 끝이다. 런타임 코드는 텍스처·머티리얼 경로를 모르고 쿼드의 머티리얼만 본다. 저작 메뉴를 다시 돌려도 `_BaseMap` 이 차 있으면 덮어쓰지 않는다. 새 이미지도 화살표가 텍스처 **왼쪽(-U)** 을 가리키게 그릴 것(아니면 `indicator_rot_offset` 조정).
 
 ---
 

@@ -51,6 +51,13 @@ public static class PlayerSilhouetteLayers
             Renderer r = renderers[i];
             if (r == null) continue;
 
+            // 몸이 아닌 표시용 렌더러(에임 인디케이터 쿼드 등)는 빼고, 남아 있을지 모르는 우리 비트만 지운다.
+            if (r.GetComponentInParent<ExcludeFromSilhouette>(true) != null)
+            {
+                r.renderingLayerMask &= ~BothMask;
+                continue;
+            }
+
             // 소유권이 바뀌거나 리스폰하면 반대쪽 비트가 남아 있을 수 있다 — 우리 비트 2개만 정리하고
             // 나머지(조명·데칼)는 그대로 둔다.
             r.renderingLayerMask = (r.renderingLayerMask & ~BothMask) | add;
