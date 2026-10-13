@@ -505,7 +505,7 @@ URP 데칼(`DecalProjector`)을 버리고 **바닥에서 띄운 얇은 쿼드**�
 | 저작 | `Tools/Player/Authoring/Aim Indicator 3D Quad`(`AimIndicatorAuthoring`, 멱등) — 머티리얼 생성/갱신 + 데칼 제거 + 쿼드 배선 |
 | 테스트 | `Player/Editor/AimIndicatorPlacementTests` — `Tools/Tests/플레이어 EditMode 테스트 실행` 에 등록 |
 
-화살표 텍스처를 작은 것으로 바꾸려면 `AimIndicator3D.mat` 의 `_BaseMap` 만 갈면 된다(화살표가 텍스처 **왼쪽(-U)** 을 가리키는 방향 규칙 유지).
+**화살표 이미지 교체** — `3.Materials/Player/AimIndicator/AimIndicator3D.mat` 의 `_BaseMap`(인스펙터 **Base Map**) 슬롯 하나에 새 텍스처를 넣으면 끝이다. 런타임 코드는 텍스처·머티리얼 경로를 모르고 쿼드의 머티리얼만 본다. 저작 메뉴를 다시 돌려도 `_BaseMap` 이 차 있으면 덮어쓰지 않는다. 새 이미지도 화살표가 텍스처 **왼쪽(-U)** 을 가리키게 그릴 것(아니면 `indicator_rot_offset` 조정).
 
 ---
 

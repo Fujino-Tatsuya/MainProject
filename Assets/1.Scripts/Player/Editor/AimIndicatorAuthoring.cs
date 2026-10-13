@@ -92,14 +92,17 @@ public static class AimIndicatorAuthoring
             AssetDatabase.CreateAsset(material, QuadMaterialPath);
         }
 
-        Material decalMaterial = AssetDatabase.LoadAssetAtPath<Material>(DecalMaterialPath);
-        Texture arrow = decalMaterial != null && decalMaterial.HasProperty(DecalArrowProperty)
-            ? decalMaterial.GetTexture(DecalArrowProperty)
-            : null;
-        if (arrow == null)
-            Debug.LogWarning("[AimIndicatorAuthoring] 기존 데칼 머티리얼에서 화살표 텍스처를 못 찾았습니다 — _BaseMap 이 비어 있음.");
-
-        material.SetTexture("_BaseMap", arrow);
+        // _BaseMap 이 비었을 때만 채운다 — 사용자가 갈아 넣은 텍스처를 재실행이 덮어쓰지 않게.
+        if (material.GetTexture("_BaseMap") == null)
+        {
+            Material decalMaterial = AssetDatabase.LoadAssetAtPath<Material>(DecalMaterialPath);
+            Texture arrow = decalMaterial != null && decalMaterial.HasProperty(DecalArrowProperty)
+                ? decalMaterial.GetTexture(DecalArrowProperty)
+                : null;
+            if (arrow == null)
+                Debug.LogWarning("[AimIndicatorAuthoring] 기존 데칼 머티리얼에서 화살표 텍스처를 못 찾았습니다 — _BaseMap 이 비어 있음.");
+            material.SetTexture("_BaseMap", arrow);
+        }
         material.SetColor("_BaseColor", Color.white);
         material.SetFloat("_Surface", 1f);  // Transparent
         material.SetFloat("_Blend", 0f);    // Alpha
