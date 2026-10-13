@@ -14,7 +14,8 @@ using UnityEngine.AI;
 /// <list type="bullet">
 /// <item><b>연습</b> — 체력 잠금 · 스핀만 · 창 간격 <see cref="windowInterval"/> · 돌진 피해 0(밀쳐내기만) · 스폰 반경 클램프.
 ///   v8 연계 연습(<see cref="SpinnerComboModel"/>): 간파 성공 → 기절 → <b>취약 유지</b>(시간 종료 없음 · FSM 정지 · 슈퍼 아머) →
-///   취약 중 우클릭 간파 적중(<see cref="ISpinnerBotOverride.NotifyInterruptHit"/>)이 공격자 반대로 밀친다 → 유효 벽(<see cref="SetPracticeWall"/>) 충돌 =
+///   취약 중 우클릭 간파 적중(<see cref="ISpinnerBotOverride.NotifyInterruptHit"/>)이 공격자 반대로 밀친다 → Wall 레이어 콜라이더 충돌
+///   (공용 <see cref="UnitWallImpacts"/> 이벤트 — 할 일 32, 안내 화살표 지점은 <see cref="SetPracticeWall"/>) =
 ///   연계 1회 → 회복 → <b>그 자리에서</b> 목표 전이면 다시 준비·간파, 3회째면 완료(사용자 변경 — 원위치 복귀 없음).
 ///   23호 취약 밀치기와 같은 방식(공격자 반대 고정 거리)이지만 코드는 따로다(23호 것은 TwentyThreeBoss 전용).</item>
 /// <item><b>전환 대기</b> — <see cref="realModeDelay"/> 초 FSM 정지(<see cref="MonsterBase.SetServerLogicSuspended"/>, 체력 잠금 유지).</item>
@@ -69,12 +70,12 @@ public sealed class TutorialSpinnerPractice : NetworkBehaviour, ISpinnerBotOverr
     float comboPushSeconds = 0.35f;
 
     [SerializeField, Min(0f)]
-    [Tooltip("벽 충돌로 보는 몸 가장자리 ↔ 유효 벽 면 거리(m).")]
-    float comboContactSlack = 0.4f;
+    [Tooltip("벽 충돌로 보는 몸 가장자리 ↔ Wall 레이어 콜라이더 거리(m) — 공용 벽 충돌 판정(UnitWallImpacts)에 넘긴다.")]
+    float comboContactSlack = UnitWallImpacts.DefaultContactSlack;
 
     [SerializeField, Min(0f)]
     [Tooltip("밀치기가 NavMesh 가장자리에 막혔을 때 벽 충돌로 보는 거리(m) — NavMesh 는 벽에서 에이전트 반경만큼 안쪽에서 끝난다.")]
-    float comboBlockedContactSlack = 1.6f;
+    float comboBlockedContactSlack = UnitWallImpacts.DefaultBlockedSlack;
 
     [SerializeField, Min(0f)]
     [Tooltip("벽 충돌 뒤 회복 시간(초) — 끝나면 그 자리에서 다시 준비·간파(3회째면 완료).")]
@@ -110,8 +111,10 @@ public sealed class TutorialSpinnerPractice : NetworkBehaviour, ISpinnerBotOverr
     readonly HashSet<Player> _pushedThisSpin = new HashSet<Player>();
 
     Vector3 _anchor;
-    Vector3 _wallNormal;        // 유효 벽 면의 방 안쪽 법선(수평 단위)
-    float _bodyRadius = 0.5f;
+    // 할 일 32 — 밀치기 한 번 = 벽 충돌 에피소드 하나(UnitWallImpacts 가 1회 보장). 민 쪽 = 우클릭 시전자.
+    readonly WallImpactEpisode _wallEpisode = new WallImpactEpisode();
+    Unit _pusher;
+    bool _wallImpactThisStep;
     bool? _appliedSuspended;    // 마지막으로 MonsterBase 에 건 FSM 정지 값(null = 아직 안 걺)
     bool _appliedSuperArmor;
     bool _subscribed;
@@ -197,15 +200,12 @@ public sealed class TutorialSpinnerPractice : NetworkBehaviour, ISpinnerBotOverr
     }
 
     /// <summary>
-    /// [서버] 연습용 유효 벽 — 벽 면 위의 점과 방 안쪽 법선(수평). 존3 흐름이 존3 슬롯 사각형에서 정한다.
-    /// <paramref name="bodyRadius"/> = 스피너봇 몸 반경(벽 거리 = 몸 가장자리 기준).
+    /// [서버] 안내 화살표가 가리킬 벽 면 위의 점(표시 전용). 존3 흐름이 연습 위치에서 가장 가까운 Wall 레이어 콜라이더 면으로 정한다.
+    /// 연계 성공 판정과는 무관하다 — 판정은 어느 Wall 콜라이더든 밀치기 중 벽 충돌 이벤트(할 일 32).
     /// </summary>
-    public void SetPracticeWall(Vector3 pointOnWall, Vector3 inwardNormal, float bodyRadius)
+    public void SetPracticeWall(Vector3 pointOnWall)
     {
         if (!RequireServer(nameof(SetPracticeWall))) return;
-        inwardNormal.y = 0f;
-        _wallNormal = inwardNormal.sqrMagnitude > 1e-6f ? inwardNormal.normalized : Vector3.forward;
-        _bodyRadius = Mathf.Max(0f, bodyRadius);
         _wallPoint.Value = pointOnWall;
         _hasWall.Value = true;
     }
@@ -257,8 +257,7 @@ public sealed class TutorialSpinnerPractice : NetworkBehaviour, ISpinnerBotOverr
         _schedule = new SpinnerPracticeWindowSchedule(windowInterval);
         // 기절 = 원래 간파 그로기(MonsterCounterWindow.groggyDuration)보다 살짝 짧게 — 그로기가 끝나 FSM 이 추격을 고르기 전에 세운다.
         float stun = _counter != null ? Mathf.Max(0f, _counter.GroggyDuration - 0.1f) : 0.9f;
-        _combo = new SpinnerComboModel(comboTarget, stun, comboRecoverSeconds, comboPushDistance, comboPushSeconds,
-                                       comboContactSlack, comboBlockedContactSlack);
+        _combo = new SpinnerComboModel(comboTarget, stun, comboRecoverSeconds, comboPushDistance, comboPushSeconds);
     }
 
     public override void OnNetworkSpawn()
@@ -271,6 +270,7 @@ public sealed class TutorialSpinnerPractice : NetworkBehaviour, ISpinnerBotOverr
         //    휴면은 디렉터가 base 에 건다(이 컴포넌트는 연습 모드로 시작). 연습 공격은 피해 0 이라 휴면 전 틈에도 안전하다.
 
         CombatStatsEvents.ServerCounterSucceeded += OnServerCounterSucceeded;
+        _bot.ServerWallImpacted += OnServerWallImpacted;
         _subscribed = true;
 
         if (_counter == null)
@@ -292,6 +292,7 @@ public sealed class TutorialSpinnerPractice : NetworkBehaviour, ISpinnerBotOverr
     {
         if (!_subscribed) return;
         CombatStatsEvents.ServerCounterSucceeded -= OnServerCounterSucceeded;
+        if (_bot != null) _bot.ServerWallImpacted -= OnServerWallImpacted;
         _subscribed = false;
     }
 
@@ -325,15 +326,12 @@ public sealed class TutorialSpinnerPractice : NetworkBehaviour, ISpinnerBotOverr
             Vector3 after = transform.position;
             float moved = new Vector2(after.x - before.x, after.z - before.z).magnitude;
 
-            float gap = float.PositiveInfinity;
-            bool toward = false;
-            if (_hasWall.Value)
-            {
-                Vector3 w = _wallPoint.Value;
-                gap = SpinnerComboGeometry.WallGap(after.x, after.z, w.x, w.z, _wallNormal.x, _wallNormal.z, _bodyRadius);
-                toward = SpinnerComboGeometry.IsTowardWall(dir.x, dir.z, _wallNormal.x, _wallNormal.z);
-            }
-            events |= _combo.ReportPushMoved(step, moved, gap, toward);
+            // 할 일 32 — 공용 벽 충돌 판정(실제 Wall 레이어 콜라이더). 충돌이면 OnServerWallImpacted 가 같은 호출 안에서 표시한다.
+            _wallImpactThisStep = false;
+            UnitWallImpacts.ServerProbe(_bot, _wallEpisode, dir, step, moved, _combo.PushSpeed, _pusher, out _,
+                                        comboContactSlack, comboBlockedContactSlack);
+            events |= _combo.ReportPushMoved(step, moved, _wallImpactThisStep);
+            if (!_combo.IsPushing) _wallEpisode.End();
         }
 
         if ((events & SpinnerComboEvent.ReadyAgain) != 0)
@@ -432,6 +430,13 @@ public sealed class TutorialSpinnerPractice : NetworkBehaviour, ISpinnerBotOverr
         }
     }
 
+    // 할 일 32 — 이 스피너봇의 공용 벽 충돌 이벤트. 연계는 우클릭 밀치기 중인 것만 센다(Q 넉백 등 다른 외부 힘은 무시).
+    void OnServerWallImpacted(UnitWallImpact impact)
+    {
+        if (_model != null && _model.Mode == SpinnerPracticeMode.Practice && _combo.IsPushing)
+            _wallImpactThisStep = true;
+    }
+
     // 취약 중 우클릭 간파 적중 = 밀치기(공격자 → 스피너봇 방향). 준비·회복 중에는 무시(외부 밀치기 없음).
     void ISpinnerBotOverride.NotifyInterruptHit(ulong attackerClientId)
     {
@@ -439,8 +444,11 @@ public sealed class TutorialSpinnerPractice : NetworkBehaviour, ISpinnerBotOverr
         if (!NetworkManager.ConnectedClients.TryGetValue(attackerClientId, out NetworkClient client) || client.PlayerObject == null) return;
 
         Vector3 away = transform.position - client.PlayerObject.transform.position;
-        if (_combo.TryBeginPush(away.x, away.z))
-            Debug.Log($"[Tutorial/스피너봇] 취약 밀치기(client {attackerClientId}) — 방향 ({_combo.PushDirX:0.##}, {_combo.PushDirZ:0.##}).", this);
+        if (!_combo.TryBeginPush(away.x, away.z)) return;
+
+        _wallEpisode.Begin();   // 새 밀치기 = 벽 충돌 1회 다시
+        _pusher = client.PlayerObject.GetComponent<Unit>();
+        Debug.Log($"[Tutorial/스피너봇] 취약 밀치기(client {attackerClientId}) — 방향 ({_combo.PushDirX:0.##}, {_combo.PushDirZ:0.##}).", this);
     }
 
     void Emit(SpinnerWindowEvent events)

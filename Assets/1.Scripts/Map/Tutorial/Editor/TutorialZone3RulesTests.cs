@@ -222,8 +222,12 @@ public class TutorialZone3RulesTests
         Assert.AreEqual(-148.55f, l.AnchorZ, 1e-3f);
         Assert.AreEqual(l.AnchorZ, l.WallZ, 1e-3f, "벽 표시 지점 = 연습 위치에서 가장 가까운 벽 점");
         // 몸 가장자리 ↔ 벽 = 간격
-        Assert.AreEqual(4f, SpinnerComboGeometry.WallGap(l.AnchorX, l.AnchorZ, l.WallX, l.WallZ, l.NormalX, l.NormalZ, 0.5f), 1e-3f);
+        Assert.AreEqual(4f, Gap(l, 0.5f), 1e-3f);
     }
+
+    // 몸 가장자리 ↔ 존 긴 변(연습 위치 기준선) 거리. 할 일 32 로 연계 판정은 실제 Wall 콜라이더(UnitWallImpacts)로 옮겼고, 이 선은 배치에만 쓴다.
+    static float Gap(TutorialZone3PracticeLayout l, float body) =>
+        (l.AnchorX - l.WallX) * l.NormalX + (l.AnchorZ - l.WallZ) * l.NormalZ - body;
 
     [Test]
     public void PracticeLayout_PicksNearerLongSide_AndRotation()
@@ -235,8 +239,7 @@ public class TutorialZone3RulesTests
         // 90° 돌린 존(긴 축이 로컬 z 그대로, 월드에서는 x) — 법선은 여전히 벽에서 방 안쪽.
         var rotated = new TutorialRect(0f, 0f, 10f, 20f, 90f);
         TutorialZone3PracticeLayout r = TutorialZone3Geometry.ChoosePracticeLayout(rotated, 0f, 0f, 0.5f, 4f, 8f);
-        float gap = SpinnerComboGeometry.WallGap(r.AnchorX, r.AnchorZ, r.WallX, r.WallZ, r.NormalX, r.NormalZ, 0.5f);
-        Assert.AreEqual(4f, gap, 1e-3f);
+        Assert.AreEqual(4f, Gap(r, 0.5f), 1e-3f);
         Assert.AreEqual(10f, System.Math.Abs(r.WallZ), 1e-3f, "로컬 x 긴 변 → 월드 z = ±10");
     }
 

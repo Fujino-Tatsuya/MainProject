@@ -119,11 +119,12 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
   0.35초 페이드(실제 시간, 높이·알파) 뒤 비활성. 다시 닫히는 일은 없다(게이트는 앞으로만).
 
 **막기**
-- 플레이어: **Wall 레이어** 비트리거 BoxCollider. 플레이어 모터 스윕 마스크(`PlayerGameRuleData.obstacleMask` = Default|Ground|Wall|Enemy|Env)가 본다.
+- 플레이어: **Barrier 레이어**(19 — 할 일 32 로 Wall 에서 분리, [wall-concept.md](wall-concept.md)) 비트리거 BoxCollider. 플레이어 모터 스윕 마스크(`PlayerGameRuleData.obstacleMask` = Default|Ground|Wall|Enemy|Env|Barrier)가 본다.
+  배리어는 벽이 아니다 — 공용 벽 충돌 이벤트(`UnitWallImpact`)가 나지 않는다.
   걷기·대시·이동 스킬(어쌔신 Q 돌진·평타 전진, 거너 E 백스텝·우클릭 반동, 팔라딘 전진)·넉백이 모두 같은 스윕(`PlayerMovementSimulation`)이라 막힌다.
   스윕을 안 타는 것 = 순간이동(`TeleportAuthoritative` — 스폰·추락 복구·보스방 이동)과 23호 잡기/밀기(`PlayerRestrainedState` — 보스방 전용).
-  Wall 은 거너 평타·차지 레이저 차단 레이어에도 있어 배리어 너머로는 거너 빔이 막힌다.
-- 몬스터: NavMeshObstacle 카브(Box, `carveOnlyStationary` 끔, 위아래 +2m — `ZoneBridgeGate` 와 같은 설정). Wall 은 NavMesh 베이크 수집(Default·Ground)에 안 들어가 다리 재베이크에 섞이지 않는다.
+  Barrier 는 거너 평타·차지 레이저 차단 레이어에도 있어(할 일 32 에서 추가) 배리어 너머로는 거너 빔이 막힌다. 부활·리스폰 점유 검사(`TutorialDeathRules`·`PartyWipeRespawner`)도 Wall|Barrier 를 본다.
+- 몬스터: NavMeshObstacle 카브(Box, `carveOnlyStationary` 끔, 위아래 +2m — `ZoneBridgeGate` 와 같은 설정). Barrier 는 NavMesh 베이크 수집(Default·Ground·Wall)에 안 들어가 다리 재베이크에 섞이지 않는다.
 - 추락 복구: 서버 `ResolveReturnPoint` 가 기준점·Ring 후보마다 `ReturnPointFilter` 를 부른다 → `TutorialBarrierRules.IsPointReachable` —
   점을 품은 구간이 모두 '아직 못 들어가는 구간'(들어가는 배리어가 닫힘)이면 거부. 튜토리얼 구간 밖(보스방)은 허용. 스폰 폴백(존1)은 원래 거르지 않았다 —
   C2 부터는 그 사람의 뒤 배리어 너머면 대체 지점을 쓴다(아래 '뒤 배리어 예외').
@@ -138,7 +139,7 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
   너머 구간(입구 G1/G3/G6/G9 = 복도 n, 출구 G2/G4/G7/G10 = 다음 존·보스 진입) 사각형 안에 있을 때. 진행 방향은 `TutorialBarrierSpec.AlongX`·`Forward`.
   `Alive` 만 판정, 단계 Finished 뒤엔 판정 안 함. 새로 지나면 서버 로그 `[TutorialBarrier] 뒤 배리어 G* 닫힘 — client n`.
 - **막기(각 피어, 로컬 플레이어 기준)**: `TutorialBarriers` 가 자기 `LocalClientId` 의 복제 마스크로 `지난 ∧ 열린 게이트`(닫힌 배리어는 일반 배리어가 막으니 중복 생성 안 함)를
-  같은 자리의 `TutorialBarriers/BackBarrier_G*` 로 켠다 — Wall 레이어 BoxCollider + 같은 머티리얼, **NavMeshObstacle 없음**(몬스터는 안 막음).
+  같은 자리의 `TutorialBarriers/BackBarrier_G*` 로 켠다 — Barrier 레이어 BoxCollider + 같은 머티리얼, **NavMeshObstacle 없음**(몬스터는 안 막음).
   이동이 오너 권한·오너 로컬 스윕이라 이 피어의 콜라이더는 이 피어의 로컬 플레이어만 막는다(남의 플레이어는 복제 위치라 무관). 늦은 클라는 스폰 직후 `StateChanged` 로 같은 결과.
   켤 때 로컬 플레이어 콜라이더 bounds 와 겹치면 켜지 않고 다음 프레임(`Update`)에 다시 시도(끼임 방지).
 - 사망(Soul) 중에도 유지(Soul 도 같은 모터 스윕 — `PlayerMotor.ResolveObstacleMask` 가 Soul 에서도 Wall 을 남긴다). 튜토리얼 비활성(비튜토리얼 스테이지)이면 안 만들고, 단계 Finished 면 끈다.

@@ -1,13 +1,14 @@
 using NUnit.Framework;
 
 /// <summary>
-/// 튜토리얼 스피너봇 연계 연습(v8 §3.5) — 간파 → 기절 → 취약 유지 → 우클릭 밀치기 → 유효 벽 충돌 → 회복 × 3.
+/// 튜토리얼 스피너봇 연계 연습(v8 §3.5) — 간파 → 기절 → 취약 유지 → 우클릭 밀치기 → 벽 충돌 → 회복 × 3.
 /// 회복 끝 = 그 자리에서 다시 준비·간파(사용자 변경 — 원위치 복귀 없음), 3회째 회복 끝 = 완료.
+/// 할 일 32: 벽 충돌 = 공용 벽 충돌 이벤트(UnitWallImpact) 여부 — 거리·방향 판정은 UnitWallImpactJudgeTests 가 맡는다.
 /// </summary>
 public sealed class SpinnerComboModelTests
 {
-    // 기절 1초 · 회복 0.5초 · 밀치기 3m/0.3초(10m/s) · 접촉 0.4 · 막힘 접촉 1.6
-    static SpinnerComboModel New(int target = 3) => new SpinnerComboModel(target, 1f, 0.5f, 3f, 0.3f, 0.4f, 1.6f);
+    // 기절 1초 · 회복 0.5초 · 밀치기 3m/0.3초(10m/s)
+    static SpinnerComboModel New(int target = 3) => new SpinnerComboModel(target, 1f, 0.5f, 3f, 0.3f);
 
     static void ToVulnerable(SpinnerComboModel m)
     {
@@ -15,16 +16,17 @@ public sealed class SpinnerComboModelTests
         Assert.AreEqual(SpinnerComboEvent.StunEnded, m.Tick(1.01f));
     }
 
-    // 벽까지 몸 가장자리 거리 gap 에서 벽 쪽으로 한 번 밀어 끝까지 보낸다. 벽에 닿으면 WallHit.
-    static SpinnerComboEvent PushAll(SpinnerComboModel m, ref float gap, bool towardWall = true, float blockedAt = float.NegativeInfinity)
+    // 밀치기를 끝까지 보낸다. 누적 이동이 impactAt(m) 에 이르면 벽 충돌 이벤트가 났다고 보고한다. blockedAt 에 이르면 더 못 움직인다.
+    static SpinnerComboEvent PushAll(SpinnerComboModel m, float impactAt = float.PositiveInfinity, float blockedAt = float.PositiveInfinity)
     {
         SpinnerComboEvent all = SpinnerComboEvent.None;
+        float travelled = 0f;
         for (int i = 0; i < 100 && m.IsPushing; i++)
         {
             float step = m.PushStep(0.05f);
-            float moved = towardWall ? System.Math.Max(0f, System.Math.Min(step, gap - blockedAt)) : step;
-            if (towardWall) gap -= moved;
-            all |= m.ReportPushMoved(step, moved, gap, towardWall);
+            float moved = System.Math.Max(0f, System.Math.Min(step, blockedAt - travelled));
+            travelled += moved;
+            all |= m.ReportPushMoved(step, moved, travelled >= impactAt);
         }
         return all;
     }
@@ -61,13 +63,12 @@ public sealed class SpinnerComboModelTests
     }
 
     [Test]
-    public void 밀치기_한_번이_벽에_닿으면_연계_1회_회복_뒤_그_자리에서_다시_준비()
+    public void 밀치기_중_벽_충돌_이벤트면_연계_1회_회복_뒤_그_자리에서_다시_준비()
     {
         var m = New();
         ToVulnerable(m);
-        float gap = 2.5f;   // 3m 밀치기 안
         Assert.IsTrue(m.TryBeginPush(1f, 0f));
-        SpinnerComboEvent e = PushAll(m, ref gap);
+        SpinnerComboEvent e = PushAll(m, impactAt: 2.1f);
         Assert.AreEqual(SpinnerComboEvent.WallHit, e);
         Assert.AreEqual(1, m.Successes);
         Assert.AreEqual(SpinnerComboPhase.Recovering, m.Phase);
@@ -91,51 +92,36 @@ public sealed class SpinnerComboModelTests
     {
         var m = New();
         ToVulnerable(m);
-        float gap = 4f;   // 3m 로는 1m 남는다(1~2회 거리)
         m.TryBeginPush(1f, 0f);
-        Assert.AreEqual(SpinnerComboEvent.PushEndedNoWall, PushAll(m, ref gap));
+        Assert.AreEqual(SpinnerComboEvent.PushEndedNoWall, PushAll(m), "거리 소진");
         Assert.AreEqual(0, m.Successes);
         Assert.IsTrue(m.IsVulnerable);
-        Assert.AreEqual(1f, gap, 1e-3f);
 
         m.TryBeginPush(1f, 0f);
-        Assert.AreEqual(SpinnerComboEvent.WallHit, PushAll(m, ref gap), "두 번째에 닿는다");
+        Assert.AreEqual(SpinnerComboEvent.WallHit, PushAll(m, impactAt: 1f), "두 번째에 닿는다");
         Assert.AreEqual(1, m.Successes);
     }
 
     [Test]
-    public void NavMesh_가장자리에_막혀도_벽_가까이면_충돌로_본다()
+    public void 벽_아닌_것에_막히면_충돌이_아니다()
     {
         var m = New();
         ToVulnerable(m);
-        float gap = 2.5f;
         m.TryBeginPush(1f, 0f);
-        // 벽 면 1.0m 앞에서 막힘(NavMesh 끝) — 막힘 접촉 1.6 이하라 충돌.
-        Assert.AreEqual(SpinnerComboEvent.WallHit, PushAll(m, ref gap, true, blockedAt: 1.0f));
-    }
-
-    [Test]
-    public void 벽에서_먼_곳에서_막히면_충돌이_아니다()
-    {
-        var m = New();
-        ToVulnerable(m);
-        float gap = 5f;
-        m.TryBeginPush(1f, 0f);
-        // 벽 면 3m 앞 장애물(상자·배리어)에 막힘.
-        Assert.AreEqual(SpinnerComboEvent.PushEndedNoWall, PushAll(m, ref gap, true, blockedAt: 3f));
+        // 상자·배리어·NavMesh 끝에 1m 에서 막힘 — 벽 충돌 이벤트 없음.
+        Assert.AreEqual(SpinnerComboEvent.PushEndedNoWall, PushAll(m, blockedAt: 1f));
         Assert.AreEqual(0, m.Successes);
         Assert.IsTrue(m.IsVulnerable);
     }
 
     [Test]
-    public void 벽_반대쪽으로_민_것은_벽에_붙어_있어도_세지_않는다()
+    public void 막힌_채로라도_벽_충돌_이벤트가_오면_센다()
     {
         var m = New();
         ToVulnerable(m);
-        m.TryBeginPush(-1f, 0f);
-        float step = m.PushStep(0.05f);
-        Assert.AreEqual(SpinnerComboEvent.None, m.ReportPushMoved(step, step, 0.1f, towardWall: false));
-        Assert.AreEqual(0, m.Successes);
+        m.TryBeginPush(1f, 0f);
+        // NavMesh 끝(벽 앞 1m)에서 막혔지만 공용 판정의 막힘 거리 안이라 이벤트가 났다.
+        Assert.AreEqual(SpinnerComboEvent.WallHit, PushAll(m, impactAt: 1f, blockedAt: 1f));
     }
 
     [Test]
@@ -145,9 +131,19 @@ public sealed class SpinnerComboModelTests
         ToVulnerable(m);
         m.TryBeginPush(1f, 0f);
         float step = m.PushStep(0.05f);
-        Assert.AreEqual(SpinnerComboEvent.WallHit, m.ReportPushMoved(step, step, 0f, true));
-        Assert.AreEqual(SpinnerComboEvent.None, m.ReportPushMoved(step, step, 0f, true), "중복 충돌 보고 무시");
+        Assert.AreEqual(SpinnerComboEvent.WallHit, m.ReportPushMoved(step, step, true));
+        Assert.AreEqual(SpinnerComboEvent.None, m.ReportPushMoved(step, step, true), "중복 충돌 보고 무시");
         Assert.AreEqual(1, m.Successes);
+    }
+
+    [Test]
+    public void 밀치기_중이_아니면_벽_충돌을_세지_않는다()
+    {
+        var m = New();
+        Assert.AreEqual(SpinnerComboEvent.None, m.ReportPushMoved(0.1f, 0.1f, true), "준비 단계(외부 넉백으로 벽에 닿은 경우)");
+        ToVulnerable(m);
+        Assert.AreEqual(SpinnerComboEvent.None, m.ReportPushMoved(0.1f, 0.1f, true), "취약이지만 밀치기 전");
+        Assert.AreEqual(0, m.Successes);
     }
 
     [Test]
@@ -157,9 +153,8 @@ public sealed class SpinnerComboModelTests
         for (int i = 1; i <= 3; i++)
         {
             ToVulnerable(m);
-            float gap = 1f;
             m.TryBeginPush(1f, 0f);
-            Assert.AreEqual(SpinnerComboEvent.WallHit, PushAll(m, ref gap));
+            Assert.AreEqual(SpinnerComboEvent.WallHit, PushAll(m, impactAt: 0.5f));
             Assert.AreEqual(SpinnerComboPhase.Recovering, m.Phase, $"{i}회째 회복(3회째도 충돌 순간은 아직 완료 아님)");
             SpinnerComboEvent recovered = m.Tick(1f);
             Assert.AreEqual(i < 3 ? SpinnerComboEvent.ReadyAgain : SpinnerComboEvent.Completed, recovered, $"{i}회째");
@@ -182,16 +177,5 @@ public sealed class SpinnerComboModelTests
         Assert.IsFalse(m.SuspendsFsm);
         Assert.IsFalse(m.BlocksExternalKnockback);
         Assert.IsFalse(m.IsVulnerable);
-    }
-
-    [Test]
-    public void 벽_거리와_방향()
-    {
-        // 벽 x = 10, 방 안쪽 법선 −x. 몸 반경 0.5.
-        Assert.AreEqual(4f, SpinnerComboGeometry.WallGap(5.5f, 0f, 10f, 0f, -1f, 0f, 0.5f), 1e-4f);
-        Assert.AreEqual(-0.5f, SpinnerComboGeometry.WallGap(10f, 3f, 10f, 0f, -1f, 0f, 0.5f), 1e-4f);
-        Assert.IsTrue(SpinnerComboGeometry.IsTowardWall(1f, 0f, -1f, 0f));
-        Assert.IsFalse(SpinnerComboGeometry.IsTowardWall(0f, 1f, -1f, 0f), "벽과 나란히");
-        Assert.IsFalse(SpinnerComboGeometry.IsTowardWall(-1f, 0f, -1f, 0f), "벽 반대");
     }
 }

@@ -12,8 +12,9 @@ using UnityEngine.AI;
 /// 디렉터 GameObject 에 런타임으로 붙는다(<see cref="TutorialDeathRules"/> 와 같은 방식 — 씬·프리팹 저장 없음).
 ///
 /// 흐름(v8 §3.5 — 간파 → 취약 밀치기 → 벽 충돌 → 회복 → 그 자리에서 다음 준비(원위치 복귀 없음 — 사용자 변경), 연계 파티 합계 3회 → 본 전투):
-///  · 활성 순간: 연습용 유효 벽·연습 위치(<see cref="TutorialZone3Geometry.ChoosePracticeLayout"/> — 존3 긴 변)를 정해 스피너봇을 옮기고
-///    (휴면 중), 연습 반경 = 그 위치 → 출구 배리어(G6) 거리 − 몸 반경 − 여유.
+///  · 활성 순간: 연습 위치(<see cref="TutorialZone3Geometry.ChoosePracticeLayout"/> — 존3 긴 변 기준)를 정해 스피너봇을 옮기고
+///    (휴면 중), 안내 화살표 = 그 위치에서 가장 가까운 Wall 레이어 콜라이더 면(<see cref="TutorialZone3WallFinder"/>, 0개면 경고),
+///    연습 반경 = 그 위치 → 출구 배리어(G6) 거리 − 몸 반경 − 여유. 벽 충돌 판정 = 공용 <see cref="UnitWallImpacts"/>(할 일 32).
 ///  · G4 열림 ∧ 존3 파티 첫 진입 → 스피너봇 휴면 해제 → <see cref="TutorialSpinnerPractice.EnterPractice"/> · 단계 Zone3Practice ·
 ///    자막 TUT_Z3_INTRO → TUT_Z3_PRACTICE_NOTE(공통 — 캐릭터별 간파 설명 없음, §2.4).
 ///  · 간파 성공(준비 단계) = <see cref="PlayerInterruptSkillBase.ServerInterruptSucceeded"/>(연습 중 · 시전자 존3 안 — 존3 의 카운터 대상은
@@ -162,8 +163,7 @@ public sealed class TutorialZone3Flow : MonoBehaviour
         var areas = new TutorialAreaTracker();
         if (!TutorialAreaLayout.TryBuild(stage != null ? stage.transform : null, areas, out string error))
         {
-            Edit.LogWarning($"[Tutorial] 존3: 구간 계산 실패({error}) — 연습 위치·반경 {_practice.PracticeRadius:0.##}m 그대로. " +
-                            "유효 벽이 없어 연계(벽 충돌)가 성립하지 않는다.", this);
+            Edit.LogWarning($"[Tutorial] 존3: 구간 계산 실패({error}) — 연습 위치·반경 {_practice.PracticeRadius:0.##}m 그대로 · 벽 안내 화살표 없음.", this);
             return;
         }
 
@@ -173,15 +173,27 @@ public sealed class TutorialZone3Flow : MonoBehaviour
             Vector3 spawn = _practice.PracticeAnchor;
             TutorialZone3PracticeLayout layout = TutorialZone3Geometry.ChoosePracticeLayout(
                 zone, spawn.x, spawn.z, body, practiceWallGap, practiceEndClearance);
-            _practice.SetPracticeWall(new Vector3(layout.WallX, spawn.y, layout.WallZ), new Vector3(layout.NormalX, 0f, layout.NormalZ), body);
             bool moved = _practice.RelocateAnchor(new Vector3(layout.AnchorX, spawn.y, layout.AnchorZ));
-            Edit.Log($"[Tutorial] 존3 연계 연습 — 유효 벽 ({layout.WallX:0.##}, {layout.WallZ:0.##}) 안쪽 법선 ({layout.NormalX:0.##}, {layout.NormalZ:0.##}) · " +
-                     $"연습 위치 ({_practice.PracticeAnchor.x:0.##}, {_practice.PracticeAnchor.z:0.##}){(moved ? "" : " — NavMesh 못 찾아 스폰 위치")} · " +
-                     $"벽 간격 {practiceWallGap:0.#}m.", this);
+            Vector3 anchorPos = _practice.PracticeAnchor;
+
+            // 할 일 32 — 안내 화살표 = 연습 위치에서 가장 가까운 Wall 레이어 콜라이더 면. 연계 판정도 Wall 콜라이더(UnitWallImpacts)라
+            // 0개면 연계가 성립하지 않는다 → 경고 + 화살표는 존 긴 변(배치 기준선)으로 대신 가리킨다.
+            int wallCount = TutorialZone3WallFinder.FindNearest(zone, anchorPos, out Vector3 wallPoint, out Collider wall);
+            if (wallCount == 0)
+            {
+                wallPoint = new Vector3(layout.WallX, spawn.y, layout.WallZ);
+                Edit.LogWarning("[Tutorial] 존3 Wall 레이어 콜라이더 0개 — 존3 벽에 Wall 태그+레이어 세팅 필요(Docs/tech/wall-concept.md). " +
+                                "그 전엔 밀치기 연계가 성공하지 않는다. 안내 화살표는 존 긴 변을 가리킨다.", this);
+            }
+            _practice.SetPracticeWall(wallPoint);
+            Edit.Log($"[Tutorial] 존3 연계 연습 — 안내 벽 ({wallPoint.x:0.##}, {wallPoint.z:0.##})" +
+                     $"{(wall != null ? $" '{wall.name}' (Wall 콜라이더 {wallCount}개)" : " (존 긴 변 — Wall 콜라이더 없음)")} · " +
+                     $"연습 위치 ({anchorPos.x:0.##}, {anchorPos.z:0.##}){(moved ? "" : " — NavMesh 못 찾아 스폰 위치")} · " +
+                     $"긴 변 간격 {practiceWallGap:0.#}m.", this);
         }
         else
         {
-            Edit.LogWarning("[Tutorial] 존3: 존3 사각형이 없다 — 유효 벽이 없어 연계(벽 충돌)가 성립하지 않는다.", this);
+            Edit.LogWarning("[Tutorial] 존3: 존3 사각형이 없다 — 연습 위치 그대로 · 벽 안내 화살표 없음.", this);
         }
 
         int target = _director.GetCounterTarget(TutorialCounter.Zone3Interrupts);
@@ -338,5 +350,44 @@ public sealed class TutorialZone3Flow : MonoBehaviour
         if (_practice != null) _practice.EnterRealMode();
         _director.SetStepServer(TutorialStep.Zone3Fight);
         _director.ShowSubtitleServer(TutorialGuideIds.Z3Real);
+    }
+}
+
+/// <summary>
+/// 존3 안내 화살표용 — 존3 사각형(+여유) 안의 Wall 레이어 비트리거 콜라이더 중 기준점에서 수평으로 가장 가까운 면 위 점(할 일 32).
+/// 반환 = 찾은 Wall 콜라이더 수(0 = 세팅 필요). 비볼록 MeshCollider 는 경계 상자로 잰다.
+/// </summary>
+internal static class TutorialZone3WallFinder
+{
+    const float Margin = 3f;       // 존 사각형 밖으로 이만큼(벽은 존 가장자리에 걸쳐 있다)
+    const float Below = 1f;
+    const float Above = 4f;
+    static readonly Collider[] Buffer = new Collider[256];
+
+    public static int FindNearest(TutorialRect zone, Vector3 from, out Vector3 point, out Collider nearest)
+    {
+        point = from;
+        nearest = null;
+        int mask = GameLayers.WallMask;
+        if (mask == 0) return 0;
+
+        zone.GetWorldBounds(out float minX, out float minZ, out float maxX, out float maxZ);
+        var center = new Vector3((minX + maxX) * 0.5f, from.y + (Above - Below) * 0.5f, (minZ + maxZ) * 0.5f);
+        var half = new Vector3((maxX - minX) * 0.5f + Margin, (Above + Below) * 0.5f, (maxZ - minZ) * 0.5f + Margin);
+        int count = Physics.OverlapBoxNonAlloc(center, half, Buffer, Quaternion.identity, mask, QueryTriggerInteraction.Ignore);
+
+        Vector3 probe = from + Vector3.up;
+        float best = float.PositiveInfinity;
+        for (int i = 0; i < count; i++)
+        {
+            Collider c = Buffer[i];
+            Vector3 p = c is MeshCollider mesh && !mesh.convex ? c.ClosestPointOnBounds(probe) : c.ClosestPoint(probe);
+            float d = new Vector2(p.x - from.x, p.z - from.z).sqrMagnitude;
+            if (d >= best) continue;
+            best = d;
+            nearest = c;
+            point = new Vector3(p.x, from.y, p.z);
+        }
+        return count;
     }
 }
