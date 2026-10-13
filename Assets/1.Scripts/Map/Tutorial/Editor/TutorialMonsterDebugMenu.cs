@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
@@ -10,9 +9,6 @@ using UnityEngine;
 internal static class TutorialMonsterDebugMenu
 {
     const string Root = "Tools/Tutorial/Debug/";
-    const int LethalDamage = 1_000_000;
-
-    static readonly List<MonsterBase> Buffer = new List<MonsterBase>();
 
     static bool Ready()
     {
@@ -55,25 +51,13 @@ internal static class TutorialMonsterDebugMenu
         d.SetZoneDormantServer(TutorialArea.Zone4, true);
     }
 
+    // 처치 코드는 런타임 구간 스킵(Alt+1~0)과 공용 — TutorialDebugActions.
     [MenuItem(Root + "존2 전멸 (깨워서 처치)", false, 60)]
-    static void KillZone2() => Kill(TutorialArea.Zone2, TutorialMonsterFilter.All);
+    static void KillZone2() => TutorialDebugActions.KillZoneMonsters(TutorialDirector.Instance, TutorialArea.Zone2, TutorialMonsterFilter.All);
 
     [MenuItem(Root + "존3 핵심 처치 (스피너봇)", false, 61)]
-    static void KillZone3Key() => Kill(TutorialArea.Zone3, TutorialMonsterFilter.KeyOnly);
+    static void KillZone3Key() => TutorialDebugActions.KillZoneMonsters(TutorialDirector.Instance, TutorialArea.Zone3, TutorialMonsterFilter.KeyOnly);
 
     [MenuItem(Root + "존4 핵심 처치 (중간보스)", false, 62)]
-    static void KillZone4Key() => Kill(TutorialArea.Zone4, TutorialMonsterFilter.KeyOnly);
-
-    static void Kill(TutorialArea zone, TutorialMonsterFilter filter)
-    {
-        TutorialDirector d = TutorialDirector.Instance;
-        d.GetZoneMonstersServer(zone, filter, Buffer);
-        Debug.Log($"[TutorialDebug] {zone} {filter} {Buffer.Count}마리 깨워서 처치");
-        foreach (MonsterBase m in Buffer)
-        {
-            d.SetMonsterDormantServer(m, false);
-            m.BreakShield();
-            m.TakeDamage(new AttackInfo(LethalDamage, AttackType.Default));
-        }
-    }
+    static void KillZone4Key() => TutorialDebugActions.KillZoneMonsters(TutorialDirector.Instance, TutorialArea.Zone4, TutorialMonsterFilter.KeyOnly);
 }

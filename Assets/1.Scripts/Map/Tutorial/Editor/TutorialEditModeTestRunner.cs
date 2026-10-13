@@ -32,6 +32,7 @@ internal static class TutorialEditModeTestRunner
         "^TutorialZone2ModelTests$", // 존2(S8) — 기상 지연·E 안내·Q/E 넛지·목표 줄
         "^TutorialZone3RulesTests$", // 존3 흐름(S9) — 시작 조건·간파 집계·빗나감/이른 간파/힌트·목표·연습 반경
         "^TutorialZone4RulesTests$", // 존4·보스 진입(S10) — 설정 자막→G8·기상 지연·패널/다리/간파 리마인드·만료·패드·도착 팁·목표/강조
+        "^TutorialSkipPlanTests$", // 구간 스킵 Alt+1~0(할 일 34) — 단축키 매핑·뒤로 거부·목적 구간 → 게이트·체크·처치·자동 획득 계획
     };
 
     const string Tag = "[TutorialTests]";
