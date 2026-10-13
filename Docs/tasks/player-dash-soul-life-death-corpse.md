@@ -84,7 +84,7 @@ Alive
 
 ## 4. LifeCount
 
-v1은 `Temp_MultiGameRule`을 만든다.
+v1은 `MultiGameRule`을 만든다.
 
 - 서버가 Client별 LifeCount를 관리.
 - 기본값: 실제 부활 가능 횟수 3회.
@@ -120,7 +120,7 @@ v1은 `Temp_MultiGameRule`을 만든다.
 - Soul은 낭떠러지 위를 항상 이동할 수 있다.
 - 맵 전체의 SoulPlane은 사전 배치하며 Runtime 생성하지 않는다.
 - 중력은 유지하고 Visual만 부유 표현 가능.
-- 이동속도는 향후 `PlayerGameRuleData.soulSpeed`, v1은 `Temp_MultiGameRule` 또는 직렬화 기본값.
+- 이동속도는 향후 `PlayerGameRuleData.soulSpeed`, v1은 `MultiGameRule` 또는 직렬화 기본값.
 - 상태이상 MoveSpeed Modifier를 적용하지 않는 고정 Soul 속도.
 
 ## 7. 사망 원인별 위치
@@ -228,7 +228,7 @@ v1 연결 계약:
 
 - `Assets/1.Scripts/Player/Life/PlayerLifeState.cs`
 - `Assets/1.Scripts/Player/Life/PlayerLifeCycleController.cs`
-- `Assets/1.Scripts/Player/Life/Temp_MultiGameRule.cs`
+- `Assets/1.Scripts/Player/Life/MultiGameRule.cs`
 - `Assets/1.Scripts/Player/Soul/PlayerSoulController.cs`
 - `Assets/1.Scripts/Player/Corpse/PlayerCorpseController.cs`
 - Soul/Corpse Prefab 및 `.meta`
@@ -264,7 +264,7 @@ Dash/Fall 브랜치도 다음 파일을 만질 수 있다.
 ## 14. 구현 순서
 
 1. `PlayerLifeState`와 생명주기 Controller
-2. `Temp_MultiGameRule` 서버 LifeCount
+2. `MultiGameRule` 서버 LifeCount
 3. DeadPresentation/Soul/PermanentDead 전환
 4. Soul Visual·Layer·이동
 5. CombatUI 정책

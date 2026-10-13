@@ -56,9 +56,19 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
 
     public static ZoneBridgeGateManager Instance { get; private set; }
 
+    /// <summary>
+    /// [서버] 패널 하나가 새로 켜졌다(SlotID, 패널 인덱스, 켜진 수, 패널 수). 읽기 전용 알림 — 구독자가 없으면 기존 동작 그대로.
+    /// 소비처: 튜토리얼 존4 흐름(Docs/tech/tutorial-zone4.md).
+    /// </summary>
+    public static event System.Action<int, int, int, int> ServerPanelActivated;
+
+    /// <summary>[서버] 다리 개통 완료(진행도 1 도달, 슬롯마다 1번). 읽기 전용 알림 — 소비처: 튜토리얼 존4 흐름.</summary>
+    public static event System.Action<int> ServerBridgeOpened;
+
     // SlotID → 이 피어에 로컬로 생성된 존 게이트
     private readonly Dictionary<int, ZoneBridgeGate> _localGates = new Dictionary<int, ZoneBridgeGate>();
     private readonly HashSet<int> _navRebakeDone = new HashSet<int>();
+    private readonly HashSet<int> _bridgeOpenedNotified = new HashSet<int>();
     private bool _warnedNoKeyboard;
 
     // 게이트별로 마지막에 화면에 그린 활성 마스크 — "새로 켜진 패널만 연출"의 기준(PLAN-title-monitor T2).
@@ -399,6 +409,11 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
 
         gates[index] = state;
         Edit.Log($"[BridgeGate] Slot {slotID} 패널 {panelIndex} 활성 (client {p.Receive.SenderClientId}).", gate);
+
+        int activated = 0;
+        for (int i = 0; i < gate.PanelCount; i++)
+            if ((state.ActivatedMask & (1 << i)) != 0) activated++;
+        ServerPanelActivated?.Invoke(slotID, panelIndex, activated, gate.PanelCount);
     }
 
     // ── 상태 반영 ───────────────────────────────────────────────────────────
@@ -448,6 +463,9 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
 
             float progress = ProgressOf(state, gate);
             gate.ApplyOpenProgress(progress);
+
+            if (IsServer && progress >= 1f && _bridgeOpenedNotified.Add(state.SlotID))
+                ServerBridgeOpened?.Invoke(state.SlotID);
 
             // NavMesh는 다리가 제자리에 온 뒤 한 번만 다시 굽는다(서버 판정 기준).
             if (IsServer && progress >= 1f && rebakeNavMeshOnOpen && _navRebakeDone.Add(state.SlotID))

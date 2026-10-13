@@ -3,6 +3,7 @@ using System.Linq;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using VeyTrace.Rendering.Occlusion;
 
 // 튜토리얼 스테이지 저작 도구 (PLAN-tutorial-stage.md · 2026-09-29 팀장 승인).
 //
@@ -19,6 +20,7 @@ public static class TutorialStageAuthoring
     const string MapScenePath = "Assets/0.Scenes/MainFlow/4.MapScene.unity";
     const string Stage1PrefabPath = "Assets/2.Prefabs/Environment/Layouts/Stages/Stage1.prefab";
     const string ZonesDir = "Assets/2.Prefabs/Environment/Layouts/Zones/";
+    const string BarrierMaterialPath = "Assets/3.Materials/MA_AoeTelegraph_Red.mat";
 
     // 이름으로 찾는 코드(MinimapController · MapOverviewUI · WallOcclusionDriver)가 기대하는 이름.
     const string StageRootName = "Stage1";
@@ -39,15 +41,40 @@ public static class TutorialStageAuthoring
     struct SlotSpec
     {
         public string Zone; public Vector3 Pos; public ZoneSize Size; public bool Spawn, Boss;
+        public ZoneEntry[] Entries;   // null = Zone 하나를 슬롯 위치·회전 0(스테이지 회전만)으로
+    }
+
+    // 슬롯 Rotations 한 줄. Pos·Yaw 는 슬롯과 같이 **스테이지 회전 전** 값 — 빌드 때 StageYawSteps 를 더하고 위치를 돌린다.
+    struct ZoneEntry
+    {
+        public string Zone; public int Yaw; public Vector3 Pos;
     }
 
     static readonly SlotSpec[] Slots =
     {
         new SlotSpec { Zone = "ZoneS_typeStart",     Pos = new Vector3(-29.8257f, 0f, -120.7997f),  Size = ZoneSize.Small,  Spawn = true },
         new SlotSpec { Zone = "ZoneS_typeA",         Pos = new Vector3(-0.1775f, 0f, -120.7997f), Size = ZoneSize.Small },
-        new SlotSpec { Zone = "ZoneM_typeA",         Pos = new Vector3(-0.1765f, 0f, -160.6469f), Size = ZoneSize.Medium },
+        // 존3 = 스피너봇 존(튜토리얼 시나리오 §1.3). 회전 270°·위치는 4.MapScene Stage1 에서 손으로 맞춘 값.
+        // 🔴 M_typeA 줄은 쓰이지 않는다(TryGetYaw/TryGetPosition 은 FixedPrefab 줄만 본다). 그래도 지우지 않는 이유:
+        //    씬 Stage1 오버라이드가 Rotations 를 **인덱스**(data[0]=M_A, data[1]=M_C)로 덮고 있어, 줄 수·순서가 다르면
+        //    M_C 줄이 엉뚱한 회전·위치로 덮인다.
+        new SlotSpec { Zone = "ZoneM_typeC",         Pos = new Vector3(-0.1765f, 0f, -160.6469f), Size = ZoneSize.Medium,
+            Entries = new[]
+            {
+                new ZoneEntry { Zone = "ZoneM_typeA", Yaw = 0, Pos = new Vector3(-0.1765f, 0f, -145.7f) },
+                new ZoneEntry { Zone = "ZoneM_typeC", Yaw = 1, Pos = new Vector3(-0.1765f, 0f, -160.2509f) },
+            } },
         new SlotSpec { Zone = "ZoneL_typeB",         Pos = new Vector3(-10.1745f, 0f, -210.2951f), Size = ZoneSize.Large },
         new SlotSpec { Zone = "ZoneS_typeBossEnter", Pos = new Vector3(29.4707f, 0f, -220.0961f), Size = ZoneSize.Small,  Boss = true },
+    };
+
+    // 벽 투명화(WallTransparencyGroup) 구역 페이드 — 튜토리얼 벽 그룹 9개 전부 같은 값(4.MapScene Stage1 에서 맞춘 값).
+    // 원본 Level_wall_hallway_tutorial 은 아트 씬(all_mesh)도 쓰고 그룹마다 기본값이 달라 그대로 두고, 이 스테이지에서만 덮는다.
+    static readonly (string Field, float Value)[] WallFade =
+    {
+        ("fadeInDuration", 0.3f), ("fadeOutDuration", 0.3f),
+        ("fadeHeightInside", -2f), ("baseYOffsetInside", 2f),
+        ("fadeHeightOutside", -15f), ("baseYOffsetOutside", 15f),
     };
 
     static Vector2 FootprintOf(ZoneSize s) => s switch
@@ -174,13 +201,31 @@ public static class TutorialStageAuthoring
         GameObject walls = AssetDatabase.LoadAssetAtPath<GameObject>(TutorialWallsPath);
         if (walls == null) { Debug.LogError($"[TutorialStage] {TutorialWallsPath} 없음"); return; }
 
+        // 🔴 재실행 — 기존 프리팹의 벽 인스턴스 오버라이드(바닥 Cast Shadows 끔 b2582266 · 투명화 영역 손질 2ddf2838 등
+        //    이 도구가 만들지 않는 손 수정)를 이어받는다. 안 그러면 다시 만들 때마다 조용히 사라진다.
+        //    fileID 는 SaveAsPrefabAsset 이 **이름으로** 맞춰 이어 준다 — 슬롯 이름(Slot_{i}_{Zone})이 바뀌면 그 슬롯의
+        //    fileID 가 새로 생겨 씬 Stage1 의 오버라이드가 끊긴다.
+        GameObject oldStage = AssetDatabase.LoadAssetAtPath<GameObject>(StagePath);
+        Transform oldWalls = oldStage != null ? oldStage.transform.Find(CorridorName) : null;
+        PropertyModification[] wallOverrides = oldWalls != null && PrefabUtility.IsAnyPrefabInstanceRoot(oldWalls.gameObject)
+            ? PrefabUtility.GetPropertyModifications(oldWalls.gameObject) : null;
+
         var root = new GameObject("StageTutorial");
         try
         {
+            // 튜토리얼 판별 마커 — 진행 상태(TutorialDirector)·타이머·패드 등 튜토리얼 전용 규칙이 이것만 본다.
+            var marker = root.AddComponent<TutorialStageMarker>();
+            // 배리어(S3) 머티리얼 — 기존 반투명 머티리얼 재사용(새 아트 없음)
+            var markerSo = new SerializedObject(marker);
+            markerSo.FindProperty("barrierMaterial").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Material>(BarrierMaterialPath);
+            markerSo.ApplyModifiedPropertiesWithoutUndo();
+
             var wallsInst = (GameObject)PrefabUtility.InstantiatePrefab(walls, root.transform);
+            if (wallOverrides != null) PrefabUtility.SetPropertyModifications(wallsInst, wallOverrides);
             wallsInst.name = CorridorName;
             wallsInst.transform.localPosition = WallsPosition;
             wallsInst.transform.localRotation = StageRotation;
+            ApplyWallFade(wallsInst);
 
             var slotsRoot = new GameObject("Slots");
             slotsRoot.transform.SetParent(root.transform, false);
@@ -203,11 +248,19 @@ public static class TutorialStageAuthoring
                 slot.IsBossCandidate = s.Boss;
                 slot.IsQuestCandidate = false;     // T4 — 퀘스트 없음
                 slot.FixedPrefab = zone;
-                slot.Rotations = new List<ZoneSlot.RotationEntry>
+                slot.Rotations = new List<ZoneSlot.RotationEntry>();
+                foreach (ZoneEntry e in s.Entries ?? new[] { new ZoneEntry { Zone = s.Zone, Pos = s.Pos } })
                 {
-                    new ZoneSlot.RotationEntry { Prefab = zone, YawSteps = StageYawSteps % 4, HasPosition = true, Position = pos },
-                };
+                    GameObject entryZone = AssetDatabase.LoadAssetAtPath<GameObject>(ZonesDir + e.Zone + ".prefab");
+                    if (entryZone == null) { Debug.LogError($"[TutorialStage] 존 프리팹 없음: {e.Zone}"); return; }
+                    slot.Rotations.Add(new ZoneSlot.RotationEntry
+                    {
+                        Prefab = entryZone, YawSteps = (StageYawSteps + e.Yaw) % 4, HasPosition = true, Position = RotateAroundWalls(e.Pos),
+                    });
+                }
             }
+
+            TutorialZone1Authoring.AddTo(root);   // S7 존1 평타 허수아비 자리(런타임 스폰)
 
             PrefabUtility.SaveAsPrefabAsset(root, StagePath, out bool ok);
             Debug.Log($"[TutorialStage] {StagePath} 저장 {(ok ? "완료" : "실패")} — 회전 {StageYawSteps * 90}° · 슬롯 {Slots.Length}개(Start=스폰 후보 · BossEnter=보스 후보 · 퀘스트 없음)");
@@ -215,6 +268,16 @@ public static class TutorialStageAuthoring
         finally
         {
             Object.DestroyImmediate(root);
+        }
+    }
+
+    static void ApplyWallFade(GameObject wallsInst)
+    {
+        foreach (WallTransparencyGroup g in wallsInst.GetComponentsInChildren<WallTransparencyGroup>(true))
+        {
+            var so = new SerializedObject(g);
+            foreach (var (field, value) in WallFade) so.FindProperty(field).floatValue = value;
+            so.ApplyModifiedPropertiesWithoutUndo();
         }
     }
 

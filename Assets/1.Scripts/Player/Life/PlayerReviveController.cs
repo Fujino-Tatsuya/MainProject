@@ -13,12 +13,12 @@ public sealed class PlayerReviveController : NetworkBehaviour
 {
     [Header("Revive")]
     [SerializeField] private PlayerLifeCycleController lifeCycle;
-    [SerializeField] private Temp_MultiGameRule gameRule;
+    [SerializeField] private MultiGameRule gameRule;
     [Tooltip("실제 부활 조건으로 교체하기 전까지 사용하는 로컬 오너 디버그 입력입니다.")]
     [SerializeField] private Key debugReviveKey = Key.F10;
 
     /// <summary>
-    /// 서버에서 Alive 전환과 LifeCount 차감이 모두 끝난 뒤 발생한다.
+    /// 서버에서 Alive 전환과 공용 목숨 차감이 모두 끝난 뒤 발생한다. 인자 = 남은 공용 목숨.
     /// Dash 충전 1/MaxCharge 초기화와 부활 보호 Token/Blink는 통합 시 이 seam을 구독한다.
     /// </summary>
     public event Action<int> ServerReviveCompleted;
@@ -50,9 +50,18 @@ public sealed class PlayerReviveController : NetworkBehaviour
 
     /// <summary>
     /// 실제 부활 조건 소비자가 서버에서 호출할 승인 진입점.
-    /// 현재 상태가 Soul이고 LifeCount가 남아 있을 때만 성공한다.
+    /// 현재 상태가 Soul이고 파티 공용 목숨이 남아 있을 때만 성공한다(성공하면 공용 목숨 1개 차감).
     /// </summary>
     public bool TryCompleteReviveOnServer()
+    {
+        return TryCompleteReviveOnServer(consumeLife: true);
+    }
+
+    /// <summary>
+    /// <paramref name="consumeLife"/> = false 면 목숨 검사·차감 없이 부활시킨다
+    /// (튜토리얼 교육 단계 자동 부활 — <c>TutorialDeathRules</c>). true 는 위 진입점과 같다.
+    /// </summary>
+    public bool TryCompleteReviveOnServer(bool consumeLife)
     {
         if (!IsSpawned || !IsServer)
             return false;
@@ -62,13 +71,25 @@ public sealed class PlayerReviveController : NetworkBehaviour
         if (lifeCycle == null || lifeCycle.State != PlayerLifeState.Soul)
             return false;
 
+        if (!consumeLife)
+        {
+            if (!lifeCycle.TryCompleteRevive())
+                return false;
+
+            int lifeCount = 0;
+            if (gameRule != null)
+                gameRule.TryGetLifeCount(OwnerClientId, out lifeCount);
+            ServerReviveCompleted?.Invoke(lifeCount);
+            return true;
+        }
+
         if (gameRule == null ||
             !gameRule.TryRegisterClient(OwnerClientId) ||
             !gameRule.HasReviveAvailable(OwnerClientId))
         {
             Debug.LogWarning(
                 $"[SoulAlert] {OwnerClientId}번 Player의 부활을 거부했습니다. " +
-                "Temp_MultiGameRule이 없거나 LifeCount가 0입니다.",
+                "MultiGameRule이 없거나 공용 목숨이 0입니다.",
                 this);
             return false;
         }
@@ -107,7 +128,7 @@ public sealed class PlayerReviveController : NetworkBehaviour
     private void ResolveGameRuleReference()
     {
         if (gameRule == null)
-            gameRule = FindFirstObjectByType<Temp_MultiGameRule>();
+            gameRule = FindFirstObjectByType<MultiGameRule>();
     }
 
     private bool CanRequestDebugRevive()

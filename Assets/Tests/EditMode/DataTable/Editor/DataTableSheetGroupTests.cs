@@ -84,4 +84,33 @@ public sealed class DataTableSheetGroupTests
         Assert.That(issues.HasErrors, Is.True);
     }
 
+    [Test]
+    public void RenamedType_OldSectionTitle_StillApplies()
+    {
+        // 할 일 35: Temp_MultiGameRule → MultiGameRule. xlsx 구역 제목은 다음 Export 전까지 옛 이름이다 —
+        // # 메모 행이라 적용 키(시트 묶음, 대상 Id, 필드)에 들어가지 않아야 한다.
+        Assert.That(new AssetDatabaseLookup().FindTypes("Player", out _), Does.Contain(typeof(MultiGameRule)));
+
+        var go = new GameObject("GameRule");
+        created.Add(go);
+        var rule = go.AddComponent<MultiGameRule>();
+        var lookup = new TestLookup(("GameRule", (Object)rule)) { Group = "Player" };
+        var issues = new DataTableIssues();
+
+        List<DataTableEntry> entries = DataTableSchema.Parse("T.xlsx", new[]
+        {
+            new XlsxSheet("Player", new[]
+            {
+                new[] { "#■ Temp_MultiGameRule" },
+                new[] { DataTableSchema.VerticalFieldHeader, DataTableSchema.DescriptionHeader, "GameRule" },
+                new[] { "partyLifeCount", "#공용 목숨", "3" },
+            }),
+        }, issues);
+        List<DataTableWrite> writes = DataTableApplier.Bind(entries, lookup, issues);
+
+        Assert.That(issues.HasErrors, Is.False, string.Join("\n", issues.Items));
+        DataTableApplier.ApplyInMemory(writes);
+        Assert.That(rule.PartyLifeCapacity, Is.EqualTo(3));
+    }
+
 }

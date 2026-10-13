@@ -10,6 +10,7 @@ using UnityEngine.UI;
 /// 항상 표시 + defaultFillColor + 라벨 없음.
 /// 게이지: 배경 → 잔상(trailFill) → 실드(shieldFill) → 체력(hpFill) 순으로 겹친다.
 /// 체력 바 아래 얇은 특성 게이지 줄(traitRoot)은 부모의 IOverheadTraitGauge 가 값·색·눈금을 공급하고, 없으면 숨긴다.
+/// 체력 바 왼쪽 대시 아이콘(dashIconRoot)은 자기/부모의 IOverheadDashIndicator 가 표시·준비 상태를 공급하고, 없으면 숨긴다.
 /// 위치 = 이 오브젝트 위치 + 월드 높이 → 로컬 Camera.main 스크린 좌표 + 화면 오프셋. 거리와 무관한 고정 크기.
 /// 옮긴 비주얼은 이 컴포넌트가 꺼지면 숨기고, 파괴되면 같이 파괴한다.
 /// </summary>
@@ -31,6 +32,16 @@ public class UnitOverheadHealthBar : MonoBehaviour
     [Tooltip("눈금(예: 암살자 최소 변신량). 가로 앵커를 눈금 위치로 옮긴다. 비워도 동작한다.")]
     [SerializeField] private RectTransform traitMarker;
 
+    [Header("대시 아이콘 (체력 바 왼쪽, 로컬 플레이어만)")]
+    [Tooltip("대시 아이콘 전체. 크기·위치는 이 RectTransform 으로 조절한다. 자기/부모에 IOverheadDashIndicator 가 없으면 숨긴다. 비워도 동작한다.")]
+    [SerializeField] private GameObject dashIconRoot;
+    [Tooltip("준비 상태 색을 곱할 그래픽(슬롯 테두리·아이콘).")]
+    [SerializeField] private Graphic[] dashIconGraphics;
+    [Tooltip("대시 충전이 남아 있을 때 곱하는 색.")]
+    [SerializeField] private Color dashReadyColor = Color.white;
+    [Tooltip("대시 재충전 중에 곱하는 색. 알파로 흐리게 할 수도 있다.")]
+    [SerializeField] private Color dashNotReadyColor = new Color(0.35f, 0.35f, 0.35f, 1f);
+
     [Header("화면 배치")]
     [Tooltip("이 오브젝트 위치에서 월드 위쪽으로 올릴 높이(m). 바를 띄울 기준점.")]
     [SerializeField] private float worldHeightOffset = 1.84f;
@@ -49,6 +60,7 @@ public class UnitOverheadHealthBar : MonoBehaviour
     private Unit unit;
     private IOverheadHealthBarRule rule;
     private IOverheadTraitGauge traitGauge;
+    private IOverheadDashIndicator dashIndicator;
     private readonly OverheadHealthTrail trail = new OverheadHealthTrail();
 
     private RectTransform barRect;
@@ -62,6 +74,9 @@ public class UnitOverheadHealthBar : MonoBehaviour
         traitGauge = GetComponentInParent<IOverheadTraitGauge>();
         if (traitRoot != null && traitGauge == null)
             traitRoot.SetActive(false);
+        dashIndicator = GetComponentInParent<IOverheadDashIndicator>();
+        if (dashIconRoot != null && dashIndicator == null)
+            dashIconRoot.SetActive(false);
 
         MoveBarToScreenCanvas();
     }
@@ -151,6 +166,7 @@ public class UnitOverheadHealthBar : MonoBehaviour
         }
 
         UpdateTraitGauge();
+        UpdateDashIcon();
     }
 
     // 위치는 Canvas 렌더 직전에 반영한다 — 카메라가 LateUpdate 에서 움직인 뒤라 바가 유닛에서 밀리지 않는다.
@@ -203,6 +219,26 @@ public class UnitOverheadHealthBar : MonoBehaviour
                 traitMarker.anchorMin = new Vector2(x, traitMarker.anchorMin.y);
                 traitMarker.anchorMax = new Vector2(x, traitMarker.anchorMax.y);
             }
+        }
+    }
+
+    // 준비/미준비 두 상태만 — 채움·숫자 없음.
+    private void UpdateDashIcon()
+    {
+        if (dashIconRoot == null || dashIndicator == null)
+            return;
+
+        bool show = dashIndicator.ShowDashIcon;
+        if (dashIconRoot.activeSelf != show)
+            dashIconRoot.SetActive(show);
+        if (!show || dashIconGraphics == null)
+            return;
+
+        Color tint = OverheadDashIconRules.Tint(dashIndicator.DashReady, dashReadyColor, dashNotReadyColor);
+        for (int i = 0; i < dashIconGraphics.Length; i++)
+        {
+            if (dashIconGraphics[i] != null)
+                dashIconGraphics[i].color = tint;
         }
     }
 }

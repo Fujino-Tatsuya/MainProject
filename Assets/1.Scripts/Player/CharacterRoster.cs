@@ -12,11 +12,14 @@ public class CharacterRoster : ScriptableObject
         [SerializeField] private GameObject playerPrefab;
         [SerializeField] private Sprite portrait;
         [SerializeField] private bool available = true;
+        [Tooltip("튜토리얼 안내 문구 변형(_PALADIN/_GUNNER/_ASSASSIN)에 쓸 캐릭터. None = 기본 문구.")]
+        [SerializeField] private TutorialCharacter tutorialCharacter;
 
         public string DisplayName => displayName;
         public GameObject PlayerPrefab => playerPrefab;
         public Sprite Portrait => portrait;
         public bool Available => available;
+        public TutorialCharacter TutorialCharacter => tutorialCharacter;
     }
 
     [SerializeField] private Entry[] entries = new Entry[0];

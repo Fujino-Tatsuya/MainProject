@@ -4,7 +4,8 @@ using UnityEngine;
 /// 플레이어 공용 이동/게임 규칙(ScriptableObject). 대시·일반 이동·접지 판정이 함께 참조하는 단일 소스.
 /// (PLAN §5 "등판각은 일반 이동 규칙 공유", "낮은 턱·지면 Snap·등판각은 Player GameRule 직렬화 값")
 ///
-/// Soul soulSpeed, 기본 LifeCount 등은 각 기능이 병합·안정화된 뒤 이 규칙으로 이관한다.
+/// Soul soulSpeed 등은 각 기능이 병합·안정화된 뒤 이 규칙으로 이관한다.
+/// 파티 공용 목숨 수(할 일 30)는 씬 단위 규칙이라 GameRule.prefab 의 <see cref="MultiGameRule"/>(같은 Player 시트, partyLifeCount)에 둔다.
 /// </summary>
 [CreateAssetMenu(fileName = "PlayerGameRuleData", menuName = "BeaverLobby/Player/Game Rule Data", order = 0)]
 [DataTableSheet("Player", Order = 6)]
@@ -44,7 +45,21 @@ public sealed class PlayerGameRuleData : ScriptableObject
     [Tooltip("넉백 속도의 선형 감속(m/s²). 6은 기존 PhysX 마찰 0.6 × 중력 9.81과 비슷한 감속이다.")]
     [DataTableIgnore] [SerializeField, Min(0f)] private float knockbackDeceleration = 6f;
 
+    [Header("간파")]
+    [Tooltip("간파(우클릭) 성공 시 그 간파 스킬의 남은 쿨에서 '전체 쿨타임 × 이 비율' 만큼 뺀다(0 미만은 0). " +
+             "성공 = 열린 카운터 창(23호·중간보스·허수아비)을 맞혀 소비한 경우만. 한 번의 시전에서 여러 대상이 성공해도 1회.")]
+    [SerializeField, Range(0f, 1f)] private float interruptSuccessCooldownReduction = InterruptSuccessCooldownModel.DefaultReductionRatio;
+
+    [Header("체력 재생")]
+    [Tooltip("마지막 피격 후 이 시간(초)이 지나야 체력 재생이 시작된다. 피격 = 체력이나 보호막이 실제로 깎인 피해(추락 포함). 다시 맞으면 처음부터 센다.")]
+    [SerializeField, Min(0f)] private float regenDelaySeconds = PlayerHealthRegenModel.DefaultDelaySeconds;
+    [Tooltip("재생 중 초당 회복량 = 최종 최대 체력 × 이 비율. 최대 체력에서 멈춘다. 0 이면 재생 없음.")]
+    [SerializeField, Range(0f, 1f)] private float regenPercentPerSecond = PlayerHealthRegenModel.DefaultPercentPerSecond;
+
     public float FallDamageRatio => fallDamageRatio;
+    public float HealthRegenDelaySeconds => Mathf.Max(0f, regenDelaySeconds);
+    public float HealthRegenPercentPerSecond => Mathf.Clamp01(regenPercentPerSecond);
+    public float InterruptSuccessCooldownReduction => Mathf.Clamp01(interruptSuccessCooldownReduction);
     public float MaxWalkableSlopeAngle => maxWalkableSlopeAngle;
     public float StepOffset => Mathf.Max(0f, stepOffset);
     public LayerMask ObstacleMask => obstacleMask;

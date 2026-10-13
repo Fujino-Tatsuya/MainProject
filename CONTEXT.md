@@ -12,7 +12,10 @@ Update this file when a term becomes important enough that future agents or team
 - 아트 전달 = [Docs/tech/telegraph-style.md](Docs/tech/telegraph-style.md). 예고 색·마스크 정본 = `2.Prefabs/Monster/Data/TelegraphStyle_Default.asset`(몬스터 데이터 12개 연결).
 - Mortar = 수직 낙하 포격(`rangedStyle` SkyStrike). 🔴 `skyStrike*` 칸은 xlsx 미반영([DataTableIgnore]) — 테이블로 옮기려면 병합 Export.
 - 10-13 후속 ✅(커밋): 기존 테스트 실패 2건 해결 — "최원거리 타깃은 Jump 전용" 옛 규칙(테스트·런타임 계약·주석)이 09-17 G3(돌진 = 최원거리) 뒤 미갱신 → "최원거리 = 거리창 끈 행만(Jump·Dash)"으로 정정, 전투 EditMode 125/0. 설정 비네트: 방향 반전 수정(`VignetteOpenScale`) · 실드 비네트 연결 · 최소에서도 모서리 유지 · 표시 0~100(50 = 기본). "후처리 (블룸 등)" → "블룸·색수차". 팀장 확인 OK.
-- ▶ **다음 세션 = `feature/Boss23` ↔ `development` 병합**(팀장 10-13). ⏸ 보류: "비네트" 용어(플레이어가 모를 수 있음 — 후보 "화면 가장자리 어둡기/부드러움") — 팀장 추후 수정.
+- ⏸ 보류: "비네트" 용어(플레이어가 모를 수 있음 — 후보 "화면 가장자리 어둡기/부드러움") — 팀장 추후 수정.
+- ✅ **10-13 `origin/development`(`b21f6e52`, 71커밋 — 튜토리얼·공용 목숨·체력 재생·간파 쿨·대시 아이콘·로비) 병합**. SVN **r431**(핀 431, check-environment 전부 통과). 충돌 2: `PlayerEditModeTestRunner.cs`(양쪽 테스트 다 살림) · `4.MapScene.unity`(옛 옵션 패널 77블록은 설정창 쪽대로 삭제 유지, dev 튜토리얼 신규 10블록 — `TutorialGuideUI`·`TutorialTraitUI`·`TutorialDirector` — 만 살림. dev 가 옛 블록을 수정한 것 0 · 끊긴 fileID 0 · SceneRoots 39). Codex 교차검증 동의. 컴파일 error CS 0 · EditMode 1284 중 1264 통과 / 실패 0 / 건너뜀 20(EuniTween Ignore).
+- ▶ **후속(미착수, 튜토리얼 담당과 공유 필요)**: 튜토리얼 안내 문구 `TutorialGuideTexts.asset`(46·99·120·210·237행)이 **Space·Q·E·F·R 고정 표기** — 설정창 키 리바인드 후 안내와 실제 키가 어긋난다(입력은 `PlayerInputReader`·`ZoneBridgeGateManager` 에서 리바인드를 따름). 수정 = 문구에 키 자리표시 + `KeyBindingConfig.DisplayName()` 연동. (Codex 머지 검토에서 발견)
+- ⏳ 병합 후 Play·MPPM(튜토리얼 흐름 + 새 설정창 ESC 겹침·입력 차단) 미확인.
 
 ## ▶▶ 작업 세션 (2026-10-09 · 은희(Claude) · **거너 레이저건 정렬 + 기본 공격 손 이탈**, 브랜치 `fix/GunnerGunAlign`(development `778bbb87` 기준)) — 계획 [PLAN-gunner-gun-align.md](PLAN-gunner-gun-align.md) ✅ 승인 · ✅ S1~S5 구현(미커밋) · ✅ 실제 Animator 레이어 합성 실측(총구 yaw 0°, 손–손잡이 ≤ 5cm) · 보고 영상 `Recordings/gunner_gun_align_report.mp4`(gitignore) · ⏳ Play·MPPM · ⏸ PLAN §6 판정 시작점
 - 원인(Unity 실측): 총은 이미 `rig/artillery` 본에 붙어 있는데 손으로 맞춘 오프셋(09-30)이 **총을 앞뒤로 뒤집어** 총구 yaw ≈174°. 애니는 `LaserGun_Mount` = `artillery` 프레임(오프셋 0)으로 저작됨 — 손 = `Grip_R`/`Grip_L`(Q 는 `Brace_R`) 좌표와 소수점 3자리 일치. + 기본 공격 상체 클립 `attack01` 은 `c_pos` 각도(180°)가 하체 `Q_charge_loop`(146.3°)와 달라, 마스크가 `c_pos` 를 빼므로 팔만 34° 돌아 손이 11~19cm 이탈.

@@ -7,12 +7,15 @@ using UnityEngine;
 //
 // 존 안의 생존 플레이어 유무를 추적해 BossTeleportManager에 알린다:
 //  - 1명 이상 진입 → 카운트다운 시작 / 전원 이탈(또는 전멸) → 카운트다운 취소 (팀장 확정, 로아식)
+//  - 튜토리얼(S5): G10 전에는 패드가 잠겨 있다 — 서 있어도 비어 있는 것으로 알린다(TutorialBossPath.IsBossPadEnabled).
+//    잠금이 풀리는 순간 이미 서 있던 사람으로 카운트다운을 시작한다. 만료 강제 이동은 이 경로를 타지 않는다.
 [RequireComponent(typeof(BoxCollider))]
 public class BossEnterTrigger : MonoBehaviour
 {
     private readonly HashSet<Player> _inside = new HashSet<Player>();
     private BoxCollider _box;
     private float _nextPruneTime;
+    private bool _padEnabled = true;
 
     private void Awake()
     {
@@ -50,6 +53,11 @@ public class BossEnterTrigger : MonoBehaviour
     {
         NetworkManager nm = NetworkManager.Singleton;
         if (nm == null || !nm.IsServer || _inside.Count == 0) return;
+
+        // 튜토리얼 패드 잠금이 바뀌면(G10 열림) 다시 알린다.
+        if (TutorialBossPath.IsBossPadEnabled != _padEnabled)
+            Push();
+
         if (Time.time < _nextPruneTime) return;
         _nextPruneTime = Time.time + 0.5f;
 
@@ -64,6 +72,7 @@ public class BossEnterTrigger : MonoBehaviour
             Debug.LogError("[BossEnterTrigger] BossTeleportManager가 씬에 없습니다.", this);
             return;
         }
-        BossTeleportManager.Instance.SetOccupied(_inside.Count > 0);
+        _padEnabled = TutorialBossPath.IsBossPadEnabled;
+        BossTeleportManager.Instance.SetOccupied(TutorialBossPathRules.PadOccupied(_inside.Count > 0, _padEnabled));
     }
 }

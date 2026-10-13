@@ -40,6 +40,16 @@ public class PlayerDashController : NetworkBehaviour
     private bool _hasPending;
     private bool _serverSnapshotWarned;
 
+    /// <summary>
+    /// [서버] 대시 요청을 승인했고 실제로 진행된다(거부·승인 후 중단·남은시간 0 은 제외). 튜토리얼 판정 훅.
+    /// 대시 캔슬(행동을 끊는 대시)도 같은 요청 경로라 구분하지 않는다. 오프라인(비스폰) 예측 대시는 서버 경로가 없어 나지 않는다.
+    /// </summary>
+    public static event System.Action<Player> ServerDashApproved;
+
+    // 도메인 리로드를 끈 Play 진입에서도 이전 세션 구독자가 남지 않게 비운다.
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStaticEvents() => ServerDashApproved = null;
+
     public bool DashEnabled => ready && config.DashEnabled;
 
     // HUD(W8)·디버그용 예측 충전 상태.
@@ -362,6 +372,13 @@ public class PlayerDashController : NetworkBehaviour
             response.RemainingServerDuration > 0.0)
         {
             invulnerability.AddServerToken(InvulnerabilityCause.Dash, response.RemainingServerDuration);
+        }
+
+        if (response.IsApproved &&
+            !response.WasInterruptedByServerState &&
+            response.RemainingServerDuration > 0.0)
+        {
+            ServerDashApproved?.Invoke(player);
         }
 
         RespondDashClientRpc(
