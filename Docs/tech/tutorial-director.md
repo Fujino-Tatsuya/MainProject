@@ -341,3 +341,8 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
     배리어 앞면 0.75m 미만으로는 붙이지 않는다(개인 뒤 배리어 콜라이더 끼임 방지). 바닥·점유 검사를 통과한 첫 점. 그래도 없으면 기존대로 그 자리.
   - 추락 복구: 거름(`TutorialBackBarrierRules.IsReturnPointAllowed(…, pads)` — `TutorialBarriers.IsReturnPointAllowed` 가 넘김)이 패드 범위 + 1m 를 **누구에게나** 거부하고,
     스폰 폴백 대체(`ReturnPointFallback`)는 위 부활 탐색을 그대로 쓴다. 테스트: `TutorialDeathRulesTests` 패드 5건 · `TutorialBackBarrierRulesTests` 패드 1건.
+- **전멸 리스폰 · 보스 재도전 되감기(할 일 30 (2), 2026-10-13)** — 상세 [party-lives-respawn.md §3](party-lives-respawn.md#3-전멸--복도4-리스폰-2단계--구현됨).
+  - 공용 목숨 0 전멸 + G10 열림이면 결과 화면 대신 `PartyWipeRespawner` 가 전원을 **복도4** 에 리스폰(`TutorialDeathRules.TryFindWipeRespawnPoints` — 복도4 격자·바닥·점유·G9 앞면 여유·패드 + 1m 밖·2m 간격).
+  - 되감기 `TutorialDirector.RewindForBossRetryServer`(순수 `TutorialFlowModel.RewindForBossRetry`) — **단계·게이트 '앞으로만' 규칙의 유일한 예외**: Finished → BossEnter, G11 닫기, 도착 래치 해제. G1~G10·장부·카운터 그대로.
+  - 개인 뒤 배리어 `ResetBackBarrierMaskServer(clientId, Corridor4)` = `TutorialBackBarrierRules.MaskWithFrontmost(Corridor4)`(G1~G9, G10 제외) — **되감기보다 먼저** 쓴다(되감기로 진행 중이 되는 순간 G10 뒤 배리어가 앞길을 막지 않게).
+  - 사망 규칙 `TutorialDeathRules.ResumeForBossRetry` — `_finished` 해제·대기 기록 비움. **보스방 재도착 전 사망 = 차감 없음**(복도4 자동 부활), **재도착(G11 다시 열림) 뒤 사망 = 다시 차감**(사양 그대로). 테스트: `TutorialBossRetryTests`.

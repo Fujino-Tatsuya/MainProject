@@ -185,6 +185,34 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
         return true;
     }
 
+    /// <summary>
+    /// [서버, 전멸 리스폰 전용 — 할 일 30 (2)] 어떤 상태(PermanentDead·Soul·DeadPresentation·Alive)에서도 체력 가득 + Alive.
+    /// 일반 전이표(<see cref="IsValidTransition"/>)의 유일한 예외 — PermanentDead 를 나가는 경로는 이것뿐이다. 호출자 = <c>PartyWipeRespawner</c> 하나.
+    /// 보류된 사망·사망 연출 예약을 지운다(리스폰 직후 예약이 PermanentDead 로 덮는 경합 방지). 연출 잠금 중이면 거부(호출자가 먼저 푼다).
+    /// Alive 였으면 상태 전이 없이 힐만 한다.
+    /// </summary>
+    public bool TryRespawnAfterWipeOnServer()
+    {
+        if (!CanWriteLifeState)
+            return false;
+
+        ResolveLocalReferences();
+        if (deathSource == null)
+        {
+            Debug.LogError("[SoulAlert] 리스폰할 Unit deathSource가 없어 Alive 전환을 중단합니다.", this);
+            return false;
+        }
+
+        deathResolutionPending = false;
+        deferredDeathWhileLocked = false;
+
+        // TryCompleteRevive 와 같은 순서 — HP·사망 래치를 먼저 복구한 뒤 Alive 를 복제한다.
+        deathSource.Revive();
+        if (lifeState.Value != PlayerLifeState.Alive)
+            lifeState.Value = PlayerLifeState.Alive;
+        return true;
+    }
+
     /// <summary>DeadPresentation 종료 후 최종 사망을 확정한다. 서버에서만 성공한다.</summary>
     public bool TryEnterPermanentDead()
     {

@@ -267,6 +267,33 @@ public sealed class TutorialFlowModel
     }
 
     /// <summary>
+    /// [전멸 리스폰 — 할 일 30 (2)] 보스 재도전 되감기. 단계·게이트가 '앞으로만' 이라는 규칙의 유일한 예외.
+    /// G10(보스 진입·패드)이 열려 있을 때만 — 단계 Finished/BossEnter → <see cref="TutorialStep.BossEnter"/>, G11(보스방 도착) 닫기(열림·교착·보류 비트 모두).
+    /// G1~G10·카운터·개인 체크는 그대로. 그래서 보스방에 다시 도착하면 G11 이 다시 열리고 그 뒤 사망은 다시 목숨 차감 대상이다(S11).
+    /// G10 이 닫혀 있으면 아무것도 안 하고 false. 바뀐 게 없으면(이미 BossEnter·G11 닫힘) false.
+    /// </summary>
+    public bool RewindForBossRetry()
+    {
+        if (!IsGateOpen(TutorialGate.G10_BossEnterAndPad)) return false;
+
+        int g11 = 1 << (int)TutorialGate.G11_BossRoom;
+        bool changed = (OpenedGateMask & g11) != 0 || (RequestedGateMask & g11) != 0;
+        OpenedGateMask &= ~g11;
+        TimeoutGateMask &= ~g11;
+        RequestedGateMask &= ~g11;
+        _firstCompleteAt[(int)TutorialGate.G11_BossRoom] = -1d;
+
+        if (Step != TutorialStep.BossEnter)
+        {
+            TutorialStep old = Step;
+            Step = TutorialStep.BossEnter;
+            StepChanged?.Invoke(old, Step);
+            changed = true;
+        }
+        return changed;
+    }
+
+    /// <summary>
     /// 서버가 직접 여는 게이트(G3·G6·G8·G9·G11 — 존 클리어·자막 종료·보스방 도착 등). 개인·카운터 게이트도 강제로 열 수 있다
     /// (타이머 만료 자동 획득 같은 예외 경로). 순서가 안 맞으면(앞 게이트 닫힘) false.
     /// </summary>

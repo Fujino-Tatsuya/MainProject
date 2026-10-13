@@ -9,8 +9,8 @@ using UnityEngine;
 /// 다른 사람의 부활로 풀이 비어 Soul 에 갇힐 수 있다). 공용 목숨이 남은 Soul·차감 없는 부활 대기 Soul(튜토리얼 G11 전)은 전멸이 아니다.
 /// Temp_MultiGameRule 이 없으면 예전 규칙(전원 PermanentDead).
 ///
-/// 전멸 상태가 유예시간 동안 유지되면 <see cref="MapSceneManager.GoToResult"/>를
-/// 한 번 호출한다. 클라 브로드캐스트와 씬 전환은 MapSceneManager가 이미 소유하므로 여기서는
+/// 전멸 상태가 유예시간 동안 유지되면 먼저 <see cref="PartyWipeRespawner.TryRespawnServer"/>(할 일 30 (2) — 보스 재도전 리스폰)를 부르고,
+/// 리스폰 대상이 아니면 <see cref="MapSceneManager.GoToResult"/>를 한 번 호출한다. 보스 클리어·나가기는 GoToResult 를 직접 부르므로 여기를 거치지 않는다. 클라 브로드캐스트와 씬 전환은 MapSceneManager가 이미 소유하므로 여기서는
 /// 판정만 한다.
 /// </summary>
 public sealed class PartyWipeWatcher : MonoBehaviour
@@ -64,6 +64,16 @@ public sealed class PartyWipeWatcher : MonoBehaviour
             return;
 
         _fired = true;
+
+        // 할 일 30 (2) — 리스폰할 수 있는 판이면 결과 화면 대신 복도4(절차 맵 = 보스 진입 패드 밖)로 전원 리스폰.
+        // 성공하면 래치를 풀어 다음 전멸도 다시 판정한다. 실패(대상 아님·지점 없음)면 아무것도 안 바뀌었으니 기존대로 결과 화면.
+        if (PartyWipeRespawner.TryRespawnServer())
+        {
+            _fired = false;
+            _wipeElapsed = 0f;
+            return;
+        }
+
         Debug.Log("[SceneFlow] PartyWipeWatcher — 전멸 확인(전원 PermanentDead 또는 공용 목숨 0 의 Soul), Result로 전환한다.");
 
         // 결과 화면이 읽을 값을 씬 전환 전에 확정한다(전멸이므로 클리어 아님).
