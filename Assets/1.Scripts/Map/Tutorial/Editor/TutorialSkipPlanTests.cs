@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using NUnit.Framework;
 
 /// <summary>
-/// 구간 스킵 계획(할 일 34) — 단축키 매핑 · 뒤로 가기 거부 · 목적 구간 → 열 게이트·개인 체크·존 처치·자동 획득 목록.
+/// 구간 스킵 계획(할 일 34) — 단축키 매핑 · 뒤로 가기 거부(처음부터 예외) · 재시작 재진입 거부 · 목적 구간 → 열 게이트·개인 체크·존 처치·자동 획득 목록.
 /// 원본: Docs/tech/tutorial-director.md §10.5.
 /// </summary>
 public sealed class TutorialSkipPlanTests
@@ -24,11 +24,11 @@ public sealed class TutorialSkipPlanTests
     static List<TutorialGate> Gates(List<TutorialSkipAction> plan) => plan.ConvertAll(a => a.Gate);
 
     [Test]
-    public void 단축키_숫자는_구간_순서_0은_존1()
+    public void 단축키_숫자는_구간_순서_0은_처음부터()
     {
         var expected = new[]
         {
-            TutorialSkipTarget.Zone1, TutorialSkipTarget.Corridor1, TutorialSkipTarget.Zone2, TutorialSkipTarget.Corridor2,
+            TutorialSkipTarget.Restart, TutorialSkipTarget.Corridor1, TutorialSkipTarget.Zone2, TutorialSkipTarget.Corridor2,
             TutorialSkipTarget.Zone3, TutorialSkipTarget.Corridor3, TutorialSkipTarget.Zone4, TutorialSkipTarget.Corridor4,
             TutorialSkipTarget.BossEnter, TutorialSkipTarget.BossRoom,
         };
@@ -40,6 +40,8 @@ public sealed class TutorialSkipPlanTests
         }
         Assert.IsFalse(TutorialSkipPlan.TryFromDigit(10, out _));
         Assert.IsFalse(TutorialSkipPlan.TryFromDigit(-1, out _));
+        Assert.AreEqual(-1, TutorialSkipPlan.DigitOf(TutorialSkipTarget.Zone1), "존1 은 단축키가 없다(지금 구간 기준으로만)");
+        Assert.AreEqual("처음부터", TutorialSkipPlan.NameOf(TutorialSkipTarget.Restart));
     }
 
     [Test]
@@ -63,12 +65,43 @@ public sealed class TutorialSkipPlanTests
     [Test]
     public void 뒤로_가기는_거부_같은_구간은_허용()
     {
-        Assert.AreEqual(TutorialSkipVerdict.Ok, TutorialSkipPlan.Check(TutorialStep.Zone1, TutorialSkipTarget.Zone1), "Alt+0 은 존1 에서만 의미");
+        Assert.AreEqual(TutorialSkipVerdict.Ok, TutorialSkipPlan.Check(TutorialStep.Zone1, TutorialSkipTarget.Zone1));
         Assert.AreEqual(TutorialSkipVerdict.Backward, TutorialSkipPlan.Check(TutorialStep.Corridor1, TutorialSkipTarget.Zone1));
         Assert.AreEqual(TutorialSkipVerdict.Backward, TutorialSkipPlan.Check(TutorialStep.Zone3Fight, TutorialSkipTarget.Corridor2));
         Assert.AreEqual(TutorialSkipVerdict.Ok, TutorialSkipPlan.Check(TutorialStep.Zone3Fight, TutorialSkipTarget.Zone3));
         Assert.AreEqual(TutorialSkipVerdict.Ok, TutorialSkipPlan.Check(TutorialStep.Zone2, TutorialSkipTarget.BossRoom));
         Assert.AreEqual(TutorialSkipVerdict.Finished, TutorialSkipPlan.Check(TutorialStep.Finished, TutorialSkipTarget.BossRoom));
+    }
+
+    [Test]
+    public void 처음부터는_뒤로_가기_예외_어느_구간에서든_허용()
+    {
+        TutorialStep[] steps =
+        {
+            TutorialStep.None, TutorialStep.Zone1, TutorialStep.Corridor1, TutorialStep.Zone3Fight,
+            TutorialStep.Zone4Combat, TutorialStep.BossEnter, TutorialStep.Finished,
+        };
+        foreach (TutorialStep step in steps)
+            Assert.AreEqual(TutorialSkipVerdict.Ok, TutorialSkipPlan.Check(step, TutorialSkipTarget.Restart), $"단계 {step}");
+    }
+
+    [Test]
+    public void 재시작_진행_중엔_재시작도_스킵도_거부()
+    {
+        Assert.AreEqual(TutorialSkipVerdict.RestartInProgress, TutorialSkipPlan.Check(TutorialStep.Zone2, TutorialSkipTarget.Restart, restartInProgress: true));
+        Assert.AreEqual(TutorialSkipVerdict.RestartInProgress, TutorialSkipPlan.Check(TutorialStep.Zone2, TutorialSkipTarget.BossRoom, restartInProgress: true));
+        Assert.AreEqual(TutorialSkipVerdict.RestartInProgress, TutorialSkipPlan.Check(TutorialStep.Finished, TutorialSkipTarget.Restart, restartInProgress: true),
+                        "재진입 거부가 Finished 판정보다 먼저");
+    }
+
+    [Test]
+    public void 처음부터는_계획이_없다_재로드가_대신한다()
+    {
+        Assert.AreEqual(0, Plan(TutorialSkipTarget.Restart).Count);
+        Assert.AreEqual(0, Plan(TutorialSkipTarget.Restart, Mask(TutorialGate.G1_Corridor1Entry, TutorialGate.G2_Zone2Entry)).Count);
+        Assert.IsFalse(TutorialSkipPlan.TryGetRequiredGate(TutorialSkipTarget.Restart, out _));
+        Assert.AreEqual(TutorialArea.Zone1, TutorialSkipPlan.AreaOf(TutorialSkipTarget.Restart));
+        Assert.AreEqual(TutorialStep.Zone1, TutorialSkipPlan.StepOf(TutorialSkipTarget.Restart));
     }
 
     [Test]

@@ -1,9 +1,11 @@
 // ----------------------------------------------------------------------------
 //  TutorialSkipController.cs — 튜토리얼 구간 스킵 Alt+1~0 (할 일 34, QA·테스트용)
 //
-//  Alt+1 복도1 · Alt+2 존2 · Alt+3 복도2 · Alt+4 존3 · Alt+5 복도3 · Alt+6 존4 · Alt+7 복도4 · Alt+8 보스 진입 · Alt+9 보스방 · Alt+0 존1.
+//  Alt+1 복도1 · Alt+2 존2 · Alt+3 복도2 · Alt+4 존3 · Alt+5 복도3 · Alt+6 존4 · Alt+7 복도4 · Alt+8 보스 진입 · Alt+9 보스방 · Alt+0 처음부터.
 //  목적 구간 앞의 모든 단계를 정식 규칙대로 끝낸 것처럼 만든 뒤(게이트 순서·개인 체크·특성 자동 획득·존 장부 클리어·G5·G8)
 //  파티 전원을 목적 구간 입구 안쪽 안전 지점으로 옮긴다. 계획은 순수 TutorialSkipPlan, 원본 Docs/tech/tutorial-director.md §10.5.
+//  Alt+0 = 판 재시작 — 맵 씬을 로딩 씬을 거쳐 다시 불러온다(NetworkLoadingFlowController.TryRestartTargetScene).
+//  이 컴포넌트는 디렉터와 함께 맵 씬에 있어 재로드로 사라진다 — 재시작 자체는 NetworkManager 쪽 흐름이 끝까지 진행한다.
 //
 //  🔴 호스트만 — 요청은 TutorialDirector.RequestSkip → ServerRpc 가 보낸 사람이 호스트인지 검증한다.
 //  🔴 에디터·Development Build 에만 있다(DevBossEntranceWarp 와 같은 부류). 릴리스 빌드엔 클래스가 없어 입력이 무시된다.
@@ -131,14 +133,18 @@ public sealed class TutorialSkipController : MonoBehaviour
     {
         if (_nm == null || !_nm.IsServer) return;
         string name = TutorialSkipPlan.NameOf(target);
-        if (_running)
+        bool restart = TutorialSkipPlan.IsRestart(target);
+        if (_running && !restart)
         {
             Warn($"→ {name} 거부 — 이전 스킵이 아직 진행 중이다.");
             return;
         }
 
-        switch (TutorialSkipPlan.Check(_director.Step, target))
+        switch (TutorialSkipPlan.Check(_director.Step, target, IsRestartInProgress))
         {
+            case TutorialSkipVerdict.RestartInProgress:
+                Warn($"→ {name} 거부 — 판 재시작(맵 재로드)이 진행 중이다.");
+                return;
             case TutorialSkipVerdict.Backward:
                 Warn($"→ {name} 거부 — 지금 구간({TutorialSkipPlan.NameOf(TutorialSkipPlan.CurrentOf(_director.Step))})보다 뒤로는 못 간다.");
                 return;
@@ -147,7 +153,42 @@ public sealed class TutorialSkipController : MonoBehaviour
                 return;
         }
 
-        StartCoroutine(Run(target));
+        if (restart) RestartServer();
+        else StartCoroutine(Run(target));
+    }
+
+    NetworkLoadingFlowController LoadingFlow => _nm != null ? _nm.GetComponent<NetworkLoadingFlowController>() : null;
+
+    // 재시작 요청부터 새 맵 로드가 끝날 때까지 — 로딩 흐름 원본을 읽는다(이 컴포넌트는 그 사이 맵 씬과 함께 사라진다).
+    bool IsRestartInProgress
+    {
+        get
+        {
+            NetworkLoadingFlowController flow = LoadingFlow;
+            return flow != null && flow.IsFlowInProgress;
+        }
+    }
+
+    // [서버] 판 재시작 — 진행 중인 구간 스킵은 끊는다(어차피 맵과 함께 사라진다). 확인 대화상자 없이 바로.
+    void RestartServer()
+    {
+        NetworkLoadingFlowController flow = LoadingFlow;
+        if (flow == null)
+        {
+            Fail("→ 처음부터 거부 — NetworkLoadingFlowController 가 없다(NetworkManager.prefab 인스턴스인지 확인).");
+            return;
+        }
+
+        StopAllCoroutines();
+        _running = false;
+        if (!flow.TryRestartTargetScene(out string reason))
+        {
+            Fail($"→ 처음부터 실패 — {reason}. 판은 그대로 이어진다.");
+            return;
+        }
+
+        Debug.Log($"{Tag} → 처음부터 — 맵 씬 재로드 시작(단계 {_director.Step} 에서). 로딩 씬 → 맵 언로드 → 재로드 → 전원 첫 스폰.", this);
+        Toast("구간 스킵 → 처음부터 (맵 다시 불러오는 중…)");
     }
 
     IEnumerator Run(TutorialSkipTarget target)
@@ -335,13 +376,15 @@ public sealed class TutorialSkipController : MonoBehaviour
         DrawPanel();
     }
 
-    // Alt 를 누르는 동안만 — 구간 10개(Alt+1 ~ Alt+0 순서). 뒤 구간은 비활성, 지금 구간은 ▶.
+    // Alt 를 누르는 동안만 — 버튼 10개(Alt+1 ~ Alt+9 구간, 마지막 Alt+0 처음부터). 뒤 구간은 비활성, 지금 구간은 ▶.
+    // 처음부터는 어느 구간에서든(스킵 진행 중에도) 누를 수 있고, 판 재시작 중엔 전부 비활성.
     void DrawPanel()
     {
         const float w = 190f, h = 24f, pad = 6f;
         float x = Screen.width - w - 12f, y = 12f;
+        bool restarting = IsRestartInProgress;
         GUI.Box(new Rect(x - pad, y - pad, w + pad * 2f, h * (TutorialSkipPlan.TargetCount + 1) + pad * 2f), GUIContent.none);
-        GUI.Label(new Rect(x, y, w, h), _running ? "구간 스킵 (진행 중…)" : "구간 스킵 (호스트)");
+        GUI.Label(new Rect(x, y, w, h), restarting ? "구간 스킵 (재시작 중…)" : _running ? "구간 스킵 (진행 중…)" : "구간 스킵 (호스트)");
 
         TutorialStep step = _director.Step;
         TutorialSkipTarget current = TutorialSkipPlan.CurrentOf(step);
@@ -351,7 +394,8 @@ public sealed class TutorialSkipController : MonoBehaviour
             int digit = (i + 1) % 10;   // Alt+1 … Alt+9, Alt+0
             TutorialSkipPlan.TryFromDigit(digit, out TutorialSkipTarget target);
             string label = $"{(target == current ? "▶ " : "")}Alt+{digit}  {TutorialSkipPlan.NameOf(target)}";
-            GUI.enabled = !_running && TutorialSkipPlan.Check(step, target) == TutorialSkipVerdict.Ok;
+            GUI.enabled = (!_running || TutorialSkipPlan.IsRestart(target)) &&
+                          TutorialSkipPlan.Check(step, target, restarting) == TutorialSkipVerdict.Ok;
             if (GUI.Button(new Rect(x, y + h * (i + 1), w, h - 2f), label)) Request(target);
         }
         GUI.enabled = enabledBefore;

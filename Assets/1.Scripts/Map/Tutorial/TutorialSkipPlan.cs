@@ -3,7 +3,10 @@ using System.Collections.Generic;
 // 튜토리얼 구간 스킵(QA·테스트용, 할 일 34)의 순수 계획 모델(Unity·NGO 비의존 — EditMode 테스트 대상).
 // 실행(서버)은 TutorialSkipController. 원본: Docs/tech/tutorial-director.md §10.5 · Docs/tech/tutorial-qa.md 0.4.
 
-/// <summary>스킵 목적 구간 — 값 = 동선 순서(존1 0 → 보스방 9). 단축키 Alt+1~9 = 값 1~9, Alt+0 = 존1.</summary>
+/// <summary>
+/// 스킵 목적 구간 — 값 = 동선 순서(존1 0 → 보스방 9). 단축키 Alt+1~9 = 값 1~9, Alt+0 = <see cref="Restart"/>.
+/// 존1 은 단축키가 없다 — 지금 구간(뒤로 가기 판정) 기준으로만 쓴다.
+/// </summary>
 public enum TutorialSkipTarget : byte
 {
     Zone1 = 0,
@@ -17,6 +20,11 @@ public enum TutorialSkipTarget : byte
     BossEnter = 8,
     /// <summary>보스방 — 보스 진입 존으로 옮긴 뒤 패드 이동 경로(<c>BossTeleportManager</c>)를 탄다.</summary>
     BossRoom = 9,
+    /// <summary>
+    /// Alt+0 — 처음부터(판 재시작). 구간이 아니라 동작이다: 맵 씬을 로딩 씬을 거쳐 다시 불러와
+    /// 처음 로드한 것처럼 전부 초기화한다(<c>NetworkLoadingFlowController.TryRestartTargetScene</c>). 어느 구간에서든 허용.
+    /// </summary>
+    Restart = 10,
 }
 
 /// <summary>목적 구간에 가기 전에 할 일 하나 — 앞 게이트를 정식 경로로 여는 단위.</summary>
@@ -69,6 +77,8 @@ public enum TutorialSkipVerdict : byte
     Backward,
     /// <summary>이미 보스방 도착(단계 Finished) — 튜토리얼 안내가 끝났다.</summary>
     Finished,
+    /// <summary>판 재시작(맵 재로드)이 진행 중 — 끝날 때까지 어떤 스킵·재시작도 받지 않는다.</summary>
+    RestartInProgress,
 }
 
 /// <summary>
@@ -77,6 +87,7 @@ public enum TutorialSkipVerdict : byte
 ///  · 목적 구간에 들어가는 데 필요한 마지막 게이트 = 그 구간의 입구 배리어 게이트(복도 n 입구 · 다음 존 = 복도 출구).
 ///    복도 목적이면 그 복도의 특성 라운드는 건드리지 않는다 — 도착한 뒤 중간 지점에서 정상으로 열린다.
 ///  · 보스방 = 보스 진입과 같은 계획 + 패드 이동.
+///  · 처음부터(<see cref="TutorialSkipTarget.Restart"/>)는 계획이 없다 — 게이트를 여는 대신 맵 씬을 다시 불러온다.
 /// </summary>
 public static class TutorialSkipPlan
 {
@@ -88,20 +99,28 @@ public static class TutorialSkipPlan
     /// <summary>계획 단계마다 게이트가 열리기를 기다리는 최대 시간(실제 시간 초). 넘으면 강제 개방(경고).</summary>
     public const float GateWaitSeconds = 5f;
 
-    /// <summary>숫자 키 → 목적 구간. 1~9 = 복도1~보스방, 0 = 존1. 범위 밖이면 false.</summary>
+    /// <summary>숫자 키 → 목적. 1~9 = 복도1~보스방, 0 = 처음부터(판 재시작). 범위 밖이면 false.</summary>
     public static bool TryFromDigit(int digit, out TutorialSkipTarget target)
     {
-        target = TutorialSkipTarget.Zone1;
+        target = TutorialSkipTarget.Restart;
         if (digit < 0 || digit > 9) return false;
-        target = (TutorialSkipTarget)digit;
+        target = digit == 0 ? TutorialSkipTarget.Restart : (TutorialSkipTarget)digit;
         return true;
     }
 
-    /// <summary>목적 구간 → 단축키 숫자(존1 = 0).</summary>
-    public static int DigitOf(TutorialSkipTarget target) => (int)target;
+    /// <summary>목적 → 단축키 숫자(처음부터 = 0). 존1 은 단축키가 없다(-1).</summary>
+    public static int DigitOf(TutorialSkipTarget target) => target switch
+    {
+        TutorialSkipTarget.Restart => 0,
+        TutorialSkipTarget.Zone1 => -1,
+        _ => (int)target,
+    };
+
+    public static bool IsRestart(TutorialSkipTarget target) => target == TutorialSkipTarget.Restart;
 
     public static string NameOf(TutorialSkipTarget target) => target switch
     {
+        TutorialSkipTarget.Restart => "처음부터",
         TutorialSkipTarget.Zone1 => "존1",
         TutorialSkipTarget.Corridor1 => "복도1",
         TutorialSkipTarget.Zone2 => "존2",
@@ -114,10 +133,10 @@ public static class TutorialSkipPlan
         _ => "보스방",
     };
 
-    /// <summary>순간이동할 구간. 보스방은 보스 진입 존에 내린 뒤 패드 이동이 데려간다.</summary>
+    /// <summary>순간이동할 구간. 보스방은 보스 진입 존에 내린 뒤 패드 이동이 데려간다. 처음부터 = 존1(재로드 뒤 처음 스폰).</summary>
     public static TutorialArea AreaOf(TutorialSkipTarget target) => target switch
     {
-        TutorialSkipTarget.Zone1 => TutorialArea.Zone1,
+        TutorialSkipTarget.Restart or TutorialSkipTarget.Zone1 => TutorialArea.Zone1,
         TutorialSkipTarget.Corridor1 => TutorialArea.Corridor1,
         TutorialSkipTarget.Zone2 => TutorialArea.Zone2,
         TutorialSkipTarget.Corridor2 => TutorialArea.Corridor2,
@@ -131,7 +150,7 @@ public static class TutorialSkipPlan
     /// <summary>디렉터 단계 — 존은 첫 진입 단계(존3 연습 · 존4 설정 자막). 보스방은 BossEnter(도착이 Finished 로 바꾼다).</summary>
     public static TutorialStep StepOf(TutorialSkipTarget target) => target switch
     {
-        TutorialSkipTarget.Zone1 => TutorialStep.Zone1,
+        TutorialSkipTarget.Restart or TutorialSkipTarget.Zone1 => TutorialStep.Zone1,
         TutorialSkipTarget.Corridor1 => TutorialStep.Corridor1,
         TutorialSkipTarget.Zone2 => TutorialStep.Zone2,
         TutorialSkipTarget.Corridor2 => TutorialStep.Corridor2,
@@ -158,11 +177,16 @@ public static class TutorialSkipPlan
     };
 
     /// <summary>
-    /// 스킵을 받아들이는가. 뒤로 가기(목적 &lt; 지금)는 거부, 이미 Finished 면 거부.
-    /// 지금과 같은 구간은 허용 — 열 게이트 없이 그 구간 입구 안쪽으로 다시 옮기기만 한다(Alt+0 은 존1 에서만 이 경우).
+    /// 스킵을 받아들이는가.
+    ///  · 판 재시작(맵 재로드) 진행 중이면 무엇이든 거부(<see cref="TutorialSkipVerdict.RestartInProgress"/>) — 재입력 방지.
+    ///  · 처음부터(Alt+0)는 뒤로 가기 규칙의 예외 — 어느 구간에서든, 보스방 도착(Finished) 뒤에도 허용.
+    ///  · 그 밖엔 뒤로 가기(목적 &lt; 지금) 거부, 이미 Finished 면 거부.
+    ///    지금과 같은 구간은 허용 — 열 게이트 없이 그 구간 입구 안쪽으로 다시 옮기기만 한다.
     /// </summary>
-    public static TutorialSkipVerdict Check(TutorialStep currentStep, TutorialSkipTarget target)
+    public static TutorialSkipVerdict Check(TutorialStep currentStep, TutorialSkipTarget target, bool restartInProgress = false)
     {
+        if (restartInProgress) return TutorialSkipVerdict.RestartInProgress;
+        if (IsRestart(target)) return TutorialSkipVerdict.Ok;
         if (currentStep == TutorialStep.Finished) return TutorialSkipVerdict.Finished;
         return target < CurrentOf(currentStep) ? TutorialSkipVerdict.Backward : TutorialSkipVerdict.Ok;
     }

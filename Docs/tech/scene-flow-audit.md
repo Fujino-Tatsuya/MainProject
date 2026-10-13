@@ -250,6 +250,9 @@ YAML 기준 MapScene에는 총 10개의 씬 배치 `NetworkObject`가 존재한�
 1. **세션 종료형:** 서버가 전환을 공지 → 모든 피어 shutdown 완료 ACK → 로컬 Result/Lobby로 이동 → 새 세션 생성.
 2. **세션 유지형:** Map unload와 다음 network scene 전환을 NGO `NetworkSceneManager`로 수행하고, Result/Lobby UI만 필요하면 로컬 additive overlay로 분리한다.
 
+> **2026-10-13 추가 — 같은 판 재시작(세션 유지형, QA 전용 호출자):** `NetworkLoadingFlowController.TryRestartTargetScene` 이 로딩 씬 Additive → 동적 스폰 NetworkObject(플레이어 포함) 디스폰 →
+> `4.MapScene` NGO 언로드 → 재로드 → `SpawnAllPlayers` 를 정식 로딩 흐름 그대로 탄다. 지금 호출자는 튜토리얼 구간 스킵 Alt+0 뿐이다([tutorial-director.md §10.5](tutorial-director.md#105-구간-스킵-alt10-할-일-34--qa테스트용)). Result/Lobby 복귀 계약은 여전히 없다.
+
 ## 9. 런타임 생성 `NetworkObject` 전수 결과
 
 | 생성 지점 | 현재 방식 | 판정 |
