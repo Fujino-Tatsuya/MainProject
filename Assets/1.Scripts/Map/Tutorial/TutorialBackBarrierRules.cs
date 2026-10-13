@@ -58,6 +58,22 @@ public static class TutorialBackBarrierRules
         return front;
     }
 
+    /// <summary>
+    /// [서버, 전멸 리스폰] 지나온 최전방 구간이 정확히 <paramref name="front"/> 인 마스크 = 너머 구간이 <paramref name="front"/> 이하인 배리어 비트 전부.
+    /// 복도4 면 G1~G9(G10 은 뺀다) — 복도4 로 리스폰한 사람이 G10 뒤 배리어에 갇히지 않고, G9 뒤로는 못 돌아간다.
+    /// 마스크를 '더하기만' 하는 일반 갱신(<see cref="UpdatePassedMask"/>)의 유일한 예외다. 존1 이하면 0.
+    /// </summary>
+    public static int MaskWithFrontmost(TutorialArea front)
+    {
+        int m = 0;
+        for (int c = 1; c <= TutorialAreaTracker.CorridorCount; c++)
+        {
+            if (AreaBeyond(c, true) <= front) m |= Bit(TutorialBarrierRules.GateOf(c, true));
+            if (AreaBeyond(c, false) <= front) m |= Bit(TutorialBarrierRules.GateOf(c, false));
+        }
+        return m;
+    }
+
     /// <summary>이 구간이 그 플레이어의 뒤 배리어 너머(지나온 최전방 구간보다 뒤)인가. 튜토리얼 밖(None)은 false.</summary>
     public static bool IsAreaBehind(TutorialArea area, int passedMask) =>
         area != TutorialArea.None && area < FrontmostPassedArea(passedMask);

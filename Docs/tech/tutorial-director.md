@@ -314,11 +314,12 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
 ## 11. 사망 규칙 (S11)
 > 코드: `TutorialDeathRulesModel`·`TutorialRevivePointRules`(순수) · `TutorialDeathRules`(서버, 디렉터에 런타임 부착). 테스트: `TutorialDeathRulesTests`(튜토리얼 러너).
 > 훅(기본값 = 기존 동작): `PlayerLifeCycleController.ServerDeathKeepsSoul` · `PlayerReviveController.TryCompleteReviveOnServer(bool consumeLife)` · `PlayerFallRecovery.RelocateServer`.
+> **목숨 = 파티 공용 풀 5개**(할 일 30, 2026-10-13 — 아래 '목숨'은 전부 공용 풀) · 전멸 → 복도4 리스폰 · 특성 재선택: [party-lives-respawn.md](party-lives-respawn.md).
 
 - 부착: 서버에서 `StateChanged` 때 `IsTutorialActive` 면 디렉터 GameObject 에 `AddComponent`(씬·프리팹 저장 없음). 비튜토리얼은 안 붙는다.
 - 사망(Alive → DeadPresentation) → 3초 뒤 자동 부활 + 2초 무적(`InvulnerabilityCause.Revive`). 차감 = **사망 시점** `IsGateOpen(G11)`(보스방 도착 — `TutorialDeathRulesModel.IsLifeChargedAt(mask)`, 단계 기준, 위치 무관).
   G11 전(존1~복도4·패드 대기·타이머 만료 강제 이동 중 — **G8 타이머 시작 뒤 포함**)은 목숨 수와 무관하게 Soul(훅), 부활 시 차감 없음.
-  G11 뒤는 기존 규칙(목숨 0 → PermanentDead → 전원이면 PartyWipeWatcher). 10-12 이전 기준은 G8 이었다 — G8 은 타이머 시작·존4 기상 용도로만 남는다.
+  G11 뒤는 기존 규칙(공용 목숨 0 → PermanentDead → 전멸이면 PartyWipeWatcher — 공용 0 의 갇힌 Soul 도 탈락으로 센다, party-lives-respawn.md §2). 10-12 이전 기준은 G8 이었다 — G8 은 타이머 시작·존4 기상 용도로만 남는다.
   G11 은 도착과 같은 순간 열리고 사망 규칙도 도착·Finished 로 끝나므로, 실제로 튜토리얼 규칙 아래 차감이 일어나는 경로는 없다(G11 뒤 사망 = 일반 규칙).
 - 부활 지점 = **지금 단계 구간**(디렉터 `Step` 의 구간 — 열린 배리어로 들어갈 수 있는 가장 앞 구간을 넘지 않음, 아래 S12 항목)(존1~복도4, **보스 진입 제외 — 패드**) → 앞 구간 순. 구간 안쪽 1m·1.5m 격자 중
   1층 바닥(스테이지 높이 ±1m)·점유 없음(Wall 포함)·살아 있는 `MonsterBase` 에서 10m(고정 — 몬스터 인지 반경 공개 API 없음) 밖, 사망 지점에 가장 가까운 점.
@@ -343,3 +344,12 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
     배리어 앞면 0.75m 미만으로는 붙이지 않는다(개인 뒤 배리어 콜라이더 끼임 방지). 바닥·점유 검사를 통과한 첫 점. 그래도 없으면 기존대로 그 자리.
   - 추락 복구: 거름(`TutorialBackBarrierRules.IsReturnPointAllowed(…, pads)` — `TutorialBarriers.IsReturnPointAllowed` 가 넘김)이 패드 범위 + 1m 를 **누구에게나** 거부하고,
     스폰 폴백 대체(`ReturnPointFallback`)는 위 부활 탐색을 그대로 쓴다. 테스트: `TutorialDeathRulesTests` 패드 5건 · `TutorialBackBarrierRulesTests` 패드 1건.
+- **전멸 리스폰 · 보스 재도전 되감기(할 일 30 (2), 2026-10-13)** — 상세 [party-lives-respawn.md §3](party-lives-respawn.md#3-전멸--복도4-리스폰-2단계--구현됨).
+  - 공용 목숨 0 전멸 + G10 열림이면 결과 화면 대신 `PartyWipeRespawner` 가 전원을 **복도4** 에 리스폰(`TutorialDeathRules.TryFindWipeRespawnPoints` — 복도4 격자·바닥·점유·G9 앞면 여유·패드 + 1m 밖·2m 간격).
+  - 되감기 `TutorialDirector.RewindForBossRetryServer`(순수 `TutorialFlowModel.RewindForBossRetry`) — **단계·게이트 '앞으로만' 규칙의 유일한 예외**: Finished → BossEnter, G11 닫기, 도착 래치 해제. G1~G10·장부·카운터 그대로.
+  - 개인 뒤 배리어 `ResetBackBarrierMaskServer(clientId, Corridor4)` = `TutorialBackBarrierRules.MaskWithFrontmost(Corridor4)`(G1~G9, G10 제외) — **되감기보다 먼저** 쓴다(되감기로 진행 중이 되는 순간 G10 뒤 배리어가 앞길을 막지 않게).
+  - 사망 규칙 `TutorialDeathRules.ResumeForBossRetry` — `_finished` 해제·대기 기록 비움. **보스방 재도착 전 사망 = 차감 없음**(복도4 자동 부활), **재도착(G11 다시 열림) 뒤 사망 = 다시 차감**(사양 그대로). 테스트: `TutorialBossRetryTests`.
+- **리스폰 뒤 특성 초기화 · 재선택(할 일 30 (3), 2026-10-13)** — 상세 [party-lives-respawn.md §4](party-lives-respawn.md#4-특성-초기화--재선택-3단계--구현됨) · [tutorial-traits.md §9](tutorial-traits.md#9-전멸-리스폰-뒤-특성-초기화--재선택-할-일-30-3단계).
+  - 리스폰 직후 각자 "특성을 초기화하고 다시 선택할까요?" 팝업(`TutorialTraitDirector` — `PartyWipeRespawned` 구독, 튜토리얼일 때만). 예 = 그 플레이어 특성 효과만 원복 + 혼자 4라운드(3장 중 1장, 고른 것 제외, 선택 중 무적). 아니오 = 유지.
+  - 🔴 **팝업·재선택 중인 사람이 있으면 보스 진입 패드가 잠긴다**(`TutorialBossPath.IsBossPadEnabled` — G10 전 잠금과 같은 경로·테두리 숨김). 패드는 한 명만 서도 전원을 끌고 가기 때문(D3).
+    끝나면 이미 서 있던 사람으로 카운트다운. 사망 규칙·뒤 배리어·되감기는 건드리지 않는다. 마감 게이지·자동 선택 없음(진행 중 복도가 없음).

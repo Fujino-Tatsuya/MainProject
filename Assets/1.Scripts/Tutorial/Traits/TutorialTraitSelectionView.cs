@@ -7,9 +7,11 @@ using UnityEngine.UI;
 /// <summary>
 /// 튜토리얼 특성 선택 UI(할 일 15 T2) — 로컬 플레이어 전용 표시. 상태는 <see cref="TutorialTraitDirector"/> 복제값만 읽는다.
 /// - 선택 창: 중앙 모달. 창 루트의 <see cref="UiModalBlocker"/> 가 켜져 있는 동안 로컬 Player 입력(이동·대시 포함)이 막힌다. 일시정지 없음.
-/// - 열림/닫힘 판정은 <see cref="TutorialTraitWindowModel"/>(한 번 닫힌 라운드 재표시 금지·획득 토스트 판정).
+/// - 열림/닫힘 판정은 <see cref="TutorialTraitWindowModel"/>(내 제시 번호 기준 — 한 번 닫힌 제시 재표시 금지·획득 토스트 판정).
 /// - 획득 특성 다시 보기: 좌상단 아이콘 줄 + 호버 툴팁.
 /// - 교착 방지 게이지(창 안): 값은 바깥(복도 흐름)이 <see cref="SetDeadline"/> 으로 넣는다 — 이 뷰는 튜토리얼 디렉터를 모른다.
+/// - 특성 초기화 팝업(할 일 30): 내 팝업 행(<see cref="TutorialTraitDirector.TryGetResetPrompt"/>)이 있으면 연다. 질문 + [예]/[아니오], 루트에 <see cref="UiModalBlocker"/>.
+///   프리팹(저작 메뉴 결과)을 다시 만들지 않으려고 창과 같은 캔버스에 <b>런타임 생성</b>한다. 한 세대에는 한 번만 답한다.
 /// 씬에 하나 두면 된다(별도 캔버스 — CombatHUD 와 무관). 디렉터가 없으면 아무것도 보이지 않는다.
 /// </summary>
 [DisallowMultipleComponent]
@@ -77,12 +79,25 @@ public sealed class TutorialTraitSelectionView : MonoBehaviour
     private int shownDeadlineCount = -1;
     private bool shownDeadlineUrgent;
 
+    // 특성 초기화 팝업(런타임 생성) — 열린 세대·답한 세대(한 세대에 한 번만 답한다).
+    private GameObject resetPrompt;
+    private TMP_Text resetPromptText;
+    private TMP_Text resetYesText;
+    private TMP_Text resetNoText;
+    private int resetPromptGeneration;
+    private int answeredResetGeneration;
+
+    private static readonly Color PromptPanelColor = new Color(0.035f, 0.045f, 0.065f, 0.97f);
+    private static readonly Color PromptOutlineColor = new Color(0.48f, 0.42f, 0.25f, 0.9f);
+    private static readonly Color PromptAccentColor = new Color(0.95f, 0.82f, 0.42f, 1f);
+
     private void Awake()
     {
         if (cardTemplate != null)
             cardTemplate.gameObject.SetActive(false);
         if (iconTemplate != null)
             iconTemplate.gameObject.SetActive(false);
+        BuildResetPrompt();
         SetActive(window, false);
         SetActive(toast, false);
         SetActive(tooltip, false);
@@ -100,6 +115,7 @@ public sealed class TutorialTraitSelectionView : MonoBehaviour
             Instance = null;
         Bind(null);
         CloseWindow();
+        CloseResetPrompt();
         SetActive(toast, false);
         SetDeadline(false, 0f, 0f, 0, 0);
     }
@@ -152,6 +168,7 @@ public sealed class TutorialTraitSelectionView : MonoBehaviour
         {
             if (model.ForceClose())
                 CloseWindow();
+            CloseResetPrompt();
             shownAcquired.Clear();
             RebuildIcons();
         }
@@ -170,7 +187,8 @@ public sealed class TutorialTraitSelectionView : MonoBehaviour
         director.GetOffered(localId, offered);
         director.GetAcquired(localId, acquired);
 
-        TutorialTraitWindowUpdate update = model.Evaluate(director.Round, offered.Count > 0, acquired.Count);
+        // 전역 라운드가 아니라 내 제시 번호로 판정한다 — 다른 사람의 재선택 라운드가 내 창을 닫지 않게(할 일 30).
+        TutorialTraitWindowUpdate update = model.Evaluate(director.GetOfferSeq(localId), offered.Count > 0, acquired.Count);
         if (update.Closed && !update.Opened)
             CloseWindow();
         if (update.Opened)
@@ -179,6 +197,8 @@ public sealed class TutorialTraitSelectionView : MonoBehaviour
             ApplyRoundTexts(director.RoundDisplay); // 옵션 복제가 행보다 늦게 와도 맞춘다
         if (update.ShowPickedToast)
             ShowPickedToast();
+
+        EvaluateResetPrompt(localId);
 
         if (!SameSequence(acquired, shownAcquired))
         {
@@ -249,6 +269,149 @@ public sealed class TutorialTraitSelectionView : MonoBehaviour
         }
 
         cards.Clear();
+    }
+
+    // ── 특성 초기화 팝업(할 일 30) ─────────────────────────────────────────
+
+    // 내 팝업 행이 있고 아직 답하지 않은 세대면 연다. 행이 사라지면(서버 처리·이탈) 닫는다. 다시 전멸하면 새 세대로 다시 열린다.
+    private void EvaluateResetPrompt(ulong localId)
+    {
+        bool prompted = director.TryGetResetPrompt(localId, out int generation);
+        if (!prompted || generation == answeredResetGeneration)
+        {
+            CloseResetPrompt();
+            return;
+        }
+
+        if (resetPromptGeneration == generation && resetPrompt != null && resetPrompt.activeSelf)
+            return;
+
+        resetPromptGeneration = generation;
+        if (resetPromptText != null)
+            resetPromptText.text = TextOf(TutorialTraitTexts.ResetPromptTitleId);
+        if (resetYesText != null)
+            resetYesText.text = TextOf(TutorialTraitTexts.ResetPromptYesId);
+        if (resetNoText != null)
+            resetNoText.text = TextOf(TutorialTraitTexts.ResetPromptNoId);
+        if (resetPrompt != null)
+            resetPrompt.transform.SetAsLastSibling(); // 특성 창 위
+        SetActive(resetPrompt, true);
+    }
+
+    private void HandleResetAnswer(bool reset)
+    {
+        if (director == null || resetPrompt == null || !resetPrompt.activeSelf || resetPromptGeneration == 0)
+            return;
+
+        // 한 세대에 한 번 — 연속 클릭·서버 반영 전 재평가로 두 번 보내지 않는다(서버도 중복을 거부한다).
+        answeredResetGeneration = resetPromptGeneration;
+        CloseResetPrompt();
+        director.RequestResetAnswer(answeredResetGeneration, reset);
+    }
+
+    private void CloseResetPrompt() => SetActive(resetPrompt, false);
+
+    // 창과 같은 캔버스에 질문 + [예]/[아니오] 를 만든다. 꺼진 채 UiModalBlocker 를 붙여 켜질 때만 입력을 막는다.
+    private void BuildResetPrompt()
+    {
+        if (resetPrompt != null)
+            return;
+
+        Transform parent = window != null && window.transform.parent != null ? window.transform.parent : transform;
+        TMP_FontAsset font = title != null ? title.font : null;
+
+        RectTransform root = NewUi("ResetPrompt", parent);
+        root.gameObject.SetActive(false);
+        root.anchorMin = Vector2.zero;
+        root.anchorMax = Vector2.one;
+        root.offsetMin = root.offsetMax = Vector2.zero;
+        root.gameObject.AddComponent<UiModalBlocker>();
+        Image dim = root.gameObject.AddComponent<Image>();
+        dim.color = new Color(0f, 0f, 0f, 0.55f);
+        dim.raycastTarget = true; // 창 밖 클릭이 뒤 UI 로 새지 않게
+
+        RectTransform panel = NewUi("Panel", root);
+        panel.anchorMin = panel.anchorMax = panel.pivot = new Vector2(0.5f, 0.5f);
+        panel.sizeDelta = new Vector2(720f, 0f);
+        Image panelBackground = panel.gameObject.AddComponent<Image>();
+        panelBackground.color = PromptPanelColor;
+        panelBackground.raycastTarget = false;
+        Outline outline = panel.gameObject.AddComponent<Outline>();
+        outline.effectColor = PromptOutlineColor;
+        outline.effectDistance = new Vector2(1.5f, -1.5f);
+        VerticalLayoutGroup panelLayout = panel.gameObject.AddComponent<VerticalLayoutGroup>();
+        panelLayout.padding = new RectOffset(40, 40, 36, 36);
+        panelLayout.spacing = 28f;
+        panelLayout.childAlignment = TextAnchor.UpperCenter;
+        panelLayout.childControlWidth = panelLayout.childControlHeight = true;
+        panelLayout.childForceExpandWidth = true;
+        panelLayout.childForceExpandHeight = false;
+        panel.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+        resetPromptText = NewText("Question", panel, font, 30f, FontStyles.Bold, PromptAccentColor);
+
+        RectTransform buttons = NewUi("Buttons", panel);
+        HorizontalLayoutGroup buttonsLayout = buttons.gameObject.AddComponent<HorizontalLayoutGroup>();
+        buttonsLayout.spacing = 32f;
+        buttonsLayout.childAlignment = TextAnchor.MiddleCenter;
+        buttonsLayout.childControlWidth = buttonsLayout.childControlHeight = false;
+        buttonsLayout.childForceExpandWidth = buttonsLayout.childForceExpandHeight = false;
+        LayoutElement buttonsElement = buttons.gameObject.AddComponent<LayoutElement>();
+        buttonsElement.preferredHeight = buttonsElement.minHeight = 64f;
+
+        resetYesText = NewButton("Yes", buttons, font, () => HandleResetAnswer(true));
+        resetNoText = NewButton("No", buttons, font, () => HandleResetAnswer(false));
+        resetPrompt = root.gameObject;
+    }
+
+    private static TMP_Text NewButton(string name, Transform parent, TMP_FontAsset font, UnityEngine.Events.UnityAction onClick)
+    {
+        RectTransform rect = NewUi(name, parent);
+        rect.sizeDelta = new Vector2(220f, 64f);
+        Image background = rect.gameObject.AddComponent<Image>();
+        background.color = new Color(0.09f, 0.11f, 0.15f, 1f);
+        Outline outline = rect.gameObject.AddComponent<Outline>();
+        outline.effectColor = PromptOutlineColor;
+        outline.effectDistance = new Vector2(2f, -2f);
+        Button button = rect.gameObject.AddComponent<Button>();
+        button.targetGraphic = background;
+        ColorBlock colors = button.colors;
+        colors.normalColor = new Color(0.82f, 0.82f, 0.82f, 1f);
+        colors.highlightedColor = Color.white;
+        colors.pressedColor = new Color(0.8f, 0.8f, 0.8f, 1f);
+        button.colors = colors;
+        button.onClick.AddListener(onClick);
+
+        TMP_Text label = NewText("Label", rect, font, 26f, FontStyles.Bold, Color.white);
+        RectTransform labelRect = label.rectTransform;
+        labelRect.anchorMin = Vector2.zero;
+        labelRect.anchorMax = Vector2.one;
+        labelRect.offsetMin = labelRect.offsetMax = Vector2.zero;
+        return label;
+    }
+
+    private static TMP_Text NewText(string name, Transform parent, TMP_FontAsset font, float size, FontStyles style, Color color)
+    {
+        RectTransform rect = NewUi(name, parent);
+        TextMeshProUGUI text = rect.gameObject.AddComponent<TextMeshProUGUI>();
+        if (font != null)
+            text.font = font;
+        text.fontSize = size;
+        text.fontStyle = style;
+        text.alignment = TextAlignmentOptions.Center;
+        text.color = color;
+        text.raycastTarget = false;
+        text.textWrappingMode = TextWrappingModes.Normal;
+        text.richText = true;
+        return text;
+    }
+
+    private static RectTransform NewUi(string name, Transform parent)
+    {
+        var go = new GameObject(name, typeof(RectTransform));
+        go.layer = parent.gameObject.layer;
+        go.transform.SetParent(parent, false);
+        return (RectTransform)go.transform;
     }
 
     // ── 교착 방지 게이지 ───────────────────────────────────────────────────

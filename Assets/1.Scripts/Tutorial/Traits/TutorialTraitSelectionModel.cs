@@ -39,6 +39,9 @@ public sealed class TutorialTraitSelectionModel
         public readonly List<int> Acquired = new List<int>();
         public bool InRound;
         public bool Chosen;
+        /// <summary>이번 참가가 혼자만의 재선택 라운드다(<see cref="StartPersonalRound"/>).</summary>
+        public bool Personal;
+        public int OfferSeq;
     }
 
     private readonly int poolSize;
@@ -46,6 +49,7 @@ public sealed class TutorialTraitSelectionModel
     private readonly Dictionary<ulong, PlayerState> players = new Dictionary<ulong, PlayerState>();
     private readonly List<int> candidateScratch = new List<int>();
     private int roundOfferCount;
+    private int lastOfferSeq;
 
     /// <param name="poolSize">풀 크기.</param>
     /// <param name="unusableIndices">제시하면 안 되는 인덱스(빈 칸 등). null 가능.</param>
@@ -101,6 +105,7 @@ public sealed class TutorialTraitSelectionModel
         {
             state.InRound = false;
             state.Chosen = false;
+            state.Personal = false;
             state.Offered.Clear();
         }
 
@@ -115,9 +120,7 @@ public sealed class TutorialTraitSelectionModel
                 continue; // 중복 id
 
             state.InRound = true;
-            PickCandidates(poolSize, state.Acquired, unusable, offerCount, next, candidateScratch);
-            state.Offered.AddRange(candidateScratch);
-            state.Chosen = state.Offered.Count == 0;
+            Offer(state, offerCount, next);
             anyOffered |= state.Offered.Count > 0;
         }
 
@@ -141,11 +144,67 @@ public sealed class TutorialTraitSelectionModel
             return TutorialTraitJoinResult.AlreadyInRound;
 
         state.InRound = true;
+        state.Personal = false;
+        Offer(state, roundOfferCount, next);
+        return state.Chosen ? TutorialTraitJoinResult.Empty : TutorialTraitJoinResult.Offered;
+    }
+
+    /// <summary>
+    /// 그 플레이어 혼자만의 라운드를 연다(할 일 30 특성 재선택). 라운드 번호(<see cref="Round"/>)는 올리지 않는다 —
+    /// 창은 그 플레이어의 <see cref="GetOfferSeq"/> 로 새로 열리고, 다른 플레이어의 참가·제시·선택·창은 건드리지 않는다.
+    /// 장 수는 <paramref name="offerCount"/>, 획득한 특성은 빠진다. 1장 이상 제시했으면 true, 0장(풀 소진)이면 바로 완료로 치고 false.
+    /// </summary>
+    public bool StartPersonalRound(ulong clientId, int offerCount, Func<int, int> next)
+    {
+        if (next == null)
+            throw new ArgumentNullException(nameof(next));
+
+        PlayerState state = GetOrCreate(clientId);
+        state.InRound = true;
+        state.Personal = true;
+        Offer(state, offerCount, next);
+        return !state.Chosen;
+    }
+
+    // 그 플레이어에게 새 후보를 뽑아 제시한다 — 제시 번호는 이때만 바뀐다(모델 전체에서 단조 증가라 같은 값이 다시 오지 않는다).
+    private void Offer(PlayerState state, int offerCount, Func<int, int> next)
+    {
         state.Offered.Clear();
-        PickCandidates(poolSize, state.Acquired, unusable, roundOfferCount, next, candidateScratch);
+        PickCandidates(poolSize, state.Acquired, unusable, offerCount, next, candidateScratch);
         state.Offered.AddRange(candidateScratch);
         state.Chosen = state.Offered.Count == 0;
-        return state.Chosen ? TutorialTraitJoinResult.Empty : TutorialTraitJoinResult.Offered;
+        state.OfferSeq = ++lastOfferSeq;
+    }
+
+    /// <summary>
+    /// 특성 초기화(할 일 30) — 그 플레이어의 획득·제시·참가를 비운다. <see cref="RemovePlayer"/> 와 달리 등록은 남긴다.
+    /// 효과 원복은 호출자 몫(이 모델은 인덱스만 안다).
+    /// </summary>
+    public void ResetPlayer(ulong clientId)
+    {
+        if (!players.TryGetValue(clientId, out PlayerState state))
+            return;
+
+        state.Acquired.Clear();
+        state.Offered.Clear();
+        state.InRound = false;
+        state.Chosen = false;
+        state.Personal = false; // 제시 번호는 남긴다 — 다음 제시가 더 큰 번호로 새 창을 연다
+    }
+
+    /// <summary>
+    /// 아직 안 고른 제시를 거둔다(재선택 도중 다시 전멸 — 할 일 30). 고른 특성은 그대로. 참가에서 빠지므로 라운드 완료를 막지 않는다.
+    /// 거둔 제시가 있었으면 true.
+    /// </summary>
+    public bool CancelOffer(ulong clientId)
+    {
+        if (!players.TryGetValue(clientId, out PlayerState state) || !state.InRound || state.Chosen)
+            return false;
+
+        state.Offered.Clear();
+        state.InRound = false;
+        state.Personal = false;
+        return true;
     }
 
     /// <summary>선택 판정. Accepted 면 획득 목록에 넣고 이번 라운드를 완료 처리한다.</summary>
@@ -188,6 +247,21 @@ public sealed class TutorialTraitSelectionModel
     public bool IsInRound(ulong clientId)
     {
         return players.TryGetValue(clientId, out PlayerState state) && state.InRound;
+    }
+
+    /// <summary>지금 참가가 혼자만의 재선택 라운드인가(<see cref="StartPersonalRound"/> — 복도 라운드 아님).</summary>
+    public bool IsPersonalRound(ulong clientId)
+    {
+        return players.TryGetValue(clientId, out PlayerState state) && state.InRound && state.Personal;
+    }
+
+    /// <summary>
+    /// 그 플레이어의 제시 번호(0 = 제시받은 적 없음). 그 플레이어에게 새 제시가 들어갈 때만 바뀐다 —
+    /// 다른 사람의 라운드·참가 추가·재선택에는 변하지 않는다. 창은 이 번호로 열고 닫는다(<see cref="TutorialTraitWindowModel"/>).
+    /// </summary>
+    public int GetOfferSeq(ulong clientId)
+    {
+        return players.TryGetValue(clientId, out PlayerState state) ? state.OfferSeq : 0;
     }
 
     /// <summary>이번 라운드 참가자 전원이 골랐는가(0장 제시·이탈자 제외). 라운드가 없었으면 true.</summary>

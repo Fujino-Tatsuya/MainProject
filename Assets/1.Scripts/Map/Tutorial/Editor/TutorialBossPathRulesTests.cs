@@ -67,6 +67,16 @@ public sealed class TutorialBossPathRulesTests
     }
 
     [Test]
+    public void Pad_LockedWhileTraitResetInProgress()
+    {
+        // 할 일 30 D3 — 패드는 한 명만 서도 전원을 끌고 가므로 팝업·재선택 중인 사람이 있으면 잠근다.
+        Assert.IsFalse(TutorialBossPathRules.IsPadEnabled(true, true, true), "G10 열림 + 재선택 중 = 잠김");
+        Assert.IsTrue(TutorialBossPathRules.IsPadEnabled(true, true, false), "재선택 끝 = 활성");
+        Assert.IsFalse(TutorialBossPathRules.IsPadEnabled(true, false, false), "G10 전 잠금은 그대로");
+        Assert.IsTrue(TutorialBossPathRules.IsPadEnabled(false, false, false), "비튜토리얼(특성 없음) = 기존 그대로");
+    }
+
+    [Test]
     public void Pad_LockedPadReportsEmptyEvenWhenOccupied()
     {
         Assert.IsFalse(TutorialBossPathRules.PadOccupied(true, false), "잠긴 패드 = 카운트다운 없음");
