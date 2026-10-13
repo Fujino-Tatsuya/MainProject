@@ -1,4 +1,5 @@
 using UnityEditor;
+using UnityEditor.Rendering.Universal.ShaderGUI;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
@@ -75,21 +76,27 @@ public static class AimIndicatorAuthoring
     // 데칼 셰이더그래프의 화살표 텍스처 프로퍼티(Raw_Range).
     private const string DecalArrowProperty = "_Raw_Range";
 
-    // 투명 언릿 URP 머티리얼. 텍스처는 기존 데칼 머티리얼의 화살표를 그대로 쓴다.
+    // 투명 URP Lit 머티리얼. 텍스처는 기존 데칼 머티리얼의 화살표를 그대로 쓴다.
+    // 화살표가 번들거리지 않게 그림자 받기·스페큘러·환경 반사를 끄고 Smoothness 0.
     private static Material EnsureQuadMaterial()
     {
+        Shader lit = Shader.Find("Universal Render Pipeline/Lit");
+        if (lit == null)
+        {
+            Debug.LogError("[AimIndicatorAuthoring] URP Lit 셰이더를 찾지 못했습니다.");
+            return null;
+        }
+
         Material material = AssetDatabase.LoadAssetAtPath<Material>(QuadMaterialPath);
         if (material == null)
         {
-            Shader unlit = Shader.Find("Universal Render Pipeline/Unlit");
-            if (unlit == null)
-            {
-                Debug.LogError("[AimIndicatorAuthoring] URP Unlit 셰이더를 찾지 못했습니다.");
-                return null;
-            }
-
-            material = new Material(unlit) { name = "AimIndicator3D" };
+            material = new Material(lit) { name = "AimIndicator3D" };
             AssetDatabase.CreateAsset(material, QuadMaterialPath);
+        }
+        else if (material.shader != lit)
+        {
+            // Unlit·Lit 모두 _BaseMap/_BaseColor 라 셰이더만 바꿔도 텍스처는 유지된다.
+            material.shader = lit;
         }
 
         // _BaseMap 이 비었을 때만 채운다 — 사용자가 갈아 넣은 텍스처를 재실행이 덮어쓰지 않게.
@@ -109,9 +116,14 @@ public static class AimIndicatorAuthoring
         material.SetFloat("_AlphaClip", 0f);
         material.SetFloat("_Cull", (float)CullMode.Back);
         material.SetFloat("_ReceiveShadows", 0f);
+        material.SetFloat("_SpecularHighlights", 0f);
+        material.SetFloat("_EnvironmentReflections", 0f);
+        material.SetFloat("_Smoothness", 0f);
+        material.SetFloat("_Metallic", 0f);
         if (material.HasProperty("_ZTest"))
             material.SetFloat("_ZTest", (float)CompareFunction.LessEqual);
-        BaseShaderGUI.SetMaterialKeywords(material);
+        // 인스펙터(LitShader.ValidateMaterial)와 같은 경로 — 공통 키워드 + Lit 전용 키워드.
+        BaseShaderGUI.SetMaterialKeywords(material, LitGUI.SetMaterialKeywords);
 
         // 키워드 설정이 채우는 값을 명시적으로 다시 확인 — ZWrite Off·Transparent 큐.
         material.SetFloat("_ZWrite", 0f);
