@@ -334,6 +334,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         BeginRuntime(stepIndex, direction, mode, step);
         if (IsNetworkActive)
             StartRpc(stepIndex, attackDirection, (byte)mode);
+        player.RaiseServerBasicAttackStarted();   // 튜토리얼 훅 — 한 타 시작(적중 무관)
         return true;
     }
 

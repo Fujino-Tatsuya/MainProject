@@ -642,6 +642,7 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
         if (player != null)
         {
             player.BeginAttackState();
+            player.RaiseServerBasicAttackStarted();   // 튜토리얼 훅 — 한 타 시작(적중 무관)
         }
 
         StartAttackPresentation(attackIndex, attackDirection, triggerAttack, crossFadeStartTime);

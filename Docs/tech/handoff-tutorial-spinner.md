@@ -86,6 +86,31 @@
 - §3-1 "미리 붙인다" = **튜토리얼 전용 Variant** `Assets/2.Prefabs/Monster/Tutorial/SpinnerBot_Tutorial.prefab` 로 했다. 원본 `SpinnerBot.prefab`·공용 `ZoneM_typeC` 는 무수정. 자세한 건 §6 · [tutorial-zone3.md](tutorial-zone3.md).
 - `practiceRadius` 는 존3 흐름이 G6 배리어 위치로 다시 계산해 `SetPracticeRadius` 로 넣는다(StageTutorial 실측 4.4m).
 
+## 4-2. v8 연계 연습(2026-10-12 · `feature/TutorialV8` · claude-alt) — 경석 공유
+
+v8 시나리오 §3.5 가 존3 을 "간파 3회"에서 **[간파 → 취약 유지 → 우클릭 밀치기 → 유효 벽 충돌 → 원위치 복귀] 파티 합계 3회**로 바꿨다.
+
+**SpinnerBot.cs 에 더한 것(+8 / −2줄)** — 주입 멤버 1개와 호출 1곳뿐. 구현체가 없으면 동작이 같다.
+
+| 위치 | 내용 | 구현체 없을 때 |
+|---|---|---|
+| `ISpinnerBotOverride.NotifyInterruptHit(ulong attackerClientId)` (신규 멤버) | 간파(우클릭) 적중이 **창 밖**에서 들어왔다 — 튜토리얼이 취약 밀치기로 쓴다 | — |
+| `TakeDamage` 간파 판정 | 창 밖 간파 적중(또는 창 컴포넌트 없음)이면 `Override?.NotifyInterruptHit(DamageAttackerClientId)` 후 return. 창 안 = 원래 성공 경로 그대로 | `Override` null → 이전과 같이 return |
+
+**재사용 판단(결정)** — 23호(`TwentyThreeBoss`) 간파 게이지·제압·취약·벽 충돌은 **재사용하지 않았다**.
+전부 23호 private 이고(벽 = 보스방 `InvisibleBoundaries` 사각형 수학, 밀치기 = 23호 `ReceiveAttack` 안 자체 이동, 이벤트 없음), 플레이어 우클릭 자체는 원래 몬스터를 밀지 않는다.
+같은 **방식**(공격자 반대 방향 고정 거리·시간 밀치기 = 23호 `vulnerableKnockbackDistance` 3m 를 출발점으로, 벽 면 거리 수학 판정)만 튜토리얼 쪽 순수 모델로 새로 뒀다.
+MonsterBase · TwentyThreeBoss · MonsterCounterWindow · 데이터는 무수정.
+
+**튜토리얼 쪽(`Tutorial/SpinnerPractice/`)**
+- `SpinnerComboModel.cs`(순수, EditMode `SpinnerComboModelTests`) — 단계 Ready → Stunned(원래 그로기) → Vulnerable(시간 종료 없음) → Recovering → (그 자리에서 Ready | Done) — 원위치 복귀(Returning) 단계는 사용자 변경(2026-10-13)으로 없앴다. 벽 충돌 = 몸 가장자리 ↔ 유효 벽 면 ≤ 0.4m,
+  또는 NavMesh 가장자리에 막혔고 ≤ 1.6m(NavMesh 가 벽에서 에이전트 반경만큼 안쪽에서 끝나서). 벽 쪽으로 민 것만(법선 내적). 한 연계 1회.
+- `TutorialSpinnerPractice` — 위 모델을 돌린다. 취약 유지·회복 = `MonsterBase.SetServerLogicSuspended(true)`(공개 API, 전환 대기와 같은 것) + `MonsterStatusEffect.ApplyStatus(SuperArmor, 0)`(외부 넉백 무시) ·
+  밀치기 이동 = `NavMeshAgent.Move`(NavMesh·배리어 카브 밖으로 못 나감, 플레이어 콜라이더 무시). 본 전투(`EnterRealMode`) 때 모두 해제.
+  새 복제 변수 3개(`_comboPhase`·`_wallPoint`·`_hasWall` — Variant NetworkBehaviour, hash 무관). 새 서버 이벤트 `ServerComboCounterAccepted`·`ServerComboEvent`. 새 서버 API `SetPracticeWall`·`RelocateAnchor`.
+- 유효 벽·연습 위치는 존3 흐름이 존3 슬롯 사각형의 긴 변에서 정한다(`TutorialZone3Geometry.ChoosePracticeLayout` — 벽 면에서 몸 가장자리 4m, 존 끝에서 8m 안쪽). 튜닝은 인스펙터(D26).
+- 간파 성공마다 파티 우클릭 쿨 초기화는 플레이어 쿨 장부 **공개 API**(`ReduceCooldownServer`·`GetCooldownRemaining`)만 쓴다 — 다른 레인의 '간파 성공 시 우클릭 쿨 80% 감소'와 겹쳐도 결과는 0.
+
 ## 5. 검증
 
 - 컴파일 에러 0. `SpinnerPracticeModelTests` 는 I0 이후 `Tools/Tests/튜토리얼 EditMode 테스트 실행` 에서 돈다(22건).

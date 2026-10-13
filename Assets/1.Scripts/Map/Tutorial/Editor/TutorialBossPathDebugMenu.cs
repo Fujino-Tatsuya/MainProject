@@ -51,17 +51,6 @@ internal static class TutorialBossPathDebugMenu
     [MenuItem(Root + "G11 열기 (앞 게이트 강제 — 보스방 도착 = 목숨 차감 시작, 이동·Finished 없음)", false, 85)]
     static void OpenG11() => OpenThrough(TutorialGate.G11_BossRoom);
 
-    static void OpenThrough(TutorialGate target)
-    {
-        TutorialDirector d = TutorialDirector.Instance;
-        int opened = 0;
-        for (int i = 0; i <= (int)target; i++)
-        {
-            var g = (TutorialGate)i;
-            if (d.IsGateOpen(g)) continue;
-            if (!d.TryOpenGateServer(g)) break;
-            opened++;
-        }
-        Debug.Log($"[TutorialDebug] {target} 까지 강제 개방 — 새로 연 게이트 {opened}개.");
-    }
+    // 강제 개방 코드는 런타임 구간 스킵(Alt+1~0)과 공용 — TutorialDebugActions.
+    static void OpenThrough(TutorialGate target) => TutorialDebugActions.OpenGatesThrough(TutorialDirector.Instance, target);
 }

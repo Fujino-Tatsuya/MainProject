@@ -47,6 +47,8 @@ TutorialTraitDirector (씬 상주 NetworkBehaviour, 서버 권한) ──Network
 | `bool StartOfferRoundServer(IEnumerable<ulong> clientIds, TutorialTraitRoundDisplay display)` | 지정 + 표시 옵션 |
 | `bool AutoChooseServer(ulong clientId)` | 그 플레이어의 제시 후보 중 무작위 1장 자동 획득. 대상 아님(이미 고름·제시 없음) = false |
 | `TutorialTraitJoinResult AddParticipantServer(ulong clientId)` | (S12) 지금 라운드에 참가자 1명 추가 — 그 사람에게만 제시, 기존 제시·선택 보존. `Offered`·`Empty`(0장)·`AlreadyInRound`(무시)·`NoRound`. 새 미선택자가 생기면 `ServerRoundCompleted` 가 같은 라운드에 다시 날 수 있다 |
+| `void StartRoundWithoutOfferServer(TutorialTraitRoundDisplay display)` | (할 일 34 구간 스킵) 아무에게도 제시하지 않고 새 라운드만 연다. 참가자는 아래 `GrantParticipantServer` 로 |
+| `TutorialTraitJoinResult GrantParticipantServer(ulong clientId)` | (할 일 34 구간 스킵) 지금 라운드에 **제시 없이** 참가 + 바로 무작위 1장 획득 — 제시 행·제시 번호(OfferSeq)가 안 생겨 **클라 창이 열리지 않는다**. 효과·`ServerTraitChosen`(Auto)·라운드 완료는 자동 획득과 같다. `Granted`·`Empty`(0장)·`AlreadyInRound`(무시)·`NoRound` |
 | `bool IsInRoundServer(ulong clientId)` | (S12) 지금 라운드 참가자인가(제시 중·고름·0장) |
 | `int AutoChooseAllPendingServer()` | 이번 라운드 미선택 전원 자동 획득. 처리 인원 수 반환 |
 | `bool IsRoundCompleteServer` | 이번 라운드 참가자 전원이 골랐나(라운드 없음 = true) |

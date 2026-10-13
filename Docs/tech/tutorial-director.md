@@ -1,6 +1,7 @@
 # 튜토리얼 진행 상태 — TutorialDirector
 
-> 할 일 15 / S1 (2026-10-11). 원본 시나리오: [../design/tutorial-scenario.md](../design/tutorial-scenario.md) §2.1·§4 · 계획: [../../PLAN-tutorial.md](../../PLAN-tutorial.md).
+> 할 일 15 / S1 (2026-10-11). 원본 시나리오: [../design/tutorial-scenario.md](../design/tutorial-scenario.md) §2.1·§4(**v8**, 2026-10-12 — 반영 계획 PLAN-tutorial §3-1) · 계획: [../../PLAN-tutorial.md](../../PLAN-tutorial.md).
+> v8 에서 바뀐 디렉터 규칙: G1 = 여덟 항목·교착 방지 제외 · G5 = 수동(연계 3회 + 마지막 복귀) · 체크 항목 SkillR·SkillInterrupt·Corridor1CooldownReset 추가 · `AttackHits` 삭제. 목숨 차감 기준 G11 은 그대로(사용자 확정, §11).
 > 코드: `Assets/1.Scripts/Map/Tutorial/` — `TutorialFlowModel`(순수 규칙) · `TutorialDirector`(서버 소유·복제) · `TutorialStageMarker`(판별).
 > 테스트: 메뉴 `Tools/Tests/튜토리얼 EditMode 테스트 실행`(`TutorialFlowModelTests` · `TutorialAreaTrackerTests`). 튜토리얼 단계의 새 픽스처는 이 러너에 넣는다.
 > S2 구간 감지는 §6. S3 배리어는 §7. S4 존 장부·몬스터 휴면은 §8. S5 타이머·보스 길은 §9. **단계별 문서·handoff 목록·API 전체는 §10.1.** S11 사망 규칙은 §11.
@@ -24,21 +25,23 @@
 | `_active` | 튜토리얼 활성 |
 | `_step` (`TutorialStep`) | 현재 단계 — 앞으로만 |
 | `_openedGates` / `_timeoutGates` | 게이트 G1~G11 열림 비트 / 그중 교착 방지로 열린 것 (G5 = 스피너봇 본 모드, G8 = 타이머 시작, G11 = 보스방 도착 — 목숨 차감 기준) |
-| `_players` (NetworkList) | 개인 진행: 체크 마스크(이동·대시·평타 적중 n/5·패시브 툴팁·Q·E·특성 복도1~4) · 접속 · 완전 사망 · 지난 배리어 마스크(개인 뒤 배리어 — §7) |
-| `_counters` (NetworkList) | 파티 카운터: 존2 처치 n/9 · 존3 간파 n/3 · 존4 패널 n/4 |
+| `_players` (NetworkList) | 개인 진행: 체크 마스크(이동·대시·기본 공격·패시브 툴팁·Q·E·R·우클릭·특성 복도1~4·복도1 쿨 초기화 기록 — v8) · 접속 · 완전 사망 · 지난 배리어 마스크(개인 뒤 배리어 — §7). v8 에서 적중 횟수(`AttackHits`) 삭제 |
+| `_counters` (NetworkList) | 파티 카운터: 존2 처치 n/9 · 존3 **연계**(간파 → 취약 밀치기 → 벽 충돌) n/3 · 존4 패널 n/4 |
 | `_wait` | 대기 표시: 지금 열 차례인 개인 게이트 · 완료 n · 전원 수 · 자동 진행 시각(ServerTime, 첫 완료자 전 -1) |
 
 늦은 클라는 이 값만으로 다시 그린다(이벤트 재생 없음).
 
 ## 4. 규칙 (`TutorialFlowModel`)
 - 게이트는 **G1 → G11 순서로만** 열린다(앞이 닫혀 있으면 뒤는 거부).
-- 개인 게이트 G1(이동·대시·적중 5·패시브 툴팁)·G2/G4/G7/G10(복도1~4 특성) = 참가자 **전원 완료**, 또는 **첫 완료자 후 60초**(서버 실제 시간 = `ServerTime` — 슬로우모션·솔로 일시정지 무관, 인스펙터 `deadlockSeconds`).
-  시계는 그 게이트가 열 차례가 된 뒤부터 잰다. 첫 완료자가 나가도 시계는 계속 간다. Q·E 는 안내용(게이트 아님, D13).
-- 카운터 게이트 G5 = 존3 간파 합계가 목표(3)에 닿으면 자동. 나머지(G3·G6·G8·G9)는 서버가 `TryOpenGateServer` 로 연다.
+- 개인 게이트 G1(v8: 이동·대시·패시브 툴팁 + **기본 공격·Q·E·R·우클릭 각 1회** = `TutorialFlowModel.G1Mask`)·G2/G4/G7/G10(복도1~4 특성) = 참가자 **전원 완료**.
+  특성 게이트(G2/G4/G7/G10)만 **첫 완료자 후 60초** 자동 진행(서버 실제 시간 = `ServerTime` — 슬로우모션·솔로 일시정지 무관, 인스펙터 `deadlockSeconds`) —
+  **G1 은 교착 방지 제외**(v8 §2.1, `HasDeadlockTimeout(G1) == false` — 대기 표시의 자동 진행 시각도 -1). 시계는 그 게이트가 열 차례가 된 뒤부터 잰다. 첫 완료자가 나가도 시계는 계속 간다.
+- v8: **카운터로 자동 열리는 게이트는 없다**(`TryGetGateCounter` 항상 false). G5(스피너봇 본 모드) = 연계 3회 + 마지막 원위치 복귀 뒤 존3 흐름이 `RequestGateServer(G5)`. 나머지(G3·G6·G8·G9)는 서버가 `TryOpenGateServer`/`RequestGateServer` 로 연다.
+- 개인 체크는 한 번 켜지면 끄지 않는다(사망·부활 무관). `Corridor1CooldownReset`(v8 복도1 첫 진입 쿨 초기화 기록)은 체크 마스크에 있지만 게이트 조건이 아니다.
 - G11(보스방 도착) = 서버 판정 게이트(개인·카운터 아님, 배리어 없음). 디렉터 `HandleBossRoomArrived`(패드·만료 강제 이동 공통 `AlivePlayersArrived`)가
   단계 Finished **전에** 연다. 순서 규칙 그대로라 **G10 전에 도착(타이머 만료 강제 이동)하면 닫힌 채로 남는다** — 사망 규칙은 도착·Finished 로 이미 끝나므로 목숨 규칙엔 영향 없음.
 - '전원' = 접속 중 + PermanentDead 아님(Soul·사망 연출은 포함). 이탈·완전 사망 시 즉시 재판정. **참가자 0명이면 자동으로 아무것도 열지 않는다**(세션 종료·결과 화면이 처리).
-- 같은 보고 중복·모르는 clientId 는 무시. 적중은 5에서, 카운터는 목표에서 멈춘다. 이탈한 id 는 다시 등록되지 않는다(재접속 없음).
+- 같은 보고 중복·모르는 clientId 는 무시. 카운터는 목표에서 멈춘다. 이탈한 id 는 다시 등록되지 않는다(재접속 없음).
 
 ## 5. API
 | 쪽 | API |
@@ -196,6 +199,7 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
 
 **디버그(Play 중 호스트, `Tools/Tutorial/Debug/`)**: 장부 로그 · 존2 기상 · 존3 기상 · 존4 기상(중간보스 제외) · 존4 중간보스 기상 · 존2~4 전부 휴면 ·
 존2 전멸(깨워서 처치) · 존3 핵심 처치 · 존4 핵심 처치. F9(DevMonsterKill)는 휴면 몬스터를 못 죽인다(무적) — 먼저 깨울 것.
+처치·강제 개방 코드는 `TutorialDebugActions`(런타임 — 구간 스킵 Alt+1~0 과 공용, §10.5).
 
 ## 9. 보스 타이머 · 보스 길 (S5)
 > 코드: `TutorialBossPathRules`(순수) · `TutorialBossPath`(판별 한 곳 — 경석 코드가 묻는 곳) · `TutorialElevatorDoor`(모든 피어) · `TutorialDirector`(G8·HUD·도착) ·
@@ -229,10 +233,10 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
 | 단계 | 문서 | 담는 것 |
 |---|---|---|
 | S6 안내 UI | [tutorial-guide-ui.md](tutorial-guide-ui.md) | 목표 패널·자막·강조 API, 문구 변형·치환 규칙, 화면 배치 |
-| 훅 | [tutorial-player-hooks.md](tutorial-player-hooks.md) | 대시 승인·툴팁 표시/숨김·간파 판정·스킬 사용·과열·조준 시작 이벤트 |
-| S0·S7 존1 | [tutorial-zone1.md](tutorial-zone1.md) | 착지 환영·이동 5m·대시·허수아비 적중 5·패시브 1초·G1·허수아비 디스폰 |
-| S8 복도1~4·존2 | [tutorial-corridors-zone2.md](tutorial-corridors-zone2.md) | 개인 도착 특성 라운드·출구 게이트·자동 획득·G10 패드 경고 · 존2 기상 4초·Q/E 안내·넛지 |
-| S9 존3 | [tutorial-zone3.md](tutorial-zone3.md) | 스피너봇 Variant 스폰 치환·연습 반경·간파 3번 → G5 → 본 모드 → G6 |
+| 훅 | [tutorial-player-hooks.md](tutorial-player-hooks.md) | 대시 승인·툴팁 표시/숨김·간파 판정·스킬 사용·과열·조준 시작 이벤트 · v8 기본 공격 시작·거너 Q 발사 |
+| S0·S7 존1(v8) | [tutorial-zone1.md](tutorial-zone1.md) | 착지 환영·이동 5m·대시·**기본 공격·Q·E·R·우클릭 각 1회**·패시브 1초·G1(교착 방지 없음)·캐릭터별 힌트·허수아비 디스폰 |
+| S8 복도1~4·존2(v8) | [tutorial-corridors-zone2.md](tutorial-corridors-zone2.md) | 개인 도착 특성 라운드·출구 게이트·자동 획득·G10 패드 경고 · **복도1 첫 진입 쿨 초기화** · 존2 기상 4초·**전멸만** |
+| S9 존3(v8) | [tutorial-zone3.md](tutorial-zone3.md) | 스피너봇 Variant 스폰 치환·유효 벽·연습 위치·**간파 → 취약 밀치기 → 벽 충돌 → 복귀 연계 3회** → G5 → 본 모드 → G6 |
 | S10 존4·보스 진입 | [tutorial-zone4.md](tutorial-zone4.md) | 설정 자막 10초 → G8 → 패널·다리·중간보스 → G9 · 만료·패드·도착 정리 · 재베이크/고정 조각 조사 |
 | 특성 | [tutorial-traits.md](tutorial-traits.md) | 특성 디렉터 API·라운드·무적 토큰·placeholder 6종·xlsx 이관 메모 |
 | S11 사망 | 이 문서 §11 | 자동 부활·목숨 차감(G11 보스방 도착)·부활 지점(단계 구간) |
@@ -263,7 +267,7 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
 - `BossTimerManager`(경석) — `bool StartTimerServer(float limitSecondsOverride = 0f)` · `TimerState State` · `float LimitSeconds` · `float RemainingSeconds` · `float Fill01`.
 - 순수: `TutorialFlowModel` · `TutorialAreaTracker`/`TutorialAreaLayout` · `TutorialBarrierRules` · `TutorialMonsterLedger` · `TutorialBossPathRules`.
 - 열거형: `TutorialStep`(None·Zone1·Corridor1·Zone2·Corridor2·Zone3Practice·Zone3Fight·Corridor3·Zone4Lore·Zone4Combat·Corridor4·BossEnter·Finished) ·
-  `TutorialGate`(G1~G11) · `TutorialCheck`(Move·Dash·AttackHit·PassiveTooltip·SkillQ·SkillE·TraitCorridor1~4) · `TutorialCounter`(Zone2Kills·Zone3Interrupts·Zone4Panels) ·
+  `TutorialGate`(G1~G11) · `TutorialCheck`(Move·Dash·BasicAttack·PassiveTooltip·SkillQ·SkillE·TraitCorridor1~4·SkillR·SkillInterrupt·Corridor1CooldownReset — v8) · `TutorialCounter`(Zone2Kills·Zone3Interrupts(= v8 연계)·Zone4Panels) ·
   `TutorialArea`(None·Zone1~4·Corridor1~4·BossEnter) · `TutorialMonsterFilter`(All·NormalOnly·KeyOnly) · `TutorialGateOpenReason`(Manual·AllDone·Timeout·CounterReached).
 
 ### 10.2 S6~S12 가 붙일 자리
@@ -308,6 +312,40 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
   G10 전 패드 위에 서도 카운트다운·테두리 없음 → `G10 열기` 순간 테두리 표시·엘리베이터 문 열림(클라 포함, 늦은 클라 = 열린 채) · 패드 3초 → 도착 → `[Tutorial] 보스방 도착` + 타이머 정지·게이지 0 ·
   G10 전 타이머 만료(인스펙터 `bossTimerLimitSeconds` 를 짧게) → 3초 경고 → 전원 강제 이동(배리어·패드 잠금 무관) → 도착 로그 ·
   🔴 절차 맵(`Stage1_Procedural`)에서 타이머가 맵 생성 직후 자동 시작·HUD 빈 틀·패드 즉시 활성·문 Closed 로 **기존과 같다**.
+
+### 10.5 구간 스킵 Alt+1~0 (할 일 34 — QA·테스트용)
+> 코드: `TutorialSkipPlan`(순수 계획) · `TutorialSkipController`(런타임 — 입력·패널·서버 실행) · `TutorialDirector.Skip.cs`(호스트 전용 ServerRpc) ·
+> `TutorialDebugActions`(강제 개방·존 처치 — `Tools/Tutorial/Debug/*` 메뉴와 공용) · `TutorialCorridorFlow.SkipRoundServer` · `TutorialDeathRules.TryFindAreaSpreadPoints`.
+> 테스트: `TutorialSkipPlanTests`(튜토리얼 러너). 단축키 표·QA 메모: [tutorial-qa.md 0.4](tutorial-qa.md#04-디버그-메뉴-play-중-호스트-toolstutorialdebug).
+- **빌드**: 모두 `#if UNITY_EDITOR || DEVELOPMENT_BUILD`(계획 모델만 예외 — 순수 코드). 릴리스 빌드엔 컨트롤러·RPC 가 없어 입력이 무시된다. 로그는 `Debug.Log`(`Edit.*` 는 빌드에서 사라짐).
+- **권한**: 각 피어의 컨트롤러가 Alt+숫자를 읽는다. 호스트가 아니면 "호스트만" 토스트로 끝. 호스트는 `RequestSkip` → `RequestSkipServerRpc` — 서버가 보낸 사람 = 서버 자신(호스트)인지 다시 검증.
+- **판정**(`TutorialSkipPlan.Check(step, target, restartInProgress)`): 판 재시작 진행 중(`NetworkLoadingFlowController.IsFlowInProgress`)이면 무엇이든 거부(`RestartInProgress`).
+  Alt+0(`Restart`) = 뒤로 가기 예외 — 어느 구간·Finished 뒤에도 허용. 그 밖엔 지금 구간 = 디렉터 `Step` 의 구간(`CurrentOf`), 목적 < 지금 = 뒤로 → 거부(토스트·로그), Finished = 거부,
+  같은 구간 = 게이트 없이 다시 옮기기만. 이전 스킵이 진행 중이면 거부(Alt+0 은 진행 중 스킵을 끊고 실행). 존1 은 단축키가 없다(지금 구간 기준값으로만 남음).
+- **처음부터(Alt+0 — 판 재시작, 할 일 34 후속 3)**: 확인 없이 `NetworkLoadingFlowController.TryRestartTargetScene` — 정식 진입과 같은 로딩 흐름을 탄다:
+  로딩 씬 Additive → (로비 언로드 대신) **동적 스폰 NetworkObject 전부 디스폰**(플레이어 포함 — `Spawn()` 기본 `DestroyWithScene=false` 라 안 지우면 NGO 가 활성 씬으로 옮겨 살린다) →
+  `4.MapScene` 네트워크 언로드 → 다시 Additive 로드 → `SpawnAllPlayers`(10m 낙하) → MainGameReady → 로딩 씬 언로드. 씬 배치 객체(디렉터·게이트·특성·몬스터·공용 목숨·보스 타이머·`SessionStatsTracker`)는
+  씬과 함께 새로 생긴다. 유지: `ServerCharacterSelectionStore`(세션 정적) · NetworkManager·GameManager 등 DDOL 매니저(`GameState` 가 Loading → MainGame 으로 돌아 MainGameReady 가 다시 발행되고, `NetworkClock.MarkMainGameStart` 재스탬프).
+  Dev_Boot(Single 로드) 경로에서도 같은 흐름. 이 컴포넌트는 맵과 함께 사라지므로 재시작은 NetworkManager 쪽이 끝까지 진행한다. 거부 = 로딩 흐름 진행 중·타깃 씬 미로드·로딩 씬 로드 실패(판 그대로).
+  - **수정(후속 4)**: Dev_Boot 재시작에서 로딩 씬이 안 내려가고 몬스터가 로딩 씬에 남던 버그 — 표시 시간 0(`SetEditorDefaults(...,0,0)`)이라 완료 루틴이 진행률 0.9(활성화 전)에서 바로 로딩 씬 언로드를 요청 → NGO `SceneEventInProgress` 거절(재시도 없음) → 로딩 씬이 활성 씬으로 남고 그 안에 Instantiate 된 몬스터도 남음. 완료 루틴이 타깃 `LoadEventCompleted` 를 먼저 기다린다([scene-flow-audit.md §8](scene-flow-audit.md)).
+- **계획**(`TutorialSkipPlan.Build`): 목적 구간 입구 게이트(복도 n = G1/G3/G6/G9, 다음 존 = G2/G4/G7, 보스 진입·보스방 = G10)까지 **닫힌 게이트만** G1 부터 순서대로, 게이트마다 정식 경로 하나:
+  G1 = 접속자 전원 `ReportCheckServer`(G1Mask 전 항목) · G2/G4/G7/G10 = `TutorialCorridorFlow.SkipRoundServer`(**제시 없이** 라운드를 열고(`StartRoundWithoutOfferServer`) 아직 참가하지 않은 접속자마다 `GrantParticipantServer` = 바로 무작위 1장 획득 → `ServerTraitChosen`(Auto) → 특성 체크 → 전원 완료.
+  제시 행·플레이어별 제시 번호(OfferSeq)가 생기지 않아 **클라 특성 창이 열리지 않는다**. 이미 중간 지점에 도착해 창을 보던 사람만 `AutoChooseAllPendingServer` 로 창이 닫힌다) ·
+  G3/G6/G9 = 그 존 살아 있는 몬스터 전부 깨워 처치(`TutorialDebugActions.KillZoneMonsters` — 장부 클리어 → `RequestGateServer`, 0마리면 직접 요청) ·
+  G5 = 연계 카운터를 목표까지 + `RequestGateServer(G5)`(존3 흐름이 '연습 없이' 본 모드로) · G8 = `StartBossTimerServer`(존4 흐름이 '설정 자막 없이' 전투 시작 + 420초 타이머).
+  존3 규칙 파일은 고치지 않는다 — 디렉터·흐름의 기존 공개 API 만 부른다.
+- **실행**(서버 코루틴): 단계마다 게이트가 열리기를 최대 5초(실제 시간) 기다린다. 안 열리면 경고 후 `TutorialDebugActions.OpenGatesThrough`(디버그 메뉴 강제 개방과 같은 코드). 그래도 안 열리면 중단·이동 없음.
+  끝나면 `SetStepServer(StepOf(목적))`(앞으로만 — 존은 첫 진입 단계) → 접속자마다(완전 사망 제외) `ResetBackBarrierMaskServer(id, 목적 구간)`(전멸 리스폰과 같은 예외 — 최전방 = 목적 구간) →
+  `TryFindAreaSpreadPoints`(전멸 리스폰과 같은 규칙: 격자·바닥·점유·지난 배리어 앞면 여유·패드 + 1m 밖·2m 간격 — 기준점 = 그 구간 입구 배리어, 존1 = 가운데) → `PlayerFallRecovery.RelocateServer`(= `TeleportAuthoritative`).
+  존이면 구간 감지가 새 위치로 `AreaFirstEntered` 를 내서 그 존 흐름(존2 4초 기상 · 존3 연습 · 존4 설정 자막)이 평소대로 시작한다. 복도면 그 복도 특성은 도착 뒤 중간 지점에서 평소대로.
+- **보스방(Alt+9)**: 보스 진입과 같은 계획·이동 뒤 `BossTeleportManager.ForceStartEncounter(3)` — 패드 이동 경로 그대로(카운트다운 → 산개 → 도착 ACK → `AlivePlayersArrived` → G11·Finished).
+- **화면**: Alt 를 **누르고 있는 동안만** 호스트 화면 오른쪽 위에 버튼 10개(지금 구간 ▶ · 뒤 구간·진행 중 비활성 · 마지막 'Alt+0 처음부터' 는 재시작 중이 아니면 늘 활성). 토글이 아닌 이유 — 단축키가 이미 Alt 조합이라 쓰려는 순간에만 보이고, 켜 둔 채 잊어 캡처·녹화에 남지 않는다.
+- **로그**: `[TutorialSkip] 시작 → X (단계 …) — 할 일 G1(…) → …` · `[TutorialSkip] → 구간 X (열린 게이트 G1·G2… · 특성 자동 획득 복도 1·2 · 이동 n명 · 단계 …)`.
+- **알려진 한계**: 건너뛴 복도1 첫 진입 쿨 초기화(체크리스트 아님)는 없다. 존4 패널·다리는 건너뛴다(카운터 0/4 그대로 — 중간보스는 다리 없이 처치).
+  건너뛴 복도의 획득 토스트는 그 플레이어가 전에 제시받은 적이 있을 때만 뜬다(창 모델 규칙 — 제시 번호 0 이면 토스트 없음). 획득 아이콘은 항상 갱신된다.
+  이동 지점은 몬스터 거리를 보지 않는다(전멸 리스폰과 같음 — 목적 존 몬스터는 아직 휴면).
+  처음부터: DDOL 풀(`EffectManager`)에 떠 있던 이펙트는 정리하지 않는다(풀 수명대로 사라짐). 타깃 씬 언로드가 실패하면 같은 씬을 겹쳐 올리지 않고 남은 판에 플레이어만 다시 스폰한다(에러 로그).
+
 ## 11. 사망 규칙 (S11)
 > 코드: `TutorialDeathRulesModel`·`TutorialRevivePointRules`(순수) · `TutorialDeathRules`(서버, 디렉터에 런타임 부착). 테스트: `TutorialDeathRulesTests`(튜토리얼 러너).
 > 훅(기본값 = 기존 동작): `PlayerLifeCycleController.ServerDeathKeepsSoul` · `PlayerReviveController.TryCompleteReviveOnServer(bool consumeLife)` · `PlayerFallRecovery.RelocateServer`.
