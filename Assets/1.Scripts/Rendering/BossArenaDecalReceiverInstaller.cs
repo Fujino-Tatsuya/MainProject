@@ -27,7 +27,7 @@ public sealed class BossArenaDecalReceiverInstaller : MonoBehaviour
     /// <summary>아레나 랜드마크. 보스 착지점이라 아레나 안에만 있다.</summary>
     const string LandmarkName = "BossLandingPoint";
 
-    /// <summary>이 이름으로 시작하는 조상을 아레나 루트로 본다. 못 찾으면 최상위를 쓴다.</summary>
+    /// <summary>이 이름으로 시작하는 조상을 아레나 루트로 본다. 못 찾으면 최상위(씬 그룹이면 그 바로 아래)를 쓴다.</summary>
     const string ArenaRootPrefix = "bossroom";
 
     const float PollInterval = 0.5f;
@@ -87,6 +87,18 @@ public sealed class BossArenaDecalReceiverInstaller : MonoBehaviour
                 return t.gameObject;
         }
 
-        return landmark.transform.root.gameObject;
+        // 최상위가 씬 정리용 그룹(4.MapScene 의 Environment 등)이면 그 아래 자식에서 멈춘다 —
+        // 그룹째 표시하면 아레나와 무관한 환경 전체로 범위가 번진다.
+        Transform top = landmark.transform;
+        while (top.parent != null && !IsSceneGroup(top.parent))
+            top = top.parent;
+        return top.gameObject;
     }
+
+    /// <summary>씬 정리용 루트 그룹 이름(Docs/tech/scene-flow-audit.md "씬 하이어라키 규칙").</summary>
+    static readonly string[] SceneGroupNames =
+        { "Management", "Camera", "UI", "Environment", "PostProcessing", "Debug" };
+
+    static bool IsSceneGroup(Transform t) =>
+        t.parent == null && System.Array.IndexOf(SceneGroupNames, t.name) >= 0;
 }

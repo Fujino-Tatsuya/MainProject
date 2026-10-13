@@ -6,6 +6,23 @@
 - 방식: 코드·씬·프리팹·NGO 2.12 패키지 소스와 기존 로그의 읽기 전용 정적 감사
 - 제한: Unity/MPPM을 재실행하지 않았고 코드·씬·프리팹은 수정하지 않았다. 따라서 기존 로그에 기록되지 않은 “실패한 정확한 `GlobalObjectIdHash`”는 새 계측 없이 복원할 수 없다.
 
+## 0. 씬 하이어라키 규칙 (2026-10-13, 할 일 37)
+
+`4.MapScene` 의 루트는 **빈 그룹 6개뿐**이다(Transform 원점·회전 0·스케일 1). 새 오브젝트는 맞는 그룹 아래에 둔다.
+
+| 그룹 | 내용 |
+|---|---|
+| Management | 매니저·디렉터(`MapSceneManager`, `GameRule`, `MapGenerator`, `MapNetworkSync`, `BossEncounterDirector` 등) |
+| Camera | `CameraFollowTarget`, `CameraSwitcher` |
+| UI | `Canvas`, 튜토리얼 UI, `Minimap` |
+| Environment | 조명·스테이지(`Stage1` 등)·`bossroom`·물·배경 |
+| PostProcessing | `Global Volume`, 화면 효과 컨트롤러 |
+| Debug | `ProfilerHUD`, `HitVFXDebugHUD` |
+
+- **매니저는 `Assets/2.Prefabs/Managers/<이름>.prefab` 프리팹 인스턴스로 둔다.** 씬 오브젝트를 가리키는 필드는 에셋에선 비고 씬 인스턴스 오버라이드로 남는다(정상).
+- 씬 배치 `NetworkObject` 매니저도 프리팹 인스턴스다 — hash 는 인스턴스별 씬 고유값이고 소스 프리팹은 `DefaultNetworkPrefabs` 에 자동 등록된다(`GameRule` 과 같은 형태). 프리팹 구조를 바꾼 뒤엔 MapScene 을 저장해 hash 가 낡지 않게 한다([criticalIssue/2026-10-07-ngo-inscene-hash-stale.md](../criticalIssue/2026-10-07-ngo-inscene-hash-stale.md)).
+- 코드는 **루트 위치·경로에 기대지 않는다** — `GameObject.Find("A/B")` 경로, `GetRootGameObjects()` 직속 검사, `transform.root` 로 "씬 최상위 오브젝트"를 가정하지 말고 이름으로 찾은 뒤 그 아래를 본다. `DontDestroyOnLoad` 매니저(`EffectManager`)는 Awake 에서 `SetParent(null)` 후 호출한다.
+
 ## 1. 판정 기준
 
 - **[확인]** 코드/직렬화 파일/로그가 직접 증명한다.
