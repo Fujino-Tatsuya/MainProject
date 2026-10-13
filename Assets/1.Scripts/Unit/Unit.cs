@@ -156,10 +156,21 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         // 막타가 보스 격파(Died → 결과 확정)보다 앞서 집계된다. 판정에는 관여하지 않는다.
         int healthLost = previousHealth - _health.CurrentHealth;
         if (healthLost > 0 || shieldDealt > 0)
+        {
             CombatStatsEvents.RaiseServerDamageApplied(this, _damageAttackerClientId,
                 healthLost + shieldDealt, _health.CurrentHealth <= 0);
+            OnServerHealthDamageApplied(healthLost, shieldDealt);
+        }
 
         NotifyDeathTransition(previousHealth);
+    }
+
+    /// <summary>
+    /// 서버에서 피해가 실제로 체력 또는 보호막을 깎았을 때(둘 중 하나라도 &gt; 0) 불린다. 무적·0 피해는 오지 않는다.
+    /// 추락·비율·직접 피해 포함. 파생이 "방금 맞았다"에 반응하는 지점(플레이어 체력 재생 지연 리셋).
+    /// </summary>
+    protected virtual void OnServerHealthDamageApplied(int healthLost, int shieldLost)
+    {
     }
 
     void ApplyMitigatedHealthDamage(int damage, out int hpDealt, out int shieldDealt)
