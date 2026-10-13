@@ -5,7 +5,7 @@ using UnityEngine;
 /// (PLAN §5 "등판각은 일반 이동 규칙 공유", "낮은 턱·지면 Snap·등판각은 Player GameRule 직렬화 값")
 ///
 /// Soul soulSpeed 등은 각 기능이 병합·안정화된 뒤 이 규칙으로 이관한다.
-/// 파티 공용 목숨 수(할 일 30)는 씬 단위 규칙이라 GameRule.prefab 의 <see cref="Temp_MultiGameRule"/>(같은 Player 시트, partyLifeCount)에 둔다.
+/// 파티 공용 목숨 수(할 일 30)는 씬 단위 규칙이라 GameRule.prefab 의 <see cref="MultiGameRule"/>(같은 Player 시트, partyLifeCount)에 둔다.
 /// </summary>
 [CreateAssetMenu(fileName = "PlayerGameRuleData", menuName = "BeaverLobby/Player/Game Rule Data", order = 0)]
 [DataTableSheet("Player", Order = 6)]

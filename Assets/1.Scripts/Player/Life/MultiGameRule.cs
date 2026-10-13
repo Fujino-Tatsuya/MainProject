@@ -11,7 +11,7 @@ using UnityEngine;
 /// clientId 와 무관하게 공용 풀을 본다. <see cref="TryRegisterClient"/>·<see cref="TryUnregisterClient"/> 는 호환용(장부 없음).
 /// </summary>
 [DataTableSheet("Player", Order = 7)]
-public class Temp_MultiGameRule : NetworkBehaviour
+public class MultiGameRule : NetworkBehaviour
 {
     [Header("공용 목숨")]
     [Tooltip("파티 공용 목숨 수. 게임 시작·전멸 리스폰 때 이 값으로 채운다. 부활(Soul → Alive) 성공마다 1개 쓴다.")]

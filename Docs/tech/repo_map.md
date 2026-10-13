@@ -1869,7 +1869,7 @@
   - bool Equals(object obj) → `Equals` 위임 [wrapper?]
   - int GetHashCode()
 
-### class Temp_MultiGameRule : NetworkBehaviour
+### class MultiGameRule : NetworkBehaviour
   - void OnNetworkSpawn()
   - void OnNetworkDespawn()
   - bool TryGetLifeCount(ulong clientId, int lifeCount)
@@ -3122,12 +3122,12 @@
 - `PlayerLifeInputPolicy.HandleCinematicLockChanged()` → `ApplyCurrentAccess` (Assets/1.Scripts/Player/Life/PlayerLifeInputPolicy.cs)
 - `PlayerReviveController.Awake()` → `ResolveGameRuleReference` (Assets/1.Scripts/Player/Life/PlayerReviveController.cs)
 - `PlayerReviveController.RequestDebugReviveRpc()` → `TryCompleteReviveOnServer` (Assets/1.Scripts/Player/Life/PlayerReviveController.cs)
-- `PlayerLifeCountEntry.NetworkSerialize()` → `serializer.SerializeValue` (Assets/1.Scripts/Player/Life/Temp_MultiGameRule.cs)
-- `PlayerLifeCountEntry.Equals()` → `Equals` (Assets/1.Scripts/Player/Life/Temp_MultiGameRule.cs)
-- `Temp_MultiGameRule.HasReviveAvailable()` → `TryGetLifeCount` (Assets/1.Scripts/Player/Life/Temp_MultiGameRule.cs)
-- `Temp_MultiGameRule.HandleClientConnected()` → `TryRegisterClient` (Assets/1.Scripts/Player/Life/Temp_MultiGameRule.cs)
-- `Temp_MultiGameRule.HandleClientDisconnected()` → `TryUnregisterClient` (Assets/1.Scripts/Player/Life/Temp_MultiGameRule.cs)
-- `Temp_MultiGameRule.HandleLifeCountsChanged()` → `LifeCountsChanged?.Invoke` (Assets/1.Scripts/Player/Life/Temp_MultiGameRule.cs)
+- `PlayerLifeCountEntry.NetworkSerialize()` → `serializer.SerializeValue` (Assets/1.Scripts/Player/Life/MultiGameRule.cs)
+- `PlayerLifeCountEntry.Equals()` → `Equals` (Assets/1.Scripts/Player/Life/MultiGameRule.cs)
+- `MultiGameRule.HasReviveAvailable()` → `TryGetLifeCount` (Assets/1.Scripts/Player/Life/MultiGameRule.cs)
+- `MultiGameRule.HandleClientConnected()` → `TryRegisterClient` (Assets/1.Scripts/Player/Life/MultiGameRule.cs)
+- `MultiGameRule.HandleClientDisconnected()` → `TryUnregisterClient` (Assets/1.Scripts/Player/Life/MultiGameRule.cs)
+- `MultiGameRule.HandleLifeCountsChanged()` → `LifeCountsChanged?.Invoke` (Assets/1.Scripts/Player/Life/MultiGameRule.cs)
 - `PlayableCharacterVisual.BindExistingVisual()` → `BindVisual` (Assets/1.Scripts/Player/PlayableCharacterVisual.cs)
 - `Player.OnGainedOwnership()` → `ConfigureMovementPhysicsAuthority` (Assets/1.Scripts/Player/Player.cs)
 - `Player.OnLostOwnership()` → `ConfigureMovementPhysicsAuthority` (Assets/1.Scripts/Player/Player.cs)
