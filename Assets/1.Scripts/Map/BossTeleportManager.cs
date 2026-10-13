@@ -477,6 +477,33 @@ public class BossTeleportManager : NetworkBehaviour
         ArrivalAborted?.Invoke();
     }
 
+    /// <summary>
+    /// [서버] 전멸 리스폰(할 일 30 (2) — Docs/tech/handoff-boss-encounter-reset.md)용 처음 상태 복귀. <b>이 메서드를 부를 때만</b> 동작한다.
+    /// 카운트다운(패드·강제)·도착 ACK 대기를 취소하고 시퀀스를 올려 늦게 온 ACK 를 버린다. 점유는 비움으로 둔다 —
+    /// 다음에 패드(<see cref="BossEnterTrigger"/>)에 들어오는 순간 다시 통지돼 카운트다운이 시작된다.
+    /// 이벤트(<see cref="AlivePlayersArrived"/>·<see cref="ArrivalAborted"/>)는 내지 않는다.
+    /// </summary>
+    public void ResetForRetryServer()
+    {
+        if (!IsServer || !IsSpawned)
+            return;
+
+        CancelCountdown();
+
+        if (_ackTimeout != null)
+        {
+            StopCoroutine(_ackTimeout);
+            _ackTimeout = null;
+        }
+
+        _awaitingArrival.Clear();
+        _arrivedClientIds.Clear();
+        _encounterSequence++;
+        _occupied.Value = false;
+
+        Edit.Log("[BossTeleport] 재도전 리셋 — 카운트다운·도착 대기 취소, 패드 다시 사용 가능.", this);
+    }
+
     /// <summary>대기 중 이탈 처리. 남은 대기자가 0이면 도착한 사람으로 진행하고, 아무도 없으면 취소한다.</summary>
     private void HandleClientDisconnected(ulong clientId)
     {
