@@ -25,6 +25,12 @@ public static class LocText
 
     public static string Code(GameLanguage language) => language == GameLanguage.En ? "en" : "ko";
 
+    /// <summary>언어 이름은 번역하지 않는다 — 각자 자기 언어로 써야 못 읽는 사람도 찾아 돌아온다(설정창 언어 버튼).</summary>
+    public static string NativeName(GameLanguage language) => language == GameLanguage.En ? "English" : "한국어";
+
+    /// <summary>다음 언어(버튼 한 번 = 한 칸) — 언어가 둘이라 한국어 ↔ English.</summary>
+    public static GameLanguage Next(GameLanguage language) => language == GameLanguage.Ko ? GameLanguage.En : GameLanguage.Ko;
+
     public static bool TryParse(string code, out GameLanguage language)
     {
         switch (code?.Trim().ToLowerInvariant())

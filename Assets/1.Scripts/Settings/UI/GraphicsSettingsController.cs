@@ -43,7 +43,7 @@ public sealed class GraphicsSettingsController : MonoBehaviour
 
     void OnEnable()
     {
-        LanguageConfig.Changed += Refresh;
+        Loc.Changed += Refresh;
         HideConfirm();
         Refresh();
     }
@@ -51,7 +51,7 @@ public sealed class GraphicsSettingsController : MonoBehaviour
     // 확인 중에 탭·패널을 닫으면 "유지"를 누르지 않은 것 — 되돌린다(화면이 안 보여 닫은 경우도 복구된다).
     void OnDisable()
     {
-        LanguageConfig.Changed -= Refresh;
+        Loc.Changed -= Refresh;
         if (_confirmLeft >= 0f) Revert();
     }
 
@@ -66,7 +66,7 @@ public sealed class GraphicsSettingsController : MonoBehaviour
     void UpdateConfirmText()
     {
         if (confirmText != null)
-            confirmText.text = SettingsStrings.Format("settings.graphics.confirm", Mathf.CeilToInt(_confirmLeft));
+            confirmText.text = ConfirmText(Mathf.CeilToInt(_confirmLeft));
     }
 
     void Refresh()
@@ -91,9 +91,9 @@ public sealed class GraphicsSettingsController : MonoBehaviour
             windowModeDropdown.ClearOptions();
             windowModeDropdown.AddOptions(new List<string>
             {
-                SettingsStrings.Get("settings.graphics.windowMode.fullscreen"),
-                SettingsStrings.Get("settings.graphics.windowMode.borderless"),
-                SettingsStrings.Get("settings.graphics.windowMode.windowed"),
+                SettingsUiStrings.GraphicsWindowModeFullscreen.Text,
+                SettingsUiStrings.GraphicsWindowModeBorderless.Text,
+                SettingsUiStrings.GraphicsWindowModeWindowed.Text,
             });
             windowModeDropdown.SetValueWithoutNotify((int)_pending.windowMode);
         }
@@ -106,7 +106,7 @@ public sealed class GraphicsSettingsController : MonoBehaviour
             for (int i = 0; i < DisplayConfig.FrameLimitOptions.Length; i++)
             {
                 int v = DisplayConfig.FrameLimitOptions[i];
-                labels.Add(v > 0 ? v.ToString() : SettingsStrings.Get("settings.graphics.frameLimit.unlimited"));
+                labels.Add(v > 0 ? v.ToString() : SettingsUiStrings.GraphicsFrameLimitUnlimited.Text);
                 if (v == _pending.frameLimit) selected = i;
             }
             frameLimitDropdown.AddOptions(labels);
@@ -122,11 +122,20 @@ public sealed class GraphicsSettingsController : MonoBehaviour
     {
         switch (c)
         {
-            case ResolutionChoice.Recommended2560x1440: return SettingsStrings.Get("settings.graphics.resolution.1440");
-            case ResolutionChoice.Recommended1920x1080: return SettingsStrings.Get("settings.graphics.resolution.1080");
-            default: return SettingsStrings.Format("settings.graphics.resolution.native", native.x, native.y);
+            case ResolutionChoice.Recommended2560x1440: return SettingsUiStrings.GraphicsResolution1440.Text;
+            case ResolutionChoice.Recommended1920x1080: return SettingsUiStrings.GraphicsResolution1080.Text;
+            default:
+                return SettingsUiStrings.GraphicsResolutionNative.Format(new Dictionary<string, string>
+                {
+                    ["width"] = native.x.ToString(),
+                    ["height"] = native.y.ToString(),
+                });
         }
     }
+
+    /// <summary>확인 창 문구 — 남은 초는 공용 초 단위(<see cref="UiStrings.Seconds"/>)로 만든다.</summary>
+    public static string ConfirmText(int secondsLeft) =>
+        SettingsUiStrings.GraphicsConfirm.Format(new Dictionary<string, string> { ["time"] = UiStrings.Seconds(secondsLeft, "0") });
 
     void OnResolutionChanged(int index)
     {

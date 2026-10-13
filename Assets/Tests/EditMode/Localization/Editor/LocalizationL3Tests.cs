@@ -150,6 +150,27 @@ public sealed class UiStringsFormatTests
         Loc.Current = GameLanguage.En;
         Assert.That(LocalizedText.Text("UI.Result.Kills", "처치"), Is.EqualTo("Kills"));
     }
+
+    [Test]
+    public void SettingsConfirm_NoRow_KoWithSecondsUnit_RowFormatsInCurrentLanguage()
+    {
+        Assert.That(GraphicsSettingsController.ConfirmText(10), Is.EqualTo("이 화면 설정을 유지할까요?\n10초 뒤 되돌립니다"));
+
+        UseRows(new StringTable.Entry("UI.Settings.Graphics.Confirm", "이 화면 설정을 유지할까요?\n{time} 뒤 되돌립니다", "Keep these display settings?\nReverting in {time}"),
+            new StringTable.Entry("UI.Unit.Seconds", "{sec}초", "{sec}s"));
+        Loc.Current = GameLanguage.En;
+        Assert.That(GraphicsSettingsController.ConfirmText(3), Is.EqualTo("Keep these display settings?\nReverting in 3s"));
+    }
+
+    [Test]
+    public void SettingsActionLabel_FollowsLanguage()
+    {
+        Assert.That(KeyRebindRow.ActionLabel("Player/SkillMain"), Is.EqualTo("스킬 1 (메인)"));
+
+        UseRows(new StringTable.Entry("UI.Settings.Controls.SkillMain", "스킬 1 (메인)", "Skill 1 (Main)"));
+        Loc.Current = GameLanguage.En;
+        Assert.That(KeyRebindRow.ActionLabel("Player/SkillMain"), Is.EqualTo("Skill 1 (Main)"));
+    }
 }
 
 public sealed class UiStringsAuthoringTests
@@ -197,12 +218,32 @@ public sealed class UiStringsAuthoringTests
     [Test]
     public void FindByPath_MatchesNameSuffix_IncludingInactive()
     {
-        GameObject row = Child(_root.transform, "LanguageOption", false);
-        GameObject label = Child(row.transform, "LanguageLabel", true);
-        Child(_root.transform, "LanguageLabel", true); // 다른 부모의 같은 이름
+        GameObject row = Child(_root.transform, "PlayerRowsHeader", false);
+        GameObject label = Child(row.transform, "Header_Kills", true);
+        Child(_root.transform, "Header_Kills", true); // 다른 부모의 같은 이름
         row.SetActive(false);
 
-        Assert.That(UiStringsAuthoring.FindByPath(_root.transform, "LanguageOption/LanguageLabel"), Is.SameAs(label.transform));
+        Assert.That(UiStringsAuthoring.FindByPath(_root.transform, "PlayerRowsHeader/Header_Kills"), Is.SameAs(label.transform));
         Assert.That(UiStringsAuthoring.FindByPath(_root.transform, "Nope"), Is.Null);
+    }
+
+    // 설정창 라벨 연결(SettingsLocalizationLinker) — 영어 저작 원문으로 키를 찾고 글자를 ko 폴백으로 맞춘다. 두 번째는 무변경.
+    [Test]
+    public void SettingsLinker_EnglishLabel_GetsKeyAndKoFallback_Idempotent()
+    {
+        var label = new GameObject("Label");
+        label.transform.SetParent(_root.transform, false);
+        label.AddComponent<TextMeshProUGUI>().text = "Resolution";
+        var value = new GameObject("Value");
+        value.transform.SetParent(_root.transform, false);
+        value.AddComponent<TextMeshProUGUI>().text = "100%";
+
+        Assert.That(SettingsLocalizationLinker.Link(_root.transform), Is.EqualTo(1));
+        Assert.That(label.GetComponent<LocalizedText>().Key, Is.EqualTo(SettingsUiStrings.GraphicsResolution.Key));
+        Assert.That(label.GetComponent<TMP_Text>().text, Is.EqualTo("해상도"));
+        Assert.That(value.GetComponent<LocalizedText>(), Is.Null);
+
+        Assert.That(SettingsLocalizationLinker.Link(_root.transform), Is.EqualTo(0));
+        Assert.That(label.GetComponents<LocalizedText>().Length, Is.EqualTo(1));
     }
 }

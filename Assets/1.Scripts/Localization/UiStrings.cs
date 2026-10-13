@@ -62,9 +62,6 @@ public static class UiStrings
     // 머리 위 체력바 이름 — PlayerOverheadHealthBarRule({n} = 1부터 세는 플레이어 번호)
     public static readonly UiString OverheadPlayerLabel = new UiString("UI.Overhead.PlayerLabel", "P{n}", "PlayerOverheadHealthBarRule — 머리 위 이름(코드)");
 
-    // 타이틀 옵션 — Gameplay › LanguageOption › LanguageLabel(언어 이름 한국어/English 는 번역하지 않는다)
-    public static readonly UiString OptionsLanguage = new UiString("UI.Options.Language", "Language", "1.TitleScene › LanguageOption/LanguageLabel");
-
     // ── L4b — 코드에 박혀 있던 UI 문구 ──
 
     // 공용 단위 — 초({sec} = 숫자만, 소수 자릿수는 쓰는 곳이 정한다). 초를 보여 주는 문구는 이 키로 숫자를 만든 뒤 {time} 에 넣는다.
@@ -159,7 +156,6 @@ public static class UiStrings
             GunnerHeatStage, GunnerHeatOverheated,
             InteractPrompt,
             OverheadPlayerLabel,
-            OptionsLanguage,
             UnitSeconds,
             LoadingPreparing, LoadingLoading, LoadingWaitingForPlayers, LoadingActivating, LoadingStandBy,
             SkillTooltipShiftHint, SkillTooltipError, SkillTooltipPassiveBadge,
@@ -169,6 +165,7 @@ public static class UiStrings
         all.AddRange(LoadingTips);
         all.AddRange(LoadingReadyMessages);
         all.AddRange(StatusEffectNames.Values);
+        all.AddRange(SettingsUiStrings.All);   // 설정창(UI.Settings.*) — 목록은 Settings 쪽 한 곳
         return all;
     }
 

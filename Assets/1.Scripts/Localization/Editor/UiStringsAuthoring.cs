@@ -8,16 +8,16 @@ using UnityEngine.SceneManagement;
 /// L3 — 씬·프리팹 정적 라벨에 <see cref="LocalizedText"/> 를 붙이고 키를 적는다(멱등 — 이미 맞으면 저장하지 않는다).
 /// 글자·위치·글꼴은 건드리지 않는다. 저작된 글자는 시트에 행이 없을 때의 폴백(ko 원문)으로 남는다.
 /// 런타임에 코드가 글자를 쓰는 라벨(어쌔신 변신·거너 과열·머리 위 이름)은 여기 없다 — 코드가 <see cref="UiStrings"/> 를 쓴다.
+/// 설정창(SettingsBody.prefab) 라벨은 여기가 아니라 <c>SettingsLocalizationLinker</c>(같은 <see cref="Apply"/> 사용)가 붙인다.
 /// </summary>
 public static class UiStringsAuthoring
 {
     private const string Tag = "[UiStringsAuthoring]";
     private const string ResultScenePath = "Assets/0.Scenes/MainFlow/5.ResultScene.unity";
-    private const string TitleScenePath = "Assets/0.Scenes/MainFlow/1.TitleScene.unity";
     private const string AssassinHudPath = "Assets/2.Prefabs/Player/Assassin/AssassinHUD.prefab";
     private const string InteractPromptPath = "Assets/2.Prefabs/UI/InteractPrompt.prefab";
 
-    /// <summary>라벨 하나 — <see cref="ObjectPath"/> 는 루트 아래 이름 경로의 끝부분(예 <c>LanguageOption/LanguageLabel</c>).</summary>
+    /// <summary>라벨 하나 — <see cref="ObjectPath"/> 는 루트 아래 이름 경로의 끝부분(예 <c>PlayerRowsHeader/Header_Kills</c>).</summary>
     private readonly struct Target
     {
         public Target(string objectPath, UiString text)
@@ -37,11 +37,6 @@ public static class UiStringsAuthoring
         new Target("Header_Kills", UiStrings.ResultKills),
         new Target("Header_Counters", UiStrings.ResultCounters),
         new Target("Header_Deaths", UiStrings.ResultDeaths),
-    };
-
-    private static readonly Target[] TitleTargets =
-    {
-        new Target(LanguageOptionAuthoring.LabelPath, UiStrings.OptionsLanguage),
     };
 
     private static readonly Target[] AssassinHudTargets =
@@ -67,7 +62,6 @@ public static class UiStringsAuthoring
         changed += AuthorPrefab(AssassinHudPath, AssassinHudTargets);
         changed += AuthorPrefab(InteractPromptPath, InteractPromptTargets);
         changed += AuthorScene(ResultScenePath, ResultTargets);
-        changed += AuthorScene(TitleScenePath, TitleTargets);
         Debug.Log($"{Tag} 완료 — 바뀐 라벨 {changed}개{(changed == 0 ? "(전부 이미 맞음, 저장 안 함)" : string.Empty)}");
     }
 

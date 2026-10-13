@@ -623,4 +623,32 @@ public sealed class UserLanguageConfigTests
 
         Assert.That(UserLanguageConfig.Language, Is.EqualTo(UserLanguageConfig.DefaultFor(Application.systemLanguage)));
     }
+
+    // 옛 설정창 언어 시스템(경석 LanguageConfig)은 같은 키에 정수(0 = English, 1 = 한국어)로 저장했다.
+    [TestCase(0, GameLanguage.En, "en")]
+    [TestCase(1, GameLanguage.Ko, "ko")]
+    public void LegacyIntSavedValue_MigratesOnceToCode(int legacy, GameLanguage expected, string code)
+    {
+        PlayerPrefs.DeleteKey(UserLanguageConfig.PrefsKey);
+        PlayerPrefs.SetInt(UserLanguageConfig.PrefsKey, legacy);
+        UserLanguageConfig.ResetCache();
+
+        Assert.That(UserLanguageConfig.Language, Is.EqualTo(expected));
+        Assert.That(PlayerPrefs.GetString(UserLanguageConfig.PrefsKey, string.Empty), Is.EqualTo(code));
+
+        UserLanguageConfig.ResetCache();
+        Assert.That(UserLanguageConfig.Language, Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void LegacyIntOutOfRange_UsesSystemDefault()
+    {
+        PlayerPrefs.DeleteKey(UserLanguageConfig.PrefsKey);
+        PlayerPrefs.SetInt(UserLanguageConfig.PrefsKey, 7);
+        UserLanguageConfig.ResetCache();
+
+        Assert.That(UserLanguageConfig.Language, Is.EqualTo(UserLanguageConfig.DefaultFor(Application.systemLanguage)));
+        Assert.That(UserLanguageConfig.LegacyIndexToLanguage(7, out _), Is.False);
+        Assert.That(UserLanguageConfig.LegacyIndexToLanguage(-1, out _), Is.False);
+    }
 }

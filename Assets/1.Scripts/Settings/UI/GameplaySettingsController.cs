@@ -4,10 +4,10 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// 설정창 게임플레이 탭(PLAN-settings S8·S9·S15·S17). 값 = <see cref="GameplayConfig"/> · <see cref="LanguageConfig"/>.
+/// 설정창 게임플레이 탭(PLAN-settings S8·S9·S15·S17). 값 = <see cref="GameplayConfig"/> · <see cref="Loc.Current"/>.
 /// - 데미지 숫자: 전체 / 내 것만 / 전체+내 것 강조 / 끄기(드롭다운 순서 = <see cref="FloatingDamageDisplayFilter"/> 값).
 /// - 화면 흔들림: 0~100%.
-/// - 언어: 버튼 한 번 = English ↔ 한국어. 버튼 글자 = 지금 언어 이름(번역하지 않음).
+/// - 언어: 버튼 한 번 = 한국어 ↔ English. 버튼 글자 = 지금 언어 이름(번역하지 않음 — <see cref="LocText.NativeName"/>).
 /// - 성능 표시: 끄기 / FPS / FPS+핑(순서 = <see cref="PerformanceDisplay"/>).
 /// </summary>
 public sealed class GameplaySettingsController : MonoBehaviour
@@ -37,11 +37,11 @@ public sealed class GameplaySettingsController : MonoBehaviour
 
     void OnEnable()
     {
-        LanguageConfig.Changed += Refresh;
+        Loc.Changed += Refresh;
         Refresh();
     }
 
-    void OnDisable() => LanguageConfig.Changed -= Refresh;
+    void OnDisable() => Loc.Changed -= Refresh;
 
     void Refresh()
     {
@@ -50,28 +50,28 @@ public sealed class GameplaySettingsController : MonoBehaviour
             ? spawner.Settings.DisplayFilter
             : GameplayConfig.DamageNumbers(FallbackDamageFilter);
         Fill(damageNumbersDropdown, (int)current,
-            "settings.gameplay.damageNumbers.all", "settings.gameplay.damageNumbers.mine",
-            "settings.gameplay.damageNumbers.allEmphasized", "settings.common.off");
+            SettingsUiStrings.GameplayDamageNumbersAll, SettingsUiStrings.GameplayDamageNumbersMine,
+            SettingsUiStrings.GameplayDamageNumbersAllEmphasized, SettingsUiStrings.CommonOff);
 
         float shake = GameplayConfig.ScreenShake;
         if (screenShakeSlider != null) screenShakeSlider.SetValueWithoutNotify(shake);
         UpdateShakeLabel(shake);
 
         TMP_Text languageLabel = languageButton != null ? languageButton.GetComponentInChildren<TMP_Text>(true) : null;
-        if (languageLabel != null) languageLabel.text = LanguageConfig.NativeName(LanguageConfig.Current);
+        if (languageLabel != null) languageLabel.text = LocText.NativeName(Loc.Current);
         if (languageStatus != null) languageStatus.text = string.Empty;
 
         Fill(performanceDropdown, (int)GameplayConfig.Performance,
-            "settings.common.off", "settings.gameplay.performance.fps", "settings.gameplay.performance.fpsPing");
+            SettingsUiStrings.CommonOff, SettingsUiStrings.GameplayPerformanceFps, SettingsUiStrings.GameplayPerformanceFpsPing);
     }
 
     // 🔴 항목을 비우고 다시 채운 뒤 값을 맞춘다 — ClearOptions/AddOptions 가 보이는 글자를 새로 그린다
     //    (값이 같으면 SetValueWithoutNotify 만으로는 다시 그리지 않는다).
-    static void Fill(TMP_Dropdown dropdown, int value, params string[] keys)
+    static void Fill(TMP_Dropdown dropdown, int value, params UiString[] texts)
     {
         if (dropdown == null) return;
-        var labels = new List<string>(keys.Length);
-        foreach (string k in keys) labels.Add(SettingsStrings.Get(k));
+        var labels = new List<string>(texts.Length);
+        foreach (UiString t in texts) labels.Add(t.Text);
         dropdown.ClearOptions();
         dropdown.AddOptions(labels);
         dropdown.SetValueWithoutNotify(value);
@@ -91,5 +91,5 @@ public sealed class GameplaySettingsController : MonoBehaviour
     }
 
     // 언어를 바꾸면 Changed → 이 탭(Refresh)·고정 라벨(LocalizedText)·다른 탭(켜질 때) 이 다시 채운다.
-    void OnLanguageClicked() => LanguageConfig.Set(LanguageConfig.Next(LanguageConfig.Current));
+    void OnLanguageClicked() => Loc.Current = LocText.Next(Loc.Current);
 }
