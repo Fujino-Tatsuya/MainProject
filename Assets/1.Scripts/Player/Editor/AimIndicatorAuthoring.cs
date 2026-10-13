@@ -113,6 +113,10 @@ public static class AimIndicatorAuthoring
         material.SetColor("_BaseColor", Color.white);
         material.SetFloat("_Surface", 1f);  // Transparent
         material.SetFloat("_Blend", 0f);    // Alpha
+        // 🔴 2026-10-13: Preserve Specular 를 켜 두면(Lit 기본값) 블렌드가 One/OneMinusSrcAlpha(프리멀티)가 되고
+        //    스페큘러·환경광(반사 OFF 여도 _GlossyEnvironmentColor) 항이 알파에 곱해지지 않아 알파 0 영역까지
+        //    희미하게 더해진다 → 쿼드 전체가 **밝은 네모**로 보였다. 끄면 SrcAlpha 블렌드로 전부 알파에 곱해진다.
+        material.SetFloat("_BlendModePreserveSpecular", 0f);
         material.SetFloat("_AlphaClip", 0f);
         material.SetFloat("_Cull", (float)CullMode.Back);
         material.SetFloat("_ReceiveShadows", 0f);
