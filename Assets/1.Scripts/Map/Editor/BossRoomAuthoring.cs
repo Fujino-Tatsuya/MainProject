@@ -664,6 +664,7 @@ public static class BossRoomAuthoring
     const string NavMarginName = "NavMeshMargin";
     const float NavMarginWidth = 1.0f;
     const float NavMarginHeight = 4f;
+    static readonly string[] NavMarginNames = { "Margin_XMin", "Margin_XMax", "Margin_ZMin", "Margin_ZMax" };
 
     [MenuItem("Tools/Map/Authoring/Build Boss Room NavMesh Margin")]
     public static void BuildBossRoomNavMeshMargin()
@@ -716,11 +717,15 @@ public static class BossRoomAuthoring
             return false;
         }
 
-        Transform stale = FindDeep(root.transform, NavMarginName);
-        if (stale != null) Object.DestroyImmediate(stale.gameObject);
-
-        var parent = new GameObject(NavMarginName);
-        parent.transform.SetParent(root.transform, false);
+        // 2026-10-13: 지우고 다시 만들면 값이 같아도 fileID 가 매번 바뀌어 prefab diff 가 생긴다 → 있으면 제자리 갱신.
+        Transform existing = FindDeep(root.transform, NavMarginName);
+        GameObject parent = existing != null ? existing.gameObject : new GameObject(NavMarginName);
+        if (existing == null) parent.transform.SetParent(root.transform, false);
+        for (int i = parent.transform.childCount - 1; i >= 0; i--)
+        {
+            Transform c = parent.transform.GetChild(i);
+            if (System.Array.IndexOf(NavMarginNames, c.name) < 0) Object.DestroyImmediate(c.gameObject);
+        }
 
         int notWalkable = UnityEngine.AI.NavMesh.GetAreaFromName("Not Walkable");
         float w = NavMarginWidth, y = floorTopY, lenX = maxX - minX, lenZ = maxZ - minZ;
@@ -737,9 +742,11 @@ public static class BossRoomAuthoring
 
     static void AddNavMargin(GameObject parent, string name, Vector3 center, Vector3 size, int area)
     {
-        var go = new GameObject(name);
-        go.transform.SetParent(parent.transform, false);
-        var vol = go.AddComponent<NavMeshModifierVolume>();
+        Transform child = parent.transform.Find(name);
+        GameObject go = child != null ? child.gameObject : new GameObject(name);
+        if (child == null) go.transform.SetParent(parent.transform, false);
+        var vol = go.GetComponent<NavMeshModifierVolume>();
+        if (vol == null) vol = go.AddComponent<NavMeshModifierVolume>();
         vol.center = center;
         vol.size = size;
         vol.area = area;
