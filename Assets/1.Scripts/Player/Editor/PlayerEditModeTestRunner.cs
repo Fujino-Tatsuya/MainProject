@@ -32,6 +32,7 @@ internal static class PlayerEditModeTestRunner
         "^PartyLivesRulesTests$", // 할 일 30 (1) — 파티 공용 목숨: 사망 목적지·공용 차감·재충전·공용 0 Soul 전멸 판정
         "^PartyWipeRespawnRulesTests$", // 할 일 30 (2) — 전멸 → 리스폰 분기(결과 화면 아님)·리스폰 조건·지점 선택(패드 제외·간격·폴백)·목숨 5
         "^InteractPromptSlotTests$", // 상호작용 F 프롬프트 — 마지막 Show 우선·소유자만 Hide·다른 뷰로 Show 시 이전 뷰 숨김·누락·파괴 정리
+        "^UnitWallImpactJudgeTests$", // 할 일 32 — 공용 벽 충돌: 스윕 결과 → 벽 충돌·제외 규칙(자기·배리어·유닛·상자·시작 겹침)·막힘 거리·에피소드당 1회
         // 튜토리얼 픽스처(특성·안내 UI·스피너봇 연습)는 TutorialEditModeTestRunner 로 옮겼다(할 일 15 I0).
     };
 

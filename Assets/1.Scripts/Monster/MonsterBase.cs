@@ -1336,6 +1336,9 @@ public class MonsterBase : Unit
                 dir.y = 0f;
             }
             TryEnterKnockback(dir.normalized, attackInfo);
+            // 할 일 32 벽 충돌 — 민 쪽(가능하면). 넉백 진입이 거절됐으면(슈퍼아머 등) 바꾸지 않는다.
+            if (_state.Value == MonsterState.Knockback && hitContext.sourceTransform != null)
+                _wallImpactPusher = hitContext.sourceTransform.GetComponentInParent<Unit>();
         }
 
         // 피격 이펙트는 판정이 아니라 연출이다 — 서버는 위치만 알리고 재생은 각 피어가 로컬로 한다.
@@ -1431,7 +1434,10 @@ public class MonsterBase : Unit
         _stateTimer = attackInfo.knockbackDuration;
 
         if (s == MonsterState.Knockback)
-            return; // 갱신만 — 이미 agent off + 상태 진입 완료
+            return; // 갱신만 — 이미 agent off + 상태 진입 완료(벽 충돌 에피소드도 이어 간다 — Q 홀드 견인은 1회)
+
+        _wallImpactEpisode.Begin();   // 할 일 32 — 새 넉백 = 벽 충돌 1회
+        _wallImpactPusher = null;     // 호출부(ReceiveAttack)가 바로 채운다
 
         // 서버틱 직접 이동과 충돌하지 않게 에이전트를 완전히 내려놓는다(off). 종료 시 재획득.
         ClearReposition();
@@ -1447,13 +1453,20 @@ public class MonsterBase : Unit
     {
         _stateTimer -= dt;
 
-        Vector3 next = transform.position + _knockbackDir * (_knockbackSpeed * dt);
+        Vector3 before = transform.position;
+        Vector3 next = before + _knockbackDir * (_knockbackSpeed * dt);
         if (NavMesh.SamplePosition(next, out NavMeshHit navHit, 0.5f, NavMesh.AllAreas))
         {
             // 수평 밀기만 반영(y는 유지) — 종료 시 Warp가 메시 높이에 정착시킨다.
             transform.position = new Vector3(navHit.position.x, transform.position.y, navHit.position.z);
         }
         // 샘플 실패 = 경계 도달 → 이번 틱 이동 생략(그 자리에서 밀림 종료 대기)
+
+        // 할 일 32 벽 충돌(이벤트만) — 판정·1회 보장은 UnitWallImpacts. Docs/tech/handoff-wall-impact.md
+        Vector3 delta = transform.position - before;
+        delta.y = 0f;
+        UnitWallImpacts.ServerProbe(this, _wallImpactEpisode, _knockbackDir, _knockbackSpeed * dt, delta.magnitude,
+                                    _knockbackSpeed, _wallImpactPusher, out _);
 
         if (_stateTimer <= 0f)
             ExitKnockback();
@@ -1462,6 +1475,8 @@ public class MonsterBase : Unit
     // 넉백 종료: 에이전트 재획득(on-mesh 보장) → Stunned 경직(staggerDuration) → 기존 Hit 타이머 경로로 재개.
     void ExitKnockback()
     {
+        _wallImpactEpisode.End();
+        _wallImpactPusher = null;
         if (agent != null)
         {
             agent.enabled = true;
@@ -1829,6 +1844,9 @@ public class MonsterBase : Unit
     protected virtual bool KeepPrefabAgentRadius => false;
 
     Vector3 _knockbackOrigin;
+    // 할 일 32 벽 충돌 — 지속넉백 한 번 = 에피소드 하나(1회). 민 쪽은 ReceiveAttack 의 hitContext 에서.
+    readonly WallImpactEpisode _wallImpactEpisode = new WallImpactEpisode();
+    Unit _wallImpactPusher;
 
     // 추격 목적지를 NavMesh 위로 투영하는 반경. 플레이어가 가장자리 띠·소품 위에 있어도 그 아래 메시를 잡는 정도.
     const float ChaseProjectRadius = 2f;
