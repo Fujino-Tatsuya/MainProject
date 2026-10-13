@@ -19,7 +19,7 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
 {
     [Header("Death Flow")]
     [SerializeField] private Unit deathSource;
-    [SerializeField] private Temp_MultiGameRule gameRule;
+    [SerializeField] private MultiGameRule gameRule;
     [SerializeField, Min(0f)] private float deathPresentationDuration = 1.5f;
 
     // 사망 시 되돌릴 애니메이터. 비워 두면 Awake 에서 자식에서 찾는다(프리팹 배선 불필요).
@@ -310,9 +310,9 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
 
         // 임시 Rule 누락이 Player를 영구 사망시키지 않도록 부활 가능한 Soul로 폴백한다.
         Debug.LogWarning(
-            "[SoulAlert] Temp_MultiGameRule/공용 목숨을 확인할 수 없어 " +
+            "[SoulAlert] MultiGameRule/공용 목숨을 확인할 수 없어 " +
             $"{OwnerClientId}번 Player를 Soul로 전환합니다. " +
-            "씬에 Spawn된 Temp_MultiGameRule을 배치하세요.",
+            "씬에 Spawn된 MultiGameRule을 배치하세요.",
             this);
         return PlayerLifeState.Soul;
     }
@@ -352,7 +352,7 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
     private void ResolveGameRuleReference()
     {
         if (gameRule == null)
-            gameRule = FindFirstObjectByType<Temp_MultiGameRule>();
+            gameRule = FindFirstObjectByType<MultiGameRule>();
     }
 
     private static bool IsValidTransition(PlayerLifeState from, PlayerLifeState to)

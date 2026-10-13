@@ -93,10 +93,10 @@ public static class PartyWipeRespawner
         }
 
         // 3) 공용 목숨
-        Temp_MultiGameRule rule = UnityEngine.Object.FindFirstObjectByType<Temp_MultiGameRule>();
+        MultiGameRule rule = UnityEngine.Object.FindFirstObjectByType<MultiGameRule>();
         int lives = -1;
         if (rule == null || !rule.TryRefillPartyLivesOnServer(out lives))
-            Debug.LogWarning("[PartyWipe] 공용 목숨을 다시 채우지 못했다(Temp_MultiGameRule 없음·스폰 전).");
+            Debug.LogWarning("[PartyWipe] 공용 목숨을 다시 채우지 못했다(MultiGameRule 없음·스폰 전).");
 
         // 4) 플레이어
         var respawned = new List<ulong>();

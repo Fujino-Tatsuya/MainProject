@@ -25,7 +25,7 @@ public enum TutorialReviveVerdict : byte
 /// <summary>부활 방법.</summary>
 public struct TutorialReviveOrder
 {
-    /// <summary>파티 공용 목숨 1개 차감(G11 뒤 사망 — Temp_MultiGameRule 공용 풀, 할 일 30).</summary>
+    /// <summary>파티 공용 목숨 1개 차감(G11 뒤 사망 — MultiGameRule 공용 풀, 할 일 30).</summary>
     public bool ConsumeLife;
     /// <summary>그 자리에서 부활(보스방 이동 중) — 안전 지점으로 옮기지 않는다.</summary>
     public bool InPlace;

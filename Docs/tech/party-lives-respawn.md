@@ -6,9 +6,9 @@
 
 ## 1. 사양 요약
 
-1. **공용 목숨 5개** — 클라별 LifeCount(기본 3) 대신 파티 공용 풀 5개. 값은 데이터 필드(`Temp_MultiGameRule.partyLifeCount`, Player 시트).
+1. **공용 목숨 5개** — 클라별 LifeCount(기본 3) 대신 파티 공용 풀 5개. 값은 데이터 필드(`MultiGameRule.partyLifeCount`, Player 시트).
    부활(Soul → Alive) **성공 때** 풀에서 1 차감(기존 '부활 시 차감' 시점 유지). 튜토리얼 G11(보스방 도착) 전 사망은 차감 없음(`TutorialDeathRules` 그대로).
-   목숨 표시 UI 는 현재 없다(2026-10-13 검색 — 디버그 UI 언급만). 생기면 `Temp_MultiGameRule.PartyLives`/`PartyLivesChanged` 를 읽는다.
+   목숨 표시 UI 는 현재 없다(2026-10-13 검색 — 디버그 UI 언급만). 생기면 `MultiGameRule.PartyLives`/`PartyLivesChanged` 를 읽는다.
 2. **전멸 리스폰** — 공용 목숨 0 에서 전멸하면 결과 화면 대신 **복도4**(튜토리얼 존4 ~ 보스 진입 사이)에 전원 리스폰.
    보스 클리어·사용자 나가기는 기존대로 결과 화면. 리스폰 = 보스 23호 처음부터(체력·패턴·등장 연출·보스방 상태) + 공용 목숨 5 재충전 + 전원 Alive·체력 가득.
    보스방은 다시 보스 진입 패드로(G10 이미 열림). 절차 맵(비튜토리얼)은 복도4 가 없어 **보스 진입 존 패드 밖** 폴백.
@@ -20,8 +20,8 @@
 | 무엇 | 어디 |
 |---|---|
 | 순수 규칙 | `PartyLivesRules`(`Assets/1.Scripts/Player/Life/PartyLivesRules.cs`) — 사망 목적지·부활 가능·차감·재충전·전멸 판정 |
-| 상태(서버 쓰기·모두 읽기) | `Temp_MultiGameRule.partyLives`(`NetworkVariable<int>`) — 스폰 때 `partyLifeCount` 로 채움 |
-| 데이터 | `Temp_MultiGameRule.partyLifeCount`(기본 5, `[Min(0)]`) — Player 시트 `Temp_MultiGameRule` 구역, 대상 Id `GameRule` |
+| 상태(서버 쓰기·모두 읽기) | `MultiGameRule.partyLives`(`NetworkVariable<int>`) — 스폰 때 `partyLifeCount` 로 채움 |
+| 데이터 | `MultiGameRule.partyLifeCount`(기본 5, `[Min(0)]`) — Player 시트 `MultiGameRule` 구역, 대상 Id `GameRule` |
 | 테스트 | `PartyLivesRulesTests`(플레이어 러너) |
 
 - **API(이름 유지, clientId 무시)**: `TryGetLifeCount`·`HasReviveAvailable`·`TryResolveDeathState`·`TryConsumeLifeAfterAliveRevive` 가 공용 풀을 본다.
@@ -34,12 +34,14 @@
 - **공용 풀의 새 경우 — 갇힌 Soul**: 풀 1 에서 둘이 Soul 이 된 뒤 한 명이 부활하면 0 — 남은 Soul 은 차감 부활을 못 한다.
   예전 클라별 풀에서는 "Soul = 목숨 있음" 이라 없던 경우다. 상태는 그대로 Soul 로 두고(관전 전환 없음), **전멸 판정이 '탈락'으로 센다**:
   `PartyWipeWatcher` 가 `PartyLivesRules.IsPartyWiped(풀, 구성원)` 으로 판정 — 전원 PermanentDead 이거나 풀 0 의 Soul(차감 없는 부활 대기 제외).
-  `Temp_MultiGameRule` 이 없거나 스폰 전이면 예전 규칙(전원 PermanentDead). 2단계 리스폰이 Soul 도 전원 살리므로 갇힌 Soul 은 전멸 리스폰으로 풀린다(D1 유지).
+  `MultiGameRule` 이 없거나 스폰 전이면 예전 규칙(전원 PermanentDead). 2단계 리스폰이 Soul 도 전원 살리므로 갇힌 Soul 은 전멸 리스폰으로 풀린다(D1 유지).
 - 튜토리얼 G11 뒤 자동 부활이 풀 0 으로 거부되면 경고 로그 후 Soul 로 남는다(`TutorialDeathRules.Revive`).
 - 보스 강제 개시 부활(`BossTeleportManager.ReviveSoulsForForcedStart`)은 Soul 마다 공용 풀에서 1개씩 쓴다 — 풀이 모자라면 `ConnectedClientsList` 순회 앞쪽만 산다. 기존 코드 그대로.
-- **데이터 테이블(xlsx Export 안 함 — 기획·병합 Export 때)**: Player 시트 · `#■ Temp_MultiGameRule` 구역 · 대상 열 `GameRule` 에 **`partyLifeCount` 행(5)** 추가.
+- **데이터 테이블(xlsx Export 안 함 — 기획·병합 Export 때)**: Player 시트 · `#■ MultiGameRule` 구역 · 대상 열 `GameRule` 에 **`partyLifeCount` 행(5)** 추가.
   행이 없는 동안은 프리팹 값 5 를 쓴다(테이블 규칙 — 행 없음 = 인스펙터 값). 옛 `defaultLifeCount` 행은 코드 필드를 남겨 두었다(지우면 `필드 'X' 가 없다` 오류로 테이블 적용 전체가 멈춘다) —
   병합 Export 로 행이 정리된 뒤 필드를 지운다.
+- **타입 이름 변경(할 일 35, `Temp_MultiGameRule` → `MultiGameRule`, guid 유지)**: xlsx(r428)의 구역 제목은 아직 `#■ Temp_MultiGameRule` 이고 다음 병합 Export 때 `#■ MultiGameRule` 로 바뀐다.
+  구역 제목은 `#` 메모 행이라 적용 키(시트 `Player` → `[DataTableSheet]` 묶음, 대상 Id, 필드)에 들어가지 않는다 — 그 전에도 `GameRule.partyLifeCount` 는 그대로 적용된다(`DataTableSheetGroupTests`).
 
 ## 3. 전멸 → 복도4 리스폰 (2단계 — 구현됨)
 
