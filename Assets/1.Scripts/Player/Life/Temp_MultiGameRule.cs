@@ -3,239 +3,132 @@ using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// 추후 PlayerGameRuleData 같은 ScriptableObject가 구현할 LifeCount 초기값 공급 계약.
-/// </summary>
-public interface IPlayerLifeCountInitialValueProvider
-{
-    int GetInitialLifeCount(ulong clientId);
-}
-
-/// <summary>Client별 실제 부활 가능 횟수의 네트워크 복제 항목.</summary>
-public struct PlayerLifeCountEntry :
-    INetworkSerializable,
-    IEquatable<PlayerLifeCountEntry>
-{
-    public ulong ClientId;
-    public int LifeCount;
-
-    public PlayerLifeCountEntry(ulong clientId, int lifeCount)
-    {
-        ClientId = clientId;
-        LifeCount = lifeCount;
-    }
-
-    public void NetworkSerialize<T>(BufferSerializer<T> serializer)
-        where T : IReaderWriter
-    {
-        serializer.SerializeValue(ref ClientId);
-        serializer.SerializeValue(ref LifeCount);
-    }
-
-    public bool Equals(PlayerLifeCountEntry other)
-    {
-        return ClientId == other.ClientId && LifeCount == other.LifeCount;
-    }
-
-    public override bool Equals(object obj)
-    {
-        return obj is PlayerLifeCountEntry other && Equals(other);
-    }
-
-    public override int GetHashCode()
-    {
-        unchecked
-        {
-            return ((int)ClientId * 397) ^ LifeCount;
-        }
-    }
-}
-
-/// <summary>
-/// 임시 멀티플레이 규칙. 서버만 Client별 LifeCount를 등록/감소/제거하며,
-/// 복제된 NetworkList는 클라이언트 Debug UI가 읽기만 할 수 있다.
+/// 임시 멀티플레이 규칙 — <b>파티 공용 목숨 풀</b>(할 일 30, 2026-10-13). 서버만 차감·재충전하고,
+/// 복제된 값은 모든 피어가 읽는다. 규칙은 순수 <see cref="PartyLivesRules"/>, 설계는 Docs/tech/party-lives-respawn.md.
+///
+/// 예전 클라별 LifeCount 장부의 API(<see cref="TryGetLifeCount"/>·<see cref="HasReviveAvailable"/>·
+/// <see cref="TryResolveDeathState"/>·<see cref="TryConsumeLifeAfterAliveRevive"/>)는 이름을 유지하고
+/// clientId 와 무관하게 공용 풀을 본다. <see cref="TryRegisterClient"/>·<see cref="TryUnregisterClient"/> 는 호환용(장부 없음).
 /// </summary>
 [DataTableSheet("Player", Order = 7)]
 public class Temp_MultiGameRule : NetworkBehaviour
 {
-    [Header("LifeCount")]
-    [SerializeField, Min(0)] private int defaultLifeCount = 3;
-    [Tooltip("선택 사항. IPlayerLifeCountInitialValueProvider를 구현한 ScriptableObject.")]
-    [SerializeField] private ScriptableObject initialValueProvider;
+    [Header("공용 목숨")]
+    [Tooltip("파티 공용 목숨 수. 게임 시작·전멸 리스폰 때 이 값으로 채운다. 부활(Soul → Alive) 성공마다 1개 쓴다.")]
+    [SerializeField, Min(0)] private int partyLifeCount = PartyLivesRules.DefaultCapacity;
 
-    private readonly NetworkList<PlayerLifeCountEntry> lifeCounts =
-        new NetworkList<PlayerLifeCountEntry>(
-            null,
+    [Tooltip("폐기(2026-10-13 공용 목숨으로 교체) — 쓰지 않는다. xlsx 에 행이 남아 있어 병합 Export 로 정리할 때까지 필드만 둔다.")]
+#pragma warning disable CS0414
+    [SerializeField, Min(0)] private int defaultLifeCount = 3;
+#pragma warning restore CS0414
+
+    private readonly NetworkVariable<int> partyLives =
+        new NetworkVariable<int>(
+            PartyLivesRules.DefaultCapacity,
             NetworkVariableReadPermission.Everyone,
             NetworkVariableWritePermission.Server);
 
-    public int DefaultLifeCount => Mathf.Max(0, defaultLifeCount);
-    public int RegisteredClientCount => lifeCounts.Count;
+    /// <summary>재충전 값(데이터 테이블 <c>partyLifeCount</c>).</summary>
+    public int PartyLifeCapacity => PartyLivesRules.Refill(partyLifeCount);
 
-    /// <summary>Debug UI 등 읽기 소비자가 목록 변경 뒤 값을 다시 조회하는 훅.</summary>
+    /// <summary>복제된 현재 공용 목숨. 스폰 전이면 용량.</summary>
+    public int PartyLives => IsSpawned ? PartyLivesRules.ClampLives(partyLives.Value) : PartyLifeCapacity;
+
+    /// <summary>공용 목숨이 바뀌었다(모든 피어). 인자 = 새 값.</summary>
+    public event Action<int> PartyLivesChanged;
+
+    /// <summary>Debug UI 등 읽기 소비자가 값을 다시 조회하는 훅(예전 장부 이벤트 — <see cref="PartyLivesChanged"/> 와 같이 발생).</summary>
     public event Action LifeCountsChanged;
 
-    private bool serverCallbacksRegistered;
     private bool CanWriteLifeCounts => IsSpawned && IsServer;
 
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
-        lifeCounts.OnListChanged += HandleLifeCountsChanged;
+        partyLives.OnValueChanged += HandlePartyLivesChanged;
 
-        if (!IsServer)
-            return;
-
-        NetworkManager.OnClientConnectedCallback += HandleClientConnected;
-        NetworkManager.OnClientDisconnectCallback += HandleClientDisconnected;
-        serverCallbacksRegistered = true;
-
-        foreach (ulong clientId in NetworkManager.ConnectedClientsIds)
-            TryRegisterClient(clientId);
+        if (IsServer)
+            partyLives.Value = PartyLifeCapacity;
     }
 
     public override void OnNetworkDespawn()
     {
-        lifeCounts.OnListChanged -= HandleLifeCountsChanged;
-
-        if (serverCallbacksRegistered && NetworkManager != null)
-        {
-            NetworkManager.OnClientConnectedCallback -= HandleClientConnected;
-            NetworkManager.OnClientDisconnectCallback -= HandleClientDisconnected;
-            serverCallbacksRegistered = false;
-        }
-
+        partyLives.OnValueChanged -= HandlePartyLivesChanged;
         base.OnNetworkDespawn();
     }
 
-    /// <summary>복제된 Client의 현재 LifeCount를 읽는다. 모든 피어에서 호출 가능하다.</summary>
+    /// <summary>공용 목숨을 읽는다(clientId 무관). 모든 피어에서 호출 가능하다. 스폰 전이면 false.</summary>
     public bool TryGetLifeCount(ulong clientId, out int lifeCount)
     {
-        int index = FindClientIndex(clientId);
-        if (index < 0)
-        {
-            lifeCount = 0;
-            return false;
-        }
-
-        lifeCount = lifeCounts[index].LifeCount;
-        return true;
+        lifeCount = IsSpawned ? PartyLives : 0;
+        return IsSpawned;
     }
 
     /// <summary>표시/사전 게이트용 읽기 API. 사망 상태의 최종 확정에는 TryResolveDeathState를 사용한다.</summary>
     public bool HasReviveAvailable(ulong clientId)
     {
-        return TryGetLifeCount(clientId, out int lifeCount) && lifeCount > 0;
+        return TryGetLifeCount(clientId, out int lifeCount) &&
+            PartyLivesRules.CanRevive(lifeCount, consumeLife: true);
     }
 
-    /// <summary>서버가 Client를 장부에 등록한다. 이미 등록된 Client면 성공으로 취급한다.</summary>
-    public bool TryRegisterClient(ulong clientId)
-    {
-        if (!CanWriteLifeCounts)
-            return false;
+    /// <summary>호환용 — 공용 풀은 등록이 필요 없다. 서버 스폰 상태면 true.</summary>
+    public bool TryRegisterClient(ulong clientId) => CanWriteLifeCounts;
 
-        if (FindClientIndex(clientId) >= 0)
-            return true;
-
-        int initialLifeCount = ResolveInitialLifeCount(clientId);
-        lifeCounts.Add(new PlayerLifeCountEntry(clientId, initialLifeCount));
-        return true;
-    }
-
-    /// <summary>서버가 연결 종료 Client의 임시 장부를 제거한다.</summary>
-    public bool TryUnregisterClient(ulong clientId)
-    {
-        if (!CanWriteLifeCounts)
-            return false;
-
-        int index = FindClientIndex(clientId);
-        if (index < 0)
-            return false;
-
-        lifeCounts.RemoveAt(index);
-        return true;
-    }
+    /// <summary>호환용 — 이탈해도 공용 풀은 그대로다. 서버 스폰 상태면 true.</summary>
+    public bool TryUnregisterClient(ulong clientId) => CanWriteLifeCounts;
 
     /// <summary>
-    /// 서버가 사망 시 Soul 또는 PermanentDead 목적지를 판정한다.
-    /// LifeCount는 이 시점에 감소하지 않는다.
+    /// 서버가 사망 시 Soul 또는 PermanentDead 목적지를 판정한다(공용 목숨 &gt; 0 → Soul).
+    /// 목숨은 이 시점에 감소하지 않는다.
     /// </summary>
     public bool TryResolveDeathState(
         ulong clientId,
         out PlayerLifeState destinationState)
     {
         destinationState = PlayerLifeState.PermanentDead;
-
-        if (!CanWriteLifeCounts ||
-            !TryGetLifeCount(clientId, out int lifeCount))
-        {
+        if (!CanWriteLifeCounts)
             return false;
-        }
 
-        destinationState = lifeCount > 0
-            ? PlayerLifeState.Soul
-            : PlayerLifeState.PermanentDead;
+        destinationState = PartyLivesRules.ResolveDeathDestination(PartyLives, keepsSoul: false);
         return true;
     }
 
     /// <summary>
-    /// 서버가 Soul에서 Alive로 실제 부활을 성공시킨 직후 LifeCount를 1 감소시킨다.
+    /// 서버가 Soul에서 Alive로 실제 부활을 성공시킨 직후 공용 목숨을 1 감소시킨다.
     /// Soul 진입이나 부활 시도 단계에서는 호출하지 않는다.
     /// </summary>
     public bool TryConsumeLifeAfterAliveRevive(
         ulong clientId,
         out int remainingLifeCount)
     {
-        remainingLifeCount = 0;
-
-        if (!CanWriteLifeCounts)
+        remainingLifeCount = PartyLives;
+        if (!CanWriteLifeCounts ||
+            !PartyLivesRules.TryConsume(partyLives.Value, out remainingLifeCount))
+        {
             return false;
+        }
 
-        int index = FindClientIndex(clientId);
-        if (index < 0)
-            return false;
-
-        PlayerLifeCountEntry entry = lifeCounts[index];
-        if (entry.LifeCount <= 0)
-            return false;
-
-        entry.LifeCount--;
-        lifeCounts[index] = entry;
-        remainingLifeCount = entry.LifeCount;
+        partyLives.Value = remainingLifeCount;
         return true;
     }
 
-    private int ResolveInitialLifeCount(ulong clientId)
+    /// <summary>
+    /// [서버] 공용 목숨을 용량(<see cref="PartyLifeCapacity"/>)으로 다시 채운다 — 전멸 리스폰(할 일 30 (2)).
+    /// </summary>
+    public bool TryRefillPartyLivesOnServer(out int partyLifeCountAfter)
     {
-        if (initialValueProvider is IPlayerLifeCountInitialValueProvider provider)
-            return Mathf.Max(0, provider.GetInitialLifeCount(clientId));
+        partyLifeCountAfter = PartyLives;
+        if (!CanWriteLifeCounts)
+            return false;
 
-        return DefaultLifeCount;
+        partyLifeCountAfter = PartyLifeCapacity;
+        partyLives.Value = partyLifeCountAfter;
+        return true;
     }
 
-    private int FindClientIndex(ulong clientId)
+    private void HandlePartyLivesChanged(int previous, int current)
     {
-        for (int i = 0; i < lifeCounts.Count; i++)
-        {
-            if (lifeCounts[i].ClientId == clientId)
-                return i;
-        }
-
-        return -1;
-    }
-
-    private void HandleClientConnected(ulong clientId)
-    {
-        TryRegisterClient(clientId);
-    }
-
-    private void HandleClientDisconnected(ulong clientId)
-    {
-        TryUnregisterClient(clientId);
-    }
-
-    private void HandleLifeCountsChanged(
-        NetworkListEvent<PlayerLifeCountEntry> changeEvent)
-    {
+        PartyLivesChanged?.Invoke(PartyLivesRules.ClampLives(current));
         LifeCountsChanged?.Invoke();
     }
 }
