@@ -6115,8 +6115,8 @@ MonoBehaviour:
   includeStaticMeshes: 1
   ghostMaterial: {fileID: 2100000, guid: 3b8f06d25a1e49c7ae04f31b96d2057c, type: 2}
   speedLines: {fileID: 807663423485243698}
-  spawnInterval: 0
-  ghostLifetime: 0.2
+  spawnInterval: 0.05
+  ghostLifetime: 0.5
   fadeCurve:
     serializedVersion: 2
     m_Curve:
@@ -6130,8 +6130,8 @@ MonoBehaviour:
       inWeight: 0
       outWeight: 0
     - serializedVersion: 3
-      time: 0.5
-      value: 0.45
+      time: 0.6
+      value: 0.85
       inSlope: 0
       outSlope: 0
       tangentMode: 0
