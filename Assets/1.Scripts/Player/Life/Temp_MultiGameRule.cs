@@ -17,11 +17,6 @@ public class Temp_MultiGameRule : NetworkBehaviour
     [Tooltip("파티 공용 목숨 수. 게임 시작·전멸 리스폰 때 이 값으로 채운다. 부활(Soul → Alive) 성공마다 1개 쓴다.")]
     [SerializeField, Min(0)] private int partyLifeCount = PartyLivesRules.DefaultCapacity;
 
-    [Tooltip("폐기(2026-10-13 공용 목숨으로 교체) — 쓰지 않는다. xlsx 에 행이 남아 있어 병합 Export 로 정리할 때까지 필드만 둔다.")]
-#pragma warning disable CS0414
-    [SerializeField, Min(0)] private int defaultLifeCount = 3;
-#pragma warning restore CS0414
-
     private readonly NetworkVariable<int> partyLives =
         new NetworkVariable<int>(
             PartyLivesRules.DefaultCapacity,
