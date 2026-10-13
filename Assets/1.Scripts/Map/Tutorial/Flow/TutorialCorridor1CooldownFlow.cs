@@ -3,14 +3,15 @@ using UnityEngine;
 
 /// <summary>
 /// 튜토리얼 복도1 첫 진입 쿨타임 초기화(v8 C1-0) — 존1 클리어(G1) 뒤 <b>각 플레이어가 복도1 에 처음 들어갈 때</b> 그 사람의
-/// Q·E·R·우클릭(기본·대체 스킬 전부)·대시 쿨을 0 으로 + 자막 <c>TUT_C1_COOLDOWN_RESET</c>(그 사람). 플레이어별 1회, 왕복·부활 재진입 반복 없음.
+/// Q·E·R·우클릭(기본·대체 스킬 전부)·대시 쿨을 0 으로. 플레이어별 1회, 왕복·부활 재진입 반복 없음.
+/// 자막은 띄우지 않는다(사용자 변경 — <c>TUT_C1_COOLDOWN_RESET</c> 행은 SO 에 남겨 둠).
 /// 진행 중 행동(실행 중 스킬·어쌔신 변신·E 강화 대기)이 있으면 끝날 때 한 번 더(초기화 예약). 자원·체력·패시브 주기는 건드리지 않는다.
 /// 원본: Docs/design/tutorial-scenario.md §3.2 · PLAN-tutorial.md V2 · Docs/tech/tutorial-corridors-zone2.md.
 /// 규칙은 순수 <see cref="TutorialCooldownResetModel"/>, 실행은 <see cref="TutorialCooldownReset"/>(쿨 장부 공개 API 만).
 ///
 /// 붙는 곳: 다른 존 흐름과 같다(<see cref="TutorialDirector.StateChanged"/> → 디렉터 GameObject 런타임 부착, 모든 피어).
 /// 서버: 구간 판정(<see cref="TutorialDirector.GetPlayerAreaServer"/>) → 초기화 → 개인 체크 <see cref="TutorialCheck.Corridor1CooldownReset"/>(복제 기록).
-/// 오너: 그 복제 기록이 켜지는 것을 보면 대시 예측 충전을 가득 채우고 자막을 띄운다(서버 대시 장부와 짝 — 추락 복구의 ResetChargeToOne 과 같은 방식).
+/// 오너: 그 복제 기록이 켜지는 것을 보면 대시 예측 충전을 가득 채운다(서버 대시 장부와 짝 — 추락 복구의 ResetChargeToOne 과 같은 방식).
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class TutorialCorridor1CooldownFlow : MonoBehaviour
@@ -24,7 +25,7 @@ public sealed class TutorialCorridor1CooldownFlow : MonoBehaviour
     private float _pollTimer;
     private readonly TutorialCooldownResetModel _model = new TutorialCooldownResetModel();
 
-    // 오너 — 복제 기록을 처음 볼 때 이미 켜져 있었으면(늦게 그린 클라) 자막·예측 초기화를 하지 않는다.
+    // 오너 — 복제 기록을 처음 볼 때 이미 켜져 있었으면(늦게 그린 클라) 예측 초기화를 하지 않는다.
     private bool _localObserved;
     private bool _localHad;
 
@@ -113,6 +114,5 @@ public sealed class TutorialCorridor1CooldownFlow : MonoBehaviour
 
         Player local = Player.LocalPlayer;
         if (local != null) local.GetComponent<PlayerDashController>()?.OwnerResetChargeToFull();
-        TutorialGuideUI.Instance?.ShowSubtitle(CooldownResetId);
     }
 }

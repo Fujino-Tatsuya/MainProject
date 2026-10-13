@@ -39,7 +39,7 @@
 | 초기화 | 서버 | 그 플레이어의 등록 스킬 중 Q·E·R·우클릭(**기본·대체 모두** — 어쌔신 변신 Q/E 등 따로 쿨을 가진 것 포함)을 `ReduceCooldownServer(skill, 남은 시간 + 0.05)` 로 0(쿨 장부 **공개 API 만**) + `PlayerDashController.ServerResetChargeToFull()`. 자원(분노·과열)·체력·패시브 주기는 건드리지 않는다 |
 | 기록 | 서버 | `ReportCheckServer(client, TutorialCheck.Corridor1CooldownReset)`(복제 — 게이트 조건 아님). 이미 기록이 있으면(흐름이 다시 붙어도) 반복 없음 |
 | 예약 | 서버 | 초기화 순간 그 사람이 **실행 중 스킬**(거너 Q 집중 포함)·**어쌔신 변신**·**어쌔신 E 강화 대기** 중이면 예약 → 그 행동이 모두 끝난 첫 순간 한 번 더 스킬 초기화(`TutorialCooldownResetModel.TickReservation`). 변신을 강제로 끝내거나 자원을 채우지 않는다 |
-| 오너 | 로컬 | 내 복제 기록이 꺼짐→켜짐으로 바뀌는 것을 본 순간 `OwnerResetChargeToFull()`(대시 예측) + 자막 `TUT_C1_COOLDOWN_RESET`(그 사람 화면만). 처음 볼 때 이미 켜져 있으면(늦게 그린 클라) 아무것도 안 함 |
+| 오너 | 로컬 | 내 복제 기록이 꺼짐→켜짐으로 바뀌는 것을 본 순간 `OwnerResetChargeToFull()`(대시 예측). **자막 없음**(사용자 변경 — `TUT_C1_COOLDOWN_RESET` 호출 제거). 처음 볼 때 이미 켜져 있으면(늦게 그린 클라) 아무것도 안 함 |
 - 첫 진입한 1명 때문에 동료를 미리 초기화하지 않는다(각자 자기 첫 진입 때). 왕복·부활 재진입 반복 없음.
 - 대시: 서버 장부(`PlayerDashValidationManager.ForceReset(…, int.MaxValue)` — 최대치로 잘림)와 오너 예측을 따로 채운다(추락 복구의 `ResetChargeToOne` 짝과 같은 방식). 복제 지연 동안 오너 예측이 잠깐 어긋날 수 있다.
 
@@ -58,8 +58,8 @@
 - 복도는 디렉터 게이트·개인 체크·특성 디렉터 제시 행(복제)으로 다시 계산한다.
 
 ## 문구 (`TutorialGuideTexts.asset`)
-- 채움: `TUT_Z2_INTRO`(4초) · `TUT_Z2_GOAL` · `TUT_C1_COOLDOWN_RESET`(5초) · `TUT_B_PAD_WARN`(8초). v8 문구는 메뉴 `Tools/UI/튜토리얼 안내 문구 v8 적용`.
-- 더 이상 호출하지 않는 행(SO 에 남김): `TUT_Z2_NUDGE` · `TUT_Z2_Q`/`TUT_Z2_E` + `_PALADIN/_GUNNER/_ASSASSIN`. 상수는 `TutorialGuideIds` 에서 지웠다.
+- 채움: `TUT_Z2_INTRO`(4초) · `TUT_Z2_GOAL` · `TUT_B_PAD_WARN`(8초). v8 문구는 메뉴 `Tools/UI/튜토리얼 안내 문구 v8 적용`.
+- 더 이상 호출하지 않는 행(SO 에 남김): `TUT_C1_COOLDOWN_RESET`(사용자 변경 — 복도1 쿨 초기화는 조용히. 상수 `TutorialCorridor1CooldownFlow.CooldownResetId` 는 문구 적용 메뉴가 쓰므로 남김) · `TUT_Z2_NUDGE` · `TUT_Z2_Q`/`TUT_Z2_E` + `_PALADIN/_GUNNER/_ASSASSIN`. 상수는 `TutorialGuideIds` 에서 지웠다.
 - 새 id(목표 줄, 시나리오 §5 에 없음): `TUT_C_PICK` · `TUT_C_WAIT` · `TUT_C_NEXT` · `TUT_C4_GO_PAD`. 상수는 `TutorialCorridorFlow`(TutorialGuideIds 는 다른 레인 소유).
 - 창 안 문구(`TUT_C1_TRAIT_INTRO`·`TUT_C4_TRAIT_LAST`·획득 토스트)는 특성 쪽 `TutorialTraitTexts.asset` 그대로.
 
@@ -75,7 +75,7 @@
 - `[Tutorial] 복도 흐름 켜짐 (서버:True) — 특성 디렉터 있음` 로그(클라도 서버:False 로 1줄).
 - 복도1 중간 지점 첫 도착 → 모든 피어에 창(상단 설명) · `복도1 특성 라운드 1 시작` 로그 · 왕복해도 다시 안 뜸 · 목표 "특성을 하나 고르세요".
 - 한 명이 고르면 그 클라 목표 "동료를 기다립니다" + 대기 줄(1/2 · 카운트다운) → 전원 선택 시 G2 · 60초면 미선택자 창 닫힘 + 자동 획득 토스트.
-- 복도1 입구 첫 진입 → 쿨 0 · 대시 가득 · `TUT_C1_COOLDOWN_RESET` · 로그 `복도1 첫 진입 쿨타임 초기화 — client n …`(어쌔신 변신 중이면 `예약` → 변신 끝에 `예약 실행`).
+- 복도1 입구 첫 진입 → 쿨 0 · 대시 가득 · **자막 없음** · 로그 `복도1 첫 진입 쿨타임 초기화 — client n …`(어쌔신 변신 중이면 `예약` → 변신 끝에 `예약 실행`).
 - 존2 첫 진입 → 진입 자막(공통) · 4초 뒤 `존2 기상 9마리` 로그 · 목표 줄 "적 처치 n/9" 만(캐릭터별 Q/E 자막·칸 펄스·넛지 없음).
 - 9마리 처치 → `구역 확보` 자막 · G3 · 목표 "복도로".
 - 복도2·3 창(설명 없음) · 복도4 창 아래 한 줄 · G10 순간 모든 피어 `TUT_B_PAD_WARN` · 목표 "엘리베이터 발판으로".

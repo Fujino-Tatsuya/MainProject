@@ -77,7 +77,7 @@
 - [ ] G1 전: 걷기·대시·이동 스킬(어쌔신 Q 돌진, 거너 E 백스텝·우클릭 반동, 팔라딘 전진)·넉백으로 복도1 에 못 들어간다. 배리어는 **눈에 보인다**.
 
 ### 복도1 — 첫 진입 쿨타임 초기화 + 특성 선택·설명 (→ tutorial-corridors-zone2, tutorial-traits)
-- [ ] 존1 에서 Q·E·R·우클릭·대시를 쓴 직후(쿨 도는 중) 복도1 입구에 들어서면 **그 순간 스킬바 쿨이 전부 0** · 대시 충전 가득 · 자막 `TUT_C1_COOLDOWN_RESET` ·
+- [ ] 존1 에서 Q·E·R·우클릭·대시를 쓴 직후(쿨 도는 중) 복도1 입구에 들어서면 **그 순간 스킬바 쿨이 전부 0** · 대시 충전 가득 · **자막은 뜨지 않는다**(사용자 변경) ·
   로그 `[Tutorial] 복도1 첫 진입 쿨타임 초기화 — client n 스킬 k개 + 대시`. 분노·과열·체력·패시브는 그대로.
 - [ ] 다시 존1 로 돌아갔다(배리어상 불가하면 생략) 오거나 죽었다 살아나 재진입해도 **두 번 초기화되지 않는다**.
 - [ ] 어쌔신: 존1 에서 **R 변신 중**에 복도1 에 들어가면 지금 한 번 초기화 + 로그 `… 진행 중 행동이 끝나면 한 번 더(예약)` → 변신이 끝나 R 쿨이 걸리는 순간 다시 0(로그 `복도1 쿨타임 초기화 예약 실행`).
@@ -229,7 +229,7 @@
 ### 클라 전용 확인 (자막 targets · 캐릭터별 문구 · 목표 패널)
 - [ ] 서로 다른 캐릭터(예: 호스트 팔라딘 · 클라 거너)로 들어가 캐릭터별 문구가 **각자 화면에** 맞게 나온다(존1 만 — Z1 Q/E/R 힌트·패시브. 어쌔신은 분노 게이지 기준).
   **존2·존3 에는 캐릭터별 문구가 없다**(v8 §2.4).
-- [ ] 복도1 `TUT_C1_COOLDOWN_RESET` 은 그 사람 화면에만.
+- [ ] 복도1 쿨 초기화 때 **어느 화면에도 자막이 뜨지 않는다**(사용자 변경 — `TUT_C1_COOLDOWN_RESET` 호출 제거).
 - [ ] 빗나감·이른 간파 문구는 **시전자에게만**, 첫 성공·힌트·연습 끝·처치는 전원.
 - [ ] 대기 줄 남은 초가 클라에서도 서버 값과 맞는다(로컬 unscaled 로 줄고 갱신 때 맞춰짐).
 - [ ] 강조(HUD 칸·월드 대상)는 각 클라 로컬 플레이어 기준(존4 계단 = 내게 가장 가까운 것).
@@ -303,7 +303,7 @@
     v8 연계 `comboTarget` 3 · `comboPushDistance` 3 · `comboPushSeconds` 0.35 · `comboContactSlack` 0.4 · `comboBlockedContactSlack` 1.6 · `comboRecoverSeconds` 0.6 · `comboReturnSpeed` 6 · `comboReturnTimeout` 5 · `comboReadyDelay` 4 ·
     존3 흐름 `practiceWallGap` 4 · `practiceEndClearance` 8.
   - v8 문구 행(안내 문구 표 — 위 `rows[]` 에 같이 들어감): 새 id `TUT_WAIT_PARTY_NOAUTO`(시나리오 §5 에 없음, G1 대기 줄) · `TUT_Z1_Q/E/RMB/R` · `TUT_Z1_Q_GUNNER` · `TUT_Z1_E_PALADIN/_GUNNER/_ASSASSIN` · `TUT_Z1_R_ASSASSIN` ·
-    `TUT_Z1_CHECK_Q/E/RMB/R`(시나리오 §5 에 없음, 체크리스트 줄) · `TUT_C1_COOLDOWN_RESET` · `TUT_Z3_COUNTER_GOAL/PUSH_INTRO/PUSH_GOAL/PUSH_HINT/WALL_SUCCESS/RETURN`.
-    더 이상 호출하지 않는 행(SO 에 남아 있음 — Export 때 빼도 됨): `TUT_Z2_Q*`·`TUT_Z2_E*`·`TUT_Z2_NUDGE`·`TUT_Z3_GUNNER`.
+    `TUT_Z1_CHECK_Q/E/RMB/R`(시나리오 §5 에 없음, 체크리스트 줄) · `TUT_Z3_COUNTER_GOAL/PUSH_INTRO/PUSH_GOAL/PUSH_HINT/WALL_SUCCESS/RETURN`.
+    더 이상 호출하지 않는 행(SO 에 남아 있음 — Export 때 빼도 됨): `TUT_Z2_Q*`·`TUT_Z2_E*`·`TUT_Z2_NUDGE`·`TUT_Z3_GUNNER`·`TUT_C1_COOLDOWN_RESET`(사용자 변경).
 - [ ] D1 팀장 합의 완료(§4).
 - [ ] 이 문서 1~3부 사람 확인 완료.

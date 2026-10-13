@@ -87,6 +87,7 @@
 **진행(2026-10-12)**: V0 `0af4cac4` · V1 `c3f6f295` · V2 `348376fc` · V3 `3ab36055` · V4 `dda9ca7b` · V5 문서 `3ff996b6`. Play 확인 순서 = Docs/tech/tutorial-qa.md(v8 반영).
 - 26(`feature/InterruptSuccessCooldown`) 병합 `df299c3a` 뒤 정리: 존3 간파 성공 판정 = `PlayerInterruptSkillBase.ServerInterruptSucceeded`(26 의 시전자 쿨 감소 **뒤** 발생 → 파티 우클릭 쿨 0 으로 덮음), `ServerCounterSucceeded`↔`ServerInterruptResolved` 같은 프레임 짝짓기 제거.
   `TutorialCooldownReset` = `PlayerSkillController.ResetCooldownServer(skill)`(위 '기존 공개 API' 결정의 `ReduceCooldownServer(…)` 를 대체). 🔴 **V8 은 26 에 의존 — 26 을 먼저 development 에 병합할 것.** 상세: Docs/tech/tutorial-zone3.md §5.
+- **사용자 변경(2026-10-13) — V2 자막 없음**: 복도1 첫 진입 쿨 초기화 때 `TUT_C1_COOLDOWN_RESET` 을 띄우지 않는다(호출만 제거, SO 행은 남김). 초기화 동작(플레이어별 1회·대시·예약)은 그대로.
 
 ## 4. 리스크
 - 몬스터·타이머·보스 진입 훅은 경석 영역 — 최소 침습 + handoff 문서, 병합 전 경석 공유.
