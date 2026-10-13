@@ -37,6 +37,7 @@ internal static class PlayerEditModeTestRunner
         "^PlayerMotionSweepStepTests$", // 모터 스윕 — 단차·급경사·낙하 착지(실제 CapsuleCast)
         "^PlayerUnitCollisionRulesTests$", // 할 일 11 — 유닛 장애물 마스크(Soul·유닛 통과)·겹침 밀어내기 상한
         "^PlayerUnitPenetrationTests$", // 할 일 11 — 겹친 유닛 관통 수집(실제 ComputePenetration)·비몸체 Player 콜라이더 무시
+        "^DashDirectionRulesTests$", // 할 일 25 — 대시 방향 옵션(캐릭터 정면 기본 / 마우스 방향) 선택 규칙
     };
 
     const string Tag = "[PlayerTests]";
