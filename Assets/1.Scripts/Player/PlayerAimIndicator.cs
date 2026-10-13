@@ -1,14 +1,21 @@
 ﻿using UnityEngine;
 using UnityEngine.InputSystem;
 using Unity.Netcode;
-using UnityEngine.Rendering.Universal;
 
 public class PlayerAimIndicator : NetworkBehaviour
 {
+    [Tooltip("바닥에 눕히는 얇은 쿼드(MeshRenderer). 플레이어 자식이지만 월드 위치·회전·크기는 매 프레임 여기서 다시 잡는다.")]
     [SerializeField] private Transform indicator;
     [SerializeField] private float indicator_rot_offset;
     [SerializeField] private Camera targetCamera;
     [SerializeField] private LayerMask groundMask;
+
+    [Tooltip("발밑 지면에서 띄우는 높이(m). 지면과 겹쳐 깜빡이거나 파묻히지 않게 한다.")]
+    [SerializeField] private float heightOffset = 0.08f;
+    [Tooltip("화살표 쿼드 한 변의 월드 크기(m). 예전 데칼(2m)의 60%.")]
+    [SerializeField] private float arrowScale = 1.2f;
+    [Tooltip("발밑에서 조준 방향으로 쿼드 중심을 미는 거리(m). 예전 데칼 오프셋(1m)의 60%.")]
+    [SerializeField] private float arrowForwardOffset = 0.6f;
 
     [Tooltip("켜면 대시 재충전 중 인디케이터를 dashCooldownTint 로 어둡게 한다. 기본 꺼짐 — 대시 상태는 머리 위 대시 아이콘이 보여 준다.")]
     [SerializeField] private bool tintOnDashCooldown;
@@ -16,6 +23,10 @@ public class PlayerAimIndicator : NetworkBehaviour
     [SerializeField] private Color dashCooldownTint = new Color(0.3f, 0.3f, 0.3f, 1f);
 
     private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
+
+    // 발밑 지면 레이: 캐릭터 위치 조금 위에서 아래로. 계단·단차 위에서도 지면을 잡는다.
+    private const float FootRayStartUp = 0.5f;
+    private const float FootRayLength = 3f;
 
     private PlayerDashController dash;
     private Material indicatorMaterial; // 인스턴스 — 프리팹 애셋 오염 금지
@@ -70,13 +81,22 @@ public class PlayerAimIndicator : NetworkBehaviour
         UpdateDashTint();
     }
 
-    private void CacheIndicatorMaterial()
+    // 이동이 끝난 뒤 배치해야 한 프레임 늦게 따라오지 않는다.
+    private void LateUpdate()
     {
-        if (indicator == null || !indicator.TryGetComponent(out DecalProjector projector) || projector.material == null)
+        if (IsNetworkActive && !IsOwner)
             return;
 
-        indicatorMaterial = new Material(projector.material);
-        projector.material = indicatorMaterial;
+        PlaceIndicator();
+    }
+
+    private void CacheIndicatorMaterial()
+    {
+        if (indicator == null || !indicator.TryGetComponent(out MeshRenderer quad) || quad.sharedMaterial == null)
+            return;
+
+        indicatorMaterial = new Material(quad.sharedMaterial);
+        quad.sharedMaterial = indicatorMaterial;
         indicatorBaseColor = indicatorMaterial.HasProperty(BaseColorId)
             ? indicatorMaterial.GetColor(BaseColorId)
             : Color.white;
@@ -146,9 +166,28 @@ public class PlayerAimIndicator : NetworkBehaviour
             return;
 
         AimDirection = direction.normalized;
+    }
 
-        float yaw = Mathf.Atan2(AimDirection.x, AimDirection.z) * Mathf.Rad2Deg;
-        indicator.rotation = Quaternion.Euler(90.0f, yaw + indicator_rot_offset, 0f);
+    // 발밑 지면 높이 + heightOffset 에 수평으로 눕히고, 조준 방향으로 Y축만 돌린다. 부모 회전과 무관하다.
+    private void PlaceIndicator()
+    {
+        if (indicator == null)
+            return;
+
+        Vector3 foot = transform.position;
+        bool hasGround = Physics.Raycast(
+            foot + Vector3.up * FootRayStartUp, Vector3.down, out RaycastHit groundHit,
+            FootRayStartUp + FootRayLength, groundMask, QueryTriggerInteraction.Ignore);
+
+        Vector3 aim = AimDirection.sqrMagnitude > 0f ? AimDirection : transform.forward;
+        float height = AimIndicatorPlacement.Height(hasGround, groundHit.point.y, foot.y, heightOffset);
+
+        indicator.SetPositionAndRotation(
+            AimIndicatorPlacement.Position(foot, height, aim, arrowForwardOffset),
+            AimIndicatorPlacement.Rotation(aim, indicator_rot_offset));
+
+        Transform parent = indicator.parent;
+        indicator.localScale = AimIndicatorPlacement.LocalScale(arrowScale, parent != null ? parent.lossyScale.x : 1f);
     }
 
     private bool IsNetworkActive =>
