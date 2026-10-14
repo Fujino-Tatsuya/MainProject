@@ -2,7 +2,7 @@ using NUnit.Framework;
 
 /// <summary>
 /// 보스 엘리베이터 순수 시간표(<see cref="BossElevatorTimeline"/>) — 단계 시각, 이징 끝점·중간값, 경과 시간 → 단계·높이·상승 속도·문 포즈·페이드 알파(늦은 합류 포함).
-/// 기본 수치: 높이 12, 대기 0.5, 하강 1.2, 문 열림 1.76·닫힘 1.68(클립 길이), 사라짐 뒤 닫힘 1.5, 상승 가속 1.5·속도 24, 페이드 지연 0·길이 1.5.
+/// 기본 수치: 높이 12(테스트 고정 — 설정 기본은 0 = 자동), 대기 0.5, 하강 1.2, 문 열림 1.76·닫힘 1.68(클립 길이), 사라짐 뒤 닫힘 1.5, 상승 가속 1.5·속도 24, 페이드 지연 0·길이 1.5.
 /// </summary>
 public sealed class BossElevatorTimelineTests
 {
@@ -14,8 +14,38 @@ public sealed class BossElevatorTimelineTests
     // ∫₀¹ InCirc = 1 - π/4
     static readonly float InCircArea = 1f - (float)System.Math.PI / 4f;
 
+    // 기본 설정의 높이는 0(자동 — 리그가 칸 대기 높이로 채운다)이라 시간표 테스트는 12 로 고정한다.
+    static BossElevatorTimingSettings Settings()
+    {
+        BossElevatorTimingSettings s = BossElevatorTimingSettings.Default;
+        s.height = 12f;
+        return s;
+    }
+
     static BossElevatorTimeline Default() =>
-        new BossElevatorTimeline(BossElevatorTimingSettings.Default, ClipOpen, ClipClose);
+        new BossElevatorTimeline(Settings(), ClipOpen, ClipClose);
+
+    // ─── 높이 자동 ─────────────────────────────────────────────────────────
+
+    [Test]
+    public void Height_ZeroOrLess_UsesIdleAboveLanded()
+    {
+        BossElevatorTimingSettings s = BossElevatorTimingSettings.Default;
+        Assert.AreEqual(0f, s.height, Eps, "기본 = 자동");
+        Assert.AreEqual(10.44f, s.WithResolvedHeight(10.99f - 0.55f).height, Eps, "대기 y 10.99 − 착지 0.55");
+        s.height = -1f;
+        Assert.AreEqual(3f, s.WithResolvedHeight(3f).height, Eps, "음수도 자동");
+        Assert.AreEqual(0f, s.WithResolvedHeight(-2f).height, Eps, "대기가 착지보다 낮으면 0");
+
+        var t = new BossElevatorTimeline(BossElevatorTimingSettings.Default.WithResolvedHeight(10.44f), ClipOpen, ClipClose);
+        Assert.AreEqual(10.44f, t.HeightAt(0.0), Eps, "재생 시작 = 칸 대기 자리(순간이동 없음)");
+    }
+
+    [Test]
+    public void Height_Positive_KeepsSetting()
+    {
+        Assert.AreEqual(12f, Settings().WithResolvedHeight(3f).height, Eps);
+    }
 
     // ─── 단계 시각 ───────────────────────────────────────────────────────
 
@@ -38,7 +68,7 @@ public sealed class BossElevatorTimelineTests
     [Test]
     public void DoorDurations_SettingOverridesClipLength()
     {
-        BossElevatorTimingSettings s = BossElevatorTimingSettings.Default;
+        BossElevatorTimingSettings s = Settings();
         s.doorOpenDuration = 1f;
         s.doorCloseDuration = 2f;
         var t = new BossElevatorTimeline(s, ClipOpen, ClipClose);
@@ -51,7 +81,7 @@ public sealed class BossElevatorTimelineTests
     [Test]
     public void FadeOutDelay_ShiftsFadeAndBlackout()
     {
-        BossElevatorTimingSettings s = BossElevatorTimingSettings.Default;
+        BossElevatorTimingSettings s = Settings();
         s.fadeOutDelay = 0.4f;
         s.fadeOutDuration = 2f;
         var t = new BossElevatorTimeline(s, ClipOpen, ClipClose);
@@ -146,7 +176,7 @@ public sealed class BossElevatorTimelineTests
     [Test]
     public void Ascent_ZeroAccel_IsConstantSpeed()
     {
-        BossElevatorTimingSettings s = BossElevatorTimingSettings.Default;
+        BossElevatorTimingSettings s = Settings();
         s.ascendDuration = 0f;
         var t = new BossElevatorTimeline(s, ClipOpen, ClipClose);
         Assert.AreEqual(Speed, t.AscendSpeedAt(t.AscendStartAt), Eps);
@@ -169,7 +199,7 @@ public sealed class BossElevatorTimelineTests
     [Test]
     public void FadeAlpha_ZeroDuration_JumpsAtBlackout()
     {
-        BossElevatorTimingSettings s = BossElevatorTimingSettings.Default;
+        BossElevatorTimingSettings s = Settings();
         s.fadeOutDelay = 0.5f;
         s.fadeOutDuration = 0f;
         var t = new BossElevatorTimeline(s, ClipOpen, ClipClose);

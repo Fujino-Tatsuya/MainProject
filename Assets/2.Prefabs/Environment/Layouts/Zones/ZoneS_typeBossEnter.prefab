@@ -2301,7 +2301,7 @@ MonoBehaviour:
   - {fileID: 1166688363084698214}
   - {fileID: 909659294297857113}
   _timing:
-    height: 12
+    height: 0
     waitBeforeDescend: 0.5
     descendDuration: 1.2
     doorOpenDuration: 0

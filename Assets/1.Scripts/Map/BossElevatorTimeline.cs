@@ -25,13 +25,13 @@ public enum BossElevatorDoorState
 }
 
 /// <summary>
-/// 보스 엘리베이터 연출 수치. 문 열림/닫힘 시간이 0 이하면 문 클립 길이를 쓴다(<see cref="BossElevatorRig"/> 가 채운다).
+/// 보스 엘리베이터 연출 수치. 문 열림/닫힘 시간이 0 이하면 문 클립 길이를, 높이가 0 이하면 칸 대기 높이를 쓴다(<see cref="BossElevatorRig"/> 가 채운다).
 /// </summary>
 [Serializable]
 public struct BossElevatorTimingSettings
 {
-    [Tooltip("착지 위치 기준 하강 시작 높이(m)")]
-    [Min(0f)] public float height;
+    [Tooltip("착지 위치 기준 하강 시작 높이(m). 0 이하 = 자동(프리팹에 놓인 칸 대기 높이 − 착지 높이)")]
+    public float height;
     [Tooltip("순간이동 후 하강 시작까지(초)")]
     [Min(0f)] public float waitBeforeDescend;
     [Tooltip("하강 시간(초) — OutQuint")]
@@ -53,7 +53,7 @@ public struct BossElevatorTimingSettings
 
     public static BossElevatorTimingSettings Default => new BossElevatorTimingSettings
     {
-        height = 12f,
+        height = 0f,
         waitBeforeDescend = 0.5f,
         descendDuration = 1.2f,
         doorOpenDuration = 0f,
@@ -64,6 +64,17 @@ public struct BossElevatorTimingSettings
         fadeOutDelay = 0f,
         fadeOutDuration = 1.5f,
     };
+
+    /// <summary>
+    /// 하강 시작 높이를 확정한 사본. <see cref="height"/> 가 0 이하면 <paramref name="idleAboveLanded"/>(칸 대기 높이 − 착지 높이)를 쓴다 —
+    /// 하강이 칸이 놓인 자리에서 시작해 재생 시작·<see cref="BossElevatorRig.ResetToIdle"/> 에서 순간이동하지 않는다.
+    /// </summary>
+    public BossElevatorTimingSettings WithResolvedHeight(float idleAboveLanded)
+    {
+        BossElevatorTimingSettings s = this;
+        if (s.height <= 0f) s.height = Mathf.Max(0f, idleAboveLanded);
+        return s;
+    }
 }
 
 /// <summary>

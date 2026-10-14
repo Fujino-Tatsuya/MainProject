@@ -12,7 +12,8 @@ using UnityEngine;
 /// · 상승은 끝 높이 없이 계속된다. <see cref="BossElevatorPhase.Blackout"/>(완전 암전)에 닿으면 재생을 멈추고 <see cref="ResetToIdle"/> 한 뒤
 ///   <see cref="OnBlackout"/> 을 낸다. 화면 페이드 자체는 리그가 그리지 않는다 — 호출자가 <see cref="OnFadeOutStart"/>·
 ///   <see cref="BossElevatorTimeline.FadeAlphaAt"/> 로 맞춘다.
-/// · <see cref="ResetToIdle"/> = 칸을 프리팹에 놓인 자리로, 문 Closed.
+/// · 칸 대기 자리 = 프리팹에 놓인 자리(위). 높이 설정이 0 이하면 하강이 그 자리에서 시작한다(<see cref="BuildTimeline"/>).
+/// · <see cref="ResetToIdle"/> = 칸을 프리팹에 놓인 자리로, 문은 대기 포즈(<see cref="IdleDoorOpen"/>).
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class BossElevatorRig : MonoBehaviour
@@ -61,6 +62,17 @@ public sealed class BossElevatorRig : MonoBehaviour
     public IReadOnlyList<Transform> FrontPoints => _frontPoints;
     public bool IsPlaying => _playing;
     public BossElevatorTimeline Timeline => _timeline;
+    /// <summary>움직이는 칸 — 상승 중 카메라가 따라간다.</summary>
+    public Transform Cab => _cab;
+
+    /// <summary>
+    /// 대기(재생 밖) 문 포즈가 열림인가. 튜토리얼 G10(<see cref="TutorialElevatorDoor"/>)이 켠다 —
+    /// 재생 중엔 리그가 문을 쥐고, <see cref="ResetToIdle"/> 에서 이 값대로 Open 끝 프레임/Closed 로 돌아간다.
+    /// </summary>
+    public bool IdleDoorOpen { get; set; }
+
+    /// <summary>씬에 있는 리그(보스 진입 존은 BossRoom 존 하나). 존이 각 피어에서 맵 생성 때 스폰되므로 없을 수 있다.</summary>
+    public static BossElevatorRig FindActive() => FindFirstObjectByType<BossElevatorRig>();
 
     void Awake()
     {
@@ -73,11 +85,16 @@ public sealed class BossElevatorRig : MonoBehaviour
         Apply(_clock() - _startTime);
     }
 
-    /// <summary>이 리그의 설정·문 클립 길이로 시간표를 만든다. 서버와 클라가 같은 프리팹이면 같은 시간표가 나온다.</summary>
+    /// <summary>
+    /// 이 리그의 설정·문 클립 길이로 시간표를 만든다. 서버와 클라가 같은 프리팹이면 같은 시간표가 나온다.
+    /// 높이 설정이 0 이하면 칸 대기 높이 − 착지 높이 — 하강이 칸이 놓인 자리에서 시작한다.
+    /// </summary>
     public BossElevatorTimeline BuildTimeline()
     {
+        CaptureIdle();
+        float idleAboveLanded = _idleCaptured ? _idleLocalPosition.y - _landedLocalY : 0f;
         return new BossElevatorTimeline(
-            _timing,
+            _timing.WithResolvedHeight(idleAboveLanded),
             _doorOpenClip != null ? _doorOpenClip.length : 0f,
             _doorCloseClip != null ? _doorCloseClip.length : 0f);
     }
@@ -99,7 +116,7 @@ public sealed class BossElevatorRig : MonoBehaviour
         Apply(_clock() - _startTime);
     }
 
-    /// <summary>재생을 멈추고 칸을 프리팹 자리로, 문을 Closed 로 되돌린다. 이벤트는 내지 않는다.</summary>
+    /// <summary>재생을 멈추고 칸을 프리팹 자리로, 문을 대기 포즈(<see cref="IdleDoorOpen"/> — Open 끝 프레임 또는 Closed)로 되돌린다. 이벤트는 내지 않는다.</summary>
     public void ResetToIdle()
     {
         CaptureIdle();
@@ -107,7 +124,7 @@ public sealed class BossElevatorRig : MonoBehaviour
         _hasLastPhase = false;
         _hasAppliedDoor = false;
         if (_cab != null) _cab.localPosition = _idleLocalPosition;
-        PlayDoor(DoorClosedHash, 1f);
+        PlayDoor(IdleDoorOpen ? DoorOpenHash : DoorClosedHash, 1f);
     }
 
     void CaptureIdle()
