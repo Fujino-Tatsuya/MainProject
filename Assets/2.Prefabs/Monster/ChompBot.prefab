@@ -491,6 +491,111 @@ Transform:
   m_Children: []
   m_Father: {fileID: 7999292454765025595}
   m_LocalEulerAnglesHint: {x: 86.09442, y: 0.0000038769545, z: 0.000003815505}
+--- !u!1 &4998047686118838745
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8920059644803645815}
+  - component: {fileID: 2819952482156166067}
+  m_Layer: 0
+  m_Name: ChompBot_Jaw
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8920059644803645815
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4998047686118838745}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.7071068, y: 0, z: -0, w: 0.7071068}
+  m_LocalPosition: {x: -0, y: 0, z: 0}
+  m_LocalScale: {x: 100, y: 100, z: 100}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2515709775261251744}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!137 &2819952482156166067
+SkinnedMeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4998047686118838745}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 3
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: 7270ba245f22c3c45bb9bee5f116ccc3, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  serializedVersion: 2
+  m_Quality: 0
+  m_UpdateWhenOffscreen: 0
+  m_SkinnedMotionVectors: 1
+  m_Mesh: {fileID: 4300000, guid: 11aa57a4ae8729d4083d84427c5809dd, type: 2}
+  m_Bones:
+  - {fileID: 4998502004633112037}
+  - {fileID: 7999292454765025595}
+  - {fileID: 8337383468949604239}
+  - {fileID: 137279843195931009}
+  - {fileID: 2283321170323235124}
+  - {fileID: 1786670288771053011}
+  - {fileID: 7599367980818021646}
+  - {fileID: 3796325343604789818}
+  - {fileID: 468762135610459077}
+  - {fileID: 3889572681923849057}
+  - {fileID: 245365416286222978}
+  - {fileID: 5422868752590224343}
+  - {fileID: 175077971607170442}
+  m_BlendShapeWeights: []
+  m_RootBone: {fileID: 4998502004633112037}
+  m_AABB:
+    m_Center: {x: 0.000044430606, y: -0.0009012418, z: 0.00954501}
+    m_Extent: {x: 0.0073548746, y: 0.010319049, z: 0.01134529}
+  m_DirtyAABB: 0
 --- !u!1 &5083357185944259280
 GameObject:
   m_ObjectHideFlags: 0
@@ -510,6 +615,7 @@ GameObject:
   - component: {fileID: 7605792445230006449}
   - component: {fileID: 4980393420285267538}
   - component: {fileID: 3145906165011328742}
+  - component: {fileID: 470375556575959905}
   m_Layer: 8
   m_Name: ChompBot
   m_TagString: Untagged
@@ -580,7 +686,7 @@ CapsuleCollider:
   m_LayerOverridePriority: 0
   m_IsTrigger: 0
   m_ProvidesContacts: 0
-  m_Enabled: 0
+  m_Enabled: 1
   serializedVersion: 2
   m_Radius: 0.5
   m_Height: 2
@@ -777,6 +883,28 @@ MonoBehaviour:
   despawnGrace: 0.3
   leadBeforeClipEnd: 0.1
   delayAfterClipEnd: 0
+--- !u!114 &470375556575959905
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5083357185944259280}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: eef89930257eb8b4a846a61f980d5079, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MonsterAttackTell
+  target: {fileID: 2819952482156166067}
+  targetName: ChompBot_Jaw
+  warnColor: {r: 2.2, g: 0.92399997, b: 0.044, a: 2.2}
+  dangerColor: {r: 2.6, g: 0.103999995, b: 0.051999997, a: 2.6}
+  fill: 0.45
+  rimPower: 2
+  anticipationState: AttackAnticipation
+  strikeState: Attack
+  redAt: 0.65
+  hitNormalizedTime: 0.357
 --- !u!1 &5267482100630464192
 GameObject:
   m_ObjectHideFlags: 0
@@ -842,6 +970,7 @@ Transform:
   m_Children:
   - {fileID: 3689241307049000671}
   - {fileID: 1999539712903484837}
+  - {fileID: 8920059644803645815}
   m_Father: {fileID: 6807899614205721584}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!95 &4411660867951341482
@@ -1159,7 +1288,7 @@ SkinnedMeshRenderer:
   m_Quality: 0
   m_UpdateWhenOffscreen: 0
   m_SkinnedMotionVectors: 1
-  m_Mesh: {fileID: 4300000, guid: 42f254a0813d8cf4da43440dee4b079d, type: 2}
+  m_Mesh: {fileID: 4300000, guid: 8d7cf6ae87c26994f8634b5d355b527d, type: 2}
   m_Bones:
   - {fileID: 4998502004633112037}
   - {fileID: 7999292454765025595}

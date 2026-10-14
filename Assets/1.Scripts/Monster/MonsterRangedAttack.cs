@@ -21,6 +21,13 @@ public class MonsterRangedAttack : BaseAttack
         _ownerUnit = GetComponentInParent<Unit>();
     }
 
+    /// <summary>발사 원점(비어 있으면 자기 transform). 수직 낙하 포격의 시야 검사 원점으로도 쓴다.</summary>
+    public Transform Muzzle => muzzle != null ? muzzle : transform;
+    /// <summary>피해 대상 레이어(MonsterBase 가 playerMask 로 주입).</summary>
+    public LayerMask TargetLayer => targetLayer;
+    /// <summary>투사체 프리팹 — 수직 낙하 포격이 떨어지는 폭탄 모양·폭발 이펙트를 여기서 빌린다.</summary>
+    public GameObject ProjectilePrefab => projectilePrefab;
+
     // 데이터 주도 설정 주입(MonsterBase.ServerInitialize에서 호출). 인스펙터 값이 있으면 그대로 두고,
     // data 쪽 값이 유효할 때만 덮어쓴다.
     public void ConfigureProjectile(GameObject prefab, float speed, float lifetime, float arcHeight = 0f, float splashRadius = 0f)
@@ -46,10 +53,11 @@ public class MonsterRangedAttack : BaseAttack
     {
         if (direction.sqrMagnitude < 0.0001f) return;
         Vector3 origin = muzzle != null ? muzzle.position : transform.position;
-        Fire(origin + direction.normalized * Mathf.Max(1f, distance));
+        Fire(origin + direction.normalized * Mathf.Max(1f, distance), distance);
     }
 
-    public void Fire(Vector3 targetPoint)
+    /// <param name="maxDistance">직선 탄의 최대 비행 거리(0 = 수명만). 터렛은 조준선 길이(attackRange)를 넘겨 예고 밖으로 안 날아가게 한다.</param>
+    public void Fire(Vector3 targetPoint, float maxDistance = 0f)
     {
         if (!IsServer)
             return;
@@ -100,7 +108,10 @@ public class MonsterRangedAttack : BaseAttack
         }
         else
         {
-            proj.Launch(_ownerUnit, dir, projectileSpeed, damage, targetLayer, projectileLifetime);
+            // 조준선(예고) 끝에서 멈춘다 — 수명만 쓰면 14m/s × 4초 = 56m 를 날아 선 밖 플레이어가 예고 없이 맞았다(점검 10-14).
+            float life = projectileLifetime;
+            if (maxDistance > 0f && projectileSpeed > 0f) life = Mathf.Min(life, maxDistance / projectileSpeed);
+            proj.Launch(_ownerUnit, dir, projectileSpeed, damage, targetLayer, life);
         }
     }
 }

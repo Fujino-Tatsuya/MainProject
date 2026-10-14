@@ -65,3 +65,4 @@ MonoBehaviour:
   locomotionAnimSpeedRange: {x: 0.5, y: 2.5}
   locomotionPlaybackScale: 0.85
   animatorControllerOverride: {fileID: 0}
+  telegraphStyle: {fileID: 11400000, guid: 92c647bea0fdba64c89c3179e14ac3e9, type: 2}

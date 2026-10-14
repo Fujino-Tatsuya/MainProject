@@ -261,10 +261,23 @@ public sealed class TutorialDeathRules : MonoBehaviour
     {
         into.Clear();
         if (_areas == null || !_areas.TryGetArea(TutorialArea.Corridor4, out TutorialRect rect)) return false;
+        return TryFindAreaSpreadPoints(TutorialArea.Corridor4, count, rect.CenterX, rect.CenterZ, into);
+    }
+
+    /// <summary>
+    /// [서버] 구간 <paramref name="area"/> 안 지점 <paramref name="count"/> 개 — 전멸 리스폰과 같은 규칙: 격자(<see cref="TutorialRevivePointRules.SampleGrid"/>)를
+    /// 최전방 = <paramref name="area"/> 마스크(<see cref="TutorialBackBarrierRules.MaskWithFrontmost"/>)의 지난 배리어 앞면 여유·바닥·점유로 거른 뒤
+    /// 패드 범위 + 1m 밖에서 기준점(<paramref name="refX"/>, <paramref name="refZ"/>)에 가까운 순으로 서로 떨어지게 고른다.
+    /// 구간 스킵(<see cref="TutorialSkipController"/> — 기준점 = 입구 배리어)도 쓴다. 후보가 없으면 false.
+    /// </summary>
+    public bool TryFindAreaSpreadPoints(TutorialArea area, int count, float refX, float refZ, List<Vector3> into)
+    {
+        into.Clear();
+        if (_areas == null || !_areas.TryGetArea(area, out TutorialRect rect)) return false;
 
         TutorialStageMarker stage = TutorialStageMarker.Active;
         float floorY = stage != null ? stage.transform.position.y : 0f;
-        int passed = TutorialBackBarrierRules.MaskWithFrontmost(TutorialArea.Corridor4);
+        int passed = TutorialBackBarrierRules.MaskWithFrontmost(area);
         float clearance = _director != null ? _director.BackBarrierClearance : TutorialBackBarrierRules.DefaultClearance;
 
         _grid.Clear();
@@ -273,19 +286,40 @@ public sealed class TutorialDeathRules : MonoBehaviour
         var ys = new List<float>();
         foreach ((float x, float z) in _grid)
         {
-            if (TutorialBackBarrierRules.IsNearPassedFace(_barrierSpecs, TutorialArea.Corridor4, x, z, passed, clearance)) continue;
+            if (TutorialBackBarrierRules.IsNearPassedFace(_barrierSpecs, area, x, z, passed, clearance)) continue;
             if (!TryResolveStandPoint(x, z, floorY, out float y)) continue;
             points.Add((x, z));
             ys.Add(y);
         }
 
         var chosen = new List<int>();
-        if (!PartyWipeRespawnRules.TrySelectSpread(points, count, rect.CenterX, rect.CenterZ, PartyWipeRespawnRules.DefaultSpacing,
+        if (!PartyWipeRespawnRules.TrySelectSpread(points, count, refX, refZ, PartyWipeRespawnRules.DefaultSpacing,
                                                     ServerPadAreas(), TutorialRevivePointRules.DefaultPadMargin, chosen))
             return false;
 
         foreach (int i in chosen) into.Add(new Vector3(points[i].x, ys[i], points[i].z));
         return true;
+    }
+
+    /// <summary>[서버] 구간 사각형(구간 계산 실패면 false) — 구간 스킵의 기준점 계산용.</summary>
+    public bool TryGetAreaRect(TutorialArea area, out TutorialRect rect)
+    {
+        rect = default;
+        return _areas != null && _areas.TryGetArea(area, out rect);
+    }
+
+    /// <summary>[서버] 구간 <paramref name="area"/> 로 들어가는 배리어(너머 구간 = area)의 모양. 존1 등 없으면 false.</summary>
+    public bool TryGetEntryBarrier(TutorialArea area, out TutorialBarrierSpec spec)
+    {
+        spec = default;
+        if (_barrierSpecs == null) return false;
+        foreach (TutorialBarrierSpec s in _barrierSpecs)
+        {
+            if (TutorialBackBarrierRules.AreaBeyond(s) != area) continue;
+            spec = s;
+            return true;
+        }
+        return false;
     }
 
     // ─── 판정 → 실행 ─────────────────────────────────────────────────────

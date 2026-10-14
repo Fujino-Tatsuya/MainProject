@@ -403,17 +403,22 @@ public class GauntletBot : MonsterBase
     //    재생 시작은 클립 이벤트(전 피어)라 서버가 알려 줄 필요가 없다 — 각 피어가 자기 인스턴스를 칠한다.
     readonly List<GameObject> _smashTelegraphInstances = new List<GameObject>();
     bool _smashTelegraphTinted;
+    int _smashTintVersion = -1;
 
     void LateUpdate()
     {
         if (smashTelegraph == null) return;
         if (!smashTelegraph.IsPlaying) { _smashTelegraphTinted = false; return; }
-        if (_smashTelegraphTinted || Counter == null) return;   // 창 없는 몹이면 원래 색 그대로
+        // 재생당 한 번 칠한다 — 단 Play 중 스타일 값이 바뀌면(아트 조절) 다시 칠한다(PLAN-telegraph-style).
+        if (_smashTelegraphTinted && _smashTintVersion == TelegraphStyleSO.Version) return;
+        if (Counter == null) return;   // 창 없는 몹이면 원래 색 그대로
 
         _smashTelegraphInstances.Clear();
         if (smashTelegraph.GetInstances(_smashTelegraphInstances) == 0) return;
 
-        Color blue = BossAttackConeTelegraph.InterruptRgb;
+        // 인터럽트 색 = 이 몬스터 스타일의 인터럽트 **채움** RGB(알파는 VFX 스프라이트 것을 유지 — 모양·페이드는 아트 VFX 담당).
+        Color blue = TelegraphStyleSO.For(this).interrupt.fill.color;
+        _smashTintVersion = TelegraphStyleSO.Version;
         for (int i = 0; i < _smashTelegraphInstances.Count; i++)
         {
             GameObject go = _smashTelegraphInstances[i];

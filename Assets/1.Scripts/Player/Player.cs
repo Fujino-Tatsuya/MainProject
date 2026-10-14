@@ -71,6 +71,10 @@ public class Player : Unit
     private IPlayerOnHitBonus[] onHitBonuses;
     private PlayerInputReader inputReader;
     private PlayerSkillTargeting skillTargeting;
+    private PlayerLifeCycleController lifeCycle;
+    private PlayerEncounterLock encounterLock;
+    // 기본 체력 재생(할 일 31) — 서버에서만 틱한다. 계산은 순수 모델, 여기는 배선만.
+    private readonly PlayerHealthRegenModel healthRegen = new PlayerHealthRegenModel();
     private NetworkTransform networkTransform;
     private bool networkTransformMissingWarningLogged;
     private PlayerTickRingBuffer<PlayerRawSimulationInput> ownerRawInputHistory;
@@ -195,6 +199,8 @@ public class Player : Unit
         onHitBonuses = GetComponents<IPlayerOnHitBonus>();
         inputReader = GetComponent<PlayerInputReader>();
         skillTargeting = GetComponent<PlayerSkillTargeting>();
+        lifeCycle = GetComponent<PlayerLifeCycleController>();
+        encounterLock = GetComponent<PlayerEncounterLock>();
         networkTransform = GetComponent<NetworkTransform>();
 
         if (animator == null)
@@ -341,6 +347,7 @@ public class Player : Unit
     {
         UpdateMovementDiagnostics();
         UpdateOwnerReconciliationDiagnostics();
+        TickServerHealthRegen();
 
         if (IsServer)
             wallImpactTracker.Tick(this, stateController.CurrentState == PlayerActionState.Knockback,
@@ -1680,6 +1687,9 @@ public class Player : Unit
         // 그래서 여기서 쉴드 감소를 확인해 PlayerShieldVfx 가 전 피어로 퍼뜨리게 한다. (판정 영향 없음)
         int shieldBefore = CurrentShield;
 
+        // 레이드 보스전 한 방 즉사 금지(PLAN-boss-raid.md, 보스가 켤 때만 — 평소엔 Ratio 0 이라 그대로).
+        attackInfo.damage = BossRaidRules.CapHitDamage(attackInfo.damage, FinalMaxHp, PlayerHitDamageCap.Ratio);
+
         bool result = base.ReceiveAttack(attackInfo, hitContext);
         if (!result)
             return false; // 이미 죽었다 — 피격 반응(패시브 쿨감·쉴드 파문)도 없다.
@@ -1727,6 +1737,50 @@ public class Player : Unit
             _fallDamageBypass = false;
         }
     }
+
+    // 재생 리셋 = 체력 피해 > 0 또는 추락 피해. 보호막만 깎인 피격은 재생을 멈추지 않는다(사용자 결정 10-13).
+    // 무적으로 막힌 피해·내가 때린 것은 오지 않는다.
+    protected override void OnServerHealthDamageApplied(int healthLost, int shieldLost)
+    {
+        healthRegen.NotifyDamage(GameplayNow(), healthLost, _fallDamageBypass);
+    }
+
+    /// <summary>
+    /// [서버] 기본 체력 재생(할 일 31). 회복은 Unit.HealHp(통계 비집계) → 기존 _currentHp 복제로 HUD 에 반영된다(오너 예측 없음).
+    /// 사망·Soul·PermanentDead·연출 잠금 중에는 막히고, 풀린 시점부터 지연을 다시 센다.
+    /// </summary>
+    private void TickServerHealthRegen()
+    {
+        if (!IsServer || _health == null)
+            return;
+
+        PlayerGameRuleData rule = motor != null ? motor.GameRule : null;
+        if (rule == null)
+            return;
+
+        bool blocked = (lifeCycle != null && lifeCycle.State != PlayerLifeState.Alive) ||
+                       (encounterLock != null && encounterLock.IsCinematicLocked);
+
+        // 회복 속도는 최종 최대 체력 기준. 상한은 Health 가 실제로 허용하는 base 최대치와 최종치 중 작은 쪽.
+        int maxHpCap = Mathf.Min(MaxHp, FinalMaxHp);
+        int heal = healthRegen.Tick(
+            GameplayNow(),
+            blocked,
+            CurrentHealth,
+            maxHpCap,
+            FinalMaxHp,
+            rule.HealthRegenDelaySeconds,
+            rule.HealthRegenPercentPerSecond);
+        // 자연 회복은 결과 통계(회복량)에 잡지 않는다(사용자 결정 10-13).
+        if (heal > 0)
+            HealHp(heal, countInStats: false);
+    }
+
+    // 상태이상·보호막과 같은 시간 도메인(일시정지·슬로모션 반영 GameNow, 없으면 ServerTime).
+    private double GameplayNow()
+        => NetworkClock.Instance != null
+            ? NetworkClock.Instance.GameNow
+            : (NetworkManager != null ? NetworkManager.ServerTime.Time : 0.0);
 
     private ClientRpcParams CreateOwnerClientRpcParams()
     {

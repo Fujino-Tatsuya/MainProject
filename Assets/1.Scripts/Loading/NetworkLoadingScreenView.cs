@@ -54,10 +54,13 @@ public class NetworkLoadingScreenView : MonoBehaviour
     {
         _tableRoutine = StartCoroutine(CycleTables());
         _registerRoutine = StartCoroutine(RegisterWhenNetworkManagerExists());
+        Loc.Changed += Relabel;
     }
 
     private void OnDisable()
     {
+        Loc.Changed -= Relabel;
+
         if (_tableRoutine != null)
         {
             StopCoroutine(_tableRoutine);
@@ -95,6 +98,12 @@ public class NetworkLoadingScreenView : MonoBehaviour
     {
         SetPhase(NetworkLoadingPhase.Completed);
         Destroy(gameObject);
+    }
+
+    private void Relabel()
+    {
+        ApplyPhaseText();
+        ApplyTooltip();
     }
 
     private IEnumerator RegisterWhenNetworkManagerExists()
@@ -192,29 +201,20 @@ public class NetworkLoadingScreenView : MonoBehaviour
             return;
         }
 
-        switch (_phase)
+        statusText.text = _phase == NetworkLoadingPhase.Ready ? GetReadyMessage() : PhaseText(_phase);
+    }
+
+    /// <summary>준비(Ready) 밖 단계의 상태 문구 — <c>UI.Loading.*</c>. 완료면 빈 글자.</summary>
+    public static string PhaseText(NetworkLoadingPhase phase)
+    {
+        switch (phase)
         {
-            case NetworkLoadingPhase.LoadingScene:
-                statusText.text = "Preparing...";
-                break;
-            case NetworkLoadingPhase.LoadingGame:
-                statusText.text = "Loading...";
-                break;
-            case NetworkLoadingPhase.WaitingForPlayers:
-                statusText.text = "Waiting for players...";
-                break;
-            case NetworkLoadingPhase.Ready:
-                statusText.text = GetReadyMessage();
-                break;
-            case NetworkLoadingPhase.Activating:
-                statusText.text = "Starting...";
-                break;
-            case NetworkLoadingPhase.Completed:
-                statusText.text = string.Empty;
-                break;
-            default:
-                statusText.text = "Stand by...";
-                break;
+            case NetworkLoadingPhase.LoadingScene: return UiStrings.LoadingPreparing.Text;
+            case NetworkLoadingPhase.LoadingGame: return UiStrings.LoadingLoading.Text;
+            case NetworkLoadingPhase.WaitingForPlayers: return UiStrings.LoadingWaitingForPlayers.Text;
+            case NetworkLoadingPhase.Activating: return UiStrings.LoadingActivating.Text;
+            case NetworkLoadingPhase.Completed: return string.Empty;
+            default: return UiStrings.LoadingStandBy.Text;
         }
     }
 
@@ -222,11 +222,21 @@ public class NetworkLoadingScreenView : MonoBehaviour
     {
         if (readyMessages == null || readyMessages.Length == 0)
         {
-            return "Enter...";
+            return UiStrings.LoadingReady1.Text;
         }
 
         var index = Mathf.FloorToInt(Time.unscaledTime * 2f) % readyMessages.Length;
-        return readyMessages[index];
+        return TableText(UiStrings.LoadingReadyMessages, readyMessages, index);
+    }
+
+    /// <summary>
+    /// 씬 직렬화 문구 표의 index 칸 — 키 목록(<see cref="UiStrings.LoadingTips"/> 등)에 같은 칸이 있으면 그 키(행이 없으면 씬 값),
+    /// 키 목록보다 긴 칸은 씬 값 그대로(키 없음).
+    /// </summary>
+    public static string TableText(System.Collections.Generic.IReadOnlyList<UiString> keys, string[] serialized, int index)
+    {
+        string authored = serialized[index] ?? string.Empty;
+        return index < keys.Count ? keys[index].TextOr(authored) : authored;
     }
 
     private void ApplyTooltip()
@@ -242,7 +252,7 @@ public class NetworkLoadingScreenView : MonoBehaviour
             return;
         }
 
-        tooltipText.text = tooltipTable[Mathf.Clamp(_tooltipIndex, 0, tooltipTable.Length - 1)];
+        tooltipText.text = TableText(UiStrings.LoadingTips, tooltipTable, Mathf.Clamp(_tooltipIndex, 0, tooltipTable.Length - 1));
     }
 
     private void ApplyImage()

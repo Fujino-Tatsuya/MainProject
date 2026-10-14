@@ -1,4 +1,6 @@
-﻿using TMPro;
+﻿using System.Collections.Generic;
+using System.Globalization;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -48,7 +50,27 @@ public sealed class TrainingDummyHealthBar : MonoBehaviour
         {
             _shownHp = currentHp;
             _shownMaxHp = maxHp;
-            hpText.text = string.Format(textFormat, currentHp, maxHp);
+            hpText.text = HpText(currentHp, maxHp, textFormat);
         }
+    }
+
+    void OnEnable() => Loc.Changed += ForceRelabel;
+    void OnDisable() => Loc.Changed -= ForceRelabel;
+    void ForceRelabel() => _shownHp = -1;
+
+    /// <summary>
+    /// 체력 글자 — <c>UI.TrainingDummy.Hp</c>({hp}·{max}). 시트에 행이 없으면 직렬화 <c>textFormat</c>(string.Format 형식 {0}/{1})
+    /// — 빈 값이면 키의 ko.
+    /// </summary>
+    public static string HpText(int currentHp, int maxHp, string serializedFormat)
+    {
+        string fallback = string.IsNullOrEmpty(serializedFormat)
+            ? UiStrings.TrainingDummyHp.Ko
+            : string.Format(serializedFormat, currentHp, maxHp);
+        return UiStrings.TrainingDummyHp.FormatOr(fallback, new Dictionary<string, string>
+        {
+            ["hp"] = currentHp.ToString(CultureInfo.InvariantCulture),
+            ["max"] = maxHp.ToString(CultureInfo.InvariantCulture),
+        });
     }
 }

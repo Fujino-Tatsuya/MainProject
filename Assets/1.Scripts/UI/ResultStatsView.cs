@@ -55,25 +55,33 @@ public sealed class ResultStatsView : MonoBehaviour
         {
             // 결과 없이 들어온 경우(직접 씬 실행 등) — 빈 값을 그대로 보여주지 않고 대시로 표기.
             SetText(outcomeText, "-");
-            SetText(survivalText, survivalPrefix + "--:--");
+            SetText(survivalText, SurvivalText(survivalPrefix, "--:--"));
             RebuildRows(null);
             return;
         }
 
-        SetText(outcomeText, GetOutcomeLabel(SessionResult.Outcome));
-        SetText(survivalText, survivalPrefix + SessionResult.FormatSurvival());
+        SetText(outcomeText, OutcomeText(SessionResult.Outcome, clearedLabel, failedLabel, abortedLabel));
+        SetText(survivalText, SurvivalText(survivalPrefix, SessionResult.FormatSurvival()));
         RebuildRows(SessionResult.Players);
     }
 
-    private string GetOutcomeLabel(SessionOutcome outcome)
+    /// <summary>판 결과 라벨 — <c>UI.Result.Cleared/Failed/Aborted</c>. 시트에 행이 없으면 직렬화 라벨.</summary>
+    public static string OutcomeText(SessionOutcome outcome, string cleared, string failed, string aborted)
     {
         switch (outcome)
         {
-            case SessionOutcome.Cleared: return clearedLabel;
-            case SessionOutcome.Aborted: return abortedLabel;
-            default: return failedLabel;
+            case SessionOutcome.Cleared: return UiStrings.ResultCleared.TextOr(cleared);
+            case SessionOutcome.Aborted: return UiStrings.ResultAborted.TextOr(aborted);
+            default: return UiStrings.ResultFailed.TextOr(failed);
         }
     }
+
+    /// <summary>
+    /// 생존 시간 줄 — <c>UI.Result.Survival</c>({time} = mm:ss). 시트에 행이 없으면 직렬화 <c>survivalPrefix</c> + 시간
+    /// (예전과 같은 글자 — 접두어 끝 공백 포함).
+    /// </summary>
+    public static string SurvivalText(string prefix, string time) =>
+        UiStrings.ResultSurvival.FormatOr((prefix ?? string.Empty) + "{time}", new Dictionary<string, string> { ["time"] = time });
 
     private void RebuildRows(IReadOnlyList<PlayerSessionStats> players)
     {

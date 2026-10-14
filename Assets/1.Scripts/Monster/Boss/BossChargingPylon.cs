@@ -238,5 +238,9 @@ public class BossChargingPylon : Unit
     {
         for (int i = 0; i < _outlineRenderers.Count; i++)
             if (_outlineRenderers[i] != null) _outlineRenderers[i].enabled = on;
+
+        // 🔴 클라는 콜라이더도 이 값을 따른다 — 서버는 콜라이더·아웃라인을 항상 같이 켜고 끄는데(TickMoving·BeginCharge·
+        //    BeginLowering) 클라는 스폰 때 끈 채 영영 안 켜져, 이동 권한이 있는 원격 플레이어가 탑을 통과했다(점검 10-14).
+        if (!IsServer) SetColliderEnabled(on);
     }
 }

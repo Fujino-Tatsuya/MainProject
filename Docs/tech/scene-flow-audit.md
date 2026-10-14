@@ -6,6 +6,23 @@
 - 방식: 코드·씬·프리팹·NGO 2.12 패키지 소스와 기존 로그의 읽기 전용 정적 감사
 - 제한: Unity/MPPM을 재실행하지 않았고 코드·씬·프리팹은 수정하지 않았다. 따라서 기존 로그에 기록되지 않은 “실패한 정확한 `GlobalObjectIdHash`”는 새 계측 없이 복원할 수 없다.
 
+## 0. 씬 하이어라키 규칙 (2026-10-13, 할 일 37)
+
+`4.MapScene` 의 루트는 **빈 그룹 6개뿐**이다(Transform 원점·회전 0·스케일 1). 새 오브젝트는 맞는 그룹 아래에 둔다.
+
+| 그룹 | 내용 |
+|---|---|
+| Management | 매니저·디렉터(`MapSceneManager`, `GameRule`, `MapGenerator`, `MapNetworkSync`, `BossEncounterDirector` 등) |
+| Camera | `CameraFollowTarget`, `CameraSwitcher` |
+| UI | `Canvas`, 튜토리얼 UI, `Minimap` |
+| Environment | 조명·스테이지(`Stage1` 등)·`bossroom`·물·배경 |
+| PostProcessing | `Global Volume`, 화면 효과 컨트롤러 |
+| Debug | `ProfilerHUD`, `HitVFXDebugHUD` |
+
+- **매니저는 `Assets/2.Prefabs/Managers/<이름>.prefab` 프리팹 인스턴스로 둔다.** 씬 오브젝트를 가리키는 필드는 에셋에선 비고 씬 인스턴스 오버라이드로 남는다(정상).
+- 씬 배치 `NetworkObject` 매니저도 프리팹 인스턴스다 — hash 는 인스턴스별 씬 고유값이고 소스 프리팹은 `DefaultNetworkPrefabs` 에 자동 등록된다(`GameRule` 과 같은 형태). 프리팹 구조를 바꾼 뒤엔 MapScene 을 저장해 hash 가 낡지 않게 한다([criticalIssue/2026-10-07-ngo-inscene-hash-stale.md](../criticalIssue/2026-10-07-ngo-inscene-hash-stale.md)).
+- 코드는 **루트 위치·경로에 기대지 않는다** — `GameObject.Find("A/B")` 경로, `GetRootGameObjects()` 직속 검사, `transform.root` 로 "씬 최상위 오브젝트"를 가정하지 말고 이름으로 찾은 뒤 그 아래를 본다. `DontDestroyOnLoad` 매니저(`EffectManager`)는 Awake 에서 `SetParent(null)` 후 호출한다.
+
 ## 1. 판정 기준
 
 - **[확인]** 코드/직렬화 파일/로그가 직접 증명한다.
@@ -249,6 +266,10 @@ YAML 기준 MapScene에는 총 10개의 씬 배치 `NetworkObject`가 존재한�
 
 1. **세션 종료형:** 서버가 전환을 공지 → 모든 피어 shutdown 완료 ACK → 로컬 Result/Lobby로 이동 → 새 세션 생성.
 2. **세션 유지형:** Map unload와 다음 network scene 전환을 NGO `NetworkSceneManager`로 수행하고, Result/Lobby UI만 필요하면 로컬 additive overlay로 분리한다.
+
+> **2026-10-13 추가 — 같은 판 재시작(세션 유지형, QA 전용 호출자):** `NetworkLoadingFlowController.TryRestartTargetScene` 이 로딩 씬 Additive → 동적 스폰 NetworkObject(플레이어 포함) 디스폰 →
+> `4.MapScene` NGO 언로드 → 재로드 → `SpawnAllPlayers` 를 정식 로딩 흐름 그대로 탄다. 지금 호출자는 튜토리얼 구간 스킵 Alt+0 뿐이다([tutorial-director.md §10.5](tutorial-director.md#105-구간-스킵-alt10-할-일-34--qa테스트용)). Result/Lobby 복귀 계약은 여전히 없다.
+> 수정(같은 날, 후속 4): `CompleteAfterMinimumVisibleTime` 은 로컬 진행률 0.9(활성화 전)에서 시작하므로 표시 시간이 0(Dev_Boot)이면 타깃 로드 이벤트가 닫히기 전에 로딩 씬 `UnloadScene` 을 불러 `SceneEventInProgress` 로 거절됐다(`UnloadNetworkScene` 은 재시도 안 함) → 로딩 씬 잔존 + 그 안(활성 씬)에 Instantiate 된 몬스터 잔존. 완료 루틴이 타깃 `LoadEventCompleted`(`_targetLoadEventCompleted`)를 먼저 기다린다.
 
 ## 9. 런타임 생성 `NetworkObject` 전수 결과
 

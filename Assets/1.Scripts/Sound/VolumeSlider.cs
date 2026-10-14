@@ -18,36 +18,22 @@ public class VolumeSlider : MonoBehaviour
     [Tooltip("isMaster가 꺼져 있을 때 제어할 카테고리")]
     [SerializeField] private BroAudioType audioType = BroAudioType.Music;
 
-    [Header("동작")]
-    [Tooltip("활성화 시 슬라이더 현재 값을 볼륨에 즉시 반영(패널 열 때 동기화)")]
-    [SerializeField] private bool applyOnEnable = true;
-    //[Tooltip("PlayerPrefs로 볼륨을 저장/복원(옵션 메뉴 표준). 필요 없으면 해제")]
-    //[SerializeField] private bool persist = true;
-
     private Slider _slider;
 
-    //private string PrefsKey => isMaster ? "vol_master" : $"vol_{audioType}";
+    private BroAudioType Target => isMaster ? BroAudioType.All : audioType;
 
     private void Awake()
     {
         _slider = GetComponent<Slider>();
     }
 
+    // 🔴 패널을 열 때 슬라이더를 **저장값**으로 맞춘다(리스너 없이 — 같은 값을 다시 쓰지 않게).
+    //    예전엔 AudioManager.Instance 를 null 확인 없이 읽어 부트스트랩 없는 Play 에서 NRE 가 났고,
+    //    저장 코드가 주석 처리돼 있어 볼륨이 실행마다 1 로 돌아갔다(PLAN-settings 오디오).
     private void OnEnable()
     {
+        _slider.SetValueWithoutNotify(SoundConfig.GetVolume(Target));
         _slider.onValueChanged.AddListener(Apply);
-
-        _slider.value = AudioManager.Instance.GetVolume(isMaster? BroAudioType.All : audioType);
-
-        //if (persist && PlayerPrefs.HasKey(PrefsKey))
-        //{
-        //    // 저장값을 슬라이더에 반영 → onValueChanged가 발생해 Apply까지 이어짐
-        //    _slider.value = PlayerPrefs.GetFloat(PrefsKey);
-        //}
-        if (applyOnEnable)
-        {
-            Apply(_slider.value);
-        }
     }
 
     private void OnDisable()
@@ -55,27 +41,6 @@ public class VolumeSlider : MonoBehaviour
         _slider.onValueChanged.RemoveListener(Apply);
     }
 
-    /// <summary>슬라이더 값 변경 콜백. 볼륨 반영(+ 저장).</summary>
-    private void Apply(float value)
-    {
-        if (AudioManager.Instance == null)
-        {
-            Edit.LogWarning("[VolumeSlider] AudioManager.Instance가 없습니다. 부트스트랩 씬에 AudioManager가 있는지 확인하세요.");
-            return;
-        }
-
-        if (isMaster)
-        {
-            AudioManager.Instance.SetMasterVolume(value);
-        }
-        else
-        {
-            AudioManager.Instance.SetVolume(audioType, value);
-        }
-
-        //if (persist)
-        //{
-        //    PlayerPrefs.SetFloat(PrefsKey, value);
-        //}
-    }
+    /// <summary>슬라이더 값 변경 콜백 — 저장하고 즉시 반영(AudioManager 가 없으면 저장만).</summary>
+    private void Apply(float value) => SoundConfig.SetVolume(Target, value);
 }

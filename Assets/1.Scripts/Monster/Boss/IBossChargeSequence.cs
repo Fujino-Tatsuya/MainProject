@@ -4,7 +4,7 @@ public enum BossChargeResult
     InProgress = 0,
     /// <summary>송전탑 전부 파괴 — 보스가 <c>Groggy</c> 로 무력화된다(단 Break 로 승격하지 않는다).</summary>
     AllPylonsDestroyed,
-    /// <summary>하나라도 도달했거나 제한시간 초과 — 보스가 <c>Rage</c> 돌진 3회로 넘어간다.</summary>
+    /// <summary>제한시간 초과(단독 조건 — 도달은 실패 조건이 아니다, BossChargeSequence 참조) — 보스가 <c>Rage</c> 돌진 3회로 넘어간다.</summary>
     Failed,
 }
 
@@ -23,6 +23,8 @@ public enum BossChargeResult
 ///    → **`destroyed + reached >= max` 합산**으로 판정하고, 결과는 이분법이다:
 ///    **전부 파괴 → <see cref="BossChargeResult.AllPylonsDestroyed"/> /
 ///    하나라도 도달 → <see cref="BossChargeResult.Failed"/>.**
+///    ⚠️ 정정(점검 10-14): 현행 구현(BossChargeSequence)은 **도달을 실패로 보지 않는다 — 실패는 제한시간 초과 단독**이다.
+///    위 문단은 레거시 교착의 역사 기록이다. 새 구현은 BossChargeSequence 의 규칙을 따를 것.
 ///    (2026-07-30자 진단 주석이 이 교착을 이미 정확히 기술해 뒀는데도 안 고쳐져 있었다.)
 /// </summary>
 public interface IBossChargeSequence

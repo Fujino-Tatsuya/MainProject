@@ -30,8 +30,10 @@ GameData.xlsx (SVN, 잠금)
 | `Monster` | 몬스터 스탯 SO · 근접 공격 · 넉백 · 카운터 창 · 터렛 조준 |
 | `MidBoss` | Gauntlet · Spinner · Wall |
 | `Boss` | 23호(`BossDataSO`) |
-| `Sound` | 문자열 키별 사운드 재생 수치(`SoundCatalog`) — SoundID 연결은 인스펙터 전용 |
+| `Sound` | 문자열 키별 사운드(`SoundCatalog`) — 재생 수치 + 엔티티 구성(라이브러리·클립·재생 모드). 구성은 `Tools/Data/사운드 동기화` 로 반영(§6 사운드 키) |
 | `Map` | 허수아비 인터럽트 순환(`TrainingDummyInterrupt`) |
+| `Strings` | **게임 문구(한/영)** — 열 `key` · `#설명` · `ko` · `en`, 세로 표가 아니다. SO 에 쓰지 않고 `StringTable` 로 간다. 쓰는 법·검증 규칙은 [localization.md](localization.md) |
+| `ErrorCodes` | **로비·네트워크 오류 문구(한/영)** — 열 `code` · `#분류` · `#원인(개발자용)` · `#조치(QA·CS용)` · `ko` · `en`. `Strings` 와 같은 규칙으로 `StringTable` 로 간다. [localization.md §2](localization.md) |
 | `SlowMotion` | 인터럽트 슬로우 모양 `interruptProfile.*`(배율·진입·유지·복귀·실패 복귀 길이, 대상 `NetworkManager`) · 오너 줌 배율 `slowMotionZoomFactor`(대상 `CameraSwitcher`). 의미는 [PLAN-interrupt-slowmo.md](../../PLAN-interrupt-slowmo.md) |
 
 ### 세로 표 — 행 = 필드, 열 = 대상
@@ -57,7 +59,8 @@ GameData.xlsx (SVN, 잠금)
 |---|---|
 | **`#` = 메모** | `#` 로 시작하는 시트·열·행은 무시. 행을 잠깐 빼고 싶으면 필드 앞에 `#`(그 행의 모든 대상이 빠진다) |
 | **테이블에 없으면 = SO·프리팹 값** | 필드 **행이 없거나** 대상 **열이 없으면** 그 값은 건드리지 않는다 — 인스펙터(SO·프리팹) 값이 그대로 쓰인다(Play·빌드 공통). 대상 열이 없으면 경고만 낸다(`… 의 행이 테이블에 없다`). 새로 추가한 필드는 병합 Export 전까지 SO 값으로 돈다(`DataTableApplier.Bind` 는 테이블에 있는 칸만 쓴다) |
-| **빈 칸 = 오류** | 행·열은 있는데 칸만 비면 오류다 — "안 채움" 과 "0" 을 구분해야 해서. 0 이면 0 을 적는다. 이 대상에서 빼려면 `-`. **예외: 툴팁 문구(`tooltip.*`) 칸은 빈 칸 = 빈 문자열**(예: `subtitle` 비우면 줄 없음) |
+| **빈 칸 = 오류** | 행·열은 있는데 칸만 비면 오류다 — "안 채움" 과 "0" 을 구분해야 해서. 0 이면 0 을 적는다. 이 대상에서 빼려면 `-`. **예외: 문자열 칸(`[DataTableText(Localize = false)]` — 사운드 `key`·`description`)은 빈 칸 = 빈 문자열** |
+| **문구는 수치 시트에 없다** | 화면 문구(툴팁 `tooltip.*`·이름 등 `[DataTableText]`)는 **`Strings` 시트가 단일 원본**이다 — 수치 시트로 Export 하지 않고, 옛 xlsx 에 남은 칸은 적용·Verify 하지 않는다(시트마다 경고 한 줄). 병합 Export 가 Strings 로 옮긴다([§9](#9-프로그래머기획--툴팁-문구와-자리표시자)) |
 | **`-` = 이 대상엔 없는 칸** | 배열 길이가 대상마다 다를 때(예: 23호 `No23` 공격 8개 · `No23_Solo` 6개 → Solo 의 `attacks[6]·[7]` 은 `-`) |
 | 숫자 | 소수점은 `.`(쉼표 X). 정수 칸에 소수 넣으면 오류 |
 | 참/거짓 | `TRUE` / `FALSE` (또는 1 / 0) |
@@ -73,12 +76,14 @@ GameData.xlsx (SVN, 잠금)
 | 메뉴 | 하는 일 |
 |---|---|
 | **Verify** | 인스펙터 값과 테이블 값이 다른 필드를 Console 에. 씬 인스턴스가 테이블 필드를 덮어쓰면 경고. 아무것도 쓰지 않는다 |
-| **Export Template** | 현재 인스펙터 값으로 xlsx 를 만든다. 파일이 있으면 **병합**(배치는 새로 짜고 기획 값은 (대상, 필드) 로 유지 — 시트에 직접 넣은 `#` 메모 행·열은 남지 않는다, `#` 메모 시트는 유지) / **덮어쓰기** 선택. 원본은 `Library/DataTableExportBackup` 에 보관 |
+| **Export Template** | 현재 인스펙터 값으로 xlsx 를 만든다. 파일이 있으면 **병합**(배치는 새로 짜고 기획 값은 (대상, 필드) 로 유지 — 시트에 직접 넣은 `#` 메모 행·열은 남지 않는다, `#` 메모 시트는 유지) / **덮어쓰기** 선택. 원본은 `Library/DataTableExportBackup` 에 보관. 옛 수치 시트의 문구 칸은 Strings 로 옮긴 뒤 뺀다([§9](#9-프로그래머기획--툴팁-문구와-자리표시자)) |
 | Export Template 필드 목록 보기 | 파일을 안 쓰고 시트별로 나갈 필드만 Console 에 |
 | 인스펙터 값을 테이블 값으로 덮어쓰기 | 디스크의 SO·프리팹을 테이블 값으로 바꾼다(되돌릴 생각이 없을 때만, Undo 가능) |
+| StringTable 갱신 (Strings·ErrorCodes 시트 → 에셋) | `Strings`·`ErrorCodes` 시트만 읽어 검증하고 `StringTable.asset` 을 갱신([localization.md](localization.md)) |
 | 테이블 폴더 열기 | 탐색기로 연다 |
 
 🔴 Export 는 xlsx 를 새로 쓴다 — **서식·색·열 너비·수식은 사라진다**(수식은 결과값으로 남는다). 병합이어도 같다.
+`Strings`·`ErrorCodes` 시트는 예외로 병합·덮어쓰기 모두 기존 행을 그대로 옮긴다(문구는 인스펙터 값이 없다) — [localization.md §2](localization.md).
 
 ## 5. 인스펙터에서 보이는 것
 
@@ -100,12 +105,36 @@ GameData.xlsx (SVN, 잠금)
 - **저장 가드**(`DataTableSaveGuard`): 테이블 Play 준비(`ExitingEditMode`)에서 켜지고 Play 종료 후 스냅샷 복구(`EnteredEditMode`)가 끝나야 풀린다. 그 사이 어떤 저장(Ctrl+S·Save Project·다른 툴의 `SaveAssets`)도 테이블 대상 SO·프리팹은 쓰지 않는다(Console 경고). 기준은 Play 여부가 아니라 "복구 전" 이다 —
   Play 여부로 막던 때, Play 종료 직후 `DevBootLauncher` 의 `SaveAssets` 가 복구보다 먼저 돌아 `Player_Gunner`·`Player_Paladin` 에 테이블 값이 저장됐다(2026-10-09 재발). 메뉴 덮어쓰기·빌드는 가드가 풀린 상태에서 돌므로 정상 저장된다.
 
-### 사운드 키
+### 사운드 키 — 사운드 동기화
 
-- 새 키는 `SoundCatalog.asset`의 `entries` 배열에 먼저 추가하고 BroAudio `SoundID`를 연결한다. 테이블은 배열 크기와 에셋 참조를 바꾸지 못한다.
-- 호출은 2D `AudioManager.Instance.Play("키")`, 위치가 있는 3D `AudioManager.Instance.Play("키", worldPosition)`를 쓴다. 로컬 재생이며 사운드 전용 RPC는 없다.
-- `volumeMultiplier`·`pitchMultiplier`·`pitchRandomMin/Max`는 BroAudio 엔티티 값에 곱하는 배율이다(1 = 그대로). `is3D`는 `0 = 2D`, `1 = 3D`다.
-- 빈 키와 중복 키는 런타임 시작 시 경고하며, 중복이면 배열에서 먼저 나온 엔트리만 사용한다. 없는 키나 유효하지 않은 `SoundID`는 경고하고 재생하지 않는다.
+> 결정·설계: [PLAN-sound-sync.md](../../PLAN-sound-sync.md). 사운드 추가 = **`Sound` 시트에 행 작성 → `Tools/Data/사운드 동기화`**. Library Manager·`SoundCatalog` 인스펙터는 열지 않는다.
+
+`Sound` 시트의 `SoundCatalog` 열, `entries[i].*` 행 한 묶음 = 키 하나.
+
+| 칸 | 예 | 누가 쓰나 | 의미 |
+|---|---|---|---|
+| `key` | `Footstep` | 데이터 테이블 + 동기화 | 코드에서 부르는 키 |
+| `library` | `SFXLibrary` | 동기화 | BroAudio 라이브러리. 없으면 만든다(`Assets/51.Audio/Data/SoundLibrary`). 다르면 엔티티를 옮긴다(guid 유지) |
+| `entity` | `Footstep` | 동기화 | BroAudio 엔티티 이름(프로젝트 전체 고유). 없으면 만들고 SoundID 를 연결한다. 한 엔티티는 한 키만 |
+| `audioType` | `SFX` | 동기화 | `Music`·`UI`·`Ambience`·`SFX`·`VoiceOver` |
+| `clipPaths` | `Assets/51.Audio/SFX/Step_01.wav`⏎`Assets/51.Audio/SFX/Step_02.wav` | 동기화 | 프로젝트 기준 전체 경로, 여러 개면 **셀 안 줄바꿈(Alt+Enter)**. 엔티티 클립을 통째로 바꾼다(남는 클립의 Volume·Weight 등은 보존). `-` = 유지 |
+| `playMode` | `Random` | 동기화 | `Single`·`Sequence`·`Random`·`Shuffle`·`Velocity`·`Chained`. `-` = 유지 |
+| `loop` | `0`/`1`/`2` | 동기화 | 0 = 반복 없음, 1 = Loop, 2 = SeamlessLoop(BGM). `-` = 유지 |
+| `volumeMultiplier`·`volumeRandomMin/Max` | `0.8`·`0.85`/`1` | 데이터 테이블 | 엔티티 볼륨에 곱하는 배율 × 재생마다 랜덤 배율(1/1 = 흔들지 않음) |
+| `pitchMultiplier`·`pitchRandomMin/Max` | `1`·`0.95`/`1.05` | 데이터 테이블 | 피치 배율 × 재생마다 랜덤 배율 |
+| `is3D`·`minDistance`·`maxDistance` | `1`·`2`·`30` | 데이터 테이블 | 0 = 2D, 1 = 3D와 감쇠 거리 |
+| `maxSimultaneous`·`retriggerCooldown` | `3`·`0.05` | 데이터 테이블 | 같은 키 동시 재생 수·재트리거 간격(0 = 제한 없음) |
+
+- **엔티티의 볼륨·피치·랜덤·3D 설정은 쓰지 않는다**(생성 기본값 1). 수치는 위 엔트리 칸에서만 고친다. SeamlessLoop 전환·Priority·클립별 Weight/Fade·SpatialSetting·PlaybackGroup 은 필요할 때 Library Manager 에서 — 동기화가 건드리지 않는다.
+- **처음 한 번은 `Export Template` 병합 필수** — 그 전의 시트엔 구성 칸이 없어 동기화가 오류로 멈춘다(배열이 줄어 키가 지워지는 걸 막는 장치).
+- 순서: SVN 잠금 → 행 추가 → **`Tools/Data/사운드 동기화`** → 변경 요약 확인 → **SVN 한 번에 커밋**: xlsx · 클립 · `Assets/51.Audio/Data/`(라이브러리·엔티티·`SoundCatalog.asset`) · **각 .meta**. 2026-10-14 부터 사운드 데이터는 전부 SVN 이다(코드 `SoundCatalog.cs` 만 git).
+- **자동 동기화(2026-10-14)**: **테이블 모드 Play 진입**과 **빌드** 직전에 확인 없이 같은 동기화가 돈다(변경은 Console `[SoundSync]`). 오류면 Play 진입 취소·빌드 실패. 인스펙터 모드 Play·MPPM 클론은 하지 않는다. 테이블 값과 달리 **결과는 디스크에 남는다** — Play·빌드 뒤 `51.Audio/Data` 에 변경이 보이면 xlsx 와 같이 SVN 커밋. 메뉴는 확인 대화상자를 보고 싶을 때 쓴다.
+- 오류가 하나라도 있으면 아무것도 쓰지 않는다(이름 오타·없는 클립·`51.Audio` 밖 경로·엔티티 공유·같은 이름 엔티티 2개·인덱스 구멍). 어느 키도 안 쓰는 엔티티·지워지는 키는 경고만 — 삭제는 사람이.
+- 새로 늘어난 엔트리의 수치는 SO 에 기본값으로 들어간다 — 인스펙터 모드 Play 에선 기본값, 테이블 모드·빌드에선 xlsx 값.
+- 새 클립의 `.meta` 는 반드시 SVN 에 같이 커밋한다 — 없으면 PC 마다 guid 가 달라 엔티티 클립 참조가 끊긴다(다시 동기화하면 그 PC 에선 고쳐지지만 git diff 가 생긴다).
+- 동기화 뒤 열려 있던 Library Manager 창은 다시 연다(새 라이브러리·엔티티 반영).
+- 호출: 2D `AudioManager.Instance.Play("키")`, 3D `Play("키", worldPosition)`, BGM `PlayBGM("BGM_Title")`. 로컬 재생이며 사운드 전용 RPC는 없다. 없는 키·무효 SoundID 는 경고하고 재생하지 않는다.
+- 현재 BGM 키: `BGM_Title`·`BGM_Lobby`·`BGM_InGame`(2026-10-14 고정 필드에서 이전).
 
 ## 7. 자주 나는 오류
 
@@ -126,17 +155,28 @@ GameData.xlsx (SVN, 잠금)
 3. 필드에 `[Tooltip("…")]` — 테이블 설명 칸이 된다. 범위가 있으면 `[Range]`·`[Min]`(테이블도 검증).
 4. `Export Template 필드 목록 보기` 로 확인 → `Export Template` **병합** → SVN 커밋.
 
-- 내보내는 건 **정수·실수 + `[DataTableText]` 문자열**(구조체·배열 원소 포함). bool·enum·일반 문자열은 템플릿에 넣지 않는다.
-- 기획 문구 문자열에는 필드에 `[DataTableText]`를 붙인다. 이 특성이 없는 문자열(`animatorStateName` 등)은 Export·병합·Verify·적용에서 계속 제외된다.
+- 수치 시트로 내보내는 건 **정수·실수 + `[DataTableText(Localize = false)]` 문자열**(구조체·배열 원소 포함). bool·enum·일반 문자열은 템플릿에 넣지 않는다.
+- 화면 문구 문자열에는 `[DataTableText]`를 붙인다 — **Strings 시트 자동 키로만** 나가고 수치 시트 Export·병합·Verify·적용에서는 빠진다([localization.md §5](localization.md#5-l2--so-문구-자동-키)).
+  코드 ID·기획 메모처럼 번역 대상이 아닌 문자열은 `[DataTableText(Localize = false)]` — 수치 시트 문자열 칸이 된다. 둘 다 없는 문자열(`animatorStateName` 등)은 어디에도 안 나간다.
 - `NetworkVariable` 안쪽은 자동 제외. 레거시 폴더·`Assets/50.Art/` 프리팹(검수용)은 템플릿 대상이 아니다.
 - 필드 이름을 바꾸면(`FormerlySerializedAs`) 시트 머리글도 같이 바꾼다 — 안 그러면 오류.
 - 테스트: `Tools/Tests/데이터 테이블 EditMode 테스트 실행`.
 
 ## 9. 프로그래머·기획 — 툴팁 문구와 자리표시자
 
-`[DataTableText]` 문자열은 xlsx 셀의 줄바꿈을 그대로 왕복한다. Excel에서 `Alt+Enter`로 문단을 나누면 게임에서도 줄바꿈으로 표시된다.
+툴팁 문구(`displayName`·`subtitle`·`description`)는 **`Strings` 시트에서 고친다** — 키 `주인ID/tooltip.description`(예 `FirstMeleeMainSkillData/tooltip.description`), ko·en 열.
+수치 시트(`Paladin` 등)에는 문구 칸이 없다. 셀 줄바꿈(`Alt+Enter`)은 게임에서도 줄바꿈이다.
 
-스킬 툴팁 `description`은 같은 대상의 직렬화 필드를 자리표시자로 읽는다.
+**옛 xlsx 이관(병합·덮어쓰기 Export 공통)** — 수치 시트에 `tooltip.*` 칸이 남아 있으면:
+
+1. 그 값을 Strings 시트의 같은 자동 키 행 **ko** 로 옮긴다(새 행, en 빈 칸). 인스펙터(SO) 값이 아니라 **xlsx 값**이 들어간다 — 기획이 고친 문구 보존.
+2. Strings 에 그 키 행이 **이미 있으면 Strings 행을 유지**한다(L2 뒤 고친 곳은 Strings — en 과 짝이 맞는 쪽). 값이 다르면 Console 경고에 두 값을 남긴다(버린 값은 Export 백업에).
+3. 옮긴 칸만 수치 시트에서 빠진다(병합 보고 `문구 칸 N개는 Strings 시트로 옮겨…`). Strings 머리글을 못 읽는 등 **옮기지 못하면 Export 를 멈추고 파일을 쓰지 않는다**.
+4. 같은 값이 두 번 들어가지 않는다 — 다시 Export 해도 결과가 같다. 원본은 `Library/DataTableExportBackup`.
+
+순수 로직은 `TableTextMigration`(테스트 `TableTextMigrationTests`). 이관 전 옛 xlsx 로 테이블 Play 하면 문구 칸은 **적용하지 않고** 시트마다 경고 한 줄 — 그동안 화면 문구는 Strings 행 → 없으면 SO 인라인 값이다.
+
+스킬 툴팁 `description`은 같은 대상(키 주인 — SO·컴포넌트)의 직렬화 필드를 자리표시자로 읽는다.
 
 | 표기 | 의미 | 예 |
 |---|---|---|
@@ -146,8 +186,8 @@ GameData.xlsx (SVN, 잠금)
 | `{dmg}` | 현재 최종 공격력으로 계산한 피해와 공격력 아이콘 | Shift를 누르면 계산식도 표시 |
 
 - 필드 경로는 A열 표기와 같다. 구조체는 `{charge.speed}`, 배열 원소는 `{stages[0]}`처럼 쓴다.
-- 다른 에셋의 값은 참조할 수 없다. 해당 행의 SO·프리팹 컴포넌트 안 필드만 쓴다.
-- 없는 필드, 잘못된 숫자 형식, 닫히지 않은 `{` 또는 `<style>` 태그는 Apply·Verify에서 셀 위치와 함께 오류가 난다. 오류가 하나라도 있으면 아무 값도 적용하지 않는다.
+- 다른 에셋의 값은 참조할 수 없다. 키 주인(SO·프리팹 컴포넌트) 안 필드만 쓴다.
+- 없는 필드, 잘못된 숫자 형식, 닫히지 않은 `{` 또는 `<style>` 태그는 **Strings 검증**(테이블 Play·빌드·StringTable 갱신)에서 **ko·en 각각** 셀 위치와 함께 오류가 난다 — 테이블 Play·빌드는 멈춘다([localization.md §2 검증 규칙](localization.md#검증-규칙)).
 - 테이블을 거치지 않는 인스펙터 모드에서는 잘못된 문구가 툴팁에 `[오류: …]`로 보이고 Console에 경고가 남는다.
 
 키워드 색은 TMP style 태그를 사용한다. 색상 값은 문구에 직접 쓰지 않고 공용 Style Sheet에서 관리한다.

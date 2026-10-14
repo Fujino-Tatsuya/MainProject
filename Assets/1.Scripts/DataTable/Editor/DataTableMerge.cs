@@ -18,8 +18,9 @@ public static class DataTableMerge
     private const string Comment = DataTableSchema.CommentPrefix;
 
     /// <param name="knownSheets">코드가 아는 시트 이름(타입 이름·묶음 이름) — 여기 있고 새 배치에 없는 옛 시트는 대체된 것으로 보고 뺀다.</param>
+    /// <param name="movedToStrings">Strings 시트로 옮긴 옛 문구 칸 (대상 Id, 필드) — 새 배치엔 없지만 버린 게 아니라 "버려졌다" 보고에서 뺀다(<see cref="TableTextMigration"/>).</param>
     public static List<XlsxWriteSheet> Merge(IReadOnlyList<XlsxSheet> existing, IReadOnlyList<XlsxWriteSheet> fresh, List<string> report,
-        ISet<string> knownSheets = null)
+        ISet<string> knownSheets = null, IEnumerable<(string id, string field)> movedToStrings = null)
     {
         var freshNames = new HashSet<string>(fresh.Select(s => s.Name), StringComparer.Ordinal);
 
@@ -54,8 +55,16 @@ public static class DataTableMerge
         }
 
         report.Add($"기존 값 {used.Count}개 유지, 새 칸 {fromInspector}개는 현재 인스펙터 값.");
+        var moved = new HashSet<string>((movedToStrings ?? Enumerable.Empty<(string id, string field)>()).Select(m => Key(m.id, m.field)),
+            StringComparer.Ordinal);
+        int movedCount = oldValues.Keys.Count(k => !used.Contains(k) && moved.Contains(k));
+        if (movedCount > 0)
+        {
+            report.Add($"문구 칸 {movedCount}개는 Strings 시트로 옮겨 수치 시트에서 뺐다.");
+        }
+
         foreach (IGrouping<string, KeyValuePair<string, (string value, string sheet)>> lost in oldValues
-                     .Where(p => !used.Contains(p.Key))
+                     .Where(p => !used.Contains(p.Key) && !moved.Contains(p.Key))
                      .GroupBy(p => p.Value.sheet))
         {
             report.Add($"{lost.Key}: 값 {lost.Count()}개는 코드에 그 대상·필드가 없어 버려졌다" +
@@ -149,7 +158,7 @@ public static class DataTableMerge
     }
 
     /// <summary>읽은 시트의 값 칸 전부(세로 표·행 테이블·키-값) — # 행·열, 빈 칸, "-" 는 뺀다.</summary>
-    private static IEnumerable<(string asset, string field, string value)> Pairs(XlsxSheet sheet)
+    public static IEnumerable<(string asset, string field, string value)> Pairs(XlsxSheet sheet)
     {
         string kind = sheet.Cell(0, 0).Trim();
         if (kind == DataTableSchema.AssetHeader)

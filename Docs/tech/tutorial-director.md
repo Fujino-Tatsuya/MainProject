@@ -200,6 +200,7 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
 
 **디버그(Play 중 호스트, `Tools/Tutorial/Debug/`)**: 장부 로그 · 존2 기상 · 존3 기상 · 존4 기상(중간보스 제외) · 존4 중간보스 기상 · 존2~4 전부 휴면 ·
 존2 전멸(깨워서 처치) · 존3 핵심 처치 · 존4 핵심 처치. F9(DevMonsterKill)는 휴면 몬스터를 못 죽인다(무적) — 먼저 깨울 것.
+처치·강제 개방 코드는 `TutorialDebugActions`(런타임 — 구간 스킵 Alt+1~0 과 공용, §10.5).
 
 ## 9. 보스 타이머 · 보스 길 (S5)
 > 코드: `TutorialBossPathRules`(순수) · `TutorialBossPath`(판별 한 곳 — 경석 코드가 묻는 곳) · `TutorialElevatorDoor`(모든 피어) · `TutorialDirector`(G8·HUD·도착) ·
@@ -312,6 +313,40 @@ S6~S12 는 모두 붙었다 — 실제로 붙은 곳은 §10.2(디렉터 안에 
   G10 전 패드 위에 서도 카운트다운·테두리 없음 → `G10 열기` 순간 테두리 표시·엘리베이터 문 열림(클라 포함, 늦은 클라 = 열린 채) · 패드 3초 → 도착 → `[Tutorial] 보스방 도착` + 타이머 정지·게이지 0 ·
   G10 전 타이머 만료(인스펙터 `bossTimerLimitSeconds` 를 짧게) → 3초 경고 → 전원 강제 이동(배리어·패드 잠금 무관) → 도착 로그 ·
   🔴 절차 맵(`Stage1_Procedural`)에서 타이머가 맵 생성 직후 자동 시작·HUD 빈 틀·패드 즉시 활성·문 Closed 로 **기존과 같다**.
+
+### 10.5 구간 스킵 Alt+1~0 (할 일 34 — QA·테스트용)
+> 코드: `TutorialSkipPlan`(순수 계획) · `TutorialSkipController`(런타임 — 입력·패널·서버 실행) · `TutorialDirector.Skip.cs`(호스트 전용 ServerRpc) ·
+> `TutorialDebugActions`(강제 개방·존 처치 — `Tools/Tutorial/Debug/*` 메뉴와 공용) · `TutorialCorridorFlow.SkipRoundServer` · `TutorialDeathRules.TryFindAreaSpreadPoints`.
+> 테스트: `TutorialSkipPlanTests`(튜토리얼 러너). 단축키 표·QA 메모: [tutorial-qa.md 0.4](tutorial-qa.md#04-디버그-메뉴-play-중-호스트-toolstutorialdebug).
+- **빌드**: 모두 `#if UNITY_EDITOR || DEVELOPMENT_BUILD`(계획 모델만 예외 — 순수 코드). 릴리스 빌드엔 컨트롤러·RPC 가 없어 입력이 무시된다. 로그는 `Debug.Log`(`Edit.*` 는 빌드에서 사라짐).
+- **권한**: 각 피어의 컨트롤러가 Alt+숫자를 읽는다. 호스트가 아니면 "호스트만" 토스트로 끝. 호스트는 `RequestSkip` → `RequestSkipServerRpc` — 서버가 보낸 사람 = 서버 자신(호스트)인지 다시 검증.
+- **판정**(`TutorialSkipPlan.Check(step, target, restartInProgress)`): 판 재시작 진행 중(`NetworkLoadingFlowController.IsFlowInProgress`)이면 무엇이든 거부(`RestartInProgress`).
+  Alt+0(`Restart`) = 뒤로 가기 예외 — 어느 구간·Finished 뒤에도 허용. 그 밖엔 지금 구간 = 디렉터 `Step` 의 구간(`CurrentOf`), 목적 < 지금 = 뒤로 → 거부(토스트·로그), Finished = 거부,
+  같은 구간 = 게이트 없이 다시 옮기기만. 이전 스킵이 진행 중이면 거부(Alt+0 은 진행 중 스킵을 끊고 실행). 존1 은 단축키가 없다(지금 구간 기준값으로만 남음).
+- **처음부터(Alt+0 — 판 재시작, 할 일 34 후속 3)**: 확인 없이 `NetworkLoadingFlowController.TryRestartTargetScene` — 정식 진입과 같은 로딩 흐름을 탄다:
+  로딩 씬 Additive → (로비 언로드 대신) **동적 스폰 NetworkObject 전부 디스폰**(플레이어 포함 — `Spawn()` 기본 `DestroyWithScene=false` 라 안 지우면 NGO 가 활성 씬으로 옮겨 살린다) →
+  `4.MapScene` 네트워크 언로드 → 다시 Additive 로드 → `SpawnAllPlayers`(10m 낙하) → MainGameReady → 로딩 씬 언로드. 씬 배치 객체(디렉터·게이트·특성·몬스터·공용 목숨·보스 타이머·`SessionStatsTracker`)는
+  씬과 함께 새로 생긴다. 유지: `ServerCharacterSelectionStore`(세션 정적) · NetworkManager·GameManager 등 DDOL 매니저(`GameState` 가 Loading → MainGame 으로 돌아 MainGameReady 가 다시 발행되고, `NetworkClock.MarkMainGameStart` 재스탬프).
+  Dev_Boot(Single 로드) 경로에서도 같은 흐름. 이 컴포넌트는 맵과 함께 사라지므로 재시작은 NetworkManager 쪽이 끝까지 진행한다. 거부 = 로딩 흐름 진행 중·타깃 씬 미로드·로딩 씬 로드 실패(판 그대로).
+  - **수정(후속 4)**: Dev_Boot 재시작에서 로딩 씬이 안 내려가고 몬스터가 로딩 씬에 남던 버그 — 표시 시간 0(`SetEditorDefaults(...,0,0)`)이라 완료 루틴이 진행률 0.9(활성화 전)에서 바로 로딩 씬 언로드를 요청 → NGO `SceneEventInProgress` 거절(재시도 없음) → 로딩 씬이 활성 씬으로 남고 그 안에 Instantiate 된 몬스터도 남음. 완료 루틴이 타깃 `LoadEventCompleted` 를 먼저 기다린다([scene-flow-audit.md §8](scene-flow-audit.md)).
+- **계획**(`TutorialSkipPlan.Build`): 목적 구간 입구 게이트(복도 n = G1/G3/G6/G9, 다음 존 = G2/G4/G7, 보스 진입·보스방 = G10)까지 **닫힌 게이트만** G1 부터 순서대로, 게이트마다 정식 경로 하나:
+  G1 = 접속자 전원 `ReportCheckServer`(G1Mask 전 항목) · G2/G4/G7/G10 = `TutorialCorridorFlow.SkipRoundServer`(**제시 없이** 라운드를 열고(`StartRoundWithoutOfferServer`) 아직 참가하지 않은 접속자마다 `GrantParticipantServer` = 바로 무작위 1장 획득 → `ServerTraitChosen`(Auto) → 특성 체크 → 전원 완료.
+  제시 행·플레이어별 제시 번호(OfferSeq)가 생기지 않아 **클라 특성 창이 열리지 않는다**. 이미 중간 지점에 도착해 창을 보던 사람만 `AutoChooseAllPendingServer` 로 창이 닫힌다) ·
+  G3/G6/G9 = 그 존 살아 있는 몬스터 전부 깨워 처치(`TutorialDebugActions.KillZoneMonsters` — 장부 클리어 → `RequestGateServer`, 0마리면 직접 요청) ·
+  G5 = 연계 카운터를 목표까지 + `RequestGateServer(G5)`(존3 흐름이 '연습 없이' 본 모드로) · G8 = `StartBossTimerServer`(존4 흐름이 '설정 자막 없이' 전투 시작 + 420초 타이머).
+  존3 규칙 파일은 고치지 않는다 — 디렉터·흐름의 기존 공개 API 만 부른다.
+- **실행**(서버 코루틴): 단계마다 게이트가 열리기를 최대 5초(실제 시간) 기다린다. 안 열리면 경고 후 `TutorialDebugActions.OpenGatesThrough`(디버그 메뉴 강제 개방과 같은 코드). 그래도 안 열리면 중단·이동 없음.
+  끝나면 `SetStepServer(StepOf(목적))`(앞으로만 — 존은 첫 진입 단계) → 접속자마다(완전 사망 제외) `ResetBackBarrierMaskServer(id, 목적 구간)`(전멸 리스폰과 같은 예외 — 최전방 = 목적 구간) →
+  `TryFindAreaSpreadPoints`(전멸 리스폰과 같은 규칙: 격자·바닥·점유·지난 배리어 앞면 여유·패드 + 1m 밖·2m 간격 — 기준점 = 그 구간 입구 배리어, 존1 = 가운데) → `PlayerFallRecovery.RelocateServer`(= `TeleportAuthoritative`).
+  존이면 구간 감지가 새 위치로 `AreaFirstEntered` 를 내서 그 존 흐름(존2 4초 기상 · 존3 연습 · 존4 설정 자막)이 평소대로 시작한다. 복도면 그 복도 특성은 도착 뒤 중간 지점에서 평소대로.
+- **보스방(Alt+9)**: 보스 진입과 같은 계획·이동 뒤 `BossTeleportManager.ForceStartEncounter(3)` — 패드 이동 경로 그대로(카운트다운 → 산개 → 도착 ACK → `AlivePlayersArrived` → G11·Finished).
+- **화면**: Alt 를 **누르고 있는 동안만** 호스트 화면 오른쪽 위에 버튼 10개(지금 구간 ▶ · 뒤 구간·진행 중 비활성 · 마지막 'Alt+0 처음부터' 는 재시작 중이 아니면 늘 활성). 토글이 아닌 이유 — 단축키가 이미 Alt 조합이라 쓰려는 순간에만 보이고, 켜 둔 채 잊어 캡처·녹화에 남지 않는다.
+- **로그**: `[TutorialSkip] 시작 → X (단계 …) — 할 일 G1(…) → …` · `[TutorialSkip] → 구간 X (열린 게이트 G1·G2… · 특성 자동 획득 복도 1·2 · 이동 n명 · 단계 …)`.
+- **알려진 한계**: 건너뛴 복도1 첫 진입 쿨 초기화(체크리스트 아님)는 없다. 존4 패널·다리는 건너뛴다(카운터 0/4 그대로 — 중간보스는 다리 없이 처치).
+  건너뛴 복도의 획득 토스트는 그 플레이어가 전에 제시받은 적이 있을 때만 뜬다(창 모델 규칙 — 제시 번호 0 이면 토스트 없음). 획득 아이콘은 항상 갱신된다.
+  이동 지점은 몬스터 거리를 보지 않는다(전멸 리스폰과 같음 — 목적 존 몬스터는 아직 휴면).
+  처음부터: DDOL 풀(`EffectManager`)에 떠 있던 이펙트는 정리하지 않는다(풀 수명대로 사라짐). 타깃 씬 언로드가 실패하면 같은 씬을 겹쳐 올리지 않고 남은 판에 플레이어만 다시 스폰한다(에러 로그).
+
 ## 11. 사망 규칙 (S11)
 > 코드: `TutorialDeathRulesModel`·`TutorialRevivePointRules`(순수) · `TutorialDeathRules`(서버, 디렉터에 런타임 부착). 테스트: `TutorialDeathRulesTests`(튜토리얼 러너).
 > 훅(기본값 = 기존 동작): `PlayerLifeCycleController.ServerDeathKeepsSoul` · `PlayerReviveController.TryCompleteReviveOnServer(bool consumeLife)` · `PlayerFallRecovery.RelocateServer`.
