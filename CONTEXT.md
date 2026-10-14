@@ -1,4 +1,4 @@
-﻿# CONTEXT.md - Shared Project Language
+# CONTEXT.md - Shared Project Language
 
 > 🆕 **새 환경에서 처음 여는 사람은 [Docs/tech/environment-setup.md](Docs/tech/environment-setup.md) 부터.**
 > 이 프로젝트는 git 만으로 안 선다 — 아트가 SVN 에 있고, 없어도 Unity 는 조용히 열린다.
@@ -8,6 +8,16 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## 작업 세션 (2026-10-14 · Codex · 로비 전선다발 통합)
+- 완료(v022): 현재 Art/lobby 씬에 바닥·벽면 배선 2개 배치, `PF_Lobby_CableRouting_v022` 별도 저장. 신규 모델/부품 프리팹 11종, 기존 v006 베이스컬러 재사용. 기존 1,451개 오브젝트 배치·메쉬·재질 및 콜라이더 339개 보존. Blender/FBX 검수·Unity Scene View 확인 완료(Play 미수행).
+- 사용자 승인: 제작한 전선다발을 Unity에 넣고 현재 로비 배치에 맞춰 연결. 신규 모델·프리팹·공유재질 추가, 현재 Art/lobby 씬의 배선 추가만 수행. 책상·플랫폼·전면 캐비닛의 사용자 배치를 유지. 기록: aiworkspace/90_조립검수/v022.
+
+## 작업 세션 (2026-10-14 · Codex · 로비 연습장 시멘트 바닥)
+- 후속 명도 조정(v021): 연습장 전용 시멘트 머티리얼 BaseColor/Color를 0.72로 낮춰 저장. 텍스처·UV·메쉬는 그대로 유지, 8개 바닥만 영향. 동일 각도 Scene View 확인 완료.
+- 사용자 요청: 연습장 4×4m 바닥 8개에 시멘트 베이스컬러 적용. 홀 진입부와 락커룸은 제외.
+- 수정 범위: 신규 바닥 FBX·공유 아틀라스 v006·전용 머티리얼 추가, `Art/lobby.unity` 및 로비 건축/Complete 프리팹의 8개 바닥 참조. 기존 바이너리·GUID·배치·콜라이더 보존.
+- 현재 열린 씬의 저장 전 상태를 별도 백업한 뒤 에디터에서 반영. 검수 기록: `D:/p_MT/lobby/aiworkspace/90_조립검수/v020/validation`.
+- 완료: 시멘트 아틀라스 v006·바닥 v004 추가, 연습장 8개 씬/프리팹 교체 및 저장. 사용자 작업 중 추가한 프랍도 보존. 배치/콜라이더/UV2 검증 통과, Unity Scene View 확인 완료(Play 검증은 미수행).
 ## ▶▶ 작업 세션 (2026-10-14 · 경석(Claude) · **23호 위협 어그로 + 일반 몬스터 추적 해제**, 브랜치 `feature/Boss23`) — 계획 [PLAN-boss-aggro.md](PLAN-boss-aggro.md) ✅ 승인(10-14) · ✅ 구현·커밋 · 컴파일 error CS 0 · 전투 EditMode 176/0(신규 27) · 보스 패턴 10/0 · ✅ 팀장 Play 확인(10-14)
 - 정정: Gauntlet·Spinner·WallBot 은 중간보스(`rank 1`)라 `loseTargetRadius` 0 — 적용 = 일반 7종.
 - `MonsterDataSO.loseTargetRadius`·`BossDataSO.threat*`·`farPressure*` 는 xlsx 에 행이 없어 SO 값으로 돈다(테이블 반영은 병합 Export 때).
