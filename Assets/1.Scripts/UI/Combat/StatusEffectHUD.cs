@@ -94,10 +94,16 @@ public class StatusEffectHUD : MonoBehaviour
 
     private static string BuildLabel(StatusEffectInstance instance, float remaining)
     {
-        string name = instance.type.ToString().Replace("Modifier", string.Empty);
+        string name = DisplayName(instance.type);
         if (instance.stackCount > 1)
             name += $" x{instance.stackCount}";
 
-        return remaining < 0f ? name : $"{name}\n{remaining:F1}s";
+        return remaining < 0f ? name : $"{name}\n{UiStrings.Seconds(remaining, "F1")}";
     }
+
+    /// <summary>표시 이름 — <c>UI.StatusEffect.&lt;enum&gt;</c>. 행이 없으면 enum 이름(Modifier 뺌), 목록에 없는 값(조합 등)도 enum 이름.</summary>
+    public static string DisplayName(StatusEffectType type) =>
+        UiStrings.TryGetStatusEffect(type, out UiString name)
+            ? name.Text
+            : type.ToString().Replace("Modifier", string.Empty);
 }

@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Globalization;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -27,6 +29,7 @@ public class GunnerHeatGauge : MonoBehaviour
 
     private GunnerHeat heat;
     private Player player;
+    private int shownStage = int.MinValue; // -1 = 과열. 같은 표시면 문구를 다시 만들지 않는다
 
     private void Awake()
     {
@@ -56,6 +59,23 @@ public class GunnerHeatGauge : MonoBehaviour
         }
 
         if (label != null)
-            label.text = heat.IsOverheated ? "과열!" : $"과열 {heat.CurrentStage}단계";
+        {
+            int shown = heat.IsOverheated ? -1 : heat.CurrentStage;
+            if (shown != shownStage)
+            {
+                shownStage = shown;
+                label.text = LabelText(heat.CurrentStage, heat.IsOverheated);
+            }
+        }
     }
+
+    private void OnEnable() => Loc.Changed += ForceRelabel;
+    private void OnDisable() => Loc.Changed -= ForceRelabel;
+    private void ForceRelabel() => shownStage = int.MinValue;
+
+    /// <summary>라벨 문구 — 과열이면 <see cref="UiStrings.GunnerHeatOverheated"/>, 아니면 <see cref="UiStrings.GunnerHeatStage"/>({stage}).</summary>
+    public static string LabelText(int stage, bool overheated) =>
+        overheated
+            ? UiStrings.GunnerHeatOverheated.Text
+            : UiStrings.GunnerHeatStage.Format(new Dictionary<string, string> { ["stage"] = stage.ToString(CultureInfo.InvariantCulture) });
 }

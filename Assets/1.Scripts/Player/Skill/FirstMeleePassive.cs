@@ -82,7 +82,7 @@ public class FirstMeleePassive : BaseNetworkBehaviour, IPlayerPassive, IPlayerOn
     public bool IsReady => HasCharge;
     public float RemainingCooldown =>
         !HasCharge ? Mathf.Max(0f, (float)(readyServerTime.Value - ServerNow)) : 0f;
-    public SkillTooltipText Tooltip => tooltip;
+    public SkillTooltipText Tooltip => tooltip.Keyed(this, nameof(tooltip));
     public UnityEngine.Object TooltipValueSource => this;
 
     public SkillTooltipDamage GetTooltipDamage(Player player) =>

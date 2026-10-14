@@ -136,47 +136,53 @@ public sealed class SettingsRulesTests
         Assert.AreEqual(3, (int)FloatingDamageDisplayFilter.Off);
     }
 
-    // ─── 언어(S15·S16) ───────────────────────────────────────────────
+    // ─── 언어(S15·S16) — 로컬라이징(Loc·UserLanguageConfig)으로 통합(할 일 38) ─────────
 
     [Test]
-    public void Language_DefaultFollowsSystem_S16()
+    public void Language_DefaultFollowsSystem_NextToggles_NamesNotTranslated_S16()
     {
-        Assert.AreEqual(GameLanguage.Korean, LanguageConfig.DefaultFor(SystemLanguage.Korean));
-        Assert.AreEqual(GameLanguage.English, LanguageConfig.DefaultFor(SystemLanguage.English));
-        Assert.AreEqual(GameLanguage.English, LanguageConfig.DefaultFor(SystemLanguage.Japanese));
-        Assert.AreEqual(GameLanguage.Korean, LanguageConfig.Next(GameLanguage.English));
-        Assert.AreEqual(GameLanguage.English, LanguageConfig.Next(GameLanguage.Korean));
+        Assert.AreEqual(GameLanguage.Ko, UserLanguageConfig.DefaultFor(SystemLanguage.Korean));
+        Assert.AreEqual(GameLanguage.En, UserLanguageConfig.DefaultFor(SystemLanguage.English));
+        Assert.AreEqual(GameLanguage.En, UserLanguageConfig.DefaultFor(SystemLanguage.Japanese));
+        Assert.AreEqual(GameLanguage.En, LocText.Next(GameLanguage.Ko));
+        Assert.AreEqual(GameLanguage.Ko, LocText.Next(GameLanguage.En));
+        Assert.AreEqual("한국어", LocText.NativeName(GameLanguage.Ko));
+        Assert.AreEqual("English", LocText.NativeName(GameLanguage.En));
     }
 
     [Test]
-    public void Strings_KeysAndEnglishUnique_KoreanFilled()
+    public void Strings_57Keys_UnderSettingsPrefix_EnglishUniqueAndFilled()
     {
-        var keys = new System.Collections.Generic.HashSet<string>();
+        Assert.AreEqual(57, SettingsUiStrings.All.Count);
         var english = new System.Collections.Generic.HashSet<string>();
-        foreach (SettingsStrings.Entry e in SettingsStrings.All)
+        foreach (UiString s in SettingsUiStrings.All)
         {
-            Assert.IsTrue(keys.Add(e.Key), $"키 중복: {e.Key}");
-            // 영어 원문이 겹치면 프리팹 라벨 역조회(FindKeyByEnglish)가 엉뚱한 키를 붙인다.
-            Assert.IsTrue(english.Add(e.English), $"영어 원문 중복: {e.English}");
-            Assert.IsFalse(string.IsNullOrWhiteSpace(e.Korean), $"한국어 비어 있음: {e.Key}");
+            StringAssert.StartsWith(SettingsUiStrings.KeyPrefix, s.Key);
+            Assert.IsTrue(SettingsUiStrings.AuthoredEnglish.TryGetValue(s.Key, out string en), s.Key);
+            Assert.IsFalse(string.IsNullOrWhiteSpace(en), $"영어 비어 있음: {s.Key}");
+            // 영어 원문이 겹치면 프리팹 라벨 역조회(FindKeyByLabel)가 엉뚱한 키를 붙인다.
+            Assert.IsTrue(english.Add(en), $"영어 원문 중복: {en}");
+            Assert.IsTrue(LocText.SamePlaceholders(s.Ko, en), $"자리표시자 다름: {s.Key}");
         }
     }
 
     [Test]
-    public void Strings_PlaceholdersMatchBetweenLanguages()
+    public void Strings_LookupByLabel_EnglishThenUniqueKo()
     {
-        var placeholder = new System.Text.RegularExpressions.Regex(@"\{\d+\}");
-        foreach (SettingsStrings.Entry e in SettingsStrings.All)
-            Assert.AreEqual(placeholder.Matches(e.English).Count, placeholder.Matches(e.Korean).Count, e.Key);
+        Assert.AreEqual(SettingsUiStrings.GraphicsResolution.Key, SettingsUiStrings.FindKeyByLabel("Resolution"));
+        Assert.AreEqual(SettingsUiStrings.GraphicsResolution.Key, SettingsUiStrings.FindKeyByLabel("해상도"));
+        Assert.IsNull(SettingsUiStrings.FindKeyByLabel("100%"));
+        Assert.IsNull(SettingsUiStrings.FindKeyByLabel("전체"));   // ko 가 두 키(데미지 숫자 전체·오디오 전체)에 있다
+        Assert.AreEqual(SettingsUiStrings.AudioMaster.Key, SettingsUiStrings.FindKeyByLabel("Master"));
     }
 
     [Test]
-    public void Strings_MissingKeyReturnsKey_LookupByEnglish()
+    public void Strings_ActionLabel_UsesControlsKey_ElseActionName()
     {
-        Assert.AreEqual("no.such.key", SettingsStrings.Get("no.such.key", GameLanguage.Korean));
-        Assert.AreEqual("해상도", SettingsStrings.Get("settings.graphics.resolution", GameLanguage.Korean));
-        Assert.AreEqual("settings.graphics.resolution", SettingsStrings.FindKeyByEnglish("Resolution"));
-        Assert.IsNull(SettingsStrings.FindKeyByEnglish("100%"));
+        Assert.IsTrue(SettingsUiStrings.TryGetAction("SkillMain", out UiString main));
+        Assert.AreEqual("UI.Settings.Controls.SkillMain", main.Key);
+        Assert.IsFalse(SettingsUiStrings.TryGetAction("NoSuchAction", out _));
+        Assert.AreEqual("NoSuchAction", KeyRebindRow.ActionLabel("Player/NoSuchAction"));
     }
 
     // 비네트 슬라이더 0~100(팀장 10-13): 50 = 기본(배율 1 = 지금 화면), 0 = 최소, 100 = 최대, 왕복 일치.

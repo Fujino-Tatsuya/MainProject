@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Globalization;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -27,7 +29,7 @@ public sealed class ResultPlayerRowView : MonoBehaviour
     {
         ResolveReferences();
 
-        SetText(slotText, string.Format(slotFormat, slotNumber));
+        SetText(slotText, SlotText(slotNumber, slotFormat));
         SetText(characterText, character != null ? character.DisplayName : unknownCharacterLabel);
         SetText(damageText, stats.Damage);
         SetText(killsText, stats.Kills);
@@ -43,6 +45,19 @@ public sealed class ResultPlayerRowView : MonoBehaviour
 
         if (localMarker != null)
             localMarker.SetActive(isLocal);
+    }
+
+    /// <summary>
+    /// 슬롯 라벨 — <c>UI.Result.PlayerSlot</c>({n}). 시트에 행이 없으면 직렬화 <c>slotFormat</c>(<c>P{0}</c>, string.Format 형식)
+    /// — 빈 값이면 키의 ko. 자리표시자 이름이 다르다(시트 <c>{n}</c>, 프리팹 <c>{0}</c>).
+    /// </summary>
+    public static string SlotText(int slotNumber, string serializedFormat)
+    {
+        string fallback = string.IsNullOrEmpty(serializedFormat)
+            ? UiStrings.ResultPlayerSlot.Ko
+            : string.Format(serializedFormat, slotNumber);
+        return UiStrings.ResultPlayerSlot.FormatOr(fallback,
+            new Dictionary<string, string> { ["n"] = slotNumber.ToString(CultureInfo.InvariantCulture) });
     }
 
     private void ResolveReferences()

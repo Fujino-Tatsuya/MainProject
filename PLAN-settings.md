@@ -27,8 +27,8 @@
 | S11 | 백그라운드 음소거 옵션(기본 켬): 포커스 잃으면 전체 출력만 0, 돌아오면 복구. 슬라이더·저장값 불변 |
 | S13 | 모니터 네이티브보다 큰 해상도 후보는 **숨긴다**. 첫 실행 기본값도 네이티브가 1440 보다 작으면 네이티브로 내린다(팀장 10-12) |
 | S14 | 상호작용 키도 리바인드 대상. 입력 에셋 `Interact` 를 E → **F** 로(SkillSub E 중복 해소), 게이트(`ZoneBridgeGateManager`, 지금 `Key.F` 직접 읽음)가 액션을 읽게. 안내(`InteractPrompt`)는 F 면 기존 이미지, 다른 키면 키 이름 텍스트(팀장 10-12) |
-| S15 | 언어 = English/한국어, **설정창 문구만**. 문구는 **코드 사전 1개**(`SettingsStrings` — 키 → 영/한 평평한 표). 나중에 버튼 하나로 SO/xlsx 로 옮길 것이 확정이라 표는 `키·영·한` 3열 외 구조를 넣지 않는다(팀장 10-13) |
-| S16 | 첫 실행 언어 = 시스템 언어(Windows 한국어면 한국어, 그 외 English). 이후 저장된 선택(팀장 10-13) |
+| S15 | 언어 = English/한국어, **설정창 문구만**. 문구는 **코드 사전 1개**(`SettingsStrings` — 키 → 영/한 평평한 표). 나중에 버튼 하나로 SO/xlsx 로 옮길 것이 확정이라 표는 `키·영·한` 3열 외 구조를 넣지 않는다(팀장 10-13)<br>→ **Loc 으로 통합됨**(10-13 할 일 38 — `SettingsUiStrings` `UI.Settings.*` + Strings 시트). [handoff-settings-localization.md](Docs/tech/handoff-settings-localization.md) 참조 |
+| S16 | 첫 실행 언어 = 시스템 언어(Windows 한국어면 한국어, 그 외 English). 이후 저장된 선택(팀장 10-13)<br>→ **Loc 으로 통합됨**(`UserLanguageConfig` — 규칙 동일, 옛 정수 저장값 자동 이관). [handoff-settings-localization.md](Docs/tech/handoff-settings-localization.md) 참조 |
 | S17 | 성능 표시 = 설정 게임플레이 탭 `끔 / FPS / FPS+핑`(기본 끔). 켜면 화면 우측 상단 구석. 전투 HUD 와 분리된 런타임 오버레이(씬 수정 없음) — 타이틀에서도 FPS 보임. 호스트는 핑 대신 `HOST`, 세션 밖은 FPS 만(팀장 10-13) |
 | S12 | 씬 변경 최소화: 패널은 프리팹, 씬은 기존 패널 → 프리팹 인스턴스 교체만. **씬 작업은 은희 튜토리얼 브랜치(4.MapScene 수정 중 4개)가 dev 에 들어간 뒤** |
 
