@@ -11,6 +11,7 @@ Update this file when a term becomes important enough that future agents or team
 ## ▶▶ 작업 세션 (2026-10-14 · 경석(Claude+Codex) · **보스·몬스터 전체 점검**, 브랜치 `feature/Boss23`) — 범위 = 23호(기존·레이드)·웰즈·장판·송전탑·디렉터 · 중간보스 3 · 일반 몬스터 · MonsterBase·간파·예고·투사체 등 공용 부품. 항목 = 버그·예외 경로 / 네트워크·권한 / 예고·판정 일치 / 문서·데이터 불일치. 처리 = 확실한 것은 바로 수정, 판단 필요한 것은 목록(팀장 10-14).
 - 🔴 **수정 예정 — 동시 수정 금지**: `Assets/1.Scripts/Monster/**` · `Map/BossEncounterDirector.cs` · 몬스터·보스 프리팹/SO(점검 결과에 따라 좁힘).
 - ✅ ③ 2인 잡기 구출 팀장 Play 확인(10-14) — 레이드 4구간 전부 검증. 기존/레이드는 툴바로 계속 비교.
+- ✅ 점검 결과·수정 = [boss-monster-audit-1014.md](Docs/tech/boss-monster-audit-1014.md) · 수정 커밋 `b9280888`(확실한 버그 17건, 컴파일 0 · 전투 149/0 · 보스 패턴 10/0, ⏳ Play 미확인). ⏳ 판단 필요 P1~P12(특히 P1 공격 슈퍼아머 잔류 · P2 riseGrace · P3 레이지 예고) 팀장 결정 대기.
 
 ## ▶▶ 작업 세션 (2026-10-14~ · 경석(Claude) · **23호 레이드 변형(지스타)**, 브랜치 `feature/Boss23`) — 계획 [PLAN-boss-raid.md](PLAN-boss-raid.md) ✅ 승인(10-14) · W1 진행 · 회의 기록 [raid-rework-meeting-1014.md](Docs/design/boss/raid-rework-meeting-1014.md)
 - ✅ W1 `b9be4190`: 변형 프리팹·데이터·툴바 "보스: 기존/레이드"(에디터 툴바 우클릭 → Dev/Boss Variant 체크해야 보일 수 있음)·구간 예약 큐·인원 HP·즉사 상한·웰즈 자막. 저작 = `Tools/Boss/레이드 변형 — 만들기`.
