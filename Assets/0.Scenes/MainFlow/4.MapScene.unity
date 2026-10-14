@@ -652,6 +652,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BossEncounterDirector
   ShowTopMostFoldoutHeaderGroup: 1
   bossPrefab: {fileID: 6928635095488946580, guid: f3f87bba52188544aa5e032c28ce9d60, type: 3}
+  raidBossPrefab: {fileID: 3707018047018839684, guid: 65e67f2b52447984d9db3c08dd272d8c, type: 3}
   bossLandingPoint: {fileID: 0}
   spawnHeight: 18
   descendDuration: 1.2

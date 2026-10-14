@@ -188,6 +188,11 @@ public enum BossPhaseSequence
 {
     None = 0,
     ChargeSequence = 1,  // 송전기(차징) 시퀀스 — 실패 시 레이지 돌진 3회
+
+    // ─── 레이드 변형 전용(PLAN-boss-raid.md §2) — No23_Raid.asset 의 phases 에만 넣는다. 기존 No23 은 안 쓴다.
+    RaidDroneCharge = 2,  // ② 전력 공급 — 드론 유도로 송전탑 파괴, 실패 = 방전 (W2)
+    RaidRescue = 3,       // ③ 새 가족 — 각본 잡기 구출(1인 = 간파 돌진) (W3)
+    RaidSelfDestruct = 4, // ④ 폐기 처분 — 자폭 카운트다운 + 공동 게이지 (W3)
 }
 
 // 페이즈 1행. hpThreshold 는 **내림차순**으로 저작한다(0.66 → 0.33).
@@ -255,6 +260,16 @@ public class BossDataSO : MonsterDataSO
         new BossPhaseEntry { hpThreshold = 0.66f, sequence = BossPhaseSequence.ChargeSequence, damageMultiplier = 1f, speedMultiplier = 1f },
         new BossPhaseEntry { hpThreshold = 0.33f, sequence = BossPhaseSequence.ChargeSequence, damageMultiplier = 1f, speedMultiplier = 1f },
     };
+
+    [Header("레이드 변형 (PLAN-boss-raid.md) — 기본값 = 꺼짐, 기존 No23 은 건드리지 않는다")]
+    [Tooltip("인원별 최대 HP 배수. [0] = 1인, [1] = 2인, [2] = 3인(넘으면 마지막 값). maxHp 는 **1인 기준**으로 저작한다.\n" +
+             "비우면 보정 없음(기존 동작). 인원 = 보스방 도착 시 생존 참가자(BossEncounterDirector 스냅샷).\n" +
+             "시작 가설 1 / 2.4 / 4.2 — 목표 전투 시간 1인 5분 · 3인 7분(팀장 10-14)에서 DPS 가 인원에 비례한다고 놓고 역산. W4 실측으로 조정.")]
+    public float[] partyHpMultipliers = new float[0];
+
+    [Tooltip("이 보스와 싸우는 동안 플레이어가 한 번에 받는 피해의 상한(플레이어 최대 HP 비율). 0 = 상한 없음(기존 동작).\n" +
+             "0.9 = 체력이 가득 찬 상태에서 한 방에 죽지 않는다(팀장 10-14: 목숨 쓸 틈도 없이 즉사하는 경험 금지).")]
+    [Range(0f, 1f)] public float playerHitDamageCapRatio = 0f;
 
     [Header("카운터 / 그로기 — maxGroggyCount·groggyDuration 은 base 필드 재사용")]
     [Tooltip("[S3] 카운터 성공으로 인정하는 정면 각도(도). 60 = 보스 정면 기준 ±60°. " +

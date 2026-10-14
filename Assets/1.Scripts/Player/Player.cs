@@ -1660,6 +1660,9 @@ public class Player : Unit
         // 그래서 여기서 쉴드 감소를 확인해 PlayerShieldVfx 가 전 피어로 퍼뜨리게 한다. (판정 영향 없음)
         int shieldBefore = CurrentShield;
 
+        // 레이드 보스전 한 방 즉사 금지(PLAN-boss-raid.md, 보스가 켤 때만 — 평소엔 Ratio 0 이라 그대로).
+        attackInfo.damage = BossRaidRules.CapHitDamage(attackInfo.damage, FinalMaxHp, PlayerHitDamageCap.Ratio);
+
         bool result = base.ReceiveAttack(attackInfo, hitContext);
         if (!result)
             return false; // 이미 죽었다 — 피격 반응(패시브 쿨감·쉴드 파문)도 없다.

@@ -264,7 +264,11 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     bool _warnedNoThrowEntry;
 
     // ─── 페이즈 시퀀스 (송전기 / 레이지) ──────────────────────────────
-    bool _pendingPhaseSequence;                     // 페이즈 통과 후 "행동이 끝나면 시작할 것"
+    // 페이즈 통과 후 "행동이 끝나면 시작할 것". 큐인 이유: 한 방에 임계 2개를 넘기면 bool 하나로는 앞의 기믹이 빠졌다(PLAN-boss-raid §3).
+    readonly Queue<BossPhaseSequence> _pendingPhaseSequences = new Queue<BossPhaseSequence>();
+    readonly List<BossPhaseSequence> _phaseSequenceScratch = new List<BossPhaseSequence>();
+    int _warnedRaidSequenceMask;
+    int _partySize;                                 // [서버] 보스방 도착 생존 인원(BossEncounterDirector 가 스폰 직전에 넣는다). 0 = 모름
     IBossChargeSequence _charge;
     AreaZone _chargeZone;
     bool _warnedNoCharge;
@@ -372,6 +376,9 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
             return;
         }
 
+        if (IsServer)
+            ApplyRaidSpawnRulesServer();
+
         // 카운터 창 표현은 모든 피어에서 돈다(서버가 창을 쓰고, 각 피어가 텔레그래프를 구동).
         _counterVisual.OnValueChanged += OnCounterWindowChanged;
         _vulnerableVisual.OnValueChanged += OnVulnerableVisualChanged;
@@ -415,6 +422,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
 
     public override void OnNetworkDespawn()
     {
+        PlayerHitDamageCap.Clear(this);
         _counterVisual.OnValueChanged -= OnCounterWindowChanged;
         _vulnerableVisual.OnValueChanged -= OnVulnerableVisualChanged;
         _wellsState.OnValueChanged -= OnWellsStateChanged;
@@ -790,15 +798,27 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
 
         // 🔴 페이즈 시퀀스 소비 지점. 이 함수는 Idle/Walk 에서만 불리므로 여기가 "행동이 끝난 직후"다
         //    (정본 §9 — 행동 도중 강제 중단 금지).
-        if (_pendingPhaseSequence)
+        while (_pendingPhaseSequences.Count > 0)
         {
-            _pendingPhaseSequence = false;
-            int seq = FindSlot(BossAttackId.ChargeSequence);
-            if (seq != NoAttack) return seq;
+            BossPhaseSequence pending = _pendingPhaseSequences.Dequeue();
+            if (pending == BossPhaseSequence.ChargeSequence)
+            {
+                int seq = FindSlot(BossAttackId.ChargeSequence);
+                if (seq != NoAttack) return seq;
 
-            Debug.LogError(
-                $"{name}: 페이즈 시퀀스를 시작해야 하는데 공격 테이블에 ChargeSequence 행이 없다 — " +
-                "SO 에 weight 0 행으로 추가할 것. 이번 시퀀스는 건너뛴다.", this);
+                Debug.LogError(
+                    $"{name}: 페이즈 시퀀스를 시작해야 하는데 공격 테이블에 ChargeSequence 행이 없다 — " +
+                    "SO 에 weight 0 행으로 추가할 것. 이번 시퀀스는 건너뛴다.", this);
+                continue;
+            }
+
+            // 레이드 변형 시퀀스(PLAN-boss-raid §2) — W2·W3 에서 구현. 그 전엔 건너뛰고 한 번만 알린다.
+            int bit = 1 << (int)pending;
+            if ((_warnedRaidSequenceMask & bit) == 0)
+            {
+                _warnedRaidSequenceMask |= bit;
+                Debug.LogWarning($"[23호/레이드] {pending} 시퀀스는 아직 구현 전 — 건너뛴다.", this);
+            }
         }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -5607,6 +5627,44 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     }
     #endregion
 
+    #region 레이드 변형 (PLAN-boss-raid.md) — 데이터가 꺼져 있으면 아무것도 안 한다
+    /// <summary>[서버] 보스방 도착 생존 인원. <see cref="BossEncounterDirector"/> 가 Spawn() **직전**에 넣는다(OnNetworkSpawn 에서 읽음).</summary>
+    public void SetPartySizeServer(int partySize) => _partySize = Mathf.Max(0, partySize);
+
+    // 스폰 시점 = HP 가 가득 찬 상태라 Initialize 를 다시 불러도 안전하다(Health 를 새로 만든다).
+    void ApplyRaidSpawnRulesServer()
+    {
+        int scaled = BossRaidRules.PartyScaledMaxHp(data.maxHp, _boss.partyHpMultipliers, _partySize);
+        if (scaled != data.maxHp)
+        {
+            Initialize(data.attackDamage, data.moveSpeed, data.attackSpeed, scaled, data.defense);
+            Debug.Log($"[23호/레이드] 인원 {_partySize}명 → 최대 HP {data.maxHp} → {scaled}", this);
+        }
+
+        if (_boss.playerHitDamageCapRatio > 0f)
+            PlayerHitDamageCap.Set(this, _boss.playerHitDamageCapRatio);
+    }
+
+    /// <summary>[서버] 웰즈 자막 — 튜토리얼 자막 UI(TutorialGuideUI)를 재사용한다. 문구는 TutorialGuideTexts 의 BOSS_RAID_* 행.</summary>
+    public void ShowRaidSubtitleServer(string id)
+    {
+        if (!IsServer || string.IsNullOrEmpty(id)) return;
+        ShowRaidSubtitleClientRpc(id);
+    }
+
+    [ClientRpc]
+    void ShowRaidSubtitleClientRpc(string id)
+    {
+        TutorialGuideUI ui = TutorialGuideUI.Instance;
+        if (ui == null)
+        {
+            Debug.LogWarning($"[23호/레이드] 자막 UI(TutorialGuideUI)가 씬에 없어 '{id}' 를 못 띄운다.", this);
+            return;
+        }
+        ui.ShowSubtitle(id);
+    }
+    #endregion
+
     #region 페이즈 (HP 임계 전환)
     public override void TakeDamage(AttackInfo attackInfo)
     {
@@ -5636,15 +5694,24 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
 
         if (next <= CurrentPhase) return;
 
+        int previous = CurrentPhase;
         CurrentPhase = next;
 
         // 🔴 시퀀스를 **여기서 시작하지 않는다.** 정본 §9: "_pendingCharging 은 현재 행동이 끝난 뒤
         //    소비한다 — 행동 도중 강제 중단하지 않는다." TakeDamage 는 공격 한복판에도 들어오므로
         //    여기서 바로 시작하면 진행 중인 잡기·점프를 끊어 버린다.
         //    소비 지점은 SelectAttackSlot — 그 함수는 Idle/Walk 에서만 호출되므로 곧 "행동 종료 직후"다.
-        BossPhaseEntry entered = ActivePhase;
-        if (entered != null && entered.sequence != BossPhaseSequence.None)
-            _pendingPhaseSequence = true;
+        //    지나친 페이즈마다 하나씩 예약한다(한 방에 여러 임계를 넘어도 순서대로 전부 나온다).
+        _phaseSequenceScratch.Clear();
+        BossRaidRules.CollectEnteredSequences(phases, previous, next, _phaseSequenceScratch);
+        for (int i = 0; i < _phaseSequenceScratch.Count; i++)
+        {
+            BossPhaseSequence seq = _phaseSequenceScratch[i];
+            _pendingPhaseSequences.Enqueue(seq);
+            // 레이드 구간 선언(웰즈 자막). 기존 ChargeSequence 는 자막이 없다.
+            if (seq >= BossPhaseSequence.RaidDroneCharge)
+                ShowRaidSubtitleServer("BOSS_RAID_" + seq);
+        }
 
         OnPhaseEntered(next);
     }

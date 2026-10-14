@@ -325,3 +325,18 @@ MonoBehaviour:
       \uC774\uB3D9\uD558\uC138\uC694 (\uBBF8\uB2C8\uB9F5 \uBCF4\uC2A4 \uC544\uC774\uCF58)"
     durationSeconds: 6
     sfx: {fileID: 0}
+  - id: BOSS_RAID_RaidDroneCharge
+    text: "\uC6F0\uC988: \"\uAC00\uC871\uC5D0\uAC8C \uC804\uB825\uC744. \uC6B0\uB9AC
+      \uC544\uC774, \uC544\uC9C1 \uBA48\uCD94\uBA74 \uC548 \uB3FC.\""
+    durationSeconds: 4
+    sfx: {fileID: 0}
+  - id: BOSS_RAID_RaidRescue
+    text: "\uC6F0\uC988: \"\uC0C8 \uAC00\uC871\uC744 \uB370\uB824\uC640. \uD558\uB098\uCBE4\uC740
+      \uB0A8\uACA8 \uB46C\uC57C\uC9C0.\""
+    durationSeconds: 4
+    sfx: {fileID: 0}
+  - id: BOSS_RAID_RaidSelfDestruct
+    text: "\uC6F0\uC988: \"\uACE0\uC7A5 \uB09C \uAC00\uC871\uC740 \uD544\uC694 \uC5C6\uC5B4.
+      \uAC19\uC774 \uC0AC\uB77C\uC838.\""
+    durationSeconds: 4
+    sfx: {fileID: 0}
