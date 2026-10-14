@@ -106,7 +106,11 @@ public sealed class BossElectricFloor : MonoBehaviour
 
         // 살아 있는 플레이어가 없으면(전원 유령 — 목숨은 남았지만 부활 입력 전) 멈춘다(팀장 10-02).
         // 드론은 대상 선정에서 자연히 기다리지만 장판은 타이머만 보고 계속 나왔다. 부활하면 4초 대기부터 다시.
+        // 레이드 방전(② 실패·④ 대폭발)이 진행 중이면 제압·그로기 멈춤보다 우선한다(팀장 10-14) — 예고 도중 간파 게이지를
+        // 0 으로 만들어 제압이 걸려도 방전은 끝까지 나간다. 전원 유령이면 맞을 사람이 없으니 멈춘다.
+        bool dischargeBusy = _mode == Mode.Raid && (_dischargePending || _step == Step.Warn || _step == Step.Vfx);
         Mode want = !AnyPlayerAlive() ? Mode.Paused
+                  : dischargeBusy ? Mode.Raid
                   : (_boss.ActivePauseConditions & _d.pauseOn) != 0 ? Mode.Paused
                   : _boss.IsRaidFloorHeld ? Mode.Raid
                   : _boss.IsChargeGimmickActive ? Mode.Charge

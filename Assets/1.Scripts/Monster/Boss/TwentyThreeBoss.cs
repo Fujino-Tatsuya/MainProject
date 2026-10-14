@@ -1201,7 +1201,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
                     // ⚠️ 2026-09-21 — 진입이 걸어가기(`ChargeMoveTimeout`)에서 **점프**로 바뀌었다.
                     //    이륙 + 체공 + 착지가 그 자리를 대신한다(BeginCharge 주석 참조).
                     _stateTimer = JumpTakeoffDuration + JumpHover + JumpLanding
-                                + ChargeTimeLimit + data.attackDuration;
+                                + ChargeWaitTime + data.attackDuration;
                     break;
                 case BossAttackId.RageDash:
                     _stateTimer = RageTotalTime + data.attackDuration;
@@ -4045,7 +4045,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
                 Debug.Log(sb.Append("  (* = 이번에 올라온 탑)").ToString(), this);
             }
         }
-        EnterPhase(BossAttackPhase.ChargeWait, ChargeTimeLimit);
+        EnterPhase(BossAttackPhase.ChargeWait, ChargeWaitTime);   // 제한시간 + 탑 상승 여유(P2)
     }
 
     /// <summary>
@@ -4320,6 +4320,16 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         if (_rageDashDir.sqrMagnitude < 0.0001f) _rageDashDir = Vector3.forward;
         _rageDashDir.Normalize();
 
+        // 바닥 예고(팀장 10-14 P3) — 반응하기 어려운 벌칙이라는 의도는 유지한다: 돌진 타이밍은 그대로, **가득 찬 띠를 즉시** 그린다.
+        //    색은 공격(빨강) — 레이지는 간파 창이 없다. 길이 = 레이지 최대 거리, 벽(NavMesh)에서 자른다.
+        float rageReach = RageDashMaxDistance;
+        Vector3 rageOrigin = transform.position;
+        if (UnityEngine.AI.NavMesh.Raycast(rageOrigin, rageOrigin + _rageDashDir * rageReach,
+                                           out UnityEngine.AI.NavMeshHit rageHit, UnityEngine.AI.NavMesh.AllAreas))
+            rageReach = Mathf.Min(rageReach, Vector3.Distance(rageOrigin, rageHit.position));
+        float rageHalfWidth = TryGetDashFootprint(_currentEntry, _rageDashDir, out float rw, out float rpad) ? rw : 1.7f;
+        ShowRageDashTelegraphClientRpc(Mathf.Max(0.1f, rageReach + Mathf.Max(0f, rpad)), rageHalfWidth);
+
         _rageDashing = true;
         // 연출도 돌진과 수명을 맞춘다 — 매 회 새로 켜고 StopRageDash 가 끈다.
         // (Play 는 재진입 시 먼저 회수하므로 연타로 불려도 핸들이 새지 않는다)
@@ -4375,9 +4385,19 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
 
     // 🔴 돌진이 끝나는 **모든** 길이 여기를 지난다 — TickRage(정상 종료)와
     //    AbortAttackChain(카운터·그로기·사망). 그래서 연출 회수를 여기 한 곳에 둔다.
+    [ClientRpc]
+    void ShowRageDashTelegraphClientRpc(float length, float halfWidth)
+    {
+        AttackCone.Show(coneRadius: 0f, coneAngleDeg: 0f, coneOffsetAngleDeg: 0f,
+                        coneForwardOffset: 0f,
+                        pathRadius: halfWidth, pathLength: length, growTime: 0f,
+                        palette: BossAttackConeTelegraph.Palette.Attack);
+    }
+
     void StopRageDash()
     {
         _rageDashing = false;
+        HideAttackConeClientRpc();     // 레이지 예고 띠(P3) — 매 회 새로 그린다
         StopRageSmashClientRpc();
         StopDashTrailClientRpc();      // 연타 사이 간격은 서 있는 구간이라 궤적도 끊는다
         meleeAttack?.EndHitWindow();
@@ -5080,6 +5100,21 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         for (int i = 0; i < rows.Length; i++)
             if (rows[i] != null && rows[i].attackId == id) return i;
         return NoAttack;
+    }
+
+    /// <summary>
+    /// 차징 대기 = 제한시간 + 송전탑 상승 여유(BossChargeSequence.riseGrace). 탑이 올라오는 동안은 못 때리므로
+    /// 그 시간을 부술 시간에서 깎지 않는다(팀장 10-14 P2). ④ 자폭은 탑이 없어 여유 없음.
+    /// </summary>
+    float ChargeWaitTime
+    {
+        get
+        {
+            if (_raidSelfDestruct) return ChargeTimeLimit;
+            if (_charge == null) _charge = GetComponentInChildren<IBossChargeSequence>(true);
+            float grace = _charge is BossChargeSequence seq ? Mathf.Max(0f, seq.RiseGrace) : 0f;
+            return ChargeTimeLimit + grace;
+        }
     }
 
     float ChargeTimeLimit => _boss == null ? 20f

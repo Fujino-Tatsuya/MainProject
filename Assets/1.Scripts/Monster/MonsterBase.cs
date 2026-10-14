@@ -2104,6 +2104,13 @@ public class MonsterBase : Unit
         if (next != MonsterState.Groggy)
             ApplyReleaseActionPose();
 
+        // 공격 슈퍼아머는 공격이 끝나면 푼다(팀장 10-14 P1). StartAttack 이 attackDuration(+예고)만큼 시간으로 걸어
+        // 펀치·채찍이 1초 안에 끝나도 2~3초 남았고, 쿨이 짧아 다음 공격이 다시 걸어 근접 교전 중 사실상 상시 경직·넉백 면역이었다.
+        // ⚠️ 상태이상은 종류당 하나라 Remove 는 통째로 지운다 — 스폰부터 무한 슈퍼아머(startsWithSuperArmor)인 몹은 건드리지 않는다.
+        if (IsServer && previous == MonsterState.Attack && next != MonsterState.Attack
+            && status != null && data != null && !data.startsWithSuperArmor)
+            status.RemoveStatus(StatusEffectType.SuperArmor);
+
         // 터렛 조준선 — 사망·대상 소실·휴면(전부 Dead/Idle 로 온다)에서 끈다. 끄는 곳이 SeekTurret 한 곳뿐이라
         // 시체·휴면 터렛에 선이 남고, 다음 대상에게는 추적 없이 낡은 방향으로 즉시 쐈다(점검 10-14).
         if (IsServer && (next == MonsterState.Dead || next == MonsterState.Idle))
