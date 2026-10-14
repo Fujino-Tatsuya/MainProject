@@ -7,7 +7,7 @@ using UnityEngine;
 /// </summary>
 public sealed class UnitWallImpactJudgeTests
 {
-    const int Default = 0, Player = 6, Wall = 7, Enemy = 8, EnemyHurtBox = 14, Barrier = 19;
+    const int Default = 0, Player = 6, Wall = 7, Enemy = 8, EnemyHurtBox = 14, Barrier = 20;
     const int WallMask = 1 << Wall;
     static readonly Vector3 East = Vector3.right;
 

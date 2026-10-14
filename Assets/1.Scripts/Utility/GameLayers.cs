@@ -18,7 +18,7 @@ public static class GameLayers
     /// <summary>Wall 레이어 비트(없으면 0).</summary>
     public static int WallMask => LayerMask.GetMask(Wall);
 
-    /// <summary>Barrier 레이어 비트(없으면 0 — TagManager 에 19번 Barrier 가 있어야 한다).</summary>
+    /// <summary>Barrier 레이어 비트(없으면 0 — TagManager 에 20번 Barrier 가 있어야 한다. 19번은 Robot Sentries 팩 몬스터 뼈(래그돌 콜라이더)가 쓰므로 쓰지 말 것).</summary>
     public static int BarrierMask => LayerMask.GetMask(Barrier);
 
     /// <summary>배리어 오브젝트에 줄 레이어. Barrier 가 없으면 예전처럼 Wall(이동은 계속 막힌다).</summary>

@@ -11,7 +11,7 @@ using UnityEngine;
 [DataTableSheet("Player", Order = 6)]
 public sealed class PlayerGameRuleData : ScriptableObject
 {
-    private const int DefaultObstacleMask = (1 << 0) | (1 << 3) | (1 << 7) | (1 << 11) | (1 << 19);   // + Barrier(19, 할 일 32)
+    private const int DefaultObstacleMask = (1 << 0) | (1 << 3) | (1 << 7) | (1 << 11) | (1 << 20);   // + Barrier(20, 할 일 32 — 19 는 몬스터 팩 뼈 레이어라 비움)
     private const int DefaultGroundMask = (1 << 0) | (1 << 3) | (1 << 11);
 
     [Header("이동")]
