@@ -87,7 +87,9 @@ public sealed class WellsDroneAttack : MonoBehaviour
         }
 
         // 송전기는 점프 출발 순간부터 멈춘다(팀장 10-02) — 점프 이동 + 차징 대기 전체.
-        bool pause = (_boss.ActivePauseConditions & _d.pauseOn) != 0 || _boss.IsChargeSequenceActive;
+        // 🔴 레이드 ② 전력 공급 차징 대기 중엔 멈추지 않는다 — 드론 착탄이 송전탑을 부수는 기믹이다(PLAN-boss-raid §2).
+        bool guide = _boss.IsRaidDroneGuideActive;
+        bool pause = (_boss.ActivePauseConditions & _d.pauseOn) != 0 || (_boss.IsChargeSequenceActive && !guide);
         if (pause)
         {
             if (!_paused)
@@ -141,7 +143,7 @@ public sealed class WellsDroneAttack : MonoBehaviour
                 {
                     CancelInProgress("추적 중 대상 무효");
                     _phase = Phase.Idle;
-                    _t = _d.cooldown;
+                    _t = guide ? _boss.RaidDroneGuideCooldown : _d.cooldown;
                     return;
                 }
                 _t -= dt;
@@ -158,7 +160,7 @@ public sealed class WellsDroneAttack : MonoBehaviour
             case Phase.Lock:
                 _t -= dt;
                 if (_t > 0f) return;
-                Impact();
+                Impact(guide);
                 _phase = Phase.Explode;
                 _t = _d.explosionDuration;
                 return;
@@ -167,7 +169,7 @@ public sealed class WellsDroneAttack : MonoBehaviour
                 _t -= dt;
                 if (_t > 0f) return;
                 _phase = Phase.Idle;
-                _t = _d.cooldown;   // 폭발 연출 종료 후부터 센다(§3-11)
+                _t = guide ? _boss.RaidDroneGuideCooldown : _d.cooldown;   // 폭발 연출 종료 후부터 센다(§3-11)
                 return;
         }
     }
@@ -193,9 +195,28 @@ public sealed class WellsDroneAttack : MonoBehaviour
 
     // §9: 충돌 순간 1회 · 대상당 1회 · 충돌 범위와 원이 겹치면 적중.
     // 🔴 **플레이어만 맞는다** — 23호 자기 피해는 제거(팀장 10-12). 기획 §9.3「23호 피격」은 폐기됐다(기획서 ⚠️ 정정).
-    void Impact()
+    // 송전탑은 기둥이라 원과 "중심 거리 ≤ 반경 + 이만큼"이면 맞은 것으로 본다(탑 몸통 반지름 근사).
+    const float PylonHitSlack = 0.75f;
+
+    void Impact(bool guide = false)
     {
         _boss.SendDroneImpact(_lockPos, _radius);
+
+        // 레이드 ② — 착탄 원에 걸친 Live 송전탑은 한 방에 부서진다(드론을 탑으로 유도하는 기믹).
+        if (guide)
+        {
+            int pylons = 0;
+            foreach (BossChargingPylon pylon in BossChargingPylon.Active)
+            {
+                if (pylon == null || !pylon.IsLive) continue;
+                Vector3 d = pylon.transform.position - _lockPos;
+                d.y = 0f;
+                if (d.magnitude > _radius + PylonHitSlack) continue;
+                pylon.TakeDamage(new AttackInfo(Mathf.Max(1, pylon.FinalMaxHp)));
+                pylons++;
+            }
+            if (pylons > 0) Debug.Log($"[자폭드론/레이드] 송전탑 {pylons}개 파괴", this);
+        }
 
         // 원(바닥) 판정을 세로 캡슐로 근사한다 — 캐릭터 콜라이더가 원 위 어디에 걸쳐도 잡히게.
         int n = Physics.OverlapCapsuleNonAlloc(_lockPos, _lockPos + Vector3.up * 3f, _radius, _overlap,

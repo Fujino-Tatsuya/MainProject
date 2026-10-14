@@ -36,6 +36,10 @@ public static class BossRaidVariantAuthoring
         ("BOSS_RAID_RaidDroneCharge",  "웰즈: \"가족에게 전력을. 우리 아이, 아직 멈추면 안 돼.\"", 4f),
         ("BOSS_RAID_RaidRescue",       "웰즈: \"새 가족을 데려와. 하나쯤은 남겨 둬야지.\"", 4f),
         ("BOSS_RAID_RaidSelfDestruct", "웰즈: \"고장 난 가족은 필요 없어. 같이 사라져.\"", 4f),
+        // W2 — 규칙 안내(처음 하는 사람용).
+        ("BOSS_RAID_OpeningDash",      "돌진이 <b>파랗게</b> 빛나면 <b>정면</b>에서 <b>우클릭</b>으로 간파하세요!", 4f),
+        ("BOSS_RAID_ChargeGuide",      "드론 표식을 <b>송전탑 위로</b> 끌고 가서 떨어뜨리세요! 직접 때려도 부서집니다.", 6f),
+        ("BOSS_RAID_Discharge",        "방전! <b>부서진 송전탑 자리</b>로 피하세요!", 3f),
     };
 
     [MenuItem(BuildMenu)]
@@ -61,6 +65,13 @@ public static class BossRaidVariantAuthoring
         var existing = AssetDatabase.LoadAssetAtPath<BossDataSO>(RaidDataPath);
         if (existing != null)
         {
+            // 레이드 각본 스위치는 수치가 아니라 구조라 항상 맞춘다(W2 에 생긴 칸 — W1 에셋엔 꺼져 있다).
+            if (!existing.raidScript)
+            {
+                existing.raidScript = true;
+                EditorUtility.SetDirty(existing);
+                log.AppendLine("  ✓ No23_Raid.raidScript 켬");
+            }
             log.AppendLine("  · No23_Raid.asset 있음 — 수치는 건드리지 않음");
             return existing;
         }
@@ -73,6 +84,7 @@ public static class BossRaidVariantAuthoring
         data.maxHp = Mathf.RoundToInt(src.maxHp / HpBaseDivisor / 100f) * 100;
         data.partyHpMultipliers = (float[])PartyHpMultipliers.Clone();
         data.playerHitDamageCapRatio = HitCapRatio;
+        data.raidScript = true;
         // 구간 각본(PLAN §2): ②75 전력 공급 · ③45 새 가족 · ④20 폐기 처분. 배수 ① 1.0 → 1.15 → 1.3.
         data.phases = new[]
         {
@@ -129,9 +141,29 @@ public static class BossRaidVariantAuthoring
         log.AppendLine("  ✓ NetworkPrefabs 등록");
     }
 
-    // 열린 씬의 BossEncounterDirector 에 연결. 씬이 원래 깨끗했으면 저장까지, 아니면 표시만 하고 저장은 사람에게 맡긴다.
+    // 10-14 development 병합으로 디렉터가 매니저 프리팹이 됐다(MapScene 은 그 인스턴스). 프리팹에 연결하면 씬 저장이 필요 없다.
+    const string DirectorPrefabPath = "Assets/2.Prefabs/Managers/BossEncounterDirector.prefab";
+
     static void WireOpenScenes(GameObject prefab, StringBuilder log)
     {
+        var directorPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(DirectorPrefabPath);
+        var prefabDirector = directorPrefab != null ? directorPrefab.GetComponent<BossEncounterDirector>() : null;
+        if (prefabDirector != null)
+        {
+            var dso = new SerializedObject(prefabDirector);
+            SerializedProperty dp = dso.FindProperty("raidBossPrefab");
+            if (dp.objectReferenceValue == prefab) log.AppendLine("  · 디렉터 프리팹 이미 연결");
+            else
+            {
+                dp.objectReferenceValue = prefab;
+                dso.ApplyModifiedPropertiesWithoutUndo();
+                PrefabUtility.SavePrefabAsset(directorPrefab);
+                log.AppendLine("  ✓ 디렉터 프리팹 raidBossPrefab 연결");
+            }
+            return;
+        }
+
+        // 프리팹이 없던 옛 구조(씬 직배치) — 열린 씬에서 찾는다.
         bool found = false;
         for (int i = 0; i < SceneManager.sceneCount; i++)
         {

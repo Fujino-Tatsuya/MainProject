@@ -84,6 +84,36 @@ public sealed class BossRaidRulesTests
         Assert.That(maxHp - capped, Is.GreaterThan(0));
     }
 
+    [TestCase(0, 1)]
+    [TestCase(1, 1)]
+    [TestCase(2, 2)]
+    [TestCase(3, 3)]
+    [TestCase(4, 3)] // 기존 송전기(3인 이상 4개)와 다르다 — 인원과 같게, 최대 3
+    public void RaidPylonCount_EqualsPartyUpToThree(int players, int expected)
+    {
+        Assert.That(BossRaidRules.RaidPylonCount(players), Is.EqualTo(expected));
+    }
+
+    /// ② 실패 방전 — 부순 탑이 선 칸만 빠지고 나머지 48칸은 전부 위험.
+    [Test]
+    public void DischargeMask_ExcludesOnlySafeTiles()
+    {
+        var safe = new List<UnityEngine.Vector2Int> { new UnityEngine.Vector2Int(0, 0), new UnityEngine.Vector2Int(6, 6) };
+        ulong mask = BossRaidRules.DischargeMask(safe);
+        Assert.That(BossTileGrid.Count(mask), Is.EqualTo(BossTileGrid.TileCount - 2));
+        Assert.That(BossTileGrid.Has(mask, 0, 0), Is.False);
+        Assert.That(BossTileGrid.Has(mask, 6, 6), Is.False);
+        Assert.That(BossTileGrid.Has(mask, 3, 3), Is.True);
+    }
+
+    [Test]
+    public void DischargeMask_NoSafeTile_IsWholeRoom_AndOutOfRangeIgnored()
+    {
+        Assert.That(BossRaidRules.DischargeMask(new List<UnityEngine.Vector2Int>()), Is.EqualTo(BossTileGrid.AllMask));
+        var bad = new List<UnityEngine.Vector2Int> { new UnityEngine.Vector2Int(-1, 2), new UnityEngine.Vector2Int(7, 0) };
+        Assert.That(BossRaidRules.DischargeMask(bad), Is.EqualTo(BossTileGrid.AllMask));
+    }
+
     [Test]
     public void HitCap_SmallHitsAndDisabledCap_Unchanged()
     {

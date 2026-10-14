@@ -269,6 +269,13 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     readonly List<BossPhaseSequence> _phaseSequenceScratch = new List<BossPhaseSequence>();
     int _warnedRaidSequenceMask;
     int _partySize;                                 // [서버] 보스방 도착 생존 인원(BossEncounterDirector 가 스폰 직전에 넣는다). 0 = 모름
+
+    // ─── 레이드 각본(PLAN-boss-raid §2) — _boss.raidScript 일 때만 쓰인다 ─────────────
+    readonly Queue<BossAttackId> _raidScript = new Queue<BossAttackId>();   // ① 기동 시연 고정 공격 순서
+    bool _raidCharge;               // 지금 도는 송전기가 ② 전력 공급(드론 유도·방전)인가. 끄는 곳 = TickCharge 결과 · AbortAttackChain
+    float _raidFloorHoldUntil;      // 방전 예고·발동이 끝날 때까지 상시 장판을 붙잡아 둔다
+    readonly List<Vector2Int> _safeTileScratch = new List<Vector2Int>(4);
+    bool IsRaid => _boss != null && _boss.raidScript;
     IBossChargeSequence _charge;
     AreaZone _chargeZone;
     bool _warnedNoCharge;
@@ -782,6 +789,11 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         // 연출 동안의 접촉 상태는 의미가 없다 — 전투가 새로 시작되므로 "안 붙은" 상태에서 출발한다.
         _inContactReach = false;
 
+        // ① 기동 시연 — 개전 고정 공격 순서(레이드만). 롤렛보다 먼저 소비된다(SelectAttackSlot).
+        _raidScript.Clear();
+        if (IsRaid && _boss.raidOpeningScript != null)
+            foreach (BossAttackId id in _boss.raidOpeningScript) _raidScript.Enqueue(id);
+
         BossAttackEntry[] rows = _boss != null ? _boss.attacks : null;
         if (rows == null) return;
 
@@ -812,7 +824,20 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
                 continue;
             }
 
-            // 레이드 변형 시퀀스(PLAN-boss-raid §2) — W2·W3 에서 구현. 그 전엔 건너뛰고 한 번만 알린다.
+            // ② 전력 공급 = 기존 송전기 흐름(점프 → 차징 → 결과)을 그대로 타고, 레이드 분기만 _raidCharge 로 가른다.
+            if (pending == BossPhaseSequence.RaidDroneCharge && IsRaid)
+            {
+                int seq = FindSlot(BossAttackId.ChargeSequence);
+                if (seq != NoAttack)
+                {
+                    _raidCharge = true;
+                    return seq;
+                }
+                Debug.LogError($"{name}: 전력 공급인데 공격 테이블에 ChargeSequence 행이 없다 — 건너뛴다.", this);
+                continue;
+            }
+
+            // 나머지 레이드 시퀀스(③·④) — W3 에서 구현. 그 전엔 건너뛰고 한 번만 알린다.
             int bit = 1 << (int)pending;
             if ((_warnedRaidSequenceMask & bit) == 0)
             {
@@ -820,6 +845,10 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
                 Debug.LogWarning($"[23호/레이드] {pending} 시퀀스는 아직 구현 전 — 건너뛴다.", this);
             }
         }
+
+        // ① 기동 시연(레이드) — 남아 있는 동안은 롤렛을 돌리지 않는다. 사거리 밖이면 NoAttack → 추격.
+        if (_raidScript.Count > 0)
+            return ConsumeRaidScript(rows, dist);
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         // [Dev] 단축키 예약(DevBossAttackHotkeys) — 페이즈 시퀀스 다음 우선. 간격·쿨다운·가중치 무시, 거리창만 지킨다
@@ -968,6 +997,34 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     }
 #endif
     #endregion
+
+    // ① 기동 시연 소비 — Dev 예약(ConsumeDevReservation)과 같은 규칙: 맨 앞만 보고, 사거리 밖이면 순서를 지켜 추격한다.
+    //    전역 공격 간격은 롤렛과 똑같이 지킨다(시연이라고 훅이 붙어 나오면 안 된다).
+    int ConsumeRaidScript(BossAttackEntry[] rows, float dist)
+    {
+        if (Time.time - _lastAttackTickTime < GlobalAttackInterval) return NoAttack;
+
+        BossAttackId next = _raidScript.Peek();
+        int slot = FindSlot(next);
+        if (slot == NoAttack)
+        {
+            _raidScript.Dequeue();
+            Debug.LogWarning($"[23호/레이드] 시연 공격 {next} 행이 테이블에 없다 — 건너뜀", this);
+            return NoAttack;
+        }
+
+        BossAttackEntry e = rows[slot];
+        if (!e.ignoreDistanceWindow)
+        {
+            float max = BossContactReachPolicy.EffectiveMaxDistance(e, data.attackRange, _inContactReach);
+            if (dist < e.minDistance || dist > max) return NoAttack;
+        }
+
+        _raidScript.Dequeue();
+        if (next == BossAttackId.Dash) ShowRaidSubtitleServer("BOSS_RAID_OpeningDash");   // 정면 간파 안내
+        Debug.Log($"[23호/레이드] 기동 시연 — {next} (남은 {_raidScript.Count})", this);
+        return slot;
+    }
 
     #region 훅 — StartAttack / PerformAttackHit / PlayStateAnimation
     // 관용구 1: 선택 결과를 base.StartAttack() **전에** 확정한다.
@@ -2430,6 +2487,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         // 🔴 차징 진입 점프도 **조기 반환 앞**에서 끈다. 남겨 두면 다음 점프어택이 착지하는 순간
         //    Recovery 대신 차징을 시작한다 — 잡기 배수·전진이 여기 앞에 있는 것과 정확히 같은 이유다.
         _chargeJump = false;
+        _raidCharge = false;   // ② 전력 공급 표식도 같은 이유 — 남으면 다음 일반 송전기가 레이드로 돈다
 
         if (_attackPhase == BossAttackPhase.None && _grabbed == null && _dashCarried == null) return;
 
@@ -3728,7 +3786,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         SetCounterWindow(false); // 차징 중엔 카운터 창 없음(확정 스펙)
 
         _chargePlayers = CountAlivePlayers();
-        _chargePylons = PylonCountFor(_chargePlayers);
+        _chargePylons = _raidCharge ? BossRaidRules.RaidPylonCount(_chargePlayers) : PylonCountFor(_chargePlayers);
 
         if (_charge == null) _charge = GetComponentInChildren<IBossChargeSequence>(true);
 
@@ -3816,7 +3874,8 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
             CrossFadeStateClientRpc(e.animatorStateName);
 
         Debug.Log($"[23호] 송전기 시작 — 인원 {_chargePlayers}명 → 송전탑 {_chargePylons}개, " +
-                  $"제한시간 {ChargeTimeLimit:0.#}초", this);
+                  $"제한시간 {ChargeTimeLimit:0.#}초{(_raidCharge ? " (레이드 ② 전력 공급)" : "")}", this);
+        if (_raidCharge) ShowRaidSubtitleServer("BOSS_RAID_ChargeGuide");   // 규칙 설명 — 처음 하는 사람용
         EnterPhase(BossAttackPhase.ChargeWait, ChargeTimeLimit);
     }
 
@@ -3888,6 +3947,11 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
 
         bool cleared = result == BossChargeResult.AllPylonsDestroyed;
 
+        // ② 전력 공급 실패 방전의 안전 칸 = 부순 송전탑이 선 칸. _charge.Cancel() 이 탑을 내리기 **전에** 읽는다.
+        bool raidCharge = _raidCharge;
+        _raidCharge = false;
+        ulong dischargeMask = raidCharge && !cleared ? BuildRaidDischargeMask() : 0UL;
+
         // 🔴 EndChargeZone 보다 **먼저** — 끝나는 방식이 결과에 따라 갈린다.
         //    기둥을 전부 부쉈다 = 플레이어가 저지했다 → 구슬이 **깨진다**(Abort).
         //    제한시간 초과 = 차징 완주 → 서서히 **사그라진다**(Stop).
@@ -3902,6 +3966,13 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
             // 🔴 송전기 그로기는 카운트를 올리되 **Break 로 승격하지 않는다** —
             //    페이즈 전환 직후 5초 무력화가 겹치면 페이즈 연출이 죽는다(확정 스펙).
             _attackPhase = BossAttackPhase.None;
+            if (raidCharge)
+            {
+                // ② 성공 보상 = 제압(5초, 받는 피해 ×1.2). 기믹이 끝난 지점이라 예약 검사를 건너뛴다.
+                Debug.Log("[23호/레이드] 전력 공급 차단 — 제압", this);
+                EnterSuppress("전력 공급 차단", fromReservation: true);
+                return;
+            }
             Debug.Log("[23호] 송전기 전멸 — 그로기(Break 승격 없음)", this);
             // 기믹이 완전히 끝나는 지점 ① — 예약된 제압이 있으면 보상 그로기 대신 제압으로.
             if (TryConsumePendingSuppress()) return;
@@ -3909,9 +3980,48 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
             return;
         }
 
+        if (raidCharge)
+        {
+            // ② 실패 = 레이지 대신 방전(부순 탑 칸만 안전). 보스는 바로 일반 전투로 돌아간다.
+            _attackPhase = BossAttackPhase.None;
+            StartRaidDischarge(dischargeMask);
+            DecideNextAfterAction();
+            return;
+        }
+
         Debug.Log("[23호] 송전기 실패 — 레이지 돌진으로 넘어간다", this);
         StartRageAfterCharge();
     }
+
+    // [서버] 지금 올라와 있는(참여) 송전탑 중 부서진 것이 선 칸 → 방전 마스크.
+    ulong BuildRaidDischargeMask()
+    {
+        _safeTileScratch.Clear();
+        if (TryGetTileGrid(out BossTileGrid grid))
+            foreach (BossChargingPylon p in BossChargingPylon.Active)
+                if (p != null && p.IsEngaged && p.WasDestroyed && grid.TryGetTile(p.transform.position, out int r, out int c))
+                    _safeTileScratch.Add(new Vector2Int(r, c));
+        return BossRaidRules.DischargeMask(_safeTileScratch);
+    }
+
+    void StartRaidDischarge(ulong mask)
+    {
+        float warn = _boss.raidDischargeWarnTime;
+        _electricFloor?.ServerQueueDischarge(mask, warn, _boss.raidDischargeDamage);
+        // 장판을 Raid 모드로 붙잡아 두는 시간 = 예고 + 여유(발동·VFX 는 장판이 끝까지 낸다).
+        _raidFloorHoldUntil = Time.time + warn + 2f;
+        ShowRaidSubtitleServer("BOSS_RAID_Discharge");
+        Debug.Log($"[23호/레이드] 전력 공급 실패 — 방전 예고 {warn:0.#}초 · 안전 칸 {_safeTileScratch.Count}개", this);
+    }
+
+    /// <summary>[서버] 상시 전기 장판을 붙잡아 둘 때(레이드): ① 구간 · ② 전력 공급 진행 · 방전 처리 중.</summary>
+    public bool IsRaidFloorHeld =>
+        IsRaid && (CurrentPhase == 0 || _raidCharge || Time.time < _raidFloorHoldUntil);
+
+    /// <summary>[서버] ② 전력 공급 차징 대기 중 — 드론이 멈추지 않고 탑 유도 모드로 돈다.</summary>
+    public bool IsRaidDroneGuideActive => _raidCharge && IsChargeGimmickActive;
+
+    public float RaidDroneGuideCooldown => _boss != null ? _boss.raidDroneGuideCooldown : 1.5f;
 
     // 차징 실패 → 레이지. 같은 Attack 상태를 이어 쓰지 않고 공격을 새로 시작한다
     // (레이지는 별도 행이라 쿨·슈퍼아머·애니를 자기 것으로 받아야 한다).
@@ -4703,7 +4813,8 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         return NoAttack;
     }
 
-    float ChargeTimeLimit => _boss != null ? Mathf.Max(1f, _boss.chargeTimeLimit) : 20f;
+    float ChargeTimeLimit => _boss == null ? 20f
+        : Mathf.Max(1f, _raidCharge ? _boss.raidChargeTimeLimit : _boss.chargeTimeLimit);
     float RageDashDuration => _boss != null ? Mathf.Max(0.1f, _boss.rageDashDuration) : 0.7f;
     float RageDashInterval => _boss != null ? Mathf.Max(0f, _boss.rageDashInterval) : 0.5f;
     float RageDashSpeedMul => _boss != null ? Mathf.Max(1f, _boss.rageDashSpeedMultiplier) : 8f;

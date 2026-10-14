@@ -33,6 +33,23 @@ public static class BossRaidRules
         return Mathf.Max(1, Mathf.RoundToInt(baseMaxHp * m));
     }
 
+    /// <summary>② 전력 공급 송전탑 개수 — 인원과 같게(1/2/3). 기존 송전기는 3인 이상 4개(PylonCountFor).</summary>
+    public static int RaidPylonCount(int players) => Mathf.Clamp(players, 1, 3);
+
+    /// <summary>② 실패 방전 마스크 = 전 타일 − 안전 칸(부순 송전탑이 선 칸).</summary>
+    public static ulong DischargeMask(IReadOnlyList<Vector2Int> safeTiles)
+    {
+        ulong mask = BossTileGrid.AllMask;
+        if (safeTiles == null) return mask;
+        for (int i = 0; i < safeTiles.Count; i++)
+        {
+            Vector2Int t = safeTiles[i];
+            if (t.x < 0 || t.y < 0 || t.x >= BossTileGrid.Size || t.y >= BossTileGrid.Size) continue;
+            mask &= ~(1UL << BossTileGrid.Bit(t.x, t.y));
+        }
+        return mask;
+    }
+
     /// <summary>한 번에 받는 피해 상한. ratio ≤ 0 이면 상한 없음.</summary>
     public static int CapHitDamage(int damage, int receiverMaxHp, float ratio)
     {

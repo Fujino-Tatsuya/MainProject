@@ -326,6 +326,12 @@ MonoBehaviour:
   - 2.4
   - 4.2
   playerHitDamageCapRatio: 0.9
+  raidScript: 1
+  raidOpeningScript: 000000000100000005000000
+  raidChargeTimeLimit: 25
+  raidDroneGuideCooldown: 1.5
+  raidDischargeWarnTime: 2.5
+  raidDischargeDamage: 150
   counterFrontAngle: 60
   backAttackAngle: 60
   hitReactionState: getowned

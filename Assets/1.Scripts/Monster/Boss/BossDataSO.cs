@@ -271,6 +271,25 @@ public class BossDataSO : MonsterDataSO
              "0.9 = 체력이 가득 찬 상태에서 한 방에 죽지 않는다(팀장 10-14: 목숨 쓸 틈도 없이 즉사하는 경험 금지).")]
     [Range(0f, 1f)] public float playerHitDamageCapRatio = 0f;
 
+    [Tooltip("레이드 각본 사용(①기동 시연·② 전력 공급 등). 꺼져 있으면 아래 레이드 칸은 전부 무시된다 — 기존 No23 = 꺼짐.")]
+    public bool raidScript = false;
+
+    [Tooltip("① 기동 시연 — 개전 직후 이 순서로 고정 시전(거리창은 지킨다, 밖이면 추격). 기본 = 훅 좌·우 → 간파 가능 돌진.\n" +
+             "① 구간(첫 임계 전)에는 상시 전기 장판을 끈다(PLAN-boss-raid §2).")]
+    public BossAttackId[] raidOpeningScript = { BossAttackId.LeftHook, BossAttackId.RightHook, BossAttackId.Dash };
+
+    [Tooltip("② 전력 공급 제한시간(초). 기존 송전기의 chargeTimeLimit 대신 쓴다.")]
+    [Min(1f)] public float raidChargeTimeLimit = 25f;
+
+    [Tooltip("② 전력 공급 중 드론 재지목 간격(초) — 평소 cooldown(7초) 대신. 짧을수록 유도 기회가 많다.")]
+    [Min(0f)] public float raidDroneGuideCooldown = 1.5f;
+
+    [Tooltip("② 실패 = 방전 예고 시간(초). 부순 송전탑 칸만 안전하다.")]
+    [Min(0.3f)] public float raidDischargeWarnTime = 2.5f;
+
+    [Tooltip("② 실패 = 방전 피해. 플레이어 최대 HP 220 기준 150 — 즉사 상한(0.9)과 별개로 '아프지만 산다' 수준.")]
+    [Min(0)] public int raidDischargeDamage = 150;
+
     [Header("카운터 / 그로기 — maxGroggyCount·groggyDuration 은 base 필드 재사용")]
     [Tooltip("[S3] 카운터 성공으로 인정하는 정면 각도(도). 60 = 보스 정면 기준 ±60°. " +
              "헤드어택(은희) 구현 후 그쪽 판정으로 교체될 지점이다.")]

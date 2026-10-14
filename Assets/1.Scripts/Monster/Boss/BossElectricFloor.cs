@@ -24,7 +24,8 @@ using UnityEngine;
 public sealed class BossElectricFloor : MonoBehaviour
 {
     // ChargePrep = 송전기 진입 점프 중(팀장 10-02: 기믹 시작 = 점프 출발) — 일반 장판을 정리하고 아무것도 안 낸다.
-    enum Mode { Off, Normal, ChargePrep, Charge, Paused }
+    // Raid = 23호 레이드 각본이 장판을 붙잡은 동안(PLAN-boss-raid §2) — 상시 장판은 안 내고, 보스가 요청한 방전만 낸다.
+    enum Mode { Off, Normal, ChargePrep, Charge, Paused, Raid }
     enum Step { Wait, Warn, Vfx }
 
     TwentyThreeBoss _boss;
@@ -39,6 +40,13 @@ public sealed class BossElectricFloor : MonoBehaviour
     bool _shown;   // 클라에 예고/VFX 가 떠 있다 — 모드 전환 때 지울지
     BossElectricFloorPatterns.ChargeGroup _group;
     int _bStage;   // 0 = A, 1 = B 안쪽 5×5, 2 = B 홀수 4줄
+
+    // 레이드 방전 요청(보스가 넣고 Raid 모드가 1회 낸다). 모드 전환으로 지워지지 않는다 — 요청 직후 전환되기 때문.
+    bool _dischargePending;
+    ulong _dischargeMask;
+    float _dischargeWarn;
+    int _dischargeDamage;
+    int _fireDamage;   // 이번 발동 피해(평소 = _d.damage)
 
     /// <summary>[서버] 장판 1회 발동에서 실제로 맞은 인원(무적·잡힘·쓰러짐 제외, 보호막이 막아도 포함). 보스 고유 게이지(B6) 훅 — 지금 구독자 없음.</summary>
     public event Action<int> ServerFloorHit;
@@ -61,6 +69,7 @@ public sealed class BossElectricFloor : MonoBehaviour
         _step = Step.Wait;
         _t = 0f;
         _shown = false;
+        _dischargePending = false;
         _patterns?.ResetAll();
         HideAllTiles();
     }
@@ -99,6 +108,7 @@ public sealed class BossElectricFloor : MonoBehaviour
         // 드론은 대상 선정에서 자연히 기다리지만 장판은 타이머만 보고 계속 나왔다. 부활하면 4초 대기부터 다시.
         Mode want = !AnyPlayerAlive() ? Mode.Paused
                   : (_boss.ActivePauseConditions & _d.pauseOn) != 0 ? Mode.Paused
+                  : _boss.IsRaidFloorHeld ? Mode.Raid
                   : _boss.IsChargeGimmickActive ? Mode.Charge
                   : _boss.IsChargeJumpActive ? Mode.ChargePrep
                   : Mode.Normal;
@@ -106,6 +116,35 @@ public sealed class BossElectricFloor : MonoBehaviour
 
         if (_mode == Mode.Normal) TickNormal(dt);
         else if (_mode == Mode.Charge) TickCharge(dt);
+        else if (_mode == Mode.Raid) TickRaid(dt);
+    }
+
+    /// <summary>[서버] 레이드 방전 1회 요청(② 전력 공급 실패). Raid 모드에서 예고 → 발동한다.</summary>
+    public void ServerQueueDischarge(ulong mask, float warnTime, int damage)
+    {
+        _dischargePending = true;
+        _dischargeMask = mask;
+        _dischargeWarn = Mathf.Max(0.3f, warnTime);
+        _dischargeDamage = Mathf.Max(0, damage);
+    }
+
+    void TickRaid(float dt)
+    {
+        if (_step == Step.Wait)
+        {
+            if (!_dischargePending) return;
+            _dischargePending = false;
+            // 🔴 Fire 는 _mask 를 쏜다 — Warn 인자만 넘기면 예고는 전 타일인데 발동은 빈 마스크(0칸)가 된다(10-14 Play: 피해 0).
+            _mask = _dischargeMask;
+            Warn(_mask, _dischargeWarn);
+            _fireDamage = _dischargeDamage;
+            return;
+        }
+
+        _t -= dt;
+        if (_t > 0f) return;
+        if (_step == Step.Warn) Fire(_mask);
+        else if (_step == Step.Vfx) { EndVfx(); _step = Step.Wait; }
     }
 
     static bool AnyPlayerAlive()
@@ -130,6 +169,10 @@ public sealed class BossElectricFloor : MonoBehaviour
                 break;
             case Mode.Charge:
                 BeginChargeGroup();
+                break;
+            case Mode.Raid:
+                _step = Step.Wait;   // 방전 요청이 있으면 다음 틱에 바로 예고
+                _t = 0f;
                 break;
         }
         Debug.Log($"[전기장판] 모드 {from} → {to}", this);
@@ -207,6 +250,7 @@ public sealed class BossElectricFloor : MonoBehaviour
 
     void Warn(ulong mask, float time)
     {
+        _fireDamage = _d.damage;   // 레이드 방전은 TickRaid 가 이 뒤에 덮어쓴다
         _step = Step.Warn;
         _t = time;
         _shown = true;
@@ -235,7 +279,7 @@ public sealed class BossElectricFloor : MonoBehaviour
             if (!BossPatternTargets.IsInvulnerable(p)) gauge++;
             // 출처 = 발 위치(맞은 타일). 보스 위치를 넘기면 보호막 파문 등이 보스 쪽에서 맞은 것처럼 보인다.
             Vector3 foot = BossPatternTargets.FootPosition(p);
-            BossPatternTargets.Damage(p, _d.damage, foot, _boss.transform);
+            BossPatternTargets.Damage(p, _fireDamage, foot, _boss.transform);
         }
         ServerFloorHit?.Invoke(gauge);
         Debug.Log($"[전기장판] 발동 {_mode}{(_mode == Mode.Charge ? $"/{_group}{(_bStage > 0 ? _bStage.ToString() : "")}" : "")} — " +
