@@ -26,8 +26,9 @@ public static class BossRaidVariantAuthoring
 
     // 인원 HP: 1인 기준 저작 + 배수. 목표 1인 5분 · 3인 7분(팀장 10-14)에서 DPS ∝ 인원으로 역산 → 1 / 2.4 / 4.2.
     // 3인 HP 가 기존 No23(10000)과 같아지도록 1인 = 10000 / 4.2 ≈ 2400. 전부 W4 실측으로 조정한다.
-    static readonly float[] PartyHpMultipliers = { 1f, 2.4f, 4.2f };
-    const float HpBaseDivisor = 4.2f;
+    // 10-14 팀장: "체력이 너무 적다" → 1인 ×1.2(2400→2880) · 3인 ×1.3(10080→13104) · 2인 ×1.25(5760→7200).
+    static readonly float[] PartyHpMultipliers = { 1f, 2.5f, 4.55f };
+    const int SoloMaxHp = 2880;
     const float HitCapRatio = 0.9f;
 
     // 웰즈 자막(초안 — 팀장 확인 전). id 는 BOSS_RAID_<BossPhaseSequence 이름>.
@@ -88,7 +89,7 @@ public static class BossRaidVariantAuthoring
         if (!AssetDatabase.CopyAsset(SrcDataPath, RaidDataPath)) { log.AppendLine("  ✗ 복제 실패"); return null; }
 
         var data = AssetDatabase.LoadAssetAtPath<BossDataSO>(RaidDataPath);
-        data.maxHp = Mathf.RoundToInt(src.maxHp / HpBaseDivisor / 100f) * 100;
+        data.maxHp = SoloMaxHp;
         data.partyHpMultipliers = (float[])PartyHpMultipliers.Clone();
         data.playerHitDamageCapRatio = HitCapRatio;
         data.raidScript = true;

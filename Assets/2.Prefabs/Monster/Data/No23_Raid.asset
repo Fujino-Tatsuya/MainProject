@@ -19,7 +19,7 @@ MonoBehaviour:
   chaseSpeed: 4
   attackSpeed: 1
   attackCooldown: 1
-  maxHp: 2400
+  maxHp: 2880
   defense: 0
   maxShield: 1000
   detectionRadius: 8
@@ -323,8 +323,8 @@ MonoBehaviour:
     speedMultiplier: 1.2
   partyHpMultipliers:
   - 1
-  - 2.4
-  - 4.2
+  - 2.5
+  - 4.55
   playerHitDamageCapRatio: 0.9
   raidScript: 1
   raidOpeningScript: 000000000100000005000000
