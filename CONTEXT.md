@@ -8,8 +8,11 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
-## ▶▶ 작업 세션 (2026-10-14 · 경석(Claude+Codex) · **보스·몬스터 전체 점검**, 브랜치 `feature/Boss23`) — 범위 = 23호(기존·레이드)·웰즈·장판·송전탑·디렉터 · 중간보스 3 · 일반 몬스터 · MonsterBase·간파·예고·투사체 등 공용 부품. 항목 = 버그·예외 경로 / 네트워크·권한 / 예고·판정 일치 / 문서·데이터 불일치. 처리 = 확실한 것은 바로 수정, 판단 필요한 것은 목록(팀장 10-14).
-- 🔴 **수정 예정 — 동시 수정 금지**: `Assets/1.Scripts/Monster/**` · `Map/BossEncounterDirector.cs` · 몬스터·보스 프리팹/SO(점검 결과에 따라 좁힘).
+## ▶▶ 다음 세션 (경석) — 팀장이 `feature/Boss23` Play 테스트 후 지시. 지금 상태 = 원격과 같음(`c475f5c0` 이후), SVN r434.
+- 테스트 대상: 레이드 ①~④(④ 실패 즉사기·자막 3종) · 점검 수정 17건 + P1(공격 슈퍼아머 해제)·P2(송전탑 상승 여유)·P3(레이지 예고)·P4(방전 유지) — 전부 **Play 미확인**.
+- 기획 메모 = [raid-23-phases.md](Docs/design/boss/raid-23-phases.md) 「추가할 것」 칸.
+
+## ▶▶ 작업 세션 (2026-10-14 · 경석(Claude+Codex) · **보스·몬스터 전체 점검** ✅ 완료(동시 수정 잠금 해제), 브랜치 `feature/Boss23`) — 범위 = 23호(기존·레이드)·웰즈·장판·송전탑·디렉터 · 중간보스 3 · 일반 몬스터 · MonsterBase·간파·예고·투사체 등 공용 부품. 항목 = 버그·예외 경로 / 네트워크·권한 / 예고·판정 일치 / 문서·데이터 불일치. 처리 = 확실한 것은 바로 수정, 판단 필요한 것은 목록(팀장 10-14).
 - ✅ ③ 2인 잡기 구출 팀장 Play 확인(10-14) — 레이드 4구간 전부 검증. 기존/레이드는 툴바로 계속 비교.
 - ✅ 점검 결과·수정 = [boss-monster-audit-1014.md](Docs/tech/boss-monster-audit-1014.md) · 수정 커밋 `b9280888`(확실한 버그 17건, 컴파일 0 · 전투 149/0 · 보스 패턴 10/0, ⏳ Play 미확인). 팀장 결정: P1(공격 슈퍼아머 공격 끝나면 해제)·P2(송전탑 상승 여유를 차징 대기에)·P3(레이지 띠 예고, 타이밍 유지)·P4(방전 중 제압 무시) 반영. WallBot·데이터 테이블·테스트 씬 = 안 함.
 
