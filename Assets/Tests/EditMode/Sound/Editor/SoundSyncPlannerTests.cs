@@ -311,4 +311,13 @@ public sealed class SoundSyncPlannerTests
         Assert.That(plan.Changes, Has.Some.Contains("loop 0 → 2"));
         Assert.That(plan.Changes, Has.Some.Contains("클립"));
     }
+
+    [Test]
+    public void MppmClonePath_IsDetected_SoAutoSyncSkipsIt()
+    {
+        Assert.That(SoundSyncMenu.IsMppmClone("C:/Proj/MainProject/Library/VP/mppm1a2b/Assets"), Is.True);
+        Assert.That(SoundSyncMenu.IsMppmClone(@"C:\Proj\MainProject\Library\VP\mppm1a2b\Assets"), Is.True);
+        Assert.That(SoundSyncMenu.IsMppmClone("C:/Proj/MainProject/Assets"), Is.False);
+        Assert.That(SoundSyncMenu.IsMppmClone(null), Is.False);
+    }
 }

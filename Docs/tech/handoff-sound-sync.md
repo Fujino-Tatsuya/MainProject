@@ -24,6 +24,11 @@
 - 🔴 **git pull 만 하고 SVN 업데이트를 안 하면** 옛 위치 파일이 사라져 `AudioManager` 의 카탈로그·BGM 이 비어 소리가 안 난다 → SVN 업데이트 필수.
 - 🔴 SVN 에 `Assets/51.Audio/Data` 와 `Data.meta` 를 **add + 커밋**해야 다른 PC 에 간다(에이전트 PC 에는 svn 명령줄이 없어 미실행).
 
+## Play·빌드 자동 동기화 (2026-10-14, 결정 C)
+- `DataSourcePlayMode.PrepareTablePlay` 맨 앞 · `DataTableBuild.WithTableValues` 맨 앞에서 `SoundSyncMenu.AutoSync` — 확인 없이 디스크에 쓰고 원복하지 않는다. 오류면 Play 취소·빌드 실패.
+- 테이블 모드에서만(인스펙터 모드는 xlsx 를 무시). MPPM 클론(`Library/VP/`)은 건너뛴다. xlsx 가 없으면 건너뛴다. 바꿀 것이 없으면 로그도 없다.
+- Verify 는 계속 읽기 전용 경고(`WarnIfPending`).
+
 ## 🔴 다음에 사람이 할 일
 1. SVN Get Lock → 로컬 `GameData.xlsx` 커밋(Sound 시트만 바뀜).
 2. `Tools/Data/사운드 동기화` → "바꿀 구조 없음" 이 나오면 정상.

@@ -100,3 +100,15 @@ S1 순수 계획 클래스 + 테스트 → S2 메뉴(생성·이동·쓰기) →
 - BroAudio 출력 폴더 `BroEditorSetting.asset` `AssetOutputPath` 를 새 경로로 — 안 바꾸면 Library Manager·사운드 동기화가 옛 위치(git 영역)에 다시 만든다.
 - 목적: xlsx·클립·엔티티·`SoundCatalog` 를 한 SVN 커밋으로 묶어 "PC 마다 엔티티가 따로 생기는" 위험을 없앤다. Play·빌드 자동 동기화는 아직 결정 전(검사만 자동 = 권장안 A).
 - 주의: SVN 은 git 브랜치와 따로 간다 — `SoundEntry` 구조(코드)를 바꾸는 작업은 development 반영 뒤 SVN 커밋.
+
+## 결정 변경 (2026-10-14) — Play·빌드 자동 동기화 = **C(전부 자동)**
+| 항목 | 결정 |
+|---|---|
+| Play | **테이블 모드 Play 진입 때** 확인 없이 동기화한다(`DataSourcePlayMode.PrepareTablePlay` 맨 앞 — 테이블 Load 가 늘어난 entries 를 보도록). 인스펙터 모드는 xlsx 를 무시하므로 하지 않는다 |
+| 빌드 | `DataTableBuild.WithTableValues` 맨 앞(Build 버튼·메뉴 빌드 공통). 테이블 적용·원복과 달리 **동기화 결과는 디스크에 남는다** |
+| 오류 | 동기화 오류가 하나라도 있으면 아무것도 쓰지 않고 **Play 진입 취소 / 빌드 실패** |
+| 변경 기록 | 대화상자 없이 Console 에 변경 목록. 바꿀 것이 없으면 조용히 지나간다 |
+| MPPM 클론 | 동기화하지 않는다(`Library/VP/` 아래에서 도는 클론은 메인과 같은 Assets 를 본다 — 메인이 쓴 결과를 읽는다) |
+| xlsx 없음 | 동기화를 건너뛴다(테이블 쪽 규칙대로 Play 는 SO 값, 빌드는 테이블이 멈춤) |
+| 수동 메뉴·Verify | 그대로(메뉴 = 확인 대화상자, Verify = 읽기 전용 경고) |
+- 받아들인 위험: Play·빌드만 해도 SVN 영역(`51.Audio/Data`)에 변경이 생길 수 있다. xlsx 를 고친 사람이 동기화 결과까지 한 SVN 커밋으로 올리는 규칙을 지키면 다른 PC 에선 "바꿀 것 없음" 으로 지나간다.
