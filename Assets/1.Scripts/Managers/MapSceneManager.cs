@@ -68,7 +68,7 @@ public class MapSceneManager : NemoSceneManager
     {
         if (AudioManager.Instance != null)
         {
-            AudioManager.Instance.PlayBGM(AudioManager.Instance.Catalog.InGameBGM);
+            AudioManager.Instance.PlayBGM("BGM_InGame");
         }
     }
 
