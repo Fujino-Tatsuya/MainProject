@@ -23,9 +23,22 @@ public static class BossAggroPolicy
         // 0 이하는 "끔"이다. 이 가드가 없으면 저작으로 껐을 때 매 틱 재선정이 돈다.
         if (interval <= 0f) return false;
 
-        // 교전 중 이동/대기 구간에서만. 나머지는 전부 커밋 구간이거나 타깃이 의미 없는 상태다.
-        if (state != MonsterState.Idle && state != MonsterState.Chase) return false;
+        if (!CanSwitchNow(state)) return false;
 
         return secondsSinceLastRetarget >= interval;
     }
+
+    /// <summary>
+    /// 어그로를 바꿔도 되는 상태인가 — 주기 재선정·위협 교체(<see cref="BossThreatTable"/>) 공통.
+    /// 교전 중 이동/대기 구간에서만. 나머지는 전부 커밋 구간이거나 타깃이 의미 없는 상태다.
+    /// </summary>
+    public static bool CanSwitchNow(MonsterState state) =>
+        state == MonsterState.Idle || state == MonsterState.Chase;
+
+    /// <summary>
+    /// 원거리 압박(PLAN-boss-aggro §3.3) — 어그로 대상이 이만큼 멀면 점프·돌진이 그 사람을 노리고,
+    /// 가중치를 올리고, 쿨을 줄인다. <paramref name="threshold"/> 0 이하 = 끔.
+    /// </summary>
+    public static bool IsFarPressure(float distToAggro, float threshold) =>
+        threshold > 0f && distToAggro >= threshold;
 }

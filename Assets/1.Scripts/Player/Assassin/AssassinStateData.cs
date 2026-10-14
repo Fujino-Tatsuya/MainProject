@@ -44,7 +44,7 @@ public sealed class AssassinStateData : ScriptableObject, ISkillTooltipSource
         basicAttackRageGain, dashStrikeRageGain, enhancedStrikeRageGain,
         transformRageDecayPerSecond, releaseLockSeconds);
 
-    public SkillTooltipText Tooltip => tooltip;
+    public SkillTooltipText Tooltip => tooltip.Keyed(this, nameof(tooltip));
     public Object TooltipValueSource => this;
 
     // 패시브 자체 피해는 없다(백어택 배율은 각 타격에 실린다 — A11).

@@ -439,22 +439,26 @@ public class BossDirectionIndicator : MonoBehaviour, IBossTelegraph
     /// 0 이면 지금까지처럼 면 전체를 균일하게 칠한다(방향 표식이 쓰는 경로 — 동작 불변).
     /// </param>
     /// <param name="interiorAlphaScale">윤곽선 모드에서 내부에 남길 알파 비율(0 = 완전히 빈 내부).</param>
+    /// <param name="reuse">같은 크기의 기존 텍스처가 있으면 새로 만들지 않고 덮어쓴다(공격 예고의 단계 굽기 — 할당 방지).</param>
     public static Texture2D BuildArcTexture(Color color, float halfAngleDeg, bool isBack,
                                             float inner, float outer, int size,
-                                            float rimWidth = 0f, float interiorAlphaScale = 0f)
+                                            float rimWidth = 0f, float interiorAlphaScale = 0f,
+                                            Texture2D reuse = null)
     {
-        var tex = new Texture2D(size, size, TextureFormat.RGBA32, false)
-        {
-            name = isBack ? "BossBackArcDecal" : "BossFrontArcDecal",
-            wrapMode = TextureWrapMode.Clamp,
-            filterMode = FilterMode.Bilinear,
-        };
+        Texture2D tex = reuse != null && reuse.width == size && reuse.height == size
+            ? reuse
+            : new Texture2D(size, size, TextureFormat.RGBA32, false)
+            {
+                name = isBack ? "BossBackArcDecal" : "BossFrontArcDecal",
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+            };
 
         float half = size * 0.5f;
         float radiusFeather = outer * (2f / size) * 2f;   // 약 2픽셀
         const float AngleFeather = 2f;                    // 도
 
-        var pixels = new Color32[size * size];
+        Color32[] pixels = PixelBuffer(size);
         for (int y = 0; y < size; y++)
         {
             for (int x = 0; x < size; x++)
@@ -496,6 +500,19 @@ public class BossDirectionIndicator : MonoBehaviour, IBossTelegraph
         tex.SetPixels32(pixels);
         tex.Apply(false, false);
         return tex;
+    }
+
+    static Color32[] _pixelBuffer;
+
+    /// <summary>
+    /// 절차 텍스처용 픽셀 버퍼(메인 스레드 전용, 공유). 굽기마다 256² 배열을 새로 잡던 할당을 없앤다.
+    /// 🔴 받은 직후 전부 덮어쓰고 SetPixels32 로 넘긴 뒤에는 들고 있지 말 것 — 다음 굽기가 같은 배열을 쓴다.
+    /// </summary>
+    public static Color32[] PixelBuffer(int size)
+    {
+        int n = size * size;
+        if (_pixelBuffer == null || _pixelBuffer.Length != n) _pixelBuffer = new Color32[n];
+        return _pixelBuffer;
     }
 
     void OnDestroy()

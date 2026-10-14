@@ -30,7 +30,7 @@ public class BossAttackEntry
     public bool ignoreDistanceWindow = false;
 
     [Tooltip("[S6] 이 공격이 노릴 대상. AggroTarget = 지금 어그로가 물린 대상, " +
-             "FarthestPlayer = 최원거리 플레이어(Jump 전용). " +
+             "FarthestPlayer = 최원거리 플레이어(Jump · Dash — 거리창을 끈 행에만, ignoreDistanceWindow). " +
              "🔴 '누가 맞는가'는 이걸로 안 정해진다 — 실제 피해는 히트박스·반경 판정이 따로 고른다. " +
              "이 값이 정하는 것은 보스가 어디를 노리고 어디로 가느냐다.")]
     public BossAttackTargeting attackTargeting = BossAttackTargeting.AggroTarget;
@@ -180,7 +180,7 @@ public class BossAttackEntry
 public enum BossAttackTargeting
 {
     AggroTarget,     // 지금 어그로가 물린 대상(base 의 _target)
-    FarthestPlayer,  // 최원거리 플레이어 — Jump 전용. 후열이 안전하게 딜하는 것을 응징한다
+    FarthestPlayer,  // 최원거리 플레이어 — Jump · Dash(G3). 후열이 안전하게 딜하는 것을 응징한다. 거리창을 끈 행에만
 }
 
 // 페이즈 진입 시 실행할 고정 시퀀스. [S7]
@@ -188,6 +188,11 @@ public enum BossPhaseSequence
 {
     None = 0,
     ChargeSequence = 1,  // 송전기(차징) 시퀀스 — 실패 시 레이지 돌진 3회
+
+    // ─── 레이드 변형 전용(PLAN-boss-raid.md §2) — No23_Raid.asset 의 phases 에만 넣는다. 기존 No23 은 안 쓴다.
+    RaidDroneCharge = 2,  // ② 전력 공급 — 드론 유도로 송전탑 파괴, 실패 = 방전 (W2)
+    RaidRescue = 3,       // ③ 새 가족 — 각본 잡기 구출(1인 = 간파 돌진) (W3)
+    RaidSelfDestruct = 4, // ④ 폐기 처분 — 자폭 카운트다운 + 공동 게이지 (W3)
 }
 
 // 페이즈 1행. hpThreshold 는 **내림차순**으로 저작한다(0.66 → 0.33).
@@ -256,6 +261,66 @@ public class BossDataSO : MonsterDataSO
         new BossPhaseEntry { hpThreshold = 0.33f, sequence = BossPhaseSequence.ChargeSequence, damageMultiplier = 1f, speedMultiplier = 1f },
     };
 
+    [Header("레이드 변형 (PLAN-boss-raid.md) — 기본값 = 꺼짐, 기존 No23 은 건드리지 않는다")]
+    [Tooltip("인원별 최대 HP 배수. [0] = 1인, [1] = 2인, [2] = 3인(넘으면 마지막 값). maxHp 는 **1인 기준**으로 저작한다.\n" +
+             "비우면 보정 없음(기존 동작). 인원 = 보스방 도착 시 생존 참가자(BossEncounterDirector 스냅샷).\n" +
+             "현재 No23_Raid = 1 / 2.5 / 4.55 · 1인 2880(팀장 10-14 '체력 적다' 상향). 처음엔 1인 5분 · 3인 7분 목표로 1 / 2.4 / 4.2 를 역산했다.")]
+    public float[] partyHpMultipliers = new float[0];
+
+    [Tooltip("이 보스와 싸우는 동안 플레이어가 한 번에 받는 피해의 상한(플레이어 최대 HP 비율). 0 = 상한 없음(기존 동작).\n" +
+             "0.9 = 체력이 가득 찬 상태에서 한 방에 죽지 않는다(팀장 10-14: 목숨 쓸 틈도 없이 즉사하는 경험 금지).")]
+    [Range(0f, 1f)] public float playerHitDamageCapRatio = 0f;
+
+    [Tooltip("레이드 각본 사용(①기동 시연·② 전력 공급 등). 꺼져 있으면 아래 레이드 칸은 전부 무시된다 — 기존 No23 = 꺼짐.")]
+    public bool raidScript = false;
+
+    [Tooltip("① 기동 시연 — 개전 직후 이 순서로 고정 시전(거리창은 지킨다, 밖이면 추격). 기본 = 훅 좌·우 → 간파 가능 돌진.\n" +
+             "교차 전기 장판은 ① 부터 나온다(팀장 10-14 — 처음엔 ① 동안 껐다).")]
+    public BossAttackId[] raidOpeningScript = { BossAttackId.LeftHook, BossAttackId.RightHook, BossAttackId.Dash };
+
+    [Tooltip("② 전력 공급 제한시간(초). 기존 송전기의 chargeTimeLimit 대신 쓴다.")]
+    [Min(1f)] public float raidChargeTimeLimit = 25f;
+
+    [Tooltip("② 전력 공급 중 드론 재지목 간격(초) — 평소 cooldown(7초) 대신. 짧을수록 유도 기회가 많다.")]
+    [Min(0f)] public float raidDroneGuideCooldown = 1.5f;
+
+    [Tooltip("② 실패 = 방전 예고 시간(초). 부순 송전탑 칸만 안전하다.")]
+    [Min(0.3f)] public float raidDischargeWarnTime = 2.5f;
+
+    [Tooltip("② 실패 = 방전 피해. 플레이어 최대 HP 220 기준 150 — 즉사 상한(0.9)과 별개로 '아프지만 산다' 수준.")]
+    [Min(0)] public int raidDischargeDamage = 150;
+
+    [Tooltip("② 전력 공급 때 올라오는 송전탑 최대 HP 배율. 송전탑 프리팹(bossroom) maxHp 200 × 2 = 400(팀장 10-14).\n" +
+             "기존 23호 송전기는 항상 1 — 같은 송전탑을 같이 쓰므로 프리팹 값은 바꾸지 않는다. 드론 표식은 배율과 무관하게 한 방.")]
+    [Min(0.01f)] public float raidPylonHpMultiplier = 2f;
+
+    [Header("레이드 ④ 폐기 처분 — 자폭 카운트다운 + 공동 게이지(간파 게이지 재사용)")]
+    [Tooltip("자폭까지 남은 시간(초). 이 안에 게이지를 0 으로 만들면 저지.")]
+    [Min(3f)] public float raidSelfDestructTime = 20f;
+
+    [Tooltip("게이지 100 → 0 에 필요한 플레이어 피해 합(1인 기준 — partyHpMultipliers 를 똑같이 곱한다).\n" +
+             "피해만으로 깰 수 있어야 한다(팀장 10-14). 1인 HP 2880 의 20% = 576 이 남은 시점이라 그보다 작게 둔다. 측정 플레이로 조정.")]
+    [Min(1)] public int raidSelfDestructGaugeDamage = 300;
+
+    [Tooltip("자폭 중 간파 성공 1회가 깎는 게이지(%p). 간파는 필수가 아니라 큰 보너스(팀장 10-14).")]
+    [Range(0f, 100f)] public float raidSelfDestructCounterBonus = 35f;
+
+    [Tooltip("자폭 중 간파 창이 열리는 간격(초)과 길이(초). 23호가 서 있기만 하므로 창을 따로 연다.")]
+    [Min(1f)] public float raidSelfDestructCounterInterval = 5f;
+    [Min(0.3f)] public float raidSelfDestructCounterWindow = 1.5f;
+
+    [Tooltip("자폭 중 보스 HP 피해 감소율(0~1). 0.9 = 플레이어 피해의 10% 만 HP 에 들어간다(팀장 10-14 — 게이지를 깎으면 체력까지 녹던 것).\n" +
+             "공동 게이지는 감소 **전** 피해로 깎인다. 1 = HP 무피해(한 대당 최소 1 은 들어간다).")]
+    [Range(0f, 1f)] public float raidSelfDestructDamageReduction = 0.9f;
+
+    [Tooltip("저지 실패 = 대폭발(방 전체). 예고 시간과 피해. 즉사기(아래)면 피해 값은 무시된다.")]
+    [Min(0.3f)] public float raidSelfDestructBlastWarn = 1.2f;
+    [Min(0)] public int raidSelfDestructBlastDamage = 190;
+
+    [Tooltip("저지 실패 대폭발을 즉사기로(한 방 상한 0.9 무시, 보호막 포함 전부). 팀장 10-14: 실패하기가 너무 어려워 즉사로.\n" +
+             "대시 무적 등 피격 무효는 그대로 통한다.")]
+    public bool raidSelfDestructBlastLethal = true;
+
     [Header("카운터 / 그로기 — maxGroggyCount·groggyDuration 은 base 필드 재사용")]
     [Tooltip("[S3] 카운터 성공으로 인정하는 정면 각도(도). 60 = 보스 정면 기준 ±60°. " +
              "헤드어택(은희) 구현 후 그쪽 판정으로 교체될 지점이다.")]
@@ -319,6 +384,36 @@ public class BossDataSO : MonsterDataSO
              "🔴 대안이 없으면(1대1) 자동으로 현행과 같아진다 — 켜도 회귀가 없다.\n" +
              "⚠️ 켜면 후열이 과하게 압박받을 수 있다. MPPM 으로 보고 정할 값이라 노브로 뺐다(2026-09-03).")]
     public bool aggroAvoidsRepeatTarget = false;
+
+    // ─── 위협 어그로 (PLAN-boss-aggro §3.1~3.3, 팀장 10-14) — 기존·레이드 공통 ───
+    [Header("위협 어그로 — 피해량 기반(PLAN-boss-aggro)")]
+    [Tooltip("위협 점수 사용. 끄면 위 '최근접 + 주기 재선정'만 돈다(이전 동작).\n" +
+             "점수 = 보스 HP 에 실제로 들어간 플레이어 피해(제압 ×1.2·④ 자폭 감소 반영 후). 간파·힐은 넣지 않는다(팀장 10-14).")]
+    public bool threatAggro = true;
+
+    [Tooltip("위협 점수 반감기(초). 작을수록 '방금 많이 때린 사람'에게 빨리 돈다.")]
+    [Min(0f)] public float threatHalfLife = 6f;
+
+    [Tooltip("1등이 현재 대상보다 이 배수 이상 앞서야 갈아탄다(비등하면 안 바꾼다 — WoW 원거리 130% 문턱과 같은 발상).")]
+    [Min(1f)] public float threatSwitchRatio = 1.3f;
+
+    [Tooltip("현재 대상을 문 뒤 최소 이 시간(초)은 위협으로 갈아타지 않는다.")]
+    [Min(0f)] public float threatMinHold = 4f;
+
+    [Tooltip("1등 점수가 이보다 낮으면 위협 교체를 하지 않는다(잽 몇 번에 휙휙 돌지 않게).\n" +
+             "아무도 이 점수를 못 넘으면 위 '최근접 + 주기 재선정'이 돈다(개전 직후·휴식 구간).")]
+    [Min(0f)] public float threatMinScore = 30f;
+
+    [Tooltip("원거리 압박 — 어그로 대상까지 이 거리(m) 이상이면 점프·돌진이 **어그로 대상**을 노리고(평소 = 최원거리),\n" +
+             "가중치 ×farPressureWeightMultiplier, 쿨 ×farPressureCooldownScale. 0 = 끔.\n" +
+             "기본 8m = 근접 공격 거리창 최대(4.4m)의 약 2배. 팀장 10-14: '원거리가 1등이면 거의 확실히 날아온다'.")]
+    [Min(0f)] public float farPressureDistance = 8f;
+
+    [Tooltip("원거리 압박 중 점프·돌진 가중치 배수.")]
+    [Min(1f)] public float farPressureWeightMultiplier = 4f;
+
+    [Tooltip("원거리 압박 중 점프·돌진 쿨 배수(0.5 = 점프 10→5초 · 돌진 5→2.5초, 팀장 10-14).")]
+    [Range(0.05f, 1f)] public float farPressureCooldownScale = 0.5f;
 
     [Tooltip("[S7] 송전기(차징) 전멸 성공 시의 전체 행동 불능 시간(초). 일반 카운터 그로기(groggyDuration)와 " +
              "따로 두는 이유 — 기믹을 깬 보상이라 카운터 한 번보다 길어야 손맛이 산다(팀장 확정 2026-09-03). " +

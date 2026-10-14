@@ -62,6 +62,7 @@ public class Player : Unit
     [DataTableIgnore] [SerializeField] private float platformGroundCheckDistance = 0.6f;
 
     private PlayerStateController stateController;
+    private readonly PlayerWallImpactTracker wallImpactTracker = new PlayerWallImpactTracker();   // [서버] 할 일 32
     private IPlayerBasicAttack defaultAttack;
     private PlayerMotor motor;
     private PlayerGroundingSensor groundingSensor;
@@ -348,6 +349,10 @@ public class Player : Unit
         UpdateOwnerReconciliationDiagnostics();
         TickServerHealthRegen();
 
+        if (IsServer)
+            wallImpactTracker.Tick(this, stateController.CurrentState == PlayerActionState.Knockback,
+                                   stateController.KnockbackDeceleration);
+
         if (IsNetworkActive &&
             !stateController.ShouldTickForNetwork(IsOwner, HasStateAuthority))
         {
@@ -467,6 +472,8 @@ public class Player : Unit
         bool accepted = stateController.BeginKnockback(direction, strength);
         if (!accepted)
             return;
+
+        wallImpactTracker.Begin(direction, strength);   // 할 일 32 — 벽 충돌 이벤트(서버)
 
         ApplyKnockbackClientRpc(direction, strength, CreateOwnerClientRpcParams());
     }
@@ -1679,6 +1686,9 @@ public class Player : Unit
         // 있고 이 메서드는 서버 전용 공격 판정에서만 불린다 — 리모트 클라에는 도착하지 않는다.
         // 그래서 여기서 쉴드 감소를 확인해 PlayerShieldVfx 가 전 피어로 퍼뜨리게 한다. (판정 영향 없음)
         int shieldBefore = CurrentShield;
+
+        // 레이드 보스전 한 방 즉사 금지(PLAN-boss-raid.md, 보스가 켤 때만 — 평소엔 Ratio 0 이라 그대로).
+        attackInfo.damage = BossRaidRules.CapHitDamage(attackInfo.damage, FinalMaxHp, PlayerHitDamageCap.Ratio);
 
         bool result = base.ReceiveAttack(attackInfo, hitContext);
         if (!result)

@@ -104,7 +104,7 @@ public class MonsterProjectile : NetworkBehaviour
                 if (hurtbox.ReceiveAttack(info, ctx))
                 {
                     if (_ballistic && _splashRadius > 0f)
-                        Detonate();
+                        Detonate(hbOwner);   // 직격 대상은 스플래시에서 뺀다 — 이중 피해 버그(10-13)
                     else
                         Despawn();
                 }
@@ -118,7 +118,7 @@ public class MonsterProjectile : NetworkBehaviour
             if (unit.ReceiveAttack(info, ctx))
             {
                 if (_ballistic && _splashRadius > 0f)
-                    Detonate();
+                    Detonate(unit);      // 직격 대상은 스플래시에서 뺀다
                 else
                     Despawn();
             }
@@ -158,11 +158,14 @@ public class MonsterProjectile : NetworkBehaviour
     }
 
     // 착탄 처리 — 스플래시 반경 내 타깃에 데미지(Unit당 1회) 후 디스폰.
-    void Detonate()
+    // 🔴 directHit = 직격으로 이미 맞은 대상. 예전엔 Clear() 뒤 스플래시가 그 대상을 **한 번 더** 때렸다
+    //    (직격 + 폭발 = 이중 피해, Explore·Codex 교차검증 10-13 · 팀장 수정 결정). 미리 넣어 두어 건너뛴다.
+    void Detonate(Unit directHit = null)
     {
         if (_splashRadius > 0f)
         {
             SplashHitUnits.Clear();
+            if (directHit != null) SplashHitUnits.Add(directHit);
             int count = Physics.OverlapSphereNonAlloc(transform.position, _splashRadius, SplashBuffer, _targetLayer, QueryTriggerInteraction.Collide);
             for (int i = 0; i < count; i++)
             {

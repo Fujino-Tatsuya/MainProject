@@ -421,3 +421,21 @@ MonoBehaviour:
     text: "\uB2E4\uC74C \uC5F0\uC2B5\uC744 \uC900\uBE44\uD569\uB2C8\uB2E4."
     durationSeconds: 3
     sfx: {fileID: 0}
+  - id: BOSS_RAID_OpeningDash
+    text: "\uB3CC\uC9C4\uC774 <b>\uD30C\uB797\uAC8C</b> \uBE5B\uB098\uBA74 <b>\uC815\uBA74</b>\uC5D0\uC11C
+      <b>\uC6B0\uD074\uB9AD</b>\uC73C\uB85C \uAC04\uD30C\uD558\uC138\uC694!"
+    durationSeconds: 4
+    sfx: {fileID: 0}
+  - id: BOSS_RAID_ChargeGuide
+    text: "\uB4DC\uB860 \uD45C\uC2DD\uC744 <b>\uC1A1\uC804\uD0D1 \uC704\uB85C</b>
+      \uB04C\uACE0 \uAC00\uC11C \uB5A8\uC5B4\uB728\uB9AC\uC138\uC694! \uC9C1\uC811
+      \uB54C\uB824\uB3C4 \uBD80\uC11C\uC9D1\uB2C8\uB2E4."
+    durationSeconds: 6
+    sfx: {fileID: 0}
+  - id: BOSS_RAID_SelfDestructGuide
+    text: "23\uD638\uAC00 <b>\uC790\uD3ED</b>\uC744 \uC900\uBE44\uD569\uB2C8\uB2E4!
+      <b>\uACF5\uACA9</b>\uD574\uC11C \uAC8C\uC774\uC9C0\uB97C \uBE44\uC6B0\uC138\uC694
+      \u2014 \uD30C\uB797\uAC8C \uBE5B\uB0A0 \uB54C <b>\uAC04\uD30C</b>\uD558\uBA74
+      \uD06C\uAC8C \uAE4E\uC785\uB2C8\uB2E4!"
+    durationSeconds: 6
+    sfx: {fileID: 0}

@@ -130,7 +130,7 @@ public static class PartyWipeRespawner
     {
         into.Clear();
         int ground = LayerMask.GetMask("Default", "Ground", "Env");
-        int obstacle = ground | LayerMask.GetMask("Wall");
+        int obstacle = ground | LayerMask.GetMask("Wall", "Barrier");   // 할 일 32 — 배리어는 Barrier 레이어
         IReadOnlyList<TutorialPadArea> pads = TutorialDeathRules.ServerPadAreas();
 
         foreach (BossEnterTrigger trigger in UnityEngine.Object.FindObjectsByType<BossEnterTrigger>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))

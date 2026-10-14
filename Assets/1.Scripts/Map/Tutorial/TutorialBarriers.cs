@@ -12,14 +12,14 @@ using UnityEngine.AI;
 /// · 만드는 시점 = <see cref="TutorialDirector.IsTutorialActive"/> 가 처음 true 로 보일 때(<see cref="TutorialDirector.StateChanged"/>).
 ///   튜토리얼이 아니면(디렉터 비활성) 만들지 않는다. 늦은 클라는 스폰 직후 StateChanged 에서 지금 열린 게이트를 그대로 반영한다.
 /// · 모양 = S2 구간(<see cref="TutorialAreaLayout"/>)의 복도 사각형 양 끝(<see cref="TutorialBarrierRules.BuildSpecs"/>).
-/// · 막기: 플레이어 = <b>Wall 레이어</b> 비트리거 BoxCollider — 플레이어 모터 스윕 마스크(PlayerGameRuleData.obstacleMask)에
-///   Wall 이 있다. 대시·이동 스킬·넉백도 같은 스윕을 탄다. 이동이 오너 권한이라 각 피어에 콜라이더가 있어야 한다.
-///   몬스터 = NavMeshObstacle 카브(ZoneBridgeGate 와 같은 설정). Wall 은 NavMesh 베이크 수집 레이어(Default·Ground)가 아니라
-///   재베이크(다리)에 섞이지 않는다.
+/// · 막기: 플레이어 = <b>Barrier 레이어</b>(할 일 32 — 전에는 Wall) 비트리거 BoxCollider — 플레이어 모터 스윕 마스크(PlayerGameRuleData.obstacleMask)에
+///   Barrier 가 있다. 대시·이동 스킬·넉백도 같은 스윕을 탄다. 이동이 오너 권한이라 각 피어에 콜라이더가 있어야 한다.
+///   몬스터 = NavMeshObstacle 카브(ZoneBridgeGate 와 같은 설정). Barrier 는 NavMesh 베이크 수집 레이어(Default·Ground·Wall)가 아니라
+///   재베이크(다리)에 섞이지 않는다. 벽이 아니라서 벽 충돌 이벤트(<see cref="UnitWallImpacts"/>)도 나지 않는다. Docs/tech/wall-concept.md
 /// · 열기: 콜라이더·카브를 즉시 끄고 짧게 페이드(실제 시간 — 슬로우모션 무관) 뒤 비활성.
 /// · 추락 복구: <see cref="PlayerSafePointTracker.ReturnPointFilter"/> 에 닫힌 배리어 너머 구간 · 그 클라이언트의 뒤 배리어 너머 제외를 건다(서버가 부른다).
 /// · 개인 뒤 배리어: 서버가 판정해 복제한 '지난 배리어' 마스크(<see cref="TutorialDirector.GetBackBarrierMask"/>)를 <b>로컬 플레이어</b> 값으로 읽어
-///   같은 자리에 Wall 콜라이더(카브 없음 — 몬스터는 안 막음)를 이 피어에서만 켠다. 이동이 오너 권한·오너 로컬 스윕이라 남의 플레이어엔 영향 없다.
+///   같은 자리에 Barrier 콜라이더(카브 없음 — 몬스터는 안 막음)를 이 피어에서만 켠다. 이동이 오너 권한·오너 로컬 스윕이라 남의 플레이어엔 영향 없다.
 ///   켤 때 로컬 플레이어와 겹치면 다음 프레임까지 미룬다. 튜토리얼 Finished 면 끈다(<see cref="TutorialBackBarrierRules"/>).
 /// </summary>
 [DisallowMultipleComponent]
@@ -239,7 +239,7 @@ public sealed class TutorialBarriers : MonoBehaviour
     // ─── 생성(런타임·에디터 미리보기 공용) ─────────────────────────────────
 
     /// <summary>
-    /// 배리어 오브젝트 하나 — Wall 레이어 큐브(BoxCollider 비트리거) + 카브 NavMeshObstacle + 반투명 머티리얼(색은 PropertyBlock).
+    /// 배리어 오브젝트 하나 — Barrier 레이어 큐브(BoxCollider 비트리거) + 카브 NavMeshObstacle + 반투명 머티리얼(색은 PropertyBlock).
     /// 바닥 높이 <paramref name="baseY"/> 에서 <paramref name="height"/> 만큼. <paramref name="carve"/> = false 면 NavMeshObstacle 없음(개인 뒤 배리어).
     /// </summary>
     public static GameObject CreateBarrierObject(TutorialBarrierSpec spec, Transform parent, float baseY, float height,
@@ -247,7 +247,7 @@ public sealed class TutorialBarriers : MonoBehaviour
     {
         GameObject go = GameObject.CreatePrimitive(PrimitiveType.Cube);
         go.name = $"Barrier_{spec.Gate}";
-        go.layer = LayerMask.NameToLayer("Wall");
+        go.layer = GameLayers.BarrierLayer;   // 할 일 32 — 벽(Wall)이 아니다: 막기는 같고 벽 충돌 이벤트·NavMesh 베이크에서 빠진다
         go.transform.SetParent(parent, false);
 
         spec.Rect.GetWorldBounds(out float minX, out float minZ, out float maxX, out float maxZ);

@@ -34,7 +34,10 @@ public sealed class PlayerLifeInputPolicy : MonoBehaviour
             lifeCycle.GameplayAccessChanged += HandleGameplayAccessChanged;
 
         if (encounterLock != null)
+        {
             encounterLock.CinematicLockChanged += HandleCinematicLockChanged;
+            encounterLock.CinematicHiddenChanged += HandleCinematicLockChanged;
+        }
     }
 
     private void Start()
@@ -48,7 +51,10 @@ public sealed class PlayerLifeInputPolicy : MonoBehaviour
             lifeCycle.GameplayAccessChanged -= HandleGameplayAccessChanged;
 
         if (encounterLock != null)
+        {
             encounterLock.CinematicLockChanged -= HandleCinematicLockChanged;
+            encounterLock.CinematicHiddenChanged -= HandleCinematicLockChanged;
+        }
     }
 
     private void HandleGameplayAccessChanged(PlayerLifeGameplayAccess access)
@@ -75,8 +81,9 @@ public sealed class PlayerLifeInputPolicy : MonoBehaviour
         if (player == null || !player.IsInputSource || inputReader == null)
             return;
 
-        // 연출 잠금은 생명주기 허용값 위에 덮어쓰는 추가 차단이다(둘 중 하나라도 막으면 막힌다).
-        bool cinematicLocked = encounterLock != null && encounterLock.IsCinematicLocked;
+        // 연출 잠금·숨김은 생명주기 허용값 위에 덮어쓰는 추가 차단이다(하나라도 막으면 막힌다).
+        bool cinematicLocked = encounterLock != null &&
+            (encounterLock.IsCinematicLocked || encounterLock.IsCinematicHidden);
         bool allowsMovement = access.AllowsMovement && !cinematicLocked;
         bool allowsCombatInput = access.AllowsCombatInput && !cinematicLocked;
 

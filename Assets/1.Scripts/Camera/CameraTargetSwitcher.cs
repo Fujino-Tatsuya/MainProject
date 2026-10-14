@@ -50,9 +50,12 @@ public class CameraTargetSwitcher : MonoBehaviour
     private Quaternion fixedCameraRotation;
     private bool hasFixedCameraRotation;
     private PlayerLifeCycleController ownerLifeCycle;
+    // 연출용 임시 추적 대상(보스 엘리베이터 칸). 있는 동안 플레이어 vcam 의 Follow 를 이것이 쥔다.
+    private Transform temporaryFollow;
 
     public bool IsInFallView { get; private set; }
     public bool IsSpectatorMode { get; private set; }
+    public bool HasTemporaryFollow => temporaryFollow != null;
 
     private void Awake()
     {
@@ -273,6 +276,49 @@ public class CameraTargetSwitcher : MonoBehaviour
         appliedZoomMultiplier = multiplier;
     }
 
+    /// <summary>
+    /// 연출 동안 플레이어 vcam 이 <paramref name="target"/> 을 따라가게 한다(보스 엘리베이터 상승 — 칸).
+    /// 추적 대상 목록·<see cref="CurrentFollowTarget"/>(포그·벽 가림 기준)은 그대로 플레이어다. 낙하 뷰 중이면 플레이어 뷰로 돌린다.
+    /// </summary>
+    public void SetTemporaryFollow(Transform target)
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        EnsureCameraRig();
+        if (playerCamera == null)
+        {
+            return;
+        }
+
+        temporaryFollow = target;
+        playerCamera.Follow = target;
+        if (IsInFallView)
+        {
+            ReturnToPlayerView();
+        }
+    }
+
+    /// <summary>임시 추적을 끝내고 현재 대상(플레이어·관전 대상)으로 컷 복귀한다 — 그 사이 순간이동한 대상까지 쓸고 지나가지 않게.</summary>
+    public void ClearTemporaryFollow()
+    {
+        if (temporaryFollow == null)
+        {
+            return;
+        }
+
+        temporaryFollow = null;
+        if (playerCamera == null)
+        {
+            return;
+        }
+
+        playerCamera.Follow = GetCurrentTarget();
+        playerCamera.PreviousStateIsValid = false;
+    }
+
     public void SwitchToNextTarget()
     {
         SwitchTarget(1);
@@ -375,7 +421,9 @@ public class CameraTargetSwitcher : MonoBehaviour
 
         currentTargetIndex = targetIndex;
         Transform target = cameraFollowTargets[currentTargetIndex];
-        playerCamera.Follow = target;
+        // 임시 추적 중엔 대상만 바꿔 두고 화면은 연출을 유지한다 — ClearTemporaryFollow 가 이 대상으로 돌아온다.
+        if (temporaryFollow == null)
+            playerCamera.Follow = target;
         floatFollowTarget?.SetSource(target);
         ClearLookAtTarget(playerCamera);
         RestoreFixedCameraRotation();

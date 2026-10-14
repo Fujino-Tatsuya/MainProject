@@ -22,7 +22,9 @@ public enum FloatingDamageDisplayFilter
 {
     AllDamage,
     OwnDealtOnly,
-    AllWithOwnEmphasis
+    AllWithOwnEmphasis,
+    // 🔴 끝에만 추가한다 — SO 에 정수로 직렬화된다. 설정창 "끄기"(PLAN-settings S8, 10-12).
+    Off
 }
 
 public readonly struct FloatingDamageDisplayDecision
@@ -50,6 +52,9 @@ public static class FloatingDamageDisplayPolicy
     {
         switch (filter)
         {
+            case FloatingDamageDisplayFilter.Off:
+                return new FloatingDamageDisplayDecision(false, 1f, 1f);
+
             case FloatingDamageDisplayFilter.OwnDealtOnly:
                 return new FloatingDamageDisplayDecision(fromLocalPlayer, 1f, 1f);
 
@@ -236,7 +241,8 @@ public sealed class FloatingDamageSettings : ScriptableObject
         new FloatingPopupStyle(PopupKind.Text, Color.white, 30f)
     };
 
-    public FloatingDamageDisplayFilter DisplayFilter => displayFilter;
+    // 설정창 값이 있으면 그것, 없으면 이 SO 의 저작값(PLAN-settings S8). 소비처 3곳이 전부 이 속성만 읽는다.
+    public FloatingDamageDisplayFilter DisplayFilter => GameplayConfig.DamageNumbers(displayFilter);
     public float TeammateScaleMultiplier => teammateScaleMultiplier;
     public float TeammateAlpha => teammateAlpha;
     public Vector2 ReferenceResolution => referenceResolution;

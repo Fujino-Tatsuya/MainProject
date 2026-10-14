@@ -51,8 +51,8 @@ public class GunnerBasicAttackData : ScriptableObject
     [Tooltip("대상 마스크 — 기본값 = Enemy·Projectile·EnemyHurtBox(가붕이 평타와 같음).")]
     [SerializeField] private LayerMask hittableLayers = 17664;
 
-    [Tooltip("지형 마스크 — 여기에 먼저 닿으면 그 지점에서 판정 종료. 기본값 = Default·Wall·Env.")]
-    [SerializeField] private LayerMask blockingLayers = 2177;
+    [Tooltip("지형 마스크 — 여기에 먼저 닿으면 그 지점에서 판정 종료. 기본값 = Default·Wall·Env·Barrier(할 일 32).")]
+    [SerializeField] private LayerMask blockingLayers = 1050753;
 
     [Tooltip("적중 시 적중 전 보너스(패시브·빌드)를 받을지.")]
     [SerializeField] private bool triggersOnHit = true;

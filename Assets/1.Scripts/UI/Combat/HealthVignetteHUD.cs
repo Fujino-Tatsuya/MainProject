@@ -89,10 +89,34 @@ public class HealthVignetteHUD : MonoBehaviour
             return;
 
         image.raycastTarget = false;
-        if (vignetteSprite == null)
-            generatedSprite = VignetteSpriteFactory.CreateRadial(
-                "HealthVignette_Generated", fallbackTextureSize, fallbackInnerRadius, fallbackOuterRadius);
-        image.sprite = vignetteSprite != null ? vignetteSprite : generatedSprite;
+        if (vignetteSprite != null)
+            image.sprite = vignetteSprite;
+        else
+            RefreshGeneratedSprite();
+    }
+
+    // 설정창 그래픽 탭 "비네트 크기/경계"(팀장 10-13 — 안개 시야 디밍과 같이 조절). 코드로 만든 텍스처일 때만 적용된다.
+    // 크기 = 어두운 테두리 크기(클수록 테두리가 안쪽까지 — 투명 반경 × 1/크기, 안개 시야와 같은 방향), 경계 = 투명→불투명 폭 배율.
+    // ⚠️ 10-13 정정: 처음엔 투명 반경에 크기를 그대로 곱해 "줄이면 테두리가 커지는" 반대 방향이었다.
+    private float appliedSizeScale = -1f;
+    private float appliedFadeScale = -1f;
+
+    private void RefreshGeneratedSprite()
+    {
+        if (vignetteSprite != null || image == null)
+            return;
+
+        float size = GraphicsQualityConfig.VignetteOpenScale;
+        float fade = GraphicsQualityConfig.VignetteFadeScale;
+        if (generatedSprite != null && Mathf.Approximately(size, appliedSizeScale) && Mathf.Approximately(fade, appliedFadeScale))
+            return;
+
+        appliedSizeScale = size;
+        appliedFadeScale = fade;
+        VignetteSpriteFactory.ApplySettings(fallbackInnerRadius, fallbackOuterRadius, out float inner, out float outer);
+        VignetteSpriteFactory.Destroy(generatedSprite);
+        generatedSprite = VignetteSpriteFactory.CreateRadial("HealthVignette_Generated", fallbackTextureSize, inner, outer);
+        image.sprite = generatedSprite;
     }
 
     private void OnEnable()
@@ -125,6 +149,7 @@ public class HealthVignetteHUD : MonoBehaviour
 
     private void Update()
     {
+        RefreshGeneratedSprite();   // 설정값이 바뀐 프레임에만 다시 만든다
         // 게임 시간으로 돈다 — 인터럽트 슬로우(전역 timeScale) 동안 비네팅 연출도 같이 느려진다(PLAN-interrupt-slowmo D9).
         Apply(Time.deltaTime);
     }

@@ -95,7 +95,7 @@ public class NetworkSessionLauncher : MonoBehaviour
         if (!TryGetProvider(out var provider, out var failureResult))
         {
             NetworkDiagnosticsLog.LogWarning(
-                $"{DiagTag}.StartHostAsync", $"프로바이더 없음 reason='{failureResult.FailureReason}'");
+                $"{DiagTag}.StartHostAsync", $"프로바이더 없음 error='{failureResult.Error.LogText}'");
             return failureResult;
         }
 
@@ -103,7 +103,7 @@ public class NetworkSessionLauncher : MonoBehaviour
         NetworkDiagnosticsLog.Log(
             $"{DiagTag}.StartHostAsync",
             $"prepare success={prepareResult.Success} shareCode='{prepareResult.ShareCode}' " +
-            $"reason='{prepareResult.FailureReason}'");
+            $"error='{prepareResult.Error.LogText}'");
         if (!prepareResult.Success)
         {
             return prepareResult;
@@ -113,7 +113,7 @@ public class NetworkSessionLauncher : MonoBehaviour
         NetworkDiagnosticsLog.Log($"{DiagTag}.StartHostAsync", $"end started={started}");
         return started
             ? SessionStartResult.Succeeded(prepareResult.ShareCode)
-            : SessionStartResult.Failed("Host 시작에 실패했습니다. 포트가 이미 사용 중인지 확인하세요.");
+            : SessionStartResult.Failed(ErrorCatalog.NetHostStartFailed);
     }
 
     public async Task<SessionStartResult> StartClientAsync(
@@ -126,14 +126,14 @@ public class NetworkSessionLauncher : MonoBehaviour
         if (!TryGetProvider(out var provider, out var failureResult))
         {
             NetworkDiagnosticsLog.LogWarning(
-                $"{DiagTag}.StartClientAsync", $"프로바이더 없음 reason='{failureResult.FailureReason}'");
+                $"{DiagTag}.StartClientAsync", $"프로바이더 없음 error='{failureResult.Error.LogText}'");
             return failureResult;
         }
 
         var prepareResult = await PrepareClientAsync(provider, joinInput, cancellationToken);
         NetworkDiagnosticsLog.Log(
             $"{DiagTag}.StartClientAsync",
-            $"prepare success={prepareResult.Success} reason='{prepareResult.FailureReason}'");
+            $"prepare success={prepareResult.Success} error='{prepareResult.Error.LogText}'");
         if (!prepareResult.Success)
         {
             return prepareResult;
@@ -143,7 +143,7 @@ public class NetworkSessionLauncher : MonoBehaviour
         NetworkDiagnosticsLog.Log($"{DiagTag}.StartClientAsync", $"end started={started}");
         return started
             ? SessionStartResult.Succeeded(prepareResult.ShareCode)
-            : SessionStartResult.Failed("Client 시작에 실패했습니다.");
+            : SessionStartResult.Failed(ErrorCatalog.NetClientStartFailed);
     }
 
     public void BeginHost()
@@ -324,16 +324,16 @@ public class NetworkSessionLauncher : MonoBehaviour
         if (provider == null)
         {
             failureResult = SessionStartResult.Failed(
-                $"{Mode} 연결 방식의 프로바이더가 등록되지 않았습니다.");
+                ErrorCatalog.NetProviderMissing, ErrorDisplay.Arg("mode", Mode.ToString()));
             return false;
         }
 
-        if (!provider.IsAvailable(out var unavailableReason))
+        if (!provider.IsAvailable(out var unavailable))
         {
             NetworkDiagnosticsLog.LogWarning(
                 $"{DiagTag}.TryGetProvider",
-                $"mode={Mode} 사용 불가 reason='{unavailableReason}'");
-            failureResult = SessionStartResult.Failed(unavailableReason);
+                $"mode={Mode} 사용 불가 error='{unavailable.LogText}'");
+            failureResult = SessionStartResult.Failed(unavailable);
             return false;
         }
 
@@ -354,12 +354,12 @@ public class NetworkSessionLauncher : MonoBehaviour
         catch (OperationCanceledException)
         {
             NetworkDiagnosticsLog.LogWarning($"{DiagTag}.PrepareHostAsync", "취소되었습니다.");
-            return SessionStartResult.Failed("세션 시작이 취소되었습니다.");
+            return SessionStartResult.Failed(ErrorCatalog.NetStartCanceled);
         }
         catch (Exception exception)
         {
             NetworkDiagnosticsLog.LogError($"{DiagTag}.PrepareHostAsync", $"예외 {exception}");
-            return SessionStartResult.Failed($"세션 연결 준비에 실패했습니다: {exception.Message}");
+            return SessionStartResult.Failed(ErrorCatalog.NetPrepareFailed, detail: exception.Message);
         }
     }
 
@@ -375,12 +375,12 @@ public class NetworkSessionLauncher : MonoBehaviour
         catch (OperationCanceledException)
         {
             NetworkDiagnosticsLog.LogWarning($"{DiagTag}.PrepareClientAsync", "취소되었습니다.");
-            return SessionStartResult.Failed("세션 시작이 취소되었습니다.");
+            return SessionStartResult.Failed(ErrorCatalog.NetStartCanceled);
         }
         catch (Exception exception)
         {
             NetworkDiagnosticsLog.LogError($"{DiagTag}.PrepareClientAsync", $"예외 {exception}");
-            return SessionStartResult.Failed($"세션 연결 준비에 실패했습니다: {exception.Message}");
+            return SessionStartResult.Failed(ErrorCatalog.NetPrepareFailed, detail: exception.Message);
         }
     }
 
@@ -399,12 +399,12 @@ public class NetworkSessionLauncher : MonoBehaviour
         catch (Exception exception)
         {
             Debug.LogError($"[SceneFlow] NetworkSessionLauncher 세션 시작 중 예외: {exception}", this);
-            result = SessionStartResult.Failed($"세션 시작 중 예외가 발생했습니다: {exception.Message}");
+            result = SessionStartResult.Failed(ErrorCatalog.NetStartException, detail: exception.Message);
         }
 
         NetworkDiagnosticsLog.Log(
             $"{DiagTag}.CompleteSessionStartAsync",
-            $"success={result.Success} shareCode='{result.ShareCode}' reason='{result.FailureReason}'");
+            $"success={result.Success} shareCode='{result.ShareCode}' error='{result.Error.LogText}'");
 
         try
         {

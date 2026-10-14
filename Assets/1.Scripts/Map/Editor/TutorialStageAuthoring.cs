@@ -106,7 +106,10 @@ public static class TutorialStageAuthoring
             var cornerLog = new List<string>();
             foreach (MeshFilter f in filters)
             {
-                f.gameObject.layer = 0;   // 본맵 벽과 같은 Default — 플레이어 장애물 마스크 ∩ NavMesh 베이크(Default+Ground)
+                // 할 일 32 벽 개념 — 벽 = Wall 레이어(플레이어 장애물 마스크 ∩ NavMesh 베이크 Default+Ground+Wall). 예전엔 Default 였다.
+                // 태그는 건드리지 않는다(사용자가 프리팹에서 Wall 태그를 단다 — Docs/tech/wall-concept.md).
+                int wallLayer = LayerMask.NameToLayer(GameLayers.Wall);
+                f.gameObject.layer = wallLayer >= 0 ? wallLayer : 0;
                 Bounds mb = f.sharedMesh.bounds;
                 if (IsCorner(f.transform) && IsLShaped(mb, thickness))
                 {

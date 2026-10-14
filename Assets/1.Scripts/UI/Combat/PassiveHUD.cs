@@ -9,6 +9,9 @@ using UnityEngine.UI;
 /// </summary>
 public class PassiveHUD : MonoBehaviour
 {
+    /// <summary>툴팁 이벤트 인자 — 튜토리얼 판정(<c>TutorialZone1Model.PassiveTooltipKey</c>)과 같아야 한다. 화면 배지는 <see cref="SkillTooltipView.KeyBadgeText"/> 가 번역한다.</summary>
+    public const string DisplayKey = "Passive";
+
     [Tooltip("남은 쿨다운 비율만큼 덮는 Filled 타입 오버레이 (스킬 쿨타임 HUD와 동일).")]
     [SerializeField] private Image cooldownFill;
 
@@ -43,7 +46,7 @@ public class PassiveHUD : MonoBehaviour
             tooltipSource,
             PlayerSkillSlot.Main,
             acceptsLeftClick: false,
-            displayKey: "Passive",
+            displayKey: DisplayKey,
             cooldownSeconds: passive != null ? passive.CooldownTime : (float?)null,
             fallbackIcon: icon != null ? icon.sprite : null);
         Refresh();

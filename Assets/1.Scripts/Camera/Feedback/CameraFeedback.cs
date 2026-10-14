@@ -168,6 +168,8 @@ public sealed class CameraFeedback : MonoBehaviour
         float minInterval,
         ref float lastTriggeredTime)
     {
+        // 설정창 화면 흔들림 배율(0~1, PLAN-settings S9). 흔들림은 전부 이 함수 하나로 나간다.
+        amplitude *= GameplayConfig.ScreenShake;
         if (!isActiveAndEnabled || source == null || amplitude <= 0f)
             return;
 

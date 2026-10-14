@@ -27,6 +27,7 @@ MonoBehaviour:
   attackRange: 2
   leashRadius: 15
   retargetInterval: 0
+  loseTargetRadius: 9.6
   returnSpeedMultiplier: 5
   turnSpeed: 10
   avoidanceRadius: 0.3
@@ -61,6 +62,8 @@ MonoBehaviour:
   locomotionFullBlendSpeed: 2
   locomotionIdleCycleSeconds: 6.3333335
   locomotionMoveCycleSeconds: 0.53333336
+  locomotionFullBlendWhileMoving: 0
   locomotionAnimSpeedRange: {x: 0.5, y: 2.5}
   locomotionPlaybackScale: 0.9
   animatorControllerOverride: {fileID: 0}
+  telegraphStyle: {fileID: 11400000, guid: 92c647bea0fdba64c89c3179e14ac3e9, type: 2}

@@ -99,7 +99,7 @@ public sealed class TutorialDeathRules : MonoBehaviour
         _model = new TutorialDeathRulesModel(reviveDelaySeconds);
         _finished = false;
         _groundMask = LayerMask.GetMask("Default", "Ground", "Env");
-        _obstacleMask = _groundMask | LayerMask.GetMask("Wall");
+        _obstacleMask = _groundMask | LayerMask.GetMask("Wall", "Barrier");   // 할 일 32 — 배리어는 Barrier 레이어
 
         PlayerLifeCycleController.ServerLifeStateChanged += HandleServerLifeStateChanged;
         _nm.OnClientDisconnectCallback += HandleClientDisconnected;

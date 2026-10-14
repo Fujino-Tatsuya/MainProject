@@ -18,6 +18,46 @@ Update this file when a term becomes important enough that future agents or team
 - 수정 범위: 신규 바닥 FBX·공유 아틀라스 v006·전용 머티리얼 추가, `Art/lobby.unity` 및 로비 건축/Complete 프리팹의 8개 바닥 참조. 기존 바이너리·GUID·배치·콜라이더 보존.
 - 현재 열린 씬의 저장 전 상태를 별도 백업한 뒤 에디터에서 반영. 검수 기록: `D:/p_MT/lobby/aiworkspace/90_조립검수/v020/validation`.
 - 완료: 시멘트 아틀라스 v006·바닥 v004 추가, 연습장 8개 씬/프리팹 교체 및 저장. 사용자 작업 중 추가한 프랍도 보존. 배치/콜라이더/UV2 검증 통과, Unity Scene View 확인 완료(Play 검증은 미수행).
+## ▶▶ 작업 세션 (2026-10-14 · 경석(Claude) · **23호 위협 어그로 + 일반 몬스터 추적 해제**, 브랜치 `feature/Boss23`) — 계획 [PLAN-boss-aggro.md](PLAN-boss-aggro.md) ✅ 승인(10-14) · ✅ 구현·커밋 · 컴파일 error CS 0 · 전투 EditMode 176/0(신규 27) · 보스 패턴 10/0 · ✅ 팀장 Play 확인(10-14)
+- 정정: Gauntlet·Spinner·WallBot 은 중간보스(`rank 1`)라 `loseTargetRadius` 0 — 적용 = 일반 7종.
+- `MonsterDataSO.loseTargetRadius`·`BossDataSO.threat*`·`farPressure*` 는 xlsx 에 행이 없어 SO 값으로 돈다(테이블 반영은 병합 Export 때).
+- `169da399`: 레이드 장판 상시화(①③ 교차 · ②④ A/B · 간격 4.2초) · ④ 자폭 HP 피해 90% 감소 · ② 송전탑 HP ×2. 이어서 ④ 자폭 30초 · 게이지 750(1인, 300 → 750 — 팀장 "너무 빨리 파훼").
+- ✅ 동시 수정 잠금 해제(10-14 커밋·푸시). 고친 곳: `Monster/Boss/TwentyThreeBoss.cs` · `BossAggroPolicy.cs` · `BossDataSO.cs` · 신규 `BossThreatTable.cs` · `Monster/MonsterBase.cs` · `MonsterDataSO.cs` · `MonsterPerceptionPolicy.cs` · `2.Prefabs/Monster/Data/` 일반 몬스터 7종 `.asset` · 테스트.
+
+## ▶▶ 다음 세션 (경석) — 팀장이 `feature/Boss23` Play 테스트 후 지시. 지금 상태 = development 에 병합·푸시(10-14), SVN **r438**(핀 438 — r437 은희 로컬라이징 Export · r438 레이드 자폭 30·750 셀).
+- ✅ 10-14 `origin/development`(사운드 동기화 5커밋, PR #31·#32) 병합 — 충돌은 이 파일만. 사운드 데이터가 SVN 으로 이동해 **`Assets/51.Audio` 를 `^/4_Resources/Sound` r436 으로 체크아웃**(이 PC 는 처음, 이전엔 빈 폴더). 옮겨진 13개 .meta guid 동일 · 컴파일 error CS 0 · ⏳ BGM·UI_Click Play 청취 미확인.
+- 테스트 대상: 레이드 ①~④(④ 실패 즉사기·자막 3종) · 점검 수정 17건 + P1(공격 슈퍼아머 해제)·P2(송전탑 상승 여유)·P3(레이지 예고)·P4(방전 유지) — 전부 **Play 미확인**.
+- 기획 메모 = [raid-23-phases.md](Docs/design/boss/raid-23-phases.md) 「추가할 것」 칸.
+
+## ▶▶ 작업 세션 (2026-10-14 · 경석(Claude+Codex) · **보스·몬스터 전체 점검** ✅ 완료(동시 수정 잠금 해제), 브랜치 `feature/Boss23`) — 범위 = 23호(기존·레이드)·웰즈·장판·송전탑·디렉터 · 중간보스 3 · 일반 몬스터 · MonsterBase·간파·예고·투사체 등 공용 부품. 항목 = 버그·예외 경로 / 네트워크·권한 / 예고·판정 일치 / 문서·데이터 불일치. 처리 = 확실한 것은 바로 수정, 판단 필요한 것은 목록(팀장 10-14).
+- ✅ ③ 2인 잡기 구출 팀장 Play 확인(10-14) — 레이드 4구간 전부 검증. 기존/레이드는 툴바로 계속 비교.
+- ✅ 점검 결과·수정 = [boss-monster-audit-1014.md](Docs/tech/boss-monster-audit-1014.md) · 수정 커밋 `b9280888`(확실한 버그 17건, 컴파일 0 · 전투 149/0 · 보스 패턴 10/0, ⏳ Play 미확인). 팀장 결정: P1(공격 슈퍼아머 공격 끝나면 해제)·P2(송전탑 상승 여유를 차징 대기에)·P3(레이지 띠 예고, 타이밍 유지)·P4(방전 중 제압 무시) 반영. WallBot·데이터 테이블·테스트 씬 = 안 함.
+
+## ▶▶ 작업 세션 (2026-10-14~ · 경석(Claude) · **23호 레이드 변형(지스타)**, 브랜치 `feature/Boss23`) — 계획 [PLAN-boss-raid.md](PLAN-boss-raid.md) ✅ 승인(10-14) · W1 진행 · 회의 기록 [raid-rework-meeting-1014.md](Docs/design/boss/raid-rework-meeting-1014.md)
+- ✅ W1 `b9be4190`: 변형 프리팹·데이터·툴바 "보스: 기존/레이드"(에디터 툴바 우클릭 → Dev/Boss Variant 체크해야 보일 수 있음)·구간 예약 큐·인원 HP·즉사 상한·웰즈 자막. 저작 = `Tools/Boss/레이드 변형 — 만들기`.
+- ✅ 10-14 `origin/development`(44커밋: 튜토리얼 구간 스킵 Alt+1~0 · MapScene 그룹 6개·매니저 13개 프리팹화 · 거너 회전 잠금 · 에임 3D) 병합 + SVN **r434**(핀 434). MapScene 충돌 22곳은 **dev 씬 기준 + 우리 설정창 변경(옛 77블록 삭제·새 2블록·OptionPanel 자식)만 재적용**으로 해결(끊긴 참조 0). `raidBossPrefab` 은 매니저 프리팹 `Managers/BossEncounterDirector.prefab` 에 연결.
+- ✅ 10-14 W2 `ec1985d8` · W3 `485b3f16` · 전투 기록 로그 `35bfffd5` · HP 상향 `f25f4c45` — **각본 4구간 조합 완료**(팀장 Play: ①~④·엔딩·방전 안전 칸 확인). 1인 2880 / 2인 7200 / 3인 13104.
+  ⏳ 남은 것: 측정 플레이(`[23호/전투기록]` 로그 — 기존 vs 레이드 · 1/2/3인) → 수치 조정 · 빌드 기본 보스 결정(지금 빌드는 항상 기존). 2인 MPPM 의 ③ 잡기 구출은 아직 Play 미확인.
+- 로아 발탄·쿠크식 구간 각본 4개(기동 시연 · 드론 유도 송전 · 구출 · 자폭 공동 게이지).
+- 📄 **구간별 진행 설명(기획용, 팀장이 「추가할 것」 칸에 덧붙임)** = [raid-23-phases.md](Docs/design/boss/raid-23-phases.md). 10-14 추가 변경: ④ 실패 = 즉사기 · 자막은 규칙 안내 3종만. **기존 23호(`TwentyThree.prefab`·`No23.asset`)는 그대로**, 변형(`TwentyThree_Raid`·`No23_Raid`) 추가 후 비교.
+- 🔴 **수정 예정 — 동시 수정 금지**: `Monster/Boss/TwentyThreeBoss.cs` · `BossDataSO.cs` · `WellsDroneAttack.cs` · `BossChargingPylon.cs` · `BossElectricFloor.cs` · `Map/BossEncounterDirector.cs` · `4.MapScene.unity`(BossEncounterDirector 칸만) · 신규 `TwentyThree_Raid.prefab`·`No23_Raid.asset`.
+
+## ▶▶ 작업 세션 (2026-10-13 · 경석(Claude) · **공격 예고 색·마스크 + 일반 몹 예고(Chomp·Humanoid·Mortar)**, 브랜치 `feature/Boss23`) — 계획 [PLAN-telegraph-style.md](PLAN-telegraph-style.md) · [PLAN-monster-tells.md](PLAN-monster-tells.md) ✅ 완료·팀장 확인 · 커밋·푸시(동시 수정 잠금 해제) · SVN 커밋
+- 아트 전달 = [Docs/tech/telegraph-style.md](Docs/tech/telegraph-style.md). 예고 색·마스크 정본 = `2.Prefabs/Monster/Data/TelegraphStyle_Default.asset`(몬스터 데이터 12개 연결).
+- Mortar = 수직 낙하 포격(`rangedStyle` SkyStrike). 🔴 `skyStrike*` 칸은 xlsx 미반영([DataTableIgnore]) — 테이블로 옮기려면 병합 Export.
+- 10-13 후속 ✅(커밋): 기존 테스트 실패 2건 해결 — "최원거리 타깃은 Jump 전용" 옛 규칙(테스트·런타임 계약·주석)이 09-17 G3(돌진 = 최원거리) 뒤 미갱신 → "최원거리 = 거리창 끈 행만(Jump·Dash)"으로 정정, 전투 EditMode 125/0. 설정 비네트: 방향 반전 수정(`VignetteOpenScale`) · 실드 비네트 연결 · 최소에서도 모서리 유지 · 표시 0~100(50 = 기본). "후처리 (블룸 등)" → "블룸·색수차". 팀장 확인 OK.
+- ⏸ 보류: "비네트" 용어(플레이어가 모를 수 있음 — 후보 "화면 가장자리 어둡기/부드러움") — 팀장 추후 수정.
+- ✅ **10-13 `origin/development`(`b21f6e52`, 71커밋 — 튜토리얼·공용 목숨·체력 재생·간파 쿨·대시 아이콘·로비) 병합**. SVN **r431**(핀 431, check-environment 전부 통과). 충돌 2: `PlayerEditModeTestRunner.cs`(양쪽 테스트 다 살림) · `4.MapScene.unity`(옛 옵션 패널 77블록은 설정창 쪽대로 삭제 유지, dev 튜토리얼 신규 10블록 — `TutorialGuideUI`·`TutorialTraitUI`·`TutorialDirector` — 만 살림. dev 가 옛 블록을 수정한 것 0 · 끊긴 fileID 0 · SceneRoots 39). Codex 교차검증 동의. 컴파일 error CS 0 · EditMode 1284 중 1264 통과 / 실패 0 / 건너뜀 20(EuniTween Ignore).
+- ▶ **후속(미착수, 튜토리얼 담당과 공유 필요)**: 튜토리얼 안내 문구 `TutorialGuideTexts.asset`(46·99·120·210·237행)이 **Space·Q·E·F·R 고정 표기** — 설정창 키 리바인드 후 안내와 실제 키가 어긋난다(입력은 `PlayerInputReader`·`ZoneBridgeGateManager` 에서 리바인드를 따름). 수정 = 문구에 키 자리표시 + `KeyBindingConfig.DisplayName()` 연동. (Codex 머지 검토에서 발견)
+- ⏳ 병합 후 Play·MPPM(튜토리얼 흐름 + 새 설정창 ESC 겹침·입력 차단) 미확인.
+- ✅ 10-13 `12d4bf1a`(Boss23 원격만): 존1 허수아비 미표시 수정 — `TutorialZone1Flow` 가 로딩 중(활성 씬 = `2.LoadingScene`) `Instantiate` 해 로딩 씬 언로드 때 같이 파괴됐다 → 스폰 전 `MoveGameObjectToScene(StageTutorial 씬)`. 팀장 Play 확인. development 에도 같은 버그가 있다(이 커밋이 들어가야 고쳐짐).
+- ▶ **다음 작업 후보(팀장 10-13)**:
+  1. **영어 대응** — ✅ HUD 키가이드만 연결(10-13): 신규 `Settings/Localization/LocalizedSprite.cs`(`LocalizedText` 의 이미지판) 를 `CombatHUD.prefab` `KeyGuide` 에 붙여 English 면 SVN r429 `keyguide_en.png`(은희), 한국어면 `keyguide.png`. ⏳ **튜토리얼 문구(`TutorialGuideTexts.asset`) 영어 번역은 나중**(팀장 — 바꿔야 함, 위 키 표기 자리표시와 같이 설계).
+  2. **송전탑 상승 높이** — ✅ `riseHeight` 1 → **0.5m**(`bossroom.prefab` 4개, 팀장 10-13 "일단 절반"). 숨김 기준 위치는 그대로. ⏳ Play 체감 확인.
+
+## ▶▶ 작업 세션 (2026-10-14 · SimJangBounce(Claude) · **사운드 동기화 — xlsx 로 라이브러리·엔티티·클립·SoundID 연결**, 브랜치 `feature/SFX`) — 계획 [PLAN-sound-sync.md](PLAN-sound-sync.md) ✅ 승인(10-14) · ✅ S1~S5 구현(미커밋) · EditMode 93/93 · 실제 에셋 엔드투엔드 18/18 · ⏳ xlsx 병합 Export(사람) · Play 청취
+- 🔴 **수정 예정 — 동시 수정 금지**: `1.Scripts/Sound/SoundCatalog.cs`(10-14 이동) · `51.Audio/Data/SoundCatalog.asset`·`51.Audio/Data/SoundLibrary/`(10-14 SVN 으로 이동) · `BroAudio/Editor/Resources/BroEditorSetting.asset`(출력 경로) · `1.Scripts/Sound/AudioManager.cs` · `1.Scripts/Sound/Editor/SoundSync*.cs`(신규) · `Managers/Title·Lobby·MapSceneManager.cs`(BGM 호출) · `DataTable/Editor/DataSourcePlayMode.cs`·`DataTableMenu.cs`(동기화 필요 경고 한 줄) · `Docs/tech/data-table.md`.
+- 인수인계 = [handoff-sound-sync.md](Docs/tech/handoff-sound-sync.md). ✅ 10-14 **Play(테이블 모드)·빌드 자동 동기화(결정 C)** — 결과가 `51.Audio/Data` 에 남으니 SVN 커밋. ✅ xlsx `Sound` 시트 새 구성으로 교체(로컬 · Sound 시트만 이식, 다른 시트 바이트 동일) — 🔴 **SVN 커밋 필요**. BGM 호출은 `PlayBGM("BGM_Title"|"BGM_Lobby"|"BGM_InGame")`, `SoundCatalog` 고정 필드 삭제.
 
 ## ▶▶ 작업 세션 (2026-10-09 · 은희(Claude) · **거너 레이저건 정렬 + 기본 공격 손 이탈**, 브랜치 `fix/GunnerGunAlign`(development `778bbb87` 기준)) — 계획 [PLAN-gunner-gun-align.md](PLAN-gunner-gun-align.md) ✅ 승인 · ✅ S1~S5 구현(미커밋) · ✅ 실제 Animator 레이어 합성 실측(총구 yaw 0°, 손–손잡이 ≤ 5cm) · 보고 영상 `Recordings/gunner_gun_align_report.mp4`(gitignore) · ⏳ Play·MPPM · ⏸ PLAN §6 판정 시작점
 - 원인(Unity 실측): 총은 이미 `rig/artillery` 본에 붙어 있는데 손으로 맞춘 오프셋(09-30)이 **총을 앞뒤로 뒤집어** 총구 yaw ≈174°. 애니는 `LaserGun_Mount` = `artillery` 프레임(오프셋 0)으로 저작됨 — 손 = `Grip_R`/`Grip_L`(Q 는 `Brace_R`) 좌표와 소수점 3자리 일치. + 기본 공격 상체 클립 `attack01` 은 `c_pos` 각도(180°)가 하체 `Q_charge_loop`(146.3°)와 달라, 마스크가 `c_pos` 를 빼므로 팔만 34° 돌아 손이 11~19cm 이탈.
@@ -75,6 +115,14 @@ Update this file when a term becomes important enough that future agents or team
 - 🔴 **SVN r381(밸런스)이 `tooltip.*` 30행 + `# ─ 툴팁` 10행을 날렸다** → r384 에서 Export 병합으로 복구(r381 수치 유지, 서식 초기화). Boss·Monster `attackCooldown` 행도 인스펙터 값으로 새로 생김. 아트 핀 381 → **384**. 경석 남은 일 3(xlsx Monster 속도)은 **r384 위에서** 고칠 것.
 - 인라인 아이콘 = `SkillTooltipGenerated/tooltipIcon_*.png` → 아틀라스 `SkillTooltipAttackIcon.asset`(guid 유지) · TMP `SkillTooltipAttackSprite`: `atk`·`shield`·`cooldown`. 재생성 = `Tools/UI/스킬 툴팁 인라인 아이콘 갱신`(⚠️ 인스펙터에서 바꾼 BX·BY·AD 를 덮어씀).
 - 표기 = 아이콘이 수치 **앞**, 색은 태그에 직접: `<sprite name="shield" color=#74C7EC>{shieldAmount}`. 🔴 속성이 붙으면 **이름에 따옴표 필수** — 없으면 EmojiOne 노란 `?` 로 깨진다(로그 없음). 칼 #F4B860(코드) · 쿨다운 #B8C4D6(코드, 머리줄 `⏱` 대체).
+
+## ▶▶ 작업 세션 (2026-10-12 · 경석(Claude) · **설정창**, 브랜치 `feature/Settings`) — 계획 [PLAN-settings.md](PLAN-settings.md) · 1~3단계 + CRT 가독성 + 그래픽 확장 구현 ✅ · ✅ **10-13 커밋 + `feature/Boss23` 에 병합**(빨리 감기) · 남은 일 = PLAN 「다음 세션」(마우스 감도 보류 등)
+- 통합 패널 `Assets/2.Prefabs/UI/SettingsBody.prefab` 을 타이틀·맵 ESC 가 같이 씀. 항목 수정 = `Tools/UI/Settings/설정 패널 항목 배치 (멱등)`(프리팹 원본을 연다).
+- 팀장 Play 확인: 드롭다운·오디오·프레임 제한·키 변경. 해상도·창 모드·그래픽 품질·비네트·Alt+Tab 음소거는 빌드에서 확인 예정.
+- 은희 `feature/DashDirectionOption`(대시 방향 옵션) **흡수함** — 따로 머지하지 말 것. 기본값은 **캐릭터 정면**(팀장 10-12).
+- 10-13(경석 Claude): 설정창 한국어(PLAN S15·S16) + FPS/핑 표시(S17) + 타이틀 설정창 가독성(1.4배·어두운 컨트롤·타이틀 동안 렌더 스케일 100%) + 타이틀 CRT 값 인스펙터 노출 ✅ · 빌드 성공(10:55) · 팀장 빌드 확인 후 Alt+Enter·커서 가두기·AA(FXAA/SMAA) 추가 · 커밋됨. 추가 수정 파일: 신규 `Settings/Localization/*`·`Settings/UI/PerformanceOverlay.cs`·`Settings/Editor/SettingsDarkTheme.cs`·`SettingsLocalizationLinker.cs`, `Settings/UI/*` 컨트롤러, `GameplayConfig.cs`·`GraphicsQualityConfig.cs`, `UI/Title/TitleMonitorDisplay.cs`·`TitleFlowDirector.cs`·`TitleCrtFx.cs`, `SettingsBody.prefab`.
+- 🔴 타이틀 CRT 값의 정본이 `MA_TitleMonitorUI.mat` → **`TitleMonitorDisplay` 인스펙터**로 옮겨졌다(머티리얼 값을 고쳐도 화면이 안 바뀐다).
+🔴 **수정 예정 — 동시 수정 금지:** 신규 `GameSettings`·설정 패널 프리팹 · `Managers/DisplayResolutionBoot.cs`·`FrameRateCap.cs`·`TitleOptionsPanel.cs`·`MapSceneManager.cs`(옵션 패널 부분) · `Sound/VolumeSlider.cs` · `Player/UserInputConfig.cs`·`PlayerDashController.cs`(방향) · `InputSystem_Actions.inputactions`(Interact E→F) · `Map/ZoneBridgeGateManager.cs`(입력) · `UI/Interact/*`(키 표기) · `UI/Combat/FloatingDamage/*`(표시 필터) · `Camera/Feedback/CameraFeedback.cs`(배율). 씬(`1.TitleScene`·`4.MapScene`)은 튜토리얼 브랜치 머지 뒤.
 
 ## ▶▶ 작업 세션 (2026-10-12 · 경석(Claude) · **송전기 노랑 아웃라인 + 간파 넉백 후 취약 유지**, 브랜치 `feature/Boss23`) — 계획 [PLAN-boss-1012.md](PLAN-boss-1012.md) ✅ 완료 · 팀장 Play 확인 · 커밋·푸시(동시 수정 잠금 해제)
 🔴 **수정 예정 — 동시 수정 금지:** `Monster/Boss/BossChargingPylon.cs` · `Monster/Boss/TwentyThreeBoss.cs`(`FinishVulnerableKnockback`) · `Rendering/Editor/FlatKitSmoothNormalBaker.cs` · 신규 `Rendering/Toon/Shaders/OutlineOnly.shader`·`3.Materials/MA_PylonOutline.mat` · `2.Prefabs/Environment/Layouts/Zones/bossroom.prefab`(송전기 4개 필드).
@@ -197,7 +245,7 @@ HUD 매 프레임 문자열(`PlayerHealthHUD`·`StatusEffectHUD`·`SkillCooldown
    - 기존 감사 문서 `Docs/04-report/deadcode-audit-2026-09-09.md` 를 출발점으로 쓸 것.
    - 이 세션의 1회성·진단 도구는 남겨 둠: `Tools/Monster/공격 클립 길이 보고`·`이동 클립 고유 속도 측정`, `Tools/Map/Authoring/Zone Monitor Screen/*` — 계속 쓸지 정리 때 판단.
 6. **미검증 Play** — 몬스터 `attackSpeed` 0.5/2 · MPPM(클라 공격 애니 속도·Mortar 발사·WallBot 평타 2단) · 모니터 패널 MPPM(다른 피어가 켠 패널).
-7. 기존 EditMode 실패 2(`BossCounterDataTests` — No23 Dash 가 FarthestPlayer): 데이터가 맞으면 테스트 수정, 실수면 데이터 원복 — 팀장 결정.
+7. ~~기존 EditMode 실패 2(`BossCounterDataTests`)~~ — 10-13 해결: 데이터가 맞고(G3) 테스트·계약 검사가 낡았다.
 8. `Assets/1.Scripts/Player/Fall/FallBoundarySettings.cs` 줄 끝(EOL)만 다른 변경이 계속 뜬다 — 내 것 아님, 커밋하지 않음.
 
 ## ▶▶ 작업 세션 (2026-10-03 · 경석(Claude) · **타이틀 시작 연출 · 존 게이트 패널 모니터 켜짐·외곽선**, 브랜치 `feature/Boss23`) — ✅ 팀장 Play OK(10-04) · `feature/Boss23` 푸시 `5e3e46fe`(development 미반영). 게이트 활성 표시 = 모니터 화면(바닥 링 삭제). ⚠️ ZoneL_typeB 를 프리팹 모드로 열어 둔 채 파일을 바꾸면 Auto Save 가 덮어쓴다 — 값은 `Tools/Map/Authoring/Zone Monitor Screen/5` 로

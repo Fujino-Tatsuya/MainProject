@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -43,6 +44,7 @@ public sealed class AssassinHUD : MonoBehaviour
     private AssassinState state;
     private Player player;
     private int shownRage = -1;
+    private int shownTransform = int.MinValue;
 
     private void Awake()
     {
@@ -133,10 +135,28 @@ public sealed class AssassinHUD : MonoBehaviour
         }
 
         if (transformLabel != null)
-            transformLabel.text = endPending
-                ? "변신 종료 대기"
-                : releasable
-                    ? $"변신 {remaining:0.0}초 · R 해제 가능"
-                    : $"변신 {remaining:0.0}초";
+        {
+            // 소수 한 자리 · 상태가 같으면 문구를 다시 만들지 않는다.
+            int shown = endPending ? -1 : Mathf.RoundToInt(remaining * 10f) * 2 + (releasable ? 1 : 0);
+            if (shown != shownTransform)
+            {
+                shownTransform = shown;
+                transformLabel.text = TransformLabelText(remaining, endPending, releasable);
+            }
+        }
+    }
+
+    private void OnEnable() => Loc.Changed += ForceRelabel;
+    private void OnDisable() => Loc.Changed -= ForceRelabel;
+    private void ForceRelabel() => shownTransform = int.MinValue;
+
+    /// <summary>변신 라벨 문구 — 종료 대기 / 해제 가능 / 남은 시간({time} = <see cref="UiStrings.Seconds"/>, 소수 한 자리).</summary>
+    public static string TransformLabelText(float remaining, bool endPending, bool releasable)
+    {
+        if (endPending)
+            return UiStrings.AssassinTransformEndPending.Text;
+
+        var args = new Dictionary<string, string> { ["time"] = UiStrings.Seconds(remaining, "0.0") };
+        return (releasable ? UiStrings.AssassinTransformReleasable : UiStrings.AssassinTransformRemaining).Format(args);
     }
 }
