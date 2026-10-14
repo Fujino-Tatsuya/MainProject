@@ -14,7 +14,7 @@ Update this file when a term becomes important enough that future agents or team
 - `169da399`: 레이드 장판 상시화(①③ 교차 · ②④ A/B · 간격 4.2초) · ④ 자폭 HP 피해 90% 감소 · ② 송전탑 HP ×2. 이어서 ④ 자폭 30초 · 게이지 750(1인, 300 → 750 — 팀장 "너무 빨리 파훼").
 - ✅ 동시 수정 잠금 해제(10-14 커밋·푸시). 고친 곳: `Monster/Boss/TwentyThreeBoss.cs` · `BossAggroPolicy.cs` · `BossDataSO.cs` · 신규 `BossThreatTable.cs` · `Monster/MonsterBase.cs` · `MonsterDataSO.cs` · `MonsterPerceptionPolicy.cs` · `2.Prefabs/Monster/Data/` 일반 몬스터 7종 `.asset` · 테스트.
 
-## ▶▶ 다음 세션 (경석) — 팀장이 `feature/Boss23` Play 테스트 후 지시. 지금 상태 = development 에 병합·푸시(10-14), SVN **r436**(핀 436).
+## ▶▶ 다음 세션 (경석) — 팀장이 `feature/Boss23` Play 테스트 후 지시. 지금 상태 = development 에 병합·푸시(10-14), SVN **r438**(핀 438 — r437 은희 로컬라이징 Export · r438 레이드 자폭 30·750 셀).
 - ✅ 10-14 `origin/development`(사운드 동기화 5커밋, PR #31·#32) 병합 — 충돌은 이 파일만. 사운드 데이터가 SVN 으로 이동해 **`Assets/51.Audio` 를 `^/4_Resources/Sound` r436 으로 체크아웃**(이 PC 는 처음, 이전엔 빈 폴더). 옮겨진 13개 .meta guid 동일 · 컴파일 error CS 0 · ⏳ BGM·UI_Click Play 청취 미확인.
 - 테스트 대상: 레이드 ①~④(④ 실패 즉사기·자막 3종) · 점검 수정 17건 + P1(공격 슈퍼아머 해제)·P2(송전탑 상승 여유)·P3(레이지 예고)·P4(방전 유지) — 전부 **Play 미확인**.
 - 기획 메모 = [raid-23-phases.md](Docs/design/boss/raid-23-phases.md) 「추가할 것」 칸.
