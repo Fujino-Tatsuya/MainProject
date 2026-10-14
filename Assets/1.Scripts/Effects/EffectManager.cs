@@ -135,6 +135,8 @@ public class EffectManager : MonoBehaviour
         }
 
         Instance = this;
+        // 씬에서는 Management 그룹 아래에 있다 — DontDestroyOnLoad 는 루트에만 걸리므로 먼저 떼어낸다.
+        transform.SetParent(null, true);
         DontDestroyOnLoad(gameObject);
 
         // 드라이버는 컴파일 타임에 전부 알려져 있다. SO/리플렉션 등록은 간접층만 늘린다.

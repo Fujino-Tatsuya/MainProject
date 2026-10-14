@@ -93,7 +93,7 @@ public class LobbySceneManager : NemoSceneManager
         ApplyRoleUi();
 
         // BGM 재생
-        AudioManager.Instance.PlayBGM(AudioManager.Instance.Catalog.LobbyBGM);
+        AudioManager.Instance.PlayBGM("BGM_Lobby");
     }
 
     private void OnDestroy()

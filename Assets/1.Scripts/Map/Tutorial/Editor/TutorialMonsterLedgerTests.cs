@@ -227,10 +227,7 @@ public sealed class TutorialMonsterLedgerTests
         Assert.IsFalse(m.IsGateOpen(TutorialGate.G3_Corridor2Entry));
 
         // G1(개인)·G2(개인)가 차례로 열리는 같은 Evaluate 에서 G3 도 연다.
-        m.ReportCheck(0, TutorialCheck.Move);
-        m.ReportCheck(0, TutorialCheck.Dash);
-        for (int i = 0; i < TutorialFlowModel.AttackHitsRequired; i++) m.ReportCheck(0, TutorialCheck.AttackHit);
-        m.ReportCheck(0, TutorialCheck.PassiveTooltip);
+        foreach (TutorialCheck c in TutorialZone1Progress.ChecklistOrder) m.ReportCheck(0, c);   // v8 G1 여덟 항목
         m.ReportCheck(0, TutorialCheck.TraitCorridor1);
         m.Evaluate(2d);
 
@@ -259,7 +256,7 @@ public sealed class TutorialMonsterLedgerTests
     }
 
     [Test]
-    public void G6_보류는_G5_카운터_도달과_같은_Evaluate_에서_열린다()
+    public void G6_보류는_G5_가_열리는_순간_같이_열린다()
     {
         var m = ModelWithPlayer();
         OpenUpTo(m, TutorialGate.G4_Zone3Entry);
@@ -267,7 +264,11 @@ public sealed class TutorialMonsterLedgerTests
         m.RequestGate(TutorialGate.G6_Corridor3Entry);
         m.AddCounter(TutorialCounter.Zone3Interrupts, 3);
         m.Evaluate(1d);
+        Assert.IsFalse(m.IsGateOpen(TutorialGate.G5_SpinnerRealMode), "v8 — 연계 3회만으로는 G5 아님(마지막 회복 대기)");
+        Assert.IsFalse(m.IsGateOpen(TutorialGate.G6_Corridor3Entry));
 
+        m.RequestGate(TutorialGate.G5_SpinnerRealMode);   // 존3 흐름 — 마지막 회복 끝
+        m.Evaluate(2d);
         Assert.IsTrue(m.IsGateOpen(TutorialGate.G5_SpinnerRealMode));
         Assert.IsTrue(m.IsGateOpen(TutorialGate.G6_Corridor3Entry));
     }

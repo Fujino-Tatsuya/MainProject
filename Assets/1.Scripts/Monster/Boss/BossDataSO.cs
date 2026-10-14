@@ -188,6 +188,11 @@ public enum BossPhaseSequence
 {
     None = 0,
     ChargeSequence = 1,  // 송전기(차징) 시퀀스 — 실패 시 레이지 돌진 3회
+
+    // ─── 레이드 변형 전용(PLAN-boss-raid.md §2) — No23_Raid.asset 의 phases 에만 넣는다. 기존 No23 은 안 쓴다.
+    RaidDroneCharge = 2,  // ② 전력 공급 — 드론 유도로 송전탑 파괴, 실패 = 방전 (W2)
+    RaidRescue = 3,       // ③ 새 가족 — 각본 잡기 구출(1인 = 간파 돌진) (W3)
+    RaidSelfDestruct = 4, // ④ 폐기 처분 — 자폭 카운트다운 + 공동 게이지 (W3)
 }
 
 // 페이즈 1행. hpThreshold 는 **내림차순**으로 저작한다(0.66 → 0.33).
@@ -255,6 +260,58 @@ public class BossDataSO : MonsterDataSO
         new BossPhaseEntry { hpThreshold = 0.66f, sequence = BossPhaseSequence.ChargeSequence, damageMultiplier = 1f, speedMultiplier = 1f },
         new BossPhaseEntry { hpThreshold = 0.33f, sequence = BossPhaseSequence.ChargeSequence, damageMultiplier = 1f, speedMultiplier = 1f },
     };
+
+    [Header("레이드 변형 (PLAN-boss-raid.md) — 기본값 = 꺼짐, 기존 No23 은 건드리지 않는다")]
+    [Tooltip("인원별 최대 HP 배수. [0] = 1인, [1] = 2인, [2] = 3인(넘으면 마지막 값). maxHp 는 **1인 기준**으로 저작한다.\n" +
+             "비우면 보정 없음(기존 동작). 인원 = 보스방 도착 시 생존 참가자(BossEncounterDirector 스냅샷).\n" +
+             "현재 No23_Raid = 1 / 2.5 / 4.55 · 1인 2880(팀장 10-14 '체력 적다' 상향). 처음엔 1인 5분 · 3인 7분 목표로 1 / 2.4 / 4.2 를 역산했다.")]
+    public float[] partyHpMultipliers = new float[0];
+
+    [Tooltip("이 보스와 싸우는 동안 플레이어가 한 번에 받는 피해의 상한(플레이어 최대 HP 비율). 0 = 상한 없음(기존 동작).\n" +
+             "0.9 = 체력이 가득 찬 상태에서 한 방에 죽지 않는다(팀장 10-14: 목숨 쓸 틈도 없이 즉사하는 경험 금지).")]
+    [Range(0f, 1f)] public float playerHitDamageCapRatio = 0f;
+
+    [Tooltip("레이드 각본 사용(①기동 시연·② 전력 공급 등). 꺼져 있으면 아래 레이드 칸은 전부 무시된다 — 기존 No23 = 꺼짐.")]
+    public bool raidScript = false;
+
+    [Tooltip("① 기동 시연 — 개전 직후 이 순서로 고정 시전(거리창은 지킨다, 밖이면 추격). 기본 = 훅 좌·우 → 간파 가능 돌진.\n" +
+             "① 구간(첫 임계 전)에는 상시 전기 장판을 끈다(PLAN-boss-raid §2).")]
+    public BossAttackId[] raidOpeningScript = { BossAttackId.LeftHook, BossAttackId.RightHook, BossAttackId.Dash };
+
+    [Tooltip("② 전력 공급 제한시간(초). 기존 송전기의 chargeTimeLimit 대신 쓴다.")]
+    [Min(1f)] public float raidChargeTimeLimit = 25f;
+
+    [Tooltip("② 전력 공급 중 드론 재지목 간격(초) — 평소 cooldown(7초) 대신. 짧을수록 유도 기회가 많다.")]
+    [Min(0f)] public float raidDroneGuideCooldown = 1.5f;
+
+    [Tooltip("② 실패 = 방전 예고 시간(초). 부순 송전탑 칸만 안전하다.")]
+    [Min(0.3f)] public float raidDischargeWarnTime = 2.5f;
+
+    [Tooltip("② 실패 = 방전 피해. 플레이어 최대 HP 220 기준 150 — 즉사 상한(0.9)과 별개로 '아프지만 산다' 수준.")]
+    [Min(0)] public int raidDischargeDamage = 150;
+
+    [Header("레이드 ④ 폐기 처분 — 자폭 카운트다운 + 공동 게이지(간파 게이지 재사용)")]
+    [Tooltip("자폭까지 남은 시간(초). 이 안에 게이지를 0 으로 만들면 저지.")]
+    [Min(3f)] public float raidSelfDestructTime = 20f;
+
+    [Tooltip("게이지 100 → 0 에 필요한 플레이어 피해 합(1인 기준 — partyHpMultipliers 를 똑같이 곱한다).\n" +
+             "피해만으로 깰 수 있어야 한다(팀장 10-14). 1인 HP 2880 의 20% = 576 이 남은 시점이라 그보다 작게 둔다. 측정 플레이로 조정.")]
+    [Min(1)] public int raidSelfDestructGaugeDamage = 300;
+
+    [Tooltip("자폭 중 간파 성공 1회가 깎는 게이지(%p). 간파는 필수가 아니라 큰 보너스(팀장 10-14).")]
+    [Range(0f, 100f)] public float raidSelfDestructCounterBonus = 35f;
+
+    [Tooltip("자폭 중 간파 창이 열리는 간격(초)과 길이(초). 23호가 서 있기만 하므로 창을 따로 연다.")]
+    [Min(1f)] public float raidSelfDestructCounterInterval = 5f;
+    [Min(0.3f)] public float raidSelfDestructCounterWindow = 1.5f;
+
+    [Tooltip("저지 실패 = 대폭발(방 전체). 예고 시간과 피해. 즉사기(아래)면 피해 값은 무시된다.")]
+    [Min(0.3f)] public float raidSelfDestructBlastWarn = 1.2f;
+    [Min(0)] public int raidSelfDestructBlastDamage = 190;
+
+    [Tooltip("저지 실패 대폭발을 즉사기로(한 방 상한 0.9 무시, 보호막 포함 전부). 팀장 10-14: 실패하기가 너무 어려워 즉사로.\n" +
+             "대시 무적 등 피격 무효는 그대로 통한다.")]
+    public bool raidSelfDestructBlastLethal = true;
 
     [Header("카운터 / 그로기 — maxGroggyCount·groggyDuration 은 base 필드 재사용")]
     [Tooltip("[S3] 카운터 성공으로 인정하는 정면 각도(도). 60 = 보스 정면 기준 ±60°. " +

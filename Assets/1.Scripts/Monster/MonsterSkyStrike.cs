@@ -195,10 +195,18 @@ public sealed class MonsterSkyStrike : MonoBehaviour
         }
     }
 
-    static double Now
+    /// <summary>
+    /// 예약·진행·착탄의 시계. 세션 시계가 돌면 <see cref="NetworkClock.GameNow"/>(일시정지·슬로우 반영 — networking.md 「GameTime」:
+    /// 보스 패턴·투사체는 GameTime 을 따른다), 아니면 ServerTime. BossTimerManager.TimerNow 와 같은 규칙.
+    /// 예전엔 ServerTime 고정이라 간파 슬로우 중에도 실시간 1.5초 뒤 착탄해 회피 시간이 줄었다(Codex 점검 10-14).
+    /// 예약하는 쪽(MonsterBase)도 이 값을 써야 같은 도메인이 된다.
+    /// </summary>
+    internal static double Now
     {
         get
         {
+            NetworkClock clock = NetworkClock.Instance;
+            if (clock != null && clock.IsRunning) return clock.GameNow;
             NetworkManager nm = NetworkManager.Singleton;
             return nm != null && nm.IsListening ? nm.ServerTime.Time : Time.timeAsDouble;
         }

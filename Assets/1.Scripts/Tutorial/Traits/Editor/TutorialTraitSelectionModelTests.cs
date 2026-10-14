@@ -45,6 +45,56 @@ public sealed class TutorialTraitSelectionModelTests
     }
 
     [Test]
+    public void SkippedRound_GrantsOneWithoutOffer_AndKeepsOfferSeq()
+    {
+        // 할 일 34 구간 스킵 — 건너뛴 복도는 제시 없이 바로 1장. 제시 번호가 그대로라 클라 창이 열리지 않는다.
+        var model = new TutorialTraitSelectionModel(12);
+        var hostWindow = new TutorialTraitWindowModel();
+        model.StartRound(new[] { Host }, 3, First);
+        model.TryChoose(Host, model.GetOffered(Host)[0]);
+        hostWindow.Evaluate(model.GetOfferSeq(Host), model.HasPendingChoice(Host), model.GetAcquired(Host).Count);
+        hostWindow.Evaluate(model.GetOfferSeq(Host), model.HasPendingChoice(Host), model.GetAcquired(Host).Count);
+        int hostSeq = model.GetOfferSeq(Host);
+
+        model.StartRound(Array.Empty<ulong>(), 3, First);
+        Assert.That(model.IsRoundComplete(), Is.True, "참가자 없는 라운드");
+        Assert.That(model.AddParticipantWithoutOffer(Host, First, out int hostTrait), Is.EqualTo(TutorialTraitJoinResult.Granted));
+        Assert.That(model.AddParticipantWithoutOffer(Client1, First, out int clientTrait), Is.EqualTo(TutorialTraitJoinResult.Granted));
+
+        Assert.That(model.GetOfferSeq(Host), Is.EqualTo(hostSeq), "제시 번호 불변");
+        Assert.That(model.GetOfferSeq(Client1), Is.EqualTo(0), "제시받은 적 없음 그대로");
+        Assert.That(model.GetOffered(Host), Is.Empty, "제시 비노출");
+        Assert.That(model.HasPendingChoice(Host) || model.HasPendingChoice(Client1), Is.False);
+        Assert.That(model.GetAcquired(Host), Is.EqualTo(new[] { 0, hostTrait }), "획득 1개 추가");
+        Assert.That(hostTrait, Is.EqualTo(1), "이미 얻은 0 은 빠진다");
+        Assert.That(model.GetAcquired(Client1), Is.EqualTo(new[] { clientTrait }));
+        Assert.That(model.IsRoundComplete(), Is.True, "전원 완료 → 출구 게이트");
+
+        TutorialTraitWindowUpdate update = hostWindow.Evaluate(model.GetOfferSeq(Host), model.HasPendingChoice(Host), model.GetAcquired(Host).Count);
+        Assert.That(update.Opened || update.Closed, Is.False, "창이 열리지도 닫히지도 않는다");
+
+        Assert.That(model.AddParticipantWithoutOffer(Host, First, out int again), Is.EqualTo(TutorialTraitJoinResult.AlreadyInRound));
+        Assert.That(again, Is.EqualTo(-1));
+        Assert.That(model.GetAcquired(Host).Count, Is.EqualTo(2), "한 라운드에 1장만");
+    }
+
+    [Test]
+    public void SkippedRound_EmptyPoolOrNoRound()
+    {
+        var fresh = new TutorialTraitSelectionModel(2);
+        Assert.That(fresh.AddParticipantWithoutOffer(Host, First, out _), Is.EqualTo(TutorialTraitJoinResult.NoRound));
+
+        var model = new TutorialTraitSelectionModel(1);
+        model.StartRound(Array.Empty<ulong>(), 3, First);
+        Assert.That(model.AddParticipantWithoutOffer(Host, First, out _), Is.EqualTo(TutorialTraitJoinResult.Granted));
+        model.StartRound(Array.Empty<ulong>(), 3, First);
+        Assert.That(model.AddParticipantWithoutOffer(Host, First, out int trait), Is.EqualTo(TutorialTraitJoinResult.Empty), "풀 소진");
+        Assert.That(trait, Is.EqualTo(-1));
+        Assert.That(model.IsInRound(Host) && !model.HasPendingChoice(Host), Is.True, "참가는 했고 고를 것은 없다");
+        Assert.That(model.GetOfferSeq(Host), Is.EqualTo(0));
+    }
+
+    [Test]
     public void PickCandidates_TakesCount_WithoutDuplicates()
     {
         var result = new List<int>();

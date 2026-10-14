@@ -45,7 +45,7 @@ public class GunnerInterruptSkill : PlayerInterruptSkillBase, ISkillPreviewSourc
         if (recoilRemaining <= 0f || motor == null || !owner.IsSimulating || Time.time < recoilStartTime)
             return;
 
-        motor.PassThroughEnemiesOverride = true; // 유닛 통과(§8.5 — 벽·오브젝트에만 막힘)
+        motor.PassThroughUnitsOverride = true; // 유닛(적·아군) 통과(§8.5 — 벽·오브젝트에만 막힘)
         float step = Mathf.Min(recoilSpeed * Time.fixedDeltaTime, recoilRemaining);
         recoilRemaining -= step;
         motor.AddGroundedDisplacement(-attackDirection * step);
@@ -55,7 +55,7 @@ public class GunnerInterruptSkill : PlayerInterruptSkillBase, ISkillPreviewSourc
     {
         recoilRemaining = 0f;
         if (motor != null)
-            motor.PassThroughEnemiesOverride = false;
+            motor.PassThroughUnitsOverride = false;
         base.OnEnd(reason);
     }
 
@@ -78,7 +78,7 @@ public class GunnerInterruptSkill : PlayerInterruptSkillBase, ISkillPreviewSourc
             ? motor.GetGroundedPreviewDistance(
                 -forward * data.RecoilDistance,
                 blockOtherPlayers: false,
-                passThroughEnemies: true)
+                passThroughUnits: true)
             : data.RecoilDistance;
         shape = SkillPreviewShapes.HitboxWithArrow(
             center,

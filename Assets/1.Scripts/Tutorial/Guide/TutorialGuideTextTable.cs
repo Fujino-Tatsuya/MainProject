@@ -71,6 +71,33 @@ public sealed class TutorialGuideTextTable : ScriptableObject, ITutorialGuideTex
         return true;
     }
 
+    /// <summary>
+    /// 저작 메뉴 전용 — 문구 개정(v8 등)을 적용한다. 행이 있으면 문구·지속시간만 바꾸고(효과음 유지), 없으면 덧붙인다.
+    /// 이미 같은 값이면 false.
+    /// </summary>
+    public bool SetRowText(string id, string text, float durationSeconds)
+    {
+        if (string.IsNullOrEmpty(id))
+            return false;
+
+        for (int i = 0; i < rows.Count; i++)
+        {
+            TutorialGuideTextRow row = rows[i];
+            if (row == null || row.Id != id)
+                continue;
+            if (row.Text == (text ?? string.Empty) && Mathf.Approximately(row.DurationSeconds, durationSeconds))
+                return false;
+
+            rows[i] = new TutorialGuideTextRow(id, text, durationSeconds, row.Sfx);
+            lookup = null;
+            return true;
+        }
+
+        rows.Add(new TutorialGuideTextRow(id, text, durationSeconds));
+        lookup = null;
+        return true;
+    }
+
     private void OnValidate()
     {
         lookup = null;

@@ -2913,7 +2913,7 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   maxHp: 200
   defense: 0
-  riseHeight: 1
+  riseHeight: 0.5
   moveSpeed: 1
   outlineMaterial: {fileID: 2100000, guid: 6fd5501f7419e464ebc7530b5fac6112, type: 2}
 --- !u!4 &985995061862146011 stripped
@@ -3286,7 +3286,7 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   maxHp: 200
   defense: 0
-  riseHeight: 1
+  riseHeight: 0.5
   moveSpeed: 1
   outlineMaterial: {fileID: 2100000, guid: 6fd5501f7419e464ebc7530b5fac6112, type: 2}
 --- !u!4 &885060816906195001 stripped
@@ -8132,7 +8132,7 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   maxHp: 200
   defense: 0
-  riseHeight: 1
+  riseHeight: 0.5
   moveSpeed: 1
   outlineMaterial: {fileID: 2100000, guid: 6fd5501f7419e464ebc7530b5fac6112, type: 2}
 --- !u!4 &5427120997204487538 stripped
@@ -10796,7 +10796,7 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   maxHp: 200
   defense: 0
-  riseHeight: 1
+  riseHeight: 0.5
   moveSpeed: 1
   outlineMaterial: {fileID: 2100000, guid: 6fd5501f7419e464ebc7530b5fac6112, type: 2}
 --- !u!1001 &7343172837201687197

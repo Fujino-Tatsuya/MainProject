@@ -17,6 +17,7 @@ public sealed class PlayerMotor : MonoBehaviour
     private const float DefaultStepOffset = 0.3f;
     private const float DefaultMaxFallSpeed = 30f;
     private const float DefaultKnockbackDeceleration = 6f;
+    private const float DefaultUnitSeparationSpeed = 5f;
     private const float NonPlanarDisplacementTolerance = 0.0001f;
     // 한 틱 최대 이동량(대시 ~20m/s × 0.02s = 0.4m)보다 넉넉히 크게 잡아 정상 이동을 오탐하지 않는다.
     private const float ExternalMoveDetectionThreshold = 1.0f;
@@ -27,8 +28,10 @@ public sealed class PlayerMotor : MonoBehaviour
     [SerializeField, Min(1)] private int maxSweepIterations = 3;
 
     private readonly RaycastHit[] castBuffer = new RaycastHit[CastBufferSize];
+    private readonly Collider[] overlapBuffer = new Collider[CastBufferSize];
 
     private Rigidbody playerRigidbody;
+    private PlayerLifeCycleController lifeCycle;
     private CapsuleCollider capsule;
     private PlayerGroundingSensor grounding;
     private PlayerMovement movement;
@@ -89,16 +92,26 @@ public sealed class PlayerMotor : MonoBehaviour
         Player.UsesServerAuthoritativeMovement;
 
     /// <summary>
-    /// 일시적으로 다른 플레이어에게 막힌다(기본 규칙은 아군 통과). 거너 E 백스텝처럼 "아군도 통과 불가" 인 이동이
-    /// 동작하는 동안만 켠다. 시뮬레이션하는 피어(오너·서버 권위 시 서버)가 각자 로컬로 켜고 끈다 — 복제하지 않는다.
+    /// 일시적으로 다른 플레이어에게 막힌다. 거너 E 백스텝처럼 "아군도 통과 불가" 인 이동이 동작하는 동안만 켠다
+    /// (2026-10-11 부터 GameRule 기본값도 아군 차단이라 지금은 같은 결과다). 시뮬레이션하는 피어(오너·서버 권위 시 서버)가
+    /// 각자 로컬로 켜고 끈다 — 복제하지 않는다.
     /// </summary>
     public bool BlockOtherPlayersOverride { get; set; }
 
     /// <summary>
-    /// 일시적으로 적(Enemy 레이어)을 통과한다(기본 규칙은 적에 막힘). 거너 우클릭 후폭풍처럼 "벽·오브젝트에만 막히는" 이동이
-    /// 동작하는 동안만 켠다. 시뮬레이션하는 피어가 각자 로컬로 켜고 끈다 — 복제하지 않는다.
+    /// 일시적으로 유닛(Enemy·Player 레이어)을 통과한다(기본 규칙은 둘 다 막힘). 암살자 Q·거너 우클릭 후폭풍처럼
+    /// "벽·지형에만 막히는" 이동이 동작하는 동안만 켠다. <see cref="BlockOtherPlayersOverride"/> 보다 우선한다.
+    /// 시뮬레이션하는 피어가 각자 로컬로 켜고 끈다 — 복제하지 않는다.
     /// </summary>
-    public bool PassThroughEnemiesOverride { get; set; }
+    public bool PassThroughUnitsOverride { get; set; }
+
+    /// <summary>
+    /// 다른 플레이어의 이동을 막는가. 사망 연출·완전 사망 중에는 막지 않는다(Soul 은 레이어가 Soul 이라 애초에 대상 밖).
+    /// 다른 피어의 스윕이 이 플레이어 몸 캡슐을 만났을 때 읽는다.
+    /// </summary>
+    public bool BlocksOtherUnits =>
+        lifeCycle == null ||
+        (lifeCycle.State != PlayerLifeState.DeadPresentation && lifeCycle.State != PlayerLifeState.PermanentDead);
 
     /// <summary>
     /// 씬 상태를 바꾸지 않고 실제 모터와 같은 캡슐·경사·레이어 규칙으로 직선 이동 가능 거리를 계산한다.
@@ -107,7 +120,7 @@ public sealed class PlayerMotor : MonoBehaviour
     public float GetGroundedPreviewDistance(
         Vector3 desiredDelta,
         bool blockOtherPlayers,
-        bool passThroughEnemies)
+        bool passThroughUnits)
     {
         float requestedDistance = desiredDelta.magnitude;
         if (capsule == null || requestedDistance <= 0.0001f)
@@ -117,7 +130,7 @@ public sealed class PlayerMotor : MonoBehaviour
         settings.ObstacleMask = ResolveObstacleMask(
             simulationState.IsSoul,
             blockOtherPlayers,
-            passThroughEnemies);
+            passThroughUnits);
 
         Vector3 resolved = PlayerMotionSweep.Resolve(
             capsule,
@@ -129,10 +142,32 @@ public sealed class PlayerMotor : MonoBehaviour
             settings.ObstacleMask,
             settings.CollisionSkin,
             settings.MaxSweepIterations,
-            castBuffer,
-            logDiagnostics: false);
+            castBuffer);
 
         return Mathf.Clamp(Vector3.Dot(resolved, desiredDelta / requestedDistance), 0f, requestedDistance);
+    }
+
+    /// <summary>
+    /// 마지막 시뮬레이션 위치에서 direction 으로 distance 만큼 갈 때 가장 먼저 막는 것이 유닛(몬스터·다른 플레이어 몸)인가.
+    /// 현재 장애물 규칙(오버라이드 포함)을 그대로 쓴다. 일반 대시의 "유닛 직전 정지" 판정용(벽이면 false).
+    /// </summary>
+    public bool IsUnitBlockingAhead(Vector3 direction, float distance)
+    {
+        if (capsule == null)
+            return false;
+
+        direction.y = 0f;
+        PlayerSimulationSettings settings = CaptureSimulationSettings(simulationState.IsSoul);
+        Vector3 currentPosition = playerRigidbody != null ? playerRigidbody.position : transform.position;
+        return PlayerMotionSweep.IsBlockedByUnitFirst(
+            capsule,
+            simulationState.Position - currentPosition,
+            direction,
+            distance + settings.CollisionSkin * 2f,
+            settings.MaxWalkableSlopeAngle,
+            settings.ObstacleMask,
+            settings.CollisionSkin,
+            castBuffer);
     }
 
     /// <summary>이번 물리 틱에 적용할 월드 속도(m/s)를 더한다.</summary>
@@ -301,6 +336,7 @@ public sealed class PlayerMotor : MonoBehaviour
         grounding = GetComponent<PlayerGroundingSensor>();
         movement = GetComponent<PlayerMovement>();
         player = GetComponent<Player>();
+        lifeCycle = GetComponent<PlayerLifeCycleController>();
         motionResolver = new RuntimeMotionResolver(this);
         visualSmoother = GetComponent<PlayerVisualReconciliationSmoother>();
         mode = playerRigidbody != null && !playerRigidbody.isKinematic
@@ -361,6 +397,7 @@ public sealed class PlayerMotor : MonoBehaviour
         input.PoseRotation = pendingPoseRotation;
 
         PlayerSimulationSettings settings = CaptureSimulationSettings(simulationState.IsSoul);
+        bool separated = ApplyUnitSeparation(ref simulationState, settings, deltaTime);
 
         DiagnoseSimulationInput("owner", rawInput, simulationState, input, settings, deltaTime);
 
@@ -382,7 +419,7 @@ public sealed class PlayerMotor : MonoBehaviour
         {
             // 이벤트와 Rigidbody 쓰기는 실제 틱의 최종 결과에만 일어난다.
             MovementResolved?.Invoke(result.RequestedDelta, result.ResolvedDelta, result.WasBlocked);
-            if (result.ResolvedDelta.sqrMagnitude > 0f)
+            if (separated || result.ResolvedDelta.sqrMagnitude > 0f)
                 ApplyRigidbodyPose(simulationState.Position, default, false);
         }
 
@@ -466,6 +503,7 @@ public sealed class PlayerMotor : MonoBehaviour
 
         PlayerSimulationSettings settings =
             CaptureSimulationSettings(serverObservationState.IsSoul);
+        bool separated = ApplyUnitSeparation(ref serverObservationState, settings, deltaTime);
         DiagnoseSimulationInput(
             "server-observation",
             rawInput,
@@ -498,7 +536,7 @@ public sealed class PlayerMotor : MonoBehaviour
         else
         {
             MovementResolved?.Invoke(result.RequestedDelta, result.ResolvedDelta, result.WasBlocked);
-            if (result.ResolvedDelta.sqrMagnitude > 0f)
+            if (separated || result.ResolvedDelta.sqrMagnitude > 0f)
                 ApplyRigidbodyPose(simulationState.Position, default, false);
         }
 
@@ -845,28 +883,69 @@ public sealed class PlayerMotor : MonoBehaviour
 
     private LayerMask ResolveObstacleMask(bool isSoul)
     {
-        return ResolveObstacleMask(isSoul, BlockOtherPlayersOverride, PassThroughEnemiesOverride);
+        return ResolveObstacleMask(isSoul, BlockOtherPlayersOverride, PassThroughUnitsOverride);
     }
 
     private LayerMask ResolveObstacleMask(
         bool isSoul,
         bool blockOtherPlayers,
-        bool passThroughEnemies)
+        bool passThroughUnits)
     {
-        int mask = gameRule != null
+        int baseMask = gameRule != null
             ? gameRule.ObstacleMask.value
             : LayerMask.GetMask("Default", "Ground", "Wall", "Env");
-        int playerBit = LayerMask.GetMask("Player");
-        int soulBit = LayerMask.GetMask("Soul");
 
-        mask &= ~playerBit;
-        mask &= ~soulBit;
-        if (!isSoul && ((gameRule != null && gameRule.BlockOtherPlayers) || blockOtherPlayers))
-            mask |= playerBit;
-        if (passThroughEnemies)
-            mask &= ~LayerMask.GetMask("Enemy");
+        return PlayerUnitCollisionRules.ResolveObstacleMask(
+            baseMask,
+            LayerMask.GetMask("Player"),
+            LayerMask.GetMask("Soul"),
+            LayerMask.GetMask("Enemy"),
+            isSoul,
+            (gameRule != null && gameRule.BlockOtherPlayers) || blockOtherPlayers,
+            passThroughUnits);
+    }
 
-        return mask;
+    /// <summary>
+    /// 이미 겹친 유닛(몬스터·다른 플레이어 몸)에서 플레이어만 빈 자리로 밀어낸다(할 일 11). 상대는 움직이지 않는다.
+    /// 시뮬레이션 직전에 기준 위치를 옮기므로 이번 틱 이동 스윕은 밀려난 자리에서 시작한다.
+    /// 밀어내기 변위도 정적 지형 마스크로 스윕해 벽 안으로 밀지 않고, 길이는 GameRule 속도 × dt 로 묶어 부드럽게 빠진다.
+    /// 넉백·보스 돌진·복제 위치 따라잡기 등 겹친 원인은 가리지 않는다.
+    /// </summary>
+    /// <returns>위치를 옮겼는가(커밋 필요).</returns>
+    private bool ApplyUnitSeparation(
+        ref PlayerSimulationState state,
+        PlayerSimulationSettings settings,
+        float deltaTime)
+    {
+        float speed = gameRule != null ? gameRule.UnitSeparationSpeed : DefaultUnitSeparationSpeed;
+        int unitMask = settings.ObstacleMask.value & LayerMask.GetMask("Enemy", "Player");
+        if (capsule == null || speed <= 0f || unitMask == 0 || !BlocksOtherUnits)
+            return false;
+
+        Vector3 currentPosition = playerRigidbody != null ? playerRigidbody.position : transform.position;
+        Vector3 originOffset = state.Position - currentPosition;
+        Vector3 penetration = PlayerMotionSweep.ComputeUnitPenetration(capsule, originOffset, unitMask, overlapBuffer);
+        Vector3 step = PlayerUnitCollisionRules.ComputeSeparationStep(penetration, speed, deltaTime);
+        if (step == Vector3.zero)
+            return false;
+
+        Vector3 resolved = PlayerMotionSweep.Resolve(
+            capsule,
+            originOffset,
+            step,
+            step,
+            state.IsGrounded,
+            settings.StepOffset,
+            settings.MaxWalkableSlopeAngle,
+            settings.ObstacleMask.value & ~unitMask,
+            settings.CollisionSkin,
+            settings.MaxSweepIterations,
+            castBuffer);
+        if (resolved.sqrMagnitude <= 1e-10f)
+            return false;
+
+        state.Position += resolved;
+        return true;
     }
 
     private void ApplyRigidbodyPose(Vector3 position, Quaternion rotation, bool applyRotation)

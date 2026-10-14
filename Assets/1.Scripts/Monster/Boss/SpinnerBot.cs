@@ -195,7 +195,9 @@ public class SpinnerBot : MonsterBase
         }
 
         _lastSpinTime = Time.time;
-        _dashDir = transform.forward;   // FaceTarget 후 전방 = 돌진 방향(고정)
+        // 🔴 base 의 FaceTarget 은 감속 회전 한 틱(~16%)이라 어중간한 각도로 돌진이 굳었다 — WallBot 과 같은 수정(점검 10-14).
+        FaceTargetImmediate();
+        _dashDir = transform.forward;   // 즉시 조준 후 전방 = 돌진 방향(고정)
         _dashTarget = ResolveDashTarget(transform.position);
         if (ov != null) _dashTarget = ov.ClampDashTarget(_dashTarget);
 
@@ -337,8 +339,13 @@ public class SpinnerBot : MonsterBase
         if (IsServer && Override != null && Override.BlocksHealthDamage) attackInfo.damage = 0;   // 튜토리얼 — 체력만 잠금
         base.TakeDamage(attackInfo);
 
-        if (!IsServer || !attackInfo.isInterruptAttack || Counter == null) return;
-        if (!Counter.TryConsumeInterrupt()) return;
+        if (!IsServer || !attackInfo.isInterruptAttack) return;
+        if (Counter == null || !Counter.TryConsumeInterrupt())
+        {
+            // 창 밖 간파 적중 — 튜토리얼(연계 연습)만 취약 밀치기로 쓴다. 구현체가 없으면 기존처럼 아무 일 없음.
+            Override?.NotifyInterruptHit(DamageAttackerClientId);
+            return;
+        }
 
         CombatStatsEvents.RaiseServerCounterSucceeded(this, DamageAttackerClientId); // 결과 화면 통계(판정 무관)
         CounterSucceeded();
@@ -480,4 +487,10 @@ public interface ISpinnerBotOverride
 
     /// <summary>덮어쓴 스핀의 돌진 틱. 이 돌진은 피해를 주지 않는다 — 밀쳐내기는 구현체 몫.</summary>
     void TickHarmlessDash();
+
+    /// <summary>
+    /// 간파(우클릭) 적중이 간파 창 <b>밖</b>에서 들어왔다(창 안 = 간파 성공은 원래 경로). 인자 = 공격자 clientId.
+    /// 튜토리얼 연계 연습이 취약 상태에서 이것을 '밀치기'로 쓴다(v8 §3.5). Q 넉백·일반 피해는 여기 오지 않는다.
+    /// </summary>
+    void NotifyInterruptHit(ulong attackerClientId);
 }

@@ -260,6 +260,7 @@ public static class DataTableMenu
     private static void Verify()
     {
         DataTableSource.Result result = DataTableSource.Load();
+        SoundSyncMenu.WarnIfPending("Verify");
         if (!ReportIssues(result, "Verify"))
         {
             return;

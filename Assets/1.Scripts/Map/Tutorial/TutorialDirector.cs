@@ -27,21 +27,21 @@ using UnityEngine;
 ///    보스방 도착(패드·만료 강제 이동 모두) → G11(G10 뒤일 때만) + 단계 Finished + <see cref="BossRoomArrived"/>(S12 안내 종료)
 ///  · S10 존4 → Z4-0 <see cref="ShowTimerHudServer"/> · 설정 자막 끝 <see cref="StartBossTimerServer"/>(= G8) · 만료 문구는 BossTimerManager.State == Expired
 ///  · S11 사망 규칙 → 목숨 차감 기준 = G11(보스방 도착) 열림 — G8(타이머 시작)과 무관
-///  · S7 존1 ✅ → TutorialZone1Flow: <see cref="ReportCheckServer"/>(Dash·AttackHit — 서버 관측) / <see cref="ReportLocalMoveDistance"/>(Move — 오너 누적 거리, 서버 상한 검증) /
+///  · S7 존1 ✅(v8 갱신) → TutorialZone1Flow: <see cref="ReportCheckServer"/>(Dash·BasicAttack·SkillQ/E/R/Interrupt — 서버 관측) / <see cref="ReportLocalMoveDistance"/>(Move — 오너 누적 거리, 서버 상한 검증) /
 ///    <see cref="ReportLocalCheck"/>(PassiveTooltip — 오너 보고)
 ///  · 서버 → 클라 자막 → <see cref="ShowSubtitleServer"/>(id, 키·값 인자, 대상 null = 전원 — 캐릭터 전용은 <see cref="GetClientsOfCharacterServer"/>). 강조·목표 패널은 흐름 파일이 클라에서 직접
-///  · S9 존3 → <see cref="AddCounterServer"/>(Zone3Interrupts) — 목표 도달 시 G5 자동 개방
+///  · S9 존3(v8) → <see cref="AddCounterServer"/>(Zone3Interrupts = 연계 벽 충돌) · 마지막 벽 충돌 회복 뒤 <see cref="RequestGateServer"/>(G5)
 ///  · S12 특성 → 개인 게이트가 <see cref="TutorialGateOpenReason.Timeout"/> 으로 열리면 미선택자 자동 획득
+///  · 할 일 34 구간 스킵(QA, 에디터·Development Build 전용) → TutorialDirector.Skip.cs 의 호스트 전용 ServerRpc → <see cref="TutorialSkipController"/>
 /// </summary>
 [DisallowMultipleComponent]
-public sealed class TutorialDirector : NetworkBehaviour
+public sealed partial class TutorialDirector : NetworkBehaviour
 {
     /// <summary>복제되는 개인 진행.</summary>
     public struct PlayerState : INetworkSerializable, IEquatable<PlayerState>
     {
         public ulong ClientId;
         public int CheckMask;
-        public byte AttackHits;
         public bool Connected;
         public bool PermanentDead;
         /// <summary>지난 배리어(개인 뒤 배리어) — bit = 1 &lt;&lt; (int)TutorialGate. <see cref="TutorialBackBarrierRules"/>.</summary>
@@ -51,14 +51,13 @@ public sealed class TutorialDirector : NetworkBehaviour
         {
             s.SerializeValue(ref ClientId);
             s.SerializeValue(ref CheckMask);
-            s.SerializeValue(ref AttackHits);
             s.SerializeValue(ref Connected);
             s.SerializeValue(ref PermanentDead);
             s.SerializeValue(ref BackBarrierMask);
         }
 
         public bool Equals(PlayerState o)
-            => ClientId == o.ClientId && CheckMask == o.CheckMask && AttackHits == o.AttackHits
+            => ClientId == o.ClientId && CheckMask == o.CheckMask
                && Connected == o.Connected && PermanentDead == o.PermanentDead && BackBarrierMask == o.BackBarrierMask;
     }
 
@@ -214,7 +213,7 @@ public sealed class TutorialDirector : NetworkBehaviour
             if (s.ClientId != clientId) continue;
             progress = new TutorialPlayerProgress
             {
-                ClientId = s.ClientId, CheckMask = s.CheckMask, AttackHits = s.AttackHits,
+                ClientId = s.ClientId, CheckMask = s.CheckMask,
                 Connected = s.Connected, PermanentDead = s.PermanentDead,
             };
             return true;
@@ -806,7 +805,7 @@ public sealed class TutorialDirector : NetworkBehaviour
     // ─── 서버 API ────────────────────────────────────────────────────────
 
     /// <summary>
-    /// 개인 체크 완료 보고(서버 관측분 — Dash·AttackHit·SkillQ·SkillE·Trait*). 반영되면 true.
+    /// 개인 체크 완료 보고(서버 관측분 — Dash·BasicAttack·SkillQ·SkillE·SkillR·SkillInterrupt·Trait*·Corridor1CooldownReset). 반영되면 true.
     /// 중복·모르는 client·비활성은 false.
     /// </summary>
     public bool ReportCheckServer(ulong clientId, TutorialCheck check)
@@ -817,7 +816,7 @@ public sealed class TutorialDirector : NetworkBehaviour
         return changed;
     }
 
-    /// <summary>파티 카운터 증가(목표에서 멈춤). Zone3Interrupts 가 목표에 닿으면 G5 가 자동으로 열린다.</summary>
+    /// <summary>파티 카운터 증가(목표에서 멈춤). v8: Zone3Interrupts(연계)는 목표에 닿아도 G5 를 열지 않는다 — 마지막 회복 뒤 존3 흐름이 연다.</summary>
     public bool AddCounterServer(TutorialCounter counter, int amount = 1)
     {
         if (!RequireServerActive(nameof(AddCounterServer))) return false;
@@ -1068,7 +1067,7 @@ public sealed class TutorialDirector : NetworkBehaviour
             _model.TryGetPlayer(_model.PlayerIds[i], out TutorialPlayerProgress m);
             var s = new PlayerState
             {
-                ClientId = m.ClientId, CheckMask = m.CheckMask, AttackHits = (byte)Math.Min(255, m.AttackHits),
+                ClientId = m.ClientId, CheckMask = m.CheckMask,
                 Connected = m.Connected, PermanentDead = m.PermanentDead,
                 BackBarrierMask = GetBackBarrierMaskServer(m.ClientId),
             };

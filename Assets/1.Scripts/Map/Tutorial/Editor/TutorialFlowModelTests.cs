@@ -17,12 +17,24 @@ public sealed class TutorialFlowModelTests
         return m;
     }
 
+    // v8 G1 = 이동·대시·패시브 + 기본 공격·Q·E·R·우클릭 각 1회.
+    static readonly TutorialCheck[] Zone1Checks =
+    {
+        TutorialCheck.Move, TutorialCheck.Dash, TutorialCheck.PassiveTooltip, TutorialCheck.BasicAttack,
+        TutorialCheck.SkillQ, TutorialCheck.SkillE, TutorialCheck.SkillR, TutorialCheck.SkillInterrupt,
+    };
+
     static void CompleteZone1(TutorialFlowModel m, ulong id)
     {
-        m.ReportCheck(id, TutorialCheck.Move);
-        m.ReportCheck(id, TutorialCheck.Dash);
-        for (int i = 0; i < TutorialFlowModel.AttackHitsRequired; i++) m.ReportCheck(id, TutorialCheck.AttackHit);
-        m.ReportCheck(id, TutorialCheck.PassiveTooltip);
+        foreach (TutorialCheck c in Zone1Checks) m.ReportCheck(id, c);
+    }
+
+    // 전원 존1 완료 → G1 열림(AllDone). 그다음 차례 = G2(복도1 특성).
+    static void OpenG1(TutorialFlowModel m, double now, params ulong[] ids)
+    {
+        foreach (ulong id in ids) CompleteZone1(m, id);
+        m.Evaluate(now);
+        Assert.IsTrue(m.IsGateOpen(TutorialGate.G1_Corridor1Entry));
     }
 
     static List<(TutorialGate, TutorialGateOpenReason)> Record(TutorialFlowModel m)
@@ -57,61 +69,92 @@ public sealed class TutorialFlowModelTests
     }
 
     [Test]
-    public void 체크리스트_한_항목이라도_빠지면_미완료다()
+    public void 존1_여덟_항목_중_하나라도_빠지면_미완료다()
     {
-        var m = NewModel(A);
-        m.ReportCheck(A, TutorialCheck.Move);
-        m.ReportCheck(A, TutorialCheck.Dash);
-        m.ReportCheck(A, TutorialCheck.PassiveTooltip);
-        for (int i = 0; i < TutorialFlowModel.AttackHitsRequired - 1; i++) m.ReportCheck(A, TutorialCheck.AttackHit);
-        m.Evaluate(0d);
-        Assert.IsFalse(m.IsGateOpen(TutorialGate.G1_Corridor1Entry), "적중 4/5");
+        foreach (TutorialCheck missing in Zone1Checks)
+        {
+            var m = NewModel(A);
+            foreach (TutorialCheck c in Zone1Checks)
+                if (c != missing) m.ReportCheck(A, c);
+            m.Evaluate(0d);
+            Assert.IsFalse(m.IsGateOpen(TutorialGate.G1_Corridor1Entry), $"{missing} 미완료");
 
-        m.ReportCheck(A, TutorialCheck.AttackHit);
-        m.Evaluate(0d);
-        Assert.IsTrue(m.IsGateOpen(TutorialGate.G1_Corridor1Entry));
+            m.ReportCheck(A, missing);
+            m.Evaluate(0d);
+            Assert.IsTrue(m.IsGateOpen(TutorialGate.G1_Corridor1Entry), $"{missing} 완료 뒤");
+        }
     }
 
     [Test]
-    public void Q_E_는_게이트_조건이_아니다()
+    public void 공격_스킬_다섯_종은_G1_조건이다()
     {
-        var m = NewModel(A);
-        CompleteZone1(m, A);
-        m.Evaluate(0d);
-        Assert.IsTrue(m.IsGateOpen(TutorialGate.G1_Corridor1Entry));
+        int g1 = TutorialFlowModel.RequiredMaskOf(TutorialGate.G1_Corridor1Entry);
+        foreach (TutorialCheck c in new[] { TutorialCheck.BasicAttack, TutorialCheck.SkillQ, TutorialCheck.SkillE,
+                                             TutorialCheck.SkillR, TutorialCheck.SkillInterrupt })
+            Assert.AreNotEqual(0, g1 & (1 << (int)c), c.ToString());
+        Assert.AreEqual(0, g1 & (1 << (int)TutorialCheck.Corridor1CooldownReset), "쿨 초기화 기록은 게이트 조건 아님");
         Assert.AreEqual(0, TutorialFlowModel.RequiredMaskOf(TutorialGate.G3_Corridor2Entry), "G3 은 존 장부(S4)가 연다");
     }
 
+    [Test]
+    public void 체크는_한_번_켜지면_되돌리지_않는다()
+    {
+        var m = NewModel(A);
+        Assert.IsTrue(m.ReportCheck(A, TutorialCheck.SkillR));
+        Assert.IsFalse(m.ReportCheck(A, TutorialCheck.SkillR), "중복");
+        m.SetPermanentDead(A, true);
+        m.SetPermanentDead(A, false);
+        m.TryGetPlayer(A, out TutorialPlayerProgress p);
+        Assert.IsTrue(p.Has(TutorialCheck.SkillR), "사망·부활로 지워지지 않는다");
+    }
+
     // ─── 교착 방지 ──────────────────────────────────────────────────────
+
+    [Test]
+    public void G1_은_교착_방지로_열리지_않는다()
+    {
+        var m = NewModel(A, B);
+        CompleteZone1(m, A);
+        m.Evaluate(10d);
+        m.Evaluate(10d + Deadlock * 100d);
+        Assert.IsFalse(m.IsGateOpen(TutorialGate.G1_Corridor1Entry), "v8 — 시간 경과로 G1 을 열지 않는다");
+        Assert.IsFalse(TutorialFlowModel.HasDeadlockTimeout(TutorialGate.G1_Corridor1Entry));
+        Assert.IsTrue(TutorialFlowModel.HasDeadlockTimeout(TutorialGate.G2_Zone2Entry));
+
+        Assert.IsTrue(m.TryGetPendingPersonalGate(out TutorialGate g, out int done, out int total, out double at));
+        Assert.AreEqual((TutorialGate.G1_Corridor1Entry, 1, 2, -1d), (g, done, total, at), "대기 표시엔 자동 진행 시각이 없다");
+    }
 
     [Test]
     public void 교착_방지는_첫_완료자_기준_정확히_경계에서_열린다()
     {
         var m = NewModel(A, B);
         var log = Record(m);
-        CompleteZone1(m, A);
+        OpenG1(m, 0d, A, B);
+        m.ReportCheck(A, TutorialCheck.TraitCorridor1);
         m.Evaluate(10d);   // 첫 완료자 시각 = 10
 
         m.Evaluate(10d + Deadlock - 0.001d);
-        Assert.IsFalse(m.IsGateOpen(TutorialGate.G1_Corridor1Entry), "경계 직전");
+        Assert.IsFalse(m.IsGateOpen(TutorialGate.G2_Zone2Entry), "경계 직전");
 
         m.Evaluate(10d + Deadlock);
-        Assert.IsTrue(m.IsGateOpen(TutorialGate.G1_Corridor1Entry), "정확히 경계");
-        CollectionAssert.AreEqual(new[] { (TutorialGate.G1_Corridor1Entry, TutorialGateOpenReason.Timeout) }, log);
-        Assert.AreNotEqual(0, m.TimeoutGateMask & (1 << (int)TutorialGate.G1_Corridor1Entry));
+        Assert.IsTrue(m.IsGateOpen(TutorialGate.G2_Zone2Entry), "정확히 경계");
+        Assert.AreEqual((TutorialGate.G2_Zone2Entry, TutorialGateOpenReason.Timeout), log[log.Count - 1]);
+        Assert.AreNotEqual(0, m.TimeoutGateMask & (1 << (int)TutorialGate.G2_Zone2Entry));
     }
 
     [Test]
     public void 두_번째_완료자는_교착_방지_시계를_다시_시작하지_않는다()
     {
         var m = NewModel(A, B, C);
-        CompleteZone1(m, A);
+        OpenG1(m, 0d, A, B, C);
+        m.ReportCheck(A, TutorialCheck.TraitCorridor1);
         m.Evaluate(10d);
-        CompleteZone1(m, B);
+        m.ReportCheck(B, TutorialCheck.TraitCorridor1);
         m.Evaluate(40d);
 
         m.Evaluate(10d + Deadlock);
-        Assert.IsTrue(m.IsGateOpen(TutorialGate.G1_Corridor1Entry));
+        Assert.IsTrue(m.IsGateOpen(TutorialGate.G2_Zone2Entry));
     }
 
     [Test]
@@ -127,14 +170,15 @@ public sealed class TutorialFlowModelTests
     public void 첫_완료자가_이탈해도_교착_방지_시계는_계속된다()
     {
         var m = NewModel(A, B);
-        CompleteZone1(m, A);
+        OpenG1(m, 0d, A, B);
+        m.ReportCheck(A, TutorialCheck.TraitCorridor1);
         m.Evaluate(10d);
         m.MarkDisconnected(A);
         m.Evaluate(20d);
-        Assert.IsFalse(m.IsGateOpen(TutorialGate.G1_Corridor1Entry), "B 미완료");
+        Assert.IsFalse(m.IsGateOpen(TutorialGate.G2_Zone2Entry), "B 미완료");
 
         m.Evaluate(10d + Deadlock);
-        Assert.IsTrue(m.IsGateOpen(TutorialGate.G1_Corridor1Entry));
+        Assert.IsTrue(m.IsGateOpen(TutorialGate.G2_Zone2Entry));
     }
 
     [Test]
@@ -280,21 +324,20 @@ public sealed class TutorialFlowModelTests
     }
 
     [Test]
-    public void 간파_합계가_목표에_닿으면_G5_가_열린다()
+    public void 연계_합계가_목표에_닿아도_G5_는_마지막_회복_끝에_흐름이_연다()
     {
         var m = NewModel(A);
         var log = Record(m);
         for (int g = 0; g <= (int)TutorialGate.G4_Zone3Entry; g++) m.TryOpenGate((TutorialGate)g);
 
-        m.AddCounter(TutorialCounter.Zone3Interrupts);
-        m.AddCounter(TutorialCounter.Zone3Interrupts);
-        m.Evaluate(1d);
-        Assert.IsFalse(m.IsGateOpen(TutorialGate.G5_SpinnerRealMode));
-
-        m.AddCounter(TutorialCounter.Zone3Interrupts);
+        m.AddCounter(TutorialCounter.Zone3Interrupts, 3);
         m.Evaluate(2d);
-        Assert.IsTrue(m.IsGateOpen(TutorialGate.G5_SpinnerRealMode));
-        Assert.AreEqual((TutorialGate.G5_SpinnerRealMode, TutorialGateOpenReason.CounterReached), log[log.Count - 1]);
+        Assert.AreEqual(3, m.GetCounter(TutorialCounter.Zone3Interrupts));
+        Assert.IsFalse(m.IsGateOpen(TutorialGate.G5_SpinnerRealMode), "v8 — 마지막 회복 끝 전");
+        Assert.IsFalse(TutorialFlowModel.TryGetGateCounter(TutorialGate.G5_SpinnerRealMode, out _));
+
+        Assert.IsTrue(m.RequestGate(TutorialGate.G5_SpinnerRealMode), "마지막 회복 끝 → 존3 흐름이 연다");
+        Assert.AreEqual((TutorialGate.G5_SpinnerRealMode, TutorialGateOpenReason.Manual), log[log.Count - 1]);
     }
 
     [Test]
@@ -318,16 +361,13 @@ public sealed class TutorialFlowModelTests
     }
 
     [Test]
-    public void 적중은_목표에서_멈춘다()
+    public void 기본_공격은_한_번이면_완료다()
     {
         var m = NewModel(A);
-        for (int i = 0; i < TutorialFlowModel.AttackHitsRequired; i++)
-            Assert.IsTrue(m.ReportCheck(A, TutorialCheck.AttackHit));
-        Assert.IsFalse(m.ReportCheck(A, TutorialCheck.AttackHit), "완료 뒤 적중은 무시");
-
+        Assert.IsTrue(m.ReportCheck(A, TutorialCheck.BasicAttack));
+        Assert.IsFalse(m.ReportCheck(A, TutorialCheck.BasicAttack), "완료 뒤 보고는 무시");
         m.TryGetPlayer(A, out TutorialPlayerProgress p);
-        Assert.AreEqual(TutorialFlowModel.AttackHitsRequired, p.AttackHits);
-        Assert.IsTrue(p.Has(TutorialCheck.AttackHit));
+        Assert.IsTrue(p.Has(TutorialCheck.BasicAttack));
     }
 
     [Test]
@@ -384,11 +424,19 @@ public sealed class TutorialFlowModelTests
         CompleteZone1(m, A);
         m.Evaluate(5d);
         m.TryGetPendingPersonalGate(out _, out done, out total, out at);
-        Assert.AreEqual((1, 3, 5d + Deadlock), (done, total, at));
+        Assert.AreEqual((1, 3, -1d), (done, total, at), "G1 은 자동 진행 없음");
 
         m.SetPermanentDead(C, true);
         m.TryGetPendingPersonalGate(out _, out done, out total, out _);
         Assert.AreEqual((1, 2), (done, total));
+
+        // 특성 게이트(G2)는 자동 진행 시각을 준다.
+        CompleteZone1(m, B);
+        m.Evaluate(6d);
+        m.ReportCheck(A, TutorialCheck.TraitCorridor1);
+        m.Evaluate(7d);
+        Assert.IsTrue(m.TryGetPendingPersonalGate(out g, out done, out total, out at));
+        Assert.AreEqual((TutorialGate.G2_Zone2Entry, 1, 2, 7d + Deadlock), (g, done, total, at));
     }
 
     [Test]

@@ -1613,6 +1613,26 @@ public class Player : Unit
     public event System.Action<AttackInfo, AttackHitContext> ServerAttackReceived;
 
     /// <summary>
+    /// [서버] 기본 공격(좌클릭) 1타가 <b>실제로 시작</b>됐다(적중 무관) — 가붕이 콤보 한 타 시작 · 거너 한 발 발사 · 어쌔신 한 타(강타 포함) 시작.
+    /// 거부된 요청·거너 준비 자세만으로는 안 난다. R 대상 확정 좌클릭은 기본 공격 경로를 타지 않는다. 튜토리얼 판정 훅(v8 Z1-3).
+    /// 발행은 각 기본 공격 구현이 <see cref="RaiseServerBasicAttackStarted"/> 로.
+    /// </summary>
+    public static event System.Action<Player> ServerBasicAttackStarted;
+
+    // 도메인 리로드를 끈 Play 진입에서도 이전 세션 구독자가 남지 않게 비운다.
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetBasicAttackEvent() => ServerBasicAttackStarted = null;
+
+    /// <summary>[서버] <see cref="ServerBasicAttackStarted"/> 발행. 서버(호스트)가 아니면 무시.</summary>
+    public void RaiseServerBasicAttackStarted()
+    {
+        if (!IsServer)
+            return;
+
+        ServerBasicAttackStarted?.Invoke(this);
+    }
+
+    /// <summary>
     /// [서버] 공격 판정 경로(평타·스킬·투사체)가 적중 대상 목록을 넘긴다. 대상이 없으면 발행하지 않는다.
     /// 🔴 "효과가 만든 피해"(패시브 추가타 등)는 여기로 보내지 말 것 — 적중 효과가 자기 자신을 재발동시킨다.
     /// </summary>
@@ -1659,6 +1679,9 @@ public class Player : Unit
         // 있고 이 메서드는 서버 전용 공격 판정에서만 불린다 — 리모트 클라에는 도착하지 않는다.
         // 그래서 여기서 쉴드 감소를 확인해 PlayerShieldVfx 가 전 피어로 퍼뜨리게 한다. (판정 영향 없음)
         int shieldBefore = CurrentShield;
+
+        // 레이드 보스전 한 방 즉사 금지(PLAN-boss-raid.md, 보스가 켤 때만 — 평소엔 Ratio 0 이라 그대로).
+        attackInfo.damage = BossRaidRules.CapHitDamage(attackInfo.damage, FinalMaxHp, PlayerHitDamageCap.Ratio);
 
         bool result = base.ReceiveAttack(attackInfo, hitContext);
         if (!result)

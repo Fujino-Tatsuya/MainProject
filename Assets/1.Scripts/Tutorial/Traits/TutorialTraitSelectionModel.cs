@@ -24,6 +24,8 @@ public enum TutorialTraitJoinResult
     AlreadyInRound,
     /// <summary>시작한 라운드가 없다(또는 서버 준비 전).</summary>
     NoRound,
+    /// <summary>제시 없이 바로 무작위 1장을 획득했다(<see cref="TutorialTraitSelectionModel.AddParticipantWithoutOffer"/> — 디버그 구간 스킵).</summary>
+    Granted,
 }
 
 /// <summary>
@@ -147,6 +149,38 @@ public sealed class TutorialTraitSelectionModel
         state.Personal = false;
         Offer(state, roundOfferCount, next);
         return state.Chosen ? TutorialTraitJoinResult.Empty : TutorialTraitJoinResult.Offered;
+    }
+
+    /// <summary>
+    /// 지금 라운드에 참가자 1명을 <b>제시 없이</b> 더하고 바로 무작위 1장을 획득시킨다(할 일 34 디버그 구간 스킵).
+    /// 제시 후보·제시 번호(<see cref="GetOfferSeq"/>)를 건드리지 않으므로 클라 창이 열리지 않는다. 후보는 <see cref="AddParticipant"/> 와 같은
+    /// 규칙(획득·사용 불가 제외)으로 뽑고, 라운드 장 수가 0 이거나 풀이 소진됐으면 <see cref="TutorialTraitJoinResult.Empty"/>.
+    /// 이미 참가자면 무시한다. <paramref name="traitIndex"/> = 획득한 인덱스(<see cref="TutorialTraitJoinResult.Granted"/> 아니면 -1).
+    /// </summary>
+    public TutorialTraitJoinResult AddParticipantWithoutOffer(ulong clientId, Func<int, int> next, out int traitIndex)
+    {
+        if (next == null)
+            throw new ArgumentNullException(nameof(next));
+
+        traitIndex = -1;
+        if (Round == 0)
+            return TutorialTraitJoinResult.NoRound;
+
+        PlayerState state = GetOrCreate(clientId);
+        if (state.InRound)
+            return TutorialTraitJoinResult.AlreadyInRound;
+
+        state.InRound = true;
+        state.Personal = false;
+        state.Chosen = true;
+        state.Offered.Clear();
+        PickCandidates(poolSize, state.Acquired, unusable, Math.Min(1, roundOfferCount), next, candidateScratch);
+        if (candidateScratch.Count == 0)
+            return TutorialTraitJoinResult.Empty;
+
+        traitIndex = candidateScratch[0];
+        state.Acquired.Add(traitIndex);
+        return TutorialTraitJoinResult.Granted;
     }
 
     /// <summary>
