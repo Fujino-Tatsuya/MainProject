@@ -25,7 +25,8 @@ public enum TutorialGuideTextStatus
 public static class TutorialGuideText
 {
     // {Q} {mm:ss} {스킬명} 처럼 중괄호 안에 중괄호가 없는 토큰. 콜론·한글 키를 허용한다.
-    private static readonly Regex Placeholder = new Regex(@"\{([^{}]+)\}", RegexOptions.Compiled);
+    // 로컬라이징(Loc.Format·Strings 시트 검증)과 같은 패턴 하나를 쓴다.
+    private static readonly Regex Placeholder = LocText.Placeholder;
 
     public static string Suffix(TutorialCharacter character) => character switch
     {

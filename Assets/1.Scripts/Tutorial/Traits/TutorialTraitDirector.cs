@@ -274,6 +274,53 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
         return result;
     }
 
+    /// <summary>
+    /// [서버, 디버그 구간 스킵 — 할 일 34] 아무에게도 제시하지 않고 새 라운드만 연다(라운드 번호 + 창 표시 옵션).
+    /// 참가자는 <see cref="GrantParticipantServer"/> 로 넣는다 — 호출자가 그 사이에 이 라운드 번호를 복도에 묶어 둘 수 있게 둘로 나눴다.
+    /// </summary>
+    public void StartRoundWithoutOfferServer(TutorialTraitRoundDisplay display)
+    {
+        if (!CanServe)
+            return;
+
+        int offerCount = pool != null ? pool.OfferCount : 0;
+        model.StartRound(Array.Empty<ulong>(), offerCount, random.Next);
+        roundDisplay.Value = (byte)display;
+        round.Value = model.Round;
+        roundCompletionRaised = false;
+        RebuildEntries();
+        SyncSelectionShields();
+        Edit.Log($"{Tag} 라운드 {model.Round} 시작 — 제시 없음(구간 스킵).", this);
+    }
+
+    /// <summary>
+    /// [서버, 디버그 구간 스킵 — 할 일 34] 지금 라운드에 참가자 1명을 <b>제시 없이</b> 넣고 바로 무작위 1장을 획득시킨다
+    /// (<see cref="TutorialTraitSelectionModel.AddParticipantWithoutOffer"/>). 제시 행·제시 번호가 생기지 않아 클라 창이 열리지 않는다.
+    /// 효과 적용·<see cref="ServerTraitChosen"/>(Auto = true)·라운드 완료 판정은 <see cref="AutoChooseServer"/> 와 같다.
+    /// </summary>
+    public TutorialTraitJoinResult GrantParticipantServer(ulong clientId)
+    {
+        if (!CanServe)
+            return TutorialTraitJoinResult.NoRound;
+
+        TutorialTraitJoinResult result = model.AddParticipantWithoutOffer(clientId, random.Next, out int traitIndex);
+        if (result == TutorialTraitJoinResult.Granted)
+        {
+            FinishAcquire(clientId, traitIndex, model.Round, auto: true, "자동·제시 없음");
+            return result;
+        }
+
+        if (result == TutorialTraitJoinResult.Empty)
+        {
+            RebuildEntries();
+            SyncSelectionShields();
+            Edit.Log($"{Tag} 라운드 {model.Round} 참가자 추가 client {clientId} — 제시 없이 획득할 후보 없음.", this);
+            CheckRoundCompleted();
+        }
+
+        return result;
+    }
+
     /// <summary>[서버] 그 플레이어가 지금 라운드 참가자인가(제시 중·고름·0장 모두).</summary>
     public bool IsInRoundServer(ulong clientId) => model != null && model.IsInRound(clientId);
 
@@ -531,6 +578,14 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
             return false;
         }
 
+        FinishAcquire(clientId, traitIndex, chosenRound, auto, auto ? "자동" : "수동");
+        return true;
+    }
+
+    // 모델이 획득을 확정한 뒤의 공통 처리 — 효과 적용·재선택 이어가기·행/무적 동기화·획득 통지·라운드 완료 판정.
+    // 선택 창 경로(CommitChoice)와 제시 없는 획득(GrantParticipantServer)이 같이 쓴다. how = 로그용.
+    private void FinishAcquire(ulong clientId, int traitIndex, int chosenRound, bool auto, string how)
+    {
         TutorialTraitDefinition trait = pool != null ? pool.Get(traitIndex) : null;
         ApplyEffect(clientId, traitIndex, trait);
 
@@ -544,11 +599,10 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
         if (reselecting)
             SyncResetBusy();
 
-        Edit.Log($"{Tag} client {clientId} 특성 획득 '{trait?.Id}'({traitIndex}) {(auto ? "자동" : "수동")} — 라운드 {chosenRound}" +
+        Edit.Log($"{Tag} client {clientId} 특성 획득 '{trait?.Id}'({traitIndex}) {how} — 라운드 {chosenRound}" +
                  $"{(reselecting ? $" (재선택, 남은 {resetModel.RoundsLeft(clientId)})" : "")}.", this);
         ServerTraitChosen?.Invoke(new TutorialTraitChosen(clientId, traitIndex, trait, auto, chosenRound));
         CheckRoundCompleted();
-        return true;
     }
 
     private void CheckRoundCompleted()

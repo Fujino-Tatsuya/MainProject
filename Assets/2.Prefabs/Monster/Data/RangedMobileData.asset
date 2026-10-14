@@ -11,8 +11,9 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 576305eb4d78f0c4eb97b90edc8cae21, type: 3}
   m_Name: RangedMobileData
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   archetype: 2
+  rank: 0
   attackDamage: 7
   moveSpeed: 3
   chaseSpeed: 3.5
@@ -25,23 +26,43 @@ MonoBehaviour:
   detectionHeightTolerance: 2
   attackRange: 9
   leashRadius: 16
+  retargetInterval: 0
   returnSpeedMultiplier: 5
   turnSpeed: 10
+  avoidanceRadius: 0.3
+  obstacleAvoidance: 2
   projectilePrefab: {fileID: 8845096525963102658, guid: 54c0baf85e460bc478f1db5826ccde56, type: 3}
   projectileSpeed: 13
   projectileLifetime: 4
   minStandoff: 5
+  projectileArcHeight: 0
+  projectileSplashRadius: 0
+  repositionBetweenAttacks: 0
+  retreatMinDuration: 1.2
+  repositionMinDuration: 1.2
   attackDuration: 0.6
   attackWindup: 0.25
+  cancelWindupIfTargetLeavesRange: 0
+  engageAttackDelay: 0
   maxGroggyCount: 0
   groggyDuration: 3
   startsWithSuperArmor: 0
   hasSuperArmorWhileAttacking: 0
   hitStunDuration: 0.4
   despawnDelay: 2
-  isMidBoss: 0
   animSpeedParam: RunBlend
   attackTrigger: Attack
+  attackFinishTrigger: 
   hitTrigger: Hit
   groggyBool: Groggy
   deathTrigger: Death
+  locomotionState: Movement
+  locomotionClipSpeed: 0
+  locomotionFullBlendSpeed: 0
+  locomotionIdleCycleSeconds: 0
+  locomotionMoveCycleSeconds: 0
+  locomotionFullBlendWhileMoving: 0
+  locomotionAnimSpeedRange: {x: 0.5, y: 2.5}
+  locomotionPlaybackScale: 1
+  animatorControllerOverride: {fileID: 0}
+  telegraphStyle: {fileID: 11400000, guid: 92c647bea0fdba64c89c3179e14ac3e9, type: 2}

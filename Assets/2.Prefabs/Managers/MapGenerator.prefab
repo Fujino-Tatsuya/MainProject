@@ -1,0 +1,114 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &3329590066078240817
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6767763067112095287}
+  - component: {fileID: 409488857172988334}
+  - component: {fileID: 3299606039141975421}
+  - component: {fileID: 1605589812811287467}
+  - component: {fileID: 8527785020554237328}
+  - component: {fileID: 1156533708695933950}
+  m_Layer: 0
+  m_Name: MapGenerator
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &6767763067112095287
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3329590066078240817}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &409488857172988334
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3329590066078240817}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b2bcc272ef7ac77498c09cb17d19459a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MapGenerator
+  Config: {fileID: 11400000, guid: 250983f3cafc78a42a010b5c8c881b5a, type: 2}
+  ZoneLayoutCatalog: {fileID: 11400000, guid: 8e5bcb7e28210994bac77da44953f261, type: 2}
+  Catalog: {fileID: 11400000, guid: 3d40564bdff3c384a8a52a6bc19e5972, type: 2}
+  LayoutPlacer: {fileID: 8527785020554237328}
+  ContentSpawner: {fileID: 3299606039141975421}
+  AutoGenerateOnStart: 0
+--- !u!114 &3299606039141975421
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3329590066078240817}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 42c0229d584264a48915fdfd020ac89f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MapContentSpawner
+--- !u!114 &1605589812811287467
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3329590066078240817}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a1368701adcc57141b54d24c1009bd29, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MapOverviewUI
+  Generator: {fileID: 409488857172988334}
+  PanelScreenRatio: 0.8
+  BackgroundColor: {r: 0, g: 0, b: 0, a: 0.95}
+  CombatZoneColor: {r: 0.45, g: 0.55, b: 0.65, a: 0.85}
+  BossZoneColor: {r: 0.75, g: 0.25, b: 0.25, a: 0.9}
+  SpawnZoneColor: {r: 0.25, g: 0.7, b: 0.35, a: 0.9}
+  QuestZoneColor: {r: 0.85, g: 0.75, b: 0.25, a: 0.9}
+  RoleIconSize: 48
+  CorridorMaxSpan: 60
+--- !u!114 &8527785020554237328
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3329590066078240817}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ad4f71ce5092bbd6e8fa1c24d5e7f90b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LayoutPlacer
+--- !u!114 &1156533708695933950
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3329590066078240817}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 903a1b7c13836134592f9e0132502576, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::WallOcclusionDriver
+  settings: {fileID: 11400000, guid: 20dd053a69504168abce216ce7d26573, type: 2}

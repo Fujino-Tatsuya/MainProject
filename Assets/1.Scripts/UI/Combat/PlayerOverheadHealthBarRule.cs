@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Globalization;
 using UnityEngine;
 
 /// <summary>
@@ -12,13 +14,14 @@ public sealed class PlayerOverheadHealthBarRule : MonoBehaviour, IOverheadHealth
     [SerializeField] Player player;
     [SerializeField] Color localPlayerColor = new Color(0.2f, 0.8f, 0.25f, 1f);
     [SerializeField] Color partyMemberColor = new Color(0.25f, 0.55f, 1f, 1f);
-    [Tooltip("{0} = 1부터 세는 플레이어 번호")]
+    [Tooltip("{0} = 1부터 세는 플레이어 번호. Strings 시트에 UI.Overhead.PlayerLabel 행이 있으면 그쪽이 이긴다(이 값은 폴백).")]
     [SerializeField] string labelFormat = "P{0}";
 
     ulong _labelClientId = ulong.MaxValue;
     string _label;
     PlayerDashController _dash;
     PlayerLifeCycleController _lifeCycle;
+    PlayerEncounterLock _encounterLock;
 
     void Awake()
     {
@@ -28,10 +31,12 @@ public sealed class PlayerOverheadHealthBarRule : MonoBehaviour, IOverheadHealth
         {
             _dash = player.GetComponent<PlayerDashController>();
             _lifeCycle = player.GetComponent<PlayerLifeCycleController>();
+            _encounterLock = player.GetComponent<PlayerEncounterLock>();
         }
     }
 
-    public bool ShouldShow => player != null;
+    // 연출 숨김(보스 엘리베이터) 동안만 감춘다.
+    public bool ShouldShow => player != null && (_encounterLock == null || !_encounterLock.IsCinematicHidden);
 
     // 오프라인(IsSpawned=false)은 혼자 하는 로컬 플레이어로 본다.
     // 소유권은 스폰 후에 확정되므로 매 프레임 판정한다.
@@ -58,9 +63,29 @@ public sealed class PlayerOverheadHealthBarRule : MonoBehaviour, IOverheadHealth
             if (clientId != _labelClientId)
             {
                 _labelClientId = clientId;
-                _label = string.Format(labelFormat, clientId + 1);
+                _label = LabelText(clientId + 1, labelFormat);
             }
             return _label;
         }
+    }
+
+    void OnEnable() => Loc.Changed += ForceRelabel;
+    void OnDisable() => Loc.Changed -= ForceRelabel;
+    void ForceRelabel() => _labelClientId = ulong.MaxValue;
+
+    /// <summary>
+    /// 머리 위 이름 — Strings 시트에 <see cref="UiStrings.OverheadPlayerLabel"/>({n}) 행이 있으면 그 문구,
+    /// 없으면 직렬화된 <paramref name="legacyFormat"/>({0}) 폴백(프리팹 값을 고치지 않고 키로 옮기기 위해서다).
+    /// </summary>
+    public static string LabelText(ulong number, string legacyFormat)
+    {
+        string n = number.ToString(CultureInfo.InvariantCulture);
+        string template = Loc.Get(UiStrings.OverheadPlayerLabel.Key, null);
+        if (template != null)
+            return TutorialGuideText.Fill(template, new Dictionary<string, string> { ["n"] = n });
+
+        return string.IsNullOrEmpty(legacyFormat)
+            ? TutorialGuideText.Fill(UiStrings.OverheadPlayerLabel.Ko, new Dictionary<string, string> { ["n"] = n })
+            : string.Format(legacyFormat, n);
     }
 }

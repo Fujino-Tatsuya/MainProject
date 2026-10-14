@@ -27,8 +27,10 @@ public sealed class PlayerGameRuleData : ScriptableObject
     [SerializeField] private LayerMask groundMask = DefaultGroundMask;
     [Tooltip("Soul 상태에서 접지로 인정하는 레이어. Player/Soul/전투 판정 레이어는 넣지 않는다.")]
     [SerializeField] private LayerMask soulGroundMask = DefaultGroundMask;
-    [Tooltip("켜면 생존 플레이어끼리 이동을 막는다. Soul은 이 값과 무관하게 Player를 통과한다.")]
+    [Tooltip("켜면 생존 플레이어끼리 이동을 막는다. Soul은 이 값과 무관하게 Player를 통과한다. (기획 10-11: 켬)")]
     [SerializeField] private bool blockOtherPlayers;
+    [Tooltip("몬스터·다른 플레이어와 겹쳤을 때 플레이어를 빈 자리로 밀어내는 최대 속도(m/s). 몬스터는 움직이지 않는다. 0이면 밀어내지 않는다.")]
+    [DataTableIgnore] [SerializeField, Min(0f)] private float unitSeparationSpeed = 5f;
 
     [Header("중력")]
     [Tooltip("Motor 수동 중력의 최대 낙하 속도(m/s).")]
@@ -50,7 +52,15 @@ public sealed class PlayerGameRuleData : ScriptableObject
              "성공 = 열린 카운터 창(23호·중간보스·허수아비)을 맞혀 소비한 경우만. 한 번의 시전에서 여러 대상이 성공해도 1회.")]
     [SerializeField, Range(0f, 1f)] private float interruptSuccessCooldownReduction = InterruptSuccessCooldownModel.DefaultReductionRatio;
 
+    [Header("체력 재생")]
+    [Tooltip("마지막 피격 후 이 시간(초)이 지나야 체력 재생이 시작된다. 피격 = 체력이나 보호막이 실제로 깎인 피해(추락 포함). 다시 맞으면 처음부터 센다.")]
+    [SerializeField, Min(0f)] private float regenDelaySeconds = PlayerHealthRegenModel.DefaultDelaySeconds;
+    [Tooltip("재생 중 초당 회복량 = 최종 최대 체력 × 이 비율. 최대 체력에서 멈춘다. 0 이면 재생 없음.")]
+    [SerializeField, Range(0f, 1f)] private float regenPercentPerSecond = PlayerHealthRegenModel.DefaultPercentPerSecond;
+
     public float FallDamageRatio => fallDamageRatio;
+    public float HealthRegenDelaySeconds => Mathf.Max(0f, regenDelaySeconds);
+    public float HealthRegenPercentPerSecond => Mathf.Clamp01(regenPercentPerSecond);
     public float InterruptSuccessCooldownReduction => Mathf.Clamp01(interruptSuccessCooldownReduction);
     public float MaxWalkableSlopeAngle => maxWalkableSlopeAngle;
     public float StepOffset => Mathf.Max(0f, stepOffset);
@@ -58,6 +68,7 @@ public sealed class PlayerGameRuleData : ScriptableObject
     public LayerMask GroundMask => groundMask;
     public LayerMask SoulGroundMask => soulGroundMask;
     public bool BlockOtherPlayers => blockOtherPlayers;
+    public float UnitSeparationSpeed => Mathf.Max(0f, unitSeparationSpeed);
     public float MaxFallSpeed => Mathf.Max(0f, maxFallSpeed);
     public float MinKnockbackTime => Mathf.Max(0f, minKnockbackTime);
     public float MaxKnockbackTime => Mathf.Max(MinKnockbackTime, maxKnockbackTime);

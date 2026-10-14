@@ -118,6 +118,24 @@ public sealed class DataTableApplierTests
     }
 
     [Test]
+    public void Bind_LocalizedText_IsNotApplied_OneWarningPerSheet()
+    {
+        DataTableTestData data = Make("A");
+        var issues = new DataTableIssues();
+
+        // 번역 문구는 Strings 가 원본 — 옛 xlsx 의 칸은 (자리표시자가 틀려도) 오류 없이 건너뛴다.
+        List<DataTableWrite> writes = Bind(issues, new TestLookup(data),
+            Entry("A", "caption", "표 문구 {nope}"),
+            Entry("A", "maxHp", "5"));
+
+        Assert.That(issues.HasErrors, Is.False, string.Join("\n", issues.Items));
+        Assert.That(issues.Items.Count(i => i.Kind == DataTableIssueKind.Warning), Is.EqualTo(1));
+        Assert.That(writes.Select(w => w.Source.Field), Is.EqualTo(new[] { "maxHp" }), "Verify(Diff)·적용 대상도 아니다");
+        DataTableApplier.ApplyInMemory(writes);
+        Assert.That(data.caption, Is.EqualTo("문구"));
+    }
+
+    [Test]
     public void Bind_UnknownSheetAssetAndDoubleWrite_AreErrors_UnmentionedAssetIsWarning()
     {
         DataTableTestData a = Make("A");

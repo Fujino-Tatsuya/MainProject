@@ -287,7 +287,7 @@ MonoBehaviour:
     OpenLocalPosition: {x: 0.03614446, y: 2.5372198, z: -9.933152}
     HasOpenPosition: 1
   openDuration: 1.5
-  interactRadius: 2.5
+  interactRadius: 7
   monitorScreenEnabled: 1
   screenLocalPosition: {x: -0.219, y: 1.2047, z: 0.2227}
   screenLocalEuler: {x: 45.6, y: 134.1, z: 0}

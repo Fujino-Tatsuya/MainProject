@@ -16,17 +16,25 @@ public sealed class TitleCrtFx : MonoBehaviour
 {
     public static TitleCrtFx Active { get; private set; }
 
-    [Header("상시 찢김")]
+    // 모든 값은 Play 중 인스펙터에서 바꾸면 다음 사건부터 바로 반영된다(매 프레임 읽는다). 범위 = (최소, 최대) 무작위.
+    [Header("상시 찢김 (가로 띠가 옆으로 밀림) — (최소, 최대)")]
+    [Tooltip("찢김 사이 간격(초).")]
     [SerializeField] private Vector2 _tearInterval = new(2f, 3f);
+    [Tooltip("한 번 찢김이 지속되는 시간(초).")]
     [SerializeField] private Vector2 _tearDuration = new(0.05f, 0.10f);
+    [Tooltip("찢어지는 띠의 반높이(화면 비율, 0.01 = 화면 높이의 1%).")]
     [SerializeField] private Vector2 _tearHalfHeight = new(0.01f, 0.035f);
+    [Tooltip("띠가 옆으로 밀리는 폭(화면 비율).")]
     [SerializeField] private Vector2 _tearOffset = new(0.012f, 0.035f);
 
-    [Header("상시 글리치 버스트 (Idle·접근 — 메인 모니터 지직거림)")]
+    [Header("상시 글리치 버스트 (Idle·접근 — 메인 모니터 지직거림) — (최소, 최대)")]
     [Tooltip("켜져 있으면 짧은 버스트를 불규칙하게 넣는다. 메뉴에서는 끈다(클릭 판정이 흔들리지 않게).")]
     [SerializeField] private bool _ambientBursts = true;
+    [Tooltip("지직거림 사이 간격(초).")]
     [SerializeField] private Vector2 _ambientInterval = new(0.6f, 1.8f);
+    [Tooltip("지직거림 세기(0~1).")]
     [SerializeField] private Vector2 _ambientStrength = new(0.25f, 0.6f);
+    [Tooltip("지직거림 길이(초).")]
     [SerializeField] private Vector2 _ambientDuration = new(0.06f, 0.18f);
 
     private float _nextAmbient;
@@ -69,6 +77,17 @@ public sealed class TitleCrtFx : MonoBehaviour
     }
 
     public void Unregister(Material m) => _targets.Remove(m);
+
+    // 머티리얼별 찢김·글리치 배율(없으면 1). 설정창이 열린 동안 중앙 모니터만 줄인다 — 벽 모니터는 그대로(팀장 10-12).
+    private readonly Dictionary<Material, float> _effectScale = new();
+
+    /// <summary>이 머티리얼의 찢김 폭·글리치 세기 배율(1 = 원래). <see cref="TitleMonitorDisplay.SetSettingsReadable"/> 가 쓴다.</summary>
+    public void SetEffectScale(Material m, float scale)
+    {
+        if (m == null) return;
+        if (Mathf.Approximately(scale, 1f)) _effectScale.Remove(m);
+        else _effectScale[m] = Mathf.Clamp01(scale);
+    }
 
     /// <summary>글리치 버스트. 즉시 피크 → 감쇠. 진행 중인 버스트보다 약하면 무시된다.</summary>
     public void Burst(float strength, float duration)
@@ -114,8 +133,9 @@ public sealed class TitleCrtFx : MonoBehaviour
             Material m = _targets[i];
             if (m == null) { _targets.RemoveAt(i); continue; }
             m.SetFloat(IdTime, _time);
-            m.SetFloat(IdGlitch, glitch);
-            m.SetVector(IdTear, _tear);
+            float k = _effectScale.TryGetValue(m, out float s) ? s : 1f;
+            m.SetFloat(IdGlitch, glitch * k);
+            m.SetVector(IdTear, k < 1f ? new Vector4(_tear.x, _tear.y, _tear.z * k, _tear.w) : _tear);   // z = 가로 밀림 폭
         }
     }
 

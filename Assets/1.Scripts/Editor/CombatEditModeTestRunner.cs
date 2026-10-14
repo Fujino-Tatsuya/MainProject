@@ -28,7 +28,10 @@ internal static class CombatEditModeTestRunner
         "^BossCounter",  // BossCounterWindupGateTests / BossCounterProgressTests / BossCounterDataTests
         "^BossContactReach",      // BossContactReachPolicyTests — 접촉 공격 개시 거리
         "^BossOpening",  // BossOpeningAttackPolicyTests
-        "^BossAggro"     // BossAggroPolicyTests
+        "^BossRaidRules", // BossRaidRulesTests — 레이드 변형 구간 예약·인원 HP·피해 상한(PLAN-boss-raid W1)
+        "^BossAggro",    // BossAggroPolicyTests
+        "^TelegraphStyle", // TelegraphStyleTests — 공격 예고 색·마스크 기본값·연결(PLAN-telegraph-style)
+        "^MonsterSkyStrike" // MonsterSkyStrikeTests — 수직 낙하 포격 판정(같은 바닥·평면 반경, PLAN-monster-tells)
     };
 
     const string Tag = "[CombatTests]";

@@ -356,8 +356,9 @@ public sealed class FogManager : MonoBehaviour
         Shader.SetGlobalFloat(ID_DimEnabled, 1f);
         Shader.SetGlobalFloat(ID_DimPlayerY, playerPos.y);
         Shader.SetGlobalVector(ID_DimPlayerXZ, new Vector4(playerPos.x, playerPos.z, 0f, 0f));
-        Shader.SetGlobalFloat(ID_ViewRange, p.viewRange);
-        Shader.SetGlobalFloat(ID_ViewFade, p.viewFade);
+        // 설정창 그래픽 탭 "Vignette Size / Edge"(팀장 10-12) — 저작값에 배율만 곱한다. 0(시야 디밍 끔)은 그대로 0.
+        Shader.SetGlobalFloat(ID_ViewRange, p.viewRange * GraphicsQualityConfig.VignetteOpenScale);   // 비네트 크기 ↑ = 보이는 반경 ↓
+        Shader.SetGlobalFloat(ID_ViewFade, Mathf.Max(0.0001f, p.viewFade * GraphicsQualityConfig.VignetteFadeScale));
         Shader.SetGlobalFloat(ID_DimRangeUp, p.dimRangeUp);
         Shader.SetGlobalFloat(ID_DimRangeDown, p.dimRangeDown);
         Shader.SetGlobalFloat(ID_DimFadeUp, p.dimFadeUp);

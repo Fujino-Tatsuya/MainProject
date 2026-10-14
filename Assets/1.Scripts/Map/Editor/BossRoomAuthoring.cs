@@ -353,7 +353,9 @@ public static class BossRoomAuthoring
         // (Env_floor_basic_typeA, 0.50)보다 0.11 높은 안전망이 만들어졌다. 그 결과 이 안전망을
         // 바닥으로 잡는 모든 것(폭탄·장판·착지점)이 타일보다 0.11 떠 있었다.
         // 슬래브는 수십 장이고 발판은 몇 개뿐이므로, 높이를 1cm 단위로 묶어 표를 세면 보행면이 이긴다.
-        var floorTopVotes = new System.Collections.Generic.Dictionary<int, int>();
+        // 🔴 2026-10-14: 개수가 아니라 **XZ 면적**으로 센다 — 바닥을 floor_stone(0.23)으로 바꾼 뒤 솟은 트렌치 덮개(0.51, 작은 판 12장)가
+        //    개수로 이겨서 BossFloorCollider 윗면이 0.5 가 됐고 플레이어가 그 턱을 못 올라갔다.
+        var floorTopVotes = new System.Collections.Generic.Dictionary<int, float>();
 
         foreach (Renderer renderer in root.GetComponentsInChildren<Renderer>(true))
         {
@@ -378,8 +380,8 @@ public static class BossRoomAuthoring
             hasFloor = true;
 
             int bucket = Mathf.RoundToInt(bounds.max.y * 100f);   // 1cm 단위
-            floorTopVotes.TryGetValue(bucket, out int votes);
-            floorTopVotes[bucket] = votes + 1;
+            floorTopVotes.TryGetValue(bucket, out float votes);
+            floorTopVotes[bucket] = votes + bounds.size.x * bounds.size.z;   // 면적 가중
         }
 
         if (!hasAny)
@@ -391,11 +393,11 @@ public static class BossRoomAuthoring
             return true;
         }
 
-        int bestBucket = 0, bestVotes = -1;
+        int bestBucket = 0; float bestVotes = -1f;
         var distribution = new System.Text.StringBuilder();
         foreach (var pair in floorTopVotes)
         {
-            distribution.Append($"y{pair.Key / 100f:F2}×{pair.Value} ");
+            distribution.Append($"y{pair.Key / 100f:F2}×{pair.Value:F0}m² ");
 
             // 표가 같으면 낮은 쪽을 택한다 — 솟은 발판보다 보행면을 기준으로 두는 게 안전하다.
             if (pair.Value > bestVotes || (pair.Value == bestVotes && pair.Key < bestBucket))
@@ -407,7 +409,7 @@ public static class BossRoomAuthoring
 
         floorTopY = bestBucket / 100f;
         Debug.Log($"[BossRoomAuthoring] 바닥 상단 Y 후보 분포 — {distribution}→ 채택 {floorTopY:F2} " +
-                  $"(최빈값. 솟은 발판이 최댓값을 끌어올리는 것을 막는다)");
+                  $"(면적 최대. 솟은 발판·덮개가 끌어올리는 것을 막는다)");
         return true;
     }
 

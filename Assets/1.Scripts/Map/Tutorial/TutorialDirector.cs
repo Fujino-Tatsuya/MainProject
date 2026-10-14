@@ -32,9 +32,10 @@ using UnityEngine;
 ///  · 서버 → 클라 자막 → <see cref="ShowSubtitleServer"/>(id, 키·값 인자, 대상 null = 전원 — 캐릭터 전용은 <see cref="GetClientsOfCharacterServer"/>). 강조·목표 패널은 흐름 파일이 클라에서 직접
 ///  · S9 존3(v8) → <see cref="AddCounterServer"/>(Zone3Interrupts = 연계 벽 충돌) · 마지막 벽 충돌 회복 뒤 <see cref="RequestGateServer"/>(G5)
 ///  · S12 특성 → 개인 게이트가 <see cref="TutorialGateOpenReason.Timeout"/> 으로 열리면 미선택자 자동 획득
+///  · 할 일 34 구간 스킵(QA, 에디터·Development Build 전용) → TutorialDirector.Skip.cs 의 호스트 전용 ServerRpc → <see cref="TutorialSkipController"/>
 /// </summary>
 [DisallowMultipleComponent]
-public sealed class TutorialDirector : NetworkBehaviour
+public sealed partial class TutorialDirector : NetworkBehaviour
 {
     /// <summary>복제되는 개인 진행.</summary>
     public struct PlayerState : INetworkSerializable, IEquatable<PlayerState>

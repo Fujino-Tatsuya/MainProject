@@ -29,9 +29,9 @@ public sealed class DirectIPv4ConnectionProvider : ISessionConnectionProvider
 
     public SessionConnectionMode Mode => SessionConnectionMode.DirectIPv4;
 
-    public bool IsAvailable(out string unavailableReason)
+    public bool IsAvailable(out SessionError unavailable)
     {
-        unavailableReason = string.Empty;
+        unavailable = default;
         return true;
     }
 
@@ -39,7 +39,7 @@ public sealed class DirectIPv4ConnectionProvider : ISessionConnectionProvider
     {
         if (cancellationToken.IsCancellationRequested)
         {
-            return Task.FromResult(SessionStartResult.Failed("세션 시작이 취소되었습니다."));
+            return Task.FromResult(SessionStartResult.Failed(ErrorCatalog.NetStartCanceled));
         }
 
         ApplyConnectionData(_address, _port);
@@ -50,12 +50,12 @@ public sealed class DirectIPv4ConnectionProvider : ISessionConnectionProvider
     {
         if (cancellationToken.IsCancellationRequested)
         {
-            return Task.FromResult(SessionStartResult.Failed("세션 시작이 취소되었습니다."));
+            return Task.FromResult(SessionStartResult.Failed(ErrorCatalog.NetStartCanceled));
         }
 
-        if (!TryParseJoinInput(joinInput, out var address, out var port, out var failureReason))
+        if (!TryParseJoinInput(joinInput, out var address, out var port, out var failure))
         {
-            return Task.FromResult(SessionStartResult.Failed(failureReason));
+            return Task.FromResult(SessionStartResult.Failed(failure));
         }
 
         ApplyConnectionData(address, port);
@@ -78,15 +78,15 @@ public sealed class DirectIPv4ConnectionProvider : ISessionConnectionProvider
         string joinInput,
         out string address,
         out ushort port,
-        out string failureReason)
+        out SessionError failure)
     {
         address = string.Empty;
         port = _port;
-        failureReason = string.Empty;
+        failure = default;
 
         if (string.IsNullOrWhiteSpace(joinInput))
         {
-            failureReason = "IP를 입력하세요.";
+            failure = new SessionError(ErrorCatalog.NetIpEmpty);
             return false;
         }
 
@@ -98,7 +98,7 @@ public sealed class DirectIPv4ConnectionProvider : ISessionConnectionProvider
             var portText = endpoint.Substring(separatorIndex + 1);
             if (!ushort.TryParse(portText, out port) || port == 0)
             {
-                failureReason = $"Port는 1~65535 범위의 숫자여야 합니다: {portText}";
+                failure = new SessionError(ErrorCatalog.NetPortInvalid, ErrorDisplay.Arg("port", portText));
                 return false;
             }
         }
@@ -110,7 +110,7 @@ public sealed class DirectIPv4ConnectionProvider : ISessionConnectionProvider
         if (!IPAddress.TryParse(address, out var parsedAddress) ||
             parsedAddress.AddressFamily != AddressFamily.InterNetwork)
         {
-            failureReason = $"IPv4 형식이 올바르지 않습니다: {address}";
+            failure = new SessionError(ErrorCatalog.NetIpv4Invalid, ErrorDisplay.Arg("ip", address));
             return false;
         }
 

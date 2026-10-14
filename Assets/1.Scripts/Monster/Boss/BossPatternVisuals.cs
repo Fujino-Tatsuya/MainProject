@@ -28,7 +28,12 @@ public static class BossPatternVisuals
         get
         {
             if (_mat != null) return _mat;
-            _mat = new Material(Shader.Find("Sprites/Default")) { name = "BossPatternTemp" };
+            // 🎨 예고 판 셰이더(Monster/TelegraphQuad) — Sprites/Default 와 같은 블렌드·속성명 + 색·마스크(PLAN-telegraph-style).
+            //    Resources 재질로 불러 빌드에 셰이더가 항상 들어가게 한다. 없으면 예전 Sprites/Default(마스크 없음).
+            Material source = Resources.Load<Material>("Telegraph/MA_TelegraphQuad");
+            _mat = source != null
+                ? new Material(source) { name = "BossPatternTelegraph" }
+                : new Material(Shader.Find("Sprites/Default")) { name = "BossPatternTemp" };
             _mat.renderQueue = 3100;   // 투명 바닥 위
             return _mat;
         }
@@ -77,7 +82,59 @@ public static class BossPatternVisuals
         r.GetPropertyBlock(_mpb);
         _mpb.SetColor(ColorId, color);
         if (tex != null) _mpb.SetTexture(MainTexId, tex);
+        // 마스크는 끈다 — 같은 판을 예고(마스크 있음) → 발동 표시(마스크 없음)로 재사용할 때 남지 않게. 스타일은 PaintStyled.
+        _mpb.SetVector(MaskParamsId, new Vector4(0f, 0f, 1f, 0f));
         r.SetPropertyBlock(_mpb);
+    }
+
+    static readonly int MaskTexId = Shader.PropertyToID("_MaskTex");
+    static readonly int MaskParamsId = Shader.PropertyToID("_MaskParams");
+    static readonly int MaskOriginId = Shader.PropertyToID("_MaskOrigin");
+    static readonly int MaskAxesId = Shader.PropertyToID("_MaskAxes");
+    static readonly int MaskExtentId = Shader.PropertyToID("_MaskExtent");
+
+    /// <summary>
+    /// 스타일 층(색 + 마스크)으로 칠한다(PLAN-telegraph-style). 마스크 좌표계 = <paramref name="origin"/> 기준,
+    /// <paramref name="right"/>·<paramref name="forward"/> 축, 늘이기 기준 크기 <paramref name="extent"/>(m).
+    /// 🔴 origin 은 **판 자신의 위치가 아니라 예고 전체의 기준점**을 넘긴다 — 채움 판은 크기를 키우며 자라서,
+    ///    판 기준이면 패턴이 같이 커지며 미끄러진다.
+    /// </summary>
+    public static void PaintStyled(Renderer r, TelegraphLayer layer, Texture shape,
+                                   Vector3 origin, Vector3 right, Vector3 forward, Vector2 extent)
+    {
+        if (r == null || layer == null) return;
+        Paint(r, layer.color, shape);
+        TelegraphMask mask = layer.mask;
+        bool on = mask != null && mask.Active;
+        r.GetPropertyBlock(_mpb);
+        _mpb.SetTexture(MaskTexId, on ? mask.texture : Texture2D.whiteTexture);
+        _mpb.SetVector(MaskParamsId, new Vector4(
+            on ? (float)mask.mode : 0f, on ? mask.strength : 0f,
+            on ? mask.tileSize : 1f, on ? mask.rotation * Mathf.Deg2Rad : 0f));
+        _mpb.SetVector(MaskOriginId, new Vector4(origin.x, origin.y, origin.z, 0f));
+        _mpb.SetVector(MaskAxesId, new Vector4(right.x, right.z, forward.x, forward.z));
+        _mpb.SetVector(MaskExtentId, new Vector4(Mathf.Max(0.01f, extent.x), Mathf.Max(0.01f, extent.y), 0f, 0f));
+        r.SetPropertyBlock(_mpb);
+    }
+
+    // 테두리 비율별 판 텍스처(스타일 rimRatio). 비율은 0.005 단위로 묶어 캐시한다 — 슬라이더를 끌 때마다 새로 만들지 않게.
+    static readonly System.Collections.Generic.Dictionary<int, Texture2D> _discByRim = new();
+    static readonly System.Collections.Generic.Dictionary<int, Texture2D> _squareByRim = new();
+
+    public static Texture2D DiscTextureFor(float rimRatio)
+    {
+        int key = Mathf.RoundToInt(Mathf.Clamp(rimRatio, 0.005f, 0.5f) * 200f);
+        if (!_discByRim.TryGetValue(key, out Texture2D t) || t == null)
+            _discByRim[key] = t = BuildDisc(128, key / 200f);
+        return t;
+    }
+
+    public static Texture2D SquareTextureFor(float rimRatio)
+    {
+        int key = Mathf.RoundToInt(Mathf.Clamp(rimRatio, 0.005f, 0.5f) * 200f);
+        if (!_squareByRim.TryGetValue(key, out Texture2D t) || t == null)
+            _squareByRim[key] = t = BuildSquare(64, key / 200f);
+        return t;
     }
 
     /// <summary>

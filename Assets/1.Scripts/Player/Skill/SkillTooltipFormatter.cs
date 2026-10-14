@@ -3,10 +3,13 @@ using System.Collections;
 using System.Globalization;
 using System.Reflection;
 using System.Text;
+using System.Text.RegularExpressions;
 
 /// <summary>
 /// 툴팁 문자열의 자리표시자와 TMP style 태그를 검증·치환하는 순수 C# 포매터.
 /// Unity 직렬화 경로와 같은 <c>field.nested[0]</c> 표기를 사용한다.
+/// 문법(중괄호·style 짝)과 자리표시자 추출은 <see cref="LocText"/> — 문자열 시트 검증과 같은 규칙이다.
+/// 이 포매터는 그 위에 "필드가 실제로 있는가·형식이 맞는가" 만 더 본다.
 /// </summary>
 public static class SkillTooltipFormatter
 {
@@ -28,41 +31,20 @@ public static class SkillTooltipFormatter
     {
         template ??= string.Empty;
         hasDamage = false;
-        error = null;
 
-        if (!ValidateStyleTags(template, out error))
+        // 문법(style 짝·중괄호)은 문자열 시트 검증과 같은 규칙 — LocText 하나.
+        error = LocText.StyleTagError(template) ?? LocText.BraceError(template);
+        if (error != null)
         {
             text = string.Empty;
             return false;
         }
 
         var result = new StringBuilder(template.Length + 32);
-        for (int i = 0; i < template.Length; i++)
+        int literalStart = 0;
+        foreach (Match match in LocText.Placeholder.Matches(template))
         {
-            char current = template[i];
-            if (current == '}')
-            {
-                text = string.Empty;
-                error = ErrorAt(i, "여는 '{'가 없는 '}'이다.");
-                return false;
-            }
-
-            if (current != '{')
-            {
-                result.Append(current);
-                continue;
-            }
-
-            int close = template.IndexOf('}', i + 1);
-            if (close < 0)
-            {
-                text = string.Empty;
-                error = ErrorAt(i, "닫히지 않은 '{'이다.");
-                return false;
-            }
-
-            string token = template.Substring(i + 1, close - i - 1);
-            if (!TryFormatToken(token, i, valueSource, damage, showCalculation,
+            if (!TryFormatToken(match.Groups[1].Value, match.Index, valueSource, damage, showCalculation,
                     out string replacement, out bool tokenHasDamage, out error))
             {
                 text = string.Empty;
@@ -70,10 +52,11 @@ public static class SkillTooltipFormatter
             }
 
             hasDamage |= tokenHasDamage;
-            result.Append(replacement);
-            i = close;
+            result.Append(template, literalStart, match.Index - literalStart).Append(replacement);
+            literalStart = match.Index + match.Length;
         }
 
+        result.Append(template, literalStart, template.Length - literalStart);
         text = result.ToString();
         return true;
     }
@@ -91,12 +74,6 @@ public static class SkillTooltipFormatter
         result = string.Empty;
         hasDamage = false;
         error = null;
-
-        if (string.IsNullOrWhiteSpace(token))
-        {
-            error = ErrorAt(offset, "빈 자리표시자다.");
-            return false;
-        }
 
         if (token == "dmg")
         {
@@ -312,54 +289,5 @@ public static class SkillTooltipFormatter
         return null;
     }
 
-    private static bool ValidateStyleTags(string text, out string error)
-    {
-        int depth = 0;
-        for (int i = 0; i < text.Length; i++)
-        {
-            if (StartsWith(text, i, "<style="))
-            {
-                int close = text.IndexOf('>', i + 7);
-                if (close < 0)
-                {
-                    error = ErrorAt(i, "닫히지 않은 <style> 태그다.");
-                    return false;
-                }
-
-                if (close == i + 7)
-                {
-                    error = ErrorAt(i, "style 이름이 비어 있다.");
-                    return false;
-                }
-
-                depth++;
-                i = close;
-            }
-            else if (StartsWith(text, i, "</style>"))
-            {
-                if (depth == 0)
-                {
-                    error = ErrorAt(i, "여는 <style>이 없는 </style>이다.");
-                    return false;
-                }
-
-                depth--;
-                i += "</style>".Length - 1;
-            }
-        }
-
-        if (depth > 0)
-        {
-            error = $"문자 {text.Length + 1}: 닫히지 않은 <style> 태그가 {depth}개 있다.";
-            return false;
-        }
-
-        error = null;
-        return true;
-    }
-
-    private static bool StartsWith(string text, int index, string value) =>
-        index + value.Length <= text.Length && string.CompareOrdinal(text, index, value, 0, value.Length) == 0;
-
-    private static string ErrorAt(int zeroBasedIndex, string message) => $"문자 {zeroBasedIndex + 1}: {message}";
+    private static string ErrorAt(int zeroBasedIndex, string message) => LocText.ErrorAt(zeroBasedIndex, message);
 }

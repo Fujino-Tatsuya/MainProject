@@ -117,6 +117,16 @@ public class PlayerInputReader : BaseNetworkBehaviour
     private void OnEnable()
     {
         RegisterDashCallback();
+
+        // 설정창 키 리바인드(PLAN-settings S7). PlayerInput 이 전역 에셋의 복제본을 쓸 수 있어 여기서 다시 건다.
+        ApplyKeyBindings();
+        KeyBindingConfig.Changed += ApplyKeyBindings;
+    }
+
+    private void ApplyKeyBindings()
+    {
+        if (playerInput != null && playerInput.actions != InputSystem.actions)
+            KeyBindingConfig.ApplyTo(playerInput.actions);
     }
 
     public bool GetSkillPressed(PlayerSkillSlot slot)
@@ -281,6 +291,7 @@ public class PlayerInputReader : BaseNetworkBehaviour
 
     private void OnDisable()
     {
+        KeyBindingConfig.Changed -= ApplyKeyBindings;
         Direction = Vector2.zero;
         dashPressedLatched = false;
         for (int i = 0; i < virtualSkillHeld.Length; i++)

@@ -58,5 +58,11 @@ MonoBehaviour:
   deathTrigger: 
   locomotionState: Idle
   locomotionClipSpeed: 0
+  locomotionFullBlendSpeed: 0
+  locomotionIdleCycleSeconds: 0
+  locomotionMoveCycleSeconds: 0
+  locomotionFullBlendWhileMoving: 0
   locomotionAnimSpeedRange: {x: 0.5, y: 2.5}
+  locomotionPlaybackScale: 1
   animatorControllerOverride: {fileID: 9100000, guid: 292844ba7d1ca444ab742cb4631a182d, type: 2}
+  telegraphStyle: {fileID: 11400000, guid: 92c647bea0fdba64c89c3179e14ac3e9, type: 2}
