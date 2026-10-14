@@ -557,6 +557,15 @@ public static class FbxWrapperConversion
             }
         }
         foreach (var kv in want.Where(kv => kv.Value > 0)) log.AppendLine($"    ✗ {s.path} 컴포넌트 없음 {kv.Key} ×{kv.Value}");
+
+        // API 로 바꾼 값은 오버라이드로 기록해야 남는다 — 안 하면 뒤이은 RemoveUnusedOverrides·저장에서 에셋 값으로 되돌아간다.
+        if (n > 0)
+            foreach (Transform t in r.GetComponentsInChildren<Transform>(true))
+            {
+                PrefabUtility.RecordPrefabInstancePropertyModifications(t.gameObject);
+                PrefabUtility.RecordPrefabInstancePropertyModifications(t);
+                foreach (Renderer rd in t.GetComponents<Renderer>()) PrefabUtility.RecordPrefabInstancePropertyModifications(rd);
+            }
         return n;
     }
 
