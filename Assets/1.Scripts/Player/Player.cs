@@ -62,6 +62,7 @@ public class Player : Unit
     [DataTableIgnore] [SerializeField] private float platformGroundCheckDistance = 0.6f;
 
     private PlayerStateController stateController;
+    private readonly PlayerWallImpactTracker wallImpactTracker = new PlayerWallImpactTracker();   // [서버] 할 일 32
     private IPlayerBasicAttack defaultAttack;
     private PlayerMotor motor;
     private PlayerGroundingSensor groundingSensor;
@@ -348,6 +349,10 @@ public class Player : Unit
         UpdateOwnerReconciliationDiagnostics();
         TickServerHealthRegen();
 
+        if (IsServer)
+            wallImpactTracker.Tick(this, stateController.CurrentState == PlayerActionState.Knockback,
+                                   stateController.KnockbackDeceleration);
+
         if (IsNetworkActive &&
             !stateController.ShouldTickForNetwork(IsOwner, HasStateAuthority))
         {
@@ -467,6 +472,8 @@ public class Player : Unit
         bool accepted = stateController.BeginKnockback(direction, strength);
         if (!accepted)
             return;
+
+        wallImpactTracker.Begin(direction, strength);   // 할 일 32 — 벽 충돌 이벤트(서버)
 
         ApplyKnockbackClientRpc(direction, strength, CreateOwnerClientRpcParams());
     }

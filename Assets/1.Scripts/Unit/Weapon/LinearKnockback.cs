@@ -18,6 +18,11 @@ public class LinearKnockback : NetworkBehaviour, IKnockbackable
 
     float _knockbackStartTime;
 
+    Unit _unit;
+    readonly WallImpactEpisode _wallImpactEpisode = new WallImpactEpisode();
+    Vector3 _wallImpactDir;
+    float _wallImpactLastSpeed;
+
     /// <summary>
     /// IKnockbackable의 ApplyKnockback 구현
     /// </summary>
@@ -43,6 +48,11 @@ public class LinearKnockback : NetworkBehaviour, IKnockbackable
         StartKnockback();
 
         _rigidbody.AddForce(direction * strength, ForceMode.Impulse);
+
+        // 할 일 32 벽 충돌 — 임펄스 한 번 = 에피소드 하나. 판정은 서버(몬스터 오너 = 서버)에서만.
+        _wallImpactDir = direction;
+        _wallImpactLastSpeed = 0f;
+        _wallImpactEpisode.Begin();
     }
 
     void StartKnockback()
@@ -64,6 +74,7 @@ public class LinearKnockback : NetworkBehaviour, IKnockbackable
     void EndKnockback()
     {
         _isKnockbacking = false;
+        _wallImpactEpisode.End();
 
         _rigidbody.linearVelocity = Vector3.zero;
         _rigidbody.angularVelocity = Vector3.zero;
@@ -81,6 +92,7 @@ public class LinearKnockback : NetworkBehaviour, IKnockbackable
     {
         _navMeshAgent = GetComponent<NavMeshAgent>();
         _rigidbody = GetComponent<Rigidbody>();
+        _unit = GetComponent<Unit>();
         _isKnockbacking = false;
     }
 
@@ -88,6 +100,8 @@ public class LinearKnockback : NetworkBehaviour, IKnockbackable
     void FixedUpdate()
     {
         if (!_isKnockbacking || !IsOwner) return;
+
+        ProbeWallImpact();
 
         float elapsed = Time.time - _knockbackStartTime;
 
@@ -104,5 +118,18 @@ public class LinearKnockback : NetworkBehaviour, IKnockbackable
         {
             EndKnockback();
         }
+    }
+
+    // 할 일 32 — 물리 넉백은 PhysX 가 벽에서 멈춘다. 벽에 막혀 속도가 0 이 돼도 처음 민 방향·직전 속도로 판정한다.
+    // 민 쪽은 Unit.Knockback(방향, 세기) 에 없어서 null. Docs/tech/handoff-wall-impact.md
+    void ProbeWallImpact()
+    {
+        if (!IsServer || _unit == null) return;
+        Vector3 v = _rigidbody.linearVelocity;
+        v.y = 0f;
+        float speed = v.magnitude;
+        Vector3 dir = speed > 0.05f ? v : _wallImpactDir;
+        UnitWallImpacts.ServerProbe(_unit, _wallImpactEpisode, dir, 0f, 0f, Mathf.Max(speed, _wallImpactLastSpeed), null, out _);
+        _wallImpactLastSpeed = speed;
     }
 }

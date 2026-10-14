@@ -55,6 +55,15 @@ public sealed class TutorialElevatorDoor : MonoBehaviour
 
         foreach (Animator a in _doors)
         {
+            // 보스 엘리베이터 연출(BossElevatorRig)이 같은 문을 쥔다 — 대기 포즈를 열림으로 알려 두고,
+            // 연출 재생 중이면 손대지 않는다(리그가 끝·리셋 때 Open 끝 프레임으로 돌려놓는다).
+            BossElevatorRig rig = a.GetComponentInParent<BossElevatorRig>();
+            if (rig != null)
+            {
+                rig.IdleDoorOpen = true;
+                if (rig.IsPlaying) continue;
+            }
+
             // 늦은 클라(처음 봤을 때 이미 열림) = 끝 프레임으로. Open 클립은 반복하지 않아 끝에서 멈춘다.
             a.Play(OpenStateHash, 0, _sawClosed ? 0f : 1f);
         }

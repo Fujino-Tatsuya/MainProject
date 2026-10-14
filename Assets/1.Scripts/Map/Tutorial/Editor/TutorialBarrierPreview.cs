@@ -78,7 +78,8 @@ internal static class TutorialBarrierPreview
     {
         var walls = new List<Bounds>();
         foreach (Collider c in stage.GetComponentsInChildren<Collider>(true))
-            if (!c.isTrigger && c.gameObject.layer != LayerMask.NameToLayer("Wall") && c.bounds.size.y > 1f) walls.Add(c.bounds);
+            // 배리어 자신은 뺀다 — 할 일 32 부터 배리어 = Barrier 레이어(벽은 Wall 레이어로 옮겨질 수 있어 Wall 로 거르면 안 된다).
+            if (!c.isTrigger && c.gameObject.layer != LayerMask.NameToLayer(GameLayers.Barrier) && c.bounds.size.y > 1f) walls.Add(c.bounds);
 
         float y = stage.position.y + 1f;
         int warn = 0;

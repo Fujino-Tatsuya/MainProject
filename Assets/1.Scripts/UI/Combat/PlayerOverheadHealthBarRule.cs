@@ -21,6 +21,7 @@ public sealed class PlayerOverheadHealthBarRule : MonoBehaviour, IOverheadHealth
     string _label;
     PlayerDashController _dash;
     PlayerLifeCycleController _lifeCycle;
+    PlayerEncounterLock _encounterLock;
 
     void Awake()
     {
@@ -30,10 +31,12 @@ public sealed class PlayerOverheadHealthBarRule : MonoBehaviour, IOverheadHealth
         {
             _dash = player.GetComponent<PlayerDashController>();
             _lifeCycle = player.GetComponent<PlayerLifeCycleController>();
+            _encounterLock = player.GetComponent<PlayerEncounterLock>();
         }
     }
 
-    public bool ShouldShow => player != null;
+    // 연출 숨김(보스 엘리베이터) 동안만 감춘다.
+    public bool ShouldShow => player != null && (_encounterLock == null || !_encounterLock.IsCinematicHidden);
 
     // 오프라인(IsSpawned=false)은 혼자 하는 로컬 플레이어로 본다.
     // 소유권은 스폰 후에 확정되므로 매 프레임 판정한다.

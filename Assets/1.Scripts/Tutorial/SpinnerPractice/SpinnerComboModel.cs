@@ -42,27 +42,24 @@ public enum SpinnerComboEvent : byte
 /// <list type="bullet">
 /// <item>간파 성공은 <see cref="SpinnerComboPhase.Ready"/> 에서만 받는다(하나의 간파 창 = 성공 1번은 창 쪽이 이미 보장).</item>
 /// <item>밀치기는 기절·취약 중 우클릭 간파 적중만(호출자가 거른다). 진행 중 밀치기에 새 밀치기가 오면 방향·거리를 새로 잡는다.</item>
-/// <item>벽 충돌 = 밀치기 이동 뒤 몸 가장자리 ↔ 유효 벽 면 거리가 <see cref="ContactSlack"/> 이하,
-///   또는 이동이 막혔는데(NavMesh 가장자리) 그 거리가 <see cref="BlockedContactSlack"/> 이하. 한 연계에 1번만 센다.</item>
+/// <item>벽 충돌 = 밀치기 중 이 스피너봇의 공용 벽 충돌 이벤트(<c>UnitWallImpact</c> — 실제 Wall 레이어 콜라이더, 할 일 32).
+///   가상 벽(존 사각형 긴 변) 거리 판정은 없앴다. 한 연계에 1번만 센다.</item>
 /// <item>회복 중에는 밀치기·간파를 받지 않는다. 사망·이탈로 성공 횟수를 되돌리지 않는다.</item>
 /// </list>
-/// 이동 자체(NavMeshAgent.Move)·벽 거리 계산은 호출자(<c>TutorialSpinnerPractice</c>) 몫 — 여기는 규칙만.
+/// 이동 자체(NavMeshAgent.Move)·벽 충돌 판정(<c>UnitWallImpacts.ServerProbe</c>)은 호출자(<c>TutorialSpinnerPractice</c>) 몫 — 여기는 규칙만.
 /// </summary>
 public sealed class SpinnerComboModel
 {
     public const int DefaultTarget = 3;
 
     public SpinnerComboModel(int target = DefaultTarget, float stunSeconds = 1f, float recoverSeconds = 0.6f,
-                             float pushDistance = 3f, float pushSeconds = 0.35f,
-                             float contactSlack = 0.4f, float blockedContactSlack = 1.6f)
+                             float pushDistance = 3f, float pushSeconds = 0.35f)
     {
         Target = Math.Max(1, target);
         StunSeconds = Math.Max(0f, stunSeconds);
         RecoverSeconds = Math.Max(0f, recoverSeconds);
         PushDistance = Math.Max(0.01f, pushDistance);
         PushSpeed = PushDistance / Math.Max(0.01f, pushSeconds);
-        ContactSlack = Math.Max(0f, contactSlack);
-        BlockedContactSlack = Math.Max(ContactSlack, blockedContactSlack);
     }
 
     public int Target { get; }
@@ -70,8 +67,6 @@ public sealed class SpinnerComboModel
     public float RecoverSeconds { get; }
     public float PushDistance { get; }
     public float PushSpeed { get; }
-    public float ContactSlack { get; }
-    public float BlockedContactSlack { get; }
 
     public SpinnerComboPhase Phase { get; private set; } = SpinnerComboPhase.Ready;
     public int Successes { get; private set; }
@@ -132,16 +127,15 @@ public sealed class SpinnerComboModel
 
     /// <summary>
     /// 밀치기 이동 결과 보고. <paramref name="requested"/> = <see cref="PushStep"/> 값, <paramref name="moved"/> = 실제로 움직인 수평 거리,
-    /// <paramref name="wallGap"/> = 이동 뒤 몸 가장자리 ↔ 유효 벽 면 거리(m, 벽 안으로 들어가면 음수).
-    /// <paramref name="towardWall"/> = 밀치기 방향이 벽 쪽인가(벽 면 법선과 반대 방향 성분이 있음).
+    /// <paramref name="wallImpact"/> = 이번 이동에서 이 스피너봇의 벽 충돌 이벤트(UnitWallImpact)가 났는가.
+    /// 벽 아닌 것(상자·몬스터·플레이어·배리어·NavMesh 끝)에 막히면 '빗나감'.
     /// </summary>
-    public SpinnerComboEvent ReportPushMoved(float requested, float moved, float wallGap, bool towardWall)
+    public SpinnerComboEvent ReportPushMoved(float requested, float moved, bool wallImpact)
     {
         if (!IsPushing) return SpinnerComboEvent.None;
 
         bool blocked = requested > 1e-4f && moved < requested * 0.5f;
-        bool hit = towardWall && (wallGap <= ContactSlack || (blocked && wallGap <= BlockedContactSlack));
-        if (hit)
+        if (wallImpact)
         {
             IsPushing = false;
             PushRemaining = 0f;
@@ -199,18 +193,4 @@ public sealed class SpinnerComboModel
         IsPushing = false;
         PushRemaining = 0f;
     }
-}
-
-/// <summary>연계 연습 지오메트리(순수) — 유효 벽 면 거리.</summary>
-public static class SpinnerComboGeometry
-{
-    /// <summary>
-    /// 몸 가장자리 ↔ 벽 면 거리. 벽 = 점 (wx, wz) 을 지나고 방 안쪽 법선 (nx, nz)(단위)인 직선. 벽 안으로 파고들면 음수.
-    /// </summary>
-    public static float WallGap(float x, float z, float wx, float wz, float nx, float nz, float bodyRadius) =>
-        (x - wx) * nx + (z - wz) * nz - Math.Max(0f, bodyRadius);
-
-    /// <summary>밀치기 방향이 벽 쪽인가 — 방 안쪽 법선과의 내적이 -<paramref name="minCos"/> 이하.</summary>
-    public static bool IsTowardWall(float dirX, float dirZ, float nx, float nz, float minCos = 0.3f) =>
-        dirX * nx + dirZ * nz <= -Math.Abs(minCos);
 }

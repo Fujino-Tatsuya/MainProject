@@ -72,7 +72,7 @@ MonoBehaviour:
   muzzleHeight: 1
   blockingLayers:
     serializedVersion: 2
-    m_Bits: 2177
+    m_Bits: 1050753
   allyLayers:
     serializedVersion: 2
     m_Bits: 64

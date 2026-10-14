@@ -11,7 +11,7 @@ using UnityEngine;
 [DataTableSheet("Player", Order = 6)]
 public sealed class PlayerGameRuleData : ScriptableObject
 {
-    private const int DefaultObstacleMask = (1 << 0) | (1 << 3) | (1 << 7) | (1 << 11);
+    private const int DefaultObstacleMask = (1 << 0) | (1 << 3) | (1 << 7) | (1 << 11) | (1 << 20);   // + Barrier(20, 할 일 32 — 19 는 몬스터 팩 뼈 레이어라 비움)
     private const int DefaultGroundMask = (1 << 0) | (1 << 3) | (1 << 11);
 
     [Header("이동")]
@@ -21,7 +21,7 @@ public sealed class PlayerGameRuleData : ScriptableObject
     [Tooltip("접지 이동 중 올라갈 수 있는 낮은 턱의 최대 높이(m). 맵 계단 에셋이 들어오면 실제 치수에 맞춰 조정한다.")]
     [DataTableIgnore] [SerializeField, Min(0f)] private float stepOffset = 0.3f;
 
-    [Tooltip("플레이어 이동을 막는 정적 지오메트리 레이어(Default | Ground | Wall | Env).")]
+    [Tooltip("플레이어 이동을 막는 정적 지오메트리 레이어(Default | Ground | Wall | Env | Barrier). Barrier = 튜토리얼·개인 뒤 배리어.")]
     [SerializeField] private LayerMask obstacleMask = DefaultObstacleMask;
     [Tooltip("생존 상태에서 접지로 인정하는 레이어(Default | Ground | Env). Wall은 제외한다.")]
     [SerializeField] private LayerMask groundMask = DefaultGroundMask;

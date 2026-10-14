@@ -791,4 +791,25 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     }
 
     #endregion
+
+    #region 벽 충돌 (할 일 32 — 이벤트만, 효과 없음)
+    /// <summary>[서버] 이 유닛이 외부 힘으로 밀려 Wall 레이어 콜라이더에 부딪혔다(<see cref="UnitWallImpacts.ServerProbe"/>).</summary>
+    public event Action<UnitWallImpact> ServerWallImpacted;
+
+    /// <summary>[모든 피어] 벽 충돌 연출 훅 — (유닛, 접촉점, 벽 법선, 충격 속도). 지금은 구독자가 없다(연출 미정).</summary>
+    public event Action<Unit, Vector3, Vector3, float> WallImpactPresented;
+
+    internal void NotifyWallImpactServer(in UnitWallImpact impact)
+    {
+        ServerWallImpacted?.Invoke(impact);
+        if (IsSpawned) WallImpactPresentRpc(impact.Point, impact.Normal, impact.Speed);
+    }
+
+    // 순수 연출 신호 — 유실돼도 상태가 갈리지 않는다.
+    [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
+    void WallImpactPresentRpc(Vector3 point, Vector3 normal, float speed)
+    {
+        WallImpactPresented?.Invoke(this, point, normal, speed);
+    }
+    #endregion
 }
