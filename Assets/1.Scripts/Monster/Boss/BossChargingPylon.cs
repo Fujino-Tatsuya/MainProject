@@ -160,11 +160,15 @@ public class BossChargingPylon : Unit
     }
 
     /// <summary>서버 전용. 체력을 되살리고 상승을 시작한다. 반복 호출해도 안전하다.</summary>
-    public void BeginCharge()
+    /// <param name="hpMultiplier">이번 시퀀스 최대 HP 배율(레이드 ② = 2). 프리팹 maxHp 는 그대로 두고 매번 다시 잡는다 —
+    /// 같은 보스방 송전탑을 기존 23호와 레이드가 같이 쓰기 때문.</param>
+    public void BeginCharge(float hpMultiplier = 1f)
     {
         if (!IsServer) return;
 
-        Revive();
+        int hp = Mathf.Max(1, Mathf.RoundToInt(maxHp * Mathf.Max(0.01f, hpMultiplier)));
+        if (hp != MaxHp) Initialize(0, 0, 0, hp, defense);
+        else Revive();
         WasDestroyed = false;
         IsEngaged = true;
         _state = PylonState.Rising;

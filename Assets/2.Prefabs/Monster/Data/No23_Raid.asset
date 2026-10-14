@@ -405,7 +405,7 @@ MonoBehaviour:
   bombThrowInterval: 6
   bombPrefab: {fileID: 7643126938755057433, guid: ede00d4e6aaec7442abf1ed83b4a7234, type: 3}
   spreadAngle: 15
-  electricFloor: {fileID: 11400000, guid: 65fd41095973d204b8beea8d63957c90, type: 2}
+  electricFloor: {fileID: 11400000, guid: 3dc6da150d6e4c29a2d414faad7d1234, type: 2}
   wellsDrone: {fileID: 11400000, guid: 18b9ee564410be04a95d0ef34173cac3, type: 2}
   globalAttackInterval: 1.5
   chargeAuraRadius: 5.5

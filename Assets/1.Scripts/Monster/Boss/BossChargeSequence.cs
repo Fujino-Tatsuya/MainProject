@@ -66,7 +66,7 @@ public class BossChargeSequence : MonoBehaviour, IBossChargeSequence
 
     bool _prepared;   // TryPrepareCenter 가 고른 집합이 아직 유효한가
 
-    public void Begin(int pylonCount, float timeLimit)
+    public void Begin(int pylonCount, float timeLimit, float pylonHpMultiplier = 1f)
     {
         if (!IsServerRuntime()) return;
 
@@ -93,7 +93,7 @@ public class BossChargeSequence : MonoBehaviour, IBossChargeSequence
         }
 
         for (int i = 0; i < _engaged.Count; i++)
-            _engaged[i].BeginCharge();
+            _engaged[i].BeginCharge(pylonHpMultiplier);
 
         if (_engaged.Count < want)
             Debug.LogWarning(

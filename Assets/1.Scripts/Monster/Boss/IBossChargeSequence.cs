@@ -40,8 +40,9 @@ public interface IBossChargeSequence
     /// <returns>고를 탑이 하나도 없으면 <c>false</c>(그때는 보스가 제자리에서 차징한다).</returns>
     bool TryPrepareCenter(int pylonCount, out UnityEngine.Vector3 center);
 
-    /// <summary>시퀀스 시작(서버). <paramref name="pylonCount"/> 는 보스가 인원수로 산출해 넘긴다.</summary>
-    void Begin(int pylonCount, float timeLimit);
+    /// <summary>시퀀스 시작(서버). <paramref name="pylonCount"/> 는 보스가 인원수로 산출해 넘긴다.
+    /// <paramref name="pylonHpMultiplier"/> = 이번에 올라오는 송전탑 최대 HP 배율(레이드 ② = 2, 기본 1).</summary>
+    void Begin(int pylonCount, float timeLimit, float pylonHpMultiplier = 1f);
 
     /// <summary>매 서버 틱 결과를 조회한다. <see cref="BossChargeResult.InProgress"/> 면 계속 대기.</summary>
     BossChargeResult Poll();

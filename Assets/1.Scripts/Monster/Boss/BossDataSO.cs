@@ -275,7 +275,7 @@ public class BossDataSO : MonsterDataSO
     public bool raidScript = false;
 
     [Tooltip("① 기동 시연 — 개전 직후 이 순서로 고정 시전(거리창은 지킨다, 밖이면 추격). 기본 = 훅 좌·우 → 간파 가능 돌진.\n" +
-             "① 구간(첫 임계 전)에는 상시 전기 장판을 끈다(PLAN-boss-raid §2).")]
+             "교차 전기 장판은 ① 부터 나온다(팀장 10-14 — 처음엔 ① 동안 껐다).")]
     public BossAttackId[] raidOpeningScript = { BossAttackId.LeftHook, BossAttackId.RightHook, BossAttackId.Dash };
 
     [Tooltip("② 전력 공급 제한시간(초). 기존 송전기의 chargeTimeLimit 대신 쓴다.")]
@@ -289,6 +289,10 @@ public class BossDataSO : MonsterDataSO
 
     [Tooltip("② 실패 = 방전 피해. 플레이어 최대 HP 220 기준 150 — 즉사 상한(0.9)과 별개로 '아프지만 산다' 수준.")]
     [Min(0)] public int raidDischargeDamage = 150;
+
+    [Tooltip("② 전력 공급 때 올라오는 송전탑 최대 HP 배율. 송전탑 프리팹(bossroom) maxHp 200 × 2 = 400(팀장 10-14).\n" +
+             "기존 23호 송전기는 항상 1 — 같은 송전탑을 같이 쓰므로 프리팹 값은 바꾸지 않는다. 드론 표식은 배율과 무관하게 한 방.")]
+    [Min(0.01f)] public float raidPylonHpMultiplier = 2f;
 
     [Header("레이드 ④ 폐기 처분 — 자폭 카운트다운 + 공동 게이지(간파 게이지 재사용)")]
     [Tooltip("자폭까지 남은 시간(초). 이 안에 게이지를 0 으로 만들면 저지.")]
@@ -304,6 +308,10 @@ public class BossDataSO : MonsterDataSO
     [Tooltip("자폭 중 간파 창이 열리는 간격(초)과 길이(초). 23호가 서 있기만 하므로 창을 따로 연다.")]
     [Min(1f)] public float raidSelfDestructCounterInterval = 5f;
     [Min(0.3f)] public float raidSelfDestructCounterWindow = 1.5f;
+
+    [Tooltip("자폭 중 보스 HP 피해 감소율(0~1). 0.9 = 플레이어 피해의 10% 만 HP 에 들어간다(팀장 10-14 — 게이지를 깎으면 체력까지 녹던 것).\n" +
+             "공동 게이지는 감소 **전** 피해로 깎인다. 1 = HP 무피해(한 대당 최소 1 은 들어간다).")]
+    [Range(0f, 1f)] public float raidSelfDestructDamageReduction = 0.9f;
 
     [Tooltip("저지 실패 = 대폭발(방 전체). 예고 시간과 피해. 즉사기(아래)면 피해 값은 무시된다.")]
     [Min(0.3f)] public float raidSelfDestructBlastWarn = 1.2f;

@@ -4007,7 +4007,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
             return;
         }
 
-        _charge?.Begin(_chargePylons, ChargeTimeLimit);
+        _charge?.Begin(_chargePylons, ChargeTimeLimit, _raidCharge ? _boss.raidPylonHpMultiplier : 1f);
         // ② 이번에 올라온 탑을 기억한다 — WasDestroyed 는 올라오는 탑만 리셋되므로 전체를 보면 지난 판(재도전 전) 파괴가 섞인다(점검 10-14).
         _raidEngagedPylons.Clear();
         if (_raidCharge)
@@ -4205,9 +4205,10 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         Debug.Log($"[23호/레이드] 전력 공급 실패 — 방전 예고 {warn:0.#}초 · 안전 칸 {_safeTileScratch.Count}개:{safe}", this);
     }
 
-    /// <summary>[서버] 상시 전기 장판을 붙잡아 둘 때(레이드): ① 구간 · ② 전력 공급 · ④ 자폭 진행 · 방전/대폭발 처리 중.</summary>
+    /// <summary>[서버] 상시 전기 장판을 붙잡아 둘 때(레이드): 방전/대폭발 처리 중만.</summary>
+    // 팀장 10-14: 레이드도 장판을 계속 낸다 — ①·③ = 교차 장판, ②·④ = A/B(둘 다 ChargeSequence 의 ChargeWait 라 장판이 Charge 모드로 읽는다).
     public bool IsRaidFloorHeld =>
-        IsRaid && (CurrentPhase == 0 || _raidCharge || _raidSelfDestruct || IsRaidRescueHold || Time.time < _raidFloorHoldUntil);
+        IsRaid && Time.time < _raidFloorHoldUntil;
 
     /// <summary>[서버] ③ 새 가족 각본이 예약·진행 중 — 상시 장판·드론을 멈춘다(PLAN §2 "각본 중 상시 공격 정지").</summary>
     public bool IsRaidRescueHold => _raidRescueActive || _raidRescueNext.HasValue;
@@ -5318,13 +5319,20 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         if (IsServer && _suppressed && IsFromPlayer(hitContext))
             attackInfo.damage = Mathf.Max(0, Mathf.RoundToInt(attackInfo.damage * SuppressDamageMultiplier));
 
+        // ④ 자폭 중 플레이어 피해는 보스 HP 에 raidSelfDestructDamageReduction 만큼 덜 들어간다(팀장 10-14 — 게이지를 깎는 동안
+        // 체력까지 같이 녹던 것). 게이지는 **감소 전** 피해로 깎는다 — 저지 난이도는 그대로.
+        bool selfDestructHit = IsServer && _raidSelfDestruct && _attackPhase == BossAttackPhase.ChargeWait && IsFromPlayer(hitContext);
+        int gaugeDamage = attackInfo.damage;
+        if (selfDestructHit && attackInfo.damage > 0)
+            attackInfo.damage = Mathf.Max(1, Mathf.RoundToInt(attackInfo.damage * (1f - _boss.raidSelfDestructDamageReduction)));
+
         // 실패든 성공이든 데미지는 정상 처리된다 — 카운터 실패에 패널티는 없다(확정 스펙).
         bool resolved = base.ReceiveAttack(attackInfo, hitContext);
         if (IsServer && resolved && IsFromPlayer(hitContext)) _fightPlayerDamage += attackInfo.damage;
 
         // ④ 자폭 중 플레이어 피해 = 공동 게이지 감소(피해만으로도 저지 가능 — 팀장 10-14).
-        if (IsServer && resolved && _raidSelfDestruct && _attackPhase == BossAttackPhase.ChargeWait && IsFromPlayer(hitContext))
-            _counterGauge.Value = BossRaidRules.SelfDestructGaugeAfterDamage(_counterGauge.Value, attackInfo.damage, _selfDestructGaugeTotal);
+        if (selfDestructHit && resolved)
+            _counterGauge.Value = BossRaidRules.SelfDestructGaugeAfterDamage(_counterGauge.Value, gaugeDamage, _selfDestructGaugeTotal);
 
         if (counter && resolved && State != MonsterState.Dead)
         {
