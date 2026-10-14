@@ -2,7 +2,11 @@
 
 > 기존 23호와 **별개의 변형 보스**다(`TwentyThree_Raid.prefab` + `No23_Raid.asset`). 에디터 툴바 **"보스: 기존/레이드"** 로 바꿔 비교한다(빌드는 아직 항상 기존).
 > 설계 배경 = [PLAN-boss-raid.md](../../../PLAN-boss-raid.md) · 회의 = [raid-rework-meeting-1014.md](raid-rework-meeting-1014.md).
-> 수치는 전부 `No23_Raid.asset` 인스펙터에서 바꾼다(데이터 테이블 xlsx 대상 아님). 아래 `필드명` 은 그 칸 이름이다.
+> 수치는 `No23_Raid.asset` 칸이다. 아래 `필드명` 은 그 칸 이름이다.
+> 🔴 **데이터 테이블(xlsx `Boss` 시트 `No23_Raid` 열) 대상이다**(`BossDataSO` = `[DataTableSheet("Boss")]`). 테이블 모드 Play·**빌드는 xlsx 값**을 쓴다 — 인스펙터만 고치면 빌드에 안 들어간다. 바꾸면 xlsx 도 같이(병합 Export 또는 해당 셀) 고치고 `Tools/Data/Verify` 로 차이 0 을 확인한다. 상세 [data-table.md](../../tech/data-table.md).
+>   - 지금 xlsx 에 행이 **없는** 칸(`raidPylonHpMultiplier` · `raidSelfDestructDamageReduction` · 위협 어그로 `threat*`·`farPressure*`)은 다음 병합 Export 전까지 인스펙터 값으로 돈다 — 그 Export 에서 지금 에셋 값이 행으로 들어간다.
+>   - 장판 수치(`BossElectricFloorData_Raid.asset`)는 테이블 대상이 아니다 — 인스펙터만 고친다.
+> ⚠️ 밸런스 수치는 전부 **1인 플레이로만 검증**했다(10-14). 2·3인은 미측정.
 >
 > ✏️ 각 구간 끝의 **「추가할 것」** 칸은 비워 뒀다 — 팀장 아이디어를 여기 적으면 구현 근거가 된다.
 
