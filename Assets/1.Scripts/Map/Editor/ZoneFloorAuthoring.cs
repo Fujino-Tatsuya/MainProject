@@ -8,8 +8,10 @@ using UnityEngine;
 // 존 바닥 Ground 콜라이더 저작 도구 (할 일 32 세팅 — Docs/tech/wall-concept.md).
 //
 // 존 프리팹은 아트 조각의 콜라이더를 전부 뺐다(바닥 포함). 충돌은 방 단위 단순 박스 — 이 메뉴가 존마다 지상층 바닥
-// 박스 'ZoneFloor'(루트 직속, Ground 태그·레이어, 비트리거 BoxCollider 하나, 렌더러 없음)를 만든다.
+// 박스 'Colliders/Floor_00'(ZoneHierarchyAuthoring 표준 자리, Ground 태그·레이어, 비트리거 BoxCollider 하나, 렌더러 없음)을 만든다.
 // 다시 돌리면 같은 결과(멱등) — 이미 맞으면 저장하지 않는다. bossroom 은 BossRoomAuthoring 이 관리하므로 제외.
+//  · Colliders/Floor_* 가 2개 이상인 존 = 사용자가 수동 분할 → 건드리지 않고 '수동 세팅됨 — 건너뜀'.
+//  · 옛 판의 루트 직속 'ZoneFloor' 가 남아 있으면 Colliders/Floor_00 으로 옮기고 이름만 바꾼다(제자리 갱신).
 //
 //  · 바닥 렌더러 = 루트 아래 경로(자기 포함)에 'floor' 가 들어간 렌더러 중 자기 이름에 'wall' 이 없는 것
 //    (바닥 PF 아래 묻힌 벽 조각 제외). 그중 납작한 것(두께 ≤ 1m)만 높이 판정에 쓴다.
@@ -26,7 +28,11 @@ public static class ZoneFloorAuthoring
 {
     const string ZonesFolder = "Assets/2.Prefabs/Environment/Layouts/Zones";
     const string BossRoomPath = ZonesFolder + "/bossroom.prefab";
-    const string FloorName = "ZoneFloor";
+    const string CollidersName = "Colliders";       // ZoneHierarchyAuthoring 표준 그룹
+    const string EnvironmentName = "Environment";
+    const string FloorPrefix = "Floor_";
+    const string FloorName = FloorPrefix + "00";
+    const string LegacyFloorName = "ZoneFloor";     // 이전 판이 루트 직속에 만들던 이름
     const string Tag = "[ZoneFloor]";
 
     const float Thickness = 1f;             // 박스 두께 — 윗면 = floorTop
@@ -59,7 +65,7 @@ public static class ZoneFloorAuthoring
         }
 
         var report = new StringBuilder();
-        report.AppendLine($"{Tag} 존 바닥 생성 — 두께 {Thickness}m · 태그/레이어 {GameLayers.Ground} · 이름 {FloorName}");
+        report.AppendLine($"{Tag} 존 바닥 생성 — 두께 {Thickness}m · 태그/레이어 {GameLayers.Ground} · 이름 {CollidersName}/{FloorName}");
         report.AppendLine("| 존 | 결과 | floorTop | 박스 XZ (루트 로컬) | 박스 크기 | 수동 확인 |");
         var manual = new List<string>();
 
@@ -84,6 +90,13 @@ public static class ZoneFloorAuthoring
         string row = null;
         EditPrefab(path, root =>
         {
+            List<Transform> floors = FloorColliders(root.transform);
+            if (floors.Count > 1)
+            {
+                row = $"| {name} | 수동 세팅됨 — 건너뜀({CollidersName}/{FloorPrefix}* {floors.Count}개) | - | - | - | - |";
+                return false;
+            }
+
             List<FloorPiece> pieces = CollectFloorPieces(root);
             List<FloorPiece> flat = pieces.Where(p => p.Flat).ToList();
             if (flat.Count == 0)
@@ -238,25 +251,52 @@ public static class ZoneFloorAuthoring
     // ─── 적용(멱등) ────────────────────────────────────────────────────────
 
     /// <summary>
-    /// ZoneFloor 를 사양과 같게 맞춘다. 이미 같으면 false(저장 안 함). 깊이 무관하게 찾아 제자리 갱신하되 루트 직속으로 옮긴다.
-    /// 남는 컴포넌트는 Transform + BoxCollider 하나(렌더러·필터 등 제거).
+    /// 존 루트 직속 Colliders 아래 Floor_* 목록. 2개 이상이면 사용자가 수동 분할한 존 — 건드리지 않는다.
+    /// </summary>
+    static List<Transform> FloorColliders(Transform root)
+    {
+        Transform colliders = root.Find(CollidersName);
+        return colliders == null ? new List<Transform>()
+            : colliders.Cast<Transform>().Where(c => c.name.StartsWith(FloorPrefix, System.StringComparison.Ordinal)).ToList();
+    }
+
+    /// <summary>
+    /// Colliders/Floor_00 을 사양과 같게 맞춘다. 이미 같으면 false(저장 안 함).
+    /// Floor_* 가 하나면 그것을 제자리 갱신, 없으면 옛 이름 ZoneFloor(어디 있든)를 Colliders/Floor_00 으로 옮기고, 그것도 없으면 만든다.
+    /// 남는 컴포넌트는 Transform + BoxCollider 하나(렌더러·필터 등 제거). 호출 전에 Floor_* 가 2개 이상인 존은 걸러낸다.
     /// </summary>
     static bool Apply(GameObject root, Vector3 center, Vector3 size, int groundLayer, out string note)
     {
         note = "";
-        Transform t = FindDeep(root.transform, FloorName);
-        if (t != null && Matches(root.transform, t, center, size, groundLayer)) return false;
+        List<Transform> floors = FloorColliders(root.transform);
+        Transform t = floors.Count == 1 ? floors[0] : null;
+        Transform legacy = FindDeep(root.transform, LegacyFloorName);
+        if (t != null && legacy != null)
+            note = $"(옛 {LegacyFloorName} 남음 — {legacy.parent.name} 아래, 수동 확인)";
+        if (t != null && Matches(t, center, size, groundLayer)) return false;
 
-        if (t == null)
+        Transform colliders = root.transform.Find(CollidersName);
+        if (colliders == null)
+        {
+            colliders = new GameObject(CollidersName).transform;
+            colliders.SetParent(root.transform, false);
+            Transform env = root.transform.Find(EnvironmentName);
+            if (env != null) colliders.SetSiblingIndex(env.GetSiblingIndex() + 1);
+            note += $"({CollidersName} 그룹 생성)";
+        }
+
+        if (t == null && legacy != null)
+        {
+            note += $"({LegacyFloorName} → {CollidersName}/{FloorName} — 이전 부모 {legacy.parent.name})";
+            t = legacy;
+            t.SetParent(colliders, false);
+            t.name = FloorName;
+        }
+        else if (t == null)
         {
             t = new GameObject(FloorName).transform;
-            t.SetParent(root.transform, false);
-            note = "(생성)";
-        }
-        else if (t.parent != root.transform)
-        {
-            note = $"(루트 직속으로 옮김 — 이전 부모 {t.parent.name})";
-            t.SetParent(root.transform, false);
+            t.SetParent(colliders, false);
+            note += "(생성)";
         }
         t.localPosition = Vector3.zero;
         t.localRotation = Quaternion.identity;
@@ -277,10 +317,10 @@ public static class ZoneFloorAuthoring
         return true;
     }
 
-    static bool Matches(Transform root, Transform t, Vector3 center, Vector3 size, int groundLayer)
+    static bool Matches(Transform t, Vector3 center, Vector3 size, int groundLayer)
     {
         GameObject go = t.gameObject;
-        if (t.parent != root || !go.activeSelf || go.layer != groundLayer || !go.CompareTag(GameLayers.Ground)) return false;
+        if (!go.activeSelf || go.layer != groundLayer || !go.CompareTag(GameLayers.Ground)) return false;
         if (t.localPosition != Vector3.zero || t.localRotation != Quaternion.identity || t.localScale != Vector3.one) return false;
         Component[] comps = go.GetComponents<Component>();
         if (comps.Length != 2 || !(comps[1] is BoxCollider box)) return false;
