@@ -45,31 +45,80 @@ public static class SoundSyncMenu
         public int FileCount;
     }
 
+    private enum Mode
+    {
+        /// <summary>메뉴 — 변경이 있으면 확인 대화상자, 결과는 알림.</summary>
+        Menu,
+
+        /// <summary>대화상자 없이 쓰고 결과를 Console 에(검증 스크립트용).</summary>
+        Silent,
+
+        /// <summary>Play·빌드 자동 동기화 — 대화상자 없음, 바꿀 것이 없으면 아무 로그도 남기지 않는다.</summary>
+        Auto,
+    }
+
     [MenuItem(MenuPath, priority = 10)]
-    private static void RunFromMenu() => Sync(confirm: true);
+    private static void RunFromMenu() => Run(Mode.Menu, null, "사운드 동기화");
 
     /// <summary>동기화를 실행한다. <paramref name="confirm"/> = false 면 확인 대화상자 없이 쓴다(자동화용).</summary>
-    public static bool Sync(bool confirm) => Sync(confirm, null);
+    public static bool Sync(bool confirm) => Run(confirm ? Mode.Menu : Mode.Silent, null, "사운드 동기화");
 
     /// <summary><paramref name="rowsOverride"/> 가 있으면 xlsx 대신 그 행을 쓴다(검증용 — xlsx 는 SVN 원본이라 건드리지 않는다).</summary>
-    internal static bool Sync(bool confirm, IReadOnlyList<DataTableEntry> rowsOverride)
+    internal static bool Sync(bool confirm, IReadOnlyList<DataTableEntry> rowsOverride) =>
+        Run(confirm ? Mode.Menu : Mode.Silent, rowsOverride, "사운드 동기화");
+
+    /// <summary>
+    /// 테이블 모드 Play·빌드 직전 자동 동기화(PLAN-sound-sync.md 결정 C). 확인 없이 디스크에 쓰고 변경은 Console 에 남긴다.
+    /// 오류가 있으면 아무것도 쓰지 않고 false — 호출 측이 Play·빌드를 멈춘다.
+    /// MPPM 클론과 xlsx 가 없을 때는 건너뛰고 true.
+    /// </summary>
+    public static bool AutoSync(string label) => AutoSync(label, null);
+
+    internal static bool AutoSync(string label, IReadOnlyList<DataTableEntry> rowsOverride)
     {
+        if (IsMppmClone(Application.dataPath))
+        {
+            return true; // 클론은 메인 에디터와 같은 Assets 를 본다 — 메인이 동기화한 결과를 읽는다
+        }
+
+        return Run(Mode.Auto, rowsOverride, label);
+    }
+
+    /// <summary>MPPM 가상 플레이어(클론)는 <c>&lt;메인&gt;/Library/VP/…/Assets</c> 에서 돈다(<see cref="DevBootTarget"/> 와 같은 규칙).</summary>
+    public static bool IsMppmClone(string dataPath) =>
+        (dataPath ?? string.Empty).Replace('\\', '/').IndexOf("/library/vp/", StringComparison.OrdinalIgnoreCase) >= 0;
+
+    private static bool Run(Mode mode, IReadOnlyList<DataTableEntry> rowsOverride, string label)
+    {
+        bool menu = mode == Mode.Menu;
+        string prefix = mode == Mode.Auto ? $"{LogPrefix}{label}: " : LogPrefix;
         if (!TryLoad(out Context context, out string loadError, rowsOverride))
         {
-            Debug.LogError(LogPrefix + loadError);
-            if (confirm) EditorUtility.DisplayDialog("사운드 동기화", loadError, "확인");
+            Debug.LogError(prefix + loadError);
+            if (menu) EditorUtility.DisplayDialog("사운드 동기화", loadError, "확인");
             return false;
+        }
+
+        if (mode == Mode.Auto && context.FileCount == 0)
+        {
+            return true; // xlsx 없음 — 테이블 쪽 규칙(Play = SO 값, 빌드 = 멈춤)을 따른다
         }
 
         SoundSyncPlan plan = SoundSyncPlanner.Plan(context.Rows, context.State);
         List<DataTableIssue> issues = context.ReadIssues.Items.Concat(plan.Issues.Items).ToList();
-        foreach (DataTableIssue issue in issues)
+        int errorCount = issues.Count(i => i.Kind == DataTableIssueKind.Error);
+
+        // 자동 모드는 바꿀 것이 없으면 조용히 — 고아 엔티티 같은 상시 경고가 Play 마다 쌓이지 않게.
+        bool report = mode != Mode.Auto || errorCount > 0 || plan.HasChanges;
+        if (report)
         {
-            if (issue.Kind == DataTableIssueKind.Error) Debug.LogError(LogPrefix + issue);
-            else Debug.LogWarning(LogPrefix + issue);
+            foreach (DataTableIssue issue in issues)
+            {
+                if (issue.Kind == DataTableIssueKind.Error) Debug.LogError(prefix + issue);
+                else Debug.LogWarning(prefix + issue);
+            }
         }
 
-        int errorCount = issues.Count(i => i.Kind == DataTableIssueKind.Error);
         if (errorCount == 0)
         {
             errorCount += CheckTargetPaths(plan, context);
@@ -77,14 +126,14 @@ public static class SoundSyncMenu
 
         if (errorCount > 0)
         {
-            string message = $"오류 {errorCount}개 — 아무것도 쓰지 않았다. 목록은 Console.";
-            Debug.LogError(LogPrefix + message);
-            if (confirm) EditorUtility.DisplayDialog("사운드 동기화", message, "확인");
+            string message = $"사운드 동기화 오류 {errorCount}개 — 아무것도 쓰지 않았다. 목록은 Console.";
+            Debug.LogError(prefix + message);
+            if (menu) EditorUtility.DisplayDialog("사운드 동기화", message, "확인");
             return false;
         }
 
         int warningCount = issues.Count(i => i.Kind == DataTableIssueKind.Warning);
-        if (plan.HasChanges && confirm && !EditorUtility.DisplayDialog("사운드 동기화", Summary(plan, warningCount), "동기화", "취소"))
+        if (plan.HasChanges && menu && !EditorUtility.DisplayDialog("사운드 동기화", Summary(plan, warningCount), "동기화", "취소"))
         {
             return false;
         }
@@ -92,22 +141,27 @@ public static class SoundSyncMenu
         Apply(plan, context);
         AssetDatabase.SaveAssets();
 
+        if (!report)
+        {
+            return true;
+        }
+
         string done = plan.HasChanges
             ? $"동기화 완료 — 변경 {plan.Changes.Count}개, 엔트리 {plan.EntryCount}개" + (warningCount > 0 ? $", 경고 {warningCount}개(Console)" : string.Empty)
             : "바꿀 구조 없음 — SoundCatalog 텍스트 칸만 맞췄다.";
         foreach (string change in plan.Changes)
         {
-            Debug.Log(LogPrefix + change);
+            Debug.Log(prefix + change);
         }
 
-        Debug.Log(LogPrefix + done, context.Catalog);
-        if (confirm) EditorWindow.focusedWindow?.ShowNotification(new GUIContent(done));
+        Debug.Log(prefix + done + (mode == Mode.Auto ? " — 결과(51.Audio/Data)를 xlsx 와 같이 SVN 에 커밋할 것." : string.Empty), context.Catalog);
+        if (menu) EditorWindow.focusedWindow?.ShowNotification(new GUIContent(done));
         return true;
     }
 
     /// <summary>
-    /// 쓰지 않고 xlsx 와 에셋이 어긋났는지만 본다 — 테이블 Play·Verify 에서 "동기화를 실행하라" 경고용.
-    /// 어떤 예외도 호출 측(Play 진입)을 막지 않는다.
+    /// 쓰지 않고 xlsx 와 에셋이 어긋났는지만 본다 — Verify(읽기 전용) 에서 "동기화를 실행하라" 경고용.
+    /// 어떤 예외도 호출 측을 막지 않는다.
     /// </summary>
     public static void WarnIfPending(string context)
     {

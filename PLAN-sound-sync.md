@@ -12,7 +12,7 @@
 | 항목 | 결정 |
 |---|---|
 | 방식 | **메뉴 수동 실행으로 디스크에 반영.** 테이블 Play·빌드의 "메모리 적용 후 되돌리기"에는 끼우지 않는다. 자동 쓰기 없음 |
-| 라이브러리 | xlsx `library` 칸. **없으면 만든다**(BroAudio 출력 폴더 `Assets/9.ScriptableObject/SoundLibrary`) |
+| 라이브러리 | xlsx `library` 칸. **없으면 만든다**(BroAudio 출력 폴더 `Assets/51.Audio/Data/SoundLibrary` — 10-14 이전 전 `9.ScriptableObject/SoundLibrary`) |
 | 엔티티 | xlsx `entity` 칸 = 엔티티 이름. **없으면 만든다**(`AudioEntity.CreateNewInstance` — Library Manager 와 같은 기본값). 프로젝트 전체에서 이름이 겹치면 오류 |
 | 소속 변경 | 기존 엔티티의 `library` 가 실제와 다르면 **엔티티를 옮긴다**(`AssetDatabase.MoveAsset`, guid 유지 + 라이브러리 역참조 갱신) |
 | 엔티티 공유 | **금지.** 두 키가 같은 엔티티를 가리키면 오류 |
@@ -94,3 +94,21 @@ S1 순수 계획 클래스 + 테스트 → S2 메뉴(생성·이동·쓰기) →
 - 새 원소의 재생 수치는 SO 에 기본값으로 들어간다(테이블 모드·빌드는 xlsx 값).
 - ✅ xlsx `Sound` 시트 새 구성 작성(병합 Export 결과에서 Sound 시트만 원본에 이식 — 전체 병합은 이 브랜치에 없는 다른 시트 필드 20개를 버려서 쓰지 않음). 로드 오류 0 · 동기화 "바꿀 것 없음".
 - ⏳ 사람: xlsx SVN 커밋 → Play 청취. 인수인계 [handoff-sound-sync.md](Docs/tech/handoff-sound-sync.md).
+
+## 이전 (2026-10-14) — 사운드 데이터를 SVN 으로
+- `SoundCatalog.asset` → `Assets/51.Audio/Data/SoundCatalog.asset`, `SoundLibrary/` → `Assets/51.Audio/Data/SoundLibrary/`(Unity 끈 채 이동, 24개 파일·.meta guid 바이트 동일). `SoundCatalog.cs` 는 git 에 남겨 `Assets/1.Scripts/Sound/` 로.
+- BroAudio 출력 폴더 `BroEditorSetting.asset` `AssetOutputPath` 를 새 경로로 — 안 바꾸면 Library Manager·사운드 동기화가 옛 위치(git 영역)에 다시 만든다.
+- 목적: xlsx·클립·엔티티·`SoundCatalog` 를 한 SVN 커밋으로 묶어 "PC 마다 엔티티가 따로 생기는" 위험을 없앤다. Play·빌드 자동 동기화는 아직 결정 전(검사만 자동 = 권장안 A).
+- 주의: SVN 은 git 브랜치와 따로 간다 — `SoundEntry` 구조(코드)를 바꾸는 작업은 development 반영 뒤 SVN 커밋.
+
+## 결정 변경 (2026-10-14) — Play·빌드 자동 동기화 = **C(전부 자동)**
+| 항목 | 결정 |
+|---|---|
+| Play | **테이블 모드 Play 진입 때** 확인 없이 동기화한다(`DataSourcePlayMode.PrepareTablePlay` 맨 앞 — 테이블 Load 가 늘어난 entries 를 보도록). 인스펙터 모드는 xlsx 를 무시하므로 하지 않는다 |
+| 빌드 | `DataTableBuild.WithTableValues` 맨 앞(Build 버튼·메뉴 빌드 공통). 테이블 적용·원복과 달리 **동기화 결과는 디스크에 남는다** |
+| 오류 | 동기화 오류가 하나라도 있으면 아무것도 쓰지 않고 **Play 진입 취소 / 빌드 실패** |
+| 변경 기록 | 대화상자 없이 Console 에 변경 목록. 바꿀 것이 없으면 조용히 지나간다 |
+| MPPM 클론 | 동기화하지 않는다(`Library/VP/` 아래에서 도는 클론은 메인과 같은 Assets 를 본다 — 메인이 쓴 결과를 읽는다) |
+| xlsx 없음 | 동기화를 건너뛴다(테이블 쪽 규칙대로 Play 는 SO 값, 빌드는 테이블이 멈춤) |
+| 수동 메뉴·Verify | 그대로(메뉴 = 확인 대화상자, Verify = 읽기 전용 경고) |
+- 받아들인 위험: Play·빌드만 해도 SVN 영역(`51.Audio/Data`)에 변경이 생길 수 있다. xlsx 를 고친 사람이 동기화 결과까지 한 SVN 커밋으로 올리는 규칙을 지키면 다른 PC 에선 "바꿀 것 없음" 으로 지나간다.
