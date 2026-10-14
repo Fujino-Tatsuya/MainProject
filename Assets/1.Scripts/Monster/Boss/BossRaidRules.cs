@@ -80,7 +80,10 @@ public static class PlayerHitDamageCap
     static Object _owner;
     static float _ratio;
 
-    public static float Ratio => _owner != null ? _ratio : 0f;
+    public static float Ratio => _owner != null && !LethalOverride ? _ratio : 0f;
+
+    /// <summary>[서버] 즉사기가 피해를 넣는 동안만 true — 상한을 건너뛴다(④ 자폭 실패 대폭발, 팀장 10-14). 넣은 쪽이 바로 끈다.</summary>
+    public static bool LethalOverride { get; set; }
 
     public static void Set(Object owner, float ratio)
     {

@@ -31,23 +31,12 @@ public static class BossRaidVariantAuthoring
     const int SoloMaxHp = 2880;
     const float HitCapRatio = 0.9f;
 
-    // 웰즈 자막(초안 — 팀장 확인 전). id 는 BOSS_RAID_<BossPhaseSequence 이름>.
+    // 규칙 안내 자막 3종만(팀장 10-14 — 웰즈 대사·그 밖 안내 제거). 돌진 = 시연·1인 ③, 송전기·자폭 = 중앙 착지 후.
     static readonly (string id, string text, float seconds)[] Subtitles =
     {
-        ("BOSS_RAID_RaidDroneCharge",  "웰즈: \"가족에게 전력을. 우리 아이, 아직 멈추면 안 돼.\"", 4f),
-        ("BOSS_RAID_RaidRescue",       "웰즈: \"새 가족을 데려와. 하나쯤은 남겨 둬야지.\"", 4f),
-        ("BOSS_RAID_RaidSelfDestruct", "웰즈: \"고장 난 가족은 필요 없어. 같이 사라져.\"", 4f),
-        // W2 — 규칙 안내(처음 하는 사람용).
-        ("BOSS_RAID_OpeningDash",      "돌진이 <b>파랗게</b> 빛나면 <b>정면</b>에서 <b>우클릭</b>으로 간파하세요!", 4f),
-        ("BOSS_RAID_ChargeGuide",      "드론 표식을 <b>송전탑 위로</b> 끌고 가서 떨어뜨리세요! 직접 때려도 부서집니다.", 6f),
-        ("BOSS_RAID_Discharge",        "방전! <b>부서진 송전탑 자리</b>로 피하세요!", 3f),
-        // W3 — ③ 새 가족 · ④ 폐기 처분 · 엔딩.
-        ("BOSS_RAID_RescueGuide",          "동료가 잡히면 23호 <b>정면</b>에서 <b>우클릭</b>으로 구출하세요!", 5f),
-        ("BOSS_RAID_RescueSuccess",        "웰즈: \"...놓쳤잖아. 쓸모없는 팔.\"", 3f),
-        ("BOSS_RAID_SelfDestructGuide",    "23호가 <b>자폭</b>을 준비합니다! <b>공격</b>해서 게이지를 비우세요 — 파랗게 빛날 때 <b>간파</b>하면 크게 깎입니다!", 6f),
-        ("BOSS_RAID_SelfDestructStopped",  "웰즈: \"자폭도 못 해? 정말 고장 났구나.\"", 3f),
-        ("BOSS_RAID_SelfDestructBlast",    "대폭발! 버티세요!", 2f),
-        ("BOSS_RAID_Defeat",               "웰즈: \"...또 망가졌네. 괜찮아, 다음 아이를 만들면 돼.\"", 6f),
+        ("BOSS_RAID_OpeningDash",       "돌진이 <b>파랗게</b> 빛나면 <b>정면</b>에서 <b>우클릭</b>으로 간파하세요!", 4f),
+        ("BOSS_RAID_ChargeGuide",       "드론 표식을 <b>송전탑 위로</b> 끌고 가서 떨어뜨리세요! 직접 때려도 부서집니다.", 6f),
+        ("BOSS_RAID_SelfDestructGuide", "23호가 <b>자폭</b>을 준비합니다! <b>공격</b>해서 게이지를 비우세요 — 파랗게 빛날 때 <b>간파</b>하면 크게 깎입니다!", 6f),
     };
 
     [MenuItem(BuildMenu)]

@@ -1107,7 +1107,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         _raidRescueActive = true;
         // 취약이면 간파 판정이 막히고 간파 스킬이 넉백으로 체인을 끊어 ③ 이 성공도 실패도 없이 사라진다(점검 10-14) → 끝낸다.
         if (IsVulnerable) EndVulnerable("③ 각본 시작");
-        ShowRaidSubtitleServer(next == BossAttackId.Grab ? "BOSS_RAID_RescueGuide" : "BOSS_RAID_OpeningDash");
+        if (next == BossAttackId.Dash) ShowRaidSubtitleServer("BOSS_RAID_OpeningDash");   // 돌진만 간파 안내(팀장 10-14 — 웰즈 대사·그 밖 안내 제거)
         Debug.Log($"[23호/레이드] 새 가족 — {next} 발동(간파·헛잡기 = 제압)", this);
         return slot;
     }
@@ -2301,7 +2301,6 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
             {
                 // ③ 각본 잡기를 전원이 피했다(범위 밖·슈퍼아머) = 성공 — 제압(PLAN-boss-raid §2).
                 _raidRescueActive = false;
-                ShowRaidSubtitleServer("BOSS_RAID_RescueSuccess");
                 FightLog("③ 새 가족 성공(헛잡기)");
                 EnterSuppress("각본 잡기 헛잡기", fromReservation: true);
                 return;
@@ -4201,7 +4200,6 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         _electricFloor?.ServerQueueDischarge(mask, warn, _boss.raidDischargeDamage);
         // 장판을 Raid 모드로 붙잡아 두는 시간 = 예고 + 여유(발동·VFX 는 장판이 끝까지 낸다).
         _raidFloorHoldUntil = Time.time + warn + 2f;
-        ShowRaidSubtitleServer("BOSS_RAID_Discharge");
         var safe = new System.Text.StringBuilder();
         foreach (Vector2Int t in _safeTileScratch) safe.Append($" ({t.x + 1},{t.y + 1})");
         Debug.Log($"[23호/레이드] 전력 공급 실패 — 방전 예고 {warn:0.#}초 · 안전 칸 {_safeTileScratch.Count}개:{safe}", this);
@@ -4262,17 +4260,17 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         {
             Debug.Log("[23호/레이드] 폐기 처분 — 자폭 저지 → 제압", this);
             FightLog($"④ 폐기 처분 저지(남은 {_attackPhaseTimer:0.0}s)");
-            ShowRaidSubtitleServer("BOSS_RAID_SelfDestructStopped");
             EnterSuppress("자폭 저지", fromReservation: true);
             return;
         }
 
-        // 저지 실패 = 대폭발(방 전체, 즉사 상한 0.9 가 같이 걸린다) → 게이지를 되돌리고 남은 HP 전투로.
+        // 저지 실패 = 대폭발(방 전체 즉사기 — raidSelfDestructBlastLethal) → 게이지를 되돌리고 남은 HP 전투로(살아남은·부활한 사람).
         _counterGauge.Value = BossCounterProgress.GaugeMax;
         float warn = _boss.raidSelfDestructBlastWarn;
-        _electricFloor?.ServerQueueDischarge(BossTileGrid.AllMask, warn, _boss.raidSelfDestructBlastDamage);
+        // 즉사기(팀장 10-14 — 실패하기가 너무 어려웠다): 한 방 상한을 건너뛴다. 피격 무효(대시 무적 등)는 그대로.
+        _electricFloor?.ServerQueueDischarge(BossTileGrid.AllMask, warn, _boss.raidSelfDestructBlastDamage,
+                                             lethal: _boss.raidSelfDestructBlastLethal);
         _raidFloorHoldUntil = Time.time + warn + 2f;
-        ShowRaidSubtitleServer("BOSS_RAID_SelfDestructBlast");
         Debug.Log("[23호/레이드] 폐기 처분 — 저지 실패, 대폭발", this);
         FightLog("④ 폐기 처분 실패 → 대폭발");
         DecideNextAfterAction();
@@ -5463,7 +5461,6 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         if (_raidRescueActive)
         {
             _raidRescueActive = false;
-            ShowRaidSubtitleServer("BOSS_RAID_RescueSuccess");
             FightLog("③ 새 가족 성공(간파)");
             EnterSuppress("구출 성공", fromReservation: true);
             return;
@@ -5884,7 +5881,6 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         TickSuppressExit(previous, next);
         if (next == MonsterState.Dead)   // 사망은 모든 예약·상태보다 우선(기획 §9.3 · 간파 §12.2)
         {
-            if (IsRaid) ShowRaidSubtitleServer("BOSS_RAID_Defeat");   // 엔딩 — 웰즈의 마지막 말
             FlushFightLog("처치");
             _pendingSuppress = false;
             EndVulnerable("사망");
@@ -6156,9 +6152,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         {
             BossPhaseSequence seq = _phaseSequenceScratch[i];
             _pendingPhaseSequences.Enqueue(seq);
-            // 레이드 구간 선언(웰즈 자막). 기존 ChargeSequence 는 자막이 없다.
-            if (seq >= BossPhaseSequence.RaidDroneCharge)
-                ShowRaidSubtitleServer("BOSS_RAID_" + seq);
+            // 구간 진입 웰즈 대사는 뺐다(팀장 10-14) — 설명은 중앙 착지 후(StartChargingInPlace·StartSelfDestructInPlace)에만 띄운다.
         }
 
         OnPhaseEntered(next);

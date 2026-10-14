@@ -46,7 +46,12 @@ public sealed class BossElectricFloor : MonoBehaviour
     ulong _dischargeMask;
     float _dischargeWarn;
     int _dischargeDamage;
+    bool _dischargeLethal;
     int _fireDamage;   // 이번 발동 피해(평소 = _d.damage)
+    bool _fireLethal;  // 이번 발동이 즉사기인가(④ 자폭 실패) — 한 방 상한을 건너뛴다
+
+    // 즉사 피해 — 보호막까지 넘기는 충분히 큰 값(플레이어 HP 220 대).
+    const int LethalDamage = 999999;
 
     /// <summary>[서버] 장판 1회 발동에서 실제로 맞은 인원(무적·잡힘·쓰러짐 제외, 보호막이 막아도 포함). 보스 고유 게이지(B6) 훅 — 지금 구독자 없음.</summary>
     public event Action<int> ServerFloorHit;
@@ -124,8 +129,9 @@ public sealed class BossElectricFloor : MonoBehaviour
     }
 
     /// <summary>[서버] 레이드 방전 1회 요청(② 전력 공급 실패). Raid 모드에서 예고 → 발동한다.</summary>
-    public void ServerQueueDischarge(ulong mask, float warnTime, int damage)
+    public void ServerQueueDischarge(ulong mask, float warnTime, int damage, bool lethal = false)
     {
+        _dischargeLethal = lethal;
         _dischargePending = true;
         _dischargeMask = mask;
         _dischargeWarn = Mathf.Max(0.3f, warnTime);
@@ -141,7 +147,8 @@ public sealed class BossElectricFloor : MonoBehaviour
             // 🔴 Fire 는 _mask 를 쏜다 — Warn 인자만 넘기면 예고는 전 타일인데 발동은 빈 마스크(0칸)가 된다(10-14 Play: 피해 0).
             _mask = _dischargeMask;
             Warn(_mask, _dischargeWarn);
-            _fireDamage = _dischargeDamage;
+            _fireDamage = _dischargeLethal ? LethalDamage : _dischargeDamage;
+            _fireLethal = _dischargeLethal;
             return;
         }
 
@@ -257,6 +264,7 @@ public sealed class BossElectricFloor : MonoBehaviour
     void Warn(ulong mask, float time)
     {
         _fireDamage = _d.damage;   // 레이드 방전은 TickRaid 가 이 뒤에 덮어쓴다
+        _fireLethal = false;
         _step = Step.Warn;
         _t = time;
         _shown = true;
@@ -285,7 +293,10 @@ public sealed class BossElectricFloor : MonoBehaviour
             if (!BossPatternTargets.IsInvulnerable(p)) gauge++;
             // 출처 = 발 위치(맞은 타일). 보스 위치를 넘기면 보호막 파문 등이 보스 쪽에서 맞은 것처럼 보인다.
             Vector3 foot = BossPatternTargets.FootPosition(p);
-            BossPatternTargets.Damage(p, _fireDamage, foot, _boss.transform);
+            // 즉사기는 이 한 번만 한 방 상한(PlayerHitDamageCap)을 끈다 — 넣자마자 다시 켠다.
+            PlayerHitDamageCap.LethalOverride = _fireLethal;
+            try { BossPatternTargets.Damage(p, _fireDamage, foot, _boss.transform); }
+            finally { PlayerHitDamageCap.LethalOverride = false; }
         }
         ServerFloorHit?.Invoke(gauge);
         Debug.Log($"[전기장판] 발동 {_mode}{(_mode == Mode.Charge ? $"/{_group}{(_bStage > 0 ? _bStage.ToString() : "")}" : "")} — " +

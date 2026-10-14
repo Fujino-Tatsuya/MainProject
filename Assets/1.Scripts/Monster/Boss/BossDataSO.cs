@@ -305,9 +305,13 @@ public class BossDataSO : MonsterDataSO
     [Min(1f)] public float raidSelfDestructCounterInterval = 5f;
     [Min(0.3f)] public float raidSelfDestructCounterWindow = 1.5f;
 
-    [Tooltip("저지 실패 = 대폭발(방 전체). 예고 시간과 피해 — 즉사 상한 0.9 가 같이 걸린다.")]
+    [Tooltip("저지 실패 = 대폭발(방 전체). 예고 시간과 피해. 즉사기(아래)면 피해 값은 무시된다.")]
     [Min(0.3f)] public float raidSelfDestructBlastWarn = 1.2f;
     [Min(0)] public int raidSelfDestructBlastDamage = 190;
+
+    [Tooltip("저지 실패 대폭발을 즉사기로(한 방 상한 0.9 무시, 보호막 포함 전부). 팀장 10-14: 실패하기가 너무 어려워 즉사로.\n" +
+             "대시 무적 등 피격 무효는 그대로 통한다.")]
+    public bool raidSelfDestructBlastLethal = true;
 
     [Header("카운터 / 그로기 — maxGroggyCount·groggyDuration 은 base 필드 재사용")]
     [Tooltip("[S3] 카운터 성공으로 인정하는 정면 각도(도). 60 = 보스 정면 기준 ±60°. " +
