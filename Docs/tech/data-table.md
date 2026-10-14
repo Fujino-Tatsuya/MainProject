@@ -30,7 +30,7 @@ GameData.xlsx (SVN, 잠금)
 | `Monster` | 몬스터 스탯 SO · 근접 공격 · 넉백 · 카운터 창 · 터렛 조준 |
 | `MidBoss` | Gauntlet · Spinner · Wall |
 | `Boss` | 23호(`BossDataSO`) |
-| `Sound` | 문자열 키별 사운드 재생 수치(`SoundCatalog`) — SoundID 연결은 인스펙터 전용 |
+| `Sound` | 문자열 키별 사운드(`SoundCatalog`) — 재생 수치 + 엔티티 구성(라이브러리·클립·재생 모드). 구성은 `Tools/Data/사운드 동기화` 로 반영(§6 사운드 키) |
 | `Map` | 허수아비 인터럽트 순환(`TrainingDummyInterrupt`) |
 | `SlowMotion` | 인터럽트 슬로우 모양 `interruptProfile.*`(배율·진입·유지·복귀·실패 복귀 길이, 대상 `NetworkManager`) · 오너 줌 배율 `slowMotionZoomFactor`(대상 `CameraSwitcher`). 의미는 [PLAN-interrupt-slowmo.md](../../PLAN-interrupt-slowmo.md) |
 
@@ -100,12 +100,36 @@ GameData.xlsx (SVN, 잠금)
 - **저장 가드**(`DataTableSaveGuard`): 테이블 Play 준비(`ExitingEditMode`)에서 켜지고 Play 종료 후 스냅샷 복구(`EnteredEditMode`)가 끝나야 풀린다. 그 사이 어떤 저장(Ctrl+S·Save Project·다른 툴의 `SaveAssets`)도 테이블 대상 SO·프리팹은 쓰지 않는다(Console 경고). 기준은 Play 여부가 아니라 "복구 전" 이다 —
   Play 여부로 막던 때, Play 종료 직후 `DevBootLauncher` 의 `SaveAssets` 가 복구보다 먼저 돌아 `Player_Gunner`·`Player_Paladin` 에 테이블 값이 저장됐다(2026-10-09 재발). 메뉴 덮어쓰기·빌드는 가드가 풀린 상태에서 돌므로 정상 저장된다.
 
-### 사운드 키
+### 사운드 키 — 사운드 동기화
 
-- 새 키는 `SoundCatalog.asset`의 `entries` 배열에 먼저 추가하고 BroAudio `SoundID`를 연결한다. 테이블은 배열 크기와 에셋 참조를 바꾸지 못한다.
-- 호출은 2D `AudioManager.Instance.Play("키")`, 위치가 있는 3D `AudioManager.Instance.Play("키", worldPosition)`를 쓴다. 로컬 재생이며 사운드 전용 RPC는 없다.
-- `volumeMultiplier`·`pitchMultiplier`·`pitchRandomMin/Max`는 BroAudio 엔티티 값에 곱하는 배율이다(1 = 그대로). `is3D`는 `0 = 2D`, `1 = 3D`다.
-- 빈 키와 중복 키는 런타임 시작 시 경고하며, 중복이면 배열에서 먼저 나온 엔트리만 사용한다. 없는 키나 유효하지 않은 `SoundID`는 경고하고 재생하지 않는다.
+> 결정·설계: [PLAN-sound-sync.md](../../PLAN-sound-sync.md). 사운드 추가 = **`Sound` 시트에 행 작성 → `Tools/Data/사운드 동기화`**. Library Manager·`SoundCatalog` 인스펙터는 열지 않는다.
+
+`Sound` 시트의 `SoundCatalog` 열, `entries[i].*` 행 한 묶음 = 키 하나.
+
+| 칸 | 예 | 누가 쓰나 | 의미 |
+|---|---|---|---|
+| `key` | `Footstep` | 데이터 테이블 + 동기화 | 코드에서 부르는 키 |
+| `library` | `SFXLibrary` | 동기화 | BroAudio 라이브러리. 없으면 만든다(`Assets/51.Audio/Data/SoundLibrary`). 다르면 엔티티를 옮긴다(guid 유지) |
+| `entity` | `Footstep` | 동기화 | BroAudio 엔티티 이름(프로젝트 전체 고유). 없으면 만들고 SoundID 를 연결한다. 한 엔티티는 한 키만 |
+| `audioType` | `SFX` | 동기화 | `Music`·`UI`·`Ambience`·`SFX`·`VoiceOver` |
+| `clipPaths` | `Assets/51.Audio/SFX/Step_01.wav`⏎`Assets/51.Audio/SFX/Step_02.wav` | 동기화 | 프로젝트 기준 전체 경로, 여러 개면 **셀 안 줄바꿈(Alt+Enter)**. 엔티티 클립을 통째로 바꾼다(남는 클립의 Volume·Weight 등은 보존). `-` = 유지 |
+| `playMode` | `Random` | 동기화 | `Single`·`Sequence`·`Random`·`Shuffle`·`Velocity`·`Chained`. `-` = 유지 |
+| `loop` | `0`/`1`/`2` | 동기화 | 0 = 반복 없음, 1 = Loop, 2 = SeamlessLoop(BGM). `-` = 유지 |
+| `volumeMultiplier`·`volumeRandomMin/Max` | `0.8`·`0.85`/`1` | 데이터 테이블 | 엔티티 볼륨에 곱하는 배율 × 재생마다 랜덤 배율(1/1 = 흔들지 않음) |
+| `pitchMultiplier`·`pitchRandomMin/Max` | `1`·`0.95`/`1.05` | 데이터 테이블 | 피치 배율 × 재생마다 랜덤 배율 |
+| `is3D`·`minDistance`·`maxDistance` | `1`·`2`·`30` | 데이터 테이블 | 0 = 2D, 1 = 3D와 감쇠 거리 |
+| `maxSimultaneous`·`retriggerCooldown` | `3`·`0.05` | 데이터 테이블 | 같은 키 동시 재생 수·재트리거 간격(0 = 제한 없음) |
+
+- **엔티티의 볼륨·피치·랜덤·3D 설정은 쓰지 않는다**(생성 기본값 1). 수치는 위 엔트리 칸에서만 고친다. SeamlessLoop 전환·Priority·클립별 Weight/Fade·SpatialSetting·PlaybackGroup 은 필요할 때 Library Manager 에서 — 동기화가 건드리지 않는다.
+- **처음 한 번은 `Export Template` 병합 필수** — 그 전의 시트엔 구성 칸이 없어 동기화가 오류로 멈춘다(배열이 줄어 키가 지워지는 걸 막는 장치).
+- 순서: SVN 잠금 → 행 추가 → **`Tools/Data/사운드 동기화`** → 변경 요약 확인 → **SVN 한 번에 커밋**: xlsx · 클립 · `Assets/51.Audio/Data/`(라이브러리·엔티티·`SoundCatalog.asset`) · **각 .meta**. 2026-10-14 부터 사운드 데이터는 전부 SVN 이다(코드 `SoundCatalog.cs` 만 git).
+- **자동 동기화(2026-10-14)**: **테이블 모드 Play 진입**과 **빌드** 직전에 확인 없이 같은 동기화가 돈다(변경은 Console `[SoundSync]`). 오류면 Play 진입 취소·빌드 실패. 인스펙터 모드 Play·MPPM 클론은 하지 않는다. 테이블 값과 달리 **결과는 디스크에 남는다** — Play·빌드 뒤 `51.Audio/Data` 에 변경이 보이면 xlsx 와 같이 SVN 커밋. 메뉴는 확인 대화상자를 보고 싶을 때 쓴다.
+- 오류가 하나라도 있으면 아무것도 쓰지 않는다(이름 오타·없는 클립·`51.Audio` 밖 경로·엔티티 공유·같은 이름 엔티티 2개·인덱스 구멍). 어느 키도 안 쓰는 엔티티·지워지는 키는 경고만 — 삭제는 사람이.
+- 새로 늘어난 엔트리의 수치는 SO 에 기본값으로 들어간다 — 인스펙터 모드 Play 에선 기본값, 테이블 모드·빌드에선 xlsx 값.
+- 새 클립의 `.meta` 는 반드시 SVN 에 같이 커밋한다 — 없으면 PC 마다 guid 가 달라 엔티티 클립 참조가 끊긴다(다시 동기화하면 그 PC 에선 고쳐지지만 git diff 가 생긴다).
+- 동기화 뒤 열려 있던 Library Manager 창은 다시 연다(새 라이브러리·엔티티 반영).
+- 호출: 2D `AudioManager.Instance.Play("키")`, 3D `Play("키", worldPosition)`, BGM `PlayBGM("BGM_Title")`. 로컬 재생이며 사운드 전용 RPC는 없다. 없는 키·무효 SoundID 는 경고하고 재생하지 않는다.
+- 현재 BGM 키: `BGM_Title`·`BGM_Lobby`·`BGM_InGame`(2026-10-14 고정 필드에서 이전).
 
 ## 7. 자주 나는 오류
 

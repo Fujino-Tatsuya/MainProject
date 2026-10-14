@@ -50,6 +50,13 @@ public static class DataTableBuild
     /// </summary>
     public static void WithTableValues(Action build)
     {
+        // Sound 시트 → BroAudio 라이브러리·엔티티·SoundCatalog(PLAN-sound-sync.md 결정 C).
+        // 테이블 값과 달리 원복하지 않는다 — 동기화 결과는 SVN 에 커밋할 에셋이다.
+        if (!SoundSyncMenu.AutoSync("빌드"))
+        {
+            throw new BuildFailedException($"{LogPrefix}사운드 동기화 오류로 빌드를 멈췄다 — Console 확인.");
+        }
+
         DataTableSource.Result result = DataTableSource.Load();
         if (result.FileCount == 0)
         {

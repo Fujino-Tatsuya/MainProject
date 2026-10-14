@@ -50,7 +50,7 @@ public class TitleSceneManager : NemoSceneManager
         PlayEnterFade();
 
         // BGM 재생
-        AudioManager.Instance.PlayBGM(AudioManager.Instance.Catalog.TitleBGM);
+        AudioManager.Instance.PlayBGM("BGM_Title");
     }
 
     private void Update()

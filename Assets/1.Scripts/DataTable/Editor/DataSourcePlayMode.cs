@@ -89,6 +89,14 @@ public static class DataSourcePlayMode
             return;
         }
 
+        // Sound 시트 → BroAudio 라이브러리·엔티티·SoundCatalog 를 디스크에 맞춘다(PLAN-sound-sync.md 결정 C).
+        // 테이블 Load 가 늘어난 entries 를 보도록 먼저 하고, 저장 가드가 켜지기 전에 끝낸다. 오류면 진입 취소.
+        if (!SoundSyncMenu.AutoSync("테이블 Play"))
+        {
+            EditorApplication.isPlaying = false;
+            return;
+        }
+
         DataTableSource.Result result = DataTableSource.Load();
         if (result.FileCount == 0)
         {
