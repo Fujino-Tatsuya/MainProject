@@ -332,6 +332,8 @@ MonoBehaviour:
   raidDroneGuideCooldown: 1.5
   raidDischargeWarnTime: 2.5
   raidDischargeDamage: 150
+  raidSelfDestructTime: 30
+  raidSelfDestructGaugeDamage: 750
   counterFrontAngle: 60
   backAttackAngle: 60
   hitReactionState: getowned
