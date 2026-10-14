@@ -50,6 +50,17 @@ public static class BossRaidRules
         return mask;
     }
 
+    /// <summary>④ 자폭 공동 게이지 — 플레이어 피해 <paramref name="damage"/> 만큼 깎은 뒤 값(0~100). 목표 피해 합이 100%.</summary>
+    public static float SelfDestructGaugeAfterDamage(float gauge, int damage, int gaugeDamageTotal)
+    {
+        if (damage <= 0 || gaugeDamageTotal <= 0) return gauge;
+        return Mathf.Clamp(gauge - 100f * damage / gaugeDamageTotal, 0f, 100f);
+    }
+
+    /// <summary>③ 구출 각본 공격 — 2인 이상 = 잡기(동료가 정면 간파로 구출), 1인 = 간파 가능 돌진(로아 싱글: 구출 → 단순 돌진).</summary>
+    public static BossAttackId RescueAttackFor(int alivePlayers) =>
+        alivePlayers >= 2 ? BossAttackId.Grab : BossAttackId.Dash;
+
     /// <summary>한 번에 받는 피해 상한. ratio ≤ 0 이면 상한 없음.</summary>
     public static int CapHitDamage(int damage, int receiverMaxHp, float ratio)
     {

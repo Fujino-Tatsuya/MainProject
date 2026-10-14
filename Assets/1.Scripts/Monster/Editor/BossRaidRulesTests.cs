@@ -114,6 +114,35 @@ public sealed class BossRaidRulesTests
         Assert.That(BossRaidRules.DischargeMask(bad), Is.EqualTo(BossTileGrid.AllMask));
     }
 
+    /// ④ 피해만으로도 게이지를 비울 수 있다 — 목표 피해 합을 넣으면 정확히 0.
+    [Test]
+    public void SelfDestructGauge_DamageAloneCanEmptyIt()
+    {
+        float g = 100f;
+        g = BossRaidRules.SelfDestructGaugeAfterDamage(g, 150, 300);
+        Assert.That(g, Is.EqualTo(50f).Within(0.001f));
+        g = BossRaidRules.SelfDestructGaugeAfterDamage(g, 150, 300);
+        Assert.That(g, Is.EqualTo(0f));
+        Assert.That(BossRaidRules.SelfDestructGaugeAfterDamage(0f, 999, 300), Is.EqualTo(0f), "0 아래로 내려가지 않는다");
+    }
+
+    [Test]
+    public void SelfDestructGauge_ZeroDamageOrTotal_Unchanged()
+    {
+        Assert.That(BossRaidRules.SelfDestructGaugeAfterDamage(70f, 0, 300), Is.EqualTo(70f));
+        Assert.That(BossRaidRules.SelfDestructGaugeAfterDamage(70f, 50, 0), Is.EqualTo(70f));
+    }
+
+    /// ③ 로아 싱글처럼 — 혼자면 구출(잡기) 대신 간파 가능 돌진.
+    [TestCase(0, BossAttackId.Dash)]
+    [TestCase(1, BossAttackId.Dash)]
+    [TestCase(2, BossAttackId.Grab)]
+    [TestCase(3, BossAttackId.Grab)]
+    public void RescueAttack_SoloIsDash_PartyIsGrab(int alive, BossAttackId expected)
+    {
+        Assert.That(BossRaidRules.RescueAttackFor(alive), Is.EqualTo(expected));
+    }
+
     [Test]
     public void HitCap_SmallHitsAndDisabledCap_Unchanged()
     {

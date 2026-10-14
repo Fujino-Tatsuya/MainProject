@@ -290,6 +290,25 @@ public class BossDataSO : MonsterDataSO
     [Tooltip("② 실패 = 방전 피해. 플레이어 최대 HP 220 기준 150 — 즉사 상한(0.9)과 별개로 '아프지만 산다' 수준.")]
     [Min(0)] public int raidDischargeDamage = 150;
 
+    [Header("레이드 ④ 폐기 처분 — 자폭 카운트다운 + 공동 게이지(간파 게이지 재사용)")]
+    [Tooltip("자폭까지 남은 시간(초). 이 안에 게이지를 0 으로 만들면 저지.")]
+    [Min(3f)] public float raidSelfDestructTime = 20f;
+
+    [Tooltip("게이지 100 → 0 에 필요한 플레이어 피해 합(1인 기준 — partyHpMultipliers 를 똑같이 곱한다).\n" +
+             "피해만으로 깰 수 있어야 한다(팀장 10-14). 1인 HP 2400 의 20% = 480 이 남은 시점이라 그보다 작게 둔다. W4 실측 조정.")]
+    [Min(1)] public int raidSelfDestructGaugeDamage = 300;
+
+    [Tooltip("자폭 중 간파 성공 1회가 깎는 게이지(%p). 간파는 필수가 아니라 큰 보너스(팀장 10-14).")]
+    [Range(0f, 100f)] public float raidSelfDestructCounterBonus = 35f;
+
+    [Tooltip("자폭 중 간파 창이 열리는 간격(초)과 길이(초). 23호가 서 있기만 하므로 창을 따로 연다.")]
+    [Min(1f)] public float raidSelfDestructCounterInterval = 5f;
+    [Min(0.3f)] public float raidSelfDestructCounterWindow = 1.5f;
+
+    [Tooltip("저지 실패 = 대폭발(방 전체). 예고 시간과 피해 — 즉사 상한 0.9 가 같이 걸린다.")]
+    [Min(0.3f)] public float raidSelfDestructBlastWarn = 1.2f;
+    [Min(0)] public int raidSelfDestructBlastDamage = 190;
+
     [Header("카운터 / 그로기 — maxGroggyCount·groggyDuration 은 base 필드 재사용")]
     [Tooltip("[S3] 카운터 성공으로 인정하는 정면 각도(도). 60 = 보스 정면 기준 ±60°. " +
              "헤드어택(은희) 구현 후 그쪽 판정으로 교체될 지점이다.")]
