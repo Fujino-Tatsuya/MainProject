@@ -5,25 +5,28 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 
 /// <summary>
-/// 튜토리얼 존1 흐름(S7) — 스폰 환영 · 이동 5m · 대시 · 허수아비 적중 5회 · 패시브 툴팁 1초 → 개인 체크 → G1.
-/// 원본: Docs/design/tutorial-scenario.md §3.0·§3.1·§5 · PLAN-tutorial.md S7 · Docs/tech/tutorial-zone1.md.
-/// 규칙은 순수 <see cref="TutorialZone1Rules"/>·<see cref="TutorialZone1Progress"/> 등(TutorialZone1Model.cs).
+/// 튜토리얼 존1 흐름(S7 → v8 V1) — 스폰 환영 · 이동 5m · 대시 · 기본 공격 · 패시브 툴팁 1초 · Q·E·우클릭·R 각각 실제 사용 1회 → 개인 체크 → G1.
+/// 원본: Docs/design/tutorial-scenario.md §3.0·§3.1·§5(v8) · PLAN-tutorial.md S7·V1 · Docs/tech/tutorial-zone1.md.
+/// 규칙은 순수 <see cref="TutorialZone1Rules"/>·<see cref="TutorialZone1SkillRules"/>·<see cref="TutorialZone1Progress"/> 등(TutorialZone1Model.cs).
 ///
 /// 붙는 곳: <see cref="TutorialDirector"/> 가 튜토리얼을 켠 것이 그 피어에서 보이는 순간(<see cref="TutorialDirector.StateChanged"/>)
 /// 디렉터 GameObject 에 런타임으로 붙는다(<b>모든 피어</b> — 씬·프리팹 저장 없음). 절차 맵은 디렉터가 안 켜져 안 붙는다.
 ///
-/// 서버:
-///  · 허수아비 스폰 — StageTutorial 의 <see cref="TutorialZone1Dummies"/> 자리에 간파 사이클 없는 변형을 스폰
+/// 서버(G1 전이면 존1 밖에서 쓴 것도 센다 — v8 "미리 쓴 것도 인정", 체크는 되돌리지 않는다):
+///  · 허수아비 스폰 — StageTutorial 의 <see cref="TutorialZone1Dummies"/> 자리에 간파 사이클 없는 변형을 스폰(거너 R 대상·어쌔신 분노 획득 대상)
 ///  · 대시 = <see cref="PlayerDashController.ServerDashApproved"/> → <see cref="TutorialDirector.ReportCheckServer"/>(Dash)
-///  · 적중 = <see cref="Player.ServerAttackLanded"/>(평타 <see cref="AttackType.Default"/>, 대상이 그 허수아비) → AttackHit(보고 1번 = 적중 1회)
+///  · 기본 공격 = <see cref="Player.ServerBasicAttackStarted"/>(한 타 실제 시작, 적중 무관) → BasicAttack
+///  · Q·E·R·우클릭 = <see cref="PlayerSkillController.ServerSkillUsed"/>(서버 승인 — 거부·조준 취소는 안 옴) → SkillQ/E/R/Interrupt.
+///    거너 Q 는 승인(충전 시작)이 아니라 <see cref="GunnerChargeLaserSkill.ServerFired"/>(발사)로 센다
 ///  · G1 열림 → 단계 Corridor1(<see cref="TutorialDirector.SetStepServer"/>, 다음 프레임 — 디렉터 Commit 안에서 다시 Commit 하지 않게)
 ///  · G1 뒤 파티가 존1 을 떠나면 허수아비 디스폰(S12 — <see cref="TutorialZone1Rules.ShouldDespawnDummies"/>)
 /// 오너(로컬 플레이어):
 ///  · 이동 = XZ 누적(순간이동 제외) 5m → <see cref="TutorialDirector.ReportLocalMoveDistance"/>(서버 상한 검증)
 ///  · 패시브 = <see cref="SkillTooltipView.TooltipShown"/>("Passive") 가 1초 유지 → <see cref="TutorialDirector.ReportLocalCheck"/>(PassiveTooltip)
-///    이동·대시·평타를 마친 뒤에만 센다(§3.1 순서) · 호버가 끝나면 캐릭터별 패시브 자막
+///    이동·대시·기본 공격을 마친 뒤에만 센다(§3.1 순서) · 호버가 끝나면 캐릭터별 패시브 자막
 ///  · 자막: 착지 1초 뒤 환영(S0) · 대시 차례 보조 · 거너 과열 1단계 · R 조준 시작(존1 1회)
-///  · 목표 패널 = 디렉터 복제 상태(개인 진행·대기)로 매번 다시 계산. 처음 그릴 때는 <see cref="TutorialGuideUI.RebuildFromState"/>(늦은 클라 — 자막 생략)
+///  · 목표 패널 = 디렉터 복제 상태(개인 진행·대기)로 매번 다시 계산 — 체크리스트 8줄 · 캐릭터별 힌트는 목표 줄 변형 행(TUT_Z1_Q_GUNNER 등).
+///    처음 그릴 때는 <see cref="TutorialGuideUI.RebuildFromState"/>(늦은 클라 — 자막 생략). G1 대기 줄은 자동 진행 없음(동료 n/total 만)
 ///  · G1 이 열리면 "복도로" 한 번 남기고 손을 뗀다(복도1·존2 안내는 S8).
 /// </summary>
 [DisallowMultipleComponent]
@@ -38,6 +41,10 @@ public sealed class TutorialZone1Flow : MonoBehaviour
     public const string CheckDashId = "TUT_Z1_CHECK_DASH";
     public const string CheckAttackId = "TUT_Z1_CHECK_ATTACK";
     public const string CheckPassiveId = "TUT_Z1_CHECK_PASSIVE";
+    public const string CheckQId = "TUT_Z1_CHECK_Q";
+    public const string CheckEId = "TUT_Z1_CHECK_E";
+    public const string CheckInterruptId = "TUT_Z1_CHECK_RMB";
+    public const string CheckRId = "TUT_Z1_CHECK_R";
 
     private const float PlayerScanInterval = 0.5f;
     private const float MoveReportRetrySeconds = 1f;
@@ -48,7 +55,6 @@ public sealed class TutorialZone1Flow : MonoBehaviour
 
     // 서버
     private readonly HashSet<Unit> _dummies = new HashSet<Unit>();
-    private readonly Dictionary<Player, Action<PlayerAttackLanded>> _attackSubs = new Dictionary<Player, Action<PlayerAttackLanded>>();
     private readonly List<Transform> _spots = new List<Transform>();
     private float _scanTimer;
     private bool _pendingCorridorStep;
@@ -105,6 +111,9 @@ public sealed class TutorialZone1Flow : MonoBehaviour
         if (_isServer)
         {
             PlayerDashController.ServerDashApproved += HandleDashApprovedServer;
+            Player.ServerBasicAttackStarted += HandleBasicAttackServer;
+            PlayerSkillController.ServerSkillUsed += HandleSkillUsedServer;
+            GunnerChargeLaserSkill.ServerFired += HandleChargeLaserFiredServer;
             SpawnDummiesServer();
             _scanTimer = 0f;
         }
@@ -124,16 +133,15 @@ public sealed class TutorialZone1Flow : MonoBehaviour
     private void OnDisable()
     {
         PlayerDashController.ServerDashApproved -= HandleDashApprovedServer;
+        Player.ServerBasicAttackStarted -= HandleBasicAttackServer;
+        PlayerSkillController.ServerSkillUsed -= HandleSkillUsedServer;
+        GunnerChargeLaserSkill.ServerFired -= HandleChargeLaserFiredServer;
         SkillTooltipView.TooltipShown -= HandleTooltipShown;
         SkillTooltipView.TooltipHidden -= HandleTooltipHidden;
         Player.LocalPlayerChanged -= BindLocal;
         TutorialDirector.StateChanged -= Render;
         TutorialDirector.GateOpened -= HandleGateOpened;
         BindLocal(null);
-
-        foreach (KeyValuePair<Player, Action<PlayerAttackLanded>> pair in _attackSubs)
-            if (pair.Key != null) pair.Key.ServerAttackLanded -= pair.Value;
-        _attackSubs.Clear();
     }
 
     /// <summary>존1 단계가 진행 중인가 — G1 이 아직 닫혀 있다.</summary>
@@ -156,8 +164,7 @@ public sealed class TutorialZone1Flow : MonoBehaviour
             if (_scanTimer <= 0f)
             {
                 _scanTimer = PlayerScanInterval;
-                if (Zone1Running) ScanPlayersServer();
-                else if (_dummies.Count > 0) TryDespawnDummiesServer();
+                if (!Zone1Running && _dummies.Count > 0) TryDespawnDummiesServer();
             }
         }
 
@@ -172,7 +179,7 @@ public sealed class TutorialZone1Flow : MonoBehaviour
         TickLocal();
     }
 
-    // ─── 서버: 허수아비 · 대시 · 적중 ─────────────────────────────────────────
+    // ─── 서버: 허수아비 · 대시 · 공격·스킬 사용 ──────────────────────────────────
 
     private void SpawnDummiesServer()
     {
@@ -180,8 +187,8 @@ public sealed class TutorialZone1Flow : MonoBehaviour
         TutorialZone1Dummies spots = stage != null ? stage.GetComponentInChildren<TutorialZone1Dummies>(true) : null;
         if (spots == null || spots.DummyPrefab == null)
         {
-            Edit.LogWarning("[Tutorial] 존1 허수아비 자리(TutorialZone1Dummies)나 프리팹이 없다 — 평타 체크(Z1-3)는 교착 방지(60초)로만 넘어간다. " +
-                            "저작 메뉴 Tools/Map/Authoring/Tutorial/8. Place Zone1 Dummies 확인.", this);
+            Edit.LogWarning("[Tutorial] 존1 허수아비 자리(TutorialZone1Dummies)나 프리팹이 없다 — 거너 R 대상·어쌔신 분노 획득 대상이 없어 " +
+                            "R 사용(Z1-8)이 막힐 수 있다(G1 은 시간으로 열리지 않는다). 저작 메뉴 Tools/Map/Authoring/Tutorial/8. Place Zone1 Dummies 확인.", this);
             return;
         }
 
@@ -203,20 +210,6 @@ public sealed class TutorialZone1Flow : MonoBehaviour
             }
             no.Spawn(true);
             _dummies.Add(unit);
-        }
-    }
-
-    // 플레이어 스폰 시점이 디렉터 활성과 엇갈려도 놓치지 않게 주기적으로 훑는다(존1 동안만).
-    private void ScanPlayersServer()
-    {
-        foreach (NetworkClient client in _nm.ConnectedClientsList)
-        {
-            Player player = client.PlayerObject != null ? client.PlayerObject.GetComponent<Player>() : null;
-            if (player == null || _attackSubs.ContainsKey(player)) continue;
-
-            Action<PlayerAttackLanded> handler = e => HandleAttackLandedServer(player, e);
-            player.ServerAttackLanded += handler;
-            _attackSubs.Add(player, handler);
         }
     }
 
@@ -252,16 +245,28 @@ public sealed class TutorialZone1Flow : MonoBehaviour
         _director.ReportCheckServer(player.OwnerClientId, TutorialCheck.Dash);
     }
 
-    private void HandleAttackLandedServer(Player player, PlayerAttackLanded landed)
+    // 기본 공격 한 타 실제 시작(적중 무관 — 어쌔신 강타 포함). R 대상 확정 좌클릭은 조준 경로라 여기 안 온다.
+    private void HandleBasicAttackServer(Player player)
     {
-        // 기본 공격만(어쌔신 강타도 Default 로 온다 — 평타라 센다). 판정 1번 = 적중 1회(관통으로 여러 개를 맞혀도 1).
-        if (player == null || landed.AttackType != AttackType.Default || !Zone1Running || landed.Targets == null) return;
-        for (int i = 0; i < landed.Targets.Count; i++)
-        {
-            if (!_dummies.Contains(landed.Targets[i])) continue;
-            _director.ReportCheckServer(player.OwnerClientId, TutorialCheck.AttackHit);
-            return;
-        }
+        if (player == null || !Zone1Running) return;
+        _director.ReportCheckServer(player.OwnerClientId, TutorialCheck.BasicAttack);
+    }
+
+    // Q·E·R·우클릭 승인 = 실제 발동(거부·조준 취소는 안 온다). 발사형(거너 Q)은 승인 = 충전 시작이라 발사 신호에서 센다.
+    private void HandleSkillUsedServer(Player player, PlayerSkillSlot slot)
+    {
+        if (player == null || !Zone1Running) return;
+        var skills = player.GetComponent<PlayerSkillController>();
+        bool countsOnFire = skills != null && skills.GetSkill(slot) is GunnerChargeLaserSkill;
+        if (!TutorialZone1SkillRules.CountsOnApproval(slot, countsOnFire)) return;
+        if (TutorialZone1SkillRules.TryGetSkillCheck(slot, out TutorialCheck check))
+            _director.ReportCheckServer(player.OwnerClientId, check);
+    }
+
+    private void HandleChargeLaserFiredServer(Player player)
+    {
+        if (player == null || !Zone1Running) return;
+        _director.ReportCheckServer(player.OwnerClientId, TutorialCheck.SkillQ);
     }
 
     private void HandleGateOpened(TutorialGate gate, TutorialGateOpenReason reason)
@@ -364,7 +369,6 @@ public sealed class TutorialZone1Flow : MonoBehaviour
     private void HandleHeatStageChanged(int stage)
     {
         if (stage < 1 || _heatTipShown || !Zone1Running) return;
-        if (TryGetLocalProgress(out TutorialPlayerProgress p) && p.Has(TutorialCheck.AttackHit)) return;
         _heatTipShown = true;
         TutorialGuideUI.Instance?.ShowSubtitle(AttackHeatId);
     }
@@ -403,18 +407,19 @@ public sealed class TutorialZone1Flow : MonoBehaviour
 
         TutorialZone1View view = TutorialZone1Progress.Resolve(p, _passiveInfoPending);
         string objectiveId = ObjectiveIdOf(view.Task);
-        var args = new Dictionary<string, string> { { "n", view.AttackHits.ToString() } };
-        TutorialChecklistItem[] checklist =
+        // 목표 줄의 "(n/1)" — 지금 할 일은 아직 안 한 항목이라 0.
+        var args = new Dictionary<string, string> { { "n", "0" } };
+        var checklist = new TutorialChecklistItem[TutorialZone1Progress.ChecklistOrder.Length];
+        for (int i = 0; i < checklist.Length; i++)
         {
-            new TutorialChecklistItem(CheckMoveId, view.MoveDone),
-            new TutorialChecklistItem(CheckDashId, view.DashDone),
-            new TutorialChecklistItem(CheckAttackId, view.AttackDone),
-            new TutorialChecklistItem(CheckPassiveId, view.PassiveDone),
-        };
+            TutorialCheck c = TutorialZone1Progress.ChecklistOrder[i];
+            checklist[i] = new TutorialChecklistItem(ChecklistIdOf(c), view.Has(c));
+        }
 
         bool hasWait = _director.TryGetWait(out TutorialGate waitGate, out int done, out int total, out float remaining);
         bool showWait = TutorialZone1Progress.ShowsWait(hasWait, waitGate, p);
-        float seconds = Mathf.Max(0f, remaining);
+        // G1 은 자동 진행이 없다(-1 = 카운트다운 없이 동료 n/total 만 — TutorialGuideUI).
+        float seconds = remaining < 0f ? -1f : remaining;
 
         if (!_rebuilt)
         {
@@ -459,6 +464,23 @@ public sealed class TutorialZone1Flow : MonoBehaviour
         TutorialZone1Task.Dash => TutorialGuideIds.Z1Dash,
         TutorialZone1Task.Attack => TutorialGuideIds.Z1Attack,
         TutorialZone1Task.Passive => TutorialGuideIds.Z1Passive,
+        // 캐릭터별 힌트(v8 §5 TUT_Z1_Q_GUNNER · TUT_Z1_E_* · TUT_Z1_R_ASSASSIN)는 이 id 의 변형 행 — 그 캐릭터의 목표 줄이 힌트로 바뀐다.
+        TutorialZone1Task.SkillQ => TutorialGuideIds.Z1Q,
+        TutorialZone1Task.SkillE => TutorialGuideIds.Z1E,
+        TutorialZone1Task.Interrupt => TutorialGuideIds.Z1Rmb,
+        TutorialZone1Task.SkillR => TutorialGuideIds.Z1R,
         _ => TutorialGuideIds.Z1Go,
+    };
+
+    private static string ChecklistIdOf(TutorialCheck check) => check switch
+    {
+        TutorialCheck.Move => CheckMoveId,
+        TutorialCheck.Dash => CheckDashId,
+        TutorialCheck.BasicAttack => CheckAttackId,
+        TutorialCheck.PassiveTooltip => CheckPassiveId,
+        TutorialCheck.SkillQ => CheckQId,
+        TutorialCheck.SkillE => CheckEId,
+        TutorialCheck.SkillInterrupt => CheckInterruptId,
+        _ => CheckRId,
     };
 }

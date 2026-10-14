@@ -30,6 +30,12 @@ public sealed class SpinnerPracticeWindowSchedule
         return true;
     }
 
+    /// <summary>다음 창을 적어도 <paramref name="time"/> 까지 미룬다(이미 더 늦으면 그대로) — 연계 회복 직후 우클릭이 준비될 틈(v8 §3.5).</summary>
+    public void DelayUntil(float time)
+    {
+        if (time > _nextAllowedAt) _nextAllowedAt = time;
+    }
+
     /// <summary>처음 상태로 — 다음 창을 바로 열 수 있다(연습 모드 재진입).</summary>
     public void Reset() => _nextAllowedAt = float.NegativeInfinity;
 }

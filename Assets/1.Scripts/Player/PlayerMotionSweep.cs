@@ -27,8 +27,7 @@ public static class PlayerMotionSweep
         LayerMask obstacleMask,
         float skin,
         int maxIterations,
-        RaycastHit[] buffer,
-        bool logDiagnostics = true)
+        RaycastHit[] buffer)
     {
         return Resolve(
             capsule,
@@ -41,8 +40,7 @@ public static class PlayerMotionSweep
             obstacleMask,
             skin,
             maxIterations,
-            buffer,
-            logDiagnostics);
+            buffer);
     }
 
     /// <summary>
@@ -59,72 +57,79 @@ public static class PlayerMotionSweep
         LayerMask obstacleMask,
         float skin,
         int maxIterations,
-        RaycastHit[] buffer,
-        bool logDiagnostics = true)
+        RaycastHit[] buffer)
     {
         if (capsule == null || buffer == null || desiredDelta.sqrMagnitude <= 1e-10f)
             return desiredDelta;
 
-        Transform owner = capsule.transform;
-        Vector3 resolved = ResolveCore(capsule, owner, originOffset, desiredDelta, horizontalStepDelta, isGrounded,
+        return ResolveCore(capsule, capsule.transform, originOffset, desiredDelta, horizontalStepDelta, isGrounded,
             stepOffset, maxWalkableAngle, obstacleMask, skin, maxIterations, buffer);
-        if (logDiagnostics)
-            LogIfBlockedByEnemy(capsule, owner, originOffset, desiredDelta, resolved, obstacleMask, skin, buffer);
-        return resolved;
     }
 
-    // ─── [임시 진단 · 2026-09-29 경석] 보스·중간보스 끼임 원인 확정용 — 동작 무변경, 원인 확정 후 삭제 ───
-    // 수평 이동을 요청했는데 거의 못 움직였고, 그 원인이 Enemy 레이어(보스 몸)일 때만 0.5초에 한 번 찍는다.
-    // 가설: CapsuleCastNonAlloc 은 시작부터 겹친 콜라이더를 distance 0 · normal = −진행방향으로 돌려줘 전 방향이 막힌다.
-    private static float s_lastEnemyBlockLog = -10f;
-    private static readonly Collider[] s_enemyOverlap = new Collider[8];
-
-    private static void LogIfBlockedByEnemy(CapsuleCollider capsule, Transform owner, Vector3 originOffset,
-        Vector3 desiredDelta, Vector3 resolved, LayerMask obstacleMask, float skin, RaycastHit[] buffer)
+    /// <summary>
+    /// dir 로 distance 만큼 갈 때 가장 먼저 막는 것이 유닛(Enemy 또는 다른 플레이어 몸)인가. 벽·지형이 먼저면 false.
+    /// 같은 캡슐·필터(<see cref="TryCast"/>)를 쓰므로 실제 이동 스윕과 판정이 어긋나지 않는다.
+    /// </summary>
+    public static bool IsBlockedByUnitFirst(
+        CapsuleCollider capsule,
+        Vector3 originOffset,
+        Vector3 dir,
+        float distance,
+        float maxWalkableAngle,
+        LayerMask obstacleMask,
+        float skin,
+        RaycastHit[] buffer)
     {
-        int enemyLayer = LayerMask.NameToLayer("Enemy");
-        if (enemyLayer < 0 || (obstacleMask.value & (1 << enemyLayer)) == 0) return;
+        if (capsule == null || buffer == null || distance <= 0f || dir.sqrMagnitude <= 1e-8f)
+            return false;
 
-        Vector3 want = new Vector3(desiredDelta.x, 0f, desiredDelta.z);
-        Vector3 got = new Vector3(resolved.x, 0f, resolved.z);
-        if (want.sqrMagnitude < 1e-6f || got.sqrMagnitude > want.sqrMagnitude * 0.01f) return;
-        if (Time.realtimeSinceStartup - s_lastEnemyBlockLog < 0.5f) return;
-
-        Vector3 lossy = owner.lossyScale;
-        float r = capsule.radius * Mathf.Max(Mathf.Abs(lossy.x), Mathf.Abs(lossy.z));
-        float half = Mathf.Max(0f, capsule.height * Mathf.Abs(lossy.y) * 0.5f - r);
-        Vector3 c = owner.TransformPoint(capsule.center) + originOffset;
-        Vector3 p1 = c + owner.up * half, p2 = c - owner.up * half;
-
-        int overlaps = Physics.OverlapCapsuleNonAlloc(p1, p2, r, s_enemyOverlap, 1 << enemyLayer, QueryTriggerInteraction.Ignore);
-        Vector3 dir = want.normalized;
-        int hits = Physics.CapsuleCastNonAlloc(p1, p2, Mathf.Max(0.01f, r - skin), dir, buffer, want.magnitude + skin,
-            obstacleMask, QueryTriggerInteraction.Ignore);
-
-        bool enemyInvolved = overlaps > 0;
-        var sb = new System.Text.StringBuilder();
-        for (int i = 0; i < hits; i++)
+        if (!TryCast(capsule, capsule.transform, originOffset, dir.normalized, distance, maxWalkableAngle,
+                obstacleMask, skin, buffer, out RaycastHit hit, out _))
         {
-            RaycastHit h = buffer[i];
-            if (h.collider == null || h.collider.transform.IsChildOf(owner)) continue;
-            bool enemy = h.collider.gameObject.layer == enemyLayer;
-            enemyInvolved |= enemy;
-            sb.Append($"\n  · 히트 {h.collider.name}[{LayerMask.LayerToName(h.collider.gameObject.layer)}] 거리 {h.distance:0.###} " +
-                      $"법선 {h.normal} 시작겹침 {(h.distance <= 0f && h.point == Vector3.zero)}");
+            return false;
         }
-        if (!enemyInvolved) return;
 
-        s_lastEnemyBlockLog = Time.realtimeSinceStartup;
-        for (int i = 0; i < overlaps; i++)
+        return IsUnitLayer(hit.collider.gameObject.layer);
+    }
+
+    /// <summary>
+    /// 이미 겹친 유닛(Enemy·Player 몸)에서 빠져나갈 수평 관통 벡터의 합. 겹침이 없으면 0.
+    /// 길이 제한·벽 스윕은 호출자가 한다(<see cref="PlayerUnitCollisionRules.ComputeSeparationStep"/>).
+    /// </summary>
+    public static Vector3 ComputeUnitPenetration(
+        CapsuleCollider capsule,
+        Vector3 originOffset,
+        LayerMask unitMask,
+        Collider[] overlapBuffer)
+    {
+        if (capsule == null || overlapBuffer == null || unitMask.value == 0)
+            return Vector3.zero;
+
+        Transform owner = capsule.transform;
+        GetCapsuleWorld(capsule, owner, originOffset, out Vector3 p1, out Vector3 p2, out float radius);
+        int count = Physics.OverlapCapsuleNonAlloc(
+            p1, p2, radius, overlapBuffer, unitMask, QueryTriggerInteraction.Ignore);
+
+        Vector3 sum = Vector3.zero;
+        Vector3 position = owner.position + originOffset;
+        for (int i = 0; i < count; i++)
         {
-            Collider o = s_enemyOverlap[i];
-            if (o == null) continue;
-            bool pen = Physics.ComputePenetration(capsule, owner.position + originOffset, owner.rotation,
-                o, o.transform.position, o.transform.rotation, out Vector3 pd, out float pdist);
-            sb.Append($"\n  · Enemy 겹침 {o.name} 관통 {(pen ? $"{pdist:0.###}m 방향 {pd}" : "없음")}");
+            Collider other = overlapBuffer[i];
+            if (other == null || other.transform == owner || other.transform.IsChildOf(owner))
+                continue;
+            if (IgnoresUnitCollider(other))
+                continue;
+
+            Transform otherTransform = other.transform;
+            if (Physics.ComputePenetration(capsule, position, owner.rotation,
+                    other, otherTransform.position, otherTransform.rotation,
+                    out Vector3 direction, out float distance))
+            {
+                sum = PlayerUnitCollisionRules.AccumulatePenetration(sum, direction, distance);
+            }
         }
-        Debug.Log($"[모터/끼임진단] {owner.name} 요청 {want.magnitude:0.###} → 실제 {got.magnitude:0.###} · 방향 {dir} · " +
-                  $"Enemy 겹침 {overlaps}개{sb}", owner);
+
+        return sum;
     }
 
     private static Vector3 ResolveCore(
@@ -410,7 +415,9 @@ public static class PlayerMotionSweep
                 continue;
             if (hit.collider.transform == owner || hit.collider.transform.IsChildOf(owner))
                 continue;
-            if (IsEscapingEnemyOverlap(hit, capsule, owner, originOffset, dir))
+            if (IgnoresUnitCollider(hit.collider))
+                continue;
+            if (IsEscapingUnitOverlap(hit, capsule, owner, originOffset, dir))
                 continue;
             // 걸을 수 있는 경사는 접선 이동에는 장애물이 아니지만, 중력/스냅처럼 표면 안쪽으로
             // 향하는 이동은 막아야 kinematic 바디가 지면을 통과하지 않는다.
@@ -432,20 +439,45 @@ public static class PlayerMotionSweep
 
     // 🔴 [2026-09-29 경석 · 끼임] CapsuleCastNonAlloc 은 **시작부터 겹친** 콜라이더를 distance 0 · point 0 ·
     //    normal = −진행방향으로 돌려준다 → 서버가 움직이는 보스 몸(Enemy)이 파고든 뒤엔 어느 방향이든 0 만큼만
-    //    가고 법선에 투영된 잔여도 0 이라 **전 방향이 막힌다**(`[모터/끼임진단]` 실측: 거리 0 · 시작겹침 True).
-    //    Enemy 레이어의 시작 겹침만, **빠져나가는 방향**(관통 해소 방향과 같은 쪽)으로 움직일 때 무시한다.
-    //    강제 밀어내기가 아니라 플레이어 입력으로 걸어 나가는 것이라 벽 뚫기·입력 경합이 없다(Codex 09-29 지적 회피).
-    //    더 파고드는 방향은 그대로 막는다. 정적 지형(Enemy 외)은 무관.
+    //    가고 법선에 투영된 잔여도 0 이라 **전 방향이 막힌다**(진단 실측: 거리 0 · 시작겹침 True).
+    //    유닛(Enemy·Player) 레이어의 시작 겹침만, **빠져나가는 방향**(관통 해소 방향과 같은 쪽)으로 움직일 때 무시한다.
+    //    더 파고드는 방향은 그대로 막는다. 정적 지형은 무관. 겹침 자체는 PlayerMotor 의 밀어내기가 푼다(할 일 11).
     private static int s_enemyLayer = int.MinValue;
+    private static int s_playerLayer = int.MinValue;
 
-    private static bool IsEscapingEnemyOverlap(RaycastHit hit, CapsuleCollider capsule, Transform owner,
+    private static void CacheUnitLayers()
+    {
+        if (s_enemyLayer != int.MinValue)
+            return;
+        s_enemyLayer = LayerMask.NameToLayer("Enemy");
+        s_playerLayer = LayerMask.NameToLayer("Player");
+    }
+
+    private static bool IsUnitLayer(int layer)
+    {
+        CacheUnitLayers();
+        return (s_enemyLayer >= 0 && layer == s_enemyLayer) || (s_playerLayer >= 0 && layer == s_playerLayer);
+    }
+
+    /// <summary>
+    /// Player 레이어 콜라이더 중 다른 플레이어의 **몸 캡슐**(PlayerMotor 가 붙은 루트)만 장애물로 인정한다.
+    /// 가붕이 평타·스킬 히트박스(AAC1~4 등, Player 레이어 비트리거)가 켜진 순간 막히지 않게 하고,
+    /// 사망 연출·완전 사망 플레이어도 통과시킨다(<see cref="PlayerMotor.BlocksOtherUnits"/>).
+    /// </summary>
+    private static bool IgnoresUnitCollider(Collider collider)
+    {
+        CacheUnitLayers();
+        if (s_playerLayer < 0 || collider.gameObject.layer != s_playerLayer)
+            return false;
+        return !collider.TryGetComponent(out PlayerMotor otherMotor) || !otherMotor.BlocksOtherUnits;
+    }
+
+    private static bool IsEscapingUnitOverlap(RaycastHit hit, CapsuleCollider capsule, Transform owner,
         Vector3 originOffset, Vector3 dir)
     {
         if (hit.distance > 0f || hit.point != Vector3.zero)
             return false;   // 시작 겹침이 아닌 정상 접촉
-        if (s_enemyLayer == int.MinValue)
-            s_enemyLayer = LayerMask.NameToLayer("Enemy");
-        if (s_enemyLayer < 0 || hit.collider.gameObject.layer != s_enemyLayer)
+        if (!IsUnitLayer(hit.collider.gameObject.layer))
             return false;
 
         Transform other = hit.collider.transform;
@@ -461,6 +493,18 @@ public static class PlayerMotionSweep
     private static bool IsWalkable(Vector3 normal, float maxWalkableAngle)
     {
         return Vector3.Angle(normal, Vector3.up) <= maxWalkableAngle;
+    }
+
+    private static void GetCapsuleWorld(CapsuleCollider capsule, Transform owner, Vector3 originOffset,
+        out Vector3 p1, out Vector3 p2, out float radius)
+    {
+        Vector3 lossy = owner.lossyScale;
+        radius = capsule.radius * Mathf.Max(Mathf.Abs(lossy.x), Mathf.Abs(lossy.z));
+        float height = Mathf.Max(capsule.height * Mathf.Abs(lossy.y), radius * 2f);
+        float half = Mathf.Max(0f, height * 0.5f - radius);
+        Vector3 center = owner.TransformPoint(capsule.center) + originOffset;
+        p1 = center + owner.up * half;
+        p2 = center - owner.up * half;
     }
 
     private static float GetCastInset(CapsuleCollider capsule, Transform owner, float skin)

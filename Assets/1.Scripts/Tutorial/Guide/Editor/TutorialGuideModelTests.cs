@@ -141,6 +141,22 @@ public sealed class TutorialGuideModelTests
     }
 
     [Test]
+    public void Wait_NegativeSeconds_MeansNoCountdown()
+    {
+        // G1(v8) — 자동 진행이 없는 대기 줄. 카운트다운 없이 n/total 만(TUT_WAIT_PARTY_NOAUTO).
+        var model = new TutorialGuideModel();
+        model.SetWait(1, 2, -1f);
+        Assert.IsTrue(model.Wait.Active);
+        Assert.IsFalse(model.Wait.HasCountdown);
+
+        model.TickWait(3f);
+        Assert.AreEqual(-1f, model.Wait.SecondsLeft, "음수는 줄이지 않는다");
+
+        model.SetWait(1, 2, 0f);
+        Assert.IsTrue(model.Wait.HasCountdown, "0 = 카운트다운 끝(자동 진행 직전)");
+    }
+
+    [Test]
     public void Highlight_SameTargetReplacesStyle_ClearRemoves()
     {
         var model = new TutorialGuideModel();

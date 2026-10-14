@@ -2045,7 +2045,7 @@ MonoBehaviour:
   healPercent: 5
   bladeGlow: {fileID: 3893365542549293267}
   healBurst: {fileID: 2585398134090246682}
-  additionalHit: {fileID: 11400000, guid: ab44dc2c6c16fd64980960752a975905, type: 2}
+  additionalHit: {fileID: 0}
   additionalHitScale: 1
   additionalHitFallbackOffset: {x: 0, y: 1, z: 0}
 --- !u!114 &6603939282142901413

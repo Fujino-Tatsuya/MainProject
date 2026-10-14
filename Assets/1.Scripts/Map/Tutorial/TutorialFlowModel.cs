@@ -31,7 +31,7 @@ public enum TutorialGate : byte
     G2_Zone2Entry = 1,
     G3_Corridor2Entry = 2,
     G4_Zone3Entry = 3,
-    /// <summary>스피너봇 연습 모드 → 본 모드.</summary>
+    /// <summary>스피너봇 연습 모드 → 본 모드(v8: 연계 3회 + 마지막 회복 끝 — 존3 흐름이 연다).</summary>
     G5_SpinnerRealMode = 4,
     G6_Corridor3Entry = 5,
     G7_Zone4Entry = 6,
@@ -49,17 +49,23 @@ public enum TutorialCheck : byte
 {
     Move = 0,
     Dash = 1,
-    /// <summary>허수아비 기본 공격 적중 — 보고마다 1회, <see cref="TutorialFlowModel.AttackHitsRequired"/> 회면 완료.</summary>
-    AttackHit = 2,
+    /// <summary>기본 공격 <b>실제 실행</b> 1회(v8 Z1-3 — 적중 불필요, R 대상 확정 좌클릭 제외).</summary>
+    BasicAttack = 2,
     PassiveTooltip = 3,
-    /// <summary>존2 Q 사용 — 안내용(게이트 아님, D13).</summary>
+    /// <summary>Q 실제 사용 1회(v8 Z1-5, 거너는 발사까지) — G1 조건.</summary>
     SkillQ = 4,
-    /// <summary>존2 E 사용 — 안내용(게이트 아님, D13).</summary>
+    /// <summary>E 실제 사용 1회(v8 Z1-6) — G1 조건.</summary>
     SkillE = 5,
     TraitCorridor1 = 6,
     TraitCorridor2 = 7,
     TraitCorridor3 = 8,
     TraitCorridor4 = 9,
+    /// <summary>R 실제 사용 1회(v8 Z1-8 — 대상 확정 뒤 발동·어쌔신 변신 진입) — G1 조건.</summary>
+    SkillR = 10,
+    /// <summary>우클릭(간파) 실제 사용 1회(v8 Z1-7 — 성공 불필요) — G1 조건.</summary>
+    SkillInterrupt = 11,
+    /// <summary>복도1 첫 진입 쿨타임 초기화를 받았다(v8 C1-0 — 개인 1회, 체크리스트 아님·게이트 아님).</summary>
+    Corridor1CooldownReset = 12,
 }
 
 /// <summary>파티 집계 카운터(범용). 목표값은 모델 생성 때 정한다.</summary>
@@ -67,7 +73,10 @@ public enum TutorialCounter : byte
 {
     /// <summary>존2 처치 n/목표(목표 = 존 장부의 존2 수, 기본 9) — 표시용. G3(전멸) 판정은 S4 존 장부가 한다.</summary>
     Zone2Kills = 0,
-    /// <summary>존3 스피너봇 간파 파티 합계 n/3 — 목표 도달 = G5(D2-1).</summary>
+    /// <summary>
+    /// 존3 연계(간파 → 취약 밀치기 → 유효 벽 충돌) 파티 합계 n/3(v8 D2·D2-1 — 이름은 이전 판 그대로). 목표 도달만으로는 G5 를 열지 않는다 —
+    /// 마지막 벽 충돌 뒤 회복이 끝나야 존3 흐름이 G5 를 연다(v8 Z3-9 · 원위치 복귀 없음 — 사용자 변경).
+    /// </summary>
     Zone3Interrupts = 1,
     /// <summary>존4 제어 패널 n/4 — 표시용(다리는 ZoneBridgeGateManager 가 연다).</summary>
     Zone4Panels = 2,
@@ -91,7 +100,6 @@ public struct TutorialPlayerProgress
     public ulong ClientId;
     /// <summary>bit = <see cref="TutorialCheck"/>.</summary>
     public int CheckMask;
-    public int AttackHits;
     /// <summary>접속 중(이탈하면 false — 재접속 없음).</summary>
     public bool Connected;
     public bool PermanentDead;
@@ -107,9 +115,10 @@ public struct TutorialPlayerProgress
 ///
 /// 규칙:
 ///  · 게이트는 <see cref="TutorialGate"/> 순서대로만 열린다(앞이 닫혀 있으면 뒤를 열지 않는다 — 건너뛰기 방지).
-///  · 개인 게이트(G1·G2·G4·G7·G10) = 참가자 전원 완료면 열림. 첫 완료자가 나온 시각부터
+///  · 개인 게이트(G1·G2·G4·G7·G10) = 참가자 전원 완료면 열림. 특성 게이트(G2·G4·G7·G10)는 첫 완료자가 나온 시각부터
 ///    <see cref="DeadlockSeconds"/> 가 지나면 자동으로 열림(교착 방지 D9). 시각 기록은 그 게이트가
 ///    <b>열 수 있는 차례</b>가 된 뒤부터 — 앞 게이트 전에 미리 끝낸 사람이 있으면 차례가 온 순간이 기준.
+///    <b>G1 은 교착 방지 제외</b>(v8 §2.1 — 공격·스킬 5종 사용이 필수라 시간으로 넘기지 않는다).
 ///  · 첫 완료자가 그 뒤 이탈·완전 사망해도 교착 방지 시계는 멈추지 않는다(파티가 멈추지 않는 쪽).
 ///  · 참가자가 0명이면 아무 게이트도 자동으로 열지 않는다(전원 이탈 = 세션 종료, 전원 완전 사망 = 결과 화면 — 기존 흐름이 처리).
 ///  · 같은 보고가 두 번 와도 한 번만 센다. 모르는 clientId 의 보고는 버린다.
@@ -118,11 +127,14 @@ public sealed class TutorialFlowModel
 {
     public const int GateCount = 11;
     public const int CounterCount = 3;
-    public const int AttackHitsRequired = 5;
     public const double DefaultDeadlockSeconds = 60d;
 
-    private const int G1Mask = (1 << (int)TutorialCheck.Move) | (1 << (int)TutorialCheck.Dash)
-                             | (1 << (int)TutorialCheck.AttackHit) | (1 << (int)TutorialCheck.PassiveTooltip);
+    /// <summary>G1 = 이동·대시·패시브 툴팁 + 기본 공격·Q·E·R·우클릭 각각 실제 사용 1회(v8 §3.1·§4).</summary>
+    public const int G1Mask = (1 << (int)TutorialCheck.Move) | (1 << (int)TutorialCheck.Dash)
+                            | (1 << (int)TutorialCheck.PassiveTooltip)
+                            | (1 << (int)TutorialCheck.BasicAttack) | (1 << (int)TutorialCheck.SkillQ)
+                            | (1 << (int)TutorialCheck.SkillE) | (1 << (int)TutorialCheck.SkillR)
+                            | (1 << (int)TutorialCheck.SkillInterrupt);
 
     private readonly Dictionary<ulong, TutorialPlayerProgress> _players = new Dictionary<ulong, TutorialPlayerProgress>();
     private readonly List<ulong> _order = new List<ulong>();   // 등록 순서(복제 목록 순서를 결정적으로)
@@ -169,11 +181,17 @@ public sealed class TutorialFlowModel
 
     public static bool IsPersonalGate(TutorialGate g) => RequiredMaskOf(g) != 0;
 
-    /// <summary>카운터로 열리는 게이트면 그 카운터.</summary>
+    /// <summary>개인 게이트 중 교착 방지(첫 완료자 뒤 자동 진행)를 쓰는가 — 특성 게이트만. G1 은 제외(v8 §2.1).</summary>
+    public static bool HasDeadlockTimeout(TutorialGate g) => IsPersonalGate(g) && g != TutorialGate.G1_Corridor1Entry;
+
+    /// <summary>
+    /// 카운터로 <b>자동으로</b> 열리는 게이트면 그 카운터. v8 부터 없다 — G5 는 연계 3회 뒤 <b>마지막 회복</b>까지 기다려야 해서
+    /// 존3 흐름이 직접 연다(<see cref="RequestGate"/>). 카운터 게이트 자리는 확장용으로 남긴다.
+    /// </summary>
     public static bool TryGetGateCounter(TutorialGate g, out TutorialCounter counter)
     {
         counter = TutorialCounter.Zone3Interrupts;
-        return g == TutorialGate.G5_SpinnerRealMode;
+        return false;
     }
 
     public bool IsGateOpen(TutorialGate g) => (OpenedGateMask & (1 << (int)g)) != 0;
@@ -222,20 +240,12 @@ public sealed class TutorialFlowModel
     // ─── 보고 ────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// 체크 항목 완료 보고. <see cref="TutorialCheck.AttackHit"/> 은 보고 1번 = 적중 1회.
+    /// 체크 항목 완료 보고(항목마다 1번이면 완료 — 되돌리지 않는다, 사망·부활 무관).
     /// 바뀐 게 있으면 true(중복·모르는 id·이미 완료는 false). 게이트 판정은 <see cref="Evaluate"/> 에서.
     /// </summary>
     public bool ReportCheck(ulong clientId, TutorialCheck check) => Mutate(clientId, (ref TutorialPlayerProgress p) =>
     {
         if (p.Has(check)) return false;
-
-        if (check == TutorialCheck.AttackHit)
-        {
-            p.AttackHits++;
-            if (p.AttackHits >= AttackHitsRequired) p.CheckMask |= 1 << (int)check;
-            return true;
-        }
-
         p.CheckMask |= 1 << (int)check;
         return true;
     });
@@ -352,6 +362,7 @@ public sealed class TutorialFlowModel
             if (total == 0) return;   // 참가자 0명 — 자동으로 열지 않는다
 
             if (done == total) { TryOpenGate(g, TutorialGateOpenReason.AllDone); continue; }
+            if (!HasDeadlockTimeout(g)) return;   // G1 — 시간으로 넘기지 않는다
 
             if (done > 0 && _firstCompleteAt[i] < 0d) _firstCompleteAt[i] = now;
 
@@ -368,7 +379,7 @@ public sealed class TutorialFlowModel
 
     /// <summary>
     /// 지금 열 차례인 개인 게이트의 대기 정보. 그런 게이트가 없으면 false.
-    /// <paramref name="autoAdvanceAt"/> = 교착 방지 자동 진행 시각(첫 완료자 전이면 -1).
+    /// <paramref name="autoAdvanceAt"/> = 교착 방지 자동 진행 시각(첫 완료자 전·교착 방지 없는 G1 이면 -1).
     /// </summary>
     public bool TryGetPendingPersonalGate(out TutorialGate gate, out int done, out int total, out double autoAdvanceAt)
     {
@@ -380,7 +391,7 @@ public sealed class TutorialFlowModel
 
             gate = g;
             CountCompletion(g, out done, out total);
-            autoAdvanceAt = _firstCompleteAt[i] >= 0d ? _firstCompleteAt[i] + DeadlockSeconds : -1d;
+            autoAdvanceAt = HasDeadlockTimeout(g) && _firstCompleteAt[i] >= 0d ? _firstCompleteAt[i] + DeadlockSeconds : -1d;
             return true;
         }
 

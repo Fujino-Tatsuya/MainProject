@@ -28,6 +28,16 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
     private bool statusApplied;
     private float ownerChargeStartTime;
 
+    /// <summary>
+    /// [서버] Q 를 실제로 <b>발사</b>했다(충전 시작·대시 취소·피격 종료는 안 난다). 튜토리얼 판정 훅(v8 Z1-5 "거너 Q 는 발사까지").
+    /// 승인 시점 신호는 <see cref="PlayerSkillController.ServerSkillUsed"/>(충전 시작)이다.
+    /// </summary>
+    public static event System.Action<Player> ServerFired;
+
+    // 도메인 리로드를 끈 Play 진입에서도 이전 세션 구독자가 남지 않게 비운다.
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStaticEvents() => ServerFired = null;
+
     public override PlayerSkillSlot Slot => PlayerSkillSlot.Main;
     public override PlayerActionState EntryActionState => PlayerActionState.Focus; // 발사하면 Skill(GunnerBeamView)
     public override bool CanMoveWhileActive => true;
@@ -163,6 +173,7 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
 
         controller.CommitCooldownServer(Slot);
         ClearStatus();
+        ServerFired?.Invoke(owner);
 
         // 🔴 **지형에 막혔는지를 같이 보낸다.** 끝점 좌표만으로는 벽에 맞은 것과
         //    최대 사거리까지 뻗어 허공에서 끝난 것을 구분할 수 없다 —

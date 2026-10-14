@@ -111,8 +111,9 @@ public class MinimapController : MonoBehaviour
     private void Awake()
     {
         // 맵 구조물(복도/다리 등)을 미리 캐싱하여 매 업데이트마다 찾는 비용 방지
-        var mapGeom = GameObject.Find("Stage1/Level_wall_hallway");
-        if (mapGeom != null) _corridorsRoot = mapGeom.transform;
+        // Stage1 은 씬 루트가 아니라 Environment 그룹 아래에 있다 — 경로 대신 이름으로 찾고 그 아래를 본다.
+        var stage = GameObject.Find("Stage1");
+        if (stage != null) _corridorsRoot = stage.transform.Find("Level_wall_hallway");
 
         _explored = new byte[MaskResolution * MaskResolution];
     }

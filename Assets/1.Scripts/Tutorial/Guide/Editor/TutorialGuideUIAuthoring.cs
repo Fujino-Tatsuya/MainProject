@@ -33,6 +33,67 @@ public static class TutorialGuideUIAuthoring
         { TutorialGuideIds.WaitParty, ("동료를 기다리는 중 ({n}/{total}) · {mm:ss} 후 자동 진행", DefaultSeconds) },
     };
 
+    // v8 시나리오(Docs/design/tutorial-scenario.md §5) 문구 — 메뉴 "튜토리얼 안내 문구 v8 적용" 이 덮어쓴다(행이 없으면 추가).
+    // 🔴 빈 행 규칙: 목표 줄 변형과 이름이 겹치는 TUT_Z1_ATTACK_GUNNER · TUT_Z1_PASSIVE_{캐릭터} 는 여기서 채우지 않는다
+    //    (채우면 그 캐릭터의 목표 줄이 자막 문구로 바뀐다 — 자막은 TUT_Z1_ATTACK_HEAT · TUT_Z1_PASSIVE_INFO_* 행). Docs/tech/tutorial-zone1.md.
+    //    반대로 TUT_Z1_Q_GUNNER · TUT_Z1_E_* · TUT_Z1_R_ASSASSIN 은 일부러 채운다 — 그 캐릭터의 Q/E/R 목표 줄을 힌트로 바꾸는 것이 의도(v8 캐릭터별 힌트).
+    internal static readonly (string id, string text, float seconds)[] V8Texts =
+    {
+        (TutorialGuideIds.WaitPartyNoAuto, "동료를 기다리는 중 ({n}/{total})", DefaultSeconds),
+        (TutorialGuideIds.Z1Attack, "<b>좌클릭</b>으로 기본 공격을 사용하세요 ({n}/1)", DefaultSeconds),
+        (TutorialGuideIds.Z1Q, "<b>Q</b> 스킬 [{Q}]을 사용하세요 ({n}/1)", DefaultSeconds),
+        (TutorialGuideIds.Z1E, "<b>E</b> 스킬 [{E}]을 사용하세요 ({n}/1)", DefaultSeconds),
+        (TutorialGuideIds.Z1Rmb, "<b>우클릭</b> 스킬을 사용하세요 ({n}/1)", DefaultSeconds),
+        (TutorialGuideIds.Z1R, "<b>R</b> 궁극기를 사용하세요 ({n}/1)", DefaultSeconds),
+        (TutorialGuideIds.Z1R + "_ASSASSIN", "허수아비를 공격해 분노를 모은 뒤 <b>R</b>로 변신하세요.", DefaultSeconds),
+        (TutorialGuideIds.Z1Q + "_GUNNER", "<b>Q</b>로 충전을 시작하고 <b>좌클릭</b>으로 발사하세요.", DefaultSeconds),
+        (TutorialGuideIds.Z1E + "_PALADIN", "<b>E</b>로 방어 자세를 취하세요. 공격을 막으면 반격합니다.", DefaultSeconds),
+        (TutorialGuideIds.Z1E + "_GUNNER", "<b>E</b>로 뒤로 물러나며 과열을 식혀 보세요.", DefaultSeconds),
+        (TutorialGuideIds.Z1E + "_ASSASSIN", "<b>E</b>로 다음 기본 공격을 강화하세요.", DefaultSeconds),
+        ("TUT_Z1_CHECK_ATTACK", "기본 공격", DefaultSeconds),
+        ("TUT_Z1_CHECK_Q", "Q 스킬", DefaultSeconds),
+        ("TUT_Z1_CHECK_E", "E 스킬", DefaultSeconds),
+        ("TUT_Z1_CHECK_RMB", "우클릭 스킬", DefaultSeconds),
+        ("TUT_Z1_CHECK_R", "R 궁극기", DefaultSeconds),
+        (TutorialCorridor1CooldownFlow.CooldownResetId, "모든 스킬의 재사용 대기시간이 초기화되었습니다.", 5f),
+        (TutorialGuideIds.Z2Intro, "적이 깨어납니다! 모든 적을 처치하세요.", 4f),
+        (TutorialGuideIds.Z2Goal, "적 처치 {n}/{total}", DefaultSeconds),
+        // 존3 — 공통 안내만(캐릭터별 간파 설명 없음). "/3" 은 목표 복제값 {total}.
+        (TutorialGuideIds.Z3Intro, "공격을 <b>간파</b>해 기회를 만들고, 취약한 적을 <b>벽으로 밀어내세요</b>. 동료도 이어서 밀 수 있습니다.", 7f),
+        (TutorialGuideIds.Z3PracticeNote, "연계를 세 번 성공할 때까지 스피너봇은 쓰러지지 않고 공격도 피해를 주지 않습니다.", 6f),
+        (TutorialGuideIds.Z3Goal, "간파 → 밀치기 → 벽 충돌 연계 ({n}/{total})", DefaultSeconds),
+        (TutorialGuideIds.Z3CounterGoal, "노랗게 빛날 때 가까이에서 적을 향해 <b>우클릭</b>으로 간파하세요.", DefaultSeconds),
+        (TutorialGuideIds.Z3Miss, "빗나갔습니다 — 더 가까이, 스피너봇을 향해.", 4f),
+        (TutorialGuideIds.Z3Early, "아직입니다 — 노랗게 빛날 때만 간파됩니다.", 4f),
+        (TutorialGuideIds.Z3FirstSuccess, "간파 성공! 공격이 끊기고 적이 취약해집니다.", 4f),
+        (TutorialGuideIds.Z3PushIntro, "우클릭이 다시 준비되었습니다. <b>벽 반대편</b>에서 적을 향해 우클릭하면 벽으로 밀어낼 수 있습니다.", 7f),
+        (TutorialGuideIds.Z3PushGoal, "취약한 스피너봇을 <b>우클릭으로 벽에 부딪히게</b> 하세요.", DefaultSeconds),
+        (TutorialGuideIds.Z3PushHint, "아직 벽에 닿지 않았습니다. 위치를 잡고 다시 밀어내세요. 동료도 이어서 밀 수 있습니다.", 5f),
+        (TutorialGuideIds.Z3WallSuccess, "벽 충돌! 연계 성공 ({n}/{total})", 4f),
+        (TutorialGuideIds.Z3Return, "다음 연습을 준비합니다.", 3f),
+        (TutorialGuideIds.Z3Hint, "요령: 노란빛이 보이면 바로 붙어서 우클릭. 간파는 다시 쓰기까지 몇 초 걸립니다.", 6f),
+        (TutorialGuideIds.Z3Real, "연습 끝. 이제 진짜입니다! 노란빛이 보이면 언제든 간파하세요.", 6f),
+    };
+
+    [MenuItem("Tools/UI/튜토리얼 안내 문구 v8 적용")]
+    public static void ApplyV8Texts()
+    {
+        TutorialGuideTextTable table = EnsureTextTable();
+        int changed = 0;
+        foreach ((string id, string text, float seconds) in V8Texts)
+        {
+            if (table.SetRowText(id, text, seconds))
+                changed++;
+        }
+
+        if (changed > 0)
+        {
+            EditorUtility.SetDirty(table);
+            AssetDatabase.SaveAssets();
+        }
+        Debug.Log($"[TutorialGuide] v8 문구 적용 — {changed}행 바뀜(전체 {V8Texts.Length}행).");
+    }
+
     [MenuItem("Tools/UI/튜토리얼 안내 UI 구성")]
     public static void Configure()
     {

@@ -9,6 +9,8 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
 ## ▶▶ 작업 세션 (2026-10-14~ · 경석(Claude) · **23호 레이드 변형(지스타)**, 브랜치 `feature/Boss23`) — 계획 [PLAN-boss-raid.md](PLAN-boss-raid.md) ✅ 승인(10-14) · W1 진행 · 회의 기록 [raid-rework-meeting-1014.md](Docs/design/boss/raid-rework-meeting-1014.md)
+- ✅ W1 `b9be4190`: 변형 프리팹·데이터·툴바 "보스: 기존/레이드"(에디터 툴바 우클릭 → Dev/Boss Variant 체크해야 보일 수 있음)·구간 예약 큐·인원 HP·즉사 상한·웰즈 자막. 저작 = `Tools/Boss/레이드 변형 — 만들기`.
+- ✅ 10-14 `origin/development`(44커밋: 튜토리얼 구간 스킵 Alt+1~0 · MapScene 그룹 6개·매니저 13개 프리팹화 · 거너 회전 잠금 · 에임 3D) 병합 + SVN **r434**(핀 434). MapScene 충돌 22곳은 **dev 씬 기준 + 우리 설정창 변경(옛 77블록 삭제·새 2블록·OptionPanel 자식)만 재적용**으로 해결(끊긴 참조 0). `raidBossPrefab` 은 매니저 프리팹 `Managers/BossEncounterDirector.prefab` 에 연결.
 - 로아 발탄·쿠크식 구간 각본 4개(기동 시연 · 드론 유도 송전 · 구출 · 자폭 공동 게이지). **기존 23호(`TwentyThree.prefab`·`No23.asset`)는 그대로**, 변형(`TwentyThree_Raid`·`No23_Raid`) 추가 후 비교.
 - 🔴 **수정 예정 — 동시 수정 금지**: `Monster/Boss/TwentyThreeBoss.cs` · `BossDataSO.cs` · `WellsDroneAttack.cs` · `BossChargingPylon.cs` · `BossElectricFloor.cs` · `Map/BossEncounterDirector.cs` · `4.MapScene.unity`(BossEncounterDirector 칸만) · 신규 `TwentyThree_Raid.prefab`·`No23_Raid.asset`.
 
