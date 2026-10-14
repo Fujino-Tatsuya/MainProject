@@ -18,8 +18,8 @@ Update this file when a term becomes important enough that future agents or team
 - ⏳ 병합 후 Play·MPPM(튜토리얼 흐름 + 새 설정창 ESC 겹침·입력 차단) 미확인.
 - ✅ 10-13 `12d4bf1a`(Boss23 원격만): 존1 허수아비 미표시 수정 — `TutorialZone1Flow` 가 로딩 중(활성 씬 = `2.LoadingScene`) `Instantiate` 해 로딩 씬 언로드 때 같이 파괴됐다 → 스폰 전 `MoveGameObjectToScene(StageTutorial 씬)`. 팀장 Play 확인. development 에도 같은 버그가 있다(이 커밋이 들어가야 고쳐짐).
 - ▶ **다음 작업 후보(팀장 10-13)**:
-  1. **영어 대응** — 설정창은 English/한국어 전환(`LanguageConfig`)이 있지만 튜토리얼 문구(`TutorialGuideTexts.asset`)는 한국어 고정, HUD 키가이드도 `keyguide.png` 만 쓰고 SVN r429 `UI/HUD/keyguide_en.png`(은희) 는 미연결. 언어에 따라 키가이드 이미지 교체 + 튜토리얼 문구 번역(위 키 표기 자리표시와 같이 설계) 방식 검토 필요.
-  2. **송전탑 상승 위치가 떠 보임** — `BossChargingPylon.riseHeight`(4개 모두 1m, `bossroom.prefab`) 또는 숨김 기준 위치 조정. 어느 쪽인지·얼마나는 팀장과 Play 보며 정할 것.
+  1. **영어 대응** — ✅ HUD 키가이드만 연결(10-13): 신규 `Settings/Localization/LocalizedSprite.cs`(`LocalizedText` 의 이미지판) 를 `CombatHUD.prefab` `KeyGuide` 에 붙여 English 면 SVN r429 `keyguide_en.png`(은희), 한국어면 `keyguide.png`. ⏳ **튜토리얼 문구(`TutorialGuideTexts.asset`) 영어 번역은 나중**(팀장 — 바꿔야 함, 위 키 표기 자리표시와 같이 설계).
+  2. **송전탑 상승 높이** — ✅ `riseHeight` 1 → **0.5m**(`bossroom.prefab` 4개, 팀장 10-13 "일단 절반"). 숨김 기준 위치는 그대로. ⏳ Play 체감 확인.
 
 ## ▶▶ 작업 세션 (2026-10-09 · 은희(Claude) · **거너 레이저건 정렬 + 기본 공격 손 이탈**, 브랜치 `fix/GunnerGunAlign`(development `778bbb87` 기준)) — 계획 [PLAN-gunner-gun-align.md](PLAN-gunner-gun-align.md) ✅ 승인 · ✅ S1~S5 구현(미커밋) · ✅ 실제 Animator 레이어 합성 실측(총구 yaw 0°, 손–손잡이 ≤ 5cm) · 보고 영상 `Recordings/gunner_gun_align_report.mp4`(gitignore) · ⏳ Play·MPPM · ⏸ PLAN §6 판정 시작점
 - 원인(Unity 실측): 총은 이미 `rig/artillery` 본에 붙어 있는데 손으로 맞춘 오프셋(09-30)이 **총을 앞뒤로 뒤집어** 총구 yaw ≈174°. 애니는 `LaserGun_Mount` = `artillery` 프레임(오프셋 0)으로 저작됨 — 손 = `Grip_R`/`Grip_L`(Q 는 `Brace_R`) 좌표와 소수점 3자리 일치. + 기본 공격 상체 클립 `attack01` 은 `c_pos` 각도(180°)가 하체 `Q_charge_loop`(146.3°)와 달라, 마스크가 `c_pos` 를 빼므로 팔만 34° 돌아 손이 11~19cm 이탈.

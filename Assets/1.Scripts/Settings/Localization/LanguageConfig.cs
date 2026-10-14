@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-/// <summary>표시 언어(PLAN-settings S15·S16). 지금은 설정창 문구만 바뀐다.</summary>
+/// <summary>표시 언어(PLAN-settings S15·S16). 지금은 설정창 문구 + HUD 키가이드 이미지(<see cref="LocalizedSprite"/>)만 바뀐다.</summary>
 public enum GameLanguage
 {
     English = 0,
