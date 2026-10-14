@@ -18,7 +18,8 @@ Update this file when a term becomes important enough that future agents or team
 - ✅ 10-14 `origin/development`(44커밋: 튜토리얼 구간 스킵 Alt+1~0 · MapScene 그룹 6개·매니저 13개 프리팹화 · 거너 회전 잠금 · 에임 3D) 병합 + SVN **r434**(핀 434). MapScene 충돌 22곳은 **dev 씬 기준 + 우리 설정창 변경(옛 77블록 삭제·새 2블록·OptionPanel 자식)만 재적용**으로 해결(끊긴 참조 0). `raidBossPrefab` 은 매니저 프리팹 `Managers/BossEncounterDirector.prefab` 에 연결.
 - ✅ 10-14 W2 `ec1985d8` · W3 `485b3f16` · 전투 기록 로그 `35bfffd5` · HP 상향 `f25f4c45` — **각본 4구간 조합 완료**(팀장 Play: ①~④·엔딩·방전 안전 칸 확인). 1인 2880 / 2인 7200 / 3인 13104.
   ⏳ 남은 것: 측정 플레이(`[23호/전투기록]` 로그 — 기존 vs 레이드 · 1/2/3인) → 수치 조정 · 빌드 기본 보스 결정(지금 빌드는 항상 기존). 2인 MPPM 의 ③ 잡기 구출은 아직 Play 미확인.
-- 로아 발탄·쿠크식 구간 각본 4개(기동 시연 · 드론 유도 송전 · 구출 · 자폭 공동 게이지). **기존 23호(`TwentyThree.prefab`·`No23.asset`)는 그대로**, 변형(`TwentyThree_Raid`·`No23_Raid`) 추가 후 비교.
+- 로아 발탄·쿠크식 구간 각본 4개(기동 시연 · 드론 유도 송전 · 구출 · 자폭 공동 게이지).
+- 📄 **구간별 진행 설명(기획용, 팀장이 「추가할 것」 칸에 덧붙임)** = [raid-23-phases.md](Docs/design/boss/raid-23-phases.md). 10-14 추가 변경: ④ 실패 = 즉사기 · 자막은 규칙 안내 3종만. **기존 23호(`TwentyThree.prefab`·`No23.asset`)는 그대로**, 변형(`TwentyThree_Raid`·`No23_Raid`) 추가 후 비교.
 - 🔴 **수정 예정 — 동시 수정 금지**: `Monster/Boss/TwentyThreeBoss.cs` · `BossDataSO.cs` · `WellsDroneAttack.cs` · `BossChargingPylon.cs` · `BossElectricFloor.cs` · `Map/BossEncounterDirector.cs` · `4.MapScene.unity`(BossEncounterDirector 칸만) · 신규 `TwentyThree_Raid.prefab`·`No23_Raid.asset`.
 
 ## ▶▶ 작업 세션 (2026-10-13 · 경석(Claude) · **공격 예고 색·마스크 + 일반 몹 예고(Chomp·Humanoid·Mortar)**, 브랜치 `feature/Boss23`) — 계획 [PLAN-telegraph-style.md](PLAN-telegraph-style.md) · [PLAN-monster-tells.md](PLAN-monster-tells.md) ✅ 완료·팀장 확인 · 커밋·푸시(동시 수정 잠금 해제) · SVN 커밋
