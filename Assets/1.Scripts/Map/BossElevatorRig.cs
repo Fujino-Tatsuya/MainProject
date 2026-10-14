@@ -9,6 +9,9 @@ using UnityEngine;
 /// · 칸 높이 = <see cref="_landedLocalY"/> + 타임라인 오프셋. 문은 컨트롤러에 전이가 없어 <see cref="Animator.Play(int,int,float)"/> 로 상태를 직접 고른다
 ///   (<see cref="TutorialElevatorDoor"/> 와 같은 방식).
 /// · 경과 시간으로 매 프레임 다시 계산하므로 늦게 합류해도 같은 그림. 지난 단계 경계의 이벤트는 처음 적용할 때 순서대로 한꺼번에 낸다.
+/// · 상승은 끝 높이 없이 계속된다. <see cref="BossElevatorPhase.Blackout"/>(완전 암전)에 닿으면 재생을 멈추고 <see cref="ResetToIdle"/> 한 뒤
+///   <see cref="OnBlackout"/> 을 낸다. 화면 페이드 자체는 리그가 그리지 않는다 — 호출자가 <see cref="OnFadeOutStart"/>·
+///   <see cref="BossElevatorTimeline.FadeAlphaAt"/> 로 맞춘다.
 /// · <see cref="ResetToIdle"/> = 칸을 프리팹에 놓인 자리로, 문 Closed.
 /// </summary>
 [DisallowMultipleComponent]
@@ -50,8 +53,10 @@ public sealed class BossElevatorRig : MonoBehaviour
     public event Action OnVanish;
     /// <summary>문이 닫히고 상승이 시작되는 순간.</summary>
     public event Action OnAscendStart;
-    /// <summary>상승이 끝난 순간 — 재생은 멈추고 칸은 위에 남는다.</summary>
-    public event Action OnDone;
+    /// <summary>화면 페이드 아웃이 시작되는 순간 — 길이는 <see cref="BossElevatorTimeline.FadeOutDuration"/>.</summary>
+    public event Action OnFadeOutStart;
+    /// <summary>완전 암전 순간 — 재생은 멈췄고 칸·문은 이미 대기 자리로 돌아가 있다.</summary>
+    public event Action OnBlackout;
 
     public IReadOnlyList<Transform> FrontPoints => _frontPoints;
     public bool IsPlaying => _playing;
@@ -114,6 +119,29 @@ public sealed class BossElevatorRig : MonoBehaviour
 
     void Apply(double elapsed)
     {
+        BossElevatorPhase phase = _timeline.PhaseAt(elapsed);
+        BossElevatorPhase from = _hasLastPhase ? _lastPhase : BossElevatorPhase.TeleportFront;
+
+        if (phase == BossElevatorPhase.Blackout)
+        {
+            ResetToIdle();
+        }
+        else
+        {
+            ApplyPose(elapsed);
+            _lastPhase = phase;
+            _hasLastPhase = true;
+        }
+
+        // 이번 프레임에 넘은 경계마다 한 번씩(늦은 합류·긴 프레임이면 여러 개를 순서대로).
+        if (from < BossElevatorPhase.Vanished && phase >= BossElevatorPhase.Vanished) OnVanish?.Invoke();
+        if (from < BossElevatorPhase.Ascending && phase >= BossElevatorPhase.Ascending) OnAscendStart?.Invoke();
+        if (from < BossElevatorPhase.FadingOut && phase >= BossElevatorPhase.FadingOut) OnFadeOutStart?.Invoke();
+        if (from < BossElevatorPhase.Blackout && phase >= BossElevatorPhase.Blackout) OnBlackout?.Invoke();
+    }
+
+    void ApplyPose(double elapsed)
+    {
         if (_cab != null)
         {
             Vector3 p = _idleLocalPosition;
@@ -135,17 +163,6 @@ public sealed class BossElevatorRig : MonoBehaviour
             _appliedDoor = door;
             _hasAppliedDoor = true;
         }
-
-        BossElevatorPhase phase = _timeline.PhaseAt(elapsed);
-        BossElevatorPhase from = _hasLastPhase ? _lastPhase : BossElevatorPhase.TeleportFront;
-        _lastPhase = phase;
-        _hasLastPhase = true;
-        if (phase == BossElevatorPhase.Done) _playing = false;
-
-        // 이번 프레임에 넘은 경계마다 한 번씩(늦은 합류·긴 프레임이면 여러 개를 순서대로).
-        if (from < BossElevatorPhase.Vanished && phase >= BossElevatorPhase.Vanished) OnVanish?.Invoke();
-        if (from < BossElevatorPhase.Ascending && phase >= BossElevatorPhase.Ascending) OnAscendStart?.Invoke();
-        if (from < BossElevatorPhase.Done && phase >= BossElevatorPhase.Done) OnDone?.Invoke();
     }
 
     void PlayDoor(int stateHash, float normalizedTime)

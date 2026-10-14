@@ -2308,6 +2308,9 @@ MonoBehaviour:
     closeDelayAfterVanish: 1.5
     doorCloseDuration: 0
     ascendDuration: 1.5
+    ascendSpeed: 24
+    fadeOutDelay: 0
+    fadeOutDuration: 1.5
 --- !u!1001 &6124110812454917498
 PrefabInstance:
   m_ObjectHideFlags: 0
