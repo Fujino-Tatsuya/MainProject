@@ -7150,6 +7150,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 2559889633684581847}
     m_Modifications:
+    - target: {fileID: 91919033082106278, guid: 9150b30e70da2a243839bfc9073d7bf8, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 4692658368657771842, guid: 9150b30e70da2a243839bfc9073d7bf8, type: 3}
       propertyPath: m_LocalPosition.x
       value: -9.802119
@@ -7193,10 +7197,6 @@ PrefabInstance:
     - target: {fileID: 5356041375796959224, guid: 9150b30e70da2a243839bfc9073d7bf8, type: 3}
       propertyPath: m_Name
       value: floor_metal
-      objectReference: {fileID: 0}
-    - target: {fileID: 5860457658565506605, guid: 9150b30e70da2a243839bfc9073d7bf8, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents:
     - {fileID: 1755475268669448222, guid: 9150b30e70da2a243839bfc9073d7bf8, type: 3}
@@ -9439,6 +9439,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 2559889633684581847}
     m_Modifications:
+    - target: {fileID: 91919033082106278, guid: 9150b30e70da2a243839bfc9073d7bf8, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 4692658368657771842, guid: 9150b30e70da2a243839bfc9073d7bf8, type: 3}
       propertyPath: m_LocalPosition.x
       value: -9.802119
@@ -9482,10 +9486,6 @@ PrefabInstance:
     - target: {fileID: 5356041375796959224, guid: 9150b30e70da2a243839bfc9073d7bf8, type: 3}
       propertyPath: m_Name
       value: floor_metal_001
-      objectReference: {fileID: 0}
-    - target: {fileID: 5860457658565506605, guid: 9150b30e70da2a243839bfc9073d7bf8, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents:
     - {fileID: 1755475268669448222, guid: 9150b30e70da2a243839bfc9073d7bf8, type: 3}
