@@ -281,6 +281,42 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     BossAttackId? _raidRescueNext;
     bool _raidRescueActive;
 
+    // ─── 전투 기록(PLAN-boss-raid W4 밸런스 실측) — 기존·레이드 공통, 서버에서 한 판 끝날 때 한 덩어리로 찍는다 ───
+    readonly System.Text.StringBuilder _fightLog = new System.Text.StringBuilder();
+    float _fightStartTime = -1f;
+    float _lastSectionTime;
+    long _fightPlayerDamage;
+    int _fightCounters, _fightSuppressions;
+
+    void FightLog(string msg)
+    {
+        if (_fightStartTime < 0f) return;
+        _fightLog.AppendLine($"  [{Time.time - _fightStartTime,6:0.0}s] {msg}");
+    }
+
+    void BeginFightLog()
+    {
+        _fightLog.Clear();
+        _fightStartTime = Time.time;
+        _lastSectionTime = Time.time;
+        _fightPlayerDamage = 0;
+        _fightCounters = _fightSuppressions = 0;
+        FightLog($"개전 — {(IsRaid ? "레이드" : "기존")} · 인원 {_partySize} · 최대 HP {FinalMaxHp}");
+    }
+
+    void FlushFightLog(string ending)
+    {
+        if (_fightStartTime < 0f) return;
+        float dur = Mathf.Max(0.01f, Time.time - _fightStartTime);
+        FightLog($"{ending} — 구간 소요 {Time.time - _lastSectionTime:0.0}s");
+        Debug.Log(
+            $"[23호/전투기록] {(IsRaid ? "레이드" : "기존")} · 인원 {_partySize} · {ending}\n" +
+            $"  총 {dur / 60f:0.0}분({dur:0}s) · 플레이어 피해 합 {_fightPlayerDamage} · 평균 DPS {_fightPlayerDamage / dur:0.0} · " +
+            $"간파 {_fightCounters}회 · 제압 {_fightSuppressions}회 · 남은 HP {CurrentHealth}/{FinalMaxHp}\n" +
+            _fightLog, this);
+        _fightStartTime = -1f;
+    }
+
     // ④ 폐기 처분(자폭) — 송전기 흐름(점프 → 차징 자세·구슬)을 타되 탑 없이 공동 게이지(간파 게이지)를 깎는다.
     bool _raidSelfDestruct;
     int _selfDestructGaugeTotal;       // 게이지 100% 에 필요한 피해 합(인원 보정)
@@ -439,6 +475,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
 
     public override void OnNetworkDespawn()
     {
+        FlushFightLog("중단(디스폰 — 전멸·재도전·종료)");
         PlayerHitDamageCap.Clear(this);
         _counterVisual.OnValueChanged -= OnCounterWindowChanged;
         _vulnerableVisual.OnValueChanged -= OnVulnerableVisualChanged;
@@ -795,6 +832,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
 
         // 전기 장판·드론의 0초도 여기(기획: "전투 시작 후 4초/5초" = 착지 완료 기준).
         _fightActive = true;
+        BeginFightLog();
 
         // 연출 동안의 접촉 상태는 의미가 없다 — 전투가 새로 시작되므로 "안 붙은" 상태에서 출발한다.
         _inContactReach = false;
@@ -2249,6 +2287,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
                 // ③ 각본 잡기를 전원이 피했다(범위 밖·슈퍼아머) = 성공 — 제압(PLAN-boss-raid §2).
                 _raidRescueActive = false;
                 ShowRaidSubtitleServer("BOSS_RAID_RescueSuccess");
+                FightLog("③ 새 가족 성공(헛잡기)");
                 EnterSuppress("각본 잡기 헛잡기", fromReservation: true);
                 return;
             }
@@ -2501,6 +2540,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         {
             _raidRescueActive = false;
             Debug.Log("[23호/레이드] 새 가족 — 구출 실패(벌칙 없음)", this);
+            FightLog("③ 새 가족 실패");
         }
 
         _attackPhase = BossAttackPhase.None;
@@ -3960,7 +4000,22 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
 
         Debug.Log($"[23호] 송전기 시작 — 인원 {_chargePlayers}명 → 송전탑 {_chargePylons}개, " +
                   $"제한시간 {ChargeTimeLimit:0.#}초{(_raidCharge ? " (레이드 ② 전력 공급)" : "")}", this);
-        if (_raidCharge) ShowRaidSubtitleServer("BOSS_RAID_ChargeGuide");   // 규칙 설명 — 처음 하는 사람용
+        if (_raidCharge)
+        {
+            ShowRaidSubtitleServer("BOSS_RAID_ChargeGuide");   // 규칙 설명 — 처음 하는 사람용
+            // 송전탑 4개 = 고정 위치 → 칸 4개(방전 안전 칸 후보). 확인용으로 찍어 둔다(행·열 1부터, 기획 표기).
+            if (TryGetTileGrid(out BossTileGrid g))
+            {
+                var sb = new System.Text.StringBuilder("[23호/레이드] 송전탑 칸:");
+                foreach (BossChargingPylon p in BossChargingPylon.Active)
+                {
+                    if (p == null) continue;
+                    Vector2Int t = NearestTile(g, p.transform.position);
+                    sb.Append($" {p.name}=({t.x + 1},{t.y + 1}){(p.IsEngaged ? "*" : "")}");
+                }
+                Debug.Log(sb.Append("  (* = 이번에 올라온 탑)").ToString(), this);
+            }
+        }
         EnterPhase(BossAttackPhase.ChargeWait, ChargeTimeLimit);
     }
 
@@ -4055,10 +4110,12 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
             {
                 // ② 성공 보상 = 제압(5초, 받는 피해 ×1.2). 기믹이 끝난 지점이라 예약 검사를 건너뛴다.
                 Debug.Log("[23호/레이드] 전력 공급 차단 — 제압", this);
+                FightLog("② 전력 공급 성공");
                 EnterSuppress("전력 공급 차단", fromReservation: true);
                 return;
             }
             Debug.Log("[23호] 송전기 전멸 — 그로기(Break 승격 없음)", this);
+            FightLog("송전기 성공");
             // 기믹이 완전히 끝나는 지점 ① — 예약된 제압이 있으면 보상 그로기 대신 제압으로.
             if (TryConsumePendingSuppress()) return;
             EnterPylonGroggy(_boss != null ? _boss.chargeClearGroggyDuration : 1f);
@@ -4069,12 +4126,14 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         {
             // ② 실패 = 레이지 대신 방전(부순 탑 칸만 안전). 보스는 바로 일반 전투로 돌아간다.
             _attackPhase = BossAttackPhase.None;
+            FightLog("② 전력 공급 실패 → 방전");
             StartRaidDischarge(dischargeMask);
             DecideNextAfterAction();
             return;
         }
 
         Debug.Log("[23호] 송전기 실패 — 레이지 돌진으로 넘어간다", this);
+        FightLog("송전기 실패 → 레이지");
         StartRageAfterCharge();
     }
 
@@ -4114,7 +4173,9 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         // 장판을 Raid 모드로 붙잡아 두는 시간 = 예고 + 여유(발동·VFX 는 장판이 끝까지 낸다).
         _raidFloorHoldUntil = Time.time + warn + 2f;
         ShowRaidSubtitleServer("BOSS_RAID_Discharge");
-        Debug.Log($"[23호/레이드] 전력 공급 실패 — 방전 예고 {warn:0.#}초 · 안전 칸 {_safeTileScratch.Count}개", this);
+        var safe = new System.Text.StringBuilder();
+        foreach (Vector2Int t in _safeTileScratch) safe.Append($" ({t.x + 1},{t.y + 1})");
+        Debug.Log($"[23호/레이드] 전력 공급 실패 — 방전 예고 {warn:0.#}초 · 안전 칸 {_safeTileScratch.Count}개:{safe}", this);
     }
 
     /// <summary>[서버] 상시 전기 장판을 붙잡아 둘 때(레이드): ① 구간 · ② 전력 공급 · ④ 자폭 진행 · 방전/대폭발 처리 중.</summary>
@@ -4168,6 +4229,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         if (stopped)
         {
             Debug.Log("[23호/레이드] 폐기 처분 — 자폭 저지 → 제압", this);
+            FightLog($"④ 폐기 처분 저지(남은 {_attackPhaseTimer:0.0}s)");
             ShowRaidSubtitleServer("BOSS_RAID_SelfDestructStopped");
             EnterSuppress("자폭 저지", fromReservation: true);
             return;
@@ -4180,6 +4242,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         _raidFloorHoldUntil = Time.time + warn + 2f;
         ShowRaidSubtitleServer("BOSS_RAID_SelfDestructBlast");
         Debug.Log("[23호/레이드] 폐기 처분 — 저지 실패, 대폭발", this);
+        FightLog("④ 폐기 처분 실패 → 대폭발");
         DecideNextAfterAction();
     }
 
@@ -5182,6 +5245,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
 
         // 실패든 성공이든 데미지는 정상 처리된다 — 카운터 실패에 패널티는 없다(확정 스펙).
         bool resolved = base.ReceiveAttack(attackInfo, hitContext);
+        if (IsServer && resolved && IsFromPlayer(hitContext)) _fightPlayerDamage += attackInfo.damage;
 
         // ④ 자폭 중 플레이어 피해 = 공동 게이지 감소(피해만으로도 저지 가능 — 팀장 10-14).
         if (IsServer && resolved && _raidSelfDestruct && _attackPhase == BossAttackPhase.ChargeWait && IsFromPlayer(hitContext))
@@ -5189,6 +5253,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
 
         if (counter && resolved && State != MonsterState.Dead)
         {
+            _fightCounters++;
             EnterCounterSuccess();
             CombatStatsEvents.RaiseServerCounterSucceeded(this, GetAttackerClientId(hitContext)); // 결과 화면 통계(판정 무관)
 
@@ -5322,6 +5387,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         {
             _raidRescueActive = false;
             ShowRaidSubtitleServer("BOSS_RAID_RescueSuccess");
+            FightLog("③ 새 가족 성공(간파)");
             EnterSuppress("구출 성공", fromReservation: true);
             return;
         }
@@ -5377,6 +5443,8 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
 
         float duration = Mathf.Max(0.05f, _boss != null ? _boss.breakDuration : 5f);
         _pendingSuppress = false;
+        _fightSuppressions++;
+        FightLog($"제압 — {reason}");
         EndVulnerable("제압 진입");   // 취약이면 즉시 종료(기획 §8.2)
         _suppressed = true;
         _groggyKind = BossPauseCondition.Suppress;
@@ -5740,6 +5808,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         if (next == MonsterState.Dead)   // 사망은 모든 예약·상태보다 우선(기획 §9.3 · 간파 §12.2)
         {
             if (IsRaid) ShowRaidSubtitleServer("BOSS_RAID_Defeat");   // 엔딩 — 웰즈의 마지막 말
+            FlushFightLog("처치");
             _pendingSuppress = false;
             EndVulnerable("사망");
             _kbActive = false;
@@ -5996,6 +6065,8 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
 
         int previous = CurrentPhase;
         CurrentPhase = next;
+        FightLog($"페이즈 {next} 진입(HP {ratio:P0}) — 직전 구간 {Time.time - _lastSectionTime:0.0}s");
+        _lastSectionTime = Time.time;
 
         // 🔴 시퀀스를 **여기서 시작하지 않는다.** 정본 §9: "_pendingCharging 은 현재 행동이 끝난 뒤
         //    소비한다 — 행동 도중 강제 중단하지 않는다." TakeDamage 는 공격 한복판에도 들어오므로
