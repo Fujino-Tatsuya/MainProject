@@ -147,14 +147,6 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 4955849520773550304, guid: 29dc6e8e16f49be489cad980e60c6eea, type: 3}
-      propertyPath: 'm_Materials.Array.data[0]'
-      value: 
-      objectReference: {fileID: 2100000, guid: 180c9256ecdbad44886ce57addd4ac16, type: 2}
-    - target: {fileID: 4955849520773550304, guid: 29dc6e8e16f49be489cad980e60c6eea, type: 3}
-      propertyPath: 'm_Materials.Array.data[1]'
-      value: 
-      objectReference: {fileID: 2100000, guid: 2a95f9ff80948c643a57b9e94a98eb3f, type: 2}
     - target: {fileID: 7658004475163181172, guid: 29dc6e8e16f49be489cad980e60c6eea, type: 3}
       propertyPath: m_Name
       value: SM_Prop_Shipping_Container_01 (1)

@@ -64,7 +64,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 100000, guid: deefb754612c0b249863a15f605c1490, type: 3}
       propertyPath: m_Name
-      value: SM_Prop_Shipping_Container_01
+      value: Model
       objectReference: {fileID: 0}
     - target: {fileID: 100000, guid: deefb754612c0b249863a15f605c1490, type: 3}
       propertyPath: m_Layer
@@ -110,6 +110,14 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 2300000, guid: deefb754612c0b249863a15f605c1490, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value:
+      objectReference: {fileID: 2100000, guid: 180c9256ecdbad44886ce57addd4ac16, type: 2}
+    - target: {fileID: 2300000, guid: deefb754612c0b249863a15f605c1490, type: 3}
+      propertyPath: 'm_Materials.Array.data[1]'
+      value:
+      objectReference: {fileID: 2100000, guid: 2a95f9ff80948c643a57b9e94a98eb3f, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
