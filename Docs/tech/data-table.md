@@ -109,7 +109,7 @@ GameData.xlsx (SVN, 잠금)
 | 칸 | 예 | 누가 쓰나 | 의미 |
 |---|---|---|---|
 | `key` | `Footstep` | 데이터 테이블 + 동기화 | 코드에서 부르는 키 |
-| `library` | `SFXLibrary` | 동기화 | BroAudio 라이브러리. 없으면 만든다(`Assets/9.ScriptableObject/SoundLibrary`). 다르면 엔티티를 옮긴다(guid 유지) |
+| `library` | `SFXLibrary` | 동기화 | BroAudio 라이브러리. 없으면 만든다(`Assets/51.Audio/Data/SoundLibrary`). 다르면 엔티티를 옮긴다(guid 유지) |
 | `entity` | `Footstep` | 동기화 | BroAudio 엔티티 이름(프로젝트 전체 고유). 없으면 만들고 SoundID 를 연결한다. 한 엔티티는 한 키만 |
 | `audioType` | `SFX` | 동기화 | `Music`·`UI`·`Ambience`·`SFX`·`VoiceOver` |
 | `clipPaths` | `Assets/51.Audio/SFX/Step_01.wav`⏎`Assets/51.Audio/SFX/Step_02.wav` | 동기화 | 프로젝트 기준 전체 경로, 여러 개면 **셀 안 줄바꿈(Alt+Enter)**. 엔티티 클립을 통째로 바꾼다(남는 클립의 Volume·Weight 등은 보존). `-` = 유지 |
@@ -122,7 +122,7 @@ GameData.xlsx (SVN, 잠금)
 
 - **엔티티의 볼륨·피치·랜덤·3D 설정은 쓰지 않는다**(생성 기본값 1). 수치는 위 엔트리 칸에서만 고친다. SeamlessLoop 전환·Priority·클립별 Weight/Fade·SpatialSetting·PlaybackGroup 은 필요할 때 Library Manager 에서 — 동기화가 건드리지 않는다.
 - **처음 한 번은 `Export Template` 병합 필수** — 그 전의 시트엔 구성 칸이 없어 동기화가 오류로 멈춘다(배열이 줄어 키가 지워지는 걸 막는 장치).
-- 순서: SVN 잠금 → 행 추가 → **`Tools/Data/사운드 동기화`** → 변경 요약 확인 → git(라이브러리·엔티티·`SoundCatalog.asset`) + SVN(xlsx·클립·**클립 .meta**) 커밋.
+- 순서: SVN 잠금 → 행 추가 → **`Tools/Data/사운드 동기화`** → 변경 요약 확인 → **SVN 한 번에 커밋**: xlsx · 클립 · `Assets/51.Audio/Data/`(라이브러리·엔티티·`SoundCatalog.asset`) · **각 .meta**. 2026-10-14 부터 사운드 데이터는 전부 SVN 이다(코드 `SoundCatalog.cs` 만 git).
 - **행을 추가하고 동기화 전에 테이블 Play 하면** 배열 범위 밖 오류로 멈춘다 — 테이블 Play·Verify 가 "사운드 동기화 먼저" 경고를 같이 낸다.
 - 오류가 하나라도 있으면 아무것도 쓰지 않는다(이름 오타·없는 클립·`51.Audio` 밖 경로·엔티티 공유·같은 이름 엔티티 2개·인덱스 구멍). 어느 키도 안 쓰는 엔티티·지워지는 키는 경고만 — 삭제는 사람이.
 - 새로 늘어난 엔트리의 수치는 SO 에 기본값으로 들어간다 — 인스펙터 모드 Play 에선 기본값, 테이블 모드·빌드에선 xlsx 값.

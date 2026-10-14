@@ -12,7 +12,7 @@
 | 항목 | 결정 |
 |---|---|
 | 방식 | **메뉴 수동 실행으로 디스크에 반영.** 테이블 Play·빌드의 "메모리 적용 후 되돌리기"에는 끼우지 않는다. 자동 쓰기 없음 |
-| 라이브러리 | xlsx `library` 칸. **없으면 만든다**(BroAudio 출력 폴더 `Assets/9.ScriptableObject/SoundLibrary`) |
+| 라이브러리 | xlsx `library` 칸. **없으면 만든다**(BroAudio 출력 폴더 `Assets/51.Audio/Data/SoundLibrary` — 10-14 이전 전 `9.ScriptableObject/SoundLibrary`) |
 | 엔티티 | xlsx `entity` 칸 = 엔티티 이름. **없으면 만든다**(`AudioEntity.CreateNewInstance` — Library Manager 와 같은 기본값). 프로젝트 전체에서 이름이 겹치면 오류 |
 | 소속 변경 | 기존 엔티티의 `library` 가 실제와 다르면 **엔티티를 옮긴다**(`AssetDatabase.MoveAsset`, guid 유지 + 라이브러리 역참조 갱신) |
 | 엔티티 공유 | **금지.** 두 키가 같은 엔티티를 가리키면 오류 |
@@ -94,3 +94,9 @@ S1 순수 계획 클래스 + 테스트 → S2 메뉴(생성·이동·쓰기) →
 - 새 원소의 재생 수치는 SO 에 기본값으로 들어간다(테이블 모드·빌드는 xlsx 값).
 - ✅ xlsx `Sound` 시트 새 구성 작성(병합 Export 결과에서 Sound 시트만 원본에 이식 — 전체 병합은 이 브랜치에 없는 다른 시트 필드 20개를 버려서 쓰지 않음). 로드 오류 0 · 동기화 "바꿀 것 없음".
 - ⏳ 사람: xlsx SVN 커밋 → Play 청취. 인수인계 [handoff-sound-sync.md](Docs/tech/handoff-sound-sync.md).
+
+## 이전 (2026-10-14) — 사운드 데이터를 SVN 으로
+- `SoundCatalog.asset` → `Assets/51.Audio/Data/SoundCatalog.asset`, `SoundLibrary/` → `Assets/51.Audio/Data/SoundLibrary/`(Unity 끈 채 이동, 24개 파일·.meta guid 바이트 동일). `SoundCatalog.cs` 는 git 에 남겨 `Assets/1.Scripts/Sound/` 로.
+- BroAudio 출력 폴더 `BroEditorSetting.asset` `AssetOutputPath` 를 새 경로로 — 안 바꾸면 Library Manager·사운드 동기화가 옛 위치(git 영역)에 다시 만든다.
+- 목적: xlsx·클립·엔티티·`SoundCatalog` 를 한 SVN 커밋으로 묶어 "PC 마다 엔티티가 따로 생기는" 위험을 없앤다. Play·빌드 자동 동기화는 아직 결정 전(검사만 자동 = 권장안 A).
+- 주의: SVN 은 git 브랜치와 따로 간다 — `SoundEntry` 구조(코드)를 바꾸는 작업은 development 반영 뒤 SVN 커밋.
