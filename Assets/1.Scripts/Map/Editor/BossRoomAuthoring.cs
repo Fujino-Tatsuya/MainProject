@@ -721,6 +721,9 @@ public static class BossRoomAuthoring
         Transform existing = FindDeep(root.transform, NavMarginName);
         GameObject parent = existing != null ? existing.gameObject : new GameObject(NavMarginName);
         if (existing == null) parent.transform.SetParent(root.transform, false);
+        // 띠 center 는 루트 로컬 값 → 부모를 루트와 같은 좌표계로 되돌린다(손으로 옮긴 위치·회전·스케일 무시).
+        SetRootLocalPosition(root, parent.transform, Vector3.zero);
+        parent.transform.localScale = Vector3.one;
         for (int i = parent.transform.childCount - 1; i >= 0; i--)
         {
             Transform c = parent.transform.GetChild(i);
@@ -745,6 +748,9 @@ public static class BossRoomAuthoring
         Transform child = parent.transform.Find(name);
         GameObject go = child != null ? child.gameObject : new GameObject(name);
         if (child == null) go.transform.SetParent(parent.transform, false);
+        go.transform.localPosition = Vector3.zero;
+        go.transform.localRotation = Quaternion.identity;
+        go.transform.localScale = Vector3.one;
         var vol = go.GetComponent<NavMeshModifierVolume>();
         if (vol == null) vol = go.AddComponent<NavMeshModifierVolume>();
         vol.center = center;
