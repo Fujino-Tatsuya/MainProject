@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -21,6 +22,10 @@ using UnityEngine;
 /// <see cref="ApplyLocalLock"/>에서 자기 FSM·애니메이터·입력에 같은 결과를 적용한다.
 /// 연출 중 추락 판정과 생명주기 전이 차단은 각 소유 컴포넌트가 이 값을 읽어 처리한다
 /// (<see cref="PlayerFallController"/>, <see cref="PlayerLifeCycleController"/>).
+///
+/// 연출 <b>숨김</b>(<see cref="SetCinematicHiddenServer"/> — 보스 엘리베이터 '뿅')도 여기 한 곳이다. 잠금과 독립된 복제 값이며
+/// 모델·실루엣(렌더러 forceRenderingOff)·머리 위 바를 감추고, 입력은 <see cref="PlayerLifeInputPolicy"/> 가, 무적은
+/// <see cref="InvulnerabilityCause.CinematicHidden"/> 토큰이 맡는다.
 /// </summary>
 [DisallowMultipleComponent]
 [RequireComponent(typeof(Player))]
@@ -41,15 +46,35 @@ public sealed class PlayerEncounterLock : NetworkBehaviour
     [SerializeField] private PlayerSkillController skillController;
     [SerializeField] private Rigidbody body;
 
+    // 연출 숨김(보스 엘리베이터 '뿅'). 잠금과 별개 — 숨김이 끝나기 전에 보스 등장 잠금이 겹쳐 걸린다.
+    private readonly NetworkVariable<bool> cinematicHidden =
+        new NetworkVariable<bool>(
+            false,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server);
+
     /// <summary>연출 잠금 여부. 서버가 확정하고 전 피어가 읽는다.</summary>
     public bool IsCinematicLocked => IsSpawned ? cinematicLocked.Value : offlineLocked;
+
+    /// <summary>
+    /// 연출 숨김 여부(전 피어). 숨김 = 모델·머리 위 UI·실루엣 안 보임 + 오너 입력 잠금(<see cref="PlayerLifeInputPolicy"/>) +
+    /// 서버 무적(<see cref="InvulnerabilityCause.CinematicHidden"/>).
+    /// </summary>
+    public bool IsCinematicHidden => IsSpawned ? cinematicHidden.Value : offlineHidden;
 
     /// <summary>잠금 변화 알림(전 피어). 입력 정책 등 로컬 소비자가 구독한다.</summary>
     public event Action<bool> CinematicLockChanged;
 
+    /// <summary>숨김 변화 알림(전 피어) — 입력 정책과 사라짐/나타남 VFX 의 훅.</summary>
+    public event Action<bool> CinematicHiddenChanged;
+
     // 오프라인(비네트워크) 실행에서는 NetworkVariable을 쓸 수 없어 로컬 플래그로 동작한다.
     private bool offlineLocked;
     private bool localLockApplied;
+    private bool offlineHidden;
+    private bool localHiddenApplied;
+    // 숨길 때 끈 렌더러만 되켠다 — 원래 꺼져 있던 것(forceRenderingOff)은 그대로 둔다.
+    private readonly List<Renderer> hiddenRenderers = new List<Renderer>();
 
     private void Awake()
     {
@@ -61,22 +86,101 @@ public sealed class PlayerEncounterLock : NetworkBehaviour
         base.OnNetworkSpawn();
         ResolveReferences();
         cinematicLocked.OnValueChanged += HandleLockChanged;
+        cinematicHidden.OnValueChanged += HandleHiddenChanged;
 
-        // 늦게 합류한 피어도 진행 중인 연출 잠금을 그대로 적용한다.
+        // 늦게 합류한 피어도 진행 중인 연출 잠금·숨김을 그대로 적용한다.
         if (cinematicLocked.Value)
             ApplyLocalLock(true);
+        if (cinematicHidden.Value)
+            ApplyLocalHidden(true);
     }
 
     public override void OnNetworkDespawn()
     {
         cinematicLocked.OnValueChanged -= HandleLockChanged;
+        cinematicHidden.OnValueChanged -= HandleHiddenChanged;
 
         // 씬 전환·디스폰으로 사라지는 경우 남은 로컬 잠금을 풀어 둔다(재사용되는 인스턴스 대비).
         // 이때 이벤트는 쏘지 않는다 — 디스폰 중 구독자가 복제 상태를 쓰려 하면 NGO가 거부한다.
         if (localLockApplied)
             ApplyLocalLock(false, notify: false);
+        if (localHiddenApplied)
+            ApplyLocalHidden(false, notify: false);
 
         base.OnNetworkDespawn();
+    }
+
+    /// <summary>
+    /// 서버 전용·멱등. 연출 숨김을 켜고 끈다(보스 엘리베이터 — <see cref="BossTeleportManager"/>).
+    /// 무적 토큰(<see cref="InvulnerabilityCause.CinematicHidden"/>)을 함께 걸고 푼다. 보스 등장 잠금(<see cref="BeginCinematicServer"/>)과는 독립이다.
+    /// </summary>
+    public bool SetCinematicHiddenServer(bool hidden)
+    {
+        if (!IsServerAuthority())
+            return false;
+
+        if (IsCinematicHidden == hidden)
+            return true;
+
+        if (hidden)
+        {
+            // 잠금과 같은 순서 — 진행 중인 행동을 정상 경로로 끊은 뒤 숨긴다.
+            skillController?.EndActiveSkillServer(SkillEndReason.Cancelled);
+            defaultAttack?.CancelCurrentAttack();
+            invulnerability?.AddServerToken(InvulnerabilityCause.CinematicHidden, 0.0);
+        }
+        else
+        {
+            invulnerability?.RemoveServerToken(InvulnerabilityCause.CinematicHidden);
+        }
+
+        if (!IsSpawned)
+        {
+            offlineHidden = hidden;
+            ApplyLocalHidden(hidden);
+        }
+        else
+        {
+            cinematicHidden.Value = hidden; // 쓰기 피어에서도 OnValueChanged → 핸들러 한 곳에서 적용
+        }
+        return true;
+    }
+
+    private void HandleHiddenChanged(bool previous, bool current)
+    {
+        ApplyLocalHidden(current);
+    }
+
+    // 렌더러는 끄지(enabled) 않고 forceRenderingOff 로 감춘다 — Soul·장비 전환이 enabled/SetActive 를 따로 쓰므로 서로 덮지 않는다.
+    // 실루엣(PlayerSilhouetteFeature)도 컬링 결과로 그리므로 함께 사라진다. 머리 위 바는 PlayerOverheadHealthBarRule 이 이 값을 읽는다.
+    private void ApplyLocalHidden(bool hidden, bool notify = true)
+    {
+        if (localHiddenApplied == hidden)
+            return;
+
+        localHiddenApplied = hidden;
+
+        if (hidden)
+        {
+            hiddenRenderers.Clear();
+            foreach (Renderer r in GetComponentsInChildren<Renderer>(true))
+            {
+                if (r.forceRenderingOff) continue;
+                r.forceRenderingOff = true;
+                hiddenRenderers.Add(r);
+            }
+        }
+        else
+        {
+            foreach (Renderer r in hiddenRenderers)
+            {
+                if (r != null) r.forceRenderingOff = false;
+            }
+            hiddenRenderers.Clear();
+        }
+
+        if (notify)
+            CinematicHiddenChanged?.Invoke(hidden);
     }
 
     /// <summary>
