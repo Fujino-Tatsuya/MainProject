@@ -86,6 +86,7 @@ public static class DataSourcePlayMode
         if (Current != DataSource.Table)
         {
             SessionState.SetString(BadgeSessionKey, "DATA: INSPECTOR");
+            StringTableBuild.RefreshForInspectorPlay(); // 문구는 xlsx 가 유일한 원본 — 수치 모드와 무관하게 갱신
             return;
         }
 
@@ -112,6 +113,7 @@ public static class DataSourcePlayMode
             return;
         }
 
+        StringTableBuild.Write(result.Strings, result.ErrorCodes); // 문구 표는 디스크 에셋(내용이 바뀌었을 때만 씀) — 스냅샷 대상 아님
         DataTableSnapshot snapshot = DataTableApplier.ApplyInMemory(result.Writes);
         SessionState.SetString(SnapshotSessionKey, JsonUtility.ToJson(snapshot));
         // 복구 전까지 이 에셋들의 저장을 막는다(DataTableSaveGuard) — 메모리의 테이블 값이 디스크로 새는 걸 막는다.

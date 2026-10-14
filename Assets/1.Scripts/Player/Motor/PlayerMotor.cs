@@ -893,7 +893,7 @@ public sealed class PlayerMotor : MonoBehaviour
     {
         int baseMask = gameRule != null
             ? gameRule.ObstacleMask.value
-            : LayerMask.GetMask("Default", "Ground", "Wall", "Env");
+            : LayerMask.GetMask("Default", "Ground", "Wall", "Env", "Barrier");
 
         return PlayerUnitCollisionRules.ResolveObstacleMask(
             baseMask,

@@ -27,7 +27,7 @@ public sealed class KeyRebindPanel : MonoBehaviour
     {
         if (KeyRebindRow.IsRebinding) return;
         KeyBindingConfig.ResetAll();
-        Show(SettingsStrings.Get("settings.controls.resetDone"));
+        Show(SettingsUiStrings.ControlsResetDone.Text);
     }
 
     void Show(string message)

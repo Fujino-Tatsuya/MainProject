@@ -33,7 +33,7 @@ public class SoundCatalog : ScriptableObject
 [Serializable]
 public sealed class SoundEntry
 {
-    [SerializeField, DataTableText]
+    [SerializeField, DataTableText(Localize = false)]
     [Tooltip("코드에서 AudioManager.Play에 넘기는 고유 키")]
     private string key = string.Empty;
 
@@ -109,7 +109,7 @@ public sealed class SoundEntry
     [Tooltip("같은 키를 다시 재생할 수 있을 때까지의 시간(초, 0 = 제한 없음)")]
     private float retriggerCooldown;
 
-    [SerializeField, DataTableText, TextArea]
+    [SerializeField, DataTableText(Localize = false), TextArea]
     [Tooltip("기획용 설명")]
     private string description = string.Empty;
 

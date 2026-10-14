@@ -64,7 +64,7 @@ public sealed class KeyRebindRow : MonoBehaviour
         bool wasEnabled = action.enabled;
         action.Disable();   // 진행 중인 액션은 리바인드할 수 없다
         IsRebinding = true;
-        if (keyText != null) keyText.text = SettingsStrings.Get("settings.controls.pressKey");
+        if (keyText != null) keyText.text = SettingsUiStrings.ControlsPressKey.Text;
 
         _op = action.PerformInteractiveRebinding(index)
             .WithControlsHavingToMatchPath("<Keyboard>")
@@ -95,7 +95,8 @@ public sealed class KeyRebindRow : MonoBehaviour
                 InputAction otherAction = InputSystem.actions.FindAction(other);
                 int otherIndex = KeyBindingConfig.KeyboardMouseBindingIndex(otherAction);
                 if (otherIndex >= 0) otherAction.ApplyBindingOverride(otherIndex, oldPath);
-                Notice?.Invoke(SettingsStrings.Format("settings.controls.swapped", ActionLabel(other)));
+                Notice?.Invoke(SettingsUiStrings.ControlsSwapped.Format(
+                    new System.Collections.Generic.Dictionary<string, string> { ["action"] = ActionLabel(other) }));
             }
             KeyBindingConfig.Save();   // Changed → 모든 줄·게이트·플레이어 입력이 다시 읽는다
         }
@@ -122,13 +123,11 @@ public sealed class KeyRebindRow : MonoBehaviour
         IsRebinding = false;
     }
 
-    // "Player/SkillMain" → 표의 settings.controls.SkillMain(지금 언어). 표에 없으면 액션 이름 그대로.
-    static string ActionLabel(string path)
+    // "Player/SkillMain" → UI.Settings.Controls.SkillMain(지금 언어). 키가 없으면 액션 이름 그대로.
+    public static string ActionLabel(string path)
     {
         int slash = path.LastIndexOf('/');
         string name = slash >= 0 ? path.Substring(slash + 1) : path;
-        string key = "settings.controls." + name;
-        string label = SettingsStrings.Get(key);
-        return label == key ? name : label;
+        return SettingsUiStrings.TryGetAction(name, out UiString label) ? label.Text : name;
     }
 }

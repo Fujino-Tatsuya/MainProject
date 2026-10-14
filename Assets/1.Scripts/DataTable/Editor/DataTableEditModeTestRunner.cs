@@ -22,6 +22,24 @@ internal static class DataTableEditModeTestRunner
         "^DataTableSaveGuardTests$",
         "^DataTableSheetGroupTests$",
         "^SkillTooltipFormatterTests$",
+        "^StringTableValidatorTests$", // 로컬라이징 L1 — Strings 시트 검증
+        "^StringsSheetTests$", // 로컬라이징 L1 — Strings 시트 읽기·Export
+        "^ErrorCodesSheetTests$", // 로컬라이징 L1 — ErrorCodes 시트 읽기·검증·Export
+        "^LocTests$", // 로컬라이징 L1 — Loc 조회·'#key' 폴백·Format·GetError
+        "^UserLanguageConfigTests$", // 로컬라이징 L1 — 언어 기본값·저장
+        "^LocKeyTests$", // 로컬라이징 L2 — 자동 키(주인ID/필드경로)
+        "^DataTableTextKeysTests$", // 로컬라이징 L2 — [DataTableText] Strings 수집·제외
+        "^CharacterRosterStringKeysTests$", // 로컬라이징 L2 — 캐릭터 이름 키
+        "^LocTextRuleTests$", // 로컬라이징 L2 — 시트 검증·툴팁 포매터 공용 문법·자리표시자 규칙
+        "^TableTextMigrationTests$", // 툴팁 문구 단일 원본 — 옛 수치 시트 문구 칸 → Strings 이관
+        "^StringOwnerFieldTests$", // 툴팁 자동 키 행 ko·en {필드} 주인 검사
+        "^UiStringsTests$", // 로컬라이징 L3 — UI 문구 키 목록·Export 등록
+        "^UiStringsFormatTests$", // 로컬라이징 L3 — 과열 단계·변신·머리 위 이름 포맷·LocalizedText 폴백
+        "^UiStringsAuthoringTests$", // 로컬라이징 L3 — 라벨 키 부착 멱등
+        "^ErrorCatalogTests$", // 로컬라이징 L4 — 오류 코드 목록·ErrorCodes Export·시트 전용 행 경고
+        "^ErrorDisplayTests$", // 로컬라이징 L4 — 오류 표시 형식·인자 치환·SessionError
+        "^UiStringsL4bTests$", // 로컬라이징 L4b — 상태이상 enum→키 전수·로딩 칸 순서·초 단위 한 곳
+        "^UiStringsL4bFormatTests$", // 로컬라이징 L4b — 로딩·툴팁·상태이상·결과·허수아비 포맷·폴백
     };
 
     const string Tag = "[DataTableTests]";

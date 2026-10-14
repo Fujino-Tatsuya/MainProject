@@ -42,26 +42,24 @@ public sealed class GraphicsQualityController : MonoBehaviour
 
     void OnEnable()
     {
-        LanguageConfig.Changed += OnLanguageChanged;
+        Loc.Changed += OnLanguageChanged;
         OnLanguageChanged();
     }
 
-    void OnDisable() => LanguageConfig.Changed -= OnLanguageChanged;
+    void OnDisable() => Loc.Changed -= OnLanguageChanged;
 
     // 항목 글자를 지금 언어로 다시 채운 뒤 값을 맞춘다(Refresh).
     void OnLanguageChanged()
     {
         _refreshing = true;
-        Fill(presetDropdown, L("settings.graphics.preset.low"), L("settings.graphics.preset.medium"),
-            L("settings.graphics.preset.high"), L("settings.graphics.preset.custom"));
-        Fill(shadowDropdown, L("settings.common.off"), L("settings.graphics.preset.low"),
-            L("settings.graphics.preset.medium"), L("settings.graphics.preset.high"));
-        Fill(antiAliasingDropdown, L("settings.common.off"), "FXAA", "SMAA");   // 10-13 MSAA → 후처리 AA
+        Fill(presetDropdown, SettingsUiStrings.GraphicsPresetLow.Text, SettingsUiStrings.GraphicsPresetMedium.Text,
+            SettingsUiStrings.GraphicsPresetHigh.Text, SettingsUiStrings.GraphicsPresetCustom.Text);
+        Fill(shadowDropdown, SettingsUiStrings.CommonOff.Text, SettingsUiStrings.GraphicsPresetLow.Text,
+            SettingsUiStrings.GraphicsPresetMedium.Text, SettingsUiStrings.GraphicsPresetHigh.Text);
+        Fill(antiAliasingDropdown, SettingsUiStrings.CommonOff.Text, "FXAA", "SMAA");   // 10-13 MSAA → 후처리 AA
         _refreshing = false;
         Refresh();
     }
-
-    static string L(string key) => SettingsStrings.Get(key);
 
     void Change(System.Action<Box> edit)
     {

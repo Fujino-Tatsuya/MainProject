@@ -29,8 +29,8 @@ public class GunnerChargeLaserData : PlayerSkillData
     [Tooltip("판정 높이(m).")]
     [SerializeField, Min(0.05f)] private float beamHeight = 2f;
     [SerializeField, DataTableIgnore] private float muzzleHeight = 1.0f;
-    [Tooltip("지형 마스크 — 비트리거 콜라이더에 닿으면 그 지점에서 레이저가 끝난다.")]
-    [SerializeField] private LayerMask blockingLayers = 2177;
+    [Tooltip("지형 마스크 — 비트리거 콜라이더에 닿으면 그 지점에서 레이저가 끝난다. 기본값 = Default·Wall·Env·Barrier(할 일 32).")]
+    [SerializeField] private LayerMask blockingLayers = 1050753;
     [Tooltip("아군(보호막 대상) 마스크 — 기본 Player 레이어.")]
     [SerializeField] private LayerMask allyLayers = 64;
 

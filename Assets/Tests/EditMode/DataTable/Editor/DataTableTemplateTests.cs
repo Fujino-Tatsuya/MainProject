@@ -36,13 +36,22 @@ public sealed class DataTableTemplateTests
 
         List<DataTableTemplate.Field> fields = DataTableTemplate.CollectFields(data);
 
-        // bool·일반 string·enum·참조 없음. [DataTableText] 문자열만 포함하고, [DataTableIgnore]와 배열 크기는 제외.
+        // bool·일반 string·enum·참조 없음. [DataTableText(Localize = false)] 문자열만 포함하고, [DataTableIgnore]와 배열 크기는 제외.
+        // 번역 문구([DataTableText] — caption)는 Strings 전용이라 수치 시트에 없다.
         Assert.That(fields.Select(f => f.Path), Is.EqualTo(new[]
         {
             "maxHp", "moveSpeed", "title", "smallCount", "charge.speed", "charge.damage", "phases[0]", "phases[1]", "cooldown",
             "ratio", "count", "stages[0]", "stages[1]",
         }));
         Assert.That(fields[0].Description, Is.EqualTo("최대 체력"));
+    }
+
+    [Test]
+    public void CollectLocalizedTexts_OnlyStringsSideFields()
+    {
+        DataTableTestData data = Make("A");
+
+        Assert.That(DataTableTemplate.CollectLocalizedTexts(data).Select(f => f.Path), Is.EqualTo(new[] { "caption" }));
     }
 
     [Test]

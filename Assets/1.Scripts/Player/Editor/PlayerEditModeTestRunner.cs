@@ -35,6 +35,7 @@ internal static class PlayerEditModeTestRunner
         "^PlayerHealthRegenModelTests$", // 할 일 31 — 기본 체력 재생: 지연·틱·상한·피격 리셋·누적기·사망 차단
         "^AimIndicatorPlacementTests$", // 할 일 33 — 에임 인디케이터 3D 쿼드: yaw·수평 회전·발밑 높이·전방 오프셋·스케일
         "^InteractPromptSlotTests$", // 상호작용 F 프롬프트 — 마지막 Show 우선·소유자만 Hide·다른 뷰로 Show 시 이전 뷰 숨김·누락·파괴 정리
+        "^UnitWallImpactJudgeTests$", // 할 일 32 — 공용 벽 충돌: 스윕 결과 → 벽 충돌·제외 규칙(자기·배리어·유닛·상자·시작 겹침)·막힘 거리·에피소드당 1회
         // 튜토리얼 픽스처(특성·안내 UI·스피너봇 연습)는 TutorialEditModeTestRunner 로 옮겼다(할 일 15 I0).
         "^PlayerMotionSweepStepTests$", // 모터 스윕 — 단차·급경사·낙하 착지(실제 CapsuleCast)
         "^PlayerUnitCollisionRulesTests$", // 할 일 11 — 유닛 장애물 마스크(Soul·유닛 통과)·겹침 밀어내기 상한

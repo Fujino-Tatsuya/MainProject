@@ -30,7 +30,7 @@ public class GunnerHeatData : ScriptableObject, ISkillTooltipSource
     public float CoolDelay => coolDelay;
     public float CoolRate => coolRate;
     public float OverheatCoolRate => overheatCoolRate;
-    public SkillTooltipText Tooltip => tooltip;
+    public SkillTooltipText Tooltip => tooltip.Keyed(this, nameof(tooltip));
     public Object TooltipValueSource => this;
 
     public SkillTooltipDamage GetTooltipDamage(Player player)
