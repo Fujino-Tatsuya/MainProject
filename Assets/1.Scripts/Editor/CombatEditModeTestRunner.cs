@@ -29,7 +29,8 @@ internal static class CombatEditModeTestRunner
         "^BossContactReach",      // BossContactReachPolicyTests — 접촉 공격 개시 거리
         "^BossOpening",  // BossOpeningAttackPolicyTests
         "^BossRaidRules", // BossRaidRulesTests — 레이드 변형 구간 예약·인원 HP·피해 상한(PLAN-boss-raid W1)
-        "^BossAggro",    // BossAggroPolicyTests
+        "^BossAggro",    // BossAggroPolicyTests · BossAggroPolicyThreatTests
+        "^BossThreat",   // BossThreatTableTests — 위협 어그로(PLAN-boss-aggro)
         "^TelegraphStyle", // TelegraphStyleTests — 공격 예고 색·마스크 기본값·연결(PLAN-telegraph-style)
         "^MonsterSkyStrike" // MonsterSkyStrikeTests — 수직 낙하 포격 판정(같은 바닥·평면 반경, PLAN-monster-tells)
     };

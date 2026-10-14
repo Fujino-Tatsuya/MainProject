@@ -27,6 +27,7 @@ MonoBehaviour:
   attackRange: 9
   leashRadius: 16
   retargetInterval: 0
+  loseTargetRadius: 13.2
   returnSpeedMultiplier: 5
   turnSpeed: 10
   avoidanceRadius: 0.3

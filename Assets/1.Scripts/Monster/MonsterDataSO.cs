@@ -40,6 +40,10 @@ public class MonsterDataSO : ScriptableObject
     // 판정은 BossAggroPolicy.ShouldRetarget 이고 교전 중 Idle/Chase 에서만 성립한다(공격 커밋 구간은 건드리지 않는다).
     // 중간보스 2종에만 값을 넣었다 — 일반몹 8종은 0 이라 동작이 그대로다.
     public float retargetInterval = 0f;
+    // 추적 해제 반경(m, PLAN-boss-aggro §3.4 — 팀장 10-14). 문 대상이 이보다 멀리 1초 넘게 있으면 놓고 다시 탐색한다.
+    // 아무도 없으면 스폰 지점으로 걸어서 돌아간다(체력 회복 없음 · 가는 길에도 탐색 — 리쉬 귀환과 다르다).
+    // 0 = 끔(이전 동작 — 리쉬로만 풀린다). 일반몹 7종 = 인지 반경 × 1.2 · 중간보스 3종·23호 = 0.
+    [Min(0f)] public float loseTargetRadius = 0f;
     public float returnSpeedMultiplier = 5f; // 복귀 시 이동속도 배수(복귀속도 = MoveSpeed × 이 값)
 
     [Header("회전")]

@@ -385,6 +385,36 @@ public class BossDataSO : MonsterDataSO
              "⚠️ 켜면 후열이 과하게 압박받을 수 있다. MPPM 으로 보고 정할 값이라 노브로 뺐다(2026-09-03).")]
     public bool aggroAvoidsRepeatTarget = false;
 
+    // ─── 위협 어그로 (PLAN-boss-aggro §3.1~3.3, 팀장 10-14) — 기존·레이드 공통 ───
+    [Header("위협 어그로 — 피해량 기반(PLAN-boss-aggro)")]
+    [Tooltip("위협 점수 사용. 끄면 위 '최근접 + 주기 재선정'만 돈다(이전 동작).\n" +
+             "점수 = 보스 HP 에 실제로 들어간 플레이어 피해(제압 ×1.2·④ 자폭 감소 반영 후). 간파·힐은 넣지 않는다(팀장 10-14).")]
+    public bool threatAggro = true;
+
+    [Tooltip("위협 점수 반감기(초). 작을수록 '방금 많이 때린 사람'에게 빨리 돈다.")]
+    [Min(0f)] public float threatHalfLife = 6f;
+
+    [Tooltip("1등이 현재 대상보다 이 배수 이상 앞서야 갈아탄다(비등하면 안 바꾼다 — WoW 원거리 130% 문턱과 같은 발상).")]
+    [Min(1f)] public float threatSwitchRatio = 1.3f;
+
+    [Tooltip("현재 대상을 문 뒤 최소 이 시간(초)은 위협으로 갈아타지 않는다.")]
+    [Min(0f)] public float threatMinHold = 4f;
+
+    [Tooltip("1등 점수가 이보다 낮으면 위협 교체를 하지 않는다(잽 몇 번에 휙휙 돌지 않게).\n" +
+             "아무도 이 점수를 못 넘으면 위 '최근접 + 주기 재선정'이 돈다(개전 직후·휴식 구간).")]
+    [Min(0f)] public float threatMinScore = 30f;
+
+    [Tooltip("원거리 압박 — 어그로 대상까지 이 거리(m) 이상이면 점프·돌진이 **어그로 대상**을 노리고(평소 = 최원거리),\n" +
+             "가중치 ×farPressureWeightMultiplier, 쿨 ×farPressureCooldownScale. 0 = 끔.\n" +
+             "기본 8m = 근접 공격 거리창 최대(4.4m)의 약 2배. 팀장 10-14: '원거리가 1등이면 거의 확실히 날아온다'.")]
+    [Min(0f)] public float farPressureDistance = 8f;
+
+    [Tooltip("원거리 압박 중 점프·돌진 가중치 배수.")]
+    [Min(1f)] public float farPressureWeightMultiplier = 4f;
+
+    [Tooltip("원거리 압박 중 점프·돌진 쿨 배수(0.5 = 점프 10→5초 · 돌진 5→2.5초, 팀장 10-14).")]
+    [Range(0.05f, 1f)] public float farPressureCooldownScale = 0.5f;
+
     [Tooltip("[S7] 송전기(차징) 전멸 성공 시의 전체 행동 불능 시간(초). 일반 카운터 그로기(groggyDuration)와 " +
              "따로 두는 이유 — 기믹을 깬 보상이라 카운터 한 번보다 길어야 손맛이 산다(팀장 확정 2026-09-03). " +
              "🔴 Break 로 승격하지는 않는다(페이즈 연출 직후 장시간 무력화가 겹치면 연출이 죽는다).")]

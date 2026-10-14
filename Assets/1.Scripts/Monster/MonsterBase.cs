@@ -119,6 +119,11 @@ public class MonsterBase : Unit
     float _heightLostSince = -1f;  // 물고 있는 대상이 높이 조건을 벗어난 시각(-1 = 정상)
     // 경사·계단을 오르내리는 동안 판정이 깜빡여 타깃이 튀는 것을 막는 유예(초).
     const float HeightLossGrace = 0.5f;
+    // 추적 해제(PLAN-boss-aggro §3.4): 반경 밖 연속 유예 · 가벼운 귀환 도착 판정 거리.
+    const float LoseTargetGrace = 1f;
+    const float SoftReturnArriveDistance = 1.5f;
+    float _loseOutsideSince = -1f;
+    bool _softReturning;
     bool _animatorHeldLocally;     // 이 피어에서 애니메이터를 정지시켜 뒀나(자세 홀드 래치)
     float _animatorResumeSpeed = 1f; // 홀드 전 애니메이터 속도 — 풀 때 이 값을 되돌린다
     Coroutine _actionPoseHoldRoutine; // 클립 끝에서 자세를 잡으려고 대기 중인 예약(피어 로컬)
@@ -509,6 +514,31 @@ public class MonsterBase : Unit
             _heightLostSince = -1f;
         }
 
+        // 추적 해제(PLAN-boss-aggro §3.4, 팀장 10-14) — 대상이 loseTargetRadius 밖에 1초 넘게 있으면 놓는다.
+        // 🔴 리쉬는 **몬스터가** 스폰에서 멀어졌는지만 봐서, 포탑(움직이지 않음)은 문 대상을 영원히 쐈고
+        //    근접 몹도 리쉬 안이면 끝없이 쫓았다. 놓은 뒤 아무도 없으면 아래 빈손 분기가 스폰으로 걸어 돌아간다.
+        if (_target != null && data.loseTargetRadius > 0f)
+        {
+            float targetDist = Vector3.Distance(transform.position, _target.position);
+            if (targetDist <= data.loseTargetRadius) _loseOutsideSince = -1f;
+            else if (_loseOutsideSince < 0f) _loseOutsideSince = Time.time;
+
+            if (MonsterPerceptionPolicy.ShouldLoseTarget(targetDist, data.loseTargetRadius, _loseOutsideSince,
+                                                         Time.time, LoseTargetGrace))
+            {
+                Edit.Log($"[Monster] {name} 추적 해제 — {_target.name} {targetDist:0.0}m > {data.loseTargetRadius:0.0}m", this);
+                _target = null;
+                _loseOutsideSince = -1f;
+                _lastRetargetTime = -1f;
+                _nextAcquireTime = 0f;   // 바로 주변을 다시 훑는다
+                _softReturning = true;
+            }
+        }
+        else
+        {
+            _loseOutsideSince = -1f;
+        }
+
         if (!IsTargetValid(_target))
         {
             // 빈손 탐색 주기 — 타깃 없는 몹 전부가 매 프레임 OverlapSphere 를 돌던 것(PLAN-cleanup-optimization S2-2).
@@ -542,12 +572,26 @@ public class MonsterBase : Unit
 
         if (_target == null)
         {
-            StopAgent();
             _inAttackRange = false;
             _aimGate?.CancelAiming();   // Idle→Idle 이면 상태 콜백이 안 불려 조준이 남는다(Codex 점검 10-14)
+
+            // 가벼운 귀환(추적 해제 뒤) — 체력 회복·상태 초기화 없이 걸어서 스폰으로. 이 분기는 매 틱 탐색을
+            // 계속 돌리므로(위 FindNearestTarget) 가는 길에 누가 인지 반경에 들어오면 바로 다시 문다.
+            // 포탑은 움직이지 않으니 대상만 놓고 제자리 탐색이다.
+            if (_softReturning && data.archetype != MonsterArchetype.RangedTurret &&
+                Vector3.Distance(transform.position, _spawnPosition) > SoftReturnArriveDistance)
+            {
+                MoveAgentTo(_spawnPosition, MoveSpeed);
+                SetState(MonsterState.Chase);
+                return;
+            }
+
+            _softReturning = false;
+            StopAgent();
             SetState(MonsterState.Idle);
             return;
         }
+        _softReturning = false;
 
         float dist = Vector3.Distance(transform.position, _target.position);
         bool movementBlocked = status != null && status.BlocksMovement;
@@ -1354,6 +1398,8 @@ public class MonsterBase : Unit
     void EnterReturn()
     {
         _target = null;
+        _softReturning = false;   // 리쉬 귀환이 가벼운 귀환을 대신한다
+        _loseOutsideSince = -1f;
         _groggyCount = 0;
         status?.ClearAll();   // 버프/디버프 전부 제거
         Revive();             // 즉시 최대 체력 회복
@@ -1786,12 +1832,15 @@ public class MonsterBase : Unit
     // 슬롯 쿨(_cooldownByAttack)이 0 이하면 base 간격 = data.attackCooldown(초)으로 폴백한다.
     // (AttackSpeed 는 2026-10-02 부터 공격 애니 재생 배율이라 간격과 무관하다.)
     // 인자를 안 주면 슬롯 0 — 공격이 1종인 일반 몬스터는 이 경로만 탄다.
-    protected bool CooldownReady(int attackSlot = DefaultAttackSlot)
+    protected bool CooldownReady(int attackSlot = DefaultAttackSlot) => CooldownReady(attackSlot, 1f);
+
+    /// <summary>쿨을 <paramref name="scale"/> 배로 줄여 본다(23호 원거리 압박 — PLAN-boss-aggro §3.3). 기록된 쿨 값은 그대로.</summary>
+    protected bool CooldownReady(int attackSlot, float scale)
     {
         if (attackSlot < 0 || attackSlot >= _lastUsedByAttack.Length)
             attackSlot = DefaultAttackSlot;
 
-        return Time.time - _lastUsedByAttack[attackSlot] >= EffectiveCooldown(attackSlot);
+        return Time.time - _lastUsedByAttack[attackSlot] >= EffectiveCooldown(attackSlot) * Mathf.Max(0f, scale);
     }
 
     // 슬롯의 실제 쿨 길이. 저작값이 0 이하면 base 간격(data.attackCooldown)으로 폴백한다.

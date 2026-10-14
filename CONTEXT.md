@@ -8,6 +8,12 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-10-14 · 경석(Claude) · **23호 위협 어그로 + 일반 몬스터 추적 해제**, 브랜치 `feature/Boss23`) — 계획 [PLAN-boss-aggro.md](PLAN-boss-aggro.md) ✅ 승인(10-14) · ✅ 구현·커밋 · 컴파일 error CS 0 · 전투 EditMode 176/0(신규 27) · 보스 패턴 10/0 · ✅ 팀장 Play 확인(10-14)
+- 정정: Gauntlet·Spinner·WallBot 은 중간보스(`rank 1`)라 `loseTargetRadius` 0 — 적용 = 일반 7종.
+- `MonsterDataSO.loseTargetRadius`·`BossDataSO.threat*`·`farPressure*` 는 xlsx 에 행이 없어 SO 값으로 돈다(테이블 반영은 병합 Export 때).
+- `169da399`: 레이드 장판 상시화(①③ 교차 · ②④ A/B · 간격 4.2초) · ④ 자폭 HP 피해 90% 감소 · ② 송전탑 HP ×2. 이어서 ④ 자폭 30초 · 게이지 750(1인, 300 → 750 — 팀장 "너무 빨리 파훼").
+- ✅ 동시 수정 잠금 해제(10-14 커밋·푸시). 고친 곳: `Monster/Boss/TwentyThreeBoss.cs` · `BossAggroPolicy.cs` · `BossDataSO.cs` · 신규 `BossThreatTable.cs` · `Monster/MonsterBase.cs` · `MonsterDataSO.cs` · `MonsterPerceptionPolicy.cs` · `2.Prefabs/Monster/Data/` 일반 몬스터 7종 `.asset` · 테스트.
+
 ## ▶▶ 다음 세션 (경석) — 팀장이 `feature/Boss23` Play 테스트 후 지시. 지금 상태 = development 에 병합·푸시(10-14), SVN **r436**(핀 436).
 - ✅ 10-14 `origin/development`(사운드 동기화 5커밋, PR #31·#32) 병합 — 충돌은 이 파일만. 사운드 데이터가 SVN 으로 이동해 **`Assets/51.Audio` 를 `^/4_Resources/Sound` r436 으로 체크아웃**(이 PC 는 처음, 이전엔 빈 폴더). 옮겨진 13개 .meta guid 동일 · 컴파일 error CS 0 · ⏳ BGM·UI_Click Play 청취 미확인.
 - 테스트 대상: 레이드 ①~④(④ 실패 즉사기·자막 3종) · 점검 수정 17건 + P1(공격 슈퍼아머 해제)·P2(송전탑 상승 여유)·P3(레이지 예고)·P4(방전 유지) — 전부 **Play 미확인**.

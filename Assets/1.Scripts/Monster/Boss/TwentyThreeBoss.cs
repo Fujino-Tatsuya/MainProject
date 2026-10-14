@@ -302,6 +302,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         _lastSectionTime = Time.time;
         _fightPlayerDamage = 0;
         _fightCounters = _fightSuppressions = 0;
+        _fightAggroSwitches = _fightFarPressureAttacks = 0;
         FightLog($"개전 — {(IsRaid ? "레이드" : "기존")} · 인원 {_partySize} · 최대 HP {FinalMaxHp}");
     }
 
@@ -313,7 +314,8 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         Debug.Log(
             $"[23호/전투기록] {(IsRaid ? "레이드" : "기존")} · 인원 {_partySize} · {ending}\n" +
             $"  총 {dur / 60f:0.0}분({dur:0}s) · 플레이어 피해 합 {_fightPlayerDamage} · 평균 DPS {_fightPlayerDamage / dur:0.0} · " +
-            $"간파 {_fightCounters}회 · 제압 {_fightSuppressions}회 · 남은 HP {CurrentHealth}/{FinalMaxHp}\n" +
+            $"간파 {_fightCounters}회 · 제압 {_fightSuppressions}회 · 위협 어그로 교체 {_fightAggroSwitches}회 · " +
+            $"원거리 압박 공격 {_fightFarPressureAttacks}회 · 남은 HP {CurrentHealth}/{FinalMaxHp}\n" +
             _fightLog, this);
         _fightStartTime = -1f;
     }
@@ -705,11 +707,90 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     protected override bool RetargetAvoidsCurrentTarget =>
         _boss != null && _boss.aggroAvoidsRepeatTarget;
 
+    // ─── 위협 어그로(PLAN-boss-aggro §3.1~3.2, 팀장 10-14) ─────────────────────
+    // 점수 = 보스 HP 에 실제로 들어간 플레이어 피해(ReceiveAttack). 키 = 플레이어 Transform InstanceID.
+    readonly BossThreatTable _threat = new BossThreatTable();
+    readonly Dictionary<int, Transform> _threatTargets = new Dictionary<int, Transform>();
+    Transform _aggroHeldTarget;   // 마지막으로 본 어그로 대상 — 바뀐 순간 _aggroHeldSince 를 새로 센다
+    float _aggroHeldSince;
+    float _nextThreatEvalTime;
+    int _fightAggroSwitches, _fightFarPressureAttacks;
+    const float ThreatEvalInterval = 0.25f;
+
+    // 원거리 압박(§3.3) — SelectAttackSlot 의 룰렛이 이번에 켰는가. 고른 공격의 조준(ResolveAttackTarget)이 읽는다.
+    // 룰렛 밖(각본·예약)에서 고른 공격은 false 로 남는다.
+    bool _farPressure;
+
+    static bool IsFarPressureRow(BossAttackEntry e) =>
+        e != null && (e.attackId == BossAttackId.Jump || e.attackId == BossAttackId.Dash);
+
+    bool ThreatAggroOn => _boss != null && _boss.threatAggro;
+
+    void ResetThreat()
+    {
+        _threat.Clear();
+        _threatTargets.Clear();
+        _aggroHeldTarget = null;
+        _nextThreatEvalTime = 0f;
+    }
+
+    void RecordThreat(AttackHitContext ctx, int damage)
+    {
+        if (!ThreatAggroOn || damage <= 0) return;
+        Player p = ctx.sourceUnit as Player;
+        if (p == null && ctx.sourceTransform != null) p = ctx.sourceTransform.GetComponentInParent<Player>();
+        if (p == null) return;
+
+        int id = p.transform.GetInstanceID();
+        _threatTargets[id] = p.transform;
+        _threat.HalfLife = _boss.threatHalfLife;
+        _threat.Add(id, damage, Time.time);
+    }
+
+    /// <summary>
+    /// [서버] 위협 1등에게 갈아탈지 본다. 반환 = 위협 규칙이 어그로를 쥐고 있는가
+    /// (누군가 <c>threatMinScore</c> 를 넘었다) — 그동안은 8초 주기 재선정을 쉬게 한다.
+    /// </summary>
+    bool TickThreatAggro()
+    {
+        if (!ThreatAggroOn) return false;
+
+        Transform current = Target;
+        if (current != _aggroHeldTarget) { _aggroHeldTarget = current; _aggroHeldSince = Time.time; }
+
+        _threat.HalfLife = _boss.threatHalfLife;
+        bool hasTop = _threat.TryGetTop(IsThreatCandidate, Time.time, out int topId, out float topScore);
+        bool engaged = hasTop && topScore >= _boss.threatMinScore;
+        if (!engaged) return false;
+
+        if (Time.time < _nextThreatEvalTime) return true;
+        _nextThreatEvalTime = Time.time + ThreatEvalInterval;
+
+        if (!BossAggroPolicy.CanSwitchNow(State)) return true;
+        if (!_threatTargets.TryGetValue(topId, out Transform top) || top == null || top == current) return true;
+
+        float currentScore = current != null ? _threat.Score(current.GetInstanceID(), Time.time) : 0f;
+        if (!BossThreatTable.ShouldSwitch(currentScore, topScore, Time.time - _aggroHeldSince,
+                                          _boss.threatSwitchRatio, _boss.threatMinHold, _boss.threatMinScore))
+            return true;
+
+        _fightAggroSwitches++;
+        AdoptAggro(top, $"위협 1등({topScore:0} vs 현재 {currentScore:0})");
+        return true;
+    }
+
+    bool IsThreatCandidate(int id) =>
+        _threatTargets.TryGetValue(id, out Transform t) && t != null && MonsterTargeting.IsAttackable(t);
+
     protected override bool ShouldReacquireTarget()
     {
         // 🔴 교전 시작 전(-1)에는 재선정하지 않는다 — base 와 같은 규약.
         //    이 가드가 없으면 `Time.time - (-1)` 이 항상 주기를 넘겨 첫 틱에 어그로가 튄다.
         if (_lastRetargetTime < 0f) return false;
+
+        // 위협 규칙이 쥐고 있으면(누가 충분히 때렸다) 교체는 거기서 이미 했다 — base 의 최근접 재선정은 쉰다.
+        // 아무도 점수가 없을 때(개전 직후·휴식)만 아래 8초 주기가 돈다(PLAN-boss-aggro §3.2).
+        if (TickThreatAggro()) return false;
 
         float interval = _boss != null ? _boss.aggroRetargetInterval : 0f;
         if (!BossAggroPolicy.ShouldRetarget(State, Time.time - _lastRetargetTime, interval))
@@ -734,6 +815,8 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         if (!AdoptTarget(t)) return;
 
         _lastRetargetTime = Time.time;
+        _aggroHeldTarget = t;          // 위협 교체 최소 유지 시계도 여기서 새로 센다(PLAN-boss-aggro §3.2)
+        _aggroHeldSince = Time.time;
         Edit.Log($"[23호/어그로] {reason} → {t.name} 로 승계 (다음 주기 재선정까지 " +
                  $"{(_boss != null ? _boss.aggroRetargetInterval : 0f)}초)", this);
     }
@@ -830,6 +913,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         //    스냅을 끝낸 뒤 부르는 단일 전환점이라 "착지 완료 = 전투 시작"과 정확히 일치한다.
         //    안 하면 초기값 0 때문에 첫 틱에 재선정이 돌아 어그로가 착지하자마자 튄다.
         _lastRetargetTime = Time.time;
+        ResetThreat();   // 위협 점수도 전투마다 새로 센다(재도전 시 지난 판 딜이 남지 않게)
 
         // 전기 장판·드론의 0초도 여기(기획: "전투 시작 후 4초/5초" = 착지 완료 기준).
         _fightActive = true;
@@ -856,6 +940,8 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         BossAttackEntry[] rows = _boss != null ? _boss.attacks : null;
         if (rows == null || rows.Length == 0)
             return base.SelectAttackSlot(dist);
+
+        _farPressure = false;   // 룰렛이 켤 때만 true(아래 3)
 
         // 🔴 페이즈 시퀀스 소비 지점. 이 함수는 Idle/Walk 에서만 불리므로 여기가 "행동이 끝난 직후"다
         //    (정본 §9 — 행동 도중 강제 중단 금지).
@@ -947,6 +1033,10 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         _inContactReach = BossContactReachPolicy.StaysInReach(
             _inContactReach, dist, data.attackRange, ContactReachExit(rows));
 
+        // 원거리 압박(PLAN-boss-aggro §3.3, 팀장 10-14: "원거리가 1등이면 거의 확실히 날아온다") —
+        // 어그로 대상이 멀면 점프·돌진의 쿨을 줄이고 가중치를 올린다. 대상은 ResolveAttackTarget 이 어그로로 바꾼다.
+        bool far = BossAggroPolicy.IsFarPressure(dist, _boss.farPressureDistance);
+
         // 1) 게이트 3단: 페이즈 → 거리창 → 쿨다운. 셋 다 통과 + 가중치 > 0 인 것만 후보다.
         int candidates = 0;
         int fallbackSlot = NoAttack;
@@ -967,9 +1057,10 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
                 if (dist < e.minDistance || dist > max) continue;
             }
 
-            if (!CooldownReady(i)) continue;
+            bool pressured = far && IsFarPressureRow(e);
+            if (!CooldownReady(i, pressured ? _boss.farPressureCooldownScale : 1f)) continue;
 
-            _weightBuffer[i] = e.weight;
+            _weightBuffer[i] = pressured ? e.weight * _boss.farPressureWeightMultiplier : e.weight;
             candidates++;
             fallbackSlot = i;
         }
@@ -1001,16 +1092,19 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
             total += _weightBuffer[i];
 
         // repeatPenalty 가 0 이고 후보가 직전 공격 하나뿐이면 합이 0 이 된다 — 멈추지 않도록 그 후보를 쓴다.
-        if (total <= 0f)
-            return fallbackSlot;
-
-        float roll = Random.value * total;
-        for (int i = 0; i < rows.Length; i++)
+        int picked = fallbackSlot; // 부동소수 잔차 안전망
+        if (total > 0f)
         {
-            roll -= _weightBuffer[i];
-            if (roll < 0f) return i;
+            float roll = Random.value * total;
+            for (int i = 0; i < rows.Length; i++)
+            {
+                roll -= _weightBuffer[i];
+                if (roll < 0f) { picked = i; break; }
+            }
         }
-        return fallbackSlot; // 부동소수 잔차 안전망
+
+        _farPressure = far && picked >= 0 && picked < rows.Length && IsFarPressureRow(rows[picked]);
+        return picked;
     }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -1151,6 +1245,12 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         //    보므로, 최원거리 대상을 노리는 공격은 그 **전에** 어그로를 옮겨야 엉뚱한 데를 향해 나간다.
         //    (점프는 체공 중 착지점을 따로 잡아 티가 안 났지만, 돌진은 방향이 곧 공격이라 치명적이다.)
         //    노린 사람이 어그로를 가져가는 규약은 점프와 같다 — 응징 대상이 압박을 계속 받는다.
+        if (_farPressure && IsFarPressureRow(e))
+        {
+            _fightFarPressureAttacks++;
+            Edit.Log($"[23호/어그로] 원거리 압박 — {e.attackId} → {(Target != null ? Target.name : "없음")}", this);
+        }
+
         if (e != null && e.attackTargeting == BossAttackTargeting.FarthestPlayer)
         {
             Transform aimed = ResolveAttackTarget(e);
@@ -3133,6 +3233,11 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     /// </summary>
     Transform ResolveAttackTarget(BossAttackEntry entry)
     {
+        // 원거리 압박이 켠 점프·돌진은 **어그로 대상**(= 위협 1등이 멀리 있는 사람)을 노린다(PLAN-boss-aggro §3.3).
+        // 멀리 있는 사람이 둘이면 최원거리가 아니라 딜 1등에게 간다.
+        if (_farPressure && IsFarPressureRow(entry) && Target != null)
+            return Target;
+
         if (entry != null && entry.attackTargeting == BossAttackTargeting.FarthestPlayer)
         {
             Player farthest = FindFarthestPlayer();
@@ -5328,7 +5433,11 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
 
         // 실패든 성공이든 데미지는 정상 처리된다 — 카운터 실패에 패널티는 없다(확정 스펙).
         bool resolved = base.ReceiveAttack(attackInfo, hitContext);
-        if (IsServer && resolved && IsFromPlayer(hitContext)) _fightPlayerDamage += attackInfo.damage;
+        if (IsServer && resolved && IsFromPlayer(hitContext))
+        {
+            _fightPlayerDamage += attackInfo.damage;
+            RecordThreat(hitContext, attackInfo.damage);   // 위협 = HP 에 실제로 들어간 값(제압·자폭 감소 반영 후)
+        }
 
         // ④ 자폭 중 플레이어 피해 = 공동 게이지 감소(피해만으로도 저지 가능 — 팀장 10-14).
         if (selfDestructHit && resolved)
