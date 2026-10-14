@@ -609,7 +609,7 @@ public sealed class BossEncounterDirector : NetworkBehaviour
         _resultTransitionAt = 0d;
 
         for (int i = BossChargingPylon.Active.Count - 1; i >= 0; i--)
-            BossChargingPylon.Active[i]?.EndCharge();
+            if (BossChargingPylon.Active[i] != null) BossChargingPylon.Active[i].EndCharge();   // ?. 는 파괴된 Unity 객체를 못 거른다
 
         SetPhase(BossEncounterPhase.Idle);
         Edit.Log("[BossEncounter] 재도전 리셋 — 보스 디스폰·페이즈 Idle. 다음 보스방 도착 때 새로 스폰한다.", this);

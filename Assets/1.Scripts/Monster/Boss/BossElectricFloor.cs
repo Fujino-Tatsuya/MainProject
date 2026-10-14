@@ -157,7 +157,9 @@ public sealed class BossElectricFloor : MonoBehaviour
     void Transition(Mode to)
     {
         Mode from = _mode;
-        Clear();   // 진행 중 예고·VFX 제거(§5.4 · §8) — 발동 전이면 공격도 안 나간다
+        Clear();
+        // 방전 요청은 Raid 모드에서만 유효 — 멈춤(전원 유령 등) 중 들어온 요청이 남아 나중 Raid(④) 첫 틱에 옛 마스크로 터지던 것(점검 10-14).
+        if (to != Mode.Raid) _dischargePending = false;   // 진행 중 예고·VFX 제거(§5.4 · §8) — 발동 전이면 공격도 안 나간다
         if (from == Mode.Charge) _patterns.ResetCharge();
         _mode = to;
 

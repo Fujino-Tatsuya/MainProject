@@ -195,7 +195,9 @@ public class SpinnerBot : MonsterBase
         }
 
         _lastSpinTime = Time.time;
-        _dashDir = transform.forward;   // FaceTarget 후 전방 = 돌진 방향(고정)
+        // 🔴 base 의 FaceTarget 은 감속 회전 한 틱(~16%)이라 어중간한 각도로 돌진이 굳었다 — WallBot 과 같은 수정(점검 10-14).
+        FaceTargetImmediate();
+        _dashDir = transform.forward;   // 즉시 조준 후 전방 = 돌진 방향(고정)
         _dashTarget = ResolveDashTarget(transform.position);
         if (ov != null) _dashTarget = ov.ClampDashTarget(_dashTarget);
 

@@ -395,6 +395,15 @@ public class MonsterBase : Unit
         {
             // 진행 중이던 이동·공격을 정리하고 대기 자세로 내려놓는다 — 연출이 끝난 뒤
             // 반쯤 진행된 공격 체인이 되살아나지 않게.
+            // 🔴 넉백 중이면 에이전트가 꺼져 있다(TryEnterKnockback) — Idle 로 바꾸면 ExitKnockback 을 건너뛰어 재개 후에도
+            //    추격·돌진이 전부 막혔다(튜토리얼 스피너 연습 → 본 모드 전환, 점검 10-14). 휴면(SetDormantServer)과 같은 복구.
+            //    넉백일 때만 — 보스 등장 연출은 일부러 에이전트를 끈 채 정지를 건다(BossEncounterDirector).
+            if (State == MonsterState.Knockback && agent != null && !agent.enabled)
+            {
+                agent.enabled = true;
+                if (!agent.isOnNavMesh && NavMesh.SamplePosition(transform.position, out NavMeshHit hit, 1f, NavMesh.AllAreas))
+                    agent.Warp(hit.position);
+            }
             ClearReposition();
             StopAgent();
             SetState(MonsterState.Idle);
@@ -444,6 +453,7 @@ public class MonsterBase : Unit
             ClearReposition();
             StopAgent();
             _target = null;
+            _aimGate?.CancelAiming();   // 휴면 터렛 조준선 제거(점검 10-14)
             _counterVisualOffAt = -1f;
             SetCounterVisual(false);
             SetState(MonsterState.Idle);
@@ -534,6 +544,7 @@ public class MonsterBase : Unit
         {
             StopAgent();
             _inAttackRange = false;
+            _aimGate?.CancelAiming();   // Idle→Idle 이면 상태 콜백이 안 불려 조준이 남는다(Codex 점검 10-14)
             SetState(MonsterState.Idle);
             return;
         }
@@ -1290,7 +1301,7 @@ public class MonsterBase : Unit
         var point = new Vector3(feet.x, floorY, feet.z);
         float radius = Mathf.Max(0.1f, data.projectileSplashRadius);
         float duration = AttackTime(data.skyStrikeTelegraphTime);
-        double impact = NetworkManager.ServerTime.Time + duration;
+        double impact = MonsterSkyStrike.Now + duration;   // 착탄 판정·연출과 같은 시계(GameNow — 슬로우 반영)
 
         int damage = rangedAttack != null ? rangedAttack.Damage : data.attackDamage;
         LayerMask mask = rangedAttack != null ? rangedAttack.TargetLayer : playerMask;
@@ -2092,6 +2103,15 @@ public class MonsterBase : Unit
         //    상태를 빠져나간 뒤에 뒤늦게 애니메이터를 얼려 버린다.
         if (next != MonsterState.Groggy)
             ApplyReleaseActionPose();
+
+        // 터렛 조준선 — 사망·대상 소실·휴면(전부 Dead/Idle 로 온다)에서 끈다. 끄는 곳이 SeekTurret 한 곳뿐이라
+        // 시체·휴면 터렛에 선이 남고, 다음 대상에게는 추적 없이 낡은 방향으로 즉시 쐈다(점검 10-14).
+        if (IsServer && (next == MonsterState.Dead || next == MonsterState.Idle))
+            _aimGate?.CancelAiming();
+
+        // 몸 콜라이더 — 서버(EnterDead)만 끄면 이동 권한이 있는 원격 플레이어가 디졸브 동안 시체에 막힌다(점검 10-14).
+        if (next == MonsterState.Dead && bodyCollider != null)
+            bodyCollider.enabled = false;
 
         // 블렌드 고정·준비는 CrossFade(ResetToLocomotion)·트리거(PlayStateAnimation)보다 먼저 정한다.
         UpdateLocomotionBlendOnStateChange(previous, next);

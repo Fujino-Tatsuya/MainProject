@@ -264,7 +264,7 @@ public class BossDataSO : MonsterDataSO
     [Header("레이드 변형 (PLAN-boss-raid.md) — 기본값 = 꺼짐, 기존 No23 은 건드리지 않는다")]
     [Tooltip("인원별 최대 HP 배수. [0] = 1인, [1] = 2인, [2] = 3인(넘으면 마지막 값). maxHp 는 **1인 기준**으로 저작한다.\n" +
              "비우면 보정 없음(기존 동작). 인원 = 보스방 도착 시 생존 참가자(BossEncounterDirector 스냅샷).\n" +
-             "시작 가설 1 / 2.4 / 4.2 — 목표 전투 시간 1인 5분 · 3인 7분(팀장 10-14)에서 DPS 가 인원에 비례한다고 놓고 역산. W4 실측으로 조정.")]
+             "현재 No23_Raid = 1 / 2.5 / 4.55 · 1인 2880(팀장 10-14 '체력 적다' 상향). 처음엔 1인 5분 · 3인 7분 목표로 1 / 2.4 / 4.2 를 역산했다.")]
     public float[] partyHpMultipliers = new float[0];
 
     [Tooltip("이 보스와 싸우는 동안 플레이어가 한 번에 받는 피해의 상한(플레이어 최대 HP 비율). 0 = 상한 없음(기존 동작).\n" +
@@ -295,7 +295,7 @@ public class BossDataSO : MonsterDataSO
     [Min(3f)] public float raidSelfDestructTime = 20f;
 
     [Tooltip("게이지 100 → 0 에 필요한 플레이어 피해 합(1인 기준 — partyHpMultipliers 를 똑같이 곱한다).\n" +
-             "피해만으로 깰 수 있어야 한다(팀장 10-14). 1인 HP 2400 의 20% = 480 이 남은 시점이라 그보다 작게 둔다. W4 실측 조정.")]
+             "피해만으로 깰 수 있어야 한다(팀장 10-14). 1인 HP 2880 의 20% = 576 이 남은 시점이라 그보다 작게 둔다. 측정 플레이로 조정.")]
     [Min(1)] public int raidSelfDestructGaugeDamage = 300;
 
     [Tooltip("자폭 중 간파 성공 1회가 깎는 게이지(%p). 간파는 필수가 아니라 큰 보너스(팀장 10-14).")]

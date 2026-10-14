@@ -275,6 +275,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     bool _raidCharge;               // 지금 도는 송전기가 ② 전력 공급(드론 유도·방전)인가. 끄는 곳 = TickCharge 결과 · AbortAttackChain
     float _raidFloorHoldUntil;      // 방전 예고·발동이 끝날 때까지 상시 장판을 붙잡아 둔다
     readonly List<Vector2Int> _safeTileScratch = new List<Vector2Int>(4);
+    readonly List<BossChargingPylon> _raidEngagedPylons = new List<BossChargingPylon>(4);   // 이번 ② 에서 올라온 탑(방전 안전 칸 후보)
     bool IsRaid => _boss != null && _boss.raidScript;
 
     // ③ 새 가족(구출) — 다음에 낼 각본 공격(잡기/1인 돌진)과, 그 공격이 진행 중인가. 끄는 곳 = 성공·헛잡기·FinishChain·AbortAttackChain
@@ -858,7 +859,8 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
 
         // 🔴 페이즈 시퀀스 소비 지점. 이 함수는 Idle/Walk 에서만 불리므로 여기가 "행동이 끝난 직후"다
         //    (정본 §9 — 행동 도중 강제 중단 금지).
-        while (_pendingPhaseSequences.Count > 0)
+        // 🔴 ③ 구출 예약이 남아 있으면(사거리·간격 대기) 큐를 꺼내지 않는다 — 꺼내면 다음 틱에 ④ 가 구출보다 먼저 나갔다(Codex 점검 10-14).
+        while (!_raidRescueNext.HasValue && _pendingPhaseSequences.Count > 0)
         {
             BossPhaseSequence pending = _pendingPhaseSequences.Dequeue();
             if (pending == BossPhaseSequence.ChargeSequence)
@@ -890,7 +892,8 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
             {
                 _raidRescueNext = BossRaidRules.RescueAttackFor(CountAlivePlayers());
                 Debug.Log($"[23호/레이드] 새 가족 — 각본 {_raidRescueNext.Value} 예약", this);
-                continue;
+                // 🔴 break — continue 면 같은 루프에서 뒤의 ④ 가 먼저 나간다(한 방에 45%·20% 를 넘긴 경우, 점검 10-14).
+                break;
             }
 
             // ④ 폐기 처분 — 송전기 흐름을 자폭으로(탑 없음, _raidSelfDestruct 로 분기).
@@ -1102,6 +1105,8 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
 
         _raidRescueNext = null;
         _raidRescueActive = true;
+        // 취약이면 간파 판정이 막히고 간파 스킬이 넉백으로 체인을 끊어 ③ 이 성공도 실패도 없이 사라진다(점검 10-14) → 끝낸다.
+        if (IsVulnerable) EndVulnerable("③ 각본 시작");
         ShowRaidSubtitleServer(next == BossAttackId.Grab ? "BOSS_RAID_RescueGuide" : "BOSS_RAID_OpeningDash");
         Debug.Log($"[23호/레이드] 새 가족 — {next} 발동(간파·헛잡기 = 제압)", this);
         return slot;
@@ -1154,6 +1159,11 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
 
         // 쿨 기록(CurrentAttackSlot) + _stateTimer(데드락 타임아웃) + StopAgent + FaceTarget + SetState(Attack).
         base.StartAttack();
+
+        // 🔴 base 의 FaceTarget 은 **감속 회전 한 틱**이라 새로 정한 최원거리 대상 쪽으로 다 못 돈 채 돌진 방향·예고 띠가 굳었다
+        //    (점검 10-14 — "후열 응징"이 엉뚱한 방향으로 나감). 레이지와 같이 즉시 조준한다.
+        if (e != null && e.attackTargeting == BossAttackTargeting.FarthestPlayer)
+            FaceTargetImmediate();
 
         // 다단계 체인은 관용구 3 대로 base 의 종료 타이머를 **체인 전체 길이**로 덮어쓴다
         // — 안 늘리면 attackDuration 이 만료돼 다음 단계에 들어가기도 전에 Attack 을 벗어난다.
@@ -1440,7 +1450,9 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
             Vector3 fwd = transform.forward; fwd.y = 0f;
             if (fwd.sqrMagnitude < 0.0001f) fwd = Vector3.forward;
             fwd.Normalize();
-            Vector3 origin = transform.position
+            Vector3 strikeBase = _lungeStrikeBaseValid ? _lungeStrikeBase : transform.position;
+            strikeBase.y = transform.position.y;
+            Vector3 origin = strikeBase
                            + Vector3.Cross(Vector3.up, fwd) * e.boxLateralOffset
                            - fwd * e.boxBackOffset;
             return meleeAttack.HitBox(origin, fwd, e.boxWidth, e.boxLength);
@@ -1448,7 +1460,10 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
 
         if (e == null || e.coneRadius <= 0f) return meleeAttack.Hit();
 
-        return meleeAttack.HitCone(transform.position, ConeForward(e), e.coneRadius, e.coneAngle);
+        // 부채꼴 꼭짓점도 예고처럼 전진 끝점(막혀 덜 갔으면 그래도 예고 자리).
+        Vector3 coneBase = _lungeStrikeBaseValid ? _lungeStrikeBase : transform.position;
+        coneBase.y = transform.position.y;
+        return meleeAttack.HitCone(coneBase, ConeForward(e), e.coneRadius, e.coneAngle);
     }
 
     /// <summary>
@@ -2304,11 +2319,8 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         if (_grabbed.NetworkObject != null)
             StartGrabbedElectricClientRpc(_grabbed.NetworkObject);
 
-        // 🔴 [G6] **여기서 인터럽트 창이 열린다.** 끌어당기는 동안에는 못 끊고, 실제로 붙잡은
-        //    뒤부터 3번째 내려치기 직전까지만 열려 있다(팀장 확정 C10).
-        //    창을 닫는 곳은 둘이다 — 마지막 내려치기(AdvanceGrabSlam)와 이탈(AbortAttackChain).
-        //    ⚠️ 데이터가 창을 끈 공격이면 열지 않는다(`opensCounterWindow`).
-        if (_currentEntry != null && _currentEntry.opensCounterWindow) SetCounterWindow(true);
+        // ⚠️ 인터럽트 창은 여기서 열지 않는다 — 실제로 낚아챈 뒤(AttachGrabbed)부터다(팀장 확정 C10).
+        //    여기서도 열던 줄이 남아 있어 낚아채기 전(Acquire ~0.8초)에 간파가 성립했고 취약 검사도 건너뛰었다(점검 10-14).
 
         // 붙잡는 모션 → (Acquire 구간) → 지짐이.
         CrossFadeGrabCycleStateClientRpc(GrabCycleState.Catch);
@@ -2331,6 +2343,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         if (target == null || !IsGrabbedValid())
         {
             StopGrabPulseClientRpc();
+            StopGrabbedElectricClientRpc();   // AcquireGrab 에서 켰다 — 여기서 안 끄면 몸에 남는다(점검 10-14)
             _grabbed = null;
             EnterPhase(BossAttackPhase.Recovery, GrabRecovery);
             return;
@@ -2341,6 +2354,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         if (!target.BeginGrabbedByInstigator(gameObject))
         {
             StopGrabPulseClientRpc();
+            StopGrabbedElectricClientRpc();
             _grabbed = null;
             EnterPhase(BossAttackPhase.Recovery, GrabRecovery);
             return;
@@ -2414,6 +2428,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         {
             StopGrabPulseClientRpc();
             StopGrabbedElectricClientRpc();
+            SetCounterWindow(false);
             _grabbed = null;
             EnterPhase(BossAttackPhase.Recovery, GrabRecovery);
             return;
@@ -2506,6 +2521,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         // 손에서 대상이 떠나는 순간 전기도 끊는다.
         StopGrabPulseClientRpc();
         StopGrabbedElectricClientRpc();
+        SetCounterWindow(false);   // 대상 소멸로 일찍 놓을 때 창이 열린 채 놓기·복귀로 넘어가 공짜 간파가 됐다(점검 10-14)
 
         _grabbed = null;
         CrossFadeGrabCycleStateClientRpc(GrabCycleState.End);
@@ -2618,6 +2634,14 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         //    카운터·사망으로 돌진이 끊기면 플레이어가 이동 권한을 잃은 채 영구히 갇힌다.
         //    (해제 없이 보스가 죽으면 아무도 풀어 줄 수 없다.)
         ReleaseDashCarry(applyImpact: false);
+
+        // 일반 돌진 도중 끊기면(사망·연출 정지·휴면) 가속도 999·정지거리 0·자동감속 꺼짐과 열린 히트 윈도우가 남아
+        // 다음 추격이 초고속이 됐다 — 레이지(StopRageDash)·전진(EndLunge)에만 있던 정리를 일반 돌진에도(Codex 점검 10-14).
+        if (_attackPhase == BossAttackPhase.Dash)
+        {
+            EndDashMove();
+            meleeAttack?.EndHitWindow();
+        }
 
         // 🔴 Jump: 체공 중 끊기면(카운터·사망) **메시가 꺼진 채로 남아 보스가 투명해진다.**
         //    예고 장판도 바닥에 영구히 남는다. 둘 다 여기서 되돌린다.
@@ -3985,6 +4009,11 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         }
 
         _charge?.Begin(_chargePylons, ChargeTimeLimit);
+        // ② 이번에 올라온 탑을 기억한다 — WasDestroyed 는 올라오는 탑만 리셋되므로 전체를 보면 지난 판(재도전 전) 파괴가 섞인다(점검 10-14).
+        _raidEngagedPylons.Clear();
+        if (_raidCharge)
+            foreach (BossChargingPylon p in BossChargingPylon.Active)
+                if (p != null && p.IsEngaged) _raidEngagedPylons.Add(p);
         SpawnChargeZone();
         BeginChargeAura();
 
@@ -4145,7 +4174,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     {
         _safeTileScratch.Clear();
         if (TryGetTileGrid(out BossTileGrid grid))
-            foreach (BossChargingPylon p in BossChargingPylon.Active)
+            foreach (BossChargingPylon p in _raidEngagedPylons)
                 if (p != null && p.WasDestroyed)
                     _safeTileScratch.Add(NearestTile(grid, p.transform.position));
         return BossRaidRules.DischargeMask(_safeTileScratch);
@@ -4180,7 +4209,10 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
 
     /// <summary>[서버] 상시 전기 장판을 붙잡아 둘 때(레이드): ① 구간 · ② 전력 공급 · ④ 자폭 진행 · 방전/대폭발 처리 중.</summary>
     public bool IsRaidFloorHeld =>
-        IsRaid && (CurrentPhase == 0 || _raidCharge || _raidSelfDestruct || Time.time < _raidFloorHoldUntil);
+        IsRaid && (CurrentPhase == 0 || _raidCharge || _raidSelfDestruct || IsRaidRescueHold || Time.time < _raidFloorHoldUntil);
+
+    /// <summary>[서버] ③ 새 가족 각본이 예약·진행 중 — 상시 장판·드론을 멈춘다(PLAN §2 "각본 중 상시 공격 정지").</summary>
+    public bool IsRaidRescueHold => _raidRescueActive || _raidRescueNext.HasValue;
 
     // ─── ④ 폐기 처분 — 자폭 카운트다운 + 공동 게이지 ─────────────────────────
     // 게이지 = 간파 게이지(_counterGauge) 재사용 — 보스 HP 바 아래에 이미 보인다(BossHealthHUD). 새 UI 없음.
@@ -4685,6 +4717,10 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         //    두므로, 다음 틱의 도착 판정이 즉시 성립해 안전하게 끝난다.
         StartDashMove(dir, Mathf.Max(0.1f, e.lungeSpeedMultiplier), e.lungeDistance);
         _lunging = true;
+        // 판정 기준점 = 예고가 그린 **전진 끝점**. 앞에 플레이어가 붙으면 전진이 멈춰(PlayerBlocksLunge) 현재 위치가
+        // 끝점에 못 미치고, 그 자리에서 판정하면 네모가 보스 뒤 2m 까지 밀려 예고 밖 백어택 위치를 때렸다(점검 10-14).
+        _lungeStrikeBase = transform.position + dir * e.lungeDistance;
+        _lungeStrikeBaseValid = true;
 
         // 이미 앞에 플레이어가 붙어 있으면 전진하지 않는다(파고들면 플레이어가 못 빠져나간다 — 아래 TickLunge).
         if (PlayerBlocksLunge(dir)) StopLungeMove();
@@ -4721,7 +4757,8 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
             // 🔴 **결과를 버리면 안 된다.** 경로에서 맞은 사람은 윈도우에 기록되므로 끝점 판정에서
             //    빠진다 → `StrikeMelee()` 가 0 을 돌려주고 **명중 연출이 통째로 안 나간다**
             //    (경로로만 맞힌 공격이 헛스윙처럼 보인다). 공격 단위로 누적해 둔다.
-            _lungePathHits += meleeAttack.HitCone(transform.position, transform.forward, pathRadius, 360f);
+            // 앞쪽 반원만 — 예고 띠는 전진 축 앞쪽만 그린다. 360° 면 보스 뒤 플레이어도 맞았다(점검 10-14).
+            _lungePathHits += meleeAttack.HitCone(transform.position, transform.forward, pathRadius, 180f);
         }
 
         // 🔴 앞에 플레이어가 닿으면 전진을 멈춘다(2026-09-28 팀장 Play). 보스·중간보스가 플레이어를 막게 된 뒤로
@@ -4773,9 +4810,13 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     // 공격 종료 — 이동과 히트 윈도우를 모두 정리한다.
     // 🔴 끝점 판정(meleeAttack.Hit())이 **끝난 뒤에** 불러야 한다. 먼저 부르면 경로에서 맞은 사람이
     //    끝점에서 또 맞는다(윈도우가 비워지므로). 호출부는 PerformAttackHit 과 AbortAttackChain 둘이다.
+    Vector3 _lungeStrikeBase;
+    bool _lungeStrikeBaseValid;
+
     void EndLunge()
     {
         StopLungeMove();
+        _lungeStrikeBaseValid = false;
 
         // 방향 고정은 **여기서** 푼다 — 도착(StopLungeMove)이 아니라 히트/이탈 시점이다.
         _attackFacingLocked = false;
@@ -5042,7 +5083,8 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
     }
 
     float ChargeTimeLimit => _boss == null ? 20f
-        : Mathf.Max(1f, _raidCharge ? _boss.raidChargeTimeLimit : _boss.chargeTimeLimit);
+        : Mathf.Max(1f, _raidSelfDestruct ? _boss.raidSelfDestructTime   // ④ — StartAttack 안전망 예산도 이 값을 쓴다
+                       : _raidCharge ? _boss.raidChargeTimeLimit : _boss.chargeTimeLimit);
     float RageDashDuration => _boss != null ? Mathf.Max(0.1f, _boss.rageDashDuration) : 0.7f;
     float RageDashInterval => _boss != null ? Mathf.Max(0f, _boss.rageDashInterval) : 0.5f;
     float RageDashSpeedMul => _boss != null ? Mathf.Max(1f, _boss.rageDashSpeedMultiplier) : 8f;

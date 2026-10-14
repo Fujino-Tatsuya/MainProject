@@ -53,10 +53,11 @@ public class MonsterRangedAttack : BaseAttack
     {
         if (direction.sqrMagnitude < 0.0001f) return;
         Vector3 origin = muzzle != null ? muzzle.position : transform.position;
-        Fire(origin + direction.normalized * Mathf.Max(1f, distance));
+        Fire(origin + direction.normalized * Mathf.Max(1f, distance), distance);
     }
 
-    public void Fire(Vector3 targetPoint)
+    /// <param name="maxDistance">직선 탄의 최대 비행 거리(0 = 수명만). 터렛은 조준선 길이(attackRange)를 넘겨 예고 밖으로 안 날아가게 한다.</param>
+    public void Fire(Vector3 targetPoint, float maxDistance = 0f)
     {
         if (!IsServer)
             return;
@@ -107,7 +108,10 @@ public class MonsterRangedAttack : BaseAttack
         }
         else
         {
-            proj.Launch(_ownerUnit, dir, projectileSpeed, damage, targetLayer, projectileLifetime);
+            // 조준선(예고) 끝에서 멈춘다 — 수명만 쓰면 14m/s × 4초 = 56m 를 날아 선 밖 플레이어가 예고 없이 맞았다(점검 10-14).
+            float life = projectileLifetime;
+            if (maxDistance > 0f && projectileSpeed > 0f) life = Mathf.Min(life, maxDistance / projectileSpeed);
+            proj.Launch(_ownerUnit, dir, projectileSpeed, damage, targetLayer, life);
         }
     }
 }

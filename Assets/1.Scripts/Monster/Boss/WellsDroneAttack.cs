@@ -89,7 +89,8 @@ public sealed class WellsDroneAttack : MonoBehaviour
         // 송전기는 점프 출발 순간부터 멈춘다(팀장 10-02) — 점프 이동 + 차징 대기 전체.
         // 🔴 레이드 ② 전력 공급 차징 대기 중엔 멈추지 않는다 — 드론 착탄이 송전탑을 부수는 기믹이다(PLAN-boss-raid §2).
         bool guide = _boss.IsRaidDroneGuideActive;
-        bool pause = (_boss.ActivePauseConditions & _d.pauseOn) != 0 || (_boss.IsChargeSequenceActive && !guide);
+        bool pause = (_boss.ActivePauseConditions & _d.pauseOn) != 0 || (_boss.IsChargeSequenceActive && !guide)
+                     || _boss.IsRaidRescueHold;   // ③ 새 가족 각본 중 정지(PLAN §2)
         if (pause)
         {
             if (!_paused)

@@ -133,7 +133,7 @@ public class BossChargeSequence : MonoBehaviour, IBossChargeSequence
         if (!IsServerRuntime()) return;
 
         for (int i = 0; i < _engaged.Count; i++)
-            _engaged[i]?.EndCharge();   // 멱등 — 어느 상태에서든 내려간다
+            if (_engaged[i] != null) _engaged[i].EndCharge();   // 멱등 — 어느 상태에서든 내려간다(?. 는 파괴된 Unity 객체를 못 거른다)
 
         _engaged.Clear();
         _running = false;
