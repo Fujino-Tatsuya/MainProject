@@ -97,6 +97,9 @@ public static class DataSourcePlayMode
             return;
         }
 
+        // Sound 시트에 새 엔트리를 넣고 동기화를 안 했으면 아래 오류(배열 범위 밖)의 원인을 먼저 알린다.
+        SoundSyncMenu.WarnIfPending("테이블 Play");
+
         if (!DataTableMenu.ReportIssues(result, "테이블 Play"))
         {
             // 진입 취소. 반쯤 적용된 상태가 생기지 않도록 아무것도 쓰기 전에 멈춘다.
