@@ -1081,10 +1081,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 3266214028858215260}
     m_Modifications:
-    - target: {fileID: 4166010961237340965, guid: 805666e4bd6168e458d1d87ab96bf904, type: 3}
-      propertyPath: m_Convex
-      value: 1
-      objectReference: {fileID: 0}
     - target: {fileID: 8214745199861796279, guid: 805666e4bd6168e458d1d87ab96bf904, type: 3}
       propertyPath: m_Name
       value: wall_corner_inside02_001
@@ -1129,8 +1125,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4166010961237340965, guid: 805666e4bd6168e458d1d87ab96bf904, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -2397,10 +2392,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 3266214028858215260}
     m_Modifications:
-    - target: {fileID: 4166010961237340965, guid: 805666e4bd6168e458d1d87ab96bf904, type: 3}
-      propertyPath: m_Convex
-      value: 1
-      objectReference: {fileID: 0}
     - target: {fileID: 8214745199861796279, guid: 805666e4bd6168e458d1d87ab96bf904, type: 3}
       propertyPath: m_Name
       value: wall_corner_inside02_001 (1)
@@ -2445,8 +2436,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4166010961237340965, guid: 805666e4bd6168e458d1d87ab96bf904, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -5078,10 +5068,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 3266214028858215260}
     m_Modifications:
-    - target: {fileID: 4166010961237340965, guid: 805666e4bd6168e458d1d87ab96bf904, type: 3}
-      propertyPath: m_Convex
-      value: 1
-      objectReference: {fileID: 0}
     - target: {fileID: 8214745199861796279, guid: 805666e4bd6168e458d1d87ab96bf904, type: 3}
       propertyPath: m_Name
       value: wall_corner_inside02_001 (2)
@@ -5126,8 +5112,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4166010961237340965, guid: 805666e4bd6168e458d1d87ab96bf904, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -8350,10 +8335,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 3266214028858215260}
     m_Modifications:
-    - target: {fileID: 4166010961237340965, guid: 805666e4bd6168e458d1d87ab96bf904, type: 3}
-      propertyPath: m_Convex
-      value: 1
-      objectReference: {fileID: 0}
     - target: {fileID: 8214745199861796279, guid: 805666e4bd6168e458d1d87ab96bf904, type: 3}
       propertyPath: m_Name
       value: wall_corner_inside02
