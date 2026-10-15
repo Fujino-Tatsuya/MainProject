@@ -129,6 +129,13 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
     private bool wasBlendingWithNonAttackState;
     private bool hasObservedAnimationState;
     private bool wasInAttackAnimationState;
+    // 다 돈 뒤 공격(할 일 43): SnapOnStart 단이 크게 꺾으면 TurnToward 가 도는 동안 클립 시작을 늦춘다.
+    // 판정·콤보 창·End 는 클립 이벤트라 같이 늦춰지고, 전진은 아래 플래그로 막는다.
+    // 지연은 서버가 정해 PlayDefaultAttackClientRpc 로 전 피어에 싣는다 — 첫 타는 오너가 잰 값(RequestStartAttackRpc).
+    private bool hasPendingAttackClip;
+    private float pendingAttackClipTime;
+    private bool pendingTriggerAttack;
+    private float pendingCrossFadeStartTime;
 
     public bool IsAttacking => player != null && player.CurrentState == PlayerActionState.Attack;
     public bool CanRequestStart => HasAttackSteps && CurrentStepDuration > 0f;
@@ -226,10 +233,12 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
         }
 
         Vector3 requestedDirection = GetCurrentAimDirection();
+        // 첫 타의 회전 지연은 오너의 몸 방향으로 잰다 — 서버 쪽 몸 방향은 NT 로 받은 늦은 값이다.
+        float turnDelay = GetTurnDelay(0, requestedDirection);
 
         if (!IsNetworkActive)
         {
-            StartAttackServer(0, requestedDirection, true);
+            StartAttackServer(0, requestedDirection, true, 0f, turnDelay);
             return true;
         }
 
@@ -237,8 +246,17 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
             return false;
 
         isRequestingAttack = true;
-        RequestStartAttackRpc(requestedDirection);
+        RequestStartAttackRpc(requestedDirection, turnDelay);
         return true;
+    }
+
+    private void Update()
+    {
+        if (hasPendingAttackClip && Time.time >= pendingAttackClipTime)
+        {
+            hasPendingAttackClip = false;
+            PlayAttackClip(pendingTriggerAttack, pendingCrossFadeStartTime);
+        }
     }
 
     public void BeginFromState()
@@ -368,7 +386,8 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
         if (IsNetworkActive && !IsServer)
             return;
 
-        if (!IsAttacking)
+        // 회전 대기 중 이벤트는 이 단이 아니라 직전 클립의 것이다.
+        if (!IsAttacking || hasPendingAttackClip)
         {
             return;
         }
@@ -488,7 +507,7 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
         }
 
         int stepIndex = IsAttacking ? currentAttackIndex : isFinishingAttackTail ? finishingAttackIndex : -1;
-        if (stepIndex < 0)
+        if (stepIndex < 0 || hasPendingAttackClip)
             return;
 
         if (!HasAttackStep(stepIndex))
@@ -548,7 +567,7 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
     }
 
     [Rpc(SendTo.Server)]
-    private void RequestStartAttackRpc(Vector3 requestedDirection, RpcParams rpcParams = default)
+    private void RequestStartAttackRpc(Vector3 requestedDirection, float requestedTurnDelay, RpcParams rpcParams = default)
     {
         if (rpcParams.Receive.SenderClientId != OwnerClientId)
             return;
@@ -560,7 +579,11 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
             return;
         }
 
-        StartAttackServer(0, requestedDirection, true);
+        // 각은 다시 재지 않고 상한만 자른다 — 지연이 길면 보낸 쪽만 손해다.
+        float turnDelay = attackSteps[0].RotationType == DefaultAttackRotationType.SnapOnStart
+            ? movement.ClampAttackTurnDelay(requestedTurnDelay)
+            : 0f;
+        StartAttackServer(0, requestedDirection, true, 0f, turnDelay);
     }
 
     [Rpc(SendTo.Server)]
@@ -577,7 +600,7 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
     }
 
     [ClientRpc]
-    private void PlayDefaultAttackClientRpc(int attackIndex, Vector3 direction, bool triggerAttack, float crossFadeStartTime)
+    private void PlayDefaultAttackClientRpc(int attackIndex, Vector3 direction, bool triggerAttack, float crossFadeStartTime, float turnDelay)
     {
         if (IsServer)
             return;
@@ -590,7 +613,7 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
             return;
         }
 
-        StartAttackPresentation(attackIndex, direction, triggerAttack, crossFadeStartTime);
+        StartAttackPresentation(attackIndex, direction, triggerAttack, crossFadeStartTime, turnDelay);
     }
 
     [ClientRpc]
@@ -614,7 +637,7 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
             isRequestingAttack = false;
     }
 
-    private void StartAttackServer(int attackIndex, Vector3 direction, bool triggerAttack, float crossFadeStartTime = 0f)
+    private void StartAttackServer(int attackIndex, Vector3 direction, bool triggerAttack, float crossFadeStartTime, float turnDelay)
     {
         if (!HasAttackStep(attackIndex))
         {
@@ -634,7 +657,7 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
         currentAttackIndex = attackIndex;
         attackDirection = ResolveAttackDirection(direction);
         queuedAttackDirection = attackDirection;
-        attackEndFallbackTime = Time.time + GetPlaybackDuration(step) + Mathf.Max(0f, endFallbackPadding);
+        attackEndFallbackTime = Time.time + turnDelay + GetPlaybackDuration(step) + Mathf.Max(0f, endFallbackPadding);
 
         int damageSnapshot = CalculateDamageSnapshot(step);
         playerDefaultAttack.PrepareStep(step, damageSnapshot, attackDirection);
@@ -645,13 +668,13 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
             player.RaiseServerBasicAttackStarted();   // 튜토리얼 훅 — 한 타 시작(적중 무관)
         }
 
-        StartAttackPresentation(attackIndex, attackDirection, triggerAttack, crossFadeStartTime);
+        StartAttackPresentation(attackIndex, attackDirection, triggerAttack, crossFadeStartTime, turnDelay);
 
         if (IsNetworkActive)
-            PlayDefaultAttackClientRpc(attackIndex, attackDirection, triggerAttack, crossFadeStartTime);
+            PlayDefaultAttackClientRpc(attackIndex, attackDirection, triggerAttack, crossFadeStartTime, turnDelay);
     }
 
-    private void StartAttackPresentation(int attackIndex, Vector3 direction, bool triggerAttack, float crossFadeStartTime = 0f)
+    private void StartAttackPresentation(int attackIndex, Vector3 direction, bool triggerAttack, float crossFadeStartTime, float turnDelay)
     {
         if (!HasAttackStep(attackIndex))
             return;
@@ -671,10 +694,24 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
         moveSpeed = playbackDuration > 0f ? moveRemaining / playbackDuration : 0f;
 
         if (step.RotationType == DefaultAttackRotationType.SnapOnStart)
-            movement.RotateImmediately(attackDirection);
+            movement.TurnToward(attackDirection);
 
         player.SetAnimatorMoving(false);
 
+        hasPendingAttackClip = turnDelay > 0f;
+        if (hasPendingAttackClip)
+        {
+            pendingAttackClipTime = Time.time + turnDelay;
+            pendingTriggerAttack = triggerAttack;
+            pendingCrossFadeStartTime = crossFadeStartTime;
+            return;
+        }
+
+        PlayAttackClip(triggerAttack, crossFadeStartTime);
+    }
+
+    private void PlayAttackClip(bool triggerAttack, float crossFadeStartTime)
+    {
         if (animator == null)
             return;
 
@@ -696,7 +733,9 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
         {
             // 대부분의 스텝은 LoopBackEntryTime이 0이라 처음부터 재생된다 — 체인이
             // 마지막 스텝에서 첫 스텝으로 되감길 때(0번 스텝)만 0이 아니라서 윈드업을 건너뛴다.
-            StartAttackServer(nextIndex, nextDirection, false, attackSteps[nextIndex].LoopBackEntryTime);
+            // 다음 단의 회전 지연은 서버가 잰다 — 이 단 내내 몸이 이 단 방향에 고정돼 있어 NT 값도 이미 따라와 있다.
+            StartAttackServer(nextIndex, nextDirection, false, attackSteps[nextIndex].LoopBackEntryTime,
+                GetTurnDelay(nextIndex, nextDirection));
             return;
         }
 
@@ -771,7 +810,7 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
 
         DefaultAttackStep step = attackSteps[currentAttackIndex];
 
-        if (moveRemaining <= 0f)
+        if (moveRemaining <= 0f || hasPendingAttackClip)
             return;
 
         float moveDistance = Mathf.Min(moveSpeed * Time.fixedDeltaTime, moveRemaining);
@@ -852,6 +891,16 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
         isComboWindowOpen = false;
         hasStartedAttack = false;
         isRequestingAttack = false;
+        hasPendingAttackClip = false;
+    }
+
+    // SnapOnStart 단만 TurnToward 로 돌므로 그 단만 회전을 기다린다.
+    private float GetTurnDelay(int attackIndex, Vector3 direction)
+    {
+        if (!HasAttackStep(attackIndex) || attackSteps[attackIndex].RotationType != DefaultAttackRotationType.SnapOnStart)
+            return 0f;
+
+        return movement.GetAttackTurnDelay(ResolveAttackDirection(direction));
     }
 
     private ClientRpcParams CreateOwnerClientRpcParams()

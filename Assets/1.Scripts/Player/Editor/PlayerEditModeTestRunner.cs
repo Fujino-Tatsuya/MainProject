@@ -23,6 +23,7 @@ internal static class PlayerEditModeTestRunner
         "^HealthShieldTests$",
         "^GunnerHeatModelTests$",
         "^GunnerAttackFacingModelTests$", // 할 일 27 — 원인별 회전 잠금 토큰·평타 발 단위 잠금·발 사이 제한 회전
+        "^AttackTurnTimingTests$", // 할 일 43 — 근접 평타 다 돈 뒤 공격: 각 → 회전 지연·스냅 각·오너 지연 상한
         "^HealthVignetteModelTests$", // 로컬 체력 비네팅 — 시작 비율·맥동·피격 플래시 색·사망 어둡게(맥동·플래시 끔)
         "^ShieldVignetteModelTests$", // 로컬 실드 비네팅 — 표시 여부·고정 알파 페이드 인/아웃
         "^CombatHudLayerRulesTests$", // CombatHUD 상태 레이어 — 생명주기 상태별 표시 레이어
