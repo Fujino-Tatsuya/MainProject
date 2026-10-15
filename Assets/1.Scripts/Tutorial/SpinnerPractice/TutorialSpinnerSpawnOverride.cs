@@ -3,7 +3,7 @@ using UnityEngine;
 
 /// <summary>
 /// 튜토리얼 스테이지에서만 SpinnerBot 을 <b>튜토리얼 전용 Variant</b>(<c>Assets/2.Prefabs/Monster/Tutorial/SpinnerBot_Tutorial.prefab</c> —
-/// SpinnerBot + <see cref="TutorialSpinnerPractice"/> + 머리 위 체력바 + <see cref="TutorialSpinnerHealthBarRule"/>)로 바꿔 스폰한다(서버).
+/// SpinnerBot + <see cref="TutorialSpinnerPractice"/> + <see cref="TutorialSpinnerHealthBarRule"/> — 바는 공용 몬스터 발밑 바)로 바꿔 스폰한다(서버).
 ///
 /// 왜 이 방법인가: <see cref="TutorialSpinnerPractice"/> 는 NetworkBehaviour 라 런타임 AddComponent 를 못 한다(NGO 인덱스가 갈린다).
 /// 존3 스피너봇은 공용 존 프리팹 <c>ZoneM_typeC</c> 의 스폰 지점 Override(<c>SpinnerBot.prefab</c>)에서 나오는데, 공용 존·원본 SpinnerBot 을

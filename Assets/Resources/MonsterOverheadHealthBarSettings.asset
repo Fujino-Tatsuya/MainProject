@@ -13,8 +13,7 @@ MonoBehaviour:
   m_Name: MonsterOverheadHealthBarSettings
   m_EditorClassIdentifier: Assembly-CSharp::MonsterOverheadHealthBarSettings
   hideDelaySeconds: 3
-  midBossHeightScale: 1.5
-  worldHeightOffset: 2.2
-  midBossWorldHeightOffset: 3
-  barPrefab: {fileID: 103, guid: 8c90edb86f91484993f438c98fa595ec, type: 3}
-  fillColor: {r: 0.9, g: 0.2, b: 0.2, a: 1}
+  footScreenOffset: 50
+  midBossFootScreenOffset: 100
+  normalBarPrefab: {fileID: 5300111404067518424, guid: 5c33ecbb342fd194ea857586168d286b, type: 3}
+  midBossBarPrefab: {fileID: 5070489626493700089, guid: c4c5ec006feba194fafd4150eff23e56, type: 3}

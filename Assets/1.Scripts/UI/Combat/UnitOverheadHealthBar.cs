@@ -111,15 +111,16 @@ public class UnitOverheadHealthBar : MonoBehaviour
         barGroup.alpha = 0f;
     }
 
+    /// <summary>규칙이 색을 정하지 않을 때 쓰는 프리팹의 체력 게이지 색. 몬스터 규칙은 이 값을 그대로 쓴다.</summary>
+    public Color DefaultFillColor => defaultFillColor;
+
     /// <summary>
-    /// 런타임에 붙인 바의 배치를 바꾼다(몬스터 — MonsterOverheadHealthBarRule). Awake 뒤에 부른다.
-    /// heightScale 은 화면 위 바 두께 배율이다(가로 길이는 그대로).
+    /// 런타임에 붙인 바의 배치를 바꾼다(몬스터 발밑 — MonsterOverheadHealthBarRule). 플레이어 바는 부르지 않는다.
     /// </summary>
-    public void ConfigurePlacement(float worldHeight, float heightScale)
+    public void ConfigurePlacement(float worldHeight, Vector2 canvasOffset)
     {
         worldHeightOffset = worldHeight;
-        if (barRect != null && heightScale > 0f && !Mathf.Approximately(heightScale, 1f))
-            barRect.sizeDelta = new Vector2(barRect.sizeDelta.x, barRect.sizeDelta.y * heightScale);
+        screenOffset = canvasOffset;
     }
 
     private void OnEnable()
