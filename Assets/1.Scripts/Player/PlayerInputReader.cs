@@ -122,7 +122,7 @@ public class PlayerInputReader : BaseNetworkBehaviour
     public void ConsumeBufferedSkillInput(PlayerSkillSlot slot) =>
         ConsumeBufferedInput(PlayerInputBuffer.FromSkillSlot(slot));
 
-    /// <summary>Idle/Move 에서 그 입력으로 시작을 시도한 결과를 버퍼에 반영한다 — 시작 = 비움, 자원 부족 = 버림, 막힘 = 유지.</summary>
+    /// <summary>Idle/Move 에서 그 입력으로 시작을 시도한 결과를 버퍼에 반영한다 — 시작 = 비움, 막힘(바쁨·CC) = 유지, 그 밖의 거부 = 그 입력만 버림.</summary>
     public void ResolveBufferedInput(PlayerBufferedInput input, PlayerActionAttempt attempt)
     {
         CaptureBufferedPresses();

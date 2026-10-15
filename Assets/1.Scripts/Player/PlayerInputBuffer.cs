@@ -18,7 +18,27 @@ public enum PlayerActionAttempt
     /// <summary>행동·요청 중이거나 CC 등으로 지금만 못 쓴다 — 유지 시간 동안 들고 있다가 다시 시도한다.</summary>
     Blocked,
     /// <summary>쿨타임·대시 충전 없음·과열처럼 자원이 모자라 거부됐다 — 그 입력을 바로 버린다(재시도 안 함).</summary>
-    OutOfResource
+    OutOfResource,
+    /// <summary>차단 효과(침묵·속박·약화처럼 그 행동만 막는 상태이상)로 거부됐다 — 바로 버리고 차단 피드백을 낸다.</summary>
+    BlockedByEffect,
+    /// <summary>그 밖의 거부(사용 조건 CanUse·빈 슬롯·비접지 등) — 바로 버린다. 피드백 없음.</summary>
+    Rejected
+}
+
+/// <summary>
+/// 상태이상으로 행동이 막혔을 때 입력을 보관할지(CC) 버릴지(차단 효과) 가른다(할 일 44). 호출자는 그 행동의
+/// 차단 판정(BlocksSkill·BlocksAttack·BlocksMovement·BlocksInterrupt)이 참일 때만 부른다.
+/// </summary>
+public static class PlayerActionRejectPolicy
+{
+    /// <summary>
+    /// 행동 불능 CC(<see cref="StatusEffectController.IncapacitatingEffects"/> — 기절·에어본)가 하나라도 있으면 보관,
+    /// 아니면 그 행동만 막는 봉인으로 본다. 둘이 겹치면 CC 가 이긴다 — 풀린 뒤 다시 시도해 봉인이 남았으면 그때 버린다.
+    /// </summary>
+    public static PlayerActionAttempt ClassifyEffectBlock(StatusEffectType activeEffects) =>
+        (activeEffects & StatusEffectController.IncapacitatingEffects) != 0
+            ? PlayerActionAttempt.Blocked
+            : PlayerActionAttempt.BlockedByEffect;
 }
 
 /// <summary>
@@ -79,8 +99,9 @@ public sealed class PlayerInputBuffer
     }
 
     /// <summary>
-    /// 그 입력으로 시작을 시도한 결과를 반영한다. 시작 = 전부 비움, 자원 부족 = 그 입력만 버림, 막힘 = 그대로 둠.
-    /// 자원 부족 입력을 바로 버리므로 같은 입력이 거부(로그·피드백)를 두 번 내지 않는다.
+    /// 그 입력으로 시작을 시도한 결과를 반영한다. 시작 = 전부 비움, 막힘(바쁨·CC) = 그대로 둠,
+    /// 그 밖의 거부(자원 부족·차단 효과·기타) = 그 입력만 버림.
+    /// 거부된 입력을 바로 버리므로 같은 입력이 거부(로그·피드백)를 두 번 내지 않는다.
     /// </summary>
     public void Resolve(PlayerBufferedInput input, PlayerActionAttempt attempt)
     {
@@ -89,7 +110,9 @@ public sealed class PlayerInputBuffer
             case PlayerActionAttempt.Started:
                 Clear();
                 break;
-            case PlayerActionAttempt.OutOfResource:
+            case PlayerActionAttempt.Blocked:
+                break;
+            default:
                 Consume(input);
                 break;
         }

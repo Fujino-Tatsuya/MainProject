@@ -78,6 +78,8 @@ public class PlayerSkillController : BaseNetworkBehaviour
 
     public PlayerSkillBase ActiveSkill => activeSkill;
     public bool IsSkillActive => activeSkill != null;
+    /// <summary>[오너] 스킬 실행 중이거나 시전 요청 응답을 기다리는 중 — 이때 못 쓴 입력은 선입력 버퍼에 남긴다(할 일 44).</summary>
+    public bool IsBusy => IsSkillActive || isRequestingSkill;
     public event Action<PlayerSkillSlot> SlotBindingChanged;
 
     /// <summary>
@@ -274,7 +276,7 @@ public class PlayerSkillController : BaseNetworkBehaviour
     /// </summary>
     public bool IsBlockedByCooldown(PlayerSkillSlot slot)
     {
-        if (IsSkillActive || isRequestingSkill)
+        if (IsBusy)
             return false;
 
         PlayerSkillBase skill = GetSkill(slot);

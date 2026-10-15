@@ -1,6 +1,6 @@
 using NUnit.Framework;
 
-/// <summary>선입력 버퍼(할 일 44) — 기록·만료·덮어쓰기·소비·비우기·끔.</summary>
+/// <summary>선입력 버퍼(할 일 44) — 기록·만료·덮어쓰기·소비·비우기·끔, 거부 사유별 보관/버림·입력 1회 = 피드백 1회.</summary>
 public sealed class PlayerInputBufferTests
 {
     private const float Hold = 0.2f;
@@ -87,17 +87,46 @@ public sealed class PlayerInputBufferTests
         Assert.That(buffer.Peek(10f), Is.EqualTo(PlayerBufferedInput.None), "시작하면 다른 종류도 비운다");
     }
 
-    [TestCase(PlayerBufferedInput.SkillMain)]
-    [TestCase(PlayerBufferedInput.Dash)]
-    [TestCase(PlayerBufferedInput.Attack)]
-    public void Resolve_OutOfResource_DropsThatInput(PlayerBufferedInput input)
+    [TestCase(PlayerBufferedInput.SkillMain, PlayerActionAttempt.OutOfResource)]
+    [TestCase(PlayerBufferedInput.Dash, PlayerActionAttempt.OutOfResource)]
+    [TestCase(PlayerBufferedInput.Attack, PlayerActionAttempt.OutOfResource)]
+    [TestCase(PlayerBufferedInput.SkillSub, PlayerActionAttempt.BlockedByEffect)]
+    [TestCase(PlayerBufferedInput.Dash, PlayerActionAttempt.BlockedByEffect)]
+    [TestCase(PlayerBufferedInput.SkillUltimate, PlayerActionAttempt.Rejected)]
+    [TestCase(PlayerBufferedInput.SkillInterrupt, PlayerActionAttempt.Rejected)]
+    public void Resolve_Rejection_DropsThatInput(PlayerBufferedInput input, PlayerActionAttempt attempt)
     {
-        // 쿨타임(스킬)·충전 없음(대시)·과열(거너 평타) — 재시도 없이 바로 버린다.
+        // 자원 부족(쿨타임·충전 없음·과열)·차단 효과(침묵·속박·약화)·그 밖(CanUse·빈 슬롯·비접지) — 재시도 없이 바로 버린다.
         var buffer = new PlayerInputBuffer(Hold);
         buffer.Record(input, 10f);
-        buffer.Resolve(input, PlayerActionAttempt.OutOfResource);
+        buffer.Resolve(input, attempt);
 
         Assert.That(buffer.Peek(10.01f), Is.EqualTo(PlayerBufferedInput.None));
+    }
+
+    [TestCase(PlayerActionAttempt.BlockedByEffect)]
+    [TestCase(PlayerActionAttempt.Rejected)]
+    public void Resolve_Rejection_KeepsOtherKind(PlayerActionAttempt attempt)
+    {
+        var buffer = new PlayerInputBuffer(Hold);
+        buffer.Record(PlayerBufferedInput.Attack, 10f);
+        buffer.Resolve(PlayerBufferedInput.SkillMain, attempt);
+
+        Assert.That(buffer.Peek(10f), Is.EqualTo(PlayerBufferedInput.Attack), "거부된 종류만 버린다");
+    }
+
+    [TestCase(StatusEffectType.Silenced, PlayerActionAttempt.BlockedByEffect)]
+    [TestCase(StatusEffectType.Rooted, PlayerActionAttempt.BlockedByEffect)]
+    [TestCase(StatusEffectType.Debilitated, PlayerActionAttempt.BlockedByEffect)]
+    [TestCase(StatusEffectType.Silenced | StatusEffectType.Slowed, PlayerActionAttempt.BlockedByEffect)]
+    [TestCase(StatusEffectType.Stunned, PlayerActionAttempt.Blocked)]
+    [TestCase(StatusEffectType.Airborne, PlayerActionAttempt.Blocked)]
+    [TestCase(StatusEffectType.Stunned | StatusEffectType.Silenced, PlayerActionAttempt.Blocked)]
+    [TestCase(StatusEffectType.Airborne | StatusEffectType.Rooted, PlayerActionAttempt.Blocked)]
+    public void ClassifyEffectBlock_IncapacitatingKeeps_SealDrops(StatusEffectType active, PlayerActionAttempt expected)
+    {
+        // 기절·에어본(행동 불능 CC) = 보관, 그 행동만 막는 봉인 = 버림 + 차단 피드백. 겹치면 CC 가 이긴다.
+        Assert.That(PlayerActionRejectPolicy.ClassifyEffectBlock(active), Is.EqualTo(expected));
     }
 
     [Test]
@@ -129,10 +158,10 @@ public sealed class PlayerInputBufferTests
         var buffer = new PlayerInputBuffer(Hold);
         buffer.Record(PlayerBufferedInput.SkillMain, 10f);
 
-        int feedback = SimulateIdleFrames(buffer, PlayerBufferedInput.SkillMain, pressedAt: 10f,
-            from: 10f, to: 10.5f, busyUntil: 0f, cooldownUntil: 99f);
+        SimResult result = SimulateIdleFrames(buffer, new SimTimeline { cooldownUntil = 99f });
 
-        Assert.That(feedback, Is.EqualTo(1), "입력 1회 = 피드백 1회 — 쿨타임 동안 프레임마다 다시 나지 않는다");
+        Assert.That(result.cooldownFeedback, Is.EqualTo(1), "입력 1회 = 피드백 1회 — 쿨타임 동안 프레임마다 다시 나지 않는다");
+        Assert.That(result.effectFeedback, Is.EqualTo(0));
     }
 
     [Test]
@@ -142,10 +171,9 @@ public sealed class PlayerInputBufferTests
         var buffer = new PlayerInputBuffer(Hold);
         buffer.Record(PlayerBufferedInput.SkillMain, 10f);
 
-        int feedback = SimulateIdleFrames(buffer, PlayerBufferedInput.SkillMain, pressedAt: 10f,
-            from: 10f, to: 10.5f, busyUntil: 10.1f, cooldownUntil: 99f);
+        SimResult result = SimulateIdleFrames(buffer, new SimTimeline { busyUntil = 10.1f, cooldownUntil = 99f });
 
-        Assert.That(feedback, Is.EqualTo(1));
+        Assert.That(result.cooldownFeedback, Is.EqualTo(1));
     }
 
     [Test]
@@ -155,42 +183,178 @@ public sealed class PlayerInputBufferTests
         var buffer = new PlayerInputBuffer(Hold);
         buffer.Record(PlayerBufferedInput.SkillMain, 10f);
 
-        int feedback = SimulateIdleFrames(buffer, PlayerBufferedInput.SkillMain, pressedAt: 10f,
-            from: 10f, to: 10.5f, busyUntil: 11f, cooldownUntil: 99f);
+        SimResult result = SimulateIdleFrames(buffer, new SimTimeline { busyUntil = 11f, cooldownUntil = 99f });
 
-        Assert.That(feedback, Is.EqualTo(0));
+        Assert.That(result.cooldownFeedback, Is.EqualTo(0));
     }
 
-    // 60fps 로 프레임을 돌리며 PlayerStateBase.TryStartSkill 의 판정 순서를 흉내 낸다. 반환 = 쿨타임 거부 피드백 횟수.
-    private static int SimulateIdleFrames(
-        PlayerInputBuffer buffer, PlayerBufferedInput input, float pressedAt,
-        float from, float to, float busyUntil, float cooldownUntil)
+    [Test]
+    public void EffectBlock_Seal_DropsAndRaisesOnce()
+    {
+        // 침묵 중 스킬 입력 — 바로 버리고 차단 피드백 1회. 침묵이 금방 풀려도 뒤늦게 실행되지 않는다.
+        var buffer = new PlayerInputBuffer(Hold);
+        buffer.Record(PlayerBufferedInput.SkillMain, 10f);
+
+        SimResult result = SimulateIdleFrames(buffer, new SimTimeline
+        {
+            effectUntil = 10.05f, effects = StatusEffectType.Silenced
+        });
+
+        Assert.That(result.effectFeedback, Is.EqualTo(1), "입력 1회 = 차단 피드백 1회");
+        Assert.That(result.cooldownFeedback, Is.EqualTo(0));
+        Assert.That(result.started, Is.False, "봉인 중 입력은 풀린 뒤에도 실행하지 않는다");
+    }
+
+    [Test]
+    public void EffectBlock_SealAndCooldown_RaisesSealOnly()
+    {
+        // 봉인 + 쿨타임 — 상태이상을 먼저 보므로 차단 피드백 하나만 난다(한 입력에 두 이벤트 없음).
+        var buffer = new PlayerInputBuffer(Hold);
+        buffer.Record(PlayerBufferedInput.SkillSub, 10f);
+
+        SimResult result = SimulateIdleFrames(buffer, new SimTimeline
+        {
+            input = PlayerBufferedInput.SkillSub, effectUntil = 99f, effects = StatusEffectType.Silenced, cooldownUntil = 99f
+        });
+
+        Assert.That(result.effectFeedback + result.cooldownFeedback, Is.EqualTo(1));
+        Assert.That(result.effectFeedback, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void EffectBlock_Incapacitated_KeepsAndRunsWhenFreed()
+    {
+        // 기절 중 입력 — 보관했다가 유지 시간 안에 풀리면 그 첫 틱에 실행. 피드백 없음.
+        var buffer = new PlayerInputBuffer(Hold);
+        buffer.Record(PlayerBufferedInput.Dash, 10f);
+
+        SimResult result = SimulateIdleFrames(buffer, new SimTimeline
+        {
+            input = PlayerBufferedInput.Dash, effectUntil = 10.1f, effects = StatusEffectType.Stunned
+        });
+
+        Assert.That(result.started, Is.True);
+        Assert.That(result.effectFeedback, Is.EqualTo(0));
+    }
+
+    [Test]
+    public void EffectBlock_IncapacitatedLongerThanHold_ExpiresSilently()
+    {
+        var buffer = new PlayerInputBuffer(Hold);
+        buffer.Record(PlayerBufferedInput.Attack, 10f);
+
+        SimResult result = SimulateIdleFrames(buffer, new SimTimeline
+        {
+            input = PlayerBufferedInput.Attack, effectUntil = 11f, effects = StatusEffectType.Airborne
+        });
+
+        Assert.That(result.started, Is.False, "유지 시간이 지나면 버려진다");
+        Assert.That(result.effectFeedback, Is.EqualTo(0));
+    }
+
+    [Test]
+    public void EffectBlock_StunThenSilenceRemains_RaisesOnceAfterStun()
+    {
+        // 기절 + 침묵 — 기절 동안은 보관, 기절이 풀린 첫 틱에 침묵이 남아 있으면 그때 한 번 버리고 피드백.
+        var buffer = new PlayerInputBuffer(Hold);
+        buffer.Record(PlayerBufferedInput.SkillMain, 10f);
+
+        SimResult result = SimulateIdleFrames(buffer, new SimTimeline
+        {
+            effectUntil = 10.1f, effects = StatusEffectType.Stunned | StatusEffectType.Silenced,
+            secondEffectUntil = 99f, secondEffects = StatusEffectType.Silenced
+        });
+
+        Assert.That(result.effectFeedback, Is.EqualTo(1));
+        Assert.That(result.started, Is.False);
+    }
+
+    [Test]
+    public void OtherReject_DropsWithoutFeedback()
+    {
+        // 사용 조건(CanUse)·빈 슬롯·비접지 — 바로 버리고 피드백 없음. 조건이 곧 맞아도 뒤늦게 실행되지 않는다.
+        var buffer = new PlayerInputBuffer(Hold);
+        buffer.Record(PlayerBufferedInput.SkillUltimate, 10f);
+
+        SimResult result = SimulateIdleFrames(buffer, new SimTimeline
+        {
+            input = PlayerBufferedInput.SkillUltimate, rejectedUntil = 10.05f
+        });
+
+        Assert.That(result.started, Is.False);
+        Assert.That(result.effectFeedback + result.cooldownFeedback, Is.EqualTo(0));
+    }
+
+    private struct SimTimeline
+    {
+        public PlayerBufferedInput input;     // 기본 SkillMain
+        public float busyUntil;               // 실행·요청 중
+        public float effectUntil;             // 차단 상태이상(effects)이 걸려 있는 끝 시각
+        public StatusEffectType effects;
+        public float secondEffectUntil;       // effectUntil 이후 남는 상태이상
+        public StatusEffectType secondEffects;
+        public float cooldownUntil;
+        public float rejectedUntil;           // CanUse 불충족 등 그 밖의 거부
+    }
+
+    private struct SimResult
+    {
+        public int cooldownFeedback;
+        public int effectFeedback;
+        public bool started;
+    }
+
+    // 60fps 로 10초~10.5초 프레임을 돌리며 PlayerStateBase.TryStartSkill 의 판정 순서를 흉내 낸다(10초에 1회 누름):
+    // 바쁨(보관) → 상태이상(CC 보관 / 봉인 버림 + 차단 피드백) → 쿨타임(버림 + 쿨타임 피드백) → 그 밖의 거부(버림) → 시작.
+    private static SimResult SimulateIdleFrames(PlayerInputBuffer buffer, SimTimeline t)
     {
         const float Frame = 1f / 60f;
-        int feedback = 0;
-        for (float now = from; now <= to; now += Frame)
+        const float PressedAt = 10f;
+        PlayerBufferedInput input = t.input == PlayerBufferedInput.None ? PlayerBufferedInput.SkillMain : t.input;
+        var result = new SimResult();
+
+        for (float now = PressedAt; now <= 10.5f; now += Frame)
         {
-            bool pressedThisFrame = now == pressedAt;
+            bool pressedThisFrame = now == PressedAt;
             if (!pressedThisFrame && !buffer.Has(input, now))
                 continue;
 
-            if (now < busyUntil)
+            if (now < t.busyUntil)
             {
                 buffer.Resolve(input, PlayerActionAttempt.Blocked);
                 continue;
             }
 
-            if (now < cooldownUntil)
+            StatusEffectType active = now < t.effectUntil ? t.effects
+                : now < t.secondEffectUntil ? t.secondEffects
+                : StatusEffectType.None;
+            if (active != StatusEffectType.None)
+            {
+                PlayerActionAttempt attempt = PlayerActionRejectPolicy.ClassifyEffectBlock(active);
+                buffer.Resolve(input, attempt);
+                if (attempt == PlayerActionAttempt.BlockedByEffect)
+                    result.effectFeedback++;
+                continue;
+            }
+
+            if (now < t.cooldownUntil)
             {
                 buffer.Resolve(input, PlayerActionAttempt.OutOfResource);
-                feedback++;
+                result.cooldownFeedback++;
+                continue;
+            }
+
+            if (now < t.rejectedUntil)
+            {
+                buffer.Resolve(input, PlayerActionAttempt.Rejected);
                 continue;
             }
 
             buffer.Resolve(input, PlayerActionAttempt.Started);
+            result.started = true;
         }
 
-        return feedback;
+        return result;
     }
 
     [Test]

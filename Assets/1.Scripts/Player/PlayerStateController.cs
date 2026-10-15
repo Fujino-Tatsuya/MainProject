@@ -12,6 +12,17 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
     [SerializeField] private PlayerActionState currentStateDebug;
     [SerializeField, Min(0f)] private float serverKnockbackReportGraceTime = 0.25f;
 
+    [Tooltip("평타·대시·스킬·인터럽트가 차단 효과(침묵·속박·약화 등 봉인)로 거부됐을 때 오너 로컬에서 재생할 사운드 키(Sound 시트 key). 비우면 무음 — Docs/tech/skill-reject-feedback.md")]
+    [SerializeField] private string effectBlockedSoundKey = "";
+
+    /// <summary>
+    /// [오너 로컬] 평타·대시·스킬·인터럽트 입력이 차단 효과(그 행동만 막는 상태이상 — 침묵·속박·약화)로 거부됐다.
+    /// 인자 = 거부된 입력 종류, 그때 걸려 있던 차단·CC류 상태이상(<see cref="StatusEffectImmunityPolicy.BlockedCrowdControl"/> 범위).
+    /// 입력 1회당 1회(그 입력은 버퍼에서 버린다). 기절·에어본(행동 불능 CC) 중에는 나지 않는다 — 입력을 보관한다.
+    /// 쿨타임 거부(<see cref="PlayerSkillController.CooldownRejected"/>)와 같은 입력에 겹쳐 나지 않는다. 문서: Docs/tech/skill-reject-feedback.md
+    /// </summary>
+    public event System.Action<PlayerBufferedInput, StatusEffectType> ActionBlockedByEffect;
+
     private const float DefaultMinKnockbackTime = 0.15f;
     private const float DefaultMaxKnockbackTime = 1.5f;
     private const float DefaultKnockbackStopSpeed = 0.15f;
@@ -97,12 +108,49 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
     public bool CanDashFromAction =>
         CurrentState != PlayerActionState.Dead && !cinematicLocked && !context.StatusEffects.BlocksMovement;
 
+    /// <summary>
+    /// 상태이상으로 막힌 입력을 처리한다 — 행동 불능 CC 면 보관(Blocked), 봉인이면 버리고 차단 피드백 1회(BlockedByEffect).
+    /// 호출자는 그 행동의 차단 판정이 참일 때만 부른다. 반환값을 그대로 <see cref="PlayerInputReader.ResolveBufferedInput"/> 에 넘긴다.
+    /// </summary>
+    internal PlayerActionAttempt RejectByEffect(PlayerBufferedInput input)
+    {
+        StatusEffectType active = context.StatusEffects.ActiveEffects;
+        PlayerActionAttempt attempt = PlayerActionRejectPolicy.ClassifyEffectBlock(active);
+        if (attempt == PlayerActionAttempt.BlockedByEffect)
+            NotifyBlockedByEffect(input, active & StatusEffectImmunityPolicy.BlockedCrowdControl);
+
+        return attempt;
+    }
+
+    private void NotifyBlockedByEffect(PlayerBufferedInput input, StatusEffectType effects)
+    {
+        if (context.Player == null || !context.Player.IsInputSource)
+            return;
+
+        Edit.Log($"[Input] {input} 차단 효과 거부 — {effects}(입력 버림)", this);
+        ActionBlockedByEffect?.Invoke(input, effects);
+
+        if (!string.IsNullOrEmpty(effectBlockedSoundKey) && AudioManager.Instance != null)
+            AudioManager.Instance.Play(effectBlockedSoundKey, transform.position);
+    }
+
+    /// <summary>대시가 거부된 이유를 버퍼 처리로 바꾼다 — 상태이상(CC 보관·봉인 버림) → 충전 없음 → 그 밖(비접지 등, 버림) 순.</summary>
+    internal PlayerActionAttempt ClassifyDashReject()
+    {
+        if (context.StatusEffects.BlocksMovement)
+            return RejectByEffect(PlayerBufferedInput.Dash);
+
+        return context.Dash != null && context.Dash.IsOutOfCharge
+            ? PlayerActionAttempt.OutOfResource
+            : PlayerActionAttempt.Rejected;
+    }
+
     public void Tick()
     {
         // 대시 우선 — 행동이 허락하면 그 행동을 끊고 대시(BeginDash 가 현재 상태를 덮는다: 공격은 CancelCurrentAttack,
         // 스킬은 HandleSkillStateExit(Dash) → SkillEndReason.DashCancelled).
         // 선입력 버퍼에 남은 대시(끊을 수 없는 행동 중에 누른 것)도 같은 식으로 받는다 — 성공하면 비우고,
-        // 충전이 없어 거부되면 그 대시만 버린다(재시도·거부 로그 반복 없음). 그 밖의 거부는 남겨 다시 시도한다.
+        // 행동 불능 CC 면 남겨 다시 시도하고, 그 밖의 거부(속박 등 봉인·충전 없음·비접지)는 그 대시만 버린다(재시도·거부 로그 반복 없음).
         bool dashHandled = false;
         bool dashDropped = false;
         if (context.Input != null && !CurrentStateReadsActionInput &&
@@ -110,11 +158,9 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
             CurrentActionAllowsDashCancel && context.Dash != null)
         {
             dashHandled = context.Dash.TryBeginPredictedDash(cancelsAction: true);
-            dashDropped = !dashHandled && context.Dash.IsOutOfCharge;
-            context.Input.ResolveBufferedInput(PlayerBufferedInput.Dash,
-                dashHandled ? PlayerActionAttempt.Started
-                : dashDropped ? PlayerActionAttempt.OutOfResource
-                : PlayerActionAttempt.Blocked);
+            PlayerActionAttempt attempt = dashHandled ? PlayerActionAttempt.Started : ClassifyDashReject();
+            dashDropped = !dashHandled && attempt != PlayerActionAttempt.Blocked;
+            context.Input.ResolveBufferedInput(PlayerBufferedInput.Dash, attempt);
         }
 
         // ⚠️ "대시가 됐다 말았다"의 가장 흔한 무증상 경로: 대시 입력이 상태 때문에 바로 실행되지 않는 경우.
@@ -602,8 +648,9 @@ public abstract class PlayerStateBase : IPlayerState
     protected bool TryConsumeActionInput()
     {
         // 각 입력은 '이번 프레임 눌림 또는 선입력 버퍼에 살아 있음'으로 본다(할 일 44).
-        // 행동 시작에 성공하면 버퍼를 비운다. 쿨타임·대시 충전 없음·과열(자원 부족)로 거부되면 그 입력을 바로 버리고,
-        // 그 밖의 거부(요청 응답 대기·CC 등)는 만료까지 남겨 다음 틱에 다시 시도한다 — PlayerActionAttempt.
+        // 행동 시작에 성공하면 버퍼를 비운다. 바빠서(실행·요청 응답 대기) 또는 행동 불능 CC(기절·에어본)로 못 쓴 입력만
+        // 만료까지 남겨 다음 틱에 다시 시도하고, 나머지 거부는 그 입력을 바로 버린다 — PlayerActionAttempt:
+        // 자원 부족(쿨타임·충전 없음·과열) / 차단 효과(침묵·속박·약화 — 피드백 이벤트) / 그 밖(CanUse·빈 슬롯·비접지).
         bool dashRequested = Context.Input.DashPressed || Context.Input.HasBufferedInput(PlayerBufferedInput.Dash);
 
         // 조준 모드 중에는 일반 액션 입력(공격/다른 스킬/인터럽트)을 억제한다.
@@ -636,8 +683,7 @@ public abstract class PlayerStateBase : IPlayerState
                 return true;
             }
 
-            if (Context.Dash.IsOutOfCharge)
-                Context.Input.ResolveBufferedInput(PlayerBufferedInput.Dash, PlayerActionAttempt.OutOfResource);
+            Context.Input.ResolveBufferedInput(PlayerBufferedInput.Dash, Context.Controller.ClassifyDashReject());
         }
 
         // 공격 시작은 누른 프레임(press)이나 버퍼된 press 에만 허용한다. 홀드 상태로는 시작되지 않으므로,
@@ -645,14 +691,23 @@ public abstract class PlayerStateBase : IPlayerState
         if ((Context.Input.AttackPressed || Context.Input.HasBufferedInput(PlayerBufferedInput.Attack)) &&
             Context.DefaultAttack != null)
         {
-            if (Context.DefaultAttack.TryStart())
+            // 상태이상 차단은 시작 요청 전에 가린다 — TryStart 는 이를 보지 않고 요청부터 보낸다(서버가 거부해도 입력은 사라졌다).
+            if (Context.StatusEffects.BlocksAttack)
+            {
+                Context.Input.ResolveBufferedInput(PlayerBufferedInput.Attack,
+                    Context.Controller.RejectByEffect(PlayerBufferedInput.Attack));
+            }
+            else if (Context.DefaultAttack.TryStart())
             {
                 Context.Input.ClearInputBuffer();
                 return true;
             }
-
-            if (Context.DefaultAttack.IsOutOfResource)
-                Context.Input.ResolveBufferedInput(PlayerBufferedInput.Attack, PlayerActionAttempt.OutOfResource);
+            else
+            {
+                // 과열은 버림, 그 밖(공격·요청 중)은 바쁨이라 남긴다.
+                Context.Input.ResolveBufferedInput(PlayerBufferedInput.Attack,
+                    Context.DefaultAttack.IsOutOfResource ? PlayerActionAttempt.OutOfResource : PlayerActionAttempt.Blocked);
+            }
         }
 
         if (TryStartSkillInput())
@@ -661,11 +716,22 @@ public abstract class PlayerStateBase : IPlayerState
             return true;
         }
 
-        if ((Context.Input.InterruptPressed || Context.Input.HasBufferedInput(PlayerBufferedInput.SkillInterrupt)) &&
-            Context.Controller.ChangeState(PlayerActionState.Interrupt))
+        if (Context.Input.InterruptPressed || Context.Input.HasBufferedInput(PlayerBufferedInput.SkillInterrupt))
         {
-            Context.Input.ClearInputBuffer();
-            return true;
+            if (Context.Controller.ChangeState(PlayerActionState.Interrupt))
+            {
+                Context.Input.ClearInputBuffer();
+                return true;
+            }
+
+            // 우클릭에 스킬이 배정돼 있으면 위 스킬 경로가 이 입력을 이미 판정했다 — 여기서 다시 버리거나 피드백하지 않는다.
+            if (Context.Skills == null || Context.Skills.GetSkill(PlayerSkillSlot.Interrupt) == null)
+            {
+                Context.Input.ResolveBufferedInput(PlayerBufferedInput.SkillInterrupt,
+                    Context.StatusEffects.BlocksInterrupt
+                        ? Context.Controller.RejectByEffect(PlayerBufferedInput.SkillInterrupt)
+                        : PlayerActionAttempt.Rejected);
+            }
         }
 
         return false;
@@ -691,8 +757,29 @@ public abstract class PlayerStateBase : IPlayerState
         if (!Context.Input.GetSkillPressed(slot) && !Context.Input.HasBufferedInput(kind))
             return false;
 
+        // 빈 슬롯은 버린다. 단 우클릭은 아래 인터럽트 상태 경로가 같은 입력을 쓰므로 그쪽에 맡긴다.
+        if (skills.GetSkill(slot) == null)
+        {
+            if (slot != PlayerSkillSlot.Interrupt)
+                Context.Input.ResolveBufferedInput(kind, PlayerActionAttempt.Rejected);
+            return false;
+        }
+
+        // 실행·요청 응답 대기(바쁨) — 남겨 두었다가 풀린 첫 틱에 다시 판정한다.
+        if (skills.IsBusy)
+            return false;
+
+        // 상태이상 차단 — 기절·에어본(CC)은 남기고, 침묵 등 봉인은 버리고 차단 피드백 1회. 요청은 보내지 않는다
+        // (원격 오너도 복제된 상태이상 목록으로 판정 — 서버 최종 검증은 그대로). 쿨타임보다 먼저 본다:
+        // CC 중 입력은 풀린 뒤에 쿨타임을 다시 판정하고, 봉인 + 쿨타임이면 봉인 피드백 하나만 낸다.
+        if (Context.StatusEffects.BlocksSkill)
+        {
+            Context.Input.ResolveBufferedInput(kind, Context.Controller.RejectByEffect(kind));
+            return false;
+        }
+
         // 쿨타임 거부 — 시전 요청을 보내지 않고 입력을 버린 뒤 피드백을 한 번 낸다. 버렸으니 다음 틱에 같은 입력이
-        // 다시 거부·피드백되지 않는다(입력 1회 = 피드백 1회). 실행·요청 중(바쁨)은 여기 걸리지 않고 버퍼에 남는다.
+        // 다시 거부·피드백되지 않는다(입력 1회 = 피드백 1회).
         if (skills.IsBlockedByCooldown(slot))
         {
             Context.Input.ResolveBufferedInput(kind, PlayerActionAttempt.OutOfResource);
@@ -700,7 +787,12 @@ public abstract class PlayerStateBase : IPlayerState
             return false;
         }
 
-        return skills.TryUse(slot);
+        if (skills.TryUse(slot))
+            return true;
+
+        // 사용 조건(CanUse)·조준 진입 실패 등 — 버린다(피드백 없음).
+        Context.Input.ResolveBufferedInput(kind, PlayerActionAttempt.Rejected);
+        return false;
     }
 }
 
