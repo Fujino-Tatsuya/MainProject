@@ -1,5 +1,5 @@
 // ----------------------------------------------------------------------------
-//  LookToggle.cs — 룩 A/B 비교 토글 (개발용, 릴리스 빌드에서 컴파일 제외)
+//  LookToggle.cs — 룩 A/B 비교 토글 (개발용, DEV_HOTKEYS 없는 릴리스 빌드에서 컴파일 제외)
 //
 //  목적: 두 룩을 키 하나로 왕복해 팀장이 육안으로 고르게 한다.
 //    A = 채도 살림 (디밍·차폐 없음)
@@ -10,7 +10,7 @@
 //
 //  ⚠️ 이 컴포넌트는 결과물이 아니라 판정 도구다. 룩이 확정되면
 //     승자 값을 기본값으로 커밋하고 이 스크립트와 씬 컴포넌트를 삭제하는 것이 마무리다.
-//     (ProfilerHUD 와 같은 부류 — #if 로 감싸져 있어 릴리스 빌드에서는 클래스가 없고,
+//     (ProfilerHUD 와 같은 부류 — #if 로 감싸져 있어 DEV_HOTKEYS 없는 릴리스 빌드에서는 클래스가 없고,
 //      씬에 남겨두면 missing script 경고가 된다.)
 //
 //  🔴 이 클래스가 지키는 불변식: ScriptableObject 애셋에 쓰지 않는다.
@@ -24,7 +24,7 @@
 //     대신 룩을 되돌릴 때 반드시 원래 값으로 복구해야 게임플레이가 안 새어나간다
 //     (RestoreSnapshot 이 담당).
 // ----------------------------------------------------------------------------
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
 using UnityEngine;
 using UnityEngine.Rendering;
 #if ENABLE_INPUT_SYSTEM

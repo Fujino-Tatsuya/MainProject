@@ -1,5 +1,5 @@
 // HitVFXDebugHUD.cs
-// 피격 이펙트 런타임 교체 HUD — 에디터/개발 빌드 전용 (릴리스 빌드에서는 컴파일 제외).
+// 피격 이펙트 런타임 교체 HUD — 에디터/개발 빌드/DEV_HOTKEYS 빌드 전용 (심볼 없는 릴리스 빌드에서는 컴파일 제외).
 //
 // 사용법:
 //   1) 아무 씬(보통 4.MapScene)의 빈 GameObject에 이 컴포넌트를 추가한다.
@@ -15,11 +15,11 @@
 //    (HitVFXPlayback / MonsterBase.PlayHitVFXRpc 참조), 키를 누른 창만 바뀐다. 이건 결함이 아니라
 //    의도다 — MPPM 창 두 개를 나란히 놓고 서로 다른 설정을 동시에 비교할 수 있다.
 //
-// 주의: 이 컴포넌트는 #if UNITY_EDITOR || DEVELOPMENT_BUILD 로 감싸져 있어 릴리스 빌드엔 클래스가
-//       없다. 릴리스로 출하되는 씬/프리팹에는 붙여두지 말 것(미싱 스크립트 경고 방지).
+// 주의: 이 컴포넌트는 #if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS 로 감싸져 있어 DEV_HOTKEYS 를
+//       지운 릴리스 빌드엔 클래스가 없다. 릴리스로 출하되는 씬/프리팹에는 붙여두지 말 것(미싱 스크립트 경고 방지).
 //       ProfilerHUD와 동일한 관례다.
 
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
 using System;
 using UnityEngine;
 #if ENABLE_INPUT_SYSTEM

@@ -8,13 +8,13 @@
 //  이 컴포넌트는 디렉터와 함께 맵 씬에 있어 재로드로 사라진다 — 재시작 자체는 NetworkManager 쪽 흐름이 끝까지 진행한다.
 //
 //  🔴 호스트만 — 요청은 TutorialDirector.RequestSkip → ServerRpc 가 보낸 사람이 호스트인지 검증한다.
-//  🔴 에디터·Development Build 에만 있다(DevBossEntranceWarp 와 같은 부류). 릴리스 빌드엔 클래스가 없어 입력이 무시된다.
+//  🔴 에디터·Development Build·DEV_HOTKEYS 빌드에만 있다(DevBossEntranceWarp 와 같은 부류). 심볼을 지운 릴리스 빌드엔 클래스가 없어 입력이 무시된다.
 //  🔴 로그는 Debug.Log — Edit.* 는 에디터 전용이라 빌드에서 사라진다(빌드로 검증하는 도구가 말을 못 하면 안 된다).
 //
 //  화면: Alt 를 누르고 있는 동안만 호스트 화면 오른쪽 위에 구간 버튼 10개 — 단축키와 같은 동작.
 //  (토글이 아니라 누르는 동안 표시: 단축키가 이미 Alt 조합이라 Alt 를 누르는 순간 = 쓸 때만 보이고, 켜 둔 채 잊어 화면·캡처에 남지 않는다.)
 // ----------------------------------------------------------------------------
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
 using System.Collections;
 using System.Collections.Generic;
 using Unity.Netcode;
