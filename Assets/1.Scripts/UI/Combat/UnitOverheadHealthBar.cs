@@ -9,6 +9,7 @@ using UnityEngine.UI;
 /// IOverheadHealthBarRule 이 공급하고(플레이어 = PlayerOverheadHealthBarRule), 규칙이 없으면
 /// 항상 표시 + defaultFillColor + 라벨 없음.
 /// 게이지: 배경 → 잔상(trailFill) → 실드(shieldFill) → 체력(hpFill) 순으로 겹친다.
+/// 몬스터 바는 trailFill 대신 보스·플레이어 HUD 와 같은 지연 감소 바(delayed — DelayedHealthBar)를 쓴다. 잔상 Image 가 비면 꺼진다.
 /// 체력 바 아래 얇은 특성 게이지 줄(traitRoot)은 부모의 IOverheadTraitGauge 가 값·색·눈금을 공급하고, 없으면 숨긴다.
 /// 체력 바 왼쪽 대시 아이콘(dashIconRoot)은 자기/부모의 IOverheadDashIndicator 가 표시·준비 상태를 공급하고, 없으면 숨긴다.
 /// 위치 = 이 오브젝트 위치 + 월드 높이 → 로컬 Camera.main 스크린 좌표 + 화면 오프셋. 거리와 무관한 고정 크기.
@@ -57,11 +58,17 @@ public class UnitOverheadHealthBar : MonoBehaviour
     [Tooltip("잔상이 내려오는 속도(게이지 전체 길이/초)")]
     [SerializeField, Min(0f)] private float trailSpeed = 0.8f;
 
+    [Header("지연 감소 바 (몬스터 바)")]
+    [Tooltip("보스·플레이어 HUD 와 같은 지연 감소 바. 잔상 Image 가 비어 있으면 아무것도 하지 않는다(플레이어 머리 위 바).")]
+    [SerializeField] private DelayedHealthBar delayed = new DelayedHealthBar();
+
     private Unit unit;
     private IOverheadHealthBarRule rule;
     private IOverheadTraitGauge traitGauge;
     private IOverheadDashIndicator dashIndicator;
     private readonly OverheadHealthTrail trail = new OverheadHealthTrail();
+    private bool delayedShown;
+    private Color delayedColor;
 
     private RectTransform barRect;
     private CanvasGroup barGroup;
@@ -126,11 +133,22 @@ public class UnitOverheadHealthBar : MonoBehaviour
     private void OnEnable()
     {
         Canvas.willRenderCanvases += ApplyScreenPosition;
+
+        if (unit != null && delayed.HasFill)
+        {
+            // 재활성 때 중복 구독이 되지 않게 한 번 떼고 붙인다(PlayerHealthHUD 와 같은 방식).
+            unit.ClientHpChanged -= delayed.OnHpChanged;
+            unit.ClientHpChanged += delayed.OnHpChanged;
+            delayed.Bind(unit.CurrentHealth);
+            delayedShown = false;
+        }
     }
 
     private void OnDisable()
     {
         Canvas.willRenderCanvases -= ApplyScreenPosition;
+        if (unit != null)
+            unit.ClientHpChanged -= delayed.OnHpChanged;
         if (barRect != null && barRoot.activeSelf)
             barRoot.SetActive(false);
     }
@@ -148,6 +166,8 @@ public class UnitOverheadHealthBar : MonoBehaviour
             barRoot.SetActive(shouldShow);
         if (label != null && !shouldShow && label.gameObject.activeSelf)
             label.gameObject.SetActive(false);
+
+        TickDelayed(shouldShow);
 
         if (!shouldShow)
             return;
@@ -205,6 +225,24 @@ public class UnitOverheadHealthBar : MonoBehaviour
         }
 
         barGroup.alpha = visible ? 1f : 0f;
+    }
+
+    // 숨김 중에도 돈다 — 표시를 켜는 첫 타의 잔상을 살리고, 숨김 순간 스냅으로 다음 표시 때 옛 값에서 튀지 않는다(OverheadDelayedBarRules).
+    // 분모는 게이지 스케일(실드 포함) — 체력 게이지와 같은 길이 단위.
+    private void TickDelayed(bool shown)
+    {
+        if (unit == null || !delayed.HasFill)
+            return;
+
+        int health = unit.CurrentHealth;
+        Color color = rule != null ? rule.FillColor : defaultFillColor;
+        if (OverheadDelayedBarRules.ShouldSnap(delayedShown, shown, delayedColor, color))
+            delayed.Bind(health);
+        delayedShown = shown;
+        delayedColor = color;
+
+        var layout = OverheadHealthBarLayout.Compute(health, unit.FinalMaxHp, unit.CurrentShield);
+        delayed.Tick(Time.deltaTime, health, Mathf.RoundToInt(layout.Scale));
     }
 
     // 0 이어도 빈 줄로 항상 그린다.
