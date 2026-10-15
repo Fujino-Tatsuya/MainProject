@@ -2964,8 +2964,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: wall_corner_inside03
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 3597538256484705653, guid: bc6fb1c40fb86f649bab2f2c15694dac, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
