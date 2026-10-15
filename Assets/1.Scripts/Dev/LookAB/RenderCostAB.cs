@@ -24,7 +24,7 @@
 //  ⚠️ 이 컴포넌트는 결과물이 아니라 판정 도구다(LookToggle 과 같은 부류).
 //     숫자가 나오면 이 스크립트와 씬 오브젝트를 지우는 것이 마무리다.
 // ----------------------------------------------------------------------------
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
 using System.Text;
 using Unity.Profiling;
 using UnityEngine;
