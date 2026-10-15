@@ -255,6 +255,22 @@ HUD 매 프레임 문자열(`PlayerHealthHUD`·`StatusEffectHUD`·`SkillCooldown
 - ✅ 1단계 Codex(코드) `09e9cc57` · ✅ 2단계 Claude(씬·에셋·`LobbySceneManager` 배선). 결과 요약 = [player-prefabs.md §8.3](Docs/tech/player-prefabs.md)
 - 🔴 남은 것: **은희 MPPM Play 확인**(호스트+클라2: 초상화·Ready 동기화 / Start 활성 / 고른 Variant 스폰) → PR. 레이아웃은 첫 배치라 Play 보고 조정 가능
 - 범위 밖: 전투 HUD 초상화 Paladin 고정(Gunner 도 Paladin 얼굴)
+## ▶▶ 작업 세션 (2026-10-15 · 민경(Claude) · **어쌔신 변신 Q = Storm Slash 루프(플레이어 루트·Rate over Distance)**, 브랜치 `feature/VFX`) — 구현(컴파일 에러 0) · ⏳ Play·MPPM · 🔴 SVN add · 🔴 은희 공유(handoff-assassin-r-vfx §3-2)
+- MyProject `Export/Player3/BM Strom Slash.prefab`(운반체 Velocity 제거 → FuzzAlpha·데칼이 직접 Rate over Distance, World, Looping, Emitter Velocity = Transform) → `Players/Player3/Q_TransformedDash/FX_Assassin_StormSlash(.prefab|_Entry.asset)`, 카탈로그 `Assassin_Q_StormSlash`(outroDuration 1.1). 의존 3개 추가(Ring 머티리얼·Trail_Cone_Cut.fbx·텍스처 1 — Ring 렌더러는 꺼져 있음).
+- `AssassinDashStrikeSkill` 변신 데이터일 때만 OnClientPlay → `BeginStormSlash`, OnEnd → `EndStormSlash`. 임시 돌진 궤적은 일반 Q 만(변신 Q 에서 제거).
+
+## ▶▶ 작업 세션 (2026-10-15 · 민경(Claude) · **어쌔신 변신 E = Multi Slashes 루프(원 중심·배율 = 원 반경)**, 브랜치 `feature/VFX`) — 구현(컴파일 에러 0) · ⏳ Play·MPPM · 🔴 SVN add · 🔴 은희 공유(handoff-assassin-r-vfx §3-1)
+- MyProject `Export/Player3/BM Multi Slashes.prefab` 원본 그대로 반입 → `50.Art/VFX/Common/Players/Player3/E_CircleStrike/FX_Assassin_MultiSlashes(.prefab|_Entry.asset)`, 카탈로그 `Assassin_E_MultiSlashes`. 의존 22개 추가(PBR FX.shadergraph·머티리얼 3·텍스처 17·FBX 1, `PilotoStudio/` 하위).
+- 끊김 대책 = 엔트리 `outroDuration` 1.1(Release 는 방출만 멈춤 → 남은 입자 수명 최대 1.05초). 바닥 데칼 알파 곡선은 손대지 않음(민경 결정). 임시 `Burst_rings` 1회 유지.
+- `AssassinCircleStrikeSkill` OnClientPlay → `BeginCircleStrike`, OnEnd → `EndCircleStrike`. 배율 = `AreaRadius × circleStrikeScaleFactor(1)`.
+
+## ▶▶ 작업 세션 (2026-10-14 · 민경(Claude) · **어쌔신 R 변신 VFX = Blade Vortex(0.5초 생성·0.5초 사라짐)**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 · ✅ 1단계 MyProject 컨펌(민경) · ✅ 2단계 반입·배선(컴파일 에러 0) · ⏳ Play·MPPM · 🔴 SVN add · 🔴 은희 공유 [handoff-assassin-r-vfx.md](Docs/tech/handoff-assassin-r-vfx.md)
+- 원본: MyProject `Export/Player3/BM Blade Vortex.prefab` → 사본 `_Fast`(t=0 버스트 + 알파·크기 키 앞당김, 민경이 위치·크기 조정) · `_End`(원샷, 바깥으로 흩어짐). 원본은 그대로.
+- MainProject: `50.Art/VFX/Common/Players/Player3/R_Transform/FX_Assassin_BladeVortex(.prefab|_End.prefab|_Entry.asset)` · 카탈로그 `Assassin_R_BladeVortex`. Piloto 의존 23개(UberFXSG+서브그래프 4·머티리얼 7·텍스처 9·FBX 2)는 `50.Art/VFX/*/PilotoStudio/`, guid 유지.
+- `EffectEntry.outroPlayRate`(기본 1) 신설 — Release 시 남은 루프 입자를 배속(Main ▸ Simulation Speed). 이 엔트리 8 · outroDuration 0.6.
+- `AssassinSkillView` 변신 루프 = `PlayLooping`/`Release`(임시 `CharacterCirclePurple`·`Poof_electric` 제거). EffectStagePlayer 는 단계 교체가 즉시 회수라 파티클에서 끊겨 안 씀(grill Q13).
+- 🔴 SVN add: 위 R_Transform 폴더 + PilotoStudio 폴더 4곳(폴더 .meta 포함).
+
 ## ▶▶ 작업 세션 (2026-10-12 · 민경(Claude) · **카운터 성공 섬광 = 몸 표면 CameraDir 재생**, 브랜치 `feature/VFX`) — ✅ Play 확인(민경 10-12, 4종 모두) · ⏳ **MPPM 2인 남음** · 🔴 경석 공유
 - `EffectSocketPlayer.PlayOnceOnSurface(Collider)` 추가 — `EffectHitPoint.Resolve(CameraDir)` 로 위치·회전, 배율은 소켓 플레이어 `scale`. 표면 못 쓰면 `PlayOnce`(소켓) 폴백.
 - `MonsterBase.EffectSurfaceCollider` = `hitVFXCollider ?? bodyCollider` (23호는 hitVFXCollider 비어 있음 → 몸 캡슐).

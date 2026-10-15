@@ -92,16 +92,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 5123715575110306132, guid: 3a5f368447661b44592ccc55d5568854, type: 3}
   m_PrefabInstance: {fileID: 7044578137847324228}
   m_PrefabAsset: {fileID: 0}
---- !u!4 &4076455800681530309 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 6435965534741421441, guid: 3a5f368447661b44592ccc55d5568854, type: 3}
-  m_PrefabInstance: {fileID: 7044578137847324228}
-  m_PrefabAsset: {fileID: 0}
---- !u!4 &4618909188503218869 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 2439533801842078961, guid: 3a5f368447661b44592ccc55d5568854, type: 3}
-  m_PrefabInstance: {fileID: 7044578137847324228}
-  m_PrefabAsset: {fileID: 0}
 --- !u!95 &8085700165709622879 stripped
 Animator:
   m_CorrespondingSourceObject: {fileID: 1294066962840629275, guid: 3a5f368447661b44592ccc55d5568854, type: 3}
@@ -168,6 +158,10 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1160318589990200604, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1976202963046299133, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
+      propertyPath: m_Enabled
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2456265857858466963, guid: 55ee4e06e5b56ec48a45b3796040b9ae, type: 3}
@@ -425,7 +419,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AssassinSkillView
   ShowTopMostFoldoutHeaderGroup: 1
-  transformLoopPrefab: {fileID: 1597097068444350898, guid: a1daf7073cf07e7468eb75e9d2d5e967, type: 3}
+  transformEffectOffset: {x: 0, y: 0, z: 0}
+  transformEffectScale: 1
+  circleStrikeScaleFactor: 1
+  stormSlashOffset: {x: 0, y: 0, z: 0}
+  stormSlashScale: 1
   normalSlashPrefabs:
   - {fileID: 856368647163548680, guid: ae1f8ca5a160a2d41a2cf81398afbe10, type: 3}
   - {fileID: 856368647163548680, guid: 4f857450797a5fa4fa012bb522d7a64b, type: 3}
@@ -434,13 +432,11 @@ MonoBehaviour:
   enhancedSlashPrefab: {fileID: 3600389243222657682, guid: 37390631ea99cd1439f01ee21d9f89ad, type: 3}
   transformedSlashPrefab: {fileID: 3724192508554018546, guid: d2ec27c39b8361e4c9cca2635b5fc285, type: 3}
   enhanceCastPrefab: {fileID: 230651131596242121, guid: d8a8bbe703ee8174e9754da9050b17a9, type: 3}
-  transformCastPrefab: {fileID: 8307689965681055727, guid: 8050863a467fe9e46acb029a0fa570fc, type: 3}
   interruptCastPrefab: {fileID: 1151845124054409814, guid: 7e930ada5a14bc3408374b04fce9d119, type: 3}
   dashTrailPrefab: {fileID: 8780727661788297695, guid: 6a288b836c116494bafe48246b12f73e, type: 3}
   circleStrikePrefab: {fileID: 1475618779179179817, guid: 07799b25da23d9c4d97a417f6f0d0f31, type: 3}
   backAttackHitPrefab: {fileID: 7634420434017284396, guid: b9ed127bfed05be4db493ca51e744a76, type: 3}
   releaseLifetime: 2
-  transformSocket: {fileID: 4076455800681530309}
   normalSlashSockets:
   - {fileID: 951801660152849883}
   - {fileID: 2799064500811683600}

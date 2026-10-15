@@ -82,6 +82,21 @@ public class EffectCatalog : ScriptableObject
     [field: SerializeField] public EffectEntry Ultimate_TargetFloor { get; private set; }
     [field: SerializeField] public EffectEntry Ultimate_Strike { get; private set; }
 
+    [Header("플레이어 — 어쌔신 변신(R)")]
+    // 변신 동안 루프(FX_Assassin_BladeVortex) → 해제 시 outro(FX_Assassin_BladeVortex_End) + 남은 입자 ×outroPlayRate.
+    // AssassinSkillView 가 AssassinState.TransformChanged 로 PlayLooping / Release 한다(2026-10-14 민경).
+    [field: SerializeField] public EffectEntry Assassin_R_BladeVortex { get; private set; }
+
+    [Header("플레이어 — 어쌔신 변신 E(원형 5타)")]
+    // 공격 동안 원 중심 루프(FX_Assassin_MultiSlashes). 배율 = 원 반경 — 프리팹 생성 원이 반경 1m 로 저작돼 있다.
+    // Release 는 방출만 멈추고 outroDuration(1.1초) 동안 남은 입자가 제 곡선대로 사라지게 둔다(2026-10-15 민경).
+    [field: SerializeField] public EffectEntry Assassin_E_MultiSlashes { get; private set; }
+
+    [Header("플레이어 — 어쌔신 변신 Q(관통 돌진)")]
+    // 돌진 동안 플레이어 루트를 따라가는 루프(FX_Assassin_StormSlash). 입자는 World + Rate over Distance 라
+    // 지나간 자리에 남는다. Release 는 방출만 멈추고 outroDuration(1.1초) 동안 남은 입자가 사라지게 둔다(2026-10-15 민경).
+    [field: SerializeField] public EffectEntry Assassin_Q_StormSlash { get; private set; }
+
     // ── 몬스터 ──────────────────────────────────────────────────────────
 
     [Header("몬스터")]
