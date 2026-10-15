@@ -32,7 +32,8 @@ internal static class CombatEditModeTestRunner
         "^BossAggro",    // BossAggroPolicyTests · BossAggroPolicyThreatTests
         "^BossThreat",   // BossThreatTableTests — 위협 어그로(PLAN-boss-aggro)
         "^TelegraphStyle", // TelegraphStyleTests — 공격 예고 색·마스크 기본값·연결(PLAN-telegraph-style)
-        "^MonsterSkyStrike" // MonsterSkyStrikeTests — 수직 낙하 포격 판정(같은 바닥·평면 반경, PLAN-monster-tells)
+        "^MonsterSkyStrike", // MonsterSkyStrikeTests — 수직 낙하 포격 판정(같은 바닥·평면 반경, PLAN-monster-tells)
+        "^MonsterOverheadHealthBar" // MonsterOverheadHealthBarVisibilityTests — 몬스터 머리 위 체력바 표시 판단
     };
 
     const string Tag = "[CombatTests]";
