@@ -58,6 +58,10 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     // 강타 전진 — 시뮬레이션 피어(오너, 서버 권위 이동이면 서버도)만 모터에 낸다. 끝·취소·막힘이면 0.
     private float lungeRemaining;
     private PlayerMotor motor;
+    // 다 돈 뒤 공격(할 일 43): 크게 꺾으면 TurnToward 가 도는 동안 클립 시작·강타 전진을 늦춘다.
+    // 판정·End 는 클립 이벤트라 같이 늦춰진다. 지연은 서버가 정해 StartRpc 로 싣는다 — 첫 타는 오너가 잰 값.
+    private bool hasPendingClip;
+    private float pendingClipTime;
 
     public bool CanStartApprovedAttack => data != null && data.TryGetNormalStep(0, out _);
     // 일반 타·강타·변신 묶음 어디서든 대시로 끊는다(할 일 9). 나간 타격의 피해는 그대로, 남은 동작만 끊긴다.
@@ -93,6 +97,12 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
 
     private void Update()
     {
+        if (hasPendingClip && Time.time >= pendingClipTime)
+        {
+            hasPendingClip = false;
+            PlayAttackClip();
+        }
+
         if (player == null || combo == null)
             return;
 
@@ -112,14 +122,16 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             return false;
 
         Vector3 direction = CurrentAimDirection();
+        // 첫 타의 회전 지연은 오너의 몸 방향으로 잰다 — 서버 쪽 몸 방향은 NT 로 받은 늦은 값이다.
+        float turnDelay = movement.GetAttackTurnDelay(direction);
         if (!IsNetworkActive)
-            return StartServerAttack(direction);
+            return StartServerAttack(direction, turnDelay);
 
         if (!IsOwner)
             return false;
 
         requesting = true;
-        RequestStartRpc(direction);
+        RequestStartRpc(direction, turnDelay);
         return true;
     }
 
@@ -140,7 +152,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     // 강타 전진(§8.2) — 승인 방향으로 판정 프레임 전까지 나눠 낸다. 적 통과 없음(벽·몸 콜라이더 켜진 적에 막힘).
     public void FixedTickMovement()
     {
-        if (!active || lungeRemaining <= 0f || motor == null || data == null || !player.IsSimulating)
+        if (!active || hasPendingClip || lungeRemaining <= 0f || motor == null || data == null || !player.IsSimulating)
             return;
 
         float step = AssassinLungeRules.StepDistance(
@@ -191,6 +203,10 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
 
     public void HandleAnimationEvent(DefaultAttackAnimationEventType eventType)
     {
+        // 회전 대기 중 이벤트는 이 타가 아니라 직전 클립의 것이다.
+        if (hasPendingClip)
+            return;
+
         // 베기 연출은 전 피어 — 클립 Hit 이벤트는 모든 피어에서 재생된다(판정은 아래 서버만).
         if (eventType == DefaultAttackAnimationEventType.Hit && active && view != null)
             view.PlayAttackSlash(currentMode, currentStepIndex);
@@ -246,7 +262,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     }
 
     /// <summary>[서버] 모드를 골라 첫 타(또는 다음 타·다음 묶음)를 시작한다. 실패하면 오너 요청을 거절한다.</summary>
-    private bool StartServerAttack(Vector3 direction)
+    private bool StartServerAttack(Vector3 direction, float turnDelay)
     {
         if (!TrySelectAttackMode(out AssassinBasicAttackMode mode))
         {
@@ -256,7 +272,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
 
         // 강타·변신 묶음은 일반 4타 순서와 별개다.
         int stepIndex = mode == AssassinBasicAttackMode.Normal ? combo.Begin(Time.time) : 0;
-        return StartServer(stepIndex, direction, mode);
+        return StartServer(stepIndex, direction, mode, turnDelay);
     }
 
     private void TickInputSource()
@@ -282,7 +298,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     }
 
     [Rpc(SendTo.Server)]
-    private void RequestStartRpc(Vector3 direction, RpcParams rpcParams = default)
+    private void RequestStartRpc(Vector3 direction, float turnDelay, RpcParams rpcParams = default)
     {
         if (rpcParams.Receive.SenderClientId != OwnerClientId)
             return;
@@ -293,7 +309,8 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             return;
         }
 
-        StartServerAttack(direction);
+        // 각은 다시 재지 않고 상한만 자른다 — 지연이 길면 보낸 쪽만 손해다.
+        StartServerAttack(direction, movement.ClampAttackTurnDelay(turnDelay));
     }
 
     [Rpc(SendTo.Server)]
@@ -309,7 +326,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             serverNextDirection = Flatten(direction);
     }
 
-    private bool StartServer(int stepIndex, Vector3 direction, AssassinBasicAttackMode mode)
+    private bool StartServer(int stepIndex, Vector3 direction, AssassinBasicAttackMode mode, float turnDelay)
     {
         if (!TryGetStep(mode, stepIndex, out AssassinBasicAttackStepData step))
         {
@@ -331,15 +348,15 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             assassinState?.ServerConsumeEnhancement();
         }
 
-        BeginRuntime(stepIndex, direction, mode, step);
+        BeginRuntime(stepIndex, direction, mode, step, turnDelay);
         if (IsNetworkActive)
-            StartRpc(stepIndex, attackDirection, (byte)mode);
+            StartRpc(stepIndex, attackDirection, (byte)mode, turnDelay);
         player.RaiseServerBasicAttackStarted();   // 튜토리얼 훅 — 한 타 시작(적중 무관)
         return true;
     }
 
     [Rpc(SendTo.NotServer)]
-    private void StartRpc(int stepIndex, Vector3 direction, byte modeValue)
+    private void StartRpc(int stepIndex, Vector3 direction, byte modeValue, float turnDelay)
     {
         requesting = false;
         AssassinBasicAttackMode mode = (AssassinBasicAttackMode)modeValue;
@@ -349,7 +366,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             return;
         }
 
-        BeginRuntime(stepIndex, direction, mode, step);
+        BeginRuntime(stepIndex, direction, mode, step, turnDelay);
     }
 
     [Rpc(SendTo.Owner)]
@@ -390,7 +407,8 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         int stepIndex,
         Vector3 direction,
         AssassinBasicAttackMode mode,
-        AssassinBasicAttackStepData step)
+        AssassinBasicAttackStepData step,
+        float turnDelay)
     {
         active = true;
         requesting = false;
@@ -402,7 +420,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         currentMode = mode;
         attackDirection = Flatten(direction);
         serverNextDirection = attackDirection;
-        fallbackEndTime = Time.time + step.MotionDuration + data.EndFallbackPadding;
+        fallbackEndTime = Time.time + turnDelay + step.MotionDuration + data.EndFallbackPadding;
         nextInputSyncTime = Time.time;
 
         StopLunge();
@@ -416,9 +434,21 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         player.SetAnimatorMoving(false);
         combatIdle?.NotifyAttackStarted();
 
+        hasPendingClip = turnDelay > 0f;
+        if (hasPendingClip)
+        {
+            pendingClipTime = Time.time + turnDelay;
+            return;
+        }
+
+        PlayAttackClip();
+    }
+
+    private void PlayAttackClip()
+    {
         if (animator != null)
         {
-            animator.SetInteger(AttackIndexHash, AnimatorIndexFor(mode, currentStepIndex));
+            animator.SetInteger(AttackIndexHash, AnimatorIndexFor(currentMode, currentStepIndex));
             animator.SetTrigger(DefaultAttackHash);
         }
     }
@@ -469,7 +499,9 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             combo.Complete(currentStepIndex, Time.time);
 
         // 계속 누르고 있으면 다음 타·다음 묶음. 변신 종료 대기면 시작하지 못하고 여기서 끝난다.
-        if (serverContinueHeld && StartServerAttack(serverNextDirection))
+        // 다음 타의 회전 지연은 서버가 잰다 — 이 타 내내 몸이 이 타 방향에 고정돼 있어 NT 값도 이미 따라와 있다.
+        if (serverContinueHeld &&
+            StartServerAttack(serverNextDirection, movement.GetAttackTurnDelay(serverNextDirection)))
             return;
 
         EndServer();
@@ -505,6 +537,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         serverContinueHeld = false;
         hitsFired = 0;
         fallbackEndTime = 0f;
+        hasPendingClip = false;
         StopLunge();
     }
 

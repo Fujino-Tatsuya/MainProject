@@ -18,10 +18,13 @@ public class PlayerMovement : MonoBehaviour
     [DataTableIgnore] [SerializeField] private float alignThreshold = 0.98f;
     [DataTableIgnore] [SerializeField] private float viewYaw = -45f;
 
-    // 공격 방향 전환 보간(TurnToward). 이 각도 이하로 바뀌면 즉시 맞추고(연속 조준 추적),
-    // 넘으면 turnDuration 동안 돈다 — 크게 꺾을 때 순간 스냅으로 끊겨 보이던 것을 막는다.
-    [DataTableIgnore] [SerializeField, Min(0f)] private float attackTurnDuration = 0.08f;
-    [DataTableIgnore] [SerializeField, Range(0f, 180f)] private float attackTurnSnapAngle = 30f;
+    // 공격 방향 전환 보간(TurnToward). 스냅 각 이하로 바뀌면 즉시 맞추고(연속 조준 추적),
+    // 넘으면 각속도로 돈다 — 크게 꺾을 때 순간 스냅으로 끊겨 보이던 것을 막는다.
+    // 근접 평타(가붕이·어쌔신)는 다 돈 뒤에 그 단을 시작한다(할 일 43, AttackTurnTiming).
+    [Tooltip("근접 평타 방향 전환 각속도(도/초). 스냅 각보다 크게 꺾으면 이 속도로 돌고, 다 돈 뒤에 그 타가 나간다. 0 = 항상 즉시")]
+    [SerializeField, Min(0f)] private float attackTurnSpeed = 1500f;
+    [Tooltip("근접 평타 방향 전환 스냅 각(도). 이 각도 이하로 꺾으면 회전·지연 없이 즉시 맞춘다")]
+    [SerializeField, Range(0f, 180f)] private float attackTurnSnapAngle = 30f;
 
     // 🔴 회전은 물리 틱에서 돈다 — 시각 효과가 아니라 **시뮬레이션 상태**이기 때문이다.
     // Move()의 속도 계산이 armature.forward에 의존한다(dot >= alignThreshold면 즉시 최고속,
@@ -137,7 +140,29 @@ public class PlayerMovement : MonoBehaviour
     }
 
     /// <summary>
-    /// 공격 방향 전환용. 작은 변화는 즉시, 큰 변화는 <see cref="attackTurnDuration"/> 동안 빠르게 돈다.
+    /// 지금 몸 방향에서 <paramref name="direction"/> 까지 <see cref="TurnToward"/> 로 도는 데 걸리는 시간(초).
+    /// 근접 평타가 그 단의 시작을 이만큼 늦춘다. 스냅 각 이하면 0.
+    /// </summary>
+    public float GetAttackTurnDelay(Vector3 direction)
+    {
+        if (armature == null)
+            return 0f;
+
+        direction.y = 0f;
+
+        if (direction.sqrMagnitude < 0.001f)
+            return 0f;
+
+        float angle = Quaternion.Angle(armature.rotation, Quaternion.LookRotation(direction.normalized));
+        return AttackTurnTiming.Delay(angle, attackTurnSnapAngle, attackTurnSpeed);
+    }
+
+    /// <summary>오너가 보낸 회전 지연을 이 플레이어의 각속도로 가능한 범위로 자른다(서버용).</summary>
+    public float ClampAttackTurnDelay(float requested) =>
+        AttackTurnTiming.ClampRequested(requested, attackTurnSnapAngle, attackTurnSpeed);
+
+    /// <summary>
+    /// 공격 방향 전환용. 작은 변화는 즉시, 큰 변화는 <see cref="attackTurnSpeed"/>(도/초)로 돈다.
     /// 판정 방향은 호출자가 들고 있는 값이고 여기는 몸체 표시만 바꾼다.
     ///
     /// 회전 권한이 없는 피어(원격 프록시·클라 소유 플레이어의 서버 사본)는 Armature 를 NetworkTransform 이
@@ -158,15 +183,13 @@ public class PlayerMovement : MonoBehaviour
         Quaternion target = Quaternion.LookRotation(direction.normalized);
         float angle = Quaternion.Angle(armature.rotation, target);
 
-        if (!hasRotationAuthority || attackTurnDuration <= 0f || angle <= attackTurnSnapAngle)
+        if (!hasRotationAuthority || AttackTurnTiming.Delay(angle, attackTurnSnapAngle, attackTurnSpeed) <= 0f)
         {
             RotateImmediately(direction);
             return;
         }
 
-        // 같은 목표를 매 프레임 다시 불러도 처음 정한 속도를 유지해야 시간 안에 끝난다.
-        float requiredSpeed = angle / attackTurnDuration;
-        turnSpeed = isTurning ? Mathf.Max(turnSpeed, requiredSpeed) : requiredSpeed;
+        turnSpeed = attackTurnSpeed;
         turnTarget = target;
         isTurning = true;
         hasRotate = false;
