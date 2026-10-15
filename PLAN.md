@@ -1,3 +1,87 @@
+# ▶▶▶ 계획 = **어쌔신 R 변신 VFX — Blade Vortex 생성(0.5초)·유지·사라짐(0.5초)** (2026-10-14 · ✅ 1단계 컨펌 · ✅ 2단계 반입·배선 — 컴파일 에러 0 · ⏳ Play·MPPM)
+
+> 🔸 **단계 분리(2026-10-14 민경)**: 1단계 = MyProject 에서 `_Fast`·`_End` 수정 + 테스터로 확인까지. **컨펌 뒤** 2단계(아래 B·C·D — MainProject 반입·코드·배선)를 진행한다.
+> 1단계 산출물: `Export/Player3/BM Blade Vortex_Fast.prefab`·`BM Blade Vortex_End.prefab`, 테스터 `1.Scripts/BladeVortexTester.cs`(종료 = StopEmitting + ×outroPlayRate + End 원샷, outroDuration 뒤 루프 제거 — 2단계 EffectManager 동작과 동일). 빌드 스크립트는 세션 scratchpad `vortex_build.py`.
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-14). `AssassinSkillView`·`Player_Assassin.prefab` 은 은희 영역 → handoff 로 공유.
+
+## 목표
+- MyProject `Assets/Export/Player3/BM Blade Vortex.prefab` 을 어쌔신 **R 변신 루프 연출**로 쓴다:
+  변신 시작에 **0.5초 만에 차오르고** → 변신 동안 유지 → 변신이 끝나면 **0.5초 만에 바깥으로 흩어지며 사라진다**.
+
+## 결정 (grill 2026-10-14)
+| 항목 | 결정 |
+|---|---|
+| 역할 | `transformLoopPrefab`(임시 `CharacterCirclePurple`) 대체. 시전 1회 `transformCastPrefab`(`Poof_electric`)은 **제거** |
+| 사라짐 시점 | `AssassinState.TransformChanged(false)` 하나 — 시간 만료·수동 해제·쓰러짐/사망 모두 같은 연출 (쓰러짐도 `ResetForDownServer` → 같은 이벤트임을 확인) |
+| 재생 경로 | **EffectManager 전환**(Instantiate/Destroy 임시 경로에서 이 연출만 빠짐). 엔트리 하나 = `parts`[Vortex] + `outroParts`[End] |
+| 엔트리 위치 | **`EffectCatalog.Assassin_R_BladeVortex`**(프리워밍). `AssassinSkillView` 는 `PlayLooping` / `Release` 만 부른다 |
+| EffectStagePlayer 재활용 | **안 함**(Q13 다안). 단계 교체가 `ReleaseImmediate` 라 무작위 파티클 이펙트에서는 두 번 툭 끊긴다 |
+| 생성 0.5초 | 사본의 **기존 시스템을 직접 수정**: t=0 버스트(정상 상태 개체 수의 약 절반) + 알파 상승 키를 수명의 ~13% 로 + Size 시작값 ~0.8 + Flecks 지연 0 |
+| 사라짐 0.5초 | **`EffectEntry.outroPlayRate`(신규, 기본 1)** — Release 시 남은 루프 파티클을 ×8 로 돌려 자기 페이드아웃을 0.5초 안에 끝냄 + 바깥으로 흩어지는 `_End` 원샷을 겹친다 |
+| 저작 | MyProject **사본**에 제가 수치를 넣는다. 원본 `BM Blade Vortex` 는 그대로 |
+| 위치·크기 | 플레이어 루트 추종 + 오프셋(Vortex 아랫부분이 발밑에 오게 추정값, Play 에서 조정). 배율 1 시작 |
+| 이름·폴더 | `Assets/50.Art/VFX/Common/Players/Player3/R_Transform/FX_Assassin_BladeVortex.prefab` · `_End.prefab` · `_Entry.asset` |
+
+## 만드는 것
+### A. MyProject (샌드박스 `D:\김민경\유니티\My project`)
+1. `Assets/Export/Player3/BM Blade Vortex_Fast.prefab` — 원본 복제(새 guid).
+   - t=0 버스트: Smoke_burst 12 · Wind_Stuff 6(슬롯 신규) · Flecks 10 · Smoke_loop 3 · Wind_Radial 1. FuzzAdd/FuzzAlpha 의 기존 t=0 버스트 유지.
+   - Flecks `startDelay` 1.0 → 0.
+   - Color over Lifetime 알파 상승 키(0.31~0.52) → ~0.13. Size over Lifetime 시작값(0.45~0.61) → ~0.8.
+   - `Burst_1` 컨테이너의 꺼진 렌더러에 걸린 **없는 머티리얼 참조**(guid b739…) → 비움.
+2. `Assets/Export/Player3/BM Blade Vortex_End.prefab` — 같은 머티리얼로 만든 **원샷**(looping off, 총 ~0.5초).
+   - 바람 원판·연기·바람 줄기·반짝이: t=0 버스트, 수명 0.4~0.5초, 알파 1→0, 크기 1→0.5, **radial 속도 바깥(+)**, 회전(orbital)은 유지 방향 그대로.
+   - FuzzAlpha 블롭 t=0 1개(생성 때와 같은 마무리 펄스).
+
+### B. MainProject 반입 (guid 그대로)
+3. 위 두 프리팹 → `Players/Player3/R_Transform/FX_Assassin_BladeVortex(.prefab|_End.prefab)`.
+4. **의존 에셋 23개** — MainProject 에 하나도 없다(guid 검사 완료). 기존 관례(`50.Art/VFX/{ShaderGraph,_Materials,Textures,Models}`)에 `PilotoStudio/` 하위 폴더로 넣는다:
+   - `ShaderGraph/PilotoStudio/`: `UberFXSG.shadergraph` + 서브그래프 4개(`Functions/`)
+   - `_Materials/PilotoStudio/`: 머티리얼 7개
+   - `Textures/PilotoStudio/`: 텍스처 9개
+   - `Models/PilotoStudio/`: `SpiralMesh.fbx`, `UV_Distorted_PolarCord.fbx`
+   - **새 파일 추가만**(교체 없음)이라 Unity 를 켠 채로 가능. `50.Art` 는 SVN — **svn add 는 사람이**.
+
+### C. Effects 코드 (VFX 영역)
+5. `EffectEntry.cs` — `[Min(1f)] public float outroPlayRate = 1f;` (툴팁: Release 시 기존 루프 파트를 이 배속으로 돌려 남은 입자를 빨리 걷는다. 1 = 지금 동작).
+6. `EffectManager.Release` — StopEmitting 거는 그 루프에서 `outroPlayRate > 1` 이면 `DriverOf(instance)?.SetPlayRate(instance, active.playRate * outroPlayRate)`. 기본 1 이라 **기존 엔트리(ChargeBall 등) 동작 불변**.
+7. `EffectCatalog.cs` + `.asset` — `[Header("플레이어 — 어쌔신 변신(R)")] Assassin_R_BladeVortex`.
+8. `FX_Assassin_BladeVortex_Entry.asset` — parts[Vortex], outroParts[End], `outroDuration` 0.6, `outroPlayRate` 8, `prewarmCount` 2.
+
+### D. 어쌔신 (은희 영역 — handoff)
+9. `AssassinSkillView.cs`
+   - `transformLoopPrefab` · `transformCastPrefab` · `transformSocket` · `PlayTransformCast` 제거.
+   - `EffectHandle transformLoop` + `[SerializeField] Vector3 transformEffectOffset` · `float transformEffectScale = 1`.
+   - `HandleTransformChanged(true)` → (핸들 없을 때만) `PlayLooping(catalog.Assassin_R_BladeVortex, transform, offset, scale)`. `(false)` → `Release`. 늦은 접속 `SyncLoops` 는 그대로 동작.
+   - `OnDestroy` 에서 핸들 회수. 엔트리가 비면 경고 후 건너뜀.
+10. `AssassinTransformSkill.cs:49` — `PlayTransformCast` 호출 1줄 제거.
+11. `Player_Assassin.prefab` — 제거된 3개 필드 줄 삭제, 새 오프셋·배율 값.
+12. 문서: `Docs/tech/handoff-assassin-r-vfx.md`(은희용), `CONTEXT.md` 세션 기록.
+
+## 범위 밖
+- 어쌔신의 나머지 임시 연출(평타·Q 궤적·E·간파·백어택)의 EffectManager 전환.
+- `EffectStagePlayer` 변경.
+
+## 리스크
+- **×8 배속 마무리**: 마지막 0.5초에 소용돌이가 확 빨라진다 — 의도("빨려 사라짐")와 맞는지 Play 에서 확인. 어색하면 배속↓ + `outroDuration`↑ 로 조정(0.5초 목표와 맞바꿈).
+- **버스트 펄스**: t=0 버스트 개체가 같은 나이라 ~3초 뒤 같이 사라지며 밀도가 한 번 출렁일 수 있다 — 버스트 양으로 조절.
+- 알파 키를 앞당겨 **유지 모습이 살짝 진해진다**.
+- Piloto `UberFXSG` 는 샌드박스 URP 17.4 에서 저작, MainProject 는 17.3(ShaderGraph 는 둘 다 17.3) — 반입 후 셰이더 컴파일 에러 확인.
+- 아웃트로 중 `SetPlayRateForTarget`(히트스톱)이 같은 대상에 오면 배속을 덮어쓴다 — 플레이어 대상 히트스톱 호출은 현재 없음.
+- `AssassinSkillView`·프리팹은 은희 영역 — handoff 필수.
+
+## 검증 (완료 조건)
+- Refresh 후 컴파일 에러 0, 셰이더 에러 0. 반입 파일 `cmp` 일치 + guid 유지.
+- 기존 루프 엔트리(ChargeBall 등) `outroPlayRate` = 1 확인.
+- 사람 확인(Play):
+  - R 시전 → ~0.5초에 소용돌이가 차고 플레이어를 따라다님. `Poof_electric` 안 나옴.
+  - 시간 만료 / 2초 뒤 수동 해제 / 쓰러짐 → ~0.5초에 툭 끊김 없이 흩어져 사라짐.
+  - 연속 R(쿨 끝난 뒤) 반복 시 풀 누수 경고 없음.
+  - MPPM: 다른 피어에서도 보임, 변신 중 늦게 접속한 클라도 보임.
+
+---
+
 # ▶▶▶ 계획 = **사운드 데이터 테이블 (SoundCatalog 키 엔트리 + GameData.xlsx `Sound` 시트)** (2026-10-08 · 승인 ✅ · ✅ 구현 완료 · Play 확인(10-08))
 
 > 브랜치 `feature/SoundAssetDataTable` (development `37f97719` 기준). 결정: 은희.

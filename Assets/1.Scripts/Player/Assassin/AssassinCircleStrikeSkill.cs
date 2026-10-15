@@ -77,7 +77,8 @@ public sealed class AssassinCircleStrikeSkill : PlayerSkillBase
         Edit.Log($"[Assassin/E변신] 공격 시작 — 중심 {areaCenter}, 반경 {data.AreaRadius:F1}m, {data.HitCount}타, 피해 {damageSnapshot}/타", this);
     }
 
-    // 전 피어 — 임시 원 연출. 클라는 서버 재투영 지점을 모르므로 승인 방향 × 중심 거리로 근사한다(같은 1.5m 고정 거리).
+    // 전 피어 — 원 루프 연출(Multi Slashes). 클라는 서버 재투영 지점을 모르므로 승인 방향 × 중심 거리로 근사한다
+    // (같은 1.5m 고정 거리 — 시전자 화면에서는 바닥 원 표시 중심과 같다). 배율 = 원 반경.
     public override void OnClientPlay(Vector3 direction)
     {
         AssassinCircleStrikeSkillData data = StrikeData;
@@ -86,7 +87,7 @@ public sealed class AssassinCircleStrikeSkill : PlayerSkillBase
 
         direction.y = 0f;
         Vector3 forward = direction.sqrMagnitude > 0.001f ? direction.normalized : owner.transform.forward;
-        view.PlayCircleStrike(owner.transform.position + forward * data.CenterDistance);
+        view.BeginCircleStrike(owner.transform.position + forward * data.CenterDistance, data.AreaRadius, data.MaxActiveDuration);
     }
 
     public override void OnAnimationEvent(SkillAnimationEventType eventType)
@@ -113,6 +114,7 @@ public sealed class AssassinCircleStrikeSkill : PlayerSkillBase
         // 완료면 이미 다 쳤다. 사망·강제 중단이면 남은 타는 버린다(§12.2-3).
         sequence.Stop();
         RemoveInvulnerability();
+        view?.EndCircleStrike();   // 전 피어 — 완료·중단 모두 같은 사라짐
         base.OnEnd(reason);
     }
 
