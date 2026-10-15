@@ -101,21 +101,26 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
     {
         // 대시 우선 — 행동이 허락하면 그 행동을 끊고 대시(BeginDash 가 현재 상태를 덮는다: 공격은 CancelCurrentAttack,
         // 스킬은 HandleSkillStateExit(Dash) → SkillEndReason.DashCancelled).
-        // 선입력 버퍼에 남은 대시(끊을 수 없는 행동 중에 눌렀거나 충전이 없었던 것)도 같은 식으로 받는다 — 성공하면 비운다.
+        // 선입력 버퍼에 남은 대시(끊을 수 없는 행동 중에 누른 것)도 같은 식으로 받는다 — 성공하면 비우고,
+        // 충전이 없어 거부되면 그 대시만 버린다(재시도·거부 로그 반복 없음). 그 밖의 거부는 남겨 다시 시도한다.
         bool dashHandled = false;
+        bool dashDropped = false;
         if (context.Input != null && !CurrentStateReadsActionInput &&
             (context.Input.DashPressed || context.Input.HasBufferedInput(PlayerBufferedInput.Dash)) &&
             CurrentActionAllowsDashCancel && context.Dash != null)
         {
             dashHandled = context.Dash.TryBeginPredictedDash(cancelsAction: true);
-            if (dashHandled)
-                context.Input.ClearInputBuffer();
+            dashDropped = !dashHandled && context.Dash.IsOutOfCharge;
+            context.Input.ResolveBufferedInput(PlayerBufferedInput.Dash,
+                dashHandled ? PlayerActionAttempt.Started
+                : dashDropped ? PlayerActionAttempt.OutOfResource
+                : PlayerActionAttempt.Blocked);
         }
 
         // ⚠️ "대시가 됐다 말았다"의 가장 흔한 무증상 경로: 대시 입력이 상태 때문에 바로 실행되지 않는 경우.
         // 공격·스킬 모션 중 Shift를 누르면 TryBeginPredictedDash가 호출조차 되지 않아
         // 시작 로그도, 거부 로그도 남지 않는다(누른 프레임에만 한 줄이므로 스팸이 아니다).
-        if (!dashHandled && context.Input != null && context.Input.DashPressed && !CurrentStateReadsActionInput)
+        if (!dashHandled && !dashDropped && context.Input != null && context.Input.DashPressed && !CurrentStateReadsActionInput)
         {
             Edit.LogWarning(
                 $"[Dash] 입력 보류: 현재 상태 {CurrentState}는 액션 입력을 읽지 않습니다(Idle/Move에서만 대시 입력 처리). " +
@@ -597,7 +602,8 @@ public abstract class PlayerStateBase : IPlayerState
     protected bool TryConsumeActionInput()
     {
         // 각 입력은 '이번 프레임 눌림 또는 선입력 버퍼에 살아 있음'으로 본다(할 일 44).
-        // 행동 시작에 성공하면 버퍼를 비우고, 실패(쿨다운 등)하면 만료까지 남겨 다음 틱에 다시 시도한다.
+        // 행동 시작에 성공하면 버퍼를 비운다. 쿨타임·대시 충전 없음·과열(자원 부족)로 거부되면 그 입력을 바로 버리고,
+        // 그 밖의 거부(요청 응답 대기·CC 등)는 만료까지 남겨 다음 틱에 다시 시도한다 — PlayerActionAttempt.
         bool dashRequested = Context.Input.DashPressed || Context.Input.HasBufferedInput(PlayerBufferedInput.Dash);
 
         // 조준 모드 중에는 일반 액션 입력(공격/다른 스킬/인터럽트)을 억제한다.
@@ -622,21 +628,31 @@ public abstract class PlayerStateBase : IPlayerState
 
         // 대시 우선: Idle/Move에서 대시와 공격·스킬이 같은 프레임이면 대시가 이긴다. (PLAN §7)
         // 사용 불가능한 대시 입력은 여기서 소비되지 않아 아래 공격·스킬 경로가 보존된다.
-        if (Context.Dash != null &&
-            dashRequested &&
-            Context.Dash.TryBeginPredictedDash())
+        if (Context.Dash != null && dashRequested)
         {
-            Context.Input.ClearInputBuffer();
-            return true;
+            if (Context.Dash.TryBeginPredictedDash())
+            {
+                Context.Input.ClearInputBuffer();
+                return true;
+            }
+
+            if (Context.Dash.IsOutOfCharge)
+                Context.Input.ResolveBufferedInput(PlayerBufferedInput.Dash, PlayerActionAttempt.OutOfResource);
         }
 
         // 공격 시작은 누른 프레임(press)이나 버퍼된 press 에만 허용한다. 홀드 상태로는 시작되지 않으므로,
         // Once 정책에서 체인이 끝난 뒤 계속 누르고 있어도 재시작되지 않는다(릴리즈 요구).
         if ((Context.Input.AttackPressed || Context.Input.HasBufferedInput(PlayerBufferedInput.Attack)) &&
-            Context.DefaultAttack != null && Context.DefaultAttack.TryStart())
+            Context.DefaultAttack != null)
         {
-            Context.Input.ClearInputBuffer();
-            return true;
+            if (Context.DefaultAttack.TryStart())
+            {
+                Context.Input.ClearInputBuffer();
+                return true;
+            }
+
+            if (Context.DefaultAttack.IsOutOfResource)
+                Context.Input.ResolveBufferedInput(PlayerBufferedInput.Attack, PlayerActionAttempt.OutOfResource);
         }
 
         if (TryStartSkillInput())
@@ -671,9 +687,20 @@ public abstract class PlayerStateBase : IPlayerState
 
     private bool TryStartSkill(PlayerSkillController skills, PlayerSkillSlot slot)
     {
-        return (Context.Input.GetSkillPressed(slot) ||
-                Context.Input.HasBufferedInput(PlayerInputBuffer.FromSkillSlot(slot))) &&
-            skills.TryUse(slot);
+        PlayerBufferedInput kind = PlayerInputBuffer.FromSkillSlot(slot);
+        if (!Context.Input.GetSkillPressed(slot) && !Context.Input.HasBufferedInput(kind))
+            return false;
+
+        // 쿨타임 거부 — 시전 요청을 보내지 않고 입력을 버린 뒤 피드백을 한 번 낸다. 버렸으니 다음 틱에 같은 입력이
+        // 다시 거부·피드백되지 않는다(입력 1회 = 피드백 1회). 실행·요청 중(바쁨)은 여기 걸리지 않고 버퍼에 남는다.
+        if (skills.IsBlockedByCooldown(slot))
+        {
+            Context.Input.ResolveBufferedInput(kind, PlayerActionAttempt.OutOfResource);
+            skills.NotifyCooldownRejected(slot);
+            return false;
+        }
+
+        return skills.TryUse(slot);
     }
 }
 

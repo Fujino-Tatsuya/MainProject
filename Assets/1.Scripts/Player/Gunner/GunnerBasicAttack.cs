@@ -106,6 +106,8 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
 
     // ── IPlayerBasicAttack ───────────────────────────────────────────────
 
+    public bool IsOutOfResource => heat != null && heat.IsOverheated;
+
     public bool TryStart()
     {
         if (active || isRequesting || data == null || player == null || heat.IsOverheated)

@@ -16,6 +16,12 @@ public interface IPlayerBasicAttack
     /// </summary>
     bool CanBeCanceledByDash { get; }
 
+    /// <summary>
+    /// 자원이 모자라 지금 새 공격을 시작할 수 없는가(거너 과열). 참이면 <see cref="TryStart"/> 거부 입력을
+    /// 선입력 버퍼에서 바로 버린다 — 행동 중이라 못 쓴 입력만 들고 있는다(할 일 44). 자원이 없는 캐릭터는 항상 false.
+    /// </summary>
+    bool IsOutOfResource { get; }
+
     /// <summary>오너 입력으로 공격 시작을 시도한다. 시작 요청이 나가면 true.</summary>
     bool TryStart();
 

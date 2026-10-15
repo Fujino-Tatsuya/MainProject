@@ -116,6 +116,8 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         }
     }
 
+    public bool IsOutOfResource => false;
+
     public bool TryStart()
     {
         if (active || requesting || player == null || !CanStartApprovedAttack)

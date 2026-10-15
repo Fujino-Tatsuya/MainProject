@@ -225,6 +225,8 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
         return false;
     }
 
+    public bool IsOutOfResource => false;
+
     public bool TryStart()
     {
         if (IsAttacking || isRequestingAttack || player == null || !CanRequestStart)
