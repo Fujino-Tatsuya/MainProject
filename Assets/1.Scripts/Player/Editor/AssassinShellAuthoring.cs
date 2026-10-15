@@ -1113,8 +1113,7 @@ public static class AssassinShellAuthoring
         AnimatorState transformedAttack = EnsureState(sm, TransformedAttackState, LoadClip("Speed_Attack_Loop"));
         transformedAttack.speed = attackData != null && attackData.TransformedStep != null ? attackData.TransformedStep.PlaybackSpeed : 1.25f;
         EnsureReturnToIdleTransitions(transformedAttack, idle, combatIdle);
-        // 유지 입력으로 묶음을 반복하면 같은 상태로 다시 들어가야 한다.
-        EnsureAnyStateAttackTransition(sm, transformedAttack, AssassinBasicAttack.TransformedAnimatorIndex, canTransitionToSelf: true);
+        EnsureAnyStateAttackTransition(sm, transformedAttack, AssassinBasicAttack.TransformedAnimatorIndex);
 
         // A7: 스킬 상태는 PlayerSkillController 가 animatorStateName 으로 CrossFade 한다(AnyState 전이 불필요).
         // 일반 E Buff 는 걸으며 쓰므로 0층이 아니라 상체 레이어에 둔다(EnsureUpperBodyLayer).
@@ -1541,8 +1540,12 @@ public static class AssassinShellAuthoring
         transition.AddCondition(mode, threshold, parameter);
     }
 
+    // 평타 전이는 모두 같은 상태로 다시 들어갈 수 있어야 한다 — 변신 묶음 반복뿐 아니라, 콤보 유예가 0 이라
+    // 끊고 다시 누르면 늘 1타라서 직전 1타 꼬리(End 이벤트 85% ~ 복귀 98%)에 누른 1타가 막힌다.
+    // 막히면 트리거가 남아 Idle_Combat 으로 빠졌다가 늦게 1타가 틀어지고(할 일 42-1), 그 사이 대시 등으로
+    // 끊기면 남은 트리거가 엉뚱한 때 1타를 튼다. 트리거는 SetTrigger 한 번에 한 번만 소모되니 재진입은 요청 때만 일어난다.
     private static void EnsureAnyStateAttackTransition(
-        AnimatorStateMachine machine, AnimatorState to, int attackIndex, bool canTransitionToSelf = false)
+        AnimatorStateMachine machine, AnimatorState to, int attackIndex)
     {
         foreach (AnimatorStateTransition existing in machine.anyStateTransitions)
         {
@@ -1551,7 +1554,7 @@ public static class AssassinShellAuthoring
                 HasCondition(conditions, "DefaultAttack", AnimatorConditionMode.If, 0f) &&
                 HasCondition(conditions, "AttackIndex", AnimatorConditionMode.Equals, attackIndex))
             {
-                existing.canTransitionToSelf = canTransitionToSelf;
+                existing.canTransitionToSelf = true;
                 return;
             }
         }
@@ -1559,7 +1562,7 @@ public static class AssassinShellAuthoring
         AnimatorStateTransition transition = machine.AddAnyStateTransition(to);
         transition.hasExitTime = false;
         transition.duration = 0.04f;
-        transition.canTransitionToSelf = canTransitionToSelf;
+        transition.canTransitionToSelf = true;
         transition.AddCondition(AnimatorConditionMode.If, 0f, "DefaultAttack");
         transition.AddCondition(AnimatorConditionMode.Equals, attackIndex, "AttackIndex");
     }
