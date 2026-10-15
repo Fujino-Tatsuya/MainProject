@@ -45,8 +45,9 @@ public sealed class AssassinTransformSkill : PlayerInstantSkill
             owner.StatusEffects.Apply(StatusEffectType.SuperArmor, Data.MaxActiveDuration, SourceId);
     }
 
-    public override void OnClientPlay(Vector3 direction) =>
-        AssassinSkillView.Play(owner, v => v.PlayTransformCast());
+    // 시전 1회 연출 없음 — 변신 루프(Blade Vortex)의 차오름이 시전 연출을 겸한다.
+    // 루프는 AssassinSkillView 가 AssassinState.TransformChanged 로 켠다(2026-10-14 민경).
+    public override void OnClientPlay(Vector3 direction) { }
 
     public override void OnEnd(SkillEndReason reason)
     {

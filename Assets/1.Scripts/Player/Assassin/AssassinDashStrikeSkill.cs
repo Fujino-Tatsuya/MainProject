@@ -97,9 +97,14 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
     public override void OnClientPlay(Vector3 direction)
     {
         dashDirection = Flatten(direction);
-        view?.BeginDashTrail();
 
         AssassinDashStrikeSkillData data = DashData;
+        // 일반 Q = 임시 돌진 궤적, 변신 Q = Storm Slash 루프(궤적 없음). 데이터 타입으로 가른다
+        // (변신 상태 복제보다 확실하다. 이 인스턴스가 곧 alternateSkills[Main]).
+        if (data is AssassinTransformedDashStrikeSkillData)
+            view?.BeginStormSlash(data.MaxActiveDuration);
+        else
+            view?.BeginDashTrail();
         if (data == null || motor == null || owner == null || !owner.IsSimulating)
             return;
 
@@ -181,7 +186,9 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
         // 사망·강제 종료면 아직 훑지 않은 경로의 타격은 버린다(§12.2-3).
         isServerSweeping = false;
         StopLocalDash();
-        view?.EndDashTrail();
+        view?.EndDashTrail();   // 궤적이 없으면(변신 Q) 조용한 no-op
+        if (DashData is AssassinTransformedDashStrikeSkillData)
+            view?.EndStormSlash();   // 전 피어 — 완료·벽 조기 종료·강제 중단 공통
         if (motor != null)
             motor.PassThroughUnitsOverride = false;
 

@@ -355,10 +355,16 @@ public class EffectManager : MonoBehaviour
         Schedule(active, active.entry.outroParts, true);
         FirePending(active, 0f);
 
+        // outroPlayRate > 1 이면 남은 입자를 빨리 돌려 outroDuration 안에 자기 페이드아웃을 마치게 한다.
+        // 반납 시 ResetForPool 이 배속을 1로 되돌린다.
+        float outroRate = active.entry.outroPlayRate > 1f ? active.playRate * active.entry.outroPlayRate : 0f;
+
         for (int i = 0; i < beforeOutro; i++)
         {
             GameObject instance = active.instances[i].go;
-            DriverOf(instance)?.Stop(instance, false);
+            IEffectSystem driver = DriverOf(instance);
+            driver?.Stop(instance, false);
+            if (outroRate > 0f) driver?.SetPlayRate(instance, outroRate);
         }
 
         float life = active.entry.ResolvedOutroDuration;
