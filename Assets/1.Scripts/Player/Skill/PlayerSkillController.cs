@@ -289,9 +289,14 @@ public class PlayerSkillController : BaseNetworkBehaviour
     }
 
     // 같은 스킬키 재입력 여부 — 조준 취소 판별용(PlayerSkillTargeting에서 조회).
+    // 참이면 조준 취소에 쓰이므로 선입력 버퍼에서도 지운다 — 취소 뒤 같은 스킬 재시전으로 이어지지 않게(할 일 44).
     public bool WasSkillRePressed(PlayerSkillSlot slot)
     {
-        return inputReader != null && inputReader.GetSkillPressed(slot);
+        if (inputReader == null || !inputReader.GetSkillPressed(slot))
+            return false;
+
+        inputReader.ConsumeBufferedSkillInput(slot);
+        return true;
     }
 
     // 실제 시전 공통 경로. aimPoint는 GroundPoint 확정 지점(hasAimPoint일 때만 유효).
@@ -667,6 +672,8 @@ public class PlayerSkillController : BaseNetworkBehaviour
 
         if (activeSkill.ConsumesPrimaryInput && inputReader != null && inputReader.AttackPressed)
         {
+            // 스킬이 받은 좌클릭이 스킬이 끝난 뒤 평타로 한 번 더 나가지 않게 한다(할 일 44).
+            inputReader.ConsumeBufferedInput(PlayerBufferedInput.Attack);
             if (!IsNetworkActive)
                 activeSkill.OnPrimaryPressed(aim);
             else
@@ -708,7 +715,12 @@ public class PlayerSkillController : BaseNetworkBehaviour
             return false;
         }
 
-        return inputReader.GetSkillPressed(activeSkill.Slot);
+        // 종료에 쓴 재입력이 스킬이 끝난 뒤 같은 스킬 재시전으로 이어지지 않게 선입력 버퍼에서 지운다(할 일 44).
+        if (!inputReader.GetSkillPressed(activeSkill.Slot))
+            return false;
+
+        inputReader.ConsumeBufferedSkillInput(activeSkill.Slot);
+        return true;
     }
 
     // ── RPC (오너 → 서버) ──

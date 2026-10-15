@@ -280,6 +280,12 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         if (!releaseLatched && !input.AttackHeld)
             releaseLatched = true;
 
+        // 뗀 적 없이(프레임 사이 짧은 탭 포함) 이번 타 중에 눌린 입력은 홀드 이어가기에 쓰인다 —
+        // 공격이 끝난 뒤 새 평타로 한 번 더 나가지 않게 선입력 버퍼에서 지운다(할 일 44).
+        // 뗀 뒤 다시 누른 입력은 이어가기에 안 쓰이므로 남겨 공격이 끝난 뒤 새 평타로 실행한다.
+        if (!releaseLatched && input.AttackPressed)
+            input.ConsumeBufferedInput(PlayerBufferedInput.Attack);
+
         Vector3 direction = CurrentAimDirection();
         bool held = !releaseLatched;
 

@@ -210,6 +210,8 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
         // 창 밖이어도 서버는 "누르고 있음"으로 받아 홀드가 이어진다.
         if (input.AttackPressed)
         {
+            // 발사 중 클릭은 여기서 홀드/예약으로 쓴다 — 공격이 끝난 뒤 새 평타로 한 번 더 나가지 않게 선입력 버퍼에서 지운다(할 일 44).
+            input.ConsumeBufferedInput(PlayerBufferedInput.Attack);
             holdSent = true;
             nextHoldSignalTime = Time.time + data.FireInterval * HoldSignalIntervals;
             // 오너도 같은 창으로 자기 예약을 든다 — 서버 예약과 기준(각자의 직전 발사)이 같아 지터만큼만 어긋난다.

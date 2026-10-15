@@ -227,6 +227,9 @@ public sealed class AssassinState : BaseNetworkBehaviour, IPassiveTooltipProvide
         if (input == null || !State.transformed || !input.GetSkillPressed(PlayerSkillSlot.Ultimate))
             return;
 
+        // 변신 중 R 은 해제 입력으로만 쓴다 — FSM 시전 경로(CanUse 거부)로 다시 넘기지 않게 선입력 버퍼에서 지운다(할 일 44).
+        input.ConsumeBufferedInput(PlayerBufferedInput.SkillUltimate);
+
         // 2초 전 입력은 무시하고 예약하지 않는다. 서버가 같은 규칙으로 다시 검증한다.
         if (!CanRequestRelease)
             return;

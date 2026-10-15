@@ -74,7 +74,7 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
     public string LastTransitionCause { get; private set; } = "(없음)";
 
     // Idle/Move만 PlayerStateBase.TryConsumeActionInput을 호출한다 —
-    // 그 외 상태(공격·스킬·인터럽트·넉백·그랩·연출·대시·사망)에서는 Shift가 조용히 버려진다.
+    // 그 외 상태(공격·스킬·인터럽트·넉백·그랩·연출·대시)에서 누른 입력은 선입력 버퍼에 남아 Idle/Move 로 돌아온 첫 틱에 실행된다(할 일 44).
     private bool CurrentStateReadsActionInput =>
         CurrentState == PlayerActionState.Idle || CurrentState == PlayerActionState.Move;
 
@@ -101,21 +101,27 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
     {
         // 대시 우선 — 행동이 허락하면 그 행동을 끊고 대시(BeginDash 가 현재 상태를 덮는다: 공격은 CancelCurrentAttack,
         // 스킬은 HandleSkillStateExit(Dash) → SkillEndReason.DashCancelled).
+        // 선입력 버퍼에 남은 대시(끊을 수 없는 행동 중에 눌렀거나 충전이 없었던 것)도 같은 식으로 받는다 — 성공하면 비운다.
         bool dashHandled = false;
-        if (context.Input != null && context.Input.DashPressed && !CurrentStateReadsActionInput &&
+        if (context.Input != null && !CurrentStateReadsActionInput &&
+            (context.Input.DashPressed || context.Input.HasBufferedInput(PlayerBufferedInput.Dash)) &&
             CurrentActionAllowsDashCancel && context.Dash != null)
         {
             dashHandled = context.Dash.TryBeginPredictedDash(cancelsAction: true);
+            if (dashHandled)
+                context.Input.ClearInputBuffer();
         }
 
-        // ⚠️ "대시가 됐다 말았다"의 가장 흔한 무증상 경로: 대시 입력이 상태 때문에 아예 읽히지 않는 경우.
+        // ⚠️ "대시가 됐다 말았다"의 가장 흔한 무증상 경로: 대시 입력이 상태 때문에 바로 실행되지 않는 경우.
         // 공격·스킬 모션 중 Shift를 누르면 TryBeginPredictedDash가 호출조차 되지 않아
-        // 시작 로그도, 거부 로그도 남지 않는다(입력 1회당 한 줄이므로 스팸이 아니다).
+        // 시작 로그도, 거부 로그도 남지 않는다(누른 프레임에만 한 줄이므로 스팸이 아니다).
         if (!dashHandled && context.Input != null && context.Input.DashPressed && !CurrentStateReadsActionInput)
         {
             Edit.LogWarning(
-                $"[Dash] 입력 무시: 현재 상태 {CurrentState}는 액션 입력을 읽지 않습니다(Idle/Move에서만 대시 입력 처리). " +
-                "이 프레임의 Shift는 버퍼되지 않고 버려집니다.", this);
+                $"[Dash] 입력 보류: 현재 상태 {CurrentState}는 액션 입력을 읽지 않습니다(Idle/Move에서만 대시 입력 처리). " +
+                (context.Input.InputBufferSeconds > 0f
+                    ? $"이 Shift는 선입력 버퍼에 {context.Input.InputBufferSeconds:0.##}초 보관돼 Idle/Move 로 돌아오면 실행되고, 그 전에 지나면 버려집니다."
+                    : "선입력 버퍼가 꺼져 있어(유지 0초) 이 Shift는 버려집니다."), this);
         }
 
         currentState?.Tick();
@@ -590,10 +596,14 @@ public abstract class PlayerStateBase : IPlayerState
 
     protected bool TryConsumeActionInput()
     {
+        // 각 입력은 '이번 프레임 눌림 또는 선입력 버퍼에 살아 있음'으로 본다(할 일 44).
+        // 행동 시작에 성공하면 버퍼를 비우고, 실패(쿨다운 등)하면 만료까지 남겨 다음 틱에 다시 시도한다.
+        bool dashRequested = Context.Input.DashPressed || Context.Input.HasBufferedInput(PlayerBufferedInput.Dash);
+
         // 조준 모드 중에는 일반 액션 입력(공격/다른 스킬/인터럽트)을 억제한다.
         // 좌클릭 확정·Esc/재입력 취소는 PlayerSkillTargeting이 직접 처리한다.
         // 대상 지정 중 대시 — 조준 중인 스킬이 허락하면(거너 R) 조준을 취소(쿨 없음)하고 아래 대시 경로로 넘어간다.
-        if (Context.Skills != null && Context.Input.DashPressed && Context.Skills.CanCancelTargetingByDash)
+        if (Context.Skills != null && dashRequested && Context.Skills.CanCancelTargetingByDash)
             Context.Skills.CancelTargeting();
 
         if (Context.Skills != null && Context.Skills.IsChoosingTarget)
@@ -605,32 +615,40 @@ public abstract class PlayerStateBase : IPlayerState
                     "조준을 확정/취소한 뒤 대시가 가능합니다.", Context.Player);
             }
 
+            // 억제된 입력(확정 좌클릭·취소 우클릭·재입력 포함)은 버퍼에도 남기지 않는다 — 조준이 끝난 뒤 뒤늦게 실행되면 이중 실행이다.
+            Context.Input.ClearInputBuffer();
             return false;
         }
 
         // 대시 우선: Idle/Move에서 대시와 공격·스킬이 같은 프레임이면 대시가 이긴다. (PLAN §7)
         // 사용 불가능한 대시 입력은 여기서 소비되지 않아 아래 공격·스킬 경로가 보존된다.
         if (Context.Dash != null &&
-            Context.Input.DashPressed &&
+            dashRequested &&
             Context.Dash.TryBeginPredictedDash())
         {
+            Context.Input.ClearInputBuffer();
             return true;
         }
 
-        // 공격 시작은 누른 프레임(press)에만 허용한다. 홀드 상태로는 시작되지 않으므로,
+        // 공격 시작은 누른 프레임(press)이나 버퍼된 press 에만 허용한다. 홀드 상태로는 시작되지 않으므로,
         // Once 정책에서 체인이 끝난 뒤 계속 누르고 있어도 재시작되지 않는다(릴리즈 요구).
-        if (Context.Input.AttackPressed &&
+        if ((Context.Input.AttackPressed || Context.Input.HasBufferedInput(PlayerBufferedInput.Attack)) &&
             Context.DefaultAttack != null && Context.DefaultAttack.TryStart())
         {
+            Context.Input.ClearInputBuffer();
             return true;
         }
 
         if (TryStartSkillInput())
+        {
+            Context.Input.ClearInputBuffer();
             return true;
+        }
 
-        if (Context.Input.InterruptPressed &&
+        if ((Context.Input.InterruptPressed || Context.Input.HasBufferedInput(PlayerBufferedInput.SkillInterrupt)) &&
             Context.Controller.ChangeState(PlayerActionState.Interrupt))
         {
+            Context.Input.ClearInputBuffer();
             return true;
         }
 
@@ -645,10 +663,17 @@ public abstract class PlayerStateBase : IPlayerState
 
         // Interrupt 슬롯에 스킬(단죄의 방패)이 배정되면 여기서 소비되어
         // 아래 기존 Interrupt 상태 경로를 자연히 대체한다. 미배정이면 TryUse가 false라 기존 경로 유지.
-        return (Context.Input.GetSkillPressed(PlayerSkillSlot.Main) && skills.TryUse(PlayerSkillSlot.Main)) ||
-            (Context.Input.GetSkillPressed(PlayerSkillSlot.Sub) && skills.TryUse(PlayerSkillSlot.Sub)) ||
-            (Context.Input.GetSkillPressed(PlayerSkillSlot.Interrupt) && skills.TryUse(PlayerSkillSlot.Interrupt)) ||
-            (Context.Input.GetSkillPressed(PlayerSkillSlot.Ultimate) && skills.TryUse(PlayerSkillSlot.Ultimate));
+        return TryStartSkill(skills, PlayerSkillSlot.Main) ||
+            TryStartSkill(skills, PlayerSkillSlot.Sub) ||
+            TryStartSkill(skills, PlayerSkillSlot.Interrupt) ||
+            TryStartSkill(skills, PlayerSkillSlot.Ultimate);
+    }
+
+    private bool TryStartSkill(PlayerSkillController skills, PlayerSkillSlot slot)
+    {
+        return (Context.Input.GetSkillPressed(slot) ||
+                Context.Input.HasBufferedInput(PlayerInputBuffer.FromSkillSlot(slot))) &&
+            skills.TryUse(slot);
     }
 }
 
@@ -827,6 +852,9 @@ public sealed class PlayerLockedState : PlayerStateBase
     public override void Enter(PlayerActionState previousState)
     {
         Context.Player.SetAnimatorMoving(false);
+
+        // 사망·연출 잠금 전에 눌린 선입력은 풀린 뒤에 실행하지 않는다.
+        Context.Input.ClearInputBuffer();
     }
 }
 
