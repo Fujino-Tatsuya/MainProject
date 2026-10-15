@@ -45,6 +45,8 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     private bool finishingTail;
     private bool releaseLatched;
     private bool serverContinueHeld;
+    // 이번 타(일반 1타·강타 1회)의 분노 게이지 충전을 이미 받았는가 — 타 하나에 1번(§4.2).
+    private bool rageClaimed;
     private int hitsFired;
     private int currentStepIndex;
     private AssassinBasicAttackMode currentMode;
@@ -53,8 +55,12 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     private float fallbackEndTime;
     private float nextInputSyncTime;
     private PlayerActionState observedState;
+    // 강타 전진 — 시뮬레이션 피어(오너, 서버 권위 이동이면 서버도)만 모터에 낸다. 끝·취소·막힘이면 0.
+    private float lungeRemaining;
+    private PlayerMotor motor;
 
     public bool CanStartApprovedAttack => data != null && data.TryGetNormalStep(0, out _);
+    // 일반 타·강타·변신 묶음 어디서든 대시로 끊는다(할 일 9). 나간 타격의 피해는 그대로, 남은 동작만 끊긴다.
     public bool CanBeCanceledByDash => true;
     public AssassinBasicAttackData Data => data;
 
@@ -72,6 +78,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         combatIdle = GetComponent<AssassinCombatIdle>();
         assassinState = GetComponent<AssassinState>();
         view = GetComponent<AssassinSkillView>();
+        motor = GetComponent<PlayerMotor>();
 
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
@@ -130,7 +137,17 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             CompleteCurrentStep();
     }
 
-    public void FixedTickMovement() { }
+    // 강타 전진(§8.2) — 승인 방향으로 판정 프레임 전까지 나눠 낸다. 적 통과 없음(벽·몸 콜라이더 켜진 적에 막힘).
+    public void FixedTickMovement()
+    {
+        if (!active || lungeRemaining <= 0f || motor == null || data == null || !player.IsSimulating)
+            return;
+
+        float step = AssassinLungeRules.StepDistance(
+            lungeRemaining, data.EnhancedLungeDistance, data.EnhancedLungeDuration, Time.fixedDeltaTime);
+        lungeRemaining -= step;
+        motor.AddGroundedDisplacement(attackDirection * step);
+    }
 
     public void CancelCurrentAttack()
     {
@@ -317,6 +334,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         BeginRuntime(stepIndex, direction, mode, step);
         if (IsNetworkActive)
             StartRpc(stepIndex, attackDirection, (byte)mode);
+        player.RaiseServerBasicAttackStarted();   // 튜토리얼 훅 — 한 타 시작(적중 무관)
         return true;
     }
 
@@ -378,6 +396,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         requesting = false;
         releaseLatched = false;
         serverContinueHeld = true;
+        rageClaimed = false;
         hitsFired = 0;
         currentStepIndex = stepIndex;
         currentMode = mode;
@@ -385,6 +404,13 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         serverNextDirection = attackDirection;
         fallbackEndTime = Time.time + step.MotionDuration + data.EndFallbackPadding;
         nextInputSyncTime = Time.time;
+
+        StopLunge();
+        if (mode == AssassinBasicAttackMode.Enhanced && motor != null && player.IsSimulating)
+        {
+            lungeRemaining = data.EnhancedLungeDistance;
+            motor.MovementResolved += HandleLungeMovementResolved;
+        }
 
         movement.TurnToward(attackDirection);
         player.SetAnimatorMoving(false);
@@ -423,11 +449,14 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             damage,
             data.TriggersOnHit);
 
-        // 강타가 보스·몹·송전기를 맞히면 대상 수와 무관하게 1스택(§4.2·§4.3). 변신 중 획득 없음은 모델이 막는다.
-        if (currentMode == AssassinBasicAttackMode.Enhanced && assassinState != null &&
+        // 일반 1타·강타가 유효 대상(§4.3)을 맞히면 대상 수와 무관하게 1번 충전(§4.2). 변신 묶음은 충전 없음 — 모델도 막는다.
+        if (!rageClaimed && currentMode != AssassinBasicAttackMode.Transformed && assassinState != null &&
             AssassinHitTargets.ContainsRewardTarget(coneAttack.LastLandedUnits))
         {
-            assassinState.ServerTryGainStack();
+            rageClaimed = true;
+            assassinState.ServerTryGainRage(currentMode == AssassinBasicAttackMode.Enhanced
+                ? AssassinRageSource.EnhancedStrike
+                : AssassinRageSource.BasicAttack);
         }
     }
 
@@ -476,6 +505,26 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         serverContinueHeld = false;
         hitsFired = 0;
         fallbackEndTime = 0f;
+        StopLunge();
+    }
+
+    // 벽·적 몸에 막히면 남은 전진을 버린다 — 막힌 자리에서 옆으로 미끄러지지 않게(Q 돌진과 같은 규칙).
+    private void HandleLungeMovementResolved(Vector3 requested, Vector3 resolved, bool wasBlocked)
+    {
+        if (wasBlocked || lungeRemaining <= 0f)
+            StopLunge();
+    }
+
+    private void StopLunge()
+    {
+        lungeRemaining = 0f;
+        if (motor != null)
+            motor.MovementResolved -= HandleLungeMovementResolved;
+    }
+
+    private void OnDisable()
+    {
+        StopLunge();
     }
 
     private void RejectStartRpcIfNeeded()

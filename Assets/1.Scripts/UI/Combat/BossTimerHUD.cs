@@ -42,7 +42,8 @@ public sealed class BossTimerHUD : MonoBehaviour
 
     private void Update()
     {
-        _timer -= Time.unscaledDeltaTime;
+        // 갱신 주기만 게임 시간으로 센다(D9). 남은 시간 자체는 BossTimerManager 가 GameNow(슬로우·일시정지 제외)로 계산한다.
+        _timer -= Time.deltaTime;
         if (_timer > 0f) return;
 
         _timer = refreshInterval;
@@ -59,7 +60,8 @@ public sealed class BossTimerHUD : MonoBehaviour
         //    GameObject** 로 배선한다. 초기화 순서상 Awake 시점에 매니저가 아직 없으면 스스로를 꺼버리고,
         //    그러면 Update 가 돌지 않아 **매니저가 나중에 생겨도 영원히 되살아나지 못했다.**
         //    알파로 감추면 컴포넌트는 계속 살아 있어 복구된다.
-        bool available = timer != null && timer.isActiveAndEnabled;
+        // 튜토리얼(S5): 타이머 시작 전(Idle)에는 디렉터가 '타이머 HUD 표시'를 켤 때(Z4-0)까지 감춘다. 비튜토리얼은 기존대로.
+        bool available = timer != null && timer.isActiveAndEnabled && !TutorialBossPath.ShouldHideTimerHud(timer.State);
         if (group != null)
         {
             group.alpha = available ? 1f : 0f;

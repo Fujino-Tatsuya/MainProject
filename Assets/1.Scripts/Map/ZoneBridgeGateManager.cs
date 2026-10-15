@@ -38,9 +38,11 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
                && OpenStartServerTime.Equals(o.OpenStartServerTime);
     }
 
-    [Header("입력")]
-    [Tooltip("상호작용 키. 플레이어는 이 키만 누르고, 판정은 서버가 한다.")]
-    [SerializeField] private Key interactKey = Key.F;
+    // 입력 — 상호작용 키는 설정창 리바인드를 따른다(입력 에셋 Player/Interact, 기본 F — PLAN-settings S14, 10-12).
+    // 예전엔 인스펙터 Key(F)를 직접 읽어 에셋의 Interact(E)와 따로 놀았다(에셋 쪽은 사용처 0).
+    // 플레이어는 이 키만 누르고, 판정은 서버가 한다.
+    private const string InteractActionPath = "Player/Interact";
+    private InputAction _interactAction;
 
     [Header("NavMesh")]
     [Tooltip("개통 완료 시 NavMesh 전체를 다시 굽는다. 기본은 끔 — 이 서피스는 맵 전체를 덮어 " +
@@ -54,9 +56,19 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
 
     public static ZoneBridgeGateManager Instance { get; private set; }
 
+    /// <summary>
+    /// [서버] 패널 하나가 새로 켜졌다(SlotID, 패널 인덱스, 켜진 수, 패널 수). 읽기 전용 알림 — 구독자가 없으면 기존 동작 그대로.
+    /// 소비처: 튜토리얼 존4 흐름(Docs/tech/tutorial-zone4.md).
+    /// </summary>
+    public static event System.Action<int, int, int, int> ServerPanelActivated;
+
+    /// <summary>[서버] 다리 개통 완료(진행도 1 도달, 슬롯마다 1번). 읽기 전용 알림 — 소비처: 튜토리얼 존4 흐름.</summary>
+    public static event System.Action<int> ServerBridgeOpened;
+
     // SlotID → 이 피어에 로컬로 생성된 존 게이트
     private readonly Dictionary<int, ZoneBridgeGate> _localGates = new Dictionary<int, ZoneBridgeGate>();
     private readonly HashSet<int> _navRebakeDone = new HashSet<int>();
+    private readonly HashSet<int> _bridgeOpenedNotified = new HashSet<int>();
     private bool _warnedNoKeyboard;
 
     // 게이트별로 마지막에 화면에 그린 활성 마스크 — "새로 켜진 패널만 연출"의 기준(PLAN-title-monitor T2).
@@ -70,10 +82,43 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
 
     private void Awake() => Instance = this;
 
+    private void OnEnable() => KeyBindingConfig.Changed += RebuildInteractAction;
+
+    private void OnDisable()
+    {
+        InteractPrompt.Hide(this);
+        KeyBindingConfig.Changed -= RebuildInteractAction;
+        DisposeInteractAction();
+    }
+
     public override void OnDestroy()
     {
+        InteractPrompt.Hide(this);
+        DisposeInteractAction();
         if (Instance == this) Instance = null;
         base.OnDestroy();
+    }
+
+    // 설정창 키를 그대로 쓰는 독립 액션. 플레이어 PlayerInput 과 무관하게(게이트는 씬 매니저) 이 키만 듣는다.
+    private bool InteractPressedThisFrame()
+    {
+        if (_interactAction == null)
+        {
+            string path = KeyBindingConfig.EffectivePath(InteractActionPath) ?? "<Keyboard>/f";
+            _interactAction = new InputAction("BridgeInteract", InputActionType.Button, path);
+            _interactAction.Enable();
+        }
+        return _interactAction.WasPressedThisFrame();
+    }
+
+    private void RebuildInteractAction() => DisposeInteractAction();   // 다음 프레임에 새 키로 다시 만든다
+
+    private void DisposeInteractAction()
+    {
+        if (_interactAction == null) return;
+        _interactAction.Disable();
+        _interactAction.Dispose();
+        _interactAction = null;
     }
 
     public override void OnNetworkSpawn()
@@ -96,6 +141,7 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
     public override void OnNetworkDespawn()
     {
         gates.OnListChanged -= HandleGatesChanged;
+        InteractPrompt.Hide(this);
         base.OnNetworkDespawn();
     }
 
@@ -151,7 +197,7 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
         if (gate == null) return;
         _localGates.Remove(gate.SlotID);
         _appliedMask.Remove(gate);
-        if (_highlightGate == gate) { _highlightGate = null; _highlightPanel = -1; }
+        if (_highlightGate == gate) { _highlightGate = null; _highlightPanel = -1; InteractPrompt.Hide(this); }
     }
 
     // ── 입력 (각 피어 로컬) ────────────────────────────────────────────────
@@ -173,7 +219,7 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
             return;
         }
 
-        if (!Keyboard.current[interactKey].wasPressedThisFrame) return;
+        if (!InteractPressedThisFrame()) return;
 
         // ⚠️ 키를 눌렀는데 아무 일도 안 일어나는 상태를 조용히 두지 않는다. 조기 반환이 6가지라
         // 로그가 없으면 어디서 막혔는지 알 방법이 없다(F가 안 먹는다는 보고의 원인).
@@ -262,6 +308,14 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
         _highlightGate = gate;
         _highlightPanel = panel;
         if (gate != null) gate.SetPanelHighlighted(panel, true);
+
+        // F 프롬프트는 외곽선과 같은 선택을 따른다(별도 거리 판정 없음). 뷰는 패널 자식 InteractPrompt 인스턴스 — 없으면 Show 가 경고한다.
+        if (gate != null)
+        {
+            gate.TryGetPromptView(panel, out InteractPromptView view);
+            InteractPrompt.Show(this, view);
+        }
+        else InteractPrompt.Hide(this);
     }
 
     private bool TryFindNearestPanel(Vector3 from, out int slotID, out int panelIndex,
@@ -355,6 +409,11 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
 
         gates[index] = state;
         Edit.Log($"[BridgeGate] Slot {slotID} 패널 {panelIndex} 활성 (client {p.Receive.SenderClientId}).", gate);
+
+        int activated = 0;
+        for (int i = 0; i < gate.PanelCount; i++)
+            if ((state.ActivatedMask & (1 << i)) != 0) activated++;
+        ServerPanelActivated?.Invoke(slotID, panelIndex, activated, gate.PanelCount);
     }
 
     // ── 상태 반영 ───────────────────────────────────────────────────────────
@@ -404,6 +463,9 @@ public sealed class ZoneBridgeGateManager : NetworkBehaviour
 
             float progress = ProgressOf(state, gate);
             gate.ApplyOpenProgress(progress);
+
+            if (IsServer && progress >= 1f && _bridgeOpenedNotified.Add(state.SlotID))
+                ServerBridgeOpened?.Invoke(state.SlotID);
 
             // NavMesh는 다리가 제자리에 온 뒤 한 번만 다시 굽는다(서버 판정 기준).
             if (IsServer && progress >= 1f && rebakeNavMeshOnOpen && _navRebakeDone.Add(state.SlotID))

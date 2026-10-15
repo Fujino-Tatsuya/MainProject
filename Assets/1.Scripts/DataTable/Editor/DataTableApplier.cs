@@ -131,6 +131,7 @@ public static class DataTableApplier
             string typeNames = string.Join("/", types.Select(t => t.Name));
             var candidatesById = new Dictionary<string, List<Object>>(StringComparer.Ordinal);
             var failed = new HashSet<string>(StringComparer.Ordinal);
+            var localizedSkipped = new List<DataTableEntry>();
             foreach (DataTableEntry entry in sheet)
             {
                 if (failed.Contains(entry.AssetId))
@@ -195,13 +196,19 @@ public static class DataTableApplier
                     continue;
                 }
 
+                FieldInfo resolvedField = DataTableFields.Resolve(targetType, path);
+                if (property.propertyType == SerializedPropertyType.String && DataTableFields.IsLocalizedText(resolvedField))
+                {
+                    localizedSkipped.Add(entry); // 번역 문구는 Strings 시트가 원본 — 수치 시트 칸은 적용하지 않는다(병합 Export 가 옮긴다).
+                    continue;
+                }
+
                 if (written.TryGetValue((target, path), out DataTableEntry previous))
                 {
                     issues.Error(entry.Location, $"'{entry.AssetId}.{entry.Field}' 를 {previous.Location} 에서도 쓴다.");
                     continue;
                 }
 
-                FieldInfo resolvedField = DataTableFields.Resolve(targetType, path);
                 if (property.propertyType == SerializedPropertyType.String && !DataTableFields.IsTableText(resolvedField))
                 {
                     issues.Error(entry.Location,
@@ -243,6 +250,13 @@ public static class DataTableApplier
                 writes.Add(new DataTableWrite(target, path, property.propertyType, value, entry));
             }
 
+            if (localizedSkipped.Count > 0)
+            {
+                issues.Warning(localizedSkipped[0].Location,
+                    $"{sheet.Key}: 번역 문구 칸 {localizedSkipped.Count}개(예: {string.Join(", ", localizedSkipped.Take(3).Select(e => $"{e.AssetId}.{e.Field}"))})는 " +
+                    "Strings 시트가 원본이라 적용하지 않는다 — 병합 Export 가 Strings 로 옮기고 이 칸을 뺀다.");
+            }
+
             foreach (Type type in types)
             {
                 IReadOnlyCollection<string> allIds = lookup.AllIds(type);
@@ -273,7 +287,8 @@ public static class DataTableApplier
     }
 
     /// <summary>
-    /// 테이블 Play 용. 디스크에는 쓰지 않는다 — 적용 후 dirty 를 지워 저장 대상에서 뺀다.
+    /// 테이블 Play 용. 디스크에는 쓰지 않는다 — 적용 후 dirty 를 지워 저장 대상에서 뺀다
+    /// (Variant 의 오버라이드 dirty 는 여기서 못 지운다 — Play 중엔 DataTableSaveGuard 가 막고, <see cref="Restore"/> 가 재임포트로 지운다).
     /// 프리팹 컴포넌트도 메모리의 프리팹 에셋을 바꾸므로, 런타임에 Instantiate·네트워크 스폰되는 사본이 테이블 값을 받는다.
     /// 반환한 스냅샷으로 <see cref="Restore"/> 해야 원래 값으로 돌아온다.
     /// </summary>
@@ -309,10 +324,19 @@ public static class DataTableApplier
         return snapshot;
     }
 
-    /// <summary>메모리 적용을 되돌린다. 찾지 못한 대상 수를 반환한다(0 이 정상).</summary>
+    /// <summary>
+    /// 메모리 적용을 되돌린다. 찾지 못한 대상 수를 반환한다(0 이 정상).
+    /// <para>
+    /// 🔴 프리팹 에셋 안의 대상은 값 되쓰기가 아니라 디스크에서 다시 임포트한다. Variant 컴포넌트에 쓰면 Unity 가
+    /// 숨은 PrefabInstance 에 오버라이드(maxHp 등)를 기록하고 그 객체를 dirty 로 만든다 — 값을 JSON 으로 되돌려도
+    /// 오버라이드와 dirty 는 남아, Play 뒤 첫 Save Project(Ctrl+S)가 Player_Gunner 에 maxHp/attackDamage 오버라이드를 써 넣었다(10-09 재현).
+    /// 디스크는 처음부터 바뀌지 않았으므로 다시 읽으면 오버라이드·dirty 까지 원래대로다.
+    /// </para>
+    /// </summary>
     public static int Restore(DataTableSnapshot snapshot)
     {
         int missing = 0;
+        var prefabPaths = new HashSet<string>(StringComparer.Ordinal);
         foreach (DataTableSnapshot.Item item in snapshot.items)
         {
             Object target = FindSnapshotTarget(item);
@@ -322,12 +346,24 @@ public static class DataTableApplier
                 continue;
             }
 
+            string assetPath = AssetDatabase.GetAssetPath(target);
+            if (assetPath.EndsWith(".prefab", StringComparison.OrdinalIgnoreCase))
+            {
+                prefabPaths.Add(assetPath);
+                continue;
+            }
+
             bool wasDirty = EditorUtility.IsDirty(target);
             EditorJsonUtility.FromJsonOverwrite(item.json, target);
             if (!wasDirty)
             {
                 EditorUtility.ClearDirty(target);
             }
+        }
+
+        foreach (string prefabPath in prefabPaths)
+        {
+            AssetDatabase.ImportAsset(prefabPath, ImportAssetOptions.ForceUpdate);
         }
 
         return missing;

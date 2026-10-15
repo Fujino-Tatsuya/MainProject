@@ -43,7 +43,8 @@ public static class AssassinDashStrikeRules
 }
 
 /// <summary>
-/// Q 사용 1회의 적중 장부. 같은 대상은 사용당 1회만 피해(§7.1), 변신 Q 쿨 차감은 사용당 최초 유효 적중 1회(§7.3).
+/// Q 사용 1회의 적중 장부. 같은 대상은 사용당 1회만 피해(§7.1), 변신 Q 쿨 차감은 사용당 최초 유효 적중 1회(§7.3),
+/// 일반 Q 분노 게이지 충전도 사용당 최초 유효 적중 1회(§4.2).
 /// 키는 Unit 또는 (Unit 이 아닌 상자의) Hurtbox — 호출자가 정한다.
 /// </summary>
 public sealed class AssassinDashHitLedger
@@ -51,6 +52,7 @@ public sealed class AssassinDashHitLedger
     private readonly HashSet<object> damagedTargets = new HashSet<object>();
 
     public bool CooldownRewardClaimed { get; private set; }
+    public bool RageRewardClaimed { get; private set; }
     public int DamagedCount => damagedTargets.Count;
 
     /// <summary>새 사용 시작 — 장부를 비운다.</summary>
@@ -58,6 +60,7 @@ public sealed class AssassinDashHitLedger
     {
         damagedTargets.Clear();
         CooldownRewardClaimed = false;
+        RageRewardClaimed = false;
     }
 
     /// <summary>이번 사용에서 처음 보는 대상이면 true 를 돌려주고 기록한다.</summary>
@@ -76,6 +79,16 @@ public sealed class AssassinDashHitLedger
             return false;
 
         CooldownRewardClaimed = true;
+        return true;
+    }
+
+    /// <summary>이번 틱에 보상 대상이 맞았고 아직 게이지를 받지 않았으면 true(사용당 1회). 쿨 차감과 별개로 센다.</summary>
+    public bool TryClaimRageReward(bool landedRewardTarget)
+    {
+        if (!landedRewardTarget || RageRewardClaimed)
+            return false;
+
+        RageRewardClaimed = true;
         return true;
     }
 }

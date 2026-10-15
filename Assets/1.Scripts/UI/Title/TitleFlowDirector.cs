@@ -58,6 +58,25 @@ public sealed class TitleFlowDirector : MonoBehaviour
     [Tooltip("게임 시작 연출(모니터 꺼짐 → 검은 화면 속으로 → 페이드 → 로비). 비우면 이 오브젝트에 기본값으로 붙인다.")]
     [SerializeField] private TitleStartDive _startDive;
 
+    // 화면 전환 순간의 지직거림(팀장 10-13 — 인스펙터에서 조절). x = 세기(0~1), y = 길이(초).
+    // 상시 지직거림·찢김은 TitleCrtFx, CRT 화면 효과는 TitleMonitorDisplay 인스펙터.
+    [Header("전환 지직거림 (x = 세기 0~1, y = 길이 초)")]
+    [Tooltip("PRESS ANY KEY 뒤 모니터로 다가갈 때.")]
+    [SerializeField] private Vector2 _approachBurst = new(0.8f, 0.25f);
+    [Tooltip("메뉴가 뜰 때(로고 → 메뉴 화면 전환).")]
+    [SerializeField] private Vector2 _menuBurst = new(0.9f, 0.28f);
+    [Tooltip("설정창을 열 때.")]
+    [SerializeField] private Vector2 _settingsBurst = new(0.5f, 0.16f);
+    [Tooltip("게임 시작을 누를 때.")]
+    [SerializeField] private Vector2 _startBurst = new(0.35f, 0.1f);
+    [Tooltip("종료를 누를 때.")]
+    [SerializeField] private Vector2 _exitBurst = new(0.35f, 0.1f);
+
+    [Header("설정창")]
+    [Tooltip("타이틀에서 연 설정창(탭+내용) 배율. 모니터 RT 에 다시 찍혀 글씨가 작아져 키운다 — 공유 프리팹·ESC 는 그대로.\n" +
+             "1.4 = 모니터 캔버스(약 ±858 × ±604)와 Options 제목 안쪽.")]
+    [SerializeField, Range(1f, 1.6f)] private float _titleSettingsScale = 1.4f;
+
     [Header("UI 루트")]
     [Tooltip("PRESS ANY KEY — 화면 앞 오버레이(모니터 안이 아니다).")]
     [SerializeField] private GameObject _pressAnyKeyRoot;
@@ -185,7 +204,7 @@ public sealed class TitleFlowDirector : MonoBehaviour
         SetActive(_settingsRoot, false);
         SetActive(_skipHintRoot, true);
 
-        Burst(0.8f, 0.25f);
+        Burst(_approachBurst);
 
         // 접근하는 동안엔 로고가 계속 지직거리고, 도착하는 순간 메뉴로 바뀐다(팀장 09-23 — EnterMenu 에서 ShowUI).
 
@@ -234,10 +253,13 @@ public sealed class TitleFlowDirector : MonoBehaviour
         SetActive(_settingsRoot, false);
         SetActive(_menuRoot, true);
         if (_monitorDisplay != null)
+        {
             _monitorDisplay.ShowUI(); // 도착 — 로고 → START / SETTING / EXIT
+            _monitorDisplay.SetSettingsReadable(false);   // 설정창에서 돌아오면 CRT 원래 세기
+        }
         if (_crtFx != null)
             _crtFx.AmbientBursts = false; // 메뉴에선 끈다 — 클릭 판정이 흔들리지 않게
-        Burst(0.9f, 0.28f); // 화면 전환은 강한 버스트 한 번으로
+        Burst(_menuBurst); // 화면 전환은 강한 버스트 한 번으로
 
         // 🔴 처음부터 START 를 선택하면 Selected 색이 hover 처럼 보여 혼자 밝다(팀장 09-28).
         // 셋 다 같은 색으로 시작하고, 키보드·패드 첫 입력 때 START 부터 잡히게 기억만 해 둔다.
@@ -266,6 +288,22 @@ public sealed class TitleFlowDirector : MonoBehaviour
 
     // ── 버튼 진입점 (씬의 UnityEvent 는 이쪽으로 재지정한다) ──────────────
 
+    // 🔴 타이틀 설정창은 RT(1536×1080)에 그려져 3D 모니터에 다시 찍히므로 글자가 화면에서 작아진다(18 → 약 12px).
+    //    공유 프리팹(SettingsBody — ESC 도 씀)은 그대로 두고 타이틀에서만 통째로 키운다(팀장 10-13).
+    //    1.4배 = 탭+내용 묶음 ±722 × (+328~-428) — 모니터 캔버스(약 ±858 × ±604)와 Options 제목(위 +408~) 안쪽.
+    //    배율 = 인스펙터 _titleSettingsScale(Play 중 바꾸면 OnValidate 로 바로 반영).
+    private void ScaleSettingsBody()
+    {
+        if (_settingsRoot == null) return;
+        TitleOptionsPanel body = _settingsRoot.GetComponentInChildren<TitleOptionsPanel>(true);
+        if (body != null) body.transform.localScale = new Vector3(_titleSettingsScale, _titleSettingsScale, 1f);
+    }
+
+    private void OnValidate()
+    {
+        if (Application.isPlaying && _state == TitleFlowState.Settings) ScaleSettingsBody();
+    }
+
     public void OpenSettings()
     {
         if (InputLocked || _state == TitleFlowState.Settings)
@@ -275,7 +313,11 @@ public sealed class TitleFlowDirector : MonoBehaviour
 
         SetActive(_menuRoot, false);
         SetActive(_settingsRoot, true);
-        Burst(0.5f, 0.16f);
+        ScaleSettingsBody();
+        // 설정창은 글이 작아 CRT 에 묻힌다 — 열린 동안 CRT 효과 95% 감소(팀장 10-12 70% → 10-13 95%). 닫으면 EnterMenu 가 되돌린다.
+        if (_monitorDisplay != null)
+            _monitorDisplay.SetSettingsReadable(true);
+        Burst(_settingsBurst);
         // 🔴 줌하지 않는다(팀장 09-23) — 메뉴가 보이던 Near 뷰 그대로 모니터 내용만 설정창으로 바뀐다.
         //    예전엔 VCam_Closeup 으로 한 번 더 들어가 설정창이 화면 밖으로 잘렸다. Closeup vcam 은 남겨 두되 안 쓴다.
 
@@ -301,7 +343,7 @@ public sealed class TitleFlowDirector : MonoBehaviour
         ClearSelection();
         if (_crtFx != null)
             _crtFx.AmbientBursts = true; // 메뉴에서 끈 지직거림을 시작 연출 동안 되살린다 — 입력은 이미 잠겼다
-        Burst(0.35f, 0.1f);
+        Burst(_startBurst);
         Debug.Log("[TitleFlow] Starting");
 
         // Start: 중앙 모니터가 월드에서 꺼지고 → 카메라가 그 검은 화면으로 천천히 들어가며 → 검정 페이드 → 로비(팀장 10-03).
@@ -319,7 +361,7 @@ public sealed class TitleFlowDirector : MonoBehaviour
 
         _state = TitleFlowState.Exiting;
         ClearSelection();
-        Burst(0.35f, 0.1f);
+        Burst(_exitBurst);
         Debug.Log("[TitleFlow] Exiting");
 
         // Exit 도 같은 꺼짐(팀장 09-23).
@@ -337,10 +379,11 @@ public sealed class TitleFlowDirector : MonoBehaviour
             _sceneManager.StartGame();
     }
 
-    private void Burst(float strength, float duration)
+    // x = 세기, y = 길이(초) — 인스펙터 「전환 지직거림」.
+    private void Burst(Vector2 strengthDuration)
     {
         if (_crtFx != null)
-            _crtFx.Burst(strength, duration);
+            _crtFx.Burst(strengthDuration.x, strengthDuration.y);
     }
 
     // ── 입력 ───────────────────────────────────────────────────────────────
@@ -364,6 +407,10 @@ public sealed class TitleFlowDirector : MonoBehaviour
     /// <summary>ESC 또는 패드 B. 🔴 uGUI Button 은 ICancelHandler 를 구현하지 않아 직접 읽어야 한다.</summary>
     private static bool CancelPressed()
     {
+        // 키 변경 중 Esc = 변경 취소(설정창 KeyRebindRow) — 설정 화면을 닫지 않는다.
+        if (KeyRebindRow.IsRebinding)
+            return false;
+
         if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
             return true;
 

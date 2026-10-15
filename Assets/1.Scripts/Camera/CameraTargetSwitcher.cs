@@ -7,6 +7,7 @@ using VeyTrace.RuntimeSafety;
 
 // MapScene camera manager. It creates one render camera and two identical
 // Cinemachine cameras, then switches their priorities for normal/fall views.
+[DataTableSheet("SlowMotion", Order = 1)]
 public class CameraTargetSwitcher : MonoBehaviour
 {
     public static CameraTargetSwitcher Active { get; private set; }
@@ -22,8 +23,13 @@ public class CameraTargetSwitcher : MonoBehaviour
 
     [SerializeField] private GameObject mainCameraPrefab;
     [SerializeField] private GameObject followCameraPrefab;
+    // 블렌드 길이는 카메라 연출 정렬 값이라 테이블에 내지 않는다 — 이 컴포넌트가 내는 건 슬로우 줌 배율뿐.
+    [DataTableIgnore]
     [SerializeField, Min(0f)] private float toFloatBlendDuration = 0.2f;
+    [DataTableIgnore]
     [SerializeField, Min(0f)] private float toFollowBlendDuration = 0.35f;
+    [Tooltip("내가 일으킨 인터럽트 슬로우의 유지 단계에서 플레이어 카메라 거리 배율. [0.1, 1] — 1 이면 줌 없음 (PLAN-interrupt-slowmo D10)")]
+    [SerializeField, Range(SlowMotionCameraZoom.MinZoomFactor, 1f)] private float slowMotionZoomFactor = 0.85f;
 
     // 생성한 리그 인스턴스를 들고 있어야 EnsureCameraRig가 멱등해진다(중복 생성 방지).
     private GameObject mainCameraInstance;
@@ -37,12 +43,19 @@ public class CameraTargetSwitcher : MonoBehaviour
     private readonly List<Transform> cameraFollowTargets = new();
     private int currentTargetIndex = -1;
     private CinemachineFollow playerCameraFollow;
+    // 줌은 원래 오프셋에 배율을 곱해서 쓴다 — 매 프레임 현재 값에 곱하면 오차가 쌓인다.
+    private Vector3 basePlayerFollowOffset;
+    private float slowMotionZoomDepth;
+    private float appliedZoomMultiplier = 1f;
     private Quaternion fixedCameraRotation;
     private bool hasFixedCameraRotation;
     private PlayerLifeCycleController ownerLifeCycle;
+    // 연출용 임시 추적 대상(보스 엘리베이터 칸). 있는 동안 플레이어 vcam 의 Follow 를 이것이 쥔다.
+    private Transform temporaryFollow;
 
     public bool IsInFallView { get; private set; }
     public bool IsSpectatorMode { get; private set; }
+    public bool HasTemporaryFollow => temporaryFollow != null;
 
     private void Awake()
     {
@@ -203,6 +216,8 @@ public class CameraTargetSwitcher : MonoBehaviour
 
     private void Update()
     {
+        UpdateSlowMotionZoom();
+
         if (!IsSpectatorMode)
         {
             return;
@@ -224,6 +239,84 @@ public class CameraTargetSwitcher : MonoBehaviour
         {
             SwitchToNextTarget();
         }
+    }
+
+    // 오너 슬로우 줌인(D10). GlobalTimeScale(-100)이 이번 프레임 배율을 정한 뒤, Cinemachine(LateUpdate)보다 먼저 돈다.
+    private void UpdateSlowMotionZoom()
+    {
+        if (playerCameraFollow == null)
+        {
+            return;
+        }
+
+        GlobalTimeScale timeScale = GlobalTimeScale.Instance;
+        NetworkManager networkManager = NetworkManager.Singleton;
+        bool sessionRunning = timeScale != null && networkManager != null && networkManager.IsListening;
+        bool slowActive = sessionRunning && timeScale.IsActive;
+
+        float targetDepth = SlowMotionCameraZoom.TargetDepth(
+            slowActive,
+            slowActive && timeScale.CurrentTriggerClientId == networkManager.LocalClientId,
+            sessionRunning && !IsInFallView && !IsSpectatorMode,
+            slowActive ? timeScale.CurrentScale : 1f,
+            slowActive ? timeScale.InterruptProfile.ClampedScale : 1f);
+
+        // 감쇠는 실시간 — 슬로우 중에도 발동자 전환 줌아웃이 같은 속도로 끝난다.
+        slowMotionZoomDepth = SlowMotionCameraZoom.StepDepth(slowMotionZoomDepth, targetDepth, Time.unscaledDeltaTime);
+        float multiplier = SlowMotionCameraZoom.OffsetMultiplier(slowMotionZoomDepth, slowMotionZoomFactor);
+
+        // 정확 비교 — 근사 비교면 복귀 끝의 1 직전 값에서 멈춰 원래 오프셋으로 돌아오지 않는다.
+        if (multiplier == appliedZoomMultiplier)
+        {
+            return;
+        }
+
+        // 원래 오프셋에서 다시 계산한다 — 복귀가 끝나면(배율 1) 정확히 원래 값으로 돌아온다.
+        playerCameraFollow.FollowOffset = basePlayerFollowOffset * multiplier;
+        appliedZoomMultiplier = multiplier;
+    }
+
+    /// <summary>
+    /// 연출 동안 플레이어 vcam 이 <paramref name="target"/> 을 따라가게 한다(보스 엘리베이터 상승 — 칸).
+    /// 추적 대상 목록·<see cref="CurrentFollowTarget"/>(포그·벽 가림 기준)은 그대로 플레이어다. 낙하 뷰 중이면 플레이어 뷰로 돌린다.
+    /// </summary>
+    public void SetTemporaryFollow(Transform target)
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        EnsureCameraRig();
+        if (playerCamera == null)
+        {
+            return;
+        }
+
+        temporaryFollow = target;
+        playerCamera.Follow = target;
+        if (IsInFallView)
+        {
+            ReturnToPlayerView();
+        }
+    }
+
+    /// <summary>임시 추적을 끝내고 현재 대상(플레이어·관전 대상)으로 컷 복귀한다 — 그 사이 순간이동한 대상까지 쓸고 지나가지 않게.</summary>
+    public void ClearTemporaryFollow()
+    {
+        if (temporaryFollow == null)
+        {
+            return;
+        }
+
+        temporaryFollow = null;
+        if (playerCamera == null)
+        {
+            return;
+        }
+
+        playerCamera.Follow = GetCurrentTarget();
+        playerCamera.PreviousStateIsValid = false;
     }
 
     public void SwitchToNextTarget()
@@ -328,7 +421,9 @@ public class CameraTargetSwitcher : MonoBehaviour
 
         currentTargetIndex = targetIndex;
         Transform target = cameraFollowTargets[currentTargetIndex];
-        playerCamera.Follow = target;
+        // 임시 추적 중엔 대상만 바꿔 두고 화면은 연출을 유지한다 — ClearTemporaryFollow 가 이 대상으로 돌아온다.
+        if (temporaryFollow == null)
+            playerCamera.Follow = target;
         floatFollowTarget?.SetSource(target);
         ClearLookAtTarget(playerCamera);
         RestoreFixedCameraRotation();
@@ -475,6 +570,11 @@ public class CameraTargetSwitcher : MonoBehaviour
         }
 
         playerCameraFollow = playerCamera.GetComponent<CinemachineFollow>();
+        if (playerCameraFollow != null)
+        {
+            basePlayerFollowOffset = playerCameraFollow.FollowOffset;
+        }
+
         if (playerCameraFollow != null && playerCameraFollow.FollowOffset.sqrMagnitude > Mathf.Epsilon)
         {
             fixedCameraRotation = Quaternion.LookRotation(-playerCameraFollow.FollowOffset.normalized, Vector3.up);

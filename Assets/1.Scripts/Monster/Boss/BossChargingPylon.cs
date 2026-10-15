@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Unity.Netcode;
 using UnityEngine;
 
 // 송전탑(차징 기둥). 서버 권한으로 숨김↔활성 위치를 왕복하고, 활성 중에만 피격된다.
@@ -45,6 +46,21 @@ public class BossChargingPylon : Unit
     [Tooltip("상승·하강 속도(m/s).")]
     float moveSpeed = 1f;
 
+    // ─── 공격 가능 표시 — 노랑 아웃라인 (PLAN-boss-1012.md §A, 팀장 10-12) ─────────────
+    // 기믹으로 안 보인다는 피드백 → **Live(피격 가능)일 때만** 테두리를 켠다.
+    // 🔴 본체 재질은 맵 공용 아틀라스(`Generic_01_A`, 프리팹 107개 공유)라 거기 아웃라인을 켜면 맵 전체가
+    //    테두리를 갖는다. 그래서 **같은 메시의 자식 렌더러**에 아웃라인 전용 재질(`Project/Outline Only`)을
+    //    씌우고 enabled 만 토글한다. 본체 렌더러의 재질 배열은 건드리지 않는다(HitFlash 가 재질을 캐시한다).
+    [Header("공격 가능 표시")]
+    [SerializeField]
+    [Tooltip("Live 동안 켜는 아웃라인 재질(MA_PylonOutline, 셰이더 Project/Outline Only). 비우면 아웃라인 없이 동작.")]
+    Material outlineMaterial;
+
+    // 상태(_state)는 서버 전용이라 클라는 Live 를 모른다 → 표시 여부만 복제한다.
+    readonly NetworkVariable<bool> _outlined = new NetworkVariable<bool>(false);
+    readonly List<Renderer> _outlineRenderers = new List<Renderer>();
+    bool _warnedNoOutlineMaterial;
+
     Collider _collider;
     Vector3 _hiddenLocal;
     Vector3 _liveLocal;
@@ -66,6 +82,9 @@ public class BossChargingPylon : Unit
         _collider = GetComponent<Collider>();
         _hiddenLocal = transform.localPosition;
         _liveLocal = _hiddenLocal + Vector3.up * riseHeight;
+
+        // 🔴 Awake 에서 만든다 — HitFlash 는 스폰 때 붙어 렌더러를 긁으므로 그 전에 NoHitFlash 가 있어야 한다.
+        BuildOutlineRenderers();
     }
 
     public override void OnNetworkSpawn()
@@ -74,7 +93,12 @@ public class BossChargingPylon : Unit
 
         SetColliderEnabled(false);
 
+        _outlined.OnValueChanged += OnOutlinedChanged;
+        ApplyOutline(_outlined.Value);   // 늦게 합류한 클라도 지금 값으로
+
         if (!IsServer) return;
+
+        _outlined.Value = false;
 
         Initialize(0, 0, 0, maxHp, defense);
         Active.Add(this);
@@ -86,6 +110,7 @@ public class BossChargingPylon : Unit
 
     public override void OnNetworkDespawn()
     {
+        _outlined.OnValueChanged -= OnOutlinedChanged;
         Active.Remove(this);
         base.OnNetworkDespawn();
     }
@@ -126,6 +151,7 @@ public class BossChargingPylon : Unit
         {
             _state = PylonState.Live;
             SetColliderEnabled(true);
+            _outlined.Value = true;
             return;
         }
 
@@ -134,15 +160,20 @@ public class BossChargingPylon : Unit
     }
 
     /// <summary>서버 전용. 체력을 되살리고 상승을 시작한다. 반복 호출해도 안전하다.</summary>
-    public void BeginCharge()
+    /// <param name="hpMultiplier">이번 시퀀스 최대 HP 배율(레이드 ② = 2). 프리팹 maxHp 는 그대로 두고 매번 다시 잡는다 —
+    /// 같은 보스방 송전탑을 기존 23호와 레이드가 같이 쓰기 때문.</param>
+    public void BeginCharge(float hpMultiplier = 1f)
     {
         if (!IsServer) return;
 
-        Revive();
+        int hp = Mathf.Max(1, Mathf.RoundToInt(maxHp * Mathf.Max(0.01f, hpMultiplier)));
+        if (hp != MaxHp) Initialize(0, 0, 0, hp, defense);
+        else Revive();
         WasDestroyed = false;
         IsEngaged = true;
         _state = PylonState.Rising;
         SetColliderEnabled(false);
+        _outlined.Value = false;   // 올라오는 동안은 맞지 않는다 — 다 올라온 뒤에 켠다
     }
 
     /// <summary>서버 전용·멱등. 어느 상태에서든 숨김 위치로 되돌린다.</summary>
@@ -158,10 +189,62 @@ public class BossChargingPylon : Unit
     {
         _state = PylonState.Lowering;
         SetColliderEnabled(false);
+        _outlined.Value = false;   // 부서짐·차징 종료 모두 여기로 온다
     }
 
     void SetColliderEnabled(bool value)
     {
         if (_collider != null) _collider.enabled = value;
+    }
+
+    // ─── 아웃라인 ─────────────────────────────────────────────────────
+
+    void BuildOutlineRenderers()
+    {
+        if (outlineMaterial == null)
+        {
+            if (!_warnedNoOutlineMaterial)
+            {
+                _warnedNoOutlineMaterial = true;
+                Debug.LogWarning($"{name}: outlineMaterial 이 비어 있어 송전기 아웃라인이 안 보인다 — " +
+                                 "bossroom.prefab 의 BossChargingPylon 에 MA_PylonOutline 을 지정할 것.", this);
+            }
+            return;
+        }
+
+        var sources = GetComponentsInChildren<MeshRenderer>(true);
+        for (int i = 0; i < sources.Length; i++)
+        {
+            MeshRenderer src = sources[i];
+            var filter = src.GetComponent<MeshFilter>();
+            if (filter == null || filter.sharedMesh == null) continue;
+
+            var go = new GameObject("PylonOutline") { layer = src.gameObject.layer };
+            go.transform.SetParent(src.transform, false);
+            go.AddComponent<NoHitFlash>();   // 피격 플래시가 아웃라인 색을 덮지 않게
+
+            go.AddComponent<MeshFilter>().sharedMesh = filter.sharedMesh;
+            var r = go.AddComponent<MeshRenderer>();
+            // 서브메시마다 한 장 — 한 장만 주면 첫 서브메시에만 테두리가 생긴다.
+            var mats = new Material[Mathf.Max(1, filter.sharedMesh.subMeshCount)];
+            for (int m = 0; m < mats.Length; m++) mats[m] = outlineMaterial;
+            r.sharedMaterials = mats;
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            r.receiveShadows = false;
+            r.enabled = false;
+            _outlineRenderers.Add(r);
+        }
+    }
+
+    void OnOutlinedChanged(bool previous, bool next) => ApplyOutline(next);
+
+    void ApplyOutline(bool on)
+    {
+        for (int i = 0; i < _outlineRenderers.Count; i++)
+            if (_outlineRenderers[i] != null) _outlineRenderers[i].enabled = on;
+
+        // 🔴 클라는 콜라이더도 이 값을 따른다 — 서버는 콜라이더·아웃라인을 항상 같이 켜고 끄는데(TickMoving·BeginCharge·
+        //    BeginLowering) 클라는 스폰 때 끈 채 영영 안 켜져, 이동 권한이 있는 원격 플레이어가 탑을 통과했다(점검 10-14).
+        if (!IsServer) SetColliderEnabled(on);
     }
 }

@@ -156,10 +156,21 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         // 막타가 보스 격파(Died → 결과 확정)보다 앞서 집계된다. 판정에는 관여하지 않는다.
         int healthLost = previousHealth - _health.CurrentHealth;
         if (healthLost > 0 || shieldDealt > 0)
+        {
             CombatStatsEvents.RaiseServerDamageApplied(this, _damageAttackerClientId,
                 healthLost + shieldDealt, _health.CurrentHealth <= 0);
+            OnServerHealthDamageApplied(healthLost, shieldDealt);
+        }
 
         NotifyDeathTransition(previousHealth);
+    }
+
+    /// <summary>
+    /// 서버에서 피해가 실제로 체력 또는 보호막을 깎았을 때(둘 중 하나라도 &gt; 0) 불린다. 무적·0 피해는 오지 않는다.
+    /// 추락·비율·직접 피해 포함. 파생이 "방금 맞았다"에 반응하는 지점(플레이어 체력 재생 — 보호막만 깎인 피해는 거기서 거른다).
+    /// </summary>
+    protected virtual void OnServerHealthDamageApplied(int healthLost, int shieldLost)
+    {
     }
 
     void ApplyMitigatedHealthDamage(int damage, out int hpDealt, out int shieldDealt)
@@ -310,9 +321,29 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
     /// <param name="healAmount">회복시킬 체력 양</param>
     public void HealHp(int healAmount)
     {
+        HealHp(healAmount, true);
+    }
+
+    /// <summary>
+    /// healAmount만큼 체력을 회복시킨다. countInStats=false 면 결과 통계 회복 채널
+    /// (<see cref="CombatStatsEvents.ServerHealApplied"/>)을 타지 않는다 — 플레이어 기본 체력 재생(사용자 결정 10-13).
+    /// </summary>
+    public void HealHp(int healAmount, bool countInStats)
+    {
         if (!IsServer) return; // 서버에서만 체력 회복 처리
+        int previousHealth = _health.CurrentHealth;
         _health.HealHp(healAmount);
         _currentHp.Value = _health.CurrentHealth;
+        ReportServerHeal(this, _health.CurrentHealth - previousHealth, countInStats);
+    }
+
+    /// <summary>실제 회복량을 통계 채널에 알린다. 비집계 회복·0 회복은 발행하지 않는다(EditMode 테스트 대상).</summary>
+    public static void ReportServerHeal(Unit target, int healed, bool countInStats)
+    {
+        if (!countInStats || healed <= 0)
+            return;
+
+        CombatStatsEvents.RaiseServerHealApplied(target, healed);
     }
 
     /// <summary>
@@ -759,5 +790,26 @@ public class Unit : BaseNetworkBehaviour, IAttackReceiver
         _knockback.ApplyKnockback(direction, strength);
     }
 
+    #endregion
+
+    #region 벽 충돌 (할 일 32 — 이벤트만, 효과 없음)
+    /// <summary>[서버] 이 유닛이 외부 힘으로 밀려 Wall 레이어 콜라이더에 부딪혔다(<see cref="UnitWallImpacts.ServerProbe"/>).</summary>
+    public event Action<UnitWallImpact> ServerWallImpacted;
+
+    /// <summary>[모든 피어] 벽 충돌 연출 훅 — (유닛, 접촉점, 벽 법선, 충격 속도). 지금은 구독자가 없다(연출 미정).</summary>
+    public event Action<Unit, Vector3, Vector3, float> WallImpactPresented;
+
+    internal void NotifyWallImpactServer(in UnitWallImpact impact)
+    {
+        ServerWallImpacted?.Invoke(impact);
+        if (IsSpawned) WallImpactPresentRpc(impact.Point, impact.Normal, impact.Speed);
+    }
+
+    // 순수 연출 신호 — 유실돼도 상태가 갈리지 않는다.
+    [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
+    void WallImpactPresentRpc(Vector3 point, Vector3 normal, float speed)
+    {
+        WallImpactPresented?.Invoke(this, point, normal, speed);
+    }
     #endregion
 }

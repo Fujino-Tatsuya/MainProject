@@ -26,6 +26,7 @@ public static class AssassinShellAuthoring
     private const string DaggerRightPath = "Assets/50.Art/Char/assassin/Dagger_Weapon_R.fbx";
     private const string AnimationFolder = "Assets/4.Animations/Player/Assassin";
     private const string ControllerPath = AnimationFolder + "/AssassinAnimatorController.controller";
+    private const string UpperBodyMaskPath = AnimationFolder + "/AssassinUpperBody.mask";
     private const string DataFolder = "Assets/9.ScriptableObject/Player/Assassin";
     private const string BasicAttackDataPath = DataFolder + "/AssassinBasicAttackData.asset";
     private const string StateDataPath = DataFolder + "/AssassinStateData.asset";
@@ -44,8 +45,6 @@ public static class AssassinShellAuthoring
     private const string HudInstanceName = "AssassinHUD";
     private const string KrFontPath = "Assets/Resources/NotoSansKR-VariableFont_wght SDF.asset";
     // 🔸 임시 VFX — 프로젝트 공용 파티클. 민경 정식 VFX 로 교체 대상(필드가 비어 있을 때만 채우므로 교체값은 재실행에도 유지).
-    private const string TransformLoopVfxPath = "Assets/50.Art/VFX/Common/Combat/CharacterCircle/CharacterCirclePurple.prefab";
-    private const string EnhancedReadyVfxPath = "Assets/50.Art/VFX/Common/Combat/CharacterCircle/CharacterCircleYellow.prefab";
     private const string DashTrailVfxPath = "Assets/50.Art/VFX/Common/Boss/Dash/FX_Dash_Trail.prefab";
     private const string CircleStrikeVfxPath = "Assets/50.Art/VFX/Common/Burst/Burst_rings.prefab";
     private const string BackAttackVfxPath = "Assets/50.Art/VFX/Common/Burst/Burst_sharp.prefab";
@@ -61,7 +60,6 @@ public static class AssassinShellAuthoring
     private const string EnhancedSlashVfxPath = PlayerSlashFolder + "FX_DoubleSlash_O.prefab";
     private const string TransformedSlashVfxPath = "Assets/50.Art/VFX/Common/Monsters/FX_Mob_Slash.prefab";
     private const string EnhanceCastVfxPath = "Assets/50.Art/VFX/Common/Burst/Flash_star.prefab";
-    private const string TransformCastVfxPath = "Assets/50.Art/VFX/Common/Burst/Poof_electric.prefab";
     private const string InterruptCastVfxPath = "Assets/50.Art/VFX/Common/FX_Interrupt_Flash.prefab";
     private const string RosterPath = "Assets/9.ScriptableObject/Player/CharacterRoster.asset";
 
@@ -534,8 +532,7 @@ public static class AssassinShellAuthoring
         {
             AssassinSkillView view = EnsureComponent<AssassinSkillView>(root);
             SerializedObject so = new SerializedObject(view);
-            SetIfEmpty(so, "transformLoopPrefab", TransformLoopVfxPath);
-            SetIfEmpty(so, "enhancedReadyLoopPrefab", EnhancedReadyVfxPath);
+            // 변신 루프는 정식 VFX(EffectCatalog.Assassin_R_BladeVortex)로 바뀌어 여기서 채우지 않는다(2026-10-14 민경).
             SetIfEmpty(so, "dashTrailPrefab", DashTrailVfxPath);
             SetIfEmpty(so, "circleStrikePrefab", CircleStrikeVfxPath);
             SetIfEmpty(so, "backAttackHitPrefab", BackAttackVfxPath);
@@ -543,11 +540,7 @@ public static class AssassinShellAuthoring
             SetIfEmpty(so, "enhancedSlashPrefab", EnhancedSlashVfxPath);
             SetIfEmpty(so, "transformedSlashPrefab", TransformedSlashVfxPath);
             SetIfEmpty(so, "enhanceCastPrefab", EnhanceCastVfxPath);
-            SetIfEmpty(so, "transformCastPrefab", TransformCastVfxPath);
             SetIfEmpty(so, "interruptCastPrefab", InterruptCastVfxPath);
-            so.FindProperty("transformSocket").objectReferenceValue = root.transform.Find("Armature/VFX/Transformation");
-            // 강화 준비 루프는 강타 베기 소켓(EnhancedAttack)과 분리 — 베기 위치를 옮겨도 발밑 원은 그대로.
-            so.FindProperty("enhancedSocket").objectReferenceValue = root.transform.Find("Armature/VFX/EnhancedReady");
             SerializedProperty slashSockets = so.FindProperty("normalSlashSockets");
             slashSockets.arraySize = 4;
             for (int i = 0; i < 4; i++)
@@ -612,7 +605,7 @@ public static class AssassinShellAuthoring
         }
     }
 
-    // 임시 HUD — 화면 하단 중앙(거너 과열 게이지와 같은 높이대, 공용 CombatHUD 위). 스프라이트 없이 Image 색만 쓴다(구슬은 내장 Knob).
+    // 임시 HUD — 화면 하단 중앙(거너 과열 게이지와 같은 높이대, 공용 CombatHUD 위). 스프라이트 없이 Image 색만 쓴다.
     private static GameObject EnsureHudPrefab()
     {
         GameObject existing = AssetDatabase.LoadAssetAtPath<GameObject>(HudPrefabPath);
@@ -644,21 +637,10 @@ public static class AssassinShellAuthoring
             panel.anchoredPosition = new Vector2(0f, 170f);
             panel.sizeDelta = new Vector2(320f, 64f);
 
-            // R 스택 구슬 4 — 패널 위쪽 왼편
-            Sprite knob = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd");
-            UnityEngine.UI.Image[] orbs = new UnityEngine.UI.Image[4];
-            for (int i = 0; i < orbs.Length; i++)
-            {
-                RectTransform orb = NewUiRect($"Stack{i + 1}", panel);
-                orb.anchorMin = orb.anchorMax = new Vector2(0f, 1f);
-                orb.pivot = new Vector2(0f, 1f);
-                orb.anchoredPosition = new Vector2(i * 24f, 0f);
-                orb.sizeDelta = new Vector2(18f, 18f);
-                orbs[i] = orb.gameObject.AddComponent<UnityEngine.UI.Image>();
-                orbs[i].sprite = knob;
-            }
+            // 분노 게이지 — 패널 위쪽 왼편
+            BuildRageGauge(hud, panel, font);
 
-            // 일반 E 강화 준비 — 구슬 오른쪽 글자
+            // 일반 E 강화 준비 — 게이지 오른쪽 글자
             RectTransform enhanced = NewUiRect("EnhancedReady", panel);
             enhanced.anchorMin = enhanced.anchorMax = new Vector2(0f, 1f);
             enhanced.pivot = new Vector2(0f, 1f);
@@ -705,10 +687,6 @@ public static class AssassinShellAuthoring
 
             SerializedObject so = new SerializedObject(hud);
             so.FindProperty("canvas").objectReferenceValue = canvas;
-            SerializedProperty orbProperty = so.FindProperty("stackOrbs");
-            orbProperty.arraySize = orbs.Length;
-            for (int i = 0; i < orbs.Length; i++)
-                orbProperty.GetArrayElementAtIndex(i).objectReferenceValue = orbs[i];
             so.FindProperty("transformRoot").objectReferenceValue = transformRoot.gameObject;
             so.FindProperty("transformFill").objectReferenceValue = fill;
             so.FindProperty("transformFillImage").objectReferenceValue = fillImage;
@@ -726,6 +704,95 @@ public static class AssassinShellAuthoring
         }
 
         return AssetDatabase.LoadAssetAtPath<GameObject>(HudPrefabPath);
+    }
+
+    private const string RageGaugeName = "Rage";
+    private static readonly string[] LegacyStackOrbNames = { "Stack1", "Stack2", "Stack3", "Stack4" };
+
+    /// <summary>
+    /// 구 R 스택 구슬을 분노 게이지 바로 바꾼다(§4.2, 2026-10-09). 기존 HUD 프리팹만 고친다 — 다른 요소의 배치는 그대로.
+    /// 재실행해도 결과가 같다(이미 게이지가 있으면 배선만 다시 한다).
+    /// </summary>
+    [MenuItem("Tools/Player/Assassin/9. HUD 분노 게이지 갱신 (R 스택 대체)")]
+    public static void UpgradeHudToRageGauge()
+    {
+        if (AssetDatabase.LoadAssetAtPath<GameObject>(HudPrefabPath) == null)
+        {
+            Debug.LogError($"{Tag} HUD 프리팹이 없다. 8번 메뉴가 게이지 포함으로 새로 만든다: {HudPrefabPath}");
+            return;
+        }
+
+        GameObject root = PrefabUtility.LoadPrefabContents(HudPrefabPath);
+        try
+        {
+            AssassinHUD hud = root.GetComponent<AssassinHUD>();
+            Transform panel = root.transform.Find("Canvas/Panel");
+            if (hud == null || panel == null)
+            {
+                Debug.LogError($"{Tag} HUD 프리팹 구조가 다르다(AssassinHUD·Canvas/Panel) — 수동으로 고칠 것: {HudPrefabPath}");
+                return;
+            }
+
+            foreach (string orbName in LegacyStackOrbNames)
+            {
+                Transform orb = panel.Find(orbName);
+                if (orb != null)
+                    Object.DestroyImmediate(orb.gameObject);
+            }
+
+            Transform existing = panel.Find(RageGaugeName);
+            if (existing != null)
+                Object.DestroyImmediate(existing.gameObject);
+
+            BuildRageGauge(hud, (RectTransform)panel, AssetDatabase.LoadAssetAtPath<TMPro.TMP_FontAsset>(KrFontPath));
+
+            PrefabUtility.SaveAsPrefabAsset(root, HudPrefabPath);
+            Debug.Log($"{Tag} HUD 분노 게이지 갱신 — R 스택 구슬 제거, 게이지 바·최소 변신량 눈금 배선: {HudPrefabPath}");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    // 분노 게이지 — 패널 위쪽 왼편 가로 바(구 스택 구슬 자리) + 최소 변신량 눈금 + 바 안 수치.
+    private static void BuildRageGauge(AssassinHUD hud, RectTransform panel, TMPro.TMP_FontAsset font)
+    {
+        RectTransform bar = NewUiRect(RageGaugeName, panel);
+        bar.anchorMin = bar.anchorMax = new Vector2(0f, 1f);
+        bar.pivot = new Vector2(0f, 1f);
+        bar.anchoredPosition = new Vector2(0f, -3f);
+        bar.sizeDelta = new Vector2(100f, 14f);
+
+        RectTransform back = NewUiRect("Back", bar);
+        Stretch(back);
+        back.gameObject.AddComponent<UnityEngine.UI.Image>().color = new Color(0f, 0f, 0f, 0.6f);
+
+        RectTransform fill = NewUiRect("Fill", bar);
+        Stretch(fill);
+        fill.anchorMax = new Vector2(0f, 1f);
+        UnityEngine.UI.Image fillImage = fill.gameObject.AddComponent<UnityEngine.UI.Image>();
+
+        RectTransform tick = NewUiRect("MinTick", bar);
+        tick.anchorMin = new Vector2(0.4f, 0f);
+        tick.anchorMax = new Vector2(0.4f, 1f);
+        tick.pivot = new Vector2(0.5f, 0.5f);
+        tick.sizeDelta = new Vector2(2f, 4f);
+        tick.anchoredPosition = Vector2.zero;
+        tick.gameObject.AddComponent<UnityEngine.UI.Image>().color = Color.white;
+
+        RectTransform labelRect = NewUiRect("Label", bar);
+        Stretch(labelRect);
+        TMPro.TextMeshProUGUI label = NewLabel(labelRect, font, "0", Color.white, TMPro.TextAlignmentOptions.Center);
+        label.fontSize = 12f;
+        label.raycastTarget = false;
+
+        SerializedObject so = new SerializedObject(hud);
+        so.FindProperty("rageFill").objectReferenceValue = fill;
+        so.FindProperty("rageFillImage").objectReferenceValue = fillImage;
+        so.FindProperty("rageMinTick").objectReferenceValue = tick;
+        so.FindProperty("rageLabel").objectReferenceValue = label;
+        so.ApplyModifiedPropertiesWithoutUndo();
     }
 
     private static TMPro.TextMeshProUGUI NewLabel(
@@ -803,19 +870,23 @@ public static class AssassinShellAuthoring
         EditorUtility.SetDirty(data);
     }
 
-    // 컨트롤러는 animatorStateName 의 해시로 CrossFade 한다 — 같은 해시의 상태가 0층에 있어야 한다.
+    // 컨트롤러는 animatorStateName 의 해시로 레이어 지정 없이(-1) CrossFade 한다 — 그 해시를 가진 첫 레이어의 상태가 재생된다.
+    // 일반 E Buff 는 상체 레이어에 있다.
     private static void ValidateSkillState(AnimatorController controller, PlayerSkillData data)
     {
         if (data == null)
             return;
 
         int hash = Animator.StringToHash(data.AnimatorStateName);
-        foreach (ChildAnimatorState child in controller.layers[0].stateMachine.states)
+        foreach (AnimatorControllerLayer layer in controller.layers)
         {
-            if (child.state.nameHash == hash)
+            foreach (ChildAnimatorState child in layer.stateMachine.states)
             {
-                Debug.Log($"{Tag} {data.name} → Animator 상태 '{data.AnimatorStateName}' 해시 {hash} 확인.");
-                return;
+                if (child.state.nameHash == hash)
+                {
+                    Debug.Log($"{Tag} {data.name} → Animator 상태 '{data.AnimatorStateName}'({layer.name}) 해시 {hash} 확인.");
+                    return;
+                }
             }
         }
 
@@ -1046,9 +1117,8 @@ public static class AssassinShellAuthoring
         EnsureAnyStateAttackTransition(sm, transformedAttack, AssassinBasicAttack.TransformedAnimatorIndex, canTransitionToSelf: true);
 
         // A7: 스킬 상태는 PlayerSkillController 가 animatorStateName 으로 CrossFade 한다(AnyState 전이 불필요).
-        AnimatorState enhanceSkill = EnsureState(sm, EnhanceSkillState, LoadClip("Buff"));
-        enhanceSkill.speed = EnhanceBuffSpeed;
-        EnsureReturnToIdleTransitions(enhanceSkill, idle, combatIdle);
+        // 일반 E Buff 는 걸으며 쓰므로 0층이 아니라 상체 레이어에 둔다(EnsureUpperBodyLayer).
+        EnsureUpperBodyLayer(controller);
 
         AnimatorState transformSkill = EnsureState(sm, TransformSkillState, LoadClip("Parry_R"));
         transformSkill.speed = TransformParrySpeed;
@@ -1070,7 +1140,89 @@ public static class AssassinShellAuthoring
 
         EditorUtility.SetDirty(controller);
         AssetDatabase.SaveAssets();
-        Debug.Log($"{Tag} Animator 구성: Idle 2, Run Start/Loop/Stop, Dodge, Interrupt, Wave 4, 강타·변신 묶음, E Buff·R Parry·Q 돌진 2·변신 E 상태");
+        Debug.Log($"{Tag} Animator 구성: Idle 2, Run Start/Loop/Stop, Dodge, Interrupt, Wave 4, 강타·변신 묶음, R Parry·Q 돌진 2·변신 E 상태 + 상체 레이어 E Buff");
+    }
+
+    [MenuItem("Tools/Player/Assassin/9. 일반 E 상체 레이어 (걸으며 Buff)")]
+    public static void BuildUpperBodyLayer()
+    {
+        AnimatorController controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(ControllerPath);
+        if (controller == null)
+        {
+            Debug.LogError($"{Tag} Animator Controller가 없다. 먼저 1번 메뉴를 실행할 것: {ControllerPath}");
+            return;
+        }
+
+        EnsureUpperBodyLayer(controller);
+        EditorUtility.SetDirty(controller);
+        AssetDatabase.SaveAssets();
+        ValidateSkillState(controller, AssetDatabase.LoadAssetAtPath<PlayerSkillData>(EnhanceSkillDataPath));
+    }
+
+    // 일반 E Buff 를 상체 마스크 레이어(Override)에서 재생한다 — 하체는 0층의 Idle/Run 이 그대로 움직인다.
+    // 기본 가중치는 0 이다. Humanoid 에서 모션 없는 빈 상태는 가중치 1 이면 0층을 통과시키지 않고 상체를 한 자세로 굳힌다
+    // (3ef05ddf 회귀 — 평타·강타·변신 묶음의 상체가 멈춤). 가중치는 AssassinEnhanceSkill 이 Buff 동안만 올렸다 내린다.
+    // Buff 는 끝 프레임을 유지하고(나가는 전이 없음) 가중치가 0 이 되면 스킬이 빈 상태로 되돌린다.
+    private static void EnsureUpperBodyLayer(AnimatorController controller)
+    {
+        AnimatorStateMachine baseMachine = controller.layers[0].stateMachine;
+        foreach (ChildAnimatorState child in baseMachine.states)
+        {
+            if (child.state.name != EnhanceSkillState)
+                continue;
+            baseMachine.RemoveState(child.state);
+            break;
+        }
+
+        AvatarMask mask = EnsureUpperBodyMask();
+        AnimatorControllerLayer[] layers = controller.layers;
+        int layerIndex = Array.FindIndex(layers, l => l.name == AssassinEnhanceSkill.UpperBodyLayerName);
+        if (layerIndex < 0)
+        {
+            controller.AddLayer(AssassinEnhanceSkill.UpperBodyLayerName);
+            layers = controller.layers;
+            layerIndex = layers.Length - 1;
+        }
+
+        layers[layerIndex].avatarMask = mask;
+        layers[layerIndex].blendingMode = AnimatorLayerBlendingMode.Override;
+        layers[layerIndex].defaultWeight = 0f;
+        controller.layers = layers;
+
+        AnimatorStateMachine sm = controller.layers[layerIndex].stateMachine;
+        AnimatorState empty = EnsureState(sm, AssassinEnhanceSkill.UpperBodyEmptyState, null);
+        empty.writeDefaultValues = false;
+        sm.defaultState = empty;
+
+        AnimatorState buff = EnsureState(sm, EnhanceSkillState, LoadClip("Buff"));
+        buff.speed = EnhanceBuffSpeed;
+        buff.writeDefaultValues = false; // 한 레이어 안에서 Write Defaults 를 섞지 않는다
+        // 가중치 1 인 채로 빈 상태에 들어가면 상체가 굳는다 — 종료는 스킬의 가중치 페이드가 맡는다.
+        foreach (AnimatorStateTransition transition in buff.transitions)
+            buff.RemoveTransition(transition);
+    }
+
+    // Humanoid 상체 — 몸통·머리·팔·손가락·손 IK. 루트·다리·발 IK 는 0층(걷기)을 따른다.
+    private static AvatarMask EnsureUpperBodyMask()
+    {
+        AvatarMask mask = AssetDatabase.LoadAssetAtPath<AvatarMask>(UpperBodyMaskPath);
+        if (mask == null)
+        {
+            mask = new AvatarMask();
+            AssetDatabase.CreateAsset(mask, UpperBodyMaskPath);
+        }
+
+        for (AvatarMaskBodyPart part = 0; part < AvatarMaskBodyPart.LastBodyPart; part++)
+        {
+            bool upper = part == AvatarMaskBodyPart.Body || part == AvatarMaskBodyPart.Head ||
+                part == AvatarMaskBodyPart.LeftArm || part == AvatarMaskBodyPart.RightArm ||
+                part == AvatarMaskBodyPart.LeftFingers || part == AvatarMaskBodyPart.RightFingers ||
+                part == AvatarMaskBodyPart.LeftHandIK || part == AvatarMaskBodyPart.RightHandIK;
+            mask.SetHumanoidBodyPartActive(part, upper);
+        }
+
+        EditorUtility.SetDirty(mask);
+        return mask;
     }
 
     private static GameObject EnsureArmature(AnimatorController controller)

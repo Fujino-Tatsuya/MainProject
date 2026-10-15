@@ -48,6 +48,10 @@ public class SpinnerBot : MonsterBase
     [SerializeField, Min(0.1f)]
     [Tooltip("돌진 최대 거리(m). navmesh 경계에서 잘림(낙하 방지).")]
     float dashMaxDistance = 16f;
+    [SerializeField, Min(0.1f)]
+    [Tooltip("돌진(회전) 판정·예고의 **반폭**(m) = 칼날 회전 반경. 채찍은 MeleeHitbox 박스 폭(2.5m) 그대로.\n" +
+             "실측 3.12m(본체 메시 칼날 팔 끝 — 회전축에서 가장 먼 정점, 10-12). 박스 폭 그대로면 칼날 끝에 걸쳐도 안 맞았다.")]
+    [DataTableIgnore] float dashHalfWidth = 3.1f;   // 아트 형상에 묶인 값 — 밸런스 시트에 안 올린다(sideLateralOffset 과 같은 판단)
     [Header("예고 (2026-09-28 팀장: 범위를 보여 준 뒤 공격)")]
     [SerializeField, Min(0f)]
     [Tooltip("채찍을 고른 뒤 판정 박스를 바닥에 채우는 시간(초). 다 차면 채찍이 나간다. 0 = 예고 없음(예전).\n" +
@@ -107,6 +111,19 @@ public class SpinnerBot : MonsterBase
     MonsterCounterWindow _counter;
     EffectAnimEvents _effects;
 
+    // 튜토리얼 주입 지점(handoff-tutorial-spinner.md). 구현체가 없으면 null — 모든 분기가 원래 경로다.
+    ISpinnerBotOverride _override;
+    bool _overrideResolved;
+    ISpinnerBotOverride _harmlessSpin;   // 이번 스핀이 주입 아래서 시작됐으면 그 구현체(돌진 피해 없음)
+    ISpinnerBotOverride Override
+    {
+        get
+        {
+            if (!_overrideResolved) { _override = GetComponent<ISpinnerBotOverride>(); _overrideResolved = true; }
+            return _override;
+        }
+    }
+
     bool SpinReady => Time.time - _lastSpinTime >= spinCooldown;
 
     /// <summary>
@@ -144,7 +161,16 @@ public class SpinnerBot : MonsterBase
 
     protected override void StartAttack()
     {
-        bool doSpin = SpinReady && Random.value < spinChance;
+        // 튜토리얼 주입(ISpinnerBotOverride) — 없으면 else 가 원래 선택 그대로다.
+        ISpinnerBotOverride ov = Override != null && Override.OverridesAttack ? Override : null;
+        bool doSpin;
+        if (ov != null)
+        {
+            if (Counter == null || !ov.TryBeginSpin()) return;   // 다음 창 전 = 공격하지 않고 기다린다
+            doSpin = true;
+        }
+        else doSpin = SpinReady && Random.value < spinChance;
+        _harmlessSpin = ov;
 
         base.StartAttack(); // StopAgent + FaceTarget + (옵션)슈퍼아머 + SetState(Attack)
 
@@ -169,8 +195,11 @@ public class SpinnerBot : MonsterBase
         }
 
         _lastSpinTime = Time.time;
-        _dashDir = transform.forward;   // FaceTarget 후 전방 = 돌진 방향(고정)
+        // 🔴 base 의 FaceTarget 은 감속 회전 한 틱(~16%)이라 어중간한 각도로 돌진이 굳었다 — WallBot 과 같은 수정(점검 10-14).
+        FaceTargetImmediate();
+        _dashDir = transform.forward;   // 즉시 조준 후 전방 = 돌진 방향(고정)
         _dashTarget = ResolveDashTarget(transform.position);
+        if (ov != null) _dashTarget = ov.ClampDashTarget(_dashTarget);
 
         // 🔴 base 의 attackDuration 을 스핀 전체 길이로 덮어쓴다. 애니를 멈춰도 이 타이머는 계속 줄기
         //    때문에(MonsterBase.HandleAttack) 창 길이를 반드시 더해야 한다 — 안 더하면 돌진 전에 Attack 이 끝난다.
@@ -194,7 +223,12 @@ public class SpinnerBot : MonsterBase
             //    목적지를 도달점에 두면 autoBraking 이 그 앞에서 감속해 더 못 간다.
             //    예전엔 목적지 거리(최대 40m)를 그렸는데 가속 8 로는 1.2초에 ≈5.8m 만 갔다(10-02 교차검증, 팀장: 예고를 실제에 맞춤).
             float reach = Mathf.Min(flat.magnitude, AttackDashReach(MoveSpeed * dashSpeedMultiplier, dashDuration));
-            ShowHitboxTelegraph(meleeAttack.ColliderInfo, WindupDuration, reach);
+            // 🔴 간파 창이 열리는 공격이면 **파랑**(인터럽트 색) — 채찍(빨강)과 구분된다(팀장 10-12, 23호 돌진과 같은 규약).
+            //    아래 Counter.Open() 은 조건 없이 창을 열므로 Counter 유무가 곧 "간파 가능"이다.
+            var palette = Counter != null ? BossAttackConeTelegraph.Palette.Interrupt : BossAttackConeTelegraph.Palette.Attack;
+            // 폭 = 칼날 회전 반경(dashHalfWidth) — 판정(MeleeHitWithHalfWidth)과 같은 값.
+            ShowHitboxTelegraph(meleeAttack.ColliderInfo, WindupDuration, reach, palette: palette,
+                                halfWidthOverride: dashHalfWidth);
         }
 
         // 창이 저작돼 있으면 자세를 정지시켜 "끊을 수 있다"를 보여 준다. 없으면 예전처럼 그냥 회전한다.
@@ -239,14 +273,22 @@ public class SpinnerBot : MonsterBase
                 break;
 
             case SpinPhase.Dash:
-                // 반복 히트: BeginHitWindow 가 "유닛당 1회" 집합을 비우므로 주기마다 다시 부르면 재히트가 된다.
-                // ⚠️ 유닛별 0.5초 쿨다운이 아니라 **집합 리셋 경계**다 — 경계 직전/직후에 연속 2히트가 가능하다.
-                if (Time.time >= _nextRepeatHitTime)
+                if (_harmlessSpin != null)
                 {
-                    meleeAttack?.BeginHitWindow();
-                    _nextRepeatHitTime = Time.time + RepeatSeconds;
+                    _harmlessSpin.TickHarmlessDash();   // 튜토리얼 연습 — 피해 없이 밀쳐내기만(구현체 몫)
                 }
-                meleeAttack?.Hit();
+                else
+                {
+                    // 반복 히트: BeginHitWindow 가 "유닛당 1회" 집합을 비우므로 주기마다 다시 부르면 재히트가 된다.
+                    // ⚠️ 유닛별 0.5초 쿨다운이 아니라 **집합 리셋 경계**다 — 경계 직전/직후에 연속 2히트가 가능하다.
+                    if (Time.time >= _nextRepeatHitTime)
+                    {
+                        meleeAttack?.BeginHitWindow();
+                        _nextRepeatHitTime = Time.time + RepeatSeconds;
+                    }
+                    // 🔴 폭은 칼날 회전 반경 — 박스(채찍용 2.5m) 그대로면 칼날 끝에 걸쳐도 안 맞았다(팀장 10-12). 예고와 같은 값.
+                    MeleeHitWithHalfWidth(dashHalfWidth);
+                }
 
                 if (_phaseTimer <= 0f) EndSpin();
                 break;
@@ -294,10 +336,16 @@ public class SpinnerBot : MonsterBase
     /// </summary>
     public override void TakeDamage(AttackInfo attackInfo)
     {
+        if (IsServer && Override != null && Override.BlocksHealthDamage) attackInfo.damage = 0;   // 튜토리얼 — 체력만 잠금
         base.TakeDamage(attackInfo);
 
-        if (!IsServer || !attackInfo.isInterruptAttack || Counter == null) return;
-        if (!Counter.TryConsumeInterrupt()) return;
+        if (!IsServer || !attackInfo.isInterruptAttack) return;
+        if (Counter == null || !Counter.TryConsumeInterrupt())
+        {
+            // 창 밖 간파 적중 — 튜토리얼(연계 연습)만 취약 밀치기로 쓴다. 구현체가 없으면 기존처럼 아무 일 없음.
+            Override?.NotifyInterruptHit(DamageAttackerClientId);
+            return;
+        }
 
         CombatStatsEvents.RaiseServerCounterSucceeded(this, DamageAttackerClientId); // 결과 화면 통계(판정 무관)
         CounterSucceeded();
@@ -337,7 +385,8 @@ public class SpinnerBot : MonsterBase
             return;
         }
 
-        interruptFlash.PlayOnce();
+        // 소켓이 아니라 몸 표면의 카메라 쪽 면에서 — 피격 이펙트 CameraDir 와 같은 방식(2026-10-12 민경).
+        interruptFlash.PlayOnceOnSurface(EffectSurfaceCollider);
     }
 
     void WarnNoInterruptFlashOnce()
@@ -415,4 +464,33 @@ public class SpinnerBot : MonsterBase
     [ClientRpc] void PlaySpinStartClientRpc() => SafeCrossFade(spinStartState);
     [ClientRpc] void PlaySpinLoopClientRpc() => SafeCrossFade(spinLoopState);
     [ClientRpc] void PlayWhipClientRpc(bool useR) => SafeCrossFade(useR ? whipStateR : whipStateL);
+}
+
+/// <summary>
+/// SpinnerBot 동작을 같은 오브젝트의 다른 컴포넌트가 덮어쓰는 주입 지점 — 튜토리얼 스피너봇 연습 모드
+/// (<c>TutorialSpinnerPractice</c>, Docs/tech/handoff-tutorial-spinner.md).
+/// 🔴 구현체가 붙어 있지 않으면 SpinnerBot 은 이전과 똑같이 돈다. 전부 서버에서만 묻는다.
+/// </summary>
+public interface ISpinnerBotOverride
+{
+    /// <summary>true 면 공격 선택을 덮어쓴다 — 채찍 없이 스핀만, 확률·쿨 대신 <see cref="TryBeginSpin"/>.</summary>
+    bool OverridesAttack { get; }
+
+    /// <summary>true 면 받는 공격의 체력 피해를 0 으로 만든다(피격 반응·간파 판정은 그대로).</summary>
+    bool BlocksHealthDamage { get; }
+
+    /// <summary>지금 스핀(간파 창)을 시작해도 되는가. true 를 돌려주면 시작한 것으로 센다. false 면 공격하지 않는다.</summary>
+    bool TryBeginSpin();
+
+    /// <summary>덮어쓴 스핀의 돌진 끝점 보정(이동 범위 제한).</summary>
+    Vector3 ClampDashTarget(Vector3 target);
+
+    /// <summary>덮어쓴 스핀의 돌진 틱. 이 돌진은 피해를 주지 않는다 — 밀쳐내기는 구현체 몫.</summary>
+    void TickHarmlessDash();
+
+    /// <summary>
+    /// 간파(우클릭) 적중이 간파 창 <b>밖</b>에서 들어왔다(창 안 = 간파 성공은 원래 경로). 인자 = 공격자 clientId.
+    /// 튜토리얼 연계 연습이 취약 상태에서 이것을 '밀치기'로 쓴다(v8 §3.5). Q 넉백·일반 피해는 여기 오지 않는다.
+    /// </summary>
+    void NotifyInterruptHit(ulong attackerClientId);
 }

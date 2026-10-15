@@ -27,6 +27,7 @@ MonoBehaviour:
   attackRange: 9
   leashRadius: 16
   retargetInterval: 0
+  loseTargetRadius: 19.2
   returnSpeedMultiplier: 5
   turnSpeed: 10
   avoidanceRadius: 0.3
@@ -37,6 +38,13 @@ MonoBehaviour:
   minStandoff: 6
   projectileArcHeight: 4
   projectileSplashRadius: 1.5
+  rangedStyle: 1
+  skyStrikeTelegraphTime: 1.5
+  skyStrikeFallTime: 0.35
+  skyStrikeFloorTolerance: 1.5
+  skyStrikeLosBlockMask:
+    serializedVersion: 2
+    m_Bits: 1
   repositionBetweenAttacks: 1
   retreatMinDuration: 1.2
   repositionMinDuration: 1.2
@@ -61,6 +69,8 @@ MonoBehaviour:
   locomotionFullBlendSpeed: 1.5
   locomotionIdleCycleSeconds: 0.9666667
   locomotionMoveCycleSeconds: 0.5066667
+  locomotionFullBlendWhileMoving: 0
   locomotionAnimSpeedRange: {x: 0.5, y: 2.5}
   locomotionPlaybackScale: 0.43
   animatorControllerOverride: {fileID: 0}
+  telegraphStyle: {fileID: 11400000, guid: 92c647bea0fdba64c89c3179e14ac3e9, type: 2}

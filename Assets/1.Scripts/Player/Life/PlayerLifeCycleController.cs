@@ -19,7 +19,7 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
 {
     [Header("Death Flow")]
     [SerializeField] private Unit deathSource;
-    [SerializeField] private Temp_MultiGameRule gameRule;
+    [SerializeField] private MultiGameRule gameRule;
     [SerializeField, Min(0f)] private float deathPresentationDuration = 1.5f;
 
     // 사망 시 되돌릴 애니메이터. 비워 두면 Awake 에서 자식에서 찾는다(프리팹 배선 불필요).
@@ -51,6 +51,13 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
     /// 플레이어 행 등록에 쓰고, 사망 횟수는 Alive→DeadPresentation 전이만 센다.
     /// </summary>
     public static event Action<ulong, PlayerLifeState, PlayerLifeState> ServerLifeStateChanged;
+
+    /// <summary>
+    /// [서버] 사망 목적지 훅(전역, 인자 = OwnerClientId). true 면 공용 목숨 수와 무관하게 Soul 로 보낸다.
+    /// 튜토리얼 교육 단계의 차감 없는 자동 부활(<c>TutorialDeathRules</c>)이 건다. null = 기존 규칙(공용 목숨 0 → PermanentDead).
+    /// 전멸 판정(<c>PartyWipeWatcher</c>)도 이 훅으로 '차감 없는 부활 대기 Soul' 을 가린다.
+    /// </summary>
+    public static Func<ulong, bool> ServerDeathKeepsSoul;
 
     private bool CanWriteLifeState => IsSpawned && IsServer && !IsCinematicLocked;
     private bool deathResolutionPending;
@@ -178,6 +185,34 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
         return true;
     }
 
+    /// <summary>
+    /// [서버, 전멸 리스폰 전용 — 할 일 30 (2)] 어떤 상태(PermanentDead·Soul·DeadPresentation·Alive)에서도 체력 가득 + Alive.
+    /// 일반 전이표(<see cref="IsValidTransition"/>)의 유일한 예외 — PermanentDead 를 나가는 경로는 이것뿐이다. 호출자 = <c>PartyWipeRespawner</c> 하나.
+    /// 보류된 사망·사망 연출 예약을 지운다(리스폰 직후 예약이 PermanentDead 로 덮는 경합 방지). 연출 잠금 중이면 거부(호출자가 먼저 푼다).
+    /// Alive 였으면 상태 전이 없이 힐만 한다.
+    /// </summary>
+    public bool TryRespawnAfterWipeOnServer()
+    {
+        if (!CanWriteLifeState)
+            return false;
+
+        ResolveLocalReferences();
+        if (deathSource == null)
+        {
+            Debug.LogError("[SoulAlert] 리스폰할 Unit deathSource가 없어 Alive 전환을 중단합니다.", this);
+            return false;
+        }
+
+        deathResolutionPending = false;
+        deferredDeathWhileLocked = false;
+
+        // TryCompleteRevive 와 같은 순서 — HP·사망 래치를 먼저 복구한 뒤 Alive 를 복제한다.
+        deathSource.Revive();
+        if (lifeState.Value != PlayerLifeState.Alive)
+            lifeState.Value = PlayerLifeState.Alive;
+        return true;
+    }
+
     /// <summary>DeadPresentation 종료 후 최종 사망을 확정한다. 서버에서만 성공한다.</summary>
     public bool TryEnterPermanentDead()
     {
@@ -262,6 +297,9 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
 
     private PlayerLifeState ResolveDeathDestination()
     {
+        if (ServerDeathKeepsSoul != null && ServerDeathKeepsSoul(OwnerClientId))
+            return PlayerLifeState.Soul;
+
         ResolveGameRuleReference();
         if (gameRule != null &&
             gameRule.TryRegisterClient(OwnerClientId) &&
@@ -272,9 +310,9 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
 
         // 임시 Rule 누락이 Player를 영구 사망시키지 않도록 부활 가능한 Soul로 폴백한다.
         Debug.LogWarning(
-            "[SoulAlert] Temp_MultiGameRule/LifeCount를 확인할 수 없어 " +
+            "[SoulAlert] MultiGameRule/공용 목숨을 확인할 수 없어 " +
             $"{OwnerClientId}번 Player를 Soul로 전환합니다. " +
-            "씬에 Spawn된 Temp_MultiGameRule을 배치하세요.",
+            "씬에 Spawn된 MultiGameRule을 배치하세요.",
             this);
         return PlayerLifeState.Soul;
     }
@@ -314,7 +352,7 @@ public class PlayerLifeCycleController : NetworkBehaviour, IPlayerDeathPresentat
     private void ResolveGameRuleReference()
     {
         if (gameRule == null)
-            gameRule = FindFirstObjectByType<Temp_MultiGameRule>();
+            gameRule = FindFirstObjectByType<MultiGameRule>();
     }
 
     private static bool IsValidTransition(PlayerLifeState from, PlayerLifeState to)

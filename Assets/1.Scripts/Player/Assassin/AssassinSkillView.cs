@@ -6,8 +6,14 @@ using UnityEngine;
 /// 🔸 어쌔신 임시 VFX 창구(PLAN-assassin A12) — 민경 정식 VFX 가 오면 프리팹 필드만 교체한다(거너 GunnerBeamView 선례).
 /// 스킬(PlayerSkillBase)은 RPC 를 가질 수 없으므로 서버 판정 결과를 퍼뜨리는 창구도 여기 둔다.
 ///
-/// - 변신 중 루프 · 강화 준비 루프: <see cref="AssassinState"/> 의 전 피어 이벤트로 켜고 끈다(늦은 접속은 스폰 시 현재 상태로 맞춤).
-/// - Q 돌진 궤적 · 변신 E 원 · E/R/간파 시전: 스킬의 OnClientPlay/OnEnd(전 피어)가 로컬로 부른다 — RPC 없음.
+/// - 변신 중 루프: <see cref="AssassinState"/> 의 전 피어 이벤트로 켜고 끈다(늦은 접속은 스폰 시 현재 상태로 맞춤).
+///   🔹 정식 VFX — <c>EffectCatalog.Assassin_R_BladeVortex</c> 를 EffectManager 로 재생한다(2026-10-14 민경).
+///   변신 시작 = PlayLooping(0.5초에 차오름), 종료(만료·수동 해제·쓰러짐 공통) = Release(0.5초에 흩어짐).
+/// - Q 돌진 궤적 · 변신 E 원 · E/간파 시전: 스킬의 OnClientPlay/OnEnd(전 피어)가 로컬로 부른다 — RPC 없음.
+///   🔹 변신 E 원 = 정식 VFX <c>EffectCatalog.Assassin_E_MultiSlashes</c> 루프(2026-10-15 민경) — 확정 시 원 중심에서
+///   배율 = 원 반경으로 켜고, 스킬 OnEnd(5타 완료·중단 공통)에서 Release 한다. 확정 순간 1회 <c>circleStrikePrefab</c> 도 그대로 낸다.
+///   🔹 변신 Q 돌진 = 정식 VFX <c>EffectCatalog.Assassin_Q_StormSlash</c> 루프(2026-10-15 민경) — 플레이어 루트를 따라가며
+///   지나간 자리에 자국을 남긴다(입자 World + Rate over Distance). 임시 돌진 궤적(dashTrailPrefab)은 일반 Q 만.
 /// - 평타 베기: 클립 Hit 애니 이벤트(전 피어에서 재생)마다 <see cref="AssassinBasicAttack"/> 가 부른다 — RPC 없음.
 /// - 백어택 적중: [서버] <see cref="ServerBackAttackHit"/> → 전 피어. 판정은 A11 이 붙인다(그 전까지 호출자 없음).
 /// 프리팹이 비어 있으면 해당 연출만 빠진다.
@@ -15,9 +21,22 @@ using UnityEngine;
 [RequireComponent(typeof(AssassinState))]
 public sealed class AssassinSkillView : BaseNetworkBehaviour
 {
-    [Header("루프 — 상태가 켜진 동안")]
-    [SerializeField] private GameObject transformLoopPrefab;
-    [SerializeField] private GameObject enhancedReadyLoopPrefab;
+    [Header("변신 루프 — EffectCatalog.Assassin_R_BladeVortex")]
+    [Tooltip("플레이어 루트 기준 월드 오프셋. 배율에 곱해지지 않는다 — 프리팹 피벗이 발밑이라 기본 0.")]
+    [SerializeField] private Vector3 transformEffectOffset;
+    [Tooltip("프리팹 저작 크기에 곱하는 배율.")]
+    [SerializeField, Min(0.01f)] private float transformEffectScale = 1f;
+
+    [Header("변신 E 원형 5타 — EffectCatalog.Assassin_E_MultiSlashes")]
+    [Tooltip("배율 = 원 반경(m) × 이 값. 1 = 프리팹의 입자 생성 원(반경 1m 저작)이 바닥 원 표시와 같은 크기.\n" +
+             "베기·바닥 자국 자체 크기 때문에 실제로 보이는 범위는 원보다 넓다 — 외곽을 원에 맞추려면 0.4~0.5.")]
+    [SerializeField, Min(0.01f)] private float circleStrikeScaleFactor = 1f;
+
+    [Header("변신 Q 돌진 — EffectCatalog.Assassin_Q_StormSlash")]
+    [Tooltip("플레이어 루트 기준 월드 오프셋. 배율에 곱해지지 않는다.")]
+    [SerializeField] private Vector3 stormSlashOffset;
+    [Tooltip("프리팹 저작 크기에 곱하는 배율.")]
+    [SerializeField, Min(0.01f)] private float stormSlashScale = 1f;
 
     [Header("평타 베기 — 클립 Hit 이벤트마다(전 피어)")]
     [Tooltip("일반 4타 — 인덱스 = 타 순서(0~3). 비어 있는 칸은 연출 없음.")]
@@ -28,19 +47,17 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
 
     [Header("시전 1회 — 스킬 OnClientPlay(전 피어)")]
     [SerializeField] private GameObject enhanceCastPrefab;
-    [SerializeField] private GameObject transformCastPrefab;
     [SerializeField] private GameObject interruptCastPrefab;
 
     [Header("1회·스킬 동안")]
     [SerializeField] private GameObject dashTrailPrefab;
+    [Tooltip("변신 E 확정 순간 원 중심에 1회(Multi Slashes 루프와 함께).")]
     [SerializeField] private GameObject circleStrikePrefab;
     [SerializeField] private GameObject backAttackHitPrefab;
     [Tooltip("1회 연출·꺼진 루프가 남은 입자를 흘리고 사라지기까지(초).")]
     [SerializeField, Min(0.1f)] private float releaseLifetime = 2f;
 
     [Header("소켓 (비우면 플레이어 루트)")]
-    [SerializeField] private Transform transformSocket;
-    [SerializeField] private Transform enhancedSocket;
     [Tooltip("평타 베기 위치·회전 — Assassin_Armature/VFX/BasicAttack01~04. 소켓을 옮기면 그 타의 이펙트가 따라간다.")]
     [SerializeField] private Transform[] normalSlashSockets = new Transform[4];
     [Tooltip("강타 베기 — Armature/VFX/EnhancedAttack.")]
@@ -49,18 +66,18 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
     [SerializeField] private Transform transformedSlashSocket;
 
     private AssassinState state;
-    private GameObject transformLoop;
-    private GameObject enhancedLoop;
+    private EffectHandle transformLoop;
+    private EffectHandle circleStrikeLoop;
+    private float circleStrikeDeadline;
+    private EffectHandle stormSlashLoop;
+    private float stormSlashDeadline;
     private GameObject dashTrail;
 
     private void Awake()
     {
         state = GetComponent<AssassinState>();
         if (state != null)
-        {
             state.TransformChanged += HandleTransformChanged;
-            state.EnhancedReadyChanged += HandleEnhancedReadyChanged;
-        }
     }
 
     private void Start() => SyncLoops();
@@ -75,10 +92,20 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
     public override void OnDestroy()
     {
         if (state != null)
-        {
             state.TransformChanged -= HandleTransformChanged;
-            state.EnhancedReadyChanged -= HandleEnhancedReadyChanged;
+        // 디스폰·씬 언로드 — 아웃트로 없이 바로 반납(추종 대상이 사라지므로).
+        if (EffectManager.Instance != null)
+        {
+            if (transformLoop.IsSet)
+                EffectManager.Instance.ReleaseImmediate(transformLoop);
+            if (circleStrikeLoop.IsSet)
+                EffectManager.Instance.ReleaseImmediate(circleStrikeLoop);
+            if (stormSlashLoop.IsSet)
+                EffectManager.Instance.ReleaseImmediate(stormSlashLoop);
         }
+        transformLoop = EffectHandle.None;
+        circleStrikeLoop = EffectHandle.None;
+        stormSlashLoop = EffectHandle.None;
         base.OnDestroy();
     }
 
@@ -117,9 +144,6 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
     /// <summary>[전 피어] 일반 E 버프 시전.</summary>
     public void PlayEnhanceCast() => PlayAttached(enhanceCastPrefab);
 
-    /// <summary>[전 피어] R 변신 시전(Parry_R 시작).</summary>
-    public void PlayTransformCast() => PlayAttached(transformCastPrefab);
-
     /// <summary>[전 피어] 우클릭 간파 시전.</summary>
     public void PlayInterruptCast() => PlayAttached(interruptCastPrefab);
 
@@ -133,8 +157,73 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
     /// <summary>[전 피어] Q 종료(사유 무관) — 궤적을 떼어 남은 입자만 흘린다.</summary>
     public void EndDashTrail() => Release(ref dashTrail);
 
-    /// <summary>[전 피어] 변신 E 공격 시작 — 원 중심에 1회.</summary>
-    public void PlayCircleStrike(Vector3 center) => PlayOneShot(circleStrikePrefab, center);
+    /// <summary>
+    /// [전 피어] 변신 E 공격 시작 — 원 중심에서 루프를 켠다. 배율 = <paramref name="radius"/> × circleStrikeScaleFactor.
+    /// <paramref name="maxDuration"/>(스킬 최대 지속) + 1초 안에 <see cref="EndCircleStrike"/> 가 안 오면 스스로 해제한다 —
+    /// 클라의 종료 RPC 가 이미 정리된 스킬에 막혀 OnEnd 가 안 불리는 경우의 안전망.
+    /// </summary>
+    public void BeginCircleStrike(Vector3 center, float radius, float maxDuration)
+    {
+        EndCircleStrike();   // 재진입 — 남은 루프는 먼저 걷는다
+        PlayOneShot(circleStrikePrefab, center);
+        if (!EffectManager.TryGet(out EffectManager effects, this))
+            return;
+
+        EffectEntry entry = effects.Catalog.Assassin_E_MultiSlashes;
+        if (entry == null)
+        {
+            Edit.LogWarning("[AssassinSkillView] EffectCatalog.Assassin_E_MultiSlashes 가 비어 변신 E 연출을 건너뛴다.", this);
+            return;
+        }
+
+        circleStrikeLoop = effects.PlayLooping(entry, center, Quaternion.identity, Mathf.Max(0.01f, radius * circleStrikeScaleFactor));
+        circleStrikeDeadline = Time.time + Mathf.Max(0f, maxDuration) + 1f;
+    }
+
+    /// <summary>[전 피어] 변신 E 종료(사유 무관) — 방출만 멈추고 남은 입자는 엔트리 outroDuration 동안 사라지게 둔다.</summary>
+    public void EndCircleStrike()
+    {
+        if (circleStrikeLoop.IsSet && EffectManager.Instance != null)
+            EffectManager.Instance.Release(circleStrikeLoop);
+        circleStrikeLoop = EffectHandle.None;
+    }
+
+    /// <summary>
+    /// [전 피어] 변신 Q 돌진 시작 — 플레이어 루트를 따라가는 루프를 켠다. 입자는 World + Rate over Distance 라 움직인 만큼
+    /// 지나간 자리에 남는다. <paramref name="maxDuration"/>(스킬 최대 지속) + 1초 안에 <see cref="EndStormSlash"/> 가 안 오면 스스로 해제한다.
+    /// </summary>
+    public void BeginStormSlash(float maxDuration)
+    {
+        EndStormSlash();   // 재진입 — 남은 루프는 먼저 걷는다
+        if (!EffectManager.TryGet(out EffectManager effects, this))
+            return;
+
+        EffectEntry entry = effects.Catalog.Assassin_Q_StormSlash;
+        if (entry == null)
+        {
+            Edit.LogWarning("[AssassinSkillView] EffectCatalog.Assassin_Q_StormSlash 가 비어 변신 Q 연출을 건너뛴다.", this);
+            return;
+        }
+
+        stormSlashLoop = effects.PlayLooping(entry, transform, stormSlashOffset, stormSlashScale);
+        stormSlashDeadline = Time.time + Mathf.Max(0f, maxDuration) + 1f;
+    }
+
+    /// <summary>[전 피어] 변신 Q 종료(사유 무관) — 방출만 멈추고 남은 자국은 엔트리 outroDuration 동안 사라지게 둔다.</summary>
+    public void EndStormSlash()
+    {
+        if (stormSlashLoop.IsSet && EffectManager.Instance != null)
+            EffectManager.Instance.Release(stormSlashLoop);
+        stormSlashLoop = EffectHandle.None;
+    }
+
+    private void Update()
+    {
+        if (circleStrikeLoop.IsSet && Time.time >= circleStrikeDeadline)
+            EndCircleStrike();
+        if (stormSlashLoop.IsSet && Time.time >= stormSlashDeadline)
+            EndStormSlash();
+    }
 
     // ── 서버 판정 → 전 피어 ──
 
@@ -172,29 +261,34 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
 
     // ── 루프 ──
 
-    private void HandleTransformChanged(bool on) => SetLoop(ref transformLoop, transformLoopPrefab, transformSocket, on);
+    // 변신 루프 — 켜면 차오르고(프리팹이 0.5초 안에 스스로 채운다), 끄면 엔트리의 outro 로 흩어진다
+    // (End 원샷 + 남은 입자 ×outroPlayRate). 쓰러짐·사망도 같은 이벤트로 온다.
+    private void HandleTransformChanged(bool on)
+    {
+        if (on)
+        {
+            if (transformLoop.IsSet || !EffectManager.TryGet(out EffectManager effects, this))
+                return;
+            EffectEntry entry = effects.Catalog.Assassin_R_BladeVortex;
+            if (entry == null)
+            {
+                Edit.LogWarning("[AssassinSkillView] EffectCatalog.Assassin_R_BladeVortex 가 비어 변신 연출을 건너뛴다.", this);
+                return;
+            }
+            transformLoop = effects.PlayLooping(entry, transform, transformEffectOffset, transformEffectScale);
+            return;
+        }
 
-    private void HandleEnhancedReadyChanged(bool on) => SetLoop(ref enhancedLoop, enhancedReadyLoopPrefab, enhancedSocket, on);
+        if (transformLoop.IsSet && EffectManager.Instance != null)
+            EffectManager.Instance.Release(transformLoop);
+        transformLoop = EffectHandle.None;
+    }
 
     private void SyncLoops()
     {
         if (state == null)
             return;
         HandleTransformChanged(state.IsTransformed);
-        HandleEnhancedReadyChanged(state.IsEnhancedReady);
-    }
-
-    private void SetLoop(ref GameObject instance, GameObject prefab, Transform socket, bool on)
-    {
-        if (on)
-        {
-            if (instance == null)
-                instance = Spawn(prefab, socket != null ? socket : transform);
-        }
-        else
-        {
-            Release(ref instance);
-        }
     }
 
     private static GameObject Spawn(GameObject prefab, Transform parent)
@@ -205,7 +299,7 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
         GameObject instance = parent != null ? Instantiate(prefab, parent, false) : Instantiate(prefab);
         instance.name = prefab.name + "(임시)";
 
-        // 빌려 쓰는 프리팹 중 루트 위치가 0 이 아닌 것이 있다(CharacterCircleYellow/Purple — 씬 배치값이 저장됨).
+        // 빌려 쓰는 프리팹 중 루트 위치가 0 이 아닌 것이 있다(CharacterCirclePurple —씬 배치값이 저장됨).
         // 붙일 때 그 값이 소켓 기준 오프셋이 되어 원이 몇 m 떨어져 생긴다 — 위치는 소켓이 정한다.
         if (parent != null)
             instance.transform.localPosition = Vector3.zero;

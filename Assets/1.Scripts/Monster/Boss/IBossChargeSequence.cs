@@ -4,7 +4,7 @@ public enum BossChargeResult
     InProgress = 0,
     /// <summary>송전탑 전부 파괴 — 보스가 <c>Groggy</c> 로 무력화된다(단 Break 로 승격하지 않는다).</summary>
     AllPylonsDestroyed,
-    /// <summary>하나라도 도달했거나 제한시간 초과 — 보스가 <c>Rage</c> 돌진 3회로 넘어간다.</summary>
+    /// <summary>제한시간 초과(단독 조건 — 도달은 실패 조건이 아니다, BossChargeSequence 참조) — 보스가 <c>Rage</c> 돌진 3회로 넘어간다.</summary>
     Failed,
 }
 
@@ -23,6 +23,8 @@ public enum BossChargeResult
 ///    → **`destroyed + reached >= max` 합산**으로 판정하고, 결과는 이분법이다:
 ///    **전부 파괴 → <see cref="BossChargeResult.AllPylonsDestroyed"/> /
 ///    하나라도 도달 → <see cref="BossChargeResult.Failed"/>.**
+///    ⚠️ 정정(점검 10-14): 현행 구현(BossChargeSequence)은 **도달을 실패로 보지 않는다 — 실패는 제한시간 초과 단독**이다.
+///    위 문단은 레거시 교착의 역사 기록이다. 새 구현은 BossChargeSequence 의 규칙을 따를 것.
 ///    (2026-07-30자 진단 주석이 이 교착을 이미 정확히 기술해 뒀는데도 안 고쳐져 있었다.)
 /// </summary>
 public interface IBossChargeSequence
@@ -38,8 +40,9 @@ public interface IBossChargeSequence
     /// <returns>고를 탑이 하나도 없으면 <c>false</c>(그때는 보스가 제자리에서 차징한다).</returns>
     bool TryPrepareCenter(int pylonCount, out UnityEngine.Vector3 center);
 
-    /// <summary>시퀀스 시작(서버). <paramref name="pylonCount"/> 는 보스가 인원수로 산출해 넘긴다.</summary>
-    void Begin(int pylonCount, float timeLimit);
+    /// <summary>시퀀스 시작(서버). <paramref name="pylonCount"/> 는 보스가 인원수로 산출해 넘긴다.
+    /// <paramref name="pylonHpMultiplier"/> = 이번에 올라오는 송전탑 최대 HP 배율(레이드 ② = 2, 기본 1).</summary>
+    void Begin(int pylonCount, float timeLimit, float pylonHpMultiplier = 1f);
 
     /// <summary>매 서버 틱 결과를 조회한다. <see cref="BossChargeResult.InProgress"/> 면 계속 대기.</summary>
     BossChargeResult Poll();

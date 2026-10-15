@@ -29,10 +29,12 @@ public class BossElectricFloorDataSO : ScriptableObject
     public BossPauseCondition pauseOn = BossPauseCondition.Suppress | BossPauseCondition.PylonGroggy;
 
     [Header("연출 (임시 — 민경 교체 훅)")]
-    [Tooltip("예고 사각형 바깥 색(연하게).")]
-    public Color warnOuterColor = new Color(1f, 0.15f, 0.1f, 0.28f);
-    [Tooltip("안쪽에서 차오르는 진한 색.")]
-    public Color warnFillColor = new Color(1f, 0.05f, 0.02f, 0.55f);
+    // ⚠️ 10-13 — 경고 칸 색은 23호 데이터의 telegraphStyle(TelegraphStyleSO.floorTile)로 옮겼다(PLAN-telegraph-style).
+    //    아래 두 칸은 **아무도 읽지 않는다**. 저작값 보존을 위해 지우지 않고 남겨 둔다(값 = 기본 스타일과 같음).
+    [Tooltip("⚠️ 미사용. 경고 칸 색은 23호 데이터(No23)의 Telegraph Style → floorTile 에서 고친다.")]
+    [System.Obsolete("TelegraphStyleSO.floorTile.outline 을 쓴다")] public Color warnOuterColor = new Color(1f, 0.15f, 0.1f, 0.28f);
+    [Tooltip("⚠️ 미사용. 경고 칸 색은 23호 데이터(No23)의 Telegraph Style → floorTile 에서 고친다.")]
+    [System.Obsolete("TelegraphStyleSO.floorTile.fill 을 쓴다")] public Color warnFillColor = new Color(1f, 0.05f, 0.02f, 0.55f);
     [Tooltip("임시 전기 표시 색.")]
     public Color electricColor = new Color(0.45f, 0.85f, 1f, 0.8f);
     [Tooltip("임시 전기 깜빡임 속도(라디안/초). 0 = 깜빡임 없이 고정.")]

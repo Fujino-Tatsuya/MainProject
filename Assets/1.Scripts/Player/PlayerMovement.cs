@@ -36,6 +36,8 @@ public class PlayerMovement : MonoBehaviour
     private bool isTurning;
     private Quaternion turnTarget;
     private float turnSpeed; // 도/초
+    // 원인별 회전 잠금(할 일 27). 이동 입력 회전과 RotateToward 를 막는다 — PlayerFacingLock 주석 참조.
+    private readonly PlayerFacingLock facingLock = new PlayerFacingLock();
 
     private void Awake()
     {
@@ -78,7 +80,7 @@ public class PlayerMovement : MonoBehaviour
             MoveDirection = rawInput.MoveDirection,
             HasMoveInput = rawInput.HasMoveInput,
             CanMove = player == null || player.CanMove,
-            CanRotate = player == null || player.CanMovementRotate,
+            CanRotate = (player == null || player.CanMovementRotate) && !facingLock.IsLocked,
             HasFixedMoveSpeed = hasFixedMoveSpeed,
             FixedMoveSpeed = hasFixedMoveSpeed ? fixedMoveSpeed : 0f,
             MoveSpeedMultiplier = statusMultiplier
@@ -193,9 +195,24 @@ public class PlayerMovement : MonoBehaviour
         motor?.SynchronizeArmatureRotation(armature.rotation, hasRotate);
     }
 
+    /// <summary>
+    /// <paramref name="cause"/> 이름으로 회전을 잠그고 <paramref name="direction"/> 을 바라본다.
+    /// 같은 원인으로 다시 부르면 방향만 바꾼다. 풀기는 <see cref="ReleaseFacingLock"/> — 원인마다 따로다.
+    /// </summary>
+    public void AcquireFacingLock(object cause, Vector3 direction)
+    {
+        facingLock.Acquire(cause);
+        RotateImmediately(direction);
+    }
+
+    /// <summary>이 원인의 잠금만 푼다. 다른 원인이 남아 있으면 여전히 잠겨 있다.</summary>
+    public void ReleaseFacingLock(object cause) => facingLock.Release(cause);
+
+    public bool IsFacingLocked => facingLock.IsLocked;
+
     public void RotateToward(Vector3 direction, float speed)
     {
-        if (armature == null)
+        if (armature == null || facingLock.IsLocked)
             return;
 
         direction.y = 0f;

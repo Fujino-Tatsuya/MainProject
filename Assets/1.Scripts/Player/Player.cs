@@ -62,6 +62,7 @@ public class Player : Unit
     [DataTableIgnore] [SerializeField] private float platformGroundCheckDistance = 0.6f;
 
     private PlayerStateController stateController;
+    private readonly PlayerWallImpactTracker wallImpactTracker = new PlayerWallImpactTracker();   // [서버] 할 일 32
     private IPlayerBasicAttack defaultAttack;
     private PlayerMotor motor;
     private PlayerGroundingSensor groundingSensor;
@@ -70,6 +71,10 @@ public class Player : Unit
     private IPlayerOnHitBonus[] onHitBonuses;
     private PlayerInputReader inputReader;
     private PlayerSkillTargeting skillTargeting;
+    private PlayerLifeCycleController lifeCycle;
+    private PlayerEncounterLock encounterLock;
+    // 기본 체력 재생(할 일 31) — 서버에서만 틱한다. 계산은 순수 모델, 여기는 배선만.
+    private readonly PlayerHealthRegenModel healthRegen = new PlayerHealthRegenModel();
     private NetworkTransform networkTransform;
     private bool networkTransformMissingWarningLogged;
     private PlayerTickRingBuffer<PlayerRawSimulationInput> ownerRawInputHistory;
@@ -194,6 +199,8 @@ public class Player : Unit
         onHitBonuses = GetComponents<IPlayerOnHitBonus>();
         inputReader = GetComponent<PlayerInputReader>();
         skillTargeting = GetComponent<PlayerSkillTargeting>();
+        lifeCycle = GetComponent<PlayerLifeCycleController>();
+        encounterLock = GetComponent<PlayerEncounterLock>();
         networkTransform = GetComponent<NetworkTransform>();
 
         if (animator == null)
@@ -340,6 +347,11 @@ public class Player : Unit
     {
         UpdateMovementDiagnostics();
         UpdateOwnerReconciliationDiagnostics();
+        TickServerHealthRegen();
+
+        if (IsServer)
+            wallImpactTracker.Tick(this, stateController.CurrentState == PlayerActionState.Knockback,
+                                   stateController.KnockbackDeceleration);
 
         if (IsNetworkActive &&
             !stateController.ShouldTickForNetwork(IsOwner, HasStateAuthority))
@@ -460,6 +472,8 @@ public class Player : Unit
         bool accepted = stateController.BeginKnockback(direction, strength);
         if (!accepted)
             return;
+
+        wallImpactTracker.Begin(direction, strength);   // 할 일 32 — 벽 충돌 이벤트(서버)
 
         ApplyKnockbackClientRpc(direction, strength, CreateOwnerClientRpcParams());
     }
@@ -1606,6 +1620,26 @@ public class Player : Unit
     public event System.Action<AttackInfo, AttackHitContext> ServerAttackReceived;
 
     /// <summary>
+    /// [서버] 기본 공격(좌클릭) 1타가 <b>실제로 시작</b>됐다(적중 무관) — 가붕이 콤보 한 타 시작 · 거너 한 발 발사 · 어쌔신 한 타(강타 포함) 시작.
+    /// 거부된 요청·거너 준비 자세만으로는 안 난다. R 대상 확정 좌클릭은 기본 공격 경로를 타지 않는다. 튜토리얼 판정 훅(v8 Z1-3).
+    /// 발행은 각 기본 공격 구현이 <see cref="RaiseServerBasicAttackStarted"/> 로.
+    /// </summary>
+    public static event System.Action<Player> ServerBasicAttackStarted;
+
+    // 도메인 리로드를 끈 Play 진입에서도 이전 세션 구독자가 남지 않게 비운다.
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetBasicAttackEvent() => ServerBasicAttackStarted = null;
+
+    /// <summary>[서버] <see cref="ServerBasicAttackStarted"/> 발행. 서버(호스트)가 아니면 무시.</summary>
+    public void RaiseServerBasicAttackStarted()
+    {
+        if (!IsServer)
+            return;
+
+        ServerBasicAttackStarted?.Invoke(this);
+    }
+
+    /// <summary>
     /// [서버] 공격 판정 경로(평타·스킬·투사체)가 적중 대상 목록을 넘긴다. 대상이 없으면 발행하지 않는다.
     /// 🔴 "효과가 만든 피해"(패시브 추가타 등)는 여기로 보내지 말 것 — 적중 효과가 자기 자신을 재발동시킨다.
     /// </summary>
@@ -1652,6 +1686,9 @@ public class Player : Unit
         // 있고 이 메서드는 서버 전용 공격 판정에서만 불린다 — 리모트 클라에는 도착하지 않는다.
         // 그래서 여기서 쉴드 감소를 확인해 PlayerShieldVfx 가 전 피어로 퍼뜨리게 한다. (판정 영향 없음)
         int shieldBefore = CurrentShield;
+
+        // 레이드 보스전 한 방 즉사 금지(PLAN-boss-raid.md, 보스가 켤 때만 — 평소엔 Ratio 0 이라 그대로).
+        attackInfo.damage = BossRaidRules.CapHitDamage(attackInfo.damage, FinalMaxHp, PlayerHitDamageCap.Ratio);
 
         bool result = base.ReceiveAttack(attackInfo, hitContext);
         if (!result)
@@ -1700,6 +1737,50 @@ public class Player : Unit
             _fallDamageBypass = false;
         }
     }
+
+    // 재생 리셋 = 체력 피해 > 0 또는 추락 피해. 보호막만 깎인 피격은 재생을 멈추지 않는다(사용자 결정 10-13).
+    // 무적으로 막힌 피해·내가 때린 것은 오지 않는다.
+    protected override void OnServerHealthDamageApplied(int healthLost, int shieldLost)
+    {
+        healthRegen.NotifyDamage(GameplayNow(), healthLost, _fallDamageBypass);
+    }
+
+    /// <summary>
+    /// [서버] 기본 체력 재생(할 일 31). 회복은 Unit.HealHp(통계 비집계) → 기존 _currentHp 복제로 HUD 에 반영된다(오너 예측 없음).
+    /// 사망·Soul·PermanentDead·연출 잠금 중에는 막히고, 풀린 시점부터 지연을 다시 센다.
+    /// </summary>
+    private void TickServerHealthRegen()
+    {
+        if (!IsServer || _health == null)
+            return;
+
+        PlayerGameRuleData rule = motor != null ? motor.GameRule : null;
+        if (rule == null)
+            return;
+
+        bool blocked = (lifeCycle != null && lifeCycle.State != PlayerLifeState.Alive) ||
+                       (encounterLock != null && encounterLock.IsCinematicLocked);
+
+        // 회복 속도는 최종 최대 체력 기준. 상한은 Health 가 실제로 허용하는 base 최대치와 최종치 중 작은 쪽.
+        int maxHpCap = Mathf.Min(MaxHp, FinalMaxHp);
+        int heal = healthRegen.Tick(
+            GameplayNow(),
+            blocked,
+            CurrentHealth,
+            maxHpCap,
+            FinalMaxHp,
+            rule.HealthRegenDelaySeconds,
+            rule.HealthRegenPercentPerSecond);
+        // 자연 회복은 결과 통계(회복량)에 잡지 않는다(사용자 결정 10-13).
+        if (heal > 0)
+            HealHp(heal, countInStats: false);
+    }
+
+    // 상태이상·보호막과 같은 시간 도메인(일시정지·슬로모션 반영 GameNow, 없으면 ServerTime).
+    private double GameplayNow()
+        => NetworkClock.Instance != null
+            ? NetworkClock.Instance.GameNow
+            : (NetworkManager != null ? NetworkManager.ServerTime.Time : 0.0);
 
     private ClientRpcParams CreateOwnerClientRpcParams()
     {

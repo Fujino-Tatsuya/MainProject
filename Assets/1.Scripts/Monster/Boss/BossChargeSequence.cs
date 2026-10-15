@@ -29,6 +29,9 @@ public class BossChargeSequence : MonoBehaviour, IBossChargeSequence
              "상승 시간까지 제한시간에서 깎으면 플레이어가 부술 시간이 줄어든다.")]
     float riseGrace = 1.5f;
 
+    /// <summary>상승 여유(초) — 보스도 차징 대기에 같은 값을 더한다(TwentyThreeBoss.ChargeWaitTime). 안 더하면 보스 타이머가 먼저 끝나 이 값이 무시됐다(점검 10-14 P2).</summary>
+    public float RiseGrace => riseGrace;
+
     [SerializeField]
     [Tooltip("기둥을 고르는 기준. 켜면 보스에서 가까운 순, 끄면 등록 순(씬 배치 순).")]
     bool pickNearest = true;
@@ -63,7 +66,7 @@ public class BossChargeSequence : MonoBehaviour, IBossChargeSequence
 
     bool _prepared;   // TryPrepareCenter 가 고른 집합이 아직 유효한가
 
-    public void Begin(int pylonCount, float timeLimit)
+    public void Begin(int pylonCount, float timeLimit, float pylonHpMultiplier = 1f)
     {
         if (!IsServerRuntime()) return;
 
@@ -90,7 +93,7 @@ public class BossChargeSequence : MonoBehaviour, IBossChargeSequence
         }
 
         for (int i = 0; i < _engaged.Count; i++)
-            _engaged[i].BeginCharge();
+            _engaged[i].BeginCharge(pylonHpMultiplier);
 
         if (_engaged.Count < want)
             Debug.LogWarning(
@@ -133,7 +136,7 @@ public class BossChargeSequence : MonoBehaviour, IBossChargeSequence
         if (!IsServerRuntime()) return;
 
         for (int i = 0; i < _engaged.Count; i++)
-            _engaged[i]?.EndCharge();   // 멱등 — 어느 상태에서든 내려간다
+            if (_engaged[i] != null) _engaged[i].EndCharge();   // 멱등 — 어느 상태에서든 내려간다(?. 는 파괴된 Unity 객체를 못 거른다)
 
         _engaged.Clear();
         _running = false;

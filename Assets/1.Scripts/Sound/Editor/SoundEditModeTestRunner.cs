@@ -8,7 +8,8 @@ internal static class SoundEditModeTestRunner
     static readonly string[] Fixtures =
     {
         "^SoundCatalogLookupTests",
-        "^SoundPlaybackLimiterTests"
+        "^SoundPlaybackLimiterTests",
+        "^SoundSyncPlannerTests"
     };
 
     const string Tag = "[SoundTests]";

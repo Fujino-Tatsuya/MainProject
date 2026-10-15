@@ -222,9 +222,9 @@ public class TurretHeadAim : NetworkBehaviour, ITurretAimGate
             laserOrigin = FindBone("Muzzle_Socket") ?? FindBone("Head") ?? headBone;
 
         // 🔴 막는 레이어를 안 정하면 예고선이 벽을 뚫고 나가 "저기까지 공격이 온다"로 오해된다.
-        //    지정이 없으면 바닥·구조물 레이어로 기본값을 잡는다(MapContentSpawner 와 같은 집합).
+        //    지정이 없으면 바닥·구조물 레이어로 기본값을 잡는다(MapContentSpawner 와 같은 집합 + 할 일 32 의 Wall).
         if (laserBlockers.value == 0)
-            laserBlockers = LayerMask.GetMask("Default", "Ground");
+            laserBlockers = LayerMask.GetMask("Default", "Ground", "Wall");
 
         if (aimLaser != null)
         {

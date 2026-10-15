@@ -4,8 +4,9 @@ using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// 어쌔신 R 스택·일반 E 강화·변신 상태(PLAN-assassin A7). 서버만 쓰고 전 피어에 하나의 스냅샷으로 복제한다 —
-/// 남은 변신 시간은 각 피어가 스냅샷과 네트워크 시계로 계산하므로 매 프레임 복제하지 않는다.
+/// 어쌔신 분노 게이지·일반 E 강화·변신 상태(PLAN-assassin A7, §4.2 게이지 2026-10-09). 서버만 쓰고 전 피어에 하나의 스냅샷으로 복제한다 —
+/// 변신 중 줄어드는 게이지·남은 변신 시간은 각 피어가 스냅샷과 네트워크 시계로 계산하므로 매 프레임 복제하지 않는다.
+/// 충전(적중 판정)·감소·초기화는 서버, 오너는 HUD 와 R 입력 가능 판정에 읽기만 한다. R 시전 허가는 서버 스킬 승인이 최종 판정한다.
 /// 규칙은 <see cref="AssassinStateModel"/>, 수치는 <see cref="AssassinStateData"/>.
 ///
 /// 변신 종료(만료·수동 해제)는 "현재 공격 완료 후"다 — 서버 FSM 이 공격·스킬·간파 상태를 벗어난 첫 프레임에 끝내고
@@ -32,11 +33,8 @@ public sealed class AssassinState : BaseNetworkBehaviour, IPassiveTooltipProvide
     private AssassinEnhanceSkill enhanceSkill;
     private AssassinTransformSkill transformSkill;
 
-    /// <summary>[전 피어] 스냅샷이 바뀌었다(이전, 현재). HUD 구슬·변신 바·강화 강조가 구독한다.</summary>
+    /// <summary>[전 피어] 스냅샷이 바뀌었다(이전, 현재). 변신 중 게이지 감소는 스냅샷을 바꾸지 않는다 — 표시는 <see cref="Rage"/> 를 매 프레임 읽는다.</summary>
     public event Action<AssassinStateSnapshot, AssassinStateSnapshot> StateChanged;
-
-    /// <summary>[전 피어] 스택 수가 바뀌었다(0~상한).</summary>
-    public event Action<int> StacksChanged;
 
     /// <summary>[전 피어] 변신 시작(true)·종료(false). VFX 훅.</summary>
     public event Action<bool> TransformChanged;
@@ -46,11 +44,14 @@ public sealed class AssassinState : BaseNetworkBehaviour, IPassiveTooltipProvide
 
     public AssassinStateData Data => data;
 
-    /// <summary>P 칸 툴팁 출처(백어택 + R 스택 설명) — PassiveHUD 가 캐릭터 타입을 모르고 찾는다.</summary>
+    /// <summary>P 칸 툴팁 출처(백어택 + 분노 게이지 설명) — PassiveHUD 가 캐릭터 타입을 모르고 찾는다.</summary>
     public ISkillTooltipSource PassiveTooltip => data;
     public AssassinStateSnapshot Snapshot => State;
-    public int Stacks => State.stacks;
-    public int MaxStacks => Rules.MaxStacks;
+
+    /// <summary>지금 분노 게이지(0~최대). 변신 중이면 감소를 반영한 값.</summary>
+    public float Rage => AssassinStateModel.Rage(State, Now(), Rules);
+    public float MaxRage => Rules.MaxRage;
+    public float MinTransformRage => Rules.MinTransformRage;
     public bool IsEnhancedReady => State.enhancedReady;
     public bool IsTransformed => State.transformed;
     public bool IsReleaseRequested => State.releaseRequested;
@@ -83,7 +84,8 @@ public sealed class AssassinState : BaseNetworkBehaviour, IPassiveTooltipProvide
         return attackInfo;
     }
 
-    public bool CanBeginTransform =>AssassinStateModel.CanBeginTransform(State);
+    /// <summary>일반 상태 + 게이지 ≥ 최소 변신량. 오너는 입력·HUD 판정에, 서버는 R 승인(<see cref="AssassinTransformSkill.CanUse"/>)에 쓴다.</summary>
+    public bool CanBeginTransform => AssassinStateModel.CanBeginTransform(State, Rules);
     public bool CanPrepareEnhancement => AssassinStateModel.CanPrepareEnhancement(State);
 
     private AssassinStateSnapshot State => IsNetworkActive ? state.Value : offlineState;
@@ -117,6 +119,7 @@ public sealed class AssassinState : BaseNetworkBehaviour, IPassiveTooltipProvide
         state.OnValueChanged += HandleStateValueChanged;
 
         // 플레이어는 씬마다 새로 스폰된다 — 스폰 시점이 곧 초기화 시점이다.
+        // 🔸 게이지는 스테이지 이동에 유지해야 하는데(§4.2) 지금은 스폰마다 0 이 된다 — 스테이지 간 이월 수단이 생기면 여기서 복원한다.
         if (IsServer)
             state.Value = default;
     }
@@ -138,18 +141,21 @@ public sealed class AssassinState : BaseNetworkBehaviour, IPassiveTooltipProvide
 
     // ── 서버 API (스킬·평타가 호출) ──
 
-    /// <summary>[서버] 강타 적중 보상 1스택. 변신 중·상한이면 무시.</summary>
-    public bool ServerTryGainStack()
+    /// <summary>
+    /// [서버] 유효 대상 적중 공격 1회의 분노 게이지 충전(평타 1타·Q 1회·강타 1회). 여러 대상이어도 호출자가 1번만 부른다.
+    /// 변신 중·상한이면 무시.
+    /// </summary>
+    public bool ServerTryGainRage(AssassinRageSource source)
     {
         if (!HasStateAuthority)
             return false;
 
         AssassinStateSnapshot next = State;
-        if (!AssassinStateModel.TryGainStack(ref next, Rules))
+        if (!AssassinStateModel.TryGainRage(ref next, source, Rules))
             return false;
 
         Write(next);
-        Edit.Log($"[Assassin] R 스택 +1 → {next.stacks}", this);
+        Edit.Log($"[Assassin] 분노 게이지 +{Rules.GainFor(source):0.#} ({source}) → {next.rage:0.#}/{Rules.MaxRage:0.#}", this);
         return true;
     }
 
@@ -185,7 +191,7 @@ public sealed class AssassinState : BaseNetworkBehaviour, IPassiveTooltipProvide
     }
 
     /// <summary>
-    /// [서버] Parry_R 시작 — 스택 전부 소모, 지속 시작, 강화 준비 제거(+일반 E 쿨), Q·E 대체 세트 요청(§10.1).
+    /// [서버] Parry_R 시작 — 게이지 전부가 연료, 감소 시작, 강화 준비 제거(+일반 E 쿨), Q·E 대체 세트 요청(§10.1).
     /// 대체 스킬이 비어 있는 슬롯은 컨트롤러가 무시하고, R 실행 중 요청은 R 종료 직후 적용된다(A2).
     /// </summary>
     public bool ServerBeginTransform()
@@ -194,7 +200,6 @@ public sealed class AssassinState : BaseNetworkBehaviour, IPassiveTooltipProvide
             return false;
 
         AssassinStateSnapshot next = State;
-        int consumed = next.stacks;
         if (!AssassinStateModel.TryBeginTransform(ref next, Now(), Rules, out bool removedEnhancement))
             return false;
 
@@ -208,7 +213,7 @@ public sealed class AssassinState : BaseNetworkBehaviour, IPassiveTooltipProvide
             skills.SetSlotOverride(PlayerSkillSlot.Sub, true);
         }
 
-        Edit.Log($"[Assassin] 변신 시작 — 스택 {consumed} 소모, 지속 {Rules.DurationFor(consumed):F1}s" +
+        Edit.Log($"[Assassin] 변신 시작 — 게이지 {next.rage:0.#} 연료, 지속 {Rules.DurationFor(next.rage):F1}s" +
                  (removedEnhancement ? ", 강화 제거(일반 E 쿨)" : ""), this);
         return true;
     }
@@ -288,12 +293,12 @@ public sealed class AssassinState : BaseNetworkBehaviour, IPassiveTooltipProvide
     private void FinishTransformServer(string reason)
     {
         AssassinStateSnapshot next = State;
-        if (!AssassinStateModel.TryFinishTransform(ref next))
+        if (!AssassinStateModel.TryFinishTransform(ref next, Now(), Rules))
             return;
 
         Write(next);
         RestoreSlotsAndStartTransformCooldown();
-        Edit.Log($"[Assassin] 변신 종료({reason}) — 슬롯 원복, R 쿨타임 시작", this);
+        Edit.Log($"[Assassin] 변신 종료({reason}) — 남은 게이지 {next.rage:0.#} 보존, 슬롯 원복, R 쿨타임 시작", this);
     }
 
     private void RestoreSlotsAndStartTransformCooldown()
@@ -341,7 +346,7 @@ public sealed class AssassinState : BaseNetworkBehaviour, IPassiveTooltipProvide
                 skills.EndActiveSkillServer(SkillEndReason.CasterDied);
         }
 
-        // 1·2·5. 스택 0, 강화 제거(+일반 E 쿨), 변신 즉시 종료(+슬롯 원복·R 쿨). 6. 다른 쿨은 그대로.
+        // 1·2·5. 게이지 0, 강화 제거(+일반 E 쿨), 변신 즉시 종료(+슬롯 원복·R 쿨). 6. 다른 쿨은 그대로.
         AssassinStateSnapshot next = State;
         AssassinDownResult result = AssassinStateModel.ResetForDown(ref next);
         Write(next);
@@ -380,9 +385,6 @@ public sealed class AssassinState : BaseNetworkBehaviour, IPassiveTooltipProvide
             return;
 
         StateChanged?.Invoke(previous, current);
-
-        if (previous.stacks != current.stacks)
-            StacksChanged?.Invoke(current.stacks);
 
         if (previous.enhancedReady != current.enhancedReady)
             EnhancedReadyChanged?.Invoke(current.enhancedReady);

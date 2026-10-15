@@ -124,7 +124,7 @@ public class AoeTelegraph : MonoBehaviour
             shape = _discTexture;
         }
 
-        _decal.material = new Material(_decal.material);
+        _decal.material = _ownedMaterial = new Material(_decal.material);   // 한 번만(_decalSearched) — OnDestroy 에서 정리
         bool hasBaseMap = _decal.material.HasProperty(BaseMapId);
         if (hasBaseMap)
             _decal.material.SetTexture(BaseMapId, shape);
@@ -224,9 +224,42 @@ public class AoeTelegraph : MonoBehaviour
         return tex;
     }
 
+    // 🔴 복제한 재질도 정리한다(10-13 이전엔 새고 있었다 — Codex 지적).
     void OnDestroy()
     {
         if (_discTexture != null) Destroy(_discTexture);
+        if (_ownedMaterial != null) Destroy(_ownedMaterial);
+    }
+
+    Material _ownedMaterial;
+    static readonly int MaskTexId = Shader.PropertyToID("_MaskTex");
+    static readonly int MaskParamsId = Shader.PropertyToID("_MaskParams");
+    static readonly int MaskOriginId = Shader.PropertyToID("_MaskOrigin");
+    static readonly int MaskAxesId = Shader.PropertyToID("_MaskAxes");
+    static readonly int MaskExtentId = Shader.PropertyToID("_MaskExtent");
+
+    /// <summary>
+    /// 몬스터 스타일(<see cref="TelegraphStyleSO"/>)의 층으로 색·마스크를 덮는다(PLAN-telegraph-style).
+    /// 🔴 <b>호출하는 쪽이 넘겼을 때만</b> 적용한다 — 안 넘기면 이 프리팹의 인스펙터 값 그대로(우선순위 충돌 방지).
+    /// 재질이 예고 셰이더(<c>SG_TelegraphDecal</c> — <c>_BaseColor</c>·<c>_MaskTex</c>)일 때만 먹는다. 기존 바닥 전용 재질은 색 입력이 없다.
+    /// ⚠️ 2026-10-13 기준 이 컴포넌트를 쓰는 곳이 없다(점프 예고 = 이펙트, 차징 오라 프리팹 칸 비어 있음). 다시 쓰게 되면 재질부터 바꿀 것.
+    /// </summary>
+    public void ApplyStyle(TelegraphLayer layer)
+    {
+        if (layer == null || !TryDecal(out DecalProjector d) || d.material == null) return;
+        Material m = d.material;
+        if (!m.HasProperty(BaseColorId) || !m.HasProperty(MaskTexId)) return;
+
+        m.SetColor(BaseColorId, layer.color);
+        TelegraphMask mask = layer.mask;
+        bool on = mask != null && mask.Active;
+        m.SetTexture(MaskTexId, on ? mask.texture : Texture2D.whiteTexture);
+        m.SetVector(MaskParamsId, new Vector4(on ? (float)mask.mode : 0f, on ? mask.strength : 0f,
+                                              on ? mask.tileSize : 1f, on ? mask.rotation * Mathf.Deg2Rad : 0f));
+        Vector3 p = transform.position;
+        m.SetVector(MaskOriginId, new Vector4(p.x, p.y, p.z, 0f));
+        m.SetVector(MaskAxesId, new Vector4(1f, 0f, 0f, 1f));
+        m.SetVector(MaskExtentId, new Vector4(Mathf.Max(0.01f, d.size.x), Mathf.Max(0.01f, d.size.y), 0f, 0f));
     }
 
     // 반경 반영. 메시는 스케일로, 데칼은 프로젝터 크기로 — 나머지 흐름(Show/Grow/Hide)은 공유한다.

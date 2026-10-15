@@ -118,6 +118,24 @@ public sealed class DataTableApplierTests
     }
 
     [Test]
+    public void Bind_LocalizedText_IsNotApplied_OneWarningPerSheet()
+    {
+        DataTableTestData data = Make("A");
+        var issues = new DataTableIssues();
+
+        // 번역 문구는 Strings 가 원본 — 옛 xlsx 의 칸은 (자리표시자가 틀려도) 오류 없이 건너뛴다.
+        List<DataTableWrite> writes = Bind(issues, new TestLookup(data),
+            Entry("A", "caption", "표 문구 {nope}"),
+            Entry("A", "maxHp", "5"));
+
+        Assert.That(issues.HasErrors, Is.False, string.Join("\n", issues.Items));
+        Assert.That(issues.Items.Count(i => i.Kind == DataTableIssueKind.Warning), Is.EqualTo(1));
+        Assert.That(writes.Select(w => w.Source.Field), Is.EqualTo(new[] { "maxHp" }), "Verify(Diff)·적용 대상도 아니다");
+        DataTableApplier.ApplyInMemory(writes);
+        Assert.That(data.caption, Is.EqualTo("문구"));
+    }
+
+    [Test]
     public void Bind_UnknownSheetAssetAndDoubleWrite_AreErrors_UnmentionedAssetIsWarning()
     {
         DataTableTestData a = Make("A");
@@ -269,6 +287,45 @@ public sealed class DataTableApplierTests
         finally
         {
             Object.DestroyImmediate(go);
+        }
+    }
+
+    [Test]
+    public void PrefabVariantComponent_InMemoryApplyAndRestore_LeavesNoOverrideOrDirty()
+    {
+        // 테이블 Play 뒤 Save Project 가 Variant 에 오버라이드를 써 넣던 회귀(Player_Gunner maxHp/attackDamage, 10-09).
+        const string basePath = "Assets/Tests/EditMode/DataTable/Editor/__DataTableBaseTemp.prefab";
+        const string variantPath = "Assets/Tests/EditMode/DataTable/Editor/__DataTableVariantTemp.prefab";
+        var go = new GameObject("Bot");
+        go.AddComponent<DataTableTestComponent>();
+        GameObject basePrefab = PrefabUtility.SaveAsPrefabAsset(go, basePath);
+        Object.DestroyImmediate(go);
+        var instance = (GameObject)PrefabUtility.InstantiatePrefab(basePrefab);
+        GameObject variant = PrefabUtility.SaveAsPrefabAsset(instance, variantPath);
+        Object.DestroyImmediate(instance);
+        try
+        {
+            var component = variant.GetComponent<DataTableTestComponent>();
+            var issues = new DataTableIssues();
+            List<DataTableWrite> writes = DataTableApplier.Bind(
+                new[] { Entry("__DataTableVariantTemp", "damage", "42", nameof(DataTableTestComponent)) },
+                new TestLookup(("__DataTableVariantTemp", (Object)component)), issues);
+
+            DataTableSnapshot snapshot = DataTableApplier.ApplyInMemory(writes);
+            Assert.That(component.damage, Is.EqualTo(42));
+
+            DataTableApplier.Restore(snapshot);
+
+            GameObject reloaded = AssetDatabase.LoadAssetAtPath<GameObject>(variantPath);
+            Assert.That(reloaded.GetComponent<DataTableTestComponent>().damage, Is.EqualTo(10));
+            Assert.That(PrefabUtility.GetPropertyModifications(reloaded).Any(m => m.propertyPath == "damage"), Is.False,
+                "Variant 에 테이블 오버라이드가 남으면 다음 저장 때 파일에 써진다");
+            Assert.That(AssetDatabase.LoadAllAssetsAtPath(variantPath).Where(o => o != null).Any(EditorUtility.IsDirty), Is.False);
+        }
+        finally
+        {
+            AssetDatabase.DeleteAsset(variantPath);
+            AssetDatabase.DeleteAsset(basePath);
         }
     }
 

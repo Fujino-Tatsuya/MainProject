@@ -21,10 +21,10 @@
 //
 // 측정 기본값 = 프레임 상한 해제(measureUncapped). 상한(144)이 걸려 있으면 대기 시간이 Frame 에 섞인다.
 //
-// 릴리스 빌드: 클래스는 남고 본문만 빠진다(씬에 붙어 있어도 Missing Script 경고가 안 나게).
+// 릴리스 빌드(DEV_HOTKEYS 심볼 삭제 시): 클래스는 남고 본문만 빠진다(씬에 붙어 있어도 Missing Script 경고가 안 나게).
 
 using UnityEngine;
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -60,7 +60,7 @@ public sealed class ZonePerfRecorder : MonoBehaviour
     [SerializeField] bool showOverlay = true;
 #pragma warning restore 0414
 
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
     // 144 상한(FrameRateCap.DefaultTarget)에서 실제로 프레임이 떨어지는 경계. 예산과 별개로 같이 센다.
     const float kCapMs = 1000f / FrameRateCap.DefaultTarget;
     const float kHitchMs = 33.3f;           // 30fps 미만 = 체감 끊김
@@ -556,7 +556,7 @@ public sealed class ZonePerfRecorder : MonoBehaviour
         var urp = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
         var csv = new StringBuilder(4096);
         csv.Append("# 존별 성능 ").Append(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")).Append(" · ").Append(reason).Append('\n');
-        csv.Append("# 환경 ").Append(Application.isEditor ? "에디터" : "개발 빌드")
+        csv.Append("# 환경 ").Append(Application.isEditor ? "에디터" : Debug.isDebugBuild ? "개발 빌드" : "릴리스 빌드(DEV_HOTKEYS)")
            .Append(" · ").Append(SystemInfo.processorType).Append(" · ").Append(SystemInfo.graphicsDeviceName)
            .Append(" · ").Append(SystemInfo.graphicsDeviceType)
            .Append(" · 해상도 ").Append(Screen.width).Append('x').Append(Screen.height)

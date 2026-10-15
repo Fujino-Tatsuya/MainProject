@@ -12,11 +12,27 @@ public class CharacterRoster : ScriptableObject
         [SerializeField] private GameObject playerPrefab;
         [SerializeField] private Sprite portrait;
         [SerializeField] private bool available = true;
+        [Tooltip("튜토리얼 안내 문구 변형(_PALADIN/_GUNNER/_ASSASSIN)에 쓸 캐릭터. None = 기본 문구.")]
+        [SerializeField] private TutorialCharacter tutorialCharacter;
 
-        public string DisplayName => displayName;
+        /// <summary>현재 언어 이름 — Strings 시트 <see cref="NameKey"/>, 행이 없으면 인라인 <c>displayName</c>(ko).</summary>
+        public string DisplayName => Loc.Get(NameKey, InlineDisplayName);
+
+        /// <summary>인라인 ko 이름(Strings 시트 수집·폴백용).</summary>
+        public string InlineDisplayName => displayName ?? string.Empty;
+
+        /// <summary>
+        /// <c>Character.&lt;플레이어 프리팹 이름&gt;.Name</c>(예 <c>Character.Player_Paladin.Name</c>). 프리팹이 없으면 null(인라인 이름).
+        /// 배열 순서가 아니라 프리팹 이름으로 정해 칸을 옮겨도 번역이 따라간다. 프리팹 이름을 바꾸면 키도 바뀐다.
+        /// </summary>
+        public string NameKey => NameKeyFor(playerPrefab != null ? playerPrefab.name : null);
+
+        public static string NameKeyFor(string prefabName) =>
+            string.IsNullOrEmpty(prefabName) ? null : $"Character.{prefabName}.Name";
         public GameObject PlayerPrefab => playerPrefab;
         public Sprite Portrait => portrait;
         public bool Available => available;
+        public TutorialCharacter TutorialCharacter => tutorialCharacter;
     }
 
     [SerializeField] private Entry[] entries = new Entry[0];

@@ -57,6 +57,11 @@ public class BossEnterZoneVisual : MonoBehaviour
 
     private void Update()
     {
+        // 튜토리얼(S5): G10 전 잠긴 패드는 테두리를 감춘다(디렉터 복제 게이트 — 모든 피어·늦은 클라 같은 값).
+        bool padEnabled = TutorialBossPath.IsBossPadEnabled;
+        if (_line != null && _line.enabled != padEnabled)
+            _line.enabled = padEnabled;
+
         BossTeleportManager manager = BossTeleportManager.Instance;
         bool active = manager != null && (manager.IsOccupied || manager.IsCountdownActive);
         Color target = manager != null

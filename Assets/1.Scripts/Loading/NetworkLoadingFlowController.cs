@@ -43,12 +43,22 @@ public class NetworkLoadingFlowController : MonoBehaviour
     private NetworkSceneManager _registeredSceneManager;
     private CustomMessagingManager _registeredMessagingManager;
     private bool _playersSpawnedForCurrentTargetScene;
+    // 타깃 씬 LoadEventCompleted 를 받았는가 — 완료 루틴이 로딩 씬 언로드 전에 기다린다(CompleteAfterMinimumVisibleTime 주석).
+    private bool _targetLoadEventCompleted;
     private uint _flowId;
     private float _averageProgress;
     private float _minimumTimerStartedAt;
     private string _sourceSceneName;
+    // 판 재시작(TryRestartTargetScene) — 로딩 씬이 뜬 뒤 소스(로컬) 씬 대신 타깃 씬을 네트워크 언로드한다.
+    private bool _restartingTargetScene;
+    private readonly List<NetworkObject> _despawnBuffer = new List<NetworkObject>();
 
     private bool IsServerActive => _networkManager != null && _networkManager.IsListening && _networkManager.IsServer;
+
+    /// <summary>로딩 흐름(첫 진입·판 재시작)이 진행 중인가 — 끝나기 전엔 재시작을 받지 않는다.</summary>
+    public bool IsFlowInProgress =>
+        (_phase != NetworkLoadingPhase.Idle && _phase != NetworkLoadingPhase.Completed) ||
+        _targetLoadRoutine != null || _completionRoutine != null || _restartingTargetScene;
 
     private void Awake()
     {
@@ -204,6 +214,136 @@ public class NetworkLoadingFlowController : MonoBehaviour
         {
             Edit.LogWarning($"[Loading] Failed to load {loadingSceneName} with {nameof(SceneEventProgressStatus)}.{status}.");
         }
+    }
+
+    /// <summary>
+    /// [서버] 판 재시작 — 타깃 씬(4.MapScene)을 처음 로드한 것처럼 다시 불러온다(호출자: 튜토리얼 구간 스킵 Alt+0, 할 일 34 후속 3).
+    /// 정식 진입과 같은 경로를 탄다: 로딩 씬 Additive → (소스 씬 언로드 대신) 동적 NetworkObject·플레이어 디스폰 + 타깃 씬
+    /// 네트워크 언로드 → 타깃 씬 Additive 로드 → <see cref="SpawnAllPlayers"/>(10m 낙하 포함) → MainGameReady → 로딩 씬 언로드.
+    /// 씬 배치 객체(디렉터·게이트·몬스터·보스 타이머·통계)는 씬과 함께 새로 생기고, 캐릭터 선택(<see cref="ServerCharacterSelectionStore"/>)은
+    /// 세션 정적 저장소라 그대로 남는다. 로딩 흐름이 진행 중이거나 타깃 씬이 안 떠 있으면 거부(false + 이유).
+    /// 원본: Docs/tech/tutorial-director.md §10.5 · Docs/tech/scene-flow-audit.md.
+    /// </summary>
+    public bool TryRestartTargetScene(out string reason)
+    {
+        RegisterNetworkCallbacks();
+
+        if (!IsServerActive)
+        {
+            reason = "서버가 아니다";
+            return false;
+        }
+
+        if (IsFlowInProgress)
+        {
+            reason = $"로딩 흐름이 진행 중이다(phase={_phase})";
+            return false;
+        }
+
+        if (!IsRegistrationCurrent())
+        {
+            reason = "씬 이벤트 구독이 아직 준비되지 않았다";
+            return false;
+        }
+
+        var targetScene = SceneManager.GetSceneByName(targetSceneName);
+        if (!targetScene.IsValid() || !targetScene.isLoaded)
+        {
+            reason = $"타깃 씬 {targetSceneName} 이 로드돼 있지 않다";
+            return false;
+        }
+
+        ResetFlow();
+        _flowId++;
+        _phase = NetworkLoadingPhase.LoadingScene;
+        _minimumTimerStartedAt = Time.unscaledTime;
+        _sourceSceneName = targetSceneName; // 소스 = 타깃 → 로컬 소스 언로드는 건너뛰고 아래 재시작 분기가 언로드한다
+        _restartingTargetScene = true;
+
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.TryRestartTargetScene loadingScene={loadingSceneName} targetScene={targetSceneName} flowId={_flowId}");
+        ApplyViewState();
+        BroadcastState();
+
+        var status = _networkManager.SceneManager.LoadScene(loadingSceneName, LoadSceneMode.Additive);
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.TryRestartTargetScene LoadScene loading status={status}");
+        if (status != SceneEventProgressStatus.Started)
+        {
+            // 아무것도 안 바뀌었다 — 판은 그대로 이어진다. 클라가 받은 LoadingScene 상태를 Completed 로 되돌린다.
+            _restartingTargetScene = false;
+            _sourceSceneName = string.Empty;
+            _phase = NetworkLoadingPhase.Completed;
+            BroadcastState();
+            reason = $"{loadingSceneName} 로드 요청 실패({status})";
+            return false;
+        }
+
+        reason = null;
+        return true;
+    }
+
+    // [서버] 판 재시작 — 타깃 씬을 비운다. 동적 스폰 NetworkObject(플레이어·투사체·장판·스폰 몹 등)는 Spawn() 기본값이
+    // DestroyWithScene=false 라 씬 언로드 때 NGO 가 DDOL → 활성 씬으로 옮겨 살려 둔다. 그래서 언로드 전에 전부 직접 디스폰한다.
+    // 씬 배치 객체(IsSceneObject)는 언로드가 정리한다. false = 언로드 실패.
+    private IEnumerator UnloadTargetSceneForRestart()
+    {
+        int despawned = DespawnDynamicNetworkObjects();
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.UnloadTargetSceneForRestart despawned={despawned}");
+
+        var scene = SceneManager.GetSceneByName(targetSceneName);
+        if (scene.IsValid() && scene.isLoaded)
+        {
+            MoveActiveSceneBeforeLocalUnload(scene);
+        }
+
+        // 로딩 씬 LoadEventCompleted 직후라 NGO 씬 이벤트가 아직 닫히지 않았을 수 있다 — 타깃 로드와 같은 재시도.
+        _completedUnloads.Remove(targetSceneName);
+        var status = scene.IsValid() && scene.isLoaded
+            ? _networkManager.SceneManager.UnloadScene(scene)
+            : SceneEventProgressStatus.SceneNotLoaded;
+        var retries = 0;
+        while (status == SceneEventProgressStatus.SceneEventInProgress && retries < 30)
+        {
+            retries++;
+            yield return null;
+            status = _networkManager.SceneManager.UnloadScene(scene);
+        }
+
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.UnloadTargetSceneForRestart UnloadScene target={targetSceneName} status={status} retries={retries}");
+        if (status == SceneEventProgressStatus.Started)
+        {
+            while (!_completedUnloads.Contains(targetSceneName))
+            {
+                yield return null;
+            }
+        }
+        else if (status != SceneEventProgressStatus.SceneNotLoaded)
+        {
+            Debug.LogError($"[Loading] 판 재시작 — {targetSceneName} 언로드 실패({status}). 같은 씬이 두 번 뜨지 않게 다시 로드하지 않는다.");
+        }
+
+        LogLoadedScenes("UnloadTargetSceneForRestart.after");
+    }
+
+    private int DespawnDynamicNetworkObjects()
+    {
+        _despawnBuffer.Clear();
+        _despawnBuffer.AddRange(_networkManager.SpawnManager.SpawnedObjectsList);
+
+        var count = 0;
+        foreach (var networkObject in _despawnBuffer)
+        {
+            // 씬 배치(true)는 언로드가 정리한다. 부모가 먼저 디스폰하며 같이 사라진 자식은 IsSpawned=false.
+            if (networkObject == null || !networkObject.IsSpawned || networkObject.IsSceneObject != false)
+            {
+                continue;
+            }
+
+            networkObject.Despawn(true);
+            count++;
+        }
+
+        _despawnBuffer.Clear();
+        return count;
     }
 
     private bool CanStartFromLobby()
@@ -405,6 +545,8 @@ public class NetworkLoadingFlowController : MonoBehaviour
             return;
         }
 
+        _targetLoadEventCompleted = true;
+
         foreach (var clientId in sceneEvent.ClientsThatCompleted)
         {
             _trackedClients.Add(clientId);
@@ -513,6 +655,9 @@ public class NetworkLoadingFlowController : MonoBehaviour
             $"position={spawnPose.position}.");
     }
 
+    /// <summary>스폰에 쓰는 캐릭터 로스터(튜토리얼 캐릭터 판별이 PrefabIdHash 역조회에 쓴다).</summary>
+    public CharacterRoster CharacterRoster => characterRoster;
+
     private GameObject ResolvePlayerPrefabForClient(ulong clientId)
     {
         if (ServerCharacterSelectionStore.TryGet(clientId, out var characterId) &&
@@ -557,7 +702,27 @@ public class NetworkLoadingFlowController : MonoBehaviour
         Debug.Log("[SceneFlow] NetworkLoadingFlowController.StartTargetLoadAfterSceneEvent begin");
         LogLoadedScenes("StartTargetLoadAfterSceneEvent.beforeSourceUnload");
         yield return null;
-        yield return UnloadSourceSceneIfNeeded();
+        if (_restartingTargetScene)
+        {
+            yield return UnloadTargetSceneForRestart();
+            _restartingTargetScene = false;
+
+            var stale = SceneManager.GetSceneByName(targetSceneName);
+            if (stale.IsValid() && stale.isLoaded)
+            {
+                // 언로드 실패 복구 — 남은 판에 플레이어만 다시 세우고 로딩을 닫는다(같은 씬을 겹쳐 올리지 않는다).
+                // 타깃 로드 이벤트가 없는 경로라 완료 루틴이 기다리지 않게 표시한다.
+                _targetLoadEventCompleted = true;
+                SpawnAllPlayersOnce();
+                _targetLoadRoutine = null;
+                _completionRoutine = StartCoroutine(CompleteAfterMinimumVisibleTime());
+                yield break;
+            }
+        }
+        else
+        {
+            yield return UnloadSourceSceneIfNeeded();
+        }
         LogLoadedScenes("StartTargetLoadAfterSceneEvent.afterSourceUnload");
 
         _phase = NetworkLoadingPhase.LoadingGame;
@@ -596,6 +761,15 @@ public class NetworkLoadingFlowController : MonoBehaviour
         LogDebug("All tracked clients reached 100%. Waiting for minimum visible time.");
         ApplyViewState();
         BroadcastState();
+
+        // 🔴 이 루틴은 로컬 진행률 0.9(= AsyncOperation 이 활성화 직전) 에서 시작된다. 표시 시간이 0 이면
+        // (DevSceneBooter.SetEditorDefaults(...,0,0) — Dev 부팅의 판 재시작) 타깃 씬 NGO 로드 이벤트가 닫히기 전에
+        // 로딩 씬 언로드를 요청해 NGO 가 SceneEventInProgress 로 거절했다 → 로딩 씬이 활성 씬인 채 남고,
+        // 그 사이 Instantiate 된 몬스터도 로딩 씬에 남았다(할 일 34 후속 4). 로드 이벤트 완료를 먼저 기다린다.
+        while (!_targetLoadEventCompleted)
+        {
+            yield return null;
+        }
 
         var elapsed = Time.unscaledTime - _minimumTimerStartedAt;
         var remaining = minimumVisibleSeconds - elapsed;
@@ -849,6 +1023,13 @@ public class NetworkLoadingFlowController : MonoBehaviour
             return;
         }
 
+        if (flowId > _flowId && _phase == NetworkLoadingPhase.Completed)
+        {
+            // 끝난 흐름 뒤의 새 흐름(판 재시작) — 지난 흐름의 소스 씬(로비) 이름을 버린다. 소스 = 맵이라 클라가 로컬로 내릴 씬은 없다.
+            // 첫 진입(_phase=Idle)은 건드리지 않는다 — 로딩 씬 이벤트가 먼저 와서 로비를 잡아 뒀을 수 있다.
+            _sourceSceneName = string.Empty;
+        }
+
         _flowId = flowId;
         _phase = (NetworkLoadingPhase)phaseValue;
         _averageProgress = Mathf.Clamp01(averageProgress);
@@ -930,8 +1111,10 @@ public class NetworkLoadingFlowController : MonoBehaviour
         _timedOutClients.Clear();
         _clientProgress.Clear();
         _playersSpawnedForCurrentTargetScene = false;
+        _targetLoadEventCompleted = false;
         _averageProgress = 0f;
         _sourceSceneName = string.Empty;
+        _restartingTargetScene = false;
 
         if (_phase != NetworkLoadingPhase.Completed)
         {

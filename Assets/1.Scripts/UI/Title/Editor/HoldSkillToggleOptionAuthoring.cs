@@ -56,7 +56,9 @@ public static class HoldSkillToggleOptionAuthoring
                 return;
             }
 
-            Build(controls.transform, (RectTransform)masterRow, masterLabel.gameObject);
+            BuildToggleRow<HoldSkillToggleOption>(
+                controls.transform, (RectTransform)masterRow, masterLabel.gameObject,
+                ToggleName, "HoldSkillToggleLabel", LabelText);
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
             Debug.Log($"[HoldToggleAuthoring] 배치 완료: {controls.name}/{ToggleName} · 씬 저장");
@@ -68,9 +70,13 @@ public static class HoldSkillToggleOptionAuthoring
         }
     }
 
-    private static void Build(Transform parent, RectTransform rowTemplate, GameObject labelTemplate)
+    /// <summary>체크박스 + 라벨 한 줄을 만든다. 자리는 <paramref name="rowTemplate"/>, 글꼴은 <paramref name="labelTemplate"/> 를 따른다.
+    /// Controls 탭의 다른 토글(<see cref="DashDirectionOptionAuthoring"/>)도 같은 모양으로 쓴다.</summary>
+    internal static void BuildToggleRow<TOption>(
+        Transform parent, RectTransform rowTemplate, GameObject labelTemplate,
+        string toggleName, string labelName, string labelText) where TOption : Component
     {
-        var root = new GameObject(ToggleName, typeof(RectTransform));
+        var root = new GameObject(toggleName, typeof(RectTransform));
         var rootRect = (RectTransform)root.transform;
         rootRect.SetParent(parent, false);
         rootRect.anchorMin = rowTemplate.anchorMin;
@@ -102,22 +108,22 @@ public static class HoldSkillToggleOptionAuthoring
 
         // 라벨은 Audio 라벨을 복제해 글꼴·크기·색을 그대로 가져온다.
         GameObject label = Object.Instantiate(labelTemplate, rootRect, false);
-        label.name = "HoldSkillToggleLabel";
+        label.name = labelName;
         var labelRect = (RectTransform)label.transform;
         labelRect.anchorMin = labelRect.anchorMax = new Vector2(0f, 0.5f);
         labelRect.pivot = new Vector2(0f, 0.5f);
         labelRect.anchoredPosition = new Vector2(BoxSize + 12f, 0f);
         labelRect.sizeDelta = new Vector2(rowTemplate.sizeDelta.x - BoxSize - 12f, BoxSize);
-        label.GetComponent<TMP_Text>().text = LabelText;
+        label.GetComponent<TMP_Text>().text = labelText;
 
         var toggle = root.AddComponent<Toggle>();
         toggle.targetGraphic = backgroundImage;
         toggle.graphic = checkImage;
         toggle.isOn = false;
-        root.AddComponent<HoldSkillToggleOption>();
+        root.AddComponent<TOption>();
     }
 
-    private static T FindInScene<T>(Scene scene) where T : Component
+    internal static T FindInScene<T>(Scene scene) where T : Component
     {
         foreach (GameObject go in scene.GetRootGameObjects())
         {

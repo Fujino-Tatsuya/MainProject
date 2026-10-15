@@ -44,6 +44,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9d0fa1e475cd45845b66ec146f6bd949, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::HitVFXDebugHUD
-  visible: 1
+  visible: 0
   offset: {x: 12, y: 12}
   scale: 1

@@ -1,5 +1,5 @@
 ﻿using UnityEngine;
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
 using UnityEngine.InputSystem;
 #endif
 
@@ -40,7 +40,7 @@ public sealed class RetroCRTController : MonoBehaviour
     [SerializeField] private Material _materialOverride;
 
     private static RetroCRTController s_active;
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
     private InputAction _toggleAction;
 #endif
 
@@ -129,7 +129,7 @@ public sealed class RetroCRTController : MonoBehaviour
             Debug.LogWarning("[RetroCRT] 컨트롤러가 둘 이상이다. 맵 씬에 하나만 둘 것.", this);
 
         s_active = this;
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
         if (Application.isPlaying)
         {
             _toggleAction = new InputAction("Toggle CRT", InputActionType.Button, "<Keyboard>/f7");
@@ -141,7 +141,7 @@ public sealed class RetroCRTController : MonoBehaviour
 
     private void OnDisable()
     {
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
         _toggleAction?.Dispose();
         _toggleAction = null;
 #endif
@@ -152,7 +152,7 @@ public sealed class RetroCRTController : MonoBehaviour
             s_active = null;
     }
 
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
     private void OnTogglePerformed(InputAction.CallbackContext context)
     {
         if (Application.isPlaying && s_active == this)

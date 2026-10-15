@@ -135,6 +135,8 @@ public class EffectManager : MonoBehaviour
         }
 
         Instance = this;
+        // 씬에서는 Management 그룹 아래에 있다 — DontDestroyOnLoad 는 루트에만 걸리므로 먼저 떼어낸다.
+        transform.SetParent(null, true);
         DontDestroyOnLoad(gameObject);
 
         // 드라이버는 컴파일 타임에 전부 알려져 있다. SO/리플렉션 등록은 간접층만 늘린다.
@@ -353,10 +355,16 @@ public class EffectManager : MonoBehaviour
         Schedule(active, active.entry.outroParts, true);
         FirePending(active, 0f);
 
+        // outroPlayRate > 1 이면 남은 입자를 빨리 돌려 outroDuration 안에 자기 페이드아웃을 마치게 한다.
+        // 반납 시 ResetForPool 이 배속을 1로 되돌린다.
+        float outroRate = active.entry.outroPlayRate > 1f ? active.playRate * active.entry.outroPlayRate : 0f;
+
         for (int i = 0; i < beforeOutro; i++)
         {
             GameObject instance = active.instances[i].go;
-            DriverOf(instance)?.Stop(instance, false);
+            IEffectSystem driver = DriverOf(instance);
+            driver?.Stop(instance, false);
+            if (outroRate > 0f) driver?.SetPlayRate(instance, outroRate);
         }
 
         float life = active.entry.ResolvedOutroDuration;

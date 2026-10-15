@@ -23,7 +23,7 @@ public class AudioManager : MonoBehaviour
     [Tooltip("BGM 페이드 인 / 크로스페이드 시간(초)")]
     [SerializeField, Min(0f)] private float bgmFadeTime = 1.5f;
 
-    /// <summary>중앙 사운드 카탈로그. 예: AudioManager.Instance.Catalog.UIClick</summary>
+    /// <summary>중앙 사운드 카탈로그. 재생은 키로 한다 — 예: AudioManager.Instance.Play("UI_Click")</summary>
     public SoundCatalog Catalog => catalog;
 
     // BroAudioType별 현재 볼륨(0~10, 1=원음). 게임 시작 시 전부 1f로 초기화. PlayerPrefs 미사용.
@@ -45,6 +45,7 @@ public class AudioManager : MonoBehaviour
         DontDestroyOnLoad(gameObject);
 
         InitVolumes();
+        SoundConfig.ApplyTo(this);   // 저장된 설정 볼륨(없으면 원음 그대로) — PLAN-settings
 
         if (catalog == null)
         {
@@ -149,12 +150,10 @@ public class AudioManager : MonoBehaviour
         }
 
         // SetVolume은 BroAudio의 track 배율이라 엔티티/클립 볼륨을 보존한 채 곱해진다.
-        player.SetVolume(entry.VolumeMultiplier);
+        player.SetVolume(entry.VolumeMultiplier * RandomMultiplier(entry.VolumeRandomMin, entry.VolumeRandomMax));
 
         // Play가 반환될 때는 엔티티 피치 랜덤화까지 AudioSource에 반영돼 있으므로 그 값에 배율을 곱한다.
-        float randomMin = Mathf.Min(entry.PitchRandomMin, entry.PitchRandomMax);
-        float randomMax = Mathf.Max(entry.PitchRandomMin, entry.PitchRandomMax);
-        float pitchMultiplier = entry.PitchMultiplier * Random.Range(randomMin, randomMax);
+        float pitchMultiplier = entry.PitchMultiplier * RandomMultiplier(entry.PitchRandomMin, entry.PitchRandomMax);
         player.SetPitch(player.AudioSource.pitch * pitchMultiplier);
 
         if (entry.Is3D)
@@ -165,6 +164,12 @@ public class AudioManager : MonoBehaviour
 
         player.OnEnd(_ => _playbackLimiter.Release(key));
         return player;
+    }
+
+    /// <summary>min~max 사이 랜덤 배율. 두 값이 뒤집혀 있어도 범위로 본다.</summary>
+    private static float RandomMultiplier(float min, float max)
+    {
+        return Random.Range(Mathf.Min(min, max), Mathf.Max(min, max));
     }
 
     private bool TryGetEntry(string key, out SoundEntry entry)
@@ -209,6 +214,28 @@ public class AudioManager : MonoBehaviour
     #endregion
 
     #region BGM
+
+    /// <summary>
+    /// 카탈로그 키로 BGM을 재생한다. 엔트리의 볼륨 배율을 적용하고, 재생 제한(동시 수·쿨다운)은 쓰지 않는다.
+    /// </summary>
+    public void PlayBGM(string key)
+    {
+        if (!TryGetEntry(key, out SoundEntry entry))
+        {
+            return;
+        }
+
+        if (!entry.Sound.IsValid())
+        {
+            Edit.LogWarning($"[AudioManager] BGM 키 '{key}'의 SoundID가 유효하지 않습니다.", this);
+            return;
+        }
+
+        BroAudio.Play(entry.Sound)
+            .AsBGM()
+            .SetTransition(bgmTransition, bgmFadeTime)
+            .SetVolume(entry.VolumeMultiplier);
+    }
 
     /// <summary>
     /// BGM을 재생한다. BroAudio가 Music 타입을 자동으로 BGM으로 취급해

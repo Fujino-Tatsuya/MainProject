@@ -31,4 +31,19 @@ public static class MonsterPerceptionPolicy
         if (tolerance <= 0f) return true;
         return Mathf.Abs(targetY - selfY) <= tolerance;
     }
+
+    /// <summary>
+    /// 문 대상을 놓을 것인가(PLAN-boss-aggro §3.4). 대상이 <paramref name="loseRadius"/> 밖에
+    /// <paramref name="grace"/> 초 이상 <b>연속으로</b> 있었을 때만 true — 경계에서 깜빡이지 않게.
+    /// </summary>
+    /// <param name="distance">대상까지 거리.</param>
+    /// <param name="loseRadius">해제 반경. 0 이하 = 끔(항상 false).</param>
+    /// <param name="outsideSince">반경 밖으로 처음 나간 시각. 안이면 -1(호출측이 갱신).</param>
+    public static bool ShouldLoseTarget(float distance, float loseRadius, float outsideSince, float now, float grace)
+    {
+        if (loseRadius <= 0f) return false;
+        if (distance <= loseRadius) return false;
+        if (outsideSince < 0f) return false;
+        return now - outsideSince >= grace;
+    }
 }

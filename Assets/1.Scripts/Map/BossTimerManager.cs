@@ -6,9 +6,11 @@ using UnityEngine;
 /// 승인 계획: <c>PLAN-boss-timer.md</c> (T1~T17).
 ///
 /// 흐름:
-///  1) 서버가 <see cref="MapGenerator.OnGenerated"/> 를 받아 만료 시각(서버시간)을 확정한다.
+///  1) 서버가 <see cref="MapGenerator.OnGenerated"/> 를 받아 만료 시각을 확정한다.
 ///  2) 만료 시각만 <see cref="NetworkVariable{T}"/> 로 복제한다 — 매 프레임 복제는 없다(대역폭 0).
-///     클라는 <c>ServerTime</c> 과의 차이로 게이지를 그린다(<see cref="BossTimerHUD"/>).
+///     클라는 자기 시계와의 차이로 게이지를 그린다(<see cref="BossTimerHUD"/>).
+///  · 시간 도메인 = <see cref="NetworkClock.GameNow"/>(일시정지·슬로우 모션 제외) — 슬로우·솔로 일시정지 동안
+///    제한시간도 덜 흐른다(PLAN-interrupt-slowmo D16). 세션 시계가 없을 때만 <c>ServerTime</c>(<see cref="TimerNow"/>).
 ///  3) 만료 → <see cref="BossTeleportManager.ForceStartEncounter"/>. 이미 진행 중이면 **미루고
 ///     만료 사실은 유지**한다 — 그 진행이 취소되면 다음 틱에 다시 시도한다.
 ///  4) 제한시간 안에 스스로 보스방에 도착하면(<see cref="BossTeleportManager.AlivePlayersArrived"/>)
@@ -16,6 +18,10 @@ using UnityEngine;
 ///
 /// 🔴 <b>배치</b> — <see cref="BossTeleportManager"/> 와 **같은 씬 상주 GameObject** 에 붙인다.
 ///    (하나의 NetworkObject 에 NetworkBehaviour 가 여럿인 것은 정상이다.)
+///
+/// 튜토리얼(할 일 15 S5 — Docs/tech/handoff-tutorial.md §3): <see cref="TutorialBossPath.ShouldAutoStartTimer"/> 가 false 면
+/// 1) 의 자동 시작을 건너뛰고 Idle 로 둔다 → 디렉터가 G8 에서 <see cref="StartTimerServer"/>(420초)로 시작한다.
+/// 만료·도착 계약(3·4)은 그대로다.
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class BossTimerManager : NetworkBehaviour
@@ -33,7 +39,7 @@ public sealed class BossTimerManager : NetworkBehaviour
     }
 
     [Header("제한시간")]
-    [Tooltip("맵 생성 완료부터 보스전 강제 개시까지의 시간(초). 팀장 확정 = 5분.")]
+    [Tooltip("맵 생성 완료부터 보스전 강제 개시까지의 시간(게임 시간 초 — 슬로우·일시정지 동안 덜 흐른다). 팀장 확정 = 5분.")]
     [SerializeField, Min(5f)] private float limitSeconds = 300f;
 
     [Tooltip("만료 후 강제 이동까지의 경고 시간(초). 기존 패드 카운트다운 표시를 그대로 재사용한다.")]
@@ -44,17 +50,22 @@ public sealed class BossTimerManager : NetworkBehaviour
              "🔴 기획 미확정이라 코드 수정 없이 뒤집을 수 있게 빼 둔 값이다(PLAN-boss-timer T2).")]
     [SerializeField] private bool fillUpAsTimePasses = true;
 
-    // 만료 시각(서버시간). 0 = 비활성. 서버 write / 모두 read.
+    // 만료 시각(TimerNow 도메인 = GameNow). 0 = 비활성. 서버 write / 모두 read.
     private readonly NetworkVariable<double> _expiresAt = new NetworkVariable<double>(
         0d, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     private readonly NetworkVariable<TimerState> _state = new NetworkVariable<TimerState>(
         TimerState.Idle, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
+    // 이번 판의 제한시간 덮어쓰기(초). 0 = 인스펙터 값. 서버 write / 모두 read — 클라 게이지(Fill01)도 같은 길이로 그린다.
+    // 튜토리얼 시작 API(StartTimerServer)만 쓴다. 자동 시작(비튜토리얼)은 0 그대로 = 기존 동작.
+    private readonly NetworkVariable<float> _limitOverride = new NetworkVariable<float>(
+        0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
     public static BossTimerManager Instance { get; private set; }
 
     public TimerState State => _state.Value;
-    public float LimitSeconds => limitSeconds;
+    public float LimitSeconds => TutorialBossPathRules.EffectiveLimitSeconds(_limitOverride.Value, limitSeconds);
     public bool FillUpAsTimePasses => fillUpAsTimePasses;
 
     /// <summary>남은 시간(초). 안 도는 중이면 0.</summary>
@@ -62,13 +73,38 @@ public sealed class BossTimerManager : NetworkBehaviour
     {
         get
         {
-            if (_state.Value != TimerState.Running || _expiresAt.Value <= 0d)
+            if (_state.Value != TimerState.Running)
                 return 0f;
 
-            double remain = _expiresAt.Value - NetworkManager.ServerTime.Time;
-            return remain > 0d ? (float)remain : 0f;
+            return (float)RemainingAt(_expiresAt.Value, TimerNow(NetworkManager));
         }
     }
+
+    /// <summary>
+    /// 제한시간의 시계. 세션 시계가 돌면 <see cref="NetworkClock.GameNow"/>, 없거나 안 돌면 <c>ServerTime</c>(기존 동작).
+    /// 서버·클라가 같은 규칙으로 고르므로(같은 NetworkManager 프리팹) <c>_expiresAt</c> 과 비교값이 늘 같은 도메인이다.
+    /// ⚠️ 클라 GameNow 는 슬로우 Start 를 편도 지연만큼 늦게 받아 서버와 잠깐 어긋난다(역행은 단조 클램프가 막는다) — 표시 오차로 허용.
+    /// </summary>
+    private static double TimerNow(NetworkManager nm)
+    {
+        NetworkClock clock = NetworkClock.Instance;
+        bool clockRunning = clock != null && clock.IsRunning;
+        return SelectNow(clockRunning, clockRunning ? clock.GameNow : 0d, nm != null ? nm.ServerTime.Time : 0d);
+    }
+
+    // ---- 순수 계산(EditMode 테스트 대상) ----
+
+    /// <summary>세션 시계가 돌면 GameNow, 아니면 ServerTime.</summary>
+    public static double SelectNow(bool sessionClockRunning, double gameNow, double serverTime) =>
+        sessionClockRunning ? gameNow : serverTime;
+
+    /// <summary>남은 시간(초). 만료 시각 ≤ 0 = 비활성 → 0. 음수는 0.</summary>
+    public static double RemainingAt(double expiresAt, double now) =>
+        expiresAt <= 0d ? 0d : System.Math.Max(0d, expiresAt - now);
+
+    /// <summary>만료 판정. 만료 시각 ≤ 0 = 비활성 → false.</summary>
+    public static bool IsExpiredAt(double expiresAt, double now) =>
+        expiresAt > 0d && now >= expiresAt;
 
     /// <summary>
     /// 게이지 채움 0~1. 🔴 표시 전용 — <see cref="TimerState.Stopped"/> 는 **항상 0**(빈 게이지)이다
@@ -90,10 +126,11 @@ public sealed class BossTimerManager : NetworkBehaviour
                     return fillUpAsTimePasses ? 1f : 0f;
             }
 
-            if (limitSeconds <= 0f)
+            float limit = LimitSeconds;
+            if (limit <= 0f)
                 return 0f;
 
-            float elapsed01 = Mathf.Clamp01(1f - RemainingSeconds / limitSeconds);
+            float elapsed01 = Mathf.Clamp01(1f - RemainingSeconds / limit);
             return fillUpAsTimePasses ? elapsed01 : 1f - elapsed01;
         }
     }
@@ -103,8 +140,8 @@ public sealed class BossTimerManager : NetworkBehaviour
     //    그때는 **실제 생성 시각을 보관**했다가 스폰 직후 한 번만 적용한다.
     //    (스폰 시각 기준으로 다시 재면 "맵 생성 완료부터 5분"이라는 계약을 어긴다.)
     private bool _pendingStart;
-    private bool _pendingUsesServerClock;
-    private double _pendingStartServerTime;
+    private bool _pendingUsesSessionClock;
+    private double _pendingStartTime;   // TimerNow 도메인
     private float _pendingStartRealtime;
 
     private BossTeleportManager _teleport;
@@ -181,16 +218,26 @@ public sealed class BossTimerManager : NetworkBehaviour
         if (online && !nm.IsServer)
             return;
 
+        // 튜토리얼(S5): 자동 시작하지 않는다 — Idle 로 두고 디렉터가 G8 에서 StartTimerServer 로 시작한다.
+        // 판별(TutorialStageMarker)은 씬 로드 때 확정돼 있어 이 이벤트·스폰 순서와 무관하다. 보류도 만들지 않으므로
+        // 스폰 직후(ApplyPendingStart)에도 시작되지 않는다.
+        if (!TutorialBossPath.ShouldAutoStartTimer)
+        {
+            _pendingStart = false;
+            Edit.Log("[BossTimer] 튜토리얼 스테이지 — 맵 생성 자동 시작을 건너뛴다(G8 에서 서버가 시작).", this);
+            return;
+        }
+
         // 생성 시각을 붙잡아 둔다. 스폰이 늦어도 "맵 생성 완료부터 5분"(T1)이 지켜지려면
         // 스폰 시점이 아니라 **생성 시점**부터 재야 한다.
         //
-        // 🔴 가능하면 **서버 시계 하나만** 쓴다. `ServerTime` 은 NetworkManager 의 것이라
-        //    이 컴포넌트가 스폰되기 전에도 읽을 수 있다. 실시간 시계와 서버 시계를 섞으면
+        // 🔴 가능하면 **세션 시계 하나만**(TimerNow) 쓴다. NetworkManager·NetworkClock 의 것이라
+        //    이 컴포넌트가 스폰되기 전에도 읽을 수 있다. 실시간 시계와 세션 시계를 섞으면
         //    둘의 샘플 시점이 달라(서버 시각은 PreUpdate 에서 프레임 단위로 누적된다)
         //    **로딩이 긴 프레임에서 만료가 앞당겨진다**(Codex 3차 지적).
         _pendingStart = true;
-        _pendingUsesServerClock = online;
-        _pendingStartServerTime = online ? nm.ServerTime.Time : 0d;
+        _pendingUsesSessionClock = online;
+        _pendingStartTime = online ? TimerNow(nm) : 0d;
         _pendingStartRealtime = Time.realtimeSinceStartup;
 
         if (IsSpawned && IsServer)
@@ -204,28 +251,58 @@ public sealed class BossTimerManager : NetworkBehaviour
 
         _pendingStart = false;
 
-        // 서버 시계로 잡아 뒀으면 그 값을 그대로 쓴다 — 시계를 섞지 않는다.
-        if (_pendingUsesServerClock)
+        // 튜토리얼(S5) 이중 안전 — 생성 이벤트에서 이미 걸렀지만 보류가 남았어도 자동 시작하지 않는다.
+        if (!TutorialBossPath.ShouldAutoStartTimer) return;
+
+        // 세션 시계로 잡아 뒀으면 그 값을 그대로 쓴다 — 시계를 섞지 않는다.
+        if (_pendingUsesSessionClock)
         {
-            StartTimer(_pendingStartServerTime);
+            StartTimer(_pendingStartTime);
             return;
         }
 
         // 네트워크가 아직 안 떠 있던 경우에만 실시간 경과로 보정한다(폴백).
+        // 세션 전이라 그 구간엔 일시정지·슬로우가 없다 — 실시간 경과를 게임 시간 경과로 봐도 된다.
         float elapsed = Mathf.Max(0f, Time.realtimeSinceStartup - _pendingStartRealtime);
-        StartTimer(NetworkManager.ServerTime.Time - elapsed);
+        StartTimer(TimerNow(NetworkManager) - elapsed);
     }
 
-    private void StartTimer(double startServerTime)
+    /// <summary>
+    /// [서버] 지금부터 제한시간을 시작한다 — 튜토리얼 G8(Docs/tech/handoff-tutorial.md §3). Idle 일 때만(이미 돌았거나
+    /// 도착해 멈췄으면 false). <paramref name="limitSecondsOverride"/> &gt; 0 이면 이번 판 제한시간을 그 값으로 덮어쓴다(복제).
+    /// 시간 도메인·만료·도착 처리는 자동 시작과 같다.
+    /// </summary>
+    public bool StartTimerServer(float limitSecondsOverride = 0f)
+    {
+        if (!IsServer || !IsSpawned)
+        {
+            Edit.LogWarning($"[BossTimer] StartTimerServer: 서버에서 스폰된 뒤에만 쓸 수 있다(서버:{IsServer} 스폰:{IsSpawned}).", this);
+            return false;
+        }
+        if (_state.Value != TimerState.Idle)
+        {
+            Edit.LogWarning($"[BossTimer] StartTimerServer: 이미 {_state.Value} — 다시 시작하지 않는다.", this);
+            return false;
+        }
+
+        _pendingStart = false;
+        _limitOverride.Value = Mathf.Max(0f, limitSecondsOverride);
+        StartTimer(TimerNow(NetworkManager));
+        return true;
+    }
+
+    /// <param name="startTime"><see cref="TimerNow"/> 도메인 시작 시각.</param>
+    private void StartTimer(double startTime)
     {
         if (!IsServer) return;
 
-        _expiresAt.Value = startServerTime + limitSeconds;
+        float limit = LimitSeconds;
+        _expiresAt.Value = startTime + limit;
         _state.Value = TimerState.Running;
         _expired = false;
 
-        Edit.Log($"[BossTimer] 제한시간 시작 — {limitSeconds:0}초 후 보스전 강제 개시 " +
-                 $"(만료 서버시각 {_expiresAt.Value:0.0}).", this);
+        Edit.Log($"[BossTimer] 제한시간 시작 — {limit:0}초(게임 시간) 후 보스전 강제 개시 " +
+                 $"(만료 시각 {_expiresAt.Value:0.0}).", this);
     }
 
     /// <summary>제때 도착했다 — 타이머를 멈추고 게이지를 0 으로 비운다.</summary>
@@ -244,6 +321,25 @@ public sealed class BossTimerManager : NetworkBehaviour
         Edit.Log("[BossTimer] 보스방 도착 — 제한시간 종료.", this);
     }
 
+    /// <summary>
+    /// [서버] 전멸 리스폰(할 일 30 (2) — Docs/tech/handoff-boss-encounter-reset.md)용 — 타이머를 <b>재가동하지 않고</b> Stopped(게이지 0)로 둔다.
+    /// 보스방에 도착했던 판이면 이미 Stopped 라 그대로. 만료(Expired) 상태였으면 만료 재시도도 지운다 — 안 지우면 리스폰 직후 강제 이동이 걸린다.
+    /// <b>이 메서드를 부를 때만</b> 동작한다(기존 자동 시작·G8 시작·만료·도착 계약은 그대로).
+    /// </summary>
+    public void StopForRetryServer()
+    {
+        if (!IsServer || !IsSpawned)
+            return;
+
+        _expired = false;
+        if (_state.Value == TimerState.Stopped)
+            return;
+
+        _state.Value = TimerState.Stopped;
+        _expiresAt.Value = 0d;
+        Edit.Log("[BossTimer] 재도전 리셋 — 제한시간을 재가동하지 않는다(Stopped).", this);
+    }
+
     // 만료는 한 번만 판정하고, **강제 개시에 성공할 때까지 사실을 유지**한다.
     private bool _expired;
 
@@ -253,8 +349,7 @@ public sealed class BossTimerManager : NetworkBehaviour
             return;
 
         if (_state.Value == TimerState.Running &&
-            _expiresAt.Value > 0d &&
-            NetworkManager.ServerTime.Time >= _expiresAt.Value)
+            IsExpiredAt(_expiresAt.Value, TimerNow(NetworkManager)))
         {
             _expired = true;
             _state.Value = TimerState.Expired;

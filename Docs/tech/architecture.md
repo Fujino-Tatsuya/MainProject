@@ -30,6 +30,16 @@
 - 발동/판정은 클라(오너) 트리거, **데미지/CC/패링 방향판정/스택은 서버 RPC**(서버 권한).
 - 적(UnitBase)은 **스택 카운트** 보유(원거리 평타 누적, 우클릭 소비). 쿨/범위/스택수는 `[SerializeField]`로 노출.
 
+## 로컬 조작 설정 (`UserInputConfig`)
+- 오너 로컬 취향 설정. **PlayerPrefs 저장, 네트워크에 싣지 않는다**(결과만 기존 RPC 로 간다). 옵션 UI = 타이틀 옵션 Controls 탭.
+  | 설정 | PlayerPrefs 키 | 기본 | 옵션 UI · 배치 메뉴 |
+  |---|---|---|---|
+  | Hold 스킬 토글 조작 | `Input.HoldSkillAsToggle` (0/1) | 0 = 누르고 있는 동안 | `HoldSkillToggleOption` · `Tools/UI/Title/옵션 Controls — Hold 토글 배치` |
+  | 대시 방향 | `Input.DashDirectionMode` (0 = `CharacterFacing`, 1 = `Cursor`) | 0 = 캐릭터 정면 | `DashDirectionOption`("Dash: Mouse Direction", 켜짐 = 마우스) · `Tools/UI/Title/옵션 Controls — 대시 방향 토글 배치` |
+- **대시 방향**(전 캐릭터·공격/스킬 캔슬 대시 공통, `PlayerDashController.ResolveDashDirection` 한 곳):
+  캐릭터 정면 = 이동 입력 → 현재 정면(조준 무시) / 마우스 방향 = 조준 → 이동 입력 → 현재 정면.
+  오너가 계산해 대시 요청 RPC 로 보내고, 대시 진입 시 캐릭터가 그 방향으로 즉시 돌아선다. 규칙 = `DashDirectionRules`(EditMode 테스트 있음).
+
 ## 빌드(모디파이어)
 - `BuildModifier`(SO) → 스폰 시 **서버에서** StatSet/AbilityController에 적용.
 - 효과 종류·연결: [../design/builds.md](../design/builds.md).

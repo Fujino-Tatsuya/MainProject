@@ -333,9 +333,19 @@ public class MapContentSpawner : MonoBehaviour
         return n;
     }
 
+    /// <summary>
+    /// [서버] 몬스터 스폰 직전 프리팹 치환 훅. 기본 null = 그대로. 돌려준 값이 null 이면 원래 프리팹.
+    /// 튜토리얼 스테이지만 쓴다 — 공용 존 프리팹을 고치지 않고 튜토리얼 전용 Variant 로 바꿔 스폰한다
+    /// (<c>TutorialSpinnerSpawnOverride</c>, Docs/tech/handoff-tutorial-spinner.md §6). 치환 프리팹도 NetworkPrefabs 에 등록돼 있어야 한다.
+    /// </summary>
+    public static System.Func<GameObject, GameObject> ServerMonsterPrefabOverride;
+
     // 스폰 인스턴스화 + 네트워크 등록/정리 추적. 두 스폰 경로가 공유한다.
     private void SpawnMonsterInstance(GameObject monsterPrefab, Vector3 spawnPoint, Quaternion rotation)
     {
+        GameObject substitute = ServerMonsterPrefabOverride?.Invoke(monsterPrefab);
+        if (substitute != null) monsterPrefab = substitute;
+
         GameObject go = Instantiate(monsterPrefab, spawnPoint, rotation);
 
         var netObj = go.GetComponent<NetworkObject>();

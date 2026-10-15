@@ -81,7 +81,7 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
     /// <summary>
     /// 지금 행동을 공용 대시로 끊을 수 있는가(대시 우선 — 거너 D1). 행동 쪽이 정한다:
     /// 기본 공격 = <see cref="IPlayerBasicAttack.CanBeCanceledByDash"/>, 스킬 = <see cref="PlayerSkillBase.CanBeCanceledByDash"/>.
-    /// 가붕이는 둘 다 아니오라 기존과 같다(공격·스킬 중 대시 입력 무시).
+    /// 기본 공격은 세 캐릭터 모두 언제든 예다(할 일 9).
     /// </summary>
     public bool CurrentActionAllowsDashCancel => CurrentState switch
     {
@@ -1127,6 +1127,7 @@ public sealed class PlayerDashState : PlayerStateBase
         tickCount++;
 
         // 정면 벽으로 이동이 0이 되어도 대시 상태는 원래 종료시각까지 유지한다. (불변식: 상태·무적 유지)
+        // 단, 몬스터·다른 플레이어에 막히면 그 자리에서 대시를 끝낸다(할 일 11 — OnMotorMovementResolved).
         if (speed <= 0f && tickCount == 1) // 매 tick 반복될 값이라 첫 tick에만 남긴다
         {
             Edit.LogWarning("[Dash] 속도가 0이라 대시 내내 이동량이 없습니다(PlayerDashData.dashSpeed 확인).", Context.Player);
@@ -1222,7 +1223,7 @@ public sealed class PlayerDashState : PlayerStateBase
             case PlayerActionState.Dead:
                 return "사망";
             case PlayerActionState.Idle:
-                return "Idle 전이(서버 취소 EndDash 또는 외부 전이)";
+                return "Idle 전이(서버 취소 EndDash · 유닛 충돌 · 외부 전이)";
             default:
                 return $"{nextState} 전이";
         }
@@ -1234,6 +1235,22 @@ public sealed class PlayerDashState : PlayerStateBase
         float applied = new Vector3(appliedDelta.x, 0f, appliedDelta.z).magnitude;
         requestedDistance += requested;
         appliedDistance += applied;
+
+        // 유닛(몬스터·다른 플레이어)은 대시로 통과하지 못한다 — 막힌 틱에 바로 대시를 끝내 직전에 멈춘다(기획 10-11).
+        // 벽·지형은 아래처럼 종전대로 종료시각까지 상태를 유지한다.
+        if (Context.Motor != null &&
+            PlayerUnitCollisionRules.ShouldEndDashOnUnitBlock(
+                requested,
+                applied,
+                applied < requested - PlayerUnitCollisionRules.DashBlockedTolerance &&
+                Context.Motor.IsUnitBlockingAhead(direction, requested - applied)))
+        {
+            Edit.Log(
+                $"[Dash] tick #{tickCount}: 유닛에 막혀 대시 종료 — 요청 {requested:F3}m → 적용 {applied:F3}m",
+                Context.Player);
+            Context.Controller.ChangeState(PlayerActionState.Idle);
+            return;
+        }
 
         // 요청량의 10% 미만만 남았으면 사실상 벽에 막힌 tick으로 센다.
         if (wasBlocked && requested > 0.0001f && applied < requested * 0.1f)

@@ -40,8 +40,12 @@ public sealed class DataTableIgnoreAttribute : Attribute
 /// <summary>
 /// 기획이 xlsx에서 편집하는 문자열. 문자열은 기본적으로 데이터 테이블 대상이 아니며,
 /// 이 특성이 붙은 필드만 Export·병합·Verify·적용 대상이 된다.
+/// 화면에 보이는 문구로 보고 Export 가 Strings 시트에도 자동 키(<c>에셋/필드경로</c>)로 모은다(로컬라이징 L2).
+/// 코드 ID·기획 메모처럼 번역 대상이 아니면 <c>[DataTableText(Localize = false)]</c>.
 /// </summary>
 [AttributeUsage(AttributeTargets.Field)]
 public sealed class DataTableTextAttribute : Attribute
 {
+    /// <summary>false 면 Strings 시트에 모으지 않는다(수치 시트의 문자열 칸으로만 남는다).</summary>
+    public bool Localize { get; set; } = true;
 }

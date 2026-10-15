@@ -111,8 +111,9 @@ public class MinimapController : MonoBehaviour
     private void Awake()
     {
         // 맵 구조물(복도/다리 등)을 미리 캐싱하여 매 업데이트마다 찾는 비용 방지
-        var mapGeom = GameObject.Find("Stage1/Level_wall_hallway");
-        if (mapGeom != null) _corridorsRoot = mapGeom.transform;
+        // Stage1 은 씬 루트가 아니라 Environment 그룹 아래에 있다 — 경로 대신 이름으로 찾고 그 아래를 본다.
+        var stage = GameObject.Find("Stage1");
+        if (stage != null) _corridorsRoot = stage.transform.Find("Level_wall_hallway");
 
         _explored = new byte[MaskResolution * MaskResolution];
     }
@@ -529,7 +530,7 @@ public class MinimapController : MonoBehaviour
         _mapRoot.offsetMax = Vector2.zero;
         _mapRoot.anchoredPosition = Vector2.zero;
 
-        // 🔴 표시 권한은 HUD 정책(PlayerCombatUiLifecyclePolicy)에 남긴다 — 우리 Canvas 는 비운다.
+        // 🔴 표시 권한은 HUD 정책(PlayerCombatUiLifecyclePolicy — 슬롯이 든 Combat 레이어 CanvasGroup)에 남긴다 — 우리 Canvas 는 비운다.
         if (_canvas != null) _canvas.enabled = false;
 
         // 크기의 주인은 슬롯이다 — 디자이너가 프리팹에서 슬롯을 키우면 미니맵도 따라 커진다.
@@ -725,7 +726,7 @@ public class MinimapController : MonoBehaviour
     // 네트워크 세션 중엔 플레이어가 스폰된 뒤에만 표시. 오프라인(에디터 단독 테스트)은 항상 표시.
     private void UpdateCanvasVisibility()
     {
-        // 🔴 CombatHUD 슬롯에 붙었으면 표시 권한은 그쪽 정책(PlayerCombatUiLifecyclePolicy)의 것이다.
+        // 🔴 CombatHUD 슬롯에 붙었으면 표시 권한은 그쪽 정책(PlayerCombatUiLifecyclePolicy — Combat 레이어)의 것이다.
         //    여기서 매초 켜면 **사망으로 숨긴 HUD 전체를 되살린다.**
         if (_slot != null) return;
 

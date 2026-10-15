@@ -16,16 +16,19 @@ MonoBehaviour:
   stepOffset: 0.3
   obstacleMask:
     serializedVersion: 2
-    m_Bits: 2441
+    m_Bits: 1051017
   groundMask:
     serializedVersion: 2
     m_Bits: 2057
   soulGroundMask:
     serializedVersion: 2
     m_Bits: 2057
-  blockOtherPlayers: 0
+  blockOtherPlayers: 1
+  unitSeparationSpeed: 5
   maxFallSpeed: 30
   minKnockbackTime: 0.15
   maxKnockbackTime: 1.5
   knockbackStopSpeed: 0.15
   knockbackDeceleration: 6
+  regenDelaySeconds: 5
+  regenPercentPerSecond: 0.02

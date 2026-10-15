@@ -105,7 +105,7 @@ public class GunnerCoolBackstepSkill : PlayerSkillBase, ISkillPreviewSource
             ? motor.GetGroundedPreviewDistance(
                 -forward * data.Distance,
                 blockOtherPlayers: true,
-                passThroughEnemies: false)
+                passThroughUnits: false)
             : data.Distance;
         shape = SkillPreviewShapes.Arrow(
             arrowDirection: -1f,

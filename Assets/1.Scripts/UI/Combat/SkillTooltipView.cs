@@ -35,6 +35,36 @@ public sealed class SkillTooltipView : MonoBehaviour
     private bool visible;
     private bool loggedError;
 
+    /// <summary>
+    /// [오너 로컬] 툴팁이 지연 뒤 실제로 떴다. 인자 = 그 슬롯의 키 표기(displayKey) —
+    /// Q·E·R·RMB(SkillCooldownHUD), 패시브 칸은 "Passive"(PassiveHUD). 튜토리얼 판정 훅.
+    /// </summary>
+    public static event System.Action<string> TooltipShown;
+
+    /// <summary>[오너 로컬] 떠 있던 툴팁이 닫혔다(호버 종료·다른 슬롯으로 이동·출처 없음).</summary>
+    public static event System.Action TooltipHidden;
+
+    // 도메인 리로드를 끈 Play 진입에서도 이전 세션 구독자가 남지 않게 비운다.
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStaticEvents()
+    {
+        TooltipShown = null;
+        TooltipHidden = null;
+    }
+
+    // visible 의 유일한 쓰기 창구 — 바뀔 때만 이벤트를 낸다.
+    private void SetVisible(bool value)
+    {
+        if (visible == value)
+            return;
+
+        visible = value;
+        if (value)
+            TooltipShown?.Invoke(displayKey);
+        else
+            TooltipHidden?.Invoke();
+    }
+
     private void Awake()
     {
         rectTransform = panel != null ? panel.transform as RectTransform : transform as RectTransform;
@@ -59,7 +89,7 @@ public sealed class SkillTooltipView : MonoBehaviour
         displayKey = key;
         cooldown = cooldownSeconds;
         hoverStartedAt = Time.unscaledTime;
-        visible = false;
+        SetVisible(false);
         loggedError = false;
         if (panel != null)
             panel.SetActive(false);
@@ -73,7 +103,7 @@ public sealed class SkillTooltipView : MonoBehaviour
         owner = null;
         source = null;
         anchor = null;
-        visible = false;
+        SetVisible(false);
         if (panel != null)
             panel.SetActive(false);
     }
@@ -102,7 +132,7 @@ public sealed class SkillTooltipView : MonoBehaviour
 
         if (source == null)
         {
-            visible = false;
+            SetVisible(false);
             if (panel != null)
                 panel.SetActive(false);
         }
@@ -120,7 +150,7 @@ public sealed class SkillTooltipView : MonoBehaviour
             if (Time.unscaledTime - hoverStartedAt < showDelay)
                 return;
 
-            visible = true;
+            SetVisible(true);
             if (panel != null)
                 panel.SetActive(true);
         }
@@ -143,7 +173,7 @@ public sealed class SkillTooltipView : MonoBehaviour
         {
             bool hasKey = !string.IsNullOrEmpty(displayKey);
             keyBadge.gameObject.SetActive(hasKey);
-            keyBadge.text = hasKey ? displayKey : string.Empty;
+            keyBadge.text = hasKey ? KeyBadgeText(displayKey) : string.Empty;
         }
 
         if (displayName != null)
@@ -160,7 +190,7 @@ public sealed class SkillTooltipView : MonoBehaviour
         {
             bool hasCooldown = cooldown.HasValue;
             cooldownText.gameObject.SetActive(hasCooldown);
-            cooldownText.text = hasCooldown ? $"<sprite name=\"cooldown\" color=#B8C4D6> {cooldown.Value:0.#}초" : string.Empty;
+            cooldownText.text = hasCooldown ? CooldownText(cooldown.Value) : string.Empty;
         }
 
         SkillTooltipDamage damage = source.GetTooltipDamage(player);
@@ -174,7 +204,7 @@ public sealed class SkillTooltipView : MonoBehaviour
             out string error);
 
         if (description != null)
-            description.text = ok ? formatted : $"[오류: {error}]";
+            description.text = ok ? formatted : ErrorText(error);
 
         if (!ok && !loggedError)
         {
@@ -188,9 +218,21 @@ public sealed class SkillTooltipView : MonoBehaviour
             shiftHint.gameObject.SetActive(true);
             bool showHint = ok && hasDamage && !detailed;
             shiftHint.canvasRenderer.SetAlpha(showHint ? 1f : 0f); // 프리팹 색(알파 포함)은 건드리지 않는다
-            shiftHint.text = "자세한 정보를 보려면 [Shift] 키를 누르세요";
+            shiftHint.text = UiStrings.SkillTooltipShiftHint.Text;
         }
     }
+
+    /// <summary>키 배지 글자 — 패시브 칸(<see cref="PassiveHUD.DisplayKey"/>)만 번역하고 Q·E·R·RMB 는 그대로. 이벤트 인자 displayKey 는 바꾸지 않는다(튜토리얼 판정).</summary>
+    public static string KeyBadgeText(string key) =>
+        key == PassiveHUD.DisplayKey ? UiStrings.SkillTooltipPassiveBadge.Text : key;
+
+    /// <summary>쿨타임 줄 — 아이콘 + <see cref="UiStrings.Seconds"/>(소수 최대 한 자리).</summary>
+    public static string CooldownText(float seconds) =>
+        $"<sprite name=\"cooldown\" color=#B8C4D6> {UiStrings.Seconds(seconds, "0.#")}";
+
+    /// <summary>툴팁 문구 오류 표시({error} = 포매터 오류 — 개발용 문장이라 번역하지 않는다).</summary>
+    public static string ErrorText(string error) =>
+        UiStrings.SkillTooltipError.Format(new System.Collections.Generic.Dictionary<string, string> { ["error"] = error ?? string.Empty });
 
     private void Reposition()
     {

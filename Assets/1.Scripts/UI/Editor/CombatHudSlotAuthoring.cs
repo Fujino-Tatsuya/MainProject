@@ -51,8 +51,8 @@ public static class CombatHudSlotAuthoring
 
         try
         {
-            BuildMinimapSlot(root.transform);
-            BuildTimerSlot(root.transform);
+            BuildMinimapSlot(SlotParent(root.transform, MinimapSlotName));
+            BuildTimerSlot(SlotParent(root.transform, TimerSlotName));
 
             PrefabUtility.SaveAsPrefabAsset(root, HudPath);
             Debug.Log($"[CombatHudSlot] 슬롯 생성/갱신 완료 — {HudPath}");
@@ -127,6 +127,21 @@ public static class CombatHudSlotAuthoring
     }
 
     // ── 헬퍼 ────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// 슬롯은 상태 레이어(<see cref="PlayerCombatUiLifecyclePolicy"/>) 아래에 산다 — 이미 있으면 그 부모를,
+    /// 없으면 Combat 레이어를 쓴다(레이어가 없던 옛 프리팹이면 루트).
+    /// </summary>
+    static Transform SlotParent(Transform root, string slotName)
+    {
+        Transform combat = null;
+        foreach (Transform t in root.GetComponentsInChildren<Transform>(true))
+        {
+            if (t != root && t.name == slotName) return t.parent;
+            if (t.name == PlayerCombatUiLifecyclePolicy.CombatLayerName) combat = t;
+        }
+        return combat != null ? combat : root;
+    }
 
     static RectTransform EnsureChild(Transform parent, string name)
     {

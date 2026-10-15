@@ -82,11 +82,31 @@ public class EffectCatalog : ScriptableObject
     [field: SerializeField] public EffectEntry Ultimate_TargetFloor { get; private set; }
     [field: SerializeField] public EffectEntry Ultimate_Strike { get; private set; }
 
+    [Header("플레이어 — 어쌔신 변신(R)")]
+    // 변신 동안 루프(FX_Assassin_BladeVortex) → 해제 시 outro(FX_Assassin_BladeVortex_End) + 남은 입자 ×outroPlayRate.
+    // AssassinSkillView 가 AssassinState.TransformChanged 로 PlayLooping / Release 한다(2026-10-14 민경).
+    [field: SerializeField] public EffectEntry Assassin_R_BladeVortex { get; private set; }
+
+    [Header("플레이어 — 어쌔신 변신 E(원형 5타)")]
+    // 공격 동안 원 중심 루프(FX_Assassin_MultiSlashes). 배율 = 원 반경 — 프리팹 생성 원이 반경 1m 로 저작돼 있다.
+    // Release 는 방출만 멈추고 outroDuration(1.1초) 동안 남은 입자가 제 곡선대로 사라지게 둔다(2026-10-15 민경).
+    [field: SerializeField] public EffectEntry Assassin_E_MultiSlashes { get; private set; }
+
+    [Header("플레이어 — 어쌔신 변신 Q(관통 돌진)")]
+    // 돌진 동안 플레이어 루트를 따라가는 루프(FX_Assassin_StormSlash). 입자는 World + Rate over Distance 라
+    // 지나간 자리에 남는다. Release 는 방출만 멈추고 outroDuration(1.1초) 동안 남은 입자가 사라지게 둔다(2026-10-15 민경).
+    [field: SerializeField] public EffectEntry Assassin_Q_StormSlash { get; private set; }
+
     // ── 몬스터 ──────────────────────────────────────────────────────────
 
     [Header("몬스터")]
     [field: SerializeField] public EffectEntry Mob_Slash { get; private set; }
     [field: SerializeField] public EffectEntry Mob_Bite { get; private set; }
+
+    // 인터럽트(카운터) 성공 섬광. 터뜨리는 주체가 플레이어가 아니라 **맞는 쪽**이라 여기 둔다 —
+    // 23호 본체와 건틀릿·스피너·월봇이 같은 엔트리를 쓴다(각 프리팹의 interruptFlash 소켓).
+    // 창이 실제로 열려 있을 때만 난다(CounterWindow.TryConsumeInterrupt). 팔라딘·거너 공용이다.
+    [field: SerializeField] public EffectEntry Interrupt_Flash { get; private set; }
 
     // ── 보스 ────────────────────────────────────────────────────────────
 
@@ -120,6 +140,11 @@ public class EffectCatalog : ScriptableObject
     // 폭발 **뒤에 남는 장판**의 비주얼(FX_Bomb_Exploded). 장판의 수명·반경은 AreaZone 이 정하고
     // 이 엔트리는 그 위에 얹히는 그림이다 — 피해 판정은 여기에 들어 있지 않다.
     [field: SerializeField] public EffectEntry Bomb_Exploded { get; private set; }
+
+    [Header("보스 — 웰즈 자폭 드론")]
+    // 드론 충돌 순간 폭발 원샷(FX_Drone_Explosion). WellsDroneAttack.ClientImpact 가 폭발 반경(m)을 배율로 재생한다 —
+    // 프리팹은 반경 1m 로 저작한다. 피해 판정은 서버가 따로 한다.
+    [field: SerializeField] public EffectEntry Wells_Drone_Explosion { get; private set; }
 
     [Header("보스 — 차징 번개구슬 (4단계)")]
     // 한 엔트리에 파트로 몰지 않고 넷으로 나눈 이유: FadeOut과 Break가 서로 다른 종료 분기다.

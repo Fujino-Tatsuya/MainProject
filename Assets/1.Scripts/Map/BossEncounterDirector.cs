@@ -37,6 +37,12 @@ public sealed class BossEncounterDirector : NetworkBehaviour
     [Tooltip("스폰할 보스 프리팹(NetworkObject 필수). No.23 = TwentyThree.prefab")]
     [SerializeField] private GameObject bossPrefab;
 
+    [Tooltip("비교용 레이드 변형(TwentyThree_Raid.prefab, PLAN-boss-raid.md). 에디터 툴바 \"보스: 레이드\" 일 때만 쓴다 — 빌드는 항상 bossPrefab.")]
+    [SerializeField] private GameObject raidBossPrefab;
+
+    private GameObject PrefabToSpawn =>
+        BossVariantSelection.UseRaid && raidBossPrefab != null ? raidBossPrefab : bossPrefab;
+
     [Tooltip("착지 지점. 비어 있으면 bossroom의 BossLandingPoint를 이름으로 찾는다.")]
     [SerializeField] private Transform bossLandingPoint;
 
@@ -332,13 +338,17 @@ public sealed class BossEncounterDirector : NetworkBehaviour
             return true;
         }
 
-        if (bossPrefab == null || bossLandingPoint == null)
+        GameObject prefab = PrefabToSpawn;
+        if (prefab == null || bossLandingPoint == null)
             return false;
+
+        if (BossVariantSelection.UseRaid && raidBossPrefab == null)
+            Edit.LogWarning("[BossEncounter] 툴바가 '레이드' 인데 raidBossPrefab 이 비어 있어 기존 보스를 스폰한다.", this);
 
         Vector3 landing = bossLandingPoint.position;
         Vector3 spawnPosition = landing + Vector3.up * spawnHeight;
 
-        GameObject bossInstance = Instantiate(bossPrefab, spawnPosition, EntranceRotation());
+        GameObject bossInstance = Instantiate(prefab, spawnPosition, EntranceRotation());
         _bossNetworkObject = bossInstance.GetComponent<NetworkObject>();
         if (_bossNetworkObject == null)
         {
@@ -348,6 +358,10 @@ public sealed class BossEncounterDirector : NetworkBehaviour
         }
 
         CacheBossComponents(bossInstance);
+
+        // 인원 HP 보정용(레이드 변형). OnNetworkSpawn 에서 읽으므로 Spawn() **전**에 넣는다.
+        if (bossInstance.TryGetComponent(out TwentyThreeBoss twentyThree))
+            twentyThree.SetPartySizeServer(_eligibleClientIds.Count);
 
         _bossNetworkObject.Spawn();
 
@@ -563,6 +577,45 @@ public sealed class BossEncounterDirector : NetworkBehaviour
 
         SetPhase(BossEncounterPhase.FailedSafe);
     }
+    /// <summary>[서버] 보스가 쓰러져 결과 화면 전환을 기다리는 중인가(클리어 확정). 전멸 리스폰은 이때 하지 않는다.</summary>
+    public bool IsBossDefeatedServer => _defeatHandled;
+
+    /// <summary>
+    /// [서버] 전멸 리스폰(할 일 30 (2) — Docs/tech/handoff-boss-encounter-reset.md)용 처음 상태 복귀. <b>이 메서드를 부를 때만</b> 동작한다.
+    /// 보스는 리셋하지 않고 <b>디스폰</b>한다 — 다음 보스방 도착 때 기존 경로(<see cref="SpawnBossServer"/>)가 새로 스폰하므로
+    /// 체력·패턴·FSM·등장 연출(Preparing → Descending → Impact)이 처음부터다. 디스폰 정리(장판·드론·잡기 해제)는 보스 쪽 OnNetworkDespawn 그대로.
+    /// 아레나 송전탑(씬 상주)은 차징 도중이었을 수 있어 숨김으로 내린다(<see cref="BossChargingPylon.EndCharge"/> — 멱등).
+    /// 보스가 이미 쓰러졌으면(결과 전환 예약) 거부 — 그건 클리어다.
+    /// </summary>
+    public bool ResetForRetryServer()
+    {
+        if (!IsServer || !IsSpawned)
+            return false;
+
+        if (_defeatHandled)
+        {
+            Edit.LogWarning("[BossEncounter] 재도전 리셋 거부 — 보스가 이미 쓰러졌다(결과 화면 전환 대기).", this);
+            return false;
+        }
+
+        UnlockAllParticipants();
+        DespawnBoss();
+
+        _bossMonster = null;
+        _bossEntranceAnim = null;
+        _eligibleClientIds.Clear();
+        eligibleCount.Value = 0;
+        _combatStarted = false;
+        _resultTransitionAt = 0d;
+
+        for (int i = BossChargingPylon.Active.Count - 1; i >= 0; i--)
+            if (BossChargingPylon.Active[i] != null) BossChargingPylon.Active[i].EndCharge();   // ?. 는 파괴된 Unity 객체를 못 거른다
+
+        SetPhase(BossEncounterPhase.Idle);
+        Edit.Log("[BossEncounter] 재도전 리셋 — 보스 디스폰·페이즈 Idle. 다음 보스방 도착 때 새로 스폰한다.", this);
+        return true;
+    }
+
     private void SnapBossToNavMesh()
     {
         if (_bossNetworkObject == null)

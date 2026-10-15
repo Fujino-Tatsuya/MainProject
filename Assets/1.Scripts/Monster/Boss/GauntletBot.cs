@@ -288,7 +288,8 @@ public class GauntletBot : MonsterBase
             return;
         }
 
-        interruptFlash.PlayOnce();
+        // 소켓이 아니라 몸 표면의 카메라 쪽 면에서 — 피격 이펙트 CameraDir 와 같은 방식(2026-10-12 민경).
+        interruptFlash.PlayOnceOnSurface(EffectSurfaceCollider);
     }
 
     void WarnNoInterruptFlashOnce()
@@ -392,6 +393,41 @@ public class GauntletBot : MonsterBase
         if (s == MonsterState.Attack)
             return;
         base.PlayStateAnimation(s);
+    }
+
+    // ─── 스매시 바닥 원 = 인터럽트 색(파랑) ─────────────────────────────
+    // 🔴 스매시는 간파 창을 여는 공격이라 바닥 예고 원을 **파랑**으로(팀장 10-12 — 23호 돌진·스피너 돌진과 같은 규약).
+    //    원은 SVN VFX(`FX_Mob_Smah_Warning` 의 `L_circle` 스프라이트, 저작 색 빨강-주황)라 에셋은 건드리지 않고,
+    //    재생된 인스턴스의 **RGB 만** 칠한다. 알파는 `FadeInHoldEffect` 가 맡고 RGB 는 보존하므로 페이드와 안 싸운다.
+    //    이 이펙트는 건틀렛만 쓰고 스매시는 항상 간파 공격이라 풀에 파랑이 남아도 다른 데로 번지지 않는다.
+    //    재생 시작은 클립 이벤트(전 피어)라 서버가 알려 줄 필요가 없다 — 각 피어가 자기 인스턴스를 칠한다.
+    readonly List<GameObject> _smashTelegraphInstances = new List<GameObject>();
+    bool _smashTelegraphTinted;
+    int _smashTintVersion = -1;
+
+    void LateUpdate()
+    {
+        if (smashTelegraph == null) return;
+        if (!smashTelegraph.IsPlaying) { _smashTelegraphTinted = false; return; }
+        // 재생당 한 번 칠한다 — 단 Play 중 스타일 값이 바뀌면(아트 조절) 다시 칠한다(PLAN-telegraph-style).
+        if (_smashTelegraphTinted && _smashTintVersion == TelegraphStyleSO.Version) return;
+        if (Counter == null) return;   // 창 없는 몹이면 원래 색 그대로
+
+        _smashTelegraphInstances.Clear();
+        if (smashTelegraph.GetInstances(_smashTelegraphInstances) == 0) return;
+
+        // 인터럽트 색 = 이 몬스터 스타일의 인터럽트 **채움** RGB(알파는 VFX 스프라이트 것을 유지 — 모양·페이드는 아트 VFX 담당).
+        Color blue = TelegraphStyleSO.For(this).interrupt.fill.color;
+        _smashTintVersion = TelegraphStyleSO.Version;
+        for (int i = 0; i < _smashTelegraphInstances.Count; i++)
+        {
+            GameObject go = _smashTelegraphInstances[i];
+            if (go == null) continue;
+            foreach (SpriteRenderer sr in go.GetComponentsInChildren<SpriteRenderer>(true))
+                sr.color = new Color(blue.r, blue.g, blue.b, sr.color.a);
+        }
+        _smashTelegraphInstances.Clear();   // 풀 소유 — 들고 있지 않는다
+        _smashTelegraphTinted = true;
     }
 
     // 가중치 룰렛: 근접 플레이어 수 기반 스매시 가중치 + 펀치01/02/03 가중치 합에서 랜덤 선택.

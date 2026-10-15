@@ -23,8 +23,7 @@ public class WellsDroneDataSO : ScriptableObject
              "피해 판정과 바닥 원이 이 값 하나를 같이 쓴다.")]
     [Min(0.05f)] public float diameterInTiles = 1.25f;
     [Min(0)] public int playerDamage = 25;
-    [Tooltip("23호에게 주는 피해(일반 보스 피해 — 간파·취약 판정 안 탐). 300 → 120(0.4배, 팀장 10-02 — 범위 2.5배로 맞히기 쉬워짐).")]
-    [Min(0)] public int bossDamage = 120;
+    // ⚠️ bossDamage(23호 자기 피해, 마지막 값 120) 는 제거(팀장 10-12) — 드론은 플레이어만 맞는다.
     [Tooltip("멈추는 그로기 종류(체크형). 기본 = 제압 + 송전기 전멸 그로기.")]
     public BossPauseCondition pauseOn = BossPauseCondition.Suppress | BossPauseCondition.PylonGroggy;
 
@@ -51,9 +50,7 @@ public class WellsDroneDataSO : ScriptableObject
     [Range(0.05f, 0.95f)] public float approachSlowTimePortion = 0.5f;
     [Tooltip("느린 구간 동안 이동하는 거리 비율(0~1). 나머지 거리를 뒤 구간에서 급가속해 내려온다.")]
     [Range(0.01f, 0.9f)] public float approachSlowDistancePortion = 0.15f;
-    [Tooltip("충돌 순간 생성할 폭발 VFX(선택). 비우면 임시 원 확산.")]
-    public GameObject explosionVfxPrefab;
-    [Tooltip("폭발 연출 유지(초) — 피해와 무관한 연출 값. 이게 끝난 뒤 쿨다운을 센다.")]
+    [Tooltip("폭발 뒤 쿨다운을 세기 시작할 때까지(초) — 피해와 무관. 폭발 연출은 EffectCatalog.Wells_Drone_Explosion 이 정한다(이 값과 무관).")]
     [Min(0f)] public float explosionDuration = 0.5f;
     [Header("크로스헤어 (추적 단계)")]
     [Tooltip("크로스헤어 기준 지름(m). 아래 시작/끝 배율이 여기에 곱해진다.")]
@@ -78,11 +75,11 @@ public class WellsDroneDataSO : ScriptableObject
     [Tooltip("줄어드는 구간 중 초록 → 주황으로 바뀌는 지점(0~1). 0.5 = 줄어드는 시간의 절반.")]
     [Range(0f, 1f)] public float crosshairMidColorAt = 0.5f;
 
-    [Header("바닥 원 · 폭발 색")]
-    public Color circleOuterColor = new Color(1f, 0.15f, 0.1f, 0.3f);
-    public Color circleFillColor = new Color(1f, 0.05f, 0.02f, 0.6f);
-    [Tooltip("임시 폭발 원 색(폭발 VFX 프리팹이 비었을 때).")]
-    public Color explosionColor = new Color(1f, 0.55f, 0.1f, 0.85f);
-    [Tooltip("임시 폭발 원이 범위 반경의 몇 배까지 퍼지는가.")]
-    [Min(1f)] public float explosionGrowScale = 2.5f;
+    // ⚠️ 10-13 — 착탄 원 색은 23호 데이터의 telegraphStyle(TelegraphStyleSO.circle)로 옮겼다(PLAN-telegraph-style).
+    //    아래 두 칸은 **아무도 읽지 않는다**. 저작값 보존을 위해 지우지 않고 남겨 둔다(값 = 기본 스타일과 같음).
+    [Header("⚠️ 미사용 — 색은 TelegraphStyle(circle)")]
+    [Tooltip("⚠️ 미사용. 착탄 원 색은 23호 데이터(No23)의 Telegraph Style → circle 에서 고친다.")]
+    [System.Obsolete("TelegraphStyleSO.circle.outline 을 쓴다")] public Color circleOuterColor = new Color(1f, 0.15f, 0.1f, 0.3f);
+    [Tooltip("⚠️ 미사용. 착탄 원 색은 23호 데이터(No23)의 Telegraph Style → circle 에서 고친다.")]
+    [System.Obsolete("TelegraphStyleSO.circle.fill 을 쓴다")] public Color circleFillColor = new Color(1f, 0.05f, 0.02f, 0.6f);
 }

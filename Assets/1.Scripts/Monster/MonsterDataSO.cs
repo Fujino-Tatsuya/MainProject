@@ -40,6 +40,10 @@ public class MonsterDataSO : ScriptableObject
     // 판정은 BossAggroPolicy.ShouldRetarget 이고 교전 중 Idle/Chase 에서만 성립한다(공격 커밋 구간은 건드리지 않는다).
     // 중간보스 2종에만 값을 넣었다 — 일반몹 8종은 0 이라 동작이 그대로다.
     public float retargetInterval = 0f;
+    // 추적 해제 반경(m, PLAN-boss-aggro §3.4 — 팀장 10-14). 문 대상이 이보다 멀리 1초 넘게 있으면 놓고 다시 탐색한다.
+    // 아무도 없으면 스폰 지점으로 걸어서 돌아간다(체력 회복 없음 · 가는 길에도 탐색 — 리쉬 귀환과 다르다).
+    // 0 = 끔(이전 동작 — 리쉬로만 풀린다). 일반몹 7종 = 인지 반경 × 1.2 · 중간보스 3종·23호 = 0.
+    [Min(0f)] public float loseTargetRadius = 0f;
     public float returnSpeedMultiplier = 5f; // 복귀 시 이동속도 배수(복귀속도 = MoveSpeed × 이 값)
 
     [Header("회전")]
@@ -64,6 +68,19 @@ public class MonsterDataSO : ScriptableObject
     public float minStandoff = 4f;           // RangedMobile: 이보다 가까우면 후퇴(사격 사거리 = attackRange)
     public float projectileArcHeight = 0f;   // 0=직선(기존), >0=포물선 정점 높이(m). 포물선 포격용(MortarBot), 발사 시점 타깃 지점 조준·유도 없음.
     public float projectileSplashRadius = 0f; // 0=직격만, >0=착탄 지점 반경 스플래시 데미지.
+
+    [Header("원거리 — 공격 방식 (RangedMobile, PLAN-monster-tells)")]
+    [Tooltip("Projectile = 투사체를 쏜다(기존). SkyStrike = 타깃 발밑에 원형 예고 → 하늘에서 수직 낙하(코그모 궁 방식).\n" +
+             "SkyStrike 는 벽에 부딪히지 않는 대신 **시야가 있을 때만** 쏜다(벽 = 엄폐물 유지). 반경 = projectileSplashRadius.")]
+    [DataTableIgnore] public MonsterRangedStyle rangedStyle = MonsterRangedStyle.Projectile;
+    [Tooltip("SkyStrike: 원이 다 차는 데 걸리는 시간(초) = 발사 → 착탄. 다 차는 순간 피해.")]
+    [DataTableIgnore] [Min(0.1f)] public float skyStrikeTelegraphTime = 1.5f;
+    [Tooltip("SkyStrike: 폭탄이 보이며 떨어지는 마지막 구간(초). 예고 시간 안에 포함된다(추가 회피 시간이 아니다).")]
+    [DataTableIgnore] [Min(0.05f)] public float skyStrikeFallTime = 0.35f;
+    [Tooltip("SkyStrike: 착탄 바닥 높이 ± 이 값 안의 대상만 맞는다(m). 위층·다리 아래는 안 맞게.")]
+    [DataTableIgnore] [Min(0f)] public float skyStrikeFloorTolerance = 1.5f;
+    [Tooltip("SkyStrike: 시야를 막는 레이어. 기본 Default — 존 프리팹의 벽·바닥이 전부 Default 다. 몬스터·플레이어(Unit)는 막지 않는다.")]
+    [DataTableIgnore] public LayerMask skyStrikeLosBlockMask = 1;
     // RangedMobile: 쿨다운 대기 중 제자리(앉는 Idle) 대신 타깃 주변 링을 걸어 재배치(전투 상태 연출, MortarBot).
     public bool repositionBetweenAttacks = false;
     // 후퇴/재배치 최소 이동 시간(초). 이동이 시작되면 이 시간 동안은 공격·정지를 미루고 계속 걷는다(짧은 찔끔 이동 방지).
@@ -152,4 +169,9 @@ public class MonsterDataSO : ScriptableObject
              "외부 프리팹에서 m_Controller 를 오버라이드하면 타깃이 해석되지 않는다(2026-09-10 실측 — " +
              "저장은 성공하고 YAML 에도 남는데 로드하면 null 이다).")]
     public RuntimeAnimatorController animatorControllerOverride;
+
+    [Header("공격 예고 색·마스크 (아트 조절)")]
+    [Tooltip("이 몬스터의 공격 예고·인터럽트·드론 원·전기 장판 색과 마스크. 비우면 코드 기본값(2026-10-13 화면).\n" +
+             "Play 중 그 에셋 값을 바꾸면 켜진 예고에 바로 반영되고 값은 에셋에 남는다. 규격 = Docs/tech/telegraph-style.md")]
+    [DataTableIgnore] public TelegraphStyleSO telegraphStyle;
 }

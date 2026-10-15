@@ -23,7 +23,7 @@ Player.prefab (base)            ← 네트워크·입력·이동·생명주기·
 │  ├─ VFX  (EffectSocketPlayer 들)
 │  └─ 루트 추가: PlayerDefaultAttack·DefaultAttackController(콤보) · FirstMelee* 스킬 5종 · PlayerSkillVfx · PlayerShieldVfx · EffectAnimEvents
 └─ Player_Gunner.prefab (Variant, 2026-09-30~10-01 — character_gunner.md / PLAN-gunner.md)
-   ├─ Armature  = <중첩 Gunner/Gunner_Armature.prefab>    ← gunner.fbx(Generic) · Animator(GunnerAnimatorController) · hand.r/LaserGun · InterruptAttack 앵커
+   ├─ Armature  = <중첩 Gunner/Gunner_Armature.prefab>    ← gunner.fbx(Generic) · Animator(GunnerAnimatorController) · rig/artillery/LaserGun(오프셋 0 — Mount 회전만 상쇄) · InterruptAttack 앵커
    └─ 루트 추가: GunnerHeat · GunnerBeamAttack · GunnerBasicAttack(연사) · GunnerHeatHUD(임시) · GunnerBeamView ·
                  GunnerChargeLaserSkill(Q) · GunnerCoolBackstepSkill(E) · GunnerInterruptSkill(우클릭) · GunnerTrackingLaserSkill(R)
    (+ 별도 네트워크 프리팹 Gunner/GunnerTrackingLaser.prefab — R 이 서버에서 스폰)
@@ -464,6 +464,75 @@ grep -rn '"Armature"' Assets/1.Scripts --include=*.cs
 # NetworkTransform / NetworkAnimator 권한 (0=Server, 1=Owner)
 grep -n "AuthorityMode" Assets/2.Prefabs/Player/Player.prefab Assets/2.Prefabs/Player/Paladin/Paladin_Armature.prefab Assets/2.Prefabs/Player/Paladin/Player_Paladin.prefab
 ```
+
+---
+
+## 10. 머리 위 대시 아이콘 · 에임 대시 틴트 (2026-10-12, 할 일 29)
+
+**대시 아이콘** — 로컬(오너) 플레이어 머리 위 체력바 **오른쪽**에 대시 슬롯 아이콘을 띄운다. 준비/미준비 두 상태만(채움·숫자 없음).
+
+| 항목 | 내용 |
+|------|------|
+| 위치 | `2.Prefabs/UI/OverheadHealthBar.prefab` → `Bar/DashIcon`(`Slot` = `Common_DashSlotIcon` 테두리, `Icon` = `Common_DashIcon`, 같은 1254² 캔버스라 둘 다 꽉 채움). `Player.prefab` 은 이 프리팹을 중첩하므로 **모든 Variant 가 오버라이드 없이 상속**한다 |
+| 배치값 | 앵커 = Bar 오른쪽 가운데, 피벗 (1, 0.5), 위치 (40, -2), 크기 40×40, 스케일 1.05(아이콘) — 2026-10-13 사용자 Play 검증에서 조정. 크기·간격은 `DashIcon` RectTransform 에서 조절 |
+| 위치 | 처음엔 게이지 만충 표시(오른쪽 끝)를 피해 왼쪽(22×22)에 뒀으나, 사용자 Play 검증에서 오른쪽·40×40 으로 옮겼다(10-13). 옛 캐릭터 HUD(`GunnerHeatGauge`·`AssassinHUD`)는 비활성 |
+| 표시 규칙 | `OverheadDashIconRules.ShouldShow` — **로컬 플레이어 + `PlayerLifeState.Alive`** 일 때만. 원격 플레이어 머리 위엔 없다(예측 충전은 오너만 진행). 사망 연출·Soul(대시 금지)·영구 사망(관전)은 숨긴다 — 체력바 자체는 이때도 보인다. 체력바가 숨으면 자식이라 같이 숨는다 |
+| 준비 판정 | `PlayerDashController.IsReady`(예측 충전 > 0). 공급자 = `PlayerOverheadHealthBarRule`(`IOverheadDashIndicator`). 공급자가 없는 바(스피너봇 등)는 아이콘을 숨긴다 |
+| 인스펙터 | `UnitOverheadHealthBar` 「대시 아이콘」: `dashIconRoot` · `dashIconGraphics`(색을 곱할 Slot·Icon) · `dashReadyColor`(흰색) · `dashNotReadyColor`(0.35 회색, 알파로 흐리게도 가능) |
+| 테스트 | `UI/Combat/Editor/OverheadDashIconRulesTests` — `Tools/Tests/플레이어 EditMode 테스트 실행` 에 등록(UI 픽스처도 이 러너가 돌린다) |
+
+**에임 대시 틴트** — `PlayerAimIndicator.tintOnDashCooldown`(기본 **꺼짐**). 켜면 예전처럼 재충전 중 인디케이터를
+`dashCooldownTint` 로 어둡게 한다(쿼드 머티리얼 **인스턴스**의 `_BaseColor` — §12). 꺼져 있으면 항상 원래 색이고, 어두운 상태에서 끄면 원래 색으로 되돌린다.
+base·Variant 모두 이 값을 오버라이드하지 않는다(2026-10-12 확인) — 다시 켜려면 base `Player.prefab` 에서 켠다.
+## 11. 회전 잠금 — `PlayerFacingLock` (할 일 27, 2026-10-12)
+
+몸(`Armature`) 회전을 행동이 잠시 묶어 둘 때 쓰는 **원인별 토큰**이다. `PlayerMovement` 가 하나 들고 있다.
+
+- `AcquireFacingLock(cause, direction)` — 그 방향을 보고 잠근다. `ReleaseFacingLock(cause)` — **그 원인만** 푼다.
+  원인이 하나라도 남으면 잠겨 있다. 다른 기능(어쌔신 등)이 잠금을 써도 서로 풀지 않는다.
+- 막는 것: 이동 입력 회전(시뮬레이션 입력 `CanRotate`)·`RotateToward`(추적 회전).
+  **`RotateImmediately` 는 막지 않는다** — 대시 진입·낙하 복귀처럼 행동이 직접 내리는 회전이다.
+  잠금을 건 행동이 끊기면 `PlayerAttackState.Exit` 가 다음 상태 `Enter` 보다 먼저 돌아 잠금이 먼저 풀린다.
+- 현재 사용처: 거너 기본 공격(`GunnerBasicAttack`, 규칙은 `GunnerAttackFacingModel`). 2026-10-12 후속으로 **발 단위**로 좁혔다.
+  - **토큰(공격 잠금)** = 공격 런타임 전체(`BeginRuntime` ~ `ResetRuntime`). 이동 입력 회전·`RotateToward` 를 공격 내내 막는다.
+    해제 = 마무리 분기(마지막 발 + `ShotRecovery`) → `EndServer`/`EndRpc`, 또는 대시·넉백·구속·사망 등 상태 전이 → `CancelCurrentAttack`.
+  - **발 잠금** = 각 발의 준비 시작 ~ 그 발 사격 끝. 이 동안은 커서로도 돌지 않는다.
+    - 첫 발: 준비 시작 = 공격 시작 순간의 **조준**(커서로 즉시 돌아봄), 준비 동작(`WindupDuration`) 내내 잠김.
+    - 이어지는 발(홀드·입력 창): 준비 동작이 없어 준비 시작 = 오너가 발사를 요청하는 순간. 그때의 **몸 방향**으로 잠근다 — 덜 돌았으면 덜 돈 방향.
+    - 사격 끝 = 그 발이 이 피어에서 나간 때(`PlayShot`). 원격 오너는 왕복 지연만큼 잠긴다. `ShotRpc`(신뢰성 없음)가 빠지면 다음 발 시각에 풀린다.
+  - **발 사이**(홀드 연사 간격·창으로 이은 다음 발 전·후딜) = 오너가 커서 쪽으로 `GunnerBasicAttackData.betweenShotTurnSpeed`(도/초)로 돈다
+    (`TickOwner` → `RotateImmediately` — 토큰이 막지 않는 행동 회전). 0 = 사이에도 고정(이어지는 발이 전부 시작 방향).
+  - 이동 입력은 공격 중 회전에 쓰이지 않는다 — Attack 상태는 `CanMovementRotate=false`(평타 중 이동 불가)이고 토큰도 막는다. 커서 회전만 있다.
+  - ⚠️ 스턴(상태이상)은 상태 전이가 아니라 거너 평타를 끊지 않는다(기존 동작).
+  - **네트워크**: 이어지는 발의 허락은 서버(눌림·창 예약·간격·과열), **요청 시점과 방향은 오너**다. 오너가 `FireShotRpc(direction)` 에
+    잠근 몸 방향을 실어 보내고 서버는 그 방향으로 판정한다(몸 회전이 오너 권한이라 오너 몸이 기준). 서버는 눌림·예약이 없으면 요청을 버린다(창 우회 방지).
+    창 예약을 받았는데 요청이 `FireInterval × 3` 안에 안 오면 예약을 버리고 마무리한다.
+  - **원격 일치**: 오너 화면은 발 잠금이 `PlayShot` 까지라 몸=빔. 다른 피어는 몸(`Armature` NetworkTransform)과 빔(`ShotRpc`)이 같은 경로(오너→서버→피어)로
+    오므로 같은 오너 시각을 보여 준다. 다만 이어지는 발은 발사 직전에 몸이 돌고 있었으므로, 보간 버퍼만큼(≈ 회전 속도 × 보간 지연) 몸이 늦게 따라와
+    잠깐 어긋났다가 맞는다 — 빔은 서버 끝점을 매 프레임 다시 겨누므로(`GunnerBeamView.UpdateBeam`) 끝점은 정확하다.
+- 테스트: `GunnerAttackFacingModelTests`(플레이어 EditMode 러너).
+
+---
+
+## 12. 에임 인디케이터 — 3D 쿼드 (2026-10-13, 할 일 33)
+
+URP 데칼(`DecalProjector`)을 버리고 **바닥에서 띄운 얇은 쿼드**로 바꿨다. 데칼은 지형·벽에 투영돼 경사·단차에서 늘어지고
+캐릭터 몸에도 찍혔다. 쿼드는 발밑 높이에 **수평으로 눕힌 채 조준 방향으로 Y축만** 돈다.
+
+| 항목 | 내용 |
+|------|------|
+| 구조 | base `Player.prefab` → `AimIndicator`(게임오브젝트·Transform fileID 유지 — Variant 오버라이드 보존). 컴포넌트 = `MeshFilter`(내장 Quad) + `MeshRenderer`. **콜라이더 없음**. 같은 프리팹의 다른 데칼(`SkillRangeIndicator` 등)은 그대로 데칼 |
+| 머티리얼 | `3.Materials/Player/AimIndicator/AimIndicator3D.mat` — URP `Lit`(2026-10-13 Unlit → Lit), Transparent·Alpha 블렌드, Receive Shadows·Specular Highlights·Environment Reflections 끔, Smoothness·Metallic 0(번들거림 방지), 텍스처 = 옛 데칼 머티리얼(`AimIndicator.mat`)의 화살표. 옛 `AimIndicator.mat`·`.shadergraph` 는 참조만 끊겼고 남아 있다 |
+| 깊이·그림자 | ZTest LEqual(벽·지형에 **가려진다**), ZWrite Off, 렌더 큐 Transparent(3000), 그림자 캐스트·수신 끔, 라이트/반사 프로브 끔 |
+| 높이 | 캐릭터 위치 0.5m 위에서 아래로 `groundMask` 레이(3.5m) → 맞으면 그 Y, 아니면 캐릭터 Y. 여기에 `heightOffset` 을 더한다. 조준점(마우스) 높이가 아니라 **발밑** 기준이라 계단·단차에서 파묻히지 않는다 |
+| 회전·위치 | `AimIndicatorPlacement`(순수 계산) — yaw = `atan2(x, z)`, 회전 = `Euler(90, yaw + indicator_rot_offset(90), 0)`, 중심 = 발밑 + 조준 방향 × `arrowForwardOffset`. **월드 값을 매 프레임 `LateUpdate` 에서 다시 넣어** 부모(플레이어) 회전과 무관하다. 크기는 부모 스케일을 상쇄한다 |
+| 인스펙터 (`PlayerAimIndicator`) | `heightOffset` 0.08m · `arrowScale` 1.2m(쿼드 한 변) · `arrowForwardOffset` 0.6m. 옛 데칼(2×2m, 중심 1m 앞 = 발밑~2m) 대비 **60%** — 발밑~1.2m |
+| 오너 전용 | 기존 규칙 그대로 — 네트워크 중 비오너는 `OnNetworkSpawn` 에서 인디케이터를 끄고 `Update`·`LateUpdate` 를 건너뛴다 |
+| 대시 틴트 | §10 — `MeshRenderer` 의 머티리얼을 `Awake` 에서 인스턴스로 복제해 `_BaseColor` 를 바꾼다(프리팹 애셋 오염 없음) |
+| 저작 | `Tools/Player/Authoring/Aim Indicator 3D Quad`(`AimIndicatorAuthoring`, 멱등) — 머티리얼 생성/갱신(셰이더를 Lit 로 맞추고 인스펙터와 같은 `BaseShaderGUI.SetMaterialKeywords(…, LitGUI.SetMaterialKeywords)` 로 키워드 재설정) + 데칼 제거 + 쿼드 배선 |
+| 테스트 | `Player/Editor/AimIndicatorPlacementTests` — `Tools/Tests/플레이어 EditMode 테스트 실행` 에 등록 |
+
+**화살표 이미지 교체** — `3.Materials/Player/AimIndicator/AimIndicator3D.mat` 의 `_BaseMap`(인스펙터 **Base Map**) 슬롯 하나에 새 텍스처를 넣으면 끝이다. 런타임 코드는 텍스처·머티리얼 경로를 모르고 쿼드의 머티리얼만 본다. 저작 메뉴를 다시 돌려도 `_BaseMap` 이 차 있으면 덮어쓰지 않는다. 새 이미지도 화살표가 텍스처 **왼쪽(-U)** 을 가리키게 그릴 것(아니면 `indicator_rot_offset` 조정).
 
 ---
 

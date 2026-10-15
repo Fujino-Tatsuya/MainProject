@@ -48,12 +48,17 @@ public sealed class BossCounterDataTests
         // 1.0 은 체감이 부족해 1.5 로 올렸다(팀장 Play 확정 2026-09-03).
         Assert.That(data.chargeClearGroggyDuration, Is.EqualTo(1.5f));
 
-        // 🔴 최원거리 타겟은 Jump 전용이다. 이 규칙의 전신(targetRule)은 아무도 안 읽는 죽은
-        //    데이터였다가 2026-09-03 에 교체됐다 — 같은 일이 반복되지 않게 저작을 고정한다.
+        // 🔴 최원거리 타겟 = Jump · Dash(G3 — 2026-09-17 돌진 재작업 "붙어 있어도 후열로 돌진"). 이 규칙의 전신(targetRule)은
+        //    아무도 안 읽는 죽은 데이터였다가 2026-09-03 에 교체됐다 — 같은 일이 반복되지 않게 저작을 고정한다.
+        //    ⚠️ 10-13 정정: 이 단언이 09-17 이후 "Jump 전용"으로 남아 계속 실패했다(데이터가 맞고 테스트가 낡았다).
         Assert.That(
             data.attacks.Where(a => a.attackTargeting == BossAttackTargeting.FarthestPlayer)
                 .Select(a => a.attackId),
-            Is.EquivalentTo(new[] { BossAttackId.Jump }));
+            Is.EquivalentTo(new[] { BossAttackId.Jump, BossAttackId.Dash }));
+
+        // 최원거리 행은 거리창을 꺼야 한다 — 켜면 "가까운 사람만 후보인데 먼 사람을 노린다"는 모순이 된다.
+        foreach (BossAttackEntry far in data.attacks.Where(a => a.attackTargeting == BossAttackTargeting.FarthestPlayer))
+            Assert.That(far.ignoreDistanceWindow, Is.True, $"{far.attackId} 은 최원거리 타겟인데 거리창을 쓴다");
 
         // 어그로 주기 재선정 — 0 이면 기능이 꺼져 "처음 문 대상을 끝까지" 로 되돌아간다.
         Assert.That(data.aggroRetargetInterval, Is.EqualTo(8f));

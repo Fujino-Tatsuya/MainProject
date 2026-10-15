@@ -27,6 +27,18 @@ public static class CombatStatsEvents
     /// </summary>
     public static event Action<Unit, ulong> ServerCounterSucceeded;
 
+    /// <summary>
+    /// 서버에서 통계 대상 회복이 실제로 적용될 때 발생한다. 인자 = (대상, 실제 회복량 &gt; 0).
+    /// 🔴 플레이어 기본 체력 재생은 발행하지 않는다(<c>Unit.HealHp(amount, countInStats: false)</c> — 사용자 결정 10-13).
+    /// 아직 구독자(회복량 통계)는 없다 — 붙일 때 이 채널을 구독하면 자연 회복이 섞이지 않는다.
+    /// </summary>
+    public static event Action<Unit, int> ServerHealApplied;
+
+    public static void RaiseServerHealApplied(Unit target, int amount)
+    {
+        ServerHealApplied?.Invoke(target, amount);
+    }
+
     public static void RaiseServerDamageApplied(Unit target, ulong attackerClientId, int amount, bool lethal)
     {
         ServerDamageApplied?.Invoke(target, attackerClientId, amount, lethal);

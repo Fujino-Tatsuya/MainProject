@@ -61,5 +61,8 @@ MonoBehaviour:
   locomotionFullBlendSpeed: 2
   locomotionIdleCycleSeconds: 3.966667
   locomotionMoveCycleSeconds: 2.3000002
+  locomotionFullBlendWhileMoving: 0
   locomotionAnimSpeedRange: {x: 0.5, y: 2.5}
+  locomotionPlaybackScale: 1
   animatorControllerOverride: {fileID: 0}
+  telegraphStyle: {fileID: 11400000, guid: 92c647bea0fdba64c89c3179e14ac3e9, type: 2}

@@ -24,6 +24,7 @@ public class PlayerDashController : NetworkBehaviour
     private PlayerInputReader input;
     private PlayerStateController stateController;
     private PlayerMovement movement;
+    private PlayerAimIndicator aim;
     private StatusEffectController statusEffects;
     private PlayerInvulnerability invulnerability;
     private PlayerEncounterLock encounterLock;
@@ -38,6 +39,16 @@ public class PlayerDashController : NetworkBehaviour
     private uint _pendingRequestId;
     private bool _hasPending;
     private bool _serverSnapshotWarned;
+
+    /// <summary>
+    /// [서버] 대시 요청을 승인했고 실제로 진행된다(거부·승인 후 중단·남은시간 0 은 제외). 튜토리얼 판정 훅.
+    /// 대시 캔슬(행동을 끊는 대시)도 같은 요청 경로라 구분하지 않는다. 오프라인(비스폰) 예측 대시는 서버 경로가 없어 나지 않는다.
+    /// </summary>
+    public static event System.Action<Player> ServerDashApproved;
+
+    // 도메인 리로드를 끈 Play 진입에서도 이전 세션 구독자가 남지 않게 비운다.
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStaticEvents() => ServerDashApproved = null;
 
     public bool DashEnabled => ready && config.DashEnabled;
 
@@ -80,6 +91,7 @@ public class PlayerDashController : NetworkBehaviour
         input = GetComponent<PlayerInputReader>();
         stateController = GetComponent<PlayerStateController>();
         movement = GetComponent<PlayerMovement>();
+        aim = GetComponent<PlayerAimIndicator>();
         statusEffects = GetComponent<StatusEffectController>();
         invulnerability = GetComponent<PlayerInvulnerability>();
         encounterLock = GetComponent<PlayerEncounterLock>();
@@ -362,6 +374,13 @@ public class PlayerDashController : NetworkBehaviour
             invulnerability.AddServerToken(InvulnerabilityCause.Dash, response.RemainingServerDuration);
         }
 
+        if (response.IsApproved &&
+            !response.WasInterruptedByServerState &&
+            response.RemainingServerDuration > 0.0)
+        {
+            ServerDashApproved?.Invoke(player);
+        }
+
         RespondDashClientRpc(
             requestId, response.IsApproved, (int)response.Reason, response.RemainingServerDuration,
             response.WasInterruptedByServerState, response.AuthoritativeChargeCount, response.NextChargeReadyServerTime,
@@ -503,18 +522,35 @@ public class PlayerDashController : NetworkBehaviour
             predictedLedger.ForceReset(1, OwnerNow());
     }
 
+    /// <summary>
+    /// 서버 권한 충전을 가득 채운다(튜토리얼 복도1 첫 진입 쿨타임 초기화 — v8 C1-0). 오너 예측은 <see cref="OwnerResetChargeToFull"/> 로 짝을 맞춘다
+    /// (<see cref="ServerResetChargeToOne"/>/<see cref="OwnerResetChargeToOne"/> 과 같은 방식). 장부가 최대치로 자른다.
+    /// </summary>
+    public void ServerResetChargeToFull()
+    {
+        if (IsServer && PlayerDashValidationManager.Instance != null)
+            PlayerDashValidationManager.Instance.ForceReset(NetworkObjectId, int.MaxValue, ServerNow());
+    }
+
+    /// <summary>오너 예측 충전을 가득 채운다(<see cref="ServerResetChargeToFull"/> 의 오너 짝).</summary>
+    public void OwnerResetChargeToFull()
+    {
+        if (player != null && player.IsInputSource && predictedLedger != null)
+            predictedLedger.ForceReset(int.MaxValue, OwnerNow());
+    }
+
+    // 대시 방향은 옵션(UserInputConfig.DashDirection, 기본 = 캐릭터 정면)을 따른다(모든 캐릭터 공통,
+    // 공격·스킬 캔슬 대시 포함). 캐릭터 정면 = 이동 입력 → 현재 정면, 마우스 방향 = 조준 → 이동 입력 → 정면.
+    // 조준·옵션은 오너 로컬 값이므로 이 방향은 오너가 계산해 요청 RPC로 서버에 보낸다.
+    // 대시 상태 진입 시 캐릭터도 이 방향으로 즉시 돌아선다. 선택 규칙 = DashDirectionRules.
     private Vector3 ResolveDashDirection()
     {
-        if (movement != null)
-        {
-            Vector3 inputDir = movement.GetInputWorldDirection();
-            if (inputDir.sqrMagnitude > 0.0001f)
-                return inputDir;
-            return movement.CurrentFacing;
-        }
-
-        Vector3 forward = transform.forward;
-        forward.y = 0f;
-        return forward.sqrMagnitude > 0.0001f ? forward.normalized : Vector3.forward;
+        DashDirectionMode mode = UserInputConfig.DashDirection;
+        return DashDirectionRules.Resolve(
+            mode,
+            mode == DashDirectionMode.Cursor && aim != null ? aim.AimDirection : Vector3.zero,
+            movement != null ? movement.GetInputWorldDirection() : Vector3.zero,
+            movement != null ? movement.CurrentFacing : Vector3.zero,
+            transform.forward);
     }
 }

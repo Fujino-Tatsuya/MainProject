@@ -54,7 +54,6 @@ public sealed class WellsDroneAttack : MonoBehaviour
         _started = _paused = false;
         _target = _lastTarget = null;
         ClientCancel();
-        DestroyBoomVfx();
     }
 
     void Update()
@@ -88,7 +87,10 @@ public sealed class WellsDroneAttack : MonoBehaviour
         }
 
         // 송전기는 점프 출발 순간부터 멈춘다(팀장 10-02) — 점프 이동 + 차징 대기 전체.
-        bool pause = (_boss.ActivePauseConditions & _d.pauseOn) != 0 || _boss.IsChargeSequenceActive;
+        // 🔴 레이드 ② 전력 공급 차징 대기 중엔 멈추지 않는다 — 드론 착탄이 송전탑을 부수는 기믹이다(PLAN-boss-raid §2).
+        bool guide = _boss.IsRaidDroneGuideActive;
+        bool pause = (_boss.ActivePauseConditions & _d.pauseOn) != 0 || (_boss.IsChargeSequenceActive && !guide)
+                     || _boss.IsRaidRescueHold;   // ③ 새 가족 각본 중 정지(PLAN §2)
         if (pause)
         {
             if (!_paused)
@@ -142,7 +144,7 @@ public sealed class WellsDroneAttack : MonoBehaviour
                 {
                     CancelInProgress("추적 중 대상 무효");
                     _phase = Phase.Idle;
-                    _t = _d.cooldown;
+                    _t = guide ? _boss.RaidDroneGuideCooldown : _d.cooldown;
                     return;
                 }
                 _t -= dt;
@@ -159,7 +161,7 @@ public sealed class WellsDroneAttack : MonoBehaviour
             case Phase.Lock:
                 _t -= dt;
                 if (_t > 0f) return;
-                Impact();
+                Impact(guide);
                 _phase = Phase.Explode;
                 _t = _d.explosionDuration;
                 return;
@@ -168,7 +170,7 @@ public sealed class WellsDroneAttack : MonoBehaviour
                 _t -= dt;
                 if (_t > 0f) return;
                 _phase = Phase.Idle;
-                _t = _d.cooldown;   // 폭발 연출 종료 후부터 센다(§3-11)
+                _t = guide ? _boss.RaidDroneGuideCooldown : _d.cooldown;   // 폭발 연출 종료 후부터 센다(§3-11)
                 return;
         }
     }
@@ -192,17 +194,36 @@ public sealed class WellsDroneAttack : MonoBehaviour
         return tile * _d.diameterInTiles * 0.5f;
     }
 
-    // §9: 충돌 순간 1회 · 대상당 1회 · 충돌 범위와 원이 겹치면 적중 · 플레이어와 23호 각각 독립.
-    void Impact()
+    // §9: 충돌 순간 1회 · 대상당 1회 · 충돌 범위와 원이 겹치면 적중.
+    // 🔴 **플레이어만 맞는다** — 23호 자기 피해는 제거(팀장 10-12). 기획 §9.3「23호 피격」은 폐기됐다(기획서 ⚠️ 정정).
+    // 송전탑은 기둥이라 원과 "중심 거리 ≤ 반경 + 이만큼"이면 맞은 것으로 본다(탑 몸통 반지름 근사).
+    const float PylonHitSlack = 0.75f;
+
+    void Impact(bool guide = false)
     {
         _boss.SendDroneImpact(_lockPos, _radius);
+
+        // 레이드 ② — 착탄 원에 걸친 Live 송전탑은 한 방에 부서진다(드론을 탑으로 유도하는 기믹).
+        if (guide)
+        {
+            int pylons = 0;
+            foreach (BossChargingPylon pylon in BossChargingPylon.Active)
+            {
+                if (pylon == null || !pylon.IsLive) continue;
+                Vector3 d = pylon.transform.position - _lockPos;
+                d.y = 0f;
+                if (d.magnitude > _radius + PylonHitSlack) continue;
+                pylon.TakeDamage(new AttackInfo(Mathf.Max(1, pylon.FinalMaxHp)));
+                pylons++;
+            }
+            if (pylons > 0) Debug.Log($"[자폭드론/레이드] 송전탑 {pylons}개 파괴", this);
+        }
 
         // 원(바닥) 판정을 세로 캡슐로 근사한다 — 캐릭터 콜라이더가 원 위 어디에 걸쳐도 잡히게.
         int n = Physics.OverlapCapsuleNonAlloc(_lockPos, _lockPos + Vector3.up * 3f, _radius, _overlap,
                                                _boss.DroneHitMask, QueryTriggerInteraction.Collide);
         _hitOnce.Clear();
         int players = 0;
-        bool bossHit = false;
         for (int i = 0; i < n; i++)
         {
             Collider c = _overlap[i];
@@ -218,20 +239,11 @@ public sealed class WellsDroneAttack : MonoBehaviour
                 if (!BossPatternTargets.IsValid(p, _boss) || !_hitOnce.Add(p)) continue;
                 BossPatternTargets.Damage(p, _d.playerDamage, _lockPos, _boss.transform);
                 players++;
-                continue;
-            }
-
-            TwentyThreeBoss b = c.GetComponentInParent<TwentyThreeBoss>();
-            if (b == _boss && _hitOnce.Add(b))
-            {
-                // 일반 보스 피해 — 인터럽트 아님(간파·취약 판정 안 탐), 출처가 플레이어가 아니라 제압 ×1.2 도 없다.
-                BossPatternTargets.Damage(b, _d.bossDamage, _lockPos, _boss.transform);
-                bossHit = true;
             }
         }
         if (n == _overlap.Length)
             Debug.LogWarning("[자폭드론] 겹침 버퍼가 찼다 — 일부 대상이 잘렸을 수 있다(버퍼 확대 필요).", this);
-        Debug.Log($"[자폭드론] 충돌 — 플레이어 {players}명{(bossHit ? " + 23호" : "")} 적중 (반경 {_radius:0.##}m)", this);
+        Debug.Log($"[자폭드론] 충돌 — 플레이어 {players}명 적중 (반경 {_radius:0.##}m)", this);
     }
 
     void CancelInProgress(string why)
@@ -248,14 +260,14 @@ public sealed class WellsDroneAttack : MonoBehaviour
 
     #region 클라(전 피어) — 임시 연출
 
-    MeshRenderer _cross, _outer, _fill, _boom;
+    MeshRenderer _cross, _outer, _fill;
     Transform _crossTarget;
     float _vStart, _vDur;
     Vector3 _vPos;
     float _vRadius, _vFloorY;
-    enum View { None, Mark, Lock, Boom }
+    enum View { None, Mark, Lock }
     View _view;
-    GameObject _droneGo, _boomVfx;
+    GameObject _droneGo;
     Transform _viewRoot;
     Vector3 _vFrom, _vTo;   // 드론 비행 출발점(대각선 위) → 충돌 지점
     Color _crossColor;
@@ -347,11 +359,10 @@ public sealed class WellsDroneAttack : MonoBehaviour
         _vFloorY = BossPatternVisuals.SampleFloorY(pos, pos.y) + 0.07f;
 
         PlaceDisc(_outer, radius, 0f);
-        BossPatternVisuals.Paint(_outer, _d.circleOuterColor, BossPatternVisuals.DiscTexture);
         _outer.gameObject.SetActive(true);
         PlaceDisc(_fill, 0.01f, 0.01f);
-        BossPatternVisuals.Paint(_fill, _d.circleFillColor, BossPatternVisuals.DiscTexture);
         _fill.gameObject.SetActive(true);
+        PaintLockCircle();
 
         if (_d.droneModel != null)
         {
@@ -381,51 +392,47 @@ public sealed class WellsDroneAttack : MonoBehaviour
     public void ClientImpact(Vector3 pos, float radius)
     {
         EnsureView();
-        ClientCancel();
-        _view = View.Boom;
-        _vStart = Time.time;
-        _vDur = Mathf.Max(0.01f, _d.explosionDuration);
-        _vPos = pos;
-        _vRadius = radius;
-        _vFloorY = BossPatternVisuals.SampleFloorY(pos, pos.y) + 0.08f;
+        ClientCancel();   // 예고 원·드론을 거둔다
 
-        if (_d.explosionVfxPrefab != null)
+        // 🔴 폭발은 EffectCatalog.Wells_Drone_Explosion 의 EffectManager 일회 재생이다(2026-10-08 민경).
+        //    수명은 엔트리가 정하고 풀이 회수한다 — 핸들을 쥐지 않으므로 뒤이은 제압·사망 취소에도
+        //    끝까지 재생된다(이미 터진 폭발이라 맞다). 서버의 explosionDuration 은 쿨다운 시작 시점만 정한다.
+        //    배율 = 폭발 반경(m) — 엔트리 프리팹이 반경 1m 로 저작돼 있다.
+        if (!EffectManager.TryGet(out EffectManager effects, this)) return;
+        EffectEntry entry = effects.Catalog.Wells_Drone_Explosion;
+        if (entry == null)
         {
-            // 참조를 쥐고 있는다 — 제압·사망 취소(ClientCancel)와 파괴에서 회수해야 한다(Codex 교차검증 10-02).
-            // 수명 = explosionDuration. 프리팹 파티클이 더 길면 데이터 값을 늘린다(서버 대기와 같은 기준).
-            DestroyBoomVfx();
-            _boomVfx = Instantiate(_d.explosionVfxPrefab, new Vector3(pos.x, _vFloorY, pos.z), Quaternion.identity);
+            Edit.LogWarning("[웰즈 드론] EffectCatalog.Wells_Drone_Explosion 이 비어 폭발 연출을 건너뛴다.", this);
+            return;
         }
-        else
-        {
-            BossPatternVisuals.Paint(_boom, _d.explosionColor, BossPatternVisuals.DiscTexture);
-            _boom.gameObject.SetActive(true);
-        }
+        float floorY = BossPatternVisuals.SampleFloorY(pos, pos.y) + 0.08f;
+        effects.Play(entry, new Vector3(pos.x, floorY, pos.z), Quaternion.identity, radius);
     }
 
-    /// <summary>서버 취소 RPC — 진행 중 표식·원·드론에 더해 폭발 VFX 까지 거둔다.</summary>
+    /// <summary>서버 취소 RPC · 단계 전환 — 표식·예고 원·드론을 거둔다. 이미 터진 폭발 연출은 자기 수명대로 둔다.</summary>
     public void ClientCancel()
-    {
-        HideTemp();
-        DestroyBoomVfx();
-    }
-
-    void DestroyBoomVfx()
-    {
-        if (_boomVfx != null) { Destroy(_boomVfx); _boomVfx = null; }
-    }
-
-    // 단계 전환용 — 임시 판·드론만 지운다(폭발 VFX 는 자기 수명대로 둔다).
-    void HideTemp()
     {
         _view = View.None;
         _crossTarget = null;
         if (_cross != null) _cross.gameObject.SetActive(false);
         if (_outer != null) _outer.gameObject.SetActive(false);
         if (_fill != null) _fill.gameObject.SetActive(false);
-        if (_boom != null) _boom.gameObject.SetActive(false);
         StopDroneClips();
         if (_droneGo != null) { Destroy(_droneGo); _droneGo = null; }
+    }
+
+    int _paintedStyleVersion = -1;
+
+    // 착탄 원 색·마스크 = 23호(소유 몬스터) 스타일의 circle(PLAN-telegraph-style). 예전 _d.circleOuter/FillColor 는 기본 스타일로 옮겨졌다.
+    // 마스크 기준점 = 착탄 중심(채움 판이 커져도 패턴은 제자리), 축 = 월드(원이라 방향이 없다).
+    void PaintLockCircle()
+    {
+        TelegraphPlateStyle s = TelegraphStyleSO.For(this).circle;
+        Texture2D disc = BossPatternVisuals.DiscTextureFor(s.rimRatio);
+        var extent = new Vector2(_vRadius * 2f, _vRadius * 2f);
+        BossPatternVisuals.PaintStyled(_outer, s.outline, disc, _vPos, Vector3.right, Vector3.forward, extent);
+        BossPatternVisuals.PaintStyled(_fill, s.fill, disc, _vPos, Vector3.right, Vector3.forward, extent);
+        _paintedStyleVersion = TelegraphStyleSO.Version;
     }
 
     void ClientTick()
@@ -441,6 +448,7 @@ public sealed class WellsDroneAttack : MonoBehaviour
                 break;
 
             case View.Lock:
+                if (_paintedStyleVersion != TelegraphStyleSO.Version) PaintLockCircle();   // Play 중 스타일 조절 — 진행은 그대로
                 PlaceDisc(_fill, _vRadius * k, 0.01f);   // 안쪽 진한 원이 1초 동안 차오른다(§7)
                 if (_droneGo != null)
                 {
@@ -456,15 +464,6 @@ public sealed class WellsDroneAttack : MonoBehaviour
                     }
                     TickDroneClips();
                 }
-                break;
-
-            case View.Boom:
-                if (k >= 1f) { ClientCancel(); return; }
-                // 임시 폭발 — 원이 반경 → explosionGrowScale 배로 퍼지며 사라진다.
-                PlaceDisc(_boom, Mathf.Lerp(_vRadius, _vRadius * _d.explosionGrowScale, k), 0.02f);
-                Color boom = _d.explosionColor;
-                boom.a *= 1f - k;
-                BossPatternVisuals.Paint(_boom, boom, null);
                 break;
         }
     }
@@ -510,7 +509,6 @@ public sealed class WellsDroneAttack : MonoBehaviour
         _cross = BossPatternVisuals.CreateFlat("Crosshair", _viewRoot);
         _outer = BossPatternVisuals.CreateFlat("CircleOuter", _viewRoot);
         _fill = BossPatternVisuals.CreateFlat("CircleFill", _viewRoot);
-        _boom = BossPatternVisuals.CreateFlat("Explosion", _viewRoot);
     }
 
     void OnDisable() => ClientCancel();
@@ -519,7 +517,6 @@ public sealed class WellsDroneAttack : MonoBehaviour
     {
         StopDroneClips();
         if (_droneGo != null) Destroy(_droneGo);
-        DestroyBoomVfx();
         if (_viewRoot != null) Destroy(_viewRoot.gameObject);
         if (_ownedDefaults != null) Destroy(_ownedDefaults);
     }

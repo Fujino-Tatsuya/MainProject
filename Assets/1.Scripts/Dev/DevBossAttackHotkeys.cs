@@ -21,10 +21,10 @@
 //        근접 패턴은 사거리 밖이면 예약을 든 채 추격하다 붙으면 나간다.
 //
 //  🔴 **호스트 창에서만** 동작한다 — 보스 FSM 은 서버에서만 돈다. 클라 창에서 누르면 토스트로 알린다.
-//  ⚠️ DevBossEntranceWarp 와 같은 부류: 씬에 배치하지 않고 런타임에 스스로 생긴다. 릴리스 빌드에는 없다
-//     (빌드에서 쓰려면 Development Build). 로그는 빌드에서도 남도록 Debug.Log.
+//  ⚠️ DevBossEntranceWarp 와 같은 부류: 씬에 배치하지 않고 런타임에 스스로 생긴다. 빌드에는 Standalone 심볼
+//     DEV_HOTKEYS(또는 Development Build)가 있을 때만 들어간다. 로그는 빌드에서도 남도록 Debug.Log.
 // ----------------------------------------------------------------------------
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
 using Unity.Netcode;
 using UnityEngine;
 #if ENABLE_INPUT_SYSTEM
