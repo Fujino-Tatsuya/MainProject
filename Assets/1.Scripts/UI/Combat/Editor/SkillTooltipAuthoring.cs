@@ -264,7 +264,7 @@ public static class SkillTooltipAuthoring
         SeedSkills(PaladinData, new Dictionary<PlayerSkillSlot, (string, string, string)>
         {
             { PlayerSkillSlot.Main, ("진격의 방패", "Q 스킬", "TODO 전진하며 적에게 {dmg} 피해를 줍니다.") },
-            { PlayerSkillSlot.Sub, ("수호자의 의지", "E 스킬", "TODO {shieldAmount}의 보호막을 {shieldDuration:0.0}초 동안 얻습니다.") },
+            { PlayerSkillSlot.Sub, ("수호자의 의지", "E 스킬", "전방의 공격을 막으면 반격하여 {dmg}의 피해를 입힙니다. 반격 중에는 피해를 무시합니다.") },
             { PlayerSkillSlot.Interrupt, ("단죄의 방패", "우클릭 스킬", "TODO 적을 간파해 {dmg} 피해를 줍니다.") },
             { PlayerSkillSlot.Ultimate, ("최후의 심판", "궁극기", "TODO 대상을 심판해 {dmg} 피해를 줍니다.") },
         });

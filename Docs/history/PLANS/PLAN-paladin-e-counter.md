@@ -272,3 +272,25 @@ C2~C9 의 세부(테스트 이름·의사코드)는 조사 원본 PLAN 의 같�
 그 밖(`PlayerSkillController` :79·:355-357·:395-418·:593-601·:995, `PlayerInputReader` :14, `FirstMeleeSubSkill` L18·L21·L27-47,
 `PlayerStateController` :251·:273·:527-533, `Unit` :774, `TwentyThreeBoss` :2362·:4571-4576·:4602·:4668, `AssassinConeAttack` :118,
 `MonsterProjectile` :96·:177, `StatusEffectController.Apply` :143·:152)은 원본과 같다.
+
+## 10. 구현 차이 (계획 → 실제 코드)
+
+| 항목 | 계획 | 실제 |
+| --- | --- | --- |
+| C2 부채꼴 경계 | 각도 ≤ 반각 | `FirstMeleeGuardRules.AngleToleranceDeg = 0.001°` 여유 — 정확히 옆(90°)이 부동소수 오차로 떨어지지 않게 |
+| C6 `counterHitDelay`·`counterDuration` | Min 없음 | `[Min(0f)]` 추가(음수 방지) |
+| C8 반격 판정 시그니처 | `ResolveCounterHit(Vector3 origin)` | `ResolveCounterHit(Vector3 origin, Vector3 forward)` — 다음 프레임 보장 반격이 모델 종료 뒤라 방어 방향을 따로 넘긴다(`deferredCounterForward`) |
+| C8 브로드페이즈 버퍼 | 크기 미정 | `const int MaxCounterHitResults = 16` (초과분은 무시) |
+| C9 문서 인수인계 | 프로젝트 `CONTEXT.md` | 이 절(§11)과 브릿지 보고로 대신 — `CONTEXT.md`·루트 `PLAN.md` 는 고치지 않음 |
+| C5·C10 | 선택 | 하지 않음(결정대로) |
+
+## 11. 인수인계
+
+- **xlsx 병합 Export 필요** — `Paladin` 시트 E 행: `cooldownTime` 7 · `attackDamageMultiplier` 2.5 · `maxActiveDuration` 1.5,
+  새 열 `guardDuration`(1) · `guardAngle`(180) · `counterAngle`(120) · `counterRange`(3). `counterHitDelay`·`counterDuration` 은 `[DataTableIgnore]` 라 열 없음.
+  구 `shieldAmount`·`shieldDuration` 열은 이때 정리한다. GameData.xlsx(SVN) 은 이 브랜치에서 건드리지 않았다.
+- **Export 전에는 '데이터: 테이블' 모드에서 E 가 옛 값**(쿨 · 계수 · 지속)으로 돈다. Play 확인은 '데이터: 인스펙터' 모드로.
+- 툴팁 문구는 `StringTable` 의 새 반격 문구(`{dmg}`)가 원본이고, `SkillTooltipAuthoring` 시드도 같은 문구로 맞췄다(C9). `{dmg}` = 공격력 × 2.5 표시 Play 확인 필요.
+- **HolyShield 정리 미정** — §7 범위 밖 목록 그대로(ShieldType.HolyShield·HolyShieldEffect·System·보호막 색·HealthShieldTests·SO 구 필드).
+- **일반 몹 투사체 방어 불가** — C5(MonsterProjectile 주체 전달, 경석 영역) 제외. PeekABot·TeslaBot 투사체는 정면이라도 '주체 없음 → Pass' 로 피해가 들어간다.
+- Play·MPPM 확인(§6)은 사람이 해야 한다 — 워커는 Play 모드에 들어가지 않았다.

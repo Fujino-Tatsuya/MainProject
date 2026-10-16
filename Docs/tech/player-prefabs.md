@@ -367,7 +367,7 @@ Paladin  (루트 컴포넌트 37개 — Player 와 동일 구성)
 ### 8.0 🔴 Variant 를 만들기 전에 풀어야 하는 것 — 캐릭터 고유 스킬
 
 현재 **루트에 붙은 스킬 컴포넌트 5종이 전부 가붕이(근거리) 전용**이다 —
-`FirstMeleeMainSkill`("Q 진격의 방패") · `FirstMeleeSubSkill` · `FirstMeleeUltimateSkill` ·
+`FirstMeleeMainSkill`("Q 진격의 방패") · `FirstMeleeSubSkill`("E 수호자의 의지" — 전방 방어 → 자동 반격, [PLAN-paladin-e-counter.md](../history/PLANS/PLAN-paladin-e-counter.md)) · `FirstMeleeUltimateSkill` ·
 `FirstMeleeInterruptSkill`("단죄의 방패") · `FirstMeleePassive`.
 징크스(원거리)는 좌클릭 스택·우클릭 스택 발동 등 **다른 스킬 세트**가 필요하다([players.md](../design/players.md)).
 
