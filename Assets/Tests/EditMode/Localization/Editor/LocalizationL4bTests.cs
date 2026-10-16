@@ -22,9 +22,30 @@ public sealed class UiStringsL4bTests
 
             Assert.That(found, Is.True, type.ToString());
             Assert.That(name.Key, Is.EqualTo("UI.StatusEffect." + type), type.ToString());
-            Assert.That(name.Ko, Is.EqualTo(type.ToString().Replace("Modifier", string.Empty)), type.ToString());
+            // 차단류 CC 6종은 ko 폴백이 한국어(할 일 50 확정), 나머지는 enum 이름(Modifier 뺌).
+            string expectedKo = CrowdControlKo.TryGetValue(type, out string ko) ? ko : type.ToString().Replace("Modifier", string.Empty);
+            Assert.That(name.Ko, Is.EqualTo(expectedKo), type.ToString());
             Assert.That(UiStrings.All.Count(s => s.Key == name.Key), Is.EqualTo(1), name.Key);
         }
+    }
+
+    static readonly System.Collections.Generic.Dictionary<StatusEffectType, string> CrowdControlKo =
+        new System.Collections.Generic.Dictionary<StatusEffectType, string>
+        {
+            [StatusEffectType.Airborne] = "공중에 뜸",
+            [StatusEffectType.Stunned] = "기절",
+            [StatusEffectType.Rooted] = "속박",
+            [StatusEffectType.Silenced] = "침묵",
+            [StatusEffectType.Debilitated] = "약화",
+            [StatusEffectType.Slowed] = "둔화",
+        };
+
+    [Test]
+    public void StatusEffect_Grabbed_HasOwnKey()
+    {
+        Assert.That(UiStrings.StatusEffectGrabbed.Key, Is.EqualTo("UI.StatusEffect.Grabbed"));
+        Assert.That(UiStrings.StatusEffectGrabbed.Ko, Is.EqualTo("붙잡힘"));
+        Assert.That(UiStrings.All.Count(s => s.Key == UiStrings.StatusEffectGrabbed.Key), Is.EqualTo(1));
     }
 
     [Test]
@@ -138,7 +159,8 @@ public sealed class UiStringsL4bFormatTests
     [Test]
     public void StatusEffect_NoRow_ShowsEnumNameWithoutModifier()
     {
-        Assert.That(StatusEffectHUD.DisplayName(StatusEffectType.Stunned), Is.EqualTo("Stunned"));
+        // CC 6종은 코드 폴백 ko 가 한국어다(할 일 50) — 나머지·조합 값은 enum 이름.
+        Assert.That(StatusEffectHUD.DisplayName(StatusEffectType.Stunned), Is.EqualTo("기절"));
         Assert.That(StatusEffectHUD.DisplayName(StatusEffectType.MoveSpeedModifier), Is.EqualTo("MoveSpeed"));
         Assert.That(StatusEffectHUD.DisplayName(StatusEffectType.Stunned | StatusEffectType.Slowed), Is.EqualTo("Stunned, Slowed"));
     }
