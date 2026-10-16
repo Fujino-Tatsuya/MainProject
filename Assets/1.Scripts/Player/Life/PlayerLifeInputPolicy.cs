@@ -37,6 +37,7 @@ public sealed class PlayerLifeInputPolicy : MonoBehaviour
         {
             encounterLock.CinematicLockChanged += HandleCinematicLockChanged;
             encounterLock.CinematicHiddenChanged += HandleCinematicLockChanged;
+            encounterLock.CinematicInputLockChanged += HandleCinematicLockChanged;
         }
     }
 
@@ -54,6 +55,7 @@ public sealed class PlayerLifeInputPolicy : MonoBehaviour
         {
             encounterLock.CinematicLockChanged -= HandleCinematicLockChanged;
             encounterLock.CinematicHiddenChanged -= HandleCinematicLockChanged;
+            encounterLock.CinematicInputLockChanged -= HandleCinematicLockChanged;
         }
     }
 
@@ -81,9 +83,9 @@ public sealed class PlayerLifeInputPolicy : MonoBehaviour
         if (player == null || !player.IsInputSource || inputReader == null)
             return;
 
-        // 연출 잠금·숨김은 생명주기 허용값 위에 덮어쓰는 추가 차단이다(하나라도 막으면 막힌다).
+        // 연출 잠금·엘리베이터 입력 잠금·숨김은 생명주기 허용값 위에 덮어쓰는 추가 차단이다(하나라도 막으면 막힌다).
         bool cinematicLocked = encounterLock != null &&
-            (encounterLock.IsCinematicLocked || encounterLock.IsCinematicHidden);
+            (encounterLock.IsCinematicLocked || encounterLock.IsCinematicInputLocked || encounterLock.IsCinematicHidden);
         bool allowsMovement = access.AllowsMovement && !cinematicLocked;
         bool allowsCombatInput = access.AllowsCombatInput && !cinematicLocked;
 

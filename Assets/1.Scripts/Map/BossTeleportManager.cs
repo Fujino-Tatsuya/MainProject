@@ -11,12 +11,13 @@ using UnityEngine;
 //  1) BossEnterTrigger가 존 점유(생존 플레이어 유무)를 통지 — 점유 시작 → 카운트다운,
 //     전원 이탈/전멸 → 취소·리셋(로아식, 재진입 시 재시작).
 //  2) 만료 시각(서버시간)을 NetworkVariable로 복제 → 전 피어가 동일한 3·2·1 표시.
-//  3) 만료 시 보스 엘리베이터 연출(할 일 39) — 서버가 참가자를 BossEnter 의 FrontPoints 로 옮기고, 시작 시각(서버시간)을
-//     NetworkVariable 로 복제해 전 피어가 같은 시각으로 BossElevatorRig 를 재생한다(늦은 합류도 같은 그림).
-//     서버는 시간표의 Vanish 시각에 참가자 숨김(입력 잠금·무적 포함), Blackout(완전 암전) 시각에 4) 를 한다.
-//     시작 뒤엔 취소가 없다 — 패드 이탈은 카운트다운만 취소한다. 리그가 없는 구성이면 곧바로 4).
-//  4) 서버가 참가자 전원을 PlayerArrivalPoints 로 텔레포트 → 도착 ACK → AlivePlayersArrived → 숨김 해제.
-//     이동하는 본인 화면은 이동 직전 암전 → 이동 → 밝아짐(로컬 연출). 엘리베이터 상승 중엔 카메라가 칸을 따라가고
+//  3) 만료 시 보스 엘리베이터 연출(할 일 39·46 — Docs/design/boss-entrance-elevator.md). 시작 시각(서버시간)과 참가자 순서(슬롯 = clientId
+//     오름차순, 플레이어 NetworkObjectId 목록)를 복제해 전 피어가 같은 시간표로 BossElevatorRig·화면 페이드·실루엣을 그린다(늦은 합류도 같은 그림).
+//     서버는 시간표대로: 페이드 아웃 끝(암전) = 참가자를 FrontPoints 로 순간이동 → 페이드 인 끝 = 카메라 엘리베이터 포커스·입력 잠금 +
+//     오너에게 보행 지시(목표·시작 시각·시간) → (하강·문 열림·슬롯 순서 보행은 각 피어/오너가 시간표로) → 상승 시작(문 닫힘 끝) = 숨김 →
+//     Blackout(완전 암전) = 4). 시작 뒤엔 취소가 없다 — 패드 이탈은 카운트다운만 취소한다. 리그가 없는 구성이면 곧바로 4).
+//  4) 서버가 참가자 전원을 PlayerArrivalPoints 로 텔레포트 → 도착 ACK → AlivePlayersArrived → 입력 잠금·숨김 해제.
+//     리그 없는 구성에서 이동하는 본인 화면은 이동 직전 암전 → 이동 → 밝아짐(로컬 연출). 엘리베이터면 상승 중 카메라가 칸을 따라가고
 //     화면이 시간표대로 검게 페이드 아웃, 도착 RPC 까지 암전을 유지한 뒤 기존 페이드 인으로 이어진다.
 //
 // 진입 패드 크기/표시 색/페이드는 전부 이 컴포넌트 인스펙터에서 튜닝한다(팀장 확정) —
@@ -47,7 +48,7 @@ public class BossTeleportManager : NetworkBehaviour
     [SerializeField] private Color idleColor = new Color(0.25f, 0.8f, 1f, 0.9f);
     [SerializeField] private Color activeColor = new Color(0.35f, 1f, 0.4f, 1f);
 
-    [Header("이동 페이드 (본인 화면만)")]
+    [Header("이동 페이드 (본인 화면만 — 엘리베이터 연출의 페이드는 BossElevatorRig 시간표)")]
     [SerializeField, Min(0.05f)] private float fadeOutSeconds = 0.3f;
     [SerializeField, Min(0.05f)] private float fadeInSeconds = 0.5f;
     [SerializeField] private Color fadeColor = Color.black;
@@ -64,6 +65,11 @@ public class BossTeleportManager : NetworkBehaviour
     // 도착 완료·도착 무효·재도전 리셋에서 0 으로 돌아간다.
     private readonly NetworkVariable<double> _elevatorStartAt = new NetworkVariable<double>(
         0d, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+    // 엘리베이터 참가자 플레이어 NetworkObjectId — 슬롯(P1, P2, P3) 순서. 서버 write / 모두 read.
+    // 각 피어가 인원(시간표 보행 길이)·슬롯별 실루엣 끄기·"내가 참가자인가"(페이드·카메라)를 여기서 읽는다. 시작 시각과 함께 채우고 비운다.
+    private readonly NetworkList<ulong> _elevatorWalkers = new NetworkList<ulong>(
+        default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     private static double ServerNow =>
         NetworkManager.Singleton != null ? NetworkManager.Singleton.ServerTime.Time : 0d;
@@ -88,7 +94,8 @@ public class BossTeleportManager : NetworkBehaviour
 
     // 엘리베이터 연출 상태(서버 전용). 진행 중엔 패드 이탈로 취소하지 않는다.
     private bool _elevatorRunning;
-    private readonly List<ulong> _hiddenClientIds = new List<ulong>();
+    // 입력 잠금·숨김을 걸었을 수 있는 참가자(clientId) — EndElevatorServer 가 둘 다 푼다.
+    private readonly List<ulong> _elevatorClientIds = new List<ulong>();
 
     // 엘리베이터 연출 로컬 재생(전 피어).
     private BossElevatorRig _rig;
@@ -96,7 +103,22 @@ public class BossTeleportManager : NetworkBehaviour
     private double _elevatorSeenStart;   // 이 피어가 마지막으로 반영한 시작 시각(0 = 없음)
     private bool _rigStarted;            // 그 시작 시각으로 리그를 재생했나(존 스폰 전이면 다음 프레임에 다시)
     private bool _elevatorArrivedLocal;  // 이번 연출에서 보스룸 도착 RPC 를 받았나 — 암전 유지·칸 추적을 끝낸다
-    private bool _cameraOnCab;
+    private Transform _cameraFollow;     // 지금 카메라 임시 추적 대상(null = 플레이어)
+    // 이 피어에서 실루엣을 꺼 둔 참가자 — 연출이 끝나면(도착·취소·재도전·디스폰) 반드시 되켠다.
+    private readonly List<PlayerSilhouetteTag> _suppressedSilhouettes = new List<PlayerSilhouetteTag>();
+
+    // 오너 보행(엘리베이터 문 앞 → 칸 안). 서버가 RPC 로 목표·시작 시각·시간을 주고, 오너가 Motor 포즈로 직선 이동한다.
+    private struct OwnerWalk
+    {
+        public bool Active;
+        public double ElevatorStart;  // 어느 연출의 지시인가 — 시작 시각이 다른 값으로 바뀌면 버린다
+        public Vector3 Target;
+        public double StartAt;        // 서버시간
+        public float Duration;
+        public bool Started;
+        public Vector3 From;
+    }
+    private OwnerWalk _walk;
 
     /// <summary>서버 전용. 유효 참가자 전원이 도착을 적용했을 때 한 번 발화한다.</summary>
     public event Action<IReadOnlyList<ulong>> AlivePlayersArrived;
@@ -140,7 +162,9 @@ public class BossTeleportManager : NetworkBehaviour
         if (IsServer && NetworkManager != null)
             NetworkManager.OnClientDisconnectCallback -= HandleClientDisconnected;
 
-        SetCabFollow(false);
+        SetCameraFollow(null);
+        RestoreSilhouettes();
+        StopOwnerWalk();
         if (_rigStarted && _rig != null) _rig.ResetToIdle();
         _rigStarted = false;
         _elevatorSeenStart = 0d;
@@ -289,15 +313,33 @@ public class BossTeleportManager : NetworkBehaviour
 
         // 🔴 여기부터 취소 없음 — 패드 이탈은 카운트다운만 취소한다(SetOccupied). 재도전 리셋만 이 코루틴을 멈춘다.
         _elevatorRunning = true;
-        BossElevatorTimeline timeline = rig.BuildTimeline();
+        BossElevatorTimeline timeline = rig.BuildTimeline(participants.Count);
         double start = NetworkManager.ServerTime.Time;
 
-        TeleportToElevatorFront(participants, rig.FrontPoints);
+        // 참가자 순서를 시작 시각보다 먼저 쓴다 — 피어가 시작 시각을 보는 순간 인원(시간표)도 맞아 있게.
+        _elevatorClientIds.Clear();
+        _elevatorClientIds.AddRange(participants);
+        _elevatorWalkers.Clear();
+        foreach (ulong clientId in participants)
+            _elevatorWalkers.Add(NetworkManager.ConnectedClients[clientId].PlayerObject.NetworkObjectId);
         _elevatorStartAt.Value = start;
         _teleportAt.Value = 0d; // 표시 종료
-        Edit.Log($"[BossTeleport] 보스 엘리베이터 시작 — 참가자 {participants.Count}명, 사라짐 +{timeline.VanishAt:0.##}s, 암전 +{timeline.BlackoutAt:0.##}s", this);
+        Edit.Log($"[BossTeleport] 보스 엘리베이터 시작 — 참가자 {participants.Count}명, 문 앞 +{timeline.TeleportFrontAt:0.##}s, " +
+                 $"포커스 +{timeline.FocusAt:0.##}s, 보행 +{timeline.WalkStartAt(0):0.##}s(간격 {timeline.WalkInterval:0.##}·{timeline.WalkDuration:0.##}s), " +
+                 $"상승 +{timeline.AscendStartAt:0.##}s, 암전 +{timeline.BlackoutAt:0.##}s", this);
 
-        while (NetworkManager.ServerTime.Time < start + timeline.VanishAt)
+        // 페이드 아웃 끝(완전 암전) — 문 앞으로.
+        while (NetworkManager.ServerTime.Time < start + timeline.TeleportFrontAt)
+            yield return null;
+        TeleportToElevatorFront(participants, rig);
+
+        // 페이드 인 끝 — 카메라 포커스(각 피어 시간표)와 함께 입력 잠금, 오너에게 보행 지시.
+        while (NetworkManager.ServerTime.Time < start + timeline.FocusAt)
+            yield return null;
+        LockAndDirectWalk(participants, rig, timeline, start);
+
+        // 문이 다 닫힌 순간 — 칸 안에서 숨긴다(상승은 칸만 움직인다).
+        while (NetworkManager.ServerTime.Time < start + timeline.AscendStartAt)
             yield return null;
         HideParticipants(participants);
 
@@ -325,24 +367,46 @@ public class BossTeleportManager : NetworkBehaviour
         return ids;
     }
 
-    /// <summary>참가자를 엘리베이터 문 앞(FrontPoints)으로 — 보스룸 이동과 같은 오너 권한 경로, 도착 ACK 없음.</summary>
-    private void TeleportToElevatorFront(List<ulong> participants, IReadOnlyList<Transform> frontPoints)
+    /// <summary>[암전 중] 참가자를 엘리베이터 문 앞(FrontPoints, 슬롯 순서)으로 — 보스룸 이동과 같은 오너 권한 경로, 도착 ACK 없음.</summary>
+    private void TeleportToElevatorFront(List<ulong> participants, BossElevatorRig rig)
     {
         for (int slot = 0; slot < participants.Count; slot++)
         {
+            // 페이드 아웃 동안 끊긴 참가자는 건너뛴다.
+            if (!NetworkManager.ConnectedClients.TryGetValue(participants[slot], out NetworkClient client) || client.PlayerObject == null)
+                continue;
+
             // 지점보다 사람이 많으면 돌려 쓴다(현재 최대 3인 = 지점 3개).
-            Transform point = frontPoints[slot % frontPoints.Count];
-            if (point == null)
+            if (!rig.GetFrontPose(slot, out Vector3 position, out Quaternion rotation))
             {
-                Edit.LogWarning($"[BossTeleport] 엘리베이터 FrontPoints[{slot % frontPoints.Count}] 가 비어 있다 — clientId={participants[slot]} 는 제자리.", this);
+                Edit.LogWarning($"[BossTeleport] 엘리베이터 FrontPoints[{slot % rig.FrontPoints.Count}] 가 비어 있다 — clientId={participants[slot]} 는 제자리.", this);
                 continue;
             }
 
-            TeleportParticipant(participants[slot], point.position, point.rotation, isArrival: false);
+            TeleportParticipant(participants[slot], position, rotation, isArrival: false);
         }
     }
 
-    /// <summary>Vanish 시각 — 아직 접속해 있는 참가자를 숨긴다(모델·머리 위 UI·입력 잠금·무적).</summary>
+    /// <summary>
+    /// [포커스 시각] 참가자 입력 잠금(보이는 채로·무적) + 오너에게 보행 지시 — 슬롯 순서대로 시간표의 시작 시각에 칸 안 지점까지.
+    /// 시작 시각·시간을 함께 보내 오너가 서버 시간표에 맞춰 걷는다(잠금 전에 조금 움직였어도 같은 시각에 도착).
+    /// </summary>
+    private void LockAndDirectWalk(List<ulong> participants, BossElevatorRig rig, BossElevatorTimeline timeline, double start)
+    {
+        for (int slot = 0; slot < participants.Count; slot++)
+        {
+            ulong clientId = participants[slot];
+            if (!NetworkManager.ConnectedClients.TryGetValue(clientId, out NetworkClient client) || client.PlayerObject == null)
+                continue;
+
+            client.PlayerObject.GetComponent<PlayerEncounterLock>()?.SetCinematicInputLockServer(true);
+
+            ElevatorWalkOwnerClientRpc(rig.GetInsidePoint(slot), start, start + timeline.WalkStartAt(slot), timeline.WalkDuration,
+                new ClientRpcParams { Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } } });
+        }
+    }
+
+    /// <summary>상승 시작(문 닫힘 끝) — 아직 접속해 있는 참가자를 칸 안에서 숨긴다(모델·머리 위 UI·실루엣, 입력 잠금·무적은 유지).</summary>
     private void HideParticipants(List<ulong> participants)
     {
         foreach (ulong clientId in participants)
@@ -350,32 +414,34 @@ public class BossTeleportManager : NetworkBehaviour
             if (!NetworkManager.ConnectedClients.TryGetValue(clientId, out NetworkClient client) || client.PlayerObject == null)
                 continue;
 
-            var encounterLock = client.PlayerObject.GetComponent<PlayerEncounterLock>();
-            if (encounterLock == null || !encounterLock.SetCinematicHiddenServer(true))
-                continue;
-
-            if (!_hiddenClientIds.Contains(clientId))
-                _hiddenClientIds.Add(clientId);
+            client.PlayerObject.GetComponent<PlayerEncounterLock>()?.SetCinematicHiddenServer(true);
         }
     }
 
     /// <summary>
-    /// [서버] 엘리베이터 연출 마무리 — 숨김(무적 포함) 해제, 시작 시각 0(전 피어 리그 대기 복귀·카메라 복귀). 멱등.
-    /// 도착 완료(보스 등장 잠금이 걸린 뒤)·도착 무효·재도전 리셋에서 부른다.
+    /// [서버] 엘리베이터 연출 마무리 — 입력 잠금·숨김(무적 포함) 해제, 시작 시각 0·참가자 목록 비움(전 피어 리그 대기 복귀·카메라·실루엣 복귀,
+    /// 오너 보행 중단). 멱등. 도착 완료(보스 등장 잠금이 걸린 뒤)·도착 무효·재도전 리셋에서 부른다.
     /// </summary>
     private void EndElevatorServer()
     {
         _elevatorRunning = false;
 
-        foreach (ulong clientId in _hiddenClientIds)
+        foreach (ulong clientId in _elevatorClientIds)
         {
-            if (NetworkManager.ConnectedClients.TryGetValue(clientId, out NetworkClient client) && client.PlayerObject != null)
-                client.PlayerObject.GetComponent<PlayerEncounterLock>()?.SetCinematicHiddenServer(false);
+            if (!NetworkManager.ConnectedClients.TryGetValue(clientId, out NetworkClient client) || client.PlayerObject == null)
+                continue;
+
+            var encounterLock = client.PlayerObject.GetComponent<PlayerEncounterLock>();
+            if (encounterLock == null) continue;
+            encounterLock.SetCinematicHiddenServer(false);
+            encounterLock.SetCinematicInputLockServer(false);
         }
-        _hiddenClientIds.Clear();
+        _elevatorClientIds.Clear();
 
         if (_elevatorStartAt.Value != 0d)
             _elevatorStartAt.Value = 0d;
+        if (_elevatorWalkers.Count > 0)
+            _elevatorWalkers.Clear();
     }
 
     /// <summary>이동 대상인가. 완전 사망(PermanentDead)만 제외한다.</summary>
@@ -512,6 +578,9 @@ public class BossTeleportManager : NetworkBehaviour
         NetworkObject playerObject = NetworkManager.LocalClient?.PlayerObject;
         if (playerObject == null) return;
 
+        // 보스룸 도착 — 칸 안에 세워 두던 포즈 고정을 먼저 끊는다(안 그러면 다음 틱에 칸 자리로 되돌린다).
+        if (isArrival) StopOwnerWalk();
+
         // 🔴 Motor 를 거쳐 옮긴다. 예전에는 Rigidbody 에 직접 썼는데, Motor 구동 중 바디는
         //    **kinematic** 이라 `linearVelocity = 0` 이 아무것도 지우지 않았다
         //    (유니티가 "Setting linear velocity of a kinematic body is not supported." 로 경고까지 찍었다).
@@ -546,18 +615,86 @@ public class BossTeleportManager : NetworkBehaviour
             netTransform.Teleport(destination, rotation, playerObject.transform.localScale);
         }
 
-        _fadeAlpha = 1f;
-        _fadingIn = true;
-
+        // 🔴 엘리베이터 문 앞 이동은 시간표 페이드(아웃 → 암전 → 인) 한가운데서 일어난다 — 여기서 따로 암전 → 페이드 인을
+        //    걸면 시간표 페이드와 겹쳐 두 번 번쩍인다(할 일 46 이전: 카운트다운 직후 검게 번쩍임). 도착 때만 건다.
         if (!isArrival)
             return;
 
+        _fadeAlpha = 1f;
+        _fadingIn = true;
+
         // 보스룸 도착 — 엘리베이터 암전 유지를 끝내고(기존 페이드 인으로) 카메라를 플레이어로 컷 복귀.
         _elevatorArrivedLocal = true;
-        SetCabFollow(false);
+        SetCameraFollow(null);
 
         // 적용 완료를 서버에 통보 — 서버는 전원 ACK 이후에만 다음 단계로 넘어간다.
         ArrivalAppliedServerRpc(sequence);
+    }
+
+    /// <summary>
+    /// [오너] 엘리베이터 보행 지시 — <paramref name="startAt"/>(서버시간)부터 <paramref name="duration"/> 동안 지금 자리 → <paramref name="target"/>
+    /// 직선 보행(Walk 애니 = IsMoving). 도착 뒤에도 그 자리를 붙잡아 둔다(숨김·상승 동안 낙하·밀림 없음). 보스룸 도착·연출 끝에 풀린다.
+    /// <paramref name="elevatorStart"/> = 어느 연출의 지시인가(복제 시작 시각과 RPC 의 도착 순서가 바뀌어도 맞춰 본다).
+    /// </summary>
+    [ClientRpc]
+    private void ElevatorWalkOwnerClientRpc(
+        Vector3 target, double elevatorStart, double startAt, float duration, ClientRpcParams rpcParams = default)
+    {
+        StopOwnerWalk();
+        _walk = new OwnerWalk
+        {
+            Active = true,
+            ElevatorStart = elevatorStart,
+            Target = target,
+            StartAt = startAt,
+            Duration = Mathf.Max(0f, duration),
+        };
+    }
+
+    // 오너 보행 — Motor 포즈 목표로 옮긴다. 포즈는 충돌 해석을 거치지 않아 문틀·칸 벽·다른 플레이어에 걸리지 않고,
+    // 수직 속도도 매 틱 0 이라 칸 안에서 떨어지지 않는다. 위치는 오너 NetworkTransform·IsMoving 은 NetworkAnimator(오너)로 복제된다.
+    private void FixedUpdate()
+    {
+        if (!_walk.Active || _elevatorStartAt.Value != _walk.ElevatorStart) return;
+
+        NetworkManager nm = NetworkManager.Singleton;
+        NetworkObject po = nm != null ? nm.LocalClient?.PlayerObject : null;
+        if (po == null || !po.TryGetComponent(out PlayerMotor motor)) return;
+
+        double now = ServerNow;
+        if (now < _walk.StartAt) return;
+
+        Player player = po.GetComponent<Player>();
+        if (!_walk.Started)
+        {
+            _walk.Started = true;
+            _walk.From = motor.Position;
+            _walk.Target.y = _walk.From.y; // 평지 보행 — 지금 발 높이 유지
+
+            if (po.TryGetComponent(out PlayerStateController stateController)) stateController.EndDash();
+            motor.ClearKnockbackVelocity();
+
+            Vector3 dir = _walk.Target - _walk.From;
+            if (po.TryGetComponent(out PlayerMovement movement)) movement.RotateImmediately(dir);
+        }
+
+        float t = _walk.Duration > 0f ? Mathf.Clamp01((float)((now - _walk.StartAt) / _walk.Duration)) : 1f;
+        motor.SetPoseTarget(Vector3.Lerp(_walk.From, _walk.Target, t), po.transform.rotation);
+        if (player != null) player.SetAnimatorMoving(t < 1f);
+    }
+
+    /// <summary>오너 보행을 멈춘다(걷는 중이었으면 Walk 애니도 끈다). 멱등.</summary>
+    private void StopOwnerWalk()
+    {
+        if (_walk.Active && _walk.Started)
+        {
+            NetworkManager nm = NetworkManager.Singleton;
+            NetworkObject po = nm != null ? nm.LocalClient?.PlayerObject : null;
+            Player player = po != null ? po.GetComponent<Player>() : null;
+            if (player != null) player.SetAnimatorMoving(false);
+        }
+
+        _walk = default;
     }
 
     /// <summary>도착 적용 ACK. sender가 대기 집합에 있고 sequence가 일치할 때만 수락한다(중복 무시).</summary>
@@ -687,7 +824,7 @@ public class BossTeleportManager : NetworkBehaviour
     }
 
     // 로컬 페이드 진행 — 이동 대상(생존한 본인)만 만료 직전 암전, 취소 시 복구.
-    // 엘리베이터 연출 중 숨겨진 본인은 시간표대로 암전하고, 보스룸 도착 RPC 까지 암전을 유지한다.
+    // 엘리베이터 연출 참가자인 본인은 시간표대로(문 앞 이동 페이드, 상승 뒤 암전) 그리고, 보스룸 도착 RPC 까지 암전을 유지한다.
     private void Update()
     {
         UpdateElevatorLocal();
@@ -707,8 +844,10 @@ public class BossTeleportManager : NetworkBehaviour
             return;
         }
 
+        // 엘리베이터가 있으면 카운트다운 직전 암전을 하지 않는다 — 카운트다운이 끝나는 순간 시간표 페이드 아웃이 0 부터 시작하므로,
+        // 여기서 미리 어둡게 하면 시간표로 넘어가며 한 번 밝아졌다 다시 어두워진다.
         double teleportAt = _teleportAt.Value;
-        if (teleportAt > 0d && IsLocalPlayerAlive())
+        if (teleportAt > 0d && IsLocalPlayerAlive() && !HasElevatorRig())
         {
             double remain = teleportAt - NetworkManager.Singleton.ServerTime.Time;
             if (remain <= fadeOutSeconds)
@@ -722,7 +861,8 @@ public class BossTeleportManager : NetworkBehaviour
     }
 
     /// <summary>
-    /// [전 피어] 복제된 시작 시각으로 리그를 재생·복귀시키고, 숨겨진 본인이면 상승 시작부터 도착까지 카메라가 칸을 따라간다.
+    /// [전 피어] 복제된 시작 시각·참가자 순서로 리그를 재생·복귀시키고, 슬롯이 걷기 시작하면 그 플레이어 실루엣을 끈다(연출 끝에 되켬).
+    /// 참가자인 본인이면 포커스부터 상승 전까지 카메라가 착지 중앙을, 상승부터 도착까지 칸을 따라간다.
     /// 존(리그)은 각 피어가 맵 생성 때 스폰하므로 못 찾으면 다음 프레임에 다시 찾는다 — 늦게 합류해도 같은 시각으로 이어 그린다.
     /// </summary>
     private void UpdateElevatorLocal()
@@ -734,61 +874,111 @@ public class BossTeleportManager : NetworkBehaviour
             _rigStarted = false;
             _elevatorArrivedLocal = false;
             _elevatorSeenStart = start;
+            RestoreSilhouettes();
+            // 다른 연출(또는 끝)로 바뀌었으면 보행 지시를 버린다. RPC 가 시작 시각 복제보다 먼저 와도 같은 연출이면 유지된다.
+            if (_walk.Active && _walk.ElevatorStart != start) StopOwnerWalk();
         }
 
         if (start <= 0d)
         {
-            SetCabFollow(false);
+            SetCameraFollow(null);
             return;
         }
+
+        int walkers = _elevatorWalkers.Count;
+        if (_rigStarted && _localTimeline.WalkerCount != walkers)
+            _rigStarted = false; // 참가자 목록이 시작 시각보다 늦게 왔다 — 인원에 맞춰 다시 짜서 같은 시각부터 이어 그린다
 
         if (!_rigStarted)
         {
             if (_rig == null) _rig = BossElevatorRig.FindActive();
             if (_rig == null) return;
 
-            _localTimeline = _rig.BuildTimeline();
+            _localTimeline = _rig.BuildTimeline(walkers);
             _rig.Play(_localTimeline, start, ServerClock);
             _rigStarted = true;
         }
 
         double elapsed = ServerNow - start;
-        SetCabFollow(!_elevatorArrivedLocal && IsLocalPlayerHidden() && elapsed >= _localTimeline.AscendStartAt);
+        UpdateWalkerSilhouettes(elapsed);
+
+        Transform follow = null;
+        if (!_elevatorArrivedLocal && IsLocalElevatorParticipant() && elapsed >= _localTimeline.FocusAt)
+            follow = elapsed >= _localTimeline.AscendStartAt ? _rig.Cab : _rig.FocusPoint;
+        SetCameraFollow(follow);
+    }
+
+    /// <summary>걷기 시작한 슬롯의 플레이어 실루엣을 끈다 — 연출이 끝날 때까지(뒤이어 숨김). 늦게 합류해도 지난 슬롯을 한꺼번에 끈다.</summary>
+    private void UpdateWalkerSilhouettes(double elapsed)
+    {
+        NetworkManager nm = NetworkManager.Singleton;
+        if (nm == null || nm.SpawnManager == null) return;
+
+        for (int slot = 0; slot < _elevatorWalkers.Count; slot++)
+        {
+            if (elapsed < _localTimeline.WalkStartAt(slot)) break; // 슬롯 순서 = 시작 순서
+
+            if (!nm.SpawnManager.SpawnedObjects.TryGetValue(_elevatorWalkers[slot], out NetworkObject po) || po == null)
+                continue;
+
+            PlayerSilhouetteTag silhouette = po.GetComponentInChildren<PlayerSilhouetteTag>(true);
+            if (silhouette == null || _suppressedSilhouettes.Contains(silhouette)) continue;
+
+            silhouette.SetSuppressed(true);
+            _suppressedSilhouettes.Add(silhouette);
+        }
+    }
+
+    /// <summary>꺼 둔 실루엣을 전부 되켠다(보는 사람 기준 색은 <see cref="PlayerSilhouetteTag"/> 가 다시 고른다). 멱등.</summary>
+    private void RestoreSilhouettes()
+    {
+        foreach (PlayerSilhouetteTag silhouette in _suppressedSilhouettes)
+        {
+            if (silhouette != null) silhouette.SetSuppressed(false);
+        }
+        _suppressedSilhouettes.Clear();
     }
 
     private float ElevatorFadeAlpha()
     {
-        if (!_rigStarted || _elevatorArrivedLocal || _localTimeline == null || !IsLocalPlayerHidden())
+        if (!_rigStarted || _elevatorArrivedLocal || _localTimeline == null || !IsLocalElevatorParticipant())
             return 0f;
 
         return _localTimeline.FadeAlphaAt(ServerNow - _elevatorSeenStart);
     }
 
-    private void SetCabFollow(bool on)
+    /// <summary>카메라 임시 추적 대상을 바꾼다(null = 플레이어로 컷 복귀).</summary>
+    private void SetCameraFollow(Transform target)
     {
-        if (_cameraOnCab == on) return;
+        if (_cameraFollow == target) return;
 
         CameraTargetSwitcher cameraSwitcher = CameraTargetSwitcher.Active;
-        if (on)
+        if (target != null)
         {
-            if (cameraSwitcher == null || _rig == null || _rig.Cab == null) return;
-            cameraSwitcher.SetTemporaryFollow(_rig.Cab);
+            if (cameraSwitcher == null) return;
+            cameraSwitcher.SetTemporaryFollow(target);
         }
         else if (cameraSwitcher != null)
         {
             cameraSwitcher.ClearTemporaryFollow();
         }
 
-        _cameraOnCab = on;
+        _cameraFollow = target;
     }
 
-    private static bool IsLocalPlayerHidden()
+    /// <summary>이 피어의 플레이어가 진행 중인 엘리베이터 연출의 참가자인가(복제 목록 기준 — 관전자·완전 사망자는 아니다).</summary>
+    private bool IsLocalElevatorParticipant()
     {
         NetworkManager nm = NetworkManager.Singleton;
         NetworkObject po = nm != null ? nm.LocalClient?.PlayerObject : null;
-        if (po == null) return false;
-        PlayerEncounterLock encounterLock = po.GetComponent<PlayerEncounterLock>();
-        return encounterLock != null && encounterLock.IsCinematicHidden;
+        return po != null && _elevatorWalkers.Contains(po.NetworkObjectId);
+    }
+
+    /// <summary>이 피어에 엘리베이터 리그(문 앞 지점 포함)가 있는가 — 서버가 연출 경로를 탈 구성인지.</summary>
+    private bool HasElevatorRig()
+    {
+        if (_rig == null) _rig = BossElevatorRig.FindActive();
+        return _rig != null && _rig.FrontPoints.Count > 0;
     }
 
     private bool IsLocalPlayerAlive()

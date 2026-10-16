@@ -14,8 +14,11 @@ using UnityEngine;
 ///   <see cref="BossElevatorTimeline.FadeAlphaAt"/> 로 맞춘다.
 /// · 칸 대기 자리 = 프리팹에 놓인 자리(위). 높이 설정이 0 이하면 하강이 그 자리에서 시작한다(<see cref="BuildTimeline"/>).
 /// · <see cref="ResetToIdle"/> = 칸을 프리팹에 놓인 자리로, 문은 대기 포즈(<see cref="IdleDoorOpen"/>).
+/// · 보행 경로(<see cref="GetFrontPose"/> → <see cref="GetInsidePoint"/>)도 여기서 정한다 — 칸 안 지점 = 착지 중앙(이 오브젝트 위치)에서
+///   문 앞 지점 배치를 <see cref="_insideSpread"/> 배로 줄인 자리. 서버·클라가 같은 프리팹이면 같은 거리·시간표가 나온다.
 /// </summary>
 [DisallowMultipleComponent]
+[DataTableSheet("Map", Order = 1)]
 public sealed class BossElevatorRig : MonoBehaviour
 {
     const string DoorClosedState = "Closed";
@@ -33,10 +36,13 @@ public sealed class BossElevatorRig : MonoBehaviour
     [Tooltip("문 열림/닫힘 시간이 0 이하일 때 길이를 쓰는 클립")]
     [SerializeField] AnimationClip _doorOpenClip;
     [SerializeField] AnimationClip _doorCloseClip;
+    [DataTableIgnore]
     [Tooltip("문이 열리는 착지 높이(칸 localPosition.y) — 칸 밑면이 floor_charger 판에 얹히는 값")]
     [SerializeField] float _landedLocalY = 0.55f;
-    [Tooltip("플레이어 순간이동 지점 — 문 앞, 엘리베이터를 바라본다")]
+    [Tooltip("플레이어 순간이동 지점 — 문 앞. 슬롯(P1, P2, P3) 순서")]
     [SerializeField] Transform[] _frontPoints = Array.Empty<Transform>();
+    [Tooltip("칸 안 도착 지점 간격 배율 — 문 앞 지점들의 서로 간 배치를 칸 중앙 기준으로 이 배만큼 줄여 세운다. 0 = 전원 정중앙")]
+    [SerializeField, Min(0f)] float _insideSpread = 0.6f;
     [SerializeField] BossElevatorTimingSettings _timing = BossElevatorTimingSettings.Default;
 
     BossElevatorTimeline _timeline;
@@ -50,8 +56,6 @@ public sealed class BossElevatorRig : MonoBehaviour
     BossElevatorDoorState _appliedDoor;
     bool _hasAppliedDoor;
 
-    /// <summary>플레이어가 사라지는 순간(문 열림 끝).</summary>
-    public event Action OnVanish;
     /// <summary>문이 닫히고 상승이 시작되는 순간.</summary>
     public event Action OnAscendStart;
     /// <summary>화면 페이드 아웃이 시작되는 순간 — 길이는 <see cref="BossElevatorTimeline.FadeOutDuration"/>.</summary>
@@ -64,6 +68,8 @@ public sealed class BossElevatorRig : MonoBehaviour
     public BossElevatorTimeline Timeline => _timeline;
     /// <summary>움직이는 칸 — 상승 중 카메라가 따라간다.</summary>
     public Transform Cab => _cab;
+    /// <summary>착지 중앙(이 오브젝트) — 포커스부터 상승 전까지 카메라가 본다. 칸은 위에서 내려오므로 칸 대신 이 자리를 본다.</summary>
+    public Transform FocusPoint => transform;
 
     /// <summary>
     /// 대기(재생 밖) 문 포즈가 열림인가. 튜토리얼 G10(<see cref="TutorialElevatorDoor"/>)이 켠다 —
@@ -86,17 +92,65 @@ public sealed class BossElevatorRig : MonoBehaviour
     }
 
     /// <summary>
-    /// 이 리그의 설정·문 클립 길이로 시간표를 만든다. 서버와 클라가 같은 프리팹이면 같은 시간표가 나온다.
+    /// 이 리그의 설정·문 클립 길이·보행 거리로 시간표를 만든다. 서버와 클라가 같은 프리팹·같은 인원이면 같은 시간표가 나온다.
     /// 높이 설정이 0 이하면 칸 대기 높이 − 착지 높이 — 하강이 칸이 놓인 자리에서 시작한다.
     /// </summary>
-    public BossElevatorTimeline BuildTimeline()
+    /// <param name="walkerCount">걸어 들어가는 사람 수(참가자 수).</param>
+    public BossElevatorTimeline BuildTimeline(int walkerCount)
     {
         CaptureIdle();
         float idleAboveLanded = _idleCaptured ? _idleLocalPosition.y - _landedLocalY : 0f;
         return new BossElevatorTimeline(
             _timing.WithResolvedHeight(idleAboveLanded),
             _doorOpenClip != null ? _doorOpenClip.length : 0f,
-            _doorCloseClip != null ? _doorCloseClip.length : 0f);
+            _doorCloseClip != null ? _doorCloseClip.length : 0f,
+            walkerCount,
+            MaxWalkDistance());
+    }
+
+    /// <summary>슬롯의 문 앞 지점(지점보다 사람이 많으면 돌려 쓴다). 지점이 비어 있으면 false.</summary>
+    public bool GetFrontPose(int slot, out Vector3 position, out Quaternion rotation)
+    {
+        Transform point = _frontPoints.Length > 0 ? _frontPoints[Mathf.Max(0, slot) % _frontPoints.Length] : null;
+        if (point == null)
+        {
+            position = default;
+            rotation = Quaternion.identity;
+            return false;
+        }
+
+        position = point.position;
+        rotation = point.rotation;
+        return true;
+    }
+
+    /// <summary>
+    /// 슬롯의 칸 안 도착 지점(월드). 착지 중앙에서 (문 앞 지점 − 첫 지점) × <see cref="_insideSpread"/> 만큼 — 문 앞에 선 줄 모양 그대로 줄여 들어간다.
+    /// 높이는 문 앞 지점 높이(평지 보행).
+    /// </summary>
+    public Vector3 GetInsidePoint(int slot)
+    {
+        Vector3 center = transform.position;
+        if (!GetFrontPose(slot, out Vector3 front, out _) || !GetFrontPose(0, out Vector3 first, out _))
+            return center;
+
+        Vector3 inside = center + (front - first) * _insideSpread;
+        inside.y = front.y;
+        return inside;
+    }
+
+    /// <summary>문 앞 지점 → 칸 안 지점 수평 거리 중 가장 먼 것(m) — 시간표의 보행 시간 기준.</summary>
+    public float MaxWalkDistance()
+    {
+        float max = 0f;
+        for (int slot = 0; slot < _frontPoints.Length; slot++)
+        {
+            if (!GetFrontPose(slot, out Vector3 front, out _)) continue;
+            Vector3 d = GetInsidePoint(slot) - front;
+            d.y = 0f;
+            max = Mathf.Max(max, d.magnitude);
+        }
+        return max;
     }
 
     /// <summary>
@@ -137,7 +191,7 @@ public sealed class BossElevatorRig : MonoBehaviour
     void Apply(double elapsed)
     {
         BossElevatorPhase phase = _timeline.PhaseAt(elapsed);
-        BossElevatorPhase from = _hasLastPhase ? _lastPhase : BossElevatorPhase.TeleportFront;
+        BossElevatorPhase from = _hasLastPhase ? _lastPhase : BossElevatorPhase.FrontFadeOut;
 
         if (phase == BossElevatorPhase.Blackout)
         {
@@ -151,7 +205,6 @@ public sealed class BossElevatorRig : MonoBehaviour
         }
 
         // 이번 프레임에 넘은 경계마다 한 번씩(늦은 합류·긴 프레임이면 여러 개를 순서대로).
-        if (from < BossElevatorPhase.Vanished && phase >= BossElevatorPhase.Vanished) OnVanish?.Invoke();
         if (from < BossElevatorPhase.Ascending && phase >= BossElevatorPhase.Ascending) OnAscendStart?.Invoke();
         if (from < BossElevatorPhase.FadingOut && phase >= BossElevatorPhase.FadingOut) OnFadeOutStart?.Invoke();
         if (from < BossElevatorPhase.Blackout && phase >= BossElevatorPhase.Blackout) OnBlackout?.Invoke();
