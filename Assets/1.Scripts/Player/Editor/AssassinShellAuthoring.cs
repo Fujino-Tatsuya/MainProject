@@ -1101,16 +1101,20 @@ public static class AssassinShellAuthoring
         EnsureReturnToIdleTransitions(interrupt, idle, combatIdle);
         EnsureAnyStateTransition(sm, interrupt, "Interrupt", AnimatorConditionMode.If, 0f);
 
+        AssassinBasicAttackData attackData = AssetDatabase.LoadAssetAtPath<AssassinBasicAttackData>(BasicAttackDataPath);
         for (int i = 0; i < WaveClips.Length; i++)
         {
             AnimatorState attack = EnsureState(sm, $"Default_Attack{i}", LoadClip(WaveClips[i]));
-            attack.speed = i == 3 ? 2.5f : 3f;
+            // 재생 속도는 평타 데이터 값을 따른다(게임플레이 종료 시점 = 클립 길이 ÷ 이 값과 같아야 한다).
+            attack.speed = attackData != null && attackData.TryGetNormalStep(i, out AssassinBasicAttackStepData step)
+                ? step.PlaybackSpeed
+                : (i == 3 ? 3f : 3.6f);
             EnsureReturnToIdleTransitions(attack, idle, combatIdle);
             EnsureAnyStateAttackTransition(sm, attack, i);
         }
 
         // A7: 강타·변신 묶음(AttackIndex 4·5) — 재생 속도는 평타 데이터 값을 따른다.
-        AssassinBasicAttackData attackData = AssetDatabase.LoadAssetAtPath<AssassinBasicAttackData>(BasicAttackDataPath);
+        // attackData 는 평타 루프 앞에서 읽는다
         AnimatorState enhancedAttack = EnsureState(sm, EnhancedAttackState, LoadClip("Combo_Attack_02_01"));
         enhancedAttack.speed = attackData != null && attackData.EnhancedStep != null ? attackData.EnhancedStep.PlaybackSpeed : 2f;
         EnsureReturnToIdleTransitions(enhancedAttack, idle, combatIdle);
