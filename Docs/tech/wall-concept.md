@@ -45,6 +45,7 @@
 | 몬스터 임펄스 넉백(`Unit.Knockback`) | `LinearKnockback.FixedUpdate` | `ApplyKnockbackClientRpc`(오너 = 서버) | null | 물리가 벽에서 멈춤 — 처음 민 방향·직전 속도로 판정 |
 | 플레이어 넉백(`Unit.Knockback`) | `Player.Update`(서버) → `PlayerWallImpactTracker` | `Player.OnKnockback` 수락 | null | 이동이 오너 권한 → 서버는 복제 위치로 판정. 속도 = 세기 − 감속×경과 |
 | 튜토리얼 스피너봇 우클릭 밀치기 | `TutorialSpinnerPractice.TickCombo` | `NotifyInterruptHit`(새 밀치기) | 우클릭 시전자 | 존3 연계 판정이 이 이벤트를 쓴다 |
+| 허수아비 지속넉백(AttackInfo.knockback* — 팔라딘 Q 견인 등) | `TrainingDummy.TickKnockback`(서버) → `TrainingDummyKnockbackSweep` | — (**벽 충돌 이벤트 없음**) | — | 할 일 51. transform 직접 이동이라 매 프레임 몸 캡슐(`UnitWallImpacts.GetBodyCapsule`)을 Wall·Barrier 로만 스윕해 벽 앞(스킨 0.02)에서 멈춤. 시작 겹침 = 정지. 타이머·자리 복귀는 그대로 |
 | 23호 취약 넉백 | (안 바꿈) | — | — | `InvisibleBoundaries` 경계 판정 그대로 — 이관 방법은 handoff |
 
 ## 5. 마스크 전수 조사 — 벽이 Default → Wall 로 옮겨질 때 / 배리어가 Wall → Barrier 로 옮겨질 때
