@@ -42,6 +42,8 @@ internal static class PlayerEditModeTestRunner
         "^PlayerUnitCollisionRulesTests$", // 할 일 11 — 유닛 장애물 마스크(Soul·유닛 통과)·겹침 밀어내기 상한
         "^PlayerUnitPenetrationTests$", // 할 일 11 — 겹친 유닛 관통 수집(실제 ComputePenetration)·비몸체 Player 콜라이더 무시
         "^DashDirectionRulesTests$", // 할 일 25 — 대시 방향 옵션(캐릭터 정면 기본 / 마우스 방향) 선택 규칙
+        "^PlayerInputBufferTests$", // 할 일 44 — 선입력 버퍼 기록·만료·덮어쓰기·거부 사유별 보관/버림
+        "^PlayerInputBufferDiagnosticsTests$", // 할 일 44 후속 — 선입력 버퍼 진단: 즉시·버퍼 실행·만료·놓친 간격·중앙값/90%
     };
 
     const string Tag = "[PlayerTests]";

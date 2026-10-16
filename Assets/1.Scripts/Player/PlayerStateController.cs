@@ -220,6 +220,8 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
         currentState = CreateState(nextState);
         currentStateDebug = currentState.StateType;
         currentState.Enter(previousState);
+        if (context.Input != null)
+            context.Input.DiagnoseActionStateChanged(CurrentState); // 선입력 버퍼 진단(관측 전용)
         return true;
     }
 
@@ -472,6 +474,8 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
         currentState = nextState;
         currentStateDebug = currentState.StateType;
         currentState.Enter(previousState);
+        if (context.Input != null)
+            context.Input.DiagnoseActionStateChanged(CurrentState); // 선입력 버퍼 진단(관측 전용)
     }
 
     // 서버·오너 양쪽에서 도는 공통 가드. 슈퍼아머 판정은 여기 두지 않는다(TryReceiveRestraint 주석 참고).
@@ -679,7 +683,7 @@ public abstract class PlayerStateBase : IPlayerState
         {
             if (Context.Dash.TryBeginPredictedDash())
             {
-                Context.Input.ClearInputBuffer();
+                Context.Input.ClearInputBufferOnActionStarted();
                 return true;
             }
 
@@ -699,7 +703,7 @@ public abstract class PlayerStateBase : IPlayerState
             }
             else if (Context.DefaultAttack.TryStart())
             {
-                Context.Input.ClearInputBuffer();
+                Context.Input.ClearInputBufferOnActionStarted();
                 return true;
             }
             else
@@ -712,7 +716,7 @@ public abstract class PlayerStateBase : IPlayerState
 
         if (TryStartSkillInput())
         {
-            Context.Input.ClearInputBuffer();
+            Context.Input.ClearInputBufferOnActionStarted();
             return true;
         }
 
@@ -720,7 +724,7 @@ public abstract class PlayerStateBase : IPlayerState
         {
             if (Context.Controller.ChangeState(PlayerActionState.Interrupt))
             {
-                Context.Input.ClearInputBuffer();
+                Context.Input.ClearInputBufferOnActionStarted();
                 return true;
             }
 

@@ -65,3 +65,15 @@ Idle/Move 에서 입력(이번 프레임 눌림 또는 선입력 버퍼)으로 �
 - **비우면 무음**(기본값). 키가 있으면 `AudioManager.Instance.Play(key, 플레이어 위치)` — 2D 엔트리는 위치를 무시한다.
 - 사운드 추가 순서는 [data-table.md §6 사운드 키](data-table.md#사운드-키--사운드-동기화): `Sound` 시트에 행 작성(예: key `SFX_SkillCooldownReject`·`SFX_ActionBlocked`, audioType `UI` 또는 `SFX`, is3D `0`) → `Tools/Data/사운드 동기화` → 위 인스펙터 칸에 같은 키.
 - 슬롯·행동마다 다른 소리가 필요하면 이벤트 인자로 구독하는 쪽에서 나눈다.
+
+## 3. 선입력 버퍼 진단 로그
+
+0.2초 창이 실제 플레이에서 얼마나 자주 아슬아슬하게 놓치는지 숫자로 보는 관측 전용 로그. 버퍼 규칙은 바꾸지 않는다.
+
+- 범위: 오너 클라만. `UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS` 일 때만 컴파일된다(훅은 `[Conditional]` — 심볼이 없으면 호출째 사라진다).
+- 토글: `PlayerInputBufferDiagnostics.Enabled`(기본 켜짐). 에디터는 메뉴 `Tools/Debug/선입력 버퍼 진단 로그`(EditorPrefs 에 남음).
+- 출력: 콘솔 `[InputBuf]` 한 줄씩 + CSV. 에디터 = 프로젝트 `Logs/InputBuffer-<시각>.csv`, 빌드 = `Application.persistentDataPath`. Play 종료 때 입력별 개수·분포 요약과 CSV 경로를 콘솔에 남긴다.
+- 이벤트: `press`·`buffered`(누른 프레임에 실행 못 함 + 사유)·`consumed`(즉시/버퍼 실행 + press→실행 ms)·`expired`·`dropped`(사유)·`overwritten`·`actionable`(바쁨 → Idle/Move).
+- 핵심 숫자: `actionable` 의 **놓친 간격** = 실행 가능해진 시각 − 만료 시각(press + 유지 시간), **press→actionable** = 그 입력이 살아남으려면 필요했던 유지 시간. 바쁜 동안 만료된 입력만 센다.
+- 알려진 한계: 원격 클라 오너의 근접 평타 콤보 예약 입력은 버퍼에서 지우지 않아(창을 서버만 안다) 콤보 중 누른 LMB 가 `expired` 로 잡힐 수 있다. Idle/Move 안에서 요청 응답만 기다리는 경우(스킬 요청 대기)는 `actionable` 로 보지 않는다.
+- 코드: `PlayerInputBufferDiagnostics.cs`(추적기·집계·세션), 훅은 `PlayerInputReader`(기록·소비·Resolve·비움)·`PlayerStateController.ChangeState`/`SetState`. 테스트: `PlayerInputBufferDiagnosticsTests`.

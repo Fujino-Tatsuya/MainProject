@@ -1,4 +1,5 @@
-﻿using BaseNetCode;
+﻿using System.Runtime.CompilerServices;
+using BaseNetCode;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -102,6 +103,13 @@ public class PlayerInputReader : BaseNetworkBehaviour
         dashPressedLatched = false;
     }
 
+    // 버퍼 기록 + 진단 press. 기록 규칙은 inputBuffer.Record 그대로다.
+    private void RecordBufferedPress(PlayerBufferedInput input, float now)
+    {
+        inputBuffer.Record(input, now);
+        DiagnoseBufferPress(input, now);
+    }
+
     /// <summary>
     /// 선입력 버퍼에 그 종류가 살아 있는가. 각 행동의 '이번 프레임 눌림'과 OR 해서 쓴다 — 버퍼가 꺼져 있어도
     /// 눌린 프레임 입력은 그대로 읽힌다.
@@ -113,26 +121,46 @@ public class PlayerInputReader : BaseNetworkBehaviour
     }
 
     /// <summary>행동 중에 원시 입력을 받아들인 소비처가 부른다 — 그 입력이 행동이 끝난 뒤 한 번 더 실행되지 않게 지운다.</summary>
-    public void ConsumeBufferedInput(PlayerBufferedInput input)
+    // 호출자 정보는 진단 로그(consumed 사유)에만 쓴다.
+    public void ConsumeBufferedInput(
+        PlayerBufferedInput input,
+        [CallerMemberName] string callerMember = null,
+        [CallerFilePath] string callerFile = null)
     {
         CaptureBufferedPresses();
+        DiagnoseBufferConsumed(input, callerMember, callerFile);
         inputBuffer.Consume(input);
     }
 
-    public void ConsumeBufferedSkillInput(PlayerSkillSlot slot) =>
-        ConsumeBufferedInput(PlayerInputBuffer.FromSkillSlot(slot));
+    public void ConsumeBufferedSkillInput(
+        PlayerSkillSlot slot,
+        [CallerMemberName] string callerMember = null,
+        [CallerFilePath] string callerFile = null) =>
+        ConsumeBufferedInput(PlayerInputBuffer.FromSkillSlot(slot), callerMember, callerFile);
 
     /// <summary>Idle/Move 에서 그 입력으로 시작을 시도한 결과를 버퍼에 반영한다 — 시작 = 비움, 막힘(바쁨·CC) = 유지, 그 밖의 거부 = 그 입력만 버림.</summary>
     public void ResolveBufferedInput(PlayerBufferedInput input, PlayerActionAttempt attempt)
     {
         CaptureBufferedPresses();
+        DiagnoseBufferResolve(input, attempt);
         inputBuffer.Resolve(input, attempt);
     }
 
-    /// <summary>새 행동을 시작했거나 입력을 버려야 할 때(조준 억제·사망·입력 차단) 버퍼를 비운다.</summary>
-    public void ClearInputBuffer()
+    /// <summary>입력으로 새 행동을 시작했을 때 버퍼를 비운다(진단: 들고 있던 입력 = 실행됨).</summary>
+    public void ClearInputBufferOnActionStarted()
+    {
+        CaptureBufferedPresses();
+        DiagnoseBufferConsumed(PlayerBufferedInput.None, "행동 시작", null);
+        inputBuffer.Clear();
+    }
+
+    /// <summary>입력을 버려야 할 때(조준 억제·사망·연출 잠금) 버퍼를 비운다. 호출자 정보는 진단 로그(dropped 사유)에만 쓴다.</summary>
+    public void ClearInputBuffer(
+        [CallerMemberName] string callerMember = null,
+        [CallerFilePath] string callerFile = null)
     {
         CaptureBufferedPresses(); // 이번 프레임 눌림이 비운 뒤에 뒤늦게 기록되지 않게 먼저 받는다
+        DiagnoseBufferDropped(PlayerBufferedInput.None, callerMember, callerFile);
         inputBuffer.Clear();
     }
 
@@ -151,18 +179,19 @@ public class PlayerInputReader : BaseNetworkBehaviour
             return;
 
         float now = Time.time;
+        DiagnoseBufferFrame(now);
         if (InterruptPressed)
-            inputBuffer.Record(PlayerBufferedInput.SkillInterrupt, now);
+            RecordBufferedPress(PlayerBufferedInput.SkillInterrupt, now);
         if (WasSkillActionPressed(PlayerSkillSlot.Ultimate))
-            inputBuffer.Record(PlayerBufferedInput.SkillUltimate, now);
+            RecordBufferedPress(PlayerBufferedInput.SkillUltimate, now);
         if (WasSkillActionPressed(PlayerSkillSlot.Sub))
-            inputBuffer.Record(PlayerBufferedInput.SkillSub, now);
+            RecordBufferedPress(PlayerBufferedInput.SkillSub, now);
         if (WasSkillActionPressed(PlayerSkillSlot.Main))
-            inputBuffer.Record(PlayerBufferedInput.SkillMain, now);
+            RecordBufferedPress(PlayerBufferedInput.SkillMain, now);
         if (AttackPressed)
-            inputBuffer.Record(PlayerBufferedInput.Attack, now);
+            RecordBufferedPress(PlayerBufferedInput.Attack, now);
         if (DashPressed)
-            inputBuffer.Record(PlayerBufferedInput.Dash, now);
+            RecordBufferedPress(PlayerBufferedInput.Dash, now);
     }
 
     // 키보드 스킬 액션만 본다 — GetSkillPressed 는 가상 press 를 '관측됨'으로 표시하므로 기록용으로 쓰지 않는다.
@@ -260,7 +289,7 @@ public class PlayerInputReader : BaseNetworkBehaviour
             if (CanReadCombatInput)
             {
                 CaptureBufferedPresses();
-                inputBuffer.Record(PlayerInputBuffer.FromSkillSlot(slot), Time.time);
+                RecordBufferedPress(PlayerInputBuffer.FromSkillSlot(slot), Time.time);
             }
         }
 
@@ -318,7 +347,10 @@ public class PlayerInputReader : BaseNetworkBehaviour
     {
         combatInputEnabled = isEnabled;
         if (!isEnabled)
+        {
+            DiagnoseBufferDropped(PlayerBufferedInput.None, "전투 입력 차단", null);
             inputBuffer.Clear();
+        }
     }
 
     private void RefreshControlState()
@@ -347,6 +379,7 @@ public class PlayerInputReader : BaseNetworkBehaviour
         {
             Direction = Vector2.zero;
             dashPressedLatched = false;
+            DiagnoseBufferDropped(PlayerBufferedInput.None, "입력 차단", null);
             inputBuffer.Clear();
         }
 
@@ -390,6 +423,7 @@ public class PlayerInputReader : BaseNetworkBehaviour
         KeyBindingConfig.Changed -= ApplyKeyBindings;
         Direction = Vector2.zero;
         dashPressedLatched = false;
+        DiagnoseBufferDropped(PlayerBufferedInput.None, "컴포넌트 비활성", null);
         inputBuffer.Clear();
         for (int i = 0; i < virtualSkillHeld.Length; i++)
         {
@@ -471,4 +505,160 @@ public class PlayerInputReader : BaseNetworkBehaviour
             $"MoveAction.enabled={moveAction != null && moveAction.enabled}",
             this);
     }
+
+    // ── 선입력 버퍼 진단(할 일 44 후속) ── 오너 로컬만, 관측 전용. Docs/tech/skill-reject-feedback.md
+    // 훅은 [Conditional] 이라 심볼이 없으면 호출(인자 계산 포함)째 사라지고, 토글이 꺼져 있으면 추적기를 만들지 않는다.
+
+    [System.Diagnostics.Conditional("UNITY_EDITOR"), System.Diagnostics.Conditional("DEVELOPMENT_BUILD"), System.Diagnostics.Conditional("DEV_HOTKEYS")]
+    private void DiagnoseBufferFrame(float now)
+    {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
+        GetInputBufferDiag()?.BeginFrame(now, Time.frameCount);
+#endif
+    }
+
+    [System.Diagnostics.Conditional("UNITY_EDITOR"), System.Diagnostics.Conditional("DEVELOPMENT_BUILD"), System.Diagnostics.Conditional("DEV_HOTKEYS")]
+    private void DiagnoseBufferPress(PlayerBufferedInput input, float now)
+    {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
+        GetInputBufferDiag()?.Press(input, now, Time.frameCount, inputBuffer.HoldSeconds);
+#endif
+    }
+
+    [System.Diagnostics.Conditional("UNITY_EDITOR"), System.Diagnostics.Conditional("DEVELOPMENT_BUILD"), System.Diagnostics.Conditional("DEV_HOTKEYS")]
+    private void DiagnoseBufferConsumed(PlayerBufferedInput input, string callerMember, string callerFile)
+    {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
+        PlayerInputBufferDiagTracker diag = GetInputBufferDiag();
+        if (diag != null && diag.Pending != PlayerBufferedInput.None)
+            diag.Consumed(input, Time.time, Time.frameCount, DescribeInputBufferCaller(callerMember, callerFile));
+#endif
+    }
+
+    [System.Diagnostics.Conditional("UNITY_EDITOR"), System.Diagnostics.Conditional("DEVELOPMENT_BUILD"), System.Diagnostics.Conditional("DEV_HOTKEYS")]
+    private void DiagnoseBufferDropped(PlayerBufferedInput input, string callerMember, string callerFile)
+    {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
+        PlayerInputBufferDiagTracker diag = GetInputBufferDiag();
+        if (diag != null && diag.Pending != PlayerBufferedInput.None)
+            diag.Dropped(input, Time.time, Time.frameCount, DescribeInputBufferCaller(callerMember, callerFile));
+#endif
+    }
+
+    [System.Diagnostics.Conditional("UNITY_EDITOR"), System.Diagnostics.Conditional("DEVELOPMENT_BUILD"), System.Diagnostics.Conditional("DEV_HOTKEYS")]
+    private void DiagnoseBufferResolve(PlayerBufferedInput input, PlayerActionAttempt attempt)
+    {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
+        PlayerInputBufferDiagTracker diag = GetInputBufferDiag();
+        if (diag == null || diag.Pending == PlayerBufferedInput.None)
+            return;
+
+        float now = Time.time;
+        int frame = Time.frameCount;
+        switch (attempt)
+        {
+            case PlayerActionAttempt.Started:
+                diag.Consumed(PlayerBufferedInput.None, now, frame, $"{input} 시작");
+                break;
+            case PlayerActionAttempt.Blocked:
+                diag.Blocked(input, now, frame, IsInputBufferDiagIncapacitated() ? "CC" : "바쁨(요청 대기)");
+                break;
+            case PlayerActionAttempt.OutOfResource:
+                diag.Dropped(input, now, frame, "자원 부족(쿨타임·충전·과열)");
+                break;
+            case PlayerActionAttempt.BlockedByEffect:
+                diag.Dropped(input, now, frame, "차단 효과");
+                break;
+            default:
+                diag.Dropped(input, now, frame, "기타 거부(사용 조건·빈 슬롯·비접지 등)");
+                break;
+        }
+#endif
+    }
+
+    /// <summary>PlayerStateController 가 상태를 바꾼 뒤 부른다 — 바쁨 → Idle/Move 전환을 actionable 로 남긴다.</summary>
+    [System.Diagnostics.Conditional("UNITY_EDITOR"), System.Diagnostics.Conditional("DEVELOPMENT_BUILD"), System.Diagnostics.Conditional("DEV_HOTKEYS")]
+    internal void DiagnoseActionStateChanged(PlayerActionState state)
+    {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
+        PlayerInputBufferDiagTracker diag = GetInputBufferDiag();
+        if (diag == null)
+            return;
+
+        bool actionable = state == PlayerActionState.Idle || state == PlayerActionState.Move;
+        if (actionable != diag.IsActionable)
+            diag.StateChanged(actionable, Time.time, Time.frameCount, $"→{state}");
+#endif
+    }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
+    private PlayerInputBufferDiagTracker inputBufferDiag;
+    private PlayerStateController inputBufferDiagState;
+    private PlayerSkillController inputBufferDiagSkills;
+    private IPlayerBasicAttack inputBufferDiagAttack;
+    private StatusEffectController inputBufferDiagEffects;
+
+    // 오너 로컬(버퍼를 기록하는 쪽)이고 토글이 켜져 있을 때만 추적기를 준다.
+    private PlayerInputBufferDiagTracker GetInputBufferDiag()
+    {
+        if (!PlayerInputBufferDiagnostics.Enabled || !CanUseLocalControl)
+            return null;
+
+        if (inputBufferDiag == null)
+        {
+            inputBufferDiagState = GetComponent<PlayerStateController>();
+            inputBufferDiagSkills = GetComponent<PlayerSkillController>();
+            inputBufferDiagAttack = GetComponent<IPlayerBasicAttack>();
+            inputBufferDiagEffects = GetComponent<StatusEffectController>();
+            inputBufferDiag = new PlayerInputBufferDiagTracker(WriteInputBufferDiag, DescribeInputBufferWait);
+        }
+
+        return inputBufferDiag;
+    }
+
+    private PlayerActionState InputBufferDiagState =>
+        inputBufferDiagState != null ? inputBufferDiagState.CurrentState : PlayerActionState.Idle;
+
+    private void WriteInputBufferDiag(InputBufferDiagRecord record) =>
+        PlayerInputBufferDiagnostics.Write(record, InputBufferDiagState, DescribeInputBufferAction(), inputBufferSeconds);
+
+    // 현재 행동 이름 — 스킬이면 슬롯:스킬 클래스, 평타면 평타 컴포넌트, 그 밖은 "-".
+    private string DescribeInputBufferAction()
+    {
+        switch (InputBufferDiagState)
+        {
+            case PlayerActionState.Skill:
+            case PlayerActionState.Focus:
+                PlayerSkillBase skill = inputBufferDiagSkills != null ? inputBufferDiagSkills.ActiveSkill : null;
+                return skill != null ? $"{skill.Slot}:{skill.GetType().Name}" : "skill";
+            case PlayerActionState.Attack:
+            case PlayerActionState.AttackReady:
+                return inputBufferDiagAttack != null ? inputBufferDiagAttack.GetType().Name : "attack";
+            default:
+                return "-";
+        }
+    }
+
+    // 누른 프레임에 실행 못 한 이유(buffered 사유).
+    private string DescribeInputBufferWait()
+    {
+        PlayerActionState state = InputBufferDiagState;
+        if (state != PlayerActionState.Idle && state != PlayerActionState.Move)
+            return $"행동 중({state})";
+        if (IsInputBufferDiagIncapacitated())
+            return "CC";
+        if (inputBufferDiagSkills != null && inputBufferDiagSkills.IsBusy)
+            return "스킬 요청 대기";
+        return "다음 프레임 처리";
+    }
+
+    private bool IsInputBufferDiagIncapacitated() =>
+        inputBufferDiagEffects != null &&
+        (inputBufferDiagEffects.ActiveEffects & StatusEffectController.IncapacitatingEffects) != 0;
+
+    private static string DescribeInputBufferCaller(string callerMember, string callerFile) =>
+        string.IsNullOrEmpty(callerFile)
+            ? callerMember
+            : $"{callerMember}@{System.IO.Path.GetFileNameWithoutExtension(callerFile)}";
+#endif
 }
