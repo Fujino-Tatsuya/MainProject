@@ -1,7 +1,8 @@
 using NUnit.Framework;
 using UnityEngine;
 
-// 할 일 47 연장 — 어쌔신 평타 다음 타 예약 창(가붕이 ComboWindowOpen~Close 와 같은 규칙, 클립 정규화 시간).
+// 할 일 47 연장·정정 — 어쌔신 평타 다음 타 연결: 예약 창(가붕이 ComboWindowOpen~Close 와 같은 규칙, 클립 정규화 시간)
+// + End 순간 눌림(거너 기본 공격과 같은 홀드).
 public sealed class AssassinComboWindowRulesTests
 {
     // Combo_Attack_Wave_0N 클립 길이(1.25초)와 단별 재생 속도(3.6/3.6/3.6/3).
@@ -70,6 +71,77 @@ public sealed class AssassinComboWindowRulesTests
         {
             Object.DestroyImmediate(data);
         }
+    }
+
+    // ── 할 일 47 정정 — End 순간 다음 타 = 창 예약 || 눌림(거너와 같은 홀드 + 창) ──
+
+    private const float StaleAfter = 0.5f;      // AssassinBasicAttack.HoldStaleSeconds
+    private const float HoldSignalGap = 0.1f;   // AssassinBasicAttack.HoldSignalInterval
+
+    [Test]
+    public void HeldAtEndContinues()
+    {
+        Assert.That(AssassinComboWindowRules.ShouldContinueAtEnd(queued: false, held: true), Is.True);
+    }
+
+    [Test]
+    public void WindowQueueContinuesEvenAfterRelease()
+    {
+        Assert.That(AssassinComboWindowRules.ShouldContinueAtEnd(queued: true, held: false), Is.True);
+        Assert.That(AssassinComboWindowRules.ShouldContinueAtEnd(queued: true, held: true), Is.True);
+    }
+
+    [Test]
+    public void NeitherQueuedNorHeldEnds()
+    {
+        Assert.That(AssassinComboWindowRules.ShouldContinueAtEnd(queued: false, held: false), Is.False);
+    }
+
+    // 꾹 누르고만 있으면 1→2→3→4→1 이 계속 이어진다 — 유예 0 이어도 End 같은 순간 이어지니 4타 뒤 1타로 돈다.
+    [Test]
+    public void HoldingOnlyLoopsThroughFourStepsAndBackToFirst()
+    {
+        var model = new AssassinComboModel(4, 0f);
+        float now = 0f;
+        int step = model.Begin(now);
+
+        for (int i = 0; i < 9; i++)
+        {
+            Assert.That(step, Is.EqualTo(i % 4), $"{i + 1}번째 타");
+            now += 0.35f;
+            model.Complete(step, now);
+
+            bool held = AssassinComboWindowRules.IsHoldFresh(true, now - HoldSignalGap, now, StaleAfter);
+            Assert.That(AssassinComboWindowRules.ShouldContinueAtEnd(false, held), Is.True, "눌림 — 다음 타");
+            step = model.Begin(now);
+        }
+    }
+
+    // 예전 홀드 방식의 "처음 누른 입력을 떼지 않아야" 조건은 없다 — 뗐다 다시 눌러 들고 있으면 End 순간 눌림으로 잇는다.
+    [Test]
+    public void ReleasedThenRepressedAndHeldContinues()
+    {
+        // 0.05 누름 → 0.12 뗌 → 0.2 다시 누름(각각 변경 즉시 신호). 서버가 아는 상태 = 마지막 변경(눌림, 0.2).
+        const float end = 0.3f;
+        Assert.That(AssassinComboWindowRules.ShouldContinueAtEnd(
+            false, AssassinComboWindowRules.IsHoldFresh(true, 0.2f, end, StaleAfter)), Is.True);
+    }
+
+    [Test]
+    public void ReleasedBeforeEndWithoutQueueEnds()
+    {
+        Assert.That(AssassinComboWindowRules.ShouldContinueAtEnd(
+            false, AssassinComboWindowRules.IsHoldFresh(false, 0.29f, 0.3f, StaleAfter)), Is.False);
+    }
+
+    // 주기 신호가 끊기면(뗌 신호 유실 등) 안 눌림으로 본다 — 무한히 이어지지 않게. 경계는 포함.
+    [Test]
+    public void StaleHoldSignalCountsAsReleased()
+    {
+        Assert.That(AssassinComboWindowRules.IsHoldFresh(true, 1f, 1.5f, StaleAfter), Is.True, "경계");
+        Assert.That(AssassinComboWindowRules.IsHoldFresh(true, 1f, 1.51f, StaleAfter), Is.False, "끊김");
+        Assert.That(AssassinComboWindowRules.ShouldContinueAtEnd(
+            false, AssassinComboWindowRules.IsHoldFresh(true, 1f, 2f, StaleAfter)), Is.False);
     }
 
     private static bool InWindow(float elapsed, float motionDuration, float open, float close) =>
