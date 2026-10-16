@@ -71,8 +71,8 @@ public sealed class BossElevatorTimelineTests
     public void PhaseStarts_DefaultSettings()
     {
         BossElevatorTimeline t = Default();
-        const float focus = 0.4f + 0.2f + 0.5f;
-        const float descend = focus + 0.5f;
+        const float fadeInEnd = 0.4f + 0.2f + 0.5f;
+        const float descend = fadeInEnd + 0.5f;
         const float doorOpen = descend + 2.1f;
         const float walkIn = doorOpen + ClipOpen;
         const float lastWalkEnd = walkIn + 0.2f + 2 * 0.6f + 2f;
@@ -83,9 +83,9 @@ public sealed class BossElevatorTimelineTests
         Assert.AreEqual(0.4f, t.StartOf(BossElevatorPhase.FrontBlackout), Eps, "페이드 아웃 0.4 끝 = 문 앞 순간이동");
         Assert.AreEqual(0.4f, t.TeleportFrontAt, Eps);
         Assert.AreEqual(0.6f, t.StartOf(BossElevatorPhase.FrontFadeIn), Eps, "암전 유지 0.2");
-        Assert.AreEqual(focus, t.StartOf(BossElevatorPhase.Focus), Eps, "페이드 인 0.5 끝 = 카메라 포커스·보행 지시");
-        Assert.AreEqual(focus, t.FocusAt, Eps);
-        Assert.AreEqual(descend, t.StartOf(BossElevatorPhase.Descending), Eps, "포커스 + 0.5");
+        Assert.AreEqual(fadeInEnd, t.StartOf(BossElevatorPhase.WaitDescend), Eps, "페이드 인 0.5 끝 = 보행 지시");
+        Assert.AreEqual(fadeInEnd, t.FrontFadeInEndAt, Eps);
+        Assert.AreEqual(descend, t.StartOf(BossElevatorPhase.Descending), Eps, "페이드 인 끝 + 0.5 — 별도 카메라 포커스 대기 없음");
         Assert.AreEqual(doorOpen, t.StartOf(BossElevatorPhase.DoorOpening), Eps, "하강 2.1 끝");
         Assert.AreEqual(walkIn, t.StartOf(BossElevatorPhase.WalkingIn), Eps, "Open 클립 길이 뒤");
         Assert.AreEqual(doorClose, t.StartOf(BossElevatorPhase.DoorClosing), Eps, "마지막 사람 도착 + 0.5");
@@ -93,6 +93,17 @@ public sealed class BossElevatorTimelineTests
         Assert.AreEqual(ascend + 1f, t.StartOf(BossElevatorPhase.FadingOut), Eps, "페이드 지연 1");
         Assert.AreEqual(ascend + 2.6f, t.StartOf(BossElevatorPhase.Blackout), Eps, "페이드 1.6");
         Assert.AreEqual(1.6f, t.FadeOutDuration, Eps);
+    }
+
+    [Test]
+    public void CameraFocus_SwitchesInFrontBlackout_NotAfterFadeIn()
+    {
+        BossElevatorTimeline t = Default();
+        Assert.AreEqual(t.TeleportFrontAt, t.CameraFocusAt, Eps, "카메라 전환 = 문 앞 이동 순간(암전)");
+        Assert.AreEqual(1f, t.FadeAlphaAt(t.CameraFocusAt), Eps, "전환 순간은 완전 암전 — 컷이 보이지 않는다");
+        Assert.AreEqual(BossElevatorPhase.FrontBlackout, t.PhaseAt(t.CameraFocusAt));
+        Assert.Less(t.CameraFocusAt, t.FrontFadeInAt, "페이드 인이 시작될 때 이미 엘리베이터를 보고 있다");
+        Assert.AreEqual(t.FrontFadeInEndAt + 0.5f, t.DescendStartAt, Eps, "하강 대기는 페이드 인 끝에서 바로 이어진다");
     }
 
     [Test]
@@ -104,7 +115,7 @@ public sealed class BossElevatorTimelineTests
         Assert.AreEqual(BossElevatorPhase.FrontFadeOut, t.PhaseAt(0.39));
         Assert.AreEqual(BossElevatorPhase.FrontBlackout, t.PhaseAt(t.TeleportFrontAt));
         Assert.AreEqual(BossElevatorPhase.FrontFadeIn, t.PhaseAt(t.FrontFadeInAt));
-        Assert.AreEqual(BossElevatorPhase.Focus, t.PhaseAt(t.FocusAt));
+        Assert.AreEqual(BossElevatorPhase.WaitDescend, t.PhaseAt(t.FrontFadeInEndAt));
         Assert.AreEqual(BossElevatorPhase.Descending, t.PhaseAt(t.DescendStartAt));
         Assert.AreEqual(BossElevatorPhase.DoorOpening, t.PhaseAt(t.DoorOpenAt));
         Assert.AreEqual(BossElevatorPhase.WalkingIn, t.PhaseAt(t.WalkInAt));
@@ -189,7 +200,7 @@ public sealed class BossElevatorTimelineTests
         BossElevatorTimeline trio = Default();
         Assert.AreEqual(solo.WalkEndAt(0) + 0.5f, solo.DoorCloseAt, Eps);
         Assert.AreEqual(1.2f, trio.DoorCloseAt - solo.DoorCloseAt, Eps, "남은 두 사람 몫(간격 × 2)만큼 빠르다");
-        Assert.AreEqual(trio.FocusAt, solo.FocusAt, Eps, "보행 앞 단계는 인원과 무관");
+        Assert.AreEqual(trio.FrontFadeInEndAt, solo.FrontFadeInEndAt, Eps, "보행 앞 단계는 인원과 무관");
     }
 
     [Test]
@@ -226,7 +237,7 @@ public sealed class BossElevatorTimelineTests
     {
         BossElevatorTimeline t = Default();
         Assert.AreEqual(12f, t.HeightAt(0.0), Eps, "시작 = 위에서 대기");
-        Assert.AreEqual(12f, t.HeightAt(t.FocusAt), Eps, "포커스 동안도 위");
+        Assert.AreEqual(12f, t.HeightAt(t.FrontFadeInEndAt), Eps, "하강 대기 동안도 위");
         Assert.AreEqual(12f, t.HeightAt(t.DescendStartAt), Eps, "하강 시작");
         Assert.AreEqual(12f * (1f - 0.96875f), t.HeightAt(t.DescendStartAt + 2.1 * 0.5), Eps, "하강 중간 = OutQuint");
         Assert.AreEqual(0f, t.HeightAt(t.DoorOpenAt), Eps, "착지");
@@ -287,13 +298,13 @@ public sealed class BossElevatorTimelineTests
         Assert.AreEqual(1f, t.FadeAlphaAt(t.TeleportFrontAt), Eps, "순간이동 순간 = 완전 암전");
         Assert.AreEqual(1f, t.FadeAlphaAt(t.FrontFadeInAt - 0.01), Eps, "암전 유지");
         Assert.AreEqual(0.5f, t.FadeAlphaAt(t.FrontFadeInAt + 0.25), Eps, "페이드 인 중간");
-        Assert.AreEqual(0f, t.FadeAlphaAt(t.FocusAt), Eps, "포커스 = 다 밝아짐");
+        Assert.AreEqual(0f, t.FadeAlphaAt(t.FrontFadeInEndAt), Eps, "페이드 인 끝 = 다 밝아짐");
 
         // 0 → 1 → 0 이 한 번뿐 — 올라가다 내려가는 지점이 하나다(중간에 다시 어두워지지 않는다).
         float prev = 0f;
         int turns = 0;
         bool rising = true;
-        for (double e = 0.0; e <= t.FocusAt + 1e-6; e += 0.01)
+        for (double e = 0.0; e <= t.FrontFadeInEndAt + 1e-6; e += 0.01)
         {
             float a = t.FadeAlphaAt(e);
             if (rising && a < prev - 1e-5f) { rising = false; turns++; }
@@ -337,8 +348,9 @@ public sealed class BossElevatorTimelineTests
         s.frontFadeInDuration = 0f;
         var t = new BossElevatorTimeline(s, ClipOpen, ClipClose, Walkers, WalkDistance);
         Assert.AreEqual(0f, t.TeleportFrontAt, Eps);
-        Assert.AreEqual(0f, t.FocusAt, Eps, "곧바로 포커스");
-        Assert.AreEqual(BossElevatorPhase.Focus, t.PhaseAt(0.0), "0 길이 단계는 건너뛴다");
+        Assert.AreEqual(0f, t.CameraFocusAt, Eps, "곧바로 카메라 전환");
+        Assert.AreEqual(0f, t.FrontFadeInEndAt, Eps, "곧바로 하강 대기");
+        Assert.AreEqual(BossElevatorPhase.WaitDescend, t.PhaseAt(0.0), "0 길이 단계는 건너뛴다");
         Assert.AreEqual(0f, t.FadeAlphaAt(0.0), Eps, "암전 없음");
     }
 

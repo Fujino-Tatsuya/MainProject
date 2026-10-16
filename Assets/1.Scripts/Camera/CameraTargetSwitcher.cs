@@ -295,6 +295,8 @@ public class CameraTargetSwitcher : MonoBehaviour
 
         temporaryFollow = target;
         playerCamera.Follow = target;
+        // 컷 — 보스 엘리베이터는 암전 중에 넘기므로, 밝아질 때 이미 새 대상을 보고 있어야 한다(감쇠로 쓸고 지나가지 않게).
+        playerCamera.PreviousStateIsValid = false;
         if (IsInFallView)
         {
             ReturnToPlayerView();

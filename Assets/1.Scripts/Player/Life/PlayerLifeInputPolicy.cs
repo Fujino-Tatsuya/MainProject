@@ -1,3 +1,4 @@
+using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
@@ -20,6 +21,12 @@ public sealed class PlayerLifeInputPolicy : MonoBehaviour
     [SerializeField] private PlayerStateController stateController;
     [SerializeField] private PlayerSkillTargeting skillTargeting;
     [SerializeField] private PlayerEncounterLock encounterLock;
+
+    // [ElevatorFlow] 진단 — 엘리베이터 입력 잠금이 바뀐 순간만 한 줄 남긴다.
+    private bool lastLoggedElevatorLock;
+
+    private static double ServerTimeNow() =>
+        NetworkManager.Singleton != null ? NetworkManager.Singleton.ServerTime.Time : 0d;
 
     private void Awake()
     {
@@ -69,7 +76,11 @@ public sealed class PlayerLifeInputPolicy : MonoBehaviour
         ApplyCurrentAccess();
     }
 
-    private void ApplyCurrentAccess()
+    /// <summary>
+    /// 지금 생명주기 허용값과 연출 잠금을 합쳐 다시 적용한다. 다른 계통이 자기 임시 입력 잠금을 풀 때
+    /// <see cref="PlayerInputReader.SetInputEnabled"/>(true) 대신 이걸 부른다 — 그래야 그 사이 걸린 연출 잠금을 지우지 않는다.
+    /// </summary>
+    public void ApplyCurrentAccess()
     {
         if (lifeCycle == null)
             ResolveReferences();
@@ -88,6 +99,13 @@ public sealed class PlayerLifeInputPolicy : MonoBehaviour
             (encounterLock.IsCinematicLocked || encounterLock.IsCinematicInputLocked || encounterLock.IsCinematicHidden);
         bool allowsMovement = access.AllowsMovement && !cinematicLocked;
         bool allowsCombatInput = access.AllowsCombatInput && !cinematicLocked;
+
+        if (encounterLock != null && encounterLock.IsCinematicInputLocked != lastLoggedElevatorLock)
+        {
+            lastLoggedElevatorLock = encounterLock.IsCinematicInputLocked;
+            Edit.Log($"[ElevatorFlow] 오너 입력 적용 — t={ServerTimeNow():0.###} clientId={player.OwnerClientId} " +
+                     $"elevatorLock={lastLoggedElevatorLock} allowsMovement={allowsMovement}", this);
+        }
 
         if (!allowsCombatInput)
             CancelCombatActions();

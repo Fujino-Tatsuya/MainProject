@@ -6,9 +6,9 @@ using UnityEngine;
 public enum BossElevatorPhase
 {
     FrontFadeOut,   // t=0 — 카운트다운 끝, 서버가 입력 잠금. 화면이 검게 페이드 아웃. 엘리베이터는 위에서 대기
-    FrontBlackout,  // 완전 암전 — 서버가 참가자를 문 앞(FrontPoints)으로 옮긴다
-    FrontFadeIn,    // 문 앞에서 화면이 밝아진다
-    Focus,          // 카메라가 엘리베이터에 포커스 + 보행 지시, 하강 대기
+    FrontBlackout,  // 완전 암전 — 서버가 참가자를 문 앞(FrontPoints)으로 옮기고, 참가자 카메라가 엘리베이터로 넘어간다
+    FrontFadeIn,    // 문 앞에서 화면이 밝아진다(이미 엘리베이터를 보고 있다)
+    WaitDescend,    // 다 밝아짐 — 보행 지시, 하강 대기
     Descending,     // 위 → 착지 (OutQuint)
     DoorOpening,    // 문 Open 클립
     WalkingIn,      // 문 열린 채 — 참가자가 슬롯 순서(P1→P2→P3)대로 칸 안으로 걸어 들어간다
@@ -37,14 +37,14 @@ public struct BossElevatorTimingSettings
     [Tooltip("착지 위치 기준 하강 시작 높이(m). 0 이하 = 자동(프리팹에 놓인 칸 대기 높이 − 착지 높이)")]
     public float height;
 
-    [Tooltip("카운트다운 끝 → 화면이 검게 되는 시간(초). 끝나는 순간 참가자가 문 앞으로 옮겨진다")]
+    [Tooltip("카운트다운 끝 → 화면이 검게 되는 시간(초). 끝나는 순간 참가자가 문 앞으로 옮겨지고 카메라가 엘리베이터로 간다")]
     [Min(0f)] public float frontFadeOutDuration;
     [Tooltip("문 앞으로 옮긴 뒤 완전 암전을 유지하는 시간(초) — 순간이동 보간을 가린다")]
     [Min(0f)] public float frontBlackHold;
-    [Tooltip("문 앞에서 화면이 밝아지는 시간(초). 끝나는 순간 카메라가 엘리베이터로 가고 입력이 잠긴다")]
+    [Tooltip("문 앞에서 화면이 밝아지는 시간(초)")]
     [Min(0f)] public float frontFadeInDuration;
 
-    [Tooltip("카메라 포커스(입력 잠금) 후 하강 시작까지(초)")]
+    [Tooltip("문 앞 페이드 인이 끝난 뒤 하강 시작까지(초)")]
     [Min(0f)] public float waitBeforeDescend;
     [Tooltip("하강 시간(초) — OutQuint")]
     [Min(0f)] public float descendDuration;
@@ -135,9 +135,11 @@ public sealed class BossElevatorTimeline
 
     /// <summary>문 앞 순간이동 시각 = 페이드 아웃이 끝나 완전히 검은 순간.</summary>
     public float TeleportFrontAt { get; }
+    /// <summary>참가자 카메라가 엘리베이터(착지 중앙)로 넘어가는 시각 = 문 앞 순간이동과 같은 암전 순간 — 페이드 인 때 이미 엘리베이터를 보고 있다.</summary>
+    public float CameraFocusAt => TeleportFrontAt;
     public float FrontFadeInAt { get; }
-    /// <summary>카메라 엘리베이터 포커스·입력 잠금 시각 = 문 앞 페이드 인이 끝난 순간.</summary>
-    public float FocusAt { get; }
+    /// <summary>문 앞 페이드 인이 끝난 시각(<see cref="BossElevatorPhase.WaitDescend"/> 시작) — 서버가 보행을 지시한다.</summary>
+    public float FrontFadeInEndAt { get; }
     public float DescendStartAt { get; }
     public float DoorOpenAt { get; }
     /// <summary>문이 다 열린 시각(<see cref="BossElevatorPhase.WalkingIn"/> 시작).</summary>
@@ -173,8 +175,8 @@ public sealed class BossElevatorTimeline
 
         TeleportFrontAt = FrontFadeOutDuration;
         FrontFadeInAt = TeleportFrontAt + Mathf.Max(0f, settings.frontBlackHold);
-        FocusAt = FrontFadeInAt + FrontFadeInDuration;
-        DescendStartAt = FocusAt + Mathf.Max(0f, settings.waitBeforeDescend);
+        FrontFadeInEndAt = FrontFadeInAt + FrontFadeInDuration;
+        DescendStartAt = FrontFadeInEndAt + Mathf.Max(0f, settings.waitBeforeDescend);
         DoorOpenAt = DescendStartAt + DescendDuration;
         WalkInAt = DoorOpenAt + DoorOpenDuration;
         _firstWalkAt = WalkInAt + Mathf.Max(0f, settings.walkStartDelay);
@@ -204,7 +206,7 @@ public sealed class BossElevatorTimeline
             case BossElevatorPhase.FrontFadeOut: return 0f;
             case BossElevatorPhase.FrontBlackout: return TeleportFrontAt;
             case BossElevatorPhase.FrontFadeIn: return FrontFadeInAt;
-            case BossElevatorPhase.Focus: return FocusAt;
+            case BossElevatorPhase.WaitDescend: return FrontFadeInEndAt;
             case BossElevatorPhase.Descending: return DescendStartAt;
             case BossElevatorPhase.DoorOpening: return DoorOpenAt;
             case BossElevatorPhase.WalkingIn: return WalkInAt;
@@ -225,7 +227,7 @@ public sealed class BossElevatorTimeline
         if (elapsed >= WalkInAt) return BossElevatorPhase.WalkingIn;
         if (elapsed >= DoorOpenAt) return BossElevatorPhase.DoorOpening;
         if (elapsed >= DescendStartAt) return BossElevatorPhase.Descending;
-        if (elapsed >= FocusAt) return BossElevatorPhase.Focus;
+        if (elapsed >= FrontFadeInEndAt) return BossElevatorPhase.WaitDescend;
         if (elapsed >= FrontFadeInAt) return BossElevatorPhase.FrontFadeIn;
         if (elapsed >= TeleportFrontAt) return BossElevatorPhase.FrontBlackout;
         return BossElevatorPhase.FrontFadeOut;
@@ -239,7 +241,7 @@ public sealed class BossElevatorTimeline
             case BossElevatorPhase.FrontFadeOut:
             case BossElevatorPhase.FrontBlackout:
             case BossElevatorPhase.FrontFadeIn:
-            case BossElevatorPhase.Focus:
+            case BossElevatorPhase.WaitDescend:
                 return Height;
             case BossElevatorPhase.Descending:
                 return Height * (1f - EaseOutQuint(Progress(elapsed, DescendStartAt, DescendDuration)));
@@ -269,7 +271,7 @@ public sealed class BossElevatorTimeline
         if (elapsed < 0d) return 0f;
         if (elapsed >= BlackoutAt) return 1f;
         if (elapsed >= FadeOutStartAt) return Progress(elapsed, FadeOutStartAt, FadeOutDuration);
-        if (elapsed >= FocusAt) return 0f;
+        if (elapsed >= FrontFadeInEndAt) return 0f;
         if (elapsed >= FrontFadeInAt) return 1f - Progress(elapsed, FrontFadeInAt, FrontFadeInDuration);
         if (elapsed >= TeleportFrontAt) return 1f;
         return Progress(elapsed, 0f, FrontFadeOutDuration);

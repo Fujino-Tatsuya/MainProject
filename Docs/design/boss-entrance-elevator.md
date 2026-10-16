@@ -6,16 +6,16 @@
 
 ## 1. 흐름
 
-발판 → 카운트다운 → **입력 잠금 · 페이드 아웃** → (암전 중 문 앞 FrontPoints 로 이동) → **페이드 인** → **카메라가 엘리베이터에 포커스** →
+발판 → 카운트다운 → **입력 잠금 · 페이드 아웃** → (암전 중 문 앞 FrontPoints 로 이동 + **카메라가 엘리베이터로 컷**) → **페이드 인**(이미 엘리베이터를 보고 있음) →
 **하강** → **문 열림** → **P1 → P2 → P3 순서로 걸어 들어감**(Walk 애니, 걷는 동안 실루엣 꺼짐) → **문 닫힘** → **상승**(숨김, 카메라는 칸을 따라감) →
 페이드 아웃 → 완전 암전 → 보스방 도착(도착 ACK → 보스 등장 연출, 기존 그대로).
 
 | 단계(`BossElevatorPhase`) | 시작 | 누가 무엇을 |
 |---|---|---|
 | `FrontFadeOut` | 0(카운트다운 끝) | **서버**: 입력 잠금(보이는 채로·무적). 참가자 화면이 검게 |
-| `FrontBlackout` | `TeleportFrontAt` | **서버**: 참가자를 슬롯 순서대로 FrontPoints 로 순간이동 |
+| `FrontBlackout` | `TeleportFrontAt` = `CameraFocusAt` | **서버**: 참가자를 슬롯 순서대로 FrontPoints 로 순간이동. **각 피어**: 참가자 카메라가 착지 중앙으로 컷 |
 | `FrontFadeIn` | `FrontFadeInAt` | 화면이 밝아짐(아웃 → 암전 → 인이 끊김 없이 한 번) |
-| `Focus` | `FocusAt` | **서버**: 오너에게 보행 지시. **각 피어**: 참가자 카메라가 착지 중앙으로 |
+| `WaitDescend` | `FrontFadeInEndAt` | **서버**: 오너에게 보행 지시. 하강 대기(`waitBeforeDescend`) — 별도 카메라 포커스 대기는 없다 |
 | `Descending` | `DescendStartAt` | 칸 하강(OutQuint) |
 | `DoorOpening` | `DoorOpenAt` | 문 Open 클립 |
 | `WalkingIn` | `WalkInAt` | 슬롯 s 가 `WalkStartAt(s)` 에 걷기 시작해 `WalkDuration` 뒤 칸 안 도착. 걷기 시작하면 그 플레이어 실루엣 꺼짐 |
@@ -34,8 +34,8 @@
 |---|---|---|---|
 | `_timing.frontFadeOutDuration` | 0.4 | (카운트다운 직전 0.3, `BossTeleportManager.fadeOutSeconds`) | 카운트다운 끝 → 완전 암전(초) |
 | `_timing.frontBlackHold` | 0.2 | — | 문 앞 순간이동 뒤 암전 유지(초) |
-| `_timing.frontFadeInDuration` | 0.5 | (0.5, `fadeInSeconds`) | 문 앞에서 밝아짐(초). 끝 = 포커스·보행 지시 |
-| `_timing.waitBeforeDescend` | 0.5 | 0.5 | 포커스 → 하강 시작(초) |
+| `_timing.frontFadeInDuration` | 0.5 | (0.5, `fadeInSeconds`) | 문 앞에서 밝아짐(초). 끝 = 보행 지시 |
+| `_timing.waitBeforeDescend` | 0.5 | 0.5 | 페이드 인 끝 → 하강 시작(초) |
 | `_timing.descendDuration` | **2.1** | 1.2 | 하강 시간(초, 1.75배) |
 | `_timing.doorOpenDuration` | 0 | 0 | 문 열림(초). 0 = Open 클립 길이(1.76) |
 | `_timing.walkStartDelay` | 0.2 | — | 문 다 열림 → P1 출발(초) |
@@ -50,12 +50,12 @@
 | `_insideSpread` | 0.6 | — | 칸 안 도착 지점 간격 배율(문 앞 지점 배치를 칸 중앙 기준으로 줄임, 0 = 전원 정중앙) |
 
 - 기술 값 `_timing.height`(0 = 자동, 칸 대기 높이)·`_landedLocalY` 는 `[DataTableIgnore]`.
-- 3인 기준 총 길이: 포커스 +1.1 · 하강 +1.6 · 문 열림 +3.7 · P1 출발 +5.66 · P3 도착 +8.65 · 문 닫힘 +9.15 · 상승 +10.83 · 암전 +13.43초(1인 +12.23).
+- 3인 기준 총 길이: 입력 잠금 0 · 문 앞 이동·카메라 전환 +0.4 · 페이드 인 +0.6 · 페이드 인 끝(보행 지시) +1.1 · 하강 +1.6 · 문 열림 +3.7 · P1 출발 +5.66 · P3 도착 +8.65 · 문 닫힘 +9.15 · 상승 +10.83 · 암전 +13.43초(1인 +12.23).
 - 시트에 행이 생기기 전(병합 Export 전)에는 프리팹 값으로 돈다(data-table.md §3).
 
 ## 3. 구현 결정
 
-- **보행 = 오너 권한 연출 이동.** 서버가 포커스 시각에 오너에게 `ElevatorWalkOwnerClientRpc(목표, 연출 시작 시각, 출발 시각, 시간)` 를 보내고,
+- **보행 = 오너 권한 연출 이동.** 서버가 페이드 인 끝(`FrontFadeInEndAt`)에 오너에게 `ElevatorWalkOwnerClientRpc(목표, 연출 시작 시각, 출발 시각, 시간)` 를 보내고,
   오너가 `FixedUpdate` 에서 `PlayerMotor.SetPoseTarget` 로 지금 자리 → 칸 안 지점을 **직선 보간**한다(시간 기준 — 출발 자리가 문 앞에서 조금 어긋나 있어도 같은 시각에 도착).
   포즈 목표는 충돌 해석을 거치지 않아 문틀·칸 벽·다른 플레이어에 걸리지 않고, 매 틱 수직 속도 0 이라 떨어지지 않는다.
   방향은 `PlayerMovement.RotateImmediately`, Walk 애니는 `Player.SetAnimatorMoving`(IsMoving) — 위치는 오너 NetworkTransform, 애니는 NetworkAnimator(오너)로 복제된다.
@@ -66,11 +66,14 @@
   페이드 아웃·문 앞 이동·페이드 인 동안에도 이동·공격·스킬·대시가 막힌다. 걸기 = `TeleportAfter` 가 시작 시각을 복제한 직후 `LockParticipants`,
   풀기 = `EndElevatorServer` 한 곳(도착 완료는 `AlivePlayersArrived` → 보스 등장 잠금이 걸린 **뒤** 부르므로 풀렸다 다시 걸리는 틈이 없다).
   리그가 없어 곧바로 이동하는 경로는 잠그지 않는다.
+  🔴 다른 계통이 자기 임시 입력 잠금을 풀 때는 `PlayerInputReader.SetInputEnabled(true)` 가 아니라 `PlayerLifeInputPolicy.ApplyCurrentAccess()` 로 푼다.
+  예전 `PlayerFallRecovery.CancelRecoveryOwnerRpc` 가 직접 켜서, 문 앞 이동(`TeleportParticipant` → `CancelRecoveryServer`, 낙하 중이 아니어도 항상 보냄)이
+  엘리베이터 입력 잠금을 +0.4초에 지웠다(할 일 46 후속 2).
 - **상승 때는 숨긴다(칸과 함께 옮기지 않는다).** 칸은 각 피어가 로컬 시간표로 움직이고 플레이어는 오너 NetworkTransform 보간(지연)으로 보인다 —
   14m/s 로 올라가는 칸에 태우면 원격 화면에서 플레이어가 칸 바닥을 뚫고 처지거나 떨린다. 문이 다 닫힌 순간 숨기므로 보이는 차이가 없다.
 - **실루엣**: 각 피어가 `WalkStartAt(슬롯)` 부터 `PlayerSilhouetteTag.SetSuppressed(true)`, 연출이 끝나면(시작 시각 0 — 도착 완료·도착 무효·재도전·디스폰) 되켠다(보는 사람 기준 색 그대로).
 - **페이드 번쩍임 수정**: 문 앞 이동 RPC 가 따로 "암전 → 페이드 인" 을 걸던 것을 도착 이동에만 남겼다. 엘리베이터가 있으면 카운트다운 직전 암전도 하지 않는다 — 시간표 페이드 하나로 이어진다.
-- **카메라**: 포커스 ~ 상승 전 = 착지 중앙(`BossElevatorRig.FocusPoint`, 칸은 위에서 내려오므로), 상승 ~ 도착 = 칸. 도착·연출 끝에 플레이어로 컷 복귀.
+- **카메라**: 문 앞 이동 암전(`CameraFocusAt` = `TeleportFrontAt`, 컷 — `CameraTargetSwitcher.SetTemporaryFollow` 가 감쇠 없이 넘긴다) ~ 상승 전 = 착지 중앙(`BossElevatorRig.FocusPoint`, 칸은 위에서 내려오므로), 상승 ~ 도착 = 칸. 도착·연출 끝에 플레이어로 컷 복귀.
 
 ## 4. 다른 경로와의 관계
 
