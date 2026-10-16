@@ -86,6 +86,8 @@ public static class AssassinShellAuthoring
     // 할 일 47-1 "모든 애니메이션을 끝까지 재생한 뒤 전이" — 행동 종료 End 이벤트와 시간으로 넘어가는 전이는 클립 끝에서.
     private const float ClipEndTime = 1f;
     private const float AutoTransitionBlend = 0.08f;
+    // 평타 End 는 끝에서 살짝 앞(97%) — 정확히 끝(1.0)에 두면 Idle 복귀 전이와 같은 프레임에 겹쳐 다음 타가 한 박자 멈춰 보였다(10-16).
+    private const float AttackEndTime = 0.97f;
 
     private static readonly string[] WaveClips =
     {
@@ -221,18 +223,18 @@ public static class AssassinShellAuthoring
         // End 는 클립 끝(할 일 47-1) — 다음 타·Idle 복귀가 클립을 끝까지 재생한 뒤에만 일어난다.
         foreach (string clipName in WaveClips)
             ReplaceEvents(clipName, DefaultAttackEvent(0.40f, DefaultAttackAnimationEventType.Hit),
-                DefaultAttackEvent(ClipEndTime, DefaultAttackAnimationEventType.End));
+                DefaultAttackEvent(AttackEndTime, DefaultAttackAnimationEventType.End));
 
         // A7 연결 자리까지 같은 메뉴가 준비한다. 실제 타격 프레임은 Play에서 튜닝한다.
         ReplaceEvents("Combo_Attack_02_01",
             DefaultAttackEvent(0.40f, DefaultAttackAnimationEventType.Hit),
-            DefaultAttackEvent(ClipEndTime, DefaultAttackAnimationEventType.End));
+            DefaultAttackEvent(AttackEndTime, DefaultAttackAnimationEventType.End));
         ReplaceEvents("Speed_Attack_Loop",
             DefaultAttackEvent(0.15f, DefaultAttackAnimationEventType.Hit),
             DefaultAttackEvent(0.35f, DefaultAttackAnimationEventType.Hit),
             DefaultAttackEvent(0.55f, DefaultAttackAnimationEventType.Hit),
             DefaultAttackEvent(0.75f, DefaultAttackAnimationEventType.Hit),
-            DefaultAttackEvent(ClipEndTime, DefaultAttackAnimationEventType.End));
+            DefaultAttackEvent(AttackEndTime, DefaultAttackAnimationEventType.End));
 
         // Q 돌진은 돌진 종료(OnTick)가, 간파는 skillDuration 타이머가 먼저 끝낸다 — 클립보다 훨씬 짧아 End 는 안전망이다(47-1 예외).
         ReplaceEvents("Combo_Attack_02_04", SkillEvent(0.40f, SkillAnimationEventType.Hit), SkillEvent(0.85f, SkillAnimationEventType.End));
