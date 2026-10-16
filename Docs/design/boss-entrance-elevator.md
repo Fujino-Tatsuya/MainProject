@@ -29,26 +29,48 @@
 
 ## 2. 수치 (데이터 테이블 `Map` 시트 · 대상 `ZoneS_typeBossEnter` · 타입 `BossElevatorRig`)
 
-| 필드 | 기본값 | 이전 | 의미 |
-|---|---|---|---|
-| `_timing.frontFadeOutDuration` | 0.4 | (카운트다운 직전 0.3, `BossTeleportManager.fadeOutSeconds`) | 카운트다운 끝 → 완전 암전(초) |
-| `_timing.frontBlackHold` | 0.2 | — | 문 앞 순간이동 뒤 암전 유지(초) |
-| `_timing.frontFadeInDuration` | 0.5 | (0.5, `fadeInSeconds`) | 문 앞에서 밝아짐(초). 끝 = 보행 지시 |
-| `_timing.descendDelay` | **0** | (`waitBeforeDescend` 0.5 — 페이드 인 끝 기준, 이름·의미 변경) | 문 앞 이동(암전·카메라 전환) → 하강 시작(초). 암전 유지(0.2)보다 길면 밝아질 때 칸이 아직 멈춰 있다 |
-| `_timing.descendDuration` | **2.5** | 1.2 → 2.1 | 하강 시간(초). 하강 거리 20.14m(아래) 기준 평균 8.1m/s·출발 순간 최대 40m/s(OutQuint = 5H/T) |
-| `_timing.doorOpenDuration` | 0 | 0 | 문 열림(초). 0 = Open 클립 길이(1.76) |
-| `_timing.walkStartDelay` | 0.2 | — | 문 다 열림 → P1 출발(초) |
-| `_timing.walkInterval` | 0.6 | — | 다음 사람 출발 간격(초) |
-| `_timing.walkSpeed` | 3 | — | 걷는 속도(m/s). 보행 시간 = 가장 먼 경로(현재 5.37m) ÷ 속도 = 1.79초 |
-| `_timing.closeDelayAfterWalk` | 0.5 | (`closeDelayAfterVanish` 1.5 — 삭제) | 마지막 도착 → 문 닫힘(초) |
-| `_timing.doorCloseDuration` | 0 | 0 | 문 닫힘(초). 0 = Close 클립 길이(1.68) |
-| `_timing.ascendDuration` | **2.6** | 1.5 | 상승 가속 시간(초) |
-| `_timing.ascendSpeed` | **14** | 24 | 가속 뒤 상승 속도(m/s) |
-| `_timing.fadeOutDelay` | **1** | 0 | 상승 시작 → 페이드 아웃(초) |
-| `_timing.fadeOutDuration` | **1.6** | 1.5 | 페이드 아웃(초). 상승이 보이는 시간 1.5 → 2.6초(약 1.7배) |
-| `_insideSpread` | 0.6 | — | 칸 안 도착 지점 간격 배율(문 앞 지점 배치를 칸 중앙 기준으로 줄임, 0 = 전원 정중앙) |
+연출의 시간·속도·지연·거리는 전부 **`ZoneS_typeBossEnter` 프리팹 → `BossElevatorRig` 인스펙터**에 단계 순서대로 묶여 있다(할 일 46 후속 8).
+보스룸 도착 뒤 값(도착 페이드 인·페이드 색·도착 ACK)만 리그 없는 경로와 함께 쓰여 **`BossTeleportManager` 인스펙터**(`4.MapScene` 의 `BossTeleportManager.prefab`)에 있다.
+t = 0 은 카운트다운 끝(연출 시작). 괄호 = 이 수치로 짠 3인 시간표의 그 순간.
 
-- 기술 값 `_timing.height`(0 = 자동, 칸 대기 높이)·`_landedLocalY` 는 `[DataTableIgnore]`.
+| 인스펙터 묶음 · 필드 | 의미(기준 시각) | 단위 | 기본값 |
+|---|---|---|---|
+| **암전 · 문 앞 이동** | | | |
+| `_timing.frontFadeOutDuration` | t=0 → 완전 암전. 끝 = 문 앞 이동·카메라가 칸으로 컷(`TeleportFrontAt` = `CameraFocusAt`, +0.4) | 초 | 0.4 |
+| `_timing.frontBlackHold` | 문 앞 이동 → 화면이 밝아지기 시작(+0.6) — 순간이동 보간을 가린다 | 초 | 0.2 |
+| `_timing.frontFadeInDuration` | 밝아지기 시작 → 다 밝아짐(+1.1). 끝 = 서버 보행 지시(출발 시각은 아래 보행 묶음) | 초 | 0.5 |
+| **하강** | | | |
+| `_timing.height` | 착지 기준 하강 시작 높이. 0 이하 = 자동(칸 대기 localY − `_landedLocalY` = 20.14m). `[DataTableIgnore]` | m | 0 |
+| `_timing.descendDelay` | 문 앞 이동 → 하강 시작(+0.4). 암전 유지보다 길면 밝아질 때 칸이 아직 멈춰 있다 | 초 | 0 |
+| `_timing.descendDuration` | 하강 시작 → 착지·문 열림 시작(+2.9). 평균 하강 속도 = 높이 ÷ 이 값(20.14m → 8.1m/s, OutQuint 출발 순간 최대 5H/T = 40m/s) | 초 | 2.5 |
+| `_timing.descendEase` | 하강 이징(진행도 → 내려온 비율). Back·Elastic·Bounce 는 착지 아래로 넘친다. enum 이라 시트에 안 나감(인스펙터 전용) | `Ease` | OutQuint |
+| **문 열림** | | | |
+| `_timing.doorOpenDuration` | 착지 → 문 다 열림(+4.66). 0 이하 = Open 클립 길이(1.76) | 초 | 0 |
+| **보행 (P1 → P2 → P3)** | | | |
+| `_timing.walkStartDelay` | 문 다 열림 → P1 출발(+4.86) | 초 | 0.2 |
+| `_timing.walkInterval` | 앞사람 출발 → 다음 사람 출발 | 초 | 0.6 |
+| `_timing.walkSpeed` | 걷는 속도. 보행 시간 = 가장 먼 경로(현재 5.37m) ÷ 속도 = 1.79초(전원 같은 시간) | m/s | 3 |
+| `_insideSpread`(리그, `보행 경로` 묶음) | 칸 안 도착 지점 간격 배율 — 문 앞 지점 배치를 칸 중앙 기준으로 줄임(0 = 전원 정중앙). 보행 거리·시간도 바뀐다 | 배 | 0.6 |
+| **문 닫힘** | | | |
+| `_timing.closeDelayAfterWalk` | 마지막 사람 도착(+7.85) → 문 닫힘 시작(+8.35) | 초 | 0.5 |
+| `_timing.doorCloseDuration` | 문 닫힘 시작 → 다 닫힘 = 숨김·상승 시작(+10.03). 0 이하 = Close 클립 길이(1.68) | 초 | 0 |
+| **상승** | | | |
+| `_timing.ascendDuration` | 상승 시작 → 가속 끝(InCirc 로 0 → 상승 속도). 0 = 처음부터 등속 | 초 | 2.6 |
+| `_timing.ascendSpeed` | 가속 뒤 유지 속도(끝 높이 없음) | m/s | 14 |
+| **페이드 아웃 → 보스룸 이동** | | | |
+| `_timing.fadeOutDelay` | 상승 시작 → 페이드 아웃 시작(+11.03) | 초 | 1 |
+| `_timing.fadeOutDuration` | 페이드 아웃 시작 → 완전 암전 = 서버 보스룸 이동(+12.63) | 초 | 1.6 |
+| **`BossTeleportManager`**(공유) | | | |
+| `fadeInSeconds` | 보스룸 도착 RPC 받은 순간 → 다 밝아짐(리그 없는 경로와 공유) | 초 | 0.5 |
+| `fadeColor` | 모든 이동 페이드 색(시간표 페이드 포함) | 색 | 검정 |
+| `arrivalAckTimeoutSeconds` | **서버 전용** — 보스룸 이동 → 전원 ACK 대기 한도(넘으면 도착 무효) | 초 | 5 |
+| `fadeOutSeconds` | 리그 **없는** 경로 전용 카운트다운 직전 암전 — 엘리베이터는 안 씀 | 초 | 0.3 |
+
+- 고정(노출 안 함): 상승 가속 이징 **InCirc** — 상승 높이를 닫힌 식(∫InCirc = 1 − π/4)으로 적분해 칸 위치를 내므로 다른 이징으로 바꾸면 적분식을 새로 짜야 한다. 카메라 컷 시각 = 문 앞 이동 시각(따로 값 없음), 서버 보행 지시 시각 = 페이드 인 끝.
+- **서버·클라 같은 시간표**: 수치는 복제하지 않는다. 서버는 시작 시각(`_elevatorStartAt`)·참가자 목록만 복제하고, 각 피어가 자기 로컬 `ZoneS_typeBossEnter` 인스턴스에서 `BuildTimeline(인원)` 을 짠다 — 같은 빌드·같은 데이터 모드면 같은 값.
+  서버만 쓰는 시각(문 앞 이동·보행 지시·숨김·보스룸 이동)도 서버 자신의 리그 시간표다. 보행은 서버가 출발 시각·시간을 RPC 로 보내 오너가 그대로 따른다.
+  🔴 MPPM 에서 인스펙터 값을 Play 중에 고치면 그 피어만 바뀐다 — 프리팹을 저장한 뒤 Play 를 다시 시작할 것.
+- 기술 값 `_timing.height`(0 = 자동, 칸 대기 높이)·`_landedLocalY` 는 `[DataTableIgnore]`. `_timing.descendEase` 는 enum 이라 시트로 나가지 않는다(인스펙터 값이 Play·빌드 공통).
 - **하강 거리 = 칸 대기 localY − `_landedLocalY`**(리그 `Awake`·`BuildTimeline` 에서 프리팹에 놓인 칸 자리를 읽는다 — 코드에 높이 상수 없음).
   2026-10-16 사용자 배치: 칸 `PF_Prop_object_MV_bossroomenter` localY 20.69(이전 10.99) − 0.55 = **20.14m**(이전 10.44m). `[Elevator]` 루트 y 0.1 은 칸·`floor_charger` 가 같이 올라가 착지 높이 0.55(리그 기준)는 그대로.
 - 시간표(3인): 입력 잠금 0 · 문 앞 이동·카메라 전환·**하강** +0.4 · 페이드 인 +0.6(칸 높이 13.3m, 34% 내려옴) · 페이드 인 끝(보행 지시) +1.1(3.9m 남음) · 착지·문 열림 +2.9 · 문 다 열림 +4.66 · P1 출발 +4.86 · P3 도착 +7.85 · 문 닫힘 +8.35 · 상승 +10.03 · 페이드 아웃 +11.03 · 암전 +12.63초.

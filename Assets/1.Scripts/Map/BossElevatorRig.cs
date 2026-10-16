@@ -39,10 +39,12 @@ public sealed class BossElevatorRig : MonoBehaviour
     [DataTableIgnore]
     [Tooltip("문이 열리는 착지 높이(칸 localPosition.y) — 칸 밑면이 floor_charger 판에 얹히는 값")]
     [SerializeField] float _landedLocalY = 0.55f;
+    [Header("보행 경로")]
     [Tooltip("플레이어 순간이동 지점 — 문 앞. 슬롯(P1, P2, P3) 순서")]
     [SerializeField] Transform[] _frontPoints = Array.Empty<Transform>();
-    [Tooltip("칸 안 도착 지점 간격 배율 — 문 앞 지점들의 서로 간 배치를 칸 중앙 기준으로 이 배만큼 줄여 세운다. 0 = 전원 정중앙")]
+    [Tooltip("칸 안 도착 지점 간격 배율 — 문 앞 지점들의 서로 간 배치를 칸 중앙 기준으로 이 배만큼 줄여 세운다. 0 = 전원 정중앙. 보행 거리(→ 보행 시간)도 따라 바뀐다")]
     [SerializeField, Min(0f)] float _insideSpread = 0.6f;
+    [Tooltip("연출 시간표 — 단계 순서대로(암전·문 앞 이동 → 하강 → 문 → 보행 → 상승 → 페이드 아웃). 서버·클라가 각자 이 프리팹 값으로 같은 시간표를 짠다")]
     [SerializeField] BossElevatorTimingSettings _timing = BossElevatorTimingSettings.Default;
 
     BossElevatorTimeline _timeline;

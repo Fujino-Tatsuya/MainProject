@@ -11,7 +11,7 @@ public enum BossElevatorPhase
 {
     FrontFadeOut,   // t=0 — 카운트다운 끝, 서버가 입력 잠금. 화면이 검게 페이드 아웃. 엘리베이터는 위에서 대기
     WaitDescend,    // 완전 암전 — 서버가 참가자를 문 앞(FrontPoints)으로 옮기고 카메라가 칸으로 넘어간다. 하강 대기(기본 0초)
-    Descending,     // 위 → 착지 (OutQuint). 암전 중에 시작 — 화면이 밝아질 때 이미 내려오는 중
+    Descending,     // 위 → 착지 (descendEase, 기본 OutQuint). 암전 중에 시작 — 화면이 밝아질 때 이미 내려오는 중
     DoorOpening,    // 문 Open 클립
     WalkingIn,      // 문 열린 채 — 참가자가 슬롯 순서(P1→P2→P3)대로 칸 안으로 걸어 들어간다
     DoorClosing,    // 문 Close 클립
@@ -30,57 +30,71 @@ public enum BossElevatorDoorState
 }
 
 /// <summary>
-/// 보스 엘리베이터 연출 수치. 문 열림/닫힘 시간이 0 이하면 문 클립 길이를, 높이가 0 이하면 칸 대기 높이를 쓴다(<see cref="BossElevatorRig"/> 가 채운다).
+/// 보스 엘리베이터 연출 수치 — 인스펙터에서 단계 순서대로 묶는다(t = 0 은 카운트다운 끝).
+/// 문 열림/닫힘 시간이 0 이하면 문 클립 길이를, 높이가 0 이하면 칸 대기 높이를 쓴다(<see cref="BossElevatorRig"/> 가 채운다).
+/// 보스룸 도착 뒤 페이드 인·페이드 색·도착 ACK 타임아웃은 리그 없는 경로와 함께 쓰는 값이라 <see cref="BossTeleportManager"/> 인스펙터에 있다.
 /// </summary>
 [Serializable]
 public struct BossElevatorTimingSettings
 {
+    [Header("암전 · 문 앞 이동 (t=0 = 카운트다운 끝)")]
+    [Tooltip("t=0(카운트다운 끝) → 화면이 완전히 검게 되는 시간(초). 끝나는 순간 = 문 앞 이동: 참가자가 문 앞으로 옮겨지고 카메라가 엘리베이터로 간다")]
+    [Min(0f)] public float frontFadeOutDuration;
+    [Tooltip("문 앞 이동 뒤 완전 암전을 유지하는 시간(초) — 순간이동 보간을 가린다. 끝나는 순간 화면이 밝아지기 시작")]
+    [Min(0f)] public float frontBlackHold;
+    [Tooltip("암전 유지가 끝난 뒤 화면이 밝아지는 시간(초). 끝나는 순간 서버가 보행을 지시한다(실제 걷기 시작은 보행 묶음 기준)")]
+    [Min(0f)] public float frontFadeInDuration;
+
+    [Header("하강")]
     [DataTableIgnore]
     [Tooltip("착지 위치 기준 하강 시작 높이(m). 0 이하 = 자동(프리팹에 놓인 칸 대기 높이 − 착지 높이)")]
     public float height;
-
-    [Tooltip("카운트다운 끝 → 화면이 검게 되는 시간(초). 끝나는 순간 참가자가 문 앞으로 옮겨지고 카메라가 엘리베이터로 간다")]
-    [Min(0f)] public float frontFadeOutDuration;
-    [Tooltip("문 앞으로 옮긴 뒤 완전 암전을 유지하는 시간(초) — 순간이동 보간을 가린다")]
-    [Min(0f)] public float frontBlackHold;
-    [Tooltip("문 앞에서 화면이 밝아지는 시간(초)")]
-    [Min(0f)] public float frontFadeInDuration;
-
     [Tooltip("문 앞 이동(완전 암전·카메라 전환) → 하강 시작(초). 0 = 그 순간 바로. 암전 유지보다 길면 화면이 밝아질 때 칸이 아직 멈춰 있다")]
     [Min(0f)] public float descendDelay;
-    [Tooltip("하강 시간(초) — OutQuint")]
+    [Tooltip("하강 시작 → 착지(초). 평균 하강 속도 = 높이 ÷ 이 값. 착지 순간 문이 열리기 시작한다")]
     [Min(0f)] public float descendDuration;
-    [Tooltip("문 열림 시간(초). 0 이하 = Open 클립 길이")]
+    [Tooltip("하강 이징(진행도 → 내려온 비율). 기본 OutQuint = 처음 빠르고 착지 직전 느리게. Back·Elastic·Bounce 는 착지 높이 아래로 넘친다")]
+    public Ease descendEase;
+
+    [Header("문 열림")]
+    [Tooltip("착지 → 문이 다 열림(초). 0 이하 = Open 클립 길이")]
     public float doorOpenDuration;
 
-    [Tooltip("문이 다 열린 뒤 첫 사람(P1)이 걷기 시작할 때까지(초)")]
+    [Header("보행 (P1 → P2 → P3)")]
+    [Tooltip("문이 다 열린 순간 → 첫 사람(P1)이 걷기 시작(초)")]
     [Min(0f)] public float walkStartDelay;
-    [Tooltip("다음 사람이 걷기 시작하는 간격(초) — P1 → P2 → P3")]
+    [Tooltip("앞사람이 걷기 시작한 순간 → 다음 사람이 걷기 시작(초)")]
     [Min(0f)] public float walkInterval;
-    [Tooltip("걷는 속도(m/s). 한 사람의 보행 시간 = 가장 먼 문 앞 지점 → 칸 안 지점 거리 ÷ 이 값")]
+    [Tooltip("걷는 속도(m/s). 한 사람의 보행 시간 = 가장 먼 문 앞 지점 → 칸 안 지점 거리 ÷ 이 값(전원 같은 시간). 칸 안 지점 간격은 리그의 _insideSpread")]
     [Min(0.1f)] public float walkSpeed;
-    [Tooltip("마지막 사람이 칸 안에 도착한 뒤 문 닫힘 시작까지(초)")]
+
+    [Header("문 닫힘")]
+    [Tooltip("마지막 사람이 칸 안에 도착한 순간 → 문 닫힘 시작(초)")]
     [Min(0f)] public float closeDelayAfterWalk;
-    [Tooltip("문 닫힘 시간(초). 0 이하 = Close 클립 길이")]
+    [Tooltip("문 닫힘 시작 → 다 닫힘(초). 0 이하 = Close 클립 길이. 다 닫힌 순간 참가자를 숨기고 상승을 시작한다")]
     public float doorCloseDuration;
 
-    [Tooltip("상승 가속 시간(초) — 속도를 InCirc 로 0 → 상승 속도까지 올린다. 0 = 처음부터 상승 속도")]
+    [Header("상승")]
+    [Tooltip("상승 가속 시간(초) — 문이 다 닫힌 순간부터 속도를 InCirc 로 0 → 상승 속도까지 올린다. 0 = 처음부터 상승 속도")]
     [Min(0f)] public float ascendDuration;
     [Tooltip("가속이 끝난 뒤 유지하는 상승 속도(m/s) — 끝 높이 없이 계속 올라간다")]
     [Min(0f)] public float ascendSpeed;
-    [Tooltip("상승 시작 후 화면 페이드 아웃 시작까지(초)")]
+
+    [Header("페이드 아웃 → 보스룸 이동")]
+    [Tooltip("상승 시작(문이 다 닫힌 순간) → 화면 페이드 아웃 시작(초)")]
     [Min(0f)] public float fadeOutDelay;
-    [Tooltip("검은 화면 페이드 아웃 시간(초) — 끝나는 순간이 Blackout")]
+    [Tooltip("검은 화면 페이드 아웃 시간(초) — 끝나는 순간 완전 암전(Blackout): 서버가 보스룸으로 옮기고 리그는 대기 자리로. 그 뒤 페이드 인은 BossTeleportManager 의 fadeInSeconds")]
     [Min(0f)] public float fadeOutDuration;
 
     public static BossElevatorTimingSettings Default => new BossElevatorTimingSettings
     {
-        height = 0f,
         frontFadeOutDuration = 0.4f,
         frontBlackHold = 0.2f,
         frontFadeInDuration = 0.5f,
+        height = 0f,
         descendDelay = 0f,
         descendDuration = 2.5f,
+        descendEase = Ease.OutQuint,
         doorOpenDuration = 0f,
         walkStartDelay = 0.2f,
         walkInterval = 0.6f,
@@ -122,6 +136,7 @@ public sealed class BossElevatorTimeline
     public float FrontFadeOutDuration { get; }
     public float FrontFadeInDuration { get; }
     public float DescendDuration { get; }
+    public Ease DescendEase { get; }
     public float DoorOpenDuration { get; }
     public float DoorCloseDuration { get; }
     public float AscendAccelDuration { get; }
@@ -172,6 +187,7 @@ public sealed class BossElevatorTimeline
         FrontFadeOutDuration = Mathf.Max(0f, settings.frontFadeOutDuration);
         FrontFadeInDuration = Mathf.Max(0f, settings.frontFadeInDuration);
         DescendDuration = Mathf.Max(0f, settings.descendDuration);
+        DescendEase = settings.descendEase;
         DoorOpenDuration = Mathf.Max(0f, settings.doorOpenDuration > 0f ? settings.doorOpenDuration : clipOpenSeconds);
         DoorCloseDuration = Mathf.Max(0f, settings.doorCloseDuration > 0f ? settings.doorCloseDuration : clipCloseSeconds);
         AscendAccelDuration = Mathf.Max(0f, settings.ascendDuration);
@@ -248,7 +264,7 @@ public sealed class BossElevatorTimeline
             case BossElevatorPhase.WaitDescend:
                 return Height;
             case BossElevatorPhase.Descending:
-                return Height * (1f - EaseOutQuint(Progress(elapsed, DescendStartAt, DescendDuration)));
+                return Height * (1f - Easing.Evaluate(DescendEase, Progress(elapsed, DescendStartAt, DescendDuration)));
             case BossElevatorPhase.Ascending:
             case BossElevatorPhase.FadingOut:
             case BossElevatorPhase.Blackout:

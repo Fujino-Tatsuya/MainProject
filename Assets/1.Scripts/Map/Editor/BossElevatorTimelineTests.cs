@@ -300,6 +300,18 @@ public sealed class BossElevatorTimelineTests
     }
 
     [Test]
+    public void Descent_EaseFromSettings()
+    {
+        Assert.AreEqual(EuniTween.Ease.OutQuint, BossElevatorTimingSettings.Default.descendEase, "기본 = OutQuint(할 일 46 후속 8 이전과 같음)");
+
+        BossElevatorTimingSettings s = Settings();
+        s.descendEase = EuniTween.Ease.Linear;
+        var t = new BossElevatorTimeline(s, ClipOpen, ClipClose, Walkers, WalkDistance);
+        Assert.AreEqual(6f, t.HeightAt(t.DescendStartAt + 2.5 * 0.5), Eps, "Linear 하강 중간 = 절반 높이");
+        Assert.AreEqual(Default().DoorOpenAt, t.DoorOpenAt, Eps, "이징은 단계 시각을 바꾸지 않는다");
+    }
+
+    [Test]
     public void Ascent_AcceleratesThenKeepsSpeed_NoCeiling()
     {
         BossElevatorTimeline t = Default();

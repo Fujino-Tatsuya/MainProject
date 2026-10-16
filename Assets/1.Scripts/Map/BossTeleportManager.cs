@@ -38,7 +38,7 @@ public class BossTeleportManager : NetworkBehaviour
     [SerializeField] private Transform[] arrivalPoints;
 
     [Header("도착 ACK")]
-    [Tooltip("이 시간 안에 전원 ACK가 오지 않으면 전투를 강행하지 않고 실패로 복구한다.")]
+    [Tooltip("서버 전용. 보스룸 이동(엘리베이터면 Blackout 순간) 뒤 이 시간(초) 안에 전원 ACK가 오지 않으면 전투를 강행하지 않고 실패로 복구한다.")]
     [SerializeField, Min(0.5f)] private float arrivalAckTimeoutSeconds = 5f;
 
     [Header("진입 패드 (존 중앙 트리거+테두리 크기, m)")]
@@ -48,9 +48,12 @@ public class BossTeleportManager : NetworkBehaviour
     [SerializeField] private Color idleColor = new Color(0.25f, 0.8f, 1f, 0.9f);
     [SerializeField] private Color activeColor = new Color(0.35f, 1f, 0.4f, 1f);
 
-    [Header("이동 페이드 (본인 화면만 — 엘리베이터 연출의 페이드는 BossElevatorRig 시간표)")]
+    [Header("이동 페이드 (본인 화면만 — 엘리베이터 연출 중 페이드 시간은 BossElevatorRig 시간표)")]
+    [Tooltip("리그 없는 구성에서만 — 카운트다운 끝 직전 화면이 검게 되는 시간(초). 엘리베이터 연출이면 리그의 frontFadeOutDuration 을 쓴다.")]
     [SerializeField, Min(0.05f)] private float fadeOutSeconds = 0.3f;
+    [Tooltip("보스룸 도착 RPC 를 받은 순간 → 화면이 다 밝아지는 시간(초). 엘리베이터 연출의 마지막 페이드 인도 이 값이다(리그 없는 경로와 공유).")]
     [SerializeField, Min(0.05f)] private float fadeInSeconds = 0.5f;
+    [Tooltip("페이드 색 — 리그 없는 경로·엘리베이터 시간표 페이드(문 앞 이동·상승 뒤 암전)·도착 페이드 인 공통.")]
     [SerializeField] private Color fadeColor = Color.black;
 
     // 텔레포트 만료 시각(서버시간). 0 = 비활성. 서버 write / 모두 read.

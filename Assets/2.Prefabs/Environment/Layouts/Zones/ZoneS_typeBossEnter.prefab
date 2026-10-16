@@ -2388,12 +2388,13 @@ MonoBehaviour:
   - {fileID: 909659294297857113}
   _insideSpread: 0.6
   _timing:
-    height: 0
     frontFadeOutDuration: 0.4
     frontBlackHold: 0.2
     frontFadeInDuration: 0.5
+    height: 0
     descendDelay: 0
     descendDuration: 2.5
+    descendEase: 14
     doorOpenDuration: 0
     walkStartDelay: 0.2
     walkInterval: 0.6
