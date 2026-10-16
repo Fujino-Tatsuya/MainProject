@@ -79,11 +79,11 @@ public sealed class BossElevatorTimelineTests
         const float doorClose = lastWalkEnd + 0.5f;
         const float ascend = doorClose + ClipClose;
 
-        Assert.AreEqual(0f, t.StartOf(BossElevatorPhase.FrontFadeOut), Eps);
+        Assert.AreEqual(0f, t.StartOf(BossElevatorPhase.FrontFadeOut), Eps, "카운트다운 끝 = 연출 시작·입력 잠금");
         Assert.AreEqual(0.4f, t.StartOf(BossElevatorPhase.FrontBlackout), Eps, "페이드 아웃 0.4 끝 = 문 앞 순간이동");
         Assert.AreEqual(0.4f, t.TeleportFrontAt, Eps);
         Assert.AreEqual(0.6f, t.StartOf(BossElevatorPhase.FrontFadeIn), Eps, "암전 유지 0.2");
-        Assert.AreEqual(focus, t.StartOf(BossElevatorPhase.Focus), Eps, "페이드 인 0.5 끝 = 카메라 포커스·입력 잠금");
+        Assert.AreEqual(focus, t.StartOf(BossElevatorPhase.Focus), Eps, "페이드 인 0.5 끝 = 카메라 포커스·보행 지시");
         Assert.AreEqual(focus, t.FocusAt, Eps);
         Assert.AreEqual(descend, t.StartOf(BossElevatorPhase.Descending), Eps, "포커스 + 0.5");
         Assert.AreEqual(doorOpen, t.StartOf(BossElevatorPhase.DoorOpening), Eps, "하강 2.1 끝");

@@ -5,10 +5,10 @@ using UnityEngine;
 /// <summary>보스 엘리베이터 연출 단계(시간 순서). <see cref="BossElevatorTimeline.PhaseAt"/> 가 경과 시간으로 고른다.</summary>
 public enum BossElevatorPhase
 {
-    FrontFadeOut,   // t=0 — 카운트다운 끝, 화면이 검게 페이드 아웃. 엘리베이터는 위에서 대기
+    FrontFadeOut,   // t=0 — 카운트다운 끝, 서버가 입력 잠금. 화면이 검게 페이드 아웃. 엘리베이터는 위에서 대기
     FrontBlackout,  // 완전 암전 — 서버가 참가자를 문 앞(FrontPoints)으로 옮긴다
     FrontFadeIn,    // 문 앞에서 화면이 밝아진다
-    Focus,          // 카메라가 엘리베이터에 포커스 + 입력 잠금, 하강 대기
+    Focus,          // 카메라가 엘리베이터에 포커스 + 보행 지시, 하강 대기
     Descending,     // 위 → 착지 (OutQuint)
     DoorOpening,    // 문 Open 클립
     WalkingIn,      // 문 열린 채 — 참가자가 슬롯 순서(P1→P2→P3)대로 칸 안으로 걸어 들어간다

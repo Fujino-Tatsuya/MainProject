@@ -23,7 +23,7 @@ using UnityEngine;
 /// 연출 중 추락 판정과 생명주기 전이 차단은 각 소유 컴포넌트가 이 값을 읽어 처리한다
 /// (<see cref="PlayerFallController"/>, <see cref="PlayerLifeCycleController"/>).
 ///
-/// 보스 엘리베이터 연출의 <b>입력 잠금</b>(<see cref="SetCinematicInputLockServer"/> — 카메라 포커스부터, 보이는 채로 걸어 들어간다)과
+/// 보스 엘리베이터 연출의 <b>입력 잠금</b>(<see cref="SetCinematicInputLockServer"/> — 카운트다운이 끝난 순간부터, 보이는 채로 걸어 들어간다)과
 /// <b>숨김</b>(<see cref="SetCinematicHiddenServer"/> — 문이 닫힌 뒤 상승 동안)도 여기 한 곳이다. 둘 다 보스 등장 잠금과 독립된 복제 값이다.
 /// 숨김은 모델·실루엣(렌더러 forceRenderingOff)·머리 위 바를 감춘다. 입력은 둘 다 <see cref="PlayerLifeInputPolicy"/> 가 막고,
 /// 무적은 둘 중 하나라도 켜져 있는 동안 <see cref="InvulnerabilityCause.CinematicHidden"/> 토큰 하나가 맡는다.
@@ -172,7 +172,7 @@ public sealed class PlayerEncounterLock : NetworkBehaviour
     }
 
     /// <summary>
-    /// 서버 전용·멱등. 보스 엘리베이터 입력 잠금을 켜고 끈다(<see cref="BossTeleportManager"/> — 카메라 포커스 ~ 연출 끝).
+    /// 서버 전용·멱등. 보스 엘리베이터 입력 잠금을 켜고 끈다(<see cref="BossTeleportManager"/> — 연출 시작(카운트다운 끝) ~ 보스방 도착 뒤 보스 등장 잠금으로 넘김).
     /// 보이는 채로 오너 입력만 막고 무적을 건다. 켤 때 진행 중인 스킬·공격을 정상 경로로 끊는다. 숨김·보스 등장 잠금과는 독립이다.
     /// </summary>
     public bool SetCinematicInputLockServer(bool locked)

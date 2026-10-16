@@ -324,6 +324,9 @@ public class BossTeleportManager : NetworkBehaviour
             _elevatorWalkers.Add(NetworkManager.ConnectedClients[clientId].PlayerObject.NetworkObjectId);
         _elevatorStartAt.Value = start;
         _teleportAt.Value = 0d; // 표시 종료
+        // 카운트다운이 끝난 순간부터 입력 잠금(보이는 채로·무적) — 페이드·문 앞 이동 동안에도 이동·공격·스킬·대시가 막힌다.
+        // 해제는 EndElevatorServer(도착 완료 = 보스 등장 잠금이 걸린 뒤·도착 무효·재도전) 한 곳이다.
+        LockParticipants(participants);
         Edit.Log($"[BossTeleport] 보스 엘리베이터 시작 — 참가자 {participants.Count}명, 문 앞 +{timeline.TeleportFrontAt:0.##}s, " +
                  $"포커스 +{timeline.FocusAt:0.##}s, 보행 +{timeline.WalkStartAt(0):0.##}s(간격 {timeline.WalkInterval:0.##}·{timeline.WalkDuration:0.##}s), " +
                  $"상승 +{timeline.AscendStartAt:0.##}s, 암전 +{timeline.BlackoutAt:0.##}s", this);
@@ -333,10 +336,10 @@ public class BossTeleportManager : NetworkBehaviour
             yield return null;
         TeleportToElevatorFront(participants, rig);
 
-        // 페이드 인 끝 — 카메라 포커스(각 피어 시간표)와 함께 입력 잠금, 오너에게 보행 지시.
+        // 페이드 인 끝 — 카메라 포커스(각 피어 시간표)와 함께 오너에게 보행 지시.
         while (NetworkManager.ServerTime.Time < start + timeline.FocusAt)
             yield return null;
-        LockAndDirectWalk(participants, rig, timeline, start);
+        DirectWalk(participants, rig, timeline, start);
 
         // 문이 다 닫힌 순간 — 칸 안에서 숨긴다(상승은 칸만 움직인다).
         while (NetworkManager.ServerTime.Time < start + timeline.AscendStartAt)
@@ -387,19 +390,29 @@ public class BossTeleportManager : NetworkBehaviour
         }
     }
 
+    /// <summary>[연출 시작(카운트다운 끝)] 참가자 입력 잠금(보이는 채로·무적). 풀기는 <see cref="EndElevatorServer"/>.</summary>
+    private void LockParticipants(List<ulong> participants)
+    {
+        foreach (ulong clientId in participants)
+        {
+            if (!NetworkManager.ConnectedClients.TryGetValue(clientId, out NetworkClient client) || client.PlayerObject == null)
+                continue;
+
+            client.PlayerObject.GetComponent<PlayerEncounterLock>()?.SetCinematicInputLockServer(true);
+        }
+    }
+
     /// <summary>
-    /// [포커스 시각] 참가자 입력 잠금(보이는 채로·무적) + 오너에게 보행 지시 — 슬롯 순서대로 시간표의 시작 시각에 칸 안 지점까지.
-    /// 시작 시각·시간을 함께 보내 오너가 서버 시간표에 맞춰 걷는다(잠금 전에 조금 움직였어도 같은 시각에 도착).
+    /// [포커스 시각] 오너에게 보행 지시 — 슬롯 순서대로 시간표의 시작 시각에 칸 안 지점까지.
+    /// 시작 시각·시간을 함께 보내 오너가 서버 시간표에 맞춰 걷는다(출발 자리가 문 앞에서 조금 어긋나 있어도 같은 시각에 도착).
     /// </summary>
-    private void LockAndDirectWalk(List<ulong> participants, BossElevatorRig rig, BossElevatorTimeline timeline, double start)
+    private void DirectWalk(List<ulong> participants, BossElevatorRig rig, BossElevatorTimeline timeline, double start)
     {
         for (int slot = 0; slot < participants.Count; slot++)
         {
             ulong clientId = participants[slot];
             if (!NetworkManager.ConnectedClients.TryGetValue(clientId, out NetworkClient client) || client.PlayerObject == null)
                 continue;
-
-            client.PlayerObject.GetComponent<PlayerEncounterLock>()?.SetCinematicInputLockServer(true);
 
             ElevatorWalkOwnerClientRpc(rig.GetInsidePoint(slot), start, start + timeline.WalkStartAt(slot), timeline.WalkDuration,
                 new ClientRpcParams { Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } } });
