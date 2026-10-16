@@ -46,6 +46,8 @@ internal static class PlayerEditModeTestRunner
         "^PlayerInputBufferTests$", // 할 일 44 — 선입력 버퍼 기록·만료·덮어쓰기·거부 사유별 보관/버림
         "^PlayerInputBufferDiagnosticsTests$", // 할 일 44 후속 — 선입력 버퍼 진단: 즉시·버퍼 실행·만료·놓친 간격·중앙값/90%
         "^PlayerBasicAttackInputRulesTests$", // 할 일 44 5차 — 거너 홀드 시작·공격 중 스킬 입력은 지금 발 마무리 뒤 예약(다음 발 금지·만료 없음·마지막 1개·연타 1회)
+        "^AssassinHairClipRulesTests$", // 할 일 47 — 머리카락 구동기: 클립 → 보정 종류(회피 v15·v16·v13), 클립 안 초, trailing 재설정(전환·루프·되감기·리셋)
+        "^AssassinHairPrefabTests$", // 할 일 47 — Armature 머리카락 체인 7×4 본·캡처·몸 캡슐·구동기·보정 2종, Variant 중첩
     };
 
     const string Tag = "[PlayerTests]";

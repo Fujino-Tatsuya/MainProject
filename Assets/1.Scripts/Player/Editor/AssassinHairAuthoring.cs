@@ -29,15 +29,28 @@ public static class AssassinHairAuthoring
         }
     }
 
+    // 납품 DiveHairTests 사용법.txt — "Fan Degrees는 22로 둡니다"(검수 통과 설정, 스크립트 기본값 14 와 다름).
+    private const float DiveFanDegrees = 22f;
+
     /// <summary>
-    /// Armature 루트에 v13 솔버를 보장하고 지금(애니메이션 전) 자세로 바인드 포즈를 캡처한다.
+    /// Armature 루트에 v13 솔버·v16/v15 보정·구동기를 보장하고 지금(애니메이션 전) 자세로 바인드 포즈를 캡처한다.
     /// 런타임 Awake 자동 캡처에 기대지 않는다 — 비활성 생성 등으로 첫 Awake 때 자세가 바인드가 아닐 수 있다.
+    /// 이미 있는 컴포넌트의 인스펙터 값(보정 strength 등)은 건드리지 않는다 — 회피 fan 은 새로 붙일 때만 넣는다.
     /// </summary>
     public static bool Ensure(GameObject root)
     {
         AssassinHairMotion hair = root.GetComponent<AssassinHairMotion>();
         if (hair == null)
             hair = root.AddComponent<AssassinHairMotion>();
+
+        if (root.GetComponent<AssassinActionHairAnimation>() == null)
+            root.AddComponent<AssassinActionHairAnimation>();
+
+        if (root.GetComponent<AssassinDiveHairAnimation>() == null)
+            root.AddComponent<AssassinDiveHairAnimation>().fanDegrees = DiveFanDegrees;
+
+        if (root.GetComponent<AssassinHairDriver>() == null)
+            root.AddComponent<AssassinHairDriver>();
 
         try
         {

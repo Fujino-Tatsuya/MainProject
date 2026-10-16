@@ -603,6 +603,15 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 17873cd8217cc704594694a4440a50a8, type: 3}
       insertIndex: -1
       addedObject: {fileID: 8710333951963908211}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 17873cd8217cc704594694a4440a50a8, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2467674300260316779}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 17873cd8217cc704594694a4440a50a8, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1526062505902616386}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 17873cd8217cc704594694a4440a50a8, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 6102637746479172449}
   m_SourcePrefab: {fileID: 100100000, guid: 17873cd8217cc704594694a4440a50a8, type: 3}
 --- !u!4 &27783628436737668 stripped
 Transform:
@@ -1356,6 +1365,59 @@ MonoBehaviour:
   maximumContactResidual: 0
   solverVersion: 13
   bindGravityLocal: {x: 7.1054274e-15, y: -0.9999999, z: 0.00000017881393}
+--- !u!114 &2467674300260316779
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5502993523011662043}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ec5fa6b857417844f8c5b16dce59c0fb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AssassinActionHairAnimation
+  strength: 1
+  motionEnabled: 1
+  worldUp: {x: 0, y: 1, z: 0}
+--- !u!114 &1526062505902616386
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5502993523011662043}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bb7abbc4dea640b4ba83a1d2c432ab5d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AssassinDiveHairAnimation
+  strength: 1
+  fanDegrees: 22
+  rootDropDegrees: 12
+  tipDropDegrees: -2
+  rippleDegrees: 2
+  anticipationStart: 0.18
+  streamFull: 0.3
+  releaseStart: 0.65
+  settledTime: 1.15
+  tipLag: 0.06
+  worldUp: {x: 0, y: 1, z: 0}
+  motionEnabled: 1
+--- !u!114 &6102637746479172449
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5502993523011662043}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 09b3a66acafa20647a8dcbe9a836c27e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AssassinHairDriver
+  actionHairEnabled: 1
+  diveHairEnabled: 1
 --- !u!4 &5769946785076208913 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8030728863137896293, guid: 17873cd8217cc704594694a4440a50a8, type: 3}
