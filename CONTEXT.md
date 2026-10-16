@@ -255,6 +255,10 @@ HUD 매 프레임 문자열(`PlayerHealthHUD`·`StatusEffectHUD`·`SkillCooldown
 - ✅ 1단계 Codex(코드) `09e9cc57` · ✅ 2단계 Claude(씬·에셋·`LobbySceneManager` 배선). 결과 요약 = [player-prefabs.md §8.3](Docs/tech/player-prefabs.md)
 - 🔴 남은 것: **은희 MPPM Play 확인**(호스트+클라2: 초상화·Ready 동기화 / Start 활성 / 고른 Variant 스폰) → PR. 레이아웃은 첫 배치라 Play 보고 조정 가능
 - 범위 밖: 전투 HUD 초상화 Paladin 고정(Gunner 도 Paladin 얼굴)
+## ▶▶ 작업 세션 (2026-10-16 · 민경(Claude) · **어쌔신 일반 Q = 관통 일섬(PierceLine + PierceBurst)**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 · ✅ MyProject 컨펌 · ✅ 반입·배선(컴파일 에러 0) · ⏳ Play·MPPM · 🔴 SVN add · 🔴 은희 공유(handoff §3-3)
+- MyProject `Export/Player3/BM Thrust Slash_PierceLine`(+Z 1m 메시 파티클 3겹 + 잔흔·속도선)·`_PierceBurst`(Thrust Slash 재채색) → `Players/Player3/Q_Dash/FX_Assassin_PierceLine`·`_PierceBurst`, 카탈로그 `Assassin_Q_PierceLine`·`Assassin_Q_PierceBurst`. 의존 11개 추가(머티리얼 3·FBX 1·텍스처 7 — `Gradient_Quad02.png` 는 이름 충돌로 `Textures/PilotoStudio/Shared/`).
+- `EffectManager` 축별 배율 원샷 오버로드 + `EffectPool.Rent(Vector3)`. 일섬은 OnEnd 에서 시작점→실제 끝점, 임시 돌진 궤적 삭제.
+
 ## ▶▶ 작업 세션 (2026-10-15 · 민경(Claude) · **어쌔신 변신 Q = Storm Slash 루프(플레이어 루트·Rate over Distance)**, 브랜치 `feature/VFX`) — 구현(컴파일 에러 0) · ⏳ Play·MPPM · 🔴 SVN add · 🔴 은희 공유(handoff-assassin-r-vfx §3-2)
 - MyProject `Export/Player3/BM Strom Slash.prefab`(운반체 Velocity 제거 → FuzzAlpha·데칼이 직접 Rate over Distance, World, Looping, Emitter Velocity = Transform) → `Players/Player3/Q_TransformedDash/FX_Assassin_StormSlash(.prefab|_Entry.asset)`, 카탈로그 `Assassin_Q_StormSlash`(outroDuration 1.1). 의존 3개 추가(Ring 머티리얼·Trail_Cone_Cut.fbx·텍스처 1 — Ring 렌더러는 꺼져 있음).
 - `AssassinDashStrikeSkill` 변신 데이터일 때만 OnClientPlay → `BeginStormSlash`, OnEnd → `EndStormSlash`. 임시 돌진 궤적은 일반 Q 만(변신 Q 에서 제거).
