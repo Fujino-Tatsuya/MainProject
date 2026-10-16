@@ -18,6 +18,11 @@ public sealed class AssassinBasicAttackStepData
     [SerializeField, Min(0.01f)] private float playbackSpeed = 3f;
     [Tooltip("클립 하나에 든 타격 수(Hit 이벤트 수). 변신 평타 묶음 = 4, 나머지 = 1.")]
     [SerializeField, Min(1)] private int hitCount = 1;
+    [Tooltip("다음 타 예약 창 열림 — 클립 정규화 시간(0~1). 이 타 재생 중 창 안에서 좌클릭하면 End 순간 다음 타로 이어진다. " +
+             "가붕이 ComboWindowOpen 이벤트와 같은 의미(재생 속도에 같이 비례).")]
+    [SerializeField, Range(0f, 1f)] private float comboWindowOpen = 0.4f;
+    [Tooltip("다음 타 예약 창 닫힘 — 클립 정규화 시간(0~1). End(0.97) 앞에 둔다.")]
+    [SerializeField, Range(0f, 1f)] private float comboWindowClose = 0.95f;
 
     public AnimationClip Clip => clip;
     public float AttackDamageMultiplier => attackDamageMultiplier;
@@ -27,20 +32,33 @@ public sealed class AssassinBasicAttackStepData
     // 필드가 생기기 전 직렬화된 스텝은 0 으로 읽힐 수 있다 — 최소 1타.
     public int HitCount => Mathf.Max(1, hitCount);
     public float MotionDuration => clip != null ? clip.length / Mathf.Max(0.01f, playbackSpeed) : 0f;
+    public float ComboWindowOpen => comboWindowOpen;
+    public float ComboWindowClose => comboWindowClose;
 
     public AssassinBasicAttackStepData(
         float attackDamageMultiplier = 1f,
         float range = 1.5f,
         float angle = 90f,
         float playbackSpeed = 3f,
-        int hitCount = 1)
+        int hitCount = 1,
+        float comboWindowOpen = 0.4f,
+        float comboWindowClose = 0.95f)
     {
         this.attackDamageMultiplier = attackDamageMultiplier;
         this.range = range;
         this.angle = angle;
         this.playbackSpeed = playbackSpeed;
         this.hitCount = hitCount;
+        this.comboWindowOpen = comboWindowOpen;
+        this.comboWindowClose = comboWindowClose;
     }
+
+    /// <summary>클립 재생 시작부터 지난 시간이 다음 타 예약 창 안인가.</summary>
+    public bool IsInComboWindow(float elapsedSeconds) =>
+        AssassinComboWindowRules.IsInside(
+            AssassinComboWindowRules.NormalizedProgress(elapsedSeconds, MotionDuration),
+            comboWindowOpen,
+            comboWindowClose);
 
     public bool IsPlayable => clip != null && MotionDuration > 0f;
 }
@@ -70,11 +88,11 @@ public sealed class AssassinBasicAttackData : ScriptableObject
 
     [Header("변신 평타 묶음 (Speed_Attack_Loop, 타당 계수)")]
     [SerializeField] private AssassinBasicAttackStepData transformedStep =
-        new AssassinBasicAttackStepData(1.2f, 1.8f, 120f, 1.25f, 4);
+        new AssassinBasicAttackStepData(1.2f, 1.8f, 120f, 1.25f, 4, 0.75f);   // 창은 마지막(4번째) 판정 뒤부터
 
     [Header("연결")]
-    [Tooltip("마지막 타 종료 후 이 시간 안에 다시 누르면 다음 타부터 시작한다. " +
-             "0 = 타가 끝날 때 좌클릭을 누르고 있지 않으면 다음 입력은 항상 1타(10-06 은희 — 기획 0.8초에서 변경).")]
+    [Tooltip("마지막 타가 다음 타 예약 없이 끝난 뒤 이 시간 안에 다시 누르면 다음 타부터 시작한다. " +
+             "0 = 예약 창 안에서 누르지 않고 끝나면 다음 입력은 항상 1타(10-06 은희 — 기획 0.8초에서 변경).")]
     [SerializeField, Min(0f)] private float comboContinuationSeconds = 0f;
 
     [Header("판정")]

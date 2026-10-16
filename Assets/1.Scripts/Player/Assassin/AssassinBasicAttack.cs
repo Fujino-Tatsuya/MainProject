@@ -3,8 +3,9 @@ using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// 어쌔신 일반 평타. 추가 클릭은 예약하지 않고, 한 타가 끝나는 순간까지 처음 누른 좌클릭을 계속 유지한 경우에만 다음 타로 이어진다.
-/// 입력과 방향은 오너가 보내며 시작/연결 승인, 판정, 피해는 서버가 담당한다.
+/// 어쌔신 일반 평타. 가붕이와 같은 입력 창 방식 — 한 타 재생 중 예약 창(단별 클립 정규화 시간) 안에서 좌클릭하면
+/// 다음 타가 예약되고 그 타의 End 순간 이어진다. 창 밖 클릭·누르고만 있기는 예약하지 않는다.
+/// 입력과 방향은 오너가 보내며 시작/예약 승인(서버 자기 애니 진행 기준), 판정, 피해는 서버가 담당한다.
 /// 모드는 <see cref="AssassinState"/> 로 고른다 — 변신 중 = Speed_Attack_Loop 4타 묶음, 일반 E 강화 준비 = 강타 1회, 그 외 = 일반 4타.
 /// </summary>
 [RequireComponent(typeof(Player))]
@@ -18,8 +19,6 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     private static readonly int AttackIndexHash = Animator.StringToHash("AttackIndex");
     private static readonly int IdleHash = Animator.StringToHash("Idle");
     private static readonly int RunLoopHash = Animator.StringToHash("Run_Loop");
-
-    private const float InputSyncInterval = 0.08f;
 
     // Animator AttackIndex — 일반 0~3 뒤에 강타·변신 묶음 상태를 둔다(AssassinShellAuthoring 이 같은 값으로 전이를 만든다).
     public const int EnhancedAnimatorIndex = 4;
@@ -43,8 +42,10 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     private bool requesting;
     private bool endingGracefully;
     private bool finishingTail;
-    private bool releaseLatched;
-    private bool serverContinueHeld;
+    // 오너 자기 예약 — 이 타에서 이미 보냈으면 다시 보내지 않는다. 서버 거절(RejectQueueRpc)·다음 타·종료에서 풀린다.
+    private bool ownerQueued;
+    // [서버] 다음 타 예약 — 서버가 자기 애니 진행으로 창 안이라고 판단한 경우만.
+    private bool hasQueuedNextAttack;
     // 이번 타(일반 1타·강타 1회)의 분노 게이지 충전을 이미 받았는가 — 타 하나에 1번(§4.2).
     private bool rageClaimed;
     private int hitsFired;
@@ -53,7 +54,8 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     private Vector3 attackDirection;
     private Vector3 serverNextDirection;
     private float fallbackEndTime;
-    private float nextInputSyncTime;
+    // 이 타 클립을 튼 시각(회전 대기 뒤). 예약 창 진행도의 기준 — 피어마다 자기 재생 기준이다.
+    private float clipStartTime;
     private PlayerActionState observedState;
     // 강타 전진 — 시뮬레이션 피어(오너, 서버 권위 이동이면 서버도)만 모터에 낸다. 끝·취소·막힘이면 0.
     private float lungeRemaining;
@@ -277,24 +279,29 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
 
     private void TickInputSource()
     {
-        if (!releaseLatched && !input.AttackHeld)
-            releaseLatched = true;
+        // 창 안에서 누른 프레임만 예약한다 — 꾹 누르고만 있으면 이어지지 않는다. 오너도 자기 재생 기준 창으로 거른다.
+        if (ownerQueued || !input.AttackPressed || !IsInCurrentComboWindow())
+            return;
 
+        ownerQueued = true;
         Vector3 direction = CurrentAimDirection();
-        bool held = !releaseLatched;
 
         if (!IsNetworkActive)
         {
-            serverContinueHeld = held;
+            hasQueuedNextAttack = true;
             serverNextDirection = direction;
             return;
         }
 
-        if (!IsOwner || Time.time < nextInputSyncTime)
-            return;
+        RequestQueueNextAttackRpc(direction);
+    }
 
-        nextInputSyncTime = Time.time + InputSyncInterval;
-        SyncContinuationInputRpc(held, direction);
+    // 예약 창 = 이 타 클립 정규화 시간 [열림, 닫힘]. 회전 대기 중엔 이 타 클립이 아직 시작 전이라 창 밖이다.
+    private bool IsInCurrentComboWindow()
+    {
+        return active && !hasPendingClip &&
+               TryGetStep(currentMode, currentStepIndex, out AssassinBasicAttackStepData step) &&
+               step.IsInComboWindow(Time.time - clipStartTime);
     }
 
     [Rpc(SendTo.Server)]
@@ -314,16 +321,20 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     }
 
     [Rpc(SendTo.Server)]
-    private void SyncContinuationInputRpc(bool held, Vector3 direction, RpcParams rpcParams = default)
+    private void RequestQueueNextAttackRpc(Vector3 direction, RpcParams rpcParams = default)
     {
-        if (rpcParams.Receive.SenderClientId != OwnerClientId || !active)
+        if (rpcParams.Receive.SenderClientId != OwnerClientId)
             return;
 
-        // 한 타 도중 한 번 놓았으면 다시 누른 입력은 다음 타 예약으로 취급하지 않는다.
-        if (!held)
-            serverContinueHeld = false;
-        if (serverContinueHeld)
-            serverNextDirection = Flatten(direction);
+        // 창 판정은 서버 자기 애니 진행으로 한다(가붕이 isComboWindowOpen 과 같은 권한). 창 밖이면 오너 예약을 푼다.
+        if (!IsInCurrentComboWindow())
+        {
+            RejectQueueRpc();
+            return;
+        }
+
+        hasQueuedNextAttack = true;
+        serverNextDirection = Flatten(direction);
     }
 
     private bool StartServer(int stepIndex, Vector3 direction, AssassinBasicAttackMode mode, float turnDelay)
@@ -375,6 +386,13 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         requesting = false;
     }
 
+    // 서버가 창 밖이라 예약을 받지 않았다 — 남은 창에서 다시 누를 수 있게 오너 예약만 푼다.
+    [Rpc(SendTo.Owner)]
+    private void RejectQueueRpc()
+    {
+        ownerQueued = false;
+    }
+
     [Rpc(SendTo.NotServer)]
     private void EndRpc()
     {
@@ -412,8 +430,8 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     {
         active = true;
         requesting = false;
-        releaseLatched = false;
-        serverContinueHeld = true;
+        ownerQueued = false;
+        hasQueuedNextAttack = false;
         rageClaimed = false;
         hitsFired = 0;
         currentStepIndex = stepIndex;
@@ -421,7 +439,6 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         attackDirection = Flatten(direction);
         serverNextDirection = attackDirection;
         fallbackEndTime = Time.time + turnDelay + step.MotionDuration + data.EndFallbackPadding;
-        nextInputSyncTime = Time.time;
 
         StopLunge();
         if (mode == AssassinBasicAttackMode.Enhanced && motor != null && player.IsSimulating)
@@ -446,6 +463,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
 
     private void PlayAttackClip()
     {
+        clipStartTime = Time.time;
         if (animator != null)
         {
             animator.SetInteger(AttackIndexHash, AnimatorIndexFor(currentMode, currentStepIndex));
@@ -498,9 +516,9 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         if (currentMode == AssassinBasicAttackMode.Normal)
             combo.Complete(currentStepIndex, Time.time);
 
-        // 계속 누르고 있으면 다음 타·다음 묶음. 변신 종료 대기면 시작하지 못하고 여기서 끝난다.
+        // 창 안에서 예약됐으면 다음 타·다음 묶음. 변신 종료 대기면 시작하지 못하고 여기서 끝난다.
         // 다음 타의 회전 지연은 서버가 잰다 — 이 타 내내 몸이 이 타 방향에 고정돼 있어 NT 값도 이미 따라와 있다.
-        if (serverContinueHeld &&
+        if (hasQueuedNextAttack &&
             StartServerAttack(serverNextDirection, movement.GetAttackTurnDelay(serverNextDirection)))
             return;
 
@@ -533,8 +551,8 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     {
         active = false;
         requesting = false;
-        releaseLatched = false;
-        serverContinueHeld = false;
+        ownerQueued = false;
+        hasQueuedNextAttack = false;
         hitsFired = 0;
         fallbackEndTime = 0f;
         hasPendingClip = false;
