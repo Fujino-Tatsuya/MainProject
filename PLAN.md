@@ -1,3 +1,26 @@
+# ▶▶▶ 계획 = **어쌔신 일반 Q VFX — 관통 일섬(PierceLine + PierceBurst)** (2026-10-16 · grill 확정 · ✅ MyProject 컨펌 · ✅ 반입·배선 — 컴파일 에러 0 · ⏳ Play·MPPM)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-16). 변신 Q(Storm Slash — 바닥에 남는 무거운 자국)와 반대로 **허리 높이의 가늘고 날카로운 검붉은 일섬**.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 콘셉트 | 돌진 중은 가볍게(일섬 프리팹 안의 붉은 속도선), 무게는 **끝나는 순간 경로 위 일섬** |
+| 위치·길이 | 시작점(OnClientPlay 위치·방향) → 실제 끝점(OnEnd 위치). 벽 조기 종료도 길이 일치 |
+| 시점 | `OnEnd`(서버 종료 = 돌진 끝 + 0.1초) — "베인 자리가 늦게 드러나는" 박자. 전 피어 같은 경로 |
+| 높이·색 | 허리 높이 공중, 바닥 흔적 없음. 검은 코어(알파) + 진한 피색 번짐(가산). 총 약 0.5초 |
+| 두께 | 코어 ~0.2m, 번짐 ≤ 1.2m(판정 폭) |
+| 구조 | **프리팹 2개**: `_Line`(+Z 1m 메시 파티클, **Z 배율만 = 이동 거리**) + `_Burst`(끝점, 배율 1, BM Thrust Slash 재채색). EffectManager 에 **축별 배율 원샷 오버로드** 추가 |
+| 적중 연출 | 없음(몬스터 공용 피격으로 충분) |
+| 임시 FX_Dash_Trail | 일반 Q 에서도 제거 |
+| 진행 | MyProject `Export/Player3/BM Thrust Slash_PierceLine`·`_PierceBurst` + 테스터 `1.Scripts/PierceLineTester.cs` → 컨펌 → MainProject `Players/Player3/Q_Dash/FX_Assassin_PierceLine`·`_PierceBurst`, 카탈로그 `Assassin_Q_PierceLine`·`Assassin_Q_PierceBurst` |
+
+## 리스크
+- 메시 파티클(Local + Hierarchy)에 루트 비균등 배율이 길이로만 들어가는지 — 테스터로 확인.
+- 클라에서는 OnEnd 가 네트워크 지연만큼 늦게 온다.
+
+---
+
 # ▶▶▶ 계획 = **어쌔신 R 변신 VFX — Blade Vortex 생성(0.5초)·유지·사라짐(0.5초)** (2026-10-14 · ✅ 1단계 컨펌 · ✅ 2단계 반입·배선 — 컴파일 에러 0 · ⏳ Play·MPPM)
 
 > 🔸 **단계 분리(2026-10-14 민경)**: 1단계 = MyProject 에서 `_Fast`·`_End` 수정 + 테스터로 확인까지. **컨펌 뒤** 2단계(아래 B·C·D — MainProject 반입·코드·배선)를 진행한다.

@@ -227,6 +227,20 @@ public class EffectManager : MonoBehaviour
     /// </param>
     public void Play(EffectEntry entry, Vector3 position, Quaternion rotation, float scale = 1f,
                      float durationOverride = 0f)
+        => PlayOneShot(entry, position, rotation, scale, Vector3.one, durationOverride);
+
+    /// <summary>
+    /// 원샷을 <b>축별 배율</b>로 재생한다. 인스턴스 localScale 에만 축별로 곱해지고, 파트 offset 은 배율을 타지 않는다.
+    /// 쓰는 곳은 길이만 늘여야 하는 연출이다 — 어쌔신 일반 Q 일섬은 +Z 1m 로 저작해 Z 에만 실제 돌진 거리를 준다
+    /// (두께는 그대로). 비균등 배율이 의미 있으려면 파트가 메시 파티클(Local)처럼 transform 행렬을 그대로 타야 한다 —
+    /// 빌보드는 비균등 배율에서 모양이 보장되지 않는다.
+    /// </summary>
+    public void Play(EffectEntry entry, Vector3 position, Quaternion rotation, Vector3 axisScale,
+                     float durationOverride = 0f)
+        => PlayOneShot(entry, position, rotation, 1f, SanitizeAxisScale(entry, axisScale), durationOverride);
+
+    private void PlayOneShot(EffectEntry entry, Vector3 position, Quaternion rotation, float scale,
+                             Vector3 axisScale, float durationOverride)
     {
         if (!CanPlay(entry)) return;
 
@@ -238,6 +252,7 @@ public class EffectManager : MonoBehaviour
         active.rotation = rotation;
         active.offset = Vector3.zero;
         active.scale = SanitizeScale(entry, scale);
+        active.axisScale = axisScale;
         float life = durationOverride > 0f ? durationOverride : entry.ResolvedDuration;
         active.life = life;
         active.lifeCounting = true;
@@ -538,7 +553,7 @@ public class EffectManager : MonoBehaviour
 
         if (part.prefab != null)
         {
-            GameObject instance = _pool.Rent(part.prefab, active.scale);
+            GameObject instance = _pool.Rent(part.prefab, active.axisScale * active.scale);
             instance.transform.SetPositionAndRotation(worldPosition, active.rotation);
             instance.SetActive(true);
 
@@ -582,6 +597,7 @@ public class EffectManager : MonoBehaviour
         active.lifeCounting = false;
         active.playRate = 1f;
         active.scale = 1f;
+        active.axisScale = Vector3.one;
         active.driverDuration = 0f;
         active.inUse = false;      // 세대는 다음 대출에서 새로 발급된다 → stale 핸들은 여기서 죽는다
 
@@ -629,6 +645,18 @@ public class EffectManager : MonoBehaviour
         return 1f;
     }
 
+    // 축별 배율 — 한 축이라도 0 이하면 사라지거나 뒤집힌다. 그 축만 1로 되돌린다.
+    private Vector3 SanitizeAxisScale(EffectEntry entry, Vector3 axisScale)
+    {
+        if (axisScale.x > 0f && axisScale.y > 0f && axisScale.z > 0f) return axisScale;
+
+        WarnOnce(entry, "scale", $"[EffectManager] '{entry.name}'를 축별 배율 {axisScale}로 재생하려 했다. " +
+                                 "0 이하인 축은 1로 되돌린다.");
+        return new Vector3(axisScale.x > 0f ? axisScale.x : 1f,
+                           axisScale.y > 0f ? axisScale.y : 1f,
+                           axisScale.z > 0f ? axisScale.z : 1f);
+    }
+
     private ActiveEffect AcquireSlot(EffectEntry entry)
     {
         ActiveEffect active;
@@ -647,6 +675,7 @@ public class EffectManager : MonoBehaviour
         active.generation = _nextGeneration++;
         active.entry = entry;
         active.playRate = 1f;
+        active.axisScale = Vector3.one;
         active.released = false;
 
         return active;
@@ -764,6 +793,7 @@ public class EffectManager : MonoBehaviour
         public float life;         // 남은 수명(초)
         public float playRate = 1f;
         public float scale = 1f;   // 프리팹 크기에 곱해지는 배율. 파트 offset에도 곱해진다
+        public Vector3 axisScale = Vector3.one;   // 축별 배율(원샷 오버로드 전용). localScale 에만 곱한다
 
         // 드라이버에게 넘길 시간(초). 루프 전용이다 — 원샷은 남은 수명(life)을 그대로 쓴다.
         // 루프는 수명이 외부 이벤트(Release)로 정해지므로 "얼마나 살지"와 "파트가 얼마 동안 움직일지"가

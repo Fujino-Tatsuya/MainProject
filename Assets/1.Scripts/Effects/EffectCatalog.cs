@@ -92,6 +92,12 @@ public class EffectCatalog : ScriptableObject
     // Release 는 방출만 멈추고 outroDuration(1.1초) 동안 남은 입자가 제 곡선대로 사라지게 둔다(2026-10-15 민경).
     [field: SerializeField] public EffectEntry Assassin_E_MultiSlashes { get; private set; }
 
+    [Header("플레이어 — 어쌔신 일반 Q(관통 돌진)")]
+    // 돌진이 끝나면(스킬 OnEnd) 지나온 경로 위로 긋는 일섬(+Z 1m 저작 — Z 축 배율 = 실제 이동 거리)과
+    // 끝점 버스트(배율 1). AssassinSkillView.EndPierce 가 재생한다(2026-10-16 민경).
+    [field: SerializeField] public EffectEntry Assassin_Q_PierceLine { get; private set; }
+    [field: SerializeField] public EffectEntry Assassin_Q_PierceBurst { get; private set; }
+
     [Header("플레이어 — 어쌔신 변신 Q(관통 돌진)")]
     // 돌진 동안 플레이어 루트를 따라가는 루프(FX_Assassin_StormSlash). 입자는 World + Rate over Distance 라
     // 지나간 자리에 남는다. Release 는 방출만 멈추고 outroDuration(1.1초) 동안 남은 입자가 사라지게 둔다(2026-10-15 민경).
