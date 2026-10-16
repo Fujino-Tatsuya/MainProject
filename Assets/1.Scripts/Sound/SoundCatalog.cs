@@ -37,23 +37,23 @@ public sealed class SoundEntry
     [Tooltip("코드에서 AudioManager.Play에 넘기는 고유 키")]
     private string key = string.Empty;
 
-    [SerializeField, DataTableText]
+    [SerializeField, DataTableText(Localize = false)]
     [Tooltip("엔티티가 속할 BroAudio 라이브러리 이름. 없으면 사운드 동기화가 만든다")]
     private string library = string.Empty;
 
-    [SerializeField, DataTableText]
+    [SerializeField, DataTableText(Localize = false)]
     [Tooltip("연결할 BroAudio 엔티티 이름(프로젝트 전체에서 고유). 없으면 사운드 동기화가 만든다")]
     private string entity = string.Empty;
 
-    [SerializeField, DataTableText]
+    [SerializeField, DataTableText(Localize = false)]
     [Tooltip("엔티티 AudioType: Music·UI·Ambience·SFX·VoiceOver")]
     private string audioType = string.Empty;
 
-    [SerializeField, DataTableText, TextArea]
+    [SerializeField, DataTableText(Localize = false), TextArea]
     [Tooltip("엔티티 클립 경로(Assets/51.Audio/...). 여러 개면 셀 안 줄바꿈(Alt+Enter). - = 엔티티 클립 유지")]
     private string clipPaths = "-";
 
-    [SerializeField, DataTableText]
+    [SerializeField, DataTableText(Localize = false)]
     [Tooltip("엔티티 재생 모드: Single·Sequence·Random·Shuffle·Velocity·Chained. - = 유지")]
     private string playMode = "-";
 
