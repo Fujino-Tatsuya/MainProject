@@ -66,6 +66,7 @@
   페이드 아웃·문 앞 이동·페이드 인 동안에도 이동·공격·스킬·대시가 막힌다. 걸기 = `TeleportAfter` 가 시작 시각을 복제한 직후 `LockParticipants`,
   풀기 = `EndElevatorServer` 한 곳(도착 완료는 `AlivePlayersArrived` → 보스 등장 잠금이 걸린 **뒤** 부르므로 풀렸다 다시 걸리는 틈이 없다).
   리그가 없어 곧바로 이동하는 경로는 잠그지 않는다.
+  잠금 순간 **진행 중이던 대시도 그 자리에서 끊긴다** — 오너가 복제 값을 받는 `PlayerLifeInputPolicy.ApplyAccess` → `CancelCombatActions`(`ShouldCancelToIdle`)가 스킬과 같은 경로로 Idle 로 바꾸고, `PlayerDashState.Exit` → `PlayerMotor.ClearDashMotion` 이 남은 대시 이동을 0 으로 만든다. 소비한 대시 충전은 환불하지 않는다(할 일 46 후속 3).
   🔴 다른 계통이 자기 임시 입력 잠금을 풀 때는 `PlayerInputReader.SetInputEnabled(true)` 가 아니라 `PlayerLifeInputPolicy.ApplyCurrentAccess()` 로 푼다.
   예전 `PlayerFallRecovery.CancelRecoveryOwnerRpc` 가 직접 켜서, 문 앞 이동(`TeleportParticipant` → `CancelRecoveryServer`, 낙하 중이 아니어도 항상 보냄)이
   엘리베이터 입력 잠금을 +0.4초에 지웠다(할 일 46 후속 2).
