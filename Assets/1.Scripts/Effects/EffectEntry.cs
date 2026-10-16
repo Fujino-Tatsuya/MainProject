@@ -27,6 +27,11 @@ public class EffectEntry : ScriptableObject
              "0으로 두면 outroParts에서 계산한 값을 따라간다")]
     [Min(0f)] public float outroDuration;
 
+    [Tooltip("루프: Release() 시 parts 의 남은 입자를 이 배속으로 돌린다(Main ▸ Simulation Speed).\n" +
+             "입자가 자기 페이드아웃을 빨리 마쳐 outroDuration 안에 끊김 없이 걷힌다 — 수명이 긴 루프를 짧게 끝낼 때.\n" +
+             "1 = 원래 속도(기존 동작). outroParts 에는 적용하지 않는다")]
+    [Min(1f)] public float outroPlayRate = 1f;
+
     [Header("풀링")]
     [Tooltip("씬 로드 시 파트 프리팹마다 미리 만들어 둘 개수")]
     [Min(0)] public int prewarmCount;

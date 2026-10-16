@@ -1,4 +1,4 @@
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
@@ -13,7 +13,7 @@ using UnityEngine;
 /// <item><b>Shift + F9</b> — 씬의 몬스터 전부</item>
 /// </list>
 ///
-/// 🔴 <b>빌드에 안 들어간다.</b> 파일 전체가 <c>UNITY_EDITOR || DEVELOPMENT_BUILD</c> 안에 있다.
+/// 🔴 <b>DEV_HOTKEYS 를 지운 릴리스 빌드에는 안 들어간다.</b> 파일 전체가 <c>UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS</c> 안에 있다.
 ///
 /// 🔴 <b>배선이 없다.</b> <see cref="RuntimeInitializeOnLoadMethod"/> 로 스스로 올라온다 —
 /// 씬이나 프리팹에 손을 대지 않으므로 팀원 파일과 충돌할 일이 없고, 지우고 싶으면 이 파일만 지우면 된다.
@@ -46,7 +46,7 @@ public class DevMonsterKill : MonoBehaviour
         var go = new GameObject("[Dev] MonsterKill");
         go.AddComponent<DevMonsterKill>();
         DontDestroyOnLoad(go);
-        Debug.Log("[DevKill] F9 = 가장 가까운 몬스터 즉사 · Shift+F9 = 전부 (호스트에서만, 개발 빌드 전용)");
+        Debug.Log("[DevKill] F9 = 가장 가까운 몬스터 즉사 · Shift+F9 = 전부 (호스트에서만, 디버그 단축키 빌드 전용)");
     }
 
     void Update()

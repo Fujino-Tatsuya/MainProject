@@ -1,9 +1,9 @@
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
 using Unity.Netcode;
 using UnityEngine;
 
 // 튜토리얼 구간 스킵(할 일 34, QA·테스트용) — 단축키·패널은 각 피어의 TutorialSkipController, 실행은 서버.
-// 🔴 에디터·Development Build 에만 있다(릴리스 빌드엔 RPC 도 없다 — 호스트·클라는 같은 빌드여야 한다).
+// 🔴 에디터·Development Build·DEV_HOTKEYS 빌드에만 있다(심볼을 지운 릴리스 빌드엔 RPC 도 없다 — 호스트·클라는 같은 빌드여야 한다).
 // 원본: Docs/tech/tutorial-director.md §10.5.
 public sealed partial class TutorialDirector
 {

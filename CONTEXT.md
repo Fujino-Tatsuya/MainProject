@@ -1,4 +1,4 @@
-﻿# CONTEXT.md - Shared Project Language
+# CONTEXT.md - Shared Project Language
 
 > 🆕 **새 환경에서 처음 여는 사람은 [Docs/tech/environment-setup.md](Docs/tech/environment-setup.md) 부터.**
 > 이 프로젝트는 git 만으로 안 선다 — 아트가 SVN 에 있고, 없어도 Unity 는 조용히 열린다.
@@ -8,6 +8,16 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## 작업 세션 (2026-10-14 · Codex · 로비 전선다발 통합)
+- 완료(v022): 현재 Art/lobby 씬에 바닥·벽면 배선 2개 배치, `PF_Lobby_CableRouting_v022` 별도 저장. 신규 모델/부품 프리팹 11종, 기존 v006 베이스컬러 재사용. 기존 1,451개 오브젝트 배치·메쉬·재질 및 콜라이더 339개 보존. Blender/FBX 검수·Unity Scene View 확인 완료(Play 미수행).
+- 사용자 승인: 제작한 전선다발을 Unity에 넣고 현재 로비 배치에 맞춰 연결. 신규 모델·프리팹·공유재질 추가, 현재 Art/lobby 씬의 배선 추가만 수행. 책상·플랫폼·전면 캐비닛의 사용자 배치를 유지. 기록: aiworkspace/90_조립검수/v022.
+
+## 작업 세션 (2026-10-14 · Codex · 로비 연습장 시멘트 바닥)
+- 후속 명도 조정(v021): 연습장 전용 시멘트 머티리얼 BaseColor/Color를 0.72로 낮춰 저장. 텍스처·UV·메쉬는 그대로 유지, 8개 바닥만 영향. 동일 각도 Scene View 확인 완료.
+- 사용자 요청: 연습장 4×4m 바닥 8개에 시멘트 베이스컬러 적용. 홀 진입부와 락커룸은 제외.
+- 수정 범위: 신규 바닥 FBX·공유 아틀라스 v006·전용 머티리얼 추가, `Art/lobby.unity` 및 로비 건축/Complete 프리팹의 8개 바닥 참조. 기존 바이너리·GUID·배치·콜라이더 보존.
+- 현재 열린 씬의 저장 전 상태를 별도 백업한 뒤 에디터에서 반영. 검수 기록: `D:/p_MT/lobby/aiworkspace/90_조립검수/v020/validation`.
+- 완료: 시멘트 아틀라스 v006·바닥 v004 추가, 연습장 8개 씬/프리팹 교체 및 저장. 사용자 작업 중 추가한 프랍도 보존. 배치/콜라이더/UV2 검증 통과, Unity Scene View 확인 완료(Play 검증은 미수행).
 ## ▶▶ 작업 세션 (2026-10-14 · 경석(Claude) · **23호 위협 어그로 + 일반 몬스터 추적 해제**, 브랜치 `feature/Boss23`) — 계획 [PLAN-boss-aggro.md](PLAN-boss-aggro.md) ✅ 승인(10-14) · ✅ 구현·커밋 · 컴파일 error CS 0 · 전투 EditMode 176/0(신규 27) · 보스 패턴 10/0 · ✅ 팀장 Play 확인(10-14)
 - 정정: Gauntlet·Spinner·WallBot 은 중간보스(`rank 1`)라 `loseTargetRadius` 0 — 적용 = 일반 7종.
 - `MonsterDataSO.loseTargetRadius`·`BossDataSO.threat*`·`farPressure*` 는 xlsx 에 행이 없어 SO 값으로 돈다(테이블 반영은 병합 Export 때).
@@ -245,6 +255,22 @@ HUD 매 프레임 문자열(`PlayerHealthHUD`·`StatusEffectHUD`·`SkillCooldown
 - ✅ 1단계 Codex(코드) `09e9cc57` · ✅ 2단계 Claude(씬·에셋·`LobbySceneManager` 배선). 결과 요약 = [player-prefabs.md §8.3](Docs/tech/player-prefabs.md)
 - 🔴 남은 것: **은희 MPPM Play 확인**(호스트+클라2: 초상화·Ready 동기화 / Start 활성 / 고른 Variant 스폰) → PR. 레이아웃은 첫 배치라 Play 보고 조정 가능
 - 범위 밖: 전투 HUD 초상화 Paladin 고정(Gunner 도 Paladin 얼굴)
+## ▶▶ 작업 세션 (2026-10-15 · 민경(Claude) · **어쌔신 변신 Q = Storm Slash 루프(플레이어 루트·Rate over Distance)**, 브랜치 `feature/VFX`) — 구현(컴파일 에러 0) · ⏳ Play·MPPM · 🔴 SVN add · 🔴 은희 공유(handoff-assassin-r-vfx §3-2)
+- MyProject `Export/Player3/BM Strom Slash.prefab`(운반체 Velocity 제거 → FuzzAlpha·데칼이 직접 Rate over Distance, World, Looping, Emitter Velocity = Transform) → `Players/Player3/Q_TransformedDash/FX_Assassin_StormSlash(.prefab|_Entry.asset)`, 카탈로그 `Assassin_Q_StormSlash`(outroDuration 1.1). 의존 3개 추가(Ring 머티리얼·Trail_Cone_Cut.fbx·텍스처 1 — Ring 렌더러는 꺼져 있음).
+- `AssassinDashStrikeSkill` 변신 데이터일 때만 OnClientPlay → `BeginStormSlash`, OnEnd → `EndStormSlash`. 임시 돌진 궤적은 일반 Q 만(변신 Q 에서 제거).
+
+## ▶▶ 작업 세션 (2026-10-15 · 민경(Claude) · **어쌔신 변신 E = Multi Slashes 루프(원 중심·배율 = 원 반경)**, 브랜치 `feature/VFX`) — 구현(컴파일 에러 0) · ⏳ Play·MPPM · 🔴 SVN add · 🔴 은희 공유(handoff-assassin-r-vfx §3-1)
+- MyProject `Export/Player3/BM Multi Slashes.prefab` 원본 그대로 반입 → `50.Art/VFX/Common/Players/Player3/E_CircleStrike/FX_Assassin_MultiSlashes(.prefab|_Entry.asset)`, 카탈로그 `Assassin_E_MultiSlashes`. 의존 22개 추가(PBR FX.shadergraph·머티리얼 3·텍스처 17·FBX 1, `PilotoStudio/` 하위).
+- 끊김 대책 = 엔트리 `outroDuration` 1.1(Release 는 방출만 멈춤 → 남은 입자 수명 최대 1.05초). 바닥 데칼 알파 곡선은 손대지 않음(민경 결정). 임시 `Burst_rings` 1회 유지.
+- `AssassinCircleStrikeSkill` OnClientPlay → `BeginCircleStrike`, OnEnd → `EndCircleStrike`. 배율 = `AreaRadius × circleStrikeScaleFactor(1)`.
+
+## ▶▶ 작업 세션 (2026-10-14 · 민경(Claude) · **어쌔신 R 변신 VFX = Blade Vortex(0.5초 생성·0.5초 사라짐)**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 · ✅ 1단계 MyProject 컨펌(민경) · ✅ 2단계 반입·배선(컴파일 에러 0) · ⏳ Play·MPPM · 🔴 SVN add · 🔴 은희 공유 [handoff-assassin-r-vfx.md](Docs/tech/handoff-assassin-r-vfx.md)
+- 원본: MyProject `Export/Player3/BM Blade Vortex.prefab` → 사본 `_Fast`(t=0 버스트 + 알파·크기 키 앞당김, 민경이 위치·크기 조정) · `_End`(원샷, 바깥으로 흩어짐). 원본은 그대로.
+- MainProject: `50.Art/VFX/Common/Players/Player3/R_Transform/FX_Assassin_BladeVortex(.prefab|_End.prefab|_Entry.asset)` · 카탈로그 `Assassin_R_BladeVortex`. Piloto 의존 23개(UberFXSG+서브그래프 4·머티리얼 7·텍스처 9·FBX 2)는 `50.Art/VFX/*/PilotoStudio/`, guid 유지.
+- `EffectEntry.outroPlayRate`(기본 1) 신설 — Release 시 남은 루프 입자를 배속(Main ▸ Simulation Speed). 이 엔트리 8 · outroDuration 0.6.
+- `AssassinSkillView` 변신 루프 = `PlayLooping`/`Release`(임시 `CharacterCirclePurple`·`Poof_electric` 제거). EffectStagePlayer 는 단계 교체가 즉시 회수라 파티클에서 끊겨 안 씀(grill Q13).
+- 🔴 SVN add: 위 R_Transform 폴더 + PilotoStudio 폴더 4곳(폴더 .meta 포함).
+
 ## ▶▶ 작업 세션 (2026-10-12 · 민경(Claude) · **카운터 성공 섬광 = 몸 표면 CameraDir 재생**, 브랜치 `feature/VFX`) — ✅ Play 확인(민경 10-12, 4종 모두) · ⏳ **MPPM 2인 남음** · 🔴 경석 공유
 - `EffectSocketPlayer.PlayOnceOnSurface(Collider)` 추가 — `EffectHitPoint.Resolve(CameraDir)` 로 위치·회전, 배율은 소켓 플레이어 `scale`. 표면 못 쓰면 `PlayOnce`(소켓) 폴백.
 - `MonsterBase.EffectSurfaceCollider` = `hitVFXCollider ?? bodyCollider` (23호는 hitVFXCollider 비어 있음 → 몸 캡슐).

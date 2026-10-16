@@ -7,17 +7,17 @@
 //     점유 → 3초 카운트다운 → 전원 산개 텔레포트 → 등장 연출 → 전투. 그 흐름 자체가 검증
 //     대상이므로 건너뛰지 않는다. 걸어가는 구간만 없앤다.
 //
-//  ⚠️ 이 컴포넌트는 결과물이 아니라 도구다. `#if` 로 감싸 릴리스 빌드에서는 클래스가 아예 없다
+//  ⚠️ 이 컴포넌트는 결과물이 아니라 도구다. `#if` 로 감싸 DEV_HOTKEYS 없는 릴리스 빌드에서는 클래스가 아예 없다
 //     (ProfilerHUD·LookToggle 과 같은 부류). 다만 **씬에 배치하지 않는다** — 런타임에 스스로
 //     생기므로 씬에 missing script 가 남을 일도 없고, 어떤 씬에서 Play 해도 붙는다.
 //
-//  ⚠️ 빌드에서 쓰려면 Build Settings 의 **Development Build 를 켜야 한다**(DEVELOPMENT_BUILD).
-//     끄고 뽑으면 이 클래스가 컴파일되지 않아 F5 가 아무 일도 하지 않는다.
+//  ⚠️ 빌드에서는 Standalone 스크립팅 심볼 **DEV_HOTKEYS** 가 있을 때만 들어간다(Development Build 도 됨).
+//     심볼을 지우고 릴리스로 뽑으면 이 클래스가 컴파일되지 않아 F5 가 아무 일도 하지 않는다(Docs/tech/debug-hotkeys.md).
 //
 //  🔴 로그는 `Edit.Log` 가 아니라 `Debug.Log` 다. `Edit.*` 는 [Conditional("UNITY_EDITOR")] 라
 //     빌드에서 통째로 사라진다 — 빌드로 검증하는 도구가 빌드에서 말을 못 하면 안 된다.
 // ----------------------------------------------------------------------------
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
 using Unity.Netcode;
 using Unity.Netcode.Components;
 using UnityEngine;

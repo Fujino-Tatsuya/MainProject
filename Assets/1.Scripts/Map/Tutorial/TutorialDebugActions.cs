@@ -1,10 +1,10 @@
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
 using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
 /// 튜토리얼 디버그 강제 동작 — 에디터 메뉴(<c>Tools/Tutorial/Debug/*</c>)와 런타임 구간 스킵(<see cref="TutorialSkipController"/>)이 함께 쓴다.
-/// <b>서버(호스트)에서만</b> 부른다 — 게이트·휴면·피해는 서버 권한. 에디터·Development Build 에만 있다(릴리스 빌드엔 클래스가 없다).
+/// <b>서버(호스트)에서만</b> 부른다 — 게이트·휴면·피해는 서버 권한. 에디터·Development Build·DEV_HOTKEYS 빌드에만 있다(심볼을 지운 릴리스 빌드엔 클래스가 없다).
 /// 로그는 <c>Debug.Log</c> — <c>Edit.*</c> 는 에디터 전용이라 빌드에서 사라진다.
 /// </summary>
 public static class TutorialDebugActions

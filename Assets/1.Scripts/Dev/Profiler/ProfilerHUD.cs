@@ -1,5 +1,5 @@
 // ProfilerHUD.cs
-// 런타임 프로파일링 오버레이 HUD — 에디터/개발 빌드 전용 (릴리스 빌드에서는 컴파일 제외).
+// 런타임 프로파일링 오버레이 HUD — 에디터/개발 빌드/DEV_HOTKEYS 빌드 전용 (심볼 없는 릴리스 빌드에서는 컴파일 제외).
 // 외부 패키지 의존성 없음 (IMGUI + ProfilerRecorder + FrameTimingManager).
 // 프로젝트 기준: Unity 6000.3.16f1 / URP 17.3 / 신 Input System.
 //
@@ -11,10 +11,10 @@
 // GPU ms 가 0/N/A 면 Project Settings > Player > Other Settings > "Frame Timing Stats" 활성화.
 // 패스 ms 는 AddRasterRenderPass<T>("이름", ...) 의 "이름" 과 Marker Name 이 정확히 같아야 잡힌다.
 //
-// 주의: 이 컴포넌트는 #if UNITY_EDITOR || DEVELOPMENT_BUILD 로 감싸져 있어 릴리스 빌드엔 클래스가 없다.
-//       릴리스로 출하되는 씬/프리팹에는 붙여두지 말 것(미싱 스크립트 경고 방지). 프로파일링 시 수동으로 추가.
+// 주의: 이 컴포넌트는 #if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS 로 감싸져 있어 DEV_HOTKEYS 를 지운
+//       릴리스 빌드엔 클래스가 없다. 릴리스로 출하되는 씬/프리팹에는 붙여두지 말 것(미싱 스크립트 경고 방지). 프로파일링 시 수동으로 추가.
 
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
 using System.Collections.Generic;
 using System.Text;
 using Unity.Profiling;
@@ -416,4 +416,4 @@ public sealed class ProfilerHUD : MonoBehaviour
         GUI.color = prev;
     }
 }
-#endif // UNITY_EDITOR || DEVELOPMENT_BUILD
+#endif // UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS

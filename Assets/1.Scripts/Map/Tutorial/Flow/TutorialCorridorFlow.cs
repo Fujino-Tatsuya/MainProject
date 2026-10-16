@@ -263,7 +263,7 @@ public sealed class TutorialCorridorFlow : MonoBehaviour
         if (n > 0 || absent > 0) Edit.Log($"[Tutorial] 복도{corridor} 자동 획득 {n}명(미도착 {absent}명 포함) — {reason}.", this);
     }
 
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
     /// <summary>
     /// [서버, 디버그 구간 스킵 — <see cref="TutorialSkipController"/>] 건너뛰는 복도의 특성 라운드를 <b>창 없이</b> 끝낸다:
     /// 라운드를 아직 안 열었으면 제시 없이 열고(<see cref="TutorialTraitDirector.StartRoundWithoutOfferServer"/>), 아직 참가하지 않은 접속자는

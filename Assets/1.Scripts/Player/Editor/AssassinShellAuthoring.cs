@@ -45,7 +45,6 @@ public static class AssassinShellAuthoring
     private const string HudInstanceName = "AssassinHUD";
     private const string KrFontPath = "Assets/Resources/NotoSansKR-VariableFont_wght SDF.asset";
     // 🔸 임시 VFX — 프로젝트 공용 파티클. 민경 정식 VFX 로 교체 대상(필드가 비어 있을 때만 채우므로 교체값은 재실행에도 유지).
-    private const string TransformLoopVfxPath = "Assets/50.Art/VFX/Common/Combat/CharacterCircle/CharacterCirclePurple.prefab";
     private const string DashTrailVfxPath = "Assets/50.Art/VFX/Common/Boss/Dash/FX_Dash_Trail.prefab";
     private const string CircleStrikeVfxPath = "Assets/50.Art/VFX/Common/Burst/Burst_rings.prefab";
     private const string BackAttackVfxPath = "Assets/50.Art/VFX/Common/Burst/Burst_sharp.prefab";
@@ -61,7 +60,6 @@ public static class AssassinShellAuthoring
     private const string EnhancedSlashVfxPath = PlayerSlashFolder + "FX_DoubleSlash_O.prefab";
     private const string TransformedSlashVfxPath = "Assets/50.Art/VFX/Common/Monsters/FX_Mob_Slash.prefab";
     private const string EnhanceCastVfxPath = "Assets/50.Art/VFX/Common/Burst/Flash_star.prefab";
-    private const string TransformCastVfxPath = "Assets/50.Art/VFX/Common/Burst/Poof_electric.prefab";
     private const string InterruptCastVfxPath = "Assets/50.Art/VFX/Common/FX_Interrupt_Flash.prefab";
     private const string RosterPath = "Assets/9.ScriptableObject/Player/CharacterRoster.asset";
 
@@ -534,7 +532,7 @@ public static class AssassinShellAuthoring
         {
             AssassinSkillView view = EnsureComponent<AssassinSkillView>(root);
             SerializedObject so = new SerializedObject(view);
-            SetIfEmpty(so, "transformLoopPrefab", TransformLoopVfxPath);
+            // 변신 루프는 정식 VFX(EffectCatalog.Assassin_R_BladeVortex)로 바뀌어 여기서 채우지 않는다(2026-10-14 민경).
             SetIfEmpty(so, "dashTrailPrefab", DashTrailVfxPath);
             SetIfEmpty(so, "circleStrikePrefab", CircleStrikeVfxPath);
             SetIfEmpty(so, "backAttackHitPrefab", BackAttackVfxPath);
@@ -542,9 +540,7 @@ public static class AssassinShellAuthoring
             SetIfEmpty(so, "enhancedSlashPrefab", EnhancedSlashVfxPath);
             SetIfEmpty(so, "transformedSlashPrefab", TransformedSlashVfxPath);
             SetIfEmpty(so, "enhanceCastPrefab", EnhanceCastVfxPath);
-            SetIfEmpty(so, "transformCastPrefab", TransformCastVfxPath);
             SetIfEmpty(so, "interruptCastPrefab", InterruptCastVfxPath);
-            so.FindProperty("transformSocket").objectReferenceValue = root.transform.Find("Armature/VFX/Transformation");
             SerializedProperty slashSockets = so.FindProperty("normalSlashSockets");
             slashSockets.arraySize = 4;
             for (int i = 0; i < 4; i++)

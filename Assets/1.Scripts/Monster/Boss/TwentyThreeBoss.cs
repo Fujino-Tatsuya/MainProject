@@ -1010,9 +1010,9 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         if (_raidScript.Count > 0)
             return ConsumeRaidScript(rows, dist);
 
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
         // [Dev] 단축키 예약(DevBossAttackHotkeys) — 페이즈 시퀀스 다음 우선. 간격·쿨다운·가중치 무시, 거리창만 지킨다
-        //       (사거리 밖이면 예약을 들고 추격 → 붙으면 발동). 릴리스 빌드에는 없다.
+        //       (사거리 밖이면 예약을 들고 추격 → 붙으면 발동). DEV_HOTKEYS 를 지운 릴리스 빌드에는 없다.
         int devSlot = ConsumeDevReservation(rows, dist);
         if (devSlot != NoAttack) return devSlot;
 #endif
@@ -1107,7 +1107,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         return picked;
     }
 
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
     /// <summary>[Dev] 예약 대기열 최대 길이. 넘치면 새 예약을 받지 않는다(덮어쓰지 않는다 — 넣은 순서가 곧 재현 순서다).</summary>
     public const int DevReservationCapacity = 8;
     readonly Queue<BossAttackId> _devReservations = new Queue<BossAttackId>(DevReservationCapacity);
