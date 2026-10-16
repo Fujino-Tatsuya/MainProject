@@ -37,7 +37,7 @@
 | 우선순위(하나만) | **붙잡힘 > 에어본 > 기절 > 속박 > 침묵 > 약화 > 둔화** |
 | 사망 | 살아 있지 않으면(사망 연출·Soul·영구 사망) 상태이상이 남아 있어도 **원래 이름** |
 | 문구 | 남은 시간 없음. `UI.StatusEffect.<enum>`(HUD 와 같은 키) · 붙잡힘 = `UI.StatusEffect.Grabbed`. ko/en = 공중에 뜸 Airborne · 기절 Stunned · 속박 Rooted · 침묵 Silenced · 약화 Weakened · 둔화 Slowed · 붙잡힘 Grabbed |
-| 모양 | 흰 글자 고정 + 검정 아웃라인(리치 텍스트 색 태그 없음) — [player-prefabs.md](../tech/player-prefabs.md) §10 |
+| 모양 | 흰 글자 고정 + 검정 아웃라인 ≈3px(라틴·한글 같은 두께, 리치 텍스트 색 태그 없음). 이름표 전용 폰트 에셋(`Assets/Fonts/Overhead/`)을 쓴다 — [player-prefabs.md](../tech/player-prefabs.md) §10 |
 | 동기화 | 상태이상 목록(`StatusEffectController` NetworkList)·구속 여부 모두 복제값이라 **호스트·클라 모든 피어, 내 캐릭터·파티원 모두 같은 글자**를 본다. 오프라인(스폰 전)은 이름만 |
 | 붙잡힘 복제 | 구속 FSM 은 서버·오너만 돈다(ClientRpc 는 오너에게만). 표시용으로 `Player.IsRestrainedReplicated`(서버 쓰기·전원 읽기 `NetworkVariable<bool>`)를 따로 둔다 — `BeginRestrainedByInstigator` 성공 시 true, `EndRestrainedByInstigator` 에서 false, 그 밖의 해제(사망·넉백·대시·연출 잠금이 `Restrained` 를 덮음)는 서버 `Player.Update` 가 상태를 보고 false 로 걷는다. 판정에는 쓰지 않는다 |
 | 코드 | 판정 `UI/Combat/OverheadStatusLabelRules`(순수, 테스트 `OverheadStatusLabelRulesTests`) · 연결 `PlayerOverheadHealthBarRule.Label` |
