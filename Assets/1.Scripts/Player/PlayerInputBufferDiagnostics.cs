@@ -26,7 +26,9 @@ public enum InputBufferDiagEvent
     /// <summary>새 입력에 덮여 버려졌다.</summary>
     Overwritten,
     /// <summary>바빴던 행동이 끝나 Idle/Move 로 돌아왔다 — 직전 만료 입력이 있으면 놓친 간격을 함께 남긴다.</summary>
-    Actionable
+    Actionable,
+    /// <summary>기본 공격 중 스킬 입력으로 공격을 끊고 스킬을 요청했다(거너). 뒤이어 같은 입력의 Consumed 가 난다.</summary>
+    CancelForSkill
 }
 
 /// <summary>진단 이벤트 1건. 시간은 전부 초(Time.time 기준), 없으면 음수.</summary>
@@ -194,6 +196,16 @@ public sealed class PlayerInputBufferDiagTracker
             missedGap: missedGap, pressToActionable: pressToActionable, detail: detail));
     }
 
+    /// <summary>기본 공격 중 스킬 입력으로 공격을 끊었다. 들고 있는 입력은 건드리지 않는다 — 실행 처리는 뒤이은 Consumed 가 한다.</summary>
+    public void CancelForSkill(PlayerBufferedInput input, float now, int frame, string detail)
+    {
+        CheckExpiry(now, frame);
+        if (input == PlayerBufferedInput.None)
+            return;
+
+        Emit(new InputBufferDiagRecord(InputBufferDiagEvent.CancelForSkill, input, now, frame, detail: detail));
+    }
+
     private bool Matches(PlayerBufferedInput input) =>
         pendingKind != PlayerBufferedInput.None && (input == PlayerBufferedInput.None || input == pendingKind);
 
@@ -305,7 +317,7 @@ public sealed class PlayerInputBufferDiagStats
         sb.Append(PlayerInputBufferDiagnostics.Prefix)
             .Append(" 요약 — 유지 ").Append(Ms(holdSeconds)).Append("ms, 이벤트 ").Append(TotalEvents)
             .Append("건, CSV: ").Append(csvPath ?? "(없음)").AppendLine();
-        sb.AppendLine("입력 | press | 즉시 실행 | 버퍼 실행 | 만료 | 버림 | 덮임");
+        sb.AppendLine("입력 | press | 즉시 실행 | 버퍼 실행 | 만료 | 버림 | 덮임 | 평타 끊기");
         foreach (PlayerBufferedInput input in Inputs)
         {
             int consumed = Count(input, InputBufferDiagEvent.Consumed);
@@ -317,6 +329,7 @@ public sealed class PlayerInputBufferDiagStats
                 .Append(" | ").Append(Count(input, InputBufferDiagEvent.Expired))
                 .Append(" | ").Append(Count(input, InputBufferDiagEvent.Dropped))
                 .Append(" | ").Append(Count(input, InputBufferDiagEvent.Overwritten))
+                .Append(" | ").Append(Count(input, InputBufferDiagEvent.CancelForSkill))
                 .AppendLine();
         }
 
@@ -497,6 +510,7 @@ public static class PlayerInputBufferDiagnostics
         InputBufferDiagEvent.Dropped => "dropped",
         InputBufferDiagEvent.Overwritten => "overwritten",
         InputBufferDiagEvent.Actionable => "actionable",
+        InputBufferDiagEvent.CancelForSkill => "cancel-for-skill",
         _ => evt.ToString()
     };
 

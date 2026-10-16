@@ -142,6 +142,10 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
     public bool CanStartApprovedAttack => HasAttackSteps && CurrentStepDuration > 0f;
     // 콤보 중 언제든 대시로 끊는다(할 일 9). 판정이 나갔으면 피해는 그대로, 남은 동작·예약만 끊긴다(CancelCurrentAttack).
     public bool CanBeCanceledByDash => true;
+    // 콤보는 누른 프레임으로만 시작하고, 공격 중 스킬 입력은 콤보가 끝날 때까지 버퍼에 둔다(할 일 44 — 거너만 다름).
+    public bool StartsOnHold => false;
+    public bool CanBeCanceledBySkill => false;
+    public bool IsSkillCancelDeferred => false;
     private bool HasGameplayAuthority => !IsNetworkActive || IsServer;
 
     private void Awake()

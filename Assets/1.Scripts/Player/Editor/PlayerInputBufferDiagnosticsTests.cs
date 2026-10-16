@@ -32,6 +32,25 @@ public sealed class PlayerInputBufferDiagnosticsTests
     }
 
     [Test]
+    public void CancelForSkill_EmitsEventAndCount_KeepsPendingForConsume()
+    {
+        tracker.StateChanged(false, 9.9f, 90, "→Attack");
+        tracker.Press(PlayerBufferedInput.SkillSub, 10f, 100, Hold);
+        tracker.CancelForSkill(PlayerBufferedInput.SkillSub, 10.1f, 106, "스킬 요청");
+
+        Assert.That(tracker.Pending, Is.EqualTo(PlayerBufferedInput.SkillSub), "끊기 이벤트는 들고 있는 입력을 건드리지 않는다");
+        tracker.Consumed(PlayerBufferedInput.None, 10.1f, 106, "행동 시작");
+
+        Assert.That(Last(InputBufferDiagEvent.CancelForSkill).Input, Is.EqualTo(PlayerBufferedInput.SkillSub));
+        Assert.That(Last(InputBufferDiagEvent.Consumed).Input, Is.EqualTo(PlayerBufferedInput.SkillSub));
+
+        var stats = new PlayerInputBufferDiagStats();
+        records.ForEach(r => stats.Add(r));
+        Assert.That(stats.Count(PlayerBufferedInput.SkillSub, InputBufferDiagEvent.CancelForSkill), Is.EqualTo(1));
+        StringAssert.Contains("E | 1 | 0 | 1 | 0 | 0 | 0 | 1", stats.BuildSummary(Hold, "x.csv"));
+    }
+
+    [Test]
     public void PressWhileBusy_NextFrameBuffered_ThenConsumedWithElapsed()
     {
         tracker.StateChanged(false, 9.9f, 90, "→Attack");

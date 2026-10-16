@@ -33,6 +33,21 @@ Idle/Move 에서 입력(이번 프레임 눌림 또는 선입력 버퍼)으로 �
 - 코드: `PlayerActionAttempt`·`PlayerActionRejectPolicy`(`PlayerInputBuffer.cs`), `PlayerStateController.RejectByEffect`·`ClassifyDashReject`, `PlayerStateBase.TryConsumeActionInput`·`TryStartSkill`.
 - 테스트: `PlayerInputBufferTests` — `Resolve_*`, `ClassifyEffectBlock_*`, `CooldownReject_*`, `EffectBlock_*`, `OtherReject_*`.
 
+### 0.1 거너 — 홀드 시작·공격 중 스킬 입력(5차, 2026-10-16)
+
+캐릭터별 판단은 `IPlayerBasicAttack` 한 곳이다 — 거너만 예, 가붕이·어쌔신은 아니오(기존 그대로).
+
+| 항목 | 속성 | 동작 |
+|---|---|---|
+| 홀드 시작 | `StartsOnHold` | Idle/Move 에서 좌클릭을 누르고 있기만 해도 평타를 시작한다(스킬이 끝났는데 계속 누르고 있으면 평타가 이어진다). 누른 입력(평타·스킬·인터럽트)을 다 본 뒤 맨 마지막에 봐서 버퍼에 남은 스킬을 앞지르지 않는다. 과열·공격 차단 효과·스킬 실행/요청 중이면 피드백 없이 건너뛴다. |
+| 스킬로 끊기 | `CanBeCanceledBySkill` | 평타(AttackReady·Attack) 중 Q·E·R·우클릭 스킬 입력은 평타를 끊고 스킬을 쓴다. 판정 순서·거부 처리(바쁨·상태이상·쿨타임·`TryUse`)는 §0 표와 같다. |
+| 발 잠금 미룸 | `IsSkillCancelDeferred` | 발 잠금(발사 −`ShotLockLead` ~ +`ShotLockTail`, 오너 시계) 중이면 '바쁨'으로 버퍼에 남기고 풀린 첫 틱에 끊는다. 첫 발은 준비 끝 − Lead 부터 잠긴다(준비 초반은 바로 끊음). |
+
+- 네트워크: 오너는 평타 상태 그대로 스킬 요청만 보낸다. 서버 `CanApproveSkill`·`BeginSkill` 은 `PlayerStateController.CanStartSkill`(Idle/Move 또는 끊을 수 있는 평타 중 + 차단 효과 없음)로 승인하고, `BeginSkill` 의 상태 전이 → `PlayerAttackState.Exit` → `CancelCurrentAttack` 이 끊는다(거너 `EndRpc` → 원격 피어 정리, 그 뒤 `PlaySkillClientRpc`). 서버는 발 잠금을 검증하지 않는다.
+- 조준 스킬(거너 R): 끊는 시점은 조준 확정 요청이다 — 조준 중에는 평타가 계속되고, 확정 요청은 발 잠금을 기다리지 않는다.
+- 진단 로그: 끊기 요청마다 `cancel-for-skill`(요약 표 '평타 끊기' 열). 미룬 입력의 `buffered` 사유 = `바쁨(발 잠금)`.
+- 코드: `PlayerBasicAttackInputRules`(`IPlayerBasicAttack.cs`), `PlayerStateBase.TryCancelAttackForSkillInput`·`TryStartAttackOnHold`. 테스트: `PlayerBasicAttackInputRulesTests`.
+
 ## 1. 이벤트
 
 ### 1.1 쿨타임 거부 — `PlayerSkillController.CooldownRejected`
@@ -73,7 +88,7 @@ Idle/Move 에서 입력(이번 프레임 눌림 또는 선입력 버퍼)으로 �
 - 범위: 오너 클라만. `UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS` 일 때만 컴파일된다(훅은 `[Conditional]` — 심볼이 없으면 호출째 사라진다).
 - 토글: `PlayerInputBufferDiagnostics.Enabled`(기본 켜짐). 에디터는 메뉴 `Tools/Debug/선입력 버퍼 진단 로그`(EditorPrefs 에 남음).
 - 출력: 콘솔 `[InputBuf]` 한 줄씩 + CSV. 에디터 = 프로젝트 `Logs/InputBuffer-<시각>.csv`, 빌드 = `Application.persistentDataPath`. Play 종료 때 입력별 개수·분포 요약과 CSV 경로를 콘솔에 남긴다.
-- 이벤트: `press`·`buffered`(누른 프레임에 실행 못 함 + 사유)·`consumed`(즉시/버퍼 실행 + press→실행 ms)·`expired`·`dropped`(사유)·`overwritten`·`actionable`(바쁨 → Idle/Move).
+- 이벤트: `press`·`buffered`(누른 프레임에 실행 못 함 + 사유)·`consumed`(즉시/버퍼 실행 + press→실행 ms)·`expired`·`dropped`(사유)·`overwritten`·`actionable`(바쁨 → Idle/Move)·`cancel-for-skill`(거너 평타를 스킬 입력으로 끊음, §0.1).
 - 핵심 숫자: `actionable` 의 **놓친 간격** = 실행 가능해진 시각 − 만료 시각(press + 유지 시간), **press→actionable** = 그 입력이 살아남으려면 필요했던 유지 시간. 바쁜 동안 만료된 입력만 센다.
 - 알려진 한계: 원격 클라 오너의 근접 평타 콤보 예약 입력은 버퍼에서 지우지 않아(창을 서버만 안다) 콤보 중 누른 LMB 가 `expired` 로 잡힐 수 있다. Idle/Move 안에서 요청 응답만 기다리는 경우(스킬 요청 대기)는 `actionable` 로 보지 않는다.
 - 코드: `PlayerInputBufferDiagnostics.cs`(추적기·집계·세션), 훅은 `PlayerInputReader`(기록·소비·Resolve·비움)·`PlayerStateController.ChangeState`/`SetState`. 테스트: `PlayerInputBufferDiagnosticsTests`.

@@ -15,7 +15,9 @@ using UnityEngine;
 ///    발사 간격이 차면 요청한다. 서버는 눌림·예약이 없는 요청을 버린다(창 우회 방지).
 /// 어느 쪽이든 준비 동작은 첫 발만이다. 둘 다 아니거나 과열되면 후속 동작(ShotRecovery)까지 마무리하고 끝난다.
 /// 창은 애니 이벤트가 아니라 데이터의 시간 값이다(판정도 시간 기반이라 한 곳에서 맞춘다).
-/// 공격 중 이동 불가. 다른 스킬 입력은 상태기계가 막는다(Attack 상태 — §3.2, 예약 없음).
+/// 공격 중 이동 불가. 스킬 입력(Q·E·R·우클릭)은 이 공격을 끊고 스킬을 쓴다 — 발 잠금 중이면 풀릴 때까지 선입력 버퍼가 들고 있다
+/// (<see cref="IsSkillCancelDeferred"/>, 할 일 44). 끊기는 서버가 스킬을 승인하며 상태를 바꿀 때 <see cref="CancelCurrentAttack"/> 로 난다.
+/// 홀드 시작(<see cref="StartsOnHold"/>): 스킬 등으로 공격이 끝난 뒤에도 좌클릭을 누르고 있으면 Idle/Move 에서 다시 시작한다.
 /// 방향(할 일 27, <see cref="GunnerAttackFacingModel"/>): 발 잠금 중에는 몸이 돌지 않고, 그 밖에는 커서 쪽으로
 /// <see cref="GunnerBasicAttackData.BetweenShotTurnSpeed"/> 로 돈다. 발 잠금 = 첫 발은 공격 시작 ~ 발사 + ShotLockTail,
 /// 이어지는 발은 발사 − ShotLockLead ~ 발사 + ShotLockTail(잠근 순간의 몸 방향). 🔴 잠금은 오너 시계만으로 돈다 —
@@ -85,6 +87,16 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
     // 공용 대시 우선(D1·D2) — 준비 중 끊기면 발사·과열 없음, 발사 후면 이미 쏜 발은 그대로이고 후속 동작만 끊긴다.
     // 홀드 연사 중에도 언제든 끊는다(할 일 9).
     public bool CanBeCanceledByDash => true;
+
+    // 홀드 연사 캐릭터 — 누르고 있으면 시작하고, 스킬 입력은 공격을 끊는다(할 일 44).
+    public bool StartsOnHold => true;
+    public bool CanBeCanceledBySkill => true;
+
+    // 발 잠금 중에는 끊지 않는다 — 그 발을 다 쏜 뒤(ShotLockTail) 끊는다. 오너 시계만으로 판단한다(잠금과 같은 기준).
+    public bool IsSkillCancelDeferred =>
+        active && data != null && heat != null &&
+        PlayerBasicAttackInputRules.IsInShotLock(
+            Time.time, ownerLastShotTime, OwnerNextShotTime(), data.ShotLockLead, data.ShotLockTail);
 
     private bool HasGameplayAuthority => !IsNetworkActive || IsServer;
     private bool IsInputSource => !IsNetworkActive || IsOwner;
@@ -260,6 +272,16 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
             HoldSignalRpc();
         else
             ServerHoldSignal();
+    }
+
+    // 오너가 다음 발을 요청할 예정 시각 — 첫 발은 준비 끝, 이어지는 발은 누르고 있거나 창 예약이 있을 때만. 없으면 -1.
+    private float OwnerNextShotTime()
+    {
+        if (heat.IsOverheated)
+            return -1f;
+        if (!firstShotSent)
+            return startTime + data.WindupDuration;
+        return input.AttackHeld || ownerQueued ? ownerLastShotTime + data.FireInterval : -1f;
     }
 
     private void RequestShot(Vector3 direction)

@@ -104,6 +104,21 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
         _ => false,
     };
 
+    /// <summary>
+    /// 지금 행동을 스킬로 끊을 수 있는가(할 일 44) — 기본 공격 중이고 <see cref="IPlayerBasicAttack.CanBeCanceledBySkill"/>(거너만 예).
+    /// 캐릭터 규칙만 본다: 발 잠금 미룸(<see cref="IPlayerBasicAttack.IsSkillCancelDeferred"/>)은 오너가 요청 전에 따로 보고, 서버는 검증하지 않는다.
+    /// </summary>
+    public bool CurrentActionAllowsSkillCancel =>
+        (CurrentState == PlayerActionState.AttackReady || CurrentState == PlayerActionState.Attack) &&
+        context.DefaultAttack != null && context.DefaultAttack.CanBeCanceledBySkill;
+
+    /// <summary>
+    /// 스킬을 시작할 수 있는가 — Idle/Move(<see cref="CanUseSkill"/>) 이거나, 스킬로 끊을 수 있는 기본 공격 중(차단 효과 없음).
+    /// 서버 승인(<see cref="PlayerSkillController"/>)과 <see cref="BeginSkill"/> 이 같은 조건을 쓴다.
+    /// </summary>
+    public bool CanStartSkill =>
+        CanUseSkill || (CurrentActionAllowsSkillCancel && !cinematicLocked && !context.StatusEffects.BlocksSkill);
+
     /// <summary>행동을 끊는 대시의 이동 가능 조건 — 상태 제한(Idle/Move)만 빼고 CC·연출 잠금·사망은 그대로 막는다.</summary>
     public bool CanDashFromAction =>
         CurrentState != PlayerActionState.Dead && !cinematicLocked && !context.StatusEffects.BlocksMovement;
@@ -384,10 +399,15 @@ public class PlayerStateController : MonoBehaviour, IRestraintReceiver
 
     // Skill 상태는 실행할 스킬 인스턴스가 필요해 BeginKnockback처럼 인스턴스 주입 경로로만 진입한다.
     // 진입 상태는 스킬이 정한다(기본 Skill, 거너 Q = Focus).
+    // 스킬로 끊을 수 있는 기본 공격(거너) 중이면 그 공격을 덮는다 — PlayerAttackState.Exit → CancelCurrentAttack 이
+    // 서버에서 끊기를 전 피어에 보내고(거너 EndRpc), 원격 피어는 스킬 RPC 보다 먼저 받거나 여기서 같은 Exit 로 정리한다(할 일 44).
     public bool BeginSkill(PlayerSkillBase skill)
     {
-        if (skill == null || !CanUseSkill)
+        if (skill == null || !CanStartSkill)
             return false;
+
+        if (!CanUseSkill)
+            Edit.Log($"[Skill] 기본 공격({CurrentState})을 끊고 {skill.Slot} 시작", this);
 
         SetState(new PlayerSkillState(context, skill, skill.EntryActionState));
         return true;
@@ -692,6 +712,7 @@ public abstract class PlayerStateBase : IPlayerState
 
         // 공격 시작은 누른 프레임(press)이나 버퍼된 press 에만 허용한다. 홀드 상태로는 시작되지 않으므로,
         // Once 정책에서 체인이 끝난 뒤 계속 누르고 있어도 재시작되지 않는다(릴리즈 요구).
+        // 예외: 홀드 시작 캐릭터(거너)는 아래 맨 끝(TryStartAttackOnHold)에서 누르고 있기만 해도 시작한다.
         if ((Context.Input.AttackPressed || Context.Input.HasBufferedInput(PlayerBufferedInput.Attack)) &&
             Context.DefaultAttack != null)
         {
@@ -738,8 +759,87 @@ public abstract class PlayerStateBase : IPlayerState
             }
         }
 
+        if (TryStartAttackOnHold())
+        {
+            Context.Input.ClearInputBufferOnActionStarted();
+            return true;
+        }
+
         return false;
     }
+
+    // 홀드 시작(할 일 44) — 홀드 연사 캐릭터(거너)는 누른 프레임이 아니어도 좌클릭을 누르고 있으면 시작한다.
+    // 스킬이 끝났는데 계속 누르고 있으면 평타가 다시 이어진다. 누른 입력(평타·스킬·인터럽트)을 다 본 뒤 마지막에 봐서
+    // 버퍼에 남은 스킬 입력을 앞지르지 않는다. 매 프레임 조건이라 거부(과열·차단 효과·요청 중)는 버퍼·피드백 없이 건너뛴다.
+    private bool TryStartAttackOnHold()
+    {
+        IPlayerBasicAttack attack = Context.DefaultAttack;
+        return attack != null &&
+            PlayerBasicAttackInputRules.ShouldStartOnHold(
+                attack.StartsOnHold, Context.Input.AttackHeld, Context.StatusEffects.BlocksAttack,
+                Context.Skills != null && Context.Skills.IsBusy) &&
+            attack.TryStart();
+    }
+
+    /// <summary>
+    /// 기본 공격 중 스킬 입력(할 일 44) — 공격이 스킬로 끊을 수 있으면(거너) 스킬을 시도한다. 시전이 승인되면 서버가 상태를 바꾸며
+    /// 공격을 끊는다(<see cref="PlayerStateController.BeginSkill"/> → <see cref="PlayerAttackState"/>.Exit → CancelCurrentAttack).
+    /// 발 잠금 중이면 입력을 버퍼에 남겨(바쁨) 풀린 첫 틱에 다시 시도한다. 쿨타임·차단 효과·사용 조건 거부는 Idle/Move 와 같은 규칙.
+    /// 못 끊는 공격(가붕이·어쌔신)은 아무것도 하지 않는다 — 입력은 공격이 끝나 Idle/Move 로 돌아온 첫 틱에 버퍼가 넘긴다.
+    /// </summary>
+    protected bool TryCancelAttackForSkillInput()
+    {
+        IPlayerBasicAttack attack = Context.DefaultAttack;
+        PlayerSkillController skills = Context.Skills;
+        if (attack == null || skills == null || Context.Input == null || !Context.Player.IsInputSource)
+            return false;
+
+        // 조준 중 입력은 PlayerSkillTargeting 이 처리한다(확정·재입력 취소).
+        if (skills.IsChoosingTarget)
+            return false;
+
+        PlayerBufferedInput kind = PendingSkillInput(skills);
+        if (kind == PlayerBufferedInput.None)
+            return false;
+
+        switch (PlayerBasicAttackInputRules.ClassifySkillCancel(attack.CanBeCanceledBySkill, attack.IsSkillCancelDeferred))
+        {
+            case PlayerSkillCancelDecision.NotAllowed:
+                return false;
+            case PlayerSkillCancelDecision.Deferred:
+                Context.Input.ResolveBufferedInput(kind, PlayerActionAttempt.Blocked);
+                return false;
+        }
+
+        if (!TryStartSkillInput())
+            return false;
+
+        Context.Input.DiagnoseCancelForSkill(kind, skills.IsChoosingTarget ? "조준 진입(공격 유지)" : "스킬 요청");
+        Context.Input.ClearInputBufferOnActionStarted();
+        return true;
+    }
+
+    // 이번 프레임 눌림 또는 버퍼에 살아 있는 스킬 입력 — TryStartSkillInput 과 같은 슬롯 순서. 비어 있는 우클릭은 인터럽트 상태 몫이라 뺀다.
+    private PlayerBufferedInput PendingSkillInput(PlayerSkillController skills)
+    {
+        for (int i = 0; i < SkillSlotOrder.Length; i++)
+        {
+            PlayerSkillSlot slot = SkillSlotOrder[i];
+            if (slot == PlayerSkillSlot.Interrupt && skills.GetSkill(slot) == null)
+                continue;
+
+            PlayerBufferedInput kind = PlayerInputBuffer.FromSkillSlot(slot);
+            if (Context.Input.GetSkillPressed(slot) || Context.Input.HasBufferedInput(kind))
+                return kind;
+        }
+
+        return PlayerBufferedInput.None;
+    }
+
+    private static readonly PlayerSkillSlot[] SkillSlotOrder =
+    {
+        PlayerSkillSlot.Main, PlayerSkillSlot.Sub, PlayerSkillSlot.Interrupt, PlayerSkillSlot.Ultimate
+    };
 
     private bool TryStartSkillInput()
     {
@@ -882,6 +982,12 @@ public sealed class PlayerAttackState : PlayerStateBase
 
     public override void Tick()
     {
+        // 스킬로 끊을 수 있는 공격(거너)이면 스킬 입력을 먼저 본다. 오프라인·호스트는 여기서 바로 스킬 상태로 넘어가고,
+        // 원격 오너는 서버 승인(PlaySkillClientRpc) 때 넘어간다 — 그 사이 공격은 그대로 돈다.
+        TryCancelAttackForSkillInput();
+        if (Context.Controller.CurrentState != StateType)
+            return;
+
         Context.Player.SetAnimatorMoving(false);
         Context.DefaultAttack?.Tick();
     }

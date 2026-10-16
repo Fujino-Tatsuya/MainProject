@@ -561,7 +561,12 @@ public class PlayerInputReader : BaseNetworkBehaviour
                 diag.Consumed(PlayerBufferedInput.None, now, frame, $"{input} 시작");
                 break;
             case PlayerActionAttempt.Blocked:
-                diag.Blocked(input, now, frame, IsInputBufferDiagIncapacitated() ? "CC" : "바쁨(요청 대기)");
+                // 기본 공격 중의 Blocked 는 스킬 끊기를 발 잠금이 미룬 것뿐이다(거너, 할 일 44).
+                diag.Blocked(input, now, frame,
+                    IsInputBufferDiagIncapacitated() ? "CC"
+                    : InputBufferDiagState == PlayerActionState.Attack || InputBufferDiagState == PlayerActionState.AttackReady
+                        ? "바쁨(발 잠금)"
+                        : "바쁨(요청 대기)");
                 break;
             case PlayerActionAttempt.OutOfResource:
                 diag.Dropped(input, now, frame, "자원 부족(쿨타임·충전·과열)");
@@ -573,6 +578,15 @@ public class PlayerInputReader : BaseNetworkBehaviour
                 diag.Dropped(input, now, frame, "기타 거부(사용 조건·빈 슬롯·비접지 등)");
                 break;
         }
+#endif
+    }
+
+    /// <summary>기본 공격 중 스킬 입력으로 공격을 끊고 스킬을 요청했을 때 상태기계가 부른다(cancel-for-skill, 거너).</summary>
+    [System.Diagnostics.Conditional("UNITY_EDITOR"), System.Diagnostics.Conditional("DEVELOPMENT_BUILD"), System.Diagnostics.Conditional("DEV_HOTKEYS")]
+    internal void DiagnoseCancelForSkill(PlayerBufferedInput input, string detail)
+    {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
+        GetInputBufferDiag()?.CancelForSkill(input, Time.time, Time.frameCount, detail);
 #endif
     }
 
