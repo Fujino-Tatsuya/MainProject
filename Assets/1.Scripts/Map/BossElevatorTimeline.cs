@@ -80,7 +80,7 @@ public struct BossElevatorTimingSettings
         frontBlackHold = 0.2f,
         frontFadeInDuration = 0.5f,
         descendDelay = 0f,
-        descendDuration = 2.1f,
+        descendDuration = 2.5f,
         doorOpenDuration = 0f,
         walkStartDelay = 0.2f,
         walkInterval = 0.6f,

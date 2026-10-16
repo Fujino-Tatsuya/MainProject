@@ -3,7 +3,7 @@ using NUnit.Framework;
 /// <summary>
 /// 보스 엘리베이터 순수 시간표(<see cref="BossElevatorTimeline"/>) — 단계 시각, 이징 끝점·중간값, 경과 시간 → 단계·높이·상승 속도·문 포즈·페이드 알파·
 /// 슬롯별 보행(늦은 합류 포함).
-/// 기본 수치: 높이 12(테스트 고정 — 설정 기본은 0 = 자동), 문 앞 페이드 아웃 0.4·암전 유지 0.2·페이드 인 0.5, 하강 지연 0(문 앞 이동 순간 시작), 하강 2.1,
+/// 기본 수치: 높이 12(테스트 고정 — 설정 기본은 0 = 자동), 문 앞 페이드 아웃 0.4·암전 유지 0.2·페이드 인 0.5, 하강 지연 0(문 앞 이동 순간 시작), 하강 2.5,
 /// 문 열림 1.76·닫힘 1.68(클립 길이), 보행 시작 지연 0.2·간격 0.6·속도 3, 보행 뒤 닫힘 0.5, 상승 가속 2.6·속도 14, 페이드 지연 1·길이 1.6.
 /// 보행 거리는 테스트 고정 6m(= 2초), 3인.
 /// </summary>
@@ -36,7 +36,7 @@ public sealed class BossElevatorTimelineTests
     public void Defaults_SlowerThanBefore()
     {
         BossElevatorTimingSettings s = BossElevatorTimingSettings.Default;
-        Assert.AreEqual(2.1f, s.descendDuration, Eps, "하강 1.2 → 2.1초(1.75배)");
+        Assert.AreEqual(2.5f, s.descendDuration, Eps, "하강 1.2 → 2.1 → 2.5초(할 일 46 후속 7)");
         Assert.AreEqual(2.6f, s.ascendDuration, Eps, "상승 가속 1.5 → 2.6초");
         Assert.AreEqual(14f, s.ascendSpeed, Eps, "상승 속도 24 → 14m/s");
         // 상승 시작 → 암전까지 보이는 시간: 이전 0 + 1.5 = 1.5초 → 1 + 1.6 = 2.6초(약 1.7배).
@@ -74,7 +74,7 @@ public sealed class BossElevatorTimelineTests
         BossElevatorTimeline t = Default();
         const float fadeInEnd = 0.4f + 0.2f + 0.5f;
         const float descend = 0.4f;
-        const float doorOpen = descend + 2.1f;
+        const float doorOpen = descend + 2.5f;
         const float walkIn = doorOpen + ClipOpen;
         const float lastWalkEnd = walkIn + 0.2f + 2 * 0.6f + 2f;
         const float doorClose = lastWalkEnd + 0.5f;
@@ -86,7 +86,7 @@ public sealed class BossElevatorTimelineTests
         Assert.AreEqual(0.6f, t.FrontFadeInAt, Eps, "암전 유지 0.2");
         Assert.AreEqual(fadeInEnd, t.FrontFadeInEndAt, Eps, "페이드 인 0.5 끝 = 보행 지시");
         Assert.AreEqual(descend, t.StartOf(BossElevatorPhase.Descending), Eps, "문 앞 이동 + 하강 지연 0 — 암전 중 하강 시작");
-        Assert.AreEqual(doorOpen, t.StartOf(BossElevatorPhase.DoorOpening), Eps, "하강 2.1 끝");
+        Assert.AreEqual(doorOpen, t.StartOf(BossElevatorPhase.DoorOpening), Eps, "하강 2.5 끝");
         Assert.AreEqual(walkIn, t.StartOf(BossElevatorPhase.WalkingIn), Eps, "Open 클립 길이 뒤");
         Assert.AreEqual(doorClose, t.StartOf(BossElevatorPhase.DoorClosing), Eps, "마지막 사람 도착 + 0.5");
         Assert.AreEqual(ascend, t.StartOf(BossElevatorPhase.Ascending), Eps, "Close 끝 뒤");
@@ -135,7 +135,7 @@ public sealed class BossElevatorTimelineTests
         Assert.AreEqual(BossElevatorPhase.WaitDescend, t.PhaseAt(t.TeleportFrontAt), "지연 동안 = 하강 대기(암전)");
         Assert.AreEqual(t.Height, t.HeightAt(t.DescendStartAt - 0.01), Eps);
         Assert.AreEqual(baseline.FrontFadeInEndAt, t.FrontFadeInEndAt, Eps, "페이드 인은 지연과 무관");
-        Assert.AreEqual(t.DescendStartAt + 2.1f, t.DoorOpenAt, Eps, "이후 단계는 하강 끝 기준");
+        Assert.AreEqual(t.DescendStartAt + 2.5f, t.DoorOpenAt, Eps, "이후 단계는 하강 끝 기준");
         Assert.AreEqual(0.1f, t.WalkStartAt(0) - baseline.WalkStartAt(0), Eps, "보행·닫힘·상승도 같이 밀린다");
         Assert.AreEqual(0.1f, t.BlackoutAt - baseline.BlackoutAt, Eps);
     }
@@ -293,7 +293,7 @@ public sealed class BossElevatorTimelineTests
         Assert.AreEqual(12f, t.HeightAt(0.0), Eps, "시작 = 위에서 대기");
         Assert.AreEqual(12f, t.HeightAt(t.TeleportFrontAt - 0.01), Eps, "문 앞 이동 전(페이드 아웃) 동안도 위");
         Assert.AreEqual(12f, t.HeightAt(t.DescendStartAt), Eps, "하강 시작");
-        Assert.AreEqual(12f * (1f - 0.96875f), t.HeightAt(t.DescendStartAt + 2.1 * 0.5), Eps, "하강 중간 = OutQuint");
+        Assert.AreEqual(12f * (1f - 0.96875f), t.HeightAt(t.DescendStartAt + 2.5 * 0.5), Eps, "하강 중간 = OutQuint");
         Assert.AreEqual(0f, t.HeightAt(t.DoorOpenAt), Eps, "착지");
         Assert.AreEqual(0f, t.HeightAt(t.WalkInAt + 0.1), Eps);
         Assert.AreEqual(0f, t.HeightAt(t.AscendStartAt), Eps, "상승 시작");
