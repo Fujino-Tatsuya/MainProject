@@ -501,6 +501,7 @@ grep -n "AuthorityMode" Assets/2.Prefabs/Player/Player.prefab Assets/2.Prefabs/P
   폰트 메트릭 문제가 아니고(advance 가 원본 `LiberationSans SDF` 와 같다), Dilate 부풀림도 아니다(면 간격 변화 ≤1px).
   자간 20 에서 먹힘 ≈0 — 머티리얼·두께는 그대로다. 아웃라인을 두껍게 바꾸면 자간도 다시 맞춘다(10→84px², 15→8px², 18→1px², 20→0.1px², 영문 9개 합계).
 - **정적 아틀라스**라 에디터·Play 에서 에셋이 다시 써지지 않는다(git 노이즈 없음). 2,350자 밖 글자(희귀 한글·한자 등 닉네임)는 TMP Settings 전역 fallback(`NotoSansKR … SDF`)로 그려진다 — 보이긴 하지만 아웃라인이 ≈1px 로 얇다.
+- 2,350자 밖 글자는 전역 fallback 으로 외곽선 약 1px — 사용자 승인(2026-10-16: 정적 아틀라스 유지, 한글 전용 에셋 9.6MB 그대로).
   글자를 늘릴 땐 Font Asset Creator 에서 에셋에 저장된 생성 설정(문자 목록 포함)으로 다시 굽는다.
 
 **에임 대시 틴트** — `PlayerAimIndicator.tintOnDashCooldown`(기본 **꺼짐**). 켜면 예전처럼 재충전 중 인디케이터를
