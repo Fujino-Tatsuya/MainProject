@@ -83,6 +83,10 @@ public static class AssassinShellAuthoring
     private const float CircleStrikeSpeed = 1.5f;
     private const int EnemyHittableLayers = 17664; // Enemy·Projectile·EnemyHurtBox — 가붕이 Q·어쌔신 평타와 같다
 
+    // 할 일 47-1 "모든 애니메이션을 끝까지 재생한 뒤 전이" — 행동 종료 End 이벤트와 시간으로 넘어가는 전이는 클립 끝에서.
+    private const float ClipEndTime = 1f;
+    private const float AutoTransitionBlend = 0.08f;
+
     private static readonly string[] WaveClips =
     {
         "Combo_Attack_Wave_01",
@@ -214,30 +218,32 @@ public static class AssassinShellAuthoring
         }
 
         // 일반 평타: 실제 타격 프레임 확인 전 기본값. Play에서 반드시 튜닝한다.
+        // End 는 클립 끝(할 일 47-1) — 다음 타·Idle 복귀가 클립을 끝까지 재생한 뒤에만 일어난다.
         foreach (string clipName in WaveClips)
             ReplaceEvents(clipName, DefaultAttackEvent(0.40f, DefaultAttackAnimationEventType.Hit),
-                DefaultAttackEvent(0.85f, DefaultAttackAnimationEventType.End));
+                DefaultAttackEvent(ClipEndTime, DefaultAttackAnimationEventType.End));
 
         // A7 연결 자리까지 같은 메뉴가 준비한다. 실제 타격 프레임은 Play에서 튜닝한다.
         ReplaceEvents("Combo_Attack_02_01",
             DefaultAttackEvent(0.40f, DefaultAttackAnimationEventType.Hit),
-            DefaultAttackEvent(0.85f, DefaultAttackAnimationEventType.End));
+            DefaultAttackEvent(ClipEndTime, DefaultAttackAnimationEventType.End));
         ReplaceEvents("Speed_Attack_Loop",
             DefaultAttackEvent(0.15f, DefaultAttackAnimationEventType.Hit),
             DefaultAttackEvent(0.35f, DefaultAttackAnimationEventType.Hit),
             DefaultAttackEvent(0.55f, DefaultAttackAnimationEventType.Hit),
             DefaultAttackEvent(0.75f, DefaultAttackAnimationEventType.Hit),
-            DefaultAttackEvent(0.90f, DefaultAttackAnimationEventType.End));
+            DefaultAttackEvent(ClipEndTime, DefaultAttackAnimationEventType.End));
 
+        // Q 돌진은 돌진 종료(OnTick)가, 간파는 skillDuration 타이머가 먼저 끝낸다 — 클립보다 훨씬 짧아 End 는 안전망이다(47-1 예외).
         ReplaceEvents("Combo_Attack_02_04", SkillEvent(0.40f, SkillAnimationEventType.Hit), SkillEvent(0.85f, SkillAnimationEventType.End));
         ReplaceEvents("Combo_Attack_03_04", SkillEvent(0.40f, SkillAnimationEventType.Hit), SkillEvent(0.85f, SkillAnimationEventType.End));
-        ReplaceEvents("Buff", SkillEvent(0.85f, SkillAnimationEventType.End));
+        ReplaceEvents("Buff", SkillEvent(ClipEndTime, SkillAnimationEventType.End));
         ReplaceEvents("Skill_02_Move_000pct",
             SkillEvent(0.18f, SkillAnimationEventType.Hit), SkillEvent(0.32f, SkillAnimationEventType.Hit),
             SkillEvent(0.46f, SkillAnimationEventType.Hit), SkillEvent(0.60f, SkillAnimationEventType.Hit),
-            SkillEvent(0.74f, SkillAnimationEventType.Hit), SkillEvent(0.90f, SkillAnimationEventType.End));
+            SkillEvent(0.74f, SkillAnimationEventType.Hit), SkillEvent(ClipEndTime, SkillAnimationEventType.End));
         ReplaceEvents("Attack_Up_01", SkillEvent(0.40f, SkillAnimationEventType.Hit), SkillEvent(0.85f, SkillAnimationEventType.End));
-        ReplaceEvents("Parry_R", SkillEvent(0.85f, SkillAnimationEventType.End));
+        ReplaceEvents("Parry_R", SkillEvent(ClipEndTime, SkillAnimationEventType.End));
 
         AssetDatabase.SaveAssets();
         Debug.Log($"{Tag} 클립 {configured}/{AllClipNames.Length}개 Loop 설정, 이벤트 교체 완료. " +
@@ -1084,12 +1090,12 @@ public static class AssassinShellAuthoring
         EnsureTransition(combatIdle, idle, false, 0f, "IsCombatIdle", AnimatorConditionMode.IfNot, 0f);
         EnsureTransition(idle, runStart, false, 0f, "IsMoving", AnimatorConditionMode.If, 0f);
         EnsureTransition(combatIdle, runStart, false, 0f, "IsMoving", AnimatorConditionMode.If, 0f);
-        EnsureTransition(runStart, runLoop, true, 0.85f, null, default, 0f);
+        EnsureTransition(runStart, runLoop, true, ClipEndTime, null, default, 0f);
         EnsureTransition(runStart, runStop, false, 0f, "IsMoving", AnimatorConditionMode.IfNot, 0f);
         EnsureTransition(runLoop, runStop, false, 0f, "IsMoving", AnimatorConditionMode.IfNot, 0f);
         EnsureTransition(runStop, runStart, false, 0f, "IsMoving", AnimatorConditionMode.If, 0f);
-        EnsureTransition(runStop, idle, true, 0.85f, "IsCombatIdle", AnimatorConditionMode.IfNot, 0f);
-        EnsureTransition(runStop, combatIdle, true, 0.85f, "IsCombatIdle", AnimatorConditionMode.If, 0f);
+        EnsureTransition(runStop, idle, true, ClipEndTime, "IsCombatIdle", AnimatorConditionMode.IfNot, 0f);
+        EnsureTransition(runStop, combatIdle, true, ClipEndTime, "IsCombatIdle", AnimatorConditionMode.If, 0f);
 
         EnsureReturnToIdleTransitions(dodge, idle, combatIdle);
         EnsureReturnToIdleTransitions(interrupt, idle, combatIdle);
@@ -1493,9 +1499,11 @@ public static class AssassinShellAuthoring
 
     private static void EnsureReturnToIdleTransitions(AnimatorState from, AnimatorState idle, AnimatorState combatIdle)
     {
-        EnsureTransition(from, idle, true, 0.98f, "IsCombatIdle", AnimatorConditionMode.IfNot, 0f);
-        EnsureTransition(from, combatIdle, true, 0.98f, "IsCombatIdle", AnimatorConditionMode.If, 0f);
+        EnsureTransition(from, idle, true, ClipEndTime, "IsCombatIdle", AnimatorConditionMode.IfNot, 0f);
+        EnsureTransition(from, combatIdle, true, ClipEndTime, "IsCombatIdle", AnimatorConditionMode.If, 0f);
     }
+
+    // 이미 있는 전이도 저작 값으로 맞춘다 — 메뉴를 다시 돌리면 컨트롤러가 늘 같은 값이 된다.
 
     private static void EnsureTransition(
         AnimatorState from,
@@ -1506,18 +1514,26 @@ public static class AssassinShellAuthoring
         AnimatorConditionMode mode,
         float threshold)
     {
+        AnimatorStateTransition transition = null;
         foreach (AnimatorStateTransition existing in from.transitions)
         {
             if (existing.destinationState == to && ConditionsMatch(existing.conditions, parameter, mode, threshold))
-                return;
+            {
+                transition = existing;
+                break;
+            }
         }
 
-        AnimatorStateTransition transition = from.AddTransition(to);
+        if (transition == null)
+        {
+            transition = from.AddTransition(to);
+            if (!string.IsNullOrEmpty(parameter))
+                transition.AddCondition(mode, threshold, parameter);
+        }
+
         transition.hasExitTime = hasExitTime;
         transition.exitTime = exitTime;
-        transition.duration = 0.08f;
-        if (!string.IsNullOrEmpty(parameter))
-            transition.AddCondition(mode, threshold, parameter);
+        transition.duration = AutoTransitionBlend;
     }
 
     private static void EnsureAnyStateTransition(
@@ -1541,7 +1557,7 @@ public static class AssassinShellAuthoring
     }
 
     // 평타 전이는 모두 같은 상태로 다시 들어갈 수 있어야 한다 — 변신 묶음 반복뿐 아니라, 콤보 유예가 0 이라
-    // 끊고 다시 누르면 늘 1타라서 직전 1타 꼬리(End 이벤트 85% ~ 복귀 98%)에 누른 1타가 막힌다.
+    // 끊고 다시 누르면 늘 1타라서 직전 1타 꼬리(End 이벤트 ~ Idle 복귀 블렌드)에 누른 1타가 막힌다.
     // 막히면 트리거가 남아 Idle_Combat 으로 빠졌다가 늦게 1타가 틀어지고(할 일 42-1), 그 사이 대시 등으로
     // 끊기면 남은 트리거가 엉뚱한 때 1타를 튼다. 트리거는 SetTrigger 한 번에 한 번만 소모되니 재진입은 요청 때만 일어난다.
     private static void EnsureAnyStateAttackTransition(
