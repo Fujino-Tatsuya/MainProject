@@ -76,6 +76,7 @@ public class Player : Unit
     private IPlayerOnHitBonus[] onHitBonuses;
     private PlayerInputReader inputReader;
     private PlayerSkillTargeting skillTargeting;
+    private PlayerSkillController skillController;   // 피격 가로채기 훅(IPlayerIncomingAttackGuard) 조회용
     private PlayerLifeCycleController lifeCycle;
     private PlayerEncounterLock encounterLock;
     // 기본 체력 재생(할 일 31) — 서버에서만 틱한다. 계산은 순수 모델, 여기는 배선만.
@@ -207,6 +208,7 @@ public class Player : Unit
         onHitBonuses = GetComponents<IPlayerOnHitBonus>();
         inputReader = GetComponent<PlayerInputReader>();
         skillTargeting = GetComponent<PlayerSkillTargeting>();
+        skillController = GetComponent<PlayerSkillController>();
         lifeCycle = GetComponent<PlayerLifeCycleController>();
         encounterLock = GetComponent<PlayerEncounterLock>();
         networkTransform = GetComponent<NetworkTransform>();
@@ -483,6 +485,11 @@ public class Player : Unit
 
     protected override void OnKnockback(Vector3 direction, float strength)
     {
+        // 진행 중 스킬이 넉백을 막는 동안(팔라딘 E 반격 등)은 통째로 버린다 — 오너에게도 전파하지 않는다.
+        if (skillController != null && skillController.ActiveSkill is IPlayerIncomingAttackGuard guard
+            && guard.ServerBlocksKnockback)
+            return;
+
         // 서버가 거부(사망 — 슈퍼아머는 Unit.Knockback에서 선차단)하면 오너에게도 전파하지 않는다
         bool accepted = stateController.BeginKnockback(direction, strength);
         if (!accepted)
@@ -1700,6 +1707,15 @@ public class Player : Unit
 
     public override bool ReceiveAttack(AttackInfo attackInfo, AttackHitContext hitContext)
     {
+        // 진행 중 스킬의 피격 가로채기(팔라딘 E 방어·반격). 피해 상한·base 보다 먼저 묻는다.
+        // 살아 있고 무적이 아닐 때만 — 죽었으면 아래 base 가 false 를 돌려주는 계약을 그대로 두고,
+        // 무적 중 피격은 방어 성공으로 치지 않는다(무적 판정은 CanApplyHealthDamage 에서 원래대로).
+        bool invulnerable = invulnerability != null && invulnerability.IsServerInvulnerable;
+        if (CurrentHealth > 0 && !invulnerable && skillController != null
+            && skillController.ActiveSkill is IPlayerIncomingAttackGuard guard
+            && guard.ServerTryAbsorbAttack(attackInfo, hitContext))
+            return true;
+
         // 보호막 피격 파문(연출)은 "어느 방향에서 맞았나"가 필요한데, 그 정보는 AttackHitContext 에만
         // 있고 이 메서드는 서버 전용 공격 판정에서만 불린다 — 리모트 클라에는 도착하지 않는다.
         // 그래서 여기서 쉴드 감소를 확인해 PlayerShieldVfx 가 전 피어로 퍼뜨리게 한다. (판정 영향 없음)
