@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -9,7 +10,7 @@ using UnityEngine;
 /// </summary>
 public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
 {
-    // 반격 순간 연출 자리값(PlayerShieldVfx.ServerInterruptWave 재사용, 결정 25) — 반격 판정 커밋에서 쓴다.
+    // 반격 순간 연출 자리값(PlayerShieldVfx.ServerInterruptWave 재사용, 결정 25). 반격 판정마다 대상 유무와 무관하게 1회.
     [Header("연출")]
     [Tooltip("연출 창구. 플레이어 루트의 PlayerShieldVfx 를 물린다.\n비워두면 연출만 빠진다")]
     [SerializeField] private PlayerShieldVfx shieldVfx;
@@ -22,6 +23,13 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
     // 모델은 OnEnd 에서 Reset 되므로 방향은 따로 들고 있는다.
     private bool pendingDeferredCounter;
     private Vector3 deferredCounterForward;
+
+    // 반격 판정 버퍼. 데이터에 MaxHitResults 열을 늘리지 않으려고 고정 크기로 둔다(xlsx 열 추가 회피).
+    private const int MaxCounterHitResults = 16;
+    private readonly Collider[] counterHitResults = new Collider[MaxCounterHitResults];
+    // 키가 Object 인 이유는 FirstMeleeMainSkill.tickTargets 와 같다(Unit 이 아닌 IAttackReceiver 는 Hurtbox 가 키).
+    private readonly HashSet<Object> counterTargets = new HashSet<Object>();
+    private readonly List<Unit> counterLandedUnits = new List<Unit>();
 
     public override PlayerSkillSlot Slot => PlayerSkillSlot.Sub;
 
@@ -77,9 +85,9 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
         // CounterHitDue 를 받으면 반드시 MarkCounterFired — 안 하면 HasPendingCounter 가 남아 OnEnd 보장 반격이 중복된다.
         if (tick.CounterHitDue)
         {
-            // TODO(C8): 반격 판정(전방 counterAngle·counterRange·대상당 1회·공격력 배율)
             model.MarkCounterFired();
-            Edit.Log("[Skill] 수호자의 의지 — 반격 시점(피해는 아직 없음)", this);
+            if (IsServerPeer && owner.CurrentHealth > 0)
+                ResolveCounterHit(owner.transform.position, model.GuardForward);
         }
 
         if (tick.HasEnded)
@@ -124,8 +132,85 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
             yield break;
 
         pendingDeferredCounter = false;
-        // TODO(C8): ResolveCounterHit(owner.transform.position) — 방향은 deferredCounterForward
-        Edit.Log($"[Skill] 수호자의 의지 — deferred counter (E 종료 뒤 보장 반격, 방향 {deferredCounterForward}, 피해는 아직 없음)", this);
+
+        // 한 프레임 사이에 시전자가 파괴·사망했으면 반격하지 않는다(결정 2 — 사망 취소는 보장 대상이 아니다).
+        if (owner == null || owner.CurrentHealth <= 0 || !IsServerPeer)
+            yield break;
+
+        // 원점은 지금 위치다 — 구속·이동 중이었으면 방어 성공 시점과 다를 수 있다(PLAN C8 리스크, 문서화).
+        Edit.Log($"[Skill] 수호자의 의지 — deferred counter (E 종료 뒤 보장 반격, 방향 {deferredCounterForward})", this);
+        ResolveCounterHit(owner.transform.position, deferredCounterForward);
+    }
+
+    /// <summary>
+    /// [서버] 반격 1회 — 고정 방어 방향 기준 전방 counterAngle·counterRange 안의 대상에게 대상당 1회 피해.
+    /// 흐름은 <see cref="FirstMeleeMainSkill"/>.OnHoldTick 과 같다. 방어 성공과 별개라
+    /// 막은 공격자가 범위 밖이면 피해가 없다. 연출은 대상이 없어도 1회 낸다.
+    /// </summary>
+    private void ResolveCounterHit(Vector3 origin, Vector3 forward)
+    {
+        FirstMeleeSubSkillData data = SubSkillData;
+        if (data == null || owner == null)
+            return;
+
+        forward.y = 0f;
+
+        int hitCount = Physics.OverlapSphereNonAlloc(
+            origin, data.CounterRange, counterHitResults, data.HittableLayers, QueryTriggerInteraction.Collide);
+        counterTargets.Clear();
+        counterLandedUnits.Clear();
+        bool onHitBonusTaken = false;
+
+        for (int i = 0; i < hitCount; i++)
+        {
+            Collider hit = counterHitResults[i];
+            if (hit == null)
+                continue;
+
+            if (!FirstMeleeGuardRules.IsInsideCounterSector(
+                    origin, forward, hit.ClosestPoint(origin), hit.bounds.center, data.CounterRange, data.CounterAngle))
+                continue;
+
+            Unit unit = ResolveHitUnit(hit, out Hurtbox hurtbox);
+
+            // Unit 이 아닌 대상(파괴 가능한 상자 등)은 hurtbox 를 키로 쓴다 — FirstMeleeMainSkill 과 같은 이유.
+            Object target = unit != null ? (Object)unit : hurtbox;
+            if (target == null || unit == owner || !counterTargets.Add(target))
+                continue;
+
+            int resolvedDamage = damageSnapshot;
+            // 시체(공격 거절)는 첫 대상 자리를 차지하지 않는다 — 뒤의 살아 있는 첫 Unit 이 보너스를 받는다.
+            if (!onHitBonusTaken && unit != null && unit.CurrentHealth > 0)
+            {
+                onHitBonusTaken = true;
+                int bonus = owner.ServerTakeOnHitBonus(data.TriggersOnHit, unit);
+                resolvedDamage = bonus >= int.MaxValue - resolvedDamage
+                    ? int.MaxValue
+                    : resolvedDamage + bonus;
+            }
+
+            AttackInfo attackInfo = new AttackInfo(resolvedDamage, DamageAttackType,
+                isInterruptAttack: false,
+                hitPattern: DamageHitPattern);
+            AttackHitContext hitContext = new AttackHitContext(origin, owner.transform, hit, owner);
+
+            bool resolved = hurtbox != null
+                ? hurtbox.ReceiveAttack(attackInfo, hitContext)
+                : unit.ReceiveAttack(attackInfo, hitContext);
+
+            if (!resolved)
+                continue;
+
+            if (unit != null)
+                counterLandedUnits.Add(unit);
+
+            Edit.Log($"[Skill] 수호자의 의지 반격 — {target.name} 피해 {attackInfo.damage}", this);
+        }
+
+        owner.RaiseServerAttackLanded(DamageAttackType, data.TriggersOnHit, counterLandedUnits, this);
+
+        if (shieldVfx != null)
+            shieldVfx.ServerInterruptWave();
     }
 
     // ── IPlayerIncomingAttackGuard (서버) ──
