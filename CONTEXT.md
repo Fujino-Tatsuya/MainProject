@@ -8,6 +8,13 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-10-16 · 경석(Claude) · 간파 슬로우·스피너·드론 재질, 브랜치 `feature/Boss23`) — ✅ 커밋·푸시 · SVN r454(핀 454)
+- 간파 슬로우 모션 = 23호·중간보스 3종에 연결(`8fc8c0a1`, 은희 handoff-interrupt-slowmo). 튜토리얼 연습 스피너는 D18 대로 안 걸림.
+- 스피너 회전 = 예고가 다 찬 뒤부터(준비 동작을 예고 시간에 맞춰 늘임 · `MonsterBase.AnimatorSpeedScale`).
+- 웰즈 드론 회색 = DRONE.fbx 에 머티리얼 없음 → `WellsDrone.prefab`(래퍼) + `DRONE_Mat`(SVN r454, URP Lit 베이스+노멀). 저작 `Tools/Boss/웰즈 드론 — 재질·래퍼 프리팹 만들기`.
+- 레이드 테스트 빌드 메뉴 `Build/Windows64 Player (MainFlow · 레이드 보스)`(BOSS_RAID_BUILD, 출력 `MainProjectBuilds/WindowsRaid`). ⚠️ 빌드 후 ProjectSettings preloadedAssets·link.xml 부산물 되돌릴 것.
+- ⏸ 보류: Stage1 `Slot_8_Z9_M` 배치 어긋남(은희 보고) — 팀장 나중에 확인. 전투 시스템 개정(제압 칸·간파 성공 넉백+그로기→취약 8초·취약 중 CC 패턴 끊기)은 칸 UI 회의 후, 보스 넉백 ↔ UnitWallImpacts 연결은 은희와 상의.
+
 ## 작업 세션 (2026-10-14 · Codex · 로비 전선다발 통합)
 - 완료(v022): 현재 Art/lobby 씬에 바닥·벽면 배선 2개 배치, `PF_Lobby_CableRouting_v022` 별도 저장. 신규 모델/부품 프리팹 11종, 기존 v006 베이스컬러 재사용. 기존 1,451개 오브젝트 배치·메쉬·재질 및 콜라이더 339개 보존. Blender/FBX 검수·Unity Scene View 확인 완료(Play 미수행).
 - 사용자 승인: 제작한 전선다발을 Unity에 넣고 현재 로비 배치에 맞춰 연결. 신규 모델·프리팹·공유재질 추가, 현재 Art/lobby 씬의 배선 추가만 수행. 책상·플랫폼·전면 캐비닛의 사용자 배치를 유지. 기록: aiworkspace/90_조립검수/v022.
