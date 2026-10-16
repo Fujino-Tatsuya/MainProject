@@ -61,6 +61,11 @@ public class Player : Unit
     [Tooltip("발밑 검사 거리(m).")]
     [DataTableIgnore] [SerializeField] private float platformGroundCheckDistance = 0.6f;
 
+    // 구속(잡기·돌진 밀기) 여부 표시 복제(할 일 50 — 머리 위 "붙잡힘" 라벨). 서버만 쓰고 모두 읽는다.
+    // 구속 FSM 자체는 지금처럼 서버·오너만 돈다(ClientRpc) — 이 값은 표시 전용이라 판정에 쓰지 않는다.
+    private readonly NetworkVariable<bool> restrainedReplicated = new NetworkVariable<bool>(
+        false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
     private PlayerStateController stateController;
     private readonly PlayerWallImpactTracker wallImpactTracker = new PlayerWallImpactTracker();   // [서버] 할 일 32
     private IPlayerBasicAttack defaultAttack;
@@ -180,6 +185,9 @@ public class Player : Unit
     public bool CanMovementRotate => stateController == null || stateController.CanMovementRotate;
     public float InterruptDuration => interruptDuration;
     public float InterruptForwardDistance => interruptForwardDistance;
+
+    /// <summary>모든 피어가 읽는 구속(잡기·밀기) 여부 — 표시 전용(머리 위 라벨). 오프라인에서는 항상 false.</summary>
+    public bool IsRestrainedReplicated => restrainedReplicated.Value;
 
     private void Awake()
     {
@@ -350,8 +358,15 @@ public class Player : Unit
         TickServerHealthRegen();
 
         if (IsServer)
+        {
             wallImpactTracker.Tick(this, stateController.CurrentState == PlayerActionState.Knockback,
                                    stateController.KnockbackDeceleration);
+
+            // 구속은 EndRestrainedByInstigator 말고도 끝난다 — 사망(Dead)·넉백·대시·연출 잠금이 상태를 덮어쓴다.
+            // 그 경로들은 여기서 걷어 "붙잡힘" 표시가 남아 붙지 않게 한다.
+            if (restrainedReplicated.Value && stateController.CurrentState != PlayerActionState.Restrained)
+                restrainedReplicated.Value = false;
+        }
 
         if (IsNetworkActive &&
             !stateController.ShouldTickForNetwork(IsOwner, HasStateAuthority))
@@ -506,6 +521,8 @@ public class Player : Unit
         if (!stateController.BeginRestrained(instigator, mode, frontOffset))
             return false;
 
+        restrainedReplicated.Value = true;
+
         // Transform은 복제할 수 없으므로 종류(byte)와 offset만 싣는다 — 오너가 같은 규칙으로 목표를 계산한다.
         BeginRestrainedClientRpc(
             new NetworkObjectReference(instigatorNetworkObject), (byte)mode, frontOffset,
@@ -519,6 +536,7 @@ public class Player : Unit
             return false;
 
         bool ended = stateController.EndRestrained();
+        restrainedReplicated.Value = false;
         EndRestrainedClientRpc(CreateOwnerClientRpcParams());
         return ended;
     }
