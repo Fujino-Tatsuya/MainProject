@@ -142,6 +142,10 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
     public bool CanStartApprovedAttack => HasAttackSteps && CurrentStepDuration > 0f;
     // 콤보 중 언제든 대시로 끊는다(할 일 9). 판정이 나갔으면 피해는 그대로, 남은 동작·예약만 끊긴다(CancelCurrentAttack).
     public bool CanBeCanceledByDash => true;
+    // 콤보는 누른 프레임으로만 시작하고, 공격 중 스킬 입력은 선입력 버퍼(0.2초) 그대로다(할 일 44 — 거너만 다름).
+    public bool StartsOnHold => false;
+    public bool ReservesSkillAfterAttack => false;
+    public void FinishWithoutChaining() { }
     private bool HasGameplayAuthority => !IsNetworkActive || IsServer;
 
     private void Awake()
@@ -224,6 +228,8 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
 
         return false;
     }
+
+    public bool IsOutOfResource => false;
 
     public bool TryStart()
     {
@@ -834,10 +840,17 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
 
             hasQueuedNextAttack = true;
             queuedAttackDirection = direction;
+            // 예약에 쓴 입력은 선입력 버퍼에서 지운다(할 일 44). 창 밖 입력은 남겨 공격이 끝난 뒤 새 평타로 실행한다.
+            inputReader.ConsumeBufferedInput(PlayerBufferedInput.Attack);
             return;
         }
 
         RequestQueueNextAttackRpc(direction);
+
+        // 창은 서버만 안다(애니 이벤트가 서버 전용). 호스트 오너만 같은 판단으로 지운다 —
+        // 원격 클라 오너는 창 여부를 몰라 버퍼를 그대로 둔다(체인이 이어지는 동안 0.2초 안에 만료된다).
+        if (IsServer && isComboWindowOpen)
+            inputReader.ConsumeBufferedInput(PlayerBufferedInput.Attack);
     }
 
     private bool CanApproveServerAttack()

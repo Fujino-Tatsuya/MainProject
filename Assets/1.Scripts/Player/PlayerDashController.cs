@@ -223,6 +223,22 @@ public class PlayerDashController : NetworkBehaviour
             landingProtected: false); // TODO: W5 착지 보호
     }
 
+    /// <summary>
+    /// [입력 주체] 예측 충전이 지금 하나도 없는가. <see cref="TryBeginPredictedDash"/> 거부가 '충전 없음' 때문인지
+    /// 가리는 데 쓴다 — 그 입력은 선입력 버퍼에서 바로 버린다(할 일 44). 장부가 없으면(초기화 전) false.
+    /// </summary>
+    public bool IsOutOfCharge
+    {
+        get
+        {
+            if (!ready || predictedLedger == null)
+                return false;
+
+            predictedLedger.Advance(OwnerNow());
+            return !predictedLedger.HasCharge;
+        }
+    }
+
     /// <summary>Idle/Move 액션 입력에서 대시 우선으로 호출된다. 입력 주체는 요청하고 실제 대시 상태는 이동 결과 권위가 시작한다.</summary>
     /// <param name="cancelsAction">진행 중 행동(공격·스킬)을 끊는 대시인가 — 그때는 Idle/Move 이동 조건 대신
     /// <see cref="PlayerStateController.CanDashFromAction"/>(CC·연출 잠금·사망만 막음)으로 본다.</param>

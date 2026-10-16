@@ -45,6 +45,9 @@ public class PlayerSkillController : BaseNetworkBehaviour
     [SerializeField] private AlternateSkillSet alternateSkills = new AlternateSkillSet();
     [SerializeField] private float endFallbackPadding = 0.1f;
 
+    [Tooltip("스킬을 쿨타임 중에 눌러 거부됐을 때 오너 로컬에서 재생할 사운드 키(Sound 시트 key). 슬롯 공용. 비우면 무음 — Docs/tech/skill-reject-feedback.md")]
+    [SerializeField] private string cooldownRejectSoundKey = "";
+
     private readonly NetworkVariable<byte> activeSlotOverrides = new NetworkVariable<byte>(
         0,
         NetworkVariableReadPermission.Everyone,
@@ -75,7 +78,15 @@ public class PlayerSkillController : BaseNetworkBehaviour
 
     public PlayerSkillBase ActiveSkill => activeSkill;
     public bool IsSkillActive => activeSkill != null;
+    /// <summary>[오너] 스킬 실행 중이거나 시전 요청 응답을 기다리는 중 — 이때 못 쓴 입력은 선입력 버퍼에 남긴다(할 일 44).</summary>
+    public bool IsBusy => IsSkillActive || isRequestingSkill;
     public event Action<PlayerSkillSlot> SlotBindingChanged;
+
+    /// <summary>
+    /// [오너 로컬] 스킬을 쿨타임 중에 입력해 사용이 거부됐다. 인자 = 거부된 슬롯. 입력 1회당 1회(선입력 버퍼 재시도 없음).
+    /// 서버·다른 피어에서는 나지 않는다 — 효과음·UI 같은 로컬 피드백용. 문서: Docs/tech/skill-reject-feedback.md
+    /// </summary>
+    public event Action<PlayerSkillSlot> CooldownRejected;
 
     /// <summary>
     /// [서버] 스킬 시전을 승인해 시작했다(Q·E·R·우클릭 공통, 쿨타임 시작 지점). 인자 = 시전자, 슬롯.
@@ -258,6 +269,34 @@ public class PlayerSkillController : BaseNetworkBehaviour
         return Cast(slot, null, Vector3.zero, false);
     }
 
+    /// <summary>
+    /// [오너] 이 슬롯이 쿨타임 때문에만 못 쓰는가 — 실행·요청 중(바쁨)이면 false.
+    /// FSM 이 <see cref="TryUse(PlayerSkillSlot)"/> 전에 묻고, 참이면 시전 요청을 보내지 않고 입력을 버린다(할 일 44).
+    /// 판정은 이 피어의 쿨타임 장부(원격 오너 = 서버가 미러한 HUD 장부)로 한다 — 조준 진입 게이트와 같은 조기 차단이다.
+    /// </summary>
+    public bool IsBlockedByCooldown(PlayerSkillSlot slot)
+    {
+        if (IsBusy)
+            return false;
+
+        PlayerSkillBase skill = GetSkill(slot);
+        return skill != null && skill.Data != null && GetSkillIndex(skill) != InvalidSkillIndex &&
+            !IsCooldownReady(skill);
+    }
+
+    /// <summary>[오너] 쿨타임 거부 피드백을 낸다 — <see cref="CooldownRejected"/> + 사운드 키. 입력 1회당 한 번만 부를 것.</summary>
+    public void NotifyCooldownRejected(PlayerSkillSlot slot)
+    {
+        if (IsNetworkActive && !IsOwner)
+            return;
+
+        Edit.Log($"[Skill] {slot} 쿨타임 거부 — {GetCooldownRemaining(slot):F1}s 남음(입력 버림)", this);
+        CooldownRejected?.Invoke(slot);
+
+        if (!string.IsNullOrEmpty(cooldownRejectSoundKey) && AudioManager.Instance != null)
+            AudioManager.Instance.Play(cooldownRejectSoundKey, transform.position);
+    }
+
     // 명시적 대상 지정 시전 (기존 시그니처 유지 — 조준 모드를 건너뛰고 바로 시전).
     public bool TryUse(PlayerSkillSlot slot, Unit target)
     {
@@ -289,9 +328,14 @@ public class PlayerSkillController : BaseNetworkBehaviour
     }
 
     // 같은 스킬키 재입력 여부 — 조준 취소 판별용(PlayerSkillTargeting에서 조회).
+    // 참이면 조준 취소에 쓰이므로 선입력 버퍼에서도 지운다 — 취소 뒤 같은 스킬 재시전으로 이어지지 않게(할 일 44).
     public bool WasSkillRePressed(PlayerSkillSlot slot)
     {
-        return inputReader != null && inputReader.GetSkillPressed(slot);
+        if (inputReader == null || !inputReader.GetSkillPressed(slot))
+            return false;
+
+        inputReader.ConsumeBufferedSkillInput(slot);
+        return true;
     }
 
     // 실제 시전 공통 경로. aimPoint는 GroundPoint 확정 지점(hasAimPoint일 때만 유효).
@@ -667,6 +711,8 @@ public class PlayerSkillController : BaseNetworkBehaviour
 
         if (activeSkill.ConsumesPrimaryInput && inputReader != null && inputReader.AttackPressed)
         {
+            // 스킬이 받은 좌클릭이 스킬이 끝난 뒤 평타로 한 번 더 나가지 않게 한다(할 일 44).
+            inputReader.ConsumeBufferedInput(PlayerBufferedInput.Attack);
             if (!IsNetworkActive)
                 activeSkill.OnPrimaryPressed(aim);
             else
@@ -708,7 +754,12 @@ public class PlayerSkillController : BaseNetworkBehaviour
             return false;
         }
 
-        return inputReader.GetSkillPressed(activeSkill.Slot);
+        // 종료에 쓴 재입력이 스킬이 끝난 뒤 같은 스킬 재시전으로 이어지지 않게 선입력 버퍼에서 지운다(할 일 44).
+        if (!inputReader.GetSkillPressed(activeSkill.Slot))
+            return false;
+
+        inputReader.ConsumeBufferedSkillInput(activeSkill.Slot);
+        return true;
     }
 
     // ── RPC (오너 → 서버) ──

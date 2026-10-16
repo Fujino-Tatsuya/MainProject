@@ -251,6 +251,8 @@ public class PlayerSkillTargeting : MonoBehaviour
         {
             // 취소 유발 입력(우클릭 등)이 같은 프레임에 FSM 액션(단죄의 방패 등)으로 새지 않도록 1프레임 억제
             justHandledConfirm = true;
+            // 취소에 쓴 우클릭(= 인터럽트 입력)이 뒤늦게 인터럽트로 나가지 않게 선입력 버퍼에서 지운다(할 일 44). 재입력은 WasSkillRePressed 가 지운다.
+            input?.ConsumeBufferedInput(PlayerBufferedInput.SkillInterrupt);
             EndAimSession(false);
             ExitStandby();
             return;
@@ -474,6 +476,8 @@ public class PlayerSkillTargeting : MonoBehaviour
     private void HandleConfirm()
     {
         justHandledConfirm = true;
+        // 확정 좌클릭이 시전 뒤 평타로 한 번 더 나가지 않게 선입력 버퍼에서 지운다(할 일 44).
+        input?.ConsumeBufferedInput(PlayerBufferedInput.Attack);
 
         if (currentData.TargetingMode == SkillTargetingMode.GroundPoint)
         {

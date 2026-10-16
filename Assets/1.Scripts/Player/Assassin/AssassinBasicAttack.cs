@@ -79,6 +79,10 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     public bool CanStartApprovedAttack => data != null && data.TryGetNormalStep(0, out _);
     // 일반 타·강타·변신 묶음 어디서든 대시로 끊는다(할 일 9). 나간 타격의 피해는 그대로, 남은 동작만 끊긴다.
     public bool CanBeCanceledByDash => true;
+    // 누른 프레임으로만 시작하고, 공격 중 스킬 입력은 선입력 버퍼(0.2초) 그대로다(할 일 44 — 거너만 다름).
+    public bool StartsOnHold => false;
+    public bool ReservesSkillAfterAttack => false;
+    public void FinishWithoutChaining() { }
     public AssassinBasicAttackData Data => data;
 
     private bool HasGameplayAuthority => !IsNetworkActive || IsServer;
@@ -128,6 +132,8 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             observedState = state;
         }
     }
+
+    public bool IsOutOfResource => false;
 
     public bool TryStart()
     {
@@ -296,6 +302,9 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         if (ownerQueued || !input.AttackPressed || !IsInCurrentComboWindow())
             return;
 
+        // 예약에 쓴 입력은 선입력 버퍼에서 지운다 — 공격이 끝난 뒤 새 평타로 한 번 더 나가지 않게(할 일 44).
+        // 창 밖 입력은 남긴다: 홀드로 End 까지 들고 있으면 이어가기에 쓰이고(그동안 0.2초 만료), 떼면 공격 종료 뒤 새 평타가 된다.
+        input.ConsumeBufferedInput(PlayerBufferedInput.Attack);
         ownerQueued = true;
         Vector3 direction = CurrentAimDirection();
 
