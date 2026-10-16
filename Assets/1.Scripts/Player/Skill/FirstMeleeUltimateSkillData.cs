@@ -23,6 +23,13 @@ public class FirstMeleeUltimateSkillData : PlayerSkillData
              "파티클 simulationSpeed(저작값에 곱)·startDelay·엔트리 파트 delay·수명이 함께 빨라진다")]
     [SerializeField, Min(0.1f), DataTableIgnore] private float vfxPlayRate = 1.2f;
 
+    [Tooltip("마무리 낙뢰(하늘에서 칼이 떨어지는 FX_Lightening_Strike)를 채널 완주보다 몇 초 앞서 쏠지.\n" +
+             "칼이 프리팹 delay + 낙하 시간 뒤에 닿으므로, 앞당겨 피해 시각에 닿게 한다. 0 = 완주 순간(예전).\n" +
+             "피해 시각·채널 길이는 그대로다. 채널 길이(maxActiveDuration)를 넘으면 채널 길이로 자른다.\n" +
+             "앞당긴 구간에 채널이 끊기면(대상 소실·사망·취소) 피해가 없으니 낙뢰를 걷는다")]
+    [SerializeField, Min(0f), DataTableIgnore] private float finalStrikeVfxLead = 0.5f;
+
     public float AnimationSpeed => animationSpeed;
     public float VfxPlayRate => vfxPlayRate;
+    public float FinalStrikeVfxLead => FinalStrikeVfxSchedule.ClampLead(finalStrikeVfxLead, MaxActiveDuration);
 }

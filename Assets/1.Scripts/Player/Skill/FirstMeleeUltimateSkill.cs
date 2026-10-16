@@ -29,6 +29,8 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
     private static readonly int UltimateSpeedHash = Animator.StringToHash("UltimateSpeed");
 
     private Unit lockedTarget;
+    // [서버] 마무리 낙뢰를 이번 시전에 쐈는지. 칼이 닿는 데 시간이 걸려 완주보다 앞서 쏜다.
+    private readonly FinalStrikeVfxSchedule finalStrike = new FinalStrikeVfxSchedule();
     // 완료 판정 1회의 적중 대상(1명). Player.ServerAttackLanded 통지용 버퍼.
     private readonly System.Collections.Generic.List<Unit> landedUnits = new System.Collections.Generic.List<Unit>(1);
 
@@ -53,6 +55,7 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
     {
         base.OnServerStart(direction, target);
         lockedTarget = target;
+        finalStrike.Reset();
 
         // 🔴 여기는 서버에서만 돈다 — 그래서 창구를 거친다. 누구를 지목했는지는
         //    PlaySkillClientRpc 에 실려 가지 않아(SingleTarget 은 aimPoint 를 안 쓴다)
@@ -111,6 +114,15 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
             return;
         }
 
+        // 🔴 base.OnTick(완주 판정)보다 먼저 묻는다 — lead 0 이면 완주와 같은 틱에, 피해보다 먼저 나간다(예전 시각).
+        //    여기도 서버 전용이라 창구를 거친다(OnTick 은 TickServer 경로다).
+        //    위치는 넘기지 않는다 — 각 피어가 표식을 깔 때 잡아 둔 그 트랜스폼에 떨어진다.
+        if (State == SkillState.Channeling && Data != null &&
+            finalStrike.TryFire(ChannelElapsed, Data.MaxActiveDuration, FinalStrikeVfxLead))
+        {
+            skillVfx?.ServerPlayTargetStrike(VfxPlayRate);
+        }
+
         base.OnTick();
     }
 
@@ -133,9 +145,7 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
             owner.RaiseServerAttackLanded(DamageAttackType, Data != null && Data.TriggersOnHit, landedUnits, this);
         }
 
-        // 🔴 여기도 서버 전용이라 창구를 거친다(OnChannelCompleted 는 TickServer 경로다).
-        //    위치는 넘기지 않는다 — 각 피어가 표식을 깔 때 잡아 둔 그 트랜스폼에 떨어진다.
-        skillVfx?.ServerPlayTargetStrike(VfxPlayRate);
+        // 마무리 낙뢰는 여기서 쏘지 않는다 — OnTick 이 완주 lead 초 전에 이미 쐈다.
 
         Edit.Log($"[Skill] 최후의 심판 — {lockedTarget.name}에게 피해 {attackInfo.damage}", this);
     }
@@ -151,6 +161,10 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
         skillVfx?.StopUltimateVfxLocal();
         skillVfx?.StopTargetFloorLocal();
 
+        // 앞당겨 쏜 칼이 떨어지는 중에 완주 못 하고 끝났다 — 피해가 없으니 걷는다. 완주면 끝까지 재생한다.
+        if (FinalStrikeVfxSchedule.ShouldRecall(reason))
+            skillVfx?.StopTargetStrikeLocal();
+
         // 서버 전용 쓰기(CanWrite) 가드가 내장돼 있어 클라에서는 no-op
         if (owner != null && owner.StatusEffects != null)
             owner.StatusEffects.Remove(StatusEffectType.SuperArmor, SourceId);
@@ -162,6 +176,7 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
     // 데이터가 궁극 전용 SO 가 아니면(에셋 교체 실수 등) 원래 속도로 돈다.
     private float AnimationSpeed => Data is FirstMeleeUltimateSkillData ult ? ult.AnimationSpeed : 1f;
     private float VfxPlayRate => Data is FirstMeleeUltimateSkillData ult ? ult.VfxPlayRate : 1f;
+    private float FinalStrikeVfxLead => Data is FirstMeleeUltimateSkillData ult ? ult.FinalStrikeVfxLead : 0f;
 
     private ulong SourceId => owner != null && owner.NetworkObject != null ? owner.NetworkObjectId : 0UL;
 

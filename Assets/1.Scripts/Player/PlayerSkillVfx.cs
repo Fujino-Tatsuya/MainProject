@@ -53,7 +53,7 @@ public class PlayerSkillVfx : BaseNetworkBehaviour
     [Tooltip("표식 배율. 저작 크기가 10유닛이라 대개 줄여 쓴다")]
     [SerializeField, Min(0.01f)] private float targetFloorScale = 1f;
 
-    [Tooltip("채널을 완주했을 때 대상 자리에 내리꽂을 낙뢰. FX_Lightening_Strike_Entry 를 물린다.\n" +
+    [Tooltip("채널 완주 직전(데이터 finalStrikeVfxLead 초 전) 대상 자리에 내리꽂을 낙뢰. FX_Lightening_Strike_Entry 를 물린다.\n" +
              "표식과 같은 자리에 떨어진다 — 좌표를 따로 넘기지 않는다")]
     [SerializeField] private EffectEntry targetStrike;
 
@@ -62,6 +62,10 @@ public class PlayerSkillVfx : BaseNetworkBehaviour
 
     // 소켓 컴포넌트가 대신 들어 주지 않으므로 핸들을 직접 든다. 🔴 드는 쪽이 반드시 반납해야 한다.
     private EffectHandle _targetFloorHandle;
+
+    // 마무리 낙뢰는 원샷이라 스스로 반납된다. 핸들은 채널이 끊겼을 때 걷기 위해서만 든다
+    // (피해보다 앞서 쏘므로 — FinalStrikeVfxSchedule). 안 걷으면 그냥 수명대로 끝난다.
+    private EffectHandle _targetStrikeHandle;
 
     // 대시 잔상용. 셋 다 Awake 에서 찾는다 — 아래 Awake 주석 참고.
     private Player _player;
@@ -203,7 +207,8 @@ public class PlayerSkillVfx : BaseNetworkBehaviour
     }
 
     /// <summary>
-    /// [서버] 채널을 완주했다. <b>표식이 서 있는 그 자리</b>에 마무리 낙뢰를 내리꽂는다.
+    /// [서버] 채널 완주 <c>lead</c> 초 전이다(<see cref="FinalStrikeVfxSchedule"/>). <b>표식이 서 있는 그 자리</b>에 마무리 낙뢰를 내리꽂는다.
+    /// 칼이 떨어져 닿는 데 시간이 걸려 피해 시각보다 앞서 쏜다 — 그 사이 채널이 끊기면 <see cref="StopTargetStrikeLocal"/>이 걷는다.
     ///
     /// <b>좌표를 다시 보내지 않는다.</b> 각 피어는 표식을 깔 때 자리를 이미 고정해 뒀다
     /// (<see cref="_targetPosition"/>). 그걸 그대로 쓰면 표식과 낙뢰가 <b>정의상 같은 자리</b>다 —
@@ -234,9 +239,22 @@ public class PlayerSkillVfx : BaseNetworkBehaviour
 
         // 표식을 깔 때 고정해 둔 그 자리. 표식이 안 움직이므로 낙뢰도 따라 움직이면 안 된다 —
         // 둘이 어긋나면 "표식 옆에 칼이 꽂히는" 그림이 된다.
-        // 원샷은 핸들이 없다 — 엔트리의 computedDuration 뒤에 매니저가 알아서 반납한다.
-        EffectManager.Instance.Play(targetStrike, _targetPosition, Quaternion.identity, targetStrikeScale,
-            0f, playRate);
+        // 원샷이라 엔트리 수명 뒤에 매니저가 알아서 반납한다. 핸들은 도중에 걷을 때만 쓴다.
+        _targetStrikeHandle = EffectManager.Instance.PlayRecallable(targetStrike, _targetPosition, Quaternion.identity,
+            targetStrikeScale, 0f, playRate);
+    }
+
+    /// <summary>
+    /// [전 피어] 떨어지던 마무리 낙뢰를 즉시 걷는다. 채널이 완주하지 못하고 끝났을 때(피해 없음) 스킬의 <c>OnEnd</c>가 부른다 —
+    /// <c>OnEnd</c>는 전 피어에서 도니 RPC 가 필요 없다. 낙뢰 RPC 와 종료 RPC 는 같은 서버에서 순서대로 나가 낙뢰가 먼저 도착한다.
+    /// 이미 수명이 끝났거나 쏜 적이 없으면 조용한 no-op 이다.
+    /// </summary>
+    public void StopTargetStrikeLocal()
+    {
+        if (!_targetStrikeHandle.IsSet) return;
+
+        if (EffectManager.Instance != null) EffectManager.Instance.ReleaseImmediate(_targetStrikeHandle);
+        _targetStrikeHandle = EffectHandle.None;
     }
 
     private void PlayTargetFloorLocal(Transform target, Vector3 fallbackPosition, float playRate)

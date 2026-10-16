@@ -244,10 +244,20 @@ public class EffectManager : MonoBehaviour
                      float durationOverride = 0f)
         => PlayOneShot(entry, position, rotation, 1f, SanitizeAxisScale(entry, axisScale), durationOverride, 1f);
 
-    private void PlayOneShot(EffectEntry entry, Vector3 position, Quaternion rotation, float scale,
-                             Vector3 axisScale, float durationOverride, float playRate)
+    /// <summary>
+    /// 원샷인데 <b>도중에 걷을 수 있어야 하는</b> 경우용 — 핸들을 돌려준다. 수명·반납은 <see cref="Play(EffectEntry, Vector3, Quaternion, float, float, float)"/>와
+    /// 똑같이 스스로 끝나므로 핸들을 버려도 풀이 새지 않는다(루프 핸들과 다른 점). 수명이 끝난 뒤의 핸들은
+    /// 세대가 바뀌어 <see cref="ReleaseImmediate"/>가 조용한 no-op 이다.
+    /// 쓰는 곳: 팔라딘 R 마무리 낙뢰 — 피해보다 앞서 쏘므로 채널이 끊기면 걷는다.
+    /// </summary>
+    public EffectHandle PlayRecallable(EffectEntry entry, Vector3 position, Quaternion rotation, float scale = 1f,
+                                       float durationOverride = 0f, float playRate = 1f)
+        => PlayOneShot(entry, position, rotation, scale, Vector3.one, durationOverride, playRate);
+
+    private EffectHandle PlayOneShot(EffectEntry entry, Vector3 position, Quaternion rotation, float scale,
+                                     Vector3 axisScale, float durationOverride, float playRate)
     {
-        if (!CanPlay(entry)) return;
+        if (!CanPlay(entry)) return EffectHandle.None;
 
         ActiveEffect active = AcquireSlot(entry);
         active.playRate = SanitizePlayRate(entry, playRate);
@@ -279,6 +289,8 @@ public class EffectManager : MonoBehaviour
         Schedule(active, entry.parts, false);
         FirePending(active, 0f);   // delay 0인 파트는 이번 프레임에 바로 터진다
         WarnIfTooManyActive(entry);
+
+        return new EffectHandle(active.slot, active.generation);
     }
 
     /// <summary>원샷 재생(회전 없음).</summary>
