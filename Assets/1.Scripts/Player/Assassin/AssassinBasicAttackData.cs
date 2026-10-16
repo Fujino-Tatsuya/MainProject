@@ -21,7 +21,7 @@ public sealed class AssassinBasicAttackStepData
     [Tooltip("다음 타 예약 창 열림 — 클립 정규화 시간(0~1). 이 타 재생 중 창 안에서 좌클릭하면 End 순간 다음 타로 이어진다. " +
              "가붕이 ComboWindowOpen 이벤트와 같은 의미(재생 속도에 같이 비례).")]
     [SerializeField, Range(0f, 1f)] private float comboWindowOpen = 0.4f;
-    [Tooltip("다음 타 예약 창 닫힘 — 클립 정규화 시간(0~1). End(0.97) 앞에 둔다.")]
+    [Tooltip("다음 타 예약 창 닫힘 — 클립 정규화 시간(0~1). 그 클립의 End 이벤트 앞에 둔다.")]
     [SerializeField, Range(0f, 1f)] private float comboWindowClose = 0.95f;
 
     public AnimationClip Clip => clip;
@@ -68,12 +68,14 @@ public sealed class AssassinBasicAttackStepData
 [DataTableSheet("Assassin", Order = 0)]
 public sealed class AssassinBasicAttackData : ScriptableObject
 {
+    // 창은 Combo_Attack_Wave_0N 클립 이벤트(10-16 은희 직접 배치 — Hit 0, End 1타 0.32 · 2~4타 0.267 정규화)에 맞춘다.
+    // 열림 = Hit 직후, 닫힘 = End 바로 앞. 이벤트를 옮기면 이 값과 에셋 값도 같이 옮긴다.
     [SerializeField] private AssassinBasicAttackStepData[] normalSteps =
     {
-        new AssassinBasicAttackStepData(1f, 1.5f, 90f, 3f),
-        new AssassinBasicAttackStepData(1f, 1.5f, 100f, 3f),
-        new AssassinBasicAttackStepData(1f, 1.6f, 100f, 3f),
-        new AssassinBasicAttackStepData(1.3f, 1.7f, 120f, 2.5f),
+        new AssassinBasicAttackStepData(1f, 1.5f, 90f, 3f, 1, 0.05f, 0.30f),
+        new AssassinBasicAttackStepData(1f, 1.5f, 100f, 3f, 1, 0.05f, 0.25f),
+        new AssassinBasicAttackStepData(1f, 1.6f, 100f, 3f, 1, 0.05f, 0.25f),
+        new AssassinBasicAttackStepData(1.3f, 1.7f, 120f, 2.5f, 1, 0.05f, 0.25f),
     };
 
     [Header("일반 E 강타 (Combo_Attack_02_01)")]

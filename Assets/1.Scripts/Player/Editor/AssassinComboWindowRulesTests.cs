@@ -56,21 +56,40 @@ public sealed class AssassinComboWindowRulesTests
         Assert.That(InWindow(elapsed, slow, 0.4f, 0.95f), Is.True, "4타는 0.35초가 창 안(≈0.84)");
     }
 
+    // 평타 1~4타 클립 이벤트(10-16 직접 배치): Hit 0, End 1타 0.4초 · 2~4타 0.333초 / 1.25초 클립.
+    private const float Wave1End = 0.4f / WaveClipLength;          // 0.32
+    private const float Wave2To4End = 0.33333334f / WaveClipLength; // ≈0.267
+    private const float SpecialEnd = 0.97f;                        // 강타·변신 묶음 End(AssassinShellAuthoring.AttackEndTime)
+
     [Test]
     public void DataDefaultsOpenAfterHitAndCloseBeforeEnd()
     {
         AssassinBasicAttackData data = ScriptableObject.CreateInstance<AssassinBasicAttackData>();
         try
         {
-            foreach (AssassinBasicAttackStepData step in data.NormalSteps)
-                AssertWindow(step, 0.4f, 0.95f);
-            AssertWindow(data.EnhancedStep, 0.4f, 0.95f);
-            AssertWindow(data.TransformedStep, 0.75f, 0.95f);   // 묶음 마지막(4번째) 판정 뒤
+            AssassinBasicAttackStepData[] steps = data.NormalSteps;
+            AssertWindow(steps[0], 0.05f, 0.30f, Wave1End);
+            for (int i = 1; i < 4; i++)
+                AssertWindow(steps[i], 0.05f, 0.25f, Wave2To4End);
+            AssertWindow(data.EnhancedStep, 0.4f, 0.95f, SpecialEnd);
+            AssertWindow(data.TransformedStep, 0.75f, 0.95f, SpecialEnd);   // 묶음 마지막(4번째) 판정 뒤
         }
         finally
         {
             Object.DestroyImmediate(data);
         }
+    }
+
+    // 1타 3.6배속: 창 0.05~0.30 = 약 0.017~0.104초, End 0.111초 — 창이 End 전에 닫히고 그 사이가 비지 않는다.
+    [Test]
+    public void FirstStepWindowFitsBeforeEnd()
+    {
+        float duration = WaveClipLength / 3.6f;
+
+        Assert.That(InWindow(0.01f, duration, 0.05f, 0.30f), Is.False, "판정 프레임(0초) 직후는 아직 창 전");
+        Assert.That(InWindow(0.05f, duration, 0.05f, 0.30f), Is.True);
+        Assert.That(InWindow(0.10f, duration, 0.05f, 0.30f), Is.True);
+        Assert.That(InWindow(Wave1End * duration, duration, 0.05f, 0.30f), Is.False, "End 순간엔 닫혀 있다");
     }
 
     // ── 할 일 47 정정 — End 순간 다음 타 = 창 예약 || 눌림(거너와 같은 홀드 + 창) ──
@@ -148,10 +167,10 @@ public sealed class AssassinComboWindowRulesTests
         AssassinComboWindowRules.IsInside(
             AssassinComboWindowRules.NormalizedProgress(elapsed, motionDuration), open, close);
 
-    private static void AssertWindow(AssassinBasicAttackStepData step, float open, float close)
+    private static void AssertWindow(AssassinBasicAttackStepData step, float open, float close, float end)
     {
         Assert.That(step.ComboWindowOpen, Is.EqualTo(open).Within(1e-5f));
         Assert.That(step.ComboWindowClose, Is.EqualTo(close).Within(1e-5f));
-        Assert.That(step.ComboWindowClose, Is.LessThan(0.97f), "End(0.97) 전에 닫혀야 한다");
+        Assert.That(step.ComboWindowClose, Is.LessThan(end), $"End({end:F3}) 전에 닫혀야 한다");
     }
 }

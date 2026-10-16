@@ -86,7 +86,7 @@ public static class AssassinShellAuthoring
     // 할 일 47-1 "모든 애니메이션을 끝까지 재생한 뒤 전이" — 행동 종료 End 이벤트와 시간으로 넘어가는 전이는 클립 끝에서.
     private const float ClipEndTime = 1f;
     private const float AutoTransitionBlend = 0.08f;
-    // 평타 End 는 끝에서 살짝 앞(97%) — 정확히 끝(1.0)에 두면 Idle 복귀 전이와 같은 프레임에 겹쳐 다음 타가 한 박자 멈춰 보였다(10-16).
+    // 강타·변신 묶음 End 는 끝에서 살짝 앞(97%) — 정확히 끝(1.0)에 두면 Idle 복귀 전이와 같은 프레임에 겹쳐 다음 타가 한 박자 멈춰 보였다(10-16).
     private const float AttackEndTime = 0.97f;
 
     private static readonly string[] WaveClips =
@@ -96,6 +96,9 @@ public static class AssassinShellAuthoring
         "Combo_Attack_Wave_03",
         "Combo_Attack_Wave_04",
     };
+
+    // 평타 1~4타 End 정규화 시점 — 사용자가 클립에 직접 둔 값(10-16, 1.25초 클립의 0.4초·0.333초). 클립이 비어 있을 때만 쓴다.
+    private static readonly float[] WaveEndTimes = { 0.32f, 0.2667f, 0.2667f, 0.2667f };
 
     private static readonly string[] AllClipNames =
     {
@@ -219,11 +222,11 @@ public static class AssassinShellAuthoring
             configured++;
         }
 
-        // 일반 평타: 실제 타격 프레임 확인 전 기본값. Play에서 반드시 튜닝한다.
-        // End 는 클립 끝(할 일 47-1) — 다음 타·Idle 복귀가 클립을 끝까지 재생한 뒤에만 일어난다.
-        foreach (string clipName in WaveClips)
-            ReplaceEvents(clipName, DefaultAttackEvent(0.40f, DefaultAttackAnimationEventType.Hit),
-                DefaultAttackEvent(AttackEndTime, DefaultAttackAnimationEventType.End));
+        // 일반 평타 1~4타: 이벤트는 사용자가 클립에서 직접 배치한다(10-16) — 이미 있으면 덮어쓰지 않는다.
+        // 비어 있을 때만 그 배치(Hit 0, End 1타 0.32 · 2~4타 0.267)로 채운다. 예약 창(AssassinBasicAttackData)이 이 End 앞에 맞춰져 있다.
+        for (int i = 0; i < WaveClips.Length; i++)
+            StampEventsIfEmpty(WaveClips[i], DefaultAttackEvent(0f, DefaultAttackAnimationEventType.Hit),
+                DefaultAttackEvent(WaveEndTimes[i], DefaultAttackAnimationEventType.End));
 
         // A7 연결 자리까지 같은 메뉴가 준비한다. 실제 타격 프레임은 Play에서 튜닝한다.
         ReplaceEvents("Combo_Attack_02_01",
@@ -1748,6 +1751,22 @@ public static class AssassinShellAuthoring
         AnimationUtility.SetAnimationEvents(clip, events);
         EditorUtility.SetDirty(clip);
         Debug.Log($"{Tag} 이벤트 교체: {clipName} ({events.Length}개, 누적 안 함)");
+    }
+
+    // 클립에 이벤트가 하나라도 있으면 손으로 둔 배치로 보고 그대로 둔다.
+    private static void StampEventsIfEmpty(string clipName, params AnimationEventSpec[] specs)
+    {
+        AnimationClip clip = LoadClip(clipName);
+        if (clip == null)
+            return;
+
+        if (AnimationUtility.GetAnimationEvents(clip).Length > 0)
+        {
+            Debug.Log($"{Tag} 이벤트 유지(직접 배치): {clipName}");
+            return;
+        }
+
+        ReplaceEvents(clipName, specs);
     }
 
     private static void EnsureFolder(string path)

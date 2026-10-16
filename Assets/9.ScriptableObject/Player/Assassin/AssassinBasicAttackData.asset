@@ -19,32 +19,32 @@ MonoBehaviour:
     angle: 90
     playbackSpeed: 3.6
     hitCount: 1
-    comboWindowOpen: 0.4
-    comboWindowClose: 0.95
+    comboWindowOpen: 0.05
+    comboWindowClose: 0.3
   - clip: {fileID: 7400000, guid: 1ca7a6b60353a274dacf546765f091f0, type: 2}
     attackDamageMultiplier: 1
     range: 1.5
     angle: 100
     playbackSpeed: 3.6
     hitCount: 1
-    comboWindowOpen: 0.4
-    comboWindowClose: 0.95
+    comboWindowOpen: 0.05
+    comboWindowClose: 0.25
   - clip: {fileID: 7400000, guid: ff2fe3801b995ba43873937b01578e9a, type: 2}
     attackDamageMultiplier: 1
     range: 1.6
     angle: 100
     playbackSpeed: 3.6
     hitCount: 1
-    comboWindowOpen: 0.4
-    comboWindowClose: 0.95
+    comboWindowOpen: 0.05
+    comboWindowClose: 0.25
   - clip: {fileID: 7400000, guid: ea72c7918b158e3408e3d1c4dda5e5c3, type: 2}
     attackDamageMultiplier: 1.3
     range: 1.7
     angle: 120
     playbackSpeed: 3
     hitCount: 1
-    comboWindowOpen: 0.4
-    comboWindowClose: 0.95
+    comboWindowOpen: 0.05
+    comboWindowClose: 0.25
   enhancedStep:
     clip: {fileID: 7400000, guid: e2591c52e17a3aa4a94ca0b1bb90250e, type: 2}
     attackDamageMultiplier: 2.5
