@@ -38,6 +38,9 @@ public class PlayerInputReader : BaseNetworkBehaviour
     private readonly PlayerInputBuffer inputBuffer = new PlayerInputBuffer(0f);
     private int inputBufferCapturedFrame = -1;
 
+    // 기본 공격 뒤 스킬 예약(할 일 44, 거너) — 선입력 버퍼와 따로 들고 만료가 없다. 버퍼를 비우는 곳(행동 시작·입력 차단)에서 함께 비운다.
+    private readonly PlayerSkillReservation skillReservation = new PlayerSkillReservation();
+
     // [MoveDiag] 입력/게이트 엣지를 최대 초당 한 줄로 묶기 위한 관측 전용 상태.
     private bool inputDiagnosticInitialized;
     private Vector2 inputDiagnosticObservedDirection;
@@ -152,6 +155,7 @@ public class PlayerInputReader : BaseNetworkBehaviour
         CaptureBufferedPresses();
         DiagnoseBufferConsumed(PlayerBufferedInput.None, "행동 시작", null);
         inputBuffer.Clear();
+        skillReservation.Clear();
     }
 
     /// <summary>입력을 버려야 할 때(조준 억제·사망·연출 잠금) 버퍼를 비운다. 호출자 정보는 진단 로그(dropped 사유)에만 쓴다.</summary>
@@ -162,7 +166,31 @@ public class PlayerInputReader : BaseNetworkBehaviour
         CaptureBufferedPresses(); // 이번 프레임 눌림이 비운 뒤에 뒤늦게 기록되지 않게 먼저 받는다
         DiagnoseBufferDropped(PlayerBufferedInput.None, callerMember, callerFile);
         inputBuffer.Clear();
+        skillReservation.Clear();
     }
+
+    /// <summary>기본 공격 뒤에 쓰려고 예약한 스킬 입력(할 일 44, 거너). 없으면 None. 만료가 없다.</summary>
+    public PlayerBufferedInput ReservedSkillInput => skillReservation.Reserved;
+
+    /// <summary>
+    /// 기본 공격 중 스킬 입력을 공격 뒤로 예약한다 — 그 입력은 선입력 버퍼에서 예약으로 옮겨 가 0.2초 만료를 받지 않는다.
+    /// 마지막 1개만(다른 스킬이 덮는다), 같은 스킬 연타는 1번. 새로 예약했거나 바꿨으면 true.
+    /// </summary>
+    public bool ReserveSkillAfterAttack(PlayerBufferedInput input)
+    {
+        CaptureBufferedPresses();
+        PlayerBufferedInput previous = skillReservation.Reserved;
+        bool changed = skillReservation.Reserve(input);
+        DiagnoseSkillReserved(input,
+            !changed ? "같은 스킬 연타(1회로)"
+            : previous == PlayerBufferedInput.None ? "예약"
+            : $"예약 교체({previous}→{input})");
+        inputBuffer.Consume(input);
+        return changed;
+    }
+
+    /// <summary>예약을 비운다 — 실행 거부·행동 끊김(대시·넉백 등).</summary>
+    public void ClearSkillReservation() => skillReservation.Clear();
 
     // 이번 프레임에 새로 눌린 입력을 버퍼에 남긴다. 프레임당 한 번 — 소비처·상태 머신·Update 중 먼저 부른 쪽이 받는다.
     // 그래서 누가 먼저 돌든 '받아서 지움'이 '뒤늦게 기록'에 덮이지 않는다.
@@ -350,6 +378,7 @@ public class PlayerInputReader : BaseNetworkBehaviour
         {
             DiagnoseBufferDropped(PlayerBufferedInput.None, "전투 입력 차단", null);
             inputBuffer.Clear();
+            skillReservation.Clear();
         }
     }
 
@@ -381,6 +410,7 @@ public class PlayerInputReader : BaseNetworkBehaviour
             dashPressedLatched = false;
             DiagnoseBufferDropped(PlayerBufferedInput.None, "입력 차단", null);
             inputBuffer.Clear();
+            skillReservation.Clear();
         }
 
         ObserveInputDiagnosticEdges("gate-change");
@@ -425,6 +455,7 @@ public class PlayerInputReader : BaseNetworkBehaviour
         dashPressedLatched = false;
         DiagnoseBufferDropped(PlayerBufferedInput.None, "컴포넌트 비활성", null);
         inputBuffer.Clear();
+        skillReservation.Clear();
         for (int i = 0; i < virtualSkillHeld.Length; i++)
         {
             virtualSkillHeld[i] = false;
@@ -561,12 +592,7 @@ public class PlayerInputReader : BaseNetworkBehaviour
                 diag.Consumed(PlayerBufferedInput.None, now, frame, $"{input} 시작");
                 break;
             case PlayerActionAttempt.Blocked:
-                // 기본 공격 중의 Blocked 는 스킬 끊기를 발 잠금이 미룬 것뿐이다(거너, 할 일 44).
-                diag.Blocked(input, now, frame,
-                    IsInputBufferDiagIncapacitated() ? "CC"
-                    : InputBufferDiagState == PlayerActionState.Attack || InputBufferDiagState == PlayerActionState.AttackReady
-                        ? "바쁨(발 잠금)"
-                        : "바쁨(요청 대기)");
+                diag.Blocked(input, now, frame, IsInputBufferDiagIncapacitated() ? "CC" : "바쁨(요청 대기)");
                 break;
             case PlayerActionAttempt.OutOfResource:
                 diag.Dropped(input, now, frame, "자원 부족(쿨타임·충전·과열)");
@@ -581,12 +607,11 @@ public class PlayerInputReader : BaseNetworkBehaviour
 #endif
     }
 
-    /// <summary>기본 공격 중 스킬 입력으로 공격을 끊고 스킬을 요청했을 때 상태기계가 부른다(cancel-for-skill, 거너).</summary>
     [System.Diagnostics.Conditional("UNITY_EDITOR"), System.Diagnostics.Conditional("DEVELOPMENT_BUILD"), System.Diagnostics.Conditional("DEV_HOTKEYS")]
-    internal void DiagnoseCancelForSkill(PlayerBufferedInput input, string detail)
+    private void DiagnoseSkillReserved(PlayerBufferedInput input, string detail)
     {
 #if UNITY_EDITOR || DEVELOPMENT_BUILD || DEV_HOTKEYS
-        GetInputBufferDiag()?.CancelForSkill(input, Time.time, Time.frameCount, detail);
+        GetInputBufferDiag()?.SkillReservedAfterAttack(input, Time.time, Time.frameCount, detail);
 #endif
     }
 

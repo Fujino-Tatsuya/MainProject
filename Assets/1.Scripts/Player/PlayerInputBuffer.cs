@@ -126,4 +126,17 @@ public sealed class PlayerInputBuffer
         PlayerSkillSlot.Ultimate => PlayerBufferedInput.SkillUltimate,
         _ => PlayerBufferedInput.None
     };
+
+    /// <summary><see cref="FromSkillSlot"/> 의 역. 스킬 입력이 아니면 false.</summary>
+    public static bool TryGetSkillSlot(PlayerBufferedInput input, out PlayerSkillSlot slot)
+    {
+        switch (input)
+        {
+            case PlayerBufferedInput.SkillMain: slot = PlayerSkillSlot.Main; return true;
+            case PlayerBufferedInput.SkillSub: slot = PlayerSkillSlot.Sub; return true;
+            case PlayerBufferedInput.SkillInterrupt: slot = PlayerSkillSlot.Interrupt; return true;
+            case PlayerBufferedInput.SkillUltimate: slot = PlayerSkillSlot.Ultimate; return true;
+            default: slot = default; return false;
+        }
+    }
 }

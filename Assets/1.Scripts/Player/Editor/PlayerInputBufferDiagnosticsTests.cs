@@ -32,22 +32,26 @@ public sealed class PlayerInputBufferDiagnosticsTests
     }
 
     [Test]
-    public void CancelForSkill_EmitsEventAndCount_KeepsPendingForConsume()
+    public void SkillReservedAfterAttack_EmitsEventAndCount_StopsTrackingWithoutExpiry()
     {
         tracker.StateChanged(false, 9.9f, 90, "→Attack");
         tracker.Press(PlayerBufferedInput.SkillSub, 10f, 100, Hold);
-        tracker.CancelForSkill(PlayerBufferedInput.SkillSub, 10.1f, 106, "스킬 요청");
+        tracker.SkillReservedAfterAttack(PlayerBufferedInput.SkillSub, 10f, 100, "예약");
 
-        Assert.That(tracker.Pending, Is.EqualTo(PlayerBufferedInput.SkillSub), "끊기 이벤트는 들고 있는 입력을 건드리지 않는다");
-        tracker.Consumed(PlayerBufferedInput.None, 10.1f, 106, "행동 시작");
+        Assert.That(tracker.Pending, Is.EqualTo(PlayerBufferedInput.None), "예약으로 옮겨 가 버퍼 추적은 끝난다");
+        tracker.BeginFrame(10.5f, 130); // 0.2초가 지나도 만료로 세지 않는다
 
-        Assert.That(Last(InputBufferDiagEvent.CancelForSkill).Input, Is.EqualTo(PlayerBufferedInput.SkillSub));
-        Assert.That(Last(InputBufferDiagEvent.Consumed).Input, Is.EqualTo(PlayerBufferedInput.SkillSub));
+        Assert.That(CountOf(InputBufferDiagEvent.Expired), Is.EqualTo(0));
+        InputBufferDiagRecord reserved = Last(InputBufferDiagEvent.SkillReservedAfterAttack);
+        Assert.That(reserved.Input, Is.EqualTo(PlayerBufferedInput.SkillSub));
+        Assert.That(reserved.Detail, Is.EqualTo("예약"));
+        Assert.That(PlayerInputBufferDiagnostics.EventName(InputBufferDiagEvent.SkillReservedAfterAttack),
+            Is.EqualTo("skill-reserved-after-attack"));
 
         var stats = new PlayerInputBufferDiagStats();
         records.ForEach(r => stats.Add(r));
-        Assert.That(stats.Count(PlayerBufferedInput.SkillSub, InputBufferDiagEvent.CancelForSkill), Is.EqualTo(1));
-        StringAssert.Contains("E | 1 | 0 | 1 | 0 | 0 | 0 | 1", stats.BuildSummary(Hold, "x.csv"));
+        Assert.That(stats.Count(PlayerBufferedInput.SkillSub, InputBufferDiagEvent.SkillReservedAfterAttack), Is.EqualTo(1));
+        StringAssert.Contains("E | 1 | 0 | 0 | 0 | 0 | 0 | 1", stats.BuildSummary(Hold, "x.csv"));
     }
 
     [Test]

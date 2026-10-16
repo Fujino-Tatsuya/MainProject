@@ -29,16 +29,17 @@ public interface IPlayerBasicAttack
     bool StartsOnHold { get; }
 
     /// <summary>
-    /// 공격 중(AttackReady·Attack) 스킬 입력으로 이 공격을 끊고 스킬을 쓸 수 있는가 — 캐릭터 규칙(거너 = 예).
-    /// 서버 승인도 이것만 본다(발 잠금은 오너 시계라 서버가 검증하지 않는다). 끊기는 상태 전이 → <see cref="CancelCurrentAttack"/>.
+    /// 공격 중(AttackReady·Attack) 스킬 입력을 '공격 뒤 스킬'로 예약하고 이 공격을 지금 발에서 마무리하는가 — 거너 = 예(할 일 44).
+    /// 공격은 끊지 않는다: 현재 발은 끝까지 가고 다음 발만 잇지 않는다(<see cref="FinishWithoutChaining"/>), 정상 종료 뒤
+    /// Idle/Move 첫 틱에 예약한 스킬을 기존 경로로 요청한다. 가붕이·어쌔신 = 아니오(공격 중 스킬 입력은 0.2초 선입력 버퍼 그대로).
     /// </summary>
-    bool CanBeCanceledBySkill { get; }
+    bool ReservesSkillAfterAttack { get; }
 
     /// <summary>
-    /// [오너] 지금은 스킬로 끊기를 미뤄야 하는가(거너 발 잠금 — 발사 −ShotLockLead ~ +ShotLockTail).
-    /// 참인 동안 스킬 입력은 선입력 버퍼에 남고(바쁨), 풀린 첫 틱에 다시 시도한다.
+    /// [오너] 다음 발을 잇지 않고 지금 발로 공격을 마무리한다 — 누르고 있음·창 예약을 무시(버튼을 뗀 것처럼).
+    /// 끝은 기존 정상 종료 경로(거너: 발사 + ShotRecovery 뒤 서버 EndRpc)다. 예약 캐릭터가 아니면 아무것도 안 한다.
     /// </summary>
-    bool IsSkillCancelDeferred { get; }
+    void FinishWithoutChaining();
 
     /// <summary>오너 입력으로 공격 시작을 시도한다. 시작 요청이 나가면 true.</summary>
     bool TryStart();
@@ -74,12 +75,40 @@ public interface IPlayerBasicAttack
     void SetAnimator(Animator animator);
 }
 
-/// <summary>공격 중 스킬 입력의 처리(할 일 44) — 못 끊음(행동이 끝날 때까지 버퍼에 보관) / 미룸(발 잠금, 버퍼에 보관) / 지금 끊음.</summary>
-public enum PlayerSkillCancelDecision
+/// <summary>
+/// 기본 공격 중 스킬 입력의 처리(할 일 44) — 예약 안 하는 캐릭터(0.2초 선입력 버퍼 그대로) / 차단 효과 거부 / 쿨타임 거부 / 공격 뒤로 예약.
+/// 거부는 누른 순간 기존 규칙(버림·피드백 이벤트)이고 예약하지 않으므로 공격은 그대로 이어진다.
+/// </summary>
+public enum PlayerSkillDuringAttackDecision
 {
-    NotAllowed,
-    Deferred,
-    Cancel
+    NotReserving,
+    RejectByEffect,
+    RejectByCooldown,
+    Reserve
+}
+
+/// <summary>
+/// 기본 공격 뒤에 쓸 스킬 예약(할 일 44, 거너) — 오너 로컬. 마지막에 누른 스킬 1개만 기억하고(다른 스킬이 덮는다),
+/// 같은 스킬 연타는 1번으로 본다. 선입력 버퍼와 달리 만료가 없다 — 현재 발 남은 간격 + ShotRecovery 가 버퍼 유지 시간보다
+/// 길 수 있어 평타가 끝날 때까지 들고 있어야 한다. 비우기는 호출자가 한다(실행·거부·행동 끊김·입력 차단).
+/// MonoBehaviour 아님 — EditMode 테스트 대상.
+/// </summary>
+public sealed class PlayerSkillReservation
+{
+    public PlayerBufferedInput Reserved { get; private set; } = PlayerBufferedInput.None;
+    public bool HasReservation => Reserved != PlayerBufferedInput.None;
+
+    /// <summary>예약한다. 새로 예약했거나 다른 스킬로 바꿨으면 true, 같은 스킬 연타(이미 예약됨)·None 이면 false.</summary>
+    public bool Reserve(PlayerBufferedInput input)
+    {
+        if (input == PlayerBufferedInput.None || input == Reserved)
+            return false;
+
+        Reserved = input;
+        return true;
+    }
+
+    public void Clear() => Reserved = PlayerBufferedInput.None;
 }
 
 /// <summary>기본 공격과 다른 입력이 만나는 순수 규칙(할 일 44). MonoBehaviour 아님 — EditMode 테스트 대상.</summary>
@@ -92,20 +121,26 @@ public static class PlayerBasicAttackInputRules
     public static bool ShouldStartOnHold(bool startsOnHold, bool attackHeld, bool attackBlocked, bool skillBusy) =>
         startsOnHold && attackHeld && !attackBlocked && !skillBusy;
 
-    /// <summary>공격 중 스킬 입력 — 캐릭터가 허락하지 않으면 못 끊고, 허락해도 발 잠금 중이면 미룬다.</summary>
-    public static PlayerSkillCancelDecision ClassifySkillCancel(bool canBeCanceledBySkill, bool deferred)
+    /// <summary>
+    /// 기본 공격 중 스킬 입력 — 예약 캐릭터가 아니면 손대지 않는다. 판정 순서는 Idle/Move 와 같다:
+    /// 차단 효과(상태이상) → 쿨타임 → 예약. 사용 조건(CanUse)·조준 진입은 공격이 끝나 실제로 시도할 때 본다.
+    /// </summary>
+    public static PlayerSkillDuringAttackDecision ClassifySkillDuringAttack(
+        bool reservesSkillAfterAttack, bool blockedByEffect, bool blockedByCooldown)
     {
-        if (!canBeCanceledBySkill)
-            return PlayerSkillCancelDecision.NotAllowed;
+        if (!reservesSkillAfterAttack)
+            return PlayerSkillDuringAttackDecision.NotReserving;
+        if (blockedByEffect)
+            return PlayerSkillDuringAttackDecision.RejectByEffect;
+        if (blockedByCooldown)
+            return PlayerSkillDuringAttackDecision.RejectByCooldown;
 
-        return deferred ? PlayerSkillCancelDecision.Deferred : PlayerSkillCancelDecision.Cancel;
+        return PlayerSkillDuringAttackDecision.Reserve;
     }
 
     /// <summary>
-    /// 거너 발 잠금 구간인가(오너 시계) — 직전 발 요청 뒤 <paramref name="tail"/> 동안, 또는 다음 발 예정 <paramref name="lead"/> 전부터.
-    /// 시각이 음수면 그 발이 없다(아직 안 쐈음 / 이어 쏠 발 없음).
+    /// 거너가 다음 발을 잇는가 — 누르고 있거나 창 예약이 있을 때. 스킬이 예약됐으면 둘 다 무시하고 지금 발로 마무리한다(할 일 44).
     /// </summary>
-    public static bool IsInShotLock(float now, float lastShotTime, float nextShotTime, float lead, float tail) =>
-        (lastShotTime >= 0f && now < lastShotTime + tail) ||
-        (nextShotTime >= 0f && now >= nextShotTime - lead);
+    public static bool ShouldChainNextShot(bool attackHeld, bool windowQueued, bool skillReserved) =>
+        !skillReserved && (attackHeld || windowQueued);
 }

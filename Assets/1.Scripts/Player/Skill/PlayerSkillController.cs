@@ -654,8 +654,7 @@ public class PlayerSkillController : BaseNetworkBehaviour
                 return false;
             }
         }
-        // 스킬로 끊을 수 있는 기본 공격(거너) 중이면 승인한다 — 끊기는 BeginSkill 의 상태 전이가 한다(할 일 44).
-        else if (!stateController.CanStartSkill)
+        else if (!stateController.CanUseSkill)
         {
             Edit.Log($"[Skill] {slot} 거부 — 상태 {stateController.CurrentState} 또는 차단 효과", this);
             return false;
