@@ -6,17 +6,16 @@
 
 ## 1. 흐름
 
-발판 → 카운트다운 → **입력 잠금 · 페이드 아웃** → (암전 중 문 앞 FrontPoints 로 이동 + **카메라가 엘리베이터 칸으로 컷**, 이후 도착까지 칸을 따라감) → **페이드 인**(이미 엘리베이터를 보고 있음) →
-**하강** → **문 열림** → **P1 → P2 → P3 순서로 걸어 들어감**(Walk 애니, 걷는 동안 실루엣 꺼짐) → **문 닫힘** → **상승**(숨김, 카메라는 칸을 따라감) →
+발판 → 카운트다운 → **입력 잠금 · 페이드 아웃** → (암전 중 문 앞 FrontPoints 로 이동 + **카메라가 엘리베이터 칸으로 컷** + **하강 시작**, 이후 도착까지 칸을 따라감) →
+**페이드 인**(이미 엘리베이터가 내려오는 중) → 착지 → **문 열림** → **P1 → P2 → P3 순서로 걸어 들어감**(Walk 애니, 걷는 동안 실루엣 꺼짐) → **문 닫힘** → **상승**(숨김, 카메라는 칸을 따라감) →
 페이드 아웃 → 완전 암전 → 보스방 도착(도착 ACK → 보스 등장 연출, 기존 그대로).
 
 | 단계(`BossElevatorPhase`) | 시작 | 누가 무엇을 |
 |---|---|---|
 | `FrontFadeOut` | 0(카운트다운 끝) | **서버**: 입력 잠금(보이는 채로·무적). 참가자 화면이 검게 |
-| `FrontBlackout` | `TeleportFrontAt` = `CameraFocusAt` | **서버**: 참가자를 슬롯 순서대로 FrontPoints 로 순간이동. **각 피어**: 참가자 카메라가 칸으로 컷(도착까지 칸을 따라감) |
-| `FrontFadeIn` | `FrontFadeInAt` | 화면이 밝아짐(아웃 → 암전 → 인이 끊김 없이 한 번) |
-| `WaitDescend` | `FrontFadeInEndAt` | **서버**: 오너에게 보행 지시. 하강 대기(`waitBeforeDescend`) — 별도 카메라 포커스 대기는 없다 |
-| `Descending` | `DescendStartAt` | 칸 하강(OutQuint) |
+| `WaitDescend` | `TeleportFrontAt` = `CameraFocusAt` | **서버**: 참가자를 슬롯 순서대로 FrontPoints 로 순간이동. **각 피어**: 참가자 카메라가 칸으로 컷(도착까지 칸을 따라감). 하강 대기 `descendDelay`(기본 0 = 바로 하강) |
+| `Descending` | `DescendStartAt` = `TeleportFrontAt + descendDelay` | 칸 하강(OutQuint). 완전 암전 속에서 출발 — 화면이 밝아질 때 이미 내려오는 중 |
+| (페이드 트랙) | `FrontFadeInAt` → `FrontFadeInEndAt` | 하강과 겹쳐 화면이 밝아짐(아웃 → 암전 → 인이 끊김 없이 한 번, `FadeAlphaAt`). 끝 = **서버**: 오너에게 보행 지시 — 단계(`BossElevatorPhase`)가 아니다 |
 | `DoorOpening` | `DoorOpenAt` | 문 Open 클립 |
 | `WalkingIn` | `WalkInAt` | 슬롯 s 가 `WalkStartAt(s)` 에 걷기 시작해 `WalkDuration` 뒤 칸 안 도착. 걷기 시작하면 그 플레이어 실루엣 꺼짐 |
 | `DoorClosing` | 마지막 도착 + `closeDelayAfterWalk` | 문 Close 클립 |
@@ -35,8 +34,8 @@
 | `_timing.frontFadeOutDuration` | 0.4 | (카운트다운 직전 0.3, `BossTeleportManager.fadeOutSeconds`) | 카운트다운 끝 → 완전 암전(초) |
 | `_timing.frontBlackHold` | 0.2 | — | 문 앞 순간이동 뒤 암전 유지(초) |
 | `_timing.frontFadeInDuration` | 0.5 | (0.5, `fadeInSeconds`) | 문 앞에서 밝아짐(초). 끝 = 보행 지시 |
-| `_timing.waitBeforeDescend` | 0.5 | 0.5 | 페이드 인 끝 → 하강 시작(초) |
-| `_timing.descendDuration` | **2.1** | 1.2 | 하강 시간(초, 1.75배) |
+| `_timing.descendDelay` | **0** | (`waitBeforeDescend` 0.5 — 페이드 인 끝 기준, 이름·의미 변경) | 문 앞 이동(암전·카메라 전환) → 하강 시작(초). 암전 유지(0.2)보다 길면 밝아질 때 칸이 아직 멈춰 있다 |
+| `_timing.descendDuration` | **2.1** | 1.2 | 하강 시간(초). 하강 거리 20.14m(아래) 기준 평균 9.6m/s·출발 순간 최대 48m/s |
 | `_timing.doorOpenDuration` | 0 | 0 | 문 열림(초). 0 = Open 클립 길이(1.76) |
 | `_timing.walkStartDelay` | 0.2 | — | 문 다 열림 → P1 출발(초) |
 | `_timing.walkInterval` | 0.6 | — | 다음 사람 출발 간격(초) |
@@ -50,12 +49,17 @@
 | `_insideSpread` | 0.6 | — | 칸 안 도착 지점 간격 배율(문 앞 지점 배치를 칸 중앙 기준으로 줄임, 0 = 전원 정중앙) |
 
 - 기술 값 `_timing.height`(0 = 자동, 칸 대기 높이)·`_landedLocalY` 는 `[DataTableIgnore]`.
-- 3인 기준 총 길이: 입력 잠금 0 · 문 앞 이동·카메라 전환 +0.4 · 페이드 인 +0.6 · 페이드 인 끝(보행 지시) +1.1 · 하강 +1.6 · 문 열림 +3.7 · P1 출발 +5.66 · P3 도착 +8.65 · 문 닫힘 +9.15 · 상승 +10.83 · 암전 +13.43초(1인 +12.23).
+- **하강 거리 = 칸 대기 localY − `_landedLocalY`**(리그 `Awake`·`BuildTimeline` 에서 프리팹에 놓인 칸 자리를 읽는다 — 코드에 높이 상수 없음).
+  2026-10-16 사용자 배치: 칸 `PF_Prop_object_MV_bossroomenter` localY 20.69(이전 10.99) − 0.55 = **20.14m**(이전 10.44m). `[Elevator]` 루트 y 0.1 은 칸·`floor_charger` 가 같이 올라가 착지 높이 0.55(리그 기준)는 그대로.
+- 시간표(3인): 입력 잠금 0 · 문 앞 이동·카메라 전환·**하강** +0.4 · 페이드 인 +0.6(칸 높이 12.2m, 39% 내려옴) · 페이드 인 끝(보행 지시) +1.1(2.65m 남음) · 문 열림 +2.5 · P1 출발 +4.46 · P3 도착 +7.45 · 문 닫힘 +7.95 · 상승 +9.63 · 암전 +12.23초.
+  1인: P1 도착 +6.25 · 문 닫힘 +6.75 · 상승 +8.43 · 암전 +11.03초. (이전 하강 +1.6 대비 전 단계 1.2초 앞당김.)
 - 시트에 행이 생기기 전(병합 Export 전)에는 프리팹 값으로 돈다(data-table.md §3).
 
 ## 3. 구현 결정
 
-- **보행 = 오너 권한 연출 이동.** 서버가 페이드 인 끝(`FrontFadeInEndAt`)에 오너에게 `ElevatorWalkOwnerClientRpc(목표, 연출 시작 시각, 출발 시각, 시간)` 를 보내고,
+- **하강 = 암전 기준**(할 일 46 후속 5). 예전엔 페이드 인 끝 + 0.5 에 출발해 밝아진 화면에 멈춘 칸이 보였다. 이제 문 앞 이동 순간(`TeleportFrontAt`) + `descendDelay` —
+  밝아질 때 이미 내려오는 중이다. 문 열림·보행·닫힘·상승은 하강 끝 기준이라 같이 앞당겨진다. 암전 유지·페이드 인은 하강과 겹치므로 단계 enum 에서 뺐다(`FadeAlphaAt` 별도 트랙).
+- **보행 = 오너 권한 연출 이동.** 서버가 페이드 인 끝(`FrontFadeInEndAt`, 하강 중 — 출발은 문 열림 뒤라 지시가 먼저 도착)에 오너에게 `ElevatorWalkOwnerClientRpc(목표, 연출 시작 시각, 출발 시각, 시간)` 를 보내고,
   오너가 `FixedUpdate` 에서 `PlayerMotor.SetPoseTarget` 로 지금 자리 → 칸 안 지점을 **직선 보간**한다(시간 기준 — 출발 자리가 문 앞에서 조금 어긋나 있어도 같은 시각에 도착).
   포즈 목표는 충돌 해석을 거치지 않아 문틀·칸 벽·다른 플레이어에 걸리지 않고, 매 틱 수직 속도 0 이라 떨어지지 않는다.
   방향은 `PlayerMovement.RotateImmediately`, Walk 애니는 `Player.SetAnimatorMoving`(IsMoving) — 위치는 오너 NetworkTransform, 애니는 NetworkAnimator(오너)로 복제된다.

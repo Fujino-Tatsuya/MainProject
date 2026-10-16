@@ -2,14 +2,16 @@ using System;
 using EuniTween;
 using UnityEngine;
 
-/// <summary>보스 엘리베이터 연출 단계(시간 순서). <see cref="BossElevatorTimeline.PhaseAt"/> 가 경과 시간으로 고른다.</summary>
+/// <summary>
+/// 보스 엘리베이터 연출 단계(시간 순서) — 칸·문 기준. <see cref="BossElevatorTimeline.PhaseAt"/> 가 경과 시간으로 고른다.
+/// 문 앞 이동의 암전 유지·페이드 인은 하강과 겹치므로 단계가 아니다 — <see cref="BossElevatorTimeline.FadeAlphaAt"/>·
+/// <see cref="BossElevatorTimeline.FrontFadeInAt"/>·<see cref="BossElevatorTimeline.FrontFadeInEndAt"/> 로 따로 본다.
+/// </summary>
 public enum BossElevatorPhase
 {
     FrontFadeOut,   // t=0 — 카운트다운 끝, 서버가 입력 잠금. 화면이 검게 페이드 아웃. 엘리베이터는 위에서 대기
-    FrontBlackout,  // 완전 암전 — 서버가 참가자를 문 앞(FrontPoints)으로 옮기고, 참가자 카메라가 엘리베이터로 넘어간다
-    FrontFadeIn,    // 문 앞에서 화면이 밝아진다(이미 엘리베이터를 보고 있다)
-    WaitDescend,    // 다 밝아짐 — 보행 지시, 하강 대기
-    Descending,     // 위 → 착지 (OutQuint)
+    WaitDescend,    // 완전 암전 — 서버가 참가자를 문 앞(FrontPoints)으로 옮기고 카메라가 칸으로 넘어간다. 하강 대기(기본 0초)
+    Descending,     // 위 → 착지 (OutQuint). 암전 중에 시작 — 화면이 밝아질 때 이미 내려오는 중
     DoorOpening,    // 문 Open 클립
     WalkingIn,      // 문 열린 채 — 참가자가 슬롯 순서(P1→P2→P3)대로 칸 안으로 걸어 들어간다
     DoorClosing,    // 문 Close 클립
@@ -44,8 +46,8 @@ public struct BossElevatorTimingSettings
     [Tooltip("문 앞에서 화면이 밝아지는 시간(초)")]
     [Min(0f)] public float frontFadeInDuration;
 
-    [Tooltip("문 앞 페이드 인이 끝난 뒤 하강 시작까지(초)")]
-    [Min(0f)] public float waitBeforeDescend;
+    [Tooltip("문 앞 이동(완전 암전·카메라 전환) → 하강 시작(초). 0 = 그 순간 바로. 암전 유지보다 길면 화면이 밝아질 때 칸이 아직 멈춰 있다")]
+    [Min(0f)] public float descendDelay;
     [Tooltip("하강 시간(초) — OutQuint")]
     [Min(0f)] public float descendDuration;
     [Tooltip("문 열림 시간(초). 0 이하 = Open 클립 길이")]
@@ -77,7 +79,7 @@ public struct BossElevatorTimingSettings
         frontFadeOutDuration = 0.4f,
         frontBlackHold = 0.2f,
         frontFadeInDuration = 0.5f,
-        waitBeforeDescend = 0.5f,
+        descendDelay = 0f,
         descendDuration = 2.1f,
         doorOpenDuration = 0f,
         walkStartDelay = 0.2f,
@@ -143,9 +145,11 @@ public sealed class BossElevatorTimeline
     /// 그 전은 플레이어. 끝(보스룸 도착)은 시간표 밖이라 호출자가 플레이어로 돌린다.
     /// </summary>
     public bool CameraFollowsCabAt(double elapsed) => elapsed >= CameraFocusAt;
+    /// <summary>문 앞 암전 유지가 끝나 화면이 밝아지기 시작하는 시각.</summary>
     public float FrontFadeInAt { get; }
-    /// <summary>문 앞 페이드 인이 끝난 시각(<see cref="BossElevatorPhase.WaitDescend"/> 시작) — 서버가 보행을 지시한다.</summary>
+    /// <summary>문 앞 페이드 인이 끝난 시각 — 서버가 보행을 지시한다(칸은 이미 하강 중).</summary>
     public float FrontFadeInEndAt { get; }
+    /// <summary>하강 시작 = 문 앞 이동 + <see cref="BossElevatorTimingSettings.descendDelay"/> — 페이드 인과 무관하게 암전 기준.</summary>
     public float DescendStartAt { get; }
     public float DoorOpenAt { get; }
     /// <summary>문이 다 열린 시각(<see cref="BossElevatorPhase.WalkingIn"/> 시작).</summary>
@@ -182,7 +186,7 @@ public sealed class BossElevatorTimeline
         TeleportFrontAt = FrontFadeOutDuration;
         FrontFadeInAt = TeleportFrontAt + Mathf.Max(0f, settings.frontBlackHold);
         FrontFadeInEndAt = FrontFadeInAt + FrontFadeInDuration;
-        DescendStartAt = FrontFadeInEndAt + Mathf.Max(0f, settings.waitBeforeDescend);
+        DescendStartAt = TeleportFrontAt + Mathf.Max(0f, settings.descendDelay);
         DoorOpenAt = DescendStartAt + DescendDuration;
         WalkInAt = DoorOpenAt + DoorOpenDuration;
         _firstWalkAt = WalkInAt + Mathf.Max(0f, settings.walkStartDelay);
@@ -210,9 +214,7 @@ public sealed class BossElevatorTimeline
         switch (phase)
         {
             case BossElevatorPhase.FrontFadeOut: return 0f;
-            case BossElevatorPhase.FrontBlackout: return TeleportFrontAt;
-            case BossElevatorPhase.FrontFadeIn: return FrontFadeInAt;
-            case BossElevatorPhase.WaitDescend: return FrontFadeInEndAt;
+            case BossElevatorPhase.WaitDescend: return TeleportFrontAt;
             case BossElevatorPhase.Descending: return DescendStartAt;
             case BossElevatorPhase.DoorOpening: return DoorOpenAt;
             case BossElevatorPhase.WalkingIn: return WalkInAt;
@@ -233,9 +235,7 @@ public sealed class BossElevatorTimeline
         if (elapsed >= WalkInAt) return BossElevatorPhase.WalkingIn;
         if (elapsed >= DoorOpenAt) return BossElevatorPhase.DoorOpening;
         if (elapsed >= DescendStartAt) return BossElevatorPhase.Descending;
-        if (elapsed >= FrontFadeInEndAt) return BossElevatorPhase.WaitDescend;
-        if (elapsed >= FrontFadeInAt) return BossElevatorPhase.FrontFadeIn;
-        if (elapsed >= TeleportFrontAt) return BossElevatorPhase.FrontBlackout;
+        if (elapsed >= TeleportFrontAt) return BossElevatorPhase.WaitDescend;
         return BossElevatorPhase.FrontFadeOut;
     }
 
@@ -245,8 +245,6 @@ public sealed class BossElevatorTimeline
         switch (PhaseAt(elapsed))
         {
             case BossElevatorPhase.FrontFadeOut:
-            case BossElevatorPhase.FrontBlackout:
-            case BossElevatorPhase.FrontFadeIn:
             case BossElevatorPhase.WaitDescend:
                 return Height;
             case BossElevatorPhase.Descending:

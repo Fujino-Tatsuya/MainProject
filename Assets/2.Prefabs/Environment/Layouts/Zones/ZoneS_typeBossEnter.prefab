@@ -2392,7 +2392,7 @@ MonoBehaviour:
     frontFadeOutDuration: 0.4
     frontBlackHold: 0.2
     frontFadeInDuration: 0.5
-    waitBeforeDescend: 0.5
+    descendDelay: 0
     descendDuration: 2.1
     doorOpenDuration: 0
     walkStartDelay: 0.2
