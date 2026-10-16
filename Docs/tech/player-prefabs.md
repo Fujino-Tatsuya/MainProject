@@ -481,6 +481,29 @@ grep -n "AuthorityMode" Assets/2.Prefabs/Player/Player.prefab Assets/2.Prefabs/P
 | 인스펙터 | `UnitOverheadHealthBar` 「대시 아이콘」: `dashIconRoot` · `dashIconGraphics`(색을 곱할 Slot·Icon) · `dashReadyColor`(흰색) · `dashNotReadyColor`(0.35 회색, 알파로 흐리게도 가능) |
 | 테스트 | `UI/Combat/Editor/OverheadDashIconRulesTests` — `Tools/Tests/플레이어 EditMode 테스트 실행` 에 등록(UI 픽스처도 이 러너가 돌린다) |
 
+**머리 위 라벨 = 이름 / 상태이상** (2026-10-16, 할 일 50) — `Bar/NameLabel` 은 평소 이름(P1·P2…), CC·붙잡힘 중에는 그 이름 하나로 바뀐다(규칙·우선순위: [status-effects.md](../design/status-effects.md) §머리 위 표시).
+글자는 흰색 고정 + 검정 아웃라인 ≈3px(2026-10-16 후속) — 전역 폰트(TMP Settings·원본 `LiberationSans SDF`·`Resources/NotoSansKR … SDF`)는 그대로 두고 **이름표 전용 폰트 에셋**을 쓴다.
+
+| 에셋 | 설정 |
+|------|------|
+| `Assets/Fonts/Overhead/LiberationSans SDF - Overhead.asset` | `NameLabel` 의 폰트. `TextMesh Pro/Fonts/LiberationSans.ttf` · 샘플 86 · 패딩 20 · 1024² · SDFAA_HINTED · **정적** · ASCII 32–126. fallback 표 = 아래 한글 에셋 하나 |
+| `Assets/Fonts/Overhead/NotoSansKR SDF - Overhead.asset` | `Fonts/NotoSansKR-VariableFont_wght.ttf` · 샘플 28 · 패딩 6 · 2048² · SDFAA · **정적** · KS X 1001 완성형 2,350자(상태이상 문구 전부 포함) |
+| `2.Prefabs/UI/LiberationSans SDF - Overhead Outline.mat` | `NameLabel` 의 머티리얼(guid 그대로). Mobile SDF·`OUTLINE_ON`, `_MainTex` = 위 라틴 아틀라스, Outline Width **0.35** · Face Dilate **0.5** |
+| `OverheadHealthBar.prefab` → `Bar/NameLabel` | 18pt · **Character Spacing 20** (아래 「자간」) |
+
+- **두께 맞춤**: 아웃라인은 아틀라스의 (패딩+1)/샘플 크기에 비례한다. 라틴 21/86 ≈ 한글 7/28 ≈ 0.25 로 맞춰 같은 머티리얼 값에서 같은 두께가 나온다.
+  한글 글리프는 TMP 가 이 머티리얼을 복사한 fallback 머티리얼(`… Outline + NotoSansKR SDF - Overhead Atlas`)로 그려 아웃라인이 그대로 붙는다.
+  예전 원본 LiberationSans SDF(패딩 9/샘플 86)로는 18pt 에서 바깥으로 ≈1.9px 까지만 닿아 3px 가 안 나왔다.
+- **측정**(1080p, 렌더 커버리지 합): 18pt 기준 라틴 중앙값 2.9px · 한글 2.8px. 실제 게임은 바 스케일 0.9(`screenScale`)라 16.2px 글자에서 라틴 2.6 · 한글 2.9px.
+  값을 더 올리면 라틴은 패딩 한계로 두께가 더 늘지 않고 한글 획만 깎인다.
+- **자간 20**(2026-10-16 후속 2): TMP 는 글자마다 쿼드를 순서대로 그려서, **오른쪽 글자의 아웃라인이 왼쪽 글자의 흰 면을 덮는다**.
+  라틴 글자 사이 원래 면 간격은 16.2px 에서 1–2px 뿐이라 ≈2.7px 아웃라인보다 좁다 — 자간 0 에서 `Stunned` 등이 글자당 10–16px² 씩 먹혀 겹쳐 보였다(한글은 간격이 넓어 0–2px²).
+  폰트 메트릭 문제가 아니고(advance 가 원본 `LiberationSans SDF` 와 같다), Dilate 부풀림도 아니다(면 간격 변화 ≤1px).
+  자간 20 에서 먹힘 ≈0 — 머티리얼·두께는 그대로다. 아웃라인을 두껍게 바꾸면 자간도 다시 맞춘다(10→84px², 15→8px², 18→1px², 20→0.1px², 영문 9개 합계).
+- **정적 아틀라스**라 에디터·Play 에서 에셋이 다시 써지지 않는다(git 노이즈 없음). 2,350자 밖 글자(희귀 한글·한자 등 닉네임)는 TMP Settings 전역 fallback(`NotoSansKR … SDF`)로 그려진다 — 보이긴 하지만 아웃라인이 ≈1px 로 얇다.
+- 2,350자 밖 글자는 전역 fallback 으로 외곽선 약 1px — 사용자 승인(2026-10-16: 정적 아틀라스 유지, 한글 전용 에셋 9.6MB 그대로).
+  글자를 늘릴 땐 Font Asset Creator 에서 에셋에 저장된 생성 설정(문자 목록 포함)으로 다시 굽는다.
+
 **에임 대시 틴트** — `PlayerAimIndicator.tintOnDashCooldown`(기본 **꺼짐**). 켜면 예전처럼 재충전 중 인디케이터를
 `dashCooldownTint` 로 어둡게 한다(쿼드 머티리얼 **인스턴스**의 `_BaseColor` — §12). 꺼져 있으면 항상 원래 색이고, 어두운 상태에서 끄면 원래 색으로 되돌린다.
 base·Variant 모두 이 값을 오버라이드하지 않는다(2026-10-12 확인) — 다시 켜려면 base `Player.prefab` 에서 켠다.

@@ -345,23 +345,23 @@ MonoBehaviour:
     ko: Starting...
     en: Starting...
   - key: UI.StatusEffect.Airborne
-    ko: Airborne
+    ko: "\uACF5\uC911\uC5D0 \uB738"
     en: Airborne
   - key: UI.StatusEffect.Stunned
-    ko: Stunned
+    ko: "\uAE30\uC808"
     en: Stunned
   - key: UI.StatusEffect.Slowed
-    ko: Slowed
+    ko: "\uB454\uD654"
     en: Slowed
   - key: UI.StatusEffect.Rooted
-    ko: Rooted
+    ko: "\uC18D\uBC15"
     en: Rooted
   - key: UI.StatusEffect.Silenced
-    ko: Silenced
+    ko: "\uCE68\uBB35"
     en: Silenced
   - key: UI.StatusEffect.Debilitated
-    ko: Debilitated
-    en: Debilitated
+    ko: "\uC57D\uD654"
+    en: Weakened
   - key: UI.StatusEffect.SuperArmor
     ko: SuperArmor
     en: SuperArmor

@@ -101,7 +101,8 @@ public static class UiStrings
     // 허수아비 체력 — TrainingDummyHealthBar
     public static readonly UiString TrainingDummyHp = new UiString("UI.TrainingDummy.Hp", "{hp} / {max}", "TrainingDummy.prefab — 머리 위 체력({hp} = 현재, {max} = 최대)");
 
-    // 상태이상 이름 — StatusEffectHUD. 키 = UI.StatusEffect.<enum 이름>, ko = 지금 화면 글자(enum 이름에서 Modifier 를 뺀 것)
+    // 상태이상 이름 — StatusEffectHUD·머리 위 라벨. 키 = UI.StatusEffect.<enum 이름>.
+    // ko = 차단류 CC 6종(BlockedCrowdControl)은 아래 한국어(할 일 50 확정), 나머지는 enum 이름에서 Modifier 를 뺀 것
     private static readonly Dictionary<StatusEffectType, string> StatusEffectHints = new Dictionary<StatusEffectType, string>
     {
         [StatusEffectType.Airborne] = "공중에 뜸",
@@ -124,6 +125,9 @@ public static class UiStrings
 
     public const string StatusEffectKeyPrefix = "UI.StatusEffect.";
 
+    // 붙잡힘(구속 — 잡기·돌진 밀기) — 상태이상 enum 이 아니라 따로 둔다. 머리 위 라벨만 쓴다(할 일 50)
+    public static readonly UiString StatusEffectGrabbed = new UiString(StatusEffectKeyPrefix + "Grabbed", "붙잡힘", "PlayerOverheadHealthBarRule — 머리 위 붙잡힘(구속)(코드)");
+
     /// <summary>상태이상 하나의 표시 이름 키. <c>None</c>·조합 값처럼 단일 이름이 아니면 false.</summary>
     public static bool TryGetStatusEffect(StatusEffectType type, out UiString name) => StatusEffectNames.TryGetValue(type, out name);
 
@@ -139,7 +143,10 @@ public static class UiStrings
             string where = "StatusEffectHUD — 상태이상 이름(코드)";
             if (StatusEffectHints.TryGetValue(type, out string hint))
                 where += " · " + hint;
-            names[type] = new UiString(StatusEffectKeyPrefix + enumName, enumName.Replace("Modifier", string.Empty), where);
+            string ko = (type & StatusEffectImmunityPolicy.BlockedCrowdControl) != 0 && hint != null
+                ? hint
+                : enumName.Replace("Modifier", string.Empty);
+            names[type] = new UiString(StatusEffectKeyPrefix + enumName, ko, where);
         }
 
         return names;
@@ -165,6 +172,7 @@ public static class UiStrings
         all.AddRange(LoadingTips);
         all.AddRange(LoadingReadyMessages);
         all.AddRange(StatusEffectNames.Values);
+        all.Add(StatusEffectGrabbed);
         all.AddRange(SettingsUiStrings.All);   // 설정창(UI.Settings.*) — 목록은 Settings 쪽 한 곳
         return all;
     }

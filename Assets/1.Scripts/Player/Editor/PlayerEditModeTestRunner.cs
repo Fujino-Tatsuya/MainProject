@@ -31,6 +31,7 @@ internal static class PlayerEditModeTestRunner
         "^InterruptHighlightModelTests$", // 인터럽트 강조(할 일 5) — 창 열림 × 사거리 → RMB 슬롯 발광·페이드·맥동
         "^InterruptOmniRangeModelTests$", // 인터럽트 강조 사거리 — 방향 무관 판정 형상 도달 거리 × 대상 콜라이더 표면 거리
         "^OverheadDashIconRulesTests$", // 할 일 29 — 머리 위 대시 아이콘 표시(로컬·생존)·준비 색, 에임 대시 틴트 토글(기본 꺼짐)
+        "^OverheadStatusLabelRulesTests$", // 할 일 50 — 머리 위 이름 → 상태이상 이름: 붙잡힘·CC 6종 우선순위·버프 무시·사망/Soul 은 이름·BlockedCrowdControl 집합 일치
         "^InterruptSuccessCooldownModelTests$", // 할 일 26 — 간파 성공 쿨 감소(전체 쿨 × 비율·0 클램프·시전당 1회)
         "^PartyLivesRulesTests$", // 할 일 30 (1) — 파티 공용 목숨: 사망 목적지·공용 차감·재충전·공용 0 Soul 전멸 판정
         "^PartyWipeRespawnRulesTests$", // 할 일 30 (2) — 전멸 → 리스폰 분기(결과 화면 아님)·리스폰 조건·지점 선택(패드 제외·간격·폴백)·목숨 5
