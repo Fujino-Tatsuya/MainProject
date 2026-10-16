@@ -20,7 +20,7 @@ MonoBehaviour:
   diameterInTiles: 1.25
   playerDamage: 25
   pauseOn: 3
-  droneModel: {fileID: 919132149155446097, guid: fcc07944700f48a419a0cbde4e5cf5d5, type: 3}
+  droneModel: {fileID: 3484687064186887524, guid: a30c886fe816b534cb3a783b2cab2def, type: 3}
   droneScale: 2
   approachDistance: 10
   droneRotationOffset: {x: 0, y: 0, z: 0}

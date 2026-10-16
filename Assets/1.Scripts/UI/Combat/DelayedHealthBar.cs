@@ -24,6 +24,9 @@ public sealed class DelayedHealthBar
     private float holdTimer;
     private int heldTotal;
 
+    /// <summary>잔상 Image 가 연결돼 있는가. 비어 있으면 구독·Tick 을 건너뛰어도 된다(머리 위 플레이어 바).</summary>
+    public bool HasFill => delayedFill != null;
+
     public void Bind(int hp)
     {
         held.Clear();

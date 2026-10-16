@@ -20,7 +20,7 @@ using UnityEngine.AI;
 //
 // 애니는 상태복제가 아니라 ClientRpc로 확정(선택값 미복제 회피). Whip/Spin=CrossFade(트리거/Variation 배선 의존 X).
 [DataTableSheet("MidBoss", Order = 1)]
-public class SpinnerBot : MonsterBase
+public class SpinnerBot : MonsterBase, IInterruptSlowMotionTarget
 {
     enum SpinPhase { None, Window, Dash }
 
@@ -209,7 +209,7 @@ public class SpinnerBot : MonsterBase
         if (data != null && data.hasSuperArmorWhileAttacking && status != null)
             status.ApplyStatus(StatusEffectType.SuperArmor, WindupDuration + DashSeconds);
 
-        PlaySpinStartClientRpc();
+        PlaySpinStartClientRpc(WindupDuration);   // 준비 동작을 예고 시간에 맞춰 늘인다 — 다 찬 순간 회전 시작
 
         _phase = SpinPhase.Window;
         _phaseTimer = WindupDuration;
@@ -231,7 +231,7 @@ public class SpinnerBot : MonsterBase
                                 halfWidthOverride: dashHalfWidth);
         }
 
-        // 창이 저작돼 있으면 자세를 정지시켜 "끊을 수 있다"를 보여 준다. 없으면 예전처럼 그냥 회전한다.
+        // 창이 저작돼 있으면 간파 창을 연다(파란 예고). 몸은 늘인 준비 동작을 하다가 창이 끝나는 순간 회전한다(PlaySpinStartClientRpc).
         if (Counter != null)
         {
             Counter.Open();
@@ -347,9 +347,24 @@ public class SpinnerBot : MonsterBase
             return;
         }
 
+        _interruptSuccessCount++;   // 🔴 슬로우 모션 성공 판별 — 이 TakeDamage 호출 안에서 올려야 플레이어가 전후 비교로 잡는다
         CombatStatsEvents.RaiseServerCounterSucceeded(this, DamageAttackerClientId); // 결과 화면 통계(판정 무관)
         CounterSucceeded();
     }
+
+    // ─── 간파 슬로우 모션(handoff-interrupt-slowmo · 팀장 10-16: 중간보스·23호에 건다) ───
+    int _interruptSuccessCount;   // 누적만 한다 — 값 자체가 아니라 타격 전후 비교용
+
+    /// <summary>
+    /// [서버] 지금 인터럽트를 받으면 카운터가 성립하는가(슬로우 시작 예측).
+    /// 🔴 튜토리얼 연습 개체(<see cref="ISpinnerBotOverride"/> 주입)는 false — 튜토리얼 결정 D18 "스피너봇에 간파 슬로우 연결 안 함" 유지.
+    ///    예측이 false 면 슬로우가 시작되지 않으므로 아래 성공 수는 쓰이지 않는다.
+    /// </summary>
+    bool IInterruptSlowMotionTarget.ServerIsInterruptible =>
+        IsServer && Override == null && Counter != null && Counter.IsOpen;
+
+    /// <summary>[서버] 카운터 성공 누적 — 플레이어가 ReceiveAttack 전후로 비교한다.</summary>
+    int IInterruptSlowMotionTarget.ServerInterruptSuccessCount => _interruptSuccessCount;
 
     // 카운터 성공 — 돌진을 취소하고 즉시 그로기. 그로기 애니는 `IsDizzy` 불로 컨트롤러가 잡는다
     // (2026-09-08 SVN r292 에서 `AnyState → Dizzy` 전이를 넣었다. 그 전에는 논리만 그로기였다).
@@ -461,9 +476,63 @@ public class SpinnerBot : MonsterBase
         _effects.StopEffect(spinEffectId);
     }
 
-    [ClientRpc] void PlaySpinStartClientRpc() => SafeCrossFade(spinStartState);
-    [ClientRpc] void PlaySpinLoopClientRpc() => SafeCrossFade(spinLoopState);
-    [ClientRpc] void PlayWhipClientRpc(bool useR) => SafeCrossFade(useR ? whipStateR : whipStateL);
+    // ─── 준비 동작 늘이기(팀장 10-16: 예고가 다 차야 그때부터 회전) ───
+    // 시작 클립은 앞부분이 준비 동작이고 StartEffect(Spin) 이벤트 지점부터 회전한다(A_Spinner_AttackStart 32.7%).
+    // 준비 구간(예고 시간) 동안 그 지점까지를 늘여 재생해 "다 찬 순간 = 회전 시작"으로 맞춘다.
+    // 배율은 RPC 로 받은 예고 시간으로 **각 피어가 직접** 계산한다(서버 _phase 는 클라에 없다).
+    const float SpinUpLead = 0.05f;   // 이벤트가 크로스페이드(BeginDash → Loop)보다 확실히 먼저 지나가게 하는 여유(초)
+    float _spinWindupAnimScale = 1f;
+    float _spinUpSeconds = -1f;        // 시작 클립에서 회전 이벤트까지(초, 재생 배율 1) — 처음 쓸 때 클립에서 읽는다
+
+    // 공격 상태일 때만 적용 — 간파 성공·피격으로 공격을 벗어나면 저절로 1 로 돌아온다(State 는 복제값).
+    protected override float AnimatorSpeedScale => State == MonsterState.Attack ? _spinWindupAnimScale : 1f;
+
+    /// <summary>시작 클립에서 회전 이벤트(StartEffect = spinEffectId)까지 시간. 못 찾으면 0(= 늘이지 않음).</summary>
+    float SpinUpSeconds()
+    {
+        if (_spinUpSeconds >= 0f) return _spinUpSeconds;
+        _spinUpSeconds = 0f;
+        RuntimeAnimatorController rac = animator != null ? animator.runtimeAnimatorController : null;
+        if (rac == null) return 0f;
+        foreach (AnimationClip clip in rac.animationClips)
+        {
+            if (clip == null) continue;
+            foreach (AnimationEvent ev in clip.events)
+            {
+                if (ev.functionName != "StartEffect" || ev.stringParameter != spinEffectId) continue;
+                _spinUpSeconds = ev.time;
+                return _spinUpSeconds;
+            }
+        }
+        Debug.LogWarning($"[Spinner] 시작 클립에서 StartEffect({spinEffectId}) 이벤트를 못 찾았다 — 준비 동작을 늘이지 않는다.", this);
+        return 0f;
+    }
+
+    [ClientRpc]
+    void PlaySpinStartClientRpc(float windupSeconds)
+    {
+        float spinUp = SpinUpSeconds();
+        float target = windupSeconds - SpinUpLead;
+        // 관리 속도(공격 중 = attackSpeed)에 곱해지므로 그만큼 나눈다. 예고가 아주 짧아도 3배 이상은 당기지 않는다.
+        _spinWindupAnimScale = spinUp > 0f && target > 0.01f
+            ? Mathf.Clamp(spinUp / (AttackAnimSpeed * target), 0.05f, 3f)
+            : 1f;
+        SafeCrossFade(spinStartState);
+    }
+
+    [ClientRpc]
+    void PlaySpinLoopClientRpc()
+    {
+        _spinWindupAnimScale = 1f;
+        SafeCrossFade(spinLoopState);
+    }
+
+    [ClientRpc]
+    void PlayWhipClientRpc(bool useR)
+    {
+        _spinWindupAnimScale = 1f;
+        SafeCrossFade(useR ? whipStateR : whipStateL);
+    }
 }
 
 /// <summary>

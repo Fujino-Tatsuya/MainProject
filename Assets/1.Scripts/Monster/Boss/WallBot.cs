@@ -30,7 +30,7 @@ using UnityEngine.AI;
 //    창 한가운데에 있는데, 그대로 두면 모으는 도중에 근접 판정이 나가고 `AttackEnd` 트리거까지
 //    발동해 2단이 먼저 재생된다.
 [DataTableSheet("MidBoss", Order = 2)]
-public class WallBot : MonsterBase
+public class WallBot : MonsterBase, IInterruptSlowMotionTarget
 {
     enum ShieldPhase { None, Gather, Dash, Shock }
 
@@ -337,9 +337,19 @@ public class WallBot : MonsterBase
         if (!IsServer || !attackInfo.isInterruptAttack || Counter == null) return;
         if (!Counter.TryConsumeInterrupt()) return;
 
+        _interruptSuccessCount++;   // 🔴 슬로우 모션 성공 판별 — 이 TakeDamage 호출 안에서 올려야 플레이어가 전후 비교로 잡는다
         CombatStatsEvents.RaiseServerCounterSucceeded(this, DamageAttackerClientId); // 결과 화면 통계(판정 무관)
         CounterSucceeded();
     }
+
+    // ─── 간파 슬로우 모션(handoff-interrupt-slowmo · 팀장 10-16: 중간보스·23호에 건다) ───
+    int _interruptSuccessCount;   // 누적만 한다 — 값 자체가 아니라 타격 전후 비교용
+
+    /// <summary>[서버] 지금 인터럽트를 받으면 카운터가 성립하는가(슬로우 시작 예측).</summary>
+    bool IInterruptSlowMotionTarget.ServerIsInterruptible => IsServer && Counter != null && Counter.IsOpen;
+
+    /// <summary>[서버] 카운터 성공 누적 — 플레이어가 ReceiveAttack 전후로 비교한다.</summary>
+    int IInterruptSlowMotionTarget.ServerInterruptSuccessCount => _interruptSuccessCount;
 
     // 카운터 성공 — 모으기를 취소하고 즉시 그로기. 그로기 자세는 `Hit` 클립으로 보여 준다
     // (이 컨트롤러엔 그로기 상태가 없다 — PLAN §9.1. `PlayStateAnimation` 에서 트리거를 친다).

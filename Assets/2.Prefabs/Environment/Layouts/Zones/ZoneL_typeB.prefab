@@ -3455,9 +3455,9 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
+  - {fileID: 5661914410478692917}
   - {fileID: 8212068577914354729}
   - {fileID: 3467629636430682045}
-  - {fileID: 5661914410478692917}
   - {fileID: 2878171601098139260}
   - {fileID: 7266377101663384528}
   - {fileID: 1955555919962232020}
@@ -4261,11 +4261,11 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
+  - {fileID: 4325319161855072258}
   - {fileID: 676048995587092038}
   - {fileID: 4294691121373677014}
   - {fileID: 5465415417499271625}
   - {fileID: 5849892402703580948}
-  - {fileID: 4325319161855072258}
   - {fileID: 5406641009788641585}
   - {fileID: 926117936459062755}
   - {fileID: 7583864527738814932}
@@ -4345,8 +4345,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4502743583402229400, guid: e8370390e198edc47af2b062275d08a3, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -4605,12 +4604,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone (32)
       objectReference: {fileID: 0}
-    - target: {fileID: 7918671310875253532, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
-      propertyPath: m_IsActive
-      value: 1
-      objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 1555623083947162686, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -4947,10 +4941,6 @@ PrefabInstance:
       value: floor_molding_corner04 (1)
       objectReference: {fileID: 0}
     - target: {fileID: 8817152494828172345, guid: 8c9c2aa8a3552c149bb5945ca2be69da, type: 3}
-      propertyPath: m_LocalScale.x
-      value: -1
-      objectReference: {fileID: 0}
-    - target: {fileID: 8817152494828172345, guid: 8c9c2aa8a3552c149bb5945ca2be69da, type: 3}
       propertyPath: m_LocalPosition.x
       value: -3.911726
       objectReference: {fileID: 0}
@@ -4990,10 +4980,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4471314327906615758, guid: 8c9c2aa8a3552c149bb5945ca2be69da, type: 3}
-    - {fileID: 6323882565453801669, guid: 8c9c2aa8a3552c149bb5945ca2be69da, type: 3}
-    - {fileID: 4024245400363936123, guid: 8c9c2aa8a3552c149bb5945ca2be69da, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -5921,8 +5908,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 8569691624125336227, guid: cd483b93854eed8418ed84cc94b34db1, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -6187,12 +6173,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone_trench_068
       objectReference: {fileID: 0}
-    - target: {fileID: 5469790226188622297, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
-      objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 5917185863045527761, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -6599,12 +6580,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone_trench_073
       objectReference: {fileID: 0}
-    - target: {fileID: 5469790226188622297, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
-      objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 5917185863045527761, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -7043,8 +7019,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4502743583402229400, guid: e8370390e198edc47af2b062275d08a3, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -7624,8 +7599,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone_trench_083
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 5917185863045527761, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -7687,8 +7661,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4502743583402229400, guid: e8370390e198edc47af2b062275d08a3, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -8036,10 +8009,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 7188285752969298720}
     m_Modifications:
-    - target: {fileID: 7342437656987902386, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 7399156037342429606, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
       propertyPath: m_LocalPosition.x
       value: 3.9158475
@@ -8084,8 +8053,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone (36)
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 1555623083947162686, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -8147,8 +8115,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 8569691624125336227, guid: cd483b93854eed8418ed84cc94b34db1, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -8210,9 +8177,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 508519048116527277, guid: 17d9f8c40dba0d94eb9ba0780208add7, type: 3}
-    - {fileID: 3090473811836406634, guid: 17d9f8c40dba0d94eb9ba0780208add7, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -8408,9 +8373,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 508519048116527277, guid: 17d9f8c40dba0d94eb9ba0780208add7, type: 3}
-    - {fileID: 3090473811836406634, guid: 17d9f8c40dba0d94eb9ba0780208add7, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -8431,14 +8394,6 @@ PrefabInstance:
     - target: {fileID: 8442811471140723066, guid: 8c9c2aa8a3552c149bb5945ca2be69da, type: 3}
       propertyPath: m_Name
       value: floor_molding_corner04 (3)
-      objectReference: {fileID: 0}
-    - target: {fileID: 8817152494828172345, guid: 8c9c2aa8a3552c149bb5945ca2be69da, type: 3}
-      propertyPath: m_LocalScale.x
-      value: -1
-      objectReference: {fileID: 0}
-    - target: {fileID: 8817152494828172345, guid: 8c9c2aa8a3552c149bb5945ca2be69da, type: 3}
-      propertyPath: m_LocalScale.z
-      value: -1
       objectReference: {fileID: 0}
     - target: {fileID: 8817152494828172345, guid: 8c9c2aa8a3552c149bb5945ca2be69da, type: 3}
       propertyPath: m_LocalPosition.x
@@ -8480,10 +8435,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4471314327906615758, guid: 8c9c2aa8a3552c149bb5945ca2be69da, type: 3}
-    - {fileID: 6323882565453801669, guid: 8c9c2aa8a3552c149bb5945ca2be69da, type: 3}
-    - {fileID: 4024245400363936123, guid: 8c9c2aa8a3552c149bb5945ca2be69da, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -8568,10 +8520,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone_caution01_004
       objectReference: {fileID: 0}
-    - target: {fileID: 5946870355968988179, guid: a73e6202bd51865419953cbe93648c5d, type: 3}
-      propertyPath: m_IsActive
-      value: 1
-      objectReference: {fileID: 0}
     - target: {fileID: 6470643213188550313, guid: a73e6202bd51865419953cbe93648c5d, type: 3}
       propertyPath: m_LocalPosition.x
       value: 3.9136014
@@ -8612,8 +8560,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 1624251988924086259, guid: a73e6202bd51865419953cbe93648c5d, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -8801,8 +8748,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 8569691624125336227, guid: cd483b93854eed8418ed84cc94b34db1, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -8823,10 +8769,6 @@ PrefabInstance:
     - target: {fileID: 140799510297223574, guid: 7575aa58d07640c42a761c2763d5a838, type: 3}
       propertyPath: m_Name
       value: Floor_urethane02_001
-      objectReference: {fileID: 0}
-    - target: {fileID: 140799510297223574, guid: 7575aa58d07640c42a761c2763d5a838, type: 3}
-      propertyPath: m_IsActive
-      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 7095252420066686203, guid: 7575aa58d07640c42a761c2763d5a838, type: 3}
       propertyPath: m_LocalPosition.x
@@ -8868,11 +8810,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 6314104406608372157, guid: 7575aa58d07640c42a761c2763d5a838, type: 3}
-    - {fileID: 4048535255209631490, guid: 7575aa58d07640c42a761c2763d5a838, type: 3}
-    - {fileID: 5412065110728117605, guid: 7575aa58d07640c42a761c2763d5a838, type: 3}
-    - {fileID: 1541786955827079397, guid: 7575aa58d07640c42a761c2763d5a838, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -9453,10 +9391,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 7188285752969298720}
     m_Modifications:
-    - target: {fileID: 7342437656987902386, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 7399156037342429606, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
       propertyPath: m_LocalPosition.x
       value: -15.684154
@@ -9501,8 +9435,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone (81)
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 1555623083947162686, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -9587,10 +9520,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 7188285752969298720}
     m_Modifications:
-    - target: {fileID: 7342437656987902386, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 7399156037342429606, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
       propertyPath: m_LocalPosition.x
       value: 7.835849
@@ -9635,8 +9564,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone (61)
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 1555623083947162686, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -9964,12 +9892,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone_trench_079
       objectReference: {fileID: 0}
-    - target: {fileID: 5469790226188622297, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
-      objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 5917185863045527761, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -10179,10 +10102,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone_caution01_003
       objectReference: {fileID: 0}
-    - target: {fileID: 5946870355968988179, guid: a73e6202bd51865419953cbe93648c5d, type: 3}
-      propertyPath: m_IsActive
-      value: 1
-      objectReference: {fileID: 0}
     - target: {fileID: 6470643213188550313, guid: a73e6202bd51865419953cbe93648c5d, type: 3}
       propertyPath: m_LocalPosition.x
       value: -0.004200386
@@ -10223,8 +10142,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 1624251988924086259, guid: a73e6202bd51865419953cbe93648c5d, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -10474,12 +10392,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone_trench_077
       objectReference: {fileID: 0}
-    - target: {fileID: 5469790226188622297, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
-      objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 5917185863045527761, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -10541,8 +10454,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4502743583402229400, guid: e8370390e198edc47af2b062275d08a3, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -10604,8 +10516,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4502743583402229400, guid: e8370390e198edc47af2b062275d08a3, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -10922,9 +10833,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 508519048116527277, guid: 17d9f8c40dba0d94eb9ba0780208add7, type: 3}
-    - {fileID: 3090473811836406634, guid: 17d9f8c40dba0d94eb9ba0780208add7, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -11175,12 +11084,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone_trench_080
       objectReference: {fileID: 0}
-    - target: {fileID: 5469790226188622297, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
-      objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 5917185863045527761, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -11265,10 +11169,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 7188285752969298720}
     m_Modifications:
-    - target: {fileID: 7342437656987902386, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 7399156037342429606, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
       propertyPath: m_LocalPosition.x
       value: 11.755848
@@ -11313,8 +11213,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone (69)
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 1555623083947162686, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -11438,8 +11337,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4502743583402229400, guid: e8370390e198edc47af2b062275d08a3, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -11564,12 +11462,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone_trench_074
       objectReference: {fileID: 0}
-    - target: {fileID: 5469790226188622297, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
-      objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 5917185863045527761, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -11694,9 +11587,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 508519048116527277, guid: 17d9f8c40dba0d94eb9ba0780208add7, type: 3}
-    - {fileID: 3090473811836406634, guid: 17d9f8c40dba0d94eb9ba0780208add7, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -11910,10 +11801,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 7188285752969298720}
     m_Modifications:
-    - target: {fileID: 7342437656987902386, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 7399156037342429606, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
       propertyPath: m_LocalPosition.x
       value: -7.8441534
@@ -11958,8 +11845,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone (87)
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 1555623083947162686, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -12147,8 +12033,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 8569691624125336227, guid: cd483b93854eed8418ed84cc94b34db1, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -12169,10 +12054,6 @@ PrefabInstance:
     - target: {fileID: 5946870355968988179, guid: a73e6202bd51865419953cbe93648c5d, type: 3}
       propertyPath: m_Name
       value: floor_stone_caution01_001
-      objectReference: {fileID: 0}
-    - target: {fileID: 5946870355968988179, guid: a73e6202bd51865419953cbe93648c5d, type: 3}
-      propertyPath: m_IsActive
-      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 6470643213188550313, guid: a73e6202bd51865419953cbe93648c5d, type: 3}
       propertyPath: m_LocalPosition.x
@@ -12214,8 +12095,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 1624251988924086259, guid: a73e6202bd51865419953cbe93648c5d, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -12340,8 +12220,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_molding_corner01 (7)
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 2428672745626535912, guid: 74fac890ce70300438766df48cd13435, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -12403,8 +12282,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4502743583402229400, guid: e8370390e198edc47af2b062275d08a3, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -12863,8 +12741,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_molding_corner01 (10)
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 2428672745626535912, guid: 74fac890ce70300438766df48cd13435, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -13115,8 +12992,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4502743583402229400, guid: e8370390e198edc47af2b062275d08a3, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -13197,25 +13073,9 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 7188285752969298720}
     m_Modifications:
-    - target: {fileID: 499993323692766968, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2462280635074482823, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 3959018913558237367, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 4113930652156066955, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
       propertyPath: m_Name
       value: Floor_urethane01_002
-      objectReference: {fileID: 0}
-    - target: {fileID: 4192220379270025118, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7305054492310442018, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
       propertyPath: m_LocalPosition.x
@@ -13257,11 +13117,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4960724223065867001, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
-    - {fileID: 8419795730435368118, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
-    - {fileID: 1838048625670288509, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
-    - {fileID: 109223787324762468, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -13663,10 +13519,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 7188285752969298720}
     m_Modifications:
-    - target: {fileID: 7342437656987902386, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 7399156037342429606, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
       propertyPath: m_LocalPosition.x
       value: -7.8441534
@@ -13711,8 +13563,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone (37)
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 1555623083947162686, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -13908,8 +13759,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4502743583402229400, guid: e8370390e198edc47af2b062275d08a3, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -14066,25 +13916,9 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 7188285752969298720}
     m_Modifications:
-    - target: {fileID: 499993323692766968, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2462280635074482823, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 3959018913558237367, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 4113930652156066955, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
       propertyPath: m_Name
       value: Floor_urethane01_003
-      objectReference: {fileID: 0}
-    - target: {fileID: 4192220379270025118, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7305054492310442018, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
       propertyPath: m_LocalPosition.x
@@ -14126,11 +13960,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4960724223065867001, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
-    - {fileID: 8419795730435368118, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
-    - {fileID: 1838048625670288509, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
-    - {fileID: 109223787324762468, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -14318,8 +14148,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 8569691624125336227, guid: cd483b93854eed8418ed84cc94b34db1, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -14576,8 +14405,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4502743583402229400, guid: e8370390e198edc47af2b062275d08a3, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -14702,12 +14530,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone (88)
       objectReference: {fileID: 0}
-    - target: {fileID: 7918671310875253532, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
-      propertyPath: m_IsActive
-      value: 1
-      objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 1555623083947162686, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -14832,8 +14655,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4502743583402229400, guid: e8370390e198edc47af2b062275d08a3, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -15083,9 +14905,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 508519048116527277, guid: 17d9f8c40dba0d94eb9ba0780208add7, type: 3}
-    - {fileID: 3090473811836406634, guid: 17d9f8c40dba0d94eb9ba0780208add7, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -15103,10 +14923,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 7188285752969298720}
     m_Modifications:
-    - target: {fileID: 7342437656987902386, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 7399156037342429606, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
       propertyPath: m_LocalPosition.x
       value: -11.7641535
@@ -15151,8 +14967,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone (86)
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 1555623083947162686, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -15716,8 +15531,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4502743583402229400, guid: e8370390e198edc47af2b062275d08a3, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -16372,12 +16186,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone_trench_075
       objectReference: {fileID: 0}
-    - target: {fileID: 5469790226188622297, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
-      objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 5917185863045527761, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -16502,12 +16311,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone (113)
       objectReference: {fileID: 0}
-    - target: {fileID: 7918671310875253532, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
-      propertyPath: m_IsActive
-      value: 1
-      objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 1555623083947162686, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -16569,12 +16373,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone_trench_076
       objectReference: {fileID: 0}
-    - target: {fileID: 5469790226188622297, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
-      objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 5917185863045527761, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -16636,8 +16435,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4502743583402229400, guid: e8370390e198edc47af2b062275d08a3, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -16699,8 +16497,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 7143992740914202710, guid: c40bd83cd6ecd5b48aefdb6c6cb3eccc, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -17244,8 +17041,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_molding_corner01 (3)
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 2428672745626535912, guid: 74fac890ce70300438766df48cd13435, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -17374,8 +17170,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_molding_corner01 (1)
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 2428672745626535912, guid: 74fac890ce70300438766df48cd13435, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -17500,8 +17295,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 8569691624125336227, guid: cd483b93854eed8418ed84cc94b34db1, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -17563,8 +17357,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_molding_corner01 (4)
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 2428672745626535912, guid: 74fac890ce70300438766df48cd13435, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -17689,8 +17482,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 8569691624125336227, guid: cd483b93854eed8418ed84cc94b34db1, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -17752,8 +17544,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_molding_corner01 (5)
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 2428672745626535912, guid: 74fac890ce70300438766df48cd13435, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -17815,8 +17606,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4502743583402229400, guid: e8370390e198edc47af2b062275d08a3, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -18357,10 +18147,6 @@ PrefabInstance:
       value: floor_molding_corner04 (2)
       objectReference: {fileID: 0}
     - target: {fileID: 8817152494828172345, guid: 8c9c2aa8a3552c149bb5945ca2be69da, type: 3}
-      propertyPath: m_LocalScale.z
-      value: -1
-      objectReference: {fileID: 0}
-    - target: {fileID: 8817152494828172345, guid: 8c9c2aa8a3552c149bb5945ca2be69da, type: 3}
       propertyPath: m_LocalPosition.x
       value: 3.903283
       objectReference: {fileID: 0}
@@ -18400,10 +18186,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4471314327906615758, guid: 8c9c2aa8a3552c149bb5945ca2be69da, type: 3}
-    - {fileID: 6323882565453801669, guid: 8c9c2aa8a3552c149bb5945ca2be69da, type: 3}
-    - {fileID: 4024245400363936123, guid: 8c9c2aa8a3552c149bb5945ca2be69da, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -18465,12 +18248,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone_trench_069
       objectReference: {fileID: 0}
-    - target: {fileID: 5469790226188622297, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
-      objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 5917185863045527761, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -18744,10 +18522,6 @@ PrefabInstance:
       value: floor_molding_basic01com (1)
       objectReference: {fileID: 0}
     - target: {fileID: 8025026244097763841, guid: c40bd83cd6ecd5b48aefdb6c6cb3eccc, type: 3}
-      propertyPath: m_LocalScale.x
-      value: -1
-      objectReference: {fileID: 0}
-    - target: {fileID: 8025026244097763841, guid: c40bd83cd6ecd5b48aefdb6c6cb3eccc, type: 3}
       propertyPath: m_LocalPosition.x
       value: 3.913601
       objectReference: {fileID: 0}
@@ -18787,8 +18561,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 7143992740914202710, guid: c40bd83cd6ecd5b48aefdb6c6cb3eccc, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -18850,8 +18623,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_molding_corner01 (9)
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 2428672745626535912, guid: 74fac890ce70300438766df48cd13435, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -19161,8 +18933,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_molding_corner01
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 2428672745626535912, guid: 74fac890ce70300438766df48cd13435, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -19287,9 +19058,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 508519048116527277, guid: 17d9f8c40dba0d94eb9ba0780208add7, type: 3}
-    - {fileID: 3090473811836406634, guid: 17d9f8c40dba0d94eb9ba0780208add7, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -19605,8 +19374,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 8569691624125336227, guid: cd483b93854eed8418ed84cc94b34db1, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -19856,9 +19624,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 508519048116527277, guid: 17d9f8c40dba0d94eb9ba0780208add7, type: 3}
-    - {fileID: 3090473811836406634, guid: 17d9f8c40dba0d94eb9ba0780208add7, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -19920,8 +19686,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4502743583402229400, guid: e8370390e198edc47af2b062275d08a3, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -20007,10 +19772,6 @@ PrefabInstance:
       value: floor_molding_basic01com (2)
       objectReference: {fileID: 0}
     - target: {fileID: 8025026244097763841, guid: c40bd83cd6ecd5b48aefdb6c6cb3eccc, type: 3}
-      propertyPath: m_LocalScale.z
-      value: -1
-      objectReference: {fileID: 0}
-    - target: {fileID: 8025026244097763841, guid: c40bd83cd6ecd5b48aefdb6c6cb3eccc, type: 3}
       propertyPath: m_LocalPosition.x
       value: -3.9242067
       objectReference: {fileID: 0}
@@ -20050,8 +19811,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 7143992740914202710, guid: c40bd83cd6ecd5b48aefdb6c6cb3eccc, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -20175,9 +19935,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 508519048116527277, guid: 17d9f8c40dba0d94eb9ba0780208add7, type: 3}
-    - {fileID: 3090473811836406634, guid: 17d9f8c40dba0d94eb9ba0780208add7, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -20379,9 +20137,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 508519048116527277, guid: 17d9f8c40dba0d94eb9ba0780208add7, type: 3}
-    - {fileID: 3090473811836406634, guid: 17d9f8c40dba0d94eb9ba0780208add7, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -20466,10 +20222,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: Floor_urethane02_002
       objectReference: {fileID: 0}
-    - target: {fileID: 140799510297223574, guid: 7575aa58d07640c42a761c2763d5a838, type: 3}
-      propertyPath: m_IsActive
-      value: 1
-      objectReference: {fileID: 0}
     - target: {fileID: 7095252420066686203, guid: 7575aa58d07640c42a761c2763d5a838, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0.08400537
@@ -20510,11 +20262,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 6314104406608372157, guid: 7575aa58d07640c42a761c2763d5a838, type: 3}
-    - {fileID: 4048535255209631490, guid: 7575aa58d07640c42a761c2763d5a838, type: 3}
-    - {fileID: 5412065110728117605, guid: 7575aa58d07640c42a761c2763d5a838, type: 3}
-    - {fileID: 1541786955827079397, guid: 7575aa58d07640c42a761c2763d5a838, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -20899,8 +20647,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4502743583402229400, guid: e8370390e198edc47af2b062275d08a3, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -20962,9 +20709,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 508519048116527277, guid: 17d9f8c40dba0d94eb9ba0780208add7, type: 3}
-    - {fileID: 3090473811836406634, guid: 17d9f8c40dba0d94eb9ba0780208add7, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -21727,8 +21472,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_molding_corner01 (2)
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 2428672745626535912, guid: 74fac890ce70300438766df48cd13435, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -21938,10 +21682,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone_caution01_002
       objectReference: {fileID: 0}
-    - target: {fileID: 5946870355968988179, guid: a73e6202bd51865419953cbe93648c5d, type: 3}
-      propertyPath: m_IsActive
-      value: 1
-      objectReference: {fileID: 0}
     - target: {fileID: 6470643213188550313, guid: a73e6202bd51865419953cbe93648c5d, type: 3}
       propertyPath: m_LocalPosition.x
       value: -0.004200386
@@ -21982,8 +21722,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 1624251988924086259, guid: a73e6202bd51865419953cbe93648c5d, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -22126,10 +21865,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 7188285752969298720}
     m_Modifications:
-    - target: {fileID: 7342437656987902386, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 7399156037342429606, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
       propertyPath: m_LocalPosition.x
       value: 3.9158485
@@ -22174,8 +21909,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone (54)
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 1555623083947162686, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -22300,8 +22034,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 8569691624125336227, guid: cd483b93854eed8418ed84cc94b34db1, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -22426,9 +22159,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 508519048116527277, guid: 17d9f8c40dba0d94eb9ba0780208add7, type: 3}
-    - {fileID: 3090473811836406634, guid: 17d9f8c40dba0d94eb9ba0780208add7, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -22490,8 +22221,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 8569691624125336227, guid: cd483b93854eed8418ed84cc94b34db1, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -22509,10 +22239,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 7188285752969298720}
     m_Modifications:
-    - target: {fileID: 7342437656987902386, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 7399156037342429606, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
       propertyPath: m_LocalPosition.x
       value: 7.835848
@@ -22557,8 +22283,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone (46)
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 1555623083947162686, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -22639,10 +22364,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 7188285752969298720}
     m_Modifications:
-    - target: {fileID: 7342437656987902386, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 7399156037342429606, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
       propertyPath: m_LocalPosition.x
       value: 11.755849
@@ -22687,8 +22408,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone (40)
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 1555623083947162686, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -22750,8 +22470,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_molding_corner01 (11)
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 2428672745626535912, guid: 74fac890ce70300438766df48cd13435, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -22834,25 +22553,9 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 7188285752969298720}
     m_Modifications:
-    - target: {fileID: 499993323692766968, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2462280635074482823, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 3959018913558237367, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 4113930652156066955, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
       propertyPath: m_Name
       value: Floor_urethane01_001
-      objectReference: {fileID: 0}
-    - target: {fileID: 4192220379270025118, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7305054492310442018, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
       propertyPath: m_LocalPosition.x
@@ -22894,11 +22597,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4960724223065867001, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
-    - {fileID: 8419795730435368118, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
-    - {fileID: 1838048625670288509, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
-    - {fileID: 109223787324762468, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -23100,8 +22799,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 8569691624125336227, guid: cd483b93854eed8418ed84cc94b34db1, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -23163,8 +22861,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4502743583402229400, guid: e8370390e198edc47af2b062275d08a3, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -23351,9 +23048,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 508519048116527277, guid: 17d9f8c40dba0d94eb9ba0780208add7, type: 3}
-    - {fileID: 3090473811836406634, guid: 17d9f8c40dba0d94eb9ba0780208add7, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -23482,8 +23177,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4502743583402229400, guid: e8370390e198edc47af2b062275d08a3, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -23607,8 +23301,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4502743583402229400, guid: e8370390e198edc47af2b062275d08a3, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -24014,8 +23707,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4502743583402229400, guid: e8370390e198edc47af2b062275d08a3, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -24201,8 +23893,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4502743583402229400, guid: e8370390e198edc47af2b062275d08a3, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -24264,8 +23955,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4502743583402229400, guid: e8370390e198edc47af2b062275d08a3, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -24641,8 +24331,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4502743583402229400, guid: e8370390e198edc47af2b062275d08a3, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -24722,10 +24411,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 7188285752969298720}
     m_Modifications:
-    - target: {fileID: 7342437656987902386, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 7399156037342429606, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
       propertyPath: m_LocalPosition.x
       value: -11.7641535
@@ -24770,8 +24455,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone (121)
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 1555623083947162686, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -24895,12 +24579,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone_trench_072
       objectReference: {fileID: 0}
-    - target: {fileID: 5469790226188622297, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
-      objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 5917185863045527761, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -25087,8 +24766,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4502743583402229400, guid: e8370390e198edc47af2b062275d08a3, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -25106,25 +24784,9 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 7188285752969298720}
     m_Modifications:
-    - target: {fileID: 499993323692766968, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2462280635074482823, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 3959018913558237367, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 4113930652156066955, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
       propertyPath: m_Name
       value: Floor_urethane01
-      objectReference: {fileID: 0}
-    - target: {fileID: 4192220379270025118, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7305054492310442018, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
       propertyPath: m_LocalPosition.x
@@ -25166,11 +24828,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4960724223065867001, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
-    - {fileID: 8419795730435368118, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
-    - {fileID: 1838048625670288509, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
-    - {fileID: 109223787324762468, guid: d95d3617997aa3a44acbb7046c4dbf79, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -25294,8 +24952,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_molding_corner01 (6)
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 2428672745626535912, guid: 74fac890ce70300438766df48cd13435, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -25357,12 +25014,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone_trench_078
       objectReference: {fileID: 0}
-    - target: {fileID: 5469790226188622297, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
-      objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 5917185863045527761, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -25736,8 +25388,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4502743583402229400, guid: e8370390e198edc47af2b062275d08a3, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -25925,8 +25576,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone_trench_082
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 5917185863045527761, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -25988,8 +25638,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4502743583402229400, guid: e8370390e198edc47af2b062275d08a3, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -26176,8 +25825,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone_trench_084
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 5917185863045527761, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -26637,8 +26285,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_molding_corner01 (8)
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 2428672745626535912, guid: 74fac890ce70300438766df48cd13435, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -26700,8 +26347,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4502743583402229400, guid: e8370390e198edc47af2b062275d08a3, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -27147,8 +26793,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4502743583402229400, guid: e8370390e198edc47af2b062275d08a3, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -27273,8 +26918,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 8569691624125336227, guid: cd483b93854eed8418ed84cc94b34db1, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -27570,10 +27214,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 7188285752969298720}
     m_Modifications:
-    - target: {fileID: 7342437656987902386, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 7399156037342429606, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
       propertyPath: m_LocalPosition.x
       value: -15.684154
@@ -27618,8 +27258,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone (78)
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 1555623083947162686, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -27893,14 +27532,6 @@ PrefabInstance:
       value: floor_molding_basic01com (3)
       objectReference: {fileID: 0}
     - target: {fileID: 8025026244097763841, guid: c40bd83cd6ecd5b48aefdb6c6cb3eccc, type: 3}
-      propertyPath: m_LocalScale.x
-      value: -1
-      objectReference: {fileID: 0}
-    - target: {fileID: 8025026244097763841, guid: c40bd83cd6ecd5b48aefdb6c6cb3eccc, type: 3}
-      propertyPath: m_LocalScale.z
-      value: -1
-      objectReference: {fileID: 0}
-    - target: {fileID: 8025026244097763841, guid: c40bd83cd6ecd5b48aefdb6c6cb3eccc, type: 3}
       propertyPath: m_LocalPosition.x
       value: 3.9157996
       objectReference: {fileID: 0}
@@ -27940,8 +27571,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 7143992740914202710, guid: c40bd83cd6ecd5b48aefdb6c6cb3eccc, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -28003,8 +27633,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4502743583402229400, guid: e8370390e198edc47af2b062275d08a3, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -28066,8 +27695,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4502743583402229400, guid: e8370390e198edc47af2b062275d08a3, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -28129,12 +27757,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone_trench_070
       objectReference: {fileID: 0}
-    - target: {fileID: 5469790226188622297, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
-      propertyPath: m_CastShadows
-      value: 0
-      objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 5917185863045527761, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -28259,10 +27882,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4471314327906615758, guid: 8c9c2aa8a3552c149bb5945ca2be69da, type: 3}
-    - {fileID: 6323882565453801669, guid: 8c9c2aa8a3552c149bb5945ca2be69da, type: 3}
-    - {fileID: 4024245400363936123, guid: 8c9c2aa8a3552c149bb5945ca2be69da, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -28324,8 +27944,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone_trench_081
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 5917185863045527761, guid: 46617fa4fec1a8b4c92419cb1ef0542f, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -28640,12 +28259,7 @@ PrefabInstance:
       propertyPath: m_Name
       value: floor_stone (60)
       objectReference: {fileID: 0}
-    - target: {fileID: 7918671310875253532, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
-      propertyPath: m_IsActive
-      value: 1
-      objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 1555623083947162686, guid: 8ffa37d58a91c69469aa00a9d3f68cd9, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -28903,8 +28517,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4502743583402229400, guid: e8370390e198edc47af2b062275d08a3, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -28966,8 +28579,7 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4502743583402229400, guid: e8370390e198edc47af2b062275d08a3, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []

@@ -213,6 +213,9 @@ public class MonsterBase : Unit
 
         // 스폰 시점의 상태를 즉시 애니메이션에 반영(뒤늦게 접속한 클라 포함).
         PlayStateAnimation(_state.Value);
+
+        // 머리 위 체력바 런타임 부착(모든 피어, 표시 전용 — FSM 과 무관). Docs/tech/handoff-monster-healthbar.md
+        MonsterOverheadHealthBarRule.TryInstall(this);
     }
 
     public override void OnNetworkDespawn()
@@ -286,7 +289,7 @@ public class MonsterBase : Unit
 
         // 애니 재생 속도 — 모든 피어, 이 한 곳에서만 쓴다(자세 홀드 중엔 홀드가 0 을 쥔다).
         if (ManagesAnimatorSpeed && !_animatorHeldLocally && animator != null)
-            animator.speed = ManagedAnimatorSpeed();
+            animator.speed = ManagedAnimatorSpeed() * AnimatorSpeedScale;
 
         if (!IsServer || !_initialized || _isDead)
             return;
@@ -2428,9 +2431,16 @@ public class MonsterBase : Unit
 
         if (!_animatorHeldLocally) return;
         // 관리 대상이면 홀드 전 값이 아니라 **지금** 맞는 값으로 푼다(그사이 상태가 바뀌었을 수 있다).
-        animator.speed = ManagesAnimatorSpeed ? ManagedAnimatorSpeed() : _animatorResumeSpeed;
+        animator.speed = ManagesAnimatorSpeed ? ManagedAnimatorSpeed() * AnimatorSpeedScale : _animatorResumeSpeed;
         _animatorHeldLocally = false;
     }
+
+    /// <summary>
+    /// [모든 피어] 관리되는 재생 속도(<see cref="ManagedAnimatorSpeed"/>)에 곱할 파생 배율. 기본 1.
+    /// 공격 하나의 클립 길이를 예고 시간에 맞출 때 쓴다(SpinnerBot 준비 동작 — 팀장 10-16).
+    /// 🔴 피어마다 같은 값이 나와야 한다 — 서버 전용 필드로 정하지 말고 RPC·복제 상태로 정할 것.
+    /// </summary>
+    protected virtual float AnimatorSpeedScale => 1f;
 
     /// <summary>
     /// <c>animator.speed</c> 를 <see cref="MonsterAnimSpeedPolicy"/> 로 매 프레임 정하는가. 기본 true.

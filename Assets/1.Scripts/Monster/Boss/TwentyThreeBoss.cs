@@ -15,7 +15,7 @@ using UnityEngine.AI;
 //   S2 근접 3종 히트 정밀화(앵커 전환·어퍼 Airborne) / S3 카운터 창 / S4 Grab 체인 /
 //   S5 Dash 캐리-푸시 / S6 Jump 장판 / S7 페이즈 시퀀스(송전기)
 // 미구현 공격은 애니만 재생되고 히트 시 **1회 경고**를 남긴다(조용한 실패 금지).
-public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
+public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation, IInterruptSlowMotionTarget
 {
     // 서버·클라 공통(프리팹에 직렬화된 data 를 캐스팅) — 클라도 애니 상태명을 조회해야 한다.
     BossDataSO _boss;
@@ -5446,6 +5446,7 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
         if (counter && resolved && State != MonsterState.Dead)
         {
             _fightCounters++;
+            _interruptSuccessCount++;   // 🔴 슬로우 모션 성공 판별 — 이 ReceiveAttack 호출 안에서 올려야 플레이어가 전후 비교로 잡는다
             EnterCounterSuccess();
             CombatStatsEvents.RaiseServerCounterSucceeded(this, GetAttackerClientId(hitContext)); // 결과 화면 통계(판정 무관)
 
@@ -5711,6 +5712,20 @@ public class TwentyThreeBoss : MonsterBase, IBossEntranceAnimation
 
     /// <summary>취약·제압 중엔 간파 창·판정이 없다(기획 간파 §5.2 · §8).</summary>
     bool CounterBlockedByState => IsVulnerable || _suppressed;
+
+    // ─── 간파 슬로우 모션(handoff-interrupt-slowmo · 팀장 10-16: 중간보스·23호에 건다) ───
+    // _fightCounters 는 전투마다 0 으로 돌아가 쓰지 않는다 — 전후 비교 도중 리셋이 끼면 "실패"로 읽힌다.
+    int _interruptSuccessCount;
+
+    /// <summary>
+    /// [서버] 지금 인터럽트를 받으면 카운터가 성립하는가(슬로우 시작 예측) — ReceiveAttack 의 counter 조건에서 방향만 뺀 것.
+    /// 창이 열리는 곳 전부(돌진 · 잡기 붙잡은 뒤 · ④ 자폭 간파 창)에서 건다(팀장 10-16). 뒤에서 간파하면 슬로우가 걸렸다가
+    /// 판정 실패로 바로 풀린다(IsCounterFromFront — 플레이어 쪽이 실패 복귀).
+    /// </summary>
+    bool IInterruptSlowMotionTarget.ServerIsInterruptible => IsServer && _counterWindow.Value && !CounterBlockedByState;
+
+    /// <summary>[서버] 카운터 성공 누적 — 플레이어가 ReceiveAttack 전후로 비교한다.</summary>
+    int IInterruptSlowMotionTarget.ServerInterruptSuccessCount => _interruptSuccessCount;
 
     float VulnerableDuration => _boss != null ? Mathf.Max(0f, _boss.vulnerableDuration) : 4f;
     float KnockbackDistance => _boss != null ? Mathf.Max(0f, _boss.vulnerableKnockbackDistance) : 3f;

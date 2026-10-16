@@ -35,12 +35,15 @@ public class EffectPool
     /// 배율이 1이든 아니든 <b>대출할 때마다 명시적으로</b> 설정한다 — 반납 복원이 한 번 누락돼도
     /// 다음 대출자가 이상한 크기로 나오지 않게 하기 위해서다.
     /// </summary>
-    public GameObject Rent(GameObject prefab, float scale = 1f)
+    public GameObject Rent(GameObject prefab, float scale = 1f) => Rent(prefab, Vector3.one * scale);
+
+    /// <summary>축별 배율로 빌린다 — 저작된 scale 에 축별로 곱한다(길이만 늘이는 원샷용).</summary>
+    public GameObject Rent(GameObject prefab, Vector3 scale)
     {
         GameObject instance = PoolFor(prefab).Get();
 
         var id = instance.GetComponent<EffectInstance>();
-        if (id != null) instance.transform.localScale = id.originalScale * scale;
+        if (id != null) instance.transform.localScale = Vector3.Scale(id.originalScale, scale);
 
         return instance;
     }

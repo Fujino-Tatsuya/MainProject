@@ -58,6 +58,20 @@ public static class BuildWindowsPlayer
         Build(Path.GetFullPath(DevOutput), BuildOptions.Development);
     }
 
+    private const string RaidOutput = "../MainProjectBuilds/WindowsRaid/MainProject.exe";
+
+    /// <summary>
+    /// 23호 **레이드 변형**으로 뽑는 테스트 빌드(팀장 10-16 — 다 같이 보스만 플레이). 이번 빌드에만 <c>BOSS_RAID_BUILD</c> 심볼을 얹어
+    /// <see cref="BossVariantSelection.UseRaid"/> 가 true 가 된다 — ProjectSettings 는 건드리지 않으므로 다른 빌드는 그대로 기존 보스다.
+    /// 튜토리얼 스킵(Alt+1~9)·보스방 워프(F5)는 DEV_HOTKEYS(Standalone 기본 심볼)로 이미 들어간다.
+    /// ⚠️ 호스트·클라 모두 이 빌드여야 한다(RPC 테이블·보스 프리팹이 같아야 한다).
+    /// </summary>
+    [MenuItem("Build/Windows64 Player (MainFlow · 레이드 보스)")]
+    public static void BuildWindows64RaidFromMenu()
+    {
+        Build(Path.GetFullPath(RaidOutput), BuildOptions.None, new[] { "BOSS_RAID_BUILD" });
+    }
+
     /// <summary>CLI -executeMethod 진입점. 성공 0, 실패 1로 종료한다.</summary>
     public static void BuildWindows64()
     {
@@ -66,7 +80,7 @@ public static class BuildWindowsPlayer
         EditorApplication.Exit(ok ? 0 : 1);
     }
 
-    private static bool Build(string outputPath, BuildOptions buildOptions)
+    private static bool Build(string outputPath, BuildOptions buildOptions, string[] extraDefines = null)
     {
         var scenes = EditorBuildSettings.scenes
             .Where(s => s.enabled)
@@ -96,7 +110,11 @@ public static class BuildWindowsPlayer
             locationPathName = outputPath,
             // 릴리즈 = None. 측정용 = Development 만(script debugging·프로파일러 연결 미포함).
             options = buildOptions,
+            // 이번 빌드에만 얹는 심볼(레이드 빌드 = BOSS_RAID_BUILD). ProjectSettings 의 Standalone 심볼(DEV_HOTKEYS 등)에 더해진다.
+            extraScriptingDefines = extraDefines,
         };
+        if (extraDefines != null && extraDefines.Length > 0)
+            Debug.Log($"[Build] extraDefines={string.Join(";", extraDefines)}");
 
         // 빌드 = 항상 테이블(xlsx) 값 — Build 버튼 훅과 같은 경로로 감싼다(10-07, 이전엔 인스펙터 값으로 빌드됐다).
         UnityEditor.Build.Reporting.BuildReport report = null;
