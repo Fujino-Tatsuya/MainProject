@@ -877,7 +877,7 @@ public class BossTeleportManager : NetworkBehaviour
 
     /// <summary>
     /// [전 피어] 복제된 시작 시각·참가자 순서로 리그를 재생·복귀시키고, 슬롯이 걷기 시작하면 그 플레이어 실루엣을 끈다(연출 끝에 되켬).
-    /// 참가자인 본인이면 문 앞 이동(암전)부터 상승 전까지 카메라가 착지 중앙을, 상승부터 도착까지 칸을 따라간다.
+    /// 참가자인 본인이면 문 앞 이동(암전)부터 도착까지 카메라가 칸을 따라간다 — 하강 시작 때 칸이 화면 밖이어도 칸과 함께 내려온다.
     /// 존(리그)은 각 피어가 맵 생성 때 스폰하므로 못 찾으면 다음 프레임에 다시 찾는다 — 늦게 합류해도 같은 시각으로 이어 그린다.
     /// </summary>
     private void UpdateElevatorLocal()
@@ -917,10 +917,8 @@ public class BossTeleportManager : NetworkBehaviour
         double elapsed = ServerNow - start;
         UpdateWalkerSilhouettes(elapsed);
 
-        Transform follow = null;
-        if (!_elevatorArrivedLocal && IsLocalElevatorParticipant() && elapsed >= _localTimeline.CameraFocusAt)
-            follow = elapsed >= _localTimeline.AscendStartAt ? _rig.Cab : _rig.FocusPoint;
-        SetCameraFollow(follow);
+        bool followCab = !_elevatorArrivedLocal && IsLocalElevatorParticipant() && _localTimeline.CameraFollowsCabAt(elapsed);
+        SetCameraFollow(followCab ? _rig.Cab : null);
     }
 
     /// <summary>걷기 시작한 슬롯의 플레이어 실루엣을 끈다 — 연출이 끝날 때까지(뒤이어 숨김). 늦게 합류해도 지난 슬롯을 한꺼번에 끈다.</summary>

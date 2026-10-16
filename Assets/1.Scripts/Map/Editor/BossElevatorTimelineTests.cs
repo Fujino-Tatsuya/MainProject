@@ -107,6 +107,27 @@ public sealed class BossElevatorTimelineTests
     }
 
     [Test]
+    public void CameraFollowsCab_FromFocusThroughWholeElevator()
+    {
+        BossElevatorTimeline t = Default();
+        Assert.IsFalse(t.CameraFollowsCabAt(0.0), "연출 시작(페이드 아웃) = 플레이어");
+        Assert.IsFalse(t.CameraFollowsCabAt(t.CameraFocusAt - 0.01), "+0.4 직전 = 플레이어");
+        Assert.IsTrue(t.CameraFollowsCabAt(t.CameraFocusAt), "+0.4(암전) = 칸");
+        Assert.AreEqual(0.4f, t.CameraFocusAt, Eps);
+        // 착지 중앙 고정 단계 없음 — 하강·문 열림·보행·닫힘·상승·암전 내내 칸.
+        foreach (BossElevatorPhase phase in new[]
+                 {
+                     BossElevatorPhase.FrontFadeIn, BossElevatorPhase.WaitDescend, BossElevatorPhase.Descending,
+                     BossElevatorPhase.DoorOpening, BossElevatorPhase.WalkingIn, BossElevatorPhase.DoorClosing,
+                     BossElevatorPhase.Ascending, BossElevatorPhase.FadingOut, BossElevatorPhase.Blackout,
+                 })
+        {
+            Assert.IsTrue(t.CameraFollowsCabAt(t.StartOf(phase)), $"{phase} 시작 = 칸");
+        }
+        Assert.IsTrue(t.CameraFollowsCabAt(t.BlackoutAt + 10.0), "도착 RPC 전까지 칸 — 복귀는 호출자");
+    }
+
+    [Test]
     public void PhaseAt_BoundaryBelongsToNextPhase()
     {
         BossElevatorTimeline t = Default();

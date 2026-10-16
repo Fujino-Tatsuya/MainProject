@@ -135,8 +135,14 @@ public sealed class BossElevatorTimeline
 
     /// <summary>문 앞 순간이동 시각 = 페이드 아웃이 끝나 완전히 검은 순간.</summary>
     public float TeleportFrontAt { get; }
-    /// <summary>참가자 카메라가 엘리베이터(착지 중앙)로 넘어가는 시각 = 문 앞 순간이동과 같은 암전 순간 — 페이드 인 때 이미 엘리베이터를 보고 있다.</summary>
+    /// <summary>참가자 카메라가 칸으로 넘어가는 시각 = 문 앞 순간이동과 같은 암전 순간 — 페이드 인 때 이미 칸을 보고 있다.</summary>
     public float CameraFocusAt => TeleportFrontAt;
+
+    /// <summary>
+    /// 경과 시간에 참가자 카메라가 칸을 따라가는가 — <see cref="CameraFocusAt"/> 부터 끝없이 true(하강·문 열림·보행·상승 내내 같은 대상).
+    /// 그 전은 플레이어. 끝(보스룸 도착)은 시간표 밖이라 호출자가 플레이어로 돌린다.
+    /// </summary>
+    public bool CameraFollowsCabAt(double elapsed) => elapsed >= CameraFocusAt;
     public float FrontFadeInAt { get; }
     /// <summary>문 앞 페이드 인이 끝난 시각(<see cref="BossElevatorPhase.WaitDescend"/> 시작) — 서버가 보행을 지시한다.</summary>
     public float FrontFadeInEndAt { get; }

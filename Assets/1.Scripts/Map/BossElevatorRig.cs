@@ -66,9 +66,9 @@ public sealed class BossElevatorRig : MonoBehaviour
     public IReadOnlyList<Transform> FrontPoints => _frontPoints;
     public bool IsPlaying => _playing;
     public BossElevatorTimeline Timeline => _timeline;
-    /// <summary>움직이는 칸 — 상승 중 카메라가 따라간다.</summary>
+    /// <summary>움직이는 칸 — 문 앞 이동 암전부터 도착까지 참가자 카메라가 따라간다(하강·보행·상승 내내).</summary>
     public Transform Cab => _cab;
-    /// <summary>착지 중앙(이 오브젝트) — 포커스부터 상승 전까지 카메라가 본다. 칸은 위에서 내려오므로 칸 대신 이 자리를 본다.</summary>
+    /// <summary>착지 중앙(이 오브젝트). 카메라는 더 이상 이 자리를 보지 않는다(칸을 따라간다) — 참조용으로 남겨 둔다.</summary>
     public Transform FocusPoint => transform;
 
     /// <summary>
