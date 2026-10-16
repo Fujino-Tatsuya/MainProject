@@ -2,7 +2,7 @@
 
 > 2026-10-15 · 브랜치 `feature/MonsterHealthBar` · 작성: Claude(claude-alt).
 > 1차(da67f1f6) = 머리 위 바 + 런타임 두께 배율. **2차(사용자 피드백) = 발밑 위치 + 등급별 프리팹 2개 + 튜토리얼 스피너봇 이전.**
-> **3차(사용자 추가 지시) = 지연 감소(잔상) 바** — §8.
+> **3차(사용자 추가 지시) = 지연 감소(잔상) 바** — §8. **4차 = 중간 보스 바 굵은 빗금** — §9.
 > 몬스터는 경석 담당 영역이라 몬스터 프리팹은 **튜토리얼 스피너봇 1개만**(바 제거) 고쳤고, 나머지는 코드 훅 1줄로 런타임에 붙인다.
 > Play 확인은 아직 안 했다(아래 §7 체크리스트).
 
@@ -186,3 +186,37 @@ Z3-7 "스피너봇 체력 바 활성"). 연습 중(`IsHealthLocked`) 체력이 �
 
 검증(3차, Play 없이): 컴파일 에러 0 · EditMode 전체 통과 1646 / 실패 0 / 건너뜀 20 · 전투 러너 218/0 · 튜토리얼 러너 376/0 · 새 픽스처 12/0.
 Play 확인은 §7 의 9~12 (사람).
+
+## 9. 중간 보스 바 굵은 빗금 — 4차
+
+2026-10-16 · 사용자가 직접 고친 Normal·MidBoss 프리팹(9ddff5d0) 위에 이어서 작업. **코드 변경 없음**, 플레이어 바·`MonsterHealthBar_Normal.prefab` 무수정.
+
+| 항목 | 내용 |
+|---|---|
+| 텍스처 | `Assets/2.Prefabs/UI/Textures/MonsterHealthBarHatch.png` (git 추적, `.meta` 포함 — 50.Art 는 SVN 이라 피했다). 64×64, 45° 대각(`\`) 흰 줄 + 나머지 완전 투명(RGB 는 전부 흰색, 알파만 줄). 대각 주기 32px(64 안에 2주기 → 이음매 없음), 줄 굵기 = 주기의 절반, 가장자리 ~1px 안티앨리어싱. 에디터 C# 로 생성(Texture2D → EncodeToPNG) |
+| 임포트 | Sprite(Single) · PPU 100 · Mesh Type **Full Rect** · Wrap **Repeat** · sRGB · Alpha Is Transparency · mipmap 끔 · Bilinear · 무압축 |
+| 구조 | `Bar/HpFill` 에 **`Mask`(showMaskGraphic = true)** 추가 + 자식 **`Hatch`**(Image, Tiled, 앵커 전체 늘림·sizeDelta 0, raycastTarget 끔). 둘 다 MidBoss Variant 의 추가 오버라이드 |
+| 왜 Mask(코드 없음) | Filled 이미지는 fillAmount 만큼만 메쉬를 만들고, Mask 는 그 메쉬를 스텐실로 쓴다 → 빗금이 **체력 채움 모양을 그대로 따라 줄어든다.** `UnitOverheadHealthBar` 는 HpFill 의 `fillAmount`·`color` 만 바꾸고(활성은 안 건드림) `DelayedHealthBar` 는 `DelayedFill` 만 만지므로 오버레이가 깨지지 않는다. `DelayedFill`·`ShieldFill` 은 HpFill 의 형제(뒤)라 빗금이 깔리지 않는다. RectMask2D 는 사각 영역 클리핑이라 fillAmount 를 따라가려면 코드가 필요해 고르지 않았다 |
+| 타일 원점 | Tiled 는 rect 왼쪽 아래 기준이라 체력이 줄어도 줄무늬가 제자리에 있고 오른쪽 끝만 잘린다(흐르지 않음) |
+
+**조정 (MidBoss 프리팹 `Bar/HpFill/Hatch` 의 Image)**
+- 색·불투명도: `Color` — 기본 **검정 알파 0.25**. 빨강(0.9,0.2,0.2) 위에서 R 230 → 203 정도로 어둡게 깔린다.
+- 줄 간격: `Pixels Per Unit Multiplier` — 기본 **1.6**. 타일 = 64 / 값 (Canvas 단위), 가로 방향 한 주기 = 32 / 값 = **20** ≈ 바 높이(21). 값을 줄이면 굵고 넓게, 키우면 촘촘하게.
+- 빗금을 끄려면 `Hatch` 오브젝트를 비활성화(Mask 는 showMaskGraphic 이라 채움 표시엔 영향 없음).
+
+**튜토리얼 스피너봇 회색 바**: 회색(0.55) 위에서도 같은 알파 0.25 로 대비가 비슷하게 나와 따로 조정하지 않았다(캡처 비교).
+
+**캡처**(Play 없이 프리뷰 씬 오프스크린 렌더, ×4 와 실제 크기 ×0.9): `C:\UnityProject\_lane-artifacts\MainProject-WorkTree\monster-healthbar-hatch\`
+`red_fill1.0_x4.png` · `red_fill0.5_delayed0.7_x4.png`(잔상 회색 구간엔 빗금 없음) · `gray_fill1.0_x4.png` · `*_x1.png`.
+
+| 4차 파일 | 내용 |
+|---|---|
+| `Assets/2.Prefabs/UI/Textures/MonsterHealthBarHatch.png` (+ `.meta`, 폴더 `.meta`) (새) | 빗금 텍스처 |
+| `Assets/2.Prefabs/UI/MonsterHealthBar_MidBoss.prefab` | HpFill 에 Mask + `Hatch` 자식 |
+
+**Play 확인 (사람)**
+13. 중간 보스(Gauntlet·Spinner·Wall) 바에 빗금이 보이고, 맞을 때 빗금이 빨간 채움과 **같이** 줄어드는지. 잔상(회색)·실드 구간엔 빗금이 없는지.
+14. 체력 0 근처(채움 몇 px)·0 에서 빗금이 삐져나오지 않는지.
+15. 튜토리얼 스피너봇: 연습 중 회색 바·본 모드 빨강 바 모두 빗금이 어색하지 않은지, 잠금 라벨이 가려지지 않는지.
+16. 일반 몬스터 바에는 빗금이 **없는지**, 플레이어 머리 위 바가 그대로인지.
+17. 화면 해상도(1080p 외)에서 줄무늬가 깨지거나 모아레가 생기지 않는지(mipmap 없음 + Bilinear).
