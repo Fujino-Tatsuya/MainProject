@@ -48,6 +48,7 @@ internal static class PlayerEditModeTestRunner
         "^PlayerBasicAttackInputRulesTests$", // 할 일 44 5차 — 거너 홀드 시작·공격 중 스킬 입력은 지금 발 마무리 뒤 예약(다음 발 금지·만료 없음·마지막 1개·연타 1회)
         "^AssassinHairClipRulesTests$", // 할 일 47 — 머리카락 구동기: 클립 → 보정 종류(회피 v15·v16·v13), 클립 안 초, trailing 재설정(전환·루프·되감기·리셋)
         "^AssassinHairPrefabTests$", // 할 일 47 — Armature 머리카락 체인 7×4 본·캡처·몸 캡슐·구동기·보정 2종, Variant 중첩
+        "^AssassinHairArmClearanceTests$", // 할 일 47 후속 — 팔 밀어내기 후처리: 겹침만 밀기·상한·회전만(길이 보존)·팔 캡슐 4개
     };
 
     const string Tag = "[PlayerTests]";

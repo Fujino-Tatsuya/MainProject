@@ -1418,6 +1418,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AssassinHairDriver
   actionHairEnabled: 1
   diveHairEnabled: 1
+  armClearanceEnabled: 1
+  armClearanceMaxDegrees: 45
 --- !u!4 &5769946785076208913 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8030728863137896293, guid: 17873cd8217cc704594694a4440a50a8, type: 3}

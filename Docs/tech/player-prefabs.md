@@ -543,16 +543,17 @@ URP 데칼(`DecalProjector`)을 버리고 **바닥에서 띄운 얇은 쿼드**�
 
 | 항목 | 내용 |
 |------|------|
-| 스크립트 | `1.Scripts/Player/Assassin/Hair/` — 납품 원본 그대로·`.meta` guid 유지: `AssassinHairMotion`(v13 물리 솔버) · `AssassinActionHairAnimation`+`AssassinActionHairProfiles`(v16 동작별 보정) · `AssassinDiveHairAnimation`(v15 회피). 우리 코드: `AssassinHairDriver`(구동기) · `AssassinHairClipRules`/`AssassinHairClipTracker`(순수 규칙) |
+| 스크립트 | `1.Scripts/Player/Assassin/Hair/` — 납품 원본 그대로·`.meta` guid 유지: `AssassinHairMotion`(v13 물리 솔버) · `AssassinActionHairAnimation`+`AssassinActionHairProfiles`(v16 동작별 보정) · `AssassinDiveHairAnimation`(v15 회피). 우리 코드: `AssassinHairDriver`(구동기) · `AssassinHairClipRules`/`AssassinHairClipTracker`(순수 규칙) · `AssassinHairArmClearance`(팔 밀어내기 후처리) |
 | Armature 구성 | 루트에 위 4 컴포넌트(`AssassinHairMotion`·`AssassinActionHairAnimation`·`AssassinDiveHairAnimation`·`AssassinHairDriver`). 솔버는 **에디터에서 바인드 포즈 캡처**(체인 7×4·몸 캡슐 8, `captured`) — 런타임 자동 캡처에 기대지 않는다 |
-| 한 프레임 순서 | 구동기 `[DefaultExecutionOrder(21000)]`(SDArmTwist 20000·Animator 뒤). `Awake` 에서 v13 `externalDrive=true`, 보정 2종 `Capture`(첫 Animator 평가 전 원래 자세) → 매 프레임 `Update`: 보정 `RestoreBasePose` → (Animator·SDArmTwist) → `LateUpdate`: v13 `Advance` **1회** → 지금 클립에 맞는 `ApplyPose`. v13 을 한 프레임에 두 번 돌리지 않는다. 구동기만 꺼지면 v13 이 자기 LateUpdate 로 혼자 돈다 |
+| 한 프레임 순서 | 구동기 `[DefaultExecutionOrder(21000)]`(SDArmTwist 20000·Animator 뒤). `Awake` 에서 v13 `externalDrive=true`, 보정 2종 `Capture`(첫 Animator 평가 전 원래 자세) → 매 프레임 `Update`: 보정 `RestoreBasePose` → (Animator·SDArmTwist) → `LateUpdate`: v13 `Advance` **1회** → 지금 클립에 맞는 `ApplyPose` → 팔 밀어내기 후처리. v13 을 한 프레임에 두 번 돌리지 않는다. 구동기만 꺼지면 v13 이 자기 LateUpdate 로 혼자 돈다 |
+| 팔 밀어내기 후처리 | `LateUpdate` 마지막(v13 `Advance`·보정 `ApplyPose` 뒤) 1회. 팔 캡슐 4개(좌우 상완·전완)에 닿는 마디만 뿌리 쪽부터 **회전**시켜 캡슐 밖으로 민다(뿌리 고정·마디 길이 보존, 본 회전이 자식 마디를 데려가므로 다음 마디는 옮겨진 자리에서 판단). 캡슐·반경·`bindAllowance` 는 v13 이 가진 것을 이름으로 찾아 재사용. 가슴·허리 캡슐은 **가드**로만 쓴다 — 민 가닥이 그 프레임 원래 깊이보다 몸통으로 더 들어가지 않게 한 걸음을 줄인다(이미 겹친 몸통은 v13 몫, 건드리지 않음). v13 이 팔 접촉을 못 푸는 이유는 옆 가닥이 몸통만 보는 가상 중심 가닥에서 8°/12° 이상 못 벗어나기 때문이다(납품 원본은 무수정). 다음 프레임 v13 `Advance` 가 `CaptureTargets` 에서 바인드 회전으로 되돌린 뒤 자기 내부 점으로 다시 쓰므로 후처리 결과는 시뮬레이션 상태에 들어가지 않는다. 인스펙터: `armClearanceEnabled`(기본 켬) · `armClearanceMaxDegrees`(마디 하나를 더 꺾는 최대 각, 기본 45° — 진단상 필요 회전 22~56°, 45° 위로는 잔여 겹침이 거의 안 줄고 꺾임만 커진다). 판단은 `AssassinHairArmClearance`(순수 함수) |
 | 클립 고르기 | **Base Layer** 현재 상태의 가장 무거운 클립(UpperBody 레이어는 안 본다). `Dodge_Combat_F_0` → v15, v16 프로필이 있는 클립 → v16, 그 외 → v13 만. 클립 안 초 = 정규화 시간 × 원본 길이(재생 속도 3.6배여도 위상 같음) |
 | trailing 방향 | "출발 반대 방향"은 처음·상태/클립 전환·루프 한 바퀴·시간 되감기(Any State 재진입)·v13 리셋 때 `-Armature.forward` 로 다시 잡고, 그 사이엔 유지(납품 브리지 규칙 + 리셋) |
 | 캡처 실패 | 경고 1줄 후 보정만 끄고 v13 은 계속 |
 | 네트워크 | 순수 표현 — NetworkVariable·RPC·NetworkAnimator 변경 없음. 각 피어가 자기 Animator(NetworkAnimator 복제) 결과로 로컬 계산, 피어마다 미세하게 달라도 된다 |
-| 튜닝 | 납품 기본값(v13 기본·보정 strength 1·회피 fan 22 — 납품 사용법 값). 프리팹 인스펙터에서만 조정, xlsx 노출 안 함. 구동기 인스펙터: `actionHairEnabled`·`diveHairEnabled` |
+| 튜닝 | 납품 기본값(v13 기본·보정 strength 1·회피 fan 22 — 납품 사용법 값). 프리팹 인스펙터에서만 조정, xlsx 노출 안 함. 구동기 인스펙터: `actionHairEnabled`·`diveHairEnabled`·`armClearanceEnabled`·`armClearanceMaxDegrees` |
 | 저작 | `Tools/Player/Assassin/머리카락 본 연결`(`AssassinHairAuthoring`, 멱등 — 없으면 추가·있으면 재캡처, 기존 인스펙터 값 유지). 전체 저작(`AssassinShellAuthoring` Armature 단계)도 같은 `Ensure` 를 부른다 |
-| 테스트 | `Player/Editor/AssassinHairClipRulesTests`(규칙) · `AssassinHairPrefabTests`(체인 7×4 본·캡처·캡슐·구동기·Variant 중첩) — `Tools/Tests/플레이어 EditMode 테스트 실행` 에 등록 |
+| 테스트 | `Player/Editor/AssassinHairClipRulesTests`(규칙) · `AssassinHairArmClearanceTests`(밀어내기·상한·길이 보존·몸통 가드) · `AssassinHairPrefabTests`(체인 7×4 본·캡처·캡슐·구동기·Variant 중첩) — `Tools/Tests/플레이어 EditMode 테스트 실행` 에 등록 |
 
 **리셋 경로** — 피어마다 로컬 시뮬레이션이라 서버/오너에서만 불리는 훅(`TeleportAuthoritative`·`PlaceOwnerAtSpawnClientRpc`·`PlayerFallRecovery`·`BossTeleportManager`)에 걸지 않는다. 별도 리셋 코드를 더하지 않았다(아래로 전부 덮임).
 

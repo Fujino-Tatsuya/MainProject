@@ -5,7 +5,8 @@ using UnityEngine;
 /// <summary>
 /// 할 일 47 — 게임 Animator 를 읽어 납품 머리카락 시스템(v13 물리 + v16 동작별 보정 + v15 회피)을 한 프레임 순서대로 구동한다.
 /// 납품 연결 순서를 그대로 따른다: 원래 자세에서 Capture 1회 → 매 프레임 RestoreBasePose(Update) → Animator 평가·SDArmTwist
-/// → v13 Advance 1회 → 지금 클립에 맞는 ApplyPose(LateUpdate). v13 자동 LateUpdate 는 externalDrive 로 끈다(한 프레임 두 번 계산 금지).
+/// → v13 Advance 1회 → 지금 클립에 맞는 ApplyPose → 팔 밀어내기 후처리(<see cref="AssassinHairArmClearance"/>, LateUpdate).
+/// v13 자동 LateUpdate 는 externalDrive 로 끈다(한 프레임 두 번 계산 금지).
 /// 순수 표현이다 — 각 피어가 자기 Animator(NetworkAnimator 복제) 결과로 따로 계산하고, 네트워크로 아무것도 보내지 않는다.
 /// 판단 규칙은 <see cref="AssassinHairClipRules"/>·<see cref="AssassinHairClipTracker"/>.
 /// </summary>
@@ -23,6 +24,12 @@ public sealed class AssassinHairDriver : MonoBehaviour
     [Tooltip("v15 회피(Dodge_Combat_F_0) 전용 머리. 끄면 회피도 v13 물리만 쓴다.")]
     [SerializeField] private bool diveHairEnabled = true;
 
+    [Tooltip("v13·보정이 끝난 뒤 팔 캡슐(좌우 상완·전완)에 닿는 가닥만 회전으로 밀어낸다. 끄면 팔꿈치가 머리카락 밖으로 나올 수 있다.")]
+    [SerializeField] private bool armClearanceEnabled = true;
+
+    [Tooltip("팔 밀어내기가 마디 하나를 더 꺾는 최대 각도(도). 크면 팔은 덜 비치지만 가닥이 팔 위에서 갈라지듯 꺾인다.")]
+    [SerializeField, Range(0f, 90f)] private float armClearanceMaxDegrees = 45f;
+
     private readonly AssassinHairClipTracker tracker = new();
     private readonly List<AnimatorClipInfo> clipInfos = new();
 
@@ -34,6 +41,7 @@ public sealed class AssassinHairDriver : MonoBehaviour
     private Vector3 trailingDirection;
     private AnimationClip cachedClip;
     private string cachedClipName;
+    private AssassinHairArmClearance.Buffers armClearance;
 
     private void Awake()
     {
@@ -42,6 +50,7 @@ public sealed class AssassinHairDriver : MonoBehaviour
         actionHair = GetComponent<AssassinActionHairAnimation>();
         diveHair = GetComponent<AssassinDiveHairAnimation>();
         hair.externalDrive = true;
+        armClearance = AssassinHairArmClearance.Prepare(hair);
 
         // Awake 는 첫 Animator 평가 전이다 — 보정의 좌우 배치(fan)를 원래 자세에서 기록한다.
         try
@@ -91,6 +100,15 @@ public sealed class AssassinHairDriver : MonoBehaviour
             return;
 
         hair.Advance(Time.deltaTime);
+        ApplyOverlays();
+
+        // 마지막 덧쓰기 — 다음 프레임 v13 Advance 가 바인드 회전부터 다시 쓰므로 시뮬레이션 상태에 들어가지 않는다.
+        if (armClearanceEnabled && hair.motionEnabled && hair.weight > 0f)
+            AssassinHairArmClearance.Apply(hair, armClearance, armClearanceMaxDegrees);
+    }
+
+    private void ApplyOverlays()
+    {
         if (!overlaysReady)
             return;
 
