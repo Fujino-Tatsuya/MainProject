@@ -94,7 +94,7 @@
 | 항목 | 키 | 결정할 것 |
 |---|---|---|
 | ko 가 영어인 문구 | `UI.Loading.Preparing`·`Loading`·`WaitingForPlayers`·`Activating`·`StandBy` · `UI.Loading.Ready1~3` · `UI.Result.Cleared`·`Failed`·`Aborted` · `UI.SkillTooltip.PassiveBadge` · `UI.Options.Language` | ko 칸을 한국어로 할지(en 은 지금 글자 그대로) |
-| 상태이상 이름 | `UI.StatusEffect.*` 14개 | ko 를 한국어(`#설명` 의 기절·둔화…)로 할지 · en 을 띄어 쓸지(`Super Armor`·`Move Speed`·`Max HP` 등) |
+| 상태이상 이름 | `UI.StatusEffect.*` 14개 | ✅ CC 6종 + `Grabbed` 는 확정(2026-10-16, 할 일 50 — 아래 표). 남은 8개(슈퍼아머·스탯 배율·패시브 충전·정신 집중): ko 를 한국어로 할지 · en 을 띄어 쓸지(`Super Armor`·`Move Speed`·`Max HP` 등) |
 | 로딩 장난 팁 | `UI.Loading.Tip1~3` | 문구 교체 후보 — 실제 팁으로 바꿀지 |
 | 스킬 툴팁 `TODO` 문구 | `*/tooltip.description` 전부 | ko 확정 뒤 en 재번역 |
 | 문구에 박힌 수치 | `AssassinTransformSkillData/tooltip.description`(`2초`) · `AssassinCircleStrikeSkillData/tooltip.description`(`5번`) | 자리표시자로 뺄지(빼면 ko·en 같이) |
@@ -206,14 +206,21 @@
 
 ### UiStrings — 상태이상 이름 (L4b)
 
+> CC 6종 + `Grabbed` 는 **확정**(2026-10-16, 할 일 50 — 머리 위 라벨·HUD 공용). 코드 폴백 ko(`UiStrings`)는 이미 한국어다.
+> 시트의 기존 6행은 Export 가 덮어쓰지 않으므로 **xlsx 에서 ko·en 을 손으로 고치고**, `Grabbed` 는 새 행으로 넣는다.
+
+| 시트 | key | ko(확정) | en(확정) | 메모 |
+|---|---|---|---|---|
+| Strings | `UI.StatusEffect.Airborne` | `공중에 뜸` | `Airborne` | ✅ 확정 |
+| Strings | `UI.StatusEffect.Stunned` | `기절` | `Stunned` | ✅ 확정 |
+| Strings | `UI.StatusEffect.Slowed` | `둔화` | `Slowed` | ✅ 확정 |
+| Strings | `UI.StatusEffect.Rooted` | `속박` | `Rooted` | ✅ 확정 |
+| Strings | `UI.StatusEffect.Silenced` | `침묵` | `Silenced` | ✅ 확정 |
+| Strings | `UI.StatusEffect.Debilitated` | `약화` | `Weakened` | ✅ 확정 — en 은 enum 이름(`Debilitated`)이 아니라 `Weakened` |
+| Strings | `UI.StatusEffect.Grabbed` | `붙잡힘` | `Grabbed` | ✅ 확정 · 새 키(구속 — 잡기·돌진 밀기, 머리 위 라벨 전용) |
+
 | 시트 | key | ko(현재 값) | en 초안 | 메모 |
 |---|---|---|---|---|
-| Strings | `UI.StatusEffect.Airborne` | `Airborne` | `Airborne` | ko 가 영어 — ko 를 한국어로 할지 기획 결정 (뜻: 공중에 뜸) |
-| Strings | `UI.StatusEffect.Stunned` | `Stunned` | `Stunned` | ko 가 영어 — ko 를 한국어로 할지 기획 결정 (기절) |
-| Strings | `UI.StatusEffect.Slowed` | `Slowed` | `Slowed` | ko 가 영어 — ko 를 한국어로 할지 기획 결정 (둔화) |
-| Strings | `UI.StatusEffect.Rooted` | `Rooted` | `Rooted` | ko 가 영어 — ko 를 한국어로 할지 기획 결정 (속박) |
-| Strings | `UI.StatusEffect.Silenced` | `Silenced` | `Silenced` | ko 가 영어 — ko 를 한국어로 할지 기획 결정 (침묵) |
-| Strings | `UI.StatusEffect.Debilitated` | `Debilitated` | `Debilitated` | ko 가 영어 — ko 를 한국어로 할지 기획 결정 (약화) |
 | Strings | `UI.StatusEffect.SuperArmor` | `SuperArmor` | `SuperArmor` | ko 가 영어 — ko 를 한국어로 할지 기획 결정 (슈퍼아머) · en 띄어쓰기 `Super Armor` 후보 |
 | Strings | `UI.StatusEffect.MoveSpeedModifier` | `MoveSpeed` | `MoveSpeed` | ko 가 영어 — ko 를 한국어로 할지 기획 결정 (이동 속도 증감) · en `Move Speed` 후보 |
 | Strings | `UI.StatusEffect.AttackDamageModifier` | `AttackDamage` | `AttackDamage` | ko 가 영어 — ko 를 한국어로 할지 기획 결정 (공격력 증감) · en `Attack Damage` 후보 |
