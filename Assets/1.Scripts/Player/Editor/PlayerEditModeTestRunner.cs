@@ -47,6 +47,7 @@ internal static class PlayerEditModeTestRunner
         "^PlayerInputBufferTests$", // 할 일 44 — 선입력 버퍼 기록·만료·덮어쓰기·거부 사유별 보관/버림
         "^PlayerInputBufferDiagnosticsTests$", // 할 일 44 후속 — 선입력 버퍼 진단: 즉시·버퍼 실행·만료·놓친 간격·중앙값/90%
         "^PlayerBasicAttackInputRulesTests$", // 할 일 44 5차 — 거너 홀드 시작·공격 중 스킬 입력은 지금 발 마무리 뒤 예약(다음 발 금지·만료 없음·마지막 1개·연타 1회)
+        "^FirstMeleeGuardRulesTests$", // PLAN-paladin-counter-e C2 — 팔라딘 E 방어 방향(평면·경계·겹침)·반격 부채꼴(표면 거리·평면 각도)
     };
 
     const string Tag = "[PlayerTests]";
