@@ -2095,6 +2095,7 @@ MonoBehaviour:
   hitboxAnchor: {fileID: 0}
   skillVfx: {fileID: 6735174628152974569}
   superArmorOverlay: {fileID: 949514895202568280}
+  stickVfx: {fileID: 2581342685191034331}
 --- !u!114 &183473686508495034
 MonoBehaviour:
   m_ObjectHideFlags: 0

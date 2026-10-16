@@ -21,6 +21,13 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
     [Tooltip("슈퍼아머 구간 동안 몸에 덮을 오버레이. 'Paladin_Armature/tripo_part_0' 의 DissolveOverlay 를 물린다. 비워두면 연출만 빠진다")]
     [SerializeField] private DissolveOverlay superArmorOverlay;
 
+    [Tooltip("클립 이벤트 PlayEffect(\"Stick\") 가 부르는 칼 꽂기 소켓('VFX/UltimateSkill/SwordStick', id Stick). 데이터의 이펙트 배율을 여기 넣는다.\n" +
+             "비워두면 Stick 만 저작 속도로 나온다")]
+    [SerializeField] private EffectSocketPlayer stickVfx;
+
+    // Garen_Ultimate_Skill 상태 전용 속도 파라미터. 평타의 AttackSpeed 와 섞이지 않게 따로 둔다.
+    private static readonly int UltimateSpeedHash = Animator.StringToHash("UltimateSpeed");
+
     private Unit lockedTarget;
     // 완료 판정 1회의 적중 대상(1명). Player.ServerAttackLanded 통지용 버퍼.
     private readonly System.Collections.Generic.List<Unit> landedUnits = new System.Collections.Generic.List<Unit>(1);
@@ -50,7 +57,7 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
         // 🔴 여기는 서버에서만 돈다 — 그래서 창구를 거친다. 누구를 지목했는지는
         //    PlaySkillClientRpc 에 실려 가지 않아(SingleTarget 은 aimPoint 를 안 쓴다)
         //    리모트 클라가 알 방법이 없다.
-        skillVfx?.ServerPlayTargetFloor(lockedTarget);
+        skillVfx?.ServerPlayTargetFloor(lockedTarget, VfxPlayRate);
 
         // 채널 동안 CC 면역. 채널은 이동 잠금(CanMoveWhileActive=false)만으로는 지킬 수 없다 —
         // 그건 내 입력을 막을 뿐이고, 남이 미는 것은 PlayerStateController.BeginKnockback 이
@@ -70,13 +77,23 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
         //    그 '구간'은 스킬이 활성인 동안 그 자체라 OnClientPlay~OnEnd 로 정확히 같은 창을 그린다.
         //    두 콜백 모두 전 피어에서 돈다.
         superArmorOverlay?.Show();
+
+        // 🔴 여기도 전 피어다(서버는 TryStartSkillServer, 클라는 PlaySkillClientRpc → PlaySkillPresentation).
+        //    방금 CrossFade 한 같은 프레임이라 첫 프레임부터 이 속도로 돈다. 원격 피어도 각자 같은 값을 넣는다.
+        //    Animator 는 시전마다 찾는다 — 캐릭터 교체로 Armature 가 바뀔 수 있다.
+        Animator animator = owner != null ? owner.GetComponentInChildren<Animator>() : null;
+        if (animator != null)
+            animator.SetFloat(UltimateSpeedHash, AnimationSpeed);
+
+        // Stick 은 클립 이벤트라 피어마다 각자 재생한다 — 이벤트보다 먼저 배율을 넣어 둔다.
+        stickVfx?.SetPlayRate(VfxPlayRate);
     }
 
     /// <summary>[오너] R 을 눌러 조준에 들어갔다. 낙뢰를 바로 떨어뜨리고, 이어서 칼날에 전기가 흐른다.</summary>
     public override void OnOwnerAimStart()
     {
         // 오너 전용 경로라 로컬 재생만으로는 남에게 안 보인다 — 창구가 서버를 거쳐 나머지 피어에 뿌린다.
-        skillVfx?.OwnerPlayUltimateVfx();
+        skillVfx?.OwnerPlayUltimateVfx(VfxPlayRate);
     }
 
     /// <summary>[오너] 시전까지 가지 못하고 조준이 물렸다. 연출을 걷는다.</summary>
@@ -118,7 +135,7 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
 
         // 🔴 여기도 서버 전용이라 창구를 거친다(OnChannelCompleted 는 TickServer 경로다).
         //    위치는 넘기지 않는다 — 각 피어가 표식을 깔 때 잡아 둔 그 트랜스폼에 떨어진다.
-        skillVfx?.ServerPlayTargetStrike();
+        skillVfx?.ServerPlayTargetStrike(VfxPlayRate);
 
         Edit.Log($"[Skill] 최후의 심판 — {lockedTarget.name}에게 피해 {attackInfo.damage}", this);
     }
@@ -141,6 +158,10 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
         // 🔴 종료 사유를 가리지 않는다 — 취소·사망·안전망 만료 어느 쪽으로 끝나도 오버레이가 남지 않는다.
         superArmorOverlay?.Hide();
     }
+
+    // 데이터가 궁극 전용 SO 가 아니면(에셋 교체 실수 등) 원래 속도로 돈다.
+    private float AnimationSpeed => Data is FirstMeleeUltimateSkillData ult ? ult.AnimationSpeed : 1f;
+    private float VfxPlayRate => Data is FirstMeleeUltimateSkillData ult ? ult.VfxPlayRate : 1f;
 
     private ulong SourceId => owner != null && owner.NetworkObject != null ? owner.NetworkObjectId : 0UL;
 

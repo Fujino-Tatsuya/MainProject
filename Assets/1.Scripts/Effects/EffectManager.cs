@@ -225,9 +225,14 @@ public class EffectManager : MonoBehaviour
     /// 성장 시간이 서버가 점프 체공시간으로 계산한 값이라 저작 시점에 적을 수가 없다.
     /// 이 값은 파트 드라이버에게도 그대로 전달된다(<see cref="IEffectSystem.Play"/>).
     /// </param>
+    /// <param name="playRate">
+    /// 재생 속도 배율(1 = 저작 그대로). 파티클 simulationSpeed(저작값에 곱한다)·파트 delay·수명이 함께 빨라진다 —
+    /// 히트스톱의 <see cref="SetPlayRateForTarget"/>와 같은 축이다. 반납 때 1로 돌아가 다음 대출자에게 남지 않는다.
+    /// 쓰는 곳은 애니메이션을 빨리 돌리는 연출이다(팔라딘 R 1.2배).
+    /// </param>
     public void Play(EffectEntry entry, Vector3 position, Quaternion rotation, float scale = 1f,
-                     float durationOverride = 0f)
-        => PlayOneShot(entry, position, rotation, scale, Vector3.one, durationOverride);
+                     float durationOverride = 0f, float playRate = 1f)
+        => PlayOneShot(entry, position, rotation, scale, Vector3.one, durationOverride, playRate);
 
     /// <summary>
     /// 원샷을 <b>축별 배율</b>로 재생한다. 인스턴스 localScale 에만 축별로 곱해지고, 파트 offset 은 배율을 타지 않는다.
@@ -237,14 +242,15 @@ public class EffectManager : MonoBehaviour
     /// </summary>
     public void Play(EffectEntry entry, Vector3 position, Quaternion rotation, Vector3 axisScale,
                      float durationOverride = 0f)
-        => PlayOneShot(entry, position, rotation, 1f, SanitizeAxisScale(entry, axisScale), durationOverride);
+        => PlayOneShot(entry, position, rotation, 1f, SanitizeAxisScale(entry, axisScale), durationOverride, 1f);
 
     private void PlayOneShot(EffectEntry entry, Vector3 position, Quaternion rotation, float scale,
-                             Vector3 axisScale, float durationOverride)
+                             Vector3 axisScale, float durationOverride, float playRate)
     {
         if (!CanPlay(entry)) return;
 
         ActiveEffect active = AcquireSlot(entry);
+        active.playRate = SanitizePlayRate(entry, playRate);
         active.looping = false;
         active.attached = false;
         active.follow = null;
@@ -294,27 +300,29 @@ public class EffectManager : MonoBehaviour
     /// 파트 드라이버에게 넘길 시간(초). <b>수명이 아니다</b> — 루프의 수명은 <see cref="Release"/>가 정한다.
     /// 시간축을 호출자가 정하는 드라이버만 쓴다(파티클은 무시). 0이면 "시간 없음".
     /// </param>
+    /// <param name="playRate">재생 속도 배율(1 = 저작 그대로). 원샷 <see cref="Play(EffectEntry, Vector3, Quaternion, float, float, float)"/>와 같다.</param>
     public EffectHandle PlayLooping(EffectEntry entry, Transform follow, Vector3 offset = default,
-                                    float scale = 1f, float partDuration = 0f)
+                                    float scale = 1f, float partDuration = 0f, float playRate = 1f)
     {
         return follow != null
-            ? PlayLoopingCore(entry, follow, offset, follow.rotation, scale, partDuration)
-            : PlayLoopingCore(entry, null, offset, Quaternion.identity, scale, partDuration);
+            ? PlayLoopingCore(entry, follow, offset, follow.rotation, scale, partDuration, playRate)
+            : PlayLoopingCore(entry, null, offset, Quaternion.identity, scale, partDuration, playRate);
     }
 
     /// <summary>루프 재생을 월드 좌표·회전에 고정한다. (설계 API에 대한 편의 오버로드)</summary>
     public EffectHandle PlayLooping(EffectEntry entry, Vector3 position, Quaternion rotation,
-                                    float scale = 1f, float partDuration = 0f)
+                                    float scale = 1f, float partDuration = 0f, float playRate = 1f)
     {
-        return PlayLoopingCore(entry, null, position, rotation, scale, partDuration);
+        return PlayLoopingCore(entry, null, position, rotation, scale, partDuration, playRate);
     }
 
     private EffectHandle PlayLoopingCore(EffectEntry entry, Transform follow, Vector3 offsetOrPosition,
-                                         Quaternion rotation, float scale, float partDuration)
+                                         Quaternion rotation, float scale, float partDuration, float playRate)
     {
         if (!CanPlay(entry)) return EffectHandle.None;
 
         ActiveEffect active = AcquireSlot(entry);
+        active.playRate = SanitizePlayRate(entry, playRate);
         active.looping = true;
         active.attached = follow != null;
         active.follow = follow;
@@ -642,6 +650,15 @@ public class EffectManager : MonoBehaviour
 
         WarnOnce(entry, "scale", $"[EffectManager] '{entry.name}'를 배율 {scale}로 재생하려 했다. " +
                                  "0이면 보이지 않고 음수면 뒤집힌다. 1로 되돌린다.");
+        return 1f;
+    }
+
+    // 재생 배율 — 0 이하는 호출 쪽 오용이다(0 = 얼어붙은 채 수명도 안 흐른다). 정지는 히트스톱 경로의 몫이라 1로 되돌린다.
+    private float SanitizePlayRate(EffectEntry entry, float playRate)
+    {
+        if (playRate > 0f) return playRate;
+
+        WarnOnce(entry, "playRate", $"[EffectManager] '{entry.name}'를 재생 배율 {playRate}로 재생하려 했다. 1로 되돌린다.");
         return 1f;
     }
 

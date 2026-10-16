@@ -34,8 +34,15 @@ MonoBehaviour:
   targetingMode: 1
   confirmMode: 0
   castRange: 6
+  fixedDistance: 0
+  aoeRadius: 0
   targetableLayers:
     serializedVersion: 2
     m_Bits: 16640
+  groundPointOutOfRange: 0
+  groundMarkerRadius: 0
+  hoverMarkerDistance: 3
   animatorStateName: Garen_Ultimate_Skill
   snapRotationOnStart: 1
+  animationSpeed: 1.2
+  vfxPlayRate: 1.2

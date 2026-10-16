@@ -15,6 +15,13 @@ public class ShurikenPartCache : MonoBehaviour
     /// <summary>인스턴스 안의 모든 ParticleSystem. 감속·루프 판별용.</summary>
     [System.NonSerialized] public ParticleSystem[] all;
 
+    /// <summary>
+    /// <see cref="all"/>과 같은 순서의 <b>저작된 simulationSpeed</b>. 캐시를 만들 때(첫 재생 전) 한 번 읽는다.
+    /// 배율은 여기에 곱하고 반납 때 여기로 되돌린다 — 1로 덮으면 저작값이 1이 아닌 프리팹
+    /// (예: FX_Sword_Electric = 2)이 한 번 반납된 뒤로 느려진다.
+    /// </summary>
+    [System.NonSerialized] public float[] authoredSpeeds;
+
     /// <summary>부모에 ParticleSystem이 없는 최상위 시스템들. 재생·정지는 여기에만 건다(withChildren=true).</summary>
     [System.NonSerialized] public ParticleSystem[] roots;
 

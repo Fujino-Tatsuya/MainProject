@@ -10,4 +10,19 @@
 [DataTableSheet("Paladin", Order = 5)]
 public class FirstMeleeUltimateSkillData : PlayerSkillData
 {
+    // 🔴 둘 다 연출 정렬 값이라 테이블에 내보내지 않는다(인스펙터에서 바로 고친다).
+    //    채널 시간(maxActiveDuration)·피해 시각은 이 값과 무관하다 — 빨라지는 것은 보이는 것뿐이다.
+    [Header("연출 속도")]
+    [Tooltip("궁극기 애니메이션 재생 속도 배율. 1 = 클립 원래 속도.\n" +
+             "Animator 상태 Garen_Ultimate_Skill 의 속도 파라미터 UltimateSpeed 로 들어간다(다른 상태는 영향 없음).\n" +
+             "클립 이벤트(칼 꽂기 Stick)도 같이 당겨진다: 클립 1.2초 → 1.2배면 실제 1.0초")]
+    [SerializeField, Min(0.1f), DataTableIgnore] private float animationSpeed = 1.2f;
+
+    [Tooltip("궁극기 이펙트 재생 속도 배율. 1 = 저작 그대로.\n" +
+             "칼 낙뢰·칼날 전기·발밑 표식·칼 꽂기(Stick)·마무리 낙뢰 전부에 걸린다.\n" +
+             "파티클 simulationSpeed(저작값에 곱)·startDelay·엔트리 파트 delay·수명이 함께 빨라진다")]
+    [SerializeField, Min(0.1f), DataTableIgnore] private float vfxPlayRate = 1.2f;
+
+    public float AnimationSpeed => animationSpeed;
+    public float VfxPlayRate => vfxPlayRate;
 }
