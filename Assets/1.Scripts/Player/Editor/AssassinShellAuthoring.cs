@@ -1288,6 +1288,8 @@ public static class AssassinShellAuthoring
             if (!twist.left.captured || !twist.right.captured)
                 Debug.LogError($"{Tag} SDArmTwist 팔 바인드 포즈 캡처 실패. FBX 본 이름(Left/RightLowerArm·Hand·ForearmTwist01/02)을 확인할 것.", root);
 
+            AssassinHairAuthoring.Ensure(root); // 할 일 47 — 머리카락 2차 모션(재저작해도 빠지지 않게)
+
             SkinnedMeshRenderer[] renderers = root.GetComponentsInChildren<SkinnedMeshRenderer>(true);
             // 슬롯마다 — HeadNeck 메시는 서브메시가 여럿(Head·Face)이다. 0번만 바꾸면 Face 슬롯이 FBX 의
             // 원래 재질(패키지의 Built-in Assassin_Face — 가져오지 않음)로 남아 깨진다(10-06 은희 Play).

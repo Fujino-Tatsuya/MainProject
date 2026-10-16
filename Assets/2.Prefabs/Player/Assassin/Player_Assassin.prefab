@@ -92,6 +92,14 @@ PrefabInstance:
       propertyPath: m_Name
       value: Armature
       objectReference: {fileID: 0}
+    - target: {fileID: 6102637746479172449, guid: 3a5f368447661b44592ccc55d5568854, type: 3}
+      propertyPath: armClearanceEnabled
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 6102637746479172449, guid: 3a5f368447661b44592ccc55d5568854, type: 3}
+      propertyPath: armClearanceMaxDegrees
+      value: 47.7
+      objectReference: {fileID: 0}
     - target: {fileID: 6170323812212706955, guid: 3a5f368447661b44592ccc55d5568854, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0.046589606
