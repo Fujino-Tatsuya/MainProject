@@ -13,7 +13,9 @@ using UnityEngine;
 ///   🔹 변신 E 원 = 정식 VFX <c>EffectCatalog.Assassin_E_MultiSlashes</c> 루프(2026-10-15 민경) — 확정 시 원 중심에서
 ///   배율 = 원 반경으로 켜고, 스킬 OnEnd(5타 완료·중단 공통)에서 Release 한다. 확정 순간 1회 <c>circleStrikePrefab</c> 도 그대로 낸다.
 ///   🔹 변신 Q 돌진 = 정식 VFX <c>EffectCatalog.Assassin_Q_StormSlash</c> 루프(2026-10-15 민경) — 플레이어 루트를 따라가며
-///   지나간 자리에 자국을 남긴다(입자 World + Rate over Distance). 임시 돌진 궤적(dashTrailPrefab)은 일반 Q 만.
+///   지나간 자리에 자국을 남긴다(입자 World + Rate over Distance).
+///   🔹 일반 Q 돌진 = 정식 VFX <c>Assassin_Q_PierceLine</c>·<c>Assassin_Q_PierceBurst</c>(2026-10-16 민경) — 시작점을 기억했다가
+///   스킬 OnEnd 에서 지나온 경로 위로 일섬(Z 배율 = 실제 이동 거리)을 긋고 끝점에 버스트. 임시 돌진 궤적은 제거.
 /// - 평타 베기: 클립 Hit 애니 이벤트(전 피어에서 재생)마다 <see cref="AssassinBasicAttack"/> 가 부른다 — RPC 없음.
 /// - 백어택 적중: [서버] <see cref="ServerBackAttackHit"/> → 전 피어. 판정은 A11 이 붙인다(그 전까지 호출자 없음).
 /// 프리팹이 비어 있으면 해당 연출만 빠진다.
@@ -38,6 +40,12 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
     [Tooltip("프리팹 저작 크기에 곱하는 배율.")]
     [SerializeField, Min(0.01f)] private float stormSlashScale = 1f;
 
+    [Header("일반 Q 돌진 — EffectCatalog.Assassin_Q_PierceLine / PierceBurst")]
+    [Tooltip("일섬 두께·높이와 버스트 크기에 곱하는 배율(길이는 실제 이동 거리). 프리팹은 허리 높이(1m)로 저작돼 있다.")]
+    [SerializeField, Min(0.01f)] private float pierceScale = 1f;
+    [Tooltip("이 거리(m)보다 짧게 끝나면(돌진 직후 벽 등) 일섬은 생략하고 버스트만 낸다.")]
+    [SerializeField, Min(0f)] private float pierceMinLength = 0.3f;
+
     [Header("평타 베기 — 클립 Hit 이벤트마다(전 피어)")]
     [Tooltip("일반 4타 — 인덱스 = 타 순서(0~3). 비어 있는 칸은 연출 없음.")]
     [SerializeField] private GameObject[] normalSlashPrefabs = new GameObject[4];
@@ -50,7 +58,6 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
     [SerializeField] private GameObject interruptCastPrefab;
 
     [Header("1회·스킬 동안")]
-    [SerializeField] private GameObject dashTrailPrefab;
     [Tooltip("변신 E 확정 순간 원 중심에 1회(Multi Slashes 루프와 함께).")]
     [SerializeField] private GameObject circleStrikePrefab;
     [SerializeField] private GameObject backAttackHitPrefab;
@@ -71,7 +78,9 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
     private float circleStrikeDeadline;
     private EffectHandle stormSlashLoop;
     private float stormSlashDeadline;
-    private GameObject dashTrail;
+    private Vector3 pierceStart;
+    private Vector3 pierceDirection;
+    private bool pierceArmed;
 
     private void Awake()
     {
@@ -147,15 +156,43 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
     /// <summary>[전 피어] 우클릭 간파 시전.</summary>
     public void PlayInterruptCast() => PlayAttached(interruptCastPrefab);
 
-    /// <summary>[전 피어] Q 돌진 시작 — 궤적을 플레이어에 붙인다.</summary>
-    public void BeginDashTrail()
+    /// <summary>[전 피어] 일반 Q 돌진 시작 — 일섬을 그을 시작점·방향만 기억한다(이 시점엔 아무것도 재생하지 않는다).</summary>
+    public void BeginPierce(Vector3 start, Vector3 direction)
     {
-        Release(ref dashTrail);
-        dashTrail = Spawn(dashTrailPrefab, transform);
+        direction.y = 0f;
+        pierceStart = start;
+        pierceDirection = direction.sqrMagnitude > 0.0001f ? direction.normalized : transform.forward;
+        pierceArmed = true;
     }
 
-    /// <summary>[전 피어] Q 종료(사유 무관) — 궤적을 떼어 남은 입자만 흘린다.</summary>
-    public void EndDashTrail() => Release(ref dashTrail);
+    /// <summary>
+    /// [전 피어] 일반 Q 종료(사유 무관) — 시작점에서 지금 위치까지 지나온 경로 위로 일섬을 긋고 끝점에 버스트.
+    /// 길이 = 돌진 방향으로 실제 나아간 거리(벽 조기 종료면 그만큼 짧다). 서버 종료가 돌진 끝 + 0.1초라
+    /// "베인 자리가 한 박자 늦게 드러나는" 타이밍이 된다.
+    /// </summary>
+    public void EndPierce()
+    {
+        if (!pierceArmed)
+            return;
+        pierceArmed = false;
+        if (!EffectManager.TryGet(out EffectManager effects, this))
+            return;
+
+        Vector3 end = transform.position;
+        float length = Mathf.Max(0f, Vector3.Dot(end - pierceStart, pierceDirection));
+        Quaternion rotation = Quaternion.LookRotation(pierceDirection, Vector3.up);
+        Vector3 endPoint = pierceStart + pierceDirection * length;
+
+        EffectEntry line = effects.Catalog.Assassin_Q_PierceLine;
+        EffectEntry burst = effects.Catalog.Assassin_Q_PierceBurst;
+        if (line == null || burst == null)
+            Edit.LogWarning("[AssassinSkillView] EffectCatalog.Assassin_Q_PierceLine/PierceBurst 가 비어 일반 Q 연출 일부를 건너뛴다.", this);
+
+        if (line != null && length >= pierceMinLength)
+            effects.Play(line, pierceStart, rotation, new Vector3(pierceScale, pierceScale, length));
+        if (burst != null)
+            effects.Play(burst, endPoint, rotation, pierceScale);
+    }
 
     /// <summary>
     /// [전 피어] 변신 E 공격 시작 — 원 중심에서 루프를 켠다. 배율 = <paramref name="radius"/> × circleStrikeScaleFactor.
@@ -311,19 +348,5 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
                 particle.Play(false);
         }
         return instance;
-    }
-
-    // 루프·궤적용 — 방출을 멈추고 월드에 떼어 남은 입자가 사라진 뒤 파괴한다.
-    private void Release(ref GameObject instance)
-    {
-        if (instance == null)
-            return;
-
-        foreach (ParticleSystem particle in instance.GetComponentsInChildren<ParticleSystem>())
-            particle.Stop(false, ParticleSystemStopBehavior.StopEmitting);
-
-        instance.transform.SetParent(null, true);
-        Destroy(instance, releaseLifetime);
-        instance = null;
     }
 }

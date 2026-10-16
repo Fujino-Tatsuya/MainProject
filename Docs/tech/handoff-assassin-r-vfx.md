@@ -37,12 +37,20 @@
 
 ## 3-2. 변신 Q 돌진 루프 (2026-10-15 추가)
 - `AssassinDashStrikeSkill.OnClientPlay` → 데이터가 `AssassinTransformedDashStrikeSkillData` 일 때만 `view.BeginStormSlash(MaxActiveDuration)`, `OnEnd`(완료·벽 조기 종료·중단 공통) → `view.EndStormSlash()`. 일반 Q 는 변화 없음.
-- 임시 돌진 궤적(`dashTrailPrefab`)은 **일반 Q 에서만** 나간다(변신 Q 는 Storm Slash 로 대체, 민경 결정 10-15).
+- 임시 돌진 궤적(`dashTrailPrefab`)은 **삭제**(10-16) — 변신 Q 는 Storm Slash, 일반 Q 는 아래 §3-3.
 - `AssassinSkillView`: `BeginStormSlash`/`EndStormSlash` + `stormSlashOffset`(0)·`stormSlashScale`(1). 플레이어 루트 추종, 안전망(최대 지속 + 1초) 동일.
 - 엔트리 `Players/Player3/Q_TransformedDash/FX_Assassin_StormSlash_Entry` · 카탈로그 `Assassin_Q_StormSlash` · `outroDuration` 1.1. 입자는 World + Rate over Distance — 움직인 만큼 지나간 자리에 남는다.
+
+## 3-3. 일반 Q 관통 일섬 (2026-10-16 추가)
+- `AssassinDashStrikeSkill.OnClientPlay`(일반 데이터) → `view.BeginPierce(시작 위치, 돌진 방향)` — 기억만 한다. `OnEnd`(사유 무관) → `view.EndPierce()`.
+- `EndPierce`: 길이 = 돌진 방향으로 실제 나아간 거리. `Assassin_Q_PierceLine` 을 시작점에 축별 배율 `(s, s, 길이)`로, `Assassin_Q_PierceBurst` 를 끝점에 배율 `s` 로 원샷. 길이 < `pierceMinLength`(0.3m)면 일섬 생략.
+- `AssassinSkillView`: `dashTrailPrefab`·`BeginDashTrail`/`EndDashTrail`·`Release(ref)` **삭제**, `pierceScale`(1)·`pierceMinLength`(0.3) 추가. `AssassinShellAuthoring` 의 해당 줄도 삭제.
+- `EffectManager.Play(entry, pos, rot, Vector3 axisScale)` 오버로드 신설(VFX 코드) — localScale 에만 축별로 곱한다. 기존 float 배율 경로는 동작 불변.
+- 에셋 `Players/Player3/Q_Dash/FX_Assassin_PierceLine`·`_PierceBurst`(+Entry, duration 0.6·1.0).
 
 ## 4. 확인 부탁
 - Play: R → 0.5초에 소용돌이가 차고 따라다님 / 만료·수동 해제·쓰러짐 → 0.5초에 흩어짐.
 - MPPM: 다른 피어·변신 중 늦게 들어온 클라에서도 보이는지.
 - 변신 E: 원 표시 중심에서 루프가 나오고, 5타 끝(또는 중단) 뒤 1초쯤에 걸쳐 흩어지는지.
 - 변신 Q: 돌진 경로에 자국이 남고, 출발 순간 엉뚱한 곳에서 한 줄로 쏟아지지 않는지(풀 인스턴스 위치 이동).
+- 일반 Q: 돌진이 끝나고 한 박자 뒤 경로 위로 일섬 + 끝점 버스트, 벽에 막히면 일섬이 그만큼 짧은지. 다른 피어에서도 경로와 맞는지.
