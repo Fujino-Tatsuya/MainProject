@@ -53,6 +53,13 @@ public class StatusEffectController : BaseNetworkBehaviour, IStatusEffectFacade
     private const StatusEffectType SkillBlockers =
         StatusEffectType.Stunned | StatusEffectType.Silenced | StatusEffectType.Airborne;
 
+    /// <summary>
+    /// 행동 불능 CC — 이동·공격·스킬을 전부 막는 상태이상. 위 차단 테이블에 걸려도 '봉인'(침묵·속박처럼 일부 행동만 막음)과
+    /// 달리, 이 동안 누른 입력은 선입력 버퍼에 보관했다가 풀린 뒤 실행한다(PlayerActionRejectPolicy, 할 일 44).
+    /// </summary>
+    public const StatusEffectType IncapacitatingEffects =
+        StatusEffectType.Stunned | StatusEffectType.Airborne;
+
     private readonly NetworkList<StatusEffectInstance> effects = new NetworkList<StatusEffectInstance>();
 
     // Player 전용 — 연출 잠금 중 신규 상태이상 거부에만 사용한다. 몬스터에는 부착되지 않으므로 null이 정상.

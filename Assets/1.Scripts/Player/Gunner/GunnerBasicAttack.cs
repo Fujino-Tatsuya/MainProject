@@ -15,7 +15,10 @@ using UnityEngine;
 ///    발사 간격이 차면 요청한다. 서버는 눌림·예약이 없는 요청을 버린다(창 우회 방지).
 /// 어느 쪽이든 준비 동작은 첫 발만이다. 둘 다 아니거나 과열되면 후속 동작(ShotRecovery)까지 마무리하고 끝난다.
 /// 창은 애니 이벤트가 아니라 데이터의 시간 값이다(판정도 시간 기반이라 한 곳에서 맞춘다).
-/// 공격 중 이동 불가. 다른 스킬 입력은 상태기계가 막는다(Attack 상태 — §3.2, 예약 없음).
+/// 공격 중 이동 불가. 스킬 입력(Q·E·R·우클릭)은 공격을 끊지 않는다 — 상태기계가 '공격 뒤 스킬'로 예약하고
+/// <see cref="FinishWithoutChaining"/> 을 부르면 현재 발은 끝까지 가고 다음 발만 잇지 않아(뗀 것처럼) 정상 종료한다.
+/// 끝나면 Idle/Move 첫 틱에 예약 스킬이 기존 경로로 요청된다(<see cref="ReservesSkillAfterAttack"/>, 할 일 44).
+/// 홀드 시작(<see cref="StartsOnHold"/>): 스킬 등으로 공격이 끝난 뒤에도 좌클릭을 누르고 있으면 Idle/Move 에서 다시 시작한다.
 /// 방향(할 일 27, <see cref="GunnerAttackFacingModel"/>): 발 잠금 중에는 몸이 돌지 않고, 그 밖에는 커서 쪽으로
 /// <see cref="GunnerBasicAttackData.BetweenShotTurnSpeed"/> 로 돈다. 발 잠금 = 첫 발은 공격 시작 ~ 발사 + ShotLockTail,
 /// 이어지는 발은 발사 − ShotLockLead ~ 발사 + ShotLockTail(잠근 순간의 몸 방향). 🔴 잠금은 오너 시계만으로 돈다 —
@@ -72,6 +75,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
     private float ownerLastShotTime = -1f; // 오너가 마지막 발을 요청한 시각(오너 시계)
     private bool ownerQueued;              // 오너 쪽 입력 창 예약 — 서버 예약과 같은 규칙
     private bool ownerPreLocked;           // 다음 발을 위해 발사 전에 미리 잠갔는가(오너 시계)
+    private bool ownerFinishing;           // 스킬 예약 — 지금 발로 마무리(누름·창 예약 무시, 할 일 44)
 
     // 서버
     private bool hasQueuedShot;
@@ -85,6 +89,14 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
     // 공용 대시 우선(D1·D2) — 준비 중 끊기면 발사·과열 없음, 발사 후면 이미 쏜 발은 그대로이고 후속 동작만 끊긴다.
     // 홀드 연사 중에도 언제든 끊는다(할 일 9).
     public bool CanBeCanceledByDash => true;
+
+    // 홀드 연사 캐릭터 — 누르고 있으면 시작하고, 공격 중 스킬 입력은 지금 발 마무리 뒤로 예약된다(할 일 44).
+    public bool StartsOnHold => true;
+    public bool ReservesSkillAfterAttack => true;
+
+    // 이어지는 발 조건 — 누르고 있거나 창 예약. 스킬이 예약됐으면 무시한다(오너 시계).
+    private bool OwnerChainsNextShot =>
+        PlayerBasicAttackInputRules.ShouldChainNextShot(input.AttackHeld, ownerQueued, ownerFinishing);
 
     private bool HasGameplayAuthority => !IsNetworkActive || IsServer;
     private bool IsInputSource => !IsNetworkActive || IsOwner;
@@ -105,6 +117,8 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
     }
 
     // ── IPlayerBasicAttack ───────────────────────────────────────────────
+
+    public bool IsOutOfResource => heat != null && heat.IsOverheated;
 
     public bool TryStart()
     {
@@ -161,6 +175,22 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
             EndRpc();
     }
 
+    // 스킬 예약(할 일 44) — 끊지 않고 뗀 것처럼 마무리한다. 서버도 눌림·창 예약을 지워 이번 발(첫 발이면 준비 뒤 첫 발)의
+    // ShotRecovery 뒤 기존 정상 종료(EndServer → EndRpc)로 끝난다 — 원격 피어의 마무리·애니도 평소 종료와 같다.
+    public void FinishWithoutChaining()
+    {
+        if (!active || !IsInputSource || ownerFinishing)
+            return;
+
+        ownerFinishing = true;
+        ownerQueued = false;
+        holdSent = false;
+        if (IsNetworkActive)
+            FinishRpc();
+        else
+            ServerFinish();
+    }
+
     public void CancelFinishingTailForMovement() { }
     public void EndCurrentAttack() { }
     public void HitCurrentAttack() { }
@@ -182,11 +212,11 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
     {
         // 발 잠금은 오너 시계만으로 돈다(2026-10-13, 서버 왕복·검증 없음): 발사 요청 뒤 ShotLockTail 이 지나면 풀고,
         // 다음 발을 이어 쏠 거면 발사 ShotLockLead 전에 그 순간 몸 방향으로 다시 잠근다. 그 사이는 커서 쪽으로 제한 속도 회전.
-        if (ownerPreLocked && !input.AttackHeld && !ownerQueued)
-            ownerPreLocked = false; // 미리 잠근 뒤 손을 뗐다 — 다음 발이 없으니 잠금도 푼다
+        if (ownerPreLocked && !OwnerChainsNextShot)
+            ownerPreLocked = false; // 미리 잠근 뒤 손을 뗐다(또는 스킬 예약) — 다음 발이 없으니 잠금도 푼다
         if (facing.IsShotLocked && firstShotSent && !ownerPreLocked && Time.time >= ownerLastShotTime + data.ShotLockTail)
             facing.EndShot();
-        if (firstShotSent && !ownerPreLocked && (input.AttackHeld || ownerQueued) && !heat.IsOverheated
+        if (firstShotSent && !ownerPreLocked && OwnerChainsNextShot && !heat.IsOverheated
             && Time.time >= ownerLastShotTime + data.FireInterval - data.ShotLockLead)
         {
             facing.BeginShot(movement.CurrentFacing);
@@ -207,9 +237,11 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
         }
 
         // 클릭 — 누른 프레임만 보낸다. 창 안인지는 서버가 자기 시각으로 판단한다(팔라딘 RequestQueueNextAttackRpc 와 같음).
-        // 창 밖이어도 서버는 "누르고 있음"으로 받아 홀드가 이어진다.
-        if (input.AttackPressed)
+        // 창 밖이어도 서버는 "누르고 있음"으로 받아 홀드가 이어진다. 스킬 예약 뒤 클릭은 보내지 않는다(마무리 중).
+        if (input.AttackPressed && !ownerFinishing)
         {
+            // 발사 중 클릭은 여기서 홀드/예약으로 쓴다 — 공격이 끝난 뒤 새 평타로 한 번 더 나가지 않게 선입력 버퍼에서 지운다(할 일 44).
+            input.ConsumeBufferedInput(PlayerBufferedInput.Attack);
             holdSent = true;
             nextHoldSignalTime = Time.time + data.FireInterval * HoldSignalIntervals;
             // 오너도 같은 창으로 자기 예약을 든다 — 서버 예약과 기준(각자의 직전 발사)이 같아 지터만큼만 어긋난다.
@@ -237,7 +269,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
 
         // 이어지는 발 — 누르고 있거나 창 안에서 예약했으면 발사 간격이 찰 때 요청한다.
         // 방향 = 발사 ShotLockLead 전에 잠근 몸 방향(덜 돌았으면 덜 돈 방향). 그 사이에 눌러 미리 못 잠갔으면 지금 몸 방향.
-        if ((input.AttackHeld || ownerQueued) && !heat.IsOverheated
+        if (OwnerChainsNextShot && !heat.IsOverheated
             && Time.time >= ownerLastShotTime + data.FireInterval)
         {
             ownerQueued = false;
@@ -319,6 +351,21 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
         if (rpcParams.Receive.SenderClientId != OwnerClientId)
             return;
         held = false;
+    }
+
+    [Rpc(SendTo.Server)]
+    private void FinishRpc(RpcParams rpcParams = default)
+    {
+        if (rpcParams.Receive.SenderClientId != OwnerClientId)
+            return;
+        ServerFinish();
+    }
+
+    // 스킬 예약 마무리 — 눌림·창 예약을 지운다. 이미 온 발 요청은 그대로 쏘고(첫 발 포함), 그 뒤 TickServer 가 ShotRecovery 로 끝낸다.
+    private void ServerFinish()
+    {
+        held = false;
+        hasQueuedShot = false;
     }
 
     [Rpc(SendTo.Server)]
@@ -499,6 +546,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
         hasQueuedShot = false;
         ownerQueued = false;
         ownerPreLocked = false;
+        ownerFinishing = false;
         startTime = Time.time;
         lastShotTime = -1f;
         ownerLastShotTime = -1f;
@@ -552,6 +600,7 @@ public class GunnerBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
         hasQueuedShot = false;
         ownerQueued = false;
         ownerPreLocked = false;
+        ownerFinishing = false;
         held = false;
         lastShotTime = -1f;
         ownerLastShotTime = -1f;
