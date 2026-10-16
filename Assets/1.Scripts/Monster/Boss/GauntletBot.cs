@@ -21,7 +21,7 @@ using UnityEngine;
 //    Punch01/02는 기존처럼 meleeAttack.Hit() 단타. Punch03(어퍼컷)은 데미지만 동일 경로로 내고,
 //    airborne CC는 은희의 상태이상 인터페이스 통합 전까지 훅(OnUppercutHit)만 남겨둔다.
 [DataTableSheet("MidBoss", Order = 0)]
-public class GauntletBot : MonsterBase
+public class GauntletBot : MonsterBase, IInterruptSlowMotionTarget
 {
     // 공격 종류. Smash 1종 + 펀치 3종 × L/R = 총 7종.
     enum GauntletAttackId
@@ -245,9 +245,19 @@ public class GauntletBot : MonsterBase
         }
 
         Edit.Log("[Gauntlet] 카운터 성공 — 스매시 취소, 그로기", this);
+        _interruptSuccessCount++;   // 🔴 슬로우 모션 성공 판별 — 이 TakeDamage 호출 안에서 올려야 플레이어가 전후 비교로 잡는다
         CombatStatsEvents.RaiseServerCounterSucceeded(this, DamageAttackerClientId); // 결과 화면 통계(판정 무관)
         CounterSucceeded();
     }
+
+    // ─── 간파 슬로우 모션(handoff-interrupt-slowmo · 팀장 10-16: 중간보스·23호에 건다) ───
+    int _interruptSuccessCount;   // 누적만 한다 — 값 자체가 아니라 타격 전후 비교용
+
+    /// <summary>[서버] 지금 인터럽트를 받으면 카운터가 성립하는가(슬로우 시작 예측).</summary>
+    bool IInterruptSlowMotionTarget.ServerIsInterruptible => IsServer && Counter != null && Counter.IsOpen;
+
+    /// <summary>[서버] 카운터 성공 누적 — 플레이어가 ReceiveAttack 전후로 비교한다.</summary>
+    int IInterruptSlowMotionTarget.ServerInterruptSuccessCount => _interruptSuccessCount;
 
     // 카운터 성공 — 스매시를 취소하고 즉시 그로기.
     // 🔴 이 컨트롤러에는 그로기·피격 클립도, 그로기 파라미터도 없다(PLAN §9.1). 그래서 그로기를
