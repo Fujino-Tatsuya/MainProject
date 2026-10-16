@@ -918,7 +918,7 @@ public class BossTeleportManager : NetworkBehaviour
         UpdateWalkerSilhouettes(elapsed);
 
         bool followCab = !_elevatorArrivedLocal && IsLocalElevatorParticipant() && _localTimeline.CameraFollowsCabAt(elapsed);
-        SetCameraFollow(followCab ? _rig.Cab : null);
+        SetCameraFollow(followCab ? _rig.CameraTarget : null);
     }
 
     /// <summary>걷기 시작한 슬롯의 플레이어 실루엣을 끈다 — 연출이 끝날 때까지(뒤이어 숨김). 늦게 합류해도 지난 슬롯을 한꺼번에 끈다.</summary>

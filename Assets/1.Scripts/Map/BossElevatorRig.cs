@@ -46,6 +46,7 @@ public sealed class BossElevatorRig : MonoBehaviour
     [SerializeField] BossElevatorTimingSettings _timing = BossElevatorTimingSettings.Default;
 
     BossElevatorTimeline _timeline;
+    Transform _cameraTarget;
     double _startTime;
     Func<double> _clock;
     Vector3 _idleLocalPosition;
@@ -66,8 +67,16 @@ public sealed class BossElevatorRig : MonoBehaviour
     public IReadOnlyList<Transform> FrontPoints => _frontPoints;
     public bool IsPlaying => _playing;
     public BossElevatorTimeline Timeline => _timeline;
-    /// <summary>움직이는 칸 — 문 앞 이동 암전부터 도착까지 참가자 카메라가 따라간다(하강·보행·상승 내내).</summary>
+    /// <summary>움직이는 칸(높이를 바꾸는 대상).</summary>
     public Transform Cab => _cab;
+    /// <summary>
+    /// 문 앞 이동 암전부터 도착까지 참가자 카메라가 화면 중앙에 두는 지점 — 칸 아래 <see cref="CameraTargetName"/> 오브젝트(칸과 함께 움직인다).
+    /// 없으면 <see cref="Cab"/>. 플레이어 추적 태그는 칸 프리팹에서 Untagged 로 덮어써 관전 목록·안개 기준에 섞이지 않는다.
+    /// </summary>
+    public Transform CameraTarget => _cameraTarget != null ? _cameraTarget : _cameraTarget = FindCameraTarget(_cab);
+
+    /// <summary>칸 아래 카메라 지점 오브젝트 이름(<c>CameraFollowTarget.prefab</c> 인스턴스).</summary>
+    public const string CameraTargetName = "CameraFollowTarget";
     /// <summary>착지 중앙(이 오브젝트). 카메라는 더 이상 이 자리를 보지 않는다(칸을 따라간다) — 참조용으로 남겨 둔다.</summary>
     public Transform FocusPoint => transform;
 
@@ -179,6 +188,17 @@ public sealed class BossElevatorRig : MonoBehaviour
         _hasAppliedDoor = false;
         if (_cab != null) _cab.localPosition = _idleLocalPosition;
         PlayDoor(IdleDoorOpen ? DoorOpenHash : DoorClosedHash, 1f);
+    }
+
+    /// <summary><paramref name="cab"/> 아래(깊이 무관)에서 <see cref="CameraTargetName"/> 을 찾는다. 없으면 <paramref name="cab"/>.</summary>
+    public static Transform FindCameraTarget(Transform cab)
+    {
+        if (cab == null) return null;
+        foreach (Transform t in cab.GetComponentsInChildren<Transform>(true))
+        {
+            if (t != cab && t.name == CameraTargetName) return t;
+        }
+        return cab;
     }
 
     void CaptureIdle()
