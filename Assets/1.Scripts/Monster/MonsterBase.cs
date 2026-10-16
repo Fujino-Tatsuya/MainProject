@@ -213,6 +213,9 @@ public class MonsterBase : Unit
 
         // 스폰 시점의 상태를 즉시 애니메이션에 반영(뒤늦게 접속한 클라 포함).
         PlayStateAnimation(_state.Value);
+
+        // 머리 위 체력바 런타임 부착(모든 피어, 표시 전용 — FSM 과 무관). Docs/tech/handoff-monster-healthbar.md
+        MonsterOverheadHealthBarRule.TryInstall(this);
     }
 
     public override void OnNetworkDespawn()
