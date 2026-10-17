@@ -8,6 +8,14 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-10-17 · 은희(Claude) · **어쌔신 비주얼 v18 반영 — Flat Kit 재질 + 키 ×1.25**, 브랜치 `feature/AssassinVisual`) — 계획 [PLAN-assassin.md](PLAN-assassin.md) §9 ✅ 승인(기본안) · ✅ V1 교체(SVN 미커밋)·V2·V3·V3b·V3c·V3d·V5(작업 트리 — 플레이어 EditMode 450/0 · 튜토리얼 376/0) · ⏳ V4 Play(은희) · ⏳ V6 SVN·핀·머지
+- 🔴 **수정 예정 — 동시 수정 금지**: `PLAN-assassin.md` · `2.Prefabs/Player/Assassin/Assassin_Armature.prefab` · 신규 `3.Materials/FlatKit/Player/Assassin/FK_Assassin_Body.mat` · `4.Animations/Player/Assassin/AssassinAnimatorController.controller`(Run_Loop 속도) · `1.Scripts/Player/Editor/AssassinHairAuthoring.cs`·`AssassinShellAuthoring.cs`·`AssassinHairPrefabTests.cs`·신규 `AssassinVisualPrefabTests.cs`·`PlayerEditModeTestRunner.cs` · `1.Scripts/Rendering/Editor/FlatKitPlayerVariants.cs` · `Docs/tech/art-svn.json`·`player-prefabs.md` · `Docs/design/character/character_assassin.md`
+- 🔴 **`Assets/50.Art` 456M(어쌔신 FBX·.meta·BaseColor 3파일)은 의도된 미커밋** — `svn revert` 금지(check-environment 의 WARN·revert 안내 따르지 말 것). SVN 커밋은 V4 Play 확인 뒤 머지 직전에 핀 갱신과 함께(§9).
+- ⏳ 남은 일: ① 은희 — 작업사본의 `Assassin_Metallic`·`MetallicSmoothness`·`Roughness`(.png·.meta 6개) 삭제(`svn add` 금지) → PLAN §9 V4 Play 체크리스트 → V6 SVN 커밋(경로 3개). ② Claude — V6 핀 갱신·git 커밋(경로 지정)·`--no-ff` 머지(Unity 닫고).
+- 10-17 에디터 메뉴 실행(MCP): `Tools/Player/Assassin/머리카락 본 연결`(재캡처, 은희 허락) · `Tools/Rendering/Flat Kit/플레이어 Variant 구성`(재실행 안전 확인 — 해시 19개 동일) · 플레이어·튜토리얼 EditMode 러너.
+- 머지 뒤 팀원은 **git 과 SVN 을 같이 받을 것**(새 리비전 = art-svn.json 핀). 한쪽만 받으면 키·단검·머리카락 값이 어긋난다.
+- `Docs/tech/player-prefabs.md` 를 잠근 「거너 레이저건 정렬」 세션(`fix/GunnerGunAlign`)은 이미 병합됐다(`1d2e4b22`) — 그 잠금은 끝난 것으로 본다.
+
 ## ▶▶ 작업 세션 (2026-10-16 · 경석(Claude) · 간파 슬로우·스피너·드론 재질, 브랜치 `feature/Boss23`) — ✅ 커밋·푸시 · SVN r454(핀 454)
 - 간파 슬로우 모션 = 23호·중간보스 3종에 연결(`8fc8c0a1`, 은희 handoff-interrupt-slowmo). 튜토리얼 연습 스피너는 D18 대로 안 걸림.
 - 스피너 회전 = 예고가 다 찬 뒤부터(준비 동작을 예고 시간에 맞춰 늘임 · `MonsterBase.AnimatorSpeedScale`).

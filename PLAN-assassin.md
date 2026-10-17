@@ -233,3 +233,42 @@ Q22 `AssassinState` NetworkVariable · Q23·Q26 클립 git + 애니 이벤트(�
   **임시 단검을 붙이지 말 것(은희).** 단검 작업은 뒤로 미룸 — 은희가 다시 시작하면 그동안 `Assassin_Armature`·`Player_Assassin` 재저장 메뉴 실행·위임 금지.
 - ✅ **임시 VFX 보강**(10-06, 단검보다 먼저 — 은희): 평타 Hit 이벤트마다(전 피어) 일반 4타 `FX_SingleSlash_O/X/O`·`FX_DoubleSlash_X`, 강타 `FX_DoubleSlash_O`, 변신 묶음 `FX_Mob_Slash`,
   시전(OnClientPlay) E `Flash_star` · R `Poof_electric` · 간파 `FX_Interrupt_Flash`. RPC 증가 없음. `CharacterCircle*` 은 looping 이라 변신 중 유지(6초 우려 해당 없음). EditMode 95/0. 민경 교체 대상.
+
+
+---
+
+## 9. 비주얼 통일 반영 — v18 최종 (2026-10-17 작성 · 은희 승인 「기본안」 · 영향 점검 뒤 2차 승인 「기본안」)
+
+아트 작업 공간: `D:\p_MT\char\암살자\AIWorkSpace\v18_CastUnity_20261014\` · 납품: `Delivery_final_v18g_T3H\`(FBX·BaseColor·편집용 blend·미리보기·읽어주세요)
+초안·근거: `00_handoff\PLAN_어쎄신_비주얼반영_초안.md` · 단검 스케일 검증: `120_dagger_scale_check\` · 상세 결정 [player-prefabs.md §14](Docs/tech/player-prefabs.md)
+브랜치: `feature/AssassinVisual`(development `1c734a03` 에서 분기)
+
+**Goal** — 인게임 어쌔신을 v18 최종 비주얼(형상 v18g + 텍스처 T3H)로 바꾸고, 가붕이·거너와 같은 Flat Kit 재질 + 키 ×1.25(1.252→약 1.565m)로 맞춘다.
+판정 박스·스킬 수치·클립·네트워크는 바뀌지 않는다.
+
+| 단계 | 내용 | 누가 / 조건 · 상태 |
+|---|---|---|
+| V1 아트 교체 | `50.Art/Char/assassin/Assassin.fbx`·`Textures/Assassin_BaseColor.png` 를 납품본으로 교체(**.meta 유지 = guid 유지**). `Assassin.fbx.meta` 첫 `globalScale: 1` → `1.25`. 콘솔 `Assassin_HeadNeck 굽기 완료 — 정점 7120` 확인. 계획에 없던 `Assassin_Metallic`·`MetallicSmoothness`·`Roughness`(.png·.meta 6개)는 쓰는 곳이 없다 → SVN 에 올리지 않고 작업사본에서 지운다 | **은희** · ✅ 교체·확인(10-17) · ⏳ 텍스처 3장 삭제 |
+| V2 Flat Kit 재질 | `3.Materials/FlatKit/Player/Assassin/FK_Assassin_Body.mat` = `FK_Paladin_Toon` Variant, `_BaseMap` = Assassin_BaseColor(af607ea0…). `Assassin_Armature.prefab` 재질 오버라이드 5개 `Assassin_Toon`(5fdfa8ad…) → `FK_Assassin_Body` — `Assassin_HeadNeck` 0·1(Head·Face) · `Assassin_SourceBody` 0 · **단검 L/R**. `FlatKitPlayerVariants`(메뉴 `플레이어 Variant 구성`)가 어쌔신도 만들고 슬롯을 바꾼다 — 10-17 MCP 로 1회 실행해 재실행 안전 확인(실행 전후 팔라딘·거너·어쌔신 재질·프리팹 19개 해시 동일). `AssassinShellAuthoring.MaterialPath` 도 FK 로, Face 전용 ToonLit 분기 제거(모든 슬롯 FK). `Assassin_Toon.mat` 은 남김(되돌리기용) | Claude · git · ✅ |
+| V3 단검 | 단검 **루트** `m_LocalScale` 1 → **1.25 만**(guid + propertyPath 로 6줄). 쥐는 위치 오프셋은 루트 아래 자식에 있어 자동 ×1.25 — **곱하지 않음**(곱하면 ×1.5625). 게임 값은 `Player_Assassin.prefab` 이 자식에 덮어쓴 오프셋이다. `AssassinShellAuthoring` 이 새로 붙이는 단검 = 임포트 배율(`AssassinHairAuthoring.ImportScale`) | Claude · git · ✅ |
+| V3b 머리카락 | 납품 v13 솔버의 길이 차원 값이 배율 1 리그 기준 → `AssassinHairAuthoring.Ensure` 가 임포트 배율(1.25)을 곱해 재캡처: 캡슐 반경 · `hairRadius` 0.018→0.0225 · 끝 마디 0.15→0.1875 m · `gravitySupport` 0.65→0.8125 · `maximumDynamicSpeed` 2→2.5 · `neighbourOffsetLimit` 0.09→0.1125 · `bindAllowanceReference` 재계산. 납품 원본 `AssassinHairMotion.cs` 무수정. `Tools/Player/Assassin/머리카락 본 연결` 1회 실행(은희 허락 10-17) | Claude · git · ✅ |
+| V3c 달리기 | `AssassinAnimatorController` `Run_Loop` 재생 속도 1 → **0.8** = 1 / 임포트 배율(×1.25 로 클립 자연 속도 4.98 → 6.23 m/s, 재생 0.8 로 실제 4.98 m/s ≈ 이동 5 m/s). Start/Stop 은 V4 에서 보고 정한다. `AssassinShellAuthoring.BuildAnimator` 가 같은 식으로 넣는다 | Claude · git · ✅ |
+| V3d 테스트 | `AssassinVisualPrefabTests`(슬롯 5개·부모·BaseMap · 단검 루트 = 임포트 배율 · `Run_Loop` = 1 / 배율 · Armature 루트·판정 박스 배율 1) · `AssassinHairPrefabTests.SolverLengthsFollowRigScale`(길이 값 · 리그 실측 배율)·`BindAllowancesMatchCapsuleRadii`(겹침 허용치 재계산 대조) → 플레이어 러너 등록. 에디터 실행: 플레이어 441 → **450 통과 / 0 실패**, 튜토리얼 376 / 0 | Claude · ✅ |
+| V4 검증 | Play: 로비 선택·스폰 · 키 비교 · 평타 1~4·Q·E·R·간파·백어택 판정 범위 불변 · 달리기/정지 발 미끄럼(Run_Loop 0.8 · Start/Stop 판단)·앞코 +15.4mm(×1 기준, 게임 ×1.25 에서 약 +19mm) 접지·대시 거리 · 머리 위 HUD·특성 게이지 높이 · Flat Kit 외곽선·근접 얼굴 · **머리카락: 팔꿈치가 머리카락 밖으로 나오는지, 뒤 가닥 끝의 몸 관통, 처짐·흔들림 느낌**(달리기·평타·Q·회피) · 양손 단검 쥔 모양(`Player_Assassin`) · 팔 흔들 때 허리·넥타이·코르셋 겹침 · **변신 R 소용돌이·Q 일섬 VFX 높이**(키우면 `AssassinSkillView` 배율 1→1.25, 민경 확인) · 그림자 속 밝기(가붕이·거너와 같은지) · `Animator.humanScale` ≈ 0.843 한 줄 확인 · MPPM 2~3인 | 은희 |
+| V5 문서 | `Docs/tech/player-prefabs.md` §7 5-1(Flat Kit 규칙)·§13·§14 · `character_assassin.md` 구현 결정 · CONTEXT 작업 세션 · 납품 `읽어주세요.txt` 단검 안내 정정 | Claude · ✅ |
+| V6 SVN·머지 | V4 확인 뒤 **한 세션에**: ① 안 쓰는 텍스처 3장(.png·.meta 6개) 삭제 확인 → SVN 커밋(경로 지정 3개 — `Assassin.fbx`·`Assassin.fbx.meta`(globalScale 1.25)·`Textures/Assassin_BaseColor.png`, `svn add` 없음, 메시지는 UTF-8 파일) → `svn update`(남의 바이너리 U 줄을 받으면 그 전에 Unity 닫기) → `svnversion` 이 숫자 하나인지 → ② `git fetch` — origin/development 가 움직였으면 feature/AssassinVisual 에 먼저 병합 → 같은 git 커밋에 `Docs/tech/art-svn.json` `pinnedRevision` 456 → N · `pinnedAt` → `check-environment.py` OK → ③ git 은 **경로 지정 스테이징만**(`-A`·`commit -a` 금지 — `MainProject-git.slnx`·`Assets/_Recovery`·`PLAN-lobby-stage.md`·`PLAN-title-camera.md` 는 우리 것이 아님) → ④ `development` 전환·머지는 **Unity 닫고**(또는 별도 git worktree 에서) `--no-ff`, 전체 EditMode 결과를 머지 메시지에 (`merge: feature/AssassinVisual → development — …`). 그 전까지 `50.Art` 456M 은 의도된 미커밋 — `svn revert` 금지 | 은희(SVN) · Claude(git) · ⏳ |
+
+사실·리스크:
+- 🔴 **Armature 루트 스케일 금지** — `InterruptAttack`·`DefaultAttack`(BoxCollider + 판정)과 VFX 기준점(z=1m)이 `Assassin_Armature` 루트의 자식이라 판정이 1.25배가 된다. 스케일은 FBX 임포터로만.
+- 충돌 캡슐은 `Player.prefab` 공용(높이 1.6 / 1.79) — ×1.25 후 키 1.565m 에 맞음, 변경 없음.
+- humanScale 0.674 → 0.843(임포트 결과 실측 0.843048 — 아바타 T-pose 도 ×1.25 로 다시 만들어짐). 어쌔신 이동은 코드 구동(applyRootMotion=false)이라 거리 영향 없음 — 발 IK·접지는 V4 확인.
+- 머리 메시 컨트롤 포인트 5473→5263(입 안쪽 숨은 면 삭제) — `FlatKitSmoothNormalBaker` 는 임포트마다 UV3 를 다시 굽는다(정점 수와 무관). 단검도 UV3 가 구워져 있다(Library 실측).
+- ToonLit `_FaceLiftHeight 1.42` 가 어쌔신 얼굴에 닿지 않던 문제는 Flat Kit 전환으로 해당 없음. Flat Kit 은 장면 조명을 받고 실시간 그림자를 받지 않는다(ToonLit 은 고정광 `_FIXEDLIGHT_ON`·그림자 0.35) — 가붕이·거너와 같아진다.
+- 🔸 단검 재질: 단검도 어쌔신 아틀라스를 쓰는데 단검 UV 가 아틀라스의 얼굴·눈 섬과 겹친다(기존부터) → 텍스처 교체 시 단검 겉모습도 바뀜. 단검 전용 텍스처 원본 미확보 — **별도 아트 작업**으로 등록.
+- 🔸 `Assassin.fbx.meta` 의 재질 remap 이 없는 guid 를 가리켜 FBX 원본 슬롯은 비어 있다(v08 부터) — 슬롯 오버라이드를 Revert 하면 분홍. 로비 쇼케이스가 `Assassin.fbx` 를 직접 쓰면 재질을 따로 넣을 것.
+- 🔸 SVN ↔ git 짝: V2~V3c 는 새 FBX·×1.25 를 전제한다. 한쪽만 받으면 키·단검·머리카락·달리기 속도가 어긋난다 → V6 를 한 세션에 끝낸다.
+- 후속(이번 범위 밖): `Assassin_BaseColor` 임포트 = 4096 무압축(VRAM 약 85 MiB, 기존부터) — 바꾼다면 Standalone 4096 + BC7(약 21 MiB, 근접 얼굴 유지) 권장 · 어쌔신 판정 거리를 커진 몸에 맞출지는 기획 확인 · 로비 초상화.
+- 되돌리기: SVN 이전 리비전 · `.meta` globalScale 1 → `머리카락 본 연결` 재실행(배율 1 로 재캡처) · 재질 오버라이드 `Assassin_Toon` · 단검 루트 1 · `Run_Loop` 1(셸 저작 재실행도 1 / 배율로 맞춘다) · `AssassinShellAuthoring.MaterialPath` · `FlatKitPlayerVariants` 의 어쌔신 블록(지우지 않으면 메뉴를 돌릴 때마다 슬롯이 FK 로 돌아간다) · `AssassinVisualPrefabTests`·머리카락 길이 테스트 등록 해제 · `art-svn.json` 핀.
+
+남은 아트(10/22 Codex 한도 해제 후): 윗속눈썹 바깥 끝 흐림 · 눈꼬리 바깥 그림자 +3~5mm² · 입선 좌우 농도 · 눈 안쪽 흰자 회색 음영·눈물샘 선 ·
+토캡 매끈한 아치 · 홍채 미세 꺾임(9.5° vs 8.5°) · 피핑 경계 선명도 · 원화 바깥 속눈썹 끝 · v18.2 눈·입 UV 밀도. 근접 얼굴 화면 도입 전 처리.
