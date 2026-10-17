@@ -8,6 +8,13 @@ This file defines the shared vocabulary for the project. Keep it concise. It is 
 
 Update this file when a term becomes important enough that future agents or teammates must use it consistently.
 
+## ▶▶ 작업 세션 (2026-10-17 · 은희(Claude) · **어쌔신 비주얼 v18 반영 — Flat Kit 재질 + 키 ×1.25**, 브랜치 `feature/AssassinVisual`) — 계획 [PLAN-assassin.md](PLAN-assassin.md) §9 ✅ 승인(기본안) · ✅ V1~V6 — 은희 Play 확인 · SVN **r457**(핀 457) · development 병합·푸시 · EditMode 전체 1793 / 0(건너뜀 20)
+- 🔸 **git 과 SVN 을 같이 받을 것** — SVN r457 = 어쌔신 `Assassin.fbx`(v18g)·`.meta`(임포트 Scale Factor 1.25)·`Textures/Assassin_BaseColor.png`(T3H). git 쪽 단검 배율·머리카락 길이 값·`Run_Loop` 0.8 은 이 아트를 전제한다. 한쪽만 받으면 키·단검·머리카락이 어긋난다.
+- ✅ 동시 수정 잠금 해제(10-17 병합·푸시). 고친 곳: `2.Prefabs/Player/Assassin/Assassin_Armature.prefab` · 신규 `3.Materials/FlatKit/Player/Assassin/FK_Assassin_Body.mat` · `4.Animations/Player/Assassin/AssassinAnimatorController.controller` · `1.Scripts/Player/Editor/AssassinHairAuthoring.cs`·`AssassinShellAuthoring.cs`·`AssassinHairPrefabTests.cs`·신규 `AssassinVisualPrefabTests.cs`·`PlayerEditModeTestRunner.cs` · `1.Scripts/Rendering/Editor/FlatKitPlayerVariants.cs` · `Docs/tech/art-svn.json`·`player-prefabs.md`(§7 5-1·§13·§14) · `Docs/design/character/character_assassin.md` · `PLAN-assassin.md` §9.
+- 10-17 에디터 메뉴 실행(MCP): `Tools/Player/Assassin/머리카락 본 연결`(재캡처, 은희 허락) · `Tools/Rendering/Flat Kit/플레이어 Variant 구성`(재실행 안전 확인 — 해시 19개 동일) · 플레이어·튜토리얼 EditMode 러너.
+- ⏸ 후속(범위 밖): 텍스처 남은 항목·v18.2 눈·입 UV 밀도(10/22 Codex 한도 해제 뒤 — PLAN §9 끝) · `Assassin_BaseColor` 4096 무압축(약 85 MiB → 4096 BC7 권장) · 판정 거리를 커진 몸에 맞출지 기획 확인 · 변신 R·Q 일섬 VFX 배율(민경) · 단검 전용 텍스처 · 로비 초상화 · `Run_Start`/`Run_Stop` 속도.
+- `Docs/tech/player-prefabs.md` 를 잠근 「거너 레이저건 정렬」 세션(`fix/GunnerGunAlign`)은 이미 병합됐다(`1d2e4b22`) — 그 잠금은 끝난 것으로 본다.
+
 ## ▶▶ 작업 세션 (2026-10-16 · 경석(Claude) · 간파 슬로우·스피너·드론 재질, 브랜치 `feature/Boss23`) — ✅ 커밋·푸시 · SVN r454(핀 454)
 - 간파 슬로우 모션 = 23호·중간보스 3종에 연결(`8fc8c0a1`, 은희 handoff-interrupt-slowmo). 튜토리얼 연습 스피너는 D18 대로 안 걸림.
 - 스피너 회전 = 예고가 다 찬 뒤부터(준비 동작을 예고 시간에 맞춰 늘임 · `MonsterBase.AnimatorSpeedScale`).
