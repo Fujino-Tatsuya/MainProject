@@ -438,12 +438,19 @@ public static class DataTableTemplate
         path.IndexOf("legacy/", StringComparison.OrdinalIgnoreCase) >= 0 ||
         path.IndexOf("/Lagacy/", StringComparison.OrdinalIgnoreCase) >= 0 ||
         path.StartsWith("Assets/50.Art/", StringComparison.OrdinalIgnoreCase) ||
-        ArchivedPrefabs.Contains(Path.GetFileNameWithoutExtension(path));
+        ArchivedPrefabs.Contains(Path.GetFileNameWithoutExtension(path)) ||
+        NestedOnlyPrefabs.Contains(Path.GetFileNameWithoutExtension(path));
 
     /// <summary>
     /// 보관만 하고 스폰하지 않는 프리팹(AGENTS.md — 2026-09-29 base+Variant 전환 뒤 참고용). 테이블 열로 나오면 헷갈린다(D7, 은희).
     /// </summary>
     private static readonly HashSet<string> ArchivedPrefabs = new HashSet<string>(StringComparer.Ordinal) { "Paladin_VFX" };
+
+    /// <summary>
+    /// 다른 프리팹 안에만 들어가 단독으로 스폰되지 않는 프리팹 — 바깥 프리팹 행이 실제 값이라 같은 열이 둘 생기지 않게 뺀다.
+    /// Elevator = ZoneS_typeBossEnter 안에만 중첩(BossElevatorRig 은 ZoneS_typeBossEnter 행만).
+    /// </summary>
+    private static readonly HashSet<string> NestedOnlyPrefabs = new HashSet<string>(StringComparer.Ordinal) { "Elevator" };
 
     /// <summary>파일을 쓰지 않고 시트별로 나갈 필드만 Console 에 — 기술 값이 섞였는지([DataTableIgnore] 빠짐) 점검용.</summary>
     [MenuItem("Tools/Data/Export Template 필드 목록 보기 (파일 안 씀)", priority = 31)]
