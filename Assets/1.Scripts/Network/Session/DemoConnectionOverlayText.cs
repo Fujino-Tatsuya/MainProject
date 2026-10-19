@@ -19,10 +19,12 @@ public static class DemoConnectUiStrings
     public static readonly UiString ConfigMissing = new UiString("UI.DemoConnect.ConfigMissing", "설정 파일 없음 — 호스트 모드", Where + " · demo-connection.json 없음 안내(3초)");
     public static readonly UiString BuildInfo = new UiString("UI.DemoConnect.BuildInfo", "v{version} · cfg {hash}", Where + " · 빌드 버전 + NetworkConfig 해시");
     public static readonly UiString RejoinWaiting = new UiString("UI.DemoConnect.RejoinWaiting", "판에 다시 합류하는 중 — 잠시 기다리세요", Where + " · 거절 사유 RejoinWaiting(판 명단 안 사람이 씬 전환·옛 연결 정리를 기다림)");
+    public static readonly UiString JoiningMatch = new UiString("UI.DemoConnect.JoiningMatch", "판에 합류하는 중…", Where + " · 판 도중 재합류 — 맵에 들어왔지만 내 캐릭터가 아직 스폰되지 않음(서버 스폰 보류 중)");
 
     public static readonly IReadOnlyList<UiString> All = new[]
     {
         WaitingForHost, StartingHost, Disconnected, Address, Connecting, RetryIn, ConfigMissing, BuildInfo, RejoinWaiting,
+        JoiningMatch,
     };
 }
 
@@ -72,6 +74,16 @@ public static class DemoConnectionOverlayText
     public static bool ShouldShowStatus(ReconnectState state)
     {
         return state != ReconnectState.Connected && state != ReconnectState.Hosting;
+    }
+
+    /// <summary>
+    /// 판 도중 재합류 — 접속됐고 활성 씬이 맵인데 내 플레이어가 없으면 "판에 합류하는 중…" 을 띄운다(C14 §3.6).
+    /// 이 맵에서 한 번이라도 내 플레이어가 있었으면 띄우지 않는다 — 판 끝 로비 전환 직전 디스폰 때 깜빡이지 않게.
+    /// 내 플레이어가 생기면(LocalPlayerChanged) 닫힌다.
+    /// </summary>
+    public static bool ShouldShowJoiningMatch(ReconnectState state, bool isMapActive, bool hasLocalPlayer, bool hadLocalPlayerInThisMap)
+    {
+        return state == ReconnectState.Connected && isMapActive && !hasLocalPlayer && !hadLocalPlayerInThisMap;
     }
 
     /// <summary>"설정 파일 없음 — 호스트 모드" 를 부팅 후 3초 동안 띄운다(Q5).</summary>

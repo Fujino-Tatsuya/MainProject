@@ -22,6 +22,8 @@ public sealed class DemoSessionDirector : MonoBehaviour
     [SerializeField] private bool runDemoFlow = true;
     [SerializeField] private string lobbySceneName = "3.LobbyScene";
     [SerializeField] private string waitSceneName = "6.DemoConnectScene";
+    [Tooltip("판 도중 재합류 오버레이(\"판에 합류하는 중…\")를 띄울 맵 씬 이름.")]
+    [SerializeField] private string mapSceneName = "4.MapScene";
 
     /// <summary>이번 실행에서 데모 흐름이 켜졌는가. 로비의 옛 연결 패널을 숨기는 판단에 쓴다.</summary>
     public static bool IsDemoFlowActive { get; private set; }
@@ -41,6 +43,8 @@ public sealed class DemoSessionDirector : MonoBehaviour
     bool _lobbyLoadPending;
     bool _callbacksRegistered;
     string _lastConfigHash;
+    // 지금 떠 있는 맵에서 내 플레이어가 한 번이라도 있었는가 — 맵이 새로 로드되면 false(재합류 오버레이 판단).
+    bool _hadLocalPlayerInMap;
 
     double Now => Time.realtimeSinceStartupAsDouble;
 
@@ -100,6 +104,7 @@ public sealed class DemoSessionDirector : MonoBehaviour
         // 첫 시도도 대기 씬에서 한다 — 부트스트랩 씬엔 카메라·배경이 없다. 호스트는 곧바로 NGO 로 로비를 Single 로드한다.
         _waitingForWaitScene = true;
         SceneManager.sceneLoaded += HandleSceneLoaded;
+        Player.LocalPlayerChanged += HandleLocalPlayerChanged;
         RegisterNetworkCallbacks();
         SceneManager.LoadScene(waitSceneName, LoadSceneMode.Single);
     }
@@ -107,6 +112,7 @@ public sealed class DemoSessionDirector : MonoBehaviour
     private void OnDestroy()
     {
         SceneManager.sceneLoaded -= HandleSceneLoaded;
+        Player.LocalPlayerChanged -= HandleLocalPlayerChanged;
         UnregisterNetworkCallbacks();
         if (_overlay != null)
             Destroy(_overlay.gameObject);
@@ -136,8 +142,23 @@ public sealed class DemoSessionDirector : MonoBehaviour
         RefreshOverlay();
     }
 
+    private void HandleLocalPlayerChanged(Player player)
+    {
+        // 재합류 스폰이 끝나 내 플레이어가 생기면 "판에 합류하는 중…" 을 닫는다(다음 RefreshOverlay).
+        if (player != null && IsMapActive())
+            _hadLocalPlayerInMap = true;
+    }
+
+    private bool IsMapActive()
+    {
+        return SceneManager.GetActiveScene().name == mapSceneName;
+    }
+
     private void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
     {
+        if (scene.name == mapSceneName)
+            _hadLocalPlayerInMap = false;
+
         if (!_waitingForWaitScene || scene.name != waitSceneName)
             return;
 
@@ -303,8 +324,17 @@ public sealed class DemoSessionDirector : MonoBehaviour
         if (_overlay == null)
             return;
 
+        var isMapActive = IsMapActive();
+        var hasLocalPlayer = Player.LocalPlayer != null;
+        if (isMapActive && hasLocalPlayer)
+            _hadLocalPlayerInMap = true; // 맵 활성 전에 스폰된 경우(정상 진입)도 잡는다
+
         var showStatus = DemoConnectionOverlayText.ShouldShowStatus(_loop.State);
-        _overlay.SetStatus(showStatus, showStatus ? DemoConnectionOverlayText.BuildStatus(BuildOverlayModel()) : string.Empty);
+        var showJoining = DemoConnectionOverlayText.ShouldShowJoiningMatch(_loop.State, isMapActive, hasLocalPlayer, _hadLocalPlayerInMap);
+        if (showJoining)
+            _overlay.SetStatus(true, DemoConnectUiStrings.JoiningMatch.Text);
+        else
+            _overlay.SetStatus(showStatus, showStatus ? DemoConnectionOverlayText.BuildStatus(BuildOverlayModel()) : string.Empty);
 
         var showNotice = DemoConnectionOverlayText.ShouldShowConfigMissing(_loadResult.IsFileMissing, Time.realtimeSinceStartup - _bootTime);
         _overlay.SetNotice(showNotice, showNotice ? DemoConnectUiStrings.ConfigMissing.Text : string.Empty);

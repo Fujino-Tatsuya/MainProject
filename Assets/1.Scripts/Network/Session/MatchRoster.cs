@@ -17,6 +17,36 @@ public sealed class MatchRoster
     /// <summary>서버 인스턴스. 클라에선 늘 비활성이다.</summary>
     public static MatchRoster Server { get; } = new MatchRoster();
 
+    /// <summary>
+    /// [서버] 판 도중 재합류 — 같은 playerId 가 새 clientId 로 다시 스폰된 직후(인자: playerId, oldClientId, newClientId).
+    /// 새 PlayerObject 가 이미 있다. clientId 로 키를 잡은 시스템(특성·튜토리얼·생명·통계)이 여기서 옛 키를 새 키로 옮긴다(R4c·R5c).
+    /// 발행은 <see cref="RaisePlayerRejoined"/> 만 한다.
+    /// </summary>
+    public static event Action<string, ulong, ulong> PlayerRejoined;
+
+    /// <summary>[서버] <see cref="PlayerRejoined"/> 발행. 구독자 하나가 던져도 나머지는 계속 받는다. 받은 구독자 수를 돌려준다.</summary>
+    public static int RaisePlayerRejoined(string playerId, ulong oldClientId, ulong newClientId)
+    {
+        var handlers = PlayerRejoined;
+        if (handlers == null)
+            return 0;
+
+        var delegates = handlers.GetInvocationList();
+        foreach (var handler in delegates)
+        {
+            try
+            {
+                ((Action<string, ulong, ulong>)handler)(playerId, oldClientId, newClientId);
+            }
+            catch (Exception exception)
+            {
+                UnityEngine.Debug.LogException(exception);
+            }
+        }
+
+        return delegates.Length;
+    }
+
     readonly HashSet<string> _playerIds = new HashSet<string>(StringComparer.Ordinal);
     // 그 판에서 playerId 가 마지막으로 쓴 clientId — 퇴장해도 남는다(재합류 때 옛 clientId 로 키를 옮기는 데 쓴다).
     readonly Dictionary<string, ulong> _lastClientByPlayerId = new Dictionary<string, ulong>(StringComparer.Ordinal);

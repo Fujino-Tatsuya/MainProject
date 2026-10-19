@@ -30,6 +30,9 @@ public sealed class PartyWipeWatcher : MonoBehaviour
     private readonly System.Collections.Generic.List<PartyMemberLife> _members =
         new System.Collections.Generic.List<PartyMemberLife>();
 
+    /// <summary>[서버] 전멸 유예 중(전멸 판정이 났고 리스폰·결과 판정을 기다린다) — 판 도중 재합류 스폰을 미룬다(C14). 읽기 전용.</summary>
+    public bool IsWipeGracePending => !_fired && _wipeElapsed > 0f;
+
     private void Awake()
     {
         if (mapSceneManager == null)
