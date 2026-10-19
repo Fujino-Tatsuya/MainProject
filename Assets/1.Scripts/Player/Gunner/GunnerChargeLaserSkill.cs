@@ -9,6 +9,8 @@ using UnityEngine;
 /// 지형에서 끊기는 굵은 직선 안의 적·오브젝트에 피해, 아군(시전자 제외)에 보호막(합산) — 전부 대상별 1회.
 /// 쿨타임은 발사 순간부터(수동 커밋). 발사 없이 끝나면(쓰러짐·사망·조작 불가·피격 취소) 쿨타임 없음.
 /// Q 재입력은 취소가 아니다(§3.3 — 실행 중 같은 슬롯 시전은 컨트롤러가 거절). 과열도는 건드리지 않는다.
+/// 발사 후 회복 종료 = 발사 때 GunnerBeamView 가 트는 Gunner_Q_Fire 클립(gunner_skill_Q_fire)의 End 이벤트(서버).
+/// 안 오면 maxActiveDuration 안전망(시전 시작부터).
 /// </summary>
 public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
 {
@@ -24,7 +26,6 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
     private int storedStage;
     private Vector3 aim;
     private bool fired;
-    private float endTime;
     private bool statusApplied;
     private float ownerChargeStartTime;
 
@@ -70,7 +71,6 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
         chargeStartTime = Time.time;
         aim = direction;
         fired = false;
-        endTime = 0f;
 
         // 시전 시작 순간의 단계를 저장 — 과열 중이면 3단계(§5.6)
         storedStage = heat != null ? heat.CaptureStage() : 0;
@@ -137,7 +137,12 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
 
         if (State == SkillState.Charging && Time.time >= chargeStartTime + data.MaxChargeTime + data.AutoFireHoldTime)
             Fire(aim);
-        else if (fired && Time.time >= endTime)
+    }
+
+    public override void OnAnimationEvent(SkillAnimationEventType eventType)
+    {
+        // 발사 전(집중 중)에는 Q_Fire 가 재생되지 않는다 — 혹시 와도 무시.
+        if (fired && eventType == SkillAnimationEventType.End)
             EndSelf(SkillEndReason.Completed);
     }
 
@@ -147,7 +152,6 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
         lineIndicator?.HideCharge();
         State = SkillState.Active;
         fired = true;
-        endTime = Time.time + data.FireRecovery;
 
         direction.y = 0f;
         direction = direction.sqrMagnitude > 0.001f ? direction.normalized : owner.transform.forward;
@@ -217,6 +221,8 @@ public class GunnerChargeLaserSkill : PlayerSkillBase, ISkillPreviewSource
 
     public override void OnEnd(SkillEndReason reason)
     {
+        if (fired)
+            GunnerSkillEventRules.WarnIfFallbackEnded(reason, "Q", "gunner_skill_Q_fire", SkillAnimationEventType.End, this);
         lineIndicator?.HideCharge();
         // 🔴 **권한 가드 밖이다.** 발사 없이 끝나는 경로(대시 취소·피격·사망)에서도
         //    전 피어가 충전 루프를 꺼야 한다. 안 그러면 그 피어에 총구 연출이 남는다.
