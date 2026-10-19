@@ -3,10 +3,13 @@ using UnityEngine;
 /// <summary>
 /// 거너 우클릭 — 근접 간파 (character_gunner.md §8, D10·D11, PLAN-gunner.md G6).
 ///
-/// 레이저포를 내질러 총구가 닿는 순간(HitDelay 또는 Hit 애니 이벤트, 1회) 앵커 범위에 피해 + <b>간파 공격 표시</b>를 싣는다.
+/// 레이저포를 내질러 총구가 닿는 순간(클립 Hit 이벤트, 1회) 앵커 범위에 피해 + <b>간파 공격 표시</b>를 싣는다.
 /// 간파 성공 조건(유효 구간·전방 120도)·취약 넉백·벽/증기 벤트는 <b>맞는 쪽(보스)</b>이 판단한다 — 가붕이 우클릭과 같은 계약.
 /// 그 순간부터 적중·간파 여부와 무관하게 후폭풍으로 공격 반대 방향으로 밀려난다 — 벽·오브젝트에만 막히고 유닛은 통과, 무적 없음.
 /// 쿨타임은 사용 시점(빗나가도 적용 — §8.6). 과열도와 무관.
+///
+/// 시점 = gunner_skill_RMB_interrupt 클립 이벤트(PLAN-anim-event-timing P3-2 ①): Hit = 판정(서버)·후폭풍 출발(각 피어 자기 애니메이터),
+/// End = 종료. 이벤트가 안 오면 컨트롤러 MaxActiveDuration 안전망 — 후폭풍도 없다. 시점 튜닝은 클립에서 이벤트를 옮긴다.
 /// </summary>
 public class GunnerInterruptSkill : PlayerInterruptSkillBase, ISkillPreviewSource
 {
@@ -14,9 +17,9 @@ public class GunnerInterruptSkill : PlayerInterruptSkillBase, ISkillPreviewSourc
     private GunnerBeamView view;
     // 시뮬레이션 피어(오너 + 서버 권위 시 서버)
     private Vector3 attackDirection;
-    private float recoilStartTime;
-    private float recoilRemaining;
-    private float recoilSpeed;
+    private GunnerRecoilModel recoil;
+
+    protected override bool TimingFromAnimationEvents => true;
 
     private GunnerInterruptData IData => Data as GunnerInterruptData;
 
@@ -29,33 +32,40 @@ public class GunnerInterruptSkill : PlayerInterruptSkillBase, ISkillPreviewSourc
 
     public override bool CanUse(Vector3 direction, Unit target) => IData != null && HitboxAnchor != null;
 
-    // 전 피어. 후폭풍은 판정 시각(시작 + HitDelay)에 각 시뮬레이션 피어가 스스로 시작한다(RPC 없이 같은 시각 규칙).
+    // 전 피어. 후폭풍은 실어만 두고, 각 피어 자기 애니메이터의 Hit 에서 출발한다(RPC 없음 — OnLocalAnimationEvent).
     public override void OnClientPlay(Vector3 direction)
     {
         GunnerInterruptData data = IData;
         direction.y = 0f;
         attackDirection = direction.sqrMagnitude > 0.001f ? direction.normalized : owner.transform.forward;
-        recoilStartTime = Time.time + (data != null ? data.HitDelay : 0f);
-        recoilRemaining = data != null ? data.RecoilDistance : 0f;
-        recoilSpeed = data != null ? data.RecoilDistance / data.RecoilDuration : 0f;
+        if (data != null)
+            recoil.Arm(data.RecoilDistance, data.RecoilDuration);
+        else
+            recoil.Clear();
+    }
+
+    // 전 피어 — 이 피어 애니메이터의 Hit = 총구가 닿는 순간. 이동은 시뮬레이션 피어만 OnFixedTick 에서 한다(판정은 서버 OnAnimationEvent).
+    public override void OnLocalAnimationEvent(SkillAnimationEventType eventType)
+    {
+        if (eventType == SkillAnimationEventType.Hit)
+            recoil.Release();
     }
 
     public override void OnFixedTick()
     {
-        if (recoilRemaining <= 0f || motor == null || !owner.IsSimulating || Time.time < recoilStartTime)
+        if (!recoil.IsMoving || motor == null || !owner.IsSimulating)
             return;
 
         motor.PassThroughUnitsOverride = true; // 유닛(적·아군) 통과(§8.5 — 벽·오브젝트에만 막힘)
-        float step = Mathf.Min(recoilSpeed * Time.fixedDeltaTime, recoilRemaining);
-        recoilRemaining -= step;
-        motor.AddGroundedDisplacement(-attackDirection * step);
+        motor.AddGroundedDisplacement(-attackDirection * recoil.Step(Time.fixedDeltaTime));
     }
 
     public override void OnEnd(SkillEndReason reason)
     {
-        recoilRemaining = 0f;
+        recoil.Clear();
         if (motor != null)
             motor.PassThroughUnitsOverride = false;
+        GunnerSkillEventRules.WarnIfFallbackEnded(reason, "우클릭", "gunner_skill_RMB_interrupt", SkillAnimationEventType.End, this);
         base.OnEnd(reason);
     }
 
