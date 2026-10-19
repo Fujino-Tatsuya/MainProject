@@ -11,6 +11,7 @@
 - `Assets/1.Scripts/UI/Combat/BossHealthHUD.cs` — `EnsureShieldFill`(hpFill 런타임 `Instantiate`) 삭제. 직렬화된 `shieldFill` 만 쓴다.
   `Awake` 에서 `shieldFill.color = shieldColor`(색 원본은 여전히 `shieldColor` 필드), 비어 있으면 경고 1회 후 실드 표시를 건너뛴다.
   실드 비율(`SelfDestructShield01`)·`fillAmount`·표시 조건·활성 토글은 그대로.
+- 후속: 사용자 지시로 실드 스프라이트를 흰색 단색 `Assets/2.Prefabs/UI/Textures/BossShieldGaugeSolid.png`(HP 바와 같은 916×28 실루엣, RGB 흰색·알파만 `gauge_boss_HP` 복사)로 교체 — HP 붉은 그라데이션에 곱해져 주황으로 보이던 것을 `shieldColor` 가 그대로 보이게, 로직 무변경.
 
 ## 상속
 - `CombatHUD.prefab` 은 `BossHealthHUD.prefab` 을 중첩 인스턴스로 쓰고, `shieldFill` 오버라이드·제거 오브젝트가 없어 그대로 상속된다(CombatHUD 무수정).
