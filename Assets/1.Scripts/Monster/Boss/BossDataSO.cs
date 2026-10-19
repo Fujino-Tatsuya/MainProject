@@ -330,6 +330,11 @@ public class BossDataSO : MonsterDataSO
     [Min(1f)] public float raidSelfDestructCounterInterval = 5f;
     [Min(0.3f)] public float raidSelfDestructCounterWindow = 1.5f;
 
+    // 🔴 10-19 에 지웠다가 되살렸다 — r455(10-16 병합 Export)에서 xlsx Boss 시트에 행이 생겨 있었다. 지우자
+    //    테이블 적용이 "필드 없음" 오류로 Play·빌드를 막았다(팀장 Play). 위 셋과 같이 다음 병합 Export 때 행부터 정리하고 지운다.
+    [Tooltip("⚠️ 미사용(10-19 실드로 대체). 예전: 자폭 중 보스 HP 피해 감소율.")]
+    [Range(0f, 1f)] public float raidSelfDestructDamageReduction = 0.9f;
+
     [Tooltip("저지 실패 = 대폭발(방 전체). 예고 시간과 피해. 즉사기(아래)면 피해 값은 무시된다.")]
     [Min(0.3f)] public float raidSelfDestructBlastWarn = 1.2f;
     [Min(0)] public int raidSelfDestructBlastDamage = 190;
