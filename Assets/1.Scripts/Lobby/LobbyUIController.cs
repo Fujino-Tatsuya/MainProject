@@ -2,10 +2,9 @@
 using UnityEngine;
 
 /// <summary>
-/// 옛 2D 로비 UI(슬롯 3칸·Ready·캐릭터 버튼)와 <see cref="LobbySession"/> 사이의 얇은 연결 — PLAN-48 C8.
-/// 상태는 갖지 않는다. 읽기 = LobbySession 의 복제 자리 목록, 쓰기 = LobbySession 의 RPC.
-/// 옛 named message 3종(Lobby.ReadyRequest·CharacterRequest·State)과 "호스트 항상 Ready" 예외는 퇴역했다.
-/// 이 UI 는 C9 걷는 로비에서 씬째 지운다.
+/// 로비 상단 플레이어 슬롯 3칸(이름·캐릭터·준비)과 <see cref="LobbySession"/> 사이의 얇은 뷰 — PLAN-48 C8·C9.
+/// 상태는 갖지 않는다. 읽기 = LobbySession 의 복제 자리 목록, 쓰기 = LobbySession 의 RPC(준비·캐릭터 요청 진입점 — 상호작용 C10·선택 패널 C12 가 부른다).
+/// 옛 Ready·캐릭터 버튼은 C9 걷는 로비에서 씬째 지웠다.
 /// </summary>
 public class LobbyUIController : MonoBehaviour
 {
@@ -96,6 +95,16 @@ public class LobbyUIController : MonoBehaviour
             : null;
     }
 
+    // 이름 = 머리 위 이름과 같은 "P{clientId+1}"(UiStrings.OverheadPlayerLabel), 뒤에 캐릭터 이름.
+    private string BuildSlotLabel(LobbyPlayerEntry entry)
+    {
+        var playerLabel = UiStrings.OverheadPlayerLabel.Format(
+            new System.Collections.Generic.Dictionary<string, string> { ["n"] = (entry.ClientId + 1).ToString() });
+        return characterRoster != null && characterRoster.TryGetAvailableCharacter(entry.CharacterId, out var character)
+            ? $"{playerLabel} · {character.DisplayName}"
+            : playerLabel;
+    }
+
     private void ApplyUi()
     {
         if (slots != null)
@@ -118,7 +127,7 @@ public class LobbyUIController : MonoBehaviour
                 }
 
                 var entry = session.GetEntry(i);
-                slot.SetState(true, entry.Ready, GetCharacterPortrait(entry.CharacterId));
+                slot.SetState(true, entry.Ready, GetCharacterPortrait(entry.CharacterId), BuildSlotLabel(entry));
             }
         }
 

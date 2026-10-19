@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -6,6 +7,8 @@ public class LobbyPlayerSlotView : MonoBehaviour
     [SerializeField] private Image connectedImage;
     [SerializeField] private Image readyImage;
     [SerializeField] private Image portraitImage;
+    [Tooltip("이름·캐릭터 표기(예: P1 · 팔라딘). 비우면 표시하지 않는다.")]
+    [SerializeField] private TMP_Text labelText;
     [SerializeField] private Sprite connectedSprite;
     [SerializeField] private Sprite disconnectedSprite;
     [SerializeField] private Sprite readySprite;
@@ -15,11 +18,22 @@ public class LobbyPlayerSlotView : MonoBehaviour
     [SerializeField] private Color readyColor = new Color(0.25f, 0.65f, 1f, 1f);
     [SerializeField] private Color notReadyColor = new Color(0.85f, 0.25f, 0.25f, 1f);
 
-    public void SetState(bool connected, bool ready, Sprite portrait)
+    public void SetState(bool connected, bool ready, Sprite portrait, string label = null)
     {
         SetConnected(connected);
         SetReady(connected && ready);
         SetPortrait(connected, connected ? portrait : null);
+        SetLabel(connected ? label : null);
+    }
+
+    private void SetLabel(string label)
+    {
+        if (labelText == null)
+        {
+            return;
+        }
+
+        labelText.text = label ?? string.Empty;
     }
 
     private void SetConnected(bool connected)
