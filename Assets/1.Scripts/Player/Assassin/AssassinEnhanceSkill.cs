@@ -20,7 +20,10 @@ public sealed class AssassinEnhanceSkill : PlayerInstantSkill
     // 전 피어 — Buff 재생 중이면 상체 레이어 가중치를 1 로, 아니면 0 으로 옮긴다.
     private bool upperBodyActive;
 
+    private static readonly SkillAnimationEventType[] RequiredEvents = { SkillAnimationEventType.End };
+
     public override PlayerSkillSlot Slot => PlayerSkillSlot.Sub;
+    public override System.Collections.Generic.IReadOnlyList<SkillAnimationEventType> RequiredAnimationEvents => RequiredEvents;
 
     // Buff 중 걸으며 사용(기획 "이동·대시는 기존 공통 처리" = 가붕이 E 와 같다). 감속 없음 — 판정 없는 0.5초 준비 동작이다.
     // Buff 는 상체 레이어에서 재생하고 하체는 0층의 Idle/Run 을 그대로 따른다.

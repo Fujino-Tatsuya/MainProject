@@ -394,6 +394,7 @@ public class PlayerSkillTargeting : MonoBehaviour
         Camera cam = aimIndicator != null ? aimIndicator.TargetCamera : null;
         if (cam == null || Mouse.current == null)
         {
+            SetTargetMarker(null, 0f);
             SetCursorState(SkillCursorState.Targeting);
             return;
         }
@@ -402,6 +403,7 @@ public class PlayerSkillTargeting : MonoBehaviour
         if (!Physics.Raycast(ray, out RaycastHit hit, RaycastMaxDistance,
                 currentData.TargetableLayers, QueryTriggerInteraction.Collide))
         {
+            SetTargetMarker(null, 0f);
             SetCursorState(SkillCursorState.Targeting);
             return;
         }
@@ -409,6 +411,7 @@ public class PlayerSkillTargeting : MonoBehaviour
         Unit unit = ResolveUnit(hit.collider);
         if (unit == null || unit == owner || unit.CurrentHealth <= 0)
         {
+            SetTargetMarker(null, 0f);
             SetCursorState(SkillCursorState.InvalidTarget);
             return;
         }
@@ -416,6 +419,8 @@ public class PlayerSkillTargeting : MonoBehaviour
         // 사거리 무관하게 포착 — 사거리 밖이면 확정 시 자동 이동으로 접근한다
         hoveredTarget = unit;
         hoveredInRange = IsWithinRange(unit.transform.position, currentData.CastRange);
+        // 대상 주변 광역 원(거너 R 레이저 반경). 반경 0 단일 피해 스킬은 SetTargetMarker 가 숨긴다.
+        SetTargetMarker(unit, GetGroundMarkerRadius(currentData));
         SetHighlightedTarget(unit); // 아웃라인은 보류 — 현재 훅만 (no-op)
         SetCursorState(hoveredInRange ? SkillCursorState.ValidTarget : SkillCursorState.OutOfRange);
     }
@@ -735,6 +740,12 @@ public class PlayerSkillTargeting : MonoBehaviour
             return 0f;
 
         return data.AoeRadius > 0f ? data.AoeRadius : data.GroundMarkerRadius;
+    }
+
+    private void SetTargetMarker(Unit target, float radius)
+    {
+        if (rangeIndicator != null)
+            rangeIndicator.SetTargetMarker(target, radius);
     }
 
     private void SetCursorState(SkillCursorState state)

@@ -274,6 +274,12 @@ public class MonsterBase : Unit
         if (data.startsWithSuperArmor && status != null)
             status.ApplyStatus(StatusEffectType.SuperArmor, 0f);
 
+        // 선딜이 공격 안전망 시간(attackDuration) 이상이면 히트 전에 공격이 강제 종료된다 — 조용한 피해 0(PLAN-attack-windup §5).
+        // 예비동작 상태가 있는 몹만 선딜을 쓰므로 그 경우에만 알린다.
+        if (data.attackWindup >= data.attackDuration && animator != null && animator.HasState(0, AnticipationStateHash))
+            Debug.LogWarning($"{name}: attackWindup({data.attackWindup}s) ≥ attackDuration({data.attackDuration}s) — " +
+                             "예비동작이 끝나기 전에 공격이 끝나 피해가 안 나갈 수 있다. attackDuration 을 늘릴 것.", this);
+
         _initialized = true;
         SetState(MonsterState.Idle);
     }
@@ -951,7 +957,10 @@ public class MonsterBase : Unit
     /// </summary>
     public Transform CurrentTarget => _target;
 
-    /// <summary>선딜 길이(초). 조준 예고선처럼 <b>시각 전용</b> 요소가 표시 구간을 잡을 때 읽는다.</summary>
+    /// <summary>
+    /// 선딜 길이(초, 데이터 값 그대로 — 공격 속도 배율 전). 예비동작 상태가 있는 몹은 이 길이로 예비동작을 재생한다
+    /// (<see cref="AnticipationNaturalLength"/> · PLAN-attack-windup). 조준 예고선처럼 <b>시각 전용</b> 요소도 읽을 수 있다.
+    /// </summary>
     public float AttackWindupSeconds => data != null ? data.attackWindup : 0f;
 
     /// <summary>사거리(m). 예고선 길이 산출용 — 값이 없으면 0 이다.</summary>
@@ -2520,10 +2529,44 @@ public class MonsterBase : Unit
             _locomotionHash = Animator.StringToHash(data.locomotionState ?? "");
         }
 
-        bool playingLocomotion = PlayingStateHash(0) == _locomotionHash && !UpperLayerActing();
+        int playing = PlayingStateHash(0);
+        bool playingLocomotion = playing == _locomotionHash && !UpperLayerActing();
+        bool playingAnticipation = playing == AnticipationStateHash;
 
         return MonsterAnimSpeedPolicy.Resolve(
-            playingLocomotion, _animSpeed.Value, State == MonsterState.Attack, AttackAnimSpeed, LocomotionData);
+            playingLocomotion, _animSpeed.Value, State == MonsterState.Attack, AttackAnimSpeed, LocomotionData,
+            playingAnticipation, playingAnticipation ? AnticipationNaturalLength() : 0f, data.attackWindup);
+    }
+
+    // ─── 예비동작 = 공격 선딜 (PLAN-attack-windup) ─────────────────────────
+    // `AttackAnticipation` 상태가 있는 컨트롤러(Chomp·Humanoid)만 해당한다. 상태명은 두 컨트롤러 공통이라 상수로 둔다.
+    // 🔴 선딜을 타이머로 되살리지 않는다 — 히트는 애니 이벤트(OnAttackHit) 전용이라 타이머를 붙이면 이중 히트다.
+    //    대신 예비동작 재생 속도를 바꿔 windup 초에 끝나게 한다(화면과 판정이 같이 움직인다).
+    static readonly int AnticipationStateHash = Animator.StringToHash("AttackAnticipation");
+
+    RuntimeAnimatorController _anticipationLengthOf;
+    float _anticipationLength;
+
+    /// <summary>
+    /// 예비동작 상태의 원래 길이(초) = 클립 길이 ÷ 상태 속도. animator.speed 와 무관한 값이라 컨트롤러당 한 번만 잰다
+    /// (Chomp 0.55 · Humanoid 0.73). 못 재면 0 → 원래 속도로 재생.
+    /// </summary>
+    float AnticipationNaturalLength()
+    {
+        RuntimeAnimatorController controller = animator.runtimeAnimatorController;
+        if (ReferenceEquals(_anticipationLengthOf, controller) && _anticipationLength > 0f)
+            return _anticipationLength;
+
+        bool next = animator.IsInTransition(0);
+        AnimatorStateInfo info = next ? animator.GetNextAnimatorStateInfo(0) : animator.GetCurrentAnimatorStateInfo(0);
+        AnimatorClipInfo[] clips = next ? animator.GetNextAnimatorClipInfo(0) : animator.GetCurrentAnimatorClipInfo(0);
+        float stateSpeed = Mathf.Abs(info.speed * info.speedMultiplier);
+        if (clips.Length == 0 || clips[0].clip == null || stateSpeed <= 0f)
+            return 0f;
+
+        _anticipationLengthOf = controller;
+        _anticipationLength = clips[0].clip.length / stateSpeed;
+        return _anticipationLength;
     }
 
     // 블렌드 값과 재생 속도가 **같은** 측정값을 보게 한 곳에서 만든다(data != null 전제).

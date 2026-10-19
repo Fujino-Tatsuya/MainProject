@@ -7,6 +7,8 @@ using UnityEngine;
 /// 그 정반대로 짧게 이동 — 이동 입력·이후 마우스는 무시. 적·아군·벽·오브젝트를 통과하지 못하고 막히면 그 앞에서 멈춘다
 /// (공용 대시는 아군 통과지만 E 는 모터의 일시 아군 차단을 켠다). 피해·상태이상·무적 없음.
 /// 동작 중에는 다른 행동 불가(Skill 상태), 끝나면 기본 공격 포함 모두 가능.
+/// 종료 = 클립 gunner_skill_E_cool_backstep 의 End 이벤트(서버). 안 오면 maxActiveDuration 안전망.
+/// 이동 거리·속도는 그대로 distance / moveDuration 이다 — End 를 이동보다 앞에 두면 이동이 그 자리에서 끊긴다.
 /// </summary>
 public class GunnerCoolBackstepSkill : PlayerSkillBase, ISkillPreviewSource
 {
@@ -20,9 +22,6 @@ public class GunnerCoolBackstepSkill : PlayerSkillBase, ISkillPreviewSource
     private Vector3 moveDirection;
     private float moveSpeed;
     private float remaining;
-
-    // 서버
-    private float endTime;
 
     public override PlayerSkillSlot Slot => PlayerSkillSlot.Sub;
     public override bool CanMoveWhileActive => false;
@@ -42,7 +41,6 @@ public class GunnerCoolBackstepSkill : PlayerSkillBase, ISkillPreviewSource
     public override void OnServerStart(Vector3 direction, Unit target)
     {
         State = SkillState.Active;
-        endTime = Time.time + EData.MoveDuration;
 
         // 막혀서 거리가 짧아져도 냉각은 정상 적용(§7.3)
         heat?.ServerResetToZero();
@@ -75,14 +73,15 @@ public class GunnerCoolBackstepSkill : PlayerSkillBase, ISkillPreviewSource
         motor.AddGroundedDisplacement(moveDirection * step); // 막히면 모터 스윕이 그 앞에서 멈춘다
     }
 
-    public override void OnTick()
+    public override void OnAnimationEvent(SkillAnimationEventType eventType)
     {
-        if (State == SkillState.Active && Time.time >= endTime)
+        if (State == SkillState.Active && eventType == SkillAnimationEventType.End)
             EndSelf(SkillEndReason.Completed);
     }
 
     public override void OnEnd(SkillEndReason reason)
     {
+        GunnerSkillEventRules.WarnIfFallbackEnded(reason, "E", "gunner_skill_E_cool_backstep", SkillAnimationEventType.End, this);
         remaining = 0f;
         view?.EndBackstep();   // 🔴 전 피어. 여기서 빠뜨리면 클라에 냉기가 남는다
         if (motor != null)

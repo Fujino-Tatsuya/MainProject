@@ -79,6 +79,7 @@ public class PlayerShieldVfx : BaseNetworkBehaviour
     private readonly List<GameObject> _instances = new List<GameObject>();
 
     private Unit _unit;
+    private Animator _animator;
     private Barrier _shown;
     private bool _subscribed;
 
@@ -312,4 +313,38 @@ public class PlayerShieldVfx : BaseNetworkBehaviour
     // 원샷이라 Unreliable 이다. 한 발 유실되면 충격파 한 번이 안 뜰 뿐 상태가 어긋나지 않는다.
     [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
     private void InterruptWaveRpc() => interruptWave?.PlayOnce();
+
+    /// <summary>
+    /// [서버] 수호자의 의지(E) 방어 성공 — 반격 자세 상태로 <b>전 피어(오너 포함)</b>에서 CrossFade 한다.
+    ///
+    /// <b>왜 서버만 하면 안 되나.</b> 반격 판정·종료는 반격 클립의 Hit·End 이벤트로 정해지는데,
+    /// 스킬 이벤트는 서버 애니메이터에서만 처리된다. 플레이어에는 오너 권한 NetworkAnimator 가 있어
+    /// 서버만 바꾸면 오너 동기가 상태를 방어 자세로 되돌린다 — 그러면 Hit·End 가 안 온다.
+    /// 그래서 시작 상태와 같은 길을 탄다(<c>PlayerSkillController</c>: 서버 PlaySkillPresentation →
+    /// PlaySkillClientRpc 의 비서버 피어 CrossFadeInFixedTime). 스킬 부모는 MonoBehaviour 라 RPC 를 여기 둔다.
+    /// </summary>
+    public void ServerPlayGuardCounterPose(int stateHash, float fadeSeconds)
+    {
+        if (IsNetworkActive && !IsServer) return;
+
+        // 서버(오프라인 포함)는 바로 바꾼다 — 판정 이벤트가 이 애니메이터에서 난다.
+        PlayGuardCounterPoseLocal(stateHash, fadeSeconds);
+
+        if (IsNetworkActive)
+            GuardCounterPoseRpc(stateHash, fadeSeconds);
+    }
+
+    // 상태 전환이라 Reliable 이다 — 유실되면 그 피어 화면이 방어 자세에 남는다(오너면 동기로 서버까지 되돌린다).
+    [Rpc(SendTo.NotServer, Delivery = RpcDelivery.Reliable)]
+    private void GuardCounterPoseRpc(int stateHash, float fadeSeconds) => PlayGuardCounterPoseLocal(stateHash, fadeSeconds);
+
+    private void PlayGuardCounterPoseLocal(int stateHash, float fadeSeconds)
+    {
+        // Player·PlayerSkillController 와 같은 해석(미지정이면 자식의 첫 Animator).
+        if (_animator == null)
+            _animator = GetComponentInChildren<Animator>();
+
+        if (_animator != null)
+            _animator.CrossFadeInFixedTime(stateHash, fadeSeconds);
+    }
 }

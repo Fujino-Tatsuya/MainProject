@@ -26,8 +26,7 @@ public static class BossDataWiring
 
         var sb = new StringBuilder($"[BossData] {data.name} — Unity 가 들고 있는 값\n");
         sb.AppendLine($"  archetype={data.archetype} · maxHp={data.maxHp} · defense={data.defense} · attackDamage={data.attackDamage}");
-        sb.AppendLine($"  {Mark(data.bombPrefab != null)} bombPrefab        = {Name(data.bombPrefab)}");
-        sb.AppendLine($"  {Mark(data.jumpTelegraphPrefab != null)} jumpTelegraphPrefab = {Name(data.jumpTelegraphPrefab)}");
+        // bombPrefab · jumpTelegraphPrefab 줄은 10-19 칸 삭제와 함께 뺐다(둘 다 런타임 미사용이었다).
         sb.AppendLine($"  {Mark(data.chargeZonePrefab != null)} chargeZonePrefab  = {Name(data.chargeZonePrefab)}");
 
         sb.AppendLine($"  attacks {data.attacks?.Length ?? 0}개:");

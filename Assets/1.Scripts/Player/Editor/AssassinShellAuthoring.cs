@@ -96,6 +96,14 @@ public static class AssassinShellAuthoring
 
     // 평타 1~4타 End 정규화 시점 — 사용자가 클립에 직접 둔 값(10-16, 1.25초 클립의 0.4초·0.333초). 클립이 비어 있을 때만 쓴다.
     private static readonly float[] WaveEndTimes = { 0.32f, 0.2667f, 0.2667f, 0.2667f };
+    // 예약 창 기본 배치(정규화) — 클립이 비어 있을 때만 쓴다. 닫힘은 위 End 앞.
+    private const float WaveWindowOpenTime = 0.05f;
+    private static readonly float[] WaveWindowCloseTimes = { 0.30f, 0.25f, 0.25f, 0.25f };
+
+    // 평타 상태 재생 속도 — 상태를 처음 만들 때만 쓴다. 이후 튜닝은 Animator 상태 speed 한 곳(재실행해도 덮어쓰지 않는다).
+    private static readonly float[] WaveAttackSpeeds = { 1.2f, 1.2f, 1.2f, 1.2f };
+    private const float EnhancedAttackSpeed = 2f;
+    private const float TransformedAttackSpeed = 1.25f;
 
     private static readonly string[] AllClipNames =
     {
@@ -219,41 +227,56 @@ public static class AssassinShellAuthoring
             configured++;
         }
 
-        // 일반 평타 1~4타: 이벤트는 사용자가 클립에서 직접 배치한다(10-16) — 이미 있으면 덮어쓰지 않는다.
-        // 비어 있을 때만 그 배치(Hit 0, End 1타 0.32 · 2~4타 0.267)로 채운다. 예약 창(AssassinBasicAttackData)이 이 End 앞에 맞춰져 있다.
+        // 평타 이벤트(판정·예약 창·종료)는 사용자가 클립에서 직접 옮겨 튜닝한다(10-16, PLAN-anim-event-timing P2-1) — 이미 있으면 덮어쓰지 않는다.
+        // 비어 있을 때만 기본 배치로 채운다: 1~4타 Hit 0 · 창 0.05~ · End 1타 0.32 · 2~4타 0.267(창은 End 앞에서 닫힘).
         for (int i = 0; i < WaveClips.Length; i++)
             StampEventsIfEmpty(WaveClips[i], DefaultAttackEvent(0f, DefaultAttackAnimationEventType.Hit),
+                DefaultAttackEvent(WaveWindowOpenTime, DefaultAttackAnimationEventType.ComboWindowOpen),
+                DefaultAttackEvent(WaveWindowCloseTimes[i], DefaultAttackAnimationEventType.ComboWindowClose),
                 DefaultAttackEvent(WaveEndTimes[i], DefaultAttackAnimationEventType.End));
 
-        // A7 연결 자리까지 같은 메뉴가 준비한다. 실제 타격 프레임은 Play에서 튜닝한다.
-        ReplaceEvents("Combo_Attack_02_01",
+        // 강타·변신 묶음 — 창은 (마지막) 판정과 함께 열려 End 앞에서 닫힌다.
+        StampEventsIfEmpty("Combo_Attack_02_01",
             DefaultAttackEvent(0.40f, DefaultAttackAnimationEventType.Hit),
+            DefaultAttackEvent(0.40f, DefaultAttackAnimationEventType.ComboWindowOpen),
+            DefaultAttackEvent(0.95f, DefaultAttackAnimationEventType.ComboWindowClose),
             DefaultAttackEvent(AttackEndTime, DefaultAttackAnimationEventType.End));
-        // 변신 베기 루프 켜기·끄기 — EffectAnimEvents(민경 배치 0.05초·0.65초 / 클립 0.667초). 이 메뉴를 다시 돌려도 남게 같이 찍는다.
-        ReplaceEvents("Speed_Attack_Loop",
+        // 변신 베기 루프 켜기·끄기 — EffectAnimEvents(정규화 0.075·0.975 = 클립 0.667초 기준 0.05초·0.65초).
+        // 🔴 StampEventsIfEmpty 라 **클립에 이벤트가 하나도 없을 때만** 찍힌다. 이미 박혀 있는 것을 덮지 않는다
+        //    (민경이 옮긴 Hit 시각을 지키려는 쪽이 우선 — 2026-10-19 머지 결정). effect 이벤트만 지워진 경우는
+        //    이 메뉴로 복구되지 않으므로 직접 넣을 것.
+        StampEventsIfEmpty("Speed_Attack_Loop",
             EffectEvent(0.075f, nameof(EffectAnimEventRelay.StartEffect), TransformedSlashEffectId),
             EffectEvent(0.975f, nameof(EffectAnimEventRelay.StopEffect), TransformedSlashEffectId),
             DefaultAttackEvent(0.15f, DefaultAttackAnimationEventType.Hit),
             DefaultAttackEvent(0.35f, DefaultAttackAnimationEventType.Hit),
             DefaultAttackEvent(0.55f, DefaultAttackAnimationEventType.Hit),
             DefaultAttackEvent(0.75f, DefaultAttackAnimationEventType.Hit),
+            DefaultAttackEvent(0.75f, DefaultAttackAnimationEventType.ComboWindowOpen),
+            DefaultAttackEvent(0.95f, DefaultAttackAnimationEventType.ComboWindowClose),
             DefaultAttackEvent(AttackEndTime, DefaultAttackAnimationEventType.End));
 
-        // Q 돌진은 돌진 종료(OnTick)가, 간파는 skillDuration 타이머가 먼저 끝낸다 — 클립보다 훨씬 짧아 End 는 안전망이다(47-1 예외).
-        ReplaceEvents("Combo_Attack_02_04", SkillEvent(0.40f, SkillAnimationEventType.Hit), SkillEvent(0.85f, SkillAnimationEventType.End));
-        ReplaceEvents("Combo_Attack_03_04", SkillEvent(0.40f, SkillAnimationEventType.Hit), SkillEvent(0.85f, SkillAnimationEventType.End));
+        // Q 돌진(P2-3): Custom0 = 준비 끝(출발), End = 종료 — 클립보다 훨씬 짧아 End 를 앞에 둔다(47-1 예외). Hit 은 쓰지 않는다(경로 스윕).
+        // 비어 있을 때만 실제 시간 준비 0.1s·종료 ≈0.283s(준비 + 5m/60m/s + 0.1) 자리로 채운다 — 일반 1배속 1.283s, 변신 1.5배속 1.917s.
+        StampEventsIfEmpty("Combo_Attack_02_04", SkillEvent(0.0779f, SkillAnimationEventType.Custom0),
+            SkillEvent(0.40f, SkillAnimationEventType.Hit), SkillEvent(0.2208f, SkillAnimationEventType.End));
+        StampEventsIfEmpty("Combo_Attack_03_04", SkillEvent(0.0783f, SkillAnimationEventType.Custom0),
+            SkillEvent(0.40f, SkillAnimationEventType.Hit), SkillEvent(0.2217f, SkillAnimationEventType.End));
         ReplaceEvents("Buff", SkillEvent(ClipEndTime, SkillAnimationEventType.End));
         ReplaceEvents("Skill_02_Move_000pct",
             SkillEvent(0.18f, SkillAnimationEventType.Hit), SkillEvent(0.32f, SkillAnimationEventType.Hit),
             SkillEvent(0.46f, SkillAnimationEventType.Hit), SkillEvent(0.60f, SkillAnimationEventType.Hit),
             SkillEvent(0.74f, SkillAnimationEventType.Hit), SkillEvent(ClipEndTime, SkillAnimationEventType.End));
-        // 간파 기 모으기 켜기 → 13프레임 끄기 + 튀기기 → 16프레임 올려치기 — EffectAnimEvents(민경 배치 10-19 / 클립 1.5초 = 90프레임).
-        ReplaceEvents("Attack_Up_01",
+        // 간파 = Hit·End 이벤트가 판정·종료(P2-2). 기 모으기 켜기 → 13프레임 끄기 + 튀기기 → 16프레임 올려치기는
+        // EffectAnimEvents(민경 배치 10-19 / 클립 1.5초 = 90프레임).
+        // 🔴 StampEventsIfEmpty 라 **클립에 이벤트가 하나도 없을 때만** 찍힌다 — 은희가 옮긴 Hit·End 를 덮지 않는다
+        //    (2026-10-19 머지 결정). 효과 이벤트만 지워진 경우는 이 메뉴로 복구되지 않으므로 직접 넣을 것.
+        StampEventsIfEmpty("Attack_Up_01",
             EffectEvent(0f, nameof(EffectAnimEventRelay.StartEffect), InsightWindupEffectId),
             EffectEvent(13f / 90f, nameof(EffectAnimEventRelay.StopEffect), InsightWindupEffectId),
             EffectEvent(13f / 90f, nameof(EffectAnimEventRelay.PlayEffect), InsightPopEffectId),
             EffectEvent(16f / 90f, nameof(EffectAnimEventRelay.PlayEffect), InsightSlashEffectId),
-            SkillEvent(0.40f, SkillAnimationEventType.Hit), SkillEvent(0.85f, SkillAnimationEventType.End));
+            SkillEvent(0.10f, SkillAnimationEventType.Hit), SkillEvent(0.40f, SkillAnimationEventType.End));
         ReplaceEvents("Parry_R", SkillEvent(ClipEndTime, SkillAnimationEventType.End));
 
         AssetDatabase.SaveAssets();
@@ -976,7 +999,6 @@ public static class AssassinShellAuthoring
         float[] multipliers = { 1f, 1f, 1f, 1.3f };
         float[] ranges = { 1.5f, 1.5f, 1.6f, 1.7f };
         float[] angles = { 90f, 100f, 100f, 120f };
-        float[] speeds = { 3f, 3f, 3f, 2.5f };
 
         for (int i = 0; i < 4; i++)
         {
@@ -996,12 +1018,11 @@ public static class AssassinShellAuthoring
             step.FindPropertyRelative("attackDamageMultiplier").floatValue = multipliers[i];
             step.FindPropertyRelative("range").floatValue = ranges[i];
             step.FindPropertyRelative("angle").floatValue = angles[i];
-            step.FindPropertyRelative("playbackSpeed").floatValue = speeds[i];
         }
 
         // A7: 클립이 비어 있을 때(= 처음 채울 때)만 기본 수치까지 쓴다. 이후 재실행은 튜닝 값을 유지한다.
-        EnsureSpecialStep(so.FindProperty("enhancedStep"), "Combo_Attack_02_01", 2.5f, 1.8f, 120f, 2f, 1);
-        EnsureSpecialStep(so.FindProperty("transformedStep"), "Speed_Attack_Loop", 1.2f, 1.8f, 120f, 1.25f, 4);
+        EnsureSpecialStep(so.FindProperty("enhancedStep"), "Combo_Attack_02_01", 2.5f, 1.8f, 120f, 1);
+        EnsureSpecialStep(so.FindProperty("transformedStep"), "Speed_Attack_Loop", 1.2f, 1.8f, 120f, 4);
 
         so.ApplyModifiedPropertiesWithoutUndo();
         EditorUtility.SetDirty(data);
@@ -1009,7 +1030,7 @@ public static class AssassinShellAuthoring
     }
 
     private static void EnsureSpecialStep(
-        SerializedProperty step, string clipName, float multiplier, float range, float angle, float speed, int hitCount)
+        SerializedProperty step, string clipName, float multiplier, float range, float angle, int hitCount)
     {
         if (step == null)
         {
@@ -1025,9 +1046,8 @@ public static class AssassinShellAuthoring
         step.FindPropertyRelative("attackDamageMultiplier").floatValue = multiplier;
         step.FindPropertyRelative("range").floatValue = range;
         step.FindPropertyRelative("angle").floatValue = angle;
-        step.FindPropertyRelative("playbackSpeed").floatValue = speed;
         step.FindPropertyRelative("hitCount").intValue = hitCount;
-        Debug.Log($"{Tag} 평타 스텝 초기화: {step.name} = {clipName} (×{multiplier}, {range}m, {angle}°, {speed}배속, {hitCount}타)");
+        Debug.Log($"{Tag} 평타 스텝 초기화: {step.name} = {clipName} (×{multiplier}, {range}m, {angle}°, {hitCount}타)");
     }
 
     private static AnimatorController EnsureController()
@@ -1080,27 +1100,20 @@ public static class AssassinShellAuthoring
         EnsureReturnToIdleTransitions(interrupt, idle, combatIdle);
         EnsureAnyStateTransition(sm, interrupt, "Interrupt", AnimatorConditionMode.If, 0f);
 
-        AssassinBasicAttackData attackData = AssetDatabase.LoadAssetAtPath<AssassinBasicAttackData>(BasicAttackDataPath);
+        // 평타 재생 속도는 Animator 상태 speed 한 곳 — 판정·창·종료는 클립 이벤트라 속도에 같이 비례한다(P2-1). 처음 만들 때만 기본값.
         for (int i = 0; i < WaveClips.Length; i++)
         {
-            AnimatorState attack = EnsureState(sm, $"Default_Attack{i}", LoadClip(WaveClips[i]));
-            // 재생 속도는 평타 데이터 값을 따른다(게임플레이 종료 시점 = 클립 길이 ÷ 이 값과 같아야 한다).
-            attack.speed = attackData != null && attackData.TryGetNormalStep(i, out AssassinBasicAttackStepData step)
-                ? step.PlaybackSpeed
-                : (i == 3 ? 3f : 3.6f);
+            AnimatorState attack = EnsureStateWithInitialSpeed(sm, $"Default_Attack{i}", LoadClip(WaveClips[i]), WaveAttackSpeeds[i]);
             EnsureReturnToIdleTransitions(attack, idle, combatIdle);
             EnsureAnyStateAttackTransition(sm, attack, i);
         }
 
-        // A7: 강타·변신 묶음(AttackIndex 4·5) — 재생 속도는 평타 데이터 값을 따른다.
-        // attackData 는 평타 루프 앞에서 읽는다
-        AnimatorState enhancedAttack = EnsureState(sm, EnhancedAttackState, LoadClip("Combo_Attack_02_01"));
-        enhancedAttack.speed = attackData != null && attackData.EnhancedStep != null ? attackData.EnhancedStep.PlaybackSpeed : 2f;
+        // A7: 강타·변신 묶음(AttackIndex 4·5).
+        AnimatorState enhancedAttack = EnsureStateWithInitialSpeed(sm, EnhancedAttackState, LoadClip("Combo_Attack_02_01"), EnhancedAttackSpeed);
         EnsureReturnToIdleTransitions(enhancedAttack, idle, combatIdle);
         EnsureAnyStateAttackTransition(sm, enhancedAttack, AssassinBasicAttack.EnhancedAnimatorIndex);
 
-        AnimatorState transformedAttack = EnsureState(sm, TransformedAttackState, LoadClip("Speed_Attack_Loop"));
-        transformedAttack.speed = attackData != null && attackData.TransformedStep != null ? attackData.TransformedStep.PlaybackSpeed : 1.25f;
+        AnimatorState transformedAttack = EnsureStateWithInitialSpeed(sm, TransformedAttackState, LoadClip("Speed_Attack_Loop"), TransformedAttackSpeed);
         EnsureReturnToIdleTransitions(transformedAttack, idle, combatIdle);
         EnsureAnyStateAttackTransition(sm, transformedAttack, AssassinBasicAttack.TransformedAnimatorIndex);
 
@@ -1463,6 +1476,19 @@ public static class AssassinShellAuthoring
         }
 
         controller.AddParameter(name, type);
+    }
+
+    // 없으면 만들고 speed 를 기본값으로, 있으면 speed 를 건드리지 않는다(튜닝 보존).
+    private static AnimatorState EnsureStateWithInitialSpeed(AnimatorStateMachine machine, string name, Motion motion, float initialSpeed)
+    {
+        bool existed = false;
+        foreach (ChildAnimatorState child in machine.states)
+            existed |= child.state.name == name;
+
+        AnimatorState state = EnsureState(machine, name, motion);
+        if (!existed)
+            state.speed = initialSpeed;
+        return state;
     }
 
     private static AnimatorState EnsureState(AnimatorStateMachine machine, string name, Motion motion)

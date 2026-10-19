@@ -50,7 +50,7 @@ public enum DefaultAttackHitType
 [RequireComponent(typeof(PlayerMotor))]
 [RequireComponent(typeof(PlayerAimIndicator))]
 [RequireComponent(typeof(PlayerDefaultAttack))]
-public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
+public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack, IAnimationEventRequirementSource
 {
     private static readonly int DefaultAttackHash = Animator.StringToHash("DefaultAttack");
     private static readonly int AttackIndexHash = Animator.StringToHash("AttackIndex");
@@ -205,28 +205,28 @@ public class DefaultAttackController : BaseNetworkBehaviour, IPlayerBasicAttack
                     this);
             }
 
-            AnimationClip stepClip = attackSteps[i]?.Clip;
-            if (stepClip != null && !HasComboWindowOpenEvent(stepClip))
-            {
-                Edit.LogWarning(
-                    $"[Player] 클립 '{stepClip.name}'에 ComboWindowOpen 이벤트" +
-                    $"(HandleDefaultAttackEvent, int={(int)DefaultAttackAnimationEventType.ComboWindowOpen})가 없습니다. " +
-                    "윈도우가 열리지 않으면 이 스텝에서 다음 타를 예약할 수 없습니다.",
-                    this);
-            }
         }
+
+        // 판정·입력 창·종료는 스텝 클립 이벤트다 — ComboWindowOpen 이 없으면 이 스텝에서 다음 타를 예약할 수 없다.
+        AnimationEventRequirements.WarnMissing(this, animator, this);
     }
 
-    private static bool HasComboWindowOpenEvent(AnimationClip clip)
+    // 스텝마다 Hit·ComboWindowOpen·End. Close 는 없으면 End 가 창을 닫으므로 요구하지 않는다.
+    public void CollectAnimationEventRequirements(System.Collections.Generic.List<AnimationEventRequirement> requirements)
     {
-        foreach (AnimationEvent clipEvent in clip.events)
-        {
-            if (clipEvent.functionName == nameof(PlayerAnimationEventRelay.HandleDefaultAttackEvent) &&
-                clipEvent.intParameter == (int)DefaultAttackAnimationEventType.ComboWindowOpen)
-                return true;
-        }
+        if (attackSteps == null)
+            return;
 
-        return false;
+        foreach (DefaultAttackStep step in attackSteps)
+        {
+            AnimationClip clip = step?.Clip;
+            if (clip == null)
+                continue;
+
+            requirements.Add(AnimationEventRequirement.ForAttackClip(clip, DefaultAttackAnimationEventType.Hit));
+            requirements.Add(AnimationEventRequirement.ForAttackClip(clip, DefaultAttackAnimationEventType.ComboWindowOpen));
+            requirements.Add(AnimationEventRequirement.ForAttackClip(clip, DefaultAttackAnimationEventType.End));
+        }
     }
 
     public bool IsOutOfResource => false;

@@ -150,15 +150,47 @@ public sealed class AssassinDashStrikeModelTests
         Assert.That(cooldowns.GetRemaining(0, 0.2f), Is.EqualTo(0f));
     }
 
-    // 10-06 은희: 준비 0.1 → 돌진(5m/60m/s) → 종료 0.1. 벽 조기 종료로 상한이 줄면 그만큼 일찍 끝난다.
-    [Test]
-    public void Phases_PrepareDashEnd_FinishTime()
-    {
-        float full = 0.1f + 5f / 60f + 0.1f;
-        Assert.That(AssassinDashStrikeRules.IsFinished(full - 0.01f, 0.1f, 5f, 60f, 0.1f), Is.False);
-        Assert.That(AssassinDashStrikeRules.IsFinished(full + 0.001f, 0.1f, 5f, 60f, 0.1f), Is.True);
+    // ── 단계 시점 = 클립 이벤트(PLAN-anim-event-timing P2-3) ──
 
-        float walled = 0.1f + 1.2f / 60f + 0.1f;
-        Assert.That(AssassinDashStrikeRules.IsFinished(walled + 0.001f, 0.1f, 1.2f, 60f, 0.1f), Is.True);
+    // 일반·변신 Q 돌진 클립: Custom0(출발) → 경로 끝(출발 + 거리/속도) → End 순서이고, End 가 안전망(maxActiveDuration) 앞이다.
+    // 실제 시간 = 클립 시각 ÷ 상태 speed.
+    [TestCase("Assets/9.ScriptableObject/Player/Assassin/AssassinDashStrikeSkillData.asset")]
+    [TestCase("Assets/9.ScriptableObject/Player/Assassin/AssassinTransformedDashStrikeSkillData.asset")]
+    public void DashClip_StartsAtCustom0_EndsAfterPathAndBeforeSafetyNet(string dataPath)
+    {
+        AssassinDashStrikeSkillData data = UnityEditor.AssetDatabase.LoadAssetAtPath<AssassinDashStrikeSkillData>(dataPath);
+        Assert.That(data, Is.Not.Null, dataPath);
+
+        UnityEditor.Animations.AnimatorController controller =
+            UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEditor.Animations.AnimatorController>(
+                "Assets/4.Animations/Player/Assassin/AssassinAnimatorController.controller");
+        UnityEditor.Animations.AnimatorState state = null;
+        foreach (UnityEditor.Animations.ChildAnimatorState child in controller.layers[0].stateMachine.states)
+        {
+            if (child.state.name == data.AnimatorStateName)
+                state = child.state;
+        }
+
+        Assert.That(state, Is.Not.Null, data.AnimatorStateName);
+        UnityEngine.AnimationClip clip = state.motion as UnityEngine.AnimationClip;
+        Assert.That(clip, Is.Not.Null);
+
+        float start = SkillEventTime(clip, SkillAnimationEventType.Custom0) / state.speed;
+        float end = SkillEventTime(clip, SkillAnimationEventType.End) / state.speed;
+
+        Assert.That(start, Is.GreaterThanOrEqualTo(0f), "Custom0 없음");
+        Assert.That(end, Is.GreaterThanOrEqualTo(start + data.DashDuration), "End 가 경로 끝보다 앞");
+        Assert.That(end, Is.LessThan(data.MaxActiveDuration), "End 가 안전망 뒤");
+    }
+
+    private static float SkillEventTime(UnityEngine.AnimationClip clip, SkillAnimationEventType type)
+    {
+        foreach (UnityEngine.AnimationEvent e in UnityEditor.AnimationUtility.GetAnimationEvents(clip))
+        {
+            if (e.functionName == nameof(PlayerAnimationEventRelay.HandleSkillEvent) && e.intParameter == (int)type)
+                return e.time;
+        }
+
+        return -1f;
     }
 }

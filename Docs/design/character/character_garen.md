@@ -24,7 +24,7 @@ Garen은 근거리 전투를 담당하는 캐릭터이다. 방어적 보조 액�
 | `basicAttack` | TBD | 근거리 기본 공격 |
 | `secondaryAction` | TBD | 방어/패링 계열 보조 액션 후보 |
 | `mainSkill` | TBD | 주력 근접 스킬 |
-| `subSkill` | TBD | 보조 근접 스킬 |
+| `subSkill` | `FirstMeleeSubSkillData` (E 수호자의 의지) | 전방 방어(마우스 방향 고정, 180도, 최대 1초) → 첫 방어 성공 시 그 피해 무시 → 자동 반격 1회(전방 120도·3m, 공격력 250%, 대상당 1회) → 종료. 반격 끝까지 피해·넉백 무시, 쿨 7초. 상세: [PLAN-paladin-e-counter.md](../../history/PLANS/PLAN-paladin-e-counter.md) |
 | `ultimateSkill` | TBD | 궁극기 |
 
 - 기본 공격 대시 취소(2026-10-09, 세 캐릭터 공통): 기본 공격 중 **언제든** 대시로 끊는다(판정이 나갔으면 피해는 유지, 남은 동작만 끊김). 취소하면 콤보는 1타부터, 예약된 다음 타는 버린다.

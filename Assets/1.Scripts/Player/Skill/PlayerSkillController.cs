@@ -548,9 +548,12 @@ public class PlayerSkillController : BaseNetworkBehaviour
             NotifySkillOwnerResultRpc(skillIndex, value);
     }
 
-    // 애니메이션 이벤트 (릴레이 경유). 판정은 서버만 처리한다.
+    // 애니메이션 이벤트 (릴레이 경유). 각 피어는 자기 애니메이터의 이벤트를 받는다 —
+    // 먼저 이 피어 로컬(오너 이동·연출)로 넘기고, 판정 경로(OnAnimationEvent)는 서버만 처리한다.
     public void HandleAnimationEvent(SkillAnimationEventType eventType)
     {
+        activeSkill?.OnLocalAnimationEvent(eventType);
+
         if (IsNetworkActive && !IsServer)
             return;
 

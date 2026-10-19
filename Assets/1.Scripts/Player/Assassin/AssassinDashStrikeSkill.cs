@@ -16,9 +16,15 @@ using UnityEngine;
 ///
 /// 돌진 중 슈퍼아머(A1 — 넉백·밀기·스턴·잡기 거부), 무적 없음. 쿨타임은 승인 = 돌진 시작에 시작한다.
 /// E 강화를 소모하지 않는다. 일반 Q 는 유효 대상 적중 시 분노 게이지를 1회 충전한다(§4.2). 평타 순서 초기화는 스킬 상태 진입으로 <see cref="AssassinBasicAttack"/> 가 한다.
+///
+/// 단계 시점 = 클립 이벤트(PLAN-anim-event-timing P2-3): 준비 → Custom0 = 돌진 시작(시뮬레이션 피어는 이동, 서버는 경로 재구성 시작 —
+/// 각자 자기 애니메이터 기준) → 경로 끝 → End = 종료. 클립 Hit 은 쓰지 않는다(판정은 경로 스윕). 안전망 = 컨트롤러 MaxActiveDuration.
 /// </summary>
 public sealed class AssassinDashStrikeSkill : PlayerSkillBase
 {
+    private static readonly SkillAnimationEventType[] RequiredEvents =
+        { SkillAnimationEventType.Custom0, SkillAnimationEventType.End };
+
     private PlayerMotor motor;
     private AssassinState assassinState;
     private AssassinSkillView view;
@@ -30,21 +36,22 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
 
     // 서버
     private Vector3 serverOrigin;
-    private float serverApprovalTime;
-    private float serverStartTime;   // 실제 돌진 시작 = 승인 + 준비
+    private float serverStartTime;   // 실제 돌진 시작 = 서버 애니메이터의 Custom0
     private float serverTraveled;
     private float serverCap;
-    private bool isServerSweeping;
+    private bool isServerDashPending; // 승인 ~ Custom0(준비)
+    private bool isServerSweeping;    // Custom0 ~ 경로 끝
     private bool hasSuperArmor;
 
     // 시뮬레이션 피어(오너, 서버 권위 이동이면 서버도)
     private bool isLocallyDashing;
-    private float localPrepareRemaining;
+    private bool isLocalDashReleased; // 이 피어 애니메이터의 Custom0 를 받았다 — 그 전은 준비(제자리)
     private float localRemaining;
     private float localTraveled;
 
     public override PlayerSkillSlot Slot => PlayerSkillSlot.Main;
     public override bool CanMoveWhileActive => false;
+    public override IReadOnlyList<SkillAnimationEventType> RequiredAnimationEvents => RequiredEvents;
 
     private AssassinDashStrikeSkillData DashData => Data as AssassinDashStrikeSkillData;
     private ulong SourceId => owner != null && owner.NetworkObject != null ? owner.NetworkObjectId : 0UL;
@@ -78,14 +85,13 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
 
         dashDirection = Flatten(direction);
         serverOrigin = owner.transform.position;
-        serverApprovalTime = Time.time;
-        serverStartTime = Time.time + data.PrepareDuration;
         serverTraveled = 0f;
         serverCap = data.DashDistance;
-        isServerSweeping = true;
+        isServerDashPending = true;
+        isServerSweeping = false;
         ledger.Begin();
 
-        // 서버 전용 쓰기. 돌진이 끝나 스킬이 종료되면(OnTick → EndSelf) 또는 강제 종료면 OnEnd 가 해제한다. 만료 안전망은 지속시간.
+        // 서버 전용 쓰기. 클립 End 로 스킬이 끝나거나 강제 종료면 OnEnd 가 해제한다. 만료 안전망은 지속시간.
         if (owner.StatusEffects != null)
         {
             owner.StatusEffects.Apply(StatusEffectType.SuperArmor, data.MaxActiveDuration, SourceId);
@@ -108,7 +114,7 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
         if (data == null || motor == null || owner == null || !owner.IsSimulating)
             return;
 
-        localPrepareRemaining = data.PrepareDuration;
+        isLocalDashReleased = false;
         localRemaining = data.DashDistance;
         localTraveled = 0f;
         isLocallyDashing = true;
@@ -123,12 +129,9 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
         if (!isLocallyDashing || localRemaining <= 0f || data == null || motor == null)
             return;
 
-        // 1단계 준비 — 제자리(웅크리기 애니 자리).
-        if (localPrepareRemaining > 0f)
-        {
-            localPrepareRemaining -= Time.fixedDeltaTime;
+        // 1단계 준비 — 제자리(웅크리기 애니 자리). 이 피어 클립의 Custom0 가 오면 출발한다.
+        if (!isLocalDashReleased)
             return;
-        }
 
         float step = Mathf.Min(data.DashSpeed * Time.fixedDeltaTime, localRemaining);
         localRemaining -= step;
@@ -144,22 +147,23 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
         float elapsed = Time.time - serverStartTime;
         SweepServerTo(AssassinDashStrikeRules.TraveledAt(elapsed, data.DashSpeed, serverCap));
 
-        // 준비 → 돌진 → 종료(10-06 은희). 경로를 다 훑고 종료 단계까지 지나면 끝낸다(클립 End 를 기다리지 않음).
-        // 종료 단계는 제자리 — 궤적 이펙트가 늦게 따라와 속도감을 준다. 끝나면 컨트롤러가 Idle 로 크로스페이드한다.
-        if (serverTraveled >= serverCap &&
-            AssassinDashStrikeRules.IsFinished(Time.time - serverApprovalTime, data.PrepareDuration,
-                serverCap, data.DashSpeed, data.EndDuration))
-        {
+        // 경로 끝 — 이후 종료 단계는 제자리(궤적 이펙트가 늦게 따라와 속도감을 준다). 종료는 클립 End 가 정한다.
+        if (serverTraveled >= serverCap)
             isServerSweeping = false;
-            EndSelf(SkillEndReason.Completed);
-        }
+    }
+
+    // 전 피어 — 이 피어 애니메이터의 Custom0 = 준비 끝, 시뮬레이션 피어는 여기서 출발한다(판정 없음).
+    public override void OnLocalAnimationEvent(SkillAnimationEventType eventType)
+    {
+        if (eventType == SkillAnimationEventType.Custom0 && isLocallyDashing)
+            isLocalDashReleased = true;
     }
 
     // 서버 전용 — 오너가 벽에 막혀 멈춘 실제 이동 거리. 0~최대 거리로 검증해 경로 상한만 줄인다(늘리지 않음).
     public override void OnOwnerResultReported(float value)
     {
         AssassinDashStrikeSkillData data = DashData;
-        if (!isServerSweeping || data == null ||
+        if ((!isServerSweeping && !isServerDashPending) || data == null ||
             !AssassinDashStrikeRules.TryValidateReportedDistance(value, data.DashDistance, out float reported))
         {
             return;
@@ -171,19 +175,30 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
 
     public override void OnAnimationEvent(SkillAnimationEventType eventType)
     {
-        if (eventType != SkillAnimationEventType.End)
-            return;
+        switch (eventType)
+        {
+            // 서버 — 준비 끝, 경로 재구성 시작(서버 자기 애니메이터 기준. 오너 이동과의 차이는 판정 허용 범위).
+            case SkillAnimationEventType.Custom0:
+                if (!isServerDashPending)
+                    return;
+                isServerDashPending = false;
+                isServerSweeping = true;
+                serverStartTime = Time.time;
+                break;
 
-        // 보통은 돌진 종료(OnTick)가 먼저 끝낸다. 클립 End 가 돌진보다 이르게 튜닝돼도 경로 판정은 끝까지 마친다.
-        if (isServerSweeping)
-            SweepServerTo(serverCap);
-
-        EndSelf(SkillEndReason.Completed);
+            // 종료. 클립 End 가 경로 끝보다 이르게 튜닝돼도 출발한 경로의 판정은 끝까지 마친다(출발 전이면 훑지 않는다).
+            case SkillAnimationEventType.End:
+                if (isServerSweeping)
+                    SweepServerTo(serverCap);
+                EndSelf(SkillEndReason.Completed);
+                break;
+        }
     }
 
     public override void OnEnd(SkillEndReason reason)
     {
         // 사망·강제 종료면 아직 훑지 않은 경로의 타격은 버린다(§12.2-3).
+        isServerDashPending = false;
         isServerSweeping = false;
         StopLocalDash();
         // 전 피어 — 완료·벽 조기 종료·강제 중단 공통
@@ -227,6 +242,7 @@ public sealed class AssassinDashStrikeSkill : PlayerSkillBase
     private void StopLocalDash()
     {
         isLocallyDashing = false;
+        isLocalDashReleased = false;
         localRemaining = 0f;
         if (motor != null)
             motor.MovementResolved -= HandleMovementResolved;
