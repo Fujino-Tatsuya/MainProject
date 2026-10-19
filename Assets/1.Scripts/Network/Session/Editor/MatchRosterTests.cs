@@ -141,4 +141,23 @@ public sealed class MatchRosterTests
         Assert.IsFalse(roster.Contains("a"), "Begin 이 이전 명단을 버린다");
         Assert.AreEqual(1, roster.Count);
     }
+
+    [Test]
+    public void 묶임이_풀려도_마지막_clientId_로_playerId_를_찾는다()
+    {
+        var roster = Begun("a", "b");
+        roster.BindClient("a", 1, out _, out _);
+        roster.BindClient("b", 2, out _, out _);
+
+        roster.UnbindClient(2); // 퇴장 콜백 순서상 묶임이 먼저 풀려도
+        Assert.IsTrue(roster.TryGetPlayerIdByLastClient(2, out var playerId));
+        Assert.AreEqual("b", playerId);
+
+        roster.BindClient("b", 5, out _, out _); // 재합류 뒤에는 옛 clientId 로 찾지 않는다
+        Assert.IsFalse(roster.TryGetPlayerIdByLastClient(2, out _));
+        Assert.IsTrue(roster.TryGetPlayerIdByLastClient(5, out playerId) && playerId == "b");
+
+        roster.End();
+        Assert.IsFalse(roster.TryGetPlayerIdByLastClient(5, out _), "판이 끝나면 없다");
+    }
 }

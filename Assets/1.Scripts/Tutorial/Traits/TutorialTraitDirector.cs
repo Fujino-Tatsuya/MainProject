@@ -39,6 +39,8 @@ public readonly struct TutorialTraitChosen
 /// 특성 초기화(할 일 30 3단계): <see cref="PartyWipeRespawner.PartyWipeRespawned"/> → 리스폰한 각자에게 팝업 행(<see cref="EntryKind.ResetPrompt"/>) →
 /// 응답 RPC 를 서버가 <see cref="TutorialTraitResetModel"/> 로 검증 → [예] = 그 플레이어 효과만 원복 + 혼자만의 라운드 4번(<see cref="TutorialTraitSelectionModel.StartPersonalRound"/>).
 /// 팝업·재선택 중인 사람이 있으면 <see cref="IsTraitResetInProgress"/> 가 보스 진입 패드를 잠근다(D3). 원본: Docs/tech/party-lives-respawn.md §4.
+/// 판 도중 재합류(할 일 48 C14 R4c): 퇴장 때 상태를 playerId 키로 <see cref="RejoinMemory"/> 에 보관 → <see cref="MatchRoster.PlayerRejoined"/> 때
+/// 새 clientId 로 획득 목록·라운드 참가·팝업/재선택을 되돌리고 효과를 다시 건다(<see cref="TutorialTraitRejoin"/>).
 /// 이 컴포넌트를 씬에 두지 않으면 아무 일도 하지 않는다(튜토리얼 외 영향 없음).
 /// </summary>
 [DisallowMultipleComponent]
@@ -165,6 +167,12 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
         NetworkManager.OnClientDisconnectCallback += HandleClientDisconnected;
         PlayerLifeCycleController.ServerLifeStateChanged += HandleServerLifeStateChanged;
         PartyWipeRespawner.PartyWipeRespawned += HandlePartyWipeRespawnedServer;
+        MatchRoster.PlayerRejoined += HandlePlayerRejoinedServer;
+
+        // 새 디렉터 = 새 특성 상태(맵 다시 로드) — 이전 디렉터 때 보관한 특성 기록은 되돌릴 대상이 아니다.
+        int stale = RejoinMemory.Server.ClearTraits();
+        if (stale > 0)
+            Edit.Log($"{Tag} 디렉터 스폰 — 이전 특성 재합류 기록 {stale}건을 버린다.", this);
     }
 
     public override void OnNetworkDespawn()
@@ -180,6 +188,7 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
         {
             PlayerLifeCycleController.ServerLifeStateChanged -= HandleServerLifeStateChanged;
             PartyWipeRespawner.PartyWipeRespawned -= HandlePartyWipeRespawnedServer;
+            MatchRoster.PlayerRejoined -= HandlePlayerRejoinedServer;
             shieldRetryRequested = false;
             ReleaseAllSelectionShields();
         }
@@ -619,6 +628,7 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
         if (model == null)
             return;
 
+        SaveForRejoin(clientId);
         model.RemovePlayer(clientId);
         resetModel?.Remove(clientId); // 팝업·재선택 대기가 패드 잠금으로 남지 않게
         // 떠난 플레이어 오브젝트는 곧 사라진다 — 원복 없이 장부에서만 뺀다.
@@ -629,6 +639,71 @@ public sealed class TutorialTraitDirector : NetworkBehaviour
         SyncSelectionShields();
         SyncResetBusy();
         CheckRoundCompleted();
+    }
+
+    // ── 판 도중 재합류(할 일 48 C14 R4c) ────────────────────────────────────
+    // 퇴장: 모델에서 지우기 직전 상태를 playerId 키로 RejoinMemory 에 넣는다. 모델·리셋 모델만 읽으므로 퇴장 순간 PlayerObject 유무와 무관하다.
+    // playerId 는 판 명단의 "마지막 clientId" 로 찾는다 — 퇴장 콜백 순서(명단 묶임 풀기·레지스트리 삭제)와 무관. 명단 밖(데모 흐름 밖)이면 보관하지 않는다.
+
+    private void SaveForRejoin(ulong clientId)
+    {
+        if (!MatchRoster.Server.IsActive || !MatchRoster.Server.TryGetPlayerIdByLastClient(clientId, out string playerId))
+            return;
+
+        TutorialTraitRejoinSnapshot snapshot = TutorialTraitRejoin.Capture(model, resetModel, clientId);
+        RejoinMemory.Server.SaveTraits(playerId, snapshot);
+        Edit.Log($"{Tag} client {clientId}({playerId}) 퇴장 — 재합류용 특성 보관 {snapshot} (보관 {RejoinMemory.Server.TraitCount}건).", this);
+    }
+
+    // 재스폰 직후(새 PlayerObject 있음): 획득 목록·라운드 참가·팝업/재선택을 되돌리고, 효과 장부에 없는 획득 특성 효과만 건다(멱등).
+    // 기록은 꺼내면 지워지므로 Drop(AlreadyHasPlayerObject) 경로에서 같은 사람에게 또 와도 두 번 되돌리지 않는다.
+    private void HandlePlayerRejoinedServer(string playerId, ulong oldClientId, ulong newClientId)
+    {
+        if (!CanServe)
+            return;
+
+        if (!RejoinMemory.Server.TryTakeTraits(playerId, out TutorialTraitRejoinSnapshot snapshot))
+        {
+            Edit.Log($"{Tag} 재합류 {playerId} client {oldClientId}→{newClientId} — 보관한 특성 기록 없음.", this);
+            return;
+        }
+
+        // 팝업·재선택은 전멸 팝업을 띄우는 조건(튜토리얼 진행 중)과 같을 때만 되살린다.
+        TutorialDirector tutorial = TutorialDirector.Instance;
+        bool allowReset = tutorial != null && tutorial.IsTutorialActive;
+        TutorialTraitRejoinReset reset = TutorialTraitRejoin.Restore(model, resetModel, newClientId, snapshot, allowReset);
+        if (reset == TutorialTraitRejoinReset.ReselectContinue)
+            ContinueReselect(newClientId);
+        else if (reset == TutorialTraitRejoinReset.ReselectOffer)
+            roundDisplay.Value = (byte)TutorialTraitRoundDisplay.None; // 재선택 창엔 복도 안내 문구를 붙이지 않는다(ContinueReselect 와 같다)
+
+        int applied = ApplyMissingEffects(newClientId);
+        RebuildEntries();
+        SyncSelectionShields();
+        SyncResetBusy();
+        CheckRoundCompleted();
+
+        Edit.Log($"{Tag} 재합류 {playerId} client {oldClientId}→{newClientId} — 특성 복원 {snapshot}, 효과 {applied}개 적용, " +
+                 $"초기화 {reset}{(snapshot.HadResetState && !allowReset ? "(튜토리얼 아님 — 건너뜀)" : "")}.", this);
+    }
+
+    // 획득했는데 효과 장부에 없는 특성만 효과를 건다 — 복원 직후 + 스폰 전에 자동 획득돼 효과를 놓친 것까지. 건 수.
+    private int ApplyMissingEffects(ulong clientId)
+    {
+        IReadOnlyList<int> acquired = model.GetAcquired(clientId);
+        int applied = 0;
+        for (int i = 0; i < acquired.Count; i++)
+        {
+            int traitIndex = acquired[i];
+            if (appliedEffects.Has(clientId, traitIndex))
+                continue;
+
+            ApplyEffect(clientId, traitIndex, pool != null ? pool.Get(traitIndex) : null);
+            if (appliedEffects.Has(clientId, traitIndex))
+                applied++;
+        }
+
+        return applied;
     }
 
     // ── 선택 창 무적 ───────────────────────────────────────────────────────

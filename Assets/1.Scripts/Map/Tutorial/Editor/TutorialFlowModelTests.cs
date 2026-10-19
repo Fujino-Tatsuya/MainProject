@@ -447,4 +447,64 @@ public sealed class TutorialFlowModelTests
         m.TryOpenGate(TutorialGate.G2_Zone2Entry);
         Assert.IsFalse(m.TryGetPendingPersonalGate(out _, out _, out _, out _), "G3 차례(수동)");
     }
+
+    // ─── 판 도중 재합류(할 일 48 C14 R4c · R-b) ─────────────────────────────
+
+    [Test]
+    public void 재합류_새_id_가_체크를_이어_받아_개인_게이트를_막지_않는다()
+    {
+        var m = NewModel(A, B);
+        OpenG1(m, 0d, A, B);
+        m.ReportCheck(B, TutorialCheck.TraitCorridor1);
+        m.MarkDisconnected(B);
+        m.AddPlayer(C);                 // 접속 콜백이 먼저 만든 CheckMask 0 기록
+        m.Evaluate(1d);
+        Assert.IsFalse(m.IsGateOpen(TutorialGate.G2_Zone2Entry), "리바인드 전: 새 기록이 체크 0 이라 막는다");
+
+        Assert.IsTrue(m.RebindPlayer(B, C));
+        Assert.IsTrue(m.TryGetPlayer(C, out TutorialPlayerProgress p));
+        Assert.IsTrue(p.Has(TutorialCheck.TraitCorridor1) && p.Has(TutorialCheck.SkillR), "개인 체크 이어 받기");
+        Assert.IsTrue(p.Connected);
+        Assert.IsTrue(m.TryGetPlayer(B, out TutorialPlayerProgress old) && !old.Connected, "옛 기록은 이탈로 남는다");
+
+        m.ReportCheck(A, TutorialCheck.TraitCorridor1);
+        m.Evaluate(2d);
+        Assert.IsTrue(m.IsGateOpen(TutorialGate.G2_Zone2Entry), "60초를 기다리지 않고 전원 완료로 열린다");
+        Assert.AreEqual(0, m.TimeoutGateMask & (1 << (int)TutorialGate.G2_Zone2Entry), "교착 방지가 아니다");
+        Assert.AreEqual(2, m.ParticipantCount);
+    }
+
+    [Test]
+    public void 재합류_완전_사망을_이어_받고_새_기록이_없으면_만든다()
+    {
+        var m = NewModel(A, B);
+        m.SetPermanentDead(B, true);
+        m.ReportCheck(B, TutorialCheck.Move);
+        m.MarkDisconnected(B);
+
+        Assert.IsTrue(m.RebindPlayer(B, C), "접속 콜백 기록이 없어도 새로 만든다");
+        Assert.IsTrue(m.TryGetPlayer(C, out TutorialPlayerProgress p));
+        Assert.IsTrue(p.PermanentDead && p.Connected && p.Has(TutorialCheck.Move));
+        Assert.AreEqual(1, m.ParticipantCount, "완전 사망은 전원에서 빠진다");
+        CollectionAssert.AreEqual(new[] { A, B, C }, m.PlayerIds, "등록 순서 뒤에 붙는다(복제 인덱스 유지)");
+    }
+
+    [Test]
+    public void 재합류_리바인드는_멱등이고_모르는_id_는_거절한다()
+    {
+        var m = NewModel(A, B);
+        m.ReportCheck(B, TutorialCheck.Dash);
+        m.MarkDisconnected(B);
+        m.AddPlayer(C);
+        m.ReportCheck(C, TutorialCheck.Move);   // 리바인드 전 새 기록에 쌓인 체크도 유지(OR)
+
+        Assert.IsTrue(m.RebindPlayer(B, C));
+        Assert.IsTrue(m.RebindPlayer(B, C), "두 번 불러도 결과가 같다");
+        Assert.IsTrue(m.TryGetPlayer(C, out TutorialPlayerProgress p));
+        Assert.IsTrue(p.Has(TutorialCheck.Dash) && p.Has(TutorialCheck.Move));
+        Assert.AreEqual(3, m.PlayerIds.Count, "기록이 늘지 않는다");
+
+        Assert.IsFalse(m.RebindPlayer(9, C), "옛 기록 없음");
+        Assert.IsFalse(m.RebindPlayer(C, C), "같은 id");
+    }
 }

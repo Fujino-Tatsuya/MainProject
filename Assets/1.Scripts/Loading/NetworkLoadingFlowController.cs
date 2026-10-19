@@ -471,6 +471,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
 
         // 판 재시작 경로(TryRestartTargetScene)는 이 함수를 거치지 않는다 — 같은 판이라 명단을 그대로 둔다.
         var previous = roster.IsActive ? roster.Count : 0;
+        ClearRejoinMemory("begin");
         roster.Begin(playerIds);
         var players = new List<string>(playerIds.Count);
         for (var i = 0; i < playerIds.Count; i++)
@@ -487,6 +488,8 @@ public class NetworkLoadingFlowController : MonoBehaviour
     /// <summary>[서버] 판 명단을 끝낸다(C14). 활성이었으면 크기를 남긴다 — 판마다 begin/end 가 짝을 이루지 않으면 누적이다(R1).</summary>
     public static void EndMatchRoster(string context)
     {
+        // 보관소는 명단이 비활성이어도 비운다 — 판 경계마다 0 으로 돌아가야 누적이 없다(R1).
+        ClearRejoinMemory(context);
         var roster = MatchRoster.Server;
         if (!roster.IsActive)
         {
@@ -496,6 +499,14 @@ public class NetworkLoadingFlowController : MonoBehaviour
         int bound = roster.BoundCount;
         int count = roster.End();
         Debug.Log($"[SceneFlow] NetworkLoadingFlowController.MatchRoster end context={context} count={count} bound={bound}");
+    }
+
+    // [서버] 재합류 보관소(RejoinMemory) 비우기 — 판 명단과 같은 경계. 비운 게 있을 때만 크기를 남긴다.
+    private static void ClearRejoinMemory(string context)
+    {
+        int cleared = RejoinMemory.Server.Clear();
+        if (cleared > 0)
+            Debug.Log($"[SceneFlow] NetworkLoadingFlowController.RejoinMemory clear context={context} count={cleared}");
     }
 
     private IEnumerator LoadSessionSceneSingle(string sceneName)
@@ -883,6 +894,8 @@ public class NetworkLoadingFlowController : MonoBehaviour
             return;
         }
 
+        // 구독자(특성 복원 R4c·튜토리얼 RebindPlayer)가 먼저 돈다. 생명 상태 복원(R5c)은 구독으로 붙이지 말고 이 발행이 끝난 뒤
+        // 여기서 직접 부른다 — 특성 효과(영구 상태이상)가 사망·연출 잠금에서 거부되지 않게 "생명 상태는 마지막에"(설계 메모 §3.3).
         var subscribers = MatchRoster.RaisePlayerRejoined(entry.PlayerId, oldClientId, entry.ClientId);
         Debug.Log(
             $"[Rejoin] PlayerRejoined playerId={entry.PlayerId} oldClientId={oldClientId} newClientId={entry.ClientId} " +

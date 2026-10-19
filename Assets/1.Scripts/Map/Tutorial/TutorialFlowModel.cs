@@ -201,7 +201,7 @@ public sealed class TutorialFlowModel
 
     // ─── 인원 ────────────────────────────────────────────────────────────
 
-    /// <summary>플레이어 등록(접속 중). 이미 있으면 무시(재접속은 없음 — 이탈한 id 는 되살리지 않는다).</summary>
+    /// <summary>플레이어 등록(접속 중). 이미 있으면 무시(이탈한 id 는 되살리지 않는다 — 판 도중 재합류는 새 id 가 <see cref="RebindPlayer"/> 로 이어 받는다).</summary>
     public bool AddPlayer(ulong clientId)
     {
         if (_players.ContainsKey(clientId)) return false;
@@ -217,6 +217,33 @@ public sealed class TutorialFlowModel
         p.Connected = false;
         return true;
     });
+
+    /// <summary>
+    /// [판 도중 재합류 — 할 일 48 C14 R4c] 같은 사람이 새 clientId 로 돌아왔다. 옛 기록의 개인 체크·완전 사망을 새 기록이 이어 받고
+    /// 새 기록은 접속 중이 된다(옛 기록은 이탈 그대로 남는다 — 복제 목록이 등록 순서 인덱스라 지우지 않는다).
+    /// 새 기록이 없으면 만든다(접속 콜백이 먼저 만든 CheckMask 0 기록이 있으면 거기에 합친다 — 체크는 되돌리지 않으므로 OR).
+    /// 같은 쌍을 두 번 불러도 결과가 같다. 옛 id 를 모르거나 같은 id 면 false. 호출 뒤 <see cref="Evaluate"/> 로 재판정.
+    /// 개인 뒤 배리어 마스크는 이 모델 밖(TutorialDirector) — 재합류자는 첫 스폰에서 다시 출발하므로 디렉터가 0 으로 둔다.
+    /// </summary>
+    public bool RebindPlayer(ulong oldClientId, ulong newClientId)
+    {
+        if (oldClientId == newClientId || !_players.TryGetValue(oldClientId, out TutorialPlayerProgress old)) return false;
+
+        old.Connected = false;
+        _players[oldClientId] = old;
+
+        if (!_players.TryGetValue(newClientId, out TutorialPlayerProgress p))
+        {
+            p = new TutorialPlayerProgress { ClientId = newClientId };
+            _order.Add(newClientId);
+        }
+
+        p.CheckMask |= old.CheckMask;
+        p.PermanentDead = old.PermanentDead;
+        p.Connected = true;
+        _players[newClientId] = p;
+        return true;
+    }
 
     public bool SetPermanentDead(ulong clientId, bool dead) => Mutate(clientId, (ref TutorialPlayerProgress p) =>
     {

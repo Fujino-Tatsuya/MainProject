@@ -131,7 +131,7 @@ false 일 때 `ServerRoundCompleted` 는 같은 호출 안에서 이미 불렸�
 
 - **틱 판정 공격**(거너 빔 등)은 틱마다 `ServerAttackLanded` 가 나와 쿨감이 틱마다 반복된다.
 - **연출 잠금 중** 상태이상 `Apply` 가 거부된다 → 배율 특성 효과 없음(획득은 기록). 자동 획득은 잠금 전에(§3-5).
-- **끊긴 플레이어의 획득 기록은 삭제**된다(재접속하면 처음부터).
+- **끊긴 플레이어의 획득 기록은 모델에서 삭제**된다 — 판 명단 안 사람(데모 흐름)은 §10 재합류로 되돌아온다. 데모 흐름 밖(명단 없음)은 재접속하면 처음부터.
 - **추락 피해는 무적을 우회**한다 — 선택 중에도 떨어지면 맞는다.
 - **같은 특성의 플레이어 간 중복 허용**. 중복 제외는 개인 기준(내가 얻은 것만 다시 안 나온다).
 - **공격속도·방어·최대체력 배율은 소비처가 없어** 효과 종류에 두지 않았다.
@@ -188,3 +188,11 @@ API:
 - **문구**: `TUT_TRAIT_RESET_PROMPT`("특성을 초기화하고 다시 선택할까요?") · `TUT_TRAIT_RESET_YES`("예") · `TUT_TRAIT_RESET_NO`("아니오") — `TutorialTraitTexts` 상수 + `AllIds`.
   `TutorialTraitTexts.asset` 에는 행을 넣지 않았다(행 없음 = 상수 폴백, 로컬라이징 브랜치와 에셋 충돌 회피) — 기획이 문구를 바꿀 때 행을 추가한다.
 - 테스트: `TutorialTraitResetModelTests`(튜토리얼 러너).
+
+## 10. 판 도중 재합류 (할 일 48 C14 R4c)
+
+- **퇴장**: `HandleClientDisconnected` 가 모델에서 지우기 직전 `TutorialTraitRejoin.Capture` → `RejoinMemory.Server.SaveTraits(playerId)`(playerId = `MatchRoster.TryGetPlayerIdByLastClient`).
+  담는 것 = 획득 목록(순서) · 지금 복도 라운드에서 이미 골랐나 · 초기화 팝업 세대 / 재선택 남은 라운드·열린 후보.
+- **재스폰**: `MatchRoster.PlayerRejoined` → `TutorialTraitRejoin.Restore`(새 clientId) → 장부에 없는 획득 특성만 `ApplyEffect`(멱등) → `RebuildEntries`.
+  팝업 대기였으면 같은 세대 팝업, 재선택 중이었으면 같은 후보 창(퇴장 중 다시 전멸했으면 지금 세대 팝업). 고르던 복도 제시는 되살리지 않는다(문 열림 자동 획득).
+- `TutorialDirector` 는 같은 이벤트로 `TutorialFlowModel.RebindPlayer`(체크·완전 사망 이어 받기, 뒤 배리어 0). 테스트: `TutorialTraitRejoinTests`.

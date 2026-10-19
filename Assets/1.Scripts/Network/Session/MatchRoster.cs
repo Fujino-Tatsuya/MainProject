@@ -131,6 +131,25 @@ public sealed class MatchRoster
         return playerId != null && _lastClientByPlayerId.TryGetValue(playerId, out clientId);
     }
 
+    /// <summary>
+    /// 이 판에서 그 clientId 를 마지막으로 쓴 playerId(묶임이 이미 풀렸어도 찾는다). 퇴장 콜백 순서와 무관하게
+    /// 퇴장하는 clientId 의 playerId 를 알아야 하는 보관(<see cref="RejoinMemory"/>)이 쓴다. 비활성·모르는 id 면 false.
+    /// </summary>
+    public bool TryGetPlayerIdByLastClient(ulong clientId, out string playerId)
+    {
+        foreach (var pair in _lastClientByPlayerId)
+        {
+            if (pair.Value == clientId)
+            {
+                playerId = pair.Key;
+                return true;
+            }
+        }
+
+        playerId = null;
+        return false;
+    }
+
     void Reset()
     {
         IsActive = false;
