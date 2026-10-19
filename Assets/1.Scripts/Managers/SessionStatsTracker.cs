@@ -3,7 +3,7 @@ using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// 한 판의 플레이 시간과 플레이어별 통계(데미지·처치·간파·사망)를 집계한다. MapScene에 하나 배치한다.
+/// 한 판의 플레이 시간과 플레이어별 통계(데미지·처치·간파·사망·회복량·입은 피해)를 집계한다. MapScene에 하나 배치한다.
 ///
 /// 서버(또는 오프라인)에서만 집계한다. 판이 끝나는 지점에서 <see cref="Capture(SessionOutcome)"/>를 호출해
 /// <see cref="SessionResult"/>에 확정한다 — 전멸 PartyWipeWatcher · 클리어 BossEncounterDirector ·
@@ -11,6 +11,8 @@ using UnityEngine;
 ///
 /// 입력은 정적 채널뿐이다(몬스터·Unit 에 통계 의존성을 심지 않는다):
 ///   · <see cref="CombatStatsEvents.ServerDamageApplied"/> — 데미지·처치(막타)
+///   · <see cref="CombatStatsEvents.ServerHealthLost"/> — 입은 피해(대상이 플레이어일 때)
+///   · <see cref="CombatStatsEvents.ServerHealApplied"/> — 회복량(대상이 플레이어일 때, 회복 주체에게)
 ///   · <see cref="CombatStatsEvents.ServerCounterSucceeded"/> — 간파 성공
 ///   · <see cref="PlayerLifeCycleController.ServerLifeStateChanged"/> — 행 등록·사망
 /// 필터 규칙은 <see cref="SessionStatsAggregator"/> 가 고정한다. 여기서는 대상 분류만 한다.
@@ -40,6 +42,8 @@ public sealed class SessionStatsTracker : MonoBehaviour
     private void OnEnable()
     {
         CombatStatsEvents.ServerDamageApplied += HandleDamageApplied;
+        CombatStatsEvents.ServerHealthLost += HandleHealthLost;
+        CombatStatsEvents.ServerHealApplied += HandleHealApplied;
         CombatStatsEvents.ServerCounterSucceeded += HandleCounterSucceeded;
         PlayerLifeCycleController.ServerLifeStateChanged += HandleLifeStateChanged;
     }
@@ -47,6 +51,8 @@ public sealed class SessionStatsTracker : MonoBehaviour
     private void OnDisable()
     {
         CombatStatsEvents.ServerDamageApplied -= HandleDamageApplied;
+        CombatStatsEvents.ServerHealthLost -= HandleHealthLost;
+        CombatStatsEvents.ServerHealApplied -= HandleHealApplied;
         CombatStatsEvents.ServerCounterSucceeded -= HandleCounterSucceeded;
         PlayerLifeCycleController.ServerLifeStateChanged -= HandleLifeStateChanged;
 
@@ -100,6 +106,24 @@ public sealed class SessionStatsTracker : MonoBehaviour
         _aggregator.RecordDamage(attackerClientId, IsCountedMonster(target), amount, lethal);
     }
 
+    private void HandleHealthLost(Unit target, int healthLost)
+    {
+        if (_captured || !IsCountingAuthority())
+            return;
+
+        Player player = target as Player;
+        _aggregator.RecordDamageTaken(PlayerClientId(player), player != null, healthLost);
+    }
+
+    private void HandleHealApplied(Unit target, ulong healerClientId, int amount)
+    {
+        if (_captured || !IsCountingAuthority())
+            return;
+
+        // 대상이 플레이어인 회복만 — 더미 자기 회복 같은 몬스터 회복이 호스트에게 붙지 않게.
+        _aggregator.RecordHealing(healerClientId, target is Player, amount);
+    }
+
     private void HandleCounterSucceeded(Unit target, ulong attackerClientId)
     {
         if (_captured || !IsCountingAuthority())
@@ -131,6 +155,11 @@ public sealed class SessionStatsTracker : MonoBehaviour
     private static bool IsCountedMonster(Unit target)
     {
         return target is MonsterBase;
+    }
+
+    private static ulong PlayerClientId(Player player)
+    {
+        return player != null && player.IsSpawned ? player.OwnerClientId : SessionStatsAggregator.NoAttacker;
     }
 
     private static bool IsCountingAuthority()
