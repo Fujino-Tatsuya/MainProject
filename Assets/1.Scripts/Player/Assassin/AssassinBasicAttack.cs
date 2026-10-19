@@ -4,7 +4,7 @@ using UnityEngine;
 
 /// <summary>
 /// 어쌔신 일반 평타. 거너 기본 공격과 같은 "홀드 + 입력 창" 연결 — 한 타의 End 순간 좌클릭이 눌려 있거나,
-/// 그 타 재생 중 예약 창(단별 클립 정규화 시간) 안에서 좌클릭해 예약했으면 다음 타로 잇는다. 둘 다 아니면 그 타로 끝.
+/// 그 타 재생 중 예약 창(클립 ComboWindowOpen~Close 이벤트, 가붕이와 같다) 안에서 좌클릭해 예약했으면 다음 타로 잇는다. 둘 다 아니면 그 타로 끝.
 /// 입력과 방향은 오너가 보내며(눌림은 바뀔 때 즉시 + 눌린 동안 주기 신호) 시작/예약 승인(서버 자기 애니 진행 기준),
 /// 연결 판단, 판정, 피해는 서버가 담당한다.
 /// 모드는 <see cref="AssassinState"/> 로 고른다 — 변신 중 = Speed_Attack_Loop 4타 묶음, 일반 E 강화 준비 = 강타 1회, 그 외 = 일반 4타.
@@ -65,8 +65,8 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     private Vector3 attackDirection;
     private Vector3 serverNextDirection;
     private float fallbackEndTime;
-    // 이 타 클립을 튼 시각(회전 대기 뒤). 예약 창 진행도의 기준 — 피어마다 자기 재생 기준이다.
-    private float clipStartTime;
+    // 예약 창 — 이 타 클립의 ComboWindowOpen~Close(또는 End) 사이. 피어마다 자기 애니메이터 이벤트로 연다(오너 = 예약 거르기, 서버 = 승인).
+    private bool comboWindowOpen;
     private PlayerActionState observedState;
     // 강타 전진 — 시뮬레이션 피어(오너, 서버 권위 이동이면 서버도)만 모터에 낸다. 끝·취소·막힘이면 0.
     private float lungeRemaining;
@@ -113,7 +113,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         AnimationEventRequirements.WarnMissing(this, animator, this);
     }
 
-    // 일반 4타·강타·변신 묶음 클립마다 판정(Hit)·종료(End).
+    // 일반 4타·강타·변신 묶음 클립마다 판정(Hit)·예약 창(ComboWindowOpen·Close)·종료(End).
     public void CollectAnimationEventRequirements(System.Collections.Generic.List<AnimationEventRequirement> requirements)
     {
         if (data == null)
@@ -136,6 +136,8 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             return;
 
         requirements.Add(AnimationEventRequirement.ForAttackClip(step.Clip, DefaultAttackAnimationEventType.Hit));
+        requirements.Add(AnimationEventRequirement.ForAttackClip(step.Clip, DefaultAttackAnimationEventType.ComboWindowOpen));
+        requirements.Add(AnimationEventRequirement.ForAttackClip(step.Clip, DefaultAttackAnimationEventType.ComboWindowClose));
         requirements.Add(AnimationEventRequirement.ForAttackClip(step.Clip, DefaultAttackAnimationEventType.End));
     }
 
@@ -256,6 +258,16 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         // 베기 연출은 전 피어 — 클립 Hit 이벤트는 모든 피어에서 재생된다(판정은 아래 서버만).
         if (eventType == DefaultAttackAnimationEventType.Hit && active && view != null)
             view.PlayAttackSlash(currentMode, currentStepIndex);
+
+        // 예약 창도 전 피어 — 오너는 자기 예약을, 서버는 승인을 각자 자기 애니 진행으로 거른다(가붕이 isComboWindowOpen 과 같다).
+        if (active)
+        {
+            if (eventType == DefaultAttackAnimationEventType.ComboWindowOpen)
+                comboWindowOpen = true;
+            else if (eventType == DefaultAttackAnimationEventType.ComboWindowClose ||
+                     eventType == DefaultAttackAnimationEventType.End)
+                comboWindowOpen = false;
+        }
 
         if (IsNetworkActive && !IsServer)
             return;
@@ -413,12 +425,10 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
     private bool IsServerHoldFresh() =>
         AssassinComboWindowRules.IsHoldFresh(serverHeld, lastHoldSignalTime, Time.time, HoldStaleSeconds);
 
-    // 예약 창 = 이 타 클립 정규화 시간 [열림, 닫힘]. 회전 대기 중엔 이 타 클립이 아직 시작 전이라 창 밖이다.
+    // 예약 창 = 이 타 클립의 ComboWindowOpen~Close 이벤트 사이. 회전 대기 중엔 이 타 클립이 아직 시작 전이라 창 밖이다.
     private bool IsInCurrentComboWindow()
     {
-        return active && !hasPendingClip &&
-               TryGetStep(currentMode, currentStepIndex, out AssassinBasicAttackStepData step) &&
-               step.IsInComboWindow(Time.time - clipStartTime);
+        return active && !hasPendingClip && comboWindowOpen;
     }
 
     [Rpc(SendTo.Server)]
@@ -549,13 +559,14 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         requesting = false;
         ownerQueued = false;
         hasQueuedNextAttack = false;
+        comboWindowOpen = false;
         rageClaimed = false;
         hitsFired = 0;
         currentStepIndex = stepIndex;
         currentMode = mode;
         attackDirection = Flatten(direction);
         serverNextDirection = attackDirection;
-        fallbackEndTime = Time.time + turnDelay + step.MotionDuration + data.EndFallbackPadding;
+        fallbackEndTime = Time.time + turnDelay + step.ClipLength + data.EndFallbackPadding;
 
         StopLunge();
         if (mode == AssassinBasicAttackMode.Enhanced && motor != null && player.IsSimulating)
@@ -580,7 +591,6 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
 
     private void PlayAttackClip()
     {
-        clipStartTime = Time.time;
         if (animator != null)
         {
             animator.SetInteger(AttackIndexHash, AnimatorIndexFor(currentMode, currentStepIndex));
@@ -670,6 +680,7 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         requesting = false;
         ownerQueued = false;
         hasQueuedNextAttack = false;
+        comboWindowOpen = false;
         holdSent = false;
         serverHeld = false;
         hitsFired = 0;
