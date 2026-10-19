@@ -18,6 +18,9 @@ public enum DemoJoinRejectReason
     /// <summary>ConnectionData 의 playerId 가 비었거나 깨졌다.</summary>
     InvalidPlayerId,
     Unknown,
+    /// <summary>판 명단 안 사람이 다시 들어오는 중인데 아직 받을 수 없다 — 씬 전환 중이거나 서버가 옛 연결을 아직 못 끊었다(C14 Q-E).
+    /// 재시도하면 들어간다.</summary>
+    RejoinWaiting,
 }
 
 public static class DemoJoinRejectReasonText
@@ -36,6 +39,7 @@ public static class DemoJoinRejectReasonText
             case DemoJoinRejectReason.Timeout: return "응답 없음 — 호스트를 기다리는 중";
             case DemoJoinRejectReason.DuplicatePlayerId: return "같은 플레이어 ID 가 이미 접속 중 — 설정 파일의 playerId 확인";
             case DemoJoinRejectReason.InvalidPlayerId: return "플레이어 ID 가 올바르지 않음 — 설정 파일의 playerId 확인";
+            case DemoJoinRejectReason.RejoinWaiting: return DemoConnectUiStrings.RejoinWaiting.Text;
             default: return "알 수 없는 이유로 연결되지 않음";
         }
     }

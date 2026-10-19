@@ -58,6 +58,7 @@ public sealed class DemoSessionRulesTests
     [TestCase(DemoJoinRejectReason.LobbyFull)]
     [TestCase(DemoJoinRejectReason.DuplicatePlayerId)]
     [TestCase(DemoJoinRejectReason.InvalidPlayerId)]
+    [TestCase(DemoJoinRejectReason.RejoinWaiting)]
     public void 서버_거절_코드는_그_사유로_바꾼다(DemoJoinRejectReason reason)
     {
         var text = DemoJoinRule.ToApprovalReason(reason);

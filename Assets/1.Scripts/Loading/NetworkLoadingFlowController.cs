@@ -223,6 +223,7 @@ public class NetworkLoadingFlowController : MonoBehaviour
             return;
         }
 
+        BeginMatchRoster();
         ResetFlow();
         _flowId++;
         _phase = NetworkLoadingPhase.LoadingScene;
@@ -408,9 +409,66 @@ public class NetworkLoadingFlowController : MonoBehaviour
             return false;
         }
 
+        // 판 끝 — 여기부터 명단 안 사람도 재합류가 아니라 로비 입장으로 다시 받는다(C14).
+        EndMatchRoster($"single={sceneName}");
         _sessionSceneLoadRoutine = StartCoroutine(LoadSessionSceneSingle(sceneName));
         reason = null;
         return true;
+    }
+
+    /// <summary>[서버] 씬을 바꾸는 중 — 로딩 흐름(첫 진입·판 재시작) 또는 맵 → 로비 Single 전환 대기·진행. 재합류 승인을 미룬다(C14).</summary>
+    public bool IsSceneTransitionInProgress => IsFlowInProgress || _sessionSceneLoadRoutine != null;
+
+    // [서버] 판 명단 고정(C14) — 로비 → 맵 래치를 통과한 순간 접속해 있던 playerId. 데모 흐름 밖에선 명단 기능 전체를 끈다
+    // (playerId 가 없거나 겹친 client-·# 키가 명단에 들어가지 않게).
+    private void BeginMatchRoster()
+    {
+        var roster = MatchRoster.Server;
+        if (!DemoSessionDirector.IsDemoFlowActive)
+        {
+            EndMatchRoster("begin.notDemo");
+            return;
+        }
+
+        var registry = PlayerIdRegistry.Server;
+        var playerIds = new List<string>();
+        var clientIds = new List<ulong>();
+        foreach (var clientId in _networkManager.ConnectedClientsIds)
+        {
+            if (registry.TryGetPlayerId(clientId, out var playerId))
+            {
+                playerIds.Add(playerId);
+                clientIds.Add(clientId);
+            }
+        }
+
+        // 판 재시작 경로(TryRestartTargetScene)는 이 함수를 거치지 않는다 — 같은 판이라 명단을 그대로 둔다.
+        var previous = roster.IsActive ? roster.Count : 0;
+        roster.Begin(playerIds);
+        var players = new List<string>(playerIds.Count);
+        for (var i = 0; i < playerIds.Count; i++)
+        {
+            roster.BindClient(playerIds[i], clientIds[i], out _, out _);
+            players.Add($"{playerIds[i]}:{clientIds[i]}");
+        }
+
+        Debug.Log(
+            $"[SceneFlow] NetworkLoadingFlowController.MatchRoster begin count={roster.Count} bound={roster.BoundCount} " +
+            $"connected={_networkManager.ConnectedClientsIds.Count} previousActive={previous} players=[{string.Join(",", players)}]");
+    }
+
+    /// <summary>[서버] 판 명단을 끝낸다(C14). 활성이었으면 크기를 남긴다 — 판마다 begin/end 가 짝을 이루지 않으면 누적이다(R1).</summary>
+    public static void EndMatchRoster(string context)
+    {
+        var roster = MatchRoster.Server;
+        if (!roster.IsActive)
+        {
+            return;
+        }
+
+        int bound = roster.BoundCount;
+        int count = roster.End();
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.MatchRoster end context={context} count={count} bound={bound}");
     }
 
     private IEnumerator LoadSessionSceneSingle(string sceneName)

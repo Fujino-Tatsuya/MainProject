@@ -18,10 +18,11 @@ public static class DemoConnectUiStrings
     public static readonly UiString RetryIn = new UiString("UI.DemoConnect.RetryIn", "{time} 후 재시도 ({attempt}회째)", Where + " · 재시도 대기({time} = UI.Unit.Seconds, {attempt} = 재시도 번호)");
     public static readonly UiString ConfigMissing = new UiString("UI.DemoConnect.ConfigMissing", "설정 파일 없음 — 호스트 모드", Where + " · demo-connection.json 없음 안내(3초)");
     public static readonly UiString BuildInfo = new UiString("UI.DemoConnect.BuildInfo", "v{version} · cfg {hash}", Where + " · 빌드 버전 + NetworkConfig 해시");
+    public static readonly UiString RejoinWaiting = new UiString("UI.DemoConnect.RejoinWaiting", "판에 다시 합류하는 중 — 잠시 기다리세요", Where + " · 거절 사유 RejoinWaiting(판 명단 안 사람이 씬 전환·옛 연결 정리를 기다림)");
 
     public static readonly IReadOnlyList<UiString> All = new[]
     {
-        WaitingForHost, StartingHost, Disconnected, Address, Connecting, RetryIn, ConfigMissing, BuildInfo,
+        WaitingForHost, StartingHost, Disconnected, Address, Connecting, RetryIn, ConfigMissing, BuildInfo, RejoinWaiting,
     };
 }
 
