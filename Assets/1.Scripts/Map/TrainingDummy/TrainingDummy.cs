@@ -194,6 +194,8 @@ public sealed class TrainingDummy : Unit
     ///
     /// `MonsterBase` 와 달리 NavMesh 경계 클램프는 하지 않는다 — 허수아비는 NavMesh 밖에 놓일 수
     /// 있고, 밀려난 거리는 `resetDistance` 자리 복귀가 어차피 잡는다.
+    /// 대신 이동(`TickKnockback`)은 매 프레임 몸 캡슐을 스윕해 Wall·Barrier 레이어 앞에서 멈춘다
+    /// (`TrainingDummyKnockbackSweep` — 할 일 51, 팔라딘 Q 견인이 벽을 뚫던 버그). 벽 충돌 이벤트는 내지 않는다.
     /// </remarks>
     void TryEnterKnockback(AttackInfo attackInfo, AttackHitContext hitContext)
     {
@@ -230,13 +232,21 @@ public sealed class TrainingDummy : Unit
     }
 
     // 서버틱 지속 밀기. 임펄스가 아니라 "knockbackDuration 초 동안 knockbackStrength m/s 로 민다".
+    // transform 을 직접 옮기므로 물리가 막아주지 않는다 — 몸 캡슐 스윕으로 벽·배리어 앞에서 자른다(할 일 51).
+    // 막혀도 타이머는 그대로 흐른다(벽 앞에 멈춰 있다가 안 맞으면 자리 복귀).
     void TickKnockback(float deltaTime)
     {
         if (_knockbackTimer <= 0f)
             return;
 
         _knockbackTimer -= deltaTime;
-        transform.position += _knockbackDir * (_knockbackSpeed * deltaTime);
+
+        float requested = _knockbackSpeed * deltaTime;
+        UnitWallImpacts.GetBodyCapsule(this, out Vector3 p1, out Vector3 p2, out float radius);
+        float allowed = TrainingDummyKnockbackSweep.Sweep(p1, p2, radius, _knockbackDir, requested,
+            transform, TrainingDummyKnockbackSweep.BlockMask);
+        if (allowed > 0f)
+            transform.position += _knockbackDir * allowed;
     }
     #endregion
 

@@ -333,10 +333,10 @@ Paladin  (루트 컴포넌트 37개 — Player 와 동일 구성)
    - `Tools/Player/Authoring/Repair PlayerEncounterLock Wiring` (`PlayerEncounterLockAuthoring.cs`, 멱등 — `Player/` 폴더 순회, `Legacy/` 제외)
    - `Tools/Player/Authoring/Wire Interrupt Skill (단죄의 방패)` (`PlayerInterruptSkillAuthoring.cs` — `Paladin_Armature` + `Player_Paladin`)
    - `Tools/Rendering/Look/Wire Player Silhouette` (`PlayerSilhouetteAuthoring.cs` — base)
-5-1. **캐릭터·무기 머티리얼**(2026-10-02) → 셰이더 수치는 공통 부모 **`3.Materials/Toon/PlayableCharacter_Toon.mat`** 에서만 고친다.
-   캐릭터·무기마다 그 **Material Variant**(`Paladin_Toon`·`Paladin_Sword/Shield_Toon`·`Gunner_Toon`·`LaserGun_Toon`)를 두고 **Base Map 만** 덮는다.
-   새 캐릭터 = Variant 하나 추가. 정리 툴 `Tools/Player/Toon Material/공통 머티리얼 + Variant 정리`(`PlayableToonMaterialAuthoring.cs`, 재실행 안전 — 🔴 Variant 의 Base Map 외 오버라이드를 전부 되돌린다).
-   계획 원본 [PLAN-playable-toon-material.md](../history/PLANS/PLAN-playable-toon-material.md).
+5-1. **캐릭터·무기 머티리얼**(2026-10-02 Flat Kit 전환 · 10-17 어쌔신 추가) → 셰이더·외곽선·셀 수치는 공통 부모 **`3.Materials/FlatKit/Player/FK_Paladin_Toon.mat`**(가붕이 몸)에서만 고친다.
+   캐릭터·무기마다 그 **Material Variant** 를 두고 **Base Map(·틴트)만** 덮는다: `FK_Paladin_Sword/Shield_Toon` · `Gunner/FK_Gunner_Body` · `Gunner/FK_LaserGun` · `Assassin/FK_Assassin_Body`(머리·몸·단검 L/R 공용, §14).
+   새 캐릭터 = Variant 하나 추가. 정리 툴 `Tools/Rendering/Flat Kit/플레이어 Variant 구성 (가붕이 부모)`(`FlatKitPlayerVariants.cs`, 재실행 안전 — 🔴 Variant 의 Base Map·틴트 외 오버라이드를 전부 되돌린다).
+   ToonLit Variant(`3.Materials/Toon/`, 부모 `PlayableCharacter_Toon`)는 되돌리기용으로만 남아 있다(미사용) — 이전 계획 [PLAN-playable-toon-material.md](../history/PLANS/PLAN-playable-toon-material.md) · [PLAN-flatkit.md](../../PLAN-flatkit.md).
 5-2. **캐릭터 고유 HUD**(2026-10-06, [PLAN-assassin.md](../../PLAN-assassin.md) A5) → 공용 `CombatHUD` 에 넣지 않는다. 캐릭터 전용 UI 프리팹을
    **`<Char>_Armature/HUD`** 아래에 중첩한다(자체 Canvas, 오너만 표시). 유령 상태에서 Armature 가 꺼지면 함께 숨는다.
    예: 거너 과열 게이지 = `Gunner_Armature/HUD/GunnerHeatGauge`(`Tools/Player/Gunner/과열 게이지 프리팹 (임시 UI)`, 재실행 안전).
@@ -481,6 +481,29 @@ grep -n "AuthorityMode" Assets/2.Prefabs/Player/Player.prefab Assets/2.Prefabs/P
 | 인스펙터 | `UnitOverheadHealthBar` 「대시 아이콘」: `dashIconRoot` · `dashIconGraphics`(색을 곱할 Slot·Icon) · `dashReadyColor`(흰색) · `dashNotReadyColor`(0.35 회색, 알파로 흐리게도 가능) |
 | 테스트 | `UI/Combat/Editor/OverheadDashIconRulesTests` — `Tools/Tests/플레이어 EditMode 테스트 실행` 에 등록(UI 픽스처도 이 러너가 돌린다) |
 
+**머리 위 라벨 = 이름 / 상태이상** (2026-10-16, 할 일 50) — `Bar/NameLabel` 은 평소 이름(P1·P2…), CC·붙잡힘 중에는 그 이름 하나로 바뀐다(규칙·우선순위: [status-effects.md](../design/status-effects.md) §머리 위 표시).
+글자는 흰색 고정 + 검정 아웃라인 ≈3px(2026-10-16 후속) — 전역 폰트(TMP Settings·원본 `LiberationSans SDF`·`Resources/NotoSansKR … SDF`)는 그대로 두고 **이름표 전용 폰트 에셋**을 쓴다.
+
+| 에셋 | 설정 |
+|------|------|
+| `Assets/Fonts/Overhead/LiberationSans SDF - Overhead.asset` | `NameLabel` 의 폰트. `TextMesh Pro/Fonts/LiberationSans.ttf` · 샘플 86 · 패딩 20 · 1024² · SDFAA_HINTED · **정적** · ASCII 32–126. fallback 표 = 아래 한글 에셋 하나 |
+| `Assets/Fonts/Overhead/NotoSansKR SDF - Overhead.asset` | `Fonts/NotoSansKR-VariableFont_wght.ttf` · 샘플 28 · 패딩 6 · 2048² · SDFAA · **정적** · KS X 1001 완성형 2,350자(상태이상 문구 전부 포함) |
+| `2.Prefabs/UI/LiberationSans SDF - Overhead Outline.mat` | `NameLabel` 의 머티리얼(guid 그대로). Mobile SDF·`OUTLINE_ON`, `_MainTex` = 위 라틴 아틀라스, Outline Width **0.35** · Face Dilate **0.5** |
+| `OverheadHealthBar.prefab` → `Bar/NameLabel` | 18pt · **Character Spacing 20** (아래 「자간」) |
+
+- **두께 맞춤**: 아웃라인은 아틀라스의 (패딩+1)/샘플 크기에 비례한다. 라틴 21/86 ≈ 한글 7/28 ≈ 0.25 로 맞춰 같은 머티리얼 값에서 같은 두께가 나온다.
+  한글 글리프는 TMP 가 이 머티리얼을 복사한 fallback 머티리얼(`… Outline + NotoSansKR SDF - Overhead Atlas`)로 그려 아웃라인이 그대로 붙는다.
+  예전 원본 LiberationSans SDF(패딩 9/샘플 86)로는 18pt 에서 바깥으로 ≈1.9px 까지만 닿아 3px 가 안 나왔다.
+- **측정**(1080p, 렌더 커버리지 합): 18pt 기준 라틴 중앙값 2.9px · 한글 2.8px. 실제 게임은 바 스케일 0.9(`screenScale`)라 16.2px 글자에서 라틴 2.6 · 한글 2.9px.
+  값을 더 올리면 라틴은 패딩 한계로 두께가 더 늘지 않고 한글 획만 깎인다.
+- **자간 20**(2026-10-16 후속 2): TMP 는 글자마다 쿼드를 순서대로 그려서, **오른쪽 글자의 아웃라인이 왼쪽 글자의 흰 면을 덮는다**.
+  라틴 글자 사이 원래 면 간격은 16.2px 에서 1–2px 뿐이라 ≈2.7px 아웃라인보다 좁다 — 자간 0 에서 `Stunned` 등이 글자당 10–16px² 씩 먹혀 겹쳐 보였다(한글은 간격이 넓어 0–2px²).
+  폰트 메트릭 문제가 아니고(advance 가 원본 `LiberationSans SDF` 와 같다), Dilate 부풀림도 아니다(면 간격 변화 ≤1px).
+  자간 20 에서 먹힘 ≈0 — 머티리얼·두께는 그대로다. 아웃라인을 두껍게 바꾸면 자간도 다시 맞춘다(10→84px², 15→8px², 18→1px², 20→0.1px², 영문 9개 합계).
+- **정적 아틀라스**라 에디터·Play 에서 에셋이 다시 써지지 않는다(git 노이즈 없음). 2,350자 밖 글자(희귀 한글·한자 등 닉네임)는 TMP Settings 전역 fallback(`NotoSansKR … SDF`)로 그려진다 — 보이긴 하지만 아웃라인이 ≈1px 로 얇다.
+- 2,350자 밖 글자는 전역 fallback 으로 외곽선 약 1px — 사용자 승인(2026-10-16: 정적 아틀라스 유지, 한글 전용 에셋 9.6MB 그대로).
+  글자를 늘릴 땐 Font Asset Creator 에서 에셋에 저장된 생성 설정(문자 목록 포함)으로 다시 굽는다.
+
 **에임 대시 틴트** — `PlayerAimIndicator.tintOnDashCooldown`(기본 **꺼짐**). 켜면 예전처럼 재충전 중 인디케이터를
 `dashCooldownTint` 로 어둡게 한다(쿼드 머티리얼 **인스턴스**의 `_BaseColor` — §12). 꺼져 있으면 항상 원래 색이고, 어두운 상태에서 끄면 원래 색으로 되돌린다.
 base·Variant 모두 이 값을 오버라이드하지 않는다(2026-10-12 확인) — 다시 켜려면 base `Player.prefab` 에서 켠다.
@@ -533,6 +556,54 @@ URP 데칼(`DecalProjector`)을 버리고 **바닥에서 띄운 얇은 쿼드**�
 | 테스트 | `Player/Editor/AimIndicatorPlacementTests` — `Tools/Tests/플레이어 EditMode 테스트 실행` 에 등록 |
 
 **화살표 이미지 교체** — `3.Materials/Player/AimIndicator/AimIndicator3D.mat` 의 `_BaseMap`(인스펙터 **Base Map**) 슬롯 하나에 새 텍스처를 넣으면 끝이다. 런타임 코드는 텍스처·머티리얼 경로를 모르고 쿼드의 머티리얼만 본다. 저작 메뉴를 다시 돌려도 `_BaseMap` 이 차 있으면 덮어쓰지 않는다. 새 이미지도 화살표가 텍스처 **왼쪽(-U)** 을 가리키게 그릴 것(아니면 `indicator_rot_offset` 조정).
+
+---
+
+## 13. 어쌔신 머리카락 2차 모션 (2026-10-16, 할 일 47)
+
+머리카락 본 28개(`Hair_Source00~06_01~04`, 7가닥 × 4마디, 전부 `Head` 아래)는 FBX 에 스킨돼 있지만 클립에 커브가 없어
+굳어 있었다. 납품 스크립트를 그대로 들여와 `Assassin_Armature.prefab` 루트에 붙였다. **(10-16 머리카락 작업 기준) FBX·아바타·클립·Animator 컨트롤러·SVN 무수정.**
+10-17 v18(§14)에서 FBX 임포트 배율 ×1.25(SVN)·아바타 재생성·`Run_Loop` 0.8 로 바뀌었고, 바인드 포즈를 ×1.25 길이 값으로 다시 캡처했다.
+
+| 항목 | 내용 |
+|------|------|
+| 스크립트 | `1.Scripts/Player/Assassin/Hair/` — 납품 원본 그대로·`.meta` guid 유지: `AssassinHairMotion`(v13 물리 솔버) · `AssassinActionHairAnimation`+`AssassinActionHairProfiles`(v16 동작별 보정) · `AssassinDiveHairAnimation`(v15 회피). 우리 코드: `AssassinHairDriver`(구동기) · `AssassinHairClipRules`/`AssassinHairClipTracker`(순수 규칙) · `AssassinHairArmClearance`(팔 밀어내기 후처리) |
+| Armature 구성 | 루트에 위 4 컴포넌트(`AssassinHairMotion`·`AssassinActionHairAnimation`·`AssassinDiveHairAnimation`·`AssassinHairDriver`). 솔버는 **에디터에서 바인드 포즈 캡처**(체인 7×4·몸 캡슐 8, `captured`) — 런타임 자동 캡처에 기대지 않는다 |
+| 한 프레임 순서 | 구동기 `[DefaultExecutionOrder(21000)]`(SDArmTwist 20000·Animator 뒤). `Awake` 에서 v13 `externalDrive=true`, 보정 2종 `Capture`(첫 Animator 평가 전 원래 자세) → 매 프레임 `Update`: 보정 `RestoreBasePose` → (Animator·SDArmTwist) → `LateUpdate`: v13 `Advance` **1회** → 지금 클립에 맞는 `ApplyPose` → 팔 밀어내기 후처리. v13 을 한 프레임에 두 번 돌리지 않는다. 구동기만 꺼지면 v13 이 자기 LateUpdate 로 혼자 돈다 |
+| 팔 밀어내기 후처리 | `LateUpdate` 마지막(v13 `Advance`·보정 `ApplyPose` 뒤) 1회. 팔 캡슐 4개(좌우 상완·전완)에 닿는 마디만 뿌리 쪽부터 **회전**시켜 캡슐 밖으로 민다(뿌리 고정·마디 길이 보존, 본 회전이 자식 마디를 데려가므로 다음 마디는 옮겨진 자리에서 판단). 캡슐·반경·`bindAllowance` 는 v13 이 가진 것을 이름으로 찾아 재사용. 가슴·허리 캡슐은 **가드**로만 쓴다 — 민 가닥이 그 프레임 원래 깊이보다 몸통으로 더 들어가지 않게 한 걸음을 줄인다(이미 겹친 몸통은 v13 몫, 건드리지 않음). v13 이 팔 접촉을 못 푸는 이유는 옆 가닥이 몸통만 보는 가상 중심 가닥에서 8°/12° 이상 못 벗어나기 때문이다(납품 원본은 무수정). 다음 프레임 v13 `Advance` 가 `CaptureTargets` 에서 바인드 회전으로 되돌린 뒤 자기 내부 점으로 다시 쓰므로 후처리 결과는 시뮬레이션 상태에 들어가지 않는다. 인스펙터: `armClearanceEnabled`(기본 켬) · `armClearanceMaxDegrees`(마디 하나를 더 꺾는 최대 각, 기본 45° — 진단상 필요 회전 22~56°, 45° 위로는 잔여 겹침이 거의 안 줄고 꺾임만 커진다). 판단은 `AssassinHairArmClearance`(순수 함수) |
+| 클립 고르기 | **Base Layer** 현재 상태의 가장 무거운 클립(UpperBody 레이어는 안 본다). `Dodge_Combat_F_0` → v15, v16 프로필이 있는 클립 → v16, 그 외 → v13 만. 클립 안 초 = 정규화 시간 × 원본 길이(재생 속도 3.6배여도 위상 같음) |
+| trailing 방향 | "출발 반대 방향"은 처음·상태/클립 전환·루프 한 바퀴·시간 되감기(Any State 재진입)·v13 리셋 때 `-Armature.forward` 로 다시 잡고, 그 사이엔 유지(납품 브리지 규칙 + 리셋) |
+| 캡처 실패 | 경고 1줄 후 보정만 끄고 v13 은 계속 |
+| 네트워크 | 순수 표현 — NetworkVariable·RPC·NetworkAnimator 변경 없음. 각 피어가 자기 Animator(NetworkAnimator 복제) 결과로 로컬 계산, 피어마다 미세하게 달라도 된다 |
+| 튜닝 | 납품 기본값(v13 기본·보정 strength 1·회피 fan 22 — 납품 사용법 값). 🔸 길이 차원 값(`hairRadius`·캡슐 반경·끝 마디·`gravitySupport`·`maximumDynamicSpeed`·`neighbourOffsetLimit`)은 **납품값 × 리그 배율**(v18 = 1.25, §14). 그 밖의 값은 프리팹 인스펙터에서만 조정(길이 차원 값은 저작 메뉴가 매번 다시 쓰므로 `AssassinHairAuthoring` 의 `Delivered*` 상수에서 바꾼다), xlsx 노출 안 함. 구동기 인스펙터: `actionHairEnabled`·`diveHairEnabled`·`armClearanceEnabled`·`armClearanceMaxDegrees` |
+| 저작 | `Tools/Player/Assassin/머리카락 본 연결`(`AssassinHairAuthoring`, 멱등 — 없으면 추가·있으면 재캡처, 기존 인스펙터 값 유지 — 단 위 길이 차원 값은 납품값 × 임포트 배율로 매번 다시 쓴다). 전체 저작(`AssassinShellAuthoring` Armature 단계)도 같은 `Ensure` 를 부른다 |
+| 테스트 | `Player/Editor/AssassinHairClipRulesTests`(규칙) · `AssassinHairArmClearanceTests`(밀어내기·상한·길이 보존·몸통 가드) · `AssassinHairPrefabTests`(체인 7×4 본·캡처·캡슐·구동기·Variant 중첩·길이 값 = 납품값 × 임포트 배율·겹침 허용치 재계산 대조) — `Tools/Tests/플레이어 EditMode 테스트 실행` 에 등록 |
+
+**리셋 경로** — 피어마다 로컬 시뮬레이션이라 서버/오너에서만 불리는 훅(`TeleportAuthoritative`·`PlaceOwnerAtSpawnClientRpc`·`PlayerFallRecovery`·`BossTeleportManager`)에 걸지 않는다. 별도 리셋 코드를 더하지 않았다(아래로 전부 덮임).
+
+| 경로 | 덮는 것 |
+|------|---------|
+| 사망 → 유령 → 부활 | `PlayerSoulController` 가 alive visual(Armature)을 끄고 켠다 → v13 `OnEnable → ResetSimulation`(모든 피어 — 생명 상태 복제로 각자 켠다) |
+| 스테이지 이동(보스룸·엘리베이터) | `NetworkTransform.Teleport` → 원격도 한 프레임에 스냅 → v13 Head 이동 거리 > `teleportDistance`(4m) 자동 리셋 |
+| 낙하 복귀 · 스폰 배치 · 전멸 리스폰 | 오너: `TeleportAuthoritative` 스냅(1m 넘으면 시각 보간 안 함) → 4m 넘으면 자동 리셋, 그 아래는 빠른 이동으로 처리. 원격: `Teleport` 플래그 없이 복제돼 NT 보간(≤0.1초)으로 미끄러진다 → 리셋 없이 빠른 이동으로 처리. v13 은 마디 길이를 강제하고 루트 속도를 그대로 실어 날라(상대 속도만 2.5m/s 제한 — 납품 2 × 리그 배율 1.25) 늘어나거나 튀지 않는다(에디터 스모크: 15m/6프레임 슬라이드 길이 오차 0) |
+| 프레임 끊김(> 0.5초) | v13 `deltaTime > 0.5` 리셋 |
+
+## 14. 어쌔신 v18 비주얼 — Flat Kit 재질 · 키 ×1.25 (2026-10-17, PLAN-assassin §9)
+
+계획 [PLAN-assassin.md](../../PLAN-assassin.md) §9. 가붕이·거너와 통일감을 맞추려고 형상 v18g + 텍스처 T3H 로 바꾸고 키를 1.252 → 약 1.565m 로 키웠다. **판정·스킬 수치·클립·네트워크는 그대로다.**
+
+| 항목 | 내용 |
+|------|------|
+| 크기 | **FBX 임포터 Scale Factor(`Assassin.fbx.meta` 첫 `globalScale`) 1 → 1.25 만** 쓴다(SVN). 메시·본 **위치**에 구워지고 본 lossyScale 은 1 이다. humanScale 0.674 → 0.843(아바타 T-pose 도 ×1.25 로 다시 만들어짐) |
+| 🔴 루트 배율 금지 | `Assassin_Armature` 루트에 배율을 걸지 않는다 — `DefaultAttack`·`InterruptAttack`(BoxCollider 판정)과 VFX 기준점이 루트의 자식이라 판정이 같이 커진다 |
+| 단검 | 손 본에 붙은 단검 **루트** `m_LocalScale` 1 → 1.25(본 lossyScale 이 1 이라 직접 키운다). 쥐는 위치 오프셋은 루트 아래 자식에 있어 루트를 따라 커진다 — **곱하지 않는다**(곱하면 ×1.5625). 게임에서 쓰는 오프셋은 `Player_Assassin.prefab` 이 단검 자식에 덮어쓴 값이고 Armature 쪽 값은 가려져 있다. 저작 `AssassinShellAuthoring` 이 새로 붙이는 단검 = 임포트 배율(`AssassinHairAuthoring.ImportScale`) |
+| 재질 | `3.Materials/FlatKit/Player/Assassin/FK_Assassin_Body.mat`(§7 5-1 Variant). 슬롯 5개 = `Assassin_HeadNeck` 0·1(Head·Face) · `Assassin_SourceBody` 0 · 단검 L/R 각 0 — Face 도 FK(셸 저작의 ToonLit Face 분기 제거). 단검도 어쌔신 아틀라스를 쓰고 단검 UV 가 얼굴·눈 섬과 겹친다(기존부터 — 전용 텍스처는 별도 아트 작업). 🔸 `Assassin.fbx.meta` 의 재질 remap 이 없는 guid 를 가리켜 FBX 원본 슬롯은 비어 있다 → 슬롯 오버라이드를 Revert 하면 분홍이 된다. ToonLit `3.Materials/Toon/Assassin_Toon.mat` 은 되돌리기용 |
+| 조명 | Flat Kit 은 장면 조명을 그대로 받고 실시간 그림자를 받지 않는다(ToonLit 은 고정광 `_FIXEDLIGHT_ON`·그림자 0.35) — 가붕이·거너와 같다 |
+| 머리카락 | §13 의 길이 차원 값 × 임포트 배율로 재캡처(`AssassinHairAuthoring.RigScale` = `ModelImporter.globalScale`, 리그 실측과 1% 넘게 다르면 에러): 캡슐 반경 · `hairRadius` 0.0225 · 끝 마디 0.1875 m · `gravitySupport` 0.8125 · `maximumDynamicSpeed` 2.5 · `neighbourOffsetLimit` 0.1125 · `bindAllowanceReference` 재계산. 각도·시간 상수(`armClearanceMaxDegrees` 47.7° 등)는 그대로 |
+| 달리기 | `AssassinAnimatorController` `Run_Loop` 재생 속도 = **1 / 임포트 배율 = 0.8**(×1.25 로 클립 자연 속도 4.98 → 6.23 m/s, 재생 0.8 로 실제 4.98 m/s ≈ 이동 5 m/s). Start/Stop 은 1. 저작 `AssassinShellAuthoring.BuildAnimator` |
+| SVN ↔ git | FBX·.meta·BaseColor 는 SVN, 나머지는 git — 둘은 짝이다. `Docs/tech/art-svn.json` 핀이 새 리비전을 가리킨다. 한쪽만 받으면 키·단검·머리카락·달리기 속도가 어긋난다 |
+| 테스트 | `Player/Editor/AssassinVisualPrefabTests`(슬롯 5개·부모·BaseMap · 단검 루트 = 임포트 배율 · `Run_Loop` = 1 / 배율 · Armature 루트·판정 박스 배율 1) · `AssassinHairPrefabTests.SolverLengthsFollowRigScale`·`BindAllowancesMatchCapsuleRadii` — `Tools/Tests/플레이어 EditMode 테스트 실행` 에 등록 |
+| 되돌리기 | `globalScale` 1 → `머리카락 본 연결` 재실행(배율 1 로 다시 캡처) · 단검 루트 1 · `Run_Loop` 1 · 재질 오버라이드 `Assassin_Toon` · `AssassinShellAuthoring.MaterialPath` · `FlatKitPlayerVariants` 의 어쌔신 블록(지우지 않으면 메뉴를 돌릴 때마다 슬롯이 FK 로 돌아간다) · 위 테스트 등록 해제 · 핀 |
 
 ---
 

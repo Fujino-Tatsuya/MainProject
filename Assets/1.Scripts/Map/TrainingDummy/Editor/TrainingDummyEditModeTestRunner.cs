@@ -3,7 +3,7 @@ using UnityEditor.TestTools.TestRunner.Api;
 using UnityEngine;
 
 /// <summary>
-/// 허수아비 인터럽트 순환(+ 재사용하는 몬스터 카운터 창) EditMode 테스트를 메뉴 한 번으로 돌리고 결과를 콘솔에 남긴다.
+/// 허수아비 인터럽트 순환(+ 재사용하는 몬스터 카운터 창)·지속 넉백 벽 스윕 EditMode 테스트를 메뉴 한 번으로 돌리고 결과를 콘솔에 남긴다.
 /// 패턴은 <see cref="DataTableEditModeTestRunner"/> 를 따랐다.
 /// </summary>
 internal static class TrainingDummyEditModeTestRunner
@@ -12,6 +12,7 @@ internal static class TrainingDummyEditModeTestRunner
     {
         "^TrainingDummyInterruptCycleTests$",
         "^CounterWindowTests$",
+        "^TrainingDummyKnockbackSweepTests$",
     };
 
     const string Tag = "[TrainingDummyTests]";
