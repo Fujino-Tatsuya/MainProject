@@ -256,6 +256,8 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             return;
 
         // 베기 연출은 전 피어 — 클립 Hit 이벤트는 모든 피어에서 재생된다(판정은 아래 서버만).
+        // 일반 1~4타·변신 묶음 베기는 클립의 EffectAnimEvents 이벤트(PlayEffect / StartEffect·StopEffect)가 직접 낸다 —
+        // 여기로 오는 건 강타(임시 프리팹)뿐이다(2026-10-19 민경).
         if (eventType == DefaultAttackAnimationEventType.Hit && active && view != null)
             view.PlayAttackSlash(currentMode, currentStepIndex);
 
@@ -591,6 +593,10 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
 
     private void PlayAttackClip()
     {
+        // 변신 묶음 베기 루프는 클립의 StartEffect/StopEffect 이벤트(EffectAnimEvents)가 켜고 끈다.
+        // 안전망 — 일반·강타 클립이 시작되면 남은 루프를 끈다. 끝·취소(StopEffect 프레임에 못 닿는 경우)는 ResetRuntime 이 끈다.
+        if (view != null && currentMode != AssassinBasicAttackMode.Transformed)
+            view.EndTransformedSlash();
         if (animator != null)
         {
             animator.SetInteger(AttackIndexHash, AnimatorIndexFor(currentMode, currentStepIndex));
@@ -617,12 +623,16 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         // 백어택(A11) — 일반·강타·변신 묶음 모두 배율을 싣고, 변신 중이면 위치 무관(타격 시점의 변신 여부).
         if (assassinState != null)
             coneAttack.SetBackAttack(assassinState.BackAttackMultiplier, assassinState.IsTransformed);
-        coneAttack.Fire(
+        bool landed = coneAttack.Fire(
             attackDirection,
             step.Range,
             step.Angle,
             damage,
             data.TriggersOnHit);
+
+        // 일반 타가 무언가를 맞히면 전 피어에서 그 타의 성공 연출을 일반 베기 위에 겹친다(강타·변신 묶음은 없음).
+        if (landed && currentMode == AssassinBasicAttackMode.Normal && view != null)
+            view.ServerNormalSlashHit(currentStepIndex);
 
         // 일반 1타·강타가 유효 대상(§4.3)을 맞히면 대상 수와 무관하게 1번 충전(§4.2). 변신 묶음은 충전 없음 — 모델도 막는다.
         if (!rageClaimed && currentMode != AssassinBasicAttackMode.Transformed && assassinState != null &&
@@ -687,6 +697,8 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
         fallbackEndTime = 0f;
         hasPendingClip = false;
         StopLunge();
+        if (view != null)
+            view.EndTransformedSlash();   // 묶음 끝·취소·시작 실패 — StopEffect 프레임 전에 끊겨도 변신 베기 루프가 남지 않게
     }
 
     // 벽·적 몸에 막히면 남은 전진을 버린다 — 막힌 자리에서 옆으로 미끄러지지 않게(Q 돌진과 같은 규칙).

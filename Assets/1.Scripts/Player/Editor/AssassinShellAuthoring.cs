@@ -54,16 +54,9 @@ public static class AssassinShellAuthoring
     private const string CircleStrikeVfxPath = "Assets/50.Art/VFX/Common/Burst/Burst_rings.prefab";
     private const string BackAttackVfxPath = "Assets/50.Art/VFX/Common/Burst/Burst_sharp.prefab";
     // 평타·시전 임시 VFX(10-06 은희 요청) — 가붕이 평타 베기·공용 연출 재사용. 민경 교체 대상.
+    // 일반 4타·변신 묶음은 정식 VFX(Player_Assassin/VFX/* 의 EffectSocketPlayer — 민경이 프리팹에서 엔트리·소켓 지정, 2026-10-19)로 바뀌어 여기서 채우지 않는다.
     private const string PlayerSlashFolder = "Assets/50.Art/VFX/Common/Players/Player1/DefaultAttack/";
-    private static readonly string[] NormalSlashVfxPaths =
-    {
-        PlayerSlashFolder + "FX_SingleSlash_O.prefab",
-        PlayerSlashFolder + "FX_SingleSlash_X.prefab",
-        PlayerSlashFolder + "FX_SingleSlash_O.prefab",
-        PlayerSlashFolder + "FX_DoubleSlash_X.prefab",
-    };
     private const string EnhancedSlashVfxPath = PlayerSlashFolder + "FX_DoubleSlash_O.prefab";
-    private const string TransformedSlashVfxPath = "Assets/50.Art/VFX/Common/Monsters/FX_Mob_Slash.prefab";
     private const string EnhanceCastVfxPath = "Assets/50.Art/VFX/Common/Burst/Flash_star.prefab";
     private const string InterruptCastVfxPath = "Assets/50.Art/VFX/Common/FX_Interrupt_Flash.prefab";
     private const string RosterPath = "Assets/9.ScriptableObject/Player/CharacterRoster.asset";
@@ -249,7 +242,13 @@ public static class AssassinShellAuthoring
             DefaultAttackEvent(0.40f, DefaultAttackAnimationEventType.ComboWindowOpen),
             DefaultAttackEvent(0.95f, DefaultAttackAnimationEventType.ComboWindowClose),
             DefaultAttackEvent(AttackEndTime, DefaultAttackAnimationEventType.End));
+        // 변신 베기 루프 켜기·끄기 — EffectAnimEvents(정규화 0.075·0.975 = 클립 0.667초 기준 0.05초·0.65초).
+        // 🔴 StampEventsIfEmpty 라 **클립에 이벤트가 하나도 없을 때만** 찍힌다. 이미 박혀 있는 것을 덮지 않는다
+        //    (민경이 옮긴 Hit 시각을 지키려는 쪽이 우선 — 2026-10-19 머지 결정). effect 이벤트만 지워진 경우는
+        //    이 메뉴로 복구되지 않으므로 직접 넣을 것.
         StampEventsIfEmpty("Speed_Attack_Loop",
+            EffectEvent(0.075f, nameof(EffectAnimEventRelay.StartEffect), TransformedSlashEffectId),
+            EffectEvent(0.975f, nameof(EffectAnimEventRelay.StopEffect), TransformedSlashEffectId),
             DefaultAttackEvent(0.15f, DefaultAttackAnimationEventType.Hit),
             DefaultAttackEvent(0.35f, DefaultAttackAnimationEventType.Hit),
             DefaultAttackEvent(0.55f, DefaultAttackAnimationEventType.Hit),
@@ -569,17 +568,10 @@ public static class AssassinShellAuthoring
             // 변신 루프는 정식 VFX(EffectCatalog.Assassin_R_BladeVortex)로 바뀌어 여기서 채우지 않는다(2026-10-14 민경).
             SetIfEmpty(so, "circleStrikePrefab", CircleStrikeVfxPath);
             SetIfEmpty(so, "backAttackHitPrefab", BackAttackVfxPath);
-            SetArrayIfEmpty(so, "normalSlashPrefabs", NormalSlashVfxPaths);
             SetIfEmpty(so, "enhancedSlashPrefab", EnhancedSlashVfxPath);
-            SetIfEmpty(so, "transformedSlashPrefab", TransformedSlashVfxPath);
             SetIfEmpty(so, "enhanceCastPrefab", EnhanceCastVfxPath);
             SetIfEmpty(so, "interruptCastPrefab", InterruptCastVfxPath);
-            SerializedProperty slashSockets = so.FindProperty("normalSlashSockets");
-            slashSockets.arraySize = 4;
-            for (int i = 0; i < 4; i++)
-                slashSockets.GetArrayElementAtIndex(i).objectReferenceValue = root.transform.Find($"Armature/VFX/BasicAttack0{i + 1}");
             so.FindProperty("enhancedSlashSocket").objectReferenceValue = root.transform.Find("Armature/VFX/EnhancedAttack");
-            so.FindProperty("transformedSlashSocket").objectReferenceValue = root.transform.Find("Armature/VFX/TransformedAttack");
             so.ApplyModifiedPropertiesWithoutUndo();
 
             PrefabUtility.SaveAsPrefabAsset(root, VariantPath);
@@ -612,30 +604,6 @@ public static class AssassinShellAuthoring
         if (prefab == null)
             Debug.LogWarning($"{Tag} 임시 VFX 프리팹이 없어 {propertyName} 을 비운다: {assetPath}");
         property.objectReferenceValue = prefab;
-    }
-
-    // 배열 칸마다 SetIfEmpty — 민경이 바꾼 칸은 유지한다.
-    private static void SetArrayIfEmpty(SerializedObject so, string propertyName, string[] assetPaths)
-    {
-        SerializedProperty array = so.FindProperty(propertyName);
-        if (array == null || !array.isArray)
-        {
-            Debug.LogError($"{Tag} {so.targetObject.GetType().Name}.{propertyName} 배열 필드가 없다.");
-            return;
-        }
-        if (array.arraySize < assetPaths.Length)
-            array.arraySize = assetPaths.Length;
-
-        for (int i = 0; i < assetPaths.Length; i++)
-        {
-            SerializedProperty element = array.GetArrayElementAtIndex(i);
-            if (element.objectReferenceValue != null)
-                continue;
-            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(assetPaths[i]);
-            if (prefab == null)
-                Debug.LogWarning($"{Tag} 임시 VFX 프리팹이 없어 {propertyName}[{i}] 를 비운다: {assetPaths[i]}");
-            element.objectReferenceValue = prefab;
-        }
     }
 
     // 임시 HUD — 화면 하단 중앙(거너 과열 게이지와 같은 높이대, 공용 CombatHUD 위). 스프라이트 없이 Image 색만 쓴다.
@@ -1753,6 +1721,14 @@ public static class AssassinShellAuthoring
         return new AnimationEventSpec(normalizedTime, nameof(PlayerAnimationEventRelay.HandleDefaultAttackEvent), (int)type);
     }
 
+    // Player_Assassin/VFX/TransformedSlash 의 EffectSocketPlayer.Id 와 같아야 한다.
+    private const string TransformedSlashEffectId = "Assassin_TransformedSlash";
+
+    private static AnimationEventSpec EffectEvent(float normalizedTime, string functionName, string effectId)
+    {
+        return new AnimationEventSpec(normalizedTime, functionName, 0, effectId);
+    }
+
     private static AnimationEventSpec SkillEvent(float normalizedTime, SkillAnimationEventType type)
     {
         return new AnimationEventSpec(normalizedTime, nameof(PlayerAnimationEventRelay.HandleSkillEvent), (int)type);
@@ -1772,6 +1748,7 @@ public static class AssassinShellAuthoring
                 time = Mathf.Clamp01(specs[i].NormalizedTime) * clip.length,
                 functionName = specs[i].FunctionName,
                 intParameter = specs[i].IntParameter,
+                stringParameter = specs[i].StringParameter,
             };
         }
 
@@ -1812,12 +1789,14 @@ public static class AssassinShellAuthoring
         public readonly float NormalizedTime;
         public readonly string FunctionName;
         public readonly int IntParameter;
+        public readonly string StringParameter;
 
-        public AnimationEventSpec(float normalizedTime, string functionName, int intParameter)
+        public AnimationEventSpec(float normalizedTime, string functionName, int intParameter, string stringParameter = null)
         {
             NormalizedTime = normalizedTime;
             FunctionName = functionName;
             IntParameter = intParameter;
+            StringParameter = stringParameter;
         }
     }
 }

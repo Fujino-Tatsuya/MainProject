@@ -48,9 +48,29 @@
 - `EffectManager.Play(entry, pos, rot, Vector3 axisScale)` 오버로드 신설(VFX 코드) — localScale 에만 축별로 곱한다. 기존 float 배율 경로는 동작 불변.
 - 에셋 `Players/Player3/Q_Dash/FX_Assassin_PierceLine`·`_PierceBurst`(+Entry, duration 0.6·1.0).
 
+## 3-4. 일반 E 단검 강화 — 날 붉은 발광 + 오라 + 차지 (2026-10-16 추가)
+- ✅ **공용 셰이더 `ToonLit`·`MaterialFadeEffect` 는 수정 없음**(10-16 2차 — 처음 넣었던 발광·날 마스크·Color 모드는 되돌렸다). 칼날 발광 = **팔라딘 패시브와 같은 방식**:
+  양손 단검 렌더러 `m_Materials` = [0] 원래 `Assassin_Toon.mat` + [1] 오버레이 `50.Art/VFX/_Materials/Dagger_Blade_Glow.mat`(`Shader_IntegratedEffect`, 마스크 `50.Art/VFX/Textures/Dagger_BladeMask.png` = 단검 UV0 의 칼날 폴리곤만).
+- 신규 `AssassinEnhanceReadyView`(Assassin_Armature `VFX/EnhancedReady` 에 부착, 같은 오브젝트에 MaterialFadeEffect `_ColorFactor` 0 ↔ 1, 0.5초 인 / 0.3초 아웃): `AssassinState.IsEnhancedReady` 로 켜고 끈다. 차지는 `EnhancedReadyChanged(true)` 순간만, 늦은 접속·Armature 재활성은 Update 가 차지 없이 맞춘다. **추가 RPC 없음.**
+- 단검 소켓 `Dagger_Weapon_R/L/VFX_EnhanceAura`(날 중간 로컬 Y 0.33, Assassin_Armature 에서 추가) — 오라·차지가 붙는다.
+- `Player_Assassin` 의 `enhanceCastPrefab`(임시 Flash_star) 비움 — 차지가 대신한다. `AssassinSkillView.PlayEnhanceCast` 호출은 그대로(빈 필드 = 연출 없음).
+- 강화 일격 슬래쉬는 `enhancedSlashPrefab` 교체만(코드 무변경) — 반입 때.
+
+## 3-5. 좌클릭 — 일반 4타 · 적중 성공 · 변신 묶음 (2026-10-19 추가)
+- 소켓 = `Player_Assassin/VFX/NormalSlash_1~4 · NormalSlash_Success_1~4 · TransformedSlash`(민경이 넣은 `EffectSocketPlayer`, 각자 Armature `BasicAttack01~04`·`TransformedAttack` 추종). 엔트리 `EffectCatalog.Assassin_LClick_Slash`(일반 4타 공용 원샷)·`_Success`(원샷)·`_Transformed`(루프, outro 0.5초).
+- 🔸 **재생 구조(민경 결정)** = `EffectAnimEventRelay` → `EffectAnimEvents`. `Player_Assassin` 루트에 `EffectAnimEvents` 추가(Armature 의 기존 `EffectAnimEventRelay` 가 찾는다). 소켓 id: `Assassin_NormalSlash_1~4`·`Assassin_TransformedSlash`(성공 4개는 id 없음 — 코드 재생).
+  클립 이벤트: `Combo_Attack_Wave_01~04` = `PlayEffect("Assassin_NormalSlash_N")`(0.133/0.05/0.117/0.117초, 민경 배치), `Speed_Attack_Loop` = `StartEffect("Assassin_TransformedSlash")` 0.05초 · `StopEffect` 0.65초. 판정 Hit 은 그대로.
+- `AssassinSkillView`: `normalSlashPrefabs`·`transformedSlashPrefab`·`normalSlashSockets`·`transformedSlashSocket` **삭제**. 남은 것: `EffectSocketPlayer[] normalSlashSuccess` + 신규 `ServerNormalSlashHit(int)` → `[Rpc(ClientsAndHost, Unreliable)] NormalSlashHitRpc` → `normalSlashSuccess[타].PlayOnce()`(서버 판정이라 애니 이벤트로 못 낸다, 팔라딘 `PlaySlashVfxRpc` 선례), `EffectSocketPlayer transformedSlash` + `EndTransformedSlash()`(안전 정지). `PlayAttackSlash`(Hit) 는 강타 임시 프리팹만.
+- `AssassinBasicAttack`: `FireCurrentHit` 가 `coneAttack.Fire()` 반환값(지금까지 버림)을 받아 **일반 모드 + 적중**이면 `view.ServerNormalSlashHit(currentStepIndex)`. 변신 루프 안전 정지 — `PlayAttackClip`(일반·강타 클립 시작)·`ResetRuntime`(끝·취소·시작 실패)에서 `EndTransformedSlash`(피격·대시·변신 해제로 StopEffect 프레임 전에 끊겨도 루프가 남지 않게).
+- ⚠️ 묶음을 이어 누르면 다음 묶음의 `StartEffect` 가 루프를 다시 켠다(`EffectSocketPlayer.Play` 는 Stop 후 재생 — 남은 입자는 outro 로 흩어지고 새 루프 시작).
+- `AssassinShellAuthoring`(에디터 저작 메뉴): 지운 필드를 채우던 줄·상수·`SetArrayIfEmpty` 삭제. `Speed_Attack_Loop` ReplaceEvents 에 Start/StopEffect 를 같이 찍게(`AnimationEventSpec` 에 string 인자 추가) — 메뉴를 다시 돌려도 남는다. 일반 4타 클립은 이벤트가 있으면 유지.
+- 🔸 이펙트 공용: `ShurikenEffectSystem.SetPlayRate` 가 `저작 Simulation Speed × 배율` 로 쓴다(`ShurikenPartCache.baseSpeeds`, 첫 캐시 = 첫 재생 전 프리팹 값). 전에는 배율을 그대로 덮어써 풀 반납(1) 뒤 빠르게 저작한 이펙트가 1배속이 됐다. 저작 속도 1 인 기존 이펙트는 동작 불변.
+
 ## 4. 확인 부탁
 - Play: R → 0.5초에 소용돌이가 차고 따라다님 / 만료·수동 해제·쓰러짐 → 0.5초에 흩어짐.
 - MPPM: 다른 피어·변신 중 늦게 들어온 클라에서도 보이는지.
 - 변신 E: 원 표시 중심에서 루프가 나오고, 5타 끝(또는 중단) 뒤 1초쯤에 걸쳐 흩어지는지.
 - 변신 Q: 돌진 경로에 자국이 남고, 출발 순간 엉뚱한 곳에서 한 줄로 쏟아지지 않는지(풀 인스턴스 위치 이동).
 - 일반 Q: 돌진이 끝나고 한 박자 뒤 경로 위로 일섬 + 끝점 버스트, 벽에 막히면 일섬이 그만큼 짧은지. 다른 피어에서도 경로와 맞는지.
+- 일반 E: 누르면 양손 단검 날만 붉게 + 검붉은 오라, 강화 일격·변신·쓰러짐에 꺼짐. 다른 피어·늦은 접속에서도 같은지. 다른 캐릭터(팔라딘·거너·어쌔신 몸)가 그대로인지.
+- 좌클릭: 일반 4타마다 소켓 방향대로 베기, 맞았을 때만 성공 연출이 겹쳐 나옴(빗나가면 베기만). 변신 묶음 동안 루프가 돌고 묶음 끝·피격 취소·변신 해제에 꺼지는지. 다른 피어에서도 같은지.

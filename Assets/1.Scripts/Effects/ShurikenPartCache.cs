@@ -29,4 +29,10 @@ public class ShurikenPartCache : MonoBehaviour
     /// 다음 대출 때 이전 위치와 새 위치를 잇는 긴 줄이 한 번 그어진다(풀링된 트레일의 전형적 증상).
     /// </summary>
     [System.NonSerialized] public TrailRenderer[] trails;
+
+    /// <summary>
+    /// <see cref="all"/>과 같은 순서의 <b>저작 Simulation Speed</b>(캐시를 만들 때 = 첫 재생 전 프리팹 값).
+    /// 배율은 이 값에 곱한다 — 그냥 덮어쓰면 반납(<c>SetPlayRate(1)</c>) 뒤 빠르게 저작한 이펙트가 1배속이 된다.
+    /// </summary>
+    [System.NonSerialized] public float[] baseSpeeds;
 }

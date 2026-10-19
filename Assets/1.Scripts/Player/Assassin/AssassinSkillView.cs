@@ -17,6 +17,11 @@ using UnityEngine;
 ///   🔹 일반 Q 돌진 = 정식 VFX <c>Assassin_Q_PierceLine</c>·<c>Assassin_Q_PierceBurst</c>(2026-10-16 민경) — 시작점을 기억했다가
 ///   스킬 OnEnd 에서 지나온 경로 위로 일섬(Z 배율 = 실제 이동 거리)을 긋고 끝점에 버스트. 임시 돌진 궤적은 제거.
 /// - 평타 베기: 클립 Hit 애니 이벤트(전 피어에서 재생)마다 <see cref="AssassinBasicAttack"/> 가 부른다 — RPC 없음.
+///   🔹 정식 VFX(2026-10-19 민경) — 소켓은 <c>Player_Assassin/VFX/*</c> 의 <see cref="EffectSocketPlayer"/>(엔트리·위치는 프리팹에서):
+///   일반 1~4타·변신 묶음은 클립의 <see cref="EffectAnimEvents"/> 이벤트(<c>PlayEffect</c> / <c>StartEffect</c>·<c>StopEffect</c>)가
+///   직접 재생한다 — 여기서 하지 않는다. 여기 남은 것: 적중 성공 = [서버] <see cref="ServerNormalSlashHit"/> → 전 피어
+///   <c>normalSlashSuccess[타]</c> 원샷(일반 베기와 겹쳐 재생 — 서버 판정이라 애니 이벤트로 못 낸다),
+///   변신 루프 안전 정지 <see cref="EndTransformedSlash"/>(묶음이 StopEffect 프레임 전에 끊길 때). 강타는 아직 임시 프리팹 경로.
 /// - 백어택 적중: [서버] <see cref="ServerBackAttackHit"/> → 전 피어. 판정은 A11 이 붙인다(그 전까지 호출자 없음).
 /// 프리팹이 비어 있으면 해당 연출만 빠진다.
 /// </summary>
@@ -46,12 +51,14 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
     [Tooltip("이 거리(m)보다 짧게 끝나면(돌진 직후 벽 등) 일섬은 생략하고 버스트만 낸다.")]
     [SerializeField, Min(0f)] private float pierceMinLength = 0.3f;
 
-    [Header("평타 베기 — 클립 Hit 이벤트마다(전 피어)")]
-    [Tooltip("일반 4타 — 인덱스 = 타 순서(0~3). 비어 있는 칸은 연출 없음.")]
-    [SerializeField] private GameObject[] normalSlashPrefabs = new GameObject[4];
+    [Header("평타 베기 — EffectSocketPlayer(Player_Assassin/VFX/*, 엔트리·소켓은 각 컴포넌트에서)")]
+    [Tooltip("일반 1~4타 적중 성공 — 서버 판정 → RPC 로 같은 타 일반 베기와 겹쳐 원샷. 인덱스 = 타 순서(0~3). 엔트리 = Assassin_LClick_Success.\n" +
+             "(일반 베기 자체는 클립의 PlayEffect 이벤트가 낸다.)")]
+    [SerializeField] private EffectSocketPlayer[] normalSlashSuccess = new EffectSocketPlayer[4];
+    [Tooltip("변신 평타 묶음 루프 — 켜고 끄는 건 클립의 StartEffect/StopEffect 이벤트. 여기는 묶음이 끊길 때의 안전 정지에만 쓴다.")]
+    [SerializeField] private EffectSocketPlayer transformedSlash;
+    [Tooltip("강타 — 임시 프리팹(Hit 이벤트에 소켓에 붙여 1회).")]
     [SerializeField] private GameObject enhancedSlashPrefab;
-    [Tooltip("변신 평타 묶음 — Hit 4번마다 같은 프리팹.")]
-    [SerializeField] private GameObject transformedSlashPrefab;
 
     [Header("시전 1회 — 스킬 OnClientPlay(전 피어)")]
     [SerializeField] private GameObject enhanceCastPrefab;
@@ -65,12 +72,8 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
     [SerializeField, Min(0.1f)] private float releaseLifetime = 2f;
 
     [Header("소켓 (비우면 플레이어 루트)")]
-    [Tooltip("평타 베기 위치·회전 — Assassin_Armature/VFX/BasicAttack01~04. 소켓을 옮기면 그 타의 이펙트가 따라간다.")]
-    [SerializeField] private Transform[] normalSlashSockets = new Transform[4];
     [Tooltip("강타 베기 — Armature/VFX/EnhancedAttack.")]
     [SerializeField] private Transform enhancedSlashSocket;
-    [Tooltip("변신 평타 묶음 베기 — Armature/VFX/TransformedAttack.")]
-    [SerializeField] private Transform transformedSlashSocket;
 
     private AssassinState state;
     private EffectHandle transformLoop;
@@ -130,21 +133,24 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
             play(view);
     }
 
-    /// <summary>[전 피어] 평타 Hit 애니 이벤트 — 플레이어 루트에 붙여 바라보는 방향으로 벤다.</summary>
+    /// <summary>
+    /// [전 피어] 평타 Hit 애니 이벤트 — 강타만 임시 프리팹을 소켓에 붙여 1회. 일반 1~4타·변신 묶음은 클립의
+    /// EffectAnimEvents 이벤트가 직접 내므로 여기서는 아무것도 하지 않는다.
+    /// </summary>
     public void PlayAttackSlash(AssassinBasicAttackMode mode, int stepIndex)
     {
-        switch (mode)
-        {
-            case AssassinBasicAttackMode.Enhanced:
-                PlayAttached(enhancedSlashPrefab, enhancedSlashSocket);
-                break;
-            case AssassinBasicAttackMode.Transformed:
-                PlayAttached(transformedSlashPrefab, transformedSlashSocket);
-                break;
-            default:
-                PlayAttached(At(normalSlashPrefabs, stepIndex), At(normalSlashSockets, stepIndex));
-                break;
-        }
+        if (mode == AssassinBasicAttackMode.Enhanced)
+            PlayAttached(enhancedSlashPrefab, enhancedSlashSocket);
+    }
+
+    /// <summary>
+    /// [전 피어] 변신 묶음 끝·취소·일반 모드 타 시작 — 안전 정지(엔트리 outroDuration 동안 남은 입자가 사라진다). 꺼져 있으면 무시.
+    /// 평소엔 클립의 StopEffect 이벤트가 끄지만, 피격·대시·변신 해제로 묶음이 그 프레임 전에 끊기면 이게 끈다.
+    /// </summary>
+    public void EndTransformedSlash()
+    {
+        if (transformedSlash != null && transformedSlash.IsPlaying)
+            transformedSlash.Stop();
     }
 
     private static T At<T>(T[] array, int index) where T : Object =>
@@ -275,6 +281,28 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
 
     [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
     private void BackAttackHitRpc(Vector3 position) => PlayBackAttackHit(position);
+
+    /// <summary>
+    /// [서버] 일반 평타 <paramref name="stepIndex"/> 타가 무언가를 맞혔다 — 전 피어에서 그 타의 성공 연출을 일반 베기 위에 겹쳐 낸다.
+    /// 팔라딘 <c>DefaultAttackController.PlaySlashVfxRpc</c> 와 같은 방식(호스트는 같은 프레임, 원격은 RPC 지연만큼 늦게 겹친다).
+    /// </summary>
+    public void ServerNormalSlashHit(int stepIndex)
+    {
+        if (IsNetworkActive)
+            NormalSlashHitRpc(stepIndex);
+        else
+            PlayNormalSlashSuccess(stepIndex);
+    }
+
+    [Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
+    private void NormalSlashHitRpc(int stepIndex) => PlayNormalSlashSuccess(stepIndex);
+
+    private void PlayNormalSlashSuccess(int stepIndex)
+    {
+        EffectSocketPlayer success = At(normalSlashSuccess, stepIndex);
+        if (success != null)
+            success.PlayOnce();
+    }
 
     private void PlayBackAttackHit(Vector3 position) => PlayOneShot(backAttackHitPrefab, position);
 
