@@ -2,6 +2,7 @@
 
 > PLAN-48 v2 §4.6 "선택 패널" 의 UI 만 먼저 만든 것. 이 문서는 **패널을 로비에 붙이는 쪽(48 C12)** 이 볼 것만 적는다.
 > 패널은 **네트워크를 모른다**(NetworkBehaviour·NetworkManager 참조 없음). 서버 요청·준비 상태 연결은 C12 몫이다.
+> ✅ **C12 연결 완료(2026-10-19)** — 연결 코드: `Assets/1.Scripts/Lobby/LobbyInteractor.cs`(F → `Show`·`SetLocked`·`CharacterChosen` → `LobbySession.RequestCharacter`), 서버 검증·교체는 `LobbySession.RequestCharacterServerRpc` → `LobbyPlayerSpawner.TrySwapCharacter`.
 > 만든 방식은 [lobby-result-panel.md](lobby-result-panel.md) 와 같다 — 자체 Canvas·`UiModalBlocker`·ESC 소유·순수 규칙 분리·저작/재생성/캡처 메뉴.
 
 ## 파일

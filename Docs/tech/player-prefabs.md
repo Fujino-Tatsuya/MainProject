@@ -13,6 +13,8 @@
 **구조.** `Player.prefab` = 캐릭터 무관한 **역할 base**. 캐릭터마다 그 **Prefab Variant** 를 두고,
 Variant 가 `Armature`(캐릭터 몸체) · 스킬 · VFX · 무기 · 스탯 · 평타 데이터를 얹는다.
 **캐릭터는 스폰 전에 고른다** — 스폰할 Variant 를 고르는 방식이다(런타임 Armature 교체는 미채택, §1.5).
+**로비 캐릭터 교체도 같은 원칙이다** — 서버가 지금 PlayerObject 를 디스폰하고 같은 위치·회전에 새 Variant 를 `SpawnAsPlayerObject` 한다
+(런타임 Armature 교체 아님, 할 일 48 C12 — `LobbyPlayerSpawner.TrySwapCharacter` → `PlayerSpawnService.SpawnCharacter`).
 
 ```
 Player.prefab (base)            ← 네트워크·입력·이동·생명주기·상태이상·HUD·HurtBox·실루엣 태그·시각 보간

@@ -39,7 +39,7 @@ Last updated: 2026-10-19 (target flow for the booth demo added — see below)
 ### Lobby result panel
 
 - Opens **only when returning to the lobby after a 4.MapScene game ends.** It does not open on first boot or when a client enters the lobby by (re)connecting.
-- Each player closes it with a close button or `Esc`; it also closes automatically after **15 seconds**.
+- Each player closes it with a close button or `Esc`; it also closes automatically after **180 seconds** (`LobbyResultPanelRules.DefaultAutoCloseSeconds` and `LobbyResultPanel.prefab` `autoCloseSeconds`).
 - While open it is **modal** (gameplay input blocked through the UI modal blocker).
 - Until the next game starts, players can reopen it from a **result object** in the lobby.
 - Data source = existing `SessionResult` + the result payload named message. No new result data type.

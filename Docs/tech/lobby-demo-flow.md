@@ -7,7 +7,7 @@
 ## 1. 흐름
 ```text
 exe 실행 → (호스트) 바로 호스팅 / (클라) 자동 접속 — 버튼 없음
-  → 걷는 로비(3.LobbyScene) → 준비 오브젝트 앞에서 F
+  → 걷는 로비(3.LobbyScene) → (원하면 캐릭터 선택 오브젝트 앞에서 F → 패널에서 교체) → 준비 오브젝트 앞에서 F
   → 접속자 1~3명 전원 준비 → 5초 카운트다운 → 4.MapScene
   → 판 끝(클리어·전멸·나가기) → 로비 복귀 + 결과 패널(180초 뒤 자동 닫힘, 닫기·ESC)
   → 다시 준비 → … (exe 재실행 없이 반복)
@@ -74,7 +74,9 @@ exe 실행 → (호스트) 바로 호스팅 / (클라) 자동 접속 — 버튼 
 - 시나리오 시작 씬은 `0.BootStrapScene`. 체크 목록은 PLAN §7(솔로·MPPM 3인·끊김).
 
 ## 7. 알려진 한계 (2026-10-19)
-- **캐릭터 선택 오브젝트·패널은 C12** — 아직 로비에서 캐릭터를 바꿀 수 없다(선택 오브젝트에 다가가도 프롬프트가 뜨지 않는다).
+- **캐릭터 선택(C12)** — 로비의 캐릭터 선택 오브젝트(`Environment/LobbyInteractables/CharacterSelectStation`, 스폰 지점 왼쪽) 앞에서 F → 선택 패널 → 고르면 그 자리에서 캐릭터가 바뀐다(디스폰 → 같은 자리 새 Variant 스폰, 교체 VFX 없음 — 1~2 프레임 깜빡일 수 있다).
+  - **준비 중·카운트다운 중에는 바꿀 수 없다**(패널은 열리지만 잠금 문구). 교체 뒤 0.5초 쿨다운(`LobbyRules.asset`). 오브젝트에서 멀어진 채 보낸 요청·연타는 서버가 거부하고 **로그만** 남긴다(화면 피드백 없음).
+  - 고른 캐릭터는 다음 판 스폰·판 사이·재접속(`playerId`)에 유지된다. 코드: [LobbyInteractor.cs](../../Assets/1.Scripts/Lobby/LobbyInteractor.cs)(패널 연결) · [LobbySession.cs](../../Assets/1.Scripts/Lobby/LobbySession.cs)(`RequestCharacterServerRpc` 검증) · [LobbyPlayerSpawner.cs](../../Assets/1.Scripts/Lobby/LobbyPlayerSpawner.cs)(`TrySwapCharacter`).
 - **증강(특성)은 재접속·판 사이에 유지되지 않는다** — 미결. [networking.md "Reconnect identity"](networking.md#reconnect-identity).
 - 해시는 대기 화면에서만 보인다(§3).
 - 무입력 리셋·스태프 키·코스 스킵·전멸 상한·관람객 디버그 키 차단은 범위 밖(별도 작업). 디버그 단축키(`DEV_HOTKEYS`)는 빌드에 들어 있다 — [debug-hotkeys.md](debug-hotkeys.md).
