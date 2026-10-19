@@ -82,8 +82,9 @@ public class ShurikenEffectSystem : IEffectSystem
         for (int i = 0; i < cache.all.Length; i++)
         {
             // MainModule은 struct — 지역 변수에 받아서 설정해야 한다.
+            // 저작 속도 × 배율 — 프리팹이 2배속으로 저작돼 있으면 히트스톱 0.5 = 1배속, 반납(1) = 다시 2배속.
             ParticleSystem.MainModule main = cache.all[i].main;
-            main.simulationSpeed = rate;
+            main.simulationSpeed = cache.baseSpeeds[i] * rate;
         }
 
         // 트레일에는 배율 개념이 없다(재생 속도 속성이 없다). 대신 궤적은 트랜스폼 이동으로 그려지므로,
@@ -105,7 +106,7 @@ public class ShurikenEffectSystem : IEffectSystem
             cache.trails[i].Clear();
         }
 
-        // 감속이 걸린 채 반납되면 다음 대출자가 얼어붙은 이펙트를 받는다.
+        // 감속이 걸린 채 반납되면 다음 대출자가 얼어붙은 이펙트를 받는다. 배율 1 = 저작 속도로 되돌린다.
         SetPlayRate(instance, 1f);
     }
 
@@ -125,13 +126,17 @@ public class ShurikenEffectSystem : IEffectSystem
     private static ShurikenPartCache Cache(GameObject instance)
     {
         var cache = instance.GetComponent<ShurikenPartCache>();
-        if (cache != null && cache.all != null && cache.trails != null) return cache;
+        if (cache != null && cache.all != null && cache.trails != null && cache.baseSpeeds != null) return cache;
 
         if (cache == null) cache = instance.AddComponent<ShurikenPartCache>();
 
         cache.all = instance.GetComponentsInChildren<ParticleSystem>(true);
         cache.roots = FindRoots(cache.all, instance.transform);
         cache.trails = instance.GetComponentsInChildren<TrailRenderer>(true);
+        // 첫 캐시는 첫 재생 직전 — 아직 아무도 속도를 건드리지 않은 프리팹 저작값이다.
+        cache.baseSpeeds = new float[cache.all.Length];
+        for (int i = 0; i < cache.all.Length; i++)
+            cache.baseSpeeds[i] = cache.all[i].main.simulationSpeed;
         return cache;
     }
 
