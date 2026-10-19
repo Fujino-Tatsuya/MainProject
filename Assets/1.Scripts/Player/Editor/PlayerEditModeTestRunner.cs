@@ -59,6 +59,7 @@ internal static class PlayerEditModeTestRunner
         "^LobbyReadyRulesTests$", // 할 일 48 C8 — 로비 전원 준비 → 카운트다운·취소·새 접속 Ready 초기화·캐릭터 변경 거부·시작 1회 래치(호스트 예외 없음)
         "^CharacterSelectionMemoryTests$", // 할 일 48 C8 — 캐릭터 선택 저장소: 퇴장 뒤 같은 playerId 재접속에 마지막 선택 되살림
         "^PlayerInputBlockTokensTests$", // 할 일 48 C9 — 입력 차단 토큰: 요청자별 걸기·풀기, 마지막 토큰이 풀릴 때만 열림, 중복·null 무시
+        "^NearestInteractableTests$", // 할 일 48 C10 — 로비 상호작용 대상(반경·사용 불가·동률 앞 인덱스·평면 거리)·서버 거리 재검증(반경+여유)·카운트다운 올림 초
     };
 
     const string Tag = "[PlayerTests]";

@@ -14,7 +14,8 @@ using UnityEngine;
 /// NetworkLoadingFlowController.CanStartFromLobby 는 <see cref="CanStartGame"/>(래치)를 본다.</item>
 /// <item>접속 승인: <see cref="NetworkSessionLauncher.LobbyCountdownActiveProvider"/> 를 스폰 때 걸고 디스폰 때 자기 것이면 푼다.</item>
 /// </list>
-/// 실제 프리팹 교체 재스폰은 C12, 상호작용 거리 재검증은 C10, 정식 카운트다운 UI 는 C10 몫이다(지금은 초 단위 로그).
+/// 준비 요청은 서버가 준비 오브젝트(<see cref="LobbyInteractable"/>)와의 거리를 다시 본다(C10). 카운트다운 표시는 <see cref="LobbyCountdownView"/>,
+/// "준비 n/m" 은 <see cref="LobbyReadyCountLabel"/>. 실제 프리팹 교체 재스폰은 C12 몫이다.
 /// </summary>
 [DisallowMultipleComponent]
 public sealed class LobbySession : NetworkBehaviour
@@ -173,8 +174,11 @@ public sealed class LobbySession : NetworkBehaviour
         if (_rules == null)
             return;
 
-        // 준비 오브젝트 거리 재검증 자리 — C10 에서 보낸 사람 PlayerObject 와 오브젝트 거리(rules.InteractRadius)를 본다.
+        // 준비 오브젝트 거리 재검증(C10) — 클라 프롬프트 판정만 믿으면 어디서든 준비할 수 있다.
         var clientId = p.Receive.SenderClientId;
+        if (!IsNearReadyObject(clientId))
+            return;
+
         if (!_rules.ToggleReady(clientId, NetworkManager.ServerTime.Time, CountdownSeconds))
         {
             Debug.LogWarning($"{Tag} 준비 토글 거부 client {clientId} — 자리 없음 또는 시작 래치 뒤.", this);
@@ -205,6 +209,25 @@ public sealed class LobbySession : NetworkBehaviour
         ServerCharacterSelectionStore.Set(clientId, characterId);
         SyncReplicatedState();
         Debug.Log($"[SceneFlow] {Tag} client {clientId} character={characterId}");
+    }
+
+    // [서버] 보낸 사람 PlayerObject 가 준비 오브젝트(LobbyInteractable Ready) 반경 + 여유 안인가 — 평면 거리. 밖이면 경고하고 거부한다.
+    private bool IsNearReadyObject(ulong clientId)
+    {
+        var player = NetworkManager.ConnectedClients.TryGetValue(clientId, out var client) ? client.PlayerObject : null;
+        if (player == null)
+        {
+            Debug.LogWarning($"{Tag} 준비 토글 거부 client {clientId} — PlayerObject 없음(로비 스폰 전).", this);
+            return false;
+        }
+
+        if (LobbyInteractable.AnyWithinServerReach(LobbyInteractableKind.Ready, player.transform.position, out var distance))
+            return true;
+
+        Debug.LogWarning(distance < float.MaxValue
+            ? $"{Tag} 준비 토글 거부 client {clientId} — 준비 오브젝트까지 {distance:F2}m(반경 + 여유 {LobbyInteractable.ServerReachTolerance}m 밖). 서버가 본 위치 {player.transform.position}."
+            : $"{Tag} 준비 토글 거부 client {clientId} — 씬에 준비 오브젝트(LobbyInteractable Ready)가 없다.", this);
+        return false;
     }
 
     private void HandleClientConnected(ulong clientId)
@@ -277,7 +300,7 @@ public sealed class LobbySession : NetworkBehaviour
             countdownEndServerTime.Value = _rules.CountdownEndTime;
     }
 
-    // 정식 카운트다운 UI 는 C10 — 지금은 초가 바뀔 때마다 전 피어에 로그로 남긴다.
+    // 초가 바뀔 때마다 전 피어에 로그 한 줄 + StateChanged(표시는 LobbyCountdownView 가 매 프레임 직접 읽는다).
     private void LogCountdownSecond()
     {
         if (!IsCountdownActive)

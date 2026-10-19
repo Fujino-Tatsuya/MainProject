@@ -53,7 +53,7 @@ Last updated: 2026-10-19 (target flow for the booth demo added — see below)
 - While Ready or during the countdown, the character cannot be changed.
 - A new connection resets everyone's Ready state.
 - The Host has **no "always Ready" exception** — the Host readies the same way as Clients.
-- ✅ **Implemented (C8):** state lives in `LobbySession` (scene `NetworkObject` in `3.LobbyScene`, server-written `NetworkList<LobbyPlayerEntry>` + `CountdownEndServerTime`). Rules = pure `LobbyReadyRules` (a player leaving also cancels the countdown and resets Ready). Values = `LobbyRules.asset`. When the countdown ends the server latches and calls `StartGameLoading()` once. On spawn it seeds each seat from `ServerCharacterSelectionStore` (0 only if missing), so the character survives Map → Lobby. The old `Lobby.*` named messages and the GameStart button are retired. Countdown display is a per-second log until the C10 UI.
+- ✅ **Implemented (C8):** state lives in `LobbySession` (scene `NetworkObject` in `3.LobbyScene`, server-written `NetworkList<LobbyPlayerEntry>` + `CountdownEndServerTime`). Rules = pure `LobbyReadyRules` (a player leaving also cancels the countdown and resets Ready). Values = `LobbyRules.asset`. When the countdown ends the server latches and calls `StartGameLoading()` once. On spawn it seeds each seat from `ServerCharacterSelectionStore` (0 only if missing), so the character survives Map → Lobby. The old `Lobby.*` named messages and the GameStart button are retired. Countdown display = `Slot_Countdown` (C10) plus the per-second `[SceneFlow]` log.
 
 ### Lobby scene layout (C9)
 
@@ -61,17 +61,18 @@ Last updated: 2026-10-19 (target flow for the booth demo added — see below)
 
 | Root | Contents |
 |---|---|
-| `Management` | `LobbySceneManager` (fade, BGM, result panel open-on-enter only), `LobbySession` (scene `NetworkObject`), `LobbyPlayerSpawner` (server), `PlayerDashValidationManager`, `EffectManager`, `FallBoundarySettings` (backstop at -200) |
+| `Management` | `LobbySceneManager` (fade, BGM, result panel open-on-enter only), `LobbySession` (scene `NetworkObject`), `LobbyPlayerSpawner` (server), `PlayerDashValidationManager`, `EffectManager`, `FallBoundarySettings` (backstop at -200), `LobbyInteractor` (local, C10) |
 | `Camera` | `CameraFollowTarget` + `CameraSwitcher` (`CameraTargetSwitcher` builds the main/follow camera rig when the owner player spawns — same as the map) |
-| `UI` | `Canvas` (top player slots `Panel_PlayerSlots` read by `LobbyUIController`, `Button_ShowLastResult`, empty `Slot_Countdown` for C10 and `Slot_CharacterSelectPanel` for C12, `Fade_Image`), `EventSystem`, `LobbyResultPanel` |
-| `Environment` | `PF_Lobby_Complete_v016` (art prefab, not modified), `Directional Light`, `PlayerSpawnPoints/SpawnPoint_0~2` |
+| `UI` | `Canvas` (top player slots `Panel_PlayerSlots` read by `LobbyUIController`, `Button_ShowLastResult`, `Slot_Countdown` (C10 countdown) and empty `Slot_CharacterSelectPanel` for C12, `Fade_Image`), `EventSystem`, `LobbyResultPanel` |
+| `Environment` | `PF_Lobby_Complete_v016` (art prefab, not modified), `Directional Light`, `PlayerSpawnPoints/SpawnPoint_0~2`, `LobbyInteractables/ReadyStation` (C10) |
 | `PostProcessing` | `Global Volume` (the map profile `VP_CombatLevel_Target`) |
 | `Debug` | `HitVFXDebugHUD` |
 
 - **Spawning:** `LobbyPlayerSpawner` spawns each client that completed the lobby NGO load (`LoadEventCompleted`), and late joiners after `SynchronizeComplete`. The prefab comes from `PlayerSpawnService` (same as the map). It never spawns twice for a client that already has a `PlayerObject`, and stops once the start latch is set. Leaving the lobby despawns lobby players through the existing source-scene cleanup in `NetworkLoadingFlowController`.
 - **Falling:** below `fallRespawnY` (-5) the server moves the player back to their spawn point with no damage (`PlayerFallRecovery.RelocateServer`).
 - **Input:** everything is allowed. Modal UI (result panel) still blocks the local player through `UiModalBlocker` → `PlayerUiInputPolicy` → a `PlayerInputReader` block token. Block tokens are ANDed with the life-cycle input policy.
-- The old 2D UI (IP/Port, StartHost/StartClient, Relay, join code, error text, GameStart, Ready, character buttons) is deleted. Ready and character select come back as walk-up objects in C10 and C12. **Until C10, the lobby has no way to Ready.**
+- The old 2D UI (IP/Port, StartHost/StartClient, Relay, join code, error text, GameStart, Ready, character buttons) is deleted. Ready and character select come back as walk-up objects in C10 and C12.
+- ✅ **Ready object (C10):** `Environment/LobbyInteractables/ReadyStation` (`LobbyInteractable` kind Ready, radius = `LobbyRules.interactRadius` 2 m, flat XZ distance) with a world-space "준비 n/m" label (`LobbyReadyCountLabel`, reads the replicated seat list). `Management/LobbyInteractor` (scene, local — no player-prefab change) picks the nearest usable object with pure `NearestInteractable.Pick`, shows `InteractPrompt` ("준비" / "준비 해제") and sends `ToggleReadyServerRpc` on the Interact key (settings `Player/Interact`, default F — same standalone action as the bridge gate). The server re-checks the sender `PlayerObject` is within radius + 0.5 m of a Ready object, otherwise rejects with a warning. A modal UI (result panel), any input block token, or a non-Alive life state hides the prompt and ignores F; ESC is not used. `UI/Canvas/Slot_Countdown` shows the remaining seconds from `CountdownEndServerTime` and `ServerTime` (`LobbyCountdownView`, hidden with no countdown). Character select objects (`LobbyInteractableKind.CharacterSelect`) are skipped until C12.
 
 ### Connection (target)
 
