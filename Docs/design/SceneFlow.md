@@ -43,6 +43,7 @@ Last updated: 2026-10-19 (target flow for the booth demo added — see below)
 - While open it is **modal** (gameplay input blocked through the UI modal blocker).
 - Until the next game starts, players can reopen it from a **result object** in the lobby.
 - Data source = existing `SessionResult` + the result payload named message. No new result data type.
+- ✅ **Implemented (C7a·C7b):** Map → Lobby goes straight through NGO `LoadScene(Single)` (C7a). `3.LobbyScene` holds `LobbyResultPanel.prefab`; `LobbySceneManager.Start` opens it when `SessionResult.HasValue`, and a temporary **"지난 판 결과" button** (`Button_ShowLastResult`, key `UI.Lobby.ShowLastResult`) reopens it until the next game — the walkable result object comes after C9. The result is cleared by `SessionStatsTracker.Awake` (next Map) and `DemoSessionDirector.CleanupAfterDrop` (reconnect). Panel usage: [lobby-result-panel.md](../tech/lobby-result-panel.md).
 
 ### Lobby rules (target)
 

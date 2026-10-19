@@ -98,6 +98,9 @@ public static class UiStrings
     public static readonly UiString ResultSurvival = new UiString("UI.Result.Survival", "생존 시간  {time}", "5.ResultScene › Text_Survival({time} = mm:ss)");
     public static readonly UiString ResultPlayerSlot = new UiString("UI.Result.PlayerSlot", "P{n}", "ResultPlayerRow.prefab › Text_Slot({n} = 1부터 세는 플레이어 번호)");
 
+    // 로비 — LobbySceneManager. 직전 판 결과 패널 다시 보기(임시 버튼, 걷는 로비 결과 오브젝트는 C9 이후)
+    public static readonly UiString LobbyShowLastResult = new UiString("UI.Lobby.ShowLastResult", "지난 판 결과", "3.LobbyScene › Button_ShowLastResult(코드)");
+
     // 허수아비 체력 — TrainingDummyHealthBar
     public static readonly UiString TrainingDummyHp = new UiString("UI.TrainingDummy.Hp", "{hp} / {max}", "TrainingDummy.prefab — 머리 위 체력({hp} = 현재, {max} = 최대)");
 
@@ -167,6 +170,7 @@ public static class UiStrings
             LoadingPreparing, LoadingLoading, LoadingWaitingForPlayers, LoadingActivating, LoadingStandBy,
             SkillTooltipShiftHint, SkillTooltipError, SkillTooltipPassiveBadge,
             ResultCleared, ResultFailed, ResultAborted, ResultSurvival, ResultPlayerSlot,
+            LobbyShowLastResult,
             TrainingDummyHp,
         };
         all.AddRange(LoadingTips);

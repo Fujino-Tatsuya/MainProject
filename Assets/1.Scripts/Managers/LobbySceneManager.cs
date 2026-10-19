@@ -32,6 +32,12 @@ public class LobbySceneManager : NemoSceneManager
     [Header("Messages")]
     [SerializeField] private TMP_Text errorText;
 
+    // 직전 판 결과 — 4.Map 이 끝나고 로비에 들어왔을 때만 자동으로 연다(PLAN-48 C7b, Docs/tech/lobby-result-panel.md).
+    // 첫 부팅·재접속은 SessionResult 가 비어 있어 열리지 않는다(비우기 = SessionStatsTracker.Awake · DemoSessionDirector.CleanupAfterDrop).
+    [Header("Result")]
+    [SerializeField] private LobbyResultPanel resultPanel;
+    [SerializeField] private Button showLastResultButton;
+
     [Header("Connection Defaults")]
     [SerializeField] private string defaultIp = "127.0.0.1";
     [SerializeField] private ushort defaultPort = 7777;
@@ -90,6 +96,7 @@ public class LobbySceneManager : NemoSceneManager
         }
 
         ApplyRoleUi();
+        ShowLastResultOnEnter();
 
         // BGM 재생
         AudioManager.Instance.PlayBGM("BGM_Lobby");
@@ -223,6 +230,38 @@ public class LobbySceneManager : NemoSceneManager
         SetErrorMessage(string.Empty);
         SetButtonsInteractable(false, gameStartButton);
         _sessionLauncher.StartGameLoading();
+    }
+
+    /// <summary>다시 보기 버튼 — 결과는 로비에 있는 동안 지우지 않으므로 몇 번이든 다시 연다.</summary>
+    public void ShowLastResult()
+    {
+        if (resultPanel != null)
+        {
+            resultPanel.Show();
+        }
+    }
+
+    // 클라는 결과 페이로드(MapSceneManager.HandleGoToResultMessage → SessionResult.Capture)가 로비 로드보다 먼저 와 있다.
+    // 결과는 로비에 있는 동안 바뀌지 않으므로(다음 판 Map 진입·끊김 정리 때만 비움) 버튼 표시는 진입 때 한 번 정한다.
+    private void ShowLastResultOnEnter()
+    {
+        var hasResult = resultPanel != null && resultPanel.HasResult;
+        Debug.Log($"[SceneFlow] LobbySceneManager.ShowLastResultOnEnter hasPanel={resultPanel != null} hasResult={hasResult}");
+
+        if (showLastResultButton != null)
+        {
+            showLastResultButton.gameObject.SetActive(hasResult);
+            var label = showLastResultButton.GetComponentInChildren<TMP_Text>(true);
+            if (label != null)
+            {
+                label.text = UiStrings.LobbyShowLastResult.Text;
+            }
+        }
+
+        if (hasResult)
+        {
+            resultPanel.Show();
+        }
     }
 
     private bool EnsureConnectionData()
@@ -563,6 +602,9 @@ public class LobbySceneManager : NemoSceneManager
         directPanel ??= FindInActiveScene("Panel_Direct");
         modeToggleButton ??= FindButton("Button_ModeToggle");
 
+        showLastResultButton ??= FindButton("Button_ShowLastResult");
+        resultPanel ??= FindFirstObjectByType<LobbyResultPanel>();
+
         if (characterButtons == null || characterButtons.Length != CharacterButtonCount)
         {
             characterButtons = new Button[CharacterButtonCount];
@@ -586,6 +628,8 @@ public class LobbySceneManager : NemoSceneManager
         WarnIfMissing(portInputField, nameof(portInputField));
         WarnIfMissing(errorText, nameof(errorText));
         WarnIfMissing(sessionConnectPanel, nameof(sessionConnectPanel));
+        WarnIfMissing(resultPanel, nameof(resultPanel));
+        WarnIfMissing(showLastResultButton, nameof(showLastResultButton));
 
         // relayPanel·directPanel·modeToggleButton 은 숨김 전용이라 없어도 경고하지 않는다.
 
@@ -599,6 +643,7 @@ public class LobbySceneManager : NemoSceneManager
         BindButton(setConnectionDataButton, ApplyConnectionData);
         BindButton(gameStartButton, StartGameLoading);
         BindButton(readyButton, ToggleReady);
+        BindButton(showLastResultButton, ShowLastResult);
 
         for (var i = 0; i < characterButtons.Length; i++)
         {

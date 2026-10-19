@@ -17,6 +17,7 @@
 - `3.LobbyScene` is a walkable **NGO scene**. `5.ResultScene` is removed; results open as a lobby result panel only after returning from 4.MapScene.
 - All transitions are host-driven `NetworkManager.SceneManager.LoadScene`. Clients never load gameplay scenes locally.
 - Map → Lobby: `GoToResult` captures and broadcasts the result payload → `DespawnDynamicNetworkObjects()` (log remaining count) → `LoadScene("3.LobbyScene", Single)`.
+- ✅ Implemented: C7a (Map → Lobby NGO direct) · C7b (lobby result panel — opens on lobby entry when `SessionResult.HasValue`; the payload reaches clients before the lobby scene event on the same reliable pipeline). Panel: [lobby-result-panel.md](lobby-result-panel.md).
 
 ### Connection config (`demo-connection.json`)
 - Location: `Path.GetDirectoryName(Application.dataPath)/demo-connection.json` — next to the exe in builds, project root in the Editor.
