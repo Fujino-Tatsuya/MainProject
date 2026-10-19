@@ -10,6 +10,7 @@ using UnityEngine;
 /// 판정 타이밍은 두 경로를 모두 받되 <b>1회만</b> 발동한다:
 /// 클립의 Hit 애니메이션 이벤트(정밀) 또는 <see cref="FirstMeleeInterruptSkillData.HitDelay"/> 타이머(폴백).
 /// 클립은 아트/SVN 관할이라 이벤트 없이도 성립해야 한다.
+/// 팔라딘 Garen_Parry 에는 Hit 0.25s·End 0.6s 이벤트가 있다(지금 타이머와 같은 시각).
 /// </summary>
 public class FirstMeleeInterruptSkill : PlayerInterruptSkillBase, ISkillPreviewSource
 {
