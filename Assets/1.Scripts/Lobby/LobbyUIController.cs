@@ -187,6 +187,13 @@ public class LobbyUIController : MonoBehaviour
             SyncConnectedClientsFromServer();
             BroadcastState();
         }
+        else if (_networkManager.IsConnectedClient)
+        {
+            // 판이 끝나 로비가 NGO 로 다시 로드되면(PLAN-48 C7) 서버의 첫 Lobby.State 는 클라 로비가 뜨기 전에 가서 버려진다
+            // (등록 안 된 named message 는 NGO 가 조용히 버린다). 지금 Ready 를 한 번 보내 서버가 상태를 다시 방송하게 한다.
+            // 첫 접속(아직 미승인)이면 보내지 않는다 — 그땐 서버 HandleClientConnected 가 상태를 보낸다.
+            SendReadyRequest(_localReady);
+        }
     }
 
     private void UnregisterCallbacks()

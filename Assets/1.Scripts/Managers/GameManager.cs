@@ -172,7 +172,6 @@ public class GameManager : MonoBehaviour
     {
         _hideSessionConnectPanelOnLobbyLoad = IsInNetworkSession();
         Debug.Log($"[SceneFlow] GameManager.GoToLobby LoadScene lobbySceneName={lobbySceneName} hideSessionPanel={_hideSessionConnectPanelOnLobbyLoad}");
-        SetState(GameState.Lobby);
         SceneManager.LoadScene(lobbySceneName);
     }
 
@@ -195,11 +194,36 @@ public class GameManager : MonoBehaviour
         Instance.GoToLobby();
     }
 
+    /// <summary>
+    /// 판 종료 전환(PLAN-48 C7) — 5.ResultScene 대신 로비로 간다. 결과는 <see cref="SessionResult"/> 에 남는다
+    /// (C7b 에서 Work1 LobbyResultPanel 연결 예정). 서버: NGO Single 로 로비 로드(동적 객체 디스폰 포함, 클라는 NGO 가 따라온다).
+    /// 클라: 아무것도 안 한다 — 서버의 전환을 기다린다. 오프라인: 로컬 Single 로드.
+    /// </summary>
     public void GoToResult()
     {
-        Debug.Log($"[SceneFlow] GameManager.GoToResult LoadScene resultSceneName={resultSceneName}");
-        SetState(GameState.Result);
-        SceneManager.LoadScene(resultSceneName);
+        var networkManager = NetworkManager.Singleton;
+        if (networkManager != null && networkManager.IsListening)
+        {
+            if (!networkManager.IsServer)
+            {
+                Debug.Log("[SceneFlow] GameManager.GoToResult client — 서버의 로비 NGO 전환을 기다린다");
+                return;
+            }
+
+            var loadingFlow = networkManager.GetComponent<NetworkLoadingFlowController>();
+            string reason = "NetworkLoadingFlowController 없음";
+            if (loadingFlow != null && loadingFlow.TryLoadSessionSceneSingle(lobbySceneName, out reason))
+            {
+                Debug.Log($"[SceneFlow] GameManager.GoToResult server NGO Single lobbySceneName={lobbySceneName}");
+                return;
+            }
+
+            Debug.LogError($"[SceneFlow] GameManager.GoToResult 로비 NGO 전환 거부 — {reason}");
+            return;
+        }
+
+        Debug.Log($"[SceneFlow] GameManager.GoToResult offline LoadScene lobbySceneName={lobbySceneName}");
+        SceneManager.LoadScene(lobbySceneName);
     }
 
     public static void GoToResultButton()
@@ -225,8 +249,20 @@ public class GameManager : MonoBehaviour
     {
         Debug.Log($"[SceneFlow] GameManager.HandleSceneLoaded scene={scene.name} mode={mode} activeScene={SceneManager.GetActiveScene().name}");
 
-        // NGO 추가 로드도 sceneLoaded를 발생시키므로 Loading/MainGame 진입을 여기서 감지한다.
-        if (scene.name == loadingSceneName)
+        // NGO 로드(Single·Additive)도 sceneLoaded를 발생시키므로 상태는 전부 씬 이름으로 정한다.
+        if (scene.name == titleSceneName)
+        {
+            SetState(GameState.Title);
+        }
+        else if (scene.name == lobbySceneName)
+        {
+            SetState(GameState.Lobby);
+        }
+        else if (scene.name == resultSceneName)
+        {
+            SetState(GameState.Result);
+        }
+        else if (scene.name == loadingSceneName)
         {
             SetState(GameState.Loading);
         }

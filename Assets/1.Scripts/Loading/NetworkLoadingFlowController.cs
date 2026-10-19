@@ -58,6 +58,8 @@ public class NetworkLoadingFlowController : MonoBehaviour
     // NGO 의 ScenesLoaded 는 internal 이고, StartHost 때 이미 떠 있던 로컬 씬(지금의 로비)까지 담아 판별에 못 쓴다.
     private readonly HashSet<string> _networkLoadedScenes = new HashSet<string>();
     private readonly List<NetworkObject> _despawnBuffer = new List<NetworkObject>();
+    // [서버] 판 종료 Single 전환(TryLoadSessionSceneSingle) 루틴.
+    private Coroutine _sessionSceneLoadRoutine;
 
     private bool IsServerActive => _networkManager != null && _networkManager.IsListening && _networkManager.IsServer;
 
@@ -381,6 +383,69 @@ public class NetworkLoadingFlowController : MonoBehaviour
         int despawned = DespawnDynamicNetworkObjects();
         int remaining = _networkManager.SpawnManager.SpawnedObjectsList.Count;
         Debug.Log($"[SceneFlow] NetworkLoadingFlowController.DespawnBeforeTransition context={context} despawned={despawned} remaining={remaining}");
+    }
+
+    /// <summary>
+    /// [서버] 세션 유지형 Single 전환 — 판이 끝나면 4.MapScene 에서 로비로 바로 간다(PLAN-48 C7, 5.ResultScene 경유 없음).
+    /// 한 프레임 뒤에 동적 NetworkObject·플레이어를 디스폰하고(남은 개수 로그, R1) NGO <c>LoadScene(Single)</c> 을 부른다 — 클라는 NGO 가 따라 옮긴다.
+    /// 한 프레임 미루는 건 호출 전에 보낸 결과 페이로드(MapScene.GoToResult named message)를 씬 이벤트보다 앞선 프레임에 송신하기 위해서다
+    /// (둘 다 UnityTransport 의 같은 ReliableSequenced 파이프라인이라 같은 프레임이어도 순서는 지켜진다).
+    /// 로딩 흐름이 진행 중이면 끝날 때까지 기다렸다 전환한다. 서버가 아니거나 이미 전환 중이면 거부(false + 이유).
+    /// </summary>
+    public bool TryLoadSessionSceneSingle(string sceneName, out string reason)
+    {
+        RegisterNetworkCallbacks();
+
+        if (!IsServerActive)
+        {
+            reason = "서버가 아니다";
+            return false;
+        }
+
+        if (_sessionSceneLoadRoutine != null)
+        {
+            reason = "이미 Single 전환 중이다";
+            return false;
+        }
+
+        _sessionSceneLoadRoutine = StartCoroutine(LoadSessionSceneSingle(sceneName));
+        reason = null;
+        return true;
+    }
+
+    private IEnumerator LoadSessionSceneSingle(string sceneName)
+    {
+        yield return null;
+        while (IsServerActive && IsFlowInProgress)
+        {
+            yield return null;
+        }
+
+        if (!IsServerActive)
+        {
+            Debug.LogWarning($"[SceneFlow] NetworkLoadingFlowController.LoadSessionSceneSingle 서버가 멈춰 전환을 취소한다 scene={sceneName}");
+            _sessionSceneLoadRoutine = null;
+            yield break;
+        }
+
+        DespawnDynamicNetworkObjectsBeforeTransition($"single={sceneName}");
+
+        var status = _networkManager.SceneManager.LoadScene(sceneName, LoadSceneMode.Single);
+        var retries = 0;
+        while (status == SceneEventProgressStatus.SceneEventInProgress && retries < 30)
+        {
+            retries++;
+            yield return null;
+            status = _networkManager.SceneManager.LoadScene(sceneName, LoadSceneMode.Single);
+        }
+
+        Debug.Log($"[SceneFlow] NetworkLoadingFlowController.LoadSessionSceneSingle LoadScene scene={sceneName} status={status} retries={retries}");
+        if (status != SceneEventProgressStatus.Started)
+        {
+            Debug.LogError($"[Loading] {sceneName} Single 로드 실패({status}) — 판 종료 전환이 멈췄다.");
+        }
+
+        _sessionSceneLoadRoutine = null;
     }
 
     private bool CanStartFromLobby()
