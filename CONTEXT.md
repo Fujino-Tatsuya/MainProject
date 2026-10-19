@@ -15,6 +15,12 @@ Update this file when a term becomes important enough that future agents or team
 - ⏸ 후속(범위 밖): 텍스처 남은 항목·v18.2 눈·입 UV 밀도(10/22 Codex 한도 해제 뒤 — PLAN §9 끝) · `Assassin_BaseColor` 4096 무압축(약 85 MiB → 4096 BC7 권장) · 판정 거리를 커진 몸에 맞출지 기획 확인 · 변신 R·Q 일섬 VFX 배율(민경) · 단검 전용 텍스처 · 로비 초상화 · `Run_Start`/`Run_Stop` 속도.
 - `Docs/tech/player-prefabs.md` 를 잠근 「거너 레이저건 정렬」 세션(`fix/GunnerGunAlign`)은 이미 병합됐다(`1d2e4b22`) — 그 잠금은 끝난 것으로 본다.
 
+## ▶▶ 작업 세션 (2026-10-18~19 · 경석(Claude) · 23호 콤보 · 레이드 ④ 실드 · HUD 레이캐스트, 브랜치 `feature/Boss23`) — ✅ 커밋·푸시 · SVN r457(핀 457)
+- 콤보 = [PLAN-boss-combo.md](PLAN-boss-combo.md) — 룰렛 가중치(훅·훅·돌진 20 · 훅·어퍼 15 · 돌진·잡기 15 임시, 팀장이 정함) · 0.3초 · 추격 유예 1초 · 어그로 고정 · 개전 오른훅→왼훅→돌진(기존·레이드, 1인 제외). Codex 교차검증 반영.
+- 레이드 ④ 자폭 = 체력바 실드(간파 게이지·창·전기 구슬 제거) · ③ 구출 자막 제거. 간파 보너스·창 칸은 xlsx 행 때문에 **미사용으로 남김**(다음 병합 Export 때 정리).
+- HUD: 플레이어 상태·키가이드 Raycast Target 끔(미니맵·보스 체력바·보스 타이머는 원래 끔, 스킬 슬롯은 툴팁용 유지). 23호 `hitVFXCollider` = HurtBox 연결(기존·레이드 — 비어 있어 피격 이펙트가 안 나오고 경고만 찍혔다).
+- 📝 메모(손대지 않음): `4.MapScene` `UI/Canvas/Fade_Image` 가 Raycast Target 켜진 전체 화면 이미지다. 지금은 **꺼진 채 아무도 안 켜서** 무해하지만, 누가 켜면 그 캔버스 UI 클릭을 전부 막는다 — 쓰게 되면 Raycast Target 부터 끌 것.
+
 ## ▶▶ 작업 세션 (2026-10-16 · 경석(Claude) · 간파 슬로우·스피너·드론 재질, 브랜치 `feature/Boss23`) — ✅ 커밋·푸시 · SVN r454(핀 454)
 - 간파 슬로우 모션 = 23호·중간보스 3종에 연결(`8fc8c0a1`, 은희 handoff-interrupt-slowmo). 튜토리얼 연습 스피너는 D18 대로 안 걸림.
 - 스피너 회전 = 예고가 다 찬 뒤부터(준비 동작을 예고 시간에 맞춰 늘임 · `MonsterBase.AnimatorSpeedScale`).

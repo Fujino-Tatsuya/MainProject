@@ -1903,7 +1903,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 64
   maxDetectionResults: 16
-  hitVFXCollider: {fileID: 0}
+  hitVFXCollider: {fileID: 7921475421488456110}
   hitVFXType: 0
   bodyCollider: {fileID: 5290444511566405505}
   attackTelegraphMaterial: {fileID: 0}
