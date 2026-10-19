@@ -288,7 +288,6 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
     /// </summary>
     public void ServerNormalSlashHit(int stepIndex)
     {
-        Edit.Log($"[진단:성공연출] 서버 호출 step={stepIndex} networkActive={IsNetworkActive}", this);   // TODO(민경): 원인 확인 후 삭제
         if (IsNetworkActive)
             NormalSlashHitRpc(stepIndex);
         else
@@ -301,10 +300,6 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
     private void PlayNormalSlashSuccess(int stepIndex)
     {
         EffectSocketPlayer success = At(normalSlashSuccess, stepIndex);
-        // TODO(민경): 원인 확인 후 삭제
-        Edit.Log($"[진단:성공연출] 재생 step={stepIndex} player={(success != null ? success.name : "null")} " +
-                 $"socket={(success != null ? success.Socket.name + " " + success.Socket.position : "-")} " +
-                 $"manager={(EffectManager.Instance != null)} arrayLen={(normalSlashSuccess != null ? normalSlashSuccess.Length : -1)}", this);
         if (success != null)
             success.PlayOnce();
     }

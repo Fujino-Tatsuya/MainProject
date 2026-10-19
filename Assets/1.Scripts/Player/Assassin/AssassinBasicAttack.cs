@@ -594,7 +594,6 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             data.TriggersOnHit);
 
         // 일반 타가 무언가를 맞히면 전 피어에서 그 타의 성공 연출을 일반 베기 위에 겹친다(강타·변신 묶음은 없음).
-        Edit.Log($"[진단:성공연출] 판정 landed={landed} mode={currentMode} step={currentStepIndex} view={(view != null)}", this);   // TODO(민경): 원인 확인 후 삭제
         if (landed && currentMode == AssassinBasicAttackMode.Normal && view != null)
             view.ServerNormalSlashHit(currentStepIndex);
 
