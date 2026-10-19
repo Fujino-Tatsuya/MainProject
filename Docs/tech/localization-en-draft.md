@@ -148,7 +148,7 @@
 | Strings | `AssassinEnhanceSkillData/tooltip.description` | `TODO 다음 기본 공격이 강타로 바뀝니다. 강타가 적중하면 분노 게이지가 크게 찹니다.` | `TODO Your next basic attack becomes a Power Strike. Landing it fills a large amount of Rage.` | ko·en 앞 `TODO` = 문구 미확정 표시(그대로 둠) |
 | Strings | `FirstMeleeSubSkillData/tooltip.displayName` | `수호자의 의지` | `Guardian's Will` |  |
 | Strings | `FirstMeleeSubSkillData/tooltip.subtitle` | `E 스킬` | `E Skill` |  |
-| Strings | `FirstMeleeSubSkillData/tooltip.description` | `TODO <style=shield><sprite name="shield" color=#74C7EC>{shieldAmount}</style>의 보호막을 {shieldDuration:0.0}초 동안 얻습니다.` | `TODO Gain a <style=shield><sprite name="shield" color=#74C7EC>{shieldAmount}</style> shield for {shieldDuration:0.0}s.` | ko·en 앞 `TODO` = 문구 미확정 표시(그대로 둠) · `<style=shield>` 짝·`<sprite>` 그대로 · 툴팁 안 `초` → `s` |
+| Strings | `FirstMeleeSubSkillData/tooltip.description` | `TODO <style=shield><sprite name="shield" color=#74C7EC>{shieldAmount}</style>의 보호막을 {shieldDuration:0.0}초 동안 얻습니다.` | `TODO Gain a <style=shield><sprite name="shield" color=#74C7EC>{shieldAmount}</style> shield for {shieldDuration:0.0}s.` | ❌ **폐기**(2026-10-16) — E 가 보호막 → 방어·자동 반격으로 바뀌었다([PLAN-paladin-e-counter.md](../history/PLANS/PLAN-paladin-e-counter.md)). 현재 ko·en 은 위 "xlsx 반영" 표(`{dmg}` 반격 문구) |
 | Strings | `AssassinCircleStrikeSkillData/tooltip.displayName` | `원형 난격` | `Circle Barrage` |  |
 | Strings | `AssassinCircleStrikeSkillData/tooltip.subtitle` | `E 스킬 · 변신` | `E Skill · Transformed` |  |
 | Strings | `AssassinCircleStrikeSkillData/tooltip.description` | `TODO 지정한 원 범위에 {dmg} 피해를 5번 줍니다. 공격 중 무적입니다.` | `TODO Deal {dmg} damage 5 times in the target circle. Invulnerable while attacking.` | ko·en 앞 `TODO` = 문구 미확정 표시(그대로 둠) · `5번` 이 문구에 박힌 수치 |

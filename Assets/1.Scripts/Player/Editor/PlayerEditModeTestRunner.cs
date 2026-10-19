@@ -23,6 +23,8 @@ internal static class PlayerEditModeTestRunner
         "^BackAttackRulesTests$", // PLAN-assassin A11 — 보스 후방 판정·변신 강제·배율
         "^HealthShieldTests$",
         "^GunnerHeatModelTests$",
+        "^GunnerAnimEventAuthoringTests$", // PLAN-anim-event-timing P3 — 거너 클립 이벤트 저작: 상태 속도 환산·정규화·병합(사용자 위치 보존)
+        "^GunnerSkillEventRulesTests$", // PLAN-anim-event-timing P3 — 거너 R 레이저 Custom0 생성 위치·대상(대상 사망 시 시전 위치·재탐색), 우클릭 Hit·End 요구·후폭풍 Hit 출발(P3-2 ①)
         "^GunnerAttackFacingModelTests$", // 할 일 27 — 원인별 회전 잠금 토큰·평타 발 단위 잠금·발 사이 제한 회전
         "^AttackTurnTimingTests$", // 할 일 43 — 근접 평타 다 돈 뒤 공격: 각 → 회전 지연·스냅 각·오너 지연 상한
         "^HealthVignetteModelTests$", // 로컬 체력 비네팅 — 시작 비율·맥동·피격 플래시 색·사망 어둡게(맥동·플래시 끔)
@@ -50,7 +52,10 @@ internal static class PlayerEditModeTestRunner
         "^AssassinHairClipRulesTests$", // 할 일 47 — 머리카락 구동기: 클립 → 보정 종류(회피 v15·v16·v13), 클립 안 초, trailing 재설정(전환·루프·되감기·리셋)
         "^AssassinHairPrefabTests$", // 할 일 47 — Armature 머리카락 체인 7×4 본·캡처·몸 캡슐·구동기·보정 2종, Variant 중첩
         "^AssassinHairArmClearanceTests$", // 할 일 47 후속 — 팔 밀어내기 후처리: 겹침만 밀기·상한·회전만(길이 보존)·팔 캡슐 4개
+        "^PlayerAnimationEventRequirementTests$", // PLAN-anim-event-timing P0-1 — 스킬·평타가 선언한 클립 이벤트가 플레이어 프리팹 컨트롤러·클립에 있는가
         "^AssassinVisualPrefabTests$", // PLAN-assassin §9 — v18 비주얼: Flat Kit 슬롯 5개·부모·BaseMap, 단검 루트 = 임포트 배율, Armature 루트·판정 박스 배율 1
+        "^FirstMeleeGuardRulesTests$", // PLAN-paladin-counter-e C2 — 팔라딘 E 방어 방향(평면·경계·겹침)·반격 부채꼴(표면 거리·평면 각도)
+        "^FirstMeleeGuardCounterModelTests$", // PLAN-paladin-counter-e C3 — 팔라딘 E 단계: 방어 불가 Pass·대기 경계·반격 중 무시(now < counterEndAt)·반격 1회·같은 틱 둘 다·Clamp·반격 보장·넉백
     };
 
     const string Tag = "[PlayerTests]";

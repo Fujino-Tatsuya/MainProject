@@ -16,13 +16,22 @@ public class BossHealthHUD : MonoBehaviour
     [SerializeField] private DelayedHealthBar delayed = new DelayedHealthBar();
 
     [Header("23호 레이드 ④ 자폭 실드(팀장 10-19)")]
-    [Tooltip("HP 바 위를 덮는 실드 바. 비우면 hpFill 을 복제해 런타임에 만든다(프리팹 수정 없이 동작).\n" +
+    [Tooltip("HP 바 위를 덮는 실드 바(프리팹의 SelfDestructShieldFill — HP_Fill 바로 다음 형제). 비우면 실드를 표시하지 않는다.\n" +
              "자폭 시작 때 바 전체를 덮고, 실드가 깎일수록 오른쪽부터 줄어든다. 자폭이 아니면 숨긴다.")]
     [SerializeField] private Image shieldFill;
+    [Tooltip("실드 바 색. Awake 에서 shieldFill 에 적용한다(색 원본은 이 필드).")]
     [SerializeField] private Color shieldColor = new Color(0.55f, 0.85f, 1f, 0.65f);
 
     private Unit boundBoss;
     private TwentyThreeBoss boundGaugeBoss;   // 간파 게이지를 가진 보스(23호)일 때만
+
+    private void Awake()
+    {
+        if (shieldFill != null)
+            shieldFill.color = shieldColor;
+        else
+            Debug.LogWarning($"[BossHealthHUD] shieldFill 이 비어 있어 자폭 실드를 표시하지 않는다: {name}", this);
+    }
 
     private void Update()
     {
@@ -54,27 +63,12 @@ public class BossHealthHUD : MonoBehaviour
 
         // ④ 자폭 실드 — 복제 비율(SelfDestructShield01)을 HP 바 위 덮개로.
         float shield01 = boundGaugeBoss != null ? boundGaugeBoss.SelfDestructShield01 : 0f;
-        Image shield = shield01 > 0f ? EnsureShieldFill() : shieldFill;
-        if (shield != null)
+        if (shieldFill != null)
         {
             bool show = shield01 > 0f;
-            if (shield.gameObject.activeSelf != show) shield.gameObject.SetActive(show);
-            if (show) shield.fillAmount = Mathf.Clamp01(shield01);
+            if (shieldFill.gameObject.activeSelf != show) shieldFill.gameObject.SetActive(show);
+            if (show) shieldFill.fillAmount = Mathf.Clamp01(shield01);
         }
-    }
-
-    // 실드 바가 저작돼 있지 않으면 hpFill 을 복제해 바로 위(형제 순서 다음)에 둔다 — 채움 방식·크기·앵커가 HP 바와 같아진다.
-    private Image EnsureShieldFill()
-    {
-        if (shieldFill != null || hpFill == null) return shieldFill;
-
-        GameObject go = Instantiate(hpFill.gameObject, hpFill.transform.parent);
-        go.name = "SelfDestructShieldFill";
-        go.transform.SetSiblingIndex(hpFill.transform.GetSiblingIndex() + 1);
-        shieldFill = go.GetComponent<Image>();
-        shieldFill.color = shieldColor;
-        shieldFill.raycastTarget = false;
-        return shieldFill;
     }
 
     private void OnDisable()

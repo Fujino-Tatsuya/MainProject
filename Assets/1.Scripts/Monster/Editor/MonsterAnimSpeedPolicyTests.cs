@@ -21,6 +21,51 @@ public sealed class MonsterAnimSpeedPolicyTests
         Assert.AreEqual(2f, MonsterAnimSpeedPolicy.Resolve(false, 0f, true, 2f, Loco(2f)), 1e-5f);
     }
 
+    // ─── 예비동작 = 공격 선딜 (PLAN-attack-windup) ───
+    [Test]
+    public void 예비동작은_windup_초에_끝나게_재생한다()
+    {
+        // Humanoid: 원래 0.73초 → windup 0.55 면 0.73/0.55 배로 빨리.
+        float speed = MonsterAnimSpeedPolicy.Resolve(false, 0f, true, 1f, Loco(2f), true, 0.73f, 0.55f);
+        Assert.AreEqual(0.73f / 0.55f, speed, 1e-5f);
+        Assert.AreEqual(0.55f, 0.73f / speed, 1e-5f, "실제 예비동작 시간 = windup");
+    }
+
+    [Test]
+    public void 예비동작_길이와_windup_이_같으면_원래_속도()
+    {
+        Assert.AreEqual(1f, MonsterAnimSpeedPolicy.Resolve(false, 0f, true, 1f, Loco(2f), true, 0.55f, 0.55f), 1e-5f);
+    }
+
+    [Test]
+    public void 예비동작도_공격속도를_따른다()
+    {
+        // attackSpeed 2 → 실제 선딜 = windup ÷ 2.
+        float speed = MonsterAnimSpeedPolicy.Resolve(false, 0f, true, 2f, Loco(2f), true, 0.55f, 0.55f);
+        Assert.AreEqual(0.55f / 2f, 0.55f / speed, 1e-5f);
+    }
+
+    [Test]
+    public void windup_0_이나_길이를_모르면_지금_동작()
+    {
+        Assert.AreEqual(2f, MonsterAnimSpeedPolicy.Resolve(false, 0f, true, 2f, Loco(2f), true, 0.55f, 0f), 1e-5f);
+        Assert.AreEqual(2f, MonsterAnimSpeedPolicy.Resolve(false, 0f, true, 2f, Loco(2f), true, 0f, 0.55f), 1e-5f);
+    }
+
+    [Test]
+    public void 예비동작이_아니면_windup_을_안_본다()
+    {
+        // 공격 본동작·터렛·중간보스(예비동작 상태 없음) — 공격 속도 그대로.
+        Assert.AreEqual(1f, MonsterAnimSpeedPolicy.Resolve(false, 0f, true, 1f, Loco(2f), false, 0.73f, 0.1f), 1e-5f);
+    }
+
+    [Test]
+    public void 예비동작_속도는_극단값을_자른다()
+    {
+        Assert.AreEqual(10f, MonsterAnimSpeedPolicy.AnticipationSpeed(1f, 1f, 0.0001f), 1e-5f);
+        Assert.AreEqual(0.05f, MonsterAnimSpeedPolicy.AnticipationSpeed(1f, 0.01f, 100f), 1e-5f);
+    }
+
     [Test]
     public void 로직은_Attack_이어도_이동_애니가_나오면_공격속도를_안_건다()
     {

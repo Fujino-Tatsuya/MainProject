@@ -89,7 +89,11 @@ public class MonsterDataSO : ScriptableObject
 
     [Header("공격 타이밍")]
     public float attackDuration = 0.9f; // 공격 상태 지속(모션 길이 근사)
-    public float attackWindup = 0.35f;  // (이벤트 전환으로 base 미사용 — 서브클래스/폴백 참고용)
+    [Tooltip("공격 선딜(초) = 예비동작(AttackAnticipation 상태) 길이. 실제 시간 = 이 값 ÷ attackSpeed.\n" +
+             "예비동작 상태가 있는 몹(Chomp·Humanoid)만 쓴다 — 없는 몹은 무시된다. 0 이면 예비동작 원래 길이.\n" +
+             "히트는 애니 이벤트(OnAttackHit)가 내므로 예비동작이 길어지면 타격도 그만큼 늦게 나간다.\n" +
+             "🔴 attackDuration 보다 작게 — 그 시간이 지나면 공격이 강제 종료된다(스폰 시 경고). PLAN-attack-windup")]
+    public float attackWindup = 0.35f;
     public bool cancelWindupIfTargetLeavesRange = false; // 선딜(히트 발생 전) 중 타깃이 사거리+여유를 벗어나면 공격을 취소하고 추격 복귀(원거리 준비-취소 설계, MortarBot). 멜리 커밋 몹은 false 유지.
     // 사거리 안으로 들어온 순간부터 첫 공격까지 최소 지연(초). 0 = 기존 동작 — 사거리에 닿는 프레임에 바로 때린다.
     // 규칙과 구현 근거는 MonsterEngagePolicy 참조. 완전히 벗어났다 다시 들어오면 다시 걸린다.

@@ -15,25 +15,27 @@ public sealed class AssassinBasicAttackStepData
     [SerializeField] private float attackDamageMultiplier = 1f;
     [SerializeField, Min(0.1f)] private float range = 1.5f;
     [SerializeField, Range(1f, 360f)] private float angle = 90f;
+    // ⚠️ 미사용 3칸(PLAN-anim-event-timing P2-1) — 재생 속도는 Animator 상태 speed, 예약 창은 클립 ComboWindowOpen/Close 이벤트로 옮겼다.
+    //    GameData.xlsx Assassin 시트에 행이 있어 지우면 테이블 모드가 "필드 없음"으로 막힌다 — 다음 병합 Export 때 행부터 정리하고 지운다.
+#pragma warning disable CS0414
+    [Tooltip("⚠️ 미사용 — 재생 속도는 AssassinAnimatorController 의 상태 speed 한 곳에서 정한다.")]
     [SerializeField, Min(0.01f)] private float playbackSpeed = 3f;
     [Tooltip("클립 하나에 든 타격 수(Hit 이벤트 수). 변신 평타 묶음 = 4, 나머지 = 1.")]
     [SerializeField, Min(1)] private int hitCount = 1;
-    [Tooltip("다음 타 예약 창 열림 — 클립 정규화 시간(0~1). 이 타 재생 중 창 안에서 좌클릭하면 End 순간 다음 타로 이어진다. " +
-             "가붕이 ComboWindowOpen 이벤트와 같은 의미(재생 속도에 같이 비례).")]
+    [Tooltip("⚠️ 미사용 — 예약 창 열림은 클립의 ComboWindowOpen 이벤트(HandleDefaultAttackEvent ComboWindowOpen=1)다.")]
     [SerializeField, Range(0f, 1f)] private float comboWindowOpen = 0.4f;
-    [Tooltip("다음 타 예약 창 닫힘 — 클립 정규화 시간(0~1). 그 클립의 End 이벤트 앞에 둔다.")]
+    [Tooltip("⚠️ 미사용 — 예약 창 닫힘은 클립의 ComboWindowClose 이벤트(HandleDefaultAttackEvent ComboWindowClose=2)다.")]
     [SerializeField, Range(0f, 1f)] private float comboWindowClose = 0.95f;
+#pragma warning restore CS0414
 
     public AnimationClip Clip => clip;
     public float AttackDamageMultiplier => attackDamageMultiplier;
     public float Range => range;
     public float Angle => angle;
-    public float PlaybackSpeed => playbackSpeed;
     // 필드가 생기기 전 직렬화된 스텝은 0 으로 읽힐 수 있다 — 최소 1타.
     public int HitCount => Mathf.Max(1, hitCount);
-    public float MotionDuration => clip != null ? clip.length / Mathf.Max(0.01f, playbackSpeed) : 0f;
-    public float ComboWindowOpen => comboWindowOpen;
-    public float ComboWindowClose => comboWindowClose;
+    // 안전망(End 이벤트가 안 올 때) 기준 길이 = 클립 원래 길이. 평타 상태 speed 가 1 이상이라 실제 재생보다 길다.
+    public float ClipLength => clip != null ? clip.length : 0f;
 
     public AssassinBasicAttackStepData(
         float attackDamageMultiplier = 1f,
@@ -53,14 +55,7 @@ public sealed class AssassinBasicAttackStepData
         this.comboWindowClose = comboWindowClose;
     }
 
-    /// <summary>클립 재생 시작부터 지난 시간이 다음 타 예약 창 안인가.</summary>
-    public bool IsInComboWindow(float elapsedSeconds) =>
-        AssassinComboWindowRules.IsInside(
-            AssassinComboWindowRules.NormalizedProgress(elapsedSeconds, MotionDuration),
-            comboWindowOpen,
-            comboWindowClose);
-
-    public bool IsPlayable => clip != null && MotionDuration > 0f;
+    public bool IsPlayable => clip != null && clip.length > 0f;
 }
 
 /// <summary>어쌔신 일반·강타·변신 평타와 전투 대기 수치(character_assassin.md §5·§6·§8.2, 구현 결정).</summary>
@@ -68,8 +63,7 @@ public sealed class AssassinBasicAttackStepData
 [DataTableSheet("Assassin", Order = 0)]
 public sealed class AssassinBasicAttackData : ScriptableObject
 {
-    // 창은 Combo_Attack_Wave_0N 클립 이벤트(10-16 은희 직접 배치 — Hit 0, End 1타 0.32 · 2~4타 0.267 정규화)에 맞춘다.
-    // 열림 = Hit 직후, 닫힘 = End 바로 앞. 이벤트를 옮기면 이 값과 에셋 값도 같이 옮긴다.
+    // 판정·예약 창·종료는 각 클립의 Hit / ComboWindowOpen·Close / End 이벤트다(창 정규화 값 인자는 미사용 칸의 기본값일 뿐).
     [SerializeField] private AssassinBasicAttackStepData[] normalSteps =
     {
         new AssassinBasicAttackStepData(1f, 1.5f, 90f, 3f, 1, 0.05f, 0.30f),
@@ -90,7 +84,7 @@ public sealed class AssassinBasicAttackData : ScriptableObject
 
     [Header("변신 평타 묶음 (Speed_Attack_Loop, 타당 계수)")]
     [SerializeField] private AssassinBasicAttackStepData transformedStep =
-        new AssassinBasicAttackStepData(1.2f, 1.8f, 120f, 1.25f, 4, 0.75f);   // 창은 마지막(4번째) 판정 뒤부터
+        new AssassinBasicAttackStepData(1.2f, 1.8f, 120f, 1.25f, 4, 0.75f);
 
     [Header("연결")]
     [Tooltip("마지막 타가 다음 타 예약 없이 끝난 뒤 이 시간 안에 다시 누르면 다음 타부터 시작한다. " +
@@ -103,7 +97,7 @@ public sealed class AssassinBasicAttackData : ScriptableObject
     [SerializeField, DataTableIgnore, Min(1)] private int maxHitResults = 32;
 
     [Header("안전망")]
-    [Tooltip("End 이벤트가 없을 때 모션 길이 뒤에 더 기다리는 시간.")]
+    [Tooltip("End 이벤트가 안 올 때 클립 원래 길이 뒤에 더 기다리는 시간.")]
     [SerializeField, DataTableIgnore, Min(0f)] private float endFallbackPadding = 0.1f;
 
     [Header("전투 대기")]

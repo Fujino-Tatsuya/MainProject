@@ -7,12 +7,13 @@ using UnityEngine;
 /// 이 스킬의 계약은 "이 히트는 인터럽트 스킬이다"를 실어 보내는 것까지다.
 /// 카운터 창 여부·정면 각도·그로기/Break 전이는 <b>전부 맞는 쪽(보스) 책임</b>이다 — 여기서 판단하지 않는다.
 ///
-/// 판정 타이밍은 두 경로를 모두 받되 <b>1회만</b> 발동한다:
-/// 클립의 Hit 애니메이션 이벤트(정밀) 또는 <see cref="FirstMeleeInterruptSkillData.HitDelay"/> 타이머(폴백).
-/// 클립은 아트/SVN 관할이라 이벤트 없이도 성립해야 한다.
+/// 판정·종료 = Garen_Parry 의 Hit·End 이벤트(PLAN-anim-event-timing P1-④). 시점 튜닝은 클립에서 이벤트를 옮긴다.
+/// <see cref="FirstMeleeInterruptSkillData.HitDelay"/>·SkillDuration 은 쓰지 않는다 — 이벤트가 안 오면 컨트롤러 안전망(MaxActiveDuration)이 끝낸다.
 /// </summary>
 public class FirstMeleeInterruptSkill : PlayerInterruptSkillBase, ISkillPreviewSource
 {
+    protected override bool TimingFromAnimationEvents => true;
+
     // 🔴 여기는 RPC 가 필요 없다 — OnClientPlay 와 OnEnd 는 둘 다 전 피어에서 돈다:
     //    시작 → 서버는 TryStartSkillServer 가, 클라는 PlaySkillClientRpc 가 PlaySkillPresentation 을 탄다
     //    종료 → 서버는 EndActiveSkillServer 가, 클라는 EndSkillClientRpc 가 OnEnd 를 부른다
