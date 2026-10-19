@@ -36,6 +36,18 @@ public sealed class PlayerSilhouetteTag : NetworkBehaviour
     static void ResetCount() => ActiveCount = 0;
 
     private bool _counted;
+    private bool _suppressed;
+
+    /// <summary>
+    /// 연출 동안 이 플레이어의 실루엣을 잠깐 끈다(보스 엘리베이터 보행 — <see cref="BossTeleportManager"/>). 로컬 시각 값이라 복제하지 않는다.
+    /// 끄는 동안 <see cref="Retag"/> 가 불려도 꺼진 채로 둔다. 다시 켜면 보는 사람 기준(<see cref="NetworkBehaviour.IsOwner"/>)으로 다시 표시한다.
+    /// </summary>
+    public void SetSuppressed(bool suppressed)
+    {
+        if (_suppressed == suppressed) return;
+        _suppressed = suppressed;
+        Retag();
+    }
 
     private void SetCounted(bool on)
     {
@@ -53,6 +65,7 @@ public sealed class PlayerSilhouetteTag : NetworkBehaviour
     public override void OnNetworkDespawn()
     {
         SetCounted(false);
+        _suppressed = false;
         PlayerSilhouetteLayers.Untag(Target);
     }
 
@@ -74,6 +87,12 @@ public sealed class PlayerSilhouetteTag : NetworkBehaviour
     public void Retag()
     {
         if (!IsSpawned) return;
+
+        if (_suppressed)
+        {
+            PlayerSilhouetteLayers.Untag(Target);
+            return;
+        }
 
         int count = PlayerSilhouetteLayers.Tag(Target, IsOwner);
 

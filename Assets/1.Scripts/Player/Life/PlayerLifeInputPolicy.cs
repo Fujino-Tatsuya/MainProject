@@ -1,3 +1,4 @@
+using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
@@ -21,6 +22,12 @@ public sealed class PlayerLifeInputPolicy : MonoBehaviour
     [SerializeField] private PlayerSkillTargeting skillTargeting;
     [SerializeField] private PlayerEncounterLock encounterLock;
 
+    // [ElevatorFlow] 진단 — 엘리베이터 입력 잠금이 바뀐 순간만 한 줄 남긴다.
+    private bool lastLoggedElevatorLock;
+
+    private static double ServerTimeNow() =>
+        NetworkManager.Singleton != null ? NetworkManager.Singleton.ServerTime.Time : 0d;
+
     private void Awake()
     {
         ResolveReferences();
@@ -37,6 +44,7 @@ public sealed class PlayerLifeInputPolicy : MonoBehaviour
         {
             encounterLock.CinematicLockChanged += HandleCinematicLockChanged;
             encounterLock.CinematicHiddenChanged += HandleCinematicLockChanged;
+            encounterLock.CinematicInputLockChanged += HandleCinematicLockChanged;
         }
     }
 
@@ -54,6 +62,7 @@ public sealed class PlayerLifeInputPolicy : MonoBehaviour
         {
             encounterLock.CinematicLockChanged -= HandleCinematicLockChanged;
             encounterLock.CinematicHiddenChanged -= HandleCinematicLockChanged;
+            encounterLock.CinematicInputLockChanged -= HandleCinematicLockChanged;
         }
     }
 
@@ -67,7 +76,11 @@ public sealed class PlayerLifeInputPolicy : MonoBehaviour
         ApplyCurrentAccess();
     }
 
-    private void ApplyCurrentAccess()
+    /// <summary>
+    /// 지금 생명주기 허용값과 연출 잠금을 합쳐 다시 적용한다. 다른 계통이 자기 임시 입력 잠금을 풀 때
+    /// <see cref="PlayerInputReader.SetInputEnabled"/>(true) 대신 이걸 부른다 — 그래야 그 사이 걸린 연출 잠금을 지우지 않는다.
+    /// </summary>
+    public void ApplyCurrentAccess()
     {
         if (lifeCycle == null)
             ResolveReferences();
@@ -81,14 +94,19 @@ public sealed class PlayerLifeInputPolicy : MonoBehaviour
         if (player == null || !player.IsInputSource || inputReader == null)
             return;
 
-        // 연출 잠금·숨김은 생명주기 허용값 위에 덮어쓰는 추가 차단이다(하나라도 막으면 막힌다).
-        bool cinematicLocked = encounterLock != null &&
-            (encounterLock.IsCinematicLocked || encounterLock.IsCinematicHidden);
+        bool cinematicLocked = encounterLock != null && BlocksForCinematic(
+            encounterLock.IsCinematicLocked, encounterLock.IsCinematicInputLocked, encounterLock.IsCinematicHidden);
         bool allowsMovement = access.AllowsMovement && !cinematicLocked;
         bool allowsCombatInput = access.AllowsCombatInput && !cinematicLocked;
 
-        if (!allowsCombatInput)
-            CancelCombatActions();
+        if (encounterLock != null && encounterLock.IsCinematicInputLocked != lastLoggedElevatorLock)
+        {
+            lastLoggedElevatorLock = encounterLock.IsCinematicInputLocked;
+            Edit.Log($"[ElevatorFlow] 오너 입력 적용 — t={ServerTimeNow():0.###} clientId={player.OwnerClientId} " +
+                     $"elevatorLock={lastLoggedElevatorLock} allowsMovement={allowsMovement}", this);
+        }
+
+        CancelCombatActions(allowsCombatInput);
 
         // DeadPresentation/PermanentDead는 PlayerInput 자체를 끄고 Direction을 즉시 0으로 만든다.
         // Soul은 PlayerInput을 유지하되 아래 전투 게이트만 닫아 이동 입력을 보존한다.
@@ -96,12 +114,27 @@ public sealed class PlayerLifeInputPolicy : MonoBehaviour
         inputReader.SetCombatInputEnabled(allowsCombatInput);
     }
 
-    private void CancelCombatActions()
+    /// <summary>
+    /// 연출 잠금·엘리베이터 입력 잠금·숨김은 생명주기 허용값 위에 덮어쓰는 추가 차단이다(하나라도 막으면 막힌다).
+    /// </summary>
+    public static bool BlocksForCinematic(bool cinematicLocked, bool elevatorInputLocked, bool hidden) =>
+        cinematicLocked || elevatorInputLocked || hidden;
+
+    /// <summary>
+    /// 전투 입력이 막히는 순간 지금 행동을 Idle 로 끊는가. Idle 이 아닌 모든 상태가 대상이다 —
+    /// <b>대시도 여기서 끊긴다</b>(엘리베이터 입력 잠금 t=0 에 남은 대시로 미끄러지지 않는다. 할 일 46 후속 3).
+    /// Idle 전이가 <see cref="PlayerDashState"/>.Exit → Motor.ClearDashMotion 으로 남은 대시 이동을 0 으로 만든다.
+    /// </summary>
+    public static bool ShouldCancelToIdle(bool allowsCombatInput, PlayerActionState currentState) =>
+        !allowsCombatInput && currentState != PlayerActionState.Idle;
+
+    private void CancelCombatActions(bool allowsCombatInput)
     {
-        skillTargeting?.Cancel();
+        if (!allowsCombatInput)
+            skillTargeting?.Cancel();
 
         if (stateController != null &&
-            stateController.CurrentState != PlayerActionState.Idle)
+            ShouldCancelToIdle(allowsCombatInput, stateController.CurrentState))
         {
             stateController.ChangeState(PlayerActionState.Idle);
         }
