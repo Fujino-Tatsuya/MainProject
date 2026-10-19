@@ -45,7 +45,7 @@ public class NetworkSessionLauncher : MonoBehaviour
     }
 
     /// <summary>
-    /// 로비 카운트다운 중인가 — 접속 승인(<see cref="DemoJoinRule"/>)이 묻는다. LobbySession(C8)이 생기면 거기서 넣는다. 없으면 false.
+    /// 로비 카운트다운 중인가 — 접속 승인(<see cref="DemoJoinRule"/>)이 묻는다. <see cref="LobbySession"/> 이 스폰 때 넣고 디스폰 때 뺀다. 없으면 false.
     /// </summary>
     public static Func<bool> LobbyCountdownActiveProvider { get; set; }
 
@@ -289,6 +289,8 @@ public class NetworkSessionLauncher : MonoBehaviour
                 : isPlayerIdConnected ? $"{playerId}#{clientId}"
                 : playerId;
             registry.Register(clientId, registryKey);
+            // 재접속이면 그 playerId 의 마지막 캐릭터를 새 clientId 에 되살린다 — LobbySession 이 이 값으로 자리를 시드한다(Q4).
+            ServerCharacterSelectionStore.BindPlayer(clientId, registryKey);
         }
 
         NetworkDiagnosticsLog.Log(
@@ -574,6 +576,7 @@ public class NetworkSessionLauncher : MonoBehaviour
 
     private void HandleClientDisconnected(ulong clientId)
     {
+        // clientId 쪽 선택만 지운다 — playerId 의 마지막 선택은 남아 재접속 승인 때 되살아난다(Q4).
         ServerCharacterSelectionStore.Remove(clientId);
         // clientId 매핑만 지운다 — 재접속하면 새 clientId 로 같은 playerId 를 다시 묶는다(Q4).
         PlayerIdRegistry.Server.RemoveClient(clientId);

@@ -205,31 +205,12 @@ public class LobbySceneManager : NemoSceneManager
         controller.ToggleLocalReady();
     }
 
+    /// <summary>
+    /// 옛 GameStart 버튼 — 게임 시작은 LobbySession 카운트다운(전원 준비 → 5초)으로 바뀌었다(PLAN-48 C8). 버튼은 숨기고 호출되면 진단 로그만 남긴다(C9 에서 씬째 삭제).
+    /// </summary>
     public void StartGameLoading()
     {
-        Debug.Log($"[SceneFlow] LobbySceneManager.StartGameLoading hasSessionLauncher={_sessionLauncher != null}");
-        NetworkDiagnosticsLog.Log(
-            $"{DiagTag}.StartGameLoading",
-            $"버튼 입력 hasSessionLauncher={_sessionLauncher != null} " +
-            $"isHost={_networkManager != null && _networkManager.IsHost} " +
-            $"connectedCount={(_networkManager != null && _networkManager.IsServer ? _networkManager.ConnectedClientsIds.Count : -1)}");
-        if (_sessionLauncher == null)
-        {
-            WarnMissingReference(nameof(NetworkSessionLauncher));
-            ShowError(ErrorCatalog.LobbyLauncherMissing);
-            return;
-        }
-
-        var controller = ResolveLobbyUIController();
-        if (controller != null && !controller.CanStartGame)
-        {
-            ShowError(ErrorCatalog.LobbyNotAllReady);
-            return;
-        }
-
-        SetErrorMessage(string.Empty);
-        SetButtonsInteractable(false, gameStartButton);
-        _sessionLauncher.StartGameLoading();
+        NetworkDiagnosticsLog.Log($"{DiagTag}.StartGameLoading", "옛 GameStart 입력 — 카운트다운으로 대체되어 무시");
     }
 
     /// <summary>다시 보기 버튼 — 결과는 로비에 있는 동안 지우지 않으므로 몇 번이든 다시 연다.</summary>
@@ -324,32 +305,30 @@ public class LobbySceneManager : NemoSceneManager
         }
     }
 
-    // Host는 GameStart만, Client는 Ready만 노출한다. 네트워크 시작 전에는 패널이 화면을 덮는다.
+    // 호스트·클라 모두 Ready 만 노출한다 — GameStart 는 LobbySession 카운트다운으로 대체돼 숨긴다(PLAN-48 C8). 네트워크 시작 전에는 패널이 화면을 덮는다.
     private void ApplyRoleUi()
     {
         var listening = _networkManager != null && _networkManager.IsListening;
-        var isHost = listening && _networkManager.IsHost;
         var controller = ResolveLobbyUIController();
 
         if (gameStartButton != null)
         {
-            gameStartButton.gameObject.SetActive(!listening || isHost);
-            gameStartButton.interactable = isHost && controller != null && controller.CanStartGame;
+            gameStartButton.gameObject.SetActive(false);
         }
 
         if (readyButton != null)
         {
-            readyButton.gameObject.SetActive(!listening || !isHost);
+            readyButton.gameObject.SetActive(true);
         }
 
-        ApplyCharacterSelectUi(listening, isHost, controller);
+        ApplyCharacterSelectUi(listening, controller);
     }
 
-    // 선택 버튼 강조, 클라 Ready = 선택 버튼 초록. 클라는 Ready 중 변경 불가(서버도 거부) — 호스트는 항상 Ready 라 잠그지 않는다.
-    private void ApplyCharacterSelectUi(bool listening, bool isHost, LobbyUIController controller)
+    // 선택 버튼 강조, Ready = 선택 버튼 초록. Ready·카운트다운 중 변경 불가(서버도 거부) — 호스트 예외 없음.
+    private void ApplyCharacterSelectUi(bool listening, LobbyUIController controller)
     {
         var roster = controller != null ? controller.Roster : null;
-        var locked = !isHost && controller != null && controller.IsLocalReady();
+        var locked = controller != null && controller.IsLocalCharacterSelectionLocked();
         var selectedId = controller != null ? controller.GetLocalCharacterSelectionId() : -1;
 
         for (var i = 0; i < characterButtons.Length; i++)
@@ -381,8 +360,7 @@ public class LobbySceneManager : NemoSceneManager
             return;
         }
 
-        var isHost = _networkManager != null && _networkManager.IsHost;
-        if (!isHost && controller.IsLocalReady())
+        if (controller.IsLocalCharacterSelectionLocked())
         {
             return;
         }

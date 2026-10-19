@@ -35,12 +35,15 @@
 
 ### Reconnect identity
 - A reconnecting Client gets a new `ClientId`. The server store for the last character selection and traits (augments) is keyed by `playerId`, so both are kept across reconnects.
+- ✅ **Character (C8):** on approval `NetworkSessionLauncher` calls `ServerCharacterSelectionStore.BindPlayer(clientId, playerId)`; leaving removes only the `clientId` side, so the same `playerId` gets its last character back (pure core: `CharacterSelectionMemory`). Session stop clears everything.
+- ⏳ **Traits:** not persisted. Trait state lives in the Map scene's `TutorialTraitDirector` and is dropped on leave and on every Map unload, and rejoining mid-game is rejected — open question, see PLAN-48 C8 report.
 
 ### Lobby rules
 - All input is allowed in the lobby (movement, attack, skills).
 - Character select object (`F`) → panel → despawn + respawn the new Variant at the same position.
 - Ready object (`F`) → when all connected players (1~3) are Ready, a 5-second server-time countdown → `4.MapScene`.
 - No character change while Ready or during the countdown. A new connection resets all Ready states. No Host "always Ready" exception.
+- ✅ Implemented in C8 by `LobbySession` (server-written `NetworkList` + countdown `NetworkVariable`, `ToggleReadyServerRpc`/`RequestCharacterServerRpc`) and the pure `LobbyReadyRules`. The old `Lobby.ReadyRequest`/`Lobby.CharacterRequest`/`Lobby.State` named messages are gone. Details: [SceneFlow.md](../design/SceneFlow.md#lobby-rules-target).
 
 ## 연결 흐름 (old / current code)
 > Superseded for the demo by [Lobby Demo (target)](#lobby-demo-target-2026-10-19): Title is skipped and Result is a lobby panel.

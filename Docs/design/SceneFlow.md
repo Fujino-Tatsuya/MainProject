@@ -53,6 +53,7 @@ Last updated: 2026-10-19 (target flow for the booth demo added — see below)
 - While Ready or during the countdown, the character cannot be changed.
 - A new connection resets everyone's Ready state.
 - The Host has **no "always Ready" exception** — the Host readies the same way as Clients.
+- ✅ **Implemented (C8):** state lives in `LobbySession` (scene `NetworkObject` in `3.LobbyScene`, server-written `NetworkList<LobbyPlayerEntry>` + `CountdownEndServerTime`). Rules = pure `LobbyReadyRules` (a player leaving also cancels the countdown and resets Ready). Values = `LobbyRules.asset`. When the countdown ends the server latches and calls `StartGameLoading()` once. On spawn it seeds each seat from `ServerCharacterSelectionStore` (0 only if missing), so the character survives Map → Lobby. The old `Lobby.*` named messages and the GameStart button are retired; the old Ready/character buttons call `LobbySession` RPCs until C9 removes them. Countdown display is a per-second log until the C10 UI.
 
 ### Connection (target)
 

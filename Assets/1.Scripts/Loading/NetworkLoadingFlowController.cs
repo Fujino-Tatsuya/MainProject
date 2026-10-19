@@ -448,14 +448,10 @@ public class NetworkLoadingFlowController : MonoBehaviour
         _sessionSceneLoadRoutine = null;
     }
 
+    // 로비 시작 조건 = LobbySession 카운트다운이 끝나 시작 래치가 걸렸다(PLAN-48 C8). 로비 세션이 없는 경로(Dev 부팅 등)는 막지 않는다.
     private bool CanStartFromLobby()
     {
-        var lobby = LobbyUIController.Active;
-        if (lobby == null)
-        {
-            lobby = FindFirstObjectByType<LobbyUIController>();
-        }
-
+        var lobby = LobbySession.Active;
         return lobby == null || lobby.CanStartGame;
     }
 
