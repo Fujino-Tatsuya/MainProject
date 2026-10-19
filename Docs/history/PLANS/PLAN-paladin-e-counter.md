@@ -16,10 +16,10 @@
 | --- | --- |
 | 방어 방향 | Cast 시점 조준 방향으로 고정(`OnServerStart` direction), `snapRotationOnStart = 1` |
 | 방어 각도 | 전방 180도(좌우 90도), 바닥 평면(y 제거), 경계 포함(`<=`) |
-| 방어 대기 | 최대 1초(`guardDuration`) |
-| 방어 성공 | `now < guardEnd` 에 피해가 들어오는 순간, **공격 주체**가 방어 각도 안 → 그 피해 무시 + 반격 단계 진입 |
+| 방어 대기 | 최대 1초 — 방어 클립 `Custom0`(창 열림)~`Custom1`(창 닫힘) 이벤트 위치(지금 0.0s~1.0s). 원래 `guardDuration` 필드 → **P1-③ 에서 이벤트로 교체**(§10) |
+| 방어 성공 | 방어 창(`Custom0`~`Custom1`)이 열려 있을 때 피해가 들어오는 순간, **공격 주체**가 방어 각도 안 → 그 피해 무시 + 반격 단계 진입 |
 | 반격 | 첫 성공 시 자동 1회. 고정 방어 방향 기준 전방 120도·3m, 대상당 1회, 공격력 250%(`attackDamageMultiplier 2.5`) |
-| 반격 중 | `now < counterEndAt` 동안 방향 무관 피해 무시·모든 넉백 무시. 추가 성공이 와도 반격 재발동·연장 없음 |
+| 반격 중 | 반격 클립 `End` 이벤트 전까지 방향 무관 피해 무시·모든 넉백 무시. 추가 성공이 와도 반격 재발동·연장 없음(원래 `now < counterEndAt` 시각 비교 → P1-③ 에서 이벤트로 교체) |
 | 실패 | 대기 시간 안에 성공 없으면 반격 없이 종료. 범위 밖·방어 불가 공격은 정상 적용(범위 밖 넉백이면 E 끊김) |
 | 쿨타임 | 7초, E 승인 순간 시작, 환불 없음(이미 그렇게 동작 — `PlayerSkillController.cs:593-595`) |
 | 행동 제한 | 대기·반격 중 이동·회전·평타·대시·다른 스킬 불가(`CanMoveWhileActive = false`), 종료 후 가능 |
@@ -29,18 +29,23 @@
 
 ## 2. 설계 핵심
 
-### 2.1 단계 정의와 시간 경계
+### 2.1 단계 정의와 경계
+
+> **P1-③ 에서 초 단위 타이머 → 클립 이벤트로 교체**(§10). 아래 표는 교체 뒤 코드(`FirstMeleeGuardCounterModel`) 기준이다.
+> 방어 클립 = 애니메이터 상태 `SubSkillGuard`(`Garen_Guard_Placeholder`: `Custom0` 0.0s 창 열림 · `Custom1` 1.0s 창 닫힘),
+> 반격 클립 = 상태 `SubSkillCounter`(`Garen_GuardCounter_Placeholder`: `Hit` 0.1s 반격 판정 · `End` 0.4s 종료).
+> 원래 계획은 `guardEnd`·`counterHitAt`·`counterEndAt` 시각 비교(`guardDuration`·`counterHitDelay`·`counterDuration`)였다.
 
 | 단계 | 진입 | 피격 판정 | 넉백 | 종료 |
 | --- | --- | --- | --- | --- |
 | Idle | — | Pass | 통과 | — |
-| Guarding | `Begin(now, …)` | `now < guardEnd` 이고 주체가 방어 각도 안 → **BlockAndCounter**, 그 밖 Pass | 통과(→ E 끊김) | `now >= guardEnd` → Ended(GuardExpired), 반격 없음 |
-| Countering | 첫 BlockAndCounter. `counterHitAt = now + counterHitDelay`, `counterEndAt = now + counterDuration` | `now < counterEndAt` → **Ignore**(방향 무관). `now >= counterEndAt` → Pass(종료 처리 전이라도) | `now < counterEndAt` 동안 차단 | `now >= counterHitAt` → CounterHitDue(1회), `now >= counterEndAt` → Ended(CounterFinished) |
+| Guarding | `Begin(forward, angle)` — 방어 창 **닫힌 채** 시작, `Custom0` 이 연다 | 창이 열려 있고 주체가 방어 각도 안 → **BlockAndCounter**, 그 밖(창 열리기 전 포함) Pass | 통과(→ E 끊김) | `Custom1` → Ended(GuardExpired), 반격 없음 |
+| Countering | 첫 BlockAndCounter. 서버가 전 피어를 `SubSkillCounter` 로 CrossFade(§10 P1-③-2) | **Ignore**(방향 무관) | `End` 전까지 차단(`BlocksKnockback`) | `Hit` → CounterHitDue(1회), `End` → Ended(CounterFinished) |
 | Finished | Ended 처리 | Pass | 통과 | — |
 
-- 시간 경계는 모두 **시각 비교**다. Countering 이 '종료 처리가 됐는가'에 기대지 않으므로 스크립트 실행 순서와 무관하다.
-- 같은 틱에 CounterHitDue 와 Ended 가 함께 오면 **CounterHitDue 를 먼저** 처리한다(반격 → 종료 순서 고정).
-- `counterHitDelay` 는 `[0, counterDuration]` 으로 Clamp(모델 Begin + 데이터 OnValidate 경고).
+- **단계에 맞지 않는 이벤트는 무시한다** — CrossFade 중 뒤늦게 온 방어 클립 `Custom1`, 오너 동기로 반격 상태가 다시 들어가 두 번 온 `Hit`·`End`.
+- `Hit` 없이 `End` 가 오면(클립에서 Hit 이 End 뒤로 밀렸거나 빠짐) `OnCounterEnd` 가 CounterHitDue 와 Ended 를 함께 낸다 — **CounterHitDue 를 먼저** 처리한다(반격 → 종료 순서 고정).
+- 이벤트가 오지 않으면(클립·상태 누락, `shieldVfx` 미배선) 안전망 `maxActiveDuration`(1.5s)이 끝내고, 방어 성공 상태면 OnEnd 보장 반격(§2.7)이 1회 낸다.
 - 방어 불가(§2.3)는 단계와 무관하게 항상 Pass.
 
 ### 2.2 피격 가로채기 지점
@@ -118,8 +123,8 @@ return u != null ? u : null;
 - 막은 근접 히트 직후 `MonsterMeleeAttack` 이 Knockback 을 부르고, 23호 오라(`TickChargeAura` `TwentyThreeBoss.cs:4976-5018`)도
   ReceiveAttack 뒤에 따로 Knockback(`:5015-5016`)을 부른다. 넉백은 스킬을 끊으므로 `Player.OnKnockback`(`Player.cs:484`) 맨 위에서 막는다.
 - `Unit.Knockback`(`Unit.cs:774`)에는 공격자 정보가 없어 '이 넉백이 Pass 된 히트의 것인지' 구분할 수 없다.
-  그래서 게이트는 **반격 단계(`now < counterEndAt`) 전체에 적용**된다 — 방어 불가 히트의 넉백도 무시된다(현재 반격 중 넉백을 동반하는 방어 불가 공격은 없다).
-- `counterEndAt` 이후에는 실행 순서와 무관하게 통과. 방어 대기(Guarding) 중 범위 밖 공격의 넉백은 정상 적용되고 E 가 끊긴다.
+  그래서 게이트는 **반격 단계(반격 클립 `End` 이벤트 전까지 — P1-③ 전에는 `now < counterEndAt`) 전체에 적용**된다 — 방어 불가 히트의 넉백도 무시된다(현재 반격 중 넉백을 동반하는 방어 불가 공격은 없다).
+- `End` 이후에는 통과. 방어 대기(Guarding) 중 범위 밖 공격의 넉백은 정상 적용되고 E 가 끊긴다.
 
 ### 2.9 반격 범위 — '3D 구 → 평면 각도'
 
@@ -151,9 +156,9 @@ return u != null ? u : null;
 | 3 | 행동 제한 | 채택 — `CanMoveWhileActive = false`(현재 true, `FirstMeleeSubSkill.cs:21`). 평타·스킬·대시는 기존 Skill 상태 규칙 |
 | 4 | 방어 방향 고정 | Cast 시점 조준 + `snapRotationOnStart = 1`. 선입력 편차 유지(§2.10) |
 | 5 | 반격 방향 | 고정된 방어 방향 기준 전방 120도·3m(공격자 쪽으로 돌지 않음) |
-| 6 | 반격 타이밍 자리값 | `counterHitDelay 0.1`·`counterDuration 0.4`, `[DataTableIgnore]`. Clamp + OnValidate 경고. 클립이 생기면 Hit/End 이벤트로 교체 |
+| 6 | 반격 타이밍 자리값 | `counterHitDelay 0.1`·`counterDuration 0.4`, `[DataTableIgnore]`. Clamp + OnValidate 경고. 클립이 생기면 Hit/End 이벤트로 교체 → **P1-③ 에서 교체 완료**(필드 삭제, §10) |
 | 7 | 피해 스냅샷 시점 | E 승인 시점 |
-| 8 | 반격 중 피해 무시 방향 | 방향 무관(방어 불가 제외), `counterEndAt` 까지만 |
+| 8 | 반격 중 피해 무시 방향 | 방향 무관(방어 불가 제외), `counterEndAt` 까지만(P1-③ 뒤 = 반격 클립 `End` 까지) |
 | 9 | 반격 중 넉백 | 모든 넉백 무시, 단계 전체 적용(§2.8) |
 | 10 | 반격 중 기절·에어본·경직 무시(C10) | **보류 확정** — 현재 막을 대상 없음(아래 C10) |
 | 11 | SuperArmor | 미사용 |
@@ -193,18 +198,23 @@ C2~C9 의 세부(테스트 이름·의사코드)는 조사 원본 PLAN 의 같�
 
 | 필드 | 형 / 기본값 | 비고 |
 | --- | --- | --- |
-| `guardDuration` | float 1.0, Min 0.05 | 방어 대기 최대(초). Paladin 시트 새 열 |
+| ~~`guardDuration`~~ | ~~float 1.0, Min 0.05~~ | **P1-③ 에서 삭제** — 방어 클립 `Custom0`~`Custom1` 이벤트 위치로 대체. 테이블 열 만들지 않음 |
 | `guardAngle` | float 180, Range 0-360 | 전방 방어 전체 각도(바닥 평면). 새 열 |
 | `counterAngle` | float 120, Range 0-360 | 반격 부채꼴 전체 각도(바닥 평면). 새 열 |
 | `counterRange` | float 3, Min 0 | 3D 구 반경, 대상 표면(ClosestPoint) 기준. 새 열 |
-| `counterHitDelay` | float 0.1, `[DataTableIgnore]` | ≤ counterDuration Clamp. 애니 Hit 이벤트로 대체 예정 |
-| `counterDuration` | float 0.4, `[DataTableIgnore]` | 피해·넉백 무시 종료. 애니 End 이벤트로 대체 예정 |
+| ~~`counterHitDelay`~~ | ~~float 0.1, `[DataTableIgnore]`~~ | **P1-③ 에서 삭제** — 반격 클립 `Hit` 이벤트(0.1s)로 대체 |
+| ~~`counterDuration`~~ | ~~float 0.4, `[DataTableIgnore]`~~ | **P1-③ 에서 삭제** — 반격 클립 `End` 이벤트(0.4s)로 대체 |
 | 기존 값 변경 | cooldownTime 14→7, attackDamageMultiplier 0→2.5, maxActiveDuration 0.5→1.5, snapRotationOnStart 0→1, hittableLayers 0→17664(Enemy·Projectile·EnemyHurtBox, Q 와 동일) | 현재 에셋 값 확인함(14 / 0 / 0.5 / 0) |
+| `animatorStateName` | `SubSkillGuard`(P1-③-1) | 시작 상태 = 방어 클립. 반격 상태 `SubSkillCounter` 는 코드 상수(데이터 열 아님) |
+
+> 🔴 **안전망 `maxActiveDuration` 1.5 는 방어 클립 `Custom1`(1.0) + 반격 클립 `End`(0.4) 보다 길어야 한다.**
+> 클립에서 이벤트를 늦게 옮기면 이 값도 같이 늘린다 — 짧으면 반격 중에 안전망이 E 를 끊는다(반격은 OnEnd 보장 반격으로 1회 나간다).
+> P1-③ 에서 이 조건을 검사하던 OnValidate·런타임 경고는 지웠다(`FirstMeleeSubSkillData` 클래스 주석에만 남음).
 | `shieldAmount`·`shieldDuration` | 유지(미사용) | 병합 Export 때 제거 |
 
 > ⚠️ **xlsx 갱신 전에는 툴바 '데이터: 인스펙터' 로만 검증한다.** xlsx Paladin 시트에는 아직 maxActiveDuration 0.5,
 > attackDamageMultiplier 0, cooldownTime 14 가 남아 있어 '데이터: 테이블' 모드와 **빌드**에서는 E 가 깨진다(maxActiveDuration 0.5 + 여유로 강제 종료 폴백, 반격 피해 0).
-> xlsx 반영(값 3개 + 새 열 4개)은 병합 후 SVN 병합 Export 로 하며 **빌드 전 필수**다.
+> xlsx 반영(값 3개 + 새 열 3개 — P1-③ 전에는 4개)은 병합 후 SVN 병합 Export 로 하며 **빌드 전 필수**다.
 
 ## 6. Play 확인 (사람이 '데이터: 인스펙터' 모드로)
 
@@ -226,7 +236,7 @@ C2~C9 의 세부(테스트 이름·의사코드)는 조사 원본 PLAN 의 같�
 
 ## 7. 범위 밖
 
-- E 방어·반격 애니메이션 클립과 Hit/End 이벤트 · 정식 VFX·SFX(민경) · GameData.xlsx 직접 수정
+- E 방어·반격 **정식** 애니메이션 클립(P1-③ 에서 `Garen_Parry` 복제 임시 클립 + 이벤트는 넣음 — 정식이 오면 클립만 교체) · 정식 VFX·SFX(민경) · GameData.xlsx 직접 수정
 - HolyShield 정리(ShieldType.HolyShield, HolyShieldEffect·System, PlayerShieldVfx 보호막 색, HealthShieldTests, SO 구 필드)
 - AreaZone·BossBomb instigator · AttackInfo unblockable/grab/dash 플래그 · 반격 중 Push 구속 거부
 - Unit.Knockback 공격자 정보로 히트별 넉백 게이트 세분화 · 보스 코드(TwentyThreeBoss 돌진·캐리 순서) 변경
@@ -278,17 +288,29 @@ C2~C9 의 세부(테스트 이름·의사코드)는 조사 원본 PLAN 의 같�
 | 항목 | 계획 | 실제 |
 | --- | --- | --- |
 | C2 부채꼴 경계 | 각도 ≤ 반각 | `FirstMeleeGuardRules.AngleToleranceDeg = 0.001°` 여유 — 정확히 옆(90°)이 부동소수 오차로 떨어지지 않게 |
-| C6 `counterHitDelay`·`counterDuration` | Min 없음 | `[Min(0f)]` 추가(음수 방지) |
+| C6 `counterHitDelay`·`counterDuration` | Min 없음 | `[Min(0f)]` 추가(음수 방지) → P1-③-2 에서 필드째 삭제 |
 | C8 반격 판정 시그니처 | `ResolveCounterHit(Vector3 origin)` | `ResolveCounterHit(Vector3 origin, Vector3 forward)` — 다음 프레임 보장 반격이 모델 종료 뒤라 방어 방향을 따로 넘긴다(`deferredCounterForward`) |
 | C8 브로드페이즈 버퍼 | 크기 미정 | `const int MaxCounterHitResults = 16` (초과분은 무시) |
 | C9 문서 인수인계 | 프로젝트 `CONTEXT.md` | 이 절(§11)과 브릿지 보고로 대신 — `CONTEXT.md`·루트 `PLAN.md` 는 고치지 않음 |
 | C5·C10 | 선택 | 하지 않음(결정대로) |
+| P1-③-1 E 임시 클립·상태(`f6f83fa8`) | 결정 6 '클립이 생기면 Hit/End 이벤트로' | `Garen_Parry` 복제(새 guid) 2개: `Garen_Guard_Placeholder`(`Custom0` 0.0s · `Custom1` 1.0s), `Garen_GuardCounter_Placeholder`(`Hit` 0.1s · `End` 0.4s), 모두 `HandleSkillEvent(int)`. `PlayerAnimatorController`(guid 5b86…) Base Layer 에 `SubSkillGuard`·`SubSkillCounter` 상태(speed 1, Idle 로 exitTime 1·0.05s 전이 — `Interrupt` 와 동일), `animatorStateName = SubSkillGuard`. 이 커밋만으로는 동작 변화 0 |
+| P1-③-2 E 타이밍 = 클립 이벤트(`dda95b1a`) | 초 단위 시각 비교(§2.1 원안) | 모델에서 시간 인자·`Tick` 제거 — `Begin(forward, angle)`(창 닫힌 대기) · `OnGuardWindowOpened`(Custom0) · `OnGuardWindowClosed`(Custom1, Guarding 일 때만 GuardExpired) · `Evaluate(incoming)` · `OnCounterHit`(Hit, 1회) · `OnCounterEnd`(End, Hit 미발사면 CounterHitDue 동반 → 반격 먼저 → 종료). 단계 밖 이벤트 무시. `BlocksKnockback` 은 속성, End 까지. `FirstMeleeSubSkill.OnAnimationEvent` 가 4종을 처리하고 `OnTick` 시간 진행 삭제. 데이터 `guardDuration`·`counterHitDelay`·`counterDuration` 삭제(SO 3줄)·관련 경고 삭제, 안전망 `maxActiveDuration` 1.5 만 남김(§5). EditMode 28개 |
+| P1-③-2 반격 상태 재생 | — | 방어 성공 시 `PlayerShieldVfx.ServerPlayGuardCounterPose(SubSkillCounter, 0.05s)` — 서버 로컬 CrossFade + `Rpc(SendTo.NotServer, Reliable)`. 스킬 이벤트는 서버 애니메이터에서만 처리되는데 플레이어 NetworkAnimator 가 오너 권한이라 서버만 바꾸면 오너 동기가 방어 자세로 되돌려 Hit·End 가 안 온다 — 시작 상태(PlaySkillPresentation + PlaySkillClientRpc)와 같은 길. `shieldVfx` 가 비면 경고 후 안전망이 끝낸다 |
+| P1-④ 우클릭 `Garen_Parry` 이벤트(`5ecc21df`) | — | `Hit` 0.25s · `End` 0.6s 추가(`Interrupt` 상태 speed 1 → 클립 시간 = 실제 초). 타이머 `hitDelay` 0.25 · `skillDuration` 0.6 과 같은 시각이라 지금은 **먼저 온 쪽**이 이긴다(동작 변화 0). 동작 코드는 그대로, `FirstMeleeInterruptSkill` 주석 1줄만 |
 
 ## 11. 인수인계
 
 - **xlsx 병합 Export 필요** — `Paladin` 시트 E 행: `cooldownTime` 7 · `attackDamageMultiplier` 2.5 · `maxActiveDuration` 1.5,
-  새 열 `guardDuration`(1) · `guardAngle`(180) · `counterAngle`(120) · `counterRange`(3). `counterHitDelay`·`counterDuration` 은 `[DataTableIgnore]` 라 열 없음.
+  새 열 `guardAngle`(180) · `counterAngle`(120) · `counterRange`(3). `guardDuration`·`counterHitDelay`·`counterDuration` 은 P1-③ 에서 삭제돼 열 없음(타이밍 = 클립 이벤트).
   구 `shieldAmount`·`shieldDuration` 열은 이때 정리한다. GameData.xlsx(SVN) 은 이 브랜치에서 건드리지 않았다.
+- **E·우클릭 타이밍 튜닝 = 클립에서 이벤트를 옮긴다**(§2.1·§10). E 이벤트를 늦게 옮기면 `maxActiveDuration` 도 같이 늘린다(§5 🔴).
+  두 E 클립은 `Garen_Parry` 임시 복제다 — 정식 애니가 오면 클립만 교체하고 이벤트 4종(Custom0·Custom1 / Hit·End)을 다시 단다.
+- **후속 1줄 커밋 필요(Work3 병합 뒤)** — Work3(`feature/AnimEventCore`) 의 `PlayerInterruptSkillBase.TimingFromAnimationEvents` 가 들어오면
+  `FirstMeleeInterruptSkill` 에서 켠다. 그 전에는 `Garen_Parry` 이벤트를 0.25s 보다 늦게 옮겨도 타이머가 먼저 이긴다.
+  같은 때 E(`FirstMeleeSubSkill`)에도 필요한 이벤트 목록(`RequiredAnimationEvents`: Custom0·Custom1·Hit·End) 선언을 붙인다.
+- **병합 순서** — Main 52.1(애니메이터를 `Garen/GarenAnimatorController.controller` 로 이동, guid 5b86 유지)을 먼저 →
+  이 브랜치는 그 뒤 rename 충돌을 확인한다(이 브랜치가 `PlayerAnimatorController.controller` 에 `SubSkillGuard`·`SubSkillCounter` 상태를 넣었다).
+  Work3 도 이 브랜치보다 먼저 들어오는 편이 좋다(위 후속 1줄).
 - **Export 전에는 '데이터: 테이블' 모드에서 E 가 옛 값**(쿨 · 계수 · 지속)으로 돈다. Play 확인은 '데이터: 인스펙터' 모드로.
 - 툴팁 문구는 `StringTable` 의 새 반격 문구(`{dmg}`)가 원본이고, `SkillTooltipAuthoring` 시드도 같은 문구로 맞췄다(C9). `{dmg}` = 공격력 × 2.5 표시 Play 확인 필요.
 - **HolyShield 정리 미정** — §7 범위 밖 목록 그대로(ShieldType.HolyShield·HolyShieldEffect·System·보호막 색·HealthShieldTests·SO 구 필드).
