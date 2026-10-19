@@ -18,12 +18,18 @@ public static class AssassinShellAuthoring
     private const string ArmaturePath = PrefabFolder + "/Assassin_Armature.prefab";
     private const string VariantPath = PrefabFolder + "/Player_Assassin.prefab";
     private const string ModelPath = "Assets/50.Art/Char/assassin/Assassin.fbx";
-    private const string MaterialPath = "Assets/3.Materials/Toon/Assassin_Toon.mat";
-    private const string FaceMaterialPath = "Assets/3.Materials/Toon/Assassin_Face_Toon.mat";
+    // v18(10-17, PLAN-assassin §9 V2) — 팔라딘·거너와 같은 Flat Kit Variant. 만드는 곳 = Tools/Rendering/Flat Kit/플레이어 Variant 구성.
+    // 예전 ToonLit Assets/3.Materials/Toon/Assassin_Toon.mat 은 되돌리기용으로 남겨 둔다.
+    private const string MaterialPath = "Assets/3.Materials/FlatKit/Player/Assassin/FK_Assassin_Body.mat";
     // 단검(10-06 은희 추가, SVN) — 모델에 무기 본이 없어 Humanoid 손 본에 정적으로 붙인다.
     // 클립의 Dagger_Weapon_* 커브는 원본(UE) 경로라 이 리그에 바인딩되지 않는다 — 손을 따라가기만 한다.
     private const string DaggerLeftPath = "Assets/50.Art/Char/assassin/Dagger_Weapon_L.fbx";
     private const string DaggerRightPath = "Assets/50.Art/Char/assassin/Dagger_Weapon_R.fbx";
+    // 🔸 v18(10-17) 부터 몸 크기 = FBX 임포트 배율(Assassin.fbx Scale Factor, 지금 1.25 — AssassinHairAuthoring.ImportScale).
+    //    본 lossyScale 은 1 이라 손 본에 붙인 단검은 같은 배율을 루트에 직접 받는다. 쥐는 위치 오프셋은 단검 루트 아래 자식에 있어
+    //    루트 배율을 따라간다 — 오프셋은 곱하지 않는다(곱하면 배율²).
+    //    달리기 루프는 보폭이 배율만큼 길어진다 — 클립 자연 속도는 배율 1 에서 4.98 m/s(≈ 이동 5 m/s), ×1.25 에서 6.23 m/s 라
+    //    재생 속도 = 1 / 배율(지금 0.8)로 실제 4.98 m/s 에 맞춘다(발 미끄럼 방지).
     private const string AnimationFolder = "Assets/4.Animations/Player/Assassin";
     private const string ControllerPath = AnimationFolder + "/AssassinAnimatorController.controller";
     private const string UpperBodyMaskPath = AnimationFolder + "/AssassinUpperBody.mask";
@@ -98,6 +104,14 @@ public static class AssassinShellAuthoring
 
     // 평타 1~4타 End 정규화 시점 — 사용자가 클립에 직접 둔 값(10-16, 1.25초 클립의 0.4초·0.333초). 클립이 비어 있을 때만 쓴다.
     private static readonly float[] WaveEndTimes = { 0.32f, 0.2667f, 0.2667f, 0.2667f };
+    // 예약 창 기본 배치(정규화) — 클립이 비어 있을 때만 쓴다. 닫힘은 위 End 앞.
+    private const float WaveWindowOpenTime = 0.05f;
+    private static readonly float[] WaveWindowCloseTimes = { 0.30f, 0.25f, 0.25f, 0.25f };
+
+    // 평타 상태 재생 속도 — 상태를 처음 만들 때만 쓴다. 이후 튜닝은 Animator 상태 speed 한 곳(재실행해도 덮어쓰지 않는다).
+    private static readonly float[] WaveAttackSpeeds = { 1.2f, 1.2f, 1.2f, 1.2f };
+    private const float EnhancedAttackSpeed = 2f;
+    private const float TransformedAttackSpeed = 1.25f;
 
     private static readonly string[] AllClipNames =
     {
@@ -221,32 +235,42 @@ public static class AssassinShellAuthoring
             configured++;
         }
 
-        // 일반 평타 1~4타: 이벤트는 사용자가 클립에서 직접 배치한다(10-16) — 이미 있으면 덮어쓰지 않는다.
-        // 비어 있을 때만 그 배치(Hit 0, End 1타 0.32 · 2~4타 0.267)로 채운다. 예약 창(AssassinBasicAttackData)이 이 End 앞에 맞춰져 있다.
+        // 평타 이벤트(판정·예약 창·종료)는 사용자가 클립에서 직접 옮겨 튜닝한다(10-16, PLAN-anim-event-timing P2-1) — 이미 있으면 덮어쓰지 않는다.
+        // 비어 있을 때만 기본 배치로 채운다: 1~4타 Hit 0 · 창 0.05~ · End 1타 0.32 · 2~4타 0.267(창은 End 앞에서 닫힘).
         for (int i = 0; i < WaveClips.Length; i++)
             StampEventsIfEmpty(WaveClips[i], DefaultAttackEvent(0f, DefaultAttackAnimationEventType.Hit),
+                DefaultAttackEvent(WaveWindowOpenTime, DefaultAttackAnimationEventType.ComboWindowOpen),
+                DefaultAttackEvent(WaveWindowCloseTimes[i], DefaultAttackAnimationEventType.ComboWindowClose),
                 DefaultAttackEvent(WaveEndTimes[i], DefaultAttackAnimationEventType.End));
 
-        // A7 연결 자리까지 같은 메뉴가 준비한다. 실제 타격 프레임은 Play에서 튜닝한다.
-        ReplaceEvents("Combo_Attack_02_01",
+        // 강타·변신 묶음 — 창은 (마지막) 판정과 함께 열려 End 앞에서 닫힌다.
+        StampEventsIfEmpty("Combo_Attack_02_01",
             DefaultAttackEvent(0.40f, DefaultAttackAnimationEventType.Hit),
+            DefaultAttackEvent(0.40f, DefaultAttackAnimationEventType.ComboWindowOpen),
+            DefaultAttackEvent(0.95f, DefaultAttackAnimationEventType.ComboWindowClose),
             DefaultAttackEvent(AttackEndTime, DefaultAttackAnimationEventType.End));
-        ReplaceEvents("Speed_Attack_Loop",
+        StampEventsIfEmpty("Speed_Attack_Loop",
             DefaultAttackEvent(0.15f, DefaultAttackAnimationEventType.Hit),
             DefaultAttackEvent(0.35f, DefaultAttackAnimationEventType.Hit),
             DefaultAttackEvent(0.55f, DefaultAttackAnimationEventType.Hit),
             DefaultAttackEvent(0.75f, DefaultAttackAnimationEventType.Hit),
+            DefaultAttackEvent(0.75f, DefaultAttackAnimationEventType.ComboWindowOpen),
+            DefaultAttackEvent(0.95f, DefaultAttackAnimationEventType.ComboWindowClose),
             DefaultAttackEvent(AttackEndTime, DefaultAttackAnimationEventType.End));
 
-        // Q 돌진은 돌진 종료(OnTick)가, 간파는 skillDuration 타이머가 먼저 끝낸다 — 클립보다 훨씬 짧아 End 는 안전망이다(47-1 예외).
-        ReplaceEvents("Combo_Attack_02_04", SkillEvent(0.40f, SkillAnimationEventType.Hit), SkillEvent(0.85f, SkillAnimationEventType.End));
-        ReplaceEvents("Combo_Attack_03_04", SkillEvent(0.40f, SkillAnimationEventType.Hit), SkillEvent(0.85f, SkillAnimationEventType.End));
+        // Q 돌진(P2-3): Custom0 = 준비 끝(출발), End = 종료 — 클립보다 훨씬 짧아 End 를 앞에 둔다(47-1 예외). Hit 은 쓰지 않는다(경로 스윕).
+        // 비어 있을 때만 실제 시간 준비 0.1s·종료 ≈0.283s(준비 + 5m/60m/s + 0.1) 자리로 채운다 — 일반 1배속 1.283s, 변신 1.5배속 1.917s.
+        StampEventsIfEmpty("Combo_Attack_02_04", SkillEvent(0.0779f, SkillAnimationEventType.Custom0),
+            SkillEvent(0.40f, SkillAnimationEventType.Hit), SkillEvent(0.2208f, SkillAnimationEventType.End));
+        StampEventsIfEmpty("Combo_Attack_03_04", SkillEvent(0.0783f, SkillAnimationEventType.Custom0),
+            SkillEvent(0.40f, SkillAnimationEventType.Hit), SkillEvent(0.2217f, SkillAnimationEventType.End));
         ReplaceEvents("Buff", SkillEvent(ClipEndTime, SkillAnimationEventType.End));
         ReplaceEvents("Skill_02_Move_000pct",
             SkillEvent(0.18f, SkillAnimationEventType.Hit), SkillEvent(0.32f, SkillAnimationEventType.Hit),
             SkillEvent(0.46f, SkillAnimationEventType.Hit), SkillEvent(0.60f, SkillAnimationEventType.Hit),
             SkillEvent(0.74f, SkillAnimationEventType.Hit), SkillEvent(ClipEndTime, SkillAnimationEventType.End));
-        ReplaceEvents("Attack_Up_01", SkillEvent(0.40f, SkillAnimationEventType.Hit), SkillEvent(0.85f, SkillAnimationEventType.End));
+        // 간파 = Hit·End 이벤트가 판정·종료(P2-2). 사용자가 옮겨 튜닝하므로 비어 있을 때만 채운다(Hit 0.15초·End 0.6초, 1배속).
+        StampEventsIfEmpty("Attack_Up_01", SkillEvent(0.10f, SkillAnimationEventType.Hit), SkillEvent(0.40f, SkillAnimationEventType.End));
         ReplaceEvents("Parry_R", SkillEvent(ClipEndTime, SkillAnimationEventType.End));
 
         AssetDatabase.SaveAssets();
@@ -1001,7 +1025,6 @@ public static class AssassinShellAuthoring
         float[] multipliers = { 1f, 1f, 1f, 1.3f };
         float[] ranges = { 1.5f, 1.5f, 1.6f, 1.7f };
         float[] angles = { 90f, 100f, 100f, 120f };
-        float[] speeds = { 3f, 3f, 3f, 2.5f };
 
         for (int i = 0; i < 4; i++)
         {
@@ -1021,12 +1044,11 @@ public static class AssassinShellAuthoring
             step.FindPropertyRelative("attackDamageMultiplier").floatValue = multipliers[i];
             step.FindPropertyRelative("range").floatValue = ranges[i];
             step.FindPropertyRelative("angle").floatValue = angles[i];
-            step.FindPropertyRelative("playbackSpeed").floatValue = speeds[i];
         }
 
         // A7: 클립이 비어 있을 때(= 처음 채울 때)만 기본 수치까지 쓴다. 이후 재실행은 튜닝 값을 유지한다.
-        EnsureSpecialStep(so.FindProperty("enhancedStep"), "Combo_Attack_02_01", 2.5f, 1.8f, 120f, 2f, 1);
-        EnsureSpecialStep(so.FindProperty("transformedStep"), "Speed_Attack_Loop", 1.2f, 1.8f, 120f, 1.25f, 4);
+        EnsureSpecialStep(so.FindProperty("enhancedStep"), "Combo_Attack_02_01", 2.5f, 1.8f, 120f, 1);
+        EnsureSpecialStep(so.FindProperty("transformedStep"), "Speed_Attack_Loop", 1.2f, 1.8f, 120f, 4);
 
         so.ApplyModifiedPropertiesWithoutUndo();
         EditorUtility.SetDirty(data);
@@ -1034,7 +1056,7 @@ public static class AssassinShellAuthoring
     }
 
     private static void EnsureSpecialStep(
-        SerializedProperty step, string clipName, float multiplier, float range, float angle, float speed, int hitCount)
+        SerializedProperty step, string clipName, float multiplier, float range, float angle, int hitCount)
     {
         if (step == null)
         {
@@ -1050,9 +1072,8 @@ public static class AssassinShellAuthoring
         step.FindPropertyRelative("attackDamageMultiplier").floatValue = multiplier;
         step.FindPropertyRelative("range").floatValue = range;
         step.FindPropertyRelative("angle").floatValue = angle;
-        step.FindPropertyRelative("playbackSpeed").floatValue = speed;
         step.FindPropertyRelative("hitCount").intValue = hitCount;
-        Debug.Log($"{Tag} 평타 스텝 초기화: {step.name} = {clipName} (×{multiplier}, {range}m, {angle}°, {speed}배속, {hitCount}타)");
+        Debug.Log($"{Tag} 평타 스텝 초기화: {step.name} = {clipName} (×{multiplier}, {range}m, {angle}°, {hitCount}타)");
     }
 
     private static AnimatorController EnsureController()
@@ -1084,6 +1105,7 @@ public static class AssassinShellAuthoring
         AnimatorState combatIdle = EnsureState(sm, "Idle_Combat", LoadClip("Idle_Combat"));
         AnimatorState runStart = EnsureState(sm, "Run_Start", LoadClip("Run_Combat_Fast_Start"));
         AnimatorState runLoop = EnsureState(sm, "Run_Loop", LoadClip("Run_Combat_Fast_Loop"));
+        runLoop.speed = 1f / AssassinHairAuthoring.ImportScale();
         AnimatorState runStop = EnsureState(sm, "Run_Stop", LoadClip("Run_Combat_Fast_Stop"));
         AnimatorState dodge = EnsureState(sm, "Dodge", LoadClip("Dodge_Combat_F_0"));
         AnimatorState interrupt = EnsureState(sm, "Interrupt", LoadClip("Attack_Up_01"));
@@ -1104,27 +1126,20 @@ public static class AssassinShellAuthoring
         EnsureReturnToIdleTransitions(interrupt, idle, combatIdle);
         EnsureAnyStateTransition(sm, interrupt, "Interrupt", AnimatorConditionMode.If, 0f);
 
-        AssassinBasicAttackData attackData = AssetDatabase.LoadAssetAtPath<AssassinBasicAttackData>(BasicAttackDataPath);
+        // 평타 재생 속도는 Animator 상태 speed 한 곳 — 판정·창·종료는 클립 이벤트라 속도에 같이 비례한다(P2-1). 처음 만들 때만 기본값.
         for (int i = 0; i < WaveClips.Length; i++)
         {
-            AnimatorState attack = EnsureState(sm, $"Default_Attack{i}", LoadClip(WaveClips[i]));
-            // 재생 속도는 평타 데이터 값을 따른다(게임플레이 종료 시점 = 클립 길이 ÷ 이 값과 같아야 한다).
-            attack.speed = attackData != null && attackData.TryGetNormalStep(i, out AssassinBasicAttackStepData step)
-                ? step.PlaybackSpeed
-                : (i == 3 ? 3f : 3.6f);
+            AnimatorState attack = EnsureStateWithInitialSpeed(sm, $"Default_Attack{i}", LoadClip(WaveClips[i]), WaveAttackSpeeds[i]);
             EnsureReturnToIdleTransitions(attack, idle, combatIdle);
             EnsureAnyStateAttackTransition(sm, attack, i);
         }
 
-        // A7: 강타·변신 묶음(AttackIndex 4·5) — 재생 속도는 평타 데이터 값을 따른다.
-        // attackData 는 평타 루프 앞에서 읽는다
-        AnimatorState enhancedAttack = EnsureState(sm, EnhancedAttackState, LoadClip("Combo_Attack_02_01"));
-        enhancedAttack.speed = attackData != null && attackData.EnhancedStep != null ? attackData.EnhancedStep.PlaybackSpeed : 2f;
+        // A7: 강타·변신 묶음(AttackIndex 4·5).
+        AnimatorState enhancedAttack = EnsureStateWithInitialSpeed(sm, EnhancedAttackState, LoadClip("Combo_Attack_02_01"), EnhancedAttackSpeed);
         EnsureReturnToIdleTransitions(enhancedAttack, idle, combatIdle);
         EnsureAnyStateAttackTransition(sm, enhancedAttack, AssassinBasicAttack.EnhancedAnimatorIndex);
 
-        AnimatorState transformedAttack = EnsureState(sm, TransformedAttackState, LoadClip("Speed_Attack_Loop"));
-        transformedAttack.speed = attackData != null && attackData.TransformedStep != null ? attackData.TransformedStep.PlaybackSpeed : 1.25f;
+        AnimatorState transformedAttack = EnsureStateWithInitialSpeed(sm, TransformedAttackState, LoadClip("Speed_Attack_Loop"), TransformedAttackSpeed);
         EnsureReturnToIdleTransitions(transformedAttack, idle, combatIdle);
         EnsureAnyStateAttackTransition(sm, transformedAttack, AssassinBasicAttack.TransformedAnimatorIndex);
 
@@ -1248,7 +1263,7 @@ public static class AssassinShellAuthoring
         }
         if (material == null)
         {
-            Debug.LogError($"{Tag} Toon 머티리얼이 없다: {MaterialPath}");
+            Debug.LogError($"{Tag} Flat Kit 머티리얼이 없다: {MaterialPath} — Tools/Rendering/Flat Kit/플레이어 Variant 구성 을 먼저 돌릴 것.");
             return null;
         }
 
@@ -1293,10 +1308,9 @@ public static class AssassinShellAuthoring
             SkinnedMeshRenderer[] renderers = root.GetComponentsInChildren<SkinnedMeshRenderer>(true);
             // 슬롯마다 — HeadNeck 메시는 서브메시가 여럿(Head·Face)이다. 0번만 바꾸면 Face 슬롯이 FBX 의
             // 원래 재질(패키지의 Built-in Assassin_Face — 가져오지 않음)로 남아 깨진다(10-06 은희 Play).
-            // Face 는 같은 아틀라스지만 따로 조정할 수 있게 별도 Variant(Assassin_Face_Toon)를 쓴다.
-            // 🔸 FBX .meta 의 재질 remap 이 가져오지 않은 패키지 재질을 가리켜 원본 슬롯 이름이 비어 있다 — 이름으로 Face 를 못 가르면
-            //    기본 Toon 으로 채우고, 이미 채워진 슬롯(손으로 Assassin_Face_Toon 을 넣은 것 포함)은 건드리지 않는다.
-            Material faceMaterial = AssetDatabase.LoadAssetAtPath<Material>(FaceMaterialPath);
+            // v18(10-17)부터 Face 를 포함한 모든 슬롯 = Flat Kit FK_Assassin_Body(같은 아틀라스). 예전 ToonLit Assassin_Face_Toon 은 쓰지 않는다.
+            // 🔸 FBX .meta 의 재질 remap 이 가져오지 않은 패키지 재질을 가리켜 원본 슬롯이 비어 있다 — 빈 슬롯은 FK 로 채우고,
+            //    이미 채워진 슬롯(손으로 넣은 재질 포함)은 건드리지 않는다.
             foreach (SkinnedMeshRenderer renderer in renderers)
             {
                 var source = PrefabUtility.GetCorrespondingObjectFromOriginalSource(renderer);
@@ -1307,8 +1321,7 @@ public static class AssassinShellAuthoring
                 {
                     Material existing = i < current.Length ? current[i] : null;
                     string slotName = sourceSlots[i] != null ? sourceSlots[i].name : string.Empty;
-                    bool isFace = slotName.IndexOf("Face", StringComparison.OrdinalIgnoreCase) >= 0 && faceMaterial != null;
-                    slots[i] = existing != null && existing != sourceSlots[i] ? existing : isFace ? faceMaterial : material;
+                    slots[i] = existing != null && existing != sourceSlots[i] ? existing : material;
                     Debug.Log($"{Tag} 재질 슬롯 {renderer.name}[{i}] 원본 '{slotName}' → {slots[i].name}");
                 }
                 renderer.sharedMaterials = slots;
@@ -1316,7 +1329,7 @@ public static class AssassinShellAuthoring
             if (renderers.Length == 0)
                 Debug.LogError($"{Tag} SkinnedMeshRenderer를 찾지 못해 머티리얼을 적용하지 못했다.", root);
             else if (renderers.Length != 2)
-                Debug.LogWarning($"{Tag} 예상 메시 2개와 다르다({renderers.Length}개). 찾은 렌더러 모두 Assassin_Toon을 적용했다.", root);
+                Debug.LogWarning($"{Tag} 예상 메시 2개와 다르다({renderers.Length}개). 찾은 렌더러 모두 {material.name}을 적용했다.", root);
 
             EnsureDagger(root.transform, "LeftHand", DaggerLeftPath, material);
             EnsureDagger(root.transform, "RightHand", DaggerRightPath, material);
@@ -1491,6 +1504,19 @@ public static class AssassinShellAuthoring
         controller.AddParameter(name, type);
     }
 
+    // 없으면 만들고 speed 를 기본값으로, 있으면 speed 를 건드리지 않는다(튜닝 보존).
+    private static AnimatorState EnsureStateWithInitialSpeed(AnimatorStateMachine machine, string name, Motion motion, float initialSpeed)
+    {
+        bool existed = false;
+        foreach (ChildAnimatorState child in machine.states)
+            existed |= child.state.name == name;
+
+        AnimatorState state = EnsureState(machine, name, motion);
+        if (!existed)
+            state.speed = initialSpeed;
+        return state;
+    }
+
     private static AnimatorState EnsureState(AnimatorStateMachine machine, string name, Motion motion)
     {
         foreach (ChildAnimatorState child in machine.states)
@@ -1659,10 +1685,11 @@ public static class AssassinShellAuthoring
         var dagger = (GameObject)PrefabUtility.InstantiatePrefab(fbx, hand);
         dagger.transform.localPosition = Vector3.zero;
         dagger.transform.localRotation = fbx.transform.localRotation;
-        dagger.transform.localScale = Vector3.one;
+        float scale = AssassinHairAuthoring.ImportScale();
+        dagger.transform.localScale = Vector3.one * scale;
         foreach (Renderer renderer in dagger.GetComponentsInChildren<Renderer>(true))
             renderer.sharedMaterial = material;
-        Debug.Log($"{Tag} 단검 부착: {handBoneName}/{fbx.name} (Assassin_Toon)");
+        Debug.Log($"{Tag} 단검 부착: {handBoneName}/{fbx.name} ({material.name} · 배율 {scale})");
     }
 
     private static Transform FindDeep(Transform parent, string name)

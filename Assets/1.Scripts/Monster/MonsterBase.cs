@@ -42,7 +42,7 @@ public class MonsterBase : Unit
 
     /// <summary>
     /// 몸 표면에서 터지는 연출(카운터 성공 섬광 등)이 쓸 콜라이더. 피격 이펙트 콜라이더가 비어 있으면
-    /// <see cref="bodyCollider"/> 로 대신한다(23호는 hitVFXCollider 가 비어 있다 — 2026-10-12).
+    /// <see cref="bodyCollider"/> 로 대신한다(23호는 비어 있었다 — 10-19 HurtBox 연결, 다른 몬스터와 같은 허트박스 기준).
     /// </summary>
     protected Collider EffectSurfaceCollider => hitVFXCollider != null ? hitVFXCollider : bodyCollider;
 

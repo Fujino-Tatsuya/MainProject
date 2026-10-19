@@ -254,6 +254,26 @@ public class BossDataSO : MonsterDataSO
              "🔴 단 다른 후보가 하나도 없으면 제외하지 않는다 — 보스가 제자리에 멈춰 서는 쪽이 더 나쁜 버그다.")]
     [Min(0)] public int repeatBlockAfter = 2;
 
+    // ─── 콤보 (PLAN-boss-combo, 팀장 10-18) — 단타 행을 묶어 룰렛에 가중치로 섞는다. 기존·레이드만(1인 = 비움) ───
+    [Header("콤보 — 단타 행 재사용(PLAN-boss-combo)")]
+    [Tooltip("룰렛에 단타와 같이 섞이는 콤보. 비우면 콤보 없음(이전 동작).\n" +
+             "타 사이 = comboStepInterval · 쿨다운 무시 · 다음 타 거리창이 안 맞으면 버림 · 콤보 동안 어그로 고정.")]
+    [DataTableIgnore] public BossComboEntry[] combos = new BossComboEntry[0];
+
+    [Tooltip("개전 콤보 — 전투 시작 때 1회 고정(룰렛 아님). 기존·레이드 공통(팀장 10-18: 오른훅 → 왼훅 → 돌진).\n" +
+             "첫 타는 사거리 밖이면 다가가서 쓴다. 비우면 개전 없음(1인). 예전 raidOpeningScript(레이드 ① 전용)를 대체.")]
+    [DataTableIgnore] public BossAttackId[] openingCombo = new BossAttackId[0];
+
+    [Tooltip("콤보 타 사이 간격(초) — 직전 공격 종료 기준. 전역 공격 간격(globalAttackInterval) 대신 쓴다.")]
+    [Min(0f)] public float comboStepInterval = 0.3f;
+
+    [Tooltip("콤보 다음 타가 사거리 밖일 때 다가가며 기다려 주는 시간(초). 넘기면 콤보를 버린다(팀장 10-19: 1초).\n" +
+             "0 = 바로 버림. 살짝 물러난 것으로는 안 끊기고 대시로 크게 빠지면 끊긴다.")]
+    [Min(0f)] public float comboChaseGrace = 1f;
+
+    [Tooltip("레이드 ① 개전 콤보만 타 사이 간격(초) — 배우는 구간이라 느리게(팀장 10-18: 1.5 → 1초). 기존 23호 개전은 comboStepInterval.")]
+    [Min(0f)] public float raidOpeningStepInterval = 1f;
+
     [Header("페이즈 — hpThreshold 내림차순으로 저작")]
     public BossPhaseEntry[] phases =
     {
@@ -274,9 +294,7 @@ public class BossDataSO : MonsterDataSO
     [Tooltip("레이드 각본 사용(①기동 시연·② 전력 공급 등). 꺼져 있으면 아래 레이드 칸은 전부 무시된다 — 기존 No23 = 꺼짐.")]
     public bool raidScript = false;
 
-    [Tooltip("① 기동 시연 — 개전 직후 이 순서로 고정 시전(거리창은 지킨다, 밖이면 추격). 기본 = 훅 좌·우 → 간파 가능 돌진.\n" +
-             "교차 전기 장판은 ① 부터 나온다(팀장 10-14 — 처음엔 ① 동안 껐다).")]
-    public BossAttackId[] raidOpeningScript = { BossAttackId.LeftHook, BossAttackId.RightHook, BossAttackId.Dash };
+    // ① 기동 시연 각본(raidOpeningScript)은 openingCombo(위 콤보 칸, 기존·레이드 공통)로 옮겼다(팀장 10-18).
 
     [Tooltip("② 전력 공급 제한시간(초). 기존 송전기의 chargeTimeLimit 대신 쓴다.")]
     [Min(1f)] public float raidChargeTimeLimit = 25f;
@@ -294,23 +312,27 @@ public class BossDataSO : MonsterDataSO
              "기존 23호 송전기는 항상 1 — 같은 송전탑을 같이 쓰므로 프리팹 값은 바꾸지 않는다. 드론 표식은 배율과 무관하게 한 방.")]
     [Min(0.01f)] public float raidPylonHpMultiplier = 2f;
 
-    [Header("레이드 ④ 폐기 처분 — 자폭 카운트다운 + 공동 게이지(간파 게이지 재사용)")]
-    [Tooltip("자폭까지 남은 시간(초). 이 안에 게이지를 0 으로 만들면 저지.")]
+    [Header("레이드 ④ 폐기 처분 — 자폭 카운트다운 + 체력바 실드(팀장 10-19)")]
+    [Tooltip("자폭까지 남은 시간(초). 이 안에 실드를 부수면 저지(제압).")]
     [Min(3f)] public float raidSelfDestructTime = 20f;
 
-    [Tooltip("게이지 100 → 0 에 필요한 플레이어 피해 합(1인 기준 — partyHpMultipliers 를 똑같이 곱한다).\n" +
-             "피해만으로 깰 수 있어야 한다(팀장 10-14). 1인 HP 2880 의 20% = 576 이 남은 시점이라 그보다 작게 둔다. 측정 플레이로 조정.")]
+    [Tooltip("자폭 실드 총량 = 부숴야 하는 플레이어 피해 합(1인 기준 — partyHpMultipliers 를 똑같이 곱한다).\n" +
+             "실드가 남아 있는 동안 보스 HP 는 안 깎이고 넘친 몫만 HP 로 간다. 체력바 위 하늘색 덮개로 보인다(BossHealthHUD).\n" +
+             "이름은 예전 '공동 게이지' 그대로 — xlsx Boss 시트 행이 이 이름이라 바꾸지 않는다.")]
     [Min(1)] public int raidSelfDestructGaugeDamage = 300;
 
-    [Tooltip("자폭 중 간파 성공 1회가 깎는 게이지(%p). 간파는 필수가 아니라 큰 보너스(팀장 10-14).")]
+    // ⚠️ 아래 셋은 **미사용**(팀장 10-19 — 자폭은 간파 창을 열지 않고 실드를 공격으로 부순다).
+    //    xlsx Boss 시트에 행이 있어 지우면 테이블 적용이 "필드 없음" 오류로 Play·빌드를 막는다 — 다음 병합 Export 때 정리.
+    [Tooltip("⚠️ 미사용(10-19 실드로 대체). 예전: 자폭 중 간파 1회가 깎는 게이지(%p).")]
     [Range(0f, 100f)] public float raidSelfDestructCounterBonus = 35f;
 
-    [Tooltip("자폭 중 간파 창이 열리는 간격(초)과 길이(초). 23호가 서 있기만 하므로 창을 따로 연다.")]
+    [Tooltip("⚠️ 미사용(10-19 실드로 대체). 예전: 자폭 중 간파 창 간격(초)과 길이(초).")]
     [Min(1f)] public float raidSelfDestructCounterInterval = 5f;
     [Min(0.3f)] public float raidSelfDestructCounterWindow = 1.5f;
 
-    [Tooltip("자폭 중 보스 HP 피해 감소율(0~1). 0.9 = 플레이어 피해의 10% 만 HP 에 들어간다(팀장 10-14 — 게이지를 깎으면 체력까지 녹던 것).\n" +
-             "공동 게이지는 감소 **전** 피해로 깎인다. 1 = HP 무피해(한 대당 최소 1 은 들어간다).")]
+    // 🔴 10-19 에 지웠다가 되살렸다 — r455(10-16 병합 Export)에서 xlsx Boss 시트에 행이 생겨 있었다. 지우자
+    //    테이블 적용이 "필드 없음" 오류로 Play·빌드를 막았다(팀장 Play). 위 셋과 같이 다음 병합 Export 때 행부터 정리하고 지운다.
+    [Tooltip("⚠️ 미사용(10-19 실드로 대체). 예전: 자폭 중 보스 HP 피해 감소율.")]
     [Range(0f, 1f)] public float raidSelfDestructDamageReduction = 0.9f;
 
     [Tooltip("저지 실패 = 대폭발(방 전체). 예고 시간과 피해. 즉사기(아래)면 피해 값은 무시된다.")]

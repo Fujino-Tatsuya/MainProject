@@ -1,95 +1,115 @@
+using System.Collections.Generic;
 using NUnit.Framework;
+using UnityEditor;
+using UnityEditor.Animations;
 using UnityEngine;
 
-// 할 일 47 연장·정정 — 어쌔신 평타 다음 타 연결: 예약 창(가붕이 ComboWindowOpen~Close 와 같은 규칙, 클립 정규화 시간)
+// 할 일 47 연장·정정 — 어쌔신 평타 다음 타 연결: 예약 창(클립 ComboWindowOpen~Close 이벤트, 가붕이와 같다 — PLAN-anim-event-timing P2-1)
 // + End 순간 눌림(거너 기본 공격과 같은 홀드).
 public sealed class AssassinComboWindowRulesTests
 {
-    // Combo_Attack_Wave_0N 클립 길이(1.25초)와 단별 재생 속도(3.6/3.6/3.6/3).
-    private const float WaveClipLength = 1.25f;
+    private const string BasicAttackDataPath = "Assets/9.ScriptableObject/Player/Assassin/AssassinBasicAttackData.asset";
+    private const string ControllerPath = "Assets/4.Animations/Player/Assassin/AssassinAnimatorController.controller";
 
+    // 창은 (마지막) 판정과 같은 프레임 또는 그 뒤에 열리고, End 전에 닫힌다 — 1~4타·강타·변신 묶음 모두 창 이벤트가 하나씩.
     [Test]
-    public void ProgressIsElapsedOverMotionDuration()
+    public void ClipWindowOpensAfterHitAndClosesBeforeEnd()
     {
-        Assert.That(AssassinComboWindowRules.NormalizedProgress(0.25f, 0.5f), Is.EqualTo(0.5f).Within(1e-5f));
-        Assert.That(AssassinComboWindowRules.NormalizedProgress(0f, 0.5f), Is.EqualTo(0f));
-    }
-
-    [Test]
-    public void ZeroMotionDurationIsOutsideWindow()
-    {
-        float progress = AssassinComboWindowRules.NormalizedProgress(0.1f, 0f);
-
-        Assert.That(AssassinComboWindowRules.IsInside(progress, 0f, 1f), Is.False);
-    }
-
-    [Test]
-    public void BoundariesAreInclusive()
-    {
-        Assert.That(AssassinComboWindowRules.IsInside(0.4f, 0.4f, 0.95f), Is.True, "열림 경계");
-        Assert.That(AssassinComboWindowRules.IsInside(0.95f, 0.4f, 0.95f), Is.True, "닫힘 경계");
-    }
-
-    [Test]
-    public void OutsideWindowIsRejected()
-    {
-        Assert.That(AssassinComboWindowRules.IsInside(0.39f, 0.4f, 0.95f), Is.False, "판정 전 클릭");
-        Assert.That(AssassinComboWindowRules.IsInside(0.96f, 0.4f, 0.95f), Is.False, "닫힘 뒤 ~ End 전 클릭");
-        Assert.That(AssassinComboWindowRules.IsInside(-1f, 0.4f, 0.95f), Is.False, "회전 대기 중(클립 시작 전)");
-    }
-
-    [Test]
-    public void InvertedWindowNeverOpens()
-    {
-        Assert.That(AssassinComboWindowRules.IsInside(0.5f, 0.8f, 0.2f), Is.False);
-    }
-
-    // 정규화 창은 재생 속도에 비례한다 — 같은 창 값이 3.6배속 단과 3배속 단에서 서로 다른 초가 된다.
-    [Test]
-    public void SameNormalizedWindowScalesWithPlaybackSpeed()
-    {
-        float fast = WaveClipLength / 3.6f;   // 1~3타 ≈ 0.347초
-        float slow = WaveClipLength / 3f;     // 4타 ≈ 0.417초
-        const float elapsed = 0.35f;
-
-        Assert.That(InWindow(elapsed, fast, 0.4f, 0.95f), Is.False, "1~3타는 0.35초면 이미 끝(창 밖)");
-        Assert.That(InWindow(elapsed, slow, 0.4f, 0.95f), Is.True, "4타는 0.35초가 창 안(≈0.84)");
-    }
-
-    // 평타 1~4타 클립 이벤트(10-16 직접 배치): Hit 0, End 1타 0.4초 · 2~4타 0.333초 / 1.25초 클립.
-    private const float Wave1End = 0.4f / WaveClipLength;          // 0.32
-    private const float Wave2To4End = 0.33333334f / WaveClipLength; // ≈0.267
-    private const float SpecialEnd = 0.97f;                        // 강타·변신 묶음 End(AssassinShellAuthoring.AttackEndTime)
-
-    [Test]
-    public void DataDefaultsOpenAfterHitAndCloseBeforeEnd()
-    {
-        AssassinBasicAttackData data = ScriptableObject.CreateInstance<AssassinBasicAttackData>();
-        try
+        foreach ((string label, AnimationClip clip) in StepClips())
         {
-            AssassinBasicAttackStepData[] steps = data.NormalSteps;
-            AssertWindow(steps[0], 0.05f, 0.30f, Wave1End);
-            for (int i = 1; i < 4; i++)
-                AssertWindow(steps[i], 0.05f, 0.25f, Wave2To4End);
-            AssertWindow(data.EnhancedStep, 0.4f, 0.95f, SpecialEnd);
-            AssertWindow(data.TransformedStep, 0.75f, 0.95f, SpecialEnd);   // 묶음 마지막(4번째) 판정 뒤
-        }
-        finally
-        {
-            Object.DestroyImmediate(data);
+            AnimationEvent[] events = AnimationUtility.GetAnimationEvents(clip);
+            Assert.That(Count(events, DefaultAttackAnimationEventType.ComboWindowOpen), Is.EqualTo(1), $"{label} 열림 1개");
+            Assert.That(Count(events, DefaultAttackAnimationEventType.ComboWindowClose), Is.EqualTo(1), $"{label} 닫힘 1개");
+            Assert.That(Count(events, DefaultAttackAnimationEventType.End), Is.EqualTo(1), $"{label} End 1개");
+
+            float open = TimeOf(events, DefaultAttackAnimationEventType.ComboWindowOpen);
+            float close = TimeOf(events, DefaultAttackAnimationEventType.ComboWindowClose);
+            float end = TimeOf(events, DefaultAttackAnimationEventType.End);
+            Assert.That(open, Is.GreaterThanOrEqualTo(LastTimeOf(events, DefaultAttackAnimationEventType.Hit) - 1e-4f),
+                $"{label} 창은 (마지막) 판정 뒤에 연다");
+            Assert.That(close, Is.GreaterThan(open), $"{label} 닫힘 > 열림");
+            Assert.That(close, Is.LessThan(end), $"{label} End 전에 닫는다");
         }
     }
 
-    // 1타 3.6배속: 창 0.05~0.30 = 약 0.017~0.104초, End 0.111초 — 창이 End 전에 닫히고 그 사이가 비지 않는다.
+    // 안전망(클립 원래 길이 + 여유)이 End 이벤트의 실제 시각(클립 시각 ÷ 상태 speed)보다 뒤 — 정상 종료를 안전망이 앞지르지 않는다.
     [Test]
-    public void FirstStepWindowFitsBeforeEnd()
+    public void SafetyNetIsAfterEndEventRealTime()
     {
-        float duration = WaveClipLength / 3.6f;
+        AnimatorController controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(ControllerPath);
+        Assert.That(controller, Is.Not.Null, ControllerPath);
 
-        Assert.That(InWindow(0.01f, duration, 0.05f, 0.30f), Is.False, "판정 프레임(0초) 직후는 아직 창 전");
-        Assert.That(InWindow(0.05f, duration, 0.05f, 0.30f), Is.True);
-        Assert.That(InWindow(0.10f, duration, 0.05f, 0.30f), Is.True);
-        Assert.That(InWindow(Wave1End * duration, duration, 0.05f, 0.30f), Is.False, "End 순간엔 닫혀 있다");
+        foreach ((string label, AnimationClip clip) in StepClips())
+        {
+            float speed = StateSpeedOf(controller, clip);
+            Assert.That(speed, Is.GreaterThan(0f), $"{label} 클립을 쓰는 상태가 없다");
+
+            float endRealTime = TimeOf(AnimationUtility.GetAnimationEvents(clip), DefaultAttackAnimationEventType.End) / speed;
+            Assert.That(endRealTime, Is.LessThan(clip.length), $"{label} End {endRealTime:F3}s ≥ 안전망 {clip.length:F3}s");
+        }
+    }
+
+    private static IEnumerable<(string, AnimationClip)> StepClips()
+    {
+        AssassinBasicAttackData data = AssetDatabase.LoadAssetAtPath<AssassinBasicAttackData>(BasicAttackDataPath);
+        Assert.That(data, Is.Not.Null, BasicAttackDataPath);
+
+        for (int i = 0; i < data.NormalSteps.Length; i++)
+            yield return ($"{i + 1}타", data.NormalSteps[i].Clip);
+        yield return ("강타", data.EnhancedStep.Clip);
+        yield return ("변신 묶음", data.TransformedStep.Clip);
+    }
+
+    private static bool IsEvent(AnimationEvent e, DefaultAttackAnimationEventType type) =>
+        e.functionName == nameof(PlayerAnimationEventRelay.HandleDefaultAttackEvent) && e.intParameter == (int)type;
+
+    private static int Count(AnimationEvent[] events, DefaultAttackAnimationEventType type)
+    {
+        int count = 0;
+        foreach (AnimationEvent e in events)
+        {
+            if (IsEvent(e, type))
+                count++;
+        }
+
+        return count;
+    }
+
+    private static float TimeOf(AnimationEvent[] events, DefaultAttackAnimationEventType type)
+    {
+        foreach (AnimationEvent e in events)
+        {
+            if (IsEvent(e, type))
+                return e.time;
+        }
+
+        return float.NaN;
+    }
+
+    private static float LastTimeOf(AnimationEvent[] events, DefaultAttackAnimationEventType type)
+    {
+        float last = float.NegativeInfinity;
+        foreach (AnimationEvent e in events)
+        {
+            if (IsEvent(e, type))
+                last = Mathf.Max(last, e.time);
+        }
+
+        return last;
+    }
+
+    private static float StateSpeedOf(AnimatorController controller, AnimationClip clip)
+    {
+        foreach (AnimatorControllerLayer layer in controller.layers)
+        {
+            foreach (ChildAnimatorState child in layer.stateMachine.states)
+            {
+                if (child.state.motion == clip)
+                    return child.state.speed;
+            }
+        }
+
+        return 0f;
     }
 
     // ── 할 일 47 정정 — End 순간 다음 타 = 창 예약 || 눌림(거너와 같은 홀드 + 창) ──
@@ -161,16 +181,5 @@ public sealed class AssassinComboWindowRulesTests
         Assert.That(AssassinComboWindowRules.IsHoldFresh(true, 1f, 1.51f, StaleAfter), Is.False, "끊김");
         Assert.That(AssassinComboWindowRules.ShouldContinueAtEnd(
             false, AssassinComboWindowRules.IsHoldFresh(true, 1f, 2f, StaleAfter)), Is.False);
-    }
-
-    private static bool InWindow(float elapsed, float motionDuration, float open, float close) =>
-        AssassinComboWindowRules.IsInside(
-            AssassinComboWindowRules.NormalizedProgress(elapsed, motionDuration), open, close);
-
-    private static void AssertWindow(AssassinBasicAttackStepData step, float open, float close, float end)
-    {
-        Assert.That(step.ComboWindowOpen, Is.EqualTo(open).Within(1e-5f));
-        Assert.That(step.ComboWindowClose, Is.EqualTo(close).Within(1e-5f));
-        Assert.That(step.ComboWindowClose, Is.LessThan(end), $"End({end:F3}) 전에 닫혀야 한다");
     }
 }

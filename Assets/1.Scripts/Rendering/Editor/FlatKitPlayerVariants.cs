@@ -11,8 +11,10 @@ using UnityEngine;
 /// | FK_Paladin_Sword_Toon · FK_Paladin_Shield_Toon (기존 guid 유지 — 프리팹 참조 그대로) | Base Map 없음 + 금속 틴트(텍스처가 없다) |
 /// | Gunner/FK_Gunner_Body (신규) | Base Map = Gunner_BaseColor_4K |
 /// | Gunner/FK_LaserGun (신규) | Base Map = LaserGun_BaseColor_Toon |
+/// | Assassin/FK_Assassin_Body (10-17, PLAN-assassin §9 V2) | Base Map = Assassin_BaseColor — 머리·몸·단검 L/R 공용(단검도 같은 아틀라스) |
 ///
-/// 그리고 Gunner_Armature 의 ToonLit 슬롯(Gunner_Toon · LaserGun_Toon)을 위 Variant 로 바꾼다.
+/// 그리고 Gunner_Armature 의 ToonLit 슬롯(Gunner_Toon · LaserGun_Toon)과 Assassin_Armature 의 ToonLit 슬롯(Assassin_Toon —
+/// HeadNeck 2 · SourceBody 1 · 단검 L/R 1씩 = 5개)을 위 Variant 로 바꾼다. 단검 루트 배율(1.25)은 여기서 다루지 않는다.
 /// 은희 ToonLit Variant(3.Materials/Toon/)는 지우지 않는다. 안 쓰는 예전 FK 5개는 Player/Legacy/ 로 옮긴다.
 /// 재실행 안전 — 이미 Variant 면 덮는 값만 다시 맞춘다.
 /// </summary>
@@ -25,6 +27,10 @@ static class FlatKitPlayerVariants
     const string GunnerArmature = "Assets/2.Prefabs/Player/Gunner/Gunner_Armature.prefab";
     const string GunnerBodyTex = "Assets/50.Art/Char/gunner/Gunner_BaseColor_4K.png";
     const string LaserGunTex = "Assets/50.Art/Char/gunner/LaserGun_BaseColor_Toon.png";
+    const string AssassinDir = Root + "/Assassin";
+    const string AssassinArmature = "Assets/2.Prefabs/Player/Assassin/Assassin_Armature.prefab";
+    const string AssassinBodyTex = "Assets/50.Art/Char/assassin/Textures/Assassin_BaseColor.png";
+    const int AssassinSlotCount = 5; // HeadNeck 2(Head·Face 서브메시) · SourceBody 1 · 단검 L/R 1씩 — v18g 임포트 실측(10-17)
 
     static readonly string[] LegacyMats =
     {
@@ -55,13 +61,26 @@ static class FlatKitPlayerVariants
         var gun = LoadOrCreate($"{GunnerDir}/FK_LaserGun.mat", parent);
         MakeVariant(gun, parent, AssetDatabase.LoadAssetAtPath<Texture2D>(LaserGunTex), Color.white);
 
+        // 어쌔신 — 신규 Variant. 텍스처는 SVN 아트라 없으면(작업사본이 낡음) 하얀 몸으로 덮지 않고 건너뛴다.
+        Material assassin = null;
+        var assassinTex = AssetDatabase.LoadAssetAtPath<Texture2D>(AssassinBodyTex);
+        if (assassinTex == null)
+            Debug.LogError($"[PlayerVariants] 어쌔신 텍스처 없음(SVN 확인): {AssassinBodyTex} — 어쌔신 Variant 건너뜀");
+        else
+        {
+            if (!AssetDatabase.IsValidFolder(AssassinDir)) AssetDatabase.CreateFolder(Root, "Assassin");
+            assassin = LoadOrCreate($"{AssassinDir}/FK_Assassin_Body.mat", parent);
+            MakeVariant(assassin, parent, assassinTex, Color.white);
+        }
+
         AssetDatabase.SaveAssets();
 
         AssignGunner(body, gun);
+        if (assassin != null) AssignAssassin(assassin);
         MoveLegacy();
 
         AssetDatabase.SaveAssets();
-        Debug.Log($"[PlayerVariants] 완료 — 부모 {parent.name} · Variant: 검·방패·{body.name}·{gun.name}");
+        Debug.Log($"[PlayerVariants] 완료 — 부모 {parent.name} · Variant: 검·방패·{body.name}·{gun.name}{(assassin != null ? "·" + assassin.name : "")}");
     }
 
     static Material LoadOrCreate(string path, Material parent)
@@ -111,6 +130,38 @@ static class FlatKitPlayerVariants
         }
         finally { PrefabUtility.UnloadPrefabContents(root); }
         Debug.Log($"[PlayerVariants] {GunnerArmature} — 슬롯 {swapped}개 교체");
+    }
+
+    // Assassin_Armature: ToonLit(Assassin_Toon) 슬롯을 전부 Flat Kit Variant 로 — 몸·얼굴 서브메시·단검 L/R 이 한 아틀라스를 쓴다.
+    // 이미 바뀐 슬롯은 이름이 달라 건너뛴다(재실행 안전). 끝나고 Variant 를 쓰는 슬롯 수가 기대(5)와 다르면 알린다.
+    static void AssignAssassin(Material body)
+    {
+        GameObject root = PrefabUtility.LoadPrefabContents(AssassinArmature);
+        int swapped = 0, inUse = 0;
+        try
+        {
+            foreach (Renderer r in root.GetComponentsInChildren<Renderer>(true))
+            {
+                Material[] mats = r.sharedMaterials;
+                bool changed = false;
+                for (int i = 0; i < mats.Length; i++)
+                {
+                    if (mats[i] != null && mats[i].name == "Assassin_Toon")
+                    {
+                        mats[i] = body;
+                        changed = true;
+                        swapped++;
+                    }
+                    if (mats[i] == body) inUse++;
+                }
+                if (changed) r.sharedMaterials = mats;
+            }
+            if (swapped > 0) PrefabUtility.SaveAsPrefabAsset(root, AssassinArmature);
+        }
+        finally { PrefabUtility.UnloadPrefabContents(root); }
+        string msg = $"[PlayerVariants] {AssassinArmature} — 슬롯 {swapped}개 교체 · {body.name} 사용 슬롯 {inUse}개";
+        if (inUse != AssassinSlotCount) Debug.LogWarning($"{msg} (기대 {AssassinSlotCount}개)");
+        else Debug.Log(msg);
     }
 
     static void MoveLegacy()

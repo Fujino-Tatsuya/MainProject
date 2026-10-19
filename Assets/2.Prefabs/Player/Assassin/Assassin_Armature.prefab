@@ -534,7 +534,7 @@ PrefabInstance:
     - target: {fileID: -5252922369203148992, guid: 17873cd8217cc704594694a4440a50a8, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 2100000, guid: 5fdfa8ad9ebe02f48a4d5010a8f7defe, type: 2}
+      objectReference: {fileID: 2100000, guid: af9d35c09fdc4d83ae98384fc21b263e, type: 2}
     - target: {fileID: 919132149155446097, guid: 17873cd8217cc704594694a4440a50a8, type: 3}
       propertyPath: m_Name
       value: Assassin_Armature
@@ -558,11 +558,11 @@ PrefabInstance:
     - target: {fileID: 8967703787556190417, guid: 17873cd8217cc704594694a4440a50a8, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 2100000, guid: 5fdfa8ad9ebe02f48a4d5010a8f7defe, type: 2}
+      objectReference: {fileID: 2100000, guid: af9d35c09fdc4d83ae98384fc21b263e, type: 2}
     - target: {fileID: 8967703787556190417, guid: 17873cd8217cc704594694a4440a50a8, type: 3}
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
-      objectReference: {fileID: 2100000, guid: 5fdfa8ad9ebe02f48a4d5010a8f7defe, type: 2}
+      objectReference: {fileID: 2100000, guid: af9d35c09fdc4d83ae98384fc21b263e, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects:
@@ -957,18 +957,18 @@ MonoBehaviour:
     - {x: -0.0588237, y: -0.0056374595, z: -0.038962208, w: 0.99749184}
     - {x: -0.080178455, y: -0.00012256231, z: 0.3337297, w: 0.93925285}
     bindPositions:
-    - {x: -0.13173467, y: 0.11599994, z: 0.028898947}
-    - {x: 0.000000009816413, y: 0.15705195, z: 0.000000008614734}
-    - {x: 0.000000017708938, y: 0.16673334, z: -0.000000016763806}
-    - {x: 0.000000058795973, y: 0.16913623, z: -0.0000000055879354}
-    tipLocal: {x: 0.09404005, y: 0.11465883, z: 0.022580134}
+    - {x: -0.16466834, y: 0.14499992, z: 0.036123686}
+    - {x: 0.000000012270515, y: 0.19631493, z: 0.000000010768417}
+    - {x: 0.000000022136174, y: 0.20841667, z: -0.000000020954758}
+    - {x: 0.00000007349497, y: 0.21142028, z: -0.0000000069849193}
+    tipLocal: {x: 0.117550105, y: 0.1433239, z: 0.028225303}
     bindAllowanceReference:
     - 0
     - 0
     - 0
     - 0
     - 0
-    - 0.01030065
+    - 0.0128707895
     - 0
     - 0
     - 0
@@ -976,7 +976,7 @@ MonoBehaviour:
     - 0
     - 0
     - 0
-    - 0.01277212
+    - 0.015960075
     - 0
     - 0
     - 0
@@ -1006,18 +1006,18 @@ MonoBehaviour:
     - {x: -0.060726758, y: 0.015623503, z: 0.099072695, w: 0.9931026}
     - {x: -0.12588866, y: -0.010795918, z: 0.29363817, w: 0.9475295}
     bindPositions:
-    - {x: -0.11175778, y: 0.11599994, z: 0.08520771}
-    - {x: 0.000000006804405, y: 0.15502578, z: -7.566996e-10}
-    - {x: -0.00000004930893, y: 0.17692028, z: -0.000000009313226}
-    - {x: 0.000000041857472, y: 0.16048838, z: -0.0000000088475645}
-    tipLocal: {x: 0.08387704, y: 0.11937858, z: 0.0348339}
+    - {x: -0.13969722, y: 0.14499992, z: 0.10650963}
+    - {x: 0.0000000085055065, y: 0.19378223, z: -9.458745e-10}
+    - {x: -0.000000061636165, y: 0.22115035, z: -0.000000011641532}
+    - {x: 0.00000005232184, y: 0.20061047, z: -0.000000011059456}
+    tipLocal: {x: 0.10484634, y: 0.14922346, z: 0.04354254}
     bindAllowanceReference:
     - 0
     - 0
     - 0
     - 0
     - 0
-    - 0.0038458619
+    - 0.004802213
     - 0
     - 0
     - 0
@@ -1025,7 +1025,7 @@ MonoBehaviour:
     - 0
     - 0
     - 0
-    - 0.0062920293
+    - 0.007859887
     - 0
     - 0
     - 0
@@ -1055,11 +1055,11 @@ MonoBehaviour:
     - {x: 0.031652804, y: 0.005515173, z: 0.027519766, w: 0.9991048}
     - {x: -0.24842535, y: -0.0005943036, z: 0.027387049, w: 0.9682636}
     bindPositions:
-    - {x: -0.06753039, y: 0.11599994, z: 0.12877087}
-    - {x: 0.000000022904524, y: 0.1545084, z: 0.0000000030704541}
-    - {x: -0.000000019030942, y: 0.1566647, z: 0.000000020489097}
-    - {x: 0.000000008338326, y: 0.15819426, z: 0.00000006315531}
-    tipLocal: {x: 0.007999666, y: 0.13126047, z: 0.07215747}
+    - {x: -0.08441299, y: 0.14499992, z: 0.1609636}
+    - {x: 0.000000028630655, y: 0.1931355, z: 0.0000000038380676}
+    - {x: -0.000000023788678, y: 0.19583088, z: 0.00000002561137}
+    - {x: 0.000000010422907, y: 0.19774282, z: 0.00000007894414}
+    tipLocal: {x: 0.009999589, y: 0.16407609, z: 0.09019702}
     bindAllowanceReference:
     - 0
     - 0
@@ -1104,11 +1104,11 @@ MonoBehaviour:
     - {x: -0.0065780827, y: -0.004944859, z: -0.023721598, w: 0.99968475}
     - {x: -0.25776312, y: -0.0028466035, z: 0.045813274, w: 0.9651172}
     bindPositions:
-    - {x: 0.0029902768, y: 0.11599994, z: 0.13166589}
-    - {x: -0.0000000019455406, y: 0.15451561, z: -0.0000000114722525}
-    - {x: 1.925402e-10, y: 0.15753007, z: 0.000000006434348}
-    - {x: -0.000000003583569, y: 0.15727258, z: -0.000000021915184}
-    tipLocal: {x: 0.013484676, y: 0.12943786, z: 0.0745923}
+    - {x: 0.003737846, y: 0.14499992, z: 0.16458236}
+    - {x: -0.0000000024319258, y: 0.19314452, z: -0.000000014340316}
+    - {x: 2.4067526e-10, y: 0.19691259, z: 0.000000008042935}
+    - {x: -0.0000000044794612, y: 0.19659072, z: -0.00000002739398}
+    tipLocal: {x: 0.016855862, y: 0.16179766, z: 0.09324057}
     bindAllowanceReference:
     - 0
     - 0
@@ -1153,11 +1153,11 @@ MonoBehaviour:
     - {x: -0.016836805, y: -0.006093588, z: -0.028758055, w: 0.999426}
     - {x: -0.2026836, y: 0.00096455857, z: -0.07572878, w: 0.9763112}
     bindPositions:
-    - {x: 0.054849975, y: 0.11599994, z: 0.13592695}
-    - {x: -0.000000011623827, y: 0.15544462, z: -0.000000014028046}
-    - {x: 9.807414e-10, y: 0.15857697, z: -0.000000022351742}
-    - {x: 0.0000000032586498, y: 0.15693508, z: -0.000000010768417}
-    tipLocal: {x: -0.02223912, y: 0.13595541, z: 0.059342716}
+    - {x: 0.06856247, y: 0.14499992, z: 0.16990869}
+    - {x: -0.000000014529784, y: 0.19430578, z: -0.000000017535058}
+    - {x: 0.0000000012259267, y: 0.1982212, z: -0.000000027939677}
+    - {x: 0.0000000040733124, y: 0.19616885, z: -0.000000013460522}
+    tipLocal: {x: -0.02779892, y: 0.16994447, z: 0.07417835}
     bindAllowanceReference:
     - 0
     - 0
@@ -1202,15 +1202,15 @@ MonoBehaviour:
     - {x: -0.07948222, y: -0.0020406393, z: -0.015971934, w: 0.99670625}
     - {x: -0.067727834, y: 0.008153475, z: -0.33373472, w: 0.94019556}
     bindPositions:
-    - {x: 0.1115723, y: 0.11599994, z: 0.06894046}
-    - {x: 0.0000000058992833, y: 0.15486234, z: 0.000000004656613}
-    - {x: 0.0000000011986465, y: 0.16761899, z: 0.000000011175871}
-    - {x: 0.0000000098305835, y: 0.16240226, z: -0.000000007450581}
-    tipLocal: {x: -0.09429838, y: 0.115210146, z: 0.018286906}
+    - {x: 0.13946538, y: 0.14499992, z: 0.086175576}
+    - {x: 0.000000007374104, y: 0.19357793, z: 0.000000005820766}
+    - {x: 0.0000000014983081, y: 0.20952374, z: 0.000000013969839}
+    - {x: 0.000000012288229, y: 0.20300283, z: -0.000000009313226}
+    tipLocal: {x: -0.11787314, y: 0.14401318, z: 0.022858776}
     bindAllowanceReference:
     - 0
     - 0
-    - 0.00020538908
+    - 0.0002516814
     - 0
     - 0
     - 0
@@ -1218,7 +1218,7 @@ MonoBehaviour:
     - 0
     - 0
     - 0
-    - 0.0032052759
+    - 0.0040015513
     - 0
     - 0
     - 0
@@ -1251,15 +1251,15 @@ MonoBehaviour:
     - {x: -0.0117586525, y: 0.0027958057, z: 0.022562692, w: 0.99967235}
     - {x: -0.07852771, y: -0.008764636, z: -0.30145943, w: 0.95019937}
     bindPositions:
-    - {x: 0.13246407, y: 0.11599994, z: 0.027144387}
-    - {x: 0.0000000037920254, y: 0.15626204, z: 0.0000000057043508}
-    - {x: 0.000000029487257, y: 0.1650396, z: 0.000000024214387}
-    - {x: -0.00000003287824, y: 0.16745247, z: -0.0000000027939677}
-    tipLocal: {x: -0.08572755, y: 0.12088666, z: 0.02317768}
+    - {x: 0.16558008, y: 0.14499992, z: 0.033930484}
+    - {x: 0.0000000047400315, y: 0.19532755, z: 0.0000000071304385}
+    - {x: 0.00000003685907, y: 0.2062995, z: 0.000000030267984}
+    - {x: -0.0000000410978, y: 0.20931558, z: -0.0000000034924597}
+    tipLocal: {x: -0.10715947, y: 0.15110844, z: 0.028972207}
     bindAllowanceReference:
     - 0
     - 0
-    - 0.014663628
+    - 0.018324658
     - 0
     - 0
     - 0
@@ -1267,7 +1267,7 @@ MonoBehaviour:
     - 0
     - 0
     - 0
-    - 0.01947433
+    - 0.024337985
     - 0
     - 0
     - 0
@@ -1293,49 +1293,49 @@ MonoBehaviour:
   - name: Chest
     first: {fileID: 4941851360190451610}
     last: {fileID: 5242763782210939581}
-    radius: 0.105
+    radius: 0.13125
     firstOffset: {x: 0, y: 0, z: 0}
     lastOffset: {x: 0, y: 0, z: 0}
   - name: Waist
     first: {fileID: 8064653375833044452}
     last: {fileID: 4941851360190451610}
-    radius: 0.095
+    radius: 0.11875
     firstOffset: {x: 0, y: 0, z: 0}
     lastOffset: {x: 0, y: 0, z: 0}
   - name: Left upper arm
     first: {fileID: 9146964536968623171}
     last: {fileID: 7990644147083117564}
-    radius: 0.06
+    radius: 0.074999996
     firstOffset: {x: 0, y: 0, z: 0}
     lastOffset: {x: 0, y: 0, z: 0}
   - name: Left forearm
     first: {fileID: 7990644147083117564}
     last: {fileID: 7610982838954398543}
-    radius: 0.042
+    radius: 0.0525
     firstOffset: {x: 0, y: 0, z: 0}
     lastOffset: {x: 0, y: 0, z: 0}
   - name: Left thigh
     first: {fileID: 4471371544167581461}
     last: {fileID: 2338103202510963533}
-    radius: 0.065
+    radius: 0.08125
     firstOffset: {x: 0, y: 0, z: 0}
     lastOffset: {x: 0, y: 0, z: 0}
   - name: Right upper arm
     first: {fileID: 8728076518778258984}
     last: {fileID: 8139613859352650238}
-    radius: 0.06
+    radius: 0.074999996
     firstOffset: {x: 0, y: 0, z: 0}
     lastOffset: {x: 0, y: 0, z: 0}
   - name: Right forearm
     first: {fileID: 8139613859352650238}
     last: {fileID: 27783628436737668}
-    radius: 0.042
+    radius: 0.0525
     firstOffset: {x: 0, y: 0, z: 0}
     lastOffset: {x: 0, y: 0, z: 0}
   - name: Right thigh
     first: {fileID: 1074535035255607386}
     last: {fileID: 8196480753883595101}
-    radius: 0.065
+    radius: 0.08125
     firstOffset: {x: 0, y: 0, z: 0}
     lastOffset: {x: 0, y: 0, z: 0}
   weight: 1
@@ -1345,14 +1345,14 @@ MonoBehaviour:
   rootCarry: 0.2
   damping: 10
   stiffness: 60
-  gravitySupport: 0.65
+  gravitySupport: 0.8125
   gravityAcceleration: {x: 0, y: -9.81, z: 0}
-  hairRadius: 0.018
-  maximumDynamicSpeed: 2
+  hairRadius: 0.022499999
+  maximumDynamicSpeed: 2.5
   teleportDistance: 4
   teleportAngle: 175
   neighbourCoupling: 0.06
-  neighbourOffsetLimit: 0.09
+  neighbourOffsetLimit: 0.112500004
   contactFriction: 4
   constraintIterations: 6
   captured: 1
@@ -1525,15 +1525,15 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: -8679921383154817045, guid: 2085fe0b44692404bab8f8c42223ddab, type: 3}
       propertyPath: m_LocalScale.x
-      value: 1
+      value: 1.25
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 2085fe0b44692404bab8f8c42223ddab, type: 3}
       propertyPath: m_LocalScale.y
-      value: 1
+      value: 1.25
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 2085fe0b44692404bab8f8c42223ddab, type: 3}
       propertyPath: m_LocalScale.z
-      value: 1
+      value: 1.25
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 2085fe0b44692404bab8f8c42223ddab, type: 3}
       propertyPath: m_LocalPosition.x
@@ -1622,7 +1622,7 @@ PrefabInstance:
     - target: {fileID: 7295242544202085966, guid: 2085fe0b44692404bab8f8c42223ddab, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 2100000, guid: 5fdfa8ad9ebe02f48a4d5010a8f7defe, type: 2}
+      objectReference: {fileID: 2100000, guid: af9d35c09fdc4d83ae98384fc21b263e, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -1709,15 +1709,15 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: -8679921383154817045, guid: 1bc7954d80183cd459871d6e88278edb, type: 3}
       propertyPath: m_LocalScale.x
-      value: 1
+      value: 1.25
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 1bc7954d80183cd459871d6e88278edb, type: 3}
       propertyPath: m_LocalScale.y
-      value: 1
+      value: 1.25
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 1bc7954d80183cd459871d6e88278edb, type: 3}
       propertyPath: m_LocalScale.z
-      value: 1
+      value: 1.25
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 1bc7954d80183cd459871d6e88278edb, type: 3}
       propertyPath: m_LocalPosition.x
@@ -1802,7 +1802,7 @@ PrefabInstance:
     - target: {fileID: 5327997824847518605, guid: 1bc7954d80183cd459871d6e88278edb, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 2100000, guid: 5fdfa8ad9ebe02f48a4d5010a8f7defe, type: 2}
+      objectReference: {fileID: 2100000, guid: af9d35c09fdc4d83ae98384fc21b263e, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

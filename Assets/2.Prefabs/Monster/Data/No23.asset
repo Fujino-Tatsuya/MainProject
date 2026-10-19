@@ -301,6 +301,40 @@ MonoBehaviour:
     telegraphPoseNormalized: 0.15
   repeatPenalty: 0.3
   repeatBlockAfter: 2
+  combos:
+  - name: HookHookDash
+    weight: 20
+    allowedFromPhase: 0
+    cooldown: 8
+    steps:
+    - attack: 0
+      forceFire: 0
+    - attack: 1
+      forceFire: 0
+    - attack: 5
+      forceFire: 0
+  - name: HookUpper
+    weight: 15
+    allowedFromPhase: 0
+    cooldown: 8
+    steps:
+    - attack: 0
+      forceFire: 0
+    - attack: 2
+      forceFire: 0
+  - name: DashGrab
+    weight: 15
+    allowedFromPhase: 0
+    cooldown: 8
+    steps:
+    - attack: 5
+      forceFire: 0
+    - attack: 3
+      forceFire: 1
+  openingCombo: 010000000000000005000000
+  comboStepInterval: 0.3
+  comboChaseGrace: 1
+  raidOpeningStepInterval: 1
   phases:
   - hpThreshold: 0.66
     sequence: 1

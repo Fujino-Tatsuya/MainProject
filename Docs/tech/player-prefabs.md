@@ -333,10 +333,10 @@ Paladin  (루트 컴포넌트 37개 — Player 와 동일 구성)
    - `Tools/Player/Authoring/Repair PlayerEncounterLock Wiring` (`PlayerEncounterLockAuthoring.cs`, 멱등 — `Player/` 폴더 순회, `Legacy/` 제외)
    - `Tools/Player/Authoring/Wire Interrupt Skill (단죄의 방패)` (`PlayerInterruptSkillAuthoring.cs` — `Paladin_Armature` + `Player_Paladin`)
    - `Tools/Rendering/Look/Wire Player Silhouette` (`PlayerSilhouetteAuthoring.cs` — base)
-5-1. **캐릭터·무기 머티리얼**(2026-10-02) → 셰이더 수치는 공통 부모 **`3.Materials/Toon/PlayableCharacter_Toon.mat`** 에서만 고친다.
-   캐릭터·무기마다 그 **Material Variant**(`Paladin_Toon`·`Paladin_Sword/Shield_Toon`·`Gunner_Toon`·`LaserGun_Toon`)를 두고 **Base Map 만** 덮는다.
-   새 캐릭터 = Variant 하나 추가. 정리 툴 `Tools/Player/Toon Material/공통 머티리얼 + Variant 정리`(`PlayableToonMaterialAuthoring.cs`, 재실행 안전 — 🔴 Variant 의 Base Map 외 오버라이드를 전부 되돌린다).
-   계획 원본 [PLAN-playable-toon-material.md](../history/PLANS/PLAN-playable-toon-material.md).
+5-1. **캐릭터·무기 머티리얼**(2026-10-02 Flat Kit 전환 · 10-17 어쌔신 추가) → 셰이더·외곽선·셀 수치는 공통 부모 **`3.Materials/FlatKit/Player/FK_Paladin_Toon.mat`**(가붕이 몸)에서만 고친다.
+   캐릭터·무기마다 그 **Material Variant** 를 두고 **Base Map(·틴트)만** 덮는다: `FK_Paladin_Sword/Shield_Toon` · `Gunner/FK_Gunner_Body` · `Gunner/FK_LaserGun` · `Assassin/FK_Assassin_Body`(머리·몸·단검 L/R 공용, §14).
+   새 캐릭터 = Variant 하나 추가. 정리 툴 `Tools/Rendering/Flat Kit/플레이어 Variant 구성 (가붕이 부모)`(`FlatKitPlayerVariants.cs`, 재실행 안전 — 🔴 Variant 의 Base Map·틴트 외 오버라이드를 전부 되돌린다).
+   ToonLit Variant(`3.Materials/Toon/`, 부모 `PlayableCharacter_Toon`)는 되돌리기용으로만 남아 있다(미사용) — 이전 계획 [PLAN-playable-toon-material.md](../history/PLANS/PLAN-playable-toon-material.md) · [PLAN-flatkit.md](../../PLAN-flatkit.md).
 5-2. **캐릭터 고유 HUD**(2026-10-06, [PLAN-assassin.md](../../PLAN-assassin.md) A5) → 공용 `CombatHUD` 에 넣지 않는다. 캐릭터 전용 UI 프리팹을
    **`<Char>_Armature/HUD`** 아래에 중첩한다(자체 Canvas, 오너만 표시). 유령 상태에서 Armature 가 꺼지면 함께 숨는다.
    예: 거너 과열 게이지 = `Gunner_Armature/HUD/GunnerHeatGauge`(`Tools/Player/Gunner/과열 게이지 프리팹 (임시 UI)`, 재실행 안전).
@@ -367,7 +367,9 @@ Paladin  (루트 컴포넌트 37개 — Player 와 동일 구성)
 ### 8.0 🔴 Variant 를 만들기 전에 풀어야 하는 것 — 캐릭터 고유 스킬
 
 현재 **루트에 붙은 스킬 컴포넌트 5종이 전부 가붕이(근거리) 전용**이다 —
-`FirstMeleeMainSkill`("Q 진격의 방패") · `FirstMeleeSubSkill` · `FirstMeleeUltimateSkill` ·
+`FirstMeleeMainSkill`("Q 진격의 방패") · `FirstMeleeSubSkill`("E 수호자의 의지" — 전방 방어 → 자동 반격, [PLAN-paladin-e-counter.md](../history/PLANS/PLAN-paladin-e-counter.md).
+타이밍은 초 값이 아니라 **클립 이벤트** — 애니메이터 상태 `SubSkillGuard`(방어 클립 `Custom0` 창 열림 · `Custom1` 닫힘)와
+`SubSkillCounter`(반격 클립 `Hit` 판정 · `End` 종료, 방어 성공 시 서버가 전 피어 CrossFade). 초 값은 안전망 `maxActiveDuration` 만) · `FirstMeleeUltimateSkill` ·
 `FirstMeleeInterruptSkill`("단죄의 방패") · `FirstMeleePassive`.
 징크스(원거리)는 좌클릭 스택·우클릭 스택 발동 등 **다른 스킬 세트**가 필요하다([players.md](../design/players.md)).
 
@@ -562,7 +564,8 @@ URP 데칼(`DecalProjector`)을 버리고 **바닥에서 띄운 얇은 쿼드**�
 ## 13. 어쌔신 머리카락 2차 모션 (2026-10-16, 할 일 47)
 
 머리카락 본 28개(`Hair_Source00~06_01~04`, 7가닥 × 4마디, 전부 `Head` 아래)는 FBX 에 스킨돼 있지만 클립에 커브가 없어
-굳어 있었다. 납품 스크립트를 그대로 들여와 `Assassin_Armature.prefab` 루트에 붙였다. **FBX·아바타·클립·Animator 컨트롤러·SVN 무수정.**
+굳어 있었다. 납품 스크립트를 그대로 들여와 `Assassin_Armature.prefab` 루트에 붙였다. **(10-16 머리카락 작업 기준) FBX·아바타·클립·Animator 컨트롤러·SVN 무수정.**
+10-17 v18(§14)에서 FBX 임포트 배율 ×1.25(SVN)·아바타 재생성·`Run_Loop` 0.8 로 바뀌었고, 바인드 포즈를 ×1.25 길이 값으로 다시 캡처했다.
 
 | 항목 | 내용 |
 |------|------|
@@ -574,9 +577,9 @@ URP 데칼(`DecalProjector`)을 버리고 **바닥에서 띄운 얇은 쿼드**�
 | trailing 방향 | "출발 반대 방향"은 처음·상태/클립 전환·루프 한 바퀴·시간 되감기(Any State 재진입)·v13 리셋 때 `-Armature.forward` 로 다시 잡고, 그 사이엔 유지(납품 브리지 규칙 + 리셋) |
 | 캡처 실패 | 경고 1줄 후 보정만 끄고 v13 은 계속 |
 | 네트워크 | 순수 표현 — NetworkVariable·RPC·NetworkAnimator 변경 없음. 각 피어가 자기 Animator(NetworkAnimator 복제) 결과로 로컬 계산, 피어마다 미세하게 달라도 된다 |
-| 튜닝 | 납품 기본값(v13 기본·보정 strength 1·회피 fan 22 — 납품 사용법 값). 프리팹 인스펙터에서만 조정, xlsx 노출 안 함. 구동기 인스펙터: `actionHairEnabled`·`diveHairEnabled`·`armClearanceEnabled`·`armClearanceMaxDegrees` |
-| 저작 | `Tools/Player/Assassin/머리카락 본 연결`(`AssassinHairAuthoring`, 멱등 — 없으면 추가·있으면 재캡처, 기존 인스펙터 값 유지). 전체 저작(`AssassinShellAuthoring` Armature 단계)도 같은 `Ensure` 를 부른다 |
-| 테스트 | `Player/Editor/AssassinHairClipRulesTests`(규칙) · `AssassinHairArmClearanceTests`(밀어내기·상한·길이 보존·몸통 가드) · `AssassinHairPrefabTests`(체인 7×4 본·캡처·캡슐·구동기·Variant 중첩) — `Tools/Tests/플레이어 EditMode 테스트 실행` 에 등록 |
+| 튜닝 | 납품 기본값(v13 기본·보정 strength 1·회피 fan 22 — 납품 사용법 값). 🔸 길이 차원 값(`hairRadius`·캡슐 반경·끝 마디·`gravitySupport`·`maximumDynamicSpeed`·`neighbourOffsetLimit`)은 **납품값 × 리그 배율**(v18 = 1.25, §14). 그 밖의 값은 프리팹 인스펙터에서만 조정(길이 차원 값은 저작 메뉴가 매번 다시 쓰므로 `AssassinHairAuthoring` 의 `Delivered*` 상수에서 바꾼다), xlsx 노출 안 함. 구동기 인스펙터: `actionHairEnabled`·`diveHairEnabled`·`armClearanceEnabled`·`armClearanceMaxDegrees` |
+| 저작 | `Tools/Player/Assassin/머리카락 본 연결`(`AssassinHairAuthoring`, 멱등 — 없으면 추가·있으면 재캡처, 기존 인스펙터 값 유지 — 단 위 길이 차원 값은 납품값 × 임포트 배율로 매번 다시 쓴다). 전체 저작(`AssassinShellAuthoring` Armature 단계)도 같은 `Ensure` 를 부른다 |
+| 테스트 | `Player/Editor/AssassinHairClipRulesTests`(규칙) · `AssassinHairArmClearanceTests`(밀어내기·상한·길이 보존·몸통 가드) · `AssassinHairPrefabTests`(체인 7×4 본·캡처·캡슐·구동기·Variant 중첩·길이 값 = 납품값 × 임포트 배율·겹침 허용치 재계산 대조) — `Tools/Tests/플레이어 EditMode 테스트 실행` 에 등록 |
 
 **리셋 경로** — 피어마다 로컬 시뮬레이션이라 서버/오너에서만 불리는 훅(`TeleportAuthoritative`·`PlaceOwnerAtSpawnClientRpc`·`PlayerFallRecovery`·`BossTeleportManager`)에 걸지 않는다. 별도 리셋 코드를 더하지 않았다(아래로 전부 덮임).
 
@@ -584,8 +587,25 @@ URP 데칼(`DecalProjector`)을 버리고 **바닥에서 띄운 얇은 쿼드**�
 |------|---------|
 | 사망 → 유령 → 부활 | `PlayerSoulController` 가 alive visual(Armature)을 끄고 켠다 → v13 `OnEnable → ResetSimulation`(모든 피어 — 생명 상태 복제로 각자 켠다) |
 | 스테이지 이동(보스룸·엘리베이터) | `NetworkTransform.Teleport` → 원격도 한 프레임에 스냅 → v13 Head 이동 거리 > `teleportDistance`(4m) 자동 리셋 |
-| 낙하 복귀 · 스폰 배치 · 전멸 리스폰 | 오너: `TeleportAuthoritative` 스냅(1m 넘으면 시각 보간 안 함) → 4m 넘으면 자동 리셋, 그 아래는 빠른 이동으로 처리. 원격: `Teleport` 플래그 없이 복제돼 NT 보간(≤0.1초)으로 미끄러진다 → 리셋 없이 빠른 이동으로 처리. v13 은 마디 길이를 강제하고 루트 속도를 그대로 실어 날라(상대 속도만 2m/s 제한) 늘어나거나 튀지 않는다(에디터 스모크: 15m/6프레임 슬라이드 길이 오차 0) |
+| 낙하 복귀 · 스폰 배치 · 전멸 리스폰 | 오너: `TeleportAuthoritative` 스냅(1m 넘으면 시각 보간 안 함) → 4m 넘으면 자동 리셋, 그 아래는 빠른 이동으로 처리. 원격: `Teleport` 플래그 없이 복제돼 NT 보간(≤0.1초)으로 미끄러진다 → 리셋 없이 빠른 이동으로 처리. v13 은 마디 길이를 강제하고 루트 속도를 그대로 실어 날라(상대 속도만 2.5m/s 제한 — 납품 2 × 리그 배율 1.25) 늘어나거나 튀지 않는다(에디터 스모크: 15m/6프레임 슬라이드 길이 오차 0) |
 | 프레임 끊김(> 0.5초) | v13 `deltaTime > 0.5` 리셋 |
+
+## 14. 어쌔신 v18 비주얼 — Flat Kit 재질 · 키 ×1.25 (2026-10-17, PLAN-assassin §9)
+
+계획 [PLAN-assassin.md](../../PLAN-assassin.md) §9. 가붕이·거너와 통일감을 맞추려고 형상 v18g + 텍스처 T3H 로 바꾸고 키를 1.252 → 약 1.565m 로 키웠다. **판정·스킬 수치·클립·네트워크는 그대로다.**
+
+| 항목 | 내용 |
+|------|------|
+| 크기 | **FBX 임포터 Scale Factor(`Assassin.fbx.meta` 첫 `globalScale`) 1 → 1.25 만** 쓴다(SVN). 메시·본 **위치**에 구워지고 본 lossyScale 은 1 이다. humanScale 0.674 → 0.843(아바타 T-pose 도 ×1.25 로 다시 만들어짐) |
+| 🔴 루트 배율 금지 | `Assassin_Armature` 루트에 배율을 걸지 않는다 — `DefaultAttack`·`InterruptAttack`(BoxCollider 판정)과 VFX 기준점이 루트의 자식이라 판정이 같이 커진다 |
+| 단검 | 손 본에 붙은 단검 **루트** `m_LocalScale` 1 → 1.25(본 lossyScale 이 1 이라 직접 키운다). 쥐는 위치 오프셋은 루트 아래 자식에 있어 루트를 따라 커진다 — **곱하지 않는다**(곱하면 ×1.5625). 게임에서 쓰는 오프셋은 `Player_Assassin.prefab` 이 단검 자식에 덮어쓴 값이고 Armature 쪽 값은 가려져 있다. 저작 `AssassinShellAuthoring` 이 새로 붙이는 단검 = 임포트 배율(`AssassinHairAuthoring.ImportScale`) |
+| 재질 | `3.Materials/FlatKit/Player/Assassin/FK_Assassin_Body.mat`(§7 5-1 Variant). 슬롯 5개 = `Assassin_HeadNeck` 0·1(Head·Face) · `Assassin_SourceBody` 0 · 단검 L/R 각 0 — Face 도 FK(셸 저작의 ToonLit Face 분기 제거). 단검도 어쌔신 아틀라스를 쓰고 단검 UV 가 얼굴·눈 섬과 겹친다(기존부터 — 전용 텍스처는 별도 아트 작업). 🔸 `Assassin.fbx.meta` 의 재질 remap 이 없는 guid 를 가리켜 FBX 원본 슬롯은 비어 있다 → 슬롯 오버라이드를 Revert 하면 분홍이 된다. ToonLit `3.Materials/Toon/Assassin_Toon.mat` 은 되돌리기용 |
+| 조명 | Flat Kit 은 장면 조명을 그대로 받고 실시간 그림자를 받지 않는다(ToonLit 은 고정광 `_FIXEDLIGHT_ON`·그림자 0.35) — 가붕이·거너와 같다 |
+| 머리카락 | §13 의 길이 차원 값 × 임포트 배율로 재캡처(`AssassinHairAuthoring.RigScale` = `ModelImporter.globalScale`, 리그 실측과 1% 넘게 다르면 에러): 캡슐 반경 · `hairRadius` 0.0225 · 끝 마디 0.1875 m · `gravitySupport` 0.8125 · `maximumDynamicSpeed` 2.5 · `neighbourOffsetLimit` 0.1125 · `bindAllowanceReference` 재계산. 각도·시간 상수(`armClearanceMaxDegrees` 47.7° 등)는 그대로 |
+| 달리기 | `AssassinAnimatorController` `Run_Loop` 재생 속도 = **1 / 임포트 배율 = 0.8**(×1.25 로 클립 자연 속도 4.98 → 6.23 m/s, 재생 0.8 로 실제 4.98 m/s ≈ 이동 5 m/s). Start/Stop 은 1. 저작 `AssassinShellAuthoring.BuildAnimator` |
+| SVN ↔ git | FBX·.meta·BaseColor 는 SVN, 나머지는 git — 둘은 짝이다. `Docs/tech/art-svn.json` 핀이 새 리비전을 가리킨다. 한쪽만 받으면 키·단검·머리카락·달리기 속도가 어긋난다 |
+| 테스트 | `Player/Editor/AssassinVisualPrefabTests`(슬롯 5개·부모·BaseMap · 단검 루트 = 임포트 배율 · `Run_Loop` = 1 / 배율 · Armature 루트·판정 박스 배율 1) · `AssassinHairPrefabTests.SolverLengthsFollowRigScale`·`BindAllowancesMatchCapsuleRadii` — `Tools/Tests/플레이어 EditMode 테스트 실행` 에 등록 |
+| 되돌리기 | `globalScale` 1 → `머리카락 본 연결` 재실행(배율 1 로 다시 캡처) · 단검 루트 1 · `Run_Loop` 1 · 재질 오버라이드 `Assassin_Toon` · `AssassinShellAuthoring.MaterialPath` · `FlatKitPlayerVariants` 의 어쌔신 블록(지우지 않으면 메뉴를 돌릴 때마다 슬롯이 FK 로 돌아간다) · 위 테스트 등록 해제 · 핀 |
 
 ---
 
