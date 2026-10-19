@@ -275,6 +275,34 @@ HUD 매 프레임 문자열(`PlayerHealthHUD`·`StatusEffectHUD`·`SkillCooldown
 - ✅ 1단계 Codex(코드) `09e9cc57` · ✅ 2단계 Claude(씬·에셋·`LobbySceneManager` 배선). 결과 요약 = [player-prefabs.md §8.3](Docs/tech/player-prefabs.md)
 - 🔴 남은 것: **은희 MPPM Play 확인**(호스트+클라2: 초상화·Ready 동기화 / Start 활성 / 고른 Variant 스폰) → PR. 레이아웃은 첫 배치라 Play 보고 조정 가능
 - 범위 밖: 전투 HUD 초상화 Paladin 고정(Gunner 도 Paladin 얼굴)
+## ▶▶ 작업 세션 (2026-10-16 · 민경(Claude) · **어쌔신 일반 E(단검 강화) VFX — 날 붉은 발광 + 검붉은 오라 + 차지 + 강화 일격 슬래쉬**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · 🛠 MainProject 발광·배선(진행 = PLAN 「진행」) · MyProject 빌드 메뉴 `Tools/VFX/Assassin Enhance (일반 E) 빌드` → ⏳ 민경 실행·컨펌 → 반입 · 🔴 은희 공유 handoff-assassin-r-vfx §3-4(공용 ToonLit)
+- 수정: 신규 `AssassinEnhanceReadyView.cs` · `Assassin_Armature.prefab`(단검 머티리얼·소켓·컴포넌트) · `Player_Assassin.prefab`(임시 시전 연출 비움). 반입 때 `Player3/E_Enhance/`.
+- 🔸 10-16 2차(민경 grill): 칼날 발광을 **팔라딘 방식**으로 교체 — `ToonLit.shader`·`MaterialFadeEffect.cs` **HEAD 로 되돌림**, `Assassin_Dagger_Toon.mat` 삭제(단검 [0] = `Assassin_Toon`), 단검 [1] 오버레이 신규 `50.Art/VFX/_Materials/Dagger_Blade_Glow.mat` + `50.Art/VFX/Textures/Dagger_BladeMask.png`(🔴 SVN add). 오라는 칼날 메시 `Dagger_Blade.fbx`(MyProject `Export/Player3/Models/`, 반입 시 `50.Art/VFX/Models/` · SVN add)의 표면에서 방출(Shape 위치 −0.33 보정). MyProject 에 단검 FBX·텍스처·발광 재질·마스크를 **같은 guid** 로 복사, `EnhanceTester` 실제 단검 사용. 은희 공유는 ToonLit 되돌림으로 불필요.
+## ▶▶ 메모 (2026-10-19 · 민경(Claude) · MyProject 에셋 소작업)
+- `Export/Player3/LClick/Slash_B.prefab` 의 `slash_add` 재질을 NamuFX `M_slashB_Add`(Additive — 검정 = 투명) → 사본 `Export/Player3/Materials/M_slashB_Alpha.mat`(Alpha 블렌드 0 · Dst 10)로.
+- NamuFX `SlashMesh_ring.fbx`(360°) 기반 원호 메시 `Export/Player3/Models/SlashMesh_ring_200·180·150·120·90·60.fbx`(ASCII FBX, 원본 단면·좌표축·모델 변환·import 설정 그대로, 원호 중심 = 링의 U 0.5 방향, U 는 원호 전체 0→1). 반입 시 SVN add.
+
+## ▶▶ 작업 세션 (2026-10-17 · 민경(Claude) · **어쌔신 좌클릭 = Insight 슬래쉬 · E 강타 · 우클릭 올려치기/성공 재제작(SlashReference 참고)**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · 🛠 MyProject 제작(미반입)
+- MyProject `Export/Player3/LClick/BM Assassin_Slash_Insight`(간파 사본, ✦ 제거·×1.7·Speed 2) · `BM Assassin_EnhancedSlash`(25 교차 초승달 구성, Speed 1.5 — Round Slash 결정 대체) · `RClick/BM Insight_Uppercut`(06 세로 베기 1개, Speed 1.5) · `RClick/BM Insight_SuccessBurst`(11 대칭 초승달 X자 + 불꽃, Speed 1.0) + 재질 사본 `Export/Player3/Materials/SR_*` 11개(_TintColor 만 검붉게). 참고 파티클 층을 그대로 복사하고 방향·크기·색·속도만 바꿈. 반입 의존 = `SpecialSkillsEffectsPack/Models/Donut_Mesh.fbx`·팩 텍스처(MainProject 대부분 없음), 셰이더 `Shader_IntegratedEffect` 는 같은 guid.
+- 🔸 10-17 민경 피드백 "선혈 낭자 → 12세 이용가·어쌔신답게, 색은 검붉게 유지, BM 계열로": 강타·성공의 Donut 링 층 재질을 **BM 검기 재질 사본**(`Materials/SR_BM_Edge·_Blade·_Fill`, Soft Particle 끔)으로 교체 + BM Slash Custom Data·정점 스트림(0001030422), 스핀 끔, 색 = 간파 값. Donut UV = Piloto 링 배치라 그대로 맞음. 올려치기는 SR 재질 텍스처만 흑백 BM(`Tx_Slash_07`·`WindStreak_Clamped`). 성공 불티 50 → 15. 백업 = 스크래치패드 `sr_bm_backup`.
+
+## ▶▶ 작업 세션 (2026-10-16 · 민경(Claude) · **어쌔신 강화 기본 공격(E 후 강타) 슬래쉬 — Round Slash 기반**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · 🛠 MyProject 제작(미반입)
+- 🔸 최종: 강화 슬래쉬 = MyProject `Export/Player3/BM Round Slash .prefab` 원본 그대로(민경 결정). 아래 `BM Assassin_EnhancedSlash`·`BM_AssassinHeavy_*` 재질 4개는 **삭제함**(10-16).
+- 클립 `Combo_Attack_02_01` × 2배속(Hit 0.283초). MyProject `Export/Player3/BM Assassin_EnhancedSlash.prefab`(정면 Arc150 ≈2.1m + 흰빛 심지 · 360° 링 배경 · 디스토션 3 · 반원 링(Arc180) · 연기·불티·섬광, Simulation Speed 1.5) + 재질 사본 `Export/Player3/Materials/BM_AssassinHeavy_Edge·_Blade·_Fill·_RingFill`. `EnhanceTester` 강타 = 0.283초 뒤 슬래쉬 + 1.5배 섬광. ⚠️ MyProject `Export/Player3` 가 민경 정리로 하위 폴더(LClick·RClick·NormalQ·R·TransformE)로 나뉨 — 좌클릭 산출물은 `LClick/`.
+
+## ▶▶ 작업 세션 (2026-10-16 · 민경(Claude) · **어쌔신 변신 좌클릭 VFX — 4타 묶음 슬래쉬(변신판)**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · 🛠 MyProject 제작(미반입)
+- MyProject `Export/Player3/BM Assassin_TransformedSlash.prefab`(Arc120 · 바깥 ≈1.8m · 디스토션 2장 · 검은 연기 꼬리 · Simulation Speed 3.0, 재질은 일반 슬래쉬 사본 공유) + 테스터 `1.Scripts/TransformedAttackTester.cs`. 반입 때: 소켓 `TransformedAttack01~04` + `AssassinSkillView` 묶음 내 Hit 순번 카운터(전 피어), `ShurikenEffectSystem` 속도 덮어쓰기 수정.
+
+## ▶▶ 작업 세션 (2026-10-16 · 민경(Claude) · **어쌔신 일반 좌클릭 VFX — 원호 슬래쉬 + 타격 성공 그어진 섬광**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 ✅ 승인 · 🛠 MyProject 제작(미반입 · MainProject 파일 수정 없음)
+- MyProject `Export/Player3/BM Assassin_Slash`(Arc120)·`_Slash_Arc90`·`_Slash_Arc150`(Variant — 렌더러 2개 Mesh 만)·`BM Assassin_SlashImpact`, 테스터 `1.Scripts/BasicAttackTester.cs`. 원본 = 민경이 손본 `Export/Player3/BM Flash Slash` 사본. 10-16 민경 피드백(너무 연함)으로 검기 재질을 BM Slash 단일 검기 재질(`BM_Slash_Edge_Light_1_add_soft`·`BM_Slash_Blade_Light_1_alpha_soft`, 원본 그대로)로 교체 — 스핀 대신 Custom1.z UV 오프셋으로 원호를 따라 지나간다(원호 각도 = 휘두르는 범위). 이어서 Flash Slash 참고 취소 · Soft Particle 끈 재질 사본 `Export/Player3/Materials/BM_AssassinSlash_Edge·_Blade`(반입 시 같이 가져갈 것).
+- 🔸 10-16 2차 재제작: 섬광 빼고 `BM Insight_Slash` 기반으로 다시 만듦(파일 guid 유지) + 팔라딘 `Slash Distortion` 층 + 재질 사본 3개(MainTex V 반복 0.625 — 원호 모델 UV 보정). 재생 속도 = 모든 시스템 Simulation Speed(2.0). 🔴 반입 때 `ShurikenEffectSystem` 이 Simulation Speed 를 1 로 덮어쓰는 문제 고칠 것(PLAN 맨 위).
+- 반입 때: 원호 모델은 MainProject `50.Art/VFX/Models/Slash_Arc*` 가 같은 파일(guid 만 다름 — 재매핑). 섬광 RPC 는 `AssassinBasicAttack.FireCurrentHit` → `AssassinSkillView`(은희 영역, handoff).
+
+## ▶▶ 작업 세션 (2026-10-16 · 민경(Claude) · **어쌔신 우클릭(간파) VFX — 기 모으기·튀기기·올려치기·성공 강조**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 · 🛠 MyProject 제작 중(미반입) · 부착은 애니 이벤트 × EffectSocketPlayer
+- MyProject `Export/Player3/BM Insight_Windup`(루프, 칼날 소켓)·`_Pop`(루프 멈출 때 튀기기)·`_Slash`(세로 초승달 + 칼끝 ✦)·`_Success`, 테스터 `1.Scripts/InsightTester.cs`.
+- 🔸 **부착 방식 확정(10-16)**: 모두 `EffectSocketPlayer` + `Attack_Up_01` 의 `EffectAnimEvents` 이벤트(StartEffect/PlayEffect/StopEffect). 소켓은 민경이 잡는다. 성공 강조만 성공 알림 쪽에서 `PlayOnce` — 표는 PLAN.md "부착 계획".
+- 🔴 판정(hitDelay 0.15초) vs 애니 올려치기(Hit 이벤트 0.6초) 불일치 — 애니 Hit·End 이벤트는 지금 실제로 무시됨. 정렬은 은희.
+
 ## ▶▶ 작업 세션 (2026-10-16 · 민경(Claude) · **어쌔신 일반 Q = 관통 일섬(PierceLine + PierceBurst)**, 브랜치 `feature/VFX`) — 계획 [PLAN.md](PLAN.md) 맨 위 · ✅ MyProject 컨펌 · ✅ 반입·배선(컴파일 에러 0) · ⏳ Play·MPPM · 🔴 SVN add · 🔴 은희 공유(handoff §3-3)
 - MyProject `Export/Player3/BM Thrust Slash_PierceLine`(+Z 1m 메시 파티클 3겹 + 잔흔·속도선)·`_PierceBurst`(Thrust Slash 재채색) → `Players/Player3/Q_Dash/FX_Assassin_PierceLine`·`_PierceBurst`, 카탈로그 `Assassin_Q_PierceLine`·`Assassin_Q_PierceBurst`. 의존 11개 추가(머티리얼 3·FBX 1·텍스처 7 — `Gradient_Quad02.png` 는 이름 충돌로 `Textures/PilotoStudio/Shared/`).
 - `EffectManager` 축별 배율 원샷 오버로드 + `EffectPool.Rent(Vector3)`. 일섬은 OnEnd 에서 시작점→실제 끝점, 임시 돌진 궤적 삭제.
