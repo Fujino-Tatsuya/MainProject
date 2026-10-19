@@ -120,7 +120,7 @@ public sealed class DemoSessionDirector : MonoBehaviour
 
         if (_networkManager.IsListening && _networkManager.NetworkConfig != null)
         {
-            // GetConfig(false) — 기본값 true 는 해시를 캐시해 실제 접속에 영향을 준다(LobbySceneManager.DescribeConfigHash 참고).
+            // GetConfig(false) — 기본값 true 는 해시를 캐시해 실제 접속에 영향을 준다.
             _lastConfigHash = _networkManager.NetworkConfig.GetConfig(false).ToString();
         }
 

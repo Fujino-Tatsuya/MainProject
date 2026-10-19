@@ -53,7 +53,25 @@ Last updated: 2026-10-19 (target flow for the booth demo added — see below)
 - While Ready or during the countdown, the character cannot be changed.
 - A new connection resets everyone's Ready state.
 - The Host has **no "always Ready" exception** — the Host readies the same way as Clients.
-- ✅ **Implemented (C8):** state lives in `LobbySession` (scene `NetworkObject` in `3.LobbyScene`, server-written `NetworkList<LobbyPlayerEntry>` + `CountdownEndServerTime`). Rules = pure `LobbyReadyRules` (a player leaving also cancels the countdown and resets Ready). Values = `LobbyRules.asset`. When the countdown ends the server latches and calls `StartGameLoading()` once. On spawn it seeds each seat from `ServerCharacterSelectionStore` (0 only if missing), so the character survives Map → Lobby. The old `Lobby.*` named messages and the GameStart button are retired; the old Ready/character buttons call `LobbySession` RPCs until C9 removes them. Countdown display is a per-second log until the C10 UI.
+- ✅ **Implemented (C8):** state lives in `LobbySession` (scene `NetworkObject` in `3.LobbyScene`, server-written `NetworkList<LobbyPlayerEntry>` + `CountdownEndServerTime`). Rules = pure `LobbyReadyRules` (a player leaving also cancels the countdown and resets Ready). Values = `LobbyRules.asset`. When the countdown ends the server latches and calls `StartGameLoading()` once. On spawn it seeds each seat from `ServerCharacterSelectionStore` (0 only if missing), so the character survives Map → Lobby. The old `Lobby.*` named messages and the GameStart button are retired. Countdown display is a per-second log until the C10 UI.
+
+### Lobby scene layout (C9)
+
+`3.LobbyScene` uses the same root layout as `4.MapScene`:
+
+| Root | Contents |
+|---|---|
+| `Management` | `LobbySceneManager` (fade, BGM, result panel open-on-enter only), `LobbySession` (scene `NetworkObject`), `LobbyPlayerSpawner` (server), `PlayerDashValidationManager`, `EffectManager`, `FallBoundarySettings` (backstop at -200) |
+| `Camera` | `CameraFollowTarget` + `CameraSwitcher` (`CameraTargetSwitcher` builds the main/follow camera rig when the owner player spawns — same as the map) |
+| `UI` | `Canvas` (top player slots `Panel_PlayerSlots` read by `LobbyUIController`, `Button_ShowLastResult`, empty `Slot_Countdown` for C10 and `Slot_CharacterSelectPanel` for C12, `Fade_Image`), `EventSystem`, `LobbyResultPanel` |
+| `Environment` | `PF_Lobby_Complete_v016` (art prefab, not modified), `Directional Light`, `PlayerSpawnPoints/SpawnPoint_0~2` |
+| `PostProcessing` | `Global Volume` (the map profile `VP_CombatLevel_Target`) |
+| `Debug` | `HitVFXDebugHUD` |
+
+- **Spawning:** `LobbyPlayerSpawner` spawns each client that completed the lobby NGO load (`LoadEventCompleted`), and late joiners after `SynchronizeComplete`. The prefab comes from `PlayerSpawnService` (same as the map). It never spawns twice for a client that already has a `PlayerObject`, and stops once the start latch is set. Leaving the lobby despawns lobby players through the existing source-scene cleanup in `NetworkLoadingFlowController`.
+- **Falling:** below `fallRespawnY` (-5) the server moves the player back to their spawn point with no damage (`PlayerFallRecovery.RelocateServer`).
+- **Input:** everything is allowed. Modal UI (result panel) still blocks the local player through `UiModalBlocker` → `PlayerUiInputPolicy` → a `PlayerInputReader` block token. Block tokens are ANDed with the life-cycle input policy.
+- The old 2D UI (IP/Port, StartHost/StartClient, Relay, join code, error text, GameStart, Ready, character buttons) is deleted. Ready and character select come back as walk-up objects in C10 and C12. **Until C10, the lobby has no way to Ready.**
 
 ### Connection (target)
 
@@ -69,7 +87,7 @@ The current scene manager structure is:
 
 - `NemoSceneManager`: common base class for scene managers.
 - `TitleSceneManager`: title UI flow, options panel, start/exit buttons.
-- `LobbySceneManager`: lobby scene entry behavior for now.
+- `LobbySceneManager`: lobby entry fade, BGM, and the result panel (connection UI removed in PLAN-48 C9).
 - `MapSceneManager`: map scene UI bridge, including result transition.
 - `ResultSceneManager`: result scene UI bridge, including lobby transition.
 

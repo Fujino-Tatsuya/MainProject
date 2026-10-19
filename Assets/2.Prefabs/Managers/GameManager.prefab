@@ -49,4 +49,3 @@ MonoBehaviour:
   resultSceneName: 5.ResultScene
   loadingSceneName: 2.LoadingScene
   mainGameSceneName: 4.MapScene
-  sessionConnectPanelName: Pannel_SessionConnect
