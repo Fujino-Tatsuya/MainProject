@@ -50,6 +50,7 @@ internal static class PlayerEditModeTestRunner
         "^AssassinHairClipRulesTests$", // 할 일 47 — 머리카락 구동기: 클립 → 보정 종류(회피 v15·v16·v13), 클립 안 초, trailing 재설정(전환·루프·되감기·리셋)
         "^AssassinHairPrefabTests$", // 할 일 47 — Armature 머리카락 체인 7×4 본·캡처·몸 캡슐·구동기·보정 2종, Variant 중첩
         "^AssassinHairArmClearanceTests$", // 할 일 47 후속 — 팔 밀어내기 후처리: 겹침만 밀기·상한·회전만(길이 보존)·팔 캡슐 4개
+        "^PlayerAnimationEventRequirementTests$", // PLAN-anim-event-timing P0-1 — 스킬·평타가 선언한 클립 이벤트가 플레이어 프리팹 컨트롤러·클립에 있는가
         "^AssassinVisualPrefabTests$", // PLAN-assassin §9 — v18 비주얼: Flat Kit 슬롯 5개·부모·BaseMap, 단검 루트 = 임포트 배율, Armature 루트·판정 박스 배율 1
     };
 

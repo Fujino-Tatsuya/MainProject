@@ -14,7 +14,7 @@ using UnityEngine;
 [RequireComponent(typeof(PlayerMovement))]
 [RequireComponent(typeof(PlayerAimIndicator))]
 [RequireComponent(typeof(AssassinConeAttack))]
-public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack
+public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAttack, IAnimationEventRequirementSource
 {
     private static readonly int DefaultAttackHash = Animator.StringToHash("DefaultAttack");
     private static readonly int AttackIndexHash = Animator.StringToHash("AttackIndex");
@@ -110,6 +110,33 @@ public sealed class AssassinBasicAttack : BaseNetworkBehaviour, IPlayerBasicAtta
             coneAttack.Configure(data.HittableLayers, data.MaxHitResults);
 
         observedState = player != null ? player.CurrentState : PlayerActionState.Idle;
+        AnimationEventRequirements.WarnMissing(this, animator, this);
+    }
+
+    // 일반 4타·강타·변신 묶음 클립마다 판정(Hit)·종료(End).
+    public void CollectAnimationEventRequirements(System.Collections.Generic.List<AnimationEventRequirement> requirements)
+    {
+        if (data == null)
+            return;
+
+        if (data.NormalSteps != null)
+        {
+            foreach (AssassinBasicAttackStepData step in data.NormalSteps)
+                AddStepRequirements(step, requirements);
+        }
+
+        AddStepRequirements(data.EnhancedStep, requirements);
+        AddStepRequirements(data.TransformedStep, requirements);
+    }
+
+    private static void AddStepRequirements(
+        AssassinBasicAttackStepData step, System.Collections.Generic.List<AnimationEventRequirement> requirements)
+    {
+        if (step == null || step.Clip == null)
+            return;
+
+        requirements.Add(AnimationEventRequirement.ForAttackClip(step.Clip, DefaultAttackAnimationEventType.Hit));
+        requirements.Add(AnimationEventRequirement.ForAttackClip(step.Clip, DefaultAttackAnimationEventType.End));
     }
 
     private void Update()

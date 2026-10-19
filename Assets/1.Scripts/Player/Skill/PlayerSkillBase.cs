@@ -34,8 +34,10 @@ public enum SkillEndReason
 /// (회전이 armature에만 적용되므로 방향성 판정은 반드시 앵커 기준).
 /// 수명주기는 PlayerSkillController가 서버 권위로 호출한다 — 스킬은 RPC를 직접 갖지 않는다.
 /// </summary>
-public abstract class PlayerSkillBase : MonoBehaviour
+public abstract class PlayerSkillBase : MonoBehaviour, IAnimationEventRequirementSource
 {
+    private static readonly SkillAnimationEventType[] NoRequiredEvents = System.Array.Empty<SkillAnimationEventType>();
+
     [SerializeField] private PlayerSkillData data;
     // 판정 기준점 (MainSkill/SubSkill/InterruptAttack/UltimateSkill 앵커). E처럼 판정 없는 스킬은 비워도 된다.
     [SerializeField] private ColliderInfo hitboxAnchor;
@@ -88,10 +90,26 @@ public abstract class PlayerSkillBase : MonoBehaviour
     // 실행 중 오너 조준을 서버로 주기 전송할지. 기본은 홀드 스킬만(기존 동작).
     public virtual bool WantsAimUpdates => data != null && data.InputType == PlayerSkillInputType.Hold;
 
+    /// <summary>
+    /// 이 스킬이 상태 클립(<see cref="PlayerSkillData.AnimatorStateName"/>)에 요구하는 이벤트. 판정·종료·연출 시점을 이벤트로 정하는 스킬이 선언한다.
+    /// 빠지면 에디터 경고(<see cref="Initialize"/>)와 EditMode 전수 검사(PlayerAnimationEventRequirementTests)가 잡는다.
+    /// </summary>
+    public virtual System.Collections.Generic.IReadOnlyList<SkillAnimationEventType> RequiredAnimationEvents => NoRequiredEvents;
+
+    public void CollectAnimationEventRequirements(System.Collections.Generic.List<AnimationEventRequirement> requirements)
+    {
+        if (data == null || string.IsNullOrEmpty(data.AnimatorStateName))
+            return;
+
+        foreach (SkillAnimationEventType eventType in RequiredAnimationEvents)
+            requirements.Add(AnimationEventRequirement.ForSkillState(data.AnimatorStateName, eventType));
+    }
+
     public virtual void Initialize(Player owner, PlayerSkillController controller)
     {
         this.owner = owner;
         this.controller = controller;
+        AnimationEventRequirements.WarnMissing(this, owner != null ? owner.GetComponentInChildren<Animator>(true) : null, this);
     }
 
     // 쿨타임/FSM 외 추가 시전 조건 (사거리, 대상 생존 등). 서버 승인 시점에만 호출된다.
