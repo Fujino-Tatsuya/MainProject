@@ -19,7 +19,14 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
 
     // 방어 성공 시 CrossFade 할 반격 자세 상태(PlayerAnimatorController Base Layer). 시작 상태(SubSkillGuard)는 데이터의
     // animatorStateName 이고, 반격 상태는 이 스킬 전용이라 데이터 열로 늘리지 않는다(xlsx 열 추가 회피).
-    private static readonly int CounterStateHash = Animator.StringToHash("SubSkillCounter");
+    private const string CounterStateName = "SubSkillCounter";
+    private static readonly int CounterStateHash = Animator.StringToHash(CounterStateName);
+
+    // 방어 클립(데이터 animatorStateName) = Custom0·Custom1, 반격 클립(CounterStateName) = Hit·End.
+    private static readonly SkillAnimationEventType[] GuardEvents =
+        { SkillAnimationEventType.Custom0, SkillAnimationEventType.Custom1 };
+    private static readonly SkillAnimationEventType[] CounterEvents =
+        { SkillAnimationEventType.Hit, SkillAnimationEventType.End };
     // 시작 상태 CrossFade(PlayerSkillController.PlaySkillPresentation)와 같은 값.
     private const float CounterCrossFadeSeconds = 0.05f;
 
@@ -42,6 +49,15 @@ public class FirstMeleeSubSkill : PlayerInstantSkill, IPlayerIncomingAttackGuard
 
     // 방어 대기·반격 중 이동·회전 불가(결정 3). 평타·다른 스킬·대시는 Skill 상태 규칙으로 이미 막힌다(CanBeCanceledByDash 기본 false).
     public override bool CanMoveWhileActive => false;
+
+    public override IReadOnlyList<SkillAnimationEventType> RequiredAnimationEvents => GuardEvents;
+
+    public override void CollectAnimationEventRequirements(List<AnimationEventRequirement> requirements)
+    {
+        base.CollectAnimationEventRequirements(requirements);
+        foreach (SkillAnimationEventType eventType in CounterEvents)
+            requirements.Add(AnimationEventRequirement.ForSkillState(CounterStateName, eventType));
+    }
 
     private FirstMeleeSubSkillData SubSkillData => Data as FirstMeleeSubSkillData;
 

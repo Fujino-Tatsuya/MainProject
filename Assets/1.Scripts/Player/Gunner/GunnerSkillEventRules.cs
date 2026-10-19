@@ -33,7 +33,7 @@ public static class GunnerSkillEventRules
             return;
 
         Debug.LogWarning($"[Gunner/{skill}] {eventType} 애니 이벤트 없이 안전망(maxActiveDuration)으로 끝났다 — " +
-                         $"클립 '{clip}' 의 HandleSkillEvent({(int)eventType}) 확인: Tools/Player/Gunner/스킬 클립 애니 이벤트 검사", context);
+                         $"클립 '{clip}' 의 HandleSkillEvent({eventType}={(int)eventType}) 확인: Tools/Player/Gunner/스킬 클립 애니 이벤트 검사", context);
 #endif
     }
 }
