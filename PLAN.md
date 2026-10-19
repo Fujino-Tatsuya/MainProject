@@ -1,3 +1,32 @@
+# ▶▶▶ 계획 = **어쌔신 우클릭(간파) VFX 반입·배선 — 기 모으기 · 튀기기 · 올려치기 · 성공 (EffectSocketPlayer)** (2026-10-19 · grill 확정 · ✅ 승인 · ✅ 반입·코드·프리팹·클립 배선 — dotnet 빌드 오류 0 · ⏳ 민경 Play/MPPM)
+
+> 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-19). 소켓 4개 = 민경이 `Player_Assassin/VFX/RightClick/WindUp · Pop · Slash · Slash_Success` 에 EffectSocketPlayer 를 넣어 둠(커밋 `23a389de`, id·effect 비어 있음. Slash·Slash_Success 소켓은 10-19 `InterruptSlash` 트랜스폼으로 옮김). 좌클릭 반입(아래 계획)과 같은 방식.
+
+## 결정
+| 항목 | 결정 |
+|---|---|
+| 반입 프리팹 | MyProject `Export/Player3/RClick/BM Insight_Windup`·`_Pop`·`_Slash`·`_Success`(+ 중첩 `BM Hit`) → `50.Art/VFX/Common/Players/Player3/RClick/FX_Assassin_RClick_Windup`·`_Pop`·`_Slash`·`_Success`·`_Hit`(같은 guid, 루트 이름만 변경). 엔트리 = 기 모으기 루프(outroDuration 0 → 끄는 즉시 반납), 튀기기 0.4초·올려치기 1.0초·성공 1.0초 원샷. `EffectCatalog` 에 `Assassin_RClick_*` 등록(prewarm) |
+| 의존 | 신규 31개(Piloto 재질·텍스처·모델 → `*/PilotoStudio/`, Matthew Guz `Hit.mat`·텍스처 → `*/MatthewGuz/`, `SR_Success_Spark.mat` → `_Materials/Player3/`). 나머지는 같은 guid 로 이미 있음. 🔴 새 아트 SVN add |
+| 소켓 id | `WindUp`=`Assassin_InsightWindup`, `Pop`=`Assassin_InsightPop`, `Slash`=`Assassin_InsightSlash`, `Slash_Success` = id 없음(코드 전용) |
+| 클립 `Attack_Up_01` 이벤트 | 0초 `StartEffect(Assassin_InsightWindup)` · 13프레임(0.2167초) `StopEffect(Assassin_InsightWindup)` + `PlayEffect(Assassin_InsightPop)` · **16프레임(0.2667초, 민경이 넣어 둔 빈 이벤트) `PlayEffect(Assassin_InsightSlash)`**(10-19 민경 지정). 판정 Hit(0.6초)·End(1.275초)는 그대로. 상태 전이는 exitTime 1 이라 스킬 종료(0.6초)로 애니가 끊기지 않음 |
+| "성공" 기준 | **간파 성공** = 서버 `PlayerInterruptSkillBase.ServerInterruptSucceeded`(쿨 감소와 같은 기준). 단순 적중은 아님 |
+| 🔸 성공 = 올려치기와 **같이** | 서버 성공 알림 → RPC(전 피어) → "성공 대기" 표시. `EffectAnimEvents` 에 재생 알림 이벤트 `Played(string id)` 를 추가하고, `AssassinSkillView` 가 올려치기 소켓 id 가 재생되는 순간 성공 대기면 `Slash_Success.PlayOnce()`. 알림이 올려치기보다 늦게 오면(지연·나중에 판정이 0.6초로 옮겨짐) 받는 즉시 재생. 표시는 다음 시전 시작에 지운다(스킬 종료 0.6초와 올려치기 0.6초가 겹쳐도 안 잃음) |
+| 기 모으기 안전 정지 | 스킬 `OnEnd`(완료·피격·사망 공통, 전 피어)에서 켜져 있으면 끈다 |
+| 임시 연출 제거 | `interruptCastPrefab`(`FX_Interrupt_Flash`)·`PlayInterruptCast` 제거 → `OnClientPlay` 는 성공 대기 초기화만 |
+| 담당·공유 | `AssassinInterruptSkill`·`AssassinSkillView` = 은희 영역 → `Docs/tech/handoff-assassin-r-vfx.md` 에 추가. `EffectAnimEvents` = VFX 영역(이벤트 추가만, 기존 동작 불변) |
+
+## 변경 파일
+- 신규: `50.Art/VFX/Common/Players/Player3/RClick/*`(프리팹 5·엔트리 4) + 의존 아트
+- `1.Scripts/Effects/EffectAnimEvents.cs`(Played 이벤트) · `EffectCatalog.cs`·`.asset`
+- `1.Scripts/Player/Assassin/AssassinSkillView.cs` · `AssassinInterruptSkill.cs`
+- `2.Prefabs/Player/Assassin/Player_Assassin.prefab`(소켓 4개 id·엔트리, 뷰 필드) · `4.Animations/Player/Assassin/Attack_Up_01.anim`(이벤트 4개)
+- 문서: handoff · CONTEXT
+
+## 검증
+- 컴파일 에러 0 · guid 연결(dangling 0) · cmp. ⏳ 민경 Play / MPPM(호스트·클라 모두: 기 모으기 → 0.55초 튀기며 사라짐 → 올려치기, 보스 간파 성공 때만 성공 연출이 올려치기와 함께, 시전 중 피격 시 기 모으기 남지 않음).
+
+---
+
 # ▶▶▶ 계획 = **어쌔신 좌클릭 VFX 반입·배선 — 일반 4타 · 일반 성공 · 변신 루프 (EffectSocketPlayer)** (2026-10-19 · grill 확정 · ✅ 승인 · ✅ 반입·코드·프리팹 배선(컴파일은 MainProject Unity 를 켜야 확인) · ⏳ 민경 Play/MPPM)
 
 > 브랜치 `feature/VFX`. 결정: 민경(grill 2026-10-19). 소켓 9개 = 민경이 `Player_Assassin/VFX/NormalSlash_1~4 · NormalSlash_Success_1~4 · TransformedSlash` 에 EffectSocketPlayer 를 넣어 둠(id·effect 비어 있음, 각자 Armature `BasicAttack01~04`·`TransformedAttack` 추종).

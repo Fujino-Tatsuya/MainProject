@@ -66,6 +66,16 @@
 - `AssassinShellAuthoring`(에디터 저작 메뉴): 지운 필드를 채우던 줄·상수·`SetArrayIfEmpty` 삭제. `Speed_Attack_Loop` ReplaceEvents 에 Start/StopEffect 를 같이 찍게(`AnimationEventSpec` 에 string 인자 추가) — 메뉴를 다시 돌려도 남는다. 일반 4타 클립은 이벤트가 있으면 유지.
 - 🔸 이펙트 공용: `ShurikenEffectSystem.SetPlayRate` 가 `저작 Simulation Speed × 배율` 로 쓴다(`ShurikenPartCache.baseSpeeds`, 첫 캐시 = 첫 재생 전 프리팹 값). 전에는 배율을 그대로 덮어써 풀 반납(1) 뒤 빠르게 저작한 이펙트가 1배속이 됐다. 저작 속도 1 인 기존 이펙트는 동작 불변.
 
+## 3-6. 우클릭 간파 — 기 모으기 · 튀기기 · 올려치기 · 간파 성공 (2026-10-19 추가)
+- 소켓 = `Player_Assassin/VFX/RightClick/WindUp · Pop · Slash · Slash_Success`(민경이 넣은 `EffectSocketPlayer`). 엔트리 `EffectCatalog.Assassin_RClick_Windup`(루프, outro 0 = 끄는 즉시 반납)·`_Pop`(0.4초)·`_Slash`(1.0초)·`_Success`(1.0초).
+- 소켓 id: `Assassin_InsightWindup`·`Assassin_InsightPop`·`Assassin_InsightSlash`(성공은 id 없음 — 코드 재생). 클립 `Attack_Up_01` 이벤트(민경 배치): 0초 `StartEffect(Windup)` · 13프레임(0.2167초) `StopEffect(Windup)` + `PlayEffect(Pop)` · 16프레임(0.2667초) `PlayEffect(Slash)`. 판정 Hit(0.6초)·End(1.275초)는 그대로.
+- 🔸 **간파 성공 = 올려치기와 같이.** 기준 = 서버 `PlayerInterruptSkillBase.ServerInterruptSucceeded`(쿨 감소와 같은 기준, **베이스 무변경**). `AssassinSkillView` 가 `OnEnable` 에서 구독 → 시전자 == 자기 `Player` 면 `[Rpc(ClientsAndHost)] InterruptSucceededRpc`(Reliable) → 전 피어 "성공 대기". `EffectAnimEvents` 에 새로 연 `Played(string id)` 이벤트로 올려치기 소켓 id 가 재생되는 순간을 받아, 대기 중이면 `insightSuccess.PlayOnce()`. 알림이 올려치기보다 늦으면(지연, 판정을 뒤로 옮길 때) 받는 즉시 재생 — 순서 무관. 대기 표시는 다음 시전(`BeginInterrupt`)에서 지운다(스킬 종료 0.6초가 올려치기보다 먼저 와도 안 잃게).
+- `AssassinSkillView`: `interruptCastPrefab`·`PlayInterruptCast` **삭제**(임시 `FX_Interrupt_Flash` — 기 모으기가 대신). 신규 필드 `insightWindup`·`insightSlash`·`insightSuccess`, `BeginInterrupt()`(대기 초기화)·`EndInterrupt()`(기 모으기 안전 정지).
+- `AssassinInterruptSkill`: `OnClientPlay` → `BeginInterrupt`, `OnEnd` 오버라이드 신설 → `EndInterrupt` 후 `base.OnEnd`(시전 중 피격·사망으로 13프레임 전에 끊겨도 기 모으기가 남지 않게).
+- `AssassinShellAuthoring`: `interruptCastPrefab` 채우던 줄·상수 삭제, `Attack_Up_01` ReplaceEvents 에 위 효과 이벤트 3종을 같이 찍게(메뉴 3번을 다시 돌려도 남는다).
+- `EffectAnimEvents`(VFX 코드): `PlayEffect`·`StartEffect` 가 재생 성공 뒤 `Played(id)` 를 낸다. 구독자 없으면 동작 불변.
+- ⚠️ 판정(0.15초 타이머)과 올려치기 프레임(0.2667초)은 여전히 따로다 — 정렬은 은희 결정. 판정을 옮겨도 성공 연출은 위 구조로 따라온다.
+
 ## 4. 확인 부탁
 - Play: R → 0.5초에 소용돌이가 차고 따라다님 / 만료·수동 해제·쓰러짐 → 0.5초에 흩어짐.
 - MPPM: 다른 피어·변신 중 늦게 들어온 클라에서도 보이는지.
@@ -74,3 +84,4 @@
 - 일반 Q: 돌진이 끝나고 한 박자 뒤 경로 위로 일섬 + 끝점 버스트, 벽에 막히면 일섬이 그만큼 짧은지. 다른 피어에서도 경로와 맞는지.
 - 일반 E: 누르면 양손 단검 날만 붉게 + 검붉은 오라, 강화 일격·변신·쓰러짐에 꺼짐. 다른 피어·늦은 접속에서도 같은지. 다른 캐릭터(팔라딘·거너·어쌔신 몸)가 그대로인지.
 - 좌클릭: 일반 4타마다 소켓 방향대로 베기, 맞았을 때만 성공 연출이 겹쳐 나옴(빗나가면 베기만). 변신 묶음 동안 루프가 돌고 묶음 끝·피격 취소·변신 해제에 꺼지는지. 다른 피어에서도 같은지.
+- 우클릭: 기 모으기 → 13프레임에 튀기며 사라지고 16프레임 올려치기. 보스·중간보스 간파 **성공 때만** 성공 연출이 올려치기와 함께(빗나감·일반 적중은 올려치기만). 시전 중 피격되면 기 모으기가 남지 않는지. 다른 피어에서도 같은지.

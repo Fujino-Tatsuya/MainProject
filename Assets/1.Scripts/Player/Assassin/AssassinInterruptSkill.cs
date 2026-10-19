@@ -11,9 +11,17 @@ public sealed class AssassinInterruptSkill : PlayerInterruptSkillBase
 {
     private AssassinState assassinState;
 
-    // 애니메이션은 PlayerSkillController 가 animatorStateName 으로 재생한다. 연출은 임시(AssassinSkillView — 민경 교체).
+    // 애니메이션은 PlayerSkillController 가 animatorStateName 으로 재생한다. 기 모으기·튀기기·올려치기 연출은 Attack_Up_01 의
+    // EffectAnimEvents 이벤트가 낸다(2026-10-19 민경). 여기서는 성공 대기 초기화와 기 모으기 안전 정지만(AssassinSkillView).
     public override void OnClientPlay(Vector3 direction) =>
-        AssassinSkillView.Play(owner, v => v.PlayInterruptCast());
+        AssassinSkillView.Play(owner, v => v.BeginInterrupt());
+
+    // 전 피어 — 완료·피격·사망 공통. 시전이 기 모으기 StopEffect 프레임 전에 끊기면 루프가 남지 않게.
+    public override void OnEnd(SkillEndReason reason)
+    {
+        AssassinSkillView.Play(owner, v => v.EndInterrupt());
+        base.OnEnd(reason);
+    }
 
     protected override AttackInfo DecorateAttackInfo(AttackInfo attackInfo)
     {

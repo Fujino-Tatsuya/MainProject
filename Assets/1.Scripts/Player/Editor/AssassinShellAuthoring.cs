@@ -58,7 +58,6 @@ public static class AssassinShellAuthoring
     private const string PlayerSlashFolder = "Assets/50.Art/VFX/Common/Players/Player1/DefaultAttack/";
     private const string EnhancedSlashVfxPath = PlayerSlashFolder + "FX_DoubleSlash_O.prefab";
     private const string EnhanceCastVfxPath = "Assets/50.Art/VFX/Common/Burst/Flash_star.prefab";
-    private const string InterruptCastVfxPath = "Assets/50.Art/VFX/Common/FX_Interrupt_Flash.prefab";
     private const string RosterPath = "Assets/9.ScriptableObject/Player/CharacterRoster.asset";
 
     // A7 Animator 상태 — 스킬 데이터 animatorStateName 과 같은 이름이어야 CrossFade 가 맞는다.
@@ -248,7 +247,13 @@ public static class AssassinShellAuthoring
             SkillEvent(0.18f, SkillAnimationEventType.Hit), SkillEvent(0.32f, SkillAnimationEventType.Hit),
             SkillEvent(0.46f, SkillAnimationEventType.Hit), SkillEvent(0.60f, SkillAnimationEventType.Hit),
             SkillEvent(0.74f, SkillAnimationEventType.Hit), SkillEvent(ClipEndTime, SkillAnimationEventType.End));
-        ReplaceEvents("Attack_Up_01", SkillEvent(0.40f, SkillAnimationEventType.Hit), SkillEvent(0.85f, SkillAnimationEventType.End));
+        // 간파 기 모으기 켜기 → 13프레임 끄기 + 튀기기 → 16프레임 올려치기 — EffectAnimEvents(민경 배치 10-19 / 클립 1.5초 = 90프레임).
+        ReplaceEvents("Attack_Up_01",
+            EffectEvent(0f, nameof(EffectAnimEventRelay.StartEffect), InsightWindupEffectId),
+            EffectEvent(13f / 90f, nameof(EffectAnimEventRelay.StopEffect), InsightWindupEffectId),
+            EffectEvent(13f / 90f, nameof(EffectAnimEventRelay.PlayEffect), InsightPopEffectId),
+            EffectEvent(16f / 90f, nameof(EffectAnimEventRelay.PlayEffect), InsightSlashEffectId),
+            SkillEvent(0.40f, SkillAnimationEventType.Hit), SkillEvent(0.85f, SkillAnimationEventType.End));
         ReplaceEvents("Parry_R", SkillEvent(ClipEndTime, SkillAnimationEventType.End));
 
         AssetDatabase.SaveAssets();
@@ -549,7 +554,6 @@ public static class AssassinShellAuthoring
             SetIfEmpty(so, "backAttackHitPrefab", BackAttackVfxPath);
             SetIfEmpty(so, "enhancedSlashPrefab", EnhancedSlashVfxPath);
             SetIfEmpty(so, "enhanceCastPrefab", EnhanceCastVfxPath);
-            SetIfEmpty(so, "interruptCastPrefab", InterruptCastVfxPath);
             so.FindProperty("enhancedSlashSocket").objectReferenceValue = root.transform.Find("Armature/VFX/EnhancedAttack");
             so.ApplyModifiedPropertiesWithoutUndo();
 
@@ -1699,6 +1703,9 @@ public static class AssassinShellAuthoring
 
     // Player_Assassin/VFX/TransformedSlash 의 EffectSocketPlayer.Id 와 같아야 한다.
     private const string TransformedSlashEffectId = "Assassin_TransformedSlash";
+    private const string InsightWindupEffectId = "Assassin_InsightWindup";
+    private const string InsightPopEffectId = "Assassin_InsightPop";
+    private const string InsightSlashEffectId = "Assassin_InsightSlash";
 
     private static AnimationEventSpec EffectEvent(float normalizedTime, string functionName, string effectId)
     {

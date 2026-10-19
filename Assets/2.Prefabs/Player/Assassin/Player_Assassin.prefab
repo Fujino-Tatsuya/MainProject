@@ -318,7 +318,7 @@ GameObject:
   m_Component:
   - component: {fileID: 7908778008248557700}
   m_Layer: 0
-  m_Name: InterruptAttackSlash
+  m_Name: EnhancedSlash
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -483,9 +483,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
-  id: 
-  effect: {fileID: 0}
-  socket: {fileID: 7908778008248557700}
+  id: Assassin_InsightSlash
+  effect: {fileID: 11400000, guid: 114db434195a49519b775c192571905a, type: 2}
+  socket: {fileID: 2987403964900530997}
   offset: {x: 0, y: 0, z: 0}
   scale: 1
   safetyTimeout: 5
@@ -534,8 +534,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
   id: 
-  effect: {fileID: 0}
-  socket: {fileID: 7908778008248557700}
+  effect: {fileID: 11400000, guid: 5e8ad15d315143f48f2e0b91da6f8d1d, type: 2}
+  socket: {fileID: 2987403964900530997}
   offset: {x: 0, y: 0, z: 0}
   scale: 1
   safetyTimeout: 5
@@ -633,8 +633,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
-  id: 
-  effect: {fileID: 0}
+  id: Assassin_InsightPop
+  effect: {fileID: 11400000, guid: 2aa86f8708d344c2bdfdf0eb39b8a4d1, type: 2}
   socket: {fileID: 5512788469884495506}
   offset: {x: 0, y: 0, z: 0}
   scale: 1
@@ -689,6 +689,37 @@ MonoBehaviour:
   offset: {x: 0, y: 0, z: 0}
   scale: 1
   safetyTimeout: 5
+--- !u!1 &7964300108588684876
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2987403964900530997}
+  m_Layer: 0
+  m_Name: InterruptSlash
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2987403964900530997
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7964300108588684876}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: 0.5294747, w: 0.8483258}
+  m_LocalPosition: {x: 0.326, y: 0.857, z: 0.774}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 3688994765029105812}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 63.94}
 --- !u!1 &7999636224408020444
 GameObject:
   m_ObjectHideFlags: 0
@@ -733,8 +764,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bcc479019d2d26c4489bb17fe05682ca, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EffectSocketPlayer
-  id: 
-  effect: {fileID: 0}
+  id: Assassin_InsightWindup
+  effect: {fileID: 11400000, guid: 2df2a20b8f5040258bb649122ff98b8f, type: 2}
   socket: {fileID: 5512788469884495506}
   offset: {x: 0, y: 0, z: 0}
   scale: 1
@@ -1103,6 +1134,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 5977032411610529488, guid: 3a5f368447661b44592ccc55d5568854, type: 3}
       insertIndex: -1
       addedObject: {fileID: 7908778008248557700}
+    - targetCorrespondingSourceObject: {fileID: 5977032411610529488, guid: 3a5f368447661b44592ccc55d5568854, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2987403964900530997}
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 3a5f368447661b44592ccc55d5568854, type: 3}
 --- !u!4 &951801660152849883 stripped
@@ -1511,8 +1545,10 @@ MonoBehaviour:
   - {fileID: 8598537009228163081}
   transformedSlash: {fileID: 3931342188816061101}
   enhancedSlashPrefab: {fileID: 3600389243222657682, guid: 37390631ea99cd1439f01ee21d9f89ad, type: 3}
+  insightWindup: {fileID: 6282029894871603578}
+  insightSlash: {fileID: 5827325434796818791}
+  insightSuccess: {fileID: 9014081686492225755}
   enhanceCastPrefab: {fileID: 230651131596242121, guid: d8a8bbe703ee8174e9754da9050b17a9, type: 3}
-  interruptCastPrefab: {fileID: 1151845124054409814, guid: 7e930ada5a14bc3408374b04fce9d119, type: 3}
   circleStrikePrefab: {fileID: 1475618779179179817, guid: 07799b25da23d9c4d97a417f6f0d0f31, type: 3}
   backAttackHitPrefab: {fileID: 7634420434017284396, guid: b9ed127bfed05be4db493ca51e744a76, type: 3}
   releaseLifetime: 2

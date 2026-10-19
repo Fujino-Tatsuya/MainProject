@@ -9,7 +9,7 @@ using UnityEngine;
 /// - 변신 중 루프: <see cref="AssassinState"/> 의 전 피어 이벤트로 켜고 끈다(늦은 접속은 스폰 시 현재 상태로 맞춤).
 ///   🔹 정식 VFX — <c>EffectCatalog.Assassin_R_BladeVortex</c> 를 EffectManager 로 재생한다(2026-10-14 민경).
 ///   변신 시작 = PlayLooping(0.5초에 차오름), 종료(만료·수동 해제·쓰러짐 공통) = Release(0.5초에 흩어짐).
-/// - Q 돌진 궤적 · 변신 E 원 · E/간파 시전: 스킬의 OnClientPlay/OnEnd(전 피어)가 로컬로 부른다 — RPC 없음.
+/// - Q 돌진 궤적 · 변신 E 원 · E 시전: 스킬의 OnClientPlay/OnEnd(전 피어)가 로컬로 부른다 — RPC 없음.
 ///   🔹 변신 E 원 = 정식 VFX <c>EffectCatalog.Assassin_E_MultiSlashes</c> 루프(2026-10-15 민경) — 확정 시 원 중심에서
 ///   배율 = 원 반경으로 켜고, 스킬 OnEnd(5타 완료·중단 공통)에서 Release 한다. 확정 순간 1회 <c>circleStrikePrefab</c> 도 그대로 낸다.
 ///   🔹 변신 Q 돌진 = 정식 VFX <c>EffectCatalog.Assassin_Q_StormSlash</c> 루프(2026-10-15 민경) — 플레이어 루트를 따라가며
@@ -22,6 +22,10 @@ using UnityEngine;
 ///   직접 재생한다 — 여기서 하지 않는다. 여기 남은 것: 적중 성공 = [서버] <see cref="ServerNormalSlashHit"/> → 전 피어
 ///   <c>normalSlashSuccess[타]</c> 원샷(일반 베기와 겹쳐 재생 — 서버 판정이라 애니 이벤트로 못 낸다),
 ///   변신 루프 안전 정지 <see cref="EndTransformedSlash"/>(묶음이 StopEffect 프레임 전에 끊길 때). 강타는 아직 임시 프리팹 경로.
+/// - 우클릭 간파: 🔹 정식 VFX(2026-10-19 민경) — 기 모으기·튀기기·올려치기는 <c>Attack_Up_01</c> 클립의 <see cref="EffectAnimEvents"/>
+///   이벤트가 <c>Player_Assassin/VFX/RightClick/*</c> 소켓에서 직접 재생한다. 여기 남은 것: 간파 성공 = [서버]
+///   <see cref="PlayerInterruptSkillBase.ServerInterruptSucceeded"/> → 전 피어 "성공 대기" → 올려치기 소켓 id 가 재생되는 순간
+///   <c>insightSuccess</c> 원샷(알림이 더 늦으면 받는 즉시), 기 모으기 안전 정지 <see cref="EndInterrupt"/>(스킬 OnEnd).
 /// - 백어택 적중: [서버] <see cref="ServerBackAttackHit"/> → 전 피어. 판정은 A11 이 붙인다(그 전까지 호출자 없음).
 /// 프리팹이 비어 있으면 해당 연출만 빠진다.
 /// </summary>
@@ -60,9 +64,16 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
     [Tooltip("강타 — 임시 프리팹(Hit 이벤트에 소켓에 붙여 1회).")]
     [SerializeField] private GameObject enhancedSlashPrefab;
 
+    [Header("우클릭 간파 — EffectSocketPlayer(Player_Assassin/VFX/RightClick/*)")]
+    [Tooltip("기 모으기 루프 — 켜고 끄는 건 Attack_Up_01 의 StartEffect/StopEffect 이벤트. 여기는 시전이 그 프레임 전에 끊길 때의 안전 정지에만 쓴다.")]
+    [SerializeField] private EffectSocketPlayer insightWindup;
+    [Tooltip("올려치기 — 클립의 PlayEffect 이벤트가 낸다. 여기서는 이 소켓의 Id 가 재생되는 순간을 성공 연출의 기준 프레임으로만 쓴다.")]
+    [SerializeField] private EffectSocketPlayer insightSlash;
+    [Tooltip("간파 성공 — 서버 판정 → RPC → 올려치기와 함께 원샷. id 비워 둠(코드 전용). 엔트리 = Assassin_RClick_Success.")]
+    [SerializeField] private EffectSocketPlayer insightSuccess;
+
     [Header("시전 1회 — 스킬 OnClientPlay(전 피어)")]
     [SerializeField] private GameObject enhanceCastPrefab;
-    [SerializeField] private GameObject interruptCastPrefab;
 
     [Header("1회·스킬 동안")]
     [Tooltip("변신 E 확정 순간 원 중심에 1회(Multi Slashes 루프와 함께).")]
@@ -84,13 +95,26 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
     private Vector3 pierceStart;
     private Vector3 pierceDirection;
     private bool pierceArmed;
+    private Player player;
+    private EffectAnimEvents animEvents;
+    private bool insightSuccessPending;
+    private bool insightSlashPlayed;
 
     private void Awake()
     {
         state = GetComponent<AssassinState>();
         if (state != null)
             state.TransformChanged += HandleTransformChanged;
+        player = GetComponent<Player>();
+        animEvents = GetComponent<EffectAnimEvents>();
+        if (animEvents != null)
+            animEvents.Played += HandleAnimEffectPlayed;
     }
+
+    // 서버에서만 난다(정적 이벤트) — 시전자가 나인 것만 거른다.
+    private void OnEnable() => PlayerInterruptSkillBase.ServerInterruptSucceeded += HandleServerInterruptSucceeded;
+
+    private void OnDisable() => PlayerInterruptSkillBase.ServerInterruptSucceeded -= HandleServerInterruptSucceeded;
 
     private void Start() => SyncLoops();
 
@@ -105,6 +129,8 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
     {
         if (state != null)
             state.TransformChanged -= HandleTransformChanged;
+        if (animEvents != null)
+            animEvents.Played -= HandleAnimEffectPlayed;
         // 디스폰·씬 언로드 — 아웃트로 없이 바로 반납(추종 대상이 사라지므로).
         if (EffectManager.Instance != null)
         {
@@ -159,8 +185,24 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
     /// <summary>[전 피어] 일반 E 버프 시전.</summary>
     public void PlayEnhanceCast() => PlayAttached(enhanceCastPrefab);
 
-    /// <summary>[전 피어] 우클릭 간파 시전.</summary>
-    public void PlayInterruptCast() => PlayAttached(interruptCastPrefab);
+    /// <summary>
+    /// [전 피어] 우클릭 간파 시전 — 지난 시전의 성공 대기·올려치기 표시를 지운다. 연출 재생은 클립 이벤트가 한다.
+    /// </summary>
+    public void BeginInterrupt()
+    {
+        insightSuccessPending = false;
+        insightSlashPlayed = false;
+    }
+
+    /// <summary>
+    /// [전 피어] 간파 스킬 종료(완료·피격·사망 공통) — 기 모으기 안전 정지. 꺼져 있으면 무시.
+    /// 성공 대기는 지우지 않는다 — 스킬 종료(0.6초)가 올려치기 프레임과 겹치거나 앞설 수 있어서, 다음 시전에서 지운다.
+    /// </summary>
+    public void EndInterrupt()
+    {
+        if (insightWindup != null && insightWindup.IsPlaying)
+            insightWindup.Stop();
+    }
 
     /// <summary>[전 피어] 일반 Q 돌진 시작 — 일섬을 그을 시작점·방향만 기억한다(이 시점엔 아무것도 재생하지 않는다).</summary>
     public void BeginPierce(Vector3 start, Vector3 direction)
@@ -302,6 +344,46 @@ public sealed class AssassinSkillView : BaseNetworkBehaviour
         EffectSocketPlayer success = At(normalSlashSuccess, stepIndex);
         if (success != null)
             success.PlayOnce();
+    }
+
+    // [서버] 간파 성공(쿨 감소와 같은 기준) — 전 피어에 성공 대기를 알린다. 1회성 판정 결과라 Reliable.
+    private void HandleServerInterruptSucceeded(Player caster, PlayerInterruptSkillBase skill)
+    {
+        if (caster == null || caster != player)
+            return;
+        if (IsNetworkActive)
+            InterruptSucceededRpc();
+        else
+            MarkInsightSuccess();
+    }
+
+    [Rpc(SendTo.ClientsAndHost)]
+    private void InterruptSucceededRpc() => MarkInsightSuccess();
+
+    private void MarkInsightSuccess()
+    {
+        insightSuccessPending = true;
+        TryPlayInsightSuccess();
+    }
+
+    // [전 피어] 클립이 재생한 이펙트 — 올려치기 소켓이면 성공 연출의 기준 프레임.
+    private void HandleAnimEffectPlayed(string id)
+    {
+        if (insightSlash == null || string.IsNullOrEmpty(id) || id != insightSlash.Id)
+            return;
+        insightSlashPlayed = true;
+        TryPlayInsightSuccess();
+    }
+
+    // 성공 알림과 올려치기 프레임이 둘 다 왔을 때 한 번 — 순서는 상관없다(알림이 늦으면 받는 즉시).
+    private void TryPlayInsightSuccess()
+    {
+        if (!insightSuccessPending || !insightSlashPlayed)
+            return;
+        insightSuccessPending = false;
+        insightSlashPlayed = false;
+        if (insightSuccess != null)
+            insightSuccess.PlayOnce();
     }
 
     private void PlayBackAttackHit(Vector3 position) => PlayOneShot(backAttackHitPrefab, position);

@@ -111,6 +111,15 @@ public class EffectCatalog : ScriptableObject
     [field: SerializeField] public EffectEntry Assassin_LClick_Success { get; private set; }
     [field: SerializeField] public EffectEntry Assassin_LClick_Transformed { get; private set; }
 
+    [Header("플레이어 — 어쌔신 우클릭(간파)")]
+    // Attack_Up_01 클립의 EffectAnimEvents 이벤트가 소켓에서 재생한다: 기 모으기 루프(FX_Assassin_RClick_Windup, 끄면 즉시 반납) →
+    // 튀기기 원샷(_Pop, 기 모으기 정지와 같은 프레임) → 올려치기 원샷(_Slash). 간파 성공 = 서버 판정 → RPC → 올려치기가
+    // 재생되는 순간 함께 원샷(_Success, AssassinSkillView). (2026-10-19 민경)
+    [field: SerializeField] public EffectEntry Assassin_RClick_Windup { get; private set; }
+    [field: SerializeField] public EffectEntry Assassin_RClick_Pop { get; private set; }
+    [field: SerializeField] public EffectEntry Assassin_RClick_Slash { get; private set; }
+    [field: SerializeField] public EffectEntry Assassin_RClick_Success { get; private set; }
+
     // ── 몬스터 ──────────────────────────────────────────────────────────
 
     [Header("몬스터")]
