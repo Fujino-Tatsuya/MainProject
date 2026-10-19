@@ -59,7 +59,7 @@ public sealed class CharacterSelectPanel : MonoBehaviour
     /// <summary>다른 캐릭터를 골랐다(캐릭터 id = 로스터 index). 곧이어 <see cref="Closed"/>(<see cref="CharacterSelectCloseReason.Chosen"/>).</summary>
     public event Action<int> CharacterChosen;
 
-    /// <summary>닫힐 때 한 번(Api·Button·Escape·Chosen·Unchanged).</summary>
+    /// <summary>닫힐 때 한 번(Api·Button·Escape·Chosen). 지금 캐릭터를 다시 고르면 Button.</summary>
     public event Action<CharacterSelectCloseReason> Closed;
 
     public bool IsOpen => Rules.IsOpen;
@@ -206,20 +206,14 @@ public sealed class CharacterSelectPanel : MonoBehaviour
     public CharacterSelectConfirmResult Confirm()
     {
         CharacterSelectConfirmResult result = Rules.Confirm();
-        switch (result)
-        {
-            case CharacterSelectConfirmResult.Chosen:
-                int id = Rules.Focus;
-                CharacterChosen?.Invoke(id);
-                ApplyClosed(CharacterSelectCloseReason.Chosen);
-                break;
-            case CharacterSelectConfirmResult.Unchanged:
-                ApplyClosed(CharacterSelectCloseReason.Unchanged);
-                break;
-            case CharacterSelectConfirmResult.Locked:
-                _lockedPulseUntil = Time.unscaledTime + lockedPulseSeconds;
-                break;
-        }
+        if (result == CharacterSelectConfirmResult.Chosen)
+            CharacterChosen?.Invoke(Rules.Focus);
+        else if (result == CharacterSelectConfirmResult.Locked)
+            _lockedPulseUntil = Time.unscaledTime + lockedPulseSeconds;
+
+        // 다른 캐릭터 = Chosen, 지금 캐릭터 = Button(뒤로가기와 같은 그냥 닫기).
+        if (CharacterSelectPanelRules.TryGetCloseReason(result, out CharacterSelectCloseReason reason))
+            ApplyClosed(reason);
 
         return result;
     }

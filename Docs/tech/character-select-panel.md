@@ -36,7 +36,7 @@
 | `void SetLocked(bool)` | 열린 채로 준비 상태 갱신 — 잠금 문구·확정 가능 여부. 닫혀 있으면 무시(다음 `Show` 값이 이긴다) |
 | `bool IsOpen` / `bool IsLocked` / `int FocusedCharacterId` | 상태 |
 | `event Action<int> CharacterChosen` | **다른** 캐릭터를 골랐다(id = 로스터 index). 곧이어 `Closed(Chosen)` |
-| `event Action<CharacterSelectCloseReason> Closed` | 닫힐 때 한 번 — `Api`·`Button`·`Escape`·`Chosen`·`Unchanged` |
+| `event Action<CharacterSelectCloseReason> Closed` | 닫힐 때 한 번 — `Api`(호출 측 `Hide`)·`Button`(그냥 닫기 — 뒤로가기 또는 지금 캐릭터 재선택)·`Escape`·`Chosen` |
 | `static bool IsEscapeClaimed` | 열려 있거나 이 프레임 ESC 로 닫혔다 — 아래 ESC 참고 |
 | `void MoveFocus(int)` / `CharacterSelectConfirmResult Confirm()` | 키 입력과 같은 길(테스트·게임패드 연결용) |
 
@@ -45,7 +45,7 @@
 |---|---|
 | 준비 중(잠금) | 거부 — 이벤트 없음, 잠금 문구가 0.6초 붉게 커졌다 돌아온다. 패널은 열린 채 |
 | 로스터 `Available=false` | 거부 — 이벤트 없음. 카드는 회색 + "선택 불가" |
-| 지금 캐릭터 | 이벤트 없이 닫힘 — `Closed(Unchanged)` |
+| 지금 캐릭터(`SameAsCurrent`) | `CharacterChosen` 없이 그냥 닫힘 — 뒤로가기와 같은 `Closed(Button)`(전용 사유 없음, 10-19 결정) |
 | 그 밖 | `CharacterChosen(id)` 한 번 → `Closed(Chosen)` |
 
 ## 화면
@@ -54,7 +54,7 @@
 - 카드 = 초상화(카드 모양으로 잘림) + 이름. **지금 내 캐릭터 = 금색 테두리 + "현재" 표식**(포커스 표시인 초록·크기와 따로 보인다).
   잠금 중에는 포커스 카드 초록이 바래고, 왼쪽 아래에 "준비를 해제해야 바꿀 수 있습니다".
 - 왼쪽 아래 이름판 = 포커스된 캐릭터의 원형 초상화·이름. 왼쪽 위 = 뒤로가기 + 조작 안내. 맨 오른쪽 = SELECT 셰브론 띠.
-- 배경 = 단색(`bg_color`, 불투명 — 뒤 클릭 막기) + 타이포 루프(`bg_typography_loop`)를 26° 돌려 줄무늬 방향으로 **40px/s**(unscaled) 흐름.
+- 배경 = 단색(`bg_color`, 불투명 — 뒤 클릭 막기) + 타이포 루프(`bg_typography_loop`)를 26° 돌려 줄무늬를 따라 **오른쪽으로 40px/s**(unscaled) 흐름(방향 = 10-19 결정).
   - 아트 텍스처가 Wrap=Clamp 라(아트 .meta 는 SVN 소관) uvRect 대신 타일 4장을 움직인다. 방향·속도는 `Bg_Rotate/Bg_Scroll` 의 인스펙터.
   - 일반판 vs `_gamma` 판: 캡처 비교(왼쪽 영역 평균 밝기, 0~255) 목업 30.2 · 일반판 34.1 · `_gamma` 43.2 → **일반판** 사용(프로젝트 = Linear).
 - 목업의 "기본/코어" 탭(스킬 정보 자리)은 데이터가 없어 **배치하지 않았다**(`tab_*` 아트는 그대로 남아 있음).

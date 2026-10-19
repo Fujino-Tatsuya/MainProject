@@ -99,8 +99,21 @@ public sealed class CharacterSelectPanelRulesTests
     {
         var rules = Opened(1);
 
-        Assert.AreEqual(CharacterSelectConfirmResult.Unchanged, rules.Confirm());
+        Assert.AreEqual(CharacterSelectConfirmResult.SameAsCurrent, rules.Confirm());
         Assert.IsFalse(rules.IsOpen);
+    }
+
+    [Test]
+    public void CloseReason_SameAsCurrentIsPlainClose_ChosenIsChosen()
+    {
+        Assert.IsTrue(CharacterSelectPanelRules.TryGetCloseReason(CharacterSelectConfirmResult.SameAsCurrent, out var same));
+        Assert.AreEqual(CharacterSelectCloseReason.Button, same, "지금 캐릭터 = 뒤로가기와 같은 그냥 닫기");
+        Assert.IsTrue(CharacterSelectPanelRules.TryGetCloseReason(CharacterSelectConfirmResult.Chosen, out var chosen));
+        Assert.AreEqual(CharacterSelectCloseReason.Chosen, chosen);
+
+        foreach (var stays in new[] { CharacterSelectConfirmResult.NotOpen, CharacterSelectConfirmResult.Empty,
+                     CharacterSelectConfirmResult.Locked, CharacterSelectConfirmResult.Unavailable })
+            Assert.IsFalse(CharacterSelectPanelRules.TryGetCloseReason(stays, out _), stays.ToString());
     }
 
     [Test]

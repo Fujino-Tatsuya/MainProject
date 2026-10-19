@@ -14,8 +14,8 @@ public sealed class CharacterSelectBackgroundScroll : MonoBehaviour
     [SerializeField] private Vector2 tileSize = new Vector2(2900f, 1888f);
     [Tooltip("위상 0 일 때 묶음 좌상단에서 타일 한 장 뺀 기준점(부모 가운데 기준). 회전된 화면을 어느 위상에서도 덮게 저작 메뉴가 정한다.")]
     [SerializeField] private Vector2 gridOrigin = new Vector2(-1450f, 944f);
-    [Tooltip("흐르는 방향(부모 회전 좌표 — x = 줄무늬 방향, y 위). 기본 = 줄무늬를 따라 왼쪽.")]
-    [SerializeField] private Vector2 direction = new Vector2(-1f, 0f);
+    [Tooltip("흐르는 방향(부모 회전 좌표 — x = 줄무늬 방향, y 위). 기본 = 줄무늬를 따라 오른쪽.")]
+    [SerializeField] private Vector2 direction = new Vector2(1f, 0f);
     [Tooltip("초당 px(unscaled). 0 이면 멈춘다.")]
     [SerializeField] private float speed = 40f;
 
