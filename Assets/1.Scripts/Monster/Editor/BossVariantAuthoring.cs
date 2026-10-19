@@ -59,7 +59,7 @@ public static class BossVariantAuthoring
             sb.AppendLine($"  {M(solo.maxHp == SoloMaxHp)} maxHp={solo.maxHp}");
             sb.AppendLine($"  {M(noExcluded)} 패턴 {solo.attacks?.Length ?? 0}종 — {string.Join(", ", (solo.attacks ?? new BossAttackEntry[0]).Select(a => a.attackId.ToString()))}");
             sb.AppendLine($"  {M(seqNone)} 페이즈 시퀀스 전부 None");
-            sb.AppendLine($"  {M(solo.bombPrefab == null)} bombPrefab 비움 · {M(solo.chargeZonePrefab == null)} chargeZonePrefab 비움");
+            sb.AppendLine($"  {M(solo.chargeZonePrefab == null)} chargeZonePrefab 비움");
             sb.AppendLine($"  {M(!solo.hasSuperArmorWhileAttacking)} hasSuperArmorWhileAttacking off");
         }
 

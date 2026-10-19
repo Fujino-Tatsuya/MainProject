@@ -568,10 +568,7 @@ public class BossDataSO : MonsterDataSO
     //    이 자리에 있던 기존 주석이 "예고 이펙트가 확정되면 지운다(SO 값을 잃으므로 팀장 확인)" 였고,
     //    팀장 확인을 받았다(2026-09-21). 마지막 저작값 — OuterAlpha 0.4 / FillAlpha 0.85 / Prefab 비어 있음.
     //    예고를 바꾸려면 EffectCatalog.asset 과 FX_Drop_Charge_* 프리팹을 볼 것.
-    [Tooltip("⚠️ **미사용** — 착지 예고는 EffectCatalog 의 Drop_Charge_Boundary(경계) + " +
-    "Drop_Charge_Indicator(차오르는 원) 이펙트가 그린다. 여기에 프리팹을 넣어도 아무 일도 안 난다.\n" +
-    "예고를 바꾸려면 EffectCatalog.asset 과 FX_Drop_Charge_* 프리팹을 볼 것.")]
-    public GameObject jumpTelegraphPrefab;
+    // 남아 있던 `jumpTelegraphPrefab` 도 2026-10-19 에 지웠다(PLAN-monster-data-inspector §3.4 · xlsx 행 없음 확인 r461).
 
     [Tooltip("착지점을 대상에게서 **이만큼 떨어뜨린다**(m). 0 이면 플레이어 위에 정확히 내려앉는다.\n" +
     "🔴 0 으로 두면 안 된다 — 보스 캡슐을 플레이어 캡슐 안에 꽂으면 물리 디페네트레이션이 " +
@@ -685,8 +682,8 @@ public class BossDataSO : MonsterDataSO
              "스폰되지 않는 중첩 NetworkObject 라 자기 NetworkVariable 을 가질 수 없다.")]
     [Min(0f)] public float bombThrowInterval = 6f;
 
-    [Tooltip("[S8] 폭탄 프리팹(서버 스폰).")]
-    public GameObject bombPrefab;
+    // `bombPrefab` 은 2026-10-19 에 지웠다 — 폭탄 투척이 09-16 에 제거된 뒤 읽는 런타임 코드가 없었다
+    // (PLAN-monster-data-inspector §3.4 · xlsx 행 없음 확인 r461). 폭탄 모양은 투사체 프리팹에서 빌린다.
 
     // ⚠️ 2026-09-21 SO 전수조사 — **유령 필드**(선언 파일 밖 참조 0)라 주석 처리했다.
     //    주석 처리하면 Unity 가 다음 직렬화에서 에셋의 값도 버리므로, 마지막 저작값을 여기 남긴다.
