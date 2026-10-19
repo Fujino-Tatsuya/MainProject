@@ -18,7 +18,7 @@ Variant 가 `Armature`(캐릭터 몸체) · 스킬 · VFX · 무기 · 스탯 ·
 Player.prefab (base)            ← 네트워크·입력·이동·생명주기·상태이상·HUD·HurtBox·실루엣 태그·시각 보간
 │                                  🔴 기본 공격 없음(2026-09-30) — 캐릭터가 IPlayerBasicAttack 구현을 얹는다
 ├─ Player_Paladin.prefab (Variant)
-│  ├─ Armature  = <중첩 Paladin/Paladin_Armature.prefab>  ← 모델·리그·Animator·히트박스·VFX 소켓
+│  ├─ Armature  = <중첩 Paladin/Paladin_Armature.prefab>  ← 모델·리그·Animator(4.Animations/Player/Garen/GarenAnimatorController — Idle/Walk = Garen_Idle·Garen_Walk.anim)·히트박스·VFX 소켓
 │  ├─ PlayerWaeponSlot/SM_Wep_Shield_01 · SM_Wep_Sword_03
 │  ├─ VFX  (EffectSocketPlayer 들)
 │  └─ 루트 추가: PlayerDefaultAttack·DefaultAttackController(콤보) · FirstMelee* 스킬 5종 · PlayerSkillVfx · PlayerShieldVfx · EffectAnimEvents
@@ -176,7 +176,7 @@ Variant 가 아니라 **통짜 복제본**을 만들면 §4 의 어긋남이 캐
 | 루트 오브젝트 이름 | `Player` | `Paladin` | `TempPlayer_Armature` |
 | 루트 레이어 / 태그 | 6 (Player) / `Player` | 6 (Player) / `Player` | — |
 | 모델 | `PlayerBaseModel.fbx` (Armature 경유) | `paladin 1.fbx` (평탄화) | `PlayerBaseModel.fbx` |
-| Animator Controller | `4.Animations/Player/PlayerAnimatorController.controller` | **동일** | 동일 |
+| Animator Controller | `4.Animations/Player/PlayerAnimatorController.controller`(당시 경로. 지금 팔라딘은 `4.Animations/Player/Garen/GarenAnimatorController.controller` — guid 유지 이동, §0) | **동일** | 동일 |
 | 최초 커밋 | `d40f6bcb` (2026-06-09) | `36d7f9e6` (2026-07-06, "Add Garen player prefab setup") | — |
 | 전환 커밋 | — | `5e773aea` (2026-07-30, "Paladin migration complete") | — |
 | 네트워크 프리팹 목록 등록 | ✅ | ✅ | — |

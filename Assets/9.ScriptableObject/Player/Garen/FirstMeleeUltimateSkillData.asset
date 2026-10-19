@@ -46,4 +46,3 @@ MonoBehaviour:
   snapRotationOnStart: 1
   animationSpeed: 1.2
   vfxPlayRate: 1.2
-  finalStrikeVfxLead: 0.5

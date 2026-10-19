@@ -3,11 +3,16 @@
 /// <summary>
 /// R 최후의 심판 — 대상 지정(SingleTarget) 채널링 스킬. 조준 모드에서 사거리 내 적을 지정해 시전하고,
 /// 채널을 완주하면 지정 대상에게 단일 피해를 1회 적용한다(타겟팅 인프라 검증용 최소 효과).
-/// 대상 유효성(생존·사거리)은 서버 CanUse로 권위 검증하며, 채널 중 대상이 사라지면 취소한다.
+/// 대상 유효성(생존·사거리)은 서버 CanUse로 권위 검증하며, 채널 중(피해 전) 대상이 사라지면 취소한다.
+///
+/// 시점은 전부 클립 Garen_Ultimate_Skill 의 이벤트(HandleSkillEvent)가 정한다 — 타이머가 없다.
+/// Custom0 = 마무리 낙뢰 발사 / Hit = 피해(완주 판정) / End = 종료. MaxActiveDuration 은 안전망(+padding)이다.
+/// 이벤트는 애니 배율(UltimateSpeed)을 같이 타서 실제 시각 = 클립 시각 ÷ 배율.
+/// 🔴 End 를 maxActiveDuration + padding(0.1) 뒤로 옮기면 안전망이 먼저 끊는다 — 피해는 나도 낙뢰가 걷힌다.
 ///
 /// 채널 동안 <b>슈퍼아머</b>를 건다(Q와 같은 방식). 부모 클래스 주석은 이 보호를 "Custom 애니 이벤트
 /// 구간에서" 건다고 적어 두었지만, 이 스킬은 채널 전체가 보호 구간이라 <c>OnServerStart</c>~<c>OnEnd</c>로 잡는다.
-/// 클립에 이벤트를 심지 않아도 성립하고(클립은 아트/SVN 관할), 취소·사망 어느 쪽으로 끝나도 해제가 보장된다.
+/// 보호 구간용 이벤트가 따로 필요 없고, 취소·사망 어느 쪽으로 끝나도 해제가 보장된다.
 ///
 /// ⚠️ <b>슈퍼아머는 넉백/밀기만 막는다.</b> 피해는 그대로 들어오고, 맞아도 채널은 끊기지 않는다 —
 /// 채널을 끊는 것은 대상 소실과 사망뿐이다.
@@ -28,8 +33,23 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
     // Garen_Ultimate_Skill 상태 전용 속도 파라미터. 평타의 AttackSpeed 와 섞이지 않게 따로 둔다.
     private static readonly int UltimateSpeedHash = Animator.StringToHash("UltimateSpeed");
 
+    // 슈퍼아머 만료 안전망 여유. 정상·강제 종료는 OnEnd 가 바로 걷는다 — 만료는 OnEnd 가 안 돈 경우만이다.
+    // 🔴 컨트롤러 안전망 padding(0.1)보다 길어야 한다. 짧으면 End 이벤트·안전망 종료 직전 프레임에 슈퍼아머가 먼저 풀린다.
+    private const float SuperArmorExpiryPadding = 0.25f;
+
+    /// <summary>
+    /// 클립에 있어야 하는 HandleSkillEvent 이벤트. 하나라도 없으면 에디터에서 경고한다(타이머 대체 경로는 없다).
+    /// TODO(Work3 병합 뒤): 공용 선언 PlayerSkillBase.RequiredAnimationEvents 로 옮긴다.
+    /// </summary>
+    public static readonly SkillAnimationEventType[] UltimateClipEvents =
+    {
+        SkillAnimationEventType.Hit,
+        SkillAnimationEventType.End,
+        SkillAnimationEventType.Custom0,
+    };
+
     private Unit lockedTarget;
-    // [서버] 마무리 낙뢰를 이번 시전에 쐈는지. 칼이 닿는 데 시간이 걸려 완주보다 앞서 쏜다.
+    // [서버] 마무리 낙뢰를 이번 시전에 쐈는지. 칼이 닿는 데 시간이 걸려 클립 Custom0 에서 피해(Hit)보다 앞서 쏜다.
     private readonly FinalStrikeVfxSchedule finalStrike = new FinalStrikeVfxSchedule();
     // 완료 판정 1회의 적중 대상(1명). Player.ServerAttackLanded 통지용 버퍼.
     private readonly System.Collections.Generic.List<Unit> landedUnits = new System.Collections.Generic.List<Unit>(1);
@@ -38,6 +58,17 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
 
     // 채널 중 이동/회전 잠금
     public override bool CanMoveWhileActive => false;
+
+    // 피해(Hit)·종료(End)를 클립 이벤트로 정한다.
+    protected override bool CompletesOnClipEvents => true;
+
+    public override void Initialize(Player owner, PlayerSkillController controller)
+    {
+        base.Initialize(owner, controller);
+#if UNITY_EDITOR
+        WarnMissingClipEvents();
+#endif
+    }
 
     // 서버 권위 시전 조건: 대상이 살아있는 적이고 사거리 내여야 한다.
     public override bool CanUse(Vector3 direction, Unit target)
@@ -65,10 +96,11 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
         // 채널 동안 CC 면역. 채널은 이동 잠금(CanMoveWhileActive=false)만으로는 지킬 수 없다 —
         // 그건 내 입력을 막을 뿐이고, 남이 미는 것은 PlayerStateController.BeginKnockback 이
         // 사망·연출잠금만 거부하므로 Skill 상태여도 그대로 들어온다.
-        // 만료 안전망은 지속시간, 정상/강제 종료 시엔 OnEnd 가 즉시 해제한다.
+        // 만료 안전망은 지속시간(컨트롤러 안전망보다 길게), 정상/강제 종료 시엔 OnEnd 가 즉시 해제한다.
+        // 종료가 End 이벤트라 MaxActiveDuration 과 같은 시각 근처에서 끝날 수 있다 — 딱 맞추면 마지막 프레임에 풀린다.
         // (오프라인에서는 상태이상 시스템이 비활성 — 스탯 계열과 동일 제약)
         if (owner != null && owner.StatusEffects != null)
-            owner.StatusEffects.Apply(StatusEffectType.SuperArmor, Data.MaxActiveDuration, SourceId);
+            owner.StatusEffects.Apply(StatusEffectType.SuperArmor, Data.MaxActiveDuration + SuperArmorExpiryPadding, SourceId);
     }
 
     // 🔴 낙뢰는 여기서 켜지 않는다. R 은 조준만 켜고(ClickToConfirm), 실제 시전은 좌클릭 확정
@@ -107,23 +139,26 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
 
     public override void OnTick()
     {
-        // 채널 중 대상이 사라지거나 사망하면 취소 (완주 판정은 base가 처리)
-        if (State == SkillState.Channeling && (lockedTarget == null || lockedTarget.CurrentHealth <= 0))
+        // 피해(Hit) 전에 대상이 사라지거나 사망하면 취소. 피해 뒤 End 까지는 대상이 그 피해로 죽어도 완주다.
+        if (State == SkillState.Channeling && !ChannelCompleted &&
+            (lockedTarget == null || lockedTarget.CurrentHealth <= 0))
         {
             EndSelf(SkillEndReason.Cancelled);
             return;
         }
 
-        // 🔴 base.OnTick(완주 판정)보다 먼저 묻는다 — lead 0 이면 완주와 같은 틱에, 피해보다 먼저 나간다(예전 시각).
-        //    여기도 서버 전용이라 창구를 거친다(OnTick 은 TickServer 경로다).
-        //    위치는 넘기지 않는다 — 각 피어가 표식을 깔 때 잡아 둔 그 트랜스폼에 떨어진다.
-        if (State == SkillState.Channeling && Data != null &&
-            finalStrike.TryFire(ChannelElapsed, Data.MaxActiveDuration, FinalStrikeVfxLead))
-        {
-            skillVfx?.ServerPlayTargetStrike(VfxPlayRate);
-        }
-
         base.OnTick();
+    }
+
+    public override void OnAnimationEvent(SkillAnimationEventType eventType)
+    {
+        // 🔴 마무리 낙뢰. 애니 이벤트는 서버에서만 온다 — 그래서 창구(RPC)를 거친다.
+        //    위치는 넘기지 않는다 — 각 피어가 표식을 깔 때 잡아 둔 그 트랜스폼에 떨어진다.
+        if (eventType == SkillAnimationEventType.Custom0 && State == SkillState.Channeling && finalStrike.TryFire())
+            skillVfx?.ServerPlayTargetStrike(VfxPlayRate);
+
+        // Hit = 피해(완주 판정) / End = 종료 — base 가 처리한다.
+        base.OnAnimationEvent(eventType);
     }
 
     protected override void OnChannelCompleted()
@@ -145,7 +180,7 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
             owner.RaiseServerAttackLanded(DamageAttackType, Data != null && Data.TriggersOnHit, landedUnits, this);
         }
 
-        // 마무리 낙뢰는 여기서 쏘지 않는다 — OnTick 이 완주 lead 초 전에 이미 쐈다.
+        // 마무리 낙뢰는 여기서 쏘지 않는다 — 클립 Custom0 에서 이미 쐈다.
 
         Edit.Log($"[Skill] 최후의 심판 — {lockedTarget.name}에게 피해 {attackInfo.damage}", this);
     }
@@ -161,7 +196,8 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
         skillVfx?.StopUltimateVfxLocal();
         skillVfx?.StopTargetFloorLocal();
 
-        // 앞당겨 쏜 칼이 떨어지는 중에 완주 못 하고 끝났다 — 피해가 없으니 걷는다. 완주면 끝까지 재생한다.
+        // Custom0 에서 쏜 칼이 떨어지는 중에 완주 못 하고 끝났다 — 피해가 없으니 걷는다. 완주면 끝까지 재생한다.
+        // 안전망 종료(MaxDurationReached)도 걷는다 — End 이벤트가 안 온 경우라 피해가 났어도 여기는 사유만 안다.
         if (FinalStrikeVfxSchedule.ShouldRecall(reason))
             skillVfx?.StopTargetStrikeLocal();
 
@@ -176,7 +212,6 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
     // 데이터가 궁극 전용 SO 가 아니면(에셋 교체 실수 등) 원래 속도로 돈다.
     private float AnimationSpeed => Data is FirstMeleeUltimateSkillData ult ? ult.AnimationSpeed : 1f;
     private float VfxPlayRate => Data is FirstMeleeUltimateSkillData ult ? ult.VfxPlayRate : 1f;
-    private float FinalStrikeVfxLead => Data is FirstMeleeUltimateSkillData ult ? ult.FinalStrikeVfxLead : 0f;
 
     private ulong SourceId => owner != null && owner.NetworkObject != null ? owner.NetworkObjectId : 0UL;
 
@@ -186,4 +221,84 @@ public class FirstMeleeUltimateSkill : PlayerChannelingSkill
         flat.y = 0f;
         return flat.sqrMagnitude <= Data.CastRange * Data.CastRange;
     }
+
+    /// <summary>클립에 HandleSkillEvent(int = <paramref name="eventType"/>) 이벤트가 있는가.</summary>
+    public static bool HasSkillClipEvent(AnimationClip clip, SkillAnimationEventType eventType)
+    {
+        if (clip == null)
+            return false;
+
+        foreach (AnimationEvent clipEvent in clip.events)
+        {
+            if (clipEvent.functionName == nameof(PlayerAnimationEventRelay.HandleSkillEvent) &&
+                clipEvent.intParameter == (int)eventType)
+                return true;
+        }
+
+        return false;
+    }
+
+#if UNITY_EDITOR
+    // 상태(Data.AnimatorStateName)의 클립에 UltimateClipEvents 가 다 있는지. 없으면 그 시점이 영영 안 온다 —
+    // Hit·End 없으면 안전망 종료(피해 없음), Custom0 없으면 마무리 낙뢰가 안 나간다.
+    private void WarnMissingClipEvents()
+    {
+        Animator animator = owner != null ? owner.GetComponentInChildren<Animator>() : null;
+        string stateName = Data != null ? Data.AnimatorStateName : null;
+        AnimationClip clip = FindStateClip(animator, stateName);
+        if (clip == null)
+            return;
+
+        foreach (SkillAnimationEventType eventType in UltimateClipEvents)
+        {
+            if (HasSkillClipEvent(clip, eventType))
+                continue;
+
+            Edit.LogWarning(
+                $"[Player] 클립 '{clip.name}'(상태 {stateName})에 {eventType} 이벤트" +
+                $"(HandleSkillEvent, int={(int)eventType})가 없습니다. 최후의 심판은 이 시점을 타이머로 대신하지 않습니다.",
+                this);
+        }
+    }
+
+    private static AnimationClip FindStateClip(Animator animator, string stateName)
+    {
+        if (animator == null || string.IsNullOrEmpty(stateName))
+            return null;
+
+        var animatorController = animator.runtimeAnimatorController as UnityEditor.Animations.AnimatorController;
+        if (animatorController == null)
+            return null;
+
+        foreach (UnityEditor.Animations.AnimatorControllerLayer layer in animatorController.layers)
+        {
+            AnimationClip clip = FindStateClip(layer.stateMachine, stateName);
+            if (clip != null)
+                return clip;
+        }
+
+        return null;
+    }
+
+    private static AnimationClip FindStateClip(UnityEditor.Animations.AnimatorStateMachine stateMachine, string stateName)
+    {
+        if (stateMachine == null)
+            return null;
+
+        foreach (UnityEditor.Animations.ChildAnimatorState child in stateMachine.states)
+        {
+            if (child.state != null && child.state.name == stateName)
+                return child.state.motion as AnimationClip;
+        }
+
+        foreach (UnityEditor.Animations.ChildAnimatorStateMachine child in stateMachine.stateMachines)
+        {
+            AnimationClip clip = FindStateClip(child.stateMachine, stateName);
+            if (clip != null)
+                return clip;
+        }
+
+        return null;
+    }
+#endif
 }

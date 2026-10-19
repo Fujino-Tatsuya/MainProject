@@ -53,7 +53,8 @@ public class PlayerSkillVfx : BaseNetworkBehaviour
     [Tooltip("표식 배율. 저작 크기가 10유닛이라 대개 줄여 쓴다")]
     [SerializeField, Min(0.01f)] private float targetFloorScale = 1f;
 
-    [Tooltip("채널 완주 직전(데이터 finalStrikeVfxLead 초 전) 대상 자리에 내리꽂을 낙뢰. FX_Lightening_Strike_Entry 를 물린다.\n" +
+    [Tooltip("클립 Garen_Ultimate_Skill 의 Custom0 이벤트(피해 Hit 보다 앞) 때 대상 자리에 내리꽂을 낙뢰. FX_Lightening_Strike_Entry 를 물린다.\n" +
+             "시각은 클립에서 Custom0 이벤트를 옮겨 맞춘다.\n" +
              "표식과 같은 자리에 떨어진다 — 좌표를 따로 넘기지 않는다")]
     [SerializeField] private EffectEntry targetStrike;
 
@@ -207,7 +208,7 @@ public class PlayerSkillVfx : BaseNetworkBehaviour
     }
 
     /// <summary>
-    /// [서버] 채널 완주 <c>lead</c> 초 전이다(<see cref="FinalStrikeVfxSchedule"/>). <b>표식이 서 있는 그 자리</b>에 마무리 낙뢰를 내리꽂는다.
+    /// [서버] 클립 Custom0 이벤트다(<see cref="FinalStrikeVfxSchedule"/>, 시전당 1회). <b>표식이 서 있는 그 자리</b>에 마무리 낙뢰를 내리꽂는다.
     /// 칼이 떨어져 닿는 데 시간이 걸려 피해 시각보다 앞서 쏜다 — 그 사이 채널이 끊기면 <see cref="StopTargetStrikeLocal"/>이 걷는다.
     ///
     /// <b>좌표를 다시 보내지 않는다.</b> 각 피어는 표식을 깔 때 자리를 이미 고정해 뒀다
