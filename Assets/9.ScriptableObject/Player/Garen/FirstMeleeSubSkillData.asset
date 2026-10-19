@@ -15,28 +15,38 @@ MonoBehaviour:
   tooltip:
     displayName: "\uC218\uD638\uC790\uC758 \uC758\uC9C0"
     subtitle: "E \uC2A4\uD0AC"
-    description: "TODO <style=shield><sprite name=\"shield\" color=#74C7EC>{shieldAmount}</style>\uC758 \uBCF4\uD638\uB9C9\uC744 {shieldDuration:0.0}\uCD08 \uB3D9\uC548 \uC5BB\uC2B5\uB2C8\uB2E4."
+    description: "\uC804\uBC29\uC758 \uACF5\uACA9\uC744 \uB9C9\uC73C\uBA74 \uBC18\uACA9\uD558\uC5EC
+      {dmg}\uC758 \uD53C\uD574\uB97C \uC785\uD799\uB2C8\uB2E4. \uBC18\uACA9 \uC911\uC5D0\uB294
+      \uD53C\uD574\uB97C \uBB34\uC2DC\uD569\uB2C8\uB2E4."
     icon: {fileID: 21300000, guid: 95a8efb689b9bf24a85cfb8a36b366c9, type: 3}
   inputType: 0
-  cooldownTime: 14
+  cooldownTime: 7
   commitCooldownManually: 0
-  attackDamageMultiplier: 0
+  attackDamageMultiplier: 2.5
   flatDamageBonus: 0
-  maxActiveDuration: 0.5
+  maxActiveDuration: 1.5
   tickInterval: 0
   hitPattern: 0
   usableWhileDead: 0
   hittableLayers:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 17664
   triggersOnHit: 0
   targetingMode: 0
   confirmMode: 0
   castRange: 8
+  fixedDistance: 0
+  aoeRadius: 0
   targetableLayers:
     serializedVersion: 2
     m_Bits: 0
-  animatorStateName: 
-  snapRotationOnStart: 0
+  groundPointOutOfRange: 0
+  groundMarkerRadius: 0
+  hoverMarkerDistance: 3
+  animatorStateName: SubSkillGuard
+  snapRotationOnStart: 1
+  guardAngle: 180
+  counterAngle: 120
+  counterRange: 3
   shieldAmount: 100
   shieldDuration: 10

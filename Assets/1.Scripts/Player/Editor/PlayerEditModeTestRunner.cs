@@ -54,6 +54,8 @@ internal static class PlayerEditModeTestRunner
         "^AssassinHairArmClearanceTests$", // 할 일 47 후속 — 팔 밀어내기 후처리: 겹침만 밀기·상한·회전만(길이 보존)·팔 캡슐 4개
         "^PlayerAnimationEventRequirementTests$", // PLAN-anim-event-timing P0-1 — 스킬·평타가 선언한 클립 이벤트가 플레이어 프리팹 컨트롤러·클립에 있는가
         "^AssassinVisualPrefabTests$", // PLAN-assassin §9 — v18 비주얼: Flat Kit 슬롯 5개·부모·BaseMap, 단검 루트 = 임포트 배율, Armature 루트·판정 박스 배율 1
+        "^FirstMeleeGuardRulesTests$", // PLAN-paladin-counter-e C2 — 팔라딘 E 방어 방향(평면·경계·겹침)·반격 부채꼴(표면 거리·평면 각도)
+        "^FirstMeleeGuardCounterModelTests$", // PLAN-paladin-counter-e C3 — 팔라딘 E 단계: 방어 불가 Pass·대기 경계·반격 중 무시(now < counterEndAt)·반격 1회·같은 틱 둘 다·Clamp·반격 보장·넉백
     };
 
     const string Tag = "[PlayerTests]";
