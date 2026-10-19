@@ -158,6 +158,21 @@
 - If boss HP reaches 0 during a fixed tick, combat ends immediately at that point.
 - The server fixed tick pipeline should be centralized so event ordering can be changed by reordering pipeline steps.
 
+## Play 종료 후 포트 점유 진단 ([PortLeak])
+에디터 전용 진단(`Assets/1.Scripts/Dev/Editor/PlayModePortLeakProbe.cs`). 동작은 바꾸지 않고 로그만 남긴다.
+- `ExitingPlayMode` 에 스냅샷(씬의 NetworkManager 수, Singleton 의 IsListening/IsServer/IsClient/ShutdownInProgress,
+  UnityTransport 별 포트·드라이버 생성 여부, 에디터 pid)을 `SessionState` 에 보관 → `EnteredEditMode` 2프레임 뒤
+  7777 + 종료 시 본 Transport 포트(DevBoot port++ 포함)를 `DevSceneBooter.IsUdpPortInUse` 로 탐침한다.
+- 모두 비어 있으면 **로그 없음**. 하나라도 잡혀 있으면 `[PortLeak] Play 종료 후 포트 N 아직 점유` 경고 1개.
+- 읽는 법:
+  - `소유:` — `netstat -ano -p UDP` 로 찾은 그 포트의 pid. **`이 에디터`면 진짜 누수 후보**,
+    `다른 프로세스`면 다른 에디터(Main·Work 레인)나 빌드가 호스트 중인 것이라 **오탐**. netstat 실패면 `알 수 없음`.
+  - `종료 시 스냅샷` — Play 를 끝내는 순간 상태. IsListening=True·드라이버 생성=예 였는데 지금도 점유면
+    종료 과정에서 소켓이 안 닫힌 것.
+  - `편집 모드 스냅샷` — 편집 모드로 돌아온 뒤 상태. 보통 NetworkManager 0개·Singleton=null 이어야 한다.
+- 재현되면 받을 것: 경고 전문, Play 전에 한 일(DevBoot 사용 여부·로비/호스트 경로), MPPM 여부,
+  같은 PC 에서 다른 에디터가 호스트 중이었는지.
+
 ## 패키지 주의
 - NGO/Steamworks 패키지를 추가하면 **반드시 `Packages/manifest.json` + `packages-lock.json` 커밋**
   (현재 미추적 — [../../AGENT.md](../../AGENT.md) §3).
