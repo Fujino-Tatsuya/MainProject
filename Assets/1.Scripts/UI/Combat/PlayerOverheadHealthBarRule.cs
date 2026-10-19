@@ -5,6 +5,7 @@ using UnityEngine;
 /// <summary>
 /// 플레이어 머리 위 체력바 규칙. 보는 사람 기준으로 내 캐릭터는 초록, 파티원은 파랑.
 /// 사망·Soul 상태에서도 숨기지 않는다(체력 0 그대로 표시).
+/// 연출 숨김·엘리베이터 입력 잠금·보스 등장 잠금(PlayerEncounterLock) 동안은 머리 위 표시 전체를 감춘다 — 표시만 끄고 구독·데이터는 그대로.
 /// 체력바 옆 대시 아이콘(IOverheadDashIndicator)도 공급한다 — 로컬 플레이어가 살아 있을 때만, 준비 상태는 PlayerDashController.IsReady.
 /// 이름 라벨은 상태이상·붙잡힘 중에 그 이름으로 바뀐다(할 일 50).
 /// </summary>
@@ -39,8 +40,16 @@ public sealed class PlayerOverheadHealthBarRule : MonoBehaviour, IOverheadHealth
         }
     }
 
-    // 연출 숨김(보스 엘리베이터) 동안만 감춘다.
-    public bool ShouldShow => player != null && (_encounterLock == null || !_encounterLock.IsCinematicHidden);
+    // 연출 숨김·엘리베이터 입력 잠금·보스 등장 잠금 동안 감춘다(전 피어 — PlayerEncounterLock 복제 값만 읽는다).
+    public bool ShouldShow => player != null && (_encounterLock == null || IsVisibleDuringEncounter(
+        _encounterLock.IsCinematicHidden, _encounterLock.IsCinematicInputLocked, _encounterLock.IsCinematicLocked));
+
+    /// <summary>
+    /// 연출 상태로 본 표시 여부 — 숨김·입력 잠금·등장 잠금 중 하나라도 걸려 있으면 감춘다.
+    /// 셋이 겹쳐도 마지막 하나가 풀릴 때까지 꺼진 채다.
+    /// </summary>
+    public static bool IsVisibleDuringEncounter(bool cinematicHidden, bool cinematicInputLocked, bool cinematicLocked) =>
+        !cinematicHidden && !cinematicInputLocked && !cinematicLocked;
 
     // 오프라인(IsSpawned=false)은 혼자 하는 로컬 플레이어로 본다.
     // 소유권은 스폰 후에 확정되므로 매 프레임 판정한다.

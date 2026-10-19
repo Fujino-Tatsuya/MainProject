@@ -9,11 +9,15 @@ using UnityEngine;
 [DataTableSheet("Assassin", Order = 2)]
 public class AssassinDashStrikeSkillData : PlayerSkillData
 {
-    [Header("단계 (10-06 은희) — 준비 → 돌진 → 종료")]
-    [Tooltip("준비(초) — 승인 후 제자리에서 웅크리는 시간(애니 미정). 이 동안 이동·판정 없음.")]
+    // ⚠️ 미사용 2칸(PLAN-anim-event-timing P2-3) — 준비 끝 = 클립 Custom0, 종료 = 클립 End 이벤트(돌진 클립에서 옮겨 튜닝).
+    //    GameData.xlsx Assassin 시트에 행이 있어 지우면 테이블 모드가 막힌다 — 다음 병합 Export 때 행부터 정리하고 지운다.
+#pragma warning disable CS0414
+    [Header("단계 (미사용 — 클립 Custom0·End 이벤트)")]
+    [Tooltip("⚠️ 미사용 — 준비 끝(돌진 출발)은 돌진 클립의 Custom0 이벤트.")]
     [SerializeField, Min(0f)] private float prepareDuration = 0.1f;
-    [Tooltip("종료(초) — 도착 후 제자리에서 머무는 시간. 궤적 이펙트가 늦게 따라와 속도감을 준다.")]
+    [Tooltip("⚠️ 미사용 — 종료는 돌진 클립의 End 이벤트(경로 끝 뒤에 둔다). 이벤트가 안 오면 maxActiveDuration 안전망.")]
     [SerializeField, Min(0f)] private float endDuration = 0.1f;
+#pragma warning restore CS0414
 
     [Header("돌진")]
     [SerializeField, Min(0f)] private float dashDistance = 4f;
@@ -23,8 +27,6 @@ public class AssassinDashStrikeSkillData : PlayerSkillData
     [SerializeField, Min(0.1f), DataTableIgnore] private float pathHeight = 2f;
     [SerializeField, Min(1), DataTableIgnore] private int maxHitResults = 16;
 
-    public float PrepareDuration => prepareDuration;
-    public float EndDuration => endDuration;
     public float DashDistance => dashDistance;
     public float DashSpeed => dashSpeed;
     public float DashDuration => dashSpeed > 0f ? dashDistance / dashSpeed : 0f;

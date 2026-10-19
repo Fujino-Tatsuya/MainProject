@@ -11,9 +11,12 @@ using UnityEngine;
 /// </summary>
 public sealed class AssassinTransformSkill : PlayerInstantSkill
 {
+    private static readonly SkillAnimationEventType[] RequiredEvents = { SkillAnimationEventType.End };
+
     private AssassinState assassinState;
 
     public override PlayerSkillSlot Slot => PlayerSkillSlot.Ultimate;
+    public override System.Collections.Generic.IReadOnlyList<SkillAnimationEventType> RequiredAnimationEvents => RequiredEvents;
     public override bool CanMoveWhileActive => false;
 
     private ulong SourceId => owner != null && owner.NetworkObject != null ? owner.NetworkObjectId : 0UL;

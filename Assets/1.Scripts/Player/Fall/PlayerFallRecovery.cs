@@ -31,6 +31,7 @@ public sealed class PlayerFallRecovery : NetworkBehaviour
     [SerializeField, Min(0f)] private float fallReturnInvulnerability = 1.5f;
 
     private Player player;
+    private PlayerLifeInputPolicy inputPolicy;
     private Coroutine serverReturnRoutine;
     private Coroutine ownerRecoveryRoutine;
 
@@ -186,7 +187,7 @@ public sealed class PlayerFallRecovery : NetworkBehaviour
 
         // 6. 입력 잠금 0.5초 유지 후 해제. (무적/Blink는 서버가 별도로 1.5초 유지)
         yield return new WaitForSeconds(fallReturnInputLock);
-        input?.SetInputEnabled(true);
+        ReleaseInputLock();
         ownerRecoveryRoutine = null;
     }
 
@@ -270,7 +271,18 @@ public sealed class PlayerFallRecovery : NetworkBehaviour
 
         // 코루틴이 중간에 끊기면 카메라와 입력이 잠긴 채로 남는다 — 둘 다 명시적으로 되돌린다.
         CameraTargetSwitcher.Active?.ReturnToPlayerView();
-        input?.SetInputEnabled(true);
+        ReleaseInputLock();
+    }
+
+    // 🔴 낙하 입력 잠금만 푼다 — 입력을 곧바로 켜지 않고 입력 정책(생명주기·연출 잠금 합산)에 다시 맡긴다.
+    //    예전에는 SetInputEnabled(true) 를 직접 불러, 보스 엘리베이터 문 앞 이동(TeleportParticipant → CancelRecoveryServer,
+    //    복구 중이 아니어도 항상 온다)이 카운트다운 끝에 건 엘리베이터 입력 잠금을 0.4초 만에 지웠다(할 일 46).
+    private void ReleaseInputLock()
+    {
+        if (inputPolicy != null)
+            inputPolicy.ApplyCurrentAccess();
+        else
+            input?.SetInputEnabled(true);
     }
 
     private void CancelServerReturnRoutine()
@@ -299,6 +311,7 @@ public sealed class PlayerFallRecovery : NetworkBehaviour
         if (dashController == null) dashController = GetComponent<PlayerDashController>();
         if (movement == null) movement = GetComponent<PlayerMovement>();
         if (input == null) input = GetComponent<PlayerInputReader>();
+        if (inputPolicy == null) inputPolicy = GetComponent<PlayerLifeInputPolicy>();
         if (grounding == null) grounding = GetComponent<PlayerGroundingSensor>();
         if (motor == null) motor = GetComponent<PlayerMotor>();
         if (player == null) player = GetComponent<Player>();

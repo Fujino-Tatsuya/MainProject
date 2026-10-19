@@ -34,8 +34,10 @@ public enum SkillEndReason
 /// (회전이 armature에만 적용되므로 방향성 판정은 반드시 앵커 기준).
 /// 수명주기는 PlayerSkillController가 서버 권위로 호출한다 — 스킬은 RPC를 직접 갖지 않는다.
 /// </summary>
-public abstract class PlayerSkillBase : MonoBehaviour
+public abstract class PlayerSkillBase : MonoBehaviour, IAnimationEventRequirementSource
 {
+    private static readonly SkillAnimationEventType[] NoRequiredEvents = System.Array.Empty<SkillAnimationEventType>();
+
     [SerializeField] private PlayerSkillData data;
     // 판정 기준점 (MainSkill/SubSkill/InterruptAttack/UltimateSkill 앵커). E처럼 판정 없는 스킬은 비워도 된다.
     [SerializeField] private ColliderInfo hitboxAnchor;
@@ -88,10 +90,27 @@ public abstract class PlayerSkillBase : MonoBehaviour
     // 실행 중 오너 조준을 서버로 주기 전송할지. 기본은 홀드 스킬만(기존 동작).
     public virtual bool WantsAimUpdates => data != null && data.InputType == PlayerSkillInputType.Hold;
 
+    /// <summary>
+    /// 이 스킬이 상태 클립(<see cref="PlayerSkillData.AnimatorStateName"/>)에 요구하는 이벤트. 판정·종료·연출 시점을 이벤트로 정하는 스킬이 선언한다.
+    /// 빠지면 에디터 경고(<see cref="Initialize"/>)와 EditMode 전수 검사(PlayerAnimationEventRequirementTests)가 잡는다.
+    /// </summary>
+    public virtual System.Collections.Generic.IReadOnlyList<SkillAnimationEventType> RequiredAnimationEvents => NoRequiredEvents;
+
+    // 시작 상태 말고 다른 상태(코드 상수로 CrossFade 하는 상태 등)에도 요구가 있는 스킬은 base 를 부른 뒤 덧붙인다(팔라딘 E 반격 상태).
+    public virtual void CollectAnimationEventRequirements(System.Collections.Generic.List<AnimationEventRequirement> requirements)
+    {
+        if (data == null || string.IsNullOrEmpty(data.AnimatorStateName))
+            return;
+
+        foreach (SkillAnimationEventType eventType in RequiredAnimationEvents)
+            requirements.Add(AnimationEventRequirement.ForSkillState(data.AnimatorStateName, eventType));
+    }
+
     public virtual void Initialize(Player owner, PlayerSkillController controller)
     {
         this.owner = owner;
         this.controller = controller;
+        AnimationEventRequirements.WarnMissing(this, owner != null ? owner.GetComponentInChildren<Animator>(true) : null, this);
     }
 
     // 쿨타임/FSM 외 추가 시전 조건 (사거리, 대상 생존 등). 서버 승인 시점에만 호출된다.
@@ -130,6 +149,11 @@ public abstract class PlayerSkillBase : MonoBehaviour
 
     // 서버 전용: 애니메이션 이벤트 수신 (판정 ON 등)
     public virtual void OnAnimationEvent(SkillAnimationEventType eventType) { }
+
+    // 모든 피어(이 스킬이 실행 중으로 보이는 피어 — 서버·오너·관전 클라): 이 피어 애니메이터의 클립 이벤트.
+    // 오너 이동 시작(owner.IsSimulating 일 때만)·로컬 연출 시점용이다. 🔴 판정·피해·상태 변경 금지 — 그건 OnAnimationEvent(서버).
+    // 서버에서는 같은 이벤트로 이것이 먼저, OnAnimationEvent 가 뒤에 불린다.
+    public virtual void OnLocalAnimationEvent(SkillAnimationEventType eventType) { }
 
     // 서버 전용: 홀드 조향 갱신 (오너가 주기 전송)
     public virtual void OnAimUpdated(Vector3 direction) { }

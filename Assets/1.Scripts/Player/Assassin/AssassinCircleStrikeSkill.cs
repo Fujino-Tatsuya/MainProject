@@ -27,8 +27,12 @@ public sealed class AssassinCircleStrikeSkill : PlayerSkillBase
     private Vector3 areaCenter;
     private bool hasInvulnerability;
 
+    private static readonly SkillAnimationEventType[] RequiredEvents =
+        { SkillAnimationEventType.Hit, SkillAnimationEventType.End };
+
     public override PlayerSkillSlot Slot => PlayerSkillSlot.Sub;
     public override bool CanMoveWhileActive => false;
+    public override IReadOnlyList<SkillAnimationEventType> RequiredAnimationEvents => RequiredEvents;
 
     private AssassinCircleStrikeSkillData StrikeData => Data as AssassinCircleStrikeSkillData;
 

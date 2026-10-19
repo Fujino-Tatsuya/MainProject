@@ -9,10 +9,9 @@ using UnityEngine;
 public class FirstMeleeInterruptSkillData : PlayerSkillData, IPlayerInterruptSkillData
 {
     [Header("판정 타이밍")]
-    // 시전 → 판정까지의 선딜(초). 클립에 Hit 애니메이션 이벤트를 심으면 그쪽이 우선한다.
+    // 🔴 지금 안 쓴다 — 판정·종료는 Garen_Parry 의 Hit·End 이벤트가 정한다(FirstMeleeInterruptSkill.TimingFromAnimationEvents,
+    //    PLAN-anim-event-timing P1-④). 열 삭제는 Export 정리 때 한다. 시점 튜닝은 클립에서 이벤트를 옮긴다.
     [SerializeField, Min(0f)] private float hitDelay = 0.15f;
-    // 스킬 자체 종료 시각(초). End 애니메이션 이벤트가 있으면 그쪽이 먼저 끝낸다.
-    // MaxActiveDuration(강제 종료 안전망)보다 작아야 한다.
     [SerializeField, Min(0.05f)] private float skillDuration = 0.6f;
 
     [Header("판정")]
