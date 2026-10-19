@@ -11,6 +11,7 @@ using UnityEngine;
 /// |---|---|
 /// | 이동 블렌드 + 움직이는 중         | 실제 속도 ÷ 지금 발이 나가는 속도, 범위 제한      |
 /// | 이동 블렌드 + 서 있음 / 맞춤 끔   | 1                                              |
+/// | 예비동작 + 로직 Attack           | attackSpeed × 예비동작 원래 길이 ÷ attackWindup  |
 /// | 그 밖 + 로직 Attack              | 몬스터 고유 공격속도(attackSpeed)                |
 /// | 그 밖(피격·그로기·사망)           | 1                                              |
 ///
@@ -42,15 +43,35 @@ public static class MonsterAnimSpeedPolicy
             ? Mathf.Max(moveSpeed, loco.fullBlendSpeed)
             : moveSpeed;
 
-    public static float Resolve(bool playingLocomotion, float moveSpeed, bool logicAttacking, float attackSpeed, in Locomotion loco)
+    /// <param name="playingAnticipation">예비동작 상태(<c>AttackAnticipation</c>)를 재생 중인가.</param>
+    /// <param name="anticipationLength">그 상태의 원래 길이(초, 클립 길이 ÷ 상태 속도 — animator.speed 미포함).</param>
+    /// <param name="windup">데이터 <c>attackWindup</c>(초). 0 이하 = 예비동작 원래 길이.</param>
+    public static float Resolve(bool playingLocomotion, float moveSpeed, bool logicAttacking, float attackSpeed, in Locomotion loco,
+                                bool playingAnticipation = false, float anticipationLength = 0f, float windup = 0f)
     {
         if (playingLocomotion)
             return LocomotionSpeed(moveSpeed, loco);
 
         if (logicAttacking)
-            return Mathf.Max(0.05f, attackSpeed);
+            return playingAnticipation
+                ? AnticipationSpeed(attackSpeed, anticipationLength, windup)
+                : Mathf.Max(0.05f, attackSpeed);
 
         return 1f;
+    }
+
+    /// <summary>
+    /// 예비동작 재생 속도 — 예비동작이 <c>windup ÷ attackSpeed</c> 초에 끝나게 한다(PLAN-attack-windup W1·W4).
+    /// 히트는 계속 애니 이벤트(OnAttackHit)가 내므로 화면과 판정이 어긋나지 않는다.
+    /// windup·길이를 모르면(0 이하) 지금 동작 = 공격 속도 배율 그대로.
+    /// </summary>
+    public static float AnticipationSpeed(float attackSpeed, float anticipationLength, float windup)
+    {
+        float rate = Mathf.Max(0.05f, attackSpeed);
+        if (windup <= 0f || anticipationLength <= 0f)
+            return rate;
+
+        return Mathf.Clamp(rate * anticipationLength / windup, 0.05f, 10f);
     }
 
     /// <summary>

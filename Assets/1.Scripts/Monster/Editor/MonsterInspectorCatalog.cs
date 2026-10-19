@@ -112,6 +112,7 @@ public static class MonsterInspectorCatalog
         (Combat, "archetype", "유형"),
         (Combat, "rank", "등급"),
         (Combat, "attackRange", "공격 사거리"),
+        (Combat, "attackWindup", "공격 선딜 (예비동작 길이)"),
         (Combat, "attackDuration", "공격 지속 (모션 길이)"),
         (Combat, "cancelWindupIfTargetLeavesRange", "선딜 중 이탈하면 공격 취소"),
         (Combat, "engageAttackDelay", "사거리 진입 후 첫 공격 지연"),
@@ -270,7 +271,6 @@ public static class MonsterInspectorCatalog
         (Tech, "locomotionMoveCycleSeconds", "이동 클립 주기 (측정)"),
 
         // ── ⚠️ 미사용 (PLAN §3.4) ──
-        (Unused, "attackWindup", "공격 선딜 — 연결 예정 (지금 효과 없음)"),
         (Unused, "maxShield", "최대 실드"),
         (Unused, "grabThrowDistance", "던지기 거리 (변위 미적용)"),
         (Unused, "bombThrowInterval", "웰즈 폭탄 주기 (폭탄 제거됨)"),

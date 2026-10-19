@@ -18,7 +18,9 @@ Update this file when a term becomes important enough that future agents or team
 ## ▶▶ 작업 세션 (2026-10-19 · 경석(Claude+Codex) · **몬스터 데이터 인스펙터 1차(표시만)**, 브랜치 `feature/Boss23`) — 계획 [PLAN-monster-data-inspector.md](PLAN-monster-data-inspector.md) ✅ 승인(§7 결정 · §8 교차검증) · 조사 원본 [monster-data-survey-1019.md](Docs/tech/monster-data-survey-1019.md)(333칸)
 - ✅ 1차 표시 구현(미커밋): `Monster/Editor/` `MonsterInspectorCatalog.cs`(칸 사전 — 이름·묶음·★ 은 여기 한 곳) · `MonsterDataSOEditor.cs` · `BossEntryDrawers.cs`(공격·콤보·타·페이즈 행) · `MonsterInspectorGUI.cs` · 테스트 `MonsterInspectorCatalogTests`(전투 러너에 등록) + `DataTableInspectorBadge.cs` 칸 단위 조회(`TryGetWrite`)·머리 요약 한 줄. 컴파일 error CS 0 · 전투 EditMode 240/0 · 인스펙터 화면 확인(No23·ChompBot) · 열고 펼쳐도 에셋 변경 0.
 - ⏳ 팀장·기획 눈 확인(★ 목록 조정은 사전 한 줄) · 다중 선택·Undo 손 확인.
-- 다음 ① 죽은 칸 6개 삭제(콤보는 `3a0d7e8d` 로 커밋됨 → 막힘 풀림. `BossDataWiring`·`BossVariantAuthoring` 같이) ② `attackWindup` 공격 선딜 연결(별도 — 조사 → 질문 → Play) ③ 2차(장판·드론·예고 스타일·중간보스).
+- ✅ 커밋 `b54596df`(인스펙터 1차).
+- ✅ `attackWindup` 연결 = [PLAN-attack-windup.md](PLAN-attack-windup.md)(미커밋) — `AttackAnticipation` 상태(Chomp·Humanoid)만 재생 속도로 windup ÷ attackSpeed 초에 끝나게. 히트는 계속 애니 이벤트. Humanoid 는 xlsx 0.55 로 지금(0.73)보다 빨라짐(경석 결정). 컴파일 0 · 전투 EditMode 246/0 · ✅ 경석 Play 확인(10-19) · ⏳ MPPM 2인.
+- 다음 ① 죽은 칸 6개 삭제(`BossDataWiring`·`BossVariantAuthoring` 같이. attackWindup 은 이제 살아 있는 칸 — 미사용 목록에서 뺐다) ② 2차(장판·드론·예고 스타일·중간보스).
 - ⚠️ `[DataTableSheet]` SO 칸을 지우거나 이름 바꾸기 전에 **지금 xlsx** 를 다시 보고 Verify("필드 없음" 0) — 10-19 `raidSelfDestructDamageReduction` 삭제로 테이블 Play 가 막혔다(f5b48b27 로 복구).
 - (참고) 같은 작업 트리에 다른 세션의 미커밋 변경이 있다 — Dev 스크립트 `HIDE_DEBUG_UI` · `ProjectSettings` preloadedAssets · `BuildWindowsPlayer` 등. 이 작업과 무관.
 
