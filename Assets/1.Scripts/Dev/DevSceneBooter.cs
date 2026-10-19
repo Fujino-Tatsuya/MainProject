@@ -1,6 +1,9 @@
 ﻿using System;
 using System.Collections;
+using System.Net;
+using System.Net.Sockets;
 using Unity.Netcode;
+using Unity.Netcode.Transports.UTP;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -35,6 +38,11 @@ public class DevSceneBooter : MonoBehaviour
 
     [Header("대기 상한(초) — 무한 대기 방지")]
     [SerializeField, Min(1f)] private float timeoutSeconds = 30f;
+
+    [Header("호스트 포트")]
+    [Tooltip("StartHost 가 포트 사용 중으로 실패하면 포트를 1씩 올려 다시 시도한다. 시작 포트를 포함한 최대 시도 횟수 " +
+             "(NetworkManager 의 포트가 7777 이고 10 이면 7777~7786). 워크트리 에디터 여러 개를 동시에 Dev Boot 할 때 쓴다.")]
+    [SerializeField, Min(1)] private int maxPortAttempts = 10;
 
     /// <summary>부팅 대상 씬 이름.</summary>
     public string TargetScene
@@ -159,10 +167,14 @@ public class DevSceneBooter : MonoBehaviour
         {
             Debug.LogWarning("[DevBoot] 네트워크가 이미 시작된 상태다. StartHost 를 건너뛴다.", this);
         }
-        else if (!launcher.StartHost())
+        else
         {
-            Debug.LogError("[DevBoot] StartHost 실패. 7777 포트가 이미 사용 중인지 확인할 것.", this);
-            yield break;
+            bool hostStarted = false;
+            yield return StartHostWithPortRetry(networkManager, launcher, started => hostStarted = started);
+            if (!hostStarted)
+            {
+                yield break;
+            }
         }
 
         // 세션이 실제로 올라오고 씬 매니저가 준비될 때까지.
@@ -259,6 +271,124 @@ public class DevSceneBooter : MonoBehaviour
         {
             // 부팅 씬은 Single 로드로 이미 대체됐다. 남은 것은 씬 밖으로 빼둔 이 오브젝트뿐이므로 스스로 정리한다.
             Destroy(gameObject);
+        }
+    }
+
+    /// <summary>
+    /// 워크트리 에디터 여러 개가 동시에 호스트를 열면 같은 UDP 포트가 겹친다.
+    /// 실패한 포트가 실제로 점유됐을 때만 다음 포트로 넘어가고, 비어 있으면 다른 원인이므로 바로 멈춘다.
+    /// </summary>
+    private IEnumerator StartHostWithPortRetry(NetworkManager networkManager, NetworkSessionLauncher launcher, Action<bool> onDone)
+    {
+        UnityTransport transport = networkManager.GetComponent<UnityTransport>();
+        if (transport == null)
+        {
+            // 포트를 읽을 곳이 없으면 재시도 없이 한 번만 시도한다.
+            bool started = launcher.StartHost();
+            if (!started)
+                Debug.LogError("[DevBoot] StartHost 실패. NetworkManager 에 UnityTransport 가 없어 포트 재시도를 하지 못했다.", this);
+            onDone(started);
+            yield break;
+        }
+
+        string address = transport.ConnectionData.Address;
+        ushort startPort = transport.ConnectionData.Port;
+        ushort lastTriedPort = startPort;
+        int attempts = 0;
+
+        for (int attempt = 0; TryGetHostPort(startPort, maxPortAttempts, attempt, out ushort port); attempt++)
+        {
+            if (attempt > 0)
+            {
+                yield return ShutdownForRetry(networkManager);
+                launcher.OnSetConnectionData(address, port);
+            }
+
+            attempts++;
+            lastTriedPort = port;
+            if (launcher.StartHost())
+            {
+                if (port != startPort)
+                    Debug.LogWarning($"[DevBoot] 포트 {startPort} 사용 중 → {port} 로 호스트", this);
+                onDone(true);
+                yield break;
+            }
+
+            if (!IsUdpPortInUse(port))
+            {
+                Debug.LogError(
+                    $"[DevBoot] StartHost 실패. 포트 {port} 은 비어 있음 — 포트 충돌이 아닌 다른 원인. " +
+                    "콘솔의 NGO/UnityTransport 에러를 확인할 것.",
+                    this);
+                onDone(false);
+                yield break;
+            }
+
+            Debug.Log($"[DevBoot] StartHost 실패 — 포트 {port} 사용 중 (시도 {attempts})");
+        }
+
+        Debug.LogError(
+            $"[DevBoot] StartHost 실패. 포트 {startPort}~{lastTriedPort} ({attempts}회) 가 모두 사용 중이다. " +
+            "다른 에디터의 호스트를 끄거나 최대 포트 시도 횟수를 늘릴 것.",
+            this);
+        onDone(false);
+    }
+
+    private IEnumerator ShutdownForRetry(NetworkManager networkManager)
+    {
+        if (networkManager.IsListening || networkManager.ShutdownInProgress)
+        {
+            networkManager.Shutdown();
+            float deadline = Time.realtimeSinceStartup + timeoutSeconds;
+            while (networkManager.ShutdownInProgress && Time.realtimeSinceStartup <= deadline)
+            {
+                yield return null;
+            }
+        }
+
+        yield return null;
+    }
+
+    /// <summary>
+    /// <paramref name="attemptIndex"/> 번째(0부터) 시도할 포트. 시도 횟수를 넘거나 ushort 범위를 벗어나면 false.
+    /// 시도 횟수가 1 미만이면 1로 본다.
+    /// public 인 이유: EditMode 테스트(Assembly-CSharp-Editor)는 Assembly-CSharp 의 internal 을 못 본다.
+    /// </summary>
+    public static bool TryGetHostPort(ushort startPort, int maxAttempts, int attemptIndex, out ushort port)
+    {
+        port = 0;
+        int attempts = Math.Max(1, maxAttempts);
+        if (attemptIndex < 0 || attemptIndex >= attempts)
+            return false;
+
+        int candidate = startPort + attemptIndex;
+        if (candidate > ushort.MaxValue)
+            return false;
+
+        port = (ushort)candidate;
+        return true;
+    }
+
+    /// <summary>0.0.0.0:<paramref name="port"/> 에 UDP 바인드를 잠깐 시도해 다른 소켓이 쥐고 있는지 본다.</summary>
+    public static bool IsUdpPortInUse(ushort port)
+    {
+        try
+        {
+            using (var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp))
+            {
+                socket.Bind(new IPEndPoint(IPAddress.Any, port));
+            }
+
+            return false;
+        }
+        catch (SocketException ex) when (ex.SocketErrorCode == SocketError.AddressAlreadyInUse)
+        {
+            return true;
+        }
+        catch (SocketException)
+        {
+            // 점유 외의 바인드 실패(권한 등)는 포트 충돌로 보지 않는다 — 재시도하지 않고 원래 에러로 멈춘다.
+            return false;
         }
     }
 
